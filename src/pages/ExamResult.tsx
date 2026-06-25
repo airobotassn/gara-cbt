@@ -115,7 +115,6 @@ export default function ExamResult() {
   }
 
   // 채점 공개 후
-  const wrong = data.answers.filter((a) => !a.isCorrect)
   const passed = data.totalCorrect >= Math.ceil(data.totalQuestions * PASS_RATIO)
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const certName =
@@ -145,25 +144,7 @@ export default function ExamResult() {
           <div className={`exam-pass ${passed ? 'ok' : 'no'}`}>{passed ? '합 격' : '불합격'}</div>
         </div>
 
-        <div className="exam-review">
-          <h3>문항별 결과 ({wrong.length}개 오답)</h3>
-          <div className="exam-review-list">
-            {data.answers.map((a) => (
-              <div key={a.number} className={`exam-review-item ${a.isCorrect ? 'ok' : 'no'}`}>
-                <div className="exam-review-top">
-                  <span className="exam-review-no">{a.number}</span>
-                  <span className="exam-review-mark">{a.isCorrect ? '○ 정답' : '✕ 오답'}</span>
-                  {a.subject && <span className="exam-review-cat">{a.subject}</span>}
-                </div>
-                <div className="exam-review-q">{a.prompt}</div>
-                <div className="exam-review-ans">
-                  <span>내 답: {a.selectedIndex === null ? '미응답' : a.selectedIndex + 1}번</span>
-                  <span className="correct">정답: {a.correctIndex + 1}번</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <div className="exam-result-note">합격 기준 — 전체 문항의 60% 이상 정답</div>
 
         <div style={{ textAlign: 'center', marginTop: 18, display: 'flex', gap: 10, justifyContent: 'center' }}>
           {passed && (

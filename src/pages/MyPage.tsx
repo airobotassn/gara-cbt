@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import HomeLink from '../components/HomeLink'
@@ -11,6 +11,11 @@ const STATUS: Record<string, string> = {
   voided: '무효',
   expired: '만료',
 }
+const TABS = [
+  { key: 'attempts', label: '시험 응시 현황', icon: '📝', to: '/mypage' },
+  { key: 'earned', label: '자격 취득 현황', icon: '🏅', to: '/mypage/earned' },
+  { key: 'issuance', label: '자격증 발급 현황', icon: '📜', to: '/mypage/issuance' },
+]
 
 function fmtDT(iso?: string | null) {
   if (!iso) return '-'
@@ -28,10 +33,11 @@ function daysLeft(iso?: string | null) {
   if (!iso) return 0
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
 }
-
-// ?demo 미리보기용 — 합격 / 불합격 / 공개전 카드
+function certNoOf(a: MyAttempt) {
+  return `GARA-2026-${a.attemptId.replace(/-/g, '').slice(0, 6).toUpperCase()}`
+}
 function makeDummy(): MyAttempt[] {
-  const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString()
+  const iso = (d: number) => new Date(Date.now() - d * 86400000).toISOString()
   const future = new Date(Date.now() + 5 * 86400000).toISOString()
   return [
     { attemptId: 'demo-pass', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 4, totalQuestions: 5, passed: true },
@@ -43,10 +49,15 @@ function makeDummy(): MyAttempt[] {
 export default function MyPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const demo = new URLSearchParams(location.search).has('demo')
+  const { section } = useParams()
+  const tab = section && TABS.some((t) => t.key === section) ? section : 'attempts'
+  const demoQS = new URLSearchParams(location.search).has('demo') ? '?demo' : ''
+  const demo = demoQS !== ''
+
   const { isFullUser, loginWithGoogle, user } = useAuth()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
+  const [, setTick] = useState(0)
 
   useEffect(() => {
     if (demo) {
@@ -63,8 +74,11 @@ export default function MyPage() {
   const name =
     (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
 
+  const isIssued = (certNo: string) => !!localStorage.getItem(`cert_issued_${certNo}`)
   function goCert(a: MyAttempt) {
-    const certNo = `GARA-2026-${a.attemptId.replace(/-/g, '').slice(0, 6).toUpperCase()}`
+    const certNo = certNoOf(a)
+    localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
+    setTick((t) => t + 1)
     navigate('/certificate', {
       state: {
         name,
@@ -92,6 +106,10 @@ export default function MyPage() {
     )
   }
 
+  const attempts = list ?? []
+  const earned = attempts.filter((a) => a.passed === true)
+  const loading = !err && list === null
+
   return (
     <div className="wrap mypage">
       <HomeLink />
@@ -100,60 +118,106 @@ export default function MyPage() {
         <p className="mypage-sub">{name} 님</p>
       </div>
 
-      <h2 className="mypage-h2">응시 내역</h2>
-
-      {err && <div className="exam-card" style={{ textAlign: 'center' }}>{err}</div>}
-      {!err && list === null && (
-        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 30 }}>불러오는 중…</div>
-      )}
-      {!err && list && list.length === 0 && (
-        <div className="mypage-empty">
-          아직 응시 내역이 없습니다.
-          <button className="exam-btn" style={{ marginTop: 14 }} onClick={() => navigate('/exam')}>
-            자격검정 응시하기
-          </button>
-        </div>
-      )}
-
-      <div className="my-list">
-        {list?.map((a) => (
-          <div key={a.attemptId} className="my-item">
-            <div className="my-item-top">
-              <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
-              <span className={`admin-badge st-${a.status}`}>{STATUS[a.status] ?? a.status}</span>
-            </div>
-            <div className="my-item-meta">제출 {fmtDT(a.submittedAt)}</div>
-
-            <div className="my-item-result">
-              {a.status !== 'submitted' ? (
-                <span className="my-pending">제출되지 않은 응시입니다.</span>
-              ) : !a.released ? (
-                <span className="my-pending">
-                  채점 결과는 <b>{daysLeft(a.resultReleaseAt)}일 후</b>({fmtDate(a.resultReleaseAt)}) 공개됩니다.
-                </span>
-              ) : (
-                <span className="my-score">
-                  <b>{a.totalCorrect}</b> / {a.totalQuestions}
-                  <span className={`my-pass ${a.passed ? 'ok' : 'no'}`}>{a.passed ? '합격' : '불합격'}</span>
-                </span>
-              )}
-            </div>
-
-            <div className="my-item-actions">
-              {a.status === 'submitted' && (
-                <button className="exam-btn-ghost sm" onClick={() => navigate(`/exam/result/${a.attemptId}`)}>
-                  결과 보기
-                </button>
-              )}
-              {a.released && a.passed && (
-                <button className="exam-btn sm" onClick={() => goCert(a)}>
-                  📜 자격증
-                </button>
-              )}
-            </div>
-          </div>
+      <div className="mypage-tabs">
+        {TABS.map((t) => (
+          <Link key={t.key} to={`${t.to}${demoQS}`} className={tab === t.key ? 'on' : ''}>
+            <span>{t.icon}</span> {t.label}
+          </Link>
         ))}
       </div>
+
+      {err && <div className="exam-card" style={{ textAlign: 'center' }}>{err}</div>}
+      {loading && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 30 }}>불러오는 중…</div>}
+
+      {!loading && !err && tab === 'attempts' && (
+        attempts.length === 0 ? (
+          <div className="mypage-empty">
+            아직 응시 내역이 없습니다.
+            <button className="exam-btn" style={{ marginTop: 14 }} onClick={() => navigate('/exam')}>
+              자격검정 응시하기
+            </button>
+          </div>
+        ) : (
+          <div className="my-list">
+            {attempts.map((a) => (
+              <div key={a.attemptId} className="my-item">
+                <div className="my-item-top">
+                  <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
+                  <span className={`admin-badge st-${a.status}`}>{STATUS[a.status] ?? a.status}</span>
+                </div>
+                <div className="my-item-meta">제출 {fmtDT(a.submittedAt)}</div>
+                <div className="my-item-result">
+                  {a.status !== 'submitted' ? (
+                    <span className="my-pending">제출되지 않은 응시입니다.</span>
+                  ) : !a.released ? (
+                    <span className="my-pending">
+                      채점 중 · <b>{daysLeft(a.resultReleaseAt)}일 후</b>({fmtDate(a.resultReleaseAt)}) 발표
+                    </span>
+                  ) : (
+                    <span className="my-pending">결과가 발표되었습니다. 성적을 확인하세요.</span>
+                  )}
+                </div>
+                {a.released && (
+                  <div className="my-item-actions">
+                    <button className="exam-btn-ghost sm" onClick={() => navigate(`/exam/result/${a.attemptId}`)}>
+                      성적 확인
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {!loading && !err && tab === 'earned' && (
+        earned.length === 0 ? (
+          <div className="mypage-empty">취득한 자격이 없습니다.</div>
+        ) : (
+          <div className="my-list">
+            {earned.map((a) => (
+              <div key={a.attemptId} className="my-item">
+                <div className="my-item-top">
+                  <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
+                  <span className="my-pass ok">취득</span>
+                </div>
+                <div className="my-item-meta">
+                  취득일 {fmtDate(a.submittedAt)} · 자격번호 {certNoOf(a)} · 점수 {a.totalCorrect}/{a.totalQuestions}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {!loading && !err && tab === 'issuance' && (
+        earned.length === 0 ? (
+          <div className="mypage-empty">발급 가능한 자격증이 없습니다.</div>
+        ) : (
+          <div className="my-list">
+            {earned.map((a) => {
+              const certNo = certNoOf(a)
+              const issued = isIssued(certNo)
+              return (
+                <div key={a.attemptId} className="my-item my-issue-row">
+                  <div>
+                    <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
+                    <div className="my-item-meta">자격번호 {certNo}</div>
+                  </div>
+                  <div className="my-issue-right">
+                    <span className={`admin-badge ${issued ? 'st-submitted' : 'st-expired'}`}>
+                      {issued ? '발급 완료' : '미발급'}
+                    </span>
+                    <button className="exam-btn sm" onClick={() => goCert(a)}>
+                      {issued ? '다시 발급' : '자격증 발급'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
     </div>
   )
 }

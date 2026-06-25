@@ -265,3 +265,46 @@
   gap: 8px;
   margin-top: 14px;
 }
+.my-issue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.my-issue-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.mypage-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #eceef1;
+  margin: 18px 0 20px;
+}
+.mypage-tabs a {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6b7280;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+.mypage-tabs a.on {
+  color: #1a2230;
+  border-bottom-color: #8bcce9;
+}
+.mypage-tabs a:hover {
+  color: #1a2230;
+}
+.exam-result-note {
+  text-align: center;
+  color: #6b7280;
+  font-size: 13.5px;
+  margin-top: 16px;
+  padding: 11px;
+  background: #f6f7f9;
+  border-radius: 10px;
+}

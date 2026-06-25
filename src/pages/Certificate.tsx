@@ -90,8 +90,8 @@ export default function Certificate() {
         <button className="exam-btn" onClick={() => window.print()}>
           📄 PDF로 저장 / 인쇄
         </button>
-        <button className="exam-btn-ghost" onClick={() => navigate('/')}>
-          홈으로
+        <button className="exam-btn-ghost" onClick={() => navigate(-1)}>
+          ← 뒤로
         </button>
       </div>
     </div>

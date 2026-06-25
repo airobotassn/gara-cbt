@@ -32,6 +32,7 @@ export default function App() {
               <Route path="/exam/result/:attemptId" element={<ExamResult />} />
               <Route path="/certificate" element={<Certificate />} />
               <Route path="/mypage" element={<MyPage />} />
+              <Route path="/mypage/:section" element={<MyPage />} />
               <Route path="/about" element={<About />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
