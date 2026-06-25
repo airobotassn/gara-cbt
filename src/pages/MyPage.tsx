@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import HomeLink from '../components/HomeLink'
@@ -29,18 +29,35 @@ function daysLeft(iso?: string | null) {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
 }
 
+// ?demo 미리보기용 — 합격 / 불합격 / 공개전 카드
+function makeDummy(): MyAttempt[] {
+  const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString()
+  const future = new Date(Date.now() + 5 * 86400000).toISOString()
+  return [
+    { attemptId: 'demo-pass', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 4, totalQuestions: 5, passed: true },
+    { attemptId: 'demo-fail', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 1, totalQuestions: 5, passed: false },
+    { attemptId: 'demo-pending', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(2), submittedAt: iso(2), resultReleaseAt: future, released: false, totalCorrect: null, totalQuestions: 5, passed: null },
+  ]
+}
+
 export default function MyPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const demo = new URLSearchParams(location.search).has('demo')
   const { isFullUser, loginWithGoogle, user } = useAuth()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
+    if (demo) {
+      setList(makeDummy())
+      return
+    }
     if (!isFullUser) return
     callFunction<{ attempts: MyAttempt[] }>('my-attempts', {})
       .then((r) => setList(r.attempts))
       .catch((e) => setErr(e instanceof Error ? e.message : '내역을 불러올 수 없습니다.'))
-  }, [isFullUser])
+  }, [isFullUser, demo])
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const name =
@@ -59,7 +76,7 @@ export default function MyPage() {
     })
   }
 
-  if (!isFullUser) {
+  if (!isFullUser && !demo) {
     return (
       <div className="exam-center">
         <HomeLink />

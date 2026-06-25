@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthProvider'
 import { supabase, callFunction } from '../lib/supabase'
 import GemAvatar, { Avatar } from './GemAvatar'
 import { GEM_COLORS, parseAvatar, uploadAvatar } from '../lib/avatar'
+import { isSEB } from '../lib/seb'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, isFullUser, loginWithGoogle, logout } = useAuth()
@@ -22,8 +23,8 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // 응시 화면(/exam/run/:id)에서는 FAB 숨김 — 시험 중 이탈 차단
-  const inTest = pathname.startsWith('/exam/run/')
+  // 응시 화면(/exam/run/:id) + 보안 브라우저(SEB) 안에서는 FAB 숨김 — 시험 중 이탈 차단
+  const inTest = pathname.startsWith('/exam/run/') || isSEB()
 
   // 관리자 여부 — 서버(admin 'me')로 확인. 관리자면 FAB에 관리자 페이지 링크 노출.
   const [isAdmin, setIsAdmin] = useState(false)

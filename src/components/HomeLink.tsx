@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
+import { isSEB } from '../lib/seb'
 
-// 응시 전 화면(진입·점검·안내) 상단 좌측 홈 이동 — 레벨테스트 TopBar 스타일 칩
+// 응시 전 화면 상단 좌측 홈 이동 칩. 단, 보안 브라우저(SEB) 안에서는 숨김(탈출 방지).
 export default function HomeLink() {
+  if (isSEB()) return null
   return (
     <Link to="/" className="topbar exam-topbar">
       <span className="ic">←</span> 홈으로

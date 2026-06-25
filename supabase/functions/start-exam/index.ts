@@ -33,15 +33,21 @@ Deno.serve(async (req) => {
     if (examErr) return json({ error: examErr.message }, 500)
     if (!exam) return json({ error: '시험을 찾을 수 없습니다.' }, 400)
 
-    // 관리자(루트 또는 admin_users)는 재응시 허용 — 테스트/감독용
-    const email = user.email ?? ''
+    // 재응시 허용: 관리자(루트/admin_users) 또는 RETAKE_ALLOW_EMAILS 목록 — 테스트/감독용
+    const email = (user.email ?? '').toLowerCase()
     const isAdmin =
-      (!!email && email === ROOT_ADMIN) ||
-      (!!email &&
-        (await admin.from('admin_users').select('email').eq('email', email).maybeSingle()).data != null)
+      (!!email && email === ROOT_ADMIN.toLowerCase()) ||
+      (!!user.email &&
+        (await admin.from('admin_users').select('email').eq('email', user.email).maybeSingle()).data != null)
+    const allowList = (Deno.env.get('RETAKE_ALLOW_EMAILS') ?? '')
+      .toLowerCase()
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const canRetake = isAdmin || allowList.includes(email)
 
-    // 이미 제출(또는 무효)한 응시가 있으면 재응시 불가 — 1인 1회 (관리자 예외)
-    if (!isAdmin) {
+    // 이미 제출(또는 무효)한 응시가 있으면 재응시 불가 — 1인 1회 (예외 계정 제외)
+    if (!canRetake) {
       const { data: done } = await admin
         .from('exam_attempts')
         .select('id')
