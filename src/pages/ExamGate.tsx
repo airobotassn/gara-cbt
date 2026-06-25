@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import HomeLink from '../components/HomeLink'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
 import { TOTAL_QUESTIONS, TEST_DURATION_MINUTES, RESULT_RELEASE_DAYS } from '../lib/testConfig'
 
 // 자격검정 진입 페이지 — "GARA 자격검정" 응시 + 시험환경 테스트
@@ -11,6 +12,23 @@ export default function ExamGate() {
   const { isFullUser, loginWithGoogle } = useAuth()
 
   if (isMobileDevice()) return <MobileBlock />
+
+  const inSeb = isSEB()
+  const needSebLaunch = SEB_REQUIRED && !inSeb
+
+  // 응시 시작: 일반 브라우저면 먼저 SEB 실행(로그인은 SEB 안에서 1번) / SEB 안이면 로그인→안내
+  function onStart() {
+    if (needSebLaunch) {
+      if (!sebConfigured()) {
+        alert('보안 브라우저 설정이 준비되지 않았습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.')
+        return
+      }
+      window.location.href = sebLaunchUrl()
+      return
+    }
+    if (isFullUser) navigate('/exam/prepare')
+    else loginWithGoogle()
+  }
 
   return (
     <div className="exam-center">
@@ -41,20 +59,15 @@ export default function ExamGate() {
           <p>• <b>PC 전용</b> — 모바일·태블릿에서는 응시할 수 없습니다.</p>
         </div>
 
-        {isFullUser ? (
-          <button className="exam-btn-xl" onClick={() => navigate('/exam/prepare')}>
-            GARA 자격검정 응시하기 <span className="arr">→</span>
-          </button>
-        ) : (
-          <>
-            <button className="exam-btn-xl" onClick={() => loginWithGoogle()}>
-              로그인 후 응시하기
-            </button>
-            <p className="exam-gate-login-hint">
-              자격검정은 본인 확인을 위해 구글 로그인 후 응시할 수 있습니다.
-            </p>
-          </>
-        )}
+        <button className="exam-btn-xl" onClick={onStart}>
+          {needSebLaunch ? '보안 브라우저로 응시 시작' : isFullUser ? 'GARA 자격검정 응시하기' : '로그인 후 응시하기'}
+          <span className="arr">→</span>
+        </button>
+        <p className="exam-gate-login-hint">
+          {needSebLaunch
+            ? '「응시 시작」을 누르면 보안 브라우저(SEB)가 열립니다. 그 안에서 로그인 후 바로 응시하며, 다시 로그인할 필요가 없습니다.'
+            : '자격검정은 본인 확인을 위해 구글 로그인 후 응시합니다.'}
+        </p>
 
         <button className="exam-gate-check" onClick={() => navigate('/exam/check')}>
           🧪 처음이신가요? 시험환경 테스트(사전 점검) →
