@@ -30,7 +30,13 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 \t<key>quitURL</key>
 \t<string>${origin}/</string>
 \t<key>showReloadButton</key>
-\t<true/>
+\t<false/>
+\t<key>browserWindowAllowReload</key>
+\t<false/>
+\t<key>newBrowserWindowAllowReload</key>
+\t<false/>
+\t<key>allowBrowsingBackForward</key>
+\t<false/>
 \t<key>allowPreferencesWindow</key>
 \t<false/>
 \t<key>URLFilterEnable</key>
