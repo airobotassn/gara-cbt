@@ -29,8 +29,7 @@ export default function ExamGate() {
     if (isFullUser) {
       navigate('/exam/prepare')
     } else {
-      sessionStorage.setItem('postLogin', '/exam/prepare')
-      loginWithGoogle()
+      loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam/prepare')}`)
     }
   }
 

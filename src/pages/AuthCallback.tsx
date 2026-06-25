@@ -9,11 +9,10 @@ export default function AuthCallback() {
   const navigate = useNavigate()
   const { t } = useT()
   useEffect(() => {
-    // 로그인 시작 직전 저장해둔 복귀 경로로 이동(없으면 홈). 시험 플로우는 '/exam/prepare' 저장.
+    // 복귀 경로를 콜백 URL(?next=)에서 읽음 — OAuth 왕복에도 안 날아감. 시험 로그인은 next=/exam/prepare.
     const go = () => {
-      const dest = sessionStorage.getItem('postLogin') || '/'
-      sessionStorage.removeItem('postLogin')
-      navigate(dest, { replace: true })
+      const next = new URLSearchParams(window.location.search).get('next')
+      navigate(next || '/', { replace: true })
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') go()
