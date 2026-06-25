@@ -1,0 +1,117 @@
+/* base: 전역 토큰 · 레이아웃 (.wrap/.card/.pad/.sc-title/.sc-sub) */
+:root {
+  color-scheme: light dark;
+  --page: #f4f5f8; /* body(페이지) 배경 — 카드(--bg)보다 한 단계 톤 */
+  --bg: #ffffff;
+  --soft: #f7f8fa;
+  --soft2: #fbfbfd;
+  --line: #eceef2;
+  --line2: #e2e4ea;
+  --txt: #0f1622;
+  --muted: #525b6a;
+  --dim: #7c8696;
+  --ink: #0f1622;
+  --grow: #3f8fd6;
+  --accent: #3f8fd6;
+  --accent2: #3aa79f;
+  /* 컬러 위 흰 글자/대비용 고정값(다크에서도 흰색 유지) */
+  --on-accent: #ffffff;
+  /* 위험/에러 배너(인라인 스타일에서 참조 — 다크에서 톤 보정) */
+  --danger-bg: #fef2f2;
+  --danger-fg: #b91c1c;
+  /* 카드 그림자(다크에서 더 깊게 오버라이드) */
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.02), 0 26px 50px -40px rgba(15, 22, 34, 0.28);
+
+  /* ===== 반응형 유동 토큰 (모든 파셀에서 재사용) =====
+     표준 breakpoint: ≤768px(태블릿) · ≤600px(폰) · ≤400px(소형폰) */
+  --container: 760px;
+  --pad-x: clamp(16px, 5vw, 34px); /* 카드 좌우 패딩 */
+  --pad-y: clamp(24px, 4vw, 40px); /* 카드 상하 패딩 */
+  --gap: clamp(12px, 3vw, 18px);
+  --fs-display: clamp(32px, 9vw, 54px); /* 랜딩 h1 */
+  --fs-score: clamp(42px, 14vw, 64px); /* 결과 점수 */
+  --fs-title: clamp(20px, 5vw, 24px); /* 섹션 타이틀 */
+  --fs-qtext: clamp(18px, 4.6vw, 22px); /* 시험 문제 */
+}
+
+/* ===== 다크 모드: OS 설정 자동 추종 (prefers-color-scheme) =====
+   라이트 전용 디자인이던 것을 토큰 리매핑으로 다크 대응.
+   색은 토큰을 통해 흐르므로 대부분 자동 전환되고,
+   하드코딩 색만 각 파셀에서 보정한다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0e131b;
+    --bg: #161c26;
+    --soft: #1b222e;
+    --soft2: #1e2632;
+    --line: #28313f;
+    --line2: #333e4e;
+    --txt: #e7eaf2;
+    --muted: #b7c0cd;
+    --dim: #828c9c;
+    --ink: #e7eaf2;
+    --grow: #5aa6e6;
+    --accent: #5aa6e6;
+    --accent2: #4cbcb2;
+    --danger-bg: rgba(248, 113, 113, 0.13);
+    --danger-fg: #f87171;
+    --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.25), 0 26px 50px -40px rgba(0, 0, 0, 0.7);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+/* 모바일 브라우저의 자동 글자 확대(특히 일본어 등 CJK에서 기기별로 다르게 발동) 차단 */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--txt);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 공통 레이아웃 */
+.wrap {
+  width: min(var(--container), 100%);
+  margin: 0 auto;
+  padding: var(--pad-y) clamp(14px, 4vw, 20px) clamp(80px, 18vw, 140px);
+}
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+}
+.pad {
+  padding: var(--pad-y) var(--pad-x);
+}
+.sc-title {
+  font-size: var(--fs-title);
+  font-weight: 740;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.sc-sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 10px 0 30px;
+}
+

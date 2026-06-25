@@ -1,0 +1,12 @@
+{
+  // Cloudflare Workers(정적 자산)로 배포 시 SPA 라우팅 설정.
+  // not_found_handling: "single-page-application" → 매칭 안 되는 경로(/about 등)에
+  // 리다이렉트 없이 index.html 을 직접 서빙한다(딥링크·새로고침 404 방지).
+  // (_redirects 의 200 리라이트는 이 시스템에서 307+.html 스트립 → 무한루프라 사용 안 함)
+  "name": "gara-cbt",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

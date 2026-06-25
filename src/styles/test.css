@@ -1,0 +1,327 @@
+/* test: TestRunner.tsx */
+/* ===== Test ===== */
+.qtop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--line);
+}
+@media (max-width: 400px) {
+  .qtop {
+    padding: 14px 16px;
+  }
+}
+.qtop .count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.qtop .count b {
+  color: var(--ink);
+  font-size: 15px;
+}
+.qtop .leave {
+  font-size: 12px;
+  color: var(--dim);
+}
+.pbar {
+  height: 4px;
+  background: var(--line);
+}
+.pbar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 0 4px 4px 0;
+  transition: width 0.2s;
+}
+.qbody {
+  padding: var(--pad-y) var(--pad-x) clamp(20px, 4vw, 30px);
+}
+.qcat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(63, 143, 214, 0.09);
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+.qtext {
+  font-size: var(--fs-qtext);
+  line-height: 1.5;
+  letter-spacing: -0.02em;
+  font-weight: 640;
+  margin: 22px 0 30px;
+  overflow-wrap: break-word;
+}
+.opts {
+  display: grid;
+  gap: 12px;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1.5px solid var(--line2);
+  border-radius: 16px;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: 0.14s;
+  background: var(--bg);
+  text-align: left;
+  width: 100%;
+}
+@media (max-width: 400px) {
+  .opt {
+    gap: 12px;
+    padding: 14px 14px;
+  }
+}
+.opt:hover {
+  border-color: var(--accent);
+  background: rgba(63, 143, 214, 0.03);
+}
+.opt.sel {
+  border-color: var(--accent);
+  background: rgba(63, 143, 214, 0.07);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.opt .key {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1.5px solid var(--line2);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--muted);
+  flex: none;
+}
+.opt.sel .key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.opt .lab {
+  font-size: 15px;
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.qfoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 22px var(--pad-x) clamp(24px, 5vw, 34px);
+}
+.dotsteps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dotsteps i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line2);
+}
+.dotsteps i.done {
+  background: var(--accent2);
+}
+.dotsteps i.cur {
+  background: var(--accent);
+  transform: scale(1.3);
+}
+.btn-ink {
+  border: none;
+  background: var(--ink);
+  color: var(--page);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 13px 28px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.btn-ink:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-ghost {
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.warn {
+  margin: 0 var(--pad-x);
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  padding: 10px 14px;
+}
+
+
+/* 시험 진행 점 (푼 문제 색칠 + 클릭 이동) */
+.qnav {
+  display: grid;
+  grid-template-columns: repeat(10, 12px); /* 10개씩 2줄 */
+  gap: 7px;
+  justify-content: center;
+  padding: 10px var(--pad-x) 2px;
+}
+.qnav button {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  background: var(--line2);
+  cursor: pointer;
+  padding: 0;
+  transition: 0.15s;
+}
+.qnav button:hover {
+  transform: scale(1.3);
+}
+.qnav button.answered {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 2px 6px -1px rgba(63, 143, 214, 0.5);
+}
+.qnav button.cur {
+  transform: scale(1.4);
+  box-shadow: 0 0 0 3px rgba(63, 143, 214, 0.22);
+}
+/* PC: 카드가 넓으니 점·간격을 조금 키운다 (모바일은 위 기본값 12px/7px) */
+@media (min-width: 600px) {
+  .qnav {
+    grid-template-columns: repeat(10, 16px);
+    gap: 11px;
+  }
+  .qnav button {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* 시험 나가기 버튼 */
+.quit-btn {
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: 0.14s;
+}
+.quit-btn:hover {
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* ===== 시작 전 경고 게이트 ===== */
+.intro-gate {
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.intro-ico {
+  font-size: 40px;
+  margin-bottom: 6px;
+}
+.intro-meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0 16px;
+}
+.intro-anticheat {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 7px 16px;
+  margin: 0 0 18px;
+}
+.intro-rules {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+.intro-rules li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.intro-rules li .ic {
+  flex: none;
+  font-size: 16px;
+}
+.intro-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* ===== 다크모드 보정 (라이트 외관은 위에서 유지) ===== */
+@media (prefers-color-scheme: dark) {
+  /* 보기 선택/hover 의 옅은 파란 배경이 다크에서 너무 밝지 않게 */
+  .qcat {
+    background: rgba(90, 166, 230, 0.14);
+  }
+  .opt:hover {
+    background: rgba(90, 166, 230, 0.07);
+  }
+  .opt.sel {
+    background: rgba(90, 166, 230, 0.13);
+  }
+  .qnav button.cur {
+    box-shadow: 0 0 0 3px rgba(90, 166, 230, 0.28);
+  }
+  /* 경고/에러 의미색: 밝은 틴트를 어두운 톤으로 */
+  .warn {
+    background: #3a2a12;
+    color: #fbbf83;
+  }
+  .quit-btn:hover {
+    color: #f87171;
+    border-color: #7f3434;
+  }
+  .intro-anticheat {
+    color: #fca5a5;
+    background: #3a1c1c;
+    border-color: #6b2b2b;
+  }
+}
+

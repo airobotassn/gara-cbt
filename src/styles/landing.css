@@ -1,0 +1,209 @@
+/* landing: Landing.tsx */
+/* ===== Landing ===== */
+.lp {
+  position: relative;
+  min-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  padding: var(--pad-y) var(--pad-x);
+}
+.lp .aura {
+  position: absolute;
+  width: min(680px, 150vw);
+  height: min(680px, 150vw);
+  border-radius: 50%;
+  top: -200px;
+  background: radial-gradient(
+    circle,
+    rgba(63, 143, 214, 0.1),
+    rgba(63, 143, 214, 0) 62%
+  );
+  filter: blur(6px);
+  pointer-events: none;
+}
+@media (max-width: 600px) {
+  .lp .aura {
+    display: none;
+  }
+}
+.lp .eyebrow {
+  position: relative;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 26px;
+}
+.lp h1 {
+  position: relative;
+  font-size: var(--fs-display);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  margin: 0;
+  font-weight: 760;
+}
+.lp h1 .em {
+  background: linear-gradient(92deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp .lead {
+  position: relative;
+  color: var(--muted);
+  font-size: clamp(15px, 4vw, 16px);
+  font-weight: 500;
+  margin: 18px 0 0;
+  letter-spacing: -0.01em;
+}
+.cta {
+  position: relative;
+  margin-top: 40px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--ink);
+  padding: 17px 38px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 14px 30px -12px rgba(15, 22, 34, 0.55);
+  transition: 0.18s;
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .cta {
+    padding: 16px 28px;
+    font-size: 15px;
+  }
+}
+.cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -14px rgba(15, 22, 34, 0.6);
+}
+.cta .arr {
+  transition: 0.18s;
+}
+.cta:hover .arr {
+  transform: translateX(4px);
+}
+.lp .note {
+  position: relative;
+  color: var(--dim);
+  font-size: 13px;
+  margin-top: 16px;
+}
+
+/* ===== 메인 검색어 → 레벨 추천 ===== */
+.lp-search {
+  position: relative;
+  margin-top: 34px;
+  width: min(480px, 100%);
+  display: flex;
+  gap: 8px;
+}
+.lp-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  padding: 14px 20px;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--ink);
+  transition: 0.16s;
+}
+.lp-search-input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+.lp-search-input::placeholder {
+  color: var(--dim);
+}
+.lp-search-btn {
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--ink);
+  cursor: pointer;
+  transition: 0.16s;
+}
+.lp-search-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.lp-search-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lp-search-err {
+  position: relative;
+  margin-top: 14px;
+  color: #b91c1c;
+  font-size: 13px;
+}
+.lp-reco {
+  position: relative;
+  margin-top: 18px;
+  width: min(480px, 100%);
+  border-radius: 14px;
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--ink) inset;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 13px 16px;
+  word-break: keep-all; /* 한국어: 단어(어절) 중간에서 끊기지 않게 */
+}
+.lp-reco-sub {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+@media (max-width: 480px) {
+  .lp-search {
+    flex-direction: column;
+  }
+  .lp-search-input {
+    border-radius: 14px;
+  }
+  .lp-search-btn {
+    border-radius: 14px;
+    padding: 13px 22px;
+  }
+}
+
+/* ===== 다크 모드 보정 =====
+   --ink 는 다크에서 밝은색이 되므로, 흰 글자 CTA/버튼 face 는
+   대비를 위해 어두운 pill 로 고정한다(흰 글자 유지). */
+@media (prefers-color-scheme: dark) {
+  .cta,
+  .lp-search-btn {
+    background: #232c3a;
+  }
+  .lp-search-input:focus {
+    border-color: var(--accent);
+  }
+  .lp-reco {
+    box-shadow: 0 0 0 1px var(--accent) inset;
+    border-color: var(--accent);
+  }
+  .lp-search-err {
+    color: #f87171;
+  }
+}
+

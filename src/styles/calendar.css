@@ -1,0 +1,81 @@
+/* calendar: components/ContributionGraph.tsx */
+/* 월 단위 달력형 활동 표시 */
+.calm {
+  width: 100%;
+  max-width: 340px; /* 칸이 너무 커지지 않게 — 가운데 정렬 */
+  margin: 0 auto;
+}
+.calm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.calm-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--txt);
+}
+.calm-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.calm-wd {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  padding-bottom: 6px;
+}
+.calm-cell {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 9px;
+  color: var(--txt);
+  background: var(--line2);
+}
+.calm-cell.empty {
+  background: transparent;
+}
+.calm-cell.active {
+  background: #3aa79f;
+  color: #fff;
+  font-weight: 700;
+}
+.calm-cell.future {
+  background: transparent;
+  color: var(--dim);
+  opacity: 0.5;
+}
+.calm-cell.today {
+  box-shadow: inset 0 0 0 2px var(--brand, #3aa79f);
+}
+.calm-cell.today.active {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
+.calm-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.calm-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.calm-scale .calm-cell {
+  width: 12px;
+  height: 12px;
+  aspect-ratio: auto;
+  flex: none;
+}
+

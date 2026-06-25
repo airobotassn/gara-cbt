@@ -1,0 +1,94 @@
+/* shared: pager · svg · topbar (공용) */
+/* 페이저 */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+.pager button {
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pager .pinfo {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* radar svg */
+svg .ring {
+  fill: none;
+  stroke: var(--line);
+}
+svg .spoke {
+  stroke: var(--line);
+}
+svg .axislabel {
+  fill: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+svg .avg {
+  fill: rgba(154, 163, 178, 0.16);
+  stroke: var(--dim);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+}
+svg .me {
+  fill: rgba(63, 143, 214, 0.16);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+svg .medot {
+  fill: var(--accent);
+}
+
+
+/* 공통 상단: 홈으로 (원형 화살표 칩 + 라벨) */
+.topbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  text-decoration: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  transition: color 0.14s;
+}
+.topbar .ic {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink);
+  transition: 0.16s;
+}
+.topbar:hover {
+  color: var(--ink);
+}
+.topbar:hover .ic {
+  background: var(--ink);
+  color: var(--page);
+  border-color: var(--ink);
+  transform: translateX(-3px);
+}

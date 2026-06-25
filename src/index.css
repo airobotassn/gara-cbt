@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+/* 섹션별 파셀 — 모바일 반응형은 각 파셀 내부에 co-locate */
+@import './styles/base.css';
+@import './styles/landing.css';
+@import './styles/levelselect.css';
+@import './styles/test.css';
+@import './styles/result.css';
+@import './styles/ranking.css';
+@import './styles/dashboard.css';
+@import './styles/fab.css';
+@import './styles/calendar.css';
+@import './styles/policy.css';
+@import './styles/shared.css';
+@import './styles/admin.css';
+@import './styles/cbt.css';

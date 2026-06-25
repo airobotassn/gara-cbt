@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SEO & GEO 쉽게 이해하기 — GARA AI 레벨테스트</title>
+<style>
+  :root{
+    --bg:#0b1020; --card:#141b2e; --card2:#1b2438; --ink:#e8ecf5; --sub:#9fb0cf;
+    --line:#27314a; --accent:#5b8cff; --good:#41d29a; --warn:#ffb454; --bad:#ff6b6b;
+    --chip:#23304d;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:linear-gradient(180deg,#0b1020,#0d1428 40%,#0b1020);
+    color:var(--ink); font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    line-height:1.75; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:0 20px 100px}
+  header.hero{
+    text-align:center; padding:64px 20px 40px;
+    background:radial-gradient(1200px 400px at 50% -100px, rgba(91,140,255,.25), transparent);
+  }
+  .badge{display:inline-block; font-size:13px; letter-spacing:.08em; color:var(--accent);
+    background:var(--chip); border:1px solid var(--line); padding:6px 14px; border-radius:999px}
+  h1{font-size:38px; line-height:1.25; margin:18px 0 12px}
+  h1 .grad{background:linear-gradient(90deg,#7aa2ff,#41d29a); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .lead{color:var(--sub); font-size:18px; max-width:640px; margin:0 auto}
+  .toc{
+    display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:28px auto 0; max-width:680px;
+  }
+  .toc a{font-size:14px; color:var(--ink); text-decoration:none; background:var(--card);
+    border:1px solid var(--line); padding:8px 14px; border-radius:10px}
+  .toc a:hover{border-color:var(--accent); color:var(--accent)}
+
+  section{margin-top:56px}
+  h2{font-size:26px; margin:0 0 8px; display:flex; align-items:center; gap:12px}
+  h2 .num{font-size:15px; color:#0b1020; background:var(--accent); width:30px; height:30px;
+    display:grid; place-items:center; border-radius:9px; font-weight:800; flex:0 0 auto}
+  h3{font-size:19px; margin:28px 0 6px; color:#cfe0ff}
+  p{margin:10px 0}
+  .sub{color:var(--sub)}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 24px; margin:18px 0}
+  .card.soft{background:var(--card2)}
+  .analogy{border-left:4px solid var(--accent); padding:14px 18px; background:rgba(91,140,255,.08);
+    border-radius:0 12px 12px 0; margin:18px 0}
+  .analogy b{color:#cfe0ff}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media(max-width:680px){ .grid2{grid-template-columns:1fr} h1{font-size:30px} }
+
+  .pill{display:inline-block; font-size:12px; padding:3px 10px; border-radius:999px; font-weight:700}
+  .pill.seo{background:rgba(91,140,255,.18); color:#9bb8ff}
+  .pill.geo{background:rgba(65,210,154,.16); color:#6fe7bf}
+
+  table{width:100%; border-collapse:collapse; margin:8px 0; font-size:15px}
+  th,td{text-align:left; padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{color:var(--sub); font-weight:600; font-size:13px; letter-spacing:.03em}
+  tr:last-child td{border-bottom:none}
+
+  code{background:#0c1426; border:1px solid var(--line); padding:2px 7px; border-radius:6px;
+    font-family:"JetBrains Mono",Consolas,monospace; font-size:13px; color:#9be8c8}
+  pre{background:#0c1426; border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+    overflow-x:auto; font-size:13px; line-height:1.6}
+  pre code{background:none; border:none; padding:0; color:#cdd8ee}
+  .cmt{color:#6b7a9c}
+  .tag{color:#ff9bb0}
+  .attr{color:#ffd98a}
+  .val{color:#9be8c8}
+
+  .steps{counter-reset:step; padding:0; list-style:none; margin:0}
+  .steps li{position:relative; padding:16px 16px 16px 60px; background:var(--card2);
+    border:1px solid var(--line); border-radius:12px; margin:10px 0}
+  .steps li::before{counter-increment:step; content:counter(step); position:absolute; left:16px; top:16px;
+    width:30px; height:30px; background:var(--accent); color:#0b1020; border-radius:8px;
+    display:grid; place-items:center; font-weight:800}
+  .steps li b{color:#cfe0ff}
+
+  .status{display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed var(--line)}
+  .status:last-child{border-bottom:none}
+  .dot{flex:0 0 auto; width:22px; height:22px; border-radius:6px; display:grid; place-items:center; font-size:13px; font-weight:800}
+  .dot.x{background:rgba(255,107,107,.16); color:var(--bad)}
+  .dot.ok{background:rgba(65,210,154,.16); color:var(--good)}
+
+  .before-after{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:680px){ .before-after{grid-template-columns:1fr} }
+  .ba{border-radius:12px; padding:16px; border:1px solid var(--line)}
+  .ba.before{background:rgba(255,107,107,.06); border-color:rgba(255,107,107,.3)}
+  .ba.after{background:rgba(65,210,154,.06); border-color:rgba(65,210,154,.3)}
+  .ba h4{margin:0 0 8px; font-size:15px}
+  .ba.before h4{color:var(--bad)} .ba.after h4{color:var(--good)}
+
+  .timeline{position:relative; margin:10px 0; padding-left:22px}
+  .timeline::before{content:""; position:absolute; left:6px; top:6px; bottom:6px; width:2px; background:var(--line)}
+  .tl{position:relative; padding:6px 0 6px 8px}
+  .tl::before{content:""; position:absolute; left:-20px; top:14px; width:11px; height:11px; border-radius:50%;
+    background:var(--accent); border:2px solid var(--bg)}
+
+  .callout{display:flex; gap:14px; background:rgba(255,180,84,.08); border:1px solid rgba(255,180,84,.35);
+    border-radius:12px; padding:16px 18px; margin:18px 0}
+  .callout .ico{font-size:22px}
+  .footer{margin-top:70px; text-align:center; color:var(--sub); font-size:13px; border-top:1px solid var(--line); padding-top:24px}
+  .kpi{display:flex; gap:14px; flex-wrap:wrap; margin-top:8px}
+  .kpi div{flex:1; min-width:150px; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px}
+  .kpi b{display:block; font-size:22px; color:#cfe0ff}
+  .kpi span{font-size:13px; color:var(--sub)}
+  mark{background:rgba(91,140,255,.25); color:#dce7ff; padding:0 4px; border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="badge">비전공자용 쉬운 설명서</span>
+    <h1>검색엔진과 AI가<br><span class="grad">우리 사이트를 잘 찾게 만들기</span></h1>
+    <p class="lead">SEO와 GEO가 뭔지, 우리 <b>GARA AI 레벨테스트</b> 사이트에 어떻게 적용하고,
+    그러면 무엇이 달라지는지 — 어려운 용어 없이 처음부터 설명합니다.</p>
+    <nav class="toc">
+      <a href="#what">① SEO·GEO가 뭐예요?</a>
+      <a href="#how">② 검색엔진은 어떻게 동작?</a>
+      <a href="#now">③ 우리 사이트 현재 상태</a>
+      <a href="#apply">④ 무엇을 하면 되나</a>
+      <a href="#result">⑤ 그러면 어떻게 되나</a>
+      <a href="#faq">⑥ 자주 묻는 질문</a>
+    </nav>
+  </header>
+
+  <!-- 1 -->
+  <section id="what">
+    <h2><span class="num">1</span> SEO와 GEO가 도대체 뭐예요?</h2>
+    <p>둘 다 <b>"우리 사이트를 더 많은 사람이 찾아오게 만드는 일"</b>입니다. 다만 <b>누구에게</b> 잘 보이게 하느냐가 다릅니다.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <span class="pill seo">SEO</span>
+        <h3 style="margin-top:10px">검색엔진 최적화</h3>
+        <p class="sub" style="margin:4px 0 10px">Search Engine Optimization</p>
+        <p>사람이 <b>구글·네이버</b>에서 "AI 레벨테스트" 라고 검색했을 때,
+        우리 사이트가 <b>검색 결과 위쪽</b>에 뜨도록 만드는 일입니다.</p>
+        <p class="sub">→ 목표: <b>검색 결과에서 클릭받기</b></p>
+      </div>
+      <div class="card">
+        <span class="pill geo">GEO</span>
+        <h3 style="margin-top:10px">생성형 AI 최적화</h3>
+        <p class="sub" style="margin:4px 0 10px">Generative Engine Optimization</p>
+        <p>사람이 <b>ChatGPT·Perplexity·구글 AI 개요</b>에게 "AI 활용능력 테스트 어디서 해?"
+        라고 물었을 때, AI가 우리 사이트를 <b>답변에 인용·추천</b>하게 만드는 일입니다.</p>
+        <p class="sub">→ 목표: <b>AI 답변에 등장하기</b></p>
+      </div>
+    </div>
+
+    <div class="analogy">
+      🏪 <b>가게로 비유하면</b><br>
+      <b>SEO</b>는 "큰길가에 간판 잘 달아서 지나가던 사람이 들어오게 하기"입니다.<br>
+      <b>GEO</b>는 "동네 사람들에게 길 안내해주는 <b>안내데스크 직원(=AI)</b>이 우리 가게를 추천하게 만들기"입니다.<br>
+      예전엔 간판(SEO)만 잘 달면 됐는데, 요즘은 사람들이 점점 <b>안내데스크(AI)에게 먼저 물어봐서</b> GEO도 중요해졌습니다.
+    </div>
+
+    <div class="callout">
+      <span class="ico">💡</span>
+      <div><b>왜 지금 GEO가 뜨나요?</b><br>
+      사람들이 검색창에 키워드를 치는 대신, ChatGPT 같은 AI에게 문장으로 물어보고 <b>그 답만 보고 끝내는</b> 경우가
+      빠르게 늘고 있기 때문입니다. AI 답변에 우리가 안 나오면, 그 사용자는 우리 존재 자체를 모르게 됩니다.</div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section id="how">
+    <h2><span class="num">2</span> 검색엔진·AI는 사이트를 어떻게 읽나요?</h2>
+    <p>이걸 알면 왜 우리가 작업을 해야 하는지 단번에 이해됩니다. 과정은 단순합니다.</p>
+    <ol class="steps">
+      <li><b>크롤러(로봇)가 방문</b> — 구글/AI의 로봇이 우리 사이트 주소로 들어옵니다.</li>
+      <li><b>페이지의 글자(HTML)를 읽음</b> — 제목·설명·본문 텍스트를 수집합니다.</li>
+      <li><b>"이 페이지는 무슨 내용"인지 정리해서 저장</b> — 이걸 색인(인덱싱)이라고 합니다.</li>
+      <li><b>누가 검색/질문하면 꺼내서 보여줌</b> — 정리해둔 내용 중 관련 있는 걸 결과/답변으로 내보냅니다.</li>
+    </ol>
+
+    <div class="callout">
+      <span class="ico">⚠️</span>
+      <div><b>여기서 핵심 함정</b> — 우리 사이트는 화면을 <b>자바스크립트(JS)로 그립니다.</b>
+      구글 로봇은 JS를 실행할 수 있지만, <b>대부분의 AI 크롤러는 JS를 실행하지 않습니다.</b>
+      즉 AI가 우리 페이지를 열면 <b>글자가 하나도 없는 빈 종이</b>로 보입니다. (자세한 건 ③번에서)</div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section id="now">
+    <h2><span class="num">3</span> 우리 사이트는 지금 어떤 상태?</h2>
+    <p>실제로 코드를 확인한 결과입니다. 솔직하게 말하면 <b>SEO/GEO가 거의 안 되는 상태</b>입니다.</p>
+
+    <div class="card">
+      <div class="status"><span class="dot x">✕</span><div><b>페이지 설명(메타태그)이 없음</b><br>
+        <span class="sub">제목 한 줄 빼고 설명이 없어, 검색 결과에 보여줄 소개 문구나 카톡 공유 미리보기가 안 나옵니다.</span></div></div>
+      <div class="status"><span class="dot x">✕</span><div><b>robots.txt / sitemap.xml 없음</b><br>
+        <span class="sub">로봇에게 "우리 사이트엔 이런 페이지들이 있어요"라고 알려주는 안내도가 없습니다.</span></div></div>
+      <div class="status"><span class="dot x">✕</span><div><b>화면을 전부 JS로 그림 (CSR 방식)</b><br>
+        <span class="sub">→ <b>GEO에 가장 치명적.</b> AI 크롤러 눈엔 빈 페이지로 보입니다.</span></div></div>
+      <div class="status"><span class="dot x">✕</span><div><b>구조화 데이터(JSON-LD) 없음</b><br>
+        <span class="sub">"이건 단체 정보, 이건 테스트(퀴즈)예요" 라고 로봇이 100% 이해하게 알려주는 표식이 없습니다.</span></div></div>
+      <div class="status"><span class="dot x">✕</span><div><b>다국어인데 언어 표식(hreflang) 없음</b><br>
+        <span class="sub">6개 국어를 지원하는데, 검색엔진은 그걸 모르고 한 가지 언어로만 취급합니다.</span></div></div>
+    </div>
+
+    <div class="before-after">
+      <div class="ba before">
+        <h4>🤖 지금 AI 크롤러가 보는 우리 페이지</h4>
+        <pre><code>&lt;<span class="tag">body</span>&gt;
+  &lt;<span class="tag">div</span> <span class="attr">id</span>=<span class="val">"root"</span>&gt;&lt;/<span class="tag">div</span>&gt;
+  <span class="cmt">&lt;!-- 텅 비어있음 --&gt;</span>
+&lt;/<span class="tag">body</span>&gt;</code></pre>
+        <p class="sub" style="margin:8px 0 0">→ "내용 없는 페이지"로 판단 → 추천 안 함</p>
+      </div>
+      <div class="ba after">
+        <h4>✅ 작업 후 보이게 할 모습</h4>
+        <pre><code>&lt;<span class="tag">h1</span>&gt;AI 활용능력 레벨테스트&lt;/<span class="tag">h1</span>&gt;
+&lt;<span class="tag">p</span>&gt;20문항으로 6개 영역 측정,
+   롤 스타일 티어 부여…&lt;/<span class="tag">p</span>&gt;</code></pre>
+        <p class="sub" style="margin:8px 0 0">→ 내용 이해 → 답변에 인용·추천 가능</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section id="apply">
+    <h2><span class="num">4</span> 그래서 무엇을 하면 되나요?</h2>
+    <p>난이도·효과 순서로 <b>3단계</b>로 나눴습니다. 1단계만 해도 베이스라인이 크게 올라갑니다.</p>
+
+    <h3>🟢 1단계 — 기본기 갖추기 <span class="sub">(반나절, 효과 큼)</span></h3>
+    <table>
+      <tr><th>할 일</th><th>쉬운 설명</th></tr>
+      <tr><td><b>메타태그 채우기</b></td><td>각 페이지에 "이 페이지는 무슨 내용"인지 소개문·대표이미지를 적어둡니다. (검색결과 설명 + 카톡/SNS 공유 미리보기가 예쁘게 나옴)</td></tr>
+      <tr><td><b>robots.txt</b></td><td>로봇에게 "들어와도 돼요, 안내도는 여기 있어요" 라고 알려주는 문서를 둡니다.</td></tr>
+      <tr><td><b>sitemap.xml</b></td><td>우리 사이트의 페이지 목록(안내도)을 만들어 로봇에게 제출합니다.</td></tr>
+      <tr><td><b>JSON-LD 표식</b></td><td>"GARA는 협회, 이건 AI 역량 테스트" 라고 로봇이 오해 없이 알아듣게 라벨을 붙입니다.</td></tr>
+      <tr><td><b>hreflang</b></td><td>"이 페이지는 한국어/영어/일본어… 버전이 있어요" 라고 알려줘 나라별로 맞는 언어가 노출되게 합니다.</td></tr>
+      <tr><td><b>llms.txt</b></td><td>AI 전용 한 장짜리 사이트 요약 문서. (GEO용 신흥 표준)</td></tr>
+    </table>
+
+    <h3>🟡 2단계 — AI가 본문을 읽게 만들기 <span class="sub">(반~하루, GEO 핵심)</span></h3>
+    <div class="card soft">
+      <p>③번에서 본 "빈 페이지" 문제를 푸는 단계입니다. <b>프리렌더링(미리 그려두기)</b>이라고 합니다.</p>
+      <p>지금은 방문자가 올 때마다 그 자리에서 JS로 화면을 그리지만, 공개 페이지
+      (<code>홈</code>, <code>협회소개</code>, <code>개인정보처리방침</code>)는
+      <b>미리 글자가 박힌 완성된 HTML로 만들어 둡니다.</b> 그러면 JS를 못 돌리는 AI 크롤러도 본문을 그대로 읽습니다.</p>
+      <p class="sub">※ 응시·결과 페이지는 어차피 비공개라 안 해도 됩니다. 공개 페이지 3개만 하면 충분합니다.</p>
+    </div>
+
+    <h3>🔵 3단계 — 콘텐츠와 평판 쌓기 <span class="sub">(꾸준히, GEO의 본게임)</span></h3>
+    <div class="card soft">
+      <p><b>"블로그에 많이 올리면 되는 거 아냐?"</b> — 절반만 맞습니다. 그건 GEO의 한 축일 뿐이고,
+      실제로는 <b>두 갈래</b>로 나뉩니다.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <span class="pill geo">갈래 ①</span>
+        <h3 style="margin-top:10px">우리 페이지를 "인용하기 좋게"</h3>
+        <p class="sub" style="margin:4px 0 10px">온사이트 (우리 사이트 안)</p>
+        <p>AI는 답할 때 결국 <b>"글자(텍스트)를 따다 인용"</b>합니다.
+        그대로 가져다 쓰기 좋은 형태일수록 인용됩니다.</p>
+        <ul style="margin:8px 0 0">
+          <li>랜딩에 설명 텍스트 보강</li>
+          <li><b>FAQ(질문-답변)</b> 섹션 — AI가 가장 따다 쓰기 좋은 형태</li>
+          <li>협회 소개 충실하게 = "GARA가 뭔지" 설명할 근거</li>
+        </ul>
+        <p class="sub" style="margin:10px 0 0">※ 단, <b>2단계(프리렌더)</b>가 먼저예요.
+        AI가 페이지를 못 읽으면 아무리 좋은 글도 소용없으니까요.</p>
+      </div>
+      <div class="card">
+        <span class="pill geo">갈래 ②</span>
+        <h3 style="margin-top:10px">밖에서 우리를 "언급하게"</h3>
+        <p class="sub" style="margin:4px 0 10px">오프사이트 (우리 사이트 밖)</p>
+        <p>말씀하신 "블로그에 올라오는" 부분. 맞지만,
+        <b>"얼마나 많이"보다 "어디서·어떻게"가 훨씬 중요</b>합니다.</p>
+        <ul style="margin:8px 0 0">
+          <li>신뢰도 높은 매체·커뮤니티의 <b>자연스러운 언급</b></li>
+          <li>여러 곳에서 <b>"GARA = AI 활용능력 레벨테스트"</b>로 일관되게 설명</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card soft">
+      <h3 style="margin-top:0">왜 "양 많이"가 답이 아닐까?</h3>
+      <p>AI(ChatGPT·Perplexity 등)는 글의 <b>개수를 세지 않습니다.</b> 이렇게 동작해요:</p>
+      <ol class="steps" style="margin-top:10px">
+        <li>사용자가 <b>"AI 역량 테스트 추천해줘"</b> 라고 질문</li>
+        <li>AI가 <b>실시간 웹 검색</b>을 돌림</li>
+        <li><b>신뢰도 높은 출처</b> 위주로 골라서 답변에 인용·추천</li>
+      </ol>
+      <table>
+        <tr><th>🙅 흔한 오해</th><th>🙆 실제로 효과 있는 것</th></tr>
+        <tr><td>영향력 없는 블로그 100개에 도배</td><td>신뢰도 있는 매체·커뮤니티의 자연스러운 언급 1개</td></tr>
+        <tr><td>키워드만 기계적으로 반복</td><td>"GARA는 ○○ 서비스"라는 <b>일관된 설명</b>이 여러 곳에</td></tr>
+        <tr><td>우리 사이트는 두고 외부 홍보만</td><td>우리 페이지에 <b>인용하기 좋은 글·FAQ</b>부터 마련</td></tr>
+      </table>
+      <p class="sub" style="margin:12px 0 0">여러 곳에서 같은 설명이 반복되면, AI는 그걸 <b>사실로 신뢰</b>합니다.
+      이걸 "엔티티(브랜드) 인지도"라고 합니다.</p>
+    </div>
+
+    <div class="callout">
+      <span class="ico">🎯</span>
+      <div><b>3단계 한 줄 요약</b><br>
+      GEO = <b>(2단계)</b> AI가 우리 본문을 읽게 해두고 →
+      <b>(3단계-①)</b> 우리 페이지엔 인용하기 좋은 글을 두고 +
+      <b>(3단계-②)</b> 밖에선 믿을 만한 곳들이 우리를 일관되게 언급하게 만들기.
+      <br>"블로그 노출"은 그중 <b>일부</b>일 뿐입니다.</div>
+    </div>
+
+    <div class="callout">
+      <span class="ico">🛠️</span>
+      <div><b>좋은 소식</b> — 우리는 React 19를 쓰고 있어서, 1단계의 "페이지별 메타태그"는
+      <b>추가 라이브러리 없이</b> 코드에서 바로 넣을 수 있습니다. 1·2단계 대부분이 기존 구조를 크게 안 건드리고 가능합니다.</div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section id="result">
+    <h2><span class="num">5</span> 그러면 어떻게 되나요? (기대 효과)</h2>
+    <p>마법은 아닙니다. 검색엔진이 다시 읽고 반영하는 데 시간이 걸립니다. 단계별로 이렇게 달라집니다.</p>
+
+    <div class="timeline">
+      <div class="tl"><b>즉시</b> — 카톡/SNS에 링크 공유 시 <b>제목·설명·대표이미지 미리보기</b>가 예쁘게 뜸. (지금은 안 뜸)</div>
+      <div class="tl"><b>며칠~2주</b> — 구글이 sitemap을 읽고 페이지들을 <b>제대로 색인</b>. 검색 결과에 설명 문구가 나옴.</div>
+      <div class="tl"><b>2~6주</b> — "AI 레벨테스트" 류 검색에서 <b>노출 순위가 점진적으로 상승.</b></div>
+      <div class="tl"><b>1~3개월+</b> — 프리렌더·콘텐츠가 쌓이며 <b>AI 답변(ChatGPT·Perplexity 등)에 인용·추천</b>되기 시작.</div>
+    </div>
+
+    <h3>한눈에 보는 변화</h3>
+    <div class="before-after">
+      <div class="ba before">
+        <h4>지금 (작업 전)</h4>
+        <ul style="margin:0; padding-left:18px">
+          <li>검색 결과에 설명 없이 제목만</li>
+          <li>링크 공유 시 미리보기 깨짐</li>
+          <li>AI에게 물으면 우리 사이트 언급 거의 없음</li>
+          <li>다국어인데 해외 검색 노출 약함</li>
+        </ul>
+      </div>
+      <div class="ba after">
+        <h4>작업 후</h4>
+        <ul style="margin:0; padding-left:18px">
+          <li>검색 결과에 매력적인 소개 문구</li>
+          <li>공유 미리보기 깔끔하게 표시</li>
+          <li>AI가 "AI 역량 테스트 추천?"에 우리 인용</li>
+          <li>나라별 언어로 맞춤 노출</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div><b>↑ 유입</b><span>검색·AI를 통한 신규 방문자 증가</span></div>
+      <div><b>↑ 공유율</b><span>미리보기가 예뻐 클릭·공유 늘어남</span></div>
+      <div><b>↑ 신뢰</b><span>AI·검색이 추천하는 "공식 서비스" 인상</span></div>
+    </div>
+
+    <div class="callout">
+      <span class="ico">📌</span>
+      <div><b>현실적인 기대치</b> — SEO/GEO는 "켜면 끝"이 아니라 <b>꾸준히 관리하는 일</b>입니다.
+      하지만 1·2단계는 한 번 해두면 오래 가는 <b>기반 공사</b>라서, 가성비가 가장 좋습니다.</div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section id="faq">
+    <h2><span class="num">6</span> 자주 묻는 질문</h2>
+    <div class="card">
+      <h3>Q. 돈이 드나요?</h3>
+      <p>아니요. 위 작업은 대부분 <b>코드 수정과 파일 추가</b>라 추가 비용이 없습니다.
+      (광고를 사는 게 아니라, 자연 노출을 개선하는 일입니다.)</p>
+    </div>
+    <div class="card">
+      <h3>Q. 한 번 하면 영원히 되나요?</h3>
+      <p>기본기(1단계)는 오래 갑니다. 다만 콘텐츠·평판(3단계)은 꾸준히 더할수록 효과가 커집니다.</p>
+    </div>
+    <div class="card">
+      <h3>Q. 효과를 어떻게 확인하나요?</h3>
+      <p><b>구글 서치 콘솔</b>(무료)에 사이트를 등록하면 "어떤 검색어로 몇 번 노출/클릭됐는지"를 볼 수 있습니다.
+      GEO는 직접 ChatGPT·Perplexity에 관련 질문을 던져보며 우리가 언급되는지 확인합니다.</p>
+    </div>
+    <div class="card">
+      <h3>Q. 가장 먼저 뭘 하면 되나요?</h3>
+      <p><b>1단계(기본기)</b>부터입니다. 효과 대비 작업량이 가장 좋고, 2·3단계의 토대가 됩니다.</p>
+    </div>
+  </section>
+
+  <div class="footer">
+    GARA · AI 활용능력 레벨테스트 — SEO/GEO 안내 문서<br>
+    이 문서는 비전공자 이해를 돕기 위한 설명용입니다. 실제 구현 작업은 별도로 진행합니다.
+  </div>
+
+</div>
+</body>
+</html>

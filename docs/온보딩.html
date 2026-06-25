@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>온보딩 가이드 · GARA AI 레벨테스트</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1d212c; --line:#2a2f3d;
+    --text:#e6e8ee; --muted:#9aa3b2; --accent:#6ea8fe; --accent2:#7c6cf0;
+    --green:#3ad29f; --amber:#f2b84b; --red:#f2685f; --code:#0b0d12;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;
+    line-height:1.7; font-size:15.5px;
+  }
+  .wrap{display:grid; grid-template-columns:260px 1fr; max-width:1400px; margin:0 auto;}
+  nav.toc{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:24px 16px; border-right:1px solid var(--line); background:var(--panel);
+  }
+  nav.toc h2{font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:18px 0 8px}
+  nav.toc a{display:block; color:var(--muted); text-decoration:none; padding:5px 10px; border-radius:8px; font-size:13.5px}
+  nav.toc a:hover{background:var(--panel2); color:var(--text)}
+  nav.toc .brand{font-weight:800; font-size:16px; color:var(--text); margin-bottom:4px}
+  nav.toc .brand span{background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  main{padding:40px 56px 120px; min-width:0}
+  .hero{
+    background:radial-gradient(1200px 400px at 0% 0%, rgba(124,108,240,.25), transparent),
+               radial-gradient(900px 300px at 100% 0%, rgba(110,168,254,.18), transparent),
+               var(--panel);
+    border:1px solid var(--line); border-radius:20px; padding:34px 36px; margin-bottom:34px;
+  }
+  .hero h1{margin:0 0 8px; font-size:30px; letter-spacing:-.02em}
+  .hero p{margin:6px 0; color:var(--muted)}
+  .pillrow{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px}
+  .pill{font-size:12.5px; padding:5px 11px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--text)}
+  .pill.accent{border-color:var(--accent); color:var(--accent)}
+  section{margin:0 0 40px; scroll-margin-top:20px}
+  h2.sec{font-size:23px; margin:36px 0 14px; padding-bottom:10px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px}
+  h2.sec .num{display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:34px; padding:0 8px; border-radius:10px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:15px; font-weight:800}
+  h3{font-size:17px; margin:24px 0 10px; color:#fff}
+  p{margin:10px 0}
+  a{color:var(--accent)}
+  code{background:var(--code); padding:2px 6px; border-radius:6px; font-family:'JetBrains Mono','Fira Code',ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; color:#d6deff}
+  pre{background:var(--code); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow-x:auto; font-size:13px}
+  pre code{background:none; padding:0}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin:16px 0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px}
+  .card h4{margin:0 0 6px; font-size:15px}
+  .card p{margin:0; color:var(--muted); font-size:13.5px}
+  .note{border-left:4px solid var(--accent); background:rgba(110,168,254,.08); padding:12px 16px; border-radius:0 10px 10px 0; margin:16px 0}
+  .warn{border-left:4px solid var(--amber); background:rgba(242,184,75,.08); padding:12px 16px; border-radius:0 10px 10px 0; margin:16px 0}
+  .danger{border-left:4px solid var(--red); background:rgba(242,104,95,.08); padding:12px 16px; border-radius:0 10px 10px 0; margin:16px 0}
+  .ok{border-left:4px solid var(--green); background:rgba(58,210,159,.08); padding:12px 16px; border-radius:0 10px 10px 0; margin:16px 0}
+  table{width:100%; border-collapse:collapse; margin:16px 0; font-size:13.8px; overflow:hidden; border-radius:12px}
+  th,td{padding:10px 13px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top}
+  thead th{background:var(--panel2); color:var(--text); font-weight:700; border-bottom:1px solid var(--line)}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
+  td code{white-space:nowrap}
+  .diagram{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin:16px 0; text-align:center}
+  .mermaid{margin:0 auto}
+  .tierrow{display:flex; gap:8px; flex-wrap:wrap; margin:14px 0}
+  .tier{display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 16px; border-radius:12px; background:var(--panel); border:1px solid var(--line); min-width:92px}
+  .tier .dot{width:34px; height:34px; border-radius:50%}
+  .tier .t{font-weight:700; font-size:13px}
+  .tier .m{font-size:11.5px; color:var(--muted)}
+  .badge{display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; vertical-align:middle}
+  .b-guest{background:rgba(242,184,75,.15); color:var(--amber)}
+  .b-auth{background:rgba(58,210,159,.15); color:var(--green)}
+  .b-lock{background:rgba(242,104,95,.15); color:var(--red)}
+  .step{display:flex; gap:14px; margin:14px 0; align-items:flex-start}
+  .step .n{flex:0 0 28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; margin-top:3px}
+  .step .body{flex:1; min-width:0}
+  .step .body b{color:#fff}
+  .checklist{list-style:none; padding:0}
+  .checklist li{padding:8px 0 8px 30px; position:relative; border-bottom:1px dashed var(--line)}
+  .checklist li:before{content:"☐"; position:absolute; left:4px; color:var(--accent); font-size:16px}
+  hr{border:none; border-top:1px solid var(--line); margin:34px 0}
+  .footer{color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:20px}
+  @media(max-width:980px){
+    .wrap{grid-template-columns:1fr}
+    nav.toc{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line)}
+    main{padding:28px 20px 80px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ SIDEBAR ============ -->
+<nav class="toc">
+  <div class="brand"><span>GARA</span> 온보딩</div>
+  <div style="color:var(--muted);font-size:12px">AI 활용능력 레벨테스트</div>
+  <h2>시작</h2>
+  <a href="#s1">1 · 한 문장 요약</a>
+  <a href="#s2">2 · 5분 Quick Start</a>
+  <a href="#s3">3 · Supabase 최초 셋업</a>
+  <h2>제품 · 구조</h2>
+  <a href="#s4">4 · 제품 &amp; 유저 흐름</a>
+  <a href="#s5">5 · 아키텍처 한 장</a>
+  <a href="#s6">6 · 기술 스택</a>
+  <a href="#s7">7 · 디렉토리 구조</a>
+  <h2>핵심</h2>
+  <a href="#s8">8 · 데이터 흐름</a>
+  <a href="#s9">9 · 데이터베이스(ER)</a>
+  <a href="#s10">10 · 보안 모델(RLS)</a>
+  <a href="#s11">11 · 레이팅 &amp; 티어</a>
+  <a href="#s12">12 · Edge Functions API</a>
+  <a href="#s13">13 · 인증(claim 이관)</a>
+  <a href="#s14">14 · 부정행위 방지</a>
+  <a href="#s15">15 · 국제화(i18n)</a>
+  <h2>운영</h2>
+  <a href="#s16">16 · 환경변수</a>
+  <a href="#s17">17 · 배포 파이프라인</a>
+  <h2>실전</h2>
+  <a href="#s18">18 · 첫 기여 실습</a>
+  <a href="#s19">19 · 트러블슈팅</a>
+  <a href="#s20">20 · 문서 맵</a>
+</nav>
+
+<!-- ============ MAIN ============ -->
+<main>
+
+<div class="hero">
+  <h1>온보딩 가이드 · GARA AI 활용능력 레벨테스트</h1>
+  <p><strong>이 문서 하나만 보고 바로 개발에 들어갈 수 있게</strong> 만든 신규 개발자용 가이드입니다.</p>
+  <p>제품 개요 → 셋업 → 아키텍처 → 데이터 흐름 → 보안/레이팅 → API → 배포 → 첫 기여까지 순서대로 담았습니다. 다이어그램은 페이지가 열릴 때 자동 렌더됩니다(인터넷 연결 시).</p>
+  <div class="pillrow">
+    <span class="pill accent">React 19 + Vite + TS</span>
+    <span class="pill accent">Supabase (Postgres·Auth·Edge Functions)</span>
+    <span class="pill">Tailwind v4</span>
+    <span class="pill">Gemini 임베딩</span>
+    <span class="pill">Cloudflare 배포</span>
+  </div>
+</div>
+
+<div class="note">
+  <strong>다른 문서와의 관계</strong> — 이 문서는 셋업·개발·배포를 <strong>한 곳에 모은 단일 진입점</strong>입니다. 더 깊은 "왜"는 <a href="../CLAUDE.md">CLAUDE.md</a> · <a href="./기획안.md">기획안</a>, 원본 셋업 문서는 <a href="../SETUP.md">SETUP.md</a>. 구글 계정·Workspace 소유권은 <a href="./구글_계정_워크스페이스_가이드.html">구글 계정·Workspace 가이드</a>.
+</div>
+
+<!-- 1 -->
+<section id="s1">
+<h2 class="sec"><span class="num">1</span>한 문장 요약</h2>
+<div class="diagram" style="text-align:left">
+  <p style="font-size:17px;margin:0"><strong>20문항으로 6개 영역(프롬프트·모델/도구·검증·자동화·데이터·윤리)의 AI 활용능력을 측정하고, 롤(LoL) 스타일 누적 티어(아이언~마스터)를 부여하는 웹 서비스.</strong></p>
+</div>
+<ul>
+  <li>비로그인(게스트)도 응시 가능 → <span class="badge b-guest">총점만 노출</span></li>
+  <li>구글 로그인 시 <span class="badge b-auth">티어 · 6축 레이더 · 오답노트</span> 잠금 해제 (게스트 결과를 그대로 이관)</li>
+  <li>메인에서 <strong>검색어로 레벨 추천</strong> (Gemini 임베딩 코사인, 생성 없는 검색 방식)</li>
+  <li>라이브: <a href="https://gara-home.airobotassn.workers.dev">https://gara-home.airobotassn.workers.dev</a> (Cloudflare)</li>
+</ul>
+</section>
+
+<!-- 2 -->
+<section id="s2">
+<h2 class="sec"><span class="num">2</span>5분 Quick Start (로컬 실행)</h2>
+<div class="warn">전제: Node 18+ (권장 20+), git, 그리고 <strong>이미 셋업된 Supabase 프로젝트의 URL/anon key</strong>. Supabase 를 처음부터 만든다면 먼저 <a href="#s3">§3 Supabase 최초 셋업</a>을 1회 수행하세요.</div>
+<pre><code># 1) 클론 &amp; 의존성
+git clone &lt;repo-url&gt; ai-level-test
+cd ai-level-test
+npm install        # 윈도우에서 실행정책에 막히면 npm.cmd install
+
+# 2) 프론트 환경변수 (.env.local 을 루트에 생성)
+#    VITE_SUPABASE_URL=https://&lt;ref&gt;.supabase.co
+#    VITE_SUPABASE_ANON_KEY=&lt;anon public key&gt;
+
+# 3) 개발 서버
+npm run dev        # → http://localhost:5173</code></pre>
+
+<h3>자주 쓰는 명령</h3>
+<table>
+<thead><tr><th>명령</th><th>하는 일</th></tr></thead>
+<tbody>
+<tr><td><code>npm run dev</code></td><td>Vite 개발 서버 (HMR, <code>localhost:5173</code>)</td></tr>
+<tr><td><code>npm run build</code></td><td><code>tsc -b &amp;&amp; vite build</code> → 타입체크 후 <code>dist/</code> 번들</td></tr>
+<tr><td><code>npm run lint</code></td><td>ESLint 전체 검사</td></tr>
+<tr><td><code>npm run preview</code></td><td>빌드 결과 미리보기</td></tr>
+<tr><td><code>npm run test:responsive</code></td><td>Playwright 반응형 테스트</td></tr>
+</tbody>
+</table>
+<div class="warn"><strong>윈도우 주의</strong>: PowerShell 실행정책에 <code>npm</code>/<code>npx</code> 가 막히면 <code>npm.cmd</code> / <code>npx.cmd</code> 를 쓰세요. (영구 해결: <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>)</div>
+
+<h3>동작 확인 체크 (셋업이 제대로 됐는지)</h3>
+<ul class="checklist">
+  <li>비로그인 응시 → 결과창에 <strong>총점만</strong> 보이고 티어/레이더/해설은 잠김</li>
+  <li>결과창에서 구글 로그인 → <strong>같은 결과로 잠금 해제 + 유지</strong></li>
+  <li>브라우저 콘솔에서 <code>supabase.from('test_attempts').select()</code> → <strong>0행</strong> (서버 잠금 정상)</li>
+</ul>
+</section>
+
+<!-- 3 -->
+<section id="s3">
+<h2 class="sec"><span class="num">3</span>Supabase 최초 셋업 (1회)</h2>
+<p>로컬에서 시험이 실제로 돌아가려면 Supabase 백엔드가 있어야 합니다. <strong>처음 1회</strong>만 아래를 순서대로 진행하세요. (원본: <a href="../SETUP.md">SETUP.md</a>)</p>
+
+<div class="step"><div class="n">1</div><div class="body">
+  <b>프로젝트 생성</b> — <a href="https://supabase.com">supabase.com</a> → New project (Region <code>Northeast Asia (Seoul)</code> 권장). 생성 후 <b>Project Settings → API</b> 에서 3개를 메모: <code>Project URL</code>, <code>anon public</code> key, <code>service_role</code> key(비밀 — 자동 주입되니 어디에도 붙여넣지 않음).
+</div></div>
+
+<div class="step"><div class="n">2</div><div class="body">
+  <b>프론트 환경변수</b> — 루트 <code>.env.local</code> 에 입력:
+  <pre><code>VITE_SUPABASE_URL=https://&lt;ref&gt;.supabase.co
+VITE_SUPABASE_ANON_KEY=&lt;anon public key&gt;</code></pre>
+</div></div>
+
+<div class="step"><div class="n">3</div><div class="body">
+  <b>DB 스키마 + 시드</b> — 대시보드 <b>SQL Editor</b> 에서 ① <code>supabase/schema.sql</code> 전체 붙여넣기 → Run, ② <code>supabase/seed.sql</code> 전체 붙여넣기 → Run(샘플 문제 168개 — 나중에 실제 문항으로 교체).
+</div></div>
+
+<div class="step"><div class="n">4</div><div class="body">
+  <b>로그인 켜기</b> — <b>Authentication → Providers</b> 에서 <code>Anonymous</code> Enable(비로그인 응시 필수) + <code>Google</code> Enable. Google 화면의 <b>Callback URL</b>(<code>https://&lt;ref&gt;.supabase.co/auth/v1/callback</code>)을 복사 → <a href="https://console.cloud.google.com">Google Cloud Console</a> 에서 OAuth 동의화면(External) 구성 → 웹 애플리케이션 OAuth 클라이언트 ID 생성 → 승인된 리디렉션 URI 에 Callback URL 붙여넣기 → 발급된 Client ID/Secret 을 Supabase Google provider 에 입력 후 Save.
+</div></div>
+
+<div class="step"><div class="n">5</div><div class="body">
+  <b>URL 설정</b> — <b>Authentication → URL Configuration</b>: Site URL = <code>http://localhost:5173</code>, Redirect URLs 에 <code>http://localhost:5173/**</code> 추가. (배포 후엔 운영 도메인 <code>https://gara-home.airobotassn.workers.dev</code> 도 Site URL = 그 주소, Redirect URLs 에 <code>.../**</code> 추가 — <b>도메인 바뀌면 반드시 갱신</b>, 미갱신 시 로그인 후 404)
+</div></div>
+
+<div class="step"><div class="n">6</div><div class="body">
+  <b>Edge Functions 배포 + Gemini 키</b> — 함수는 git push 로 안 올라갑니다. CLI 로 배포:
+  <pre><code># CLI 로그인 + 프로젝트 연결
+npx.cmd supabase login
+npx.cmd supabase link --project-ref &lt;ref&gt;
+
+# 함수 5종 배포
+npx.cmd supabase functions deploy start-test
+npx.cmd supabase functions deploy submit-test
+npx.cmd supabase functions deploy get-result
+npx.cmd supabase functions deploy list-attempts
+npx.cmd supabase functions deploy recommend-level
+
+# 레벨 추천용 Gemini 키를 함수 시크릿으로 등록 (키: https://aistudio.google.com/apikey)
+npx.cmd supabase secrets set GEMINI_API_KEY=&lt;your-key&gt;</code></pre>
+  자세한 배포 규칙은 <a href="#s17">§17 배포 파이프라인</a> 참조.
+</div></div>
+
+<div class="ok"><strong>검증</strong>: <a href="#s2">§2</a> 의 동작 확인 체크 3개가 모두 통과하면 셋업 완료입니다.</div>
+</section>
+
+<!-- 4 -->
+<section id="s4">
+<h2 class="sec"><span class="num">4</span>제품 개요 &amp; 유저 흐름</h2>
+
+<h3>6개 측정 영역 (6축)</h3>
+<table>
+<thead><tr><th>key</th><th>라벨</th><th>측정 대상</th></tr></thead>
+<tbody>
+<tr><td><code>prompt</code></td><td>프롬프트</td><td>프롬프트 설계·역할부여·구조화</td></tr>
+<tr><td><code>model</code></td><td>모델/도구</td><td>모델 선택·도구 활용 적합성</td></tr>
+<tr><td><code>verify</code></td><td>검증</td><td>결과 검증·할루시네이션 판별</td></tr>
+<tr><td><code>automation</code></td><td>자동화</td><td>워크플로우 자동화·연계</td></tr>
+<tr><td><code>data</code></td><td>데이터</td><td>데이터 처리·해석</td></tr>
+<tr><td><code>ethics</code></td><td>윤리</td><td>보안·저작권·윤리</td></tr>
+</tbody>
+</table>
+<div class="note">정의 출처: <code>src/lib/categories.ts</code>. 6축은 DB enum <code>category</code> 와 <strong>반드시 일치</strong>해야 합니다.</div>
+
+<h3>핵심 사용자 여정</h3>
+<div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    L["랜딩 /<br/>검색어로 레벨 추천"] --> S["레벨 선택 /test/select<br/>(Lv1~7)"]
+    S --> R["시험 /test/:attemptId<br/>전체화면·20문항"]
+    R --> RES["결과 /result/:attemptId"]
+    RES -->|게스트| G["총점만 노출<br/>나머지 잠김 🔒"]
+    RES -->|로그인| U["티어·6축 레이더·오답노트 🔓"]
+    G -->|구글 로그인| Claim["claim 토큰으로<br/>같은 결과 이관"]
+    Claim --> U
+    U --> D["대시보드 /dashboard<br/>누적 티어·추이·기록"]
+    U --> RK["랭킹 /ranking"]
+</pre>
+</div>
+
+<h3>라우트 표 (<code>src/App.tsx</code>)</h3>
+<table>
+<thead><tr><th>경로</th><th>페이지</th><th>인증</th><th>설명</th></tr></thead>
+<tbody>
+<tr><td><code>/</code></td><td>Landing</td><td>불필요</td><td>히어로 + 검색어 레벨 추천(<code>recommend-level</code>)</td></tr>
+<tr><td><code>/test/select</code></td><td>LevelSelect</td><td>불필요</td><td>Lv1~7 선택, 추천/도전 태그</td></tr>
+<tr><td><code>/test/:attemptId</code></td><td>TestRunner</td><td>익명 세션</td><td>전체화면 20문항 + 이탈 감지</td></tr>
+<tr><td><code>/result/:attemptId</code></td><td>Result</td><td>게스트/로그인</td><td>결과(잠금/해제) + claim 처리</td></tr>
+<tr><td><code>/dashboard</code></td><td>Dashboard</td><td><span class="badge b-auth">로그인 전용</span></td><td>누적 티어·추이·활동·기록</td></tr>
+<tr><td><code>/ranking</code></td><td>Ranking</td><td>불필요</td><td>티어 리그 리더보드</td></tr>
+<tr><td><code>/about</code></td><td>About</td><td>불필요</td><td>협회 소개</td></tr>
+<tr><td><code>/privacy</code></td><td>Privacy</td><td>불필요</td><td>개인정보처리방침</td></tr>
+<tr><td><code>/auth/callback</code></td><td>AuthCallback</td><td>—</td><td>OAuth 콜백 → <code>/dashboard</code></td></tr>
+<tr><td><code>*</code></td><td>→ <code>/</code></td><td>—</td><td>폴백</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- 5 -->
+<section id="s5">
+<h2 class="sec"><span class="num">5</span>아키텍처 한 장</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    subgraph Browser["브라우저 (React 19 SPA)"]
+        UI["pages / components"]
+        Auth["AuthProvider<br/>(익명·구글 세션)"]
+        SB["supabase.ts<br/>callFunction()"]
+    end
+    subgraph Host["Cloudflare (정적 호스팅·Workers)"]
+        Static["dist/ (master push 자동배포)"]
+    end
+    subgraph Supabase["Supabase"]
+        EF["Edge Functions (Deno)<br/>start/submit/get-result/list/recommend"]
+        PG[("Postgres + RLS")]
+        AuthSvc["Auth (구글·익명)"]
+    end
+    Gemini["Google Gemini<br/>임베딩 API"]
+    UI --> Auth
+    UI --> SB
+    SB -->|JWT 동봉 호출| EF
+    Auth <-->|세션| AuthSvc
+    EF -->|service_role| PG
+    EF -->|recommend-level만| Gemini
+    Browser -.->|정적 자산| Static
+</pre>
+</div>
+<div class="danger"><strong>핵심 원칙 한 줄</strong>: 프론트는 <strong>DB 를 직접 읽지 않습니다.</strong> 출제·채점·결과 서빙·랭킹은 모두 <strong>Edge Function(service_role)</strong> 을 거칩니다. (보안 모델 <a href="#s10">§10</a>)</div>
+</section>
+
+<!-- 6 -->
+<section id="s6">
+<h2 class="sec"><span class="num">6</span>기술 스택</h2>
+<table>
+<thead><tr><th>레이어</th><th>기술</th><th>버전/비고</th></tr></thead>
+<tbody>
+<tr><td>프론트</td><td>React</td><td>19</td></tr>
+<tr><td>빌드</td><td>Vite + TypeScript</td><td><code>tsc -b &amp;&amp; vite build</code></td></tr>
+<tr><td>스타일</td><td>Tailwind CSS</td><td><strong>v4</strong> (PostCSS 플러그인 방식)</td></tr>
+<tr><td>차트</td><td><strong>자체 SVG</strong></td><td>Recharts 제거 — RadarChartBox·LineChart·ContributionGraph</td></tr>
+<tr><td>라우팅</td><td>react-router-dom</td><td>v7</td></tr>
+<tr><td>백엔드</td><td>Supabase</td><td>Postgres + Auth + Edge Functions(Deno)</td></tr>
+<tr><td>외부 API</td><td>Google Gemini 임베딩</td><td><code>gemini-embedding-001</code> (레벨 추천 전용)</td></tr>
+<tr><td>배포</td><td>Cloudflare(Workers) / Supabase CLI</td><td><code>master</code> push → Cloudflare 자동빌드·배포</td></tr>
+<tr><td>테스트</td><td>Playwright</td><td>반응형 스냅샷</td></tr>
+<tr><td>i18n</td><td><strong>자체 구현</strong></td><td>라이브러리 없음, <code>src/lib/i18n.tsx</code> 의 <code>D</code> 사전</td></tr>
+</tbody>
+</table>
+<div class="note">차트 라이브러리·i18n 라이브러리를 의도적으로 쓰지 않고 직접 구현했습니다(요구가 비표준이라 라이브러리보다 자체 구현이 유리).</div>
+</section>
+
+<!-- 7 -->
+<section id="s7">
+<h2 class="sec"><span class="num">7</span>디렉토리 구조 (주석판)</h2>
+<pre><code>src/
+├─ main.tsx                # 진입점: &lt;StrictMode&gt;&lt;App/&gt;&lt;/StrictMode&gt;
+├─ App.tsx                 # Provider 중첩 + 라우팅 (§4 라우트 표)
+├─ index.css               # 전역 css (styles/* 를 @import)
+│
+├─ lib/                    # ★ 공유 규칙·로직 (프론트의 "심장")
+│  ├─ supabase.ts          #   Supabase 클라 + callFunction&lt;T&gt;(name, body)
+│  ├─ types.ts             #   API 응답 타입(QuizQuestion, ResultResponse 등)
+│  ├─ scoring.ts           #   티어·MMR 수식 (※ _shared/lib.ts 와 동일 유지)
+│  ├─ categories.ts        #   6축 정의 (CATEGORY_KEYS, CategoryKey)
+│  ├─ testConfig.ts        #   상수(문항수·쿨다운·위반한도·TTL)
+│  └─ i18n.tsx             #   6개국어 사전 D + useT() (§15)
+│
+├─ context/AuthProvider.tsx  # 익명/구글 로그인 + claim 토큰 이관 (§13)
+├─ hooks/
+│  ├─ useAntiCheat.ts      # 복사차단 + 이탈감지 → 위반 누적 자동제출 (§14)
+│  └─ useCountUp.ts        # 숫자 카운트업 애니메이션
+│
+├─ components/
+│  ├─ Layout.tsx           # 최상위 래퍼 + FAB 메뉴(언어선택)
+│  ├─ TopBar.tsx · TierEmblem.tsx(티어 SVG 엠블렘)
+│  ├─ RadarChartBox.tsx · LineChart.tsx · ContributionGraph.tsx(자체 SVG)
+│  └─ GemAvatar.tsx        # 시드 기반 아바타
+│
+├─ pages/                  # 라우트 컴포넌트 (§4)
+│  ├─ Landing · LevelSelect · TestRunner · Result
+│  ├─ Dashboard · Ranking · About · Privacy
+│  └─ AuthCallback
+└─ styles/                 # 페이지별 css (base·shared·landing·test·result·dashboard…)
+
+supabase/
+├─ schema.sql              # 테이블 + enum + RLS + 트리거 (§9)
+├─ seed.sql                # 샘플 문제 168개 — 실제 문항으로 교체 필요
+└─ functions/
+   ├─ start-test/  submit-test/  get-result/  list-attempts/  recommend-level/
+   └─ _shared/
+      ├─ cors.ts           #   CORS 헤더 + json() 헬퍼
+      └─ lib.ts            #   채점 수식(프론트와 동일)·인증·쿨다운 공용</code></pre>
+<div class="danger"><strong>단일 출처 규칙 2개를 머리에 박아두세요</strong><br>
+① <strong>6축</strong>: <code>categories.ts</code> ⇄ DB enum <code>category</code> 일치<br>
+② <strong>스코어링</strong>: <code>src/lib/scoring.ts</code> ⇄ <code>supabase/functions/_shared/lib.ts</code> <strong>동일 수식</strong> (둘 다 고쳐야 함)</div>
+</section>
+
+<!-- 8 -->
+<section id="s8">
+<h2 class="sec"><span class="num">8</span>핵심 데이터 흐름: 출제 → 응시 → 채점 → 결과</h2>
+<p>이 한 장이 제품의 본질입니다.</p>
+<div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    participant U as 브라우저
+    participant A as AuthProvider
+    participant ST as start-test
+    participant SU as submit-test
+    participant GR as get-result
+    participant DB as Postgres (service_role)
+    U->>A: 응시 시작 (세션 없으면 익명 생성)
+    A-->>U: 익명/구글 JWT
+    U->>ST: { level } + JWT
+    ST->>DB: 쿨다운 체크 → 20문항 추첨 → test_attempts INSERT(in_progress)
+    ST-->>U: { attemptId, questions[] }  ⟵ correct_index 미포함
+    Note over U: 전체화면 응시 · 이탈감지(§14)
+    U->>SU: { attemptId, answers[], violationCount } + JWT
+    SU->>DB: TTL 검증 → 채점 → 축별 perf → user_skill EWMA 갱신(applied 1회)
+    alt 로그인 유저
+        SU-->>U: 전체 결과(티어·6축·해설·deltas)
+    else 게스트
+        SU-->>U: 잠금 결과(총점만)
+    end
+    Note over U: 게스트가 나중에 구글 로그인하면
+    U->>GR: { attemptId, claimToken }
+    GR->>DB: claim_token 일치 시 user_id 이관 + perf 1회 적용
+    GR-->>U: 잠금 해제된 전체 결과
+</pre>
+</div>
+<div class="cards">
+  <div class="card"><h4>🔒 정답 비노출</h4><p><code>correct_index</code> 는 출제 응답에 절대 안 실립니다. 채점은 서버에서만.</p></div>
+  <div class="card"><h4>♻️ applied 멱등</h4><p>채점·레이팅 적용은 <strong>딱 1회</strong>. 중복 제출/새로고침 farming 방지.</p></div>
+  <div class="card"><h4>🎫 claim 이관</h4><p>게스트 결과를 <code>claim_token</code> 으로 로그인 계정에 1회 이관.</p></div>
+  <div class="card"><h4>⏳ TTL 120분</h4><p><code>ATTEMPT_TTL_MINUTES=120</code> — 오래된 in_progress 는 서버가 만료.</p></div>
+</div>
+</section>
+
+<!-- 9 -->
+<section id="s9">
+<h2 class="sec"><span class="num">9</span>데이터베이스 (ER + 테이블)</h2>
+<div class="diagram">
+<pre class="mermaid">
+erDiagram
+    profiles ||--o| user_skill : "has"
+    profiles ||--o{ test_attempts : "takes"
+    test_attempts ||--o{ attempt_answers : "contains"
+    questions ||--o{ attempt_answers : "answered as"
+    profiles {
+        uuid id PK "→ auth.users"
+        text display_name
+        bool is_anonymous
+    }
+    questions {
+        uuid id PK
+        int level "1~7"
+        category category
+        jsonb options
+        int correct_index "클라 비노출"
+        bool active
+    }
+    test_attempts {
+        uuid id PK
+        uuid user_id FK
+        int level
+        attempt_status status
+        jsonb axis_perf "이번 판 축별 성적"
+        jsonb deltas "변동량"
+        text tier_after
+        bool applied "멱등 1회 적용"
+        text claim_token "익명→로그인 이관"
+    }
+    attempt_answers {
+        uuid id PK
+        uuid attempt_id FK
+        uuid question_id FK
+        int selected_index
+        bool is_correct
+    }
+    user_skill {
+        uuid user_id PK
+        numeric r_prompt
+        numeric overall
+        text tier
+        bool placed "배치 완료 여부"
+    }
+</pre>
+</div>
+<table>
+<thead><tr><th>테이블</th><th>역할</th><th>접근</th></tr></thead>
+<tbody>
+<tr><td><code>profiles</code></td><td>사용자 프로필 (트리거로 자동 생성)</td><td>본인만 read/update</td></tr>
+<tr><td><code>questions</code></td><td>문제 은행. <code>correct_index</code> 비노출</td><td><span class="badge b-lock">service_role 전용</span></td></tr>
+<tr><td><code>test_attempts</code></td><td>응시 기록 + 이번 판 결과/변동</td><td><span class="badge b-lock">service_role 전용</span></td></tr>
+<tr><td><code>attempt_answers</code></td><td>문항별 선택/정오</td><td><span class="badge b-lock">service_role 전용</span></td></tr>
+<tr><td><code>user_skill</code></td><td>누적 6축 레이팅 + 티어</td><td><span class="badge b-lock">service_role 전용</span></td></tr>
+<tr><td><code>tier_avg_profile</code></td><td>티어별 평균(레이더 고스트)</td><td><span class="badge b-auth">public read</span></td></tr>
+</tbody>
+</table>
+<div class="note">enum: <code>category</code>(6축), <code>attempt_status</code>(in_progress·submitted·expired). 트리거: <code>auth.users</code> INSERT → <code>profiles</code> 자동 생성.</div>
+</section>
+
+<!-- 10 -->
+<section id="s10">
+<h2 class="sec"><span class="num">10</span>보안 모델 (RLS) — 가장 중요</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+    Client["프론트(anon key)"] -->|❌ 직접 SELECT 불가| Locked["questions · test_attempts<br/>attempt_answers · user_skill"]
+    Client -->|✅ 호출만| EF["Edge Functions"]
+    EF -->|service_role(RLS 우회)| Locked
+    Client -->|✅ public read| Pub["tier_avg_profile"]
+</pre>
+</div>
+<ol>
+  <li><code>questions.correct_index</code> · <code>test_attempts</code> · <code>attempt_answers</code> · <code>user_skill</code> 은 <strong>RLS 정책 미부여 = service_role 전용</strong>. 프론트가 anon key 로 SELECT 하면 <strong>0행</strong>.</li>
+  <li><strong>출제·채점·결과 서빙은 Edge Function 에서만.</strong> 함수가 service_role 로 읽고, <strong>응답에서 민감 필드를 빼고</strong> 내려줍니다.</li>
+  <li><strong>익명(게스트)</strong> 응답은 서버가 <strong>총점 외 데이터를 제외</strong>합니다(잠금 결과).</li>
+  <li><code>GEMINI_API_KEY</code> 등 비밀키는 <strong>Supabase 함수 시크릿</strong>에만. 프론트(<code>VITE_*</code>)에 절대 넣지 않습니다.</li>
+</ol>
+<div class="ok"><strong>검증법</strong>: 콘솔에서 <code>await supabase.from('test_attempts').select('*')</code> → <code>data: []</code>. 0행이 정상입니다.</div>
+</section>
+
+<!-- 11 -->
+<section id="s11">
+<h2 class="sec"><span class="num">11</span>레이팅 &amp; 티어 시스템 (<code>scoring.ts</code>)</h2>
+<div class="danger"><strong>단일 출처</strong>: <code>src/lib/scoring.ts</code> 와 <code>supabase/functions/_shared/lib.ts</code> 는 <strong>같은 수식</strong>. 한쪽만 고치면 프론트 미리보기와 서버 확정값이 어긋납니다. <strong>항상 둘 다 수정.</strong></div>
+<div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    R["축 정답률 ratio (0~1)"] --> AP["axisPerf(level, ratio)"]
+    AP --> UA["updateAxis(prev, perf, placed)<br/>비대칭 EWMA"]
+    UA --> CO["computeOverall(6축)<br/>평균0.7 + 최저0.3"]
+    CO --> T["tierForOverall → 티어"]
+</pre>
+</div>
+<h3>핵심 계수</h3>
+<table>
+<thead><tr><th>상수</th><th>값</th><th>의미</th></tr></thead>
+<tbody>
+<tr><td><code>LEVEL_WEIGHT</code></td><td>1→15 … 7→100</td><td><strong>레벨이 천장.</strong> 낮은 레벨로는 상위 티어 도달 불가(레벨 게이밍 차단)</td></tr>
+<tr><td><code>EWMA_K_UP</code> / <code>EWMA_K_DOWN</code></td><td>0.25 / 0.1</td><td><strong>비대칭</strong>: 오를 땐 빠르게, 내릴 땐 천천히</td></tr>
+<tr><td><code>PLACEMENT_K</code></td><td>1</td><td>첫 응시(배치)는 perf 그대로 박음</td></tr>
+<tr><td><code>RATIO_EXPONENT</code></td><td>1.5</td><td>실수 페널티(절반 틀리면 훅 떨어짐)</td></tr>
+<tr><td><code>GUESS_BASELINE</code></td><td>0.25</td><td>4지선다 무작위 기댓값(추측 보정)</td></tr>
+<tr><td><code>BALANCE_MEAN_W</code> / <code>BALANCE_MIN_W</code></td><td>0.7 / 0.3</td><td>종합 = 평균 가중 + <strong>최저축 가중</strong>(약점 패널티)</td></tr>
+</tbody>
+</table>
+<h3>핵심 수식</h3>
+<pre><code>// 한 축 성적: 추측 기댓값을 깎고 레벨 천장을 곱한 뒤 실수 페널티 지수
+axisPerf(level, ratio) = LEVEL_WEIGHT[level] * clamp((ratio-0.25)/0.75)^1.5
+
+// 누적 갱신: 배치 전이면 perf 그대로, 이후엔 상승 빠르게/하락 천천히
+updateAxis(prev, perf, placed) = placed ? prev + k*(perf-prev) : perf   // k = perf>=prev ? 0.25 : 0.1
+
+// 종합: 평균 70% + 최저축 30%
+computeOverall = 0.7 * mean(6축) + 0.3 * min(6축)</code></pre>
+<h3>티어 밴드 (누적 overall 0~100 기준)</h3>
+<div class="tierrow">
+  <div class="tier"><span class="dot" style="background:#9ca3af"></span><span class="t">아이언</span><span class="m">min 0</span></div>
+  <div class="tier"><span class="dot" style="background:#b06a3b"></span><span class="t">브론즈</span><span class="m">min 12</span></div>
+  <div class="tier"><span class="dot" style="background:#9fb0c3"></span><span class="t">실버</span><span class="m">min 26</span></div>
+  <div class="tier"><span class="dot" style="background:#d6a534"></span><span class="t">골드</span><span class="m">min 42</span></div>
+  <div class="tier"><span class="dot" style="background:#3aa79f"></span><span class="t">플래티넘</span><span class="m">min 60</span></div>
+  <div class="tier"><span class="dot" style="background:#3f8fd6"></span><span class="t">다이아</span><span class="m">min 80</span></div>
+  <div class="tier"><span class="dot" style="background:#9a5fd0"></span><span class="t">마스터</span><span class="m">min 94</span></div>
+</div>
+<div class="note">보조 함수: <code>pointsToNextTier()</code>(승급까지 남은 점수), <code>weakestAxis()</code>(절대 최저축 = 승급 효율 최고), <code>weakestVsAvg()</code>(또래 티어 평균 대비 약점). 결과창은 <code>TierEmblem</code> SVG + 승급(글로우)/강등(흔들림) 연출을 이번 판 변동으로 표시합니다.</div>
+</section>
+
+<!-- 12 -->
+<section id="s12">
+<h2 class="sec"><span class="num">12</span>Edge Functions API 레퍼런스</h2>
+<p>호출은 전부 <code>src/lib/supabase.ts</code> 의 <code>callFunction&lt;T&gt;(name, body)</code> 로 합니다(현재 세션 JWT 자동 동봉). 공통 응답은 <code>_shared/cors.ts</code> 의 <code>json()</code>, 공용 로직은 <code>_shared/lib.ts</code>.</p>
+<table>
+<thead><tr><th>함수</th><th>입력</th><th>출력</th><th>핵심 동작</th></tr></thead>
+<tbody>
+<tr><td><code>start-test</code></td><td><code>{ level }</code></td><td><code>{ attemptId, questions[] }</code></td><td>쿨다운 체크 → 20문항 추첨 → attempt 생성. <strong>correct_index 미포함</strong></td></tr>
+<tr><td><code>submit-test</code></td><td><code>{ attemptId, answers[], violationCount }</code></td><td>로그인=전체 / 게스트=잠금</td><td>TTL 검증 → 채점 → 축별 perf → <code>user_skill</code> EWMA(applied 1회)</td></tr>
+<tr><td><code>get-result</code></td><td><code>{ attemptId, claimToken? }</code></td><td><code>ResultResponse</code></td><td>캐시 결과 서빙. claimToken 일치 시 익명→로그인 이관 + 1회 적용</td></tr>
+<tr><td><code>list-attempts</code></td><td><code>{}</code></td><td><code>{ attempts[], skill }</code></td><td><span class="badge b-auth">로그인 전용</span> 이력 + 현재 티어/레이팅</td></tr>
+<tr><td><code>recommend-level</code></td><td><code>{ query }</code></td><td><code>{ level, alt?, ranked[] }</code></td><td>Gemini 임베딩 → 7 앵커 코사인 → 추천 (<strong>단일 파일</strong>)</td></tr>
+</tbody>
+</table>
+<div class="note">응답 타입의 정식 정의는 <code>src/lib/types.ts</code>. 함수 입출력을 바꾸면 <strong>여기 타입도 같이</strong> 고치세요. 함수 배포 방법은 <a href="#s17">§17 배포 파이프라인</a> 참조.</div>
+
+<h3>레벨 추천(recommend-level) 동작 — "생성 없는 R"</h3>
+<ul>
+  <li>모델 <code>gemini-embedding-001</code>, <code>taskType=SEMANTIC_SIMILARITY</code>, <code>outputDimensionality=768</code>.</li>
+  <li>레벨별 "자기평가 표현" 앵커 7개를 콜드스타트에 1회 임베딩→메모리 캐시 → 검색어 임베딩과 코사인 유사도 → 최근접 레벨(+근소차 도전 레벨).</li>
+  <li>레벨이 7개뿐이라 <strong>벡터 DB(pgvector) 불필요</strong>. 추천 품질은 함수의 <code>ANCHORS</code> 문구가 좌우 → 튜닝 시 <code>ANCHORS</code> 수정 후 재배포.</li>
+</ul>
+</section>
+
+<!-- 13 -->
+<section id="s13">
+<h2 class="sec"><span class="num">13</span>인증 모델 (익명 → 구글 claim 이관)</h2>
+<div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> 익명: ensureAnonymous()
+    익명 --> 응시: 게스트로 시험
+    응시 --> 잠금결과: 총점만
+    잠금결과 --> 구글로그인: loginWithGoogle()
+    구글로그인 --> 이관: claim_token 으로 get-result
+    이관 --> 해제결과: 티어·레이더·해설
+    익명 --> 구글로그인: 처음부터 로그인도 가능
+    해제결과 --> [*]
+</pre>
+</div>
+<p><code>src/context/AuthProvider.tsx</code> (<code>useAuth()</code>):</p>
+<ul>
+  <li>상태: <code>session</code>, <code>user</code>, <code>loading</code>, <code>isFullUser</code>(익명 아님 여부)</li>
+  <li>메서드: <code>ensureAnonymous()</code>(없으면 생성), <code>loginWithGoogle(redirectTo?)</code>, <code>logout()</code></li>
+  <li>마운트 시 <code>onAuthStateChange</code> 구독. OAuth 콜백은 <code>/auth/callback</code> 에서 처리 후 <code>/dashboard</code> 이동</li>
+</ul>
+<div class="warn"><strong>운영 함정</strong>: OAuth localhost 튕김 = Supabase <strong>Site URL</strong> 설정 문제(<a href="#s3">§3</a>·<a href="#s17">§17</a>). 모바일 인앱 브라우저 차단 = 구글 정책(기본 브라우저로 열어야 함).</div>
+</section>
+
+<!-- 14 -->
+<section id="s14">
+<h2 class="sec"><span class="num">14</span>부정행위 방지 (<code>useAntiCheat.ts</code>)</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+    subgraph L1["1층: 복사/추출 차단"]
+        c["contextmenu · copy · cut · drag · selectstart 차단"]
+    end
+    subgraph L2["2층: 이탈 감지"]
+        v["탭 전환 · 창 blur · 전체화면 이탈 (600ms 디바운스)"]
+    end
+    L2 --> count["위반 누적 violationCount"]
+    count -->|≥ MAX_VIOLATIONS(3)| auto["자동 제출 + 무효 처리"]
+</pre>
+</div>
+<ul>
+  <li>시험 시작 전 <strong>경고 게이트</strong>(전체화면·이탈경고·무효 규칙)를 띄웁니다.</li>
+  <li><code>enterFullscreen()</code> 으로 전체화면 진입, 위반 누적 3회면 자동 제출.</li>
+  <li>반환: <code>{ violations, lastWarning, enterFullscreen }</code>. 관련 상수: <code>MAX_VIOLATIONS=3</code>, <code>ATTEMPT_TTL_MINUTES=120</code>.</li>
+</ul>
+</section>
+
+<!-- 15 -->
+<section id="s15">
+<h2 class="sec"><span class="num">15</span>국제화 (i18n) — 라이브러리 없음</h2>
+<p><code>src/lib/i18n.tsx</code> 의 사전 <code>D</code> 하나로 동작합니다. 6개국어: <strong>ko · en · ja · zh · hi · vi</strong>.</p>
+<pre><code>import { useT } from '../lib/i18n'
+
+function MyComponent() {
+  const t = useT()
+  return &lt;h1&gt;{t('landing.title')}&lt;/h1&gt;          // 키 조회
+  // 보간: t('result.score', { score: 87 })  →  "{score}" 치환
+}</code></pre>
+<div class="danger"><strong>새 문구를 추가하면 6개 언어를 모두 채우세요.</strong> 하나라도 비면 그 언어에서 키가 그대로 노출됩니다. 보간은 <code>{var}</code> 구문. 언어 선택은 FAB 패널(<code>Layout</code>), localStorage 저장.</div>
+</section>
+
+<!-- 16 -->
+<section id="s16">
+<h2 class="sec"><span class="num">16</span>환경변수</h2>
+<table>
+<thead><tr><th>변수</th><th>위치</th><th>용도</th><th>주의</th></tr></thead>
+<tbody>
+<tr><td><code>VITE_SUPABASE_URL</code></td><td>프론트 <code>.env.local</code></td><td>Supabase URL</td><td><code>VITE_</code> 접두사여야 클라 노출</td></tr>
+<tr><td><code>VITE_SUPABASE_ANON_KEY</code></td><td>프론트 <code>.env.local</code></td><td>anon public key</td><td>공개돼도 됨(RLS 가 방어)</td></tr>
+<tr><td><code>SUPABASE_*</code> / <code>SERVICE_ROLE_KEY</code></td><td>함수 런타임</td><td>자동 주입</td><td><strong>설정 불필요</strong></td></tr>
+<tr><td><code>GEMINI_API_KEY</code></td><td>Supabase 함수 시크릿</td><td><code>recommend-level</code> 임베딩</td><td><span class="badge b-lock">프론트 금지</span> 무효면 추천 500</td></tr>
+</tbody>
+</table>
+<pre><code># Gemini 키 등록 (함수 시크릿). 유효성 점검: models?key=KEY 호출 시 모델 목록이 뜨면 정상
+npx.cmd supabase secrets set GEMINI_API_KEY=&lt;your-key&gt; --project-ref jfvldoywvzvqhitcgalr</code></pre>
+<div class="danger"><code>service_role</code> key 는 어디에도 붙여넣지 않습니다. 함수 런타임에 자동 주입됩니다.</div>
+</section>
+
+<!-- 17 -->
+<section id="s17">
+<h2 class="sec"><span class="num">17</span>배포 파이프라인 (Cloudflare · Supabase 함수)</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    push["git push master"] -->|자동(수 분)| Host["Cloudflare<br/>프론트만 dist/"]
+    cli1["npx supabase functions deploy"] -->|수동| Func["Edge Functions"]
+    cli2["npx supabase secrets set"] -->|수동| Sec["함수 시크릿(GEMINI_API_KEY)"]
+</pre>
+</div>
+<div class="danger"><strong>가장 중요</strong>: <code>git push</code> 는 <strong>프론트만</strong> 배포합니다. <strong>Edge Function 은 git 으로 안 올라갑니다</strong> — 반드시 CLI 로 따로 배포하세요.</div>
+
+<h3>① 프론트엔드 → Cloudflare (Workers 정적 자산)</h3>
+<ul>
+  <li>호스팅: <strong>Cloudflare</strong> — <a href="https://gara-home.airobotassn.workers.dev">gara-home.airobotassn.workers.dev</a>. GitHub <code>master</code> 연결 → <strong>push 하면 자동 빌드·배포</strong>(<code>npm install</code> 포함 <strong>수 분</strong>, push 직후 1~2분은 옛 화면일 수 있음).</li>
+  <li>대시보드 빌드 설정: Build command <code>npm run build</code>, Build output <code>dist</code>. <strong>빌드 환경변수</strong>에 <code>VITE_SUPABASE_URL</code>·<code>VITE_SUPABASE_ANON_KEY</code> 필요.</li>
+  <li><strong>SPA 라우팅은 <code>wrangler.jsonc</code> 의 <code>not_found_handling: "single-page-application"</code></strong> 으로 처리.
+    <div class="danger" style="margin-top:8px"><code>_redirects</code> 의 <code>/* /index.html 200</code> 은 <strong>쓰지 말 것</strong> — CF 새 빌드(Workers Assets)가 <code>.html</code>/<code>index</code> 를 떼며 <strong>307 무한루프</strong>(<code>Infinite loop detected</code>)로 처리해 빌드가 깨진다. 네이티브 SPA 모드가 정답.</div>
+  </li>
+  <li>push 시 CF 가 <code>cloudflare/workers-autoconfig</code> 브랜치를 자동 생성할 수 있다 → <strong>머지하지 말 것</strong>(우리 <code>wrangler.jsonc</code> 를 덮을 수 있음).</li>
+  <li>반영 확인: 라이브 JS 해시 == 로컬 빌드 해시. 딥링크(<code>/about</code>·<code>/auth/callback</code>)가 200 이어야 SPA 정상.
+    <pre><code>curl -s https://gara-home.airobotassn.workers.dev/ | grep -oE 'assets/index-[A-Za-z0-9_]+\.js'</code></pre>
+  </li>
+</ul>
+<div class="warn"><strong>과거 — Netlify (중단)</strong>: 무료 플랜 <strong>월 빌드 한도 초과</strong>(<code>credit usage exceeded</code>)로 자동·수동 배포 모두 차단(<code>block_builds_when_usage_exceeded</code>) → Cloudflare 로 이전. <code>netlify.toml</code> 은 남아있고 월 주기 초기화 시 복구. <strong>교훈</strong>: 빌드는 push 마다 <code>npm install+build</code> 를 풀로 돌려 한도를 빨리 먹으니 <strong>자잘한 변경은 모아서 push</strong>.</div>
+
+<h3>② 백엔드 → Supabase Edge Functions</h3>
+<ul>
+  <li>프로젝트 ref: <code>jfvldoywvzvqhitcgalr</code> (이름 GARA_HOME). <code>service_role</code>·URL·anon 키는 런타임 자동 주입.</li>
+  <li><strong><code>_shared/</code> 를 import 하는 함수</strong>(start-test·submit-test·get-result·list-attempts)는 <strong>반드시 CLI 로</strong> 배포 — CLI 가 <code>_shared</code> 까지 번들합니다. 대시보드 웹에디터는 폴더 단위라 <code>../_shared</code> 가 깨질 수 있음.
+    <pre><code>npx.cmd supabase functions deploy start-test --project-ref jfvldoywvzvqhitcgalr</code></pre>
+  </li>
+  <li><code>recommend-level</code> 만 의존성 없는 <strong>단일 파일</strong>이라 대시보드 웹에디터로도 배포 가능(또는 CLI).</li>
+</ul>
+
+<h3>③ 운영 토글 — 응시 쿨다운(3일 1회)</h3>
+<ul>
+  <li><code>supabase/functions/start-test/index.ts</code> 의 <code>COOLDOWN_ENABLED</code>. 테스트 단계엔 <code>false</code>(비활성), 정식 오픈 시 <code>true</code> 로 바꾸고 <strong>함수 재배포</strong>해야 실제 반영.</li>
+  <li>참고: <strong>비로그인(게스트)는 원래 쿨다운 없음</strong> — 쿨다운은 구글 로그인 유저에게만.</li>
+</ul>
+
+<table>
+<thead><tr><th>대상</th><th>방법</th><th>트리거</th></tr></thead>
+<tbody>
+<tr><td>프론트(<code>dist/</code>)</td><td><code>git push master</code> → Cloudflare 자동빌드</td><td>자동</td></tr>
+<tr><td>함수(<code>_shared</code> 사용)</td><td><code>supabase functions deploy &lt;name&gt;</code> (CLI 필수)</td><td>수동</td></tr>
+<tr><td>함수(<code>recommend-level</code>)</td><td>CLI 또는 대시보드 웹에디터</td><td>수동</td></tr>
+<tr><td>시크릿</td><td><code>supabase secrets set GEMINI_API_KEY=...</code></td><td>수동</td></tr>
+</tbody>
+</table>
+<div class="note">구글 로그인 도메인 갱신은 <a href="#s3">§3</a>·<a href="#s13">§13</a>, 자주 막히는 것은 <a href="#s19">§19 트러블슈팅</a>.</div>
+</section>
+
+<!-- 18 -->
+<section id="s18">
+<h2 class="sec"><span class="num">18</span>첫 기여 실습 (Good First Tasks)</h2>
+<div class="cards">
+  <div class="card">
+    <h4>A · 문구 추가 <span class="badge b-auth">프론트 · 5분</span></h4>
+    <p>① <code>i18n.tsx</code> 의 <code>D</code> 에서 키를 찾거나 새로 만든다 → ② <strong>6개 언어 모두</strong> 채운다 → ③ 컴포넌트에서 <code>useT()</code> → ④ <code>npm run dev</code> 로 언어 전환 확인.</p>
+  </div>
+  <div class="card">
+    <h4>B · 문항 추가 <span class="badge b-guest">DB · 10분</span></h4>
+    <p>① SQL Editor 에서 <code>questions</code> INSERT(<code>level</code>·<code>category</code>·<code>options</code>·<code>correct_index</code>·<code>explanation</code>·<code>active</code>) → ② 해당 레벨 풀에 자동 편입 → ③ 정답은 DB 에만 있고 클라엔 안 내려감 확인.</p>
+  </div>
+  <div class="card">
+    <h4>C · 채점/티어 튜닝 <span class="badge b-lock">로직 · 신중히</span></h4>
+    <p>① <code>scoring.ts</code> 계수 수정 → ② <strong>반드시 <code>_shared/lib.ts</code> 동일 수식도</strong> 수정 → ③ <code>supabase functions deploy submit-test</code> → ④ 프론트 미리보기 = 서버 확정값 확인.</p>
+  </div>
+</div>
+<div class="note">기능/운영 변화가 크면 관련 문서를 함께 갱신하는 것이 이 저장소의 컨벤션입니다(<a href="../CLAUDE.md">CLAUDE.md</a> 참조).</div>
+</section>
+
+<!-- 19 -->
+<section id="s19">
+<h2 class="sec"><span class="num">19</span>트러블슈팅 (자주 막히는 것)</h2>
+<table>
+<thead><tr><th>증상</th><th>원인 / 해결</th></tr></thead>
+<tbody>
+<tr><td>프론트는 뜨는데 시험 시작 안 됨</td><td><code>.env.local</code> 의 <code>VITE_SUPABASE_*</code> 누락/오타, 또는 함수 미배포(<a href="#s3">§3</a>)</td></tr>
+<tr><td>함수 수정했는데 반영 안 됨</td><td><strong>git push 로는 함수가 안 올라간다.</strong> <code>supabase functions deploy &lt;name&gt;</code> 필요(<a href="#s17">§17</a>)</td></tr>
+<tr><td><code>_shared</code> import 함수 배포 후 깨짐</td><td>대시보드 웹에디터로 올렸을 것 → <strong>CLI 로 재배포</strong></td></tr>
+<tr><td>레벨 추천이 500</td><td><code>GEMINI_API_KEY</code> 미설정/무효 → <code>supabase secrets set</code></td></tr>
+<tr><td>OAuth 가 localhost 로 안 돌아옴</td><td>Supabase <strong>Site URL / Redirect URLs</strong> 설정(<a href="#s3">§3</a>)</td></tr>
+<tr><td>모바일 구글 로그인 차단</td><td>인앱 브라우저 정책 → 기본 브라우저로 열어야 함</td></tr>
+<tr><td>배포가 라이브에 반영 안 됨</td><td>(Netlify 시절) 빌드 크레딧 초과로 스킵 → Cloudflare 이전. 또는 빌드가 아직 진행 중(수 분)</td></tr>
+<tr><td>CF 빌드 <code>Infinite loop detected</code></td><td><code>_redirects</code> 대신 <code>wrangler.jsonc</code> 의 <code>not_found_handling: single-page-application</code> 사용(<a href="#s17">§17</a>)</td></tr>
+<tr><td>구글 로그인 후 404 / 딥링크 404</td><td>배포 도메인이 Supabase URL Configuration 에 미등록, 또는 SPA 라우팅 미설정(<a href="#s17">§17</a>·<a href="#s3">§3</a>)</td></tr>
+<tr><td>프론트 미리보기 ≠ 서버 결과</td><td><code>scoring.ts</code> 와 <code>_shared/lib.ts</code> 수식 불일치</td></tr>
+<tr><td>콘솔에서 <code>test_attempts</code> 조회 0행</td><td><strong>정상</strong>(RLS service_role 전용)</td></tr>
+<tr><td><code>npm</code>/<code>npx</code> PowerShell 에서 막힘</td><td><code>npm.cmd</code> / <code>npx.cmd</code> 사용</td></tr>
+<tr><td>3일 내 재응시 거부</td><td>쿨다운(<code>start-test</code> 의 <code>COOLDOWN_ENABLED</code>). 게스트는 원래 쿨다운 없음</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- 20 -->
+<section id="s20">
+<h2 class="sec"><span class="num">20</span>문서 맵</h2>
+<table>
+<thead><tr><th>문서</th><th>언제 보나</th></tr></thead>
+<tbody>
+<tr><td><strong>이 문서 (<code>docs/온보딩.html</code>)</strong></td><td>셋업·개발·배포 단일 진입점</td></tr>
+<tr><td><a href="../CLAUDE.md">CLAUDE.md</a></td><td>중심 가이드 + 문서맵 + 컨벤션</td></tr>
+<tr><td><a href="../README.md">README.md</a></td><td>제품 한 줄 소개 · 보안 모델 요약</td></tr>
+<tr><td><a href="../SETUP.md">SETUP.md</a></td><td>최초 1회 셋업(원본)</td></tr>
+<tr><td><a href="./기획안.md">기획안.md</a></td><td>제품 기획(요구사항·설계·DB·라우트)</td></tr>
+<tr><td><a href="./구글_계정_워크스페이스_가이드.html">구글_계정_워크스페이스_가이드.html</a></td><td>구글 로그인(OAuth) 계정 소유권·2FA·Workspace</td></tr>
+</tbody>
+</table>
+</section>
+
+<hr>
+<p class="footer">이 문서를 읽고 막힌 지점이 있으면 그 자체가 문서 개선 포인트입니다. 새 기능/운영 사항을 추가하면 이 문서와 관련 문서를 함께 갱신하세요. · GARA · AI 활용능력 레벨테스트</p>
+
+</main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'dark',
+    themeVariables:{
+      fontFamily:"'Pretendard',-apple-system,'Noto Sans KR',sans-serif",
+      primaryColor:'#1d212c', primaryTextColor:'#e6e8ee', primaryBorderColor:'#3a4358',
+      lineColor:'#6ea8fe', secondaryColor:'#171a23', tertiaryColor:'#171a23'
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>문제 자동생성 도구</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root { --ink:#1f2937; --line:#e5e7eb; --bg:#f7f8fa; --accent:#3aa79f; --bad:#b91c1c; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  .wrap { max-width:1100px; margin:0 auto; padding:18px 16px 60px; }
+  h1 { font-size:18px; margin:0 0 12px; }
+  .sub { color:#6b7686; font-size:12px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  label { display:block; font-weight:600; font-size:12px; margin:10px 0 4px; color:#374151; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font:inherit; background:#fff; }
+  textarea { resize:vertical; font-family:ui-monospace,monospace; font-size:13px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; }
+  .row > div { flex:1; min-width:120px; }
+  button { background:var(--ink); color:#fff; border:0; border-radius:8px; padding:10px 18px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); padding:8px 12px; }
+  button.mini { padding:6px 11px; font-size:12px; }
+  button:disabled { opacity:.5; cursor:default; }
+  details > summary { cursor:pointer; font-weight:700; font-size:13px; }
+  .muted { color:#6b7686; font-size:12px; }
+  .err { color:var(--bad); font-weight:600; } .ok { color:#1c6b63; }
+  .navtabs { display:flex; gap:8px; margin-bottom:14px; }
+  .navtab { background:#fff; border:1px solid var(--line); border-radius:9px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer; color:#6b7686; }
+  .navtab.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .sec { display:none; } .sec.on { display:block; }
+  .imodes { display:flex; gap:4px; background:#f1f3f5; border-radius:9px; padding:3px; margin-top:4px; }
+  .imode { flex:1; background:transparent; color:#6b7686; border:0; border-radius:7px; padding:8px 6px; font-weight:600; font-size:13px; cursor:pointer; }
+  .imode.on { background:#fff; color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .filler { margin-top:8px; } .filler.hidden { display:none; }
+  .axisbox { display:flex; flex-wrap:wrap; gap:6px; }
+  .axchip { display:inline-flex; align-items:center; gap:5px; font-weight:500; font-size:12px; border:1px solid var(--line); border-radius:999px; padding:5px 10px; cursor:pointer; background:#fff; }
+  .axchip:has(input:checked) { border-color:var(--accent); background:#f0faf8; color:#1c6b63; font-weight:600; }
+  .axchip input { width:auto; margin:0; }
+  .dropzone { display:block; border:2px dashed var(--line); border-radius:10px; padding:22px 14px; text-align:center; cursor:pointer; background:#fafbfc; }
+  .dropzone.over { border-color:var(--accent); background:#f0faf8; } .dropzone.has-file { border-style:solid; border-color:var(--accent); background:#fff; }
+  .dz-icon { font-size:26px; } .dz-title { font-weight:600; margin-top:6px; word-break:break-all; } .dz-sub { font-size:12px; color:#6b7686; margin-top:2px; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
+  .summary-box { margin-top:12px; padding:12px; border-radius:9px; background:#f0faf8; border:1px solid #cdeae6; }
+  .summary-box.empty { background:#fafbfc; border-color:var(--line); color:#6b7686; }
+  .summary-box .big { font-size:22px; font-weight:800; }
+  /* 노브 리스트(금지·예시) */
+  .knob-item { display:flex; gap:6px; align-items:center; margin:4px 0; }
+  .knob-item input { flex:1; }
+  .knob-item button { flex:0 0 auto; }
+  /* 생성 결과 카드 */
+  .q { border:1px solid var(--line); border-radius:8px; padding:11px 13px; margin:10px 0; }
+  .q.suspect { border-left:3px solid var(--bad); }
+  .q .qhead { display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+  .badge2 { font-size:11px; padding:1px 7px; border-radius:999px; font-weight:600; }
+  .badge2.ok { background:#ecfdf5; color:#065f46; } .badge2.warn { background:#fff7ed; color:#9a3412; }
+  .q input.qe, .q textarea.qe { width:100%; border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; margin:2px 0; resize:vertical; }
+  .q .opt { display:flex; gap:6px; align-items:center; }
+  .q .opt input[type=radio] { width:auto; flex:0 0 auto; margin:0; }
+  .q .quote { font-size:11px; color:#6b7686; margin-top:6px; border-left:2px solid var(--line); padding-left:8px; }
+  .q .quote.bad { color:var(--bad); border-left-color:var(--bad); }
+  .q .lintflags { font-size:11px; color:#9a3412; margin-top:4px; }
+  .placeholder { color:#9aa3af; text-align:center; padding:30px 10px; }
+  .note { color:var(--bad); font-size:13px; margin:6px 0; }
+  @media (max-width:760px){ .row{flex-direction:column;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>문제 자동생성 도구 <span class="sub">— 자료 / 문제 생성 (서로 독립)</span></h1>
+  <div class="navtabs">
+    <button class="navtab on" data-sec="source">📥 자료</button>
+    <button class="navtab" data-sec="gen">📝 문제 생성</button>
+  </div>
+
+  <!-- ============ 자료 ============ -->
+  <section class="sec on" id="sec-source">
+    <div class="card">
+      <div class="row">
+        <div style="max-width:130px"><label>레벨</label><select id="s_level"></select></div>
+        <div><label>축 (영역) <span class="muted">— 복수 선택</span></label><div id="s_axisBox" class="axisbox"></div></div>
+      </div>
+      <label>자료 넣는 법 <span class="muted">— AI 자동수집은 백엔드 cron이 따로. 여기선 수동 입력만.</span></label>
+      <div class="imodes">
+        <button class="imode on" data-tab="paste">✍️ 붙여넣기</button>
+        <button class="imode" data-tab="file">📄 파일</button>
+        <button class="imode" data-tab="url">🔗 URL</button>
+      </div>
+      <div class="filler" id="s_f-paste">
+        <textarea id="s_src" rows="8" placeholder="자료 본문을 붙여넣으세요…"></textarea>
+      </div>
+      <div class="filler hidden" id="s_f-file">
+        <label class="dropzone" id="s_dz">
+          <input type="file" id="s_file" accept=".txt,.md,.csv,.html,.htm,.pdf,.json" hidden />
+          <div class="dz-icon" id="s_dzIcon">⬆️</div>
+          <div class="dz-title" id="s_dzTitle">파일을 끌어다 놓거나 눌러서 선택</div>
+          <div class="dz-sub" id="s_dzSub">txt · md · pdf · html · csv · json</div>
+        </label>
+      </div>
+      <div class="filler hidden" id="s_f-url">
+        <div class="row" style="margin-top:4px"><input id="s_url" placeholder="https://…" /><button id="s_getUrl" class="ghost mini" style="flex:0 0 auto">가져오기</button></div>
+      </div>
+      <div class="cnt muted" id="s_cnt" style="text-align:right;margin-top:4px">0자</div>
+      <div class="topbar"><button id="s_go">추출 · 저장 →</button><span id="s_status" class="muted"></span></div>
+      <div class="summary-box empty" id="s_summary">아직 저장된 게 없어요. 자료 넣고 <b>추출·저장</b>을 누르세요.<br/><span class="muted">근거 불일치·중복은 자동으로 버려지고, 통과한 것만 저장됩니다.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ 문제 생성 ============ -->
+  <section class="sec" id="sec-gen">
+    <details class="card">
+      <summary>⚙️ 이 레벨 출제 지침 <span class="muted">— 난이도·중점. 레벨마다 따로.</span></summary>
+      <div class="muted" style="margin:8px 0">선택한 <b id="pc_lvlbadge">Lv.1</b>에 적용할 지침이에요. <b>이 레벨은 어떤 난이도로, 뭐가 중점</b>인지 블록으로 적으세요. <span style="color:#9aa3af">(정답 근거·출력형식 같은 핵심 규칙은 🔒 시스템 고정 — 안 보이고 안 바뀜)</span></div>
+      <div id="pc_blocks"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button id="pc_add" class="ghost mini">+ 지침 추가</button>
+      </div>
+    </details>
+
+    <div class="card">
+      <div class="row">
+        <div style="max-width:130px"><label>레벨</label><select id="g_level"></select></div>
+        <div><label>축 (영역) <span class="muted">— 복수 선택</span></label><div id="g_axisBox" class="axisbox"></div></div>
+        <div style="max-width:110px"><label>개수</label><input id="g_count" type="number" min="1" max="20" value="5" /></div>
+      </div>
+      <div class="topbar"><button id="g_go">문제 생성</button><span id="g_status" class="muted"></span></div>
+    </div>
+
+    <div class="topbar" style="margin:0 4px 6px">
+      <span><b>생성 결과</b> <span class="muted">— ⚠의심 확인 → 수정·승인 → 발행</span></span>
+      <span style="display:flex;gap:8px;align-items:center"><span id="g_pubStatus" class="muted"></span><button id="g_publish" class="mini" disabled>발행</button></span>
+    </div>
+    <div class="card"><div id="g_out"><div class="placeholder">생성하면 여기에 초안이 떠요.</div></div></div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id)
+const esc = (s) => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+const FN_BASE = 'https://jfvldoywvzvqhitcgalr.supabase.co/functions/v1'
+const FN_EXTRACT = FN_BASE + '/kb-extract', FN_SAVE = FN_BASE + '/kb-save', FN_GENERATE = FN_BASE + '/kb-generate', FN_PUBLISH = FN_BASE + '/kb-publish'
+async function callFn(url, body){
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+  const j = await res.json().catch(()=>({})); if (!res.ok) throw new Error(j.error||('HTTP '+res.status)); return j
+}
+
+// 레벨별 6축 (categories.ts 와 동기화)
+const AXES = {
+  1: [['l1_principle','생성형 AI 기본 원리'],['l1_security','AI 취약점·보안'],['l1_ethics','AI 윤리·편향'],['l1_responsibility','AI 사회적 책임·규범'],['l1_llm_eco','LLM 응용·생태계'],['l1_prompt','프롬프트 엔지니어링']],
+  2: [['l2_genai','생성형 AI 중급'],['l2_api','생성형 AI API 호출'],['l2_algo','AI 알고리즘 기획'],['l2_sensor','내장 센서 제어'],['l2_block','블록코딩 논리'],['l2_python','파이썬 기초']],
+  3: [['l3_rag','RAG·검색 파이프라인'],['l3_llm_ctrl','LLM 활용·생성 제어'],['l3_vision_eval','비전 인식·평가지표'],['l3_vision_data','비전 처리·데이터'],['l3_c_basic','C 기초 문법·흐름'],['l3_c_adv','C 메모리·구조·고급']],
+  4: [['l4_preproc','물리적 AI 전처리'],['l4_stm32','STM32 정밀제어'],['l4_ros2','ROS2 시스템 통합'],['l4_plc','PLC 프로그래밍'],['l4_sim','공정 시뮬레이션'],['l4_smartfactory','스마트공장']],
+  5: [['l5_reasoning','AI 지능·추론'],['l5_edge','엣지 AI 컴퓨팅'],['l5_iiot','산업 IoT·데이터 연계'],['l5_dtwin','디지털 트윈·시뮬레이션'],['l5_sysopt','시스템 통합·제조 최적화'],['l5_ros2','로봇 OS·제어(ROS2)']],
+  6: [['l6_swarm','군집 지능'],['l6_hrc','인간-로봇 협업(HRC)'],['l6_dtwin','디지털 트윈'],['l6_orchestration','AI 오케스트레이션'],['l6_process_opt','지능형 공정 최적화'],['l6_robosec','로보틱스 보안 및 사이버-물리 시스템']],
+  7: [['l7_standard','글로벌 표준 및 규제'],['l7_arch','초거대 시스템 아키텍처'],['l7_phyfusion','차세대 물리-지능 융합'],['l7_faulttol','극단적 결함 허용'],['l7_governance','AI 생태계 및 거버넌스'],['l7_ethics','범용 물리 지능 윤리']],
+}
+const AXIS_LABEL = {}; Object.values(AXES).flat().forEach(([k,l]) => AXIS_LABEL[k]=l)
+const fillLevelSel = (sel) => sel.innerHTML = Object.keys(AXES).map(l=>`<option value="${l}">Lv.${l}</option>`).join('')
+const fillAxisBox = (lv, box) => box.innerHTML = (AXES[lv]||[]).map(([k,label])=>`<label class="axchip"><input type="checkbox" value="${k}|${label}" checked> ${label}</label>`).join('')
+const axesOf = (box) => [...box.querySelectorAll('input:checked')].map(i=>{const[k,label]=i.value.split('|');return{key:k,label}})
+
+// 상단 탭(독립)
+document.querySelectorAll('.navtab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.navtab').forEach(x=>x.classList.toggle('on', x===t))
+  document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on', s.id==='sec-'+t.dataset.sec))
+}))
+
+// ============ 자료 탭 (수동 입력 → 추출·저장 자동 → 요약) ============
+;(function(){
+  const P='s_'
+  fillLevelSel($(P+'level')); fillAxisBox($(P+'level').value, $(P+'axisBox'))
+  $(P+'level').addEventListener('change', () => fillAxisBox($(P+'level').value, $(P+'axisBox')))
+  const setStatus = (m,c)=>{ $(P+'status').className=c||'muted'; $(P+'status').textContent=m }
+  const busy = (b)=>['go','getUrl'].forEach(k=>$(P+k).disabled=b)
+  const updateCnt = ()=> $(P+'cnt').textContent = $(P+'src').value.length.toLocaleString()+'자'
+  $(P+'src').addEventListener('input', updateCnt)
+  let curSource = {}
+
+  document.querySelectorAll('#sec-source .imode').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('#sec-source .imode').forEach(x=>x.classList.toggle('on', x===t))
+    ;['paste','file','url'].forEach(n=>$(P+'f-'+n).classList.toggle('hidden', n!==t.dataset.tab))
+  }))
+
+  // 파일(드롭존 + pdf)
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  async function readFile(file){
+    const name=file.name.toLowerCase(); setStatus('파일 읽는 중…')
+    try{
+      let text=''
+      if(name.endsWith('.pdf')){
+        if(!window.pdfjsLib) throw new Error('pdf.js 로드 실패')
+        const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise
+        for(let p=1;p<=pdf.numPages;p++){ const c=await(await pdf.getPage(p)).getTextContent(); text+=c.items.map(i=>i.str).join(' ')+'\n\n'; setStatus(`PDF ${p}/${pdf.numPages}`) }
+      } else { text=await file.text(); if(/\.html?$/.test(name)) text=text.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim() }
+      $(P+'src').value=text.trim(); curSource={title:file.name}; updateCnt()
+      $(P+'dz').classList.add('has-file'); $(P+'dzIcon').textContent='📄'; $(P+'dzTitle').textContent=file.name; $(P+'dzSub').textContent=`${text.length.toLocaleString()}자 · 교체하려면 다시`
+      setStatus(`파일 읽음 · ${text.length.toLocaleString()}자 — '추출·저장'`,'ok')
+    }catch(e){ setStatus('파일 실패: '+e.message,'err') }
+  }
+  const dz=$(P+'dz')
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')})
+  dz.addEventListener('dragleave',()=>dz.classList.remove('over'))
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f)readFile(f)})
+  $(P+'file').addEventListener('change',e=>{const f=e.target.files[0];if(f)readFile(f)})
+
+  async function getUrl(){
+    const url=$(P+'url').value.trim()
+    if(!/^https?:\/\//i.test(url)){ setStatus('올바른 URL이 아닙니다.','err'); return }
+    busy(true); setStatus('가져오는 중…')
+    try{ const j=await callFn(FN_EXTRACT,{mode:'fetch',url}); $(P+'src').value=j.text||''; curSource={url}; updateCnt()
+      document.querySelector('#sec-source .imode[data-tab="paste"]').click()  // 본문 탭으로(채워진 거 확인용)
+      setStatus(`가져옴 · ${(j.chars||0).toLocaleString()}자 — '추출·저장'`,'ok')
+    }catch(e){ setStatus('가져오기 실패: '+e.message,'err') } finally{ busy(false) }
+  }
+
+  // ★ 추출 → 자동 필터(근거불일치 컷) → 저장(중복 컷) → 요약만
+  async function extractSave(){
+    const text=$(P+'src').value.trim()
+    if(!text){ setStatus('자료 본문이 비었어요.','err'); return }
+    const axes=axesOf($(P+'axisBox')); if(!axes.length){ setStatus('축을 하나 이상 고르세요.','err'); return }
+    busy(true); setStatus('추출 중…')
+    try{
+      const ex=await callFn(FN_EXTRACT,{mode:'extract',text:text.slice(0,60000),level:$(P+'level').value,axes})
+      const all=ex.chunks||[]
+      const good=all.filter(c=>c.quote_ok)         // 근거 불일치 자동 컷
+      const droppedQuote=all.length-good.length
+      if(!good.length){ setStatus('저장할 청크 없음(전부 근거 불일치).','err'); showSummary(0,0,droppedQuote); busy(false); return }
+      setStatus('저장 중…(임베딩)')
+      const sv=await callFn(FN_SAVE,{level:$(P+'level').value,source:curSource,chunks:good.map(c=>({text:c.text,axis:c.axis,topic:c.topic}))})
+      showSummary(sv.saved||0, sv.skipped||0, droppedQuote)
+      setStatus(`완료 · 저장 ${sv.saved||0}개`,'ok')
+    }catch(e){ setStatus('실패: '+e.message,'err') } finally{ busy(false) }
+  }
+  function showSummary(saved,dupSkip,badQuote){
+    const box=$(P+'summary'); box.classList.remove('empty')
+    box.innerHTML = `<div class="big">저장 ${saved}개</div>`+
+      `<div class="muted" style="margin-top:4px">버림 — 중복 ${dupSkip}개 · 근거 불일치 ${badQuote}개</div>`+
+      (saved? '' : '<div class="err" style="margin-top:4px">저장된 게 없어요.</div>')
+  }
+  $(P+'getUrl').addEventListener('click', getUrl)
+  $(P+'go').addEventListener('click', extractSave)
+})();
+
+// ============ 문제 생성 탭 (프롬프트 노브 + 생성 → 검토 → 발행) ============
+;(function(){
+  const P='g_'
+  fillLevelSel($(P+'level')); fillAxisBox($(P+'level').value, $(P+'axisBox'))
+  $(P+'level').addEventListener('change', () => fillAxisBox($(P+'level').value, $(P+'axisBox')))
+  const setStatus=(m,c)=>{ $(P+'status').className=c||'muted'; $(P+'status').textContent=m }
+  let gQ=[]
+
+  // ── 레벨별 출제 지침 편집기 (난이도·중점만. 시스템 핵심규칙은 함수에 고정·비노출) ──
+  const PGUIDE='gen_level_guidance_v1'
+  const DEFAULT_GUIDE={
+    1:['정의·기본 용어 위주로 묻는다.','AI를 처음 접하는 사람도 풀 수 있게 쉽고 직관적으로.'],
+    2:['기초 개념의 간단한 활용을 묻는다.','한 단계만 생각하면 풀리는 수준.'],
+    3:['도구·기법(RAG·임베딩·비전 등)을 실제로 엮어 쓰는 중급 활용을 묻는다.','개념 간 연결을 이해했는지 본다.'],
+    4:['실무 시나리오·정밀 적용을 묻는다.','현장에서 바로 쓰는 판단을 본다.'],
+    5:['여러 요소의 통합·최적화·비교를 묻는다.','상황에 맞는 선택의 근거를 본다.'],
+    6:['복합 시스템 설계·트레이드오프를 묻는다.','상급 의사결정 능력을 본다.'],
+    7:['전문가 수준의 복합 문제 해결을 묻는다.','최고 난이도, 깊은 추론을 요구.'],
+  }
+  let guide
+  try{ guide = JSON.parse(localStorage.getItem(PGUIDE)||'null') || JSON.parse(JSON.stringify(DEFAULT_GUIDE)) }catch{ guide = JSON.parse(JSON.stringify(DEFAULT_GUIDE)) }
+  const curLvl=()=>$(P+'level').value
+  const saveGuide=()=>localStorage.setItem(PGUIDE, JSON.stringify(guide))
+  function drawGuide(){
+    const lv=curLvl(); $('pc_lvlbadge').textContent='Lv.'+lv
+    const arr = guide[lv] = guide[lv] || []
+    $('pc_blocks').innerHTML = arr.length ? arr.map((b,i)=>`<div class="knob-item" style="align-items:flex-start">
+      <span class="muted" style="flex:0 0 auto;padding-top:7px;font-weight:700;min-width:14px">${i+1}</span>
+      <textarea data-i="${i}" rows="2" style="flex:1;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:13px;resize:vertical">${esc(b)}</textarea>
+      <div style="display:flex;flex-direction:column;gap:2px;flex:0 0 auto">
+        <button class="ghost mini" data-up="${i}" title="위로">↑</button><button class="ghost mini" data-down="${i}" title="아래로">↓</button><button class="ghost mini" data-del="${i}" title="삭제">✕</button>
+      </div></div>`).join('') : '<div class="muted">이 레벨 지침이 비어 있어요 — “+ 지침 추가”나 “이 레벨 기본값”을 눌러보세요.</div>'
+    const box=$('pc_blocks')
+    box.querySelectorAll('textarea').forEach(el=>el.addEventListener('input',e=>{ arr[+e.target.dataset.i]=e.target.value; saveGuide() }))
+    box.querySelectorAll('[data-del]').forEach(el=>el.addEventListener('click',e=>{ arr.splice(+e.target.dataset.del,1); saveGuide(); drawGuide() }))
+    box.querySelectorAll('[data-up]').forEach(el=>el.addEventListener('click',e=>{ const i=+e.target.dataset.up; if(i>0){ [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; saveGuide(); drawGuide() } }))
+    box.querySelectorAll('[data-down]').forEach(el=>el.addEventListener('click',e=>{ const i=+e.target.dataset.down; if(i<arr.length-1){ [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; saveGuide(); drawGuide() } }))
+  }
+  drawGuide()
+  $(P+'level').addEventListener('change', drawGuide)
+  $('pc_add').addEventListener('click', ()=>{ (guide[curLvl()]=guide[curLvl()]||[]).push(''); saveGuide(); drawGuide() })
+
+  function updatePubBtn(){ const n=gQ.filter(q=>q.approved).length; $(P+'publish').disabled=!n; $(P+'publish').textContent=n?`발행 (${n})`:'발행' }
+  function draw(){
+    if(!gQ.length){ $(P+'out').innerHTML='<div class="placeholder">생성된 문항 없음.</div>'; updatePubBtn(); return }
+    $(P+'out').innerHTML = `<div class="muted" style="margin-bottom:8px">생성 ${gQ.length}개 · 의심 ${gQ.filter(q=>q.suspect).length}개 — 체크(승인)된 것만 발행</div>`+
+      gQ.map((q,i)=>`<div class="q ${q.suspect?'suspect':''}">
+        <div class="qhead">
+          <span class="badge2 ${q.suspect?'warn':'ok'}">${q.suspect?'⚠ 의심':'✓ 통과'}</span>${q.quote_ok?'':'<span class="badge2 warn">인용 불일치</span>'}
+          <span class="muted" style="font-size:11px">${esc(AXIS_LABEL[q.axis]||q.axis||'')}${q.topic?' · '+esc(q.topic):''}</span>
+          <label style="margin-left:auto;font-size:12px;font-weight:600"><input type="checkbox" class="ge-apv" data-i="${i}" ${q.approved?'checked':''} style="width:auto"> 승인</label>
+          <button class="ge-del ghost mini" data-i="${i}">✕</button>
+        </div>
+        ${q.suspect&&q.verify&&q.verify.reason?`<div class="lintflags">검수: ${esc(q.verify.reason)}</div>`:''}
+        <input class="qe ge-prompt" data-i="${i}" value="${esc(q.prompt)}" placeholder="문두">
+        ${q.options.map((o,k)=>`<div class="opt"><input type="radio" name="${P}c${i}" class="ge-correct" data-i="${i}" data-k="${k}" ${k===q.correctIndex?'checked':''}><input class="qe ge-opt" data-i="${i}" data-k="${k}" value="${esc(o)}"></div>`).join('')}
+        <textarea class="qe ge-exp" data-i="${i}" rows="2" placeholder="해설">${esc(q.explanation||'')}</textarea>
+        <div class="quote ${q.quote_ok?'':'bad'}">근거: ${esc(q.quote||'(없음)')}</div>
+        ${(q.lint&&q.lint.length)?`<div class="lintflags">⚙ ${q.lint.map(esc).join(' · ')}</div>`:''}
+      </div>`).join('')
+    const out=$(P+'out')
+    out.querySelectorAll('.ge-prompt').forEach(el=>el.addEventListener('input',e=>gQ[+e.target.dataset.i].prompt=e.target.value))
+    out.querySelectorAll('.ge-opt').forEach(el=>el.addEventListener('input',e=>{gQ[+e.target.dataset.i].options[+e.target.dataset.k]=e.target.value}))
+    out.querySelectorAll('.ge-correct').forEach(el=>el.addEventListener('change',e=>{gQ[+e.target.dataset.i].correctIndex=+e.target.dataset.k}))
+    out.querySelectorAll('.ge-exp').forEach(el=>el.addEventListener('input',e=>gQ[+e.target.dataset.i].explanation=e.target.value))
+    out.querySelectorAll('.ge-apv').forEach(el=>el.addEventListener('change',e=>{gQ[+e.target.dataset.i].approved=e.target.checked; updatePubBtn()}))
+    out.querySelectorAll('.ge-del').forEach(el=>el.addEventListener('click',e=>{gQ.splice(+e.target.dataset.i,1); draw()}))
+    updatePubBtn()
+  }
+  async function generate(){
+    const axes=axesOf($(P+'axisBox')); if(!axes.length){ setStatus('축을 하나 이상 고르세요.','err'); return }
+    const level=$(P+'level').value
+    $(P+'go').disabled=true; setStatus('생성·검증 중…(좀 걸려요)'); $(P+'out').innerHTML='<div class="placeholder">생성·검증 중…</div>'
+    const t0=Date.now()
+    try{
+      const j=await callFn(FN_GENERATE,{ level, axes, count:+$(P+'count').value||5, levelGuidance: (guide[level]||[]).filter(b=>b.trim()) })
+      gQ=(j.questions||[]).map(q=>({ ...q, level:+level, approved: !q.suspect }))
+      draw()
+      setStatus(`완료 · ${gQ.length}개 · ${((Date.now()-t0)/1000).toFixed(1)}s${(j.notes||[]).length?' · '+(j.notes||[]).join(' '):''}`,'ok')
+    }catch(e){ setStatus('실패: '+e.message,'err'); $(P+'out').innerHTML='<div class="placeholder">실패 — 상태줄 참고</div>' } finally{ $(P+'go').disabled=false }
+  }
+  async function doPublish(){
+    const ap=gQ.filter(q=>q.approved&&q.prompt&&q.options.length===4)
+    if(!ap.length){ $(P+'pubStatus').className='err'; $(P+'pubStatus').textContent='승인된 문항이 없어요'; return }
+    $(P+'publish').disabled=true; $(P+'pubStatus').className='muted'; $(P+'pubStatus').textContent='발행 중…(번역)'
+    try{
+      const r=await callFn(FN_PUBLISH,{ questions: ap.map(q=>({level:q.level,axis:q.axis,prompt:q.prompt,options:q.options,correctIndex:q.correctIndex,explanation:q.explanation})) })
+      $(P+'pubStatus').className='ok'; $(P+'pubStatus').textContent=`✓ 발행 ${r.published}개${(r.notes&&r.notes.length)?' · '+r.notes.join('; '):''}`
+      gQ=gQ.filter(q=>!q.approved); draw()
+    }catch(e){ $(P+'pubStatus').className='err'; $(P+'pubStatus').textContent='발행 실패: '+e.message } finally{ updatePubBtn() }
+  }
+  $(P+'go').addEventListener('click', generate)
+  $(P+'publish').addEventListener('click', doPublish)
+})();
+</script>
+</body>
+</html>

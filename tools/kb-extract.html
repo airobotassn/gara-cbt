@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KB 추출 도구 — 출처 확보 → 토픽·청크</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root { --ink:#1f2937; --line:#e5e7eb; --bg:#f7f8fa; --accent:#3aa79f; --bad:#b91c1c; --on:#1f2937; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color:#6b7686; margin: 0 0 16px; font-size:12px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .cfg { margin-bottom:14px; }
+  label { display:block; font-weight:600; font-size:12px; margin:10px 0 4px; color:#374151; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font:inherit; background:#fff; }
+  textarea { resize: vertical; font-family: ui-monospace,monospace; font-size:13px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:120px; }
+  button { background:var(--ink); color:#fff; border:0; border-radius:8px; padding:10px 18px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); padding:8px 12px; }
+  button.mini { padding:6px 11px; font-size:12px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .cfg summary { cursor:pointer; font-weight:600; font-size:13px; }
+  .pill { display:inline-block; background:#eef6f5; color:#1c6b63; border-radius:999px; padding:2px 9px; font-size:12px; margin:2px 4px 2px 0; cursor:default; }
+  .chunk { border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:7px; padding:9px 11px; margin:8px 0; background:#fff; }
+  .chunk.bad { border-left-color:var(--bad); background:#fff5f5; }
+  .chunk .top { font-size:12px; color:#1c6b63; font-weight:600; margin-bottom:4px; }
+  .chunk .top.bad { color:var(--bad); }
+  .chunk .txt { white-space:pre-wrap; }
+  .note { color:var(--bad); font-size:13px; margin:6px 0; }
+  .muted { color:#6b7686; font-size:12px; }
+  .err { color:var(--bad); font-weight:600; }
+  .ok { color:#1c6b63; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
+  .panes { display:flex; gap:14px; align-items:stretch; }
+  .pane { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .pane-h { font-size:13px; font-weight:700; margin:0 0 8px; display:flex; align-items:center; gap:6px; }
+  .pane-h .badge { font-size:11px; font-weight:600; padding:1px 8px; border-radius:999px; }
+  .pane-h .human { background:#eef2ff; color:#3730a3; }
+  .pane-h .ai { background:#ecfdf5; color:#065f46; }
+  #src { min-height: 200px; max-height: 360px; }
+  #out { flex:1; overflow:auto; }
+  .placeholder { color:#9aa3af; text-align:center; padding:40px 10px; }
+  /* 입력 방식 탭(세그먼트) */
+  .tabs { display:flex; gap:4px; background:#f1f3f5; border-radius:9px; padding:3px; margin-top:4px; }
+  .tab { flex:1; background:transparent; color:#6b7686; border:0; border-radius:7px; padding:8px 6px; font-weight:600; font-size:13px; cursor:pointer; }
+  .tab.on { background:#fff; color:var(--on); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .filler { margin-top:8px; }
+  .filler.hidden { display:none; }
+  .axisbox { display:flex; flex-wrap:wrap; gap:6px; }
+  .axchip { display:inline-flex; align-items:center; gap:5px; font-weight:500; font-size:12px; border:1px solid var(--line); border-radius:999px; padding:5px 10px; cursor:pointer; background:#fff; }
+  .axchip:has(input:checked) { border-color:var(--accent); background:#f0faf8; color:#1c6b63; font-weight:600; }
+  .axchip input { width:auto; margin:0; }
+  /* 드롭존 (번역 업로드 방식) */
+  .dropzone { display:block; border:2px dashed var(--line); border-radius:10px; padding:22px 14px; text-align:center; cursor:pointer; background:#fafbfc; transition:.15s; }
+  .dropzone:hover { border-color:#cbd2da; }
+  .dropzone.over { border-color:var(--accent); background:#f0faf8; }
+  .dropzone.has-file { border-style:solid; border-color:var(--accent); background:#fff; }
+  .dz-icon { font-size:26px; line-height:1; }
+  .dz-title { font-weight:600; margin-top:6px; word-break:break-all; }
+  .dz-sub { font-size:12px; color:#6b7686; margin-top:2px; }
+  .reco-item { border:1px solid var(--line); border-radius:7px; padding:8px 10px; margin:6px 0; display:flex; gap:8px; align-items:flex-start; }
+  .reco-item .body { flex:1; min-width:0; }
+  .reco-item .t { font-weight:600; font-size:13px; }
+  .reco-item .u { font-size:11px; color:#2563eb; word-break:break-all; }
+  .reco-item .w { font-size:12px; color:#6b7686; margin-top:2px; }
+  .cnt { font-size:11px; color:#9aa3af; text-align:right; margin-top:3px; }
+  @media (max-width: 820px) { .panes { flex-direction:column; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>KB 추출 도구 <span class="muted">— 출처 확보 → 토픽 + 청크</span></h1>
+  <p class="sub">cold start INPUT 프로토타입. 임베딩·DB 없이 추출 품질만 본다. (함수: <code>kb-extract</code>)</p>
+
+  <details class="card cfg">
+    <summary>⚙️ 연결 설정 (1회)</summary>
+    <label>함수 URL <span class="muted">예: https://xxxx.supabase.co/functions/v1/kb-extract</span></label>
+    <input id="fnUrl" placeholder="https://&lt;project&gt;.supabase.co/functions/v1/kb-extract" />
+    <div class="row">
+      <div><label>Passcode <span class="muted">(KB_PASSCODE 시)</span></label><input id="passcode" placeholder="(없으면 비움)" /></div>
+      <div><label>anon key <span class="muted">(JWT 검증 시)</span></label><input id="anonKey" placeholder="(없으면 비움)" /></div>
+    </div>
+    <p class="muted" style="margin-top:8px"><code>--no-verify-jwt</code> 배포면 anon key 없이 passcode만으로 돼. 값은 이 브라우저에만 저장.</p>
+  </details>
+
+  <div class="panes">
+    <!-- ① 입력 -->
+    <div class="pane">
+      <div class="pane-h"><span class="badge human">사람</span><span class="badge ai">+ AI</span> ① 출처</div>
+      <div class="card">
+        <div class="row" style="align-items:flex-start">
+          <div style="max-width:130px"><label>레벨</label><select id="level"></select></div>
+          <div><label>축 (영역) <span class="muted">— 복수 선택</span></label><div id="axisBox" class="axisbox"></div></div>
+        </div>
+
+        <label>출처 채우는 방법</label>
+        <div class="tabs">
+          <button class="tab on" data-tab="paste">✍️ 직접</button>
+          <button class="tab" data-tab="url">🔗 URL</button>
+          <button class="tab" data-tab="reco">🔎 AI 추천</button>
+        </div>
+
+        <div class="filler" id="f-paste">
+          <label class="dropzone" id="dz">
+            <input type="file" id="file" accept=".txt,.md,.csv,.html,.htm,.pdf,.json" hidden />
+            <div class="dz-icon" id="dzIcon">⬆️</div>
+            <div class="dz-title" id="dzTitle">파일을 끌어다 놓거나 눌러서 선택</div>
+            <div class="dz-sub" id="dzSub">txt · md · pdf · html · csv · json</div>
+          </label>
+          <p class="muted" style="margin:8px 0 0">또는 아래 원문칸에 직접 붙여넣기.</p>
+        </div>
+        <div class="filler hidden" id="f-url">
+          <div class="row" style="margin-top:4px">
+            <input id="url" placeholder="https://…" />
+            <button id="getUrl" class="ghost mini" style="flex:0 0 auto">가져오기</button>
+          </div>
+        </div>
+        <div class="filler hidden" id="f-reco">
+          <button id="reco" class="ghost mini" style="margin-top:4px">이 레벨·축으로 출처 검색</button>
+          <div id="recoList"></div>
+        </div>
+
+        <label>원문 <span class="muted">— 추출은 이 내용으로 돈다</span></label>
+        <textarea id="src" placeholder="여기에 출처 본문…"></textarea>
+        <div class="cnt" id="cnt">0자</div>
+
+        <div class="topbar">
+          <button id="go">추출 →</button>
+          <span id="status" class="muted"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 결과 -->
+    <div class="pane">
+      <div class="pane-h"><span class="badge ai">추출 결과</span> ② 지식 조각</div>
+      <div class="card pane">
+        <div id="out"><div class="placeholder">왼쪽에서 출처 확보 후 <b>추출</b>을 누르면<br/>여기에 지식 조각(청크·축·토픽)이 표시돼.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id)
+const LS = 'kb_extract_cfg_v1'
+
+// ── 레벨별 6축 (categories.ts 와 동기화) ──
+const AXES = {
+  1: [['l1_principle','생성형 AI 기본 원리'],['l1_security','AI 취약점·보안'],['l1_ethics','AI 윤리·편향'],['l1_responsibility','AI 사회적 책임·규범'],['l1_llm_eco','LLM 응용·생태계'],['l1_prompt','프롬프트 엔지니어링']],
+  2: [['l2_genai','생성형 AI 중급'],['l2_api','생성형 AI API 호출'],['l2_algo','AI 알고리즘 기획'],['l2_sensor','내장 센서 제어'],['l2_block','블록코딩 논리'],['l2_python','파이썬 기초']],
+  3: [['l3_rag','RAG·검색 파이프라인'],['l3_llm_ctrl','LLM 활용·생성 제어'],['l3_vision_eval','비전 인식·평가지표'],['l3_vision_data','비전 처리·데이터'],['l3_c_basic','C 기초 문법·흐름'],['l3_c_adv','C 메모리·구조·고급']],
+  4: [['l4_preproc','물리적 AI 전처리'],['l4_stm32','STM32 정밀제어'],['l4_ros2','ROS2 시스템 통합'],['l4_plc','PLC 프로그래밍'],['l4_sim','공정 시뮬레이션'],['l4_smartfactory','스마트공장']],
+  5: [['l5_reasoning','AI 지능·추론'],['l5_edge','엣지 AI 컴퓨팅'],['l5_iiot','산업 IoT·데이터 연계'],['l5_dtwin','디지털 트윈·시뮬레이션'],['l5_sysopt','시스템 통합·제조 최적화'],['l5_ros2','로봇 OS·제어(ROS2)']],
+  6: [['l6_swarm','군집 지능'],['l6_hrc','인간-로봇 협업(HRC)'],['l6_dtwin','디지털 트윈'],['l6_orchestration','AI 오케스트레이션'],['l6_process_opt','지능형 공정 최적화'],['l6_robosec','로보틱스 보안 및 사이버-물리 시스템']],
+  7: [['l7_standard','글로벌 표준 및 규제'],['l7_arch','초거대 시스템 아키텍처'],['l7_phyfusion','차세대 물리-지능 융합'],['l7_faulttol','극단적 결함 허용'],['l7_governance','AI 생태계 및 거버넌스'],['l7_ethics','범용 물리 지능 윤리']],
+}
+const AXIS_LABEL = {}; Object.values(AXES).flat().forEach(([k,l]) => AXIS_LABEL[k] = l)
+function fillLevels() { $('level').innerHTML = Object.keys(AXES).map(l => `<option value="${l}">Lv.${l}</option>`).join('') }
+function fillAxes() { const lv = $('level').value; $('axisBox').innerHTML = (AXES[lv] || []).map(([k,label]) => `<label class="axchip"><input type="checkbox" value="${k}|${label}" checked> ${label}</label>`).join('') }
+fillLevels(); fillAxes()
+$('level').addEventListener('change', fillAxes)
+
+function loadCfg() { try { const c = JSON.parse(localStorage.getItem(LS) || '{}'); $('fnUrl').value=c.fnUrl||''; $('passcode').value=c.passcode||''; $('anonKey').value=c.anonKey||'' } catch {} }
+function saveCfg() { localStorage.setItem(LS, JSON.stringify({ fnUrl:$('fnUrl').value.trim(), passcode:$('passcode').value.trim(), anonKey:$('anonKey').value.trim() })) }
+loadCfg()
+;['fnUrl','passcode','anonKey'].forEach(id => $(id).addEventListener('change', saveCfg))
+
+const esc = (s) => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+const selectedAxes = () => [...$('axisBox').querySelectorAll('input:checked')].map(i => { const [key,label] = i.value.split('|'); return { key, label } })
+
+// 입력 방식 탭
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t))
+  ;['paste','url','reco'].forEach(name => $('f-'+name).classList.toggle('hidden', name !== t.dataset.tab))
+}))
+
+// 글자수
+function updateCnt() { $('cnt').textContent = ($('src').value.length).toLocaleString() + '자' }
+$('src').addEventListener('input', updateCnt); updateCnt()
+
+async function callFn(body) {
+  const fnUrl = $('fnUrl').value.trim()
+  if (!fnUrl) throw new Error('함수 URL을 설정하세요 (⚙️).')
+  const headers = { 'Content-Type':'application/json' }
+  const pc = $('passcode').value.trim(); if (pc) headers['x-passcode'] = pc
+  const ak = $('anonKey').value.trim(); if (ak) { headers['apikey']=ak; headers['Authorization']='Bearer '+ak }
+  const res = await fetch(fnUrl, { method:'POST', headers, body: JSON.stringify(body) })
+  const j = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(j.error || ('HTTP '+res.status))
+  return j
+}
+function setStatus(msg, cls) { $('status').className = cls || 'muted'; $('status').textContent = msg }
+function busy(b) { ['go','reco','getUrl'].forEach(id => $(id).disabled = b) }
+
+async function doReco() {
+  saveCfg(); busy(true); setStatus('출처 검색 중…'); $('recoList').innerHTML = ''
+  try {
+    const j = await callFn({ mode:'recommend', level:$('level').value, axes: selectedAxes() })
+    const sources = j.sources || []
+    if (!sources.length) { $('recoList').innerHTML = '<div class="muted" style="margin-top:6px">후보 없음.</div>'; setStatus(''); return }
+    $('recoList').innerHTML = sources.map((s) => `<div class="reco-item">
+      <div class="body"><div class="t">${esc(s.title||'(제목없음)')}</div><div class="u">${esc(s.url)}</div><div class="w">${esc(s.why||'')}</div></div>
+      <button class="ghost mini" data-url="${esc(s.url)}" style="flex:0 0 auto">넣기 ↓</button></div>`).join('')
+    $('recoList').querySelectorAll('button[data-url]').forEach(b => b.addEventListener('click', () => pullUrl(b.getAttribute('data-url'))))
+    setStatus(`출처 ${sources.length}개 — 하나 골라 '넣기'`, 'ok')
+  } catch (e) { setStatus('검색 실패: '+e.message, 'err') } finally { busy(false) }
+}
+
+async function pullUrl(url) {
+  url = (url || $('url').value).trim()
+  if (!/^https?:\/\//i.test(url)) { setStatus('올바른 URL이 아닙니다.', 'err'); return }
+  saveCfg(); busy(true); setStatus('가져오는 중…')
+  try {
+    const j = await callFn({ mode:'fetch', url })
+    $('src').value = j.text || ''; updateCnt()
+    setStatus(`가져옴 · ${(j.chars||0).toLocaleString()}자 — 이제 '추출'`, 'ok')
+    $('src').scrollIntoView({ block:'nearest' })
+  } catch (e) { setStatus('가져오기 실패: '+e.message, 'err') } finally { busy(false) }
+}
+
+async function doExtract() {
+  saveCfg()
+  const text = $('src').value.trim()
+  if (!text) { setStatus('원문이 비었어요.', 'err'); return }
+  busy(true); setStatus('추출 중…'); $('out').innerHTML = '<div class="placeholder">추출 중…</div>'
+  const t0 = Date.now()
+  try {
+    const axes = selectedAxes()
+    if (!axes.length) { setStatus('축을 하나 이상 고르세요.', 'err'); busy(false); return }
+    const j = await callFn({ mode:'extract', text, level:$('level').value, axes })
+    render(j)
+    setStatus(`완료 · ${((Date.now()-t0)/1000).toFixed(1)}s · ${j.model||''}`, 'ok')
+  } catch (e) { setStatus('추출 실패: '+e.message, 'err'); $('out').innerHTML = '<div class="placeholder">실패 — 상태줄 참고</div>' } finally { busy(false) }
+}
+
+function render(j) {
+  const chunks=j.chunks||[], byAxis=j.byAxis||[], notes=j.notes||[]
+  const axLabel = (k) => AXIS_LABEL[k] || k || '(미배정)'
+  let html = ''
+  if (notes.length) html += notes.map(n => `<div class="note">⚠ ${esc(n)}</div>`).join('')
+  html += `<div style="margin-bottom:8px"><b>청크 ${chunks.length}개</b> · 축 분포</div>` +
+    `<div style="margin-bottom:12px">` + byAxis.sort((a,b)=>b.count-a.count).map(a => `<span class="pill">${esc(axLabel(a.axis))} · ${a.count}</span>`).join('') + `</div>`
+  html += chunks.map(c => `<div class="chunk ${c.quote_ok?'':'bad'}">
+      <div class="top ${c.quote_ok?'':'bad'}">${esc(axLabel(c.axis))} › ${esc(c.topic||'(미분류)')}${c.quote_ok?'':' · ⚠ 원문에 없음'}</div>
+      <div class="txt">${esc(c.text)}</div></div>`).join('')
+  $('out').innerHTML = html || '<div class="placeholder">청크가 0개야.</div>'
+}
+
+// 파일 업로드 → 원문칸 (txt·md·csv·html·json 그대로, pdf 는 pdf.js 로 텍스트 추출)
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+async function readFile(file) {
+  const name = file.name.toLowerCase()
+  setStatus('파일 읽는 중…')
+  try {
+    let text = ''
+    if (name.endsWith('.pdf')) {
+      if (!window.pdfjsLib) throw new Error('pdf.js 로드 실패(인터넷 필요)')
+      const buf = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const c = await (await pdf.getPage(p)).getTextContent()
+        text += c.items.map(i => i.str).join(' ') + '\n\n'
+        setStatus(`PDF 읽는 중… ${p}/${pdf.numPages}`)
+      }
+    } else {
+      text = await file.text()
+      if (/\.html?$/.test(name)) text = text.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim()
+    }
+    $('src').value = text.trim(); updateCnt()
+    $('dz').classList.add('has-file'); $('dzIcon').textContent = '📄'
+    $('dzTitle').textContent = file.name
+    $('dzSub').textContent = `${text.length.toLocaleString()}자 · 다른 파일 끌어다 놓거나 눌러서 교체`
+    setStatus(`파일 읽음 · ${text.length.toLocaleString()}자 — 이제 '추출'`, 'ok')
+  } catch (e) { setStatus('파일 실패: ' + e.message, 'err') }
+}
+const dz = $('dz')
+dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over') })
+dz.addEventListener('dragleave', () => dz.classList.remove('over'))
+dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) readFile(f) })
+$('file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) readFile(f) })
+
+$('reco').addEventListener('click', doReco)
+$('getUrl').addEventListener('click', () => pullUrl())
+$('go').addEventListener('click', doExtract)
+</script>
+</body>
+</html>

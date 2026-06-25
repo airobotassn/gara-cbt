@@ -1,0 +1,214 @@
+/* levelselect: LevelSelect.tsx */
+/* 제목 + 등급규칙 토글 */
+.lv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lv-head .sc-title { margin: 0; }
+.lv-rule-btn {
+  flex: none;
+  border: 1px solid var(--line2);
+  background: var(--soft);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.12s;
+}
+.lv-rule-btn:hover { border-color: var(--ink); color: var(--ink); }
+.lv-rule {
+  margin: 12px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--soft);
+  font-size: 13px;
+}
+.lv-rule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  margin-bottom: 9px;
+}
+.lv-rule-q {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.lv-rule ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.lv-rule li.up { color: #16a34a; font-weight: 600; }
+.lv-rule li.down { color: #dc2626; font-weight: 600; }
+.lv-rule-note { margin: 9px 0 0; font-size: 12px; color: var(--muted); }
+.lv-rule-login {
+  margin: 11px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line2);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ===== Level select ladder ===== */
+.ladder {
+  display: grid;
+  gap: 10px;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  padding: 16px 20px;
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--soft2), var(--bg));
+  transition: 0.16s;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0; /* grid 아이템이 트랙 폭을 넘지 않게(min-content 오버플로 방지) */
+  text-align: left;
+}
+/* 소형폰: gap/padding 축소로 320px 가로 여유 확보 */
+@media (max-width: 600px) {
+  .step {
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 16px;
+  }
+}
+@media (max-width: 400px) {
+  .step {
+    gap: 10px;
+    padding: 12px 12px;
+  }
+}
+.step:hover {
+  border-color: var(--ink);
+  transform: translateX(2px);
+}
+.step:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+.step.rec {
+  box-shadow: 0 0 0 1px var(--ink) inset;
+  border-color: var(--ink);
+}
+/* 잠긴 레벨: 흐림(0.5) 대신 점선·회색으로 '미해제'를 명확히 */
+.step.locked {
+  opacity: 1;
+  border-style: dashed;
+  background: var(--soft);
+  cursor: not-allowed;
+}
+.step.locked:hover { border-color: var(--line2); transform: none; }
+.step.locked .num { background: var(--line2); color: var(--muted); }
+.step.locked .name,
+.step.locked .go { color: var(--muted); }
+.step .num {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--on-accent);
+  flex: none;
+}
+@media (max-width: 400px) {
+  .step .num {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    font-size: 15px;
+  }
+}
+.step .body {
+  flex: 1;
+  min-width: 0; /* flex 자식 줄바꿈/말줄임 허용 */
+}
+.step .name {
+  font-size: 15px;
+  font-weight: 600;
+  /* 한국어: 단어(어절) 중간에서 끊기지 않게 띄어쓰기 단위로만 줄바꿈 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.step .diffword {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.step .rec-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--page);
+  background: var(--ink);
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.step .meter {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+/* meter 칸을 유동폭으로 — 좁은 폭에서 가로 오버플로 방지 */
+.step .meter i {
+  height: 5px;
+  flex: 1 1 18px;
+  width: 22px;
+  max-width: 22px;
+  min-width: 0;
+  border-radius: 3px;
+  background: var(--line2);
+}
+.step .go {
+  color: var(--dim);
+  font-size: 13px;
+  flex: none;
+}
+@media (max-width: 400px) {
+  .step .go {
+    font-size: 12px;
+  }
+}
+
+/* ===== 검색 추천 결과 배너(메인에서 넘어옴) ===== */
+.reco-banner {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: linear-gradient(90deg, var(--soft2), var(--bg));
+  box-shadow: 0 0 0 1px var(--ink) inset;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 12px 14px;
+  word-break: keep-all; /* 한국어: 단어(어절) 중간에서 끊기지 않게 */
+}
+
+/* ===== 다크모드 보정 (라이트 외관은 위에서 유지) ===== */
+@media (prefers-color-scheme: dark) {
+  /* 승급/강등 의미색: 다크 면에서 또렷하게 살짝 밝게 */
+  .lv-rule li.up {
+    color: #4ade80;
+  }
+  .lv-rule li.down {
+    color: #f87171;
+  }
+}
+

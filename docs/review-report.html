@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 레벨테스트 — 코드 리뷰 보고서</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2230; --border:#2a3240;
+    --text:#e6edf3; --muted:#9aa7b4; --accent:#58a6ff;
+    --crit:#f85149; --high:#ff7b35; --med:#e3b341; --low:#3fb950; --info:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard","Segoe UI",-apple-system,system-ui,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 22px 80px}
+  header.hd{border-bottom:1px solid var(--border);padding-bottom:22px;margin-bottom:8px}
+  h1{font-size:27px;margin:0 0 6px;letter-spacing:-.4px}
+  .sub{color:var(--muted);font-size:14px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:13px;color:var(--muted)}
+  .meta b{color:var(--text)}
+
+  h2{font-size:20px;margin:42px 0 14px;padding-top:10px;letter-spacing:-.3px}
+  h2 .em{color:var(--accent)}
+
+  /* summary cards */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 8px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 14px;text-align:center}
+  .card .n{font-size:30px;font-weight:700;line-height:1}
+  .card .l{font-size:12px;color:var(--muted);margin-top:6px;letter-spacing:.3px}
+  .card.crit .n{color:var(--crit)} .card.high .n{color:var(--high)}
+  .card.med .n{color:var(--med)} .card.low .n{color:var(--low)}
+
+  /* dimension bar */
+  .dims{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+  .dim{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .dim h3{margin:0 0 8px;font-size:14px}
+  .dim .ic{font-size:18px;margin-right:6px}
+  .dim p{margin:0;font-size:12.5px;color:var(--muted)}
+
+  /* verdict callout */
+  .note{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);
+    border-radius:8px;padding:14px 16px;margin:16px 0;font-size:13.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:hover td{background:#12161d}
+  td a{color:var(--accent);text-decoration:none}
+
+  /* severity pill */
+  .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:11px;font-weight:700;
+    letter-spacing:.4px;white-space:nowrap}
+  .s-critical{background:rgba(248,81,73,.16);color:var(--crit);border:1px solid rgba(248,81,73,.4)}
+  .s-high{background:rgba(255,123,53,.15);color:var(--high);border:1px solid rgba(255,123,53,.4)}
+  .s-medium{background:rgba(227,179,65,.14);color:var(--med);border:1px solid rgba(227,179,65,.4)}
+  .s-low{background:rgba(63,185,80,.13);color:var(--low);border:1px solid rgba(63,185,80,.4)}
+  .tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;background:#222b38;color:var(--muted);border:1px solid var(--border)}
+
+  /* finding block */
+  .finding{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;margin:16px 0;border-left:4px solid var(--border)}
+  .finding.critical{border-left-color:var(--crit)}
+  .finding.high{border-left-color:var(--high)}
+  .finding.medium{border-left-color:var(--med)}
+  .finding.low{border-left-color:var(--low)}
+  .finding .ftop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .finding .fid{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .finding h4{margin:6px 0 10px;font-size:16px;line-height:1.4}
+  .finding .loc{font-family:"SFMono-Regular",Consolas,monospace;font-size:12px;color:#8fb6e0;
+    background:#11161e;border:1px solid var(--border);border-radius:6px;padding:6px 10px;
+    margin:6px 0 12px;word-break:break-all}
+  .finding .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+    font-weight:700;margin:12px 0 3px}
+  .finding p{margin:3px 0}
+  .finding .fix{background:#11201a;border:1px solid #1d3a2a;border-radius:8px;padding:10px 13px;margin-top:6px;font-size:13.5px}
+  code{font-family:"SFMono-Regular",Consolas,monospace;font-size:12.5px;background:#11161e;
+    border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:#c9d6e3}
+
+  footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 0}
+  @media(max-width:720px){.cards,.dims{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hd">
+  <h1>AI 활용능력 레벨테스트 — 코드 리뷰 보고서</h1>
+  <div class="sub">보안 · 트래픽/부하 대비 · 정합성 · 배포설정 종합 점검</div>
+  <div class="meta">
+    <span><b>대상</b> ai-level-test (React+Vite / Supabase / Vercel)</span>
+    <span><b>작성일</b> 2026-06-11</span>
+    <span><b>방식</b> 서브에이전트 4차원 병렬 리뷰 + 적대적 검증</span>
+    <span><b>확정 발견</b> 17건 (검증 통과)</span>
+  </div>
+</header>
+
+<h2>요약 <span class="em">Executive Summary</span></h2>
+<p>서버 권위(채점·잠금 데이터 service-role 전용) 설계 방향은 <b>견고</b>합니다. 클라이언트가 정답·타인 데이터를 직접 SELECT 할 수 없고, RLS 잠금 모델도 의도대로 동작합니다. <b>치명적(critical) 데이터 유출/인증우회는 발견되지 않았습니다.</b></p>
+<p>다만 실제 트래픽·악용에 대한 <b>방어가 비어 있습니다.</b> 핵심 리스크는 ① <b>Edge Function 레이트리밋 전무</b> → 익명 유저 무제한 스팸, ② <b>3일 1회 잠금이 경합에 취약</b>(동시요청으로 우회), ③ <b>안티치트 오작동으로 정상 유저의 응시가 소진</b>되는 3건의 high 입니다. 이 3건이 "트래픽 대비"와 "사용자 신뢰"를 직접 위협하므로 최우선 처리 대상입니다.</p>
+
+<div class="cards">
+  <div class="card crit"><div class="n">0</div><div class="l">CRITICAL</div></div>
+  <div class="card high"><div class="n">3</div><div class="l">HIGH</div></div>
+  <div class="card med"><div class="n">6</div><div class="l">MEDIUM</div></div>
+  <div class="card low"><div class="n">8</div><div class="l">LOW</div></div>
+</div>
+
+<div class="dims">
+  <div class="dim"><h3><span class="ic">🔐</span>보안</h3><p>정답·타인 데이터 직접노출 없음. 잔여 리스크는 claim 토큰 과신·CORS 와일드카드·에러 메시지 노출. <b>3건</b></p></div>
+  <div class="dim"><h3><span class="ic">📈</span>트래픽/부하</h3><p>레이트리밋·타임아웃·캐싱 부재, 잠금 경합, 제출시 N+1. 부하 스파이크에 취약. <b>5건</b></p></div>
+  <div class="dim"><h3><span class="ic">✅</span>정합성</h3><p>안티치트 오작동, 비층화 출제로 채점 왜곡, 결과 고아화·적용누락 갭. <b>7건</b></p></div>
+  <div class="dim"><h3><span class="ic">⚙️</span>배포설정</h3><p>vercel.json 부재(SPA 리라이트·보안헤더), SETUP의 프로덕션 OAuth 미설정. <b>2건</b></p></div>
+</div>
+
+<div class="note">
+  <b>검증 방법.</b> 4개 차원(보안·트래픽·정합성·설정)을 각각 독립 서브에이전트가 실제 코드를 읽어 발견했고, <b>모든 발견은 별도의 회의적(적대적) 검증 에이전트가 해당 파일을 다시 열어 재확인</b>했습니다. 코드에 실재하지 않거나 RLS/서버검사가 이미 막는 항목은 탈락시켰으며, 과장된 심각도는 하향 조정했습니다(예: 레이트리밋 critical→high, NaN 분기 등 일부 주장은 실현 불가로 강등). 아래 17건은 검증을 통과한 것만입니다.
+</div>
+
+<h2>전체 발견 목록</h2>
+<div class="legend">
+  <span><span class="pill s-high">HIGH</span> 우선 처리</span>
+  <span><span class="pill s-medium">MEDIUM</span> 단기 개선</span>
+  <span><span class="pill s-low">LOW</span> 정리/하드닝</span>
+</div>
+<table>
+  <thead><tr><th>#</th><th>심각도</th><th>영역</th><th>제목</th><th>위치</th></tr></thead>
+  <tbody>
+    <tr><td>H1</td><td><span class="pill s-high">HIGH</span></td><td><span class="tag">트래픽</span></td><td><a href="#f-h1">레이트리밋 전무 — 익명 유저 start/submit 무제한 스팸</a></td><td><code>start-test:30</code></td></tr>
+    <tr><td>H2</td><td><span class="pill s-high">HIGH</span></td><td><span class="tag">트래픽</span></td><td><a href="#f-h2">3일 잠금이 경합 비안전 — 동시요청으로 우회·다중 진행</a></td><td><code>start-test:31-45</code></td></tr>
+    <tr><td>H3</td><td><span class="pill s-high">HIGH</span></td><td><span class="tag">정합성</span></td><td><a href="#f-h3">안티치트 1동작 중복카운트 → 정상 유저 강제제출·소진</a></td><td><code>useAntiCheat:52-62</code></td></tr>
+    <tr><td>M1</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">보안</span></td><td><a href="#f-m1">claim 토큰 과신 — 토큰 보유자가 결과 소유권 탈취 가능</a></td><td><code>get-result:37-62</code></td></tr>
+    <tr><td>M2</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">트래픽</span></td><td><a href="#f-m2">submit-test N+1 직렬 UPDATE (제출당 ~20 왕복)</a></td><td><code>submit-test:74-93</code></td></tr>
+    <tr><td>M3</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">트래픽</span></td><td><a href="#f-m3">callFunction 타임아웃·재시도·중단 없음 → 재시도 폭주</a></td><td><code>supabase.ts:24-47</code></td></tr>
+    <tr><td>M4</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">정합성</span></td><td><a href="#f-m4">비층화 출제 — 한 영역 0문항 시 채점·티어 왜곡</a></td><td><code>start-test:59-60</code></td></tr>
+    <tr><td>M5</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">정합성</span></td><td><a href="#f-m5">claim 토큰 분실 시 익명 결과 영구 고아화(데이터 손실)</a></td><td><code>Result.tsx:28-35</code></td></tr>
+    <tr><td>M6</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">정합성</span></td><td><a href="#f-m6">제출↔점수적용 비원자적 — 잠금은 되고 레이팅 미반영 갭</a></td><td><code>submit-test:103-135</code></td></tr>
+    <tr><td>M7</td><td><span class="pill s-medium">MEDIUM</span></td><td><span class="tag">설정</span></td><td><a href="#f-m7">vercel.json 부재 — SPA 리라이트·보안헤더 누락</a></td><td><code>(루트)</code></td></tr>
+    <tr><td>L1</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">보안</span></td><td><a href="#f-l1">CORS Allow-Origin 와일드카드 <code>*</code></a></td><td><code>cors.ts:1-6</code></td></tr>
+    <tr><td>L2</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">보안</span></td><td><a href="#f-l2">내부 에러 메시지 원문 노출(스키마 정찰 단서)</a></td><td><code>다수 함수</code></td></tr>
+    <tr><td>L3</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">트래픽</span></td><td><a href="#f-l3">문제 뱅크 캐싱 없음 + 편향 셔플 + 콜드스타트</a></td><td><code>start-test:47-60</code></td></tr>
+    <tr><td>L4</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">정합성</span></td><td><a href="#f-l4">72시간 롤링 vs "3일에 1회" 문구 불일치(경계 혼란)</a></td><td><code>lib.ts:132-134</code></td></tr>
+    <tr><td>L5</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">정합성</span></td><td><a href="#f-l5">OAuth 직후 잠금패널 깜빡임(인증 재수화 레이스)</a></td><td><code>Result.tsx:85</code></td></tr>
+    <tr><td>L6</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">정합성</span></td><td><a href="#f-l6">Dashboard tier 뱃지 null 시 빈 뱃지 렌더</a></td><td><code>Dashboard.tsx:74</code></td></tr>
+    <tr><td>L7</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">설정</span></td><td><a href="#f-l7">SETUP.md 프로덕션 OAuth 리다이렉트 기본 미설정</a></td><td><code>SETUP.md:34-37</code></td></tr>
+    <tr><td>L8</td><td><span class="pill s-low">LOW</span></td><td><span class="tag">정합성</span></td><td><a href="#f-l5">scorePct 0분모 미가드(현재 실현불가, 방어 권장)</a></td><td><code>Result.tsx:86</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ============ HIGH ============ -->
+<h2>🔴 HIGH — 우선 처리</h2>
+
+<div class="finding high" id="f-h1">
+  <div class="ftop"><span class="fid">H1</span><span class="pill s-high">HIGH</span><span class="tag">트래픽</span></div>
+  <h4>레이트리밋 전무 — 익명 유저가 start-test/submit-test를 무제한 호출</h4>
+  <div class="loc">supabase/functions/start-test/index.ts:30-37 · submit-test/index.ts:24-35</div>
+  <div class="lbl">영향</div>
+  <p>3일 쿨다운(<code>hasRecentSubmission</code>)은 <b>비익명 유저에게만</b> 적용됩니다(<code>if (!user.is_anonymous)</code>). 익명 세션은 클라에서 <code>signInAnonymously()</code>로 자유롭게 생성되므로, 방문자 누구나 throttle 없이 start-test를 루프로 호출 가능합니다. 호출 1건마다 문제풀 스캔(limit 200) + test_attempts INSERT + attempt_answers 20행 벌크 INSERT가 발생하고, submit/get-result/list-attempts에도 어떤 전역 제한이 없습니다. 스크립트 한 개 또는 신규 익명 유저 급증만으로 DB 쓰기 폭주·커넥션 풀 고갈·과금 폭증으로 이어집니다.</p>
+  <div class="lbl">검증</div>
+  <p>4개 함수와 <code>_shared/lib.ts</code> 전체에 토큰버킷·고정창·rate_limits 테이블·x-forwarded-for 처리 어디에도 없음을 확인. 함수는 service-role 클라이언트라 RLS로는 막을 수 없음. (Supabase 플랫폼의 익명가입/동시성 제한이 부분 백스톱은 됨 → critical에서 high로 하향.)</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">각 함수 본작업 전에 서버측 레이트리밋. Postgres 기반 고정창/토큰버킷을 <code>user_id</code>(+해시된 IP)로 키잉해 단일 SQL <code>insert ... on conflict do update ... returning count</code>로 원자 체크, 초과 시 <code>429 + Retry-After</code>. 익명 start-test는 IP당 시간당 N건으로 별도 캡. 앞단 Vercel WAF 병행 권장.</div>
+</div>
+
+<div class="finding high" id="f-h2">
+  <div class="ftop"><span class="fid">H2</span><span class="pill s-high">HIGH</span><span class="tag">트래픽</span></div>
+  <h4>쿨다운/단일진행 잠금이 경합 비안전 — 동시요청으로 3일 제한 우회 + 무제한 in-progress 생성</h4>
+  <div class="loc">supabase/functions/start-test/index.ts:31-45 · _shared/lib.ts:127-144</div>
+  <div class="lbl">영향</div>
+  <p>start-test는 ① 쿨다운 카운트 체크 → ② in_progress→expired UPDATE → ③ 신규 attempt INSERT 를 <b>트랜잭션·락 없이 3개 독립 문장</b>으로 수행합니다. 동시 호출 2건이 INSERT 전에 둘 다 카운트 체크를 통과하므로 "3일 1회"와 "단일 활성 attempt" 보장이 모두 깨집니다. 게다가 <code>hasRecentSubmission</code>은 <code>status='submitted'</code>만 세는데 start-test는 <code>in_progress</code>만 만들므로 두 동시 start는 애초에 서로를 막지 못합니다.</p>
+  <div class="lbl">검증</div>
+  <p>schema.sql의 유일 관련 인덱스는 <code>attempts_user_idx</code>(비유니크). 단일 in_progress를 강제하는 <b>부분 유니크 인덱스가 없음</b> 확인. 모든 쓰기가 service-role이라 RLS는 직렬화·유일성 어느 쪽도 제공 못 함.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">불변식을 DB에서 강제: <code>create unique index uniq_inprogress on test_attempts(user_id) where status='in_progress';</code> + 체크·INSERT를 한 트랜잭션 RPC(SECURITY DEFINER)로 묶고 <code>pg_advisory_xact_lock(user_id)</code>로 직렬화하거나 같은 트랜잭션 안에서 쿨다운을 재검증.</div>
+</div>
+
+<div class="finding high" id="f-h3">
+  <div class="ftop"><span class="fid">H3</span><span class="pill s-high">HIGH</span><span class="tag">정합성</span></div>
+  <h4>안티치트가 정상 동작 1회를 2~3번 중복카운트 → 미완성 테스트를 강제제출하고 유저 소진</h4>
+  <div class="loc">src/hooks/useAntiCheat.ts:52-62 · src/pages/TestRunner.tsx:89</div>
+  <div class="lbl">영향</div>
+  <p><code>MAX_VIOLATIONS=3</code>인데 탭 전환 한 번이 <code>visibilitychange</code>와 <code>blur</code>를 <b>동시에</b> 발생시켜 +2가 됩니다. OS 알림, 비밀번호 매니저, IME 후보창, alt-tab, OAuth 팝업도 각각 blur를 유발합니다. 평범한 방해 두 번이면 한도에 도달해 <code>onAutoSubmit()</code>이 절반만 푼 시험을 강제 제출하고, 3일 쿨다운으로 유저를 잠가버립니다. 모바일은 더 빈번(전화·앱전환). 디바운스/병합 창이 전혀 없습니다.</p>
+  <div class="lbl">검증</div>
+  <p>두 리스너 등록·무조건 <code>registerViolation</code> 호출, 디바운스 부재, 한도 도달 시 <code>submit</code> 강제호출, submit-test가 위반수 높아도 특별처리 없이 부분답안을 채점·레이팅 적용해 3일 잠금까지 확인. 위반수는 이미 서버로 전송되므로 "기록만 하고 파기는 않는" 대안이 유효함.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix"><code>blur</code>+<code>visibilitychange</code>를 단일 "이탈" 신호로 병합하고 ~1s 디바운스(직전 카운트 1초 내 중복 무시). 오탐 많은 <code>blur</code> 리스너 제거 권장. 가급적 클라 자동제출을 폐지하고 <b>위반수만 서버에 기록·검토</b>하도록 변경.</div>
+</div>
+
+<!-- ============ MEDIUM ============ -->
+<h2>🟡 MEDIUM — 단기 개선</h2>
+
+<div class="finding medium" id="f-m1">
+  <div class="ftop"><span class="fid">M1</span><span class="pill s-medium">MEDIUM</span><span class="tag">보안</span></div>
+  <h4>claim 토큰 과신 — 토큰을 가진 누구든 익명 결과의 소유권을 자기 계정에 영구 귀속</h4>
+  <div class="loc">supabase/functions/get-result/index.ts:37-62</div>
+  <div class="lbl">영향</div>
+  <p>get-result는 <code>claimToken</code>이 일치하면 익명 attempt의 <code>user_id</code>를 제시자에게 이전합니다. 이 토큰은 평문 UUID로 브라우저에 반환되어 <b>localStorage('pendingClaim')</b>에 저장됩니다. 공유 링크·XSS·로그·어깨너머·다른 탭으로 토큰이 새면, 그 결과+레이팅이 탈취자 계정에 영구 결합됩니다. 응시자 본인 증명 없이 "토큰 보유=소유"로 판정됩니다.</p>
+  <div class="lbl">검증</div>
+  <p>토큰은 122비트 랜덤이라 추측 불가 → 실제 유출 전제 필요(medium 적정). 완화책도 코드로 확인: 이미 실계정 결합된 결과는 409로 거부(피해자 결과 탈취 불가, 미클레임 신선결과만 노출창), 클레이머 3일내 제출 시 거부, 토큰 1회용 회전. <b>RLS는 admin 클라라 무관</b> — 토큰 체크가 유일 인가 게이트.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">토큰을 발급 익명 세션에 바인딩(발급 anon uid 저장 후 비교)하거나 Supabase identity-linking 사용. 최소한 토큰을 <b>localStorage에 두지 말고</b> 로그인 왕복 동안 메모리에만 보관.</div>
+</div>
+
+<div class="finding medium" id="f-m2">
+  <div class="ftop"><span class="fid">M2</span><span class="pill s-medium">MEDIUM</span><span class="tag">트래픽</span></div>
+  <h4>submit-test가 답안마다 별도 UPDATE — 제출당 ~20회 직렬 DB 왕복(N+1)</h4>
+  <div class="loc">supabase/functions/submit-test/index.ts:74-93</div>
+  <div class="lbl">영향</div>
+  <p>채점된 20개 답안 각각에 대해 <code>await admin.from('attempt_answers').update(...).eq('id', row.id)</code>를 순차 await. 제출 1건당 ~20회 직렬 왕복 + 주변 읽기/쓰기까지. 저부하에선 느린 정도지만, 제출 스파이크 시 각 요청이 20회 쓰기 내내 풀 커넥션을 점유해 풀 압박·지연·Edge Function 타임아웃 위험이 동시 제출 수에 비례해 증가합니다.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">루프를 단일 벌크 쓰기로 교체: 메모리에서 행을 모아 <code>upsert</code> 1회, 또는 jsonb 배열을 받는 Postgres RPC로 <code>update ... from jsonb_to_recordset($1)</code> 집합기반 1문장. 20왕복→1.</div>
+</div>
+
+<div class="finding medium" id="f-m3">
+  <div class="ftop"><span class="fid">M3</span><span class="pill s-medium">MEDIUM</span><span class="tag">트래픽</span></div>
+  <h4>callFunction에 타임아웃·재시도·중단 처리 없음 — 백엔드 스트레스 시 재시도 폭주</h4>
+  <div class="loc">src/lib/supabase.ts:24-47</div>
+  <div class="lbl">영향</div>
+  <p>공용 fetch 헬퍼에 <code>AbortController</code>/타임아웃이 없습니다. Edge Function이 느려지면 모든 클라 요청이 무한 대기하며 커넥션을 점유하고, 유저가 수동 재클릭해 포화된 백엔드를 더 때립니다(thundering-herd). submit 실패 시 즉시 재제출 가능, get-result는 결과 화면에서 자동 트리거되어 악화시킵니다.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix"><code>AbortController</code>로 15s 타임아웃. 멱등 읽기(list-attempts·get-result)만 지수백오프+지터 제한 재시도, start/submit은 자동재시도 금지. 서버는 과부하 시 <code>429/503 + Retry-After</code> 반환.</div>
+</div>
+
+<div class="finding medium" id="f-m4">
+  <div class="ftop"><span class="fid">M4</span><span class="pill s-medium">MEDIUM</span><span class="tag">정합성</span></div>
+  <h4>비층화 출제 — 한 영역이 0문항이 되면 min-페널티가 응시 안 한 축으로 전체 레이팅을 끌어내림</h4>
+  <div class="loc">start-test/index.ts:59-60 · submit-test/index.ts:96-100 · _shared/lib.ts:69-73</div>
+  <div class="lbl">영향</div>
+  <p>start-test는 레벨 풀에서 카테고리 층화 없이 순수 셔플로 20문항을 뽑습니다(레벨당 24문항/6영역). 한 축이 0문항인 경우 submit에서 그 축 perf=0이 되고, 첫(배치) 응시는 <code>PLACEMENT_K=1</code>로 그 0을 그대로 레이팅에 기록 → <code>computeOverall</code>의 <code>BALANCE_MIN_W*min</code>이 한 번도 안 본 축 때문에 전체/티어를 직접 억제합니다. 즉 보여주지도 않은 문제로 티어가 정해지는 공정성 버그.</p>
+  <div class="lbl">검증</div>
+  <p>완전 0문항은 드묾(약 1/1,770)이나, 부분 과소대표(축이 1~2문항)는 흔하게 같은 경로로 레이팅을 편향 → critical/high가 아닌 medium으로 평가.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">start-test에서 카테고리별 균등 층화(영역당 <code>ceil(20/6)</code> 후 잔여 보충), 또는 채점에서 <code>totalByCat[k]===0</code>축을 "미측정"으로 보고 EWMA·overall에서 제외. <code>applyPerfToSkill</code>에 축별 측정여부 전달 필요.</div>
+</div>
+
+<div class="finding medium" id="f-m5">
+  <div class="ftop"><span class="fid">M5</span><span class="pill s-medium">MEDIUM</span><span class="tag">정합성</span></div>
+  <h4>claim 토큰을 구글 로그인 완료 전에 잃으면 익명 결과가 영구 고아화(복구 불가 데이터 손실)</h4>
+  <div class="loc">src/pages/Result.tsx:28-35,54-57 · get-result/index.ts:34-64</div>
+  <div class="lbl">영향</div>
+  <p>익명 attempt와 미래 구글 계정의 유일 연결고리가 localStorage('pendingClaim')의 <code>claimToken</code>입니다. OAuth 왕복이 이 항목 생존에 의존하는데, 다른 브라우저/프로필에서 로그인·스토리지 삭제·시크릿 모드·리다이렉트가 <code>/result/:id</code>가 아닌 곳(AuthCallback→/dashboard)에 떨어지면 토큰이 제시되지 않아 attempt가 도달 불가 익명유저 소유로 영구 잔류합니다. 테이블이 service-role 전용이라 <b>유저 자가복구 불가</b>.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">전역 로그인 후 훅(<code>SIGNED_IN</code> 시 라우트 무관하게 'pendingClaim' 읽어 claim 호출)으로 재시도, 그리고/또는 attemptId+claimToken을 OAuth <code>redirectTo</code> URL/state로 전달해 스토리지 소실에도 생존.</div>
+</div>
+
+<div class="finding medium" id="f-m6">
+  <div class="ftop"><span class="fid">M6</span><span class="pill s-medium">MEDIUM</span><span class="tag">정합성</span></div>
+  <h4>제출↔점수적용이 비원자적 — 크래시 시 "3일 잠금은 되고 레이팅은 미반영" 갭(일부 복구 불가)</h4>
+  <div class="loc">supabase/functions/submit-test/index.ts:103-135 · _shared/lib.ts:127-144</div>
+  <div class="lbl">영향</div>
+  <p>submit-test는 레이팅 적용 <b>전에</b> <code>status='submitted'</code>를 먼저 기록합니다. 쿨다운은 submitted 행을 세므로, status 기록과 <code>applyPerfToSkill</code> 사이에 크래시/네트워크 단절이 나면 attempt는 쿨다운에 카운트되지만 user_skill엔 반영 안 됩니다. <b>Window A</b>(applied=false): 해당 결과 페이지 방문 시 get-result가 지연 자가치유 가능. <b>Window B</b>(applied=true인데 user_skill 미반영): get-result 가드가 <code>!applied</code> 요구라 <b>재적용 안 됨 → 복구 불가</b>.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix">status 전환과 레이팅 적용을 같은 트랜잭션으로 묶기. get-result/list-attempts가 submitted-but-unapplied를 지연 적용하도록 보강하되, Window B(이미 applied=true)도 커버하도록 가드 재설계.</div>
+</div>
+
+<div class="finding medium" id="f-m7">
+  <div class="ftop"><span class="fid">M7</span><span class="pill s-medium">MEDIUM</span><span class="tag">설정</span></div>
+  <h4>vercel.json 부재 — SPA 리라이트 누락(OAuth 콜백 깨질 위험) + 보안 헤더 0</h4>
+  <div class="loc">프로젝트 루트(vercel.json 없음) · index.html · AuthProvider.tsx:69</div>
+  <div class="lbl">영향</div>
+  <p>BrowserRouter 기반 SPA이고 OAuth가 <code>${origin}/auth/callback</code>로 리다이렉트하는데, catch-all 리라이트(<code>/(.*) → /index.html</code>)가 없으면 <code>/auth/callback</code>·<code>/ranking</code> 등 직접접근/새로고침이 Vercel 404가 됩니다(로그인 완료 흐름 위협). 또한 보안 응답헤더가 전무 — CSP·X-Frame-Options·X-Content-Type-Options·Referrer-Policy·HSTS 없음 → 클릭재킹 가능.</p>
+  <div class="lbl">검증</div>
+  <p>SPA 깨짐은 Vercel의 Vite 프리셋 자동 폴백으로 완화될 수 있어 불확실(그래서 high→medium) — 단 인증 핵심 경로를 암묵 동작에 의존하는 건 실제 결함. 보안헤더 부재만으로도 정당한 하드닝 항목.</p>
+  <div class="lbl">권장 조치</div>
+  <div class="fix"><code>vercel.json</code>에 catch-all rewrite + headers: <code>X-Content-Type-Options:nosniff</code>, <code>X-Frame-Options:DENY</code>(또는 CSP frame-ancestors 'none'), <code>Referrer-Policy:strict-origin-when-cross-origin</code>, HSTS, connect-src를 self+Supabase로 제한한 CSP.</div>
+</div>
+
+<!-- ============ LOW ============ -->
+<h2>🟢 LOW — 정리 / 하드닝</h2>
+
+<div class="finding low" id="f-l1">
+  <div class="ftop"><span class="fid">L1</span><span class="pill s-low">LOW</span><span class="tag">보안</span></div>
+  <h4>CORS <code>Access-Control-Allow-Origin: *</code> (전 함수 와일드카드)</h4>
+  <div class="loc">supabase/functions/_shared/cors.ts:1-6</div>
+  <p>인증이 쿠키가 아닌 Bearer 헤더라 고전적 CSRF는 아니지만(자격증명 자동첨부 없음), 오리진 허용목록이라는 심층방어 계층이 사라지고 토큰이 유출됐을 때 재생 가능한 출처가 넓어집니다.</p>
+  <div class="fix">Allow-Origin을 알려진 프론트 오리진(Vercel 도메인 + dev localhost)으로 제한, 허용목록만 echo.</div>
+</div>
+
+<div class="finding low" id="f-l2">
+  <div class="ftop"><span class="fid">L2</span><span class="pill s-low">LOW</span><span class="tag">보안</span></div>
+  <h4>내부 에러 메시지 원문을 클라에 반환(스키마 정찰 단서 노출)</h4>
+  <div class="loc">start-test:53,73,84 · submit-test:137 · get-result:59,87 · list-attempts:27,61</div>
+  <p>실패 시 raw Postgres/Supabase 에러 문자열(<code>err.message</code>)을 그대로 반환 → RLS 잠금 테이블의 테이블/컬럼/제약 이름 등 내부구조가 노출되어 정찰에 도움.</p>
+  <div class="fix">상세 에러는 <code>console.error</code>로 서버 로깅, 클라엔 일반 메시지(예: '서버 오류가 발생했습니다.')+상태코드만. <code>err.message</code> 직노출 금지.</div>
+</div>
+
+<div class="finding low" id="f-l3">
+  <div class="ftop"><span class="fid">L3</span><span class="pill s-low">LOW</span><span class="tag">트래픽</span></div>
+  <h4>문제 뱅크 캐싱 없음 + 편향 셔플 + 콜드스타트</h4>
+  <div class="loc">supabase/functions/start-test/index.ts:47-60</div>
+  <p>사실상 정적인 문제 뱅크(168행)를 start-test마다 재조회·재셔플하고 isolate 간 캐시가 없습니다(단, 인덱스 있어 호출당은 저렴). <code>sort(()=>Math.random()-0.5)</code>는 통계적으로 편향된 셔플.</p>
+  <div class="fix">레벨별 풀을 모듈 스코프에 짧은 TTL로 캐시, 진짜 Fisher-Yates 셔플 사용. 필요 시 워밍 핑.</div>
+</div>
+
+<div class="finding low" id="f-l4">
+  <div class="ftop"><span class="fid">L4</span><span class="pill s-low">LOW</span><span class="tag">정합성</span></div>
+  <h4>실제는 72시간 롤링인데 문구는 "3일에 1회"(달력일)로 읽혀 경계 혼란</h4>
+  <div class="loc">_shared/lib.ts:132-134 · LevelSelect.tsx:49-51 · Result.tsx:127-129</div>
+  <p>쿨다운은 제출 시각 기준 정확히 72시간 롤링(기술적으론 타임존 무관·정상)이나, 카피는 KST 달력일로 읽혀 "23:50 제출 → 3일 뒤 아침" 기대와 어긋남. 잠금 패널에 해제 시각도 없음.</p>
+  <div class="fix">문구를 "마지막 응시로부터 72시간"으로 명확화하거나 Asia/Seoul 달력일 경계로 변경. 해제 타임스탬프 반환해 '다시 응시 가능: …' 표시.</div>
+</div>
+
+<div class="finding low" id="f-l5">
+  <div class="ftop"><span class="fid">L5</span><span class="pill s-low">LOW</span><span class="tag">정합성</span></div>
+  <h4>OAuth 직후 잠금패널 깜빡임 + scorePct 0분모 미가드(현재 실현불가, 방어 권장)</h4>
+  <div class="loc">src/pages/Result.tsx:85,86</div>
+  <p><code>locked = data.locked || !isFullUser</code>인데, OAuth 복귀 직후 세션 재수화 동안 <code>isFullUser</code>가 잠시 false라 성공적으로 잠금해제된 결과가 잠깐 LockedPanel로 보입니다(서버 <code>data.locked</code>가 권위). 별도로 <code>scorePct</code> 분모 미가드는 현재 <code>total_questions≥1</code> 보장으로 NaN 실현 불가(방어적 가드만 권장).</p>
+  <div class="fix">패널 판정을 AuthProvider <code>loading</code> 종료까지 대기하거나 서버 <code>data.locked</code>에만 의존. <code>const scorePct = data.totalQuestions>0 ? ... : 0</code>.</div>
+</div>
+
+<div class="finding low" id="f-l6">
+  <div class="ftop"><span class="fid">L6</span><span class="pill s-low">LOW</span><span class="tag">정합성</span></div>
+  <h4>Dashboard tier 뱃지가 null tierKey(미산정 attempt)에서 빈 뱃지로 렌더</h4>
+  <div class="loc">src/pages/Dashboard.tsx:60-61,74 · Result.tsx:144</div>
+  <p>list-attempts의 <code>tier_after</code>는 M6 갭으로 null일 수 있고, <code>{tier?.label ?? a.tierKey}</code>가 null이면 회색 배경의 빈 뱃지가 됩니다. <code>new Date(submittedAt)</code>도 null이면 'Invalid Date'(실무상 거의 비null).</p>
+  <div class="fix">tierKey null 시 명시 폴백 라벨(예: '미산정') 렌더, submittedAt 포매팅 가드. 근본적으로 M6의 적용 갭을 닫아 tier_after를 항상 채울 것.</div>
+</div>
+
+<div class="finding low" id="f-l7">
+  <div class="ftop"><span class="fid">L7</span><span class="pill s-low">LOW</span><span class="tag">설정</span></div>
+  <h4>SETUP.md가 프로덕션 OAuth 리다이렉트/Site URL을 기본 미설정으로 남김</h4>
+  <div class="loc">SETUP.md:34-37</div>
+  <p>URL Configuration 단계가 Site URL=<code>localhost:5173</code>로 하드코딩되고 프로덕션 Vercel 도메인은 괄호 주석으로만 언급. 문서대로 따르면 프로덕션 Site URL이 localhost를 가리켜 구글 로그인 리다이렉트가 실패합니다. (검증 중 ALLOWED_ORIGINS 관련 권고는 이 코드베이스에 해당 메커니즘이 없어 부정확 → low로 하향.)</p>
+  <div class="fix">프로덕션 Site URL/Redirect(<code>https://&lt;vercel-domain&gt;/**</code>)를 필수 하위단계로 명시.</div>
+</div>
+
+<h2>권장 처리 순서</h2>
+<table>
+  <thead><tr><th>순위</th><th>항목</th><th>이유</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>H1 레이트리밋, H2 잠금 경합</td><td>"트래픽 대비"의 핵심 공백 — 악용/과금/우회를 동시에 막음. DB 레벨로 함께 처리.</td></tr>
+    <tr><td>2</td><td>H3 안티치트</td><td>정상 유저 신뢰 직결 — 출시 시 환불·항의 유발. 자동제출 폐지가 가장 안전.</td></tr>
+    <tr><td>3</td><td>M6 제출↔적용 원자화, M5 고아화</td><td>데이터 정합성/손실 — 트랜잭션 + 전역 claim 훅으로 묶어 해결.</td></tr>
+    <tr><td>4</td><td>M7 vercel.json, M1 claim 토큰</td><td>배포 안정+보안 하드닝. 출시 전 vercel.json은 사실상 필수.</td></tr>
+    <tr><td>5</td><td>M2 N+1, M3 타임아웃, M4 층화</td><td>부하·공정성 개선. 트래픽 늘면 체감.</td></tr>
+    <tr><td>6</td><td>L1~L8</td><td>CORS·에러마스킹·문구·UX 깜빡임 등 점진 하드닝.</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  <p>잘된 점: 채점·정답·잠금 데이터를 service-role 전용으로 격리한 서버 권위 모델, 클라 직접 SELECT 차단, claim 토큰 1회용 회전·409 가드 등 핵심 보안 설계는 올바른 방향입니다. 위 17건은 대부분 <b>"의도한 방어를 실제 트래픽/경합/엣지케이스까지 확장"</b>하는 작업입니다.</p>
+  <p>생성: 서브에이전트 4차원 병렬 리뷰 + 적대적 검증 (검증 통과 17건 / 차원별 보안·트래픽·정합성·설정) · 2026-06-11</p>
+</footer>
+
+</div>
+</body>
+</html>
