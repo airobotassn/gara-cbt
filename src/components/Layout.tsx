@@ -239,6 +239,11 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic">📝</span> GARA 자격검정
               </button>
+              {isFullUser ? (
+                <button className="pf-item" onClick={() => go('/mypage')}>
+                  <span className="ic">🙋</span> 마이페이지
+                </button>
+              ) : null}
               <button className="pf-item" onClick={() => go('/certificate')}>
                 <span className="ic">📜</span> 자격증 미리보기
               </button>

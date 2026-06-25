@@ -80,6 +80,20 @@ export interface AdminAttemptRow {
   violationCount: number
 }
 
+// 마이페이지: 내 응시 1건
+export interface MyAttempt {
+  attemptId: string
+  examTitle: string | null
+  status: string
+  startedAt: string
+  submittedAt: string | null
+  resultReleaseAt: string | null
+  released: boolean
+  totalCorrect: number | null
+  totalQuestions: number
+  passed: boolean | null
+}
+
 export interface AdminListResponse {
   attempts: AdminAttemptRow[]
   total: number
