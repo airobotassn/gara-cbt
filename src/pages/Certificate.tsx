@@ -4,10 +4,11 @@ import HomeLink from '../components/HomeLink'
 
 export interface CertData {
   name: string
-  qualification: string // 자격종목
-  certNo: string // 자격번호
-  issueDate: string // 발급일 (YYYY. MM. DD)
-  scoreText?: string // 성적 (선택)
+  qualification: string
+  certNo: string
+  issueDate: string
+  birth?: string
+  scoreText?: string
 }
 
 function todayStr() {
@@ -15,7 +16,17 @@ function todayStr() {
   return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
 }
 
-// 합격 시 자격증(상장형) — 이름 등 자동 입력 + PDF 저장(인쇄)
+// 템플릿 이미지(public/cert-template.png) 위 빈칸 좌표(% 기준 — 미세조정 쉬움).
+// top: 행의 세로 중심 %, left: 값 시작 가로 %, size: cqw(이미지폭 대비 %).
+const FIELDS = [
+  { key: 'name', top: 33.4, left: 55, size: 2.5 },
+  { key: 'birth', top: 40.2, left: 55, size: 2.0 },
+  { key: 'qual', top: 47.0, left: 55, size: 2.0 },
+  { key: 'no', top: 53.8, left: 55, size: 2.0 },
+  { key: 'date', top: 60.6, left: 55, size: 2.0 },
+  { key: 'reg', top: 90.6, left: 13.5, size: 1.6 },
+] as const
+
 export default function Certificate() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -26,61 +37,37 @@ export default function Certificate() {
   const fallbackName =
     (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
 
-  // state 가 없으면(직접 방문) 샘플 데이터로 미리보기
   const data: CertData = passed ?? {
     name: fallbackName,
     qualification: 'GARA 자격검정',
     certNo: 'GARA-2026-000001',
     issueDate: todayStr(),
-    scoreText: undefined,
   }
 
-  const verifyUrl = `https://gara-cbt.airobotassn.workers.dev/cert/${encodeURIComponent(data.certNo)}`
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=0&data=${encodeURIComponent(verifyUrl)}`
+  const values: Record<string, string> = {
+    name: data.name,
+    birth: data.birth ?? '',
+    qual: data.qualification,
+    no: data.certNo,
+    date: data.issueDate,
+    reg: data.certNo,
+  }
 
   return (
     <div className="cert-page">
       <HomeLink />
 
-      <div className="cert-paper">
-        <div className="cert-frame">
-          <div className="cert-no">No. {data.certNo}</div>
-
-          <div className="cert-emblem">
-            <span className="cert-emblem-in">GARA</span>
-          </div>
-
-          <h1 className="cert-title">자&nbsp;격&nbsp;증</h1>
-          <div className="cert-sub">CERTIFICATE OF QUALIFICATION</div>
-
-          <div className="cert-fields">
-            <div className="cert-row"><span>성&emsp;명</span><b>{data.name}</b></div>
-            <div className="cert-row"><span>자격종목</span><b>{data.qualification}</b></div>
-            <div className="cert-row"><span>자격번호</span><b>{data.certNo}</b></div>
-            {data.scoreText && (
-              <div className="cert-row"><span>성&emsp;적</span><b>{data.scoreText}</b></div>
-            )}
-            <div className="cert-row"><span>발급일자</span><b>{data.issueDate}</b></div>
-          </div>
-
-          <p className="cert-body">
-            위 사람은 <b>글로벌 AI·로봇 협회</b>가 시행한 <b>{data.qualification}</b>에
-            합격하였으므로 이 증서를 수여합니다.
-          </p>
-
-          <div className="cert-foot">
-            <div className="cert-issue-date">{data.issueDate}</div>
-            <div className="cert-org">
-              <div className="cert-org-name">글로벌 AI·로봇 협회</div>
-              <div className="cert-org-en">Global AI &amp; Robotics Association</div>
-              <div className="cert-ceo">
-                회&emsp;장&emsp;&emsp;&emsp;&emsp;&emsp;<span className="cert-seal">印</span>
-              </div>
-            </div>
-          </div>
-
-          <img className="cert-qr" src={qrSrc} alt="인증 QR" />
-        </div>
+      <div className="cert-canvas">
+        <img className="cert-bg" src="/cert-template.png" alt="자격증" />
+        {FIELDS.map((f) => (
+          <span
+            key={f.key}
+            className={`cert-ov cert-ov-${f.key}`}
+            style={{ top: `${f.top}%`, left: `${f.left}%`, fontSize: `${f.size}cqw` }}
+          >
+            {values[f.key]}
+          </span>
+        ))}
       </div>
 
       <div className="cert-actions">
