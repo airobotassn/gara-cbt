@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
+import { useAuth } from '../context/AuthProvider'
+import { PASS_SCORE } from '../lib/testConfig'
 import type { ExamResultResponse, SubmitExamResponse } from '../lib/types'
 
 function fmtDate(iso?: string | null) {
@@ -25,6 +27,7 @@ export default function ExamResult() {
   const navigate = useNavigate()
   const location = useLocation()
   const justSubmitted = location.state as SubmitExamResponse | null
+  const { user } = useAuth()
 
   const [data, setData] = useState<ExamResultResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -113,6 +116,21 @@ export default function ExamResult() {
 
   // 채점 공개 후
   const wrong = data.answers.filter((a) => !a.isCorrect)
+  const passed = data.totalCorrect >= PASS_SCORE
+  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const certName =
+    (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
+  const certNo = `GARA-2026-${String(attemptId ?? '').replace(/-/g, '').slice(0, 6).toUpperCase() || '000001'}`
+  const issueDate = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+  })()
+  const scoreText = `${data.totalCorrect} / ${data.totalQuestions}`
+  function goCertificate() {
+    navigate('/certificate', {
+      state: { name: certName, qualification: 'GARA 자격검정', certNo, issueDate, scoreText },
+    })
+  }
   return (
     <div className="exam-center">
       <div className="exam-card" style={{ maxWidth: 720, width: '100%' }}>
@@ -124,6 +142,7 @@ export default function ExamResult() {
             <span> / {data.totalQuestions}</span>
           </div>
           <p className="exam-sub">제출 {fmtDate(data.submittedAt)}</p>
+          <div className={`exam-pass ${passed ? 'ok' : 'no'}`}>{passed ? '합 격' : '불합격'}</div>
         </div>
 
         <div className="exam-review">
@@ -146,7 +165,12 @@ export default function ExamResult() {
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 18 }}>
+        <div style={{ textAlign: 'center', marginTop: 18, display: 'flex', gap: 10, justifyContent: 'center' }}>
+          {passed && (
+            <button className="exam-btn" onClick={goCertificate}>
+              📜 자격증 발급 (PDF)
+            </button>
+          )}
           <button className="exam-btn-ghost" onClick={() => navigate('/')}>
             홈으로
           </button>

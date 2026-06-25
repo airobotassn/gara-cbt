@@ -1480,10 +1480,10 @@
 
 /* 인쇄 차단 — Ctrl+P 단축키 차단에 더해 인쇄 출력 자체를 가림 */
 @media print {
-  body * {
+  body:has(.cbt) * {
     visibility: hidden !important;
   }
-  body::before {
+  body:has(.cbt)::before {
     content: '인쇄할 수 없는 시험 화면입니다.';
     visibility: visible;
     position: fixed;
