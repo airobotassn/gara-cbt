@@ -28,7 +28,9 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 \t<key>allowQuit</key>
 \t<true/>
 \t<key>quitURL</key>
-\t<string>${origin}/</string>
+\t<string>${origin}/exam/done</string>
+\t<key>quitURLConfirm</key>
+\t<false/>
 \t<key>showReloadButton</key>
 \t<false/>
 \t<key>browserWindowAllowReload</key>

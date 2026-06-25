@@ -96,6 +96,10 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     // 모의 문제(practice) — 백엔드 호출 없이 종료
     if (start.attemptId === 'practice') {
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+      if (isSEB()) {
+        window.location.href = `${window.location.origin}/exam/done` // SEB 종료 URL
+        return
+      }
       window.alert('모의 문제 풀이가 끝났습니다. 실제 시험도 이와 동일하게 작동합니다.')
       navigate('/exam/check')
       return
@@ -106,6 +110,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         answers: buildAnswers(),
         violationCount: violationsRef.current,
       })
+      // 보안 브라우저면 종료 URL 로 이동 → SEB 자동 종료(결과는 마이페이지에서)
+      if (isSEB()) {
+        window.location.href = `${window.location.origin}/exam/done`
+        return
+      }
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
       navigate(`/exam/result/${start.attemptId}`, { state: res, replace: true })
     } catch (e) {
