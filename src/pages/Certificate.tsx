@@ -19,11 +19,11 @@ function todayStr() {
 // 템플릿 이미지(public/cert-template.png) 위 빈칸 좌표(% 기준 — 미세조정 쉬움).
 // top: 행의 세로 중심 %, left: 값 시작 가로 %, size: cqw(이미지폭 대비 %).
 const FIELDS = [
-  { key: 'name', top: 35.2, left: 54, size: 2.4 },
-  { key: 'birth', top: 42.2, left: 54, size: 2.0 },
-  { key: 'qual', top: 49.2, left: 54, size: 2.0 },
-  { key: 'no', top: 56.2, left: 54, size: 2.0 },
-  { key: 'date', top: 63.2, left: 54, size: 2.0 },
+  { key: 'name', top: 37.0, left: 55, size: 2.4 },
+  { key: 'birth', top: 42.3, left: 55, size: 2.0 },
+  { key: 'qual', top: 47.7, left: 55, size: 2.0 },
+  { key: 'no', top: 53.1, left: 55, size: 2.0 },
+  { key: 'date', top: 58.2, left: 55, size: 2.0 },
   { key: 'reg', top: 91.0, left: 13, size: 1.6 },
 ] as const
 
