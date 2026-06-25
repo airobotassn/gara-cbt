@@ -240,6 +240,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic">📝</span> GARA 자격검정
               </button>
+              <button className="pf-item" onClick={() => go('/guide')}>
+                <span className="ic">ℹ️</span> 자격안내
+              </button>
               {isFullUser ? (
                 <button className="pf-item" onClick={() => go('/mypage')}>
                   <span className="ic">🙋</span> 마이페이지
@@ -282,6 +285,12 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           {open && moreOpen ? (
             <div className="pf-more-pop">
+              <button className="pf-more-link" onClick={() => go('/notice')}>
+                공지사항 <span className="pf-more-ext">↗</span>
+              </button>
+              <button className="pf-more-link" onClick={() => go('/faq')}>
+                자주 하는 질문 <span className="pf-more-ext">↗</span>
+              </button>
               <button className="pf-more-link" onClick={() => go('/about')}>
                 협회 소개 <span className="pf-more-ext">↗</span>
               </button>
