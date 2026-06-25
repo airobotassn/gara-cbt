@@ -46,6 +46,45 @@
   gap: 10px;
 }
 
+/* 보정 눈금자(?cal=1) */
+.cert-cal {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cert-cal-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid rgba(220, 0, 0, 0.4);
+}
+.cert-cal-h span {
+  position: absolute;
+  left: 2px;
+  top: -8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #c00;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0 1px;
+}
+.cert-cal-v {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(0, 0, 220, 0.35);
+}
+.cert-cal-v span {
+  position: absolute;
+  top: 2px;
+  left: 1px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #00c;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0 1px;
+}
+
 /* 인쇄 = PDF 저장: 자격증 한 장(A4 가로) */
 @media print {
   @page {
