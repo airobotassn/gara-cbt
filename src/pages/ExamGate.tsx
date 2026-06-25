@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
@@ -10,6 +11,7 @@ import { TOTAL_QUESTIONS, TEST_DURATION_MINUTES, RESULT_RELEASE_DAYS } from '../
 export default function ExamGate() {
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle } = useAuth()
+  const [sebNotice, setSebNotice] = useState(false)
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -23,31 +25,9 @@ export default function ExamGate() {
         alert('보안 브라우저 설정이 준비되지 않았습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.')
         return
       }
-      // SEB 실행 시도 → 2.5초 안에 창 전환(설치돼 열림)이 없으면 미설치로 보고 설치 안내
-      let opened = false
-      const mark = () => {
-        opened = true
-      }
-      const onVis = () => {
-        if (document.hidden) opened = true
-      }
-      window.addEventListener('blur', mark, { once: true })
-      document.addEventListener('visibilitychange', onVis)
+      // 보안 브라우저 실행 시도 + 즉시 안내창(설치 링크는 새 탭)
       window.location.href = sebLaunchUrl()
-      window.setTimeout(() => {
-        window.removeEventListener('blur', mark)
-        document.removeEventListener('visibilitychange', onVis)
-        if (!opened) {
-          if (
-            window.confirm(
-              '보안 브라우저(SEB)가 설치되어 있지 않은 것 같습니다.\n설치 파일을 내려받으시겠습니까?\n(설치 후 다시 「보안 브라우저로 응시 시작」을 눌러주세요)',
-            )
-          ) {
-            // window.open 은 팝업차단에 막힘 → 현재 탭에서 직접 이동(다운로드 시작)
-            window.location.href = SEB_INSTALLER_URL
-          }
-        }
-      }, 1500)
+      setSebNotice(true)
       return
     }
     if (isFullUser) {
@@ -61,6 +41,28 @@ export default function ExamGate() {
   return (
     <div className="exam-center">
       <HomeLink />
+
+      {sebNotice && (
+        <div className="seb-notice-bg" onClick={() => setSebNotice(false)}>
+          <div className="seb-notice" onClick={(e) => e.stopPropagation()}>
+            <div className="exam-ico">🛡️</div>
+            <h3 className="seb-notice-title">보안 브라우저가 열렸나요?</h3>
+            <p className="exam-sub">
+              잠시 후 <b>Safe Exam Browser</b>가 열립니다. 만약 열리지 않으면 보안 브라우저가
+              <b> 설치되지 않은</b> 것입니다. 아래에서 설치한 뒤 다시 「응시 시작」을 눌러주세요.
+            </p>
+            <div className="seb-notice-actions">
+              <a className="exam-btn" href={SEB_INSTALLER_URL} target="_blank" rel="noreferrer">
+                📥 SEB 설치 (새 창)
+              </a>
+              <button className="exam-btn-ghost" onClick={() => setSebNotice(false)}>
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="exam-gate">
         <div className="exam-gate-badge">GARA</div>
         <h1 className="exam-gate-title">GARA 자격검정</h1>
