@@ -43,10 +43,11 @@ export default function ExamGate() {
               '보안 브라우저(SEB)가 설치되어 있지 않은 것 같습니다.\n설치 파일을 내려받으시겠습니까?\n(설치 후 다시 「보안 브라우저로 응시 시작」을 눌러주세요)',
             )
           ) {
-            window.open(SEB_INSTALLER_URL, '_blank')
+            // window.open 은 팝업차단에 막힘 → 현재 탭에서 직접 이동(다운로드 시작)
+            window.location.href = SEB_INSTALLER_URL
           }
         }
-      }, 2500)
+      }, 1500)
       return
     }
     if (isFullUser) {
