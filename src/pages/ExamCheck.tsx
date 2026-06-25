@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { isSEB, SEB_INSTALLER_URL } from '../lib/seb'
+import HomeLink from '../components/HomeLink'
+import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl, SEB_INSTALLER_URL } from '../lib/seb'
 import { makePracticeExam } from '../lib/practice'
 
 type Check = { ok: boolean; label: string; note: string }
@@ -36,11 +37,17 @@ export default function ExamCheck() {
   ]
 
   function startPractice() {
+    // 실제 시험과 같은 SEB 잠금 환경에서 모의 응시 (배포 환경)
+    if (SEB_REQUIRED && !isSEB()) {
+      window.location.href = sebPracticeLaunchUrl()
+      return
+    }
     navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
   return (
     <div className="exam-center">
+      <HomeLink />
       <div className="exam-card" style={{ maxWidth: 640, width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
           <div className="exam-ico">🧪</div>
@@ -61,8 +68,14 @@ export default function ExamCheck() {
             GARA 자격검정은 화면 캡처·복사·다른 프로그램을 차단하는 <b>보안 시험 프로그램</b>에서 진행됩니다.
             이 프로그램은 스위스 취리히공대(ETH)가 만든 공식 오픈소스로, 전 세계 대학·시험기관이 사용합니다.
           </p>
-          <a className="exam-btn" href={SEB_INSTALLER_URL} download style={{ display: 'inline-block', marginTop: 6 }}>
-            보안 프로그램 설치 파일 받기
+          <a
+            className="exam-btn"
+            href={SEB_INSTALLER_URL}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: 'inline-block', marginTop: 6 }}
+          >
+            보안 프로그램(SEB) 설치하기
           </a>
           <p className="check-note">
             · 설치 시 Windows가 <b>“게시자: ETH Zürich”</b> 로 표시되면 정상입니다.<br />

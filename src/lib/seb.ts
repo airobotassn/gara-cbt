@@ -4,12 +4,9 @@
 // 운영(배포)에서만 SEB 강제. 개발/데모는 우회(로컬 테스트 가능).
 export const SEB_REQUIRED = import.meta.env.PROD
 
-// SEB 공식 다운로드(영문 사이트 — 참고용)
+// SEB 공식 다운로드(코드 서명된 설치본). GitHub 100MB 제한으로 repo 동봉 불가 → 공식 출처 링크.
 export const SEB_DOWNLOAD_URL = 'https://safeexambrowser.org/download_en.html'
-
-// 우리 도메인에서 받는 설치 파일(권장) — 배포 시 public/seb-setup.exe 에 '공식 서명본'을 넣을 것.
-// (응시자가 외부 영어 사이트로 안 가고 우리 한국어 페이지에서 바로 받게)
-export const SEB_INSTALLER_URL = '/seb-setup.exe'
+export const SEB_INSTALLER_URL = SEB_DOWNLOAD_URL
 
 // 배포 시: .env 에 VITE_SEB_CONFIG_URL = https://<도메인>/gara.seb 지정.
 // 개발 시: 현재 origin 의 /gara.seb (public/gara.seb, tools/make-seb.mjs 로 생성) 자동 사용.
@@ -18,9 +15,8 @@ const PROD_CONFIG_FALLBACK = 'https://CHANGE-ME/gara.seb'
 export function sebConfigUrl(): string {
   const env = import.meta.env.VITE_SEB_CONFIG_URL as string | undefined
   if (env) return env
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    return `${window.location.origin}/gara.seb`
-  }
+  // dev/prod 공통: 현재 도메인의 /gara.seb (public/gara.seb 로 배포됨)
+  if (typeof window !== 'undefined') return `${window.location.origin}/gara.seb`
   return PROD_CONFIG_FALLBACK
 }
 
@@ -43,4 +39,11 @@ export function sebLaunchUrl(): string {
   return sebConfigUrl()
     .replace(/^https:\/\//i, 'sebs://')
     .replace(/^http:\/\//i, 'seb://')
+}
+
+// 모의 응시용 .seb (gara-practice.seb) — 실제와 같은 SEB 잠금 환경에서 연습 문제를 연다.
+export function sebPracticeLaunchUrl(): string {
+  const url =
+    typeof window !== 'undefined' ? `${window.location.origin}/gara-practice.seb` : ''
+  return url.replace(/^https:\/\//i, 'sebs://').replace(/^http:\/\//i, 'seb://')
 }

@@ -72,11 +72,11 @@
   cursor: not-allowed;
 }
 .exam-btn-xl {
-  background: #ffc83d;
-  color: #1a2230;
+  background: #8BCCE9;
+  color: #143a4d;
   padding: 15px 30px;
   font-size: 17px;
-  box-shadow: 0 6px 18px rgba(255, 200, 61, 0.4);
+  box-shadow: 0 6px 18px rgba(139, 204, 233, 0.55);
 }
 .exam-btn-xl:hover {
   filter: brightness(1.05);
@@ -108,7 +108,7 @@
 .exam-gate-badge {
   display: inline-block;
   background: #1a2230;
-  color: #ffc83d;
+  color: #8BCCE9;
   font-weight: 900;
   letter-spacing: 1px;
   padding: 6px 14px;
@@ -373,7 +373,7 @@
 }
 .check-list li.info .ic {
   background: #eef4ff;
-  color: #2563eb;
+  color: #8BCCE9;
 }
 .check-list .lab {
   font-weight: 700;
@@ -383,6 +383,104 @@
 .check-list .note {
   color: #6b7280;
   font-size: 12.5px;
+}
+
+/* 홈으로 (응시 전 화면 좌상단) */
+.exam-home {
+  position: fixed;
+  top: 18px;
+  left: 20px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #4b5563;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  padding: 8px 15px;
+  box-shadow: 0 2px 8px rgba(20, 30, 50, 0.05);
+}
+.exam-home:hover {
+  background: #f3f4f6;
+  color: #1a2230;
+}
+
+/* 안내 플로우 보조 */
+.prep-seb-ok {
+  background: #ecfdf3;
+  color: #138a52;
+  border: 1px solid #bbf0d2;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.prep-sub {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1a2230;
+  margin: 0 0 8px;
+}
+
+/* 문제풀이 현황 — 개선 */
+.cbt-status-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 4px 4px 12px;
+  flex: none;
+}
+.cbt-status-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cbt-status-legend .dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 5px;
+  border: 1.5px solid #d8dce2;
+  background: #fff;
+}
+.cbt-status-legend .dot.done {
+  background: #8BCCE9;
+  border-color: #8BCCE9;
+}
+.cbt-status-legend .dot.cur {
+  background: #fff;
+  border-color: #8BCCE9;
+  border-width: 2px;
+}
+.cbt-grid {
+  gap: 8px;
+}
+.cbt-cell {
+  aspect-ratio: 1;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #6b7280;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  transition: transform 0.08s;
+}
+.cbt-cell:hover {
+  transform: translateY(-1px);
+  border-color: #8BCCE9;
+}
+.cbt-cell.done {
+  background: #8BCCE9;
+  border-color: #8BCCE9;
+  color: #143a4d;
+}
+.cbt-cell.cur {
+  outline: 2px solid #8BCCE9;
+  outline-offset: 2px;
 }
 
 /* ── 응시 전 안내 5단계 ── */
@@ -414,7 +512,7 @@
   list-style: none;
 }
 .prep-steps li.on {
-  color: #ffc83d;
+  color: #8BCCE9;
 }
 .prep-steps li.done {
   color: #cdd3dd;
@@ -429,9 +527,9 @@
   font-size: 12px;
 }
 .prep-steps li.on .prep-no {
-  background: #ffc83d;
-  color: #1a2230;
-  border-color: #ffc83d;
+  background: #8BCCE9;
+  color: #143a4d;
+  border-color: #8BCCE9;
 }
 .prep-body {
   padding: 28px 30px;
@@ -443,7 +541,7 @@
   color: #1a2230;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #ffc83d;
+  border-bottom: 2px solid #8BCCE9;
   display: inline-block;
 }
 .prep-text p {
@@ -469,7 +567,7 @@
   content: '•';
   position: absolute;
   left: 4px;
-  color: #ffc83d;
+  color: #8BCCE9;
   font-weight: 900;
 }
 .prep-text b {
@@ -587,7 +685,7 @@
 /* 상단 바 */
 .cbt-top {
   height: 54px;
-  background: #ffc83d;
+  background: #8BCCE9;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -599,14 +697,14 @@
   border: none;
   font-size: 26px;
   line-height: 1;
-  color: #1a2230;
+  color: #143a4d;
   cursor: pointer;
   padding: 0 6px;
 }
 .cbt-top-title {
   font-size: 17px;
   font-weight: 800;
-  color: #1a2230;
+  color: #143a4d;
 }
 
 /* 본문 2단 */
@@ -693,8 +791,8 @@
   margin: 14px 0 6px;
 }
 .cbt-tag {
-  background: #fef3d6;
-  color: #92660b;
+  background: #e7eeff;
+  color: #1e49b8;
   font-size: 12.5px;
   font-weight: 700;
   padding: 4px 11px;
@@ -711,7 +809,7 @@
   padding: 12px 2px 8px;
 }
 .cbt-q-prompt {
-  font-size: 16px;
+  font-size: 1.05em;
   line-height: 1.85;
   color: #1a2230;
   white-space: pre-wrap;
@@ -733,7 +831,7 @@
   border-radius: 12px;
   padding: 15px 16px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 0.97em;
   color: #374151;
   transition: border-color 0.12s, background 0.12s;
 }
@@ -827,7 +925,7 @@
   border-bottom: 1px solid #f0f1f4;
 }
 .cbt-sheet tr.cur {
-  background: #fff7e0;
+  background: #eef4ff;
 }
 .cbt-sheet th {
   width: 48px;
@@ -854,7 +952,7 @@
   cursor: pointer;
 }
 .cbt-bubble:hover {
-  border-color: #ffc83d;
+  border-color: #8BCCE9;
 }
 .cbt-bubble.on {
   background: #1a2230;
@@ -888,8 +986,8 @@
   border-color: #1a2230;
 }
 .cbt-legend .dot.scrap {
-  background: #ffc83d;
-  border-color: #ffc83d;
+  background: #8BCCE9;
+  border-color: #8BCCE9;
 }
 .cbt-grid {
   flex: 1;
@@ -918,7 +1016,7 @@
   color: #fff;
 }
 .cbt-cell.scrap {
-  border-color: #ffc83d;
+  border-color: #8BCCE9;
   border-width: 2px;
 }
 .cbt-cell.cur {
@@ -1205,7 +1303,7 @@
 }
 .admin-badge.st-in_progress {
   background: #eef4ff;
-  color: #2563eb;
+  color: #8BCCE9;
 }
 .admin-badge.st-voided {
   background: #fef2f2;

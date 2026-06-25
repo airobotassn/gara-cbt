@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
+import HomeLink from '../components/HomeLink'
 import { TOTAL_QUESTIONS, TEST_DURATION_MINUTES, RESULT_RELEASE_DAYS } from '../lib/testConfig'
 
 // 자격검정 진입 페이지 — "GARA 자격검정" 응시 + 시험환경 테스트
@@ -13,6 +14,7 @@ export default function ExamGate() {
 
   return (
     <div className="exam-center">
+      <HomeLink />
       <div className="exam-gate">
         <div className="exam-gate-badge">GARA</div>
         <h1 className="exam-gate-title">GARA 자격검정</h1>

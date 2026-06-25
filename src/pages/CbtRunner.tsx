@@ -6,6 +6,7 @@ import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import SebRequired from '../components/SebRequired'
 import { SEB_REQUIRED, isSEB } from '../lib/seb'
+import { makePracticeExam } from '../lib/practice'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
 
 type Tab = 'canvas' | 'sheet' | 'status'
@@ -14,22 +15,23 @@ export default function CbtRunner() {
   const { attemptId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const start = location.state as StartExamResponse | null
+  // 모의 응시(practice)는 SEB 가 새 URL 로 직접 열 수 있어 state 가 없을 수 있음 → 자체 생성
+  const start =
+    (location.state as StartExamResponse | null) ??
+    (attemptId === 'practice' ? makePracticeExam() : null)
 
   if (isMobileDevice()) return <MobileBlock />
   // 모의 문제(practice)는 SEB 없이도 체험 가능 — 실제 시험만 SEB 강제
   if (SEB_REQUIRED && !isSEB() && attemptId !== 'practice') return <SebRequired />
 
-  // 새로고침 등으로 출제 데이터가 유실되면 다시 시작해야 함(서버가 in_progress 1개만 허용)
+  // 새로고침 등으로 출제 데이터가 유실되면 다시 시작해야 함
   if (!start || start.attemptId !== attemptId) {
     return (
       <div className="exam-center">
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 460 }}>
           <div className="exam-ico">⚠️</div>
           <h2 className="exam-title">시험 정보를 불러올 수 없습니다</h2>
-          <p className="exam-sub">
-            새로고침했거나 잘못된 접근입니다. 자격검정 페이지에서 다시 시작해 주세요.
-          </p>
+          <p className="exam-sub">새로고침했거나 잘못된 접근입니다. 자격검정 페이지에서 다시 시작해 주세요.</p>
           <button className="exam-btn" style={{ marginTop: 18 }} onClick={() => navigate('/exam')}>
             자격검정으로
           </button>
@@ -56,7 +58,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
-  const [scrapped, setScrapped] = useState<Set<number>>(() => new Set())
   const [tab, setTab] = useState<Tab>('sheet')
   const [zoomI, setZoomI] = useState(0)
   const [memo, setMemo] = useState('')
@@ -132,7 +133,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     if (window.confirm('답안을 최종 제출하시겠습니까?\n제출 후에는 수정할 수 없습니다.')) doSubmit()
   }, [selected, submitting, doSubmit])
 
-  // 제한시간 카운트다운 — 0 도달 시 자동 제출(미응답 가드 없이 바로)
+  // 제한시간 카운트다운 — 0 도달 시 자동 제출
   const deadlineRef = useRef<number | null>(null)
   const durationMs = exam.durationMinutes * 60000
   const [remainMs, setRemainMs] = useState(durationMs)
@@ -151,7 +152,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     return () => clearInterval(id)
   }, [durationMs, doSubmit])
 
-  // 부정행위 차단(완전 차단형) + 이탈 시 화면 가림
+  // 부정행위 차단 + 이탈 시 화면 가림
   const { violations, masked } = useExamGuard({ enabled: !submitting })
   useEffect(() => {
     violationsRef.current = violations
@@ -163,14 +164,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       const next = [...arr]
       next[qIdx] = opt
       return next
-    })
-  }
-  function toggleScrap() {
-    setScrapped((s) => {
-      const n = new Set(s)
-      if (n.has(index)) n.delete(index)
-      else n.add(index)
-      return n
     })
   }
 
@@ -214,19 +207,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
               title="글자 크기"
             >
               🔍 {zoom}%
-            </button>
-            <button
-              className="cbt-tool"
-              onClick={() => alert('시험 중 문의는 감독관(관리자)에게 요청하세요.')}
-            >
-              ❔ 질문
-            </button>
-            <button
-              className={`cbt-tool ${scrapped.has(index) ? 'on' : ''}`}
-              onClick={toggleScrap}
-              title="나중에 다시 볼 문항 표시"
-            >
-              {scrapped.has(index) ? '★' : '☆'} 스크랩
             </button>
           </div>
 
@@ -300,22 +280,25 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
           {tab === 'status' && (
             <div className="cbt-pane">
-              <div className="cbt-legend">
-                <span><i className="dot" /> 안 푼 문항</span>
-                <span><i className="dot done" /> 푼 문항</span>
-                <span><i className="dot scrap" /> 스크랩</span>
+              <div className="cbt-sheet-head">
+                <b>문제풀이 현황</b>
+                <span>
+                  작성 <b>{answeredCount}</b>/{total}
+                </span>
+              </div>
+              <div className="cbt-status-legend">
+                <span><i className="dot done" /> 완료</span>
+                <span><i className="dot" /> 미완료</span>
+                <span><i className="dot cur" /> 현재 문항</span>
               </div>
               <div className="cbt-grid">
                 {questions.map((qq, i) => (
                   <button
                     key={qq.id}
-                    className={`cbt-cell ${selected[i] !== null ? 'done' : ''} ${
-                      scrapped.has(i) ? 'scrap' : ''
-                    } ${i === index ? 'cur' : ''}`}
+                    className={`cbt-cell ${selected[i] !== null ? 'done' : ''} ${i === index ? 'cur' : ''}`}
                     onClick={() => setIndex(i)}
                   >
                     {i + 1}
-                    {scrapped.has(i) && <em>★</em>}
                   </button>
                 ))}
               </div>
@@ -357,15 +340,15 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           >
             이전
           </button>
-          <button className="cbt-btn-dark" disabled={submitting} onClick={onClickSubmit}>
-            {submitting ? '제출 중…' : '제출'}
-          </button>
           <button
             className="cbt-btn-ghost"
             disabled={index + 1 >= total || submitting}
             onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
           >
             다음
+          </button>
+          <button className="cbt-btn-dark" disabled={submitting} onClick={onClickSubmit}>
+            {submitting ? '제출 중…' : '제출'}
           </button>
         </div>
       </footer>

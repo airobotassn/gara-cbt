@@ -11,8 +11,8 @@ import { dirname } from 'node:path'
 
 const startURL = process.argv[2] || 'http://localhost:5174/exam'
 const outPath = process.argv[3] || 'public/gara.seb'
-// 허용 모니터 수 — SEB 기본 1(보안). 듀얼모니터 PC에서 테스트하려면 2.
-const maxDisplays = Math.max(1, Number(process.argv[4] || 1))
+// 허용 모니터 수 — 기본 8(사실상 제한 없음). SEB가 추가 모니터를 검게 덮으므로 여러 대여도 안전.
+const maxDisplays = Math.max(1, Number(process.argv[4] || 8))
 const origin = new URL(startURL).origin
 
 const plist = `<?xml version="1.0" encoding="UTF-8"?>
