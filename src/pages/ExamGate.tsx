@@ -83,18 +83,18 @@ export default function ExamGate() {
         <div className="exam-gate-note">
           <p>• 응시 후 <b>{RESULT_RELEASE_DAYS}일 뒤</b> 채점 결과가 공개됩니다.</p>
           <p>• 시험 중 <b>화면 캡처·복사·이탈</b>은 차단되며 기록됩니다.</p>
-          <p>• <b>PC 전용</b> — 모바일·태블릿에서는 응시할 수 없습니다.</p>
+          <p>• 모바일·태블릿에서는 응시할 수 없으며, <b>PC(데스크톱·노트북)</b>에서만 응시할 수 있습니다.</p>
         </div>
 
         <button className="exam-btn-xl" onClick={onStart}>
           {needSebLaunch ? '보안 브라우저로 응시 시작' : isFullUser ? 'GARA 자격검정 응시하기' : '로그인 후 응시하기'}
           <span className="arr">→</span>
         </button>
-        <p className="exam-gate-login-hint">
-          {needSebLaunch
-            ? '「응시 시작」을 누르면 보안 브라우저(SEB)가 열립니다. 그 안에서 로그인 후 바로 응시하며, 다시 로그인할 필요가 없습니다.'
-            : '자격검정은 본인 확인을 위해 구글 로그인 후 응시합니다.'}
-        </p>
+        {!needSebLaunch && (
+          <p className="exam-gate-login-hint">
+            자격검정은 본인 확인을 위해 구글 로그인 후 응시합니다.
+          </p>
+        )}
 
         <button className="exam-gate-check" onClick={() => navigate('/exam/check')}>
           🧪 처음이신가요? 시험환경 테스트(사전 점검) →
