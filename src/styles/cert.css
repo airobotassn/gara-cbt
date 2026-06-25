@@ -182,9 +182,10 @@
   color: #1a2230;
 }
 .mypage-sub {
-  color: #6b7280;
-  font-size: 14px;
-  margin-top: 2px;
+  color: #1a2230;
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 6px;
 }
 .mypage-h2 {
   font-size: 16px;
