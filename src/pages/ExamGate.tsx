@@ -26,8 +26,12 @@ export default function ExamGate() {
       window.location.href = sebLaunchUrl()
       return
     }
-    if (isFullUser) navigate('/exam/prepare')
-    else loginWithGoogle()
+    if (isFullUser) {
+      navigate('/exam/prepare')
+    } else {
+      sessionStorage.setItem('postLogin', '/exam/prepare')
+      loginWithGoogle()
+    }
   }
 
   return (

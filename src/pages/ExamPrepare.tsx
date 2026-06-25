@@ -54,6 +54,7 @@ export default function ExamPrepare() {
 
   async function startExam() {
     if (!isFullUser) {
+      sessionStorage.setItem('postLogin', '/exam/prepare')
       loginWithGoogle()
       return
     }

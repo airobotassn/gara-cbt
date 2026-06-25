@@ -9,12 +9,17 @@ export default function AuthCallback() {
   const navigate = useNavigate()
   const { t } = useT()
   useEffect(() => {
+    // 로그인 시작 직전 저장해둔 복귀 경로로 이동(없으면 홈). 시험 플로우는 '/exam/prepare' 저장.
+    const go = () => {
+      const dest = sessionStorage.getItem('postLogin') || '/'
+      sessionStorage.removeItem('postLogin')
+      navigate(dest, { replace: true })
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') navigate('/dashboard', { replace: true })
+      if (event === 'SIGNED_IN') go()
     })
-    // 이미 세션이 있으면 바로 이동
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate('/dashboard', { replace: true })
+      if (data.session) go()
     })
     return () => sub.subscription.unsubscribe()
   }, [navigate])
