@@ -4,6 +4,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
+import { ROOT_ADMIN } from '../admin/constants.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -32,6 +33,31 @@ Deno.serve(async (req) => {
     if (examErr) return json({ error: examErr.message }, 500)
     if (!exam) return json({ error: '시험을 찾을 수 없습니다.' }, 400)
 
+    // 관리자(루트 또는 admin_users)는 재응시 허용 — 테스트/감독용
+    const email = user.email ?? ''
+    const isAdmin =
+      (!!email && email === ROOT_ADMIN) ||
+      (!!email &&
+        (await admin.from('admin_users').select('email').eq('email', email).maybeSingle()).data != null)
+
+    // 이미 제출(또는 무효)한 응시가 있으면 재응시 불가 — 1인 1회 (관리자 예외)
+    if (!isAdmin) {
+      const { data: done } = await admin
+        .from('exam_attempts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('exam_id', exam.id)
+        .in('status', ['submitted', 'voided'])
+        .limit(1)
+        .maybeSingle()
+      if (done) {
+        return json(
+          { error: '이미 응시를 완료하셨습니다. 자격검정은 1회만 응시할 수 있습니다.', alreadyDone: true },
+          409,
+        )
+      }
+    }
+
     // 이 유저의 진행중 응시는 모두 만료(동시 1개 강제)
     await admin
       .from('exam_attempts')
@@ -52,6 +78,10 @@ Deno.serve(async (req) => {
       return json({ error: '해당 시험의 문제가 없습니다.' }, 400)
     }
 
+    // (테스트용) 환경변수 EXAM_QUESTION_LIMIT 가 있으면 앞에서 그만큼만 출제
+    const limit = Math.max(0, Math.floor(Number(Deno.env.get('EXAM_QUESTION_LIMIT') ?? 0)))
+    const served = limit > 0 ? questions.slice(0, limit) : questions
+
     // 응시 생성
     const { data: attempt, error: aErr } = await admin
       .from('exam_attempts')
@@ -59,14 +89,14 @@ Deno.serve(async (req) => {
         exam_id: exam.id,
         user_id: user.id,
         status: 'in_progress',
-        total_questions: questions.length,
+        total_questions: served.length,
       })
       .select('id, started_at')
       .single()
     if (aErr || !attempt) return json({ error: aErr?.message ?? '응시 생성 실패' }, 500)
 
     // 출제 문항 고정(부정 제출 방지) — 한 문항당 한 행
-    const answerRows = questions.map((q) => ({
+    const answerRows = served.map((q) => ({
       attempt_id: attempt.id,
       question_id: q.id,
       number: q.number,
@@ -83,10 +113,10 @@ Deno.serve(async (req) => {
         slug: exam.slug,
         title: exam.title,
         durationMinutes: exam.duration_minutes,
-        totalQuestions: exam.total_questions,
+        totalQuestions: served.length,
       },
       startedAt: attempt.started_at,
-      questions: questions.map((q) => ({
+      questions: served.map((q) => ({
         id: q.id,
         number: q.number,
         subject: q.subject,

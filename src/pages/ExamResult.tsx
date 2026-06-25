@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
-import { PASS_SCORE } from '../lib/testConfig'
+import { PASS_RATIO } from '../lib/testConfig'
 import type { ExamResultResponse, SubmitExamResponse } from '../lib/types'
 
 function fmtDate(iso?: string | null) {
@@ -116,7 +116,7 @@ export default function ExamResult() {
 
   // 채점 공개 후
   const wrong = data.answers.filter((a) => !a.isCorrect)
-  const passed = data.totalCorrect >= PASS_SCORE
+  const passed = data.totalCorrect >= Math.ceil(data.totalQuestions * PASS_RATIO)
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const certName =
     (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
