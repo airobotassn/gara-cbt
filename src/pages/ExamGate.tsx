@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import HomeLink from '../components/HomeLink'
-import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, SEB_INSTALLER_URL } from '../lib/seb'
 import { TOTAL_QUESTIONS, TEST_DURATION_MINUTES, RESULT_RELEASE_DAYS } from '../lib/testConfig'
 
 // 자격검정 진입 페이지 — "GARA 자격검정" 응시 + 시험환경 테스트
@@ -23,7 +23,30 @@ export default function ExamGate() {
         alert('보안 브라우저 설정이 준비되지 않았습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.')
         return
       }
+      // SEB 실행 시도 → 2.5초 안에 창 전환(설치돼 열림)이 없으면 미설치로 보고 설치 안내
+      let opened = false
+      const mark = () => {
+        opened = true
+      }
+      const onVis = () => {
+        if (document.hidden) opened = true
+      }
+      window.addEventListener('blur', mark, { once: true })
+      document.addEventListener('visibilitychange', onVis)
       window.location.href = sebLaunchUrl()
+      window.setTimeout(() => {
+        window.removeEventListener('blur', mark)
+        document.removeEventListener('visibilitychange', onVis)
+        if (!opened) {
+          if (
+            window.confirm(
+              '보안 브라우저(SEB)가 설치되어 있지 않은 것 같습니다.\n설치 파일을 내려받으시겠습니까?\n(설치 후 다시 「보안 브라우저로 응시 시작」을 눌러주세요)',
+            )
+          ) {
+            window.open(SEB_INSTALLER_URL, '_blank')
+          }
+        }
+      }, 2500)
       return
     }
     if (isFullUser) {

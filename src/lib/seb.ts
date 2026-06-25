@@ -4,9 +4,11 @@
 // 운영(배포)에서만 SEB 강제. 개발/데모는 우회(로컬 테스트 가능).
 export const SEB_REQUIRED = import.meta.env.PROD
 
-// SEB 공식 다운로드(코드 서명된 설치본). GitHub 100MB 제한으로 repo 동봉 불가 → 공식 출처 링크.
+// SEB 공식 다운로드 페이지(참고)
 export const SEB_DOWNLOAD_URL = 'https://safeexambrowser.org/download_en.html'
-export const SEB_INSTALLER_URL = SEB_DOWNLOAD_URL
+// 직접 다운로드(클릭/이동 시 추가 버튼 없이 설치파일 받아짐) — 코드 서명된 공식 SourceForge 배포본
+export const SEB_INSTALLER_URL =
+  'https://sourceforge.net/projects/seb/files/seb/SEB_3.10.1/SEB_3.10.1.864_SetupBundle.exe/download'
 
 // 배포 시: .env 에 VITE_SEB_CONFIG_URL = https://<도메인>/gara.seb 지정.
 // 개발 시: 현재 origin 의 /gara.seb (public/gara.seb, tools/make-seb.mjs 로 생성) 자동 사용.
