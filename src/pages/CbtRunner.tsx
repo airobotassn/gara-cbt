@@ -286,6 +286,9 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                   작성 <b>{answeredCount}</b>/{total}
                 </span>
               </div>
+              <div className="cbt-status-bar">
+                <i style={{ width: `${(answeredCount / total) * 100}%` }} />
+              </div>
               <div className="cbt-status-legend">
                 <span><i className="dot done" /> 완료</span>
                 <span><i className="dot" /> 미완료</span>
