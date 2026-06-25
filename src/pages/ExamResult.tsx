@@ -35,19 +35,6 @@ export default function ExamResult() {
 
   useEffect(() => {
     let alive = true
-    // 데모 응시(마이페이지 더미)는 서버 조회 없이 합성 성적
-    if (attemptId?.startsWith('demo')) {
-      const sub = new Date(Date.now() - 8 * 86400000).toISOString()
-      if (attemptId === 'demo-pending') {
-        setData({ released: false, submittedAt: sub, resultReleaseAt: new Date(Date.now() + 5 * 86400000).toISOString(), totalQuestions: 5 })
-      } else {
-        setData({ released: true, submittedAt: sub, totalCorrect: attemptId === 'demo-fail' ? 1 : 4, totalQuestions: 5, answers: [] })
-      }
-      setLoading(false)
-      return () => {
-        alive = false
-      }
-    }
     callFunction<ExamResultResponse>('get-exam-result', { attemptId })
       .then((r) => alive && setData(r))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : '결과를 불러올 수 없습니다.'))

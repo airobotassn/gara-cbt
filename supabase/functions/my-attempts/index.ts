@@ -12,23 +12,6 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
 
     const admin = adminClient()
-
-    // 테스트 계정(시크릿 DEMO_MYPAGE_EMAILS)에는 더미 응시내역(합격/불합격) 반환
-    const demoEmails = (Deno.env.get('DEMO_MYPAGE_EMAILS') ?? '')
-      .toLowerCase()
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    if (demoEmails.includes((user.email ?? '').toLowerCase())) {
-      const iso = (d: number) => new Date(Date.now() - d * 86400000).toISOString()
-      return json({
-        attempts: [
-          { attemptId: 'demo-pass', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 4, totalQuestions: 5, passed: true },
-          { attemptId: 'demo-fail', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 1, totalQuestions: 5, passed: false },
-        ],
-      })
-    }
-
     const { data } = await admin
       .from('exam_attempts')
       .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions')

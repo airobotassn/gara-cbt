@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import HomeLink from '../components/HomeLink'
@@ -36,23 +36,11 @@ function daysLeft(iso?: string | null) {
 function certNoOf(a: MyAttempt) {
   return `GARA-2026-${a.attemptId.replace(/-/g, '').slice(0, 6).toUpperCase()}`
 }
-function makeDummy(): MyAttempt[] {
-  const iso = (d: number) => new Date(Date.now() - d * 86400000).toISOString()
-  const future = new Date(Date.now() + 5 * 86400000).toISOString()
-  return [
-    { attemptId: 'demo-pass', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 4, totalQuestions: 5, passed: true },
-    { attemptId: 'demo-fail', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(8), submittedAt: iso(8), resultReleaseAt: iso(1), released: true, totalCorrect: 1, totalQuestions: 5, passed: false },
-    { attemptId: 'demo-pending', examTitle: 'GARA 자격검정', status: 'submitted', startedAt: iso(2), submittedAt: iso(2), resultReleaseAt: future, released: false, totalCorrect: null, totalQuestions: 5, passed: null },
-  ]
-}
 
 export default function MyPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { section } = useParams()
   const tab = section && TABS.some((t) => t.key === section) ? section : 'attempts'
-  const demoQS = new URLSearchParams(location.search).has('demo') ? '?demo' : ''
-  const demo = demoQS !== ''
 
   const { isFullUser, loginWithGoogle, user } = useAuth()
   const [list, setList] = useState<MyAttempt[] | null>(null)
@@ -60,15 +48,11 @@ export default function MyPage() {
   const [, setTick] = useState(0)
 
   useEffect(() => {
-    if (demo) {
-      setList(makeDummy())
-      return
-    }
     if (!isFullUser) return
     callFunction<{ attempts: MyAttempt[] }>('my-attempts', {})
       .then((r) => setList(r.attempts))
       .catch((e) => setErr(e instanceof Error ? e.message : '내역을 불러올 수 없습니다.'))
-  }, [isFullUser, demo])
+  }, [isFullUser])
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const name =
@@ -90,7 +74,7 @@ export default function MyPage() {
     })
   }
 
-  if (!isFullUser && !demo) {
+  if (!isFullUser) {
     return (
       <div className="exam-center">
         <HomeLink />
@@ -120,7 +104,7 @@ export default function MyPage() {
 
       <div className="mypage-tabs">
         {TABS.map((t) => (
-          <Link key={t.key} to={`${t.to}${demoQS}`} className={tab === t.key ? 'on' : ''}>
+          <Link key={t.key} to={t.to} className={tab === t.key ? 'on' : ''}>
             <span>{t.icon}</span> {t.label}
           </Link>
         ))}
