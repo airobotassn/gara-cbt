@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
+import HomeLink from '../components/HomeLink'
 import { useAuth } from '../context/AuthProvider'
 import { PASS_RATIO } from '../lib/testConfig'
 import type { ExamResultResponse, SubmitExamResponse } from '../lib/types'
@@ -126,12 +127,14 @@ export default function ExamResult() {
   })()
   const scoreText = `${data.totalCorrect} / ${data.totalQuestions}`
   function goCertificate() {
+    localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
     navigate('/certificate', {
       state: { name: certName, qualification: 'GARA 자격검정', certNo, issueDate, scoreText },
     })
   }
   return (
     <div className="exam-center">
+      <HomeLink />
       <div className="exam-card" style={{ maxWidth: 720, width: '100%' }}>
         <div style={{ textAlign: 'center' }}>
           <div className="exam-ico">🏆</div>
@@ -152,8 +155,8 @@ export default function ExamResult() {
               📜 자격증 발급 (PDF)
             </button>
           )}
-          <button className="exam-btn-ghost" onClick={() => navigate('/')}>
-            홈으로
+          <button className="exam-btn-ghost" onClick={() => navigate(-1)}>
+            ← 뒤로
           </button>
         </div>
       </div>
