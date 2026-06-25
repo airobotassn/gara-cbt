@@ -239,11 +239,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic">📝</span> GARA 자격검정
               </button>
-              {isAdmin ? (
-                <button className="pf-item" onClick={() => go('/certificate')}>
-                  <span className="ic">📜</span> 자격증 미리보기
-                </button>
-              ) : null}
+              <button className="pf-item" onClick={() => go('/certificate')}>
+                <span className="ic">📜</span> 자격증 미리보기
+              </button>
             </div>
 
             {isAdmin ? (
