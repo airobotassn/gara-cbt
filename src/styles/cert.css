@@ -46,6 +46,29 @@
   gap: 10px;
 }
 
+/* 미리보기: 6개 언어 버전 전환 탭 */
+.cert-lang-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.cert-lang-tabs button {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid var(--line2, #d8dce2);
+  background: var(--bg, #fff);
+  color: var(--muted, #6b7280);
+  cursor: pointer;
+}
+.cert-lang-tabs button.on {
+  background: #143a4d;
+  border-color: #143a4d;
+  color: #fff;
+}
+
 /* 보정 눈금자(?cal=1) */
 .cert-cal {
   position: absolute;
