@@ -892,6 +892,10 @@ const D: Record<string, Record<Lang, string>> = {
   "fab.logout": { ko: "로그아웃", en: "Log out", ja: "ログアウト", zh: "退出登录", hi: "लॉग आउट", vi: "Đăng xuất" },
   "fab.uploadImg": { ko: "이미지 업로드", en: "Upload image", ja: "画像アップロード", zh: "上传图片", hi: "छवि अपलोड करें", vi: "Tải ảnh lên" },
   "fab.uploadFail": { ko: "업로드에 실패했습니다.", en: "Upload failed.", ja: "アップロードに失敗しました。", zh: "上传失败。", hi: "अपलोड विफल रहा।", vi: "Tải lên thất bại." },
+  "landing.hero_pre": { ko: "피지컬 AI 시대,", en: "In the age of Physical AI,", ja: "フィジカルAIの時代、", zh: "实体 AI 时代，", hi: "फिजिकल AI के युग में,", vi: "Trong kỷ nguyên AI vật lý," },
+  "landing.hero_em": { ko: "당신의 실력", en: "your skills", ja: "あなたの実力", zh: "你的实力", hi: "आपका कौशल", vi: "năng lực của bạn" },
+  "landing.hero_post": { ko: "GARA 자격검정으로 증명하세요", en: "Prove them with GARA Certification", ja: "GARA資格検定で証明しよう", zh: "用 GARA 资格检定来证明", hi: "GARA प्रमाणन से साबित करें", vi: "Hãy chứng minh bằng chứng nhận GARA" },
+  "landing.hero_cta": { ko: "자격검정 응시하기", en: "Take the certification exam", ja: "資格検定を受ける", zh: "参加资格检定", hi: "प्रमाणन परीक्षा दें", vi: "Dự thi chứng nhận" },
 }
 
 export type TFunc = (key: string, vars?: Record<string, string | number>) => string

@@ -311,12 +311,17 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-more-link" onClick={() => go('/about')}>
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>
               </button>
-              <button className="pf-more-link" onClick={() => go('/privacy')}>
-                {t('nav.privacy')} <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link" onClick={() => go('/terms')}>
-                {t('nav.terms')} <span className="pf-more-ext">↗</span>
-              </button>
+              {/* 개인정보처리방침·이용약관은 한국어 법무 문서 — 한국어에서만 노출 */}
+              {lang === 'ko' ? (
+                <>
+                  <button className="pf-more-link" onClick={() => go('/privacy')}>
+                    {t('nav.privacy')} <span className="pf-more-ext">↗</span>
+                  </button>
+                  <button className="pf-more-link" onClick={() => go('/terms')}>
+                    {t('nav.terms')} <span className="pf-more-ext">↗</span>
+                  </button>
+                </>
+              ) : null}
             </div>
           ) : null}
 

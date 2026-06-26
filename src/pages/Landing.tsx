@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
+import { useT } from '../lib/i18n'
 
 // CBT 메인(랜딩)
 export default function Landing() {
   const navigate = useNavigate()
   const { isFullUser } = useAuth()
+  const { t } = useT()
 
   // 시험 로그인이 (Site URL 설정 등으로) 홈으로 떨어져도, '시험 의도' 표식이 있으면 안내 화면으로 자동 이동
   useEffect(() => {
@@ -19,12 +21,12 @@ export default function Landing() {
     <div className="lp">
       <div className="aura" />
       <h1>
-        피지컬 AI 시대, <span className="em">당신의 실력</span>
+        {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>
         <br />
-        GARA 자격검정으로 증명하세요
+        {t('landing.hero_post')}
       </h1>
       <button className="cta" onClick={() => navigate('/exam')}>
-        자격검정 응시하기 <span className="arr">→</span>
+        {t('landing.hero_cta')} <span className="arr">→</span>
       </button>
     </div>
   )
