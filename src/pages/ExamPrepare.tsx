@@ -10,10 +10,8 @@ import {
   isSEB,
   sebConfigured,
   sebLaunchUrl,
-  sebPracticeLaunchUrl,
   SEB_INSTALLER_URL,
 } from '../lib/seb'
-import { makePracticeExam } from '../lib/practice'
 import {
   DEFAULT_EXAM_SLUG,
   TOTAL_QUESTIONS,
@@ -52,14 +50,6 @@ export default function ExamPrepare() {
     { ok: !!document.fullscreenEnabled, label: t('prep.chk_fs') },
     { ok: navigator.onLine, label: t('prep.chk_net') },
   ]
-
-  function startPractice() {
-    if (SEB_REQUIRED && !isSEB()) {
-      window.location.href = sebPracticeLaunchUrl(lang)
-      return
-    }
-    navigate('/exam/run/practice', { state: makePracticeExam() })
-  }
 
   async function startExam() {
     if (!isFullUser) {
@@ -177,7 +167,6 @@ export default function ExamPrepare() {
                 <li>{t('prep.menu_li1')}</li>
                 <li>{t('prep.menu_li2')}</li>
                 <li>{t('prep.menu_li3')}</li>
-                <li>{t('prep.menu_li4')}</li>
                 <li>{t('prep.menu_li5')}</li>
               </ul>
             </div>
@@ -232,9 +221,6 @@ export default function ExamPrepare() {
                   </div>
                 )}
               </div>
-              <button className="exam-btn-ghost sm" style={{ marginTop: 14 }} onClick={startPractice}>
-                {t('prep.sample_practice_btn')}
-              </button>
             </div>
           )}
 

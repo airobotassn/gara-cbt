@@ -13,11 +13,18 @@
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { createHash as sha } from 'node:crypto'
 
 const origin = (process.argv[2] || 'http://localhost:5174').replace(/\/$/, '')
 const outDir = process.argv[3] || 'public'
 const maxDisplays = Math.max(1, Number(process.argv[4] || 8))
 const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
+
+// 수동 종료(창닫기·Ctrl+Q) 시 비밀번호 요구 → 응시자가 임의로 SEB 를 끌 수 없음.
+// 시험 종료(quitURL=/exam/done)는 비밀번호 없이 자동 종료(quitURLConfirm=false)로 유지.
+// 감독관/관리자만 이 비밀번호로 강제 종료 가능.
+const QUIT_PASSWORD = 'gara-exit-2026'
+const hashedQuitPassword = sha('sha256').update(QUIT_PASSWORD).digest('hex')
 
 function plistFor(startURL) {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -32,6 +39,8 @@ function plistFor(startURL) {
 \t<true/>
 \t<key>allowQuit</key>
 \t<true/>
+\t<key>hashedQuitPassword</key>
+\t<string>${hashedQuitPassword}</string>
 \t<key>quitURL</key>
 \t<string>${origin}/exam/done</string>
 \t<key>quitURLConfirm</key>

@@ -10,7 +10,7 @@ import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
 
-type Tab = 'canvas' | 'sheet' | 'status'
+type Tab = 'sheet' | 'status'
 
 export default function CbtRunner() {
   const { t } = useT()
@@ -63,7 +63,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
   const [tab, setTab] = useState<Tab>('sheet')
   const [zoomI, setZoomI] = useState(0)
-  const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const submittedRef = useRef(false)
   const violationsRef = useRef(0)
@@ -247,9 +246,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         {/* 우측: 답안지/현황/캔버스 */}
         <section className="cbt-right">
           <div className="cbt-tabs">
-            <button className={tab === 'canvas' ? 'on' : ''} onClick={() => setTab('canvas')}>
-              🖉 {t('run.tab_canvas')}
-            </button>
             <button className={tab === 'sheet' ? 'on' : ''} onClick={() => setTab('sheet')}>
               ☰ {t('run.tab_sheet')}
             </button>
@@ -320,20 +316,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
             </div>
           )}
 
-          {tab === 'canvas' && (
-            <div className="cbt-pane">
-              <div className="cbt-sheet-head">
-                <b>{t('run.tab_canvas')}</b>
-                <span>{t('run.canvas_note')}</span>
-              </div>
-              <textarea
-                className="cbt-canvas"
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                placeholder={t('run.canvas_placeholder')}
-              />
-            </div>
-          )}
         </section>
       </div>
 
