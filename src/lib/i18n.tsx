@@ -896,6 +896,7 @@ const D: Record<string, Record<Lang, string>> = {
   "landing.hero_em": { ko: "당신의 실력", en: "your skills", ja: "あなたの実力", zh: "你的实力", hi: "आपका कौशल", vi: "năng lực của bạn" },
   "landing.hero_post": { ko: "GARA 자격검정으로 증명하세요", en: "Prove them with GARA Certification", ja: "GARA資格検定で証明しよう", zh: "用 GARA 资格检定来证明", hi: "GARA प्रमाणन से साबित करें", vi: "Hãy chứng minh bằng chứng nhận GARA" },
   "landing.hero_cta": { ko: "자격검정 응시하기", en: "Take the certification exam", ja: "資格検定を受ける", zh: "参加资格检定", hi: "प्रमाणन परीक्षा दें", vi: "Dự thi chứng nhận" },
+  "nav.exampreview": { ko: "응시 화면 미리보기", en: "Exam screen preview", ja: "受験画面プレビュー", zh: "应试界面预览", hi: "परीक्षा स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình thi" },
 }
 
 export type TFunc = (key: string, vars?: Record<string, string | number>) => string

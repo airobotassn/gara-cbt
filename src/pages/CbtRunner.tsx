@@ -163,8 +163,10 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     return () => clearInterval(id)
   }, [durationMs, doSubmit, t])
 
-  // 부정행위 차단 + 이탈 시 화면 가림
-  const { violations, masked } = useExamGuard({ enabled: !submitting })
+  // 부정행위 차단 + 이탈 시 화면 가림 — 모의(practice)는 디자인 확인용이라 가드 미적용
+  const { violations, masked } = useExamGuard({
+    enabled: !submitting && start.attemptId !== 'practice',
+  })
   useEffect(() => {
     violationsRef.current = violations
   }, [violations])

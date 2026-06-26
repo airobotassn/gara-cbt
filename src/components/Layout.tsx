@@ -7,6 +7,7 @@ import GemAvatar, { Avatar } from './GemAvatar'
 import { GEM_COLORS, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
 import { useT, LANGS } from '../lib/i18n'
+import { makePracticeExam } from '../lib/practice'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
@@ -114,6 +115,13 @@ export default function Layout({ children }: { children: ReactNode }) {
     setOpen(false)
     setMoreOpen(false)
     navigate(path)
+  }
+
+  // 응시 화면(연습 데이터) 바로 진입 — 디자인 확인용. SEB·로그인 없이 열림.
+  function goExamPreview() {
+    setOpen(false)
+    setMoreOpen(false)
+    navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
   return (
@@ -252,6 +260,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               ) : null}
               <button className="pf-item" onClick={() => go('/certificate')}>
                 <span className="ic">📜</span> {t('nav.certpreview')}
+              </button>
+              <button className="pf-item" onClick={goExamPreview}>
+                <span className="ic">🖥️</span> {t('nav.exampreview')}
               </button>
             </div>
 
