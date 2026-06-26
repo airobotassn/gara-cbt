@@ -20,7 +20,7 @@ export default function About() {
         <div className="doc-note">{t('about.note')}</div>
 
         <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <Link className="btn-ink" to="/test/select" style={{ textDecoration: 'none' }}>
+          <Link className="btn-ink" to="/exam" style={{ textDecoration: 'none' }}>
             {t('landing.cta')} →
           </Link>
         </div>

@@ -36,16 +36,22 @@ export function isSEB(): boolean {
   return /\bSEB\b/i.test(ua) || injected
 }
 
-// 설정 URL → SEB 실행 스킴(https→sebs://, http→seb://). 클릭 시 설치된 SEB 가 열려 시험을 로드.
-export function sebLaunchUrl(): string {
-  return sebConfigUrl()
-    .replace(/^https:\/\//i, 'sebs://')
-    .replace(/^http:\/\//i, 'seb://')
+function toScheme(url: string): string {
+  return url.replace(/^https:\/\//i, 'sebs://').replace(/^http:\/\//i, 'seb://')
 }
 
-// 모의 응시용 .seb (gara-practice.seb) — 실제와 같은 SEB 잠금 환경에서 연습 문제를 연다.
-export function sebPracticeLaunchUrl(): string {
-  const url =
-    typeof window !== 'undefined' ? `${window.location.origin}/gara-practice.seb` : ''
-  return url.replace(/^https:\/\//i, 'sebs://').replace(/^http:\/\//i, 'seb://')
+// 설정 URL → SEB 실행 스킴(https→sebs://, http→seb://). 클릭 시 설치된 SEB 가 열려 시험을 로드.
+// lang 을 주면 언어별 .seb(gara-<lang>.seb)를 사용 — SEB 안에서도 화면 언어가 유지된다.
+export function sebLaunchUrl(lang?: string): string {
+  if (lang && typeof window !== 'undefined') {
+    return toScheme(`${window.location.origin}/gara-${lang}.seb`)
+  }
+  return toScheme(sebConfigUrl())
+}
+
+// 모의 응시용 .seb (gara-practice[-<lang>].seb) — 실제와 같은 SEB 잠금 환경에서 연습 문제를 연다.
+export function sebPracticeLaunchUrl(lang?: string): string {
+  if (typeof window === 'undefined') return ''
+  const file = lang ? `gara-practice-${lang}.seb` : 'gara-practice.seb'
+  return toScheme(`${window.location.origin}/${file}`)
 }

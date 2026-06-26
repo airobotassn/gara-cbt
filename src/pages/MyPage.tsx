@@ -3,18 +3,19 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import HomeLink from '../components/HomeLink'
+import { useT } from '../lib/i18n'
 import type { MyAttempt } from '../lib/types'
 
 const STATUS: Record<string, string> = {
-  in_progress: '응시 중',
-  submitted: '제출 완료',
-  voided: '무효',
-  expired: '만료',
+  in_progress: 'my.status.in_progress',
+  submitted: 'my.status.submitted',
+  voided: 'my.status.voided',
+  expired: 'my.status.expired',
 }
 const TABS = [
-  { key: 'attempts', label: '시험 응시 현황', icon: '📝', to: '/mypage' },
-  { key: 'earned', label: '자격 취득 현황', icon: '🏅', to: '/mypage/earned' },
-  { key: 'issuance', label: '자격증 발급 현황', icon: '📜', to: '/mypage/issuance' },
+  { key: 'attempts', label: 'my.tab.attempts', icon: '📝', to: '/mypage' },
+  { key: 'earned', label: 'my.tab.earned', icon: '🏅', to: '/mypage/earned' },
+  { key: 'issuance', label: 'my.tab.issuance', icon: '📜', to: '/mypage/issuance' },
 ]
 
 function fmtDT(iso?: string | null) {
@@ -43,6 +44,7 @@ export default function MyPage() {
   const tab = section && TABS.some((t) => t.key === section) ? section : 'attempts'
 
   const { isFullUser, loginWithGoogle, user } = useAuth()
+  const { t } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
   const [, setTick] = useState(0)
@@ -51,7 +53,7 @@ export default function MyPage() {
     if (!isFullUser) return
     callFunction<{ attempts: MyAttempt[] }>('my-attempts', {})
       .then((r) => setList(r.attempts))
-      .catch((e) => setErr(e instanceof Error ? e.message : '내역을 불러올 수 없습니다.'))
+      .catch((e) => setErr(e instanceof Error ? e.message : t('my.load_failed')))
   }, [isFullUser])
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
@@ -80,10 +82,10 @@ export default function MyPage() {
         <HomeLink />
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420 }}>
           <div className="exam-ico">🔒</div>
-          <h2 className="exam-title">로그인이 필요합니다</h2>
-          <p className="exam-sub">마이페이지는 로그인 후 이용할 수 있습니다.</p>
+          <h2 className="exam-title">{t('my.login_required')}</h2>
+          <p className="exam-sub">{t('my.login_required_sub')}</p>
           <button className="exam-btn" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
-            구글로 로그인
+            {t('common.login_google')}
           </button>
         </div>
       </div>
@@ -98,27 +100,27 @@ export default function MyPage() {
     <div className="wrap mypage">
       <HomeLink />
       <div className="mypage-head">
-        <h1>마이페이지</h1>
-        <p className="mypage-sub">{name} 님</p>
+        <h1>{t('my.title')}</h1>
+        <p className="mypage-sub">{t('my.greeting', { name })}</p>
       </div>
 
       <div className="mypage-tabs">
-        {TABS.map((t) => (
-          <Link key={t.key} to={t.to} className={tab === t.key ? 'on' : ''}>
-            <span>{t.icon}</span> {t.label}
+        {TABS.map((tb) => (
+          <Link key={tb.key} to={tb.to} className={tab === tb.key ? 'on' : ''}>
+            <span>{tb.icon}</span> {t(tb.label)}
           </Link>
         ))}
       </div>
 
       {err && <div className="exam-card" style={{ textAlign: 'center' }}>{err}</div>}
-      {loading && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 30 }}>불러오는 중…</div>}
+      {loading && <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 30 }}>{t('common.loading')}</div>}
 
       {!loading && !err && tab === 'attempts' && (
         attempts.length === 0 ? (
           <div className="mypage-empty">
-            아직 응시 내역이 없습니다.
+            {t('my.empty_attempts')}
             <button className="exam-btn" style={{ marginTop: 14 }} onClick={() => navigate('/exam')}>
-              자격검정 응시하기
+              {t('my.take_exam')}
             </button>
           </div>
         ) : (
@@ -127,24 +129,24 @@ export default function MyPage() {
               <div key={a.attemptId} className="my-item">
                 <div className="my-item-top">
                   <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
-                  <span className={`admin-badge st-${a.status}`}>{STATUS[a.status] ?? a.status}</span>
+                  <span className={`admin-badge st-${a.status}`}>{STATUS[a.status] ? t(STATUS[a.status]) : a.status}</span>
                 </div>
-                <div className="my-item-meta">제출 {fmtDT(a.submittedAt)}</div>
+                <div className="my-item-meta">{t('my.submitted_prefix')} {fmtDT(a.submittedAt)}</div>
                 <div className="my-item-result">
                   {a.status !== 'submitted' ? (
-                    <span className="my-pending">제출되지 않은 응시입니다.</span>
+                    <span className="my-pending">{t('my.not_submitted')}</span>
                   ) : !a.released ? (
                     <span className="my-pending">
-                      채점 중 · <b>{daysLeft(a.resultReleaseAt)}일 후</b>({fmtDate(a.resultReleaseAt)}) 발표
+                      {t('my.grading_pre')}<b>{t('my.grading_days', { d: daysLeft(a.resultReleaseAt) })}</b>{t('my.grading_post', { date: fmtDate(a.resultReleaseAt) })}
                     </span>
                   ) : (
-                    <span className="my-pending">결과가 발표되었습니다. 성적을 확인하세요.</span>
+                    <span className="my-pending">{t('my.released')}</span>
                   )}
                 </div>
                 {a.released && (
                   <div className="my-item-actions">
                     <button className="exam-btn-ghost sm" onClick={() => navigate(`/exam/result/${a.attemptId}`)}>
-                      성적 확인
+                      {t('my.view_score')}
                     </button>
                   </div>
                 )}
@@ -156,17 +158,17 @@ export default function MyPage() {
 
       {!loading && !err && tab === 'earned' && (
         earned.length === 0 ? (
-          <div className="mypage-empty">취득한 자격이 없습니다.</div>
+          <div className="mypage-empty">{t('my.empty_earned')}</div>
         ) : (
           <div className="my-list">
             {earned.map((a) => (
               <div key={a.attemptId} className="my-item">
                 <div className="my-item-top">
                   <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
-                  <span className="my-pass ok">취득</span>
+                  <span className="my-pass ok">{t('my.earned_badge')}</span>
                 </div>
                 <div className="my-item-meta">
-                  취득일 {fmtDate(a.submittedAt)} · 자격번호 {certNoOf(a)} · 점수 {a.totalCorrect}/{a.totalQuestions}
+                  {t('my.earned_meta', { date: fmtDate(a.submittedAt), no: certNoOf(a), correct: a.totalCorrect ?? 0, total: a.totalQuestions ?? 0 })}
                 </div>
               </div>
             ))}
@@ -176,7 +178,7 @@ export default function MyPage() {
 
       {!loading && !err && tab === 'issuance' && (
         earned.length === 0 ? (
-          <div className="mypage-empty">발급 가능한 자격증이 없습니다.</div>
+          <div className="mypage-empty">{t('my.empty_issuance')}</div>
         ) : (
           <div className="my-list">
             {earned.map((a) => {
@@ -186,14 +188,14 @@ export default function MyPage() {
                 <div key={a.attemptId} className="my-item my-issue-row">
                   <div>
                     <b className="my-item-title">{a.examTitle ?? 'GARA 자격검정'}</b>
-                    <div className="my-item-meta">자격번호 {certNo}</div>
+                    <div className="my-item-meta">{t('my.cert_no', { no: certNo })}</div>
                   </div>
                   <div className="my-issue-right">
                     <span className={`admin-badge ${issued ? 'st-submitted' : 'st-expired'}`}>
-                      {issued ? '발급 완료' : '미발급'}
+                      {issued ? t('my.issued') : t('my.not_issued')}
                     </span>
                     <button className="exam-btn sm" onClick={() => goCert(a)}>
-                      {issued ? '다시 발급' : '자격증 발급'}
+                      {issued ? t('my.reissue') : t('my.issue')}
                     </button>
                   </div>
                 </div>

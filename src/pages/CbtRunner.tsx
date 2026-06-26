@@ -7,11 +7,13 @@ import MobileBlock from '../components/MobileBlock'
 import SebRequired from '../components/SebRequired'
 import { SEB_REQUIRED, isSEB } from '../lib/seb'
 import { makePracticeExam } from '../lib/practice'
+import { useT } from '../lib/i18n'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
 
 type Tab = 'canvas' | 'sheet' | 'status'
 
 export default function CbtRunner() {
+  const { t } = useT()
   const { attemptId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -30,10 +32,10 @@ export default function CbtRunner() {
       <div className="exam-center">
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 460 }}>
           <div className="exam-ico">⚠️</div>
-          <h2 className="exam-title">시험 정보를 불러올 수 없습니다</h2>
-          <p className="exam-sub">새로고침했거나 잘못된 접근입니다. 자격검정 페이지에서 다시 시작해 주세요.</p>
+          <h2 className="exam-title">{t('run.lost_title')}</h2>
+          <p className="exam-sub">{t('run.lost_sub')}</p>
           <button className="exam-btn" style={{ marginTop: 18 }} onClick={() => navigate('/exam')}>
-            자격검정으로
+            {t('run.to_exam')}
           </button>
         </div>
       </div>
@@ -52,6 +54,7 @@ function fmt(ms: number) {
 const ZOOMS = [100, 115, 130, 150]
 
 function RunnerInner({ start }: { start: StartExamResponse }) {
+  const { t } = useT()
   const navigate = useNavigate()
   const { questions, exam } = start
   const total = questions.length
@@ -100,7 +103,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         window.location.href = `${window.location.origin}/exam/done` // SEB 종료 URL
         return
       }
-      window.alert('모의 문제 풀이가 끝났습니다. 실제 시험도 이와 동일하게 작동합니다.')
+      window.alert(t('run.practice_done'))
       navigate('/exam/check')
       return
     }
@@ -120,9 +123,9 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     } catch (e) {
       submittedRef.current = false
       setSubmitting(false)
-      alert(e instanceof Error ? e.message : '제출에 실패했습니다. 다시 시도해 주세요.')
+      alert(e instanceof Error ? e.message : t('run.submit_fail'))
     }
-  }, [start.attemptId, buildAnswers, navigate])
+  }, [start.attemptId, buildAnswers, navigate, t])
 
   // 사용자가 누르는 제출: 미응답 가드 → 경고 → 미응답 문항으로 이동
   const onClickSubmit = useCallback(() => {
@@ -133,14 +136,14 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     })
     if (unanswered.length > 0) {
       window.alert(
-        `아직 답하지 않은 문항이 ${unanswered.length}개 있습니다.\n첫 미응답 문항(${unanswered[0] + 1}번)으로 이동합니다.`,
+        t('run.unanswered_warn', { n: unanswered.length, first: unanswered[0] + 1 }),
       )
       setIndex(unanswered[0])
       setTab('sheet')
       return
     }
-    if (window.confirm('답안을 최종 제출하시겠습니까?\n제출 후에는 수정할 수 없습니다.')) doSubmit()
-  }, [selected, submitting, doSubmit])
+    if (window.confirm(t('run.submit_confirm'))) doSubmit()
+  }, [selected, submitting, doSubmit, t])
 
   // 제한시간 카운트다운 — 0 도달 시 자동 제출
   const deadlineRef = useRef<number | null>(null)
@@ -152,14 +155,14 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       const left = Math.max(0, (deadlineRef.current as number) - Date.now())
       setRemainMs(left)
       if (left <= 0 && !submittedRef.current) {
-        window.alert('시험 시간이 종료되어 자동 제출됩니다.')
+        window.alert(t('run.time_up'))
         doSubmit()
       }
     }
     tick()
     const id = window.setInterval(tick, 500)
     return () => clearInterval(id)
-  }, [durationMs, doSubmit])
+  }, [durationMs, doSubmit, t])
 
   // 부정행위 차단 + 이탈 시 화면 가림
   const { violations, masked } = useExamGuard({ enabled: !submitting })
@@ -187,33 +190,33 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       {masked && (
         <div className="cbt-mask">
           <div>
-            🔒 화면 이탈이 감지되었습니다
-            <div className="cbt-mask-sub">시험 화면으로 돌아오세요. 캡처·이탈은 기록됩니다.</div>
+            🔒 {t('run.mask_title')}
+            <div className="cbt-mask-sub">{t('run.mask_sub')}</div>
           </div>
         </div>
       )}
 
       {/* 상단 바 */}
       <header className="cbt-top">
-        <button className="cbt-back" onClick={onClickSubmit} title="제출">
+        <button className="cbt-back" onClick={onClickSubmit} title={t('run.submit')}>
           ‹
         </button>
-        <h1 className="cbt-top-title">{exam.title} 문제풀이</h1>
+        <h1 className="cbt-top-title">{t('run.top_title', { title: exam.title })}</h1>
       </header>
 
       <div className="cbt-main">
         {/* 좌측: 문제 */}
         <section className="cbt-left">
           <div className="cbt-q-head">
-            <span className="cbt-q-badge">객</span>
+            <span className="cbt-q-badge">{t('run.q_badge')}</span>
             <span className="cbt-q-no">{index + 1}</span>
-            <span className={`cbt-timer ${low ? 'low' : ''}`} title="경과 / 제한시간">
-              ⏱ {fmt(elapsedMs)} <em>/ {exam.durationMinutes}분</em>
+            <span className={`cbt-timer ${low ? 'low' : ''}`} title={t('run.timer_title')}>
+              ⏱ {fmt(elapsedMs)} <em>/ {t('run.minutes', { m: exam.durationMinutes })}</em>
             </span>
             <button
               className="cbt-tool"
               onClick={() => setZoomI((i) => (i + 1) % ZOOMS.length)}
-              title="글자 크기"
+              title={t('run.font_size')}
             >
               🔍 {zoom}%
             </button>
@@ -245,22 +248,22 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         <section className="cbt-right">
           <div className="cbt-tabs">
             <button className={tab === 'canvas' ? 'on' : ''} onClick={() => setTab('canvas')}>
-              🖉 캔버스
+              🖉 {t('run.tab_canvas')}
             </button>
             <button className={tab === 'sheet' ? 'on' : ''} onClick={() => setTab('sheet')}>
-              ☰ 답안지
+              ☰ {t('run.tab_sheet')}
             </button>
             <button className={tab === 'status' ? 'on' : ''} onClick={() => setTab('status')}>
-              ▦ 문제풀이 현황
+              ▦ {t('run.tab_status')}
             </button>
           </div>
 
           {tab === 'sheet' && (
             <div className="cbt-pane">
               <div className="cbt-sheet-head">
-                <b>답안지</b>
+                <b>{t('run.tab_sheet')}</b>
                 <span>
-                  작성 완료 <b>{answeredCount}</b>/{total}
+                  {t('run.completed')} <b>{answeredCount}</b>/{total}
                 </span>
               </div>
               <div className="cbt-sheet-scroll">
@@ -290,18 +293,18 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           {tab === 'status' && (
             <div className="cbt-pane">
               <div className="cbt-sheet-head">
-                <b>문제풀이 현황</b>
+                <b>{t('run.tab_status')}</b>
                 <span>
-                  작성 <b>{answeredCount}</b>/{total}
+                  {t('run.written')} <b>{answeredCount}</b>/{total}
                 </span>
               </div>
               <div className="cbt-status-bar">
                 <i style={{ width: `${(answeredCount / total) * 100}%` }} />
               </div>
               <div className="cbt-status-legend">
-                <span><i className="dot done" /> 완료</span>
-                <span><i className="dot" /> 미완료</span>
-                <span><i className="dot cur" /> 현재 문항</span>
+                <span><i className="dot done" /> {t('run.legend_done')}</span>
+                <span><i className="dot" /> {t('run.legend_undone')}</span>
+                <span><i className="dot cur" /> {t('run.legend_current')}</span>
               </div>
               <div className="cbt-grid">
                 {questions.map((qq, i) => (
@@ -320,14 +323,14 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           {tab === 'canvas' && (
             <div className="cbt-pane">
               <div className="cbt-sheet-head">
-                <b>캔버스</b>
-                <span>계산·메모용 (제출되지 않음)</span>
+                <b>{t('run.tab_canvas')}</b>
+                <span>{t('run.canvas_note')}</span>
               </div>
               <textarea
                 className="cbt-canvas"
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
-                placeholder="이곳에 자유롭게 메모하세요. 제출 답안에는 포함되지 않습니다."
+                placeholder={t('run.canvas_placeholder')}
               />
             </div>
           )}
@@ -350,17 +353,17 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
             disabled={index === 0 || submitting}
             onClick={() => setIndex((i) => Math.max(0, i - 1))}
           >
-            이전
+            {t('run.prev')}
           </button>
           <button
             className="cbt-btn-ghost"
             disabled={index + 1 >= total || submitting}
             onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
           >
-            다음
+            {t('run.next')}
           </button>
           <button className="cbt-btn-dark" disabled={submitting} onClick={onClickSubmit}>
-            {submitting ? '제출 중…' : '제출'}
+            {submitting ? t('run.submitting') : t('run.submit')}
           </button>
         </div>
       </footer>

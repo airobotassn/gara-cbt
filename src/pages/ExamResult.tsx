@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
 import HomeLink from '../components/HomeLink'
 import { useAuth } from '../context/AuthProvider'
+import { useT } from '../lib/i18n'
 import { PASS_RATIO } from '../lib/testConfig'
 import type { ExamResultResponse, SubmitExamResponse } from '../lib/types'
 
@@ -29,6 +30,7 @@ export default function ExamResult() {
   const location = useLocation()
   const justSubmitted = location.state as SubmitExamResponse | null
   const { user } = useAuth()
+  const { t } = useT()
 
   const [data, setData] = useState<ExamResultResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -38,7 +40,7 @@ export default function ExamResult() {
     let alive = true
     callFunction<ExamResultResponse>('get-exam-result', { attemptId })
       .then((r) => alive && setData(r))
-      .catch((e) => alive && setErr(e instanceof Error ? e.message : '결과를 불러올 수 없습니다.'))
+      .catch((e) => alive && setErr(e instanceof Error ? e.message : t('result.load_failed')))
       .finally(() => alive && setLoading(false))
     return () => {
       alive = false
@@ -51,10 +53,10 @@ export default function ExamResult() {
       <div className="exam-center">
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 480 }}>
           <div className="exam-ico">🚫</div>
-          <h2 className="exam-title">응시가 무효 처리되었습니다</h2>
-          <p className="exam-sub">관리자에게 문의해 주세요.</p>
+          <h2 className="exam-title">{t('result.voided_title')}</h2>
+          <p className="exam-sub">{t('result.voided_sub')}</p>
           <button className="exam-btn-ghost" style={{ marginTop: 18 }} onClick={() => navigate('/')}>
-            홈으로
+            {t('result.home')}
           </button>
         </div>
       </div>
@@ -64,7 +66,7 @@ export default function ExamResult() {
   if (loading) {
     return (
       <div className="exam-center">
-        <div className="exam-card" style={{ textAlign: 'center' }}>결과를 불러오는 중…</div>
+        <div className="exam-card" style={{ textAlign: 'center' }}>{t('result.loading')}</div>
       </div>
     )
   }
@@ -74,10 +76,10 @@ export default function ExamResult() {
       <div className="exam-center">
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 480 }}>
           <div className="exam-ico">⚠️</div>
-          <h2 className="exam-title">결과를 불러올 수 없습니다</h2>
+          <h2 className="exam-title">{t('result.load_failed_title')}</h2>
           <p className="exam-sub">{err}</p>
           <button className="exam-btn-ghost" style={{ marginTop: 18 }} onClick={() => navigate('/')}>
-            홈으로
+            {t('result.home')}
           </button>
         </div>
       </div>
@@ -90,25 +92,25 @@ export default function ExamResult() {
       <div className="exam-center">
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 520 }}>
           <div className="exam-ico">✅</div>
-          <h2 className="exam-title">제출이 완료되었습니다</h2>
+          <h2 className="exam-title">{t('result.submitted_title')}</h2>
           <p className="exam-sub">
-            총 {data.totalQuestions}문항 응시 답안이 정상 접수되었습니다.
+            {t('result.submitted_sub', { n: data.totalQuestions })}
           </p>
           <div className="exam-release">
             <div className="exam-release-row">
-              <span>제출 일시</span>
+              <span>{t('result.submitted_at')}</span>
               <b>{fmtDate(data.submittedAt)}</b>
             </div>
             <div className="exam-release-row hi">
-              <span>채점 결과 공개</span>
+              <span>{t('result.release_at')}</span>
               <b>{fmtDate(data.resultReleaseAt)}</b>
             </div>
             <p className="exam-release-note">
-              채점 결과는 <b>{daysLeft(data.resultReleaseAt)}일 후</b> 이 화면에서 확인할 수 있습니다.
+              {t('result.release_note_pre')}<b>{t('result.release_days', { d: daysLeft(data.resultReleaseAt) })}</b>{t('result.release_note_post')}
             </p>
           </div>
           <button className="exam-btn-ghost" style={{ marginTop: 20 }} onClick={() => navigate('/')}>
-            홈으로
+            {t('result.home')}
           </button>
         </div>
       </div>
@@ -138,25 +140,25 @@ export default function ExamResult() {
       <div className="exam-card" style={{ maxWidth: 720, width: '100%' }}>
         <div style={{ textAlign: 'center' }}>
           <div className="exam-ico">🏆</div>
-          <h2 className="exam-title">채점 결과</h2>
+          <h2 className="exam-title">{t('result.graded_title')}</h2>
           <div className="exam-score">
             <b>{data.totalCorrect}</b>
             <span> / {data.totalQuestions}</span>
           </div>
-          <p className="exam-sub">제출 {fmtDate(data.submittedAt)}</p>
-          <div className={`exam-pass ${passed ? 'ok' : 'no'}`}>{passed ? '합 격' : '불합격'}</div>
+          <p className="exam-sub">{t('result.submitted_prefix')} {fmtDate(data.submittedAt)}</p>
+          <div className={`exam-pass ${passed ? 'ok' : 'no'}`}>{passed ? t('result.pass') : t('result.fail')}</div>
         </div>
 
-        <div className="exam-result-note">합격 기준 — 전체 문항의 60% 이상 정답</div>
+        <div className="exam-result-note">{t('result.pass_criteria')}</div>
 
         <div style={{ textAlign: 'center', marginTop: 18, display: 'flex', gap: 10, justifyContent: 'center' }}>
           {passed && (
             <button className="exam-btn" onClick={goCertificate}>
-              📜 자격증 발급 (PDF)
+              {t('result.issue_cert')}
             </button>
           )}
           <button className="exam-btn-ghost" onClick={() => navigate(-1)}>
-            ← 뒤로
+            {t('result.back')}
           </button>
         </div>
       </div>

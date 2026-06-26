@@ -6,8 +6,10 @@ import { supabase, callFunction } from '../lib/supabase'
 import GemAvatar, { Avatar } from './GemAvatar'
 import { GEM_COLORS, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
+import { useT, LANGS } from '../lib/i18n'
 
 export default function Layout({ children }: { children: ReactNode }) {
+  const { t, lang, setLang } = useT()
   const { user, isFullUser, loginWithGoogle, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<{
@@ -64,7 +66,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const name = isFullUser ? profile?.display_name || user?.email || '내 계정' : '게스트'
+  const name = isFullUser ? profile?.display_name || user?.email || t('fab.account') : t('fab.guest')
 
   const seedBase = user?.id ?? 'guest'
   const spec = parseAvatar(profile?.avatar_url, seedBase)
@@ -93,7 +95,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       await saveAvatar(val)
       setPicking(false)
     } catch (err) {
-      setUploadErr(err instanceof Error ? err.message : '업로드에 실패했습니다.')
+      setUploadErr(err instanceof Error ? err.message : t('fab.uploadFail'))
     } finally {
       setUploading(false)
     }
@@ -125,7 +127,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button
                 className="pf-ava-btn"
                 onClick={() => setPicking((p) => !p)}
-                title="캐릭터 변경"
+                title={t('fab.changeChar')}
               >
                 {isAdmin ? (
                   <img className="pf-ava-mascot" src="/admin-mascot.png" alt="" width={52} height={52} />
@@ -158,7 +160,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     {isFullUser ? (
                       <button
                         className="pf-edit"
-                        title="이름 변경"
+                        title={t('fab.editName')}
                         onClick={() => {
                           setDraft(profile?.display_name || '')
                           setEditing(true)
@@ -169,7 +171,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     ) : null}
                   </div>
                 )}
-                <div className="pf-sub">{isFullUser ? user?.email : '로그인하면 응시할 수 있어요'}</div>
+                <div className="pf-sub">{isFullUser ? user?.email : t('fab.loginhint')}</div>
                 {isFullUser ? (
                   <button
                     className="pf-logout"
@@ -177,14 +179,14 @@ export default function Layout({ children }: { children: ReactNode }) {
                       setOpen(false)
                       logout()
                     }}
-                    title="로그아웃"
+                    title={t('fab.logout')}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                       <polyline points="16 17 21 12 16 7" />
                       <line x1="21" y1="12" x2="9" y2="12" />
                     </svg>
-                    로그아웃
+                    {t('fab.logout')}
                   </button>
                 ) : null}
               </div>
@@ -198,7 +200,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                       className={`pf-avatar-opt pf-avatar-upload ${spec.kind === 'image' ? 'on' : ''}`}
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
-                      title="이미지 업로드"
+                      title={t('fab.uploadImg')}
                     >
                       {spec.kind === 'image' ? (
                         <Avatar avatarUrl={profile?.avatar_url} seed={seedBase} size={38} />
@@ -232,25 +234,40 @@ export default function Layout({ children }: { children: ReactNode }) {
 
             {!isFullUser ? (
               <button className="pf-login" onClick={() => loginWithGoogle()}>
-                <span>●</span> 구글로 로그인
+                <span>●</span> {t('fab.login')}
               </button>
             ) : null}
 
             <div className="pf-list">
               <button className="pf-item" onClick={() => go('/exam')}>
-                <span className="ic">📝</span> GARA 자격검정
+                <span className="ic">📝</span> {t('nav.exam')}
               </button>
               <button className="pf-item" onClick={() => go('/guide')}>
-                <span className="ic">ℹ️</span> 자격안내
+                <span className="ic">ℹ️</span> {t('nav.guide')}
               </button>
               {isFullUser ? (
                 <button className="pf-item" onClick={() => go('/mypage')}>
-                  <span className="ic">🙋</span> 마이페이지
+                  <span className="ic">🙋</span> {t('nav.mypage')}
                 </button>
               ) : null}
               <button className="pf-item" onClick={() => go('/certificate')}>
-                <span className="ic">📜</span> 자격증 미리보기
+                <span className="ic">📜</span> {t('nav.certpreview')}
               </button>
+            </div>
+
+            <div className="pf-langwrap">
+              <div className="pf-langlabel">🌐 {t('fab.language')}</div>
+              <div className="pf-lang">
+                {LANGS.map((l) => (
+                  <button
+                    key={l.code}
+                    className={lang === l.code ? 'on' : ''}
+                    onClick={() => setLang(l.code)}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {isAdmin ? (
@@ -259,7 +276,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 onClick={() => go('/admin')}
                 style={{ width: '100%', marginTop: 14, marginBottom: 8, fontWeight: 700 }}
               >
-                <span>🛠 관리자 페이지</span>
+                <span>🛠 {t('fab.admin')}</span>
                 <span className="pf-more-caret">›</span>
               </button>
             ) : null}
@@ -270,14 +287,14 @@ export default function Layout({ children }: { children: ReactNode }) {
                 onClick={() => setMoreOpen((m) => !m)}
                 aria-expanded={moreOpen}
               >
-                <span>ⓘ 더보기</span>
+                <span>ⓘ {t('fab.morebtn')}</span>
                 <span className={`pf-more-caret ${moreOpen ? 'on' : ''}`}>›</span>
               </button>
             </div>
 
             <div className="pf-hint">
               <Link to="/" style={{ color: 'inherit' }} onClick={() => setOpen(false)}>
-                GARA 자격검정
+                {t('nav.exam')}
               </Link>
               <div className="pf-assoc-en">Global AI &amp; Robotics Association</div>
             </div>
@@ -286,19 +303,19 @@ export default function Layout({ children }: { children: ReactNode }) {
           {open && moreOpen ? (
             <div className="pf-more-pop">
               <button className="pf-more-link" onClick={() => go('/notice')}>
-                공지사항 <span className="pf-more-ext">↗</span>
+                {t('nav.notice')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link" onClick={() => go('/faq')}>
-                자주 하는 질문 <span className="pf-more-ext">↗</span>
+                {t('nav.faq')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link" onClick={() => go('/about')}>
-                협회 소개 <span className="pf-more-ext">↗</span>
+                {t('nav.assoc')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link" onClick={() => go('/privacy')}>
-                개인정보처리방침 <span className="pf-more-ext">↗</span>
+                {t('nav.privacy')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link" onClick={() => go('/terms')}>
-                이용약관 <span className="pf-more-ext">↗</span>
+                {t('nav.terms')} <span className="pf-more-ext">↗</span>
               </button>
             </div>
           ) : null}

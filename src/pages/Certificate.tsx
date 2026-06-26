@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import HomeLink from '../components/HomeLink'
+import { useT } from '../lib/i18n'
 
 export interface CertData {
   name: string
@@ -31,6 +32,7 @@ export default function Certificate() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const { t } = useT()
   const passed = location.state as CertData | null
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
@@ -60,7 +62,7 @@ export default function Certificate() {
       <HomeLink />
 
       <div className="cert-canvas">
-        <img className="cert-bg" src="/cert-template.png" alt="자격증" />
+        <img className="cert-bg" src="/cert-template.png" alt={t('cert.alt')} />
         {cal && (
           <div className="cert-cal">
             {Array.from({ length: 19 }, (_, i) => (i + 1) * 5).map((p) => (
@@ -88,10 +90,10 @@ export default function Certificate() {
 
       <div className="cert-actions">
         <button className="exam-btn" onClick={() => window.print()}>
-          📄 PDF로 저장 / 인쇄
+          {t('cert.print')}
         </button>
         <button className="exam-btn-ghost" onClick={() => navigate(-1)}>
-          ← 뒤로
+          {t('cert.back')}
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
 /* ===== 자격증: 디자인 이미지 위에 값만 오버레이 ===== */
 .cert-page {
   min-height: 100dvh;
-  background: #e9ebee;
+  background: var(--page);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -144,7 +144,7 @@
   padding: 20px;
 }
 .seb-notice {
-  background: #fff;
+  background: var(--bg);
   border-radius: 18px;
   padding: 28px 26px;
   max-width: 440px;
@@ -155,7 +155,7 @@
 .seb-notice-title {
   font-size: 19px;
   font-weight: 800;
-  color: #1a2230;
+  color: var(--ink);
   margin: 4px 0 8px;
 }
 .seb-notice-actions {
@@ -179,10 +179,10 @@
 .mypage-head h1 {
   font-size: 24px;
   font-weight: 800;
-  color: #1a2230;
+  color: var(--ink);
 }
 .mypage-sub {
-  color: #1a2230;
+  color: var(--ink);
   font-size: 18px;
   font-weight: 700;
   margin-top: 6px;
@@ -190,7 +190,7 @@
 .mypage-h2 {
   font-size: 16px;
   font-weight: 800;
-  color: #1a2230;
+  color: var(--ink);
   margin: 22px 0 12px;
 }
 .mypage-empty {
@@ -198,9 +198,9 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  color: #6b7280;
+  color: var(--muted);
   padding: 40px 20px;
-  border: 1px solid #eceef1;
+  border: 1px solid var(--line);
   border-radius: 14px;
 }
 .my-list {
@@ -209,10 +209,10 @@
   gap: 12px;
 }
 .my-item {
-  border: 1px solid #eceef1;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px 18px;
-  background: #fff;
+  background: var(--bg);
 }
 .my-item-top {
   display: flex;
@@ -222,12 +222,12 @@
 }
 .my-item-title {
   font-size: 16px;
-  color: #1a2230;
+  color: var(--ink);
   font-weight: 800;
 }
 .my-item-meta {
   font-size: 13px;
-  color: #9097a1;
+  color: var(--dim);
   margin-top: 4px;
 }
 .my-item-result {
@@ -235,15 +235,15 @@
   font-size: 14px;
 }
 .my-pending {
-  color: #6b7280;
+  color: var(--muted);
 }
 .my-score {
   font-size: 15px;
-  color: #6b7280;
+  color: var(--muted);
 }
 .my-score b {
   font-size: 20px;
-  color: #1a2230;
+  color: var(--ink);
   font-weight: 900;
 }
 .my-pass {
@@ -282,31 +282,31 @@
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  border-bottom: 1px solid #eceef1;
+  border-bottom: 1px solid var(--line);
   margin: 18px 0 20px;
 }
 .mypage-tabs a {
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--muted);
   text-decoration: none;
   border-bottom: 2px solid transparent;
 }
 .mypage-tabs a.on {
-  color: #1a2230;
+  color: var(--ink);
   border-bottom-color: #8bcce9;
 }
 .mypage-tabs a:hover {
-  color: #1a2230;
+  color: var(--ink);
 }
 .exam-result-note {
   text-align: center;
-  color: #6b7280;
+  color: var(--muted);
   font-size: 13.5px;
   margin-top: 16px;
   padding: 11px;
-  background: #f6f7f9;
+  background: var(--soft);
   border-radius: 10px;
 }
 
@@ -317,11 +317,11 @@
 .page-title {
   font-size: 26px;
   font-weight: 800;
-  color: #1a2230;
+  color: var(--ink);
   margin-bottom: 8px;
 }
 .page-lead {
-  color: #4b5563;
+  color: var(--muted);
   font-size: 15px;
   line-height: 1.7;
   margin-bottom: 22px;
@@ -332,7 +332,7 @@
 .page-sec h2 {
   font-size: 17px;
   font-weight: 800;
-  color: #1a2230;
+  color: var(--ink);
   padding-bottom: 8px;
   border-bottom: 2px solid #8bcce9;
   display: inline-block;
@@ -346,7 +346,7 @@
 .page-ul li {
   position: relative;
   padding-left: 18px;
-  color: #4b5563;
+  color: var(--muted);
   font-size: 14.5px;
   line-height: 1.65;
   list-style: none;
@@ -359,7 +359,7 @@
   font-weight: 900;
 }
 .page-ul b {
-  color: #1a2230;
+  color: var(--ink);
 }
 .notice-list,
 .faq-list {
@@ -368,10 +368,10 @@
   gap: 11px;
 }
 .notice-item {
-  border: 1px solid #eceef1;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px 18px;
-  background: #fff;
+  background: var(--bg);
 }
 .notice-top {
   display: flex;
@@ -381,24 +381,24 @@
 }
 .notice-title {
   font-size: 15.5px;
-  color: #1a2230;
+  color: var(--ink);
   font-weight: 800;
 }
 .notice-date {
   font-size: 12.5px;
-  color: #9097a1;
+  color: var(--dim);
   flex: none;
 }
 .notice-body {
-  color: #4b5563;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.7;
   margin-top: 8px;
 }
 .faq-item {
-  border: 1px solid #eceef1;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--bg);
   padding: 0 16px;
 }
 .faq-item summary {
@@ -412,13 +412,102 @@
 .faq-q {
   font-size: 15px;
   font-weight: 700;
-  color: #1a2230;
+  color: var(--ink);
 }
 .faq-a {
-  color: #4b5563;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.75;
   margin: 0;
-  border-top: 1px solid #f0f1f4;
+  border-top: 1px solid var(--line);
   padding: 12px 0 16px;
+}
+
+/* ===== 모바일 반응형 (응시 화면은 PC 전용, 그 외 화면은 모바일에서도 보이게) ===== */
+@media (max-width: 640px) {
+  .exam-center {
+    padding: 24px 14px 64px;
+  }
+  .exam-gate {
+    padding: 30px 20px;
+    border-radius: 18px;
+  }
+  .exam-gate-title {
+    font-size: 23px;
+  }
+  .exam-gate-sub {
+    font-size: 13.5px;
+  }
+  .exam-gate-meta {
+    gap: 8px;
+  }
+  .exam-gate-meta b {
+    font-size: 22px;
+  }
+  .exam-btn-xl {
+    padding: 14px 20px;
+    font-size: 16px;
+  }
+  .exam-title {
+    font-size: 20px;
+  }
+  .exam-score b {
+    font-size: 38px;
+  }
+
+  .prep {
+    border-radius: 16px;
+  }
+  .prep-body {
+    padding: 22px 18px;
+    min-height: 220px;
+  }
+  .prep-foot {
+    padding: 14px 18px;
+  }
+
+  .exam-home {
+    top: 12px;
+    left: 12px;
+    padding: 6px 12px 6px 6px;
+    font-size: 12.5px;
+  }
+
+  .mypage,
+  .page {
+    padding-top: 56px;
+  }
+  .mypage-head h1,
+  .page-title {
+    font-size: 21px;
+  }
+  .mypage-sub {
+    font-size: 16px;
+  }
+  .mypage-tabs {
+    gap: 0;
+    overflow-x: auto;
+  }
+  .mypage-tabs a {
+    padding: 9px 11px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .my-issue-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .my-issue-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .page-sec h2 {
+    font-size: 16px;
+  }
+
+  /* 자격증은 가로 비율 유지 — 폭에 맞춰 축소(글자는 cqw로 자동 스케일) */
+  .cert-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
