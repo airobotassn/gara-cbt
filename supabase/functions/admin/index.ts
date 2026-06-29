@@ -25,7 +25,6 @@ function shapeAttempt(
     resultReleaseAt: a.result_release_at,
     totalCorrect: a.total_correct,
     totalQuestions: a.total_questions,
-    violationCount: a.violation_count,
   }
 }
 
@@ -37,7 +36,7 @@ async function listAttempts(admin: any, body: any) {
   const { data, count } = await admin
     .from('exam_attempts')
     .select(
-      'id, exam_id, user_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, violation_count',
+      'id, exam_id, user_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions',
       { count: 'exact' },
     )
     .order('submitted_at', { ascending: false, nullsFirst: false })
@@ -77,7 +76,7 @@ async function attemptDetail(admin: any, body: any) {
   const { data: a } = await admin
     .from('exam_attempts')
     .select(
-      'id, exam_id, user_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, violation_count',
+      'id, exam_id, user_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions',
     )
     .eq('id', aid)
     .maybeSingle()
@@ -101,7 +100,7 @@ async function attemptDetail(admin: any, body: any) {
 
   const { data: rows } = await admin
     .from('attempt_answers')
-    .select('number, selected_index, is_correct, time_spent, questions(subject, topic, prompt, options, correct_index)')
+    .select('number, selected_index, is_correct, time_spent, questions(subject, topic, prompt, choices, correct_index)')
     .eq('attempt_id', aid)
     .order('number', { ascending: true })
 
@@ -110,7 +109,7 @@ async function attemptDetail(admin: any, body: any) {
     subject: r.questions?.subject ?? null,
     topic: r.questions?.topic ?? null,
     prompt: r.questions?.prompt ?? '',
-    options: r.questions?.options ?? [],
+    choices: r.questions?.choices ?? [],
     selectedIndex: r.selected_index,
     correctIndex: r.questions?.correct_index ?? -1,
     isCorrect: r.is_correct,
