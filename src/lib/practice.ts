@@ -14,7 +14,7 @@ export function makePracticeExam(): StartExamResponse {
         topic: '연습',
         prompt:
           '이 화면은 실제 시험과 동일한 응시 환경입니다.\n보기를 클릭하거나, 오른쪽 「답안지」에서 번호를 눌러 답을 선택해 보세요. (채점되지 않습니다)',
-        options: [
+        choices: [
           '보기를 클릭해 답을 고른다',
           '오른쪽 답안지의 번호를 눌러 답을 고른다',
           '아래 이전/다음 버튼으로 문항을 이동한다',

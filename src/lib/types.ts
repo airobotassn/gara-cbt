@@ -8,7 +8,7 @@ export interface CbtQuestion {
   subject: string // 예: '전기자기학 · 정전계'
   topic: string // 예: '전위'
   prompt: string
-  options: string[] // 보기 4개
+  choices: string[] // 보기 4개
 }
 
 export interface ExamMeta {
@@ -47,7 +47,7 @@ export interface GradedAnswer {
   subject: string
   topic?: string
   prompt: string
-  options: string[]
+  choices: string[]
   selectedIndex: number | null
   correctIndex: number
   isCorrect: boolean
@@ -77,7 +77,6 @@ export interface AdminAttemptRow {
   resultReleaseAt: string | null
   totalCorrect: number | null
   totalQuestions: number | null
-  violationCount: number
 }
 
 // 마이페이지: 내 응시 1건

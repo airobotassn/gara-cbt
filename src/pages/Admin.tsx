@@ -90,7 +90,7 @@ export default function Admin() {
   }
 
   function exportCsv() {
-    const head = ['제출일시', '시험', '응시자', '이메일', '상태', '점수', '총문항', '결과공개', '이탈횟수']
+    const head = ['제출일시', '시험', '응시자', '이메일', '상태', '점수', '총문항', '결과공개']
     const lines = rows.map((r) =>
       [
         fmtDT(r.submittedAt),
@@ -101,7 +101,6 @@ export default function Admin() {
         r.totalCorrect ?? '',
         r.totalQuestions ?? '',
         fmtDT(r.resultReleaseAt),
-        r.violationCount,
       ]
         .map(csvCell)
         .join(','),
@@ -182,7 +181,6 @@ export default function Admin() {
               <th>상태</th>
               <th>점수</th>
               <th>결과 공개</th>
-              <th>이탈</th>
               <th></th>
             </tr>
           </thead>
@@ -206,7 +204,6 @@ export default function Admin() {
                     : '-'}
                 </td>
                 <td>{fmtDT(r.resultReleaseAt)}</td>
-                <td className={r.violationCount > 0 ? 'admin-warn' : ''}>{r.violationCount}</td>
                 <td>
                   <button className="exam-btn-ghost sm" onClick={() => openDetail(r.attemptId)}>
                     상세
@@ -216,7 +213,7 @@ export default function Admin() {
             ))}
             {!rows.length && !loading && (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   제출된 답안이 없습니다.
                 </td>
               </tr>
@@ -258,8 +255,7 @@ export default function Admin() {
                   {detail.attempt.examTitle} · 제출 {fmtDT(detail.attempt.submittedAt)} ·{' '}
                   {detail.attempt.totalCorrect != null
                     ? `${detail.attempt.totalCorrect}/${detail.attempt.totalQuestions}점`
-                    : '미채점'}{' '}
-                  · 이탈 {detail.attempt.violationCount}회
+                    : '미채점'}
                 </p>
                 <div className="admin-ans-list">
                   {detail.answers.map((a) => (

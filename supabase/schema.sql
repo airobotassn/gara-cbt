@@ -13,19 +13,17 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   avatar_url text,
-  is_anonymous boolean default false,
   created_at timestamptz default now()
 );
 
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, display_name, avatar_url, is_anonymous)
+  insert into public.profiles (id, display_name, avatar_url)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
-    new.raw_user_meta_data->>'avatar_url',
-    coalesce(new.is_anonymous, false)
+    new.raw_user_meta_data->>'avatar_url'
   )
   on conflict (id) do nothing;
   return new;
@@ -56,10 +54,10 @@ create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid references exams(id) on delete cascade,
   number int not null,                 -- 1..N 표시 순서
-  subject text,                        -- 예: '전기자기학 · 정전계'
-  topic text,                          -- 예: '전위'
+  subject text not null,               -- 예: '전기자기학 · 정전계'
+  topic text not null,                 -- 예: '전위'
   prompt text not null,
-  options jsonb not null,              -- 정확히 4개의 문자열 배열
+  choices jsonb not null,              -- 4지선다 보기(문자열 배열)
   correct_index int not null check (correct_index between 0 and 3),  -- 0..3, 클라 비노출
   active boolean not null default true,
   unique (exam_id, number)
@@ -77,7 +75,6 @@ create table if not exists exam_attempts (
   result_release_at timestamptz,         -- 이 시각 이후에만 점수/오답 공개(제출 +7일)
   total_questions int,
   total_correct int,
-  violation_count int default 0,
   created_at timestamptz default now()
 );
 create index if not exists exam_attempts_user_idx on exam_attempts(user_id);

@@ -14,9 +14,7 @@ interface AuthState {
   loading: boolean
   // 구글 계정 보유 = 정식 회원. 익명 유저는 false.
   isFullUser: boolean
-  // 세션이 전혀 없으면 익명 세션을 만든다(시험 시작 직전 호출).
-  ensureAnonymous: () => Promise<void>
-  // 결과창 등에서 구글로 로그인/승격. 익명 세션이 있으면 linkIdentity로 데이터 유지.
+  // 결과창 등에서 구글로 로그인/승격.
   loginWithGoogle: (redirectTo?: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -55,16 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const user = session?.user ?? null
 
-  async function ensureAnonymous() {
-    if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
-    const { data } = await supabase.auth.getSession()
-    if (data.session) return
-    const { error } = await supabase.auth.signInAnonymously()
-    if (error) throw error
-  }
-
-  // linkIdentity는 "이미 가입된 구글 계정" 충돌이 있어 쓰지 않는다.
-  // 항상 일반 구글 로그인으로 통일하고, 익명 attempt는 claim 토큰으로 이관(get-result).
+  // 항상 일반 구글 로그인으로 통일(익명 응시 없음).
   async function loginWithGoogle(redirectTo?: string) {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { error } = await supabase.auth.signInWithOAuth({
@@ -85,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     isFullUser: computeIsFullUser(user),
-    ensureAnonymous,
     loginWithGoogle,
     logout,
   }

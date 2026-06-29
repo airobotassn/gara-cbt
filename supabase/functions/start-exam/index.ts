@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     // 활성 문항 전부(번호 순)
     const { data: questions, error: qErr } = await admin
       .from('questions')
-      .select('id, number, subject, topic, prompt, options')
+      .select('id, number, subject, topic, prompt, choices')
       .eq('exam_id', exam.id)
       .eq('active', true)
       .order('number', { ascending: true })
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
         subject: q.subject,
         topic: q.topic,
         prompt: q.prompt,
-        options: q.options,
+        choices: q.choices,
       })),
     })
   } catch (e) {

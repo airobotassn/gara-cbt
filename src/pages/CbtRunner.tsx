@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
-import { useExamGuard } from '../hooks/useAntiCheat'
+import { useInputGuard, useLeaveGuard } from '../hooks/useAntiCheat'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import SebRequired from '../components/SebRequired'
@@ -65,7 +65,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const [zoomI, setZoomI] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const submittedRef = useRef(false)
-  const violationsRef = useRef(0)
 
   // 문항별 체류시간(초)
   const startTimeRef = useRef<number[]>(Array(total).fill(0))
@@ -110,7 +109,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       const res = await callFunction<SubmitExamResponse>('submit-exam', {
         attemptId: start.attemptId,
         answers: buildAnswers(),
-        violationCount: violationsRef.current,
       })
       // 보안 브라우저면 종료 URL 로 이동 → SEB 자동 종료(결과는 마이페이지에서)
       if (isSEB()) {
@@ -163,13 +161,12 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     return () => clearInterval(id)
   }, [durationMs, doSubmit, t])
 
-  // 부정행위 차단 + 이탈 시 화면 가림 — 모의(practice)는 디자인 확인용이라 가드 미적용
-  const { violations, masked } = useExamGuard({
-    enabled: !submitting && start.attemptId !== 'practice',
-  })
-  useEffect(() => {
-    violationsRef.current = violations
-  }, [violations])
+  // 브라우저 JS 보조 가드 — SEB 안 쓰는 응시용(추후 추가 예정인 모의고사 등) + 개발 폴백. 화면 미리보기(practice)는 제외.
+  // 실제 시험은 SEB(OS 레벨)가 캡처·복사·이탈을 다 막으므로 SEB 안에선 켜지 않는다(중복·리소스 낭비 방지).
+  const guardEnabled = !submitting && start.attemptId !== 'practice' && !isSEB()
+  const { masked: inputMasked } = useInputGuard({ enabled: guardEnabled })
+  const { masked: leaveMasked } = useLeaveGuard({ enabled: guardEnabled })
+  const masked = inputMasked || leaveMasked
 
   function choose(qIdx: number, opt: number) {
     if (submitting) return
@@ -231,7 +228,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           <div className="cbt-q-scroll" style={{ fontSize: `${zoom}%` }}>
             <div className="cbt-q-prompt">{q.prompt}</div>
             <div className="cbt-opts">
-              {q.options.map((opt, i) => (
+              {q.choices.map((opt, i) => (
                 <button
                   key={i}
                   className={`cbt-opt ${selected[index] === i ? 'sel' : ''}`}

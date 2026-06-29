@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+
+// 부정행위 차단(브라우저 JS). ⚠️ 운영 보안의 본체는 SEB(OS 레벨)다 — 이 훅들은 우회 가능하므로
+// SEB 가 강제되지 않는 화면(모의응시·개발/데모)용 보조 + 약한 defense-in-depth 로만 본다.
+// 입력차단(useInputGuard)과 이탈감지(useLeaveGuard)는 성격이 달라 분리한다:
+//   · 입력차단  = SEB 와 기능 중복(SEB 안에선 사실상 불필요)
+//   · 이탈감지  = SEB 안에선 탭/앱 전환 자체가 막혀 거의 안 쌓임 → SEB 밖에서만 의미
 
 interface Options {
   enabled: boolean
-}
-
-interface ExamGuardState {
-  violations: number // 화면 이탈 누적(관리자 참고용 — 자동 무효 아님)
-  masked: boolean // 이탈/캡처 시도 시 화면 가림(캡처 무력화)
-  enterFullscreen: () => Promise<void>
 }
 
 async function clearClipboard() {
@@ -18,30 +18,26 @@ async function clearClipboard() {
   }
 }
 
-// CBT 부정행위 차단 — 레벨테스트의 "3회 경고 후 무효" 대신 "완전 차단" 지향.
-//  1) 우클릭/복사/잘라내기/붙여넣기/드래그/선택 차단
-//  2) PrintScreen·캡처/개발자도구/소스보기/저장/인쇄 단축키 차단(+ 클립보드 무력화)
-//  3) 화면 이탈(탭전환/blur)·전체화면 해제는 OS 캡처를 완전히 못 막으므로
-//     화면을 가려 캡처를 무력화하고 횟수만 기록(관리자에 전달). 자동 무효는 없음.
-export function useExamGuard({ enabled }: Options): ExamGuardState {
-  const [violations, setViolations] = useState(0)
+// ① 입력 차단 — 우클릭/복사/잘라내기/붙여넣기/드래그/선택 + 개발자도구/저장/인쇄/소스보기 단축키,
+//    PrintScreen 시 클립보드 비우고 잠깐 화면 가림. 반환 masked = 캡처키 순간 가림 여부.
+export function useInputGuard({ enabled }: Options): { masked: boolean } {
   const [masked, setMasked] = useState(false)
-  const lastAtRef = useRef(0)
 
-  // 1·2층: 입력/복사/단축키 차단
   useEffect(() => {
     if (!enabled) return
     const stop = (e: Event) => {
       e.preventDefault()
       e.stopPropagation()
     }
+    const flashMask = () => {
+      clearClipboard()
+      setMasked(true)
+      window.setTimeout(() => setMasked(false), 1200)
+    }
     const onKey = (e: KeyboardEvent) => {
       const k = e.key
-      // 캡처 키: 클립보드 비우고 잠깐 가림
       if (k === 'PrintScreen') {
-        clearClipboard()
-        setMasked(true)
-        window.setTimeout(() => setMasked(false), 1200)
+        flashMask()
         e.preventDefault()
         return
       }
@@ -63,11 +59,7 @@ export function useExamGuard({ enabled }: Options): ExamGuardState {
     }
     // PrintScreen 은 keydown 이 아니라 keyup 에서만 잡히는 경우가 많음 → 둘 다 처리
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'PrintScreen') {
-        clearClipboard()
-        setMasked(true)
-        window.setTimeout(() => setMasked(false), 1200)
-      }
+      if (e.key === 'PrintScreen') flashMask()
     }
     const evs = ['contextmenu', 'copy', 'cut', 'paste', 'dragstart', 'selectstart']
     evs.forEach((ev) => document.addEventListener(ev, stop, true))
@@ -80,27 +72,18 @@ export function useExamGuard({ enabled }: Options): ExamGuardState {
     }
   }, [enabled])
 
-  // 3층: 이탈 감지 → 가림 + 횟수 기록
+  return { masked }
+}
+
+// ② 이탈 감지 — visibilitychange/blur/focus. 이탈 시 화면 가림. 반환 masked = 이탈 중 가림 여부.
+//    (부정행위 차단의 본체는 SEB(OS 레벨). 위반 횟수 집계는 제거 — SEB가 이탈 자체를 막음.)
+export function useLeaveGuard({ enabled }: Options): { masked: boolean } {
+  const [masked, setMasked] = useState(false)
+
   useEffect(() => {
     if (!enabled) return
-    const bump = () => {
-      const now = Date.now()
-      if (now - lastAtRef.current < 600) return // blur+visibility 중복 방지
-      lastAtRef.current = now
-      setViolations((v) => v + 1)
-    }
-    const onVisibility = () => {
-      if (document.hidden) {
-        setMasked(true)
-        bump()
-      } else {
-        setMasked(false)
-      }
-    }
-    const onBlur = () => {
-      setMasked(true)
-      bump()
-    }
+    const onVisibility = () => setMasked(document.hidden)
+    const onBlur = () => setMasked(true)
     const onFocus = () => setMasked(false)
 
     document.addEventListener('visibilitychange', onVisibility)
@@ -113,15 +96,16 @@ export function useExamGuard({ enabled }: Options): ExamGuardState {
     }
   }, [enabled])
 
-  async function enterFullscreen() {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen()
-      }
-    } catch {
-      /* 거부/미지원 — 치명적 아님 */
-    }
-  }
+  return { masked }
+}
 
-  return { violations, masked, enterFullscreen }
+// 전체화면 진입 — 상태 없는 헬퍼. 추후 모의고사(비-SEB)에서 전체화면 강제용으로 직접 호출.
+export async function enterFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen()
+    }
+  } catch {
+    /* 거부/미지원 — 치명적 아님 */
+  }
 }

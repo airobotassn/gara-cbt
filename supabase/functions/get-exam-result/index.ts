@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     // 공개 — 문항별 정오답(문항 조인)
     const { data: rows } = await admin
       .from('attempt_answers')
-      .select('number, selected_index, is_correct, questions(subject, topic, prompt, options, correct_index)')
+      .select('number, selected_index, is_correct, questions(subject, topic, prompt, choices, correct_index)')
       .eq('attempt_id', attemptId)
       .order('number', { ascending: true })
 
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       subject: r.questions?.subject ?? null,
       topic: r.questions?.topic ?? null,
       prompt: r.questions?.prompt ?? '',
-      options: r.questions?.options ?? [],
+      choices: r.questions?.choices ?? [],
       selectedIndex: r.selected_index,
       correctIndex: r.questions?.correct_index ?? -1,
       isCorrect: r.is_correct,

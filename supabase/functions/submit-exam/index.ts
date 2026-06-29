@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   try {
     const sebErr = await sebCheckFailed(req)
     if (sebErr) return json({ error: sebErr }, 403)
-    const { attemptId, answers, violationCount, voided } = await req.json()
+    const { attemptId, answers, voided } = await req.json()
     if (!attemptId || (!voided && !Array.isArray(answers))) {
       return json({ error: '잘못된 요청입니다.' }, 400)
     }
@@ -56,7 +56,6 @@ Deno.serve(async (req) => {
         .update({
           status: 'voided',
           submitted_at: submittedAt,
-          violation_count: Math.max(0, Math.floor(violationCount ?? 0)),
         })
         .eq('id', attemptId)
       return json({ ok: true, voided: true, submittedAt })
@@ -103,7 +102,6 @@ Deno.serve(async (req) => {
         submitted_at: submittedAt,
         result_release_at: resultReleaseAt,
         total_correct: totalCorrect,
-        violation_count: Math.max(0, Math.floor(violationCount ?? 0)),
       })
       .eq('id', attemptId)
 
