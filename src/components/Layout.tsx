@@ -26,7 +26,8 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // 응시 화면(/exam/run/:id) + 보안 브라우저(SEB) 안에서는 FAB 숨김 — 시험 중 이탈 차단
+  // 응시 화면(/exam/run/:id) + 보안 브라우저(SEB) 안에서만 FAB 숨김(시험 중 이탈 차단).
+  // 그 외 모든 페이지는 헤더 없이 FAB이 네비 역할을 한다.
   const inTest = pathname.startsWith('/exam/run/') || isSEB()
 
   // 관리자 여부 — 서버(admin 'me')로 확인. 관리자면 FAB에 관리자 페이지 링크 노출.
@@ -247,6 +248,9 @@ export default function Layout({ children }: { children: ReactNode }) {
             ) : null}
 
             <div className="pf-list">
+              <button className="pf-item" onClick={() => go('/')}>
+                <span className="ic">🏠</span> {t('common.home')}
+              </button>
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic">📝</span> {t('nav.exam')}
               </button>
@@ -317,7 +321,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {t('nav.notice')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link" onClick={() => go('/faq')}>
-                {t('nav.faq')} <span className="pf-more-ext">↗</span>
+                {t('nav.support')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link" onClick={() => go('/about')}>
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>

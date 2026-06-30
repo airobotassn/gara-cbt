@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
-import HomeLink from '../components/HomeLink'
 import { useT } from '../lib/i18n'
 
 export interface CertData {
@@ -145,8 +144,6 @@ export default function Certificate() {
 
   return (
     <div className="cert-page">
-      <HomeLink />
-
       {isPreview && (
         <div className="cert-lang-tabs">
           {CERT_LANGS.map((l) => (

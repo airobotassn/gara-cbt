@@ -1,63 +1,64 @@
-/* base: 전역 토큰 · 레이아웃 (.wrap/.card/.pad/.sc-title/.sc-sub) */
+/* base: 전역 토큰 · 레이아웃 (.wrap/.card/.pad/.sc-title/.sc-sub)
+   ── APEX 리디자인: 단일 다크 테마 · 3색(잉크/페이퍼/블루) · 3 글씨크기 ── */
 :root {
-  color-scheme: light dark;
-  --page: #f4f5f8; /* body(페이지) 배경 — 카드(--bg)보다 한 단계 톤 */
-  --bg: #ffffff;
-  --soft: #f7f8fa;
-  --soft2: #fbfbfd;
-  --line: #eceef2;
-  --line2: #e2e4ea;
-  --txt: #0f1622;
-  --muted: #525b6a;
-  --dim: #7c8696;
-  --ink: #0f1622;
-  --grow: #3f8fd6;
-  --accent: #3f8fd6;
-  --accent2: #3aa79f;
-  /* 컬러 위 흰 글자/대비용 고정값(다크에서도 흰색 유지) */
-  --on-accent: #ffffff;
-  /* 위험/에러 배너(인라인 스타일에서 참조 — 다크에서 톤 보정) */
-  --danger-bg: #fef2f2;
-  --danger-fg: #b91c1c;
-  /* 카드 그림자(다크에서 더 깊게 오버라이드) */
-  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.02), 0 26px 50px -40px rgba(15, 22, 34, 0.28);
+  color-scheme: light;
 
-  /* ===== 반응형 유동 토큰 (모든 파셀에서 재사용) =====
-     표준 breakpoint: ≤768px(태블릿) · ≤600px(폰) · ≤400px(소형폰) */
+  /* ===== 3 base hue (이 셋 + 투명도 파생만 사용) — GARA Precision 라이트 ===== */
+  --ink-bg: #faf8ff; /* 색1 — 페이지 배경(라이트 서피스) */
+  --paper: 25, 27, 35; /* 색2 — 전경 잉크(#191b23) RGB 트리플릿. 저투명=보더/캡션, 고투명=텍스트 */
+  --blue: #004ac6; /* 색3 — 액센트(코발트) */
+  --blue-hi: #1b55d0; /* 코발트 밝은 변형(글로우/포커스 링) — 같은 hue */
+  --blue-deep: #00174b; /* 코발트 딥(그라데이션 끝) — 같은 hue */
+
+  /* ===== 표면(라이트 — 흰 카드 + 옅은 틴트 밴드) ===== */
+  --page: #faf8ff; /* 페이지 최하단 배경 */
+  --bg: #ffffff; /* 카드 표면(크리스프 화이트) */
+  --soft: #f3f3fd; /* 한 단계 틴트 밴드(surface-container-low) */
+  --soft2: #f7f7fd; /* 가장 옅은 틴트 */
+  --line: rgba(var(--paper), 0.12); /* 기본 보더(옅은 회색) */
+  --line2: rgba(var(--paper), 0.2); /* 강한 보더 */
+
+  /* ===== 텍스트 ===== */
+  --txt: rgba(var(--paper), 0.9); /* 본문 */
+  --muted: rgba(var(--paper), 0.62); /* 보조 */
+  --dim: rgba(var(--paper), 0.45); /* 흐림/캡션 */
+  --ink: rgba(var(--paper), 0.98); /* 최강 전경(제목/값) */
+
+  /* ===== 액센트(전부 코발트로 collapse) ===== */
+  --grow: var(--blue);
+  --accent: var(--blue);
+  --accent2: var(--blue);
+  --on-accent: #ffffff; /* 코발트/딥 위 글자 */
+
+  /* ===== 기능적 예외(디자인 색 아님): 에러/destructive 1색 ===== */
+  --danger-bg: rgba(186, 26, 26, 0.1);
+  --danger-fg: #ba1a1a;
+
+  /* 카드 그림자: 라이트 — 앰비언트(슬레이트 틴트) + 강조용 코발트 글로우 */
+  --shadow-card: 0 4px 6px -1px rgba(30, 41, 59, 0.05), 0 12px 30px -14px rgba(30, 41, 59, 0.14);
+  --glow-blue: 0 0 0 1px rgba(0, 74, 198, 0.35), 0 0 40px -8px rgba(0, 74, 198, 0.22);
+
+  /* ===== 폰트 ===== */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  /* GARA Precision: 라틴·숫자는 Hanken Grotesk, CJK·힌디는 Pretendard(--font-sans)로 자연 폴백 */
+  --font-grotesk: 'Hanken Grotesk', 'Space Grotesk', var(--font-sans);
+
+  /* ===== 반응형 유동 토큰 ===== */
   --container: 760px;
-  --pad-x: clamp(16px, 5vw, 34px); /* 카드 좌우 패딩 */
-  --pad-y: clamp(24px, 4vw, 40px); /* 카드 상하 패딩 */
+  --pad-x: clamp(16px, 5vw, 34px);
+  --pad-y: clamp(24px, 4vw, 40px);
   --gap: clamp(12px, 3vw, 18px);
-  --fs-display: clamp(32px, 9vw, 54px); /* 랜딩 h1 */
-  --fs-score: clamp(42px, 14vw, 64px); /* 결과 점수 */
-  --fs-title: clamp(20px, 5vw, 24px); /* 섹션 타이틀 */
-  --fs-qtext: clamp(18px, 4.6vw, 22px); /* 시험 문제 */
-}
 
-/* ===== 다크 모드: OS 설정 자동 추종 (prefers-color-scheme) =====
-   라이트 전용 디자인이던 것을 토큰 리매핑으로 다크 대응.
-   색은 토큰을 통해 흐르므로 대부분 자동 전환되고,
-   하드코딩 색만 각 파셀에서 보정한다. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page: #0e131b;
-    --bg: #161c26;
-    --soft: #1b222e;
-    --soft2: #1e2632;
-    --line: #28313f;
-    --line2: #333e4e;
-    --txt: #e7eaf2;
-    --muted: #b7c0cd;
-    --dim: #828c9c;
-    --ink: #e7eaf2;
-    --grow: #5aa6e6;
-    --accent: #5aa6e6;
-    --accent2: #4cbcb2;
-    --danger-bg: rgba(248, 113, 113, 0.13);
-    --danger-fg: #f87171;
-    --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.25), 0 26px 50px -40px rgba(0, 0, 0, 0.7);
-  }
+  /* ===== 글씨 크기 — 딱 3단계 ===== */
+  --fs-lg: clamp(30px, 6vw, 52px); /* 히어로/큰 타이틀/점수 */
+  --fs-md: 16px; /* 본문·버튼·UI·작은 제목(굵게) */
+  --fs-sm: 13px; /* 아이브로·라벨·캡션·메타 */
+  /* 구버전 토큰 호환 별칭 (점진 이행용) */
+  --fs-display: var(--fs-lg);
+  --fs-score: var(--fs-lg);
+  --fs-title: var(--fs-lg);
+  --fs-qtext: var(--fs-md);
 }
 
 * {
@@ -68,7 +69,7 @@ body,
 #root {
   height: 100%;
 }
-/* 모바일 브라우저의 자동 글자 확대(특히 일본어 등 CJK에서 기기별로 다르게 발동) 차단 */
+/* 모바일 자동 글자 확대 차단 */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -77,9 +78,10 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--txt);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
-    'Malgun Gothic', sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .no-select {
@@ -88,7 +90,7 @@ body {
   -webkit-touch-callout: none;
 }
 
-/* 공통 레이아웃 */
+/* ===== 공통 레이아웃 ===== */
 .wrap {
   width: min(var(--container), 100%);
   margin: 0 auto;
@@ -97,21 +99,38 @@ body {
 .card {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 16px;
   box-shadow: var(--shadow-card);
 }
 .pad {
   padding: var(--pad-y) var(--pad-x);
 }
+
+/* ===== APEX 비주얼 프리미티브 (공용) ===== */
+/* 아이브로: 섹션 위 작은 대문자 라벨 */
+.eyebrow {
+  display: inline-block;
+  font-family: var(--font-grotesk);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue-hi);
+  margin: 0 0 14px;
+}
+/* 섹션 타이틀 / 서브 */
 .sc-title {
-  font-size: var(--fs-title);
-  font-weight: 740;
-  letter-spacing: -0.025em;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
   margin: 0;
+  color: var(--ink);
 }
 .sc-sub {
   color: var(--muted);
-  font-size: 14px;
-  margin: 10px 0 30px;
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  margin: 12px 0 30px;
+  word-break: keep-all;
 }
-

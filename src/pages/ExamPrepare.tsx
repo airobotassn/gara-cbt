@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import HomeLink from '../components/HomeLink'
 import {
   SEB_REQUIRED,
   isSEB,
@@ -91,7 +90,6 @@ export default function ExamPrepare() {
 
   return (
     <div className="exam-center">
-      <HomeLink />
       <div className="prep">
         <ol className="prep-steps">
           {STEP_KEYS.map((s, i) => (

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import TopBar from '../components/TopBar'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import type { AdminListResponse, AdminAttemptRow, AdminDetailResponse } from '../lib/types'
@@ -118,7 +117,6 @@ export default function Admin() {
   if (!isFullUser) {
     return (
       <div className="wrap">
-        <TopBar />
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420, margin: '40px auto' }}>
           <h2 className="exam-title">관리자 로그인</h2>
           <p className="exam-sub">관리자 계정으로 로그인해 주세요.</p>
@@ -132,7 +130,6 @@ export default function Admin() {
   if (state === 'checking') {
     return (
       <div className="wrap">
-        <TopBar />
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>확인 중…</div>
       </div>
     )
@@ -140,7 +137,6 @@ export default function Admin() {
   if (state === 'denied') {
     return (
       <div className="wrap">
-        <TopBar />
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420, margin: '40px auto' }}>
           <div className="exam-ico">🔒</div>
           <h2 className="exam-title">접근 권한이 없습니다</h2>
@@ -155,7 +151,6 @@ export default function Admin() {
 
   return (
     <div className="wrap admin-cbt">
-      <TopBar />
       <div className="admin-head">
         <h1>제출 답안 관리</h1>
         <div className="admin-head-actions">

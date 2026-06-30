@@ -1,4 +1,4 @@
-import TopBar from '../components/TopBar'
+import SiteFooter from '../components/SiteFooter'
 
 // 글로벌 AI 로봇협회 개인정보처리방침. 보호책임자 정보는 추후 실제 값으로 교체([입력 예정]).
 const ARTICLES: { title: string; lead?: string; items?: string[] }[] = [
@@ -51,9 +51,10 @@ const ARTICLES: { title: string; lead?: string; items?: string[] }[] = [
 
 export default function Privacy() {
   return (
-    <div className="wrap">
-      <TopBar />
-      <div className="card pad doc">
+    <div className="ax-page">
+      <main className="ax-band">
+      <div className="ax-wrap">
+      <div className="card pad doc" style={{ maxWidth: 860, margin: '0 auto' }}>
         <h1 className="doc-title">글로벌 AI 로봇협회 개인정보처리방침</h1>
         {ARTICLES.map((a) => (
           <section className="doc-article" key={a.title}>
@@ -70,6 +71,9 @@ export default function Privacy() {
         ))}
         <p className="doc-updated">시행일: [입력 예정]</p>
       </div>
+      </div>
+      </main>
+      <SiteFooter />
     </div>
   )
 }

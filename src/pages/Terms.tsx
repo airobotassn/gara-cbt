@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TopBar from '../components/TopBar'
+import SiteFooter from '../components/SiteFooter'
 import { useT, type TFunc } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabase'
@@ -171,9 +171,10 @@ export default function Terms() {
   const { t } = useT()
 
   return (
-    <div className="wrap">
-      <TopBar />
-      <div className="card pad doc">
+    <div className="ax-page">
+      <main className="ax-band">
+      <div className="ax-wrap">
+      <div className="card pad doc" style={{ maxWidth: 860, margin: '0 auto' }}>
         <h1 className="doc-title">글로벌 AI 로봇협회 서비스 이용약관</h1>
         {ARTICLES.map((a) => (
           <section className="doc-article" key={a.title}>
@@ -192,6 +193,9 @@ export default function Terms() {
 
         <WithdrawButton t={t} />
       </div>
+      </div>
+      </main>
+      <SiteFooter />
     </div>
   )
 }

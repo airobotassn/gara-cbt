@@ -8,7 +8,7 @@
   flex-wrap: wrap;
 }
 .db-head .h {
-  font-size: clamp(18px, 5vw, 22px);
+  font-size: var(--fs-md);
   font-weight: 760;
   letter-spacing: -0.02em;
   min-width: 0;
@@ -38,17 +38,17 @@
   }
 }
 .stat .k {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .stat .v {
-  font-size: clamp(20px, 6vw, 26px);
+  font-size: var(--fs-md);
   font-weight: 820;
   margin-top: 6px;
   letter-spacing: -0.02em;
 }
 .stat .d {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   margin-top: 2px;
 }
@@ -79,12 +79,12 @@
   margin-bottom: 14px;
 }
 .panel-card .ph .t {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
   min-width: 0;
 }
 .panel-card .ph .leg {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 /* 레이더 범례 — 내 점수(실선) vs 레벨 평균(음영) */
@@ -93,7 +93,7 @@
   justify-content: center;
   gap: 18px;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .radar-leg span {
@@ -108,11 +108,11 @@
   flex: none;
 }
 .radar-leg .rl-me {
-  background: rgba(63, 143, 214, 0.16);
-  border: 2px solid var(--accent);
+  background: rgba(0, 74, 198, 0.22);
+  border: 2px solid var(--blue);
 }
 .radar-leg .rl-avg {
-  background: rgba(154, 163, 178, 0.16);
+  background: rgba(var(--paper), 0.1);
   border: 1.5px dashed var(--dim);
 }
 
@@ -131,13 +131,13 @@
   justify-content: flex-end;
   gap: 8px;
 }
-/* 막대 위 평균 = 6각형 음영과 같은 느낌(회색 반투명 + 점선 경계) */
+/* 막대 위 평균 = 6각형 음영과 같은 느낌(반투명 페이퍼 + 점선 경계) */
 .axis-prog-cmp .avgfill {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
-  background: rgba(154, 163, 178, 0.22);
+  background: rgba(var(--paper), 0.1);
   border-right: 2px dashed var(--dim);
   border-radius: 999px 0 0 999px;
   z-index: 2;
@@ -146,18 +146,18 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   padding: 2px 9px;
   border-radius: 999px;
   white-space: nowrap;
 }
 .ap-status .ap-emoji {
-  font-size: 18px;
+  font-size: var(--fs-md);
   line-height: 1;
 }
 .ap-status .ap-vs {
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   /* 색 지정 없음 → 상태색(.ap-status.above/avg/below)을 상속 */
 }
@@ -171,17 +171,18 @@
   min-width: 22px;
   text-align: right;
 }
+/* 평균 대비: 위계는 블루 농도 + 투명도로만(평균 초과=블루 강조, 평균=보조, 미만=흐림) */
 .ap-status.above {
-  color: #15803d;
-  background: rgba(34, 197, 94, 0.14);
+  color: var(--blue-hi);
+  background: rgba(0, 74, 198, 0.14);
 }
 .ap-status.avg {
   color: var(--muted);
-  background: rgba(154, 163, 178, 0.16);
+  background: rgba(var(--paper), 0.12);
 }
 .ap-status.below {
-  color: #dc2626;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--dim);
+  background: rgba(var(--paper), 0.08);
 }
 .db-grid {
   display: grid;
@@ -222,7 +223,7 @@
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   flex: none;
 }
 .hrow .meta {
@@ -234,31 +235,32 @@
   overflow-wrap: anywhere;
 }
 .hrow .dt {
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .hrow .sb {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--dim);
   margin-top: 2px;
 }
 .hrow .sc2 {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
   flex: none;
 }
 .hrow .chg {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   margin-left: 10px;
   flex: none;
   white-space: nowrap;
 }
+/* 승급/강등: 빨강 금지(destructive 전용) → 상승=블루 강조, 하락=흐림 */
 .chg.up {
-  color: #15803d;
+  color: var(--blue-hi);
 }
 .chg.dn {
-  color: #dc2626;
+  color: var(--dim);
 }
 
 
@@ -290,25 +292,15 @@
   min-width: 0;
 }
 .tierhero .nm {
-  font-size: clamp(18px, 5.5vw, 22px);
+  font-size: var(--fs-md);
   font-weight: 820;
   letter-spacing: 0.02em;
   overflow-wrap: anywhere;
 }
 .tierhero .sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-top: 3px;
-}
-
-/* ===== 다크 모드 보정: 의미색(승급/강등)을 어두운 배경에서 더 밝게 ===== */
-@media (prefers-color-scheme: dark) {
-  .chg.up {
-    color: #4ade80;
-  }
-  .chg.dn {
-    color: #f87171;
-  }
 }
 
 /* ===== 랭킹 점수 분해(히어로 옆): Lv + 맞힌 개수 = 점수 ===== */
@@ -323,7 +315,7 @@
   gap: 9px;
 }
 .score-break .sb-h {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 800;
   color: var(--muted);
 }
@@ -339,7 +331,7 @@
   gap: 10px;
 }
 .sb-chip {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 800;
   border-radius: 9px;
   padding: 5px 10px;
@@ -348,11 +340,11 @@
   background: var(--line);
 }
 .sb-chip.pt {
-  color: var(--bg);
-  background: var(--ink);
+  color: var(--on-accent);
+  background: var(--blue);
 }
 .sb-op {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 800;
   color: var(--muted);
 }
@@ -361,7 +353,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -375,7 +367,7 @@
   background: color-mix(in srgb, var(--accent) 17%, transparent);
 }
 .sb-caret {
-  font-size: 10px;
+  font-size: var(--fs-sm);
   transition: transform 0.15s;
 }
 .sb-caret.open {
@@ -385,7 +377,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.45;
   color: var(--muted);
 }
@@ -404,4 +396,3 @@
     border-top: 1px solid var(--line2);
   }
 }
-

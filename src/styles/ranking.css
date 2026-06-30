@@ -4,8 +4,10 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  background: linear-gradient(120deg, #0f1622, #26303f);
-  color: #fff;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(0, 74, 198, 0.14), transparent 60%),
+    linear-gradient(120deg, var(--soft2), var(--soft));
+  color: var(--ink);
   border-radius: 20px;
   padding: 24px 26px;
 }
@@ -23,22 +25,22 @@
   display: grid;
   place-items: center;
   flex: none;
-  box-shadow: 0 0 26px rgba(58, 167, 159, 0.5);
+  box-shadow: 0 0 26px rgba(0, 74, 198, 0.5);
   font-weight: 800;
-  font-size: 12px;
-  color: #fff;
+  font-size: var(--fs-sm);
+  color: var(--on-accent);
 }
 .rk-hero .who {
   flex: 1;
 }
 .rk-hero .tier {
-  font-size: 22px;
+  font-size: var(--fs-md);
   font-weight: 820;
   letter-spacing: 0.03em;
 }
 .rk-hero .sub {
-  font-size: 13px;
-  color: #aeb7c6;
+  font-size: var(--fs-sm);
+  color: var(--muted);
   margin-top: 3px;
 }
 .rk-hero .pct {
@@ -51,18 +53,18 @@
   }
 }
 .rk-hero .pct b {
-  font-size: 30px;
+  font-size: var(--fs-lg);
   font-weight: 820;
 }
 @media (max-width: 400px) {
   .rk-hero .pct b {
-    font-size: clamp(24px, 8vw, 30px);
+    font-size: var(--fs-lg);
   }
 }
 .rk-hero .pct span {
   display: block;
-  font-size: 12px;
-  color: #aeb7c6;
+  font-size: var(--fs-sm);
+  color: var(--muted);
 }
 .rk-dist {
   display: flex;
@@ -108,10 +110,10 @@
   position: relative;
   transition: 0.2s;
   min-height: 8px;
-  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 1.5px 0 rgba(var(--paper), 0.4);
 }
 .rk-bar.me .col {
-  outline: 2.5px solid var(--ink);
+  outline: 2.5px solid var(--blue);
   outline-offset: 2px;
 }
 .rk-bar .barval {
@@ -119,26 +121,26 @@
   top: -20px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 800;
   color: var(--dim);
   white-space: nowrap;
 }
 .rk-bar.me .barval {
   top: -23px;
-  color: #fff;
-  background: var(--ink);
+  color: var(--on-accent);
+  background: var(--blue);
   padding: 2px 8px;
   border-radius: 999px;
 }
 .rk-bar .tname {
-  font-size: 10.5px;
+  font-size: var(--fs-sm);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 @media (max-width: 400px) {
   .rk-bar .tname {
-    font-size: 9px;
+    font-size: var(--fs-sm);
     letter-spacing: 0;
   }
 }
@@ -175,7 +177,7 @@
 }
 .rk-row .nm {
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-md);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -183,14 +185,14 @@
   white-space: nowrap;
 }
 .rk-row .cnt {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .rk-row .mine {
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 800;
-  color: #fff;
-  background: var(--ink);
+  color: var(--on-accent);
+  background: var(--blue);
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -209,10 +211,10 @@
   padding: 26px 20px 24px;
   margin-bottom: 14px;
   background:
-    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--tc) 42%, #131a26) 0%, #0d131d 62%),
-    linear-gradient(180deg, #131a26, #0c1019);
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--tc) 42%, var(--page)) 0%, var(--page) 62%),
+    linear-gradient(180deg, var(--soft2), var(--page));
   box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--tc) 70%, #000),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 rgba(var(--paper), 0.06);
 }
 /* 회전하는 빛줄기 후광 */
 .lb-hero-rays {
@@ -289,10 +291,10 @@
   justify-content: center;
   gap: 13px;
   margin-top: 14px;
-  font-size: clamp(22px, 6.4vw, 30px);
+  font-size: var(--fs-lg);
   font-weight: 850;
   letter-spacing: 0.04em;
-  color: #fff;
+  color: var(--ink);
   text-shadow: 0 0 18px color-mix(in srgb, var(--tc) 65%, transparent);
 }
 /* 리그명 양옆 장식선 */
@@ -317,9 +319,9 @@
   gap: 8px;
   padding: 9px 6px;
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 20px -12px rgba(0, 0, 0, 0.6);
+  background: rgba(var(--paper), 0.06);
+  border: 1px solid rgba(var(--paper), 0.13);
+  box-shadow: inset 0 1px 0 rgba(var(--paper), 0.08), 0 8px 20px -12px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -331,42 +333,42 @@
 .lb-hstat-hr {
   height: 1px;
   margin: 0 10px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--paper), 0.18), transparent);
 }
 .lb-hstat {
   padding: 2px 22px;
   text-align: center;
 }
 .lb-hstat-v {
-  font-size: 25px;
+  font-size: var(--fs-md);
   font-weight: 850;
   line-height: 1.05;
-  color: #fff;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .lb-hstat-hash {
   margin-right: 1px;
-  font-size: 18px;
+  font-size: var(--fs-md);
   color: var(--tc);
 }
 .lb-hstat-pct {
   margin-left: 1px;
-  font-size: 16px;
+  font-size: var(--fs-md);
   color: var(--tc);
 }
 .lb-hstat-k {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #9aa7ba;
+  color: var(--muted);
 }
 .lb-hstat-sep {
   align-self: center;
   width: 1px;
   height: 32px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(180deg, transparent, rgba(var(--paper), 0.2), transparent);
 }
 
 /* --- 티어 여정 트랙 --- */
@@ -476,14 +478,14 @@
   margin-bottom: 10px;
 }
 .lb-promo-k {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--dim);
   text-transform: uppercase;
 }
 .lb-promo-v {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 850;
   color: var(--tc);
 }
@@ -512,7 +514,7 @@
   background: linear-gradient(
     100deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.45) 50%,
+    rgba(var(--paper), 0.45) 50%,
     transparent 70%
   );
   transform: translateX(-100%);
@@ -554,12 +556,14 @@
 .lb-list > div:last-child .lb-row {
   border-bottom: none;
 }
+/* 내 행: 블루 보더(좌측 강조 바) + 옅은 블루 틴트 */
 .lb-row.me {
-  background: linear-gradient(90deg, rgba(63, 143, 214, 0.12), rgba(58, 167, 159, 0.08));
+  background: linear-gradient(90deg, rgba(0, 74, 198, 0.14), rgba(0, 74, 198, 0.06));
   box-shadow: inset 3px 0 0 var(--accent);
 }
+/* 상위 3위: 빨강/금색 대신 옅은 블루 강조 */
 .lb-row.top3 {
-  background: linear-gradient(90deg, rgba(224, 179, 65, 0.07), transparent 55%);
+  background: linear-gradient(90deg, rgba(0, 74, 198, 0.07), transparent 55%);
 }
 .lb-rank {
   width: 28px;
@@ -568,33 +572,33 @@
   display: grid;
   place-items: center;
   text-align: center;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 850;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-/* 상위 3위 메달 뱃지 */
+/* 상위 3위 메달 뱃지 — 금/은/동을 블루 농도 차등으로 표현 */
 .lb-rank.gold,
 .lb-rank.silver,
 .lb-rank.bronze {
   border-radius: 50%;
-  color: #fff;
-  font-size: 13px;
-  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: var(--on-accent);
+  font-size: var(--fs-md);
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(var(--paper), 0.45);
 }
 .lb-rank.gold {
-  background: linear-gradient(160deg, #f6d365, #d49a26);
+  background: linear-gradient(160deg, var(--blue-hi), var(--blue));
 }
 .lb-rank.silver {
-  background: linear-gradient(160deg, #d8dee8, #9fb0c3);
+  background: linear-gradient(160deg, rgba(0, 74, 198, 0.7), rgba(0, 74, 198, 0.45));
 }
 .lb-rank.bronze {
-  background: linear-gradient(160deg, #d9a06b, #b06a3b);
+  background: linear-gradient(160deg, rgba(0, 74, 198, 0.42), rgba(0, 74, 198, 0.24));
 }
 .lb-name {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -605,37 +609,38 @@
 }
 .lb-mebadge {
   flex: none;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 800;
-  color: #fff;
-  background: var(--ink);
+  color: var(--on-accent);
+  background: var(--blue);
   padding: 2px 8px;
   border-radius: 999px;
 }
 .lb-score {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 800;
   color: var(--muted);
   flex: none;
 }
+/* 승급 안내: 그린 성공색 대신 블루(긍정 강조) — 빨강은 destructive 전용 */
 .lb-promo {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 850;
   letter-spacing: 0.06em;
-  color: #15803d;
-  background: linear-gradient(180deg, #f0fdf4, #dcfce7);
+  color: var(--blue-hi);
+  background: linear-gradient(180deg, rgba(0, 74, 198, 0.14), rgba(0, 74, 198, 0.06));
   padding: 8px;
-  border-top: 1px solid #bbf7d0;
-  border-bottom: 1px solid #bbf7d0;
+  border-top: 1px solid rgba(0, 74, 198, 0.28);
+  border-bottom: 1px solid rgba(0, 74, 198, 0.28);
 }
 .lb-promo-chev {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   animation: lb-bob 1.6s ease-in-out infinite;
 }
 @keyframes lb-bob {
@@ -645,14 +650,14 @@
 }
 
 /* ================= 명예의 전당 (전체 TOP 10 · Ranking.tsx) ================= */
-/* 금·은·동(테마 무관 고정) */
-.hof-wrap { --gold:#f4a72c; --gold-l:#ffd56b; --silver:#9fb0cf; --silver-l:#cfd8ea; --bronze:#c07b46; --bronze-l:#e2a06f; }
+/* 메달 1·2·3등 — 블루 농도 차등(강→약)으로 위계 표현 */
+.hof-wrap { --gold: var(--blue); --gold-l: var(--blue-hi); --silver: var(--blue-deep); --silver-l: var(--blue); --bronze: rgba(0, 74, 198, 0.45); --bronze-l: rgba(0, 74, 198, 0.7); }
 .hof-wrap { padding-bottom: 92px; } /* 하단 고정 바 자리 */
 
-/* 헤더 (페이지와 같은 밝은 배경 위, 골드 메달로 아래 시상대와 톤 통일) */
+/* 헤더 (페이지와 같은 배경 위, 블루 메달로 아래 시상대와 톤 통일) */
 .hof-head { position: relative; text-align: center; margin: 10px 0 20px; }
 
-/* 골드 메달 엠블렘 */
+/* 메달 엠블렘 */
 .hof-badge {
   position: relative; z-index: 1;
   width: 72px; height: 72px; margin: 0 auto 12px;
@@ -665,25 +670,25 @@
 }
 .hof-badge-disc {
   width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
-  background: radial-gradient(120% 120% at 50% 4%, #fff4d4 0%, var(--gold-l) 40%, var(--gold) 78%, #b9741d 100%);
+  background: radial-gradient(120% 120% at 50% 4%, rgba(var(--paper), 0.85) 0%, var(--gold-l) 40%, var(--gold) 78%, var(--blue-deep) 100%);
   box-shadow:
     0 10px 22px -10px color-mix(in srgb, var(--gold) 70%, #000),
-    inset 0 2px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -6px 12px rgba(120, 70, 0, 0.35);
+    inset 0 2px 0 rgba(var(--paper), 0.6),
+    inset 0 -6px 12px rgba(14, 59, 128, 0.45);
   animation: hof-float 4.6s ease-in-out infinite;
 }
 @keyframes hof-float { 50% { transform: translateY(-4px); } }
-.hof-badge-ico { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(110, 64, 0, 0.45)); }
+.hof-badge-ico { font-size: var(--fs-lg); line-height: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
 
 /* 단색 제목 */
 .hof-title {
-  font-size: clamp(26px, 7vw, 34px); font-weight: 900; margin: 0 0 7px;
+  font-size: var(--fs-lg); font-weight: 900; margin: 0 0 7px;
   letter-spacing: -.01em; color: var(--ink);
 }
 /* 양옆 장식선이 달린 서브타이틀 (전체 TOP 10) */
 .hof-sub {
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+  margin: 0; font-size: var(--fs-sm); font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
   color: var(--muted);
 }
 .hof-sub::before, .hof-sub::after {
@@ -698,31 +703,31 @@
 /* 시상대 */
 .hof-podium { display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: end; gap: 10px; max-width: 520px; margin: 0 auto 22px; }
 .hof-pp { display: flex; flex-direction: column; align-items: center; }
-.hof-crown { font-size: 22px; margin-bottom: 1px; filter: drop-shadow(0 3px 6px rgba(244,167,44,.5)); }
+.hof-crown { font-size: var(--fs-md); margin-bottom: 1px; filter: drop-shadow(0 3px 6px rgba(0, 74, 198, 0.5)); }
 .hof-ring { border-radius: 50%; padding: 3px; background: conic-gradient(var(--a), var(--b), var(--a)); }
 .hof-ring-in { display: block; background: var(--bg); border-radius: 50%; padding: 4px; }
-.hof-pp-nm { font-weight: 800; font-size: 13px; margin-top: 7px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
-.hof-pp-pt { font-size: 12px; color: var(--muted); margin-top: 2px; font-weight: 700; }
+.hof-pp-nm { font-weight: 800; font-size: var(--fs-sm); margin-top: 7px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.hof-pp-pt { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; font-weight: 700; }
 .hof-ped {
   width: 100%; margin-top: 8px; border-radius: 11px 11px 5px 5px; display: grid; place-items: center;
-  font-weight: 900; font-size: 22px; border: 1px solid; box-shadow: inset 0 2px 0 rgba(255,255,255,.25);
+  font-weight: 900; font-size: var(--fs-md); border: 1px solid; box-shadow: inset 0 2px 0 rgba(var(--paper), 0.25);
 }
 .hof-pp.p1 { --a: var(--gold-l); --b: var(--gold); }
 .hof-pp.p2 { --a: var(--silver-l); --b: var(--silver); }
 .hof-pp.p3 { --a: var(--bronze-l); --b: var(--bronze); }
-.hof-pp.p1 .hof-ped { height: 70px; background: linear-gradient(180deg, var(--gold-l), var(--gold)); border-color: var(--gold); color: #3a2600; }
-.hof-pp.p2 .hof-ped { height: 52px; background: linear-gradient(180deg, var(--silver-l), var(--silver)); border-color: var(--silver); color: #1d2533; }
-.hof-pp.p3 .hof-ped { height: 40px; background: linear-gradient(180deg, var(--bronze-l), var(--bronze)); border-color: var(--bronze); color: #2e1a0a; }
+.hof-pp.p1 .hof-ped { height: 70px; background: linear-gradient(180deg, var(--gold-l), var(--gold)); border-color: var(--gold); color: var(--on-accent); }
+.hof-pp.p2 .hof-ped { height: 52px; background: linear-gradient(180deg, var(--silver-l), var(--silver)); border-color: var(--silver); color: var(--on-accent); }
+.hof-pp.p3 .hof-ped { height: 40px; background: linear-gradient(180deg, var(--bronze-l), var(--bronze)); border-color: var(--bronze); color: var(--on-accent); }
 
 /* 4~10 리스트 */
 .hof-list { background: var(--bg); border: 1px solid var(--line2); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-card); }
 .hof-row { display: flex; align-items: center; gap: 13px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .hof-row:last-child { border-bottom: none; }
 .hof-row.me { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
-.hof-row .rk { width: 24px; text-align: center; font-weight: 800; font-size: 15px; color: var(--dim); flex: none; }
-.hof-row .nm { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hof-row .nm small { font-weight: 600; font-size: 11px; margin-left: 2px; }
-.hof-row .pt { font-weight: 800; font-size: 14px; color: var(--ink); flex: none; }
+.hof-row .rk { width: 24px; text-align: center; font-weight: 800; font-size: var(--fs-md); color: var(--dim); flex: none; }
+.hof-row .nm { flex: 1; min-width: 0; font-weight: 700; font-size: var(--fs-md); color: var(--ink); display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hof-row .nm small { font-weight: 600; font-size: var(--fs-sm); margin-left: 2px; }
+.hof-row .pt { font-weight: 800; font-size: var(--fs-md); color: var(--ink); flex: none; }
 
 /* 내 순위 고정 바 */
 .hof-mebar {
@@ -734,40 +739,18 @@
   box-shadow: 0 14px 32px -14px color-mix(in srgb, var(--accent) 60%, #000);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
-.hof-mebar .rk { width: 26px; text-align: center; font-weight: 900; font-size: 16px; color: var(--accent); flex: none; }
-.hof-mebar .nm { flex: 1; min-width: 0; font-weight: 800; font-size: 14px; color: var(--ink); }
-.hof-mebar .nm small { display: block; font-weight: 600; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.hof-mebar .rk { width: 26px; text-align: center; font-weight: 900; font-size: var(--fs-md); color: var(--accent); flex: none; }
+.hof-mebar .nm { flex: 1; min-width: 0; font-weight: 800; font-size: var(--fs-md); color: var(--ink); }
+.hof-mebar .nm small { display: block; font-weight: 600; font-size: var(--fs-sm); color: var(--muted); margin-top: 1px; }
 .hof-mebar .nm.unr { color: var(--muted); }
-.hof-mebar .pt { font-weight: 900; font-size: 16px; color: var(--ink); flex: none; }
-.hof-mebar .meflag { flex: none; font-size: 10px; font-weight: 900; letter-spacing: .06em; background: var(--accent); color: var(--on-accent); padding: 3px 8px; border-radius: 7px; }
-.hof-mebar-cta { font-size: 13px; font-weight: 800; color: var(--accent); text-decoration: none; flex: none; }
+.hof-mebar .pt { font-weight: 900; font-size: var(--fs-md); color: var(--ink); flex: none; }
+.hof-mebar .meflag { flex: none; font-size: var(--fs-sm); font-weight: 900; letter-spacing: .06em; background: var(--accent); color: var(--on-accent); padding: 3px 8px; border-radius: 7px; }
+.hof-mebar-cta { font-size: var(--fs-sm); font-weight: 800; color: var(--accent); text-decoration: none; flex: none; }
 /* 리스트 행 안의 ME 뱃지(.nm small 과 구분) */
-.hof-row .meflag { flex: none; font-size: 10px; font-weight: 900; background: var(--accent); color: var(--on-accent); padding: 2px 7px; border-radius: 6px; }
+.hof-row .meflag { flex: none; font-size: var(--fs-sm); font-weight: 900; background: var(--accent); color: var(--on-accent); padding: 2px 7px; border-radius: 6px; }
 
 @media (max-width: 420px) {
   .hof-podium { gap: 6px; }
-  .hof-pp-nm { font-size: 12px; max-width: 84px; }
+  .hof-pp-nm { font-size: var(--fs-sm); max-width: 84px; }
   .hof-mebar { bottom: 8px; }
 }
-
-/* ===== 다크 모드 보정 ===== */
-/* 토큰으로 안 잡히는 그라데이션/틴트/반투명 오버레이만 셀렉터별로 오버라이드.
-   (히어로 배너는 라이트에서도 어두운 배경이라 그대로 둠 — 그 위 글자는 흰색 유지) */
-@media (prefers-color-scheme: dark) {
-  /* '나' 강조 행: 저알파 accent 틴트가 어두운 표면에서 약해 보여 살짝 강화 */
-  .lb-row.me {
-    background: linear-gradient(90deg, rgba(90, 166, 230, 0.16), rgba(76, 188, 178, 0.1));
-  }
-  /* 상위 3위 골드 틴트도 다크에서 약간 강화 */
-  .lb-row.top3 {
-    background: linear-gradient(90deg, rgba(224, 179, 65, 0.12), transparent 55%);
-  }
-  /* 승급 안내 배너: 라이트 그린 면이 다크에서 너무 튀어 차분한 톤으로 보정 */
-  .lb-promo {
-    color: #7ee2a8;
-    background: linear-gradient(180deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.06));
-    border-top-color: rgba(34, 197, 94, 0.28);
-    border-bottom-color: rgba(34, 197, 94, 0.28);
-  }
-}
-

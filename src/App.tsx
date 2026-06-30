@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { I18nProvider } from './lib/i18n'
 import { AuthProvider } from './context/AuthProvider'
 import Layout from './components/Layout'
@@ -21,11 +21,21 @@ import Notice from './pages/Notice'
 import Faq from './pages/Faq'
 const Admin = lazy(() => import('./pages/Admin'))
 
+// 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
+
 export default function App() {
   return (
     <I18nProvider>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Layout>
             <Routes>
               <Route path="/" element={<Landing />} />
