@@ -77,19 +77,19 @@ export default function ExamGate() {
             <div className="w-full lg:w-7/12 flex flex-col gap-8">
               <div>
                 <span className="font-label-sm text-label-sm uppercase text-primary-container bg-primary-container/5 px-4 py-1.5 rounded-full self-start border border-primary-container/10 mb-6 inline-block">Official Certification</span>
-                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">GARA 자격검정</h2>
+                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t('gate.title')}</h2>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 mt-2">
                 <button onClick={onStart} className="bg-primary-container text-on-primary font-title-md text-title-md px-10 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">
-                  GARA 자격검정 응시하기
+                  {t('gate.btn_start')}
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </button>
                 <button onClick={() => navigate('/exam/check')} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary-container font-title-md text-title-md px-10 py-4 rounded-xl transition-all border border-outline-variant hover:border-primary-container hover:shadow-md flex items-center justify-center gap-2">
-                  시험환경 테스트
+                  {t('gate.btn_check')}
                 </button>
               </div>
               {!isFullUser && !needSebLaunch && (
-                <p className="font-label-md text-label-md text-on-surface-variant">응시하려면 구글 로그인이 필요합니다. (비로그인 시 자동 안내)</p>
+                <p className="font-label-md text-label-md text-on-surface-variant">{t('gate.login_required')}</p>
               )}
             </div>
           </section>
@@ -106,7 +106,7 @@ export default function ExamGate() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="font-display-lg text-display-lg text-on-surface">{TOTAL_QUESTIONS}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">문항</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">{t('gate.meta_questions')}</span>
                 </div>
               </div>
               <div className="hidden md:block w-px h-20 bg-outline-variant/30"></div>
@@ -117,7 +117,7 @@ export default function ExamGate() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="font-display-lg text-display-lg text-on-surface">{TEST_DURATION_MINUTES}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">분</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">{t('gate.meta_minutes')}</span>
                 </div>
               </div>
               <div className="hidden md:block w-px h-20 bg-outline-variant/30"></div>
@@ -128,7 +128,7 @@ export default function ExamGate() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="font-display-lg text-display-lg text-on-surface">4</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">지선다형 객관식</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">{t('gate.format_value')}</span>
                 </div>
               </div>
             </div>
@@ -143,8 +143,8 @@ export default function ExamGate() {
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>event_available</span>
                 </div>
                 <div>
-                  <h4 className="font-title-md text-title-md text-on-surface mb-2">결과 발표 ({RESULT_RELEASE_DAYS}일 후)</h4>
-                  <p className="font-body-md text-body-md text-on-surface-variant">시험 종료 후 {RESULT_RELEASE_DAYS}일 이내에 개별 통보됩니다.</p>
+                  <h4 className="font-title-md text-title-md text-on-surface mb-2">{t('gate.instr_result_h', { d: RESULT_RELEASE_DAYS })}</h4>
+                  <p className="font-body-md text-body-md text-on-surface-variant">{t('gate.instr_result_d', { d: RESULT_RELEASE_DAYS })}</p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-start gap-5 p-6 rounded-2xl bg-surface-container-lowest border border-error-container shadow-sm hover:shadow-md transition-shadow">
@@ -152,8 +152,8 @@ export default function ExamGate() {
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>screen_share</span>
                 </div>
                 <div>
-                  <h4 className="font-title-md text-title-md text-on-surface mb-2">보안 규정 (캡처 금지)</h4>
-                  <p className="font-body-md text-body-md text-on-surface-variant">시험 중 화면 캡처 및 외부 기기 사용이 엄격히 금지됩니다.</p>
+                  <h4 className="font-title-md text-title-md text-on-surface mb-2">{t('gate.instr_security_h')}</h4>
+                  <p className="font-body-md text-body-md text-on-surface-variant">{t('gate.instr_security_d')}</p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-start gap-5 p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
@@ -161,8 +161,8 @@ export default function ExamGate() {
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>desktop_windows</span>
                 </div>
                 <div>
-                  <h4 className="font-title-md text-title-md text-on-surface mb-2">환경 요구사항 (PC 전용)</h4>
-                  <p className="font-body-md text-body-md text-on-surface-variant">원활한 진행을 위해 반드시 데스크톱 환경에서 응시해 주십시오.</p>
+                  <h4 className="font-title-md text-title-md text-on-surface mb-2">{t('gate.instr_pc_h')}</h4>
+                  <p className="font-body-md text-body-md text-on-surface-variant">{t('gate.instr_pc_d')}</p>
                 </div>
               </div>
             </div>

@@ -228,7 +228,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           <div className="p-8 md:p-12 flex flex-col gap-8 w-full" style={{ fontSize: `${zoom}%` }}>
             <div className="flex items-start justify-between border-b border-outline-variant/30 pb-4">
               <div className="flex items-baseline gap-2">
-                <span className="font-label-md text-label-md text-outline font-bold">문항</span>
+                <span className="font-label-md text-label-md text-outline font-bold">{t('run.question')}</span>
                 <span className="font-display-lg text-display-lg font-black text-primary tracking-tighter">{index + 1}</span>
               </div>
               <div className="flex gap-2">
@@ -277,7 +277,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
               </div>
               <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm">
                 <div className="grid grid-cols-[80px_1fr] border-b border-outline-variant/30 bg-surface-container-lowest">
-                  <div className="py-3 text-center font-label-sm text-label-sm text-on-surface-variant font-bold border-r border-outline-variant/30">문항</div>
+                  <div className="py-3 text-center font-label-sm text-label-sm text-on-surface-variant font-bold border-r border-outline-variant/30">{t('run.question')}</div>
                   <div className="grid grid-cols-4 py-3">
                     {[1, 2, 3, 4].map((n) => <div key={n} className="text-center font-label-sm text-label-sm text-on-surface-variant">{n}</div>)}
                   </div>
