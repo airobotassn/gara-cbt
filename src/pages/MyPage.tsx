@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -8,8 +8,7 @@ import type { MyAttempt } from '../lib/types'
 
 // gara_5 (마이페이지) 목업 디자인 그대로 + 실제 응시 데이터·탭·발급·로그인 게이트 로직 보존.
 // 원본: stitch_design_critique_assistant/gara_5/code.html
-// gara_5 는 primary=#004ac6 라 이 페이지에만 토큰 오버라이드.
-const PRIMARY_FIX = { '--color-primary': '#004ac6' } as CSSProperties
+// primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff) — 페이지별 오버라이드 제거.
 
 const TABS = [
   { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage' },
@@ -81,7 +80,7 @@ export default function MyPage() {
   // ── 로그인 게이트 ──
   if (!isFullUser) {
     return (
-      <div className="bg-background text-on-background min-h-screen flex flex-col" style={PRIMARY_FIX}>
+      <div className="bg-background text-on-background min-h-screen flex flex-col">
         <main className="flex-grow flex items-center justify-center px-margin-mobile md:px-margin-desktop py-16">
           <div className="bg-surface-container-lowest rounded-2xl p-10 border border-outline-variant/30 ambient-shadow text-center max-w-md w-full">
             <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
@@ -105,7 +104,7 @@ export default function MyPage() {
   const loading = !err && list === null
 
   return (
-    <div className="bg-background text-on-background min-h-screen relative overflow-x-hidden" style={PRIMARY_FIX}>
+    <div className="bg-background text-on-background min-h-screen relative overflow-x-hidden">
       {/* 헤더 없음 — FAB이 네비 */}
       <main className="min-h-screen px-margin-mobile md:px-margin-desktop pb-24 pt-12 relative">
         <div

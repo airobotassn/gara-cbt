@@ -184,6 +184,54 @@ html.dark {
   --glow-blue: 0 0 0 1px rgba(122, 169, 255, 0.4), 0 0 38px -8px rgba(122, 169, 255, 0.34);
 }
 
+/* ── CBT(응시 화면) 전용: 테마와 무관하게 항상 라이트 ──
+   다크에서 html.dark 가 덮은 --color-* 토큰을 라이트값으로 이 서브트리에서만 되돌린다.
+   (커스텀 프로퍼티는 가까운 조상이 이기므로 .force-light 가 html.dark 를 누른다.) */
+.force-light {
+  color-scheme: light;
+  --color-background: #faf8ff;
+  --color-on-background: #191b23;
+  --color-surface: #faf8ff;
+  --color-surface-bright: #faf8ff;
+  --color-surface-dim: #d9d9e4;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f3fd;
+  --color-surface-container: #ededf8;
+  --color-surface-container-high: #e7e7f2;
+  --color-surface-container-highest: #e2e2ec;
+  --color-surface-variant: #e2e2ec;
+  --color-on-surface: #191b23;
+  --color-on-surface-variant: #434654;
+  --color-outline: #737685;
+  --color-outline-variant: #c3c6d6;
+  --color-primary: #004ac6;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #004ac6;
+  --color-on-primary-container: #b8c8ff;
+  --color-primary-fixed: #dbe1ff;
+  --color-primary-fixed-dim: #b4c5ff;
+  --color-on-primary-fixed: #00174b;
+  --color-on-primary-fixed-variant: #003ea8;
+  --color-inverse-primary: #b4c5ff;
+  --color-secondary: #00687a;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #9ce8fd;
+  --color-on-secondary-container: #076a7c;
+  --color-tertiary: #751f00;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #9c2e02;
+  --color-on-tertiary-container: #ffb9a4;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-inverse-surface: #2e3038;
+  --color-inverse-on-surface: #f0f0fb;
+  --color-surface-tint: #1b55d0;
+  --color-glass-bg: rgba(255, 255, 255, 0.85);
+  --color-glass-border: rgba(255, 255, 255, 0.3);
+}
+
 /* 페이지 배경 — 죽은 평면 검정 대신 상단에서 내려오는 은은한 앰비언트 글로우 */
 html.dark body {
   background-color: var(--page);

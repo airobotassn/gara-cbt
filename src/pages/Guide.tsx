@@ -1,12 +1,10 @@
-import { type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
 
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
-// GARA 공식 블루 #004ac6 로 전 페이지 통일 (전역 @theme 와 동일값)
-const C = { '--color-primary': '#004ac6', '--color-primary-container': '#004ac6' } as CSSProperties
+// primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff). 히어로 밴드 위 흰 버튼만 text-[#004ac6] 하드코딩 유지.
 
 const AREAS = [
   { id: 'area1', icon: 'psychology', tone: 'bg-primary/10 text-primary', titleKey: 'guide.area1_title', descKey: 'guide.area1_desc', cls: 'md:col-span-2' },
@@ -31,7 +29,7 @@ export default function Guide() {
   const { t } = useT()
 
   return (
-    <div className="bg-background text-on-background min-h-screen" style={C}>
+    <div className="bg-background text-on-background min-h-screen">
       {/* 헤더 없음 — FAB이 네비 */}
       <main>
         {/* Hero */}

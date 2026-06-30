@@ -69,14 +69,15 @@ export default function Layout({ children }: { children: ReactNode }) {
       .then(({ data }) => setProfile(data ?? null))
   }, [isFullUser, user])
 
-  // 패널 외부 클릭 시 닫기
+  // 패널 외부 클릭 시 닫기 + '더보기' 팝오버는 자기 밖을 누르면 항상 접기(모바일에서 계속 떠 방해)
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent) {
       const el = e.target as HTMLElement | null
+      // 더보기 팝오버/토글 밖을 누르면 팝오버만 닫는다(패널 내부 다른 항목 클릭 포함)
+      if (!el?.closest('.pf-more-pop, .pf-more')) setMoreOpen(false)
       if (el?.closest('.panel, .fab, .pf-more-pop')) return
       setOpen(false)
-      setMoreOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)

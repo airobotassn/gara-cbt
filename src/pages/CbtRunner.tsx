@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
 import { useInputGuard, useLeaveGuard } from '../hooks/useAntiCheat'
@@ -13,8 +13,8 @@ import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../
 type Tab = 'sheet' | 'status'
 
 // gara_6 (정기시험 응시 화면) 목업 디자인 + 응시 로직(타이머·부정행위·OMR·제출) 전부 보존.
-// 원본: stitch_design_critique_assistant/gara_6/code.html (primary=#004ac6 → 이 화면만 스코프)
-const C = { '--color-primary': '#004ac6' } as CSSProperties
+// 원본: stitch_design_critique_assistant/gara_6/code.html
+// CBT(응시 화면)는 테마와 무관하게 항상 라이트 — 루트에 .force-light 적용(다크 토큰 무시).
 
 export default function CbtRunner() {
   const { t } = useT()
@@ -33,7 +33,7 @@ export default function CbtRunner() {
   // 새로고침 등으로 출제 데이터가 유실되면 다시 시작해야 함
   if (!start || start.attemptId !== attemptId) {
     return (
-      <div className="bg-surface min-h-screen flex items-center justify-center p-6" style={C}>
+      <div className="force-light bg-surface min-h-screen flex items-center justify-center p-6">
         <div className="bg-surface-container-lowest rounded-2xl p-10 border border-outline-variant/30 text-center max-w-md w-full shadow-sm">
           <div className="text-[40px] mb-3">⚠️</div>
           <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('run.lost_title')}</h2>
@@ -186,8 +186,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
   return (
     <div
-      className="bg-surface min-h-screen flex flex-col font-body-md text-on-surface no-select"
-      style={C}
+      className="force-light bg-surface min-h-screen flex flex-col font-body-md text-on-surface no-select"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* 부정행위 마스크 */}
@@ -338,16 +337,16 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       </main>
 
       {/* Bottom Action Bar */}
-      <footer className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 flex items-center justify-between sticky bottom-0 z-50">
+      <footer className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 flex items-center justify-between sticky bottom-0 z-50 relative">
         <div className="flex items-center gap-2">
           <span className="font-bold text-primary text-[16px]">{index + 1}</span>
           <span className="text-outline text-[14px]">/ {total}</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
           <button disabled={index === 0 || submitting} onClick={() => setIndex((i) => Math.max(0, i - 1))} className="px-6 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-semibold hover:bg-surface-container transition-colors disabled:opacity-40">{t('run.prev')}</button>
           <button disabled={index + 1 >= total || submitting} onClick={() => setIndex((i) => Math.min(total - 1, i + 1))} className="px-6 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-semibold hover:bg-surface-container transition-colors disabled:opacity-40">{t('run.next')}</button>
-          <button disabled={submitting} onClick={onClickSubmit} className="ml-4 px-8 py-2 rounded-lg bg-primary text-on-primary font-bold hover:shadow-lg transition-all disabled:opacity-60">{submitting ? t('run.submitting') : t('run.submit')}</button>
         </div>
+        <button disabled={submitting} onClick={onClickSubmit} className="px-8 py-2 rounded-lg bg-primary text-on-primary font-bold hover:shadow-lg transition-all disabled:opacity-60">{submitting ? t('run.submitting') : t('run.submit')}</button>
       </footer>
     </div>
   )
