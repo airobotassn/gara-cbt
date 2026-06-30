@@ -23,7 +23,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row w-full bg-surface text-on-surface">
       {/* Left Panel: Brand & Typography */}
-      <div className="w-full lg:w-[55%] bg-surface flex flex-col justify-between p-8 sm:p-12 lg:p-24 relative overflow-hidden shrink-0 border-b lg:border-b-0 lg:border-r border-outline-variant/30">
+      <div className="w-full lg:w-[55%] bg-surface flex flex-col justify-between p-8 sm:p-12 lg:p-24 relative overflow-hidden shrink-0 border-b lg:border-b-0 lg:border-r border-outline-variant/60">
         {/* Abstract Background Element */}
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl opacity-80 pointer-events-none"></div>
         {/* Header / Logo */}
@@ -63,7 +63,7 @@ export default function Login() {
           {/* Google Block */}
           <button
             onClick={() => loginWithGoogle()}
-            className="group w-full bg-surface-container-lowest rounded-[32px] p-8 sm:p-10 flex flex-col items-start gap-12 border-2 border-outline-variant/50 ambient-shadow hover:border-primary hover:shadow-[0_8px_30px_rgba(0,74,198,0.12)] transition-all duration-500 hover:-translate-y-1 relative overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-primary/20"
+            className="force-light group w-full bg-surface-container-lowest rounded-[32px] p-8 sm:p-10 flex flex-col items-start gap-12 border-2 border-outline-variant/50 ambient-shadow hover:border-primary hover:shadow-[0_8px_30px_rgba(0,74,198,0.12)] transition-all duration-500 hover:-translate-y-1 relative overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-primary/20"
           >
             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 shadow-sm border border-black/5">
               <svg className="w-7 h-7" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
