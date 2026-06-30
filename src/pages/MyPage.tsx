@@ -52,7 +52,7 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { section } = useParams()
   const tab = section && TABS.some((t) => t.key === section) ? section : 'attempts'
-  const { isFullUser, loginWithGoogle, user } = useAuth()
+  const { isFullUser, loginWithGoogle, loginWithKakao, user } = useAuth()
   const { t } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
@@ -83,13 +83,16 @@ export default function MyPage() {
     return (
       <div className="bg-background text-on-background min-h-screen flex flex-col" style={PRIMARY_FIX}>
         <main className="flex-grow flex items-center justify-center px-margin-mobile md:px-margin-desktop py-16">
-          <div className="bg-white rounded-2xl p-10 border border-outline-variant/30 ambient-shadow text-center max-w-md w-full">
+          <div className="bg-surface-container-lowest rounded-2xl p-10 border border-outline-variant/30 ambient-shadow text-center max-w-md w-full">
             <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
               <span className="material-symbols-outlined text-primary text-[28px]">lock</span>
             </div>
             <h2 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">로그인이 필요합니다</h2>
             <p className="font-body-md text-body-md text-on-surface-variant mb-6">마이페이지는 로그인 후 이용할 수 있습니다.</p>
-            <button onClick={() => loginWithGoogle()} className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">구글로 로그인</button>
+            <div className="flex flex-col gap-3 items-center">
+              <button onClick={() => loginWithGoogle()} className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">구글로 로그인</button>
+              <button onClick={() => loginWithKakao()} className="font-label-md text-label-md font-bold px-6 py-3 rounded-xl transition-colors ambient-shadow" style={{ background: '#FEE500', color: '#191600' }}>카카오로 로그인</button>
+            </div>
           </div>
         </main>
         <SiteFooter />
@@ -113,7 +116,7 @@ export default function MyPage() {
         <div className="max-w-5xl mx-auto w-full relative z-10">
           {/* Page Header */}
           <header className="mb-12">
-            <h1 className="font-display-lg text-display-lg font-bold text-on-surface mb-3 tracking-tight">마이페이지</h1>
+            <h1 className="font-display-lg text-4xl md:text-display-lg font-bold text-on-surface mb-3 tracking-tight break-keep">마이페이지</h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant">
               안녕하세요, <strong className="text-primary font-bold">{name} 님</strong>. GARA 자격검정 현황을 확인하세요.
             </p>
@@ -136,13 +139,13 @@ export default function MyPage() {
             ))}
           </div>
 
-          {err && <div className="bg-white rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
-          {loading && <div className="bg-white rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
+          {err && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
+          {loading && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
 
           {/* 시험 응시 현황 */}
           {!loading && !err && tab === 'attempts' && (
             attempts.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 border border-outline-variant/30 text-center">
+              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
                 <p className="font-body-md text-on-surface-variant mb-5">아직 응시 내역이 없습니다.</p>
                 <button onClick={() => navigate('/exam')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">자격검정 응시하기</button>
               </div>
@@ -151,7 +154,7 @@ export default function MyPage() {
                 {attempts.map((a) => {
                   const s = statusInfo(a)
                   return (
-                    <article key={a.attemptId} className={`bg-white rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${s.greyed ? 'opacity-75' : ''}`}>
+                    <article key={a.attemptId} className={`bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${s.greyed ? 'opacity-75' : ''}`}>
                       <div className="flex items-start gap-5 flex-1">
                         <div className={`w-14 h-14 rounded-xl ${s.wrap} flex items-center justify-center shrink-0 border`}>
                           <span className={`material-symbols-outlined ${s.color} text-[28px]`} style={{ fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
@@ -175,7 +178,7 @@ export default function MyPage() {
                       </div>
                       {a.status === 'submitted' && a.released && (
                         <div className="shrink-0">
-                          <button onClick={() => navigate(`/exam/result/${a.attemptId}`)} className="px-6 py-2.5 bg-white border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:bg-surface-container-low hover:border-primary/30 hover:text-primary transition-all duration-200 flex items-center gap-2 shadow-sm">
+                          <button onClick={() => navigate(`/exam/result/${a.attemptId}`)} className="px-6 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:bg-surface-container-low hover:border-primary/30 hover:text-primary transition-all duration-200 flex items-center gap-2 shadow-sm">
                             성적 확인
                             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                           </button>
@@ -191,11 +194,11 @@ export default function MyPage() {
           {/* 자격 취득 현황 */}
           {!loading && !err && tab === 'earned' && (
             earned.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">아직 취득한 자격이 없습니다.</div>
+              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">아직 취득한 자격이 없습니다.</div>
             ) : (
               <div className="flex flex-col gap-6">
                 {earned.map((a) => (
-                  <article key={a.attemptId} className="bg-white rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex items-start gap-5">
+                  <article key={a.attemptId} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex items-start gap-5">
                     <div className="w-14 h-14 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-secondary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
                     </div>
@@ -215,14 +218,14 @@ export default function MyPage() {
           {/* 자격증 발급 현황 */}
           {!loading && !err && tab === 'issuance' && (
             earned.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">발급 가능한 자격증이 없습니다.</div>
+              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">발급 가능한 자격증이 없습니다.</div>
             ) : (
               <div className="flex flex-col gap-6">
                 {earned.map((a) => {
                   const certNo = certNoOf(a)
                   const issued = isIssued(certNo)
                   return (
-                    <article key={a.attemptId} className="bg-white rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <article key={a.attemptId} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                       <div className="flex items-start gap-5 flex-1">
                         <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                           <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>

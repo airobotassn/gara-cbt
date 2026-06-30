@@ -16,6 +16,7 @@ interface AuthState {
   isFullUser: boolean
   // 결과창 등에서 구글로 로그인/승격.
   loginWithGoogle: (redirectTo?: string) => Promise<void>
+  loginWithKakao: (redirectTo?: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -65,6 +66,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }
 
+  async function loginWithKakao(redirectTo?: string) {
+    if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: {
+        redirectTo: redirectTo ?? `${window.location.origin}/auth/callback`,
+        // ⚠️ 카카오는 Supabase가 account_email/profile_image/profile_nickname 3개를 강제 요청한다
+        // (이 scopes 값은 무시됨). 실제 수집 범위는 카카오 콘솔 '동의항목'에서 제어 —
+        // 닉네임=필수, 이메일/프로필사진=선택동의로 두고 앱에선 닉네임만 사용.
+        scopes: 'profile_nickname',
+      },
+    })
+    if (error) throw error
+  }
+
   async function logout() {
     await supabase.auth.signOut()
   }
@@ -75,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     isFullUser: computeIsFullUser(user),
     loginWithGoogle,
+    loginWithKakao,
     logout,
   }
 

@@ -7,8 +7,15 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0d0d0f" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- 저장된 테마를 React 렌더 전에 적용 (플래시 방지). 기본=라이트 -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
     <!-- GARA Precision 폰트: 라틴/숫자 Hanken Grotesk · CJK·힌디 본문 Pretendard 폴백 · 아이콘 Material Symbols -->
     <link
       rel="stylesheet"

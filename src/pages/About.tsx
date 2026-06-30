@@ -14,7 +14,7 @@ export default function About() {
         <section className="relative min-h-[58vh] flex items-center justify-center overflow-hidden bg-surface hero-bg">
           <div className="relative z-20 max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop text-center">
             <span className="inline-block px-4 py-1.5 rounded-full bg-surface-container-low text-primary font-label-sm text-label-sm tracking-wider uppercase mb-6 border border-outline-variant/30">Global AI &amp; Robotics Association</span>
-            <h1 className="font-display-lg text-display-lg text-on-surface mb-6 leading-tight">
+            <h1 className="font-display-lg text-3xl sm:text-4xl md:text-display-lg text-on-surface mb-6 leading-tight break-keep">
               글로벌 AI 로봇협회<br />
               <span className="text-primary">세계로 뻗어가는 피지컬 AI 인재의 시작</span>
             </h1>

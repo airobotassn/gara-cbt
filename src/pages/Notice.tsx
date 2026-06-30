@@ -34,11 +34,11 @@ export default function Notice() {
       {/* Main Content Canvas (헤더 없음 — FAB이 네비) */}
       <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
         {/* Hero Section */}
-        <div className="relative py-16 md:py-16 mb-12 rounded-3xl overflow-hidden glass-panel border border-white/40 shadow-sm flex flex-col items-center justify-center text-center">
+        <div className="relative py-10 md:py-16 mb-12 rounded-3xl overflow-hidden glass-panel border border-white/40 shadow-sm flex flex-col items-center justify-center text-center">
           <div className="absolute inset-0 bg-gradient-to-b from-[#004ac6]/5 to-transparent pointer-events-none"></div>
           <div className="relative z-10 px-4">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-white/60 text-[#004ac6] font-label-sm text-label-sm uppercase tracking-wider mb-6 shadow-sm border border-white/50 backdrop-blur-md">Notice / Announcements</span>
-            <h1 className="font-display-lg text-display-lg text-on-surface mb-6 tracking-tight">공지사항</h1>
+            <span className="inline-block px-4 py-1.5 rounded-full bg-surface-container-lowest/60 text-[#004ac6] font-label-sm text-label-sm uppercase tracking-wider mb-6 shadow-sm border border-white/50 backdrop-blur-md">Notice / Announcements</span>
+            <h1 className="font-display-lg text-4xl md:text-display-lg text-on-surface mb-6 tracking-tight break-keep">공지사항</h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
               GARA 자격검정의 최신 소식, 시험 안내 및 중요 공지를 확인하세요.
             </p>
@@ -51,20 +51,20 @@ export default function Notice() {
             f === filter ? (
               <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-[#004ac6] text-white font-label-md text-label-md whitespace-nowrap shadow-sm hover:bg-[#003ea8] transition-colors">{f}</button>
             ) : (
-              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-white border border-outline-variant/50 text-on-surface-variant hover:border-[#004ac6] hover:text-[#004ac6] transition-colors font-label-md text-label-md whitespace-nowrap shadow-sm">{f}</button>
+              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface-variant hover:border-[#004ac6] hover:text-[#004ac6] transition-colors font-label-md text-label-md whitespace-nowrap shadow-sm">{f}</button>
             ),
           )}
         </div>
 
         {list.length === 0 && (
-          <div className="bg-white rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">
             ‘{filter}’ 카테고리의 공지가 없습니다.
           </div>
         )}
 
         {/* Featured Announcement */}
         {featured && (
-          <div className="group relative block w-full bg-white rounded-2xl border border-[#004ac6]/20 p-8 md:p-10 mb-8 transition-all duration-300 hover:shadow-lg hover:border-[#004ac6]/40 overflow-hidden">
+          <div className="group relative block w-full bg-surface-container-lowest rounded-2xl border border-[#004ac6]/20 p-8 md:p-10 mb-8 transition-all duration-300 hover:shadow-lg hover:border-[#004ac6]/40 overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#004ac6]/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col md:flex-row gap-6 md:items-start justify-between">
               <div className="flex-grow">
@@ -72,7 +72,7 @@ export default function Notice() {
                   <span className={`${featured.tagClass} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{featured.tag}</span>
                   <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{featured.date}</span>
                 </div>
-                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t(`notice.${featured.id}.title`)}</h2>
+                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4 break-keep">{t(`notice.${featured.id}.title`)}</h2>
                 <p className="font-body-lg text-body-lg text-on-surface-variant max-w-3xl leading-relaxed">{t(`notice.${featured.id}.body`)}</p>
               </div>
             </div>

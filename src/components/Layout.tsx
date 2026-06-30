@@ -11,7 +11,7 @@ import { makePracticeExam } from '../lib/practice'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
-  const { user, isFullUser, loginWithGoogle, logout } = useAuth()
+  const { user, isFullUser, loginWithGoogle, loginWithKakao, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<{
     display_name: string | null
@@ -24,6 +24,20 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [uploadErr, setUploadErr] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  // 다크/라이트 모드 (html.dark 토글 + localStorage 저장, index.html 에서 초기 적용)
+  const [dark, setDark] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
+  )
+  function toggleTheme() {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    try {
+      localStorage.setItem('theme', next ? 'dark' : 'light')
+    } catch {
+      /* 무시 */
+    }
+  }
   const navigate = useNavigate()
   const { pathname } = useLocation()
   // 응시 화면(/exam/run/:id) + 보안 브라우저(SEB) 안에서만 FAB 숨김(시험 중 이탈 차단).
@@ -247,6 +261,12 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
             ) : null}
 
+            {!isFullUser ? (
+              <button className="pf-login" onClick={() => loginWithKakao()} style={{ background: '#FEE500', color: '#191600' }}>
+                <span>💬</span> 카카오로 로그인
+              </button>
+            ) : null}
+
             <div className="pf-list">
               <button className="pf-item" onClick={() => go('/')}>
                 <span className="ic">🏠</span> {t('common.home')}
@@ -267,6 +287,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-item" onClick={goExamPreview}>
                 <span className="ic">🖥️</span> {t('nav.exampreview')}
+              </button>
+              <button className="pf-item" onClick={toggleTheme}>
+                <span className="ic">{dark ? '☀️' : '🌙'}</span> {dark ? t('fab.light') : t('fab.dark')}
               </button>
             </div>
 

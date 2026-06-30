@@ -1038,3 +1038,44 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===================== 다크 모드 (Privacy/Terms 등 .ax-page) =====================
+   .ax-page 는 자체 라이트 팔레트(--ax-*)+흰 배경을 들고 있어 다크에서 흰 화면이 된다.
+   토큰을 다크로 덮고 배경/헤더/FAB 만 보정하면 대부분 표면이 따라온다(코발트 콜아웃은 유지). */
+html.dark .ax-page {
+  color-scheme: dark;
+  --ax-navy: #e4e7ef;
+  --ax-text: #e4e7ef;
+  --ax-muted: #aab0c2;
+  --ax-light: #767d91;
+  --ax-blue: #4f8df5;
+  --ax-blue-hi: #82b0ff;
+  --ax-tint: #82b0ff;
+  --ax-border: rgba(170, 176, 194, 0.2);
+  --ax-border-soft: rgba(170, 176, 194, 0.12);
+  --ax-surface: #0a0c11;
+  --ax-card: #14171f;
+  --ax-band-tint: #191d26;
+  --ax-tint-bg: rgba(122, 169, 255, 0.1);
+  --ax-tint-border: rgba(122, 169, 255, 0.26);
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(64, 110, 220, 0.12) 0%, transparent 60%),
+    radial-gradient(46% 42% at 100% 8%, rgba(40, 170, 230, 0.07) 0%, transparent 55%),
+    radial-gradient(46% 42% at 0% 18%, rgba(255, 133, 194, 0.05) 0%, transparent 55%),
+    var(--ax-surface);
+}
+html.dark .ax-header {
+  background: rgba(13, 16, 23, 0.82);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+/* 카드 — 다크 깊이감(윗엣지 하이라이트 + 드롭) */
+html.dark .ax-page .ax-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 24px 52px -30px rgba(0, 0, 0, 0.72);
+}
+/* 라이트 페이지용 흰 FAB 보정 무효화 → 전역 다크 FAB 그대로 */
+html.dark .ax-page ~ .fab {
+  background: var(--color-surface-container);
+  border-color: var(--color-outline-variant);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 12px 28px rgba(0, 0, 0, 0.5);
+}

@@ -34,7 +34,7 @@ export default function CbtRunner() {
   if (!start || start.attemptId !== attemptId) {
     return (
       <div className="bg-surface min-h-screen flex items-center justify-center p-6" style={C}>
-        <div className="bg-white rounded-2xl p-10 border border-outline-variant/30 text-center max-w-md w-full shadow-sm">
+        <div className="bg-surface-container-lowest rounded-2xl p-10 border border-outline-variant/30 text-center max-w-md w-full shadow-sm">
           <div className="text-[40px] mb-3">⚠️</div>
           <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('run.lost_title')}</h2>
           <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('run.lost_sub')}</p>
@@ -202,9 +202,9 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       )}
 
       {/* Exam Header */}
-      <header className="bg-white border-b border-outline-variant/30 h-16 flex items-center px-4 md:px-margin-desktop justify-between sticky top-0 z-50">
+      <header className="bg-surface-container-lowest border-b border-outline-variant/30 h-16 flex items-center px-4 md:px-margin-desktop justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
-          <img alt="GARA" className="h-8 w-8 object-contain" src="/logo.png" />
+          <img alt="GARA" className="h-8 w-8 object-cover rounded-full" src="/logo.png" />
           <span className="font-title-md text-title-md font-bold text-on-surface tracking-tight">{t('run.top_title', { title: exam.title })}</span>
         </div>
         <div className="flex items-center gap-6">
@@ -246,7 +246,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                   <button
                     key={i}
                     onClick={() => choose(index, i)}
-                    className={`group relative flex items-center p-5 rounded-xl text-left transition-all cursor-pointer shadow-sm ${sel ? 'border-2 border-primary bg-primary-fixed/10' : 'border border-outline-variant/50 bg-white hover:bg-surface-container-low hover:border-primary/50 hover:shadow'}`}
+                    className={`group relative flex items-center p-5 rounded-xl text-left transition-all cursor-pointer shadow-sm ${sel ? 'border-2 border-primary bg-primary-fixed/10' : 'border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low hover:border-primary/50 hover:shadow'}`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-label-md text-label-md shrink-0 mr-4 transition-all ${sel ? 'bg-primary border-primary text-on-primary' : 'border border-outline-variant text-outline group-hover:border-primary group-hover:text-primary'}`}>{i + 1}</div>
                     <span className={`font-body-lg text-body-lg ${sel ? 'font-semibold text-primary' : 'text-on-surface'}`}>{opt}</span>
@@ -271,11 +271,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           {/* 답안지(OMR) */}
           {tab === 'sheet' && (
             <div className="p-6 flex-1 overflow-y-auto bg-surface-container-low">
-              <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-xl border border-outline-variant/30 shadow-sm">
+              <div className="flex justify-between items-center mb-4 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm">
                 <span className="font-title-md text-[16px] font-bold text-on-surface flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary block"></span> {t('run.tab_sheet')}</span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant">{t('run.completed')} <strong className="text-primary font-bold text-[14px]">{answeredCount}</strong>/{total}</span>
               </div>
-              <div className="bg-white border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm">
+              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm">
                 <div className="grid grid-cols-[80px_1fr] border-b border-outline-variant/30 bg-surface-container-lowest">
                   <div className="py-3 text-center font-label-sm text-label-sm text-on-surface-variant font-bold border-r border-outline-variant/30">문항</div>
                   <div className="grid grid-cols-4 py-3">
@@ -312,7 +312,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           {/* 문제풀이 현황 */}
           {tab === 'status' && (
             <div className="p-6 flex-1 overflow-y-auto bg-surface-container-low">
-              <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-xl border border-outline-variant/30 shadow-sm">
+              <div className="flex justify-between items-center mb-4 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm">
                 <span className="font-title-md text-[16px] font-bold text-on-surface">{t('run.tab_status')}</span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant">{t('run.written')} <strong className="text-primary font-bold text-[14px]">{answeredCount}</strong>/{total}</span>
               </div>
@@ -325,7 +325,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                     <button
                       key={qq.id}
                       onClick={() => setIndex(i)}
-                      className={`aspect-square rounded-lg font-label-md text-[14px] font-bold flex items-center justify-center border transition-colors ${cur ? 'border-primary ring-2 ring-primary/30 text-primary bg-white' : done ? 'bg-primary text-on-primary border-primary' : 'bg-white border-outline-variant/40 text-on-surface-variant hover:border-outline'}`}
+                      className={`aspect-square rounded-lg font-label-md text-[14px] font-bold flex items-center justify-center border transition-colors ${cur ? 'border-primary ring-2 ring-primary/30 text-primary bg-surface-container-lowest' : done ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:border-outline'}`}
                     >
                       {i + 1}
                     </button>
@@ -338,7 +338,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       </main>
 
       {/* Bottom Action Bar */}
-      <footer className="bg-white border-t border-outline-variant/30 p-4 flex items-center justify-between sticky bottom-0 z-50">
+      <footer className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 flex items-center justify-between sticky bottom-0 z-50">
         <div className="flex items-center gap-2">
           <span className="font-bold text-primary text-[16px]">{index + 1}</span>
           <span className="text-outline text-[14px]">/ {total}</span>

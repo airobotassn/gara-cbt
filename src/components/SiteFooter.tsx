@@ -7,7 +7,7 @@ export default function SiteFooter() {
       <div className="py-10 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-start gap-6">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="GARA" className="h-7 w-7 object-contain" />
+            <img src="/logo.png" alt="GARA" className="h-7 w-7 object-cover rounded-full" />
             <span className="font-title-md text-title-md font-bold text-on-surface">GARA</span>
           </div>
           <p className="font-label-sm text-label-sm text-on-surface-variant">© 2024 GARA. All rights reserved. (주)GARA 자격검정사업단</p>

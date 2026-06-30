@@ -36,18 +36,18 @@ export default function Guide() {
         <section className="relative min-h-[460px] flex items-center overflow-hidden mesh-gradient-bg py-16 px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
             <div className="text-white space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-primary font-bold text-label-sm uppercase tracking-wider mb-4 shadow-sm border border-white/50">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#004ac6] font-bold text-label-sm uppercase tracking-wider mb-4 shadow-sm border border-white/50">
                 <span className="material-symbols-outlined text-[16px]">verified</span>
                 GARA Certification
               </div>
               <h1 className="font-display-lg text-display-lg font-bold leading-tight">글로벌 AI 활용 능력의<br />확실한 기준</h1>
               <p className="font-body-lg text-body-lg opacity-90 max-w-lg">GARA는 실무 중심의 생성형 AI 활용 능력을 객관적인 지표로 평가하는 국제 표준 자격입니다. 5가지 핵심 영역을 통해 당신의 완벽한 AI 경쟁력을 증명하세요.</p>
               <div className="pt-4 flex flex-wrap gap-4">
-                <button onClick={() => navigate('/exam')} className="bg-white text-primary rounded-xl px-6 py-3 font-label-md text-label-md font-bold hover:bg-surface-container-low transition-colors ambient-shadow flex items-center gap-2">
+                <button onClick={() => navigate('/exam')} className="bg-white text-[#004ac6] rounded-xl px-6 py-3 font-label-md text-label-md font-bold hover:bg-[#eef1ff] transition-colors ambient-shadow flex items-center gap-2">
                   시험 접수하기
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </button>
-                <button onClick={() => navigate('/exam/check')} className="bg-white/60 text-primary rounded-xl px-6 py-3 font-label-md text-label-md font-bold hover:bg-white/80 transition-colors border border-white/50 backdrop-blur-md shadow-lg">모의 테스트</button>
+                <button onClick={() => navigate('/exam/check')} className="bg-white/60 text-[#004ac6] rounded-xl px-6 py-3 font-label-md text-label-md font-bold hover:bg-white/80 transition-colors border border-white/50 backdrop-blur-md shadow-lg">모의 테스트</button>
               </div>
             </div>
             <div className="glass-panel rounded-2xl p-8 ambient-shadow border border-white/40">
@@ -57,7 +57,7 @@ export default function Guide() {
               </h3>
               <div className="space-y-4">
                 {SCHEDULE.map((s) => (
-                  <div key={s.round} className={`rounded-xl p-4 flex justify-between items-center border ${s.open ? 'bg-white/60 border-white/50 hover:bg-white/80 transition-colors cursor-pointer' : 'bg-white/40 border-white/20 opacity-70'}`}>
+                  <div key={s.round} className={`rounded-xl p-4 flex justify-between items-center border ${s.open ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}>
                     <div>
                       <div className={`font-label-sm text-label-sm mb-1 ${s.open ? 'text-primary' : 'text-on-surface-variant'}`}>{s.round}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.open ? 'font-semibold' : ''}`}>{s.date}</div>
@@ -71,7 +71,7 @@ export default function Guide() {
         </section>
 
         {/* 5대 평가 영역 */}
-        <section className="py-16 bg-white px-margin-mobile md:px-margin-desktop">
+        <section className="py-16 bg-surface-container-lowest px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-10">
               <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold mb-4">5대 평가 영역</h2>
@@ -100,7 +100,7 @@ export default function Guide() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {METHODS.map((m) => (
-                <div key={m.h} className="bg-white rounded-2xl p-8 border border-outline-variant/30 ambient-shadow">
+                <div key={m.h} className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 ambient-shadow">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                     <span className="material-symbols-outlined text-primary">{m.icon}</span>
                   </div>

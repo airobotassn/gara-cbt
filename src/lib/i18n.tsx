@@ -840,6 +840,8 @@ const D: Record<string, Record<Lang, string>> = {
   "nav.notice": { ko: "공지사항", en: "Notices", ja: "お知らせ", zh: "公告", hi: "सूचनाएँ", vi: "Thông báo" },
   "nav.faq": { ko: "자주 하는 질문", en: "FAQ", ja: "よくある質問", zh: "常见问题", hi: "अक्सर पूछे जाने वाले प्रश्न", vi: "Câu hỏi thường gặp" },
   "nav.support": { ko: "고객센터", en: "Help Center", ja: "カスタマーセンター", zh: "客户中心", hi: "सहायता केंद्र", vi: "Trung tâm hỗ trợ" },
+  "fab.dark": { ko: "다크 모드", en: "Dark mode", ja: "ダークモード", zh: "深色模式", hi: "डार्क मोड", vi: "Chế độ tối" },
+  "fab.light": { ko: "라이트 모드", en: "Light mode", ja: "ライトモード", zh: "浅色模式", hi: "लाइट मोड", vi: "Chế độ sáng" },
   "nav.assoc": { ko: "협회 소개", en: "About the Association", ja: "協会紹介", zh: "协会简介", hi: "एसोसिएशन परिचय", vi: "Giới thiệu Hiệp hội" },
   "fab.login": { ko: "구글로 로그인", en: "Sign in with Google", ja: "Googleでログイン", zh: "使用 Google 登录", hi: "Google से साइन इन करें", vi: "Đăng nhập bằng Google" },
   "fab.loginhint": { ko: "로그인하면 응시할 수 있어요", en: "Sign in to take the exam", ja: "ログインすると受験できます", zh: "登录后即可应试", hi: "साइन इन करके परीक्षा दें", vi: "Đăng nhập để dự thi" },

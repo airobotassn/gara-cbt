@@ -38,10 +38,10 @@ export default function ExamCheck() {
         <div className="glass-panel rounded-2xl p-8 md:p-10 ambient-shadow flex flex-col gap-12 max-w-4xl mx-auto border-white/40">
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-6">
-            <div className="relative w-32 aspect-square rounded-full bg-white flex items-center justify-center overflow-hidden border border-surface-container-highest shadow-xl shadow-primary-container/5">
+            <div className="relative w-32 aspect-square rounded-full bg-surface-container-lowest flex items-center justify-center overflow-hidden border border-surface-container-highest shadow-xl shadow-primary-container/5">
               <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary-container via-transparent to-transparent"></div>
-              <div className="z-10 w-full h-full flex items-center justify-center">
-                <img alt="GARA Logo" className="w-full h-full object-contain p-4" src="/logo.png" />
+              <div className="z-10 w-full h-full flex items-center justify-center p-3 rounded-full overflow-hidden">
+                <img alt="GARA Logo" className="w-full h-full object-cover rounded-full scale-105" src="/logo.png" />
               </div>
               <div className="absolute w-full h-full border border-primary-container/10 rounded-full" style={{ transform: 'scale(0.8)' }}></div>
               <div className="absolute w-full h-full border border-primary-container/5 rounded-full" style={{ transform: 'scale(0.6)' }}></div>
@@ -54,7 +54,7 @@ export default function ExamCheck() {
 
           <div className="space-y-8">
             {/* Step 1: 설치 */}
-            <div className="flex flex-col sm:flex-row items-start gap-6 p-8 rounded-2xl bg-white border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col sm:flex-row items-start gap-6 p-8 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
               <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0 flex items-center justify-center w-14 h-14 font-title-md text-title-md font-bold">1</div>
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('check.sec1_title')}</h2>
@@ -68,7 +68,7 @@ export default function ExamCheck() {
             </div>
 
             {/* Step 2: 자동 점검 */}
-            <div className="flex flex-col sm:flex-row items-start gap-6 p-8 rounded-2xl bg-white border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col sm:flex-row items-start gap-6 p-8 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
               <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0 flex items-center justify-center w-14 h-14 font-title-md text-title-md font-bold">2</div>
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-6">{t('check.sec2_title')}</h2>
@@ -104,7 +104,7 @@ export default function ExamCheck() {
             </div>
 
             {/* Step 3: 모의 문제 */}
-            <div className="flex flex-col sm:flex-row items-start gap-6 p-8 rounded-2xl bg-white border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col sm:flex-row items-start gap-6 p-8 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
               <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0 flex items-center justify-center w-14 h-14 font-title-md text-title-md font-bold">3</div>
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('check.sec3_title')}</h2>
@@ -118,7 +118,7 @@ export default function ExamCheck() {
           </div>
 
           <div className="mt-8 flex justify-center">
-            <button onClick={() => navigate('/exam')} className="bg-white text-on-surface-variant hover:text-primary-container font-title-md text-title-md px-8 py-3 rounded-xl transition-all border border-outline-variant hover:border-primary-container hover:shadow-md inline-flex items-center justify-center gap-2">
+            <button onClick={() => navigate('/exam')} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary-container font-title-md text-title-md px-8 py-3 rounded-xl transition-all border border-outline-variant hover:border-primary-container hover:shadow-md inline-flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-[20px]">arrow_back</span>
               {t('check.back')}
             </button>

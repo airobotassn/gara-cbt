@@ -86,3 +86,165 @@
     radial-gradient(at 100% 0%, rgba(120, 210, 255, 0.12) 0px, transparent 50%),
     radial-gradient(at 50% 120%, rgba(180, 170, 255, 0.14) 0px, transparent 60%);
 }
+
+/* ============================================================
+   다크 모드 — html.dark 에서 토큰 재정의 (FAB 토글로 .dark on/off)
+   라이트는 그대로, .dark 일 때만 어두운 팔레트로 캐스케이드
+   ============================================================ */
+html.dark {
+  color-scheme: dark;
+
+  /* ── Material-3 @theme 색 → 다크 ──
+     표면을 +5~7 L 씩 또렷이 단차(elevation) → 카드가 배경 위로 "뜬다".
+     순검정(#0d…) 대신 살짝 푸른 딥 차콜(hue ~228°)로 깊이/온도를 준다. */
+  --color-background: #0a0c11;
+  --color-on-background: #e4e7ef;
+  --color-surface: #0a0c11;
+  --color-surface-bright: #20242f;
+  --color-surface-dim: #07080b;
+  --color-surface-container-lowest: #0d0f15;
+  --color-surface-container-low: #14171f;
+  --color-surface-container: #191d26;
+  --color-surface-container-high: #1f2430;
+  --color-surface-container-highest: #262b38;
+  --color-surface-variant: #262b38;
+  --color-on-surface: #e4e7ef;
+  --color-on-surface-variant: #aab0c2;
+  --color-outline: #767d91;
+  --color-outline-variant: #2f3543; /* 헤어라인 — 컨테이너 위에서 또렷 */
+
+  /* primary = 밝은 페리윙클 + 어두운 글자(다크 친화 패턴) */
+  --color-primary: #7aa9ff;
+  --color-on-primary: #06173a;
+  --color-primary-container: #7aa9ff;
+  --color-on-primary-container: #06173a;
+  --color-primary-fixed: #20335c;
+  --color-primary-fixed-dim: #2c4a86;
+  --color-on-primary-fixed: #d7e3ff;
+  --color-on-primary-fixed-variant: #adc6ff;
+  --color-inverse-primary: #004ac6;
+
+  --color-secondary: #62d4ea;
+  --color-on-secondary: #00141b;
+  --color-secondary-container: #0e4a55;
+  --color-on-secondary-container: #a7ecff;
+  --color-secondary-fixed: #0e4a55;
+  --color-secondary-fixed-dim: #1a6675;
+  --color-on-secondary-fixed: #c5f2ff;
+  --color-on-secondary-fixed-variant: #86d2e6;
+
+  --color-tertiary: #ffb59e;
+  --color-on-tertiary: #561c08;
+  --color-tertiary-container: #73301a;
+  --color-on-tertiary-container: #ffdbd0;
+  --color-tertiary-fixed: #73301a;
+  --color-tertiary-fixed-dim: #9c4730;
+  --color-on-tertiary-fixed: #ffdbd0;
+  --color-on-tertiary-fixed-variant: #ffb59e;
+
+  --color-error: #ff9090;
+  --color-on-error: #5a0d0d;
+  --color-error-container: #5d1414;
+  --color-on-error-container: #ffd9d9;
+
+  --color-inverse-surface: #e4e7ef;
+  --color-inverse-on-surface: #14171f;
+  --color-surface-tint: #7aa9ff;
+
+  /* glass / mesh 토큰도 다크로 (안 그러면 흰 글래스가 샌다) */
+  --color-glass-bg: rgba(24, 28, 38, 0.72);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-surface-mesh-blue: #6ea8ff1f;
+  --color-surface-mesh-cyan: #1ed7ff16;
+  --color-surface-mesh-pink: #ff85c20d;
+
+  /* base.css 레거시 토큰 → 다크 (구 .lp/Admin/Prepare/Cert/약관 등)
+     ⚠️ --bg/--soft 는 라이트에서 '솔리드 카드색'(흰색)이다 → 다크도 솔리드로.
+        예전 rgba(paper,0.045) 반투명이 카드를 배경에 녹여 "검정 색칠"처럼 보이던 원인. */
+  --ink-bg: #0a0c11;
+  --page: #0a0c11;
+  --paper: 224, 230, 244; /* 전경 잉크(쿨 화이트) RGB 트리플릿 */
+  --blue: #4f8df5; /* 솔리드 버튼용 — 흰 글자 대비 확보(중간 코발트) */
+  --blue-hi: #82b0ff; /* 글로우/그라데이션/액센트 */
+  --blue-deep: #11295a;
+  --bg: #14171f; /* 카드 표면 — 솔리드 */
+  --soft: #191d26; /* 한 단계 틴트 밴드 */
+  --soft2: #0f1219; /* 가장 옅은 밴드 */
+  --line: rgba(var(--paper), 0.1); /* 헤어라인 보더 */
+  --line2: rgba(var(--paper), 0.17); /* 강한 보더 */
+  --txt: rgba(var(--paper), 0.87);
+  --muted: rgba(var(--paper), 0.58);
+  --dim: rgba(var(--paper), 0.4);
+  --ink: rgba(var(--paper), 0.95);
+  --danger-bg: rgba(255, 144, 144, 0.13);
+  --danger-fg: #ff9090;
+  /* 다크 깊이: 위 inset 하이라이트(빛 받는 윗엣지) + 부드러운 드롭 */
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 22px 48px -28px rgba(0, 0, 0, 0.78);
+  --glow-blue: 0 0 0 1px rgba(122, 169, 255, 0.4), 0 0 38px -8px rgba(122, 169, 255, 0.34);
+}
+
+/* 페이지 배경 — 죽은 평면 검정 대신 상단에서 내려오는 은은한 앰비언트 글로우 */
+html.dark body {
+  background-color: var(--page);
+  background-image:
+    radial-gradient(125% 80% at 50% -12%, rgba(64, 110, 220, 0.12), transparent 58%),
+    radial-gradient(80% 55% at 100% 0%, rgba(40, 170, 230, 0.06), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* 글래스/메시 유틸 — 다크 버전 (빛 받는 윗엣지 + 드롭으로 떠 보이게) */
+html.dark .glass-panel {
+  background: rgba(20, 24, 33, 0.82);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 34px -14px rgba(0, 0, 0, 0.62);
+}
+html.dark .glass-card {
+  background: rgba(24, 28, 38, 0.66);
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 26px -16px rgba(0, 0, 0, 0.55);
+}
+
+/* 토큰 솔리드 카드(surface-container)도 같은 깊이감 — 헤어라인+윗엣지 하이라이트.
+   .ambient-shadow / .ambient-shadow-hover 는 거의 모든 카드가 쓰는 그림자 훅이라
+   여기서 다크 전용으로 갈아끼우면 카드가 일제히 "뜬다". */
+html.dark .ambient-shadow {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 24px 52px -30px rgba(0, 0, 0, 0.72);
+}
+html.dark .ambient-shadow-hover:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 26px -10px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(122, 169, 255, 0.14);
+  transform: translateY(-2px);
+}
+
+html.dark .mesh-gradient {
+  background-color: #12151d;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(74, 142, 255, 0.18) 0px, transparent 55%),
+    radial-gradient(at 100% 0%, rgba(30, 215, 255, 0.1) 0px, transparent 50%),
+    radial-gradient(at 50% 120%, rgba(120, 110, 255, 0.13) 0px, transparent 60%);
+}
+html.dark .mesh-bg {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(74, 142, 255, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(74, 142, 255, 0.1) 0px, transparent 50%);
+}
+html.dark .hero-bg {
+  background-image: radial-gradient(circle at top center, rgba(110, 168, 255, 0.14) 0%, transparent 50%);
+}
+
+/* mesh-gradient-bg(가이드 히어로 등 컬러 밴드) — 다크에선 밝은 파스텔 대신
+   딥 코발트/인디고 브랜드 밴드로. 아래 딥다크 페이지와 자연스럽게 이어지고
+   흰 텍스트·흰 버튼이 더 또렷하게 뜬다. (animation/배경크기는 베이스 규칙 유지) */
+html.dark .mesh-gradient-bg {
+  background-color: #0a1020;
+  /* 라이트처럼 색이 "움직이는" 게 보이도록 구분되는 hue(코발트·시안·바이올렛·블루)를
+     충분히 채도/불투명하게. 베이스는 딥 네이비라 전체 톤은 다크 유지.
+     background-size:200%·animation(gradient-move 15s)은 베이스 규칙에서 상속 → 슬라이드. */
+  background-image:
+    radial-gradient(at 0% 0%, rgba(42, 98, 240, 0.62) 0px, transparent 55%),
+    radial-gradient(at 78% 8%, rgba(30, 170, 240, 0.46) 0px, transparent 50%),
+    radial-gradient(at 100% 65%, rgba(116, 72, 232, 0.55) 0px, transparent 55%),
+    radial-gradient(at 25% 100%, rgba(38, 82, 205, 0.52) 0px, transparent 62%);
+}

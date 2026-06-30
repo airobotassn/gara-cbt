@@ -46,14 +46,14 @@ export default function Faq() {
       <main className="flex-grow w-full pb-24 pt-12">
         {/* Hero Section */}
         <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto mb-10 mt-8">
-          <div className="bg-white border border-outline-variant/20 rounded-2xl p-10 md:p-10 relative overflow-hidden shadow-sm mesh-gradient">
+          <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 md:p-10 relative overflow-hidden shadow-sm mesh-gradient">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
               <div className="w-full md:w-1/2">
                 <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm uppercase tracking-widest mb-6">
                   <span className="w-2 h-2 rounded-full bg-primary"></span> 고객센터
                 </span>
-                <h1 className="font-display-lg text-display-lg md:text-[56px] leading-[1.1] font-bold mb-6 tracking-tight text-on-surface">
+                <h1 className="font-display-lg text-4xl md:text-[56px] leading-[1.1] font-bold mb-6 tracking-tight text-on-surface break-keep">
                   무엇을 <br /><span className="text-primary">도와드릴까요?</span>
                 </h1>
                 <p className="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-lg">
@@ -64,7 +64,7 @@ export default function Faq() {
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="w-full bg-white/80 backdrop-blur-sm border border-outline-variant/50 rounded-2xl py-4 pl-14 pr-6 text-body-lg focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm outline-none placeholder:text-on-surface-variant/50"
+                    className="w-full bg-surface-container-lowest/80 backdrop-blur-sm border border-outline-variant/50 rounded-2xl py-4 pl-14 pr-6 text-body-lg focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm outline-none placeholder:text-on-surface-variant/50"
                     placeholder="질문 검색..."
                     type="text"
                   />
@@ -127,7 +127,7 @@ export default function Faq() {
           {/* Main FAQ Content */}
           <div className="w-full lg:w-3/4">
             <div className="mb-8 pb-6 border-b border-outline-variant/40">
-              <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface mb-2">{searching ? '검색 결과' : CATEGORIES[cat].label}</h2>
+              <h2 className="font-headline-lg text-2xl md:text-headline-lg font-bold text-on-surface mb-2 break-keep">{searching ? '검색 결과' : CATEGORIES[cat].label}</h2>
               <p className="text-on-surface-variant font-body-md">{searching ? `‘${query}’ 관련 문항입니다.` : 'GARA 자격검정 응시·채점·자격증에 관한 자주 묻는 질문입니다.'}</p>
             </div>
             <div className="flex flex-col gap-6">
@@ -139,8 +139,8 @@ export default function Faq() {
                     onClick={() => setOpen(isOpen ? null : f.id)}
                     className={
                       isOpen
-                        ? 'bg-white border-2 border-primary/20 rounded-xl p-6 shadow-sm cursor-pointer'
-                        : 'group bg-white border border-outline-variant/20 rounded-xl p-6 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer'
+                        ? 'bg-surface-container-lowest border-2 border-primary/20 rounded-xl p-6 shadow-sm cursor-pointer'
+                        : 'group bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-6 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer'
                     }
                   >
                     <div className="flex justify-between items-start gap-4">
@@ -171,7 +171,7 @@ export default function Faq() {
                 )
               })}
               {list.length === 0 && (
-                <div className="bg-white border border-outline-variant/20 rounded-xl p-10 text-center text-on-surface-variant">
+                <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-10 text-center text-on-surface-variant">
                   {searching ? `‘${query}’에 대한 검색 결과가 없습니다.` : '이 카테고리의 문의는 준비 중입니다.'}
                 </div>
               )}

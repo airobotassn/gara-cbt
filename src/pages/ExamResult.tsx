@@ -172,7 +172,7 @@ export default function ExamResult() {
               {t('result.issue_cert')}
             </button>
           )}
-          <button onClick={() => navigate(-1)} className="bg-white text-on-surface-variant hover:text-primary font-title-md text-title-md px-8 py-3 rounded-xl border border-outline-variant hover:border-primary transition-all">{t('result.back')}</button>
+          <button onClick={() => navigate(-1)} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary font-title-md text-title-md px-8 py-3 rounded-xl border border-outline-variant hover:border-primary transition-all">{t('result.back')}</button>
         </div>
       </Card>
     </Shell>
