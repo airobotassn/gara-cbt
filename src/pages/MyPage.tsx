@@ -12,9 +12,9 @@ import type { MyAttempt } from '../lib/types'
 const PRIMARY_FIX = { '--color-primary': '#004ac6' } as CSSProperties
 
 const TABS = [
-  { key: 'attempts', label: '시험 응시 현황', to: '/mypage' },
-  { key: 'earned', label: '자격 취득 현황', to: '/mypage/earned' },
-  { key: 'issuance', label: '자격증 발급 현황', to: '/mypage/issuance' },
+  { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage' },
+  { key: 'earned', labelKey: 'mypage.tab_earned', to: '/mypage/earned' },
+  { key: 'issuance', labelKey: 'mypage.tab_issuance', to: '/mypage/issuance' },
 ]
 
 function fmtDT(iso?: string | null) {
@@ -66,7 +66,7 @@ export default function MyPage() {
   }, [isFullUser])
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
-  const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
+  const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')
 
   const isIssued = (certNo: string) => !!localStorage.getItem(`cert_issued_${certNo}`)
   function goCert(a: MyAttempt) {
@@ -74,7 +74,7 @@ export default function MyPage() {
     localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
     setTick((x) => x + 1)
     navigate('/certificate', {
-      state: { name, qualification: a.examTitle ?? 'GARA 자격검정', certNo, issueDate: fmtDate(a.submittedAt), scoreText: `${a.totalCorrect} / ${a.totalQuestions}` },
+      state: { name, qualification: a.examTitle ?? t('mypage.exam_fallback'), certNo, issueDate: fmtDate(a.submittedAt), scoreText: `${a.totalCorrect} / ${a.totalQuestions}` },
     })
   }
 
@@ -87,11 +87,11 @@ export default function MyPage() {
             <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
               <span className="material-symbols-outlined text-primary text-[28px]">lock</span>
             </div>
-            <h2 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">로그인이 필요합니다</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant mb-6">마이페이지는 로그인 후 이용할 수 있습니다.</p>
+            <h2 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">{t('mypage.login_required')}</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('mypage.login_desc')}</p>
             <div className="flex flex-col gap-3 items-center">
-              <button onClick={() => loginWithGoogle()} className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">구글로 로그인</button>
-              <button onClick={() => loginWithKakao()} className="font-label-md text-label-md font-bold px-6 py-3 rounded-xl transition-colors ambient-shadow" style={{ background: '#FEE500', color: '#191600' }}>카카오로 로그인</button>
+              <button onClick={() => loginWithGoogle()} className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">{t('mypage.login_google')}</button>
+              <button onClick={() => loginWithKakao()} className="font-label-md text-label-md font-bold px-6 py-3 rounded-xl transition-colors ambient-shadow" style={{ background: '#FEE500', color: '#191600' }}>{t('mypage.login_kakao')}</button>
             </div>
           </div>
         </main>
@@ -116,9 +116,9 @@ export default function MyPage() {
         <div className="max-w-5xl mx-auto w-full relative z-10">
           {/* Page Header */}
           <header className="mb-12">
-            <h1 className="font-display-lg text-4xl md:text-display-lg font-bold text-on-surface mb-3 tracking-tight break-keep">마이페이지</h1>
+            <h1 className="font-display-lg text-4xl md:text-display-lg font-bold text-on-surface mb-3 tracking-tight break-keep">{t('mypage.title')}</h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant">
-              안녕하세요, <strong className="text-primary font-bold">{name} 님</strong>. GARA 자격검정 현황을 확인하세요.
+              {t('mypage.greeting_hello')}<strong className="text-primary font-bold">{t('mypage.greeting_name', { name })}</strong>{t('mypage.greeting_tail')}
             </p>
           </header>
 
@@ -134,7 +134,7 @@ export default function MyPage() {
                     : 'pb-4 border-b-[3px] border-transparent text-outline hover:text-on-surface font-title-md text-[18px] leading-[24px] font-semibold px-2 transition-colors whitespace-nowrap'
                 }
               >
-                {tb.label}
+                {t(tb.labelKey)}
               </Link>
             ))}
           </div>
@@ -146,8 +146,8 @@ export default function MyPage() {
           {!loading && !err && tab === 'attempts' && (
             attempts.length === 0 ? (
               <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
-                <p className="font-body-md text-on-surface-variant mb-5">아직 응시 내역이 없습니다.</p>
-                <button onClick={() => navigate('/exam')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">자격검정 응시하기</button>
+                <p className="font-body-md text-on-surface-variant mb-5">{t('mypage.empty_attempts')}</p>
+                <button onClick={() => navigate('/exam')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">{t('mypage.go_exam')}</button>
               </div>
             ) : (
               <div className="flex flex-col gap-6">
@@ -161,25 +161,25 @@ export default function MyPage() {
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className={`font-title-md text-[22px] leading-[28px] font-bold ${s.greyed ? 'text-on-surface-variant' : 'text-on-surface'}`}>{a.examTitle ?? 'GARA 자격검정'}</h3>
+                            <h3 className={`font-title-md text-[22px] leading-[28px] font-bold ${s.greyed ? 'text-on-surface-variant' : 'text-on-surface'}`}>{a.examTitle ?? t('mypage.exam_fallback')}</h3>
                             <span className={`px-3 py-1 ${s.badgeClass} font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border`}>{s.badge}</span>
                           </div>
-                          <p className="font-body-md text-body-md text-on-surface-variant mb-3">{fmtDT(a.submittedAt)} | 온라인</p>
+                          <p className="font-body-md text-body-md text-on-surface-variant mb-3">{fmtDT(a.submittedAt)} | {t('mypage.online')}</p>
                           {a.status === 'submitted' && !a.released && (
                             <p className="font-label-md text-[15px] leading-[22px] text-primary font-semibold flex items-center gap-1.5 bg-primary/5 px-3 py-1.5 rounded-lg w-fit">
                               <span className="material-symbols-outlined text-[18px]">schedule</span>
-                              채점 중입니다. 결과는 약 {daysLeft(a.resultReleaseAt)}일 후 발표됩니다.
+                              {t('mypage.grading', { days: daysLeft(a.resultReleaseAt) })}
                             </p>
                           )}
                           {(a.status === 'expired' || a.status === 'voided') && (
-                            <p className="font-body-md text-body-md text-outline">응시 기간 만료</p>
+                            <p className="font-body-md text-body-md text-outline">{t('mypage.expired')}</p>
                           )}
                         </div>
                       </div>
                       {a.status === 'submitted' && a.released && (
                         <div className="shrink-0">
                           <button onClick={() => navigate(`/exam/result/${a.attemptId}`)} className="px-6 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:bg-surface-container-low hover:border-primary/30 hover:text-primary transition-all duration-200 flex items-center gap-2 shadow-sm">
-                            성적 확인
+                            {t('mypage.view_score')}
                             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                           </button>
                         </div>
@@ -194,7 +194,7 @@ export default function MyPage() {
           {/* 자격 취득 현황 */}
           {!loading && !err && tab === 'earned' && (
             earned.length === 0 ? (
-              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">아직 취득한 자격이 없습니다.</div>
+              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('mypage.empty_earned')}</div>
             ) : (
               <div className="flex flex-col gap-6">
                 {earned.map((a) => (
@@ -204,10 +204,10 @@ export default function MyPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface">{a.examTitle ?? 'GARA 자격검정'}</h3>
-                        <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20">합격</span>
+                        <h3 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
+                        <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20">{t('mypage.passed')}</span>
                       </div>
-                      <p className="font-body-md text-body-md text-on-surface-variant">{fmtDate(a.submittedAt)} | 인증번호 {certNoOf(a)} | {a.totalCorrect ?? 0} / {a.totalQuestions ?? 0}</p>
+                      <p className="font-body-md text-body-md text-on-surface-variant">{fmtDate(a.submittedAt)} | {t('mypage.cert_no')} {certNoOf(a)} | {a.totalCorrect ?? 0} / {a.totalQuestions ?? 0}</p>
                     </div>
                   </article>
                 ))}
@@ -218,7 +218,7 @@ export default function MyPage() {
           {/* 자격증 발급 현황 */}
           {!loading && !err && tab === 'issuance' && (
             earned.length === 0 ? (
-              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">발급 가능한 자격증이 없습니다.</div>
+              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('mypage.empty_issuance')}</div>
             ) : (
               <div className="flex flex-col gap-6">
                 {earned.map((a) => {
@@ -231,14 +231,14 @@ export default function MyPage() {
                           <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                         </div>
                         <div>
-                          <h3 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">{a.examTitle ?? 'GARA 자격검정'}</h3>
-                          <p className="font-body-md text-body-md text-on-surface-variant">인증번호 {certNo}</p>
+                          <h3 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
+                          <p className="font-body-md text-body-md text-on-surface-variant">{t('mypage.cert_no')} {certNo}</p>
                         </div>
                       </div>
                       <div className="shrink-0 flex items-center gap-3">
                         <span className={`px-3 py-1 font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border ${issued ? 'bg-secondary/10 text-secondary border-secondary/20' : 'bg-outline/10 text-outline border-outline/20'}`}>{issued ? 'Issued' : 'Ready'}</span>
                         <button onClick={() => goCert(a)} className="px-6 py-2.5 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow flex items-center gap-2">
-                          {issued ? '재발급' : '발급'}
+                          {issued ? t('mypage.reissue') : t('mypage.issue')}
                           <span className="material-symbols-outlined text-[18px]">download</span>
                         </button>
                       </div>

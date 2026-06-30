@@ -5,21 +5,22 @@ import SiteFooter from '../components/SiteFooter'
 // gara_2 (공지사항) 목업 디자인 그대로 + 실제 동작(네비·로그인·필터·펼침) 연결.
 // 원본: stitch_design_critique_assistant/gara_2/code.html
 
-const FILTERS = ['전체', '안내', '일반', '점검', '이벤트']
+// 내부 필터/카테고리 값은 안정적인 영문 키로 유지(번역 라벨은 t()로 렌더)
+const FILTERS = ['all', 'guide', 'general', 'maintenance', 'event']
 
 // 실제 공지 데이터(i18n) — 목업 카드 디자인에 채워 동작하게
 const NOTICES = [
-  { id: 'item1', date: '2026. 06. 25', cat: '안내', tag: '공지', tagClass: 'bg-[#004ac6] text-white' },
-  { id: 'item2', date: '2026. 06. 20', cat: '안내', tag: '안내', tagClass: 'bg-surface-container-high text-on-surface' },
-  { id: 'item3', date: '2026. 06. 15', cat: '일반', tag: '필독', tagClass: 'bg-error/10 text-error' },
+  { id: 'item1', date: '2026. 06. 25', cat: 'guide', tagKey: 'notice', tagClass: 'bg-[#004ac6] text-white' },
+  { id: 'item2', date: '2026. 06. 20', cat: 'guide', tagKey: 'guide', tagClass: 'bg-surface-container-high text-on-surface' },
+  { id: 'item3', date: '2026. 06. 15', cat: 'general', tagKey: 'required', tagClass: 'bg-error/10 text-error' },
 ]
 
 export default function Notice() {
   const { t } = useT()
-  const [filter, setFilter] = useState('전체')
+  const [filter, setFilter] = useState('all')
   const [openId, setOpenId] = useState<string | null>(null)
 
-  const list = filter === '전체' ? NOTICES : NOTICES.filter((n) => n.cat === filter)
+  const list = filter === 'all' ? NOTICES : NOTICES.filter((n) => n.cat === filter)
   const featured = list[0]
   const rest = list.slice(1)
 
@@ -38,9 +39,9 @@ export default function Notice() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#004ac6]/5 to-transparent pointer-events-none"></div>
           <div className="relative z-10 px-4">
             <span className="inline-block px-4 py-1.5 rounded-full bg-surface-container-lowest/60 text-[#004ac6] font-label-sm text-label-sm uppercase tracking-wider mb-6 shadow-sm border border-white/50 backdrop-blur-md">Notice / Announcements</span>
-            <h1 className="font-display-lg text-4xl md:text-display-lg text-on-surface mb-6 tracking-tight break-keep">공지사항</h1>
+            <h1 className="font-display-lg text-4xl md:text-display-lg text-on-surface mb-6 tracking-tight break-keep">{t('nav.notice')}</h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-              GARA 자격검정의 최신 소식, 시험 안내 및 중요 공지를 확인하세요.
+              {t('notice.hero_sub')}
             </p>
           </div>
         </div>
@@ -49,16 +50,16 @@ export default function Notice() {
         <div className="flex gap-3 overflow-x-auto pb-6 mb-8 scrollbar-hide border-b border-outline-variant/30">
           {FILTERS.map((f) =>
             f === filter ? (
-              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-[#004ac6] text-white font-label-md text-label-md whitespace-nowrap shadow-sm hover:bg-[#003ea8] transition-colors">{f}</button>
+              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-[#004ac6] text-white font-label-md text-label-md whitespace-nowrap shadow-sm hover:bg-[#003ea8] transition-colors">{t(`notice.filter_${f}`)}</button>
             ) : (
-              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface-variant hover:border-[#004ac6] hover:text-[#004ac6] transition-colors font-label-md text-label-md whitespace-nowrap shadow-sm">{f}</button>
+              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface-variant hover:border-[#004ac6] hover:text-[#004ac6] transition-colors font-label-md text-label-md whitespace-nowrap shadow-sm">{t(`notice.filter_${f}`)}</button>
             ),
           )}
         </div>
 
         {list.length === 0 && (
           <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">
-            ‘{filter}’ 카테고리의 공지가 없습니다.
+            {t('notice.empty', { filter: t(`notice.filter_${filter}`) })}
           </div>
         )}
 
@@ -69,7 +70,7 @@ export default function Notice() {
             <div className="relative z-10 flex flex-col md:flex-row gap-6 md:items-start justify-between">
               <div className="flex-grow">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className={`${featured.tagClass} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{featured.tag}</span>
+                  <span className={`${featured.tagClass} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.tag_${featured.tagKey}`)}</span>
                   <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{featured.date}</span>
                 </div>
                 <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4 break-keep">{t(`notice.${featured.id}.title`)}</h2>
@@ -92,7 +93,7 @@ export default function Notice() {
                 >
                   <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
                     <div className="flex items-center gap-4 md:w-48 flex-shrink-0">
-                      <span className={`${n.tagClass} px-3 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap min-w-[60px] text-center`}>{n.tag}</span>
+                      <span className={`${n.tagClass} px-3 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap min-w-[60px] text-center`}>{t(`notice.tag_${n.tagKey}`)}</span>
                       <span className="text-outline font-label-md text-label-md whitespace-nowrap">{n.date}</span>
                     </div>
                     <div className="flex-grow flex items-center justify-between gap-4">
