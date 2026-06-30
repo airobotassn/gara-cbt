@@ -11,7 +11,7 @@ import { makePracticeExam } from '../lib/practice'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
-  const { user, isFullUser, loginWithGoogle, loginWithKakao, logout } = useAuth()
+  const { user, isFullUser, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<{
     display_name: string | null
@@ -257,14 +257,8 @@ export default function Layout({ children }: { children: ReactNode }) {
             ) : null}
 
             {!isFullUser ? (
-              <button className="pf-login" onClick={() => loginWithGoogle()}>
-                <span>●</span> {t('fab.login')}
-              </button>
-            ) : null}
-
-            {!isFullUser ? (
-              <button className="pf-login" onClick={() => loginWithKakao()} style={{ background: '#FEE500', color: '#191600' }}>
-                <span>💬</span> 카카오로 로그인
+              <button className="pf-login" onClick={() => go('/login')}>
+                <span>●</span> {t('fab.login_cta')}
               </button>
             ) : null}
 

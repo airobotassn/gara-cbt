@@ -13,6 +13,7 @@ import ExamDone from './pages/ExamDone'
 import Certificate from './pages/Certificate'
 import MyPage from './pages/MyPage'
 import AuthCallback from './pages/AuthCallback'
+import Login from './pages/Login'
 import About from './pages/About'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
@@ -39,6 +40,7 @@ export default function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/exam" element={<ExamGate />} />
               <Route path="/exam/check" element={<ExamCheck />} />
               <Route path="/exam/prepare" element={<ExamPrepare />} />
