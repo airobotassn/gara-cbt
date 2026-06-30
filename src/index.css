@@ -20,6 +20,14 @@
 @import './styles/cbt.css';
 @import './styles/cert.css';
 
+/* Tailwind v4 는 <button> 기본 커서가 default 로 바뀜 → 클릭 가능 요소는 pointer 복원(비활성 제외) */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* Stitch 목업 Tailwind 토큰 — v4 @theme (진입 파일에 직접 둬야 인식됨) */
 @theme {
   /* fontFamily (Latin/숫자 Hanken Grotesk, 한글 Pretendard 폴백) */
