@@ -1,6 +1,6 @@
 /* levelselect: LevelSelect.tsx */
 /* 제목 + 등급규칙 토글 */
-.lv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lv-head { display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
 .lv-head .sc-title { margin: 0; }
 .lv-rule-btn {
   flex: none;
