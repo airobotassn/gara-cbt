@@ -87,13 +87,13 @@ export default function Guide() {
             <div className="max-w-4xl mx-auto">
               {/* 트랙 헤더 (핵심 소개) */}
               <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-body-md font-bold mb-4">
-                  <span className="material-symbols-outlined text-[20px]">{cur.icon}</span>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-label-md md:text-body-md font-bold mb-4">
+                  <span className="material-symbols-outlined text-[18px] md:text-[20px]">{cur.icon}</span>
                   {cur.eligibility}
                 </div>
-                <h3 className="font-headline-lg-mobile md:font-headline-lg text-[30px] md:text-[36px] font-bold text-on-surface mb-1">{cur.name}</h3>
-                <p className="font-title-md text-[24px] leading-[32px] font-semibold text-on-surface-variant">{cur.tagline}</p>
-                <p className="font-body-lg text-[20px] leading-[30px] text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
+                <h3 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-[36px] font-bold text-on-surface mb-1">{cur.name}</h3>
+                <p className="font-title-md text-title-md md:text-[24px] md:leading-[32px] font-semibold text-on-surface-variant">{cur.tagline}</p>
+                <p className="font-body-lg text-body-md md:text-[20px] md:leading-[30px] text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
               </div>
 
               {/* 급수 전환: 화살표 + 급수 (하나의 통합 pill) */}
