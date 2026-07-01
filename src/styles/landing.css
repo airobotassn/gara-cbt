@@ -102,25 +102,35 @@
 /* ===== 메인 진입 3버튼 (무료 레벨 진단 · 자격시험 응시 · 학습 시작) ===== */
 .lp-ctas {
   position: relative;
-  margin-top: 40px;
+  margin-top: 36px;
   display: flex;
   gap: 14px;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   flex-wrap: wrap;
+  width: min(520px, 100%);
 }
 .lp-ctas .cta,
 .lp-ctas .cta-ghost {
   margin-top: 0;
-  font-size: 15px;
-  padding: 13px 26px;
-  font-weight: 600;
+  font-size: 17px;
+  padding: 18px 30px;
+  font-weight: 700;
+  border-radius: 16px;
+  flex: 1 1 190px;
+  justify-content: center;
+}
+/* '학습 시작(soon)'은 두 주요 선택 아래 한 줄 전체로 (부차) */
+.lp-ctas .cta-ghost.soon {
+  flex: 1 1 100%;
+  font-size: 14px;
+  padding: 12px 20px;
 }
 @media (max-width: 600px) {
   .lp-ctas .cta,
   .lp-ctas .cta-ghost {
-    font-size: 14px;
-    padding: 11px 20px;
+    font-size: 15px;
+    padding: 16px 22px;
   }
 }
 .cta-ghost {

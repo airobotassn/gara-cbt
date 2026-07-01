@@ -181,8 +181,8 @@
   background: rgba(var(--paper), 0.12);
 }
 .ap-status.below {
-  color: var(--dim);
-  background: rgba(var(--paper), 0.08);
+  color: var(--danger-fg);
+  background: var(--danger-bg);
 }
 .db-grid {
   display: grid;

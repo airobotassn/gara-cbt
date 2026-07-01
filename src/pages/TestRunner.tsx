@@ -91,7 +91,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
         violationCount: violationsRef.current,
       })
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
-      navigate(`/result/${start.attemptId}`, { state: res, replace: true })
+      navigate(`/test/result/${start.attemptId}`, { state: res, replace: true })
     } catch (e) {
       submittedRef.current = false
       setSubmitting(false)

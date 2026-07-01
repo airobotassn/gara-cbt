@@ -148,7 +148,17 @@ export default function LevelTestAdmin() {
       {tab === 'attempts' ? <AttemptsTab /> : null}
       {tab === 'list' ? <ListTab /> : null}
       {tab === 'events' ? <EventsTab /> : null}
-      {tab === 'generate' ? <GenerateTab /> : null}
+      {tab === 'generate' ? (
+        <>
+          {/* 문항 생성은 아직 개발 중 — 구현(GenerateTab)은 보존하되 미노출(나중에 이 false를 열면 됨) */}
+          {false && <GenerateTab />}
+          <div className="panel-card" style={{ textAlign: 'center', padding: '52px 24px', color: 'var(--muted)', lineHeight: 1.7 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🚧</div>
+            <b style={{ color: 'var(--ink)' }}>문항 생성 기능은 아직 개발 중입니다.</b>
+            <div style={{ fontSize: 13, marginTop: 6 }}>준비되면 열릴 예정이에요.</div>
+          </div>
+        </>
+      ) : null}
       {tab === 'upload' ? <UploadTab /> : null}
       {tab === 'reports' ? <ReportsTab /> : null}
       {tab === 'admins' && isRoot ? <AdminsTab /> : null}
