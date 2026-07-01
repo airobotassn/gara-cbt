@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
 
@@ -21,11 +20,10 @@ const METHODS = [
 const SCHEDULE = [
   { id: 'r4', roundKey: 'guide.sched_r4_round', dateKey: 'guide.sched_r4_date', open: true },
   { id: 'r5', roundKey: 'guide.sched_r5_round', dateKey: 'guide.sched_r5_date', open: false },
-  { id: 'r1_2025', roundKey: 'guide.sched_r1_round', dateKey: 'guide.sched_r1_date', open: false },
+  { id: 'r1_2027', roundKey: 'guide.sched_r1_round', dateKey: 'guide.sched_r1_date', open: false },
 ]
 
 export default function Guide() {
-  const navigate = useNavigate()
   const { t } = useT()
 
   return (
@@ -35,20 +33,12 @@ export default function Guide() {
         {/* Hero */}
         <section className="relative min-h-[460px] flex items-center overflow-hidden mesh-gradient-bg py-16 px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-            <div className="text-white space-y-6">
+            <div className="text-on-surface space-y-6">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#004ac6] font-bold text-label-sm uppercase tracking-wider mb-4 shadow-sm border border-white/50">
                 <span className="material-symbols-outlined text-[16px]">verified</span>
                 GARA Certification
               </div>
               <h1 className="font-display-lg text-display-lg font-bold leading-tight">{t('guide.hero_title_l1')}<br />{t('guide.hero_title_l2')}</h1>
-              <p className="font-body-lg text-body-lg opacity-90 max-w-lg">{t('guide.hero_subtitle')}</p>
-              <div className="pt-4 flex flex-wrap gap-4">
-                <button onClick={() => navigate('/exam')} className="bg-white text-[#004ac6] rounded-xl px-6 py-3 font-label-md text-label-md font-bold hover:bg-[#eef1ff] transition-colors ambient-shadow flex items-center gap-2">
-                  {t('guide.btn_apply')}
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </button>
-                <button onClick={() => navigate('/exam/check')} className="bg-white/60 text-[#004ac6] rounded-xl px-6 py-3 font-label-md text-label-md font-bold hover:bg-white/80 transition-colors border border-white/50 backdrop-blur-md shadow-lg">{t('guide.btn_mock')}</button>
-              </div>
             </div>
             <div className="glass-panel rounded-2xl p-8 ambient-shadow border border-white/40">
               <h3 className="font-title-md text-title-md text-on-surface mb-6 flex items-center gap-2">
@@ -75,7 +65,6 @@ export default function Guide() {
           <div className="max-w-container-max mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-10">
               <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold mb-4">{t('guide.areas_title')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">{t('guide.areas_subtitle')}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-6 max-w-[1000px] mx-auto">
               {AREAS.map((a) => (
@@ -96,7 +85,6 @@ export default function Guide() {
           <div className="max-w-container-max mx-auto">
             <div className="mb-10 text-center">
               <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold mb-4">{t('guide.methods_title')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">{t('guide.methods_subtitle')}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {METHODS.map((m) => (

@@ -44,14 +44,16 @@ export default function Login() {
               {t('login.welcome')}
             </h1>
             <p className="text-xl lg:text-2xl text-on-surface-variant font-medium leading-relaxed tracking-tight break-keep">
-              {t('login.subtitle_l1')}<br className="hidden sm:block" />
-              {t('login.subtitle_l2')}
+              {t('login.subtitle')}
             </p>
           </div>
         </div>
         {/* Footer Links (Desktop) */}
         <footer className="hidden lg:flex flex-col gap-4 relative z-10 mt-32">
-          <span className="font-bold text-on-surface text-sm tracking-wide uppercase">GARA Precision</span>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="GARA" className="h-7 w-7 object-cover rounded-full" />
+            <span className="font-title-md text-title-md font-bold text-on-surface">GARA</span>
+          </div>
           <div className="flex flex-wrap gap-6 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>
         </footer>
@@ -74,8 +76,7 @@ export default function Login() {
               </svg>
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight mb-2">{t('login.google_title')}</h2>
-              <p className="text-on-surface-variant font-medium">{t('login.google_sub')}</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">{t('login.google_title')}</h2>
             </div>
             <div className="absolute top-10 right-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-x-4 group-hover:translate-x-0">
               <svg className="w-8 h-8 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -87,7 +88,7 @@ export default function Login() {
           {/* Kakao Block */}
           <button
             onClick={() => loginWithKakao()}
-            className="group w-full bg-[#FEE500] rounded-[32px] p-8 sm:p-10 flex flex-col items-start gap-12 border-2 border-[#FEE500] ambient-shadow hover:border-[#E5CD00] hover:shadow-[0_8px_30px_rgba(254,229,0,0.3)] transition-all duration-500 hover:-translate-y-1 relative overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-[#FEE500]/50"
+            className="group w-full bg-[#FEE500] rounded-[32px] p-8 sm:p-10 flex flex-col items-start gap-12 border-2 border-[#FEE500] ambient-shadow hover:border-[#3C1E1E] hover:shadow-[0_8px_30px_rgba(254,229,0,0.3)] transition-all duration-500 hover:-translate-y-1 relative overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-[#FEE500]/50"
           >
             <div className="w-14 h-14 bg-black/5 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
               <svg className="w-8 h-8 text-black" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -95,8 +96,7 @@ export default function Login() {
               </svg>
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-black/90 tracking-tight mb-2">{t('login.kakao_title')}</h2>
-              <p className="text-black/60 font-medium">{t('login.kakao_sub')}</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-black/90 tracking-tight">{t('login.kakao_title')}</h2>
             </div>
             <div className="absolute top-10 right-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-x-4 group-hover:translate-x-0">
               <svg className="w-8 h-8 text-black/20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -108,6 +108,10 @@ export default function Login() {
 
         {/* Footer Links (Mobile) */}
         <footer className="lg:hidden flex flex-col items-center gap-4 mt-24 text-center w-full">
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="GARA" className="h-7 w-7 object-cover rounded-full" />
+            <span className="font-title-md text-title-md font-bold text-on-surface">GARA</span>
+          </div>
           <div className="flex flex-wrap justify-center gap-4 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>
         </footer>

@@ -6,13 +6,13 @@ import SiteFooter from '../components/SiteFooter'
 // 원본: stitch_design_critique_assistant/gara_2/code.html
 
 // 내부 필터/카테고리 값은 안정적인 영문 키로 유지(번역 라벨은 t()로 렌더)
-const FILTERS = ['all', 'guide', 'general', 'maintenance', 'event']
+const FILTERS = ['all', 'guide', 'schedule', 'maintenance', 'event']
 
 // 실제 공지 데이터(i18n) — 목업 카드 디자인에 채워 동작하게
 const NOTICES = [
   { id: 'item1', date: '2026. 06. 25', cat: 'guide', tagKey: 'notice', tagClass: 'bg-primary text-on-primary' },
   { id: 'item2', date: '2026. 06. 20', cat: 'guide', tagKey: 'guide', tagClass: 'bg-surface-container-high text-on-surface' },
-  { id: 'item3', date: '2026. 06. 15', cat: 'general', tagKey: 'required', tagClass: 'bg-error/10 text-error' },
+  { id: 'item3', date: '2026. 06. 15', cat: 'guide', tagKey: 'required', tagClass: 'bg-error/10 text-error' },
 ]
 
 export default function Notice() {
@@ -38,7 +38,10 @@ export default function Notice() {
         <div className="relative py-10 md:py-16 mb-12 rounded-3xl overflow-hidden glass-panel border border-white/40 shadow-sm flex flex-col items-center justify-center text-center">
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none"></div>
           <div className="relative z-10 px-4">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-surface-container-lowest/60 text-primary font-label-sm text-label-sm uppercase tracking-wider mb-6 shadow-sm border border-white/50 backdrop-blur-md">Notice / Announcements</span>
+            <span className="inline-flex items-center gap-2 pl-2.5 pr-4 py-1.5 rounded-full bg-surface-container-lowest/60 text-primary font-label-md text-label-md mb-6 shadow-sm border border-white/50 backdrop-blur-md">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary"><span className="material-symbols-outlined text-[16px]">campaign</span></span>
+              {t('notice.eyebrow')}
+            </span>
             <h1 className="font-display-lg text-4xl md:text-display-lg text-on-surface mb-6 tracking-tight break-keep">{t('nav.notice')}</h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
               {t('notice.hero_sub')}
@@ -74,7 +77,7 @@ export default function Notice() {
                   <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{featured.date}</span>
                 </div>
                 <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4 break-keep">{t(`notice.${featured.id}.title`)}</h2>
-                <p className="font-body-lg text-body-lg text-on-surface-variant max-w-3xl leading-relaxed">{t(`notice.${featured.id}.body`)}</p>
+                <p className="font-body-lg text-body-lg text-on-surface-variant leading-relaxed break-keep">{t(`notice.${featured.id}.body`)}</p>
               </div>
             </div>
           </div>

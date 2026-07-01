@@ -20,16 +20,13 @@ export default function About() {
               {t('about.hero_line1')}<br />
               <span className="text-primary">{t('about.hero_line2')}</span>
             </h1>
-            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto mb-10">
+            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto mb-10 whitespace-pre-line">
               {t('about.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button onClick={() => navigate('/exam')} className="w-full sm:w-auto bg-primary text-white font-title-md text-title-md px-8 py-4 rounded-xl hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2">
                 {t('about.cta_exam')}
                 <span className="material-symbols-outlined">arrow_forward</span>
-              </button>
-              <button onClick={() => navigate('/guide')} className="w-full sm:w-auto bg-surface border border-outline-variant text-primary font-title-md text-title-md px-8 py-4 rounded-xl hover:bg-surface-container-low transition-all duration-300">
-                {t('about.cta_brochure')}
               </button>
             </div>
           </div>

@@ -15,6 +15,7 @@ export default function ExamGate() {
   const { isFullUser, loginWithGoogle } = useAuth()
   const { t, lang } = useT()
   const [sebNotice, setSebNotice] = useState(false)
+  const [loginNotice, setLoginNotice] = useState(false)
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -35,9 +36,14 @@ export default function ExamGate() {
     if (isFullUser) {
       navigate('/exam/prepare')
     } else {
-      localStorage.setItem('examIntent', '1')
-      loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam/prepare')}`)
+      setLoginNotice(true)
     }
+  }
+
+  // 로그인 안내 팝업에서 실제 구글 로그인 실행
+  function doLogin() {
+    localStorage.setItem('examIntent', '1')
+    loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam/prepare')}`)
   }
 
   return (
@@ -54,6 +60,23 @@ export default function ExamGate() {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" href={SEB_INSTALLER_URL} target="_blank" rel="noreferrer">{t('gate.seb_install_new')}</a>
               <button className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 로그인 안내 모달 — 응시하기 클릭 시 미로그인이면 노출 */}
+      {loginNotice && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setLoginNotice(false)}>
+          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow" onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+            </div>
+            <h3 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('gate.login_modal_title')}</h3>
+            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.login_modal_desc')}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" onClick={doLogin}>{t('fab.login')}</button>
+              <button className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors" onClick={() => setLoginNotice(false)}>{t('common.close')}</button>
             </div>
           </div>
         </div>
@@ -77,7 +100,7 @@ export default function ExamGate() {
             <div className="w-full lg:w-7/12 flex flex-col gap-8">
               <div>
                 <span className="font-label-sm text-label-sm uppercase text-primary-container bg-primary-container/5 px-4 py-1.5 rounded-full self-start border border-primary-container/10 mb-6 inline-block">Official Certification</span>
-                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t('gate.title')}</h2>
+                <h2 className="font-headline-lg text-headline-lg md:font-display-lg md:text-display-lg text-on-surface mb-4">{t('gate.title')}</h2>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 mt-2">
                 <button onClick={onStart} className="bg-primary-container text-on-primary font-title-md text-title-md px-10 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">
@@ -88,9 +111,6 @@ export default function ExamGate() {
                   {t('gate.btn_check')}
                 </button>
               </div>
-              {!isFullUser && !needSebLaunch && (
-                <p className="font-label-md text-label-md text-on-surface-variant">{t('gate.login_required')}</p>
-              )}
             </div>
           </section>
 
@@ -105,8 +125,8 @@ export default function ExamGate() {
                   <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Questions</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display-lg text-display-lg text-on-surface">{TOTAL_QUESTIONS}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t('gate.meta_questions')}</span>
+                  <span className="font-headline-lg text-headline-lg text-on-surface">{TOTAL_QUESTIONS}</span>
+                  <span className="font-title-md text-title-md text-on-surface-variant">{t('gate.meta_questions')}</span>
                 </div>
               </div>
               <div className="hidden md:block w-px h-20 bg-outline-variant/30"></div>
@@ -116,8 +136,8 @@ export default function ExamGate() {
                   <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Duration</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display-lg text-display-lg text-on-surface">{TEST_DURATION_MINUTES}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t('gate.meta_minutes')}</span>
+                  <span className="font-headline-lg text-headline-lg text-on-surface">{TEST_DURATION_MINUTES}</span>
+                  <span className="font-title-md text-title-md text-on-surface-variant">{t('gate.meta_minutes')}</span>
                 </div>
               </div>
               <div className="hidden md:block w-px h-20 bg-outline-variant/30"></div>
@@ -127,8 +147,8 @@ export default function ExamGate() {
                   <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Format</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display-lg text-display-lg text-on-surface">4</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t('gate.format_value')}</span>
+                  <span className="font-headline-lg text-headline-lg text-on-surface">4</span>
+                  <span className="font-title-md text-title-md text-on-surface-variant">{t('gate.format_value')}</span>
                 </div>
               </div>
             </div>
@@ -136,7 +156,7 @@ export default function ExamGate() {
 
           {/* Important Instructions */}
           <section className="flex flex-col gap-8">
-            <h3 className="font-title-md text-title-md text-on-surface border-l-4 border-primary-container pl-4">Important Instructions</h3>
+            <h3 className="font-title-md text-title-md text-on-surface border-l-4 border-primary-container pl-4">{t('gate.instr_title')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="flex flex-col sm:flex-row items-start gap-5 p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
                 <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0">

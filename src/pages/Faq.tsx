@@ -51,15 +51,13 @@ export default function Faq() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
               <div className="w-full md:w-1/2">
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm uppercase tracking-widest mb-6">
-                  <span className="w-2 h-2 rounded-full bg-primary"></span> {t('faq.eyebrow2')}
+                <span className="inline-flex items-center gap-2 pl-2.5 pr-4 py-1.5 rounded-full bg-surface-container-lowest/70 text-primary font-title-md text-label-md font-semibold mb-6 shadow-sm border border-primary/15 backdrop-blur-md">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary"><span className="material-symbols-outlined text-[16px]">support_agent</span></span>
+                  {t('faq.eyebrow2')}
                 </span>
                 <h1 className="font-display-lg text-4xl md:text-[56px] leading-[1.1] font-bold mb-6 tracking-tight text-on-surface break-keep">
                   {t('faq.hero_title')} <br /><span className="text-primary">{t('faq.hero_title_em')}</span>
                 </h1>
-                <p className="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-lg">
-                  {t('faq.hero_sub')}
-                </p>
                 <div className="relative group max-w-xl">
                   <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors text-xl">search</span>
                   <input
@@ -94,7 +92,6 @@ export default function Faq() {
           {/* Sidebar */}
           <aside className="w-full lg:w-1/4 shrink-0">
             <div className="sticky top-12">
-              <h2 className="font-title-md text-label-sm uppercase tracking-widest text-outline mb-6">{t('faq.categories')}</h2>
               <nav className="flex flex-col gap-2">
                 {CATEGORIES.map((c, i) => {
                   const active = i === cat && !searching
@@ -118,8 +115,9 @@ export default function Faq() {
               <div className="mt-12 p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
                 <h3 className="font-title-md font-bold mb-2">{t('faq.help_title')}</h3>
                 <p className="text-sm text-on-surface-variant mb-4">{t('faq.help_body')}</p>
-                <Link className="inline-flex items-center gap-2 text-primary font-label-md hover:underline" to="/notice">
-                  {t('faq.help_link')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                <Link className="group inline-flex items-center gap-1.5 text-primary font-label-md hover:text-primary-container transition-colors" to="/notice">
+                  <span className="group-hover:underline">{t('faq.help_link')}</span>
+                  <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-0.5">arrow_forward</span>
                 </Link>
               </div>
             </div>

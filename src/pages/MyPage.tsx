@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -51,7 +51,7 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { section } = useParams()
   const tab = section && TABS.some((t) => t.key === section) ? section : 'attempts'
-  const { isFullUser, loginWithGoogle, loginWithKakao, user } = useAuth()
+  const { isFullUser, user } = useAuth()
   const { t } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
@@ -77,27 +77,8 @@ export default function MyPage() {
     })
   }
 
-  // ── 로그인 게이트 ──
-  if (!isFullUser) {
-    return (
-      <div className="bg-background text-on-background min-h-screen flex flex-col">
-        <main className="flex-grow flex items-center justify-center px-margin-mobile md:px-margin-desktop py-16">
-          <div className="bg-surface-container-lowest rounded-2xl p-10 border border-outline-variant/30 ambient-shadow text-center max-w-md w-full">
-            <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
-              <span className="material-symbols-outlined text-primary text-[28px]">lock</span>
-            </div>
-            <h2 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">{t('mypage.login_required')}</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('mypage.login_desc')}</p>
-            <div className="flex flex-col gap-3 items-center">
-              <button onClick={() => loginWithGoogle()} className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">{t('mypage.login_google')}</button>
-              <button onClick={() => loginWithKakao()} className="font-label-md text-label-md font-bold px-6 py-3 rounded-xl transition-colors ambient-shadow" style={{ background: '#FEE500', color: '#191600' }}>{t('mypage.login_kakao')}</button>
-            </div>
-          </div>
-        </main>
-        <SiteFooter />
-      </div>
-    )
-  }
+  // 로그인 안 된 상태 → 로그인 페이지로 이동 (자체 로그인 게이트 제거)
+  if (!isFullUser) return <Navigate to="/login" replace />
 
   const attempts = list ?? []
   const earned = attempts.filter((a) => a.passed === true)

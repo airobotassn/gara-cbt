@@ -10,8 +10,6 @@ import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
 
-type Tab = 'sheet' | 'status'
-
 // gara_6 (정기시험 응시 화면) 목업 디자인 + 응시 로직(타이머·부정행위·OMR·제출) 전부 보존.
 // 원본: stitch_design_critique_assistant/gara_6/code.html
 // CBT(응시 화면)는 테마와 무관하게 항상 라이트 — 루트에 .force-light 적용(다크 토큰 무시).
@@ -55,8 +53,6 @@ function fmt(ms: number) {
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-const ZOOMS = [100, 115, 130, 150]
-
 function RunnerInner({ start }: { start: StartExamResponse }) {
   const { t } = useT()
   const navigate = useNavigate()
@@ -65,8 +61,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
-  const [tab, setTab] = useState<Tab>('sheet')
-  const [zoomI, setZoomI] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const submittedRef = useRef(false)
 
@@ -138,7 +132,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     if (unanswered.length > 0) {
       window.alert(t('run.unanswered_warn', { n: unanswered.length, first: unanswered[0] + 1 }))
       setIndex(unanswered[0])
-      setTab('sheet')
       return
     }
     if (window.confirm(t('run.submit_confirm'))) doSubmit()
@@ -180,8 +173,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
   const q = questions[index]
   const answeredCount = selected.filter((s) => s !== null).length
-  const zoom = ZOOMS[zoomI]
-  const elapsedMs = durationMs - remainMs
   const low = remainMs <= 5 * 60000
 
   return (
@@ -206,16 +197,17 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
           <img alt="GARA" className="h-8 w-8 object-cover rounded-full" src="/logo.png" />
           <span className="font-title-md text-title-md font-bold text-on-surface tracking-tight">{t('run.top_title', { title: exam.title })}</span>
         </div>
-        <div className="flex items-center gap-6">
-          <button onClick={() => setZoomI((i) => (i + 1) % ZOOMS.length)} className="flex items-center gap-2 text-on-surface-variant font-label-md hover:text-primary transition-colors" title={t('run.font_size')}>
-            <span className="material-symbols-outlined text-[20px]">zoom_in</span><span>{zoom}%</span>
-          </button>
+        <div className="flex items-center gap-4 md:gap-6">
+          {/* 진행 게이지 — 푼 문항 수 / 전체 (돋보기 자리 대체) */}
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full border bg-primary/5 border-primary/20" title={t('run.progress_title')}>
+            <div className="w-14 md:w-16 h-1.5 rounded-full bg-primary/15 overflow-hidden">
+              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${total ? (answeredCount / total) * 100 : 0}%` }}></div>
+            </div>
+            <span className="font-bold text-[14px] text-primary tabular-nums">{answeredCount}/{total}</span>
+          </div>
           <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${low ? 'bg-error/5 border-error/20' : 'bg-primary/5 border-primary/20'}`} title={t('run.timer_title')}>
             <span className={`material-symbols-outlined text-[20px] ${low ? 'text-error' : 'text-primary'}`}>timer</span>
-            <div className="flex items-baseline gap-1">
-              <span className={`font-bold text-[16px] ${low ? 'text-error' : 'text-primary'}`}>{fmt(elapsedMs)}</span>
-              <span className="text-[12px] text-outline">/ {fmt(durationMs)}</span>
-            </div>
+            <span className={`font-bold text-[16px] tabular-nums ${low ? 'text-error' : 'text-primary'}`}>{fmt(remainMs)}</span>
           </div>
         </div>
       </header>
@@ -224,11 +216,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       <main className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden bg-surface-container-lowest">
         {/* Left: 문제 */}
         <section className="flex-[6] flex flex-col bg-surface-container-lowest border-r border-outline-variant/30 overflow-y-auto">
-          <div className="p-8 md:p-12 flex flex-col gap-8 w-full" style={{ fontSize: `${zoom}%` }}>
+          <div className="p-8 md:p-12 flex flex-col gap-8 w-full">
             <div className="flex items-start justify-between border-b border-outline-variant/30 pb-4">
               <div className="flex items-baseline gap-2">
-                <span className="font-label-md text-label-md text-outline font-bold">{t('run.question')}</span>
-                <span className="font-display-lg text-display-lg font-black text-primary tracking-tighter">{index + 1}</span>
+                <span className="font-title-md text-title-md text-outline font-bold">{t('run.question')}</span>
+                <span className="font-headline-lg text-headline-lg font-black text-primary tracking-tight">{index + 1}</span>
               </div>
               <div className="flex gap-2">
                 {q.subject && <span className="px-3 py-1 bg-primary/10 text-primary text-[11px] uppercase tracking-wider font-bold rounded-full border border-primary/20">{q.subject}</span>}
@@ -236,7 +228,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
               </div>
             </div>
             <div className="space-y-4">
-              <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg font-bold text-on-surface leading-snug break-keep">{q.prompt}</h2>
+              <h2 className="font-title-md text-xl md:text-2xl font-bold text-on-surface leading-snug break-keep">{q.prompt}</h2>
             </div>
             <div className="flex flex-col gap-3 mt-2 pb-12">
               {q.choices.map((opt, i) => {
@@ -245,10 +237,10 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                   <button
                     key={i}
                     onClick={() => choose(index, i)}
-                    className={`group relative flex items-center p-5 rounded-xl text-left transition-all cursor-pointer shadow-sm ${sel ? 'border-2 border-primary bg-primary-fixed/10' : 'border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low hover:border-primary/50 hover:shadow'}`}
+                    className={`group relative flex items-center p-4 rounded-xl text-left transition-all cursor-pointer shadow-sm ${sel ? 'border-2 border-primary bg-primary-fixed/10' : 'border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low hover:border-primary/50 hover:shadow'}`}
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-label-md text-label-md shrink-0 mr-4 transition-all ${sel ? 'bg-primary border-primary text-on-primary' : 'border border-outline-variant text-outline group-hover:border-primary group-hover:text-primary'}`}>{i + 1}</div>
-                    <span className={`font-body-lg text-body-lg ${sel ? 'font-semibold text-primary' : 'text-on-surface'}`}>{opt}</span>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-label-sm text-label-sm shrink-0 mr-3 transition-all ${sel ? 'bg-primary border-primary text-on-primary' : 'border border-outline-variant text-outline group-hover:border-primary group-hover:text-primary'}`}>{i + 1}</div>
+                    <span className={`font-body-md text-body-md ${sel ? 'font-semibold text-primary' : 'text-on-surface'}`}>{opt}</span>
                   </button>
                 )
               })}
@@ -258,17 +250,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
         {/* Right: 답안지/현황 */}
         <section className="flex-[4] flex flex-col bg-surface overflow-hidden">
-          <div className="flex border-b border-outline-variant/30 bg-surface-container-lowest shrink-0">
-            <button onClick={() => setTab('sheet')} className={`flex-1 py-4 text-center font-label-md text-[15px] flex items-center justify-center gap-2 transition-colors ${tab === 'sheet' ? 'font-bold text-primary border-b-[3px] border-primary bg-primary/5' : 'text-outline hover:text-on-surface hover:bg-surface-container'}`}>
-              <span className="material-symbols-outlined text-[20px]" style={tab === 'sheet' ? { fontVariationSettings: "'FILL' 1" } : undefined}>list_alt</span> {t('run.tab_sheet')}
-            </button>
-            <button onClick={() => setTab('status')} className={`flex-1 py-4 text-center font-label-md text-[15px] flex items-center justify-center gap-2 transition-colors ${tab === 'status' ? 'font-bold text-primary border-b-[3px] border-primary bg-primary/5' : 'text-outline hover:text-on-surface hover:bg-surface-container'}`}>
-              <span className="material-symbols-outlined text-[20px]">grid_view</span> {t('run.tab_status')}
-            </button>
-          </div>
-
-          {/* 답안지(OMR) */}
-          {tab === 'sheet' && (
+          {/* 답안지(OMR) — 진행 현황 포함 (별도 '현황' 탭 없음) */}
             <div className="p-6 flex-1 overflow-y-auto bg-surface-container-low">
               <div className="flex justify-between items-center mb-4 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm">
                 <span className="font-title-md text-[16px] font-bold text-on-surface flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary block"></span> {t('run.tab_sheet')}</span>
@@ -306,33 +288,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                 })}
               </div>
             </div>
-          )}
-
-          {/* 문제풀이 현황 */}
-          {tab === 'status' && (
-            <div className="p-6 flex-1 overflow-y-auto bg-surface-container-low">
-              <div className="flex justify-between items-center mb-4 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm">
-                <span className="font-title-md text-[16px] font-bold text-on-surface">{t('run.tab_status')}</span>
-                <span className="font-label-sm text-label-sm text-on-surface-variant">{t('run.written')} <strong className="text-primary font-bold text-[14px]">{answeredCount}</strong>/{total}</span>
-              </div>
-              <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden mb-5"><div className="h-full bg-primary transition-all" style={{ width: `${(answeredCount / total) * 100}%` }}></div></div>
-              <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-                {questions.map((qq, i) => {
-                  const done = selected[i] !== null
-                  const cur = i === index
-                  return (
-                    <button
-                      key={qq.id}
-                      onClick={() => setIndex(i)}
-                      className={`aspect-square rounded-lg font-label-md text-[14px] font-bold flex items-center justify-center border transition-colors ${cur ? 'border-primary ring-2 ring-primary/30 text-primary bg-surface-container-lowest' : done ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:border-outline'}`}
-                    >
-                      {i + 1}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </section>
       </main>
 
