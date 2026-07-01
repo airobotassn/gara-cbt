@@ -5,6 +5,7 @@ import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
 import type { MyAttempt } from '../lib/types'
+import LearningDashboard from '../components/LearningDashboard'
 
 // gara_5 (마이페이지) 목업 디자인 그대로 + 실제 응시 데이터·탭·발급·로그인 게이트 로직 보존.
 // 원본: stitch_design_critique_assistant/gara_5/code.html
@@ -14,6 +15,7 @@ const TABS = [
   { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage' },
   { key: 'earned', labelKey: 'mypage.tab_earned', to: '/mypage/earned' },
   { key: 'issuance', labelKey: 'mypage.tab_issuance', to: '/mypage/issuance' },
+  { key: 'learning', labelKey: 'mypage.tab_learning', to: '/mypage/learning' },
 ]
 
 function fmtDT(iso?: string | null) {
@@ -119,8 +121,11 @@ export default function MyPage() {
             ))}
           </div>
 
-          {err && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
-          {loading && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
+          {err && tab !== 'learning' && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
+          {loading && tab !== 'learning' && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
+
+          {/* 학습 대시보드 (레벨테스트) — 자체적으로 list-attempts 로딩 */}
+          {tab === 'learning' && <LearningDashboard />}
 
           {/* 시험 응시 현황 */}
           {!loading && !err && tab === 'attempts' && (

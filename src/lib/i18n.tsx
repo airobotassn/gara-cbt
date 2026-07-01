@@ -56,6 +56,7 @@ const D: Record<string, Record<Lang, string>> = {
   'reco.placeholder': { ko: '예: 나 초보야 / 그냥저냥 씀 / 자동화도 잘함', en: 'e.g. total beginner / just casual / I automate a lot', ja: '例: 初心者です / そこそこ / 自動化も得意', zh: '例如：完全新手 / 一般般 / 我很会做自动化', hi: 'उदा: बिल्कुल नया / बस सामान्य / मैं काफी ऑटोमेशन करता हूँ', vi: 'vd: người mới hoàn toàn / dùng bình thường / tôi tự động hóa nhiều' },
   'reco.button': { ko: '레벨 추천받기', en: 'Recommend a level', ja: 'レベルを提案', zh: '推荐等级', hi: 'लेवल सुझाएं', vi: 'Gợi ý cấp độ' },
   'reco.loading': { ko: '분석 중…', en: 'Analyzing…', ja: '分析中…', zh: '分析中…', hi: 'विश्लेषण…', vi: 'Đang phân tích…' },
+  'mypage.tab_learning': { ko: '학습 대시보드', en: 'Learning', ja: '学習ダッシュボード', zh: '学习仪表板', hi: 'लर्निंग', vi: 'Bảng học tập' },
   'reco.result': { ko: '입력하신 내용으로는 Lv.{n} {name}을(를) 추천해요', en: 'Based on that, we recommend Lv.{n} {name}', ja: 'その内容なら Lv.{n} {name} がおすすめ', zh: '根据描述，推荐 Lv.{n} {name}', hi: 'इसके आधार पर Lv.{n} {name} सुझाया गया', vi: 'Dựa vào đó, đề xuất Lv.{n} {name}' },
   'reco.pct_range': { ko: '입력하신 내용이면 세계 상위 {lo}~{hi}% 정도예요', en: "Based on that, you're around the top {lo}–{hi}% worldwide", ja: 'その内容なら世界で上位 {lo}〜{hi}% くらいです', zh: '根据描述，你大约处于世界前 {lo}~{hi}%', hi: 'इसके आधार पर आप दुनिया में टॉप {lo}–{hi}% के आसपास हैं', vi: 'Dựa vào đó, bạn thuộc khoảng top {lo}–{hi}% thế giới' },
   'reco.result_alt': { ko: ' · Lv.{n}로 도전해도 좋아요', en: ' · or push to Lv.{n}', ja: ' · Lv.{n}に挑戦しても', zh: ' · 也可挑战 Lv.{n}', hi: ' · या Lv.{n} आज़माएं', vi: ' · hoặc thử Lv.{n}' },
