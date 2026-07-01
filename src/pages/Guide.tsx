@@ -93,7 +93,7 @@ export default function Guide() {
                 </div>
                 <h3 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface mb-1">{cur.name}</h3>
                 <p className="font-title-md text-title-md text-on-surface-variant">{cur.tagline}</p>
-                <p className="font-body-md text-body-md text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
+                <p className="font-body-lg text-body-lg text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
               </div>
 
               {/* 급수 전환: 화살표 + 급수 (하나의 통합 pill) */}
