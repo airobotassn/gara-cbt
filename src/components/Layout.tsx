@@ -8,7 +8,6 @@ import { GEM_COLORS, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
 import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
-import { LEVELTEST_URL } from '../lib/testConfig'
 import {
   HomeIcon,
   ExamIcon,
@@ -156,11 +155,11 @@ export default function Layout({ children }: { children: ReactNode }) {
     navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
-  // 레벨테스트(별도 서비스)로 이동
+  // 레벨테스트(내부 /test) 로 이동
   function goLevelTest() {
     setOpen(false)
     setMoreOpen(false)
-    window.location.href = LEVELTEST_URL
+    navigate('/test/select')
   }
 
   return (

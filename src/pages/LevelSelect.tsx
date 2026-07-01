@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { MAX_LEVEL, QUESTIONS_PER_TEST } from '../lib/testConfigLevel'
@@ -88,6 +88,13 @@ export default function LevelSelect() {
       <div className="card pad">
         <div className="lv-head">
           <h2 className="sc-title">{t('lv.title')}</h2>
+          <Link
+            to="/ranking"
+            className="btn-ghost"
+            style={{ textDecoration: 'none', fontSize: 13, padding: '6px 12px', whiteSpace: 'nowrap' }}
+          >
+            🏆 {t('rank.title')}
+          </Link>
         </div>
 
         <div className="lv-rule">
