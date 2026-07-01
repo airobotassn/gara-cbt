@@ -21,7 +21,12 @@ export const supabase = createClient(
 const fnBase = url ? `${url}/functions/v1` : ''
 
 // Edge Function 호출 헬퍼 — 현재 세션 토큰을 실어보낸다.
-export async function callFunction<T>(name: string, body: unknown): Promise<T> {
+//   extraHeaders: KB/번역 파이프라인처럼 x-passcode 같은 추가 헤더가 필요한 함수용(옵션).
+export async function callFunction<T>(
+  name: string,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   if (!isSupabaseConfigured) {
     throw new Error('Supabase가 설정되지 않았습니다. .env.local을 채워주세요.')
   }
@@ -35,6 +40,7 @@ export async function callFunction<T>(name: string, body: unknown): Promise<T> {
       'Content-Type': 'application/json',
       apikey: anonKey as string,
       Authorization: `Bearer ${session?.access_token ?? anonKey}`,
+      ...(extraHeaders ?? {}),
     },
     body: JSON.stringify(body),
   })

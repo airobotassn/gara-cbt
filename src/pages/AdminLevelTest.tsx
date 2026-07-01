@@ -1,18 +1,47 @@
 // 레벨테스트 백오피스 (Admin.tsx 의 "레벨테스트" 탭). ai-level-test/src/pages/Admin.tsx 에서 이관.
 //  - 모든 데이터 호출은 새 엣지 함수 `admin-test` 로 (CBT admin 과 분리).
 //  - 응시 결과 링크는 gara-cbt 라우트 `/test/result/:id` 를 사용.
-//  - 이관 범위: 대시보드(개요/추이/분포/문항난이도/커버리지) · 유저 · 응시 기록 · 제보.
-//  - TODO(미이관): 문항 목록/문항 이력/번역 업로드(엑셀+자동번역)/관리자 관리 탭.
-//      원본(ai-level-test Admin.tsx)의 ListTab·EventsTab·UploadTab·AdminsTab 참고.
-//      admin-test 엣지 함수에는 해당 액션(list/events/upsert/restorable/admins…)이 이미 있어
-//      추후 UI만 붙이면 됨.
+//  - 이관 범위: 대시보드 · 유저 · 응시 기록 · 문항 목록 · 문항 이력 · 문항 생성(KB 파이프라인) · 번역 · 제보 · 관리자 관리.
+//  - KB 파이프라인(kb-extract/generate/save/publish/embed-backfill) 과 translate-questions 는
+//    x-passcode 헤더가 필요 — 관리자가 화면에서 직접 입력(usePasscode, localStorage 공유).
 import { useEffect, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
+import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
+
+// KB/번역 파이프라인 x-passcode 공유(입력값을 localStorage 에 저장 → 탭 간·재방문 시 유지).
+const PASSCODE_KEY = 'gara_kb_passcode'
+function usePasscode(): [string, (v: string) => void] {
+  const [pc, setPc] = useState<string>(() => {
+    try { return localStorage.getItem(PASSCODE_KEY) ?? '' } catch { return '' }
+  })
+  const set = (v: string) => {
+    setPc(v)
+    try { localStorage.setItem(PASSCODE_KEY, v) } catch { /* noop */ }
+  }
+  return [pc, set]
+}
+function PasscodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="admin-row" style={{ gap: 8 }}>
+      <span style={{ whiteSpace: 'nowrap' }}>파이프라인 암호</span>
+      <input
+        className="admin-search"
+        type="password"
+        placeholder="x-passcode"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ maxWidth: 220 }}
+      />
+      <span className="admin-hint">생성·번역·발행에 필요합니다.</span>
+    </label>
+  )
+}
 
 const ErrBox = ({ msg }: { msg: string }) => <div className="admin-section admin-empty">불러오기 실패 — {msg}</div>
 
@@ -64,17 +93,18 @@ export interface Analytics {
   coverage: Record<string, number>
 }
 
-type LtTab = 'dashboard' | 'users' | 'attempts' | 'reports'
+type LtTab = 'dashboard' | 'users' | 'attempts' | 'list' | 'events' | 'generate' | 'upload' | 'reports' | 'admins'
 export default function LevelTestAdmin() {
   const { isFullUser } = useAuth()
   const [tab, setTab] = useState<LtTab>('dashboard')
   // 관리자 권한은 서버(admin-test 'me')가 판별 — CBT admin 과 동일한 게이트(admin_users/ROOT).
   const [gate, setGate] = useState<'loading' | 'ok' | 'denied'>('loading')
+  const [isRoot, setIsRoot] = useState(false)
 
   useEffect(() => {
     if (!isFullUser) { setGate('denied'); return }
     callFunction<{ isRoot: boolean }>('admin-test', { action: 'me' })
-      .then(() => setGate('ok'))
+      .then((r) => { setGate('ok'); setIsRoot(!!r.isRoot) })
       .catch(() => setGate('denied'))
   }, [isFullUser])
 
@@ -96,7 +126,12 @@ export default function LevelTestAdmin() {
     { key: 'dashboard', label: '대시보드' },
     { key: 'users', label: '유저' },
     { key: 'attempts', label: '응시 기록' },
+    { key: 'list', label: '문항 목록' },
+    { key: 'events', label: '문항 이력' },
+    { key: 'generate', label: '문항 생성' },
+    { key: 'upload', label: '번역' },
     { key: 'reports', label: '제보' },
+    ...(isRoot ? [{ key: 'admins' as const, label: '관리자 관리' }] : []),
   ]
 
   return (
@@ -111,7 +146,12 @@ export default function LevelTestAdmin() {
       {tab === 'dashboard' ? <DashboardTab /> : null}
       {tab === 'users' ? <UsersTab /> : null}
       {tab === 'attempts' ? <AttemptsTab /> : null}
+      {tab === 'list' ? <ListTab /> : null}
+      {tab === 'events' ? <EventsTab /> : null}
+      {tab === 'generate' ? <GenerateTab /> : null}
+      {tab === 'upload' ? <UploadTab /> : null}
       {tab === 'reports' ? <ReportsTab /> : null}
+      {tab === 'admins' && isRoot ? <AdminsTab /> : null}
     </div>
   )
 }
@@ -783,6 +823,1454 @@ function ReportsTab() {
           })}
         </div>
         {rows.length === 0 && !loading ? <div className="admin-empty">해당 상태의 제보가 없습니다.</div> : null}
+      </div>
+    </div>
+  )
+}
+
+// ============================ 문항 목록 탭 ============================
+interface ListRow {
+  id: string
+  code: string | null
+  level: number
+  category: string
+  correct_index: number
+  prompt_i18n: Record<string, string>
+  options_i18n: Record<string, string[]>
+  explanation_i18n: Record<string, string>
+  active: boolean
+  missing: string[]
+}
+function ListTab() {
+  const [level, setLevel] = useState(1)
+  const [cat, setCat] = useState('all')
+  const [q, setQ] = useState('')
+  const [rows, setRows] = useState<ListRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [edit, setEdit] = useState<ListRow | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setErr('')
+    try {
+      const r = await callFunction<{ rows: ListRow[] }>('admin-test', { action: 'list', level })
+      setRows(r.rows)
+    } catch (e) {
+      setRows([])
+      setErr(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [level]) // eslint-disable-line
+
+  // 비활성/삭제 → 메인 목록에서 빠지고 '문항 이력' 탭으로. (낙관적으로 행 제거)
+  async function act(row: ListRow, action: 'deactivate' | 'delete') {
+    const word = action === 'delete' ? '삭제' : '비활성화'
+    if (!confirm(`${row.code ?? '이 문항'} 을(를) ${word}할까요?\n메인 목록에서 빠지고 '문항 이력' 탭으로 이동합니다. (거기서 되돌리기 가능)`)) return
+    const prev = rows
+    setRows((rs) => rs.filter((x) => x.id !== row.id))
+    try {
+      if (action === 'delete') await callFunction('admin-test', { action: 'delete', id: row.id })
+      else await callFunction('admin-test', { action: 'setActive', id: row.id, active: false })
+    } catch (e) {
+      setRows(prev)
+      alert(`${word} 실패: ` + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
+  const axes = axesForLevel(level, 'ko')
+  const qq = q.trim().toLowerCase()
+  const filtered = rows
+    .filter((r) => cat === 'all' || r.category === cat)
+    .filter((r) => !qq || (r.code ?? '').toLowerCase().includes(qq) || (r.prompt_i18n?.ko ?? '').toLowerCase().includes(qq))
+
+  return (
+    <div>
+      {err ? <ErrBox msg={err} /> : null}
+      <div className="admin-section">
+        <div className="admin-toolbar">
+          <label>레벨 <select value={level} onChange={(e) => { setLevel(+e.target.value); setCat('all') }}>
+            {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
+          </select></label>
+          <label>영역 <select value={cat} onChange={(e) => setCat(e.target.value)}>
+            <option value="all">전체 영역</option>
+            {axes.map((a) => <option key={a.key} value={a.key}>{a.short}</option>)}
+          </select></label>
+          <input className="admin-search" placeholder="번호(L3-045)·문제 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="admin-mini" onClick={load}>새로고침</button>
+          <span className="admin-hint">{filtered.length}문항{loading ? ' · 불러오는 중…' : ''}</span>
+        </div>
+        <table className="admin-table">
+          <thead><tr><th>번호</th><th>영역</th><th>문제(ko)</th><th>정답</th><th>미번역</th><th></th></tr></thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className={r.missing.length ? 'prob' : ''}>
+                <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#3f8fd6' }}>{r.code ?? '-'}</td>
+                <td>{axisDef(r.category, 'ko').short}</td>
+                <td className="admin-q">{r.prompt_i18n?.ko ?? ''}</td>
+                <td>{r.correct_index + 1}번</td>
+                <td className="admin-status">{r.missing.length ? r.missing.map((l) => LANG_LABEL[l] ?? l).join(', ') : '완료'}</td>
+                <td style={{ whiteSpace: 'nowrap', display: 'flex', gap: 6 }}>
+                  <button className="admin-mini" onClick={() => setEdit(r)}>수정</button>
+                  <button className="admin-mini" onClick={() => act(r, 'deactivate')}>비활성</button>
+                  <button className="admin-mini danger" onClick={() => act(r, 'delete')}>삭제</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && !loading ? <div className="admin-empty">조건에 맞는 문항이 없습니다.</div> : null}
+        <p className="admin-hint" style={{ marginTop: 8 }}>비활성·삭제한 문항은 <b>문항 이력</b> 탭에서 확인·되돌리기 할 수 있어요.</p>
+      </div>
+      {edit ? <QuestionEdit row={edit} onClose={() => setEdit(null)} onSaved={(u) => { setRows((rs) => rs.map((x) => (x.id === u.id ? u : x))); setEdit(null) }} /> : null}
+    </div>
+  )
+}
+
+function QuestionEdit({ row, onClose, onSaved }: { row: ListRow; onClose: () => void; onSaved: (u: ListRow) => void }) {
+  const [lang, setLang] = useState('ko')
+  const [cat, setCat] = useState(row.category)
+  const [correct, setCorrect] = useState(row.correct_index)
+  const [active, setActive] = useState(row.active)
+  const [pi, setPi] = useState<Record<string, string>>({ ...row.prompt_i18n })
+  const [oi, setOi] = useState<Record<string, string[]>>({ ...row.options_i18n })
+  const [ei, setEi] = useState<Record<string, string>>({ ...row.explanation_i18n })
+  const [msg, setMsg] = useState('')
+  const axes = axesForLevel(row.level, 'ko')
+  const koCount = Math.max(1, (oi.ko ?? []).length)
+  const ALL_LANGS = ['ko', ...LANGS]
+
+  function setOptText(l: string, k: number, val: string) {
+    setOi((o) => { const arr = [...(o[l] ?? [])]; arr[k] = val; return { ...o, [l]: arr } })
+  }
+  function addOpt() {
+    setOi((o) => { const next = { ...o }; for (const l of ALL_LANGS) next[l] = [...(o[l] ?? []), '']; return next })
+  }
+  function removeOpt(k: number) {
+    setOi((o) => { const next = { ...o }; for (const l of ALL_LANGS) if (o[l]) next[l] = o[l].filter((_, i) => i !== k); return next })
+    setCorrect((c) => (c > k ? c - 1 : c === k ? 0 : c))
+  }
+
+  async function save() {
+    setMsg('저장 중…')
+    const updated: ListRow = { ...row, category: cat, correct_index: correct, prompt_i18n: pi, options_i18n: oi, explanation_i18n: ei, active }
+    try {
+      await callFunction('admin-test', {
+        action: 'upsert',
+        rows: [{ id: row.id, level: row.level, category: cat, correct_index: correct, prompt_i18n: pi, options_i18n: oi, explanation_i18n: ei, active }],
+      })
+      setMsg('✅ 저장됨')
+      onSaved(updated)
+    } catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
+  }
+
+  return (
+    <div className="admin-modal">
+      <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="admin-modal-h"><b>문항 수정</b><span className="admin-hint">{row.code ?? `Lv.${row.level}`}</span><button className="admin-x" onClick={onClose}>✕</button></div>
+        <div className="admin-row">
+          <label>영역 <select value={cat} onChange={(e) => setCat(e.target.value)}>{axes.map((a) => <option key={a.key} value={a.key}>{a.short}</option>)}</select></label>
+          <label><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} style={{ width: 'auto' }} /> 활성</label>
+        </div>
+        <div className="admin-langtabs" style={{ marginLeft: 0, marginTop: 10 }}>
+          {['ko', ...LANGS].map((l) => <button key={l} className={lang === l ? 'on' : ''} onClick={() => setLang(l)}>{LANG_LABEL[l]}</button>)}
+        </div>
+        <div className="admin-sub" style={{ marginTop: 8 }}>문제 ({LANG_LABEL[lang]})</div>
+        <input className="admin-in" value={pi[lang] ?? ''} placeholder="문제" onChange={(e) => setPi((p) => ({ ...p, [lang]: e.target.value }))} />
+        <div className="admin-sub">보기 <span className="admin-hint">◉ 표시가 정답 · 보기 개수/정답은 모든 언어 공통</span></div>
+        <div className="opt-editor">
+          {Array.from({ length: koCount }, (_, k) => k).map((k) => (
+            <div key={k} className={`opt-row ${correct === k ? 'is-correct' : ''}`}>
+              <label className="opt-radio" title="정답으로 지정">
+                <input type="radio" name="correct" checked={correct === k} onChange={() => setCorrect(k)} />
+              </label>
+              <span className="opt-num">{k + 1}</span>
+              <input className="opt-in" value={(oi[lang] ?? [])[k] ?? ''} placeholder={`보기 ${k + 1}`} onChange={(e) => setOptText(lang, k, e.target.value)} />
+              <button className="opt-del" title="삭제" disabled={koCount <= 2} onClick={() => removeOpt(k)}>✕</button>
+            </div>
+          ))}
+          <button className="admin-mini" onClick={addOpt}>+ 보기 추가</button>
+        </div>
+        <div className="admin-sub">해설</div>
+        <textarea className="admin-ta" rows={3} value={ei[lang] ?? ''} onChange={(e) => setEi((x) => ({ ...x, [lang]: e.target.value }))} />
+        <div className="admin-row" style={{ marginTop: 12 }}>
+          <button className="btn-ink" onClick={save}>저장</button>
+          {msg ? <span className="admin-msg">{msg}</span> : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================ 문항 이력 탭 ============================
+interface QEvent {
+  id: string
+  question_id: string | null
+  code: string | null
+  level: number | null
+  action: 'edit' | 'deactivate' | 'activate' | 'delete'
+  actor: string | null
+  detail: Record<string, { before: unknown; after: unknown }> | null
+  created_at: string
+  restorable?: boolean // 그 문항이 *현재* 비활성/삭제라 되돌릴 수 있는가(서버 계산)
+}
+const EV_FIELD: Record<string, string> = { prompt_i18n: '문제', options_i18n: '보기', explanation_i18n: '해설', correct_index: '정답', category: '영역', active: '활성' }
+function evVal(field: string, v: unknown): string {
+  if (v === null || v === undefined) return '-'
+  if (field === 'correct_index') return `${Number(v) + 1}번`
+  if (field === 'category') return axisDef(String(v), 'ko').short
+  if (field === 'active') return v ? '활성' : '비활성'
+  if (field === 'options_i18n') { const ko = (v as { ko?: unknown })?.ko; return Array.isArray(ko) ? ko.join(' / ') : '-' }
+  if (field === 'prompt_i18n' || field === 'explanation_i18n') return (v as { ko?: string })?.ko ?? '-'
+  return String(v)
+}
+function EvBadge({ a }: { a: QEvent['action'] }) {
+  if (a === 'edit') return <span className="badge low">수정</span>
+  if (a === 'deactivate') return <span className="badge none">비활성</span>
+  if (a === 'activate') return <span className="badge ok">활성·복구</span>
+  return <span className="badge none" style={{ color: '#dc2626' }}>삭제</span>
+}
+interface QState { id: string; code: string | null; level: number | null; category: string; prompt: string; deleted_at: string | null }
+function EventsTab() {
+  // 탭: 히스토리(전체 이벤트 로그) / 비활성(현재 active=false) / 삭제(현재 deleted)
+  const [tab, setTab] = useState<'history' | 'inactive' | 'deleted'>('history')
+  const [rows, setRows] = useState<QEvent[]>([])
+  const [inactive, setInactive] = useState<QState[]>([])
+  const [deleted, setDeleted] = useState<QState[]>([])
+  const [q, setQ] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+
+  async function load() {
+    setLoading(true); setErr('')
+    try {
+      if (tab === 'history') {
+        const r = await callFunction<{ events: QEvent[] }>('admin-test', { action: 'events', filter: 'all' })
+        setRows(r.events)
+      } else {
+        const r = await callFunction<{ inactive: QState[]; deleted: QState[] }>('admin-test', { action: 'restorable' })
+        setInactive(r.inactive); setDeleted(r.deleted)
+      }
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [tab]) // eslint-disable-line
+
+  async function restore(it: { id: string; code: string | null }) {
+    if (!confirm(`${it.code ?? '이 문항'} 을(를) 다시 활성 상태로 되돌릴까요?`)) return
+    try {
+      await callFunction('admin-test', { action: 'restore', id: it.id })
+      alert('✅ 되돌렸습니다. 문항 목록에 다시 나타납니다.')
+      load()
+    } catch (e) { alert('실패: ' + (e instanceof Error ? e.message : String(e))) }
+  }
+
+  if (err) return <ErrBox msg={err} />
+  const qq = q.trim().toLowerCase()
+  const matchCode = (c: string | null) => !qq || (c ?? '').toLowerCase().includes(qq)
+  const TABS: [typeof tab, string][] = [['history', '히스토리'], ['inactive', '비활성'], ['deleted', '삭제']]
+  const evView = rows.filter((r) => matchCode(r.code))
+  const stateView = (tab === 'inactive' ? inactive : deleted).filter((r) => matchCode(r.code))
+  const count = tab === 'history' ? evView.length : stateView.length
+
+  return (
+    <div>
+      <div className="admin-section">
+        <div className="admin-toolbar">
+          <div className="admin-period">
+            {TABS.map(([f, label]) => (
+              <button key={f} className={tab === f ? 'on' : ''} onClick={() => setTab(f)}>{label}</button>
+            ))}
+          </div>
+          <input className="admin-search" placeholder="번호(L3-045) 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+          <span className="admin-hint">{count}건{loading ? ' · 불러오는 중…' : ''}</span>
+        </div>
+
+        {tab === 'history' ? (
+          <>
+            <p className="admin-hint" style={{ margin: '0 0 10px' }}>수정·비활성·복구·삭제 자취 전체 기록입니다(되돌리기는 ‘비활성/삭제’ 탭에서).</p>
+            <div className="ev-list">
+              {evView.map((ev) => (
+                <div key={ev.id} className="ev-card">
+                  <div className="ev-head">
+                    <span style={{ fontWeight: 800, color: '#3f8fd6' }}>{ev.code ?? '번호없음'}</span>
+                    <EvBadge a={ev.action} />
+                    {ev.level ? <span className="admin-hint">Lv.{ev.level}</span> : null}
+                    <span className="admin-hint">· {ev.actor ?? '-'}</span>
+                    <span className="admin-hint">· {fmtDT(ev.created_at)}</span>
+                  </div>
+                  {ev.action === 'edit' && ev.detail ? (
+                    <div className="ev-diff">
+                      {Object.entries(ev.detail).map(([field, v]) => (
+                        <div key={field} className="ev-diff-row">
+                          <span className="ev-field">{EV_FIELD[field] ?? field}</span>
+                          <span className="ev-before">{evVal(field, v.before)}</span>
+                          <span className="ev-arr">→</span>
+                          <span className="ev-after">{evVal(field, v.after)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            {evView.length === 0 && !loading ? <div className="admin-empty">해당 이력이 없습니다.</div> : null}
+          </>
+        ) : (
+          <>
+            <div className="ev-list">
+              {stateView.map((it) => (
+                <div key={it.id} className="ev-card">
+                  <div className="ev-head">
+                    <span style={{ fontWeight: 800, color: '#3f8fd6' }}>{it.code ?? '번호없음'}</span>
+                    {it.level ? <span className="admin-hint">Lv.{it.level}</span> : null}
+                    <span className="admin-hint">· {axisDef(it.category, 'ko').short}</span>
+                    {it.deleted_at ? <span className="admin-hint">· 삭제 {fmtDT(it.deleted_at)}</span> : null}
+                    <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={() => restore(it)}>되돌리기</button>
+                  </div>
+                  {it.prompt ? <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--muted)' }}>{it.prompt}</p> : null}
+                </div>
+              ))}
+            </div>
+            {stateView.length === 0 && !loading ? (
+              <div className="admin-empty">{tab === 'inactive' ? '현재 비활성인 문항이 없습니다.' : '현재 삭제된 문항이 없습니다.'}</div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================ 관리자 관리 탭 (루트 전용) ============================
+interface AdminRow { email: string; role: 'root' | 'admin'; added_by: string | null; created_at: string | null }
+function AdminsTab() {
+  const [rows, setRows] = useState<AdminRow[] | null>(null)
+  const [candidates, setCandidates] = useState<string[]>([])
+  const [email, setEmail] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function load() {
+    try {
+      const r = await callFunction<{ admins: AdminRow[]; candidates?: string[] }>('admin-test', { action: 'admins' })
+      setRows(r.admins); setCandidates(r.candidates ?? [])
+    } catch (e) { setMsg('불러오기 실패: ' + (e instanceof Error ? e.message : String(e))); setRows([]) }
+  }
+  useEffect(() => { load() }, [])
+
+  async function add() {
+    const t = email.trim().toLowerCase()
+    if (!t) return
+    setBusy(true); setMsg('')
+    try {
+      const r = await callFunction<{ admins: AdminRow[]; candidates?: string[] }>('admin-test', { action: 'addAdmin', email: t })
+      setRows(r.admins); setCandidates(r.candidates ?? []); setEmail(''); setMsg(`✅ ${t} 추가됨`)
+    } catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
+    setBusy(false)
+  }
+  async function remove(target: string) {
+    if (!confirm(`${target} 을(를) 관리자에서 삭제할까요?`)) return
+    setBusy(true); setMsg('')
+    try {
+      const r = await callFunction<{ admins: AdminRow[]; candidates?: string[] }>('admin-test', { action: 'removeAdmin', email: target })
+      setRows(r.admins); setCandidates(r.candidates ?? []); setMsg(`🗑 ${target} 삭제됨`)
+    } catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
+    setBusy(false)
+  }
+
+  return (
+    <div>
+      <div className="admin-section">
+        <h3>관리자 추가</h3>
+        <p className="admin-desc">이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있어요. 추가하면 그 계정으로 로그인 시 관리자 페이지를 쓸 수 있습니다. (추가·삭제는 루트 관리자만)</p>
+        <div className="admin-toolbar">
+          <input className="admin-search" list="admin-candidates" placeholder="가입 유저 이메일 선택/입력" value={email}
+            onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+          <datalist id="admin-candidates">
+            {candidates.map((c) => <option key={c} value={c} />)}
+          </datalist>
+          <button className="btn-ink" onClick={add} disabled={busy || !email.trim()}>추가</button>
+          <span className="admin-hint">지정 가능 {candidates.length}명</span>
+          {msg ? <span className="admin-msg">{msg}</span> : null}
+        </div>
+      </div>
+      <div className="admin-section">
+        <h3>관리자 목록 <span className="admin-hint">{rows ? `${rows.length}명` : ''}</span></h3>
+        <table className="admin-table">
+          <thead><tr><th>이메일</th><th>권한</th><th>추가한 사람</th><th>추가일</th><th></th></tr></thead>
+          <tbody>
+            {(rows ?? []).map((a) => (
+              <tr key={a.email}>
+                <td>{a.email}</td>
+                <td>{a.role === 'root' ? <span className="badge ok">루트</span> : <span className="badge low">관리자</span>}</td>
+                <td>{a.added_by ?? '-'}</td>
+                <td>{fmtDate(a.created_at)}</td>
+                <td>{a.role === 'root'
+                  ? <span className="admin-hint">삭제 불가</span>
+                  : <button className="admin-mini" onClick={() => remove(a.email)} disabled={busy}>삭제</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows && rows.length === 0 ? <div className="admin-empty">불러오기 실패 또는 비어 있음</div> : null}
+      </div>
+    </div>
+  )
+}
+
+// ============================ 번역 탭 (엑셀 업로드 + 자동번역) ============================
+// ── 번역 작업 자동저장/이어서하기 (localStorage) ──
+const XLATE_JOB_KEY = 'gara_xlate_job_v1'
+interface XlateJob {
+  fileName: string
+  level: number
+  cfg: ColCfg
+  catMap: Record<string, string>
+  drafts: QDraft[]
+  savedAt: number
+}
+function saveXlateJob(job: Omit<XlateJob, 'savedAt'>): boolean {
+  try {
+    localStorage.setItem(XLATE_JOB_KEY, JSON.stringify({ ...job, savedAt: Date.now() }))
+    return true
+  } catch {
+    return false // 용량 초과 등 — 호출부에서 1회 경고
+  }
+}
+function loadXlateJob(): XlateJob | null {
+  try {
+    const s = localStorage.getItem(XLATE_JOB_KEY)
+    return s ? (JSON.parse(s) as XlateJob) : null
+  } catch {
+    return null
+  }
+}
+function clearXlateJob() {
+  try { localStorage.removeItem(XLATE_JOB_KEY) } catch { /* noop */ }
+}
+// 번역 결과 배열을 drafts 뼈대에 병합(성공 → tr/issues, 실패 → error)
+function mergeTransResults(base: QDraft[], results: (TransResult | undefined)[]): QDraft[] {
+  return base.map((d, i) => {
+    const res = results[i]
+    if (!res) return d
+    return 'tr' in res
+      ? { ...d, tr: res.tr as Record<string, TransItem>, issues: res.issues, error: '' }
+      : { ...d, error: res.error }
+  })
+}
+// 모든 대상 언어가 번역 완료된 문항인지
+const draftDone = (d: QDraft) => LANGS.every((l) => !!d.tr[l]?.prompt)
+
+interface QDraft {
+  num: string
+  excelCat: string
+  correctIndex: number // 0-based
+  ko: TransItem
+  tr: Record<string, TransItem>
+  issues: Record<string, string[]>
+  error: string
+  excluded: boolean
+}
+
+// ── 한글 원본 임포트: 자동 인식 헬퍼 (사람마다 다른 형식 대응) ──
+type ColCfg = { cNum: number; cCat: number; cPrompt: number; cOptions: number[]; cAns: number; cExpl: number }
+
+// 비교용 정규화: 공백·구두점·접속사(및) 제거
+function normKey(s: unknown): string {
+  return String(s ?? '').toLowerCase().replace(/\s+/g, '').replace(/[·.,/()[\]{}・:|~\-]/g, '').replace(/및/g, '')
+}
+function bigrams(s: string): string[] {
+  const t = normKey(s)
+  if (t.length < 2) return t ? [t] : []
+  const out: string[] = []
+  for (let i = 0; i < t.length - 1; i++) out.push(t.slice(i, i + 2))
+  return out
+}
+// 0~1 유사도(Dice 계수)
+function sim(a: string, b: string): number {
+  const A = bigrams(a), B = bigrams(b)
+  if (!A.length || !B.length) return normKey(a) && normKey(a) === normKey(b) ? 1 : 0
+  const cnt = new Map<string, number>()
+  for (const x of B) cnt.set(x, (cnt.get(x) ?? 0) + 1)
+  let inter = 0
+  for (const x of A) { const c = cnt.get(x); if (c) { inter++; cnt.set(x, c - 1) } }
+  return (2 * inter) / (A.length + B.length)
+}
+// 영역 텍스트 → 그 레벨에서 가장 비슷한 축 코드
+function bestAxis(cat: string, level: number): { key: string; score: number } {
+  let best = { key: '', score: 0 }
+  for (const a of axesForLevel(level, 'ko')) {
+    const s = Math.max(sim(cat, a.label), sim(cat, a.short))
+    if (s > best.score) best = { key: a.key, score: s }
+  }
+  return best
+}
+// 영역 집합으로 레벨 추정(지문)
+function detectLevelByCats(cats: string[]): number {
+  let best = { lv: 0, score: 0 }
+  for (let lv = 1; lv <= MAX_LEVEL; lv++) {
+    if (!axesForLevel(lv).length) continue
+    const score = cats.reduce((s, c) => s + bestAxis(c, lv).score, 0)
+    if (score > best.score) best = { lv, score }
+  }
+  return best.lv || 1
+}
+function detectLevelFromName(name: string): number {
+  const m = String(name).match(/(?:level|레벨|lv)\s*\.?\s*([1-7])/i)
+  return m ? +m[1] : 0
+}
+// 헤더 행으로 컬럼 자동 인식
+const HEAD_ALIAS = {
+  num: ['번호', 'no', '순번', '문항번호'],
+  cat: ['영역', '출제영역', '카테고리', '분류', '영역명'],
+  prompt: ['문제', '문항', '질문', 'question'],
+  ans: ['정답', '정답번호', 'answer', '정답인덱스'],
+  expl: ['해설', '설명', '풀이', 'explanation'],
+}
+function findCol(header: string[], aliases: string[]): number {
+  const h = header.map(normKey)
+  for (const a of aliases) { const i = h.indexOf(normKey(a)); if (i >= 0) return i }
+  for (let i = 0; i < h.length; i++) if (h[i] && aliases.some((a) => h[i].includes(normKey(a)))) return i
+  return -1
+}
+function detectColumns(header: string[], ncol: number): { cfg: ColCfg; hasHeader: boolean } {
+  const h = header.map(normKey)
+  const optCols = h.map((x, i) => ({ x, i })).filter((o) => /보기|선택지|option|지문/.test(o.x)).map((o) => o.i)
+  const cPrompt = findCol(header, HEAD_ALIAS.prompt)
+  const cAns = findCol(header, HEAD_ALIAS.ans)
+  const cCat = findCol(header, HEAD_ALIAS.cat)
+  const cNum = findCol(header, HEAD_ALIAS.num)
+  const cExpl = findCol(header, HEAD_ALIAS.expl)
+  const hasHeader = cPrompt >= 0 || cAns >= 0 || cCat >= 0
+  return {
+    cfg: {
+      cNum: cNum >= 0 ? cNum : 0,
+      cCat: cCat >= 0 ? cCat : 1,
+      cPrompt: cPrompt >= 0 ? cPrompt : 2,
+      cOptions: optCols.length ? optCols : [3, 4, 5, 6, 7].filter((c) => c < ncol),
+      cAns: cAns >= 0 ? cAns : 8,
+      cExpl: cExpl >= 0 ? cExpl : 9,
+    },
+    hasHeader,
+  }
+}
+function colLetter(i: number): string {
+  let s = ''; let n = i
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1 } while (n >= 0)
+  return s
+}
+// 한 행이 "머리글"처럼 보이는 정도(알려진 헤더 종류가 몇 개 들어있나)
+function rowHeaderScore(row: string[]): number {
+  const cells = (row ?? []).map(normKey).filter(Boolean)
+  const groups = [HEAD_ALIAS.prompt, HEAD_ALIAS.ans, HEAD_ALIAS.cat, HEAD_ALIAS.expl, HEAD_ALIAS.num, ['보기', '선택지', 'option']]
+  let hits = 0
+  for (const g of groups) if (cells.some((c) => g.some((a) => c === normKey(a) || c.includes(normKey(a))))) hits++
+  return hits
+}
+// 앞쪽 행들을 훑어 머리글 행 위치를 찾는다(제목/안내 줄이 위에 있어도 대응). 못 찾으면 0행.
+function findHeaderRow(aoa: string[][], maxScan = 15): number {
+  let best = { idx: 0, score: 0 }
+  const lim = Math.min(maxScan, aoa.length)
+  for (let i = 0; i < lim; i++) {
+    const s = rowHeaderScore(aoa[i])
+    if (s > best.score) best = { idx: i, score: s }
+  }
+  return best.score >= 2 ? best.idx : 0
+}
+
+function UploadTab() {
+  const [passcode, setPasscode] = usePasscode()
+  const [wb, setWb] = useState<XLSX.WorkBook | null>(null)
+  const [sheetNames, setSheetNames] = useState<string[]>([])
+  const [sheetIdx, setSheetIdx] = useState(0)
+  const [rows, setRows] = useState<string[][] | null>(null)
+  const [fileName, setFileName] = useState('')
+  const [headerRow, setHeaderRow] = useState(0) // 머리글 행 인덱스(0-based, -1=머리글 없음)
+  const [cfg, setCfg] = useState<ColCfg>({ cNum: 0, cCat: 1, cPrompt: 2, cOptions: [3, 4, 5, 6, 7], cAns: 8, cExpl: 9 })
+  const [editCols, setEditCols] = useState(false)
+  const [level, setLevel] = useState(1)
+  const [detectedLevel, setDetectedLevel] = useState(0)
+  const [catMap, setCatMap] = useState<Record<string, string>>({})
+  const [phase, setPhase] = useState<'config' | 'translating' | 'review'>('config')
+  const [progress, setProgress] = useState({ done: 0, total: 0, note: '' })
+  const [drafts, setDrafts] = useState<QDraft[]>([])
+  const [reviewLang, setReviewLang] = useState<string>('en')
+  const [onlyProblems, setOnlyProblems] = useState(true)
+  const [applyMsg, setApplyMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const [savedJob, setSavedJob] = useState<XlateJob | null>(null) // 이어서할 작업(배너)
+  const [saveWarn, setSaveWarn] = useState(false) // 자동저장 용량초과 경고
+
+  // 진입 시 저장된 미완료 작업이 있으면 배너로 안내
+  useEffect(() => { setSavedJob(loadXlateJob()) }, [])
+
+  // 번역 진행 중 이탈 시 브라우저 기본 경고
+  useEffect(() => {
+    if (!(busy && phase === 'translating')) return
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [busy, phase])
+
+  function persistJob(
+    draftsArr: QDraft[],
+    meta: { level: number; catMap: Record<string, string>; cfg: ColCfg; fileName: string },
+  ) {
+    const ok = saveXlateJob({ fileName: meta.fileName, level: meta.level, cfg: meta.cfg, catMap: meta.catMap, drafts: draftsArr })
+    if (!ok) setSaveWarn(true)
+  }
+  function discardJob() { clearXlateJob(); setSavedJob(null) }
+
+  const axes = axesForLevel(level, 'ko')
+  const data = rows ? rows.slice(headerRow + 1) : []
+  const distinctCats = Array.from(new Set(data.map((r) => String(r[cfg.cCat] ?? '').trim()).filter(Boolean)))
+  const ncol = rows && rows.length ? Math.max(...rows.map((r) => r.length)) : 0
+
+  function suggestCatMap(cats: string[], lv: number): Record<string, string> {
+    const m: Record<string, string> = {}
+    for (const c of cats) { const b = bestAxis(c, lv); if (b.score >= 0.5) m[c] = b.key }
+    return m
+  }
+
+  // 머리글 행 수동 변경 → 그 행 기준으로 열·카테고리 재인식
+  function changeHeaderRow(i: number) {
+    setHeaderRow(i)
+    if (!rows) return
+    const det = detectColumns(rows[i] ?? [], ncol)
+    setCfg(det.cfg)
+    const body = rows.slice(i + 1)
+    const cats = Array.from(new Set(body.map((r) => String(r[det.cfg.cCat] ?? '').trim()).filter(Boolean)))
+    setCatMap(suggestCatMap(cats, level))
+  }
+
+  // 시트 1개를 읽어 자동 인식(열·레벨·카테고리)까지 수행
+  function ingestSheet(workbook: XLSX.WorkBook, idx: number, name: string) {
+    const ws = workbook.Sheets[workbook.SheetNames[idx]]
+    const aoa = XLSX.utils
+      .sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
+      .filter((row) => row.some((c) => String(c).trim() !== ''))
+    setRows(aoa)
+    setSheetIdx(idx)
+    setPhase('config')
+    setDrafts([])
+    setApplyMsg('')
+    const nc = aoa.length ? Math.max(...aoa.map((r) => r.length)) : 0
+    const hr = findHeaderRow(aoa)
+    const det = detectColumns(aoa[hr] ?? [], nc)
+    setCfg(det.cfg)
+    setHeaderRow(hr)
+    setEditCols(false)
+    const body = aoa.slice(hr + 1)
+    const cats = Array.from(new Set(body.map((r) => String(r[det.cfg.cCat] ?? '').trim()).filter(Boolean)))
+    const lv = detectLevelFromName(name) || detectLevelFromName(workbook.SheetNames[idx]) || detectLevelByCats(cats)
+    setLevel(lv)
+    setDetectedLevel(lv)
+    setCatMap(suggestCatMap(cats, lv))
+  }
+
+  function handleFile(file: File) {
+    setFileName(file.name)
+    const r = new FileReader()
+    r.onload = (e) => {
+      const workbook = XLSX.read(e.target?.result, { type: 'array' })
+      setWb(workbook)
+      setSheetNames(workbook.SheetNames)
+      ingestSheet(workbook, 0, file.name)
+    }
+    r.readAsArrayBuffer(file)
+  }
+
+  async function startTranslate() {
+    const unmappedC = distinctCats.filter((c) => !catMap[c])
+    if (unmappedC.length) {
+      setApplyMsg(`카테고리 매핑 필요: ${unmappedC.join(', ')}`)
+      return
+    }
+    setApplyMsg('')
+    setSaveWarn(false)
+    setBusy(true)
+    setPhase('translating')
+    const skeleton: QDraft[] = data.map((row, i) => {
+      const optCols = cfg.cOptions.filter((c) => String(row[c] ?? '').trim() !== '')
+      return {
+        num: String(row[cfg.cNum] ?? i + 1),
+        excelCat: String(row[cfg.cCat] ?? '').trim(),
+        correctIndex: Math.max(0, (parseInt(String(row[cfg.cAns] ?? '1'), 10) || 1) - 1),
+        ko: {
+          prompt: String(row[cfg.cPrompt] ?? '').trim(),
+          options: optCols.map((c) => String(row[c])),
+          explanation: String(row[cfg.cExpl] ?? '').trim(),
+        },
+        tr: {},
+        issues: {},
+        error: '',
+        excluded: false,
+      }
+    })
+    const meta = { level, catMap, cfg, fileName }
+    setDrafts(skeleton)
+    setProgress({ done: 0, total: skeleton.length, note: '' })
+    setSavedJob(null)
+    persistJob(skeleton, meta)
+    const results = await runTranslation(
+      skeleton.map((d) => d.ko),
+      [...LANGS],
+      (done, total, note) => setProgress({ done, total, note }),
+      {
+        passcode,
+        onBatch: (rs) => {
+          const merged = mergeTransResults(skeleton, rs)
+          setDrafts(merged)
+          persistJob(merged, meta)
+        },
+      },
+    )
+    const built = mergeTransResults(skeleton, results)
+    setDrafts(built)
+    persistJob(built, meta)
+    setPhase('review')
+    setBusy(false)
+  }
+
+  // 저장된 작업 이어서: 미번역·실패 문항만 다시 호출
+  async function resumeJob() {
+    const job = savedJob ?? loadXlateJob()
+    if (!job) return
+    setSaveWarn(false)
+    setFileName(job.fileName)
+    setLevel(job.level)
+    setCfg(job.cfg)
+    setCatMap(job.catMap)
+    setDrafts(job.drafts)
+    setSavedJob(null)
+    const base = job.drafts
+    const meta = { level: job.level, catMap: job.catMap, cfg: job.cfg, fileName: job.fileName }
+    if (base.every(draftDone)) { setPhase('review'); return }
+    setBusy(true)
+    setPhase('translating')
+    const seed: (TransResult | undefined)[] = base.map((d) =>
+      draftDone(d) ? { tr: d.tr, issues: d.issues } : undefined,
+    )
+    setProgress({ done: seed.filter(Boolean).length, total: base.length, note: '이어서' })
+    const results = await runTranslation(
+      base.map((d) => d.ko),
+      [...LANGS],
+      (done, total, note) => setProgress({ done, total, note }),
+      {
+        seed,
+        passcode,
+        onBatch: (rs) => {
+          const merged = mergeTransResults(base, rs)
+          setDrafts(merged)
+          persistJob(merged, meta)
+        },
+      },
+    )
+    const built = mergeTransResults(base, results)
+    setDrafts(built)
+    persistJob(built, meta)
+    setPhase('review')
+    setBusy(false)
+  }
+
+  function hasProblem(d: QDraft): boolean {
+    if (d.error) return true
+    for (const l of LANGS) {
+      if (!d.tr[l] || !d.tr[l].prompt) return true
+      if ((d.issues[l] || []).length) return true
+    }
+    return false
+  }
+
+  function editTr(idx: number, lang: string, field: 'prompt' | 'explanation', val: string) {
+    setDrafts((ds) =>
+      ds.map((d, i) => {
+        if (i !== idx) return d
+        const cur = d.tr[lang] ?? { prompt: '', options: [...d.ko.options], explanation: '' }
+        return { ...d, tr: { ...d.tr, [lang]: { ...cur, [field]: val } }, error: '' }
+      }),
+    )
+  }
+  function editOpts(idx: number, lang: string, text: string) {
+    const opts = text.split('\n')
+    setDrafts((ds) =>
+      ds.map((d, i) => {
+        if (i !== idx) return d
+        const cur = d.tr[lang] ?? { prompt: '', options: [], explanation: '' }
+        return { ...d, tr: { ...d.tr, [lang]: { ...cur, options: opts } }, error: '' }
+      }),
+    )
+  }
+  function toggleExclude(idx: number) {
+    setDrafts((ds) => ds.map((d, i) => (i === idx ? { ...d, excluded: !d.excluded } : d)))
+  }
+  async function retranslateOne(idx: number) {
+    setBusy(true)
+    const d = drafts[idx]
+    const [res] = await runTranslation([d.ko], [...LANGS], undefined, { passcode })
+    setDrafts((ds) =>
+      ds.map((x, i) =>
+        i === idx
+          ? 'tr' in res
+            ? { ...x, tr: res.tr as Record<string, TransItem>, issues: res.issues, error: '' }
+            : { ...x, error: res.error }
+          : x,
+      ),
+    )
+    setBusy(false)
+  }
+
+  async function apply() {
+    const use = drafts.filter((d) => !d.excluded)
+    const bad = use.filter((d) => d.error || !catMap[d.excelCat])
+    if (bad.length) {
+      setApplyMsg(`반영 불가: 오류/미매핑 ${bad.length}개. 수정하거나 제외하세요.`)
+      return
+    }
+    const qrows = use.map((d) => {
+      const prompt_i18n: Record<string, string> = { ko: d.ko.prompt }
+      const options_i18n: Record<string, string[]> = { ko: d.ko.options }
+      const explanation_i18n: Record<string, string> = { ko: d.ko.explanation }
+      for (const l of LANGS) {
+        if (d.tr[l] && d.tr[l].prompt) {
+          prompt_i18n[l] = d.tr[l].prompt
+          options_i18n[l] = d.tr[l].options
+          explanation_i18n[l] = d.tr[l].explanation
+        }
+      }
+      return {
+        level,
+        category: catMap[d.excelCat],
+        correct_index: d.correctIndex,
+        prompt_i18n,
+        options_i18n,
+        explanation_i18n,
+        active: true,
+      }
+    })
+    setBusy(true)
+    setApplyMsg('반영 중…')
+    try {
+      const r = await callFunction<{ count: number }>('admin-test', { action: 'upsert', rows: qrows })
+      setApplyMsg(`✅ ${r.count}개 문항 반영 완료`)
+      discardJob()
+    } catch (e) {
+      setApplyMsg('반영 실패: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setBusy(false)
+  }
+
+  function download() {
+    const out0 = XLSX.utils.book_new()
+    const header = ['번호', '카테고리코드', '정답', '문제', '보기…', '해설']
+    for (const lang of ['ko', ...LANGS]) {
+      const out: string[][] = [header]
+      drafts.forEach((d) => {
+        const t = lang === 'ko' ? d.ko : d.tr[lang]
+        out.push([
+          d.num,
+          catMap[d.excelCat] ?? d.excelCat,
+          String(d.correctIndex + 1),
+          t?.prompt ?? '(미번역)',
+          ...(t?.options ?? []),
+          t?.explanation ?? '',
+        ])
+      })
+      XLSX.utils.book_append_sheet(out0, XLSX.utils.aoa_to_sheet(out), LANG_LABEL[lang])
+    }
+    XLSX.writeFile(out0, (fileName.replace(/\.(xlsx|csv)$/i, '') || 'questions') + '_번역.xlsx')
+  }
+
+  const shown = phase === 'review' ? drafts.map((d, i) => ({ d, i })).filter(({ d }) => !onlyProblems || hasProblem(d)) : []
+  const problemCount = drafts.filter(hasProblem).length
+
+  const cfgOk = cfg.cPrompt >= 0 && cfg.cAns >= 0 && cfg.cOptions.length >= 2
+  const colOpts = Array.from({ length: ncol }, (_, i) => ({
+    i,
+    label: `${colLetter(i)}열${headerRow >= 0 && rows?.[headerRow]?.[i] != null && String(rows[headerRow][i]).trim() ? ' · ' + String(rows[headerRow][i]).trim().slice(0, 12) : ''}`,
+  }))
+  const optCountOf = (row: string[]) => cfg.cOptions.filter((c) => String(row[c] ?? '').trim() !== '').length
+  const rowErrors = data
+    .map((row, i) => {
+      const errs: string[] = []
+      if (!String(row[cfg.cPrompt] ?? '').trim()) errs.push('문제 없음')
+      const oc = optCountOf(row)
+      if (oc < 2) errs.push('보기 2개 미만')
+      const ans = parseInt(String(row[cfg.cAns] ?? ''), 10)
+      if (!ans || ans < 1 || ans > oc) errs.push(`정답번호 범위(${String(row[cfg.cAns] ?? '-')})`)
+      return { i, num: String(row[cfg.cNum] ?? i + 1), errs }
+    })
+    .filter((r) => r.errs.length)
+  const unmapped = distinctCats.filter((c) => !catMap[c])
+  const levelMismatch = !!detectedLevel && level !== detectedLevel
+  const canTranslate = data.length > 0 && cfgOk && unmapped.length === 0 && rowErrors.length === 0
+
+  return (
+    <div>
+      <div className="admin-section">
+        <PasscodeField value={passcode} onChange={setPasscode} />
+      </div>
+
+      {/* 0) 이어서하기 배너 */}
+      {savedJob && phase === 'config' ? (
+        <div className="admin-section" style={{ borderColor: 'var(--ink)' }}>
+          <div className="admin-row">
+            <b>이어서 할 번역 작업이 있어요</b>
+            <span>{savedJob.fileName} · {savedJob.drafts.filter(draftDone).length}/{savedJob.drafts.length} 완료</span>
+          </div>
+          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+            <button className="btn-ink" disabled={busy} onClick={resumeJob}>이어서 하기</button>
+            <button className="dl-btn" disabled={busy} onClick={discardJob}>버리기</button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 1) 파일 + 설정 */}
+      <div className="admin-section">
+        <div className="up-step">
+          <div className="up-step-h"><span className="up-step-n">1</span> 엑셀 파일</div>
+          <label
+            className={`dropzone ${dragOver ? 'over' : ''} ${rows ? 'has-file' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f) }}
+          >
+            <input type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files && handleFile(e.target.files[0])} />
+            <div className="dz-icon">{rows ? '📊' : '⬆️'}</div>
+            {rows ? (
+              <>
+                <div className="dz-title">{fileName}</div>
+                <div className="dz-sub">{data.length}문항 · 다른 파일을 끌어다 놓거나 눌러서 교체</div>
+              </>
+            ) : (
+              <>
+                <div className="dz-title">엑셀 파일을 끌어다 놓거나 눌러서 선택</div>
+                <div className="dz-sub">.xlsx · .xls · .csv · 형식이 달라도 자동 인식</div>
+              </>
+            )}
+          </label>
+          {rows && sheetNames.length > 1 ? (
+            <div className="admin-row" style={{ marginTop: 10 }}>
+              <label>시트 선택&nbsp;
+                <select value={sheetIdx} onChange={(e) => wb && ingestSheet(wb, +e.target.value, fileName)}>
+                  {sheetNames.map((s, i) => <option key={i} value={i}>{s}</option>)}
+                </select>
+              </label>
+              <span className="admin-hint">시트가 여러 개예요 — 한국어 원본 시트를 고르세요.</span>
+            </div>
+          ) : null}
+        </div>
+
+        {rows ? (
+          <>
+            <div className="up-step">
+              <div className="up-step-h"><span className="up-step-n">2</span> 레벨 확인</div>
+              <div className="admin-row">
+                <label>레벨&nbsp;
+                  <select value={level} onChange={(e) => { const lv = +e.target.value; setLevel(lv); setCatMap(suggestCatMap(distinctCats, lv)) }}>
+                    {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
+                  </select>
+                </label>
+                {detectedLevel ? (
+                  <span className="admin-hint">자동 감지: <b>Lv.{detectedLevel}</b>{detectedLevel === level ? ' (일치 ✓)' : ''}</span>
+                ) : null}
+              </div>
+              {levelMismatch ? (
+                <div className="admin-warn">⚠ 파일은 <b>Lv.{detectedLevel}</b>로 보이는데 <b>Lv.{level}</b>을 선택했어요. 정말 맞나요?</div>
+              ) : null}
+            </div>
+
+            <div className="up-step">
+              <div className="up-step-h">
+                <span className="up-step-n">3</span> 열 인식 · 미리보기
+                <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={() => setEditCols((v) => !v)}>{editCols ? '닫기' : '열 수정'}</button>
+              </div>
+              {!cfgOk ? <div className="admin-warn">⚠ 문제/정답/보기 열을 자동으로 못 찾았어요. <b>‘열 수정’</b>에서 직접 지정하세요.</div> : null}
+              {editCols ? (
+                <div className="col-map">
+                  {([['번호', 'cNum'], ['영역', 'cCat'], ['문제', 'cPrompt'], ['정답번호', 'cAns'], ['해설', 'cExpl']] as const).map(([lbl, key]) => (
+                    <div key={key} className="admin-row">
+                      <span style={{ width: 64, color: '#6b7686' }}>{lbl}</span>
+                      <select value={cfg[key]} onChange={(e) => setCfg((c) => ({ ...c, [key]: +e.target.value }))}>
+                        {colOpts.map((o) => <option key={o.i} value={o.i}>{o.label}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                  <div className="admin-row" style={{ alignItems: 'flex-start' }}>
+                    <span style={{ width: 64, color: '#6b7686', paddingTop: 6 }}>보기</span>
+                    <div className="col-chips">
+                      {colOpts.map((o) => (
+                        <label key={o.i} className={`col-chip ${cfg.cOptions.includes(o.i) ? 'on' : ''}`}>
+                          <input type="checkbox" checked={cfg.cOptions.includes(o.i)} onChange={() => setCfg((c) => ({ ...c, cOptions: c.cOptions.includes(o.i) ? c.cOptions.filter((x) => x !== o.i) : [...c.cOptions, o.i].sort((a, b) => a - b) }))} />
+                          {o.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              <div className="up-preview">
+                {data.slice(0, 2).map((row, i) => {
+                  const opts = cfg.cOptions.filter((c) => String(row[c] ?? '').trim() !== '')
+                  const ans = parseInt(String(row[cfg.cAns] ?? ''), 10)
+                  return (
+                    <div key={i} className="up-prev-item">
+                      <div className="up-prev-q"><b>문제</b> {String(row[cfg.cPrompt] ?? '').trim() || <em className="admin-hint">(비어있음)</em>}</div>
+                      <ol>{opts.map((c, k) => <li key={c} className={ans === k + 1 ? 'ans' : ''}>{String(row[c])}{ans === k + 1 ? ' ✓정답' : ''}</li>)}</ol>
+                      <div className="admin-hint">영역: {String(row[cfg.cCat] ?? '').trim() || '-'} · 정답번호: {String(row[cfg.cAns] ?? '').trim() || '-'}</div>
+                    </div>
+                  )
+                })}
+                {!data.length ? <div className="admin-empty">데이터 행이 없습니다.</div> : null}
+              </div>
+              <div className="dz-opt admin-row">
+                <label>머리글 행&nbsp;
+                  <select value={headerRow} onChange={(e) => changeHeaderRow(+e.target.value)}>
+                    <option value={-1}>없음</option>
+                    {(rows ?? []).slice(0, Math.min(15, rows?.length ?? 0)).map((_, i) => <option key={i} value={i}>{i + 1}행</option>)}
+                  </select>
+                </label>
+                <span className="admin-hint">자동 감지됨 · 미리보기가 어긋나면 바꾸세요</span>
+              </div>
+            </div>
+
+            {distinctCats.length ? (
+              <div className="up-step">
+                <div className="up-step-h"><span className="up-step-n">4</span> 카테고리 매핑</div>
+                <p className="admin-desc">엑셀 영역 → <b>Lv.{level} 6영역 코드</b>. 비슷한 걸 미리 골라뒀어요 — 확인/수정만 하면 됩니다.</p>
+                <div className="admin-catmap">
+                  {distinctCats.map((c) => (
+                    <div key={c} className={`admin-row ${catMap[c] ? '' : 'prob'}`}>
+                      <span className="admin-cat">{c}</span> →
+                      <select value={catMap[c] ?? ''} onChange={(e) => setCatMap((m) => ({ ...m, [c]: e.target.value }))}>
+                        <option value="">선택…</option>
+                        {axes.map((a) => <option key={a.key} value={a.key}>{a.label} ({a.key})</option>)}
+                      </select>
+                      {catMap[c] ? null : <span className="admin-hint">미매핑</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="up-step">
+              {!cfgOk || unmapped.length || rowErrors.length ? (
+                <div className="admin-warn">
+                  번역/저장 전 고칠 것:
+                  {!cfgOk ? <div>· 문제/정답/보기 열이 지정되지 않음</div> : null}
+                  {unmapped.length ? <div>· 카테고리 미매핑 {unmapped.length}개: {unmapped.join(', ')}</div> : null}
+                  {rowErrors.length ? <div>· 문항 오류 {rowErrors.length}개 (예: {rowErrors.slice(0, 3).map((r) => `${r.num}번 ${r.errs[0]}`).join(' / ')}{rowErrors.length > 3 ? ' …' : ''})</div> : null}
+                </div>
+              ) : data.length ? (
+                <div className="admin-msg">✅ {data.length}문항 검증 통과 — 번역 시작 가능</div>
+              ) : null}
+              <button className="btn-ink" disabled={busy || !canTranslate} onClick={startTranslate} style={{ marginTop: 12 }}>
+                {phase === 'translating' ? '번역 중…' : '번역 시작'}
+              </button>
+              {applyMsg ? <div className="admin-msg" style={{ marginTop: 8 }}>{applyMsg}</div> : null}
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* 2) 진행 */}
+      {phase === 'translating' ? (
+        <div className="admin-section">
+          <div className="admin-bar"><i style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} /></div>
+          <div>{progress.done}/{progress.total} {progress.note}</div>
+          <div className="admin-msg" style={{ marginTop: 8 }}>💾 진행상황이 자동 저장돼요 — 페이지를 나가도 다시 들어오면 이어서 할 수 있어요.</div>
+          {saveWarn ? (
+            <div className="admin-msg" style={{ marginTop: 6, color: 'var(--danger-fg, #b91c1c)' }}>
+              ⚠️ 자동저장 용량이 초과돼 일부는 복구가 안 될 수 있어요(배치가 매우 큰 경우). 번역은 계속 진행됩니다.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* 3) 검토 */}
+      {phase === 'review' ? (
+        <div className="admin-section">
+          <div className="admin-row">
+            <b>검토</b>
+            <span>문제 {problemCount}개</span>
+            <label><input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} /> 문제만 보기</label>
+            <span className="admin-langtabs">
+              {LANGS.map((l) => {
+                const cnt = drafts.filter((d) => d.error || !d.tr[l]?.prompt || (d.issues[l] || []).length).length
+                return (
+                  <button key={l} className={`${reviewLang === l ? 'on' : ''} ${cnt ? 'has-prob' : ''}`} onClick={() => setReviewLang(l)}>
+                    {LANG_LABEL[l]}{cnt ? ` (${cnt})` : ''}
+                  </button>
+                )
+              })}
+            </span>
+          </div>
+
+          <table className="admin-table">
+            <thead><tr><th>#</th><th>한국어</th><th>{LANG_LABEL[reviewLang]} (편집)</th><th>상태</th><th>제외</th></tr></thead>
+            <tbody>
+              {shown.map(({ d, i }) => {
+                const t = d.tr[reviewLang]
+                const langProbs = LANGS.map((l) => {
+                  const ps = [...(d.issues[l] || [])]
+                  if (!d.tr[l] || !d.tr[l].prompt) ps.unshift('미번역')
+                  return ps.length ? `${LANG_LABEL[l]} ${ps.join('/')}` : ''
+                }).filter(Boolean)
+                const probs = d.error ? [d.error, ...langProbs] : langProbs
+                return (
+                  <tr key={i} className={probs.length ? 'prob' : ''}>
+                    <td>{d.num}</td>
+                    <td className="admin-ko">
+                      <div className="admin-q">{d.ko.prompt}</div>
+                      <ol>{d.ko.options.map((o, k) => <li key={k} className={k === d.correctIndex ? 'ans' : ''}>{o}</li>)}</ol>
+                    </td>
+                    <td>
+                      <input className="admin-in" value={t?.prompt ?? ''} placeholder="문제" onChange={(e) => editTr(i, reviewLang, 'prompt', e.target.value)} />
+                      <textarea className="admin-ta" rows={d.ko.options.length} placeholder="보기(줄당 1개)" value={(t?.options ?? []).join('\n')} onChange={(e) => editOpts(i, reviewLang, e.target.value)} />
+                      <textarea className="admin-ta" rows={2} placeholder="해설" value={t?.explanation ?? ''} onChange={(e) => editTr(i, reviewLang, 'explanation', e.target.value)} />
+                      <button className="admin-mini" disabled={busy} onClick={() => retranslateOne(i)}>이 문항 재번역</button>
+                    </td>
+                    <td className="admin-status">{probs.length ? probs.join(', ') : 'OK'}</td>
+                    <td><input type="checkbox" checked={d.excluded} onChange={() => toggleExclude(i)} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+
+          <div className="admin-row" style={{ marginTop: 14 }}>
+            <button className="dl-btn" onClick={download}>엑셀 다운로드</button>
+            <button className="btn-ink" disabled={busy} onClick={apply}>DB에 반영</button>
+            {applyMsg ? <span className="admin-msg">{applyMsg}</span> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+// ============================ 문항 생성 탭 (KB 파이프라인) ============================
+//  자료 넣기(kb-extract: recommend/fetch/extract → kb-save) → 문항 생성(kb-generate)
+//  → 발행(kb-publish) → 임베딩 백필(kb-embed-backfill). 모두 x-passcode 필요.
+interface ExSource { title: string; url: string; why: string }
+interface ExChunk { text: string; axis: string; topic: string; quote_ok: boolean; excluded: boolean }
+interface GenVerify { supported: boolean; distractorsOk: boolean; suspect: boolean; reason: string }
+interface GenDraft {
+  axis: string | null
+  topic: string | null
+  chunkId?: string
+  prompt: string
+  options: string[]
+  correctIndex: number
+  explanation: string
+  quote: string
+  quote_ok: boolean
+  lint: string[]
+  verify: GenVerify
+  suspect: boolean
+  excluded: boolean
+}
+interface GenQResp {
+  axis: string | null; topic: string | null; chunkId?: string
+  prompt: string; options: string[]; correctIndex: number; explanation: string
+  quote: string; quote_ok: boolean; lint?: string[]; verify?: Partial<GenVerify>; suspect?: boolean
+}
+
+function GenerateTab() {
+  const [passcode, setPasscode] = usePasscode()
+  const [level, setLevel] = useState(1)
+  const [selAxes, setSelAxes] = useState<string[]>([])
+
+  // INPUT
+  const [url, setUrl] = useState('')
+  const [srcTitle, setSrcTitle] = useState('')
+  const [text, setText] = useState('')
+  const [sources, setSources] = useState<ExSource[]>([])
+  const [chunks, setChunks] = useState<ExChunk[]>([])
+  const [extractNotes, setExtractNotes] = useState<string[]>([])
+  const [embed, setEmbed] = useState(false)
+  const [busyIn, setBusyIn] = useState('')
+  const [inMsg, setInMsg] = useState('')
+
+  // GENERATE
+  const [count, setCount] = useState(5)
+  const [guidance, setGuidance] = useState('')
+  const [drafts, setDrafts] = useState<GenDraft[]>([])
+  const [genNotes, setGenNotes] = useState<string[]>([])
+  const [busyGen, setBusyGen] = useState(false)
+  const [genMsg, setGenMsg] = useState('')
+
+  // PUBLISH
+  const [busyPub, setBusyPub] = useState(false)
+  const [pubMsg, setPubMsg] = useState('')
+
+  // BACKFILL
+  const [bfLimit, setBfLimit] = useState(200)
+  const [busyBf, setBusyBf] = useState(false)
+  const [bfMsg, setBfMsg] = useState('')
+
+  const levelAxes = axesForLevel(level, 'ko')
+  const pcHead = () => (passcode ? { 'x-passcode': passcode } : undefined)
+  function axesPayload(): { key: string; label: string }[] {
+    const chosen = levelAxes.filter((a) => selAxes.includes(a.key))
+    const use = chosen.length ? chosen : levelAxes
+    return use.map((a) => ({ key: a.key, label: a.label }))
+  }
+  function toggleAxis(key: string) {
+    setSelAxes((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]))
+  }
+  const errStr = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+  async function recommend() {
+    setBusyIn('recommend'); setInMsg('')
+    try {
+      const r = await callFunction<{ sources: ExSource[] }>('kb-extract', { mode: 'recommend', level, axes: axesPayload() }, pcHead())
+      setSources(r.sources ?? [])
+      if (!r.sources?.length) setInMsg('추천 출처가 없습니다.')
+    } catch (e) { setInMsg('추천 실패: ' + errStr(e)) }
+    setBusyIn('')
+  }
+  async function fetchUrl() {
+    const u = url.trim()
+    if (!/^https?:\/\//i.test(u)) { setInMsg('올바른 URL이 아닙니다.'); return }
+    setBusyIn('fetch'); setInMsg('')
+    try {
+      const r = await callFunction<{ text: string; url: string; chars: number }>('kb-extract', { mode: 'fetch', url: u }, pcHead())
+      setText(r.text ?? '')
+      if (!srcTitle) setSrcTitle(u)
+      setInMsg(`가져옴: ${r.chars ?? 0}자`)
+    } catch (e) { setInMsg('가져오기 실패: ' + errStr(e)) }
+    setBusyIn('')
+  }
+  async function extract() {
+    if (!text.trim()) { setInMsg('원문 텍스트가 비어 있습니다.'); return }
+    setBusyIn('extract'); setInMsg('')
+    try {
+      const r = await callFunction<{ chunks: { text: string; topic: string; axis: string; quote_ok: boolean }[]; notes: string[] }>(
+        'kb-extract', { mode: 'extract', text: text.trim(), level, axes: axesPayload() }, pcHead(),
+      )
+      setChunks((r.chunks ?? []).map((c) => ({ text: c.text, axis: c.axis ?? '', topic: c.topic ?? '', quote_ok: !!c.quote_ok, excluded: !c.quote_ok })))
+      setExtractNotes(r.notes ?? [])
+      setInMsg(`청크 ${r.chunks?.length ?? 0}개 추출 (원문에 없는 청크는 기본 제외됨)`)
+    } catch (e) { setInMsg('추출 실패: ' + errStr(e)) }
+    setBusyIn('')
+  }
+  async function save() {
+    const use = chunks.filter((c) => !c.excluded && c.text.trim())
+    if (!use.length) { setInMsg('저장할 청크가 없습니다.'); return }
+    setBusyIn('save'); setInMsg('')
+    try {
+      const r = await callFunction<{ saved: number; skipped: number }>(
+        'kb-save',
+        { level, source: { url: url.trim() || undefined, title: srcTitle.trim() || undefined }, embed, chunks: use.map((c) => ({ text: c.text, axis: c.axis, topic: c.topic })) },
+        pcHead(),
+      )
+      setInMsg(`✅ 저장 ${r.saved}개 (중복 건너뜀 ${r.skipped})`)
+    } catch (e) { setInMsg('저장 실패: ' + errStr(e)) }
+    setBusyIn('')
+  }
+  function updChunk(i: number, patch: Partial<ExChunk>) {
+    setChunks((cs) => cs.map((c, k) => (k === i ? { ...c, ...patch } : c)))
+  }
+
+  async function generate() {
+    setBusyGen(true); setGenMsg(''); setPubMsg('')
+    try {
+      const r = await callFunction<{ questions: GenQResp[]; available: number; used: number; notes: string[] }>(
+        'kb-generate',
+        { level, axes: axesPayload(), count, levelGuidance: guidance.split('\n').map((s) => s.trim()).filter(Boolean) },
+        pcHead(),
+      )
+      setDrafts((r.questions ?? []).map((q) => ({
+        axis: q.axis ?? null, topic: q.topic ?? null, chunkId: q.chunkId,
+        prompt: q.prompt, options: q.options, correctIndex: q.correctIndex, explanation: q.explanation,
+        quote: q.quote, quote_ok: !!q.quote_ok, lint: q.lint ?? [],
+        verify: { supported: q.verify?.supported !== false, distractorsOk: q.verify?.distractorsOk !== false, suspect: !!q.verify?.suspect, reason: q.verify?.reason ?? '' },
+        suspect: !!q.suspect, excluded: false,
+      })))
+      setGenNotes(r.notes ?? [])
+      setGenMsg(`생성 ${r.used}개 (자료 ${r.available}개 중)`)
+    } catch (e) { setGenMsg('생성 실패: ' + errStr(e)) }
+    setBusyGen(false)
+  }
+  function updDraft(i: number, patch: Partial<GenDraft>) {
+    setDrafts((ds) => ds.map((d, k) => (k === i ? { ...d, ...patch } : d)))
+  }
+  function updDraftOpt(i: number, oi: number, val: string) {
+    setDrafts((ds) => ds.map((d, k) => { if (k !== i) return d; const o = [...d.options]; o[oi] = val; return { ...d, options: o } }))
+  }
+
+  async function publish() {
+    const use = drafts.filter((d) => !d.excluded && d.prompt.trim() && d.options.length === 4)
+    if (!use.length) { setPubMsg('발행할 문항이 없습니다.'); return }
+    setBusyPub(true); setPubMsg('')
+    try {
+      const r = await callFunction<{ published: number; failed: number; notes: string[] }>(
+        'kb-publish',
+        { questions: use.map((d) => ({ level, axis: d.axis ?? '', prompt: d.prompt, options: d.options, correctIndex: d.correctIndex, explanation: d.explanation })) },
+        pcHead(),
+      )
+      setPubMsg(`✅ 발행 ${r.published}개${r.failed ? ` · 실패 ${r.failed}` : ''}${r.notes?.length ? ' · ' + r.notes.join(' / ') : ''}`)
+    } catch (e) { setPubMsg('발행 실패: ' + errStr(e)) }
+    setBusyPub(false)
+  }
+
+  async function backfill() {
+    setBusyBf(true); setBfMsg('')
+    try {
+      const r = await callFunction<{ embedded: number; remaining: number; done: boolean; notes: string[] }>(
+        'kb-embed-backfill', { limit: bfLimit }, pcHead(),
+      )
+      setBfMsg(`임베딩 ${r.embedded}개 · 남음 ${r.remaining}${r.done ? ' · 완료' : ''}${r.notes?.length ? ' · ' + r.notes.join(' / ') : ''}`)
+    } catch (e) { setBfMsg('백필 실패: ' + errStr(e)) }
+    setBusyBf(false)
+  }
+
+  const draftBad = drafts.filter((d) => d.suspect).length
+
+  return (
+    <div>
+      <div className="admin-section">
+        <PasscodeField value={passcode} onChange={setPasscode} />
+        <p className="admin-desc" style={{ marginTop: 8 }}>
+          <b>자료 넣기</b>(출처 추천·가져오기·청크 추출 → 지식 저장소 저장) → <b>문항 생성</b>(초안) → <b>발행</b>(번역+문제은행 반영) 순서로 진행합니다.
+        </p>
+        <div className="admin-toolbar" style={{ marginTop: 8 }}>
+          <label>레벨 <select value={level} onChange={(e) => { setLevel(+e.target.value); setSelAxes([]) }}>
+            {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
+          </select></label>
+          <span className="admin-hint">영역(미선택 시 전체):</span>
+          <div className="col-chips">
+            {levelAxes.map((a) => (
+              <label key={a.key} className={`col-chip ${selAxes.includes(a.key) ? 'on' : ''}`}>
+                <input type="checkbox" checked={selAxes.includes(a.key)} onChange={() => toggleAxis(a.key)} />
+                {a.short}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* A) 자료 넣기 */}
+      <div className="admin-section">
+        <h3>① 자료 넣기 <span className="admin-hint">지식 저장소(kb_chunks) 적재</span></h3>
+
+        <div className="admin-toolbar">
+          <button className="admin-mini" disabled={!!busyIn} onClick={recommend}>{busyIn === 'recommend' ? '검색 중…' : '출처 추천받기(AI)'}</button>
+          <input className="admin-search" placeholder="출처 URL (https://…)" value={url} onChange={(e) => setUrl(e.target.value)} style={{ flex: 1, minWidth: 220 }} />
+          <button className="admin-mini" disabled={!!busyIn} onClick={fetchUrl}>{busyIn === 'fetch' ? '가져오는 중…' : 'URL 가져오기'}</button>
+        </div>
+
+        {sources.length ? (
+          <div className="ev-list" style={{ marginTop: 8 }}>
+            {sources.map((s, i) => (
+              <div key={i} className="ev-card">
+                <div className="ev-head">
+                  <a href={s.url} target="_blank" rel="noreferrer" style={{ fontWeight: 700, color: '#3f8fd6' }}>{s.title || s.url}</a>
+                  <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={() => { setUrl(s.url); setSrcTitle(s.title || '') }}>URL 채우기</button>
+                </div>
+                {s.why ? <p className="admin-hint" style={{ margin: '4px 0 0' }}>{s.why}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="admin-row" style={{ marginTop: 10 }}>
+          <input className="admin-search" placeholder="출처 제목(선택)" value={srcTitle} onChange={(e) => setSrcTitle(e.target.value)} style={{ maxWidth: 320 }} />
+        </div>
+        <textarea className="admin-ta" rows={8} placeholder="원문 텍스트 (URL 가져오기로 채우거나 직접 붙여넣기)" value={text} onChange={(e) => setText(e.target.value)} style={{ marginTop: 8, width: '100%' }} />
+        <div className="admin-row" style={{ marginTop: 8 }}>
+          <button className="btn-ink" disabled={!!busyIn} onClick={extract}>{busyIn === 'extract' ? '추출 중…' : '청크 추출'}</button>
+          {inMsg ? <span className="admin-msg">{inMsg}</span> : null}
+        </div>
+        {extractNotes.length ? <div className="admin-warn" style={{ marginTop: 8 }}>{extractNotes.map((n, i) => <div key={i}>· {n}</div>)}</div> : null}
+
+        {chunks.length ? (
+          <>
+            <table className="admin-table" style={{ marginTop: 10 }}>
+              <thead><tr><th>본문</th><th>영역</th><th>토픽</th><th>원문검증</th><th>제외</th></tr></thead>
+              <tbody>
+                {chunks.map((c, i) => (
+                  <tr key={i} className={!c.quote_ok ? 'prob' : ''}>
+                    <td style={{ maxWidth: 420, fontSize: 13 }}>{c.text}</td>
+                    <td>
+                      <select value={c.axis} onChange={(e) => updChunk(i, { axis: e.target.value })}>
+                        <option value="">(미배정)</option>
+                        {levelAxes.map((a) => <option key={a.key} value={a.key}>{a.short}</option>)}
+                      </select>
+                    </td>
+                    <td><input className="admin-in" value={c.topic} onChange={(e) => updChunk(i, { topic: e.target.value })} style={{ minWidth: 100 }} /></td>
+                    <td>{c.quote_ok ? <span className="badge ok">원문일치</span> : <span className="badge none">불일치</span>}</td>
+                    <td><input type="checkbox" checked={c.excluded} onChange={() => updChunk(i, { excluded: !c.excluded })} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="admin-row" style={{ marginTop: 10 }}>
+              <label><input type="checkbox" checked={embed} onChange={(e) => setEmbed(e.target.checked)} style={{ width: 'auto' }} /> 임베딩까지 생성(중복검사·유사도 · 할당량 소모)</label>
+              <button className="btn-ink" disabled={!!busyIn} onClick={save}>{busyIn === 'save' ? '저장 중…' : '지식 저장소에 저장'}</button>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* B) 문항 생성 */}
+      <div className="admin-section">
+        <h3>② 문항 생성 <span className="admin-hint">저장된 자료에서 객관식 초안 생성 (발행 아님)</span></h3>
+        <div className="admin-toolbar">
+          <label>개수 <input type="number" min={1} max={20} value={count} onChange={(e) => setCount(Math.min(20, Math.max(1, +e.target.value || 1)))} style={{ width: 64 }} /></label>
+          <button className="btn-ink" disabled={busyGen} onClick={generate}>{busyGen ? '생성 중…' : '문항 생성'}</button>
+          {genMsg ? <span className="admin-msg">{genMsg}</span> : null}
+        </div>
+        <textarea className="admin-ta" rows={2} placeholder="레벨 출제 지침(선택, 줄당 1개) — 난이도·중점" value={guidance} onChange={(e) => setGuidance(e.target.value)} style={{ width: '100%', marginTop: 8 }} />
+        {genNotes.length ? <div className="admin-warn" style={{ marginTop: 8 }}>{genNotes.map((n, i) => <div key={i}>· {n}</div>)}</div> : null}
+
+        {drafts.length ? (
+          <>
+            <p className="admin-hint" style={{ margin: '10px 0 6px' }}>정답 의심 {draftBad}개 — 빨간 문항은 정답 근거·오답 검토를 집중하세요.</p>
+            {drafts.map((d, i) => (
+              <div key={i} className={`ans-item ${d.suspect ? 'no' : 'ok'}`} style={{ marginBottom: 10 }}>
+                <div className="admin-row" style={{ marginBottom: 4 }}>
+                  <span className="admin-hint">{d.axis ? axisDef(d.axis, 'ko').short : '(미배정)'}{d.topic ? ` · ${d.topic}` : ''}</span>
+                  {d.suspect ? <span className="badge none" style={{ color: '#dc2626' }}>정답 의심</span> : <span className="badge ok">양호</span>}
+                  {!d.quote_ok ? <span className="badge low">인용 불일치</span> : null}
+                  <label style={{ marginLeft: 'auto' }}><input type="checkbox" checked={d.excluded} onChange={() => updDraft(i, { excluded: !d.excluded })} /> 제외</label>
+                </div>
+                <input className="admin-in" value={d.prompt} onChange={(e) => updDraft(i, { prompt: e.target.value })} placeholder="문제" />
+                <div className="opt-editor" style={{ marginTop: 6 }}>
+                  {d.options.map((o, k) => (
+                    <div key={k} className={`opt-row ${d.correctIndex === k ? 'is-correct' : ''}`}>
+                      <label className="opt-radio" title="정답으로 지정"><input type="radio" name={`gc-${i}`} checked={d.correctIndex === k} onChange={() => updDraft(i, { correctIndex: k })} /></label>
+                      <span className="opt-num">{k + 1}</span>
+                      <input className="opt-in" value={o} onChange={(e) => updDraftOpt(i, k, e.target.value)} placeholder={`보기 ${k + 1}`} />
+                    </div>
+                  ))}
+                </div>
+                <textarea className="admin-ta" rows={2} value={d.explanation} onChange={(e) => updDraft(i, { explanation: e.target.value })} placeholder="해설" style={{ marginTop: 6 }} />
+                {d.quote ? <div className="admin-hint" style={{ marginTop: 4 }}>📎 인용: {d.quote}</div> : null}
+                {d.lint.length ? <div className="admin-hint" style={{ color: '#b91c1c' }}>규칙: {d.lint.join(', ')}</div> : null}
+                {d.verify.reason ? <div className="admin-hint">검증: {d.verify.reason}</div> : null}
+              </div>
+            ))}
+            <div className="admin-row" style={{ marginTop: 10 }}>
+              <button className="btn-ink" disabled={busyPub} onClick={publish}>{busyPub ? '발행 중…' : '③ 발행 (번역 + 문제은행 반영)'}</button>
+              {pubMsg ? <span className="admin-msg">{pubMsg}</span> : null}
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* D) 임베딩 백필 */}
+      <div className="admin-section">
+        <h3>임베딩 백필 <span className="admin-hint">embed 없이 저장한 청크에 벡터 채우기</span></h3>
+        <div className="admin-toolbar">
+          <label>한 번에 <input type="number" min={1} max={500} value={bfLimit} onChange={(e) => setBfLimit(Math.min(500, Math.max(1, +e.target.value || 1)))} style={{ width: 72 }} />개</label>
+          <button className="admin-mini" disabled={busyBf} onClick={backfill}>{busyBf ? '처리 중…' : '임베딩 백필 실행'}</button>
+          {bfMsg ? <span className="admin-msg">{bfMsg}</span> : null}
+        </div>
       </div>
     </div>
   )
