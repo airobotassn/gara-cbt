@@ -2,6 +2,47 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import type { AdminListResponse, AdminAttemptRow, AdminDetailResponse } from '../lib/types'
+import LevelTestAdmin from './AdminLevelTest'
+
+// 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
+//  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
+//  - "레벨테스트" = 이관된 레벨테스트 관리(<LevelTestAdmin/>, admin-test 함수 호출).
+type TopTab = 'caris' | 'level'
+export default function Admin() {
+  const { isFullUser, loginWithGoogle } = useAuth()
+  const [topTab, setTopTab] = useState<TopTab>('caris')
+
+  // 로그인 게이트는 최상위에서 공유(두 탭 공통). 세부 권한은 각 탭이 서버로 확인.
+  if (!isFullUser) {
+    return (
+      <div className="wrap">
+        <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420, margin: '40px auto' }}>
+          <h2 className="exam-title">관리자 로그인</h2>
+          <p className="exam-sub">관리자 계정으로 로그인해 주세요.</p>
+          <button className="exam-btn" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
+            구글로 로그인
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="wrap" style={{ paddingBottom: 0 }}>
+        <div className="admin-tabs" style={{ marginTop: 10 }}>
+          <button className={topTab === 'caris' ? 'on' : ''} onClick={() => setTopTab('caris')}>
+            CARIS 시험
+          </button>
+          <button className={topTab === 'level' ? 'on' : ''} onClick={() => setTopTab('level')}>
+            레벨테스트
+          </button>
+        </div>
+      </div>
+      {topTab === 'caris' ? <CarisExamAdmin /> : <LevelTestAdmin />}
+    </>
+  )
+}
 
 const PAGE = 50
 
@@ -33,7 +74,8 @@ function csvCell(v: unknown): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-export default function Admin() {
+// CARIS 시험(CBT) 백오피스 — 제출 답안 조회. (기존 Admin 본문 그대로, admin 함수 호출)
+function CarisExamAdmin() {
   const { isFullUser, loginWithGoogle } = useAuth()
   const [state, setState] = useState<'checking' | 'denied' | 'ok'>('checking')
   const [rows, setRows] = useState<AdminAttemptRow[]>([])
