@@ -161,11 +161,11 @@ export default function Guide() {
                 </div>
 
                 {/* 합격 기준 */}
-                <div className="flex items-center gap-3 mt-6 bg-secondary/10 rounded-xl px-5 py-4">
-                  <span className="material-symbols-outlined text-secondary text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                <div className="flex items-start gap-3 mt-6 bg-secondary/10 rounded-xl px-5 py-4">
+                  <span className="material-symbols-outlined text-secondary text-[24px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                   <div>
                     <div className="font-label-md text-label-md text-on-surface-variant font-semibold">합격 기준</div>
-                    <div className="font-title-md text-title-md text-on-surface font-bold break-keep">{lv.pass}</div>
+                    <div className="font-title-md text-body-md md:text-title-md text-on-surface font-bold break-keep">{lv.pass}</div>
                   </div>
                 </div>
               </div>
