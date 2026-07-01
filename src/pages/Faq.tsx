@@ -41,6 +41,17 @@ export default function Faq() {
       : f.cat === cat,
   )
 
+  const helpBox = (
+    <div className="p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
+      <h3 className="font-title-md font-bold mb-2">{t('faq.help_title')}</h3>
+      <p className="text-sm text-on-surface-variant mb-4">{t('faq.help_body')}</p>
+      <Link className="group inline-flex items-center gap-1.5 text-primary font-label-md hover:text-primary-container transition-colors" to="/notice">
+        <span className="group-hover:underline">{t('faq.help_link')}</span>
+        <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-0.5">arrow_forward</span>
+      </Link>
+    </div>
+  )
+
   return (
     <div className="bg-background text-on-background font-body-md min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Main Content Canvas (헤더 없음 — FAB이 네비) */}
@@ -112,14 +123,7 @@ export default function Faq() {
                   )
                 })}
               </nav>
-              <div className="mt-12 p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
-                <h3 className="font-title-md font-bold mb-2">{t('faq.help_title')}</h3>
-                <p className="text-sm text-on-surface-variant mb-4">{t('faq.help_body')}</p>
-                <Link className="group inline-flex items-center gap-1.5 text-primary font-label-md hover:text-primary-container transition-colors" to="/notice">
-                  <span className="group-hover:underline">{t('faq.help_link')}</span>
-                  <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-0.5">arrow_forward</span>
-                </Link>
-              </div>
+              <div className="hidden lg:block mt-12">{helpBox}</div>
             </div>
           </aside>
 
@@ -176,6 +180,7 @@ export default function Faq() {
               )}
             </div>
           </div>
+          <div className="lg:hidden">{helpBox}</div>
         </div>
       </main>
 

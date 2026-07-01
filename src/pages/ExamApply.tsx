@@ -112,10 +112,27 @@ export default function ExamApply() {
                         ))}
                       </ul>
                     </div>
-                    <div className="flex flex-col gap-1.5 font-body-md text-body-md">
-                      <span className="text-on-surface-variant">검정 방법 <span className="text-on-surface font-semibold break-keep">{lv.method}</span></span>
-                      {lv.practical && <span className="text-on-surface-variant">실기 <span className="text-on-surface font-semibold break-keep">{lv.practical}</span></span>}
-                      <span className="text-on-surface-variant">합격 기준 <span className="text-on-surface font-semibold break-keep">{lv.pass}</span></span>
+                    <div className="flex flex-col gap-3">
+                      {lv.method && (
+                        <div>
+                          <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">검정 방법</span>
+                          <div className="mt-1 flex flex-col gap-0.5">
+                            {lv.method.split(' · ').map((m, i) => (
+                              <p key={i} className="font-body-md text-body-md text-on-surface font-medium break-keep">{m}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {lv.practical && (
+                        <div>
+                          <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">실기</span>
+                          <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{lv.practical}</p>
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">합격 기준</span>
+                        <p className="mt-1 font-body-md text-body-md text-on-surface font-semibold break-keep">{lv.pass}</p>
+                      </div>
                     </div>
                   </div>
                 </>
@@ -128,9 +145,11 @@ export default function ExamApply() {
                       <span className="font-body-md text-body-md text-on-surface-variant break-keep">{cur.eligibility}</span>
                     </div>
                     <p className="font-body-md text-body-md text-on-surface-variant break-keep">{cur.caption}</p>
-                    <div className="font-body-md text-body-md text-on-surface-variant">
-                      시험 구성 <span className="text-on-surface font-semibold">{cur.format}</span>
-                      <span className="text-outline"> ({cur.formatSub})</span>
+                    <div>
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">시험 구성</span>
+                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">
+                        {cur.format} <span className="text-on-surface-variant font-normal">({cur.formatSub})</span>
+                      </p>
                     </div>
                     <div>
                       <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">급수 판정</span>

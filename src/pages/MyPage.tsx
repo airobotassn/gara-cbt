@@ -95,7 +95,7 @@ export default function MyPage() {
 
         <div className="max-w-5xl mx-auto w-full relative z-10">
           {/* Page Header */}
-          <header className="mb-12">
+          <header className="mb-8 md:mb-12">
             <h1 className="font-display-lg text-4xl md:text-display-lg font-bold text-on-surface mb-3 tracking-tight break-keep">{t('mypage.title')}</h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant">
               {t('mypage.greeting_hello')}<strong className="text-primary font-bold">{t('mypage.greeting_name', { name })}</strong>{t('mypage.greeting_tail')}
@@ -103,15 +103,15 @@ export default function MyPage() {
           </header>
 
           {/* Tabs */}
-          <div className="flex gap-8 border-b border-outline-variant/40 mb-10 overflow-x-auto">
+          <div className="flex gap-5 sm:gap-8 border-b border-outline-variant/40 mb-8 md:mb-10 overflow-x-auto scrollbar-hide">
             {TABS.map((tb) => (
               <Link
                 key={tb.key}
                 to={tb.to}
                 className={
                   tab === tb.key
-                    ? 'pb-4 border-b-[3px] border-primary text-primary font-title-md text-[18px] leading-[24px] font-bold px-2 whitespace-nowrap'
-                    : 'pb-4 border-b-[3px] border-transparent text-outline hover:text-on-surface font-title-md text-[18px] leading-[24px] font-semibold px-2 transition-colors whitespace-nowrap'
+                    ? 'pb-4 border-b-[3px] border-primary text-primary font-title-md text-base sm:text-[18px] leading-[24px] font-bold px-1 sm:px-2 whitespace-nowrap'
+                    : 'pb-4 border-b-[3px] border-transparent text-outline hover:text-on-surface font-title-md text-base sm:text-[18px] leading-[24px] font-semibold px-1 sm:px-2 transition-colors whitespace-nowrap'
                 }
               >
                 {t(tb.labelKey)}
@@ -140,9 +140,9 @@ export default function MyPage() {
                           <span className={`material-symbols-outlined ${s.color} text-[28px]`} style={{ fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
                         </div>
                         <div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className={`font-title-md text-[22px] leading-[28px] font-bold ${s.greyed ? 'text-on-surface-variant' : 'text-on-surface'}`}>{a.examTitle ?? t('mypage.exam_fallback')}</h3>
-                            <span className={`px-3 py-1 ${s.badgeClass} font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border`}>{s.badge}</span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+                            <h3 className={`font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold break-keep ${s.greyed ? 'text-on-surface-variant' : 'text-on-surface'}`}>{a.examTitle ?? t('mypage.exam_fallback')}</h3>
+                            <span className={`px-3 py-1 ${s.badgeClass} font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border shrink-0`}>{s.badge}</span>
                           </div>
                           <p className="font-body-md text-body-md text-on-surface-variant mb-3">{fmtDT(a.submittedAt)} | {t('mypage.online')}</p>
                           {a.status === 'submitted' && !a.released && (
@@ -183,9 +183,9 @@ export default function MyPage() {
                       <span className="material-symbols-outlined text-secondary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
                     </div>
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
-                        <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20">{t('mypage.passed')}</span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+                        <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface break-keep">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
+                        <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20 shrink-0">{t('mypage.passed')}</span>
                       </div>
                       <p className="font-body-md text-body-md text-on-surface-variant">{fmtDate(a.submittedAt)} | {t('mypage.cert_no')} {certNoOf(a)} | {a.totalCorrect ?? 0} / {a.totalQuestions ?? 0}</p>
                     </div>
@@ -211,11 +211,11 @@ export default function MyPage() {
                           <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                         </div>
                         <div>
-                          <h3 className="font-title-md text-[22px] leading-[28px] font-bold text-on-surface mb-2">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
+                          <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface mb-2 break-keep">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
                           <p className="font-body-md text-body-md text-on-surface-variant">{t('mypage.cert_no')} {certNo}</p>
                         </div>
                       </div>
-                      <div className="shrink-0 flex items-center gap-3">
+                      <div className="shrink-0 flex flex-wrap items-center gap-3">
                         <span className={`px-3 py-1 font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border ${issued ? 'bg-secondary/10 text-secondary border-secondary/20' : 'bg-outline/10 text-outline border-outline/20'}`}>{issued ? 'Issued' : 'Ready'}</span>
                         <button onClick={() => goCert(a)} className="px-6 py-2.5 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow flex items-center gap-2">
                           {issued ? t('mypage.reissue') : t('mypage.issue')}

@@ -144,7 +144,11 @@ export default function Guide() {
                   ) : lv.method ? (
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
                       <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">검정 방법</div>
-                      <p className="flex-grow font-body-lg text-body-lg text-on-surface break-keep">{lv.method}</p>
+                      <div className="flex-grow flex flex-col gap-0.5">
+                        {lv.method.split(' · ').map((m, i) => (
+                          <p key={i} className="font-body-lg text-body-lg text-on-surface break-keep">{m}</p>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
 
