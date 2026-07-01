@@ -211,6 +211,8 @@ const D: Record<string, Record<Lang, string>> = {
   'test.next': { ko: '다음 →', en: 'Next →', ja: '次へ →', zh: '下一题 →', hi: 'अगला →', vi: 'Tiếp →' },
   'test.submit': { ko: '제출하기', en: 'Submit', ja: '提出する', zh: '提交', hi: 'जमा करें', vi: 'Nộp bài' },
   'test.submitting': { ko: '제출 중…', en: 'Submitting…', ja: '提出中…', zh: '提交中…', hi: 'जमा हो रहा है…', vi: 'Đang nộp…' },
+  'test.unanswered_warn': { ko: '아직 답하지 않은 문항이 {n}개 있습니다.\n첫 미응답 문항({first}번)으로 이동합니다.', en: 'You still have {n} unanswered question(s).\nMoving to the first unanswered question (No. {first}).', ja: '未回答の問題が{n}問あります。\n最初の未回答問題（{first}番）に移動します。', zh: '还有 {n} 道题未作答。\n将跳转到第一道未作答题目（第 {first} 题）。', hi: 'अभी {n} प्रश्न अनुत्तरित हैं।\nपहले अनुत्तरित प्रश्न (क्रमांक {first}) पर जा रहे हैं।', vi: 'Bạn còn {n} câu chưa trả lời.\nChuyển đến câu chưa trả lời đầu tiên (số {first}).' },
+  'test.submit_confirm': { ko: '답안을 최종 제출하시겠습니까?\n제출 후에는 수정할 수 없습니다.', en: "Submit your answers as final?\nYou can't change them after submitting.", ja: '解答を最終提出しますか？\n提出後は修正できません。', zh: '确定要最终提交答案吗？\n提交后将无法修改。', hi: 'क्या उत्तर अंतिम रूप से जमा करें?\nजमा करने के बाद बदलाव नहीं हो सकता।', vi: 'Nộp bài làm cuối cùng?\nSau khi nộp bạn không thể chỉnh sửa.' },
   'test.submit_failed': { ko: '제출에 실패했습니다.', en: 'Failed to submit.', ja: '提出に失敗しました。', zh: '提交失败。', hi: 'जमा करने में विफल।', vi: 'Không thể nộp bài.' },
   'void.title': { ko: '시험이 무효 처리되었습니다', en: 'Test voided', ja: 'テストが無効になりました', zh: '测试已作废', hi: 'टेस्ट अमान्य कर दिया गया', vi: 'Bài kiểm tra đã bị hủy' },
   'void.body': {
@@ -745,6 +747,7 @@ const D: Record<string, Record<Lang, string>> = {
   "exresult.correct_suffix": { ko: "정답", en: "correct", ja: "正解", zh: "正确", hi: "सही", vi: "đúng" },
   "exresult.issue_cert": { ko: "자격증 발급 (PDF)", en: "Issue certificate (PDF)", ja: "資格証発行 (PDF)", zh: "颁发证书 (PDF)", hi: "प्रमाणपत्र जारी करें (PDF)", vi: "Cấp chứng chỉ (PDF)" },
   "exresult.master_guide": { ko: "Master 과정 안내", en: "About Master track", ja: "Master課程の案内", zh: "Master 课程介绍", hi: "Master ट्रैक जानकारी", vi: "Giới thiệu khóa Master" },
+  "exresult.to_attempts": { ko: "← 내 응시 현황", en: "← My exam attempts", ja: "← 受験履歴へ", zh: "← 我的应试现况", hi: "← मेरे प्रयास", vi: "← Lịch sử thi của tôi" },
   "my.status.in_progress": { ko: "응시 중", en: "In progress", ja: "受験中", zh: "应试中", hi: "जारी", vi: "Đang làm" },
   "my.status.submitted": { ko: "제출 완료", en: "Submitted", ja: "提出完了", zh: "已提交", hi: "जमा किया", vi: "Đã nộp" },
   "my.status.voided": { ko: "무효", en: "Voided", ja: "無効", zh: "作废", hi: "अमान्य", vi: "Đã hủy" },

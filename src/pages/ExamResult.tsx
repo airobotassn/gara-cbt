@@ -264,10 +264,10 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
             </button>
           )}
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/mypage')}
             className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary font-title-md text-title-md py-3.5 px-6 rounded-xl transition-all"
           >
-            {t('result.back')}
+            {t('exresult.to_attempts')}
           </button>
         </div>
       </div>
