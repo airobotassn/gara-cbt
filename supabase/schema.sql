@@ -13,17 +13,19 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   avatar_url text,
+  is_anonymous boolean default false,   -- 레벨테스트 게스트 응시용(자격검정은 start-exam이 익명 차단)
   created_at timestamptz default now()
 );
 
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, display_name, avatar_url)
+  insert into public.profiles (id, display_name, avatar_url, is_anonymous)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
-    new.raw_user_meta_data->>'avatar_url'
+    new.raw_user_meta_data->>'avatar_url',
+    coalesce(new.is_anonymous, false)
   )
   on conflict (id) do nothing;
   return new;
@@ -123,3 +125,142 @@ create policy "profiles_select_own" on profiles
 drop policy if exists "profiles_update_own" on profiles;
 create policy "profiles_update_own" on profiles
   for update using (auth.uid() = id);
+
+-- ============================================================
+-- 레벨테스트 모듈 (/test/*) — 자격검정과 한 프로젝트 공존.
+--   충돌 회피 리네임: questions→test_questions, attempt_answers→test_answers.
+--   델타 마이그레이션: migrations/20260701120000_add_leveltest_tables.sql
+-- ============================================================
+create extension if not exists vector;
+
+do $$ begin
+  create type attempt_status as enum ('in_progress','submitted','expired','voided');
+exception when duplicate_object then null; end $$;
+
+-- test_questions (다국어 레벨 문제은행)
+create table if not exists test_questions (
+  id uuid primary key default gen_random_uuid(),
+  code text,
+  level int not null check (level between 1 and 7),
+  category text not null,              -- 그 레벨의 6축 코드
+  correct_index int not null,          -- 클라 비노출
+  prompt_i18n jsonb not null,
+  options_i18n jsonb not null,
+  explanation_i18n jsonb not null default '{}'::jsonb,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+create index if not exists test_questions_level_cat_idx on test_questions(level, category) where active;
+create index if not exists test_questions_code_idx on test_questions(code);
+
+-- test_attempts (레벨테스트 응시)
+create table if not exists test_attempts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  level int not null check (level between 1 and 7),
+  lang text not null default 'ko',
+  status attempt_status not null default 'in_progress',
+  started_at timestamptz not null default now(),
+  submitted_at timestamptz,
+  total_correct int default 0,
+  total_questions int default 0,
+  axis_perf jsonb,
+  deltas jsonb,
+  rating_after jsonb,
+  rank_before int,
+  rank_after int,
+  rank_dir text,
+  warn_strikes int default 0,
+  applied boolean not null default false,
+  violation_count int default 0,
+  claim_token uuid not null default gen_random_uuid(),  -- 게스트→로그인 결과 이관용
+  created_at timestamptz default now()
+);
+create index if not exists test_attempts_user_idx on test_attempts(user_id, status, submitted_at);
+
+-- test_answers (레벨테스트 응답)
+create table if not exists test_answers (
+  id uuid primary key default gen_random_uuid(),
+  attempt_id uuid not null references test_attempts(id) on delete cascade,
+  question_id uuid not null references test_questions(id),
+  category text not null,
+  selected_index int,
+  is_correct boolean not null default false,
+  time_spent int default 0,
+  created_at timestamptz default now()
+);
+create index if not exists test_answers_attempt_idx on test_answers(attempt_id);
+
+-- user_level_skill (레벨별 누적 6축 레이팅)
+create table if not exists user_level_skill (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  level int not null,
+  ratings jsonb not null default '{}'::jsonb,
+  attempts_count int not null default 0,
+  placed boolean not null default false,
+  updated_at timestamptz default now(),
+  primary key (user_id, level)
+);
+
+-- user_progress (현재 등급 = 레벨 + 랭킹 점수)
+create table if not exists user_progress (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  rank int not null default 1,
+  demotion_strikes int not null default 0,
+  points int not null default 0,
+  updated_at timestamptz default now()
+);
+create index if not exists user_progress_points_idx on user_progress (points desc, updated_at asc);
+
+-- question_reports (레벨테스트 문항 오류 제보)
+create table if not exists question_reports (
+  id uuid primary key default gen_random_uuid(),
+  question_id uuid references test_questions(id) on delete set null,
+  code text,
+  attempt_id uuid,
+  user_id uuid,
+  lang text,
+  message text not null,
+  status text not null default 'open',
+  created_at timestamptz not null default now()
+);
+
+alter table test_questions   enable row level security;
+alter table test_attempts    enable row level security;
+alter table test_answers     enable row level security;
+alter table user_level_skill enable row level security;
+alter table user_progress    enable row level security;
+alter table question_reports enable row level security;
+-- test_* / user_* / question_reports: 클라 정책 없음 → service role(Edge Function)만 접근.
+
+-- reco_cache / reco_shadow_log — 레벨 추천 시맨틱 캐시 (key=입력 임베딩, value=레벨)
+create table if not exists reco_cache (
+  id         bigserial primary key,
+  embedding  vector(768) not null,
+  level      smallint not null,
+  sample     text,
+  created_at timestamptz default now()
+);
+create index if not exists reco_cache_embedding_idx
+  on reco_cache using hnsw (embedding vector_cosine_ops);
+
+create table if not exists reco_shadow_log (
+  id          bigserial primary key,
+  sample      text,
+  level_llm   smallint,
+  level_cache smallint,
+  similarity  real,
+  created_at  timestamptz default now()
+);
+
+create or replace function match_reco_cache(query_embedding vector(768), match_count int default 1)
+returns table (level smallint, similarity real)
+language sql stable as $$
+  select level, (1 - (embedding <=> query_embedding))::real as similarity
+  from reco_cache
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+
+alter table reco_cache      enable row level security;
+alter table reco_shadow_log enable row level security;
