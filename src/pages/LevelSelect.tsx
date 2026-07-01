@@ -91,9 +91,9 @@ export default function LevelSelect() {
           <Link
             to="/ranking"
             className="btn-ghost"
-            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, lineHeight: 1, fontSize: 16, fontWeight: 800, padding: '10px 20px', borderRadius: 12, whiteSpace: 'nowrap' }}
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, lineHeight: 1, fontSize: 16, fontWeight: 800, padding: '10px 20px 10px 16px', borderRadius: 12, whiteSpace: 'nowrap' }}
           >
-            🏆 {t('rank.title')}
+            <span aria-hidden="true">🏆</span>{t('rank.title')}
           </Link>
         </div>
 
