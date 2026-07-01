@@ -120,8 +120,8 @@ export default function Certificate() {
     (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
   // 미리보기에서 전환한 언어에 맞춰 자격명도 그 언어로 보여줌(고유명 기본값)
   const QUAL_DEFAULT: Record<string, string> = {
-    ko: 'GARA 자격검정', en: 'GARA Certification', ja: 'GARA資格検定',
-    zh: 'GARA 资格检定', hi: 'GARA प्रमाणन', vi: 'Chứng nhận GARA',
+    ko: 'CARIS 자격검정', en: 'CARIS Certification', ja: 'CARIS資格検定',
+    zh: 'CARIS 资格检定', hi: 'CARIS प्रमाणन', vi: 'Chứng nhận CARIS',
   }
 
   const data: CertData = passed ?? {

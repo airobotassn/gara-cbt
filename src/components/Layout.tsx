@@ -277,6 +277,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic">📝</span> {t('nav.exam')}
               </button>
+              <button className="pf-item" onClick={() => go('/exam/schedule')}>
+                <span className="ic">🗓️</span> {t('nav.apply')}
+              </button>
               <button className="pf-item" onClick={goLevelTest}>
                 <span className="ic">🎯</span> {t('common.leveltest')}
               </button>

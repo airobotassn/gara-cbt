@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, SEB_INSTALLER_URL } from '../lib/seb'
-import { TOTAL_QUESTIONS, TEST_DURATION_MINUTES, RESULT_RELEASE_DAYS } from '../lib/testConfig'
+import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import { useT } from '../lib/i18n'
 
-// gara_4 (GARA 자격검정 응시 안내/원서접수) 목업 디자인 + 응시 게이트 로직 보존. 헤더 없음(FAB이 네비).
+// gara_4 (CARIS 자격검정 응시 안내/원서접수) 목업 디자인 + 응시 게이트 로직 보존. 헤더 없음(FAB이 네비).
 // 원본: stitch_design_critique_assistant/gara_4/code.html
 export default function ExamGate() {
   const navigate = useNavigate()
@@ -100,7 +100,8 @@ export default function ExamGate() {
             <div className="w-full lg:w-7/12 flex flex-col gap-8">
               <div>
                 <span className="font-label-sm text-label-sm uppercase text-primary-container bg-primary-container/5 px-4 py-1.5 rounded-full self-start border border-primary-container/10 mb-6 inline-block">Official Certification</span>
-                <h2 className="font-headline-lg text-headline-lg md:font-display-lg md:text-display-lg text-on-surface mb-4">{t('gate.title')}</h2>
+                <h2 className="font-headline-lg text-headline-lg md:font-display-lg md:text-display-lg text-on-surface mb-3">{t('gate.title')}</h2>
+                <p className="font-body-lg text-body-lg text-on-surface-variant break-keep whitespace-pre-line leading-relaxed">{t('gate.fullname')}</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 mt-2">
                 <button onClick={onStart} className="bg-primary-container text-on-primary font-title-md text-title-md px-10 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">
@@ -115,44 +116,6 @@ export default function ExamGate() {
           </section>
 
           <hr className="border-outline-variant/20" />
-
-          {/* Exam Stats */}
-          <section className="bg-surface-container-lowest rounded-2xl border border-surface-container-highest p-10 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 md:gap-4">
-              <div className="flex flex-col gap-2 w-full md:w-1/3">
-                <div className="flex items-center gap-2 text-primary-container mb-2">
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>format_list_numbered</span>
-                  <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Questions</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-headline-lg text-headline-lg text-on-surface">{TOTAL_QUESTIONS}</span>
-                  <span className="font-title-md text-title-md text-on-surface-variant">{t('gate.meta_questions')}</span>
-                </div>
-              </div>
-              <div className="hidden md:block w-px h-20 bg-outline-variant/30"></div>
-              <div className="flex flex-col gap-2 w-full md:w-1/3">
-                <div className="flex items-center gap-2 text-primary-container mb-2">
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>timer</span>
-                  <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Duration</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-headline-lg text-headline-lg text-on-surface">{TEST_DURATION_MINUTES}</span>
-                  <span className="font-title-md text-title-md text-on-surface-variant">{t('gate.meta_minutes')}</span>
-                </div>
-              </div>
-              <div className="hidden md:block w-px h-20 bg-outline-variant/30"></div>
-              <div className="flex flex-col gap-2 w-full md:w-1/3">
-                <div className="flex items-center gap-2 text-primary-container mb-2">
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>fact_check</span>
-                  <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Format</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-headline-lg text-headline-lg text-on-surface">4</span>
-                  <span className="font-title-md text-title-md text-on-surface-variant">{t('gate.format_value')}</span>
-                </div>
-              </div>
-            </div>
-          </section>
 
           {/* Important Instructions */}
           <section className="flex flex-col gap-8">

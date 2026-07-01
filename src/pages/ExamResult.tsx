@@ -148,7 +148,7 @@ export default function ExamResult() {
   const scoreText = `${data.totalCorrect} / ${data.totalQuestions}`
   function goCertificate() {
     localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
-    navigate('/certificate', { state: { name: certName, qualification: 'GARA 자격검정', certNo, issueDate, scoreText } })
+    navigate('/certificate', { state: { name: certName, qualification: 'CARIS 자격검정', certNo, issueDate, scoreText } })
   }
 
   return (

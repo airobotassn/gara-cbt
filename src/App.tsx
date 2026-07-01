@@ -5,6 +5,8 @@ import { AuthProvider } from './context/AuthProvider'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import ExamGate from './pages/ExamGate'
+import ExamSchedule from './pages/ExamSchedule'
+import ExamApply from './pages/ExamApply'
 import ExamCheck from './pages/ExamCheck'
 import ExamPrepare from './pages/ExamPrepare'
 import CbtRunner from './pages/CbtRunner'
@@ -42,6 +44,8 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/exam" element={<ExamGate />} />
+              <Route path="/exam/schedule" element={<ExamSchedule />} />
+              <Route path="/exam/apply" element={<ExamApply />} />
               <Route path="/exam/check" element={<ExamCheck />} />
               <Route path="/exam/prepare" element={<ExamPrepare />} />
               <Route path="/exam/run/:attemptId" element={<CbtRunner />} />

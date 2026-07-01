@@ -1,30 +1,24 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
+import { TRACKS, SCHEDULE } from '../lib/caris'
 
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
 // primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff). 히어로 밴드 위 흰 버튼만 text-[#004ac6] 하드코딩 유지.
 
-const AREAS = [
-  { id: 'area1', icon: 'psychology', tone: 'bg-primary/10 text-primary', titleKey: 'guide.area1_title', descKey: 'guide.area1_desc', cls: 'md:col-span-2' },
-  { id: 'area2', icon: 'database', tone: 'bg-secondary/10 text-secondary', titleKey: 'guide.area2_title', descKey: 'guide.area2_desc', cls: 'md:col-span-2' },
-  { id: 'area3', icon: 'model_training', tone: 'bg-tertiary/10 text-tertiary', titleKey: 'guide.area3_title', descKey: 'guide.area3_desc', cls: 'md:col-span-2' },
-  { id: 'area4', icon: 'gavel', tone: 'bg-error/10 text-error', titleKey: 'guide.area4_title', descKey: 'guide.area4_desc', cls: 'md:col-start-2 md:col-span-2' },
-  { id: 'area5', icon: 'rocket_launch', tone: 'bg-primary-container/10 text-primary-container', titleKey: 'guide.area5_title', descKey: 'guide.area5_desc', cls: 'md:col-span-2' },
-]
-const METHODS = [
-  { id: 'method1', icon: 'computer', titleKey: 'guide.method1_title', descKey: 'guide.method1_desc' },
-  { id: 'method2', icon: 'security', titleKey: 'guide.method2_title', descKey: 'guide.method2_desc' },
-  { id: 'method3', icon: 'fact_check', titleKey: 'guide.method3_title', descKey: 'guide.method3_desc' },
-]
-const SCHEDULE = [
-  { id: 'r4', roundKey: 'guide.sched_r4_round', dateKey: 'guide.sched_r4_date', open: true },
-  { id: 'r5', roundKey: 'guide.sched_r5_round', dateKey: 'guide.sched_r5_date', open: false },
-  { id: 'r1_2027', roundKey: 'guide.sched_r1_round', dateKey: 'guide.sched_r1_date', open: false },
-]
 
 export default function Guide() {
   const { t } = useT()
+  const navigate = useNavigate()
+  const [track, setTrack] = useState(0)
+  const [level, setLevel] = useState(0)
+  const cur = TRACKS[track]
+  const lv = cur.levels[level]
+  const isMaster = track === 1
+  const goTrack = (i: number) => { setTrack((i + TRACKS.length) % TRACKS.length); setLevel(0) }
+  const goLevel = (i: number) => setLevel((i + cur.levels.length) % cur.levels.length)
 
   return (
     <div className="bg-background text-on-background min-h-screen">
@@ -36,7 +30,7 @@ export default function Guide() {
             <div className="text-on-surface space-y-6">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#004ac6] font-bold text-label-sm uppercase tracking-wider mb-4 shadow-sm border border-white/50">
                 <span className="material-symbols-outlined text-[16px]">verified</span>
-                GARA Certification
+                CARIS Certification
               </div>
               <h1 className="font-display-lg text-display-lg font-bold leading-tight">{t('guide.hero_title_l1')}<br />{t('guide.hero_title_l2')}</h1>
             </div>
@@ -47,12 +41,19 @@ export default function Guide() {
               </h3>
               <div className="space-y-4">
                 {SCHEDULE.map((s) => (
-                  <div key={s.id} className={`rounded-xl p-4 flex justify-between items-center border ${s.open ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}>
+                  <div
+                    key={s.id}
+                    onClick={s.open ? () => navigate('/exam/apply', { state: { roundId: s.id } }) : undefined}
+                    className={`rounded-xl p-4 flex justify-between items-center gap-3 border ${s.open ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
+                  >
                     <div>
                       <div className={`font-label-sm text-label-sm mb-1 ${s.open ? 'text-primary' : 'text-on-surface-variant'}`}>{t(s.roundKey)}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.open ? 'font-semibold' : ''}`}>{t(s.dateKey)}</div>
                     </div>
-                    <div className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.open ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(s.open ? 'guide.status_open' : 'guide.status_upcoming')}</div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.open ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(s.open ? 'guide.status_open' : 'guide.status_upcoming')}</span>
+                      {s.open && <span className="material-symbols-outlined text-primary text-[20px]">arrow_forward</span>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -60,42 +61,110 @@ export default function Guide() {
           </div>
         </section>
 
-        {/* 5대 평가 영역 */}
+        {/* CARIS 자격 소개 — Pro ↔ Master 전환 */}
         <section className="py-16 bg-surface-container-lowest px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-10">
-              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold mb-4">{t('guide.areas_title')}</h2>
+              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">AI·로봇 융합역량 자격시험</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 max-w-[1000px] mx-auto">
-              {AREAS.map((a) => (
-                <div key={a.id} className={`${a.cls} bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 w-full h-full`}>
-                  <div className={`w-12 h-12 ${a.tone.split(' ')[0]} rounded-xl flex items-center justify-center mb-6`}>
-                    <span className={`material-symbols-outlined ${a.tone.split(' ')[1]} text-[24px]`}>{a.icon}</span>
-                  </div>
-                  <h3 className="font-title-md text-title-md text-on-surface mb-3">{t(a.titleKey)}</h3>
-                  <p className="font-body-md text-body-md text-on-surface-variant">{t(a.descKey)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
-        {/* 응시 방법 */}
-        <section className="py-16 bg-surface-container-low px-margin-mobile md:px-margin-desktop">
-          <div className="max-w-container-max mx-auto">
-            <div className="mb-10 text-center">
-              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold mb-4">{t('guide.methods_title')}</h2>
+            {/* 트랙 전환: 화살표 + 탭 */}
+            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-10">
+              <button onClick={() => goTrack(track - 1)} aria-label="이전 자격" className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
+                <span className="material-symbols-outlined">chevron_left</span>
+              </button>
+              <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high">
+                {TRACKS.map((tr, i) => (
+                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'px-5 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
+                ))}
+              </div>
+              <button onClick={() => goTrack(track + 1)} aria-label="다음 자격" className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
+                <span className="material-symbols-outlined">chevron_right</span>
+              </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {METHODS.map((m) => (
-                <div key={m.id} className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 ambient-shadow">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                    <span className="material-symbols-outlined text-primary">{m.icon}</span>
-                  </div>
-                  <h3 className="font-title-md text-title-md text-on-surface mb-4">{t(m.titleKey)}</h3>
-                  <p className="font-body-md text-on-surface-variant">{t(m.descKey)}</p>
+
+            {/* 트랙 패널 */}
+            <div className="max-w-4xl mx-auto">
+              {/* 트랙 헤더 (핵심 소개) */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-label-md font-bold mb-4">
+                  <span className="material-symbols-outlined text-[18px]">{cur.icon}</span>
+                  {cur.eligibility}
                 </div>
-              ))}
+                <h3 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface mb-1">{cur.name}</h3>
+                <p className="font-title-md text-title-md text-on-surface-variant">{cur.tagline}</p>
+                <p className="font-body-md text-body-md text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
+              </div>
+
+              {/* 급수 전환: 화살표 + 급수 (하나의 통합 pill) */}
+              <div className="flex justify-center mb-6">
+                <div className="inline-flex items-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm">
+                  <button onClick={() => goLevel(level - 1)} aria-label="이전 급수" className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
+                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                  </button>
+                  {cur.levels.map((l, i) => (
+                    <button key={l.grade} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>{l.grade}</button>
+                  ))}
+                  <button onClick={() => goLevel(level + 1)} aria-label="다음 급수" className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
+                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 단일 급수 카드 */}
+              <div className="bg-surface-container-lowest rounded-2xl p-7 md:p-9 border border-outline-variant/30 ambient-shadow">
+                {/* 급수 + 대상 */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-7 pb-6 border-b border-outline-variant/20">
+                  <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.grade}</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `응시 자격 · ${lv.prereq}` : lv.tag}</span>
+                </div>
+
+                {/* 스펙 (라벨 / 값) */}
+                <div className="flex flex-col divide-y divide-outline-variant/20">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5 first:pt-0">
+                    <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">검정 과목</div>
+                    <ul className="flex-grow flex flex-col gap-2.5">
+                      {lv.subjects.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2.5 font-body-lg text-body-lg text-on-surface break-keep">
+                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {cur.format ? (
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
+                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">시험 구성</div>
+                      <div className="flex-grow">
+                        <p className="font-body-lg text-body-lg text-on-surface break-keep">{cur.format}</p>
+                        <p className="font-body-md text-body-md text-on-surface-variant break-keep mt-0.5">{cur.formatSub}</p>
+                      </div>
+                    </div>
+                  ) : lv.method ? (
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
+                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">검정 방법</div>
+                      <p className="flex-grow font-body-lg text-body-lg text-on-surface break-keep">{lv.method}</p>
+                    </div>
+                  ) : null}
+
+                  {lv.practical && (
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
+                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">실기</div>
+                      <p className="flex-grow font-body-lg text-body-lg text-on-surface break-keep">{lv.practical}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 합격 기준 */}
+                <div className="flex items-center gap-3 mt-6 bg-secondary/10 rounded-xl px-5 py-4">
+                  <span className="material-symbols-outlined text-secondary text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                  <div>
+                    <div className="font-label-md text-label-md text-on-surface-variant font-semibold">합격 기준</div>
+                    <div className="font-title-md text-title-md text-on-surface font-bold break-keep">{lv.pass}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

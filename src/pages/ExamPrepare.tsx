@@ -13,7 +13,6 @@ import {
 } from '../lib/seb'
 import {
   DEFAULT_EXAM_SLUG,
-  TOTAL_QUESTIONS,
   TEST_DURATION_MINUTES,
   RESULT_RELEASE_DAYS,
 } from '../lib/testConfig'
@@ -108,7 +107,6 @@ export default function ExamPrepare() {
             <div className="prep-text">
               <p>{t('prep.guide_lead')}</p>
               <ul>
-                <li>{t('prep.guide_li1', { q: TOTAL_QUESTIONS, min: TEST_DURATION_MINUTES })}</li>
                 <li>{t('prep.guide_li2')}</li>
                 <li>{t('prep.guide_li3', { d: RESULT_RELEASE_DAYS })}</li>
                 <li>{t('prep.guide_li4')}</li>

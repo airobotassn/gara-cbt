@@ -1,0 +1,197 @@
+import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import SiteFooter from '../components/SiteFooter'
+import { useT } from '../lib/i18n'
+import { TRACKS, SCHEDULE } from '../lib/caris'
+
+// 원서접수(앞단 목업) — 회차 선택 후 자격을 고르고 결제까지의 화면 흐름만.
+//   · Pro    = 단일 시험(응시료 1건). 급수는 점수로 판정 → 급수 선택 없음.
+//   · Master = 급수별 별도 시험(응시료 다름) → 급수 선택.
+// ⚠️ PG 결제·본인인증·주문 저장 미연결(결제하기는 안내 모달만). 실제 연동은 별도 작업.
+export default function ExamApply() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { t } = useT()
+
+  const st = location.state as { roundId?: string; roundLabel?: string; dateLabel?: string } | null
+  const round = st?.roundId ? SCHEDULE.find((s) => s.id === st.roundId) : undefined
+  const openRound = SCHEDULE.find((s) => s.open) ?? SCHEDULE[0]
+  const roundLabel = round ? t(round.roundKey) : st?.roundLabel ?? t(openRound.roundKey)
+  const dateLabel = round ? t(round.dateKey) : st?.dateLabel ?? t(openRound.dateKey)
+
+  const [track, setTrack] = useState(0)
+  const [level, setLevel] = useState(0)
+  const [payNotice, setPayNotice] = useState(false)
+  const cur = TRACKS[track]
+  const lv = cur.levels[level]
+  const isMaster = track === 1
+  const goTrack = (i: number) => {
+    setTrack((i + TRACKS.length) % TRACKS.length)
+    setLevel(0)
+  }
+  const won = (n: number) => n.toLocaleString('ko-KR')
+
+  const fee = isMaster ? lv.fee ?? 0 : cur.examFee ?? 0
+  const selLabel = isMaster ? `${cur.name} ${lv.grade}` : `${cur.name} 자격시험`
+
+  return (
+    <div className="bg-background text-on-surface min-h-screen flex flex-col">
+      {/* 결제 안내(목업) 모달 */}
+      {payNotice && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setPayNotice(false)}>
+          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow" onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]">credit_card</span>
+            </div>
+            <h3 className="font-title-md text-title-md font-bold text-on-surface mb-2">결제 기능 준비 중</h3>
+            <p className="font-body-md text-body-md text-on-surface-variant mb-6 break-keep">
+              현재는 접수 화면 미리보기입니다. 본인인증·결제(PG)는 곧 연결됩니다.
+            </p>
+            <button className="bg-primary text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow" onClick={() => setPayNotice(false)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto">
+        {/* 상단 */}
+        <button onClick={() => navigate('/guide')} className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">
+          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          자격검정 안내
+        </button>
+        <div className="mb-10">
+          <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface mb-2">원서접수</h1>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-label-md font-bold">
+            <span className="material-symbols-outlined text-[18px]">event</span>
+            {roundLabel} · {dateLabel}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 좌: 자격 선택 */}
+          <div className="lg:col-span-2">
+            <section className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant/30 ambient-shadow">
+              <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-6">자격 선택</h2>
+
+              {/* 트랙 */}
+              <span className="font-label-md text-label-md text-on-surface-variant font-semibold">트랙</span>
+              <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit mt-2 mb-6">
+                {TRACKS.map((tr, i) => (
+                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
+                    {tr.name}
+                  </button>
+                ))}
+              </div>
+
+              {isMaster ? (
+                <>
+                  {/* Master: 급수 선택 */}
+                  <span className="font-label-md text-label-md text-on-surface-variant font-semibold">급수</span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {cur.levels.map((l, i) => (
+                      <button key={l.grade} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2.5 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold transition-all' : 'px-5 py-2.5 rounded-xl bg-surface-container-high text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>
+                        {l.grade}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.grade}</span>
+                      <span className="font-body-md text-body-md text-on-surface-variant break-keep">응시 자격 · {lv.prereq}</span>
+                    </div>
+                    <div>
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">검정 과목</span>
+                      <ul className="mt-1.5 flex flex-col gap-1.5">
+                        {lv.subjects.map((s, i) => (
+                          <li key={i} className="flex items-start gap-2 font-body-md text-body-md text-on-surface break-keep">
+                            <span className="text-primary font-bold shrink-0">{i + 1}.</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="flex flex-col gap-1.5 font-body-md text-body-md">
+                      <span className="text-on-surface-variant">검정 방법 <span className="text-on-surface font-semibold break-keep">{lv.method}</span></span>
+                      {lv.practical && <span className="text-on-surface-variant">실기 <span className="text-on-surface font-semibold break-keep">{lv.practical}</span></span>}
+                      <span className="text-on-surface-variant">합격 기준 <span className="text-on-surface font-semibold break-keep">{lv.pass}</span></span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Pro: 단일 시험(급수는 점수 판정) */}
+                  <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} 자격시험</span>
+                      <span className="font-body-md text-body-md text-on-surface-variant break-keep">{cur.eligibility}</span>
+                    </div>
+                    <p className="font-body-md text-body-md text-on-surface-variant break-keep">{cur.caption}</p>
+                    <div className="font-body-md text-body-md text-on-surface-variant">
+                      시험 구성 <span className="text-on-surface font-semibold">{cur.format}</span>
+                      <span className="text-outline"> ({cur.formatSub})</span>
+                    </div>
+                    <div>
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">급수 판정</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {cur.levels.map((l) => (
+                          <span key={l.grade} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high font-label-md text-label-md">
+                            <span className="text-primary font-bold">{l.grade}</span>
+                            <span className="text-on-surface-variant">{l.pass}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          </div>
+
+          {/* 우: 결제 요약 */}
+          <aside className="lg:col-span-1">
+            <div className="sticky top-12 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col gap-5">
+              <h2 className="font-title-md text-title-md font-bold text-on-surface">결제 요약</h2>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-start gap-3">
+                  <span className="font-body-md text-body-md text-on-surface-variant">선택 자격</span>
+                  <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{selLabel}</span>
+                </div>
+                <div className="flex justify-between items-start gap-3">
+                  <span className="font-body-md text-body-md text-on-surface-variant">회차</span>
+                  <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{roundLabel}</span>
+                </div>
+                <div className="flex justify-between items-start gap-3">
+                  <span className="font-body-md text-body-md text-on-surface-variant">시험일</span>
+                  <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{dateLabel}</span>
+                </div>
+                <div className="flex justify-between items-start gap-3">
+                  <span className="font-body-md text-body-md text-on-surface-variant">응시료</span>
+                  <span className="font-body-md text-body-md text-on-surface font-semibold">₩ {won(fee)}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-outline-variant/30 pt-4 flex justify-between items-baseline">
+                <span className="font-title-md text-title-md text-on-surface font-bold">총 결제금액</span>
+                <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-black">₩ {won(fee)}</span>
+              </div>
+
+              <button onClick={() => setPayNotice(true)} className="w-full bg-primary text-on-primary font-title-md text-title-md font-bold px-6 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">
+                결제하기
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </button>
+              <p className="flex items-start gap-1.5 font-label-sm text-label-sm text-outline break-keep">
+                <span className="material-symbols-outlined text-[16px] mt-px shrink-0">lock</span>
+                결제 시 본인인증이 필요합니다. 응시료·본인인증·결제는 추후 연결(미리보기).
+              </p>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <SiteFooter />
+    </div>
+  )
+}
