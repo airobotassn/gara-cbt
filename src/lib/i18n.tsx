@@ -732,6 +732,19 @@ const D: Record<string, Record<Lang, string>> = {
   "result.pass_criteria": { ko: "합격 기준 — 전체 문항의 60% 이상 정답", en: "Passing criteria — 60% or more of all questions correct", ja: "合格基準 — 全問題の60%以上正解", zh: "合格标准 — 答对全部题目的 60% 以上", hi: "उत्तीर्ण मानदंड — सभी प्रश्नों के 60% या अधिक सही", vi: "Tiêu chí đạt — đúng từ 60% tổng số câu trở lên" },
   "result.issue_cert": { ko: "📜 자격증 발급 (PDF)", en: "📜 Issue certificate (PDF)", ja: "📜 資格証発行 (PDF)", zh: "📜 颁发证书 (PDF)", hi: "📜 प्रमाणपत्र जारी करें (PDF)", vi: "📜 Cấp chứng chỉ (PDF)" },
   "result.back": { ko: "← 뒤로", en: "← Back", ja: "← 戻る", zh: "← 返回", hi: "← वापस", vi: "← Quay lại" },
+  "exresult.pass_badge": { ko: "축하합니다! CARIS Pro {grade} 합격입니다", en: "Congratulations! You passed CARIS Pro {grade}", ja: "おめでとうございます！CARIS Pro {grade} 合格です", zh: "恭喜！您已通过 CARIS Pro {grade}", hi: "बधाई हो! आपने CARIS Pro {grade} उत्तीर्ण किया", vi: "Chúc mừng! Bạn đã đạt CARIS Pro {grade}" },
+  "exresult.fail_badge": { ko: "아쉽지만 이번엔 불합격입니다", en: "Unfortunately, you did not pass this time", ja: "残念ながら今回は不合格です", zh: "很遗憾，本次未通过", hi: "दुर्भाग्य से, इस बार आप उत्तीर्ण नहीं हुए", vi: "Rất tiếc, lần này bạn chưa đạt" },
+  "exresult.score_unit": { ko: "취득 점수", en: "Score", ja: "取得点数", zh: "取得分数", hi: "प्राप्त अंक", vi: "Điểm đạt được" },
+  "exresult.earned_grade": { ko: "획득 등급", en: "Grade earned", ja: "取得等級", zh: "获得等级", hi: "अर्जित ग्रेड", vi: "Cấp đạt được" },
+  "exresult.correct_count": { ko: "정답 문항", en: "Correct answers", ja: "正解数", zh: "答对题数", hi: "सही उत्तर", vi: "Số câu đúng" },
+  "exresult.info_master": { ko: "이제 CARIS Master 과정에 응시할 수 있습니다", en: "You can now take the CARIS Master track", ja: "CARIS Master課程に応募できます", zh: "现在可报考 CARIS Master 课程", hi: "अब आप CARIS Master ट्रैक दे सकते हैं", vi: "Bạn có thể dự thi khóa CARIS Master" },
+  "exresult.info_grade": { ko: "{tag} 수준의 AI·로봇 역량을 인증합니다", en: "Certifies {tag}-level AI·robotics competency", ja: "{tag}レベルのAI·ロボット力を認証します", zh: "认证 {tag} 水平的 AI·机器人能力", hi: "{tag} स्तर की AI·रोबोटिक्स दक्षता प्रमाणित करता है", vi: "Chứng nhận năng lực AI·robot cấp {tag}" },
+  "exresult.info_fail": { ko: "합격 기준은 60점 이상입니다", en: "Passing requires 60 points or more", ja: "合格基準は60点以上です", zh: "合格标准为 60 分以上", hi: "उत्तीर्ण के लिए 60+ अंक चाहिए", vi: "Cần từ 60 điểm trở lên để đạt" },
+  "exresult.subject_title": { ko: "검정 과목별 성취도", en: "Achievement by subject", ja: "科目別の達成度", zh: "各科目成绩", hi: "विषयवार उपलब्धि", vi: "Thành tích theo môn" },
+  "exresult.subject_n": { ko: "과목 {n}", en: "Subject {n}", ja: "科目 {n}", zh: "科目 {n}", hi: "विषय {n}", vi: "Môn {n}" },
+  "exresult.correct_suffix": { ko: "정답", en: "correct", ja: "正解", zh: "正确", hi: "सही", vi: "đúng" },
+  "exresult.issue_cert": { ko: "자격증 발급 (PDF)", en: "Issue certificate (PDF)", ja: "資格証発行 (PDF)", zh: "颁发证书 (PDF)", hi: "प्रमाणपत्र जारी करें (PDF)", vi: "Cấp chứng chỉ (PDF)" },
+  "exresult.master_guide": { ko: "Master 과정 안내", en: "About Master track", ja: "Master課程の案内", zh: "Master 课程介绍", hi: "Master ट्रैक जानकारी", vi: "Giới thiệu khóa Master" },
   "my.status.in_progress": { ko: "응시 중", en: "In progress", ja: "受験中", zh: "应试中", hi: "जारी", vi: "Đang làm" },
   "my.status.submitted": { ko: "제출 완료", en: "Submitted", ja: "提出完了", zh: "已提交", hi: "जमा किया", vi: "Đã nộp" },
   "my.status.voided": { ko: "무효", en: "Voided", ja: "無効", zh: "作废", hi: "अमान्य", vi: "Đã hủy" },
@@ -1013,6 +1026,8 @@ const D: Record<string, Record<Lang, string>> = {
   "landing.card.check.d": { ko: "응시 전 보안 프로그램과 환경을 미리 점검하세요.", en: "Check the security program and your environment before you start.", ja: "受験前にセキュリティプログラムと環境を事前点検。", zh: "应试前提前检查安全程序与环境。", hi: "शुरू करने से पहले सुरक्षा प्रोग्राम और वातावरण जाँच लें।", vi: "Kiểm tra chương trình bảo mật và môi trường trước khi thi." },
   "landing.card.notice.d": { ko: "오픈 소식과 응시 전 꼭 확인할 공지를 모았습니다.", en: "Launch news and key notices to read before you take the exam.", ja: "オープン情報と受験前に必読のお知らせをまとめました。", zh: "汇总开放动态与应试前必看的公告。", hi: "लॉन्च समाचार और परीक्षा से पहले पढ़ने योग्य प्रमुख सूचनाएँ।", vi: "Tin ra mắt và các thông báo quan trọng cần đọc trước khi thi." },
   "nav.exampreview": { ko: "응시 화면 미리보기", en: "Exam screen preview", ja: "受験画面プレビュー", zh: "应试界面预览", hi: "परीक्षा स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình thi" },
+  "nav.resultpasspreview": { ko: "합격 화면 미리보기", en: "Pass result preview", ja: "合格画面プレビュー", zh: "合格界面预览", hi: "उत्तीर्ण स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình đạt" },
+  "nav.resultfailpreview": { ko: "불합격 화면 미리보기", en: "Fail result preview", ja: "不合格画面プレビュー", zh: "不合格界面预览", hi: "अनुत्तीर्ण स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình trượt" },
 }
 
 export type TFunc = (key: string, vars?: Record<string, string | number>) => string

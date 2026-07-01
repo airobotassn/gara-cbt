@@ -1,13 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
-import { PASS_RATIO } from '../lib/testConfig'
-import type { ExamResultResponse, SubmitExamResponse } from '../lib/types'
+import { useCountUp } from '../hooks/useCountUp'
+import { proGradeForScore } from '../lib/caris'
+import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
 
-// 성적 결과 — 목업 없음. GARA Precision 스타일로 자체 디자인(gara_4/5 톤) + 채점 로직/상태 보존.
+// 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
+// GARA Precision 톤으로 자체 디자인. 채점 로직/상태(공개 전·무효·에러) 보존.
+// ⚠️ 백엔드 데이터 연동은 추후 — 지금은 있는 응답(정답수·문항수·과목)으로 디자인만.
 function fmtDate(iso?: string | null) {
   if (!iso) return '-'
   const d = new Date(iso)
@@ -32,7 +35,7 @@ function Shell({ children }: { children: ReactNode }) {
   )
 }
 
-// 결과 카드 셸
+// 결과 카드 셸 (안내/에러 상태용 — 좁은 단일 카드)
 function Card({ children }: { children: ReactNode }) {
   return (
     <div className="glass-panel rounded-2xl p-8 md:p-14 ambient-shadow max-w-2xl w-full text-center border border-white/40">{children}</div>
@@ -51,9 +54,249 @@ function Emblem({ icon, tone }: { icon: string; tone: 'primary' | 'secondary' | 
   )
 }
 
+// 과목별 정답 집계 (answers[].subject 로 그룹)
+function subjectStats(answers: GradedAnswer[]) {
+  const map = new Map<string, { correct: number; total: number }>()
+  for (const a of answers) {
+    const s = (a.subject || '').trim() || '기타'
+    const cur = map.get(s) ?? { correct: 0, total: 0 }
+    cur.total += 1
+    if (a.isCorrect) cur.correct += 1
+    map.set(s, cur)
+  }
+  return [...map.entries()].map(([subject, v]) => ({
+    subject,
+    correct: v.correct,
+    total: v.total,
+    pct: Math.round((v.correct / Math.max(1, v.total)) * 100),
+  }))
+}
+
+// 성취도 색 티어 — GARA 팔레트(초록 토큰이 없어 primary/secondary/error 로 강약 표현)
+function toneFor(pct: number) {
+  if (pct >= 80) return { border: 'border-t-primary', text: 'text-primary', bar: 'bg-primary' }
+  if (pct >= 60) return { border: 'border-t-secondary', text: 'text-secondary', bar: 'bg-secondary' }
+  return { border: 'border-t-error', text: 'text-error', bar: 'bg-error' }
+}
+
+// 상세 카드 한 줄
+function Row({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="flex justify-between items-center gap-3">
+      <span className="font-body-md text-body-md text-on-surface-variant">{label}</span>
+      <span className={`font-body-md text-body-md text-right ${tone ?? 'font-medium text-on-surface'}`}>{value}</span>
+    </div>
+  )
+}
+
+type GradedData = Extract<ExamResultResponse, { released: true }>
+
+// ⚠️ 디자인 단계 더미 — 백엔드(get-exam-result) 미완성이라 화면을 바로 볼 수 있게 가짜 성적을 넣는다.
+//    백엔드 붙이면 DEMO_RESULT = false 로 끄고 실데이터로 전환할 것.
+//    URL 뒤에 ?demo=fail 붙이면 불합격 화면도 미리보기.
+const DEMO_RESULT = true
+const DEMO_SUBJECTS_PASS = [
+  { subject: '생성형 AI 및 윤리', total: 20, correct: 19 },
+  { subject: '스마트 도구 및 로봇 기술', total: 40, correct: 34 },
+  { subject: '피지컬 AI 및 데이터 처리', total: 20, correct: 14 },
+]
+const DEMO_SUBJECTS_FAIL = [
+  { subject: '생성형 AI 및 윤리', total: 20, correct: 9 },
+  { subject: '스마트 도구 및 로봇 기술', total: 40, correct: 16 },
+  { subject: '피지컬 AI 및 데이터 처리', total: 20, correct: 11 },
+]
+function demoData(fail = false): GradedData {
+  const specs = fail ? DEMO_SUBJECTS_FAIL : DEMO_SUBJECTS_PASS
+  const answers: GradedAnswer[] = []
+  let n = 1
+  for (const s of specs) {
+    for (let i = 0; i < s.total; i++) {
+      const ok = i < s.correct
+      answers.push({ number: n++, subject: s.subject, topic: '', prompt: '', choices: [], selectedIndex: 0, correctIndex: ok ? 0 : 1, isCorrect: ok })
+    }
+  }
+  return {
+    released: true,
+    submittedAt: '2026-06-22T18:12:00+09:00',
+    totalCorrect: answers.filter((a) => a.isCorrect).length,
+    totalQuestions: answers.length,
+    answers,
+  }
+}
+
+// 채점 공개 후 성적표 — 자체 훅(카운트업)을 쓰므로 컴포넌트로 분리(훅 순서 안정)
+function GradedResult({ data, attemptId, certName }: { data: GradedData; attemptId?: string; certName: string }) {
+  const navigate = useNavigate()
+  const { t } = useT()
+
+  const total = Math.max(1, data.totalQuestions)
+  const scorePct = Math.round((data.totalCorrect / total) * 100)
+  const grade = proGradeForScore(scorePct)
+  const passed = grade !== null
+  const subjects = useMemo(() => subjectStats(data.answers), [data.answers])
+
+  // 점수 카운트업 + 게이지 채움 동기화
+  const anim = useCountUp(scorePct, 1100, 0, 250)
+  const CIRC = 2 * Math.PI * 45
+  const dashoffset = CIRC * (1 - anim / 100)
+
+  const certNo = `GARA-2026-${String(attemptId ?? '').replace(/-/g, '').slice(0, 6).toUpperCase() || '000001'}`
+  const issueDate = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+  })()
+
+  function goCertificate() {
+    localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
+    navigate('/certificate', {
+      state: {
+        name: certName,
+        qualification: grade ? `CARIS Pro ${grade.grade}` : 'CARIS 자격검정',
+        certNo,
+        issueDate,
+        scoreText: `${scorePct}점 (${data.totalCorrect}/${data.totalQuestions})`,
+      },
+    })
+  }
+
+  // Pro 는 단발 시험(점수로 급수 판정) — 누적/사다리 구조가 아니다.
+  // 합격 시 상위 급수를 들이밀면(‘승급까지 N점’·‘재응시로 도전’) 멕이는 느낌 → 금지.
+  // 대신 취득한 급수가 인증하는 역량 수준을 그대로 긍정 서술. (1급만 Master 응시 자격 안내)
+  const infoLine =
+    grade?.grade === '1급'
+      ? t('exresult.info_master')
+      : passed && grade
+        ? t('exresult.info_grade', { tag: grade.tag })
+        : t('exresult.info_fail')
+  const infoIcon = grade?.grade === '1급' ? 'rocket_launch' : passed ? 'verified' : 'target'
+
+  return (
+    <div className="w-full max-w-2xl flex flex-col gap-10">
+      {/* ── 성적 카드 ── */}
+      <div className="glass-panel rounded-3xl p-8 md:p-12 ambient-shadow border border-white/40 relative overflow-hidden text-center">
+        {/* 워터마크 아이콘 */}
+        <span
+          className="material-symbols-outlined absolute -top-6 -right-6 text-[170px] pointer-events-none select-none"
+          style={{ fontVariationSettings: "'FILL' 1", color: passed ? 'rgba(0,74,198,0.05)' : 'rgba(186,26,26,0.05)' }}
+        >
+          {passed ? 'verified' : 'sentiment_dissatisfied'}
+        </span>
+
+        {/* 합격/불합격 배지 */}
+        <div
+          className={`relative inline-flex items-center gap-2 px-5 py-2 rounded-full mb-8 border font-label-md text-label-md font-bold ${
+            passed ? 'bg-primary/10 text-primary border-primary/20' : 'bg-error/10 text-error border-error/20'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            {passed ? 'workspace_premium' : 'info'}
+          </span>
+          {passed ? t('exresult.pass_badge', { grade: grade!.grade }) : t('exresult.fail_badge')}
+        </div>
+
+        {/* 점수 원형 게이지 */}
+        <div className="relative w-44 h-44 mx-auto mb-8">
+          <svg viewBox="0 0 100 100" className={`w-full h-full -rotate-90 ${passed ? 'text-primary' : 'text-error'}`}>
+            <circle cx="50" cy="50" r="45" fill="none" strokeWidth="7" style={{ stroke: 'var(--color-surface-container-high)' }} />
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={CIRC}
+              strokeDashoffset={dashoffset}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="flex items-baseline gap-1">
+              <span className={`font-display-lg text-display-lg leading-none ${passed ? 'text-primary' : 'text-error'}`}>{anim}</span>
+              <span className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant">/ 100</span>
+            </div>
+            <span className="font-label-md text-label-md text-on-surface-variant mt-1">{t('exresult.score_unit')}</span>
+          </div>
+        </div>
+
+        {/* 상세 */}
+        <div className="bg-surface-container-low/70 rounded-2xl p-6 mb-8 flex flex-col gap-4 text-left border border-outline-variant/20 max-w-md mx-auto">
+          <Row label={t('result.submitted_at')} value={fmtDate(data.submittedAt)} />
+          <div className="h-px bg-outline-variant/25" />
+          <Row
+            label={t('exresult.earned_grade')}
+            value={passed ? `CARIS Pro ${grade!.grade}` : t('result.fail')}
+            tone={passed ? 'text-primary font-bold' : 'text-error font-bold'}
+          />
+          <div className="h-px bg-outline-variant/25" />
+          <Row label={t('exresult.correct_count')} value={`${data.totalCorrect} / ${data.totalQuestions}`} />
+          <div className="bg-primary/5 rounded-lg p-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[20px]">{infoIcon}</span>
+            <span className="font-label-md text-label-md text-primary">{infoLine}</span>
+          </div>
+        </div>
+
+        {/* 액션 — 상황별 주요 버튼 + 항상 뒤로 */}
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center max-w-md mx-auto">
+          {passed && (
+            <button
+              onClick={goCertificate}
+              className="flex-1 bg-primary-container text-on-primary font-title-md text-title-md font-bold py-3.5 px-6 rounded-xl ambient-shadow hover:translate-y-[-2px] transition-transform duration-200 inline-flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[20px]">workspace_premium</span>
+              {t('exresult.issue_cert')}
+            </button>
+          )}
+          {grade?.grade === '1급' && (
+            <button
+              onClick={() => navigate('/guide')}
+              className="flex-1 bg-surface-container-lowest border border-primary/30 text-primary font-title-md text-title-md py-3.5 px-6 rounded-xl hover:bg-primary/5 transition-all inline-flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[20px]">school</span>
+              {t('exresult.master_guide')}
+            </button>
+          )}
+          <button
+            onClick={() => navigate(-1)}
+            className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary font-title-md text-title-md py-3.5 px-6 rounded-xl transition-all"
+          >
+            {t('result.back')}
+          </button>
+        </div>
+      </div>
+
+      {/* ── 과목별 성취도 ── */}
+      {subjects.length > 0 && (
+        <div className="w-full flex flex-col gap-5">
+          <h3 className="font-title-md text-title-md font-bold text-on-background text-left">{t('exresult.subject_title')}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {subjects.map((s, i) => {
+              const tone = toneFor(s.pct)
+              return (
+                <div key={s.subject} className={`glass-card rounded-2xl p-5 flex flex-col gap-3 border-t-4 ${tone.border}`}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-label-md text-label-md text-on-surface-variant">{t('exresult.subject_n', { n: i + 1 })}</span>
+                    <span className={`font-bold ${tone.text}`}>{s.pct}%</span>
+                  </div>
+                  <div className="font-body-md text-body-md font-semibold text-on-surface leading-snug">{s.subject}</div>
+                  <div className="w-full bg-outline-variant/20 h-2 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${tone.bar} transition-[width] duration-700`} style={{ width: `${s.pct}%` }} />
+                  </div>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant">
+                    {s.correct}/{s.total} {t('exresult.correct_suffix')}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ExamResult() {
   const { attemptId } = useParams()
-  const navigate = useNavigate()
   const location = useLocation()
   const justSubmitted = location.state as SubmitExamResponse | null
   const { user } = useAuth()
@@ -64,6 +307,13 @@ export default function ExamResult() {
   const [err, setErr] = useState('')
 
   useEffect(() => {
+    // 디자인 단계: 백엔드 없이 더미 성적으로 렌더 (?demo=fail → 불합격 미리보기)
+    if (DEMO_RESULT) {
+      const fail = new URLSearchParams(location.search).get('demo') === 'fail'
+      setData(demoData(fail))
+      setLoading(false)
+      return
+    }
     let alive = true
     callFunction<ExamResultResponse>('get-exam-result', { attemptId })
       .then((r) => alive && setData(r))
@@ -72,7 +322,7 @@ export default function ExamResult() {
     return () => {
       alive = false
     }
-  }, [attemptId])
+  }, [attemptId, location.search])
 
   // 무효 제출
   if (justSubmitted?.voided) {
@@ -136,45 +386,13 @@ export default function ExamResult() {
     )
   }
 
-  // 채점 공개 후
-  const passed = data.totalCorrect >= Math.ceil(data.totalQuestions * PASS_RATIO)
+  // 채점 공개 후 — 성적표
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const certName = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
-  const certNo = `GARA-2026-${String(attemptId ?? '').replace(/-/g, '').slice(0, 6).toUpperCase() || '000001'}`
-  const issueDate = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
-  })()
-  const scoreText = `${data.totalCorrect} / ${data.totalQuestions}`
-  function goCertificate() {
-    localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
-    navigate('/certificate', { state: { name: certName, qualification: 'CARIS 자격검정', certNo, issueDate, scoreText } })
-  }
 
   return (
     <Shell>
-      <Card>
-        <Emblem icon={passed ? 'trophy' : 'sentiment_dissatisfied'} tone={passed ? 'secondary' : 'error'} />
-        <span className={`inline-block px-4 py-1.5 rounded-full font-label-sm text-label-sm uppercase tracking-wider font-bold mb-5 border ${passed ? 'bg-secondary/10 text-secondary border-secondary/20' : 'bg-error/10 text-error border-error/20'}`}>
-          {passed ? t('result.pass') : t('result.fail')}
-        </span>
-        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-6">{t('result.graded_title')}</h1>
-        <div className="flex items-baseline justify-center gap-2 mb-3">
-          <span className="font-display-lg text-display-lg text-primary">{data.totalCorrect}</span>
-          <span className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant">/ {data.totalQuestions}</span>
-        </div>
-        <p className="font-body-md text-body-md text-on-surface-variant mb-8">{t('result.submitted_prefix')} {fmtDate(data.submittedAt)}</p>
-        <div className="bg-surface-container-low rounded-xl p-4 font-label-md text-label-md text-on-surface-variant mb-8">{t('result.pass_criteria')}</div>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          {passed && (
-            <button onClick={goCertificate} className="bg-primary-container text-on-primary font-title-md text-title-md px-8 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2 font-bold">
-              <span className="material-symbols-outlined text-[20px]">workspace_premium</span>
-              {t('result.issue_cert')}
-            </button>
-          )}
-          <button onClick={() => navigate(-1)} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary font-title-md text-title-md px-8 py-3 rounded-xl border border-outline-variant hover:border-primary transition-all">{t('result.back')}</button>
-        </div>
-      </Card>
+      <GradedResult data={data} attemptId={attemptId} certName={certName} />
     </Shell>
   )
 }

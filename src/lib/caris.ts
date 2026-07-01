@@ -63,6 +63,31 @@ export const TRACKS: Track[] = [
   },
 ]
 
+// ── CARIS Pro 급수 판정 ───────────────────────────────────────────
+// Pro 는 단일 필기시험 → 취득 점수(0~100)에 따라 4급~1급을 차등 부여.
+// 컷: 4급 60 / 3급 70 / 2급 80 / 1급 90. 60점 미만은 불합격(급수 없음).
+// ⚠️ TRACKS['pro'].levels 의 pass 문구(60/70/80/90점 이상)와 반드시 동기화.
+export type ProGrade = { grade: string; min: number; tag: string }
+
+export const PRO_PASS_MIN = 60 // 합격 최소 점수(4급 컷)
+
+export const PRO_GRADE_CUTS: ProGrade[] = [
+  { grade: '1급', min: 90, tag: '관리자·강사 및 전문가 과정 진입' },
+  { grade: '2급', min: 80, tag: '대학생 및 직장인 중급' },
+  { grade: '3급', min: 70, tag: '중·고등학생 및 직장인 기초' },
+  { grade: '4급', min: 60, tag: '전 국민 입문 · 기초 소양' },
+]
+
+// 취득 점수(%)로 얻은 최고 급수. 60 미만이면 null(불합격).
+export function proGradeForScore(pct: number): ProGrade | null {
+  return PRO_GRADE_CUTS.find((g) => pct >= g.min) ?? null
+}
+
+// 다음(더 높은) 급수 컷. 이미 1급이면 null.
+export function nextProGrade(pct: number): ProGrade | null {
+  return [...PRO_GRADE_CUTS].reverse().find((g) => g.min > pct) ?? null // 4급→1급 오름차순 탐색
+}
+
 export type Round = { id: string; roundKey: string; dateKey: string; open: boolean }
 
 export const SCHEDULE: Round[] = [
