@@ -289,6 +289,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/')}>
                 <span className="ic"><HomeIcon /></span> {t('common.home')}
               </button>
+              <button className="pf-item" onClick={() => go('/guide')}>
+                <span className="ic"><InfoIcon /></span> {t('nav.guide')}
+              </button>
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic"><ExamIcon /></span> {t('nav.exam')}
               </button>
@@ -297,9 +300,6 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-item" onClick={goLevelTest}>
                 <span className="ic"><TargetIcon /></span> {t('common.leveltest')}
-              </button>
-              <button className="pf-item" onClick={() => go('/guide')}>
-                <span className="ic"><InfoIcon /></span> {t('nav.guide')}
               </button>
               {isFullUser ? (
                 <button className="pf-item" onClick={() => go('/mypage')}>
