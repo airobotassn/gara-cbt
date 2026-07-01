@@ -1,7 +1,7 @@
 /* levelselect: LevelSelect.tsx */
 /* 제목 + 등급규칙 토글 */
 .lv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.lv-head .sc-title { margin: 0; }
+.lv-head .sc-title { margin: 0; font-size: clamp(20px, 3.4vw, 26px); letter-spacing: -0.02em; }
 .lv-rule-btn {
   flex: none;
   border: 1px solid var(--line2);
