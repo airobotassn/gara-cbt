@@ -8,6 +8,7 @@ import { GEM_COLORS, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
 import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
+import { LEVELTEST_URL } from '../lib/testConfig'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
@@ -140,6 +141,13 @@ export default function Layout({ children }: { children: ReactNode }) {
     navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
+  // 레벨테스트(별도 서비스)로 이동
+  function goLevelTest() {
+    setOpen(false)
+    setMoreOpen(false)
+    window.location.href = LEVELTEST_URL
+  }
+
   return (
     <>
       {children}
@@ -268,6 +276,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-item" onClick={() => go('/exam')}>
                 <span className="ic">📝</span> {t('nav.exam')}
+              </button>
+              <button className="pf-item" onClick={goLevelTest}>
+                <span className="ic">🎯</span> {t('common.leveltest')}
               </button>
               <button className="pf-item" onClick={() => go('/guide')}>
                 <span className="ic">ℹ️</span> {t('nav.guide')}

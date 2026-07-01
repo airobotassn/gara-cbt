@@ -99,6 +99,77 @@
   margin-top: 16px;
 }
 
+/* ===== 메인 진입 3버튼 (무료 레벨 진단 · 자격시험 응시 · 학습 시작) ===== */
+.lp-ctas {
+  position: relative;
+  margin-top: 40px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.lp-ctas .cta {
+  margin-top: 0;
+}
+.cta-ghost {
+  position: relative;
+  border: 1px solid var(--line2);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--txt);
+  background: var(--bg);
+  padding: 16px 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: 0.18s;
+  max-width: 100%;
+}
+.cta-ghost:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  transform: translateY(-2px);
+}
+.cta-ghost .arr {
+  transition: 0.18s;
+}
+.cta-ghost:hover .arr {
+  transform: translateX(3px);
+}
+/* '학습 시작' 준비중 — 클릭하면 안내만, 강조 안 함 */
+.cta-ghost.soon {
+  color: var(--muted);
+  cursor: default;
+}
+.cta-ghost.soon:hover {
+  border-color: var(--line2);
+  color: var(--muted);
+  transform: none;
+}
+.cta-soon-tag {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--line2);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.lp-soon-note {
+  position: relative;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 600px) {
+  .cta-ghost {
+    padding: 15px 24px;
+  }
+}
+
 /* ===== 메인 검색어 → 레벨 추천 ===== */
 .lp-search {
   position: relative;

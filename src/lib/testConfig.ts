@@ -4,6 +4,9 @@
 // 기본 시험 식별자(서버 seed 의 exams.slug 와 일치)
 export const DEFAULT_EXAM_SLUG = 'gara-default'
 
+// 레벨테스트(별도 서비스) — 메인/FAB '레벨테스트 응시하기' 이동 대상
+export const LEVELTEST_URL = 'https://gara-leveltest.airobotassn.workers.dev/'
+
 // 화면 표기/타이머 폴백 (서버 응답값으로 덮어씀)
 export const TOTAL_QUESTIONS = 100
 export const TEST_DURATION_MINUTES = 120
