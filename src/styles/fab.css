@@ -123,6 +123,7 @@
   border-radius: 50%;
   background: var(--soft);
   border: 1px solid var(--line2);
+  color: var(--muted);
   font-size: var(--fs-sm);
   display: grid;
   place-items: center;
@@ -275,7 +276,14 @@
 }
 .pf-item .ic {
   width: 22px;
-  text-align: center;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.pf-item:hover .ic {
+  color: var(--ink);
 }
 .pf-item .lockmini {
   margin-left: auto;
@@ -288,6 +296,9 @@
   border-top: 1px solid var(--line);
 }
 .pf-langlabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--dim);
@@ -350,6 +361,11 @@
 .pf-foot-link:hover {
   border-color: var(--blue);
   color: var(--ink);
+}
+.pf-foot-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .pf-more-caret {
   transition: transform 0.18s;
