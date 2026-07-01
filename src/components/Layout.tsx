@@ -291,12 +291,6 @@ export default function Layout({ children }: { children: ReactNode }) {
                   <span className="ic">🙋</span> {t('nav.mypage')}
                 </button>
               ) : null}
-              <button className="pf-item" onClick={() => go('/certificate')}>
-                <span className="ic">📜</span> {t('nav.certpreview')}
-              </button>
-              <button className="pf-item" onClick={goExamPreview}>
-                <span className="ic">🖥️</span> {t('nav.exampreview')}
-              </button>
               <button className="pf-item" onClick={toggleTheme}>
                 <span className="ic">{dark ? '☀️' : '🌙'}</span> {dark ? t('fab.light') : t('fab.dark')}
               </button>
@@ -357,6 +351,13 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-more-link" onClick={() => go('/about')}>
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>
+              </button>
+              {/* 개발/디자인 확인용 미리보기 — 런칭 시 제거 예정 */}
+              <button className="pf-more-link" onClick={() => go('/certificate')}>
+                {t('nav.certpreview')} <span className="pf-more-ext">↗</span>
+              </button>
+              <button className="pf-more-link" onClick={goExamPreview}>
+                {t('nav.exampreview')} <span className="pf-more-ext">↗</span>
               </button>
               {/* 개인정보처리방침·이용약관은 한국어 법무 문서 — 한국어에서만 노출 */}
               {lang === 'ko' ? (

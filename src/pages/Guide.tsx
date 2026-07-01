@@ -65,7 +65,7 @@ export default function Guide() {
         <section className="py-16 bg-surface-container-lowest px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-10">
-              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">AI·로봇 융합역량 자격시험</h2>
+              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">AI·Robot 융합역량 자격시험</h2>
             </div>
 
             {/* 트랙 전환: 화살표 + 탭 */}

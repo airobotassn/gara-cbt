@@ -33,7 +33,7 @@ export const TRACKS: Track[] = [
   {
     key: 'pro',
     name: 'CARIS Pro',
-    tagline: '전국민 AI·로봇 리터러시',
+    tagline: '전국민 AI·Robot 리터러시',
     eligibility: '응시 자격 제한 없음',
     icon: 'school',
     caption: '한 번의 필기시험으로, 취득 점수에 따라 4급~1급을 차등 부여합니다.',
@@ -44,7 +44,7 @@ export const TRACKS: Track[] = [
       { grade: '4급', tag: '전 국민 입문 · 기초 소양', subjects: ['생성형 AI의 일상 활용', '인공지능 윤리 및 안전한 디지털 도구 활용'], pass: '60점 이상' },
       { grade: '3급', tag: '중·고등학생 및 직장인 기초', subjects: ['스마트 도구 활용 및 프롬프트', '일상 속 로봇 및 자동화 기술'], pass: '70점 이상' },
       { grade: '2급', tag: '대학생 및 직장인 중급', subjects: ['피지컬 AI 블록코딩 및 논리 제어', '에지 디바이스와 데이터 수집·처리 기초'], pass: '80점 이상' },
-      { grade: '1급', tag: '관리자·강사 및 전문가 과정 진입', subjects: ['AI·로봇 기술 트렌드 및 산업 적용 기획', 'AI·로봇 융합 서비스 시나리오 설계'], pass: '90점 이상' },
+      { grade: '1급', tag: '관리자·강사 및 전문가 과정 진입', subjects: ['AI·Robot 기술 트렌드 및 산업 적용 기획', 'AI·Robot 융합 서비스 시나리오 설계'], pass: '90점 이상' },
     ],
   },
   {
@@ -57,8 +57,8 @@ export const TRACKS: Track[] = [
     levels: [
       { grade: '4급', prereq: 'CARIS Pro 1급 취득자', method: '필기 객50+주10 / 60분 · 실기 PC작업형 / 120분', subjects: ['AI 서비스 개발을 위한 SW 스택 이해', 'AI 통합을 위한 로봇·임베디드 HW 이해'], practical: '기초 AI API + 단일 로봇 제어 코딩', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 80000 },
       { grade: '3급', prereq: 'CARIS Master 4급 취득자', method: '필기 객50+주10 / 60분 · 실기 PC작업형 / 120분', subjects: ['온디바이스 AI 모델 경량화 및 에지 배포 실무', 'AI 기반 멀티모달 센서 융합 및 지능형 제어 적용'], practical: 'Python/C++ 코드 및 LLM 연동', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 100000 },
-      { grade: '2급', prereq: 'CARIS Master 3급 취득자', method: '필기 객30+주10 / 60분 · 실기 복합작업형 / 120분', subjects: ['AI 연동 디지털 트윈 설계 및 시뮬레이션 검증', 'AI·로봇 융합 시스템 아키텍처 설계'], practical: 'Isaac Sim·Gazebo 기반 자율주행·AI 비전 파이프라인 구축·최적화', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 120000 },
-      { grade: '1급', prereq: 'CARIS Master 2급 취득자', method: '실기 포트폴리오 제출 + 심층 면접 / 30분', subjects: ['AI·로봇 솔루션 시스템 통합 및 프로젝트 관리', '국제표준(ISO 10218·IEC 62443·ISO/IEC 42001) 및 기능안전 적용'], pass: '루브릭 심사 · 심사위원 평균 80점 이상', fee: 150000 },
+      { grade: '2급', prereq: 'CARIS Master 3급 취득자', method: '필기 객30+주10 / 60분 · 실기 복합작업형 / 120분', subjects: ['AI 연동 디지털 트윈 설계 및 시뮬레이션 검증', 'AI·Robot 융합 시스템 아키텍처 설계'], practical: 'Isaac Sim·Gazebo 기반 자율주행·AI 비전 파이프라인 구축·최적화', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 120000 },
+      { grade: '1급', prereq: 'CARIS Master 2급 취득자', method: '실기 포트폴리오 제출 + 심층 면접 / 30분', subjects: ['AI·Robot 솔루션 시스템 통합 및 프로젝트 관리', '국제표준(ISO 10218·IEC 62443·ISO/IEC 42001) 및 기능안전 적용'], pass: '루브릭 심사 · 심사위원 평균 80점 이상', fee: 150000 },
     ],
   },
 ]
