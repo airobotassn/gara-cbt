@@ -264,3 +264,69 @@ $$;
 
 alter table reco_cache      enable row level security;
 alter table reco_shadow_log enable row level security;
+
+-- ---------- 레벨테스트 후속 객체 (랭킹/소프트삭제) ----------
+-- user_level_skill.rating: applyAttempt가 매 응시 기록(랭킹 정렬용 6축 평균)
+alter table user_level_skill add column if not exists rating numeric(6,2) not null default 0;
+create index if not exists user_level_skill_lvl_rating_idx
+  on user_level_skill (level, rating desc, attempts_count asc);
+-- test_questions.deleted_at: 문항 소프트 삭제
+alter table test_questions add column if not exists deleted_at timestamptz;
+create index if not exists test_questions_deleted_idx
+  on test_questions (deleted_at) where deleted_at is not null;
+-- profiles.deactivated_at: 회원 탈퇴 소프트 삭제(랭킹 제외 + 보관 후 purge)
+alter table profiles add column if not exists deactivated_at timestamptz;
+create index if not exists profiles_deactivated_idx
+  on profiles (deactivated_at) where deactivated_at is not null;
+
+-- 명예의 전당 RPC: user_progress.points 정렬(동점=먼저 도달), 탈퇴자 제외. leaderboard 함수가 호출.
+create or replace function public.global_top(p_uid uuid, p_limit int default 10)
+returns jsonb language sql stable as $$
+with ranked as (
+  select p.user_id, p.rank as lvl, p.points,
+         row_number() over (order by p.points desc, p.updated_at asc) as grank,
+         count(*) over () as gtotal
+  from user_progress p
+  join profiles pr0 on pr0.id = p.user_id and pr0.deactivated_at is null
+)
+select jsonb_build_object(
+  'top', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'rank', r.grank,
+      'name', coalesce(nullif(pr.display_name, ''), '익명'),
+      'level', r.lvl,
+      'rating', r.points,
+      'avatar', pr.avatar_url,
+      'me', (r.user_id = p_uid)
+    ) order by r.grank)
+    from ranked r left join profiles pr on pr.id = r.user_id
+    where r.grank <= p_limit
+  ), '[]'::jsonb),
+  'total', coalesce((select gtotal from ranked limit 1), 0),
+  'me', (
+    select jsonb_build_object(
+      'rank', r.grank, 'level', r.lvl, 'rating', r.points,
+      'name', coalesce(nullif(pr.display_name, ''), '익명'), 'avatar', pr.avatar_url
+    )
+    from ranked r left join profiles pr on pr.id = r.user_id
+    where r.user_id = p_uid
+  )
+);
+$$;
+
+-- 보관기간(기본 90일) 지난 탈퇴 계정 완전 삭제(auth.users → cascade).
+create or replace function public.purge_deactivated_accounts(retention_days int default 90)
+returns int language plpgsql security definer set search_path = public, auth as $$
+declare n int;
+begin
+  with del as (
+    delete from auth.users u using profiles p
+    where p.id = u.id and p.deactivated_at is not null
+      and p.deactivated_at < now() - make_interval(days => retention_days)
+    returning u.id
+  )
+  select count(*) into n from del;
+  return n;
+end;
+$$;
+revoke all on function public.purge_deactivated_accounts(int) from public, anon, authenticated;
