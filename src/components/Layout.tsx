@@ -366,17 +366,17 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-more-link" onClick={() => go('/about')}>
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>
               </button>
-              {/* 개발/디자인 확인용 미리보기 — 런칭 시 제거 예정 */}
-              <button className="pf-more-link" onClick={() => go('/certificate')}>
+              {/* 개발/디자인 확인용 미리보기 — 런칭 시 제거 예정(앰버색으로 구분) */}
+              <button className="pf-more-link pf-preview" onClick={() => go('/certificate')}>
                 {t('nav.certpreview')} <span className="pf-more-ext">↗</span>
               </button>
-              <button className="pf-more-link" onClick={goExamPreview}>
+              <button className="pf-more-link pf-preview" onClick={goExamPreview}>
                 {t('nav.exampreview')} <span className="pf-more-ext">↗</span>
               </button>
-              <button className="pf-more-link" onClick={() => go('/exam/result/preview')}>
+              <button className="pf-more-link pf-preview" onClick={() => go('/exam/result/preview')}>
                 {t('nav.resultpasspreview')} <span className="pf-more-ext">↗</span>
               </button>
-              <button className="pf-more-link" onClick={() => go('/exam/result/preview?demo=fail')}>
+              <button className="pf-more-link pf-preview" onClick={() => go('/exam/result/preview?demo=fail')}>
                 {t('nav.resultfailpreview')} <span className="pf-more-ext">↗</span>
               </button>
               {/* 개인정보처리방침·이용약관은 한국어 법무 문서 — 한국어에서만 노출 */}

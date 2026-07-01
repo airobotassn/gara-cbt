@@ -16,6 +16,13 @@ function fmtDate(iso?: string | null) {
   const d = new Date(iso)
   return d.toLocaleString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+// 상세 행용 컴팩트 날짜 (모바일에서 라벨을 밀지 않게 짧게) — 예: 2026. 06. 22. 18:12
+function fmtDateCompact(iso?: string | null) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}. ${p(d.getHours())}:${p(d.getMinutes())}`
+}
 function daysLeft(iso?: string | null) {
   if (!iso) return 0
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
@@ -83,8 +90,8 @@ function toneFor(pct: number) {
 function Row({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <div className="flex justify-between items-center gap-3">
-      <span className="font-body-md text-body-md text-on-surface-variant">{label}</span>
-      <span className={`font-body-md text-body-md text-right ${tone ?? 'font-medium text-on-surface'}`}>{value}</span>
+      <span className="font-body-md text-body-md text-on-surface-variant shrink-0 whitespace-nowrap">{label}</span>
+      <span className={`font-body-md text-body-md text-right break-keep ${tone ?? 'font-medium text-on-surface'}`}>{value}</span>
     </div>
   )
 }
@@ -173,7 +180,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   return (
     <div className="w-full max-w-2xl flex flex-col gap-10">
       {/* ── 성적 카드 ── */}
-      <div className="glass-panel rounded-3xl p-8 md:p-12 ambient-shadow border border-white/40 relative overflow-hidden text-center">
+      <div className="glass-panel rounded-3xl p-6 md:p-12 ambient-shadow border border-white/40 relative overflow-hidden text-center">
         {/* 워터마크 아이콘 */}
         <span
           className="material-symbols-outlined absolute -top-6 -right-6 text-[170px] pointer-events-none select-none"
@@ -184,11 +191,11 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
 
         {/* 합격/불합격 배지 */}
         <div
-          className={`relative inline-flex items-center gap-2 px-5 py-2 rounded-full mb-8 border font-label-md text-label-md font-bold ${
+          className={`relative inline-flex items-center gap-2 px-4 py-2 rounded-2xl mb-8 border font-label-md text-label-md font-bold break-keep text-center leading-snug max-w-full ${
             passed ? 'bg-primary/10 text-primary border-primary/20' : 'bg-error/10 text-error border-error/20'
           }`}
         >
-          <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <span className="material-symbols-outlined text-[20px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
             {passed ? 'workspace_premium' : 'info'}
           </span>
           {passed ? t('exresult.pass_badge', { grade: grade!.grade }) : t('exresult.fail_badge')}
@@ -220,8 +227,8 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
         </div>
 
         {/* 상세 */}
-        <div className="bg-surface-container-low/70 rounded-2xl p-6 mb-8 flex flex-col gap-4 text-left border border-outline-variant/20 max-w-md mx-auto">
-          <Row label={t('result.submitted_at')} value={fmtDate(data.submittedAt)} />
+        <div className="bg-surface-container-low/70 rounded-2xl p-5 md:p-6 mb-8 flex flex-col gap-4 text-left border border-outline-variant/20 max-w-md mx-auto">
+          <Row label={t('result.submitted_at')} value={fmtDateCompact(data.submittedAt)} />
           <div className="h-px bg-outline-variant/25" />
           <Row
             label={t('exresult.earned_grade')}
@@ -230,9 +237,9 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
           />
           <div className="h-px bg-outline-variant/25" />
           <Row label={t('exresult.correct_count')} value={`${data.totalCorrect} / ${data.totalQuestions}`} />
-          <div className="bg-primary/5 rounded-lg p-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[20px]">{infoIcon}</span>
-            <span className="font-label-md text-label-md text-primary">{infoLine}</span>
+          <div className="bg-primary/5 rounded-lg p-3 flex items-start gap-2">
+            <span className="material-symbols-outlined text-primary text-[20px] shrink-0">{infoIcon}</span>
+            <span className="font-label-md text-label-md text-primary break-keep leading-snug">{infoLine}</span>
           </div>
         </div>
 
