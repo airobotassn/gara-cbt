@@ -22,6 +22,10 @@ import Terms from './pages/Terms'
 import Guide from './pages/Guide'
 import Notice from './pages/Notice'
 import Faq from './pages/Faq'
+import LevelSelect from './pages/LevelSelect'
+import TestRunner from './pages/TestRunner'
+import Result from './pages/Result'
+import Ranking from './pages/Ranking'
 const Admin = lazy(() => import('./pages/Admin'))
 
 // 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
@@ -54,6 +58,11 @@ export default function App() {
               <Route path="/certificate" element={<Certificate />} />
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/mypage/:section" element={<MyPage />} />
+              {/* 레벨테스트 모듈 (/test/*) + 랭킹 */}
+              <Route path="/test/select" element={<LevelSelect />} />
+              <Route path="/test/:attemptId" element={<TestRunner />} />
+              <Route path="/test/result/:attemptId" element={<Result />} />
+              <Route path="/ranking" element={<Ranking />} />
               <Route path="/about" element={<About />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
