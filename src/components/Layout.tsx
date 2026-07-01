@@ -9,6 +9,21 @@ import { isSEB } from '../lib/seb'
 import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
 import { LEVELTEST_URL } from '../lib/testConfig'
+import {
+  HomeIcon,
+  ExamIcon,
+  CalendarIcon,
+  TargetIcon,
+  InfoIcon,
+  UserIcon,
+  SunIcon,
+  MoonIcon,
+  GlobeIcon,
+  ToolIcon,
+  MoreIcon,
+  PencilIcon,
+  CameraIcon,
+} from './FabIcons'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
@@ -166,7 +181,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 ) : (
                   <Avatar avatarUrl={profile?.avatar_url} seed={seedBase} size={52} />
                 )}
-                <span className="pf-ava-badge">🎨</span>
+                <span className="pf-ava-badge"><PencilIcon size={11} /></span>
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {isFullUser && editing ? (
@@ -237,7 +252,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                       {spec.kind === 'image' ? (
                         <Avatar avatarUrl={profile?.avatar_url} seed={seedBase} size={38} />
                       ) : (
-                        <span className="pf-upload-ic">{uploading ? '…' : '📷'}</span>
+                        <span className="pf-upload-ic">{uploading ? '…' : <CameraIcon size={20} />}</span>
                       )}
                     </button>
                   ) : null}
@@ -272,32 +287,32 @@ export default function Layout({ children }: { children: ReactNode }) {
 
             <div className="pf-list">
               <button className="pf-item" onClick={() => go('/')}>
-                <span className="ic">🏠</span> {t('common.home')}
+                <span className="ic"><HomeIcon /></span> {t('common.home')}
               </button>
               <button className="pf-item" onClick={() => go('/exam')}>
-                <span className="ic">📝</span> {t('nav.exam')}
+                <span className="ic"><ExamIcon /></span> {t('nav.exam')}
               </button>
               <button className="pf-item" onClick={() => go('/exam/schedule')}>
-                <span className="ic">🗓️</span> {t('nav.apply')}
+                <span className="ic"><CalendarIcon /></span> {t('nav.apply')}
               </button>
               <button className="pf-item" onClick={goLevelTest}>
-                <span className="ic">🎯</span> {t('common.leveltest')}
+                <span className="ic"><TargetIcon /></span> {t('common.leveltest')}
               </button>
               <button className="pf-item" onClick={() => go('/guide')}>
-                <span className="ic">ℹ️</span> {t('nav.guide')}
+                <span className="ic"><InfoIcon /></span> {t('nav.guide')}
               </button>
               {isFullUser ? (
                 <button className="pf-item" onClick={() => go('/mypage')}>
-                  <span className="ic">🙋</span> {t('nav.mypage')}
+                  <span className="ic"><UserIcon /></span> {t('nav.mypage')}
                 </button>
               ) : null}
               <button className="pf-item" onClick={toggleTheme}>
-                <span className="ic">{dark ? '☀️' : '🌙'}</span> {dark ? t('fab.light') : t('fab.dark')}
+                <span className="ic">{dark ? <SunIcon /> : <MoonIcon />}</span> {dark ? t('fab.light') : t('fab.dark')}
               </button>
             </div>
 
             <div className="pf-langwrap">
-              <div className="pf-langlabel">🌐 {t('fab.language')}</div>
+              <div className="pf-langlabel"><GlobeIcon size={14} /> {t('fab.language')}</div>
               <div className="pf-lang">
                 {LANGS.map((l) => (
                   <button
@@ -317,7 +332,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 onClick={() => go('/admin')}
                 style={{ width: '100%', marginTop: 14, marginBottom: 8, fontWeight: 700 }}
               >
-                <span>🛠 {t('fab.admin')}</span>
+                <span className="pf-foot-lbl"><ToolIcon size={16} /> {t('fab.admin')}</span>
                 <span className="pf-more-caret">›</span>
               </button>
             ) : null}
@@ -328,7 +343,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 onClick={() => setMoreOpen((m) => !m)}
                 aria-expanded={moreOpen}
               >
-                <span>ⓘ {t('fab.morebtn')}</span>
+                <span className="pf-foot-lbl"><MoreIcon size={16} /> {t('fab.morebtn')}</span>
                 <span className={`pf-more-caret ${moreOpen ? 'on' : ''}`}>›</span>
               </button>
             </div>
