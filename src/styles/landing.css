@@ -171,38 +171,50 @@
 }
 
 /* ===== 메인 검색어 → 레벨 추천 ===== */
+/* 챗형 AI 스타일: 타원형(pill) 컨테이너 안에 인풋 + 오른쪽 동그란 화살표 버튼 */
 .lp-search {
   position: relative;
   margin-top: 34px;
   width: min(480px, 100%);
   display: flex;
+  align-items: center;
   gap: 8px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--bg);
+  padding: 6px 6px 6px 22px;
+  transition: 0.16s;
+}
+.lp-search:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0, 74, 198, 0.18);
 }
 .lp-search-input {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--line2);
-  border-radius: 999px;
-  padding: 14px 20px;
+  border: none;
+  background: transparent;
+  padding: 8px 0;
   font-size: var(--fs-md);
-  background: var(--bg);
   color: var(--txt);
-  transition: 0.16s;
 }
 .lp-search-input:focus {
   outline: none;
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(0, 74, 198, 0.18);
 }
 .lp-search-input::placeholder {
   color: var(--dim);
 }
 .lp-search-btn {
   flex: none;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: 999px;
-  padding: 0 22px;
-  font-size: var(--fs-sm);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
   font-weight: 700;
   color: var(--on-accent);
   background: var(--blue);
@@ -245,13 +257,6 @@
 }
 @media (max-width: 480px) {
   .lp-search {
-    flex-direction: column;
-  }
-  .lp-search-input {
-    border-radius: 14px;
-  }
-  .lp-search-btn {
-    border-radius: 14px;
-    padding: 13px 22px;
+    padding: 5px 5px 5px 18px;
   }
 }

@@ -53,7 +53,7 @@ const D: Record<string, Record<Lang, string>> = {
   'landing.cta': { ko: 'CARIS 자격검정 응시하기', en: 'Take the CARIS certification exam', ja: 'CARIS資格検定を受ける', zh: '参加 CARIS 资格检定', hi: 'CARIS प्रमाणन परीक्षा दें', vi: 'Tham gia kỳ thi chứng nhận CARIS' },
   // 레벨 추천(무료 진단 검색창) — /test/* 모듈용
   'reco.heading': { ko: '어느 정도 쓰는지 한마디로 적어보세요', en: 'Describe your AI skills in a few words', ja: 'AIの使い方を一言で書いてみてください', zh: '用一句话描述你的 AI 使用水平', hi: 'अपनी AI दक्षता कुछ शब्दों में बताएं', vi: 'Mô tả trình độ AI của bạn trong vài từ' },
-  'reco.placeholder': { ko: '예: 나 초보야 / 그냥저냥 씀 / 자동화도 잘함', en: 'e.g. total beginner / just casual / I automate a lot', ja: '例: 初心者です / そこそこ / 自動化も得意', zh: '例如：完全新手 / 一般般 / 我很会做自动化', hi: 'उदा: बिल्कुल नया / बस सामान्य / मैं काफी ऑटोमेशन करता हूँ', vi: 'vd: người mới hoàn toàn / dùng bình thường / tôi tự động hóa nhiều' },
+  'reco.placeholder': { ko: '내 AI 실력, 어느 정도일까?', en: 'How good is your AI skill?', ja: 'あなたのAI活用力はどのくらい？', zh: '你的 AI 实力有多强？', hi: 'आपकी AI दक्षता कितनी है?', vi: 'Trình độ AI của bạn đến đâu?' },
   'reco.button': { ko: '레벨 추천받기', en: 'Recommend a level', ja: 'レベルを提案', zh: '推荐等级', hi: 'लेवल सुझाएं', vi: 'Gợi ý cấp độ' },
   'reco.loading': { ko: '분석 중…', en: 'Analyzing…', ja: '分析中…', zh: '分析中…', hi: 'विश्लेषण…', vi: 'Đang phân tích…' },
   'mypage.tab_learning': { ko: '학습 대시보드', en: 'Learning', ja: '学習ダッシュボード', zh: '学习仪表板', hi: 'लर्निंग', vi: 'Bảng học tập' },
