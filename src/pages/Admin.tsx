@@ -30,7 +30,7 @@ export default function Admin() {
   return (
     <>
       <div className="wrap" style={{ paddingBottom: 0 }}>
-        <div className="admin-tabs" style={{ marginTop: 10 }}>
+        <div className="admin-tabs admin-tabs-top" style={{ marginTop: 10 }}>
           <button className={topTab === 'caris' ? 'on' : ''} onClick={() => setTopTab('caris')}>
             CARIS 시험
           </button>

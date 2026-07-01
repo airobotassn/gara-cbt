@@ -23,6 +23,25 @@
 .admin-tabs button:hover { color: var(--ink); }
 .admin-tabs button.on { background: var(--blue); color: var(--on-accent); box-shadow: 0 0 12px -2px rgba(0, 74, 198,.5); }
 
+/* 최상위 제품 선택 탭(CARIS 시험 / 레벨테스트) — 중앙 정렬 + 크고 예쁘게 */
+.admin-tabs-top {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.admin-tabs-top button {
+  padding: 13px 36px;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  border-radius: 12px;
+}
+
 /* 섹션 카드 */
 .admin-section, .admin-card, .admin-chartbox {
   background: var(--bg); border: 1px solid var(--a-bd); border-radius: var(--a-radius);
