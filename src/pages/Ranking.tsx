@@ -29,35 +29,19 @@ function avatarUrlOf(u: { image: string | null; color: string | null }): string 
   return null // Avatar 가 seed 로 젬색 생성
 }
 
-// 미리보기용 더미 TOP 10 (실데이터 비었을 때만 표시) — 다국어 사용자 섞음
-const DUMMY_HOF: HofResponse = {
-  total: 1284,
-  top: [
-    { rank: 1, name: '민서', level: 7, rating: 9310, color: '#e0863f', image: null, me: false },
-    { rank: 2, name: 'आरव', level: 7, rating: 8420, color: '#c2843a', image: null, me: false },
-    { rank: 3, name: 'Olivia', level: 6, rating: 7980, color: '#5aa9a0', image: null, me: false },
-    { rank: 4, name: '蓮', level: 6, rating: 7540, color: null, image: null, me: false },
-    { rank: 5, name: 'प्रिया', level: 5, rating: 7120, color: '#b9743a', image: null, me: false },
-    { rank: 6, name: '伟轩', level: 5, rating: 6890, color: null, image: null, me: false },
-    { rank: 7, name: 'Minh', level: 4, rating: 6540, color: '#5a99cc', image: null, me: false },
-    { rank: 8, name: 'さくら', level: 4, rating: 6210, color: '#cc7777', image: null, me: false },
-    { rank: 9, name: 'Liam', level: 4, rating: 5980, color: null, image: null, me: false },
-    { rank: 10, name: '芳', level: 3, rating: 5640, color: '#7a99aa', image: null, me: false },
-  ],
-  me: { rank: 42, name: '나', level: 3, rating: 4120, color: null, image: null, me: true },
-}
+// (더미 리더보드 제거 — 실데이터 또는 빈 상태만 표시)
 
 export default function Ranking() {
   const { isFullUser, loading, loginWithGoogle } = useAuth()
   const { t } = useT()
-  const [data, setData] = useState<HofResponse | null>(DUMMY_HOF) // 미리보기용 더미로 시작
+  const [data, setData] = useState<HofResponse | null>(null)
   const [err, setErr] = useState(false)
 
   // 랭킹은 공개 — 비로그인도 보드 조회(서버가 me 만 비움). 로그인 상태 바뀌면 재조회.
   useEffect(() => {
     if (loading) return
     callFunction<HofResponse>('leaderboard', {})
-      .then((d) => setData(d.top.length ? d : DUMMY_HOF)) // 실데이터 비면 더미 유지
+      .then((d) => setData(d)) // 실데이터만 (비면 빈 상태 UI)
       .catch(() => setErr(true))
   }, [isFullUser, loading])
 
