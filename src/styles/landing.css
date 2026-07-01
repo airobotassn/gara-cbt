@@ -112,15 +112,15 @@
 .lp-ctas .cta,
 .lp-ctas .cta-ghost {
   margin-top: 0;
-  font-size: 19px;
-  padding: 21px 46px;
-  font-weight: 700;
+  font-size: 15px;
+  padding: 13px 26px;
+  font-weight: 600;
 }
 @media (max-width: 600px) {
   .lp-ctas .cta,
   .lp-ctas .cta-ghost {
-    font-size: 16px;
-    padding: 16px 28px;
+    font-size: 14px;
+    padding: 11px 20px;
   }
 }
 .cta-ghost {
