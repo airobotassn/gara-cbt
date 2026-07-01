@@ -109,8 +109,19 @@
   justify-content: center;
   flex-wrap: wrap;
 }
-.lp-ctas .cta {
+.lp-ctas .cta,
+.lp-ctas .cta-ghost {
   margin-top: 0;
+  font-size: 19px;
+  padding: 21px 46px;
+  font-weight: 700;
+}
+@media (max-width: 600px) {
+  .lp-ctas .cta,
+  .lp-ctas .cta-ghost {
+    font-size: 16px;
+    padding: 16px 28px;
+  }
 }
 .cta-ghost {
   position: relative;
