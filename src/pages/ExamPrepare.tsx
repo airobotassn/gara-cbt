@@ -5,7 +5,6 @@ import { callFunction } from '../lib/supabase'
 import { isMobileDevice, getDesktopOS } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, sebInstaller } from '../lib/seb'
-import SebInstall from '../components/SebInstall'
 import {
   DEFAULT_EXAM_SLUG,
   TEST_DURATION_MINUTES,
@@ -109,16 +108,29 @@ export default function ExamPrepare() {
     <div className="exam-center">
       {sebNotice && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setSebNotice(false)}>
-          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 max-w-lg w-full ambient-shadow max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-7 max-w-sm w-full ambient-shadow" onClick={(e) => e.stopPropagation()}>
             <div className="text-center mb-5">
               <div className="w-14 h-14 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-3">
                 <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
               </div>
-              <h3 className="font-title-md text-title-md font-bold text-on-surface mb-1">{t('gate.seb_opened_q')}</h3>
+              <h3 className="font-title-md text-title-md font-bold text-on-surface mb-1.5">{t('gate.seb_opened_q')}</h3>
               <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('gate.seb_opened_desc')}</p>
             </div>
-            <SebInstall onLaunch={() => { window.location.href = sebLaunchUrl(lang) }} />
-            <button className="mt-4 w-full text-on-surface-variant hover:text-primary-container font-label-md text-label-md py-2 transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
+            {/* 실행이 주 동작(재실행), 다운로드는 미설치일 때만 쓰는 보조 동작 */}
+            <div className="flex flex-col gap-2.5">
+              <button onClick={() => { window.location.href = sebLaunchUrl(lang) }} className="w-full bg-primary-container text-on-primary font-title-md text-title-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">lock_open</span>
+                {t('seb.launch_btn')}
+              </button>
+              <a href={inst.url} target="_blank" rel="noreferrer" className="w-full border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container font-label-md text-label-md px-6 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 transition-colors">
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                {t('seb.download')} · {osLabel} · {inst.size}
+              </a>
+            </div>
+            <p className="mt-3 text-center font-label-sm text-label-sm text-on-surface-variant break-keep">
+              {t('seb.warn_title')} · {t('seb.dialog_more')} → {t('seb.dialog_run')}
+            </p>
+            <button className="mt-4 w-full text-on-surface-variant hover:text-primary-container font-label-md text-label-md py-1.5 transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
           </div>
         </div>
       )}
