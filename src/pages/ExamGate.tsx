@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
@@ -17,6 +17,17 @@ export default function ExamGate() {
   const { t, lang } = useT()
   const [sebNotice, setSebNotice] = useState(false)
   const [loginNotice, setLoginNotice] = useState(false)
+
+  // SEB 로 들어가면(이 탭이 화면에서 가려짐=hidden) 실행 안내 모달을 닫는다.
+  // 모달을 닫는 것뿐이라 오작동해도 무해. "여시겠습니까?" 확인창은 페이지를 가리지 않아 반응하지 않는다.
+  useEffect(() => {
+    if (!sebNotice) return
+    const onVis = () => {
+      if (document.hidden) setSebNotice(false)
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [sebNotice])
 
   if (isMobileDevice()) return <MobileBlock />
 
