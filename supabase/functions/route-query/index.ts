@@ -21,7 +21,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-const MODEL = 'gemini-2.5-flash-lite'
+const MODEL = 'gemini-3.1-flash-lite'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 const EMBED_MODEL = 'gemini-embedding-001'
 const EMBED_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent`
