@@ -112,7 +112,7 @@ export default function Landing() {
           {routing ? '…' : '→'}
         </button>
       </form>
-      {notFound ? <div className="lp-soon-note">{t('route.notfound')}</div> : null}
+      {notFound ? <div className="lp-notfound" role="alert">{t('route.notfound')}</div> : null}
 
       <div className="lp-ctas">
         <button className="cta-ghost" onClick={() => navigate('/test/select')}>

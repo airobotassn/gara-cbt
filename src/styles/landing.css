@@ -245,6 +245,19 @@
   color: var(--danger-fg);
   font-size: var(--fs-sm);
 }
+/* 검색 라우터 "올바르지 않은 검색어" 안내 — 눈에 띄게(작아서 안 보인다는 피드백 반영) */
+.lp-notfound {
+  position: relative;
+  margin-top: 18px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  background: var(--danger-bg);
+  border: 1px solid color-mix(in srgb, var(--danger-fg) 28%, transparent);
+  color: var(--danger-fg);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.4;
+}
 .lp-reco {
   position: relative;
   margin-top: 18px;
