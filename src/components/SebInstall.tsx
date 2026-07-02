@@ -18,7 +18,7 @@ export default function SebInstall({ onLaunch }: { onLaunch?: () => void }) {
   ]
 
   const btn =
-    'w-full sm:w-auto self-start bg-primary-container text-on-primary font-title-md text-title-md font-bold px-7 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2'
+    'w-full sm:w-auto self-center bg-primary-container text-on-primary font-title-md text-title-md font-bold px-7 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2'
 
   return (
     <div className="flex flex-col gap-4">
@@ -28,7 +28,7 @@ export default function SebInstall({ onLaunch }: { onLaunch?: () => void }) {
           <span className="material-symbols-outlined text-[20px]">download</span>
           {t('seb.download')} · {osLabel}
         </a>
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           {chips.map((c) => (
             <span key={c.icon} className="inline-flex items-center gap-1 font-label-md text-label-md text-on-surface-variant">
               <span className="material-symbols-outlined text-[16px] text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>
