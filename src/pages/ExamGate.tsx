@@ -92,7 +92,7 @@ export default function ExamGate() {
             <h3 className="font-title-md text-title-md text-on-surface border-l-4 border-primary-container pl-4">{t('gate.instr_title')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="flex flex-col sm:flex-row items-start gap-5 p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
-                <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0">
+                <div className="w-14 h-14 flex items-center justify-center rounded-full bg-primary-container/10 text-primary-container flex-shrink-0">
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>event_available</span>
                 </div>
                 <div>
@@ -101,7 +101,7 @@ export default function ExamGate() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-start gap-5 p-6 rounded-2xl bg-surface-container-lowest border border-error-container shadow-sm hover:shadow-md transition-shadow">
-                <div className="p-4 rounded-full bg-error/10 text-error flex-shrink-0">
+                <div className="w-14 h-14 flex items-center justify-center rounded-full bg-error/10 text-error flex-shrink-0">
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>screen_share</span>
                 </div>
                 <div>
@@ -110,7 +110,7 @@ export default function ExamGate() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-start gap-5 p-6 rounded-2xl bg-surface-container-lowest border border-surface-container-highest shadow-sm hover:shadow-md transition-shadow">
-                <div className="p-4 rounded-full bg-secondary/10 text-secondary flex-shrink-0">
+                <div className="w-14 h-14 flex items-center justify-center rounded-full bg-secondary/10 text-secondary flex-shrink-0">
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>desktop_windows</span>
                 </div>
                 <div>
