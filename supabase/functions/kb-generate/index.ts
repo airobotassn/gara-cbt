@@ -19,7 +19,7 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY_TEST_GENERATE') || Deno.env.get('GEMINI_API_KEY')
 const PASSCODE = Deno.env.get('KB_PASSCODE')
-const MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
+const MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-3.1-flash-lite'
 const epFor = (m: string) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${GEMINI_API_KEY}`
 const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
 

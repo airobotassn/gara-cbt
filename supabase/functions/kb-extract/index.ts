@@ -28,7 +28,7 @@ function json(body: unknown, status = 200): Response {
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY_TEST_GENERATE') || Deno.env.get('GEMINI_API_KEY')
 const PASSCODE = Deno.env.get('KB_PASSCODE')
-const MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
+const MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-3.1-flash-lite'
 const ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`
 

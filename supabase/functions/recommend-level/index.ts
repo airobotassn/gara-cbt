@@ -20,7 +20,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-const MODEL = 'gemini-2.5-flash-lite' // 다른 모델로 바꾸려면 이 문자열만 수정
+const MODEL = 'gemini-3.1-flash-lite' // 다른 모델로 바꾸려면 이 문자열만 수정
 const ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
