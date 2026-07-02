@@ -6,9 +6,11 @@ export const SEB_REQUIRED = import.meta.env.PROD
 
 // SEB 공식 다운로드 페이지(참고)
 export const SEB_DOWNLOAD_URL = 'https://safeexambrowser.org/download_en.html'
-// 직접 다운로드(클릭/이동 시 추가 버튼 없이 설치파일 받아짐) — 코드 서명된 공식 SourceForge 배포본
+// 직접 다운로드 — GitHub 공식 릴리스의 코드 서명된 SetupBundle(약 351MB, .NET 등 선행조건 포함).
+// SourceForge(광고·미러 선택·"곧 시작" interstitial) 대신 github.com 직링크라 클릭 즉시 받아짐 = 이탈 friction 감소.
+// 버전 올릴 때: https://github.com/SafeExamBrowser/seb-win-refactoring/releases/latest 의 SetupBundle 자산으로 교체.
 export const SEB_INSTALLER_URL =
-  'https://sourceforge.net/projects/seb/files/seb/SEB_3.10.1/SEB_3.10.1.864_SetupBundle.exe/download'
+  'https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.10.1/SEB_3.10.1.864_SetupBundle.exe'
 
 // 배포 시: .env 에 VITE_SEB_CONFIG_URL = https://<도메인>/gara.seb 지정.
 // 개발 시: 현재 origin 의 /gara.seb (public/gara.seb, tools/make-seb.mjs 로 생성) 자동 사용.

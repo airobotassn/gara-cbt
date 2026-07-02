@@ -16,7 +16,7 @@ export default function About() {
         <section className="relative min-h-[58vh] flex items-center justify-center overflow-hidden bg-surface hero-bg">
           <div className="relative z-20 max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop text-center">
             <span className="inline-block px-4 py-1.5 rounded-full bg-surface-container-low text-primary font-label-sm text-label-sm tracking-wider uppercase mb-6 border border-outline-variant/30">Global AI &amp; Robotics Association</span>
-            <h1 className="font-display-lg text-3xl sm:text-4xl md:text-display-lg text-on-surface mb-6 leading-tight break-keep">
+            <h1 className="font-display-lg text-3xl sm:text-4xl md:text-display-lg font-bold tracking-[-0.02em] text-on-surface mb-6 leading-tight break-keep">
               {t('about.hero_line1')}<br />
               <span className="text-primary">{t('about.hero_line2')}</span>
             </h1>

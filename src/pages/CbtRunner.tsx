@@ -62,6 +62,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
   const [submitting, setSubmitting] = useState(false)
+  const [askQuit, setAskQuit] = useState(false) // 종료(포기) 확인 모달 — 네이티브 confirm은 전체화면 해제+포커스 이탈로 부정행위 오탐 유발 → 금지
   const submittedRef = useRef(false)
 
   // 문항별 체류시간(초)
@@ -121,6 +122,29 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       alert(e instanceof Error ? e.message : t('run.submit_fail'))
     }
   }, [start.attemptId, buildAnswers, navigate, t])
+
+  // 종료(포기): 이번 응시를 무효 처리하고 시험을 빠져나간다. 채점 없음.
+  const doQuit = useCallback(async () => {
+    if (submittedRef.current) return
+    submittedRef.current = true
+    setAskQuit(false)
+    setSubmitting(true)
+    // 실제 시험만 서버에 무효 기록(모의는 백엔드 호출 없음). 기록 실패해도 응시자는 나가도록 둔다(서버는 TTL 만료로 정리).
+    if (start.attemptId !== 'practice') {
+      try {
+        await callFunction('submit-exam', { attemptId: start.attemptId, answers: [], voided: true })
+      } catch {
+        /* 무효 기록 실패 — 그래도 종료 진행 */
+      }
+    }
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+    // 보안 브라우저면 종료 URL 로 이동 → SEB 자동 종료
+    if (isSEB()) {
+      window.location.href = `${window.location.origin}/exam/done`
+      return
+    }
+    navigate('/exam', { replace: true })
+  }, [start.attemptId, navigate])
 
   // 사용자가 누르는 제출: 미응답 가드 → 경고 → 미응답 문항으로 이동
   const onClickSubmit = useCallback(() => {
@@ -209,6 +233,17 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
             <span className={`material-symbols-outlined text-[20px] ${low ? 'text-error' : 'text-primary'}`}>timer</span>
             <span className={`font-bold text-[16px] tabular-nums ${low ? 'text-error' : 'text-primary'}`}>{fmt(remainMs)}</span>
           </div>
+          {/* 종료(포기) — 응시를 무효 처리하고 나감. 실수 방지 위해 확인 모달 경유 */}
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => setAskQuit(true)}
+            title={t('run.quit')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface-variant font-semibold hover:bg-error/5 hover:border-error/40 hover:text-error transition-colors disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-[20px]">logout</span>
+            <span className="font-label-sm text-label-sm">{t('run.quit')}</span>
+          </button>
         </div>
       </header>
 
@@ -303,6 +338,36 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         </div>
         <button disabled={submitting} onClick={onClickSubmit} className="px-8 py-2 rounded-lg bg-primary text-on-primary font-bold hover:shadow-lg transition-all disabled:opacity-60">{submitting ? t('run.submitting') : t('run.submit')}</button>
       </footer>
+
+      {/* 종료(포기) 확인 모달 — 페이지 내 렌더(네이티브 confirm 금지: 부정행위 오탐 방지) */}
+      {askQuit && (
+        <div className="fixed inset-0 z-[300] bg-black/45 flex items-center justify-center p-6">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center max-w-md w-full shadow-xl">
+            <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-error text-[28px]">logout</span>
+            </div>
+            <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('run.quit_title')}</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant whitespace-pre-line mb-6">{t('run.quit_confirm')}</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setAskQuit(false)}
+                className="flex-1 px-6 py-3 rounded-xl border border-outline-variant text-on-surface-variant font-bold hover:bg-surface-container transition-colors"
+              >
+                {t('run.quit_no')}
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={doQuit}
+                className="flex-1 px-6 py-3 rounded-xl bg-error text-on-error font-bold hover:shadow-lg transition-all disabled:opacity-60"
+              >
+                {t('run.quit_yes')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

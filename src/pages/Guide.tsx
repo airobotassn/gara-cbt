@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { TRACKS, SCHEDULE } from '../lib/caris'
+import { getTracks, SCHEDULE } from '../lib/caris'
 
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
@@ -10,10 +10,11 @@ import { TRACKS, SCHEDULE } from '../lib/caris'
 
 
 export default function Guide() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const navigate = useNavigate()
   const [track, setTrack] = useState(0)
   const [level, setLevel] = useState(0)
+  const TRACKS = getTracks(lang)
   const cur = TRACKS[track]
   const lv = cur.levels[level]
   const isMaster = track === 1
@@ -65,12 +66,12 @@ export default function Guide() {
         <section className="py-16 bg-surface-container-lowest px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-10">
-              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">AI·Robot 융합역량 자격시험</h2>
+              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">{t('guide.cert_intro_title')}</h2>
             </div>
 
             {/* 트랙 전환: 화살표 + 탭 */}
             <div className="flex items-center justify-center gap-3 sm:gap-4 mb-10">
-              <button onClick={() => goTrack(track - 1)} aria-label="이전 자격" className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
+              <button onClick={() => goTrack(track - 1)} aria-label={t('guide.aria_prev_track')} className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
               <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high">
@@ -78,7 +79,7 @@ export default function Guide() {
                   <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'px-5 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
                 ))}
               </div>
-              <button onClick={() => goTrack(track + 1)} aria-label="다음 자격" className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
+              <button onClick={() => goTrack(track + 1)} aria-label={t('guide.aria_next_track')} className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
                 <span className="material-symbols-outlined">chevron_right</span>
               </button>
             </div>
@@ -99,13 +100,13 @@ export default function Guide() {
               {/* 급수 전환: 화살표 + 급수 (하나의 통합 pill) */}
               <div className="flex justify-center mb-6">
                 <div className="inline-flex items-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm">
-                  <button onClick={() => goLevel(level - 1)} aria-label="이전 급수" className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
+                  <button onClick={() => goLevel(level - 1)} aria-label={t('guide.aria_prev_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                   </button>
                   {cur.levels.map((l, i) => (
                     <button key={l.grade} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>{l.grade}</button>
                   ))}
-                  <button onClick={() => goLevel(level + 1)} aria-label="다음 급수" className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
+                  <button onClick={() => goLevel(level + 1)} aria-label={t('guide.aria_next_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                   </button>
                 </div>
@@ -116,13 +117,13 @@ export default function Guide() {
                 {/* 급수 + 대상 */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-7 pb-6 border-b border-outline-variant/20">
                   <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.grade}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `응시 자격 · ${lv.prereq}` : lv.tag}</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.tag}</span>
                 </div>
 
                 {/* 스펙 (라벨 / 값) */}
                 <div className="flex flex-col divide-y divide-outline-variant/20">
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5 first:pt-0">
-                    <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">검정 과목</div>
+                    <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.subjects')}</div>
                     <ul className="flex-grow flex flex-col gap-2.5">
                       {lv.subjects.map((s, i) => (
                         <li key={i} className="flex items-start gap-2.5 font-body-lg text-body-lg text-on-surface break-keep">
@@ -135,7 +136,7 @@ export default function Guide() {
 
                   {cur.format ? (
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
-                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">시험 구성</div>
+                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.format')}</div>
                       <div className="flex-grow">
                         <p className="font-body-lg text-body-lg text-on-surface break-keep">{cur.format}</p>
                         <p className="font-body-md text-body-md text-on-surface-variant break-keep mt-0.5">{cur.formatSub}</p>
@@ -143,7 +144,7 @@ export default function Guide() {
                     </div>
                   ) : lv.method ? (
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
-                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">검정 방법</div>
+                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.method')}</div>
                       <div className="flex-grow flex flex-col gap-0.5">
                         {lv.method.split(' · ').map((m, i) => (
                           <p key={i} className="font-body-lg text-body-lg text-on-surface break-keep">{m}</p>
@@ -154,7 +155,7 @@ export default function Guide() {
 
                   {lv.practical && (
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
-                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">실기</div>
+                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.practical')}</div>
                       <p className="flex-grow font-body-lg text-body-lg text-on-surface break-keep">{lv.practical}</p>
                     </div>
                   )}
@@ -164,7 +165,7 @@ export default function Guide() {
                 <div className="flex items-start gap-3 mt-6 bg-secondary/10 rounded-xl px-5 py-4">
                   <span className="material-symbols-outlined text-secondary text-[24px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                   <div>
-                    <div className="font-label-md text-label-md text-on-surface-variant font-semibold">합격 기준</div>
+                    <div className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('caris.lbl.pass')}</div>
                     <div className="font-title-md text-body-md md:text-title-md text-on-surface font-bold break-keep">{lv.pass}</div>
                   </div>
                 </div>

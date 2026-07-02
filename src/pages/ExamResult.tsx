@@ -5,7 +5,7 @@ import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
-import { proGradeForScore } from '../lib/caris'
+import { proGradeForScore, gradeLabel, proGradeTag } from '../lib/caris'
 import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
@@ -134,7 +134,7 @@ function demoData(fail = false): GradedData {
 // 채점 공개 후 성적표 — 자체 훅(카운트업)을 쓰므로 컴포넌트로 분리(훅 순서 안정)
 function GradedResult({ data, attemptId, certName }: { data: GradedData; attemptId?: string; certName: string }) {
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, lang } = useT()
 
   const total = Math.max(1, data.totalQuestions)
   const scorePct = Math.round((data.totalCorrect / total) * 100)
@@ -158,7 +158,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
     navigate('/certificate', {
       state: {
         name: certName,
-        qualification: grade ? `CARIS Pro ${grade.grade}` : 'CARIS 자격검정',
+        qualification: grade ? `CARIS Pro ${gradeLabel(grade.grade, lang)}` : t('mypage.exam_fallback'),
         certNo,
         issueDate,
         scoreText: `${scorePct}점 (${data.totalCorrect}/${data.totalQuestions})`,
@@ -173,7 +173,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
     grade?.grade === '1급'
       ? t('exresult.info_master')
       : passed && grade
-        ? t('exresult.info_grade', { tag: grade.tag })
+        ? t('exresult.info_grade', { tag: proGradeTag(grade.grade, lang) })
         : t('exresult.info_fail')
   const infoIcon = grade?.grade === '1급' ? 'rocket_launch' : passed ? 'verified' : 'target'
 
@@ -198,7 +198,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
           <span className="material-symbols-outlined text-[20px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
             {passed ? 'workspace_premium' : 'info'}
           </span>
-          {passed ? t('exresult.pass_badge', { grade: grade!.grade }) : t('exresult.fail_badge')}
+          {passed ? t('exresult.pass_badge', { grade: gradeLabel(grade!.grade, lang) }) : t('exresult.fail_badge')}
         </div>
 
         {/* 점수 원형 게이지 */}
@@ -232,7 +232,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
           <div className="h-px bg-outline-variant/25" />
           <Row
             label={t('exresult.earned_grade')}
-            value={passed ? `CARIS Pro ${grade!.grade}` : t('result.fail')}
+            value={passed ? `CARIS Pro ${gradeLabel(grade!.grade, lang)}` : t('result.fail')}
             tone={passed ? 'text-primary font-bold' : 'text-error font-bold'}
           />
           <div className="h-px bg-outline-variant/25" />
@@ -395,7 +395,7 @@ export default function ExamResult() {
 
   // 채점 공개 후 — 성적표
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
-  const certName = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
+  const certName = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')
 
   return (
     <Shell>

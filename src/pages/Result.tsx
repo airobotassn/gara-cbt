@@ -72,7 +72,7 @@ export default function Result() {
   }, [attemptId, isFullUser])
 
   function handleLogin() {
-    loginWithGoogle(`${window.location.origin}/result/${attemptId}`)
+    loginWithGoogle(`${window.location.origin}/test/result/${attemptId}`)
   }
 
   if (loading) {

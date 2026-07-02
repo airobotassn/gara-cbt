@@ -716,6 +716,11 @@ const D: Record<string, Record<Lang, string>> = {
   "run.prev": { ko: "이전", en: "Previous", ja: "前へ", zh: "上一题", hi: "पिछला", vi: "Trước" },
   "run.next": { ko: "다음", en: "Next", ja: "次へ", zh: "下一题", hi: "अगला", vi: "Tiếp" },
   "run.submitting": { ko: "제출 중…", en: "Submitting…", ja: "提出中…", zh: "提交中…", hi: "जमा हो रहा है…", vi: "Đang nộp…" },
+  "run.quit": { ko: "종료", en: "Exit", ja: "終了", zh: "退出", hi: "बाहर निकलें", vi: "Thoát" },
+  "run.quit_title": { ko: "시험을 포기하시겠습니까?", en: "Give up the exam?", ja: "試験を放棄しますか？", zh: "要放弃考试吗？", hi: "क्या परीक्षा छोड़ देंगे?", vi: "Bỏ bài thi?" },
+  "run.quit_confirm": { ko: "지금 종료하면 이번 응시는 무효 처리되어 채점되지 않습니다.\n다시 응시하려면 처음부터 시작해야 합니다.", en: "Exiting now voids this attempt — it won't be graded.\nYou'll have to start over to take it again.", ja: "今終了すると今回の受験は無効となり、採点されません。\n再受験するには最初からやり直す必要があります。", zh: "现在退出，本次应试将作废且不予评分。\n如需重考，必须从头开始。", hi: "अभी बाहर निकलने पर यह प्रयास अमान्य हो जाएगा और उसका मूल्यांकन नहीं होगा।\nदोबारा देने के लिए शुरू से शुरू करना होगा।", vi: "Thoát bây giờ sẽ hủy lượt thi này — bài sẽ không được chấm.\nBạn phải bắt đầu lại từ đầu nếu muốn thi lại." },
+  "run.quit_yes": { ko: "포기하고 종료", en: "Give up and exit", ja: "放棄して終了", zh: "放弃并退出", hi: "छोड़ें और बाहर निकलें", vi: "Bỏ và thoát" },
+  "run.quit_no": { ko: "계속 응시", en: "Keep taking", ja: "受験を続ける", zh: "继续应试", hi: "जारी रखें", vi: "Tiếp tục thi" },
   "result.voided_title": { ko: "응시가 무효 처리되었습니다", en: "Your attempt has been voided", ja: "受験が無効になりました", zh: "本次应试已作废", hi: "आपका प्रयास अमान्य कर दिया गया", vi: "Lượt thi của bạn đã bị hủy" },
   "result.voided_sub": { ko: "관리자에게 문의해 주세요.", en: "Please contact an administrator.", ja: "管理者にお問い合わせください。", zh: "请联系管理员。", hi: "कृपया व्यवस्थापक से संपर्क करें।", vi: "Vui lòng liên hệ quản trị viên." },
   "result.home": { ko: "홈으로", en: "Home", ja: "ホームへ", zh: "返回主页", hi: "होम पर", vi: "Về trang chủ" },
@@ -1031,6 +1036,122 @@ const D: Record<string, Record<Lang, string>> = {
   "nav.exampreview": { ko: "응시 화면 미리보기", en: "Exam screen preview", ja: "受験画面プレビュー", zh: "应试界面预览", hi: "परीक्षा स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình thi" },
   "nav.resultpasspreview": { ko: "합격 화면 미리보기", en: "Pass result preview", ja: "合格画面プレビュー", zh: "合格界面预览", hi: "उत्तीर्ण स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình đạt" },
   "nav.resultfailpreview": { ko: "불합격 화면 미리보기", en: "Fail result preview", ja: "不合格画面プレビュー", zh: "不合格界面预览", hi: "अनुत्तीर्ण स्क्रीन पूर्वावलोकन", vi: "Xem trước màn hình trượt" },
+
+  // ── CARIS 자격 데이터(caris.ts) 다국어 — getTracks/getRolling/gradeLabel/proGradeTag 가 tr() 로 참조 ──
+  // 등급 라벨(컴팩트) — 급수 pill 폭 유지를 위해 라틴권은 Lv.N, CJK는 원어
+  "caris.grade.g4": { ko: "4급", en: "Lv.4", ja: "4級", zh: "4级", hi: "Lv.4", vi: "Lv.4" },
+  "caris.grade.g3": { ko: "3급", en: "Lv.3", ja: "3級", zh: "3级", hi: "Lv.3", vi: "Lv.3" },
+  "caris.grade.g2": { ko: "2급", en: "Lv.2", ja: "2級", zh: "2级", hi: "Lv.2", vi: "Lv.2" },
+  "caris.grade.g1": { ko: "1급", en: "Lv.1", ja: "1級", zh: "1级", hi: "Lv.1", vi: "Lv.1" },
+  // 공용 스펙 라벨(Guide·ExamApply 공유)
+  "caris.lbl.subjects": { ko: "검정 과목", en: "Subjects", ja: "検定科目", zh: "检定科目", hi: "विषय", vi: "Môn thi" },
+  "caris.lbl.format": { ko: "시험 구성", en: "Exam format", ja: "試験構成", zh: "考试构成", hi: "परीक्षा प्रारूप", vi: "Cấu trúc bài thi" },
+  "caris.lbl.method": { ko: "검정 방법", en: "Exam method", ja: "検定方法", zh: "检定方式", hi: "परीक्षा विधि", vi: "Phương thức thi" },
+  "caris.lbl.practical": { ko: "실기", en: "Practical", ja: "実技", zh: "实操", hi: "प्रायोगिक", vi: "Thực hành" },
+  "caris.lbl.pass": { ko: "합격 기준", en: "Passing criteria", ja: "合格基準", zh: "合格标准", hi: "उत्तीर्ण मानदंड", vi: "Tiêu chí đạt" },
+  "caris.lbl.eligibility": { ko: "응시 자격", en: "Eligibility", ja: "受験資格", zh: "报考资格", hi: "पात्रता", vi: "Điều kiện dự thi" },
+  "caris.lbl.grade_judge": { ko: "급수 판정", en: "Grade by score", ja: "級判定", zh: "级别判定", hi: "अंक अनुसार ग्रेड", vi: "Xác định cấp theo điểm" },
+  "caris.exam_suffix": { ko: "자격시험", en: "Certification Exam", ja: "資格試験", zh: "资格考试", hi: "प्रमाणन परीक्षा", vi: "Kỳ thi chứng nhận" },
+  // CARIS Pro 트랙
+  "caris.pro.tagline": { ko: "전국민 AI·Robot 리터러시", en: "AI & robotics literacy for everyone", ja: "全国民のAI・ロボットリテラシー", zh: "全民AI·机器人素养", hi: "सभी के लिए AI·रोबोट साक्षरता", vi: "Kiến thức AI·robot cho mọi người" },
+  "caris.pro.eligibility": { ko: "응시 자격 제한 없음", en: "Open to everyone", ja: "受験資格の制限なし", zh: "无报考资格限制", hi: "कोई पात्रता प्रतिबंध नहीं", vi: "Không giới hạn điều kiện dự thi" },
+  "caris.pro.caption": { ko: "한 번의 필기시험으로, 취득 점수에 따라 4급~1급을 차등 부여합니다.", en: "One written exam awards Lv.4–Lv.1 depending on your score.", ja: "1回の筆記試験で、取得点数に応じて4級～1級を差別的に付与します。", zh: "一次笔试，根据得分分别授予4级至1级。", hi: "एक ही लिखित परीक्षा से, प्राप्त अंकों के अनुसार Lv.4~Lv.1 प्रदान किया जाता है।", vi: "Chỉ một bài thi viết, cấp từ Lv.4 đến Lv.1 tùy theo điểm số." },
+  "caris.pro.format": { ko: "총 80문항 · 60분", en: "80 questions · 60 min", ja: "全80問 · 60分", zh: "共80题 · 60分钟", hi: "कुल 80 प्रश्न · 60 मिनट", vi: "Tổng 80 câu · 60 phút" },
+  "caris.pro.formatSub": { ko: "객관식 70 · 단답형 8 · 서술형 2", en: "70 multiple-choice · 8 short-answer · 2 essay", ja: "選択式70 · 短答式8 · 記述式2", zh: "选择题70 · 简答8 · 论述2", hi: "बहुविकल्पीय 70 · लघु उत्तर 8 · वर्णनात्मक 2", vi: "Trắc nghiệm 70 · Trả lời ngắn 8 · Tự luận 2" },
+  "caris.pro.tag.g4": { ko: "전 국민 입문 · 기초 소양", en: "Public intro · basic literacy", ja: "全国民入門 · 基礎素養", zh: "全民入门 · 基础素养", hi: "आम जन प्रवेश · बुनियादी समझ", vi: "Nhập môn đại chúng · nền tảng cơ bản" },
+  "caris.pro.tag.g3": { ko: "중·고등학생 및 직장인 기초", en: "Basics for students & professionals", ja: "中高生・社会人の基礎", zh: "中学生及职场人士基础", hi: "छात्रों व पेशेवरों के लिए मूल बातें", vi: "Cơ bản cho học sinh & người đi làm" },
+  "caris.pro.tag.g2": { ko: "대학생 및 직장인 중급", en: "Intermediate for students & professionals", ja: "大学生・社会人の中級", zh: "大学生及职场人士中级", hi: "छात्रों व पेशेवरों के लिए मध्यम स्तर", vi: "Trung cấp cho sinh viên & người đi làm" },
+  "caris.pro.tag.g1": { ko: "관리자·강사 및 전문가 과정 진입", en: "Managers, instructors & expert-track entry", ja: "管理者・講師および専門家課程への入口", zh: "管理者·讲师及专家课程入门", hi: "प्रबंधक·प्रशिक्षक व विशेषज्ञ ट्रैक प्रवेश", vi: "Quản lý·giảng viên & lối vào lộ trình chuyên gia" },
+  "caris.pro.subj.g4.0": { ko: "생성형 AI의 일상 활용", en: "Everyday use of generative AI", ja: "生成AIの日常活用", zh: "生成式AI的日常应用", hi: "जेनरेटिव AI का रोज़मर्रा उपयोग", vi: "Ứng dụng AI tạo sinh hằng ngày" },
+  "caris.pro.subj.g4.1": { ko: "인공지능 윤리 및 안전한 디지털 도구 활용", en: "AI ethics & safe use of digital tools", ja: "AI倫理と安全なデジタルツール活用", zh: "人工智能伦理与安全使用数字工具", hi: "AI नैतिकता व सुरक्षित डिजिटल टूल उपयोग", vi: "Đạo đức AI & sử dụng công cụ số an toàn" },
+  "caris.pro.subj.g3.0": { ko: "스마트 도구 활용 및 프롬프트", en: "Smart tools & prompting", ja: "スマートツール活用とプロンプト", zh: "智能工具应用与提示词", hi: "स्मार्ट टूल उपयोग व प्रॉम्प्ट", vi: "Công cụ thông minh & prompt" },
+  "caris.pro.subj.g3.1": { ko: "일상 속 로봇 및 자동화 기술", en: "Robots & automation in daily life", ja: "日常のロボットと自動化技術", zh: "日常中的机器人与自动化技术", hi: "रोज़मर्रा में रोबोट व स्वचालन तकनीक", vi: "Robot & tự động hóa trong đời sống" },
+  "caris.pro.subj.g2.0": { ko: "피지컬 AI 블록코딩 및 논리 제어", en: "Physical-AI block coding & logic control", ja: "フィジカルAIブロックコーディングと論理制御", zh: "实体AI积木编程与逻辑控制", hi: "फिजिकल AI ब्लॉक कोडिंग व लॉजिक नियंत्रण", vi: "Lập trình khối AI vật lý & điều khiển logic" },
+  "caris.pro.subj.g2.1": { ko: "에지 디바이스와 데이터 수집·처리 기초", en: "Edge devices & data collection/processing basics", ja: "エッジデバイスとデータ収集・処理の基礎", zh: "边缘设备与数据采集·处理基础", hi: "एज डिवाइस व डेटा संग्रह·प्रसंस्करण मूल बातें", vi: "Thiết bị biên & cơ bản thu thập·xử lý dữ liệu" },
+  "caris.pro.subj.g1.0": { ko: "AI·Robot 기술 트렌드 및 산업 적용 기획", en: "AI·robotics trends & industrial application planning", ja: "AI・ロボット技術トレンドと産業適用の企画", zh: "AI·机器人技术趋势与产业应用规划", hi: "AI·रोबोट तकनीक रुझान व औद्योगिक अनुप्रयोग योजना", vi: "Xu hướng công nghệ AI·robot & hoạch định ứng dụng công nghiệp" },
+  "caris.pro.subj.g1.1": { ko: "AI·Robot 융합 서비스 시나리오 설계", en: "Designing AI·robotics convergence service scenarios", ja: "AI・ロボット融合サービスのシナリオ設計", zh: "AI·机器人融合服务场景设计", hi: "AI·रोबोट संगम सेवा परिदृश्य डिज़ाइन", vi: "Thiết kế kịch bản dịch vụ hội tụ AI·robot" },
+  "caris.pass.g4": { ko: "60점 이상", en: "60+ points", ja: "60点以上", zh: "60分以上", hi: "60+ अंक", vi: "Từ 60 điểm" },
+  "caris.pass.g3": { ko: "70점 이상", en: "70+ points", ja: "70点以上", zh: "70分以上", hi: "70+ अंक", vi: "Từ 70 điểm" },
+  "caris.pass.g2": { ko: "80점 이상", en: "80+ points", ja: "80点以上", zh: "80分以上", hi: "80+ अंक", vi: "Từ 80 điểm" },
+  "caris.pass.g1": { ko: "90점 이상", en: "90+ points", ja: "90点以上", zh: "90分以上", hi: "90+ अंक", vi: "Từ 90 điểm" },
+  // CARIS Master 트랙
+  "caris.master.tagline": { ko: "피지컬 AI 전문가 과정", en: "Physical-AI expert track", ja: "フィジカルAI専門家課程", zh: "实体AI专家课程", hi: "फिजिकल AI विशेषज्ञ ट्रैक", vi: "Lộ trình chuyên gia AI vật lý" },
+  "caris.master.eligibility": { ko: "하위급 순차 취득 원칙", en: "Sequential lower-grade acquisition", ja: "下位級の順次取得が原則", zh: "须逐级取得下位级", hi: "निचले स्तर क्रमिक रूप से प्राप्त करना", vi: "Nguyên tắc đạt tuần tự từ cấp dưới" },
+  "caris.master.caption": { ko: "CARIS Pro 1급 취득 후, Master 4급부터 하위급 순차 응시 원칙입니다.", en: "After earning CARIS Pro Lv.1, take Master from Lv.4 upward in sequence.", ja: "CARIS Pro 1級取得後、Master 4級から下位級順に受験するのが原則です。", zh: "取得CARIS Pro 1级后，从Master 4级起按由低到高顺序应试。", hi: "CARIS Pro Lv.1 प्राप्त करने के बाद, Master को Lv.4 से क्रमवार दें।", vi: "Sau khi đạt CARIS Pro Lv.1, dự thi Master theo thứ tự từ Lv.4 trở lên." },
+  "caris.master.prereq.g4": { ko: "CARIS Pro 1급 취득자", en: "CARIS Pro Lv.1 holders", ja: "CARIS Pro 1級取得者", zh: "CARIS Pro 1级取得者", hi: "CARIS Pro Lv.1 धारक", vi: "Người đã đạt CARIS Pro Lv.1" },
+  "caris.master.prereq.g3": { ko: "CARIS Master 4급 취득자", en: "CARIS Master Lv.4 holders", ja: "CARIS Master 4級取得者", zh: "CARIS Master 4级取得者", hi: "CARIS Master Lv.4 धारक", vi: "Người đã đạt CARIS Master Lv.4" },
+  "caris.master.prereq.g2": { ko: "CARIS Master 3급 취득자", en: "CARIS Master Lv.3 holders", ja: "CARIS Master 3級取得者", zh: "CARIS Master 3级取得者", hi: "CARIS Master Lv.3 धारक", vi: "Người đã đạt CARIS Master Lv.3" },
+  "caris.master.prereq.g1": { ko: "CARIS Master 2급 취득자", en: "CARIS Master Lv.2 holders", ja: "CARIS Master 2級取得者", zh: "CARIS Master 2级取得者", hi: "CARIS Master Lv.2 धारक", vi: "Người đã đạt CARIS Master Lv.2" },
+  "caris.master.method.g4": { ko: "필기 객50+주10 / 60분 · 실기 PC작업형 / 120분", en: "Written: 50 MC + 10 essay / 60 min · Practical: PC task / 120 min", ja: "筆記 選択50+記述10 / 60分 · 実技 PC作業型 / 120分", zh: "笔试 客观50+主观10 / 60分钟 · 实操 PC作业型 / 120分钟", hi: "लिखित: 50 वस्तुनिष्ठ + 10 वर्णनात्मक / 60 मिनट · प्रायोगिक: PC कार्य / 120 मिनट", vi: "Lý thuyết: 50 trắc nghiệm + 10 tự luận / 60 phút · Thực hành: thao tác PC / 120 phút" },
+  "caris.master.method.g3": { ko: "필기 객50+주10 / 60분 · 실기 PC작업형 / 120분", en: "Written: 50 MC + 10 essay / 60 min · Practical: PC task / 120 min", ja: "筆記 選択50+記述10 / 60分 · 実技 PC作業型 / 120分", zh: "笔试 客观50+主观10 / 60分钟 · 实操 PC作业型 / 120分钟", hi: "लिखित: 50 वस्तुनिष्ठ + 10 वर्णनात्मक / 60 मिनट · प्रायोगिक: PC कार्य / 120 मिनट", vi: "Lý thuyết: 50 trắc nghiệm + 10 tự luận / 60 phút · Thực hành: thao tác PC / 120 phút" },
+  "caris.master.method.g2": { ko: "필기 객30+주10 / 60분 · 실기 복합작업형 / 120분", en: "Written: 30 MC + 10 essay / 60 min · Practical: composite task / 120 min", ja: "筆記 選択30+記述10 / 60分 · 実技 複合作業型 / 120分", zh: "笔试 客观30+主观10 / 60分钟 · 实操 复合作业型 / 120分钟", hi: "लिखित: 30 वस्तुनिष्ठ + 10 वर्णनात्मक / 60 मिनट · प्रायोगिक: संयुक्त कार्य / 120 मिनट", vi: "Lý thuyết: 30 trắc nghiệm + 10 tự luận / 60 phút · Thực hành: thao tác tổng hợp / 120 phút" },
+  "caris.master.method.g1": { ko: "실기 포트폴리오 제출 + 심층 면접 / 30분", en: "Practical: portfolio submission + in-depth interview / 30 min", ja: "実技 ポートフォリオ提出 + 詳細面接 / 30分", zh: "实操 提交作品集 + 深度面试 / 30分钟", hi: "प्रायोगिक: पोर्टफोलियो जमा + गहन साक्षात्कार / 30 मिनट", vi: "Thực hành: nộp portfolio + phỏng vấn chuyên sâu / 30 phút" },
+  "caris.master.subj.g4.0": { ko: "AI 서비스 개발을 위한 SW 스택 이해", en: "Understanding SW stacks for AI service development", ja: "AIサービス開発のためのSWスタック理解", zh: "理解面向AI服务开发的软件栈", hi: "AI सेवा विकास हेतु SW स्टैक की समझ", vi: "Hiểu ngăn xếp phần mềm để phát triển dịch vụ AI" },
+  "caris.master.subj.g4.1": { ko: "AI 통합을 위한 로봇·임베디드 HW 이해", en: "Understanding robotics·embedded HW for AI integration", ja: "AI統合のためのロボット・組込みHW理解", zh: "理解面向AI集成的机器人·嵌入式硬件", hi: "AI एकीकरण हेतु रोबोट·एम्बेडेड HW की समझ", vi: "Hiểu phần cứng robot·nhúng để tích hợp AI" },
+  "caris.master.subj.g3.0": { ko: "온디바이스 AI 모델 경량화 및 에지 배포 실무", en: "On-device AI model optimization & edge deployment", ja: "オンデバイスAIモデルの軽量化とエッジ配備実務", zh: "端侧AI模型轻量化与边缘部署实务", hi: "ऑन-डिवाइस AI मॉडल लघुकरण व एज परिनियोजन", vi: "Tối ưu mô hình AI trên thiết bị & triển khai biên" },
+  "caris.master.subj.g3.1": { ko: "AI 기반 멀티모달 센서 융합 및 지능형 제어 적용", en: "AI-based multimodal sensor fusion & intelligent control", ja: "AIベースのマルチモーダルセンサー融合と知能制御の適用", zh: "基于AI的多模态传感器融合与智能控制应用", hi: "AI-आधारित मल्टीमॉडल सेंसर संलयन व बुद्धिमान नियंत्रण", vi: "Hợp nhất cảm biến đa phương thức dựa trên AI & điều khiển thông minh" },
+  "caris.master.subj.g2.0": { ko: "AI 연동 디지털 트윈 설계 및 시뮬레이션 검증", en: "AI-linked digital-twin design & simulation validation", ja: "AI連動デジタルツイン設計とシミュレーション検証", zh: "AI联动数字孪生设计与仿真验证", hi: "AI-लिंक्ड डिजिटल ट्विन डिज़ाइन व सिमुलेशन सत्यापन", vi: "Thiết kế digital twin liên kết AI & kiểm chứng mô phỏng" },
+  "caris.master.subj.g2.1": { ko: "AI·Robot 융합 시스템 아키텍처 설계", en: "AI·robotics convergence system architecture design", ja: "AI・ロボット融合システムアーキテクチャ設計", zh: "AI·机器人融合系统架构设计", hi: "AI·रोबोट संगम प्रणाली आर्किटेक्चर डिज़ाइन", vi: "Thiết kế kiến trúc hệ thống hội tụ AI·robot" },
+  "caris.master.subj.g1.0": { ko: "AI·Robot 솔루션 시스템 통합 및 프로젝트 관리", en: "AI·robotics solution system integration & project management", ja: "AI・ロボットソリューションのシステム統合とプロジェクト管理", zh: "AI·机器人解决方案系统集成与项目管理", hi: "AI·रोबोट समाधान प्रणाली एकीकरण व परियोजना प्रबंधन", vi: "Tích hợp hệ thống giải pháp AI·robot & quản lý dự án" },
+  "caris.master.subj.g1.1": { ko: "국제표준(ISO 10218·IEC 62443·ISO/IEC 42001) 및 기능안전 적용", en: "International standards (ISO 10218·IEC 62443·ISO/IEC 42001) & functional safety", ja: "国際標準（ISO 10218・IEC 62443・ISO/IEC 42001）と機能安全の適用", zh: "国际标准（ISO 10218·IEC 62443·ISO/IEC 42001）与功能安全应用", hi: "अंतरराष्ट्रीय मानक (ISO 10218·IEC 62443·ISO/IEC 42001) व कार्यात्मक सुरक्षा", vi: "Tiêu chuẩn quốc tế (ISO 10218·IEC 62443·ISO/IEC 42001) & an toàn chức năng" },
+  "caris.master.practical.g4": { ko: "기초 AI API + 단일 로봇 제어 코딩", en: "Basic AI API + single-robot control coding", ja: "基礎AI API + 単一ロボット制御コーディング", zh: "基础AI API + 单机器人控制编程", hi: "बुनियादी AI API + एकल रोबोट नियंत्रण कोडिंग", vi: "API AI cơ bản + lập trình điều khiển robot đơn" },
+  "caris.master.practical.g3": { ko: "Python/C++ 코드 및 LLM 연동", en: "Python/C++ coding & LLM integration", ja: "Python/C++コードとLLM連携", zh: "Python/C++代码与LLM集成", hi: "Python/C++ कोड व LLM एकीकरण", vi: "Mã Python/C++ & tích hợp LLM" },
+  "caris.master.practical.g2": { ko: "Isaac Sim·Gazebo 기반 자율주행·AI 비전 파이프라인 구축·최적화", en: "Building/optimizing autonomous-driving·AI-vision pipelines on Isaac Sim·Gazebo", ja: "Isaac Sim・Gazeboベースの自律走行・AIビジョンパイプラインの構築・最適化", zh: "基于Isaac Sim·Gazebo构建·优化自动驾驶·AI视觉管线", hi: "Isaac Sim·Gazebo पर स्वायत्त ड्राइविंग·AI विज़न पाइपलाइन निर्माण·अनुकूलन", vi: "Xây dựng·tối ưu pipeline lái tự động·thị giác AI trên Isaac Sim·Gazebo" },
+  "caris.master.pass.g4": { ko: "필기 60점↑ (과목별 40↑) · 실기 70점↑", en: "Written ≥60 (≥40 per subject) · Practical ≥70", ja: "筆記60点↑（科目別40↑）· 実技70点↑", zh: "笔试≥60（各科≥40）· 实操≥70", hi: "लिखित ≥60 (प्रति विषय ≥40) · प्रायोगिक ≥70", vi: "Lý thuyết ≥60 (mỗi môn ≥40) · Thực hành ≥70" },
+  "caris.master.pass.g3": { ko: "필기 60점↑ (과목별 40↑) · 실기 70점↑", en: "Written ≥60 (≥40 per subject) · Practical ≥70", ja: "筆記60点↑（科目別40↑）· 実技70点↑", zh: "笔试≥60（各科≥40）· 实操≥70", hi: "लिखित ≥60 (प्रति विषय ≥40) · प्रायोगिक ≥70", vi: "Lý thuyết ≥60 (mỗi môn ≥40) · Thực hành ≥70" },
+  "caris.master.pass.g2": { ko: "필기 60점↑ (과목별 40↑) · 실기 70점↑", en: "Written ≥60 (≥40 per subject) · Practical ≥70", ja: "筆記60点↑（科目別40↑）· 実技70点↑", zh: "笔试≥60（各科≥40）· 实操≥70", hi: "लिखित ≥60 (प्रति विषय ≥40) · प्रायोगिक ≥70", vi: "Lý thuyết ≥60 (mỗi môn ≥40) · Thực hành ≥70" },
+  "caris.master.pass.g1": { ko: "루브릭 심사 · 심사위원 평균 80점 이상", en: "Rubric review · panel average ≥80", ja: "ルーブリック審査 · 審査委員平均80点以上", zh: "评分量表审查 · 评委平均≥80", hi: "रूब्रिक समीक्षा · जूरी औसत ≥80", vi: "Đánh giá theo rubric · trung bình hội đồng ≥80" },
+  // 상시(Rolling) 항목
+  "caris.rolling.pro_cbt.name": { ko: "CARIS Pro 상시 검정 (CBT)", en: "CARIS Pro Rolling Exam (CBT)", ja: "CARIS Pro 常時検定 (CBT)", zh: "CARIS Pro 常规检定 (CBT)", hi: "CARIS Pro रोलिंग परीक्षा (CBT)", vi: "Kỳ thi thường trực CARIS Pro (CBT)" },
+  "caris.rolling.pro_cbt.badge": { ko: "상시 접수", en: "Rolling", ja: "常時受付", zh: "常年报名", hi: "सतत पंजीकरण", vi: "Nhận thường trực" },
+  "caris.rolling.pro_cbt.date": { ko: "연중 상시 · 예약일 응시", en: "Year-round · take on your booked date", ja: "通年 · 予約日に受験", zh: "全年常态 · 预约日应试", hi: "साल भर · बुक की गई तारीख पर परीक्षा", vi: "Quanh năm · thi vào ngày đã đặt" },
+  "caris.rolling.pro_cbt.desc": { ko: "원하는 날짜를 예약해 온라인(CBT)으로 응시하는 상시 검정입니다.", en: "A rolling exam you take online (CBT) on a date you book.", ja: "ご希望の日付を予約してオンライン（CBT）で受験する常時検定です。", zh: "预约所需日期，通过在线(CBT)应试的常规检定。", hi: "अपनी पसंद की तारीख बुक कर ऑनलाइन (CBT) दी जाने वाली सतत परीक्षा।", vi: "Kỳ thi thường trực bạn dự online (CBT) vào ngày đã đặt." },
+
+  // ── Guide(자격검정 안내) 하드코딩 라벨 ──
+  "guide.cert_intro_title": { ko: "AI·Robot 융합역량 자격시험", en: "AI·Robotics Convergence Competency Exam", ja: "AI・ロボット融合力 資格試験", zh: "AI·机器人融合能力资格考试", hi: "AI·रोबोट संगम दक्षता परीक्षा", vi: "Kỳ thi năng lực hội tụ AI·robot" },
+  "guide.aria_prev_track": { ko: "이전 자격", en: "Previous certification", ja: "前の資格", zh: "上一个资格", hi: "पिछला प्रमाणन", vi: "Chứng chỉ trước" },
+  "guide.aria_next_track": { ko: "다음 자격", en: "Next certification", ja: "次の資格", zh: "下一个资格", hi: "अगला प्रमाणन", vi: "Chứng chỉ tiếp theo" },
+  "guide.aria_prev_grade": { ko: "이전 급수", en: "Previous grade", ja: "前の級", zh: "上一级别", hi: "पिछला ग्रेड", vi: "Cấp trước" },
+  "guide.aria_next_grade": { ko: "다음 급수", en: "Next grade", ja: "次の級", zh: "下一级别", hi: "अगला ग्रेड", vi: "Cấp tiếp theo" },
+
+  // ── ExamSchedule(자격검정 접수) 하드코딩 라벨 ──
+  "sched.badge": { ko: "시험 일정", en: "Exam schedule", ja: "試験日程", zh: "考试日程", hi: "परीक्षा कार्यक्रम", vi: "Lịch thi" },
+  "sched.title": { ko: "자격검정 접수", en: "Certification registration", ja: "資格検定の申込", zh: "资格检定报名", hi: "प्रमाणन पंजीकरण", vi: "Đăng ký kỳ thi chứng nhận" },
+  "sched.desc": { ko: "접수할 시험을 선택하세요. 접수중인 일정만 신청할 수 있습니다.", en: "Select an exam to register for. Only open sessions can be applied to.", ja: "申し込む試験を選択してください。受付中の日程のみ申請できます。", zh: "请选择要报名的考试。仅可申请报名中的日程。", hi: "पंजीकरण के लिए परीक्षा चुनें। केवल खुले सत्रों के लिए ही आवेदन किया जा सकता है।", vi: "Chọn kỳ thi để đăng ký. Chỉ có thể đăng ký các đợt đang mở." },
+  "sched.regular": { ko: "정기시험 일정", en: "Regular exam schedule", ja: "定期試験日程", zh: "定期考试日程", hi: "नियमित परीक्षा कार्यक्रम", vi: "Lịch thi định kỳ" },
+  "sched.rolling": { ko: "상시시험", en: "Rolling exams", ja: "常時試験", zh: "常规考试", hi: "सतत परीक्षा", vi: "Kỳ thi thường trực" },
+  "sched.exam_date": { ko: "시험일", en: "Exam date", ja: "試験日", zh: "考试日", hi: "परीक्षा तिथि", vi: "Ngày thi" },
+  "sched.apply": { ko: "접수하기", en: "Register", ja: "申し込む", zh: "报名", hi: "पंजीकरण करें", vi: "Đăng ký" },
+
+  // ── ExamApply(원서접수) 하드코딩 라벨 ──
+  "apply.back": { ko: "자격검정 안내", en: "Certification guide", ja: "資格検定案内", zh: "资格检定指南", hi: "प्रमाणन गाइड", vi: "Hướng dẫn kỳ thi" },
+  "apply.title": { ko: "원서접수", en: "Application", ja: "願書受付", zh: "报名申请", hi: "आवेदन", vi: "Nộp hồ sơ" },
+  "apply.select_cert": { ko: "자격 선택", en: "Select certification", ja: "資格の選択", zh: "选择资格", hi: "प्रमाणन चुनें", vi: "Chọn chứng chỉ" },
+  "apply.track": { ko: "트랙", en: "Track", ja: "トラック", zh: "赛道", hi: "ट्रैक", vi: "Lộ trình" },
+  "apply.grade": { ko: "급수", en: "Grade", ja: "級", zh: "级别", hi: "ग्रेड", vi: "Cấp" },
+  "apply.pay_summary": { ko: "결제 요약", en: "Payment summary", ja: "決済サマリー", zh: "支付摘要", hi: "भुगतान सारांश", vi: "Tóm tắt thanh toán" },
+  "apply.sel_cert": { ko: "선택 자격", en: "Selected certification", ja: "選択資格", zh: "所选资格", hi: "चयनित प्रमाणन", vi: "Chứng chỉ đã chọn" },
+  "apply.round": { ko: "회차", en: "Session", ja: "回次", zh: "场次", hi: "सत्र", vi: "Đợt" },
+  "apply.fee": { ko: "응시료", en: "Exam fee", ja: "受験料", zh: "应试费", hi: "परीक्षा शुल्क", vi: "Lệ phí thi" },
+  "apply.total": { ko: "총 결제금액", en: "Total", ja: "合計金額", zh: "应付总额", hi: "कुल राशि", vi: "Tổng thanh toán" },
+  "apply.pay_btn": { ko: "결제하기", en: "Pay", ja: "決済する", zh: "去支付", hi: "भुगतान करें", vi: "Thanh toán" },
+  "apply.pay_note": { ko: "결제 시 본인인증이 필요합니다. 응시료·본인인증·결제는 추후 연결(미리보기).", en: "Identity verification is required for payment. Fees, verification, and payment will be connected later (preview).", ja: "決済には本人認証が必要です。受験料・本人認証・決済は後日連携予定（プレビュー）。", zh: "支付需实名认证。应试费·实名认证·支付将于稍后接入（预览）。", hi: "भुगतान के लिए पहचान सत्यापन आवश्यक है। शुल्क·सत्यापन·भुगतान बाद में जोड़े जाएंगे (पूर्वावलोकन)।", vi: "Cần xác minh danh tính để thanh toán. Lệ phí·xác minh·thanh toán sẽ kết nối sau (bản xem trước)." },
+  "apply.modal_title": { ko: "결제 기능 준비 중", en: "Payment coming soon", ja: "決済機能は準備中", zh: "支付功能准备中", hi: "भुगतान सुविधा जल्द", vi: "Tính năng thanh toán sắp ra mắt" },
+  "apply.modal_body": { ko: "현재는 접수 화면 미리보기입니다. 본인인증·결제(PG)는 곧 연결됩니다.", en: "This is a preview of the registration screen. Identity verification and payment (PG) will be connected soon.", ja: "現在は申込画面のプレビューです。本人認証・決済(PG)は近日連携予定です。", zh: "当前为报名界面预览。实名认证·支付(PG)即将接入。", hi: "यह पंजीकरण स्क्रीन का पूर्वावलोकन है। पहचान सत्यापन·भुगतान (PG) जल्द जोड़ा जाएगा।", vi: "Đây là bản xem trước màn hình đăng ký. Xác minh danh tính·thanh toán (PG) sẽ sớm được kết nối." },
+  "apply.confirm": { ko: "확인", en: "OK", ja: "確認", zh: "确定", hi: "ठीक है", vi: "Xác nhận" },
+}
+
+// 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.
+// eslint-disable-next-line react-refresh/only-export-components
+export function tr(lang: Lang, key: string, vars?: Record<string, string | number>): string {
+  const entry = D[key]
+  let s = entry ? entry[lang] : key
+  if (vars) {
+    for (const k of Object.keys(vars)) {
+      s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(vars[k]))
+    }
+  }
+  return s
 }
 
 export type TFunc = (key: string, vars?: Record<string, string | number>) => string
@@ -1079,16 +1200,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = l
   }
 
-  const t: TFunc = (key, vars) => {
-    const entry = D[key]
-    let s = entry ? entry[lang] : key
-    if (vars) {
-      for (const k of Object.keys(vars)) {
-        s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(vars[k]))
-      }
-    }
-    return s
-  }
+  const t: TFunc = (key, vars) => tr(lang, key, vars)
 
   return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>
 }

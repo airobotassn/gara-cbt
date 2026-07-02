@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { SCHEDULE, ROLLING } from '../lib/caris'
+import { SCHEDULE, getRolling } from '../lib/caris'
 
 // 자격검정 접수 — 정기/상시 시험 일정 목록. 항목 클릭 → /exam/apply(원서접수).
 export default function ExamSchedule() {
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, lang } = useT()
+  const ROLLING = getRolling(lang)
   const goApply = (state: Record<string, string>) => navigate('/exam/apply', { state })
 
   return (
@@ -16,15 +17,15 @@ export default function ExamSchedule() {
         <div className="mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-label-md font-bold mb-4">
             <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-            시험 일정
+            {t('sched.badge')}
           </div>
-          <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface mb-2">자격검정 접수</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant break-keep">접수할 시험을 선택하세요. 접수중인 일정만 신청할 수 있습니다.</p>
+          <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface mb-2">{t('sched.title')}</h1>
+          <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('sched.desc')}</p>
         </div>
 
         {/* 정기시험 */}
         <section className="mb-12">
-          <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">정기시험 일정</h2>
+          <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">{t('sched.regular')}</h2>
           <div className="flex flex-col gap-4">
             {SCHEDULE.map((s) => (
               <div
@@ -38,14 +39,14 @@ export default function ExamSchedule() {
                   </div>
                   <div>
                     <div className={`font-title-md text-title-md font-bold ${s.open ? 'text-on-surface' : 'text-on-surface-variant'}`}>{t(s.roundKey)}</div>
-                    <div className="font-body-md text-body-md text-on-surface-variant">시험일 {t(s.dateKey)}</div>
+                    <div className="font-body-md text-body-md text-on-surface-variant">{t('sched.exam_date')} {t(s.dateKey)}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 self-end sm:self-auto">
                   <span className={`px-3 py-1.5 rounded-full font-label-md text-label-md font-bold ${s.open ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>{t(s.open ? 'guide.status_open' : 'guide.status_upcoming')}</span>
                   {s.open && (
                     <span className="inline-flex items-center gap-1 font-label-md text-label-md text-primary font-bold whitespace-nowrap">
-                      접수하기<span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+                      {t('sched.apply')}<span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </span>
                   )}
                 </div>
@@ -56,7 +57,7 @@ export default function ExamSchedule() {
 
         {/* 상시시험 */}
         <section>
-          <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">상시시험</h2>
+          <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">{t('sched.rolling')}</h2>
           <div className="flex flex-col gap-4">
             {ROLLING.map((r) => (
               <div
@@ -76,7 +77,7 @@ export default function ExamSchedule() {
                 <div className="flex items-center gap-3 self-end sm:self-auto">
                   <span className="px-3 py-1.5 rounded-full font-label-md text-label-md font-bold bg-secondary/10 text-secondary whitespace-nowrap">{r.badge}</span>
                   <span className="inline-flex items-center gap-1 font-label-md text-label-md text-primary font-bold whitespace-nowrap">
-                    접수하기<span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+                    {t('sched.apply')}<span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                   </span>
                 </div>
               </div>

@@ -4,6 +4,10 @@
 // 결제 단위 차이(중요):
 //   · Pro    = 시험 1개(단일 응시료). 취득 점수에 따라 4급~1급 차등 부여 → 급수별 결제 아님(examFee).
 //   · Master = 급수별 별도 시험(순차). 급수마다 응시료 다름 → Level.fee.
+//
+// 다국어: 사용자 표시 문자열은 i18n D 사전(caris.* 키)에 있고, getTracks/getRolling(lang) 이 tr() 로 조립한다.
+// 등급/스코어링 내부 식별자는 한국어('4급'..)를 그대로 유지(로직·동기화 안 깨지게). 표시용 등급은 gradeLabel().
+import { tr, type Lang } from './i18n'
 
 export type Level = {
   grade: string
@@ -29,39 +33,71 @@ export type Track = {
   levels: Level[]
 }
 
-export const TRACKS: Track[] = [
-  {
+// 급수 내부 식별자(한국어) ↔ i18n 키 suffix. 스코어링/판정은 이 한국어 값을 그대로 쓴다.
+const GRADES = ['g4', 'g3', 'g2', 'g1'] as const
+type G = (typeof GRADES)[number]
+const GRADE_KO: Record<G, string> = { g4: '4급', g3: '3급', g2: '2급', g1: '1급' }
+const KO_TO_G: Record<string, G> = { '4급': 'g4', '3급': 'g3', '2급': 'g2', '1급': 'g1' }
+
+// 표시용 등급 라벨(로케일별). 입력은 내부 한국어 grade('4급'..) — 없으면 원문 반환.
+export function gradeLabel(grade: string, lang: Lang): string {
+  const g = KO_TO_G[grade]
+  return g ? tr(lang, `caris.grade.${g}`) : grade
+}
+
+// Pro 급수의 대상(tag) 로케일 문구 — ExamResult 안내문에 사용.
+export function proGradeTag(grade: string, lang: Lang): string {
+  const g = KO_TO_G[grade]
+  return g ? tr(lang, `caris.pro.tag.${g}`) : ''
+}
+
+// CARIS 트랙 데이터(로케일 반영본). Guide/ExamApply 가 소비. grade 는 표시용 라벨.
+export function getTracks(lang: Lang): Track[] {
+  const subjects = (track: 'pro' | 'master', g: G) => [
+    tr(lang, `caris.${track}.subj.${g}.0`),
+    tr(lang, `caris.${track}.subj.${g}.1`),
+  ]
+  const masterFee: Record<G, number> = { g4: 80000, g3: 100000, g2: 120000, g1: 150000 }
+  const pro: Track = {
     key: 'pro',
     name: 'CARIS Pro',
-    tagline: '전국민 AI·Robot 리터러시',
-    eligibility: '응시 자격 제한 없음',
+    tagline: tr(lang, 'caris.pro.tagline'),
+    eligibility: tr(lang, 'caris.pro.eligibility'),
     icon: 'school',
-    caption: '한 번의 필기시험으로, 취득 점수에 따라 4급~1급을 차등 부여합니다.',
-    format: '총 80문항 · 60분',
-    formatSub: '객관식 70 · 단답형 8 · 서술형 2',
+    caption: tr(lang, 'caris.pro.caption'),
+    format: tr(lang, 'caris.pro.format'),
+    formatSub: tr(lang, 'caris.pro.formatSub'),
     examFee: 30000,
-    levels: [
-      { grade: '4급', tag: '전 국민 입문 · 기초 소양', subjects: ['생성형 AI의 일상 활용', '인공지능 윤리 및 안전한 디지털 도구 활용'], pass: '60점 이상' },
-      { grade: '3급', tag: '중·고등학생 및 직장인 기초', subjects: ['스마트 도구 활용 및 프롬프트', '일상 속 로봇 및 자동화 기술'], pass: '70점 이상' },
-      { grade: '2급', tag: '대학생 및 직장인 중급', subjects: ['피지컬 AI 블록코딩 및 논리 제어', '에지 디바이스와 데이터 수집·처리 기초'], pass: '80점 이상' },
-      { grade: '1급', tag: '관리자·강사 및 전문가 과정 진입', subjects: ['AI·Robot 기술 트렌드 및 산업 적용 기획', 'AI·Robot 융합 서비스 시나리오 설계'], pass: '90점 이상' },
-    ],
-  },
-  {
+    levels: GRADES.map((g) => ({
+      grade: tr(lang, `caris.grade.${g}`),
+      tag: tr(lang, `caris.pro.tag.${g}`),
+      subjects: subjects('pro', g),
+      pass: tr(lang, `caris.pass.${g}`),
+    })),
+  }
+  const master: Track = {
     key: 'master',
     name: 'CARIS Master',
-    tagline: '피지컬 AI 전문가 과정',
-    eligibility: '하위급 순차 취득 원칙',
+    tagline: tr(lang, 'caris.master.tagline'),
+    eligibility: tr(lang, 'caris.master.eligibility'),
     icon: 'workspace_premium',
-    caption: 'CARIS Pro 1급 취득 후, Master 4급부터 하위급 순차 응시 원칙입니다.',
-    levels: [
-      { grade: '4급', prereq: 'CARIS Pro 1급 취득자', method: '필기 객50+주10 / 60분 · 실기 PC작업형 / 120분', subjects: ['AI 서비스 개발을 위한 SW 스택 이해', 'AI 통합을 위한 로봇·임베디드 HW 이해'], practical: '기초 AI API + 단일 로봇 제어 코딩', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 80000 },
-      { grade: '3급', prereq: 'CARIS Master 4급 취득자', method: '필기 객50+주10 / 60분 · 실기 PC작업형 / 120분', subjects: ['온디바이스 AI 모델 경량화 및 에지 배포 실무', 'AI 기반 멀티모달 센서 융합 및 지능형 제어 적용'], practical: 'Python/C++ 코드 및 LLM 연동', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 100000 },
-      { grade: '2급', prereq: 'CARIS Master 3급 취득자', method: '필기 객30+주10 / 60분 · 실기 복합작업형 / 120분', subjects: ['AI 연동 디지털 트윈 설계 및 시뮬레이션 검증', 'AI·Robot 융합 시스템 아키텍처 설계'], practical: 'Isaac Sim·Gazebo 기반 자율주행·AI 비전 파이프라인 구축·최적화', pass: '필기 60점↑ (과목별 40↑) · 실기 70점↑', fee: 120000 },
-      { grade: '1급', prereq: 'CARIS Master 2급 취득자', method: '실기 포트폴리오 제출 + 심층 면접 / 30분', subjects: ['AI·Robot 솔루션 시스템 통합 및 프로젝트 관리', '국제표준(ISO 10218·IEC 62443·ISO/IEC 42001) 및 기능안전 적용'], pass: '루브릭 심사 · 심사위원 평균 80점 이상', fee: 150000 },
-    ],
-  },
-]
+    caption: tr(lang, 'caris.master.caption'),
+    levels: GRADES.map((g) => ({
+      grade: tr(lang, `caris.grade.${g}`),
+      prereq: tr(lang, `caris.master.prereq.${g}`),
+      method: tr(lang, `caris.master.method.${g}`),
+      subjects: subjects('master', g),
+      practical: g === 'g1' ? undefined : tr(lang, `caris.master.practical.${g}`),
+      pass: tr(lang, `caris.master.pass.${g}`),
+      fee: masterFee[g],
+    })),
+  }
+  return [pro, master]
+}
+
+// 내부 참조가 필요할 때를 위한 급수 코드(디버그/타입). 화면은 getTracks 사용.
+export const GRADE_CODES = GRADES
+export { GRADE_KO }
 
 // ── CARIS Pro 급수 판정 ───────────────────────────────────────────
 // Pro 는 단일 필기시험 → 취득 점수(0~100)에 따라 4급~1급을 차등 부여.
@@ -96,9 +132,17 @@ export const SCHEDULE: Round[] = [
   { id: 'r1_2027', roundKey: 'guide.sched_r1_round', dateKey: 'guide.sched_r1_date', open: false },
 ]
 
-// 상시시험 — 회차와 무관하게 연중 접수(예약 응시). 1차 한국어 단일.
+// 상시시험 — 회차와 무관하게 연중 접수(예약 응시). 로케일은 caris.rolling.* 키.
 export type Rolling = { id: string; name: string; badge: string; date: string; desc: string }
 
-export const ROLLING: Rolling[] = [
-  { id: 'pro-cbt', name: 'CARIS Pro 상시 검정 (CBT)', badge: '상시 접수', date: '연중 상시 · 예약일 응시', desc: '원하는 날짜를 예약해 온라인(CBT)으로 응시하는 상시 검정입니다.' },
-]
+export function getRolling(lang: Lang): Rolling[] {
+  return [
+    {
+      id: 'pro-cbt',
+      name: tr(lang, 'caris.rolling.pro_cbt.name'),
+      badge: tr(lang, 'caris.rolling.pro_cbt.badge'),
+      date: tr(lang, 'caris.rolling.pro_cbt.date'),
+      desc: tr(lang, 'caris.rolling.pro_cbt.desc'),
+    },
+  ]
+}

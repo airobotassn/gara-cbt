@@ -63,7 +63,10 @@ export default function ExamCheck() {
                   <span className="material-symbols-outlined text-[20px]">download</span>
                   {t('check.install_btn')}
                 </a>
-                <p className="font-label-sm text-label-sm text-outline mt-4">{t('check.install_note1')} {t('check.install_note2')}</p>
+                <div className="mt-5 rounded-xl bg-surface-container-low border border-outline-variant/40 px-5 py-4 flex flex-col gap-2">
+                  <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note1')}</p>
+                  <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note2')}</p>
+                </div>
               </div>
             </div>
 

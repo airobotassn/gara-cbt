@@ -652,10 +652,11 @@
 /* ================= 명예의 전당 (전체 TOP 10 · Ranking.tsx) ================= */
 /* 메달 1·2·3등 — 블루 농도 차등(강→약)으로 위계 표현 */
 .hof-wrap { --gold: var(--blue); --gold-l: var(--blue-hi); --silver: var(--blue-deep); --silver-l: var(--blue); --bronze: rgba(0, 74, 198, 0.45); --bronze-l: rgba(0, 74, 198, 0.7); }
-.hof-wrap { padding-bottom: 92px; } /* 하단 고정 바 자리 */
+/* 데스크톱: 레거시 .wrap(760px)에 갇히지 않게 폭 확장(.admin 선례). 내부 섹션은 공통 폭으로 중앙 정렬해 어긋남 제거 */
+.hof-wrap { width: min(960px, 100%); max-width: 960px; padding-bottom: 92px; } /* 하단 고정 바 자리 */
 
 /* 헤더 (페이지와 같은 배경 위, 블루 메달로 아래 시상대와 톤 통일) */
-.hof-head { position: relative; text-align: center; margin: 10px 0 20px; }
+.hof-head { position: relative; text-align: center; margin: 10px auto 20px; max-width: 640px; }
 
 /* 메달 엠블렘 */
 .hof-badge {
@@ -670,15 +671,17 @@
 }
 .hof-badge-disc {
   width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
-  background: radial-gradient(120% 120% at 50% 4%, rgba(var(--paper), 0.85) 0%, var(--gold-l) 40%, var(--gold) 78%, var(--blue-deep) 100%);
+  /* 밝은 하늘색 메달(양 테마 공통) — 라이트 모드는 --blue(#004ac6)·--paper(어두운 잉크)를 쓰면 남색 덩어리로 보여서 고정색 사용 */
+  background: radial-gradient(120% 120% at 50% 4%, rgba(255, 255, 255, 0.92) 0%, #82b0ff 40%, #4f8df5 78%, #11295a 100%);
   box-shadow:
-    0 10px 22px -10px color-mix(in srgb, var(--gold) 70%, #000),
-    inset 0 2px 0 rgba(var(--paper), 0.6),
+    0 10px 22px -10px rgba(0, 40, 120, 0.55),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
     inset 0 -6px 12px rgba(14, 59, 128, 0.45);
   animation: hof-float 4.6s ease-in-out infinite;
 }
 @keyframes hof-float { 50% { transform: translateY(-4px); } }
-.hof-badge-ico { font-size: var(--fs-lg); line-height: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+/* 원판(64px 고정) 안에 들어가도록 이모지도 고정 크기 — --fs-lg(clamp 30~52px)를 쓰면 데스크톱에서 52px로 커져 원판 밖으로 넘침 */
+.hof-badge-ico { font-size: 30px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
 
 /* 단색 제목 */
 .hof-title {
@@ -701,7 +704,7 @@
 }
 
 /* 시상대 */
-.hof-podium { display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: end; gap: 10px; max-width: 520px; margin: 0 auto 22px; }
+.hof-podium { display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: end; gap: 10px; max-width: 640px; margin: 0 auto 22px; }
 .hof-pp { display: flex; flex-direction: column; align-items: center; }
 .hof-crown { font-size: var(--fs-md); margin-bottom: 1px; filter: drop-shadow(0 3px 6px rgba(0, 74, 198, 0.5)); }
 .hof-ring { border-radius: 50%; padding: 3px; background: conic-gradient(var(--a), var(--b), var(--a)); }
@@ -720,7 +723,7 @@
 .hof-pp.p3 .hof-ped { height: 40px; background: linear-gradient(180deg, var(--bronze-l), var(--bronze)); border-color: var(--bronze); color: var(--on-accent); }
 
 /* 4~10 리스트 */
-.hof-list { background: var(--bg); border: 1px solid var(--line2); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-card); }
+.hof-list { background: var(--bg); border: 1px solid var(--line2); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-card); max-width: 640px; margin-left: auto; margin-right: auto; }
 .hof-row { display: flex; align-items: center; gap: 13px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .hof-row:last-child { border-bottom: none; }
 .hof-row.me { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
@@ -732,7 +735,7 @@
 /* 내 순위 고정 바 */
 .hof-mebar {
   position: sticky; bottom: 12px; z-index: 5;
-  display: flex; align-items: center; gap: 12px; margin: 18px auto 0; max-width: var(--container);
+  display: flex; align-items: center; gap: 12px; margin: 18px auto 0; max-width: 640px;
   padding: 12px 16px; border-radius: 16px;
   background: color-mix(in srgb, var(--accent) 14%, var(--bg));
   border: 1px solid var(--accent);
