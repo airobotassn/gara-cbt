@@ -65,6 +65,8 @@ export default function ExamPrepare() {
         return
       }
       window.location.href = sebLaunchUrl(lang)
+      // SEB 로 넘어간 뒤 이 브라우저 탭은 메인으로 — 시험이 끝나 SEB 가 닫히면 메인 화면이 보인다
+      navigate('/')
       return
     }
 
