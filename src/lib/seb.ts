@@ -6,11 +6,21 @@ export const SEB_REQUIRED = import.meta.env.PROD
 
 // SEB 공식 다운로드 페이지(참고)
 export const SEB_DOWNLOAD_URL = 'https://safeexambrowser.org/download_en.html'
-// 직접 다운로드 — GitHub 공식 릴리스의 코드 서명된 SetupBundle(약 351MB, .NET 등 선행조건 포함).
-// SourceForge(광고·미러 선택·"곧 시작" interstitial) 대신 github.com 직링크라 클릭 즉시 받아짐 = 이탈 friction 감소.
-// 버전 올릴 때: https://github.com/SafeExamBrowser/seb-win-refactoring/releases/latest 의 SetupBundle 자산으로 교체.
+// 직접 다운로드 — GitHub 공식 릴리스의 코드 서명 설치본. SourceForge(광고·미러·interstitial) 대신 github.com
+// 직링크라 클릭 즉시 받아짐 = 이탈 friction 감소. 버전 올릴 때 각 repo 의 releases/latest 자산으로 교체.
+//   Windows: SafeExamBrowser/seb-win-refactoring · macOS: SafeExamBrowser/seb-mac
 export const SEB_INSTALLER_URL =
   'https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.10.1/SEB_3.10.1.864_SetupBundle.exe'
+export const SEB_INSTALLER_URL_MAC =
+  'https://github.com/SafeExamBrowser/seb-mac/releases/download/3.6.1/SafeExamBrowser-3.6.1.dmg'
+
+// 접속 OS 에 맞는 설치본(파일·표시 용량). 화면(다운로드 버튼)에서 사용.
+import { getDesktopOS } from './device'
+export type SebInstaller = { os: 'windows' | 'mac'; url: string; size: string }
+export function sebInstaller(os = getDesktopOS()): SebInstaller {
+  if (os === 'mac') return { os: 'mac', url: SEB_INSTALLER_URL_MAC, size: '12MB' }
+  return { os: 'windows', url: SEB_INSTALLER_URL, size: '351MB' } // Windows 기본(other 포함)
+}
 
 // 배포 시: .env 에 VITE_SEB_CONFIG_URL = https://<도메인>/gara.seb 지정.
 // 개발 시: 현재 origin 의 /gara.seb (public/gara.seb, tools/make-seb.mjs 로 생성) 자동 사용.

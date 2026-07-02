@@ -12,6 +12,7 @@ import ExamPrepare from './pages/ExamPrepare'
 import CbtRunner from './pages/CbtRunner'
 import ExamResult from './pages/ExamResult'
 import ExamDone from './pages/ExamDone'
+import ExamComplete from './pages/ExamComplete'
 import Certificate from './pages/Certificate'
 import MyPage from './pages/MyPage'
 import AuthCallback from './pages/AuthCallback'
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="/exam/prepare" element={<ExamPrepare />} />
               <Route path="/exam/run/:attemptId" element={<CbtRunner />} />
               <Route path="/exam/result/:attemptId" element={<ExamResult />} />
+              <Route path="/exam/complete" element={<ExamComplete />} />
               <Route path="/exam/done" element={<ExamDone />} />
               <Route path="/certificate" element={<Certificate />} />
               <Route path="/mypage" element={<MyPage />} />

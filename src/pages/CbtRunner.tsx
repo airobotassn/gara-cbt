@@ -93,15 +93,10 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     if (submittedRef.current) return
     submittedRef.current = true
     setSubmitting(true)
-    // 모의 문제(practice) — 백엔드 호출 없이 종료
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+    // 모의 문제(practice) — 백엔드 호출 없이 완료 화면으로
     if (start.attemptId === 'practice') {
-      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
-      if (isSEB()) {
-        window.location.href = `${window.location.origin}/exam/done` // SEB 종료 URL
-        return
-      }
-      window.alert(t('run.practice_done'))
-      navigate('/exam/check')
+      navigate('/exam/complete', { state: { mode: 'practice', seb: isSEB() }, replace: true })
       return
     }
     try {
@@ -109,12 +104,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         attemptId: start.attemptId,
         answers: buildAnswers(),
       })
-      // 보안 브라우저면 종료 URL 로 이동 → SEB 자동 종료(결과는 마이페이지에서)
+      // 보안 브라우저: 완료 화면을 거쳐 SEB 종료(결과는 발표일 이후 마이페이지). 일반 브라우저(개발): 결과 페이지로.
       if (isSEB()) {
-        window.location.href = `${window.location.origin}/exam/done`
+        navigate('/exam/complete', { state: { mode: 'submitted', seb: true }, replace: true })
         return
       }
-      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
       navigate(`/exam/result/${start.attemptId}`, { state: res, replace: true })
     } catch (e) {
       submittedRef.current = false
@@ -129,8 +123,9 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     submittedRef.current = true
     setAskQuit(false)
     setSubmitting(true)
+    const practice = start.attemptId === 'practice'
     // 실제 시험만 서버에 무효 기록(모의는 백엔드 호출 없음). 기록 실패해도 응시자는 나가도록 둔다(서버는 TTL 만료로 정리).
-    if (start.attemptId !== 'practice') {
+    if (!practice) {
       try {
         await callFunction('submit-exam', { attemptId: start.attemptId, answers: [], voided: true })
       } catch {
@@ -138,12 +133,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       }
     }
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
-    // 보안 브라우저면 종료 URL 로 이동 → SEB 자동 종료
-    if (isSEB()) {
-      window.location.href = `${window.location.origin}/exam/done`
-      return
-    }
-    navigate('/exam', { replace: true })
+    // 완료 화면으로 — SEB 는 거기서 종료 URL 로 이동해 자동 종료
+    navigate('/exam/complete', {
+      state: { mode: practice ? 'practice' : 'voided', seb: isSEB() },
+      replace: true,
+    })
   }, [start.attemptId, navigate])
 
   // 사용자가 누르는 제출: 미응답 가드 → 경고 → 미응답 문항으로 이동
