@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
-import SebInstall from '../components/SebInstall'
 import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import { useT } from '../lib/i18n'
 
@@ -14,37 +12,14 @@ import { useT } from '../lib/i18n'
 export default function ExamGate() {
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle } = useAuth()
-  const { t, lang } = useT()
-  const [sebNotice, setSebNotice] = useState(false)
+  const { t } = useT()
   const [loginNotice, setLoginNotice] = useState(false)
-
-  // SEB 로 들어가면(이 탭이 화면에서 가려짐=hidden) 실행 안내 모달을 닫는다.
-  // 모달을 닫는 것뿐이라 오작동해도 무해. "여시겠습니까?" 확인창은 페이지를 가리지 않아 반응하지 않는다.
-  useEffect(() => {
-    if (!sebNotice) return
-    const onVis = () => {
-      if (document.hidden) setSebNotice(false)
-    }
-    document.addEventListener('visibilitychange', onVis)
-    return () => document.removeEventListener('visibilitychange', onVis)
-  }, [sebNotice])
 
   if (isMobileDevice()) return <MobileBlock />
 
-  const inSeb = isSEB()
-  const needSebLaunch = SEB_REQUIRED && !inSeb
-
-  // 응시 시작: 일반 브라우저면 먼저 SEB 실행 / SEB 안이면 로그인→안내
+  // 응시 시작: 로그인 체크(결제한 시험 확인은 백엔드 준비되면 여기 훅) → prepare.
+  // SEB 실행/설치 안내는 prepare 마지막 단계("시작하기")로 이동. SEB 안에서는 /exam/seb 가 진입점.
   function onStart() {
-    if (needSebLaunch) {
-      if (!sebConfigured()) {
-        alert(t('gate.seb_not_ready'))
-        return
-      }
-      window.location.href = sebLaunchUrl(lang)
-      setSebNotice(true)
-      return
-    }
     if (isFullUser) {
       navigate('/exam/prepare')
     } else {
@@ -60,23 +35,6 @@ export default function ExamGate() {
 
   return (
     <div className="bg-background text-on-surface mesh-bg min-h-screen flex flex-col">
-      {/* SEB 실행 안내 모달 */}
-      {sebNotice && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setSebNotice(false)}>
-          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 max-w-lg w-full ambient-shadow max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="text-center mb-5">
-              <div className="w-14 h-14 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-3">
-                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
-              </div>
-              <h3 className="font-title-md text-title-md font-bold text-on-surface mb-1">{t('gate.seb_opened_q')}</h3>
-              <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('gate.seb_opened_desc')}</p>
-            </div>
-            <SebInstall onLaunch={() => { window.location.href = sebLaunchUrl(lang) }} />
-            <button className="mt-4 w-full text-on-surface-variant hover:text-primary-container font-label-md text-label-md py-2 transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
-          </div>
-        </div>
-      )}
-
       {/* 로그인 안내 모달 — 응시하기 클릭 시 미로그인이면 노출 */}
       {loginNotice && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setLoginNotice(false)}>

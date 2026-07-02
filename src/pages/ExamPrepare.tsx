@@ -4,13 +4,8 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import {
-  SEB_REQUIRED,
-  isSEB,
-  sebConfigured,
-  sebLaunchUrl,
-  SEB_INSTALLER_URL,
-} from '../lib/seb'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import SebInstall from '../components/SebInstall'
 import {
   DEFAULT_EXAM_SLUG,
   TEST_DURATION_MINUTES,
@@ -38,6 +33,7 @@ export default function ExamPrepare() {
   const [practice, setPractice] = useState<number | null>(null)
   const [starting, setStarting] = useState(false)
   const [err, setErr] = useState('')
+  const [sebNotice, setSebNotice] = useState(false)
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -64,7 +60,9 @@ export default function ExamPrepare() {
         setErr(t('prep.err_seb_not_ready'))
         return
       }
+      // SEB 실행 시도 + 설치/실행 안내 팝업(안 열리면 여기서 바로 설치). SEB 안에선 /exam/seb 로 진입.
       window.location.href = sebLaunchUrl(lang)
+      setSebNotice(true)
       return
     }
 
@@ -89,6 +87,21 @@ export default function ExamPrepare() {
 
   return (
     <div className="exam-center">
+      {sebNotice && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setSebNotice(false)}>
+          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 max-w-lg w-full ambient-shadow max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-3">
+                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+              </div>
+              <h3 className="font-title-md text-title-md font-bold text-on-surface mb-1">{t('gate.seb_opened_q')}</h3>
+              <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('gate.seb_opened_desc')}</p>
+            </div>
+            <SebInstall onLaunch={() => { window.location.href = sebLaunchUrl(lang) }} />
+            <button className="mt-4 w-full text-on-surface-variant hover:text-primary-container font-label-md text-label-md py-2 transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
+          </div>
+        </div>
+      )}
       <div className="prep">
         <ol className="prep-steps">
           {STEP_KEYS.map((s, i) => (
@@ -135,21 +148,8 @@ export default function ExamPrepare() {
                 <div className="prep-seb-ok">{t('prep.seb_running')}</div>
               ) : (
                 <>
-                  <p>{t('prep.seb_desc')}</p>
-                  <a
-                    className="exam-btn"
-                    href={SEB_INSTALLER_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ display: 'inline-block', margin: '6px 0' }}
-                  >
-                    {t('prep.seb_install_btn')}
-                  </a>
-                  <ul>
-                    <li>{t('prep.seb_li1')}</li>
-                    <li>{t('prep.seb_li2')}</li>
-                    <li>{t('prep.seb_li3')}</li>
-                  </ul>
+                  <p style={{ marginBottom: 12 }}>{t('prep.seb_desc')}</p>
+                  <SebInstall />
                 </>
               )}
             </div>

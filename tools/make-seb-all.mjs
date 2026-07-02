@@ -8,7 +8,7 @@
 //       로컬:  node tools/make-seb-all.mjs http://localhost:5174 public 8
 //
 // 생성물(언어 6종 × 실제/연습):
-//   public/gara-<lang>.seb          startURL = <origin>/exam?lang=<lang>
+//   public/gara-<lang>.seb          startURL = <origin>/exam/seb?lang=<lang>
 //   public/gara-practice-<lang>.seb startURL = <origin>/exam/run/practice?lang=<lang>
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
@@ -93,10 +93,10 @@ function emit(outPath, startURL) {
 mkdirSync(outDir, { recursive: true })
 console.log(`origin=${origin}  maxDisplays=${maxDisplays}`)
 for (const lang of LANGS) {
-  emit(join(outDir, `gara-${lang}.seb`), `${origin}/exam?lang=${lang}`)
+  emit(join(outDir, `gara-${lang}.seb`), `${origin}/exam/seb?lang=${lang}`)
   emit(join(outDir, `gara-practice-${lang}.seb`), `${origin}/exam/run/practice?lang=${lang}`)
 }
 // 언어 미지정 fallback(=ko) — 옛 /gara.seb 참조 호환
-emit(join(outDir, 'gara.seb'), `${origin}/exam?lang=ko`)
+emit(join(outDir, 'gara.seb'), `${origin}/exam/seb?lang=ko`)
 emit(join(outDir, 'gara-practice.seb'), `${origin}/exam/run/practice?lang=ko`)
 console.log('done.')

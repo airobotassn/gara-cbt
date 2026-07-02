@@ -3,13 +3,13 @@
 //
 // 사용:
 //   node tools/make-seb.mjs <startURL> [출력경로] [허용모니터수]
-//   예) 로컬(듀얼모니터): node tools/make-seb.mjs http://localhost:5174/exam public/gara.seb 2
-//       배포(엄격 1대):   node tools/make-seb.mjs https://가라도메인/exam public/gara.seb 1
+//   예) 로컬(듀얼모니터): node tools/make-seb.mjs http://localhost:5174/exam/seb public/gara.seb 2
+//       배포(엄격 1대):   node tools/make-seb.mjs https://가라도메인/exam/seb public/gara.seb 1
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 
-const startURL = process.argv[2] || 'http://localhost:5174/exam'
+const startURL = process.argv[2] || 'http://localhost:5174/exam/seb'
 const outPath = process.argv[3] || 'public/gara.seb'
 // 허용 모니터 수 — 기본 8(사실상 제한 없음). SEB가 추가 모니터를 검게 덮으므로 여러 대여도 안전.
 const maxDisplays = Math.max(1, Number(process.argv[4] || 8))

@@ -1168,6 +1168,8 @@ const D: Record<string, Record<Lang, string>> = {
   "seb.chip_publisher": { ko: "ETH Zürich 서명", en: "Signed by ETH Zürich", ja: "ETH Zürich 署名", zh: "ETH Zürich 签名", hi: "ETH Zürich हस्ताक्षरित", vi: "Ký bởi ETH Zürich" },
   "seb.chip_size": { ko: "약 {size}", en: "About {size}", ja: "約{size}", zh: "约 {size}", hi: "लगभग {size}", vi: "Khoảng {size}" },
   "seb.warn_title": { ko: "설치 중 경고가 떠도 정상이에요", en: "A warning during install is normal", ja: "インストール中の警告は正常です", zh: "安装时出现警告是正常的", hi: "इंस्टॉल के दौरान चेतावनी सामान्य है", vi: "Cảnh báo khi cài đặt là bình thường" },
+  "seb.entry_loading": { ko: "시험을 준비하고 있어요…", en: "Preparing your exam…", ja: "試験を準備しています…", zh: "正在准备考试…", hi: "आपकी परीक्षा तैयार की जा रही है…", vi: "Đang chuẩn bị bài thi…" },
+  "seb.entry_retry": { ko: "다시 시도", en: "Try again", ja: "再試行", zh: "重试", hi: "पुनः प्रयास करें", vi: "Thử lại" },
 }
 
 // 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.

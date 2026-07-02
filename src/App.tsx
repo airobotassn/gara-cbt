@@ -9,6 +9,7 @@ import ExamSchedule from './pages/ExamSchedule'
 import ExamApply from './pages/ExamApply'
 import ExamCheck from './pages/ExamCheck'
 import ExamPrepare from './pages/ExamPrepare'
+import SebStart from './pages/SebStart'
 import CbtRunner from './pages/CbtRunner'
 import ExamResult from './pages/ExamResult'
 import ExamDone from './pages/ExamDone'
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="/exam/apply" element={<ExamApply />} />
               <Route path="/exam/check" element={<ExamCheck />} />
               <Route path="/exam/prepare" element={<ExamPrepare />} />
+              <Route path="/exam/seb" element={<SebStart />} />
               <Route path="/exam/run/:attemptId" element={<CbtRunner />} />
               <Route path="/exam/result/:attemptId" element={<ExamResult />} />
               <Route path="/exam/complete" element={<ExamComplete />} />
