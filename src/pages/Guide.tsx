@@ -67,6 +67,9 @@ export default function Guide() {
           <div className="max-w-container-max mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-10">
               <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">{t('guide.cert_intro_title')}</h2>
+              <p className="font-title-md text-body-md md:text-title-md text-on-surface-variant tracking-wide break-keep mt-3">
+                Certification for AI &amp; Robotics Integrated Skills <span className="font-bold text-primary whitespace-nowrap">(CARIS)</span>
+              </p>
             </div>
 
             {/* 트랙 전환: 화살표 + 탭 */}
