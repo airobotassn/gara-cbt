@@ -29,11 +29,20 @@ const EMBED_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/
 const HIT_THRESHOLD = 0.85 // 이 이상이면 캐시 HIT(LLM 안 부름). 시드가 촘촘해 대부분 여기서 끝. 튜닝 포인트.
 
 // 인텐트 → 실제 라우트. 'unknown' 은 라우팅 안 함(null).
+// ⚠️ 여기 바꾸면 route-seed 의 SEED dest, Landing.tsx 의 VALID_DESTS/clientKeywordRoute 도 같이 갱신.
 const DEST: Record<string, string> = {
-  level_test: '/test/select',
-  guide: '/guide',
-  faq: '/faq',
-  ranking: '/ranking',
+  level_test: '/test/select',   // 무료 레벨테스트/실력 진단
+  guide: '/guide',              // 자격검정 안내(종류·급수·과목·응시자격)
+  schedule: '/exam/schedule',   // 시험 일정·날짜·회차
+  apply: '/exam/apply',         // 원서접수·신청·응시료
+  take_exam: '/exam',           // 응시 시작(시험 보러)
+  exam_check: '/exam/check',    // 시험환경 점검·모의응시
+  mypage: '/mypage',            // 내 점수·결과·이력
+  certificate: '/certificate',  // 자격증 발급·확인
+  ranking: '/ranking',          // 랭킹·순위
+  about: '/about',              // 협회 소개
+  notice: '/notice',            // 공지사항
+  faq: '/faq',                  // 고객센터·문의
 }
 const VALID = new Set(Object.values(DEST))
 
@@ -70,14 +79,23 @@ async function cacheInsert(vec: number[], dest: string, sample: string): Promise
   await supabase.from('route_cache').insert({ embedding: vec, dest, sample, source: 'llm' })
 }
 
-const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색창에 무언가를 입력했다. 그 의도를 아래 5개 중 하나로 분류해라.
+const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색창에 무언가를 입력했다. 그 의도를 아래 카테고리 중 하나로 분류해라.
 
 - level_test : 무료 AI 실력 진단/레벨테스트를 하고 싶다. ("레벨테스트", "내 실력 몇점", "무료 진단", "몇 레벨인지")
-- guide      : 어떤 시험/자격증이 있는지, 시험 일정·응시자격·급수·과목 등 자격검정 안내가 궁금하다. ("어떤 시험 있어", "자격증 종류", "시험 일정", "응시 자격")
-- faq        : 문의·고객센터·환불·연락처·도움 등 도움이 필요하다. ("문의하고 싶어", "환불", "고객센터", "도움 필요")
-- ranking    : 순위/랭킹/리더보드가 보고 싶다. ("랭킹", "순위", "1등이 누구")
+- guide      : 어떤 시험/자격증이 있는지, 급수·과목·응시자격 등 자격검정 "정보"가 궁금하다. ("어떤 시험 있어", "자격증 종류", "응시 자격", "CARIS가 뭐야")
+- schedule   : 시험 "일정/날짜/회차"가 궁금하다. ("시험 언제야", "정기시험 일정", "다음 시험 날짜", "접수 기간")
+- apply      : 원서접수/시험 신청/등록/응시료 결제를 하고 싶다. ("원서접수", "시험 신청", "접수하기", "응시료")
+- take_exam  : 지금 시험을 응시/시작하러 왔다. ("시험 보러 왔어", "응시하기", "시험 시작", "시험장 입장")
+- exam_check : 시험 환경 점검/모의응시/시험 프로그램(SEB) 설치. ("모의고사", "환경 점검", "연습 시험", "SEB 설치")
+- mypage     : 내 점수/결과/응시이력/내 정보/학습 대시보드. ("내 점수", "내 결과", "마이페이지", "응시 이력")
+- certificate: 자격증/합격증/증명서 발급·확인·출력. ("자격증 발급", "증명서 출력", "내 자격증")
+- ranking    : 순위/랭킹/리더보드/명예의전당. ("랭킹", "순위", "1등이 누구")
+- about      : 협회/기관 소개, 이 사이트가 뭔지. ("협회 소개", "무슨 협회야", "GARA가 뭐야")
+- notice     : 공지사항/소식/안내/점검 공지. ("공지사항", "새 소식", "점검 공지")
+- faq        : 문의·고객센터·환불·결제문제·시스템오류·도움. ("문의", "환불", "고객센터", "결제 문제", "도움 필요")
 - unknown    : 위 어디에도 안 맞거나(잡담·질문·욕설·무의미) 애매하다.
 
+구분 팁: 시험 "정보"=guide, "일정"=schedule, "접수/신청"=apply, "지금 응시"=take_exam. 내 데이터(점수·자격증)=mypage/certificate.
 다국어 가능(한/영/일/중/힌/베). 반드시 JSON 으로만 답한다.`
 
 // 명백한 헛입력 컷(비용 절약). recommend-level 과 동일 로직.
@@ -96,14 +114,22 @@ function looksGibberish(raw: string): boolean {
 }
 
 // 최후 폴백(임베딩·LLM 다 죽었을 때): 키워드 규칙 → dest 또는 null.
+// 구체적인 것부터(순서 중요). Landing.tsx 의 clientKeywordRoute 와 동기화.
 function keywordRoute(q: string): string | null {
   const s = q.toLowerCase()
-  const has = (re: RegExp) => re.test(s)
-  // 우선순위: ranking · faq 를 먼저(더 구체적) → guide → level_test
-  if (has(/랭킹|순위|리더보드|rank|leaderboard|ランキング|順位|排名|排行|xếp hạng|thứ hạng/)) return '/ranking'
-  if (has(/문의|질문|고객|환불|연락|상담|도움|help|contact|support|refund|問い合わせ|質問|咨询|退款|客服|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
-  if (has(/시험|자격|급수|일정|응시|과목|정기|certif|exam|schedule|eligib|試験|資格|考试|资格|证书|chứng chỉ|kỳ thi|lịch thi/)) return '/guide'
-  if (has(/레벨|진단|실력|테스트|수준|측정|level|test|assess|diagnos|レベル|診断|测评|等级|水平|trình độ|kiểm tra|đánh giá/)) return '/test/select'
+  const h = (re: RegExp) => re.test(s)
+  if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
+  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage'
+  if (h(/자격증|합격증|증명서|인증서|certificate|証明書|合格証|证书|chứng chỉ của/)) return '/certificate'
+  if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
+  if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
+  if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
+  if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
+  if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/exam/schedule'
+  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
+  if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
+  if (h(/자격|급수|과목|자격검정|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
+  if (h(/레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
   return null
 }
 
@@ -121,7 +147,10 @@ async function classify(q: string): Promise<string> {
         responseSchema: {
           type: 'OBJECT',
           properties: {
-            intent: { type: 'STRING', enum: ['level_test', 'guide', 'faq', 'ranking', 'unknown'] },
+            intent: {
+              type: 'STRING',
+              enum: ['level_test', 'guide', 'schedule', 'apply', 'take_exam', 'exam_check', 'mypage', 'certificate', 'ranking', 'about', 'notice', 'faq', 'unknown'],
+            },
             reason: { type: 'STRING' },
           },
           required: ['intent'],
