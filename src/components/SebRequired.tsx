@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { SEB_DOWNLOAD_URL, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import { SEB_DOWNLOAD_URL, sebConfigured, sebLaunchUrl, launchSeb } from '../lib/seb'
 import { useT } from '../lib/i18n'
 
 // SEB 가 시작 단계에서 내는 대표 영문 오류 → 안내 키
@@ -50,10 +50,7 @@ export default function SebRequired() {
           {ready ? (
             <button
               className="exam-btn"
-              onClick={() => {
-                window.location.href = sebLaunchUrl(lang)
-                navigate('/') // SEB 실행 후 이 탭은 메인으로
-              }}
+              onClick={() => launchSeb(sebLaunchUrl(lang), () => navigate('/'))}
             >
               {t('seb.start')}
             </button>

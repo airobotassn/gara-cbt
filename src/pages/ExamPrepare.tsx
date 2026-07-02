@@ -9,6 +9,7 @@ import {
   isSEB,
   sebConfigured,
   sebLaunchUrl,
+  launchSeb,
   SEB_INSTALLER_URL,
 } from '../lib/seb'
 import {
@@ -64,9 +65,8 @@ export default function ExamPrepare() {
         setErr(t('prep.err_seb_not_ready'))
         return
       }
-      window.location.href = sebLaunchUrl(lang)
-      // SEB 로 넘어간 뒤 이 브라우저 탭은 메인으로 — 시험이 끝나 SEB 가 닫히면 메인 화면이 보인다
-      navigate('/')
+      // SEB 실행. 시험을 마쳐 SEB 가 닫히고 이 브라우저로 돌아오면 메인으로 보낸다.
+      launchSeb(sebLaunchUrl(lang), () => navigate('/'))
       return
     }
 

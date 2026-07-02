@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl, SEB_INSTALLER_URL } from '../lib/seb'
+import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl } from '../lib/seb'
+import SebInstall from '../components/SebInstall'
 import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 
@@ -59,14 +60,7 @@ export default function ExamCheck() {
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('check.sec1_title')}</h2>
                 <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('check.sec1_desc')}</p>
-                <a href={SEB_INSTALLER_URL} target="_blank" rel="noreferrer" className="bg-primary-container text-on-primary font-title-md text-title-md px-8 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2 w-full md:w-auto font-bold">
-                  <span className="material-symbols-outlined text-[20px]">download</span>
-                  {t('check.install_btn')}
-                </a>
-                <div className="mt-5 rounded-xl bg-surface-container-low border border-outline-variant/40 px-5 py-4 flex flex-col gap-2">
-                  <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note1')}</p>
-                  <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note2')}</p>
-                </div>
+                <SebInstall />
               </div>
             </div>
 

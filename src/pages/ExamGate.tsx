@@ -4,7 +4,7 @@ import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, launchSeb, SEB_INSTALLER_URL } from '../lib/seb'
 import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import { useT } from '../lib/i18n'
 
@@ -14,6 +14,7 @@ export default function ExamGate() {
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle } = useAuth()
   const { t, lang } = useT()
+  const [sebNotice, setSebNotice] = useState(false)
   const [loginNotice, setLoginNotice] = useState(false)
 
   if (isMobileDevice()) return <MobileBlock />
@@ -28,9 +29,9 @@ export default function ExamGate() {
         alert(t('gate.seb_not_ready'))
         return
       }
-      window.location.href = sebLaunchUrl(lang)
-      // SEB 로 넘어간 뒤 이 브라우저 탭은 메인으로 — 시험이 끝나 SEB 가 닫히면 메인 화면이 보인다
-      navigate('/')
+      // SEB 실행. 시험을 마쳐 SEB 가 닫히고 이 브라우저로 돌아오면 메인으로 보낸다.
+      launchSeb(sebLaunchUrl(lang), () => navigate('/'))
+      setSebNotice(true)
       return
     }
     if (isFullUser) {
@@ -48,6 +49,23 @@ export default function ExamGate() {
 
   return (
     <div className="bg-background text-on-surface mesh-bg min-h-screen flex flex-col">
+      {/* SEB 실행 안내 모달 */}
+      {sebNotice && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setSebNotice(false)}>
+          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow" onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+            </div>
+            <h3 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('gate.seb_opened_q')}</h3>
+            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.seb_opened_desc')}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" href={SEB_INSTALLER_URL} target="_blank" rel="noreferrer">{t('gate.seb_install_new')}</a>
+              <button className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 로그인 안내 모달 — 응시하기 클릭 시 미로그인이면 노출 */}
       {loginNotice && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setLoginNotice(false)}>

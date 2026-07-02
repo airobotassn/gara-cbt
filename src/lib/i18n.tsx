@@ -1149,6 +1149,21 @@ const D: Record<string, Record<Lang, string>> = {
   "apply.modal_title": { ko: "결제 기능 준비 중", en: "Payment coming soon", ja: "決済機能は準備中", zh: "支付功能准备中", hi: "भुगतान सुविधा जल्द", vi: "Tính năng thanh toán sắp ra mắt" },
   "apply.modal_body": { ko: "현재는 접수 화면 미리보기입니다. 본인인증·결제(PG)는 곧 연결됩니다.", en: "This is a preview of the registration screen. Identity verification and payment (PG) will be connected soon.", ja: "現在は申込画面のプレビューです。本人認証・決済(PG)は近日連携予定です。", zh: "当前为报名界面预览。实名认证·支付(PG)即将接入。", hi: "यह पंजीकरण स्क्रीन का पूर्वावलोकन है। पहचान सत्यापन·भुगतान (PG) जल्द जोड़ा जाएगा।", vi: "Đây là bản xem trước màn hình đăng ký. Xác minh danh tính·thanh toán (PG) sẽ sớm được kết nối." },
   "apply.confirm": { ko: "확인", en: "OK", ja: "確認", zh: "确定", hi: "ठीक है", vi: "Xác nhận" },
+
+  // ── SEB 설치 안내(SebInstall 컴포넌트) — ExamGate 모달 · ExamCheck Step1 공유 ──
+  "seb.download": { ko: "보안 프로그램(SEB) 다운로드", en: "Download secure browser (SEB)", ja: "セキュリティソフト(SEB)をダウンロード", zh: "下载安全程序(SEB)", hi: "सुरक्षित ब्राउज़र (SEB) डाउनलोड करें", vi: "Tải phần mềm bảo mật (SEB)" },
+  "seb.dl_meta": { ko: "약 {size} · 1회만 설치하면 됩니다 · 게시자 ETH Zürich(정상)", en: "About {size} · one-time install · publisher ETH Zürich (normal)", ja: "約{size} · インストールは一度だけ · 発行元 ETH Zürich（正常）", zh: "约 {size} · 仅需安装一次 · 发布者 ETH Zürich（正常）", hi: "लगभग {size} · केवल एक बार इंस्टॉल · प्रकाशक ETH Zürich (सामान्य)", vi: "Khoảng {size} · cài một lần · nhà phát hành ETH Zürich (bình thường)" },
+  "seb.steps_title": { ko: "설치 방법 (약 2분)", en: "How to install (~2 min)", ja: "インストール方法（約2分）", zh: "安装方法（约2分钟）", hi: "इंस्टॉल कैसे करें (~2 मिनट)", vi: "Cách cài đặt (~2 phút)" },
+  "seb.step1_t": { ko: "다운로드", en: "Download", ja: "ダウンロード", zh: "下载", hi: "डाउनलोड", vi: "Tải về" },
+  "seb.step1_d": { ko: "위 버튼을 누르면 설치 파일이 받아집니다.", en: "Click the button above to get the installer.", ja: "上のボタンを押すとインストーラーが保存されます。", zh: "点击上方按钮即可下载安装文件。", hi: "ऊपर बटन दबाने पर इंस्टॉलर डाउनलोड होगा।", vi: "Nhấn nút phía trên để tải trình cài đặt." },
+  "seb.step2_t": { ko: "실행 (경고는 정상)", en: "Run it (the warning is normal)", ja: "実行（警告は正常）", zh: "运行（出现警告是正常的）", hi: "चलाएं (चेतावनी सामान्य है)", vi: "Chạy (cảnh báo là bình thường)" },
+  "seb.step2_d_mac": { ko: ".dmg 파일을 열고 SEB를 응용 프로그램 폴더로 옮긴 뒤, 처음 실행은 우클릭 → 열기 로 하세요.", en: "Open the .dmg, drag SEB to Applications, then right-click → Open for the first launch.", ja: ".dmg を開き SEB を「アプリケーション」へ移動し、初回は右クリック → 開く で起動してください。", zh: "打开 .dmg，将 SEB 拖入“应用程序”，首次启动请右键 → 打开。", hi: ".dmg खोलें, SEB को Applications में खींचें, पहली बार राइट-क्लिक → Open करें।", vi: "Mở .dmg, kéo SEB vào Applications, lần đầu hãy chuột phải → Open." },
+  "seb.step3_t": { ko: "시험 열기", en: "Open the exam", ja: "試験を開く", zh: "打开考试", hi: "परीक्षा खोलें", vi: "Mở bài thi" },
+  "seb.step3_d": { ko: "설치가 끝나면 이 화면으로 돌아와 아래 버튼으로 SEB에서 시험을 엽니다.", en: "After installing, come back here and open the exam in SEB with the button below.", ja: "インストール後、この画面に戻り下のボタンで SEB で試験を開きます。", zh: "安装完成后返回本页，用下方按钮在 SEB 中打开考试。", hi: "इंस्टॉल के बाद यहाँ लौटें और नीचे बटन से SEB में परीक्षा खोलें।", vi: "Sau khi cài, quay lại đây và mở bài thi trong SEB bằng nút bên dưới." },
+  "seb.launch_btn": { ko: "SEB로 시험 열기", en: "Open exam in SEB", ja: "SEBで試験を開く", zh: "在 SEB 中打开考试", hi: "SEB में परीक्षा खोलें", vi: "Mở bài thi trong SEB" },
+  "seb.dialog_title": { ko: "Windows가 PC를 보호했습니다", en: "Windows protected your PC", ja: "WindowsによってPCが保護されました", zh: "Windows 已保护你的电脑", hi: "Windows ने आपके PC की रक्षा की", vi: "Windows đã bảo vệ PC của bạn" },
+  "seb.dialog_more": { ko: "추가 정보", en: "More info", ja: "詳細情報", zh: "更多信息", hi: "अधिक जानकारी", vi: "Thông tin thêm" },
+  "seb.dialog_run": { ko: "실행", en: "Run anyway", ja: "実行", zh: "仍要运行", hi: "फिर भी चलाएं", vi: "Vẫn chạy" },
 }
 
 // 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.

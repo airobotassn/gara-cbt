@@ -67,3 +67,21 @@ export function sebPracticeLaunchUrl(lang?: string): string {
   const file = lang ? `gara-practice-${lang}.seb` : 'gara-practice.seb'
   return toScheme(`${window.location.origin}/${file}`)
 }
+
+// SEB(별도 앱)를 실행한다. SEB 는 창을 하나 새로 띄우므로, 시험을 마쳐 SEB 가 닫히고
+// 이 브라우저로 돌아오면(창 blur 후 다시 focus) onReturn 을 한 번 호출한다.
+// → 응시자가 SEB 에서 나왔을 때 보이는 화면을 (예: 메인으로) 바꿔줄 수 있다.
+// SEB 가 아예 안 열리면(blur 없음) 아무 일도 하지 않아 현재 화면에 그대로 머문다.
+export function launchSeb(url: string, onReturn: () => void): void {
+  const onFocus = () => {
+    window.removeEventListener('focus', onFocus)
+    onReturn()
+  }
+  const onBlur = () => {
+    window.removeEventListener('blur', onBlur)
+    // SEB 가 떠서 이 창이 가려진 뒤 → 다시 돌아왔을 때(=SEB 종료)에 한 번만 반응
+    window.addEventListener('focus', onFocus)
+  }
+  window.addEventListener('blur', onBlur)
+  window.location.href = url
+}
