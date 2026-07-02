@@ -56,6 +56,9 @@ const D: Record<string, Record<Lang, string>> = {
   'reco.placeholder': { ko: '내 AI 실력 어느 정도일까?', en: 'How good is your AI skill?', ja: 'あなたのAI活用力はどのくらい？', zh: '你的 AI 实力有多强？', hi: 'आपकी AI दक्षता कितनी है?', vi: 'Trình độ AI của bạn đến đâu?' },
   'reco.button': { ko: '레벨 추천받기', en: 'Recommend a level', ja: 'レベルを提案', zh: '推荐等级', hi: 'लेवल सुझाएं', vi: 'Gợi ý cấp độ' },
   'reco.loading': { ko: '분석 중…', en: 'Analyzing…', ja: '分析中…', zh: '分析中…', hi: 'विश्लेषण…', vi: 'Đang phân tích…' },
+  // 홈 검색 라우터(route-query) — 의미 기반 페이지 이동
+  'route.placeholder': { ko: '무엇을 찾으세요? 레벨테스트·시험안내·문의…', en: 'What are you looking for? Level test, exam guide, support…', ja: '何をお探しですか？ レベルテスト・試験案内・問い合わせ…', zh: '您在找什么？等级测试·考试指南·咨询…', hi: 'आप क्या ढूंढ रहे हैं? लेवल टेस्ट, परीक्षा गाइड, सहायता…', vi: 'Bạn đang tìm gì? Kiểm tra trình độ, hướng dẫn thi, hỗ trợ…' },
+  'route.notfound': { ko: '찾으시는 걸 정확히 못 찾았어요. 아래에서 골라주세요.', en: "Couldn't pinpoint that. Please pick below.", ja: 'うまく見つけられませんでした。下から選んでください。', zh: '没能准确找到，请从下面选择。', hi: 'ठीक से नहीं मिला। कृपया नीचे से चुनें।', vi: 'Chưa tìm chính xác được. Vui lòng chọn bên dưới.' },
   'mypage.tab_learning': { ko: '학습 대시보드', en: 'Learning', ja: '学習ダッシュボード', zh: '学习仪表板', hi: 'लर्निंग', vi: 'Bảng học tập' },
   // 레벨테스트 이식 잔여 키 (gara-cbt에 없던 7개)
   'rank.title': { ko: '랭킹', en: 'Ranking', ja: 'ランキング', zh: '排行榜', hi: 'रैंकिंग', vi: 'Xếp hạng' },
