@@ -50,6 +50,8 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     () => Array(total).fill(null),
   )
   const [submitting, setSubmitting] = useState(false)
+  const [askSubmit, setAskSubmit] = useState(false) // 제출 확인 모달 (네이티브 confirm 대신 — 전체화면/포커스 안 건드려 부정행위 오탐 방지)
+  const [askQuit, setAskQuit] = useState(false) // 나가기 확인 모달 (동일 이유로 네이티브 confirm 금지)
   const [voided, setVoided] = useState(false)
   const submittedRef = useRef(false)
   const violationsRef = useRef(0)
@@ -144,15 +146,23 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
   }
 
   function goNext() {
-    if (index + 1 >= total) submit()
-    else setIndex((i) => i + 1)
+    if (index + 1 < total) {
+      setIndex((i) => i + 1)
+      return
+    }
+    // 마지막 문항: 페이지 내 모달로 확인(실수 제출 방지). 네이티브 confirm은 전체화면 해제+포커스 이탈로 부정행위 오탐 유발 → 금지.
+    // 시간초과 자동제출은 submit() 직접 호출이라 여기 안 탐.
+    if (submitting) return
+    setAskSubmit(true)
   }
   function goPrev() {
     if (index > 0) setIndex((i) => i - 1)
   }
   function quit() {
     if (submitting) return
-    if (!window.confirm(t('test.quit_confirm'))) return
+    setAskQuit(true)
+  }
+  function doQuit() {
     submittedRef.current = true
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
     navigate('/')
@@ -346,6 +356,101 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
           </div>
         </div>
       </div>
+
+      {askSubmit ? (
+        <div
+          className="tr-submit-modal"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20,
+          }}
+        >
+          <div className="card pad" style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
+            <p
+              style={{
+                whiteSpace: 'pre-line',
+                fontSize: 16,
+                lineHeight: 1.6,
+                color: 'var(--txt)',
+                margin: 0,
+              }}
+            >
+              {selected.filter((s) => s === null).length > 0
+                ? t('test.submit_confirm_unanswered', {
+                    n: selected.filter((s) => s === null).length,
+                  })
+                : t('test.submit_confirm')}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button className="btn-ghost" style={{ flex: 1 }} onClick={() => setAskSubmit(false)}>
+                {t('intro.cancel')}
+              </button>
+              <button
+                className="btn-ink"
+                style={{ flex: 1 }}
+                disabled={submitting}
+                onClick={() => {
+                  setAskSubmit(false)
+                  submit()
+                }}
+              >
+                {t('test.submit')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {askQuit ? (
+        <div
+          className="tr-quit-modal"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20,
+          }}
+        >
+          <div className="card pad" style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
+            <p
+              style={{
+                whiteSpace: 'pre-line',
+                fontSize: 16,
+                lineHeight: 1.6,
+                color: 'var(--txt)',
+                margin: 0,
+              }}
+            >
+              {t('test.quit_confirm')}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button className="btn-ghost" style={{ flex: 1 }} onClick={() => setAskQuit(false)}>
+                {t('intro.cancel')}
+              </button>
+              <button
+                className="btn-ink"
+                style={{
+                  flex: 1,
+                  background: 'var(--danger-fg)',
+                  borderColor: 'var(--danger-fg)',
+                  color: '#fff',
+                }}
+                onClick={doQuit}
+              >
+                {t('test.quit')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
