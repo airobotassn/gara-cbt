@@ -16,8 +16,11 @@ const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+// 임베딩 전용 키: 대량 시드가 라이브 검색(GEMINI_API_KEY)의 임베딩 할당량을 안 갉아먹게 별 키 사용.
+// 임베딩 벡터는 모델(001)만 같으면 키와 무관하게 동일 → 기존 시드와 호환.
+const EMBED_KEY = Deno.env.get('GEMINI_API_KEY_TEST_GENERATE') ?? GEMINI_API_KEY
 const SEED_KEY = Deno.env.get('ROUTE_SEED_KEY')
-const EMBED_MODEL = 'gemini-embedding-001'
+const EMBED_MODEL = 'gemini-embedding-001' // ⚠️ route-query 와 동일해야 벡터 호환. 바꾸면 전체 재시드 필수.
 const EMBED_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent`
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -183,7 +186,7 @@ const SEED: { dest: string; phrases: string[] }[] = [
 // 단건 임베딩(무료 티어 OK) + 429 백오프. recommend-level 과 동일 파라미터.
 async function embedOne(text: string): Promise<number[]> {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch(`${EMBED_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    const res = await fetch(`${EMBED_ENDPOINT}?key=${EMBED_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

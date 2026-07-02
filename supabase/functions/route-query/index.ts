@@ -21,9 +21,11 @@ function json(body: unknown, status = 200): Response {
 }
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+// 임베딩 전용 키(분류기와 할당량 분리). 임베딩 벡터는 모델만 같으면 키 무관하게 동일.
+const EMBED_KEY = Deno.env.get('GEMINI_API_KEY_TEST_GENERATE') ?? GEMINI_API_KEY
 const MODEL = 'gemini-3.1-flash-lite'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
-const EMBED_MODEL = 'gemini-embedding-001'
+const EMBED_MODEL = 'gemini-embedding-001' // ⚠️ route-seed 와 동일해야 벡터 호환. 바꾸면 전체 재시드 필수.
 const EMBED_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent`
 
 const HIT_THRESHOLD = 0.85 // 이 이상이면 캐시 HIT(LLM 안 부름). 시드가 촘촘해 대부분 여기서 끝. 튜닝 포인트.
@@ -53,7 +55,7 @@ const supabase = createClient(
 
 // 입력 문장 → 임베딩 벡터(768). 실패(한도 등) 시 throw.
 async function embed(text: string): Promise<number[]> {
-  const res = await fetch(`${EMBED_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+  const res = await fetch(`${EMBED_ENDPOINT}?key=${EMBED_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -93,8 +95,9 @@ const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색�
 - about      : 협회/기관 소개, 이 사이트가 뭔지. ("협회 소개", "무슨 협회야", "GARA가 뭐야")
 - notice     : 공지사항/소식/안내/점검 공지. ("공지사항", "새 소식", "점검 공지")
 - faq        : 문의·고객센터·환불·결제문제·시스템오류·도움. ("문의", "환불", "고객센터", "결제 문제", "도움 필요")
-- unknown    : 위 어디에도 안 맞거나(잡담·질문·욕설·무의미) 애매하다.
+- unknown    : 입력이 이 사이트(시험·자격·학습·내 정보 등)와 **정말로 무관**할 때만. (인사·잡담·욕설·무의미·사이트와 상관없는 질문 "오늘 점심 뭐먹지" 등)
 
+원칙: 입력이 조금이라도 관련 있으면 애매하더라도 **12개 중 가장 가까운 하나**를 골라라. unknown 은 최후의 수단이다.
 구분 팁: 시험 "정보"=guide, "일정"=schedule, "접수/신청"=apply, "지금 응시"=take_exam. 내 데이터(점수·자격증)=mypage/certificate.
 다국어 가능(한/영/일/중/힌/베). 반드시 JSON 으로만 답한다.`
 
