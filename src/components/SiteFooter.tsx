@@ -21,13 +21,13 @@ export default function SiteFooter() {
             <img src="/logo.png" alt="GARA" className="h-7 w-7 object-cover rounded-full" />
             <span className="font-title-md text-title-md font-bold text-on-surface group-hover:text-primary transition-colors">GARA</span>
           </Link>
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t('footer.rights')}</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">{t('footer.rights')}</p>
         </div>
-        <nav className="flex flex-wrap gap-x-6 gap-y-2">
+        <nav className="flex flex-wrap gap-x-8 gap-y-3">
           {links.map((l) => (
             <Link
               key={l.to}
-              className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors"
+              className="font-body-lg text-body-lg font-medium text-on-surface-variant hover:text-primary transition-colors"
               to={l.to}
             >
               {t(l.key)}
