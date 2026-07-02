@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { isMobileDevice } from '../lib/device'
+import { isMobileDevice, getDesktopOS } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, sebInstaller } from '../lib/seb'
 import SebInstall from '../components/SebInstall'
 import {
   DEFAULT_EXAM_SLUG,
@@ -35,9 +35,29 @@ export default function ExamPrepare() {
   const [err, setErr] = useState('')
   const [sebNotice, setSebNotice] = useState(false)
 
+  // 준비 화면에 오래(15분) 아무 조작 없이 방치되면(예: SEB 로 나가고 남은 탭) 자동으로 메인으로.
+  // 폴링이 아니라 타이머 1개 + 클릭/키 리스너뿐이라 리소스 부담 없음. 조작하면 타이머 리셋 → 진행 중인 사람은 안 쫓겨남.
+  useEffect(() => {
+    const IDLE_MS = 15 * 60 * 1000
+    let id = window.setTimeout(() => navigate('/'), IDLE_MS)
+    const reset = () => {
+      window.clearTimeout(id)
+      id = window.setTimeout(() => navigate('/'), IDLE_MS)
+    }
+    window.addEventListener('click', reset)
+    window.addEventListener('keydown', reset)
+    return () => {
+      window.clearTimeout(id)
+      window.removeEventListener('click', reset)
+      window.removeEventListener('keydown', reset)
+    }
+  }, [navigate])
+
   if (isMobileDevice()) return <MobileBlock />
 
   const inSeb = isSEB()
+  const inst = sebInstaller(getDesktopOS())
+  const osLabel = inst.os === 'mac' ? 'macOS' : 'Windows'
   const checks = [
     { ok: !isMobileDevice(), label: t('prep.chk_pc') },
     { ok: window.innerWidth >= 1024, label: t('prep.chk_screen') },
@@ -148,8 +168,23 @@ export default function ExamPrepare() {
                 <div className="prep-seb-ok">{t('prep.seb_running')}</div>
               ) : (
                 <>
-                  <p style={{ marginBottom: 12 }}>{t('prep.seb_desc')}</p>
-                  <SebInstall />
+                  <p>{t('prep.seb_desc')}</p>
+                  <a
+                    className="exam-btn"
+                    href={inst.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '4px 0 16px' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>download</span>
+                    {t('seb.download')} · {osLabel} · {inst.size}
+                  </a>
+                  <ul>
+                    <li>{t('seb.chip_once')} · {t('seb.chip_publisher')}</li>
+                    <li>
+                      {t('seb.warn_title')} → <b>{t('seb.dialog_more')}</b> → <b>{t('seb.dialog_run')}</b>
+                    </li>
+                  </ul>
                 </>
               )}
             </div>
