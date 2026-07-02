@@ -27,8 +27,10 @@ export default function SebStart() {
       return
     }
 
-    // 미로그인 → 구글 로그인. 콜백이 다시 /exam/seb 로 돌아와 이 화면이 재실행됨.
+    // 미로그인 → 구글 로그인. OAuth 는 Supabase Site URL(=메인)로 떨어지므로,
+    // 메인(Landing)이 이 표식을 보고 /exam/seb 로 되돌려 이 화면이 재실행되게 한다.
     if (!isFullUser) {
+      localStorage.setItem('postLoginRedirect', '/exam/seb')
       loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam/seb')}`)
       return
     }

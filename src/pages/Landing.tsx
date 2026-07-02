@@ -13,9 +13,17 @@ export default function Landing() {
   const [learnSoon, setLearnSoon] = useState(false)
   const [query, setQuery] = useState('')
 
-  // 시험 로그인이 홈으로 떨어져도 '시험 의도' 표식이 있으면 안내 화면으로 자동 이동
+  // 로그인이 홈으로 떨어져도 복귀 표식이 있으면 자동 이동.
+  // postLoginRedirect: 지정 경로로(예: SEB 진입 /exam/seb) · examIntent: 응시 준비(/exam/prepare)
   useEffect(() => {
-    if (isFullUser && localStorage.getItem('examIntent')) {
+    if (!isFullUser) return
+    const dest = localStorage.getItem('postLoginRedirect')
+    if (dest) {
+      localStorage.removeItem('postLoginRedirect')
+      navigate(dest, { replace: true })
+      return
+    }
+    if (localStorage.getItem('examIntent')) {
       localStorage.removeItem('examIntent')
       navigate('/exam/prepare', { replace: true })
     }
