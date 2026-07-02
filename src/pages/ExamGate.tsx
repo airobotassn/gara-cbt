@@ -4,7 +4,8 @@ import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, SEB_INSTALLER_URL } from '../lib/seb'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import SebInstall from '../components/SebInstall'
 import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import { useSebReturn } from '../hooks/useSebReturn'
 import { useT } from '../lib/i18n'
@@ -55,16 +56,16 @@ export default function ExamGate() {
       {/* SEB 실행 안내 모달 */}
       {sebNotice && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setSebNotice(false)}>
-          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 max-w-lg w-full ambient-shadow max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-3">
+                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+              </div>
+              <h3 className="font-title-md text-title-md font-bold text-on-surface mb-1">{t('gate.seb_opened_q')}</h3>
+              <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('gate.seb_opened_desc')}</p>
             </div>
-            <h3 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('gate.seb_opened_q')}</h3>
-            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.seb_opened_desc')}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" href={SEB_INSTALLER_URL} target="_blank" rel="noreferrer">{t('gate.seb_install_new')}</a>
-              <button className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
-            </div>
+            <SebInstall onLaunch={async () => { await armReturn(); window.location.href = sebLaunchUrl(lang) }} />
+            <button className="mt-4 w-full text-on-surface-variant hover:text-primary-container font-label-md text-label-md py-2 transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
           </div>
         </div>
       )}
