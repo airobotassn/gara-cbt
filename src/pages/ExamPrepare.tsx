@@ -122,14 +122,16 @@ export default function ExamPrepare() {
                 <span className="material-symbols-outlined text-[20px]">lock_open</span>
                 {t('seb.launch_btn')}
               </button>
-              <a href={inst.url} target="_blank" rel="noreferrer" className="w-full border border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container font-label-md text-label-md px-6 py-2.5 rounded-xl inline-flex items-center justify-center gap-2 transition-colors">
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                {t('seb.download')} · {osLabel} · {inst.size}
+              {/* 미설치일 때만 쓰는 보조 버튼 — 라벨·용량·경고 팁을 버튼 안 여러 줄로 */}
+              <a href={inst.url} target="_blank" rel="noreferrer" className="group w-full border border-outline-variant hover:border-primary-container rounded-xl px-5 py-3 flex flex-col items-center gap-0.5 text-center transition-colors">
+                <span className="inline-flex items-center gap-2 font-label-md text-label-md font-bold text-on-surface group-hover:text-primary-container break-keep">
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  {t('seb.download')}
+                </span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant">{osLabel} · {inst.size}</span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant break-keep">{t('seb.warn_title')}</span>
               </a>
             </div>
-            <p className="mt-3 text-center font-label-sm text-label-sm text-on-surface-variant break-keep">
-              {t('seb.warn_title')} · {t('seb.dialog_more')} → {t('seb.dialog_run')}
-            </p>
             <button className="mt-4 w-full text-on-surface-variant hover:text-primary-container font-label-md text-label-md py-1.5 transition-colors" onClick={() => setSebNotice(false)}>{t('common.close')}</button>
           </div>
         </div>
