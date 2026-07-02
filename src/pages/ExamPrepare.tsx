@@ -11,7 +11,6 @@ import {
   sebLaunchUrl,
   SEB_INSTALLER_URL,
 } from '../lib/seb'
-import { useSebReturn } from '../hooks/useSebReturn'
 import {
   DEFAULT_EXAM_SLUG,
   TEST_DURATION_MINUTES,
@@ -39,7 +38,6 @@ export default function ExamPrepare() {
   const [practice, setPractice] = useState<number | null>(null)
   const [starting, setStarting] = useState(false)
   const [err, setErr] = useState('')
-  const { armReturn } = useSebReturn() // SEB 종료 후 이 탭으로 돌아오면(서버 확인) 메인으로
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -66,8 +64,6 @@ export default function ExamPrepare() {
         setErr(t('prep.err_seb_not_ready'))
         return
       }
-      // 현재 끝난 응시를 기준선으로 저장 → SEB 에서 시험이 실제로 끝나면 이 탭이 메인으로.
-      await armReturn()
       window.location.href = sebLaunchUrl(lang)
       return
     }
