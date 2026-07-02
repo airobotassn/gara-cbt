@@ -1164,6 +1164,10 @@ const D: Record<string, Record<Lang, string>> = {
   "seb.dialog_title": { ko: "Windows가 PC를 보호했습니다", en: "Windows protected your PC", ja: "WindowsによってPCが保護されました", zh: "Windows 已保护你的电脑", hi: "Windows ने आपके PC की रक्षा की", vi: "Windows đã bảo vệ PC của bạn" },
   "seb.dialog_more": { ko: "추가 정보", en: "More info", ja: "詳細情報", zh: "更多信息", hi: "अधिक जानकारी", vi: "Thông tin thêm" },
   "seb.dialog_run": { ko: "실행", en: "Run anyway", ja: "実行", zh: "仍要运行", hi: "फिर भी चलाएं", vi: "Vẫn chạy" },
+  "seb.chip_once": { ko: "1회만 설치", en: "One-time install", ja: "1回だけ", zh: "仅装一次", hi: "एक बार इंस्टॉल", vi: "Cài một lần" },
+  "seb.chip_publisher": { ko: "ETH Zürich 서명", en: "Signed by ETH Zürich", ja: "ETH Zürich 署名", zh: "ETH Zürich 签名", hi: "ETH Zürich हस्ताक्षरित", vi: "Ký bởi ETH Zürich" },
+  "seb.chip_size": { ko: "약 {size}", en: "About {size}", ja: "約{size}", zh: "约 {size}", hi: "लगभग {size}", vi: "Khoảng {size}" },
+  "seb.warn_title": { ko: "설치 중 경고가 떠도 정상이에요", en: "A warning during install is normal", ja: "インストール中の警告は正常です", zh: "安装时出现警告是正常的", hi: "इंस्टॉल के दौरान चेतावनी सामान्य है", vi: "Cảnh báo khi cài đặt là bình thường" },
 }
 
 // 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.

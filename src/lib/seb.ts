@@ -67,26 +67,3 @@ export function sebPracticeLaunchUrl(lang?: string): string {
   const file = lang ? `gara-practice-${lang}.seb` : 'gara-practice.seb'
   return toScheme(`${window.location.origin}/${file}`)
 }
-
-// SEB(별도 앱)를 실행한다. 시험을 마쳐 SEB 가 닫히고 이 브라우저로 돌아오면 onReturn 을 한 번 호출한다.
-// → 응시자가 SEB 에서 나왔을 때 보이는 화면을 (예: 메인으로) 바꿔줄 수 있다.
-//
-// ⚠️ blur/focus 는 쓰지 않는다: "SEB 여시겠습니까?" 확인창이 뜨면 창이 blur→(취소 시)focus 되어
-//    SEB 를 열지도 않았는데 오발동한다. 대신 visibilitychange 로 "이 탭이 실제로 가려졌다가
-//    (=SEB 가 화면을 덮음) 다시 보이는지(=SEB 종료)"만 본다. 확인창은 페이지를 가리지 않으므로
-//    취소해도 발동하지 않고, SEB 가 아예 안 뜨면 아무 일도 하지 않아 현재 화면에 그대로 머문다.
-export function launchSeb(url: string, onReturn: () => void): void {
-  let wasHidden = false
-  const onVis = () => {
-    if (document.hidden) {
-      wasHidden = true
-      return
-    }
-    if (wasHidden) {
-      document.removeEventListener('visibilitychange', onVis)
-      onReturn()
-    }
-  }
-  document.addEventListener('visibilitychange', onVis)
-  window.location.href = url
-}

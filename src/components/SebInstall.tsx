@@ -2,87 +2,71 @@ import { getDesktopOS } from '../lib/device'
 import { sebInstaller } from '../lib/seb'
 import { useT } from '../lib/i18n'
 
-// SEB 설치 안내(공유) — OS 감지 다운로드(#5) + 안내 문구(#3: 용량·1회·게시자) +
-// 시각적 3단계 가이드(#2: SmartScreen '추가 정보 → 실행' 목업) + 원클릭 실행(#4).
-// onLaunch 를 주면 마지막에 "SEB로 시험 열기" 버튼을 노출한다(설치 후 바로 실행 — ExamGate 모달 등).
+// SEB 설치 안내(공유) — OS 감지 다운로드(#5) + 신뢰 칩(#3: 1회·서명·용량) +
+// 실제 마찰점 하나(설치 경고 대처)만 단정한 콜아웃(#2) + 선택적 원클릭 실행(#4).
+// ⚠️ ExamCheck Step1 카드(①②③) 안에 놓이므로 자체 번호 스텝은 두지 않는다(번호 중복 방지).
+// onLaunch 를 주면 마지막에 "SEB로 시험 열기" 버튼을 노출한다(설치 후 바로 실행).
 export default function SebInstall({ onLaunch }: { onLaunch?: () => void }) {
   const { t } = useT()
   const inst = sebInstaller(getDesktopOS())
   const isMac = inst.os === 'mac'
   const osLabel = isMac ? 'macOS' : 'Windows'
 
-  const StepNum = ({ n }: { n: number }) => (
-    <span className="w-7 h-7 rounded-full bg-primary-container/10 text-primary-container font-label-sm text-label-sm font-bold flex items-center justify-center shrink-0">
-      {n}
-    </span>
-  )
+  const chips = [
+    { icon: 'check_circle', label: t('seb.chip_once') },
+    { icon: 'verified_user', label: t('seb.chip_publisher') },
+    { icon: 'download', label: t('seb.chip_size', { size: inst.size }) },
+  ]
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* 다운로드 버튼 + 안내 문구(#3) */}
-      <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col gap-5">
+      {/* 다운로드 + 신뢰 칩(#3) — 작은 회색 fine-print 대신 아이콘 칩으로 신뢰감 */}
+      <div className="flex flex-col gap-3">
         <a
           href={inst.url}
           target="_blank"
           rel="noreferrer"
-          className="w-full sm:w-auto bg-primary-container text-on-primary font-title-md text-title-md font-bold px-8 py-3.5 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2"
+          className="w-full sm:w-auto self-start bg-primary-container text-on-primary font-title-md text-title-md font-bold px-8 py-3.5 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-[20px]">download</span>
-          {t('seb.download')} ({osLabel})
+          {t('seb.download')} · {osLabel}
         </a>
-        <p className="font-label-sm text-label-sm text-on-surface-variant text-center break-keep">
-          {t('seb.dl_meta', { size: inst.size })}
-        </p>
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+          {chips.map((c) => (
+            <span key={c.icon} className="inline-flex items-center gap-1.5 font-label-md text-label-md text-on-surface-variant">
+              <span className="material-symbols-outlined text-[18px] text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>
+                {c.icon}
+              </span>
+              {c.label}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* 시각적 3단계 설치 가이드(#2) */}
-      <div className="rounded-2xl bg-surface-container-low border border-outline-variant/40 p-5 flex flex-col gap-4">
-        <div className="font-label-md text-label-md font-bold text-on-surface">{t('seb.steps_title')}</div>
-
-        {/* 1. 다운로드 */}
-        <div className="flex items-start gap-3">
-          <StepNum n={1} />
-          <div>
-            <div className="font-body-md text-body-md font-semibold text-on-surface">{t('seb.step1_t')}</div>
-            <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('seb.step1_d')}</p>
-          </div>
-        </div>
-
-        {/* 2. 실행 (Windows 는 SmartScreen 목업, macOS 는 Gatekeeper 안내) */}
-        <div className="flex items-start gap-3">
-          <StepNum n={2} />
-          <div className="flex-grow min-w-0">
-            <div className="font-body-md text-body-md font-semibold text-on-surface">{t('seb.step2_t')}</div>
-            {isMac ? (
-              <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('seb.step2_d_mac')}</p>
-            ) : (
-              <>
-                <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note2')}</p>
-                {/* Windows SmartScreen 목업 — '추가 정보 → 실행' 경로 시각화 */}
-                <div className="mt-2 rounded-lg border border-outline-variant/50 bg-surface-container-lowest p-3">
-                  <div className="flex items-center gap-1.5 font-body-md text-body-md font-bold text-on-surface">
-                    <span className="material-symbols-outlined text-[18px] text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>shield</span>
-                    {t('seb.dialog_title')}
-                  </div>
-                  <div className="flex items-center flex-wrap gap-2 mt-2">
-                    <span className="font-label-md text-label-md text-primary-container underline">{t('seb.dialog_more')}</span>
-                    <span className="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
-                    <span className="font-label-sm text-label-sm font-bold px-3 py-1 rounded-md bg-primary-container text-on-primary">{t('seb.dialog_run')}</span>
-                  </div>
-                </div>
-                <p className="font-label-sm text-label-sm text-outline break-keep mt-2">{t('check.install_note1')}</p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* 3. 시험 열기 */}
-        <div className="flex items-start gap-3">
-          <StepNum n={3} />
-          <div>
-            <div className="font-body-md text-body-md font-semibold text-on-surface">{t('seb.step3_t')}</div>
-            <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('seb.step3_d')}</p>
-          </div>
+      {/* 실제 마찰점 하나만 단정한 콜아웃(#2) — 중첩 박스·중복 번호 없음 */}
+      <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-4 flex gap-3">
+        <span
+          className="material-symbols-outlined text-primary-container shrink-0 mt-0.5"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          {isMac ? 'lightbulb' : 'shield'}
+        </span>
+        <div className="flex flex-col gap-2 min-w-0">
+          <div className="font-label-md text-label-md font-bold text-on-surface">{t('seb.warn_title')}</div>
+          {isMac ? (
+            <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('seb.step2_d_mac')}</p>
+          ) : (
+            <>
+              <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note2')}</p>
+              {/* '추가 정보 → 실행' 클릭 경로를 칩으로 시각화 */}
+              <div className="flex items-center flex-wrap gap-2 my-0.5">
+                <span className="font-label-md text-label-md px-2.5 py-1 rounded-md bg-surface-container-highest text-on-surface">{t('seb.dialog_more')}</span>
+                <span className="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>
+                <span className="font-label-md text-label-md font-bold px-2.5 py-1 rounded-md bg-primary-container text-on-primary">{t('seb.dialog_run')}</span>
+              </div>
+              <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('check.install_note1')}</p>
+            </>
+          )}
         </div>
       </div>
 
@@ -90,7 +74,7 @@ export default function SebInstall({ onLaunch }: { onLaunch?: () => void }) {
       {onLaunch && (
         <button
           onClick={onLaunch}
-          className="w-full bg-primary-container text-on-primary font-title-md text-title-md font-bold px-8 py-3.5 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2"
+          className="w-full sm:w-auto self-start bg-primary-container text-on-primary font-title-md text-title-md font-bold px-8 py-3.5 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-[20px]">lock_open</span>
           {t('seb.launch_btn')}

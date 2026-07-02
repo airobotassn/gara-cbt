@@ -49,7 +49,7 @@ export default function ExamCheck() {
             </div>
             <div>
               <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t('check.title')}</h1>
-              <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">{t('check.sub')}</p>
+              <p className="font-body-lg text-body-lg text-on-surface-variant break-keep">{t('check.sub')}</p>
             </div>
           </div>
 

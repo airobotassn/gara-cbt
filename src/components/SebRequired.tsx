@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
-import { SEB_DOWNLOAD_URL, sebConfigured, sebLaunchUrl, launchSeb } from '../lib/seb'
+import { SEB_DOWNLOAD_URL, sebConfigured, sebLaunchUrl } from '../lib/seb'
+import { useSebReturn } from '../hooks/useSebReturn'
 import { useT } from '../lib/i18n'
 
 // SEB 가 시작 단계에서 내는 대표 영문 오류 → 안내 키
@@ -12,7 +12,7 @@ const SEB_ERRORS: { code: string; fixKey: string }[] = [
 // SEB(보안 브라우저)로만 응시 가능 — 미설치/일반 브라우저 진입 시 안내.
 export default function SebRequired() {
   const { t, lang } = useT()
-  const navigate = useNavigate()
+  const { armReturn } = useSebReturn()
   const ready = sebConfigured()
   return (
     <div className="exam-center">
@@ -50,7 +50,10 @@ export default function SebRequired() {
           {ready ? (
             <button
               className="exam-btn"
-              onClick={() => launchSeb(sebLaunchUrl(lang), () => navigate('/'))}
+              onClick={async () => {
+                await armReturn()
+                window.location.href = sebLaunchUrl(lang)
+              }}
             >
               {t('seb.start')}
             </button>

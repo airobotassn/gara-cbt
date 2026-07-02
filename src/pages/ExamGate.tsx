@@ -4,8 +4,9 @@ import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, launchSeb, SEB_INSTALLER_URL } from '../lib/seb'
+import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, SEB_INSTALLER_URL } from '../lib/seb'
 import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
+import { useSebReturn } from '../hooks/useSebReturn'
 import { useT } from '../lib/i18n'
 
 // gara_4 (CARIS 자격검정 응시 안내/원서접수) 목업 디자인 + 응시 게이트 로직 보존. 헤더 없음(FAB이 네비).
@@ -16,6 +17,7 @@ export default function ExamGate() {
   const { t, lang } = useT()
   const [sebNotice, setSebNotice] = useState(false)
   const [loginNotice, setLoginNotice] = useState(false)
+  const { armReturn } = useSebReturn() // SEB 종료 후 이 탭으로 돌아오면(서버 확인) 메인으로
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -23,14 +25,15 @@ export default function ExamGate() {
   const needSebLaunch = SEB_REQUIRED && !inSeb
 
   // 응시 시작: 일반 브라우저면 먼저 SEB 실행 / SEB 안이면 로그인→안내
-  function onStart() {
+  async function onStart() {
     if (needSebLaunch) {
       if (!sebConfigured()) {
         alert(t('gate.seb_not_ready'))
         return
       }
-      // SEB 실행. 시험을 마쳐 SEB 가 닫히고 이 브라우저로 돌아오면 메인으로 보낸다.
-      launchSeb(sebLaunchUrl(lang), () => navigate('/'))
+      // 현재 끝난 응시를 기준선으로 저장 → SEB 에서 시험이 실제로 끝나(새 완료 응시가 생기면) 이 탭이 메인으로.
+      await armReturn()
+      window.location.href = sebLaunchUrl(lang)
       setSebNotice(true)
       return
     }
