@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -16,15 +16,8 @@ import {
   TEST_DURATION_MINUTES,
   RESULT_RELEASE_DAYS,
 } from '../lib/testConfig'
-import type { StartExamResponse, MyAttempt } from '../lib/types'
+import type { StartExamResponse } from '../lib/types'
 import { useT } from '../lib/i18n'
-
-// SEB 는 별도 앱이라, 시험이 끝나 SEB 가 닫혀도 이 브라우저 탭은 준비 화면에 그대로 남는다.
-// → SEB 실행 시 "현재 완료된 응시 목록"을 기준선으로 저장하고, 이 탭에서 my-attempts 를 폴링하다가
-//   기준선에 없던 '끝난 응시'가 나타나면(=SEB 에서 방금 제출/무효) 자동으로 완료 화면으로 넘긴다.
-const SEB_WAIT_KEY = 'examSebWait' // localStorage: { at:number, finished:string[] }
-const SEB_WAIT_TTL_MS = 4 * 60 * 60 * 1000 // 응시 TTL(240분)과 맞춤 — 오래된 대기 마커는 무시
-const SEB_POLL_MS = 4000
 
 const STEP_KEYS = [
   'prep.step_guide',
@@ -45,78 +38,6 @@ export default function ExamPrepare() {
   const [practice, setPractice] = useState<number | null>(null)
   const [starting, setStarting] = useState(false)
   const [err, setErr] = useState('')
-  const [waiting, setWaiting] = useState(false) // SEB 실행 후, 시험 종료를 이 탭에서 기다리는 중
-
-  // 새로고침 등으로 재진입해도 대기 상태 복구(오래된 마커는 폐기)
-  useEffect(() => {
-    const raw = localStorage.getItem(SEB_WAIT_KEY)
-    if (!raw) return
-    try {
-      const w = JSON.parse(raw) as { at?: number }
-      if (!w?.at || Date.now() - w.at > SEB_WAIT_TTL_MS) {
-        localStorage.removeItem(SEB_WAIT_KEY)
-        return
-      }
-      setWaiting(true)
-    } catch {
-      localStorage.removeItem(SEB_WAIT_KEY)
-    }
-  }, [])
-
-  // 대기 중: my-attempts 를 폴링 + 탭 복귀(focus/visibility) 시 즉시 재확인.
-  // 기준선(finished)에 없던 '끝난 응시'가 보이면 SEB 에서 방금 끝난 것 → 완료 화면으로.
-  useEffect(() => {
-    if (!waiting) return
-    let stopped = false
-    const check = async () => {
-      if (stopped) return
-      const raw = localStorage.getItem(SEB_WAIT_KEY)
-      if (!raw) return
-      let w: { at: number; finished: string[] }
-      try {
-        w = JSON.parse(raw)
-      } catch {
-        localStorage.removeItem(SEB_WAIT_KEY)
-        setWaiting(false)
-        return
-      }
-      if (Date.now() - w.at > SEB_WAIT_TTL_MS) {
-        localStorage.removeItem(SEB_WAIT_KEY)
-        setWaiting(false)
-        return
-      }
-      try {
-        const { attempts } = await callFunction<{ attempts: MyAttempt[] }>('my-attempts', {})
-        const baseline = new Set(w.finished ?? [])
-        const done = (attempts ?? []).find(
-          (a) => a.status !== 'in_progress' && !baseline.has(a.attemptId),
-        )
-        if (done && !stopped) {
-          localStorage.removeItem(SEB_WAIT_KEY)
-          setWaiting(false)
-          navigate('/exam/complete', {
-            state: { mode: done.status === 'submitted' ? 'submitted' : 'voided', seb: false },
-            replace: true,
-          })
-        }
-      } catch {
-        /* 네트워크 일시 오류 — 다음 폴에서 재시도 */
-      }
-    }
-    const id = window.setInterval(check, SEB_POLL_MS)
-    const onVis = () => {
-      if (!document.hidden) check()
-    }
-    document.addEventListener('visibilitychange', onVis)
-    window.addEventListener('focus', check)
-    check()
-    return () => {
-      stopped = true
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', onVis)
-      window.removeEventListener('focus', check)
-    }
-  }, [waiting, navigate])
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -143,17 +64,6 @@ export default function ExamPrepare() {
         setErr(t('prep.err_seb_not_ready'))
         return
       }
-      // 현재 완료된 응시를 기준선으로 저장 → SEB 에서 시험이 끝나면 이 탭이 감지해 자동 전환
-      try {
-        const { attempts } = await callFunction<{ attempts: MyAttempt[] }>('my-attempts', {})
-        const finished = (attempts ?? [])
-          .filter((a) => a.status !== 'in_progress')
-          .map((a) => a.attemptId)
-        localStorage.setItem(SEB_WAIT_KEY, JSON.stringify({ at: Date.now(), finished }))
-        setWaiting(true)
-      } catch {
-        /* 기준선 조회 실패 — 자동 전환은 건너뛰고 SEB 실행만 진행(수동 이동 가능) */
-      }
       window.location.href = sebLaunchUrl(lang)
       return
     }
@@ -176,34 +86,6 @@ export default function ExamPrepare() {
   }
 
   const last = step === STEP_KEYS.length - 1
-
-  if (waiting) {
-    return (
-      <div className="exam-center">
-        <div className="exam-card" style={{ textAlign: 'center', maxWidth: 460 }}>
-          <div className="exam-ico">🖥️</div>
-          <h2 className="exam-title">{t('prep.waiting_title')}</h2>
-          <p className="exam-sub" style={{ whiteSpace: 'pre-line' }}>
-            {t('prep.waiting_sub')}
-          </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
-            <button className="exam-btn" onClick={() => navigate('/exam/check')}>
-              {t('complete.to_check')}
-            </button>
-            <button
-              className="exam-btn-ghost"
-              onClick={() => {
-                localStorage.removeItem(SEB_WAIT_KEY)
-                setWaiting(false)
-              }}
-            >
-              {t('prep.waiting_cancel')}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="exam-center">
