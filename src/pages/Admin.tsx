@@ -1627,37 +1627,32 @@ function AdminAccountsAdmin() {
   )
 }
 
-// ── 대시보드 (운영 분석) ───────────────────────────────────────────
-const CHART_ACCENT = '#4a6cf7'
-
+// ── 대시보드 (운영 분석) — admin.css(레벨테스트) 클래스 그대로 사용 ──
 function MiniBars({ days, map, color }: { days: string[]; map: Record<string, number>; color: string }) {
   const vals = days.map((d) => map[d] ?? 0)
   const max = Math.max(1, ...vals)
   const sum = vals.reduce((x, y) => x + y, 0)
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
+    <>
+      <div className="mini-bars">
         {days.map((d, i) => (
-          <div key={d} title={`${d.slice(5)} · ${vals[i]}`} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', height: '100%' }}>
-            <div style={{ width: '100%', height: `${(vals[i] / max) * 100}%`, minHeight: vals[i] > 0 ? 2 : 0, background: color, borderRadius: '2px 2px 0 0' }} />
+          <div key={d} className="mini-bar">
+            <div className="fill" style={{ height: `${(vals[i] / max) * 100}%`, background: color }} />
+            <div className="mini-tip"><span>{d.slice(5)}</span><b>{vals[i]}</b></div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-        {days[0]?.slice(5)} ~ {days[days.length - 1]?.slice(5)} · 합계 {sum}
-      </div>
-    </div>
+      <div className="mini-foot">{days[0]?.slice(5)} ~ {days[days.length - 1]?.slice(5)} · 합계 {sum}</div>
+    </>
   )
 }
 
 function HBar({ label, value, max, sub }: { label: string; value: number; max: number; sub?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-      <span style={{ width: 130, flexShrink: 0, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</span>
-      <div style={{ flex: 1, height: 10, background: 'rgba(128,128,128,.16)', borderRadius: 5, overflow: 'hidden' }}>
-        <div style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%`, height: '100%', background: CHART_ACCENT, borderRadius: 5 }} />
-      </div>
-      <span style={{ width: 84, textAlign: 'right', fontSize: 12.5, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{value}{sub ?? ''}</span>
+    <div className="hbar">
+      <span className="hbar-l" title={label}>{label}</span>
+      <div className="hbar-track"><div className="hbar-fill" style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%` }} /></div>
+      <span className="hbar-v">{value}{sub ?? ''}</span>
     </div>
   )
 }
@@ -1667,10 +1662,10 @@ function TrendChart({ title, days, map, color }: { title: string; days: string[]
   const [period, setPeriod] = useState<number>(30)
   const view = days.slice(-period)
   return (
-    <div className="admin-section" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
-        <div className="admin-tabs" style={{ marginBottom: 0 }}>
+    <div className="admin-section">
+      <div className="admin-section-head">
+        <h3>{title}</h3>
+        <div className="admin-period">
           {DASH_PERIODS.map((p) => (
             <button key={p} className={period === p ? 'on' : ''} onClick={() => setPeriod(p)}>{p}일</button>
           ))}
@@ -1684,16 +1679,13 @@ function TrendChart({ title, days, map, color }: { title: string; days: string[]
 function DiffRows({ rows, empty }: { rows: CbtQDiff[]; empty: string }) {
   if (!rows.length) return <div className="admin-empty">{empty}</div>
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div className="diff-list">
       {rows.map((r) => (
-        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: r.active ? 1 : 0.5 }}>
-          <span style={{ width: 52, textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: r.rate < 35 ? '#d43a3a' : r.rate > 90 ? '#2e9e5b' : 'inherit' }}>{r.rate}%</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13.5 }}>{r.number}. {r.prompt}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.subject}{r.exam ? ` · ${r.exam}` : ''} · 응시 {r.n}{!r.active ? ' · 비활성' : ''}</div>
-          </div>
-          <div style={{ width: 90, height: 8, background: 'rgba(128,128,128,.16)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
-            <div style={{ width: `${r.rate}%`, height: '100%', background: r.rate < 35 ? '#d43a3a' : CHART_ACCENT }} />
+        <div key={r.id} className={`diff-item ${r.rate < 35 ? 'hard' : ''} ${!r.active ? 'off' : ''}`}>
+          <div className="diff-head" style={{ cursor: 'default' }}>
+            <span className={`diff-rate ${r.rate < 35 ? 'low' : r.rate > 90 ? 'high' : ''}`}>{r.rate}%</span>
+            <span className="diff-q">{r.number}. {r.prompt}</span>
+            <span className="diff-meta">{r.subject}{r.exam ? ` · ${r.exam}` : ''} · 응시 {r.n}{!r.active ? ' · 비활성' : ''}</span>
           </div>
         </div>
       ))}
@@ -1741,8 +1733,8 @@ function DashboardAdmin() {
 function DashboardBody({ a }: { a: CbtAnalytics }) {
   const o = a.overview
   const cards = [
-    { k: '회원', v: o.users, sub: `게스트 ${o.guests}` },
-    { k: '전체 제출', v: o.attemptsAll, sub: `최근 7일 ${o.attempts7d}` },
+    { k: '회원', v: o.users, sub: `게스트 ${o.guests}명` },
+    { k: '전체 제출', v: o.attemptsAll, sub: `최근 7일 ${o.attempts7d}건` },
     { k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건` },
     { k: '문항', v: `${o.questionsActive} / ${o.questions}`, sub: '활성 / 전체' },
     { k: '시험', v: o.exams, sub: '등록 수' },
@@ -1752,63 +1744,77 @@ function DashboardBody({ a }: { a: CbtAnalytics }) {
   const poolWarn = a.pool.filter((p) => p.active < 4)
 
   return (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+    <div className="admin-dash">
+      <div className="admin-cards">
         {cards.map((c) => (
-          <div key={c.k} className="admin-section" style={{ padding: 16 }}>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>{c.k}</div>
-            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{c.v}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{c.sub}</div>
+          <div key={c.k} className="admin-card">
+            <div className="k">{c.k}</div>
+            <div className="v">{c.v}</div>
+            <div className="sub">{c.sub}</div>
           </div>
         ))}
       </div>
 
       <TrendChart title="가입 추이" days={a.days} map={a.signupByDay} color="#3aa79f" />
-      <TrendChart title="응시(제출) 추이" days={a.days} map={a.submitByDay} color={CHART_ACCENT} />
+      <TrendChart title="응시(제출) 추이" days={a.days} map={a.submitByDay} color="#3f8fd6" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div className="admin-grid2">
         <div className="admin-section">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>점수 분포 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>합격컷 60점</span></h3>
+          <h3>점수 분포 <span className="admin-hint">합격컷 60점</span></h3>
           {Object.entries(a.scoreBands).map(([band, v]) => <HBar key={band} label={`${band}점`} value={v} max={bandMax} sub="명" />)}
-          {a.scoredN === 0 && <div className="admin-empty">채점된 응시가 없습니다.</div>}
+          {a.scoredN === 0 ? <div className="admin-empty">채점된 응시가 없습니다.</div> : null}
         </div>
         <div className="admin-section">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>시험별 응시</h3>
+          <h3>시험별 응시</h3>
           {a.byExam.map((e) => <HBar key={e.slug} label={e.title} value={e.count} max={byExamMax} sub="건" />)}
-          {!a.byExam.length && <div className="admin-empty">시험이 없습니다.</div>}
+          {!a.byExam.length ? <div className="admin-empty">시험이 없습니다.</div> : null}
         </div>
       </div>
 
-      <div className="admin-section" style={{ marginBottom: 16 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>⚠ 어려운 문항 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>정답률 낮은 순 · 응시 3회↑</span></h3>
+      <div className="admin-section">
+        <h3>⚠ 어려운 문항 <span className="admin-hint">정답률 낮은 순 · 응시 3회↑</span></h3>
         <DiffRows rows={a.qHardest} empty="아직 응시 데이터가 없습니다." />
       </div>
-      <div className="admin-section" style={{ marginBottom: 16 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>쉬운 문항 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>정답률 높은 순</span></h3>
+      <div className="admin-section">
+        <h3>쉬운 문항 <span className="admin-hint">정답률 높은 순</span></h3>
         <DiffRows rows={a.qEasiest} empty="아직 응시 데이터가 없습니다." />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+      <div className="admin-grid2">
         <div className="admin-section">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>과목별 정답률</h3>
+          <h3>과목별 정답률</h3>
           {a.subjectCorrect.map((s) => <HBar key={s.subject} label={s.subject} value={s.rate} max={100} sub={`% (${s.n})`} />)}
-          {!a.subjectCorrect.length && <div className="admin-empty">아직 응시 데이터가 없습니다.</div>}
+          {!a.subjectCorrect.length ? <div className="admin-empty">아직 응시 데이터가 없습니다.</div> : null}
         </div>
         <div className="admin-section">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>과목별 문항 풀 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>활성/전체</span></h3>
-          {poolWarn.length > 0 && <div className="admin-empty" style={{ marginBottom: 8 }}>⚠ 활성 4개 미만: {poolWarn.map((p) => p.subject).join(' · ')}</div>}
-          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-            {a.pool.map((p) => (
-              <div key={p.subject} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px solid rgba(128,128,128,.1)' }}>
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.subject}</span>
-                <span style={{ flexShrink: 0, marginLeft: 8, color: p.active < 4 ? '#d43a3a' : 'inherit', fontVariantNumeric: 'tabular-nums' }}><b>{p.active}</b> / {p.total}</span>
-              </div>
-            ))}
-            {!a.pool.length && <div className="admin-empty">문항이 없습니다.</div>}
-          </div>
+          <h3>과목별 문항 풀 <span className="admin-hint">활성 4개 이상 권장</span></h3>
+          {poolWarn.length ? <div className="admin-warn">⚠ 활성 4개 미만: {poolWarn.map((p) => p.subject).join(' · ')}</div> : null}
+          <table className="admin-table pool-table">
+            <thead>
+              <tr><th>과목</th><th>활성</th><th>전체</th><th>상태</th></tr>
+            </thead>
+            <tbody>
+              {a.pool.map((p) => {
+                const ok = p.active >= 4
+                return (
+                  <tr key={p.subject} className={ok ? '' : 'prob'}>
+                    <td>{p.subject}</td>
+                    <td><b>{p.active}</b></td>
+                    <td>{p.total}</td>
+                    <td>{p.total === 0 ? <span className="badge none">없음</span> : ok ? <span className="badge ok">충분</span> : <span className="badge low">부족</span>}</td>
+                  </tr>
+                )
+              })}
+              {!a.pool.length ? (
+                <tr>
+                  <td colSpan={4} className="admin-empty">문항이 없습니다.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
