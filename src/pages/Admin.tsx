@@ -8,7 +8,6 @@ import type {
   AdminNoticeListResponse,
   NoticeRow,
   I18nText,
-  Lang6,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
 
@@ -353,15 +352,6 @@ const NOTICE_TAG_LABEL: Record<string, string> = {
   guide: '안내',
   required: '필독',
 }
-const NLANGS: { code: Lang6; label: string }[] = [
-  { code: 'ko', label: '한국어' },
-  { code: 'en', label: 'English' },
-  { code: 'ja', label: '日本語' },
-  { code: 'zh', label: '中文' },
-  { code: 'hi', label: 'हिन्दी' },
-  { code: 'vi', label: 'Tiếng Việt' },
-]
-
 interface NoticeDraft {
   id?: string
   category: string
@@ -415,7 +405,6 @@ function NoticesAdmin() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<NoticeDraft | null>(null)
-  const [elang, setElang] = useState<Lang6>('ko')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -436,7 +425,6 @@ function NoticesAdmin() {
 
   function openNew() {
     setDraft(emptyDraft())
-    setElang('ko')
   }
   function openEdit(n: NoticeRow) {
     setDraft({
@@ -449,28 +437,26 @@ function NoticesAdmin() {
       titleI18n: { ...n.titleI18n },
       bodyI18n: { ...n.bodyI18n },
     })
-    setElang('ko')
   }
   function patch(p: Partial<NoticeDraft>) {
     setDraft((d) => (d ? { ...d, ...p } : d))
   }
   function patchTitle(v: string) {
-    setDraft((d) => (d ? { ...d, titleI18n: { ...d.titleI18n, [elang]: v } } : d))
+    setDraft((d) => (d ? { ...d, titleI18n: { ...d.titleI18n, ko: v } } : d))
   }
   function patchBody(v: string) {
-    setDraft((d) => (d ? { ...d, bodyI18n: { ...d.bodyI18n, [elang]: v } } : d))
+    setDraft((d) => (d ? { ...d, bodyI18n: { ...d.bodyI18n, ko: v } } : d))
   }
 
   async function save() {
     if (!draft) return
     if (!draft.titleI18n.ko?.trim()) {
       alert('한국어 제목은 필수입니다.')
-      setElang('ko')
       return
     }
     setSaving(true)
     try {
-      await callFunction('admin', {
+      const res = await callFunction<{ translateWarning?: string | null }>('admin', {
         action: 'noticeUpsert',
         notice: {
           ...draft,
@@ -481,6 +467,7 @@ function NoticesAdmin() {
       })
       setDraft(null)
       await load()
+      if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
     } catch (e) {
       alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
     } finally {
@@ -636,40 +623,30 @@ function NoticesAdmin() {
                 </label>
               </div>
 
-              <div className="admin-tabs" style={{ flexWrap: 'wrap' }}>
-                {NLANGS.map((l) => (
-                  <button
-                    key={l.code}
-                    type="button"
-                    className={elang === l.code ? 'on' : ''}
-                    onClick={() => setElang(l.code)}
-                  >
-                    {l.label}
-                    {l.code === 'ko' ? ' *' : draft.titleI18n[l.code]?.trim() ? ' ●' : ''}
-                  </button>
-                ))}
-              </div>
-
               <label style={fieldStyle}>
-                제목 {elang === 'ko' && <em style={{ color: 'var(--error, #d43a3a)' }}>(필수)</em>}
+                제목 <em style={{ color: 'var(--error, #d43a3a)' }}>(한국어 · 필수)</em>
                 <input
                   type="text"
                   style={inpStyle}
-                  value={draft.titleI18n[elang] ?? ''}
+                  value={draft.titleI18n.ko ?? ''}
                   onChange={(e) => patchTitle(e.target.value)}
-                  placeholder={elang === 'ko' ? '공지 제목' : '(비우면 한국어로 표시됩니다)'}
+                  placeholder="공지 제목"
                 />
               </label>
               <label style={fieldStyle}>
-                본문
+                본문 <em style={{ color: 'var(--muted)' }}>(한국어)</em>
                 <textarea
                   rows={6}
                   style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
-                  value={draft.bodyI18n[elang] ?? ''}
+                  value={draft.bodyI18n.ko ?? ''}
                   onChange={(e) => patchBody(e.target.value)}
-                  placeholder={elang === 'ko' ? '공지 본문' : '(비우면 한국어로 표시됩니다)'}
+                  placeholder="공지 본문"
                 />
               </label>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                🌐 저장하면 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역되어 올라갑니다.
+                (한국어 원문 기준 · 수정 후 저장하면 다시 번역)
+              </p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
