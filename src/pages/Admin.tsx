@@ -7,6 +7,8 @@ import type {
   AdminDetailResponse,
   AdminNoticeListResponse,
   NoticeRow,
+  AdminFaqListResponse,
+  FaqRow,
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
@@ -92,7 +94,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'subs' | 'notices'>('subs')
+  const [sub, setSub] = useState<'subs' | 'notices' | 'faq'>('subs')
 
   useEffect(() => {
     if (!isFullUser) {
@@ -208,9 +210,14 @@ function CarisExamAdmin() {
         <button className={sub === 'notices' ? 'on' : ''} onClick={() => setSub('notices')}>
           공지사항
         </button>
+        <button className={sub === 'faq' ? 'on' : ''} onClick={() => setSub('faq')}>
+          FAQ
+        </button>
       </div>
       {sub === 'notices' ? (
         <NoticesAdmin />
+      ) : sub === 'faq' ? (
+        <FaqAdmin />
       ) : (
         <>
       <div className="admin-head">
@@ -641,6 +648,263 @@ function NoticesAdmin() {
                   value={draft.bodyI18n.ko ?? ''}
                   onChange={(e) => patchBody(e.target.value)}
                   placeholder="공지 본문"
+                />
+              </label>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                🌐 저장하면 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역되어 올라갑니다.
+                (한국어 원문 기준 · 수정 후 저장하면 다시 번역)
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button className="exam-btn-ghost" onClick={() => setDraft(null)} disabled={saving}>
+                취소
+              </button>
+              <button className="exam-btn" onClick={save} disabled={saving}>
+                {saving ? '저장 중…' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── FAQ 관리 (admin 함수의 faqList/faqUpsert/faqDelete) ──
+const FAQ_CATS = ['schedule', 'system', 'payment', 'grading', 'corporate'] as const
+const FAQ_CAT_LABEL: Record<string, string> = {
+  schedule: '시험 접수·일정',
+  system: '시스템·환경',
+  payment: '결제·환불',
+  grading: '채점·자격증',
+  corporate: '기업·단체',
+}
+
+interface FaqDraft {
+  id?: string
+  category: string
+  sort: number
+  published: boolean
+  questionI18n: I18nText
+  answerI18n: I18nText
+  tagI18n: I18nText
+}
+
+function emptyFaqDraft(): FaqDraft {
+  return { category: 'schedule', sort: 100, published: true, questionI18n: {}, answerI18n: {}, tagI18n: {} }
+}
+
+function FaqAdmin() {
+  const [rows, setRows] = useState<FaqRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [draft, setDraft] = useState<FaqDraft | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<AdminFaqListResponse>('admin', { action: 'faqList' })
+      setRows(res.faqs)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'FAQ를 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function openNew() {
+    setDraft(emptyFaqDraft())
+  }
+  function openEdit(f: FaqRow) {
+    setDraft({
+      id: f.id,
+      category: f.category,
+      sort: f.sort,
+      published: f.published,
+      questionI18n: { ...f.questionI18n },
+      answerI18n: { ...f.answerI18n },
+      tagI18n: { ...f.tagI18n },
+    })
+  }
+  function patch(p: Partial<FaqDraft>) {
+    setDraft((d) => (d ? { ...d, ...p } : d))
+  }
+  function patchField(k: 'questionI18n' | 'answerI18n' | 'tagI18n', v: string) {
+    setDraft((d) => (d ? { ...d, [k]: { ...d[k], ko: v } } : d))
+  }
+
+  async function save() {
+    if (!draft) return
+    if (!draft.questionI18n.ko?.trim()) {
+      alert('한국어 질문은 필수입니다.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await callFunction<{ translateWarning?: string | null }>('admin', {
+        action: 'faqUpsert',
+        faq: draft,
+      })
+      setDraft(null)
+      await load()
+      if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  async function remove(f: FaqRow) {
+    if (!confirm(`"${f.questionI18n.ko ?? ''}" FAQ를 삭제할까요?`)) return
+    try {
+      await callFunction('admin', { action: 'faqDelete', id: f.id })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+    }
+  }
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>FAQ 관리</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">총 {rows.length}건</span>
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+          <button className="exam-btn-ghost sm" onClick={openNew}>
+            + 새 FAQ
+          </button>
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>상태</th>
+              <th>분류</th>
+              <th>질문 (한국어)</th>
+              <th>순서</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((f) => (
+              <tr key={f.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge st-${f.published ? 'submitted' : 'voided'}`}>
+                    {f.published ? '공개' : '비공개'}
+                  </span>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>{FAQ_CAT_LABEL[f.category] ?? f.category}</td>
+                <td>{f.questionI18n.ko || <span style={{ color: 'var(--muted)' }}>(질문 없음)</span>}</td>
+                <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{f.sort}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="exam-btn-ghost sm" onClick={() => openEdit(f)}>
+                    편집
+                  </button>
+                  <button
+                    className="exam-btn-ghost sm"
+                    style={{ marginLeft: 6 }}
+                    onClick={() => remove(f)}
+                  >
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && !loading && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  등록된 FAQ가 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {draft && (
+        <div className="admin-modal-bg" onClick={() => !saving && setDraft(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setDraft(null)}>
+              ✕
+            </button>
+            <h2>{draft.id ? 'FAQ 편집' : '새 FAQ'}</h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <label style={{ ...fieldStyle, flex: 2, minWidth: 140 }}>
+                  분류
+                  <select
+                    style={inpStyle}
+                    value={draft.category}
+                    onChange={(e) => patch({ category: e.target.value })}
+                  >
+                    {FAQ_CATS.map((c) => (
+                      <option key={c} value={c}>
+                        {FAQ_CAT_LABEL[c]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ ...fieldStyle, flex: 1, minWidth: 90 }}>
+                  순서 <em style={{ color: 'var(--muted)' }}>(작을수록 위)</em>
+                  <input
+                    type="number"
+                    style={inpStyle}
+                    value={draft.sort}
+                    onChange={(e) => patch({ sort: Number(e.target.value) })}
+                  />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, alignSelf: 'flex-end', paddingBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.published}
+                    onChange={(e) => patch({ published: e.target.checked })}
+                  />
+                  공개
+                </label>
+              </div>
+
+              <label style={fieldStyle}>
+                질문 <em style={{ color: 'var(--error, #d43a3a)' }}>(한국어 · 필수)</em>
+                <input
+                  type="text"
+                  style={inpStyle}
+                  value={draft.questionI18n.ko ?? ''}
+                  onChange={(e) => patchField('questionI18n', e.target.value)}
+                  placeholder="질문"
+                />
+              </label>
+              <label style={fieldStyle}>
+                답변 <em style={{ color: 'var(--muted)' }}>(한국어)</em>
+                <textarea
+                  rows={5}
+                  style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
+                  value={draft.answerI18n.ko ?? ''}
+                  onChange={(e) => patchField('answerI18n', e.target.value)}
+                  placeholder="답변"
+                />
+              </label>
+              <label style={fieldStyle}>
+                태그 <em style={{ color: 'var(--muted)' }}>(한국어 · 선택, 짧은 라벨)</em>
+                <input
+                  type="text"
+                  style={inpStyle}
+                  value={draft.tagI18n.ko ?? ''}
+                  onChange={(e) => patchField('tagI18n', e.target.value)}
+                  placeholder="예: 응시 환경"
                 />
               </label>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>

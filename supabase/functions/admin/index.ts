@@ -163,28 +163,46 @@ async function geminiJson(sys: string, user: string, maxTokens: number): Promise
   throw new Error('unreachable')
 }
 
-// 공지 한국어 제목/본문 → 나머지 5개국어. 실패 시 throw(호출측에서 best-effort 처리).
-async function translateNotice(
-  koTitle: string,
-  koBody: string,
-): Promise<{ title: Record<string, string>; body: Record<string, string> }> {
+// 여러 한국어 필드 → 나머지 5개국어. 반환: { <field>: { ko, en, ja, zh, hi, vi } }.
+//   키 없거나 내용 없으면 ko만 반환(throw X). API/파싱 실패 시 throw(호출측 best-effort). 공지·FAQ·일정 공용.
+async function translateKoFields(
+  koFields: Record<string, string>,
+): Promise<Record<string, Record<string, string>>> {
+  const fields = Object.keys(koFields)
+  const out: Record<string, Record<string, string>> = {}
+  for (const f of fields) out[f] = { ko: koFields[f] ?? '' }
+
+  const hasContent = fields.some((f) => (koFields[f] ?? '').trim())
+  if (!GEMINI_API_KEY || !hasContent) return out
+
   const langList = TARGET_LANGS.map((c) => `"${c}" = ${LANG_NAMES[c]}`).join(', ')
+  const shape = `{ ${TARGET_LANGS.map(
+    (c) => `"${c}": { ${fields.map((f) => `"${f}":"..."`).join(', ')} }`,
+  ).join(', ')} }`
   const sys =
     'You are a professional translator for a Korean AI-literacy certification website (CARIS). ' +
-    'Translate the given Korean notice title and body into the requested languages. ' +
+    'Translate the given Korean fields into the requested languages. ' +
     'RULES: (1) natural, idiomatic wording as a native speaker would write, preserving meaning and tone; ' +
-    '(2) do NOT translate product names, acronyms (SEB, PC, AI, CARIS, OMR) or numbers; ' +
+    '(2) do NOT translate product names, acronyms (SEB, PC, AI, CARIS, OMR, PDF) or numbers; ' +
     '(3) preserve line breaks; (4) output ONLY valid JSON, no markdown.'
   const user =
-    `Translate into: ${langList}.\n` +
-    `Return JSON shaped exactly as { "title": { ${TARGET_LANGS.map((c) => `"${c}":"..."`).join(', ')} }, ` +
-    `"body": { ${TARGET_LANGS.map((c) => `"${c}":"..."`).join(', ')} } }.\n` +
-    `If a source field is empty, return "" for that field in every language.\n\n` +
-    `SOURCE (Korean):\n${JSON.stringify({ title: koTitle, body: koBody })}`
+    `Translate these Korean fields into: ${langList}.\n` +
+    `Return JSON shaped exactly as ${shape}.\n` +
+    `If a source field is empty, return "" for it in every language.\n\n` +
+    `SOURCE (Korean):\n${JSON.stringify(koFields)}`
 
   const raw = await geminiJson(sys, user, 4096)
   const parsed = JSON.parse(raw)
-  return { title: parsed?.title ?? {}, body: parsed?.body ?? {} }
+  for (const c of TARGET_LANGS) {
+    const langObj = parsed?.[c]
+    if (langObj && typeof langObj === 'object') {
+      for (const f of fields) {
+        const v = (langObj as Record<string, unknown>)[f]
+        if (typeof v === 'string' && v.trim()) out[f][c] = v
+      }
+    }
+  }
+  return out
 }
 
 // ---------- 공지사항(notices) CRUD ----------
@@ -222,24 +240,17 @@ async function noticeUpsert(admin: any, body: any) {
   if (!koTitle) return json({ error: '한국어 제목은 필수입니다.' }, 400)
 
   // 한국어 → 나머지 5개국어 자동 번역. 실패해도 한국어로 저장은 진행(발행 막지 않음).
-  const title_i18n: Record<string, string> = { ko: koTitle }
-  const body_i18n: Record<string, string> = { ko: koBody }
+  let title_i18n: Record<string, string> = { ko: koTitle }
+  let body_i18n: Record<string, string> = { ko: koBody }
   let translateWarning: string | null = null
-  if (GEMINI_API_KEY) {
-    try {
-      const tr = await translateNotice(koTitle, koBody)
-      for (const c of TARGET_LANGS) {
-        const t = tr.title?.[c]
-        const b = tr.body?.[c]
-        if (typeof t === 'string' && t.trim()) title_i18n[c] = t
-        if (typeof b === 'string' && b.trim()) body_i18n[c] = b
-      }
-    } catch (e) {
-      translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
-    }
-  } else {
-    translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+  try {
+    const tr = await translateKoFields({ title: koTitle, body: koBody })
+    title_i18n = tr.title
+    body_i18n = tr.body
+  } catch (e) {
+    translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
   }
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
 
   const row: Record<string, unknown> = {
     category: n.category ?? 'guide',
@@ -270,6 +281,83 @@ async function noticeDelete(admin: any, body: any) {
   return json({ ok: true })
 }
 
+// ---------- FAQ CRUD ----------
+function shapeFaq(f: any) {
+  return {
+    id: f.id,
+    category: f.category,
+    questionI18n: f.question_i18n ?? {},
+    answerI18n: f.answer_i18n ?? {},
+    tagI18n: f.tag_i18n ?? {},
+    sort: f.sort,
+    published: !!f.published,
+    createdAt: f.created_at,
+    updatedAt: f.updated_at,
+  }
+}
+
+async function faqList(admin: any) {
+  const { data, error } = await admin
+    .from('faqs')
+    .select('*')
+    .order('category', { ascending: true })
+    .order('sort', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+  return json({ faqs: (data ?? []).map(shapeFaq) })
+}
+
+// 생성/수정. 한국어(질문·답변·태그)만 입력받아 저장 시 나머지 5개국어 자동 번역.
+async function faqUpsert(admin: any, body: any) {
+  const f = body?.faq ?? {}
+  const koQ = String(f.questionI18n?.ko ?? '').trim()
+  const koA = String(f.answerI18n?.ko ?? '').trim()
+  const koTag = String(f.tagI18n?.ko ?? '').trim()
+  if (!koQ) return json({ error: '한국어 질문은 필수입니다.' }, 400)
+
+  let question_i18n: Record<string, string> = { ko: koQ }
+  let answer_i18n: Record<string, string> = { ko: koA }
+  let tag_i18n: Record<string, string> = { ko: koTag }
+  let translateWarning: string | null = null
+  try {
+    const tr = await translateKoFields({ question: koQ, answer: koA, tag: koTag })
+    question_i18n = tr.question
+    answer_i18n = tr.answer
+    tag_i18n = tr.tag
+  } catch (e) {
+    translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
+  }
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+
+  const sortNum = Number(f.sort)
+  const row: Record<string, unknown> = {
+    category: f.category ?? 'schedule',
+    question_i18n,
+    answer_i18n,
+    tag_i18n,
+    sort: Number.isFinite(sortNum) ? Math.floor(sortNum) : 100,
+    published: f.published !== false,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (f.id) {
+    const { data, error } = await admin.from('faqs').update(row).eq('id', f.id).select().maybeSingle()
+    if (error) return json({ error: error.message }, 400)
+    return json({ faq: data ? shapeFaq(data) : null, translateWarning })
+  }
+  const { data, error } = await admin.from('faqs').insert(row).select().maybeSingle()
+  if (error) return json({ error: error.message }, 400)
+  return json({ faq: data ? shapeFaq(data) : null, translateWarning })
+}
+
+async function faqDelete(admin: any, body: any) {
+  const id = body?.id
+  if (!id) return json({ error: 'id 필요' }, 400)
+  const { error } = await admin.from('faqs').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -295,6 +383,9 @@ Deno.serve(async (req) => {
       case 'noticeList': return await noticeList(admin)
       case 'noticeUpsert': return await noticeUpsert(admin, body)
       case 'noticeDelete': return await noticeDelete(admin, body)
+      case 'faqList': return await faqList(admin)
+      case 'faqUpsert': return await faqUpsert(admin, body)
+      case 'faqDelete': return await faqDelete(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

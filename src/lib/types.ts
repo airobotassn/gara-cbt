@@ -124,3 +124,20 @@ export interface NoticeRow {
 export interface AdminNoticeListResponse {
   notices: NoticeRow[]
 }
+
+// ---------- FAQ ----------
+export interface FaqRow {
+  id: string
+  category: string // schedule | system | payment | grading | corporate
+  questionI18n: I18nText
+  answerI18n: I18nText
+  tagI18n: I18nText
+  sort: number
+  published: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AdminFaqListResponse {
+  faqs: FaqRow[]
+}

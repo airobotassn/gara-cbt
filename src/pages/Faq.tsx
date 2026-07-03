@@ -1,45 +1,71 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import SiteFooter from '../components/SiteFooter'
 
 // gara_1 (고객센터) 목업 디자인 + 실제 동작(검색·카테고리 필터·아코디언) 연결.
-// 원본: stitch_design_critique_assistant/gara_1/code.html
+// 데이터는 DB(faqs, 6개국어)에서 로드 — 관리자(admin 함수)에서 등록/수정.
 
-// labelKey = i18n 키(인덱스 0~4 순서 고정, FAQS.cat 가 이 인덱스를 참조)
-const CATEGORIES = [
-  { icon: 'calendar_month', labelKey: 'faq.cat_schedule' },
-  { icon: 'computer', labelKey: 'faq.cat_system' },
-  { icon: 'credit_card', labelKey: 'faq.cat_payment' },
-  { icon: 'workspace_premium', labelKey: 'faq.cat_grading' },
-  { icon: 'domain', labelKey: 'faq.cat_corporate' },
-]
+// 사이드바 카테고리(고정) — key = faqs.category, labelKey = i18n
+const CATS = [
+  { key: 'schedule', icon: 'calendar_month', labelKey: 'faq.cat_schedule' },
+  { key: 'system', icon: 'computer', labelKey: 'faq.cat_system' },
+  { key: 'payment', icon: 'credit_card', labelKey: 'faq.cat_payment' },
+  { key: 'grading', icon: 'workspace_premium', labelKey: 'faq.cat_grading' },
+  { key: 'corporate', icon: 'domain', labelKey: 'faq.cat_corporate' },
+] as const
 
-// 실제 FAQ(i18n) — cat = CATEGORIES 인덱스로 분류해 실제 필터링, tag 라벨도 i18n
-const FAQS = [
-  { id: 'q1', cat: 1 },
-  { id: 'q2', cat: 1 },
-  { id: 'q3', cat: 3 },
-  { id: 'q4', cat: 3 },
-  { id: 'q5', cat: 0 },
-  { id: 'q6', cat: 3 },
-  { id: 'q7', cat: 0 },
-]
+interface Row {
+  id: string
+  category: string
+  question_i18n: Record<string, string>
+  answer_i18n: Record<string, string>
+  tag_i18n: Record<string, string>
+  sort: number
+}
 
 export default function Faq() {
-  const { t } = useT()
-  const [cat, setCat] = useState(0)
+  const { t, lang } = useT()
+  const [cat, setCat] = useState<string>('schedule')
   const [open, setOpen] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [rows, setRows] = useState<Row[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!isSupabaseConfigured) {
+        if (alive) setLoading(false)
+        return
+      }
+      const { data } = await supabase
+        .from('faqs')
+        .select('id, category, question_i18n, answer_i18n, tag_i18n, sort')
+        .eq('published', true)
+        .order('sort', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (alive) {
+        setRows((data as Row[] | null) ?? [])
+        setLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const pick = (m: Record<string, string> | null | undefined) => m?.[lang] ?? m?.ko ?? ''
 
   const q = query.trim().toLowerCase()
   const searching = q.length > 0
-  // 검색 중이면 전체에서 검색, 아니면 선택한 카테고리로 필터
-  const list = FAQS.filter((f) =>
+  const list = rows.filter((f) =>
     searching
-      ? t(`faq.${f.id}.q`).toLowerCase().includes(q) || t(`faq.${f.id}.a`).toLowerCase().includes(q)
-      : f.cat === cat,
+      ? pick(f.question_i18n).toLowerCase().includes(q) || pick(f.answer_i18n).toLowerCase().includes(q)
+      : f.category === cat,
   )
+  const catLabel = (key: string) => t(CATS.find((c) => c.key === key)?.labelKey ?? 'faq.title')
 
   const helpBox = (
     <div className="p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
@@ -104,16 +130,16 @@ export default function Faq() {
           <aside className="w-full lg:w-1/4 shrink-0">
             <div className="sticky top-12">
               <nav className="flex flex-col gap-2">
-                {CATEGORIES.map((c, i) => {
-                  const active = i === cat && !searching
-                  const count = FAQS.filter((f) => f.cat === i).length
+                {CATS.map((c) => {
+                  const active = c.key === cat && !searching
+                  const count = rows.filter((f) => f.category === c.key).length
                   return active ? (
-                    <button key={c.labelKey} onClick={() => { setCat(i); setQuery('') }} className="flex items-center gap-4 p-4 rounded-xl transition-all text-left shadow-md bg-primary-container text-on-primary">
+                    <button key={c.key} onClick={() => { setCat(c.key); setQuery('') }} className="flex items-center gap-4 p-4 rounded-xl transition-all text-left shadow-md bg-primary-container text-on-primary">
                       <span className="material-symbols-outlined text-white/80">{c.icon}</span>
                       <div><span className="block font-title-md text-base font-semibold">{t(c.labelKey)}</span></div>
                     </button>
                   ) : (
-                    <button key={c.labelKey} onClick={() => { setCat(i); setQuery('') }} className="flex items-center justify-between gap-4 p-4 rounded-xl hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-all text-left group">
+                    <button key={c.key} onClick={() => { setCat(c.key); setQuery('') }} className="flex items-center justify-between gap-4 p-4 rounded-xl hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-all text-left group">
                       <span className="flex items-center gap-4">
                         <span className="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">{c.icon}</span>
                         <span className="block font-title-md text-base font-semibold group-hover:text-primary transition-colors">{t(c.labelKey)}</span>
@@ -130,12 +156,13 @@ export default function Faq() {
           {/* Main FAQ Content */}
           <div className="w-full lg:w-3/4">
             <div className="mb-8 pb-6 border-b border-outline-variant/40">
-              <h2 className="font-headline-lg text-2xl md:text-headline-lg font-bold text-on-surface mb-2 break-keep">{searching ? t('faq.search_results') : t(CATEGORIES[cat].labelKey)}</h2>
+              <h2 className="font-headline-lg text-2xl md:text-headline-lg font-bold text-on-surface mb-2 break-keep">{searching ? t('faq.search_results') : catLabel(cat)}</h2>
               <p className="text-on-surface-variant font-body-md">{searching ? t('faq.searching_sub', { query }) : t('faq.cat_sub')}</p>
             </div>
             <div className="flex flex-col gap-6">
               {list.map((f) => {
                 const isOpen = open === f.id
+                const tag = pick(f.tag_i18n)
                 return (
                   <div
                     key={f.id}
@@ -148,17 +175,19 @@ export default function Faq() {
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-grow">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={isOpen
-                            ? 'px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold tracking-wider uppercase'
-                            : 'px-2 py-0.5 rounded bg-surface-container text-primary text-[10px] font-bold tracking-wider uppercase'}>
-                            {t(`faq.${f.id}.tag`)}
-                          </span>
-                        </div>
+                        {tag && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={isOpen
+                              ? 'px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold tracking-wider uppercase'
+                              : 'px-2 py-0.5 rounded bg-surface-container text-primary text-[10px] font-bold tracking-wider uppercase'}>
+                              {tag}
+                            </span>
+                          </div>
+                        )}
                         <h3 className={isOpen
                           ? 'font-title-md text-lg font-bold text-primary'
                           : 'font-title-md text-lg font-bold text-on-surface group-hover:text-primary-container transition-colors'}>
-                          {t(`faq.${f.id}.q`)}
+                          {pick(f.question_i18n)}
                         </h3>
                       </div>
                       <span className={isOpen ? 'material-symbols-outlined text-primary' : 'material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors'}>
@@ -167,13 +196,18 @@ export default function Faq() {
                     </div>
                     {isOpen && (
                       <div className="mt-4 pt-4 border-t border-outline-variant/10">
-                        <p className="text-on-surface-variant font-body-md leading-relaxed">{t(`faq.${f.id}.a`)}</p>
+                        <p className="text-on-surface-variant font-body-md leading-relaxed whitespace-pre-line">{pick(f.answer_i18n)}</p>
                       </div>
                     )}
                   </div>
                 )
               })}
-              {list.length === 0 && (
+              {loading && (
+                <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-10 text-center text-on-surface-variant">
+                  {t('common.loading')}
+                </div>
+              )}
+              {!loading && list.length === 0 && (
                 <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-10 text-center text-on-surface-variant">
                   {searching ? t('faq.no_results', { query }) : t('faq.cat_empty')}
                 </div>
