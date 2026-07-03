@@ -330,24 +330,37 @@ async function faqUpsert(admin: any, body: any) {
   if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
 
   const sortNum = Number(f.sort)
+  const hasSort = Number.isFinite(sortNum)
   const row: Record<string, unknown> = {
     category: f.category ?? 'schedule',
     question_i18n,
     answer_i18n,
     tag_i18n,
-    sort: Number.isFinite(sortNum) ? Math.floor(sortNum) : 100,
     published: f.published !== false,
     updated_at: new Date().toISOString(),
   }
 
   if (f.id) {
+    if (hasSort) row.sort = Math.floor(sortNum) // 편집 시 순서는 보통 미포함(기존 유지). 순서변경은 faqReorder.
     const { data, error } = await admin.from('faqs').update(row).eq('id', f.id).select().maybeSingle()
     if (error) return json({ error: error.message }, 400)
     return json({ faq: data ? shapeFaq(data) : null, translateWarning })
   }
+  row.sort = hasSort ? Math.floor(sortNum) : 9999 // 새 항목은 해당 분류 맨 끝
   const { data, error } = await admin.from('faqs').insert(row).select().maybeSingle()
   if (error) return json({ error: error.message }, 400)
   return json({ faq: data ? shapeFaq(data) : null, translateWarning })
+}
+
+// 순서 재배치 — ids 를 받은 순서대로 sort = 10,20,30… 재부여(관리자 ↑↓ 이동용).
+async function faqReorder(admin: any, body: any) {
+  const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
+  if (!ids.length) return json({ error: 'ids 필요' }, 400)
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await admin.from('faqs').update({ sort: (i + 1) * 10 }).eq('id', ids[i])
+    if (error) return json({ error: error.message }, 400)
+  }
+  return json({ ok: true })
 }
 
 async function faqDelete(admin: any, body: any) {
@@ -386,6 +399,7 @@ Deno.serve(async (req) => {
       case 'faqList': return await faqList(admin)
       case 'faqUpsert': return await faqUpsert(admin, body)
       case 'faqDelete': return await faqDelete(admin, body)
+      case 'faqReorder': return await faqReorder(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

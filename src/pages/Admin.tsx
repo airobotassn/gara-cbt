@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { Fragment, useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import type {
@@ -692,7 +692,7 @@ interface FaqDraft {
 }
 
 function emptyFaqDraft(): FaqDraft {
-  return { category: 'schedule', sort: 100, published: true, questionI18n: {}, answerI18n: {}, tagI18n: {} }
+  return { category: 'schedule', sort: 9999, published: true, questionI18n: {}, answerI18n: {}, tagI18n: {} }
 }
 
 function FaqAdmin() {
@@ -701,6 +701,7 @@ function FaqAdmin() {
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<FaqDraft | null>(null)
   const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -770,6 +771,32 @@ function FaqAdmin() {
     }
   }
 
+  // 같은 분류 안에서 ↑(-1)/↓(+1) 이동 → 전체 순서 재구성해 서버가 sort 재부여
+  async function move(f: FaqRow, dir: -1 | 1) {
+    const group = rows.filter((r) => r.category === f.category).sort((a, b) => a.sort - b.sort)
+    const idx = group.findIndex((r) => r.id === f.id)
+    const swap = idx + dir
+    if (swap < 0 || swap >= group.length) return
+    const g = [...group]
+    ;[g[idx], g[swap]] = [g[swap], g[idx]]
+    const known = new Set<string>(FAQ_CATS)
+    const ids: string[] = []
+    for (const key of FAQ_CATS) {
+      if (key === f.category) g.forEach((r) => ids.push(r.id))
+      else rows.filter((r) => r.category === key).sort((a, b) => a.sort - b.sort).forEach((r) => ids.push(r.id))
+    }
+    rows.filter((r) => !known.has(r.category)).sort((a, b) => a.sort - b.sort).forEach((r) => ids.push(r.id))
+    setBusy(true)
+    try {
+      await callFunction('admin', { action: 'faqReorder', ids })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '순서 변경에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <div className="admin-head">
@@ -792,40 +819,75 @@ function FaqAdmin() {
           <thead>
             <tr>
               <th>상태</th>
-              <th>분류</th>
               <th>질문 (한국어)</th>
-              <th>순서</th>
+              <th style={{ textAlign: 'center' }}>순서</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((f) => (
-              <tr key={f.id}>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <span className={`admin-badge st-${f.published ? 'submitted' : 'voided'}`}>
-                    {f.published ? '공개' : '비공개'}
-                  </span>
-                </td>
-                <td style={{ whiteSpace: 'nowrap' }}>{FAQ_CAT_LABEL[f.category] ?? f.category}</td>
-                <td>{f.questionI18n.ko || <span style={{ color: 'var(--muted)' }}>(질문 없음)</span>}</td>
-                <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{f.sort}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="exam-btn-ghost sm" onClick={() => openEdit(f)}>
-                    편집
-                  </button>
-                  <button
-                    className="exam-btn-ghost sm"
-                    style={{ marginLeft: 6 }}
-                    onClick={() => remove(f)}
-                  >
-                    삭제
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {FAQ_CATS.map((key) => {
+              const group = rows.filter((r) => r.category === key).sort((a, b) => a.sort - b.sort)
+              if (!group.length) return null
+              return (
+                <Fragment key={key}>
+                  <tr>
+                    <td
+                      colSpan={4}
+                      style={{ background: 'var(--soft, rgba(128,128,128,.08))', fontWeight: 700, fontSize: 13 }}
+                    >
+                      {FAQ_CAT_LABEL[key] ?? key}
+                      <span style={{ color: 'var(--muted)', fontWeight: 400 }}> · {group.length}건</span>
+                    </td>
+                  </tr>
+                  {group.map((f, i) => (
+                    <tr key={f.id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <span className={`admin-badge st-${f.published ? 'submitted' : 'voided'}`}>
+                          {f.published ? '공개' : '비공개'}
+                        </span>
+                      </td>
+                      <td>{f.questionI18n.ko || <span style={{ color: 'var(--muted)' }}>(질문 없음)</span>}</td>
+                      <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <button
+                          className="exam-btn-ghost sm"
+                          disabled={busy || i === 0}
+                          onClick={() => move(f, -1)}
+                          aria-label="위로"
+                          title="위로"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className="exam-btn-ghost sm"
+                          style={{ marginLeft: 4 }}
+                          disabled={busy || i === group.length - 1}
+                          onClick={() => move(f, 1)}
+                          aria-label="아래로"
+                          title="아래로"
+                        >
+                          ↓
+                        </button>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button className="exam-btn-ghost sm" onClick={() => openEdit(f)}>
+                          편집
+                        </button>
+                        <button
+                          className="exam-btn-ghost sm"
+                          style={{ marginLeft: 6 }}
+                          onClick={() => remove(f)}
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
+              )
+            })}
             {!rows.length && !loading && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={4} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   등록된 FAQ가 없습니다.
                 </td>
               </tr>
@@ -857,15 +919,6 @@ function FaqAdmin() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label style={{ ...fieldStyle, flex: 1, minWidth: 90 }}>
-                  순서 <em style={{ color: 'var(--muted)' }}>(작을수록 위)</em>
-                  <input
-                    type="number"
-                    style={inpStyle}
-                    value={draft.sort}
-                    onChange={(e) => patch({ sort: Number(e.target.value) })}
-                  />
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, alignSelf: 'flex-end', paddingBottom: 8 }}>
                   <input
