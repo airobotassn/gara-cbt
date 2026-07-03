@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import type {
@@ -702,6 +702,7 @@ function FaqAdmin() {
   const [draft, setDraft] = useState<FaqDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [catFilter, setCatFilter] = useState<string>('schedule')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -720,7 +721,7 @@ function FaqAdmin() {
   }, [load])
 
   function openNew() {
-    setDraft(emptyFaqDraft())
+    setDraft({ ...emptyFaqDraft(), category: catFilter })
   }
   function openEdit(f: FaqRow) {
     setDraft({
@@ -797,6 +798,8 @@ function FaqAdmin() {
     }
   }
 
+  const group = rows.filter((r) => r.category === catFilter).sort((a, b) => a.sort - b.sort)
+
   return (
     <>
       <div className="admin-head">
@@ -814,6 +817,23 @@ function FaqAdmin() {
 
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
 
+      {/* 분류 버튼 — 눌러서 해당 분류만 보기(공개 FAQ 사이드바처럼) */}
+      <div className="admin-tabs" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
+        {FAQ_CATS.map((key) => {
+          const count = rows.filter((r) => r.category === key).length
+          return (
+            <button
+              key={key}
+              className={catFilter === key ? 'on' : ''}
+              onClick={() => setCatFilter(key)}
+            >
+              {FAQ_CAT_LABEL[key]}
+              {count > 0 && <span style={{ opacity: 0.55, marginLeft: 5 }}>{count}</span>}
+            </button>
+          )
+        })}
+      </div>
+
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -825,70 +845,49 @@ function FaqAdmin() {
             </tr>
           </thead>
           <tbody>
-            {FAQ_CATS.map((key) => {
-              const group = rows.filter((r) => r.category === key).sort((a, b) => a.sort - b.sort)
-              if (!group.length) return null
-              return (
-                <Fragment key={key}>
-                  <tr>
-                    <td
-                      colSpan={4}
-                      style={{ background: 'var(--soft, rgba(128,128,128,.08))', fontWeight: 700, fontSize: 13 }}
-                    >
-                      {FAQ_CAT_LABEL[key] ?? key}
-                      <span style={{ color: 'var(--muted)', fontWeight: 400 }}> · {group.length}건</span>
-                    </td>
-                  </tr>
-                  {group.map((f, i) => (
-                    <tr key={f.id}>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <span className={`admin-badge st-${f.published ? 'submitted' : 'voided'}`}>
-                          {f.published ? '공개' : '비공개'}
-                        </span>
-                      </td>
-                      <td>{f.questionI18n.ko || <span style={{ color: 'var(--muted)' }}>(질문 없음)</span>}</td>
-                      <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                        <button
-                          className="exam-btn-ghost sm"
-                          disabled={busy || i === 0}
-                          onClick={() => move(f, -1)}
-                          aria-label="위로"
-                          title="위로"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          className="exam-btn-ghost sm"
-                          style={{ marginLeft: 4 }}
-                          disabled={busy || i === group.length - 1}
-                          onClick={() => move(f, 1)}
-                          aria-label="아래로"
-                          title="아래로"
-                        >
-                          ↓
-                        </button>
-                      </td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <button className="exam-btn-ghost sm" onClick={() => openEdit(f)}>
-                          편집
-                        </button>
-                        <button
-                          className="exam-btn-ghost sm"
-                          style={{ marginLeft: 6 }}
-                          onClick={() => remove(f)}
-                        >
-                          삭제
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </Fragment>
-              )
-            })}
-            {!rows.length && !loading && (
+            {group.map((f, i) => (
+              <tr key={f.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge st-${f.published ? 'submitted' : 'voided'}`}>
+                    {f.published ? '공개' : '비공개'}
+                  </span>
+                </td>
+                <td>{f.questionI18n.ko || <span style={{ color: 'var(--muted)' }}>(질문 없음)</span>}</td>
+                <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                  <button
+                    className="exam-btn-ghost sm"
+                    disabled={busy || i === 0}
+                    onClick={() => move(f, -1)}
+                    aria-label="위로"
+                    title="위로"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="exam-btn-ghost sm"
+                    style={{ marginLeft: 4 }}
+                    disabled={busy || i === group.length - 1}
+                    onClick={() => move(f, 1)}
+                    aria-label="아래로"
+                    title="아래로"
+                  >
+                    ↓
+                  </button>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="exam-btn-ghost sm" onClick={() => openEdit(f)}>
+                    편집
+                  </button>
+                  <button className="exam-btn-ghost sm" style={{ marginLeft: 6 }} onClick={() => remove(f)}>
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!group.length && !loading && (
               <tr>
                 <td colSpan={4} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  등록된 FAQ가 없습니다.
+                  이 분류에 FAQ가 없습니다. “+ 새 FAQ”로 추가하세요.
                 </td>
               </tr>
             )}
