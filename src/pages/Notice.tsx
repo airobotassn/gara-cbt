@@ -1,26 +1,72 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import SiteFooter from '../components/SiteFooter'
 
-// gara_2 (공지사항) 목업 디자인 그대로 + 실제 동작(네비·로그인·필터·펼침) 연결.
-// 원본: stitch_design_critique_assistant/gara_2/code.html
+// gara_2 (공지사항) 목업 디자인 그대로 + 실제 동작(네비·필터·펼침) 연결.
+// 데이터는 DB(notices, 6개국어)에서 로드 — 관리자(admin 함수)에서 등록/수정.
 
-// 내부 필터/카테고리 값은 안정적인 영문 키로 유지(번역 라벨은 t()로 렌더)
+// 내부 필터 값은 안정적인 영문 키로 유지(번역 라벨은 t()로 렌더)
 const FILTERS = ['all', 'guide', 'schedule', 'maintenance', 'event']
 
-// 실제 공지 데이터(i18n) — 목업 카드 디자인에 채워 동작하게
-const NOTICES = [
-  { id: 'item1', date: '2026. 06. 25', cat: 'guide', tagKey: 'notice', tagClass: 'bg-primary text-on-primary' },
-  { id: 'item2', date: '2026. 06. 20', cat: 'guide', tagKey: 'guide', tagClass: 'bg-surface-container-high text-on-surface' },
-  { id: 'item3', date: '2026. 06. 15', cat: 'guide', tagKey: 'required', tagClass: 'bg-error/10 text-error' },
-]
+// 배지(tag) → 스타일 클래스
+const TAG_CLASS: Record<string, string> = {
+  notice: 'bg-primary text-on-primary',
+  guide: 'bg-surface-container-high text-on-surface',
+  required: 'bg-error/10 text-error',
+}
+
+interface Row {
+  id: string
+  category: string
+  tag: string
+  title_i18n: Record<string, string>
+  body_i18n: Record<string, string>
+  pinned: boolean
+  published_at: string
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}`
+}
 
 export default function Notice() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const [filter, setFilter] = useState('all')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [rows, setRows] = useState<Row[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const list = filter === 'all' ? NOTICES : NOTICES.filter((n) => n.cat === filter)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!isSupabaseConfigured) {
+        if (alive) setLoading(false)
+        return
+      }
+      const { data } = await supabase
+        .from('notices')
+        .select('id, category, tag, title_i18n, body_i18n, pinned, published_at')
+        .eq('published', true)
+        .order('pinned', { ascending: false })
+        .order('published_at', { ascending: false })
+      if (alive) {
+        setRows((data as Row[] | null) ?? [])
+        setLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // 현재 언어 투영(없으면 한국어 폴백)
+  const pick = (m: Record<string, string> | null | undefined) => m?.[lang] ?? m?.ko ?? ''
+
+  const list = filter === 'all' ? rows : rows.filter((n) => n.category === filter)
   const featured = list[0]
   const rest = list.slice(1)
 
@@ -60,31 +106,37 @@ export default function Notice() {
           )}
         </div>
 
-        {list.length === 0 && (
+        {loading && (
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">
+            {t('common.loading')}
+          </div>
+        )}
+
+        {!loading && list.length === 0 && (
           <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">
             {t('notice.empty', { filter: t(`notice.filter_${filter}`) })}
           </div>
         )}
 
         {/* Featured Announcement */}
-        {featured && (
+        {!loading && featured && (
           <div className="group relative block w-full bg-surface-container-lowest rounded-2xl border border-primary/20 p-8 md:p-10 mb-8 transition-all duration-300 hover:shadow-lg hover:border-primary/40 overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col md:flex-row gap-6 md:items-start justify-between">
               <div className="flex-grow">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className={`${featured.tagClass} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.tag_${featured.tagKey}`)}</span>
-                  <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{featured.date}</span>
+                  <span className={`${TAG_CLASS[featured.tag] ?? TAG_CLASS.notice} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.tag_${featured.tag}`)}</span>
+                  <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{fmtDate(featured.published_at)}</span>
                 </div>
-                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4 break-keep">{t(`notice.${featured.id}.title`)}</h2>
-                <p className="font-body-lg text-body-lg text-on-surface-variant leading-relaxed break-keep">{t(`notice.${featured.id}.body`)}</p>
+                <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4 break-keep">{pick(featured.title_i18n)}</h2>
+                <p className="font-body-lg text-body-lg text-on-surface-variant leading-relaxed break-keep whitespace-pre-line">{pick(featured.body_i18n)}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Refined List View */}
-        {rest.length > 0 && (
+        {!loading && rest.length > 0 && (
           <div className="flex flex-col gap-0 border-t border-outline-variant/30">
             {rest.map((n) => {
               const isOpen = openId === n.id
@@ -96,16 +148,16 @@ export default function Notice() {
                 >
                   <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
                     <div className="flex items-center gap-4 md:w-48 flex-shrink-0">
-                      <span className={`${n.tagClass} px-3 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap min-w-[60px] text-center`}>{t(`notice.tag_${n.tagKey}`)}</span>
-                      <span className="text-outline font-label-md text-label-md whitespace-nowrap">{n.date}</span>
+                      <span className={`${TAG_CLASS[n.tag] ?? TAG_CLASS.guide} px-3 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap min-w-[60px] text-center`}>{t(`notice.tag_${n.tag}`)}</span>
+                      <span className="text-outline font-label-md text-label-md whitespace-nowrap">{fmtDate(n.published_at)}</span>
                     </div>
                     <div className="flex-grow flex items-center justify-between gap-4">
-                      <h3 className={`font-title-md text-title-md text-on-surface group-hover:text-primary transition-colors ${isOpen ? '' : 'line-clamp-1'}`}>{t(`notice.${n.id}.title`)}</h3>
+                      <h3 className={`font-title-md text-title-md text-on-surface group-hover:text-primary transition-colors ${isOpen ? '' : 'line-clamp-1'}`}>{pick(n.title_i18n)}</h3>
                       <span className={`material-symbols-outlined text-outline group-hover:text-primary transition-all duration-300 hidden md:block ${isOpen ? 'rotate-90' : ''}`}>arrow_forward</span>
                     </div>
                   </div>
                   {isOpen && (
-                    <p className="mt-4 md:pl-[calc(12rem+2rem)] font-body-md text-body-md text-on-surface-variant leading-relaxed">{t(`notice.${n.id}.body`)}</p>
+                    <p className="mt-4 md:pl-[calc(12rem+2rem)] font-body-md text-body-md text-on-surface-variant leading-relaxed whitespace-pre-line">{pick(n.body_i18n)}</p>
                   )}
                 </button>
               )

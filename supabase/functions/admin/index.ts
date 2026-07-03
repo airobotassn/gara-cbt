@@ -122,6 +122,68 @@ async function attemptDetail(admin: any, body: any) {
   })
 }
 
+// ---------- 공지사항(notices) CRUD ----------
+function shapeNotice(n: any) {
+  return {
+    id: n.id,
+    category: n.category,
+    tag: n.tag,
+    titleI18n: n.title_i18n ?? {},
+    bodyI18n: n.body_i18n ?? {},
+    pinned: !!n.pinned,
+    published: !!n.published,
+    publishedAt: n.published_at,
+    createdAt: n.created_at,
+    updatedAt: n.updated_at,
+  }
+}
+
+// 관리자 목록 — 미공개 포함 전체(고정 우선 → 최신순)
+async function noticeList(admin: any) {
+  const { data, error } = await admin
+    .from('notices')
+    .select('*')
+    .order('pinned', { ascending: false })
+    .order('published_at', { ascending: false })
+  if (error) return json({ error: error.message }, 400)
+  return json({ notices: (data ?? []).map(shapeNotice) })
+}
+
+// 생성/수정(id 있으면 update). 한국어 제목 필수.
+async function noticeUpsert(admin: any, body: any) {
+  const n = body?.notice ?? {}
+  const title = (n.titleI18n ?? {}) as Record<string, unknown>
+  if (!title.ko || !String(title.ko).trim()) return json({ error: '한국어 제목은 필수입니다.' }, 400)
+
+  const row: Record<string, unknown> = {
+    category: n.category ?? 'guide',
+    tag: n.tag ?? 'notice',
+    title_i18n: title,
+    body_i18n: n.bodyI18n ?? {},
+    pinned: !!n.pinned,
+    published: n.published !== false,
+    published_at: n.publishedAt || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  if (n.id) {
+    const { data, error } = await admin.from('notices').update(row).eq('id', n.id).select().maybeSingle()
+    if (error) return json({ error: error.message }, 400)
+    return json({ notice: data ? shapeNotice(data) : null })
+  }
+  const { data, error } = await admin.from('notices').insert(row).select().maybeSingle()
+  if (error) return json({ error: error.message }, 400)
+  return json({ notice: data ? shapeNotice(data) : null })
+}
+
+async function noticeDelete(admin: any, body: any) {
+  const id = body?.id
+  if (!id) return json({ error: 'id 필요' }, 400)
+  const { error } = await admin.from('notices').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -144,6 +206,9 @@ Deno.serve(async (req) => {
       case 'me': return json({ ok: true })
       case 'list': return await listAttempts(admin, body)
       case 'detail': return await attemptDetail(admin, body)
+      case 'noticeList': return await noticeList(admin)
+      case 'noticeUpsert': return await noticeUpsert(admin, body)
+      case 'noticeDelete': return await noticeDelete(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

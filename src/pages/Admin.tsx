@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import type { AdminListResponse, AdminAttemptRow, AdminDetailResponse } from '../lib/types'
+import type {
+  AdminListResponse,
+  AdminAttemptRow,
+  AdminDetailResponse,
+  AdminNoticeListResponse,
+  NoticeRow,
+  I18nText,
+  Lang6,
+} from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
 
 // 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
@@ -85,6 +93,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [sub, setSub] = useState<'subs' | 'notices'>('subs')
 
   useEffect(() => {
     if (!isFullUser) {
@@ -193,6 +202,18 @@ function CarisExamAdmin() {
 
   return (
     <div className="wrap admin-cbt">
+      <div className="admin-tabs" style={{ marginBottom: 18 }}>
+        <button className={sub === 'subs' ? 'on' : ''} onClick={() => setSub('subs')}>
+          제출 답안
+        </button>
+        <button className={sub === 'notices' ? 'on' : ''} onClick={() => setSub('notices')}>
+          공지사항
+        </button>
+      </div>
+      {sub === 'notices' ? (
+        <NoticesAdmin />
+      ) : (
+        <>
       <div className="admin-head">
         <h1>제출 답안 관리</h1>
         <div className="admin-head-actions">
@@ -312,6 +333,356 @@ function CarisExamAdmin() {
           </div>
         </div>
       )}
+        </>
+      )}
     </div>
+  )
+}
+
+// ── 공지사항 관리 (admin 함수의 noticeList/noticeUpsert/noticeDelete) ──
+const NOTICE_CATS = ['guide', 'schedule', 'maintenance', 'event'] as const
+const NOTICE_TAGS = ['notice', 'guide', 'required'] as const
+const NOTICE_CAT_LABEL: Record<string, string> = {
+  guide: '안내',
+  schedule: '시험일정',
+  maintenance: '점검',
+  event: '이벤트',
+}
+const NOTICE_TAG_LABEL: Record<string, string> = {
+  notice: '공지',
+  guide: '안내',
+  required: '필독',
+}
+const NLANGS: { code: Lang6; label: string }[] = [
+  { code: 'ko', label: '한국어' },
+  { code: 'en', label: 'English' },
+  { code: 'ja', label: '日本語' },
+  { code: 'zh', label: '中文' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'vi', label: 'Tiếng Việt' },
+]
+
+interface NoticeDraft {
+  id?: string
+  category: string
+  tag: string
+  pinned: boolean
+  published: boolean
+  publishedAt: string // YYYY-MM-DD (편집용)
+  titleI18n: I18nText
+  bodyI18n: I18nText
+}
+
+function emptyDraft(): NoticeDraft {
+  return {
+    category: 'guide',
+    tag: 'notice',
+    pinned: false,
+    published: true,
+    publishedAt: new Date().toISOString().slice(0, 10),
+    titleI18n: {},
+    bodyI18n: {},
+  }
+}
+
+function fmtDay(iso?: string | null): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '-'
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}`
+}
+
+const inpStyle: CSSProperties = {
+  padding: '8px 10px',
+  borderRadius: 8,
+  border: '1px solid rgba(128,128,128,.35)',
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  width: '100%',
+}
+const fieldStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 5,
+  fontSize: 13,
+  color: 'var(--muted)',
+}
+
+function NoticesAdmin() {
+  const [rows, setRows] = useState<NoticeRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [draft, setDraft] = useState<NoticeDraft | null>(null)
+  const [elang, setElang] = useState<Lang6>('ko')
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<AdminNoticeListResponse>('admin', { action: 'noticeList' })
+      setRows(res.notices)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '공지를 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function openNew() {
+    setDraft(emptyDraft())
+    setElang('ko')
+  }
+  function openEdit(n: NoticeRow) {
+    setDraft({
+      id: n.id,
+      category: n.category,
+      tag: n.tag,
+      pinned: n.pinned,
+      published: n.published,
+      publishedAt: (n.publishedAt || '').slice(0, 10),
+      titleI18n: { ...n.titleI18n },
+      bodyI18n: { ...n.bodyI18n },
+    })
+    setElang('ko')
+  }
+  function patch(p: Partial<NoticeDraft>) {
+    setDraft((d) => (d ? { ...d, ...p } : d))
+  }
+  function patchTitle(v: string) {
+    setDraft((d) => (d ? { ...d, titleI18n: { ...d.titleI18n, [elang]: v } } : d))
+  }
+  function patchBody(v: string) {
+    setDraft((d) => (d ? { ...d, bodyI18n: { ...d.bodyI18n, [elang]: v } } : d))
+  }
+
+  async function save() {
+    if (!draft) return
+    if (!draft.titleI18n.ko?.trim()) {
+      alert('한국어 제목은 필수입니다.')
+      setElang('ko')
+      return
+    }
+    setSaving(true)
+    try {
+      await callFunction('admin', {
+        action: 'noticeUpsert',
+        notice: {
+          ...draft,
+          publishedAt: draft.publishedAt
+            ? new Date(draft.publishedAt + 'T00:00:00+09:00').toISOString()
+            : null,
+        },
+      })
+      setDraft(null)
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  async function remove(n: NoticeRow) {
+    if (!confirm(`"${n.titleI18n.ko ?? ''}" 공지를 삭제할까요?`)) return
+    try {
+      await callFunction('admin', { action: 'noticeDelete', id: n.id })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+    }
+  }
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>공지사항 관리</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">총 {rows.length}건</span>
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+          <button className="exam-btn-ghost sm" onClick={openNew}>
+            + 새 공지
+          </button>
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>상태</th>
+              <th>분류</th>
+              <th>제목 (한국어)</th>
+              <th>게시일</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((n) => (
+              <tr key={n.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge st-${n.published ? 'submitted' : 'voided'}`}>
+                    {n.published ? '공개' : '비공개'}
+                  </span>
+                  {n.pinned && (
+                    <span className="admin-badge st-in_progress" style={{ marginLeft: 6 }}>
+                      고정
+                    </span>
+                  )}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {NOTICE_CAT_LABEL[n.category] ?? n.category} · {NOTICE_TAG_LABEL[n.tag] ?? n.tag}
+                </td>
+                <td>{n.titleI18n.ko || <span style={{ color: 'var(--muted)' }}>(제목 없음)</span>}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDay(n.publishedAt)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="exam-btn-ghost sm" onClick={() => openEdit(n)}>
+                    편집
+                  </button>
+                  <button
+                    className="exam-btn-ghost sm"
+                    style={{ marginLeft: 6 }}
+                    onClick={() => remove(n)}
+                  >
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && !loading && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  등록된 공지가 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {draft && (
+        <div className="admin-modal-bg" onClick={() => !saving && setDraft(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setDraft(null)}>
+              ✕
+            </button>
+            <h2>{draft.id ? '공지 편집' : '새 공지'}</h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>
+                  분류
+                  <select
+                    style={inpStyle}
+                    value={draft.category}
+                    onChange={(e) => patch({ category: e.target.value })}
+                  >
+                    {NOTICE_CATS.map((c) => (
+                      <option key={c} value={c}>
+                        {NOTICE_CAT_LABEL[c]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>
+                  배지
+                  <select
+                    style={inpStyle}
+                    value={draft.tag}
+                    onChange={(e) => patch({ tag: e.target.value })}
+                  >
+                    {NOTICE_TAGS.map((c) => (
+                      <option key={c} value={c}>
+                        {NOTICE_TAG_LABEL[c]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>
+                  게시일
+                  <input
+                    type="date"
+                    style={inpStyle}
+                    value={draft.publishedAt}
+                    onChange={(e) => patch({ publishedAt: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: 20 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.published}
+                    onChange={(e) => patch({ published: e.target.checked })}
+                  />
+                  공개
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.pinned}
+                    onChange={(e) => patch({ pinned: e.target.checked })}
+                  />
+                  상단 고정
+                </label>
+              </div>
+
+              <div className="admin-tabs" style={{ flexWrap: 'wrap' }}>
+                {NLANGS.map((l) => (
+                  <button
+                    key={l.code}
+                    type="button"
+                    className={elang === l.code ? 'on' : ''}
+                    onClick={() => setElang(l.code)}
+                  >
+                    {l.label}
+                    {l.code === 'ko' ? ' *' : draft.titleI18n[l.code]?.trim() ? ' ●' : ''}
+                  </button>
+                ))}
+              </div>
+
+              <label style={fieldStyle}>
+                제목 {elang === 'ko' && <em style={{ color: 'var(--error, #d43a3a)' }}>(필수)</em>}
+                <input
+                  type="text"
+                  style={inpStyle}
+                  value={draft.titleI18n[elang] ?? ''}
+                  onChange={(e) => patchTitle(e.target.value)}
+                  placeholder={elang === 'ko' ? '공지 제목' : '(비우면 한국어로 표시됩니다)'}
+                />
+              </label>
+              <label style={fieldStyle}>
+                본문
+                <textarea
+                  rows={6}
+                  style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
+                  value={draft.bodyI18n[elang] ?? ''}
+                  onChange={(e) => patchBody(e.target.value)}
+                  placeholder={elang === 'ko' ? '공지 본문' : '(비우면 한국어로 표시됩니다)'}
+                />
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button className="exam-btn-ghost" onClick={() => setDraft(null)} disabled={saving}>
+                취소
+              </button>
+              <button className="exam-btn" onClick={save} disabled={saving}>
+                {saving ? '저장 중…' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

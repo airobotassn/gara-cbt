@@ -102,3 +102,25 @@ export interface AdminDetailResponse {
   attempt: AdminAttemptRow
   answers: Array<GradedAnswer & { timeSpent: number }>
 }
+
+// ---------- 공지사항(notices) ----------
+export type Lang6 = 'ko' | 'en' | 'ja' | 'zh' | 'hi' | 'vi'
+export type I18nText = Partial<Record<Lang6, string>>
+
+// 관리자 API 가 내려주는 공지 1건(camelCase 정규화)
+export interface NoticeRow {
+  id: string
+  category: string // guide | schedule | maintenance | event
+  tag: string // notice | guide | required
+  titleI18n: I18nText
+  bodyI18n: I18nText
+  pinned: boolean
+  published: boolean
+  publishedAt: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AdminNoticeListResponse {
+  notices: NoticeRow[]
+}
