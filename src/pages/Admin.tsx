@@ -20,7 +20,11 @@ import type {
   AdminQuestionEventsResp,
   AdminQuestionEvent,
   QuestionImportRow,
-  CbtOverviewResp,
+  CbtAnalytics,
+  CbtQDiff,
+  CbtUserRow,
+  CbtUsersResp,
+  CbtUserDetailResp,
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
@@ -106,7 +110,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'dash' | 'subs' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
+  const [sub, setSub] = useState<'dash' | 'subs' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
   const [isRoot, setIsRoot] = useState(false)
 
   useEffect(() => {
@@ -226,6 +230,9 @@ function CarisExamAdmin() {
         <button className={sub === 'subs' ? 'on' : ''} onClick={() => setSub('subs')}>
           제출 답안
         </button>
+        <button className={sub === 'users' ? 'on' : ''} onClick={() => setSub('users')}>
+          회원
+        </button>
         <button className={sub === 'questions' ? 'on' : ''} onClick={() => setSub('questions')}>
           문항
         </button>
@@ -249,6 +256,8 @@ function CarisExamAdmin() {
       </div>
       {sub === 'dash' ? (
         <DashboardAdmin />
+      ) : sub === 'users' ? (
+        <UsersAdmin />
       ) : sub === 'questions' ? (
         <QuestionsAdmin />
       ) : sub === 'notices' ? (
@@ -1618,9 +1627,82 @@ function AdminAccountsAdmin() {
   )
 }
 
-// ── 대시보드 (운영 현황) ───────────────────────────────────────────
+// ── 대시보드 (운영 분석) ───────────────────────────────────────────
+const CHART_ACCENT = '#4a6cf7'
+
+function MiniBars({ days, map, color }: { days: string[]; map: Record<string, number>; color: string }) {
+  const vals = days.map((d) => map[d] ?? 0)
+  const max = Math.max(1, ...vals)
+  const sum = vals.reduce((x, y) => x + y, 0)
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
+        {days.map((d, i) => (
+          <div key={d} title={`${d.slice(5)} · ${vals[i]}`} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+            <div style={{ width: '100%', height: `${(vals[i] / max) * 100}%`, minHeight: vals[i] > 0 ? 2 : 0, background: color, borderRadius: '2px 2px 0 0' }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+        {days[0]?.slice(5)} ~ {days[days.length - 1]?.slice(5)} · 합계 {sum}
+      </div>
+    </div>
+  )
+}
+
+function HBar({ label, value, max, sub }: { label: string; value: number; max: number; sub?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+      <span style={{ width: 130, flexShrink: 0, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</span>
+      <div style={{ flex: 1, height: 10, background: 'rgba(128,128,128,.16)', borderRadius: 5, overflow: 'hidden' }}>
+        <div style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%`, height: '100%', background: CHART_ACCENT, borderRadius: 5 }} />
+      </div>
+      <span style={{ width: 84, textAlign: 'right', fontSize: 12.5, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{value}{sub ?? ''}</span>
+    </div>
+  )
+}
+
+const DASH_PERIODS = [7, 30, 90] as const
+function TrendChart({ title, days, map, color }: { title: string; days: string[]; map: Record<string, number>; color: string }) {
+  const [period, setPeriod] = useState<number>(30)
+  const view = days.slice(-period)
+  return (
+    <div className="admin-section" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
+        <div className="admin-tabs" style={{ marginBottom: 0 }}>
+          {DASH_PERIODS.map((p) => (
+            <button key={p} className={period === p ? 'on' : ''} onClick={() => setPeriod(p)}>{p}일</button>
+          ))}
+        </div>
+      </div>
+      <MiniBars days={view} map={map} color={color} />
+    </div>
+  )
+}
+
+function DiffRows({ rows, empty }: { rows: CbtQDiff[]; empty: string }) {
+  if (!rows.length) return <div className="admin-empty">{empty}</div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {rows.map((r) => (
+        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: r.active ? 1 : 0.5 }}>
+          <span style={{ width: 52, textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: r.rate < 35 ? '#d43a3a' : r.rate > 90 ? '#2e9e5b' : 'inherit' }}>{r.rate}%</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13.5 }}>{r.number}. {r.prompt}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.subject}{r.exam ? ` · ${r.exam}` : ''} · 응시 {r.n}{!r.active ? ' · 비활성' : ''}</div>
+          </div>
+          <div style={{ width: 90, height: 8, background: 'rgba(128,128,128,.16)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
+            <div style={{ width: `${r.rate}%`, height: '100%', background: r.rate < 35 ? '#d43a3a' : CHART_ACCENT }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function DashboardAdmin() {
-  const [ov, setOv] = useState<CbtOverviewResp | null>(null)
+  const [a, setA] = useState<CbtAnalytics | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
 
@@ -1628,7 +1710,7 @@ function DashboardAdmin() {
     setLoading(true)
     setErr('')
     try {
-      setOv(await callFunction<CbtOverviewResp>('admin', { action: 'cbtOverview' }))
+      setA(await callFunction<CbtAnalytics>('admin', { action: 'cbtAnalytics' }))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
@@ -1638,16 +1720,6 @@ function DashboardAdmin() {
   useEffect(() => {
     load()
   }, [load])
-
-  const cards = ov
-    ? [
-        { label: '회원 수', value: ov.users },
-        { label: '시험 (활성/전체)', value: `${ov.examsActive} / ${ov.examsAll}` },
-        { label: '총 제출', value: ov.attemptsAll },
-        { label: '최근 7일 제출', value: ov.attempts7d },
-        { label: '문항 (활성/전체)', value: `${ov.questionsActive} / ${ov.questions}` },
-      ]
-    : []
 
   return (
     <>
@@ -1660,54 +1732,273 @@ function DashboardAdmin() {
         </div>
       </div>
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
-      {loading && !ov && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
-      {ov && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
-            {cards.map((c) => (
-              <div key={c.label} className="admin-section" style={{ padding: 16 }}>
-                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>{c.label}</div>
-                <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{c.value}</div>
+      {loading && !a && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
+      {a && <DashboardBody a={a} />}
+    </>
+  )
+}
+
+function DashboardBody({ a }: { a: CbtAnalytics }) {
+  const o = a.overview
+  const cards = [
+    { k: '회원', v: o.users, sub: `게스트 ${o.guests}` },
+    { k: '전체 제출', v: o.attemptsAll, sub: `최근 7일 ${o.attempts7d}` },
+    { k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건` },
+    { k: '문항', v: `${o.questionsActive} / ${o.questions}`, sub: '활성 / 전체' },
+    { k: '시험', v: o.exams, sub: '등록 수' },
+  ]
+  const bandMax = Math.max(1, ...Object.values(a.scoreBands))
+  const byExamMax = Math.max(1, ...a.byExam.map((e) => e.count))
+  const poolWarn = a.pool.filter((p) => p.active < 4)
+
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {cards.map((c) => (
+          <div key={c.k} className="admin-section" style={{ padding: 16 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>{c.k}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{c.v}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <TrendChart title="가입 추이" days={a.days} map={a.signupByDay} color="#3aa79f" />
+      <TrendChart title="응시(제출) 추이" days={a.days} map={a.submitByDay} color={CHART_ACCENT} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+        <div className="admin-section">
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>점수 분포 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>합격컷 60점</span></h3>
+          {Object.entries(a.scoreBands).map(([band, v]) => <HBar key={band} label={`${band}점`} value={v} max={bandMax} sub="명" />)}
+          {a.scoredN === 0 && <div className="admin-empty">채점된 응시가 없습니다.</div>}
+        </div>
+        <div className="admin-section">
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>시험별 응시</h3>
+          {a.byExam.map((e) => <HBar key={e.slug} label={e.title} value={e.count} max={byExamMax} sub="건" />)}
+          {!a.byExam.length && <div className="admin-empty">시험이 없습니다.</div>}
+        </div>
+      </div>
+
+      <div className="admin-section" style={{ marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0, fontSize: 15 }}>⚠ 어려운 문항 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>정답률 낮은 순 · 응시 3회↑</span></h3>
+        <DiffRows rows={a.qHardest} empty="아직 응시 데이터가 없습니다." />
+      </div>
+      <div className="admin-section" style={{ marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0, fontSize: 15 }}>쉬운 문항 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>정답률 높은 순</span></h3>
+        <DiffRows rows={a.qEasiest} empty="아직 응시 데이터가 없습니다." />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        <div className="admin-section">
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>과목별 정답률</h3>
+          {a.subjectCorrect.map((s) => <HBar key={s.subject} label={s.subject} value={s.rate} max={100} sub={`% (${s.n})`} />)}
+          {!a.subjectCorrect.length && <div className="admin-empty">아직 응시 데이터가 없습니다.</div>}
+        </div>
+        <div className="admin-section">
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>과목별 문항 풀 <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12.5 }}>활성/전체</span></h3>
+          {poolWarn.length > 0 && <div className="admin-empty" style={{ marginBottom: 8 }}>⚠ 활성 4개 미만: {poolWarn.map((p) => p.subject).join(' · ')}</div>}
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {a.pool.map((p) => (
+              <div key={p.subject} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderBottom: '1px solid rgba(128,128,128,.1)' }}>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.subject}</span>
+                <span style={{ flexShrink: 0, marginLeft: 8, color: p.active < 4 ? '#d43a3a' : 'inherit', fontVariantNumeric: 'tabular-nums' }}><b>{p.active}</b> / {p.total}</span>
               </div>
             ))}
+            {!a.pool.length && <div className="admin-empty">문항이 없습니다.</div>}
           </div>
-          <div className="admin-head" style={{ marginTop: 8 }}>
-            <h1 style={{ fontSize: 18 }}>시험별 활성 문항</h1>
-          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── 회원 관리 (목록 · 상세) ────────────────────────────────────────
+function UsersAdmin() {
+  const [users, setUsers] = useState<CbtUserRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  const [q, setQ] = useState('')
+  const [type, setType] = useState<'all' | 'google' | 'guest'>('google')
+  const [sort, setSort] = useState<'created' | 'attempts'>('created')
+  const [page, setPage] = useState(0)
+  const [open, setOpen] = useState<CbtUserRow | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const r = await callFunction<CbtUsersResp>('admin', { action: 'cbtUsers' })
+      setUsers(r.users)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '불러오기 실패')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+  useEffect(() => {
+    setPage(0)
+  }, [q, type, sort])
+
+  const filtered = users
+    .filter((u) => {
+      if (type === 'google' && u.anon) return false
+      if (type === 'guest' && !u.anon) return false
+      if (q) {
+        const s = q.toLowerCase()
+        if (!(u.name || '').toLowerCase().includes(s) && !(u.email || '').toLowerCase().includes(s)) return false
+      }
+      return true
+    })
+    .sort((x, y) => (sort === 'attempts' ? y.attempts - x.attempts : (y.created || '').localeCompare(x.created || '')))
+  const PER = 50
+  const pageMax = Math.max(1, Math.ceil(filtered.length / PER))
+  const shown = filtered.slice(page * PER, page * PER + PER)
+  const googleN = users.filter((u) => !u.anon).length
+  const guestN = users.length - googleN
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>회원 관리</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">구글 {googleN} · 게스트 {guestN}</span>
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+        </div>
+      </div>
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+
+      <div className="admin-section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <input style={{ ...inpStyle, width: 220 }} placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="admin-tabs" style={{ marginBottom: 0 }}>
+          <button className={type === 'google' ? 'on' : ''} onClick={() => setType('google')}>구글</button>
+          <button className={type === 'guest' ? 'on' : ''} onClick={() => setType('guest')}>게스트</button>
+          <button className={type === 'all' ? 'on' : ''} onClick={() => setType('all')}>전체</button>
+        </div>
+        <select style={{ ...inpStyle, width: 150 }} value={sort} onChange={(e) => setSort(e.target.value as 'created' | 'attempts')}>
+          <option value="created">가입 최신순</option>
+          <option value="attempts">응시 많은순</option>
+        </select>
+        <span style={{ color: 'var(--muted)', fontSize: 13 }}>{filtered.length}명</span>
+      </div>
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>이메일</th>
+              <th>유형</th>
+              <th>가입</th>
+              <th style={{ textAlign: 'right' }}>응시</th>
+              <th>마지막 활동</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((u) => (
+              <tr key={u.id}>
+                <td>{u.name || '-'}</td>
+                <td style={{ color: 'var(--muted)' }}>{u.email || '-'}</td>
+                <td>
+                  <span className={`admin-badge st-${u.anon ? 'in_progress' : 'submitted'}`}>{u.anon ? '게스트' : '구글'}</span>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.created)}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.attempts}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.lastActive)}</td>
+                <td>
+                  <button className="exam-btn-ghost sm" onClick={() => setOpen(u)}>상세</button>
+                </td>
+              </tr>
+            ))}
+            {!shown.length && !loading && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  회원이 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {pageMax > 1 && (
+        <div className="admin-pager">
+          <button className="exam-btn-ghost sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+            ‹ 이전
+          </button>
+          <span>{page + 1} / {pageMax}</span>
+          <button className="exam-btn-ghost sm" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>
+            다음 ›
+          </button>
+        </div>
+      )}
+      {open && <UserDetailModal user={open} onClose={() => setOpen(null)} />}
+    </>
+  )
+}
+
+function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => void }) {
+  const [detail, setDetail] = useState<CbtUserDetailResp | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    callFunction<CbtUserDetailResp>('admin', { action: 'cbtUserDetail', userId: user.id })
+      .then(setDetail)
+      .catch(() => setDetail({ attempts: [] }))
+      .finally(() => setLoading(false))
+  }, [user.id])
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>
+          ✕
+        </button>
+        <h2>
+          {user.name || '-'} <span className="admin-modal-email">{user.email}</span>
+        </h2>
+        <p className="admin-modal-meta">
+          {user.anon ? '게스트' : '구글'} · 가입 {fmtDT(user.created)} · 응시 {user.attempts}건
+        </p>
+        {loading ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+        ) : (
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
                   <th>시험</th>
-                  <th>slug</th>
                   <th>상태</th>
-                  <th style={{ textAlign: 'right' }}>활성 문항</th>
+                  <th>점수</th>
+                  <th>제출</th>
                 </tr>
               </thead>
               <tbody>
-                {ov.perExam.map((e) => (
-                  <tr key={e.slug}>
-                    <td>{e.title}</td>
-                    <td style={{ color: 'var(--muted)' }}>{e.slug}</td>
+                {(detail?.attempts ?? []).map((at) => (
+                  <tr key={at.id}>
+                    <td>{at.examTitle || '-'}</td>
                     <td>
-                      <span className={`admin-badge st-${e.active ? 'submitted' : 'voided'}`}>{e.active ? '활성' : '비활성'}</span>
+                      <span className={`admin-badge st-${at.status}`}>{STATUS_LABEL[at.status] ?? at.status}</span>
                     </td>
-                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{e.questions}</td>
+                    <td>{at.totalCorrect != null ? `${at.totalCorrect} / ${at.totalQuestions}` : '-'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(at.submittedAt)}</td>
                   </tr>
                 ))}
-                {!ov.perExam.length && (
+                {!(detail?.attempts ?? []).length && (
                   <tr>
                     <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
-                      등록된 시험이 없습니다.
+                      응시 이력이 없습니다.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   )
 }
 

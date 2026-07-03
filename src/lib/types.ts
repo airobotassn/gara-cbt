@@ -225,13 +225,60 @@ export interface QuestionImportRow {
   correctIndex: number
 }
 
-export interface CbtOverviewResp {
-  users: number
-  examsAll: number
-  examsActive: number
-  attemptsAll: number
-  attempts7d: number
-  questions: number
-  questionsActive: number
-  perExam: { title: string; slug: string; active: boolean; questions: number }[]
+export interface CbtQDiff {
+  id: string
+  number: number
+  subject: string
+  prompt: string
+  exam: string
+  active: boolean
+  n: number
+  rate: number
+}
+export interface CbtAnalytics {
+  overview: {
+    users: number
+    guests: number
+    attemptsAll: number
+    attempts7d: number
+    questions: number
+    questionsActive: number
+    exams: number
+  }
+  days: string[]
+  signupByDay: Record<string, number>
+  submitByDay: Record<string, number>
+  scoreBands: Record<string, number>
+  passRate: number
+  scoredN: number
+  byExam: { title: string; slug: string; count: number }[]
+  qHardest: CbtQDiff[]
+  qEasiest: CbtQDiff[]
+  subjectCorrect: { subject: string; n: number; rate: number }[]
+  pool: { subject: string; total: number; active: number }[]
+}
+
+export interface CbtUserRow {
+  id: string
+  name: string | null
+  email: string | null
+  anon: boolean
+  created: string
+  attempts: number
+  lastActive: string | null
+}
+export interface CbtUsersResp {
+  users: CbtUserRow[]
+}
+export interface CbtUserAttempt {
+  id: string
+  examTitle: string | null
+  status: string
+  totalCorrect: number | null
+  totalQuestions: number | null
+  submittedAt: string | null
+  createdAt: string
+}
+export interface CbtUserDetailResp {
+  attempts: CbtUserAttempt[]
 }

@@ -677,35 +677,203 @@ async function questionsImport(admin: any, body: any, actor: string) {
   return json({ ok: true, count: data?.length ?? payload.length })
 }
 
-// 대시보드 개요 — CBT 운영 현황 카드.
-async function cbtOverview(admin: any) {
-  const since7 = new Date(Date.now() - 7 * 864e5).toISOString()
-  const [u, exAll, exActive, subAll, sub7, qTot, qActive] = await Promise.all([
+// 대시보드 분석 — 추이·점수분포·합격률·시험별 응시·문항 난이도·과목 정답률·문항 풀.
+async function cbtAnalytics(admin: any) {
+  const now = Date.now()
+  const since7 = new Date(now - 7 * 864e5).toISOString()
+  const since90 = new Date(now - 90 * 864e5).toISOString()
+  const days: string[] = []
+  for (let i = 89; i >= 0; i--) days.push(new Date(now - i * 864e5).toISOString().slice(0, 10))
+
+  const [profRes, attRes, ansRes, qRes, examRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, qTot, qAct] = await Promise.all([
+    admin.from('profiles').select('created_at, is_anonymous').limit(10000),
+    admin.from('exam_attempts').select('exam_id, status, submitted_at, created_at, total_correct, total_questions').limit(10000),
+    admin.from('attempt_answers').select('question_id, is_correct').limit(50000),
+    admin.from('questions').select('id, exam_id, number, subject, prompt, active').is('deleted_at', null).limit(5000),
+    admin.from('exams').select('id, title, slug, active').order('created_at', { ascending: true }),
     admin.from('profiles').select('id', { count: 'exact', head: true }),
-    admin.from('exams').select('id', { count: 'exact', head: true }),
-    admin.from('exams').select('id', { count: 'exact', head: true }).eq('active', true),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', true),
     admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
     admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted').gte('submitted_at', since7),
     admin.from('questions').select('id', { count: 'exact', head: true }).is('deleted_at', null),
     admin.from('questions').select('id', { count: 'exact', head: true }).eq('active', true).is('deleted_at', null),
   ])
-  // 시험별 문항 수
-  const { data: exams } = await admin.from('exams').select('id, title, slug, active').order('created_at', { ascending: true })
-  const perExam: any[] = []
-  for (const ex of exams ?? []) {
-    const c = await admin.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id).eq('active', true).is('deleted_at', null)
-    perExam.push({ title: ex.title, slug: ex.slug, active: ex.active, questions: c.count ?? 0 })
+
+  const profs = profRes.data ?? []
+  const atts = (attRes.data ?? []).filter((a: any) => a.status === 'submitted')
+  const ans = ansRes.data ?? []
+  const qs = qRes.data ?? []
+  const exams = examRes.data ?? []
+  const examTitle: Record<string, string> = {}
+  for (const e of exams) examTitle[e.id] = e.title
+
+  // 추이(90일)
+  const signupByDay: Record<string, number> = {}
+  const submitByDay: Record<string, number> = {}
+  days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0 })
+  for (const p of profs as any[]) {
+    const k = (p.created_at ?? '').slice(0, 10)
+    if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
   }
+  for (const a of atts as any[]) {
+    const k = (a.submitted_at ?? a.created_at ?? '').slice(0, 10)
+    if (k in submitByDay) submitByDay[k]++
+  }
+
+  // 점수 분포 + 합격률(합격컷 60) + 시험별 응시
+  const scoreBands: Record<string, number> = { '0-59': 0, '60-69': 0, '70-79': 0, '80-89': 0, '90-100': 0 }
+  let passN = 0
+  let scoredN = 0
+  const byExam: Record<string, number> = {}
+  for (const a of atts as any[]) {
+    byExam[a.exam_id] = (byExam[a.exam_id] || 0) + 1
+    if (a.total_questions && a.total_correct != null) {
+      const pct = Math.round((a.total_correct / a.total_questions) * 100)
+      scoredN++
+      if (pct >= 90) scoreBands['90-100']++
+      else if (pct >= 80) scoreBands['80-89']++
+      else if (pct >= 70) scoreBands['70-79']++
+      else if (pct >= 60) scoreBands['60-69']++
+      else scoreBands['0-59']++
+      if (pct >= 60) passN++
+    }
+  }
+  const byExamArr = exams.map((e: any) => ({ title: e.title, slug: e.slug, count: byExam[e.id] || 0 }))
+
+  // 문항 난이도(정답률, 응시 3회 이상) + 과목 정답률
+  const qMap: Record<string, any> = {}
+  for (const q of qs as any[]) qMap[q.id] = q
+  const qAgg: Record<string, { n: number; c: number }> = {}
+  const subjAgg: Record<string, { n: number; c: number }> = {}
+  for (const r of ans as any[]) {
+    qAgg[r.question_id] ??= { n: 0, c: 0 }
+    qAgg[r.question_id].n++
+    if (r.is_correct) qAgg[r.question_id].c++
+    const q = qMap[r.question_id]
+    const sk = q?.subject ?? '(기타)'
+    subjAgg[sk] ??= { n: 0, c: 0 }
+    subjAgg[sk].n++
+    if (r.is_correct) subjAgg[sk].c++
+  }
+  const qDiff = Object.entries(qAgg)
+    .filter(([, v]) => v.n >= 3)
+    .map(([id, v]) => ({
+      id,
+      number: qMap[id]?.number ?? 0,
+      subject: qMap[id]?.subject ?? '',
+      prompt: qMap[id]?.prompt ?? '',
+      exam: examTitle[qMap[id]?.exam_id] ?? '',
+      active: qMap[id]?.active ?? true,
+      n: v.n,
+      rate: Math.round((v.c / v.n) * 100),
+    }))
+    .sort((a, b) => a.rate - b.rate)
+  const subjectCorrect = Object.entries(subjAgg)
+    .map(([subject, v]) => ({ subject, n: v.n, rate: Math.round((v.c / v.n) * 100) }))
+    .sort((a, b) => a.rate - b.rate)
+
+  // 과목별 문항 풀(활성/전체)
+  const poolBy: Record<string, { total: number; active: number }> = {}
+  for (const q of qs as any[]) {
+    poolBy[q.subject] ??= { total: 0, active: 0 }
+    poolBy[q.subject].total++
+    if (q.active) poolBy[q.subject].active++
+  }
+  const pool = Object.entries(poolBy)
+    .map(([subject, v]) => ({ subject, total: v.total, active: v.active }))
+    .sort((a, b) => a.subject.localeCompare(b.subject))
+
   return json({
-    users: u.count ?? 0,
-    examsAll: exAll.count ?? 0,
-    examsActive: exActive.count ?? 0,
-    attemptsAll: subAll.count ?? 0,
-    attempts7d: sub7.count ?? 0,
-    questions: qTot.count ?? 0,
-    questionsActive: qActive.count ?? 0,
-    perExam,
+    overview: {
+      users: usersCnt.count ?? profs.length,
+      guests: guestsCnt.count ?? 0,
+      attemptsAll: attsCnt.count ?? atts.length,
+      attempts7d: atts7dCnt.count ?? 0,
+      questions: qTot.count ?? qs.length,
+      questionsActive: qAct.count ?? 0,
+      exams: exams.length,
+    },
+    days,
+    signupByDay,
+    submitByDay,
+    scoreBands,
+    passRate: scoredN ? Math.round((passN / scoredN) * 100) : 0,
+    scoredN,
+    byExam: byExamArr,
+    qHardest: qDiff.slice(0, 6),
+    qEasiest: qDiff.slice(-6).reverse(),
+    subjectCorrect,
+    pool,
   })
+}
+
+// 회원 목록 — 프로필 + 이메일 + 응시수 + 마지막 활동.
+async function cbtUsers(admin: any) {
+  const { data: profiles } = await admin
+    .from('profiles')
+    .select('id, display_name, is_anonymous, created_at')
+    .order('created_at', { ascending: false })
+    .limit(5000)
+  const { data: atts } = await admin
+    .from('exam_attempts')
+    .select('user_id, submitted_at')
+    .eq('status', 'submitted')
+    .limit(20000)
+  const cnt: Record<string, number> = {}
+  const last: Record<string, string> = {}
+  for (const a of atts ?? []) {
+    const u = (a as any).user_id
+    cnt[u] = (cnt[u] || 0) + 1
+    const s = (a as any).submitted_at
+    if (s && (!last[u] || s > last[u])) last[u] = s
+  }
+  const emailMap: Record<string, string> = {}
+  try {
+    for (let page = 1; ; page++) {
+      const { data: au } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+      const list = au?.users ?? []
+      for (const x of list) emailMap[x.id] = x.email ?? ''
+      if (list.length < 1000) break
+    }
+  } catch { /* 이메일만 빈칸 */ }
+  const users = (profiles ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.display_name,
+    email: emailMap[p.id] ?? null,
+    anon: p.is_anonymous,
+    created: p.created_at,
+    attempts: cnt[p.id] ?? 0,
+    lastActive: last[p.id] ?? null,
+  }))
+  return json({ users })
+}
+
+// 회원 상세 — 응시 이력(시험명 포함).
+async function cbtUserDetail(admin: any, body: any) {
+  const uid = body?.userId
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  const { data: atts } = await admin
+    .from('exam_attempts')
+    .select('id, exam_id, status, total_correct, total_questions, submitted_at, created_at')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  const examIds = [...new Set((atts ?? []).map((a: any) => a.exam_id).filter(Boolean))]
+  const titleMap: Record<string, string> = {}
+  if (examIds.length) {
+    const { data: ex } = await admin.from('exams').select('id, title').in('id', examIds)
+    for (const e of ex ?? []) titleMap[(e as any).id] = (e as any).title
+  }
+  const attempts = (atts ?? []).map((a: any) => ({
+    id: a.id,
+    examTitle: a.exam_id ? titleMap[a.exam_id] ?? null : null,
+    status: a.status,
+    totalCorrect: a.total_correct,
+    totalQuestions: a.total_questions,
+    submittedAt: a.submitted_at,
+    createdAt: a.created_at,
+  }))
+  return json({ attempts })
 }
 
 Deno.serve(async (req) => {
@@ -753,7 +921,9 @@ Deno.serve(async (req) => {
       case 'questionRestore': return await questionRestore(admin, body, email)
       case 'questionEvents': return await questionEvents(admin, body)
       case 'questionsImport': return await questionsImport(admin, body, email)
-      case 'cbtOverview': return await cbtOverview(admin)
+      case 'cbtAnalytics': return await cbtAnalytics(admin)
+      case 'cbtUsers': return await cbtUsers(admin)
+      case 'cbtUserDetail': return await cbtUserDetail(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {
