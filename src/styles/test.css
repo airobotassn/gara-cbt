@@ -110,7 +110,7 @@
   color: var(--on-accent);
 }
 .opt .lab {
-  font-size: clamp(16px, 1.9vw, 17.5px);
+  font-size: clamp(17px, 2.3vw, 19px);
   min-width: 0;
   flex: 1;
   overflow-wrap: break-word;
