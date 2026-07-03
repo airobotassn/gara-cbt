@@ -464,6 +464,28 @@ async function examRoundDelete(admin: any, body: any) {
   return json({ ok: true })
 }
 
+// ---------- 응시료(exam_fees) — 금액만 편집 ----------
+async function examFeeList(admin: any) {
+  const { data, error } = await admin.from('exam_fees').select('key, amount').order('key', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+  return json({ fees: data ?? [] })
+}
+
+async function examFeeSave(admin: any, body: any) {
+  const items = Array.isArray(body?.fees) ? body.fees : []
+  if (!items.length) return json({ error: 'fees 필요' }, 400)
+  const now = new Date().toISOString()
+  for (const it of items) {
+    const key = String(it?.key ?? '').trim()
+    const n = Number(it?.amount)
+    if (!key || !Number.isFinite(n)) continue
+    const amount = Math.max(0, Math.floor(n))
+    const { error } = await admin.from('exam_fees').upsert({ key, amount, updated_at: now }, { onConflict: 'key' })
+    if (error) return json({ error: error.message }, 400)
+  }
+  return json({ ok: true })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -497,6 +519,8 @@ Deno.serve(async (req) => {
       case 'examRoundUpsert': return await examRoundUpsert(admin, body)
       case 'examRoundReorder': return await examRoundReorder(admin, body)
       case 'examRoundDelete': return await examRoundDelete(admin, body)
+      case 'examFeeList': return await examFeeList(admin)
+      case 'examFeeSave': return await examFeeSave(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

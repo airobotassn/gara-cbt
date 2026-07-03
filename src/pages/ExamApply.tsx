@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { getTracks, SCHEDULE } from '../lib/caris'
+import { getTracks, GRADE_CODES, SCHEDULE } from '../lib/caris'
+import { useExamFees, feeKey } from '../lib/fees'
 
 // 원서접수(앞단 목업) — 회차 선택 후 자격을 고르고 결제까지의 화면 흐름만.
 //   · Pro    = 단일 시험(응시료 1건). 급수는 점수로 판정 → 급수 선택 없음.
@@ -32,7 +33,10 @@ export default function ExamApply() {
   }
   const won = (n: number) => n.toLocaleString('ko-KR')
 
-  const fee = isMaster ? lv.fee ?? 0 : cur.examFee ?? 0
+  // 응시료: DB(exam_fees) 우선, 없으면 caris.ts 기본값 폴백.
+  const { fees } = useExamFees()
+  const fallbackFee = isMaster ? lv.fee ?? 0 : cur.examFee ?? 0
+  const fee = fees[feeKey(isMaster, GRADE_CODES[level])] ?? fallbackFee
   const selLabel = isMaster ? `${cur.name} ${lv.grade}` : `${cur.name} ${t('caris.exam_suffix')}`
 
   return (

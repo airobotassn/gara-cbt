@@ -160,3 +160,13 @@ export interface ExamRoundRow {
 export interface AdminExamRoundListResponse {
   rounds: ExamRoundRow[]
 }
+
+// ---------- 응시료 ----------
+export interface ExamFee {
+  key: string // 'pro' | 'master_g4' | 'master_g3' | 'master_g2' | 'master_g1'
+  amount: number
+}
+
+export interface AdminExamFeeListResponse {
+  fees: ExamFee[]
+}

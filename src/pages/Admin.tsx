@@ -11,6 +11,7 @@ import type {
   FaqRow,
   AdminExamRoundListResponse,
   ExamRoundRow,
+  AdminExamFeeListResponse,
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
@@ -96,7 +97,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'subs' | 'notices' | 'faq' | 'rounds'>('subs')
+  const [sub, setSub] = useState<'subs' | 'notices' | 'faq' | 'rounds' | 'fees'>('subs')
 
   useEffect(() => {
     if (!isFullUser) {
@@ -218,6 +219,9 @@ function CarisExamAdmin() {
         <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
           시험일정
         </button>
+        <button className={sub === 'fees' ? 'on' : ''} onClick={() => setSub('fees')}>
+          응시료
+        </button>
       </div>
       {sub === 'notices' ? (
         <NoticesAdmin />
@@ -225,6 +229,8 @@ function CarisExamAdmin() {
         <FaqAdmin />
       ) : sub === 'rounds' ? (
         <RoundsAdmin />
+      ) : sub === 'fees' ? (
+        <FeesAdmin />
       ) : (
         <>
       <div className="admin-head">
@@ -1326,6 +1332,109 @@ function RoundsAdmin() {
           </div>
         </div>
       )}
+    </>
+  )
+}
+
+// ── 응시료 관리 (exam_fees) ────────────────────────────────────────
+// 급수/과목/합격컷은 코드 고정 — 여기선 "금액"만 편집.
+const FEE_ROWS = [
+  { key: 'pro', label: 'CARIS Pro', sub: '단일 응시료 (점수로 4~1급 판정)' },
+  { key: 'master_g4', label: 'CARIS Master 4급', sub: '' },
+  { key: 'master_g3', label: 'CARIS Master 3급', sub: '' },
+  { key: 'master_g2', label: 'CARIS Master 2급', sub: '' },
+  { key: 'master_g1', label: 'CARIS Master 1급', sub: '' },
+] as const
+
+function FeesAdmin() {
+  const [amounts, setAmounts] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<AdminExamFeeListResponse>('admin', { action: 'examFeeList' })
+      const map: Record<string, number> = {}
+      for (const f of res.fees) map[f.key] = f.amount
+      setAmounts(map)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '응시료를 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function setAmt(key: string, v: string) {
+    const n = Math.max(0, Math.floor(Number(v) || 0))
+    setAmounts((a) => ({ ...a, [key]: n }))
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      const fees = FEE_ROWS.map((r) => ({ key: r.key, amount: amounts[r.key] ?? 0 }))
+      await callFunction('admin', { action: 'examFeeSave', fees })
+      await load()
+      alert('응시료를 저장했습니다.')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const won = (n: number) => (n || 0).toLocaleString('ko-KR')
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>응시료 관리</h1>
+        <div className="admin-head-actions">
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading || saving}>
+            새로고침
+          </button>
+          <button className="exam-btn" onClick={save} disabled={loading || saving}>
+            {saving ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
+        급수 체계·과목·합격 기준은 코드로 고정되어 있고, 여기서는 <b>응시료 금액</b>만 변경합니다. 저장하면 원서접수 화면에 바로 반영됩니다.
+      </p>
+
+      <div className="admin-section" style={{ maxWidth: 500, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {FEE_ROWS.map((r) => (
+          <div key={r.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{r.label}</div>
+              {r.sub && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{r.sub}</div>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  style={{ ...inpStyle, width: 140, textAlign: 'right' }}
+                  value={amounts[r.key] ?? 0}
+                  onChange={(e) => setAmt(r.key, e.target.value)}
+                />
+                <span style={{ color: 'var(--muted)' }}>원</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>₩ {won(amounts[r.key] ?? 0)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </>
   )
 }
