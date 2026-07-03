@@ -541,6 +541,173 @@ async function manageAdmins(
   return json({ admins, candidates })
 }
 
+// ---------- CBT 문항 관리 (목록·이력·엑셀 임포트) ----------
+async function logCbtEvent(
+  admin: any,
+  e: { question_id: string | null; exam_id: string | null; number: number | null; action: string; actor: string; detail?: unknown },
+) {
+  try {
+    await admin.from('cbt_question_events').insert({
+      question_id: e.question_id,
+      exam_id: e.exam_id,
+      number: e.number,
+      action: e.action,
+      actor: e.actor || null,
+      detail: e.detail ?? null,
+    })
+  } catch { /* 로그 실패는 무시 */ }
+}
+
+// 시험 목록 + 각 시험의 문항 수(비삭제)
+async function examListForAdmin(admin: any) {
+  const { data, error } = await admin
+    .from('exams')
+    .select('id, slug, title, total_questions, active, created_at')
+    .order('created_at', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+  const exams = data ?? []
+  const counts: Record<string, { total: number; active: number }> = {}
+  for (const ex of exams) {
+    const [t, a] = await Promise.all([
+      admin.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id).is('deleted_at', null),
+      admin.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id).eq('active', true).is('deleted_at', null),
+    ])
+    counts[ex.id] = { total: t.count ?? 0, active: a.count ?? 0 }
+  }
+  return json({ exams: exams.map((ex: any) => ({ ...ex, questionCount: counts[ex.id].total, activeCount: counts[ex.id].active })) })
+}
+
+// 한 시험의 문항 목록(비삭제, 번호순). 관리자에겐 correct_index 포함.
+async function questionList(admin: any, body: any) {
+  const examId = body?.examId
+  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const { data, error } = await admin
+    .from('questions')
+    .select('id, exam_id, number, subject, topic, prompt, choices, correct_index, active')
+    .eq('exam_id', examId)
+    .is('deleted_at', null)
+    .order('number', { ascending: true })
+    .limit(2000)
+  if (error) return json({ error: error.message }, 400)
+  return json({ rows: data ?? [] })
+}
+
+async function questionSetActive(admin: any, body: any, actor: string) {
+  if (!body?.id) return json({ error: 'id 필요' }, 400)
+  const active = !!body.active
+  const { data: before } = await admin.from('questions').select('exam_id, number').eq('id', body.id).maybeSingle()
+  const { error } = await admin.from('questions').update({ active }).eq('id', body.id)
+  if (error) return json({ error: error.message }, 400)
+  await logCbtEvent(admin, { question_id: body.id, exam_id: before?.exam_id ?? null, number: before?.number ?? null, action: active ? 'activate' : 'deactivate', actor })
+  return json({ ok: true })
+}
+
+async function questionDelete(admin: any, body: any, actor: string) {
+  if (!body?.id) return json({ error: 'id 필요' }, 400)
+  const { data: before } = await admin.from('questions').select('exam_id, number').eq('id', body.id).maybeSingle()
+  const { error } = await admin.from('questions').update({ deleted_at: new Date().toISOString(), active: false }).eq('id', body.id)
+  if (error) return json({ error: error.message }, 400)
+  await logCbtEvent(admin, { question_id: body.id, exam_id: before?.exam_id ?? null, number: before?.number ?? null, action: 'delete', actor })
+  return json({ ok: true })
+}
+
+async function questionRestore(admin: any, body: any, actor: string) {
+  if (!body?.id) return json({ error: 'id 필요' }, 400)
+  const { data: before } = await admin.from('questions').select('exam_id, number').eq('id', body.id).maybeSingle()
+  const { error } = await admin.from('questions').update({ active: true, deleted_at: null }).eq('id', body.id)
+  if (error) return json({ error: error.message }, 400)
+  await logCbtEvent(admin, { question_id: body.id, exam_id: before?.exam_id ?? null, number: before?.number ?? null, action: 'restore', actor })
+  return json({ ok: true })
+}
+
+// 변경 이력(최신순). examId 필터 + 각 이벤트에 현재 복구가능 여부.
+async function questionEvents(admin: any, body: any) {
+  let q = admin
+    .from('cbt_question_events')
+    .select('id, question_id, exam_id, number, action, actor, detail, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000)
+  if (body?.examId) q = q.eq('exam_id', body.examId)
+  const { data, error } = await q
+  if (error) return json({ error: error.message }, 400)
+  const events = data ?? []
+  const ids = [...new Set(events.map((e: any) => e.question_id).filter(Boolean))]
+  const statusById: Record<string, { active: boolean; deleted: boolean }> = {}
+  if (ids.length) {
+    const { data: qs } = await admin.from('questions').select('id, active, deleted_at').in('id', ids)
+    for (const r of qs ?? []) statusById[r.id] = { active: !!r.active, deleted: r.deleted_at != null }
+  }
+  const withStatus = events.map((e: any) => {
+    const st = e.question_id ? statusById[e.question_id] : undefined
+    return { ...e, restorable: !!st && (!st.active || st.deleted) }
+  })
+  return json({ events: withStatus })
+}
+
+// 엑셀 임포트 — rows[] 를 (exam_id, number) 기준 upsert. 재임포트 시 갱신.
+async function questionsImport(admin: any, body: any, actor: string) {
+  const examId = body?.examId
+  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const rows = Array.isArray(body?.rows) ? body.rows : []
+  if (!rows.length) return json({ error: '가져올 문항이 없습니다.' }, 400)
+
+  const payload: any[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    const number = Math.floor(Number(r?.number))
+    if (!Number.isFinite(number) || number < 1) return json({ error: `#${i + 1}행: 번호 오류` }, 400)
+    const subject = String(r?.subject ?? '').trim()
+    const topic = String(r?.topic ?? '').trim()
+    const prompt = String(r?.prompt ?? '').trim()
+    const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c ?? '').trim()) : []
+    if (!subject || !prompt) return json({ error: `#${i + 1}행(번호 ${number}): 과목·지문은 필수` }, 400)
+    if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: `#${i + 1}행(번호 ${number}): 보기 4개가 모두 필요` }, 400)
+    const ci = Math.floor(Number(r?.correctIndex))
+    if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: `#${i + 1}행(번호 ${number}): 정답(1~4) 오류` }, 400)
+    payload.push({ exam_id: examId, number, subject, topic, prompt, choices, correct_index: ci, active: true, deleted_at: null })
+  }
+  // 행 내 번호 중복 검사
+  const nums = payload.map((p) => p.number)
+  const dup = nums.find((n, i) => nums.indexOf(n) !== i)
+  if (dup != null) return json({ error: `번호 ${dup} 가 파일 안에서 중복됩니다.` }, 400)
+
+  const { data, error } = await admin.from('questions').upsert(payload, { onConflict: 'exam_id,number' }).select('id')
+  if (error) return json({ error: error.message }, 400)
+  await logCbtEvent(admin, { question_id: null, exam_id: examId, number: null, action: 'import', actor, detail: { count: payload.length } })
+  return json({ ok: true, count: data?.length ?? payload.length })
+}
+
+// 대시보드 개요 — CBT 운영 현황 카드.
+async function cbtOverview(admin: any) {
+  const since7 = new Date(Date.now() - 7 * 864e5).toISOString()
+  const [u, exAll, exActive, subAll, sub7, qTot, qActive] = await Promise.all([
+    admin.from('profiles').select('id', { count: 'exact', head: true }),
+    admin.from('exams').select('id', { count: 'exact', head: true }),
+    admin.from('exams').select('id', { count: 'exact', head: true }).eq('active', true),
+    admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
+    admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted').gte('submitted_at', since7),
+    admin.from('questions').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+    admin.from('questions').select('id', { count: 'exact', head: true }).eq('active', true).is('deleted_at', null),
+  ])
+  // 시험별 문항 수
+  const { data: exams } = await admin.from('exams').select('id, title, slug, active').order('created_at', { ascending: true })
+  const perExam: any[] = []
+  for (const ex of exams ?? []) {
+    const c = await admin.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id).eq('active', true).is('deleted_at', null)
+    perExam.push({ title: ex.title, slug: ex.slug, active: ex.active, questions: c.count ?? 0 })
+  }
+  return json({
+    users: u.count ?? 0,
+    examsAll: exAll.count ?? 0,
+    examsActive: exActive.count ?? 0,
+    attemptsAll: subAll.count ?? 0,
+    attempts7d: sub7.count ?? 0,
+    questions: qTot.count ?? 0,
+    questionsActive: qActive.count ?? 0,
+    perExam,
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -579,6 +746,14 @@ Deno.serve(async (req) => {
       case 'examRoundDelete': return await examRoundDelete(admin, body)
       case 'examFeeList': return await examFeeList(admin)
       case 'examFeeSave': return await examFeeSave(admin, body)
+      case 'examListForAdmin': return await examListForAdmin(admin)
+      case 'questionList': return await questionList(admin, body)
+      case 'questionSetActive': return await questionSetActive(admin, body, email)
+      case 'questionDelete': return await questionDelete(admin, body, email)
+      case 'questionRestore': return await questionRestore(admin, body, email)
+      case 'questionEvents': return await questionEvents(admin, body)
+      case 'questionsImport': return await questionsImport(admin, body, email)
+      case 'cbtOverview': return await cbtOverview(admin)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

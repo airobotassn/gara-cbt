@@ -170,3 +170,68 @@ export interface ExamFee {
 export interface AdminExamFeeListResponse {
   fees: ExamFee[]
 }
+
+// ---------- CBT 문항 관리 ----------
+export interface AdminExamItem {
+  id: string
+  slug: string
+  title: string
+  total_questions: number
+  active: boolean
+  questionCount: number
+  activeCount: number
+}
+export interface AdminExamListResp {
+  exams: AdminExamItem[]
+}
+
+export interface AdminQuestionRow {
+  id: string
+  exam_id: string
+  number: number
+  subject: string
+  topic: string
+  prompt: string
+  choices: string[]
+  correct_index: number
+  active: boolean
+}
+export interface AdminQuestionListResp {
+  rows: AdminQuestionRow[]
+}
+
+export interface AdminQuestionEvent {
+  id: string
+  question_id: string | null
+  exam_id: string | null
+  number: number | null
+  action: string
+  actor: string | null
+  detail: unknown
+  created_at: string
+  restorable: boolean
+}
+export interface AdminQuestionEventsResp {
+  events: AdminQuestionEvent[]
+}
+
+// 엑셀 임포트로 보낼 한 문항
+export interface QuestionImportRow {
+  number: number
+  subject: string
+  topic: string
+  prompt: string
+  choices: string[]
+  correctIndex: number
+}
+
+export interface CbtOverviewResp {
+  users: number
+  examsAll: number
+  examsActive: number
+  attemptsAll: number
+  attempts7d: number
+  questions: number
+  questionsActive: number
+  perExam: { title: string; slug: string; active: boolean; questions: number }[]
+}

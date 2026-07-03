@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import type {
@@ -12,6 +13,14 @@ import type {
   AdminExamRoundListResponse,
   ExamRoundRow,
   AdminExamFeeListResponse,
+  AdminExamListResp,
+  AdminExamItem,
+  AdminQuestionListResp,
+  AdminQuestionRow,
+  AdminQuestionEventsResp,
+  AdminQuestionEvent,
+  QuestionImportRow,
+  CbtOverviewResp,
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
@@ -97,7 +106,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'subs' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
+  const [sub, setSub] = useState<'dash' | 'subs' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
   const [isRoot, setIsRoot] = useState(false)
 
   useEffect(() => {
@@ -210,9 +219,15 @@ function CarisExamAdmin() {
 
   return (
     <div className="wrap admin-cbt">
-      <div className="admin-tabs" style={{ marginBottom: 18 }}>
+      <div className="admin-tabs" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
+        <button className={sub === 'dash' ? 'on' : ''} onClick={() => setSub('dash')}>
+          대시보드
+        </button>
         <button className={sub === 'subs' ? 'on' : ''} onClick={() => setSub('subs')}>
           제출 답안
+        </button>
+        <button className={sub === 'questions' ? 'on' : ''} onClick={() => setSub('questions')}>
+          문항
         </button>
         <button className={sub === 'notices' ? 'on' : ''} onClick={() => setSub('notices')}>
           공지사항
@@ -232,7 +247,11 @@ function CarisExamAdmin() {
           </button>
         )}
       </div>
-      {sub === 'notices' ? (
+      {sub === 'dash' ? (
+        <DashboardAdmin />
+      ) : sub === 'questions' ? (
+        <QuestionsAdmin />
+      ) : sub === 'notices' ? (
         <NoticesAdmin />
       ) : sub === 'faq' ? (
         <FaqAdmin />
@@ -1595,6 +1614,530 @@ function AdminAccountsAdmin() {
           </tbody>
         </table>
       </div>
+    </>
+  )
+}
+
+// ── 대시보드 (운영 현황) ───────────────────────────────────────────
+function DashboardAdmin() {
+  const [ov, setOv] = useState<CbtOverviewResp | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      setOv(await callFunction<CbtOverviewResp>('admin', { action: 'cbtOverview' }))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '불러오기 실패')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const cards = ov
+    ? [
+        { label: '회원 수', value: ov.users },
+        { label: '시험 (활성/전체)', value: `${ov.examsActive} / ${ov.examsAll}` },
+        { label: '총 제출', value: ov.attemptsAll },
+        { label: '최근 7일 제출', value: ov.attempts7d },
+        { label: '문항 (활성/전체)', value: `${ov.questionsActive} / ${ov.questions}` },
+      ]
+    : []
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>대시보드</h1>
+        <div className="admin-head-actions">
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+        </div>
+      </div>
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+      {loading && !ov && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
+      {ov && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
+            {cards.map((c) => (
+              <div key={c.label} className="admin-section" style={{ padding: 16 }}>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>{c.label}</div>
+                <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{c.value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="admin-head" style={{ marginTop: 8 }}>
+            <h1 style={{ fontSize: 18 }}>시험별 활성 문항</h1>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>시험</th>
+                  <th>slug</th>
+                  <th>상태</th>
+                  <th style={{ textAlign: 'right' }}>활성 문항</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ov.perExam.map((e) => (
+                  <tr key={e.slug}>
+                    <td>{e.title}</td>
+                    <td style={{ color: 'var(--muted)' }}>{e.slug}</td>
+                    <td>
+                      <span className={`admin-badge st-${e.active ? 'submitted' : 'voided'}`}>{e.active ? '활성' : '비활성'}</span>
+                    </td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{e.questions}</td>
+                  </tr>
+                ))}
+                {!ov.perExam.length && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
+                      등록된 시험이 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+// ── 문항 관리 (목록 · 이력 · 엑셀 업로드) ──────────────────────────
+function QuestionsAdmin() {
+  const [exams, setExams] = useState<AdminExamItem[]>([])
+  const [examId, setExamId] = useState<string>('')
+  const [view, setView] = useState<'list' | 'events' | 'import'>('list')
+
+  const loadExams = useCallback(async () => {
+    try {
+      const r = await callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' })
+      setExams(r.exams)
+      setExamId((cur) => cur || r.exams[0]?.id || '')
+    } catch {
+      /* 무시 */
+    }
+  }, [])
+  useEffect(() => {
+    loadExams()
+  }, [loadExams])
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>문항 관리</h1>
+        <div className="admin-head-actions">
+          <select style={{ ...inpStyle, minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
+            {exams.length === 0 && <option value="">시험 없음</option>}
+            {exams.map((ex) => (
+              <option key={ex.id} value={ex.id}>
+                {ex.title} ({ex.activeCount}/{ex.questionCount})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="admin-tabs" style={{ marginBottom: 16 }}>
+        <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
+          문항 목록
+        </button>
+        <button className={view === 'events' ? 'on' : ''} onClick={() => setView('events')}>
+          문항 이력
+        </button>
+        <button className={view === 'import' ? 'on' : ''} onClick={() => setView('import')}>
+          엑셀 업로드
+        </button>
+      </div>
+
+      {!examId ? (
+        <div className="admin-section admin-empty">등록된 시험이 없습니다. 먼저 시험(exams)을 만들어 주세요.</div>
+      ) : view === 'list' ? (
+        <QuestionListView examId={examId} onChanged={loadExams} />
+      ) : view === 'events' ? (
+        <QuestionEventsView examId={examId} onChanged={loadExams} />
+      ) : (
+        <QuestionImportView examId={examId} onImported={loadExams} />
+      )}
+    </>
+  )
+}
+
+function QuestionListView({ examId, onChanged }: { examId: string; onChanged: () => void }) {
+  const [rows, setRows] = useState<AdminQuestionRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const r = await callFunction<AdminQuestionListResp>('admin', { action: 'questionList', examId })
+      setRows(r.rows)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '불러오기 실패')
+    } finally {
+      setLoading(false)
+    }
+  }, [examId])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function act(action: string, id: string, extra?: object) {
+    setBusy(true)
+    try {
+      await callFunction('admin', { action, id, ...extra })
+      await load()
+      onChanged()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '처리 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="admin-head" style={{ marginTop: 0 }}>
+        <span className="admin-count">총 {rows.length}문항</span>
+        <div className="admin-head-actions">
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+        </div>
+      </div>
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>과목 / 토픽</th>
+              <th>지문</th>
+              <th>정답</th>
+              <th>상태</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((q) => (
+              <tr key={q.id} style={{ opacity: q.active ? 1 : 0.55 }}>
+                <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{q.number}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <b>{q.subject}</b>
+                  {q.topic ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>{q.topic}</div> : null}
+                </td>
+                <td style={{ maxWidth: 380 }}>{q.prompt}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{q.correct_index + 1}번</td>
+                <td>
+                  <span className={`admin-badge st-${q.active ? 'submitted' : 'voided'}`}>{q.active ? '활성' : '비활성'}</span>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="exam-btn-ghost sm" disabled={busy} onClick={() => act('questionSetActive', q.id, { active: !q.active })}>
+                    {q.active ? '비활성' : '활성'}
+                  </button>
+                  <button
+                    className="exam-btn-ghost sm"
+                    style={{ marginLeft: 6 }}
+                    disabled={busy}
+                    onClick={() => {
+                      if (confirm(`${q.number}번 문항을 삭제할까요? (이력에서 복구 가능)`)) act('questionDelete', q.id)
+                    }}
+                  >
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && !loading && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  문항이 없습니다. “엑셀 업로드”로 추가하세요.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+const CBT_EVENT_LABEL: Record<string, string> = {
+  import: '가져오기',
+  edit: '수정',
+  activate: '활성화',
+  deactivate: '비활성화',
+  delete: '삭제',
+  restore: '복구',
+}
+
+function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: () => void }) {
+  const [events, setEvents] = useState<AdminQuestionEvent[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await callFunction<AdminQuestionEventsResp>('admin', { action: 'questionEvents', examId })
+      setEvents(r.events)
+    } catch {
+      /* 무시 */
+    } finally {
+      setLoading(false)
+    }
+  }, [examId])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function restore(id: string) {
+    setBusy(true)
+    try {
+      await callFunction('admin', { action: 'questionRestore', id })
+      await load()
+      onChanged()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '복구 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="admin-head" style={{ marginTop: 0 }}>
+        <span className="admin-count">{events.length}건</span>
+        <div className="admin-head-actions">
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+        </div>
+      </div>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>일시</th>
+              <th>작업</th>
+              <th>문항</th>
+              <th>담당</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((e) => (
+              <tr key={e.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(e.created_at)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {CBT_EVENT_LABEL[e.action] ?? e.action}
+                  {e.action === 'import' && e.detail ? ` (${(e.detail as { count?: number }).count ?? ''})` : ''}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>{e.number != null ? `${e.number}번` : '-'}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{e.actor ?? '-'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {e.restorable && e.question_id ? (
+                    <button className="exam-btn-ghost sm" disabled={busy} onClick={() => restore(e.question_id as string)}>
+                      복구
+                    </button>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+            {!events.length && !loading && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  변경 이력이 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function QuestionImportView({ examId, onImported }: { examId: string; onImported: () => void }) {
+  const [fileName, setFileName] = useState('')
+  const [rows, setRows] = useState<QuestionImportRow[]>([])
+  const [parseErr, setParseErr] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  function parseCorrect(v: unknown, choices: string[]): number {
+    const s = String(v ?? '').trim()
+    const n = Number(s)
+    if (Number.isFinite(n) && n >= 1 && n <= 4) return n - 1
+    const idx = choices.findIndex((c) => c && c === s)
+    return idx // 못 찾으면 -1
+  }
+
+  function handleFile(file: File) {
+    setFileName(file.name)
+    setMsg('')
+    setParseErr('')
+    setRows([])
+    const r = new FileReader()
+    r.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target?.result, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const aoa = XLSX.utils
+          .sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
+          .filter((row) => row.some((c) => String(c).trim() !== ''))
+        if (aoa.length < 2) {
+          setParseErr('데이터 행이 없습니다. (첫 행은 머리글)')
+          return
+        }
+        const out: QuestionImportRow[] = []
+        for (let i = 1; i < aoa.length; i++) {
+          const row = aoa[i]
+          const choices = [row[4], row[5], row[6], row[7]].map((c) => String(c ?? '').trim())
+          out.push({
+            number: Math.floor(Number(row[0])) || i,
+            subject: String(row[1] ?? '').trim(),
+            topic: String(row[2] ?? '').trim(),
+            prompt: String(row[3] ?? '').trim(),
+            choices,
+            correctIndex: parseCorrect(row[8], choices),
+          })
+        }
+        setRows(out)
+      } catch (err) {
+        setParseErr(err instanceof Error ? err.message : '엑셀을 읽지 못했습니다.')
+      }
+    }
+    r.readAsArrayBuffer(file)
+  }
+
+  function downloadTemplate() {
+    const header = ['번호', '과목', '토픽', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)']
+    const sample = [1, '전기자기학 · 정전계', '전위', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2]
+    const ws = XLSX.utils.aoa_to_sheet([header, sample])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '문항')
+    XLSX.writeFile(wb, 'cbt_문항_템플릿.xlsx')
+  }
+
+  const problems = rows
+    .map((r, i) => {
+      if (!r.subject || !r.prompt) return `${i + 2}행: 과목/지문 비어있음`
+      if (r.choices.length !== 4 || r.choices.some((c) => !c)) return `${i + 2}행(번호 ${r.number}): 보기 4개 필요`
+      if (r.correctIndex < 0 || r.correctIndex > 3) return `${i + 2}행(번호 ${r.number}): 정답(1~4) 확인`
+      return ''
+    })
+    .filter(Boolean)
+
+  async function doImport() {
+    if (!rows.length) return
+    if (problems.length) {
+      setMsg('오류를 먼저 해결하세요: ' + problems[0])
+      return
+    }
+    setImporting(true)
+    setMsg('')
+    try {
+      const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', examId, rows })
+      setMsg(`✅ ${res.count}문항 반영됨`)
+      setRows([])
+      setFileName('')
+      onImported()
+    } catch (e) {
+      setMsg('실패: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <>
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
+        엑셀 열 순서: <b>번호 · 과목 · 토픽 · 지문 · 보기1~4 · 정답(1~4)</b>. 첫 행은 머리글로 건너뜁니다. 같은 번호가 이미 있으면 <b>덮어씁니다</b>(재업로드 = 수정).
+      </p>
+      <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <label className="exam-btn-ghost sm" style={{ cursor: 'pointer' }}>
+          엑셀 선택
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleFile(f)
+              e.target.value = ''
+            }}
+          />
+        </label>
+        <button className="exam-btn-ghost sm" onClick={downloadTemplate}>
+          템플릿 다운로드
+        </button>
+        {fileName && (
+          <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+            {fileName} · {rows.length}행
+          </span>
+        )}
+        {rows.length > 0 && (
+          <button className="exam-btn" onClick={doImport} disabled={importing || problems.length > 0}>
+            {importing ? '반영 중…' : `${rows.length}문항 반영`}
+          </button>
+        )}
+        {msg && <span style={{ fontSize: 13 }}>{msg}</span>}
+      </div>
+      {parseErr && <div className="admin-section admin-empty">엑셀 오류 — {parseErr}</div>}
+      {problems.length > 0 && (
+        <div className="admin-section admin-empty" style={{ marginBottom: 14 }}>
+          ⚠️ {problems.length}개 행에 문제: {problems.slice(0, 5).join(' / ')}
+          {problems.length > 5 ? ' …' : ''}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>과목/토픽</th>
+                <th>지문</th>
+                <th>보기</th>
+                <th>정답</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 100).map((r, i) => (
+                <tr key={i}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{r.number}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <b>{r.subject}</b>
+                    {r.topic ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.topic}</div> : null}
+                  </td>
+                  <td style={{ maxWidth: 320 }}>{r.prompt}</td>
+                  <td style={{ maxWidth: 260, fontSize: 12.5, color: 'var(--muted)' }}>{r.choices.join(' / ')}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length > 100 && (
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+              미리보기는 100행까지 · 실제로는 {rows.length}행 모두 반영됩니다.
+            </p>
+          )}
+        </div>
+      )}
     </>
   )
 }
