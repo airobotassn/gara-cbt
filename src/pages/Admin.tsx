@@ -97,15 +97,19 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'subs' | 'notices' | 'faq' | 'rounds' | 'fees'>('subs')
+  const [sub, setSub] = useState<'subs' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
+  const [isRoot, setIsRoot] = useState(false)
 
   useEffect(() => {
     if (!isFullUser) {
       setState('checking')
       return
     }
-    callFunction('admin', { action: 'me' })
-      .then(() => setState('ok'))
+    callFunction<{ ok: boolean; isRoot?: boolean }>('admin', { action: 'me' })
+      .then((r) => {
+        setIsRoot(!!r.isRoot)
+        setState('ok')
+      })
       .catch(() => setState('denied'))
   }, [isFullUser])
 
@@ -222,6 +226,11 @@ function CarisExamAdmin() {
         <button className={sub === 'fees' ? 'on' : ''} onClick={() => setSub('fees')}>
           응시료
         </button>
+        {isRoot && (
+          <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
+            관리자 관리
+          </button>
+        )}
       </div>
       {sub === 'notices' ? (
         <NoticesAdmin />
@@ -231,6 +240,8 @@ function CarisExamAdmin() {
         <RoundsAdmin />
       ) : sub === 'fees' ? (
         <FeesAdmin />
+      ) : sub === 'admins' ? (
+        <AdminAccountsAdmin />
       ) : (
         <>
       <div className="admin-head">
@@ -1434,6 +1445,155 @@ function FeesAdmin() {
             </div>
           </div>
         ))}
+      </div>
+    </>
+  )
+}
+
+// ── 관리자 계정 관리 (루트 전용) ──────────────────────────────────
+// admin_users 는 CBT·레벨테스트 공용 → 여기서 추가하면 양쪽 관리자 권한이 함께 부여됨.
+interface AdminAccountRow {
+  email: string
+  role: 'root' | 'admin'
+  added_by: string | null
+  created_at: string | null
+}
+
+function AdminAccountsAdmin() {
+  const [rows, setRows] = useState<AdminAccountRow[] | null>(null)
+  const [candidates, setCandidates] = useState<string[]>([])
+  const [email, setEmail] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const r = await callFunction<{ admins: AdminAccountRow[]; candidates?: string[] }>('admin', { action: 'admins' })
+      setRows(r.admins)
+      setCandidates(r.candidates ?? [])
+    } catch (e) {
+      setMsg('불러오기 실패: ' + (e instanceof Error ? e.message : String(e)))
+      setRows([])
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function add() {
+    const t = email.trim().toLowerCase()
+    if (!t) return
+    setBusy(true)
+    setMsg('')
+    try {
+      const r = await callFunction<{ admins: AdminAccountRow[]; candidates?: string[] }>('admin', { action: 'addAdmin', email: t })
+      setRows(r.admins)
+      setCandidates(r.candidates ?? [])
+      setEmail('')
+      setMsg(`✅ ${t} 추가됨`)
+    } catch (e) {
+      setMsg('실패: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function remove(target: string) {
+    if (!confirm(`${target} 을(를) 관리자에서 삭제할까요?`)) return
+    setBusy(true)
+    setMsg('')
+    try {
+      const r = await callFunction<{ admins: AdminAccountRow[]; candidates?: string[] }>('admin', { action: 'removeAdmin', email: target })
+      setRows(r.admins)
+      setCandidates(r.candidates ?? [])
+      setMsg(`🗑 ${target} 삭제됨`)
+    } catch (e) {
+      setMsg('실패: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>관리자 관리</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">{rows ? `${rows.length}명` : ''}</span>
+          <button className="exam-btn-ghost sm" onClick={load} disabled={busy}>
+            새로고침
+          </button>
+        </div>
+      </div>
+
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
+        이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·레벨테스트 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
+      </p>
+
+      <div className="admin-section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        <input
+          list="cbt-admin-candidates"
+          style={{ ...inpStyle, width: 280 }}
+          placeholder="가입 유저 이메일 선택/입력"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') add()
+          }}
+        />
+        <datalist id="cbt-admin-candidates">
+          {candidates.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+        <button className="exam-btn" onClick={add} disabled={busy || !email.trim()}>
+          추가
+        </button>
+        <span style={{ color: 'var(--muted)', fontSize: 13 }}>지정 가능 {candidates.length}명</span>
+        {msg && <span style={{ fontSize: 13 }}>{msg}</span>}
+      </div>
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>이메일</th>
+              <th>권한</th>
+              <th>추가한 사람</th>
+              <th>추가일</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(rows ?? []).map((a) => (
+              <tr key={a.email}>
+                <td>{a.email}</td>
+                <td>
+                  <span className={`admin-badge st-${a.role === 'root' ? 'submitted' : 'in_progress'}`}>
+                    {a.role === 'root' ? '루트' : '관리자'}
+                  </span>
+                </td>
+                <td>{a.added_by ?? '-'}</td>
+                <td>{fmtDT(a.created_at)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {a.role === 'root' ? (
+                    <span style={{ color: 'var(--muted)' }}>삭제 불가</span>
+                  ) : (
+                    <button className="exam-btn-ghost sm" onClick={() => remove(a.email)} disabled={busy}>
+                      삭제
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows && rows.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  관리자 목록이 비어 있습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </>
   )
