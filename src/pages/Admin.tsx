@@ -1072,7 +1072,7 @@ function RoundsAdmin() {
           sort: draft.sort,
           published: draft.published,
           titleI18n: draft.titleI18n,
-          noteI18n: draft.noteI18n,
+          noteI18n: isReg ? {} : draft.noteI18n,
           examDate: isReg ? draft.examDate || null : null,
           applyStartAt: isReg && draft.applyStart ? `${draft.applyStart}T00:00:00` : null,
           applyEndAt: isReg && draft.applyEnd ? `${draft.applyEnd}T23:59:59` : null,
@@ -1291,19 +1291,22 @@ function RoundsAdmin() {
                 </p>
               )}
 
-              <label style={fieldStyle}>
-                부가 설명 <em style={{ color: 'var(--muted)' }}>(한국어 · 선택{draft.kind === 'rolling' ? ' · 상시 안내문' : ''})</em>
-                <textarea
-                  rows={3}
-                  style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
-                  value={draft.noteI18n.ko ?? ''}
-                  onChange={(e) => patchField('noteI18n', e.target.value)}
-                  placeholder={draft.kind === 'rolling' ? '예: 원하는 날짜를 예약해 온라인(CBT)으로 응시합니다.' : '선택 입력'}
-                />
-              </label>
+              {/* 설명은 상시시험 카드에만 표시됨 → 상시일 때만 입력 */}
+              {!isReg && (
+                <label style={fieldStyle}>
+                  설명 <em style={{ color: 'var(--muted)' }}>(한국어 · 카드에 표시)</em>
+                  <textarea
+                    rows={3}
+                    style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
+                    value={draft.noteI18n.ko ?? ''}
+                    onChange={(e) => patchField('noteI18n', e.target.value)}
+                    placeholder="예: 원하는 날짜를 예약해 온라인(CBT)으로 응시합니다."
+                  />
+                </label>
+              )}
 
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-                🌐 회차명·설명은 저장 시 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다. 날짜는 화면 언어에 맞게 자동 표기됩니다.
+                🌐 {isReg ? '회차명은' : '회차명·설명은'} 저장 시 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다. 날짜는 화면 언어에 맞게 자동 표기됩니다.
               </p>
               {isReg && (
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
