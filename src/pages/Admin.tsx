@@ -9,6 +9,8 @@ import type {
   NoticeRow,
   AdminFaqListResponse,
   FaqRow,
+  AdminExamRoundListResponse,
+  ExamRoundRow,
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
@@ -94,7 +96,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'subs' | 'notices' | 'faq'>('subs')
+  const [sub, setSub] = useState<'subs' | 'notices' | 'faq' | 'rounds'>('subs')
 
   useEffect(() => {
     if (!isFullUser) {
@@ -213,11 +215,16 @@ function CarisExamAdmin() {
         <button className={sub === 'faq' ? 'on' : ''} onClick={() => setSub('faq')}>
           FAQ
         </button>
+        <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
+          시험일정
+        </button>
       </div>
       {sub === 'notices' ? (
         <NoticesAdmin />
       ) : sub === 'faq' ? (
         <FaqAdmin />
+      ) : sub === 'rounds' ? (
+        <RoundsAdmin />
       ) : (
         <>
       <div className="admin-head">
@@ -963,6 +970,346 @@ function FaqAdmin() {
                 🌐 저장하면 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역되어 올라갑니다.
                 (한국어 원문 기준 · 수정 후 저장하면 다시 번역)
               </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button className="exam-btn-ghost" onClick={() => setDraft(null)} disabled={saving}>
+                취소
+              </button>
+              <button className="exam-btn" onClick={save} disabled={saving}>
+                {saving ? '저장 중…' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── 시험 일정/회차 관리 (exam_rounds) ──────────────────────────────
+const ROUND_KINDS = ['regular', 'rolling'] as const
+const ROUND_KIND_LABEL: Record<string, string> = { regular: '정기시험', rolling: '상시시험' }
+
+interface RoundDraft {
+  id?: string
+  kind: 'regular' | 'rolling'
+  sort: number
+  published: boolean
+  titleI18n: I18nText
+  noteI18n: I18nText
+  examDate: string // YYYY-MM-DD
+  applyStart: string // YYYY-MM-DD
+  applyEnd: string // YYYY-MM-DD
+}
+
+function emptyRoundDraft(kind: 'regular' | 'rolling'): RoundDraft {
+  return { kind, sort: 9999, published: true, titleI18n: {}, noteI18n: {}, examDate: '', applyStart: '', applyEnd: '' }
+}
+
+function RoundsAdmin() {
+  const [rows, setRows] = useState<ExamRoundRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [draft, setDraft] = useState<RoundDraft | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [kindFilter, setKindFilter] = useState<'regular' | 'rolling'>('regular')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<AdminExamRoundListResponse>('admin', { action: 'examRoundList' })
+      setRows(res.rounds)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '시험 일정을 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function openNew() {
+    setDraft(emptyRoundDraft(kindFilter))
+  }
+  function openEdit(r: ExamRoundRow) {
+    setDraft({
+      id: r.id,
+      kind: r.kind,
+      sort: r.sort,
+      published: r.published,
+      titleI18n: { ...r.titleI18n },
+      noteI18n: { ...r.noteI18n },
+      examDate: r.examDate ?? '',
+      applyStart: r.applyStartAt ? r.applyStartAt.slice(0, 10) : '',
+      applyEnd: r.applyEndAt ? r.applyEndAt.slice(0, 10) : '',
+    })
+  }
+  function patch(p: Partial<RoundDraft>) {
+    setDraft((d) => (d ? { ...d, ...p } : d))
+  }
+  function patchField(k: 'titleI18n' | 'noteI18n', v: string) {
+    setDraft((d) => (d ? { ...d, [k]: { ...d[k], ko: v } } : d))
+  }
+
+  async function save() {
+    if (!draft) return
+    if (!draft.titleI18n.ko?.trim()) {
+      alert('한국어 회차명은 필수입니다.')
+      return
+    }
+    const isReg = draft.kind === 'regular'
+    setSaving(true)
+    try {
+      const res = await callFunction<{ translateWarning?: string | null }>('admin', {
+        action: 'examRoundUpsert',
+        round: {
+          id: draft.id,
+          kind: draft.kind,
+          sort: draft.sort,
+          published: draft.published,
+          titleI18n: draft.titleI18n,
+          noteI18n: draft.noteI18n,
+          examDate: isReg ? draft.examDate || null : null,
+          applyStartAt: isReg && draft.applyStart ? `${draft.applyStart}T00:00:00` : null,
+          applyEndAt: isReg && draft.applyEnd ? `${draft.applyEnd}T23:59:59` : null,
+        },
+      })
+      setDraft(null)
+      await load()
+      if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  async function remove(r: ExamRoundRow) {
+    if (!confirm(`"${r.titleI18n.ko ?? ''}" 일정을 삭제할까요?`)) return
+    try {
+      await callFunction('admin', { action: 'examRoundDelete', id: r.id })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+    }
+  }
+
+  // 같은 유형(정기/상시) 안에서 ↑↓ 이동 → 전체 순서 재구성해 서버가 sort 재부여
+  async function move(r: ExamRoundRow, dir: -1 | 1) {
+    const grp = rows.filter((x) => x.kind === r.kind).sort((a, b) => a.sort - b.sort)
+    const idx = grp.findIndex((x) => x.id === r.id)
+    const swap = idx + dir
+    if (swap < 0 || swap >= grp.length) return
+    const g = [...grp]
+    ;[g[idx], g[swap]] = [g[swap], g[idx]]
+    const ids: string[] = []
+    for (const k of ROUND_KINDS) {
+      if (k === r.kind) g.forEach((x) => ids.push(x.id))
+      else rows.filter((x) => x.kind === k).sort((a, b) => a.sort - b.sort).forEach((x) => ids.push(x.id))
+    }
+    setBusy(true)
+    try {
+      await callFunction('admin', { action: 'examRoundReorder', ids })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '순서 변경에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const group = rows.filter((r) => r.kind === kindFilter).sort((a, b) => a.sort - b.sort)
+  const isReg = draft?.kind === 'regular'
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>시험 일정 관리</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">총 {rows.length}건</span>
+          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+          <button className="exam-btn-ghost sm" onClick={openNew}>
+            + 새 일정
+          </button>
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+
+      {/* 유형 버튼 — 정기/상시 나눠 보기 */}
+      <div className="admin-tabs" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
+        {ROUND_KINDS.map((k) => {
+          const count = rows.filter((r) => r.kind === k).length
+          return (
+            <button key={k} className={kindFilter === k ? 'on' : ''} onClick={() => setKindFilter(k)}>
+              {ROUND_KIND_LABEL[k]}
+              {count > 0 && <span style={{ opacity: 0.55, marginLeft: 5 }}>{count}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>상태</th>
+              <th>회차명 (한국어)</th>
+              <th>시험일</th>
+              <th>접수기간</th>
+              <th style={{ textAlign: 'center' }}>순서</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {group.map((r, i) => (
+              <tr key={r.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge st-${r.published ? 'submitted' : 'voided'}`}>
+                    {r.published ? '공개' : '비공개'}
+                  </span>
+                </td>
+                <td>{r.titleI18n.ko || <span style={{ color: 'var(--muted)' }}>(회차명 없음)</span>}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{r.kind === 'rolling' ? '상시' : r.examDate ?? '-'}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 13 }}>
+                  {r.kind === 'rolling'
+                    ? '연중'
+                    : r.applyStartAt || r.applyEndAt
+                      ? `${r.applyStartAt?.slice(0, 10) ?? '?'} ~ ${r.applyEndAt?.slice(0, 10) ?? '?'}`
+                      : '-'}
+                </td>
+                <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                  <button
+                    className="exam-btn-ghost sm"
+                    disabled={busy || i === 0}
+                    onClick={() => move(r, -1)}
+                    aria-label="위로"
+                    title="위로"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="exam-btn-ghost sm"
+                    style={{ marginLeft: 4 }}
+                    disabled={busy || i === group.length - 1}
+                    onClick={() => move(r, 1)}
+                    aria-label="아래로"
+                    title="아래로"
+                  >
+                    ↓
+                  </button>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="exam-btn-ghost sm" onClick={() => openEdit(r)}>
+                    편집
+                  </button>
+                  <button className="exam-btn-ghost sm" style={{ marginLeft: 6 }} onClick={() => remove(r)}>
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!group.length && !loading && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  이 유형의 일정이 없습니다. “+ 새 일정”으로 추가하세요.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {draft && (
+        <div className="admin-modal-bg" onClick={() => !saving && setDraft(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setDraft(null)}>
+              ✕
+            </button>
+            <h2>{draft.id ? '시험 일정 편집' : '새 시험 일정'}</h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <label style={{ ...fieldStyle, flex: 2, minWidth: 140 }}>
+                  유형
+                  <select
+                    style={inpStyle}
+                    value={draft.kind}
+                    onChange={(e) => patch({ kind: e.target.value as 'regular' | 'rolling' })}
+                  >
+                    {ROUND_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {ROUND_KIND_LABEL[k]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, alignSelf: 'flex-end', paddingBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.published}
+                    onChange={(e) => patch({ published: e.target.checked })}
+                  />
+                  공개
+                </label>
+              </div>
+
+              <label style={fieldStyle}>
+                회차명 <em style={{ color: 'var(--error, #d43a3a)' }}>(한국어 · 필수)</em>
+                <input
+                  type="text"
+                  style={inpStyle}
+                  value={draft.titleI18n.ko ?? ''}
+                  onChange={(e) => patchField('titleI18n', e.target.value)}
+                  placeholder="예: 제 5회 정기시험"
+                />
+              </label>
+
+              {isReg ? (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                    시험일
+                    <input type="date" style={inpStyle} value={draft.examDate} onChange={(e) => patch({ examDate: e.target.value })} />
+                  </label>
+                  <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                    접수 시작
+                    <input type="date" style={inpStyle} value={draft.applyStart} onChange={(e) => patch({ applyStart: e.target.value })} />
+                  </label>
+                  <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                    접수 마감
+                    <input type="date" style={inpStyle} value={draft.applyEnd} onChange={(e) => patch({ applyEnd: e.target.value })} />
+                  </label>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0 }}>
+                  상시시험은 시험일·접수기간이 없습니다(연중 접수).
+                </p>
+              )}
+
+              <label style={fieldStyle}>
+                부가 설명 <em style={{ color: 'var(--muted)' }}>(한국어 · 선택{draft.kind === 'rolling' ? ' · 상시 안내문' : ''})</em>
+                <textarea
+                  rows={3}
+                  style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
+                  value={draft.noteI18n.ko ?? ''}
+                  onChange={(e) => patchField('noteI18n', e.target.value)}
+                  placeholder={draft.kind === 'rolling' ? '예: 원하는 날짜를 예약해 온라인(CBT)으로 응시합니다.' : '선택 입력'}
+                />
+              </label>
+
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                🌐 회차명·설명은 저장 시 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다. 날짜는 화면 언어에 맞게 자동 표기됩니다.
+              </p>
+              {isReg && (
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                  ⓘ 접수 시작~마감 기간이면 “접수중”, 시작 전이면 “예정”, 마감 후면 “마감”으로 표시됩니다.
+                </p>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>

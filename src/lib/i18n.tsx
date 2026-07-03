@@ -888,6 +888,8 @@ const D: Record<string, Record<Lang, string>> = {
   "guide.sched_r1_date": { ko: "2027. 03. 20 (토)", en: "Mar 20, 2027 (Sat)", ja: "2027. 03. 20 (土)", zh: "2027. 03. 20 (周六)", hi: "20 मार्च 2027 (शनि)", vi: "20/03/2027 (Thứ 7)" },
   "guide.status_open": { ko: "접수중", en: "Open", ja: "受付中", zh: "报名中", hi: "खुला", vi: "Đang nhận" },
   "guide.status_upcoming": { ko: "예정", en: "Upcoming", ja: "予定", zh: "即将开始", hi: "आगामी", vi: "Sắp tới" },
+  "guide.status_closed": { ko: "마감", en: "Closed", ja: "受付終了", zh: "已截止", hi: "बंद", vi: "Đã đóng" },
+  "sched.rolling_badge": { ko: "상시 접수", en: "Rolling", ja: "常時受付", zh: "常年报名", hi: "सतत पंजीकरण", vi: "Nhận thường trực" },
   "guide.areas_title": { ko: "5대 평가 영역", en: "5 Core Evaluation Areas", ja: "5大評価領域", zh: "五大评估领域", hi: "5 मुख्य मूल्यांकन क्षेत्र", vi: "5 lĩnh vực đánh giá chính" },
   "guide.areas_subtitle": { ko: "GARA는 AI 기술의 단순 이해를 넘어, 실제 업무 환경에서의 활용 능력을 종합적이고 체계적으로 평가합니다.", en: "Beyond simply understanding AI technology, GARA comprehensively and systematically evaluates your ability to apply it in real-world work environments.", ja: "GARAはAI技術の単なる理解を超え、実際の業務環境での活用能力を総合的かつ体系的に評価します。", zh: "GARA超越对AI技术的简单理解，全面、系统地评估你在真实工作环境中的应用能力。", hi: "AI तकनीक की महज समझ से आगे बढ़कर, GARA वास्तविक कार्य वातावरण में इसके उपयोग की आपकी क्षमता का व्यापक और व्यवस्थित मूल्यांकन करता है।", vi: "Vượt ra ngoài việc chỉ hiểu công nghệ AI, GARA đánh giá toàn diện và có hệ thống năng lực ứng dụng của bạn trong môi trường làm việc thực tế." },
   "guide.area1_title": { ko: "AI 활용·기초", en: "AI Usage & Fundamentals", ja: "AI活用・基礎", zh: "AI应用与基础", hi: "AI उपयोग और मूल बातें", vi: "Ứng dụng AI & nền tảng" },
@@ -1135,6 +1137,7 @@ const D: Record<string, Record<Lang, string>> = {
   "sched.rolling": { ko: "상시시험", en: "Rolling exams", ja: "常時試験", zh: "常规考试", hi: "सतत परीक्षा", vi: "Kỳ thi thường trực" },
   "sched.exam_date": { ko: "시험일", en: "Exam date", ja: "試験日", zh: "考试日", hi: "परीक्षा तिथि", vi: "Ngày thi" },
   "sched.apply": { ko: "접수하기", en: "Register", ja: "申し込む", zh: "报名", hi: "पंजीकरण करें", vi: "Đăng ký" },
+  "sched.empty": { ko: "등록된 시험 일정이 없습니다.", en: "No exam schedule yet.", ja: "登録された試験日程はありません。", zh: "暂无考试日程。", hi: "अभी कोई परीक्षा कार्यक्रम नहीं है।", vi: "Chưa có lịch thi." },
 
   // ── ExamApply(원서접수) 하드코딩 라벨 ──
   "apply.back": { ko: "자격검정 안내", en: "Certification guide", ja: "資格検定案内", zh: "资格检定指南", hi: "प्रमाणन गाइड", vi: "Hướng dẫn kỳ thi" },

@@ -371,6 +371,99 @@ async function faqDelete(admin: any, body: any) {
   return json({ ok: true })
 }
 
+// ---------- 시험 일정/회차(exam_rounds) CRUD ----------
+function shapeExamRound(r: any) {
+  return {
+    id: r.id,
+    kind: r.kind,
+    titleI18n: r.title_i18n ?? {},
+    examDate: r.exam_date, // 'YYYY-MM-DD' | null
+    applyStartAt: r.apply_start_at, // ISO | null
+    applyEndAt: r.apply_end_at, // ISO | null
+    noteI18n: r.note_i18n ?? {},
+    published: !!r.published,
+    sort: r.sort,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+async function examRoundList(admin: any) {
+  const { data, error } = await admin
+    .from('exam_rounds')
+    .select('*')
+    .order('kind', { ascending: true })
+    .order('sort', { ascending: true })
+    .order('exam_date', { ascending: true, nullsFirst: true })
+  if (error) return json({ error: error.message }, 400)
+  return json({ rounds: (data ?? []).map(shapeExamRound) })
+}
+
+// 생성/수정. 한국어(회차명·부가설명)만 입력받아 저장 시 나머지 5개국어 자동 번역. 날짜는 그대로 저장.
+async function examRoundUpsert(admin: any, body: any) {
+  const r = body?.round ?? {}
+  const koTitle = String(r.titleI18n?.ko ?? '').trim()
+  const koNote = String(r.noteI18n?.ko ?? '').trim()
+  if (!koTitle) return json({ error: '한국어 회차명은 필수입니다.' }, 400)
+
+  let title_i18n: Record<string, string> = { ko: koTitle }
+  let note_i18n: Record<string, string> = koNote ? { ko: koNote } : {}
+  let translateWarning: string | null = null
+  try {
+    const koFields: Record<string, string> = { title: koTitle }
+    if (koNote) koFields.note = koNote
+    const tr = await translateKoFields(koFields)
+    title_i18n = tr.title
+    note_i18n = koNote ? tr.note : {}
+  } catch (e) {
+    translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
+  }
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+
+  const kind = r.kind === 'rolling' ? 'rolling' : 'regular'
+  const sortNum = Number(r.sort)
+  const hasSort = Number.isFinite(sortNum)
+  const row: Record<string, unknown> = {
+    kind,
+    title_i18n,
+    note_i18n,
+    exam_date: r.examDate || null,
+    apply_start_at: r.applyStartAt || null,
+    apply_end_at: r.applyEndAt || null,
+    published: r.published !== false,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (r.id) {
+    if (hasSort) row.sort = Math.floor(sortNum)
+    const { data, error } = await admin.from('exam_rounds').update(row).eq('id', r.id).select().maybeSingle()
+    if (error) return json({ error: error.message }, 400)
+    return json({ round: data ? shapeExamRound(data) : null, translateWarning })
+  }
+  row.sort = hasSort ? Math.floor(sortNum) : 9999 // 새 항목은 맨 끝
+  const { data, error } = await admin.from('exam_rounds').insert(row).select().maybeSingle()
+  if (error) return json({ error: error.message }, 400)
+  return json({ round: data ? shapeExamRound(data) : null, translateWarning })
+}
+
+async function examRoundReorder(admin: any, body: any) {
+  const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
+  if (!ids.length) return json({ error: 'ids 필요' }, 400)
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await admin.from('exam_rounds').update({ sort: (i + 1) * 10 }).eq('id', ids[i])
+    if (error) return json({ error: error.message }, 400)
+  }
+  return json({ ok: true })
+}
+
+async function examRoundDelete(admin: any, body: any) {
+  const id = body?.id
+  if (!id) return json({ error: 'id 필요' }, 400)
+  const { error } = await admin.from('exam_rounds').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -400,6 +493,10 @@ Deno.serve(async (req) => {
       case 'faqUpsert': return await faqUpsert(admin, body)
       case 'faqDelete': return await faqDelete(admin, body)
       case 'faqReorder': return await faqReorder(admin, body)
+      case 'examRoundList': return await examRoundList(admin)
+      case 'examRoundUpsert': return await examRoundUpsert(admin, body)
+      case 'examRoundReorder': return await examRoundReorder(admin, body)
+      case 'examRoundDelete': return await examRoundDelete(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

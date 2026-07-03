@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { getTracks, SCHEDULE } from '../lib/caris'
+import { getTracks } from '../lib/caris'
+import { useExamRounds, type RoundStatus } from '../lib/rounds'
+
+const STATUS_KEY: Record<RoundStatus, string> = {
+  open: 'guide.status_open',
+  upcoming: 'guide.status_upcoming',
+  closed: 'guide.status_closed',
+}
 
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
@@ -14,6 +21,7 @@ export default function Guide() {
   const navigate = useNavigate()
   const [track, setTrack] = useState(0)
   const [level, setLevel] = useState(0)
+  const { regular } = useExamRounds(lang)
   const TRACKS = getTracks(lang)
   const cur = TRACKS[track]
   const lv = cur.levels[level]
@@ -41,19 +49,19 @@ export default function Guide() {
                 {t('guide.schedule_title')}
               </h3>
               <div className="space-y-4">
-                {SCHEDULE.map((s) => (
+                {regular.map((s) => (
                   <div
                     key={s.id}
-                    onClick={s.open ? () => navigate('/exam/apply', { state: { roundId: s.id } }) : undefined}
-                    className={`rounded-xl p-4 flex justify-between items-center gap-3 border ${s.open ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
+                    onClick={s.clickable ? () => navigate('/exam/apply', { state: { roundId: s.id, roundLabel: s.title, dateLabel: s.dateText } }) : undefined}
+                    className={`rounded-xl p-4 flex justify-between items-center gap-3 border ${s.clickable ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
                   >
                     <div>
-                      <div className={`font-label-sm text-label-sm mb-1 ${s.open ? 'text-primary' : 'text-on-surface-variant'}`}>{t(s.roundKey)}</div>
-                      <div className={`font-body-md text-body-md text-on-surface ${s.open ? 'font-semibold' : ''}`}>{t(s.dateKey)}</div>
+                      <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
+                      <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.open ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(s.open ? 'guide.status_open' : 'guide.status_upcoming')}</span>
-                      {s.open && <span className="material-symbols-outlined text-primary text-[20px]">arrow_forward</span>}
+                      <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.clickable ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(STATUS_KEY[s.status])}</span>
+                      {s.clickable && <span className="material-symbols-outlined text-primary text-[20px]">arrow_forward</span>}
                     </div>
                   </div>
                 ))}

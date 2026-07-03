@@ -141,3 +141,22 @@ export interface FaqRow {
 export interface AdminFaqListResponse {
   faqs: FaqRow[]
 }
+
+// ---------- 시험 일정/회차 ----------
+export interface ExamRoundRow {
+  id: string
+  kind: 'regular' | 'rolling'
+  titleI18n: I18nText
+  examDate: string | null // 'YYYY-MM-DD'
+  applyStartAt: string | null // ISO
+  applyEndAt: string | null // ISO
+  noteI18n: I18nText
+  published: boolean
+  sort: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AdminExamRoundListResponse {
+  rounds: ExamRoundRow[]
+}
