@@ -44,7 +44,7 @@ export default function Admin() {
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420, margin: '40px auto' }}>
           <h2 className="exam-title">관리자 로그인</h2>
           <p className="exam-sub">관리자 계정으로 로그인해 주세요.</p>
-          <button className="exam-btn" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
+          <button className="btn-ink" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
             구글로 로그인
           </button>
         </div>
@@ -192,7 +192,7 @@ function CarisExamAdmin() {
         <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420, margin: '40px auto' }}>
           <h2 className="exam-title">관리자 로그인</h2>
           <p className="exam-sub">관리자 계정으로 로그인해 주세요.</p>
-          <button className="exam-btn" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
+          <button className="btn-ink" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
             구글로 로그인
           </button>
         </div>
@@ -222,7 +222,7 @@ function CarisExamAdmin() {
   const pageMax = Math.max(1, Math.ceil(total / PAGE))
 
   return (
-    <div className="wrap admin-cbt">
+    <div className="wrap admin admin-cbt">
       <div className="admin-tabs" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
         <button className={sub === 'dash' ? 'on' : ''} onClick={() => setSub('dash')}>
           대시보드
@@ -276,10 +276,10 @@ function CarisExamAdmin() {
         <h1>제출 답안 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">총 {total}건</span>
-          <button className="exam-btn-ghost sm" onClick={() => load(offset)} disabled={loading}>
+          <button className="admin-mini" onClick={() => load(offset)} disabled={loading}>
             새로고침
           </button>
-          <button className="exam-btn-ghost sm" onClick={exportCsv} disabled={!rows.length}>
+          <button className="admin-mini" onClick={exportCsv} disabled={!rows.length}>
             CSV 내보내기
           </button>
         </div>
@@ -321,7 +321,7 @@ function CarisExamAdmin() {
                 </td>
                 <td>{fmtDT(r.resultReleaseAt)}</td>
                 <td>
-                  <button className="exam-btn-ghost sm" onClick={() => openDetail(r.attemptId)}>
+                  <button className="admin-mini" onClick={() => openDetail(r.attemptId)}>
                     상세
                   </button>
                 </td>
@@ -339,14 +339,14 @@ function CarisExamAdmin() {
       </div>
 
       <div className="admin-pager">
-        <button className="exam-btn-ghost sm" disabled={offset === 0 || loading} onClick={() => load(Math.max(0, offset - PAGE))}>
+        <button className="admin-mini" disabled={offset === 0 || loading} onClick={() => load(Math.max(0, offset - PAGE))}>
           ‹ 이전
         </button>
         <span>
           {pageNo} / {pageMax}
         </span>
         <button
-          className="exam-btn-ghost sm"
+          className="admin-mini"
           disabled={offset + PAGE >= total || loading}
           onClick={() => load(offset + PAGE)}
         >
@@ -549,10 +549,10 @@ function NoticesAdmin() {
         <h1>공지사항 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">총 {rows.length}건</span>
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
-          <button className="exam-btn-ghost sm" onClick={openNew}>
+          <button className="admin-mini" onClick={openNew}>
             + 새 공지
           </button>
         </div>
@@ -590,11 +590,11 @@ function NoticesAdmin() {
                 <td>{n.titleI18n.ko || <span style={{ color: 'var(--muted)' }}>(제목 없음)</span>}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDay(n.publishedAt)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="exam-btn-ghost sm" onClick={() => openEdit(n)}>
+                  <button className="admin-mini" onClick={() => openEdit(n)}>
                     편집
                   </button>
                   <button
-                    className="exam-btn-ghost sm"
+                    className="admin-mini"
                     style={{ marginLeft: 6 }}
                     onClick={() => remove(n)}
                   >
@@ -709,10 +709,10 @@ function NoticesAdmin() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button className="exam-btn-ghost" onClick={() => setDraft(null)} disabled={saving}>
+              <button className="admin-mini" onClick={() => setDraft(null)} disabled={saving}>
                 취소
               </button>
-              <button className="exam-btn" onClick={save} disabled={saving}>
+              <button className="btn-ink" onClick={save} disabled={saving}>
                 {saving ? '저장 중…' : '저장'}
               </button>
             </div>
@@ -858,10 +858,10 @@ function FaqAdmin() {
         <h1>FAQ 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">총 {rows.length}건</span>
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
-          <button className="exam-btn-ghost sm" onClick={openNew}>
+          <button className="admin-mini" onClick={openNew}>
             + 새 FAQ
           </button>
         </div>
@@ -907,7 +907,7 @@ function FaqAdmin() {
                 <td>{f.questionI18n.ko || <span style={{ color: 'var(--muted)' }}>(질문 없음)</span>}</td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                   <button
-                    className="exam-btn-ghost sm"
+                    className="admin-mini"
                     disabled={busy || i === 0}
                     onClick={() => move(f, -1)}
                     aria-label="위로"
@@ -916,7 +916,7 @@ function FaqAdmin() {
                     ↑
                   </button>
                   <button
-                    className="exam-btn-ghost sm"
+                    className="admin-mini"
                     style={{ marginLeft: 4 }}
                     disabled={busy || i === group.length - 1}
                     onClick={() => move(f, 1)}
@@ -927,10 +927,10 @@ function FaqAdmin() {
                   </button>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="exam-btn-ghost sm" onClick={() => openEdit(f)}>
+                  <button className="admin-mini" onClick={() => openEdit(f)}>
                     편집
                   </button>
-                  <button className="exam-btn-ghost sm" style={{ marginLeft: 6 }} onClick={() => remove(f)}>
+                  <button className="admin-mini" style={{ marginLeft: 6 }} onClick={() => remove(f)}>
                     삭제
                   </button>
                 </td>
@@ -1018,10 +1018,10 @@ function FaqAdmin() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button className="exam-btn-ghost" onClick={() => setDraft(null)} disabled={saving}>
+              <button className="admin-mini" onClick={() => setDraft(null)} disabled={saving}>
                 취소
               </button>
-              <button className="exam-btn" onClick={save} disabled={saving}>
+              <button className="btn-ink" onClick={save} disabled={saving}>
                 {saving ? '저장 중…' : '저장'}
               </button>
             </div>
@@ -1175,10 +1175,10 @@ function RoundsAdmin() {
         <h1>시험 일정 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">총 {rows.length}건</span>
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
-          <button className="exam-btn-ghost sm" onClick={openNew}>
+          <button className="admin-mini" onClick={openNew}>
             + 새 일정
           </button>
         </div>
@@ -1230,7 +1230,7 @@ function RoundsAdmin() {
                 </td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                   <button
-                    className="exam-btn-ghost sm"
+                    className="admin-mini"
                     disabled={busy || i === 0}
                     onClick={() => move(r, -1)}
                     aria-label="위로"
@@ -1239,7 +1239,7 @@ function RoundsAdmin() {
                     ↑
                   </button>
                   <button
-                    className="exam-btn-ghost sm"
+                    className="admin-mini"
                     style={{ marginLeft: 4 }}
                     disabled={busy || i === group.length - 1}
                     onClick={() => move(r, 1)}
@@ -1250,10 +1250,10 @@ function RoundsAdmin() {
                   </button>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="exam-btn-ghost sm" onClick={() => openEdit(r)}>
+                  <button className="admin-mini" onClick={() => openEdit(r)}>
                     편집
                   </button>
-                  <button className="exam-btn-ghost sm" style={{ marginLeft: 6 }} onClick={() => remove(r)}>
+                  <button className="admin-mini" style={{ marginLeft: 6 }} onClick={() => remove(r)}>
                     삭제
                   </button>
                 </td>
@@ -1361,10 +1361,10 @@ function RoundsAdmin() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button className="exam-btn-ghost" onClick={() => setDraft(null)} disabled={saving}>
+              <button className="admin-mini" onClick={() => setDraft(null)} disabled={saving}>
                 취소
               </button>
-              <button className="exam-btn" onClick={save} disabled={saving}>
+              <button className="btn-ink" onClick={save} disabled={saving}>
                 {saving ? '저장 중…' : '저장'}
               </button>
             </div>
@@ -1435,10 +1435,10 @@ function FeesAdmin() {
       <div className="admin-head">
         <h1>응시료 관리</h1>
         <div className="admin-head-actions">
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading || saving}>
+          <button className="admin-mini" onClick={load} disabled={loading || saving}>
             새로고침
           </button>
-          <button className="exam-btn" onClick={save} disabled={loading || saving}>
+          <button className="btn-ink" onClick={save} disabled={loading || saving}>
             {saving ? '저장 중…' : '저장'}
           </button>
         </div>
@@ -1547,7 +1547,7 @@ function AdminAccountsAdmin() {
         <h1>관리자 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">{rows ? `${rows.length}명` : ''}</span>
-          <button className="exam-btn-ghost sm" onClick={load} disabled={busy}>
+          <button className="admin-mini" onClick={load} disabled={busy}>
             새로고침
           </button>
         </div>
@@ -1573,7 +1573,7 @@ function AdminAccountsAdmin() {
             <option key={c} value={c} />
           ))}
         </datalist>
-        <button className="exam-btn" onClick={add} disabled={busy || !email.trim()}>
+        <button className="btn-ink" onClick={add} disabled={busy || !email.trim()}>
           추가
         </button>
         <span style={{ color: 'var(--muted)', fontSize: 13 }}>지정 가능 {candidates.length}명</span>
@@ -1606,7 +1606,7 @@ function AdminAccountsAdmin() {
                   {a.role === 'root' ? (
                     <span style={{ color: 'var(--muted)' }}>삭제 불가</span>
                   ) : (
-                    <button className="exam-btn-ghost sm" onClick={() => remove(a.email)} disabled={busy}>
+                    <button className="admin-mini" onClick={() => remove(a.email)} disabled={busy}>
                       삭제
                     </button>
                   )}
@@ -1718,7 +1718,7 @@ function DashboardAdmin() {
       <div className="admin-head">
         <h1>대시보드</h1>
         <div className="admin-head-actions">
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
         </div>
@@ -1871,25 +1871,25 @@ function UsersAdmin() {
         <h1>회원 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">구글 {googleN} · 게스트 {guestN}</span>
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
         </div>
       </div>
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
 
-      <div className="admin-section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-        <input style={{ ...inpStyle, width: 220 }} placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="admin-toolbar">
         <div className="admin-tabs" style={{ marginBottom: 0 }}>
           <button className={type === 'google' ? 'on' : ''} onClick={() => setType('google')}>구글</button>
           <button className={type === 'guest' ? 'on' : ''} onClick={() => setType('guest')}>게스트</button>
           <button className={type === 'all' ? 'on' : ''} onClick={() => setType('all')}>전체</button>
         </div>
-        <select style={{ ...inpStyle, width: 150 }} value={sort} onChange={(e) => setSort(e.target.value as 'created' | 'attempts')}>
+        <select value={sort} onChange={(e) => setSort(e.target.value as 'created' | 'attempts')}>
           <option value="created">가입 최신순</option>
           <option value="attempts">응시 많은순</option>
         </select>
-        <span style={{ color: 'var(--muted)', fontSize: 13 }}>{filtered.length}명</span>
+        <input className="admin-search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <span className="admin-hint">{filtered.length}명</span>
       </div>
 
       <div className="admin-table-wrap">
@@ -1917,7 +1917,7 @@ function UsersAdmin() {
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.attempts}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.lastActive)}</td>
                 <td>
-                  <button className="exam-btn-ghost sm" onClick={() => setOpen(u)}>상세</button>
+                  <button className="admin-mini" onClick={() => setOpen(u)}>상세</button>
                 </td>
               </tr>
             ))}
@@ -1933,11 +1933,11 @@ function UsersAdmin() {
       </div>
       {pageMax > 1 && (
         <div className="admin-pager">
-          <button className="exam-btn-ghost sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+          <button className="admin-mini" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
             ‹ 이전
           </button>
           <span>{page + 1} / {pageMax}</span>
-          <button className="exam-btn-ghost sm" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>
+          <button className="admin-mini" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>
             다음 ›
           </button>
         </div>
@@ -2032,7 +2032,7 @@ function QuestionsAdmin() {
       <div className="admin-head">
         <h1>문항 관리</h1>
         <div className="admin-head-actions">
-          <select style={{ ...inpStyle, minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
+          <select style={{ minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
             {exams.length === 0 && <option value="">시험 없음</option>}
             {exams.map((ex) => (
               <option key={ex.id} value={ex.id}>
@@ -2108,7 +2108,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
       <div className="admin-head" style={{ marginTop: 0 }}>
         <span className="admin-count">총 {rows.length}문항</span>
         <div className="admin-head-actions">
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
         </div>
@@ -2140,11 +2140,11 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
                   <span className={`admin-badge st-${q.active ? 'submitted' : 'voided'}`}>{q.active ? '활성' : '비활성'}</span>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="exam-btn-ghost sm" disabled={busy} onClick={() => act('questionSetActive', q.id, { active: !q.active })}>
+                  <button className="admin-mini" disabled={busy} onClick={() => act('questionSetActive', q.id, { active: !q.active })}>
                     {q.active ? '비활성' : '활성'}
                   </button>
                   <button
-                    className="exam-btn-ghost sm"
+                    className="admin-mini"
                     style={{ marginLeft: 6 }}
                     disabled={busy}
                     onClick={() => {
@@ -2217,7 +2217,7 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
       <div className="admin-head" style={{ marginTop: 0 }}>
         <span className="admin-count">{events.length}건</span>
         <div className="admin-head-actions">
-          <button className="exam-btn-ghost sm" onClick={load} disabled={loading}>
+          <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
         </div>
@@ -2245,7 +2245,7 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{e.actor ?? '-'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {e.restorable && e.question_id ? (
-                    <button className="exam-btn-ghost sm" disabled={busy} onClick={() => restore(e.question_id as string)}>
+                    <button className="admin-mini" disabled={busy} onClick={() => restore(e.question_id as string)}>
                       복구
                     </button>
                   ) : null}
@@ -2364,7 +2364,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
         엑셀 열 순서: <b>번호 · 과목 · 토픽 · 지문 · 보기1~4 · 정답(1~4)</b>. 첫 행은 머리글로 건너뜁니다. 같은 번호가 이미 있으면 <b>덮어씁니다</b>(재업로드 = 수정).
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-        <label className="exam-btn-ghost sm" style={{ cursor: 'pointer' }}>
+        <label className="admin-mini" style={{ cursor: 'pointer' }}>
           엑셀 선택
           <input
             type="file"
@@ -2377,7 +2377,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
             }}
           />
         </label>
-        <button className="exam-btn-ghost sm" onClick={downloadTemplate}>
+        <button className="admin-mini" onClick={downloadTemplate}>
           템플릿 다운로드
         </button>
         {fileName && (
@@ -2386,7 +2386,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
           </span>
         )}
         {rows.length > 0 && (
-          <button className="exam-btn" onClick={doImport} disabled={importing || problems.length > 0}>
+          <button className="btn-ink" onClick={doImport} disabled={importing || problems.length > 0}>
             {importing ? '반영 중…' : `${rows.length}문항 반영`}
           </button>
         )}
