@@ -58,7 +58,7 @@
   --fs-display: var(--fs-lg);
   --fs-score: var(--fs-lg);
   --fs-title: var(--fs-lg);
-  --fs-qtext: var(--fs-md);
+  --fs-qtext: clamp(18px, 2.3vw, 20px); /* 응시 지문(레벨테스트 .qtext) — 본문(md 16px)보다 크게, 가독성 */
 }
 
 * {
