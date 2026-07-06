@@ -20,7 +20,7 @@ export default function ExamApply() {
   // navigation state 는 클릭 진입 시 즉시 표시용(로딩 깜빡임 방지). 둘 다 없으면 접수중(open) 회차로 폴백.
   const st = location.state as { roundId?: string; roundLabel?: string; dateLabel?: string } | null
   const roundId = params.get('round') ?? st?.roundId ?? ''
-  const { regular, rolling } = useExamRounds(lang)
+  const { regular, rolling, loading } = useExamRounds(lang)
   const allRounds = [...regular, ...rolling]
   const byId = roundId ? allRounds.find((r) => r.id === roundId) : undefined
   const openRound = allRounds.find((r) => r.status === 'open') ?? regular[0] ?? rolling[0]
@@ -47,6 +47,34 @@ export default function ExamApply() {
   const fallbackFee = isMaster ? lv.fee ?? 0 : cur.examFee ?? 0
   const fee = fees[feeKey(isMaster, GRADE_CODES[level])] ?? fallbackFee
   const selLabel = isMaster ? `${cur.name} ${lv.grade}` : `${cur.name} ${t('caris.exam_suffix')}`
+
+  // 접수기간 가드: 특정 회차(?round=<id>)로 들어왔는데 그 회차가 '접수중(open)'이 아니면
+  // (마감·예정·없음·지난 시험) 접수화면을 막고 일정으로 유도. 회차 미지정은 open 회차로 폴백하되
+  // 폴백할 open 회차조차 없으면 막는다. DB 로딩 중엔 판정 보류.
+  const blocked = !loading && ((roundId ? !byId || byId.status !== 'open' : false) || !active)
+  if (blocked) {
+    return (
+      <div className="bg-background text-on-surface min-h-screen flex flex-col">
+        <main className="flex-grow flex items-center justify-center px-margin-mobile py-24">
+          <div className="max-w-md w-full text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 ambient-shadow">
+            <div className="w-16 h-16 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center mx-auto mb-5">
+              <span className="material-symbols-outlined text-[32px]">event_busy</span>
+            </div>
+            <h1 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('apply.closed_title')}</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant mb-6 break-keep">{t('apply.closed_body')}</p>
+            <button
+              onClick={() => navigate('/exam/schedule')}
+              className="bg-primary text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center gap-2"
+            >
+              {t('apply.closed_cta')}
+              <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+            </button>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    )
+  }
 
   return (
     <div className="bg-background text-on-surface min-h-screen flex flex-col">

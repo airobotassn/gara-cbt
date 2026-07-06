@@ -2036,7 +2036,6 @@ function UsersAdmin() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
-  const [type, setType] = useState<'all' | 'google' | 'guest'>('google')
   const [sort, setSort] = useState<'created' | 'attempts'>('created')
   const [page, setPage] = useState(0)
   const [open, setOpen] = useState<CbtUserRow | null>(null)
@@ -2058,12 +2057,10 @@ function UsersAdmin() {
   }, [load])
   useEffect(() => {
     setPage(0)
-  }, [q, type, sort])
+  }, [q, sort])
 
   const filtered = users
     .filter((u) => {
-      if (type === 'google' && u.anon) return false
-      if (type === 'guest' && !u.anon) return false
       if (q) {
         const s = q.toLowerCase()
         if (!(u.name || '').toLowerCase().includes(s) && !(u.email || '').toLowerCase().includes(s)) return false
@@ -2074,15 +2071,13 @@ function UsersAdmin() {
   const PER = 50
   const pageMax = Math.max(1, Math.ceil(filtered.length / PER))
   const shown = filtered.slice(page * PER, page * PER + PER)
-  const googleN = users.filter((u) => !u.anon).length
-  const guestN = users.length - googleN
 
   return (
     <>
       <div className="admin-head">
         <h1>회원 관리</h1>
         <div className="admin-head-actions">
-          <span className="admin-count">구글 {googleN} · 게스트 {guestN}</span>
+          <span className="admin-count">회원 {users.length}명</span>
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
@@ -2091,11 +2086,6 @@ function UsersAdmin() {
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
 
       <div className="admin-toolbar">
-        <div className="admin-tabs" style={{ marginBottom: 0 }}>
-          <button className={type === 'google' ? 'on' : ''} onClick={() => setType('google')}>구글</button>
-          <button className={type === 'guest' ? 'on' : ''} onClick={() => setType('guest')}>게스트</button>
-          <button className={type === 'all' ? 'on' : ''} onClick={() => setType('all')}>전체</button>
-        </div>
         <select value={sort} onChange={(e) => setSort(e.target.value as 'created' | 'attempts')}>
           <option value="created">가입 최신순</option>
           <option value="attempts">응시 많은순</option>
@@ -2110,7 +2100,6 @@ function UsersAdmin() {
             <tr>
               <th>이름</th>
               <th>이메일</th>
-              <th>유형</th>
               <th>가입</th>
               <th style={{ textAlign: 'right' }}>응시</th>
               <th>마지막 활동</th>
@@ -2122,9 +2111,6 @@ function UsersAdmin() {
               <tr key={u.id}>
                 <td>{u.name || '-'}</td>
                 <td style={{ color: 'var(--muted)' }}>{u.email || '-'}</td>
-                <td>
-                  <span className={`admin-badge st-${u.anon ? 'in_progress' : 'submitted'}`}>{u.anon ? '게스트' : '구글'}</span>
-                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.created)}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.attempts}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.lastActive)}</td>
@@ -2135,7 +2121,7 @@ function UsersAdmin() {
             ))}
             {!shown.length && !loading && (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   회원이 없습니다.
                 </td>
               </tr>
@@ -2178,7 +2164,7 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
           {user.name || '-'} <span className="admin-modal-email">{user.email}</span>
         </h2>
         <p className="admin-modal-meta">
-          {user.anon ? '게스트' : '구글'} · 가입 {fmtDT(user.created)} · 응시 {user.attempts}건
+          가입 {fmtDT(user.created)} · 응시 {user.attempts}건
         </p>
         {loading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>

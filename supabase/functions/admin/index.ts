@@ -996,9 +996,11 @@ async function cbtAnalytics(admin: any) {
 
 // 회원 목록 — 프로필 + 이메일 + 응시수 + 마지막 활동.
 async function cbtUsers(admin: any) {
+  // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → 레벨테스트 게스트(is_anonymous)는 회원목록에서 제외.
   const { data: profiles } = await admin
     .from('profiles')
     .select('id, display_name, is_anonymous, created_at')
+    .eq('is_anonymous', false)
     .order('created_at', { ascending: false })
     .limit(5000)
   const { data: atts } = await admin

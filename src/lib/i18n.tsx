@@ -1156,6 +1156,9 @@ const D: Record<string, Record<Lang, string>> = {
   "apply.modal_title": { ko: "결제 기능 준비 중", en: "Payment coming soon", ja: "決済機能は準備中", zh: "支付功能准备中", hi: "भुगतान सुविधा जल्द", vi: "Tính năng thanh toán sắp ra mắt" },
   "apply.modal_body": { ko: "현재는 접수 화면 미리보기입니다. 본인인증·결제(PG)는 곧 연결됩니다.", en: "This is a preview of the registration screen. Identity verification and payment (PG) will be connected soon.", ja: "現在は申込画面のプレビューです。本人認証・決済(PG)は近日連携予定です。", zh: "当前为报名界面预览。实名认证·支付(PG)即将接入。", hi: "यह पंजीकरण स्क्रीन का पूर्वावलोकन है। पहचान सत्यापन·भुगतान (PG) जल्द जोड़ा जाएगा।", vi: "Đây là bản xem trước màn hình đăng ký. Xác minh danh tính·thanh toán (PG) sẽ sớm được kết nối." },
   "apply.confirm": { ko: "확인", en: "OK", ja: "確認", zh: "确定", hi: "ठीक है", vi: "Xác nhận" },
+  "apply.closed_title": { ko: "지금은 접수기간이 아닙니다", en: "Registration is not open", ja: "現在は申込期間ではありません", zh: "当前不在报名期间", hi: "अभी पंजीकरण अवधि नहीं है", vi: "Hiện không trong thời gian đăng ký" },
+  "apply.closed_body": { ko: "마감되었거나 아직 열리지 않은 회차입니다. 시험 일정에서 접수 중인 회차를 확인해 주세요.", en: "This session is closed or not yet open. Please check the exam schedule for sessions currently accepting applications.", ja: "締切済み、またはまだ開始していない回次です。試験日程で申込受付中の回次をご確認ください。", zh: "该场次已截止或尚未开放。请在考试日程中查看正在报名的场次。", hi: "यह सत्र बंद है या अभी नहीं खुला है। कृपया परीक्षा कार्यक्रम में वर्तमान में आवेदन स्वीकार करने वाले सत्र देखें।", vi: "Đợt này đã đóng hoặc chưa mở. Vui lòng xem lịch thi để biết các đợt đang nhận đăng ký." },
+  "apply.closed_cta": { ko: "시험 일정 보기", en: "View exam schedule", ja: "試験日程を見る", zh: "查看考试日程", hi: "परीक्षा कार्यक्रम देखें", vi: "Xem lịch thi" },
 
   // ── SEB 설치 안내(SebInstall 컴포넌트) — ExamGate 모달 · ExamCheck Step1 공유 ──
   "seb.download": { ko: "보안 프로그램(SEB) 다운로드", en: "Download secure browser (SEB)", ja: "セキュリティソフト(SEB)をダウンロード", zh: "下载安全程序(SEB)", hi: "सुरक्षित ब्राउज़र (SEB) डाउनलोड करें", vi: "Tải phần mềm bảo mật (SEB)" },
