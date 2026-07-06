@@ -342,7 +342,7 @@ function shapeNotice(n: any) {
   return {
     id: n.id,
     category: n.category,
-    tag: n.tag,
+    required: !!n.required,
     titleI18n: n.title_i18n ?? {},
     bodyI18n: n.body_i18n ?? {},
     pinned: !!n.pinned,
@@ -386,7 +386,7 @@ async function noticeUpsert(admin: any, body: any) {
 
   const row: Record<string, unknown> = {
     category: n.category ?? 'guide',
-    tag: n.tag ?? 'notice',
+    required: !!n.required,
     title_i18n,
     body_i18n,
     pinned: !!n.pinned,

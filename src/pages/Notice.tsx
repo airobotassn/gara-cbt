@@ -13,19 +13,22 @@ import SiteFooter from '../components/SiteFooter'
 // 내부 필터 값은 안정적인 영문 키로 유지(번역 라벨은 t()로 렌더)
 const FILTERS = ['all', 'guide', 'schedule', 'maintenance', 'event']
 
-// 배지(tag) → 스타일 클래스
-const TAG_CLASS: Record<string, string> = {
-  notice: 'bg-primary text-on-primary',
+// 분류(category) → 배지 스타일. 카드 배지는 "무슨 안내인지"(분류)를 보여주고,
+// 필독 공지는 별도 빨간 배지(REQUIRED_CLASS)로 강조한다.
+const CAT_CLASS: Record<string, string> = {
   guide: 'bg-surface-container-high text-on-surface',
-  required: 'bg-error/10 text-error',
+  schedule: 'bg-primary/10 text-primary',
+  maintenance: 'bg-surface-container-high text-on-surface-variant',
+  event: 'bg-secondary/10 text-secondary',
 }
+const REQUIRED_CLASS = 'bg-error/10 text-error'
 
 const PAGE_SIZE = 10
 
 interface Row {
   id: string
   category: string
-  tag: string
+  required: boolean
   title: string | null
   title_ko?: string | null
   body: string | null
@@ -45,7 +48,7 @@ function projFor(lang: string): string {
 async function fetchPage(filter: string, lang: string, offset: number): Promise<Row[]> {
   let q = supabase
     .from('notices')
-    .select(`id, category, tag, ${projFor(lang)}, pinned, published_at`)
+    .select(`id, category, required, ${projFor(lang)}, pinned, published_at`)
     .eq('published', true)
   if (filter !== 'all') q = q.eq('category', filter)
   const { data } = await q
@@ -59,7 +62,7 @@ async function fetchPage(filter: string, lang: string, offset: number): Promise<
 async function fetchOne(id: string, lang: string): Promise<Row | null> {
   const { data } = await supabase
     .from('notices')
-    .select(`id, category, tag, ${projFor(lang)}, pinned, published_at`)
+    .select(`id, category, required, ${projFor(lang)}, pinned, published_at`)
     .eq('published', true)
     .eq('id', id)
     .maybeSingle()
@@ -238,7 +241,10 @@ export default function Notice() {
             <div className="relative z-10 flex flex-col md:flex-row gap-6 md:items-start justify-between">
               <div className="flex-grow">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className={`${TAG_CLASS[featured.tag] ?? TAG_CLASS.notice} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.tag_${featured.tag}`)}</span>
+                  {featured.required && (
+                    <span className={`${REQUIRED_CLASS} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t('notice.tag_required')}</span>
+                  )}
+                  <span className={`${CAT_CLASS[featured.category] ?? CAT_CLASS.guide} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.filter_${featured.category}`)}</span>
                   <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{fmtDate(featured.published_at)}</span>
                 </div>
                 <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4 break-keep">{title(featured)}</h2>
@@ -260,8 +266,13 @@ export default function Notice() {
                     className="group block w-full text-left py-6 hover:bg-surface-container-low/50 transition-colors px-4 -mx-4 rounded-xl"
                   >
                     <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
-                      <div className="flex items-center gap-4 md:w-48 flex-shrink-0">
-                        <span className={`${TAG_CLASS[n.tag] ?? TAG_CLASS.guide} px-3 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap min-w-[60px] text-center`}>{t(`notice.tag_${n.tag}`)}</span>
+                      <div className="flex items-center gap-3 md:w-56 flex-shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          {n.required && (
+                            <span className={`${REQUIRED_CLASS} px-2.5 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap`}>{t('notice.tag_required')}</span>
+                          )}
+                          <span className={`${CAT_CLASS[n.category] ?? CAT_CLASS.guide} px-2.5 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap`}>{t(`notice.filter_${n.category}`)}</span>
+                        </div>
                         <span className="text-outline font-label-md text-label-md whitespace-nowrap">{fmtDate(n.published_at)}</span>
                       </div>
                       <div className="flex-grow flex items-center justify-between gap-4">

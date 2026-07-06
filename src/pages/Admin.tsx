@@ -376,22 +376,16 @@ function CarisExamAdmin() {
 
 // ── 공지사항 관리 (admin 함수의 noticeList/noticeUpsert/noticeDelete) ──
 const NOTICE_CATS = ['guide', 'schedule', 'maintenance', 'event'] as const
-const NOTICE_TAGS = ['notice', 'guide', 'required'] as const
 const NOTICE_CAT_LABEL: Record<string, string> = {
   guide: '안내',
   schedule: '시험일정',
   maintenance: '점검',
   event: '이벤트',
 }
-const NOTICE_TAG_LABEL: Record<string, string> = {
-  notice: '공지',
-  guide: '안내',
-  required: '필독',
-}
 interface NoticeDraft {
   id?: string
   category: string
-  tag: string
+  required: boolean
   pinned: boolean
   published: boolean
   publishedAt: string // YYYY-MM-DD (편집용)
@@ -402,7 +396,7 @@ interface NoticeDraft {
 function emptyDraft(): NoticeDraft {
   return {
     category: 'guide',
-    tag: 'notice',
+    required: false,
     pinned: false,
     published: true,
     publishedAt: new Date().toISOString().slice(0, 10),
@@ -466,7 +460,7 @@ function NoticesAdmin() {
     setDraft({
       id: n.id,
       category: n.category,
-      tag: n.tag,
+      required: n.required,
       pinned: n.pinned,
       published: n.published,
       publishedAt: (n.publishedAt || '').slice(0, 10),
@@ -562,7 +556,12 @@ function NoticesAdmin() {
                   )}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {NOTICE_CAT_LABEL[n.category] ?? n.category} · {NOTICE_TAG_LABEL[n.tag] ?? n.tag}
+                  {NOTICE_CAT_LABEL[n.category] ?? n.category}
+                  {n.required && (
+                    <span className="admin-badge st-voided" style={{ marginLeft: 6 }}>
+                      필독
+                    </span>
+                  )}
                 </td>
                 <td>{n.titleI18n.ko || <span style={{ color: 'var(--muted)' }}>(제목 없음)</span>}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDay(n.publishedAt)}</td>
@@ -616,20 +615,6 @@ function NoticesAdmin() {
                   </select>
                 </label>
                 <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>
-                  배지
-                  <select
-                    style={inpStyle}
-                    value={draft.tag}
-                    onChange={(e) => patch({ tag: e.target.value })}
-                  >
-                    {NOTICE_TAGS.map((c) => (
-                      <option key={c} value={c}>
-                        {NOTICE_TAG_LABEL[c]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>
                   게시일
                   <input
                     type="date"
@@ -656,6 +641,14 @@ function NoticesAdmin() {
                     onChange={(e) => patch({ pinned: e.target.checked })}
                   />
                   상단 고정
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.required}
+                    onChange={(e) => patch({ required: e.target.checked })}
+                  />
+                  필독
                 </label>
               </div>
 
@@ -1143,7 +1136,14 @@ function RoundsAdmin() {
     }
   }
 
-  const group = rows.filter((r) => r.kind === kindFilter).sort((a, b) => a.sort - b.sort)
+  // 정기시험은 시험일 오름차순 자동정렬(수동 순서 없음). 상시는 sort(수동 ↑↓) 순.
+  const group = rows
+    .filter((r) => r.kind === kindFilter)
+    .sort((a, b) =>
+      kindFilter === 'regular'
+        ? (a.examDate || '9999-99-99').localeCompare(b.examDate || '9999-99-99')
+        : a.sort - b.sort,
+    )
   const isReg = draft?.kind === 'regular'
 
   return (
@@ -1184,7 +1184,7 @@ function RoundsAdmin() {
               <th>회차명 (한국어)</th>
               <th>시험일</th>
               <th>접수기간</th>
-              <th style={{ textAlign: 'center' }}>순서</th>
+              {kindFilter === 'rolling' && <th style={{ textAlign: 'center' }}>순서</th>}
               <th></th>
             </tr>
           </thead>
@@ -1205,27 +1205,29 @@ function RoundsAdmin() {
                       ? `${r.applyStartAt?.slice(0, 10) ?? '?'} ~ ${r.applyEndAt?.slice(0, 10) ?? '?'}`
                       : '-'}
                 </td>
-                <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                  <button
-                    className="admin-mini"
-                    disabled={busy || i === 0}
-                    onClick={() => move(r, -1)}
-                    aria-label="위로"
-                    title="위로"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    className="admin-mini"
-                    style={{ marginLeft: 4 }}
-                    disabled={busy || i === group.length - 1}
-                    onClick={() => move(r, 1)}
-                    aria-label="아래로"
-                    title="아래로"
-                  >
-                    ↓
-                  </button>
-                </td>
+                {kindFilter === 'rolling' && (
+                  <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                    <button
+                      className="admin-mini"
+                      disabled={busy || i === 0}
+                      onClick={() => move(r, -1)}
+                      aria-label="위로"
+                      title="위로"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="admin-mini"
+                      style={{ marginLeft: 4 }}
+                      disabled={busy || i === group.length - 1}
+                      onClick={() => move(r, 1)}
+                      aria-label="아래로"
+                      title="아래로"
+                    >
+                      ↓
+                    </button>
+                  </td>
+                )}
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => openEdit(r)}>
                     편집
@@ -1238,7 +1240,7 @@ function RoundsAdmin() {
             ))}
             {!group.length && !loading && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={kindFilter === 'rolling' ? 6 : 5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   이 유형의 일정이 없습니다. “+ 새 일정”으로 추가하세요.
                 </td>
               </tr>

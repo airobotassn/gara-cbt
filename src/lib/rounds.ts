@@ -102,8 +102,9 @@ export function useExamRounds(lang: Lang) {
         .from('exam_rounds')
         .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, note_i18n, sort')
         .eq('published', true)
+        // 정기시험은 시험일 오름차순(가까운 순). 상시(exam_date=null)는 뒤로 밀고 sort로 정렬.
+        .order('exam_date', { ascending: true, nullsFirst: false })
         .order('sort', { ascending: true })
-        .order('exam_date', { ascending: true, nullsFirst: true })
       if (!alive) return
       setRaw((data as RawRound[] | null) ?? [])
       setLoading(false)

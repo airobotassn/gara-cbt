@@ -162,7 +162,7 @@ export type I18nText = Partial<Record<Lang6, string>>
 export interface NoticeRow {
   id: string
   category: string // guide | schedule | maintenance | event
-  tag: string // notice | guide | required
+  required: boolean // 필독 여부(빨간 배지)
   titleI18n: I18nText
   bodyI18n: I18nText
   pinned: boolean
