@@ -17,84 +17,91 @@ function todayStr() {
   return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
 }
 
-// 템플릿 이미지 위 빈칸 좌표(% 기준 — 미세조정 쉬움).
-// top: 행의 세로 중심 %, left: 값 시작 가로 %, size: cqw(이미지폭 대비 %).
-type Field = { key: string; top: number; left: number; size: number }
-type CertTemplate = { src: string; fields: Field[] }
+// 서체 역할: kr=명조(한/중/일), lat=개러몬드(라틴), dev=데바나가리(힌디는 내장 폰트 없어 시스템)
+const F = {
+  kr: "'CertMyeongjo','Batang','Yu Mincho','SimSun',serif",
+  lat: "'CertGaramond','CertMyeongjo','Georgia',serif",
+  dev: "'Nirmala UI','CertMyeongjo',serif",
+} as const
+const SANS = "'Malgun Gothic','Segoe UI',sans-serif"
 
-// 언어별 자격증 템플릿(public/cert-template[-<lang>].png) + 빈칸 좌표.
-// 좌표는 ?cal=1 눈금자로 미세조정. 등록번호(reg) 위치는 디자인마다 다름
-// (ko/en/ja/hi=하단 좌측, zh/vi=본문 6번째 줄). 미정 언어는 ko 로 폴백.
-const CERT_TEMPLATES: Record<string, CertTemplate> = {
+type CLang = 'ko' | 'en' | 'ja' | 'zh' | 'hi' | 'vi'
+type CertText = {
+  title: string
+  titleSize: number
+  titleSpacing: number
+  titleFont: keyof typeof F
+  sub: string
+  font: keyof typeof F
+  labelSize: number
+  labels: [string, string, string, string, string]
+  nameSpacing: number
+  body1: string
+  body2: string
+  presTitle: string
+  presName: string
+  presNameSpacing: number
+  regPrefix: string
+}
+
+// 자격증 위 고정 문구(언어별). 값(이름·자격명·번호·날짜)은 CertData 에서 주입.
+const CERT_TEXT: Record<CLang, CertText> = {
   ko: {
-    src: '/cert-template.png',
-    fields: [
-      { key: 'name', top: 36.7, left: 55, size: 2.4 },
-      { key: 'birth', top: 42.2, left: 55, size: 2.0 },
-      { key: 'qual', top: 48.1, left: 55, size: 2.0 },
-      { key: 'no', top: 53.8, left: 55, size: 2.0 },
-      { key: 'date', top: 59.4, left: 55, size: 2.0 },
-      { key: 'reg', top: 91.7, left: 17.5, size: 1.6 },
-    ],
+    title: '자격증', titleSize: 130, titleSpacing: 76, titleFont: 'kr',
+    sub: 'CERTIFICATE OF QUALIFICATION', font: 'kr', labelSize: 33,
+    labels: ['성  명', '생년월일', '자 격 명', '자격번호', '취 득 일'], nameSpacing: 6,
+    body1: '위 사람은 글로벌 AI·로봇 협회가 시행한',
+    body2: 'GARA 자격검정에 합격하였으므로 이 증서를 수여합니다.',
+    presTitle: '협회장', presName: '황모아', presNameSpacing: 18, regPrefix: '등록번호 : ',
   },
   en: {
-    src: '/cert-template-en.png',
-    fields: [
-      { key: 'name', top: 33.5, left: 55, size: 2.3 },
-      { key: 'birth', top: 41.5, left: 55, size: 1.9 },
-      { key: 'qual', top: 49.5, left: 55, size: 1.9 },
-      { key: 'no', top: 57, left: 55, size: 1.9 },
-      { key: 'date', top: 64.5, left: 55, size: 1.9 },
-      { key: 'reg', top: 88, left: 27, size: 1.5 },
-    ],
+    title: 'CERTIFICATE', titleSize: 92, titleSpacing: 12, titleFont: 'lat',
+    sub: 'OF QUALIFICATION', font: 'lat', labelSize: 28,
+    labels: ['Name', 'Date of Birth', 'Qualification', 'Certificate No.', 'Date of Issue'], nameSpacing: 2,
+    body1: 'This certifies that the person named above has passed',
+    body2: 'the GARA qualification examination held by the Global AI & Robotics Association.',
+    presTitle: 'President', presName: 'Hwang Moa', presNameSpacing: 3, regPrefix: 'Reg. No. : ',
   },
   ja: {
-    src: '/cert-template-ja.png',
-    fields: [
-      { key: 'name', top: 38, left: 48, size: 2.3 },
-      { key: 'birth', top: 44, left: 48, size: 1.9 },
-      { key: 'qual', top: 49.5, left: 48, size: 1.9 },
-      { key: 'no', top: 55, left: 48, size: 1.9 },
-      { key: 'date', top: 60.5, left: 48, size: 1.9 },
-      { key: 'reg', top: 91, left: 16, size: 1.5 },
-    ],
+    title: '資格証', titleSize: 130, titleSpacing: 76, titleFont: 'kr',
+    sub: 'CERTIFICATE OF QUALIFICATION', font: 'kr', labelSize: 33,
+    labels: ['氏  名', '生年月日', '資 格 名', '資格番号', '取 得 日'], nameSpacing: 6,
+    body1: '上記の者は、グローバルAI・ロボット協会が実施した',
+    body2: 'GARA資格検定に合格したことをここに証します。',
+    presTitle: '会長', presName: 'ファン・モア', presNameSpacing: 5, regPrefix: '登録番号 : ',
   },
   zh: {
-    src: '/cert-template-zh.png',
-    fields: [
-      { key: 'name', top: 36, left: 48, size: 2.2 },
-      { key: 'birth', top: 42, left: 48, size: 1.9 },
-      { key: 'qual', top: 47.5, left: 48, size: 1.9 },
-      { key: 'no', top: 53, left: 48, size: 1.9 },
-      { key: 'date', top: 58.5, left: 48, size: 1.9 },
-      { key: 'reg', top: 64, left: 48, size: 1.9 },
-    ],
+    title: '资格证', titleSize: 130, titleSpacing: 76, titleFont: 'kr',
+    sub: 'CERTIFICATE OF QUALIFICATION', font: 'kr', labelSize: 33,
+    labels: ['姓  名', '出生日期', '资格名称', '资格编号', '取得日期'], nameSpacing: 6,
+    body1: '兹证明上述人员已通过全球AI·机器人协会举办的',
+    body2: 'GARA资格检定，特颁发此证书。',
+    presTitle: '会长', presName: 'Hwang Moa', presNameSpacing: 3, regPrefix: '注册编号 : ',
   },
   hi: {
-    src: '/cert-template-hi.png',
-    fields: [
-      { key: 'name', top: 38, left: 49, size: 2.2 },
-      { key: 'birth', top: 44, left: 49, size: 1.9 },
-      { key: 'qual', top: 49.5, left: 49, size: 1.9 },
-      { key: 'no', top: 55, left: 49, size: 1.9 },
-      { key: 'date', top: 60.5, left: 49, size: 1.9 },
-      { key: 'reg', top: 91, left: 20, size: 1.5 },
-    ],
+    title: 'प्रमाण पत्र', titleSize: 76, titleSpacing: 4, titleFont: 'dev',
+    sub: 'CERTIFICATE OF QUALIFICATION', font: 'dev', labelSize: 28,
+    labels: ['नाम', 'जन्म तिथि', 'योग्यता', 'प्रमाणपत्र सं.', 'प्राप्ति तिथि'], nameSpacing: 2,
+    body1: 'प्रमाणित किया जाता है कि उपर्युक्त व्यक्ति ने ग्लोबल AI·रोबोट एसोसिएशन',
+    body2: 'द्वारा आयोजित GARA योग्यता परीक्षा उत्तीर्ण की है।',
+    presTitle: 'अध्यक्ष', presName: 'Hwang Moa', presNameSpacing: 3, regPrefix: 'पंजीकरण सं. : ',
   },
   vi: {
-    src: '/cert-template-vi.png',
-    fields: [
-      { key: 'name', top: 36, left: 49, size: 2.2 },
-      { key: 'birth', top: 42, left: 49, size: 1.9 },
-      { key: 'qual', top: 47.5, left: 49, size: 1.9 },
-      { key: 'no', top: 53, left: 49, size: 1.9 },
-      { key: 'date', top: 58.5, left: 49, size: 1.9 },
-      { key: 'reg', top: 64, left: 49, size: 1.9 },
-    ],
+    title: 'CHỨNG CHỈ', titleSize: 88, titleSpacing: 10, titleFont: 'lat',
+    sub: 'CERTIFICATE OF QUALIFICATION', font: 'lat', labelSize: 27,
+    labels: ['Họ và tên', 'Ngày sinh', 'Tên chứng chỉ', 'Số chứng chỉ', 'Ngày cấp'], nameSpacing: 2,
+    body1: 'Chứng nhận người có tên trên đã đạt kỳ thi chứng nhận GARA',
+    body2: 'do Hiệp hội AI·Robot Toàn cầu tổ chức.',
+    presTitle: 'Chủ tịch', presName: 'Hwang Moa', presNameSpacing: 3, regPrefix: 'Số đăng ký : ',
   },
 }
 
-const CERT_LANGS = [
+const QUAL_DEFAULT: Record<CLang, string> = {
+  ko: 'CARIS 자격검정', en: 'CARIS Certification', ja: 'CARIS資格検定',
+  zh: 'CARIS 资格检定', hi: 'CARIS प्रमाणन', vi: 'Chứng nhận CARIS',
+}
+
+const CERT_LANGS: { code: CLang; label: string }[] = [
   { code: 'ko', label: '한국어' },
   { code: 'en', label: 'English' },
   { code: 'ja', label: '日本語' },
@@ -103,44 +110,33 @@ const CERT_LANGS = [
   { code: 'vi', label: 'Tiếng Việt' },
 ]
 
+const LABEL_Y = [384, 442, 503, 562, 621]
+
 export default function Certificate() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
   const { t, lang } = useT()
   const passed = location.state as CertData | null
-  // 미리보기(발급 데이터 없음)에서는 6개 언어 버전을 직접 전환해 볼 수 있게.
+  // 미리보기(발급 데이터 없음)에서는 6개 언어 버전을 직접 전환.
   const isPreview = !passed
-  const [previewLang, setPreviewLang] = useState(lang)
-  const activeLang = isPreview ? previewLang : lang
-  const tpl = CERT_TEMPLATES[activeLang] ?? CERT_TEMPLATES.ko
+  const [previewLang, setPreviewLang] = useState<CLang>(lang as CLang)
+  const activeLang = (isPreview ? previewLang : lang) as CLang
+  const T = CERT_TEXT[activeLang] ?? CERT_TEXT.ko
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const fallbackName =
     (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
-  // 미리보기에서 전환한 언어에 맞춰 자격명도 그 언어로 보여줌(고유명 기본값)
-  const QUAL_DEFAULT: Record<string, string> = {
-    ko: 'CARIS 자격검정', en: 'CARIS Certification', ja: 'CARIS資格検定',
-    zh: 'CARIS 资格检定', hi: 'CARIS प्रमाणन', vi: 'Chứng nhận CARIS',
-  }
 
   const data: CertData = passed ?? {
     name: fallbackName,
     qualification: QUAL_DEFAULT[activeLang] ?? QUAL_DEFAULT.ko,
-    certNo: 'GARA-2026-000001',
+    certNo: 'CA-PRO-2026-0001',
     issueDate: todayStr(),
   }
 
-  const cal = new URLSearchParams(location.search).has('cal') // ?cal=1 → 보정 눈금자
-
-  const values: Record<string, string> = {
-    name: data.name,
-    birth: data.birth ?? '',
-    qual: data.qualification,
-    no: data.certNo,
-    date: data.issueDate,
-    reg: data.certNo,
-  }
+  const krPres = activeLang === 'ko' || activeLang === 'ja' || activeLang === 'zh'
+  const values = [data.birth ?? '', data.qualification, data.certNo, data.issueDate]
 
   return (
     <div className="cert-page">
@@ -150,7 +146,7 @@ export default function Certificate() {
             <button
               key={l.code}
               className={activeLang === l.code ? 'on' : ''}
-              onClick={() => setPreviewLang(l.code as typeof lang)}
+              onClick={() => setPreviewLang(l.code)}
             >
               {l.label}
             </button>
@@ -159,30 +155,50 @@ export default function Certificate() {
       )}
 
       <div className="cert-canvas">
-        <img className="cert-bg" src={tpl.src} alt={t('cert.alt')} />
-        {cal && (
-          <div className="cert-cal">
-            {Array.from({ length: 19 }, (_, i) => (i + 1) * 5).map((p) => (
-              <div key={`h${p}`} className="cert-cal-h" style={{ top: `${p}%` }}>
-                <span>{p}</span>
-              </div>
+        <svg viewBox="0 0 1536 1024" className="cert-svg" role="img" aria-label={t('cert.alt')}>
+          <image href="/cert-bg.jpg" x="0" y="0" width="1536" height="1024" />
+
+          {/* 제목 */}
+          <text x="768" y="230" textAnchor="middle" fontFamily={F[T.titleFont]} fontWeight="800" fontSize={T.titleSize} letterSpacing={T.titleSpacing} fill="#152c55">
+            {T.title}
+          </text>
+          <text x="768" y="288" textAnchor="middle" fontFamily={F.lat} fontWeight="600" fontSize="28" letterSpacing="6" fill="#b8912f">
+            {T.sub}
+          </text>
+
+          {/* 로고 워드마크(배경엔 엠블럼만 있음) */}
+          <text x="310" y="640" textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="54" letterSpacing="4" fill="#12294e">GARA</text>
+          <text x="310" y="674" textAnchor="middle" fontFamily={SANS} fontWeight="700" fontSize="20" fill="#12294e">Global AI &amp; Robotics Association</text>
+
+          {/* 기재 라벨 */}
+          <g fontFamily={F[T.font]} fontWeight="800" fontSize={T.labelSize} fill="#1b3057">
+            {T.labels.map((lb, i) => (
+              <text key={i} x="752" y={LABEL_Y[i]} textAnchor="end">{lb}</text>
             ))}
-            {Array.from({ length: 19 }, (_, i) => (i + 1) * 5).map((p) => (
-              <div key={`v${p}`} className="cert-cal-v" style={{ left: `${p}%` }}>
-                <span>{p}</span>
-              </div>
+            {LABEL_Y.map((y, i) => (
+              <text key={i} x="770" y={y}>:</text>
             ))}
-          </div>
-        )}
-        {tpl.fields.map((f) => (
-          <span
-            key={f.key}
-            className={`cert-ov cert-ov-${f.key}`}
-            style={{ top: `${f.top}%`, left: `${f.left}%`, fontSize: `${f.size}cqw` }}
-          >
-            {values[f.key]}
-          </span>
-        ))}
+          </g>
+          {/* 기재 값 */}
+          <g fontFamily={F[T.font]} fontWeight="400" fontSize="34" fill="#10254a">
+            <text x="802" y="385" fontWeight="800" fontSize="38" letterSpacing={T.nameSpacing}>{data.name}</text>
+            {values.map((v, i) => (
+              <text key={i} x="802" y={LABEL_Y[i + 1]}>{v}</text>
+            ))}
+          </g>
+
+          {/* 본문 */}
+          <g fontFamily={F[T.font]} fontWeight="800" fontSize="32" fill="#142c55" textAnchor="middle">
+            <text x="768" y="725">{T.body1}</text>
+            <text x="768" y="777">{T.body2}</text>
+          </g>
+
+          {/* 하단 */}
+          <text x="768" y="850" textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="38" letterSpacing="0.5" fill="#142c55">Global AI &amp; Robotics Association</text>
+          <text x="718" y="908" textAnchor="end" fontFamily={krPres ? SANS : F[T.font]} fontWeight="600" fontSize="26" fill="#14284f">{T.presTitle}</text>
+          <text x="756" y="910" fontFamily={F[T.font]} fontWeight="800" fontSize="44" letterSpacing={T.presNameSpacing} fill="#14284f">{T.presName}</text>
+          <text x="245" y="922" fontFamily={SANS} fontWeight="600" fontSize="23" fill="#2c3f66">{T.regPrefix}{data.certNo}</text>
+        </svg>
       </div>
 
       <div className="cert-actions">

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { getTracks, GRADE_CODES, SCHEDULE } from '../lib/caris'
+import { getTracks, GRADE_CODES } from '../lib/caris'
 import { useExamFees, feeKey } from '../lib/fees'
+import { useExamRounds } from '../lib/rounds'
 
 // 원서접수(앞단 목업) — 회차 선택 후 자격을 고르고 결제까지의 화면 흐름만.
 //   · Pro    = 단일 시험(응시료 1건). 급수는 점수로 판정 → 급수 선택 없음.
@@ -12,13 +13,21 @@ import { useExamFees, feeKey } from '../lib/fees'
 export default function ExamApply() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [params] = useSearchParams()
   const { t, lang } = useT()
 
+  // 회차는 DB(exam_rounds)가 단일 소스. URL ?round=<id> 가 새로고침에도 살아남는 durable 소스,
+  // navigation state 는 클릭 진입 시 즉시 표시용(로딩 깜빡임 방지). 둘 다 없으면 접수중(open) 회차로 폴백.
   const st = location.state as { roundId?: string; roundLabel?: string; dateLabel?: string } | null
-  const round = st?.roundId ? SCHEDULE.find((s) => s.id === st.roundId) : undefined
-  const openRound = SCHEDULE.find((s) => s.open) ?? SCHEDULE[0]
-  const roundLabel = round ? t(round.roundKey) : st?.roundLabel ?? t(openRound.roundKey)
-  const dateLabel = round ? t(round.dateKey) : st?.dateLabel ?? t(openRound.dateKey)
+  const roundId = params.get('round') ?? st?.roundId ?? ''
+  const { regular, rolling } = useExamRounds(lang)
+  const allRounds = [...regular, ...rolling]
+  const byId = roundId ? allRounds.find((r) => r.id === roundId) : undefined
+  const openRound = allRounds.find((r) => r.status === 'open') ?? regular[0] ?? rolling[0]
+  const active = byId ?? openRound
+  // 정기=시험일(dateText), 상시=설명(note). DB 로딩 전엔 state 값으로 즉시 표시.
+  const roundLabel = active?.title ?? st?.roundLabel ?? ''
+  const dateLabel = (active ? active.dateText || active.note : '') || st?.dateLabel || ''
 
   const [track, setTrack] = useState(0)
   const [level, setLevel] = useState(0)
@@ -69,7 +78,7 @@ export default function ExamApply() {
           <h1 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface mb-2">{t('apply.title')}</h1>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-label-md font-bold">
             <span className="material-symbols-outlined text-[18px]">event</span>
-            {roundLabel} · {dateLabel}
+            {roundLabel ? (dateLabel ? `${roundLabel} · ${dateLabel}` : roundLabel) : t('common.loading')}
           </div>
         </div>
 

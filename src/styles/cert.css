@@ -1,4 +1,24 @@
-/* ===== 자격증: 디자인 이미지 위에 값만 오버레이 ===== */
+/* ===== 자격증: 원본 배경(글자 제거·워터마크 보존) 위에 SVG 텍스트 오버레이(하이브리드) =====
+   글자는 벡터(SVG text) + 내장 명조/개러몬드 → 어떤 배율·인쇄에도 선명, 6개 언어 한 배경 공용. */
+@font-face {
+  font-family: 'CertMyeongjo';
+  src: url('/fonts/NanumMyeongjo-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'CertMyeongjo';
+  src: url('/fonts/NanumMyeongjo-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'CertGaramond';
+  src: url('/fonts/CormorantGaramond.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 .cert-page {
   min-height: 100dvh;
   background: var(--page);
@@ -10,36 +30,16 @@
 }
 
 .cert-canvas {
-  position: relative;
-  container-type: inline-size;
   width: min(980px, 96vw);
   box-shadow: 0 14px 50px rgba(0, 0, 0, 0.5);
-  line-height: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  line-height: 0;
 }
-.cert-bg {
+.cert-svg {
   display: block;
   width: 100%;
   height: auto;
-}
-
-/* 빈칸 위 값 — 위치는 인라인 style(top/left/fontSize cqw)로 지정.
-   증서면(흰 종이 템플릿 이미지) 위 글자라 어두워야 함 → 증서면 한정 예외로 잉크(--ink-bg) 사용. */
-.cert-ov {
-  position: absolute;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  color: var(--ink-bg); /* 증서면 한정: 종이 위 어두운 글자 */
-  font-family: 'Batang', 'Apple SD Gothic Neo', 'Malgun Gothic', serif;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-.cert-ov-name {
-  font-weight: 800;
-  letter-spacing: 2px;
-}
-.cert-ov-reg {
-  color: var(--ink-bg); /* 증서면 한정 예외 */
-  font-weight: 600;
 }
 
 .cert-actions {
@@ -70,45 +70,6 @@
   color: var(--on-accent);
 }
 
-/* 보정 눈금자(?cal=1) — 개발용. 가로축=danger, 세로축=blue 로 구분 */
-.cert-cal {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.cert-cal-h {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-top: 1px solid rgba(248, 113, 113, 0.4);
-}
-.cert-cal-h span {
-  position: absolute;
-  left: 2px;
-  top: -8px;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--danger-fg);
-  background: rgba(var(--paper), 0.7);
-  padding: 0 1px;
-}
-.cert-cal-v {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-left: 1px solid rgba(0, 74, 198, 0.5);
-}
-.cert-cal-v span {
-  position: absolute;
-  top: 2px;
-  left: 1px;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--blue);
-  background: rgba(var(--paper), 0.7);
-  padding: 0 1px;
-}
-
 /* 인쇄 = PDF 저장: 자격증 한 장(A4 가로) */
 @media print {
   @page {
@@ -119,18 +80,20 @@
     min-height: auto;
     padding: 0;
     gap: 0;
-    background: rgb(var(--paper)); /* 증서면: 종이 화이트 풀불투명 */
+    background: #fff;
     display: block;
   }
   .cert-page .exam-home,
-  .cert-actions {
+  .cert-actions,
+  .cert-lang-tabs {
     display: none !important;
   }
   .cert-canvas {
     width: 100%;
     box-shadow: none;
+    border-radius: 0;
   }
-  .cert-bg {
+  .cert-svg {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

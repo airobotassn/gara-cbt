@@ -13,6 +13,7 @@ const RESULT_RELEASE_DAYS = Number(Deno.env.get('RESULT_RELEASE_DAYS') ?? 7)
 interface InAnswer {
   questionId: string
   selectedIndex: number | null
+  answerText?: string | null
   timeSpent?: number
 }
 
@@ -61,10 +62,10 @@ Deno.serve(async (req) => {
       return json({ ok: true, voided: true, submittedAt })
     }
 
-    // 출제된(고정된) 문항 + 정답
+    // 출제된(고정된) 문항 + 정답/유형
     const { data: assigned } = await admin
       .from('attempt_answers')
-      .select('id, question_id, questions(correct_index)')
+      .select('id, question_id, questions(kind, correct_index)')
       .eq('attempt_id', attemptId)
     if (!assigned || assigned.length === 0) {
       return json({ error: '채점할 문항이 없습니다.' }, 400)
@@ -74,9 +75,26 @@ Deno.serve(async (req) => {
     for (const a of answers as InAnswer[]) submittedMap.set(a.questionId, a)
 
     // 서버 채점: 출제된 각 문항만(클라가 보낸 임의 문항은 무시)
+    //  · 객관식: 정답 비교 자동채점(review_status=auto)
+    //  · 주관식: 답안 텍스트만 저장, 채점 보류(is_correct=null, review_status=pending) → 관리자 검수
     let totalCorrect = 0
     for (const row of assigned as any[]) {
       const sub = submittedMap.get(row.question_id)
+      const kind = row.questions?.kind ?? 'mc'
+      const timeSpent = Math.max(0, Math.floor(sub?.timeSpent ?? 0))
+      if (kind === 'short') {
+        await admin
+          .from('attempt_answers')
+          .update({
+            answer_text: sub?.answerText ?? null,
+            selected_index: null,
+            is_correct: null,
+            review_status: 'pending',
+            time_spent: timeSpent,
+          })
+          .eq('id', row.id)
+        continue
+      }
       const selected = sub?.selectedIndex ?? null
       const correctIndex = row.questions?.correct_index ?? -1
       const isCorrect = selected !== null && selected === correctIndex
@@ -86,14 +104,19 @@ Deno.serve(async (req) => {
         .update({
           selected_index: selected,
           is_correct: isCorrect,
-          time_spent: Math.max(0, Math.floor(sub?.timeSpent ?? 0)),
+          review_status: 'auto',
+          time_spent: timeSpent,
         })
         .eq('id', row.id)
     }
 
-    const resultReleaseAt = new Date(
-      Date.now() + RESULT_RELEASE_DAYS * 24 * 60 * 60 * 1000,
-    ).toISOString()
+    // 결과 공개 = 제출 +N일 되는 날의 오전 10시(KST) 정각. N<=0 이면 즉시(테스트 스위치 유지).
+    const resultReleaseAt = (() => {
+      if (RESULT_RELEASE_DAYS <= 0) return new Date().toISOString()
+      const kst = new Date(Date.now() + RESULT_RELEASE_DAYS * 864e5 + 9 * 3600e3)
+      // 01:00 UTC = 10:00 KST
+      return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate(), 1, 0, 0)).toISOString()
+    })()
 
     await admin
       .from('exam_attempts')

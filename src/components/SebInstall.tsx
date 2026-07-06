@@ -2,67 +2,71 @@ import { getDesktopOS } from '../lib/device'
 import { sebInstaller } from '../lib/seb'
 import { useT } from '../lib/i18n'
 
-// SEB 설치 안내(공유) — 좁은 팝업에도 들어가게 컴팩트하게. OS 감지 다운로드(#5) + 신뢰 칩(#3) +
-// 실제 마찰점 하나(경고 대처)만 '제목 + 클릭경로 칩'으로 압축(#2). onLaunch 주면 실행 버튼(#4).
-// ⚠️ 중복 제거: 게시자 문구는 칩으로, SmartScreen 긴 문장은 [추가 정보]→[실행] 칩으로 대체.
+// SEB 설치 안내(공유) — 정보 설계 우선.
+//  · 다운로드 버튼 → 프로그램 정보(라벨:값 — 프로그램/만든 곳/설치) → 설치 경고 대처.
+//  · 경고는 "무슨 창이 뜨는지(제목) + 왜 괜찮고 뭘 누르면 되는지(문장)"로 완결되게.
+//  · onLaunch 주면 실행 버튼 노출.
 export default function SebInstall({ onLaunch }: { onLaunch?: () => void }) {
   const { t } = useT()
   const inst = sebInstaller(getDesktopOS())
   const isMac = inst.os === 'mac'
   const osLabel = isMac ? 'macOS' : 'Windows'
 
-  const chips = [
-    { icon: 'check_circle', label: t('seb.chip_once') },
-    { icon: 'verified_user', label: t('seb.chip_publisher') },
-    { icon: 'download', label: t('seb.chip_size', { size: inst.size }) },
+  const facts: [string, string][] = [
+    [t('seb.fact_program'), `Safe Exam Browser (${osLabel})`],
+    [t('seb.fact_maker'), t('seb.fact_maker_v')],
+    [t('seb.fact_install'), `${t('seb.chip_once')} · ${t('seb.chip_size', { size: inst.size })}`],
   ]
 
   const btn =
-    'w-full sm:w-auto self-center bg-primary-container text-on-primary font-title-md text-title-md font-bold px-7 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2'
+    'w-full sm:w-auto sm:self-start shrink-0 bg-primary-container text-on-primary font-title-md text-title-md font-bold px-7 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2'
+
+  const kbd =
+    'inline-flex items-center align-middle px-2 py-0.5 mx-0.5 rounded-md border border-outline-variant/60 bg-surface-container-low font-label-md text-label-md text-on-surface whitespace-nowrap'
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* 다운로드 + 신뢰 칩(#3) */}
-      <div className="flex flex-col gap-2.5">
-        <a href={inst.url} target="_blank" rel="noreferrer" className={btn}>
-          <span className="material-symbols-outlined text-[20px]">download</span>
-          {t('seb.download')} · {osLabel}
-        </a>
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          {chips.map((c) => (
-            <span key={c.icon} className="inline-flex items-center gap-1 font-label-md text-label-md text-on-surface-variant">
-              <span className="material-symbols-outlined text-[16px] text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>
-                {c.icon}
-              </span>
-              {c.label}
-            </span>
-          ))}
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      {/* 다운로드 */}
+      <a href={inst.url} target="_blank" rel="noreferrer" className={btn}>
+        <span className="material-symbols-outlined text-[20px]">download</span>
+        {t('seb.download')}
+      </a>
 
-      {/* 경고 대처 — 제목 한 줄 + 클릭 경로 칩(긴 설명 문장 제거) */}
-      <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low px-3.5 py-3 flex items-start gap-2.5">
+      {/* 프로그램 정보 — 라벨:값 */}
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2.5">
+        {facts.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="font-label-md text-label-md font-bold text-on-surface-variant pt-px whitespace-nowrap">{k}</dt>
+            <dd className="font-body-md text-body-md text-on-surface break-keep leading-relaxed">{v}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* 설치 경고 대처 */}
+      <div className="border-t border-outline-variant/30 pt-5 flex items-start gap-3">
         <span
           className="material-symbols-outlined text-[20px] text-primary-container shrink-0 mt-0.5"
           style={{ fontVariationSettings: "'FILL' 1" }}
         >
           {isMac ? 'lightbulb' : 'shield'}
         </span>
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <div className="font-label-md text-label-md font-bold text-on-surface break-keep">{t('seb.warn_title')}</div>
+        <div className="min-w-0">
+          <div className="font-label-md text-label-md font-bold text-on-surface break-keep">
+            {isMac ? t('seb.warn_title') : t('seb.warn_title_win', { dialog: t('seb.dialog_title') })}
+          </div>
           {isMac ? (
-            <p className="font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('seb.step2_d_mac')}</p>
+            <p className="mt-1.5 font-body-md text-body-md text-on-surface-variant break-keep leading-relaxed">{t('seb.step2_d_mac')}</p>
           ) : (
-            <div className="flex items-center flex-wrap gap-1.5">
-              <span className="font-label-md text-label-md px-2 py-0.5 rounded bg-surface-container-highest text-on-surface">{t('seb.dialog_more')}</span>
-              <span className="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
-              <span className="font-label-md text-label-md font-bold px-2 py-0.5 rounded bg-primary-container text-on-primary">{t('seb.dialog_run')}</span>
-            </div>
+            <p className="mt-1.5 font-body-md text-body-md text-on-surface-variant break-keep leading-loose">
+              {t('seb.warn_body_pre')} <span className={kbd}>{t('seb.dialog_more')}</span>
+              <span className="material-symbols-outlined align-middle text-[14px] text-outline mx-0.5">arrow_forward</span>
+              <span className={`${kbd} font-bold`}>{t('seb.dialog_run')}</span> {t('seb.warn_body_post')}
+            </p>
           )}
         </div>
       </div>
 
-      {/* 원클릭 실행(#4) */}
+      {/* 원클릭 실행 */}
       {onLaunch && (
         <button onClick={onLaunch} className={btn}>
           <span className="material-symbols-outlined text-[20px]">lock_open</span>

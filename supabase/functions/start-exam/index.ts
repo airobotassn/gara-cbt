@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   try {
     const sebErr = await sebCheckFailed(req)
     if (sebErr) return json({ error: sebErr }, 403)
-    const { examSlug } = await req.json()
+    const { examSlug, roundId: reqRoundId } = await req.json()
     if (!examSlug || typeof examSlug !== 'string') {
       return json({ error: '잘못된 요청입니다.' }, 400)
     }
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     // 활성 문항 전부(번호 순)
     const { data: questions, error: qErr } = await admin
       .from('questions')
-      .select('id, number, subject, topic, prompt, choices')
+      .select('id, number, subject, topic, prompt, kind, choices')
       .eq('exam_id', exam.id)
       .eq('active', true)
       .order('number', { ascending: true })
@@ -88,11 +88,35 @@ Deno.serve(async (req) => {
     const limit = Math.max(0, Math.floor(Number(Deno.env.get('EXAM_QUESTION_LIMIT') ?? 0)))
     const served = limit > 0 ? questions.slice(0, limit) : questions
 
+    // 회차 배정 — 클라가 roundId 주면 그것(검증), 없으면 현재 활성 정기회차 자동 배정(데모/접수 UX 전 대응).
+    //  · 활성 = 오늘 이후 시험일 중 가장 임박, 없으면 가장 최근 정기회차. 없으면 null(상시/미배정).
+    let roundId: string | null = null
+    if (reqRoundId) {
+      const { data: r } = await admin.from('exam_rounds').select('id').eq('id', reqRoundId).eq('published', true).maybeSingle()
+      roundId = r?.id ?? null
+    }
+    if (!roundId) {
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: up } = await admin
+        .from('exam_rounds').select('id')
+        .eq('kind', 'regular').eq('published', true).gte('exam_date', today)
+        .order('exam_date', { ascending: true }).limit(1).maybeSingle()
+      if (up) roundId = up.id
+      else {
+        const { data: last } = await admin
+          .from('exam_rounds').select('id')
+          .eq('kind', 'regular').eq('published', true)
+          .order('exam_date', { ascending: false }).limit(1).maybeSingle()
+        roundId = last?.id ?? null
+      }
+    }
+
     // 응시 생성
     const { data: attempt, error: aErr } = await admin
       .from('exam_attempts')
       .insert({
         exam_id: exam.id,
+        round_id: roundId,
         user_id: user.id,
         status: 'in_progress',
         total_questions: served.length,
@@ -101,13 +125,14 @@ Deno.serve(async (req) => {
       .single()
     if (aErr || !attempt) return json({ error: aErr?.message ?? '응시 생성 실패' }, 500)
 
-    // 출제 문항 고정(부정 제출 방지) — 한 문항당 한 행
+    // 출제 문항 고정(부정 제출 방지) — 한 문항당 한 행. 주관식은 채점 보류(pending)로 시작.
     const answerRows = served.map((q) => ({
       attempt_id: attempt.id,
       question_id: q.id,
       number: q.number,
       selected_index: null,
       is_correct: null,
+      review_status: q.kind === 'short' ? 'pending' : 'auto',
     }))
     const { error: insErr } = await admin.from('attempt_answers').insert(answerRows)
     if (insErr) return json({ error: insErr.message }, 500)
@@ -128,6 +153,7 @@ Deno.serve(async (req) => {
         subject: q.subject,
         topic: q.topic,
         prompt: q.prompt,
+        kind: q.kind ?? 'mc',
         choices: q.choices,
       })),
     })

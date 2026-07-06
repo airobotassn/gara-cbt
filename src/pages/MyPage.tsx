@@ -6,6 +6,7 @@ import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
 import type { MyAttempt } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
+import { makeCertNo, trackOfTitle, tempSeq } from '../lib/certNo'
 
 // gara_5 (마이페이지) 목업 디자인 그대로 + 실제 응시 데이터·탭·발급·로그인 게이트 로직 보존.
 // 원본: stitch_design_critique_assistant/gara_5/code.html
@@ -35,7 +36,9 @@ function daysLeft(iso?: string | null) {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
 }
 function certNoOf(a: MyAttempt) {
-  return `GARA-2026-${a.attemptId.replace(/-/g, '').slice(0, 6).toUpperCase()}`
+  // 시험명으로 트랙(Pro/Master) 추정 → 종목·등급코드. 일련번호는 서버 연동 전까지 임시(tempSeq).
+  const year = (a.submittedAt ? new Date(a.submittedAt).getFullYear() : 0) || new Date().getFullYear()
+  return makeCertNo(trackOfTitle(a.examTitle), year, tempSeq(a.attemptId))
 }
 
 // 상태 → 카드 비주얼
@@ -57,7 +60,6 @@ export default function MyPage() {
   const { t } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
-  const [, setTick] = useState(0)
 
   useEffect(() => {
     if (!isFullUser) return
@@ -69,11 +71,15 @@ export default function MyPage() {
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')
 
-  const isIssued = (certNo: string) => !!localStorage.getItem(`cert_issued_${certNo}`)
-  function goCert(a: MyAttempt) {
+  // 발급 = 서버 기록(cert_issued_at) — 마이페이지/성적표 어디서 발급해도 '발급 완료'로 남고, 재발급도 가능
+  async function goCert(a: MyAttempt) {
+    try {
+      await callFunction('my-attempts', { issue: a.attemptId })
+      setList((prev) => prev?.map((x) => (x.attemptId === a.attemptId ? { ...x, certIssuedAt: new Date().toISOString() } : x)) ?? prev)
+    } catch {
+      /* 발급 기록 실패 — 증서 화면은 열어준다(다음 방문 때 상태 재동기화) */
+    }
     const certNo = certNoOf(a)
-    localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
-    setTick((x) => x + 1)
     navigate('/certificate', {
       state: { name, qualification: a.examTitle ?? t('mypage.exam_fallback'), certNo, issueDate: fmtDate(a.submittedAt), scoreText: `${a.totalCorrect} / ${a.totalQuestions}` },
     })
@@ -208,7 +214,7 @@ export default function MyPage() {
               <div className="flex flex-col gap-6">
                 {earned.map((a) => {
                   const certNo = certNoOf(a)
-                  const issued = isIssued(certNo)
+                  const issued = !!a.certIssuedAt
                   return (
                     <article key={a.attemptId} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                       <div className="flex items-start gap-5 flex-1">

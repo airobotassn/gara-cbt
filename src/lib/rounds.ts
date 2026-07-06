@@ -23,6 +23,7 @@ export interface RoundView {
   title: string
   note: string
   dateText: string // 정기: 시험일(언어별 포맷) / 상시: ''
+  applyText: string // 접수기간 "YYYY. MM. DD ~ YYYY. MM. DD" / 상시·미설정: ''
   status: RoundStatus
   clickable: boolean // 접수중일 때만 원서접수로 이동
 }
@@ -49,6 +50,29 @@ function fmtDate(ymd: string, lang: Lang): string {
   } catch {
     return ymd
   }
+}
+
+// 접수기간(timestamptz) → 요일 없는 짧은 날짜 (범위 표기용)
+function fmtShort(iso: string, lang: Lang): string {
+  try {
+    return new Intl.DateTimeFormat(LOCALE[lang] ?? 'en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(iso))
+  } catch {
+    return ''
+  }
+}
+
+// 접수기간 표기: 양끝 다 있으면 "start ~ end", 한쪽만 있으면 그쪽만, 없으면 ''(상시·미설정)
+function fmtApply(r: RawRound, lang: Lang): string {
+  const s = r.apply_start_at ? fmtShort(r.apply_start_at, lang) : ''
+  const e = r.apply_end_at ? fmtShort(r.apply_end_at, lang) : ''
+  if (s && e) return `${s} ~ ${e}`
+  if (e) return `~ ${e}`
+  if (s) return `${s} ~`
+  return ''
 }
 
 // 접수 상태: 상시는 항상 open, 정기는 접수기간(now) 기준.
@@ -91,18 +115,31 @@ export function useExamRounds(lang: Lang) {
 
   const views = useMemo<RoundView[]>(() => {
     const pick = (m: Record<string, string> | null) => m?.[lang] ?? m?.ko ?? ''
-    return raw.map((r) => {
-      const status = statusOf(r)
-      return {
-        id: r.id,
-        kind: r.kind,
-        title: pick(r.title_i18n),
-        note: pick(r.note_i18n),
-        dateText: r.exam_date ? fmtDate(r.exam_date, lang) : '',
-        status,
-        clickable: status === 'open',
-      }
-    })
+    // 시험일이 지난 정기 회차는 목록에서 제외(접수 페이지에 끝난 시험을 쌓지 않음).
+    // 접수만 마감(시험일 전)인 회차는 '마감'으로 계속 노출. 상시(exam_date 없음)는 항상 유지.
+    // 자정 경계 흔들림 방지: 오늘 00:00 을 지난 것만 과거로 판정.
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const isPastExam = (r: RawRound) => {
+      if (!r.exam_date) return false
+      const d = Date.parse(`${r.exam_date}T23:59:59`)
+      return !Number.isNaN(d) && d < todayStart.getTime()
+    }
+    return raw
+      .filter((r) => !isPastExam(r))
+      .map((r) => {
+        const status = statusOf(r)
+        return {
+          id: r.id,
+          kind: r.kind,
+          title: pick(r.title_i18n),
+          note: pick(r.note_i18n),
+          dateText: r.exam_date ? fmtDate(r.exam_date, lang) : '',
+          applyText: fmtApply(r, lang),
+          status,
+          clickable: status === 'open',
+        }
+      })
   }, [raw, lang])
 
   return {

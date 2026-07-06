@@ -59,10 +59,17 @@ create table if not exists questions (
   subject text not null,               -- 예: '전기자기학 · 정전계'
   topic text not null,                 -- 예: '전위'
   prompt text not null,
-  choices jsonb not null,              -- 4지선다 보기(문자열 배열)
-  correct_index int not null check (correct_index between 0 and 3),  -- 0..3, 클라 비노출
+  kind text not null default 'mc',     -- 'mc'(객관식) | 'short'(주관식)
+  choices jsonb not null,              -- 4지선다 보기(주관식은 [])
+  correct_index int,                   -- 객관식 0..3(클라 비노출), 주관식 null
+  answer_key text,                     -- 주관식 모범답안/채점 기준(관리자 검수 참고, 비노출)
   active boolean not null default true,
-  unique (exam_id, number)
+  unique (exam_id, number),
+  constraint questions_kind_check check (kind in ('mc', 'short')),
+  constraint questions_correct_index_check check (
+    (kind = 'mc' and correct_index between 0 and 3)
+    or (kind = 'short' and correct_index is null)
+  )
 );
 create index if not exists questions_exam_idx on questions(exam_id) where active;
 
@@ -70,6 +77,7 @@ create index if not exists questions_exam_idx on questions(exam_id) where active
 create table if not exists exam_attempts (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid references exams(id),
+  round_id uuid references exam_rounds(id),   -- 응시한 회차(정기시험 회차별 채점/집계). 상시·미배정은 null
   user_id uuid not null references auth.users(id) on delete cascade,
   status text not null default 'in_progress',  -- in_progress | submitted | voided | expired
   started_at timestamptz default now(),
@@ -79,6 +87,7 @@ create table if not exists exam_attempts (
   total_correct int,
   created_at timestamptz default now()
 );
+create index if not exists exam_attempts_round_idx on exam_attempts(round_id);
 create index if not exists exam_attempts_user_idx on exam_attempts(user_id);
 create index if not exists exam_attempts_status_idx on exam_attempts(status);
 create index if not exists exam_attempts_user_status_idx on exam_attempts(user_id, status);
@@ -90,8 +99,12 @@ create table if not exists attempt_answers (
   attempt_id uuid references exam_attempts(id) on delete cascade,
   question_id uuid references questions(id),
   number int,
-  selected_index int,
-  is_correct boolean,
+  selected_index int,                  -- 객관식 선택(0..3), 미응답 null
+  answer_text text,                    -- 주관식 응답
+  is_correct boolean,                  -- 채점 결과(주관식 검수 전 null)
+  review_status text not null default 'auto',  -- auto(객관식 자동) | pending(주관식 검수대기) | graded(검수완료)
+  graded_by text,                      -- 검수 관리자 이메일
+  graded_at timestamptz,
   time_spent int default 0,
   unique (attempt_id, question_id)
 );

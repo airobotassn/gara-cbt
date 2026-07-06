@@ -124,13 +124,8 @@ export function nextProGrade(pct: number): ProGrade | null {
   return [...PRO_GRADE_CUTS].reverse().find((g) => g.min > pct) ?? null // 4급→1급 오름차순 탐색
 }
 
-export type Round = { id: string; roundKey: string; dateKey: string; open: boolean }
-
-export const SCHEDULE: Round[] = [
-  { id: 'r4', roundKey: 'guide.sched_r4_round', dateKey: 'guide.sched_r4_date', open: true },
-  { id: 'r5', roundKey: 'guide.sched_r5_round', dateKey: 'guide.sched_r5_date', open: false },
-  { id: 'r1_2027', roundKey: 'guide.sched_r1_round', dateKey: 'guide.sched_r1_date', open: false },
-]
+// 시험 일정(정기/상시)은 DB(exam_rounds)가 단일 소스 — src/lib/rounds.ts 의 useExamRounds 로 로드.
+// (구 하드코딩 SCHEDULE/Round 는 제거: ExamSchedule·Guide·ExamApply 모두 DB 조회로 통일)
 
 // 상시시험 — 회차와 무관하게 연중 접수(예약 응시). 로케일은 caris.rolling.* 키.
 export type Rolling = { id: string; name: string; badge: string; date: string; desc: string }

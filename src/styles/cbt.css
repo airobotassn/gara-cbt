@@ -632,6 +632,59 @@
   font-size: var(--fs-sm);
   margin-bottom: 14px;
 }
+/* 보안 프로그램 설치(3단계) — 라벨:값 표 + 설치 경고 문장 (/exam/check 의 SebInstall 과 동일 구조) */
+.prep-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 9px 22px;
+  margin: 0 0 18px;
+}
+.prep-facts dt {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.prep-facts dd {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--txt);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+.prep-sebwarn {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.prep-sebwarn b {
+  display: block;
+  font-size: var(--fs-md);
+  color: var(--ink);
+  margin-bottom: 6px;
+  word-break: keep-all;
+}
+.prep-sebwarn p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: 1.9;
+  word-break: keep-all;
+}
+.prep-kbd {
+  display: inline-block;
+  padding: 1px 9px;
+  margin: 0 2px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.prep-kbd.strong {
+  font-weight: 800;
+}
 .prep-sample {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1410,6 +1463,7 @@
   width: 100%;
   max-height: 84vh;
   overflow-y: auto;
+  text-align: left;
 }
 .admin-modal-x {
   position: absolute;

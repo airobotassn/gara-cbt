@@ -1,10 +1,10 @@
 import type { StartExamResponse } from './types'
 
-// 시험환경 테스트용 모의 5문제 — 실제 시험과 동일한 응시 화면을 체험(채점·서버 없음).
+// 시험환경 테스트용 모의 6문제(객관식 5 + 주관식 1) — 실제 시험과 동일한 응시 화면을 체험(채점·서버 없음).
 export function makePracticeExam(): StartExamResponse {
   return {
     attemptId: 'practice',
-    exam: { slug: 'practice', title: '시험환경 테스트', durationMinutes: 10, totalQuestions: 5 },
+    exam: { slug: 'practice', title: '시험환경 테스트', durationMinutes: 10, totalQuestions: 6 },
     startedAt: new Date().toISOString(),
     questions: [
       {
@@ -72,6 +72,16 @@ export function makePracticeExam(): StartExamResponse {
           '제출 전 확인 창이 나타난다',
           '위 내용이 모두 맞다',
         ],
+      },
+      {
+        id: 'practice-6',
+        number: 6,
+        kind: 'short',
+        subject: '시험환경 테스트',
+        topic: '주관식 답안',
+        prompt:
+          '주관식 문항입니다. 아래 입력란에 답을 직접 작성해 보세요.\n실제 시험에서는 주관식 답안을 관리자가 검토해 채점합니다. (이 모의 문제는 채점되지 않습니다)',
+        choices: [],
       },
     ],
   }

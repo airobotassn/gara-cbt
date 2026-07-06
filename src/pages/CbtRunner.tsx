@@ -61,6 +61,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
+  const [texts, setTexts] = useState<string[]>(() => Array(total).fill('')) // 주관식 답안
   const [submitting, setSubmitting] = useState(false)
   const [askQuit, setAskQuit] = useState(false) // 종료(포기) 확인 모달 — 네이티브 confirm은 전체화면 해제+포커스 이탈로 부정행위 오탐 유발 → 금지
   const submittedRef = useRef(false)
@@ -76,6 +77,12 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     }
   }, [index])
 
+  // 문항 응답 완료 여부 — 객관식=보기 선택, 주관식=텍스트 입력
+  const isAnswered = useCallback(
+    (i: number) => (questions[i].kind === 'short' ? texts[i].trim() !== '' : selected[i] !== null),
+    [questions, selected, texts],
+  )
+
   const buildAnswers = useCallback((): SubmittedAnswer[] => {
     const t = startTimeRef.current[index]
     if (t) {
@@ -84,10 +91,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     }
     return questions.map((q, i) => ({
       questionId: q.id,
-      selectedIndex: selected[i],
+      selectedIndex: q.kind === 'short' ? null : selected[i],
+      answerText: q.kind === 'short' ? texts[i] : null,
       timeSpent: spentRef.current[i],
     }))
-  }, [questions, selected, index])
+  }, [questions, selected, texts, index])
 
   const doSubmit = useCallback(async () => {
     if (submittedRef.current) return
@@ -144,8 +152,8 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const onClickSubmit = useCallback(() => {
     if (submitting) return
     const unanswered: number[] = []
-    selected.forEach((s, i) => {
-      if (s === null) unanswered.push(i)
+    questions.forEach((_, i) => {
+      if (!isAnswered(i)) unanswered.push(i)
     })
     if (unanswered.length > 0) {
       window.alert(t('run.unanswered_warn', { n: unanswered.length, first: unanswered[0] + 1 }))
@@ -153,7 +161,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       return
     }
     if (window.confirm(t('run.submit_confirm'))) doSubmit()
-  }, [selected, submitting, doSubmit, t])
+  }, [questions, isAnswered, submitting, doSubmit, t])
 
   // 제한시간 카운트다운 — 0 도달 시 자동 제출
   const deadlineRef = useRef<number | null>(null)
@@ -188,9 +196,17 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       return next
     })
   }
+  function writeText(qIdx: number, v: string) {
+    if (submitting) return
+    setTexts((arr) => {
+      const next = [...arr]
+      next[qIdx] = v
+      return next
+    })
+  }
 
   const q = questions[index]
-  const answeredCount = selected.filter((s) => s !== null).length
+  const answeredCount = questions.reduce((n, _, i) => n + (isAnswered(i) ? 1 : 0), 0)
   const low = remainMs <= 5 * 60000
 
   return (
@@ -259,21 +275,38 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
             <div className="space-y-4">
               <h2 className="font-title-md text-xl md:text-2xl font-bold text-on-surface leading-snug break-keep">{q.prompt}</h2>
             </div>
-            <div className="flex flex-col gap-3 mt-2 pb-12">
-              {q.choices.map((opt, i) => {
-                const sel = selected[index] === i
-                return (
-                  <button
-                    key={i}
-                    onClick={() => choose(index, i)}
-                    className={`group relative flex items-center p-4 rounded-xl text-left transition-all cursor-pointer shadow-sm ${sel ? 'border-2 border-primary bg-primary-fixed/10' : 'border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low hover:border-primary/50 hover:shadow'}`}
-                  >
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-label-sm text-label-sm shrink-0 mr-3 transition-all ${sel ? 'bg-primary border-primary text-on-primary' : 'border border-outline-variant text-outline group-hover:border-primary group-hover:text-primary'}`}>{i + 1}</div>
-                    <span className={`font-body-md text-body-md ${sel ? 'font-semibold text-primary' : 'text-on-surface'}`}>{opt}</span>
-                  </button>
-                )
-              })}
-            </div>
+            {q.kind === 'short' ? (
+              <div className="mt-2 pb-12">
+                <textarea
+                  value={texts[index]}
+                  onChange={(e) => writeText(index, e.target.value)}
+                  disabled={submitting}
+                  rows={8}
+                  placeholder={t('run.short_placeholder')}
+                  className="w-full rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4 font-body-md text-body-md text-on-surface leading-relaxed resize-y focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all"
+                />
+                <div className="mt-2 flex justify-between font-label-sm text-label-sm text-on-surface-variant">
+                  <span>{t('run.short_hint')}</span>
+                  <span className="tabular-nums">{texts[index].length}{t('run.short_chars')}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 mt-2 pb-12">
+                {q.choices.map((opt, i) => {
+                  const sel = selected[index] === i
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => choose(index, i)}
+                      className={`group relative flex items-center p-4 rounded-xl text-left transition-all cursor-pointer shadow-sm ${sel ? 'border-2 border-primary bg-primary-fixed/10' : 'border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low hover:border-primary/50 hover:shadow'}`}
+                    >
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center font-label-sm text-label-sm shrink-0 mr-3 transition-all ${sel ? 'bg-primary border-primary text-on-primary' : 'border border-outline-variant text-outline group-hover:border-primary group-hover:text-primary'}`}>{i + 1}</div>
+                      <span className={`font-body-md text-body-md ${sel ? 'font-semibold text-primary' : 'text-on-surface'}`}>{opt}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -300,18 +333,30 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                         {cur && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-r-sm"></div>}
                         {i + 1}
                       </button>
-                      <div className="grid grid-cols-4 py-4 items-center">
-                        {[0, 1, 2, 3].map((opt) => {
-                          const on = selected[i] === opt
-                          return (
-                            <div key={opt} className="flex justify-center">
-                              <button onClick={() => choose(i, opt)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold transition-colors ${on ? 'bg-primary text-on-primary shadow-sm' : 'border border-outline-variant/60 hover:border-primary/50'}`}>
-                                {on ? opt + 1 : ''}
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
+                      {qq.kind === 'short' ? (
+                        // 주관식 — 1~4 대신 작성 여부 표시(클릭 시 해당 문항으로 이동)
+                        <button onClick={() => setIndex(i)} className="py-4 flex items-center gap-2 px-4 text-left">
+                          <span className={`material-symbols-outlined text-[18px] ${isAnswered(i) ? 'text-primary' : 'text-outline'}`} style={isAnswered(i) ? { fontVariationSettings: "'FILL' 1" } : undefined}>
+                            {isAnswered(i) ? 'edit_note' : 'edit'}
+                          </span>
+                          <span className={`font-label-sm text-label-sm ${isAnswered(i) ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>
+                            {t('run.short_label')} · {isAnswered(i) ? t('run.short_done') : t('run.short_todo')}
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="grid grid-cols-4 py-4 items-center">
+                          {[0, 1, 2, 3].map((opt) => {
+                            const on = selected[i] === opt
+                            return (
+                              <div key={opt} className="flex justify-center">
+                                <button onClick={() => choose(i, opt)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold transition-colors ${on ? 'bg-primary text-on-primary shadow-sm' : 'border border-outline-variant/60 hover:border-primary/50'}`}>
+                                  {on ? opt + 1 : ''}
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

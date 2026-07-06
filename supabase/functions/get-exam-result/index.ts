@@ -42,10 +42,10 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 공개 — 문항별 정오답(문항 조인)
+    // 공개 — 문항별 정오답(문항 조인). 주관식은 유형·응답 텍스트·검수상태 포함(보기/정답번호는 없음).
     const { data: rows } = await admin
       .from('attempt_answers')
-      .select('number, selected_index, is_correct, questions(subject, topic, prompt, choices, correct_index)')
+      .select('number, selected_index, answer_text, is_correct, review_status, questions(subject, topic, prompt, kind, choices, correct_index)')
       .eq('attempt_id', attemptId)
       .order('number', { ascending: true })
 
@@ -54,10 +54,13 @@ Deno.serve(async (req) => {
       subject: r.questions?.subject ?? null,
       topic: r.questions?.topic ?? null,
       prompt: r.questions?.prompt ?? '',
+      kind: r.questions?.kind ?? 'mc',
       choices: r.questions?.choices ?? [],
       selectedIndex: r.selected_index,
+      answerText: r.answer_text ?? null,
       correctIndex: r.questions?.correct_index ?? -1,
       isCorrect: r.is_correct,
+      reviewStatus: r.review_status ?? 'auto',
     }))
 
     return json({

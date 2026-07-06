@@ -6,6 +6,11 @@ import type {
   AdminListResponse,
   AdminAttemptRow,
   AdminDetailResponse,
+  AdminAnswerRow,
+  GradeQueueItem,
+  GradeQueueResponse,
+  GradeRound,
+  GradeRoundsResponse,
   AdminNoticeListResponse,
   NoticeRow,
   AdminFaqListResponse,
@@ -110,7 +115,7 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'dash' | 'subs' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
+  const [sub, setSub] = useState<'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
   const [isRoot, setIsRoot] = useState(false)
 
   useEffect(() => {
@@ -230,6 +235,9 @@ function CarisExamAdmin() {
         <button className={sub === 'subs' ? 'on' : ''} onClick={() => setSub('subs')}>
           제출 답안
         </button>
+        <button className={sub === 'grading' ? 'on' : ''} onClick={() => setSub('grading')}>
+          주관식 채점
+        </button>
         <button className={sub === 'users' ? 'on' : ''} onClick={() => setSub('users')}>
           회원
         </button>
@@ -256,6 +264,8 @@ function CarisExamAdmin() {
       </div>
       {sub === 'dash' ? (
         <DashboardAdmin />
+      ) : sub === 'grading' ? (
+        <GradingAdmin />
       ) : sub === 'users' ? (
         <UsersAdmin />
       ) : sub === 'questions' ? (
@@ -1627,6 +1637,208 @@ function AdminAccountsAdmin() {
   )
 }
 
+// ── 주관식 채점 (admin 함수의 gradeQueue/gradeAnswer) ──
+//   대기 목록에서 O/X 채점, "채점 완료 포함" 토글로 재채점(수정), 각 항목에서 그 응시의 객관식 답안 참고 조회.
+function fmtDTShort(iso?: string | null) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? '-' : d.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function GradingAdmin() {
+  const [items, setItems] = useState<GradeQueueItem[]>([])
+  const [scope, setScope] = useState<'pending' | 'all'>('pending')
+  const [round, setRound] = useState<string>('') // '' = 전체, roundId, 'none' = 상시/미배정
+  const [rounds, setRounds] = useState<GradeRound[]>([])
+  const [unassigned, setUnassigned] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState<string | null>(null) // 채점 중인 answerId
+  const [mcFor, setMcFor] = useState<GradeQueueItem | null>(null) // 객관식 참고 조회 대상
+
+  const loadRounds = useCallback(async () => {
+    try {
+      const r = await callFunction<GradeRoundsResponse>('admin', { action: 'gradeRounds' })
+      setRounds(r.rounds)
+      setUnassigned(r.unassigned)
+    } catch {
+      /* 회차 목록 실패해도 채점은 가능 */
+    }
+  }, [])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const r = await callFunction<GradeQueueResponse>('admin', { action: 'gradeQueue', scope, roundId: round || undefined })
+      setItems(r.items)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '불러오기 실패')
+    } finally {
+      setLoading(false)
+    }
+  }, [scope, round])
+  useEffect(() => {
+    load()
+  }, [load])
+  useEffect(() => {
+    loadRounds()
+  }, [loadRounds])
+
+  async function grade(it: GradeQueueItem, correct: boolean) {
+    setBusy(it.answerId)
+    try {
+      await callFunction('admin', { action: 'gradeAnswer', answerId: it.answerId, correct })
+      if (scope === 'pending') {
+        // 대기만 보는 중 — 채점하면 목록에서 제거
+        setItems((prev) => prev.filter((x) => x.answerId !== it.answerId))
+      } else {
+        setItems((prev) => prev.map((x) => (x.answerId === it.answerId ? { ...x, isCorrect: correct, reviewStatus: 'graded' } : x)))
+      }
+      loadRounds() // 회차별 대기 수 갱신
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '채점 실패')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const pendingN = items.filter((i) => i.reviewStatus === 'pending').length
+  const regular = rounds.filter((r) => r.kind === 'regular')
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>주관식 채점</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">대기 {scope === 'pending' ? items.length : pendingN}건</span>
+          <label className="grade-round">
+            <span className="grade-round-lab">회차</span>
+            <select value={round} onChange={(e) => setRound(e.target.value)}>
+              <option value="">전체</option>
+              {regular.map((r) => (
+                <option key={r.roundId} value={r.roundId}>{r.title}{r.pending ? ` (${r.pending})` : ''}</option>
+              ))}
+              <option value="none">상시·미배정{unassigned ? ` (${unassigned})` : ''}</option>
+            </select>
+          </label>
+          <div className="admin-tabs" style={{ marginBottom: 0 }}>
+            <button className={scope === 'pending' ? 'on' : ''} onClick={() => setScope('pending')}>채점 대기</button>
+            <button className={scope === 'all' ? 'on' : ''} onClick={() => setScope('all')}>완료 포함(수정)</button>
+          </div>
+          <button className="admin-mini" onClick={() => { load(); loadRounds() }} disabled={loading}>새로고침</button>
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+      {loading && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
+      {!loading && !err && items.length === 0 && (
+        <div className="admin-section admin-empty">{scope === 'pending' ? '채점 대기 중인 주관식 답안이 없습니다.' : '주관식 답안이 없습니다.'}</div>
+      )}
+
+      <div className="grade-list">
+        {items.map((it) => {
+          const done = it.reviewStatus === 'graded'
+          return (
+            <div key={it.answerId} className={`grade-card ${done ? (it.isCorrect ? 'ok' : 'no') : ''}`}>
+              <div className="grade-top">
+                <div className="grade-who">
+                  <b>{it.userName || '이름없음'}</b>
+                  <span>{it.userEmail}</span>
+                </div>
+                <div className="grade-meta">
+                  {it.examTitle} · {it.number}번 · 제출 {fmtDTShort(it.submittedAt)}
+                  {done && (
+                    <span className={`grade-badge ${it.isCorrect ? 'ok' : 'no'}`}>{it.isCorrect ? '정답 처리' : '오답 처리'}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grade-q">
+                <span className="grade-q-tag">{it.subject}{it.topic ? ` · ${it.topic}` : ''}</span>
+                <p className="grade-q-prompt">{it.prompt}</p>
+              </div>
+
+              {it.answerKey && (
+                <div className="grade-key">
+                  <span className="grade-label">모범답안 / 채점 기준</span>
+                  <p>{it.answerKey}</p>
+                </div>
+              )}
+
+              <div className="grade-ans">
+                <span className="grade-label">응시자 답안</span>
+                <p>{it.answerText?.trim() ? it.answerText : <em className="grade-empty">(무응답)</em>}</p>
+              </div>
+
+              <div className="grade-actions">
+                <button
+                  className={`grade-btn ok ${done && it.isCorrect ? 'active' : ''}`}
+                  disabled={busy === it.answerId}
+                  onClick={() => grade(it, true)}
+                >
+                  <span className="material-symbols-outlined">check_circle</span>
+                  {done ? '정답으로 수정' : '정답'}
+                </button>
+                <button
+                  className={`grade-btn no ${done && !it.isCorrect ? 'active' : ''}`}
+                  disabled={busy === it.answerId}
+                  onClick={() => grade(it, false)}
+                >
+                  <span className="material-symbols-outlined">cancel</span>
+                  {done ? '오답으로 수정' : '오답'}
+                </button>
+                <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={() => setMcFor(it)}>
+                  이 응시 객관식 보기
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {mcFor && <McReviewModal item={mcFor} onClose={() => setMcFor(null)} />}
+    </>
+  )
+}
+
+// 채점 참고용 — 해당 응시의 객관식 답안(정오답)을 조회해 보여준다.
+function McReviewModal({ item, onClose }: { item: GradeQueueItem; onClose: () => void }) {
+  const [answers, setAnswers] = useState<AdminAnswerRow[] | null>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    callFunction<AdminDetailResponse>('admin', { action: 'detail', attemptId: item.attemptId })
+      .then((r) => setAnswers(r.answers.filter((a) => a.kind !== 'short')))
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오기 실패'))
+  }, [item.attemptId])
+
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2>{item.userName || '-'} <span className="admin-modal-email">{item.userEmail}</span></h2>
+        <p className="admin-modal-meta">{item.examTitle} · 객관식 답안(참고)</p>
+        {err && <div className="admin-empty">{err}</div>}
+        {!answers && !err && <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>}
+        {answers && (
+          <div className="admin-ans-list">
+            {answers.map((a) => (
+              <div key={a.answerId} className={`admin-ans ${a.isCorrect ? 'ok' : 'no'}`}>
+                <span className="admin-ans-no">{a.number}</span>
+                <span className="admin-ans-q">{a.prompt}</span>
+                <span className="admin-ans-pick">
+                  {a.selectedIndex === null ? '미응답' : `${a.selectedIndex + 1}번`} / 정답 {a.correctIndex + 1}번
+                </span>
+              </div>
+            ))}
+            {!answers.length && <div className="admin-empty">객관식 문항이 없습니다.</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── 대시보드 (운영 분석) — admin.css(레벨테스트) 클래스 그대로 사용 ──
 function MiniBars({ days, map, color }: { days: string[]; map: Record<string, number>; color: string }) {
   const vals = days.map((d) => map[d] ?? 0)
@@ -2073,6 +2285,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [edit, setEdit] = useState<AdminQuestionRow | 'new' | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -2103,11 +2316,14 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
     }
   }
 
+  const nextNumber = rows.reduce((m, q) => Math.max(m, q.number), 0) + 1
+
   return (
     <>
       <div className="admin-head" style={{ marginTop: 0 }}>
         <span className="admin-count">총 {rows.length}문항</span>
         <div className="admin-head-actions">
+          <button className="admin-mini" onClick={() => setEdit('new')}>+ 문항 추가</button>
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
@@ -2119,6 +2335,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
           <thead>
             <tr>
               <th>#</th>
+              <th>유형</th>
               <th>과목 / 토픽</th>
               <th>지문</th>
               <th>정답</th>
@@ -2131,16 +2348,20 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
               <tr key={q.id} style={{ opacity: q.active ? 1 : 0.55 }}>
                 <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{q.number}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge st-${q.kind === 'short' ? 'in_progress' : 'submitted'}`}>{q.kind === 'short' ? '주관식' : '객관식'}</span>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
                   <b>{q.subject}</b>
                   {q.topic ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>{q.topic}</div> : null}
                 </td>
-                <td style={{ maxWidth: 380 }}>{q.prompt}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{q.correct_index + 1}번</td>
+                <td style={{ maxWidth: 340 }}>{q.prompt}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{q.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수 채점</span> : `${(q.correct_index ?? 0) + 1}번`}</td>
                 <td>
                   <span className={`admin-badge st-${q.active ? 'submitted' : 'voided'}`}>{q.active ? '활성' : '비활성'}</span>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="admin-mini" disabled={busy} onClick={() => act('questionSetActive', q.id, { active: !q.active })}>
+                  <button className="admin-mini" disabled={busy} onClick={() => setEdit(q)}>수정</button>
+                  <button className="admin-mini" style={{ marginLeft: 6 }} disabled={busy} onClick={() => act('questionSetActive', q.id, { active: !q.active })}>
                     {q.active ? '비활성' : '활성'}
                   </button>
                   <button
@@ -2158,15 +2379,131 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
             ))}
             {!rows.length && !loading && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  문항이 없습니다. “엑셀 업로드”로 추가하세요.
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  문항이 없습니다. “+ 문항 추가” 또는 “엑셀 업로드”로 추가하세요.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {edit && (
+        <QuestionEditModal
+          examId={examId}
+          row={edit === 'new' ? null : edit}
+          defaultNumber={nextNumber}
+          onClose={() => setEdit(null)}
+          onSaved={() => { setEdit(null); load(); onChanged() }}
+        />
+      )}
     </>
+  )
+}
+
+// 문항 편집 폼 인라인 스타일(전역 .admin label 규칙에 밀리지 않도록 div+인라인으로 고정)
+const QE: Record<string, CSSProperties> = {
+  row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  field: { display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', minWidth: 0 },
+  lab: { fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--muted)' },
+}
+
+// 개별 문항 추가/편집 — 유형(객관식/주관식) 선택 → 객관식은 보기4·정답, 주관식은 모범답안.
+function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
+  examId: string; row: AdminQuestionRow | null; defaultNumber: number; onClose: () => void; onSaved: () => void
+}) {
+  const [number, setNumber] = useState<number>(row?.number ?? defaultNumber)
+  const [kind, setKind] = useState<'mc' | 'short'>(row?.kind ?? 'mc')
+  const [subject, setSubject] = useState(row?.subject ?? '')
+  const [topic, setTopic] = useState(row?.topic ?? '')
+  const [prompt, setPrompt] = useState(row?.prompt ?? '')
+  const [choices, setChoices] = useState<string[]>(() => {
+    const c = row?.choices ?? []
+    return [c[0] ?? '', c[1] ?? '', c[2] ?? '', c[3] ?? '']
+  })
+  const [correctIndex, setCorrectIndex] = useState<number>(row?.correct_index ?? 0)
+  const [answerKey, setAnswerKey] = useState(row?.answer_key ?? '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function save() {
+    setErr('')
+    setSaving(true)
+    try {
+      await callFunction('admin', {
+        action: 'questionUpsert',
+        question: { id: row?.id, examId, number, kind, subject, topic, prompt, choices, correctIndex, answerKey, active: row ? row.active : true },
+      })
+      onSaved()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '저장 실패')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2>{row ? `${row.number}번 문항 수정` : '문항 추가'}</h2>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12, textAlign: 'left' }}>
+          <div style={QE.row}>
+            <div style={{ ...QE.field, width: 110, flex: 'none' }}>
+              <span style={QE.lab}>번호</span>
+              <input className="admin-in" type="number" min={1} value={number} onChange={(e) => setNumber(Math.floor(Number(e.target.value)) || 1)} />
+            </div>
+            <div style={{ ...QE.field, flex: 1 }}>
+              <span style={QE.lab}>유형</span>
+              <select className="admin-in" value={kind} onChange={(e) => setKind(e.target.value as 'mc' | 'short')}>
+                <option value="mc">객관식</option>
+                <option value="short">주관식</option>
+              </select>
+            </div>
+          </div>
+          <div style={QE.row}>
+            <div style={{ ...QE.field, flex: 1 }}>
+              <span style={QE.lab}>과목</span>
+              <input className="admin-in" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="예: 피지컬 AI 및 데이터 처리" />
+            </div>
+            <div style={{ ...QE.field, flex: 1 }}>
+              <span style={QE.lab}>토픽</span>
+              <input className="admin-in" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="예: 센서" />
+            </div>
+          </div>
+          <div style={QE.field}>
+            <span style={QE.lab}>지문</span>
+            <textarea className="admin-ta" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="문항 지문" />
+          </div>
+
+          {kind === 'mc' ? (
+            <div style={QE.field}>
+              <span style={QE.lab}>보기 · 정답 선택</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {choices.map((c, i) => (
+                  <div key={i} className={`qedit-choice ${correctIndex === i ? 'correct' : ''}`}>
+                    <input type="radio" name="correct" checked={correctIndex === i} onChange={() => setCorrectIndex(i)} title="정답" />
+                    <span className="qedit-choice-no">{i + 1}</span>
+                    <input className="admin-in" style={{ flex: 1 }} value={c} onChange={(e) => setChoices((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))} placeholder={`보기 ${i + 1}`} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={QE.field}>
+              <span style={QE.lab}>모범답안 / 채점 기준 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(관리자 검수 참고 · 응시자 비노출)</span></span>
+              <textarea className="admin-ta" rows={3} value={answerKey} onChange={(e) => setAnswerKey(e.target.value)} placeholder="핵심어·채점 기준" />
+            </div>
+          )}
+        </div>
+
+        {err && <p className="admin-warn" style={{ marginTop: 12 }}>{err}</p>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button className="admin-mini" onClick={onClose} disabled={saving}>취소</button>
+          <button className="grade-btn ok active" onClick={save} disabled={saving}>{saving ? '저장 중…' : '저장'}</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -2302,13 +2639,17 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
         for (let i = 1; i < aoa.length; i++) {
           const row = aoa[i]
           const choices = [row[4], row[5], row[6], row[7]].map((c) => String(c ?? '').trim())
+          // 유형 열(열10, 인덱스9)이 '주관식/short' 면 주관식. 비면 객관식(하위호환).
+          const kind: 'mc' | 'short' = /주관식|short/i.test(String(row[9] ?? '').trim()) ? 'short' : 'mc'
           out.push({
             number: Math.floor(Number(row[0])) || i,
             subject: String(row[1] ?? '').trim(),
             topic: String(row[2] ?? '').trim(),
             prompt: String(row[3] ?? '').trim(),
+            kind,
             choices,
-            correctIndex: parseCorrect(row[8], choices),
+            correctIndex: kind === 'short' ? -1 : parseCorrect(row[8], choices),
+            answerKey: kind === 'short' ? String(row[10] ?? '').trim() : undefined,
           })
         }
         setRows(out)
@@ -2320,9 +2661,10 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
   }
 
   function downloadTemplate() {
-    const header = ['번호', '과목', '토픽', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)']
-    const sample = [1, '전기자기학 · 정전계', '전위', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2]
-    const ws = XLSX.utils.aoa_to_sheet([header, sample])
+    const header = ['번호', '과목', '토픽', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)']
+    const sampleMc = [1, '전기자기학 · 정전계', '전위', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '']
+    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '개념', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI']
+    const ws = XLSX.utils.aoa_to_sheet([header, sampleMc, sampleShort])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '문항')
     XLSX.writeFile(wb, 'cbt_문항_템플릿.xlsx')
@@ -2331,6 +2673,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
   const problems = rows
     .map((r, i) => {
       if (!r.subject || !r.prompt) return `${i + 2}행: 과목/지문 비어있음`
+      if (r.kind === 'short') return '' // 주관식은 보기·정답 검증 없음
       if (r.choices.length !== 4 || r.choices.some((c) => !c)) return `${i + 2}행(번호 ${r.number}): 보기 4개 필요`
       if (r.correctIndex < 0 || r.correctIndex > 3) return `${i + 2}행(번호 ${r.number}): 정답(1~4) 확인`
       return ''
@@ -2361,7 +2704,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
   return (
     <>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-        엑셀 열 순서: <b>번호 · 과목 · 토픽 · 지문 · 보기1~4 · 정답(1~4)</b>. 첫 행은 머리글로 건너뜁니다. 같은 번호가 이미 있으면 <b>덮어씁니다</b>(재업로드 = 수정).
+        엑셀 열 순서: <b>번호 · 과목 · 토픽 · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식)</b>. 유형이 비면 객관식입니다. 주관식은 보기·정답 없이 모범답안만 넣으면 됩니다. 첫 행은 머리글로 건너뛰고, 같은 번호가 있으면 <b>덮어씁니다</b>(재업로드 = 수정).
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <label className="admin-mini" style={{ cursor: 'pointer' }}>
@@ -2405,9 +2748,10 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
             <thead>
               <tr>
                 <th>#</th>
+                <th>유형</th>
                 <th>과목/토픽</th>
                 <th>지문</th>
-                <th>보기</th>
+                <th>보기 / 모범답안</th>
                 <th>정답</th>
               </tr>
             </thead>
@@ -2416,13 +2760,16 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
                 <tr key={i}>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.number}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
+                    <span className={`admin-badge st-${r.kind === 'short' ? 'in_progress' : 'submitted'}`}>{r.kind === 'short' ? '주관식' : '객관식'}</span>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
                     <b>{r.subject}</b>
                     {r.topic ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.topic}</div> : null}
                   </td>
                   <td style={{ maxWidth: 320 }}>{r.prompt}</td>
-                  <td style={{ maxWidth: 260, fontSize: 12.5, color: 'var(--muted)' }}>{r.choices.join(' / ')}</td>
+                  <td style={{ maxWidth: 260, fontSize: 12.5, color: 'var(--muted)' }}>{r.kind === 'short' ? (r.answerKey || '—') : r.choices.join(' / ')}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
+                    {r.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수</span> : r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
                   </td>
                 </tr>
               ))}

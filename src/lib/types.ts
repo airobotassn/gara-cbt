@@ -8,7 +8,8 @@ export interface CbtQuestion {
   subject: string // 예: '전기자기학 · 정전계'
   topic: string // 예: '전위'
   prompt: string
-  choices: string[] // 보기 4개
+  kind?: 'mc' | 'short' // 'mc'(객관식·기본) | 'short'(주관식)
+  choices: string[] // 객관식 보기 4개(주관식은 [])
 }
 
 export interface ExamMeta {
@@ -29,7 +30,8 @@ export interface StartExamResponse {
 // 제출 시 보내는 답안
 export interface SubmittedAnswer {
   questionId: string
-  selectedIndex: number | null // 미응답 = null
+  selectedIndex: number | null // 객관식 선택, 미응답 = null
+  answerText?: string | null // 주관식 응답
   timeSpent: number // 초
 }
 
@@ -47,10 +49,13 @@ export interface GradedAnswer {
   subject: string
   topic?: string
   prompt: string
+  kind?: 'mc' | 'short'
   choices: string[]
   selectedIndex: number | null
+  answerText?: string | null // 주관식 응답
   correctIndex: number
-  isCorrect: boolean
+  isCorrect: boolean | null // 주관식 미검수 시 null
+  reviewStatus?: 'auto' | 'pending' | 'graded'
 }
 
 // get-exam-result 응답 — 공개 전/후 분기
@@ -91,6 +96,7 @@ export interface MyAttempt {
   totalCorrect: number | null
   totalQuestions: number
   passed: boolean | null
+  certIssuedAt: string | null // 자격증 발급 완료 시각(서버 기록) — null=미발급
 }
 
 export interface AdminListResponse {
@@ -98,9 +104,54 @@ export interface AdminListResponse {
   total: number
 }
 
+// 관리자 상세: 문항별 답안(주관식 검수 필드 포함)
+export interface AdminAnswerRow extends GradedAnswer {
+  answerId: string
+  answerKey: string | null // 주관식 모범답안/채점 기준
+  gradedBy: string | null
+  gradedAt: string | null
+  timeSpent: number
+}
 export interface AdminDetailResponse {
   attempt: AdminAttemptRow
-  answers: Array<GradedAnswer & { timeSpent: number }>
+  answers: AdminAnswerRow[]
+}
+
+// 관리자 주관식 채점 큐 항목
+export interface GradeQueueItem {
+  answerId: string
+  attemptId: string
+  number: number
+  subject: string | null
+  topic: string | null
+  prompt: string
+  answerKey: string | null
+  answerText: string | null
+  isCorrect: boolean | null
+  reviewStatus: 'pending' | 'graded'
+  gradedBy: string | null
+  gradedAt: string | null
+  userName: string | null
+  userEmail: string | null
+  examTitle: string | null
+  submittedAt: string | null
+}
+export interface GradeQueueResponse {
+  items: GradeQueueItem[]
+}
+
+// 채점 대상 회차(정기) + 미검수 수
+export interface GradeRound {
+  roundId: string
+  kind: 'regular' | 'rolling'
+  title: string
+  examDate: string | null
+  pending: number
+}
+export interface GradeRoundsResponse {
+  rounds: GradeRound[]
+  unassigned: number // 회차 미배정(상시 등) 미검수 수
+  totalPending: number
 }
 
 // ---------- 공지사항(notices) ----------
@@ -192,8 +243,10 @@ export interface AdminQuestionRow {
   subject: string
   topic: string
   prompt: string
+  kind: 'mc' | 'short'
   choices: string[]
-  correct_index: number
+  correct_index: number | null
+  answer_key: string | null
   active: boolean
 }
 export interface AdminQuestionListResp {
@@ -221,8 +274,10 @@ export interface QuestionImportRow {
   subject: string
   topic: string
   prompt: string
+  kind: 'mc' | 'short'
   choices: string[]
   correctIndex: number
+  answerKey?: string
 }
 
 export interface CbtQDiff {

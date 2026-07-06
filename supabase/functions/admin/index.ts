@@ -100,19 +100,26 @@ async function attemptDetail(admin: any, body: any) {
 
   const { data: rows } = await admin
     .from('attempt_answers')
-    .select('number, selected_index, is_correct, time_spent, questions(subject, topic, prompt, choices, correct_index)')
+    .select('id, number, selected_index, answer_text, is_correct, review_status, graded_by, graded_at, time_spent, questions(subject, topic, prompt, kind, choices, correct_index, answer_key)')
     .eq('attempt_id', aid)
     .order('number', { ascending: true })
 
   const answers = (rows ?? []).map((r: any) => ({
+    answerId: r.id,
     number: r.number,
     subject: r.questions?.subject ?? null,
     topic: r.questions?.topic ?? null,
     prompt: r.questions?.prompt ?? '',
+    kind: r.questions?.kind ?? 'mc',
     choices: r.questions?.choices ?? [],
     selectedIndex: r.selected_index,
+    answerText: r.answer_text ?? null,
     correctIndex: r.questions?.correct_index ?? -1,
+    answerKey: r.questions?.answer_key ?? null,
     isCorrect: r.is_correct,
+    reviewStatus: r.review_status ?? 'auto',
+    gradedBy: r.graded_by ?? null,
+    gradedAt: r.graded_at ?? null,
     timeSpent: r.time_spent,
   }))
 
@@ -120,6 +127,131 @@ async function attemptDetail(admin: any, body: any) {
     attempt: shapeAttempt(a, examTitleMap, nameMap, emailMap),
     answers,
   })
+}
+
+// attempt 의 total_correct 재계산 — is_correct=true 인 답안 수(주관식 검수 반영). 채점 후 호출.
+async function recomputeTotalCorrect(admin: any, attemptId: string) {
+  const { count } = await admin
+    .from('attempt_answers')
+    .select('id', { count: 'exact', head: true })
+    .eq('attempt_id', attemptId)
+    .eq('is_correct', true)
+  await admin.from('exam_attempts').update({ total_correct: count ?? 0 }).eq('id', attemptId)
+}
+
+// 채점 대상 회차 목록 — 정기 회차별 미검수(pending) 주관식 수 + 상시/미배정 집계.
+async function gradeRounds(admin: any) {
+  // 미검수 주관식 답안 + 그 응시의 회차
+  const { data, error } = await admin
+    .from('attempt_answers')
+    .select('id, exam_attempts!inner(round_id, status), questions!inner(kind)')
+    .eq('questions.kind', 'short')
+    .eq('review_status', 'pending')
+    .eq('exam_attempts.status', 'submitted')
+    .limit(5000)
+  if (error) return json({ error: error.message }, 400)
+  const rows = data ?? []
+  const pendingByRound: Record<string, number> = {}
+  let unassigned = 0
+  for (const r of rows) {
+    const rid = (r as any).exam_attempts?.round_id
+    if (rid) pendingByRound[rid] = (pendingByRound[rid] || 0) + 1
+    else unassigned++
+  }
+  // 정기 회차 메타
+  const { data: rounds } = await admin
+    .from('exam_rounds')
+    .select('id, kind, title_i18n, exam_date')
+    .eq('published', true)
+    .order('exam_date', { ascending: false })
+  const list = (rounds ?? []).map((r: any) => ({
+    roundId: r.id,
+    kind: r.kind,
+    title: r.title_i18n?.ko ?? '',
+    examDate: r.exam_date,
+    pending: pendingByRound[r.id] || 0,
+  }))
+  return json({ rounds: list, unassigned, totalPending: rows.length })
+}
+
+// 주관식 검수 대기열 — review_status=pending 답안(응시자·문항·답안·모범답안).
+// scope='all' 이면 이미 검수한 것(graded)도 포함(수정용). 기본은 대기(pending)만.
+// roundId 주면 그 회차 응시만, roundId='none' 이면 회차 미배정(상시 등)만.
+async function gradeQueue(admin: any, body: any) {
+  const includeGraded = body?.scope === 'all'
+  let q = admin
+    .from('attempt_answers')
+    .select('id, attempt_id, number, answer_text, is_correct, review_status, graded_by, graded_at, questions!inner(subject, topic, prompt, kind, answer_key), exam_attempts!inner(user_id, status, submitted_at, exam_id, round_id)')
+    .eq('questions.kind', 'short')
+    .eq('exam_attempts.status', 'submitted')
+    .order('graded_at', { ascending: true, nullsFirst: true })
+    .limit(500)
+  q = includeGraded ? q.in('review_status', ['pending', 'graded']) : q.eq('review_status', 'pending')
+  if (body?.roundId === 'none') q = q.is('exam_attempts.round_id', null)
+  else if (body?.roundId) q = q.eq('exam_attempts.round_id', body.roundId)
+  const { data, error } = await q
+  if (error) return json({ error: error.message }, 400)
+  const rows = data ?? []
+
+  // 응시자 이름/이메일 · 시험 제목
+  const userIds = [...new Set(rows.map((r: any) => r.exam_attempts?.user_id).filter(Boolean))]
+  const examIds = [...new Set(rows.map((r: any) => r.exam_attempts?.exam_id).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  const emailMap: Record<string, string> = {}
+  if (userIds.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
+    for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
+    try {
+      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
+      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+    } catch { /* 이메일만 빈칸 */ }
+  }
+  const examTitleMap: Record<string, string> = {}
+  if (examIds.length) {
+    const { data: exams } = await admin.from('exams').select('id, title').in('id', examIds)
+    for (const e of exams ?? []) examTitleMap[(e as any).id] = (e as any).title
+  }
+
+  const items = rows.map((r: any) => ({
+    answerId: r.id,
+    attemptId: r.attempt_id,
+    number: r.number,
+    subject: r.questions?.subject ?? null,
+    topic: r.questions?.topic ?? null,
+    prompt: r.questions?.prompt ?? '',
+    answerKey: r.questions?.answer_key ?? null,
+    answerText: r.answer_text ?? null,
+    isCorrect: r.is_correct,
+    reviewStatus: r.review_status,
+    gradedBy: r.graded_by ?? null,
+    gradedAt: r.graded_at ?? null,
+    userName: nameMap[r.exam_attempts?.user_id] ?? null,
+    userEmail: emailMap[r.exam_attempts?.user_id] ?? null,
+    examTitle: examTitleMap[r.exam_attempts?.exam_id] ?? null,
+    submittedAt: r.exam_attempts?.submitted_at ?? null,
+  }))
+  return json({ items })
+}
+
+// 주관식 채점(신규/수정 공용) — answerId 를 정답/오답으로. total_correct 재계산.
+async function gradeAnswer(admin: any, body: any, actor: string) {
+  const answerId = body?.answerId
+  if (!answerId || typeof body?.correct !== 'boolean') return json({ error: 'answerId·correct(bool) 필요' }, 400)
+  const { data: ans } = await admin
+    .from('attempt_answers')
+    .select('id, attempt_id, questions(kind)')
+    .eq('id', answerId)
+    .maybeSingle()
+  if (!ans) return json({ error: '답안을 찾을 수 없습니다.' }, 404)
+  if (ans.questions?.kind !== 'short') return json({ error: '주관식 답안만 검수할 수 있습니다.' }, 400)
+
+  const { error } = await admin
+    .from('attempt_answers')
+    .update({ is_correct: body.correct, review_status: 'graded', graded_by: actor, graded_at: new Date().toISOString() })
+    .eq('id', answerId)
+  if (error) return json({ error: error.message }, 400)
+  await recomputeTotalCorrect(admin, ans.attempt_id)
+  return json({ ok: true })
 }
 
 // ---------- Gemini 텍스트 번역 (공지/콘텐츠용 — 기존 GEMINI_API_KEY 재사용) ----------
@@ -583,13 +715,62 @@ async function questionList(admin: any, body: any) {
   if (!examId) return json({ error: 'examId 필요' }, 400)
   const { data, error } = await admin
     .from('questions')
-    .select('id, exam_id, number, subject, topic, prompt, choices, correct_index, active')
+    .select('id, exam_id, number, subject, topic, prompt, kind, choices, correct_index, answer_key, active')
     .eq('exam_id', examId)
     .is('deleted_at', null)
     .order('number', { ascending: true })
     .limit(2000)
   if (error) return json({ error: error.message }, 400)
   return json({ rows: data ?? [] })
+}
+
+// 개별 문항 추가/수정 — id 있으면 수정, 없으면 신규(같은 exam_id+number 있으면 덮어쓰기).
+//  · 객관식(mc): 보기 4개 + 정답(0..3). 주관식(short): 보기/정답 없이 모범답안(answer_key).
+async function questionUpsert(admin: any, body: any, actor: string) {
+  const q = body?.question ?? {}
+  const examId = q.examId
+  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const number = Math.floor(Number(q.number))
+  if (!Number.isFinite(number) || number < 1) return json({ error: '번호(1 이상)를 입력하세요.' }, 400)
+  const subject = String(q.subject ?? '').trim()
+  const prompt = String(q.prompt ?? '').trim()
+  if (!subject || !prompt) return json({ error: '과목·지문은 필수입니다.' }, 400)
+  const kind = q.kind === 'short' ? 'short' : 'mc'
+
+  const row: Record<string, unknown> = {
+    exam_id: examId,
+    number,
+    subject,
+    topic: String(q.topic ?? '').trim(),
+    prompt,
+    kind,
+    active: q.active !== false,
+    deleted_at: null,
+  }
+  if (kind === 'short') {
+    row.choices = []
+    row.correct_index = null
+    row.answer_key = String(q.answerKey ?? '').trim() || null
+  } else {
+    const choices = Array.isArray(q.choices) ? q.choices.map((c: unknown) => String(c ?? '').trim()) : []
+    if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: '객관식은 보기 4개가 모두 필요합니다.' }, 400)
+    const ci = Math.floor(Number(q.correctIndex))
+    if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: '정답(1~4)을 선택하세요.' }, 400)
+    row.choices = choices
+    row.correct_index = ci
+    row.answer_key = null
+  }
+
+  const isNew = !q.id
+  if (q.id) {
+    const { error } = await admin.from('questions').update(row).eq('id', q.id)
+    if (error) return json({ error: error.message }, 400)
+  } else {
+    const { error } = await admin.from('questions').upsert(row, { onConflict: 'exam_id,number' })
+    if (error) return json({ error: error.message }, 400)
+  }
+  await logCbtEvent(admin, { question_id: q.id ?? null, exam_id: examId, number, action: isNew ? 'import' : 'edit', actor, detail: { kind, single: true } })
+  return json({ ok: true })
 }
 
 async function questionSetActive(admin: any, body: any, actor: string) {
@@ -659,12 +840,18 @@ async function questionsImport(admin: any, body: any, actor: string) {
     const subject = String(r?.subject ?? '').trim()
     const topic = String(r?.topic ?? '').trim()
     const prompt = String(r?.prompt ?? '').trim()
-    const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c ?? '').trim()) : []
     if (!subject || !prompt) return json({ error: `#${i + 1}행(번호 ${number}): 과목·지문은 필수` }, 400)
+    const kind = r?.kind === 'short' ? 'short' : 'mc'
+    if (kind === 'short') {
+      // 주관식 — 보기/정답번호 없음, 모범답안(answerKey)은 선택
+      payload.push({ exam_id: examId, number, subject, topic, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, active: true, deleted_at: null })
+      continue
+    }
+    const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c ?? '').trim()) : []
     if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: `#${i + 1}행(번호 ${number}): 보기 4개가 모두 필요` }, 400)
     const ci = Math.floor(Number(r?.correctIndex))
     if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: `#${i + 1}행(번호 ${number}): 정답(1~4) 오류` }, 400)
-    payload.push({ exam_id: examId, number, subject, topic, prompt, choices, correct_index: ci, active: true, deleted_at: null })
+    payload.push({ exam_id: examId, number, subject, topic, prompt, kind, choices, correct_index: ci, answer_key: null, active: true, deleted_at: null })
   }
   // 행 내 번호 중복 검사
   const nums = payload.map((p) => p.number)
@@ -901,6 +1088,9 @@ Deno.serve(async (req) => {
       case 'removeAdmin': return await manageAdmins(admin, body, action, email, isRoot)
       case 'list': return await listAttempts(admin, body)
       case 'detail': return await attemptDetail(admin, body)
+      case 'gradeRounds': return await gradeRounds(admin)
+      case 'gradeQueue': return await gradeQueue(admin, body)
+      case 'gradeAnswer': return await gradeAnswer(admin, body, email)
       case 'noticeList': return await noticeList(admin)
       case 'noticeUpsert': return await noticeUpsert(admin, body)
       case 'noticeDelete': return await noticeDelete(admin, body)
@@ -916,6 +1106,7 @@ Deno.serve(async (req) => {
       case 'examFeeSave': return await examFeeSave(admin, body)
       case 'examListForAdmin': return await examListForAdmin(admin)
       case 'questionList': return await questionList(admin, body)
+      case 'questionUpsert': return await questionUpsert(admin, body, email)
       case 'questionSetActive': return await questionSetActive(admin, body, email)
       case 'questionDelete': return await questionDelete(admin, body, email)
       case 'questionRestore': return await questionRestore(admin, body, email)

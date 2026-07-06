@@ -82,6 +82,23 @@ body {
   font-size: var(--fs-md);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* 한국어 개행: 어절(띄어쓰기) 단위로만 꺾고, 넘칠 때만 강제 분리 (전역 상속) */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 개행 다듬기(전역): 제목은 줄 길이 균형, 본문은 마지막 줄 외톨이 단어 방지.
+   미지원 브라우저는 무시(점진적 향상). nowrap/ellipsis 클래스가 있으면 그쪽이 이김. */
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+}
+p,
+li,
+dd {
+  text-wrap: pretty;
 }
 
 .no-select {

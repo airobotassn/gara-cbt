@@ -5,11 +5,7 @@ import { callFunction } from '../lib/supabase'
 import { isMobileDevice, getDesktopOS } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, sebInstaller } from '../lib/seb'
-import {
-  DEFAULT_EXAM_SLUG,
-  TEST_DURATION_MINUTES,
-  RESULT_RELEASE_DAYS,
-} from '../lib/testConfig'
+import { DEFAULT_EXAM_SLUG, RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import type { StartExamResponse } from '../lib/types'
 import { useT } from '../lib/i18n'
 
@@ -56,7 +52,8 @@ export default function ExamPrepare() {
 
   const inSeb = isSEB()
   const inst = sebInstaller(getDesktopOS())
-  const osLabel = inst.os === 'mac' ? 'macOS' : 'Windows'
+  const isMac = inst.os === 'mac'
+  const osLabel = isMac ? 'macOS' : 'Windows'
   const checks = [
     { ok: !isMobileDevice(), label: t('prep.chk_pc') },
     { ok: window.innerWidth >= 1024, label: t('prep.chk_screen') },
@@ -167,7 +164,6 @@ export default function ExamPrepare() {
               <p>{t('prep.notice_lead')}</p>
               <ul>
                 <li>{t('prep.notice_li1')}</li>
-                <li>{t('prep.notice_li2')}</li>
                 <li>{t('prep.notice_li3')}</li>
                 <li>{t('prep.notice_li4')}</li>
                 <li>{t('prep.notice_li5')}</li>
@@ -175,30 +171,43 @@ export default function ExamPrepare() {
             </div>
           )}
 
-          {/* 2. 보안 프로그램 설치 */}
+          {/* 2. 보안 프로그램 설치 — /exam/check(SebInstall)와 동일 정보 구조(설명→버튼→라벨:값→경고 문장) */}
           {step === 2 && (
             <div className="prep-text">
               {inSeb ? (
                 <div className="prep-seb-ok">{t('prep.seb_running')}</div>
               ) : (
                 <>
-                  <p>{t('prep.seb_desc')}</p>
+                  <p>{t('check.sec1_desc')}</p>
                   <a
                     className="exam-btn"
                     href={inst.url}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '4px 0 16px' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '4px 0 18px' }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 20 }}>download</span>
-                    {t('seb.download')} · {osLabel} · {inst.size}
+                    {t('seb.download')}
                   </a>
-                  <ul>
-                    <li>{t('seb.chip_once')} · {t('seb.chip_publisher')}</li>
-                    <li>
-                      {t('seb.warn_title')} → <b>{t('seb.dialog_more')}</b> → <b>{t('seb.dialog_run')}</b>
-                    </li>
-                  </ul>
+                  <dl className="prep-facts">
+                    <dt>{t('seb.fact_program')}</dt>
+                    <dd>Safe Exam Browser ({osLabel})</dd>
+                    <dt>{t('seb.fact_maker')}</dt>
+                    <dd>{t('seb.fact_maker_v')}</dd>
+                    <dt>{t('seb.fact_install')}</dt>
+                    <dd>{t('seb.chip_once')} · {t('seb.chip_size', { size: inst.size })}</dd>
+                  </dl>
+                  <div className="prep-sebwarn">
+                    <b>{isMac ? t('seb.warn_title') : t('seb.warn_title_win', { dialog: t('seb.dialog_title') })}</b>
+                    {isMac ? (
+                      <p>{t('seb.step2_d_mac')}</p>
+                    ) : (
+                      <p>
+                        {t('seb.warn_body_pre')} <span className="prep-kbd">{t('seb.dialog_more')}</span> →{' '}
+                        <span className="prep-kbd strong">{t('seb.dialog_run')}</span> {t('seb.warn_body_post')}
+                      </p>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -275,7 +284,7 @@ export default function ExamPrepare() {
               <p>{t('prep.ready_lead')}</p>
               <ul>
                 <li>{t('prep.ready_li1')}</li>
-                <li>{t('prep.ready_li2', { min: TEST_DURATION_MINUTES })}</li>
+                <li>{t('prep.ready_li2')}</li>
               </ul>
               <label className="prep-agree">
                 <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />

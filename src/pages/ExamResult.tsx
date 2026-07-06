@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
 import { proGradeForScore, gradeLabel, proGradeTag } from '../lib/caris'
+import { makeCertNo, tempSeq } from '../lib/certNo'
 import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
@@ -98,10 +99,8 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: stri
 
 type GradedData = Extract<ExamResultResponse, { released: true }>
 
-// ⚠️ 디자인 단계 더미 — 백엔드(get-exam-result) 미완성이라 화면을 바로 볼 수 있게 가짜 성적을 넣는다.
-//    백엔드 붙이면 DEMO_RESULT = false 로 끄고 실데이터로 전환할 것.
-//    URL 뒤에 ?demo=fail 붙이면 불합격 화면도 미리보기.
-const DEMO_RESULT = true
+// 디자인 미리보기 전용 더미 — /exam/result/preview 로만 렌더(FAB 개발 링크. ?demo=fail = 불합격 화면).
+// 실제 응시(/exam/result/<attemptId>)는 항상 get-exam-result 실데이터 — 공개 전엔 서버가 점수를 안 내려줌.
 const DEMO_SUBJECTS_PASS = [
   { subject: '생성형 AI 및 윤리', total: 20, correct: 19 },
   { subject: '스마트 도구 및 로봇 기술', total: 40, correct: 34 },
@@ -147,14 +146,20 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   const CIRC = 2 * Math.PI * 45
   const dashoffset = CIRC * (1 - anim / 100)
 
-  const certNo = `GARA-2026-${String(attemptId ?? '').replace(/-/g, '').slice(0, 6).toUpperCase() || '000001'}`
+  // Pro 단발 시험 → 종목 CARIS(CA)·등급 PRO. 일련번호는 서버 시퀀스 연동 전까지 임시(tempSeq).
+  const certNo = makeCertNo('pro', new Date().getFullYear(), tempSeq(String(attemptId ?? '')))
   const issueDate = (() => {
     const d = new Date()
     return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
   })()
 
   function goCertificate() {
-    localStorage.setItem(`cert_issued_${certNo}`, new Date().toISOString())
+    // 발급 기록(서버) — 마이페이지 발급현황과 공유되는 '발급 완료' 상태. 미리보기는 기록 없음.
+    if (attemptId && attemptId !== 'preview') {
+      callFunction('my-attempts', { issue: attemptId }).catch(() => {
+        /* 기록 실패해도 증서 화면은 열어준다 */
+      })
+    }
     navigate('/certificate', {
       state: {
         name: certName,
@@ -314,8 +319,8 @@ export default function ExamResult() {
   const [err, setErr] = useState('')
 
   useEffect(() => {
-    // 디자인 단계: 백엔드 없이 더미 성적으로 렌더 (?demo=fail → 불합격 미리보기)
-    if (DEMO_RESULT) {
+    // 디자인 미리보기(/exam/result/preview) — 더미 성적. 실 응시는 아래 실데이터 경로.
+    if (attemptId === 'preview') {
       const fail = new URLSearchParams(location.search).get('demo') === 'fail'
       setData(demoData(fail))
       setLoading(false)

@@ -49,7 +49,7 @@ export default function ExamCheck() {
             </div>
             <div>
               <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t('check.title')}</h1>
-              <p className="font-body-lg text-body-lg text-on-surface-variant break-keep">{t('check.sub')}</p>
+              <p className="font-body-lg text-body-lg text-on-surface-variant break-keep leading-relaxed max-w-2xl mx-auto">{t('check.sub')}</p>
             </div>
           </div>
 
@@ -59,7 +59,7 @@ export default function ExamCheck() {
               <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0 flex items-center justify-center w-14 h-14 font-title-md text-title-md font-bold">1</div>
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('check.sec1_title')}</h2>
-                <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('check.sec1_desc')}</p>
+                <p className="font-body-md text-body-md text-on-surface-variant mb-6 leading-relaxed break-keep max-w-prose">{t('check.sec1_desc')}</p>
                 <SebInstall />
               </div>
             </div>
@@ -69,7 +69,7 @@ export default function ExamCheck() {
               <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0 flex items-center justify-center w-14 h-14 font-title-md text-title-md font-bold">2</div>
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-6">{t('check.sec2_title')}</h2>
-                <ul className="space-y-4">
+                <ul className="space-y-5">
                   {checks.map((c) => (
                     <li key={c.label} className="flex items-start gap-3">
                       <span
@@ -78,9 +78,9 @@ export default function ExamCheck() {
                       >
                         {c.ok ? 'check_circle' : 'cancel'}
                       </span>
-                      <div>
-                        <span className="font-label-md text-label-md font-bold text-on-surface">{c.label}</span>
-                        <span className="font-body-md text-body-md text-on-surface-variant ml-2">{c.note}</span>
+                      <div className="min-w-0">
+                        <div className="font-label-md text-label-md font-bold text-on-surface">{c.label}</div>
+                        <div className="font-body-md text-body-md text-on-surface-variant mt-0.5 break-keep">{c.note}</div>
                       </div>
                     </li>
                   ))}
@@ -91,9 +91,9 @@ export default function ExamCheck() {
                     >
                       {inSeb ? 'check_circle' : 'info'}
                     </span>
-                    <div>
-                      <span className="font-label-md text-label-md font-bold text-on-surface">{t('check.chk_seb')}</span>
-                      <span className="font-body-md text-body-md text-on-surface-variant ml-2">{inSeb ? t('check.chk_seb_ok') : t('check.chk_seb_no')}</span>
+                    <div className="min-w-0">
+                      <div className="font-label-md text-label-md font-bold text-on-surface">{t('check.chk_seb')}</div>
+                      <div className="font-body-md text-body-md text-on-surface-variant mt-0.5 break-keep">{inSeb ? t('check.chk_seb_ok') : t('check.chk_seb_no')}</div>
                     </div>
                   </li>
                 </ul>
@@ -105,7 +105,7 @@ export default function ExamCheck() {
               <div className="p-4 rounded-full bg-primary-container/10 text-primary-container flex-shrink-0 flex items-center justify-center w-14 h-14 font-title-md text-title-md font-bold">3</div>
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('check.sec3_title')}</h2>
-                <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('check.sec3_desc')}</p>
+                <p className="font-body-md text-body-md text-on-surface-variant mb-6 leading-relaxed break-keep max-w-prose">{t('check.sec3_desc')}</p>
                 <button onClick={startPractice} className="bg-primary-container text-on-primary font-title-md text-title-md px-8 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2 w-full md:w-auto font-bold">
                   <span className="material-symbols-outlined text-[20px]">play_arrow</span>
                   {t('check.practice_btn')}

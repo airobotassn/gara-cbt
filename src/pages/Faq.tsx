@@ -66,6 +66,9 @@ export default function Faq() {
       : f.category === cat,
   )
   const catLabel = (key: string) => t(CATS.find((c) => c.key === key)?.labelKey ?? 'faq.title')
+  // 항목이 있는 카테고리만 사이드바에 노출(빈 탭 숨김). 로딩 중엔 전체 유지(깜빡임 방지),
+  // 현재 선택된 탭은 비어도 유지(선택 탭이 사라지는 혼란 방지).
+  const visibleCats = loading ? CATS : CATS.filter((c) => c.key === cat || rows.some((f) => f.category === c.key))
 
   const helpBox = (
     <div className="p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
@@ -108,7 +111,7 @@ export default function Faq() {
               </div>
               <div className="w-full md:w-5/12 hidden md:block">
                 <div className="grid grid-cols-2 gap-4">
-                  <Link to="/guide" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
+                  <Link to="/exam/schedule" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><span className="material-symbols-outlined">event_available</span></div>
                     <h3 className="font-title-md text-base font-bold text-on-surface">{t('faq.card_schedule_title')}</h3>
                     <p className="text-sm text-on-surface-variant leading-relaxed">{t('faq.card_schedule_desc')}</p>
@@ -130,7 +133,7 @@ export default function Faq() {
           <aside className="w-full lg:w-1/4 shrink-0">
             <div className="sticky top-12">
               <nav className="flex flex-col gap-2">
-                {CATS.map((c) => {
+                {visibleCats.map((c) => {
                   const active = c.key === cat && !searching
                   const count = rows.filter((f) => f.category === c.key).length
                   return active ? (

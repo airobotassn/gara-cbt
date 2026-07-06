@@ -49,15 +49,21 @@ export default function Guide() {
                 {t('guide.schedule_title')}
               </h3>
               <div className="space-y-4">
-                {regular.map((s) => (
+                {/* 히어로 일정 패널은 가장 가까운 3개만(useExamRounds가 이미 가까운 순 정렬·지난 시험 제외). 전체는 /exam/schedule */}
+                {regular.slice(0, 3).map((s) => (
                   <div
                     key={s.id}
-                    onClick={s.clickable ? () => navigate('/exam/apply', { state: { roundId: s.id, roundLabel: s.title, dateLabel: s.dateText } }) : undefined}
+                    onClick={s.clickable ? () => navigate(`/exam/apply?round=${s.id}`, { state: { roundId: s.id, roundLabel: s.title, dateLabel: s.dateText } }) : undefined}
                     className={`rounded-xl p-4 flex justify-between items-center gap-3 border ${s.clickable ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
                   >
                     <div>
                       <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
+                      {s.applyText && (
+                        <div className="font-body-md text-body-md text-on-surface-variant mt-1">
+                          {t('sched.apply_period')} <span className="font-semibold text-on-surface">{s.applyText}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.clickable ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(STATUS_KEY[s.status])}</span>
