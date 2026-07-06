@@ -99,11 +99,6 @@ const STATUS_LABEL: Record<string, string> = {
   expired: '만료',
 }
 
-function csvCell(v: unknown): string {
-  const s = String(v ?? '')
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
-
 // CARIS 시험(CBT) 백오피스 — 제출 답안 조회. (기존 Admin 본문 그대로, admin 함수 호출)
 function CarisExamAdmin() {
   const { isFullUser, loginWithGoogle } = useAuth()
@@ -163,31 +158,6 @@ function CarisExamAdmin() {
     } finally {
       setDetailLoading(false)
     }
-  }
-
-  function exportCsv() {
-    const head = ['제출일시', '시험', '응시자', '이메일', '상태', '점수', '총문항', '결과공개']
-    const lines = rows.map((r) =>
-      [
-        fmtDT(r.submittedAt),
-        r.examTitle,
-        r.userName ?? '',
-        r.userEmail ?? '',
-        STATUS_LABEL[r.status] ?? r.status,
-        r.totalCorrect ?? '',
-        r.totalQuestions ?? '',
-        fmtDT(r.resultReleaseAt),
-      ]
-        .map(csvCell)
-        .join(','),
-    )
-    const csv = '﻿' + [head.join(','), ...lines].join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'gara-cbt-submissions.csv'
-    a.click()
-    URL.revokeObjectURL(a.href)
   }
 
   // ── 게이트 ──
@@ -288,9 +258,6 @@ function CarisExamAdmin() {
           <span className="admin-count">총 {total}건</span>
           <button className="admin-mini" onClick={() => load(offset)} disabled={loading}>
             새로고침
-          </button>
-          <button className="admin-mini" onClick={exportCsv} disabled={!rows.length}>
-            CSV 내보내기
           </button>
         </div>
       </div>
