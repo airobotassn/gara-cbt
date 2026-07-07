@@ -61,6 +61,13 @@
   --fs-qtext: clamp(21px, 3.2vw, 25px); /* 응시 지문(레벨테스트 .qtext) — 본문(md 16px)보다 크게, 가독성 */
 }
 
+/* 관리자 페이지만 폰트 살짝 크게(가독성). 표·폼·헤더 등 토큰(--fs-sm/md) 기반은 커지고,
+   대시보드 KPI/차트(하드코딩 px)·큰 값(--fs-lg)은 그대로라 레이아웃 안 흔들림. */
+.admin {
+  --fs-sm: 14.5px;
+  --fs-md: 18px;
+}
+
 * {
   box-sizing: border-box;
 }

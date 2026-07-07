@@ -111,8 +111,8 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 // CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
-type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'
-const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'fees', 'admins']
+type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'admins'
+const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'admins']
 // 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
 type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
 const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
@@ -272,9 +272,6 @@ function CarisExamAdmin() {
         <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
           시험일정
         </button>
-        <button className={sub === 'fees' ? 'on' : ''} onClick={() => setSub('fees')}>
-          응시료
-        </button>
         {isRoot && (
           <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
             관리자 관리
@@ -295,8 +292,6 @@ function CarisExamAdmin() {
         <FaqAdmin />
       ) : sub === 'rounds' ? (
         <RoundsAdmin />
-      ) : sub === 'fees' ? (
-        <FeesAdmin />
       ) : sub === 'admins' ? (
         <AdminAccountsAdmin />
       ) : (
@@ -1435,47 +1430,6 @@ function RoundsAdmin() {
           </div>
         </div>
       )}
-    </>
-  )
-}
-
-// ── 응시료 (읽기전용) ──────────────────────────────────────────────
-// 응시료는 caris.ts 티어 상수(단일 소스)로 고정 — 관리자·DB에서 편집 불가(변수 아님, 상수).
-// 결제(ExamApply)도 동일 상수(lv.fee)를 직접 사용하므로 두 화면이 어긋날 여지가 없다.
-// 금액을 바꾸려면 src/lib/caris.ts 의 티어 fee 를 수정. (구 exam_fees DB 편집 방식 폐지)
-const FEE_ROWS = getTracks('ko').flatMap((track) =>
-  track.tiers.map((tier) => ({
-    id: `${track.key}_${tier.key}`,
-    label: `${track.name} ${tier.name}`,
-    sub: tier.target ?? tier.prereq ?? '',
-    amount: tier.fee ?? 0,
-  })),
-)
-
-function FeesAdmin() {
-  const won = (n: number) => (n || 0).toLocaleString('ko-KR')
-
-  return (
-    <>
-      <div className="admin-head">
-        <h1>응시료</h1>
-      </div>
-
-      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
-        응시료는 코드(<b>src/lib/caris.ts</b>)에 티어별 <b>상수</b>로 고정되어 있어 여기서 변경할 수 없습니다. 결제(원서접수) 화면도 같은 상수를 직접 사용합니다. 금액을 바꾸려면 caris.ts 를 수정하세요.
-      </p>
-
-      <div className="admin-section" style={{ maxWidth: 500, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {FEE_ROWS.map((r) => (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{r.label}</div>
-              {r.sub && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{r.sub}</div>}
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>₩ {won(r.amount)}</div>
-          </div>
-        ))}
-      </div>
     </>
   )
 }
