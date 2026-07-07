@@ -198,7 +198,6 @@ export default function ExamPrepare() {
             <div className="prep-text">
               <p>{t('prep.notice_lead')}</p>
               <ul>
-                <li>{t('prep.notice_li1')}</li>
                 <li>{t('prep.notice_li3')}</li>
                 <li>{t('prep.notice_li4')}</li>
                 <li>{t('prep.notice_li5')}</li>
@@ -210,6 +209,7 @@ export default function ExamPrepare() {
                 <li>{t('prep.af3')}</li>
                 <li>{t('prep.af4')}</li>
                 <li>{t('prep.af5')}</li>
+                <li>{t('prep.af13')}</li>
                 <li>{t('prep.af6')}</li>
                 <li>{t('prep.af7')}</li>
                 <li>{t('prep.af8')}</li>
