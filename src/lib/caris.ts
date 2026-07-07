@@ -1,127 +1,89 @@
 // CARIS 자격 체계 데이터 — Guide(안내)와 ExamApply(원서접수)가 공유.
-// 1차: 한국어 단일 · 응시료는 임시 예시값 — 디자인/정책 확정 후 i18n·실가격 반영.
 //
-// 결제 단위 차이(중요):
-//   · Pro    = 시험 1개(단일 응시료). 취득 점수에 따라 4급~1급 차등 부여 → 급수별 결제 아님(examFee).
-//   · Master = 급수별 별도 시험(순차). 급수마다 응시료 다름 → Level.fee.
+// 2026-07 개편: 트랙/급수 체계 전면 교체.
+//   · CARIS-Ⅰ(전국민 AI·로봇 리터러시): Beginner / Pro / Elite — 각 독립 개별 시험, 고정 60% 합격.
+//   · CARIS-Ⅱ(피지컬 AI 전문가): Master / Grand Master / Zenith — 내용 미확정이라
+//     기존 Master 트랙 내용을 그대로 유지하고 티어 이름만 교체(4급~1급 → Master/Grand Master/Zenith).
+// 구 모델("Pro 단일시험 → 취득 점수로 4급~1급 차등")은 폐기. 각 티어가 독립 시험(합격 = 60%↑)이다.
+// 결과판정은 ExamResult 가 총점 60% 합/불로 직접 처리 — 구 점수→급수 판정 코드는 제거됨.
 //
 // 다국어: 사용자 표시 문자열은 i18n D 사전(caris.* 키)에 있고, getTracks/getRolling(lang) 이 tr() 로 조립한다.
-// 등급/스코어링 내부 식별자는 한국어('4급'..)를 그대로 유지(로직·동기화 안 깨지게). 표시용 등급은 gradeLabel().
+// 티어 이름(Beginner..Zenith)은 브랜드 고유명이라 언어 무관 영문 고정. 내부 식별자(key)는 fee 키·판정에 쓴다.
 import { tr, type Lang } from './i18n'
 
-export type Level = {
-  grade: string
-  tag?: string // Pro: 대상
-  prereq?: string // Master: 응시 자격(선행 급수)
-  method?: string // Master: 검정 방법(필기/실기)
-  subjects: string[]
-  practical?: string // Master: 실기 내용
-  pass: string
-  fee?: number // Master: 급수별 응시료(원) — 임시 예시값
+export type Tier = {
+  key: string // 내부 식별자(fee 키·판정) — beginner|pro|elite | master|grandmaster|zenith
+  name: string // 표시 이름(브랜드 영문 고정)
+  target?: string // CARIS-Ⅰ: 대상
+  prereq?: string // CARIS-Ⅱ: 응시 자격(선행 티어)
+  subjects: string[] // CARIS-Ⅰ=3, CARIS-Ⅱ=2(기존 유지)
+  format?: string // CARIS-Ⅰ: 시험 구성(티어별로 다름)
+  method?: string // CARIS-Ⅱ: 검정 방법(필기/실기)
+  practical?: string // CARIS-Ⅱ: 실기 내용
+  pass: string // 합격 기준
+  fee?: number // 티어별 응시료(원) — 임시 예시값(실값은 DB exam_fees)
 }
 
 export type Track = {
-  key: string
-  name: string
+  key: string // 't1' | 't2' (fee 키 접두사)
+  name: string // 'CARIS-Ⅰ' | 'CARIS-Ⅱ'
   tagline: string
   eligibility: string
   icon: string
   caption: string
-  format?: string // Pro: 공통 시험 구성
-  formatSub?: string
-  examFee?: number // Pro: 단일 시험 응시료(급수는 점수로 판정) — 임시 예시값
-  levels: Level[]
+  tiers: Tier[]
 }
 
-// 급수 내부 식별자(한국어) ↔ i18n 키 suffix. 스코어링/판정은 이 한국어 값을 그대로 쓴다.
-const GRADES = ['g4', 'g3', 'g2', 'g1'] as const
-type G = (typeof GRADES)[number]
-const GRADE_KO: Record<G, string> = { g4: '4급', g3: '3급', g2: '2급', g1: '1급' }
-const KO_TO_G: Record<string, G> = { '4급': 'g4', '3급': 'g3', '2급': 'g2', '1급': 'g1' }
+// 티어 목록(이름·응시료). 이름/키는 언어 무관 고정, fee 는 임시 예시값(실값은 DB exam_fees).
+const T1_TIERS = [
+  { key: 'beginner', name: 'Beginner', fee: 30000 },
+  { key: 'pro', name: 'Pro', fee: 40000 },
+  { key: 'elite', name: 'Elite', fee: 55000 },
+] as const
+const T2_TIERS = [
+  { key: 'master', name: 'Master', fee: 80000 },
+  { key: 'grandmaster', name: 'Grand Master', fee: 100000 },
+  { key: 'zenith', name: 'Zenith', fee: 150000 },
+] as const
 
-// 표시용 등급 라벨(로케일별). 입력은 내부 한국어 grade('4급'..) — 없으면 원문 반환.
-export function gradeLabel(grade: string, lang: Lang): string {
-  const g = KO_TO_G[grade]
-  return g ? tr(lang, `caris.grade.${g}`) : grade
-}
-
-// Pro 급수의 대상(tag) 로케일 문구 — ExamResult 안내문에 사용.
-export function proGradeTag(grade: string, lang: Lang): string {
-  const g = KO_TO_G[grade]
-  return g ? tr(lang, `caris.pro.tag.${g}`) : ''
-}
-
-// CARIS 트랙 데이터(로케일 반영본). Guide/ExamApply 가 소비. grade 는 표시용 라벨.
+// CARIS 트랙 데이터(로케일 반영본). Guide/ExamApply 가 소비.
 export function getTracks(lang: Lang): Track[] {
-  const subjects = (track: 'pro' | 'master', g: G) => [
-    tr(lang, `caris.${track}.subj.${g}.0`),
-    tr(lang, `caris.${track}.subj.${g}.1`),
-  ]
-  const masterFee: Record<G, number> = { g4: 80000, g3: 100000, g2: 120000, g1: 150000 }
-  const pro: Track = {
-    key: 'pro',
-    name: 'CARIS Pro',
-    tagline: tr(lang, 'caris.pro.tagline'),
-    eligibility: tr(lang, 'caris.pro.eligibility'),
-    icon: 'school',
-    caption: tr(lang, 'caris.pro.caption'),
-    format: tr(lang, 'caris.pro.format'),
-    formatSub: tr(lang, 'caris.pro.formatSub'),
-    examFee: 30000,
-    levels: GRADES.map((g) => ({
-      grade: tr(lang, `caris.grade.${g}`),
-      tag: tr(lang, `caris.pro.tag.${g}`),
-      subjects: subjects('pro', g),
-      pass: tr(lang, `caris.pass.${g}`),
+  const track1: Track = {
+    key: 't1',
+    name: tr(lang, 'caris.t1.name'),
+    tagline: tr(lang, 'caris.t1.tagline'),
+    eligibility: tr(lang, 'caris.t1.eligibility'),
+    icon: 'diversity_3',
+    caption: tr(lang, 'caris.t1.caption'),
+    tiers: T1_TIERS.map((tier) => ({
+      key: tier.key,
+      name: tier.name,
+      target: tr(lang, `caris.t1.${tier.key}.target`),
+      subjects: [0, 1, 2].map((i) => tr(lang, `caris.t1.${tier.key}.subj.${i}`)),
+      format: tr(lang, `caris.t1.${tier.key}.format`),
+      pass: tr(lang, `caris.t1.${tier.key}.pass`),
+      fee: tier.fee,
     })),
   }
-  const master: Track = {
-    key: 'master',
-    name: 'CARIS Master',
-    tagline: tr(lang, 'caris.master.tagline'),
-    eligibility: tr(lang, 'caris.master.eligibility'),
+  const track2: Track = {
+    key: 't2',
+    name: tr(lang, 'caris.t2.name'),
+    tagline: tr(lang, 'caris.t2.tagline'),
+    eligibility: tr(lang, 'caris.t2.eligibility'),
     icon: 'workspace_premium',
-    caption: tr(lang, 'caris.master.caption'),
-    levels: GRADES.map((g) => ({
-      grade: tr(lang, `caris.grade.${g}`),
-      prereq: tr(lang, `caris.master.prereq.${g}`),
-      method: tr(lang, `caris.master.method.${g}`),
-      subjects: subjects('master', g),
-      practical: g === 'g1' ? undefined : tr(lang, `caris.master.practical.${g}`),
-      pass: tr(lang, `caris.master.pass.${g}`),
-      fee: masterFee[g],
+    caption: tr(lang, 'caris.t2.caption'),
+    tiers: T2_TIERS.map((tier) => ({
+      key: tier.key,
+      name: tier.name,
+      prereq: tr(lang, `caris.t2.${tier.key}.prereq`),
+      method: tr(lang, `caris.t2.${tier.key}.method`),
+      subjects: [0, 1].map((i) => tr(lang, `caris.t2.${tier.key}.subj.${i}`)),
+      practical: tier.key === 'zenith' ? undefined : tr(lang, `caris.t2.${tier.key}.practical`),
+      pass: tr(lang, `caris.t2.${tier.key}.pass`),
+      fee: tier.fee,
     })),
   }
-  return [pro, master]
-}
-
-// 내부 참조가 필요할 때를 위한 급수 코드(디버그/타입). 화면은 getTracks 사용.
-export const GRADE_CODES = GRADES
-export { GRADE_KO }
-
-// ── CARIS Pro 급수 판정 ───────────────────────────────────────────
-// Pro 는 단일 필기시험 → 취득 점수(0~100)에 따라 4급~1급을 차등 부여.
-// 컷: 4급 60 / 3급 70 / 2급 80 / 1급 90. 60점 미만은 불합격(급수 없음).
-// ⚠️ TRACKS['pro'].levels 의 pass 문구(60/70/80/90점 이상)와 반드시 동기화.
-export type ProGrade = { grade: string; min: number; tag: string }
-
-export const PRO_PASS_MIN = 60 // 합격 최소 점수(4급 컷)
-
-export const PRO_GRADE_CUTS: ProGrade[] = [
-  { grade: '1급', min: 90, tag: '관리자·강사 및 전문가 과정 진입' },
-  { grade: '2급', min: 80, tag: '대학생 및 직장인 중급' },
-  { grade: '3급', min: 70, tag: '중·고등학생 및 직장인 기초' },
-  { grade: '4급', min: 60, tag: '전 국민 입문 · 기초 소양' },
-]
-
-// 취득 점수(%)로 얻은 최고 급수. 60 미만이면 null(불합격).
-export function proGradeForScore(pct: number): ProGrade | null {
-  return PRO_GRADE_CUTS.find((g) => pct >= g.min) ?? null
-}
-
-// 다음(더 높은) 급수 컷. 이미 1급이면 null.
-export function nextProGrade(pct: number): ProGrade | null {
-  return [...PRO_GRADE_CUTS].reverse().find((g) => g.min > pct) ?? null // 4급→1급 오름차순 탐색
+  return [track1, track2]
 }
 
 // 시험 일정(정기/상시)은 DB(exam_rounds)가 단일 소스 — src/lib/rounds.ts 의 useExamRounds 로 로드.

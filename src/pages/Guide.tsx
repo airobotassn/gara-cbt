@@ -24,10 +24,10 @@ export default function Guide() {
   const { regular } = useExamRounds(lang)
   const TRACKS = getTracks(lang)
   const cur = TRACKS[track]
-  const lv = cur.levels[level]
+  const lv = cur.tiers[level]
   const isMaster = track === 1
   const goTrack = (i: number) => { setTrack((i + TRACKS.length) % TRACKS.length); setLevel(0) }
-  const goLevel = (i: number) => setLevel((i + cur.levels.length) % cur.levels.length)
+  const goLevel = (i: number) => setLevel((i + cur.tiers.length) % cur.tiers.length)
 
   return (
     <div className="bg-background text-on-background min-h-screen">
@@ -114,14 +114,14 @@ export default function Guide() {
                 <p className="font-body-lg text-body-md md:text-[20px] md:leading-[30px] text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
               </div>
 
-              {/* 급수 전환: 화살표 + 급수 (하나의 통합 pill) */}
+              {/* 티어 전환: 화살표 + 티어 (하나의 통합 pill) */}
               <div className="flex justify-center mb-6">
-                <div className="inline-flex items-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm">
+                <div className="flex flex-wrap items-center justify-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm max-w-full">
                   <button onClick={() => goLevel(level - 1)} aria-label={t('guide.aria_prev_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                   </button>
-                  {cur.levels.map((l, i) => (
-                    <button key={l.grade} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>{l.grade}</button>
+                  {cur.tiers.map((l, i) => (
+                    <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>{l.name}</button>
                   ))}
                   <button onClick={() => goLevel(level + 1)} aria-label={t('guide.aria_next_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_right</span>
@@ -129,12 +129,12 @@ export default function Guide() {
                 </div>
               </div>
 
-              {/* 단일 급수 카드 */}
+              {/* 단일 티어 카드 */}
               <div className="bg-surface-container-lowest rounded-2xl p-7 md:p-9 border border-outline-variant/30 ambient-shadow">
-                {/* 급수 + 대상 */}
+                {/* 티어 + 대상 */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-7 pb-6 border-b border-outline-variant/20">
-                  <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.grade}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.tag}</span>
+                  <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.name}</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.target}</span>
                 </div>
 
                 {/* 스펙 (라벨 / 값) */}
@@ -151,12 +151,11 @@ export default function Guide() {
                     </ul>
                   </div>
 
-                  {cur.format ? (
+                  {lv.format ? (
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
                       <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.format')}</div>
                       <div className="flex-grow">
-                        <p className="font-body-lg text-body-lg text-on-surface break-keep">{cur.format}</p>
-                        <p className="font-body-md text-body-md text-on-surface-variant break-keep mt-0.5">{cur.formatSub}</p>
+                        <p className="font-body-lg text-body-lg text-on-surface break-keep">{lv.format}</p>
                       </div>
                     </div>
                   ) : lv.method ? (

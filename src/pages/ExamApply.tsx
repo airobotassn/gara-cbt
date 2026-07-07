@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { getTracks, GRADE_CODES } from '../lib/caris'
-import { useExamFees, feeKey } from '../lib/fees'
+import { getTracks } from '../lib/caris'
 import { useExamRounds } from '../lib/rounds'
 
 // 원서접수(앞단 목업) — 회차 선택 후 자격을 고르고 결제까지의 화면 흐름만.
-//   · Pro    = 단일 시험(응시료 1건). 급수는 점수로 판정 → 급수 선택 없음.
-//   · Master = 급수별 별도 시험(응시료 다름) → 급수 선택.
+//   개편(2026-07): CARIS-Ⅰ(Beginner/Pro/Elite)·CARIS-Ⅱ(Master/Grand Master/Zenith) 모두
+//   티어별 독립 시험 → 트랙·티어를 고르면 티어별 응시료로 결제. (구 'Pro 단일시험' 분기 폐지)
 // ⚠️ PG 결제·본인인증·주문 저장 미연결(결제하기는 안내 모달만). 실제 연동은 별도 작업.
 export default function ExamApply() {
   const navigate = useNavigate()
@@ -34,7 +33,7 @@ export default function ExamApply() {
   const [payNotice, setPayNotice] = useState(false)
   const TRACKS = getTracks(lang)
   const cur = TRACKS[track]
-  const lv = cur.levels[level]
+  const lv = cur.tiers[level]
   const isMaster = track === 1
   const goTrack = (i: number) => {
     setTrack((i + TRACKS.length) % TRACKS.length)
@@ -42,11 +41,9 @@ export default function ExamApply() {
   }
   const won = (n: number) => n.toLocaleString('ko-KR')
 
-  // 응시료: DB(exam_fees) 우선, 없으면 caris.ts 기본값 폴백.
-  const { fees } = useExamFees()
-  const fallbackFee = isMaster ? lv.fee ?? 0 : cur.examFee ?? 0
-  const fee = fees[feeKey(isMaster, GRADE_CODES[level])] ?? fallbackFee
-  const selLabel = isMaster ? `${cur.name} ${lv.grade}` : `${cur.name} ${t('caris.exam_suffix')}`
+  // 응시료: caris.ts 티어 상수(단일 소스) 직접 사용 — 편집 불가·DB 미사용이라 어긋날 여지 없음.
+  const fee = lv.fee ?? 0
+  const selLabel = `${cur.name} ${lv.name}`
 
   // 접수기간 가드: 특정 회차(?round=<id>)로 들어왔는데 그 회차가 '접수중(open)'이 아니면
   // (마감·예정·없음·지난 시험) 접수화면을 막고 일정으로 유도. 회차 미지정은 open 회차로 폴백하되
@@ -126,87 +123,61 @@ export default function ExamApply() {
                 ))}
               </div>
 
-              {isMaster ? (
-                <>
-                  {/* Master: 급수 선택 */}
-                  <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.grade')}</span>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {cur.levels.map((l, i) => (
-                      <button key={l.grade} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2.5 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold transition-all' : 'px-5 py-2.5 rounded-xl bg-surface-container-high text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>
-                        {l.grade}
-                      </button>
-                    ))}
-                  </div>
+              {/* 티어 선택 — 트랙 선택과 동일한 pill 바 스타일(크기 일치) */}
+              <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.tier')}</span>
+              <div className="flex flex-wrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full mt-2">
+                {cur.tiers.map((l, i) => (
+                  <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
+                    {l.name}
+                  </button>
+                ))}
+              </div>
 
-                  <div className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.grade}</span>
-                      <span className="font-body-md text-body-md text-on-surface-variant break-keep">{t('caris.lbl.eligibility')} · {lv.prereq}</span>
-                    </div>
-                    <div>
-                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.subjects')}</span>
-                      <ul className="mt-1.5 flex flex-col gap-1.5">
-                        {lv.subjects.map((s, i) => (
-                          <li key={i} className="flex items-start gap-2 font-body-md text-body-md text-on-surface break-keep">
-                            <span className="text-primary font-bold shrink-0">{i + 1}.</span>
-                            <span>{s}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      {lv.method && (
-                        <div>
-                          <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.method')}</span>
-                          <div className="mt-1 flex flex-col gap-0.5">
-                            {lv.method.split(' · ').map((m, i) => (
-                              <p key={i} className="font-body-md text-body-md text-on-surface font-medium break-keep">{m}</p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {lv.practical && (
-                        <div>
-                          <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.practical')}</span>
-                          <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{lv.practical}</p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.pass')}</span>
-                        <p className="mt-1 font-body-md text-body-md text-on-surface font-semibold break-keep">{lv.pass}</p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Pro: 단일 시험(급수는 점수 판정) */}
-                  <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {t('caris.exam_suffix')}</span>
-                      <span className="font-body-md text-body-md text-on-surface-variant break-keep">{cur.eligibility}</span>
-                    </div>
-                    <p className="font-body-md text-body-md text-on-surface-variant break-keep">{cur.caption}</p>
+              <div className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.name}</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.target}</span>
+                </div>
+                <div>
+                  <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.subjects')}</span>
+                  <ul className="mt-1.5 flex flex-col gap-1.5">
+                    {lv.subjects.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 font-body-md text-body-md text-on-surface break-keep">
+                        <span className="text-primary font-bold shrink-0">{i + 1}.</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {lv.format && (
                     <div>
                       <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.format')}</span>
-                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">
-                        {cur.format} <span className="text-on-surface-variant font-normal">({cur.formatSub})</span>
-                      </p>
+                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{lv.format}</p>
                     </div>
+                  )}
+                  {lv.method && (
                     <div>
-                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.grade_judge')}</span>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {cur.levels.map((l) => (
-                          <span key={l.grade} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high font-label-md text-label-md">
-                            <span className="text-primary font-bold">{l.grade}</span>
-                            <span className="text-on-surface-variant">{l.pass}</span>
-                          </span>
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.method')}</span>
+                      <div className="mt-1 flex flex-col gap-0.5">
+                        {lv.method.split(' · ').map((m, i) => (
+                          <p key={i} className="font-body-md text-body-md text-on-surface font-medium break-keep">{m}</p>
                         ))}
                       </div>
                     </div>
+                  )}
+                  {lv.practical && (
+                    <div>
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.practical')}</span>
+                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{lv.practical}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.pass')}</span>
+                    <p className="mt-1 font-body-md text-body-md text-on-surface font-semibold break-keep">{lv.pass}</p>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
             </section>
           </div>
 

@@ -5,7 +5,6 @@ import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
-import { proGradeForScore, gradeLabel, proGradeTag } from '../lib/caris'
 import { makeCertNo, tempSeq } from '../lib/certNo'
 import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
 
@@ -127,18 +126,20 @@ function demoData(fail = false): GradedData {
     totalCorrect: answers.filter((a) => a.isCorrect).length,
     totalQuestions: answers.length,
     answers,
+    examTitle: 'CARIS-Ⅰ Pro 자격시험',
   }
 }
 
 // 채점 공개 후 성적표 — 자체 훅(카운트업)을 쓰므로 컴포넌트로 분리(훅 순서 안정)
 function GradedResult({ data, attemptId, certName }: { data: GradedData; attemptId?: string; certName: string }) {
   const navigate = useNavigate()
-  const { t, lang } = useT()
+  const { t } = useT()
 
   const total = Math.max(1, data.totalQuestions)
   const scorePct = Math.round((data.totalCorrect / total) * 100)
-  const grade = proGradeForScore(scorePct)
-  const passed = grade !== null
+  // 합격 = 전체 문항의 60% 이상 정답(백엔드 my-attempts 의 PASS_RATIO=0.6 과 동일 규칙).
+  const passed = data.totalCorrect >= Math.ceil(data.totalQuestions * 0.6)
+  const certLabel = data.examTitle || t('exresult.cert_fallback')
   const subjects = useMemo(() => subjectStats(data.answers), [data.answers])
 
   // 점수 카운트업 + 게이지 채움 동기화
@@ -163,7 +164,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
     navigate('/certificate', {
       state: {
         name: certName,
-        qualification: grade ? `CARIS Pro ${gradeLabel(grade.grade, lang)}` : t('mypage.exam_fallback'),
+        qualification: passed ? certLabel : t('mypage.exam_fallback'),
         certNo,
         issueDate,
         scoreText: `${scorePct}점 (${data.totalCorrect}/${data.totalQuestions})`,
@@ -171,16 +172,10 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
     })
   }
 
-  // Pro 는 단발 시험(점수로 급수 판정) — 누적/사다리 구조가 아니다.
-  // 합격 시 상위 급수를 들이밀면(‘승급까지 N점’·‘재응시로 도전’) 멕이는 느낌 → 금지.
-  // 대신 취득한 급수가 인증하는 역량 수준을 그대로 긍정 서술. (1급만 Master 응시 자격 안내)
-  const infoLine =
-    grade?.grade === '1급'
-      ? t('exresult.info_master')
-      : passed && grade
-        ? t('exresult.info_grade', { tag: proGradeTag(grade.grade, lang) })
-        : t('exresult.info_fail')
-  const infoIcon = grade?.grade === '1급' ? 'rocket_launch' : passed ? 'verified' : 'target'
+  // 각 티어는 독립 시험(합격 = 60%↑). 합격자에게 상위 티어를 들이밀지 않고(‘승급까지 N점’·‘재응시로 도전’ 금지),
+  // 취득 자격이 인증하는 역량을 그대로 긍정 서술.
+  const infoLine = passed ? t('exresult.info_pass') : t('exresult.info_fail')
+  const infoIcon = passed ? 'verified' : 'target'
 
   return (
     <div className="w-full max-w-2xl flex flex-col gap-10">
@@ -203,7 +198,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
           <span className="material-symbols-outlined text-[20px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
             {passed ? 'workspace_premium' : 'info'}
           </span>
-          {passed ? t('exresult.pass_badge', { grade: gradeLabel(grade!.grade, lang) }) : t('exresult.fail_badge')}
+          {passed ? t('exresult.pass_badge') : t('exresult.fail_badge')}
         </div>
 
         {/* 점수 원형 게이지 */}
@@ -237,7 +232,7 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
           <div className="h-px bg-outline-variant/25" />
           <Row
             label={t('exresult.earned_grade')}
-            value={passed ? `CARIS Pro ${gradeLabel(grade!.grade, lang)}` : t('result.fail')}
+            value={passed ? certLabel : t('result.fail')}
             tone={passed ? 'text-primary font-bold' : 'text-error font-bold'}
           />
           <div className="h-px bg-outline-variant/25" />
@@ -257,15 +252,6 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
             >
               <span className="material-symbols-outlined text-[20px]">workspace_premium</span>
               {t('exresult.issue_cert')}
-            </button>
-          )}
-          {grade?.grade === '1급' && (
-            <button
-              onClick={() => navigate('/guide')}
-              className="flex-1 bg-surface-container-lowest border border-primary/30 text-primary font-title-md text-title-md py-3.5 px-6 rounded-xl hover:bg-primary/5 transition-all inline-flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[20px]">school</span>
-              {t('exresult.master_guide')}
             </button>
           )}
           <button

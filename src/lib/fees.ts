@@ -5,9 +5,10 @@ import { supabase, isSupabaseConfigured } from './supabase'
 
 export type FeeMap = Record<string, number>
 
-// 트랙·급수 → 요금 키. Pro='pro', Master=`master_${gradeCode}`(g4..g1).
-export function feeKey(isMaster: boolean, gradeCode: string): string {
-  return isMaster ? `master_${gradeCode}` : 'pro'
+// 트랙·티어 → 요금 키. `${트랙키}_${티어키}` — 예: t1_beginner, t1_pro, t1_elite, t2_master, t2_grandmaster, t2_zenith.
+// (구 키 'pro'·'master_g4'.. 는 개편으로 폐기 — DB exam_fees 시드/관리자 재설정 필요. 미설정 시 caris.ts 티어 기본값 폴백.)
+export function feeKey(trackKey: string, tierKey: string): string {
+  return `${trackKey}_${tierKey}`
 }
 
 export function useExamFees() {
