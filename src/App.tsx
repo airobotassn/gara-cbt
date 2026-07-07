@@ -23,6 +23,7 @@ import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import Guide from './pages/Guide'
 import Notice from './pages/Notice'
+import NoticeDetail from './pages/NoticeDetail'
 import Faq from './pages/Faq'
 import LevelSelect from './pages/LevelSelect'
 import TestRunner from './pages/TestRunner'
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/terms" element={<Terms />} />
               <Route path="/guide" element={<Guide />} />
               <Route path="/notice" element={<Notice />} />
+              <Route path="/notice/:id" element={<NoticeDetail />} />
               <Route path="/faq" element={<Faq />} />
               <Route
                 path="/admin"

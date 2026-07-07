@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, lazy, Suspense, type CSSProperties } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
@@ -487,6 +487,9 @@ const fieldStyle: CSSProperties = {
   color: 'var(--muted)',
 }
 
+// 공지 본문 WYSIWYG 에디터(react-quill) — 관리자 전용이라 lazy 로딩(공개 번들에 Quill 제외)
+const RichEditor = lazy(() => import('../components/RichEditor'))
+
 function NoticesAdmin() {
   const [rows, setRows] = useState<NoticeRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -510,7 +513,27 @@ function NoticesAdmin() {
     load()
   }, [load])
 
+  // 작성 중 자동 임시저장(localStorage) — 실수로 닫히거나 새로고침해도 복구(새 공지에만).
+  useEffect(() => {
+    if (!draft || draft.id) return
+    const id = setTimeout(() => localStorage.setItem('notice-draft', JSON.stringify(draft)), 600)
+    return () => clearTimeout(id)
+  }, [draft])
+
   function openNew() {
+    const saved = localStorage.getItem('notice-draft')
+    if (saved) {
+      try {
+        const d = JSON.parse(saved) as NoticeDraft
+        const hasContent = !!(d.titleI18n?.ko?.trim() || d.bodyI18n?.ko?.trim())
+        if (!d.id && hasContent && confirm('작성 중이던 공지가 있습니다. 이어서 작성할까요?')) {
+          setDraft(d)
+          return
+        }
+      } catch {
+        /* 무시 */
+      }
+    }
     setDraft(emptyDraft())
   }
   function openEdit(n: NoticeRow) {
@@ -552,6 +575,7 @@ function NoticesAdmin() {
             : null,
         },
       })
+      localStorage.removeItem('notice-draft')
       setDraft(null)
       await load()
       if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
@@ -648,7 +672,7 @@ function NoticesAdmin() {
       </div>
 
       {draft && (
-        <div className="admin-modal-bg" onClick={() => !saving && setDraft(null)}>
+        <div className="admin-modal-bg">
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setDraft(null)}>
               ✕
@@ -719,16 +743,12 @@ function NoticesAdmin() {
                   placeholder="공지 제목"
                 />
               </label>
-              <label style={fieldStyle}>
-                본문 <em style={{ color: 'var(--muted)' }}>(한국어)</em>
-                <textarea
-                  rows={6}
-                  style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
-                  value={draft.bodyI18n.ko ?? ''}
-                  onChange={(e) => patchBody(e.target.value)}
-                  placeholder="공지 본문"
-                />
-              </label>
+              <div style={fieldStyle}>
+                <span>본문 <em style={{ color: 'var(--muted)' }}>(한국어 · 서식·이미지 가능)</em></span>
+                <Suspense fallback={<div style={{ padding: 12, color: 'var(--muted)', fontSize: 13 }}>에디터 불러오는 중…</div>}>
+                  <RichEditor value={draft.bodyI18n.ko ?? ''} onChange={patchBody} />
+                </Suspense>
+              </div>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
                 🌐 저장하면 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역되어 올라갑니다.
                 (한국어 원문 기준 · 수정 후 저장하면 다시 번역)

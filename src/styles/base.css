@@ -68,6 +68,52 @@
   --fs-md: 18px;
 }
 
+/* 공지 상세(NoticeDetail) 본문 — 관리자 WYSIWYG(react-quill) HTML 렌더용 서식 */
+.notice-content { line-height: 1.75; color: var(--txt); word-break: keep-all; }
+.notice-content h2 { font-size: 1.4em; font-weight: 800; letter-spacing: -0.01em; margin: 1.3em 0 .5em; }
+.notice-content h3 { font-size: 1.18em; font-weight: 700; margin: 1.1em 0 .45em; }
+.notice-content p { margin: 0 0 .85em; }
+.notice-content ul, .notice-content ol { margin: 0 0 .9em 1.4em; }
+.notice-content ul { list-style: disc; }
+.notice-content ol { list-style: decimal; }
+.notice-content li { margin: .25em 0; }
+.notice-content a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.notice-content strong, .notice-content b { font-weight: 700; }
+.notice-content em { font-style: italic; }
+.notice-content img { max-width: 100%; height: auto; border-radius: 12px; margin: .8em 0; }
+.notice-content blockquote { border-left: 3px solid var(--line2); padding: 2px 0 2px 14px; margin: 0 0 .9em; color: var(--muted); }
+/* Quill 글자크기(class 기반) — 에디터에서 고른 크기가 상세페이지에도 반영되게 */
+.notice-content .ql-size-small { font-size: 0.82em; }
+.notice-content .ql-size-large { font-size: 1.4em; }
+.notice-content .ql-size-huge { font-size: 1.9em; }
+
+/* 관리자 공지 WYSIWYG(react-quill) — 다크 어드민 위에서 흰 '종이' 영역으로, 본문 크고 잘 보이게.
+   .ql-snow 로 특이도 올려 Quill 기본 스타일(나중 로드) 이겨냄. */
+.rich-editor .ql-toolbar.ql-snow {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.14);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+.rich-editor .ql-container.ql-snow {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.14);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  font-family: inherit;
+}
+.rich-editor .ql-editor {
+  min-height: 300px;
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: #1a1a1a;
+}
+.rich-editor .ql-editor.ql-blank::before {
+  color: #9aa0a6;
+  font-size: 16.5px;
+  font-style: normal;
+}
+
 * {
   box-sizing: border-box;
 }

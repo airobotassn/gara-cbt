@@ -316,14 +316,16 @@ async function translateKoFields(
     'Translate the given Korean fields into the requested languages. ' +
     'RULES: (1) natural, idiomatic wording as a native speaker would write, preserving meaning and tone; ' +
     '(2) do NOT translate product names, acronyms (SEB, PC, AI, CARIS, OMR, PDF) or numbers; ' +
-    '(3) preserve line breaks; (4) output ONLY valid JSON, no markdown.'
+    '(3) preserve line breaks; ' +
+    '(4) if a field contains HTML, translate ONLY the human-visible text and keep every HTML tag, attribute, and URL (href/src) exactly unchanged; ' +
+    '(5) output ONLY valid JSON, no markdown.'
   const user =
     `Translate these Korean fields into: ${langList}.\n` +
     `Return JSON shaped exactly as ${shape}.\n` +
     `If a source field is empty, return "" for it in every language.\n\n` +
     `SOURCE (Korean):\n${JSON.stringify(koFields)}`
 
-  const raw = await geminiJson(sys, user, 4096)
+  const raw = await geminiJson(sys, user, 8192)
   const parsed = JSON.parse(raw)
   for (const c of TARGET_LANGS) {
     const langObj = parsed?.[c]
