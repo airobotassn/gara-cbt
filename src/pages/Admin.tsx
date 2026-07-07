@@ -17,7 +17,6 @@ import type {
   FaqRow,
   AdminExamRoundListResponse,
   ExamRoundRow,
-  AdminExamFeeListResponse,
   AdminExamListResp,
   AdminExamItem,
   AdminQuestionListResp,
@@ -26,6 +25,7 @@ import type {
   AdminQuestionEvent,
   QuestionImportRow,
   CbtAnalytics,
+  CbtRoundStat,
   CbtQDiff,
   CbtUserRow,
   CbtUsersResp,
@@ -33,6 +33,7 @@ import type {
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
+import { getTracks } from '../lib/caris'
 
 // 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
@@ -99,6 +100,29 @@ const STATUS_LABEL: Record<string, string> = {
   expired: '만료',
 }
 
+// CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
+type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'
+// 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
+type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
+const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'in_progress', label: '진행중' },
+  { key: 'result_pending', label: '결과공개 대기' },
+  { key: 'passed', label: '합격' },
+  { key: 'failed', label: '불합격' },
+]
+function matchSubsFilter(r: AdminAttemptRow, f: SubsFilter): boolean {
+  const pct = r.totalQuestions && r.totalCorrect != null ? (r.totalCorrect / r.totalQuestions) * 100 : null
+  const releasePending = !r.resultReleaseAt || new Date(r.resultReleaseAt).getTime() > Date.now()
+  switch (f) {
+    case 'in_progress': return r.status === 'in_progress'
+    case 'result_pending': return r.status === 'submitted' && releasePending
+    case 'passed': return r.status === 'submitted' && pct != null && pct >= 60
+    case 'failed': return r.status === 'submitted' && pct != null && pct < 60
+    default: return true
+  }
+}
+
 // CARIS 시험(CBT) 백오피스 — 제출 답안 조회. (기존 Admin 본문 그대로, admin 함수 호출)
 function CarisExamAdmin() {
   const { isFullUser, loginWithGoogle } = useAuth()
@@ -110,8 +134,15 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'>('subs')
+  const [sub, setSub] = useState<CarisSub>('dash')
+  const [subsFilter, setSubsFilter] = useState<SubsFilter>('all')
   const [isRoot, setIsRoot] = useState(false)
+
+  // 대시보드 액션 카드 → 탭 이동(+제출답안 필터 프리셋)
+  const nav = useCallback((t: CarisSub, f: SubsFilter = 'all') => {
+    setSubsFilter(f)
+    setSub(t)
+  }, [])
 
   useEffect(() => {
     if (!isFullUser) {
@@ -233,7 +264,7 @@ function CarisExamAdmin() {
         )}
       </div>
       {sub === 'dash' ? (
-        <DashboardAdmin />
+        <DashboardAdmin onNav={nav} />
       ) : sub === 'grading' ? (
         <GradingAdmin />
       ) : sub === 'users' ? (
@@ -262,6 +293,19 @@ function CarisExamAdmin() {
         </div>
       </div>
 
+      {/* 빠른 필터(이 페이지 기준) — 대시보드 '처리 대기' 카드가 프리셋 지정 */}
+      <div className="admin-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
+        {SUBS_FILTERS.map((f) => {
+          const c = rows.filter((r) => matchSubsFilter(r, f.key)).length
+          return (
+            <button key={f.key} className={subsFilter === f.key ? 'on' : ''} onClick={() => setSubsFilter(f.key)}>
+              {f.label}
+              {f.key !== 'all' && <span style={{ opacity: 0.55, marginLeft: 5 }}>{c}</span>}
+            </button>
+          )
+        })}
+      </div>
+
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
 
       <div className="admin-table-wrap">
@@ -278,7 +322,7 @@ function CarisExamAdmin() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.filter((r) => matchSubsFilter(r, subsFilter)).map((r) => (
               <tr key={r.attemptId}>
                 <td>{fmtDT(r.submittedAt)}</td>
                 <td>{r.examTitle}</td>
@@ -304,10 +348,10 @@ function CarisExamAdmin() {
                 </td>
               </tr>
             ))}
-            {!rows.length && !loading && (
+            {!rows.filter((r) => matchSubsFilter(r, subsFilter)).length && !loading && (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  제출된 답안이 없습니다.
+                  {rows.length ? '이 필터에 해당하는 답안이 없습니다(이 페이지 기준).' : '제출된 답안이 없습니다.'}
                 </td>
               </tr>
             )}
@@ -1354,102 +1398,40 @@ function RoundsAdmin() {
   )
 }
 
-// ── 응시료 관리 (exam_fees) ────────────────────────────────────────
-// 급수/과목/합격컷은 코드 고정 — 여기선 "금액"만 편집.
-const FEE_ROWS = [
-  { key: 'pro', label: 'CARIS Pro', sub: '단일 응시료 (점수로 4~1급 판정)' },
-  { key: 'master_g4', label: 'CARIS Master 4급', sub: '' },
-  { key: 'master_g3', label: 'CARIS Master 3급', sub: '' },
-  { key: 'master_g2', label: 'CARIS Master 2급', sub: '' },
-  { key: 'master_g1', label: 'CARIS Master 1급', sub: '' },
-] as const
+// ── 응시료 (읽기전용) ──────────────────────────────────────────────
+// 응시료는 caris.ts 티어 상수(단일 소스)로 고정 — 관리자·DB에서 편집 불가(변수 아님, 상수).
+// 결제(ExamApply)도 동일 상수(lv.fee)를 직접 사용하므로 두 화면이 어긋날 여지가 없다.
+// 금액을 바꾸려면 src/lib/caris.ts 의 티어 fee 를 수정. (구 exam_fees DB 편집 방식 폐지)
+const FEE_ROWS = getTracks('ko').flatMap((track) =>
+  track.tiers.map((tier) => ({
+    id: `${track.key}_${tier.key}`,
+    label: `${track.name} ${tier.name}`,
+    sub: tier.target ?? tier.prereq ?? '',
+    amount: tier.fee ?? 0,
+  })),
+)
 
 function FeesAdmin() {
-  const [amounts, setAmounts] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setErr('')
-    try {
-      const res = await callFunction<AdminExamFeeListResponse>('admin', { action: 'examFeeList' })
-      const map: Record<string, number> = {}
-      for (const f of res.fees) map[f.key] = f.amount
-      setAmounts(map)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '응시료를 불러올 수 없습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-  useEffect(() => {
-    load()
-  }, [load])
-
-  function setAmt(key: string, v: string) {
-    const n = Math.max(0, Math.floor(Number(v) || 0))
-    setAmounts((a) => ({ ...a, [key]: n }))
-  }
-
-  async function save() {
-    setSaving(true)
-    try {
-      const fees = FEE_ROWS.map((r) => ({ key: r.key, amount: amounts[r.key] ?? 0 }))
-      await callFunction('admin', { action: 'examFeeSave', fees })
-      await load()
-      alert('응시료를 저장했습니다.')
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const won = (n: number) => (n || 0).toLocaleString('ko-KR')
 
   return (
     <>
       <div className="admin-head">
-        <h1>응시료 관리</h1>
-        <div className="admin-head-actions">
-          <button className="admin-mini" onClick={load} disabled={loading || saving}>
-            새로고침
-          </button>
-          <button className="btn-ink" onClick={save} disabled={loading || saving}>
-            {saving ? '저장 중…' : '저장'}
-          </button>
-        </div>
+        <h1>응시료</h1>
       </div>
 
-      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
-
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
-        급수 체계·과목·합격 기준은 코드로 고정되어 있고, 여기서는 <b>응시료 금액</b>만 변경합니다. 저장하면 원서접수 화면에 바로 반영됩니다.
+        응시료는 코드(<b>src/lib/caris.ts</b>)에 티어별 <b>상수</b>로 고정되어 있어 여기서 변경할 수 없습니다. 결제(원서접수) 화면도 같은 상수를 직접 사용합니다. 금액을 바꾸려면 caris.ts 를 수정하세요.
       </p>
 
       <div className="admin-section" style={{ maxWidth: 500, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {FEE_ROWS.map((r) => (
-          <div key={r.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{r.label}</div>
               {r.sub && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{r.sub}</div>}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                <input
-                  type="number"
-                  min={0}
-                  step={1000}
-                  style={{ ...inpStyle, width: 140, textAlign: 'right' }}
-                  value={amounts[r.key] ?? 0}
-                  onChange={(e) => setAmt(r.key, e.target.value)}
-                />
-                <span style={{ color: 'var(--muted)' }}>원</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>₩ {won(amounts[r.key] ?? 0)}</div>
-            </div>
+            <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>₩ {won(r.amount)}</div>
           </div>
         ))}
       </div>
@@ -1624,6 +1606,8 @@ function GradingAdmin() {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState<string | null>(null) // 채점 중인 answerId
   const [mcFor, setMcFor] = useState<GradeQueueItem | null>(null) // 객관식 참고 조회 대상
+  const [open, setOpen] = useState<Set<string>>(new Set()) // 펼친 응시(attemptId)
+  const toggle = (id: string) => setOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const loadRounds = useCallback(async () => {
     try {
@@ -1653,6 +1637,9 @@ function GradingAdmin() {
   useEffect(() => {
     loadRounds()
   }, [loadRounds])
+  useEffect(() => {
+    setOpen(new Set()) // 회차/범위 바뀌면 펼침 초기화
+  }, [scope, round])
 
   async function grade(it: GradeQueueItem, correct: boolean) {
     setBusy(it.answerId)
@@ -1674,6 +1661,21 @@ function GradingAdmin() {
 
   const pendingN = items.filter((i) => i.reviewStatus === 'pending').length
   const regular = rounds.filter((r) => r.kind === 'regular')
+
+  // 응시(attempt)별로 묶는다 — 응시자 한 명이 여러 주관식을 한 카드묶음으로(끝없이 길어지는 문제 해결).
+  const groups: { attemptId: string; userName: string | null; userEmail: string | null; examTitle: string | null; submittedAt: string | null; items: GradeQueueItem[] }[] = []
+  {
+    const byId = new Map<string, (typeof groups)[number]>()
+    for (const it of items) {
+      let g = byId.get(it.attemptId)
+      if (!g) {
+        g = { attemptId: it.attemptId, userName: it.userName, userEmail: it.userEmail, examTitle: it.examTitle, submittedAt: it.submittedAt, items: [] }
+        byId.set(it.attemptId, g)
+        groups.push(g)
+      }
+      g.items.push(it)
+    }
+  }
 
   return (
     <>
@@ -1701,66 +1703,39 @@ function GradingAdmin() {
 
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       {loading && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
-      {!loading && !err && items.length === 0 && (
+      {!loading && !err && groups.length === 0 && (
         <div className="admin-section admin-empty">{scope === 'pending' ? '채점 대기 중인 주관식 답안이 없습니다.' : '주관식 답안이 없습니다.'}</div>
       )}
 
-      <div className="grade-list">
-        {items.map((it) => {
-          const done = it.reviewStatus === 'graded'
+      {/* 응시자(응시)별로 접힌 목록 → 클릭하면 그 사람 주관식 문항이 펼쳐진다 */}
+      <div className="grade-groups">
+        {groups.map((g) => {
+          const isOpen = open.has(g.attemptId)
+          const pend = g.items.filter((x) => x.reviewStatus === 'pending').length
           return (
-            <div key={it.answerId} className={`grade-card ${done ? (it.isCorrect ? 'ok' : 'no') : ''}`}>
-              <div className="grade-top">
-                <div className="grade-who">
-                  <b>{it.userName || '이름없음'}</b>
-                  <span>{it.userEmail}</span>
-                </div>
-                <div className="grade-meta">
-                  {it.examTitle} · {it.number}번 · 제출 {fmtDTShort(it.submittedAt)}
-                  {done && (
-                    <span className={`grade-badge ${it.isCorrect ? 'ok' : 'no'}`}>{it.isCorrect ? '정답 처리' : '오답 처리'}</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grade-q">
-                <span className="grade-q-tag">{it.subject}{it.topic ? ` · ${it.topic}` : ''}</span>
-                <p className="grade-q-prompt">{it.prompt}</p>
-              </div>
-
-              {it.answerKey && (
-                <div className="grade-key">
-                  <span className="grade-label">모범답안 / 채점 기준</span>
-                  <p>{it.answerKey}</p>
+            <div key={g.attemptId} className={`grade-group ${isOpen ? 'open' : ''}`}>
+              <button className="grade-group-head" onClick={() => toggle(g.attemptId)} aria-expanded={isOpen}>
+                <span className="material-symbols-outlined ggh-caret">{isOpen ? 'expand_more' : 'chevron_right'}</span>
+                <span className="ggh-who">
+                  <b>{g.userName || '이름없음'}</b>
+                  <span>{g.userEmail}</span>
+                </span>
+                <span className="ggh-meta">{g.examTitle} · 제출 {fmtDTShort(g.submittedAt)}</span>
+                <span className={`ggh-count ${pend ? 'pend' : 'done'}`}>
+                  {scope === 'pending'
+                    ? `주관식 ${g.items.length}문항`
+                    : pend
+                      ? `대기 ${pend} · 완료 ${g.items.length - pend}`
+                      : `완료 ${g.items.length}`}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="grade-group-body">
+                  {g.items.map((it) => (
+                    <GradeCard key={it.answerId} it={it} busy={busy} onGrade={grade} onMc={setMcFor} />
+                  ))}
                 </div>
               )}
-
-              <div className="grade-ans">
-                <span className="grade-label">응시자 답안</span>
-                <p>{it.answerText?.trim() ? it.answerText : <em className="grade-empty">(무응답)</em>}</p>
-              </div>
-
-              <div className="grade-actions">
-                <button
-                  className={`grade-btn ok ${done && it.isCorrect ? 'active' : ''}`}
-                  disabled={busy === it.answerId}
-                  onClick={() => grade(it, true)}
-                >
-                  <span className="material-symbols-outlined">check_circle</span>
-                  {done ? '정답으로 수정' : '정답'}
-                </button>
-                <button
-                  className={`grade-btn no ${done && !it.isCorrect ? 'active' : ''}`}
-                  disabled={busy === it.answerId}
-                  onClick={() => grade(it, false)}
-                >
-                  <span className="material-symbols-outlined">cancel</span>
-                  {done ? '오답으로 수정' : '오답'}
-                </button>
-                <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={() => setMcFor(it)}>
-                  이 응시 객관식 보기
-                </button>
-              </div>
             </div>
           )
         })}
@@ -1768,6 +1743,58 @@ function GradingAdmin() {
 
       {mcFor && <McReviewModal item={mcFor} onClose={() => setMcFor(null)} />}
     </>
+  )
+}
+
+// 주관식 답안 1건 카드 — 그룹(응시자) 펼침 안에서 렌더.
+function GradeCard({ it, busy, onGrade, onMc }: {
+  it: GradeQueueItem
+  busy: string | null
+  onGrade: (it: GradeQueueItem, correct: boolean) => void
+  onMc: (it: GradeQueueItem) => void
+}) {
+  const done = it.reviewStatus === 'graded'
+  return (
+    <div className={`grade-card ${done ? (it.isCorrect ? 'ok' : 'no') : ''}`}>
+      <div className="grade-top">
+        <div className="grade-meta">
+          {it.number}번 · {it.subject}{it.topic ? ` · ${it.topic}` : ''}
+          {done && (
+            <span className={`grade-badge ${it.isCorrect ? 'ok' : 'no'}`}>{it.isCorrect ? '정답 처리' : '오답 처리'}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="grade-q">
+        <p className="grade-q-prompt">{it.prompt}</p>
+      </div>
+
+      {it.answerKey && (
+        <div className="grade-key">
+          <span className="grade-label">모범답안 / 채점 기준</span>
+          <p>{it.answerKey}</p>
+        </div>
+      )}
+
+      <div className="grade-ans">
+        <span className="grade-label">응시자 답안</span>
+        <p>{it.answerText?.trim() ? it.answerText : <em className="grade-empty">(무응답)</em>}</p>
+      </div>
+
+      <div className="grade-actions">
+        <button className={`grade-btn ok ${done && it.isCorrect ? 'active' : ''}`} disabled={busy === it.answerId} onClick={() => onGrade(it, true)}>
+          <span className="material-symbols-outlined">check_circle</span>
+          {done ? '정답으로 수정' : '정답'}
+        </button>
+        <button className={`grade-btn no ${done && !it.isCorrect ? 'active' : ''}`} disabled={busy === it.answerId} onClick={() => onGrade(it, false)}>
+          <span className="material-symbols-outlined">cancel</span>
+          {done ? '오답으로 수정' : '오답'}
+        </button>
+        <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={() => onMc(it)}>
+          이 응시 객관식 보기
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -1838,19 +1865,35 @@ function HBar({ label, value, max, sub }: { label: string; value: number; max: n
   )
 }
 
-const DASH_PERIODS = [7, 30, 90] as const
+// 기간 선택(7/30/90 + 사용자지정 날짜). 추이·결제 차트 공용.
+type DayRange = { preset: number; from: string; to: string } // preset 0 = 사용자지정
+function useDayRange(days: string[], def = 30): [DayRange, (r: DayRange) => void, string[]] {
+  const last = days[days.length - 1] ?? ''
+  const [r, setR] = useState<DayRange>({ preset: def, from: days[Math.max(0, days.length - def)] ?? days[0] ?? '', to: last })
+  const view = r.preset ? days.slice(-r.preset) : days.filter((d) => (!r.from || d >= r.from) && (!r.to || d <= r.to))
+  return [r, setR, view]
+}
+function RangeControl({ value, onChange, days }: { value: DayRange; onChange: (r: DayRange) => void; days: string[] }) {
+  const first = days[0] ?? ''
+  const last = days[days.length - 1] ?? ''
+  return (
+    <div className="rng">
+      {[7, 30, 90].map((p) => (
+        <button key={p} className={value.preset === p ? 'on' : ''} onClick={() => onChange({ preset: p, from: days[Math.max(0, days.length - p)] ?? first, to: last })}>{p}일</button>
+      ))}
+      <input type="date" className="rng-date" min={first} max={last} value={value.from} onChange={(e) => onChange({ preset: 0, from: e.target.value, to: value.to || last })} />
+      <span className="rng-tilde">~</span>
+      <input type="date" className="rng-date" min={first} max={last} value={value.to} onChange={(e) => onChange({ preset: 0, from: value.from || first, to: e.target.value })} />
+    </div>
+  )
+}
 function TrendChart({ title, days, map, color }: { title: string; days: string[]; map: Record<string, number>; color: string }) {
-  const [period, setPeriod] = useState<number>(30)
-  const view = days.slice(-period)
+  const [range, setRange, view] = useDayRange(days, 30)
   return (
     <div className="admin-section">
       <div className="admin-section-head">
         <h3>{title}</h3>
-        <div className="admin-period">
-          {DASH_PERIODS.map((p) => (
-            <button key={p} className={period === p ? 'on' : ''} onClick={() => setPeriod(p)}>{p}일</button>
-          ))}
-        </div>
+        <RangeControl value={range} onChange={setRange} days={days} />
       </div>
       <MiniBars days={view} map={map} color={color} />
     </div>
@@ -1874,7 +1917,7 @@ function DiffRows({ rows, empty }: { rows: CbtQDiff[]; empty: string }) {
   )
 }
 
-function DashboardAdmin() {
+function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => void }) {
   const [a, setA] = useState<CbtAnalytics | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -1906,94 +1949,412 @@ function DashboardAdmin() {
       </div>
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       {loading && !a && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
-      {a && <DashboardBody a={a} />}
+      {a && <DashboardBody a={a} onNav={onNav} />}
     </>
   )
 }
 
-function DashboardBody({ a }: { a: CbtAnalytics }) {
+// ── 시연용 데모 데이터 ─────────────────────────────────────────────
+// DB에 결제/접수 테이블·티어별 개별시험이 아직 없어 하드코딩. 실연동 시 이 상수/생성기를 서버 데이터로 교체.
+const won = (n: number) => `₩${n.toLocaleString()}`
+function wonShort(n: number): string {
+  if (n >= 1e8) return `₩${(n / 1e8).toFixed(n % 1e8 === 0 ? 0 : 1)}억`
+  if (n >= 1e4) return `₩${Math.round(n / 1e4).toLocaleString()}만`
+  return won(n)
+}
+// 문자열 → 0..1 안정 해시(데모값 생성 · 새로고침해도 동일)
+function hash01(s: string): number {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return ((h >>> 0) % 100000) / 100000
+}
+
+const DEMO_PAY = {
+  refundRate: 0.035,
+  methods: [
+    { k: '신용카드', n: 71 },
+    { k: '계좌이체', n: 13 },
+    { k: '간편결제', n: 6 },
+  ],
+  recent: [
+    { name: '김민준', grade: 'Elite', amount: 55000, method: '신용카드', status: 'paid', at: '2026-07-07 14:22' },
+    { name: '이서연', grade: 'Pro', amount: 40000, method: '간편결제', status: 'paid', at: '2026-07-07 11:05' },
+    { name: '박도윤', grade: 'Master', amount: 80000, method: '계좌이체', status: 'paid', at: '2026-07-06 17:48' },
+    { name: '최지우', grade: 'Pro', amount: 40000, method: '신용카드', status: 'refund', at: '2026-07-06 09:31' },
+    { name: '정하준', grade: 'Beginner', amount: 30000, method: '신용카드', status: 'paid', at: '2026-07-05 20:14' },
+    { name: '강수아', grade: 'Elite', amount: 55000, method: '신용카드', status: 'paid', at: '2026-07-05 13:02' },
+    { name: '조은우', grade: 'Grand Master', amount: 100000, method: '계좌이체', status: 'paid', at: '2026-07-04 16:39' },
+    { name: '윤서준', grade: 'Pro', amount: 40000, method: '간편결제', status: 'paid', at: '2026-07-04 10:12' },
+  ],
+}
+// 날짜별 데모 매출(원) — 안정 해시(주말 낮음·간헐 0). 결제 차트/합계가 기간 선택에 반응.
+function demoRevByDay(days: string[]): Record<string, number> {
+  const m: Record<string, number> = {}
+  for (const d of days) m[d] = hash01('z' + d) < 0.12 ? 0 : (Math.floor(hash01('rev' + d) * 26) + 3) * 10000
+  return m
+}
+
+// admin 함수(구버전)가 신규 지표를 안 주면 쓰는 데모 폴백 — 재배포 시 실데이터로 자동 전환.
+const DEMO_FB = {
+  signups7d: 9, certIssued: 42, certPending: 8, resultPending: 5, inProgress: 2,
+  pendingGrading: 11, openRounds: 2, nextExamDate: '2026-07-18' as string | null, avgScore: 73, avgDurationMin: 38,
+}
+const DEMO_ROUNDS: CbtRoundStat[] = [
+  { id: 'd7', title: '제 2회 정기시험 (2027)', examDate: '2027-06-19', kind: 'regular', attempts: 12, pass: 8, cert: 5 },
+  { id: 'd6', title: '제 4회 정기시험', examDate: '2026-10-17', kind: 'regular', attempts: 28, pass: 19, cert: 14 },
+  { id: 'd5', title: '제 3회 정기시험', examDate: '2026-09-19', kind: 'regular', attempts: 41, pass: 30, cert: 26 },
+  { id: 'd2', title: '제 2회 정기시험', examDate: '2026-08-15', kind: 'regular', attempts: 34, pass: 25, cert: 21 },
+  { id: 'd1', title: '제 1회 정기시험', examDate: '2026-07-18', kind: 'regular', attempts: 52, pass: 39, cert: 37 },
+  { id: 'd0', title: '상시 CBT', examDate: null, kind: 'rolling', attempts: 18, pass: 12, cert: 9 },
+]
+
+// 급수(티어)별 데모 통계 — /guide 의 getTracks subjects 로 라벨, 해시로 수치(재배포/티어 추적 전까지 사용).
+interface TierStat {
+  attempts: number
+  pass: number
+  passRate: number
+  scoreHist: number[] // [0-59,60-69,70-79,80-89,90-100]
+  subjects: { subject: string; rate: number; n: number }[]
+  hard: CbtQDiff[]
+  easy: CbtQDiff[]
+  pool: { subject: string; total: number; active: number }[]
+}
+function tierStat(key: string, name: string, subjects: string[]): TierStat {
+  const attempts = 24 + Math.floor(hash01('att' + key) * 176)
+  const passRate = 48 + Math.floor(hash01('pr' + key) * 42)
+  const pass = Math.round((attempts * passRate) / 100)
+  const w = [0, 1, 2, 3, 4].map((i) => 0.4 + hash01('h' + key + i))
+  const wSum = w.reduce((x, y) => x + y, 0)
+  const scoreHist = w.map((x) => Math.round((x / wSum) * attempts))
+  const subj = subjects.map((s, i) => ({
+    subject: s,
+    rate: 52 + Math.floor(hash01('sr' + key + i) * 44),
+    n: Math.round(attempts * (0.6 + hash01('sn' + key + i) * 0.4)),
+  }))
+  const mkQ = (i: number, rate: number): CbtQDiff => ({
+    id: `${key}-${i}`,
+    number: 3 + Math.floor(hash01('qn' + key + i) * 38),
+    subject: subjects[Math.floor(hash01('qs' + key + i) * subjects.length)] ?? subjects[0] ?? '과목',
+    prompt: `${name} · ${subjects[Math.floor(hash01('qs' + key + i) * subjects.length)] ?? '개념'} 적용/해석 유형 문항`,
+    exam: name,
+    active: true,
+    n: 12 + Math.floor(hash01('qnn' + key + i) * 60),
+    rate,
+  })
+  const hard = [0, 1, 2, 3].map((i) => mkQ(i, 18 + Math.floor(hash01('hr' + key + i) * 20))).sort((x, y) => x.rate - y.rate)
+  const easy = [0, 1, 2, 3].map((i) => mkQ(i + 10, 82 + Math.floor(hash01('er' + key + i) * 16))).sort((x, y) => y.rate - x.rate)
+  const pool = subjects.map((s, i) => {
+    const active = 3 + Math.floor(hash01('pa' + key + i) * 9)
+    return { subject: s, active, total: active + Math.floor(hash01('pt' + key + i) * 5) }
+  })
+  return { attempts, pass, passRate, scoreHist, subjects: subj, hard, easy, pool }
+}
+
+function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?: SubsFilter) => void }) {
   const o = a.overview
-  const cards = [
-    { k: '회원', v: o.users, sub: `게스트 ${o.guests}명` },
-    { k: '전체 제출', v: o.attemptsAll, sub: `최근 7일 ${o.attempts7d}건` },
-    { k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건` },
-    { k: '문항', v: `${o.questionsActive} / ${o.questions}`, sub: '활성 / 전체' },
-    { k: '시험', v: o.exams, sub: '등록 수' },
+  // 구버전 함수 호환: 신규 지표(certIssued)가 없으면 데모값으로 채우고 안내 배너 표시.
+  const live = o.certIssued !== undefined
+  const fb = <T,>(v: T | undefined, d: T): T => (v === undefined ? d : v)
+  const signups7d = fb(o.signups7d, DEMO_FB.signups7d)
+  const certIssued = fb(o.certIssued, DEMO_FB.certIssued)
+  const certPending = fb(o.certPending, DEMO_FB.certPending)
+  const resultPending = fb(o.resultPending, DEMO_FB.resultPending)
+  const inProgress = fb(o.inProgress, DEMO_FB.inProgress)
+  const pendingGrading = fb(o.pendingGrading, DEMO_FB.pendingGrading)
+  const avgScore = fb(a.avgScore, DEMO_FB.avgScore)
+  const rounds = a.rounds && a.rounds.length ? a.rounds : live ? [] : DEMO_ROUNDS
+
+  // 결제 KPI(데모) — 최근 30일 매출 합계
+  const demoRev = demoRevByDay(a.days)
+  const pay30 = a.days.slice(-30).reduce((s, d) => s + (demoRev[d] || 0), 0)
+  const payCount = Math.max(1, Math.round(pay30 / 52000))
+
+  const actions = [
+    { ico: 'rate_review', label: '주관식 채점 대기', n: pendingGrading, tone: 'amber', go: () => onNav('grading') },
+    { ico: 'workspace_premium', label: '자격증 미발급(합격)', n: certPending, tone: 'blue', go: () => onNav('subs', 'passed') },
+    { ico: 'schedule', label: '결과 공개 대기', n: resultPending, tone: 'muted', go: () => onNav('subs', 'result_pending') },
+    { ico: 'timelapse', label: '응시 진행 중', n: inProgress, tone: 'muted', go: () => onNav('subs', 'in_progress') },
   ]
-  const bandMax = Math.max(1, ...Object.values(a.scoreBands))
-  const byExamMax = Math.max(1, ...a.byExam.map((e) => e.count))
-  const poolWarn = a.pool.filter((p) => p.active < 4)
+  const kpis = [
+    { ico: 'group', k: '누적 회원', v: o.users.toLocaleString(), sub: `이번주 신규 +${signups7d}명`, accent: 'blue', delta: signups7d > 0 ? `+${signups7d}` : undefined },
+    { ico: 'assignment_turned_in', k: '응시 제출', v: o.attemptsAll.toLocaleString(), sub: `최근 7일 ${o.attempts7d}건`, accent: 'violet' },
+    { ico: 'verified', k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건 · 평균 ${avgScore}점`, accent: 'green' },
+    { ico: 'workspace_premium', k: '자격증 발급', v: certIssued.toLocaleString(), sub: `미발급 ${certPending}건`, accent: 'amber' },
+    { ico: 'payments', k: '매출(30일)', v: wonShort(pay30), sub: `결제 ${payCount}건 · 데모`, accent: 'green', demo: true },
+  ]
 
   return (
     <div className="admin-dash">
-      <div className="admin-cards">
-        {cards.map((c) => (
-          <div key={c.k} className="admin-card">
-            <div className="k">{c.k}</div>
-            <div className="v">{c.v}</div>
-            <div className="sub">{c.sub}</div>
-          </div>
+      {!live && (
+        <div className="admin-demo">
+          ⓘ 자격증·회차·급수·평균 등 일부 지표는 <b>데모값</b>입니다 — <code>admin</code> 함수 재배포 후 실데이터로 자동 전환됩니다. 결제·급수별 분석은 실연동/티어 추적 전까지 데모입니다.
+        </div>
+      )}
+
+      {/* KPI */}
+      <div className="kpi-grid">
+        {kpis.map((c) => <Kpi key={c.k} {...c} />)}
+      </div>
+
+      {/* 처리 대기(액션) */}
+      <div className="admin-section-head" style={{ marginBottom: 10 }}>
+        <h3 style={{ margin: 0 }}>처리 대기</h3>
+        <span className="admin-hint">클릭하면 해당 화면(필터 적용)으로 이동</span>
+      </div>
+      <div className="act-grid">
+        {actions.map((x) => (
+          <button key={x.label} className={`act ${x.n > 0 ? `t-${x.tone}` : 'done'}`} onClick={x.go}>
+            <span className="material-symbols-outlined act-ico">{x.n > 0 ? x.ico : 'check_circle'}</span>
+            <span className="act-n">{x.n}</span>
+            <span className="act-l">{x.label}</span>
+          </button>
         ))}
       </div>
 
-      <TrendChart title="가입 추이" days={a.days} map={a.signupByDay} color="#3aa79f" />
-      <TrendChart title="응시(제출) 추이" days={a.days} map={a.submitByDay} color="#3f8fd6" />
+      {/* 결제(데모) */}
+      <PaymentSection days={a.days} />
 
+      {/* 추이 */}
       <div className="admin-grid2">
-        <div className="admin-section">
-          <h3>점수 분포 <span className="admin-hint">합격컷 60점</span></h3>
-          {Object.entries(a.scoreBands).map(([band, v]) => <HBar key={band} label={`${band}점`} value={v} max={bandMax} sub="명" />)}
-          {a.scoredN === 0 ? <div className="admin-empty">채점된 응시가 없습니다.</div> : null}
-        </div>
-        <div className="admin-section">
-          <h3>시험별 응시</h3>
-          {a.byExam.map((e) => <HBar key={e.slug} label={e.title} value={e.count} max={byExamMax} sub="건" />)}
-          {!a.byExam.length ? <div className="admin-empty">시험이 없습니다.</div> : null}
-        </div>
+        <TrendChart title="가입 추이" days={a.days} map={a.signupByDay} color="var(--k-blue)" />
+        <TrendChart title="응시(제출) 추이" days={a.days} map={a.submitByDay} color="var(--k-violet)" />
+      </div>
+      {a.certByDay && <TrendChart title="자격증 발급 추이" days={a.days} map={a.certByDay} color="var(--k-green)" />}
+
+      {/* 급수별 분석 (/guide 자격 체계 기준) */}
+      <TierAnalysis />
+
+      {/* 회차별 현황 퍼널 */}
+      <div className="admin-section">
+        <h3>회차별 현황 <span className="admin-hint">응시 → 합격 → 자격증 발급</span></h3>
+        <RoundFunnel rows={rounds} />
+      </div>
+    </div>
+  )
+}
+
+// KPI 카드 — 아이콘 칩 + 값 + 증감/데모 배지 + 색상 액센트.
+function Kpi({ ico, k, v, sub, accent, delta, demo }: {
+  ico: string; k: string; v: string; sub: string; accent: string; delta?: string; demo?: boolean
+}) {
+  return (
+    <div className={`kpi k-${accent}`}>
+      <div className="kpi-top">
+        <span className="material-symbols-outlined kpi-ico">{ico}</span>
+        {demo ? <span className="kpi-tag">데모</span> : delta ? <span className="kpi-delta">▲ {delta}</span> : null}
+      </div>
+      <div className="kpi-k">{k}</div>
+      <div className="kpi-v">{v}</div>
+      <div className="kpi-sub">{sub}</div>
+    </div>
+  )
+}
+
+// 급수(티어)별 분석 — /guide 의 getTracks 를 그대로 selector 로. 급수 분포 막대 = 티어 선택기 겸용.
+function TierAnalysis() {
+  const tracks = getTracks('ko')
+  const tiers = tracks.flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
+  const [sel, setSel] = useState(tiers[1]?.key ?? tiers[0]?.key ?? '')
+  const cur = tiers.find((t) => t.key === sel) ?? tiers[0]
+  if (!cur) return null
+  const dist = tiers.map((t) => ({ ...t, n: tierStat(t.key, t.name, t.subjects).attempts }))
+  const distMax = Math.max(1, ...dist.map((d) => d.n))
+  const st = tierStat(cur.key, cur.name, cur.subjects)
+  const bands = ['0-59', '60-69', '70-79', '80-89', '90-100']
+  const histMax = Math.max(1, ...st.scoreHist)
+  const poolWarn = st.pool.filter((p) => p.active < 4)
+
+  return (
+    <div className="admin-section">
+      <div className="admin-section-head">
+        <h3>급수별 분석 <span className="admin-hint">/guide 자격 체계 기준</span></h3>
+        <span className="admin-badge-demo">데모</span>
       </div>
 
-      <div className="admin-section">
-        <h3>⚠ 어려운 문항 <span className="admin-hint">정답률 낮은 순 · 응시 3회↑</span></h3>
-        <DiffRows rows={a.qHardest} empty="아직 응시 데이터가 없습니다." />
-      </div>
-      <div className="admin-section">
-        <h3>쉬운 문항 <span className="admin-hint">정답률 높은 순</span></h3>
-        <DiffRows rows={a.qEasiest} empty="아직 응시 데이터가 없습니다." />
+      {/* 급수 분포 = 응시 수 막대 + 클릭 선택 */}
+      <div className="admin-sub">급수 분포 · 응시 수 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>(막대 클릭 → 아래 상세 전환)</span></div>
+      <div className="tier-dist">
+        {dist.map((d) => (
+          <button key={d.key} className={`tdist ${d.key === sel ? 'on' : ''}`} onClick={() => setSel(d.key)} title={`${d.track} · ${d.name} · 응시 ${d.n}`}>
+            <span className="tdist-track">{d.track.replace('CARIS-', '')}</span>
+            <span className="tdist-col"><span className="tdist-bar" style={{ height: `${(d.n / distMax) * 100}%` }} /></span>
+            <span className="tdist-n">{d.n}</span>
+            <span className="tdist-l">{d.name}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="admin-grid2">
-        <div className="admin-section">
-          <h3>과목별 정답률</h3>
-          {a.subjectCorrect.map((s) => <HBar key={s.subject} label={s.subject} value={s.rate} max={100} sub={`% (${s.n})`} />)}
-          {!a.subjectCorrect.length ? <div className="admin-empty">아직 응시 데이터가 없습니다.</div> : null}
+      {/* 선택 급수 상세 */}
+      <div className="tier-detail">
+        <div className="tier-detail-head">
+          <b>{cur.track} · {cur.name}</b>
+          <span>응시 <b>{st.attempts}</b> · 합격 <b>{st.pass}</b> ({st.passRate}%)</span>
         </div>
-        <div className="admin-section">
-          <h3>과목별 문항 풀 <span className="admin-hint">활성 4개 이상 권장</span></h3>
+        <div className="admin-grid2">
+          <div className="tier-panel">
+            <div className="admin-sub">점수 분포</div>
+            {bands.map((lb, i) => <HBar key={lb} label={`${lb}점`} value={st.scoreHist[i]} max={histMax} sub="명" />)}
+          </div>
+          <div className="tier-panel">
+            <div className="admin-sub">과목별 정답률</div>
+            {st.subjects.map((s) => <HBar key={s.subject} label={s.subject} value={s.rate} max={100} sub={`% (${s.n})`} />)}
+          </div>
+        </div>
+        <div className="tier-panel" style={{ marginTop: 14 }}>
+          <div className="admin-sub">⚠ 어려운 문항 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>정답률 낮은 순</span></div>
+          <DiffRows rows={st.hard} empty="—" />
+        </div>
+        <div className="tier-panel" style={{ marginTop: 14 }}>
+          <div className="admin-sub">쉬운 문항 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>정답률 높은 순</span></div>
+          <DiffRows rows={st.easy} empty="—" />
+        </div>
+        <div className="tier-panel" style={{ marginTop: 14 }}>
+          <div className="admin-sub">과목별 문항 풀 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>활성 4개 이상 권장</span></div>
           {poolWarn.length ? <div className="admin-warn">⚠ 활성 4개 미만: {poolWarn.map((p) => p.subject).join(' · ')}</div> : null}
           <table className="admin-table pool-table">
             <thead>
               <tr><th>과목</th><th>활성</th><th>전체</th><th>상태</th></tr>
             </thead>
             <tbody>
-              {a.pool.map((p) => {
+              {st.pool.map((p) => {
                 const ok = p.active >= 4
                 return (
                   <tr key={p.subject} className={ok ? '' : 'prob'}>
                     <td>{p.subject}</td>
                     <td><b>{p.active}</b></td>
                     <td>{p.total}</td>
-                    <td>{p.total === 0 ? <span className="badge none">없음</span> : ok ? <span className="badge ok">충분</span> : <span className="badge low">부족</span>}</td>
+                    <td>{ok ? <span className="badge ok">충분</span> : <span className="badge low">부족</span>}</td>
                   </tr>
                 )
               })}
-              {!a.pool.length ? (
-                <tr>
-                  <td colSpan={4} className="admin-empty">문항이 없습니다.</td>
-                </tr>
-              ) : null}
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// 회차별 응시→합격→발급 퍼널 표 (페이징 5행/쪽).
+function RoundFunnel({ rows }: { rows: CbtRoundStat[] }) {
+  const [page, setPage] = useState(0)
+  const PER = 5
+  if (!rows.length) return <div className="admin-empty">회차 응시 데이터가 없습니다.</div>
+  const pageMax = Math.max(1, Math.ceil(rows.length / PER))
+  const shown = rows.slice(page * PER, page * PER + PER)
+  return (
+    <>
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>회차</th>
+            <th>시험일</th>
+            <th style={{ textAlign: 'right' }}>응시</th>
+            <th style={{ textAlign: 'right' }}>합격</th>
+            <th style={{ textAlign: 'right' }}>합격률</th>
+            <th style={{ textAlign: 'right' }}>발급</th>
+            <th style={{ minWidth: 130 }}>진행</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((r) => {
+            const passRate = r.attempts ? Math.round((r.pass / r.attempts) * 100) : 0
+            const certRate = r.attempts ? Math.round((r.cert / r.attempts) * 100) : 0
+            return (
+              <tr key={r.id}>
+                <td><b>{r.title}</b></td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.kind === 'rolling' ? '상시' : r.examDate ?? '-'}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.attempts}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.pass}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{passRate}%</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.cert}</td>
+                <td>
+                  <div className="fn-bar" title={`합격 ${passRate}% · 발급 ${certRate}%`}>
+                    <div className="fn-pass" style={{ width: `${passRate}%` }} />
+                    <div className="fn-cert" style={{ width: `${certRate}%` }} />
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+    {pageMax > 1 && (
+      <div className="admin-pager" style={{ marginTop: 12 }}>
+        <button className="admin-mini" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>‹ 이전</button>
+        <span>{page + 1} / {pageMax}</span>
+        <button className="admin-mini" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>다음 ›</button>
+      </div>
+    )}
+    </>
+  )
+}
+
+// 결제 현황(시연용 하드코딩) — 기간 선택 반응. 실연동 전까지 데모.
+function PaymentSection({ days }: { days: string[] }) {
+  const [range, setRange, view] = useDayRange(days, 30)
+  const revMap = demoRevByDay(days)
+  const series = view.map((d) => revMap[d] ?? 0)
+  const total = series.reduce((s, v) => s + v, 0)
+  const max = Math.max(1, ...series)
+  const count = Math.max(1, Math.round(total / 52000))
+  const refunds = Math.max(0, Math.round(count * DEMO_PAY.refundRate))
+  const aov = count ? Math.round(total / count) : 0
+  const methodTotal = DEMO_PAY.methods.reduce((s, m) => s + m.n, 0)
+  const rangeLabel = range.preset ? `최근 ${range.preset}일` : `${range.from || '?'} ~ ${range.to || '?'}`
+  return (
+    <div className="admin-section pay-sec">
+      <div className="admin-section-head">
+        <h3><span className="material-symbols-outlined pay-ico">credit_card</span>결제 현황</h3>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <RangeControl value={range} onChange={setRange} days={days} />
+          <span className="admin-badge-demo">데모</span>
+        </div>
+      </div>
+      <div className="pay-kpis">
+        <div><span className="pk-k">매출 · {rangeLabel}</span><span className="pk-v">{won(total)}</span></div>
+        <div><span className="pk-k">결제 건수</span><span className="pk-v">{count}건</span></div>
+        <div><span className="pk-k">환불</span><span className="pk-v">{refunds}건</span></div>
+        <div><span className="pk-k">객단가</span><span className="pk-v">{won(aov)}</span></div>
+      </div>
+      <div className="pay-grid">
+        <div>
+          <div className="admin-sub">일별 매출 · {rangeLabel}</div>
+          <div className="mini-bars" style={{ height: 76 }}>
+            {view.map((d) => (
+              <div key={d} className="mini-bar">
+                <div className="fill" style={{ height: `${(revMap[d] / max) * 100}%`, background: 'var(--k-green)' }} />
+                <div className="mini-tip"><span>{d.slice(5)}</span><b>{won(revMap[d] ?? 0)}</b></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="admin-sub">결제 수단</div>
+          {DEMO_PAY.methods.map((m) => <HBar key={m.k} label={m.k} value={m.n} max={methodTotal} sub="건" />)}
+        </div>
+      </div>
+      <div className="admin-sub">최근 결제</div>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr><th>응시자</th><th>급수</th><th style={{ textAlign: 'right' }}>금액</th><th>수단</th><th>상태</th><th>일시</th></tr>
+          </thead>
+          <tbody>
+            {DEMO_PAY.recent.map((r, i) => (
+              <tr key={i}>
+                <td>{r.name}</td>
+                <td>{r.grade}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{won(r.amount)}</td>
+                <td style={{ color: 'var(--muted)' }}>{r.method}</td>
+                <td><span className={`admin-badge st-${r.status === 'refund' ? 'voided' : 'submitted'}`}>{r.status === 'refund' ? '환불' : '완료'}</span></td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.at}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )

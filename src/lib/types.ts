@@ -58,15 +58,16 @@ export interface GradedAnswer {
   reviewStatus?: 'auto' | 'pending' | 'graded'
 }
 
-// get-exam-result 응답 — 공개 전/후 분기
+// get-exam-result 응답 — 공개 전/후 분기. examTitle = 응시한 시험(=자격/티어) 제목(exams.title).
 export type ExamResultResponse =
-  | { released: false; submittedAt: string; resultReleaseAt: string; totalQuestions: number }
+  | { released: false; submittedAt: string; resultReleaseAt: string; totalQuestions: number; examTitle?: string | null }
   | {
       released: true
       submittedAt: string
       totalCorrect: number
       totalQuestions: number
       answers: GradedAnswer[]
+      examTitle?: string | null
     }
 
 // 관리자: 제출 목록 항목
@@ -290,6 +291,16 @@ export interface CbtQDiff {
   n: number
   rate: number
 }
+// 회차별 응시→합격→발급 퍼널(정기 회차). (admin 함수 재배포 후 제공 — optional)
+export interface CbtRoundStat {
+  id: string
+  title: string
+  examDate: string | null
+  kind: string
+  attempts: number
+  pass: number
+  cert: number
+}
 export interface CbtAnalytics {
   overview: {
     users: number
@@ -299,14 +310,27 @@ export interface CbtAnalytics {
     questions: number
     questionsActive: number
     exams: number
+    // ↓ admin 함수 재배포 후 채워지는 신규 지표(구버전 함수 호환 위해 전부 optional)
+    signups7d?: number
+    certIssued?: number
+    certPending?: number
+    resultPending?: number
+    inProgress?: number
+    pendingGrading?: number
+    openRounds?: number
+    nextExamDate?: string | null
   }
   days: string[]
   signupByDay: Record<string, number>
   submitByDay: Record<string, number>
+  certByDay?: Record<string, number>
   scoreBands: Record<string, number>
   passRate: number
   scoredN: number
+  avgScore?: number
+  avgDurationMin?: number
   byExam: { title: string; slug: string; count: number }[]
+  rounds?: CbtRoundStat[]
   qHardest: CbtQDiff[]
   qEasiest: CbtQDiff[]
   subjectCorrect: { subject: string; n: number; rate: number }[]

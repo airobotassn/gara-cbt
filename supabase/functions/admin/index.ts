@@ -864,40 +864,52 @@ async function questionsImport(admin: any, body: any, actor: string) {
   return json({ ok: true, count: data?.length ?? payload.length })
 }
 
-// 대시보드 분석 — 추이·점수분포·합격률·시험별 응시·문항 난이도·과목 정답률·문항 풀.
+// 대시보드 분석 — 추이·점수분포·합격률·급수·자격증·회차 퍼널·소요시간·문항 난이도·과목·풀.
 async function cbtAnalytics(admin: any) {
   const now = Date.now()
+  const nowIso = new Date(now).toISOString()
+  const today = new Date(now).toISOString().slice(0, 10)
   const since7 = new Date(now - 7 * 864e5).toISOString()
   const since90 = new Date(now - 90 * 864e5).toISOString()
   const days: string[] = []
   for (let i = 89; i >= 0; i--) days.push(new Date(now - i * 864e5).toISOString().slice(0, 10))
 
-  const [profRes, attRes, ansRes, qRes, examRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, qTot, qAct] = await Promise.all([
+  const [profRes, attRes, ansRes, qRes, examRes, roundRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, signups7dCnt, qTot, qAct, pendGradeCnt] = await Promise.all([
     admin.from('profiles').select('created_at, is_anonymous').limit(10000),
-    admin.from('exam_attempts').select('exam_id, status, submitted_at, created_at, total_correct, total_questions').limit(10000),
+    admin.from('exam_attempts').select('exam_id, round_id, status, started_at, submitted_at, created_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
     admin.from('attempt_answers').select('question_id, is_correct').limit(50000),
     admin.from('questions').select('id, exam_id, number, subject, prompt, active').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active').order('created_at', { ascending: true }),
-    admin.from('profiles').select('id', { count: 'exact', head: true }),
+    admin.from('exam_rounds').select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
+    // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(레벨테스트 익명 세션 제외)
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', false),
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', true),
     admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
     admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted').gte('submitted_at', since7),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', false).gte('created_at', since7),
     admin.from('questions').select('id', { count: 'exact', head: true }).is('deleted_at', null),
     admin.from('questions').select('id', { count: 'exact', head: true }).eq('active', true).is('deleted_at', null),
+    admin.from('attempt_answers').select('id, questions!inner(kind), exam_attempts!inner(status)', { count: 'exact', head: true }).eq('questions.kind', 'short').eq('review_status', 'pending').eq('exam_attempts.status', 'submitted'),
   ])
 
   const profs = profRes.data ?? []
-  const atts = (attRes.data ?? []).filter((a: any) => a.status === 'submitted')
+  const allAtts = attRes.data ?? []
+  const atts = allAtts.filter((a: any) => a.status === 'submitted')
   const ans = ansRes.data ?? []
   const qs = qRes.data ?? []
   const exams = examRes.data ?? []
+  const rounds = roundRes.data ?? []
   const examTitle: Record<string, string> = {}
   for (const e of exams) examTitle[e.id] = e.title
 
-  // 추이(90일)
+  // 채점 완료 판정(합격컷 60) 헬퍼
+  const pctOf = (a: any) => (a.total_questions && a.total_correct != null ? Math.round((a.total_correct / a.total_questions) * 100) : null)
+
+  // 추이(90일): 가입 · 제출 · 자격증 발급
   const signupByDay: Record<string, number> = {}
   const submitByDay: Record<string, number> = {}
-  days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0 })
+  const certByDay: Record<string, number> = {}
+  days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0; certByDay[d] = 0 })
   for (const p of profs as any[]) {
     const k = (p.created_at ?? '').slice(0, 10)
     if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
@@ -905,18 +917,28 @@ async function cbtAnalytics(admin: any) {
   for (const a of atts as any[]) {
     const k = (a.submitted_at ?? a.created_at ?? '').slice(0, 10)
     if (k in submitByDay) submitByDay[k]++
+    const ck = (a.cert_issued_at ?? '').slice(0, 10)
+    if (ck && ck in certByDay) certByDay[ck]++
   }
 
-  // 점수 분포 + 합격률(합격컷 60) + 시험별 응시
+  // 점수 분포 + 합격률(합격컷 60) + 평균점수 + 평균 소요시간 + 시험별 응시
   const scoreBands: Record<string, number> = { '0-59': 0, '60-69': 0, '70-79': 0, '80-89': 0, '90-100': 0 }
   let passN = 0
   let scoredN = 0
+  let pctSum = 0
+  let durSum = 0
+  let durN = 0
   const byExam: Record<string, number> = {}
   for (const a of atts as any[]) {
     byExam[a.exam_id] = (byExam[a.exam_id] || 0) + 1
-    if (a.total_questions && a.total_correct != null) {
-      const pct = Math.round((a.total_correct / a.total_questions) * 100)
+    if (a.started_at && a.submitted_at) {
+      const mins = (new Date(a.submitted_at).getTime() - new Date(a.started_at).getTime()) / 60000
+      if (mins > 0 && mins < 600) { durSum += mins; durN++ }
+    }
+    const pct = pctOf(a)
+    if (pct != null) {
       scoredN++
+      pctSum += pct
       if (pct >= 90) scoreBands['90-100']++
       else if (pct >= 80) scoreBands['80-89']++
       else if (pct >= 70) scoreBands['70-79']++
@@ -926,6 +948,54 @@ async function cbtAnalytics(admin: any) {
     }
   }
   const byExamArr = exams.map((e: any) => ({ title: e.title, slug: e.slug, count: byExam[e.id] || 0 }))
+
+  // 자격증 발급 · 미발급(합격했으나 미발급) · 결과 미공개 · 진행중 응시
+  let certIssued = 0
+  let certPending = 0
+  let resultPending = 0
+  let inProgress = 0
+  for (const a of allAtts as any[]) {
+    if (a.status === 'in_progress') inProgress++
+    if (a.status !== 'submitted') continue
+    if (a.cert_issued_at) certIssued++
+    const pct = pctOf(a)
+    if (pct != null && pct >= 60 && !a.cert_issued_at) certPending++
+    if (!a.result_release_at || a.result_release_at > nowIso) resultPending++
+  }
+
+  // 회차별 현황(정기) — 응시→합격→발급 (exam_date 최신순, 응시 있는 회차 위주 최대 8개)
+  const roundMeta: Record<string, any> = {}
+  for (const r of rounds as any[]) roundMeta[r.id] = r
+  const roundAgg: Record<string, { attempts: number; pass: number; cert: number }> = {}
+  for (const a of atts as any[]) {
+    if (!a.round_id) continue
+    roundAgg[a.round_id] ??= { attempts: 0, pass: 0, cert: 0 }
+    roundAgg[a.round_id].attempts++
+    const pct = pctOf(a)
+    if (pct != null && pct >= 60) roundAgg[a.round_id].pass++
+    if (a.cert_issued_at) roundAgg[a.round_id].cert++
+  }
+  const roundStats = Object.entries(roundAgg)
+    .map(([id, v]) => ({
+      id,
+      title: roundMeta[id]?.title_i18n?.ko ?? '(회차)',
+      examDate: roundMeta[id]?.exam_date ?? null,
+      kind: roundMeta[id]?.kind ?? 'regular',
+      attempts: v.attempts,
+      pass: v.pass,
+      cert: v.cert,
+    }))
+    .sort((a, b) => (b.examDate || '').localeCompare(a.examDate || ''))
+    .slice(0, 8)
+
+  // 접수중 회차 수 + 다음 시험일(오늘 이후 가장 가까운 정기)
+  let openRounds = 0
+  let nextExamDate: string | null = null
+  for (const r of rounds as any[]) {
+    if (r.kind === 'rolling') continue
+    if (r.apply_start_at && r.apply_end_at && r.apply_start_at <= nowIso && nowIso <= r.apply_end_at) openRounds++
+    if (r.exam_date && r.exam_date >= today && (!nextExamDate || r.exam_date < nextExamDate)) nextExamDate = r.exam_date
+  }
 
   // 문항 난이도(정답률, 응시 3회 이상) + 과목 정답률
   const qMap: Record<string, any> = {}
@@ -979,14 +1049,26 @@ async function cbtAnalytics(admin: any) {
       questions: qTot.count ?? qs.length,
       questionsActive: qAct.count ?? 0,
       exams: exams.length,
+      signups7d: signups7dCnt.count ?? 0,
+      certIssued,
+      certPending,
+      resultPending,
+      inProgress,
+      pendingGrading: pendGradeCnt.count ?? 0,
+      openRounds,
+      nextExamDate,
     },
     days,
     signupByDay,
     submitByDay,
+    certByDay,
     scoreBands,
     passRate: scoredN ? Math.round((passN / scoredN) * 100) : 0,
     scoredN,
+    avgScore: scoredN ? Math.round(pctSum / scoredN) : 0,
+    avgDurationMin: durN ? Math.round(durSum / durN) : 0,
     byExam: byExamArr,
+    rounds: roundStats,
     qHardest: qDiff.slice(0, 6),
     qEasiest: qDiff.slice(-6).reverse(),
     subjectCorrect,
