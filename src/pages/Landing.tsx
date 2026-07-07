@@ -115,10 +115,10 @@ export default function Landing() {
       {notFound ? <div className="lp-notfound" role="alert">{t('route.notfound')}</div> : null}
 
       <div className="lp-ctas">
-        <button className="cta-ghost" onClick={() => navigate('/test/select')}>
+        <button className="cta" onClick={() => navigate('/test/select')}>
           {t('landing.cta_diagnose')} <span className="arr">→</span>
         </button>
-        <button className="cta" onClick={() => navigate('/exam')}>
+        <button className="cta-ghost" onClick={() => navigate('/exam')}>
           {t('landing.cta_exam')} <span className="arr">→</span>
         </button>
         <button className="cta-ghost soon" onClick={() => setLearnSoon(true)}>

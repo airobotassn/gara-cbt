@@ -269,7 +269,6 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
               </div>
               <div className="flex gap-2">
                 {q.subject && <span className="px-3 py-1 bg-primary/10 text-primary text-[11px] uppercase tracking-wider font-bold rounded-full border border-primary/20">{q.subject}</span>}
-                {q.topic && <span className="px-3 py-1 bg-surface-container text-on-surface-variant text-[11px] uppercase tracking-wider font-bold rounded-full">{q.topic}</span>}
               </div>
             </div>
             <div className="space-y-4">

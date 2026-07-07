@@ -19,11 +19,18 @@ Deno.serve(async (req) => {
 
     const { data: attempt } = await admin
       .from('exam_attempts')
-      .select('id, user_id, status, submitted_at, result_release_at, total_correct, total_questions')
+      .select('id, user_id, status, submitted_at, result_release_at, total_correct, total_questions, exam_id')
       .eq('id', attemptId)
       .single()
     if (!attempt) return json({ error: '결과를 찾을 수 없습니다.' }, 404)
     if (attempt.user_id !== user.id) return json({ error: '권한이 없습니다.' }, 403)
+
+    // 응시한 시험(=자격/티어) 제목 — 결과화면 자격 라벨·자격증 발급에 사용.
+    let examTitle: string | null = null
+    if (attempt.exam_id) {
+      const { data: exam } = await admin.from('exams').select('title').eq('id', attempt.exam_id).maybeSingle()
+      examTitle = (exam as { title?: string } | null)?.title ?? null
+    }
 
     if (attempt.status !== 'submitted') {
       return json({ error: '아직 제출되지 않은 시험입니다.' }, 409)
@@ -39,6 +46,7 @@ Deno.serve(async (req) => {
         submittedAt: attempt.submitted_at,
         resultReleaseAt: attempt.result_release_at,
         totalQuestions: attempt.total_questions,
+        examTitle,
       })
     }
 
@@ -69,6 +77,7 @@ Deno.serve(async (req) => {
       totalCorrect: attempt.total_correct,
       totalQuestions: attempt.total_questions,
       answers,
+      examTitle,
     })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)

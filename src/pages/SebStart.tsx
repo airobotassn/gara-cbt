@@ -7,57 +7,62 @@ import { DEFAULT_EXAM_SLUG } from '../lib/testConfig'
 import type { StartExamResponse } from '../lib/types'
 import { useT } from '../lib/i18n'
 
-// SEB 진입점(.seb 의 startURL = /exam/seb). SEB 는 새 브라우저 프로필이라 세션이 없다 →
-// (미로그인) 구글 로그인(나중엔 본인인증) → 로그인되면 start-exam → /exam/run 직행. 게이트·prepare 스킵.
-// 결제한 시험 확인(entitlement)은 백엔드 준비 후 여기 or start-exam 서버에 붙일 훅 자리.
+// SEB 진입점(.seb 의 startURL = /exam/seb). SEB 는 새 브라우저 프로필이라 세션이 없다.
+// [본인인증 개발중] 구글 로그인 대신 "본인인증수단 개발중" 안내 → 확인 시 익명 세션 확보 후 start-exam → /exam/run.
+//   · 본인인증 수단 도입 시 begin() 의 ensureAnonymous 를 실제 인증 플로우로 교체하고 start-exam 익명 차단 복원.
 export default function SebStart() {
   const navigate = useNavigate()
-  const { isFullUser, loginWithGoogle, loading } = useAuth()
+  const { ensureAnonymous } = useAuth()
   const { t } = useT()
   const [err, setErr] = useState('')
+  const [starting, setStarting] = useState(false)
   const started = useRef(false)
 
+  // SEB 밖에서 이 URL 로 직접 들어오면 우회 방지(운영). dev 는 통과(테스트용).
   useEffect(() => {
-    if (loading) return // 세션 복원 대기 — 이거 없으면 로그인 직후에도 미로그인으로 오판해 루프
+    if (SEB_REQUIRED && !isSEB()) navigate('/exam', { replace: true })
+  }, [navigate])
+
+  async function begin() {
     if (started.current) return
-
-    // SEB 밖에서 이 URL 로 들어오면(직접 접근) 우회 방지 — 운영에선 게이트로 되돌림. dev 는 통과(테스트용).
-    if (SEB_REQUIRED && !isSEB()) {
-      navigate('/exam', { replace: true })
-      return
-    }
-
-    // 미로그인 → 구글 로그인. OAuth 는 Supabase Site URL(=메인)로 떨어지므로,
-    // 메인(Landing)이 이 표식을 보고 /exam/seb 로 되돌려 이 화면이 재실행되게 한다.
-    if (!isFullUser) {
-      localStorage.setItem('postLoginRedirect', '/exam/seb')
-      loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam/seb')}`)
-      return
-    }
-
-    // 로그인됨 → 시험 시작 (start-exam 서버가 토큰으로 신원 검증. 결제 확인 훅은 서버에)
     started.current = true
-    ;(async () => {
-      try {
-        await document.documentElement.requestFullscreen?.().catch(() => {})
-        const res = await callFunction<StartExamResponse>('start-exam', { examSlug: DEFAULT_EXAM_SLUG })
-        navigate(`/exam/run/${res.attemptId}`, { state: res, replace: true })
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : t('prep.err_start'))
-      }
-    })()
-  }, [loading, isFullUser, loginWithGoogle, navigate, t])
+    setStarting(true)
+    setErr('')
+    try {
+      // 본인인증 개발 전까지 익명 세션으로 대체(이미 세션 있으면 유지). 실제 인증 도입 시 이 줄 교체.
+      await ensureAnonymous()
+      await document.documentElement.requestFullscreen?.().catch(() => {})
+      const res = await callFunction<StartExamResponse>('start-exam', { examSlug: DEFAULT_EXAM_SLUG })
+      navigate(`/exam/run/${res.attemptId}`, { state: res, replace: true })
+    } catch (e) {
+      started.current = false
+      setStarting(false)
+      setErr(e instanceof Error ? e.message : t('prep.err_start'))
+    }
+  }
 
   return (
     <div className="exam-center">
-      <div style={{ textAlign: 'center' }}>
+      <div style={{ textAlign: 'center', maxWidth: 460, margin: '0 auto', padding: 24 }}>
         {err ? (
           <>
             <p className="prep-warn" style={{ marginBottom: 16 }}>{err}</p>
-            <button className="exam-btn" onClick={() => window.location.reload()}>{t('seb.entry_retry')}</button>
+            <button className="exam-btn" onClick={begin}>{t('seb.entry_retry')}</button>
           </>
-        ) : (
+        ) : starting ? (
           <p className="font-body-lg text-body-lg text-on-surface-variant animate-pulse">{t('seb.entry_loading')}</p>
+        ) : (
+          <>
+            <div style={{ fontSize: 42, marginBottom: 14 }}>🪪</div>
+            <h2 className="font-title-md text-title-md font-bold text-on-surface" style={{ marginBottom: 10 }}>
+              [본인인증수단 개발중]
+            </h2>
+            <p className="font-body-md text-body-md text-on-surface-variant" style={{ marginBottom: 22, lineHeight: 1.65 }}>
+              현재 본인인증 수단을 준비 중입니다.<br />
+              아래 <b>확인</b>을 누르면 시험을 시작합니다.
+            </p>
+            <button className="exam-btn" onClick={begin}>확인</button>
+          </>
         )}
       </div>
     </div>

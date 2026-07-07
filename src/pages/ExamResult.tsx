@@ -117,7 +117,7 @@ function demoData(fail = false): GradedData {
   for (const s of specs) {
     for (let i = 0; i < s.total; i++) {
       const ok = i < s.correct
-      answers.push({ number: n++, subject: s.subject, topic: '', prompt: '', choices: [], selectedIndex: 0, correctIndex: ok ? 0 : 1, isCorrect: ok })
+      answers.push({ number: n++, subject: s.subject, prompt: '', choices: [], selectedIndex: 0, correctIndex: ok ? 0 : 1, isCorrect: ok })
     }
   }
   return {

@@ -16,10 +16,10 @@ Deno.serve(async (req) => {
       return json({ error: '잘못된 요청입니다.' }, 400)
     }
 
-    // 자격검정 — 본인 인증 필수(익명 불가)
+    // [본인인증 개발중] 임시로 익명 세션 허용 — 본인인증 수단 도입 시 아래 익명 차단 라인 복원.
     const user = await getUser(req)
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
-    if (user.is_anonymous) return json({ error: '로그인이 필요합니다.' }, 403)
+    // if (user.is_anonymous) return json({ error: '로그인이 필요합니다.' }, 403)
 
     const admin = adminClient()
 

@@ -86,6 +86,20 @@ export function getTracks(lang: Lang): Track[] {
   return [track1, track2]
 }
 
+// 응시 전 안내(ExamPrepare)에서 보여줄 '결제한 시험' → 트랙·티어. 결제/응시권 연동 전까지 CARIS-Ⅰ Pro 고정(표시용).
+// ⚠️ 실제 응시 문제는 단일시험(gara-default)이라 이 티어는 안내 표시일 뿐 문제 내용과 무관.
+// TODO: 결제/응시권(exam registration)에서 사용자가 결제한 트랙·티어를 조회해 인자로 넘기도록 교체.
+export function getPrepareExam(
+  lang: Lang,
+  trackKey: string = 't1',
+  tierKey: string = 'pro',
+): { track: Track; tier: Tier } {
+  const tracks = getTracks(lang)
+  const track = tracks.find((t) => t.key === trackKey) ?? tracks[0]
+  const tier = track.tiers.find((t) => t.key === tierKey) ?? track.tiers[0]
+  return { track, tier }
+}
+
 // 시험 일정(정기/상시)은 DB(exam_rounds)가 단일 소스 — src/lib/rounds.ts 의 useExamRounds 로 로드.
 // (구 하드코딩 SCHEDULE/Round 는 제거: ExamSchedule·Guide·ExamApply 모두 DB 조회로 통일)
 

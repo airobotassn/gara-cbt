@@ -8,8 +8,10 @@ import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, sebInstaller } from '
 import { DEFAULT_EXAM_SLUG, RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import type { StartExamResponse } from '../lib/types'
 import { useT } from '../lib/i18n'
+import { getPrepareExam } from '../lib/caris'
 
 const STEP_KEYS = [
+  'prep.step_exam',
   'prep.step_guide',
   'prep.step_notice',
   'prep.step_seb',
@@ -23,6 +25,8 @@ export default function ExamPrepare() {
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle } = useAuth()
   const { t, lang } = useT()
+  // 결제한 시험 → 안내 표시용 트랙·티어(현재 CARIS-Ⅰ Pro 고정). 결제 연동 시 getPrepareExam 인자 교체.
+  const { track: examTrack, tier: examTier } = getPrepareExam(lang)
   const [step, setStep] = useState(0)
   const [agree, setAgree] = useState(false)
   const [practice, setPractice] = useState<number | null>(null)
@@ -146,8 +150,39 @@ export default function ExamPrepare() {
         <div className="prep-body">
           <h2 className="prep-title">{t(STEP_KEYS[step])}</h2>
 
-          {/* 0. 안내사항 */}
+          {/* 0. 검정 안내 — 결제한 시험(디폴트 CARIS-Ⅰ Pro)의 /guide 팩트: 과목·시험 구성·합격 기준 */}
           {step === 0 && (
+            <div className="prep-text">
+              <p>{t('prep.exam_lead', { exam: `${examTrack.name} ${examTier.name}` })}</p>
+              {examTier.target && (
+                <>
+                  <h4 className="prep-sub">{t('caris.lbl.target')}</h4>
+                  <p>{examTier.target}</p>
+                </>
+              )}
+              <h4 className="prep-sub">{t('caris.lbl.subjects')}</h4>
+              <ul>
+                {examTier.subjects.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+              <dl className="prep-facts">
+                <dt>{t('caris.lbl.format')}</dt>
+                <dd>{examTier.format ?? examTier.method ?? '-'}</dd>
+                {examTier.practical && (
+                  <>
+                    <dt>{t('caris.lbl.practical')}</dt>
+                    <dd>{examTier.practical}</dd>
+                  </>
+                )}
+                <dt>{t('caris.lbl.pass')}</dt>
+                <dd>{examTier.pass}</dd>
+              </dl>
+            </div>
+          )}
+
+          {/* 1. 안내사항 */}
+          {step === 1 && (
             <div className="prep-text">
               <p>{t('prep.guide_lead')}</p>
               <ul>
@@ -158,8 +193,8 @@ export default function ExamPrepare() {
             </div>
           )}
 
-          {/* 1. 유의사항 */}
-          {step === 1 && (
+          {/* 2. 유의사항 */}
+          {step === 2 && (
             <div className="prep-text">
               <p>{t('prep.notice_lead')}</p>
               <ul>
@@ -168,11 +203,26 @@ export default function ExamPrepare() {
                 <li>{t('prep.notice_li4')}</li>
                 <li>{t('prep.notice_li5')}</li>
               </ul>
+              <p>{t('prep.af_lead')}</p>
+              <ul>
+                <li>{t('prep.af1')}</li>
+                <li>{t('prep.af2')}</li>
+                <li>{t('prep.af3')}</li>
+                <li>{t('prep.af4')}</li>
+                <li>{t('prep.af5')}</li>
+                <li>{t('prep.af6')}</li>
+                <li>{t('prep.af7')}</li>
+                <li>{t('prep.af8')}</li>
+                <li>{t('prep.af9')}</li>
+                <li>{t('prep.af10')}</li>
+                <li>{t('prep.af11')}</li>
+                <li>{t('prep.af12')}</li>
+              </ul>
             </div>
           )}
 
-          {/* 2. 보안 프로그램 설치 — /exam/check(SebInstall)와 동일 정보 구조(설명→버튼→라벨:값→경고 문장) */}
-          {step === 2 && (
+          {/* 3. 보안 프로그램 설치 — /exam/check(SebInstall)와 동일 정보 구조(설명→버튼→라벨:값→경고 문장) */}
+          {step === 3 && (
             <div className="prep-text">
               {inSeb ? (
                 <div className="prep-seb-ok">{t('prep.seb_running')}</div>
@@ -213,8 +263,8 @@ export default function ExamPrepare() {
             </div>
           )}
 
-          {/* 3. 메뉴 설명 */}
-          {step === 3 && (
+          {/* 4. 메뉴 설명 */}
+          {step === 4 && (
             <div className="prep-text">
               <p>{t('prep.menu_lead')}</p>
               <ul>
@@ -226,8 +276,8 @@ export default function ExamPrepare() {
             </div>
           )}
 
-          {/* 4. 문제풀이 연습 + 환경 점검 */}
-          {step === 4 && (
+          {/* 5. 문제풀이 연습 + 환경 점검 */}
+          {step === 5 && (
             <div className="prep-practice">
               <h4 className="prep-sub">{t('prep.check_title')}</h4>
               <ul className="check-list" style={{ marginBottom: 18 }}>
@@ -278,8 +328,8 @@ export default function ExamPrepare() {
             </div>
           )}
 
-          {/* 5. 시험 준비 완료 */}
-          {step === 5 && (
+          {/* 6. 시험 준비 완료 */}
+          {step === 6 && (
             <div className="prep-text">
               <p>{t('prep.ready_lead')}</p>
               <ul>

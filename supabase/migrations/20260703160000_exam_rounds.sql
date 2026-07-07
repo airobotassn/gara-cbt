@@ -56,7 +56,7 @@ select * from (values
   ),
   (
     'rolling',
-    '{"ko":"CARIS Pro 상시 검정 (CBT)","en":"CARIS Pro Rolling Exam (CBT)","ja":"CARIS Pro 常時検定 (CBT)","zh":"CARIS Pro 常规检定 (CBT)","hi":"CARIS Pro रोलिंग परीक्षा (CBT)","vi":"Kỳ thi thường trực CARIS Pro (CBT)"}'::jsonb,
+    '{"ko":"CARIS 상시 검정 (CBT)","en":"CARIS Rolling Exam (CBT)","ja":"CARIS 常時検定 (CBT)","zh":"CARIS 常规检定 (CBT)","hi":"CARIS रोलिंग परीक्षा (CBT)","vi":"Kỳ thi thường trực CARIS (CBT)"}'::jsonb,
     null::date,
     null::timestamptz,
     null::timestamptz,

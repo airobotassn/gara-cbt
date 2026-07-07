@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -41,7 +42,16 @@ import { getTracks } from '../lib/caris'
 type TopTab = 'caris' | 'level'
 export default function Admin() {
   const { isFullUser, loginWithGoogle } = useAuth()
-  const [topTab, setTopTab] = useState<TopTab>('caris')
+  // 탭 상태를 URL 쿼리(?top)로 → 브라우저 뒤로/앞으로가 탭 사이를 오간다.
+  const [params, setParams] = useSearchParams()
+  const topTab: TopTab = params.get('top') === 'level' ? 'level' : 'caris'
+  const setTopTab = (t: TopTab) =>
+    setParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (t === 'caris') p.delete('top')
+      else { p.set('top', t); p.delete('tab') } // 레벨탭이면 CARIS 서브탭 제거
+      return p
+    })
 
   // 로그인 게이트는 최상위에서 공유(두 탭 공통). 세부 권한은 각 탭이 서버로 확인.
   if (!isFullUser) {
@@ -102,6 +112,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 // CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
 type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'fees' | 'admins'
+const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'fees', 'admins']
 // 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
 type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
 const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
@@ -126,6 +137,17 @@ function matchSubsFilter(r: AdminAttemptRow, f: SubsFilter): boolean {
 // CARIS 시험(CBT) 백오피스 — 제출 답안 조회. (기존 Admin 본문 그대로, admin 함수 호출)
 function CarisExamAdmin() {
   const { isFullUser, loginWithGoogle } = useAuth()
+  // 서브탭도 URL 쿼리(?tab)로 → 대시보드→문항 후 뒤로가기 시 대시보드로 복귀.
+  const [params, setParams] = useSearchParams()
+  const rawTab = params.get('tab') ?? ''
+  const sub: CarisSub = (CARIS_SUBS as string[]).includes(rawTab) ? (rawTab as CarisSub) : 'dash'
+  const setSub = (t: CarisSub) =>
+    setParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (t === 'dash') p.delete('tab')
+      else p.set('tab', t)
+      return p
+    })
   const [state, setState] = useState<'checking' | 'denied' | 'ok'>('checking')
   const [rows, setRows] = useState<AdminAttemptRow[]>([])
   const [total, setTotal] = useState(0)
@@ -134,15 +156,11 @@ function CarisExamAdmin() {
   const [err, setErr] = useState('')
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [sub, setSub] = useState<CarisSub>('dash')
   const [subsFilter, setSubsFilter] = useState<SubsFilter>('all')
   const [isRoot, setIsRoot] = useState(false)
 
   // 대시보드 액션 카드 → 탭 이동(+제출답안 필터 프리셋)
-  const nav = useCallback((t: CarisSub, f: SubsFilter = 'all') => {
-    setSubsFilter(f)
-    setSub(t)
-  }, [])
+  const nav = (t: CarisSub, f: SubsFilter = 'all') => { setSubsFilter(f); setSub(t) }
 
   useEffect(() => {
     if (!isFullUser) {
@@ -1048,7 +1066,29 @@ function FaqAdmin() {
 
 // ── 시험 일정/회차 관리 (exam_rounds) ──────────────────────────────
 const ROUND_KINDS = ['regular', 'rolling'] as const
-const ROUND_KIND_LABEL: Record<string, string> = { regular: '정기시험', rolling: '상시시험' }
+const ROUND_KIND_LABEL: Record<string, string> = { regular: '정기시험', rolling: '상시시험' } // 편집폼 유형 select 라벨
+
+// 목록 필터 세그먼트: 정기(안 지난 것) · 상시 · 지난 시험(지난 정기). '지난 시험'은 별도 데이터가 아니라 시험일 기준 분류.
+type RoundFilter = 'regular' | 'rolling' | 'past'
+const ROUND_FILTERS: { key: RoundFilter; label: string }[] = [
+  { key: 'regular', label: '정기시험' },
+  { key: 'rolling', label: '상시시험' },
+  { key: 'past', label: '지난 시험' },
+]
+// 지난 시험 판정 — 공개화면(useExamRounds)의 isPastExam 과 동일 경계: 시험일 다음날 0시부터 과거.
+function isPastRound(examDate: string | null): boolean {
+  if (!examDate) return false
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const d = Date.parse(`${examDate}T23:59:59`)
+  return !Number.isNaN(d) && d < todayStart.getTime()
+}
+// 회차가 필터 세그먼트에 속하는지 (지난 시험 = 지난 정기, 정기 = 안 지난 정기, 상시 = rolling)
+function matchRoundFilter(r: ExamRoundRow, f: RoundFilter): boolean {
+  if (f === 'rolling') return r.kind === 'rolling'
+  const past = r.kind === 'regular' && isPastRound(r.examDate)
+  return f === 'past' ? past : r.kind === 'regular' && !past
+}
 
 interface RoundDraft {
   id?: string
@@ -1073,7 +1113,7 @@ function RoundsAdmin() {
   const [draft, setDraft] = useState<RoundDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [kindFilter, setKindFilter] = useState<'regular' | 'rolling'>('regular')
+  const [kindFilter, setKindFilter] = useState<RoundFilter>('regular')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1092,7 +1132,7 @@ function RoundsAdmin() {
   }, [load])
 
   function openNew() {
-    setDraft(emptyRoundDraft(kindFilter))
+    setDraft(emptyRoundDraft(kindFilter === 'rolling' ? 'rolling' : 'regular'))
   }
   function openEdit(r: ExamRoundRow) {
     setDraft({
@@ -1182,12 +1222,13 @@ function RoundsAdmin() {
 
   // 정기시험은 시험일 오름차순 자동정렬(수동 순서 없음). 상시는 sort(수동 ↑↓) 순.
   const group = rows
-    .filter((r) => r.kind === kindFilter)
-    .sort((a, b) =>
-      kindFilter === 'regular'
-        ? (a.examDate || '9999-99-99').localeCompare(b.examDate || '9999-99-99')
-        : a.sort - b.sort,
-    )
+    .filter((r) => matchRoundFilter(r, kindFilter))
+    .sort((a, b) => {
+      if (kindFilter === 'rolling') return a.sort - b.sort
+      const av = a.examDate || '9999-99-99'
+      const bv = b.examDate || '9999-99-99'
+      return kindFilter === 'past' ? bv.localeCompare(av) : av.localeCompare(bv) // 지난 시험은 최근순
+    })
   const isReg = draft?.kind === 'regular'
 
   return (
@@ -1207,13 +1248,13 @@ function RoundsAdmin() {
 
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
 
-      {/* 유형 버튼 — 정기/상시 나눠 보기 */}
+      {/* 유형 세그먼트 — 정기 / 상시 / 지난 시험(지난 정기, 시험일 다음날 0시부터) */}
       <div className="admin-tabs" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
-        {ROUND_KINDS.map((k) => {
-          const count = rows.filter((r) => r.kind === k).length
+        {ROUND_FILTERS.map((f) => {
+          const count = rows.filter((r) => matchRoundFilter(r, f.key)).length
           return (
-            <button key={k} className={kindFilter === k ? 'on' : ''} onClick={() => setKindFilter(k)}>
-              {ROUND_KIND_LABEL[k]}
+            <button key={f.key} className={kindFilter === f.key ? 'on' : ''} onClick={() => setKindFilter(f.key)}>
+              {f.label}
               {count > 0 && <span style={{ opacity: 0.55, marginLeft: 5 }}>{count}</span>}
             </button>
           )
@@ -1285,7 +1326,7 @@ function RoundsAdmin() {
             {!group.length && !loading && (
               <tr>
                 <td colSpan={kindFilter === 'rolling' ? 6 : 5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  이 유형의 일정이 없습니다. “+ 새 일정”으로 추가하세요.
+                  {kindFilter === 'past' ? '지난 시험이 없습니다.' : '이 유형의 일정이 없습니다. “+ 새 일정”으로 추가하세요.'}
                 </td>
               </tr>
             )}
@@ -1758,7 +1799,7 @@ function GradeCard({ it, busy, onGrade, onMc }: {
     <div className={`grade-card ${done ? (it.isCorrect ? 'ok' : 'no') : ''}`}>
       <div className="grade-top">
         <div className="grade-meta">
-          {it.number}번 · {it.subject}{it.topic ? ` · ${it.topic}` : ''}
+          {it.number}번 · {it.subject}
           {done && (
             <span className={`grade-badge ${it.isCorrect ? 'ok' : 'no'}`}>{it.isCorrect ? '정답 처리' : '오답 처리'}</span>
           )}
@@ -2652,7 +2693,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
             <tr>
               <th>#</th>
               <th>유형</th>
-              <th>과목 / 토픽</th>
+              <th>과목</th>
               <th>지문</th>
               <th>정답</th>
               <th>상태</th>
@@ -2668,7 +2709,6 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <b>{q.subject}</b>
-                  {q.topic ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>{q.topic}</div> : null}
                 </td>
                 <td style={{ maxWidth: 340 }}>{q.prompt}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{q.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수 채점</span> : `${(q.correct_index ?? 0) + 1}번`}</td>
@@ -2728,10 +2768,18 @@ const QE: Record<string, CSSProperties> = {
 function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
   examId: string; row: AdminQuestionRow | null; defaultNumber: number; onClose: () => void; onSaved: () => void
 }) {
-  const [number, setNumber] = useState<number>(row?.number ?? defaultNumber)
+  const [number] = useState<number>(row?.number ?? defaultNumber) // 자동 부여(수정 불가)
   const [kind, setKind] = useState<'mc' | 'short'>(row?.kind ?? 'mc')
-  const [subject, setSubject] = useState(row?.subject ?? '')
-  const [topic, setTopic] = useState(row?.topic ?? '')
+  // /guide 급수(티어) → 과목 종속 드롭박스. 티어 목록은 getTracks(=/guide) 단일 출처.
+  const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
+  const [tierKey, setTierKey] = useState(
+    (row?.subject ? tiers.find((t) => t.subjects.includes(row.subject)) : undefined)?.key ?? tiers[0]?.key ?? '',
+  )
+  const curTier = tiers.find((t) => t.key === tierKey) ?? tiers[0]
+  const [subject, setSubject] = useState(row?.subject ?? curTier?.subjects[0] ?? '')
+  const baseSubjects = curTier?.subjects ?? []
+  // 편집 중 기존 과목이 현재 급수 목록에 없으면(레거시 자유입력) 옵션에 그대로 유지
+  const subjectOptions = subject && !baseSubjects.includes(subject) ? [subject, ...baseSubjects] : baseSubjects
   const [prompt, setPrompt] = useState(row?.prompt ?? '')
   const [choices, setChoices] = useState<string[]>(() => {
     const c = row?.choices ?? []
@@ -2748,7 +2796,7 @@ function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
     try {
       await callFunction('admin', {
         action: 'questionUpsert',
-        question: { id: row?.id, examId, number, kind, subject, topic, prompt, choices, correctIndex, answerKey, active: row ? row.active : true },
+        question: { id: row?.id, examId, number, kind, subject, prompt, choices, correctIndex, answerKey, active: row ? row.active : true },
       })
       onSaved()
     } catch (e) {
@@ -2767,7 +2815,7 @@ function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
           <div style={QE.row}>
             <div style={{ ...QE.field, width: 110, flex: 'none' }}>
               <span style={QE.lab}>번호</span>
-              <input className="admin-in" type="number" min={1} value={number} onChange={(e) => setNumber(Math.floor(Number(e.target.value)) || 1)} />
+              <input className="admin-in" value={number} readOnly disabled title="번호는 자동 부여됩니다" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
             </div>
             <div style={{ ...QE.field, flex: 1 }}>
               <span style={QE.lab}>유형</span>
@@ -2779,12 +2827,30 @@ function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
           </div>
           <div style={QE.row}>
             <div style={{ ...QE.field, flex: 1 }}>
-              <span style={QE.lab}>과목</span>
-              <input className="admin-in" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="예: 피지컬 AI 및 데이터 처리" />
+              <span style={QE.lab}>급수 <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(/guide)</span></span>
+              <select
+                className="admin-in"
+                value={tierKey}
+                onChange={(e) => {
+                  const k = e.target.value
+                  setTierKey(k)
+                  const t = tiers.find((x) => x.key === k)
+                  if (t) setSubject(t.subjects[0] ?? '')
+                }}
+              >
+                {tiers.map((t) => (
+                  <option key={t.key} value={t.key}>{t.track.replace('CARIS-', '')} · {t.name}</option>
+                ))}
+              </select>
             </div>
             <div style={{ ...QE.field, flex: 1 }}>
-              <span style={QE.lab}>토픽</span>
-              <input className="admin-in" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="예: 센서" />
+              <span style={QE.lab}>과목</span>
+              <select className="admin-in" value={subject} onChange={(e) => setSubject(e.target.value)}>
+                {!subject && <option value="">과목 선택</option>}
+                {subjectOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div style={QE.field}>
@@ -2954,18 +3020,17 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
         const out: QuestionImportRow[] = []
         for (let i = 1; i < aoa.length; i++) {
           const row = aoa[i]
-          const choices = [row[4], row[5], row[6], row[7]].map((c) => String(c ?? '').trim())
-          // 유형 열(열10, 인덱스9)이 '주관식/short' 면 주관식. 비면 객관식(하위호환).
-          const kind: 'mc' | 'short' = /주관식|short/i.test(String(row[9] ?? '').trim()) ? 'short' : 'mc'
+          const choices = [row[3], row[4], row[5], row[6]].map((c) => String(c ?? '').trim())
+          // 유형 열(열9, 인덱스8)이 '주관식/short' 면 주관식. 비면 객관식(하위호환).
+          const kind: 'mc' | 'short' = /주관식|short/i.test(String(row[8] ?? '').trim()) ? 'short' : 'mc'
           out.push({
             number: Math.floor(Number(row[0])) || i,
             subject: String(row[1] ?? '').trim(),
-            topic: String(row[2] ?? '').trim(),
-            prompt: String(row[3] ?? '').trim(),
+            prompt: String(row[2] ?? '').trim(),
             kind,
             choices,
-            correctIndex: kind === 'short' ? -1 : parseCorrect(row[8], choices),
-            answerKey: kind === 'short' ? String(row[10] ?? '').trim() : undefined,
+            correctIndex: kind === 'short' ? -1 : parseCorrect(row[7], choices),
+            answerKey: kind === 'short' ? String(row[9] ?? '').trim() : undefined,
           })
         }
         setRows(out)
@@ -2977,9 +3042,9 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
   }
 
   function downloadTemplate() {
-    const header = ['번호', '과목', '토픽', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)']
-    const sampleMc = [1, '전기자기학 · 정전계', '전위', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '']
-    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '개념', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI']
+    const header = ['번호', '과목', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)']
+    const sampleMc = [1, 'AI 리터러시', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '']
+    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI']
     const ws = XLSX.utils.aoa_to_sheet([header, sampleMc, sampleShort])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '문항')
@@ -3065,7 +3130,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
               <tr>
                 <th>#</th>
                 <th>유형</th>
-                <th>과목/토픽</th>
+                <th>과목</th>
                 <th>지문</th>
                 <th>보기 / 모범답안</th>
                 <th>정답</th>
@@ -3080,7 +3145,6 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <b>{r.subject}</b>
-                    {r.topic ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.topic}</div> : null}
                   </td>
                   <td style={{ maxWidth: 320 }}>{r.prompt}</td>
                   <td style={{ maxWidth: 260, fontSize: 12.5, color: 'var(--muted)' }}>{r.kind === 'short' ? (r.answerKey || '—') : r.choices.join(' / ')}</td>

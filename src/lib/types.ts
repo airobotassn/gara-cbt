@@ -5,8 +5,7 @@
 export interface CbtQuestion {
   id: string
   number: number // 1..N 표시 순서
-  subject: string // 예: '전기자기학 · 정전계'
-  topic: string // 예: '전위'
+  subject: string // 예: 'AI 리터러시'
   prompt: string
   kind?: 'mc' | 'short' // 'mc'(객관식·기본) | 'short'(주관식)
   choices: string[] // 객관식 보기 4개(주관식은 [])
@@ -47,7 +46,6 @@ export interface SubmitExamResponse {
 export interface GradedAnswer {
   number: number
   subject: string
-  topic?: string
   prompt: string
   kind?: 'mc' | 'short'
   choices: string[]
@@ -124,7 +122,6 @@ export interface GradeQueueItem {
   attemptId: string
   number: number
   subject: string | null
-  topic: string | null
   prompt: string
   answerKey: string | null
   answerText: string | null
@@ -242,7 +239,6 @@ export interface AdminQuestionRow {
   exam_id: string
   number: number
   subject: string
-  topic: string
   prompt: string
   kind: 'mc' | 'short'
   choices: string[]
@@ -273,7 +269,6 @@ export interface AdminQuestionEventsResp {
 export interface QuestionImportRow {
   number: number
   subject: string
-  topic: string
   prompt: string
   kind: 'mc' | 'short'
   choices: string[]

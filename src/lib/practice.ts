@@ -11,7 +11,6 @@ export function makePracticeExam(): StartExamResponse {
         id: 'practice-1',
         number: 1,
         subject: '시험환경 테스트',
-        topic: '답 선택',
         prompt:
           '이 화면은 실제 시험과 동일한 응시 환경입니다.\n보기를 클릭하거나, 오른쪽 「답안지」에서 번호를 눌러 답을 선택해 보세요. (채점되지 않습니다)',
         choices: [
@@ -25,7 +24,6 @@ export function makePracticeExam(): StartExamResponse {
         id: 'practice-2',
         number: 2,
         subject: '시험환경 테스트',
-        topic: '문항 이동',
         prompt: '다른 문항으로 이동하려면 어떻게 하나요?',
         choices: [
           '화면 하단의 「이전」·「다음」 버튼을 누른다',
@@ -38,7 +36,6 @@ export function makePracticeExam(): StartExamResponse {
         id: 'practice-3',
         number: 3,
         subject: '시험환경 테스트',
-        topic: '제한시간',
         prompt: '화면 오른쪽 위의 타이머에 대한 설명으로 맞는 것은?',
         choices: [
           '남은 시간이 표시되며 0이 되면 자동으로 제출된다',
@@ -51,7 +48,6 @@ export function makePracticeExam(): StartExamResponse {
         id: 'practice-4',
         number: 4,
         subject: '시험환경 테스트',
-        topic: '답안지',
         prompt: '오른쪽 「답안지」에서 확인할 수 있는 것은?',
         choices: [
           '각 문항에 선택한 답',
@@ -64,7 +60,6 @@ export function makePracticeExam(): StartExamResponse {
         id: 'practice-5',
         number: 5,
         subject: '시험환경 테스트',
-        topic: '제출',
         prompt: '시험을 끝내려면 어떻게 하나요?',
         choices: [
           '화면 오른쪽 아래 「제출」 버튼을 누른다',
@@ -78,7 +73,6 @@ export function makePracticeExam(): StartExamResponse {
         number: 6,
         kind: 'short',
         subject: '시험환경 테스트',
-        topic: '주관식 답안',
         prompt:
           '주관식 문항입니다. 아래 입력란에 답을 직접 작성해 보세요.\n실제 시험에서는 주관식 답안을 관리자가 검토해 채점합니다. (이 모의 문제는 채점되지 않습니다)',
         choices: [],
