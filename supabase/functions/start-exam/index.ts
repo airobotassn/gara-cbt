@@ -11,10 +11,10 @@ Deno.serve(async (req) => {
   try {
     const sebErr = await sebCheckFailed(req)
     if (sebErr) return json({ error: sebErr }, 403)
-    const { examSlug, roundId: reqRoundId } = await req.json()
-    if (!examSlug || typeof examSlug !== 'string') {
-      return json({ error: '잘못된 요청입니다.' }, 400)
-    }
+    // 2층 모델: 응시는 등록시험(회차×급수)을 본다. 과도기(결제/응시권 전)엔 tier 기본 pro + 활성 회차 자동.
+    const body = await req.json().catch(() => ({}))
+    const reqRoundId: string | undefined = body?.roundId
+    const tier = typeof body?.tier === 'string' && body.tier ? body.tier : 'pro'
 
     // [본인인증 개발중] 임시로 익명 세션 허용 — 본인인증 수단 도입 시 아래 익명 차단 라인 복원.
     const user = await getUser(req)
@@ -23,15 +23,33 @@ Deno.serve(async (req) => {
 
     const admin = adminClient()
 
-    // 활성 시험 조회
+    // 회차 결정 — 준 roundId(published) 우선, 없으면 활성 정기회차(오늘 이후 임박, 없으면 최근) 자동
+    let roundId: string | null = null
+    if (reqRoundId) {
+      const { data: r } = await admin.from('exam_rounds').select('id').eq('id', reqRoundId).eq('published', true).maybeSingle()
+      roundId = r?.id ?? null
+    }
+    if (!roundId) {
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: up } = await admin.from('exam_rounds').select('id').eq('kind', 'regular').eq('published', true).gte('exam_date', today).order('exam_date', { ascending: true }).limit(1).maybeSingle()
+      roundId = up?.id ?? null
+      if (!roundId) {
+        const { data: last } = await admin.from('exam_rounds').select('id').eq('kind', 'regular').eq('published', true).order('exam_date', { ascending: false }).limit(1).maybeSingle()
+        roundId = last?.id ?? null
+      }
+    }
+    if (!roundId) return json({ error: '열린 시험 회차가 없습니다.' }, 400)
+
+    // 등록시험 = (회차 × 급수)
     const { data: exam, error: examErr } = await admin
       .from('exams')
-      .select('id, slug, title, total_questions, duration_minutes, active')
-      .eq('slug', examSlug)
+      .select('id, slug, title, duration_minutes, round_id')
+      .eq('round_id', roundId)
+      .eq('tier', tier)
       .eq('active', true)
       .maybeSingle()
     if (examErr) return json({ error: examErr.message }, 500)
-    if (!exam) return json({ error: '시험을 찾을 수 없습니다.' }, 400)
+    if (!exam) return json({ error: '해당 회차의 시험이 준비되지 않았습니다.' }, 400)
 
     // 재응시 허용: 관리자(루트/admin_users) 또는 RETAKE_ALLOW_EMAILS 목록 — 테스트/감독용
     const email = (user.email ?? '').toLowerCase()
@@ -72,44 +90,26 @@ Deno.serve(async (req) => {
       .eq('exam_id', exam.id)
       .eq('status', 'in_progress')
 
-    // 활성 문항 전부(번호 순)
-    const { data: questions, error: qErr } = await admin
-      .from('questions')
-      .select('id, number, subject, topic, prompt, kind, choices')
+    // 출제 문항 = 이 등록시험의 뽑힌 세트(exam_questions) 조인, 세트 번호순.
+    // ⚠️ 응시자에게 나가는 페이로드 — correct_index·answer_key·explanation(해설)은 절대 select 금지.
+    const { data: set, error: qErr } = await admin
+      .from('exam_questions')
+      .select('number, questions(id, subject, topic, prompt, kind, choices, active)')
       .eq('exam_id', exam.id)
-      .eq('active', true)
       .order('number', { ascending: true })
     if (qErr) return json({ error: qErr.message }, 500)
-    if (!questions || questions.length === 0) {
-      return json({ error: '해당 시험의 문제가 없습니다.' }, 400)
+    const setRows = (set ?? []).filter((r: any) => r.questions?.active !== false)
+    if (setRows.length === 0) {
+      return json({ error: '아직 문항이 출제되지 않은 시험입니다.' }, 400)
     }
+    let served = setRows.map((r: any) => ({
+      id: r.questions.id, number: r.number, subject: r.questions.subject,
+      topic: r.questions.topic, prompt: r.questions.prompt, kind: r.questions.kind ?? 'mc', choices: r.questions.choices ?? [],
+    }))
 
     // (테스트용) 환경변수 EXAM_QUESTION_LIMIT 가 있으면 앞에서 그만큼만 출제
     const limit = Math.max(0, Math.floor(Number(Deno.env.get('EXAM_QUESTION_LIMIT') ?? 0)))
-    const served = limit > 0 ? questions.slice(0, limit) : questions
-
-    // 회차 배정 — 클라가 roundId 주면 그것(검증), 없으면 현재 활성 정기회차 자동 배정(데모/접수 UX 전 대응).
-    //  · 활성 = 오늘 이후 시험일 중 가장 임박, 없으면 가장 최근 정기회차. 없으면 null(상시/미배정).
-    let roundId: string | null = null
-    if (reqRoundId) {
-      const { data: r } = await admin.from('exam_rounds').select('id').eq('id', reqRoundId).eq('published', true).maybeSingle()
-      roundId = r?.id ?? null
-    }
-    if (!roundId) {
-      const today = new Date().toISOString().slice(0, 10)
-      const { data: up } = await admin
-        .from('exam_rounds').select('id')
-        .eq('kind', 'regular').eq('published', true).gte('exam_date', today)
-        .order('exam_date', { ascending: true }).limit(1).maybeSingle()
-      if (up) roundId = up.id
-      else {
-        const { data: last } = await admin
-          .from('exam_rounds').select('id')
-          .eq('kind', 'regular').eq('published', true)
-          .order('exam_date', { ascending: false }).limit(1).maybeSingle()
-        roundId = last?.id ?? null
-      }
-    }
+    if (limit > 0) served = served.slice(0, limit)
 
     // 응시 생성
     const { data: attempt, error: aErr } = await admin

@@ -93,7 +93,7 @@ export interface Analytics {
   coverage: Record<string, number>
 }
 
-type LtTab = 'dashboard' | 'users' | 'attempts' | 'list' | 'events' | 'generate' | 'upload' | 'reports' | 'admins'
+type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'reports' | 'admins'
 export default function LevelTestAdmin() {
   const { isFullUser } = useAuth()
   const [tab, setTab] = useState<LtTab>('dashboard')
@@ -126,10 +126,7 @@ export default function LevelTestAdmin() {
     { key: 'dashboard', label: '대시보드' },
     { key: 'users', label: '유저' },
     { key: 'attempts', label: '응시 기록' },
-    { key: 'list', label: '문항 목록' },
-    { key: 'events', label: '문항 이력' },
-    { key: 'generate', label: '문항 생성' },
-    { key: 'upload', label: '번역' },
+    { key: 'questions', label: '문항' },
     { key: 'reports', label: '제보' },
     ...(isRoot ? [{ key: 'admins' as const, label: '관리자 관리' }] : []),
   ]
@@ -146,9 +143,45 @@ export default function LevelTestAdmin() {
       {tab === 'dashboard' ? <DashboardTab /> : null}
       {tab === 'users' ? <UsersTab /> : null}
       {tab === 'attempts' ? <AttemptsTab /> : null}
-      {tab === 'list' ? <ListTab /> : null}
-      {tab === 'events' ? <EventsTab /> : null}
-      {tab === 'generate' ? (
+      {tab === 'questions' ? <QuestionsTab /> : null}
+      {tab === 'reports' ? <ReportsTab /> : null}
+      {tab === 'admins' && isRoot ? <AdminsTab /> : null}
+    </div>
+  )
+}
+
+// ============================ 문항 탭 (목록·이력·생성·번역 통합) ============================
+// CARIS(CBT) 관리자의 '문항' 탭과 동일하게, 문항 관련 화면을 한 탭 안 서브탭으로 묶는다.
+type LtQSub = 'list' | 'events' | 'generate' | 'upload'
+function QuestionsTab() {
+  const [sub, setSub] = useState<LtQSub>('list')
+  const SUBS: { key: LtQSub; label: string }[] = [
+    { key: 'list', label: '문항 목록' },
+    { key: 'events', label: '문항 이력' },
+    { key: 'generate', label: '문항 생성' },
+    { key: 'upload', label: '번역' },
+  ]
+  return (
+    <>
+      {/* CARIS(CBT) '문항 관리'와 동일한 위계: 상단 네비 탭 → 페이지 제목 헤더 → 서브탭 → 내용.
+          제목 헤더가 두 pill 탭줄(상단 네비·서브탭) 사이를 갈라줘야 겹쳐 보이지 않는다.
+          .admin-head 는 .admin-cbt 스코프라 LevelTest(.admin)엔 안 먹어 레이아웃을 인라인으로 고정. */}
+      <div
+        className="admin-head"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, margin: '4px 0 14px' }}
+      >
+        <h1 style={{ fontSize: 'var(--fs-md)', fontWeight: 800, color: 'var(--ink)', margin: 0 }}>문항 관리</h1>
+      </div>
+      <div className="admin-tabs" style={{ marginBottom: 16 }}>
+        {SUBS.map((s) => (
+          <button key={s.key} className={sub === s.key ? 'on' : ''} onClick={() => setSub(s.key)}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'list' ? <ListTab /> : null}
+      {sub === 'events' ? <EventsTab /> : null}
+      {sub === 'generate' ? (
         <>
           {/* 문항 생성은 아직 개발 중 — 구현(GenerateTab)은 보존하되 미노출(나중에 이 false를 열면 됨) */}
           {false && <GenerateTab />}
@@ -159,10 +192,8 @@ export default function LevelTestAdmin() {
           </div>
         </>
       ) : null}
-      {tab === 'upload' ? <UploadTab /> : null}
-      {tab === 'reports' ? <ReportsTab /> : null}
-      {tab === 'admins' && isRoot ? <AdminsTab /> : null}
-    </div>
+      {sub === 'upload' ? <UploadTab /> : null}
+    </>
   )
 }
 

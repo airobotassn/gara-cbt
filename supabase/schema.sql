@@ -36,42 +36,70 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
 
--- ---------- exams (시험 회차) ----------
+-- ---------- 2층 모델: 문제은행(question_banks) ↔ 등록시험(exams) ----------
+-- 문제은행 = 급수(tier)별 문항 풀. 문항은 여기 소속. 회차 무관.
+create table if not exists question_banks (
+  id uuid primary key default gen_random_uuid(),
+  tier text not null unique,            -- beginner|pro|elite|master|grandmaster|zenith (getTracks 티어 key)
+  title text not null,
+  active boolean not null default true,
+  created_at timestamptz default now()
+);
+
+-- exams = 등록시험(회차×급수). round_id + tier 로 식별. 뽑힌 문항 세트는 exam_questions.
 create table if not exists exams (
   id uuid primary key default gen_random_uuid(),
   slug text unique not null,
   title text not null,
+  round_id uuid references exam_rounds(id),  -- 소속 회차(등록시험은 NOT NULL 운영)
+  tier text,                                 -- 급수 key
   year int,
   round int,
-  total_questions int not null default 100,
+  total_questions int not null default 0,    -- 뽑힌 세트 크기
   duration_minutes int not null default 120,
   active boolean not null default true,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  unique (round_id, tier)
 );
 create index if not exists exams_active_idx on exams(active);
+create index if not exists exams_round_idx on exams(round_id);
 
--- ---------- questions (문제은행) ----------
--- 문항 1개 = 1행. correct_index 는 절대 클라에 노출하지 않음(Edge Function 채점 전용).
+-- ---------- questions (문제은행 문항) ----------
+-- 문항 1개 = 1행, 은행(bank_id) 소속. correct_index·answer_key·explanation 은 절대 클라 비노출.
 create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
-  exam_id uuid references exams(id) on delete cascade,
-  number int not null,                 -- 1..N 표시 순서
-  subject text not null,               -- 예: '전기자기학 · 정전계'
-  topic text not null,                 -- 예: '전위'
+  bank_id uuid not null references question_banks(id),
+  number int not null,                 -- 은행 내 1..N
+  subject text not null,               -- 예: 'AI 리터러시'
+  topic text not null,
   prompt text not null,
   kind text not null default 'mc',     -- 'mc'(객관식) | 'short'(주관식)
   choices jsonb not null,              -- 4지선다 보기(주관식은 [])
   correct_index int,                   -- 객관식 0..3(클라 비노출), 주관식 null
   answer_key text,                     -- 주관식 모범답안/채점 기준(관리자 검수 참고, 비노출)
+  explanation text,                    -- 정답 해설/풀이(관리자·검수 전용, 절대 비노출)
+  deleted_at timestamptz,              -- 소프트삭제
   active boolean not null default true,
-  unique (exam_id, number),
+  unique (bank_id, number),
   constraint questions_kind_check check (kind in ('mc', 'short')),
   constraint questions_correct_index_check check (
     (kind = 'mc' and correct_index between 0 and 3)
     or (kind = 'short' and correct_index is null)
   )
 );
-create index if not exists questions_exam_idx on questions(exam_id) where active;
+create index if not exists questions_bank_idx on questions(bank_id) where active;
+
+-- ---------- exam_questions (등록시험이 은행에서 뽑은 세트, N:M) ----------
+create table if not exists exam_questions (
+  id uuid primary key default gen_random_uuid(),
+  exam_id uuid not null references exams(id) on delete cascade,
+  question_id uuid not null references questions(id) on delete cascade,
+  number int not null,                 -- 출제 표시 순서 1..N
+  created_at timestamptz default now(),
+  unique (exam_id, question_id),
+  unique (exam_id, number)
+);
+create index if not exists exam_questions_exam_idx on exam_questions(exam_id);
 
 -- ---------- exam_attempts (응시) ----------
 create table if not exists exam_attempts (
@@ -125,8 +153,10 @@ create table if not exists admin_users (
 --   모든 read/write 는 Edge Function(service role)이 수행.
 -- ============================================================
 alter table profiles        enable row level security;
+alter table question_banks  enable row level security;
 alter table exams           enable row level security;
 alter table questions       enable row level security;
+alter table exam_questions  enable row level security;
 alter table exam_attempts   enable row level security;
 alter table attempt_answers enable row level security;
 alter table admin_users     enable row level security;

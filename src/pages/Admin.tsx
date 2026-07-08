@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, lazy, Suspense, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, lazy, Suspense, type CSSProperties, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
@@ -20,6 +20,10 @@ import type {
   ExamRoundRow,
   AdminExamListResp,
   AdminExamItem,
+  AdminBankListResp,
+  QuestionBankItem,
+  AdminExamSetResp,
+  ExamSetRow,
   AdminQuestionListResp,
   AdminQuestionRow,
   AdminQuestionEventsResp,
@@ -34,7 +38,7 @@ import type {
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
-import { getTracks } from '../lib/caris'
+import { getTracks, TIER_EXAM_SPEC, tierTotal } from '../lib/caris'
 
 // 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
@@ -157,6 +161,10 @@ function CarisExamAdmin() {
   const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [subsFilter, setSubsFilter] = useState<SubsFilter>('all')
+  const [subsRound, setSubsRound] = useState<string>('') // 회차 필터: '' 전체 · roundId · 'none' 미배정
+  const [subsExam, setSubsExam] = useState<string>('') // 급수(등록시험) 필터: '' 전체 · examId
+  const [subRounds, setSubRounds] = useState<ExamRoundRow[]>([])
+  const [subExams, setSubExams] = useState<AdminExamItem[]>([])
   const [isRoot, setIsRoot] = useState(false)
 
   // 대시보드 액션 카드 → 탭 이동(+제출답안 필터 프리셋)
@@ -197,6 +205,20 @@ function CarisExamAdmin() {
   useEffect(() => {
     if (state === 'ok') load(0)
   }, [state, load])
+
+  // 회차·급수 필터 옵션(등록시험 기준)
+  useEffect(() => {
+    if (state !== 'ok') return
+    Promise.all([
+      callFunction<AdminExamRoundListResponse>('admin', { action: 'examRoundList' }),
+      callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' }),
+    ])
+      .then(([r, e]) => { setSubRounds(r.rounds); setSubExams(e.exams) })
+      .catch(() => { /* 필터 옵션 실패해도 목록은 나옴 */ })
+  }, [state])
+
+  // 회차 바뀌면 급수 필터 초기화
+  useEffect(() => { setSubsExam('') }, [subsRound])
 
   async function openDetail(id: string) {
     setDetailLoading(true)
@@ -244,6 +266,14 @@ function CarisExamAdmin() {
 
   const pageNo = Math.floor(offset / PAGE) + 1
   const pageMax = Math.max(1, Math.ceil(total / PAGE))
+  // 제출답안 회차·급수 필터
+  const reMatch = (r: AdminAttemptRow) =>
+    (!subsRound || (subsRound === 'none' ? !r.roundId : r.roundId === subsRound)) &&
+    (!subsExam || r.examId === subsExam)
+  const subExamOpts = (subsRound && subsRound !== 'none' ? subExams.filter((e) => e.round_id === subsRound) : subExams)
+    .slice().sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
+  // 회차는 일정 내림차순(최신·미래가 위) — 주관식 채점(gradeRounds)과 동일 순서
+  const subRegular = subRounds.filter((r) => r.kind === 'regular').sort((a, b) => (b.examDate ?? '').localeCompare(a.examDate ?? ''))
 
   return (
     <div className="wrap admin admin-cbt">
@@ -270,7 +300,7 @@ function CarisExamAdmin() {
           FAQ
         </button>
         <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
-          시험일정
+          시험등록
         </button>
         {isRoot && (
           <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
@@ -299,6 +329,25 @@ function CarisExamAdmin() {
       <div className="admin-head">
         <h1>제출 답안 관리</h1>
         <div className="admin-head-actions">
+          <label className="grade-round">
+            <span className="grade-round-lab">회차</span>
+            <select value={subsRound} onChange={(e) => setSubsRound(e.target.value)}>
+              <option value="">전체</option>
+              {subRegular.map((r) => (
+                <option key={r.id} value={r.id}>{r.titleI18n.ko || '(회차명 없음)'}</option>
+              ))}
+              <option value="none">상시·미배정</option>
+            </select>
+          </label>
+          <label className="grade-round">
+            <span className="grade-round-lab">시험</span>
+            <select value={subsExam} onChange={(e) => setSubsExam(e.target.value)}>
+              <option value="">전체 급수</option>
+              {subExamOpts.map((ex) => (
+                <option key={ex.id} value={ex.id}>{ex.tier ? TIER_LABEL[ex.tier] ?? ex.tier : ex.title}</option>
+              ))}
+            </select>
+          </label>
           <span className="admin-count">총 {total}건</span>
           <button className="admin-mini" onClick={() => load(offset)} disabled={loading}>
             새로고침
@@ -309,7 +358,7 @@ function CarisExamAdmin() {
       {/* 빠른 필터(이 페이지 기준) — 대시보드 '처리 대기' 카드가 프리셋 지정 */}
       <div className="admin-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
         {SUBS_FILTERS.map((f) => {
-          const c = rows.filter((r) => matchSubsFilter(r, f.key)).length
+          const c = rows.filter((r) => matchSubsFilter(r, f.key) && reMatch(r)).length
           return (
             <button key={f.key} className={subsFilter === f.key ? 'on' : ''} onClick={() => setSubsFilter(f.key)}>
               {f.label}
@@ -335,7 +384,7 @@ function CarisExamAdmin() {
             </tr>
           </thead>
           <tbody>
-            {rows.filter((r) => matchSubsFilter(r, subsFilter)).map((r) => (
+            {rows.filter((r) => matchSubsFilter(r, subsFilter) && reMatch(r)).map((r) => (
               <tr key={r.attemptId}>
                 <td>{fmtDT(r.submittedAt)}</td>
                 <td>{r.examTitle}</td>
@@ -361,7 +410,7 @@ function CarisExamAdmin() {
                 </td>
               </tr>
             ))}
-            {!rows.filter((r) => matchSubsFilter(r, subsFilter)).length && !loading && (
+            {!rows.filter((r) => matchSubsFilter(r, subsFilter) && reMatch(r)).length && !loading && (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   {rows.length ? '이 필터에 해당하는 답안이 없습니다(이 페이지 기준).' : '제출된 답안이 없습니다.'}
@@ -1115,11 +1164,20 @@ interface RoundDraft {
   examDate: string // YYYY-MM-DD
   applyStart: string // YYYY-MM-DD
   applyEnd: string // YYYY-MM-DD
+  tiers: string[] // 이 회차가 여는 급수(getTracks 티어 key)
 }
 
 function emptyRoundDraft(kind: 'regular' | 'rolling'): RoundDraft {
-  return { kind, sort: 9999, published: true, titleI18n: {}, noteI18n: {}, examDate: '', applyStart: '', applyEnd: '' }
+  return { kind, sort: 9999, published: true, titleI18n: {}, noteI18n: {}, examDate: '', applyStart: '', applyEnd: '', tiers: [] }
 }
+
+// 티어 key → 표시명(6개, getTracks 단일출처). 회차 목록 배지·라벨용.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(
+  getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => [ti.key, ti.name])),
+)
+// 급수 진행 순서(Beginner→Pro→Elite→Master→GM→Zenith) — 드롭다운·목록 정렬 기준(알파벳순 방지).
+const TIER_ORDER: string[] = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ti.key))
+const tierRank = (t?: string | null) => { const i = TIER_ORDER.indexOf(t ?? ''); return i < 0 ? 999 : i }
 
 function RoundsAdmin() {
   const [rows, setRows] = useState<ExamRoundRow[]>([])
@@ -1160,6 +1218,7 @@ function RoundsAdmin() {
       examDate: r.examDate ?? '',
       applyStart: r.applyStartAt ? r.applyStartAt.slice(0, 10) : '',
       applyEnd: r.applyEndAt ? r.applyEndAt.slice(0, 10) : '',
+      tiers: r.tiers ?? [],
     })
   }
   function patch(p: Partial<RoundDraft>) {
@@ -1167,6 +1226,15 @@ function RoundsAdmin() {
   }
   function patchField(k: 'titleI18n' | 'noteI18n', v: string) {
     setDraft((d) => (d ? { ...d, [k]: { ...d[k], ko: v } } : d))
+  }
+  function toggleTier(key: string, on: boolean) {
+    setDraft((d) => {
+      if (!d) return d
+      const set = new Set(d.tiers)
+      if (on) set.add(key)
+      else set.delete(key)
+      return { ...d, tiers: [...set] }
+    })
   }
 
   async function save() {
@@ -1176,6 +1244,12 @@ function RoundsAdmin() {
       return
     }
     const isReg = draft.kind === 'regular'
+    // 선택된 급수 → [{key, title}]. title = "회차명 · 급수명"(다운스트림 examTitle 로 노출)
+    const roundKo = draft.titleI18n.ko?.trim() || '시험'
+    const tiers = getTracks('ko')
+      .flatMap((tr) => tr.tiers)
+      .filter((ti) => draft.tiers.includes(ti.key))
+      .map((ti) => ({ key: ti.key, title: `${roundKo} · ${ti.name}`, total: tierTotal(ti.key), durationMin: TIER_EXAM_SPEC[ti.key]?.durationMin ?? 120 }))
     setSaving(true)
     try {
       const res = await callFunction<{ translateWarning?: string | null }>('admin', {
@@ -1190,6 +1264,7 @@ function RoundsAdmin() {
           examDate: isReg ? draft.examDate || null : null,
           applyStartAt: isReg && draft.applyStart ? `${draft.applyStart}T00:00:00` : null,
           applyEndAt: isReg && draft.applyEnd ? `${draft.applyEnd}T23:59:59` : null,
+          tiers,
         },
       })
       setDraft(null)
@@ -1249,14 +1324,14 @@ function RoundsAdmin() {
   return (
     <>
       <div className="admin-head">
-        <h1>시험 일정 관리</h1>
+        <h1>시험 등록</h1>
         <div className="admin-head-actions">
           <span className="admin-count">총 {rows.length}건</span>
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
           <button className="admin-mini" onClick={openNew}>
-            + 새 일정
+            + 새 회차
           </button>
         </div>
       </div>
@@ -1284,6 +1359,7 @@ function RoundsAdmin() {
               <th>회차명 (한국어)</th>
               <th>시험일</th>
               <th>접수기간</th>
+              <th>열린 급수</th>
               {kindFilter === 'rolling' && <th style={{ textAlign: 'center' }}>순서</th>}
               <th></th>
             </tr>
@@ -1304,6 +1380,15 @@ function RoundsAdmin() {
                     : r.applyStartAt || r.applyEndAt
                       ? `${r.applyStartAt?.slice(0, 10) ?? '?'} ~ ${r.applyEndAt?.slice(0, 10) ?? '?'}`
                       : '-'}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {r.tiers?.length
+                    ? r.tiers.map((t) => (
+                        <span key={t} className="admin-badge st-in_progress" style={{ marginRight: 4 }}>
+                          {TIER_LABEL[t] ?? t}
+                        </span>
+                      ))
+                    : <span style={{ color: 'var(--muted)' }}>-</span>}
                 </td>
                 {kindFilter === 'rolling' && (
                   <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
@@ -1340,8 +1425,8 @@ function RoundsAdmin() {
             ))}
             {!group.length && !loading && (
               <tr>
-                <td colSpan={kindFilter === 'rolling' ? 6 : 5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  {kindFilter === 'past' ? '지난 시험이 없습니다.' : '이 유형의 일정이 없습니다. “+ 새 일정”으로 추가하세요.'}
+                <td colSpan={kindFilter === 'rolling' ? 7 : 6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  {kindFilter === 'past' ? '지난 시험이 없습니다.' : '이 유형의 회차가 없습니다. “+ 새 회차”로 추가하세요.'}
                 </td>
               </tr>
             )}
@@ -1355,7 +1440,7 @@ function RoundsAdmin() {
             <button className="admin-modal-x" onClick={() => setDraft(null)}>
               ✕
             </button>
-            <h2>{draft.id ? '시험 일정 편집' : '새 시험 일정'}</h2>
+            <h2>{draft.id ? '회차 편집' : '새 회차'}</h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -1393,6 +1478,37 @@ function RoundsAdmin() {
                   placeholder="예: 제 5회 정기시험"
                 />
               </label>
+
+              {/* 열리는 급수 — 체크한 급수마다 이 회차용 시험(exams)이 생성된다. 회차마다 문항 별도. */}
+              <div style={fieldStyle}>
+                <span>열리는 급수 <em style={{ color: 'var(--muted)' }}>(이 회차에 응시 가능한 시험 · 급수마다 문항 따로)</em></span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}>
+                  {getTracks('ko').map((tr) => (
+                    <div key={tr.name}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>{tr.name}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {tr.tiers.map((ti) => {
+                          const on = draft.tiers.includes(ti.key)
+                          return (
+                            <label
+                              key={ti.key}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer',
+                                padding: '6px 11px', borderRadius: 8,
+                                border: `1px solid ${on ? 'var(--blue)' : 'rgba(128,128,128,.35)'}`,
+                                color: on ? 'var(--blue)' : 'inherit', fontWeight: on ? 700 : 400,
+                              }}
+                            >
+                              <input type="checkbox" checked={on} onChange={(e) => toggleTier(ti.key, e.target.checked)} />
+                              {ti.name}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {isReg ? (
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -1615,7 +1731,9 @@ function GradingAdmin() {
   const [items, setItems] = useState<GradeQueueItem[]>([])
   const [scope, setScope] = useState<'pending' | 'all'>('pending')
   const [round, setRound] = useState<string>('') // '' = 전체, roundId, 'none' = 상시/미배정
+  const [exam, setExam] = useState<string>('') // '' = 전체, examTitle = 그 시험(급수)만 — 회차 안에서 더 좁혀 보기
   const [rounds, setRounds] = useState<GradeRound[]>([])
+  const [exams, setExams] = useState<AdminExamItem[]>([]) // 등록시험(회차×급수) — 시험 드롭다운 소스
   const [unassigned, setUnassigned] = useState(0)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -1626,9 +1744,13 @@ function GradingAdmin() {
 
   const loadRounds = useCallback(async () => {
     try {
-      const r = await callFunction<GradeRoundsResponse>('admin', { action: 'gradeRounds' })
+      const [r, e] = await Promise.all([
+        callFunction<GradeRoundsResponse>('admin', { action: 'gradeRounds' }),
+        callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' }),
+      ])
       setRounds(r.rounds)
       setUnassigned(r.unassigned)
+      setExams(e.exams)
     } catch {
       /* 회차 목록 실패해도 채점은 가능 */
     }
@@ -1653,7 +1775,8 @@ function GradingAdmin() {
     loadRounds()
   }, [loadRounds])
   useEffect(() => {
-    setOpen(new Set()) // 회차/범위 바뀌면 펼침 초기화
+    setOpen(new Set()) // 회차/범위 바뀌면 펼침·시험필터 초기화
+    setExam('')
   }, [scope, round])
 
   async function grade(it: GradeQueueItem, correct: boolean) {
@@ -1674,14 +1797,18 @@ function GradingAdmin() {
     }
   }
 
-  const pendingN = items.filter((i) => i.reviewStatus === 'pending').length
   const regular = rounds.filter((r) => r.kind === 'regular')
+  // 회차 안에서 시험(급수)별로 좁혀 보기 — 그 회차에 등록된 시험(exams)에서 옵션 구성(제출 유무 무관).
+  const roundExams = (round && round !== 'none' ? exams.filter((e) => e.round_id === round) : exams)
+    .slice().sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
+  const shown = exam ? items.filter((i) => (i.examTitle ?? '') === exam) : items
+  const pendingN = shown.filter((i) => i.reviewStatus === 'pending').length
 
   // 응시(attempt)별로 묶는다 — 응시자 한 명이 여러 주관식을 한 카드묶음으로(끝없이 길어지는 문제 해결).
   const groups: { attemptId: string; userName: string | null; userEmail: string | null; examTitle: string | null; submittedAt: string | null; items: GradeQueueItem[] }[] = []
   {
     const byId = new Map<string, (typeof groups)[number]>()
-    for (const it of items) {
+    for (const it of shown) {
       let g = byId.get(it.attemptId)
       if (!g) {
         g = { attemptId: it.attemptId, userName: it.userName, userEmail: it.userEmail, examTitle: it.examTitle, submittedAt: it.submittedAt, items: [] }
@@ -1697,7 +1824,7 @@ function GradingAdmin() {
       <div className="admin-head">
         <h1>주관식 채점</h1>
         <div className="admin-head-actions">
-          <span className="admin-count">대기 {scope === 'pending' ? items.length : pendingN}건</span>
+          <span className="admin-count">대기 {scope === 'pending' ? shown.length : pendingN}건</span>
           <label className="grade-round">
             <span className="grade-round-lab">회차</span>
             <select value={round} onChange={(e) => setRound(e.target.value)}>
@@ -1706,6 +1833,16 @@ function GradingAdmin() {
                 <option key={r.roundId} value={r.roundId}>{r.title}{r.pending ? ` (${r.pending})` : ''}</option>
               ))}
               <option value="none">상시·미배정{unassigned ? ` (${unassigned})` : ''}</option>
+            </select>
+          </label>
+          <label className="grade-round">
+            <span className="grade-round-lab">시험</span>
+            <select value={exam} onChange={(e) => setExam(e.target.value)}>
+              <option value="">전체 급수</option>
+              {roundExams.map((ex) => {
+                const n = items.filter((i) => (i.examTitle ?? '') === ex.title && i.reviewStatus === 'pending').length
+                return <option key={ex.id} value={ex.title}>{ex.tier ? TIER_LABEL[ex.tier] ?? ex.tier : ex.title}{n ? ` (${n})` : ''}</option>
+              })}
             </select>
           </label>
           <div className="admin-tabs" style={{ marginBottom: 0 }}>
@@ -2552,66 +2689,279 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
 }
 
 // ── 문항 관리 (목록 · 이력 · 엑셀 업로드) ──────────────────────────
+// ── 문항 급수(티어)→과목 필터 (레벨테스트 ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
+function useTierSubjectFilter() {
+  const [tierKey, setTierKey] = useState('all')
+  const [subject, setSubject] = useState('all')
+  const [kind, setKind] = useState<'all' | 'mc' | 'short'>('all')
+  const [q, setQ] = useState('')
+  const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
+  const cur = tiers.find((t) => t.key === tierKey)
+  const setTier = (k: string) => { setTierKey(k); setSubject('all') }
+  const matchTS = (subjectVal: string | null | undefined) => {
+    const sv = subjectVal ?? ''
+    if (tierKey !== 'all' && !cur?.subjects.includes(sv)) return false
+    if (subject !== 'all' && sv !== subject) return false
+    return true
+  }
+  const matchKind = (k: string | null | undefined) => kind === 'all' || (k ?? 'mc') === kind
+  const matchQ = (text: string) => { const qq = q.trim().toLowerCase(); return !qq || text.toLowerCase().includes(qq) }
+  return { tierKey, setTier, subject, setSubject, kind, setKind, q, setQ, tiers, cur, matchTS, matchKind, matchQ }
+}
+type TierSubjectFilter = ReturnType<typeof useTierSubjectFilter>
+
+function TierSubjectBar({ f, count, loading, actions }: { f: TierSubjectFilter; count: number; loading?: boolean; actions?: ReactNode }) {
+  return (
+    <div className="admin-toolbar">
+      <label>급수 <select value={f.tierKey} onChange={(e) => f.setTier(e.target.value)}>
+        <option value="all">전체 급수</option>
+        {f.tiers.map((t) => <option key={t.key} value={t.key}>{t.track.replace('CARIS-', '')} · {t.name}</option>)}
+      </select></label>
+      <label>과목 <select value={f.subject} onChange={(e) => f.setSubject(e.target.value)}>
+        <option value="all">전체 과목</option>
+        {(f.cur?.subjects ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
+      </select></label>
+      <label>유형 <select value={f.kind} onChange={(e) => f.setKind(e.target.value as 'all' | 'mc' | 'short')}>
+        <option value="all">전체 유형</option>
+        <option value="mc">객관식</option>
+        <option value="short">주관식</option>
+      </select></label>
+      <input className="admin-search" placeholder="번호·지문 검색" value={f.q} onChange={(e) => f.setQ(e.target.value)} />
+      {actions}
+      <span className="admin-hint">{count}건{loading ? ' · 불러오는 중…' : ''}</span>
+    </div>
+  )
+}
+
+// ── CBT 엑셀 스마트 파싱 (레벨테스트 import 기법 이식: 헤더 이름 자동인식 + 머리글 행 자동탐지) ──
+function qNormKey(s: unknown): string {
+  return String(s ?? '').toLowerCase().replace(/\s+/g, '').replace(/[·.,/()[\]{}・:|~\-]/g, '').replace(/및/g, '')
+}
+const CBT_HEAD = {
+  num: ['번호', 'no', '순번', '문항번호', '문번'],
+  subject: ['과목', '영역', '분류', '카테고리', '과목명'],
+  prompt: ['지문', '문제', '문항', '질문', 'question'],
+  answer: ['정답', '정답번호', 'answer', '정답인덱스'],
+  kind: ['유형', '형식', '타입', 'type', '구분'],
+  answerKey: ['모범답안', '답안', '채점기준', '모범', '기준'],
+  explanation: ['해설', '풀이', '설명', 'explanation', 'commentary'],
+  option: ['보기', '선택지', 'option'],
+}
+function qFindCol(header: string[], aliases: string[]): number {
+  const h = header.map(qNormKey)
+  for (const a of aliases) { const i = h.indexOf(qNormKey(a)); if (i >= 0) return i }
+  for (let i = 0; i < h.length; i++) if (h[i] && aliases.some((a) => h[i].includes(qNormKey(a)))) return i
+  return -1
+}
+interface QColCfg { cNum: number; cSubject: number; cPrompt: number; cOptions: number[]; cAnswer: number; cKind: number; cAnswerKey: number; cExplanation: number }
+function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHeader: boolean } {
+  const h = header.map(qNormKey)
+  const optCols = h.map((x, i) => ({ x, i })).filter((o) => CBT_HEAD.option.some((a) => o.x.includes(qNormKey(a)))).map((o) => o.i)
+  const cNum = qFindCol(header, CBT_HEAD.num)
+  const cSubject = qFindCol(header, CBT_HEAD.subject)
+  const cPrompt = qFindCol(header, CBT_HEAD.prompt)
+  const cAnswer = qFindCol(header, CBT_HEAD.answer)
+  const cKind = qFindCol(header, CBT_HEAD.kind)
+  const cAnswerKey = qFindCol(header, CBT_HEAD.answerKey)
+  const cExplanation = qFindCol(header, CBT_HEAD.explanation)
+  const hasHeader = cPrompt >= 0 || cAnswer >= 0 || cSubject >= 0
+  return {
+    cfg: {
+      cNum: cNum >= 0 ? cNum : 0,
+      cSubject: cSubject >= 0 ? cSubject : 1,
+      cPrompt: cPrompt >= 0 ? cPrompt : 2,
+      cOptions: optCols.length ? optCols.slice(0, 4) : [3, 4, 5, 6].filter((c) => c < ncol),
+      cAnswer: cAnswer >= 0 ? cAnswer : 7,
+      cKind: cKind >= 0 ? cKind : 8,
+      cAnswerKey: cAnswerKey >= 0 ? cAnswerKey : 9,
+      cExplanation: cExplanation >= 0 ? cExplanation : 10,
+    },
+    hasHeader,
+  }
+}
+function qRowHeaderScore(row: string[]): number {
+  const cells = (row ?? []).map(qNormKey).filter(Boolean)
+  const groups = [CBT_HEAD.prompt, CBT_HEAD.answer, CBT_HEAD.subject, CBT_HEAD.num, CBT_HEAD.kind, CBT_HEAD.option, CBT_HEAD.answerKey, CBT_HEAD.explanation]
+  let hits = 0
+  for (const g of groups) if (cells.some((c) => g.some((a) => c === qNormKey(a) || c.includes(qNormKey(a))))) hits++
+  return hits
+}
+function qFindHeaderRow(aoa: string[][], maxScan = 15): { idx: number; score: number } {
+  let best = { idx: 0, score: 0 }
+  const lim = Math.min(maxScan, aoa.length)
+  for (let i = 0; i < lim; i++) { const s = qRowHeaderScore(aoa[i]); if (s > best.score) best = { idx: i, score: s } }
+  return best
+}
+
+// 2층: 문항 목록/이력/업로드 = 급수별 문제은행(bank), 시험문항 = 등록시험(회차×급수)의 뽑힌 세트.
 function QuestionsAdmin() {
+  const [banks, setBanks] = useState<QuestionBankItem[]>([])
+  const [bankId, setBankId] = useState<string>('')
   const [exams, setExams] = useState<AdminExamItem[]>([])
   const [examId, setExamId] = useState<string>('')
-  const [view, setView] = useState<'list' | 'events' | 'import'>('list')
+  const [view, setView] = useState<'list' | 'events' | 'examset' | 'import'>('list')
 
-  const loadExams = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const r = await callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' })
-      setExams(r.exams)
-      setExamId((cur) => cur || r.exams[0]?.id || '')
+      const [b, e] = await Promise.all([
+        callFunction<AdminBankListResp>('admin', { action: 'bankListForAdmin' }),
+        callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' }),
+      ])
+      setBanks([...b.banks].sort((x, y) => tierRank(x.tier) - tierRank(y.tier)))
+      setExams([...e.exams].sort((x, y) => tierRank(x.tier) - tierRank(y.tier)))
     } catch {
       /* 무시 */
     }
   }, [])
   useEffect(() => {
-    loadExams()
-  }, [loadExams])
+    load()
+  }, [load])
+  useEffect(() => {
+    setBankId((c) => (banks.some((b) => b.id === c) ? c : banks[0]?.id ?? ''))
+  }, [banks])
+  useEffect(() => {
+    setExamId((c) => (exams.some((e) => e.id === c) ? c : exams[0]?.id ?? ''))
+  }, [exams])
 
+  const isSet = view === 'examset'
   return (
     <>
       <div className="admin-head">
         <h1>문항 관리</h1>
         <div className="admin-head-actions">
-          <select style={{ minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
-            {exams.length === 0 && <option value="">시험 없음</option>}
-            {exams.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.title} ({ex.activeCount}/{ex.questionCount})
-              </option>
-            ))}
-          </select>
+          {isSet ? (
+            <select style={{ minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
+              {exams.length === 0 && <option value="">등록시험 없음</option>}
+              {exams.map((ex) => (
+                <option key={ex.id} value={ex.id}>{ex.title} ({ex.questionCount})</option>
+              ))}
+            </select>
+          ) : (
+            <select style={{ minWidth: 180 }} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+              {banks.length === 0 && <option value="">은행 없음</option>}
+              {banks.map((b) => (
+                <option key={b.id} value={b.id}>{b.title} ({b.activeCount}/{b.questionCount})</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
       <div className="admin-tabs" style={{ marginBottom: 16 }}>
-        <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
-          문항 목록
-        </button>
-        <button className={view === 'events' ? 'on' : ''} onClick={() => setView('events')}>
-          문항 이력
-        </button>
-        <button className={view === 'import' ? 'on' : ''} onClick={() => setView('import')}>
-          엑셀 업로드
-        </button>
+        <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>문항 목록</button>
+        <button className={view === 'events' ? 'on' : ''} onClick={() => setView('events')}>문항 이력</button>
+        <button className={view === 'examset' ? 'on' : ''} onClick={() => setView('examset')}>시험문항</button>
+        <button className={view === 'import' ? 'on' : ''} onClick={() => setView('import')}>엑셀 업로드</button>
       </div>
 
-      {!examId ? (
-        <div className="admin-section admin-empty">등록된 시험이 없습니다. 먼저 시험(exams)을 만들어 주세요.</div>
+      {isSet ? (
+        !examId ? (
+          <div className="admin-section admin-empty">등록시험이 없습니다. <b>시험등록</b> 탭에서 회차에 급수를 추가하세요.</div>
+        ) : (
+          <ExamSetView examId={examId} exams={exams} onChanged={load} />
+        )
+      ) : !bankId ? (
+        <div className="admin-section admin-empty">문제은행이 없습니다.</div>
       ) : view === 'list' ? (
-        <QuestionListView examId={examId} onChanged={loadExams} />
+        <QuestionListView bankId={bankId} onChanged={load} />
       ) : view === 'events' ? (
-        <QuestionEventsView examId={examId} onChanged={loadExams} />
+        <QuestionEventsView bankId={bankId} onChanged={load} />
       ) : (
-        <QuestionImportView examId={examId} onImported={loadExams} />
+        <QuestionImportView bankId={bankId} onImported={load} />
       )}
     </>
   )
 }
 
-function QuestionListView({ examId, onChanged }: { examId: string; onChanged: () => void }) {
+// 시험문항 — 등록시험(회차×급수)이 자기 급수 은행에서 뽑아 저장한 세트. 추출/재추출.
+function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: AdminExamItem[]; onChanged: () => void }) {
+  const [rows, setRows] = useState<ExamSetRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const ex = exams.find((e) => e.id === examId)
+  const spec = ex?.tier ? TIER_EXAM_SPEC[ex.tier] : undefined
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await callFunction<AdminExamSetResp>('admin', { action: 'examSetList', examId })
+      setRows(r.rows)
+    } catch {
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [examId])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function draw(replace: boolean) {
+    if (!spec || spec.mc + spec.short === 0) {
+      alert('이 급수는 아직 시험 구성이 정의되지 않았습니다.')
+      return
+    }
+    setBusy(true)
+    try {
+      await callFunction('admin', { action: 'examDraw', examId, mc: spec.mc, short: spec.short, replace })
+      await load()
+      onChanged()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '추출 실패'
+      if (/응시 기록/.test(msg) && !replace) {
+        setBusy(false)
+        if (confirm('이미 응시 기록이 있습니다. 다시 뽑으면 기존 세트가 교체됩니다. 계속할까요?')) return draw(true)
+        return
+      }
+      alert(msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const mcN = rows.filter((r) => r.kind === 'mc').length
+  const shN = rows.filter((r) => r.kind === 'short').length
+  return (
+    <>
+      <div className="admin-head" style={{ marginTop: 0 }}>
+        <span className="admin-count">
+          세트 {rows.length}문항{rows.length ? ` (객 ${mcN} · 주 ${shN})` : ''}
+          {spec ? <span style={{ color: 'var(--muted)', marginLeft: 8 }}>· 구성 객 {spec.mc} + 주 {spec.short}</span> : null}
+        </span>
+        <div className="admin-head-actions">
+          <button className="grade-btn ok active" disabled={busy} onClick={() => draw(false)}>
+            {busy ? '추출 중…' : rows.length ? '다시 추출' : '문항 추출'}
+          </button>
+          <button className="admin-mini" onClick={load} disabled={loading}>새로고침</button>
+        </div>
+      </div>
+      <p className="admin-hint" style={{ marginBottom: 10 }}>
+        이 등록시험의 급수 <b>문제은행</b>에서 구성(객 {spec?.mc ?? 0} + 주 {spec?.short ?? 0})만큼 랜덤 추출해 저장합니다.
+      </p>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead><tr><th>#</th><th>유형</th><th>과목</th><th>지문</th><th>은행번호</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.questionId} style={{ opacity: r.active ? 1 : 0.5 }}>
+                <td style={{ fontVariantNumeric: 'tabular-nums' }}>{r.number}</td>
+                <td><span className={`admin-badge st-${r.kind === 'short' ? 'in_progress' : 'submitted'}`}>{r.kind === 'short' ? '주관식' : '객관식'}</span></td>
+                <td style={{ whiteSpace: 'nowrap' }}>{r.subject}</td>
+                <td style={{ maxWidth: 360 }}>{r.prompt}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.bankNumber ?? '-'}</td>
+              </tr>
+            ))}
+            {!rows.length && !loading && (
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>아직 추출된 문항이 없습니다. “문항 추출”을 누르세요.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: () => void }) {
   const [rows, setRows] = useState<AdminQuestionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -2622,14 +2972,14 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
     setLoading(true)
     setErr('')
     try {
-      const r = await callFunction<AdminQuestionListResp>('admin', { action: 'questionList', examId })
+      const r = await callFunction<AdminQuestionListResp>('admin', { action: 'questionList', bankId })
       setRows(r.rows)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
       setLoading(false)
     }
-  }, [examId])
+  }, [bankId])
   useEffect(() => {
     load()
   }, [load])
@@ -2648,11 +2998,13 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
   }
 
   const nextNumber = rows.reduce((m, q) => Math.max(m, q.number), 0) + 1
+  const f = useTierSubjectFilter()
+  const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
 
   return (
     <>
       <div className="admin-head" style={{ marginTop: 0 }}>
-        <span className="admin-count">총 {rows.length}문항</span>
+        <span className="admin-count">{filtered.length} / {rows.length}문항</span>
         <div className="admin-head-actions">
           <button className="admin-mini" onClick={() => setEdit('new')}>+ 문항 추가</button>
           <button className="admin-mini" onClick={load} disabled={loading}>
@@ -2660,6 +3012,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
           </button>
         </div>
       </div>
+      <TierSubjectBar f={f} count={filtered.length} loading={loading} />
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -2675,7 +3028,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
             </tr>
           </thead>
           <tbody>
-            {rows.map((q) => (
+            {filtered.map((q) => (
               <tr key={q.id} style={{ opacity: q.active ? 1 : 0.55 }}>
                 <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{q.number}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
@@ -2707,10 +3060,10 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
                 </td>
               </tr>
             ))}
-            {!rows.length && !loading && (
+            {!filtered.length && !loading && (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  문항이 없습니다. “+ 문항 추가” 또는 “엑셀 업로드”로 추가하세요.
+                  {rows.length ? '이 급수·과목에 해당하는 문항이 없습니다.' : '문항이 없습니다. “+ 문항 추가” 또는 “엑셀 업로드”로 추가하세요.'}
                 </td>
               </tr>
             )}
@@ -2720,7 +3073,7 @@ function QuestionListView({ examId, onChanged }: { examId: string; onChanged: ()
 
       {edit && (
         <QuestionEditModal
-          examId={examId}
+          bankId={bankId}
           row={edit === 'new' ? null : edit}
           defaultNumber={nextNumber}
           onClose={() => setEdit(null)}
@@ -2739,8 +3092,8 @@ const QE: Record<string, CSSProperties> = {
 }
 
 // 개별 문항 추가/편집 — 유형(객관식/주관식) 선택 → 객관식은 보기4·정답, 주관식은 모범답안.
-function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
-  examId: string; row: AdminQuestionRow | null; defaultNumber: number; onClose: () => void; onSaved: () => void
+function QuestionEditModal({ bankId, row, defaultNumber, onClose, onSaved }: {
+  bankId: string; row: AdminQuestionRow | null; defaultNumber: number; onClose: () => void; onSaved: () => void
 }) {
   const [number] = useState<number>(row?.number ?? defaultNumber) // 자동 부여(수정 불가)
   const [kind, setKind] = useState<'mc' | 'short'>(row?.kind ?? 'mc')
@@ -2761,6 +3114,7 @@ function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
   })
   const [correctIndex, setCorrectIndex] = useState<number>(row?.correct_index ?? 0)
   const [answerKey, setAnswerKey] = useState(row?.answer_key ?? '')
+  const [explanation, setExplanation] = useState(row?.explanation ?? '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -2770,7 +3124,7 @@ function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
     try {
       await callFunction('admin', {
         action: 'questionUpsert',
-        question: { id: row?.id, examId, number, kind, subject, prompt, choices, correctIndex, answerKey, active: row ? row.active : true },
+        question: { id: row?.id, bankId, number, kind, subject, prompt, choices, correctIndex, answerKey, explanation, active: row ? row.active : true },
       })
       onSaved()
     } catch (e) {
@@ -2851,6 +3205,12 @@ function QuestionEditModal({ examId, row, defaultNumber, onClose, onSaved }: {
               <textarea className="admin-ta" rows={3} value={answerKey} onChange={(e) => setAnswerKey(e.target.value)} placeholder="핵심어·채점 기준" />
             </div>
           )}
+
+          {/* 해설 — 객관식/주관식 공통. 응시·결과 화면 어디에도 노출되지 않는 관리자 전용 필드. */}
+          <div style={QE.field}>
+            <span style={QE.lab}>해설 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(선택 · 정답 풀이 · 응시자·결과 비노출)</span></span>
+            <textarea className="admin-ta" rows={3} value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="정답 풀이·근거·출제 의도 등" />
+          </div>
         </div>
 
         {err && <p className="admin-warn" style={{ marginTop: 12 }}>{err}</p>}
@@ -2872,7 +3232,7 @@ const CBT_EVENT_LABEL: Record<string, string> = {
   restore: '복구',
 }
 
-function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: () => void }) {
+function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: () => void }) {
   const [events, setEvents] = useState<AdminQuestionEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -2880,14 +3240,14 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await callFunction<AdminQuestionEventsResp>('admin', { action: 'questionEvents', examId })
+      const r = await callFunction<AdminQuestionEventsResp>('admin', { action: 'questionEvents', bankId })
       setEvents(r.events)
     } catch {
       /* 무시 */
     } finally {
       setLoading(false)
     }
-  }, [examId])
+  }, [bankId])
   useEffect(() => {
     load()
   }, [load])
@@ -2905,16 +3265,20 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
     }
   }
 
+  const f = useTierSubjectFilter()
+  const filtered = events.filter((e) => f.matchTS(e.subject) && f.matchQ(`${e.number ?? ''} ${e.subject ?? ''} ${CBT_EVENT_LABEL[e.action] ?? e.action}`))
+
   return (
     <>
       <div className="admin-head" style={{ marginTop: 0 }}>
-        <span className="admin-count">{events.length}건</span>
+        <span className="admin-count">{filtered.length} / {events.length}건</span>
         <div className="admin-head-actions">
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
         </div>
       </div>
+      <TierSubjectBar f={f} count={filtered.length} loading={loading} />
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -2922,12 +3286,13 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
               <th>일시</th>
               <th>작업</th>
               <th>문항</th>
+              <th>과목</th>
               <th>담당</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {events.map((e) => (
+            {filtered.map((e) => (
               <tr key={e.id}>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(e.created_at)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
@@ -2935,6 +3300,7 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
                   {e.action === 'import' && e.detail ? ` (${(e.detail as { count?: number }).count ?? ''})` : ''}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>{e.number != null ? `${e.number}번` : '-'}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{e.subject || '-'}</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{e.actor ?? '-'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {e.restorable && e.question_id ? (
@@ -2945,10 +3311,10 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
                 </td>
               </tr>
             ))}
-            {!events.length && !loading && (
+            {!filtered.length && !loading && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  변경 이력이 없습니다.
+                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  {events.length ? '이 급수·과목에 해당하는 이력이 없습니다.' : '변경 이력이 없습니다.'}
                 </td>
               </tr>
             )}
@@ -2959,7 +3325,7 @@ function QuestionEventsView({ examId, onChanged }: { examId: string; onChanged: 
   )
 }
 
-function QuestionImportView({ examId, onImported }: { examId: string; onImported: () => void }) {
+function QuestionImportView({ bankId, onImported }: { bankId: string; onImported: () => void }) {
   const [fileName, setFileName] = useState('')
   const [rows, setRows] = useState<QuestionImportRow[]>([])
   const [parseErr, setParseErr] = useState('')
@@ -2987,26 +3353,31 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
         const aoa = XLSX.utils
           .sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
           .filter((row) => row.some((c) => String(c).trim() !== ''))
-        if (aoa.length < 2) {
-          setParseErr('데이터 행이 없습니다. (첫 행은 머리글)')
-          return
-        }
-        const out: QuestionImportRow[] = []
-        for (let i = 1; i < aoa.length; i++) {
-          const row = aoa[i]
-          const choices = [row[3], row[4], row[5], row[6]].map((c) => String(c ?? '').trim())
-          // 유형 열(열9, 인덱스8)이 '주관식/short' 면 주관식. 비면 객관식(하위호환).
-          const kind: 'mc' | 'short' = /주관식|short/i.test(String(row[8] ?? '').trim()) ? 'short' : 'mc'
-          out.push({
-            number: Math.floor(Number(row[0])) || i,
-            subject: String(row[1] ?? '').trim(),
-            prompt: String(row[2] ?? '').trim(),
+        if (!aoa.length) { setParseErr('빈 시트입니다.'); return }
+        // 머리글 행 자동 탐지 → 열 이름 자동 인식(순서 달라도·위에 안내줄 있어도 대응, 레벨테스트와 동일 기법)
+        const ncol = Math.max(...aoa.map((row) => row.length))
+        const hdr = qFindHeaderRow(aoa)
+        const header = aoa[hdr.idx] ?? []
+        const { cfg, hasHeader } = qDetectColumns(header, ncol)
+        const dataRows = aoa.slice(hasHeader ? hdr.idx + 1 : 0)
+        if (!dataRows.length) { setParseErr('데이터 행이 없습니다.'); return }
+        const cell = (row: string[], i: number) => String(row[i] ?? '').trim()
+        const out: QuestionImportRow[] = dataRows.map((row, i) => {
+          const choices = cfg.cOptions.map((c) => cell(row, c))
+          while (choices.length < 4) choices.push('')
+          const four = choices.slice(0, 4)
+          const kind: 'mc' | 'short' = /주관식|short/i.test(cell(row, cfg.cKind)) ? 'short' : 'mc'
+          return {
+            number: Math.floor(Number(cell(row, cfg.cNum))) || i + 1,
+            subject: cell(row, cfg.cSubject),
+            prompt: cell(row, cfg.cPrompt),
             kind,
-            choices,
-            correctIndex: kind === 'short' ? -1 : parseCorrect(row[7], choices),
-            answerKey: kind === 'short' ? String(row[9] ?? '').trim() : undefined,
-          })
-        }
+            choices: four,
+            correctIndex: kind === 'short' ? -1 : parseCorrect(row[cfg.cAnswer], four),
+            answerKey: kind === 'short' ? cell(row, cfg.cAnswerKey) : undefined,
+            explanation: cell(row, cfg.cExplanation) || undefined, // 해설 — 유형 무관 선택 입력
+          }
+        })
         setRows(out)
       } catch (err) {
         setParseErr(err instanceof Error ? err.message : '엑셀을 읽지 못했습니다.')
@@ -3016,9 +3387,9 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
   }
 
   function downloadTemplate() {
-    const header = ['번호', '과목', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)']
-    const sampleMc = [1, 'AI 리터러시', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '']
-    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI']
+    const header = ['번호', '과목', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)', '해설']
+    const sampleMc = [1, 'AI 리터러시', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)']
+    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI', '핵심 채점 포인트 해설: …']
     const ws = XLSX.utils.aoa_to_sheet([header, sampleMc, sampleShort])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '문항')
@@ -3044,7 +3415,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
     setImporting(true)
     setMsg('')
     try {
-      const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', examId, rows })
+      const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', bankId, rows })
       setMsg(`✅ ${res.count}문항 반영됨`)
       setRows([])
       setFileName('')
@@ -3059,7 +3430,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
   return (
     <>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-        엑셀 열 순서: <b>번호 · 과목 · 토픽 · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식)</b>. 유형이 비면 객관식입니다. 주관식은 보기·정답 없이 모범답안만 넣으면 됩니다. 첫 행은 머리글로 건너뛰고, 같은 번호가 있으면 <b>덮어씁니다</b>(재업로드 = 수정).
+        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>번호 · 과목 · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식) · 해설</b>. 유형이 비면 객관식, 주관식은 보기·정답 없이 모범답안만. <b>해설은 선택</b>이며 <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 같은 번호가 있으면 <b>덮어씁니다</b>(재업로드=수정). 템플릿을 받아 채우면 가장 확실합니다.
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <label className="admin-mini" style={{ cursor: 'pointer' }}>
@@ -3108,6 +3479,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
                 <th>지문</th>
                 <th>보기 / 모범답안</th>
                 <th>정답</th>
+                <th>해설</th>
               </tr>
             </thead>
             <tbody>
@@ -3125,6 +3497,7 @@ function QuestionImportView({ examId, onImported }: { examId: string; onImported
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {r.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수</span> : r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
                   </td>
+                  <td style={{ maxWidth: 200, fontSize: 12.5, color: 'var(--muted)' }}>{r.explanation || '—'}</td>
                 </tr>
               ))}
             </tbody>

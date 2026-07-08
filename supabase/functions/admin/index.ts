@@ -12,10 +12,14 @@ function shapeAttempt(
   examTitleMap: Record<string, string>,
   nameMap: Record<string, string>,
   emailMap: Record<string, string>,
+  examTierMap: Record<string, string> = {},
 ) {
   return {
     attemptId: a.id,
     examTitle: a.exam_id ? examTitleMap[a.exam_id] ?? null : null,
+    examId: a.exam_id ?? null,
+    roundId: a.round_id ?? null,
+    tier: a.exam_id ? examTierMap[a.exam_id] ?? null : null,
     userId: a.user_id,
     userEmail: emailMap[a.user_id] || null,
     userName: nameMap[a.user_id] ?? null,
@@ -36,7 +40,7 @@ async function listAttempts(admin: any, body: any) {
   const { data, count } = await admin
     .from('exam_attempts')
     .select(
-      'id, exam_id, user_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions',
+      'id, exam_id, round_id, user_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions',
       { count: 'exact' },
     )
     .order('submitted_at', { ascending: false, nullsFirst: false })
@@ -48,9 +52,10 @@ async function listAttempts(admin: any, body: any) {
   const userIds = [...new Set(rows.map((a: any) => a.user_id).filter(Boolean))]
 
   const examTitleMap: Record<string, string> = {}
+  const examTierMap: Record<string, string> = {}
   if (examIds.length) {
-    const { data: exams } = await admin.from('exams').select('id, title').in('id', examIds)
-    for (const e of exams ?? []) examTitleMap[(e as any).id] = (e as any).title
+    const { data: exams } = await admin.from('exams').select('id, title, tier').in('id', examIds)
+    for (const e of exams ?? []) { examTitleMap[(e as any).id] = (e as any).title; if ((e as any).tier) examTierMap[(e as any).id] = (e as any).tier }
   }
 
   const nameMap: Record<string, string> = {}
@@ -64,7 +69,7 @@ async function listAttempts(admin: any, body: any) {
     } catch { /* listUsers 실패해도 이메일만 빈칸 */ }
   }
 
-  const attempts = rows.map((a: any) => shapeAttempt(a, examTitleMap, nameMap, emailMap))
+  const attempts = rows.map((a: any) => shapeAttempt(a, examTitleMap, nameMap, emailMap, examTierMap))
   return json({ attempts, total: count ?? attempts.length })
 }
 
@@ -506,7 +511,8 @@ async function faqDelete(admin: any, body: any) {
 }
 
 // ---------- 시험 일정/회차(exam_rounds) CRUD ----------
-function shapeExamRound(r: any) {
+// tiers = 이 회차가 연 급수(활성 exams.tier) 키 배열. 회차 등록 기능(exams=회차×급수)에서 채움.
+function shapeExamRound(r: any, tiers: string[] = []) {
   return {
     id: r.id,
     kind: r.kind,
@@ -517,6 +523,7 @@ function shapeExamRound(r: any) {
     noteI18n: r.note_i18n ?? {},
     published: !!r.published,
     sort: r.sort,
+    tiers, // 이 회차가 연 급수 키(활성)
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -530,7 +537,14 @@ async function examRoundList(admin: any) {
     .order('sort', { ascending: true })
     .order('exam_date', { ascending: true, nullsFirst: true })
   if (error) return json({ error: error.message }, 400)
-  return json({ rounds: (data ?? []).map(shapeExamRound) })
+  // 각 회차가 연 급수(활성 exams) 를 한 번에 조회해 roundId별로 묶는다.
+  const { data: exs } = await admin.from('exams').select('round_id, tier').eq('active', true).not('round_id', 'is', null)
+  const byRound: Record<string, string[]> = {}
+  for (const e of (exs ?? []) as any[]) {
+    if (!e.tier) continue
+    ;(byRound[e.round_id] ??= []).push(e.tier)
+  }
+  return json({ rounds: (data ?? []).map((r: any) => shapeExamRound(r, byRound[r.id] ?? [])) })
 }
 
 // 생성/수정. 한국어(회차명·부가설명)만 입력받아 저장 시 나머지 5개국어 자동 번역. 날짜는 그대로 저장.
@@ -568,16 +582,75 @@ async function examRoundUpsert(admin: any, body: any) {
     updated_at: new Date().toISOString(),
   }
 
+  let saved: any = null
   if (r.id) {
     if (hasSort) row.sort = Math.floor(sortNum)
     const { data, error } = await admin.from('exam_rounds').update(row).eq('id', r.id).select().maybeSingle()
     if (error) return json({ error: error.message }, 400)
-    return json({ round: data ? shapeExamRound(data) : null, translateWarning })
+    saved = data
+  } else {
+    row.sort = hasSort ? Math.floor(sortNum) : 9999 // 새 항목은 맨 끝
+    const { data, error } = await admin.from('exam_rounds').insert(row).select().maybeSingle()
+    if (error) return json({ error: error.message }, 400)
+    saved = data
   }
-  row.sort = hasSort ? Math.floor(sortNum) : 9999 // 새 항목은 맨 끝
-  const { data, error } = await admin.from('exam_rounds').insert(row).select().maybeSingle()
-  if (error) return json({ error: error.message }, 400)
-  return json({ round: data ? shapeExamRound(data) : null, translateWarning })
+
+  // 회차가 연 급수(tiers) 동기화 → 급수마다 exams 행 생성/재활성/소프트클로즈.
+  // r.tiers 가 배열일 때만 건드린다(구 호출이 실수로 급수를 비우지 않도록).
+  let tierKeys: string[] = []
+  if (saved?.id && Array.isArray(r.tiers)) {
+    const tiersInput = (r.tiers as any[])
+      .filter((t) => t && typeof t.key === 'string')
+      .map((t) => ({ key: t.key as string, title: String(t.title ?? t.key), total: Number(t.total) || 0, durationMin: Number(t.durationMin) || 120 }))
+    try {
+      tierKeys = await syncRoundExams(admin, saved.id, tiersInput)
+    } catch (e) {
+      // 급수 동기화 실패는 회차 저장을 무르지 않고 경고만.
+      translateWarning = (translateWarning ? translateWarning + ' / ' : '') + '급수 동기화 실패: ' + (e instanceof Error ? e.message : '오류')
+    }
+  }
+  return json({ round: saved ? shapeExamRound(saved, tierKeys) : null, translateWarning })
+}
+
+// 회차의 열린 급수 ↔ exams 동기화. tiers = [{key, title}].
+//  · 요청에 있고 없던 급수 → exams insert(활성)
+//  · 요청에 있고 이미 있던 급수 → title 갱신 + 재활성
+//  · 요청에서 빠진 급수 → 세트·응시 없으면 삭제(오등록 정리), 있으면 active=false(보존)
+//  · 구성(total/durationMin)은 클라가 TIER_EXAM_SPEC 에서 실어 보냄(Deno는 caris.ts 못 읽음)
+async function syncRoundExams(admin: any, roundId: string, tiers: { key: string; title: string; total?: number; durationMin?: number }[]): Promise<string[]> {
+  const { data: existing, error } = await admin.from('exams').select('id, tier, active').eq('round_id', roundId)
+  if (error) throw new Error(error.message)
+  const cur = (existing ?? []) as any[]
+  const curByTier = new Map<string, any>(cur.map((e) => [e.tier, e]))
+  const wantKeys = new Set(tiers.map((t) => t.key))
+
+  for (const t of tiers) {
+    const total = Number.isFinite(t.total) ? Math.floor(t.total as number) : 0
+    const dur = Number.isFinite(t.durationMin) ? Math.floor(t.durationMin as number) : 120
+    const ex = curByTier.get(t.key)
+    if (ex) {
+      const { error: e } = await admin.from('exams').update({ title: t.title, active: true, total_questions: total, duration_minutes: dur }).eq('id', ex.id)
+      if (e) throw new Error(e.message)
+    } else {
+      const slug = `r-${roundId}-${t.key}` // (round_id,tier) 유일 → slug 전역 유일
+      const { error: e } = await admin.from('exams').insert({ round_id: roundId, tier: t.key, slug, title: t.title, active: true, total_questions: total, duration_minutes: dur })
+      if (e) throw new Error(e.message)
+    }
+  }
+
+  for (const e of cur) {
+    if (wantKeys.has(e.tier)) continue
+    const [q, a] = await Promise.all([
+      admin.from('exam_questions').select('id', { count: 'exact', head: true }).eq('exam_id', e.id),
+      admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('exam_id', e.id),
+    ])
+    if ((q.count ?? 0) === 0 && (a.count ?? 0) === 0) {
+      await admin.from('exams').delete().eq('id', e.id) // 한 번도 안 쓴 오등록 → 정리
+    } else if (e.active) {
+      await admin.from('exams').update({ active: false }).eq('id', e.id) // 사용 이력 있으면 보존
+    }
+  }
+  return tiers.map((t) => t.key)
 }
 
 async function examRoundReorder(admin: any, body: any) {
@@ -593,6 +666,11 @@ async function examRoundReorder(admin: any, body: any) {
 async function examRoundDelete(admin: any, body: any) {
   const id = body?.id
   if (!id) return json({ error: 'id 필요' }, 400)
+  // 이 회차에 등록된 급수 시험(exams)이 있으면 삭제 차단(문항·응시 유실·FK 위반 방지).
+  const { count } = await admin.from('exams').select('id', { count: 'exact', head: true }).eq('round_id', id)
+  if ((count ?? 0) > 0) {
+    return json({ error: '이 회차에 등록된 급수 시험이 있어 삭제할 수 없습니다. 먼저 회차 편집에서 급수를 모두 해제하세요.' }, 400)
+  }
   const { error } = await admin.from('exam_rounds').delete().eq('id', id)
   if (error) return json({ error: error.message }, 400)
   return json({ ok: true })
@@ -678,12 +756,12 @@ async function manageAdmins(
 // ---------- CBT 문항 관리 (목록·이력·엑셀 임포트) ----------
 async function logCbtEvent(
   admin: any,
-  e: { question_id: string | null; exam_id: string | null; number: number | null; action: string; actor: string; detail?: unknown },
+  e: { question_id: string | null; bank_id: string | null; number: number | null; action: string; actor: string; detail?: unknown },
 ) {
   try {
     await admin.from('cbt_question_events').insert({
       question_id: e.question_id,
-      exam_id: e.exam_id,
+      bank_id: e.bank_id,
       number: e.number,
       action: e.action,
       actor: e.actor || null,
@@ -692,33 +770,47 @@ async function logCbtEvent(
   } catch { /* 로그 실패는 무시 */ }
 }
 
-// 시험 목록 + 각 시험의 문항 수(비삭제)
+// 문제은행 목록(급수별) + 은행별 문항 수(비삭제/활성). 문항 관리 셀렉터용.
+async function bankListForAdmin(admin: any) {
+  const { data, error } = await admin.from('question_banks').select('id, tier, title, active').order('tier', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+  const banks = data ?? []
+  const out: any[] = []
+  for (const b of banks) {
+    const [t, a] = await Promise.all([
+      admin.from('questions').select('id', { count: 'exact', head: true }).eq('bank_id', b.id).is('deleted_at', null),
+      admin.from('questions').select('id', { count: 'exact', head: true }).eq('bank_id', b.id).eq('active', true).is('deleted_at', null),
+    ])
+    out.push({ ...b, questionCount: t.count ?? 0, activeCount: a.count ?? 0 })
+  }
+  return json({ banks: out })
+}
+
+// 등록시험 목록(회차×급수, round_id NOT NULL) + 각 시험의 뽑힌 세트 수. 시험문항 셀렉터용.
 async function examListForAdmin(admin: any) {
   const { data, error } = await admin
     .from('exams')
-    .select('id, slug, title, total_questions, active, created_at')
+    .select('id, slug, title, total_questions, active, round_id, tier, created_at')
+    .not('round_id', 'is', null)
     .order('created_at', { ascending: true })
   if (error) return json({ error: error.message }, 400)
   const exams = data ?? []
-  const counts: Record<string, { total: number; active: number }> = {}
+  const counts: Record<string, number> = {}
   for (const ex of exams) {
-    const [t, a] = await Promise.all([
-      admin.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id).is('deleted_at', null),
-      admin.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id).eq('active', true).is('deleted_at', null),
-    ])
-    counts[ex.id] = { total: t.count ?? 0, active: a.count ?? 0 }
+    const { count } = await admin.from('exam_questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id)
+    counts[ex.id] = count ?? 0
   }
-  return json({ exams: exams.map((ex: any) => ({ ...ex, questionCount: counts[ex.id].total, activeCount: counts[ex.id].active })) })
+  return json({ exams: exams.map((ex: any) => ({ ...ex, questionCount: counts[ex.id], activeCount: counts[ex.id] })) })
 }
 
-// 한 시험의 문항 목록(비삭제, 번호순). 관리자에겐 correct_index 포함.
+// 한 은행의 문항 목록(비삭제, 번호순). 관리자에겐 correct_index·해설 포함.
 async function questionList(admin: any, body: any) {
-  const examId = body?.examId
-  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const bankId = body?.bankId
+  if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const { data, error } = await admin
     .from('questions')
-    .select('id, exam_id, number, subject, topic, prompt, kind, choices, correct_index, answer_key, active')
-    .eq('exam_id', examId)
+    .select('id, bank_id, number, subject, topic, prompt, kind, choices, correct_index, answer_key, explanation, active')
+    .eq('bank_id', bankId)
     .is('deleted_at', null)
     .order('number', { ascending: true })
     .limit(2000)
@@ -730,8 +822,8 @@ async function questionList(admin: any, body: any) {
 //  · 객관식(mc): 보기 4개 + 정답(0..3). 주관식(short): 보기/정답 없이 모범답안(answer_key).
 async function questionUpsert(admin: any, body: any, actor: string) {
   const q = body?.question ?? {}
-  const examId = q.examId
-  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const bankId = q.bankId
+  if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const number = Math.floor(Number(q.number))
   if (!Number.isFinite(number) || number < 1) return json({ error: '번호(1 이상)를 입력하세요.' }, 400)
   const subject = String(q.subject ?? '').trim()
@@ -740,12 +832,14 @@ async function questionUpsert(admin: any, body: any, actor: string) {
   const kind = q.kind === 'short' ? 'short' : 'mc'
 
   const row: Record<string, unknown> = {
-    exam_id: examId,
+    bank_id: bankId,
     number,
     subject,
     topic: String(q.topic ?? '').trim(),
     prompt,
     kind,
+    // 해설 — 객관식/주관식 공통(선택). 클라 비노출(출제/결과/채점 서빙에서 제외).
+    explanation: String(q.explanation ?? '').trim() || null,
     active: q.active !== false,
     deleted_at: null,
   }
@@ -768,69 +862,74 @@ async function questionUpsert(admin: any, body: any, actor: string) {
     const { error } = await admin.from('questions').update(row).eq('id', q.id)
     if (error) return json({ error: error.message }, 400)
   } else {
-    const { error } = await admin.from('questions').upsert(row, { onConflict: 'exam_id,number' })
+    const { error } = await admin.from('questions').upsert(row, { onConflict: 'bank_id,number' })
     if (error) return json({ error: error.message }, 400)
   }
-  await logCbtEvent(admin, { question_id: q.id ?? null, exam_id: examId, number, action: isNew ? 'import' : 'edit', actor, detail: { kind, single: true } })
+  await logCbtEvent(admin, { question_id: q.id ?? null, bank_id: bankId, number, action: isNew ? 'import' : 'edit', actor, detail: { kind, single: true } })
   return json({ ok: true })
 }
 
 async function questionSetActive(admin: any, body: any, actor: string) {
   if (!body?.id) return json({ error: 'id 필요' }, 400)
   const active = !!body.active
-  const { data: before } = await admin.from('questions').select('exam_id, number').eq('id', body.id).maybeSingle()
+  const { data: before } = await admin.from('questions').select('bank_id, number').eq('id', body.id).maybeSingle()
   const { error } = await admin.from('questions').update({ active }).eq('id', body.id)
   if (error) return json({ error: error.message }, 400)
-  await logCbtEvent(admin, { question_id: body.id, exam_id: before?.exam_id ?? null, number: before?.number ?? null, action: active ? 'activate' : 'deactivate', actor })
+  await logCbtEvent(admin, { question_id: body.id, bank_id: before?.bank_id ?? null, number: before?.number ?? null, action: active ? 'activate' : 'deactivate', actor })
   return json({ ok: true })
 }
 
 async function questionDelete(admin: any, body: any, actor: string) {
   if (!body?.id) return json({ error: 'id 필요' }, 400)
-  const { data: before } = await admin.from('questions').select('exam_id, number').eq('id', body.id).maybeSingle()
+  const { data: before } = await admin.from('questions').select('bank_id, number').eq('id', body.id).maybeSingle()
   const { error } = await admin.from('questions').update({ deleted_at: new Date().toISOString(), active: false }).eq('id', body.id)
   if (error) return json({ error: error.message }, 400)
-  await logCbtEvent(admin, { question_id: body.id, exam_id: before?.exam_id ?? null, number: before?.number ?? null, action: 'delete', actor })
+  await logCbtEvent(admin, { question_id: body.id, bank_id: before?.bank_id ?? null, number: before?.number ?? null, action: 'delete', actor })
   return json({ ok: true })
 }
 
 async function questionRestore(admin: any, body: any, actor: string) {
   if (!body?.id) return json({ error: 'id 필요' }, 400)
-  const { data: before } = await admin.from('questions').select('exam_id, number').eq('id', body.id).maybeSingle()
+  const { data: before } = await admin.from('questions').select('bank_id, number').eq('id', body.id).maybeSingle()
   const { error } = await admin.from('questions').update({ active: true, deleted_at: null }).eq('id', body.id)
   if (error) return json({ error: error.message }, 400)
-  await logCbtEvent(admin, { question_id: body.id, exam_id: before?.exam_id ?? null, number: before?.number ?? null, action: 'restore', actor })
+  await logCbtEvent(admin, { question_id: body.id, bank_id: before?.bank_id ?? null, number: before?.number ?? null, action: 'restore', actor })
   return json({ ok: true })
 }
 
-// 변경 이력(최신순). examId 필터 + 각 이벤트에 현재 복구가능 여부.
+// 변경 이력(최신순). bankId 필터 + 각 이벤트에 현재 복구가능 여부.
 async function questionEvents(admin: any, body: any) {
   let q = admin
     .from('cbt_question_events')
-    .select('id, question_id, exam_id, number, action, actor, detail, created_at')
+    .select('id, question_id, bank_id, number, action, actor, detail, created_at')
     .order('created_at', { ascending: false })
     .limit(1000)
-  if (body?.examId) q = q.eq('exam_id', body.examId)
+  if (body?.bankId) q = q.eq('bank_id', body.bankId)
   const { data, error } = await q
   if (error) return json({ error: error.message }, 400)
   const events = data ?? []
   const ids = [...new Set(events.map((e: any) => e.question_id).filter(Boolean))]
   const statusById: Record<string, { active: boolean; deleted: boolean }> = {}
+  const subjectById: Record<string, string> = {}
   if (ids.length) {
-    const { data: qs } = await admin.from('questions').select('id, active, deleted_at').in('id', ids)
-    for (const r of qs ?? []) statusById[r.id] = { active: !!r.active, deleted: r.deleted_at != null }
+    // id 조회라 삭제된 문항의 과목도 나옴(급수/과목 필터용)
+    const { data: qs } = await admin.from('questions').select('id, active, deleted_at, subject').in('id', ids)
+    for (const r of qs ?? []) {
+      statusById[r.id] = { active: !!r.active, deleted: r.deleted_at != null }
+      subjectById[r.id] = r.subject ?? ''
+    }
   }
   const withStatus = events.map((e: any) => {
     const st = e.question_id ? statusById[e.question_id] : undefined
-    return { ...e, restorable: !!st && (!st.active || st.deleted) }
+    return { ...e, subject: e.question_id ? subjectById[e.question_id] ?? null : null, restorable: !!st && (!st.active || st.deleted) }
   })
   return json({ events: withStatus })
 }
 
 // 엑셀 임포트 — rows[] 를 (exam_id, number) 기준 upsert. 재임포트 시 갱신.
 async function questionsImport(admin: any, body: any, actor: string) {
-  const examId = body?.examId
-  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const bankId = body?.bankId
+  if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const rows = Array.isArray(body?.rows) ? body.rows : []
   if (!rows.length) return json({ error: '가져올 문항이 없습니다.' }, 400)
 
@@ -844,26 +943,97 @@ async function questionsImport(admin: any, body: any, actor: string) {
     const prompt = String(r?.prompt ?? '').trim()
     if (!subject || !prompt) return json({ error: `#${i + 1}행(번호 ${number}): 과목·지문은 필수` }, 400)
     const kind = r?.kind === 'short' ? 'short' : 'mc'
+    // 해설 — 객관식/주관식 공통(선택). 클라 비노출.
+    const explanation = String(r?.explanation ?? '').trim() || null
     if (kind === 'short') {
       // 주관식 — 보기/정답번호 없음, 모범답안(answerKey)은 선택
-      payload.push({ exam_id: examId, number, subject, topic, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, active: true, deleted_at: null })
+      payload.push({ bank_id: bankId, number, subject, topic, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, explanation, active: true, deleted_at: null })
       continue
     }
     const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c ?? '').trim()) : []
     if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: `#${i + 1}행(번호 ${number}): 보기 4개가 모두 필요` }, 400)
     const ci = Math.floor(Number(r?.correctIndex))
     if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: `#${i + 1}행(번호 ${number}): 정답(1~4) 오류` }, 400)
-    payload.push({ exam_id: examId, number, subject, topic, prompt, kind, choices, correct_index: ci, answer_key: null, active: true, deleted_at: null })
+    payload.push({ bank_id: bankId, number, subject, topic, prompt, kind, choices, correct_index: ci, answer_key: null, explanation, active: true, deleted_at: null })
   }
   // 행 내 번호 중복 검사
   const nums = payload.map((p) => p.number)
   const dup = nums.find((n, i) => nums.indexOf(n) !== i)
   if (dup != null) return json({ error: `번호 ${dup} 가 파일 안에서 중복됩니다.` }, 400)
 
-  const { data, error } = await admin.from('questions').upsert(payload, { onConflict: 'exam_id,number' }).select('id')
+  const { data, error } = await admin.from('questions').upsert(payload, { onConflict: 'bank_id,number' }).select('id')
   if (error) return json({ error: error.message }, 400)
-  await logCbtEvent(admin, { question_id: null, exam_id: examId, number: null, action: 'import', actor, detail: { count: payload.length } })
+  await logCbtEvent(admin, { question_id: null, bank_id: bankId, number: null, action: 'import', actor, detail: { count: payload.length } })
   return json({ ok: true, count: data?.length ?? payload.length })
+}
+
+// ---------- 등록시험 뽑기(문제은행 → exam_questions 세트) ----------
+function shuffleIds(arr: string[]): string[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+// 등록시험에 그 급수 은행에서 mc N + short M 랜덤 추출 → exam_questions 교체 저장.
+async function examDraw(admin: any, body: any, actor: string) {
+  const examId = body?.examId
+  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const mc = Math.max(0, Math.floor(Number(body?.mc) || 0))
+  const short = Math.max(0, Math.floor(Number(body?.short) || 0))
+  if (mc + short === 0) return json({ error: '뽑을 문항 수가 0입니다.' }, 400)
+  const { data: ex } = await admin.from('exams').select('id, tier').eq('id', examId).not('round_id', 'is', null).maybeSingle()
+  if (!ex?.tier) return json({ error: '등록시험이 아닙니다.' }, 400)
+  const { count: att } = await admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('exam_id', examId)
+  if ((att ?? 0) > 0 && !body?.replace) return json({ error: '이미 응시 기록이 있습니다. 재추출하려면 확인이 필요합니다.', needReplace: true }, 409)
+  const { data: bank } = await admin.from('question_banks').select('id').eq('tier', ex.tier).maybeSingle()
+  if (!bank?.id) return json({ error: `'${ex.tier}' 문제은행이 없습니다.` }, 400)
+
+  async function pick(kind: string, n: number): Promise<string[]> {
+    if (n === 0) return []
+    const { data } = await admin.from('questions').select('id').eq('bank_id', bank.id).eq('kind', kind).eq('active', true).is('deleted_at', null)
+    const ids = (data ?? []).map((r: any) => r.id)
+    if (ids.length < n) throw new Error(`${kind === 'mc' ? '객관식' : '주관식'} 은행 문항 부족 (보유 ${ids.length} / 필요 ${n})`)
+    return shuffleIds(ids).slice(0, n)
+  }
+  let picked: string[]
+  try {
+    const [mcIds, shIds] = await Promise.all([pick('mc', mc), pick('short', short)])
+    picked = [...mcIds, ...shIds]
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : '추출 실패' }, 400)
+  }
+  await admin.from('exam_questions').delete().eq('exam_id', examId)
+  const rows = picked.map((qid, i) => ({ exam_id: examId, question_id: qid, number: i + 1 }))
+  const { error } = await admin.from('exam_questions').insert(rows)
+  if (error) return json({ error: error.message }, 400)
+  await admin.from('exams').update({ total_questions: rows.length }).eq('id', examId)
+  await logCbtEvent(admin, { question_id: null, bank_id: bank.id, number: null, action: 'import', actor, detail: { draw: examId, count: rows.length } })
+  return json({ ok: true, count: rows.length })
+}
+
+// 등록시험의 뽑힌 세트(번호순) + 문항 메타.
+async function examSetList(admin: any, body: any) {
+  const examId = body?.examId
+  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const { data, error } = await admin
+    .from('exam_questions')
+    .select('number, question_id, questions(number, subject, kind, prompt, active)')
+    .eq('exam_id', examId)
+    .order('number', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+  const rows = (data ?? []).map((r: any) => ({
+    number: r.number,
+    questionId: r.question_id,
+    subject: r.questions?.subject ?? '',
+    kind: r.questions?.kind ?? 'mc',
+    prompt: r.questions?.prompt ?? '',
+    bankNumber: r.questions?.number ?? null,
+    active: r.questions?.active ?? true,
+  }))
+  return json({ rows })
 }
 
 // 대시보드 분석 — 추이·점수분포·합격률·급수·자격증·회차 퍼널·소요시간·문항 난이도·과목·풀.
@@ -880,7 +1050,7 @@ async function cbtAnalytics(admin: any) {
     admin.from('profiles').select('created_at, is_anonymous').limit(10000),
     admin.from('exam_attempts').select('exam_id, round_id, status, started_at, submitted_at, created_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
     admin.from('attempt_answers').select('question_id, is_correct').limit(50000),
-    admin.from('questions').select('id, exam_id, number, subject, prompt, active').is('deleted_at', null).limit(5000),
+    admin.from('questions').select('id, bank_id, number, subject, prompt, active').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active').order('created_at', { ascending: true }),
     admin.from('exam_rounds').select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
     // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(레벨테스트 익명 세션 제외)
@@ -1021,7 +1191,7 @@ async function cbtAnalytics(admin: any) {
       number: qMap[id]?.number ?? 0,
       subject: qMap[id]?.subject ?? '',
       prompt: qMap[id]?.prompt ?? '',
-      exam: examTitle[qMap[id]?.exam_id] ?? '',
+      exam: '', // 문항은 이제 은행 소속(등록시험 아님) — 난이도 목록의 시험 라벨은 미사용
       active: qMap[id]?.active ?? true,
       n: v.n,
       rate: Math.round((v.c / v.n) * 100),
@@ -1191,6 +1361,9 @@ Deno.serve(async (req) => {
       case 'examFeeList': return await examFeeList(admin)
       case 'examFeeSave': return await examFeeSave(admin, body)
       case 'examListForAdmin': return await examListForAdmin(admin)
+      case 'bankListForAdmin': return await bankListForAdmin(admin)
+      case 'examDraw': return await examDraw(admin, body, email)
+      case 'examSetList': return await examSetList(admin, body)
       case 'questionList': return await questionList(admin, body)
       case 'questionUpsert': return await questionUpsert(admin, body, email)
       case 'questionSetActive': return await questionSetActive(admin, body, email)

@@ -46,6 +46,20 @@ const T2_TIERS = [
   { key: 'zenith', name: 'Zenith', fee: 150000 },
 ] as const
 
+// 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.
+//  Beginner/Pro = 객40, Elite = 객45+주5. T2(Master~Zenith)는 필기+실기 미확정 → 잠정 0(추후 확정).
+//  ⚠️ format 문자열 바꾸면 여기 수치도 같이 갱신할 것.
+export type TierExamSpec = { mc: number; short: number; durationMin: number; passPct: number }
+export const TIER_EXAM_SPEC: Record<string, TierExamSpec> = {
+  beginner: { mc: 40, short: 0, durationMin: 40, passPct: 60 },
+  pro: { mc: 40, short: 0, durationMin: 40, passPct: 60 },
+  elite: { mc: 45, short: 5, durationMin: 60, passPct: 60 },
+  master: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
+  grandmaster: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
+  zenith: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
+}
+export const tierTotal = (k: string) => (TIER_EXAM_SPEC[k]?.mc ?? 0) + (TIER_EXAM_SPEC[k]?.short ?? 0)
+
 // CARIS 트랙 데이터(로케일 반영본). Guide/ExamApply 가 소비.
 export function getTracks(lang: Lang): Track[] {
   const track1: Track = {

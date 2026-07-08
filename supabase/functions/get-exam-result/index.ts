@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
     }
 
     // 공개 — 문항별 정오답(문항 조인). 주관식은 유형·응답 텍스트·검수상태 포함(보기/정답번호는 없음).
+    // ⚠️ 해설(explanation)은 결과 화면에도 내리지 않는다 — 관리자 전용(요구사항: 어떤 경우에도 해설 미노출).
     const { data: rows } = await admin
       .from('attempt_answers')
       .select('number, selected_index, answer_text, is_correct, review_status, questions(subject, topic, prompt, kind, choices, correct_index)')

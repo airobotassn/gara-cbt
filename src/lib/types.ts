@@ -72,6 +72,9 @@ export type ExamResultResponse =
 export interface AdminAttemptRow {
   attemptId: string
   examTitle: string
+  examId?: string | null // 등록시험 id (회차·급수 필터용)
+  roundId?: string | null // 응시 회차
+  tier?: string | null // 급수 key
   userId: string
   userEmail: string | null
   userName: string | null
@@ -202,6 +205,7 @@ export interface ExamRoundRow {
   noteI18n: I18nText
   published: boolean
   sort: number
+  tiers?: string[] // 이 회차가 연 급수(getTracks 티어 key) — 회차 등록 기능
   createdAt?: string
   updatedAt?: string
 }
@@ -220,23 +224,53 @@ export interface AdminExamFeeListResponse {
   fees: ExamFee[]
 }
 
-// ---------- CBT 문항 관리 ----------
+// ---------- CBT 문항 관리 (2층: 은행 ↔ 등록시험) ----------
+// 문제은행(급수별) — 문항 관리 셀렉터. bankListForAdmin.
+export interface QuestionBankItem {
+  id: string
+  tier: string // getTracks 티어 key
+  title: string
+  active: boolean
+  questionCount: number
+  activeCount: number
+}
+export interface AdminBankListResp {
+  banks: QuestionBankItem[]
+}
+
+// 등록시험(회차×급수) — 시험문항 셀렉터. examListForAdmin(round_id NOT NULL).
 export interface AdminExamItem {
   id: string
   slug: string
   title: string
   total_questions: number
   active: boolean
-  questionCount: number
+  round_id?: string | null
+  tier?: string | null // getTracks 티어 key
+  questionCount: number // 뽑힌 세트 크기
   activeCount: number
 }
 export interface AdminExamListResp {
   exams: AdminExamItem[]
 }
 
+// 등록시험의 뽑힌 세트 1행. examSetList.
+export interface ExamSetRow {
+  number: number // 출제 표시 순서
+  questionId: string
+  subject: string
+  kind: 'mc' | 'short'
+  prompt: string
+  bankNumber: number | null // 은행 내 원 번호
+  active: boolean
+}
+export interface AdminExamSetResp {
+  rows: ExamSetRow[]
+}
+
 export interface AdminQuestionRow {
   id: string
-  exam_id: string
+  bank_id: string
   number: number
   subject: string
   prompt: string
@@ -244,6 +278,7 @@ export interface AdminQuestionRow {
   choices: string[]
   correct_index: number | null
   answer_key: string | null
+  explanation: string | null // 정답 해설/풀이(관리자 전용 · 응시/결과 비노출)
   active: boolean
 }
 export interface AdminQuestionListResp {
@@ -253,8 +288,9 @@ export interface AdminQuestionListResp {
 export interface AdminQuestionEvent {
   id: string
   question_id: string | null
-  exam_id: string | null
+  bank_id: string | null
   number: number | null
+  subject?: string | null // 문항 과목(급수/과목 필터용)
   action: string
   actor: string | null
   detail: unknown
@@ -274,6 +310,7 @@ export interface QuestionImportRow {
   choices: string[]
   correctIndex: number
   answerKey?: string
+  explanation?: string // 정답 해설/풀이(선택 · 관리자 전용)
 }
 
 export interface CbtQDiff {
