@@ -67,18 +67,28 @@ export default function Guide() {
                   <div
                     key={s.id}
                     onClick={s.clickable ? () => navigate(`/exam/apply?round=${s.id}`, { state: { roundId: s.id, roundLabel: s.title, dateLabel: s.dateText } }) : undefined}
-                    className={`rounded-xl p-4 flex justify-between items-center gap-3 border ${s.clickable ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
+                    className={`rounded-xl p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2.5 sm:gap-3 border ${s.clickable ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
                       {s.applyText && (
                         <div className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">
-                          {t('sched.apply_period')} <span className="font-semibold text-on-surface whitespace-nowrap">{s.applyText}</span>
+                          {t('sched.apply_period')}{' '}
+                          {(() => {
+                            const [a1, a2] = s.applyText.split('~')
+                            return a2 !== undefined ? (
+                              <span className="font-semibold text-on-surface">
+                                <span className="whitespace-nowrap">{a1.trim()}</span>{' ~ '}<span className="whitespace-nowrap">{a2.trim()}</span>
+                              </span>
+                            ) : (
+                              <span className="font-semibold text-on-surface">{s.applyText}</span>
+                            )
+                          })()}
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
                       <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.clickable ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(STATUS_KEY[s.status])}</span>
                       {s.clickable && <span className="material-symbols-outlined text-primary text-[20px]">arrow_forward</span>}
                     </div>
@@ -100,16 +110,16 @@ export default function Guide() {
             </div>
 
             {/* 트랙 전환: 화살표 + 탭 */}
-            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-10">
-              <button onClick={() => goTrack(track - 1)} aria-label={t('guide.aria_prev_track')} className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-4 mb-10">
+              <button onClick={() => goTrack(track - 1)} aria-label={t('guide.aria_prev_track')} className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
               <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high">
                 {TRACKS.map((tr, i) => (
-                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'whitespace-nowrap px-5 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'whitespace-nowrap px-5 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
+                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'whitespace-nowrap px-4 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'whitespace-nowrap px-4 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
                 ))}
               </div>
-              <button onClick={() => goTrack(track + 1)} aria-label={t('guide.aria_next_track')} className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
+              <button onClick={() => goTrack(track + 1)} aria-label={t('guide.aria_next_track')} className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
                 <span className="material-symbols-outlined">chevron_right</span>
               </button>
             </div>
