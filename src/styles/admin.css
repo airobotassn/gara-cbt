@@ -524,4 +524,12 @@
   .tdist-l { font-size: 9.5px; overflow-wrap: normal; word-break: keep-all; line-height: 1.15; }
   .tdist-track { font-size: 9px; }
   .tdist-n { font-size: 12px; }
+  /* 과목별 문항 풀: 긴 과목명이 표를 옆으로 밀어 활성/전체/상태가 안 보이던 것 — 카드형으로(과목명 위, 지표 아래 한 줄) */
+  .pool-table { display: block; border-collapse: separate; }
+  .pool-table tbody { display: block; }
+  .pool-table thead { display: none; }
+  .pool-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; border: 1px solid var(--a-bd); border-radius: 10px; background: var(--bg); padding: 10px 12px; margin-bottom: 8px; }
+  .pool-table td { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0 !important; white-space: normal; font-size: var(--fs-sm); }
+  .pool-table td:first-child { flex-basis: 100%; display: block; min-width: 0; white-space: normal; font-weight: 600; color: var(--txt); }
+  .pool-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 400; }
 }

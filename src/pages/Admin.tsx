@@ -2373,8 +2373,8 @@ function TierAnalysis() {
                 return (
                   <tr key={p.subject} className={ok ? '' : 'prob'}>
                     <td>{p.subject}</td>
-                    <td><b>{p.active}</b></td>
-                    <td>{p.total}</td>
+                    <td data-label="활성"><b>{p.active}</b></td>
+                    <td data-label="전체">{p.total}</td>
                     <td>{ok ? <span className="badge ok">충분</span> : <span className="badge low">부족</span>}</td>
                   </tr>
                 )
