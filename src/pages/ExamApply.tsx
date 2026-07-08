@@ -129,10 +129,10 @@ export default function ExamApply() {
 
               {/* 티어 선택 — 트랙 선택과 동일한 pill 바 스타일(크기 일치) */}
               <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.tier')}</span>
-              <div className="flex flex-nowrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full overflow-x-auto mt-2">
+              <div className="flex flex-nowrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full mt-2">
                 {cur.tiers.map((l, i) => (
-                  <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2 rounded-full whitespace-nowrap bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full whitespace-nowrap text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
-                    {l.name}
+                  <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
+                    <span className="flex flex-col items-center leading-[1.05]">{l.name.split(' ').map((w, k) => <span key={k}>{w}</span>)}</span>
                   </button>
                 ))}
               </div>
