@@ -139,7 +139,7 @@ export default function Guide() {
 
               {/* 티어 전환: 화살표 + 티어 (하나의 통합 pill) */}
               <div className="flex justify-center mb-6">
-                <div className="flex flex-wrap items-center justify-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm max-w-full">
+                <div className="flex flex-nowrap items-center justify-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm max-w-full overflow-x-auto">
                   <button onClick={() => goLevel(level - 1)} aria-label={t('guide.aria_prev_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                   </button>
