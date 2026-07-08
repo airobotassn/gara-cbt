@@ -1368,6 +1368,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .admin-count {
   font-size: var(--fs-sm);

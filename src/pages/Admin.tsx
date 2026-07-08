@@ -2691,41 +2691,32 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
 // ── 문항 관리 (목록 · 이력 · 엑셀 업로드) ──────────────────────────
 // ── 문항 급수(티어)→과목 필터 (레벨테스트 ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
 function useTierSubjectFilter() {
-  const [tierKey, setTierKey] = useState('all')
+  // 은행(급수)이 이미 상단에서 선택됨 → 급수 필터는 두지 않는다. 과목(실제 문항 과목)·유형·검색만.
   const [subject, setSubject] = useState('all')
   const [kind, setKind] = useState<'all' | 'mc' | 'short'>('all')
   const [q, setQ] = useState('')
-  const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
-  const cur = tiers.find((t) => t.key === tierKey)
-  const setTier = (k: string) => { setTierKey(k); setSubject('all') }
-  const matchTS = (subjectVal: string | null | undefined) => {
-    const sv = subjectVal ?? ''
-    if (tierKey !== 'all' && !cur?.subjects.includes(sv)) return false
-    if (subject !== 'all' && sv !== subject) return false
-    return true
-  }
+  const matchTS = (subjectVal: string | null | undefined) => subject === 'all' || (subjectVal ?? '') === subject
   const matchKind = (k: string | null | undefined) => kind === 'all' || (k ?? 'mc') === kind
   const matchQ = (text: string) => { const qq = q.trim().toLowerCase(); return !qq || text.toLowerCase().includes(qq) }
-  return { tierKey, setTier, subject, setSubject, kind, setKind, q, setQ, tiers, cur, matchTS, matchKind, matchQ }
+  return { subject, setSubject, kind, setKind, q, setQ, matchTS, matchKind, matchQ }
 }
 type TierSubjectFilter = ReturnType<typeof useTierSubjectFilter>
 
-function TierSubjectBar({ f, count, loading, actions }: { f: TierSubjectFilter; count: number; loading?: boolean; actions?: ReactNode }) {
+// 과목 옵션은 실제 문항의 과목에서(subjects prop). 유형(mc/short)은 목록에서만(showKind).
+function TierSubjectBar({ f, count, loading, actions, subjects, showKind = true }: { f: TierSubjectFilter; count: number; loading?: boolean; actions?: ReactNode; subjects: string[]; showKind?: boolean }) {
   return (
     <div className="admin-toolbar">
-      <label>급수 <select value={f.tierKey} onChange={(e) => f.setTier(e.target.value)}>
-        <option value="all">전체 급수</option>
-        {f.tiers.map((t) => <option key={t.key} value={t.key}>{t.track.replace('CARIS-', '')} · {t.name}</option>)}
-      </select></label>
       <label>과목 <select value={f.subject} onChange={(e) => f.setSubject(e.target.value)}>
         <option value="all">전체 과목</option>
-        {(f.cur?.subjects ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
+        {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
       </select></label>
-      <label>유형 <select value={f.kind} onChange={(e) => f.setKind(e.target.value as 'all' | 'mc' | 'short')}>
-        <option value="all">전체 유형</option>
-        <option value="mc">객관식</option>
-        <option value="short">주관식</option>
-      </select></label>
+      {showKind && (
+        <label>유형 <select value={f.kind} onChange={(e) => f.setKind(e.target.value as 'all' | 'mc' | 'short')}>
+          <option value="all">전체 유형</option>
+          <option value="mc">객관식</option>
+          <option value="short">주관식</option>
+        </select></label>
+      )}
       <input className="admin-search" placeholder="번호·지문 검색" value={f.q} onChange={(e) => f.setQ(e.target.value)} />
       {actions}
       <span className="admin-hint">{count}건{loading ? ' · 불러오는 중…' : ''}</span>
@@ -2999,6 +2990,7 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
 
   const nextNumber = rows.reduce((m, q) => Math.max(m, q.number), 0) + 1
   const f = useTierSubjectFilter()
+  const subjects = [...new Set(rows.map((r) => r.subject).filter(Boolean))].sort()
   const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
 
   return (
@@ -3012,7 +3004,7 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
           </button>
         </div>
       </div>
-      <TierSubjectBar f={f} count={filtered.length} loading={loading} />
+      <TierSubjectBar f={f} count={filtered.length} loading={loading} subjects={subjects} />
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -3266,6 +3258,7 @@ function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: 
   }
 
   const f = useTierSubjectFilter()
+  const subjects = [...new Set(events.map((e) => e.subject ?? '').filter(Boolean))].sort()
   const filtered = events.filter((e) => f.matchTS(e.subject) && f.matchQ(`${e.number ?? ''} ${e.subject ?? ''} ${CBT_EVENT_LABEL[e.action] ?? e.action}`))
 
   return (
@@ -3278,7 +3271,7 @@ function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: 
           </button>
         </div>
       </div>
-      <TierSubjectBar f={f} count={filtered.length} loading={loading} />
+      <TierSubjectBar f={f} count={filtered.length} loading={loading} subjects={subjects} showKind={false} />
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>

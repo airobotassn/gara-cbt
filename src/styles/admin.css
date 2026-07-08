@@ -500,6 +500,12 @@
   .admin-tabs button { padding: 8px 12px; font-size: var(--fs-sm); }
   .admin-toolbar { gap: 6px; }
   .admin-toolbar .admin-search { min-width: 0; max-width: none; width: 100%; }
+  /* 주관식 채점·제출답안 헤더 컨트롤(회차·급수 select 등)이 좁은 화면에서 넘치지 않게 정렬 */
+  .admin-head-actions { width: 100%; }
+  .admin-head-actions .admin-count { flex-basis: 100%; }
+  .admin-head-actions .grade-round { flex: 1 1 46%; }
+  .admin-head-actions .grade-round select { flex: 1 1 auto; min-width: 0; }
+  .admin-head-actions > .admin-tabs { width: auto; }
   /* 표: 셀은 한 줄 유지하고 넘치면 스크롤, 문제 칸만 줄바꿈 허용 */
   .admin-table { font-size: var(--fs-sm); }
   .admin-table th, .admin-table td { padding: 9px 10px; white-space: nowrap; }
