@@ -11,6 +11,19 @@ const STATUS_KEY: Record<RoundStatus, string> = {
   closed: 'guide.status_closed',
 }
 
+// 검정방법의 '필기/실기'(및 다국어 라벨) 접두를 굵게. 라벨이 앞에 오는 각 줄에만 적용.
+const GRADE_LABELS = ['필기', '실기', '筆記', '実技', '笔试', '实操', 'Lý thuyết', 'Thực hành', 'Written', 'Practical', 'लिखित', 'प्रायोगिक']
+function boldGradeLabel(text: string) {
+  const lab = GRADE_LABELS.find((l) => text.startsWith(l))
+  if (!lab) return text
+  return (
+    <>
+      <strong className="font-bold text-on-surface">{lab}</strong>
+      {text.slice(lab.length)}
+    </>
+  )
+}
+
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
 // primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff). 히어로 밴드 위 흰 버튼만 text-[#004ac6] 하드코딩 유지.
@@ -60,8 +73,8 @@ export default function Guide() {
                       <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
                       {s.applyText && (
-                        <div className="font-body-md text-body-md text-on-surface-variant mt-1">
-                          {t('sched.apply_period')} <span className="font-semibold text-on-surface">{s.applyText}</span>
+                        <div className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">
+                          {t('sched.apply_period')} <span className="font-semibold text-on-surface whitespace-nowrap">{s.applyText}</span>
                         </div>
                       )}
                     </div>
@@ -93,7 +106,7 @@ export default function Guide() {
               </button>
               <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high">
                 {TRACKS.map((tr, i) => (
-                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'px-5 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
+                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'whitespace-nowrap px-5 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'whitespace-nowrap px-5 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
                 ))}
               </div>
               <button onClick={() => goTrack(track + 1)} aria-label={t('guide.aria_next_track')} className="w-11 h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
@@ -109,7 +122,7 @@ export default function Guide() {
                   <span className="material-symbols-outlined text-[18px] md:text-[20px]">{cur.icon}</span>
                   {cur.eligibility}
                 </div>
-                <h3 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-[36px] font-bold text-on-surface mb-1">{cur.name}</h3>
+                <h3 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-[36px] font-bold text-on-surface mb-1 whitespace-nowrap">{cur.name}</h3>
                 <p className="font-title-md text-title-md md:text-[24px] md:leading-[32px] font-semibold text-on-surface-variant">{cur.tagline}</p>
                 <p className="font-body-lg text-body-md md:text-[20px] md:leading-[30px] text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
               </div>
@@ -133,7 +146,7 @@ export default function Guide() {
               <div className="bg-surface-container-lowest rounded-2xl p-7 md:p-9 border border-outline-variant/30 ambient-shadow">
                 {/* 티어 + 대상 */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-7 pb-6 border-b border-outline-variant/20">
-                  <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.name}</span>
+                  <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold whitespace-nowrap">{cur.name} {lv.name}</span>
                   <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.target}</span>
                 </div>
 
@@ -163,7 +176,7 @@ export default function Guide() {
                       <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.method')}</div>
                       <div className="flex-grow flex flex-col gap-0.5">
                         {lv.method.split(' · ').map((m, i) => (
-                          <p key={i} className="font-body-lg text-body-lg text-on-surface break-keep">{m}</p>
+                          <p key={i} className="font-body-lg text-body-lg text-on-surface break-keep">{boldGradeLabel(m)}</p>
                         ))}
                       </div>
                     </div>
@@ -182,7 +195,9 @@ export default function Guide() {
                   <span className="material-symbols-outlined text-secondary text-[24px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                   <div>
                     <div className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('caris.lbl.pass')}</div>
-                    <div className="font-title-md text-body-md md:text-title-md text-on-surface font-bold break-keep">{lv.pass}</div>
+                    <div className="font-title-md text-body-md md:text-title-md text-on-surface font-bold break-keep">
+                      {lv.pass.split(' · ').map((p, i) => <div key={i}>{p}</div>)}
+                    </div>
                   </div>
                 </div>
               </div>

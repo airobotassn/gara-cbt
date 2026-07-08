@@ -1074,6 +1074,7 @@ const D: Record<string, Record<Lang, string>> = {
   // 공용 스펙 라벨(Guide·ExamApply 공유)
   "caris.lbl.subjects": { ko: "검정 과목", en: "Subjects", ja: "検定科目", zh: "检定科目", hi: "विषय", vi: "Môn thi" },
   "caris.lbl.format": { ko: "시험 구성", en: "Exam format", ja: "試験構成", zh: "考试构成", hi: "परीक्षा प्रारूप", vi: "Cấu trúc bài thi" },
+  "caris.lbl.duration": { ko: "시험 시간", en: "Exam time", ja: "試験時間", zh: "考试时间", hi: "परीक्षा समय", vi: "Thời gian thi" },
   "caris.lbl.method": { ko: "검정 방법", en: "Exam method", ja: "検定方法", zh: "检定方式", hi: "परीक्षा विधि", vi: "Phương thức thi" },
   "caris.lbl.practical": { ko: "실기", en: "Practical", ja: "実技", zh: "实操", hi: "प्रायोगिक", vi: "Thực hành" },
   "caris.lbl.pass": { ko: "합격 기준", en: "Passing criteria", ja: "合格基準", zh: "合格标准", hi: "उत्तीर्ण मानदंड", vi: "Tiêu chí đạt" },

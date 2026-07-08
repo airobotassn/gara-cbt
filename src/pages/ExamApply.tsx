@@ -35,6 +35,10 @@ export default function ExamApply() {
   const cur = TRACKS[track]
   const lv = cur.tiers[level]
   const isMaster = track === 1
+  // 시험 구성(문항) / 시험 시간 분리 — format 은 "구성 · 시간" 패턴(마지막 조각이 시간, ' · ' 구분은 전 언어 공통)
+  const fmtParts = lv.format ? lv.format.split(' · ') : []
+  const fmtDuration = fmtParts.length > 1 ? fmtParts[fmtParts.length - 1] : ''
+  const fmtComposition = fmtParts.length > 1 ? fmtParts.slice(0, -1).join(' · ') : lv.format ?? ''
   const goTrack = (i: number) => {
     setTrack((i + TRACKS.length) % TRACKS.length)
     setLevel(0)
@@ -135,7 +139,7 @@ export default function ExamApply() {
 
               <div className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold">{cur.name} {lv.name}</span>
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-on-primary font-title-md text-title-md font-bold whitespace-nowrap">{cur.name} {lv.name}</span>
                   <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.target}</span>
                 </div>
                 <div>
@@ -153,7 +157,13 @@ export default function ExamApply() {
                   {lv.format && (
                     <div>
                       <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.format')}</span>
-                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{lv.format}</p>
+                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{fmtComposition}</p>
+                    </div>
+                  )}
+                  {fmtDuration && (
+                    <div>
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.duration')}</span>
+                      <p className="mt-1 font-body-md text-body-md text-on-surface font-medium break-keep">{fmtDuration}</p>
                     </div>
                   )}
                   {lv.method && (
@@ -161,7 +171,7 @@ export default function ExamApply() {
                       <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.method')}</span>
                       <div className="mt-1 flex flex-col gap-0.5">
                         {lv.method.split(' · ').map((m, i) => (
-                          <p key={i} className="font-body-md text-body-md text-on-surface font-medium break-keep">{m}</p>
+                          <p key={i} className="font-body-md text-body-md text-on-surface font-bold break-keep">{m}</p>
                         ))}
                       </div>
                     </div>
@@ -174,7 +184,11 @@ export default function ExamApply() {
                   )}
                   <div>
                     <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.pass')}</span>
-                    <p className="mt-1 font-body-md text-body-md text-on-surface font-semibold break-keep">{lv.pass}</p>
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      {lv.pass.split(' · ').map((p, i) => (
+                        <p key={i} className="font-body-md text-body-md text-on-surface font-semibold break-keep">{p}</p>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
