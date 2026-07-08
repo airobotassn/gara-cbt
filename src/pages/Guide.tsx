@@ -73,8 +73,16 @@ export default function Guide() {
                       <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
                       {s.applyText && (
-                        <div className="font-body-md text-[12px] sm:text-body-md text-on-surface-variant mt-1 break-keep whitespace-nowrap">
-                          {t('sched.apply_period')} <span className="font-semibold text-on-surface">{s.applyText}</span>
+                        <div className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">
+                          {t('sched.apply_period')}
+                          <span className="block font-semibold text-on-surface">
+                            {(() => {
+                              const [a1, a2] = s.applyText.split('~')
+                              return a2 !== undefined
+                                ? <><span className="whitespace-nowrap">{a1.trim()}</span>{' ~ '}<span className="whitespace-nowrap">{a2.trim()}</span></>
+                                : s.applyText
+                            })()}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -129,12 +137,12 @@ export default function Guide() {
 
               {/* 티어 전환: 화살표 + 티어 (하나의 통합 pill) */}
               <div className="flex justify-center mb-6">
-                <div className="flex flex-nowrap items-center justify-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm max-w-full overflow-x-auto">
+                <div className="flex flex-nowrap items-center justify-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm max-w-full">
                   <button onClick={() => goLevel(level - 1)} aria-label={t('guide.aria_prev_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                   </button>
                   {cur.tiers.map((l, i) => (
-                    <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>{l.name}</button>
+                    <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}><span className="flex flex-col items-center leading-[1.05]">{l.name.split(' ').map((w, k) => <span key={k}>{w}</span>)}</span></button>
                   ))}
                   <button onClick={() => goLevel(level + 1)} aria-label={t('guide.aria_next_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
                     <span className="material-symbols-outlined text-[20px]">chevron_right</span>
