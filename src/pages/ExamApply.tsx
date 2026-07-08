@@ -121,7 +121,7 @@ export default function ExamApply() {
               <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.track')}</span>
               <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit mt-2 mb-6">
                 {TRACKS.map((tr, i) => (
-                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
+                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 py-2 rounded-full whitespace-nowrap bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full whitespace-nowrap text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
                     {tr.name}
                   </button>
                 ))}
@@ -131,7 +131,7 @@ export default function ExamApply() {
               <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.tier')}</span>
               <div className="flex flex-wrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full mt-2">
                 {cur.tiers.map((l, i) => (
-                  <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
+                  <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2 rounded-full whitespace-nowrap bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full whitespace-nowrap text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
                     {l.name}
                   </button>
                 ))}
@@ -170,9 +170,16 @@ export default function ExamApply() {
                     <div>
                       <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">{t('caris.lbl.method')}</span>
                       <div className="mt-1 flex flex-col gap-0.5">
-                        {lv.method.split(' · ').map((m, i) => (
-                          <p key={i} className="font-body-md text-body-md text-on-surface font-bold break-keep">{m}</p>
-                        ))}
+                        {lv.method.split(' · ').map((m, i) => {
+                          const sp = m.indexOf(' ')
+                          const label = sp === -1 ? m : m.slice(0, sp) // 필기/실기 라벨만 볼드
+                          const rest = sp === -1 ? '' : m.slice(sp + 1)
+                          return (
+                            <p key={i} className="font-body-md text-body-md text-on-surface break-keep">
+                              <b className="font-bold">{label}</b>{rest ? ` ${rest}` : ''}
+                            </p>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
