@@ -73,18 +73,8 @@ export default function Guide() {
                       <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
                       <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
                       {s.applyText && (
-                        <div className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">
-                          {t('sched.apply_period')}{' '}
-                          {(() => {
-                            const [a1, a2] = s.applyText.split('~')
-                            return a2 !== undefined ? (
-                              <span className="font-semibold text-on-surface">
-                                <span className="whitespace-nowrap">{a1.trim()}</span>{' ~ '}<span className="whitespace-nowrap">{a2.trim()}</span>
-                              </span>
-                            ) : (
-                              <span className="font-semibold text-on-surface">{s.applyText}</span>
-                            )
-                          })()}
+                        <div className="font-body-md text-[12px] sm:text-body-md text-on-surface-variant mt-1 break-keep whitespace-nowrap">
+                          {t('sched.apply_period')} <span className="font-semibold text-on-surface">{s.applyText}</span>
                         </div>
                       )}
                     </div>
