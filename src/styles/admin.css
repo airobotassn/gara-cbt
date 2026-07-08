@@ -518,4 +518,10 @@
   .admin-modal-box { padding: 18px 16px; border-radius: 16px; }
   .admin-modal-h b { font-size: var(--fs-md); }
   .admin-row { gap: 8px; }
+  /* 급수 분포(tier-dist): 6칸이 좁아 라벨(Beginner·Grand Master 등)이 단어 중간에서 끊기던 것 — 폰트 축소 + 단어중간 개행 금지(공백에서만 줄바꿈) */
+  .tier-dist { gap: 4px; }
+  .tdist { padding: 6px 2px 8px; }
+  .tdist-l { font-size: 9.5px; overflow-wrap: normal; word-break: keep-all; line-height: 1.15; }
+  .tdist-track { font-size: 9px; }
+  .tdist-n { font-size: 12px; }
 }
