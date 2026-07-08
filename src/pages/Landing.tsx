@@ -118,7 +118,7 @@ export default function Landing() {
         <button className="cta" onClick={() => navigate('/test/select')}>
           {t('landing.cta_diagnose')} <span className="arr">→</span>
         </button>
-        <button className="cta-ghost" onClick={() => navigate('/exam')}>
+        <button className="cta-ghost" onClick={() => navigate('/guide')}>
           {t('landing.cta_exam')} <span className="arr">→</span>
         </button>
         <button className="cta-ghost soon" onClick={() => setLearnSoon(true)}>
