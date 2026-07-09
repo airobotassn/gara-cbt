@@ -38,7 +38,7 @@ import type {
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
-import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_BLUEPRINT, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
+import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_POOL_TARGET, buildDrawCells } from '../lib/caris'
 
 // 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
@@ -2830,30 +2830,33 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
     return () => { alive = false }
   }, [bankId, refreshKey, reloadTick])
 
-  // 기준 = 출제 마진 × 3배수(POOL_MULTIPLIER). 난이도별·과목별 각각 확보(활성) vs 목표. 기준은 caris.TIER_BLUEPRINT.
-  const bp = TIER_BLUEPRINT[tierKey]
+  // 기준 = 문제은행 구축(3배수·이미지 설계표) 과목×난이도(하/중/상) 목표. 확보 = 활성 문항 수.
+  const target = TIER_POOL_TARGET[tierKey]
   const subjects = cur?.subjects ?? []
   const DIFFS: Array<'하' | '중' | '상'> = ['하', '중', '상']
-  const cntActive = (pred: (q: AdminQuestionRow) => boolean) => rows.reduce((n, q) => n + (q.active && pred(q) ? 1 : 0), 0)
-  const unassigned = cntActive((q) => !q.difficulty)
-  const diffRows = DIFFS.map((d) => {
-    const g = cntActive((q) => q.difficulty === d)
-    const need = (bp?.diff[d] ?? 0) * POOL_MULTIPLIER
-    return { key: d, g, need, ok: g >= need }
+  const got = (subj: string, diff: string) => rows.reduce((n, q) => n + (q.active && q.subject === subj && q.difficulty === diff ? 1 : 0), 0)
+  const unassigned = rows.reduce((n, q) => n + (q.active && !q.difficulty ? 1 : 0), 0)
+  let shortCells = 0
+  const grid = subjects.map((subj, i) => {
+    const cells = DIFFS.map((d) => {
+      const g = got(subj, d)
+      const need = target?.[i]?.[d] ?? 0
+      const ok = g >= need
+      if (!ok) shortCells++
+      return { d, g, need, ok }
+    })
+    const rowGot = cells.reduce((s, c) => s + c.g, 0)
+    const rowNeed = cells.reduce((s, c) => s + c.need, 0)
+    return { subj, cells, rowGot, rowNeed, met: cells.every((c) => c.ok) }
   })
-  const subjRows = subjects.map((s, i) => {
-    const g = cntActive((q) => q.subject === s)
-    const need = (bp?.subj[i] ?? 0) * POOL_MULTIPLIER
-    return { key: s, g, need, ok: g >= need }
-  })
-  const shortCount = [...diffRows, ...subjRows].filter((r) => !r.ok).length
-  const totGot = diffRows.reduce((s, r) => s + r.g, 0)
-  const totNeed = diffRows.reduce((s, r) => s + r.need, 0)
+  const totGot = grid.reduce((s, r) => s + r.rowGot, 0)
+  const totNeed = grid.reduce((s, r) => s + r.rowNeed, 0)
+  const sumDiff = (d: string, k: 'g' | 'need') => grid.reduce((s, r) => s + (r.cells.find((c) => c.d === d)?.[k] ?? 0), 0)
 
   return (
     <div className="admin-section" style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div className="admin-sub" style={{ marginTop: 0 }}>문항 풀 현황 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>문제은행 구축 기준(출제×3배수) 대비 확보(활성)</span></div>
+        <div className="admin-sub" style={{ marginTop: 0 }}>문항 풀 현황 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>문제은행 구축 기준(3배수·설계표) 대비 확보(활성) · 셀 = 확보/목표</span></div>
         <button className="admin-mini" onClick={() => setReloadTick((t) => t + 1)} disabled={loading}>{loading ? '불러오는 중…' : '새로고침'}</button>
       </div>
       <div className="admin-tabs" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
@@ -2864,47 +2867,45 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
         ))}
       </div>
       {!bank && <div className="admin-warn">이 급수의 문제은행이 아직 없습니다 — 확보 0으로 표시됩니다.</div>}
-      {!bp ? (
+      {!target ? (
         <div className="admin-section admin-empty">이 급수는 출제 기준(문제은행 구축)이 아직 미확정입니다.</div>
       ) : (
         <>
           <div style={{ marginBottom: 10 }}>
-            {shortCount === 0
-              ? <span className="badge ok">기준 충족 — 난이도·과목 목표 모두 제출 완료 (난이도 {totGot}/{totNeed})</span>
-              : <span className="badge low">미달 — {shortCount}개 항목 부족 · 난이도 확보 {totGot}/{totNeed}</span>}
+            {shortCells === 0
+              ? <span className="badge ok">기준 충족 — 전 과목·난이도 제출 완료 ({totGot}/{totNeed})</span>
+              : <span className="badge low">미달 — {shortCells}개 칸 부족 · 확보 {totGot}/{totNeed}</span>}
           </div>
-          {unassigned > 0 && <div className="admin-warn">난이도 미지정 활성 문항 {unassigned}개 — 상/중/하로 분류해야 난이도 기준에 반영됩니다.</div>}
-          <div className="admin-grid2">
-            <div className="tier-panel">
-              <div className="admin-sub" style={{ marginTop: 0 }}>난이도별 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>확보/목표(=출제×3)</span></div>
-              <table className="admin-table pool-table">
-                <thead><tr><th>난이도</th><th>확보/목표</th><th>상태</th></tr></thead>
-                <tbody>
-                  {diffRows.map((r) => (
-                    <tr key={r.key} className={r.ok ? '' : 'prob'}>
-                      <td><DiffTag value={r.key} /></td>
-                      <td data-label="확보/목표" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: r.ok ? '#2f855a' : '#c0392b' }}>{r.g}/{r.need}</td>
-                      <td>{r.ok ? <span className="badge ok">충족</span> : <span className="badge low">부족 {r.need - r.g}</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="tier-panel">
-              <div className="admin-sub" style={{ marginTop: 0 }}>과목별 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>확보/목표(=출제×3)</span></div>
-              <table className="admin-table pool-table">
-                <thead><tr><th>과목</th><th>확보/목표</th><th>상태</th></tr></thead>
-                <tbody>
-                  {subjRows.map((r) => (
-                    <tr key={r.key} className={r.ok ? '' : 'prob'}>
-                      <td>{r.key}</td>
-                      <td data-label="확보/목표" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: r.ok ? '#2f855a' : '#c0392b' }}>{r.g}/{r.need}</td>
-                      <td>{r.ok ? <span className="badge ok">충족</span> : <span className="badge low">부족 {r.need - r.g}</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {unassigned > 0 && <div className="admin-warn">난이도 미지정 활성 문항 {unassigned}개 — 상/중/하로 분류해야 기준에 반영됩니다.</div>}
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr><th>과목</th><th>하</th><th>중</th><th>상</th><th>합계</th><th>상태</th></tr>
+              </thead>
+              <tbody>
+                {grid.map((r) => (
+                  <tr key={r.subj} className={r.met ? '' : 'prob'}>
+                    <td>{r.subj}</td>
+                    {r.cells.map((c) => (
+                      <td key={c.d} style={{ whiteSpace: 'nowrap', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: c.ok ? '#2f855a' : '#c0392b' }}>
+                        {c.g}/{c.need}{c.ok ? ' ✓' : ''}
+                      </td>
+                    ))}
+                    <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{r.rowGot}/{r.rowNeed}</td>
+                    <td>{r.met ? <span className="badge ok">충족</span> : <span className="badge low">미달</span>}</td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 800 }}>
+                  <td>합계</td>
+                  {DIFFS.map((d) => {
+                    const g = sumDiff(d, 'g'), need = sumDiff(d, 'need')
+                    return <td key={d} style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: g >= need ? '#2f855a' : '#c0392b' }}>{g}/{need}</td>
+                  })}
+                  <td style={{ whiteSpace: 'nowrap' }}>{totGot}/{totNeed}</td>
+                  <td style={{ color: 'var(--muted)', fontWeight: 400 }}>{loading ? '불러오는 중…' : ''}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </>
       )}

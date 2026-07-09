@@ -60,68 +60,32 @@ export const TIER_EXAM_SPEC: Record<string, TierExamSpec> = {
 }
 export const tierTotal = (k: string) => (TIER_EXAM_SPEC[k]?.mc ?? 0) + (TIER_EXAM_SPEC[k]?.short ?? 0)
 
-// 급수별 출제 마진(1회 시험) — 난이도 하:중:상 = 3:4:3, 과목 ①:②:③ = 3:4:3(가운데 40%).
-//  · subj = getTracks subjects 순서(0..2)별 출제 수. diff = 난이도별 출제 수. 둘 다 총문항의 마진.
-//  · 문제은행 목표 = 이 값 × POOL_MULTIPLIER(3배수). 문항 풀 충족 판정 기준.
-//  · T2(master~zenith)는 출제 설계 미확정 → 미정(undefined).
-//  ⚠️ 추출 로직(admin 함수 examDraw)도 이 마진을 쓰므로 supabase/functions/admin 쪽 사본과 동기화할 것.
-export const POOL_MULTIPLIER = 3
-export type TierBlueprint = { diff: { 하: number; 중: number; 상: number }; subj: number[] }
-export const TIER_BLUEPRINT: Record<string, TierBlueprint> = {
-  beginner: { diff: { 하: 12, 중: 16, 상: 12 }, subj: [12, 16, 12] }, // 40
-  pro: { diff: { 하: 15, 중: 20, 상: 15 }, subj: [15, 20, 15] }, // 50
-  elite: { diff: { 하: 18, 중: 24, 상: 18 }, subj: [18, 24, 18] }, // 60 (객50+주10)
-}
-
-// 유형(mc/short)별 출제 마진 — 실제 추출은 이 마진으로 과목×난이도 배분표를 만들어 뽑는다.
-//  Beginner/Pro = 전부 객관식. Elite = 객50(3:4:3) + 주10(3:4:3).
-export type DrawKindPlan = { diff: { 하: number; 중: number; 상: number }; subj: number[] }
-export const TIER_DRAW: Record<string, { mc: DrawKindPlan; short: DrawKindPlan | null }> = {
-  beginner: { mc: { diff: { 하: 12, 중: 16, 상: 12 }, subj: [12, 16, 12] }, short: null },
-  pro: { mc: { diff: { 하: 15, 중: 20, 상: 15 }, subj: [15, 20, 15] }, short: null },
-  elite: { mc: { diff: { 하: 15, 중: 20, 상: 15 }, subj: [15, 20, 15] }, short: { diff: { 하: 3, 중: 4, 상: 3 }, subj: [3, 4, 3] } },
+// 급수별 문제은행 구축 기준(3배수) — 자격검정 출제 설계표(이미지). 과목(getTracks 순서 0..2) × 난이도별 목표.
+//  문항 풀이 이 기준만큼 채워졌는지(제출 여부)로 판정. T2(master~zenith)는 미확정 → 미정(undefined).
+export type DiffTarget = { 하: number; 중: number; 상: number }
+export const TIER_POOL_TARGET: Record<string, DiffTarget[]> = {
+  beginner: [{ 하: 13, 중: 21, 상: 8 }, { 하: 12, 중: 20, 상: 7 }, { 하: 12, 중: 20, 상: 7 }],
+  pro: [{ 하: 15, 중: 26, 상: 10 }, { 하: 15, 중: 26, 상: 10 }, { 하: 14, 중: 24, 상: 10 }],
+  elite: [{ 하: 18, 중: 30, 상: 12 }, { 하: 18, 중: 30, 상: 12 }, { 하: 18, 중: 30, 상: 12 }],
 }
 
 export const DRAW_DIFFS = ['하', '중', '상'] as const
 
-// 과목(행합=subj[]) × 난이도(열합=cols[]) 마진을 모두 만족하는 정수 배분표. sum(subj)=sum(cols) 전제.
-// 독립비례로 시작 → 행합을 정확히 맞추고(최대 소수부 우선) → 열 초과분을 같은 행 안에서 이동해 열합까지 맞춘다.
-export function biproportional(rows: number[], cols: number[]): number[][] {
-  const R = rows.length, C = cols.length
-  const T = rows.reduce((a, b) => a + b, 0)
-  if (T === 0) return rows.map(() => new Array(C).fill(0))
-  const M = rows.map((r) => cols.map((c) => Math.floor((r * c) / T)))
-  for (let i = 0; i < R; i++) {
-    let deficit = rows[i] - M[i].reduce((a, b) => a + b, 0)
-    const order = cols
-      .map((c, j) => ({ j, f: (rows[i] * c) / T - Math.floor((rows[i] * c) / T) }))
-      .sort((a, b) => b.f - a.f)
-    let k = 0
-    while (deficit-- > 0) { M[i][order[k % C].j]++; k++ }
-  }
-  const colSum = (j: number) => M.reduce((a, r) => a + r[j], 0)
-  for (let guard = 0; guard < 4000; guard++) {
-    const j1 = cols.findIndex((c, j) => colSum(j) > c)
-    const j2 = cols.findIndex((c, j) => colSum(j) < c)
-    if (j1 < 0 || j2 < 0) break
-    const i = M.findIndex((r) => r[j1] > 0)
-    if (i < 0) break
-    M[i][j1]--; M[i][j2]++
-  }
-  return M
+// 실제 시험 출제 배분표 — 과목(getTracks 순서 0..2) × 난이도[하,중,상]별 출제 수.
+//  · 객관식(mc) = 이미지 설계표 그대로.
+//  · 주관식(short) = 난이도 3:4:3(하3·중4·상3) + 과목 3:4:3(①3·②4·③3) — Elite만. (객관식 = 이미지총 − 주관식)
+//  ⚠️ 추출(admin examDraw)은 이 표를 클라에서 받아 그대로 뽑음. 합 = TIER_EXAM_SPEC 와 일치.
+export const TIER_DRAW_CELLS: Record<string, { mc: number[][]; short: number[][] | null }> = {
+  beginner: { mc: [[4, 7, 3], [4, 7, 2], [4, 7, 2]], short: null }, // 객40
+  pro: { mc: [[5, 9, 3], [5, 9, 3], [5, 8, 3]], short: null }, // 객50
+  elite: { mc: [[5, 9, 3], [5, 8, 3], [5, 9, 3]], short: [[1, 1, 1], [1, 2, 1], [1, 1, 1]] }, // 객50 + 주10(3:4:3)
 }
 
 // 추출 요청에 실어보낼 배분표 — 과목 문자열(getTracks 순서)까지 담아 서버가 그대로 뽑게 한다.
 export function buildDrawCells(tierKey: string, subjects: string[]) {
-  const plan = TIER_DRAW[tierKey]
-  if (!plan) return null
-  const toCols = (d: DrawKindPlan['diff']) => [d.하, d.중, d.상]
-  return {
-    subjects,
-    diffs: [...DRAW_DIFFS],
-    mc: biproportional(plan.mc.subj, toCols(plan.mc.diff)),
-    short: plan.short ? biproportional(plan.short.subj, toCols(plan.short.diff)) : null,
-  }
+  const c = TIER_DRAW_CELLS[tierKey]
+  if (!c) return null
+  return { subjects, diffs: [...DRAW_DIFFS], mc: c.mc, short: c.short }
 }
 
 // CARIS 트랙 데이터(로케일 반영본). Guide/ExamApply 가 소비.
