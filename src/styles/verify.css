@@ -8,7 +8,7 @@
   --v-paper: #fffdf8;
   --v-ink: #20293c;
   --v-muted: #7c7768;
-  --v-line: #e7dfca;
+  --v-line: #e9e2d0;
   --v-ok: #2f7d54;
   --v-warn: #b17a1c;
   --v-bad: #b23b32;
@@ -16,7 +16,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 40px 16px 88px;
+  padding: 44px 16px 88px;
   background: radial-gradient(1100px 460px at 50% -8%, #f8f3e7 0%, var(--v-cream) 62%);
   color: var(--v-ink);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -24,81 +24,87 @@
 
 .vrf-doc {
   width: 100%;
-  max-width: 552px;
+  max-width: 540px;
   background: var(--v-paper);
   border: 1px solid var(--v-line);
-  box-shadow: 0 24px 60px -34px rgba(15, 33, 64, 0.4);
+  border-radius: 6px;
+  box-shadow: 0 22px 56px -34px rgba(15, 33, 64, 0.42);
   position: relative;
 }
 /* 금박 내부 프레임(자격증 금테 호응) */
 .vrf-doc::before {
   content: '';
   position: absolute;
-  inset: 7px;
+  inset: 8px;
   border: 1px solid var(--v-gold);
-  opacity: 0.5;
+  border-radius: 3px;
+  opacity: 0.45;
   pointer-events: none;
 }
-.vrf-inner { padding: 36px 30px 26px; position: relative; }
+.vrf-inner { padding: 38px 32px 28px; position: relative; }
 
 /* ── 마스트헤드 ── */
 .vrf-mast { text-align: center; }
-.vrf-logo { width: 52px; height: 52px; display: block; margin: 0 auto 12px; border-radius: 50%; }
+.vrf-logo {
+  width: 56px; height: 56px; display: block; margin: 0 auto 13px; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(184, 145, 47, 0.4), 0 2px 8px -3px rgba(15, 33, 64, 0.35);
+}
 .vrf-authority {
   font-family: 'CertGaramond', Georgia, serif;
-  font-size: 13px; font-weight: 600; letter-spacing: 0.2em;
+  font-size: 12.5px; font-weight: 600; letter-spacing: 0.19em;
   text-transform: uppercase; color: var(--v-navy);
 }
-.vrf-rule { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 11px 0; }
-.vrf-rule::before, .vrf-rule::after { content: ''; height: 1px; width: 68px; }
+.vrf-rule { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 12px 0 10px; }
+.vrf-rule::before, .vrf-rule::after { content: ''; height: 1px; width: 66px; }
 .vrf-rule::before { background: linear-gradient(90deg, transparent, var(--v-gold)); }
 .vrf-rule::after { background: linear-gradient(90deg, var(--v-gold), transparent); }
-.vrf-rule span { color: var(--v-gold); font-size: 8px; }
-.vrf-sys { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 20px; color: var(--v-navy-deep); }
+.vrf-rule span { color: var(--v-gold); font-size: 7px; }
+.vrf-sys { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 17px; color: var(--v-navy); letter-spacing: 0.01em; }
 
 /* ── 판정 ── */
-.vrf-verdict { text-align: center; margin: 24px 0 6px; }
-.vrf-seal { width: 128px; height: 128px; display: block; margin: 0 auto 14px; }
-.vrf-headline { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 21px; font-weight: 700; color: var(--v-navy-deep); margin: 2px 0 12px; word-break: keep-all; }
+.vrf-verdict { text-align: center; margin: 26px 0 8px; }
+.vrf-seal { width: 122px; height: 122px; display: block; margin: 0 auto 16px; }
+.vrf-headline { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 23px; font-weight: 700; color: var(--v-navy-deep); margin: 0 0 14px; word-break: keep-all; line-height: 1.35; }
 .vrf-chip {
-  display: inline-flex; align-items: center; font-size: 12px; font-weight: 800;
-  letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 14px; border-radius: 2px;
+  display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase; padding: 6px 15px 6px 12px; border-radius: 999px;
 }
-.vrf-chip.ok { background: rgba(47, 125, 84, 0.1); color: var(--v-ok); border: 1px solid rgba(47, 125, 84, 0.35); }
-.vrf-chip.warn { background: rgba(177, 122, 28, 0.1); color: var(--v-warn); border: 1px solid rgba(177, 122, 28, 0.35); }
-.vrf-chip.bad { background: rgba(178, 59, 50, 0.1); color: var(--v-bad); border: 1px solid rgba(178, 59, 50, 0.35); }
+.vrf-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; }
+.vrf-chip.ok { background: rgba(47, 125, 84, 0.09); color: var(--v-ok); border: 1px solid rgba(47, 125, 84, 0.32); }
+.vrf-chip.warn { background: rgba(177, 122, 28, 0.09); color: var(--v-warn); border: 1px solid rgba(177, 122, 28, 0.32); }
+.vrf-chip.bad { background: rgba(178, 59, 50, 0.09); color: var(--v-bad); border: 1px solid rgba(178, 59, 50, 0.32); }
 
 /* ── 기록 원장 ── */
-.vrf-record { margin: 22px 0 6px; border: 1px solid var(--v-line); }
+.vrf-record { margin: 24px 0 6px; border: 1px solid var(--v-line); border-radius: 9px; overflow: hidden; }
 .vrf-record-head {
-  background: var(--v-navy); color: #f2e9d2;
-  font-family: 'CertGaramond', Georgia, serif; font-size: 11.5px; font-weight: 600;
-  letter-spacing: 0.18em; text-transform: uppercase; text-align: center; padding: 9px;
+  background: var(--v-navy); color: #efe6cf;
+  font-family: 'CertGaramond', Georgia, serif; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; text-align: center; padding: 9px;
 }
-.vrf-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 12px 16px; }
+.vrf-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 13px 18px; }
 .vrf-row + .vrf-row { border-top: 1px solid var(--v-line); }
-.vrf-row .k { color: var(--v-muted); font-size: 13px; white-space: nowrap; flex-shrink: 0; }
-.vrf-row .v { color: var(--v-ink); font-size: 14px; font-weight: 600; text-align: right; word-break: keep-all; font-variant-numeric: tabular-nums; }
-.vrf-row .v.mono { font-family: ui-monospace, 'Consolas', monospace; letter-spacing: 0.03em; }
+.vrf-row .k { color: var(--v-muted); font-size: 12.5px; white-space: nowrap; flex-shrink: 0; }
+.vrf-row .v { color: var(--v-ink); font-size: 14.5px; font-weight: 600; text-align: right; word-break: keep-all; font-variant-numeric: tabular-nums; }
+.vrf-row .v.mono { font-family: ui-monospace, 'Consolas', monospace; font-size: 13.5px; letter-spacing: 0.03em; color: var(--v-navy); }
 
-.vrf-invalid-desc { text-align: center; color: var(--v-muted); font-size: 14px; line-height: 1.65; margin: 10px 6px 2px; word-break: keep-all; }
+.vrf-invalid-desc { text-align: center; color: var(--v-muted); font-size: 14px; line-height: 1.65; margin: 12px 8px 4px; word-break: keep-all; }
 
 /* ── 신뢰 푸터 ── */
-.vrf-trust { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--v-line); text-align: center; }
-.vrf-trust p { font-size: 11.5px; color: var(--v-muted); line-height: 1.65; margin: 0 0 7px; word-break: keep-all; }
-.vrf-checked { font-size: 12px; color: var(--v-navy); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrf-trust { margin-top: 26px; padding-top: 17px; border-top: 1px solid var(--v-line); text-align: center; }
+.vrf-trust p { font-size: 11.5px; color: var(--v-muted); line-height: 1.7; margin: 0 0 8px; word-break: keep-all; }
+.vrf-checked { font-size: 12px; color: var(--v-navy); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
 .vrf-checked .lbl { color: var(--v-muted); font-weight: 400; }
-.vrf-demo { margin-top: 14px; font-size: 12px; color: var(--v-warn); background: rgba(177, 122, 28, 0.08); border: 1px dashed rgba(177, 122, 28, 0.4); padding: 9px 11px; text-align: center; word-break: keep-all; }
+.vrf-demo { margin-top: 15px; font-size: 12px; color: var(--v-warn); background: rgba(177, 122, 28, 0.07); border: 1px dashed rgba(177, 122, 28, 0.4); border-radius: 8px; padding: 10px 12px; text-align: center; word-break: keep-all; }
 
 /* ── 로딩 ── */
-.vrf-load { text-align: center; padding: 44px 0; color: var(--v-muted); }
+.vrf-load { text-align: center; padding: 48px 0; color: var(--v-muted); }
 .vrf-spin { width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(184, 145, 47, 0.22); border-top-color: var(--v-gold); animation: vrf-spin 0.9s linear infinite; margin: 0 auto 16px; }
 @keyframes vrf-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .vrf-spin { animation: none; } }
 
 @media (max-width: 480px) {
-  .vrf-inner { padding: 28px 18px 22px; }
-  .vrf-sys { font-size: 18px; }
-  .vrf-headline { font-size: 19px; }
-  .vrf-seal { width: 112px; height: 112px; }
+  .vrf-inner { padding: 30px 20px 24px; }
+  .vrf-sys { font-size: 16px; }
+  .vrf-headline { font-size: 21px; }
+  .vrf-seal { width: 110px; height: 110px; }
 }
