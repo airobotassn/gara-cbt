@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
-import type { MyAttempt } from '../lib/types'
+import type { MyAttempt, MyAttemptsResponse } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
 import { makeCertNo, trackOfTitle, tempSeq } from '../lib/certNo'
 
@@ -71,17 +71,23 @@ export default function MyPage() {
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')
 
-  // 발급 = 서버 기록(cert_issued_at) — 마이페이지/성적표 어디서 발급해도 '발급 완료'로 남고, 재발급도 가능
+  // 발급 = 서버 기록(cert_issued_at) — 마이페이지/성적표 어디서 발급해도 '발급 완료'로 남고, 재발급도 가능.
+  // 발급 응답에서 진위확인 토큰·확정 자격번호를 받아 자격증(QR)에 실어 보낸다.
   async function goCert(a: MyAttempt) {
+    let verifyToken = a.verifyToken ?? undefined
+    let certNo = a.certNo ?? certNoOf(a)
     try {
-      await callFunction('my-attempts', { issue: a.attemptId })
-      setList((prev) => prev?.map((x) => (x.attemptId === a.attemptId ? { ...x, certIssuedAt: new Date().toISOString() } : x)) ?? prev)
+      const r = await callFunction<MyAttemptsResponse>('my-attempts', { issue: a.attemptId })
+      if (r.issued) {
+        verifyToken = r.issued.verifyToken
+        certNo = r.issued.certNo
+      }
+      setList((prev) => prev?.map((x) => (x.attemptId === a.attemptId ? { ...x, certIssuedAt: new Date().toISOString(), certNo: r.issued?.certNo ?? x.certNo, verifyToken: r.issued?.verifyToken ?? x.verifyToken } : x)) ?? prev)
     } catch {
       /* 발급 기록 실패 — 증서 화면은 열어준다(다음 방문 때 상태 재동기화) */
     }
-    const certNo = certNoOf(a)
     navigate('/certificate', {
-      state: { name, qualification: a.examTitle ?? t('mypage.exam_fallback'), certNo, issueDate: fmtDate(a.submittedAt), scoreText: `${a.totalCorrect} / ${a.totalQuestions}` },
+      state: { name, qualification: a.examTitle ?? t('mypage.exam_fallback'), certNo, issueDate: fmtDate(a.submittedAt), verifyToken, scoreText: `${a.totalCorrect} / ${a.totalQuestions}` },
     })
   }
 
@@ -198,7 +204,7 @@ export default function MyPage() {
                         <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface break-keep">{a.examTitle ?? t('mypage.exam_fallback')}</h3>
                         <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20 shrink-0">{t('mypage.passed')}</span>
                       </div>
-                      <p className="font-body-md text-body-md text-on-surface-variant">{fmtDate(a.submittedAt)} | {t('mypage.cert_no')} {certNoOf(a)} | {a.totalCorrect ?? 0} / {a.totalQuestions ?? 0}</p>
+                      <p className="font-body-md text-body-md text-on-surface-variant">{fmtDate(a.submittedAt)} | {t('mypage.cert_no')} {a.certNo ?? certNoOf(a)} | {a.totalCorrect ?? 0} / {a.totalQuestions ?? 0}</p>
                     </div>
                   </article>
                 ))}
@@ -213,7 +219,7 @@ export default function MyPage() {
             ) : (
               <div className="flex flex-col gap-6">
                 {earned.map((a) => {
-                  const certNo = certNoOf(a)
+                  const certNo = a.certNo ?? certNoOf(a)
                   const issued = !!a.certIssuedAt
                   return (
                     <article key={a.attemptId} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">

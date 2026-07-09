@@ -99,6 +99,30 @@ export interface MyAttempt {
   totalQuestions: number
   passed: boolean | null
   certIssuedAt: string | null // 자격증 발급 완료 시각(서버 기록) — null=미발급
+  certNo?: string | null // 발급 시 확정된 자격번호(미발급이면 null → 프론트 임시 계산)
+  verifyToken?: string | null // QR 진위확인 토큰(발급 후에만)
+}
+
+// my-attempts 응답 — 목록 + (issue 요청 시) 방금 발급된 자격증 토큰·번호
+export interface IssuedCert {
+  verifyToken: string
+  certNo: string
+}
+export interface MyAttemptsResponse {
+  attempts: MyAttempt[]
+  issued?: IssuedCert | null
+}
+
+// verify-cert 응답 — QR 진위확인 결과(공개 안전 필드만)
+export interface VerifyCertResponse {
+  valid: boolean
+  reason?: 'not_found' | 'error'
+  status?: 'valid' | 'expired'
+  name?: string // 마스킹된 소지자 이름
+  grade?: string // 자격/급수명(exam title)
+  certNo?: string
+  issuedAt?: string
+  expiresAt?: string | null // null = 무기한
 }
 
 export interface AdminListResponse {
@@ -259,6 +283,7 @@ export interface ExamSetRow {
   number: number // 출제 표시 순서
   questionId: string
   subject: string
+  difficulty: '상' | '중' | '하' | null // 난이도(관리자 전용)
   kind: 'mc' | 'short'
   prompt: string
   bankNumber: number | null // 은행 내 원 번호
@@ -273,6 +298,7 @@ export interface AdminQuestionRow {
   bank_id: string
   number: number
   subject: string
+  difficulty: '상' | '중' | '하' | null // 난이도(과목 하위분류·관리자 전용). 미지정 = null
   prompt: string
   kind: 'mc' | 'short'
   choices: string[]
@@ -305,6 +331,7 @@ export interface AdminQuestionEventsResp {
 export interface QuestionImportRow {
   number: number
   subject: string
+  difficulty?: '상' | '중' | '하' // 난이도(선택 · 상/중/하 아니면 미지정)
   prompt: string
   kind: 'mc' | 'short'
   choices: string[]

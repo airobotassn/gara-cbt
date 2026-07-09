@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
 import { makeCertNo, tempSeq } from '../lib/certNo'
-import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
+import type { ExamResultResponse, GradedAnswer, MyAttemptsResponse, SubmitExamResponse } from '../lib/types'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
 // GARA Precision 톤으로 자체 디자인. 채점 로직/상태(공개 전·무효·에러) 보존.
@@ -154,19 +154,27 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
     return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
   })()
 
-  function goCertificate() {
+  async function goCertificate() {
     // 발급 기록(서버) — 마이페이지 발급현황과 공유되는 '발급 완료' 상태. 미리보기는 기록 없음.
+    // 발급 응답에서 진위확인 토큰·확정 자격번호를 받아 자격증(QR)에 실어 보낸다.
+    let verifyToken: string | undefined
+    let issuedCertNo: string | undefined
     if (attemptId && attemptId !== 'preview') {
-      callFunction('my-attempts', { issue: attemptId }).catch(() => {
-        /* 기록 실패해도 증서 화면은 열어준다 */
-      })
+      try {
+        const r = await callFunction<MyAttemptsResponse>('my-attempts', { issue: attemptId })
+        verifyToken = r.issued?.verifyToken
+        issuedCertNo = r.issued?.certNo
+      } catch {
+        /* 기록 실패해도 증서 화면은 열어준다(QR 없이) */
+      }
     }
     navigate('/certificate', {
       state: {
         name: certName,
         qualification: passed ? certLabel : t('mypage.exam_fallback'),
-        certNo,
+        certNo: issuedCertNo ?? certNo,
         issueDate,
+        verifyToken,
         scoreText: `${scorePct}점 (${data.totalCorrect}/${data.totalQuestions})`,
       },
     })

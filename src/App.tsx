@@ -15,6 +15,7 @@ import ExamResult from './pages/ExamResult'
 import ExamDone from './pages/ExamDone'
 import ExamComplete from './pages/ExamComplete'
 import Certificate from './pages/Certificate'
+import VerifyCert from './pages/VerifyCert'
 import MyPage from './pages/MyPage'
 import AuthCallback from './pages/AuthCallback'
 import Login from './pages/Login'
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="/exam/complete" element={<ExamComplete />} />
               <Route path="/exam/done" element={<ExamDone />} />
               <Route path="/certificate" element={<Certificate />} />
+              <Route path="/verify/:token" element={<VerifyCert />} />
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/mypage/:section" element={<MyPage />} />
               {/* 레벨테스트 모듈 (/test/*) + 랭킹 */}

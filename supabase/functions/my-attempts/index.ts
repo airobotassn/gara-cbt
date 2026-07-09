@@ -4,6 +4,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
+import { makeCertNo, tempSeq, trackOfTitle } from '../_shared/cert.ts'
 
 const PASS_RATIO = 0.6
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
@@ -29,10 +30,12 @@ Deno.serve(async (req) => {
       .lt('started_at', cutoff)
 
     // 자격증 발급 기록 — 결과 공개 후 + 합격만 가능. 발급 완료여도 재발급 허용(시각 갱신).
+    // 최초 발급 시 진위확인용 토큰·자격번호를 확정 저장(재발급은 기존 값 유지 → QR 불변).
+    let issued: { verifyToken: string; certNo: string } | null = null
     if (body?.issue) {
       const { data: a } = await admin
         .from('exam_attempts')
-        .select('id, user_id, status, result_release_at, total_correct, total_questions')
+        .select('id, user_id, exam_id, status, result_release_at, submitted_at, total_correct, total_questions, verify_token, cert_no')
         .eq('id', body.issue)
         .maybeSingle()
       if (!a || a.user_id !== user.id) return json({ error: '권한이 없습니다.' }, 403)
@@ -45,16 +48,31 @@ Deno.serve(async (req) => {
           ? a.total_correct >= Math.ceil(a.total_questions * PASS_RATIO)
           : false
       if (!passed) return json({ error: '자격증은 결과 공개 후 합격한 응시만 발급할 수 있습니다.' }, 409)
+
+      let verifyToken = (a.verify_token as string | null) ?? null
+      let certNo = (a.cert_no as string | null) ?? null
+      if (!verifyToken || !certNo) {
+        // 시험명으로 트랙 추정 → 자격번호. 연도는 취득(제출) 연도.
+        let title: string | null = null
+        if (a.exam_id) {
+          const { data: ex } = await admin.from('exams').select('title').eq('id', a.exam_id).maybeSingle()
+          title = (ex as { title?: string } | null)?.title ?? null
+        }
+        const year = a.submitted_at ? new Date(a.submitted_at).getFullYear() : new Date().getFullYear()
+        verifyToken = verifyToken ?? crypto.randomUUID()
+        certNo = certNo ?? makeCertNo(trackOfTitle(title), year, tempSeq(a.id))
+      }
       const { error: issueErr } = await admin
         .from('exam_attempts')
-        .update({ cert_issued_at: new Date().toISOString() })
+        .update({ cert_issued_at: new Date().toISOString(), verify_token: verifyToken, cert_no: certNo })
         .eq('id', a.id)
       if (issueErr) return json({ error: issueErr.message }, 400)
+      issued = { verifyToken, certNo }
     }
 
     const { data } = await admin
       .from('exam_attempts')
-      .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, cert_issued_at')
+      .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, cert_issued_at, verify_token, cert_no')
       .eq('user_id', user.id)
       .order('submitted_at', { ascending: false, nullsFirst: false })
       .order('started_at', { ascending: false })
@@ -88,10 +106,12 @@ Deno.serve(async (req) => {
         totalQuestions: total,
         passed,
         certIssuedAt: passed ? r.cert_issued_at : null,
+        certNo: passed ? r.cert_no ?? null : null,
+        verifyToken: passed ? r.verify_token ?? null : null,
       }
     })
 
-    return json({ attempts })
+    return json({ attempts, issued })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)
   }
