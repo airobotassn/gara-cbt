@@ -71,12 +71,12 @@
   letter-spacing: 0.09em; text-transform: uppercase; padding: 6px 16px 6px 13px; border-radius: 999px;
 }
 .vrf-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; }
-/* 유효 — 에메랄드+금박 럭셔리 뱃지(싸구려 알약 탈피): 채운 에메랄드, 금 테두리, 금박 명조, 금 체크 */
+/* 유효 — 남색+금박 명패(초록 폐기, 검인·원장과 동일 톤): 채운 남색, 금 이중테두리, 금박 명조, 금 체크 */
 .vrf-chip.ok {
   font-family: 'CertGaramond', 'CertMyeongjo', Georgia, serif;
-  background: linear-gradient(158deg, #227a55 0%, #124f37 100%);
-  color: #ecdaa6; border: 1px solid #a9832b;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(233, 205, 128, 0.22), 0 4px 12px -5px rgba(18, 79, 55, 0.55);
+  background: linear-gradient(158deg, #1d3a63 0%, #0f2140 100%);
+  color: #e7cf8f; border: 1px solid #a9832b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(233, 205, 128, 0.25), 0 4px 12px -5px rgba(15, 33, 64, 0.55);
   letter-spacing: 0.17em; font-weight: 600; padding: 7px 21px 7px 17px; font-size: 12.5px;
 }
 .vrf-chip.ok::before { content: '✓'; width: auto; height: auto; margin-right: 9px; background: none; border-radius: 0; color: #e9cd80; font-size: 12px; }
