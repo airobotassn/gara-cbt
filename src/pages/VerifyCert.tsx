@@ -23,13 +23,33 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   )
 }
 
+// 미리보기 자격증의 QR(preview-sample)용 데모 결과 — 실제 조회 없이 '유효' 화면을 그대로 보여준다(예시 표기).
+const DEMO_TOKEN = 'preview-sample'
+function demoResult(): VerifyCertResponse {
+  const now = new Date()
+  const exp = new Date(now)
+  exp.setFullYear(exp.getFullYear() + 2)
+  return {
+    valid: true,
+    status: 'valid',
+    name: '홍*동',
+    grade: 'CARIS 자격검정',
+    certNo: 'CA-PRO-2026-0001',
+    issuedAt: now.toISOString(),
+    expiresAt: exp.toISOString(),
+  }
+}
+
 export default function VerifyCert() {
   const { token } = useParams()
   const { t } = useT()
-  const [data, setData] = useState<VerifyCertResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const isDemo = token === DEMO_TOKEN
+  // 데모 토큰이면 초기값으로 예시 결과를 세팅(함수 호출 없음). 실제 토큰만 서버 조회.
+  const [data, setData] = useState<VerifyCertResponse | null>(() => (isDemo ? demoResult() : null))
+  const [loading, setLoading] = useState(!isDemo)
 
   useEffect(() => {
+    if (isDemo) return
     let alive = true
     callFunction<VerifyCertResponse>('verify-cert', { token })
       .then((r) => alive && setData(r))
@@ -38,7 +58,7 @@ export default function VerifyCert() {
     return () => {
       alive = false
     }
-  }, [token])
+  }, [token, isDemo])
 
   const ok = !!data?.valid && data.status === 'valid'
   const expired = !!data?.valid && data.status === 'expired'
@@ -88,6 +108,9 @@ export default function VerifyCert() {
                 </div>
               ) : (
                 <p className="font-body-md text-body-md text-on-surface-variant mt-4 break-keep">{t('verify.invalid_desc')}</p>
+              )}
+              {isDemo && (
+                <p className="font-label-md text-label-md text-on-surface-variant mt-5 opacity-80 break-keep">{t('verify.demo_note')}</p>
               )}
             </>
           )}
