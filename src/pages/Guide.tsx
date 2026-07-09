@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
@@ -11,18 +11,28 @@ const STATUS_KEY: Record<RoundStatus, string> = {
   closed: 'guide.status_closed',
 }
 
-// 검정방법의 '필기/실기'(및 다국어 라벨) 접두를 굵게. 라벨이 앞에 오는 각 줄에만 적용.
-const GRADE_LABELS = ['필기', '실기', '筆記', '実技', '笔试', '实操', 'Lý thuyết', 'Thực hành', 'Written', 'Practical', 'लिखित', 'प्रायोगिक']
-function boldGradeLabel(text: string) {
-  const lab = GRADE_LABELS.find((l) => text.startsWith(l))
-  if (!lab) return text
-  return (
-    <>
-      <strong className="font-bold text-on-surface">{lab}</strong>
-      {text.slice(lab.length)}
-    </>
-  )
+// 급수 스펙트럼(딥블루 → 그린). ⚠️ src/styles/guide.css 의 색과 동기화 필수(바꾸면 양쪽).
+const SPECTRUM: Record<string, [string, string]> = {
+  beginner: ['#1e64d0', '#0a439f'],
+  pro: ['#2f8ee0', '#1069c6'],
+  elite: ['#34b4ea', '#1092d2'],
+  master: ['#22c3bb', '#0a9f9a'],
+  grandmaster: ['#2ecb7d', '#13a95b'],
+  zenith: ['#7fd05f', '#54b830'],
 }
+const TIER_BASE: Record<string, string> = {
+  beginner: '#0d54bd', pro: '#1a80d6', elite: '#14a2e0',
+  master: '#10b3ac', grandmaster: '#18bd6a', zenith: '#62c045',
+}
+// 피라미드 조각 기하(viewBox 1000×900, 위 Zenith → 아래 Beginner). polygon·텍스트 위치 고정.
+const PYRAMID: { key: string; polygon: string; lblY: number; nmY: number; nmSize: number }[] = [
+  { key: 'zenith', polygon: '500,40 573.3,180 426.7,180', lblY: 126, nmY: 156, nmSize: 26 },
+  { key: 'grandmaster', polygon: '426.7,180 573.3,180 646.7,320 353.3,320', lblY: 234, nmY: 266, nmSize: 31 },
+  { key: 'master', polygon: '353.3,320 646.7,320 720,460 280,460', lblY: 370, nmY: 404, nmSize: 36 },
+  { key: 'elite', polygon: '280,460 720,460 793.3,600 206.7,600', lblY: 510, nmY: 544, nmSize: 36 },
+  { key: 'pro', polygon: '206.7,600 793.3,600 866.7,740 133.3,740', lblY: 650, nmY: 684, nmSize: 36 },
+  { key: 'beginner', polygon: '133.3,740 866.7,740 940,880 60,880', lblY: 790, nmY: 824, nmSize: 36 },
+]
 
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
@@ -32,15 +42,33 @@ function boldGradeLabel(text: string) {
 export default function Guide() {
   const { t, lang } = useT()
   const navigate = useNavigate()
-  const [track, setTrack] = useState(0)
-  const [level, setLevel] = useState(0)
   const { regular } = useExamRounds(lang)
   const TRACKS = getTracks(lang)
-  const cur = TRACKS[track]
-  const lv = cur.tiers[level]
-  const isMaster = track === 1
-  const goTrack = (i: number) => { setTrack((i + TRACKS.length) % TRACKS.length); setLevel(0) }
-  const goLevel = (i: number) => setLevel((i + cur.tiers.length) % cur.tiers.length)
+  const tierByKey = Object.fromEntries(TRACKS.flatMap((tr) => tr.tiers).map((tt) => [tt.key, tt]))
+  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [pressKey, setPressKey] = useState<string | null>(null)
+
+  // 피라미드 조각 클릭 → 해당 급수 카드로 스크롤 + 착지 플래시
+  const goTier = (key: string) => {
+    const el = document.getElementById(`tier-${key}`)
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+    el.classList.remove('gld-flash')
+    void el.offsetWidth // 재클릭 시 애니메이션 리스타트
+    el.classList.add('gld-flash')
+  }
+
+  // 스크롤 스파이 — 현재 보는 카드에 맞춰 피라미드 조각 하이라이트
+  useEffect(() => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('.gld-card[data-tier]'))
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) setActiveKey((e.target as HTMLElement).dataset.tier ?? null) }),
+      { rootMargin: '-45% 0px -45% 0px', threshold: 0 },
+    )
+    cards.forEach((c) => io.observe(c))
+    return () => io.disconnect()
+  }, [lang])
 
   return (
     <div className="bg-background text-on-background min-h-screen">
@@ -107,108 +135,85 @@ export default function Guide() {
               </p>
             </div>
 
-            {/* 트랙 전환: 화살표 + 탭 */}
-            <div className="flex items-center justify-center gap-1.5 sm:gap-4 mb-10">
-              <button onClick={() => goTrack(track - 1)} aria-label={t('guide.aria_prev_track')} className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
-                <span className="material-symbols-outlined">chevron_left</span>
-              </button>
-              <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high">
-                {TRACKS.map((tr, i) => (
-                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'whitespace-nowrap px-4 sm:px-7 py-2.5 rounded-full bg-primary text-on-primary font-title-md text-title-md font-bold shadow-sm transition-all' : 'whitespace-nowrap px-4 sm:px-7 py-2.5 rounded-full text-on-surface-variant hover:text-on-surface font-title-md text-title-md font-semibold transition-all'}>{tr.name}</button>
-                ))}
-              </div>
-              <button onClick={() => goTrack(track + 1)} aria-label={t('guide.aria_next_track')} className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:border-primary hover:text-primary transition-colors shrink-0">
-                <span className="material-symbols-outlined">chevron_right</span>
-              </button>
-            </div>
-
-            {/* 트랙 패널 */}
-            <div className="max-w-4xl mx-auto">
-              {/* 트랙 헤더 (핵심 소개) */}
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary font-label-md text-label-md md:text-body-md font-bold mb-4">
-                  <span className="material-symbols-outlined text-[18px] md:text-[20px]">{cur.icon}</span>
-                  {cur.eligibility}
-                </div>
-                <h3 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-[36px] font-bold text-on-surface mb-1 whitespace-nowrap">{cur.name}</h3>
-                <p className="font-title-md text-title-md md:text-[24px] md:leading-[32px] font-semibold text-on-surface-variant">{cur.tagline}</p>
-                <p className="font-body-lg text-body-md md:text-[20px] md:leading-[30px] text-on-surface-variant mt-3 break-keep max-w-xl mx-auto">{cur.caption}</p>
+            {/* 급수 지도: 피라미드(네비) + 급수별 자격 플레이트 카드 */}
+            <div className="gld">
+              <div className="gld-hint">
+                <span className="material-symbols-outlined">touch_app</span>
+                <span>{t('guide.ladder_hint')}</span>
               </div>
 
-              {/* 티어 전환: 화살표 + 티어 (하나의 통합 pill) */}
-              <div className="flex justify-center mb-6">
-                <div className="flex flex-nowrap items-center justify-center gap-1 p-1.5 rounded-full bg-surface-container-high border border-outline-variant/20 shadow-sm max-w-full">
-                  <button onClick={() => goLevel(level - 1)} aria-label={t('guide.aria_prev_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-                  </button>
-                  {cur.tiers.map((l, i) => (
-                    <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'min-w-[48px] px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm transition-all' : 'min-w-[48px] px-3.5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}><span className="flex flex-col items-center leading-[1.05]">{l.name.split(' ').map((w, k) => <span key={k}>{w}</span>)}</span></button>
+              <div className="gld-pyramid-wrap">
+                <svg className="gld-pyramid" viewBox="0 0 1000 900" role="group" aria-label={t('guide.cert_intro_title')}>
+                  <defs>
+                    {PYRAMID.map((p) => {
+                      const [from, to] = SPECTRUM[p.key]
+                      return (
+                        <linearGradient key={p.key} id={`gld-g-${p.key}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stopColor={from} />
+                          <stop offset="1" stopColor={to} />
+                        </linearGradient>
+                      )
+                    })}
+                  </defs>
+                  {PYRAMID.map((p) => (
+                    <g
+                      key={p.key}
+                      className={`gld-slice${activeKey === p.key ? ' is-active' : ''}${pressKey === p.key ? ' pressing' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${tierByKey[p.key]?.name ?? p.key} ${t('caris.lbl.subjects')}`}
+                      onClick={() => goTier(p.key)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTier(p.key) } }}
+                      onPointerDown={() => setPressKey(p.key)}
+                      onPointerUp={() => setPressKey(null)}
+                      onPointerLeave={() => setPressKey(null)}
+                      onPointerCancel={() => setPressKey(null)}
+                    >
+                      <polygon points={p.polygon} fill={`url(#gld-g-${p.key})`} stroke="var(--color-surface-container-lowest)" strokeWidth="7" strokeLinejoin="round" />
+                      <text className="gld-lbl" x="500" y={p.lblY} textAnchor="middle" fontSize={p.key === 'zenith' ? 12 : 14}>CARIS</text>
+                      <text className="gld-nm" x="500" y={p.nmY} textAnchor="middle" fontSize={p.nmSize}>{tierByKey[p.key]?.name}</text>
+                    </g>
                   ))}
-                  <button onClick={() => goLevel(level + 1)} aria-label={t('guide.aria_next_grade')} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                  </button>
-                </div>
+                </svg>
               </div>
 
-              {/* 단일 티어 카드 */}
-              <div className="bg-surface-container-lowest rounded-2xl p-7 md:p-9 border border-outline-variant/30 ambient-shadow">
-                {/* 티어 + 대상 */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-7 pb-6 border-b border-outline-variant/20">
-                  <span className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-on-primary font-title-md text-title-md font-bold whitespace-nowrap">{cur.name} {lv.name}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant break-keep">{isMaster ? `${t('caris.lbl.eligibility')} · ${lv.prereq}` : lv.target}</span>
-                </div>
-
-                {/* 스펙 (라벨 / 값) */}
-                <div className="flex flex-col divide-y divide-outline-variant/20">
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5 first:pt-0">
-                    <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.subjects')}</div>
-                    <ul className="flex-grow flex flex-col gap-2.5">
-                      {lv.subjects.map((s, i) => (
-                        <li key={i} className="flex items-start gap-2.5 font-body-lg text-body-lg text-on-surface break-keep">
-                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                          <span>{s}</span>
-                        </li>
-                      ))}
-                    </ul>
+              {TRACKS.map((tr) => (
+                <div key={tr.key}>
+                  <div className="gld-grp">
+                    <span className="gld-rail" style={{ background: `linear-gradient(90deg, ${TIER_BASE[tr.tiers[0].key]}, ${TIER_BASE[tr.tiers[tr.tiers.length - 1].key]})` }} />
+                    <h3 className="gld-grp-name">{tr.name}</h3>
+                    <span className="gld-grp-cap">{tr.tagline}</span>
                   </div>
-
-                  {lv.format ? (
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
-                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.format')}</div>
-                      <div className="flex-grow">
-                        <p className="font-body-lg text-body-lg text-on-surface break-keep">{lv.format}</p>
-                      </div>
-                    </div>
-                  ) : lv.method ? (
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
-                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.method')}</div>
-                      <div className="flex-grow flex flex-col gap-0.5">
-                        {lv.method.split(' · ').map((m, i) => (
-                          <p key={i} className="font-body-lg text-body-lg text-on-surface break-keep">{boldGradeLabel(m)}</p>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {lv.practical && (
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 py-5">
-                      <div className="sm:w-28 shrink-0 font-title-md text-body-md text-on-surface-variant font-bold">{t('caris.lbl.practical')}</div>
-                      <p className="flex-grow font-body-lg text-body-lg text-on-surface break-keep">{lv.practical}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 합격 기준 */}
-                <div className="flex items-start gap-3 mt-6 bg-secondary/10 rounded-xl px-5 py-4">
-                  <span className="material-symbols-outlined text-secondary text-[24px] shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                  <div>
-                    <div className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('caris.lbl.pass')}</div>
-                    <div className="font-title-md text-body-md md:text-title-md text-on-surface font-bold break-keep">
-                      {lv.pass.split(' · ').map((p, i) => <div key={i}>{p}</div>)}
-                    </div>
+                  <div className="gld-cards">
+                    {tr.tiers.map((tier) => {
+                      const sub = tier.target ?? tier.prereq ?? ''
+                      return (
+                        <article
+                          key={tier.key}
+                          id={`tier-${tier.key}`}
+                          data-tier={tier.key}
+                          className="gld-card"
+                          style={{ '--c': TIER_BASE[tier.key] } as CSSProperties}
+                        >
+                          <div className="gld-banner">
+                            <span className="material-symbols-outlined gld-seal">workspace_premium</span>
+                            <div className="gld-nm2">{tier.name}</div>
+                            <span className="gld-track">{tr.name}{sub ? ` · ${sub}` : ''}</span>
+                          </div>
+                          <div className="gld-body">
+                            <div className="gld-subj-label">{t('caris.lbl.subjects')}</div>
+                            <ul className="gld-subj">
+                              {tier.subjects.map((s, i) => (
+                                <li key={i}><span className="gld-idx">{i + 1}</span>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </article>
+                      )
+                    })}
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
