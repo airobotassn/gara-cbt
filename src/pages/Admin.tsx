@@ -31,6 +31,7 @@ import type {
   QuestionImportRow,
   CbtAnalytics,
   CbtRoundStat,
+  CbtTierStat,
   CbtQDiff,
   CbtUserRow,
   CbtUsersResp,
@@ -38,7 +39,7 @@ import type {
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
-import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_POOL_TARGET, buildDrawCells } from '../lib/caris'
+import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 
 // 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
@@ -2106,123 +2107,20 @@ function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => voi
   )
 }
 
-// ── 시연용 데모 데이터 ─────────────────────────────────────────────
-// DB에 결제/접수 테이블·티어별 개별시험이 아직 없어 하드코딩. 실연동 시 이 상수/생성기를 서버 데이터로 교체.
+// ── 금액 표기 헬퍼 (결제 백엔드 미구현 — 결제 화면은 값 없이 빈 상태로 표시) ──
 const won = (n: number) => `₩${n.toLocaleString()}`
-function wonShort(n: number): string {
-  if (n >= 1e8) return `₩${(n / 1e8).toFixed(n % 1e8 === 0 ? 0 : 1)}억`
-  if (n >= 1e4) return `₩${Math.round(n / 1e4).toLocaleString()}만`
-  return won(n)
-}
-// 문자열 → 0..1 안정 해시(데모값 생성 · 새로고침해도 동일)
-function hash01(s: string): number {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
-  return ((h >>> 0) % 100000) / 100000
-}
-const DEMO_PAY = {
-  refundRate: 0.035,
-  methods: [
-    { k: '신용카드', n: 71 },
-    { k: '계좌이체', n: 13 },
-    { k: '간편결제', n: 6 },
-  ],
-  recent: [
-    { name: '김민준', grade: 'Elite', amount: 55000, method: '신용카드', status: 'paid', at: '2026-07-07 14:22' },
-    { name: '이서연', grade: 'Pro', amount: 40000, method: '간편결제', status: 'paid', at: '2026-07-07 11:05' },
-    { name: '박도윤', grade: 'Master', amount: 80000, method: '계좌이체', status: 'paid', at: '2026-07-06 17:48' },
-    { name: '최지우', grade: 'Pro', amount: 40000, method: '신용카드', status: 'refund', at: '2026-07-06 09:31' },
-    { name: '정하준', grade: 'Beginner', amount: 30000, method: '신용카드', status: 'paid', at: '2026-07-05 20:14' },
-    { name: '강수아', grade: 'Elite', amount: 55000, method: '신용카드', status: 'paid', at: '2026-07-05 13:02' },
-    { name: '조은우', grade: 'Grand Master', amount: 100000, method: '계좌이체', status: 'paid', at: '2026-07-04 16:39' },
-    { name: '윤서준', grade: 'Pro', amount: 40000, method: '간편결제', status: 'paid', at: '2026-07-04 10:12' },
-  ],
-}
-// 날짜별 데모 매출(원) — 안정 해시(주말 낮음·간헐 0). 결제 차트/합계가 기간 선택에 반응.
-function demoRevByDay(days: string[]): Record<string, number> {
-  const m: Record<string, number> = {}
-  for (const d of days) m[d] = hash01('z' + d) < 0.12 ? 0 : (Math.floor(hash01('rev' + d) * 26) + 3) * 10000
-  return m
-}
-
-// admin 함수(구버전)가 신규 지표를 안 주면 쓰는 데모 폴백 — 재배포 시 실데이터로 자동 전환.
-const DEMO_FB = {
-  signups7d: 9, certIssued: 42, certPending: 8, resultPending: 5, inProgress: 2,
-  pendingGrading: 11, openRounds: 2, nextExamDate: '2026-07-18' as string | null, avgScore: 73, avgDurationMin: 38,
-}
-const DEMO_ROUNDS: CbtRoundStat[] = [
-  { id: 'd7', title: '제 2회 정기시험 (2027)', examDate: '2027-06-19', kind: 'regular', attempts: 12, pass: 8, cert: 5 },
-  { id: 'd6', title: '제 4회 정기시험', examDate: '2026-10-17', kind: 'regular', attempts: 28, pass: 19, cert: 14 },
-  { id: 'd5', title: '제 3회 정기시험', examDate: '2026-09-19', kind: 'regular', attempts: 41, pass: 30, cert: 26 },
-  { id: 'd2', title: '제 2회 정기시험', examDate: '2026-08-15', kind: 'regular', attempts: 34, pass: 25, cert: 21 },
-  { id: 'd1', title: '제 1회 정기시험', examDate: '2026-07-18', kind: 'regular', attempts: 52, pass: 39, cert: 37 },
-  { id: 'd0', title: '상시 CBT', examDate: null, kind: 'rolling', attempts: 18, pass: 12, cert: 9 },
-]
-
-// 급수(티어)별 데모 통계 — /guide 의 getTracks subjects 로 라벨, 해시로 수치(재배포/티어 추적 전까지 사용).
-interface TierStat {
-  attempts: number
-  pass: number
-  passRate: number
-  scoreHist: number[] // [0-59,60-69,70-79,80-89,90-100]
-  subjects: { subject: string; rate: number; n: number }[]
-  difficulty: { level: '상' | '중' | '하'; rate: number; n: number }[] // 난이도별 정답률
-  hard: CbtQDiff[]
-  easy: CbtQDiff[]
-}
-function tierStat(key: string, name: string, subjects: string[]): TierStat {
-  const attempts = 24 + Math.floor(hash01('att' + key) * 176)
-  const passRate = 48 + Math.floor(hash01('pr' + key) * 42)
-  const pass = Math.round((attempts * passRate) / 100)
-  const w = [0, 1, 2, 3, 4].map((i) => 0.4 + hash01('h' + key + i))
-  const wSum = w.reduce((x, y) => x + y, 0)
-  const scoreHist = w.map((x) => Math.round((x / wSum) * attempts))
-  const subj = subjects.map((s, i) => ({
-    subject: s,
-    rate: 52 + Math.floor(hash01('sr' + key + i) * 44),
-    n: Math.round(attempts * (0.6 + hash01('sn' + key + i) * 0.4)),
-  }))
-  const mkQ = (i: number, rate: number): CbtQDiff => ({
-    id: `${key}-${i}`,
-    number: 3 + Math.floor(hash01('qn' + key + i) * 38),
-    subject: subjects[Math.floor(hash01('qs' + key + i) * subjects.length)] ?? subjects[0] ?? '과목',
-    prompt: `${name} · ${subjects[Math.floor(hash01('qs' + key + i) * subjects.length)] ?? '개념'} 적용/해석 유형 문항`,
-    exam: name,
-    active: true,
-    n: 12 + Math.floor(hash01('qnn' + key + i) * 60),
-    rate,
-  })
-  const hard = [0, 1, 2, 3].map((i) => mkQ(i, 18 + Math.floor(hash01('hr' + key + i) * 20))).sort((x, y) => x.rate - y.rate)
-  const easy = [0, 1, 2, 3].map((i) => mkQ(i + 10, 82 + Math.floor(hash01('er' + key + i) * 16))).sort((x, y) => y.rate - x.rate)
-  // 난이도별 정답률 — 상은 낮게·하는 높게(백엔드 집계 붙기 전까지 과목별과 동일 데모 방식). 문항 풀은 문항관리에서 실데이터로 표시.
-  const DLEVELS = ['상', '중', '하'] as const
-  const dBase = { 상: 38, 중: 58, 하: 76 } as const
-  const difficulty = DLEVELS.map((lv, i) => ({
-    level: lv,
-    rate: dBase[lv] + Math.floor(hash01('dr' + key + i) * 14),
-    n: Math.round(attempts * (0.7 + hash01('dn' + key + i) * 0.3)),
-  }))
-  return { attempts, pass, passRate, scoreHist, subjects: subj, difficulty, hard, easy }
-}
 
 function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?: SubsFilter) => void }) {
   const o = a.overview
-  // 구버전 함수 호환: 신규 지표(certIssued)가 없으면 데모값으로 채우고 안내 배너 표시.
-  const live = o.certIssued !== undefined
-  const fb = <T,>(v: T | undefined, d: T): T => (v === undefined ? d : v)
-  const signups7d = fb(o.signups7d, DEMO_FB.signups7d)
-  const certIssued = fb(o.certIssued, DEMO_FB.certIssued)
-  const certPending = fb(o.certPending, DEMO_FB.certPending)
-  const resultPending = fb(o.resultPending, DEMO_FB.resultPending)
-  const inProgress = fb(o.inProgress, DEMO_FB.inProgress)
-  const pendingGrading = fb(o.pendingGrading, DEMO_FB.pendingGrading)
-  const avgScore = fb(a.avgScore, DEMO_FB.avgScore)
-  const rounds = a.rounds && a.rounds.length ? a.rounds : live ? [] : DEMO_ROUNDS
-
-  // 결제 KPI(데모) — 최근 30일 매출 합계
-  const demoRev = demoRevByDay(a.days)
-  const pay30 = a.days.slice(-30).reduce((s, d) => s + (demoRev[d] || 0), 0)
-  const payCount = Math.max(1, Math.round(pay30 / 52000))
+  // 전부 admin.cbtAnalytics 실집계(값 없으면 0). 결제는 백엔드 미구현 → 빈 상태.
+  const signups7d = o.signups7d ?? 0
+  const certIssued = o.certIssued ?? 0
+  const certPending = o.certPending ?? 0
+  const resultPending = o.resultPending ?? 0
+  const inProgress = o.inProgress ?? 0
+  const pendingGrading = o.pendingGrading ?? 0
+  const avgScore = a.avgScore ?? 0
+  const rounds = a.rounds ?? []
 
   const actions = [
     { ico: 'rate_review', label: '주관식 채점 대기', n: pendingGrading, tone: 'amber', go: () => onNav('grading') },
@@ -2235,17 +2133,11 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
     { ico: 'assignment_turned_in', k: '응시 제출', v: o.attemptsAll.toLocaleString(), sub: `최근 7일 ${o.attempts7d}건`, accent: 'violet' },
     { ico: 'verified', k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건 · 평균 ${avgScore}점`, accent: 'green' },
     { ico: 'workspace_premium', k: '자격증 발급', v: certIssued.toLocaleString(), sub: `미발급 ${certPending}건`, accent: 'amber' },
-    { ico: 'payments', k: '매출(30일)', v: wonShort(pay30), sub: `결제 ${payCount}건 · 데모`, accent: 'green', demo: true },
+    { ico: 'payments', k: '매출(30일)', v: won(0), sub: '결제 연동 전', accent: 'green' },
   ]
 
   return (
     <div className="admin-dash">
-      {!live && (
-        <div className="admin-demo">
-          ⓘ 자격증·회차·급수·평균 등 일부 지표는 <b>데모값</b>입니다 — <code>admin</code> 함수 재배포 후 실데이터로 자동 전환됩니다. 결제·급수별 분석은 실연동/티어 추적 전까지 데모입니다.
-        </div>
-      )}
-
       {/* KPI */}
       <div className="kpi-grid">
         {kpis.map((c) => <Kpi key={c.k} {...c} />)}
@@ -2266,8 +2158,8 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
         ))}
       </div>
 
-      {/* 결제(데모) */}
-      <PaymentSection days={a.days} />
+      {/* 결제 현황 (결제 백엔드 미구현 — 빈 상태) */}
+      <PaymentSection />
 
       {/* 추이 */}
       <div className="admin-grid2">
@@ -2276,8 +2168,8 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
       </div>
       {a.certByDay && <TrendChart title="자격증 발급 추이" days={a.days} map={a.certByDay} color="var(--k-green)" />}
 
-      {/* 급수별 분석 (/guide 자격 체계 기준) */}
-      <TierAnalysis />
+      {/* 급수별 분석 (/guide 자격 체계 기준 · 서버 실집계) */}
+      <TierAnalysis tiers={a.tiers ?? []} />
 
       {/* 회차별 현황 퍼널 */}
       <div className="admin-section">
@@ -2288,15 +2180,15 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
   )
 }
 
-// KPI 카드 — 아이콘 칩 + 값 + 증감/데모 배지 + 색상 액센트.
-function Kpi({ ico, k, v, sub, accent, delta, demo }: {
-  ico: string; k: string; v: string; sub: string; accent: string; delta?: string; demo?: boolean
+// KPI 카드 — 아이콘 칩 + 값 + 증감 배지 + 색상 액센트.
+function Kpi({ ico, k, v, sub, accent, delta }: {
+  ico: string; k: string; v: string; sub: string; accent: string; delta?: string
 }) {
   return (
     <div className={`kpi k-${accent}`}>
       <div className="kpi-top">
         <span className="material-symbols-outlined kpi-ico">{ico}</span>
-        {demo ? <span className="kpi-tag">데모</span> : delta ? <span className="kpi-delta">▲ {delta}</span> : null}
+        {delta ? <span className="kpi-delta">▲ {delta}</span> : null}
       </div>
       <div className="kpi-k">{k}</div>
       <div className="kpi-v">{v}</div>
@@ -2305,27 +2197,28 @@ function Kpi({ ico, k, v, sub, accent, delta, demo }: {
   )
 }
 
-// 급수(티어)별 분석 — /guide 의 getTracks 를 그대로 selector 로. 급수 분포 막대 = 티어 선택기 겸용.
-function TierAnalysis() {
-  const tracks = getTracks('ko')
-  const tiers = tracks.flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
-  const [sel, setSel] = useState(tiers[1]?.key ?? tiers[0]?.key ?? '')
-  const cur = tiers.find((t) => t.key === sel) ?? tiers[0]
+// 급수(티어)별 분석 — 백엔드 급수별 실집계(admin.cbtAnalytics.tiers) 매칭. 막대·상세 패널은 항상 표시(값 없으면 0/빈).
+// 급수 목록·라벨·과목은 /guide(getTracks) 단일 출처, 수치는 서버 실집계에서 tier key로 매칭.
+function TierAnalysis({ tiers }: { tiers: CbtTierStat[] }) {
+  const catalog = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
+  const statOf = (key: string) => tiers.find((t) => t.tier === key)
+  const [sel, setSel] = useState(catalog[1]?.key ?? catalog[0]?.key ?? '')
+  const cur = catalog.find((t) => t.key === sel) ?? catalog[0]
   if (!cur) return null
-  const dist = tiers.map((t) => ({ ...t, n: tierStat(t.key, t.name, t.subjects).attempts }))
+  const dist = catalog.map((t) => ({ ...t, n: statOf(t.key)?.attempts ?? 0 }))
   const distMax = Math.max(1, ...dist.map((d) => d.n))
-  const st = tierStat(cur.key, cur.name, cur.subjects)
+  const st = statOf(cur.key)
   const bands = ['0-59', '60-69', '70-79', '80-89', '90-100']
-  const histMax = Math.max(1, ...st.scoreHist)
+  const histMax = Math.max(1, ...(st?.scoreHist ?? []))
+  const DLEVELS = ['상', '중', '하']
 
   return (
     <div className="admin-section">
       <div className="admin-section-head">
-        <h3>급수별 분석 <span className="admin-hint">/guide 자격 체계 기준</span></h3>
-        <span className="admin-badge-demo">데모</span>
+        <h3>급수별 분석 <span className="admin-hint">/guide 자격 체계 기준 · 서버 실집계</span></h3>
       </div>
 
-      {/* 급수 분포 = 응시 수 막대 + 클릭 선택 */}
+      {/* 급수 분포 = 응시 수 막대 + 클릭 선택 (0이어도 항상 표시·선택 가능) */}
       <div className="admin-sub">급수 분포 · 응시 수 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>(막대 클릭 → 아래 상세 전환)</span></div>
       <div className="tier-dist">
         {dist.map((d) => (
@@ -2338,33 +2231,39 @@ function TierAnalysis() {
         ))}
       </div>
 
-      {/* 선택 급수 상세 */}
+      {/* 선택 급수 상세 — 데이터 없어도 칸은 항상 표시, 값만 0/빈 */}
       <div className="tier-detail">
         <div className="tier-detail-head">
           <b>{cur.track} · {cur.name}</b>
-          <span>응시 <b>{st.attempts}</b> · 합격 <b>{st.pass}</b> ({st.passRate}%)</span>
+          <span>응시 <b>{st?.attempts ?? 0}</b> · 합격 <b>{st?.pass ?? 0}</b> ({st?.passRate ?? 0}%)</span>
         </div>
         <div className="tier-panel">
           <div className="admin-sub">점수 분포</div>
-          {bands.map((lb, i) => <HBar key={lb} label={`${lb}점`} value={st.scoreHist[i]} max={histMax} sub="명" />)}
+          {bands.map((lb, i) => <HBar key={lb} label={`${lb}점`} value={st?.scoreHist[i] ?? 0} max={histMax} sub="명" />)}
         </div>
         <div className="admin-grid2" style={{ marginTop: 14 }}>
           <div className="tier-panel">
             <div className="admin-sub">과목별 정답률</div>
-            {st.subjects.map((s) => <HBar key={s.subject} label={s.subject} value={s.rate} max={100} sub={`% (${s.n})`} />)}
+            {cur.subjects.map((subj) => {
+              const s = st?.subjects.find((x) => x.subject === subj)
+              return <HBar key={subj} label={subj} value={s?.rate ?? 0} max={100} sub={`% (${s?.n ?? 0})`} />
+            })}
           </div>
           <div className="tier-panel">
             <div className="admin-sub">난이도별 정답률</div>
-            {st.difficulty.map((d) => <HBar key={d.level} label={d.level} value={d.rate} max={100} sub={`% (${d.n})`} />)}
+            {DLEVELS.map((lv) => {
+              const d = st?.difficulty.find((x) => x.level === lv)
+              return <HBar key={lv} label={lv} value={d?.rate ?? 0} max={100} sub={`% (${d?.n ?? 0})`} />
+            })}
           </div>
         </div>
         <div className="tier-panel" style={{ marginTop: 14 }}>
-          <div className="admin-sub">⚠ 어려운 문항 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>정답률 낮은 순</span></div>
-          <DiffRows rows={st.hard} empty="—" />
+          <div className="admin-sub">⚠ 어려운 문항 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>정답률 낮은 순 · 응시 3회 이상</span></div>
+          <DiffRows rows={st?.hard ?? []} empty="집계할 문항이 없습니다(문항당 응시 3회 이상 필요)." />
         </div>
         <div className="tier-panel" style={{ marginTop: 14 }}>
           <div className="admin-sub">쉬운 문항 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>정답률 높은 순</span></div>
-          <DiffRows rows={st.easy} empty="—" />
+          <DiffRows rows={st?.easy ?? []} empty="집계할 문항이 없습니다(문항당 응시 3회 이상 필요)." />
         </div>
       </div>
     </div>
@@ -2428,69 +2327,22 @@ function RoundFunnel({ rows }: { rows: CbtRoundStat[] }) {
   )
 }
 
-// 결제 현황(시연용 하드코딩) — 기간 선택 반응. 실연동 전까지 데모.
-function PaymentSection({ days }: { days: string[] }) {
-  const [range, setRange, view] = useDayRange(days, 30)
-  const revMap = demoRevByDay(days)
-  const series = view.map((d) => revMap[d] ?? 0)
-  const total = series.reduce((s, v) => s + v, 0)
-  const max = Math.max(1, ...series)
-  const count = Math.max(1, Math.round(total / 52000))
-  const refunds = Math.max(0, Math.round(count * DEMO_PAY.refundRate))
-  const aov = count ? Math.round(total / count) : 0
-  const methodTotal = DEMO_PAY.methods.reduce((s, m) => s + m.n, 0)
-  const rangeLabel = range.preset ? `최근 ${range.preset}일` : `${range.from || '?'} ~ ${range.to || '?'}`
+// 결제 현황 — 결제/접수 백엔드 미구현. 값 없이 빈 상태(0)로 표시. 실연동 시 이 컴포넌트를 서버 데이터로 채움.
+function PaymentSection() {
   return (
     <div className="admin-section pay-sec">
       <div className="admin-section-head">
         <h3><span className="material-symbols-outlined pay-ico">credit_card</span>결제 현황</h3>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <RangeControl value={range} onChange={setRange} days={days} />
-          <span className="admin-badge-demo">데모</span>
-        </div>
+        <span className="admin-badge-demo">연동 전</span>
       </div>
       <div className="pay-kpis">
-        <div><span className="pk-k">매출 · {rangeLabel}</span><span className="pk-v">{won(total)}</span></div>
-        <div><span className="pk-k">결제 건수</span><span className="pk-v">{count}건</span></div>
-        <div><span className="pk-k">환불</span><span className="pk-v">{refunds}건</span></div>
-        <div><span className="pk-k">객단가</span><span className="pk-v">{won(aov)}</span></div>
+        <div><span className="pk-k">매출</span><span className="pk-v">{won(0)}</span></div>
+        <div><span className="pk-k">결제 건수</span><span className="pk-v">0건</span></div>
+        <div><span className="pk-k">환불</span><span className="pk-v">0건</span></div>
+        <div><span className="pk-k">객단가</span><span className="pk-v">{won(0)}</span></div>
       </div>
-      <div className="pay-grid">
-        <div>
-          <div className="admin-sub">일별 매출 · {rangeLabel}</div>
-          <div className="mini-bars" style={{ height: 76 }}>
-            {view.map((d) => (
-              <div key={d} className="mini-bar">
-                <div className="fill" style={{ height: `${(revMap[d] / max) * 100}%`, background: 'var(--k-green)' }} />
-                <div className="mini-tip"><span>{d.slice(5)}</span><b>{won(revMap[d] ?? 0)}</b></div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="admin-sub">결제 수단</div>
-          {DEMO_PAY.methods.map((m) => <HBar key={m.k} label={m.k} value={m.n} max={methodTotal} sub="건" />)}
-        </div>
-      </div>
-      <div className="admin-sub">최근 결제</div>
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr><th>응시자</th><th>급수</th><th style={{ textAlign: 'right' }}>금액</th><th>수단</th><th>상태</th><th>일시</th></tr>
-          </thead>
-          <tbody>
-            {DEMO_PAY.recent.map((r, i) => (
-              <tr key={i}>
-                <td>{r.name}</td>
-                <td>{r.grade}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{won(r.amount)}</td>
-                <td style={{ color: 'var(--muted)' }}>{r.method}</td>
-                <td><span className={`admin-badge st-${r.status === 'refund' ? 'voided' : 'submitted'}`}>{r.status === 'refund' ? '환불' : '완료'}</span></td>
-                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.at}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="admin-empty" style={{ marginTop: 4 }}>
+        결제·접수 연동 전입니다. 결제 데이터가 쌓이면 매출·결제 수단·최근 결제 내역이 여기에 표시됩니다.
       </div>
     </div>
   )
@@ -2813,6 +2665,7 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
   const [rows, setRows] = useState<AdminQuestionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [reloadTick, setReloadTick] = useState(0) // 수동 새로고침
+  const [poolKind, setPoolKind] = useState<'mc' | 'short'>('mc') // 유형별 풀(주관식 있는 급수는 토글)
 
   const cur = tiers.find((t) => t.key === tierKey) ?? tiers[0]
   const bank = banks.find((b) => b.tier === tierKey)
@@ -2830,17 +2683,21 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
     return () => { alive = false }
   }, [bankId, refreshKey, reloadTick])
 
-  // 기준 = 문제은행 구축(3배수·이미지 설계표) 과목×난이도(하/중/상) 목표. 확보 = 활성 문항 수.
-  const target = TIER_POOL_TARGET[tierKey]
+  // 기준 = 출제 배분표 × 3배수. 유형(mc/short)별로 따로 판정. 확보 = 활성 문항 수(해당 유형).
+  const draw = TIER_DRAW_CELLS[tierKey]
+  const hasShort = !!draw?.short
+  const kind: 'mc' | 'short' = hasShort ? poolKind : 'mc'
+  const matrix = draw ? (kind === 'short' ? draw.short : draw.mc) : null
+  const kindLabel = kind === 'short' ? '주관식' : '객관식'
   const subjects = cur?.subjects ?? []
   const DIFFS: Array<'하' | '중' | '상'> = ['하', '중', '상']
-  const got = (subj: string, diff: string) => rows.reduce((n, q) => n + (q.active && q.subject === subj && q.difficulty === diff ? 1 : 0), 0)
-  const unassigned = rows.reduce((n, q) => n + (q.active && !q.difficulty ? 1 : 0), 0)
+  const got = (subj: string, diff: string) => rows.reduce((n, q) => n + (q.active && (q.kind ?? 'mc') === kind && q.subject === subj && q.difficulty === diff ? 1 : 0), 0)
+  const unassigned = rows.reduce((n, q) => n + (q.active && (q.kind ?? 'mc') === kind && !q.difficulty ? 1 : 0), 0)
   let shortCells = 0
   const grid = subjects.map((subj, i) => {
-    const cells = DIFFS.map((d) => {
+    const cells = DIFFS.map((d, di) => {
       const g = got(subj, d)
-      const need = target?.[i]?.[d] ?? 0
+      const need = (matrix?.[i]?.[di] ?? 0) * POOL_MULTIPLIER
       const ok = g >= need
       if (!ok) shortCells++
       return { d, g, need, ok }
@@ -2856,27 +2713,33 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
   return (
     <div className="admin-section" style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div className="admin-sub" style={{ marginTop: 0 }}>문항 풀 현황 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>문제은행 구축 기준(3배수·설계표) 대비 확보(활성) · 셀 = 확보/목표</span></div>
+        <div className="admin-sub" style={{ marginTop: 0 }}>문항 풀 현황 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>출제 배분표 × 3배수 대비 확보(활성) · 셀 = 확보/목표</span></div>
         <button className="admin-mini" onClick={() => setReloadTick((t) => t + 1)} disabled={loading}>{loading ? '불러오는 중…' : '새로고침'}</button>
       </div>
-      <div className="admin-tabs" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
+      <div className="admin-tabs" style={{ marginBottom: hasShort ? 8 : 14, flexWrap: 'wrap' }}>
         {tiers.map((t) => (
           <button key={t.key} className={t.key === tierKey ? 'on' : ''} onClick={() => setTierKey(t.key)}>
             {t.track.replace('CARIS-', '')} · {t.name}
           </button>
         ))}
       </div>
+      {hasShort && (
+        <div className="admin-tabs" style={{ marginBottom: 14 }}>
+          <button className={kind === 'mc' ? 'on' : ''} onClick={() => setPoolKind('mc')}>객관식</button>
+          <button className={kind === 'short' ? 'on' : ''} onClick={() => setPoolKind('short')}>주관식</button>
+        </div>
+      )}
       {!bank && <div className="admin-warn">이 급수의 문제은행이 아직 없습니다 — 확보 0으로 표시됩니다.</div>}
-      {!target ? (
+      {!draw ? (
         <div className="admin-section admin-empty">이 급수는 출제 기준(문제은행 구축)이 아직 미확정입니다.</div>
       ) : (
         <>
           <div style={{ marginBottom: 10 }}>
             {shortCells === 0
-              ? <span className="badge ok">기준 충족 — 전 과목·난이도 제출 완료 ({totGot}/{totNeed})</span>
-              : <span className="badge low">미달 — {shortCells}개 칸 부족 · 확보 {totGot}/{totNeed}</span>}
+              ? <span className="badge ok">{kindLabel} 기준 충족 — 전 과목·난이도 제출 완료 ({totGot}/{totNeed})</span>
+              : <span className="badge low">{kindLabel} 미달 — {shortCells}개 칸 부족 · 확보 {totGot}/{totNeed}</span>}
           </div>
-          {unassigned > 0 && <div className="admin-warn">난이도 미지정 활성 문항 {unassigned}개 — 상/중/하로 분류해야 기준에 반영됩니다.</div>}
+          {unassigned > 0 && <div className="admin-warn">{kindLabel} 난이도 미지정 활성 {unassigned}개 — 상/중/하로 분류해야 기준에 반영됩니다.</div>}
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>

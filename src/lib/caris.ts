@@ -60,14 +60,8 @@ export const TIER_EXAM_SPEC: Record<string, TierExamSpec> = {
 }
 export const tierTotal = (k: string) => (TIER_EXAM_SPEC[k]?.mc ?? 0) + (TIER_EXAM_SPEC[k]?.short ?? 0)
 
-// 급수별 문제은행 구축 기준(3배수) — 자격검정 출제 설계표(이미지). 과목(getTracks 순서 0..2) × 난이도별 목표.
-//  문항 풀이 이 기준만큼 채워졌는지(제출 여부)로 판정. T2(master~zenith)는 미확정 → 미정(undefined).
-export type DiffTarget = { 하: number; 중: number; 상: number }
-export const TIER_POOL_TARGET: Record<string, DiffTarget[]> = {
-  beginner: [{ 하: 13, 중: 21, 상: 8 }, { 하: 12, 중: 20, 상: 7 }, { 하: 12, 중: 20, 상: 7 }],
-  pro: [{ 하: 15, 중: 26, 상: 10 }, { 하: 15, 중: 26, 상: 10 }, { 하: 14, 중: 24, 상: 10 }],
-  elite: [{ 하: 18, 중: 30, 상: 12 }, { 하: 18, 중: 30, 상: 12 }, { 하: 18, 중: 30, 상: 12 }],
-}
+// 문제은행 구축 기준 = 출제 배분표(TIER_DRAW_CELLS) × 3배수. 유형(mc/short)별로 따로 채워야 추출이 성립.
+export const POOL_MULTIPLIER = 3
 
 export const DRAW_DIFFS = ['하', '중', '상'] as const
 
