@@ -1098,10 +1098,10 @@ async function cbtAnalytics(admin: any) {
 
   const [profRes, attRes, ansRes, qRes, examRes, roundRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, signups7dCnt, qTot, qAct, pendGradeCnt] = await Promise.all([
     admin.from('profiles').select('created_at, is_anonymous').limit(10000),
-    admin.from('exam_attempts').select('exam_id, round_id, status, started_at, submitted_at, created_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
-    admin.from('attempt_answers').select('question_id, is_correct').limit(50000),
-    admin.from('questions').select('id, bank_id, number, subject, prompt, active').is('deleted_at', null).limit(5000),
-    admin.from('exams').select('id, title, slug, active').order('created_at', { ascending: true }),
+    admin.from('exam_attempts').select('id, exam_id, round_id, status, started_at, submitted_at, created_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
+    admin.from('attempt_answers').select('attempt_id, question_id, is_correct').limit(50000),
+    admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
+    admin.from('exams').select('id, title, slug, active, tier').order('created_at', { ascending: true }),
     admin.from('exam_rounds').select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
     // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(레벨테스트 익명 세션 제외)
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', false),
@@ -1133,6 +1133,7 @@ async function cbtAnalytics(admin: any) {
   const certByDay: Record<string, number> = {}
   days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0; certByDay[d] = 0 })
   for (const p of profs as any[]) {
+    if (p.is_anonymous) continue // 가입 추이 = 가입 회원(비익명)만 — 게스트·레벨테스트 익명 세션 제외(누적 회원 KPI와 동일 기준)
     const k = (p.created_at ?? '').slice(0, 10)
     if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
   }
@@ -1262,6 +1263,68 @@ async function cbtAnalytics(admin: any) {
     .map(([subject, v]) => ({ subject, total: v.total, active: v.active }))
     .sort((a, b) => a.subject.localeCompare(b.subject))
 
+  // 급수(tier)별 실집계 — 응시→시험(exam.tier)로 급수 귀속, 답안은 응시가 속한 급수로 귀속.
+  const examTier: Record<string, string | null> = {}
+  for (const e of exams as any[]) examTier[e.id] = e.tier ?? null
+  const attemptTier: Record<string, string | null> = {}
+  for (const a of allAtts as any[]) attemptTier[a.id] = examTier[a.exam_id] ?? null
+  type TAgg = { attempts: number; pass: number; hist: number[]; subj: Record<string, { n: number; c: number }>; diff: Record<string, { n: number; c: number }>; q: Record<string, { n: number; c: number }> }
+  const tierAgg: Record<string, TAgg> = {}
+  const ensureTier = (t: string): TAgg => (tierAgg[t] ??= { attempts: 0, pass: 0, hist: [0, 0, 0, 0, 0], subj: {}, diff: {}, q: {} })
+  for (const a of atts as any[]) {
+    const t = examTier[a.exam_id]
+    if (!t) continue
+    const T = ensureTier(t)
+    T.attempts++
+    const pct = pctOf(a)
+    if (pct != null) {
+      if (pct >= 90) T.hist[4]++
+      else if (pct >= 80) T.hist[3]++
+      else if (pct >= 70) T.hist[2]++
+      else if (pct >= 60) T.hist[1]++
+      else T.hist[0]++
+      if (pct >= 60) T.pass++
+    }
+  }
+  for (const r of ans as any[]) {
+    const t = attemptTier[r.attempt_id]
+    if (!t) continue
+    const T = ensureTier(t)
+    const q = qMap[r.question_id]
+    const sk = q?.subject ?? '(기타)'
+    T.subj[sk] ??= { n: 0, c: 0 }; T.subj[sk].n++; if (r.is_correct) T.subj[sk].c++
+    const dk = q?.difficulty
+    if (dk) { T.diff[dk] ??= { n: 0, c: 0 }; T.diff[dk].n++; if (r.is_correct) T.diff[dk].c++ }
+    T.q[r.question_id] ??= { n: 0, c: 0 }; T.q[r.question_id].n++; if (r.is_correct) T.q[r.question_id].c++
+  }
+  const DIFF_ORDER = ['상', '중', '하']
+  const tiers = Object.entries(tierAgg).map(([tier, T]) => {
+    const qd = Object.entries(T.q)
+      .filter(([, v]) => v.n >= 3)
+      .map(([id, v]) => ({
+        id,
+        number: qMap[id]?.number ?? 0,
+        subject: qMap[id]?.subject ?? '',
+        prompt: qMap[id]?.prompt ?? '',
+        exam: '',
+        active: qMap[id]?.active ?? true,
+        n: v.n,
+        rate: Math.round((v.c / v.n) * 100),
+      }))
+      .sort((a, b) => a.rate - b.rate)
+    return {
+      tier,
+      attempts: T.attempts,
+      pass: T.pass,
+      passRate: T.attempts ? Math.round((T.pass / T.attempts) * 100) : 0,
+      scoreHist: T.hist,
+      subjects: Object.entries(T.subj).map(([subject, v]) => ({ subject, n: v.n, rate: Math.round((v.c / v.n) * 100) })).sort((a, b) => a.rate - b.rate),
+      difficulty: DIFF_ORDER.filter((d) => T.diff[d]).map((d) => ({ level: d, n: T.diff[d].n, rate: Math.round((T.diff[d].c / T.diff[d].n) * 100) })),
+      hard: qd.slice(0, 4),
+      easy: qd.slice(-4).reverse(),
+    }
+  })
+
   return json({
     overview: {
       users: usersCnt.count ?? profs.length,
@@ -1295,6 +1358,7 @@ async function cbtAnalytics(admin: any) {
     qEasiest: qDiff.slice(-6).reverse(),
     subjectCorrect,
     pool,
+    tiers,
   })
 }
 

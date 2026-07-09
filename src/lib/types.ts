@@ -360,6 +360,18 @@ export interface CbtRoundStat {
   pass: number
   cert: number
 }
+// 급수(tier)별 실집계 — 응시→시험(exam.tier)로 급수 귀속. 급수별 추적 응시가 없으면 attempts=0(빈 상태).
+export interface CbtTierStat {
+  tier: string // getTracks 티어 key
+  attempts: number
+  pass: number
+  passRate: number
+  scoreHist: number[] // [0-59,60-69,70-79,80-89,90-100]
+  subjects: { subject: string; rate: number; n: number }[]
+  difficulty: { level: string; rate: number; n: number }[] // 상/중/하 정답률
+  hard: CbtQDiff[]
+  easy: CbtQDiff[]
+}
 export interface CbtAnalytics {
   overview: {
     users: number
@@ -394,6 +406,7 @@ export interface CbtAnalytics {
   qEasiest: CbtQDiff[]
   subjectCorrect: { subject: string; n: number; rate: number }[]
   pool: { subject: string; total: number; active: number }[]
+  tiers?: CbtTierStat[] // 급수별 실집계(admin 함수 재배포 후 제공)
 }
 
 export interface CbtUserRow {
