@@ -71,6 +71,7 @@ create table if not exists questions (
   bank_id uuid not null references question_banks(id),
   number int not null,                 -- 은행 내 1..N
   subject text not null,               -- 예: 'AI 리터러시'
+  difficulty text,                     -- 난이도 '상'|'중'|'하'(과목 하위분류·관리자 전용·비노출), 미지정 null
   topic text not null,
   prompt text not null,
   kind text not null default 'mc',     -- 'mc'(객관식) | 'short'(주관식)
@@ -82,6 +83,7 @@ create table if not exists questions (
   active boolean not null default true,
   unique (bank_id, number),
   constraint questions_kind_check check (kind in ('mc', 'short')),
+  constraint questions_difficulty_check check (difficulty is null or difficulty in ('상', '중', '하')),
   constraint questions_correct_index_check check (
     (kind = 'mc' and correct_index between 0 and 3)
     or (kind = 'short' and correct_index is null)

@@ -47,18 +47,82 @@ const T2_TIERS = [
 ] as const
 
 // 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.
-//  Beginner/Pro = 객40, Elite = 객45+주5. T2(Master~Zenith)는 필기+실기 미확정 → 잠정 0(추후 확정).
+//  Beginner=객40, Pro=객50, Elite=객50+주10. T2(Master~Zenith)는 필기+실기 미확정 → 잠정 0(추후 확정).
 //  ⚠️ format 문자열 바꾸면 여기 수치도 같이 갱신할 것.
 export type TierExamSpec = { mc: number; short: number; durationMin: number; passPct: number }
 export const TIER_EXAM_SPEC: Record<string, TierExamSpec> = {
   beginner: { mc: 40, short: 0, durationMin: 40, passPct: 60 },
-  pro: { mc: 40, short: 0, durationMin: 40, passPct: 60 },
-  elite: { mc: 45, short: 5, durationMin: 60, passPct: 60 },
+  pro: { mc: 50, short: 0, durationMin: 50, passPct: 60 },
+  elite: { mc: 50, short: 10, durationMin: 60, passPct: 60 },
   master: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
   grandmaster: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
   zenith: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
 }
 export const tierTotal = (k: string) => (TIER_EXAM_SPEC[k]?.mc ?? 0) + (TIER_EXAM_SPEC[k]?.short ?? 0)
+
+// 급수별 출제 마진(1회 시험) — 난이도 하:중:상 = 3:4:3, 과목 ①:②:③ = 3:4:3(가운데 40%).
+//  · subj = getTracks subjects 순서(0..2)별 출제 수. diff = 난이도별 출제 수. 둘 다 총문항의 마진.
+//  · 문제은행 목표 = 이 값 × POOL_MULTIPLIER(3배수). 문항 풀 충족 판정 기준.
+//  · T2(master~zenith)는 출제 설계 미확정 → 미정(undefined).
+//  ⚠️ 추출 로직(admin 함수 examDraw)도 이 마진을 쓰므로 supabase/functions/admin 쪽 사본과 동기화할 것.
+export const POOL_MULTIPLIER = 3
+export type TierBlueprint = { diff: { 하: number; 중: number; 상: number }; subj: number[] }
+export const TIER_BLUEPRINT: Record<string, TierBlueprint> = {
+  beginner: { diff: { 하: 12, 중: 16, 상: 12 }, subj: [12, 16, 12] }, // 40
+  pro: { diff: { 하: 15, 중: 20, 상: 15 }, subj: [15, 20, 15] }, // 50
+  elite: { diff: { 하: 18, 중: 24, 상: 18 }, subj: [18, 24, 18] }, // 60 (객50+주10)
+}
+
+// 유형(mc/short)별 출제 마진 — 실제 추출은 이 마진으로 과목×난이도 배분표를 만들어 뽑는다.
+//  Beginner/Pro = 전부 객관식. Elite = 객50(3:4:3) + 주10(3:4:3).
+export type DrawKindPlan = { diff: { 하: number; 중: number; 상: number }; subj: number[] }
+export const TIER_DRAW: Record<string, { mc: DrawKindPlan; short: DrawKindPlan | null }> = {
+  beginner: { mc: { diff: { 하: 12, 중: 16, 상: 12 }, subj: [12, 16, 12] }, short: null },
+  pro: { mc: { diff: { 하: 15, 중: 20, 상: 15 }, subj: [15, 20, 15] }, short: null },
+  elite: { mc: { diff: { 하: 15, 중: 20, 상: 15 }, subj: [15, 20, 15] }, short: { diff: { 하: 3, 중: 4, 상: 3 }, subj: [3, 4, 3] } },
+}
+
+export const DRAW_DIFFS = ['하', '중', '상'] as const
+
+// 과목(행합=subj[]) × 난이도(열합=cols[]) 마진을 모두 만족하는 정수 배분표. sum(subj)=sum(cols) 전제.
+// 독립비례로 시작 → 행합을 정확히 맞추고(최대 소수부 우선) → 열 초과분을 같은 행 안에서 이동해 열합까지 맞춘다.
+export function biproportional(rows: number[], cols: number[]): number[][] {
+  const R = rows.length, C = cols.length
+  const T = rows.reduce((a, b) => a + b, 0)
+  if (T === 0) return rows.map(() => new Array(C).fill(0))
+  const M = rows.map((r) => cols.map((c) => Math.floor((r * c) / T)))
+  for (let i = 0; i < R; i++) {
+    let deficit = rows[i] - M[i].reduce((a, b) => a + b, 0)
+    const order = cols
+      .map((c, j) => ({ j, f: (rows[i] * c) / T - Math.floor((rows[i] * c) / T) }))
+      .sort((a, b) => b.f - a.f)
+    let k = 0
+    while (deficit-- > 0) { M[i][order[k % C].j]++; k++ }
+  }
+  const colSum = (j: number) => M.reduce((a, r) => a + r[j], 0)
+  for (let guard = 0; guard < 4000; guard++) {
+    const j1 = cols.findIndex((c, j) => colSum(j) > c)
+    const j2 = cols.findIndex((c, j) => colSum(j) < c)
+    if (j1 < 0 || j2 < 0) break
+    const i = M.findIndex((r) => r[j1] > 0)
+    if (i < 0) break
+    M[i][j1]--; M[i][j2]++
+  }
+  return M
+}
+
+// 추출 요청에 실어보낼 배분표 — 과목 문자열(getTracks 순서)까지 담아 서버가 그대로 뽑게 한다.
+export function buildDrawCells(tierKey: string, subjects: string[]) {
+  const plan = TIER_DRAW[tierKey]
+  if (!plan) return null
+  const toCols = (d: DrawKindPlan['diff']) => [d.하, d.중, d.상]
+  return {
+    subjects,
+    diffs: [...DRAW_DIFFS],
+    mc: biproportional(plan.mc.subj, toCols(plan.mc.diff)),
+    short: plan.short ? biproportional(plan.short.subj, toCols(plan.short.diff)) : null,
+  }
+}
 
 // CARIS 트랙 데이터(로케일 반영본). Guide/ExamApply 가 소비.
 export function getTracks(lang: Lang): Track[] {

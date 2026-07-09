@@ -1424,6 +1424,17 @@
   background: rgba(0, 74, 198, 0.14);
   color: var(--blue-hi);
 }
+/* 주관식 유형 뱃지 — 객관식(파랑)과 구분되는 보라색 */
+.admin-badge.st-short {
+  background: color-mix(in srgb, #7c3aed 16%, transparent);
+  color: #7c3aed;
+}
+@media (prefers-color-scheme: dark) {
+  .admin-badge.st-short {
+    background: color-mix(in srgb, #a78bfa 22%, transparent);
+    color: #c4b5fd;
+  }
+}
 .admin-badge.st-voided {
   background: var(--danger-bg);
   color: var(--danger-fg);

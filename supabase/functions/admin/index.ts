@@ -809,13 +809,20 @@ async function questionList(admin: any, body: any) {
   if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const { data, error } = await admin
     .from('questions')
-    .select('id, bank_id, number, subject, topic, prompt, kind, choices, correct_index, answer_key, explanation, active')
+    .select('id, bank_id, number, subject, difficulty, topic, prompt, kind, choices, correct_index, answer_key, explanation, active')
     .eq('bank_id', bankId)
     .is('deleted_at', null)
     .order('number', { ascending: true })
     .limit(2000)
   if (error) return json({ error: error.message }, 400)
   return json({ rows: data ?? [] })
+}
+
+// 난이도(과목 하위분류) — 상/중/하 중 하나만 유효, 그 외/빈값은 null(미지정).
+const DIFFICULTIES = ['상', '중', '하']
+function normDifficulty(v: unknown): string | null {
+  const s = String(v ?? '').trim()
+  return DIFFICULTIES.includes(s) ? s : null
 }
 
 // 개별 문항 추가/수정 — id 있으면 수정, 없으면 신규(같은 exam_id+number 있으면 덮어쓰기).
@@ -835,6 +842,7 @@ async function questionUpsert(admin: any, body: any, actor: string) {
     bank_id: bankId,
     number,
     subject,
+    difficulty: normDifficulty(q.difficulty),
     topic: String(q.topic ?? '').trim(),
     prompt,
     kind,
@@ -926,42 +934,49 @@ async function questionEvents(admin: any, body: any) {
   return json({ events: withStatus })
 }
 
-// 엑셀 임포트 — rows[] 를 (exam_id, number) 기준 upsert. 재임포트 시 갱신.
+// 엑셀 임포트 — 항상 은행 뒤에 새 문항으로 이어붙인다(append). 엑셀의 '번호'는 파일 내 순번일 뿐,
+// 은행 문항 번호와 무관 → 기존 문항을 덮어쓰지 않는다. 은행 현재 최대 번호 다음부터 순차 채번.
 async function questionsImport(admin: any, body: any, actor: string) {
   const bankId = body?.bankId
   if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const rows = Array.isArray(body?.rows) ? body.rows : []
   if (!rows.length) return json({ error: '가져올 문항이 없습니다.' }, 400)
 
+  // 은행 내 최대 번호(삭제분 포함 — unique(bank_id,number)가 소프트삭제 행도 잡으므로) 다음부터 채번.
+  const { data: maxRow } = await admin
+    .from('questions')
+    .select('number')
+    .eq('bank_id', bankId)
+    .order('number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  let next = Math.floor(Number(maxRow?.number ?? 0)) || 0
+
   const payload: any[] = []
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]
-    const number = Math.floor(Number(r?.number))
-    if (!Number.isFinite(number) || number < 1) return json({ error: `#${i + 1}행: 번호 오류` }, 400)
     const subject = String(r?.subject ?? '').trim()
+    const difficulty = normDifficulty(r?.difficulty)
     const topic = String(r?.topic ?? '').trim()
     const prompt = String(r?.prompt ?? '').trim()
-    if (!subject || !prompt) return json({ error: `#${i + 1}행(번호 ${number}): 과목·지문은 필수` }, 400)
+    if (!subject || !prompt) return json({ error: `#${i + 1}행: 과목·지문은 필수` }, 400)
     const kind = r?.kind === 'short' ? 'short' : 'mc'
     // 해설 — 객관식/주관식 공통(선택). 클라 비노출.
     const explanation = String(r?.explanation ?? '').trim() || null
+    next++ // 은행 뒤에 이어붙일 새 번호
     if (kind === 'short') {
       // 주관식 — 보기/정답번호 없음, 모범답안(answerKey)은 선택
-      payload.push({ bank_id: bankId, number, subject, topic, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, explanation, active: true, deleted_at: null })
+      payload.push({ bank_id: bankId, number: next, subject, difficulty, topic, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, explanation, active: true, deleted_at: null })
       continue
     }
     const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c ?? '').trim()) : []
-    if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: `#${i + 1}행(번호 ${number}): 보기 4개가 모두 필요` }, 400)
+    if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: `#${i + 1}행: 보기 4개가 모두 필요` }, 400)
     const ci = Math.floor(Number(r?.correctIndex))
-    if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: `#${i + 1}행(번호 ${number}): 정답(1~4) 오류` }, 400)
-    payload.push({ bank_id: bankId, number, subject, topic, prompt, kind, choices, correct_index: ci, answer_key: null, explanation, active: true, deleted_at: null })
+    if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: `#${i + 1}행: 정답(1~4) 오류` }, 400)
+    payload.push({ bank_id: bankId, number: next, subject, difficulty, topic, prompt, kind, choices, correct_index: ci, answer_key: null, explanation, active: true, deleted_at: null })
   }
-  // 행 내 번호 중복 검사
-  const nums = payload.map((p) => p.number)
-  const dup = nums.find((n, i) => nums.indexOf(n) !== i)
-  if (dup != null) return json({ error: `번호 ${dup} 가 파일 안에서 중복됩니다.` }, 400)
 
-  const { data, error } = await admin.from('questions').upsert(payload, { onConflict: 'bank_id,number' }).select('id')
+  const { data, error } = await admin.from('questions').insert(payload).select('id')
   if (error) return json({ error: error.message }, 400)
   await logCbtEvent(admin, { question_id: null, bank_id: bankId, number: null, action: 'import', actor, detail: { count: payload.length } })
   return json({ ok: true, count: data?.length ?? payload.length })
@@ -977,13 +992,12 @@ function shuffleIds(arr: string[]): string[] {
   return a
 }
 
-// 등록시험에 그 급수 은행에서 mc N + short M 랜덤 추출 → exam_questions 교체 저장.
+// 등록시험에 그 급수 은행에서 추출 → exam_questions 교체 저장.
+//  · cells(과목×난이도 배분표, 클라 buildDrawCells)가 오면: (과목·난이도·유형) 버킷별로 그 수만큼 뽑아 3:4:3 마진 충족.
+//  · cells 없으면(구버전 호출): mc N + short M 랜덤(하위호환).
 async function examDraw(admin: any, body: any, actor: string) {
   const examId = body?.examId
   if (!examId) return json({ error: 'examId 필요' }, 400)
-  const mc = Math.max(0, Math.floor(Number(body?.mc) || 0))
-  const short = Math.max(0, Math.floor(Number(body?.short) || 0))
-  if (mc + short === 0) return json({ error: '뽑을 문항 수가 0입니다.' }, 400)
   const { data: ex } = await admin.from('exams').select('id, tier').eq('id', examId).not('round_id', 'is', null).maybeSingle()
   if (!ex?.tier) return json({ error: '등록시험이 아닙니다.' }, 400)
   const { count: att } = await admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('exam_id', examId)
@@ -991,20 +1005,55 @@ async function examDraw(admin: any, body: any, actor: string) {
   const { data: bank } = await admin.from('question_banks').select('id').eq('tier', ex.tier).maybeSingle()
   if (!bank?.id) return json({ error: `'${ex.tier}' 문제은행이 없습니다.` }, 400)
 
-  async function pick(kind: string, n: number): Promise<string[]> {
-    if (n === 0) return []
-    const { data } = await admin.from('questions').select('id').eq('bank_id', bank.id).eq('kind', kind).eq('active', true).is('deleted_at', null)
-    const ids = (data ?? []).map((r: any) => r.id)
-    if (ids.length < n) throw new Error(`${kind === 'mc' ? '객관식' : '주관식'} 은행 문항 부족 (보유 ${ids.length} / 필요 ${n})`)
-    return shuffleIds(ids).slice(0, n)
+  const cells = body?.cells
+  let picked: string[] = []
+
+  if (cells && Array.isArray(cells.subjects) && Array.isArray(cells.diffs)) {
+    // 과목×난이도×유형 버킷(활성만) → 배분표대로 뽑기
+    const { data: qs } = await admin.from('questions').select('id, subject, difficulty, kind').eq('bank_id', bank.id).eq('active', true).is('deleted_at', null)
+    const bucket: Record<string, string[]> = {}
+    for (const q of qs ?? []) {
+      ;(bucket[`${q.kind}|${q.subject}|${q.difficulty ?? ''}`] ??= []).push(q.id)
+    }
+    const subjects: string[] = cells.subjects
+    const diffs: string[] = cells.diffs
+    const shortfalls: string[] = []
+    const drawKind = (kind: string, matrix: number[][] | null | undefined) => {
+      if (!Array.isArray(matrix)) return
+      for (let i = 0; i < subjects.length; i++) {
+        for (let d = 0; d < diffs.length; d++) {
+          const need = Math.max(0, Math.floor(Number(matrix[i]?.[d]) || 0))
+          if (!need) continue
+          const pool = shuffleIds(bucket[`${kind}|${subjects[i]}|${diffs[d]}`] ?? [])
+          if (pool.length < need) shortfalls.push(`${subjects[i]} · ${diffs[d]} · ${kind === 'mc' ? '객관식' : '주관식'} 부족(보유 ${pool.length}/필요 ${need})`)
+          picked.push(...pool.slice(0, need))
+        }
+      }
+    }
+    drawKind('mc', cells.mc)
+    drawKind('short', cells.short)
+    if (shortfalls.length) return json({ error: '문항 부족 — 채운 뒤 다시 추출하세요:\n' + shortfalls.join('\n') }, 400)
+    if (picked.length === 0) return json({ error: '배분표가 비어 있습니다.' }, 400)
+  } else {
+    // 하위호환: mc/short 랜덤
+    const mc = Math.max(0, Math.floor(Number(body?.mc) || 0))
+    const short = Math.max(0, Math.floor(Number(body?.short) || 0))
+    if (mc + short === 0) return json({ error: '뽑을 문항 수가 0입니다.' }, 400)
+    const pick = async (kind: string, n: number): Promise<string[]> => {
+      if (n === 0) return []
+      const { data } = await admin.from('questions').select('id').eq('bank_id', bank.id).eq('kind', kind).eq('active', true).is('deleted_at', null)
+      const ids = (data ?? []).map((r: any) => r.id)
+      if (ids.length < n) throw new Error(`${kind === 'mc' ? '객관식' : '주관식'} 은행 문항 부족 (보유 ${ids.length} / 필요 ${n})`)
+      return shuffleIds(ids).slice(0, n)
+    }
+    try {
+      const [mcIds, shIds] = await Promise.all([pick('mc', mc), pick('short', short)])
+      picked = [...mcIds, ...shIds]
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : '추출 실패' }, 400)
+    }
   }
-  let picked: string[]
-  try {
-    const [mcIds, shIds] = await Promise.all([pick('mc', mc), pick('short', short)])
-    picked = [...mcIds, ...shIds]
-  } catch (e) {
-    return json({ error: e instanceof Error ? e.message : '추출 실패' }, 400)
-  }
+
   await admin.from('exam_questions').delete().eq('exam_id', examId)
   const rows = picked.map((qid, i) => ({ exam_id: examId, question_id: qid, number: i + 1 }))
   const { error } = await admin.from('exam_questions').insert(rows)
@@ -1020,7 +1069,7 @@ async function examSetList(admin: any, body: any) {
   if (!examId) return json({ error: 'examId 필요' }, 400)
   const { data, error } = await admin
     .from('exam_questions')
-    .select('number, question_id, questions(number, subject, kind, prompt, active)')
+    .select('number, question_id, questions(number, subject, difficulty, kind, prompt, active)')
     .eq('exam_id', examId)
     .order('number', { ascending: true })
   if (error) return json({ error: error.message }, 400)
@@ -1028,6 +1077,7 @@ async function examSetList(admin: any, body: any) {
     number: r.number,
     questionId: r.question_id,
     subject: r.questions?.subject ?? '',
+    difficulty: r.questions?.difficulty ?? null,
     kind: r.questions?.kind ?? 'mc',
     prompt: r.questions?.prompt ?? '',
     bankNumber: r.questions?.number ?? null,

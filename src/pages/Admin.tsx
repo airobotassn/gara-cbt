@@ -38,7 +38,7 @@ import type {
   I18nText,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
-import { getTracks, TIER_EXAM_SPEC, tierTotal } from '../lib/caris'
+import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_BLUEPRINT, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 
 // 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
@@ -2120,7 +2120,6 @@ function hash01(s: string): number {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
   return ((h >>> 0) % 100000) / 100000
 }
-
 const DEMO_PAY = {
   refundRate: 0.035,
   methods: [
@@ -2167,9 +2166,9 @@ interface TierStat {
   passRate: number
   scoreHist: number[] // [0-59,60-69,70-79,80-89,90-100]
   subjects: { subject: string; rate: number; n: number }[]
+  difficulty: { level: '상' | '중' | '하'; rate: number; n: number }[] // 난이도별 정답률
   hard: CbtQDiff[]
   easy: CbtQDiff[]
-  pool: { subject: string; total: number; active: number }[]
 }
 function tierStat(key: string, name: string, subjects: string[]): TierStat {
   const attempts = 24 + Math.floor(hash01('att' + key) * 176)
@@ -2195,11 +2194,15 @@ function tierStat(key: string, name: string, subjects: string[]): TierStat {
   })
   const hard = [0, 1, 2, 3].map((i) => mkQ(i, 18 + Math.floor(hash01('hr' + key + i) * 20))).sort((x, y) => x.rate - y.rate)
   const easy = [0, 1, 2, 3].map((i) => mkQ(i + 10, 82 + Math.floor(hash01('er' + key + i) * 16))).sort((x, y) => y.rate - x.rate)
-  const pool = subjects.map((s, i) => {
-    const active = 3 + Math.floor(hash01('pa' + key + i) * 9)
-    return { subject: s, active, total: active + Math.floor(hash01('pt' + key + i) * 5) }
-  })
-  return { attempts, pass, passRate, scoreHist, subjects: subj, hard, easy, pool }
+  // 난이도별 정답률 — 상은 낮게·하는 높게(백엔드 집계 붙기 전까지 과목별과 동일 데모 방식). 문항 풀은 문항관리에서 실데이터로 표시.
+  const DLEVELS = ['상', '중', '하'] as const
+  const dBase = { 상: 38, 중: 58, 하: 76 } as const
+  const difficulty = DLEVELS.map((lv, i) => ({
+    level: lv,
+    rate: dBase[lv] + Math.floor(hash01('dr' + key + i) * 14),
+    n: Math.round(attempts * (0.7 + hash01('dn' + key + i) * 0.3)),
+  }))
+  return { attempts, pass, passRate, scoreHist, subjects: subj, difficulty, hard, easy }
 }
 
 function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?: SubsFilter) => void }) {
@@ -2314,7 +2317,6 @@ function TierAnalysis() {
   const st = tierStat(cur.key, cur.name, cur.subjects)
   const bands = ['0-59', '60-69', '70-79', '80-89', '90-100']
   const histMax = Math.max(1, ...st.scoreHist)
-  const poolWarn = st.pool.filter((p) => p.active < 4)
 
   return (
     <div className="admin-section">
@@ -2342,14 +2344,18 @@ function TierAnalysis() {
           <b>{cur.track} · {cur.name}</b>
           <span>응시 <b>{st.attempts}</b> · 합격 <b>{st.pass}</b> ({st.passRate}%)</span>
         </div>
-        <div className="admin-grid2">
-          <div className="tier-panel">
-            <div className="admin-sub">점수 분포</div>
-            {bands.map((lb, i) => <HBar key={lb} label={`${lb}점`} value={st.scoreHist[i]} max={histMax} sub="명" />)}
-          </div>
+        <div className="tier-panel">
+          <div className="admin-sub">점수 분포</div>
+          {bands.map((lb, i) => <HBar key={lb} label={`${lb}점`} value={st.scoreHist[i]} max={histMax} sub="명" />)}
+        </div>
+        <div className="admin-grid2" style={{ marginTop: 14 }}>
           <div className="tier-panel">
             <div className="admin-sub">과목별 정답률</div>
             {st.subjects.map((s) => <HBar key={s.subject} label={s.subject} value={s.rate} max={100} sub={`% (${s.n})`} />)}
+          </div>
+          <div className="tier-panel">
+            <div className="admin-sub">난이도별 정답률</div>
+            {st.difficulty.map((d) => <HBar key={d.level} label={d.level} value={d.rate} max={100} sub={`% (${d.n})`} />)}
           </div>
         </div>
         <div className="tier-panel" style={{ marginTop: 14 }}>
@@ -2359,28 +2365,6 @@ function TierAnalysis() {
         <div className="tier-panel" style={{ marginTop: 14 }}>
           <div className="admin-sub">쉬운 문항 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>정답률 높은 순</span></div>
           <DiffRows rows={st.easy} empty="—" />
-        </div>
-        <div className="tier-panel" style={{ marginTop: 14 }}>
-          <div className="admin-sub">과목별 문항 풀 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>활성 4개 이상 권장</span></div>
-          {poolWarn.length ? <div className="admin-warn">⚠ 활성 4개 미만: {poolWarn.map((p) => p.subject).join(' · ')}</div> : null}
-          <table className="admin-table pool-table">
-            <thead>
-              <tr><th>과목</th><th>활성</th><th>전체</th><th>상태</th></tr>
-            </thead>
-            <tbody>
-              {st.pool.map((p) => {
-                const ok = p.active >= 4
-                return (
-                  <tr key={p.subject} className={ok ? '' : 'prob'}>
-                    <td>{p.subject}</td>
-                    <td data-label="활성"><b>{p.active}</b></td>
-                    <td data-label="전체">{p.total}</td>
-                    <td>{ok ? <span className="badge ok">충분</span> : <span className="badge low">부족</span>}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -2691,25 +2675,37 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
 // ── 문항 관리 (목록 · 이력 · 엑셀 업로드) ──────────────────────────
 // ── 문항 급수(티어)→과목 필터 (레벨테스트 ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
 function useTierSubjectFilter() {
-  // 은행(급수)이 이미 상단에서 선택됨 → 급수 필터는 두지 않는다. 과목(실제 문항 과목)·유형·검색만.
+  // 은행(급수)이 이미 상단에서 선택됨 → 급수 필터는 두지 않는다. 과목(실제 문항 과목)·난이도·유형·검색만.
   const [subject, setSubject] = useState('all')
+  const [difficulty, setDifficulty] = useState<'all' | '상' | '중' | '하' | 'none'>('all')
   const [kind, setKind] = useState<'all' | 'mc' | 'short'>('all')
   const [q, setQ] = useState('')
   const matchTS = (subjectVal: string | null | undefined) => subject === 'all' || (subjectVal ?? '') === subject
+  const matchDiff = (d: string | null | undefined) =>
+    difficulty === 'all' || (difficulty === 'none' ? !d : d === difficulty)
   const matchKind = (k: string | null | undefined) => kind === 'all' || (k ?? 'mc') === kind
   const matchQ = (text: string) => { const qq = q.trim().toLowerCase(); return !qq || text.toLowerCase().includes(qq) }
-  return { subject, setSubject, kind, setKind, q, setQ, matchTS, matchKind, matchQ }
+  return { subject, setSubject, difficulty, setDifficulty, kind, setKind, q, setQ, matchTS, matchDiff, matchKind, matchQ }
 }
 type TierSubjectFilter = ReturnType<typeof useTierSubjectFilter>
 
-// 과목 옵션은 실제 문항의 과목에서(subjects prop). 유형(mc/short)은 목록에서만(showKind).
-function TierSubjectBar({ f, count, loading, actions, subjects, showKind = true }: { f: TierSubjectFilter; count: number; loading?: boolean; actions?: ReactNode; subjects: string[]; showKind?: boolean }) {
+// 과목 옵션은 실제 문항의 과목에서(subjects prop). 난이도·유형(mc/short)은 목록에서만(showDiff·showKind).
+function TierSubjectBar({ f, count, loading, actions, subjects, showKind = true, showDiff = true }: { f: TierSubjectFilter; count: number; loading?: boolean; actions?: ReactNode; subjects: string[]; showKind?: boolean; showDiff?: boolean }) {
   return (
     <div className="admin-toolbar">
       <label>과목 <select value={f.subject} onChange={(e) => f.setSubject(e.target.value)}>
         <option value="all">전체 과목</option>
         {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
       </select></label>
+      {showDiff && (
+        <label>난이도 <select value={f.difficulty} onChange={(e) => f.setDifficulty(e.target.value as typeof f.difficulty)}>
+          <option value="all">전체 난이도</option>
+          <option value="상">상</option>
+          <option value="중">중</option>
+          <option value="하">하</option>
+          <option value="none">미지정</option>
+        </select></label>
+      )}
       {showKind && (
         <label>유형 <select value={f.kind} onChange={(e) => f.setKind(e.target.value as 'all' | 'mc' | 'short')}>
           <option value="all">전체 유형</option>
@@ -2731,6 +2727,7 @@ function qNormKey(s: unknown): string {
 const CBT_HEAD = {
   num: ['번호', 'no', '순번', '문항번호', '문번'],
   subject: ['과목', '영역', '분류', '카테고리', '과목명'],
+  difficulty: ['난이도', '난도', '상중하', 'difficulty', 'level', '레벨'],
   prompt: ['지문', '문제', '문항', '질문', 'question'],
   answer: ['정답', '정답번호', 'answer', '정답인덱스'],
   kind: ['유형', '형식', '타입', 'type', '구분'],
@@ -2744,12 +2741,22 @@ function qFindCol(header: string[], aliases: string[]): number {
   for (let i = 0; i < h.length; i++) if (h[i] && aliases.some((a) => h[i].includes(qNormKey(a)))) return i
   return -1
 }
-interface QColCfg { cNum: number; cSubject: number; cPrompt: number; cOptions: number[]; cAnswer: number; cKind: number; cAnswerKey: number; cExplanation: number }
+// 엑셀 난이도 셀 → '상'|'중'|'하'(그 외/빈값은 '' = 미지정). 흔한 동의어도 수용.
+function qNormDiff(v: unknown): '' | '상' | '중' | '하' {
+  const s = String(v ?? '').trim().toLowerCase()
+  if (!s) return ''
+  if (s === '상' || /상급|어려움|어렵|high|hard/.test(s)) return '상'
+  if (s === '중' || /중급|보통|normal|mid|medium/.test(s)) return '중'
+  if (s === '하' || /하급|쉬움|쉬운|low|easy/.test(s)) return '하'
+  return ''
+}
+interface QColCfg { cNum: number; cSubject: number; cDifficulty: number; cPrompt: number; cOptions: number[]; cAnswer: number; cKind: number; cAnswerKey: number; cExplanation: number }
 function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHeader: boolean } {
   const h = header.map(qNormKey)
   const optCols = h.map((x, i) => ({ x, i })).filter((o) => CBT_HEAD.option.some((a) => o.x.includes(qNormKey(a)))).map((o) => o.i)
   const cNum = qFindCol(header, CBT_HEAD.num)
   const cSubject = qFindCol(header, CBT_HEAD.subject)
+  const cDifficulty = qFindCol(header, CBT_HEAD.difficulty)
   const cPrompt = qFindCol(header, CBT_HEAD.prompt)
   const cAnswer = qFindCol(header, CBT_HEAD.answer)
   const cKind = qFindCol(header, CBT_HEAD.kind)
@@ -2760,6 +2767,7 @@ function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHead
     cfg: {
       cNum: cNum >= 0 ? cNum : 0,
       cSubject: cSubject >= 0 ? cSubject : 1,
+      cDifficulty, // 난이도는 선택 컬럼 — 없으면 -1(미지정), 머리글 없는 파일에선 기본열 배정 안 함
       cPrompt: cPrompt >= 0 ? cPrompt : 2,
       cOptions: optCols.length ? optCols.slice(0, 4) : [3, 4, 5, 6].filter((c) => c < ncol),
       cAnswer: cAnswer >= 0 ? cAnswer : 7,
@@ -2772,7 +2780,7 @@ function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHead
 }
 function qRowHeaderScore(row: string[]): number {
   const cells = (row ?? []).map(qNormKey).filter(Boolean)
-  const groups = [CBT_HEAD.prompt, CBT_HEAD.answer, CBT_HEAD.subject, CBT_HEAD.num, CBT_HEAD.kind, CBT_HEAD.option, CBT_HEAD.answerKey, CBT_HEAD.explanation]
+  const groups = [CBT_HEAD.prompt, CBT_HEAD.answer, CBT_HEAD.subject, CBT_HEAD.difficulty, CBT_HEAD.num, CBT_HEAD.kind, CBT_HEAD.option, CBT_HEAD.answerKey, CBT_HEAD.explanation]
   let hits = 0
   for (const g of groups) if (cells.some((c) => g.some((a) => c === qNormKey(a) || c.includes(qNormKey(a))))) hits++
   return hits
@@ -2784,6 +2792,126 @@ function qFindHeaderRow(aoa: string[][], maxScan = 15): { idx: number; score: nu
   return best
 }
 
+// 난이도(상/중/하) 배지 — 관리자 목록·미리보기 공용. 미지정은 흐린 '—'.
+const DIFF_STYLE: Record<string, { bg: string; fg: string }> = {
+  '상': { bg: 'rgba(212,58,58,.14)', fg: '#c0392b' },
+  '중': { bg: 'rgba(214,158,46,.16)', fg: '#b7791f' },
+  '하': { bg: 'rgba(56,161,105,.14)', fg: '#2f855a' },
+}
+function DiffTag({ value }: { value: string | null | undefined }) {
+  if (!value || !DIFF_STYLE[value]) return <span style={{ color: 'var(--dim)' }}>—</span>
+  const s = DIFF_STYLE[value]
+  return <span style={{ background: s.bg, color: s.fg, padding: '2px 9px', borderRadius: 999, fontSize: 12.5, fontWeight: 700 }}>{value}</span>
+}
+
+// 문항 풀 현황 — 문항 관리 최상단 독립 섹션. 급수·검정과목은 /guide(getTracks) 단일 출처.
+// 급수 탭 선택 → 그 급수의 과목(가이드 정의 전부, 0개=미출제도 노출) + 난이도별 문항 수를 얹어 보여줌.
+// 급수→문제은행 매핑(bank.tier)으로 문항만 불러오고, 과목 목록 자체는 문항에서 뽑지 않는다.
+function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refreshKey?: number }) {
+  const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
+  const [tierKey, setTierKey] = useState(tiers[0]?.key ?? '')
+  const [rows, setRows] = useState<AdminQuestionRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [reloadTick, setReloadTick] = useState(0) // 수동 새로고침
+
+  const cur = tiers.find((t) => t.key === tierKey) ?? tiers[0]
+  const bank = banks.find((b) => b.tier === tierKey)
+  const bankId = bank?.id
+
+  // 급수 변경·부모의 문항 변경(refreshKey)·수동 새로고침 때마다 재조회
+  useEffect(() => {
+    if (!bankId) { setRows([]); return }
+    let alive = true
+    setLoading(true)
+    callFunction<AdminQuestionListResp>('admin', { action: 'questionList', bankId })
+      .then((r) => { if (alive) setRows(r.rows) })
+      .catch(() => { if (alive) setRows([]) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [bankId, refreshKey, reloadTick])
+
+  // 기준 = 출제 마진 × 3배수(POOL_MULTIPLIER). 난이도별·과목별 각각 확보(활성) vs 목표. 기준은 caris.TIER_BLUEPRINT.
+  const bp = TIER_BLUEPRINT[tierKey]
+  const subjects = cur?.subjects ?? []
+  const DIFFS: Array<'하' | '중' | '상'> = ['하', '중', '상']
+  const cntActive = (pred: (q: AdminQuestionRow) => boolean) => rows.reduce((n, q) => n + (q.active && pred(q) ? 1 : 0), 0)
+  const unassigned = cntActive((q) => !q.difficulty)
+  const diffRows = DIFFS.map((d) => {
+    const g = cntActive((q) => q.difficulty === d)
+    const need = (bp?.diff[d] ?? 0) * POOL_MULTIPLIER
+    return { key: d, g, need, ok: g >= need }
+  })
+  const subjRows = subjects.map((s, i) => {
+    const g = cntActive((q) => q.subject === s)
+    const need = (bp?.subj[i] ?? 0) * POOL_MULTIPLIER
+    return { key: s, g, need, ok: g >= need }
+  })
+  const shortCount = [...diffRows, ...subjRows].filter((r) => !r.ok).length
+  const totGot = diffRows.reduce((s, r) => s + r.g, 0)
+  const totNeed = diffRows.reduce((s, r) => s + r.need, 0)
+
+  return (
+    <div className="admin-section" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div className="admin-sub" style={{ marginTop: 0 }}>문항 풀 현황 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>문제은행 구축 기준(출제×3배수) 대비 확보(활성)</span></div>
+        <button className="admin-mini" onClick={() => setReloadTick((t) => t + 1)} disabled={loading}>{loading ? '불러오는 중…' : '새로고침'}</button>
+      </div>
+      <div className="admin-tabs" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
+        {tiers.map((t) => (
+          <button key={t.key} className={t.key === tierKey ? 'on' : ''} onClick={() => setTierKey(t.key)}>
+            {t.track.replace('CARIS-', '')} · {t.name}
+          </button>
+        ))}
+      </div>
+      {!bank && <div className="admin-warn">이 급수의 문제은행이 아직 없습니다 — 확보 0으로 표시됩니다.</div>}
+      {!bp ? (
+        <div className="admin-section admin-empty">이 급수는 출제 기준(문제은행 구축)이 아직 미확정입니다.</div>
+      ) : (
+        <>
+          <div style={{ marginBottom: 10 }}>
+            {shortCount === 0
+              ? <span className="badge ok">기준 충족 — 난이도·과목 목표 모두 제출 완료 (난이도 {totGot}/{totNeed})</span>
+              : <span className="badge low">미달 — {shortCount}개 항목 부족 · 난이도 확보 {totGot}/{totNeed}</span>}
+          </div>
+          {unassigned > 0 && <div className="admin-warn">난이도 미지정 활성 문항 {unassigned}개 — 상/중/하로 분류해야 난이도 기준에 반영됩니다.</div>}
+          <div className="admin-grid2">
+            <div className="tier-panel">
+              <div className="admin-sub" style={{ marginTop: 0 }}>난이도별 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>확보/목표(=출제×3)</span></div>
+              <table className="admin-table pool-table">
+                <thead><tr><th>난이도</th><th>확보/목표</th><th>상태</th></tr></thead>
+                <tbody>
+                  {diffRows.map((r) => (
+                    <tr key={r.key} className={r.ok ? '' : 'prob'}>
+                      <td><DiffTag value={r.key} /></td>
+                      <td data-label="확보/목표" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: r.ok ? '#2f855a' : '#c0392b' }}>{r.g}/{r.need}</td>
+                      <td>{r.ok ? <span className="badge ok">충족</span> : <span className="badge low">부족 {r.need - r.g}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="tier-panel">
+              <div className="admin-sub" style={{ marginTop: 0 }}>과목별 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>확보/목표(=출제×3)</span></div>
+              <table className="admin-table pool-table">
+                <thead><tr><th>과목</th><th>확보/목표</th><th>상태</th></tr></thead>
+                <tbody>
+                  {subjRows.map((r) => (
+                    <tr key={r.key} className={r.ok ? '' : 'prob'}>
+                      <td>{r.key}</td>
+                      <td data-label="확보/목표" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: r.ok ? '#2f855a' : '#c0392b' }}>{r.g}/{r.need}</td>
+                      <td>{r.ok ? <span className="badge ok">충족</span> : <span className="badge low">부족 {r.need - r.g}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // 2층: 문항 목록/이력/업로드 = 급수별 문제은행(bank), 시험문항 = 등록시험(회차×급수)의 뽑힌 세트.
 function QuestionsAdmin() {
   const [banks, setBanks] = useState<QuestionBankItem[]>([])
@@ -2791,6 +2919,7 @@ function QuestionsAdmin() {
   const [exams, setExams] = useState<AdminExamItem[]>([])
   const [examId, setExamId] = useState<string>('')
   const [view, setView] = useState<'list' | 'events' | 'examset' | 'import'>('list')
+  const [tick, setTick] = useState(0) // 문항 변경(추가·수정·삭제·업로드) 시 증가 → 풀 매트릭스 갱신 신호
 
   const load = useCallback(async () => {
     try {
@@ -2804,6 +2933,8 @@ function QuestionsAdmin() {
       /* 무시 */
     }
   }, [])
+  // 문항 변경 시: 은행 카운트 새로고침 + 풀 매트릭스 재조회 신호
+  const bump = useCallback(() => { load(); setTick((t) => t + 1) }, [load])
   useEffect(() => {
     load()
   }, [load])
@@ -2819,23 +2950,27 @@ function QuestionsAdmin() {
     <>
       <div className="admin-head">
         <h1>문항 관리</h1>
-        <div className="admin-head-actions">
-          {isSet ? (
-            <select style={{ minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
-              {exams.length === 0 && <option value="">등록시험 없음</option>}
-              {exams.map((ex) => (
-                <option key={ex.id} value={ex.id}>{ex.title} ({ex.questionCount})</option>
-              ))}
-            </select>
-          ) : (
-            <select style={{ minWidth: 180 }} value={bankId} onChange={(e) => setBankId(e.target.value)}>
-              {banks.length === 0 && <option value="">은행 없음</option>}
-              {banks.map((b) => (
-                <option key={b.id} value={b.id}>{b.title} ({b.activeCount}/{b.questionCount})</option>
-              ))}
-            </select>
-          )}
-        </div>
+      </div>
+
+      <PoolOverview banks={banks} refreshKey={tick} />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{isSet ? '등록시험' : '문제은행'}</span>
+        {isSet ? (
+          <select style={{ minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
+            {exams.length === 0 && <option value="">등록시험 없음</option>}
+            {exams.map((ex) => (
+              <option key={ex.id} value={ex.id}>{ex.title} ({ex.questionCount})</option>
+            ))}
+          </select>
+        ) : (
+          <select style={{ minWidth: 180 }} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+            {banks.length === 0 && <option value="">은행 없음</option>}
+            {banks.map((b) => (
+              <option key={b.id} value={b.id}>{b.title} ({b.activeCount}/{b.questionCount})</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="admin-tabs" style={{ marginBottom: 16 }}>
@@ -2849,16 +2984,16 @@ function QuestionsAdmin() {
         !examId ? (
           <div className="admin-section admin-empty">등록시험이 없습니다. <b>시험등록</b> 탭에서 회차에 급수를 추가하세요.</div>
         ) : (
-          <ExamSetView examId={examId} exams={exams} onChanged={load} />
+          <ExamSetView examId={examId} exams={exams} onChanged={bump} />
         )
       ) : !bankId ? (
         <div className="admin-section admin-empty">문제은행이 없습니다.</div>
       ) : view === 'list' ? (
-        <QuestionListView bankId={bankId} onChanged={load} />
+        <QuestionListView bankId={bankId} onChanged={bump} />
       ) : view === 'events' ? (
-        <QuestionEventsView bankId={bankId} onChanged={load} />
+        <QuestionEventsView bankId={bankId} onChanged={bump} />
       ) : (
-        <QuestionImportView bankId={bankId} onImported={load} />
+        <QuestionImportView bankId={bankId} onImported={bump} />
       )}
     </>
   )
@@ -2892,9 +3027,12 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
       alert('이 급수는 아직 시험 구성이 정의되지 않았습니다.')
       return
     }
+    // 과목×난이도 배분표(3:4:3) — getTracks 과목 순서 그대로. 서버가 이 표대로 (과목·난이도·유형) 버킷에서 뽑는다.
+    const tierSubjects = getTracks('ko').flatMap((tr) => tr.tiers).find((ti) => ti.key === ex?.tier)?.subjects ?? []
+    const cells = ex?.tier ? buildDrawCells(ex.tier, tierSubjects) : null
     setBusy(true)
     try {
-      await callFunction('admin', { action: 'examDraw', examId, mc: spec.mc, short: spec.short, replace })
+      await callFunction('admin', { action: 'examDraw', examId, mc: spec.mc, short: spec.short, cells, replace })
       await load()
       onChanged()
     } catch (e) {
@@ -2931,19 +3069,20 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
       </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
-          <thead><tr><th>#</th><th>유형</th><th>과목</th><th>지문</th><th>은행번호</th></tr></thead>
+          <thead><tr><th>#</th><th>유형</th><th>과목</th><th>난이도</th><th>지문</th><th>은행번호</th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.questionId} style={{ opacity: r.active ? 1 : 0.5 }}>
                 <td style={{ fontVariantNumeric: 'tabular-nums' }}>{r.number}</td>
-                <td><span className={`admin-badge st-${r.kind === 'short' ? 'in_progress' : 'submitted'}`}>{r.kind === 'short' ? '주관식' : '객관식'}</span></td>
+                <td><span className={`admin-badge st-${r.kind === 'short' ? 'short' : 'submitted'}`}>{r.kind === 'short' ? '주관식' : '객관식'}</span></td>
                 <td style={{ whiteSpace: 'nowrap' }}>{r.subject}</td>
-                <td style={{ maxWidth: 360 }}>{r.prompt}</td>
+                <td style={{ whiteSpace: 'nowrap' }}><DiffTag value={r.difficulty} /></td>
+                <td style={{ maxWidth: 360, whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.prompt}</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.bankNumber ?? '-'}</td>
               </tr>
             ))}
             {!rows.length && !loading && (
-              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>아직 추출된 문항이 없습니다. “문항 추출”을 누르세요.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>아직 추출된 문항이 없습니다. “문항 추출”을 누르세요.</td></tr>
             )}
           </tbody>
         </table>
@@ -2991,7 +3130,7 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
   const nextNumber = rows.reduce((m, q) => Math.max(m, q.number), 0) + 1
   const f = useTierSubjectFilter()
   const subjects = [...new Set(rows.map((r) => r.subject).filter(Boolean))].sort()
-  const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
+  const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchDiff(q.difficulty) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
 
   return (
     <>
@@ -3013,6 +3152,7 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
               <th>#</th>
               <th>유형</th>
               <th>과목</th>
+              <th>난이도</th>
               <th>지문</th>
               <th>정답</th>
               <th>상태</th>
@@ -3024,12 +3164,13 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
               <tr key={q.id} style={{ opacity: q.active ? 1 : 0.55 }}>
                 <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{q.number}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <span className={`admin-badge st-${q.kind === 'short' ? 'in_progress' : 'submitted'}`}>{q.kind === 'short' ? '주관식' : '객관식'}</span>
+                  <span className={`admin-badge st-${q.kind === 'short' ? 'short' : 'submitted'}`}>{q.kind === 'short' ? '주관식' : '객관식'}</span>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <b>{q.subject}</b>
                 </td>
-                <td style={{ maxWidth: 340 }}>{q.prompt}</td>
+                <td style={{ whiteSpace: 'nowrap' }}><DiffTag value={q.difficulty} /></td>
+                <td style={{ maxWidth: 340, whiteSpace: 'normal', wordBreak: 'break-word' }}>{q.prompt}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{q.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수 채점</span> : `${(q.correct_index ?? 0) + 1}번`}</td>
                 <td>
                   <span className={`admin-badge st-${q.active ? 'submitted' : 'voided'}`}>{q.active ? '활성' : '비활성'}</span>
@@ -3099,6 +3240,8 @@ function QuestionEditModal({ bankId, row, defaultNumber, onClose, onSaved }: {
   const baseSubjects = curTier?.subjects ?? []
   // 편집 중 기존 과목이 현재 급수 목록에 없으면(레거시 자유입력) 옵션에 그대로 유지
   const subjectOptions = subject && !baseSubjects.includes(subject) ? [subject, ...baseSubjects] : baseSubjects
+  // 난이도(과목 하위분류·관리자 전용). 신규는 '중' 기본, 기존 미지정(null)은 '' 유지(무심코 값 부여 방지).
+  const [difficulty, setDifficulty] = useState<'' | '상' | '중' | '하'>(row ? row.difficulty ?? '' : '중')
   const [prompt, setPrompt] = useState(row?.prompt ?? '')
   const [choices, setChoices] = useState<string[]>(() => {
     const c = row?.choices ?? []
@@ -3116,7 +3259,7 @@ function QuestionEditModal({ bankId, row, defaultNumber, onClose, onSaved }: {
     try {
       await callFunction('admin', {
         action: 'questionUpsert',
-        question: { id: row?.id, bankId, number, kind, subject, prompt, choices, correctIndex, answerKey, explanation, active: row ? row.active : true },
+        question: { id: row?.id, bankId, number, kind, subject, difficulty, prompt, choices, correctIndex, answerKey, explanation, active: row ? row.active : true },
       })
       onSaved()
     } catch (e) {
@@ -3142,6 +3285,15 @@ function QuestionEditModal({ bankId, row, defaultNumber, onClose, onSaved }: {
               <select className="admin-in" value={kind} onChange={(e) => setKind(e.target.value as 'mc' | 'short')}>
                 <option value="mc">객관식</option>
                 <option value="short">주관식</option>
+              </select>
+            </div>
+            <div style={{ ...QE.field, flex: 1 }}>
+              <span style={QE.lab}>난이도 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(응시자 비노출)</span></span>
+              <select className="admin-in" value={difficulty} onChange={(e) => setDifficulty(e.target.value as '' | '상' | '중' | '하')}>
+                <option value="">미지정</option>
+                <option value="상">상</option>
+                <option value="중">중</option>
+                <option value="하">하</option>
               </select>
             </div>
           </div>
@@ -3271,7 +3423,7 @@ function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: 
           </button>
         </div>
       </div>
-      <TierSubjectBar f={f} count={filtered.length} loading={loading} subjects={subjects} showKind={false} />
+      <TierSubjectBar f={f} count={filtered.length} loading={loading} subjects={subjects} showKind={false} showDiff={false} />
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -3360,9 +3512,11 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
           while (choices.length < 4) choices.push('')
           const four = choices.slice(0, 4)
           const kind: 'mc' | 'short' = /주관식|short/i.test(cell(row, cfg.cKind)) ? 'short' : 'mc'
+          const difficulty = qNormDiff(cfg.cDifficulty >= 0 ? cell(row, cfg.cDifficulty) : '')
           return {
             number: Math.floor(Number(cell(row, cfg.cNum))) || i + 1,
             subject: cell(row, cfg.cSubject),
+            difficulty: difficulty || undefined, // 난이도 — 선택(상/중/하 아니면 미지정)
             prompt: cell(row, cfg.cPrompt),
             kind,
             choices: four,
@@ -3380,9 +3534,9 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
   }
 
   function downloadTemplate() {
-    const header = ['번호', '과목', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)', '해설']
-    const sampleMc = [1, 'AI 리터러시', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)']
-    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI', '핵심 채점 포인트 해설: …']
+    const header = ['번호', '과목', '난이도(상/중/하)', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)', '해설']
+    const sampleMc = [1, 'AI 리터러시', '중', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)']
+    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '상', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI', '핵심 채점 포인트 해설: …']
     const ws = XLSX.utils.aoa_to_sheet([header, sampleMc, sampleShort])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '문항')
@@ -3423,7 +3577,7 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
   return (
     <>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>번호 · 과목 · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식) · 해설</b>. 유형이 비면 객관식, 주관식은 보기·정답 없이 모범답안만. <b>해설은 선택</b>이며 <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 같은 번호가 있으면 <b>덮어씁니다</b>(재업로드=수정). 템플릿을 받아 채우면 가장 확실합니다.
+        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식) · 해설</b>. 유형이 비면 객관식, 주관식은 보기·정답 없이 모범답안만. <b>난이도·해설은 선택</b>이며(난이도가 상/중/하가 아니면 미지정) <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호는 자동 부여 · 엑셀의 ‘번호’ 열은 참고용일 뿐 기존 문항을 덮어쓰지 않음). 템플릿을 받아 채우면 가장 확실합니다.
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <label className="admin-mini" style={{ cursor: 'pointer' }}>
@@ -3469,6 +3623,7 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
                 <th>#</th>
                 <th>유형</th>
                 <th>과목</th>
+                <th>난이도</th>
                 <th>지문</th>
                 <th>보기 / 모범답안</th>
                 <th>정답</th>
@@ -3480,17 +3635,18 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
                 <tr key={i}>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.number}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    <span className={`admin-badge st-${r.kind === 'short' ? 'in_progress' : 'submitted'}`}>{r.kind === 'short' ? '주관식' : '객관식'}</span>
+                    <span className={`admin-badge st-${r.kind === 'short' ? 'short' : 'submitted'}`}>{r.kind === 'short' ? '주관식' : '객관식'}</span>
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <b>{r.subject}</b>
                   </td>
-                  <td style={{ maxWidth: 320 }}>{r.prompt}</td>
-                  <td style={{ maxWidth: 260, fontSize: 12.5, color: 'var(--muted)' }}>{r.kind === 'short' ? (r.answerKey || '—') : r.choices.join(' / ')}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}><DiffTag value={r.difficulty} /></td>
+                  <td style={{ maxWidth: 320, whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.prompt}</td>
+                  <td style={{ maxWidth: 260, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: 12.5, color: 'var(--muted)' }}>{r.kind === 'short' ? (r.answerKey || '—') : r.choices.join(' / ')}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {r.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수</span> : r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
                   </td>
-                  <td style={{ maxWidth: 200, fontSize: 12.5, color: 'var(--muted)' }}>{r.explanation || '—'}</td>
+                  <td style={{ maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: 12.5, color: 'var(--muted)' }}>{r.explanation || '—'}</td>
                 </tr>
               ))}
             </tbody>
