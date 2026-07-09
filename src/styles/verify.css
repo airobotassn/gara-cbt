@@ -9,7 +9,8 @@
   --v-ink: #20293c;
   --v-muted: #7c7768;
   --v-line: #e9e2d0;
-  --v-ok: #2f7d54;
+  --v-ok: #1a6b48;       /* 유효 — 깊은 에메랄드(고급 톤) */
+  --v-ok-deep: #12583b;
   --v-warn: #b17a1c;
   --v-bad: #b23b32;
   min-height: 100vh;
@@ -51,26 +52,29 @@
 }
 .vrf-authority {
   font-family: 'CertGaramond', Georgia, serif;
-  font-size: 12.5px; font-weight: 600; letter-spacing: 0.19em;
-  text-transform: uppercase; color: var(--v-navy);
+  font-size: 14px; font-weight: 600; letter-spacing: 0.17em;
+  text-transform: uppercase; color: var(--v-navy); line-height: 1.3;
 }
-.vrf-rule { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 12px 0 10px; }
-.vrf-rule::before, .vrf-rule::after { content: ''; height: 1px; width: 66px; }
+.vrf-authority-sub {
+  margin-top: 4px; font-size: 11.5px; color: var(--v-muted); letter-spacing: 0.03em; word-break: keep-all;
+}
+.vrf-rule { display: flex; align-items: center; justify-content: center; gap: 9px; margin: 13px 0 10px; }
+.vrf-rule::before, .vrf-rule::after { content: ''; height: 1px; width: 70px; }
 .vrf-rule::before { background: linear-gradient(90deg, transparent, var(--v-gold)); }
 .vrf-rule::after { background: linear-gradient(90deg, var(--v-gold), transparent); }
 .vrf-rule span { color: var(--v-gold); font-size: 7px; }
-.vrf-sys { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 17px; color: var(--v-navy); letter-spacing: 0.01em; }
+.vrf-sys { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 18px; font-weight: 600; color: var(--v-navy-deep); letter-spacing: 0.01em; }
 
 /* ── 판정 ── */
 .vrf-verdict { text-align: center; margin: 26px 0 8px; }
-.vrf-seal { width: 122px; height: 122px; display: block; margin: 0 auto 16px; }
+.vrf-seal { width: 124px; height: 124px; display: block; margin: 0 auto 16px; }
 .vrf-headline { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 23px; font-weight: 700; color: var(--v-navy-deep); margin: 0 0 14px; word-break: keep-all; line-height: 1.35; }
 .vrf-chip {
   display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700;
-  letter-spacing: 0.09em; text-transform: uppercase; padding: 6px 15px 6px 12px; border-radius: 999px;
+  letter-spacing: 0.09em; text-transform: uppercase; padding: 6px 16px 6px 13px; border-radius: 999px;
 }
 .vrf-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; }
-.vrf-chip.ok { background: rgba(47, 125, 84, 0.09); color: var(--v-ok); border: 1px solid rgba(47, 125, 84, 0.32); }
+.vrf-chip.ok { background: linear-gradient(rgba(26, 107, 72, 0.12), rgba(26, 107, 72, 0.06)); color: var(--v-ok-deep); border: 1px solid rgba(26, 107, 72, 0.34); }
 .vrf-chip.warn { background: rgba(177, 122, 28, 0.09); color: var(--v-warn); border: 1px solid rgba(177, 122, 28, 0.32); }
 .vrf-chip.bad { background: rgba(178, 59, 50, 0.09); color: var(--v-bad); border: 1px solid rgba(178, 59, 50, 0.32); }
 
@@ -104,7 +108,8 @@
 
 @media (max-width: 480px) {
   .vrf-inner { padding: 30px 20px 24px; }
-  .vrf-sys { font-size: 16px; }
+  .vrf-authority { font-size: 13px; }
+  .vrf-sys { font-size: 16.5px; }
   .vrf-headline { font-size: 21px; }
-  .vrf-seal { width: 110px; height: 110px; }
+  .vrf-seal { width: 112px; height: 112px; }
 }

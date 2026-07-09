@@ -58,13 +58,13 @@ function Seal({ tone }: { tone: 'ok' | 'warn' | 'bad' }) {
     )
   })
   return (
-    <svg className="vrf-seal" viewBox="0 0 140 140" role="img" aria-hidden="true">
-      <circle cx="70" cy="70" r="66" fill="none" stroke={ring} strokeWidth="2.4" />
-      <circle cx="70" cy="70" r="54" fill="none" stroke={ring} strokeWidth="0.9" opacity="0.75" />
-      {ticks}
+    <svg className="vrf-seal" viewBox="0 0 140 140" aria-hidden="true">
       <defs>
         <path id="vrf-arc" d="M 26,70 A 44,44 0 0 1 114,70" fill="none" />
       </defs>
+      <circle cx="70" cy="70" r="66" fill="none" stroke={ring} strokeWidth="2.4" />
+      <circle cx="70" cy="70" r="54" fill="none" stroke={ring} strokeWidth="0.9" opacity="0.75" />
+      {ticks}
       <text fontFamily="'CertGaramond', Georgia, serif" fontSize="7.2" letterSpacing="1.6" fontWeight="600" fill={ring}>
         <textPath href="#vrf-arc" startOffset="50%" textAnchor="middle">
           CERTIFICATE&nbsp;·&nbsp;VERIFICATION
@@ -115,8 +115,9 @@ export default function VerifyCert() {
           <header className="vrf-mast">
             <img className="vrf-logo" src="/logo.png" alt="GARA" />
             <div className="vrf-authority">Global AI &amp; Robotics Association</div>
+            <div className="vrf-authority-sub">{t('verify.official_body')}</div>
             <div className="vrf-rule"><span>◆</span></div>
-            <div className="vrf-sys">{t('verify.system_sub')}</div>
+            <h1 className="vrf-sys">{t('verify.system_sub')}</h1>
           </header>
 
           {loading ? (

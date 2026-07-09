@@ -835,6 +835,7 @@ const D: Record<string, Record<Lang, string>> = {
   "verify.status_expired": { ko: "만료", en: "Expired", ja: "期限切れ", zh: "已过期", hi: "समाप्त", vi: "Hết hạn" },
   "verify.demo_note": { ko: "※ 미리보기 예시입니다 — 실제 발급된 자격증이 아닙니다.", en: "※ Preview sample — not an actually issued certificate.", ja: "※ プレビュー例です — 実際に発行された資格証ではありません。", zh: "※ 预览示例 — 并非实际发放的证书。", hi: "※ पूर्वावलोकन उदाहरण — वास्तव में जारी किया गया प्रमाणपत्र नहीं।", vi: "※ Ví dụ xem trước — không phải chứng chỉ đã cấp thực tế." },
   "verify.system_sub": { ko: "자격 진위확인 시스템", en: "Certificate Verification System", ja: "資格真偽確認システム", zh: "证书真伪验证系统", hi: "प्रमाणपत्र सत्यापन प्रणाली", vi: "Hệ thống xác thực chứng chỉ" },
+  "verify.official_body": { ko: "공인 AI·로봇 자격 검정기관", en: "Accredited AI & Robotics Certification Body", ja: "公認AI・ロボット資格検定機関", zh: "认证 AI·机器人资格检定机构", hi: "मान्यता प्राप्त AI·रोबोटिक्स प्रमाणन संस्था", vi: "Cơ quan chứng nhận AI·Robot được công nhận" },
   "verify.headline_valid": { ko: "유효한 자격증입니다", en: "This is a valid certificate", ja: "有効な資格証です", zh: "这是有效的证书", hi: "यह एक वैध प्रमाणपत्र है", vi: "Đây là chứng chỉ hợp lệ" },
   "verify.headline_expired": { ko: "유효기간이 만료된 자격증입니다", en: "This certificate has expired", ja: "有効期限が切れた資格証です", zh: "该证书已过期", hi: "इस प्रमाणपत्र की अवधि समाप्त हो गई है", vi: "Chứng chỉ này đã hết hạn" },
   "verify.headline_invalid": { ko: "확인되지 않는 자격증입니다", en: "This certificate could not be verified", ja: "確認できない資格証です", zh: "无法验证的证书", hi: "यह प्रमाणपत्र सत्यापित नहीं हो सका", vi: "Không thể xác thực chứng chỉ này" },
