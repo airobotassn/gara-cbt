@@ -20,6 +20,7 @@ function fmtDateTime(d: Date) {
 
 // 미리보기 자격증 QR(preview-sample)용 데모 — 실제 조회 없이 '유효' 예시를 그대로 보여준다.
 const DEMO_TOKEN = 'preview-sample'
+const DEMO_BAD_TOKEN = 'preview-invalid'
 function demoResult(): VerifyCertResponse {
   const now = new Date()
   const exp = new Date(now)
@@ -84,9 +85,11 @@ function Seal({ tone }: { tone: 'ok' | 'warn' | 'bad' }) {
 export default function VerifyCert() {
   const { token } = useParams()
   const { t } = useT()
-  const isDemo = token === DEMO_TOKEN
+  const isDemo = token === DEMO_TOKEN || token === DEMO_BAD_TOKEN
   // 데모 토큰이면 초기값으로 예시 결과(함수 호출 없음). 실제 토큰만 서버 조회.
-  const [data, setData] = useState<VerifyCertResponse | null>(() => (isDemo ? demoResult() : null))
+  const [data, setData] = useState<VerifyCertResponse | null>(() =>
+    token === DEMO_TOKEN ? demoResult() : token === DEMO_BAD_TOKEN ? { valid: false, reason: 'not_found' } : null,
+  )
   const [loading, setLoading] = useState(!isDemo)
   const [checkedAt] = useState(() => new Date())
 

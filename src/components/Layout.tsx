@@ -370,6 +370,12 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-more-link pf-preview" onClick={() => go('/certificate')}>
                 {t('nav.certpreview')} <span className="pf-more-ext">↗</span>
               </button>
+              <button className="pf-more-link pf-preview" onClick={() => go('/verify/preview-sample')}>
+                진위확인(유효) 미리보기 <span className="pf-more-ext">↗</span>
+              </button>
+              <button className="pf-more-link pf-preview" onClick={() => go('/verify/preview-invalid')}>
+                진위확인(무효) 미리보기 <span className="pf-more-ext">↗</span>
+              </button>
               <button className="pf-more-link pf-preview" onClick={goExamPreview}>
                 {t('nav.exampreview')} <span className="pf-more-ext">↗</span>
               </button>
