@@ -1,29 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import type { VerifyCertResponse } from '../lib/types'
 
-// QR 진위확인 결과 — 공개 페이지(로그인 불필요). /verify/<token>.
-// verify-cert 함수가 서버 원본(발급 기록)을 조회해 유효/만료/무효를 판정한 걸 그대로 표시.
+// 자격 진위확인 포털 — 공개(로그인 불필요). /verify/<token>.
+// verify-cert 함수가 서버 원본(발급 기록)을 조회한 결과를 공문서 톤으로 표시.
 function fmtDate(iso?: string | null) {
   if (!iso) return '-'
   const d = new Date(iso)
   if (isNaN(d.getTime())) return '-'
-  return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}`
+}
+function fmtDateTime(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}. ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex justify-between items-center gap-3">
-      <span className="font-body-md text-body-md text-on-surface-variant shrink-0 whitespace-nowrap">{label}</span>
-      <span className={`font-body-md text-body-md text-right break-keep ${strong ? 'font-bold text-on-surface' : 'font-medium text-on-surface'}`}>{value}</span>
-    </div>
-  )
-}
-
-// 미리보기 자격증의 QR(preview-sample)용 데모 결과 — 실제 조회 없이 '유효' 화면을 그대로 보여준다(예시 표기).
+// 미리보기 자격증 QR(preview-sample)용 데모 — 실제 조회 없이 '유효' 예시를 그대로 보여준다.
 const DEMO_TOKEN = 'preview-sample'
 function demoResult(): VerifyCertResponse {
   const now = new Date()
@@ -40,13 +35,60 @@ function demoResult(): VerifyCertResponse {
   }
 }
 
+// 공식 검인(檢印) 엠블럼 — 이중 링 + 비딩(engine-turn) + 원호 문자 + 중앙 판정 글리프.
+function Seal({ tone }: { tone: 'ok' | 'warn' | 'bad' }) {
+  const ring = tone === 'ok' ? '#b8912f' : tone === 'warn' ? '#b17a1c' : '#b23b32'
+  const navy = '#16305b'
+  const glyph = tone === 'bad' ? '#e6b7b2' : '#e9cd80'
+  const ticks = Array.from({ length: 72 }, (_, i) => {
+    const a = (i / 72) * Math.PI * 2
+    const r1 = 56
+    const r2 = 63
+    return (
+      <line
+        key={i}
+        x1={70 + Math.cos(a) * r1}
+        y1={70 + Math.sin(a) * r1}
+        x2={70 + Math.cos(a) * r2}
+        y2={70 + Math.sin(a) * r2}
+        stroke={ring}
+        strokeWidth={i % 6 === 0 ? 1.5 : 0.7}
+        opacity={0.85}
+      />
+    )
+  })
+  return (
+    <svg className="vrf-seal" viewBox="0 0 140 140" role="img" aria-hidden="true">
+      <circle cx="70" cy="70" r="66" fill="none" stroke={ring} strokeWidth="2.4" />
+      <circle cx="70" cy="70" r="54" fill="none" stroke={ring} strokeWidth="0.9" opacity="0.75" />
+      {ticks}
+      <defs>
+        <path id="vrf-arc" d="M 26,70 A 44,44 0 0 1 114,70" fill="none" />
+      </defs>
+      <text fontFamily="'CertGaramond', Georgia, serif" fontSize="7.2" letterSpacing="1.6" fontWeight="600" fill={ring}>
+        <textPath href="#vrf-arc" startOffset="50%" textAnchor="middle">
+          CERTIFICATE&nbsp;·&nbsp;VERIFICATION
+        </textPath>
+      </text>
+      <circle cx="70" cy="70" r="40" fill={navy} />
+      <circle cx="70" cy="70" r="40" fill="none" stroke={ring} strokeWidth="1" />
+      {tone === 'bad' ? (
+        <path d="M59 59 L81 81 M81 59 L59 81" stroke={glyph} strokeWidth="4.6" strokeLinecap="round" />
+      ) : (
+        <path d="M56 71 l10 11 l19 -25" fill="none" stroke={glyph} strokeWidth="4.6" strokeLinecap="round" strokeLinejoin="round" />
+      )}
+    </svg>
+  )
+}
+
 export default function VerifyCert() {
   const { token } = useParams()
   const { t } = useT()
   const isDemo = token === DEMO_TOKEN
-  // 데모 토큰이면 초기값으로 예시 결과를 세팅(함수 호출 없음). 실제 토큰만 서버 조회.
+  // 데모 토큰이면 초기값으로 예시 결과(함수 호출 없음). 실제 토큰만 서버 조회.
   const [data, setData] = useState<VerifyCertResponse | null>(() => (isDemo ? demoResult() : null))
   const [loading, setLoading] = useState(!isDemo)
+  const [checkedAt] = useState(() => new Date())
 
   useEffect(() => {
     if (isDemo) return
@@ -62,61 +104,57 @@ export default function VerifyCert() {
 
   const ok = !!data?.valid && data.status === 'valid'
   const expired = !!data?.valid && data.status === 'expired'
-
-  const theme = ok
-    ? { icon: 'verified', ring: 'bg-primary/10 text-primary border-primary/20', badge: 'bg-primary/10 text-primary border-primary/20', label: t('verify.valid_badge') }
-    : expired
-      ? { icon: 'schedule', ring: 'bg-secondary/10 text-secondary border-secondary/20', badge: 'bg-secondary/10 text-secondary border-secondary/20', label: t('verify.expired_badge') }
-      : { icon: 'gpp_bad', ring: 'bg-error/10 text-error border-error/20', badge: 'bg-error/10 text-error border-error/20', label: t('verify.invalid_badge') }
+  const tone: 'ok' | 'warn' | 'bad' = ok ? 'ok' : expired ? 'warn' : 'bad'
+  const headline = ok ? t('verify.headline_valid') : expired ? t('verify.headline_expired') : t('verify.headline_invalid')
+  const chipText = ok ? t('verify.status_valid') : expired ? t('verify.status_expired') : t('verify.status_invalid')
 
   return (
-    <div className="bg-background text-on-surface mesh-bg min-h-screen flex flex-col">
-      <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto flex items-center justify-center">
-        <div className="glass-panel rounded-3xl p-8 md:p-12 ambient-shadow max-w-lg w-full text-center border border-white/40">
+    <div className="vrf-page">
+      <div className="vrf-doc">
+        <div className="vrf-inner">
+          <header className="vrf-mast">
+            <img className="vrf-logo" src="/logo.png" alt="GARA" />
+            <div className="vrf-authority">Global AI &amp; Robotics Association</div>
+            <div className="vrf-rule"><span>◆</span></div>
+            <div className="vrf-sys">{t('verify.system_sub')}</div>
+          </header>
+
           {loading ? (
-            <>
-              <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto mb-6" />
-              <p className="font-body-lg text-body-lg text-on-surface-variant">{t('verify.loading')}</p>
-            </>
+            <div className="vrf-load">
+              <div className="vrf-spin" />
+              <p>{t('verify.loading')}</p>
+            </div>
           ) : (
             <>
-              <div className={`w-20 h-20 rounded-full ${theme.ring} border flex items-center justify-center mx-auto mb-6`}>
-                <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {theme.icon}
-                </span>
+              <div className="vrf-verdict">
+                <Seal tone={tone} />
+                <div className="vrf-headline">{headline}</div>
+                <span className={`vrf-chip ${tone}`}>{chipText}</span>
               </div>
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl mb-5 border font-label-md text-label-md font-bold ${theme.badge}`}>
-                {theme.label}
-              </div>
-              <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-1">
-                {t('verify.title')}
-              </h1>
 
               {data?.valid ? (
-                <div className="bg-surface-container-low/70 rounded-2xl p-5 md:p-6 mt-6 flex flex-col gap-4 text-left border border-outline-variant/20">
-                  <Row label={t('verify.name')} value={data.name || '-'} strong />
-                  <div className="h-px bg-outline-variant/25" />
-                  <Row label={t('verify.grade')} value={data.grade || '-'} />
-                  <div className="h-px bg-outline-variant/25" />
-                  <Row label={t('verify.cert_no')} value={data.certNo || '-'} />
-                  <div className="h-px bg-outline-variant/25" />
-                  <Row label={t('verify.issued_at')} value={fmtDate(data.issuedAt)} />
-                  <div className="h-px bg-outline-variant/25" />
-                  <Row label={t('verify.expires_at')} value={data.expiresAt ? fmtDate(data.expiresAt) : t('verify.no_expiry')} />
-                  <div className="h-px bg-outline-variant/25" />
-                  <Row label={t('verify.status')} value={expired ? t('verify.status_expired') : t('verify.status_valid')} strong />
-                </div>
+                <section className="vrf-record">
+                  <div className="vrf-record-head">{t('verify.record_title')}</div>
+                  <div className="vrf-row"><span className="k">{t('verify.name')}</span><span className="v">{data.name || '-'}</span></div>
+                  <div className="vrf-row"><span className="k">{t('verify.grade')}</span><span className="v">{data.grade || '-'}</span></div>
+                  <div className="vrf-row"><span className="k">{t('verify.cert_no')}</span><span className="v mono">{data.certNo || '-'}</span></div>
+                  <div className="vrf-row"><span className="k">{t('verify.issued_at')}</span><span className="v">{fmtDate(data.issuedAt)}</span></div>
+                  <div className="vrf-row"><span className="k">{t('verify.expires_at')}</span><span className="v">{data.expiresAt ? fmtDate(data.expiresAt) : t('verify.no_expiry')}</span></div>
+                </section>
               ) : (
-                <p className="font-body-md text-body-md text-on-surface-variant mt-4 break-keep">{t('verify.invalid_desc')}</p>
+                <p className="vrf-invalid-desc">{t('verify.invalid_desc')}</p>
               )}
-              {isDemo && (
-                <p className="font-label-md text-label-md text-on-surface-variant mt-5 opacity-80 break-keep">{t('verify.demo_note')}</p>
-              )}
+
+              {isDemo && <div className="vrf-demo">{t('verify.demo_note')}</div>}
+
+              <footer className="vrf-trust">
+                <p>{t('verify.trust')}</p>
+                <div className="vrf-checked"><span className="lbl">{t('verify.checked_at')} · </span>{fmtDateTime(checkedAt)}</div>
+              </footer>
             </>
           )}
         </div>
-      </main>
-      <SiteFooter />
+      </div>
     </div>
   )
 }
