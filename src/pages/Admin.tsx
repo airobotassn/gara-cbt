@@ -2593,6 +2593,45 @@ function qFindCol(header: string[], aliases: string[]): number {
   for (let i = 0; i < h.length; i++) if (h[i] && aliases.some((a) => h[i].includes(qNormKey(a)))) return i
   return -1
 }
+
+// 급수(티어) key → 그 급수의 정규 검정과목(가이드=getTracks 단일 출처). 미지정/미확정이면 빈 배열.
+// 문항 목록 과목 드롭다운·업로드 과목 매핑이 "실제 문항"이 아니라 이 정규 과목을 기준으로 삼는다.
+function tierSubjectsOf(tier?: string): string[] {
+  if (!tier) return []
+  return getTracks('ko').flatMap((tr) => tr.tiers).find((ti) => ti.key === tier)?.subjects ?? []
+}
+// 엑셀 과목 → 정규 과목 매핑(레벨테스트 카테고리 매핑 이식). qNormKey 정규화(소문자·공백/기호 제거) 후
+// 정확일치를 우선하고, 없으면 Dice bigram 유사도로 최근접(≥0.5)을 자동 제안. 대소문자("AI"↔"ai")·
+// 띄어쓰기·기호 차이는 정규화가 흡수하므로 그런 near-miss는 정확일치로 잡힌다.
+function qBigrams(s: string): string[] {
+  const t = qNormKey(s)
+  if (t.length < 2) return t ? [t] : []
+  const out: string[] = []
+  for (let i = 0; i < t.length - 1; i++) out.push(t.slice(i, i + 2))
+  return out
+}
+function qSim(a: string, b: string): number {
+  const A = qBigrams(a), B = qBigrams(b)
+  if (!A.length || !B.length) return qNormKey(a) !== '' && qNormKey(a) === qNormKey(b) ? 1 : 0
+  const cnt = new Map<string, number>()
+  for (const x of B) cnt.set(x, (cnt.get(x) ?? 0) + 1)
+  let inter = 0
+  for (const x of A) { const c = cnt.get(x); if (c) { inter++; cnt.set(x, c - 1) } }
+  return (2 * inter) / (A.length + B.length)
+}
+// 엑셀에 등장한 distinct 과목들 → 정규 과목 자동 매핑 제안(정확일치 없으면 유사도 최고 ≥0.5).
+function suggestSubjectMap(excelSubjects: string[], guide: string[]): Record<string, string> {
+  const m: Record<string, string> = {}
+  if (!guide.length) return m
+  for (const c of excelSubjects) {
+    const exact = guide.find((g) => qNormKey(g) === qNormKey(c))
+    if (exact) { m[c] = exact; continue }
+    let best = { subj: '', score: 0 }
+    for (const g of guide) { const s = qSim(c, g); if (s > best.score) best = { subj: g, score: s } }
+    if (best.score >= 0.5) m[c] = best.subj
+  }
+  return m
+}
 // 엑셀 난이도 셀 → '상'|'중'|'하'(그 외/빈값은 '' = 미지정). 흔한 동의어도 수용.
 function qNormDiff(v: unknown): '' | '상' | '중' | '하' {
   const s = String(v ?? '').trim().toLowerCase()
@@ -2810,6 +2849,7 @@ function QuestionsAdmin() {
   }, [exams])
 
   const isSet = view === 'examset'
+  const curBankTier = banks.find((b) => b.id === bankId)?.tier // 선택된 은행의 급수 → 정규 과목 기준
   return (
     <>
       <div className="admin-head">
@@ -2853,11 +2893,11 @@ function QuestionsAdmin() {
       ) : !bankId ? (
         <div className="admin-section admin-empty">문제은행이 없습니다.</div>
       ) : view === 'list' ? (
-        <QuestionListView bankId={bankId} onChanged={bump} />
+        <QuestionListView bankId={bankId} tier={curBankTier} onChanged={bump} />
       ) : view === 'events' ? (
         <QuestionEventsView bankId={bankId} onChanged={bump} />
       ) : (
-        <QuestionImportView bankId={bankId} onImported={bump} />
+        <QuestionImportView bankId={bankId} tier={curBankTier} onImported={bump} />
       )}
     </>
   )
@@ -2955,7 +2995,7 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
   )
 }
 
-function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: () => void }) {
+function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: string; onChanged: () => void }) {
   const [rows, setRows] = useState<AdminQuestionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -2993,7 +3033,12 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
 
   const nextNumber = rows.reduce((m, q) => Math.max(m, q.number), 0) + 1
   const f = useTierSubjectFilter()
-  const subjects = [...new Set(rows.map((r) => r.subject).filter(Boolean))].sort()
+  // 과목 옵션 = 이 급수의 정규 과목(가이드) 먼저 + 실제 문항에만 있는 비정규 과목(교정 필요분)을 뒤에.
+  // 이렇게 해야 아직 업로드 전인 PRO·ELITE 도 정해진 과목이 그대로 뜨고(비어있지 않음),
+  // 정규명과 어긋난 과목도 함께 보여 교정 대상을 드러낸다.
+  const guideSubjects = tierSubjectsOf(tier)
+  const extraSubjects = [...new Set(rows.map((r) => r.subject).filter(Boolean))].filter((s) => !guideSubjects.includes(s)).sort()
+  const subjects = [...guideSubjects, ...extraSubjects]
   const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchDiff(q.difficulty) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
 
   return (
@@ -3071,6 +3116,7 @@ function QuestionListView({ bankId, onChanged }: { bankId: string; onChanged: ()
       {edit && (
         <QuestionEditModal
           bankId={bankId}
+          tier={tier}
           row={edit === 'new' ? null : edit}
           defaultNumber={nextNumber}
           onClose={() => setEdit(null)}
@@ -3089,15 +3135,16 @@ const QE: Record<string, CSSProperties> = {
 }
 
 // 개별 문항 추가/편집 — 유형(객관식/주관식) 선택 → 객관식은 보기4·정답, 주관식은 모범답안.
-function QuestionEditModal({ bankId, row, defaultNumber, onClose, onSaved }: {
-  bankId: string; row: AdminQuestionRow | null; defaultNumber: number; onClose: () => void; onSaved: () => void
+function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved }: {
+  bankId: string; tier?: string; row: AdminQuestionRow | null; defaultNumber: number; onClose: () => void; onSaved: () => void
 }) {
   const [number] = useState<number>(row?.number ?? defaultNumber) // 자동 부여(수정 불가)
   const [kind, setKind] = useState<'mc' | 'short'>(row?.kind ?? 'mc')
   // /guide 급수(티어) → 과목 종속 드롭박스. 티어 목록은 getTracks(=/guide) 단일 출처.
   const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
+  // 기본 급수: 기존 문항이면 그 과목이 속한 급수, 신규면 지금 보고 있는 은행의 급수(tier). 둘 다 없으면 첫 급수.
   const [tierKey, setTierKey] = useState(
-    (row?.subject ? tiers.find((t) => t.subjects.includes(row.subject)) : undefined)?.key ?? tiers[0]?.key ?? '',
+    (row?.subject ? tiers.find((t) => t.subjects.includes(row.subject)) : undefined)?.key ?? tier ?? tiers[0]?.key ?? '',
   )
   const curTier = tiers.find((t) => t.key === tierKey) ?? tiers[0]
   const [subject, setSubject] = useState(row?.subject ?? curTier?.subjects[0] ?? '')
@@ -3334,12 +3381,19 @@ function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: 
   )
 }
 
-function QuestionImportView({ bankId, onImported }: { bankId: string; onImported: () => void }) {
+function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier?: string; onImported: () => void }) {
   const [fileName, setFileName] = useState('')
   const [rows, setRows] = useState<QuestionImportRow[]>([])
+  const [subjMap, setSubjMap] = useState<Record<string, string>>({}) // 엑셀 과목 → 정규 과목 매핑
   const [parseErr, setParseErr] = useState('')
   const [importing, setImporting] = useState(false)
   const [msg, setMsg] = useState('')
+
+  const guideSubjects = tierSubjectsOf(tier) // 이 은행 급수의 정규 검정과목(가이드)
+  // 엑셀에 등장한 distinct 과목, 그리고 매핑을 적용한 최종 행(정규 과목명으로 치환). 매핑 없으면 원문 유지.
+  const distinctSubjects = [...new Set(rows.map((r) => r.subject).filter(Boolean))]
+  const mappedRows = rows.map((r) => ({ ...r, subject: subjMap[r.subject] || r.subject }))
+  const unmappedSubjects = guideSubjects.length ? distinctSubjects.filter((s) => !subjMap[s]) : []
 
   function parseCorrect(v: unknown, choices: string[]): number {
     const s = String(v ?? '').trim()
@@ -3354,6 +3408,7 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
     setMsg('')
     setParseErr('')
     setRows([])
+    setSubjMap({})
     const r = new FileReader()
     r.onload = (e) => {
       try {
@@ -3390,6 +3445,10 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
           }
         })
         setRows(out)
+        // 엑셀 과목 → 이 급수의 정규 과목 자동 매핑 제안(정규화 정확일치 + 퍼지). 관리자가 확인/수정.
+        const gs = tierSubjectsOf(tier)
+        const distinct = [...new Set(out.map((o) => o.subject).filter(Boolean))]
+        setSubjMap(suggestSubjectMap(distinct, gs))
       } catch (err) {
         setParseErr(err instanceof Error ? err.message : '엑셀을 읽지 못했습니다.')
       }
@@ -3407,7 +3466,8 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
     XLSX.writeFile(wb, 'cbt_문항_템플릿.xlsx')
   }
 
-  const problems = rows
+  // 검증·미리보기·반영은 매핑을 적용한 mappedRows 기준(정규 과목명으로 치환된 상태).
+  const problems = mappedRows
     .map((r, i) => {
       if (!r.subject || !r.prompt) return `${i + 2}행: 과목/지문 비어있음`
       if (r.kind === 'short') return '' // 주관식은 보기·정답 검증 없음
@@ -3418,7 +3478,7 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
     .filter(Boolean)
 
   async function doImport() {
-    if (!rows.length) return
+    if (!mappedRows.length) return
     if (problems.length) {
       setMsg('오류를 먼저 해결하세요: ' + problems[0])
       return
@@ -3426,9 +3486,10 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
     setImporting(true)
     setMsg('')
     try {
-      const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', bankId, rows })
+      const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', bankId, rows: mappedRows })
       setMsg(`✅ ${res.count}문항 반영됨`)
       setRows([])
+      setSubjMap({})
       setFileName('')
       onImported()
     } catch (e) {
@@ -3441,7 +3502,7 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
   return (
     <>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식) · 해설</b>. 유형이 비면 객관식, 주관식은 보기·정답 없이 모범답안만. <b>난이도·해설은 선택</b>이며(난이도가 상/중/하가 아니면 미지정) <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호는 자동 부여 · 엑셀의 ‘번호’ 열은 참고용일 뿐 기존 문항을 덮어쓰지 않음). 템플릿을 받아 채우면 가장 확실합니다.
+        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식) · 해설</b>. 유형이 비면 객관식, 주관식은 보기·정답 없이 모범답안만. <b>난이도·해설은 선택</b>이며(난이도가 상/중/하가 아니면 미지정) <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 엑셀 <b>과목명은 아래 “과목 매핑”에서 이 급수의 정규 검정과목으로 치환</b>됩니다(대소문자·띄어쓰기 차이는 자동 교정 — 그래야 풀 현황 집계·실제 출제에 잡힘). 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호는 자동 부여 · 엑셀의 ‘번호’ 열은 참고용일 뿐 기존 문항을 덮어쓰지 않음). 템플릿을 받아 채우면 가장 확실합니다.
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <label className="admin-mini" style={{ cursor: 'pointer' }}>
@@ -3472,6 +3533,50 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
         )}
         {msg && <span style={{ fontSize: 13 }}>{msg}</span>}
       </div>
+      {/* 과목 매핑 — 엑셀 과목명을 이 급수의 정규 검정과목으로 치환. 비슷한 걸 자동 선택해두고 확인/수정만.
+          정규 과목으로 맞춰야 문항 풀 현황 집계·실제 출제 추출(둘 다 과목명 완전일치)에 잡힌다. */}
+      {guideSubjects.length > 0 && distinctSubjects.length > 0 && (
+        <div className="admin-section" style={{ marginBottom: 14 }}>
+          <div className="admin-sub" style={{ marginTop: 0 }}>
+            과목 매핑{' '}
+            <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>
+              엑셀 과목 → 이 급수의 정규 검정과목 · 비슷한 걸 미리 골라뒀어요(대소문자·띄어쓰기 차이는 자동 교정)
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+            {distinctSubjects.map((c) => {
+              const mapped = subjMap[c] ?? ''
+              const changed = mapped && qNormKey(mapped) !== qNormKey(c)
+              const n = rows.reduce((a, r) => a + (r.subject === c ? 1 : 0), 0)
+              return (
+                <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ minWidth: 0, fontWeight: 600 }}>{c}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>({n})</span>
+                  <span style={{ color: 'var(--dim)' }}>→</span>
+                  <select className="admin-in" style={{ maxWidth: 340 }} value={mapped} onChange={(e) => setSubjMap((m) => ({ ...m, [c]: e.target.value }))}>
+                    <option value="">그대로 유지(정규 과목 아님)</option>
+                    {guideSubjects.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                  {!mapped ? (
+                    <span className="admin-hint" style={{ color: 'var(--error,#d43a3a)' }}>미매핑 — 풀 현황·출제에서 제외됨</span>
+                  ) : changed ? (
+                    <span className="admin-hint" style={{ color: '#2f855a' }}>교정됨</span>
+                  ) : (
+                    <span className="admin-hint">일치</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {unmappedSubjects.length > 0 && (
+            <div className="admin-hint" style={{ marginTop: 8 }}>
+              ⚠️ 미매핑 {unmappedSubjects.length}개는 이대로 올리면 문항 풀 현황·실제 출제에서 빠집니다. 정규 과목에 맞춰 주세요.
+            </div>
+          )}
+        </div>
+      )}
       {parseErr && <div className="admin-section admin-empty">엑셀 오류 — {parseErr}</div>}
       {problems.length > 0 && (
         <div className="admin-section admin-empty" style={{ marginBottom: 14 }}>
@@ -3495,7 +3600,7 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 100).map((r, i) => (
+              {mappedRows.slice(0, 100).map((r, i) => (
                 <tr key={i}>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.number}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
@@ -3503,6 +3608,9 @@ function QuestionImportView({ bankId, onImported }: { bankId: string; onImported
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <b>{r.subject}</b>
+                    {rows[i] && rows[i].subject !== r.subject && (
+                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--dim)', textDecoration: 'line-through' }}>{rows[i].subject}</span>
+                    )}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}><DiffTag value={r.difficulty} /></td>
                   <td style={{ maxWidth: 320, whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.prompt}</td>
