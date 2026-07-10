@@ -111,7 +111,7 @@ export default function Faq() {
               </div>
               <div className="w-full md:w-5/12 hidden md:block">
                 <div className="grid grid-cols-2 gap-4">
-                  <Link to="/exam/schedule" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
+                  <Link to="/guide" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><span className="material-symbols-outlined">event_available</span></div>
                     <h3 className="font-title-md text-base font-bold text-on-surface">{t('faq.card_schedule_title')}</h3>
                     <p className="text-sm text-on-surface-variant leading-relaxed">{t('faq.card_schedule_desc')}</p>

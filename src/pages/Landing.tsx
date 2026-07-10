@@ -9,7 +9,7 @@ import { callFunction } from '../lib/supabase'
 //   서버가 죽어도(함수 미배포·장애) 클라 키워드 폴백으로 안 깨지게 한다.
 // route-query 가 반환할 수 있는 목적지(응답 검증용). DEST(route-query) 와 동기화.
 const VALID_DESTS = new Set([
-  '/test/select', '/guide', '/exam/schedule', '/exam/apply', '/exam', '/exam/check',
+  '/test/select', '/guide', '/exam', '/exam/check',
   '/mypage', '/certificate', '/ranking', '/about', '/notice', '/faq',
 ])
 
@@ -25,11 +25,11 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
   if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
   if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
-  if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/exam/schedule'
-  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
+  if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/guide'
+  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/guide'
   if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
   if (h(/자격|급수|과목|자격검정|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
-  if (h(/레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
+  if (h(/세미카리스|세미\s?카리스|semi[\s-]?caris|레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
   if (h(/약관|이용약관|terms/)) return '/terms'
   if (h(/개인정보|프라이버시|privacy/)) return '/privacy'
   if (h(/로그인|로그아웃|login|sign\s?in/)) return '/login'

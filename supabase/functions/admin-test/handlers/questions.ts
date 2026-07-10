@@ -1,6 +1,6 @@
 // 문항: 목록 · 통계 · upsert(추가/수정) · 활성토글 · 삭제 · 복구 · 변경이력
 //  변경(수정/비활성/활성/삭제)은 question_events 에 한 줄씩 적재 → "문항 이력" 탭의 원천.
-//  레벨테스트 이관: questions→test_questions (question_events 는 유지).
+//  SEMI-CARIS 이관: questions→test_questions (question_events 는 유지).
 import { json } from '../../_shared/cors.ts'
 import { axisKeysForLevel, SUPPORTED_LANGS, MAX_LEVEL } from '../../_shared/scoring.ts'
 

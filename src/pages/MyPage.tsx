@@ -116,6 +116,23 @@ export default function MyPage() {
             </p>
           </header>
 
+          {/* CARIS 자격검정 응시 진입 — FAB에서 이관한 상단 CTA 배너 */}
+          <button
+            onClick={() => navigate('/exam')}
+            className="group w-full mb-8 md:mb-10 flex items-center justify-between gap-4 rounded-2xl bg-primary-container text-on-primary px-6 py-5 md:px-8 md:py-6 ambient-shadow hover:translate-y-[-2px] transition-transform duration-200 text-left"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>edit_document</span>
+              </div>
+              <div>
+                <div className="font-title-md text-lg md:text-[22px] font-bold">{t('mypage.go_exam')}</div>
+                <div className="font-body-md text-body-md opacity-90">{t('mypage.cta_sub')}</div>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[28px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+          </button>
+
           {/* Tabs */}
           <div className="flex gap-5 sm:gap-8 border-b border-outline-variant/40 mb-8 md:mb-10 overflow-x-auto scrollbar-hide">
             {TABS.map((tb) => (
@@ -136,7 +153,7 @@ export default function MyPage() {
           {err && tab !== 'learning' && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
           {loading && tab !== 'learning' && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
 
-          {/* 학습 대시보드 (레벨테스트) — 자체적으로 list-attempts 로딩 */}
+          {/* 학습 대시보드 (SEMI-CARIS) — 자체적으로 list-attempts 로딩 */}
           {tab === 'learning' && <LearningDashboard />}
 
           {/* 시험 응시 현황 */}

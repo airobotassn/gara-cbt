@@ -1,6 +1,6 @@
-// _shared/scoring.ts — 레벨테스트 스코어링/레벨 엔진 (Deno).
+// _shared/scoring.ts — SEMI-CARIS 스코어링/레벨 엔진 (Deno).
 // ⚠️ 프론트 src/lib/scoring.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
-// 인증·클라이언트·다국어(pick/proj) 헬퍼는 ./lib.ts 를 재수출한다(레벨테스트 함수는 이 파일만 import).
+// 인증·클라이언트·다국어(pick/proj) 헬퍼는 ./lib.ts 를 재수출한다(SEMI-CARIS 함수는 이 파일만 import).
 import { type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { pickLang, projText, projOptions } from './lib.ts'
 export * from './lib.ts'

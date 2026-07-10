@@ -66,7 +66,7 @@ supabase secrets set GEMINI_API_KEY=<your-gemini-api-key>
 ```powershell
 npm run dev
 ```
-http://localhost:5173 접속 → 레벨테스트 진행.
+http://localhost:5173 접속 → SEMI-CARIS 진행.
 
 ## 검증 체크
 - 비로그인 응시 → 결과창 **총점만** 노출, 티어/레이더/해설 잠김

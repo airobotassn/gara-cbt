@@ -10,8 +10,6 @@ import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
 import {
   HomeIcon,
-  ExamIcon,
-  CalendarIcon,
   TargetIcon,
   InfoIcon,
   UserIcon,
@@ -156,8 +154,8 @@ export default function Layout({ children }: { children: ReactNode }) {
     navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
-  // 레벨테스트(내부 /test) 로 이동
-  function goLevelTest() {
+  // SEMI-CARIS(내부 /test) 로 이동
+  function goSemiCaris() {
     setOpen(false)
     setMoreOpen(false)
     navigate('/test/select')
@@ -309,17 +307,11 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/')}>
                 <span className="ic"><HomeIcon /></span> {t('common.home')}
               </button>
-              <button className="pf-item" onClick={() => go('/guide')}>
-                <span className="ic"><InfoIcon /></span> {t('nav.guide')}
-              </button>
-              <button className="pf-item" onClick={() => go('/exam')}>
-                <span className="ic"><ExamIcon /></span> {t('nav.exam')}
-              </button>
-              <button className="pf-item" onClick={() => go('/exam/schedule')}>
-                <span className="ic"><CalendarIcon /></span> {t('nav.apply')}
-              </button>
-              <button className="pf-item" onClick={goLevelTest}>
+              <button className="pf-item" onClick={goSemiCaris}>
                 <span className="ic"><TargetIcon /></span> {t('common.leveltest')}
+              </button>
+              <button className="pf-item" onClick={() => go('/guide')}>
+                <span className="ic"><InfoIcon /></span> {t('nav.caris')}
               </button>
             </div>
 

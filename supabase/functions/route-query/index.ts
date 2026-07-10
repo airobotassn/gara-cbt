@@ -33,10 +33,10 @@ const HIT_THRESHOLD = 0.85 // 이 이상이면 캐시 HIT(LLM 안 부름). 시�
 // 인텐트 → 실제 라우트. 'unknown' 은 라우팅 안 함(null).
 // ⚠️ 여기 바꾸면 route-seed 의 SEED dest, Landing.tsx 의 VALID_DESTS/clientKeywordRoute 도 같이 갱신.
 const DEST: Record<string, string> = {
-  level_test: '/test/select',   // 무료 레벨테스트/실력 진단
+  level_test: '/test/select',   // SEMI-CARIS(무료 레벨 진단/실력 진단)
   guide: '/guide',              // 자격검정 안내(종류·급수·과목·응시자격)
-  schedule: '/exam/schedule',   // 시험 일정·날짜·회차
-  apply: '/exam/apply',         // 원서접수·신청·응시료
+  schedule: '/guide',           // 일정 페이지 폐지 → 자격검정 안내로 통합(안내에 일정·상시시험 노출)
+  apply: '/guide',              // 원서접수·응시료 검색 → 안내 허브(안내의 접수 버튼으로 결제 진입)
   take_exam: '/exam',           // 응시 시작(시험 보러)
   exam_check: '/exam/check',    // 시험환경 점검·모의응시
   mypage: '/mypage',            // 내 점수·결과·이력
@@ -83,7 +83,7 @@ async function cacheInsert(vec: number[], dest: string, sample: string): Promise
 
 const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색창에 무언가를 입력했다. 그 의도를 아래 카테고리 중 하나로 분류해라.
 
-- level_test : 무료 AI 실력 진단/레벨테스트를 하고 싶다. ("레벨테스트", "내 실력 몇점", "무료 진단", "몇 레벨인지")
+- level_test : 무료 AI 실력 진단/SEMI-CARIS(옛 레벨테스트)를 하고 싶다. ("세미카리스", "SEMI-CARIS", "레벨테스트", "내 실력 몇점", "무료 진단", "몇 레벨인지")
 - guide      : 어떤 시험/자격증이 있는지, 급수·과목·응시자격 등 자격검정 "정보"가 궁금하다. ("어떤 시험 있어", "자격증 종류", "응시 자격", "CARIS가 뭐야")
 - schedule   : 시험 "일정/날짜/회차"가 궁금하다. ("시험 언제야", "정기시험 일정", "다음 시험 날짜", "접수 기간")
 - apply      : 원서접수/시험 신청/등록/응시료 결제를 하고 싶다. ("원서접수", "시험 신청", "접수하기", "응시료")
@@ -128,11 +128,11 @@ function keywordRoute(q: string): string | null {
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
   if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
   if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
-  if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/exam/schedule'
-  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
+  if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/guide'
+  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/guide'
   if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
   if (h(/자격|급수|과목|자격검정|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
-  if (h(/레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
+  if (h(/세미카리스|세미\s?카리스|semi[\s-]?caris|레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
   return null
 }
 

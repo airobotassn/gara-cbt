@@ -64,7 +64,7 @@ export default function ExamApply() {
             <h1 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('apply.closed_title')}</h1>
             <p className="font-body-md text-body-md text-on-surface-variant mb-6 break-keep">{t('apply.closed_body')}</p>
             <button
-              onClick={() => navigate('/exam/schedule')}
+              onClick={() => navigate('/guide')}
               className="bg-primary text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center gap-2"
             >
               {t('apply.closed_cta')}

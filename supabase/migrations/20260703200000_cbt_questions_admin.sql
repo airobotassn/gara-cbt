@@ -1,6 +1,6 @@
 -- CBT 문항 관리(목록·이력·엑셀 임포트) 지원.
 --  · questions 에 소프트삭제(deleted_at) 추가 — 삭제해도 행 보존(이력/복구).
---  · CBT 전용 변경 이력 테이블(cbt_question_events) — 레벨테스트 question_events 와 분리.
+--  · CBT 전용 변경 이력 테이블(cbt_question_events) — SEMI-CARIS question_events 와 분리.
 -- correct_index 는 여전히 클라 비노출(공개 read 정책 없음 = service role/admin 함수 전용).
 
 alter table questions add column if not exists deleted_at timestamptz;

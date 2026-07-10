@@ -41,9 +41,9 @@ import type {
 import LevelTestAdmin from './AdminLevelTest'
 import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 
-// 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / 레벨테스트.
+// 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / SEMI-CARIS.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
-//  - "레벨테스트" = 이관된 레벨테스트 관리(<LevelTestAdmin/>, admin-test 함수 호출).
+//  - "SEMI-CARIS" = 이관된 SEMI-CARIS 관리(<LevelTestAdmin/>, admin-test 함수 호출).
 type TopTab = 'caris' | 'level'
 export default function Admin() {
   const { isFullUser, loginWithGoogle } = useAuth()
@@ -81,7 +81,7 @@ export default function Admin() {
             CARIS 시험
           </button>
           <button className={topTab === 'level' ? 'on' : ''} onClick={() => setTopTab('level')}>
-            레벨테스트
+            SEMI-CARIS
           </button>
         </div>
       </div>
@@ -1572,7 +1572,7 @@ function RoundsAdmin() {
 }
 
 // ── 관리자 계정 관리 (루트 전용) ──────────────────────────────────
-// admin_users 는 CBT·레벨테스트 공용 → 여기서 추가하면 양쪽 관리자 권한이 함께 부여됨.
+// admin_users 는 CBT·SEMI-CARIS 공용 → 여기서 추가하면 양쪽 관리자 권한이 함께 부여됨.
 interface AdminAccountRow {
   email: string
   role: 'root' | 'admin'
@@ -1647,7 +1647,7 @@ function AdminAccountsAdmin() {
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
-        이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·레벨테스트 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
+        이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·SEMI-CARIS 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
       </p>
 
       <div className="admin-section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
@@ -1988,7 +1988,7 @@ function McReviewModal({ item, onClose }: { item: GradeQueueItem; onClose: () =>
   )
 }
 
-// ── 대시보드 (운영 분석) — admin.css(레벨테스트) 클래스 그대로 사용 ──
+// ── 대시보드 (운영 분석) — admin.css(SEMI-CARIS) 클래스 그대로 사용 ──
 function MiniBars({ days, map, color }: { days: string[]; map: Record<string, number>; color: string }) {
   const vals = days.map((d) => map[d] ?? 0)
   const max = Math.max(1, ...vals)
@@ -2525,7 +2525,7 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
 }
 
 // ── 문항 관리 (목록 · 이력 · 엑셀 업로드) ──────────────────────────
-// ── 문항 급수(티어)→과목 필터 (레벨테스트 ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
+// ── 문항 급수(티어)→과목 필터 (SEMI-CARIS ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
 function useTierSubjectFilter() {
   // 은행(급수)이 이미 상단에서 선택됨 → 급수 필터는 두지 않는다. 과목(실제 문항 과목)·난이도·유형·검색만.
   const [subject, setSubject] = useState('all')
@@ -2572,7 +2572,7 @@ function TierSubjectBar({ f, count, loading, actions, subjects, showKind = true,
   )
 }
 
-// ── CBT 엑셀 스마트 파싱 (레벨테스트 import 기법 이식: 헤더 이름 자동인식 + 머리글 행 자동탐지) ──
+// ── CBT 엑셀 스마트 파싱 (SEMI-CARIS import 기법 이식: 헤더 이름 자동인식 + 머리글 행 자동탐지) ──
 function qNormKey(s: unknown): string {
   return String(s ?? '').toLowerCase().replace(/\s+/g, '').replace(/[·.,/()[\]{}・:|~\-]/g, '').replace(/및/g, '')
 }
@@ -2600,7 +2600,7 @@ function tierSubjectsOf(tier?: string): string[] {
   if (!tier) return []
   return getTracks('ko').flatMap((tr) => tr.tiers).find((ti) => ti.key === tier)?.subjects ?? []
 }
-// 엑셀 과목 → 정규 과목 매핑(레벨테스트 카테고리 매핑 이식). qNormKey 정규화(소문자·공백/기호 제거) 후
+// 엑셀 과목 → 정규 과목 매핑(SEMI-CARIS 카테고리 매핑 이식). qNormKey 정규화(소문자·공백/기호 제거) 후
 // 정확일치를 우선하고, 없으면 Dice bigram 유사도로 최근접(≥0.5)을 자동 제안. 대소문자("AI"↔"ai")·
 // 띄어쓰기·기호 차이는 정규화가 흡수하므로 그런 near-miss는 정확일치로 잡힌다.
 function qBigrams(s: string): string[] {
@@ -3418,7 +3418,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
           .sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
           .filter((row) => row.some((c) => String(c).trim() !== ''))
         if (!aoa.length) { setParseErr('빈 시트입니다.'); return }
-        // 머리글 행 자동 탐지 → 열 이름 자동 인식(순서 달라도·위에 안내줄 있어도 대응, 레벨테스트와 동일 기법)
+        // 머리글 행 자동 탐지 → 열 이름 자동 인식(순서 달라도·위에 안내줄 있어도 대응, SEMI-CARIS와 동일 기법)
         const ncol = Math.max(...aoa.map((row) => row.length))
         const hdr = qFindHeaderRow(aoa)
         const header = aoa[hdr.idx] ?? []

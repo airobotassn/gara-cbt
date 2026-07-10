@@ -13,7 +13,7 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   avatar_url text,
-  is_anonymous boolean default false,   -- 레벨테스트 게스트 응시용(자격검정은 start-exam이 익명 차단)
+  is_anonymous boolean default false,   -- SEMI-CARIS 게스트 응시용(자격검정은 start-exam이 익명 차단)
   created_at timestamptz default now()
 );
 
@@ -172,7 +172,7 @@ create policy "profiles_update_own" on profiles
   for update using (auth.uid() = id);
 
 -- ============================================================
--- 레벨테스트 모듈 (/test/*) — 자격검정과 한 프로젝트 공존.
+-- SEMI-CARIS 모듈 (/test/*) — 자격검정과 한 프로젝트 공존.
 --   충돌 회피 리네임: questions→test_questions, attempt_answers→test_answers.
 --   델타 마이그레이션: migrations/20260701120000_add_leveltest_tables.sql
 -- ============================================================
@@ -198,7 +198,7 @@ create table if not exists test_questions (
 create index if not exists test_questions_level_cat_idx on test_questions(level, category) where active;
 create index if not exists test_questions_code_idx on test_questions(code);
 
--- test_attempts (레벨테스트 응시)
+-- test_attempts (SEMI-CARIS 응시)
 create table if not exists test_attempts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -223,7 +223,7 @@ create table if not exists test_attempts (
 );
 create index if not exists test_attempts_user_idx on test_attempts(user_id, status, submitted_at);
 
--- test_answers (레벨테스트 응답)
+-- test_answers (SEMI-CARIS 응답)
 create table if not exists test_answers (
   id uuid primary key default gen_random_uuid(),
   attempt_id uuid not null references test_attempts(id) on delete cascade,
@@ -257,7 +257,7 @@ create table if not exists user_progress (
 );
 create index if not exists user_progress_points_idx on user_progress (points desc, updated_at asc);
 
--- question_reports (레벨테스트 문항 오류 제보)
+-- question_reports (SEMI-CARIS 문항 오류 제보)
 create table if not exists question_reports (
   id uuid primary key default gen_random_uuid(),
   question_id uuid references test_questions(id) on delete set null,
@@ -310,7 +310,7 @@ $$;
 alter table reco_cache      enable row level security;
 alter table reco_shadow_log enable row level security;
 
--- ---------- 레벨테스트 후속 객체 (랭킹/소프트삭제) ----------
+-- ---------- SEMI-CARIS 후속 객체 (랭킹/소프트삭제) ----------
 -- user_level_skill.rating: applyAttempt가 매 응시 기록(랭킹 정렬용 6축 평균)
 alter table user_level_skill add column if not exists rating numeric(6,2) not null default 0;
 create index if not exists user_level_skill_lvl_rating_idx

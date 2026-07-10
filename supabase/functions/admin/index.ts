@@ -699,7 +699,7 @@ async function examFeeSave(admin: any, body: any) {
 }
 
 // ---------- 관리자 계정 관리 (루트 전용) ----------
-// admin_users 는 CBT·레벨테스트 공용 게이트 테이블 → 여기서 추가/삭제하면 양쪽 권한이 함께 반영됨.
+// admin_users 는 CBT·SEMI-CARIS 공용 게이트 테이블 → 여기서 추가/삭제하면 양쪽 권한이 함께 반영됨.
 async function manageAdmins(
   admin: any,
   body: any,
@@ -1103,7 +1103,7 @@ async function cbtAnalytics(admin: any) {
     admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active, tier').order('created_at', { ascending: true }),
     admin.from('exam_rounds').select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
-    // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(레벨테스트 익명 세션 제외)
+    // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(SEMI-CARIS 익명 세션 제외)
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', false),
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', true),
     admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
@@ -1133,7 +1133,7 @@ async function cbtAnalytics(admin: any) {
   const certByDay: Record<string, number> = {}
   days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0; certByDay[d] = 0 })
   for (const p of profs as any[]) {
-    if (p.is_anonymous) continue // 가입 추이 = 가입 회원(비익명)만 — 게스트·레벨테스트 익명 세션 제외(누적 회원 KPI와 동일 기준)
+    if (p.is_anonymous) continue // 가입 추이 = 가입 회원(비익명)만 — 게스트·SEMI-CARIS 익명 세션 제외(누적 회원 KPI와 동일 기준)
     const k = (p.created_at ?? '').slice(0, 10)
     if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
   }
@@ -1364,7 +1364,7 @@ async function cbtAnalytics(admin: any) {
 
 // 회원 목록 — 프로필 + 이메일 + 응시수 + 마지막 활동.
 async function cbtUsers(admin: any) {
-  // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → 레벨테스트 게스트(is_anonymous)는 회원목록에서 제외.
+  // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → SEMI-CARIS 게스트(is_anonymous)는 회원목록에서 제외.
   const { data: profiles } = await admin
     .from('profiles')
     .select('id, display_name, is_anonymous, created_at')

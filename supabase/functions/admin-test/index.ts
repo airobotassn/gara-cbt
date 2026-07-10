@@ -1,6 +1,6 @@
-// admin-test: 레벨테스트 전용 백오피스 API (service role). 액션 라우터 → handlers/* 로 위임.
-//  - gara-cbt(CARIS CBT) 로 이관된 레벨테스트 관리 함수. CBT admin 함수와 별개.
-//  - 레벨테스트 테이블: questions→test_questions, attempt_answers→test_answers (이관 시 개명).
+// admin-test: SEMI-CARIS 전용 백오피스 API (service role). 액션 라우터 → handlers/* 로 위임.
+//  - gara-cbt(CARIS CBT) 로 이관된 SEMI-CARIS 관리 함수. CBT admin 함수와 별개.
+//  - SEMI-CARIS 테이블: questions→test_questions, attempt_answers→test_answers (이관 시 개명).
 //  - 인증: 루트(ROOT_ADMIN) 또는 admin_users 테이블 등록 이메일만 통과
 //  - _shared 사용 + 멀티파일 → CLI 로만 배포할 것
 import { corsHeaders, json } from '../_shared/cors.ts'
