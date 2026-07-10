@@ -22,6 +22,7 @@ import {
   MoreIcon,
   PencilIcon,
   CameraIcon,
+  ChevronUpIcon,
 } from './FabIcons'
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -217,25 +218,45 @@ export default function Layout({ children }: { children: ReactNode }) {
                     ) : null}
                   </div>
                 )}
-                <div className="pf-sub">{isFullUser ? user?.email : t('fab.loginhint')}</div>
+                {!isFullUser ? (
+                  <div className="pf-sub">{t('fab.loginhint')}</div>
+                ) : null}
                 {isFullUser ? (
-                  <button
-                    className="pf-logout"
-                    onClick={() => {
-                      setOpen(false)
-                      logout()
-                    }}
-                    title={t('fab.logout')}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                    {t('fab.logout')}
-                  </button>
+                  <div className="pf-acct-actions">
+                    <button
+                      className="pf-acct-btn"
+                      onClick={() => go('/mypage')}
+                      title={t('nav.mypage')}
+                    >
+                      <UserIcon size={13} />
+                      {t('nav.mypage')}
+                    </button>
+                    <button
+                      className="pf-acct-btn pf-logout-btn"
+                      onClick={() => {
+                        setOpen(false)
+                        logout()
+                      }}
+                      title={t('fab.logout')}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
+                      {t('fab.logout')}
+                    </button>
+                  </div>
                 ) : null}
               </div>
+              <button
+                className="pf-theme"
+                onClick={toggleTheme}
+                title={dark ? t('fab.light') : t('fab.dark')}
+                aria-label={dark ? t('fab.light') : t('fab.dark')}
+              >
+                {dark ? <SunIcon size={18} /> : <MoonIcon size={18} />}
+              </button>
             </div>
 
             {picking ? (
@@ -299,14 +320,6 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-item" onClick={goLevelTest}>
                 <span className="ic"><TargetIcon /></span> {t('common.leveltest')}
-              </button>
-              {isFullUser ? (
-                <button className="pf-item" onClick={() => go('/mypage')}>
-                  <span className="ic"><UserIcon /></span> {t('nav.mypage')}
-                </button>
-              ) : null}
-              <button className="pf-item" onClick={toggleTheme}>
-                <span className="ic">{dark ? <SunIcon /> : <MoonIcon />}</span> {dark ? t('fab.light') : t('fab.dark')}
               </button>
             </div>
 
@@ -398,6 +411,16 @@ export default function Layout({ children }: { children: ReactNode }) {
               ) : null}
             </div>
           ) : null}
+
+          {/* 맨 위로 — FAB이 있는 모든 화면에 함께 노출(응시/SEB에선 FAB과 같이 숨김). 화면 우하단 끝. */}
+          <button
+            className="fab-top"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            aria-label={t('fab.toTop')}
+            title={t('fab.toTop')}
+          >
+            <ChevronUpIcon size={24} />
+          </button>
 
           <button className="fab" onClick={() => setOpen((o) => !o)} aria-label="menu">
             <img

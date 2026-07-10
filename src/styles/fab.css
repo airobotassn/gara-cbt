@@ -6,12 +6,17 @@
   display: block;
 }
 .pf-divider { height: 1px; background: var(--line); margin: 12px 0; }
-/* 로그아웃: 이메일 아래 차분한 텍스트 버튼(아이콘+글자) */
-.pf-logout {
+/* 계정 액션(마이페이지·로그아웃): 이름 아래 나란히 놓는 차분한 텍스트 버튼 */
+.pf-acct-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 5px;
+}
+.pf-acct-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 3px;
   border: none;
   background: none;
   color: var(--dim);
@@ -21,8 +26,28 @@
   cursor: pointer;
   transition: color 0.12s;
 }
-.pf-logout svg { opacity: 0.85; }
-.pf-logout:hover { color: var(--danger-fg); }
+.pf-acct-btn svg { opacity: 0.85; }
+.pf-acct-btn:hover { color: var(--ink); }
+.pf-logout-btn:hover { color: var(--danger-fg); }
+/* 테마 토글: 헤더 우측 상단 구석의 아이콘 버튼 — 달/해는 노란색 */
+.pf-theme {
+  align-self: flex-start;
+  flex: none;
+  margin: -2px -4px 0 0;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 4px;
+  color: #fbbf24;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: 0.12s;
+}
+.pf-theme:hover {
+  background: var(--soft);
+  color: #f59e0b;
+}
 /* ===== FAB profile ===== */
 .fab {
   position: fixed;
@@ -55,6 +80,29 @@
   color: var(--on-accent);
   font-size: var(--fs-sm);
   font-weight: 800;
+}
+/* 맨 위로 — 화면 우하단 끝(FAB은 좌하단이므로 반대편 코너). 모든 FAB 화면에 함께 노출. */
+.fab-top {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 60;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.6);
+  transition: 0.15s;
+}
+.fab-top:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 74, 198, 0.5);
+  box-shadow: 0 0 24px -6px rgba(0, 74, 198, 0.5);
 }
 .panel {
   position: fixed;

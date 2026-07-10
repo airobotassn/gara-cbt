@@ -33,6 +33,16 @@ export function HomeIcon(p: IcoProps) {
   )
 }
 
+// 맨 위로(scroll-to-top) 버튼용 위쪽 화살표
+export function ChevronUpIcon(p: IcoProps) {
+  return (
+    <Ico {...p}>
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </Ico>
+  )
+}
+
 export function ExamIcon(p: IcoProps) {
   return (
     <Ico {...p}>

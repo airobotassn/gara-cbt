@@ -1079,6 +1079,7 @@ const D: Record<string, Record<Lang, string>> = {
   "fab.logout": { ko: "로그아웃", en: "Log out", ja: "ログアウト", zh: "退出登录", hi: "लॉग आउट", vi: "Đăng xuất" },
   "fab.uploadImg": { ko: "이미지 업로드", en: "Upload image", ja: "画像アップロード", zh: "上传图片", hi: "छवि अपलोड करें", vi: "Tải ảnh lên" },
   "fab.uploadFail": { ko: "업로드에 실패했습니다.", en: "Upload failed.", ja: "アップロードに失敗しました。", zh: "上传失败。", hi: "अपलोड विफल रहा।", vi: "Tải lên thất bại." },
+  "fab.toTop": { ko: "맨 위로", en: "Back to top", ja: "トップへ", zh: "回到顶部", hi: "ऊपर जाएँ", vi: "Lên đầu trang" },
   "landing.hero_pre": { ko: "피지컬 AI 시대", en: "In the age of Physical AI,", ja: "フィジカルAIの時代、", zh: "实体 AI 时代，", hi: "फिजिकल AI के युग में,", vi: "Trong kỷ nguyên AI vật lý," },
   "landing.hero_em": { ko: "당신의 실력", en: "your skills", ja: "あなたの実力", zh: "你的实力", hi: "आपका कौशल", vi: "năng lực của bạn" },
   "landing.hero_post": { ko: "CARIS로 증명하세요", en: "Prove them with CARIS", ja: "CARISで証明しよう", zh: "用 CARIS 来证明", hi: "CARIS से साबित करें", vi: "Hãy chứng minh bằng CARIS" },
