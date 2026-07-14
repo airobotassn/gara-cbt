@@ -21,10 +21,18 @@ export function colorForSeed(seed: string): string {
   return GEM_COLORS[h % GEM_COLORS.length]
 }
 
-// avatar_url 해석: 'img:<url>'=업로드 이미지 · 'gem:#hex'=젬 · 그 외/NULL=시드 젬(구글 URL 등은 무시).
+// 관리자 전용 마스코트(고정 X · 선택 가능). public/admin-mascot-<n>.png (n=1..N).
+export const ADMIN_MASCOT_COUNT = 3
+export function mascotSrc(n: number): string {
+  return `/admin-mascot-${n}.png`
+}
+
+// avatar_url 해석: 'img:<url>'=업로드 이미지 · 'gem:#hex'=젬 · 'mascot:<n>'=관리자 마스코트 · 'char:<id>'=캐릭터(Phase2, 지금은 플레이스홀더 젬) · 그 외/NULL=시드 젬(구글 URL 등은 무시).
 export type AvatarSpec =
   | { kind: 'image'; url: string }
   | { kind: 'gem'; color: string }
+  | { kind: 'mascot'; n: number; url: string }
+  | { kind: 'character'; id: string }
 
 export function parseAvatar(
   avatarUrl: string | null | undefined,
@@ -32,7 +40,24 @@ export function parseAvatar(
 ): AvatarSpec {
   if (avatarUrl?.startsWith('img:')) return { kind: 'image', url: avatarUrl.slice(4) }
   if (avatarUrl?.startsWith('gem:')) return { kind: 'gem', color: avatarUrl.slice(4) }
+  if (avatarUrl?.startsWith('mascot:')) {
+    const n = Number(avatarUrl.slice(7))
+    if (Number.isInteger(n) && n >= 1 && n <= ADMIN_MASCOT_COUNT)
+      return { kind: 'mascot', n, url: mascotSrc(n) }
+  }
+  if (avatarUrl?.startsWith('char:')) return { kind: 'character', id: avatarUrl.slice(5) }
   return { kind: 'gem', color: colorForSeed(seed) }
+}
+
+// avatar_url 스킴 판별(라우팅/서버 resolver 용). 미해석 문자열/NULL 은 'seed'.
+export function avatarScheme(
+  avatarUrl: string | null | undefined,
+): 'img' | 'gem' | 'mascot' | 'char' | 'seed' {
+  if (avatarUrl?.startsWith('img:')) return 'img'
+  if (avatarUrl?.startsWith('gem:')) return 'gem'
+  if (avatarUrl?.startsWith('mascot:')) return 'mascot'
+  if (avatarUrl?.startsWith('char:')) return 'char'
+  return 'seed'
 }
 
 const OUT = 256 // 출력 한 변(px)

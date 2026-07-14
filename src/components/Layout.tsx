@@ -4,7 +4,7 @@ import type { ChangeEvent, ReactNode } from 'react'
 import { useAuth } from '../context/AuthProvider'
 import { supabase, callFunction } from '../lib/supabase'
 import GemAvatar, { Avatar } from './GemAvatar'
-import { GEM_COLORS, parseAvatar, uploadAvatar } from '../lib/avatar'
+import { GEM_COLORS, ADMIN_MASCOT_COUNT, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
 import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
@@ -102,6 +102,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   const seedBase = user?.id ?? 'guest'
   const spec = parseAvatar(profile?.avatar_url, seedBase)
   const gemColor = spec.kind === 'gem' ? spec.color : null
+  // 관리자 마스코트: 고정이 아니라 선택 — 아직 안 고른 관리자는 1번을 기본으로 표시.
+  const activeMascot = spec.kind === 'mascot' ? spec.n : isAdmin ? 1 : null
+  const headerAvatarUrl = isAdmin ? `mascot:${activeMascot ?? 1}` : profile?.avatar_url
 
   async function saveAvatar(val: string) {
     if (!user) return
@@ -111,6 +114,12 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   async function pickColor(c: string) {
     await saveAvatar(`gem:${c}`)
+    setUploadErr('')
+    setPicking(false)
+  }
+
+  async function pickMascot(n: number) {
+    await saveAvatar(`mascot:${n}`)
     setUploadErr('')
     setPicking(false)
   }
@@ -154,8 +163,8 @@ export default function Layout({ children }: { children: ReactNode }) {
     navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
-  // SEMI-CARIS(내부 /test) 로 이동
-  function goSemiCaris() {
+  // CARIS ARENA(내부 /test) 로 이동
+  function goCarisArena() {
     setOpen(false)
     setMoreOpen(false)
     navigate('/test/select')
@@ -174,11 +183,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 onClick={() => setPicking((p) => !p)}
                 title={t('fab.changeChar')}
               >
-                {isAdmin ? (
-                  <img className="pf-ava-mascot" src="/admin-mascot.png" alt="" width={52} height={52} />
-                ) : (
-                  <Avatar avatarUrl={profile?.avatar_url} seed={seedBase} size={52} />
-                )}
+                <Avatar avatarUrl={headerAvatarUrl} seed={seedBase} size={52} />
                 <span className="pf-ava-badge"><PencilIcon size={11} /></span>
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -260,31 +265,47 @@ export default function Layout({ children }: { children: ReactNode }) {
             {picking ? (
               <>
                 <div className="pf-avatars">
-                  {isFullUser ? (
-                    <button
-                      className={`pf-avatar-opt pf-avatar-upload ${spec.kind === 'image' ? 'on' : ''}`}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      title={t('fab.uploadImg')}
-                    >
-                      {spec.kind === 'image' ? (
-                        <Avatar avatarUrl={profile?.avatar_url} seed={seedBase} size={38} />
-                      ) : (
-                        <span className="pf-upload-ic">{uploading ? '…' : <CameraIcon size={20} />}</span>
-                      )}
-                    </button>
-                  ) : null}
-                  {GEM_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      className={`pf-avatar-opt ${gemColor === c ? 'on' : ''}`}
-                      onClick={() => pickColor(c)}
-                    >
-                      <GemAvatar color={c} size={38} />
-                    </button>
-                  ))}
+                  {isAdmin ? (
+                    // 관리자: 마스코트 3종 중 선택(고정 아님).
+                    Array.from({ length: ADMIN_MASCOT_COUNT }, (_, i) => i + 1).map((n) => (
+                      <button
+                        key={n}
+                        className={`pf-avatar-opt ${activeMascot === n ? 'on' : ''}`}
+                        onClick={() => pickMascot(n)}
+                        title={t('fab.changeChar')}
+                      >
+                        <Avatar avatarUrl={`mascot:${n}`} seed={seedBase} size={38} />
+                      </button>
+                    ))
+                  ) : (
+                    <>
+                      {isFullUser ? (
+                        <button
+                          className={`pf-avatar-opt pf-avatar-upload ${spec.kind === 'image' ? 'on' : ''}`}
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          title={t('fab.uploadImg')}
+                        >
+                          {spec.kind === 'image' ? (
+                            <Avatar avatarUrl={profile?.avatar_url} seed={seedBase} size={38} />
+                          ) : (
+                            <span className="pf-upload-ic">{uploading ? '…' : <CameraIcon size={20} />}</span>
+                          )}
+                        </button>
+                      ) : null}
+                      {GEM_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          className={`pf-avatar-opt ${gemColor === c ? 'on' : ''}`}
+                          onClick={() => pickColor(c)}
+                        >
+                          <GemAvatar color={c} size={38} />
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
-                {isFullUser ? (
+                {isFullUser && !isAdmin ? (
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -307,7 +328,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/')}>
                 <span className="ic"><HomeIcon /></span> {t('common.home')}
               </button>
-              <button className="pf-item" onClick={goSemiCaris}>
+              <button className="pf-item" onClick={goCarisArena}>
                 <span className="ic"><TargetIcon /></span> {t('common.leveltest')}
               </button>
               <button className="pf-item" onClick={() => go('/guide')}>

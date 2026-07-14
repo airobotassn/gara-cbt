@@ -1,6 +1,6 @@
 // 카와이 젬 마스코트(자체 SVG) — 동그란 눈 + 미소 + 파스텔 + 두꺼운 외곽선.
 // 외부 서비스/스토리지 없이 색만 바꿔 사용.
-import { parseAvatar } from '../lib/avatar'
+import { parseAvatar, colorForSeed } from '../lib/avatar'
 
 const DARK = '#2b2d42'
 const HEX = '50,7 89,28.5 89,71.5 50,93 11,71.5 11,28.5'
@@ -88,6 +88,50 @@ export function Avatar({
           display: 'block',
         }}
       />
+    )
+  }
+  if (spec.kind === 'mascot') {
+    // 전신 마스코트(비정사각) → 원형 안에 contain 으로 전체가 보이게, 연한 배경으로 여백 정리.
+    return (
+      <img
+        src={spec.url}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          objectFit: 'contain',
+          background: '#eef1f6',
+          display: 'block',
+        }}
+      />
+    )
+  }
+  if (spec.kind === 'character') {
+    // Phase-2 캐릭터(장착 파츠) 풀 렌더는 이후 슬라이스(user_characters/user_cosmetics)에서.
+    // 지금은 char: 를 캐릭터 id 로 시드한 플레이스홀더 젬 + 소형 캐릭터 배지 점으로 안전 폴백 → 절대 blank 안 됨.
+    return (
+      <span style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+        <GemAvatar color={colorForSeed(spec.id)} size={size} />
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            right: 0,
+            bottom: 0,
+            width: Math.max(6, Math.round(size * 0.22)),
+            height: Math.max(6, Math.round(size * 0.22)),
+            borderRadius: '50%',
+            background: '#2b2d42',
+            border: '1.5px solid #fff',
+            boxSizing: 'border-box',
+          }}
+        />
+      </span>
     )
   }
   return <GemAvatar color={spec.color} size={size} />
