@@ -18,7 +18,7 @@ export const URLS = {
 }
 
 export const META = {
-  project: 'GARA · SEMI-CARIS',
+  project: 'GARA · CARIS ARENA',
   title: '변경사항 리포트 — 가독성·문구·관리자 UX + 메인 검색 추천 개편',
 }
 

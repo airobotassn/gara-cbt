@@ -1,4 +1,4 @@
-// SEMI-CARIS 백오피스 (Admin.tsx 의 "SEMI-CARIS" 탭). ai-level-test/src/pages/Admin.tsx 에서 이관.
+// CARIS ARENA 백오피스 (Admin.tsx 의 "CARIS ARENA" 탭). ai-level-test/src/pages/Admin.tsx 에서 이관.
 //  - 모든 데이터 호출은 새 엣지 함수 `admin-test` 로 (CBT admin 과 분리).
 //  - 응시 결과 링크는 gara-cbt 라우트 `/test/result/:id` 를 사용.
 //  - 이관 범위: 대시보드 · 유저 · 응시 기록 · 문항 목록 · 문항 이력 · 문항 생성(KB 파이프라인) · 번역 · 제보 · 관리자 관리.
@@ -116,7 +116,7 @@ export default function LevelTestAdmin() {
       <div className="wrap admin">
         <div className="admin-section" style={{ textAlign: 'center' }}>
           <h3>관리자 전용</h3>
-          <p className="admin-hint">SEMI-CARIS 관리자 계정으로 로그인해야 합니다.</p>
+          <p className="admin-hint">WORLD ARENA 관리자 계정으로 로그인해야 합니다.</p>
         </div>
       </div>
     )

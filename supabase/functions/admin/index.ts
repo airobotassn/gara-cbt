@@ -699,7 +699,7 @@ async function examFeeSave(admin: any, body: any) {
 }
 
 // ---------- 관리자 계정 관리 (루트 전용) ----------
-// admin_users 는 CBT·SEMI-CARIS 공용 게이트 테이블 → 여기서 추가/삭제하면 양쪽 권한이 함께 반영됨.
+// admin_users 는 CBT·CARIS ARENA 공용 게이트 테이블 → 여기서 추가/삭제하면 양쪽 권한이 함께 반영됨.
 async function manageAdmins(
   admin: any,
   body: any,
@@ -1086,6 +1086,51 @@ async function examSetList(admin: any, body: any) {
   return json({ rows })
 }
 
+// 등록시험 세트를 실제 응시 화면(CbtRunner)에서 눈으로 검수하기 위한 미리보기 페이로드.
+// start-exam 과 동일한 StartExamResponse 형태지만 응시 기록(exam_attempt)을 만들지 않는다(attemptId='preview').
+// ⚠️ 실제 응시와 동일 조건으로 검수 — correct_index·answer_key·explanation 은 절대 내보내지 않음.
+async function examPreview(admin: any, body: any) {
+  const examId = body?.examId
+  if (!examId) return json({ error: 'examId 필요' }, 400)
+  const { data: exam, error: exErr } = await admin
+    .from('exams')
+    .select('id, slug, title, duration_minutes')
+    .eq('id', examId)
+    .maybeSingle()
+  if (exErr) return json({ error: exErr.message }, 400)
+  if (!exam) return json({ error: '시험을 찾을 수 없습니다.' }, 404)
+  const { data, error } = await admin
+    .from('exam_questions')
+    .select('number, questions(id, subject, prompt, kind, choices, active)')
+    .eq('exam_id', examId)
+    .order('number', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+  const questions = (data ?? [])
+    .filter((r: any) => r.questions)
+    .map((r: any) => ({
+      id: r.questions.id,
+      number: r.number,
+      subject: r.questions.subject ?? '',
+      prompt: r.questions.prompt ?? '',
+      kind: r.questions.kind ?? 'mc',
+      choices: r.questions.choices ?? [],
+    }))
+  if (questions.length === 0) {
+    return json({ error: '아직 추출된 문항이 없습니다. 먼저 “문항 추출”을 하세요.' }, 400)
+  }
+  return json({
+    attemptId: 'preview',
+    exam: {
+      slug: exam.slug,
+      title: exam.title,
+      durationMinutes: exam.duration_minutes,
+      totalQuestions: questions.length,
+    },
+    startedAt: new Date().toISOString(),
+    questions,
+  })
+}
+
 // 대시보드 분석 — 추이·점수분포·합격률·급수·자격증·회차 퍼널·소요시간·문항 난이도·과목·풀.
 async function cbtAnalytics(admin: any) {
   const now = Date.now()
@@ -1103,7 +1148,7 @@ async function cbtAnalytics(admin: any) {
     admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active, tier').order('created_at', { ascending: true }),
     admin.from('exam_rounds').select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
-    // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(SEMI-CARIS 익명 세션 제외)
+    // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(CARIS ARENA 익명 세션 제외)
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', false),
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', true),
     admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
@@ -1133,7 +1178,7 @@ async function cbtAnalytics(admin: any) {
   const certByDay: Record<string, number> = {}
   days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0; certByDay[d] = 0 })
   for (const p of profs as any[]) {
-    if (p.is_anonymous) continue // 가입 추이 = 가입 회원(비익명)만 — 게스트·SEMI-CARIS 익명 세션 제외(누적 회원 KPI와 동일 기준)
+    if (p.is_anonymous) continue // 가입 추이 = 가입 회원(비익명)만 — 게스트·CARIS ARENA 익명 세션 제외(누적 회원 KPI와 동일 기준)
     const k = (p.created_at ?? '').slice(0, 10)
     if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
   }
@@ -1364,7 +1409,7 @@ async function cbtAnalytics(admin: any) {
 
 // 회원 목록 — 프로필 + 이메일 + 응시수 + 마지막 활동.
 async function cbtUsers(admin: any) {
-  // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → SEMI-CARIS 게스트(is_anonymous)는 회원목록에서 제외.
+  // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → CARIS ARENA 게스트(is_anonymous)는 회원목록에서 제외.
   const { data: profiles } = await admin
     .from('profiles')
     .select('id, display_name, is_anonymous, created_at')
@@ -1433,6 +1478,21 @@ async function cbtUserDetail(admin: any, body: any) {
   return json({ attempts })
 }
 
+// ---------- 어드민: 지역 오배정 정정 (T9) ----------
+// 락된 회원의 국가/지역을 강제 정정(admin_set_region RPC = 함수-내부 GUC 로 트리거 우회).
+// country 는 region 접두(예: KR-26 → KR)와 일치해야 함. region_code 는 regions FK 로 검증됨.
+async function setRegion(admin: any, body: any) {
+  const uid = String(body?.uid ?? '').trim()
+  const region = String(body?.region ?? '').trim()
+  const country = String(body?.country ?? '').trim()
+  if (!uid) return json({ error: 'uid 가 필요합니다.' }, 400)
+  if (!region) return json({ error: 'region 이 필요합니다.' }, 400)
+  if (country !== region.slice(0, 2)) return json({ error: '국가·지역 접두가 일치하지 않습니다.' }, 400)
+  const { error } = await admin.rpc('admin_set_region', { p_uid: uid, p_country: country, p_region: region })
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -1478,6 +1538,7 @@ Deno.serve(async (req) => {
       case 'bankListForAdmin': return await bankListForAdmin(admin)
       case 'examDraw': return await examDraw(admin, body, email)
       case 'examSetList': return await examSetList(admin, body)
+      case 'examPreview': return await examPreview(admin, body)
       case 'questionList': return await questionList(admin, body)
       case 'questionUpsert': return await questionUpsert(admin, body, email)
       case 'questionSetActive': return await questionSetActive(admin, body, email)
@@ -1488,6 +1549,7 @@ Deno.serve(async (req) => {
       case 'cbtAnalytics': return await cbtAnalytics(admin)
       case 'cbtUsers': return await cbtUsers(admin)
       case 'cbtUserDetail': return await cbtUserDetail(admin, body)
+      case 'setRegion': return await setRegion(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

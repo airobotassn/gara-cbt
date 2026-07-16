@@ -1,4 +1,4 @@
-// GARA 자격검정용 .seb(Safe Exam Browser 설정) 생성기.
+// CARIS 자격검정용 .seb(Safe Exam Browser 설정) 생성기.
 // 포맷(공식): final = gzip( "plnd" + gzip( XML plist ) )  — plnd = 비암호화.
 //
 // 사용:

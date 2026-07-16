@@ -21,7 +21,7 @@ export type Tier = {
   method?: string // CARIS-Ⅱ: 검정 방법(필기/실기)
   practical?: string // CARIS-Ⅱ: 실기 내용
   pass: string // 합격 기준
-  fee?: number // 티어별 응시료(원) — 임시 예시값(실값은 DB exam_fees)
+  fee?: number // 티어별 응시료(USD) — 현재 전 티어 $1 고정(런칭/결제 테스트용). 실값은 DB exam_fees
 }
 
 export type Track = {
@@ -34,16 +34,16 @@ export type Track = {
   tiers: Tier[]
 }
 
-// 티어 목록(이름·응시료). 이름/키는 언어 무관 고정, fee 는 임시 예시값(실값은 DB exam_fees).
+// 티어 목록(이름·응시료). 이름/키는 언어 무관 고정. fee 는 현재 전 티어 $1 고정(런칭/결제 테스트용, 실값은 DB exam_fees).
 const T1_TIERS = [
-  { key: 'beginner', name: 'Beginner', fee: 30000 },
-  { key: 'pro', name: 'Pro', fee: 40000 },
-  { key: 'elite', name: 'Elite', fee: 55000 },
+  { key: 'beginner', name: 'Beginner', fee: 1 },
+  { key: 'pro', name: 'Pro', fee: 1 },
+  { key: 'elite', name: 'Elite', fee: 1 },
 ] as const
 const T2_TIERS = [
-  { key: 'master', name: 'Master', fee: 80000 },
-  { key: 'grandmaster', name: 'Grand Master', fee: 100000 },
-  { key: 'zenith', name: 'Zenith', fee: 150000 },
+  { key: 'master', name: 'Master', fee: 1 },
+  { key: 'grandmaster', name: 'Grand Master', fee: 1 },
+  { key: 'zenith', name: 'Zenith', fee: 1 },
 ] as const
 
 // 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.

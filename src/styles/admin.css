@@ -29,7 +29,7 @@
 .admin-tabs button:hover { color: var(--ink); }
 .admin-tabs button.on { background: var(--blue); color: var(--on-accent); box-shadow: 0 0 12px -2px rgba(0, 74, 198,.5); }
 
-/* 최상위 제품 선택 탭(CARIS 시험 / SEMI-CARIS) — 중앙 정렬 + 크고 예쁘게 */
+/* 최상위 제품 선택 탭(CARIS 시험 / CARIS ARENA) — 중앙 정렬 + 크고 예쁘게 */
 .admin-tabs-top {
   display: flex;
   width: fit-content;

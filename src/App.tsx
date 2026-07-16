@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { I18nProvider } from './lib/i18n'
-import { AuthProvider } from './context/AuthProvider'
+import { AuthProvider, useAuth } from './context/AuthProvider'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import ExamGate from './pages/ExamGate'
@@ -29,6 +29,10 @@ import LevelSelect from './pages/LevelSelect'
 import TestRunner from './pages/TestRunner'
 import Result from './pages/Result'
 import Ranking from './pages/Ranking'
+import Onboarding from './pages/Onboarding'
+import Demo from './pages/Demo'
+import Hub from './pages/Hub'
+import WorldArena from './pages/WorldArena'
 const Admin = lazy(() => import('./pages/Admin'))
 
 // 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
@@ -40,6 +44,23 @@ function ScrollToTop() {
   return null
 }
 
+// 최초 로그인 온보딩 게이트: 정식 회원이 지역 미확정이면 강제(enforced) 라우트 접근 시 /onboarding으로.
+// 강제 대상: /test/*, /ranking, /mypage. 그 외(/, /admin, /exam/*, 법적 고지, /onboarding 등)는 통과.
+// onboardingLoading 중에는 리다이렉트하지 않음(앱 전체를 막지 않는다). 익명 유저는 needsOnboarding=false.
+function OnboardingGate({ children }: { children: ReactNode }) {
+  const { needsOnboarding, onboardingLoading } = useAuth()
+  const { pathname, search } = useLocation()
+  const enforced =
+    pathname.startsWith('/test') ||
+    pathname.startsWith('/ranking') ||
+    pathname.startsWith('/mypage')
+  if (!onboardingLoading && needsOnboarding && enforced) {
+    const next = encodeURIComponent(pathname + search)
+    return <Navigate to={`/onboarding?next=${next}`} replace />
+  }
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <I18nProvider>
@@ -47,8 +68,12 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           <Layout>
+            <OnboardingGate>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/demo" element={<Demo />} />
+              <Route path="/arena" element={<WorldArena />} />
+              <Route path="/hub" element={<Hub />} />
               <Route path="/login" element={<Login />} />
               <Route path="/exam" element={<ExamGate />} />
               <Route path="/exam/apply" element={<ExamApply />} />
@@ -63,7 +88,7 @@ export default function App() {
               <Route path="/verify/:token" element={<VerifyCert />} />
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/mypage/:section" element={<MyPage />} />
-              {/* SEMI-CARIS 모듈 (/test/*) + 랭킹 */}
+              {/* CARIS ARENA 모듈 (/test/*) + 랭킹 */}
               <Route path="/test/select" element={<LevelSelect />} />
               <Route path="/test/:attemptId" element={<TestRunner />} />
               <Route path="/test/result/:attemptId" element={<Result />} />
@@ -84,8 +109,10 @@ export default function App() {
                 }
               />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </OnboardingGate>
           </Layout>
         </BrowserRouter>
       </AuthProvider>

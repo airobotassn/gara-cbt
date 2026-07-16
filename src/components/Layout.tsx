@@ -10,12 +10,12 @@ import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
 import {
   HomeIcon,
-  TargetIcon,
   InfoIcon,
   UserIcon,
   SunIcon,
   MoonIcon,
   GlobeIcon,
+  EarthIcon,
   ToolIcon,
   MoreIcon,
   PencilIcon,
@@ -163,11 +163,11 @@ export default function Layout({ children }: { children: ReactNode }) {
     navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
-  // CARIS ARENA(내부 /test) 로 이동
-  function goCarisArena() {
+  // WORLD ARENA(글로벌 응시 현황) 지도로 이동
+  function goArena() {
     setOpen(false)
     setMoreOpen(false)
-    navigate('/test/select')
+    navigate('/arena')
   }
 
   return (
@@ -328,8 +328,8 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/')}>
                 <span className="ic"><HomeIcon /></span> {t('common.home')}
               </button>
-              <button className="pf-item" onClick={goCarisArena}>
-                <span className="ic"><TargetIcon /></span> {t('common.leveltest')}
+              <button className="pf-item" onClick={goArena}>
+                <span className="ic"><EarthIcon /></span> {t('common.leveltest')}
               </button>
               <button className="pf-item" onClick={() => go('/guide')}>
                 <span className="ic"><InfoIcon /></span> {t('nav.caris')}
@@ -438,7 +438,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <button className="fab" onClick={() => setOpen((o) => !o)} aria-label="menu">
             <img
               src="/logo.png"
-              alt="GARA"
+              alt="CARIS"
               style={{ width: 40, height: 40, borderRadius: '50%' }}
             />
           </button>

@@ -14,12 +14,16 @@ interface AuthState {
   loading: boolean
   // 구글 계정 보유 = 정식 회원. 익명 유저는 false.
   isFullUser: boolean
-  // 세션이 없으면 익명 세션 생성(SEMI-CARIS 게스트 응시 시작 직전 호출). CBT 자격검정은 사용 안 함.
+  // 세션이 없으면 익명 세션 생성(CARIS ARENA 게스트 응시 시작 직전 호출). CBT 자격검정은 사용 안 함.
   ensureAnonymous: () => Promise<void>
   // 결과창 등에서 구글로 로그인/승격.
   loginWithGoogle: (redirectTo?: string) => Promise<void>
   loginWithKakao: (redirectTo?: string) => Promise<void>
   logout: () => Promise<void>
+  // 온보딩(지역 잠금) 게이트: 정식 회원이 아직 지역을 확정하지 않았으면 true.
+  needsOnboarding: boolean
+  // 정식 회원의 최초 프로필 조회가 끝날 때까지 true. 익명/무세션은 false.
+  onboardingLoading: boolean
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -34,21 +38,52 @@ function computeIsFullUser(user: User | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [onboardingLoading, setOnboardingLoading] = useState(false)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false)
       return
     }
+    async function loadOnboarding(u: User | null) {
+      // 익명/무세션은 게이트 대상 아님.
+      if (!u || !computeIsFullUser(u)) {
+        setNeedsOnboarding(false)
+        setOnboardingLoading(false)
+        return
+      }
+      setOnboardingLoading(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('region_locked_at,country_code,region_code')
+        .eq('id', u.id)
+        .maybeSingle()
+      // 조회 실패 → FAIL-OPEN: 유저를 가두지 않는다.
+      if (error) {
+        setNeedsOnboarding(false)
+        setOnboardingLoading(false)
+        return
+      }
+      // 프로필 행이 없으면(최초) 지역 미확정 → 온보딩 필요.
+      setNeedsOnboarding(data == null ? true : data.region_locked_at == null)
+      setOnboardingLoading(false)
+    }
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setLoading(false)
+      loadOnboarding(data.session?.user ?? null)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
       // 탈퇴(soft delete) 복구: 보관기간 내 재로그인하면 비활성 플래그 해제
       if (event === 'SIGNED_IN' && s?.user && !s.user.is_anonymous) {
         supabase.from('profiles').update({ deactivated_at: null }).eq('id', s.user.id).then(() => {})
+        loadOnboarding(s.user)
+      }
+      if (event === 'SIGNED_OUT') {
+        setNeedsOnboarding(false)
+        setOnboardingLoading(false)
       }
     })
     return () => sub.subscription.unsubscribe()
@@ -56,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const user = session?.user ?? null
 
-  // 세션이 전혀 없을 때만 익명 세션 생성(SEMI-CARIS 게스트 응시용). 이미 세션 있으면 no-op.
+  // 세션이 전혀 없을 때만 익명 세션 생성(CARIS ARENA 게스트 응시용). 이미 세션 있으면 no-op.
   async function ensureAnonymous() {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { data } = await supabase.auth.getSession()
@@ -101,6 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     isFullUser: computeIsFullUser(user),
+    needsOnboarding,
+    onboardingLoading,
     ensureAnonymous,
     loginWithGoogle,
     loginWithKakao,

@@ -1,5 +1,5 @@
 // 유저: 목록 · 상세(응시이력+레이팅) · 등급 수동조정
-//  SEMI-CARIS 이관: 참조 테이블(profiles·user_progress·test_attempts·user_level_skill)은 유지.
+//  CARIS ARENA 이관: 참조 테이블(profiles·user_progress·test_attempts·user_level_skill)은 유지.
 import { json } from '../../_shared/cors.ts'
 import { MAX_LEVEL } from '../../_shared/scoring.ts'
 

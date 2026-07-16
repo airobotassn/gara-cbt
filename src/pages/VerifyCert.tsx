@@ -116,7 +116,7 @@ export default function VerifyCert() {
       <div className="vrf-doc">
         <div className="vrf-inner">
           <header className="vrf-mast">
-            <img className="vrf-logo" src="/logo.png" alt="GARA" />
+            <img className="vrf-logo" src="/logo.png" alt="CARIS" />
             <div className="vrf-authority">Global AI &amp; Robotics Association</div>
             <div className="vrf-rule"><span>◆</span></div>
             <h1 className="vrf-sys">{t('verify.system_sub')}</h1>

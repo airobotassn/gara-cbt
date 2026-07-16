@@ -17,8 +17,13 @@ export default function ExamGate() {
 
   if (isMobileDevice()) return <MobileBlock />
 
-  // 응시 시작: 로그인 체크(결제한 시험 확인은 백엔드 준비되면 여기 훅) → prepare.
+  // 응시 시작: 로그인 체크 → prepare.
   // SEB 실행/설치 안내는 prepare 마지막 단계("시작하기")로 이동. SEB 안에서는 /exam/seb 가 진입점.
+  // TODO(응시권): 결제/응시권 백엔드가 생기면 여기서 "결제된(접수 완료) 시험이 있는지" 확인해
+  //   - 있으면 그대로 /exam/prepare 로 진행
+  //   - 없으면 /guide 로 보내 접수부터 하게 한다(응시게이트로 들어온 모든 진입점을 여기서 일괄 게이팅).
+  //   지금은 exam_attempts 가 '응시 시작 후에만' 생겨 '결제했지만 미응시' 상태를 판별할 데이터가 없음
+  //   (start-exam 도 과도기라 결제 확인 없이 활성 회차+pro 로 바로 생성) → 데모로 무조건 통과.
   function onStart() {
     if (isFullUser) {
       navigate('/exam/prepare')
@@ -61,7 +66,7 @@ export default function ExamGate() {
               <div className="relative w-full aspect-square max-w-md rounded-full bg-surface-container-lowest flex items-center justify-center overflow-hidden border border-surface-container-highest shadow-xl shadow-primary-container/5">
                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary-container via-transparent to-transparent"></div>
                 <div className="z-10 w-2/3 h-2/3 flex items-center justify-center rounded-full overflow-hidden">
-                  <img src="/logo.png" alt="GARA Logo" className="w-full h-full object-cover scale-105" />
+                  <img src="/logo.png" alt="CARIS Logo" className="w-full h-full object-cover scale-105" />
                 </div>
                 <div className="absolute w-full h-full border border-primary-container/10 rounded-full" style={{ transform: 'scale(0.8)' }}></div>
                 <div className="absolute w-full h-full border border-primary-container/5 rounded-full" style={{ transform: 'scale(0.6)' }}></div>

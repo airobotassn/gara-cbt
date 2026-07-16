@@ -1,5 +1,5 @@
 // Edge Functions 공용 모듈 (Deno). 인증·서비스롤 클라 + 다국어 투영(pick/proj*) 헬퍼.
-// ⚠️ 옛 SEMI-CARIS의 레벨/6축·티어 채점은 제거됨(CBT 채점은 submit-exam 의 맞힌수 집계뿐).
+// ⚠️ 옛 CARIS ARENA의 레벨/6축·티어 채점은 제거됨(CBT 채점은 submit-exam 의 맞힌수 집계뿐).
 import {
   createClient,
   type SupabaseClient,

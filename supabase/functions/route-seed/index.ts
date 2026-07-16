@@ -33,9 +33,12 @@ const supabase = createClient(
 // 표현 다양성(직접요청·구어체·질문·키워드·동의어)을 넓게 깔아 대부분 쿼리가 임베딩 HIT 되게.
 const SEED: { dest: string; phrases: string[] }[] = [
   {
-    dest: '/test/select', // SEMI-CARIS(무료 레벨 진단/AI 실력 진단)
+    dest: '/test/select', // WORLD ARENA(무료 레벨 진단/AI 실력 진단)
     phrases: [
-      '세미카리스', 'SEMI-CARIS', '세미 카리스', '세미카리스 응시', '세미카리스 하고싶어', 'semi caris', 'semi-caris',
+      // 현재 제품명
+      '월드 아레나', 'WORLD ARENA', '월드아레나', '월드 아레나 응시', '월드 아레나 하고싶어', 'world arena', 'world-arena',
+      // 옛 이름(CARIS ARENA·SEMI-CARIS) — 예전 이름으로 검색해도 찾아지게 유지
+      '카리스 아레나', 'CARIS ARENA', '카리스아레나', '카리스 아레나 응시', '카리스 아레나 하고싶어', 'caris arena', 'caris-arena',
       '레벨테스트 하고싶어', '무료로 내 실력 진단', '내 AI 실력 몇 점일까', '레벨 테스트', '실력 측정하고 싶어',
       'AI 활용 능력 진단', '무료 테스트 해볼래', '내가 몇 레벨인지 궁금해', '레벨 측정', 'AI 얼마나 잘하는지 확인',
       '간단하게 실력 체크', '레벨진단', '무료진단', '내 수준 알아보기', '레벨테스트 시작', 'AI 실력 테스트',

@@ -4,7 +4,7 @@
 // 기본 시험 식별자(서버 seed 의 exams.slug 와 일치)
 export const DEFAULT_EXAM_SLUG = 'gara-default'
 
-// SEMI-CARIS(별도 서비스) — 메인/FAB 'SEMI-CARIS 응시하기' 이동 대상
+// CARIS ARENA(별도 서비스) — 메인/FAB 'CARIS ARENA 응시하기' 이동 대상
 export const LEVELTEST_URL = 'https://gara-leveltest.airobotassn.workers.dev/'
 
 // 화면 표기/타이머 폴백 (서버 응답값으로 덮어씀)

@@ -77,19 +77,57 @@ async function seedAuthAndMocks(context) {
   const lbColors = ['#a566e0', '#4aa0e8', '#3fb8ad', '#aeb9c8', '#b8763e', '#86efac', '#ff9bb0', '#c7a3ff', '#9fe0d8', '#ffd29b']
   const lbLevels = [7, 7, 6, 6, 6, 5, 5, 5, 4, 4]
   const lbRatings = [96, 92, 88, 85, 83, 80, 78, 75, 72, 70]
-  await context.route('**/functions/v1/leaderboard', (r) =>
-    r.fulfill({ status: 200, contentType: 'application/json',
+  // 집계 리더보드 목(지역·국가·학교) — 새 버킷 응답 { buckets, scope, window }. 탭마다 화면이 비지 않게.
+  const regionBuckets = [
+    { code: 'KR-11', member_count: 412, avg_level: 4.8, active_today: 173, participation: 0.42, score: 2.02 },
+    { code: 'KR-41', member_count: 388, avg_level: 4.6, active_today: 151, participation: 0.39, score: 1.79 },
+    { code: 'KR-26', member_count: 205, avg_level: 4.4, active_today: 72, participation: 0.35, score: 1.54 },
+    { code: 'KR-28', member_count: 164, avg_level: 4.3, active_today: 51, participation: 0.31, score: 1.33 },
+    { code: 'KR-30', member_count: 98, avg_level: 4.1, active_today: 27, participation: 0.28, score: 1.15 },
+    { code: 'KR-27', member_count: 87, avg_level: 3.9, active_today: 21, participation: 0.24, score: 0.94 },
+    { code: 'KR-50', member_count: 41, avg_level: 3.7, active_today: 8, participation: 0.2, score: 0.74 },
+  ]
+  const countryBuckets = [
+    { code: 'KR', member_count: 1980, avg_level: 4.5, active_today: 612, participation: 0.31, score: 1.4 },
+  ]
+  const schoolBuckets = [
+    { code: 'sch-001', label: '서울과학고등학교', member_count: 96, avg_level: 5.1, active_today: 48, participation: 0.5, score: 2.55 },
+    { code: 'sch-002', label: '경기북과학고등학교', member_count: 72, avg_level: 4.9, active_today: 31, participation: 0.43, score: 2.11 },
+    { code: 'sch-003', label: '대전동신과학고등학교', member_count: 58, avg_level: 4.6, active_today: 22, participation: 0.38, score: 1.75 },
+    { code: 'sch-004', label: '부산일과학고등학교', member_count: 33, avg_level: 4.2, active_today: 11, participation: 0.33, score: 1.39 },
+    { code: 'sch-005', label: '인천진산과학고등학교', member_count: 12, avg_level: 3.8, active_today: 4, participation: 0.33, score: 1.25 },
+  ]
+  await context.route('**/functions/v1/leaderboard', (r) => {
+    let scope = 'global'
+    let win = 'daily'
+    try {
+      const b = JSON.parse(r.request().postData() || '{}')
+      if (b.scope) scope = b.scope
+      if (b.window) win = b.window
+    } catch { /* noop */ }
+    if (scope === 'region' || scope === 'country' || scope === 'school') {
+      const buckets = scope === 'region' ? regionBuckets : scope === 'country' ? countryBuckets : schoolBuckets
+      return r.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ buckets, scope, window: win }) })
+    }
+    // 기본(개인/명예의 전당) — 구버전(users)·신버전(top/me) 필드를 모두 담아 Before/After 둘 다 렌더되게.
+    return r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({
         // 신버전(명예의 전당)
         top: lbNames.map((name, i) => ({
           rank: i + 1, name, level: lbLevels[i], rating: lbRatings[i], color: lbColors[i], image: null, me: false,
+          // 칭호(자격증 트랙·급수) 샘플 — 실서버는 me 에만 부착하지만 데모는 상위 2행에 배지 렌더 예시.
+          title: i === 0 ? 'CARIS Master 1급' : i === 1 ? 'CARIS Pro 2급' : null,
         })),
-        me: { rank: 171, level: 2, rating: 14, name: '나 (Demo)', color: '#e3b23c', image: null, me: true },
+        // me.title/titles = user_titles(본인) 파생 배지(실서버 leaderboard fn 이 부착).
+        me: { rank: 171, level: 2, rating: 14, name: '나 (Demo)', color: '#e3b23c', image: null, me: true,
+          title: 'CARIS Pro 3급', titles: [{ track: 'Pro', grade: '3급', exam_title: 'CARIS Pro' }] },
         total: 980,
         // 구버전(리그 리스트) 호환 필드
         users: lbNames.slice(0, 6).map((name, i) => ({ name, rating: lbRatings[i], color: lbColors[i], me: i === 3 })),
         myRank: 4, myGlobalRank: 171, globalTotal: 980,
-      }) }))
+      }) })
+  })
 
   // start-test (시험 시작) — 레벨 선택 → 퀴즈 진입용. 레벨 1, 20문항.
   await context.route('**/functions/v1/start-test', (r) =>

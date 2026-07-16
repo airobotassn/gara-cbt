@@ -1,5 +1,5 @@
 // 문항 오류 제보: 목록 · 상태 변경(open/resolved/dismissed)
-//  SEMI-CARIS 이관: questions→test_questions (조인 개명), question_reports 는 유지.
+//  CARIS ARENA 이관: questions→test_questions (조인 개명), question_reports 는 유지.
 import { json } from '../../_shared/cors.ts'
 
 export async function listReports(admin: any, body: any) {

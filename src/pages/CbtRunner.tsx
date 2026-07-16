@@ -19,6 +19,32 @@ export default function CbtRunner() {
   const { attemptId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  // 관리자 검수용 미리보기 — 등록시험 세트를 실제 응시 화면 그대로 렌더(SEB·모바일·서버 제출 없음).
+  //   /exam/run/preview?examId=<id> 로 진입(새 탭 가능) → admin.examPreview 로 세트 로드.
+  const preview = attemptId === 'preview'
+  const examId = preview ? new URLSearchParams(location.search).get('examId') || '' : ''
+  const [pStart, setPStart] = useState<StartExamResponse | null>(
+    preview ? ((location.state as StartExamResponse | null) ?? null) : null,
+  )
+  const [pErr, setPErr] = useState('')
+  useEffect(() => {
+    if (!preview || pStart || !examId) return
+    let alive = true
+    callFunction<StartExamResponse>('admin', { action: 'examPreview', examId })
+      .then((r) => alive && setPStart(r))
+      .catch((e) => alive && setPErr(e instanceof Error ? e.message : '미리보기를 불러오지 못했습니다.'))
+    return () => {
+      alive = false
+    }
+  }, [preview, pStart, examId])
+
+  if (preview) {
+    if (!examId) return <PreviewNotice title="미리보기를 열 수 없습니다" sub="미리보기할 시험(examId)이 지정되지 않았습니다." onBack={() => navigate('/admin')} />
+    if (pErr) return <PreviewNotice title="미리보기를 열 수 없습니다" sub={pErr} onBack={() => navigate('/admin')} />
+    if (!pStart) return <PreviewNotice title="시험 화면 미리보기" sub="등록된 문항을 불러오는 중…" />
+    return <RunnerInner start={pStart} />
+  }
+
   // 모의 응시(practice)는 SEB 가 새 URL 로 직접 열 수 있어 state 가 없을 수 있음 → 자체 생성
   const start =
     (location.state as StartExamResponse | null) ??
@@ -47,6 +73,24 @@ export default function CbtRunner() {
   return <RunnerInner start={start} />
 }
 
+// 미리보기 로딩/오류 안내 — 실제 응시 화면과 동일한 라이트 테마.
+function PreviewNotice({ title, sub, onBack }: { title: string; sub: string; onBack?: () => void }) {
+  return (
+    <div className="force-light bg-surface min-h-screen flex items-center justify-center p-6">
+      <div className="bg-surface-container-lowest rounded-2xl p-10 border border-outline-variant/30 text-center max-w-md w-full shadow-sm">
+        <div className="text-[40px] mb-3">{onBack ? '⚠️' : '⏳'}</div>
+        <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{title}</h2>
+        <p className="font-body-md text-body-md text-on-surface-variant mb-6">{sub}</p>
+        {onBack && (
+          <button className="bg-primary text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:shadow-lg transition-all" onClick={onBack}>
+            관리자로 돌아가기
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function fmt(ms: number) {
   const s = Math.max(0, Math.ceil(ms / 1000))
   const m = Math.floor(s / 60)
@@ -58,6 +102,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const navigate = useNavigate()
   const { questions, exam } = start
   const total = questions.length
+  const preview = start.attemptId === 'preview' // 관리자 검수 미리보기 — 서버 제출·부정행위 가드 없음
 
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
@@ -102,6 +147,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     submittedRef.current = true
     setSubmitting(true)
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+    // 검수 미리보기 — 서버 제출 없이 관리자 페이지로 복귀
+    if (preview) {
+      navigate('/admin', { replace: true })
+      return
+    }
     // 모의 문제(practice) — 백엔드 호출 없이 완료 화면으로
     if (start.attemptId === 'practice') {
       navigate('/exam/complete', { state: { mode: 'practice', seb: isSEB() }, replace: true })
@@ -123,7 +173,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       setSubmitting(false)
       alert(e instanceof Error ? e.message : t('run.submit_fail'))
     }
-  }, [start.attemptId, buildAnswers, navigate, t])
+  }, [start.attemptId, preview, buildAnswers, navigate, t])
 
   // 종료(포기): 이번 응시를 무효 처리하고 시험을 빠져나간다. 채점 없음.
   const doQuit = useCallback(async () => {
@@ -131,6 +181,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     submittedRef.current = true
     setAskQuit(false)
     setSubmitting(true)
+    // 검수 미리보기 — 무효 기록 없이 관리자 페이지로 복귀
+    if (preview) {
+      navigate('/admin', { replace: true })
+      return
+    }
     const practice = start.attemptId === 'practice'
     // 실제 시험만 서버에 무효 기록(모의는 백엔드 호출 없음). 기록 실패해도 응시자는 나가도록 둔다(서버는 TTL 만료로 정리).
     if (!practice) {
@@ -146,11 +201,16 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       state: { mode: practice ? 'practice' : 'voided', seb: isSEB() },
       replace: true,
     })
-  }, [start.attemptId, navigate])
+  }, [start.attemptId, preview, navigate])
 
   // 사용자가 누르는 제출: 미응답 가드 → 경고 → 미응답 문항으로 이동
   const onClickSubmit = useCallback(() => {
     if (submitting) return
+    // 검수 미리보기 — 미응답 가드 없이 종료 확인만
+    if (preview) {
+      if (window.confirm('미리보기를 종료할까요?')) doSubmit()
+      return
+    }
     const unanswered: number[] = []
     questions.forEach((_, i) => {
       if (!isAnswered(i)) unanswered.push(i)
@@ -161,7 +221,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       return
     }
     if (window.confirm(t('run.submit_confirm'))) doSubmit()
-  }, [questions, isAnswered, submitting, doSubmit, t])
+  }, [questions, isAnswered, submitting, preview, doSubmit, t])
 
   // 제한시간 카운트다운 — 0 도달 시 자동 제출
   const deadlineRef = useRef<number | null>(null)
@@ -183,7 +243,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   }, [durationMs, doSubmit, t])
 
   // 브라우저 JS 보조 가드 — SEB 안 쓰는 응시용 + 개발 폴백. 화면 미리보기(practice)는 제외.
-  const guardEnabled = !submitting && start.attemptId !== 'practice' && !isSEB()
+  const guardEnabled = !submitting && !preview && start.attemptId !== 'practice' && !isSEB()
   const { masked: inputMasked } = useInputGuard({ enabled: guardEnabled })
   const { masked: leaveMasked } = useLeaveGuard({ enabled: guardEnabled })
   const masked = inputMasked || leaveMasked
@@ -228,8 +288,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       {/* Exam Header */}
       <header className="bg-surface-container-lowest border-b border-outline-variant/30 h-16 flex items-center px-4 md:px-margin-desktop justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
-          <img alt="GARA" className="h-8 w-8 object-cover rounded-full" src="/logo.png" />
+          <img alt="CARIS" className="h-8 w-8 object-cover rounded-full" src="/logo.png" />
           <span className="font-title-md text-title-md font-bold text-on-surface tracking-tight">{t('run.top_title', { title: exam.title })}</span>
+          {preview && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/30 text-[11px] font-bold">검수 미리보기</span>
+          )}
         </div>
         <div className="flex items-center gap-4 md:gap-6">
           {/* 진행 게이지 — 푼 문항 수 / 전체 (돋보기 자리 대체) */}

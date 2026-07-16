@@ -222,13 +222,13 @@ export default function ExamApply() {
                 </div>
                 <div className="flex justify-between items-start gap-3">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t('apply.fee')}</span>
-                  <span className="font-body-md text-body-md text-on-surface font-semibold">₩ {won(fee)}</span>
+                  <span className="font-body-md text-body-md text-on-surface font-semibold">$ {won(fee)}</span>
                 </div>
               </div>
 
               <div className="border-t border-outline-variant/30 pt-4 flex justify-between items-baseline">
                 <span className="font-title-md text-title-md text-on-surface font-bold">{t('apply.total')}</span>
-                <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-black">₩ {won(fee)}</span>
+                <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-black">$ {won(fee)}</span>
               </div>
 
               <button onClick={() => setPayNotice(true)} className="w-full bg-primary text-on-primary font-title-md text-title-md font-bold px-6 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">

@@ -1,5 +1,5 @@
 // 응시: 최근 기록 목록 · 상세(문항별 정오답, 응시 언어로 투영)
-//  SEMI-CARIS 이관: attempt_answers→test_answers, questions→test_questions (조인 개명).
+//  CARIS ARENA 이관: attempt_answers→test_answers, questions→test_questions (조인 개명).
 import { json } from '../../_shared/cors.ts'
 import { pickLang, projText, projOptionsForLevel } from '../../_shared/scoring.ts'
 

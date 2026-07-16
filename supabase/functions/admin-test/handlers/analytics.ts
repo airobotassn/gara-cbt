@@ -1,5 +1,5 @@
 // 대시보드: 개요 카드 · 분석(추이·분포·문항난이도·풀·커버리지)
-//  SEMI-CARIS 이관: attempt_answers→test_answers, questions→test_questions.
+//  CARIS ARENA 이관: attempt_answers→test_answers, questions→test_questions.
 import { json } from '../../_shared/cors.ts'
 import { SUPPORTED_LANGS } from '../../_shared/scoring.ts'
 

@@ -108,6 +108,20 @@ export function MoonIcon(p: IcoProps) {
   )
 }
 
+// WORLD ARENA 항목용. 대륙 실루엣이라 "지구(Earth)"로 읽힌다 —
+// 위경선 지구본인 GlobeIcon 은 "언어" 라벨이 쓰고 있어 뜻이 겹치지 않게 분리.
+export function EarthIcon(p: IcoProps) {
+  return (
+    <Ico {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M20.5 14.5H17a2 2 0 0 0-2 2v3.6" />
+      <path d="M7.5 3.9V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2 2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 1 2-2h2.6" />
+      <path d="M11 20.9V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H3.1" />
+    </Ico>
+  )
+}
+
+// "언어" 라벨용 위경선 지구본.
 export function GlobeIcon(p: IcoProps) {
   return (
     <Ico {...p}>

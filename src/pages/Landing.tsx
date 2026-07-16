@@ -29,7 +29,7 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/guide'
   if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
   if (h(/자격|급수|과목|자격검정|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
-  if (h(/세미카리스|세미\s?카리스|semi[\s-]?caris|레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
+  if (h(/카리스\s?아레나|caris[\s-]?arena|레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
   if (h(/약관|이용약관|terms/)) return '/terms'
   if (h(/개인정보|프라이버시|privacy/)) return '/privacy'
   if (h(/로그인|로그아웃|login|sign\s?in/)) return '/login'
@@ -115,7 +115,7 @@ export default function Landing() {
       {notFound ? <div className="lp-notfound" role="alert">{t('route.notfound')}</div> : null}
 
       <div className="lp-ctas">
-        <button className="cta" onClick={() => navigate('/test/select')}>
+        <button className="cta" onClick={() => navigate('/arena')}>
           {t('landing.cta_diagnose')} <span className="arr">→</span>
         </button>
         <button className="cta-ghost" onClick={() => navigate('/guide')}>

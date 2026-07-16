@@ -31,10 +31,10 @@ export default function Login() {
           <button
             onClick={() => navigate('/')}
             className="w-16 h-16 flex items-center justify-center group mb-16 lg:mb-32 rounded-full overflow-hidden"
-            aria-label="GARA"
+            aria-label="CARIS"
           >
             <img
-              alt="GARA Logo"
+              alt="CARIS Logo"
               className="w-full h-full object-cover rounded-full transition-transform duration-700 ease-out group-hover:scale-110"
               src="/logo.png"
             />
@@ -51,8 +51,8 @@ export default function Login() {
         {/* Footer Links (Desktop) */}
         <footer className="hidden lg:flex flex-col gap-4 relative z-10 mt-32">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="GARA" className="h-7 w-7 object-cover rounded-full" />
-            <span className="font-title-md text-title-md font-bold text-on-surface">GARA</span>
+            <img src="/logo.png" alt="CARIS" className="h-7 w-7 object-cover rounded-full" />
+            <span className="font-title-md text-title-md font-bold text-on-surface">CARIS</span>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>
@@ -109,8 +109,8 @@ export default function Login() {
         {/* Footer Links (Mobile) */}
         <footer className="lg:hidden flex flex-col items-center gap-4 mt-24 text-center w-full">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="GARA" className="h-7 w-7 object-cover rounded-full" />
-            <span className="font-title-md text-title-md font-bold text-on-surface">GARA</span>
+            <img src="/logo.png" alt="CARIS" className="h-7 w-7 object-cover rounded-full" />
+            <span className="font-title-md text-title-md font-bold text-on-surface">CARIS</span>
           </div>
           <div className="flex flex-wrap justify-center gap-4 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>

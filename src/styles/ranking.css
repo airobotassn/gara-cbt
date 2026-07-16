@@ -757,3 +757,46 @@
   .hof-pp-nm { font-size: var(--fs-sm); max-width: 84px; }
   .hof-mebar { bottom: 8px; }
 }
+/* ===== 집계 탭바 · 오늘/시즌 토글 · 버킷 카드(지역·국가·학교) ===== */
+.hof-tabs {
+  display: flex; gap: 6px; max-width: 640px; margin: 0 auto 16px;
+  padding: 4px; border-radius: 14px;
+  background: var(--soft); border: 1px solid var(--line2);
+}
+.hof-tab {
+  flex: 1; padding: 9px 6px; border: none; border-radius: 10px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-weight: 800; font-size: var(--fs-sm); letter-spacing: .01em;
+  transition: background .15s, color .15s;
+}
+.hof-tab.on { background: var(--bg); color: var(--accent); box-shadow: var(--shadow-card); }
+
+.hof-wintoggle {
+  display: flex; width: fit-content; gap: 4px; margin: 0 auto 14px; padding: 3px;
+  border-radius: 999px; background: var(--soft); border: 1px solid var(--line2);
+}
+.hof-winbtn {
+  padding: 6px 18px; border: none; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--muted); font-weight: 800; font-size: var(--fs-sm);
+}
+.hof-winbtn.on { background: var(--accent); color: var(--on-accent); }
+
+.hof-buckets {
+  max-width: 640px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.hof-bkt {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; border-radius: 16px;
+  background: var(--bg); border: 1px solid var(--line2); box-shadow: var(--shadow-card);
+}
+.hof-bkt-rk {
+  flex: none; width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 9px; font-weight: 900; font-size: var(--fs-md);
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.hof-bkt-main { flex: 1; min-width: 0; }
+.hof-bkt-nm { font-weight: 820; font-size: var(--fs-md); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hof-bkt-meta { margin-top: 3px; display: flex; align-items: center; gap: 7px; font-size: var(--fs-sm); color: var(--muted); font-weight: 700; }
+.hof-bkt-meta .dot { color: var(--line2); }
+.hof-bkt-agg { font-style: italic; color: var(--dim); }

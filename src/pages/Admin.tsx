@@ -40,10 +40,11 @@ import type {
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
 import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
+import { REGIONS } from '../lib/regions'
 
-// 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / SEMI-CARIS.
+// 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / CARIS ARENA.
 //  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
-//  - "SEMI-CARIS" = 이관된 SEMI-CARIS 관리(<LevelTestAdmin/>, admin-test 함수 호출).
+//  - "CARIS ARENA" = 이관된 CARIS ARENA 관리(<LevelTestAdmin/>, admin-test 함수 호출).
 type TopTab = 'caris' | 'level'
 export default function Admin() {
   const { isFullUser, loginWithGoogle } = useAuth()
@@ -81,7 +82,7 @@ export default function Admin() {
             CARIS 시험
           </button>
           <button className={topTab === 'level' ? 'on' : ''} onClick={() => setTopTab('level')}>
-            SEMI-CARIS
+            WORLD ARENA
           </button>
         </div>
       </div>
@@ -1572,7 +1573,7 @@ function RoundsAdmin() {
 }
 
 // ── 관리자 계정 관리 (루트 전용) ──────────────────────────────────
-// admin_users 는 CBT·SEMI-CARIS 공용 → 여기서 추가하면 양쪽 관리자 권한이 함께 부여됨.
+// admin_users 는 CBT·CARIS ARENA 공용 → 여기서 추가하면 양쪽 관리자 권한이 함께 부여됨.
 interface AdminAccountRow {
   email: string
   role: 'root' | 'admin'
@@ -1647,7 +1648,7 @@ function AdminAccountsAdmin() {
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
-        이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·SEMI-CARIS 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
+        이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·WORLD ARENA 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
       </p>
 
       <div className="admin-section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
@@ -1988,7 +1989,7 @@ function McReviewModal({ item, onClose }: { item: GradeQueueItem; onClose: () =>
   )
 }
 
-// ── 대시보드 (운영 분석) — admin.css(SEMI-CARIS) 클래스 그대로 사용 ──
+// ── 대시보드 (운영 분석) — admin.css(CARIS ARENA) 클래스 그대로 사용 ──
 function MiniBars({ days, map, color }: { days: string[]; map: Record<string, number>; color: string }) {
   const vals = days.map((d) => map[d] ?? 0)
   const max = Math.max(1, ...vals)
@@ -2412,6 +2413,8 @@ function UsersAdmin() {
         <span className="admin-hint">{filtered.length}명</span>
       </div>
 
+      <RegionFixForm />
+
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -2460,6 +2463,56 @@ function UsersAdmin() {
       )}
       {open && <UserDetailModal user={open} onClose={() => setOpen(null)} />}
     </>
+  )
+}
+
+// ── 지역 오배정 정정 (T9) — 락된 회원의 지역을 어드민 CS 로 강제 정정 ──
+function RegionFixForm() {
+  const [uid, setUid] = useState('')
+  const [region, setRegion] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  async function submit() {
+    const id = uid.trim()
+    if (!id || !region) { setMsg('회원 UID·지역을 입력하세요.'); return }
+    setBusy(true)
+    setMsg('')
+    try {
+      await callFunction('admin', { action: 'setRegion', uid: id, region, country: region.slice(0, 2) })
+      setMsg(`✅ ${id} → ${region} 정정됨`)
+      setUid('')
+      setRegion('')
+    } catch (e) {
+      setMsg(`⚠ ${e instanceof Error ? e.message : '정정 실패'}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="admin-section">
+      <h3>지역 오배정 정정</h3>
+      <p className="admin-hint">락된 회원의 지역을 강제로 바로잡습니다(어드민 CS 전용).</p>
+      <div className="admin-toolbar">
+        <input
+          className="admin-search"
+          placeholder="회원 UID"
+          value={uid}
+          onChange={(e) => setUid(e.target.value)}
+        />
+        <select value={region} onChange={(e) => setRegion(e.target.value)}>
+          <option value="">지역 선택…</option>
+          {REGIONS.map((r) => (
+            <option key={r.code} value={r.code}>{r.code}</option>
+          ))}
+        </select>
+        <button className="admin-mini" onClick={submit} disabled={busy || !uid.trim() || !region}>
+          {busy ? '정정 중…' : '정정'}
+        </button>
+      </div>
+      {msg && <span className="admin-hint">{msg}</span>}
+    </div>
   )
 }
 
@@ -2525,7 +2578,7 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
 }
 
 // ── 문항 관리 (목록 · 이력 · 엑셀 업로드) ──────────────────────────
-// ── 문항 급수(티어)→과목 필터 (SEMI-CARIS ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
+// ── 문항 급수(티어)→과목 필터 (CARIS ARENA ListTab 의 레벨→영역 패턴) — 목록·이력 공용 ──
 function useTierSubjectFilter() {
   // 은행(급수)이 이미 상단에서 선택됨 → 급수 필터는 두지 않는다. 과목(실제 문항 과목)·난이도·유형·검색만.
   const [subject, setSubject] = useState('all')
@@ -2572,7 +2625,7 @@ function TierSubjectBar({ f, count, loading, actions, subjects, showKind = true,
   )
 }
 
-// ── CBT 엑셀 스마트 파싱 (SEMI-CARIS import 기법 이식: 헤더 이름 자동인식 + 머리글 행 자동탐지) ──
+// ── CBT 엑셀 스마트 파싱 (CARIS ARENA import 기법 이식: 헤더 이름 자동인식 + 머리글 행 자동탐지) ──
 function qNormKey(s: unknown): string {
   return String(s ?? '').toLowerCase().replace(/\s+/g, '').replace(/[·.,/()[\]{}・:|~\-]/g, '').replace(/및/g, '')
 }
@@ -2600,7 +2653,7 @@ function tierSubjectsOf(tier?: string): string[] {
   if (!tier) return []
   return getTracks('ko').flatMap((tr) => tr.tiers).find((ti) => ti.key === tier)?.subjects ?? []
 }
-// 엑셀 과목 → 정규 과목 매핑(SEMI-CARIS 카테고리 매핑 이식). qNormKey 정규화(소문자·공백/기호 제거) 후
+// 엑셀 과목 → 정규 과목 매핑(CARIS ARENA 카테고리 매핑 이식). qNormKey 정규화(소문자·공백/기호 제거) 후
 // 정확일치를 우선하고, 없으면 Dice bigram 유사도로 최근접(≥0.5)을 자동 제안. 대소문자("AI"↔"ai")·
 // 띄어쓰기·기호 차이는 정규화가 흡수하므로 그런 near-miss는 정확일치로 잡힌다.
 function qBigrams(s: string): string[] {
@@ -2965,11 +3018,20 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
           <button className="grade-btn ok active" disabled={busy} onClick={() => draw(false)}>
             {busy ? '추출 중…' : rows.length ? '다시 추출' : '문항 추출'}
           </button>
+          <button
+            className="admin-mini"
+            disabled={!rows.length}
+            title={rows.length ? '등록된 문항을 실제 응시 화면으로 검수' : '먼저 문항을 추출하세요'}
+            onClick={() => window.open(`/exam/run/preview?examId=${examId}`, '_blank', 'noopener')}
+          >
+            시험화면 미리보기
+          </button>
           <button className="admin-mini" onClick={load} disabled={loading}>새로고침</button>
         </div>
       </div>
       <p className="admin-hint" style={{ marginBottom: 10 }}>
         이 등록시험의 급수 <b>문제은행</b>에서 구성(객 {spec?.mc ?? 0} + 주 {spec?.short ?? 0})만큼 랜덤 추출해 저장합니다.
+        추출 후 <b>시험화면 미리보기</b>로 실제 응시 화면 그대로(정답·해설 비노출·SEB 불필요) 검수할 수 있습니다.
       </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -3418,7 +3480,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
           .sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
           .filter((row) => row.some((c) => String(c).trim() !== ''))
         if (!aoa.length) { setParseErr('빈 시트입니다.'); return }
-        // 머리글 행 자동 탐지 → 열 이름 자동 인식(순서 달라도·위에 안내줄 있어도 대응, SEMI-CARIS와 동일 기법)
+        // 머리글 행 자동 탐지 → 열 이름 자동 인식(순서 달라도·위에 안내줄 있어도 대응, CARIS ARENA와 동일 기법)
         const ncol = Math.max(...aoa.map((row) => row.length))
         const hdr = qFindHeaderRow(aoa)
         const header = aoa[hdr.idx] ?? []

@@ -1,6 +1,6 @@
-// _shared/scoring.ts — SEMI-CARIS 스코어링/레벨 엔진 (Deno).
+// _shared/scoring.ts — CARIS ARENA 스코어링/레벨 엔진 (Deno).
 // ⚠️ 프론트 src/lib/scoring.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
-// 인증·클라이언트·다국어(pick/proj) 헬퍼는 ./lib.ts 를 재수출한다(SEMI-CARIS 함수는 이 파일만 import).
+// 인증·클라이언트·다국어(pick/proj) 헬퍼는 ./lib.ts 를 재수출한다(CARIS ARENA 함수는 이 파일만 import).
 import { type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { pickLang, projText, projOptions } from './lib.ts'
 export * from './lib.ts'
@@ -278,6 +278,17 @@ export async function applyAttempt(
     },
     { onConflict: 'user_id' },
   )
+
+  // 레벨 최초 도달마다 쿠폰 1장 발급(side-effect, 채점 공식 아님).
+  // 강등 후 재승급은 유니크(user_id,issued_for_level) 충돌로 무발급 → 최초 도달 1회만.
+  if (nextRank > rankBefore) {
+    await admin
+      .from('user_coupons')
+      .upsert(
+        { user_id: userId, issued_for_level: nextRank, coupon_code: 'LEVELUP10' },
+        { onConflict: 'user_id,issued_for_level', ignoreDuplicates: true },
+      )
+  }
 
   // 강등이면: 내려간 레벨을 그 티어 상단(DEMOTE_SEED)으로 시드 — 위에서 내려온 값이라 0이 아닌 높은 데서 시작(롤식).
   if (dir === 'down') {
