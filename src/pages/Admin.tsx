@@ -2751,9 +2751,8 @@ function DiffTag({ value }: { value: string | null | undefined }) {
 // 문항 풀 현황 — 문항 관리 최상단 독립 섹션. 급수·검정과목은 /guide(getTracks) 단일 출처.
 // 급수 탭 선택 → 그 급수의 과목(가이드 정의 전부, 0개=미출제도 노출) + 난이도별 문항 수를 얹어 보여줌.
 // 급수→문제은행 매핑(bank.tier)으로 문항만 불러오고, 과목 목록 자체는 문항에서 뽑지 않는다.
-function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refreshKey?: number }) {
+function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: QuestionBankItem[]; tierKey: string; onTierKey: (k: string) => void; refreshKey?: number }) {
   const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
-  const [tierKey, setTierKey] = useState(tiers[0]?.key ?? '')
   const [rows, setRows] = useState<AdminQuestionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [reloadTick, setReloadTick] = useState(0) // 수동 새로고침
@@ -2803,14 +2802,14 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
   const sumDiff = (d: string, k: 'g' | 'need') => grid.reduce((s, r) => s + (r.cells.find((c) => c.d === d)?.[k] ?? 0), 0)
 
   return (
-    <div className="admin-section" style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <div className="admin-sub" style={{ marginTop: 0 }}>문항 풀 현황 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>출제 배분표 × 3배수 대비 확보(활성) · 셀 = 확보/목표</span></div>
         <button className="admin-mini" onClick={() => setReloadTick((t) => t + 1)} disabled={loading}>{loading ? '불러오는 중…' : '새로고침'}</button>
       </div>
       <div className="admin-tabs" style={{ marginBottom: hasShort ? 8 : 14, flexWrap: 'wrap' }}>
         {tiers.map((t) => (
-          <button key={t.key} className={t.key === tierKey ? 'on' : ''} onClick={() => setTierKey(t.key)}>
+          <button key={t.key} className={t.key === tierKey ? 'on' : ''} onClick={() => onTierKey(t.key)}>
             {t.track.replace('CARIS-', '')} · {t.name}
           </button>
         ))}
@@ -2871,7 +2870,7 @@ function PoolOverview({ banks, refreshKey }: { banks: QuestionBankItem[]; refres
 // 2층: 문항 목록/이력/업로드 = 급수별 문제은행(bank), 시험문항 = 등록시험(회차×급수)의 뽑힌 세트.
 function QuestionsAdmin() {
   const [banks, setBanks] = useState<QuestionBankItem[]>([])
-  const [bankId, setBankId] = useState<string>('')
+  const [tierKey, setTierKey] = useState<string>(() => getTracks('ko').flatMap((tr) => tr.tiers)[0]?.key ?? '') // 단일 급수 선택 — 풀 현황·문항 목록·이력·업로드 공용
   const [exams, setExams] = useState<AdminExamItem[]>([])
   const [examId, setExamId] = useState<string>('')
   const [view, setView] = useState<'list' | 'events' | 'examset' | 'import'>('list')
@@ -2895,40 +2894,32 @@ function QuestionsAdmin() {
     load()
   }, [load])
   useEffect(() => {
-    setBankId((c) => (banks.some((b) => b.id === c) ? c : banks[0]?.id ?? ''))
-  }, [banks])
-  useEffect(() => {
     setExamId((c) => (exams.some((e) => e.id === c) ? c : exams[0]?.id ?? ''))
   }, [exams])
 
   const isSet = view === 'examset'
-  const curBankTier = banks.find((b) => b.id === bankId)?.tier // 선택된 은행의 급수 → 정규 과목 기준
+  const bank = banks.find((b) => b.tier === tierKey)
+  const bankId = bank?.id ?? ''
+  const curBankTier = bank?.tier // 선택된 은행의 급수 → 정규 과목 기준
   return (
     <>
       <div className="admin-head">
         <h1>문항 관리</h1>
       </div>
 
-      <PoolOverview banks={banks} refreshKey={tick} />
+      <PoolOverview banks={banks} tierKey={tierKey} onTierKey={setTierKey} refreshKey={tick} />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{isSet ? '등록시험' : '문제은행'}</span>
-        {isSet ? (
+      {isSet && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>등록시험</span>
           <select style={{ minWidth: 220 }} value={examId} onChange={(e) => setExamId(e.target.value)}>
             {exams.length === 0 && <option value="">등록시험 없음</option>}
             {exams.map((ex) => (
               <option key={ex.id} value={ex.id}>{ex.title} ({ex.questionCount})</option>
             ))}
           </select>
-        ) : (
-          <select style={{ minWidth: 180 }} value={bankId} onChange={(e) => setBankId(e.target.value)}>
-            {banks.length === 0 && <option value="">은행 없음</option>}
-            {banks.map((b) => (
-              <option key={b.id} value={b.id}>{b.title} ({b.activeCount}/{b.questionCount})</option>
-            ))}
-          </select>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="admin-tabs" style={{ marginBottom: 16 }}>
         <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>문항 목록</button>
