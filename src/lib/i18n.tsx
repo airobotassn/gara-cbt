@@ -60,6 +60,10 @@ const D: Record<string, Record<Lang, string>> = {
   'region.KR-49': { ko: '제주특별자치도', en: 'Jeju', ja: '済州特別自治道', zh: '济州特别自治道', hi: 'जेजू', vi: 'Jeju' },
   'region.KR-50': { ko: '세종특별자치시', en: 'Sejong', ja: '世宗特別自治市', zh: '世宗特别自治市', hi: 'सेजोंग', vi: 'Sejong' },
   'onboarding.title': { ko: '어느 지역에서 함께 하시겠어요?', en: 'Which region will you join from?', ja: 'どの地域から参加しますか？', zh: '您想从哪个地区加入？', hi: 'आप किस क्षेत्र से जुड़ेंगे?', vi: 'Bạn tham gia từ khu vực nào?' },
+  // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
+  'onboarding.intro_title': { ko: '지역별로 순위를 겨뤄요', en: 'Rankings are by region', ja: '地域ごとに順位を競います', zh: '按地区进行排名', hi: 'रैंकिंग क्षेत्र के अनुसार होती है', vi: 'Xếp hạng theo khu vực' },
+  'onboarding.intro_body': { ko: '같은 지역·국가·학교 사람들과 순위가 매겨져요.', en: 'You’ll be ranked among people from your region, country, and school.', ja: '同じ地域・国・学校の人たちと順位がつきます。', zh: '您将与同地区、同国家、同学校的人一同排名。', hi: 'आपकी रैंक आपके क्षेत्र, देश और स्कूल के लोगों के बीच तय होगी।', vi: 'Bạn sẽ được xếp hạng cùng những người ở khu vực, quốc gia và trường của bạn.' },
+  'onboarding.intro_next': { ko: '시작', en: 'Start', ja: '始める', zh: '开始', hi: 'शुरू करें', vi: 'Bắt đầu' },
   'onboarding.country': { ko: '국가', en: 'Country', ja: '国', zh: '国家', hi: 'देश', vi: 'Quốc gia' },
   'onboarding.region': { ko: '지역', en: 'Region', ja: '地域', zh: '地区', hi: 'क्षेत्र', vi: 'Khu vực' },
   'onboarding.school': { ko: '학교(선택)', en: 'School (optional)', ja: '学校（任意）', zh: '学校（可选）', hi: 'स्कूल (वैकल्पिक)', vi: 'Trường học (tùy chọn)' },

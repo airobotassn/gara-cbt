@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { I18nProvider } from './lib/i18n'
+import { I18nProvider, useT } from './lib/i18n'
 import { AuthProvider, useAuth } from './context/AuthProvider'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
@@ -45,21 +45,43 @@ function ScrollToTop() {
   return null
 }
 
-// 최초 로그인 온보딩 게이트: 정식 회원이 지역 미확정이면 강제(enforced) 라우트 접근 시 /onboarding으로.
-// 강제 대상: /test/*, /ranking, /mypage. 그 외(/, /admin, /exam/*, 법적 고지, /onboarding 등)는 통과.
-// onboardingLoading 중에는 리다이렉트하지 않음(앱 전체를 막지 않는다). 익명 유저는 needsOnboarding=false.
+// 온보딩(지역) 게이트 — 아레나 진입 시에만.
+// 지역(country_code/region_code)은 아레나 집계 랭킹(지역·국가·학교 탭)과 월드맵에서만 쓰인다.
+// 자격검정 경로(/exam/*·/certificate·verify-cert)는 이 값을 아예 읽지 않으므로 막지 않는다 —
+// 자격증만 따고 나가는 응시자에게 되돌릴 수 없는 선택을 강요하지 않기 위함.
+// 마이페이지도 제외(표시 전용, null 이면 '-'). 익명 게스트는 needsOnboarding=false 라 응시에 지장 없음.
+// 지역은 나중에 정해도 집계 RPC 가 조회 시점에 profiles 를 조인하므로 과거 기록까지 소급 반영된다.
+const ONBOARDING_ENFORCED = [
+  '/arena', // 월드 아레나 지도 (랜딩 CTA · FAB 🌍)
+  '/test', // 레벨 응시 (/test/select 등) — 랜딩 검색으로 직행하는 경로가 있어 함께 막는다
+  '/ranking', // 명예의 전당
+]
+
 function OnboardingGate({ children }: { children: ReactNode }) {
-  const { needsOnboarding, onboardingLoading } = useAuth()
+  const { needsOnboarding, onboardingLoading, isFullUser, loading } = useAuth()
   const { pathname, search } = useLocation()
-  const enforced =
-    pathname.startsWith('/test') ||
-    pathname.startsWith('/ranking') ||
-    pathname.startsWith('/mypage')
-  if (!onboardingLoading && needsOnboarding && enforced) {
+  const enforced = ONBOARDING_ENFORCED.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  if (!enforced) return <>{children}</>
+
+  // 판정 전에 렌더하면 아레나가 한 프레임 보였다가 튕긴다 → 알 때까지 대기.
+  if (loading || (isFullUser && onboardingLoading)) return <GateSpinner />
+
+  if (isFullUser && needsOnboarding) {
     const next = encodeURIComponent(pathname + search)
     return <Navigate to={`/onboarding?next=${next}`} replace />
   }
   return <>{children}</>
+}
+
+function GateSpinner() {
+  const { t } = useT()
+  return (
+    <div className="wrap">
+      <div className="card pad" style={{ textAlign: 'center', color: 'var(--muted)' }}>
+        {t('common.loading')}
+      </div>
+    </div>
+  )
 }
 
 export default function App() {
