@@ -36,3 +36,4 @@ dist-ssr
 
 # 개인 커리어 기록 (회사 repo에 커밋하지 않음)
 docs/커리어기록.md
+bun.lock
