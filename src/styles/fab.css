@@ -1,4 +1,33 @@
 /* fab: components/Layout.tsx (FAB + 프로필 패널) — APEX 다크 */
+
+/* 다크 대응 토큰. 패널의 면·글자색은 base.css/stitch.css 의 --bg/--ink 등이 이미 다크로 뒤집지만,
+   아래 값들은 원래 fab.css 안에 리터럴로 박혀 있어서 다크에서 안 바뀌던 것들이다.
+   (그림자는 밝은 배경 기준이라 어두운 면에서 안 보이고, hover 강조색은 라이트 --blue 고정,
+    --on-accent 는 다크에서 --blue 가 밝아지는데도 흰색 그대로라 대비가 무너졌음.) */
+:root {
+  --theme-toggle: #fbbf24;        /* 라이트 값은 기존 그대로(요청 범위는 다크뿐) */
+  --theme-toggle-hover: #f59e0b;
+  --fab-accent: 0, 74, 198;       /* 라이트 --blue(#004ac6) */
+  --fab-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.6);
+  --fab-panel-shadow: 0 24px 56px -24px rgba(30, 41, 59, 0.32);
+  --fab-pop-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --fab-badge-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+  --fab-on-accent: var(--on-accent);
+}
+html.dark {
+  --theme-toggle: #fbbf24;        /* 다크: 달 아이콘 — 어두운 패널에서 빛나는 앰버 */
+  --theme-toggle-hover: #fcd34d;  /* hover 는 더 밝게(라이트와 반대 방향) */
+  --fab-accent: 79, 141, 245;     /* 다크 --blue(#4f8df5) */
+  --fab-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.85);
+  --fab-panel-shadow: 0 24px 56px -24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(224, 230, 244, 0.06) inset;
+  --fab-pop-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  --fab-badge-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.8);
+  /* 다크 --blue(#4f8df5)는 밝은 파랑이라 흰 글씨 대비가 2.8:1 로 무너진다 → 어두운 글씨.
+     ⚠️ 전역 --on-accent 를 덮지 않는다(앱 50여 곳이 쓰는 토큰이라 파급이 너무 크다).
+     FAB 내부 파란 면에만 적용. */
+  --fab-on-accent: #0b1220;
+}
+
 .pf-divider { height: 1px; background: var(--line); margin: 12px 0; }
 /* 계정 액션(마이페이지·로그아웃): 이름 아래 나란히 놓는 차분한 텍스트 버튼 */
 .pf-acct-actions {
@@ -32,7 +61,7 @@
   background: none;
   border-radius: 8px;
   padding: 4px;
-  color: #fbbf24;
+  color: var(--theme-toggle);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -40,7 +69,7 @@
 }
 .pf-theme:hover {
   background: var(--soft);
-  color: #f59e0b;
+  color: var(--theme-toggle-hover);
 }
 /* ===== FAB profile ===== */
 .fab {
@@ -56,13 +85,13 @@
   background: var(--bg);
   display: grid;
   place-items: center;
-  box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--fab-shadow);
   transition: 0.15s;
 }
 .fab:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 74, 198, 0.5);
-  box-shadow: 0 0 24px -6px rgba(0, 74, 198, 0.5);
+  border-color: rgba(var(--fab-accent), 0.5);
+  box-shadow: 0 0 24px -6px rgba(var(--fab-accent), 0.5);
 }
 .fab .av {
   width: 34px;
@@ -71,7 +100,7 @@
   background: var(--blue);
   display: grid;
   place-items: center;
-  color: var(--on-accent);
+  color: var(--fab-on-accent);
   font-size: var(--fs-sm);
   font-weight: 800;
 }
@@ -90,13 +119,13 @@
   color: var(--ink);
   display: grid;
   place-items: center;
-  box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--fab-shadow);
   transition: 0.15s;
 }
 .fab-top:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 74, 198, 0.5);
-  box-shadow: 0 0 24px -6px rgba(0, 74, 198, 0.5);
+  border-color: rgba(var(--fab-accent), 0.5);
+  box-shadow: 0 0 24px -6px rgba(var(--fab-accent), 0.5);
 }
 .panel {
   position: fixed;
@@ -110,7 +139,7 @@
   border: 1px solid var(--line2);
   border-radius: 20px;
   padding: 18px;
-  box-shadow: 0 24px 56px -24px rgba(30, 41, 59, 0.32);
+  box-shadow: var(--fab-panel-shadow);
   transform: translateY(12px) scale(0.96);
   opacity: 0;
   pointer-events: none;
@@ -169,7 +198,7 @@
   font-size: var(--fs-sm);
   display: grid;
   place-items: center;
-  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--fab-badge-shadow);
 }
 .pf-avatars {
   display: flex;
@@ -266,7 +295,7 @@
 .pf-save {
   border: none;
   background: var(--blue);
-  color: var(--on-accent);
+  color: var(--fab-on-accent);
   border-radius: 8px;
   width: 28px;
   height: 28px;
@@ -282,7 +311,7 @@
   width: 100%;
   margin-top: 14px;
   background: var(--blue);
-  color: var(--on-accent);
+  color: var(--fab-on-accent);
   border: none;
   cursor: pointer;
   border-radius: 12px;
@@ -293,7 +322,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 0 20px -6px rgba(0, 74, 198, 0.6);
+  box-shadow: 0 0 20px -6px rgba(var(--fab-accent), 0.6);
 }
 .pf-list {
   margin-top: 8px;
@@ -369,7 +398,7 @@
 }
 .pf-lang button.on {
   background: var(--blue);
-  color: var(--on-accent);
+  color: var(--fab-on-accent);
   border-color: var(--blue);
 }
 .pf-hint {
@@ -426,7 +455,7 @@
   border: 1px solid var(--line2);
   border-radius: 14px;
   padding: 6px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--fab-pop-shadow);
   animation: pf-more-in 0.16s ease;
 }
 @keyframes pf-more-in {

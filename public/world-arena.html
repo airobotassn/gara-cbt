@@ -2,50 +2,56 @@
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 /* ===== GARA 글로벌 응시 현황 — 보고용 드릴다운 맵 (자체 완결) ===== */
+/* 테마: 라이트가 기본, 다크는 :root[data-theme="dark"].
+   data-theme 은 부모(WorldArena.tsx)가 ?theme= 쿼리 + postMessage('arena:theme') 로 넣는다.
+   ⚠️ prefers-color-scheme 은 쓰지 않는다 — 앱 테마는 OS가 아니라 FAB 토글(html.dark)이 정하므로
+      OS 설정을 따라가면 앱과 아이프레임이 서로 다른 테마가 된다. */
 :root {
   --bg: #faf8ff; --panel: #ffffff; --panel-2: #eef3fd;
   --ink: #33323f; --muted: #6c7188; --faint: #9aa0b8;
   --line: #33323f; --line-2: #33323f;
   --accent: #5f8ed0; --accent-soft: #dbe7fb; --gold: #f2c65e;
-  --ocean: #cfe0f7; --sphere-line: rgba(51,50,63,.18); --land-none: #dfe6f4;
-  --shadow: 0 6px 0 rgba(51,50,63,.13), 0 16px 26px -14px rgba(51,50,63,.24);
+  --ocean: #cfe0f7; --sphere-line: var(--sh-solid); --land-none: #dfe6f4;
+  --shadow: 0 6px 0 var(--sh-solid), 0 16px 26px -14px var(--sh-solid);
   --c0: #dde8fb; --c1: #a7c4ee; --c2: #6f9fe0; --c3: #3f6fc0;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #faf8ff; --panel: #ffffff; --panel-2: #eef3fd;
-    --ink: #33323f; --muted: #6c7188; --faint: #9aa0b8;
-    --line: #33323f; --line-2: #33323f;
-    --accent: #5f8ed0; --accent-soft: #dbe7fb; --gold: #f2c65e;
-    --ocean: #cfe0f7; --sphere-line: rgba(51,50,63,.18); --land-none: #dfe6f4;
-    --shadow: 0 6px 0 rgba(51,50,63,.13), 0 16px 26px -14px rgba(51,50,63,.24);
-    --c0: #dde8fb; --c1: #a7c4ee; --c2: #6f9fe0; --c3: #3f6fc0;
-  }
-}
-:root[data-theme="light"] {
-  --bg: #faf8ff; --panel: #ffffff; --panel-2: #eef3fd;
-  --ink: #33323f; --muted: #6c7188; --faint: #9aa0b8;
-  --line: #33323f; --line-2: #33323f;
-  --accent: #5f8ed0; --accent-soft: #dbe7fb; --gold: #f2c65e;
-  --ocean: #cfe0f7; --sphere-line: rgba(51,50,63,.18); --land-none: #dfe6f4;
-  --shadow: 0 6px 0 rgba(51,50,63,.13), 0 16px 26px -14px rgba(51,50,63,.24);
-  --c0: #dde8fb; --c1: #a7c4ee; --c2: #6f9fe0; --c3: #3f6fc0;
+  --glow: rgba(0, 74, 198, .16);
+  /* 지구본(SVG 그라디언트·스트로크)과 카드 표면 — 원래 리터럴로 박혀 있어 테마를 안 탔던 것들 */
+  --ocean-hi: #eaf4ff; --ocean-mid: #9fc6f2; --ocean-lo: #4f88d4;
+  --geo-stroke: #ffffff;
+  --spec-op: .72;
+  --atmo: #9cc6ff; --atmo-op: .6;
+  --inset-grad: linear-gradient(160deg, #eaf4ff, #a9cef2);
+  --inset-lab-bg: rgba(255, 255, 255, .82);
+  --surface-mix: #fff;          /* color-mix 로 옅은 배경을 만들 때 섞는 바탕 */
+  --sh-solid: var(--sh-solid);
 }
 :root[data-theme="dark"] {
-  --bg: #faf8ff; --panel: #ffffff; --panel-2: #eef3fd;
-  --ink: #33323f; --muted: #6c7188; --faint: #9aa0b8;
-  --line: #33323f; --line-2: #33323f;
-  --accent: #5f8ed0; --accent-soft: #dbe7fb; --gold: #f2c65e;
-  --ocean: #cfe0f7; --sphere-line: rgba(51,50,63,.18); --land-none: #dfe6f4;
-  --shadow: 0 6px 0 rgba(51,50,63,.13), 0 16px 26px -14px rgba(51,50,63,.24);
-  --c0: #dde8fb; --c1: #a7c4ee; --c2: #6f9fe0; --c3: #3f6fc0;
+  --bg: #12151c; --panel: #1c212c; --panel-2: #252c3a;
+  --ink: #e6ebf7; --muted: #a7b0c4; --faint: #79839a;
+  /* 카툰 외곽선: 어두운 면 위에서는 먹색이 사라지므로 밝은 회청색으로 */
+  --line: #5c6578; --line-2: #454d5e;
+  --accent: #6f9ee0; --accent-soft: #24354f; --gold: #d9b45f;
+  --ocean: #161e2c; --sphere-line: rgba(224,230,244,.16); --land-none: #2b3444;
+  --shadow: 0 6px 0 rgba(0,0,0,.5), 0 16px 26px -14px rgba(0,0,0,.6);
+  /* 응시자수 단계색: 어두운 바다 위에서 어두움→밝음으로 올라가야 읽힌다(라이트의 역방향) */
+  --c0: #24354f; --c1: #3a6099; --c2: #5a8ed6; --c3: #8fb9f5;
+  --glow: rgba(79, 141, 245, .14);
+  /* 바다는 --c0(데이터 최저 단계)·--land-none 보다 확실히 어두워야 대륙이 떠 보인다 */
+  --ocean-hi: #1e2a3f; --ocean-mid: #141d2e; --ocean-lo: #0b1220;
+  --geo-stroke: rgba(224, 230, 244, .45);
+  --spec-op: .16;               /* 어두운 구체에 흰 하이라이트를 세게 주면 뿌옇게 뜬다 */
+  --atmo: #5f8ed0; --atmo-op: .45;
+  --inset-grad: linear-gradient(160deg, #22304a, #131b29);
+  --inset-lab-bg: rgba(18, 21, 28, .82);
+  --surface-mix: #1c212c;
+  --sh-solid: rgba(0, 0, 0, .5);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0; color: var(--ink);
   background-color: var(--bg);
-  background-image: radial-gradient(circle 480px at 50% 120px, rgba(0, 74, 198, .16), rgba(0, 74, 198, 0) 62%);
+  background-image: radial-gradient(circle 480px at 50% 120px, var(--glow), rgba(0, 74, 198, 0) 62%);
   background-repeat: no-repeat;
   font-family: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, -apple-system,
     BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -87,14 +93,14 @@ body {
 /* ── 시·도 재클릭 진입 안내 프롬프트 ── */
 .prompt { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); z-index: 7; max-width: 92%;
   background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 800; padding: 7px 15px; border-radius: 999px;
-  border: 2px solid var(--line); box-shadow: 0 4px 0 rgba(51,50,63,.22); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 2px solid var(--line); box-shadow: 0 4px 0 var(--sh-solid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   opacity: 0; pointer-events: none; transition: opacity .15s; }
 .prompt.on { opacity: 1; }
 
 /* ── 우리 순위 카드 ── */
 .ourrank { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px;
-  padding: 9px 13px; border-radius: 14px; border: 2.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 9%, #fff);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 38%, #fff); }
+  padding: 9px 13px; border-radius: 14px; border: 2.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface-mix));
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 38%, var(--surface-mix)); }
 .ourrank .or-t { display: block; font-size: 10px; font-weight: 800; letter-spacing: .09em; color: var(--accent); text-transform: uppercase; }
 .ourrank .or-n { display: block; font-size: 14px; font-weight: 900; color: var(--ink); }
 .ourrank .or-r { text-align: right; line-height: 1.02; }
@@ -107,29 +113,29 @@ body {
 .legend .bar { flex: 1; height: 8px; border-radius: 999px;
   background: linear-gradient(90deg, var(--c0), var(--c1), var(--c2), var(--c3)); }
 .zoomctl { position: absolute; left: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
-.zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 rgba(51,50,63,.18); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .zoomctl button:hover { background: var(--panel-2); }
-.zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(51,50,63,.18); }
-.dokinset { position: absolute; top: 12px; right: 12px; width: 150px; height: 112px; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; z-index: 7; box-shadow: 0 3px 0 rgba(51,50,63,.16); background: linear-gradient(160deg, #eaf4ff, #a9cef2); pointer-events: none; }
+.zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--sh-solid); }
+.dokinset { position: absolute; top: 12px; right: 12px; width: 150px; height: 112px; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; z-index: 7; box-shadow: 0 3px 0 var(--sh-solid); background: var(--inset-grad); pointer-events: none; }
 .dokinset[hidden] { display: none; }
 .dokinset svg { width: 100%; height: 100%; display: block; }
-.dokinset .doklab { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 10.5px; font-weight: 800; color: var(--ink); background: rgba(255,255,255,.82); padding: 1px 0; }
-.dokisland { stroke: #ffffff; stroke-width: 1; }
+.dokinset .doklab { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 10.5px; font-weight: 800; color: var(--ink); background: var(--inset-lab-bg); padding: 1px 0; }
+.dokisland { stroke: var(--geo-stroke); stroke-width: 1; }
 
 /* ── 아레나 마스코트(새싹이) ── */
 .mascot { position: absolute; left: 6px; bottom: 6px; height: 188px; z-index: 6; pointer-events: none;
-  filter: drop-shadow(0 10px 5px rgba(51,50,63,.18)); }
+  filter: drop-shadow(0 10px 5px var(--sh-solid)); }
 @media (max-width: 880px) { .mascot { height: 120px; } }
 
 /* ── 하단 런처(이동 버튼 3개) ── */
 .launch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
 .lbtn { display: flex; align-items: center; gap: 13px; padding: 15px 18px; border-radius: 18px;
-  background: var(--panel); border: 2.5px solid var(--line); box-shadow: 0 4px 0 rgba(51,50,63,.14);
+  background: var(--panel); border: 2.5px solid var(--line); box-shadow: 0 4px 0 var(--sh-solid);
   text-decoration: none; cursor: pointer; transition: transform .1s ease, box-shadow .1s ease; }
-.lbtn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(51,50,63,.14); }
-.lbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(51,50,63,.14); }
+.lbtn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--sh-solid); }
+.lbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--sh-solid); }
 .lbtn .ic { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
-  font-size: 22px; background: color-mix(in srgb, var(--lb-bg) 20%, #fff); border: 2px solid var(--lb-bg); }
+  font-size: 22px; background: color-mix(in srgb, var(--lb-bg) 20%, var(--surface-mix)); border: 2px solid var(--lb-bg); }
 .lbtn .lt { min-width: 0; line-height: 1.25; }
 .lbtn .lt b { display: block; font-size: 15.5px; font-weight: 900; color: var(--ink); letter-spacing: -.01em; }
 .lbtn .lt i { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--muted); }
@@ -172,20 +178,20 @@ body {
 #tip .row { display: flex; justify-content: space-between; gap: 14px; margin-top: 3px; font-weight: 600; opacity: .85; }
 #tip .row span:last-child { font-variant-numeric: tabular-nums; }
 
-.geo { stroke: #ffffff; stroke-width: 1; transition: fill .15s; cursor: pointer; vector-effect: non-scaling-stroke; }
+.geo { stroke: var(--geo-stroke); stroke-width: 1; transition: fill .15s; cursor: pointer; vector-effect: non-scaling-stroke; }
 .geo.dim { cursor: pointer; }
 .geo.hot { stroke: var(--gold); stroke-width: 1.6; }
 .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
 .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--line); stroke-width: 3; }
 .spec { fill: url(#specGrad); pointer-events: none; }
-#specGrad .s-in  { stop-color: #ffffff; stop-opacity: .72; }
+#specGrad .s-in  { stop-color: #ffffff; stop-opacity: var(--spec-op); }
 #specGrad .s-out { stop-color: #ffffff; stop-opacity: 0; }
 .atmo { fill: url(#atmoGrad); pointer-events: none; }
-#oceanGrad .g-hi  { stop-color: #eaf4ff; }
-#oceanGrad .g-mid { stop-color: #9fc6f2; }
-#oceanGrad .g-lo  { stop-color: #4f88d4; }
-#atmoGrad .a-in   { stop-color: #9cc6ff; stop-opacity: 0; }
-#atmoGrad .a-out  { stop-color: #9cc6ff; stop-opacity: .6; }
+#oceanGrad .g-hi  { stop-color: var(--ocean-hi); }
+#oceanGrad .g-mid { stop-color: var(--ocean-mid); }
+#oceanGrad .g-lo  { stop-color: var(--ocean-lo); }
+#atmoGrad .a-in   { stop-color: var(--atmo); stop-opacity: 0; }
+#atmoGrad .a-out  { stop-color: var(--atmo); stop-opacity: var(--atmo-op); }
 .grat { fill: none; stroke: var(--sphere-line); stroke-width: .5; opacity: .5; }
 .krmark { fill: none; stroke: var(--gold); stroke-width: 2; }
 .foot { margin-top: 16px; font-size: 12px; color: var(--faint); text-align: center; font-weight: 600; line-height: 1.6; }
@@ -194,7 +200,12 @@ body {
 
 </style>
 <title>GARA 글로벌 응시 현황 — 보고용</title>
-<script>if (location.search.indexOf('embed') > -1) document.documentElement.classList.add('embed');</script>
+<script>if (location.search.indexOf('embed') > -1) document.documentElement.classList.add('embed');
+// 테마 부트스트랩: 첫 페인트 전에 ?theme= 을 반영해야 흰 화면이 번쩍이지 않는다.
+(function () {
+  var t = new URLSearchParams(location.search).get('theme');
+  if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+})();</script>
 <div class="wrap">
   <header class="head">
     <div class="brand">
@@ -715,6 +726,12 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
   window.addEventListener("message", (e) => {
     if (e.origin !== window.location.origin) return;
     if (e.data && e.data.type === "arena:data") ingestReal(e.data.payload);
+    // 부모에서 FAB 테마 토글을 누르면 아이프레임도 즉시 따라간다(리로드 없이).
+    if (e.data && e.data.type === "arena:theme") {
+      const t = e.data.theme === "dark" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+      render();
+    }
   });
   if (window.parent && window.parent !== window) {
     try { window.parent.postMessage({ type: "arena:ready" }, window.location.origin); } catch (_) {}
