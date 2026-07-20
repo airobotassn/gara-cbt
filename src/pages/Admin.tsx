@@ -3203,6 +3203,7 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
     (row?.subject ? tiers.find((t) => t.subjects.includes(row.subject)) : undefined)?.key ?? tier ?? tiers[0]?.key ?? '',
   )
   const curTier = tiers.find((t) => t.key === tierKey) ?? tiers[0]
+  const allowShort = (TIER_EXAM_SPEC[tierKey]?.short ?? 0) > 0 // 주관식은 출제 스펙에 short 있는 급수(현재 elite)만
   const [subject, setSubject] = useState(row?.subject ?? curTier?.subjects[0] ?? '')
   const baseSubjects = curTier?.subjects ?? []
   // 편집 중 기존 과목이 현재 급수 목록에 없으면(레거시 자유입력) 옵션에 그대로 유지
@@ -3248,10 +3249,10 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
               <input className="admin-in" value={number} readOnly disabled title="번호는 자동 부여됩니다" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
             </div>
             <div style={{ ...QE.field, flex: 1 }}>
-              <span style={QE.lab}>유형</span>
+              <span style={QE.lab}>유형{!allowShort && kind !== 'short' && <span style={{ color: 'var(--dim)', fontWeight: 400 }}> (이 급수는 객관식만)</span>}</span>
               <select className="admin-in" value={kind} onChange={(e) => setKind(e.target.value as 'mc' | 'short')}>
                 <option value="mc">객관식</option>
-                <option value="short">주관식</option>
+                {(allowShort || kind === 'short') && <option value="short">주관식</option>}
               </select>
             </div>
             <div style={{ ...QE.field, flex: 1 }}>
@@ -3275,6 +3276,7 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
                   setTierKey(k)
                   const t = tiers.find((x) => x.key === k)
                   if (t) setSubject(t.subjects[0] ?? '')
+                  if ((TIER_EXAM_SPEC[k]?.short ?? 0) === 0) setKind('mc') // 주관식 없는 급수로 바꾸면 유형 강제 객관식
                 }}
               >
                 {tiers.map((t) => (
@@ -3514,10 +3516,22 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
   }
 
   function downloadTemplate() {
-    const header = ['번호', '과목', '난이도(상/중/하)', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)', '유사정답1', '유사정답2', '유사정답3', '유사정답4', '유사정답5', '해설']
-    const sampleMc = [1, 'AI 리터러시', '중', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '', '', '', '', '', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)']
-    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '중', '데이터를 발생 지점 근처에서 처리하는 방식을 무엇이라 하는가?', '', '', '', '', '', '주관식', '엣지 컴퓨팅', 'edge computing', 'edgecomputing', '엣지컴퓨팅', '', '', '대소문자·띄어쓰기 차이는 자동 무시 · 허용답안은 여러 개 입력']
-    const ws = XLSX.utils.aoa_to_sheet([header, sampleMc, sampleShort])
+    const hasShort = (TIER_EXAM_SPEC[tier ?? '']?.short ?? 0) > 0
+    const base = ['번호', '과목', '난이도(상/중/하)', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)']
+    const mcHead = [1, 'AI 리터러시', '중', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식']
+    const header = hasShort
+      ? [...base, '모범답안(주관식)', '유사정답1', '유사정답2', '유사정답3', '유사정답4', '유사정답5', '해설']
+      : [...base, '해설']
+    const rows: (string | number)[][] = hasShort
+      ? [
+          [...mcHead, '', '', '', '', '', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)'],
+          [2, '피지컬 AI 및 데이터 처리', '중', '데이터를 발생 지점 근처에서 처리하는 방식을 무엇이라 하는가?', '', '', '', '', '', '주관식', '엣지 컴퓨팅', 'edge computing', 'edgecomputing', '엣지컴퓨팅', '', '', '대소문자·띄어쓰기 차이는 자동 무시 · 허용답안은 여러 개 입력'],
+        ]
+      : [
+          [...mcHead, '2번이 정답인 이유: …(응시자에게 노출되지 않음)'],
+          [2, 'AI 리터러시', '하', '다음 중 옳지 않은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 3, '객관식', ''],
+        ]
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '문항')
     XLSX.writeFile(wb, 'cbt_문항_템플릿.xlsx')
@@ -3527,7 +3541,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
   const problems = mappedRows
     .map((r, i) => {
       if (!r.subject || !r.prompt) return `${i + 2}행: 과목/지문 비어있음`
-      if (r.kind === 'short') return '' // 주관식은 보기·정답 검증 없음
+      if (r.kind === 'short') return (TIER_EXAM_SPEC[tier ?? '']?.short ?? 0) > 0 ? '' : `${i + 2}행(번호 ${r.number}): 이 급수는 주관식이 없습니다 — 유형을 객관식으로 바꾸세요`
       if (r.choices.length !== 4 || r.choices.some((c) => !c)) return `${i + 2}행(번호 ${r.number}): 보기 4개 필요`
       if (r.correctIndex < 0 || r.correctIndex > 3) return `${i + 2}행(번호 ${r.number}): 정답(1~4) 확인`
       return ''
@@ -3559,7 +3573,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
   return (
     <>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안(주관식) · 해설</b>. 유형이 비면 객관식, 주관식은 보기·정답 없이 모범답안만. <b>난이도·해설은 선택</b>이며(난이도가 상/중/하가 아니면 미지정) <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 엑셀 <b>과목명은 아래 “과목 매핑”에서 이 급수의 정규 검정과목으로 치환</b>됩니다(대소문자·띄어쓰기 차이는 자동 교정 — 그래야 풀 현황 집계·실제 출제에 잡힘). 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호는 자동 부여 · 엑셀의 ‘번호’ 열은 참고용일 뿐 기존 문항을 덮어쓰지 않음). 템플릿을 받아 채우면 가장 확실합니다.
+        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안·유사정답1~5(주관식) · 해설</b>. 유형이 비면 객관식. <b>주관식·유사정답 열은 주관식이 있는 급수에서만</b> 쓰이며(이 급수에 주관식이 없으면 주관식 행은 업로드 거부), 주관식은 <b>모범답안+유사정답을 정규화 정확일치로 자동채점</b>합니다(대소문자·띄어쓰기 무시). <b>난이도·해설은 선택</b>이며 <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 엑셀 <b>과목명은 아래 “과목 매핑”에서 이 급수의 정규 검정과목으로 치환</b>됩니다. 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호 자동 부여).
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <label className="admin-mini" style={{ cursor: 'pointer' }}>
