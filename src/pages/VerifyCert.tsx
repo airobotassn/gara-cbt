@@ -24,12 +24,12 @@ const DEMO_BAD_TOKEN = 'preview-invalid'
 function demoResult(): VerifyCertResponse {
   const now = new Date()
   const exp = new Date(now)
-  exp.setFullYear(exp.getFullYear() + 2)
+  exp.setMonth(exp.getMonth() + 6) // CARIS Pro = 취득일 +6개월
   return {
     valid: true,
     status: 'valid',
     name: '홍*동',
-    grade: 'CARIS 자격검정',
+    grade: 'CARIS PRO',
     certNo: 'CA-PRO-2026-0001',
     issuedAt: now.toISOString(),
     expiresAt: exp.toISOString(),
@@ -38,9 +38,9 @@ function demoResult(): VerifyCertResponse {
 
 // 공식 검인(檢印) 엠블럼 — 이중 링 + 비딩(engine-turn) + 원호 문자 + 중앙 판정 글리프.
 function Seal({ tone }: { tone: 'ok' | 'warn' | 'bad' }) {
-  const ring = tone === 'ok' ? '#b8912f' : tone === 'warn' ? '#b17a1c' : '#b23b32'
+  const ring = tone === 'ok' ? '#1663c7' : tone === 'warn' ? '#b17a1c' : '#b23b32'
   const navy = '#16305b'
-  const glyph = tone === 'bad' ? '#e6b7b2' : '#e9cd80'
+  const glyph = tone === 'bad' ? '#e6b7b2' : '#cfe3ff'
   const ticks = Array.from({ length: 72 }, (_, i) => {
     const a = (i / 72) * Math.PI * 2
     const r1 = 56

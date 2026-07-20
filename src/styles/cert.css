@@ -1,5 +1,5 @@
-/* ===== 자격증: 원본 배경(글자 제거·워터마크 보존) 위에 SVG 텍스트 오버레이(하이브리드) =====
-   글자는 벡터(SVG text) + 내장 명조/개러몬드 → 어떤 배율·인쇄에도 선명, 6개 언어 한 배경 공용. */
+/* ===== 자격증: 순수 벡터 SVG(값·문구·급수·워드마크) + logo.png 엠블럼 — 스크린샷 배경 없음 =====
+   모든 글자는 벡터 + 내장 폰트(Montserrat 워드마크 / Tinos 세리프 / 나눔명조) → 어떤 배율·인쇄에도 선명. */
 @font-face {
   font-family: 'CertMyeongjo';
   src: url('/fonts/NanumMyeongjo-Regular.woff2') format('woff2');
@@ -16,6 +16,24 @@
   font-family: 'CertGaramond';
   src: url('/fonts/CormorantGaramond.woff2') format('woff2');
   font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'CariWord';
+  src: url('/fonts/Montserrat-800.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'CariSerif';
+  src: url('/fonts/Tinos-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'CariSerif';
+  src: url('/fonts/Tinos-700.woff2') format('woff2');
+  font-weight: 700;
   font-display: swap;
 }
 
@@ -88,12 +106,18 @@
   .cert-lang-tabs {
     display: none !important;
   }
+  /* 새 시안 비율(≈1.38)이 A4 가로(≈1.41)보다 세로로 살짝 길어 — 높이에 맞춰 한 장에 담는다.
+     SVG viewBox+preserveAspectRatio(기본 meet)가 페이지 안에서 비율 유지·가운데 정렬. */
   .cert-canvas {
-    width: 100%;
+    width: 297mm;
+    height: 210mm;
     box-shadow: none;
     border-radius: 0;
+    overflow: hidden;
   }
   .cert-svg {
+    width: 100%;
+    height: 100%;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

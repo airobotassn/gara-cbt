@@ -6,7 +6,7 @@ import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
 import type { MyAttempt, MyAttemptsResponse } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
-import { makeCertNo, trackOfTitle, tempSeq } from '../lib/certNo'
+import { makeCertNo, gradeOfTitle, gradeDisplay, certExpiryDate, tempSeq } from '../lib/certNo'
 import { searchSchools } from '../lib/schools'
 import { countryName } from '../lib/regions'
 
@@ -38,9 +38,9 @@ function daysLeft(iso?: string | null) {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
 }
 function certNoOf(a: MyAttempt) {
-  // 시험명으로 트랙(Pro/Master) 추정 → 종목·등급코드. 일련번호는 서버 연동 전까지 임시(tempSeq).
+  // 시험명(급수)에서 등급 추정 → 종목·등급코드. 일련번호는 서버 연동 전까지 임시(tempSeq).
   const year = (a.submittedAt ? new Date(a.submittedAt).getFullYear() : 0) || new Date().getFullYear()
-  return makeCertNo(trackOfTitle(a.examTitle), year, tempSeq(a.attemptId))
+  return makeCertNo(gradeOfTitle(a.examTitle), year, tempSeq(a.attemptId))
 }
 
 // 상태 → 카드 비주얼
@@ -219,7 +219,16 @@ export default function MyPage() {
       /* 발급 기록 실패 — 증서 화면은 열어준다(다음 방문 때 상태 재동기화) */
     }
     navigate('/certificate', {
-      state: { name, qualification: a.examTitle ?? t('mypage.exam_fallback'), certNo, issueDate: fmtDate(a.submittedAt), verifyToken, scoreText: `${a.totalCorrect} / ${a.totalQuestions}` },
+      state: {
+        name,
+        qualification: a.examTitle ?? t('mypage.exam_fallback'),
+        grade: gradeDisplay(a.examTitle),
+        certNo,
+        issueDate: fmtDate(a.submittedAt),
+        expiryDate: certExpiryDate(a.examTitle, a.submittedAt ? new Date(a.submittedAt) : new Date()),
+        verifyToken,
+        scoreText: `${a.totalCorrect} / ${a.totalQuestions}`,
+      },
     })
   }
 

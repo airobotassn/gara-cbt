@@ -12,8 +12,8 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { kstDay } from '../_shared/kst.ts'
 
-// DB 하드코딩 상수(gacha_draw: 100/20/50 · complete_daily: 10)와 동일하게 유지 — 표시 전용.
-const ECON = { drawCost: 100, dupeRefund: 20, pityCeiling: 50, dailyPoints: 10 }
+// DB 하드코딩 상수(gacha_draw: 20/천장15/가루10~20/즉시5%/교환250 · complete_daily: 10)와 동일하게 유지 — 표시 전용.
+const ECON = { drawCost: 20, pityCeiling: 15, dailyPoints: 10, dustMin: 10, dustMax: 20 }
 const POOL_KEY = 'default'
 
 Deno.serve(async (req) => {
@@ -21,20 +21,24 @@ Deno.serve(async (req) => {
   try {
     const admin = adminClient()
 
-    // 상점 카탈로그(공개 select) + 뽑기풀 희귀 플래그 — 비로그인도 가격/희귀 열람 가능.
-    const [{ data: catRows }, { data: poolRows }] = await Promise.all([
+    // 상점 카탈로그(코인 기본템) + 뽑기풀 희귀 + 뽑기 전용 한정템(가루 교환가) — 비로그인도 열람 가능.
+    const [{ data: catRows }, { data: poolRows }, { data: exRows }] = await Promise.all([
       admin.from('shop_catalog').select('part_key, price').eq('active', true),
       admin.from('gacha_pool').select('part_key, is_rare').eq('pool_key', POOL_KEY),
+      admin.from('gacha_exclusive').select('part_key, dust_price').eq('active', true),
     ])
     const rareSet = new Set((poolRows ?? []).filter((p) => p.is_rare).map((p) => p.part_key))
     const catalog = (catRows ?? [])
       .map((c) => ({ partKey: c.part_key as string, price: c.price as number, rare: rareSet.has(c.part_key) }))
       .sort((a, b) => a.price - b.price || a.partKey.localeCompare(b.partKey))
+    const exclusives = (exRows ?? [])
+      .map((e) => ({ partKey: e.part_key as string, dustPrice: e.dust_price as number }))
+      .sort((a, b) => a.dustPrice - b.dustPrice || a.partKey.localeCompare(b.partKey))
 
     // 인증: 비로그인/익명은 공개 정보만.
     const user = await getUser(req)
     if (!user || user.is_anonymous) {
-      return json({ authed: false, econ: ECON, catalog })
+      return json({ authed: false, econ: ECON, catalog, exclusives })
     }
 
     const uid = user.id
@@ -51,7 +55,7 @@ Deno.serve(async (req) => {
       { data: progress },
       { data: titles },
     ] = await Promise.all([
-      admin.from('user_currency').select('points').eq('user_id', uid).maybeSingle(),
+      admin.from('user_currency').select('points, dust').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
       admin.from('user_characters').select('base_key, equipped').eq('user_id', uid).maybeSingle(),
       admin.from('user_stamps').select('count').eq('user_id', uid).eq('stamp_kind', 'daily').maybeSingle(),
@@ -80,6 +84,7 @@ Deno.serve(async (req) => {
       level: progress?.rank ?? null,
       rankPoints: progress?.points ?? null,
       points: Number(currency?.points ?? 0),
+      dust: Number(currency?.dust ?? 0),
       cosmetics: (cosmetics ?? []).map((c) => c.part_key as string),
       baseKey: (character?.base_key as string) ?? 'default',
       equipped: (character?.equipped as Record<string, string>) ?? {},
@@ -87,6 +92,7 @@ Deno.serve(async (req) => {
       pity: (pity?.counter as number) ?? 0,
       dailyDone: !!daily,
       catalog,
+      exclusives,
       coupons: couponList,
       titles: titleList,
       econ: ECON,

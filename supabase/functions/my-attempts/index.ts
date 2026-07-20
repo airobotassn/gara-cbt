@@ -4,7 +4,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { makeCertNo, tempSeq, trackOfTitle } from '../_shared/cert.ts'
+import { makeCertNo, tempSeq, gradeOfTitle } from '../_shared/cert.ts'
 
 const PASS_RATIO = 0.6
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         }
         const year = a.submitted_at ? new Date(a.submitted_at).getFullYear() : new Date().getFullYear()
         verifyToken = verifyToken ?? crypto.randomUUID()
-        certNo = certNo ?? makeCertNo(trackOfTitle(title), year, tempSeq(a.id))
+        certNo = certNo ?? makeCertNo(gradeOfTitle(title), year, tempSeq(a.id))
       }
       const { error: issueErr } = await admin
         .from('exam_attempts')

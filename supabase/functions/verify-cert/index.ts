@@ -5,7 +5,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient } from '../_shared/lib.ts'
-import { trackOfTitle, expiryMonths, maskName } from '../_shared/cert.ts'
+import { gradeOfTitle, expiryMonths, maskName } from '../_shared/cert.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -30,8 +30,8 @@ Deno.serve(async (req) => {
       title = (ex as { title?: string } | null)?.title ?? null
     }
 
-    const track = trackOfTitle(title)
-    const months = expiryMonths(track)
+    const grade = gradeOfTitle(title)
+    const months = expiryMonths(grade)
     const issuedAt = a.cert_issued_at as string
     let expiresAt: string | null = null
     if (months != null) {

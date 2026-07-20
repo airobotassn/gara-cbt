@@ -6,6 +6,8 @@ import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
+import { useNavigate } from 'react-router-dom'
+import { MINIGAMES } from '../lib/minigames'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -27,9 +29,8 @@ function Ic({ n, s = 24 }: { n: string; s?: number }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: 'block' }} aria-hidden="true">{ICONS[n]}</svg>
 }
 
-const DRAW_COST = 100
-const DUPE_REFUND = 20
-const PITY_CEILING = 10
+const DRAW_COST = 20
+const PITY_CEILING = 15
 const DAILY_POINTS = 10
 
 type Part = { key: string; name: string; rare: boolean; weight: number; price: number }
@@ -38,8 +39,8 @@ const POOL: Part[] = [
   { key: 'hat_common_02', name: '비니', rare: false, weight: 40, price: 200 },
   { key: 'shoe_common_01', name: '포근 양말', rare: false, weight: 30, price: 200 },
   { key: 'glasses_common_01', name: '동글 안경', rare: false, weight: 30, price: 200 },
-  { key: 'wing_rare_01', name: '✨빛나는 날개', rare: true, weight: 5, price: 800 },
-  { key: 'crown_rare_01', name: '👑작은 왕관', rare: true, weight: 5, price: 800 },
+  { key: 'wing_rare_01', name: '빛나는 날개', rare: true, weight: 5, price: 800 },
+  { key: 'crown_rare_01', name: '작은 왕관', rare: true, weight: 5, price: 800 },
 ]
 function partName(key: string) {
   return POOL.find((p) => p.key === key)?.name ?? key
@@ -55,22 +56,26 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[] }
-interface GachaResp { part_key: string; was_dupe: boolean; refund_points: number; pity_before: number; points_after: number }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[] }
+interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
+interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
 interface DailyResp { ok: boolean; day: string; first: boolean }
 
 function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : ''
   if (msg === 'insufficient_points') return '포인트가 부족해요'
+  if (msg === 'insufficient_dust') return '가루가 부족해요'
+  if (msg === 'already_owned') return '이미 보유한 한정템이에요'
   if (msg === 'unauthorized') return '로그인이 필요해요'
   return '오류가 발생했어요. 잠시 후 다시 시도해주세요'
 }
 
-type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title'
+type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'game'
 
 export default function Hub() {
   const { isFullUser, loginWithGoogle, user } = useAuth()
+  const navigate = useNavigate()
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
@@ -82,8 +87,11 @@ export default function Hub() {
   const [titles, setTitles] = useState<{ track: string; grade: string }[]>([])
   const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
-  const [lastDraw, setLastDraw] = useState<{ part: Part; dupe: boolean; refund: number } | null>(null)
+  const [dust, setDust] = useState(0)
+  const [exclusives, setExclusives] = useState<{ partKey: string; dustPrice: number }[]>([])
+  const [lastDraw, setLastDraw] = useState<{ dust: number; part: Part | null } | null>(null)
   const [drawing, setDrawing] = useState(false)
+  const [purchased, setPurchased] = useState<{ partKey: string; kind: 'coin' | 'dust' } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
@@ -116,6 +124,8 @@ export default function Hub() {
     setTitles(h.titles ?? [])
     setCoupons(h.coupons ?? [])
     setCatalog(h.catalog ?? [])
+    setDust(h.dust ?? 0)
+    setExclusives(h.exclusives ?? [])
   }
   async function hydrate() {
     try {
@@ -149,18 +159,16 @@ export default function Hub() {
   // 뽑기 → gacha-draw (서버권위/멱등 nonce/천장/환급). 서버 결과로 토스트, get-hub 로 재동기화.
   async function doGacha() {
     if (!isFullUser) { void loginWithGoogle(); return }
-    if (points < DRAW_COST) { pushLog('포인트가 부족해요'); return }
+    if (points < DRAW_COST) { pushLog('코인이 부족해요'); return }
     try {
       setDrawing(true)
       setLastDraw(null)
       const r = await callFunction<GachaResp>('gacha-draw', { pool_key: 'default', client_nonce: crypto.randomUUID() })
-      const part = POOL.find((p) => p.key === r.part_key) ?? POOL[0]
-      const forced = r.pity_before + 1 >= PITY_CEILING
+      const part = r.part_key ? (POOL.find((p) => p.key === r.part_key) ?? null) : null
       window.setTimeout(() => {
-        setLastDraw({ part, dupe: r.was_dupe, refund: r.refund_points })
+        setLastDraw({ dust: r.dust_gained, part })
         setDrawing(false)
       }, 900)
-      pushLog(`뽑기: ${part.name}${part.rare ? ' (레어!)' : ''}${r.was_dupe ? ` · 중복→+${DUPE_REFUND}P` : ''}${forced ? ' · 천장' : ''}`)
       await hydrate()
     } catch (e) {
       setDrawing(false)
@@ -174,7 +182,21 @@ export default function Hub() {
     if (points < price) { pushLog(`포인트가 부족해요: ${partName(partKey)} (${price}P)`); return }
     try {
       await callFunction<ShopResp>('shop-buy', { part_key: partKey, client_nonce: crypto.randomUUID() })
-      pushLog(`상점 구매: ${partName(partKey)} · -${price}P`)
+      setPurchased({ partKey, kind: 'coin' })
+      await hydrate()
+    } catch (e) {
+      pushLog(friendlyError(e))
+    }
+  }
+
+  // 가루 교환 → gacha-exchange (뽑기 전용 한정템 지정 확정). 성공 시 리워드 팝업.
+  async function doExchange(partKey: string, price: number) {
+    if (!isFullUser) { void loginWithGoogle(); return }
+    if (owned.has(partKey)) return
+    if (dust < price) { pushLog('가루가 부족해요'); return }
+    try {
+      await callFunction<ExchangeResp>('gacha-exchange', { part_key: partKey, client_nonce: crypto.randomUUID() })
+      setPurchased({ partKey, kind: 'dust' })
       await hydrate()
     } catch (e) {
       pushLog(friendlyError(e))
@@ -247,7 +269,7 @@ export default function Hub() {
               ))}
             </div>
           </div>
-          <button className="cta-main" onClick={() => pushLog('미니 게임은 준비 중이에요')}>
+          <button className="cta-main" onClick={() => setModal('game')}>
             <span className="cta-star"><Ic n="star" s={24} /></span>
             미니 게임
           </button>
@@ -262,15 +284,28 @@ export default function Hub() {
         </div>
       )}
 
+      {purchased && (
+        <div className="hub-modal-backdrop buy-pop-backdrop" onClick={() => setPurchased(null)}>
+          <div className="buy-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="buy-pop-spark"><span>✨</span><span>🎉</span><span>✨</span></div>
+            <div className="buy-pop-title">{purchased.kind === 'dust' ? '교환 완료!' : '구매 완료!'}</div>
+            <div className="buy-pop-thumb">{partEmoji(purchased.partKey)}</div>
+            <div className="buy-pop-name">{partName(purchased.partKey)}</div>
+
+            <button className="pbtn buy-pop-ok" style={btn('#6bbf9a')} onClick={() => setPurchased(null)}>확인</button>
+          </div>
+        </div>
+      )}
+
       {modal === 'gacha' && (
         <Modal title="뽑기" onClose={() => setModal(null)}>
+          <div className="gacha-head">
+            <span className="gchip gchip-dust"><span className="dust-ic">✨</span><span className="num">{dust.toLocaleString()}</span><span className="dust-lab">가루</span></span>
+            <span className="chip" style={{ margin: 0 }}>보유 {owned.size}종</span>
+          </div>
           <div className="gacha-gauge">
             <div className="gacha-gauge-bar"><div className="gacha-gauge-fill" style={{ width: `${Math.min(100, (pity / PITY_CEILING) * 100)}%` }} /></div>
             <span className="gacha-gauge-lab">천장까지 {Math.max(0, PITY_CEILING - pity)}회</span>
-          </div>
-          <div className="pill-row" style={{ alignItems: 'center' }}>
-            <button className="pbtn gacha-draw-btn" onClick={doGacha} disabled={drawing}>{drawing ? '뽑는 중…' : `뽑기 (${DRAW_COST}P)`}</button>
-            <span className="chip" style={{ margin: 0 }}>보유 {owned.size}종</span>
           </div>
           <div className="gacha-stage">
             {drawing && (
@@ -279,20 +314,43 @@ export default function Hub() {
               </div>
             )}
             {!drawing && lastDraw && (
-              <div className={`gacha-result ${lastDraw.part.rare ? 'is-rare' : 'is-common'}`}>
-                {lastDraw.part.rare && (
-                  <>
-                    <span className="gacha-ribbon">레어!</span>
-                    <span className="gacha-spark s1">✨</span><span className="gacha-spark s2">✨</span><span className="gacha-spark s3">✨</span>
-                  </>
-                )}
-                <div className="gacha-result-icon">{lastDraw.part.rare ? '👑' : '🎀'}</div>
-                <b>{lastDraw.part.name}</b>
-                {lastDraw.dupe && <span className="gacha-refund">+{lastDraw.refund}P 환급</span>}
-              </div>
+              lastDraw.part ? (
+                <div className="gacha-result is-rare">
+                  <span className="gacha-ribbon">한정템!</span>
+                  <span className="gacha-spark s1">✨</span><span className="gacha-spark s2">✨</span><span className="gacha-spark s3">✨</span>
+                  <div className="gacha-result-icon">{partEmoji(lastDraw.part.key)}</div>
+                  <b>{lastDraw.part.name}</b>
+                  <span className="gacha-dustgain">가루 +{lastDraw.dust}</span>
+                </div>
+              ) : (
+                <div className="gacha-result is-dust">
+                  <div className="gacha-result-icon">✨</div>
+                  <b>가루 +{lastDraw.dust}</b>
+                  <span className="gacha-dust-hint">모아서 한정템 교환!</span>
+                </div>
+              )
             )}
           </div>
-          <p className="hub-modal-help">꽝 없이 항상 파츠를 받아요. 이미 있는 파츠가 나오면 포인트로 환급해드려요.</p>
+          <button className="pbtn gacha-draw-btn gacha-draw-full" onClick={doGacha} disabled={drawing}>{drawing ? '뽑는 중…' : `뽑기 (${DRAW_COST} 🪙)`}</button>
+          <div className="gacha-exchange">
+            <div className="gacha-ex-head">✨ 가루 교환소 <span className="gacha-ex-sub">뽑기 전용 한정템</span></div>
+            <div className="gacha-ex-list">
+              {exclusives.map((e) => {
+                const has = owned.has(e.partKey)
+                const canAfford = dust >= e.dustPrice
+                return (
+                  <div key={e.partKey} className={`gacha-ex-item ${has ? 'is-owned' : ''}`}>
+                    {has && <span className="gacha-ex-owned">보유중</span>}
+                    <div className="gacha-ex-thumb">{partEmoji(e.partKey)}</div>
+                    <div className="gacha-ex-name">{partName(e.partKey)}</div>
+                    <div className="gacha-ex-price">✨ {e.dustPrice}</div>
+                    <button className="pbtn gacha-ex-buy" style={btn(has || !canAfford ? '#c3cbe0' : '#7b6bd6')} onClick={() => doExchange(e.partKey, e.dustPrice)} disabled={has}>{has ? '보유중' : '교환'}</button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <p className="hub-modal-help">뽑기하면 항상 가루가 쌓여요. 천장(15회)엔 한정템이 확정! 가루로 원하는 한정템을 바로 교환할 수도 있어요.</p>
         </Modal>
       )}
 
@@ -308,6 +366,7 @@ export default function Hub() {
                 <div key={c.partKey} className={`hub-shop-item ${c.rare ? 'is-rare' : ''}`}>
                   {c.rare && <span className="hub-shop-ribbon">레어</span>}
                   {owned.has(c.partKey) && <span className="hub-shop-owned">보유중</span>}
+
                   <div className="hub-shop-thumb">{partEmoji(c.partKey)}</div>
                   <div className="hub-shop-name">{partName(c.partKey)}</div>
                   <div className="hub-shop-price">🪙 {c.price}</div>
@@ -365,14 +424,42 @@ export default function Hub() {
           )}
         </Modal>
       )}
+
+      {modal === 'game' && (
+        <Modal title="미니 게임" className="mg-modal" onClose={() => setModal(null)}>
+          <div className="mg-shelf">
+            {MINIGAMES.map((g) => {
+              const [pre, post] = g.accent && g.title.includes(g.accent)
+                ? [g.title.slice(0, g.title.indexOf(g.accent)), g.accent]
+                : [g.title, '']
+              return (
+                <button
+                  key={g.id}
+                  className="mg-cover"
+                  onClick={() => { setModal(null); navigate(`/games/${g.id}`) }}
+                  aria-label={`${g.title} 플레이`}
+                >
+                  <img className="mg-art" src={g.art} alt="" />
+                  <span className="mg-caption">
+                    <span className="mg-badge">{g.badge}</span>
+                    <b className="mg-name">{pre}{post && <i className="mg-accent">{post}</i>}</b>
+                    <span className="mg-tag">{g.tagline}</span>
+                    <span className="mg-play"><b className="mg-play-tri" />PLAY</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Modal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
   return (
     <div className="hub-modal-backdrop" onClick={onClose}>
-      <div className="hub-modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`hub-modal${className ? ' ' + className : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="hub-modal-head">
           <h3>{title}</h3>
           <button className="hub-modal-close" onClick={onClose} aria-label="닫기">×</button>

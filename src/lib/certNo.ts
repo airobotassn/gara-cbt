@@ -9,9 +9,9 @@
 //    makeCertNo 는 형식 조합만 담당하고 seq 는 서버가 부여한 값을 받는다.
 //    tempSeq 는 서버 시퀀스 연동 전까지 형식 미리보기에 쓰는 임시값(순차 아님).
 //
-// 종목↔등급 배치(현재 해석): CARIS(CA)=Beginner·Pro·Elite / CARIS Master(CM)=Master·Grand Master·Zenith.
+// ⚠️ 서버 supabase/functions/_shared/cert.ts 와 동일 로직(등급판정·자격번호·유효기간) — 양쪽 동기화 유지.
+//    종목↔등급 배치: CARIS(CA)=Beginner·Pro·Elite / CARIS Master(CM)=Master·Grand Master·Zenith.
 
-export type CertTrack = 'pro' | 'master'
 export type GradeCode = 'BEG' | 'PRO' | 'ELT' | 'MAS' | 'GMA' | 'ZEN'
 
 const SUBJECT_CODE: Record<GradeCode, 'CA' | 'CM'> = {
@@ -19,20 +19,55 @@ const SUBJECT_CODE: Record<GradeCode, 'CA' | 'CM'> = {
   MAS: 'CM', GMA: 'CM', ZEN: 'CM',
 }
 
-// 현재 운영 트랙(CARIS Pro / CARIS Master) → 등급코드.
-// ⚠️ 임시 매핑(사용자 지시로 임시 확정) — 등급 체계(6단계)가 확정되면 이 표 한 곳만 갱신하면 됨.
-//    Beginner·Elite·Grand Master·Zenith 도입 및 Pro 급수(4~1급)별 코드 세분화도 여기서 처리.
-const TRACK_GRADE: Record<CertTrack, GradeCode> = { pro: 'PRO', master: 'MAS' }
+// 자격증 유효기간(개월) — 등급별. null = 무기한. 정책 변경 시 이 표 한 곳만 수정.
+//   CARIS-Ⅰ: Beginner·Pro = 6개월, Elite = 12개월. CARIS-Ⅱ(Master 계열) = 무기한(내용 미확정).
+const EXPIRY_MONTHS: Record<GradeCode, number | null> = {
+  BEG: 6, PRO: 6, ELT: 12, MAS: null, GMA: null, ZEN: null,
+}
+
+// 등급 표시명(브랜드 고정, 언어 무관) — 자격증 급수 라벨("CARIS PRO" 등)에 사용.
+const GRADE_NAME: Record<GradeCode, string> = {
+  BEG: 'BEGINNER', PRO: 'PRO', ELT: 'ELITE', MAS: 'MASTER', GMA: 'GRAND MASTER', ZEN: 'ZENITH',
+}
+
+// 시험명(급수) → 등급코드. Grand Master 는 Master 보다 먼저 검사. 미상은 Pro 로 폴백.
+export function gradeOfTitle(title?: string | null): GradeCode {
+  const t = (title ?? '').toLowerCase()
+  if (/grand\s*master/.test(t)) return 'GMA'
+  if (/zenith/.test(t)) return 'ZEN'
+  if (/master/.test(t)) return 'MAS'
+  if (/elite/.test(t)) return 'ELT'
+  if (/beginner/.test(t)) return 'BEG'
+  return 'PRO'
+}
+
+// 자격증 표시용 급수명 — "CARIS PRO" 등(브랜드 고정).
+export function gradeDisplay(title?: string | null): string {
+  return `CARIS ${GRADE_NAME[gradeOfTitle(title)]}`
+}
 
 // 형식 조합. seq 는 서버가 부여한 종목·등급·연도별 순차 번호.
-export function makeCertNo(track: CertTrack, year: number, seq: number): string {
-  const grade = TRACK_GRADE[track]
+export function makeCertNo(grade: GradeCode, year: number, seq: number): string {
   return `${SUBJECT_CODE[grade]}-${grade}-${year}-${String(Math.max(1, seq)).padStart(4, '0')}`
 }
 
-// 시험명으로 트랙 추정 — "Master" 포함이면 master, 아니면 pro(기본).
-export function trackOfTitle(title?: string | null): CertTrack {
-  return title && /master/i.test(title) ? 'master' : 'pro'
+// 등급 유효기간(개월). null=무기한.
+export function expiryMonths(grade: GradeCode): number | null {
+  return EXPIRY_MONTHS[grade]
+}
+
+// 날짜 표기 "2026. 07. 15" — 자격증/성적표 공용 포맷.
+export function fmtCertDate(d: Date): string {
+  return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+}
+
+// 취득일(Date) + 급수(title) → 유효기간(만료일) 문자열. null = 무기한.
+export function certExpiryDate(title: string | null | undefined, acquiredAt: Date): string | null {
+  const m = expiryMonths(gradeOfTitle(title))
+  if (m == null) return null
+  const d = new Date(acquiredAt)
+  d.setMonth(d.getMonth() + m)
+  return fmtCertDate(d)
 }
 
 // 서버 시퀀스 연동 전 임시 일련번호 — attemptId 해시(순차 아님, 형식 미리보기용).

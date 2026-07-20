@@ -54,9 +54,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // 응시 화면(/exam/run/:id) + 보안 브라우저(SEB) 안에서만 FAB 숨김(시험 중 이탈 차단).
+  // FAB 숨김: 응시 화면(/exam/run/:id)·보안 브라우저(SEB)는 시험 중 이탈 차단, /games/* 는 게임 UI(하단 선택지)와 FAB 겹침 방지.
   // 그 외 모든 페이지는 헤더 없이 FAB이 네비 역할을 한다.
-  const inTest = pathname.startsWith('/exam/run/') || isSEB()
+  const inTest = pathname.startsWith('/exam/run/') || pathname.startsWith('/games/') || isSEB()
 
   // 관리자 여부 — 서버(admin 'me')로 확인. 관리자면 FAB에 관리자 페이지 링크 노출.
   const [isAdmin, setIsAdmin] = useState(false)

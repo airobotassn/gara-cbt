@@ -5,7 +5,7 @@ import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
-import { makeCertNo, tempSeq } from '../lib/certNo'
+import { makeCertNo, tempSeq, gradeOfTitle, gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import type { ExamResultResponse, GradedAnswer, MyAttemptsResponse, SubmitExamResponse } from '../lib/types'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
@@ -147,12 +147,11 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   const CIRC = 2 * Math.PI * 45
   const dashoffset = CIRC * (1 - anim / 100)
 
-  // Pro 단발 시험 → 종목 CARIS(CA)·등급 PRO. 일련번호는 서버 시퀀스 연동 전까지 임시(tempSeq).
-  const certNo = makeCertNo('pro', new Date().getFullYear(), tempSeq(String(attemptId ?? '')))
-  const issueDate = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
-  })()
+  // 취득일·유효기간·자격번호 — 시험명(급수)에서 등급 추정. 일련번호는 서버 시퀀스 연동 전까지 임시(tempSeq).
+  const acquiredAt = new Date()
+  const certNo = makeCertNo(gradeOfTitle(certLabel), acquiredAt.getFullYear(), tempSeq(String(attemptId ?? '')))
+  const issueDate = fmtCertDate(acquiredAt)
+  const expiryDate = certExpiryDate(certLabel, acquiredAt)
 
   async function goCertificate() {
     // 발급 기록(서버) — 마이페이지 발급현황과 공유되는 '발급 완료' 상태. 미리보기는 기록 없음.
@@ -172,8 +171,10 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
       state: {
         name: certName,
         qualification: passed ? certLabel : t('mypage.exam_fallback'),
+        grade: passed ? gradeDisplay(certLabel) : undefined,
         certNo: issuedCertNo ?? certNo,
         issueDate,
+        expiryDate,
         verifyToken,
         scoreText: `${scorePct}점 (${data.totalCorrect}/${data.totalQuestions})`,
       },

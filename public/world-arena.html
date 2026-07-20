@@ -106,6 +106,15 @@ body {
 .legend { display: flex; align-items: center; gap: 10px; padding: 10px 18px 15px; font-size: 11.5px; color: var(--muted); font-weight: 600; }
 .legend .bar { flex: 1; height: 8px; border-radius: 999px;
   background: linear-gradient(90deg, var(--c0), var(--c1), var(--c2), var(--c3)); }
+.zoomctl { position: absolute; left: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
+.zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 rgba(51,50,63,.18); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.zoomctl button:hover { background: var(--panel-2); }
+.zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(51,50,63,.18); }
+.dokinset { position: absolute; top: 12px; right: 12px; width: 150px; height: 112px; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; z-index: 7; box-shadow: 0 3px 0 rgba(51,50,63,.16); background: linear-gradient(160deg, #eaf4ff, #a9cef2); pointer-events: none; }
+.dokinset[hidden] { display: none; }
+.dokinset svg { width: 100%; height: 100%; display: block; }
+.dokinset .doklab { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 10.5px; font-weight: 800; color: var(--ink); background: rgba(255,255,255,.82); padding: 1px 0; }
+.dokisland { stroke: #ffffff; stroke-width: 1; }
 
 /* ── 아레나 마스코트(새싹이) ── */
 .mascot { position: absolute; left: 6px; bottom: 6px; height: 188px; z-index: 6; pointer-events: none;
@@ -163,7 +172,7 @@ body {
 #tip .row { display: flex; justify-content: space-between; gap: 14px; margin-top: 3px; font-weight: 600; opacity: .85; }
 #tip .row span:last-child { font-variant-numeric: tabular-nums; }
 
-.geo { stroke: #ffffff; stroke-width: 1; transition: fill .15s; cursor: pointer; }
+.geo { stroke: #ffffff; stroke-width: 1; transition: fill .15s; cursor: pointer; vector-effect: non-scaling-stroke; }
 .geo.dim { cursor: pointer; }
 .geo.hot { stroke: var(--gold); stroke-width: 1.6; }
 .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
@@ -193,17 +202,26 @@ body {
         <h1>월드 아레나</h1>
       </div>
     </div>
-    <span class="tag">보고용 프로토타입 · 목(예시) 데이터</span>
+    <span class="tag">실데이터 연동 · 지역 미수집 구간은 예시</span>
   </header>
 
   <div class="grid">
     <section class="card stage">
       <nav class="crumb" id="crumb"></nav>
-      <svg id="map" role="img" aria-label="지역별 평균점수 지도"></svg>
+      <svg id="map" role="img" aria-label="지역별 평균 레벨 지도"></svg>
       <div class="prompt" id="prompt"></div>
       <div class="legend">
         <span>낮음</span><div class="bar"></div><span>높음</span>
-        <span style="margin-left:8px">평균점수</span>
+        <span style="margin-left:8px">평균 레벨</span>
+      </div>
+      <div class="zoomctl" role="group" aria-label="지도 확대·축소">
+        <button id="zin" type="button" aria-label="확대">+</button>
+        <button id="zout" type="button" aria-label="축소">−</button>
+        <button id="zreset" type="button" aria-label="원래대로">⤾</button>
+      </div>
+      <div class="dokinset" id="dokinset" role="img" aria-label="독도" hidden>
+        <svg id="dokmap" viewBox="0 0 120 88" preserveAspectRatio="xMidYMid meet"></svg>
+        <span class="doklab" id="doklab">독도</span>
       </div>
     </section>
 
@@ -235,7 +253,7 @@ body {
   </nav>
 
   <p class="foot">
-    ※ 점수·응시자 수는 시연용 <b>가짜 데이터</b>입니다(지역 코드 기반 난수). 실데이터 연동은 응시/원서접수 시 지역 수집이 선행되어야 합니다.<br>
+    ※ 지역/국가 <b>실데이터</b>가 있으면 자동 반영(참여 5명 이상 지역), 아직 데이터가 없는 지역·시군구는 <b>예시</b> 값입니다.<br>
     지도 경계: Natural Earth(세계) · 통계청 2018 행정구역(대한민국 시도·시군구).
   </p>
 </div>
@@ -258,6 +276,27 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
 (function () {
   const KR_ID = "410"; // South Korea (Natural Earth)
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ── 언어/홈 국가 (부모 앱과 동기: ?lang=, home 은 메시지로 갱신) ──
+  const params = new URLSearchParams(location.search);
+  const LANG_SET = ["ko", "en", "ja", "zh", "hi", "vi"];
+  const LANG = LANG_SET.includes(params.get("lang")) ? params.get("lang") : "ko";
+  let HOME = (params.get("home") || "KR").toUpperCase(); // 로그인 계정 국가(부모가 메시지로 갱신)
+  let spinLocked = params.has("home");                   // 홈 확정 시 자동회전 억제(그 국가에 고정)
+
+  // UI 문구 6개국어. 국가명은 Intl.DisplayNames, 한국 시도/시군구는 name_eng(비-ko) 로 현지화.
+  const UI = {
+    ko: { tag: "실데이터 연동 · 지역 미수집 구간은 예시", low: "낮음", high: "높음", avgLevel: "평균 레벨", part: "참여 인원", rankL: "순위", ourRank: "우리 순위", topRegion: "최고 지역", totalPart: "총 참여", search: "지역 검색…", world: "세계", worldLeague: "세계 리그", league: " 리그", real: "실데이터", ppl: "명", unit: "위", avg: "평균", drillHint: "‘{n}’ 선택됨 · 한 번 더 누르면 시·군·구로 들어가요", our0: "· 세계", our1: "· 우리 지역", our2: "· 우리 동네", bLevel: "레벨 테스트", bLevelS: "내 실력 측정 · 진화", bHubS: "홈 · 캐릭터 허브", bDaily: "오늘의 문제", bDailyS: "데일리 콘텐츠", foot: "지역/국가 실데이터가 있으면 자동 반영(참여 5명 이상 지역), 아직 데이터가 없는 지역·시군구는 예시 값입니다." },
+    en: { tag: "Live data · sample where region data is missing", low: "Low", high: "High", avgLevel: "Avg. level", part: "Participants", rankL: "Rank", ourRank: "Our rank", topRegion: "Top region", totalPart: "Total", search: "Search region…", world: "World", worldLeague: "World League", league: " League", real: "live", ppl: "", unit: "", avg: "avg", drillHint: "‘{n}’ selected · tap again to enter districts", our0: "· World", our1: "· Our region", our2: "· Our town", bLevel: "Level Test", bLevelS: "Measure & evolve", bHubS: "Home · Character hub", bDaily: "Daily", bDailyS: "Daily content", foot: "Regions/countries with live data appear automatically (5+ participants); areas without data show sample values." },
+    ja: { tag: "実データ連携 · 未収集地域はサンプル", low: "低", high: "高", avgLevel: "平均レベル", part: "参加者", rankL: "順位", ourRank: "自国の順位", topRegion: "最高地域", totalPart: "合計", search: "地域を検索…", world: "世界", worldLeague: "ワールドリーグ", league: " リーグ", real: "実データ", ppl: "人", unit: "位", avg: "平均", drillHint: "「{n}」選択 · もう一度で市郡区へ", our0: "· 世界", our1: "· 自地域", our2: "· 自町", bLevel: "レベルテスト", bLevelS: "実力測定 · 進化", bHubS: "ホーム · キャラハブ", bDaily: "今日の問題", bDailyS: "デイリー", foot: "実データのある地域/国は自動反映（参加5人以上）。データのない地域・市郡区はサンプル値です。" },
+    zh: { tag: "实时数据 · 无数据地区为示例", low: "低", high: "高", avgLevel: "平均等级", part: "参与人数", rankL: "排名", ourRank: "本国排名", topRegion: "最高地区", totalPart: "总计", search: "搜索地区…", world: "世界", worldLeague: "世界联赛", league: " 联赛", real: "实时", ppl: "人", unit: "名", avg: "平均", drillHint: "已选“{n}” · 再点一次进入市郡区", our0: "· 世界", our1: "· 本地区", our2: "· 本区", bLevel: "等级测试", bLevelS: "测评 · 进化", bHubS: "主页 · 角色中心", bDaily: "每日一题", bDailyS: "每日内容", foot: "有实时数据的地区/国家自动显示（参与≥5人）；暂无数据的地区·市郡区为示例值。" },
+    hi: { tag: "लाइव डेटा · डेटा रहित क्षेत्र नमूना", low: "कम", high: "अधिक", avgLevel: "औसत स्तर", part: "प्रतिभागी", rankL: "रैंक", ourRank: "हमारी रैंक", topRegion: "शीर्ष क्षेत्र", totalPart: "कुल", search: "क्षेत्र खोजें…", world: "विश्व", worldLeague: "वर्ल्ड लीग", league: " लीग", real: "लाइव", ppl: "", unit: "", avg: "औसत", drillHint: "‘{n}’ चयनित · जिलों हेतु फिर टैप करें", our0: "· विश्व", our1: "· हमारा क्षेत्र", our2: "· हमारा नगर", bLevel: "लेवल टेस्ट", bLevelS: "मापें · विकास", bHubS: "होम · कैरेक्टर हब", bDaily: "आज का प्रश्न", bDailyS: "दैनिक", foot: "लाइव डेटा वाले क्षेत्र/देश स्वतः दिखते हैं (5+ प्रतिभागी); डेटा रहित क्षेत्र नमूना मान हैं।" },
+    vi: { tag: "Dữ liệu thực · vùng thiếu dữ liệu là ví dụ", low: "Thấp", high: "Cao", avgLevel: "Cấp TB", part: "Người tham gia", rankL: "Hạng", ourRank: "Hạng của ta", topRegion: "Vùng cao nhất", totalPart: "Tổng", search: "Tìm khu vực…", world: "Thế giới", worldLeague: "Giải Thế giới", league: " Giải", real: "thực", ppl: "", unit: "", avg: "TB", drillHint: "Đã chọn ‘{n}’ · chạm lần nữa để vào quận/huyện", our0: "· Thế giới", our1: "· Vùng ta", our2: "· Khu ta", bLevel: "Kiểm tra cấp", bLevelS: "Đo lường · tiến hóa", bHubS: "Trang chủ · Nhân vật", bDaily: "Câu hỏi hôm nay", bDailyS: "Nội dung ngày", foot: "Vùng/quốc gia có dữ liệu thực hiển thị tự động (≥5 người); nơi chưa có dữ liệu là giá trị ví dụ." }
+  };
+  const T = (k, vars) => { let s = (UI[LANG] && UI[LANG][k] != null) ? UI[LANG][k] : (UI.ko[k] != null ? UI.ko[k] : k); if (vars) for (const p in vars) s = s.split("{" + p + "}").join(vars[p]); return s; };
+  const fmt = (n) => Number(n).toLocaleString(LANG === "ko" ? "ko-KR" : LANG);
+  const ppl = (n) => fmt(n) + T("ppl");
 
   // ── features ──
   const countries = topojson.feature(WORLD, WORLD.objects.countries).features
@@ -267,25 +306,70 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
   const muniObj = Object.keys(KRMUNI.objects)[0];
   const munis = topojson.feature(KRMUNI, KRMUNI.objects[muniObj]).features;
 
-  // 국가명 한글화: world id=숫자 M49 코드 → 한국어 테이블(ISO 3166-1 + Intl로 사전 생성). 시·도/시·군·구 데이터는 이미 한국어.
+  // 국가명 폴백표(한국어). 비-ko 는 Intl.DisplayNames 우선.
   const NUM2KO = {"004":"아프가니스탄","008":"알바니아","010":"남극 대륙","012":"알제리","024":"앙골라","031":"아제르바이잔","032":"아르헨티나","036":"오스트레일리아","040":"오스트리아","044":"바하마","050":"방글라데시","051":"아르메니아","056":"벨기에","064":"부탄","068":"볼리비아","070":"보스니아 헤르체고비나","072":"보츠와나","076":"브라질","084":"벨리즈","090":"솔로몬 제도","096":"브루나이","100":"불가리아","104":"미얀마","108":"부룬디","112":"벨라루스","116":"캄보디아","120":"카메룬","124":"캐나다","140":"중앙 아프리카 공화국","144":"스리랑카","148":"차드","152":"칠레","156":"중국","158":"대만","170":"콜롬비아","178":"콩고-브라자빌","180":"콩고-킨샤사","188":"코스타리카","191":"크로아티아","192":"쿠바","196":"키프로스","203":"체코","204":"베냉","208":"덴마크","214":"도미니카 공화국","218":"에콰도르","222":"엘살바도르","226":"적도 기니","231":"에티오피아","232":"에리트리아","233":"에스토니아","238":"포클랜드 제도","242":"피지","246":"핀란드","250":"프랑스","260":"프랑스령 남방 지역","262":"지부티","266":"가봉","268":"조지아","270":"감비아","275":"팔레스타인 지구","276":"독일","288":"가나","300":"그리스","304":"그린란드","320":"과테말라","324":"기니","328":"가이아나","332":"아이티","340":"온두라스","348":"헝가리","352":"아이슬란드","356":"인도","360":"인도네시아","364":"이란","368":"이라크","372":"아일랜드","376":"이스라엘","380":"이탈리아","384":"코트디부아르","388":"자메이카","392":"일본","398":"카자흐스탄","400":"요르단","404":"케냐","408":"북한","410":"대한민국","414":"쿠웨이트","417":"키르기스스탄","418":"라오스","422":"레바논","426":"레소토","428":"라트비아","430":"라이베리아","434":"리비아","440":"리투아니아","442":"룩셈부르크","450":"마다가스카르","454":"말라위","458":"말레이시아","466":"말리","478":"모리타니","484":"멕시코","496":"몽골","498":"몰도바","499":"몬테네그로","504":"모로코","508":"모잠비크","512":"오만","516":"나미비아","524":"네팔","528":"네덜란드","540":"뉴칼레도니아","548":"바누아투","554":"뉴질랜드","558":"니카라과","562":"니제르","566":"나이지리아","578":"노르웨이","586":"파키스탄","591":"파나마","598":"파푸아뉴기니","600":"파라과이","604":"페루","608":"필리핀","616":"폴란드","620":"포르투갈","624":"기니비사우","626":"동티모르","630":"푸에르토리코","634":"카타르","642":"루마니아","643":"러시아","646":"르완다","682":"사우디아라비아","686":"세네갈","688":"세르비아","694":"시에라리온","703":"슬로바키아","704":"베트남","705":"슬로베니아","706":"소말리아","710":"남아프리카","716":"짐바브웨","724":"스페인","728":"남수단","729":"수단","732":"서사하라","740":"수리남","748":"에스와티니","752":"스웨덴","756":"스위스","760":"시리아","762":"타지키스탄","764":"태국","768":"토고","780":"트리니다드 토바고","784":"아랍에미리트","788":"튀니지","792":"튀르키예","795":"투르크메니스탄","800":"우간다","804":"우크라이나","807":"북마케도니아","818":"이집트","826":"영국","834":"탄자니아","840":"미국","854":"부르키나파소","858":"우루과이","860":"우즈베키스탄","862":"베네수엘라","887":"예멘","894":"잠비아"};
-  const koCountry = (f) => NUM2KO[f.id] || f.properties.name;
+
+  // ── mock 값(실데이터 없을 때 지역 코드 기반) ──
+  function h32(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  const mockLevel = (k) => Math.round((1 + (h32("s" + k) % 601) / 100) * 10) / 10; // 1.0–7.0
+  const mockTakers = (k) => 30 + (h32("n" + k) % 9970);
+
+  // 지도 코드 → 백엔드 코드 매핑. world topojson id(M49 숫자) → ISO 3166-1 alpha-2.
+  const M49_TO_ISO2 = {"100":"BG","104":"MM","108":"BI","112":"BY","116":"KH","120":"CM","124":"CA","140":"CF","144":"LK","148":"TD","152":"CL","156":"CN","158":"TW","170":"CO","178":"CG","180":"CD","188":"CR","191":"HR","192":"CU","196":"CY","203":"CZ","204":"BJ","208":"DK","214":"DO","218":"EC","222":"SV","226":"GQ","231":"ET","232":"ER","233":"EE","238":"FK","242":"FJ","246":"FI","250":"FR","260":"TF","262":"DJ","266":"GA","268":"GE","270":"GM","275":"PS","276":"DE","288":"GH","300":"GR","304":"GL","320":"GT","324":"GN","328":"GY","332":"HT","340":"HN","348":"HU","352":"IS","356":"IN","360":"ID","364":"IR","368":"IQ","372":"IE","376":"IL","380":"IT","384":"CI","388":"JM","392":"JP","398":"KZ","400":"JO","404":"KE","408":"KP","410":"KR","414":"KW","417":"KG","418":"LA","422":"LB","426":"LS","428":"LV","430":"LR","434":"LY","440":"LT","442":"LU","450":"MG","454":"MW","458":"MY","466":"ML","478":"MR","484":"MX","496":"MN","498":"MD","499":"ME","504":"MA","508":"MZ","512":"OM","516":"NA","524":"NP","528":"NL","540":"NC","548":"VU","554":"NZ","558":"NI","562":"NE","566":"NG","578":"NO","586":"PK","591":"PA","598":"PG","600":"PY","604":"PE","608":"PH","616":"PL","620":"PT","624":"GW","626":"TL","630":"PR","634":"QA","642":"RO","643":"RU","646":"RW","682":"SA","686":"SN","688":"RS","694":"SL","703":"SK","704":"VN","705":"SI","706":"SO","710":"ZA","716":"ZW","724":"ES","728":"SS","729":"SD","732":"EH","740":"SR","748":"SZ","752":"SE","756":"CH","760":"SY","762":"TJ","764":"TH","768":"TG","780":"TT","784":"AE","788":"TN","792":"TR","795":"TM","800":"UG","804":"UA","807":"MK","818":"EG","826":"GB","834":"TZ","840":"US","854":"BF","858":"UY","860":"UZ","862":"VE","887":"YE","894":"ZM","004":"AF","008":"AL","010":"AQ","012":"DZ","024":"AO","031":"AZ","032":"AR","036":"AU","040":"AT","044":"BS","050":"BD","051":"AM","056":"BE","064":"BT","068":"BO","070":"BA","072":"BW","076":"BR","084":"BZ","090":"SB","096":"BN"};
+  // southkorea-maps 시도 code → ISO 3166-2(region_code). REGION_CODES(_shared/regions.ts) 17개와 동일 집합.
+  const PROV_TO_ISO = {"11":"KR-11","21":"KR-26","22":"KR-27","23":"KR-28","24":"KR-29","25":"KR-30","26":"KR-31","29":"KR-50","31":"KR-41","32":"KR-42","33":"KR-43","34":"KR-44","35":"KR-45","36":"KR-46","37":"KR-47","38":"KR-48","39":"KR-49"};
+  // 백엔드 주입 저장소: alpha2/region_code → { level, members }
+  const REAL = { country: Object.create(null), region: Object.create(null) };
+
+  // 국가명 현지화: ISO alpha-2 → Intl.DisplayNames(LANG). 실패 시 한글표/영문명.
+  let regionNames = null;
+  try { regionNames = new Intl.DisplayNames([LANG], { type: "region" }); } catch (_) { regionNames = null; }
+  function countryName(f) {
+    const iso = M49_TO_ISO2[f.id];
+    if (iso && regionNames) { try { const n = regionNames.of(iso); if (n && n !== iso) return n; } catch (_) {} }
+    return NUM2KO[f.id] || f.properties.name;
+  }
+  // 한국 지명 현지화: ko=한글, en/vi/hi=영문 로마자(name_eng; 해당 언어 표준 표기), ja/zh=시도 한자명.
+  //   시군구(250개)는 로마자 유지. 시도 17개만 ja/zh 한자 제공.
+  const PROV_I18N = {
+    ja: {"11":"ソウル","21":"釜山","22":"大邱","23":"仁川","24":"光州","25":"大田","26":"蔚山","29":"世宗","31":"京畿道","32":"江原道","33":"忠清北道","34":"忠清南道","35":"全羅北道","36":"全羅南道","37":"慶尚北道","38":"慶尚南道","39":"済州"},
+    zh: {"11":"首尔","21":"釜山","22":"大邱","23":"仁川","24":"光州","25":"大田","26":"蔚山","29":"世宗","31":"京畿道","32":"江原道","33":"忠清北道","34":"忠清南道","35":"全罗北道","36":"全罗南道","37":"庆尚北道","38":"庆尚南道","39":"济州"}
+  };
+  const localName = (f) => (LANG === "ko" ? f.properties.name : (f.properties.name_eng || f.properties.name));
+  const provName = (f) => {
+    if (LANG === "ko") return f.properties.name;
+    const t = PROV_I18N[LANG]; if (t && t[f.properties.code]) return t[f.properties.code];
+    return f.properties.name_eng || f.properties.name;
+  };
+  const koreaName = () => { const f = countries.find((x) => x.id === KR_ID); return f ? countryName(f) : "Korea"; };
+
+  // 지역 r 의 표시값(실데이터 우선). real=true 면 서버 집계값.
+  function valueFor(r) {
+    let b = null;
+    if (level === 0) { const iso = M49_TO_ISO2[r.f.id]; if (iso) b = REAL.country[iso]; }
+    else if (level === 1) { const iso = PROV_TO_ISO[r.code]; if (iso) b = REAL.region[iso]; }
+    if (b) return { score: b.level, takers: b.members, real: true };
+    return { score: mockLevel(r.key), takers: mockTakers(r.key), real: false };
+  }
+
+  const cscale = d3.scaleLinear().domain([1, 3, 5, 7])
+    .range(["#d9e8fd", "#9dc2f0", "#5b93e2", "#2e6bc8"]).clamp(true);
+
+  // 독도: 간소화 경계 데이터엔 없어 확대도(inset)로 표기. 실제 해안선(OSM, ODbL) 서도+동도.
+  const DOKDO_GEO = {"type":"MultiPolygon","coordinates":[[[[131.865079,37.244205],[131.865576,37.243935],[131.866067,37.24345],[131.866118,37.243393],[131.865997,37.243231],[131.86625,37.243252],[131.866261,37.243114],[131.866106,37.242938],[131.866228,37.242857],[131.866196,37.242718],[131.865904,37.242484],[131.866193,37.242324],[131.866203,37.242232],[131.866493,37.242159],[131.866328,37.241993],[131.866414,37.241923],[131.866293,37.241743],[131.866627,37.241891],[131.866846,37.241867],[131.866527,37.241532],[131.866777,37.241149],[131.866869,37.241104],[131.866888,37.24124],[131.867057,37.241283],[131.866969,37.241169],[131.867123,37.241071],[131.866987,37.240958],[131.866519,37.241008],[131.866455,37.240776],[131.866388,37.240991],[131.86615,37.240957],[131.865758,37.240653],[131.865904,37.240451],[131.865497,37.240041],[131.865202,37.240089],[131.864851,37.240009],[131.864894,37.24024],[131.865088,37.240433],[131.865029,37.240463],[131.864205,37.240134],[131.863659,37.240274],[131.863609,37.240406],[131.863709,37.240464],[131.863544,37.240544],[131.863378,37.240288],[131.862881,37.240802],[131.863117,37.240701],[131.863115,37.24092],[131.863355,37.24115],[131.863453,37.241394],[131.863334,37.241742],[131.863245,37.241779],[131.863331,37.24192],[131.863101,37.241922],[131.86313,37.242038],[131.863076,37.24197],[131.862942,37.242053],[131.862785,37.242328],[131.863082,37.242159],[131.862998,37.242463],[131.862524,37.242649],[131.862482,37.242817],[131.862812,37.242954],[131.86321,37.24293],[131.863428,37.242625],[131.863361,37.242416],[131.863773,37.242581],[131.863673,37.242754],[131.863777,37.24291],[131.864023,37.242854],[131.864164,37.242565],[131.864709,37.242651],[131.865089,37.243017],[131.864967,37.24336],[131.865267,37.243586],[131.864936,37.243656],[131.864954,37.24382],[131.865115,37.243817],[131.86494,37.244069],[131.865079,37.244205]]],[[[131.867588,37.239659],[131.86773,37.239601],[131.867514,37.239274],[131.867955,37.239111],[131.867797,37.239297],[131.868031,37.239338],[131.868248,37.239682],[131.86835,37.240003],[131.868266,37.240215],[131.868414,37.24039],[131.868405,37.240676],[131.868792,37.241013],[131.869004,37.24107],[131.869166,37.241282],[131.86997,37.241648],[131.870133,37.241921],[131.870334,37.242016],[131.870455,37.241668],[131.870434,37.241383],[131.869905,37.240456],[131.869906,37.240321],[131.870235,37.240442],[131.870619,37.240838],[131.87108,37.241024],[131.871335,37.240879],[131.871219,37.240672],[131.870994,37.240684],[131.870853,37.240509],[131.871143,37.240184],[131.87111,37.240118],[131.8713,37.240001],[131.871936,37.240038],[131.872181,37.239884],[131.872126,37.239758],[131.871716,37.239556],[131.870737,37.239648],[131.870747,37.239403],[131.870555,37.239247],[131.870466,37.239469],[131.870201,37.239296],[131.870264,37.238957],[131.870141,37.238814],[131.86979,37.23898],[131.869653,37.23891],[131.86964,37.238795],[131.870276,37.238341],[131.870192,37.238146],[131.869633,37.238141],[131.869392,37.238445],[131.869239,37.238417],[131.868684,37.238738],[131.868356,37.239076],[131.868556,37.238624],[131.868118,37.238991],[131.867908,37.239073],[131.867694,37.23901],[131.868151,37.238701],[131.868213,37.238368],[131.867542,37.238911],[131.867923,37.238415],[131.867513,37.238794],[131.867393,37.238791],[131.867416,37.238899],[131.867218,37.238888],[131.867259,37.238972],[131.867173,37.239007],[131.867588,37.239659]]]]};
+  const dokLabel = () => (LANG === "ko" ? "독도" : "Dokdo");
+  // 확대도 노출: 전국(레벨1) · 경북(레벨2, code 37). 지구본·타 시도엔 숨김.
+  const showDokInset = () => level === 1 || (level === 2 && curProv && curProv.code === "37");
+
 
   function setPrompt(t) {
     const p = document.getElementById("prompt"); if (!p) return;
     if (t) { p.textContent = t; p.classList.add("on"); } else { p.classList.remove("on"); }
   }
 
-  // ── mock data (deterministic from region key) ──
-  function h32(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
-  const scoreOf = (k) => Math.round((45 + (h32("s" + k) % 511) / 10) * 10) / 10; // 45.0–96.0
-  const takersOf = (k) => 30 + (h32("n" + k) % 9970);
-
-  const cscale = d3.scaleLinear().domain([45, 62, 79, 96])
-    .range(["#d9e8fd", "#9dc2f0", "#5b93e2", "#2e6bc8"]).clamp(true);
-
   // ── state ──
   let level = 0, curProv = null, rot = [-30, -12, 0], timer = null, selKey = null;
+  let globeK = 1, baseScale0 = 1; // 지구본 배율(줌) / fit 기준 스케일
   const svg = d3.select("#map");
   const defs = svg.append("defs");
   (() => {
@@ -302,8 +386,10 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
     const fl = defs.append("filter").attr("id", "globeShadow").attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
     fl.append("feDropShadow").attr("dx", 0).attr("dy", 12).attr("stdDeviation", 16).attr("flood-color", "#33456b").attr("flood-opacity", 0.3);
   })();
-  const gAtmo = svg.append("g"), gSphere = svg.append("g"), gSpec = svg.append("g"), gGrat = svg.append("g"),
-    gGeo = svg.append("g"), gMark = svg.append("g");
+  // 줌/팬 대상: 모든 지오 그룹을 viewport 로 감싸 평면 레벨에서 transform 적용.
+  const viewport = svg.append("g").attr("class", "viewport");
+  const gAtmo = viewport.append("g"), gSphere = viewport.append("g"), gSpec = viewport.append("g"), gGrat = viewport.append("g"),
+    gGeo = viewport.append("g"), gMark = viewport.append("g");
   const grat = d3.geoGraticule10();
   const tip = d3.select("#tip");
   let W = 0, H = 0, proj = null, path = null, current = [];
@@ -316,14 +402,19 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
 
   // ── region set for current level ──
   function regions() {
-    if (level === 0) return countries.map((f) => ({ f, key: "C" + f.id, name: koCountry(f), drill: f.id === KR_ID }));
-    if (level === 1) return provinces.map((f) => ({ f, key: "P" + f.properties.code, name: f.properties.name, code: f.properties.code, drill: true }));
+    if (level === 0) return countries.map((f) => ({ f, key: "C" + f.id, name: countryName(f), drill: f.id === KR_ID }));
+    if (level === 1) return provinces.map((f) => ({ f, key: "P" + f.properties.code, name: provName(f), code: f.properties.code, drill: true }));
     return munis.filter((f) => f.properties.code.slice(0, 2) === curProv.code)
-      .map((f) => ({ f, key: "M" + f.properties.code, name: f.properties.name, drill: false }));
+      .map((f) => ({ f, key: "M" + f.properties.code, name: localName(f), code: f.properties.code, drill: false }));
   }
 
   function makeProjection(regs) {
-    if (level === 0) { const p = d3.geoOrthographic().fitExtent([[18, 14], [W - 18, H - 24]], { type: "Sphere" }).rotate(rot); p.scale(p.scale() * 1.32); return p; }
+    if (level === 0) {
+      const p = d3.geoOrthographic().fitExtent([[18, 14], [W - 18, H - 24]], { type: "Sphere" }).rotate(rot);
+      baseScale0 = p.scale() * 1.32;
+      p.scale(baseScale0 * globeK);
+      return p;
+    }
     const fc = { type: "FeatureCollection", features: regs.map((r) => r.f) };
     return d3.geoMercator().fitExtent([[16, 16], [W - 16, H - 16]], fc);
   }
@@ -343,11 +434,11 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
       gGrat.selectAll("path").data([grat]).join("path").attr("class", "grat").attr("d", path);
     } else { gAtmo.selectAll("*").remove(); gSphere.selectAll("*").remove(); gSpec.selectAll("*").remove(); gGrat.selectAll("*").remove(); }
     gGeo.selectAll("path").attr("d", (d) => path(d.f));
-    // 지구본 위 한국 표시 링
+    // 지구본 위 홈 국가 표시 링
     if (level === 0) {
-      const kr = countries.find((f) => f.id === KR_ID);
-      const c = d3.geoCentroid(kr), vis = isVisible(c);
-      gMark.selectAll("circle").data(vis ? [proj(c)] : []).join("circle")
+      const homeF = countries.find((f) => M49_TO_ISO2[f.id] === HOME) || countries.find((f) => f.id === KR_ID);
+      const c = homeF ? d3.geoCentroid(homeF) : null;
+      gMark.selectAll("circle").data(c && isVisible(c) ? [proj(c)] : []).join("circle")
         .attr("class", "krmark").attr("cx", (d) => d[0]).attr("cy", (d) => d[1]).attr("r", 13);
     } else gMark.selectAll("*").remove();
   }
@@ -359,7 +450,7 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
   // ── full render on level change ──
   function render() {
     current = regions();
-    current.forEach((r) => { r.score = scoreOf(r.key); r.takers = takersOf(r.key); });
+    current.forEach((r) => { const v = valueFor(r); r.score = v.score; r.takers = v.takers; r.real = v.real; });
     proj = makeProjection(current);
     const sel = gGeo.selectAll("path").data(current, (d) => d.key);
     sel.exit().remove();
@@ -373,7 +464,8 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
     paint();
     panel();
     crumb();
-    if (level === 0 && !reduce) startSpin(); else stopSpin();
+    drawDokInset();
+    if (level === 0 && !reduce && !spinLocked) startSpin(); else stopSpin();
   }
 
   // ── auto-rotate ──
@@ -389,9 +481,9 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
   // ── interactions ──
   function onHover(e, d) {
     const rank = current.slice().sort((a, b) => b.score - a.score).findIndex((x) => x.key === d.key) + 1;
-    tip.html(`<b>${d.name}</b><div class="row"><span>평균점수</span><span>${d.score.toFixed(1)}점</span></div>` +
-      `<div class="row"><span>응시자</span><span>${d.takers.toLocaleString()}명</span></div>` +
-      `<div class="row"><span>순위</span><span>${rank} / ${current.length}</span></div>`)
+    tip.html(`<b>${d.name}</b>${d.real ? ' <span style="color:#2e6bc8;font-weight:800">· ' + T("real") + '</span>' : ''}<div class="row"><span>${T("avgLevel")}</span><span>Lv.${d.score.toFixed(1)}</span></div>` +
+      `<div class="row"><span>${T("part")}</span><span>${ppl(d.takers)}</span></div>` +
+      `<div class="row"><span>${T("rankL")}</span><span>${rank} / ${current.length}</span></div>`)
       .style("left", e.clientX + "px").style("top", e.clientY + "px").style("opacity", 1);
     gGeo.selectAll("path").classed("hot", (x) => x.key === d.key);
     d3.selectAll("#rank li").classed("hot", (x, i, n) => n[i].dataset.key === d.key);
@@ -408,7 +500,7 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
         selKey = d.key;
         gGeo.selectAll("path").classed("sel", (x) => x.key === selKey);
         d3.selectAll("#rank li").classed("sel", (x, i, n) => n[i].dataset.key === selKey);
-        setPrompt("‘" + d.name + "’ 선택됨 · 한 번 더 누르면 시·군·구로 들어가요");
+        setPrompt(T("drillHint", { n: d.name }));
       }
     } else {
       selKey = d.key;
@@ -447,6 +539,7 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
       .style("opacity", 0).style("transform", "scale(1.16)")
       .on("end", () => {
         mut();
+        resetView();
         render();
         svg.style("opacity", 0).style("transform", "scale(0.9)")
           .transition().duration(620).ease(d3.easeCubicOut)
@@ -458,24 +551,24 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
   // ── side panel ──
   function panel() {
     const sorted = current.slice().sort((a, b) => b.score - a.score);
-    const avg = d3.mean(current, (d) => d.score), max = sorted[0];
+    const max = sorted[0];
     const totalTakers = d3.sum(current, (d) => d.takers);
-    const scope = level === 0 ? "세계 리그" : level === 1 ? "대한민국 리그" : curProv.name + " 리그";
+    const scope = level === 0 ? T("worldLeague") : level === 1 ? (koreaName() + T("league")) : (curProv.name + T("league"));
     document.getElementById("sideTitle").textContent = scope;
     document.getElementById("stats").innerHTML =
-      `<div class="stat"><div class="k">최고 지역</div><div class="v">${max.name.length > 7 ? max.name.slice(0, 7) + "…" : max.name}</div></div>` +
-      `<div class="stat"><div class="k">총 응시자</div><div class="v">${totalTakers.toLocaleString("ko-KR")}명</div></div>`;
-    // 우리 순위 — 우리 국가/지역이 몇 위인지 항상 표시
+      `<div class="stat"><div class="k">${T("topRegion")}</div><div class="v">${max.name.length > 8 ? max.name.slice(0, 8) + "…" : max.name}</div></div>` +
+      `<div class="stat"><div class="k">${T("totalPart")}</div><div class="v">${ppl(totalTakers)}</div></div>`;
+    // 우리 순위 — 홈 국가(레벨0) / 홈이 KR 이면 서울·강남(레벨1·2)
     const ourEl = document.getElementById("ourRank");
     let our = null, ourLabel = "";
-    if (level === 0) { our = current.find((d) => d.drill); ourLabel = "🇰🇷 대한민국 · 세계"; }
-    else if (level === 1) { our = current.find((d) => /서울/.test(d.name)); ourLabel = "📍 서울 · 우리 지역"; }
-    else if (level === 2) { our = current.find((d) => /강남/.test(d.name)); ourLabel = "🏠 강남구 · 우리 동네"; }
+    if (level === 0) { our = current.find((d) => M49_TO_ISO2[d.f.id] === HOME) || current.find((d) => d.drill); if (our) ourLabel = "📍 " + our.name + " " + T("our0"); }
+    else if (level === 1 && HOME === "KR") { our = current.find((d) => d.code === "11"); if (our) ourLabel = "📍 " + our.name + " " + T("our1"); }
+    else if (level === 2 && HOME === "KR") { our = current.find((d) => d.code === "11230"); if (our) ourLabel = "🏠 " + our.name + " " + T("our2"); }
     if (our) {
       const orank = sorted.indexOf(our) + 1;
       ourEl.style.display = "";
-      ourEl.innerHTML = `<div><span class="or-t">우리 순위</span><span class="or-n">${ourLabel}</span></div>` +
-        `<div class="or-r"><b>${orank}</b><span> / ${current.length}위</span><i>평균 ${our.score.toFixed(1)}</i></div>`;
+      ourEl.innerHTML = `<div><span class="or-t">${T("ourRank")}</span><span class="or-n">${ourLabel}</span></div>` +
+        `<div class="or-r"><b>${orank}</b><span> / ${current.length}${T("unit")}</span><i>${T("avg")} Lv.${our.score.toFixed(1)}</i></div>`;
     } else { ourEl.style.display = "none"; }
     const maxSc = sorted[0].score, minSc = sorted[sorted.length - 1].score;
     const rank = document.getElementById("rank");
@@ -492,7 +585,7 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
       const w = 10 + 90 * ((d.score - minSc) / (maxSc - minSc || 1));
       li.innerHTML = `<span class="no">${rk}</span><div class="nm"><b>${d.name}${d.drill && level === 0 ? " 🇰🇷" : ""}</b>` +
         `<div class="bw" style="width:${w}%;background:${cscale(d.score)}"></div>` +
-        `<div class="cnt">응시 ${d.takers.toLocaleString()}명</div></div>` +
+        `<div class="cnt">👥 ${fmt(d.takers)}</div></div>` +
         `<span class="sc">${d.score.toFixed(1)}</span>`;
       li.onclick = () => activate(d);
       li.onmouseenter = () => { gGeo.selectAll("path").classed("hot", (x) => x.key === d.key); };
@@ -506,8 +599,8 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
     const c = document.getElementById("crumb");
     if (level === 0) { c.innerHTML = ""; c.style.display = "none"; return; }
     c.style.display = "";
-    const parts = [{ t: "세계", l: 0 }];
-    if (level >= 1) parts.push({ t: "대한민국", l: 1 });
+    const parts = [{ t: T("world"), l: 0 }];
+    if (level >= 1) parts.push({ t: koreaName(), l: 1 });
     if (level >= 2) parts.push({ t: curProv.name, l: 2 });
     c.innerHTML = "";
     parts.forEach((p, i) => {
@@ -517,18 +610,115 @@ const KRMUNI={"type":"Topology","arcs":[[[15143,32880],[1,-45]],[[15144,32835],[
     });
   }
 
-  // ── drag to rotate (globe only) ──
-  let dragBase = null;
-  svg.call(d3.drag()
-    .on("start", (e) => { if (level !== 0) return; stopSpin(); dragBase = { x: e.x, y: e.y, r: rot.slice() }; svg.classed("dragging", true); })
-    .on("drag", (e) => { if (level !== 0 || !dragBase) return; rot[0] = dragBase.r[0] + (e.x - dragBase.x) * 0.35; rot[1] = Math.max(-88, Math.min(88, dragBase.r[1] - (e.y - dragBase.y) * 0.35)); proj.rotate(rot); paint(); })
-    .on("end", () => { dragBase = null; svg.classed("dragging", false); if (level === 0 && !reduce) startSpin(); }));
+  // ── 확대/축소 + 이동 (마우스 휠·드래그 · 모바일 핀치) ──
+  //   레벨0(지구본): 드래그=회전, 휠/핀치=배율. 레벨1·2(평면): 드래그=이동, 휠/핀치=배율.
+  let zStart = null;
+  const zoom = d3.zoom().scaleExtent([0.4, 8])
+    .on("start", (e) => {
+      if (level === 0) { stopSpin(); zStart = { t: e.transform, rot: rot.slice() }; }
+      svg.classed("dragging", true);
+    })
+    .on("zoom", (e) => {
+      const t = e.transform;
+      if (level === 0) {
+        if (zStart && Math.abs(t.k - zStart.t.k) < 1e-3) {
+          rot[0] = zStart.rot[0] + (t.x - zStart.t.x) * 0.32 / t.k;
+          rot[1] = clamp(zStart.rot[1] - (t.y - zStart.t.y) * 0.32 / t.k, -85, 85);
+        }
+        globeK = clamp(t.k, 0.4, 8);
+        proj.scale(baseScale0 * globeK).rotate(rot);
+        paint();
+      } else {
+        viewport.attr("transform", t.toString());
+      }
+    })
+    .on("end", () => {
+      svg.classed("dragging", false); zStart = null;
+      if (level === 0 && !reduce && !spinLocked) startSpin();
+    });
+  svg.call(zoom).on("dblclick.zoom", null);
+
+  function resetView() { globeK = 1; viewport.attr("transform", null); svg.node().__zoom = d3.zoomIdentity; }
+  const zbtn = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
+  zbtn("zin", () => zoom.scaleBy(svg.transition().duration(180), 1.6));
+  zbtn("zout", () => zoom.scaleBy(svg.transition().duration(180), 1 / 1.6));
+  zbtn("zreset", () => {
+    if (level === 0) { globeK = 1; svg.node().__zoom = d3.zoomIdentity; proj.scale(baseScale0).rotate(rot); paint(); }
+    else { zoom.transform(svg.transition().duration(220), d3.zoomIdentity); }
+  });
+
+  // ── 홈 국가 중앙 정렬 ──
+  function centerHome() {
+    const f = countries.find((x) => M49_TO_ISO2[x.id] === HOME);
+    if (!f) return;
+    const c = d3.geoCentroid(f);
+    rot = [-c[0], -c[1], 0];
+  }
+  function flyToHome() {
+    const f = countries.find((x) => M49_TO_ISO2[x.id] === HOME);
+    if (f) rotateTo({ f });
+  }
+
+  // ── 정적 UI 문구 현지화 ──
+  // ── 독도 확대도(inset): 실제 섬 모양을 코너 액자로 확대 표기 ──
+  function drawDokInset() {
+    const box = document.getElementById("dokinset");
+    if (!box) return;
+    if (!showDokInset()) { box.hidden = true; return; }
+    box.hidden = false;
+    const lab = document.getElementById("doklab"); if (lab) lab.textContent = dokLabel();
+    // 섬 색 = 소속 지역(경북/울릉군) 색과 동일 → 우리 땅으로 자연스럽게.
+    const parent = level === 2 ? current.find((d) => d.code === "37430") : current.find((d) => d.code === "37");
+    const fill = parent ? cscale(parent.score) : "#5b93e2";
+    const dp = d3.geoMercator().fitExtent([[30, 18], [90, 56]], DOKDO_GEO);
+    const dpath = d3.geoPath(dp);
+    d3.select("#dokmap").selectAll("path").data(DOKDO_GEO.coordinates).join("path")
+      .attr("class", "dokisland").attr("fill", fill)
+      .attr("d", (poly) => dpath({ type: "Polygon", coordinates: poly }));
+  }
+
+  function applyChrome() {
+    document.documentElement.lang = LANG;
+    const $ = (s) => document.querySelector(s);
+    const tg = $(".tag"); if (tg) tg.textContent = T("tag");
+    const mp = $("#map"); if (mp) mp.setAttribute("aria-label", T("avgLevel"));
+    const lg = $(".legend"); if (lg) { const sp = lg.querySelectorAll("span"); if (sp[0]) sp[0].textContent = T("low"); if (sp[1]) sp[1].textContent = T("high"); if (sp[2]) sp[2].textContent = T("avgLevel"); }
+    const qi = $("#q"); if (qi) qi.setAttribute("placeholder", T("search"));
+    const cariS = $(".lbtn.cari i"); if (cariS) cariS.textContent = T("bHubS");
+    const lvB = $(".lbtn.lvl b"); if (lvB) lvB.textContent = T("bLevel");
+    const lvS = $(".lbtn.lvl i"); if (lvS) lvS.textContent = T("bLevelS");
+    const dB = $(".lbtn.daily b"); if (dB) dB.textContent = T("bDaily");
+    const dS = $(".lbtn.daily i"); if (dS) dS.textContent = T("bDailyS");
+    const ft = $(".foot"); if (ft) ft.innerHTML = "※ " + T("foot");
+  }
 
   function resync() { size(); proj = makeProjection(current); paint(); }
   window.addEventListener("resize", resync);
+  applyChrome();
+  if (spinLocked) centerHome();
   size(); render();
   document.getElementById("q").addEventListener("input", panel);
   requestAnimationFrame(resync); // 레이아웃 안정화 후 크기 재동기화
+
+  // ── 백엔드 실데이터 + 홈 국가 수신(부모 프레임 postMessage) ──
+  function ingestReal(payload) {
+    if (!payload) return;
+    let homeChanged = false;
+    if (payload.home) { const h = String(payload.home).toUpperCase(); if (h !== HOME || !spinLocked) homeChanged = true; HOME = h; spinLocked = true; }
+    REAL.country = Object.create(null); REAL.region = Object.create(null);
+    for (const b of (payload.country || [])) if (b && b.code) REAL.country[b.code] = { level: +b.level, members: +b.members };
+    for (const b of (payload.region || [])) if (b && b.code) REAL.region[b.code] = { level: +b.level, members: +b.members };
+    stopSpin();
+    render();
+    if (homeChanged && level === 0) flyToHome();
+  }
+  window.addEventListener("message", (e) => {
+    if (e.origin !== window.location.origin) return;
+    if (e.data && e.data.type === "arena:data") ingestReal(e.data.payload);
+  });
+  if (window.parent && window.parent !== window) {
+    try { window.parent.postMessage({ type: "arena:ready" }, window.location.origin); } catch (_) {}
+  }
 })();
 
 </script>
