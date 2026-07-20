@@ -2637,6 +2637,7 @@ const CBT_HEAD = {
   answer: ['정답', '정답번호', 'answer', '정답인덱스'],
   kind: ['유형', '형식', '타입', 'type', '구분'],
   answerKey: ['모범답안', '답안', '채점기준', '모범', '기준'],
+  simAnswer: ['유사정답', '허용답안', '유사답안', '동의어'],
   explanation: ['해설', '풀이', '설명', 'explanation', 'commentary'],
   option: ['보기', '선택지', 'option'],
 }
@@ -2694,7 +2695,7 @@ function qNormDiff(v: unknown): '' | '상' | '중' | '하' {
   if (s === '하' || /하급|쉬움|쉬운|low|easy/.test(s)) return '하'
   return ''
 }
-interface QColCfg { cNum: number; cSubject: number; cDifficulty: number; cPrompt: number; cOptions: number[]; cAnswer: number; cKind: number; cAnswerKey: number; cExplanation: number }
+interface QColCfg { cNum: number; cSubject: number; cDifficulty: number; cPrompt: number; cOptions: number[]; cAnswer: number; cKind: number; cAnswerKey: number; cAnswerKeyExtra: number[]; cExplanation: number }
 function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHeader: boolean } {
   const h = header.map(qNormKey)
   const optCols = h.map((x, i) => ({ x, i })).filter((o) => CBT_HEAD.option.some((a) => o.x.includes(qNormKey(a)))).map((o) => o.i)
@@ -2705,6 +2706,7 @@ function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHead
   const cAnswer = qFindCol(header, CBT_HEAD.answer)
   const cKind = qFindCol(header, CBT_HEAD.kind)
   const cAnswerKey = qFindCol(header, CBT_HEAD.answerKey)
+  const cAnswerKeyExtra = h.map((x, i) => ({ x, i })).filter((o) => o.i !== cAnswerKey && CBT_HEAD.simAnswer.some((a) => o.x.includes(qNormKey(a)))).map((o) => o.i)
   const cExplanation = qFindCol(header, CBT_HEAD.explanation)
   const hasHeader = cPrompt >= 0 || cAnswer >= 0 || cSubject >= 0
   return {
@@ -2717,6 +2719,7 @@ function qDetectColumns(header: string[], ncol: number): { cfg: QColCfg; hasHead
       cAnswer: cAnswer >= 0 ? cAnswer : 7,
       cKind: cKind >= 0 ? cKind : 8,
       cAnswerKey: cAnswerKey >= 0 ? cAnswerKey : 9,
+      cAnswerKeyExtra,
       cExplanation: cExplanation >= 0 ? cExplanation : 10,
     },
     hasHeader,
@@ -3309,8 +3312,9 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
             </div>
           ) : (
             <div style={QE.field}>
-              <span style={QE.lab}>모범답안 / 채점 기준 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(관리자 검수 참고 · 응시자 비노출)</span></span>
-              <textarea className="admin-ta" rows={3} value={answerKey} onChange={(e) => setAnswerKey(e.target.value)} placeholder="핵심어·채점 기준" />
+              <span style={QE.lab}>정답 · 허용답안 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(한 줄에 하나 · 유사정답 포함 · 대소문자·띄어쓰기 자동 무시 · 응시자 비노출)</span></span>
+              <textarea className="admin-ta" rows={4} value={answerKey} onChange={(e) => setAnswerKey(e.target.value)} placeholder={'엣지 컴퓨팅\nedge computing\nedgecomputing'} />
+              {kind === 'short' && !answerKey.trim() && <span style={{ fontSize: 12, color: 'var(--muted)' }}>비우면 자동채점되지 않고 관리자 수동검수로 넘어갑니다.</span>}
             </div>
           )}
 
@@ -3493,7 +3497,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
             kind,
             choices: four,
             correctIndex: kind === 'short' ? -1 : parseCorrect(row[cfg.cAnswer], four),
-            answerKey: kind === 'short' ? cell(row, cfg.cAnswerKey) : undefined,
+            answerKey: kind === 'short' ? [cell(row, cfg.cAnswerKey), ...cfg.cAnswerKeyExtra.map((c) => cell(row, c))].filter(Boolean).join('\n') : undefined,
             explanation: cell(row, cfg.cExplanation) || undefined, // 해설 — 유형 무관 선택 입력
           }
         })
@@ -3510,9 +3514,9 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
   }
 
   function downloadTemplate() {
-    const header = ['번호', '과목', '난이도(상/중/하)', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)', '해설']
-    const sampleMc = [1, 'AI 리터러시', '중', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)']
-    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '상', '피지컬 AI란 무엇인지 서술하시오.', '', '', '', '', '', '주관식', '센서·액추에이터로 물리세계와 상호작용하는 AI', '핵심 채점 포인트 해설: …']
+    const header = ['번호', '과목', '난이도(상/중/하)', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)', '모범답안(주관식)', '유사정답1', '유사정답2', '유사정답3', '유사정답4', '유사정답5', '해설']
+    const sampleMc = [1, 'AI 리터러시', '중', '다음 중 옳은 것은?', '보기 A', '보기 B', '보기 C', '보기 D', 2, '객관식', '', '', '', '', '', '', '2번이 정답인 이유: …(응시자에게 노출되지 않음)']
+    const sampleShort = [2, '피지컬 AI 및 데이터 처리', '중', '데이터를 발생 지점 근처에서 처리하는 방식을 무엇이라 하는가?', '', '', '', '', '', '주관식', '엣지 컴퓨팅', 'edge computing', 'edgecomputing', '엣지컴퓨팅', '', '', '대소문자·띄어쓰기 차이는 자동 무시 · 허용답안은 여러 개 입력']
     const ws = XLSX.utils.aoa_to_sheet([header, sampleMc, sampleShort])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '문항')
@@ -3647,7 +3651,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
                 <th>과목</th>
                 <th>난이도</th>
                 <th>지문</th>
-                <th>보기 / 모범답안</th>
+                <th>보기 / 허용답안</th>
                 <th>정답</th>
                 <th>해설</th>
               </tr>
@@ -3667,9 +3671,9 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}><DiffTag value={r.difficulty} /></td>
                   <td style={{ maxWidth: 320, whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.prompt}</td>
-                  <td style={{ maxWidth: 260, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: 12.5, color: 'var(--muted)' }}>{r.kind === 'short' ? (r.answerKey || '—') : r.choices.join(' / ')}</td>
+                  <td style={{ maxWidth: 260, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: 12.5, color: 'var(--muted)' }}>{r.kind === 'short' ? (r.answerKey ? r.answerKey.split(/\r?\n/).filter(Boolean).join(' / ') : '—') : r.choices.join(' / ')}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {r.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수</span> : r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
+                    {r.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>{r.answerKey ? '자동' : '검수'}</span> : r.correctIndex >= 0 ? `${r.correctIndex + 1}번` : <span style={{ color: 'var(--error,#d43a3a)' }}>?</span>}
                   </td>
                   <td style={{ maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: 12.5, color: 'var(--muted)' }}>{r.explanation || '—'}</td>
                 </tr>

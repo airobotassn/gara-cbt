@@ -4,6 +4,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
+import { matchShort, parseAcceptedAnswers } from '../_shared/normalize.ts'
 
 // 응시 TTL(분) — submit-test(120분)보다 여유. 만료 시 제출 거부.
 const ATTEMPT_TTL_MINUTES = 240
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
     // 출제된(고정된) 문항 + 정답/유형
     const { data: assigned } = await admin
       .from('attempt_answers')
-      .select('id, question_id, questions(kind, correct_index)')
+      .select('id, question_id, questions(kind, correct_index, answer_key)')
       .eq('attempt_id', attemptId)
     if (!assigned || assigned.length === 0) {
       return json({ error: '채점할 문항이 없습니다.' }, 400)
@@ -76,20 +77,25 @@ Deno.serve(async (req) => {
 
     // 서버 채점: 출제된 각 문항만(클라가 보낸 임의 문항은 무시)
     //  · 객관식: 정답 비교 자동채점(review_status=auto)
-    //  · 주관식: 답안 텍스트만 저장, 채점 보류(is_correct=null, review_status=pending) → 관리자 검수
+    //  · 주관식: 허용답안(answer_key, 줄바꿈 목록) 있으면 정규화 정확일치 자동채점(auto).
+    //           허용답안이 없으면(미큐레이션) 기존대로 보류(pending) → 관리자 수동검수 폴백.
     let totalCorrect = 0
     for (const row of assigned as any[]) {
       const sub = submittedMap.get(row.question_id)
       const kind = row.questions?.kind ?? 'mc'
       const timeSpent = Math.max(0, Math.floor(sub?.timeSpent ?? 0))
       if (kind === 'short') {
+        const answerKey: string | null = row.questions?.answer_key ?? null
+        const auto = parseAcceptedAnswers(answerKey).length > 0
+        const ok = auto && matchShort(sub?.answerText, answerKey)
+        if (ok) totalCorrect += 1
         await admin
           .from('attempt_answers')
           .update({
             answer_text: sub?.answerText ?? null,
             selected_index: null,
-            is_correct: null,
-            review_status: 'pending',
+            is_correct: auto ? ok : null,
+            review_status: auto ? 'auto' : 'pending',
             time_spent: timeSpent,
           })
           .eq('id', row.id)
