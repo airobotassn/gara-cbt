@@ -1,78 +1,129 @@
-// WORLD ARENA — 글로벌 응시 현황 지도(자체 완결 HTML)를 앱 내부 라우트로 임베드.
-//   iframe 이지만 SPA 라우트(/arena) 안이라 CARIS FAB 가 그대로 뜨고 전체 새로고침 없이 전환된다.
-//   ?embed=1 로 지도 HTML 의 dev 배지/푸터를 숨겨 앱 화면처럼 보이게 한다.
+// WORLD ARENA(/arena) — 국가·지역별 평균 레벨 지도 + 지역 랭킹.
 //
-// 백엔드/개인화 연동:
-//   · lang → iframe ?lang= 쿼리(첫 페인트부터 해당 언어). 언어 바뀌면 src 변경 → 지도 리로드.
-//   · leaderboard 함수(scope=country|region) 결과 + 로그인 계정 국가(home) 를 postMessage 로 지도에 주입.
-//     지도는 실데이터가 있는 지역을 평균 레벨/참여 인원으로 칠하고, home 국가를 지구본 중앙에 정렬한다.
-//   · 정적 iframe 에 secret 을 두지 않으려고, env·세션·프로필을 가진 부모가 fetch → 전달하는 구조.
-import { useEffect, useRef, useState } from 'react'
+// 2026-07 이전엔 자립형 정적 HTML(public/world-arena.html)을 iframe 으로 감싸 쓰던 화면인데,
+// 앱 라우트에 맞게 React 로 옮겼다. 그 결과 사라진 것들:
+//   · postMessage 브리지(부모가 fetch → 아이프레임에 주입) → 여기서 직접 callFunction
+//   · 6개국어 사전 중복 → src/lib/i18n.tsx 의 arena.* 로 일원화
+//   · target="_top" 링크 → react-router <Link> (SPA 전환)
+//   · 인라인 d3/지도데이터 660KB → npm d3 + public/geo/*.json (시군구는 지연 로드)
+//
+// 상태는 이 컴포넌트가 소유하고, 그리기만 ArenaMap 에 맡긴다(제어 컴포넌트).
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
-
-// 앱 테마는 Context 가 아니라 Layout 의 토글이 <html> 에 .dark 를 붙였다 떼는 방식이라,
-// 여기서는 그 클래스를 직접 관찰한다. (ThemeProvider 가 생기면 이 훅은 그걸로 교체할 것)
-function useHtmlTheme(): 'dark' | 'light' {
-  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-  )
-  useEffect(() => {
-    const el = document.documentElement
-    const obs = new MutationObserver(() =>
-      setTheme(el.classList.contains('dark') ? 'dark' : 'light'),
-    )
-    obs.observe(el, { attributes: true, attributeFilter: ['class'] })
-    return () => obs.disconnect()
-  }, [])
-  return theme
-}
+import { ArenaMap, DokdoInset, type ArenaMapHandle, type HoverInfo } from '../components/ArenaMap'
+import { MiniGamePicker } from '../components/MiniGamePicker'
+import {
+  buildRegions,
+  cscale,
+  EMPTY_REAL,
+  koreaName,
+  loadCountries,
+  loadMunicipalities,
+  loadProvinces,
+  type ArenaLevel,
+  type GeoFeature,
+  type RealData,
+  type Region,
+} from '../lib/arena/data'
+import { M49_TO_ISO2 } from '../lib/arena/tables'
+import '../styles/arena.css'
 
 type ServerBucket = { code: string; avg_level: number; member_count: number }
-type ArenaBucket = { code: string; level: number; members: number }
-type ArenaPayload = { home: string; country: ArenaBucket[]; region: ArenaBucket[] }
 
-const toArena = (b: ServerBucket): ArenaBucket => ({
-  code: b.code,
-  level: b.avg_level,
-  members: b.member_count,
+/** 랭킹 목록 한 줄 — hover 마다 60줄을 통째로 다시 그리지 않도록 memo */
+const RankRow = memo(function RankRow({
+  region,
+  rank,
+  width,
+  selected,
+  hot,
+  showFlag,
+  count,
+  onActivate,
+  onEnter,
+  onLeave,
+}: {
+  region: Region
+  rank: number
+  width: number
+  selected: boolean
+  hot: boolean
+  showFlag: boolean
+  count: string
+  onActivate(r: Region): void
+  onEnter(key: string): void
+  onLeave(): void
+}) {
+  return (
+    <li
+      className={[region.drill ? 'drill' : '', selected ? 'sel' : '', hot ? 'hot' : ''].filter(Boolean).join(' ')}
+      onClick={() => onActivate(region)}
+      onMouseEnter={() => onEnter(region.key)}
+      onMouseLeave={onLeave}
+    >
+      <span className="no">{rank}</span>
+      <div className="nm">
+        <b>
+          {region.name}
+          {showFlag ? ' 🇰🇷' : ''}
+        </b>
+        <div className="bw" style={{ width: `${width}%`, background: cscale(region.score) }} />
+        <div className="cnt">👥 {count}</div>
+      </div>
+      <span className="sc">{region.score.toFixed(1)}</span>
+    </li>
+  )
 })
 
 export default function WorldArena() {
-  const { lang } = useT()
+  const { t, lang } = useT()
   const { user } = useAuth()
   const userId = user?.id ?? null
+  const mapRef = useRef<ArenaMapHandle>(null)
 
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const payloadRef = useRef<ArenaPayload | null>(null)
-  const readyRef = useRef(false)
+  // ── 지도 경계 데이터 ──
+  const [countries, setCountries] = useState<GeoFeature[]>([])
+  const [provinces, setProvinces] = useState<GeoFeature[]>([])
+  const [municipalities, setMunicipalities] = useState<GeoFeature[]>([])
 
-  const theme = useHtmlTheme()
-  // src 에는 '마운트 시점' 테마만 넣는다. theme 을 그대로 끼우면 토글할 때마다 src 가 바뀌어
-  // 지도가 통째로 리로드되고 회전·드릴다운 상태가 날아간다. 이후 변경은 postMessage 로만.
-  const [bootTheme] = useState(theme)
+  // ── 화면 상태 ──
+  const [level, setLevel] = useState<ArenaLevel>(0)
+  const [prov, setProv] = useState<{ code: string; name: string } | null>(null)
+  const [selKey, setSelKey] = useState<string | null>(null)
+  const [hotKey, setHotKey] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [prompt, setPrompt] = useState('')
+  const [hover, setHover] = useState<HoverInfo | null>(null)
+  const [gamesOpen, setGamesOpen] = useState(false)
 
-  // 테마 토글 → 아이프레임에 즉시 통보(리로드 없음).
+  // ── 백엔드 실데이터 ──
+  const [real, setReal] = useState<RealData>(EMPTY_REAL)
+  const [home, setHome] = useState('KR')
+  const [homeReady, setHomeReady] = useState(false) // 확정되면 지구본 자동회전 정지
+
+  const fmt = useCallback((n: number) => Number(n).toLocaleString(lang === 'ko' ? 'ko-KR' : lang), [lang])
+  const ppl = useCallback((n: number) => fmt(n) + t('arena.ppl'), [fmt, t])
+
+  // 지구본·시도는 즉시, 시군구(177KB)는 시도까지 들어온 사람만 — 레벨1 도달 시 미리 받아둔다.
   useEffect(() => {
-    iframeRef.current?.contentWindow?.postMessage(
-      { type: 'arena:theme', theme },
-      window.location.origin,
-    )
-  }, [theme])
+    let alive = true
+    loadCountries().then((f) => alive && setCountries(f)).catch(() => {})
+    loadProvinces().then((f) => alive && setProvinces(f)).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  useEffect(() => {
+    if (level < 1) return
+    let alive = true
+    loadMunicipalities().then((f) => alive && setMunicipalities(f)).catch(() => {})
+    return () => { alive = false }
+  }, [level])
 
+  // 리더보드 집계 + 로그인 계정 국가. 실패해도 목값으로 화면은 살아 있어야 한다.
   useEffect(() => {
     let cancelled = false
-    const origin = window.location.origin
-
-    // 지도가 준비됐고 데이터가 있으면 주입. 양쪽 이벤트(iframe ready / fetch 완료)가 순서 무관하게 수렴.
-    const flush = () => {
-      const win = iframeRef.current?.contentWindow
-      if (!win || !readyRef.current || !payloadRef.current) return
-      win.postMessage({ type: 'arena:data', payload: payloadRef.current }, origin)
-    }
-
-    // 로그인 계정의 국가(country_code, alpha-2). 미로그인/미확정이면 KR 기본.
     const fetchHome = async (): Promise<string> => {
       if (!userId) return 'KR'
       try {
@@ -82,65 +133,346 @@ export default function WorldArena() {
         return 'KR'
       }
     }
-
     const load = async () => {
+      const homeCode = await fetchHome().catch(() => 'KR')
+      if (cancelled) return
+      setHome(homeCode)
+      setHomeReady(true)
       try {
-        const [country, region, home] = await Promise.all([
+        const [country, region] = await Promise.all([
           callFunction<{ buckets: ServerBucket[] }>('leaderboard', { scope: 'country', window: 'season' }),
           callFunction<{ buckets: ServerBucket[] }>('leaderboard', { scope: 'region', country: 'KR', window: 'season' }),
-          fetchHome(),
         ])
         if (cancelled) return
-        payloadRef.current = {
-          home,
-          country: (country.buckets ?? []).map(toArena),
-          region: (region.buckets ?? []).map(toArena),
+        const toMap = (bs: ServerBucket[] | undefined) => {
+          const out: RealData['country'] = {}
+          for (const b of bs ?? []) if (b?.code) out[b.code] = { level: Number(b.avg_level), members: Number(b.member_count) }
+          return out
         }
-        flush()
+        setReal({ country: toMap(country.buckets), region: toMap(region.buckets) })
       } catch {
-        // 실데이터 실패 시에도 home 만이라도 전달(지구본 중앙 정렬).
-        if (cancelled) return
-        payloadRef.current = { home: await fetchHome(), country: [], region: [] }
-        flush()
+        /* 목값 유지 */
       }
     }
-
-    const onMessage = (e: MessageEvent) => {
-      if (e.origin !== origin) return
-      if ((e.data as { type?: string } | null)?.type === 'arena:ready') {
-        readyRef.current = true
-        flush()
-      }
-    }
-
-    window.addEventListener('message', onMessage)
     void load()
-    return () => {
-      cancelled = true
-      window.removeEventListener('message', onMessage)
-    }
+    return () => { cancelled = true }
   }, [userId])
 
+  const regions = useMemo(
+    () =>
+      buildRegions({
+        level,
+        lang,
+        real,
+        countries,
+        provinces,
+        municipalities,
+        provCode: prov?.code ?? null,
+      }),
+    [level, lang, real, countries, provinces, municipalities, prov],
+  )
+
+  // 점수 내림차순 — 순위·통계·목록이 모두 이걸 쓴다.
+  const sorted = useMemo(() => regions.slice().sort((a, b) => b.score - a.score), [regions])
+
+  // ── 사이드 패널 파생값 ──
+  const scopeTitle = useMemo(() => {
+    if (level === 0) return t('arena.worldLeague')
+    if (level === 1) return koreaName(countries, lang) + t('arena.league')
+    return (prov?.name ?? '') + t('arena.league')
+  }, [level, countries, lang, prov, t])
+
+  const totalTakers = useMemo(() => regions.reduce((s, r) => s + r.takers, 0), [regions])
+
+  // 우리 순위 — 지구본은 홈 국가, 국내는 서울(레벨1)·강남구(레벨2)
+  const our = useMemo(() => {
+    let r: Region | undefined
+    let label = ''
+    if (level === 0) {
+      r = regions.find((x) => M49_TO_ISO2[String(x.f.id)] === home) ?? regions.find((x) => x.drill)
+      if (r) label = '📍 ' + r.name + ' ' + t('arena.our0')
+    } else if (level === 1 && home === 'KR') {
+      r = regions.find((x) => x.code === '11')
+      if (r) label = '📍 ' + r.name + ' ' + t('arena.our1')
+    } else if (level === 2 && home === 'KR') {
+      r = regions.find((x) => x.code === '11230')
+      if (r) label = '🏠 ' + r.name + ' ' + t('arena.our2')
+    }
+    if (!r) return null
+    return { region: r, label, rank: sorted.indexOf(r) + 1 }
+  }, [level, regions, sorted, home, t])
+
+  // 상위 60개(검색 시 필터). 세계 단위에선 드릴 대상(대한민국)이 밖으로 밀려도 맨 아래 고정 노출.
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = q ? sorted.filter((d) => d.name.toLowerCase().includes(q)).slice(0, 60) : sorted.slice(0, 60)
+    if (!q && level === 0) {
+      const kr = regions.find((d) => d.drill)
+      if (kr && !list.includes(kr)) return [...list, kr]
+    }
+    return list
+  }, [query, sorted, level, regions])
+
+  const scoreSpan = useMemo(() => {
+    if (!sorted.length) return { max: 1, min: 0 }
+    return { max: sorted[0].score, min: sorted[sorted.length - 1].score }
+  }, [sorted])
+
+  // ── 지도 → 화면 상태 반영 ──
+  const handleDrill = useCallback((r: Region) => {
+    setSelKey(null)
+    setQuery('')
+    setPrompt('')
+    setLevel((cur) => {
+      if (cur === 0) return 1
+      return 2
+    })
+    if (r.code) setProv({ code: r.code, name: r.name })
+  }, [])
+
+  const goto = useCallback((l: ArenaLevel) => {
+    setSelKey(null)
+    setQuery('')
+    setPrompt('')
+    setLevel(l)
+    if (l < 2) setProv(null)
+  }, [])
+
+  // pointermove 마다 setState 하면 과한 렌더가 되므로 프레임당 1회로 묶는다.
+  const hoverRaf = useRef(0)
+  const pendingHover = useRef<HoverInfo | null>(null)
+  const handleHover = useCallback((info: HoverInfo | null) => {
+    pendingHover.current = info
+    if (hoverRaf.current) return
+    hoverRaf.current = requestAnimationFrame(() => {
+      hoverRaf.current = 0
+      setHover(pendingHover.current)
+      setHotKey(pendingHover.current?.region.key ?? null)
+    })
+  }, [])
+  useEffect(() => () => { if (hoverRaf.current) cancelAnimationFrame(hoverRaf.current) }, [])
+
+  // 레벨이 바뀌면 랭킹 목록을 맨 위로. (원본은 innerHTML 을 비워 자연히 초기화됐지만,
+  //  React 는 같은 <ul> 을 재사용해서 이전 레벨의 스크롤 위치가 그대로 남는다.)
+  const rankListRef = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    if (rankListRef.current) rankListRef.current.scrollTop = 0
+  }, [level, prov])
+
+  const activate = useCallback((r: Region) => mapRef.current?.activate(r), [])
+  const onRowEnter = useCallback((key: string) => setHotKey(key), [])
+  const onRowLeave = useCallback(() => setHotKey(null), [])
+
+  // 툴팁의 순위 — sorted 에서의 위치
+  const hoverRank = useMemo(() => {
+    if (!hover) return 0
+    return sorted.findIndex((x) => x.key === hover.region.key) + 1
+  }, [hover, sorted])
+
+  // 독도 확대도: 전국(레벨1)·경북(레벨2, code 37)에서만. 색은 소속 지역과 동일.
+  const dokdo = useMemo(() => {
+    const show = level === 1 || (level === 2 && prov?.code === '37')
+    if (!show) return null
+    const parent = level === 2 ? regions.find((d) => d.code === '37430') : regions.find((d) => d.code === '37')
+    return { fill: parent ? cscale(parent.score) : '#5b93e2' }
+  }, [level, prov, regions])
+
+  const crumbs = useMemo(() => {
+    if (level === 0) return []
+    const parts: { text: string; level: ArenaLevel }[] = [{ text: t('arena.world'), level: 0 }]
+    if (level >= 1) parts.push({ text: koreaName(countries, lang), level: 1 })
+    if (level >= 2 && prov) parts.push({ text: prov.name, level: 2 })
+    return parts
+  }, [level, countries, lang, prov, t])
+
+  const ready = countries.length > 0
+
   return (
-    <div style={{ width: '100%', height: '100dvh', background: 'var(--bg)' }}>
-      <iframe
-        ref={iframeRef}
-        // lang·theme 을 src 에 실어 첫 페인트부터 맞춘다(흰 화면 번쩍임 방지).
-        // 언어 변경 시에만 src 가 바뀌며 지도 리로드 — 테마 변경은 postMessage 라 리로드 없음.
-        src={`/world-arena.html?embed=1&lang=${lang}&theme=${bootTheme}`}
-        title="WORLD ARENA"
-        onLoad={() => {
-          const win = iframeRef.current?.contentWindow
-          if (!win) return
-          // ready 신호를 놓친 드문 경우 대비 백업 주입.
-          if (payloadRef.current) {
-            win.postMessage({ type: 'arena:data', payload: payloadRef.current }, window.location.origin)
-          }
-          // lang 변경으로 리로드된 경우 src 의 bootTheme 은 낡았을 수 있으므로 현재 테마를 다시 보낸다.
-          win.postMessage({ type: 'arena:theme', theme }, window.location.origin)
-        }}
-        style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
-      />
+    <div className="arena">
+      <div className="aa-wrap">
+        <header className="aa-head">
+          <h1>{t('arena.title')}</h1>
+        </header>
+
+        <div className="aa-grid">
+          <section className="aa-card aa-stage">
+            {crumbs.length > 0 && (
+              <nav className="aa-crumb">
+                {crumbs.map((c, i) => (
+                  <span key={c.level} style={{ display: 'contents' }}>
+                    {i > 0 && <span className="sep">›</span>}
+                    {i === crumbs.length - 1 ? (
+                      <span className="cur">{c.text}</span>
+                    ) : (
+                      <button onClick={() => goto(c.level)}>{c.text}</button>
+                    )}
+                  </span>
+                ))}
+              </nav>
+            )}
+
+            {ready ? (
+              <ArenaMap
+                ref={mapRef}
+                regions={regions}
+                level={level}
+                home={home}
+                spinLocked={homeReady}
+                selKey={selKey}
+                hotKey={hotKey}
+                onSelect={setSelKey}
+                onDrill={handleDrill}
+                onPrompt={(name) => setPrompt(t('arena.drillHint', { n: name }))}
+                onHover={handleHover}
+              />
+            ) : (
+              <div className="aa-loading">{t('arena.loading')}</div>
+            )}
+
+            <div className={`aa-prompt${prompt ? ' on' : ''}`}>{prompt}</div>
+
+            <div className="aa-legend">
+              <span>{t('arena.low')}</span>
+              <div className="bar" />
+              <span>{t('arena.high')}</span>
+              <span style={{ marginLeft: 8 }}>{t('arena.avgLevel')}</span>
+            </div>
+
+            <div className="aa-zoomctl" role="group" aria-label={t('arena.avgLevel')}>
+              <button type="button" aria-label={t('arena.zoom_in')} onClick={() => mapRef.current?.zoomIn()}>+</button>
+              <button type="button" aria-label={t('arena.zoom_out')} onClick={() => mapRef.current?.zoomOut()}>−</button>
+              <button type="button" aria-label={t('arena.zoom_reset')} onClick={() => mapRef.current?.zoomReset()}>⤾</button>
+            </div>
+
+            {dokdo && <DokdoInset fill={dokdo.fill} label={t('arena.dokdo')} />}
+          </section>
+
+          <aside className="aa-card aa-side">
+            <h2>{scopeTitle}</h2>
+
+            {our && (
+              <div className="aa-ourrank">
+                <div>
+                  <span className="or-t">{t('arena.ourRank')}</span>
+                  <span className="or-n">{our.label}</span>
+                </div>
+                <div className="or-r">
+                  <b>{our.rank}</b>
+                  <span>
+                    {' / '}
+                    {regions.length}
+                    {t('arena.unit')}
+                  </span>
+                  <i>
+                    {t('arena.avg')} Lv.{our.region.score.toFixed(1)}
+                  </i>
+                </div>
+              </div>
+            )}
+
+            <div className="aa-stats">
+              <div className="aa-stat">
+                <div className="k">{t('arena.topRegion')}</div>
+                <div className="v">
+                  {sorted[0] ? (sorted[0].name.length > 8 ? sorted[0].name.slice(0, 8) + '…' : sorted[0].name) : '—'}
+                </div>
+              </div>
+              <div className="aa-stat">
+                <div className="k">{t('arena.totalPart')}</div>
+                <div className="v">{ppl(totalTakers)}</div>
+              </div>
+            </div>
+
+            <input
+              className="aa-search"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('arena.search')}
+              autoComplete="off"
+              spellCheck={false}
+            />
+
+            <ul className="aa-rank" ref={rankListRef}>
+              {shown.map((d) => (
+                <RankRow
+                  key={d.key}
+                  region={d}
+                  rank={sorted.indexOf(d) + 1}
+                  width={10 + 90 * ((d.score - scoreSpan.min) / (scoreSpan.max - scoreSpan.min || 1))}
+                  selected={d.key === selKey}
+                  hot={d.key === hotKey}
+                  showFlag={d.drill && level === 0}
+                  count={fmt(d.takers)}
+                  onActivate={activate}
+                  onEnter={onRowEnter}
+                  onLeave={onRowLeave}
+                />
+              ))}
+            </ul>
+          </aside>
+        </div>
+
+        {/* 하단 런처 — 아레나가 허브·레벨테스트·데일리·미니게임의 관문 역할을 한다. */}
+        <nav className="aa-launch">
+          <Link className="aa-lbtn cari" to="/hub">
+            <span className="ic">🎓</span>
+            <span className="lt">
+              <b>CARI</b>
+              <i>{t('arena.bHubS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          <Link className="aa-lbtn lvl" to="/test/select">
+            <span className="ic">🎯</span>
+            <span className="lt">
+              <b>{t('arena.bLevel')}</b>
+              <i>{t('arena.bLevelS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          {/* 콘텐츠 파이프라인은 아직이지만 화면(/daily)은 있다 — 슬롯이 자리표시자인 상태. */}
+          <Link className="aa-lbtn daily" to="/daily">
+            <span className="ic">☀️</span>
+            <span className="lt">
+              <b>{t('arena.bDaily')}</b>
+              <i>{t('arena.bDailyS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          <button type="button" className="aa-lbtn game" onClick={() => setGamesOpen(true)}>
+            <span className="ic">🕹️</span>
+            <span className="lt">
+              <b>{t('arena.bGame')}</b>
+              <i>{t('arena.bGameS')}</i>
+            </span>
+            <span className="go">›</span>
+          </button>
+        </nav>
+      </div>
+
+      {hover && (
+        <div className="aa-tip" style={{ left: hover.x, top: hover.y }}>
+          <b>{hover.region.name}</b>
+          {hover.region.real && <span className="real"> · {t('arena.real')}</span>}
+          <div className="row">
+            <span>{t('arena.avgLevel')}</span>
+            <span>Lv.{hover.region.score.toFixed(1)}</span>
+          </div>
+          <div className="row">
+            <span>{t('arena.part')}</span>
+            <span>{ppl(hover.region.takers)}</span>
+          </div>
+          <div className="row">
+            <span>{t('arena.rankL')}</span>
+            <span>
+              {hoverRank} / {regions.length}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {gamesOpen && <MiniGamePicker title={t('arena.bGame')} onClose={() => setGamesOpen(false)} />}
     </div>
   )
 }

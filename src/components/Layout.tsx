@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import type { ChangeEvent, ReactNode } from 'react'
 import { useAuth } from '../context/AuthProvider'
 import { supabase, callFunction } from '../lib/supabase'
@@ -374,9 +374,6 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
 
             <div className="pf-hint">
-              <Link to="/" style={{ color: 'inherit' }} onClick={() => setOpen(false)}>
-                {t('nav.exam')}
-              </Link>
               <div className="pf-assoc-en">Global AI &amp; Robotics Association</div>
             </div>
           </div>

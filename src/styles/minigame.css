@@ -1,0 +1,74 @@
+/* ===== 미니게임 선택창 =====
+   원래 /hub 의 모달이었는데 미니게임 진입점이 /arena 로 옮겨가면서 hub.css 에서 분리했다.
+   hub.css 는 전부 `.hub` 스코프라 그대로는 재사용이 안 돼, 필요한 토큰만 `.mgm` 에 다시 정의한다. */
+
+.mgm-backdrop {
+  --card: #fff;
+  --line: #33323f;
+  --ink: #33323f;
+  --ink2: #6b5a48;
+  --brand: #5f8ed0;
+  --shc: 43, 32, 21; /* 스티커 드롭섀도 rgb */
+
+  position: fixed; inset: 0; z-index: 50; background: rgba(26, 28, 36, .45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+html.dark .mgm-backdrop {
+  --card: #242a36;
+  --line: #6b7488;
+  --ink: #e6ebf7;
+  --ink2: #aab3c6;
+  --brand: #5680bd;
+  --shc: 0, 0, 0;
+  --mg-cap-grad: linear-gradient(180deg, rgba(20,23,31,0) 0%, #171a22 22%, #171a22 100%);
+  --mg-name-ink: #e6ebf7;
+  --mg-name-sh: 0 2px 0 rgba(0,0,0,.6), 0 3px 8px rgba(0,0,0,.5);
+  --mg-accent-ink: #7fa9f5;
+  --mg-accent-sh: 0 1px 0 rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.6);
+  --mg-tag-ink: #a3adc4;
+
+  background: rgba(0, 0, 0, .6);
+}
+
+/* 게임 모달은 커버 수만큼 가로로 넓어진다(스크롤 없이 한 번에). */
+.mgm-modal { position: relative; width: 100%; max-width: min(680px, 94vw); max-height: 86vh; overflow-y: auto;
+  background: var(--card); border: 2.5px solid var(--line); border-radius: 16px; padding: 16px; color: var(--ink);
+  box-shadow: 0 4px 0 rgba(var(--shc), .12); }
+.mgm-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.mgm-head h3 { margin: 0; font-size: 17px; font-weight: 900; }
+.mgm-close { width: 30px; height: 30px; border-radius: 10px; border: 2.5px solid var(--line); background: var(--card); color: var(--ink); font-size: 16px; line-height: 1; font-weight: 900; cursor: pointer; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
+.mgm-close:active { transform: translateY(2px); box-shadow: none; }
+
+/* ── 표지 커버(일러스트 포스터, 가로 나란히) ── */
+.mg-shelf { display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 14px; }
+/* 각 커버는 세로 포스터(게임 화면 위에 텍스트가 겹쳐 얹히는 오버레이). cqw 로 캡션이 커버 폭에 맞춰 스케일. */
+.mg-cover { position: relative; flex: 1 1 0; min-width: 0; max-width: 300px; aspect-ratio: 92 / 172; container-type: inline-size;
+  overflow: hidden; cursor: pointer; border-radius: 20px; border: 3px solid var(--line); padding: 0; text-align: left; background: #e3ebf7;
+  box-shadow: 0 6px 0 rgba(var(--shc), .2); transition: transform .1s, box-shadow .1s; }
+.mg-cover:hover { transform: translateY(-3px); box-shadow: 0 9px 0 rgba(var(--shc), .2); }
+.mg-cover:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(var(--shc), .2); }
+html.dark .mg-cover { background: #1b2130; }
+.mg-art { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.mg-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 13cqw 5cqw 5cqw;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2.2cqw;
+  background: var(--mg-cap-grad, linear-gradient(180deg, rgba(252,253,255,0) 0%, #fcfdff 22%, #fcfdff 100%)); }
+.mg-badge { font-size: clamp(8px, 3.4cqw, 11px); font-weight: 900; letter-spacing: .02em;
+  color: var(--brand); background: rgba(0,74,198,.09); border: 1.5px solid rgba(0,74,198,.2);
+  padding: 3px 9px; border-radius: 999px; }
+.mg-name { font-size: clamp(15px, 9.4cqw, 27px); font-weight: 900; letter-spacing: -.02em; color: var(--mg-name-ink, #28324c); line-height: 1.02;
+  text-shadow: var(--mg-name-sh, 0 2px 0 #fff, 0 3px 8px rgba(80,100,150,.22)); }
+.mg-accent { font-style: normal; color: var(--mg-accent-ink, #0043b8);
+  text-shadow: var(--mg-accent-sh, 0 1px 0 #fff, 0 0 3px rgba(255,255,255,.95), 0 2px 6px rgba(255,255,255,.85)); }
+.mg-tag { font-size: clamp(9.5px, 4.2cqw, 13px); font-weight: 800; color: var(--mg-tag-ink, #55617e); margin-bottom: 2px; }
+/* PLAY — 크고 게임다운 풀폭 입체 버튼 */
+.mg-play { align-self: stretch; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: clamp(12px, 5.6cqw, 17px); font-weight: 900; letter-spacing: .08em; color: #fff; padding: clamp(9px, 4.3cqw, 14px) 12px; border-radius: 15px;
+  background: linear-gradient(160deg, #4a82f0 0%, #1b55d0 55%, #003fb4 100%);
+  border: 2px solid rgba(255,255,255,.6);
+  box-shadow: 0 5px 0 #00318a, 0 9px 18px rgba(0,74,198,.42), inset 0 2px 3px rgba(255,255,255,.45);
+  animation: mg-play-bob 1.6s ease-in-out infinite; }
+.mg-cover:hover .mg-play { filter: brightness(1.06); }
+.mg-cover:active .mg-play { box-shadow: 0 2px 0 #00318a, 0 4px 10px rgba(0,74,198,.4), inset 0 2px 3px rgba(255,255,255,.45); transform: translateY(2px); }
+.mg-play-tri { width: 0; height: 0; border-style: solid; border-width: 8px 0 8px 13px;
+  border-color: transparent transparent transparent #fff; filter: drop-shadow(0 1px 1px rgba(0,40,120,.35)); }
+@keyframes mg-play-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }

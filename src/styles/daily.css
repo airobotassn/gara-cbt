@@ -1,0 +1,155 @@
+/* ============================================================
+   /daily — 오늘의 학습. hub.css 와 같은 카툰/두들 계열
+   (두꺼운 외곽선 + 스티커 드롭섀도 + 크림 배경).
+
+   레이아웃 = 데스크톱 우선. 진입점인 /arena(arena.css) 와 같은 계열로 맞춘다:
+     · 컨테이너 max-width 1240px + padding clamp(14px, 3vw, 30px)
+     · 2단(콘텐츠 슬롯 + 보상 레일) → 880px 이하에서 1열 스택
+   ⚠️ 폰 프레임(max-width:480px) 아님. 모바일은 반응형으로 커버하는 것이지 기준이 아니다.
+
+   ⚠️ 네임스페이스 규칙(hub.css 와 동일): 모든 선택자를 반드시 `.dy-page` 아래로 스코프한다.
+      Daily.tsx 가 App.tsx 에서 정적 import 라 이 파일은 항상 번들에 들어간다.
+      스코프 없는 제네릭 이름(.card .btn .day 등)은 앱 전체로 새어나가 다른 화면을 덮는다.
+      (hub.css 에서 실제로 그 사고가 났음 — 전역 .panel 이 FAB 메뉴를 덮어씀.)
+      ⚠️ 루트 클래스도 마찬가지다. 처음에 `.daily` 로 뒀다가 아레나 런처의
+      `.aa-lbtn.daily`(색상 모디파이어)에 걸려 그 버튼이 min-height:100vh 짜리로 늘어났다.
+      그래서 루트는 자식들과 같은 `dy-` 접두사를 쓴다 — 짧고 흔한 단어를 루트로 쓰지 말 것.
+
+   색은 토큰으로만 쓴다(하드코딩 금지) — 맨 아래 `html.dark .dy-page` 가 토큰만 갈아끼워 다크를 만든다.
+   ============================================================ */
+.dy-page {
+  --ink: #33323f; --line: #33323f;
+  --brand: #5f8ed0;
+  --gold: #f2c65e; --yellow: #ffe08a; --teal: #74c6bf;
+  --card: #fff;
+  --pagebg: #faf8ff;
+  --glow: rgba(0, 74, 198, .16);
+  --ink2: #6b5a48;
+  --slot-bg: #fffdf6;
+  --slot-line: #cfc7b4;
+  --shc: 43, 32, 21;
+  --shc2: 26, 28, 36;
+  position: relative; min-height: 100vh; box-sizing: border-box; color: var(--ink);
+  font-family: system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 800;
+  background-color: var(--pagebg);
+  background-image: radial-gradient(circle 720px at 50% 0, var(--glow), rgba(0, 74, 198, 0) 62%);
+  background-repeat: no-repeat;
+}
+.dy-page * { box-sizing: border-box; }
+.dy-wrap { max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 48px; }
+
+/* ── 상단 바 ── */
+.dy-page .dy-top { display: flex; align-items: center; gap: 14px; }
+.dy-page .dy-back { flex: 0 0 auto; width: 44px; height: 44px; border: 3px solid var(--line); border-radius: 14px;
+  background: var(--card); color: var(--ink); font-size: 24px; font-weight: 900; line-height: 1; cursor: pointer;
+  box-shadow: 0 4px 0 rgba(var(--shc2), .16); }
+.dy-page .dy-back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc2), .16); }
+.dy-page .dy-head { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.dy-page .dy-head b { font-size: 26px; font-weight: 900; letter-spacing: -.01em; }
+.dy-page .dy-head i { font-style: normal; font-size: 14px; font-weight: 800; color: var(--ink2); }
+.dy-page .dy-coin { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 900;
+  background: var(--card); border: 3px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 9px;
+  box-shadow: 0 4px 0 rgba(var(--shc2), .14); }
+
+/* ── 비로그인 배너 ── */
+.dy-page .dy-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px;
+  padding: 10px 12px 10px 16px; border-radius: 14px; font-size: 13.5px; font-weight: 800; color: var(--ink);
+  background: var(--yellow); border: 3px solid var(--line); box-shadow: 0 4px 0 rgba(var(--shc2), .14); }
+
+/* ── 2단 그리드: 콘텐츠(주) + 보상 레일(부) ── */
+.dy-page .dy-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; margin-top: 16px; }
+.dy-page .dy-rail { position: sticky; top: 20px; display: flex; flex-direction: column; }
+
+/* ── 콘텐츠 슬롯(자리표시자) ──
+   콘텐츠가 붙으면 이 점선 박스가 실제 렌더러로 교체된다. 점선 = '아직 빈 자리'라는 신호.
+   min-height 는 문제형/영상 어느 쪽이 와도 레이아웃이 튀지 않게 잡아둔 바닥값. */
+.dy-page .dy-slot { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 460px; padding: 40px 28px; text-align: center;
+  background: var(--slot-bg); border: 4px dashed var(--slot-line); border-radius: 22px; }
+/* Tailwind preflight 가 svg{display:block} 이라 text-align 으로는 안 가운데선다 → 플렉스로 센터링. */
+.dy-page .dy-slot-ic { display: flex; justify-content: center; line-height: 0; margin-bottom: 14px; opacity: .75; }
+.dy-page .dy-slot-title { display: block; font-size: 20px; font-weight: 900; }
+.dy-page .dy-slot-desc { margin: 10px 0 0; font-size: 14px; font-weight: 700; line-height: 1.7; color: var(--ink2); }
+.dy-page .dy-slot-desc b { color: var(--ink); }
+
+/* ── 보상 예고 ── */
+.dy-page .dy-reward { background: var(--card); border: 4px solid var(--line); border-radius: 18px;
+  padding: 14px 14px 16px; box-shadow: 0 5px 0 rgba(var(--shc2), .16); }
+.dy-page .dy-rw-top { font-size: 14px; font-weight: 900; color: var(--ink2); }
+.dy-page .dy-rw-row { display: flex; gap: 8px; margin-top: 9px; }
+.dy-page .dy-rw-item { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 15px; font-weight: 900; background: var(--yellow); border: 3px solid var(--line); border-radius: 12px; padding: 8px 4px; }
+.dy-page .dy-streak { display: flex; gap: 5px; margin-top: 11px; }
+.dy-page .dy-day { flex: 1; text-align: center; border: 3px solid var(--line); border-radius: 11px; padding: 7px 0;
+  font-size: 14px; font-weight: 900; background: var(--card); line-height: 1.15; }
+.dy-page .dy-day.on { background: var(--teal); color: #fff; }
+
+/* ── CTA ── */
+.dy-page .dy-err { margin: 12px 0 0; font-size: 13px; font-weight: 800; color: #d05a5a; text-align: center; }
+.dy-page .dy-cta { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; margin-top: 14px;
+  padding: 16px 18px; cursor: pointer; font-size: 19px; font-weight: 900; color: #fff;
+  background: var(--brand); border: 4px solid var(--line); border-radius: 18px; box-shadow: 0 5px 0 rgba(var(--shc), .3); }
+.dy-page .dy-cta-ic { line-height: 0; }
+.dy-page .dy-cta:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 rgba(var(--shc), .3); }
+.dy-page .dy-cta:disabled { filter: grayscale(.35) opacity(.75); cursor: default; }
+.dy-page .dy-note { margin: 11px 0 0; font-size: 12.5px; font-weight: 700; line-height: 1.6; color: var(--ink2); text-align: center; }
+
+/* ── 공용 버튼 ── */
+.dy-page .dy-btn { border: 2.5px solid var(--line); border-radius: 12px; background: var(--brand); color: #fff;
+  font-weight: 900; font-size: 14px; padding: 9px 16px; cursor: pointer; box-shadow: 0 3px 0 rgba(var(--shc), .2); }
+.dy-page .dy-btn:active { transform: translateY(3px); box-shadow: 0 0 0 rgba(var(--shc), .2); }
+.dy-page .dy-btn-sm { font-size: 12.5px; padding: 7px 12px; }
+.dy-page .dy-ghost { background: var(--card); color: var(--ink); }
+
+/* ── 완료 연출 팝업 ── */
+.dy-page .dy-pop-bd { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px;
+  background: rgba(24, 22, 32, .48); }
+.dy-page .dy-pop { width: min(92vw, 360px); text-align: center; padding: 26px 20px 20px;
+  background: var(--card); border: 4px solid var(--line); border-radius: 22px; box-shadow: 0 6px 0 rgba(var(--shc2), .22);
+  animation: dy-pop-in .22s ease-out; }
+@keyframes dy-pop-in { from { transform: translateY(10px) scale(.94); opacity: 0 } to { transform: none; opacity: 1 } }
+.dy-page .dy-pop-burst { display: flex; justify-content: center; line-height: 0; margin-bottom: 10px; }
+.dy-page .dy-pop-title { display: block; font-size: 23px; font-weight: 900; }
+.dy-page .dy-pop-gain { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+.dy-page .dy-pop-gain span { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 900;
+  background: var(--yellow); border: 3px solid var(--line); border-radius: 11px; padding: 7px 11px; }
+.dy-page .dy-pop-msg { margin: 14px 0 0; font-size: 13px; font-weight: 700; color: var(--ink2); }
+.dy-page .dy-pop-btns { display: flex; gap: 8px; margin-top: 18px; }
+.dy-page .dy-pop-btns .dy-btn { flex: 1; }
+
+/* ── 좁은 화면: 2단 → 1열 스택. 레일이 아래로 내려가므로 sticky 해제. ── */
+@media (max-width: 880px) {
+  .dy-page .dy-grid { grid-template-columns: 1fr; gap: 14px; }
+  .dy-page .dy-rail { position: static; }
+  .dy-page .dy-slot { min-height: 300px; padding: 34px 20px; }
+  .dy-page .dy-head b { font-size: 22px; }
+}
+@media (max-width: 520px) {
+  .dy-wrap { padding: 16px 14px 32px; }
+  .dy-page .dy-top { gap: 10px; }
+  .dy-page .dy-back { width: 38px; height: 38px; font-size: 22px; }
+  /* 좁으면 제목/날짜가 한 줄에 안 들어가 줄바꿈되며 baseline 이 어긋난다 → 세로로. */
+  .dy-page .dy-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .dy-page .dy-head b { font-size: 19px; }
+  .dy-page .dy-head i { font-size: 12px; }
+  .dy-page .dy-coin { font-size: 14px; padding: 5px 12px 5px 8px; }
+  .dy-page .dy-slot { min-height: 240px; }
+  .dy-page .dy-slot-title { font-size: 17px; }
+  .dy-page .dy-slot-desc { font-size: 13px; }
+  .dy-page .dy-cta { font-size: 17px; padding: 14px 16px; }
+}
+
+/* ── 다크: 토큰만 교체 ── */
+html.dark .dy-page {
+  --ink: #e8eaf0; --line: #1b1f28;
+  --brand: #4a72ab;
+  --gold: #dcb96a; --yellow: #4a4326; --teal: #3f7a75;
+  --card: #2a2f3a;
+  --pagebg: #171a21;
+  --glow: rgba(90, 140, 220, .10);
+  --ink2: #9aa3b2;
+  --slot-bg: #232833;
+  --slot-line: #495064;
+}
+html.dark .dy-page .dy-day.on { color: #eef3f2; }
+html.dark .dy-page .dy-pop-bd { background: rgba(0, 0, 0, .6); }

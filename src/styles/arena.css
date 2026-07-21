@@ -1,0 +1,190 @@
+/* ===== 월드 아레나(/arena) — 드릴다운 지도 + 지역 랭킹 =====
+   public/world-arena.html 의 <style> 을 옮긴 것(아이프레임 → React 포팅).
+   · 클래스는 전부 `aa-` 접두 — 앱 전역의 .card/.stage/.side/.rank 등과 이름이 겹쳐서
+     접두 없이 두면 서로 스타일이 새어 든다.
+   · 토큰(--aa-*)은 :root 가 아니라 .arena 에만 정의한다. 앱 전역 토큰(Material/APEX/AX 3벌)을
+     오염시키지 않고, 반대로 오염되지도 않게 하려는 것.
+   · 다크는 OS(prefers-color-scheme)가 아니라 앱 FAB 토글이 <html> 에 붙이는 .dark 를 따른다. */
+
+.arena {
+  --aa-bg: #faf8ff; --aa-panel: #ffffff; --aa-panel-2: #eef3fd;
+  --aa-ink: #33323f; --aa-muted: #6c7188; --aa-faint: #9aa0b8;
+  --aa-line: #33323f; --aa-line-2: #33323f;
+  --aa-accent: #5f8ed0; --aa-gold: #f2c65e;
+  --aa-sphere-line: rgba(51, 50, 63, .18); --aa-land-none: #dfe6f4;
+  --aa-c0: #dde8fb; --aa-c1: #a7c4ee; --aa-c2: #6f9fe0; --aa-c3: #3f6fc0;
+  --aa-glow: rgba(0, 74, 198, .16);
+  /* 지구본(SVG 그라디언트)과 카드 표면 */
+  --aa-ocean-hi: #eaf4ff; --aa-ocean-mid: #9fc6f2; --aa-ocean-lo: #4f88d4;
+  --aa-geo-stroke: #ffffff;
+  --aa-spec-op: .72;
+  --aa-atmo: #9cc6ff; --aa-atmo-op: .6;
+  --aa-inset-grad: linear-gradient(160deg, #eaf4ff, #a9cef2);
+  --aa-inset-lab-bg: rgba(255, 255, 255, .82);
+  --aa-surface-mix: #fff;          /* color-mix 로 옅은 배경을 만들 때 섞는 바탕 */
+  /* ⚠️ 원본은 라이트에서 --sh-solid 가 자기 자신을 참조(순환)해 그림자가 전부 무효였다.
+     현재 화면 그대로 유지하려고 transparent 로 옮겨 적었다 — 라이트에도 카툰 그림자를
+     주려면 rgba(51,50,63,.16) 으로 바꾸면 된다. */
+  --aa-sh-solid: transparent;
+  --aa-shadow: 0 6px 0 var(--aa-sh-solid), 0 16px 26px -14px var(--aa-sh-solid);
+
+  color: var(--aa-ink);
+  background-color: var(--aa-bg);
+  background-image: radial-gradient(circle 480px at 50% 120px, var(--aa-glow), rgba(0, 74, 198, 0) 62%);
+  background-repeat: no-repeat;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+}
+
+html.dark .arena {
+  --aa-bg: #12151c; --aa-panel: #1c212c; --aa-panel-2: #252c3a;
+  --aa-ink: #e6ebf7; --aa-muted: #a7b0c4; --aa-faint: #79839a;
+  /* 카툰 외곽선: 어두운 면 위에서는 먹색이 사라지므로 밝은 회청색으로 */
+  --aa-line: #5c6578; --aa-line-2: #454d5e;
+  --aa-accent: #6f9ee0; --aa-gold: #d9b45f;
+  --aa-sphere-line: rgba(224, 230, 244, .16); --aa-land-none: #2b3444;
+  /* 응시자수 단계색: 어두운 바다 위에서 어두움→밝음으로 올라가야 읽힌다(라이트의 역방향) */
+  --aa-c0: #24354f; --aa-c1: #3a6099; --aa-c2: #5a8ed6; --aa-c3: #8fb9f5;
+  --aa-glow: rgba(79, 141, 245, .14);
+  /* 바다는 --aa-c0(데이터 최저 단계)·--aa-land-none 보다 확실히 어두워야 대륙이 떠 보인다 */
+  --aa-ocean-hi: #1e2a3f; --aa-ocean-mid: #141d2e; --aa-ocean-lo: #0b1220;
+  --aa-geo-stroke: rgba(224, 230, 244, .45);
+  --aa-spec-op: .16;               /* 어두운 구체에 흰 하이라이트를 세게 주면 뿌옇게 뜬다 */
+  --aa-atmo: #5f8ed0; --aa-atmo-op: .45;
+  --aa-inset-grad: linear-gradient(160deg, #22304a, #131b29);
+  --aa-inset-lab-bg: rgba(18, 21, 28, .82);
+  --aa-surface-mix: #1c212c;
+  --aa-sh-solid: rgba(0, 0, 0, .5);
+}
+
+.aa-wrap { max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 40px; }
+
+/* ── 헤더 ── */
+.aa-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+.aa-head h1 { margin: 0; font-size: clamp(26px, 3.6vw, 36px); font-weight: 900; letter-spacing: -.02em; }
+
+/* ── 레이아웃 ── */
+.aa-grid { display: grid; grid-template-columns: 1fr 316px; gap: 16px; align-items: stretch; height: clamp(500px, 70vh, 720px); }
+.aa-stage, .aa-side { height: 100%; min-height: 0; }
+@media (max-width: 880px) {
+  .aa-grid { grid-template-columns: 1fr; height: auto; }
+  .aa-stage { height: 60vh; }
+  .aa-side { height: auto; max-height: 74vh; }
+}
+.aa-card { background: var(--aa-panel); border: 2.5px solid var(--aa-line); border-radius: 20px; box-shadow: var(--aa-shadow); }
+
+/* ── 지도 ── */
+.aa-stage { position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.aa-crumb { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 14px 18px 10px; font-size: 13px; }
+.aa-crumb button { font: inherit; border: 0; background: none; color: var(--aa-muted); cursor: pointer; padding: 3px 7px; border-radius: 8px; font-weight: 600; }
+.aa-crumb button:hover { background: var(--aa-panel-2); color: var(--aa-ink); }
+.aa-crumb .cur { color: var(--aa-ink); font-weight: 800; padding: 3px 7px; }
+.aa-crumb .sep { color: var(--aa-faint); }
+#arena-map { flex: 1; min-height: 0; width: 100%; display: block; cursor: grab; touch-action: none; }
+#arena-map.dragging { cursor: grabbing; }
+
+/* ── 시·도 재클릭 진입 안내 프롬프트 ── */
+.aa-prompt { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); z-index: 7; max-width: 92%;
+  background: var(--aa-accent); color: #fff; font-size: 12.5px; font-weight: 800; padding: 7px 15px; border-radius: 999px;
+  border: 2px solid var(--aa-line); box-shadow: 0 4px 0 var(--aa-sh-solid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; pointer-events: none; transition: opacity .15s; }
+.aa-prompt.on { opacity: 1; }
+
+/* ── 우리 순위 카드 ── */
+.aa-ourrank { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px;
+  padding: 9px 13px; border-radius: 14px; border: 2.5px solid var(--aa-accent); background: color-mix(in srgb, var(--aa-accent) 9%, var(--aa-surface-mix));
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--aa-accent) 38%, var(--aa-surface-mix)); }
+.aa-ourrank .or-t { display: block; font-size: 10px; font-weight: 800; letter-spacing: .09em; color: var(--aa-accent); text-transform: uppercase; }
+.aa-ourrank .or-n { display: block; font-size: 14px; font-weight: 900; color: var(--aa-ink); }
+.aa-ourrank .or-r { text-align: right; line-height: 1.02; }
+.aa-ourrank .or-r b { font-size: 25px; font-weight: 900; color: var(--aa-accent); }
+.aa-ourrank .or-r span { font-size: 12px; font-weight: 800; color: var(--aa-muted); }
+.aa-ourrank .or-r i { display: block; font-style: normal; font-size: 11px; font-weight: 700; color: var(--aa-faint); }
+
+/* ── 범례 · 확대축소 ── */
+.aa-legend { display: flex; align-items: center; gap: 10px; padding: 10px 18px 15px; font-size: 11.5px; color: var(--aa-muted); font-weight: 700; }
+.aa-legend .bar { flex: 1; height: 8px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--aa-c0), var(--aa-c1), var(--aa-c2), var(--aa-c3)); }
+.aa-zoomctl { position: absolute; left: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
+.aa-zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--aa-line); background: var(--aa-panel); color: var(--aa-ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--aa-sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.aa-zoomctl button:hover { background: var(--aa-panel-2); }
+.aa-zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
+
+/* ── 독도 확대도 ── */
+.dokinset { position: absolute; top: 12px; right: 12px; width: 150px; height: 112px; border: 2px solid var(--aa-line); border-radius: 10px; overflow: hidden; z-index: 7; box-shadow: 0 3px 0 var(--aa-sh-solid); background: var(--aa-inset-grad); pointer-events: none; }
+.dokinset svg { width: 100%; height: 100%; display: block; }
+.dokinset .doklab { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 10.5px; font-weight: 800; color: var(--aa-ink); background: var(--aa-inset-lab-bg); padding: 1px 0; }
+.dokisland { stroke: var(--aa-geo-stroke); stroke-width: 1; }
+
+/* ── 하단 런처(이동 버튼 4개) ── */
+.aa-launch { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 16px; }
+.aa-lbtn { display: flex; align-items: center; gap: 13px; padding: 15px 18px; border-radius: 18px;
+  background: var(--aa-panel); border: 2.5px solid var(--aa-line); box-shadow: 0 4px 0 var(--aa-sh-solid);
+  text-decoration: none; cursor: pointer; transition: transform .1s ease, box-shadow .1s ease; text-align: left; font: inherit; }
+.aa-lbtn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--aa-sh-solid); }
+.aa-lbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--aa-sh-solid); }
+.aa-lbtn .ic { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+  font-size: 22px; background: color-mix(in srgb, var(--lb-bg) 20%, var(--aa-surface-mix)); border: 2px solid var(--lb-bg); }
+.aa-lbtn .lt { min-width: 0; line-height: 1.25; }
+.aa-lbtn .lt b { display: block; font-size: 15.5px; font-weight: 900; color: var(--aa-ink); letter-spacing: -.01em; }
+.aa-lbtn .lt i { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--aa-muted); }
+.aa-lbtn .go { margin-left: auto; font-size: 20px; font-weight: 900; color: var(--lb-bg); }
+.aa-lbtn.cari  { --lb-bg: #5f8ed0; }
+.aa-lbtn.lvl   { --lb-bg: #56b6ae; }
+.aa-lbtn.daily { --lb-bg: #e0a93e; }
+.aa-lbtn.game  { --lb-bg: #b07ad6; }
+/* 4개는 좁아지면 2×2 로 접는다(1열 스택이면 지도보다 런처가 길어진다) */
+@media (max-width: 1080px) { .aa-launch { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .aa-launch { grid-template-columns: 1fr; } }
+
+/* ── 사이드 패널(랭킹) ── */
+.aa-side { display: flex; flex-direction: column; padding: 16px 16px 12px; }
+.aa-side h2 { margin: 0 0 12px; font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
+.aa-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.aa-stat { background: var(--aa-panel-2); border: 1px solid var(--aa-line-2); border-radius: 12px; padding: 10px 12px; }
+.aa-stat .k { font-size: 11px; color: var(--aa-muted); font-weight: 700; }
+.aa-stat .v { font-size: 19px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.aa-rank { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
+.aa-rank li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 9px;
+  padding: 8px 8px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+.aa-rank li:hover, .aa-rank li.hot { background: var(--aa-panel-2); border-color: var(--aa-line); }
+.aa-search { width: 100%; margin: 0 0 10px; padding: 9px 12px; border: 1px solid var(--aa-line); border-radius: 10px; background: var(--aa-panel-2); color: var(--aa-ink); font: inherit; font-size: 13px; outline: none; }
+.aa-search::placeholder { color: var(--aa-faint); }
+.aa-search:focus { border-color: var(--aa-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--aa-accent) 18%, transparent); background: var(--aa-panel); }
+.aa-rank li.sel { background: color-mix(in srgb, #e5484d 12%, var(--aa-panel)); border-color: color-mix(in srgb, #e5484d 45%, transparent); box-shadow: inset 3px 0 0 #e5484d; }
+.aa-rank .no { font-size: 12px; font-weight: 800; color: var(--aa-faint); text-align: center; font-variant-numeric: tabular-nums; }
+.aa-rank .nm { min-width: 0; }
+.aa-rank .nm b { font-size: 13.5px; font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aa-rank .nm .bw { height: 5px; border-radius: 999px; background: var(--aa-accent); margin-top: 5px; opacity: .9; }
+.aa-rank .nm .cnt { font-size: 11px; color: var(--aa-faint); font-weight: 600; margin-top: 3px; }
+.aa-rank .sc { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.aa-rank li.drill .sc::after { content: "›"; margin-left: 5px; color: var(--aa-faint); font-weight: 700; }
+
+/* ── 툴팁 ── */
+.aa-tip { position: fixed; z-index: 20; pointer-events: none; transform: translate(-50%, -114%);
+  background: var(--aa-ink); color: var(--aa-bg); padding: 8px 11px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .5); white-space: nowrap; }
+.aa-tip b { font-size: 13.5px; }
+.aa-tip .real { color: #2e6bc8; font-weight: 800; }
+html.dark .arena .aa-tip .real { color: #8fb9f5; }
+.aa-tip .row { display: flex; justify-content: space-between; gap: 14px; margin-top: 3px; font-weight: 600; opacity: .85; }
+.aa-tip .row span:last-child { font-variant-numeric: tabular-nums; }
+
+/* ── 지도 SVG 내부 ── */
+#arena-map .geo { stroke: var(--aa-geo-stroke); stroke-width: 1; transition: fill .15s; cursor: pointer; vector-effect: non-scaling-stroke; }
+#arena-map .geo.hot { stroke: var(--aa-gold); stroke-width: 1.6; }
+#arena-map .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
+#arena-map .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--aa-line); stroke-width: 3; }
+#arena-map .spec { fill: url(#specGrad); pointer-events: none; }
+#arena-map #specGrad .s-in  { stop-color: #ffffff; stop-opacity: var(--aa-spec-op); }
+#arena-map #specGrad .s-out { stop-color: #ffffff; stop-opacity: 0; }
+#arena-map .atmo { fill: url(#atmoGrad); pointer-events: none; }
+#arena-map #oceanGrad .g-hi  { stop-color: var(--aa-ocean-hi); }
+#arena-map #oceanGrad .g-mid { stop-color: var(--aa-ocean-mid); }
+#arena-map #oceanGrad .g-lo  { stop-color: var(--aa-ocean-lo); }
+#arena-map #atmoGrad .a-in   { stop-color: var(--aa-atmo); stop-opacity: 0; }
+#arena-map #atmoGrad .a-out  { stop-color: var(--aa-atmo); stop-opacity: var(--aa-atmo-op); }
+#arena-map .grat { fill: none; stroke: var(--aa-sphere-line); stroke-width: .5; opacity: .5; }
+#arena-map .krmark { fill: none; stroke: var(--aa-gold); stroke-width: 2; }
+
+.aa-loading { display: grid; place-items: center; height: 100%; color: var(--aa-muted); font-weight: 700; font-size: 14px; }

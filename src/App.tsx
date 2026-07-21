@@ -30,10 +30,10 @@ import TestRunner from './pages/TestRunner'
 import Result from './pages/Result'
 import Ranking from './pages/Ranking'
 import Onboarding from './pages/Onboarding'
-import Demo from './pages/Demo'
 import Hub from './pages/Hub'
 import WorldArena from './pages/WorldArena'
 import MiniGame from './pages/MiniGame'
+import Daily from './pages/Daily'
 const Admin = lazy(() => import('./pages/Admin'))
 
 // 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
@@ -94,10 +94,10 @@ export default function App() {
             <OnboardingGate>
             <Routes>
               <Route path="/" element={<Landing />} />
-              <Route path="/demo" element={<Demo />} />
               <Route path="/arena" element={<WorldArena />} />
               <Route path="/hub" element={<Hub />} />
               <Route path="/games/:gameId" element={<MiniGame />} />
+              <Route path="/daily" element={<Daily />} />
               <Route path="/login" element={<Login />} />
               <Route path="/exam" element={<ExamGate />} />
               <Route path="/exam/apply" element={<ExamApply />} />

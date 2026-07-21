@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { MAX_LEVEL, QUESTIONS_PER_TEST } from '../lib/testConfigLevel'
@@ -86,15 +86,9 @@ export default function LevelSelect() {
     <div className="wrap">
       <TopBar />
       <div className="card pad">
+        {/* 랭킹 진입점은 /hub 도크 CTA 로 옮겼다(레벨선택 화면에서는 제거). */}
         <div className="lv-head">
           <h2 className="sc-title">{t('lv.title')}</h2>
-          <Link
-            to="/ranking"
-            className="btn-ghost"
-            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, lineHeight: 1, fontSize: 16, fontWeight: 800, padding: '10px 20px 10px 16px', borderRadius: 12, whiteSpace: 'nowrap' }}
-          >
-            <span aria-hidden="true">🏆</span>{t('rank.title')}
-          </Link>
         </div>
 
         <div className="lv-rule">

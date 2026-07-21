@@ -51,6 +51,50 @@ npm run preview  # 빌드 결과 미리보기
 
 ---
 
+## 라우트 ↔ 파일 맵 (화면 얘기가 나오면 여기부터)
+
+단일 출처 = `src/App.tsx` 의 `<Routes>`. 아래 표와 어긋나면 App.tsx가 맞다(표를 갱신할 것).
+CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접 import 하는 건 `hub.css` 뿐.
+
+| URL | 페이지 파일 | CSS | 주 Edge Function |
+|---|---|---|---|
+| `/` (메인·랜딩) | `pages/Landing.tsx` | `landing.css` | `route-query`(의미 검색 라우터) |
+| `/guide` (급수·응시안내) | `pages/Guide.tsx` | `guide.css` ⚠️급수 색 양쪽 동기화 | — |
+| `/notice` · `/notice/:id` | `Notice.tsx` · `NoticeDetail.tsx` | `shared.css` | `admin`(운영 CRUD) |
+| `/faq` | `pages/Faq.tsx` | `shared.css` | `admin` |
+| `/about` · `/privacy` · `/terms` | `About/Privacy/Terms.tsx` | `policy.css` | — |
+| `/login` · `/auth/callback` | `Login.tsx` · `AuthCallback.tsx` | — | (Supabase Auth) |
+| `/onboarding` (국가·지역·학교) | `pages/Onboarding.tsx` | `shared.css` | `set-region` |
+| **CARIS 자격검정 (CBT 본선)** ||||
+| `/exam` (검정 게이트) | `pages/ExamGate.tsx` | `cbt.css` | — |
+| `/exam/apply` (원서접수) | `pages/ExamApply.tsx` | `cbt.css` | `admin` |
+| `/exam/check` (환경점검·모의) | `pages/ExamCheck.tsx` | `cbt.css` | — |
+| `/exam/prepare` · `/exam/seb` | `ExamPrepare.tsx` · `SebStart.tsx` | `cbt.css` | `start-exam` |
+| `/exam/run/:attemptId` (실제 응시) | `pages/CbtRunner.tsx` | `cbt.css` | `start-exam` · `submit-exam` |
+| `/exam/result/:attemptId` | `pages/ExamResult.tsx` | `cbt.css` | `get-exam-result` |
+| `/exam/complete` · `/exam/done` | `ExamComplete.tsx` · `ExamDone.tsx` | `cbt.css` | — |
+| `/certificate` (자격증 발급) | `pages/Certificate.tsx` | `cert.css` | `get-exam-result` |
+| `/verify/:token` (자격증 진위확인) | `pages/VerifyCert.tsx` | `verify.css` | `verify-cert` |
+| `/mypage` · `/mypage/:section` | `pages/MyPage.tsx` | `dashboard.css` | `my-attempts` · `mypage-ai` |
+| **캐릭터 허브 / 미니게임** ||||
+| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` |
+| `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` | — |
+| `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
+| **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
+| `/arena` (지도+지역랭킹) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx` · `lib/arena/*` | `arena.css` | `leaderboard` |
+| `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
+| `/test/:attemptId` (응시) | `pages/TestRunner.tsx` | `test.css` | `start-test` · `submit-test` |
+| `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` · `submit-report` |
+| `/ranking` (리더보드) | `pages/Ranking.tsx` | `ranking.css` | `leaderboard` |
+| **관리자** ||||
+| `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) | `admin.css` | `admin` · `admin-test` |
+
+- `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
+- 온보딩 게이트(`App.tsx`의 `OnboardingGate`): 정식 회원이 지역 미확정이면 `/test/*` · `/ranking` · `/mypage` 접근 시 `/onboarding` 으로 강제. 그 외 라우트는 통과.
+- **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
+- **`/arena` 는 더 이상 iframe 이 아니다**: 옛 `public/world-arena.html`(자립형 d3 HTML)을 React 로 포팅하고 삭제했다. 지도 경계는 `public/geo/*.json`(world·kr-prov 즉시, kr-muni 는 시도 진입 시 지연 로드), d3 는 npm 서브모듈(`d3-geo`·`d3-zoom` 등). 문구는 `i18n.tsx` 의 `arena.*`.
+- 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
+
 ## 구조 맵
 
 ```
@@ -59,13 +103,15 @@ src/
   context/     AuthProvider — 익명/구글 로그인 + claim 토큰 이관
   hooks/       useAntiCheat(복사차단+이탈감지), useCountUp
   components/  Layout(FAB 패널·언어선택), TierEmblem(티어 SVG 엠블렘), RadarChartBox, TopBar 등
-  pages/       Landing(검색추천+CTA) · LevelSelect(난이도) · TestRunner · Result(엠블렘·승급/강등) · Ranking · Dashboard · AuthCallback
-  styles/      페이지별 css (index.css 가 @import)
+  pages/       33개 — 라우트별 매핑은 위 "라우트 ↔ 파일 맵" 표 참고
+  styles/      페이지별 css (index.css 가 일괄 @import · hub.css만 페이지에서 직접)
 supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   start-test · submit-test · get-result · list-attempts · recommend-level
+  functions/   30개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+               · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy) · 검색라우터(route-query·route-seed)
+               · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용)
 ```
 

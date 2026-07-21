@@ -6,8 +6,7 @@ import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
-import { useNavigate } from 'react-router-dom'
-import { MINIGAMES } from '../lib/minigames'
+import { Link } from 'react-router-dom'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -24,6 +23,7 @@ const ICONS: Record<string, ReactNode> = {
   fire: (<path d="M12 2.5c1.5 3 .5 4.8-.8 6.2C9.7 10.4 8 11.7 8 14.4a4 4 0 1 0 8 0c0-1.3-.5-2.4-1.2-3.4.3 1.1-.4 2-1.2 2-1 0-1.3-1-1-2.3.5-2.3 1-4.6-.6-8.2Z" fill="#ff7a3c" stroke={IK} strokeWidth="1.6" strokeLinejoin="round" />),
   star: (<path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.9l6.5-.9L12 2.6Z" fill="#ffd15a" stroke={IK} strokeWidth="1.8" strokeLinejoin="round" />),
   coin: (<><circle cx="12" cy="12" r="9" fill="#ffc93c" stroke={IK} strokeWidth="2" /><circle cx="12" cy="12" r="6" fill="none" stroke={IK} strokeWidth="1.2" strokeOpacity=".5" /><path d="M9 8.5l3 4 3-4M12 12.5v3M9.7 12.5h4.6M9.7 14h4.6" stroke={IK} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></>),
+  trophy: (<><path d="M7 3.5h10V9a5 5 0 0 1-10 0V3.5Z" fill="#ffd15a" stroke={IK} strokeWidth="2" strokeLinejoin="round" /><path d="M7 5.2H4.4c0 2 1.2 3.5 2.9 3.8M17 5.2h2.6c0 2-1.2 3.5-2.9 3.8" fill="none" stroke={IK} strokeWidth="1.7" strokeLinecap="round" /><path d="M12 14v3" stroke={IK} strokeWidth="2.2" strokeLinecap="round" /><rect x="8.2" y="17" width="7.6" height="3.5" rx="1.2" fill="#ff6b6b" stroke={IK} strokeWidth="2" /></>),
 }
 function Ic({ n, s = 24 }: { n: string; s?: number }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: 'block' }} aria-hidden="true">{ICONS[n]}</svg>
@@ -71,11 +71,10 @@ function friendlyError(e: unknown): string {
   return '오류가 발생했어요. 잠시 후 다시 시도해주세요'
 }
 
-type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'game'
+type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title'
 
 export default function Hub() {
   const { isFullUser, loginWithGoogle, user } = useAuth()
-  const navigate = useNavigate()
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
@@ -230,7 +229,7 @@ export default function Hub() {
             <span className="hud-lv">Lv.{level ?? '—'}</span>
           </div>
           <div className="hud-mid">
-            <div className="hud-name">카리 {titleBadge}</div>
+            <div className="hud-name">CARI {titleBadge}</div>
             <div className="hud-xp">
               <div className="exp"><div className="exp-fill" style={{ width: `${Math.min(100, ((rankPoints || 0) / 10000) * 100)}%` }} /><span className="exp-lab">경험치 {rankPoints.toLocaleString()} / 10000</span></div>
               <span className="gchip"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
@@ -251,8 +250,8 @@ export default function Hub() {
           </div>
           <div className="stage">
             <div className="pedestal" />
-            <img className="hero-char" src="/hub-char.png" alt="카리" />
-            <div className="nameplate"><b>카리</b> {titleBadge}</div>
+            <img className="hero-char" src="/hub-char.png" alt="CARI" />
+            <div className="nameplate"><b>CARI</b> {titleBadge}</div>
           </div>
         </div>
 
@@ -269,10 +268,11 @@ export default function Hub() {
               ))}
             </div>
           </div>
-          <button className="cta-main" onClick={() => setModal('game')}>
-            <span className="cta-star"><Ic n="star" s={24} /></span>
-            미니 게임
-          </button>
+          {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
+          <Link className="cta-main" to="/ranking">
+            <span className="cta-star"><Ic n="trophy" s={24} /></span>
+            랭킹
+          </Link>
         </div>
       </div>
 
@@ -425,33 +425,6 @@ export default function Hub() {
         </Modal>
       )}
 
-      {modal === 'game' && (
-        <Modal title="미니 게임" className="mg-modal" onClose={() => setModal(null)}>
-          <div className="mg-shelf">
-            {MINIGAMES.map((g) => {
-              const [pre, post] = g.accent && g.title.includes(g.accent)
-                ? [g.title.slice(0, g.title.indexOf(g.accent)), g.accent]
-                : [g.title, '']
-              return (
-                <button
-                  key={g.id}
-                  className="mg-cover"
-                  onClick={() => { setModal(null); navigate(`/games/${g.id}`) }}
-                  aria-label={`${g.title} 플레이`}
-                >
-                  <img className="mg-art" src={g.art} alt="" />
-                  <span className="mg-caption">
-                    <span className="mg-badge">{g.badge}</span>
-                    <b className="mg-name">{pre}{post && <i className="mg-accent">{post}</i>}</b>
-                    <span className="mg-tag">{g.tagline}</span>
-                    <span className="mg-play"><b className="mg-play-tri" />PLAY</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }
