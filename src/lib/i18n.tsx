@@ -1312,7 +1312,7 @@ const D: Record<string, Record<Lang, string>> = {
   'arena.bDailyS': { ko: "데일리 콘텐츠", en: "Daily content", ja: "デイリー", zh: "每日内容", hi: "दैनिक", vi: "Nội dung ngày" },
   'arena.foot': { ko: "지역/국가 실데이터가 있으면 자동 반영(참여 5명 이상 지역), 아직 데이터가 없는 지역·시군구는 예시 값입니다.", en: "Regions/countries with live data appear automatically (5+ participants); areas without data show sample values.", ja: "実データのある地域/国は自動反映（参加5人以上）。データのない地域・市郡区はサンプル値です。", zh: "有实时数据的地区/国家自动显示（参与≥5人）；暂无数据的地区·市郡区为示例值。", hi: "लाइव डेटा वाले क्षेत्र/देश स्वतः दिखते हैं (5+ प्रतिभागी); डेटा रहित क्षेत्र नमूना मान हैं।", vi: "Vùng/quốc gia có dữ liệu thực hiển thị tự động (≥5 người); nơi chưa có dữ liệu là giá trị ví dụ." },
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
-  'arena.title': { ko: "월드 아레나", en: "WORLD ARENA", ja: "WORLD ARENA", zh: "WORLD ARENA", hi: "WORLD ARENA", vi: "WORLD ARENA" },
+  'arena.title': { ko: "WORLD ARENA", en: "WORLD ARENA", ja: "WORLD ARENA", zh: "WORLD ARENA", hi: "WORLD ARENA", vi: "WORLD ARENA" },
   'arena.bGame': { ko: "미니게임", en: "Mini Games", ja: "ミニゲーム", zh: "小游戏", hi: "मिनी गेम्स", vi: "Trò chơi nhỏ" },
   'arena.bGameS': { ko: "AI 용어로 한 판", en: "Play & learn terms", ja: "AI用語で一勝負", zh: "用AI术语来一局", hi: "खेलें और सीखें", vi: "Chơi & học thuật ngữ" },
   'arena.loading': { ko: "지도를 불러오는 중…", en: "Loading map…", ja: "地図を読み込み中…", zh: "正在加载地图…", hi: "मानचित्र लोड हो रहा है…", vi: "Đang tải bản đồ…" },

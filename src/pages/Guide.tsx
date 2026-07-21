@@ -125,10 +125,11 @@ export default function Guide() {
           </div>
         </section>
 
-        {/* 상시시험 — 언제든 접수 가능한 회차(원서접수로 이동). 일정 페이지(/exam/schedule) 폐지로 여기서 노출. */}
-        {/* 배경(.guide-band)은 히어로 하늘색 → 본문 흰색으로 넘어가는 전환 구간 역할도 겸한다. */}
-        {rolling.length > 0 && (
-          <section className="py-12 guide-band px-margin-mobile md:px-margin-desktop">
+        {/* 상시시험 — 언제든 접수 가능한 회차(원서접수로 이동). 일정 페이지(/exam/schedule) 폐지로 여기서 노출.
+            이 섹션은 회차가 없어도 항상 렌더한다: 배경(.guide-band)이 히어로 하늘색 → 본문 흰색으로 넘어가는
+            전환 구간을 겸하기 때문. 회차가 늘면 섹션이 그만큼 높아지고 그라데이션도 %기준이라 같이 늘어난다. */}
+        <section className="py-12 guide-band px-margin-mobile md:px-margin-desktop">
+          {rolling.length > 0 && (
             <div className="max-w-container-max mx-auto">
               <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">{t('sched.rolling')}</h2>
               <div className="flex flex-col gap-4">
@@ -157,8 +158,8 @@ export default function Guide() {
                 ))}
               </div>
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* CARIS 자격 소개 — Pro ↔ Master 전환 */}
         <section className="py-16 bg-surface-container-lowest px-margin-mobile md:px-margin-desktop">

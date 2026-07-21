@@ -22,10 +22,10 @@
   --aa-inset-grad: linear-gradient(160deg, #eaf4ff, #a9cef2);
   --aa-inset-lab-bg: rgba(255, 255, 255, .82);
   --aa-surface-mix: #fff;          /* color-mix 로 옅은 배경을 만들 때 섞는 바탕 */
-  /* ⚠️ 원본은 라이트에서 --sh-solid 가 자기 자신을 참조(순환)해 그림자가 전부 무효였다.
-     현재 화면 그대로 유지하려고 transparent 로 옮겨 적었다 — 라이트에도 카툰 그림자를
-     주려면 rgba(51,50,63,.16) 으로 바꾸면 된다. */
-  --aa-sh-solid: transparent;
+  /* 원본은 라이트에서 --sh-solid 가 자기 자신을 참조(순환)해 그림자가 전부 무효였다(다크만 정상).
+     포팅 시엔 현재 화면 보존을 위해 transparent 로 뒀다가, 의도대로 카툰 그림자를 켰다.
+     끄려면 transparent 로 되돌리면 된다. */
+  --aa-sh-solid: rgba(51, 50, 63, .16);
   --aa-shadow: 0 6px 0 var(--aa-sh-solid), 0 16px 26px -14px var(--aa-sh-solid);
 
   color: var(--aa-ink);

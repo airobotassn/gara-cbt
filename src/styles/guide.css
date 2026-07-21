@@ -146,3 +146,5 @@ html.dark .guide-band {
     linear-gradient(180deg, rgba(13, 15, 21, 0) 0%, #0d0f15 88%),
     linear-gradient(90deg, #0d172f 0%, #0b1428 100%);
 }
+/* 상시시험 회차가 0개여도 전환 구간이 남아야 하므로 최소 높이를 준다(내용이 늘면 자연히 커짐). */
+.guide-band { min-height: 132px; }
