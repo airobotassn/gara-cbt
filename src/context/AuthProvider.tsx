@@ -24,6 +24,9 @@ interface AuthState {
   needsOnboarding: boolean
   // 정식 회원의 최초 프로필 조회가 끝날 때까지 true. 익명/무세션은 false.
   onboardingLoading: boolean
+  // 온보딩 화면에서 지역 확정 성공 직후 호출. 이걸 안 하면 needsOnboarding 이 true 로 남아
+  // OnboardingGate 가 목적지에서 다시 /onboarding 으로 튕긴다(새로고침해야 풀리는 버그).
+  markOnboardingDone: () => void
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -131,6 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  // set-region 이 200/409(already_locked) 로 끝났다 = 서버 기준 확정. 재조회 없이 낙관적으로 해제.
+  function markOnboardingDone() {
+    setNeedsOnboarding(false)
+    setOnboardingLoading(false)
+  }
+
   const value: AuthState = {
     session,
     user,
@@ -138,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isFullUser: computeIsFullUser(user),
     needsOnboarding,
     onboardingLoading,
+    markOnboardingDone,
     ensureAnonymous,
     loginWithGoogle,
     loginWithKakao,
