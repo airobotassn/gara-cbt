@@ -416,8 +416,8 @@ export default function WorldArena() {
         {/* 하단 런처 — 아레나가 허브·레벨테스트·데일리·미니게임의 관문 역할을 한다. */}
         <nav className="aa-launch">
           <Link className="aa-lbtn cari" to="/hub">
-            {/* 학사모 이모지 대신 CARI 얼굴(원본 'CARI 정면.png' 에서 머리만 크롭) */}
-            <span className="ic ic-img"><img src="/cari-face.png" alt="" /></span>
+            {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
+            <span className="ic ic-img"><img src="/cari-diagonal.png" alt="" /></span>
             <span className="lt">
               <b>CARI</b>
               <i>{t('arena.bHubS')}</i>
