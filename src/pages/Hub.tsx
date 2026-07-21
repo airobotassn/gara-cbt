@@ -213,6 +213,13 @@ export default function Hub() {
         <span className="spark s3">✧</span><span className="spark s4">✦</span>
       </div>
 
+      {/* 허브는 아레나 런처(CARI 버튼)로 들어오는 화면 — 뒤로가기도 아레나로 */}
+      <div className="hub-backrow">
+        <Link className="hub-back" to="/arena">
+          <span className="ic">←</span>아레나
+        </Link>
+      </div>
+
       {!isFullUser && (
         <div className="slim-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>로그인해야 출석·뽑기·상점이 작동해요</span>

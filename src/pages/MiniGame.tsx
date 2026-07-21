@@ -1,5 +1,6 @@
 // 미니게임 플레이 화면 — 자립형 게임 HTML(public/games/*.html)을 iframe 으로 임베드.
-//   상단 얇은 바에 '허브로' 뒤로가기 + 게임명. 없는 id 는 /hub 로.
+//   상단 얇은 바에 '아레나로' 뒤로가기 + 게임명. 없는 id 도 /arena 로.
+//   (미니게임 진입점이 /arena 하단 런처라 돌아갈 곳도 아레나)
 //   게임 본체가 화면 하단 선택지/HUD 를 꽉 채워 FAB 과 겹치므로, /games/* 에선 Layout 이 FAB 을 숨긴다.
 import { useNavigate, useParams } from 'react-router-dom'
 import { findMiniGame } from '../lib/minigames'
@@ -14,10 +15,10 @@ export default function MiniGame() {
       <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', padding: 24, textAlign: 'center', gap: 12 }}>
         <p style={{ fontWeight: 800, color: '#28324c' }}>준비 중인 미니게임이에요.</p>
         <button
-          onClick={() => navigate('/hub')}
+          onClick={() => navigate('/arena')}
           style={{ padding: '10px 20px', borderRadius: 999, border: 0, cursor: 'pointer', background: '#004ac6', color: '#fff', fontWeight: 800 }}
         >
-          허브로 돌아가기
+          아레나로 돌아가기
         </button>
       </div>
     )
@@ -39,8 +40,8 @@ export default function MiniGame() {
         }}
       >
         <button
-          onClick={() => navigate('/hub')}
-          aria-label="허브로"
+          onClick={() => navigate('/arena')}
+          aria-label="아레나로"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -55,7 +56,7 @@ export default function MiniGame() {
             cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> 허브
+          <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> 아레나
         </button>
         <strong style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }}>{game.title}</strong>
         <span style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{game.tagline}</span>

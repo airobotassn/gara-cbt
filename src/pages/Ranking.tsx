@@ -83,7 +83,8 @@ export default function Ranking() {
 
   return (
     <div className="wrap hof-wrap">
-      <TopBar />
+      {/* 랭킹 진입점이 허브 도크 CTA 라 뒤로가기도 허브로 */}
+      <TopBar to="/hub" label={t('common.hub')} />
 
       <header className="hof-head">
         <div className="hof-badge">

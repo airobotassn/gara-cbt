@@ -181,7 +181,9 @@
 
   /* 시작 인트로 (게임 타이틀 화면) */
   .intro{ gap:0; }
-  .intro-mascot{ width:284px; height:auto; margin-top:-6px; filter:drop-shadow(0 14px 18px rgba(70,90,140,.32)); animation:bob 2.6s ease-in-out infinite; }
+  /* 마스코트 크기를 화면 높이에 연동 — 세로가 짧은 폰(예: 375x667)에서 앱 헤더까지 빠지면
+     '버티기 시작' 버튼이 화면 밖으로 밀려 잘렸다. 높은 화면에서는 min() 이 284px 로 잡혀 원래 그대로. */
+  .intro-mascot{ width:min(284px, 36vh); height:auto; margin-top:-6px; filter:drop-shadow(0 14px 18px rgba(70,90,140,.32)); animation:bob 2.6s ease-in-out infinite; }
   @keyframes bob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}}
   .intro-title{ font-size:44px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:10px 0 0;
     transform:rotate(-2.5deg); animation:titlePop .55s cubic-bezier(.2,1.7,.4,1) both; }

@@ -84,7 +84,8 @@ export default function LevelSelect() {
 
   return (
     <div className="wrap">
-      <TopBar />
+      {/* 레벨테스트는 아레나에서 들어오는 화면 — 뒤로가기도 아레나로 */}
+      <TopBar to="/arena" label={t('common.leveltest')} />
       <div className="card pad">
         {/* 랭킹 진입점은 /hub 도크 CTA 로 옮겼다(레벨선택 화면에서는 제거). */}
         <div className="lv-head">

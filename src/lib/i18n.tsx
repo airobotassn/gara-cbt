@@ -21,6 +21,7 @@ const D: Record<string, Record<Lang, string>> = {
   'common.dashboard': { ko: '학습 대시보드', en: 'Learning dashboard', ja: '学習ダッシュボード', zh: '学习仪表盘', hi: 'लर्निंग डैशबोर्ड', vi: 'Bảng điều khiển học tập' },
   'common.close': { ko: '닫기', en: 'Close', ja: '閉じる', zh: '关闭', hi: 'बंद करें', vi: 'Đóng' },
   'common.ranking': { ko: '랭킹', en: 'Ranking', ja: 'ランキング', zh: '排行榜', hi: 'रैंकिंग', vi: 'Xếp hạng' },
+  'common.hub': { ko: '허브', en: 'Hub', ja: 'ハブ', zh: '角色中心', hi: 'हब', vi: 'Hub' },
   'common.leveltest': { ko: 'WORLD ARENA', en: 'WORLD ARENA', ja: 'WORLD ARENA', zh: 'WORLD ARENA', hi: 'WORLD ARENA', vi: 'WORLD ARENA' },
   'common.login_google': { ko: '구글로 로그인', en: 'Sign in with Google', ja: 'Googleでログイン', zh: '使用 Google 登录', hi: 'Google से साइन इन करें', vi: 'Đăng nhập bằng Google' },
   'common.logout': { ko: '로그아웃', en: 'Sign out', ja: 'ログアウト', zh: '退出登录', hi: 'साइन आउट', vi: 'Đăng xuất' },
