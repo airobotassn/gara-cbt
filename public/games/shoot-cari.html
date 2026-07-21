@@ -67,12 +67,14 @@
     font-variant-numeric:tabular-nums; opacity:0; transition:opacity .2s;}
   .combo.on{opacity:1;}
 
+  /* 떨어지는 문제 글씨: 돌 표면이 밝은 하늘색이라 흰 글씨는 모바일에서 거의 안 읽혔다.
+     → 진한 남색 + 크기/굵기 상향 + 흰 그림자로 대비 확보(밝은 파랑 돌·붉은 near 돌 양쪽에서 읽힘). */
   .meteor{position:absolute; z-index:2; width:190px; padding:10px 12px; border-radius:14px;
-    color:#fff; font-size:12.5px; font-weight:600; line-height:1.4; text-align:center;
+    color:#132038; font-size:14.5px; font-weight:800; line-height:1.4; text-align:center;
+    text-shadow:0 1px 0 rgba(255,255,255,.6);
     background:linear-gradient(160deg,var(--stone1),var(--stone2) 55%,var(--stone3));
     box-shadow:0 6px 16px rgba(80,105,165,.35), inset 0 2px 6px rgba(255,255,255,.25);
     will-change:transform;}
-  .meteor .tag{display:block; font-size:9.5px; font-weight:900; letter-spacing:.05em; opacity:.85; margin-bottom:3px;}
   .meteor.near{box-shadow:0 6px 16px rgba(242,102,79,.5), inset 0 2px 6px rgba(255,255,255,.25);
     background:linear-gradient(160deg,#eeb2a6,#d98878 55%,#c56f5f);}
   .meteor.hit{animation:pop .3s forwards;}
@@ -340,7 +342,6 @@ const POOL=[
   ["멀티모달","언어·이미지 등 다른 종류 데이터를 함께 이해","피지컬AI"],
   ["VLA모델","시각·언어를 입력받아 곧바로 로봇 행동을 출력","피지컬AI"],
 ];
-const CATCOLOR={AI:"#3f6ee0","로봇":"#12a58c","피지컬AI":"#e59b17"};
 function norm(s){return s.replace(/\(.*?\)/g,"").replace(/\s+/g,"").toLowerCase();}
 
 const $=id=>document.getElementById(id);
@@ -374,7 +375,8 @@ function spawn(){
   const q=nextQ(), [term,def,cat]=q;
   const el=document.createElement("div");
   el.className="meteor";
-  el.innerHTML=`<div class="flashred"></div><span class="tag" style="color:${CATCOLOR[cat]};filter:brightness(1.4)">${cat}</span>${def}`;
+  // 문제 글씨만 — 위에 붙던 분야 태그(AI·로봇·피지컬AI)는 가독성 때문에 뺐다.
+  el.innerHTML=`<div class="flashred"></div>${def}`;
   el.style.left="0px"; el.style.top="0px";
   pit.appendChild(el);
   const w=el.offsetWidth, pw=pit.clientWidth;
