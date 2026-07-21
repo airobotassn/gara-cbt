@@ -111,6 +111,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const [askQuit, setAskQuit] = useState(false) // 종료(포기) 확인 모달 — 네이티브 confirm은 전체화면 해제+포커스 이탈로 부정행위 오탐 유발 → 금지
   const submittedRef = useRef(false)
 
+  // 문제 영역 / 답안지(OMR) 스크롤 컨테이너 + 답안지 각 행 — 문항 이동 시 답안지를 따라가게 하는 데 쓴다.
+  const paperRef = useRef<HTMLElement>(null)
+  const omrRef = useRef<HTMLDivElement>(null)
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+
   // 문항별 체류시간(초)
   const startTimeRef = useRef<number[]>(Array(total).fill(0))
   const spentRef = useRef<number[]>(Array(total).fill(0))
@@ -269,9 +274,34 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const answeredCount = questions.reduce((n, _, i) => n + (isAnswered(i) ? 1 : 0), 0)
   const low = remainMs <= 5 * 60000
 
+  // 문항이 바뀌면 문제 영역은 맨 위부터 읽게 되돌린다(답 선택으로는 움직이면 안 되므로 index 에만 반응).
+  useEffect(() => {
+    paperRef.current?.scrollTo({ top: 0 })
+  }, [index])
+
+  // 답안지를 현재 문항에 맞춘다 — 문항을 옮겼을 때뿐 아니라 **왼쪽에서 답을 고른 순간**에도.
+  //   (답안지를 1번 근처로 올려둔 채 20번을 풀면, 3번을 찍어도 어디에 표기됐는지 안 보이던 문제)
+  //   이미 보이는 행이면 아무것도 하지 않는다 — 답안지에서 직접 번호/보기를 누른 경우 화면이 튀지 않도록.
+  //   컨테이너 안에서만 움직여야 해서 scrollIntoView(조상까지 스크롤) 대신 직접 계산한다.
+  const curMark = q.kind === 'short' ? (texts[index].trim() ? 1 : 0) : selected[index]
+  useEffect(() => {
+    const row = rowRefs.current[index]
+    const box = omrRef.current
+    if (!row || !box) return
+    const r = row.getBoundingClientRect()
+    const b = box.getBoundingClientRect()
+    const pad = 12
+    if (r.top < b.top + pad) box.scrollBy({ top: r.top - b.top - pad, behavior: 'smooth' })
+    else if (r.bottom > b.bottom - pad) box.scrollBy({ top: r.bottom - b.bottom + pad, behavior: 'smooth' })
+  }, [index, curMark])
+
+  // 루트를 뷰포트 높이에 '고정'한다(min-h 가 아니라 h + overflow-hidden).
+  //   min-h-screen 이면 컨테이너가 내용만큼 늘어나 안쪽 overflow-y-auto 가 아예 발동하지 않고
+  //   페이지 전체가 스크롤된다 → 문제와 답안지가 한 덩어리로 같이 움직이던 원인.
+  //   (응시 화면은 isMobileDevice() 로 모바일을 막으므로 데스크톱 전제로 잡아도 안전)
   return (
     <div
-      className="force-light bg-surface min-h-screen flex flex-col font-body-md text-on-surface no-select"
+      className="force-light bg-surface h-dvh overflow-hidden flex flex-col font-body-md text-on-surface no-select"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* 부정행위 마스크 */}
@@ -286,7 +316,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       )}
 
       {/* Exam Header */}
-      <header className="bg-surface-container-lowest border-b border-outline-variant/30 h-16 flex items-center px-4 md:px-margin-desktop justify-between sticky top-0 z-50">
+      <header className="bg-surface-container-lowest border-b border-outline-variant/30 h-16 shrink-0 flex items-center px-4 md:px-margin-desktop justify-between z-50">
         <div className="flex items-center gap-2">
           <img alt="CARIS" className="h-8 w-8 object-cover rounded-full" src="/logo.png" />
           <span className="font-title-md text-title-md font-bold text-on-surface tracking-tight">{t('run.top_title', { title: exam.title })}</span>
@@ -321,9 +351,10 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       </header>
 
       {/* Split */}
-      <main className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden bg-surface-container-lowest">
-        {/* Left: 문제 */}
-        <section className="flex-[6] flex flex-col bg-surface-container-lowest border-r border-outline-variant/30 overflow-y-auto">
+      {/* min-h-0 이 없으면 flex 자식의 기본 min-height:auto 때문에 내용만큼 늘어나 스크롤이 안 생긴다. */}
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row w-full overflow-hidden bg-surface-container-lowest">
+        {/* Left: 문제 — 답안지와 독립 스크롤 */}
+        <section ref={paperRef} className="flex-[6] min-h-0 flex flex-col bg-surface-container-lowest border-r border-outline-variant/30 overflow-y-auto">
           <div className="p-8 md:p-12 flex flex-col gap-8 w-full">
             <div className="flex items-start justify-between border-b border-outline-variant/30 pb-4">
               <div className="flex items-baseline gap-2">
@@ -373,9 +404,9 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
         </section>
 
         {/* Right: 답안지/현황 */}
-        <section className="flex-[4] flex flex-col bg-surface overflow-hidden">
-          {/* 답안지(OMR) — 진행 현황 포함 (별도 '현황' 탭 없음) */}
-            <div className="p-6 flex-1 overflow-y-auto bg-surface-container-low">
+        <section className="flex-[4] min-h-0 flex flex-col bg-surface overflow-hidden">
+          {/* 답안지(OMR) — 진행 현황 포함 (별도 '현황' 탭 없음). 문제 영역과 독립 스크롤. */}
+            <div ref={omrRef} className="p-6 flex-1 min-h-0 overflow-y-auto bg-surface-container-low">
               <div className="flex justify-between items-center mb-4 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm">
                 <span className="font-title-md text-[16px] font-bold text-on-surface flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary block"></span> {t('run.tab_sheet')}</span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant">{t('run.completed')} <strong className="text-primary font-bold text-[14px]">{answeredCount}</strong>/{total}</span>
@@ -390,7 +421,11 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
                 {questions.map((qq, i) => {
                   const cur = i === index
                   return (
-                    <div key={qq.id} className={`grid grid-cols-[80px_1fr] border-b border-outline-variant/20 transition-colors ${cur ? 'bg-primary/5' : 'hover:bg-surface-container-low'}`}>
+                    <div
+                      key={qq.id}
+                      ref={(el) => { rowRefs.current[i] = el }}
+                      className={`grid grid-cols-[80px_1fr] border-b border-outline-variant/20 transition-colors ${cur ? 'bg-primary/5' : 'hover:bg-surface-container-low'}`}
+                    >
                       <button onClick={() => setIndex(i)} className={`py-4 flex items-center justify-center font-title-md text-[16px] border-r border-outline-variant/20 relative ${cur ? 'font-bold text-primary' : 'text-on-surface-variant'}`}>
                         {cur && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-r-sm"></div>}
                         {i + 1}
@@ -428,7 +463,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       </main>
 
       {/* Bottom Action Bar */}
-      <footer className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 flex items-center justify-between sticky bottom-0 z-50 relative">
+      <footer className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 shrink-0 flex items-center justify-between z-50 relative">
         <div className="flex items-center gap-2">
           <span className="font-bold text-primary text-[16px]">{index + 1}</span>
           <span className="text-outline text-[14px]">/ {total}</span>
