@@ -88,3 +88,61 @@ html.dark .gld-idx { color: color-mix(in srgb, var(--c) 58%, white); background:
   .gld-body { padding: 20px 20px 22px; }
   .gld-subj li { font-size: 15.5px; }
 }
+
+/* ── /guide 히어로 로고 락업 (레퍼런스: 바탕화면 dudfks3534@moate_20260721_141058674.png) ──
+   색은 레퍼런스 PNG 에서 직접 추출: 배경 #d4e5ee~#ddedfd / CARIS #00236e / 부제 #164691 / 바 #57a0fa
+   ⚠️ 배경을 .mesh-gradient-bg 로 두지 않는 이유: 그 클래스는 /mypage 와 공유라 고치면 그쪽까지 바뀐다. */
+.guide-hero {
+  --gh-title: #00236e;
+  --gh-sub: #164691;
+  --gh-bar: #57a0fa;
+  background-color: #ddedfd;
+  background-image:
+    linear-gradient(155deg, #d4e5ee 0%, #ddedfd 45%, #d7e8fc 100%),
+    radial-gradient(at 50% 0%, rgba(255, 255, 255, .55) 0px, transparent 60%);
+}
+/* 다크에서는 레퍼런스의 옅은 하늘색을 그대로 쓰면 눈이 부시고 글자가 안 읽힌다 → 딥 네이비로 반전 */
+html.dark .guide-hero {
+  --gh-title: #cfe0ff;
+  --gh-sub: #9dc0f0;
+  --gh-bar: #57a0fa;
+  background-color: #0d1730;
+  background-image:
+    linear-gradient(155deg, #101c3a 0%, #0d1730 45%, #0b1428 100%),
+    radial-gradient(at 50% 0%, rgba(87, 160, 250, .16) 0px, transparent 60%);
+}
+
+.guide-hero-lockup { display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* logo.png 는 상하좌우 여백이 39% 라 그대로 넣으면 작고 붕 뜬다 → 크게 잡고 음수 마진으로 상쇄 */
+.guide-hero-logo { width: 168px; height: auto; display: block; margin: -22px 0 -14px; }
+.guide-hero-title { font-size: clamp(52px, 7vw, 86px); font-weight: 900; letter-spacing: .02em;
+  line-height: 1; color: var(--gh-title); margin: 0; }
+.guide-hero-sub { font-size: clamp(16px, 1.7vw, 22px); font-weight: 800; letter-spacing: -.01em;
+  color: var(--gh-sub); margin: 14px 0 0; word-break: keep-all; }
+.guide-hero-bar { display: block; width: 84px; height: 4px; border-radius: 999px;
+  background: var(--gh-bar); margin: 20px auto 0; }
+
+@media (max-width: 640px) {
+  .guide-hero-logo { width: 132px; margin: -18px 0 -11px; }
+  .guide-hero-bar { width: 68px; margin-top: 16px; }
+}
+
+/* ── 상시시험 띠 = 히어로(하늘색) → 본문(흰색) 전환 구간 ──
+   원래 bg-background(#faf8ff, 연보라)라 파란 히어로와 흰 본문 사이에서 혼자 떠 보이고
+   위아래 경계선이 두 줄 생겼다. 색을 하나 고르는 대신 '그라데이션 다리'로 바꾼다.
+   ⚠️ 시작색은 히어로 아래끝 실측값(좌 #dcecfd → 우 #d7e8fc)이라 이음매가 안 보인다.
+      히어로 배경(.guide-hero)을 바꾸면 이 값도 같이 맞춰야 함.
+   ⚠️ bg-background 토큰 자체는 손대지 않는다 — 앱 전역이 쓰는 토큰이라 다른 페이지까지 바뀐다. */
+.guide-band {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 88%),
+    linear-gradient(90deg, #dcecfd 0%, #d7e8fc 100%);
+}
+/* 다크: 히어로 아래끝(#0d172f→#0b1428) → 아래 본문 surface(#0d0f15) */
+html.dark .guide-band {
+  background-color: #0d0f15;
+  background-image:
+    linear-gradient(180deg, rgba(13, 15, 21, 0) 0%, #0d0f15 88%),
+    linear-gradient(90deg, #0d172f 0%, #0b1428 100%);
+}

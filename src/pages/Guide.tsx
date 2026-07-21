@@ -75,14 +75,14 @@ export default function Guide() {
       {/* 헤더 없음 — FAB이 네비 */}
       <main>
         {/* Hero */}
-        <section className="relative min-h-[460px] flex items-center overflow-hidden mesh-gradient-bg py-16 px-margin-mobile md:px-margin-desktop">
+        <section className="relative min-h-[460px] flex items-center overflow-hidden guide-hero py-16 px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-            <div className="text-on-surface space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#004ac6] font-bold text-label-sm uppercase tracking-wider mb-4 shadow-sm border border-white/50">
-                <span className="material-symbols-outlined text-[16px]">verified</span>
-                CARIS Certification
-              </div>
-              <h1 className="font-display-lg text-display-lg font-bold leading-tight">{t('guide.hero_title_l1')}<br />{t('guide.hero_title_l2')}</h1>
+            {/* 로고 락업 — 오른쪽 일정 패널은 그대로 두고 이 칸만 가운데 정렬 */}
+            <div className="guide-hero-lockup">
+              <img className="guide-hero-logo" src="/logo.png" alt="CARIS" />
+              <h1 className="guide-hero-title">CARIS</h1>
+              <p className="guide-hero-sub">{t('guide.hero_lockup_sub')}</p>
+              <span className="guide-hero-bar" aria-hidden="true" />
             </div>
             <div className="glass-panel rounded-2xl p-8 ambient-shadow border border-white/40">
               <h3 className="font-title-md text-title-md text-on-surface mb-6 flex items-center gap-2">
@@ -126,8 +126,9 @@ export default function Guide() {
         </section>
 
         {/* 상시시험 — 언제든 접수 가능한 회차(원서접수로 이동). 일정 페이지(/exam/schedule) 폐지로 여기서 노출. */}
+        {/* 배경(.guide-band)은 히어로 하늘색 → 본문 흰색으로 넘어가는 전환 구간 역할도 겸한다. */}
         {rolling.length > 0 && (
-          <section className="py-12 bg-background px-margin-mobile md:px-margin-desktop">
+          <section className="py-12 guide-band px-margin-mobile md:px-margin-desktop">
             <div className="max-w-container-max mx-auto">
               <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">{t('sched.rolling')}</h2>
               <div className="flex flex-col gap-4">
