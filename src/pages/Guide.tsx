@@ -37,9 +37,8 @@ const PYRAMID: { key: string; polygon: string; lblY: number; nmY: number; nmSize
 // 피라미드 우측 그룹 브레이스( ] )+라벨. 위 3티어(y40~460)=피지컬 AI(CARIS-Ⅱ), 아래 3티어(y460~880)=AI·로봇 리터러시(CARIS-Ⅰ).
 //   viewBox 를 x1360 으로 넓혀(피라미드는 60~940 그대로) 오른쪽 여백 940~1360 에 배치 → 피라미드가 살짝 왼쪽으로.
 const PYRAMID_GROUPS: { key: string; tkey: string; y1: number; y2: number; color: string }[] = [
-  // 두 브레이스가 Master/Elite 경계(y460)에서 거의 붙어 보여 간격을 넓혔다(16→60단위).
-  { key: 'phys', tkey: 'guide.group_physical', y1: 52, y2: 430, color: '#12a58c' },  // Zenith~Master
-  { key: 'lit', tkey: 'guide.group_literacy', y1: 490, y2: 868, color: '#1156bd' },  // Elite~Beginner
+  { key: 'phys', tkey: 'guide.group_physical', y1: 52, y2: 452, color: '#12a58c' },  // Zenith~Master
+  { key: 'lit', tkey: 'guide.group_literacy', y1: 468, y2: 868, color: '#1156bd' },  // Elite~Beginner
 ]
 
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
@@ -239,7 +238,7 @@ export default function Guide() {
               </div>
 
               {TRACKS.map((tr) => (
-                <div key={tr.key}>
+                <div key={tr.key} className="gld-track-block">
                   {/* 트랙 헤더(CARIS-Ⅰ/Ⅱ + 태그라인)는 제거 — 트랙명은 각 카드 배너의 .gld-track 에 이미 나온다. */}
                   <div className="gld-cards">
                     {tr.tiers.map((tier) => {

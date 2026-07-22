@@ -50,6 +50,9 @@
 
 /* 자격증 플레이트 카드 */
 .gld-cards { display: flex; flex-direction: column; gap: 18px; }
+/* 트랙(CARIS-Ⅰ/Ⅱ) 블록 사이 간격 — 옛 트랙 헤더(.gld-grp)를 없애며 사라진 구분을 대신한다.
+   카드 내부 간격(18px)보다 넓혀 Elite(Ⅰ 끝)와 Master(Ⅱ 시작)가 붙어 보이지 않게. */
+.gld-track-block + .gld-track-block { margin-top: 36px; }
 .gld-card {
   scroll-margin-top: 20px; background: var(--color-surface-container-lowest);
   border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
