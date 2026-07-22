@@ -324,41 +324,6 @@ alter table profiles add column if not exists deactivated_at timestamptz;
 create index if not exists profiles_deactivated_idx
   on profiles (deactivated_at) where deactivated_at is not null;
 
--- 명예의 전당 RPC: user_progress.points 정렬(동점=먼저 도달), 탈퇴자 제외. leaderboard 함수가 호출.
-create or replace function public.global_top(p_uid uuid, p_limit int default 10)
-returns jsonb language sql stable as $$
-with ranked as (
-  select p.user_id, p.rank as lvl, p.points,
-         row_number() over (order by p.points desc, p.updated_at asc) as grank,
-         count(*) over () as gtotal
-  from user_progress p
-  join profiles pr0 on pr0.id = p.user_id and pr0.deactivated_at is null
-)
-select jsonb_build_object(
-  'top', coalesce((
-    select jsonb_agg(jsonb_build_object(
-      'rank', r.grank,
-      'name', coalesce(nullif(pr.display_name, ''), '익명'),
-      'level', r.lvl,
-      'rating', r.points,
-      'avatar', pr.avatar_url,
-      'me', (r.user_id = p_uid)
-    ) order by r.grank)
-    from ranked r left join profiles pr on pr.id = r.user_id
-    where r.grank <= p_limit
-  ), '[]'::jsonb),
-  'total', coalesce((select gtotal from ranked limit 1), 0),
-  'me', (
-    select jsonb_build_object(
-      'rank', r.grank, 'level', r.lvl, 'rating', r.points,
-      'name', coalesce(nullif(pr.display_name, ''), '익명'), 'avatar', pr.avatar_url
-    )
-    from ranked r left join profiles pr on pr.id = r.user_id
-    where r.user_id = p_uid
-  )
-);
-$$;
-
 -- 보관기간(기본 90일) 지난 탈퇴 계정 완전 삭제(auth.users → cascade).
 create or replace function public.purge_deactivated_accounts(retention_days int default 90)
 returns int language plpgsql security definer set search_path = public, auth as $$
@@ -453,137 +418,6 @@ end $$;
 drop trigger if exists trg_region_lock on profiles;
 create trigger trg_region_lock before update on profiles
   for each row execute function enforce_region_lock();
-
-
--- ============================================================
--- 집계 리더보드 RPC (Phase 1 · T7)
---   · 지역/국가/학교 버킷 집계만 반환(개인 식별 필드 절대 미노출).
---   · SECURITY DEFINER + set search_path=public. service-role(엣지fn)만 호출:
---     PUBLIC/anon/authenticated 는 revoke execute → service_role 에만 grant.
---     ⚠️ Postgres 는 함수 생성 시 PUBLIC 에 EXECUTE 기본부여 → anon/authenticated
---        만 revoke 하면 PUBLIC 경유로 무력화(T1 CONTROL 과 동일 함정). PUBLIC 부터 revoke.
---   · MIN_BUCKET_USERS=5 프라이버시 floor — member_count<5 버킷 제외
---     (학교 n=1 레벨 유출 방지). 아래 having 절의 리터럴 5 (추후 config-driven).
---   · 참여율 단일출처 = active_today_user_ids() 헬퍼 한 곳만 Phase-2 스왑.
---   · KST 경계: (ts at time zone 'Asia/Seoul')::date.
---   · score = daily? avg_level*participation : avg_level(season 누적).
---   멱등(재실행 안전). schema.sql 의 동명 블록과 DDL 동일.
--- ============================================================
-
--- (1) 참여율 단일출처 헬퍼 — 오늘(KST) 응시 기록이 있는 distinct 유저.
---     Phase-2 에 daily_activity 로 교체하는 단일 지점(여기만 바꾸면 RPC 3종 반영).
---     RPC 3종이 definer 컨텍스트에서만 호출 → 외부 실행권한 전부 revoke.
-create or replace function public.active_today_user_ids() returns setof uuid
-  language sql stable security definer set search_path = public as $$
-  -- Phase-2 스왑: test_attempts 프록시 → 실제 참여 신호 daily_activity(day=KST 캘린더일).
-  select user_id from daily_activity
-  where day = (now() at time zone 'Asia/Seoul')::date
-$$;
-revoke execute on function public.active_today_user_ids() from public, anon, authenticated;
-
--- (2) region_leaderboard — country_code=p_country, region_code 버킷.
-create or replace function public.region_leaderboard(p_country text default 'KR', p_window text default 'daily')
-returns jsonb
-language sql stable security definer set search_path = public as $$
-with active as (select user_id from active_today_user_ids() as t(user_id)),
-buckets as (
-  select pr.region_code                                          as code,
-         count(*)                                                as member_count,
-         avg(up.rank)::numeric                                   as avg_level,
-         count(*) filter (where a.user_id is not null)           as active_today
-  from profiles pr
-  join user_progress up on up.user_id = pr.id
-  left join active a     on a.user_id = pr.id
-  where pr.deactivated_at is null
-    and pr.country_code = p_country
-    and pr.region_code is not null
-  group by pr.region_code
-  having count(*) >= 5   -- MIN_BUCKET_USERS 프라이버시 floor (추후 config-driven)
-)
-select coalesce(jsonb_agg(jsonb_build_object(
-    'code',          code,
-    'member_count',  member_count,
-    'avg_level',     round(avg_level, 2),
-    'active_today',  active_today,
-    'participation', round(active_today::numeric / member_count, 4),
-    'score',         round(case p_window when 'season' then avg_level
-                                         else avg_level * (active_today::numeric / member_count) end, 4)
-  ) order by (case p_window when 'season' then avg_level
-                            else avg_level * (active_today::numeric / member_count) end) desc), '[]'::jsonb)
-from buckets;
-$$;
-revoke execute on function public.region_leaderboard(text, text) from public, anon, authenticated;
-grant  execute on function public.region_leaderboard(text, text) to service_role;
-
--- (3) country_leaderboard — country_code 버킷(전 국가).
-create or replace function public.country_leaderboard(p_window text default 'daily')
-returns jsonb
-language sql stable security definer set search_path = public as $$
-with active as (select user_id from active_today_user_ids() as t(user_id)),
-buckets as (
-  select pr.country_code                                         as code,
-         count(*)                                                as member_count,
-         avg(up.rank)::numeric                                   as avg_level,
-         count(*) filter (where a.user_id is not null)           as active_today
-  from profiles pr
-  join user_progress up on up.user_id = pr.id
-  left join active a     on a.user_id = pr.id
-  where pr.deactivated_at is null
-    and pr.country_code is not null
-  group by pr.country_code
-  having count(*) >= 5   -- MIN_BUCKET_USERS 프라이버시 floor (추후 config-driven)
-)
-select coalesce(jsonb_agg(jsonb_build_object(
-    'code',          code,
-    'member_count',  member_count,
-    'avg_level',     round(avg_level, 2),
-    'active_today',  active_today,
-    'participation', round(active_today::numeric / member_count, 4),
-    'score',         round(case p_window when 'season' then avg_level
-                                         else avg_level * (active_today::numeric / member_count) end, 4)
-  ) order by (case p_window when 'season' then avg_level
-                            else avg_level * (active_today::numeric / member_count) end) desc), '[]'::jsonb)
-from buckets;
-$$;
-revoke execute on function public.country_leaderboard(text) from public, anon, authenticated;
-grant  execute on function public.country_leaderboard(text) to service_role;
-
--- (4) school_leaderboard — country_code=p_country, school_id 버킷(label=schools.name).
-create or replace function public.school_leaderboard(p_country text default 'KR', p_window text default 'daily')
-returns jsonb
-language sql stable security definer set search_path = public as $$
-with active as (select user_id from active_today_user_ids() as t(user_id)),
-buckets as (
-  select pr.school_id                                            as code,
-         max(s.name)                                             as label,
-         count(*)                                                as member_count,
-         avg(up.rank)::numeric                                   as avg_level,
-         count(*) filter (where a.user_id is not null)           as active_today
-  from profiles pr
-  join user_progress up on up.user_id = pr.id
-  left join schools s    on s.id = pr.school_id
-  left join active a     on a.user_id = pr.id
-  where pr.deactivated_at is null
-    and pr.country_code = p_country
-    and pr.school_id is not null
-  group by pr.school_id
-  having count(*) >= 5   -- MIN_BUCKET_USERS 프라이버시 floor (추후 config-driven)
-)
-select coalesce(jsonb_agg(jsonb_build_object(
-    'code',          code,
-    'label',         label,
-    'member_count',  member_count,
-    'avg_level',     round(avg_level, 2),
-    'active_today',  active_today,
-    'participation', round(active_today::numeric / member_count, 4),
-    'score',         round(case p_window when 'season' then avg_level
-                                         else avg_level * (active_today::numeric / member_count) end, 4)
-  ) order by (case p_window when 'season' then avg_level
-                            else avg_level * (active_today::numeric / member_count) end) desc), '[]'::jsonb)
-from buckets;
-$$;
-revoke execute on function public.school_leaderboard(text, text) from public, anon, authenticated;
-grant  execute on function public.school_leaderboard(text, text) to service_role;
 
 -- ---------- 어드민: 지역 오배정 정정 (T9) ----------
 -- 락된 profiles 의 국가/지역을 어드민 CS 경로로 강제 정정. enforce_region_lock 트리거를
@@ -1135,3 +969,433 @@ begin
 end $$;
 revoke execute on function public.consume_quota(uuid, text, int) from public, anon, authenticated;
 grant  execute on function public.consume_quota(uuid, text, int) to service_role;
+-- ============================================================
+-- 랭킹 통합 재설계 STAGE 1 — skill/activity 점수 분리 + activity_ledger + 시즌 아카이브 + reset_season().
+--   델타 마이그레이션: migrations/20260721010000_ranking_progress_columns.sql
+--                     migrations/20260721020000_activity_ledger.sql
+--                     migrations/20260721030000_ranking_season_archive.sql
+--                     migrations/20260721040000_daily_activity_flags.sql
+--                     migrations/20260721050000_reset_season_fn.sql
+-- ============================================================
+
+-- 랭킹 통합 재설계 STAGE 1a — user_progress 실력/활동 점수 분리 컬럼.
+--  · skill_score = 기존 응시 기반 실력 트랙, activity_score = 출석/학습/미니게임 등 활동 적립(activity_ledger 트리거 전용).
+--  · season_total = 두 트랙 합(generated, 통합 랭킹 정렬 단일출처). tier 컬럼은 두지 않음(read-시점 파생).
+--  · 기존 points(옛 랭킹점수) 는 유지(drop 금지) — 하위호환 + 아래 백필 소스.
+--  멱등(재실행 안전). schema.sql 의 동명 블록과 DDL 동일.
+alter table user_progress add column if not exists skill_score numeric not null default 0;
+alter table user_progress add column if not exists activity_score numeric not null default 0;
+alter table user_progress add column if not exists season_total numeric generated always as (skill_score + activity_score) stored;
+alter table user_progress add column if not exists season_id int;
+create index if not exists user_progress_season_total_idx on user_progress (season_total desc, updated_at asc);
+
+-- 인라인 백필(단일 statement): 기존 points(0~10000, 예전 랭킹점수)를 skill_score 초기값으로 복사 — 순서 보존·동점 방지.
+--   points=0(미응시자) 는 스킵 — skill_score 는 이미 default 0.
+update user_progress set skill_score = points where skill_score = 0 and points > 0;
+
+-- 랭킹 통합 재설계 STAGE 1b — activity_ledger: 활동 점수 append-only 원장 + user_progress.activity_score 원자 증분 트리거.
+--  · 하루-cap 소스(attendance/daily_learn) 멱등키: 부분 unique(user_id, kind, day). minigame 은 게임별 1행/일 unique(user_id, day, source_ref).
+--  · 트리거(AFTER INSERT, SECURITY DEFINER): activity_score = activity_score + new.delta 원자 증분(complete_daily 원자 증분 패턴, read-modify-write 경합 없음).
+--  · user_currency(cosmetic 재화)와 무조인(별개 레이어) — 이 원장은 activity_score 만 갱신한다.
+--  멱등(재실행 안전). schema.sql 의 동명 블록과 DDL 동일.
+create table if not exists activity_ledger (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  season_id int not null,
+  kind text not null check (kind in ('attendance','daily_learn','minigame')),
+  delta numeric not null check (delta >= 0),
+  day date not null,
+  source_ref text,
+  created_at timestamptz default now(),
+  check (kind <> 'minigame' or source_ref is not null)
+);
+alter table activity_ledger enable row level security;
+
+create unique index if not exists activity_ledger_daycap_idx
+  on activity_ledger (user_id, kind, day) where kind in ('attendance','daily_learn');
+create unique index if not exists activity_ledger_minigame_idx
+  on activity_ledger (user_id, day, source_ref);
+
+create or replace function activity_ledger_apply() returns trigger
+  language plpgsql security definer set search_path = public as $$
+declare
+  v_diff numeric := new.delta - coalesce(old.delta, 0);
+begin
+  if v_diff = 0 then
+    return new;
+  end if;
+  insert into user_progress (user_id, activity_score, updated_at)
+    values (new.user_id, v_diff, now())
+    on conflict (user_id) do update
+      set activity_score = user_progress.activity_score + v_diff, updated_at = now();
+  return new;
+end
+$$;
+
+drop trigger if exists activity_ledger_apply_trg on activity_ledger;
+create trigger activity_ledger_apply_trg
+  after insert or update on activity_ledger
+  for each row execute function activity_ledger_apply();
+
+revoke execute on function activity_ledger_apply() from public, anon, authenticated;
+
+-- 랭킹 통합 재설계 STAGE 1c — 시즌 아카이브: ranking_season(시즌 메타) + ranking_season_result(시즌 종료 스냅샷).
+--  · 개인 누적(업적 박제)·역대 최고 티어는 이 result 테이블에서 파생. reset_season() 이 스냅샷을 쓴다(STAGE1e).
+--  · 활성 시즌 1행 seed — 없으면 reset_season() 이 no-op 가드로 종료(활성 시즌 필수).
+--  멱등(재실행 안전). schema.sql 의 동명 블록과 DDL 동일.
+create table if not exists ranking_season (
+  id serial primary key,
+  code text unique,
+  starts_on date,
+  ends_on date,
+  status text not null default 'active'
+);
+alter table ranking_season enable row level security;
+
+create unique index if not exists ranking_season_active_uidx
+  on ranking_season ((status)) where status = 'active';
+
+create table if not exists ranking_season_result (
+  season_id int not null,
+  user_id uuid references auth.users(id) on delete cascade,
+  final_tier text,
+  final_rank int,
+  skill_score numeric,
+  activity_score numeric,
+  season_total numeric,
+  archived_at timestamptz default now(),
+  primary key (season_id, user_id)
+);
+alter table ranking_season_result enable row level security;
+
+create index if not exists ranking_season_result_user_idx
+  on ranking_season_result (user_id);
+
+insert into ranking_season (code, starts_on, status)
+  values ('2026Q3', current_date, 'active')
+  on conflict (code) do nothing;
+
+-- 랭킹 통합 재설계 STAGE 1d — daily_activity 활동 플래그(출석/학습/미니게임/레벨테스트) — 활동잔디 색·풀콤 소스.
+--  멱등(재실행 안전). schema.sql 의 동명 블록과 DDL 동일.
+alter table daily_activity add column if not exists did_attendance bool not null default false;
+alter table daily_activity add column if not exists did_learn bool not null default false;
+alter table daily_activity add column if not exists did_minigame bool not null default false;
+alter table daily_activity add column if not exists did_leveltest bool not null default false;
+
+-- 랭킹 통합 재설계 STAGE 1e — reset_season(): 시즌 종료 스냅샷 아카이브 + activity_score 리셋 + 신규 시즌 개시.
+--  · 멱등: pg_advisory_xact_lock 으로 직렬화 + 활성 시즌 status='active' 가드(없으면 no-op) → 이중 아카이브·재-0 없음.
+--  · final_tier 는 season_total 백분위 5티어(다이아≤5% · 플래≤20% · 골드≤45% · 실버≤75% · 브론즈)를 cume_dist 로 아카이브.
+--    STAGE2 read-시점 티어(tierForPercentile)와 동일 밴드.
+--  · final_rank 는 season_total 내림차순(동점=updated_at 오름차순) row_number, 탈퇴자(profiles.deactivated_at) 제외(global_top 과 동일 컨벤션).
+--  · 스냅샷 → activity_score=0 → 시즌 롤오버 순서 보장(단일 트랜잭션).
+--  · SECURITY DEFINER + set search_path=public + PUBLIC부터 revoke, service_role 만 grant.
+--  멱등(재실행 안전). schema.sql 의 동명 블록과 DDL 동일.
+create or replace function public.ranking_tier(p_pct numeric) returns text
+  language sql immutable as $$
+  select case
+    when p_pct <= 0.05 then 'diamond'
+    when p_pct <= 0.20 then 'platinum'
+    when p_pct <= 0.45 then 'gold'
+    when p_pct <= 0.75 then 'silver'
+    else 'bronze'
+  end
+$$;
+
+create or replace function public.reset_season() returns jsonb
+  language plpgsql security definer set search_path = public as $$
+declare
+  v_season_id int;
+  v_next_code text;
+  v_next_id int;
+begin
+  perform pg_advisory_xact_lock(923874165);
+
+  select id into v_season_id from ranking_season where status = 'active' order by id desc limit 1;
+  if v_season_id is null then
+    return jsonb_build_object('ok', false, 'reason', 'no_active_season');
+  end if;
+
+  insert into ranking_season_result (season_id, user_id, final_tier, final_rank, skill_score, activity_score, season_total, archived_at)
+  select
+    v_season_id,
+    up.user_id,
+    ranking_tier((cume_dist() over (order by up.season_total desc))::numeric),
+    row_number() over (order by up.season_total desc, up.updated_at asc),
+    up.skill_score, up.activity_score, up.season_total, now()
+  from user_progress up
+  join profiles pr on pr.id = up.user_id and pr.deactivated_at is null
+  on conflict (season_id, user_id) do nothing;
+
+  update user_progress set activity_score = 0, updated_at = now();
+
+  update ranking_season set status = 'archived', ends_on = current_date where id = v_season_id;
+  v_next_code := to_char(current_date, 'YYYY') || '-S' || v_season_id::text;
+  insert into ranking_season (code, starts_on, status)
+    values (v_next_code, current_date, 'active')
+    on conflict (code) do nothing
+    returning id into v_next_id;
+  if v_next_id is null then
+    select id into v_next_id from ranking_season where code = v_next_code;
+  end if;
+
+  return jsonb_build_object('ok', true, 'archived_season_id', v_season_id, 'next_season_id', v_next_id);
+end
+$$;
+
+revoke all on function public.reset_season() from public, anon, authenticated;
+grant execute on function public.reset_season() to service_role;
+-- ============================================================
+-- 랭킹 통합 재설계 STAGE 2 슬라이스 B — global_top / my_rank_context / 집계 리더보드 RPC 재설계
+--   · global_top: 정렬 season_total desc, updated_at asc(동점=먼저 도달). is_anonymous=false 게스트 응시자 제외.
+--     tier/percentile 은 cume_dist() over (order by season_total desc) → ranking_tier() 5티어.
+--     기존 반환 필드(rank/name/level/rating/avatar/me) 유지 — rating 은 season_total.
+--   · my_rank_context: 게이지 전용 경량 RPC. 내 순위/티어/백분위 + 바로 윗사람과의 points_to_pass(1위면 null).
+--     global_top 과 동일 노출 수준(SECURITY DEFINER 아님, PUBLIC 실행) — season_total/ranking_tier 정의 이후에 위치해야 한다.
+--   · region_/country_/school_leaderboard: score = 베이지안 보정평균 (n*group_avg + K*global_avg)/(n+K).
+--     season_total/ranking_tier 컬럼·함수가 이 시점에 이미 존재해야 하므로 원 정의(20260714000200) 위치가 아닌
+--     season_total 컬럼(STAGE2 1a) · ranking_tier(STAGE1e) · reset_season(STAGE1e) 정의 이후로 재배치했다 —
+--     schema.sql 순차 적용 안전성 + 20260721050000_reset_season_fn.sql 의 parity 연속성 보존.
+--   멱등(재실행 안전). migrations/20260714000200_leaderboard_rpcs.sql(집계 3종) ·
+--   migrations/20260721060000_ranking_stage2_rpcs.sql(global_top·my_rank_context) 과 DDL 동일.
+-- ============================================================
+
+-- (0) daily_activity 선행 생성 — active_today_user_ids() 가 참조하므로 이 마이그레이션에서 먼저 보장.
+--     (원 정의는 20260714000400_phase2_character.sql; 둘 다 idempotent `create table if not exists`.)
+create table if not exists daily_activity (
+  user_id uuid references auth.users(id) on delete cascade,
+  day date not null,
+  first_seen_at timestamptz default now(),
+  primary key (user_id, day)
+);
+alter table daily_activity enable row level security;
+
+-- (1) 참여율 단일출처 헬퍼 — 오늘(KST) 응시 기록이 있는 distinct 유저.
+--     Phase-2 에 daily_activity 로 교체하는 단일 지점(여기만 바꾸면 RPC 3종 반영).
+--     RPC 3종이 definer 컨텍스트에서만 호출 → 외부 실행권한 전부 revoke.
+create or replace function public.active_today_user_ids() returns setof uuid
+  language sql stable security definer set search_path = public as $$
+  -- Phase-2 스왑: test_attempts 프록시 → 실제 참여 신호 daily_activity(day=KST 캘린더일).
+  select user_id from daily_activity
+  where day = (now() at time zone 'Asia/Seoul')::date
+$$;
+revoke execute on function public.active_today_user_ids() from public, anon, authenticated;
+
+-- (2) region_leaderboard — country_code=p_country, region_code 버킷.
+create or replace function public.region_leaderboard(p_country text default 'KR', p_window text default 'daily')
+returns jsonb
+language sql stable security definer set search_path = public as $$
+with active as (select user_id from active_today_user_ids() as t(user_id)),
+scope as (
+  select up.season_total
+  from profiles pr
+  join user_progress up on up.user_id = pr.id
+  where pr.deactivated_at is null
+    and pr.is_anonymous = false
+    and pr.country_code = p_country
+    and pr.region_code is not null
+),
+prior as (
+  select avg(season_total)::numeric as global_avg from scope
+),
+buckets as (
+  select pr.region_code                                          as code,
+         count(*)                                                as member_count,
+         avg(up.season_total)::numeric                           as avg_level,
+         count(*) filter (where a.user_id is not null)           as active_today
+  from profiles pr
+  join user_progress up on up.user_id = pr.id
+  left join active a     on a.user_id = pr.id
+  where pr.deactivated_at is null
+    and pr.is_anonymous = false
+    and pr.country_code = p_country
+    and pr.region_code is not null
+  group by pr.region_code
+  having count(*) >= 5   -- MIN_BUCKET_USERS 프라이버시 floor (추후 config-driven)
+),
+scored as (
+  select b.*,
+         -- K=25: 베이지안 shrinkage 상수(소형 그룹은 global_avg 로 강하게 수렴, n>>25 대형 그룹은 group_avg 지배). 추후 config-driven.
+         (b.member_count * b.avg_level + 25 * p.global_avg) / (b.member_count + 25) as bayes
+  from buckets b cross join prior p
+)
+select coalesce(jsonb_agg(jsonb_build_object(
+    'code',          code,
+    'member_count',  member_count,
+    'avg_level',     round(avg_level, 2),
+    'active_today',  active_today,
+    'participation', round(active_today::numeric / member_count, 4),
+    'score',         round(case p_window when 'season' then bayes
+                                         else bayes * (active_today::numeric / member_count) end, 4)
+  ) order by (case p_window when 'season' then bayes
+                            else bayes * (active_today::numeric / member_count) end) desc), '[]'::jsonb)
+from scored;
+$$;
+revoke execute on function public.region_leaderboard(text, text) from public, anon, authenticated;
+grant  execute on function public.region_leaderboard(text, text) to service_role;
+
+-- (3) country_leaderboard — country_code 버킷(전 국가).
+create or replace function public.country_leaderboard(p_window text default 'daily')
+returns jsonb
+language sql stable security definer set search_path = public as $$
+with active as (select user_id from active_today_user_ids() as t(user_id)),
+scope as (
+  select up.season_total
+  from profiles pr
+  join user_progress up on up.user_id = pr.id
+  where pr.deactivated_at is null
+    and pr.is_anonymous = false
+    and pr.country_code is not null
+),
+prior as (
+  select avg(season_total)::numeric as global_avg from scope
+),
+buckets as (
+  select pr.country_code                                         as code,
+         count(*)                                                as member_count,
+         avg(up.season_total)::numeric                           as avg_level,
+         count(*) filter (where a.user_id is not null)           as active_today
+  from profiles pr
+  join user_progress up on up.user_id = pr.id
+  left join active a     on a.user_id = pr.id
+  where pr.deactivated_at is null
+    and pr.is_anonymous = false
+    and pr.country_code is not null
+  group by pr.country_code
+  having count(*) >= 5   -- MIN_BUCKET_USERS 프라이버시 floor (추후 config-driven)
+),
+scored as (
+  select b.*,
+         -- K=25: 베이지안 shrinkage 상수(소형 그룹은 global_avg 로 강하게 수렴, n>>25 대형 그룹은 group_avg 지배). 추후 config-driven.
+         (b.member_count * b.avg_level + 25 * p.global_avg) / (b.member_count + 25) as bayes
+  from buckets b cross join prior p
+)
+select coalesce(jsonb_agg(jsonb_build_object(
+    'code',          code,
+    'member_count',  member_count,
+    'avg_level',     round(avg_level, 2),
+    'active_today',  active_today,
+    'participation', round(active_today::numeric / member_count, 4),
+    'score',         round(case p_window when 'season' then bayes
+                                         else bayes * (active_today::numeric / member_count) end, 4)
+  ) order by (case p_window when 'season' then bayes
+                            else bayes * (active_today::numeric / member_count) end) desc), '[]'::jsonb)
+from scored;
+$$;
+revoke execute on function public.country_leaderboard(text) from public, anon, authenticated;
+grant  execute on function public.country_leaderboard(text) to service_role;
+
+-- (4) school_leaderboard — country_code=p_country, school_id 버킷(label=schools.name).
+create or replace function public.school_leaderboard(p_country text default 'KR', p_window text default 'daily')
+returns jsonb
+language sql stable security definer set search_path = public as $$
+with active as (select user_id from active_today_user_ids() as t(user_id)),
+scope as (
+  select up.season_total
+  from profiles pr
+  join user_progress up on up.user_id = pr.id
+  where pr.deactivated_at is null
+    and pr.is_anonymous = false
+    and pr.country_code = p_country
+    and pr.school_id is not null
+),
+prior as (
+  select avg(season_total)::numeric as global_avg from scope
+),
+buckets as (
+  select pr.school_id                                            as code,
+         max(s.name)                                             as label,
+         count(*)                                                as member_count,
+         avg(up.season_total)::numeric                           as avg_level,
+         count(*) filter (where a.user_id is not null)           as active_today
+  from profiles pr
+  join user_progress up on up.user_id = pr.id
+  left join schools s    on s.id = pr.school_id
+  left join active a     on a.user_id = pr.id
+  where pr.deactivated_at is null
+    and pr.is_anonymous = false
+    and pr.country_code = p_country
+    and pr.school_id is not null
+  group by pr.school_id
+  having count(*) >= 5   -- MIN_BUCKET_USERS 프라이버시 floor (추후 config-driven)
+),
+scored as (
+  select b.*,
+         -- K=25: 베이지안 shrinkage 상수(소형 그룹은 global_avg 로 강하게 수렴, n>>25 대형 그룹은 group_avg 지배). 추후 config-driven.
+         (b.member_count * b.avg_level + 25 * p.global_avg) / (b.member_count + 25) as bayes
+  from buckets b cross join prior p
+)
+select coalesce(jsonb_agg(jsonb_build_object(
+    'code',          code,
+    'label',         label,
+    'member_count',  member_count,
+    'avg_level',     round(avg_level, 2),
+    'active_today',  active_today,
+    'participation', round(active_today::numeric / member_count, 4),
+    'score',         round(case p_window when 'season' then bayes
+                                         else bayes * (active_today::numeric / member_count) end, 4)
+  ) order by (case p_window when 'season' then bayes
+                            else bayes * (active_today::numeric / member_count) end) desc), '[]'::jsonb)
+from scored;
+$$;
+revoke execute on function public.school_leaderboard(text, text) from public, anon, authenticated;
+grant  execute on function public.school_leaderboard(text, text) to service_role;
+
+-- (5) global_top — 명예의 전당 RPC: season_total 정렬(동점=먼저 도달), 탈퇴자·is_anonymous 게스트 제외.
+create or replace function public.global_top(p_uid uuid, p_limit int default 10)
+returns jsonb language sql stable as $$
+with ranked as (
+  select p.user_id, p.rank as lvl, p.season_total,
+         row_number() over (order by p.season_total desc, p.updated_at asc) as grank,
+         count(*) over () as gtotal,
+         cume_dist() over (order by p.season_total desc)::numeric as pct
+  from user_progress p
+  join profiles pr0 on pr0.id = p.user_id and pr0.deactivated_at is null and pr0.is_anonymous = false
+)
+select jsonb_build_object(
+  'top', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'rank', r.grank,
+      'name', coalesce(nullif(pr.display_name, ''), '익명'),
+      'level', r.lvl,
+      'rating', r.season_total,
+      'avatar', pr.avatar_url,
+      'tier', ranking_tier(r.pct),
+      'percentile', round(r.pct, 4),
+      'me', (r.user_id = p_uid)
+    ) order by r.grank)
+    from ranked r left join profiles pr on pr.id = r.user_id
+    where r.grank <= p_limit
+  ), '[]'::jsonb),
+  'total', coalesce((select gtotal from ranked limit 1), 0),
+  'me', (
+    select jsonb_build_object(
+      'rank', r.grank, 'level', r.lvl, 'rating', r.season_total,
+      'name', coalesce(nullif(pr.display_name, ''), '익명'), 'avatar', pr.avatar_url,
+      'tier', ranking_tier(r.pct), 'percentile', round(r.pct, 4)
+    )
+    from ranked r left join profiles pr on pr.id = r.user_id
+    where r.user_id = p_uid
+  )
+);
+$$;
+
+-- (6) my_rank_context — 게이지 전용 경량 RPC: 내 순위·티어·백분위 + 바로 윗사람과의 points_to_pass(1위면 null).
+create or replace function public.my_rank_context(p_uid uuid)
+returns jsonb language sql stable as $$
+with ranked as (
+  select p.user_id, p.season_total,
+         row_number() over (order by p.season_total desc, p.updated_at asc) as grank,
+         cume_dist() over (order by p.season_total desc)::numeric as pct
+  from user_progress p
+  join profiles pr0 on pr0.id = p.user_id and pr0.deactivated_at is null and pr0.is_anonymous = false
+),
+me as (select * from ranked where user_id = p_uid),
+above as (select r.season_total from ranked r join me on r.grank = me.grank - 1)
+select jsonb_build_object(
+  'rank',            (select grank from me),
+  'season_total',    (select season_total from me),
+  'tier',            (select ranking_tier(pct) from me),
+  'percentile',      (select round(pct, 4) from me),
+  'points_to_pass',  (select season_total from above) - (select season_total from me)
+);
+$$;

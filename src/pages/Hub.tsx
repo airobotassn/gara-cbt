@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
-import { ACTIVITY_DELTA, type Tier } from '../lib/scoring'
+import { type Tier } from '../lib/scoring'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -96,9 +96,9 @@ export default function Hub() {
   const [toast, setToast] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
-  const [skillScore, setSkillScore] = useState(0)
-  const [activityScore, setActivityScore] = useState(0)
-  const [seasonTotal, setSeasonTotal] = useState(0)
+  const [, setSkillScore] = useState(0)
+  const [, setActivityScore] = useState(0)
+  const [, setSeasonTotal] = useState(0)
   const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
   const [pointsToPass, setPointsToPass] = useState<number | null>(null)
@@ -218,12 +218,11 @@ export default function Hub() {
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
   // const unusedCoupons = coupons.filter((c) => !c.used).length
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {titles[0].track} {titles[0].grade}</span> : null
-  // 다음 순위 게이지: percentile(0~1, 상위일수록 작음) 기반 fill = 1 - percentile → 상위일수록 가득(단조).
-  //   percentile null(미배치)이면 0. tier 는 있는데 percentile 이 없고 pointsToPass 도 null(=1위 엣지케이스)이면 가득(1).
-  const aboveScore = seasonTotal + (pointsToPass ?? 0)
-  const gaugeFillPct =
-    percentile != null ? Math.max(0, Math.min(100, (1 - percentile) * 100)) : tier && pointsToPass == null ? 100 : 0
-  const gaugeLabel = !tier ? t('rank.unplaced') : pointsToPass == null ? t('rank.top_tier') : t('rank.next_gap', { n: pointsToPass })
+  // 다음 순위 게이지: 신규/무점수 유저는 '미배치'가 아니라 백분위 100%(꼴찌)·브론즈에서 시작 — 콘텐츠로 위로 올라간다.
+  const dispTier: Tier = tier ?? 'bronze'
+  const dispPct = percentile ?? 1 // 데이터 없으면 상위 100%(바닥)
+  const gaugeFillPct = Math.max(0, Math.min(100, (1 - dispPct) * 100)) // 상위일수록 pct 작음 → 가득
+  const gaugeLabel = pointsToPass != null && pointsToPass > 0 ? t('rank.next_gap', { n: pointsToPass }) : ''
 
   // 허브는 로그인 전용(게스트는 출석·뽑기·상점이 전부 잠긴 빈 화면이라 진입 자체를 막는다).
   //   로그인 후 /hub 로 복귀 — /auth/callback?next=/hub 로 왕복해도 next 가 URL 에 실려 안 날아간다.
@@ -244,7 +243,11 @@ export default function Hub() {
           <p className="hub-gate-sub">로그인하고 출석·뽑기·상점을 이용해보세요</p>
           <button
             className="hub-gate-btn"
-            onClick={() => loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/hub')}`)}
+            onClick={() => {
+              // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시키므로(AuthCallback 참고).
+              try { sessionStorage.setItem('postLoginRedirect', '/hub') } catch { /* 무시 */ }
+              loginWithGoogle(`${window.location.origin}/auth/callback`)
+            }}
           >
             {t('common.login_google')}
           </button>
@@ -285,19 +288,11 @@ export default function Hub() {
             <span className="hud-lv">Lv.{level ?? '—'}</span>
           </div>
           <div className="hud-mid">
-            <div className="hud-name">CARI {titleBadge}{tier && <span className="tier-chip">{t(`rank.tier_${tier}`)}{percentile != null && <em>{t('rank.top', { p: Math.round(percentile * 100) })}</em>}</span>}</div>
+            <div className="hud-name">CARI {titleBadge}<span className="tier-chip">{t(`rank.tier_${dispTier}`)}<em>{t('rank.top', { p: Math.round(dispPct * 100) })}</em></span></div>
             <div className="hud-xp">
               <div className="rank-gauge">
-                <div className="rank-gauge-lab">{gaugeLabel}</div>
-                <div className="rank-gauge-track">
-                  <span className="rank-gauge-end lo">{seasonTotal.toLocaleString()}</span>
-                  <div className="exp"><div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} /></div>
-                  <span className="rank-gauge-end hi">{aboveScore.toLocaleString()}</span>
-                </div>
-                <div className="rank-gauge-break">
-                  <span>{t('db.skill_score')} {skillScore.toLocaleString()}</span>
-                  <span>{t('db.activity_score')} {activityScore.toLocaleString()}</span>
-                </div>
+                {gaugeLabel ? <div className="rank-gauge-lab">{gaugeLabel}</div> : null}
+                <div className="exp"><div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} /></div>
               </div>
               <span className="gchip"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
             </div>
@@ -339,37 +334,6 @@ export default function Hub() {
             <span className="cta-star"><Ic n="trophy" s={24} /></span>
             랭킹
           </Link>
-        </div>
-        <div className="todo">
-          <div className="todo-head">{t('hub.today_todo')}</div>
-          <div className="todo-list">
-            <div className={`todo-item ${checkedIn ? 'done' : ''}`}>
-              <span className="todo-ic"><Ic n="calendar" s={22} /></span>
-              <span className="todo-name">{t('hub.todo_attendance')}</span>
-              <span className="todo-pt">+{ACTIVITY_DELTA.attendance}P</span>
-              {checkedIn ? <span className="todo-chk">✓</span> : (
-                <button className="todo-cta" onClick={doDaily}>GO</button>
-              )}
-            </div>
-            <div className="todo-item is-placeholder">
-              <span className="todo-ic"><Ic n="star" s={22} /></span>
-              <span className="todo-name">{t('hub.todo_problem')}</span>
-              <span className="todo-pt">—</span>
-              <span className="todo-soon">Soon</span>
-            </div>
-            <div className="todo-item">
-              <span className="todo-ic"><Ic n="book" s={22} /></span>
-              <span className="todo-name">{t('hub.todo_learn')}</span>
-              <span className="todo-pt">+{ACTIVITY_DELTA.daily_learn}P</span>
-              <Link className="todo-cta" to="/daily">GO</Link>
-            </div>
-            <div className="todo-item">
-              <span className="todo-ic"><Ic n="gift" s={22} /></span>
-              <span className="todo-name">{t('hub.todo_game')}</span>
-              <span className="todo-pt">+{ACTIVITY_DELTA.minigame}P</span>
-              <Link className="todo-cta" to="/arena">GO</Link>
-            </div>
-          </div>
         </div>
       </div>
 

@@ -56,3 +56,16 @@ export async function getUser(req: Request): Promise<User | null> {
   } = await client.auth.getUser()
   return user
 }
+
+// 활성 시즌 id 조회 — activity_ledger.season_id 귀속용 경량 조회(코스메틱/랭킹 엣지fn 공용).
+//  ranking_season.status='active' 는 부분 유니크 인덱스로 최대 1행(STAGE1c) — 없으면 null(시즌 미개시, 호출부가 스킵 가드).
+export async function getActiveSeasonId(admin: SupabaseClient): Promise<number | null> {
+  const { data } = await admin
+    .from('ranking_season')
+    .select('id')
+    .eq('status', 'active')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return (data?.id as number) ?? null
+}

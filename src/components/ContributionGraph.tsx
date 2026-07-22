@@ -129,9 +129,14 @@ export default function ContributionGraph({ days }: { days: Map<string, DayEntry
 
       <div className="calm-legend">
         <span>{t('cal.days_active', { n: monthActive })}</span>
-        <span className="calm-scale">
-          <i className="calm-cell active" /> {t('cal.active')}
-        </span>
+      </div>
+      <div className="calm-colorleg">
+        {(['attendance', 'learn', 'minigame', 'leveltest'] as const).map((k) => (
+          <span className="calm-cl" key={k}>
+            <i style={{ backgroundColor: DOMINANT_COLOR[k] }} />
+            {t(`cal.dominant_${k}`)}
+          </span>
+        ))}
       </div>
     </div>
   )

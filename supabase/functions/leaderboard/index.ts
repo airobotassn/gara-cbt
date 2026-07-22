@@ -3,7 +3,7 @@
 //  - scope 'region'|'country'|'school': 집계 버킷 리더보드. RPC region_/country_/school_leaderboard.
 //      개인 식별 필드 없이 집계값만(code·member_count·avg_level·active_today·participation·score, 학교는 label 추가).
 //      응답 { buckets, scope, window }. member_count<5 프라이버시 floor 버킷은 RPC 가 이미 제외.
-//  - 정렬(global): 랭킹 점수(user_progress.points) desc → 동점 먼저 도달. rating 필드에 points.
+//  - 정렬(global): season_total(실력+활동 통합 랭킹점수) desc → 동점 먼저 도달. rating 필드에 season_total.
 //  - 닉네임·레벨·점수·아바타만 공개(이메일 비공개).
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/scoring.ts'
@@ -16,6 +16,8 @@ interface RpcUser {
   level: number
   rating: number
   avatar: string | null
+  tier?: string
+  percentile?: number
   me?: boolean
 }
 
@@ -32,6 +34,8 @@ function mapUser(u: RpcUser, me = false) {
     image: av.startsWith('img:') ? av.slice(4) : null,
     mascot: av.startsWith('mascot:') ? av.slice(7) : null,
     character: av.startsWith('char:') ? av.slice(5) : null,
+    tier: u.tier ?? null,
+    percentile: u.percentile ?? null,
     me: me || !!u.me,
   }
 }
@@ -67,6 +71,11 @@ Deno.serve(async (req) => {
           me.title = `CARIS ${arr[0].track} ${arr[0].grade}`
           me.titles = arr
         }
+        // 다음 순위 게이지(points_to_pass): global_top 의 me 는 tier/percentile 은 이미 포함하지만
+        // 바로 윗사람과의 점수차는 별도 경량 RPC(my_rank_context) 소관 — 실패해도 무시(back-compat).
+        const { data: rankCtx } = await admin.rpc('my_rank_context', { p_uid: user.id })
+        const rc = rankCtx as { points_to_pass?: number | null } | null
+        me.pointsToPass = rc?.points_to_pass ?? null
       }
       return json({ top, total: d.total ?? 0, me })
     }

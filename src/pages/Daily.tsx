@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import '../styles/daily.css'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
+import { dailyTerm, dailyChoices } from '../lib/terms'
 
 // ⚠️ 서버(complete-daily)의 DAILY_POINTS 와 같은 값이어야 한다. 적립 권위는 서버, 여기는 예고 표시용.
 const DAILY_POINTS = 10
@@ -41,6 +42,12 @@ export default function Daily() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [celebrate, setCelebrate] = useState(false) // 완료 직후 보상 연출(재방문 시엔 안 뜬다)
+  // 오늘의 문제 — 미니게임과 같은 용어 풀(lib/terms)에서 날짜별로 하나씩 순환. 마운트 시 1회 고정.
+  const [term] = useState(() => dailyTerm())
+  const [choices] = useState(() => dailyChoices()) // 보기 4개(정답+오답3), 날짜 시드로 섞임
+  const [picked, setPicked] = useState<string | null>(null) // 이번 방문에 고른 보기
+  // 정답 공개 조건 = 이번에 골랐거나 / 서버가 이미 오늘 완료로 기록(재방문)한 경우.
+  const answered = picked !== null || done
 
   function applyHub(h: HubState) {
     setAuthed(!!h.authed)
@@ -59,7 +66,7 @@ export default function Daily() {
   }, [])
 
   // 완료 → complete-daily(1일 1회 서버 강제·멱등). 성공 후 get-hub 로 재화/스탬프 재동기화.
-  // 콘텐츠가 붙기 전까지는 이 버튼이 곧 '소비 완료' 신호다.
+  // 완료 트리거 = 오늘의 문제 '시도'(onPick). 설계상 맞히는 게 아니라 시도하면 완료다.
   async function complete() {
     if (!isFullUser) { void loginWithGoogle(); return }
     if (done || busy) return
@@ -75,6 +82,14 @@ export default function Daily() {
     } finally {
       setBusy(false)
     }
+  }
+
+  // 보기 선택 = 오늘 학습 '시도'. 정답 공개는 로그인과 무관(누구나 학습), 적립만 로그인 필요
+  //   → complete() 안에서 비로그인이면 로그인 유도. 맞히든 틀리든 한 번 고르면 완료로 간다.
+  function onPick(opt: string) {
+    if (answered || busy) return
+    setPicked(opt)
+    void complete()
   }
 
   const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
@@ -103,14 +118,37 @@ export default function Daily() {
       {/* 2단: 콘텐츠(주) + 보상 레일(부). 880px 이하에서 1열로 스택된다. */}
       <div className="dy-grid">
       <main className="dy-main">
-      {/* 콘텐츠 슬롯 — 문제형/수동 소비형 렌더러가 들어올 자리. 지금은 자리표시자. */}
-      <div className="dy-slot">
-        <span className="dy-slot-ic"><Ic n="lock" s={38} /></span>
-        <b className="dy-slot-title">오늘의 콘텐츠 준비 중</b>
-        <p className="dy-slot-desc">
-          문제 하나이거나, 짧은 글·영상일 수 있어요.<br />
-          <b>맞히는 게 아니라 보는 것</b>만으로 완료돼요.
-        </p>
+      {/* 콘텐츠 슬롯 — 오늘의 용어 4지선다. 미니게임과 같은 풀에서 날짜별로 하나. */}
+      <div className="dy-quiz">
+        <div className="dy-q-head">
+          <span className="dy-q-badge">{term.field}</span>
+          <span className="dy-q-label">오늘의 용어</span>
+        </div>
+        <p className="dy-q-desc">{term.desc}</p>
+        <div className="dy-q-opts">
+          {choices.map((opt) => {
+            const isAnswer = opt === term.answer
+            const isPicked = opt === picked
+            const cls = answered && isAnswer ? 'dy-q-opt correct'
+              : answered && isPicked ? 'dy-q-opt wrong'
+              : 'dy-q-opt'
+            return (
+              <button key={opt} className={cls} onClick={() => onPick(opt)} disabled={answered || busy}>
+                <span className="dy-q-mark">{answered && isAnswer ? '✓' : answered && isPicked ? '✕' : ''}</span>
+                <span className="dy-q-txt">{opt}</span>
+              </button>
+            )
+          })}
+        </div>
+        {answered && (
+          <p className={`dy-q-result ${picked === term.answer ? 'ok' : picked ? 'no' : 'seen'}`}>
+            {picked === term.answer
+              ? '정답이에요! 🎉 오늘 학습 완료.'
+              : picked
+              ? <>아쉬워요 — 정답은 <b>{term.answer}</b> 예요. 시도했으니 완료!</>
+              : <>오늘 학습은 이미 완료했어요. 정답은 <b>{term.answer}</b> 예요.</>}
+          </p>
+        )}
       </div>
       </main>
 
@@ -131,14 +169,13 @@ export default function Daily() {
 
       {err && <p className="dy-err">{err}</p>}
 
-      <button className="dy-cta" onClick={complete} disabled={done || busy}>
-        <span className="dy-cta-ic"><Ic n="sun" s={24} /></span>
-        {done ? '오늘 학습 완료 ✓' : busy ? '기록하는 중…' : '오늘 학습 완료하기'}
-      </button>
+      {/* 완료 트리거는 문제 시도(왼쪽 카드)로 옮겨졌다. 여기는 상태 안내만. */}
       <p className="dy-note">
         {done
-          ? '내일 새 학습이 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).'
-          : '하루 1회만 적립돼요. 며칠 놓쳐도 스탬프는 사라지지 않아요.'}
+          ? '오늘 학습 완료 ✓ 내일 새 문제가 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).'
+          : busy
+          ? '기록하는 중…'
+          : '정답을 고르면 오늘 학습이 완료돼요. 맞히지 않아도 시도하면 적립돼요.'}
       </p>
       </aside>
       </div>

@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
       { data: coupons },
       { data: progress },
       { data: titles },
+      { data: rankCtx },
     ] = await Promise.all([
       admin.from('user_currency').select('points, dust').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
@@ -66,8 +67,11 @@ Deno.serve(async (req) => {
         .select('issued_for_level, coupon_code, issued_at, used_at, coupons(discount)')
         .eq('user_id', uid)
         .order('issued_for_level', { ascending: false }),
-      admin.from('user_progress').select('rank, points').eq('user_id', uid).maybeSingle(),
+      // HUD 표시(레벨·랭킹점수·실력/활동 분해)용 읽기 전용 — 이 함수는 user_progress 를 절대 쓰지 않는다(cosmetic-only).
+      admin.from('user_progress').select('rank, points, skill_score, activity_score, season_total').eq('user_id', uid).maybeSingle(),
       admin.rpc('user_titles', { p_uid: uid }),
+      // 다음 순위 게이지(티어·백분위·points_to_pass) — season_total 기반 read-시점 파생, 실패해도 무시(back-compat).
+      admin.rpc('my_rank_context', { p_uid: uid }),
     ])
 
     const couponList = (coupons ?? []).map((c) => ({
@@ -78,11 +82,22 @@ Deno.serve(async (req) => {
       issuedAt: c.issued_at as string,
     }))
     const titleList = Array.isArray(titles) ? titles : []
+    const rc = (rankCtx ?? null) as { tier?: string | null; percentile?: number | null; points_to_pass?: number | null } | null
+    // TODO(#5 미구현): 응답에 일별 활동 breakdown(잔디 dominant 색)이 없다 — 잔디는 현재 프론트가
+    //   list-attempts(레벨테스트) 응시일만으로 채워 leveltest(금색) 활동만 표시한다. attendance/learn/
+    //   minigame 색을 살리려면 여기서 activity_ledger(day,kind,delta)+daily_activity(day,did_*) 를
+    //   조인/집계해 유저별 일별 dominant kind + total 을 반환하는 생산자를 배선해야 한다(범위 제외, 후속).
 
     return json({
       authed: true,
       level: progress?.rank ?? null,
       rankPoints: progress?.points ?? null,
+      skillScore: (progress?.skill_score as number) ?? null,
+      activityScore: (progress?.activity_score as number) ?? null,
+      seasonTotal: (progress?.season_total as number) ?? null,
+      tier: rc?.tier ?? null,
+      percentile: rc?.percentile ?? null,
+      pointsToPass: rc?.points_to_pass ?? null,
       points: Number(currency?.points ?? 0),
       dust: Number(currency?.dust ?? 0),
       cosmetics: (cosmetics ?? []).map((c) => c.part_key as string),

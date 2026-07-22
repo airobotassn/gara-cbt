@@ -9,9 +9,17 @@ export default function AuthCallback() {
   const navigate = useNavigate()
   const { t } = useT()
   useEffect(() => {
-    // 복귀 경로를 콜백 URL(?next=)에서 읽음 — OAuth 왕복에도 안 날아감. 시험 로그인은 next=/exam/prepare.
+    // 복귀 경로 결정.
+    //   ⚠️ Supabase 는 redirect_to 의 query(?next=)를 OAuth 왕복 중 유실시킨다(알려진 동작) → 홈으로 폴백.
+    //   그래서 복귀 경로는 로그인 직전 sessionStorage 에 저장해 두고 여기서 읽는다(query 는 폴백).
+    const KEY = 'postLoginRedirect'
     const go = () => {
-      const next = new URLSearchParams(window.location.search).get('next')
+      let next: string | null = null
+      try {
+        next = sessionStorage.getItem(KEY)
+        if (next) sessionStorage.removeItem(KEY)
+      } catch { /* sessionStorage 불가 환경 무시 */ }
+      if (!next) next = new URLSearchParams(window.location.search).get('next')
       navigate(next || '/', { replace: true })
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {

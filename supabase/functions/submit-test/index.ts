@@ -12,6 +12,7 @@ import {
   ATTEMPT_TTL_MINUTES,
   type AxisMap,
 } from '../_shared/scoring.ts'
+import { kstDay } from '../_shared/kst.ts'
 
 interface InAnswer {
   questionId: string
@@ -148,6 +149,10 @@ Deno.serve(async (req) => {
       finalAttempt.rank_after = applied.rankAfter
       finalAttempt.rank_dir = applied.rankDir
       finalAttempt.warn_strikes = warnStrikes
+      // 레벨테스트 = 실력점수 전용(활동점수 미적립) — 활동잔디엔 did_leveltest 플래그로만 금색 표시.
+      await admin
+        .from('daily_activity')
+        .upsert({ user_id: user.id, day: kstDay(), did_leveltest: true }, { onConflict: 'user_id,day' })
     }
 
     return json(await fullResult(admin, finalAttempt))

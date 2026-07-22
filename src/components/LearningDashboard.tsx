@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { emblemKeyForLevel, levelColor, DEMOTE_STRIKES, computeSkillScore, tierColor } from '../lib/scoring'
+import { levelColor, DEMOTE_STRIKES, computeSkillScore, tierColor } from '../lib/scoring'
 import { axesForLevel, axisKeysForLevel } from '../lib/categories'
 import type { AxisMap, Tier } from '../lib/scoring'
 import { useT } from '../lib/i18n'
@@ -44,14 +44,13 @@ export default function LearningDashboard() {
   const { t, lang } = useT()
   const navigate = useNavigate()
   const [attempts, setAttempts] = useState<AttemptSummary[] | null>(null)
-  const [currentRank, setCurrentRank] = useState<number | null>(null)
+  const [, setCurrentRank] = useState<number | null>(null)
   const [points, setPoints] = useState(0)
   const [strikes, setStrikes] = useState(0)
   const [levelSkills, setLevelSkills] = useState<LevelSkill[]>([])
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [radarIdx, setRadarIdx] = useState(0)
-  const [showHints, setShowHints] = useState(false) // 점수 오르는 법 펼침
   // 티어 히어로(시즌 총점/실력·활동 분해/다음 순위 게이지) — get-hub 응답 중 이 화면이 쓰는 것만.
   const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
@@ -158,7 +157,6 @@ export default function LearningDashboard() {
   const pageCount = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount - 1)
   const pageItems = list.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
-  const rank = currentRank ?? (list[0]?.rankAfter ?? null)
 
   return (
     <div className="wrap">
@@ -196,10 +194,10 @@ export default function LearningDashboard() {
         <>
           {/* 티어 히어로: 현재 티어 + 시즌 총점(실력/활동 분해) + 다음 순위 게이지(요약) */}
           <div className="tierhero">
-            <TierEmblem tierKey={tier ?? emblemKeyForLevel(rank ?? 1)} size={64} />
+            <TierEmblem tierKey={tier ?? 'bronze'} size={64} />
             <div>
-              <div className="nm" style={{ color: tier ? tierColor(tier) : levelColor(rank ?? 1) }}>
-                {tier ? t(`rank.tier_${tier}`) : `Lv.${rank ?? '-'}`}
+              <div className="nm" style={{ color: tierColor(tier ?? 'bronze') }}>
+                {t(`rank.tier_${tier ?? 'bronze'}`)}
               </div>
               <div className="sub">{t('db.cur_rank', { n: list.length })}</div>
               <div className="sub" style={{ fontWeight: 700, color: 'var(--ink)' }}>
@@ -211,42 +209,12 @@ export default function LearningDashboard() {
                   <span>{t('db.activity_score')} {(activityScore ?? 0).toLocaleString()}</span>
                 </div>
               ) : null}
-              {percentile != null ? (
-                <div className="sub">
-                  {t('rank.top', { p: Math.max(1, Math.round(percentile * 100)) })}
-                  {pointsToPass != null && pointsToPass > 0 ? ` · ${t('rank.next_gap', { n: pointsToPass })}` : ''}
-                </div>
-              ) : null}
+              <div className="sub">
+                {t('rank.top', { p: Math.max(1, Math.round((percentile ?? 1) * 100)) })}
+                {pointsToPass != null && pointsToPass > 0 ? ` · ${t('rank.next_gap', { n: pointsToPass })}` : ''}
+              </div>
             </div>
 
-            {/* '점수는 레벨 + 맞힌 개수로 정해진다'는 개념만 — 버튼 누르면 펼침(실제 수치 박지 않음) */}
-            <div className="score-break">
-              <button
-                type="button"
-                className="sb-toggle"
-                onClick={() => setShowHints((v) => !v)}
-                aria-expanded={showHints}
-              >
-                ⓘ {t('db.score_break_h')}
-                <span className={`sb-caret ${showHints ? 'open' : ''}`}>▾</span>
-              </button>
-              {showHints ? (
-                <div className="sb-detail">
-                  <div className="sb-eq">
-                    <span className="sb-chip">{t('db.eq_level')}</span>
-                    <span className="sb-op">+</span>
-                    <span className="sb-chip">{t('db.eq_correct')}</span>
-                    <span className="sb-op">=</span>
-                    <span className="sb-chip pt">{t('db.eq_points')}</span>
-                  </div>
-                  <div className="sb-hints">
-                    <span>⬆️ {t('db.howto_up')}</span>
-                    <span>🎯 {t('db.howto_within')}</span>
-                    <span>⬇️ {t('db.howto_demote')}</span>
-                  </div>
-                </div>
-              ) : null}
-            </div>
           </div>
 
           {/* 강등 경고 */}
@@ -294,11 +262,11 @@ export default function LearningDashboard() {
             </div>
             <div className="stat">
               <div className="k">{t('rank.my_tier')}</div>
-              <div className="v" style={{ color: tier ? tierColor(tier) : 'var(--ink)' }}>
-                {tier ? t(`rank.tier_${tier}`) : '-'}
+              <div className="v" style={{ color: tierColor(tier ?? 'bronze') }}>
+                {t(`rank.tier_${tier ?? 'bronze'}`)}
               </div>
               <div className="d" style={{ color: 'var(--muted)' }}>
-                {percentile != null ? t('rank.top', { p: Math.max(1, Math.round(percentile * 100)) }) : t('db.placed_before')}
+                {t('rank.top', { p: Math.max(1, Math.round((percentile ?? 1) * 100)) })}
               </div>
             </div>
           </div>

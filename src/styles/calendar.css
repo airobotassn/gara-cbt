@@ -82,3 +82,8 @@
   flex: none;
 }
 
+/* 활동 색 범례 (설계 §7.3: 출석=회색 / 학습=파랑 / 게임=주황 / 응시=금색) */
+.calm-colorleg { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 700; color: var(--ink2); }
+.calm-cl { display: inline-flex; align-items: center; gap: 5px; }
+.calm-cl i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); flex: 0 0 auto; }
+

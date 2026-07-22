@@ -12,6 +12,11 @@ const DDL_MIGRATIONS = [
   'supabase/migrations/20260714000700_coupons.sql',
   'supabase/migrations/20260714000800_titles.sql',
   'supabase/migrations/20260714000900_lecture_ai.sql',
+  'supabase/migrations/20260721010000_ranking_progress_columns.sql',
+  'supabase/migrations/20260721020000_activity_ledger.sql',
+  'supabase/migrations/20260721030000_ranking_season_archive.sql',
+  'supabase/migrations/20260721040000_daily_activity_flags.sql',
+  'supabase/migrations/20260721050000_reset_season_fn.sql',
 ];
 
 const stripped = (text) => text.split('\n').map((l) => l.replace(/\s+$/, ''))

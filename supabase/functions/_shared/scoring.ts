@@ -90,10 +90,49 @@ export function computeRankChange(
 
 // 랭킹 점수(0~10000) — 레벨당 1/MAX_LEVEL, 레벨 내부는 승급컷 정규화.
 export const MAX_POINTS = 10000
+/** @deprecated skill_score/computeSkillScore 로 전환 예정. 보존 사유는 FE 폴백이 아니라 백엔드
+ *  applyAttempt() 가 여전히 이 값으로 points 컬럼을 채우기 때문(아래 computePoints(nextRank, latestCorrect)
+ *  호출부 참조) — points 컬럼(및 이를 읽는 구코드)이 남아있는 동안은 계속 이 값을 반환해야 함 — 삭제 금지. */
 export function computePoints(level: number, correct: number): number {
   const lv = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level))
   const frac = Math.min(Math.max(0, correct) / promoteCut(lv), 1)
   return Math.round(((lv - 1 + frac) / MAX_LEVEL) * MAX_POINTS)
+}
+export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame'
+// 활동 종류별 적립값(활동 최대 기여의 상한). attendance < daily_learn < minigame 부등호 유지.
+// minigame 값은 "정규화 상한"이다 — 실제 적립값은 게임별 서버 정규화 점수를 이 상한 이하로 스케일해서 쓴다(게임별 스코어링은 이 파일 밖 관심사).
+// 튜닝 근거(부등호 "실력 최고치 > 활동 최대 기여" 성립 확인):
+//   실력 최고치 = computeSkillScore(MAX_LEVEL, promoteCut(MAX_LEVEL)) = SKILL_LEVEL_STEP*MAX_LEVEL = MAX_POINTS = 10000.
+//   가정(assumption, 튜닝 필요시 갱신): 시즌 ≈ 60일, 활성 미니게임 2종(src/lib/minigames.ts 기준).
+//   활동 일일 최대 = ATTENDANCE(10) + DAILY_LEARN(30) + MINIGAME(50)×2종 = 140 → 시즌 누적 ≈ 8,400 (< 10,000, 여유 16%).
+//   ⚠️ 미니게임 종류가 늘어나면(예: 3종 이상) 이 여유가 줄거나 역전될 수 있다 — 레지스트리가 커지면 ACTIVITY_DELTA.minigame 을
+//      낮추거나 시즌 단위 활동 캡(추후 스테이지 과제)을 도입해 이 부등호를 재검증할 것. (미해결/가정으로 명시)
+export const ACTIVITY_DELTA: Record<ActivityKind, number> = {
+  attendance: 10,
+  daily_learn: 30,
+  minigame: 50,
+}
+export function activityDelta(kind: ActivityKind): number {
+  return ACTIVITY_DELTA[kind]
+}
+// 레벨가중 실력점수(최고성취 기반). computePoints 와 스케일 연속성 유지
+// (SKILL_LEVEL_STEP*MAX_LEVEL === MAX_POINTS) — STAGE1 백필(points→skill_score 그대로 복사)과 이어짐.
+// level 은 하한만 clamp(MIN_LEVEL)하고 상한은 두지 않는다("상한 없음") — 향후 MAX_LEVEL 이 늘어도 재작성 불필요.
+export const SKILL_LEVEL_STEP = MAX_POINTS / MAX_LEVEL // 튜닝 대상: 레벨당 계단 폭
+export function computeSkillScore(level: number, correct: number): number {
+  const lv = Math.max(MIN_LEVEL, level)
+  const frac = Math.min(Math.max(0, correct) / promoteCut(lv), 1)
+  return Math.round(SKILL_LEVEL_STEP * (lv - 1) + SKILL_LEVEL_STEP * frac)
+}
+
+// 백분위(0~1, 낮을수록 상위) → 티어 5단계. DB ranking_tier(pct)(reset_season_fn.sql)와 동일 밴드 — FE/백엔드 단일 출처.
+export type Tier = 'diamond' | 'platinum' | 'gold' | 'silver' | 'bronze'
+export function tierForPercentile(pct: number): Tier {
+  if (pct <= 0.05) return 'diamond'
+  if (pct <= 0.2) return 'platinum'
+  if (pct <= 0.45) return 'gold'
+  if (pct <= 0.75) return 'silver'
+  return 'bronze'
 }
 // </scoring-sync>
 
@@ -194,6 +233,7 @@ export async function applyAttempt(
   rankAfter: number
   rankDir: RankDir
   points: number
+  skillScore: number
   demotionStrikes: number // 갱신된 경고 누적
   warned: boolean // 이번에 강등 경고가 떴는가
 }> {
@@ -238,7 +278,7 @@ export async function applyAttempt(
   // 등급(레벨) 이동 + 강등 경고(3진 아웃)
   const { data: prog } = await admin
     .from('user_progress')
-    .select('rank, demotion_strikes')
+    .select('rank, demotion_strikes, skill_score')
     .eq('user_id', userId)
     .maybeSingle()
   const rankBefore = (prog?.rank as number) ?? MIN_LEVEL
@@ -267,6 +307,8 @@ export async function applyAttempt(
     latestCorrect = (la?.total_correct as number) ?? 0
   }
   const points = computePoints(nextRank, latestCorrect)
+  // 실력점수(skill_score) — 레벨테스트 전용 트랙(활동점수와 별개). 최고성취만 유지(GREATEST, 강등으로 낮아지지 않음).
+  const skillScore = Math.max((prog?.skill_score as number) ?? 0, computeSkillScore(nextRank, latestCorrect))
 
   await admin.from('user_progress').upsert(
     {
@@ -274,6 +316,7 @@ export async function applyAttempt(
       rank: nextRank,
       demotion_strikes: nextStrikes,
       points,
+      skill_score: skillScore,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id' },
@@ -308,6 +351,7 @@ export async function applyAttempt(
     rankAfter: nextRank,
     rankDir: dir,
     points,
+    skillScore,
     demotionStrikes: nextStrikes,
     warned,
   }

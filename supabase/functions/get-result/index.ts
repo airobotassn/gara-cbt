@@ -13,6 +13,7 @@ import {
   lockedResult,
   type AxisMap,
 } from '../_shared/scoring.ts'
+import { kstDay } from '../_shared/kst.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -99,6 +100,10 @@ Deno.serve(async (req) => {
         attempt.rank_after = applied.rankAfter
         attempt.rank_dir = applied.rankDir
         attempt.warn_strikes = warnStrikes
+        // 레벨테스트 = 실력점수 전용(활동점수 미적립) — 활동잔디엔 did_leveltest 플래그로만 금색 표시.
+        await admin
+          .from('daily_activity')
+          .upsert({ user_id: user.id, day: kstDay(), did_leveltest: true }, { onConflict: 'user_id,day' })
       }
     }
 
