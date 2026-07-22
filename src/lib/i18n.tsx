@@ -135,7 +135,8 @@ const D: Record<string, Record<Lang, string>> = {
   'about.desc': { ko: '인공지능과 로봇 기술 융복합의 새로운 표준을 선도하는 글로벌 협회입니다.', en: 'A global association leading new standards in the convergence of AI and robotics.', ja: 'AIとロボット技術の融合における新たな標準を先導するグローバル協会です。', zh: '引领人工智能与机器人技术融合新标准的全球性协会。', hi: 'AI और रोबोटिक्स के अभिसरण में नए मानक स्थापित करने वाला वैश्विक संगठन।', vi: 'Hiệp hội toàn cầu dẫn dắt các tiêu chuẩn mới trong hội tụ AI và robot.' },
   'about.note': { ko: '협회 회원 및 회원사 모집, 활동 소식 등 자세한 내용은 순차적으로 공개될 예정입니다.', en: 'Details on membership, corporate partners, and activities will be announced progressively.', ja: '協会会員・会員企業の募集や活動情報など、詳細は順次公開予定です。', zh: '协会会员及会员单位招募、活动资讯等详情将陆续公布。', hi: 'सदस्यता, सदस्य कंपनियों और गतिविधियों के विवरण क्रमशः घोषित किए जाएंगे।', vi: 'Thông tin chi tiết về hội viên, doanh nghiệp thành viên và hoạt động sẽ được công bố dần.' },
 
-  'lv.title': { ko: 'WORLD ARENA', en: 'WORLD ARENA', ja: 'WORLD ARENA', zh: 'WORLD ARENA', hi: 'WORLD ARENA', vi: 'WORLD ARENA' },
+  // 레벨선택 페이지 제목 — 아레나 지도(WORLD ARENA)와 겹치지 않게 런처 버튼과 같은 '레벨 테스트'로.
+  'lv.title': { ko: '레벨 테스트', en: 'Level Test', ja: 'レベルテスト', zh: '等级测试', hi: 'लेवल टेस्ट', vi: 'Kiểm tra cấp' },
   'lv.rule_btn': { ko: '등급 규칙', en: 'Tier rules', ja: '等級ルール', zh: '等级规则', hi: 'टियर नियम', vi: 'Luật hạng' },
   'lv.rule_head': { ko: '한 시험은 {q}문항', en: 'Each test has {q} questions', ja: '1回の試験は{q}問', zh: '每次测试 {q} 题', hi: 'हर टेस्ट में {q} प्रश्न', vi: 'Mỗi bài thi có {q} câu' },
   'lv.rule_up': { ko: '{q}문항 중 {p1}개 이상 맞히면 한 단계 올라가요 (Lv.4~7은 {p2}개)', en: 'Get {p1}+ of {q} right to move up a tier (Lv.4–7: {p2}+)', ja: '{q}問中{p1}問以上正解で1段階アップ（Lv.4~7は{p2}問）', zh: '{q} 题中答对 {p1} 题以上升一级（Lv.4~7 为 {p2} 题）', hi: '{q} में से {p1}+ सही पर एक टियर ऊपर (Lv.4–7: {p2}+)', vi: 'Đúng {p1}+/{q} câu để lên 1 hạng (Lv.4–7: {p2}+)' },
