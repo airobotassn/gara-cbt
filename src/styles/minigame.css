@@ -53,7 +53,7 @@ html.dark .mgm-backdrop {
   background-image: radial-gradient(circle 480px at 50% 120px, var(--glow), rgba(0,74,198,0) 62%);
   background-repeat: no-repeat;
 }
-.mgp-in { max-width: 760px; margin: 0 auto; padding: 20px clamp(14px, 3vw, 22px) 44px; }
+.mgp-in { max-width: 900px; margin: 0 auto; padding: 20px clamp(14px, 3vw, 22px) 44px; }
 html.dark .mgp {
   --bg: #12151c; --card: #1c212c; --line: #5c6578; --ink: #e6ebf7; --muted: #a7b0c4;
   --brand: #7fa9f5; --glow: rgba(79,141,245,.14); --shc: 0, 0, 0;
@@ -86,8 +86,8 @@ html.dark .mgp {
 /* ── 표지 커버(일러스트 포스터, 가로 나란히) ── */
 .mg-shelf { display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 14px; }
 /* 페이지에선 화면이 좁으면 줄바꿈해 커버가 너무 얇아지지 않게 한다(모달은 한 줄 유지). */
-.mgp .mg-shelf { flex-wrap: wrap; }
-.mgp .mg-cover { flex: 1 1 200px; max-width: 340px; }
+.mgp .mg-shelf { flex-wrap: wrap; gap: 16px; }
+.mgp .mg-cover { flex: 1 1 250px; max-width: 420px; }
 /* 각 커버는 세로 포스터(게임 화면 위에 텍스트가 겹쳐 얹히는 오버레이). cqw 로 캡션이 커버 폭에 맞춰 스케일. */
 .mg-cover { position: relative; flex: 1 1 0; min-width: 0; max-width: 300px; aspect-ratio: 92 / 172; container-type: inline-size;
   overflow: hidden; cursor: pointer; border-radius: 20px; border: 3px solid var(--line); padding: 0; text-align: left; background: #e3ebf7;

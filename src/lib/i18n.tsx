@@ -542,7 +542,7 @@ const D: Record<string, Record<Lang, string>> = {
   'rank.top_tier': { ko: '최고 티어', en: 'Top tier', ja: '最高ティア', zh: '最高段位', hi: 'सर्वोच्च टियर', vi: 'Hạng cao nhất' },
   'rank.pt': { ko: '{n}점', en: '{n} pt', ja: '{n}点', zh: '{n} 分', hi: '{n} अंक', vi: '{n} điểm' },
   'rank.you': { ko: '나', en: 'You', ja: 'あなた', zh: '我', hi: 'आप', vi: 'Bạn' },
-  'rank.cta_test': { ko: '테스트로 리그에 참가하세요', en: 'Take a test to join a league', ja: 'テストでリーグに参加', zh: '做测试加入联赛', hi: 'लीग में शामिल होने के लिए टेस्ट दें', vi: 'Làm bài để tham gia giải đấu' },
+  'rank.cta_test': { ko: '테스트로 랭킹에 배치받기', en: 'Take a test to get ranked', ja: 'テストでランク配置', zh: '做测试获得排名', hi: 'रैंक पाने के लिए टेस्ट दें', vi: 'Làm bài để được xếp hạng' },
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음)
   'rank.coop_header': { ko: '우리가 함께 올라갑니다', en: 'We rise together', ja: 'みんなで上がっていく', zh: '我们一起向上', hi: 'हम साथ मिलकर ऊपर उठते हैं', vi: 'Chúng ta cùng nhau vươn lên' },
   'rank.tab_personal': { ko: '개인', en: 'Personal', ja: '個人', zh: '个人', hi: 'व्यक्तिगत', vi: 'Cá nhân' },
@@ -580,7 +580,7 @@ const D: Record<string, Record<Lang, string>> = {
   'db.recent_n': { ko: '최근 {n}회', en: 'Last {n}', ja: '直近{n}回', zh: '最近 {n} 次', hi: 'पिछले {n}', vi: '{n} lần gần nhất' },
   'db.stat_lastchange': { ko: '최근 변동', en: 'Last change', ja: '直近の変動', zh: '最近变化', hi: 'अंतिम बदलाव', vi: 'Thay đổi gần nhất' },
   'db.last_lp': { ko: '지난 응시 LP', en: 'Last LP', ja: '前回のLP', zh: '上次应试 LP', hi: 'पिछला LP', vi: 'LP lần trước' },
-  'db.trend_title': { ko: '랭킹 점수 추이', en: 'Ranking points', ja: 'ランキングポイント推移', zh: '排名分数走势', hi: 'रैंकिंग अंक रुझान', vi: 'Xu hướng điểm xếp hạng' },
+  'db.trend_title': { ko: '랭킹 추이', en: 'Ranking trend', ja: 'ランキング推移', zh: '排名走势', hi: 'रैंकिंग रुझान', vi: 'Xu hướng xếp hạng' },
   'db.activity_title': { ko: '활동 기록', en: 'Activity', ja: '活動記録', zh: '活动记录', hi: 'गतिविधि', vi: 'Hoạt động' },
   'db.radar_title': { ko: '영역 밸런스', en: 'Area balance', ja: '領域バランス', zh: '领域均衡', hi: 'क्षेत्र संतुलन', vi: 'Cân bằng lĩnh vực' },
   'db.radar_me': { ko: '내 점수', en: 'You', ja: '自分', zh: '我的', hi: 'आप', vi: 'Bạn' },
@@ -1198,7 +1198,7 @@ const D: Record<string, Record<Lang, string>> = {
   "caris.t1.pro.subj.0": { ko: "생성형 AI 도구 활용 및 프롬프트 엔지니어링 기초", en: "Generative-AI tools & prompt-engineering basics", ja: "生成AIツール活用とプロンプトエンジニアリング基礎", zh: "生成式AI工具应用与提示工程基础", hi: "जेनरेटिव AI टूल्स व प्रॉम्प्ट इंजीनियरिंग की मूल बातें", vi: "Sử dụng công cụ AI tạo sinh & cơ bản kỹ thuật prompt" },
   "caris.t1.pro.subj.1": { ko: "AI·로봇 자동화 기술의 이해와 활용", en: "Understanding & using AI/robot automation", ja: "AI・ロボット自動化技術の理解と活用", zh: "AI·机器人自动化技术的理解与应用", hi: "AI·रोबोट स्वचालन तकनीक की समझ व उपयोग", vi: "Hiểu & ứng dụng công nghệ tự động hóa AI·robot" },
   "caris.t1.pro.subj.2": { ko: "피지컬 AI 블록코딩 및 로봇 제어 기초", en: "Physical-AI block coding & robot-control basics", ja: "フィジカルAIブロックコーディングとロボット制御基礎", zh: "实体AI积木编程与机器人控制基础", hi: "फिजिकल AI ब्लॉक कोडिंग व रोबोट नियंत्रण की मूल बातें", vi: "Lập trình khối AI vật lý & cơ bản điều khiển robot" },
-  "caris.t1.elite.target": { ko: "관리자·강사 및 전문가 과정", en: "Managers, instructors & expert track", ja: "管理者・講師および専門家課程", zh: "管理者·讲师及专家课程", hi: "प्रबंधक·प्रशिक्षक व विशेषज्ञ ट्रैक", vi: "Quản lý·giảng viên & lộ trình chuyên gia" },
+  "caris.t1.elite.target": { ko: "관리자 강사 및 전문가 진입 과정", en: "Managers, instructors & expert entry track", ja: "管理者・講師および専門家入門課程", zh: "管理者·讲师及专家入门课程", hi: "प्रबंधक·प्रशिक्षक व विशेषज्ञ प्रवेश ट्रैक", vi: "Quản lý·giảng viên & lộ trình nhập môn chuyên gia" },
   "caris.t1.elite.format": { ko: "객관식 50문항 + 단답형 10문항 · 60분", en: "50 multiple-choice + 10 short-answer · 60 min", ja: "選択式50問 + 短答式10問 · 60分", zh: "客观题50题 + 简答题10题 · 60分钟", hi: "बहुविकल्पीय 50 + लघु उत्तर 10 प्रश्न · 60 मिनट", vi: "50 trắc nghiệm + 10 trả lời ngắn · 60 phút" },
   "caris.t1.elite.pass": { ko: "60점(36문항) 이상", en: "60+ points (36 questions)", ja: "60点（36問）以上", zh: "60分（36题）以上", hi: "60+ अंक (36 प्रश्न)", vi: "Từ 60 điểm (36 câu)" },
   "caris.t1.elite.subj.0": { ko: "에지 AI 디바이스와 센서 데이터 처리", en: "Edge-AI devices & sensor-data processing", ja: "エッジAIデバイスとセンサーデータ処理", zh: "边缘AI设备与传感器数据处理", hi: "एज-AI डिवाइस व सेंसर डेटा प्रसंस्करण", vi: "Thiết bị edge-AI & xử lý dữ liệu cảm biến" },
@@ -1236,7 +1236,7 @@ const D: Record<string, Record<Lang, string>> = {
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": { ko: "AI·Robot 융합역량 자격검정", en: "AI·Robotics Convergence Competency Exam", ja: "AI・ロボット融合力 資格試験", zh: "AI·机器人融合能力资格考试", hi: "AI·रोबोट संगम दक्षता परीक्षा", vi: "Kỳ thi năng lực hội tụ AI·robot" },
   // 피라미드 우측 그룹 라벨 — '|' 로 줄바꿈(브레이스 옆 2줄 세로 배치). 위 3티어=피지컬 AI, 아래 3티어=AI·로봇 리터러시
-  "guide.group_physical": { ko: "피지컬|AI", en: "Physical|AI", ja: "フィジカル|AI", zh: "实体|AI", hi: "फिजिकल|AI", vi: "AI|vật lý" },
+  "guide.group_physical": { ko: "피지컬 AI|전문가", en: "Physical AI|Expert", ja: "フィジカルAI|専門家", zh: "实体AI|专家", hi: "फिजिकल AI|विशेषज्ञ", vi: "Chuyên gia|AI vật lý" },
   "guide.group_literacy": { ko: "AI·로봇|리터러시", en: "AI·Robotics|Literacy", ja: "AI・ロボット|リテラシー", zh: "AI·机器人|素养", hi: "AI·रोबोटिक्स|साक्षरता", vi: "Hiểu biết|AI·robot" },
   // CARIS-Ⅱ(피지컬 AI) 카드 배너 문구 — 응시화면의 prereq(응시자격)과 별개로 Guide 배너 전용. Master=초급/GM=중급/Zenith=고급
   "guide.ptrack.master": { ko: "피지컬 AI 초급 전문가", en: "Physical-AI Junior Specialist", ja: "フィジカルAI 初級専門家", zh: "实体AI 初级专家", hi: "फिजिकल AI जूनियर विशेषज्ञ", vi: "Chuyên gia sơ cấp AI vật lý" },
@@ -1339,7 +1339,7 @@ const D: Record<string, Record<Lang, string>> = {
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   'arena.title': { ko: "WORLD ARENA", en: "WORLD ARENA", ja: "WORLD ARENA", zh: "WORLD ARENA", hi: "WORLD ARENA", vi: "WORLD ARENA" },
   'arena.bGame': { ko: "미니게임", en: "Mini Games", ja: "ミニゲーム", zh: "小游戏", hi: "मिनी गेम्स", vi: "Trò chơi nhỏ" },
-  'arena.bGameS': { ko: "AI 용어로 한 판", en: "Play & learn terms", ja: "AI用語で一勝負", zh: "用AI术语来一局", hi: "खेलें और सीखें", vi: "Chơi & học thuật ngữ" },
+  'arena.bGameS': { ko: "AI 로봇 용어로 한 판", en: "Play & learn terms", ja: "AI用語で一勝負", zh: "用AI术语来一局", hi: "खेलें और सीखें", vi: "Chơi & học thuật ngữ" },
   'arena.loading': { ko: "지도를 불러오는 중…", en: "Loading map…", ja: "地図を読み込み中…", zh: "正在加载地图…", hi: "मानचित्र लोड हो रहा है…", vi: "Đang tải bản đồ…" },
   'arena.zoom_in': { ko: "확대", en: "Zoom in", ja: "拡大", zh: "放大", hi: "ज़ूम इन", vi: "Phóng to" },
   'arena.zoom_out': { ko: "축소", en: "Zoom out", ja: "縮小", zh: "缩小", hi: "ज़ूम आउट", vi: "Thu nhỏ" },
