@@ -2,8 +2,8 @@
 //  - 모든 데이터 호출은 새 엣지 함수 `admin-test` 로 (CBT admin 과 분리).
 //  - 응시 결과 링크는 gara-cbt 라우트 `/test/result/:id` 를 사용.
 //  - 이관 범위: 대시보드 · 유저 · 응시 기록 · 문항 목록 · 문항 이력 · 문항 생성(KB 파이프라인) · 번역 · 제보 · 관리자 관리.
-//  - KB 파이프라인(kb-extract/generate/save/publish/embed-backfill) 과 translate-questions 는
-//    x-passcode 헤더가 필요 — 관리자가 화면에서 직접 입력(usePasscode, localStorage 공유).
+//  - KB 파이프라인(kb-extract/generate/save/publish/embed-backfill)·translate-questions 는 관리자 인증만으로 호출한다
+//    (옛 x-passcode 입력칸은 제거 — 서버 시크릿 KB_PASSCODE/TRANSLATE_PASSCODE 미설정이라 검사 자체를 안 함).
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
@@ -13,35 +13,6 @@ import { runTranslation, type TransItem, type TransResult } from '../lib/adminTr
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
-
-// KB/번역 파이프라인 x-passcode 공유(입력값을 localStorage 에 저장 → 탭 간·재방문 시 유지).
-const PASSCODE_KEY = 'gara_kb_passcode'
-function usePasscode(): [string, (v: string) => void] {
-  const [pc, setPc] = useState<string>(() => {
-    try { return localStorage.getItem(PASSCODE_KEY) ?? '' } catch { return '' }
-  })
-  const set = (v: string) => {
-    setPc(v)
-    try { localStorage.setItem(PASSCODE_KEY, v) } catch { /* noop */ }
-  }
-  return [pc, set]
-}
-function PasscodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="admin-row" style={{ gap: 8 }}>
-      <span style={{ whiteSpace: 'nowrap' }}>파이프라인 암호</span>
-      <input
-        className="admin-search"
-        type="password"
-        placeholder="x-passcode"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ maxWidth: 220 }}
-      />
-      <span className="admin-hint">생성·번역·발행에 필요합니다.</span>
-    </label>
-  )
-}
 
 const ErrBox = ({ msg }: { msg: string }) => <div className="admin-section admin-empty">불러오기 실패 — {msg}</div>
 
@@ -588,8 +559,8 @@ function UserDetail({ user, onClose }: { user: UserRow; onClose: () => void }) {
     catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
   }
   return (
-    <div className="admin-modal" onClick={onClose}>
-      <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
+    <div className="lt-modal" onClick={onClose}>
+      <div className="lt-modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="admin-modal-h">
           <b>{user.name || '유저'}</b>
           <span className="admin-hint">{user.email || (user.anon ? '게스트' : '')}</span>
@@ -748,8 +719,8 @@ function AttemptDetail({ attempt, onClose }: { attempt: AttemptRow; onClose: () 
   }, []) // eslint-disable-line
   const info = ABORT_INFO[attempt.status] ?? ABORT_INFO.in_progress
   return (
-    <div className="admin-modal" onClick={onClose}>
-      <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
+    <div className="lt-modal" onClick={onClose}>
+      <div className="lt-modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="admin-modal-h">
           <b>{attempt.name} · Lv.{attempt.level}</b>
           <span className="admin-hint">
@@ -889,11 +860,14 @@ function ListTab() {
   const [rows, setRows] = useState<ListRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
-  const [edit, setEdit] = useState<ListRow | null>(null)
+  const [edit, setEdit] = useState<ListRow | 'new' | null>(null) // 'new' = 문항 추가
+  const [sel, setSel] = useState<Set<string>>(new Set()) // 체크박스 선택(일괄 비활성·삭제용)
+  const [bulk, setBulk] = useState('')
 
   async function load() {
     setLoading(true)
     setErr('')
+    setSel(new Set())
     try {
       const r = await callFunction<{ rows: ListRow[] }>('admin-test', { action: 'list', level })
       setRows(r.rows)
@@ -926,6 +900,45 @@ function ListTab() {
     .filter((r) => cat === 'all' || r.category === cat)
     .filter((r) => !qq || (r.code ?? '').toLowerCase().includes(qq) || (r.prompt_i18n?.ko ?? '').toLowerCase().includes(qq))
 
+  const selCount = filtered.filter((r) => sel.has(r.id)).length
+  const allChecked = filtered.length > 0 && selCount === filtered.length
+  function toggle(id: string) {
+    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function toggleAll() {
+    setSel((s) => {
+      const n = new Set(s)
+      if (allChecked) filtered.forEach((r) => n.delete(r.id))
+      else filtered.forEach((r) => n.add(r.id))
+      return n
+    })
+  }
+
+  // 선택 일괄 처리 — 함수에 벌크 API가 없어 건별 호출을 4개씩 병렬로 돌린다.
+  async function bulkAct(action: 'deactivate' | 'delete') {
+    const targets = filtered.filter((r) => sel.has(r.id))
+    if (!targets.length) return
+    const word = action === 'delete' ? '삭제' : '비활성화'
+    if (!confirm(`선택한 ${targets.length}개 문항을 ${word}할까요?\n메인 목록에서 빠지고 '문항 이력' 탭으로 이동합니다. (거기서 되돌리기 가능)`)) return
+    setBulk(`${word} 중… 0/${targets.length}`)
+    let done = 0
+    const fails: string[] = []
+    let i = 0
+    const worker = async () => {
+      while (i < targets.length) {
+        const r = targets[i++]
+        try {
+          if (action === 'delete') await callFunction('admin-test', { action: 'delete', id: r.id })
+          else await callFunction('admin-test', { action: 'setActive', id: r.id, active: false })
+        } catch { fails.push(r.code ?? r.id.slice(0, 6)) }
+        setBulk(`${word} 중… ${++done}/${targets.length}`)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker))
+    setBulk(fails.length ? `⚠️ ${targets.length - fails.length}개 ${word} · 실패 ${fails.length}개(${fails.join(', ')})` : `✅ ${targets.length}개 ${word} 완료`)
+    await load()
+  }
+
   return (
     <div>
       {err ? <ErrBox msg={err} /> : null}
@@ -939,14 +952,29 @@ function ListTab() {
             {axes.map((a) => <option key={a.key} value={a.key}>{a.short}</option>)}
           </select></label>
           <input className="admin-search" placeholder="번호(L3-045)·문제 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="admin-mini" onClick={() => setEdit('new')}>+ 문항 추가</button>
           <button className="admin-mini" onClick={load}>새로고침</button>
           <span className="admin-hint">{filtered.length}문항{loading ? ' · 불러오는 중…' : ''}</span>
         </div>
+        {/* 선택 일괄 처리 바 — 체크된 게 있을 때만 */}
+        {selCount ? (
+          <div className="admin-toolbar" style={{ marginBottom: 10 }}>
+            <b>{selCount}개 선택됨</b>
+            <button className="admin-mini" disabled={!!bulk && bulk.endsWith('중…')} onClick={() => bulkAct('deactivate')}>선택 비활성</button>
+            <button className="admin-mini danger" disabled={!!bulk && bulk.endsWith('중…')} onClick={() => bulkAct('delete')}>선택 삭제</button>
+            <button className="admin-mini" onClick={() => setSel(new Set())}>선택 해제</button>
+            {bulk ? <span className="admin-msg">{bulk}</span> : null}
+          </div>
+        ) : bulk ? <div className="admin-toolbar" style={{ marginBottom: 10 }}><span className="admin-msg">{bulk}</span></div> : null}
         <table className="admin-table">
-          <thead><tr><th>번호</th><th>영역</th><th>문제(ko)</th><th>정답</th><th>미번역</th><th></th></tr></thead>
+          <thead><tr>
+            <th style={{ width: 34 }}><input type="checkbox" checked={allChecked} onChange={toggleAll} title="전체 선택" /></th>
+            <th>번호</th><th>영역</th><th>문제(ko)</th><th>정답</th><th>미번역</th><th></th>
+          </tr></thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id} className={r.missing.length ? 'prob' : ''}>
+                <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} /></td>
                 <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#3f8fd6' }}>{r.code ?? '-'}</td>
                 <td>{axisDef(r.category, 'ko').short}</td>
                 <td className="admin-q">{r.prompt_i18n?.ko ?? ''}</td>
@@ -964,23 +992,40 @@ function ListTab() {
         {filtered.length === 0 && !loading ? <div className="admin-empty">조건에 맞는 문항이 없습니다.</div> : null}
         <p className="admin-hint" style={{ marginTop: 8 }}>비활성·삭제한 문항은 <b>문항 이력</b> 탭에서 확인·되돌리기 할 수 있어요.</p>
       </div>
-      {edit ? <QuestionEdit row={edit} onClose={() => setEdit(null)} onSaved={(u) => { setRows((rs) => rs.map((x) => (x.id === u.id ? u : x))); setEdit(null) }} /> : null}
+      {edit ? (
+        <QuestionEdit
+          row={edit === 'new' ? null : edit}
+          level={level}
+          onClose={() => setEdit(null)}
+          onSaved={() => { setEdit(null); load() }}
+        />
+      ) : null}
     </div>
   )
 }
 
-function QuestionEdit({ row, onClose, onSaved }: { row: ListRow; onClose: () => void; onSaved: (u: ListRow) => void }) {
+// 문항 추가/수정 — row=null 이면 신규(추가). 한국어로 쓰고 '자동 번역'으로 나머지 5개 언어를 채운다
+// (번역 탭과 같은 translate-questions 파이프라인 = runTranslation).
+function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
+  row: ListRow | null; level: number; onClose: () => void; onSaved: () => void
+}) {
+  const isNew = !row
+  const [level, setLevel] = useState(row?.level ?? listLevel) // 신규만 변경 가능(영역 목록이 레벨 종속)
   const [lang, setLang] = useState('ko')
-  const [cat, setCat] = useState(row.category)
-  const [correct, setCorrect] = useState(row.correct_index)
-  const [active, setActive] = useState(row.active)
-  const [pi, setPi] = useState<Record<string, string>>({ ...row.prompt_i18n })
-  const [oi, setOi] = useState<Record<string, string[]>>({ ...row.options_i18n })
-  const [ei, setEi] = useState<Record<string, string>>({ ...row.explanation_i18n })
+  const [cat, setCat] = useState(row?.category ?? axesForLevel(row?.level ?? listLevel, 'ko')[0]?.key ?? '')
+  const [correct, setCorrect] = useState(row?.correct_index ?? 0)
+  const [active, setActive] = useState(row?.active ?? true)
+  const [pi, setPi] = useState<Record<string, string>>({ ...(row?.prompt_i18n ?? {}) })
+  const [oi, setOi] = useState<Record<string, string[]>>(row ? { ...row.options_i18n } : { ko: ['', '', '', ''] })
+  const [ei, setEi] = useState<Record<string, string>>({ ...(row?.explanation_i18n ?? {}) })
   const [msg, setMsg] = useState('')
-  const axes = axesForLevel(row.level, 'ko')
+  const [busy, setBusy] = useState(false)
+  const axes = axesForLevel(level, 'ko')
   const koCount = Math.max(1, (oi.ko ?? []).length)
   const ALL_LANGS = ['ko', ...LANGS]
+  const koOpts = (oi.ko ?? []).map((s) => (s ?? '').trim())
+  const koReady = !!(pi.ko ?? '').trim() && koOpts.length >= 2 && koOpts.every(Boolean)
+  const trDone = LANGS.filter((l) => !!(pi[l] ?? '').trim())
 
   function setOptText(l: string, k: number, val: string) {
     setOi((o) => { const arr = [...(o[l] ?? [])]; arr[k] = val; return { ...o, [l]: arr } })
@@ -993,29 +1038,119 @@ function QuestionEdit({ row, onClose, onSaved }: { row: ListRow; onClose: () => 
     setCorrect((c) => (c > k ? c - 1 : c === k ? 0 : c))
   }
 
+  // 한국어 원문 → 5개 언어 자동 번역(번역 탭과 동일 파이프라인). 보기 개수가 어긋난 언어는 버린다(서버 검증 통과용).
+  async function translate() {
+    setBusy(true)
+    setMsg('번역 중… (영어·일본어·중국어·힌디어·베트남어)')
+    const [res] = await runTranslation(
+      [{ prompt: (pi.ko ?? '').trim(), options: koOpts, explanation: (ei.ko ?? '').trim() }],
+      [...LANGS],
+    )
+    if (!res || 'error' in res) {
+      setMsg('번역 실패: ' + (res ? res.error : '빈 응답'))
+      setBusy(false)
+      return
+    }
+    const tr = res.tr as Record<string, TransItem>
+    const ok: string[] = []
+    const bad: string[] = []
+    const nextP = { ...pi }, nextO = { ...oi }, nextE = { ...ei }
+    for (const l of LANGS) {
+      const t = tr[l]
+      if (!t?.prompt || !Array.isArray(t.options) || t.options.length !== koOpts.length) { bad.push(l); continue }
+      nextP[l] = t.prompt
+      nextO[l] = t.options
+      nextE[l] = t.explanation ?? ''
+      ok.push(l)
+    }
+    setPi(nextP); setOi(nextO); setEi(nextE)
+    const issues = Object.entries(res.issues ?? {}).filter(([, v]) => (v ?? []).length)
+    setMsg(
+      (bad.length ? `⚠️ ${bad.map((l) => LANG_LABEL[l]).join('·')} 실패 — 다시 시도하세요. ` : `✅ ${ok.length}개 언어 번역 완료. `) +
+      (issues.length ? `검수 경고: ${issues.map(([l, v]) => `${LANG_LABEL[l] ?? l}(${v.join(',')})`).join(' / ')}` : '언어 탭에서 확인 후 저장하세요.'),
+    )
+    setBusy(false)
+  }
+
+  // 저장 payload: 한국어는 필수, 나머지는 "문제·보기가 다 차 있고 보기 개수가 ko와 같은" 언어만 보낸다.
+  function buildI18n() {
+    const P: Record<string, string> = { ko: (pi.ko ?? '').trim() }
+    const O: Record<string, string[]> = { ko: koOpts }
+    const E: Record<string, string> = { ko: (ei.ko ?? '').trim() }
+    const dropped: string[] = []
+    for (const l of LANGS) {
+      const p = (pi[l] ?? '').trim()
+      const o = (oi[l] ?? []).map((s) => (s ?? '').trim())
+      if (!p && !o.some(Boolean)) continue // 아예 비어 있으면 조용히 생략(미번역)
+      if (!p || o.length !== koOpts.length || o.some((x) => !x)) { dropped.push(l); continue }
+      P[l] = p; O[l] = o; E[l] = (ei[l] ?? '').trim()
+    }
+    return { P, O, E, dropped }
+  }
+
   async function save() {
+    if (!(pi.ko ?? '').trim()) { setMsg('문제(한국어)를 입력하세요.'); return }
+    if (koOpts.length < 2 || koOpts.some((s) => !s)) { setMsg('보기(한국어)를 모두 채우세요. (2개 이상)'); return }
+    if (!cat) { setMsg('영역을 선택하세요.'); return }
+    const { P, O, E, dropped } = buildI18n()
+    setBusy(true)
     setMsg('저장 중…')
-    const updated: ListRow = { ...row, category: cat, correct_index: correct, prompt_i18n: pi, options_i18n: oi, explanation_i18n: ei, active }
     try {
       await callFunction('admin-test', {
         action: 'upsert',
-        rows: [{ id: row.id, level: row.level, category: cat, correct_index: correct, prompt_i18n: pi, options_i18n: oi, explanation_i18n: ei, active }],
+        rows: [{
+          ...(row ? { id: row.id } : {}),
+          level, category: cat, correct_index: correct,
+          prompt_i18n: P, options_i18n: O, explanation_i18n: E, active,
+        }],
       })
-      setMsg('✅ 저장됨')
-      onSaved(updated)
-    } catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
+      setMsg(`✅ ${isNew ? '추가' : '저장'}됨`)
+      if (dropped.length) alert(`${dropped.map((l) => LANG_LABEL[l]).join('·')} 은(는) 문제·보기가 덜 채워져 저장에서 제외했습니다.`)
+      onSaved()
+    } catch (e) {
+      setMsg('실패: ' + (e instanceof Error ? e.message : String(e)))
+      setBusy(false)
+    }
   }
 
   return (
-    <div className="admin-modal">
-      <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="admin-modal-h"><b>문항 수정</b><span className="admin-hint">{row.code ?? `Lv.${row.level}`}</span><button className="admin-x" onClick={onClose}>✕</button></div>
+    <div className="lt-modal">
+      <div className="lt-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="admin-modal-h">
+          <b>{isNew ? '문항 추가' : '문항 수정'}</b>
+          <span className="admin-hint">{row ? row.code ?? `Lv.${row.level}` : '번호(L1-001…)는 저장 시 자동 부여'}</span>
+          <button className="admin-x" onClick={onClose}>✕</button>
+        </div>
         <div className="admin-row">
+          {isNew ? (
+            <label>레벨 <select value={level} onChange={(e) => {
+              const lv = +e.target.value
+              setLevel(lv)
+              setCat(axesForLevel(lv, 'ko')[0]?.key ?? '')
+            }}>
+              {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
+            </select></label>
+          ) : null}
           <label>영역 <select value={cat} onChange={(e) => setCat(e.target.value)}>{axes.map((a) => <option key={a.key} value={a.key}>{a.short}</option>)}</select></label>
           <label><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} style={{ width: 'auto' }} /> 활성</label>
         </div>
+        {/* 한국어로 작성 → 자동 번역으로 5개 언어를 채운다(실패 언어는 저장에서 제외되고 목록에 '미번역'으로 표시). */}
+        <div className="admin-row" style={{ marginTop: 10, gap: 8, alignItems: 'center' }}>
+          <button className="btn-ink" disabled={busy || !koReady} onClick={translate}>
+            {busy ? '처리 중…' : '🌐 자동 번역 (5개 언어)'}
+          </button>
+          <span className="admin-hint">
+            {koReady
+              ? `한국어 원문 기준 · 현재 번역됨 ${trDone.length}/${LANGS.length}`
+              : '문제·보기(한국어)를 모두 채우면 번역할 수 있어요.'}
+          </span>
+        </div>
         <div className="admin-langtabs" style={{ marginLeft: 0, marginTop: 10 }}>
-          {['ko', ...LANGS].map((l) => <button key={l} className={lang === l ? 'on' : ''} onClick={() => setLang(l)}>{LANG_LABEL[l]}</button>)}
+          {['ko', ...LANGS].map((l) => (
+            <button key={l} className={lang === l ? 'on' : ''} onClick={() => setLang(l)}>
+              {LANG_LABEL[l]}{l !== 'ko' && !(pi[l] ?? '').trim() ? ' •' : ''}
+            </button>
+          ))}
         </div>
         <div className="admin-sub" style={{ marginTop: 8 }}>문제 ({LANG_LABEL[lang]})</div>
         <input className="admin-in" value={pi[lang] ?? ''} placeholder="문제" onChange={(e) => setPi((p) => ({ ...p, [lang]: e.target.value }))} />
@@ -1036,7 +1171,7 @@ function QuestionEdit({ row, onClose, onSaved }: { row: ListRow; onClose: () => 
         <div className="admin-sub">해설</div>
         <textarea className="admin-ta" rows={3} value={ei[lang] ?? ''} onChange={(e) => setEi((x) => ({ ...x, [lang]: e.target.value }))} />
         <div className="admin-row" style={{ marginTop: 12 }}>
-          <button className="btn-ink" onClick={save}>저장</button>
+          <button className="btn-ink" onClick={save} disabled={busy}>{isNew ? '추가' : '저장'}</button>
           {msg ? <span className="admin-msg">{msg}</span> : null}
         </div>
       </div>
@@ -1082,9 +1217,11 @@ function EventsTab() {
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [sel, setSel] = useState<Set<string>>(new Set()) // 비활성·삭제 탭의 체크박스(일괄 되돌리기)
+  const [bulk, setBulk] = useState('')
 
   async function load() {
-    setLoading(true); setErr('')
+    setLoading(true); setErr(''); setSel(new Set())
     try {
       if (tab === 'history') {
         const r = await callFunction<{ events: QEvent[] }>('admin-test', { action: 'events', filter: 'all' })
@@ -1107,13 +1244,49 @@ function EventsTab() {
     } catch (e) { alert('실패: ' + (e instanceof Error ? e.message : String(e))) }
   }
 
-  if (err) return <ErrBox msg={err} />
   const qq = q.trim().toLowerCase()
   const matchCode = (c: string | null) => !qq || (c ?? '').toLowerCase().includes(qq)
   const TABS: [typeof tab, string][] = [['history', '히스토리'], ['inactive', '비활성'], ['deleted', '삭제']]
   const evView = rows.filter((r) => matchCode(r.code))
   const stateView = (tab === 'inactive' ? inactive : deleted).filter((r) => matchCode(r.code))
   const count = tab === 'history' ? evView.length : stateView.length
+
+  const selCount = stateView.filter((r) => sel.has(r.id)).length
+  const allChecked = stateView.length > 0 && selCount === stateView.length
+  function toggle(id: string) {
+    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function toggleAll() {
+    setSel((s) => {
+      const n = new Set(s)
+      if (allChecked) stateView.forEach((r) => n.delete(r.id))
+      else stateView.forEach((r) => n.add(r.id))
+      return n
+    })
+  }
+  // 선택 일괄 되돌리기 — 벌크 API가 없어 건별 호출을 4개씩 병렬로.
+  async function bulkRestore() {
+    const targets = stateView.filter((r) => sel.has(r.id))
+    if (!targets.length) return
+    if (!confirm(`선택한 ${targets.length}개 문항을 다시 활성 상태로 되돌릴까요?\n문항 목록에 다시 나타납니다.`)) return
+    setBulk(`되돌리는 중… 0/${targets.length}`)
+    let done = 0
+    const fails: string[] = []
+    let i = 0
+    const worker = async () => {
+      while (i < targets.length) {
+        const it = targets[i++]
+        try { await callFunction('admin-test', { action: 'restore', id: it.id }) }
+        catch { fails.push(it.code ?? it.id.slice(0, 6)) }
+        setBulk(`되돌리는 중… ${++done}/${targets.length}`)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker))
+    setBulk(fails.length ? `⚠️ ${targets.length - fails.length}개 복구 · 실패 ${fails.length}개(${fails.join(', ')})` : `✅ ${targets.length}개 되돌림`)
+    await load()
+  }
+
+  if (err) return <ErrBox msg={err} />
 
   return (
     <div>
@@ -1160,10 +1333,23 @@ function EventsTab() {
           </>
         ) : (
           <>
+            {/* 선택 일괄 되돌리기 */}
+            {stateView.length ? (
+              <div className="admin-toolbar" style={{ marginBottom: 10 }}>
+                <label style={{ gap: 6 }}>
+                  <input type="checkbox" checked={allChecked} onChange={toggleAll} style={{ width: 'auto' }} /> 전체 선택
+                </label>
+                {selCount ? <b>{selCount}개 선택됨</b> : <span className="admin-hint">여러 개 선택해 한 번에 되돌릴 수 있어요.</span>}
+                {selCount ? <button className="admin-mini" disabled={bulk.endsWith('중…')} onClick={bulkRestore}>선택 되돌리기</button> : null}
+                {selCount ? <button className="admin-mini" onClick={() => setSel(new Set())}>선택 해제</button> : null}
+                {bulk ? <span className="admin-msg">{bulk}</span> : null}
+              </div>
+            ) : null}
             <div className="ev-list">
               {stateView.map((it) => (
                 <div key={it.id} className="ev-card">
                   <div className="ev-head">
+                    <input type="checkbox" checked={sel.has(it.id)} onChange={() => toggle(it.id)} style={{ width: 'auto' }} />
                     <span style={{ fontWeight: 800, color: '#3f8fd6' }}>{it.code ?? '번호없음'}</span>
                     {it.level ? <span className="admin-hint">Lv.{it.level}</span> : null}
                     <span className="admin-hint">· {axisDef(it.category, 'ko').short}</span>
@@ -1422,7 +1608,6 @@ function findHeaderRow(aoa: string[][], maxScan = 15): number {
 }
 
 function UploadTab() {
-  const [passcode, setPasscode] = usePasscode()
   const [wb, setWb] = useState<XLSX.WorkBook | null>(null)
   const [sheetNames, setSheetNames] = useState<string[]>([])
   const [sheetIdx, setSheetIdx] = useState(0)
@@ -1561,7 +1746,6 @@ function UploadTab() {
       [...LANGS],
       (done, total, note) => setProgress({ done, total, note }),
       {
-        passcode,
         onBatch: (rs) => {
           const merged = mergeTransResults(skeleton, rs)
           setDrafts(merged)
@@ -1602,7 +1786,6 @@ function UploadTab() {
       (done, total, note) => setProgress({ done, total, note }),
       {
         seed,
-        passcode,
         onBatch: (rs) => {
           const merged = mergeTransResults(base, rs)
           setDrafts(merged)
@@ -1651,7 +1834,7 @@ function UploadTab() {
   async function retranslateOne(idx: number) {
     setBusy(true)
     const d = drafts[idx]
-    const [res] = await runTranslation([d.ko], [...LANGS], undefined, { passcode })
+    const [res] = await runTranslation([d.ko], [...LANGS])
     setDrafts((ds) =>
       ds.map((x, i) =>
         i === idx
@@ -1751,10 +1934,6 @@ function UploadTab() {
 
   return (
     <div>
-      <div className="admin-section">
-        <PasscodeField value={passcode} onChange={setPasscode} />
-      </div>
-
       {/* 0) 이어서하기 배너 */}
       {savedJob && phase === 'config' ? (
         <div className="admin-section" style={{ borderColor: 'var(--ink)' }}>
@@ -1995,7 +2174,7 @@ function UploadTab() {
 
 // ============================ 문항 생성 탭 (KB 파이프라인) ============================
 //  자료 넣기(kb-extract: recommend/fetch/extract → kb-save) → 문항 생성(kb-generate)
-//  → 발행(kb-publish) → 임베딩 백필(kb-embed-backfill). 모두 x-passcode 필요.
+//  → 발행(kb-publish) → 임베딩 백필(kb-embed-backfill). (관리자 인증만 — 별도 암호 없음)
 interface ExSource { title: string; url: string; why: string }
 interface ExChunk { text: string; axis: string; topic: string; quote_ok: boolean; excluded: boolean }
 interface GenVerify { supported: boolean; distractorsOk: boolean; suspect: boolean; reason: string }
@@ -2021,7 +2200,6 @@ interface GenQResp {
 }
 
 function GenerateTab() {
-  const [passcode, setPasscode] = usePasscode()
   const [level, setLevel] = useState(1)
   const [selAxes, setSelAxes] = useState<string[]>([])
 
@@ -2054,7 +2232,6 @@ function GenerateTab() {
   const [bfMsg, setBfMsg] = useState('')
 
   const levelAxes = axesForLevel(level, 'ko')
-  const pcHead = () => (passcode ? { 'x-passcode': passcode } : undefined)
   function axesPayload(): { key: string; label: string }[] {
     const chosen = levelAxes.filter((a) => selAxes.includes(a.key))
     const use = chosen.length ? chosen : levelAxes
@@ -2068,7 +2245,7 @@ function GenerateTab() {
   async function recommend() {
     setBusyIn('recommend'); setInMsg('')
     try {
-      const r = await callFunction<{ sources: ExSource[] }>('kb-extract', { mode: 'recommend', level, axes: axesPayload() }, pcHead())
+      const r = await callFunction<{ sources: ExSource[] }>('kb-extract', { mode: 'recommend', level, axes: axesPayload() })
       setSources(r.sources ?? [])
       if (!r.sources?.length) setInMsg('추천 출처가 없습니다.')
     } catch (e) { setInMsg('추천 실패: ' + errStr(e)) }
@@ -2079,7 +2256,7 @@ function GenerateTab() {
     if (!/^https?:\/\//i.test(u)) { setInMsg('올바른 URL이 아닙니다.'); return }
     setBusyIn('fetch'); setInMsg('')
     try {
-      const r = await callFunction<{ text: string; url: string; chars: number }>('kb-extract', { mode: 'fetch', url: u }, pcHead())
+      const r = await callFunction<{ text: string; url: string; chars: number }>('kb-extract', { mode: 'fetch', url: u })
       setText(r.text ?? '')
       if (!srcTitle) setSrcTitle(u)
       setInMsg(`가져옴: ${r.chars ?? 0}자`)
@@ -2091,7 +2268,7 @@ function GenerateTab() {
     setBusyIn('extract'); setInMsg('')
     try {
       const r = await callFunction<{ chunks: { text: string; topic: string; axis: string; quote_ok: boolean }[]; notes: string[] }>(
-        'kb-extract', { mode: 'extract', text: text.trim(), level, axes: axesPayload() }, pcHead(),
+        'kb-extract', { mode: 'extract', text: text.trim(), level, axes: axesPayload() },
       )
       setChunks((r.chunks ?? []).map((c) => ({ text: c.text, axis: c.axis ?? '', topic: c.topic ?? '', quote_ok: !!c.quote_ok, excluded: !c.quote_ok })))
       setExtractNotes(r.notes ?? [])
@@ -2107,7 +2284,6 @@ function GenerateTab() {
       const r = await callFunction<{ saved: number; skipped: number }>(
         'kb-save',
         { level, source: { url: url.trim() || undefined, title: srcTitle.trim() || undefined }, embed, chunks: use.map((c) => ({ text: c.text, axis: c.axis, topic: c.topic })) },
-        pcHead(),
       )
       setInMsg(`✅ 저장 ${r.saved}개 (중복 건너뜀 ${r.skipped})`)
     } catch (e) { setInMsg('저장 실패: ' + errStr(e)) }
@@ -2123,7 +2299,6 @@ function GenerateTab() {
       const r = await callFunction<{ questions: GenQResp[]; available: number; used: number; notes: string[] }>(
         'kb-generate',
         { level, axes: axesPayload(), count, levelGuidance: guidance.split('\n').map((s) => s.trim()).filter(Boolean) },
-        pcHead(),
       )
       setDrafts((r.questions ?? []).map((q) => ({
         axis: q.axis ?? null, topic: q.topic ?? null, chunkId: q.chunkId,
@@ -2152,7 +2327,6 @@ function GenerateTab() {
       const r = await callFunction<{ published: number; failed: number; notes: string[] }>(
         'kb-publish',
         { questions: use.map((d) => ({ level, axis: d.axis ?? '', prompt: d.prompt, options: d.options, correctIndex: d.correctIndex, explanation: d.explanation })) },
-        pcHead(),
       )
       setPubMsg(`✅ 발행 ${r.published}개${r.failed ? ` · 실패 ${r.failed}` : ''}${r.notes?.length ? ' · ' + r.notes.join(' / ') : ''}`)
     } catch (e) { setPubMsg('발행 실패: ' + errStr(e)) }
@@ -2163,7 +2337,7 @@ function GenerateTab() {
     setBusyBf(true); setBfMsg('')
     try {
       const r = await callFunction<{ embedded: number; remaining: number; done: boolean; notes: string[] }>(
-        'kb-embed-backfill', { limit: bfLimit }, pcHead(),
+        'kb-embed-backfill', { limit: bfLimit },
       )
       setBfMsg(`임베딩 ${r.embedded}개 · 남음 ${r.remaining}${r.done ? ' · 완료' : ''}${r.notes?.length ? ' · ' + r.notes.join(' / ') : ''}`)
     } catch (e) { setBfMsg('백필 실패: ' + errStr(e)) }
@@ -2175,7 +2349,6 @@ function GenerateTab() {
   return (
     <div>
       <div className="admin-section">
-        <PasscodeField value={passcode} onChange={setPasscode} />
         <p className="admin-desc" style={{ marginTop: 8 }}>
           <b>자료 넣기</b>(출처 추천·가져오기·청크 추출 → 지식 저장소 저장) → <b>문항 생성</b>(초안) → <b>발행</b>(번역+문제은행 반영) 순서로 진행합니다.
         </p>

@@ -1,6 +1,6 @@
 // 관리자 번역 오케스트레이션: 배포된 translate-questions 함수를 호출하되
 // 점진적 쪼개기(10→5→1) + 큐 + 분당 스로틀로 안정적으로 처리. 순서는 인덱스로 보존.
-//  (ai-level-test 에서 이관 — translate-questions 가 x-passcode 를 요구하므로 opts.passcode 로 전달)
+//  (ai-level-test 에서 이관. 호출 보호는 관리자 인증에만 의존 — 옛 x-passcode 전달은 제거)
 import { callFunction } from './supabase'
 
 export interface TransItem {
@@ -45,14 +45,11 @@ export async function runTranslation(
     seed?: (TransResult | undefined)[]
     // 배치 하나가 끝날 때마다 현재까지의 결과 스냅샷 전달(자동저장용)
     onBatch?: (results: TransResult[]) => void
-    // translate-questions 보호용 암호(x-passcode 헤더). 비어 있으면 보내지 않음.
-    passcode?: string
   },
 ): Promise<TransResult[]> {
   const results: (TransResult | undefined)[] =
     opts?.seed && opts.seed.length === items.length ? [...opts.seed] : new Array(items.length)
   const take = makeLimiter(RPM)
-  const pcHeaders = opts?.passcode ? { 'x-passcode': opts.passcode } : undefined
   let dailyStopped = false
   const doneCount = () => results.filter(isOk).length
   const snapshot = () => results.map((r) => r ?? ({ error: '미처리' } as TransResult))
@@ -67,7 +64,6 @@ export async function runTranslation(
         const r = await callFunction<{ results: (TransResult | null)[] }>(
           'translate-questions',
           { items: payload, langs },
-          pcHeaders,
         )
         ;(r.results || []).forEach((res, k) => {
           results[idxs[k]] = res ?? { error: '빈응답' }
