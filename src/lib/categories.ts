@@ -28,7 +28,7 @@ function ax(
   return { key, label: m(l), short: m(s) }
 }
 
-// helper(임시 영역용): ko·en만 주고 나머지 언어는 ko 로 폴백. L1(신설)·L7 콘텐츠 확정 시 ax() 로 교체.
+// helper(임시 영역용): ko·en만 주고 나머지 언어는 ko 로 폴백. L7 콘텐츠 확정 시 ax() 로 교체.
 function axd(key: string, ko: string, en: string, koS: string, enS: string): AxisRaw {
   return {
     key,
@@ -39,16 +39,10 @@ function axd(key: string, ko: string, en: string, koS: string, enS: string): Axi
 
 // 2026-07: 사다리를 한 칸씩 밀었다(옛 L7 폐기 · 옛 1~6 → 2~7 · L1 신설).
 //   축 코드도 같이 밀었다 — 옛 l1_principle = 지금 l2_principle. 옛 l7_* 는 폐기.
-//   L1(신설)·L7(옛 L6)은 임시 축 — 콘텐츠 확정 시 axd() → ax() 로 교체.
+//   L1(신설)은 6축 미정이라 비워뒀다. L7(옛 L6)은 임시 축(ko·en 폴백).
 const LEVEL_CATEGORIES_RAW: Record<number, AxisRaw[]> = {
-  1: [
-    axd('l1_device', '컴퓨터·스마트기기 기초', 'Computer & smart device basics', '기기기초', 'Devices'),
-    axd('l1_internet', '인터넷·계정·보안 기초', 'Internet, accounts & basic security', '인터넷기초', 'Internet'),
-    axd('l1_chatbot', 'AI 챗봇 첫걸음', 'First steps with AI chatbots', 'AI챗봇', 'Chatbot'),
-    axd('l1_search', '정보 검색·사실 확인', 'Search & fact-checking', '검색·확인', 'Search'),
-    axd('l1_citizen', '디지털 시민의식·예절', 'Digital citizenship & etiquette', '디지털시민', 'Citizenship'),
-    axd('l1_aitool', '생활 속 AI 도구 체험', 'Everyday AI tools', 'AI도구체험', 'AI tools'),
-  ],
+  // 1: 신설 레벨 — 6축 미정(비워둠). 커리큘럼 확정되면 여기에 ax() 6개를 넣고
+  //    _shared/scoring.ts 의 LEVEL_AXES[1] 과 testConfigLevel.ts 의 COMING_SOON_LEVELS 를 같이 갱신할 것.
   2: [
     ax('l2_principle',
       ['생성형 AI 기본 원리', 'Generative AI basics', '生成AIの基礎', '生成式AI原理', 'जनरेटिव AI मूल', 'Nguyên lý AI tạo sinh'],

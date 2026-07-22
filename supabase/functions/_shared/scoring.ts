@@ -18,8 +18,7 @@ export const EXTRA_AXES = 2
 
 // ----- 레벨별 6축 코드 (categories.ts 와 동일하게 유지!) -----
 export const LEVEL_AXES: Record<number, string[]> = {
-  // L1 = 2026-07 사다리 한 칸 밀기로 신설된 입문 레벨(임시 축 — 콘텐츠 확정 시 교체).
-  1: ['l1_device', 'l1_internet', 'l1_chatbot', 'l1_search', 'l1_citizen', 'l1_aitool'],
+  // 1: 2026-07 사다리 한 칸 밀기로 신설된 레벨 — 6축 미정(비워둠). categories.ts 와 같이 채울 것.
   2: ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt'],
   3: ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python'],
   4: ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv'],

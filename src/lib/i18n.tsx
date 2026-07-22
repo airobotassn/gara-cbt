@@ -200,7 +200,8 @@ const D: Record<string, Record<Lang, string>> = {
   'lv.coming_soon': { ko: '오픈 예정', en: 'Coming soon', ja: '公開予定', zh: '即将开放', hi: 'जल्द आ रहा है', vi: 'Sắp mở' },
   'lv.start_failed': { ko: '시작에 실패했습니다.', en: 'Failed to start.', ja: '開始に失敗しました。', zh: '启动失败。', hi: 'शुरू करने में विफल।', vi: 'Không thể bắt đầu.' },
   'lv.1.name': { ko: '입문', en: 'Starter', ja: '入門', zh: '入门', hi: 'शुरुआती', vi: 'Nhập môn' },
-  'lv.1.desc': { ko: 'AI 첫걸음 — 기기·인터넷 기초, AI 챗봇 사용, 정보 확인과 디지털 예절', en: 'First steps with AI — device & internet basics, using AI chatbots, fact-checking and digital etiquette', ja: 'AIの第一歩 — 機器・インターネット基礎、AIチャットボットの利用、情報確認とデジタルマナー', zh: 'AI 第一步 — 设备与网络基础、使用 AI 聊天机器人、信息核实与数字礼仪', hi: 'AI की पहली सीढ़ी — डिवाइस व इंटरनेट की मूल बातें, AI चैटबॉट का उपयोग, तथ्य-जाँच और डिजिटल शिष्टाचार', vi: 'Bước đầu với AI — cơ bản về thiết bị & internet, dùng chatbot AI, kiểm chứng thông tin và ứng xử số' },
+  // 신설 레벨 — 출제 영역 미정이라 설명도 비워둔 상태(확정되면 교체)
+  'lv.1.desc': { ko: '콘텐츠 준비 중', en: 'Content coming soon', ja: 'コンテンツ準備中', zh: '内容准备中', hi: 'सामग्री जल्द आ रही है', vi: 'Nội dung sắp có' },
   'lv.2.name': { ko: '기초', en: 'Basic', ja: '基礎', zh: '基础', hi: 'बुनियादी', vi: 'Cơ bản' },
   'lv.2.desc': { ko: 'AI(생성형 AI 리터러시·AI 윤리), 프롬프트 엔지니어링 기초', en: 'Generative-AI literacy & ethics, prompt-engineering basics', ja: '生成AIリテラシー・AI倫理、プロンプトエンジニアリング基礎', zh: '生成式 AI 素养与伦理，提示工程基础', hi: 'जनरेटिव AI साक्षरता व नैतिकता, प्रॉम्प्ट इंजीनियरिंग की मूल बातें', vi: 'Hiểu biết & đạo đức AI tạo sinh, nền tảng prompt engineering' },
   'lv.3.name': { ko: '중급', en: 'Intermediate', ja: '中級', zh: '中级', hi: 'मध्यम', vi: 'Trung cấp' },
