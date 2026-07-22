@@ -244,7 +244,7 @@ export default function Hub() {
           <p className="hub-gate-sub">로그인하고 출석·뽑기·상점을 이용해보세요</p>
           <button
             className="hub-gate-btn"
-            onClick={() => loginWithGoogle(`${window.location.origin}/auth/callback?next=/hub`)}
+            onClick={() => loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/hub')}`)}
           >
             {t('common.login_google')}
           </button>
