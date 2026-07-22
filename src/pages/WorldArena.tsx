@@ -14,7 +14,6 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { ArenaMap, DokdoInset, type ArenaMapHandle, type HoverInfo } from '../components/ArenaMap'
-import { MiniGamePicker } from '../components/MiniGamePicker'
 import {
   buildRegions,
   cscale,
@@ -30,7 +29,10 @@ import {
 } from '../lib/arena/data'
 import { M49_TO_ISO2 } from '../lib/arena/tables'
 import '../styles/arena.css'
-
+// ⚠️ 소스 일원화: 위 leaderboard 호출은 src/pages/Ranking.tsx 의 AggregateBoard(집계 탭)와
+//    완전히 동일한 RPC(region_/country_leaderboard, scope='region'|'country')를 쓴다 — 이중 fetch/별도 엔드포인트 없음.
+//    avg_level = 그 버킷의 원시 season_total 평균(레벨 아님, 필드명은 하위호환). 베이지안 보정값은 같은 응답의
+//    `score` 필드(Ranking.BucketCard 가 표시하는 값)로 별도 노출되며, 지도 색칠은 지금처럼 avg_level 을 그대로 쓴다.
 type ServerBucket = { code: string; avg_level: number; member_count: number }
 
 /** 랭킹 목록 한 줄 — hover 마다 60줄을 통째로 다시 그리지 않도록 memo */
@@ -97,7 +99,6 @@ export default function WorldArena() {
   const [query, setQuery] = useState('')
   const [prompt, setPrompt] = useState('')
   const [hover, setHover] = useState<HoverInfo | null>(null)
-  const [gamesOpen, setGamesOpen] = useState(false)
 
   // ── 백엔드 실데이터 ──
   const [real, setReal] = useState<RealData>(EMPTY_REAL)
@@ -294,6 +295,44 @@ export default function WorldArena() {
           <h1>{t('arena.title')}</h1>
         </header>
 
+        {/* 런처 — 아레나가 허브·미니게임·레벨테스트·데일리의 관문이라 지도보다 위에 둔다. */}
+        <nav className="aa-launch">
+          <Link className="aa-lbtn cari" to="/hub">
+            {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
+            <span className="ic ic-img"><img src="/cari-diagonal.png" alt="" /></span>
+            <span className="lt">
+              <b>CARI</b>
+              <i>{t('arena.bHubS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          <Link className="aa-lbtn game" to="/games">
+            <span className="ic">🕹️</span>
+            <span className="lt">
+              <b>{t('arena.bGame')}</b>
+              <i>{t('arena.bGameS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          <Link className="aa-lbtn lvl" to="/test/select">
+            <span className="ic">🎯</span>
+            <span className="lt">
+              <b>{t('arena.bLevel')}</b>
+              <i>{t('arena.bLevelS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          {/* 콘텐츠 파이프라인은 아직이지만 화면(/daily)은 있다 — 슬롯이 자리표시자인 상태. */}
+          <Link className="aa-lbtn daily" to="/daily">
+            <span className="ic">☀️</span>
+            <span className="lt">
+              <b>{t('arena.bDaily')}</b>
+              <i>{t('arena.bDailyS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+        </nav>
+
         <div className="aa-grid">
           <section className="aa-card aa-stage">
             {crumbs.length > 0 && (
@@ -413,43 +452,6 @@ export default function WorldArena() {
           </aside>
         </div>
 
-        {/* 하단 런처 — 아레나가 허브·레벨테스트·데일리·미니게임의 관문 역할을 한다. */}
-        <nav className="aa-launch">
-          <Link className="aa-lbtn cari" to="/hub">
-            {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
-            <span className="ic ic-img"><img src="/cari-diagonal.png" alt="" /></span>
-            <span className="lt">
-              <b>CARI</b>
-              <i>{t('arena.bHubS')}</i>
-            </span>
-            <span className="go">›</span>
-          </Link>
-          <Link className="aa-lbtn lvl" to="/test/select">
-            <span className="ic">🎯</span>
-            <span className="lt">
-              <b>{t('arena.bLevel')}</b>
-              <i>{t('arena.bLevelS')}</i>
-            </span>
-            <span className="go">›</span>
-          </Link>
-          {/* 콘텐츠 파이프라인은 아직이지만 화면(/daily)은 있다 — 슬롯이 자리표시자인 상태. */}
-          <Link className="aa-lbtn daily" to="/daily">
-            <span className="ic">☀️</span>
-            <span className="lt">
-              <b>{t('arena.bDaily')}</b>
-              <i>{t('arena.bDailyS')}</i>
-            </span>
-            <span className="go">›</span>
-          </Link>
-          <button type="button" className="aa-lbtn game" onClick={() => setGamesOpen(true)}>
-            <span className="ic">🕹️</span>
-            <span className="lt">
-              <b>{t('arena.bGame')}</b>
-              <i>{t('arena.bGameS')}</i>
-            </span>
-            <span className="go">›</span>
-          </button>
-        </nav>
       </div>
 
       {hover && (
@@ -473,7 +475,6 @@ export default function WorldArena() {
         </div>
       )}
 
-      {gamesOpen && <MiniGamePicker title={t('arena.bGame')} onClose={() => setGamesOpen(false)} />}
     </div>
   )
 }

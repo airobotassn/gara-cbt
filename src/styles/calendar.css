@@ -58,6 +58,9 @@
 .calm-cell.today.active {
   box-shadow: inset 0 0 0 2px var(--on-accent);
 }
+.calm-cell.active.full {
+  box-shadow: 0 0 0 2px #e3b23c, 0 0 8px rgba(227, 178, 60, .7);
+}
 
 .calm-legend {
   display: flex;

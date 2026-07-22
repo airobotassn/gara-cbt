@@ -94,7 +94,10 @@ export default function Landing() {
       <h1>
         {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>
         <br />
-        {t('landing.hero_post')}
+        {/* 뒷줄의 'CARIS' 만 강조색으로. 브랜드명이라 6개국어 모두 같은 토큰이므로 문자열 분할로 처리한다. */}
+        {t('landing.hero_post')
+          .split('CARIS')
+          .flatMap((part, i) => (i === 0 ? [part] : [<span key={i} className="em">CARIS</span>, part]))}
       </h1>
 
       {/* 의미 기반 검색 라우터 — 입력 의도에 맞는 페이지로 이동 */}

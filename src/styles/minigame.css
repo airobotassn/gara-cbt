@@ -39,8 +39,55 @@ html.dark .mgm-backdrop {
 .mgm-close { width: 30px; height: 30px; border-radius: 10px; border: 2.5px solid var(--line); background: var(--card); color: var(--ink); font-size: 16px; line-height: 1; font-weight: 900; cursor: pointer; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
 .mgm-close:active { transform: translateY(2px); box-shadow: none; }
 
+/* ===== 미니게임 페이지 (/games) =====
+   예전엔 위 모달(.mgm)이 유일한 진입점이었으나 전용 페이지로 승격.
+   커버 셀(.mg-cover…)은 모달과 공용이라 그게 필요로 하는 토큰을 여기서도 정의한다.
+   히어로는 게임들과 같은 CARI 우주 톤(코발트+크림)이라 라이트/다크 공통. */
+/* 아레나(부모 페이지)와 동일한 껍데기 — 연보라 배경 + 코발트 글로우 + 굵은 제목.
+   이 앱엔 배너 히어로가 없다(모든 페이지가 배경 위 굵은 제목 → 카드). 그 규칙을 따른다. */
+.mgp {
+  --bg: #faf8ff; --card: #fff; --line: #33323f; --ink: #33323f; --muted: #6c7188;
+  --brand: #5f8ed0; --glow: rgba(0,74,198,.16); --shc: 43, 32, 21;
+  min-height: 100%; color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle 480px at 50% 120px, var(--glow), rgba(0,74,198,0) 62%);
+  background-repeat: no-repeat;
+}
+.mgp-in { max-width: 760px; margin: 0 auto; padding: 20px clamp(14px, 3vw, 22px) 44px; }
+html.dark .mgp {
+  --bg: #12151c; --card: #1c212c; --line: #5c6578; --ink: #e6ebf7; --muted: #a7b0c4;
+  --brand: #7fa9f5; --glow: rgba(79,141,245,.14); --shc: 0, 0, 0;
+  --mg-cap-grad: linear-gradient(180deg, rgba(20,23,31,0) 0%, #171a22 22%, #171a22 100%);
+  --mg-name-ink: #e6ebf7;
+  --mg-name-sh: 0 2px 0 rgba(0,0,0,.6), 0 3px 8px rgba(0,0,0,.5);
+  --mg-accent-ink: #7fa9f5;
+  --mg-accent-sh: 0 1px 0 rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.6);
+  --mg-tag-ink: #a3adc4;
+}
+
+/* ── 뒤로 (스티커 pill) ── */
+.mgp-back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px;
+  padding: 7px 15px 7px 12px; border-radius: 999px; border: 2px solid var(--line);
+  background: var(--card); color: var(--ink); font-size: 12.5px; font-weight: 800;
+  text-decoration: none; box-shadow: 0 3px 0 rgba(var(--shc), .16); }
+.mgp-back:active { transform: translateY(2px); box-shadow: none; }
+.mgp-back span { font-size: 15px; line-height: 1; }
+
+/* ── 헤더 — 아레나 헤더와 동일(배경 위 굵은 제목) ── */
+.mgp-head { margin-bottom: 18px; }
+.mgp-head h1 { margin: 0; display: flex; align-items: center; gap: 10px;
+  font-size: clamp(26px, 6.5vw, 34px); font-weight: 900; letter-spacing: -.02em; color: var(--ink); }
+.mgp-head p { margin: 5px 0 0; font-size: 14px; font-weight: 700; color: var(--muted); }
+.mgp-count { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px;
+  border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--brand) 42%, transparent);
+  color: var(--brand); font-size: 13px; font-weight: 900; }
+
 /* ── 표지 커버(일러스트 포스터, 가로 나란히) ── */
 .mg-shelf { display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 14px; }
+/* 페이지에선 화면이 좁으면 줄바꿈해 커버가 너무 얇아지지 않게 한다(모달은 한 줄 유지). */
+.mgp .mg-shelf { flex-wrap: wrap; }
+.mgp .mg-cover { flex: 1 1 200px; max-width: 340px; }
 /* 각 커버는 세로 포스터(게임 화면 위에 텍스트가 겹쳐 얹히는 오버레이). cqw 로 캡션이 커버 폭에 맞춰 스케일. */
 .mg-cover { position: relative; flex: 1 1 0; min-width: 0; max-width: 300px; aspect-ratio: 92 / 172; container-type: inline-size;
   overflow: hidden; cursor: pointer; border-radius: 20px; border: 3px solid var(--line); padding: 0; text-align: left; background: #e3ebf7;

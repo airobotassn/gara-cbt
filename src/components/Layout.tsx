@@ -227,11 +227,12 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {isFullUser ? (
                   <div className="pf-acct-actions">
                     <button
-                      className="pf-acct-btn"
+                      className="pf-acct-btn pf-mypage-btn"
                       onClick={() => go('/mypage')}
                       title={t('nav.mypage')}
                     >
-                      <UserIcon size={13} />
+                      {/* 아이콘 크기는 옆 글자 크기(fab.css 의 .pf-mypage-btn)와 맞춘다 */}
+                      <UserIcon size={15} />
                       {t('nav.mypage')}
                     </button>
                     <button

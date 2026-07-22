@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>골라라 CARI</title>
+<style>
+  :root{
+    /* 껍데기 토큰 = 버텨라·쏴라 CARI 와 동일 */
+    --page:#e9eff9; --bg:#fbfaf5; --ink:#28324c; --sub:#7c869e;
+    --brand:#004ac6; --brand-hi:#1b55d0; --line:#e6e9f3;
+    --good:#12b58c; --bad:#f2664f; --skip:#e59b17;
+    --cream:#ece9e0;
+    /* 필드 지오메트리는 JS 의 GEO 가 주입 (단일 출처) */
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);
+    color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    display:flex; align-items:center; justify-content:center; min-height:100%; overflow:hidden;
+    user-select:none;
+  }
+  .stage{
+    position:relative; width:min(460px,100vw); height:min(860px,100vh);
+    display:flex; flex-direction:column; background:var(--bg);
+    box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
+  }
+
+  /* ===== HUD — 가운데에 큰 타이머 ===== */
+  .hud{position:relative; display:flex; align-items:center; justify-content:space-between;
+    gap:8px; padding:7px 12px; z-index:6; min-height:66px;
+    background:linear-gradient(#ffffff,#f4f6fb); border-bottom:1px solid var(--line);}
+  .hud-score{display:flex; align-items:center; gap:7px;}
+  .hs-ic{width:26px; height:26px; border-radius:9px; display:grid; place-items:center;
+    background:linear-gradient(180deg,#ffd25a,#f0a91a); box-shadow:0 2px 6px rgba(230,160,20,.5);}
+  .hs-ic svg{width:15px; height:15px; fill:#fff;}
+  .hs-num{font-size:24px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; line-height:1;}
+  .hs-unit{font-size:11px; font-weight:800; color:var(--sub); margin-left:-1px;}
+  .hud-right{display:flex; align-items:center; gap:6px;}
+  .hud-chip{display:flex; align-items:center; gap:4px; background:#fff; border:1px solid #e2e7f1;
+    border-radius:20px; padding:4px 9px 4px 7px; box-shadow:0 2px 6px rgba(80,100,150,.06);}
+  .hud-chip svg{width:13px; height:13px; fill:#f0a91a; flex:none;}
+  .hud-chip .hc-lab{font-size:10.5px; color:var(--sub); font-weight:700;}
+  .hud-chip b{font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; font-weight:800;}
+  .hud-chip.alive svg{fill:var(--good);} .hud-chip.alive b{color:var(--good);}
+  /* HUD 정중앙 절대배치 — 좌우 내용 길이에 안 흔들리게 */
+  .timer{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:56px; height:56px; border-radius:50%; display:grid; place-items:center;
+    --p:1; --tcol:var(--brand);
+    background:conic-gradient(var(--tcol) calc(var(--p) * 1turn), #e4eaf4 0);
+    box-shadow:0 3px 10px rgba(80,100,150,.18); transition:background .3s linear;}
+  .timer::before{content:""; position:absolute; inset:5px; border-radius:50%; background:#fff;}
+  .timer b{position:relative; font-size:25px; font-weight:900; line-height:1;
+    color:var(--tcol); font-variant-numeric:tabular-nums;}
+  .timer.crit{animation:tpulse .5s ease-in-out infinite;}
+  @keyframes tpulse{50%{transform:translate(-50%,-50%) scale(1.1);}}
+
+  /* ===== 문제판 (위) — 용어를 먼저 크게, 설명을 아래. 'A — 이것은 B 이다' 문장은 폐기. ===== */
+  .qboard{padding:14px 18px 16px; background:linear-gradient(#ffffff,#f7f8fc);
+    border-bottom:1px solid var(--line); box-shadow:0 4px 14px rgba(80,100,150,.05); z-index:6;}
+  .qrule{width:34px; height:3px; border-radius:2px; margin-bottom:9px;
+    background:linear-gradient(90deg,var(--brand),#5b90ff);}
+  .qterm{font-size:29px; font-weight:900; color:var(--brand); letter-spacing:-.035em;
+    line-height:1.14; margin-bottom:9px; word-break:keep-all;}
+  .qdesc{font-size:15.5px; font-weight:500; color:#42506f; line-height:1.62;
+    letter-spacing:-.005em; min-height:76px; word-break:keep-all;}
+
+  /* ===== 필드 = 우주 ===== */
+  .field{position:relative; flex:1; overflow:hidden; z-index:1;
+    background:linear-gradient(180deg,#131a35 0%, #0d1226 42%, #080b1a 78%, #05070f 100%);}
+
+  /* --- 우주 배경 --- */
+  .void{position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
+  /* 성운 — 크게 흐린 색 구름 */
+  .neb{position:absolute; border-radius:50%; filter:blur(38px);}
+  .neb.n1{left:-22%; top:-14%; width:86%; height:56%;
+    background:radial-gradient(circle, rgba(96,86,220,.42), transparent 66%);}
+  .neb.n2{right:-26%; top:22%; width:88%; height:60%;
+    background:radial-gradient(circle, rgba(30,150,190,.34), transparent 66%);}
+  .neb.n3{left:6%; bottom:-22%; width:96%; height:52%;
+    background:radial-gradient(circle, rgba(150,70,190,.26), transparent 68%);}
+  /* 은하수 띠 */
+  .milky{position:absolute; left:-30%; right:-30%; top:34%; height:34%;
+    transform:rotate(-13deg); filter:blur(20px);
+    background:linear-gradient(180deg, transparent, rgba(190,205,255,.13) 45%, transparent);}
+  /* 멀리 있는 고리 행성 */
+  .planet{position:absolute; right:-16%; top:60%; width:150px; height:150px;}
+  .planet .pb{position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(circle at 34% 30%, #7b8fd8, #3d4a86 52%, #232a55 100%);
+    box-shadow:inset -14px -10px 26px rgba(0,0,0,.55), 0 0 40px rgba(110,130,220,.22);}
+  .planet .pr{position:absolute; left:-26%; top:42%; width:152%; height:24%;
+    border-radius:50%; border:5px solid rgba(160,180,240,.3);
+    transform:rotate(-19deg); box-shadow:0 0 16px rgba(150,175,240,.2);}
+  /* 별 — JS 가 생성 */
+  .star{position:absolute; border-radius:50%; background:#fff; animation:tw ease-in-out infinite;}
+  @keyframes tw{0%,100%{opacity:var(--o);} 50%{opacity:calc(var(--o) * .25);}}
+  /* 유성 */
+  .shoot{position:absolute; width:110px; height:1.6px; border-radius:2px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.95));
+    filter:drop-shadow(0 0 5px rgba(190,220,255,.9));
+    transform:rotate(24deg); opacity:0; animation:shoot linear infinite;}
+  @keyframes shoot{
+    0%{opacity:0; transform:translate(0,0) rotate(24deg);}
+    3%{opacity:1;}
+    12%{opacity:0; transform:translate(230px,102px) rotate(24deg);}
+    100%{opacity:0; transform:translate(230px,102px) rotate(24deg);}}
+
+  /* --- 발판 --- */
+  .zone{position:absolute; top:var(--zone-top); height:var(--zone-h); width:40%; z-index:2;}
+  .zoneO{left:4%; --tilt:-7deg;} .zoneX{right:4%; --tilt:7deg;}
+  /* 우주에 떠 있는 정거장 발판 — 밝은 상판(어두운 우주에서 튐) + 색 림 글로우 + 패널 라인 */
+  .plate{position:absolute; inset:0; display:grid; place-items:center; overflow:hidden;
+    border-radius:15px; transition:box-shadow .25s, filter .25s;
+    background:
+      repeating-linear-gradient(90deg, rgba(90,120,175,.07) 0 1px, transparent 1px 30px),
+      repeating-linear-gradient(0deg, rgba(90,120,175,.07) 0 1px, transparent 1px 30px),
+      linear-gradient(180deg,#eef4fd 0%, #d3dff4 58%, #b8cbe9 100%);
+    box-shadow:0 13px 0 #6a82b8, 0 15px 3px rgba(4,8,20,.5), 0 26px 40px rgba(4,8,20,.7),
+               0 0 30px rgba(91,144,255,.4), inset 0 2px 0 rgba(255,255,255,.95),
+               inset 0 0 0 2px rgba(91,144,255,.35);}
+  .zoneX .plate{
+    background:
+      repeating-linear-gradient(90deg, rgba(175,95,80,.07) 0 1px, transparent 1px 30px),
+      repeating-linear-gradient(0deg, rgba(175,95,80,.07) 0 1px, transparent 1px 30px),
+      linear-gradient(180deg,#fdeee9 0%, #f9d3c8 58%, #f2b6a4 100%);
+    box-shadow:0 13px 0 #b96a54, 0 15px 3px rgba(4,8,20,.5), 0 26px 40px rgba(4,8,20,.7),
+               0 0 30px rgba(242,102,79,.4), inset 0 2px 0 rgba(255,255,255,.95),
+               inset 0 0 0 2px rgba(242,102,79,.35);}
+  .zone-mark{font-size:96px; font-weight:900; line-height:1; letter-spacing:-.04em; opacity:.2;}
+  .zoneO .zone-mark{color:var(--brand);} .zoneX .zone-mark{color:#c2452c;}
+  /* 발판·대기 공통 명패 */
+  .zone-tag{position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:4;
+    display:flex; align-items:baseline; gap:2px; padding:5px 17px; border-radius:22px;
+    color:#fff; font-size:12.5px; font-weight:800; white-space:nowrap;
+    font-variant-numeric:tabular-nums; box-shadow:0 4px 12px rgba(6,12,30,.5);}
+  .zone-tag b{font-size:18px; font-weight:900; line-height:1;}
+  .zoneO .zone-tag{background:linear-gradient(160deg,#2f6be0,var(--brand));
+    box-shadow:0 4px 12px rgba(6,12,30,.5), 0 0 18px rgba(60,120,240,.5);}
+  .zoneX .zone-tag{background:linear-gradient(160deg,#f4826e,var(--bad));
+    box-shadow:0 4px 12px rgba(6,12,30,.5), 0 0 18px rgba(242,102,79,.5);}
+  .zone.safe .plate{filter:saturate(1.15) brightness(1.06);
+    box-shadow:0 13px 0 #4a9e86, 0 0 0 3px var(--good), 0 0 30px rgba(18,181,140,.55),
+               0 28px 36px rgba(8,14,30,.55);}
+  .zone.collapse .zone-tag{opacity:0; transition:opacity .2s;}
+  /* 발판이 나선을 그리며 사건의 지평선으로 빨려든다 */
+  .zone.collapse .plate{animation:plateSuck 1.2s cubic-bezier(.55,0,.85,.5) forwards;}
+  @keyframes plateSuck{
+    0%{transform:translate(0,0) rotate(0) scale(1);}
+    14%{transform:translate(0,6px) rotate(calc(var(--tilt) * .5)) scale(.98);}
+    100%{transform:translate(0,52%) rotate(430deg) scale(.04); opacity:.15;}}
+
+  /* ===== 블랙홀 ===== */
+  .bh{position:absolute; z-index:28; pointer-events:none; transform:translate(-50%,-50%);
+    width:0; height:0;}
+  .bh-core{position:absolute; left:50%; top:50%; width:190px; height:190px; border-radius:50%;
+    transform:translate(-50%,-50%) scale(0); background:#02030a;
+    box-shadow:0 0 40px 10px rgba(2,3,10,.9), 0 0 0 2px rgba(180,140,255,.5);
+    animation:bhCore 1.55s cubic-bezier(.2,.8,.3,1) forwards;}
+  @keyframes bhCore{0%{transform:translate(-50%,-50%) scale(0);}
+    22%{transform:translate(-50%,-50%) scale(1.06);}
+    62%{transform:translate(-50%,-50%) scale(1);}
+    100%{transform:translate(-50%,-50%) scale(0); opacity:.6;}}
+  .bh-disk{position:absolute; left:50%; top:50%; width:300px; height:300px; border-radius:50%;
+    transform:translate(-50%,-50%) scale(0) rotate(0);
+    background:conic-gradient(from 0deg, rgba(255,190,120,0) 0deg, rgba(255,170,90,.85) 70deg,
+      rgba(210,130,255,.9) 150deg, rgba(120,180,255,.8) 230deg, rgba(255,190,120,0) 330deg);
+    -webkit-mask:radial-gradient(circle, transparent 30%, #000 38%, #000 52%, transparent 62%);
+    mask:radial-gradient(circle, transparent 30%, #000 38%, #000 52%, transparent 62%);
+    filter:blur(2px); animation:bhDisk 1.55s cubic-bezier(.2,.8,.3,1) forwards;}
+  @keyframes bhDisk{0%{transform:translate(-50%,-50%) scale(0) rotate(0); opacity:0;}
+    18%{opacity:1;} 62%{transform:translate(-50%,-50%) scale(1.05) rotate(420deg); opacity:1;}
+    100%{transform:translate(-50%,-50%) scale(.1) rotate(760deg); opacity:0;}}
+  .bh-charge{position:absolute; left:50%; top:50%; width:60px; height:60px; border-radius:50%;
+    transform:translate(-50%,-50%) scale(0);
+    background:radial-gradient(circle, #fff 0%, rgba(200,170,255,.9) 40%, transparent 70%);
+    animation:bhCharge 360ms ease-in forwards;}
+  @keyframes bhCharge{0%{transform:translate(-50%,-50%) scale(0); opacity:0;}
+    70%{transform:translate(-50%,-50%) scale(1.1); opacity:1;}
+    100%{transform:translate(-50%,-50%) scale(.45); opacity:1;}}
+
+
+  /* --- 대기 발판 — 표면은 홀로그램(우주), 형태는 O/X 와 같은 두께 있는 슬랩 --- */
+  .waitzone{position:absolute; left:6%; right:6%; top:var(--wait-top); height:var(--wait-h);
+    z-index:1; border-radius:15px;
+    background:linear-gradient(180deg, rgba(120,195,255,.26) 0%, rgba(70,140,230,.14) 60%, rgba(50,110,200,.16) 100%);
+    box-shadow:
+      0 13px 0 rgba(38,92,158,.8),          /* 발판 두께 */
+      0 15px 3px rgba(4,8,20,.5),
+      0 26px 40px rgba(4,8,20,.7),
+      0 0 34px rgba(90,170,255,.5),         /* 홀로 글로우 */
+      inset 0 2px 0 rgba(200,240,255,.6),
+      inset 0 0 36px rgba(90,170,255,.2),
+      inset 0 0 0 2px rgba(125,200,255,.45);}
+  /* 그리드·스캔라인만 잘라내는 내부 레이어 — waitzone 에 overflow:hidden 을 걸면 명패가 잘린다 */
+  .wz-fx{position:absolute; inset:0; border-radius:15px; overflow:hidden; pointer-events:none;}
+  .wz-fx::before{content:""; position:absolute; inset:0;
+    background:repeating-linear-gradient(90deg, rgba(165,220,255,.2) 0 1px, transparent 1px 28px),
+               repeating-linear-gradient(0deg, rgba(165,220,255,.14) 0 1px, transparent 1px 24px);}
+  .wz-fx::after{content:""; position:absolute; left:0; right:0; height:26%;
+    background:linear-gradient(180deg, transparent, rgba(185,228,255,.32), transparent);
+    animation:scan 3.6s ease-in-out infinite;}
+  @keyframes scan{0%,100%{top:-14%;} 50%{top:88%;}}
+  /* 명패는 발판 명패와 같은 규격 */
+  .waitzone .wl{position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:4;
+    padding:5px 17px; border-radius:22px; color:#fff; font-size:14px; font-weight:800;
+    white-space:nowrap; background:linear-gradient(160deg,#4f8fd4,#2b5f9e);
+    box-shadow:0 4px 12px rgba(6,12,30,.5), 0 0 18px rgba(110,190,255,.5);}
+
+  /* ===== 캐릭터 — 나 = CARI, 나머지 = 같은 우주복의 응시생(슈트 색으로 구분) ===== */
+  .ch{position:absolute; z-index:10; width:38px; transform:translate(-50%,-50%);
+    transition:left .5s cubic-bezier(.4,1.4,.5,1), top .5s cubic-bezier(.4,1.4,.5,1); will-change:left,top;
+    filter:drop-shadow(0 3px 4px rgba(6,12,30,.55));}
+  .ch .art{width:100%; height:auto; display:block; transform-origin:50% 92%; animation:hop 1.5s ease-in-out infinite;}
+  @keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .ch .lab{position:absolute; top:-11px; left:50%; transform:translateX(-50%); white-space:nowrap;
+    font-size:9px; font-weight:800; color:#eaf0fb; background:rgba(18,26,48,.78);
+    padding:0 5px; border-radius:7px;}
+  .ch.me{width:52px; z-index:12;}
+  .ch.me .lab{color:#fff; background:var(--brand); top:-12px;}
+  /* 나를 항상 찾을 수 있게 — 크림 슈트가 밝은 발판 위에서 묻혀서 발밑 글로우를 깔았다 */
+  .ch.me::before{content:""; position:absolute; left:50%; top:58%; width:165%; height:62%;
+    transform:translate(-50%,-50%); border-radius:50%; z-index:-1; pointer-events:none;
+    background:radial-gradient(circle, rgba(91,144,255,.6), rgba(91,144,255,0) 70%);
+    animation:mePulse 2.2s ease-in-out infinite;}
+  @keyframes mePulse{0%,100%{opacity:.75;} 50%{opacity:1;}}
+  /* 탈락 — 참가자도 나선으로 빨려든다 */
+  .ch.out .art{animation:none;}
+  .ch.out{z-index:8; animation:exHole 1.1s cubic-bezier(.5,0,.85,.5) forwards;}
+  @keyframes exHole{0%{transform:translate(-50%,-50%) rotate(0) scale(1); opacity:1;}
+    18%{transform:translate(-50%,-64%) rotate(-14deg) scale(1.06);}
+    100%{transform:translate(-50%,20%) rotate(560deg) scale(.05); opacity:0;}}
+
+  /* 접촉 순간 섬광 — 밝은 발판 위에선 먼지만으론 타격감이 안 살았다 */
+  .hitflash{position:absolute; z-index:33; pointer-events:none; width:220px; height:220px;
+    border-radius:50%; transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(214,232,255,.55) 38%, transparent 70%);
+    animation:hitflash .26s ease-out forwards;}
+  @keyframes hitflash{0%{opacity:.95; transform:translate(-50%,-50%) scale(.35);}
+    100%{opacity:0; transform:translate(-50%,-50%) scale(1.15);}}
+
+  /* ===== 임팩트 ===== */
+  .debris{position:absolute; z-index:34; border-radius:3px; pointer-events:none;
+    background:linear-gradient(160deg,#9db4dc,#4f6597); box-shadow:0 1px 3px rgba(10,18,40,.55);}
+  .shake-hard{animation:shk2 .09s linear infinite;}
+  @keyframes shk2{0%{transform:translate(0,0)}25%{transform:translate(-4px,2px)}
+    50%{transform:translate(4px,-2px)}75%{transform:translate(-3px,-1px)}100%{transform:translate(3px,1px)}}
+
+  /* ===== 정답 공개 카드 ===== */
+  .verdict{position:absolute; top:56%; left:50%; z-index:22; opacity:0;
+    transform:translate(-50%,-50%) scale(0); display:flex; align-items:center; gap:12px;
+    padding:9px 20px 9px 10px; border-radius:20px; white-space:nowrap;
+    background:rgba(255,255,255,.97); box-shadow:0 14px 36px rgba(6,12,30,.6);}
+  .verdict.show{animation:vPop .5s cubic-bezier(.2,1.7,.4,1) forwards;}
+  @keyframes vPop{0%{opacity:0; transform:translate(-50%,-50%) scale(0) rotate(-9deg);}
+    60%{opacity:1; transform:translate(-50%,-50%) scale(1.1) rotate(2.5deg);}
+    100%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(0);}}
+  .verdict.hide{animation:vOut .28s ease-in forwards;}
+  @keyframes vOut{to{opacity:0; transform:translate(-50%,-50%) scale(.86);}}
+  .v-mark{position:relative; width:48px; height:48px; border-radius:15px; display:grid;
+    place-items:center; font-size:29px; font-weight:900; color:#fff; line-height:1;}
+  .verdict.o .v-mark{background:linear-gradient(160deg,var(--brand-hi),var(--brand));}
+  .verdict.x .v-mark{background:linear-gradient(160deg,#f4826e,var(--bad));}
+  .v-mark::after{content:""; position:absolute; inset:0; border-radius:15px;
+    border:3px solid currentColor; opacity:0;}
+  .verdict.show .v-mark::after{animation:vRing .62s ease-out .12s;}
+  @keyframes vRing{0%{transform:scale(1); opacity:.85;} 100%{transform:scale(2.3); opacity:0;}}
+  .v-lab{font-size:10.5px; font-weight:800; letter-spacing:.12em; color:var(--sub);}
+  .v-sub{font-size:16.5px; font-weight:900; color:var(--ink); letter-spacing:-.01em; margin-top:1px;}
+
+  /* ===== 답 버튼 (아래 — 엄지 닿는 자리) ===== */
+  .answerbar{display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:11px 14px 15px;
+    background:linear-gradient(#f7f8fc,#ffffff); border-top:1px solid var(--line);
+    box-shadow:0 -6px 18px rgba(80,100,150,.07); z-index:6;}
+  .choice{display:flex; align-items:center; justify-content:center; gap:9px; padding:14px 10px;
+    border-radius:14px; background:#f4f6fc; border:1px solid #d9e0f0; color:var(--ink);
+    font-size:15.5px; font-weight:800; cursor:pointer; min-height:62px;
+    transition:transform .05s, background .12s, border-color .12s, box-shadow .12s;}
+  .choice:active{transform:scale(.97);}
+  .choice svg{width:26px; height:26px; flex:none; fill:none;}
+  .choice.o svg{stroke:var(--brand);} .choice.x svg{stroke:var(--bad);}
+  .choice.sel{background:#fff; box-shadow:0 0 0 3px rgba(0,74,198,.22); border-color:var(--brand);}
+  .choice.x.sel{box-shadow:0 0 0 3px rgba(242,102,79,.22); border-color:var(--bad);}
+  .choice.correct{background:rgba(18,181,140,.16); border-color:var(--good); box-shadow:none;}
+  .choice .kbd{font-size:10.5px; font-weight:700; color:var(--sub); background:#fff;
+    border:1px solid var(--line); border-radius:5px; padding:1px 5px;}
+
+  /* ===== 오버레이 (껍데기 = CARI 그대로) ===== */
+  .overlay{position:absolute; inset:0; z-index:40; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:28px;
+    background:rgba(245,247,252,.9); backdrop-filter:blur(4px);}
+  .btn{margin-top:18px; padding:15px 48px; border-radius:30px; border:0; cursor:pointer;
+    background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:17px; font-weight:800;
+    box-shadow:0 10px 24px rgba(0,74,198,.32);}
+  .btn:active{transform:scale(.97);}
+  .intro-mascot{width:min(178px,22vh); height:auto; filter:drop-shadow(0 14px 18px rgba(70,90,140,.32));
+    animation:bob 2.6s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}}
+  .intro-title{font-size:44px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:10px 0 0;
+    transform:rotate(-2.5deg); animation:titlePop .55s cubic-bezier(.2,1.7,.4,1) both;}
+  .intro-title .t1{color:var(--ink); text-shadow:0 2px 0 #fff, 0 4px 10px rgba(80,100,150,.28);}
+  .intro-title .t2{background:linear-gradient(180deg,#5b90ff,#004ac6); -webkit-background-clip:text;
+    background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+    filter:drop-shadow(0 3px 7px rgba(0,74,198,.45));}
+  @keyframes titlePop{0%{opacity:0; transform:scale(.5) rotate(-2.5deg)}
+    60%{transform:scale(1.08) rotate(-2.5deg)} 100%{opacity:1; transform:scale(1) rotate(-2.5deg)}}
+  .intro-tag{font-size:14px; font-weight:700; color:var(--sub); margin:16px 0 22px;}
+  .intro-rules{display:flex; flex-direction:column; gap:8px; width:100%; max-width:308px; margin-bottom:20px;}
+  .ir{display:flex; align-items:center; gap:10px; text-align:left; font-size:13.5px; color:var(--ink);
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 13px;
+    box-shadow:0 3px 10px rgba(80,100,150,.05);}
+  .ir b{font-weight:800;}
+  .ir-ic{flex:none; width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+    font-size:12px; font-weight:900; color:#fff;}
+  .ir-ic.o{background:var(--brand);} .ir-ic.dn{background:var(--bad);} .ir-ic.st{background:var(--skip);}
+  .over-badge{font-size:12px; font-weight:900; letter-spacing:.14em; color:var(--bad);
+    background:rgba(242,102,79,.12); border:1px solid rgba(242,102,79,.3); padding:5px 14px; border-radius:20px;}
+  .over-badge.win{color:var(--good); background:rgba(18,181,140,.12); border-color:rgba(18,181,140,.3);}
+  .over-img{width:140px; height:auto; margin:10px 0 2px;
+    animation:titlePop .5s cubic-bezier(.2,1.7,.4,1) both; filter:drop-shadow(0 9px 13px rgba(70,90,140,.3));}
+  .over-title{font-size:29px; font-weight:900; color:var(--ink); letter-spacing:-.02em;
+    transform:rotate(-2deg); margin:6px 0 16px; text-shadow:0 2px 0 #fff, 0 4px 10px rgba(80,100,150,.25);}
+  .over-scorebox{background:#fff; border:1px solid var(--line); border-radius:18px; padding:13px 38px;
+    margin-bottom:14px; box-shadow:0 8px 22px rgba(80,100,150,.1);}
+  .os-lab{font-size:11px; color:var(--sub); font-weight:800; letter-spacing:.06em;}
+  .os-num{font-size:50px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; line-height:1.05;}
+  .os-new{margin-top:4px; font-size:13px; font-weight:800; color:var(--good);}
+  .over-stats{display:flex; gap:10px;}
+  .ost{background:#f4f6fc; border:1px solid var(--line); border-radius:13px; padding:10px 15px; min-width:74px;}
+  .ost-k{font-size:10.5px; color:var(--sub); letter-spacing:.05em; font-weight:700; margin-bottom:3px;}
+  .ost-v{font-size:19px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums;}
+  .hidden{display:none!important;}
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <div class="hud">
+    <div class="hud-score">
+      <span class="hs-ic"><svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26H20.66l-5.37 3.88 2.09 6.26L12 14.52l-5.38 3.88 2.09-6.26L3.34 8.26H9.91z"/></svg></span>
+      <span class="hs-num" id="stageNum">1</span><span class="hs-unit">스테이지</span>
+    </div>
+    <div class="timer" id="timer"><b id="tnum">10</b></div>
+    <div class="hud-right">
+      <div class="hud-chip alive"><svg viewBox="0 0 24 24"><path d="M12 21C7 17 3 13.5 3 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 9 2.5C21 13.5 17 17 12 21z"/></svg><b id="aliveN">16</b></div>
+      <div class="hud-chip"><svg viewBox="0 0 24 24"><path d="M5 19L3.6 8.5 8 11.5 12 5 16 11.5 20.4 8.5 19 19z"/></svg><span class="hc-lab">최고</span><b id="best">0</b></div>
+    </div>
+  </div>
+
+  <div class="qboard">
+    <div class="qrule"></div>
+    <div class="qterm" id="qterm">준비되면 시작하세요</div>
+    <div class="qdesc" id="qdesc"></div>
+  </div>
+
+  <div class="field" id="field">
+    <div class="void" id="void">
+      <div class="neb n1"></div><div class="neb n2"></div><div class="neb n3"></div>
+      <div class="milky"></div>
+      <div class="planet"><div class="pb"></div><div class="pr"></div></div>
+    </div>
+    <div class="zone zoneO" id="zoneO"><div class="plate"><span class="zone-mark">O</span></div><div class="zone-tag" id="tagO"><b>0</b>명</div></div>
+    <div class="zone zoneX" id="zoneX"><div class="plate"><span class="zone-mark">X</span></div><div class="zone-tag" id="tagX"><b>0</b>명</div></div>
+    <div class="waitzone"><i class="wz-fx"></i><span class="wl">대기</span></div>
+    <div class="verdict" id="verdict">
+      <div class="v-mark" id="vMark">O</div>
+      <div><div class="v-lab">정답</div><div class="v-sub" id="vSub">맞는 설명이에요</div></div>
+    </div>
+  </div>
+
+  <div class="answerbar">
+    <button class="choice o" id="btnO">
+      <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" stroke-width="7"/></svg>
+      맞다 <span class="kbd">1</span>
+    </button>
+    <button class="choice x" id="btnX">
+      <svg viewBox="0 0 40 40"><path d="M10 10 L30 30 M30 10 L10 30" stroke-width="7" stroke-linecap="round"/></svg>
+      아니다 <span class="kbd">2</span>
+    </button>
+  </div>
+
+  <!-- START -->
+  <div class="overlay" id="startOv">
+    <div class="intro-mascot" id="introMascot"></div>
+    <div class="intro-title"><span class="t1">골라라</span> <span class="t2">CARI</span></div>
+    <div class="intro-tag">발판이 무너지기 전에 O·X 를 골라라!</div>
+    <div class="intro-rules">
+      <div class="ir"><span class="ir-ic o">O</span><span>용어 뜻이 <b>맞으면 O</b>, 틀리면 <b>X</b> 발판으로</span></div>
+      <div class="ir"><span class="ir-ic dn">▼</span><span>10초 뒤 <b>틀린 발판이 무너져요</b></span></div>
+      <div class="ir"><span class="ir-ic st">★</span><span>15 스테이지 버티면 <b>승리</b></span></div>
+    </div>
+    <button class="btn" id="startBtn">골라보기</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay hidden" id="overOv">
+    <div class="over-badge" id="overBadge">GAME OVER</div>
+    <div class="over-img" id="overImg"></div>
+    <div class="over-title" id="overTitle">여기서 발판이 무너졌어요!</div>
+    <div class="over-scorebox">
+      <div class="os-lab">생존 스테이지</div>
+      <div class="os-num" id="finalRound">0</div>
+      <div id="newbest" class="os-new hidden">🏆 신기록!</div>
+    </div>
+    <div class="over-stats">
+      <div class="ost"><div class="ost-k">최종 순위</div><div class="ost-v" id="finalRank">-</div></div>
+      <div class="ost"><div class="ost-k">남은 인원</div><div class="ost-v" id="finalAlive">0</div></div>
+      <div class="ost"><div class="ost-k">최고 기록</div><div class="ost-v" id="finalBest">0</div></div>
+    </div>
+    <button class="btn" id="againBtn">다시 도전</button>
+  </div>
+
+</div>
+
+<script>
+(() => {
+const $=id=>document.getElementById(id);
+const stage=$("stage"), field=$("field"), voidEl=$("void");
+const qtermEl=$("qterm"), qdescEl=$("qdesc");
+const tnum=$("tnum"), timerEl=$("timer");
+const btnO=$("btnO"), btnX=$("btnX");
+const zoneO=$("zoneO"), zoneX=$("zoneX"), tagO=$("tagO"), tagX=$("tagX");
+const verdict=$("verdict"), vMark=$("vMark"), vSub=$("vSub");
+
+/* ===== 필드 지오메트리 — 단일 출처. CSS 변수로 주입하고 망치 접촉 좌표도 여기서 유도. ===== */
+const GEO={ zoneTop:8, zoneH:46, waitTop:64, waitH:30 };
+{ const s=document.documentElement.style;
+  s.setProperty('--zone-top',GEO.zoneTop+'%'); s.setProperty('--zone-h',GEO.zoneH+'%');
+  s.setProperty('--wait-top',GEO.waitTop+'%'); s.setProperty('--wait-h',GEO.waitH+'%'); }
+
+/* 붕괴 연출 타임라인 — 예고 350ms 뒤에 터진다. 세 연출이 같은 값을 쓴다. */
+const CONTACT=350;
+
+/* ===== 문제 풀 =====
+   버텨라 CARI 와 같은 원본(AI로봇피지컬AI_용어퀴즈_50문항.xlsx).
+   [분야, 설명, [정답, 오답×3]] → '용어 + 설명' 짝으로 런타임 변환.
+   정답 용어를 붙이면 O, 오답 용어를 붙이면 X. 50 × 4 = 200가지. */
+const POOL = [
+  ["AI","컴퓨터가 인간처럼 학습·추론하며 문제를 해결하도록 만드는 기술 전반",["인공지능(AI)","머신러닝","딥러닝","알고리즘"]],
+  ["AI","데이터로부터 규칙·패턴을 스스로 학습해 성능을 개선하는 인공지능의 하위 분야",["머신러닝","딥러닝","자연어처리","컴퓨터 비전"]],
+  ["AI","여러 층의 인공신경망으로 데이터의 복잡한 패턴을 학습하는 머신러닝 기법",["딥러닝","강화학습","전이학습","지도학습"]],
+  ["AI","뇌의 뉴런 구조를 모방해 입력과 가중치를 연산해 출력을 만드는 딥러닝의 기본 구조",["신경망","트랜스포머","어텐션 메커니즘","하이퍼파라미터"]],
+  ["AI","입력값과 정답(레이블)이 쌍으로 주어진 데이터로 모델을 학습시키는 방식",["지도학습","비지도학습","강화학습","자기지도학습"]],
+  ["AI","정답 레이블 없이 데이터의 구조·패턴(군집 등)을 스스로 찾아내는 학습 방식",["비지도학습","지도학습","강화학습","모방학습"]],
+  ["AI","에이전트가 환경과 상호작용하며 보상을 최대화하도록 행동을 학습하는 방식",["강화학습","지도학습","비지도학습","모방학습"]],
+  ["AI","어텐션을 핵심 구조로 써서 문장 내 단어 관계를 병렬 처리하는 신경망 구조",["트랜스포머","순환신경망","합성곱신경망","신경망"]],
+  ["AI","방대한 텍스트로 학습돼 사람 같은 언어를 이해·생성하는 초대형 언어 모델",["거대언어모델(LLM)","자연어처리","생성형 AI","프롬프트 엔지니어링"]],
+  ["AI","학습된 모델을 특정 목적·도메인 데이터에 맞게 추가 학습시켜 조정하는 기법",["파인튜닝","프롬프트 엔지니어링","하이퍼파라미터 튜닝","전이학습"]],
+  ["AI","원하는 결과를 얻으려 AI에 넣는 지시문(프롬프트)을 설계·개선하는 기술",["프롬프트 엔지니어링","파인튜닝","자연어처리","어텐션 메커니즘"]],
+  ["AI","학습 데이터에 지나치게 맞춰져 새로운 데이터엔 성능이 떨어지는 현상",["과적합","과소적합","일반화","편향"]],
+  ["AI","텍스트·이미지·음성 등 새로운 콘텐츠를 스스로 만들어내는 인공지능 분야",["생성형 AI","판별형 AI","컴퓨터 비전","자연어처리"]],
+  ["AI","이미지·영상에서 객체를 인식·분류·추적하는 등 시각 정보를 처리하는 AI 분야",["컴퓨터 비전","자연어처리","센서 퓨전","라이다"]],
+  ["AI","사람의 언어를 컴퓨터가 이해·분석·생성하도록 처리하는 AI 분야",["자연어처리(NLP)","컴퓨터 비전","거대언어모델","프롬프트 엔지니어링"]],
+  ["AI","입력의 각 부분이 출력에 얼마나 중요한지 가중치로 반영하는 트랜스포머의 핵심 연산",["어텐션 메커니즘","역전파","경사하강법","임베딩"]],
+  ["AI","데이터로부터 자동 학습되지 않고 사람이 미리 설정하는 값(학습률 등)",["하이퍼파라미터","가중치","편향값","임베딩 벡터"]],
+  ["로봇","전기·유압·공압 에너지를 기계적 움직임(힘·운동)으로 변환하는 로봇의 구동 장치",["액추에이터","센서","엔코더","서보모터"]],
+  ["로봇","온도·거리·힘·빛 등 물리 정보를 감지해 전기 신호로 변환하는 장치",["센서","액추에이터","그리퍼","컨트롤러"]],
+  ["로봇","로봇 관절이 독립적으로 움직일 수 있는 방향·축의 수를 나타내는 지표",["자유도(DOF)","토크","역기구학","엔코더"]],
+  ["로봇","로봇팔 끝에 부착돼 실제 작업(용접·파지 등)을 수행하는 도구 부분",["엔드 이펙터","액추에이터","서보모터","매니퓰레이터"]],
+  ["로봇","정밀한 위치·속도 제어가 가능하도록 피드백 장치가 결합된 모터",["서보모터","액추에이터","인코더","그리퍼"]],
+  ["로봇","여러 관절로 연결돼 물체를 조작할 수 있는 로봇팔 구조 전체",["매니퓰레이터","엔드 이펙터","그리퍼","액추에이터"]],
+  ["로봇","로봇팔 끝에서 물체를 집거나 잡는 손 형태의 장치",["그리퍼","엔드 이펙터","액추에이터","서보모터"]],
+  ["로봇","엔드 이펙터가 원하는 위치·자세에 도달하도록 각 관절 각도를 계산하는 기법",["역기구학","순기구학","경로계획","SLAM"]],
+  ["로봇","각 관절 각도가 주어졌을 때 엔드 이펙터의 위치·자세를 계산하는 기법",["순기구학","역기구학","경로계획","자유도"]],
+  ["로봇","이동하며 주변 지도를 작성함과 동시에 자기 위치를 추정하는 기술",["SLAM","라이다","경로계획","디지털 트윈"]],
+  ["로봇","레이저 반사 시간을 측정해 주변 사물까지 거리·형상을 파악하는 센서",["라이다(LiDAR)","카메라","초음파 센서","촉각 센서"]],
+  ["로봇","모터·관절의 회전 각도·속도를 측정해 전기 신호로 출력하는 장치",["엔코더","액추에이터","서보모터","센서 퓨전"]],
+  ["로봇","회전축을 중심으로 물체를 돌리는 힘, 로봇 관절의 구동력을 나타내는 단위",["토크","자유도","압력","가속도"]],
+  ["로봇","안전 펜스 없이 사람과 같은 공간에서 함께 작업하도록 설계된 로봇",["협동로봇(코봇)","산업용 로봇","휴머노이드 로봇","스와름 로봇"]],
+  ["로봇","사람의 신체 형태(머리·팔·다리 등)를 본떠 만든 로봇",["휴머노이드 로봇","협동로봇","매니퓰레이터","스와름 로봇"]],
+  ["로봇","사람 개입 없이 스스로 환경을 인식·판단하여 주행하는 기술",["자율주행","경로계획","SLAM","원격조종"]],
+  ["로봇","출발지에서 목적지까지 장애물을 피해 이동할 최적 경로를 계산하는 기술",["경로계획","SLAM","역기구학","자율주행"]],
+  ["피지컬AI","디지털을 넘어 로봇·자율주행차 등 물리적 실체로 현실과 상호작용하는 AI",["피지컬 AI","임베디드 AI","엣지 컴퓨팅","디지털 트윈"]],
+  ["피지컬AI","클라우드가 아닌 로봇·기기 내부 하드웨어에 직접 탑재돼 동작하는 인공지능",["임베디드 AI","온디바이스 AI","엣지 컴퓨팅","클라우드 AI"]],
+  ["피지컬AI","데이터를 중앙 서버가 아닌 단말 근처에서 처리해 지연시간을 줄이는 방식",["엣지 컴퓨팅","클라우드 컴퓨팅","임베디드 AI","디지털 트윈"]],
+  ["피지컬AI","시뮬레이션에서 학습한 로봇 정책을 실제 물리 환경에 적용하는 기법",["시뮬레이션 투 리얼(Sim-to-Real)","디지털 트윈","모방학습","강화학습"]],
+  ["피지컬AI","실제 로봇·설비를 가상 공간에 복제해 시뮬레이션·모니터링에 쓰는 기술",["디지털 트윈","시뮬레이션 투 리얼","가상현실","증강현실"]],
+  ["피지컬AI","로봇이 물체를 만졌을 때의 압력·질감 등을 감지하는 센서",["촉각 센서","라이다","자기수용감각 센서","비전 센서"]],
+  ["피지컬AI","전문가의 시연(행동)을 관찰해 로봇이 같은 작업 방식을 학습하는 방법",["모방학습","강화학습","지도학습","전이학습"]],
+  ["피지컬AI","대규모 데이터로 사전학습돼 다양한 로봇 작업에 범용 적용되는 대형 정책 모델",["파운데이션 모델","VLA 모델","거대언어모델","디지털 트윈"]],
+  ["피지컬AI","텍스트·이미지·음성 등 서로 다른 종류의 데이터를 함께 처리·이해하는 AI 방식",["멀티모달","싱글모달","엣지 컴퓨팅","센서 퓨전"]],
+  ["피지컬AI","외부 센서 없이도 자기 관절의 위치·자세·움직임을 스스로 인식하는 감각",["자기수용감각","촉각","시각","청각"]],
+  ["피지컬AI","다수의 소형 로봇이 협력해 복잡한 작업을 수행하는 로봇 시스템",["스와름 로보틱스","협동로봇","휴머노이드 로봇","멀티에이전트"]],
+  ["피지컬AI","외부 충격·접촉에 유연하게 반응하도록 힘을 조절하는 로봇 제어 방식",["컴플라이언트 제어","위치 제어","속도 제어","임피던스 없는 제어"]],
+  ["피지컬AI","센서 입력부터 제어 명령 출력까지 정해진 짧은 시간 안에 끝내야 하는 제어 방식",["실시간 제어","배치 제어","비동기 제어","분산 제어"]],
+  ["피지컬AI","클라우드로 데이터를 보내지 않고 로봇·기기 자체에서 AI 연산을 수행하는 방식",["온디바이스 AI","클라우드 AI","임베디드 AI","엣지 컴퓨팅"]],
+  ["피지컬AI","시각·언어 정보를 입력받아 곧바로 로봇의 행동을 출력하는 최신 로봇 제어 모델",["VLA 모델","LLM","파운데이션 모델","멀티모달 모델"]],
+  ["피지컬AI","다양한 환경 변화·예외 상황에서도 안정적으로 성능을 유지하는 능력",["강건성(Robustness)","일반화","정확도","효율성"]],
+];
+
+/* ===== 캐릭터 =====
+   전부 CARI 실루엣(둥근 후드 몸통 + 귀 2개 + 검은 바이저 + 빛나는 눈)을 공유한다.
+   나 = 진짜 CARI(크림 슈트 + 행성 안테나 + 가슴 배지), 나머지 15 = 슈트 색만 다른 응시생.
+   슬라임을 버린 이유: 3D CARI 옆에 플랫 슬라임을 두면 아트가 따로 논다. */
+const SUITS=[                     // [슈트, 슈트그림자, 귀]
+  ['#c9dcf7','#93aed6','#5f86cf'], ['#ffd9c2','#e0a985','#e2895a'],
+  ['#c9efdd','#8fc9b0','#4fb894'], ['#ffd7e2','#e5a8ba','#e88aa2'],
+  ['#dcd6fb','#ada5dd','#8479d8'], ['#ffeec2','#dcc389','#e0ab2f'],
+  ['#c8e9f7','#93c2d6','#4f9fc4'], ['#e2edc4','#b5c58e','#8fae4f'],
+  ['#f7d5f0','#d3a3ca','#c977b8'], ['#dbe2ec','#a9b4c6','#7b8aa3'],
+];
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  // CARI 만: 머리 위 행성 안테나 + 가슴 배지
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2"
+      transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2"
+      font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg class="art" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+
+const NAMES=['두두','뽀뽀','냥이','토토','메로','콩이','삐약','루피','모모','치치','두부','까망','하양','방울','초코','설탕','호두','바니'];
+const T0=10, TOTAL_STAGES=15;
+
+let players=[], me=null, round=1, phase='idle', curAns='O', tLeft=T0, tick=null;
+let best=+(localStorage.getItem('cari_ox_best')||0);
+const recent=[];
+
+const rand=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* 우주 배경 — 별 + 유성 (성운·은하수·행성은 CSS 고정) */
+function buildStars(){
+  voidEl.querySelectorAll('.star,.shoot').forEach(e=>e.remove());
+  for(let i=0;i<78;i++){
+    const s=document.createElement('div'); s.className='star';
+    const d=rand(1,2.6), o=rand(.3,1);
+    s.style.cssText=`left:${rand(0,100).toFixed(1)}%;top:${rand(0,100).toFixed(1)}%;
+      width:${d.toFixed(1)}px;height:${d.toFixed(1)}px;--o:${o.toFixed(2)};opacity:${o.toFixed(2)};
+      animation-duration:${rand(1.8,5).toFixed(1)}s;animation-delay:-${rand(0,5).toFixed(1)}s;
+      ${d>2.1?'box-shadow:0 0 5px rgba(200,225,255,.9);':''}`;
+    voidEl.appendChild(s);
+  }
+  for(let i=0;i<2;i++){
+    const sh=document.createElement('div'); sh.className='shoot';
+    sh.style.cssText=`left:${rand(-8,45).toFixed(0)}%;top:${rand(2,40).toFixed(0)}%;
+      animation-duration:${rand(9,15).toFixed(1)}s;animation-delay:-${rand(0,9).toFixed(1)}s;`;
+    voidEl.appendChild(sh);
+  }
+}
+
+/* 랜덤 배치는 이름표가 서로 뭉개져서 격자 패킹으로 바꿨다.
+   대기 구역은 넓고 낮아서 정사각 배치를 쓰면 세로로 겹친다 → maxRows 로 줄 수를 강제. */
+const AREA={
+  O:{x0:6, x1:42, y0:GEO.zoneTop+5, y1:GEO.zoneTop+GEO.zoneH-3, maxCols:4},
+  X:{x0:58, x1:94, y0:GEO.zoneTop+5, y1:GEO.zoneTop+GEO.zoneH-3, maxCols:4},
+  W:{x0:9,  x1:91, y0:GEO.waitTop+4, y1:GEO.waitTop+GEO.waitH-3, maxCols:8, maxRows:2},
+};
+function packInto(list,r){
+  const n=list.length; if(!n) return;
+  const cols = r.maxRows
+    ? Math.max(1,Math.min(r.maxCols,Math.ceil(n/r.maxRows)))
+    : Math.max(1,Math.min(r.maxCols,Math.ceil(Math.sqrt(n*1.3))));
+  const rows=Math.ceil(n/cols);
+  list.forEach((p,i)=>{
+    const rw=Math.floor(i/cols), c=i%cols;
+    const inRow=(rw===rows-1)?(n-rw*cols):cols;    // 마지막 줄은 남은 수만큼 가운데 정렬
+    const cw=(r.x1-r.x0)/inRow, ch=(r.y1-r.y0)/rows;
+    place(p.el, r.x0+cw*(c+.5)+p.jx*cw*.14, r.y0+ch*(rw+.5)+p.jy*ch*.14);
+  });
+}
+function relayout(){
+  const alive=players.filter(p=>p.alive);
+  packInto(alive.filter(p=>p.choice==='O'), AREA.O);
+  packInto(alive.filter(p=>p.choice==='X'), AREA.X);
+  packInto(alive.filter(p=>!p.choice),      AREA.W);
+}
+
+$("best").textContent=best;
+$("introMascot").innerHTML=charSVG(CARI_SUIT,{cari:true});
+$("overImg").innerHTML=charSVG(CARI_SUIT,{cari:true,shock:true});
+buildStars();
+
+function makeQuestion(){
+  let q,key,guard=0;
+  do{
+    const [cat,desc,opts]=pick(POOL);
+    const isTrue=Math.random()<.5;
+    const term=isTrue?opts[0]:pick(opts.slice(1));
+    q={cat,desc,term,ans:isTrue?'O':'X'}; key=desc+'|'+term;
+  }while(recent.includes(key) && ++guard<20);
+  recent.push(key); if(recent.length>12) recent.shift();
+  return q;
+}
+
+function buildPlayers(){
+  field.querySelectorAll('.ch,.bh,.debris,.hitflash').forEach(e=>e.remove());
+  players=[];
+  const names=[...NAMES].sort(()=>Math.random()-.5);
+  const suits=[...SUITS].sort(()=>Math.random()-.5);
+  for(let i=0;i<16;i++){
+    const isMe=i===0;
+    const suit=isMe?CARI_SUIT:suits[i%suits.length];
+    const el=document.createElement('div'); el.className='ch'+(isMe?' me':'');
+    const p={el,isMe,alive:true,choice:null,suit,assign:null,jx:rand(-1,1),jy:rand(-1,1)};
+    el.innerHTML=charSVG(suit,{cari:isMe})+`<div class="lab">${isMe?'나':names[i%names.length]}</div>`;
+    el.querySelector('.art').style.animationDelay=(Math.random()*1.4).toFixed(2)+'s';
+    field.appendChild(el);
+    players.push(p); if(isMe) me=p;
+  }
+  relayout(); updateCounts();
+}
+function place(el,x,y){ el.style.left=x+'%'; el.style.top=y+'%'; }
+function redraw(p,opt){
+  const a=p.el.querySelector('.art'); if(!a) return;
+  a.outerHTML=charSVG(p.suit,{cari:p.isMe,...opt});
+  const n=p.el.querySelector('.art'); if(n) n.style.animationDelay=(Math.random()*1.4).toFixed(2)+'s';
+}
+function faceDir(p,c){ redraw(p,{dir:c==='O'?-1:c==='X'?1:0}); }
+function updateCounts(){
+  let o=0,x=0,alive=0;
+  players.forEach(p=>{ if(!p.alive)return; alive++; if(p.choice==='O')o++; else if(p.choice==='X')x++; });
+  tagO.innerHTML=`<b>${o}</b>명`; tagX.innerHTML=`<b>${x}</b>명`; $("aliveN").textContent=alive;
+}
+function moveTo(p,choice){ p.choice=choice; faceDir(p,choice); relayout(); updateCounts(); }
+
+function planSurvivors(n){
+  if(n<=2) return 1;
+  let frac, r=Math.random();
+  if(n>10)      frac = r<.18 ? rand(.32,.5) : rand(.62,.8);
+  else if(n>5)  frac = r<.22 ? rand(.4,.55) : rand(.58,.74);
+  else          frac = rand(.5,.72);
+  return clamp(Math.round(n*frac),1,n-1);
+}
+
+function newRound(){
+  phase='answer';
+  $("stageNum").textContent=round;
+  const q=makeQuestion();
+  curAns=q.ans;
+  qtermEl.textContent=q.term; qdescEl.textContent=q.desc;
+  zoneO.className='zone zoneO'; zoneX.className='zone zoneX';
+  verdict.className='verdict';
+
+  const aliveList=players.filter(p=>p.alive);
+  aliveList.forEach(p=>{ p.choice=null; faceDir(p,null); });
+  relayout(); updateCounts();
+  btnO.classList.remove('sel','correct'); btnX.classList.remove('sel','correct');
+
+  const target=planSurvivors(aliveList.length);
+  const dummies=aliveList.filter(p=>!p.isMe);
+  const dummySurv=clamp(target-1,0,dummies.length);
+  const wrongSide=curAns==='O'?'X':'O';
+  [...dummies].sort(()=>Math.random()-.5).forEach((p,i)=> p.assign = i<dummySurv ? curAns : wrongSide);
+  dummies.forEach(p=>{
+    if(Math.random()<.55){ const ft=rand(1000,4200);
+      setTimeout(()=>{ if(phase==='answer'&&p.alive) moveTo(p, Math.random()<.5?'O':'X'); }, ft); }
+    const ct=Math.max(400, T0*1000-rand(900,2600));
+    setTimeout(()=>{ if(phase==='answer'&&p.alive) moveTo(p,p.assign); }, ct);
+  });
+
+  tLeft=T0; renderTimer();
+  clearInterval(tick);
+  tick=setInterval(()=>{ tLeft--; renderTimer(); if(tLeft<=0){ clearInterval(tick); reveal(); } },1000);
+}
+function renderTimer(){
+  const t=Math.max(0,tLeft);
+  tnum.textContent=t;
+  timerEl.style.setProperty('--p', t/T0);
+  timerEl.style.setProperty('--tcol', t<=3?'var(--bad)':t<=5?'var(--skip)':'var(--brand)');
+  timerEl.classList.toggle('crit', t<=3 && t>0);
+}
+
+function choose(c){
+  if(phase!=='answer'||!me.alive) return;
+  moveTo(me,c);
+  btnO.classList.toggle('sel',c==='O'); btnX.classList.toggle('sel',c==='X');
+}
+btnO.onclick=()=>choose('O'); btnX.onclick=()=>choose('X');
+/* 초안은 F1/F2 였는데 F1 이 브라우저 도움말을 열어버려서 1/2·O/X·←→ 로 바꿨다. */
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='1'||k==='o'||k==='arrowleft'){ e.preventDefault(); choose('O'); }
+  else if(k==='2'||k==='x'||k==='arrowright'){ e.preventDefault(); choose('X'); }
+});
+
+function reveal(){
+  phase='reveal';
+  (curAns==='O'?btnO:btnX).classList.add('correct');
+  (curAns==='O'?zoneO:zoneX).classList.add('safe');
+  vMark.textContent=curAns;
+  vSub.textContent = curAns==='O' ? '맞는 설명이에요' : '틀린 설명이에요';
+  verdict.className='verdict '+(curAns==='O'?'o':'x')+' show';
+  setTimeout(()=>verdict.classList.add('hide'),1900);
+  const loseSide=curAns==='O'?'X':'O';
+  const dead=players.filter(p=>p.alive && p.choice!==curAns);
+  smashSide(loseSide,dead);
+  setTimeout(()=>{ dead.forEach(p=>p.alive=false); updateCounts(); afterReveal(); }, CONTACT+1600);
+}
+
+/* ===== 붕괴 연출 =====
+   셋 다 같은 뼈대를 쓴다: [예고 0~CONTACT] → [CONTACT 에서 터짐] → [퇴장].
+   FX 하나가 (예고 DOM, 발판 클래스, 캐릭터 퇴장 클래스, 터질 때 할 일)을 들고 있다.
+   접촉 시점은 CONTACT 상수 하나가 잡아서 이펙트와 애니가 절대 어긋나지 않는다. */
+const PLATE_Y = GEO.zoneTop + GEO.zoneH/2;      // 발판 한가운데(%) — 연출이 터지는 지점
+
+/* 파편은 바깥이 아니라 안쪽으로 — 블랙홀이 빨아들이는 방향 */
+function spawnDebris(cx,cy,n){
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div'); d.className='debris';
+    const s=rand(5,12); d.style.width=s+'px'; d.style.height=s*rand(.5,1)+'px';
+    d.style.left=cx+'%'; d.style.top=cy+'%'; field.appendChild(d);
+    const ang=rand(-Math.PI,Math.PI), dist=rand(70,175);
+    d.animate([
+      {transform:`translate(${Math.cos(ang)*dist-50}%,${Math.sin(ang)*dist-50}%) rotate(0)`,opacity:1},
+      {transform:'translate(-50%,-50%) rotate(420deg) scale(.1)',opacity:0},
+    ],{duration:850,easing:'cubic-bezier(.5,0,.85,.5)'});
+    setTimeout(()=>d.remove(),870);
+  }
+}
+function flash(cx,cy){
+  const fl=document.createElement('div'); fl.className='hitflash';
+  fl.style.left=cx+'%'; fl.style.top=cy+'%'; field.appendChild(fl);
+  setTimeout(()=>fl.remove(),280);
+}
+
+/* 붕괴 = 블랙홀.
+   [예고 0~CONTACT] 발판 한가운데로 빛점이 모인다
+   [CONTACT]        강착원반 + 사건의 지평선이 열리고, 파편이 안쪽으로 빨려든다
+   [이후]           발판과 참가자가 나선을 그리며 삼켜진다
+   접촉 시점은 CONTACT 상수 하나가 잡아서 CSS 애니와 이펙트가 어긋나지 않는다. */
+function smashSide(side,dead){
+  const cx  = side==='O' ? 24 : 76;
+  const zone= side==='O' ? zoneO : zoneX;
+
+  const bh=document.createElement('div'); bh.className='bh';
+  bh.style.left=cx+'%'; bh.style.top=PLATE_Y+'%';
+  bh.innerHTML='<div class="bh-charge"></div>';
+  field.appendChild(bh);
+
+  setTimeout(()=>{
+    stage.classList.add('shake-hard');
+    zone.classList.add('collapse');
+    bh.innerHTML='<div class="bh-disk"></div><div class="bh-core"></div>';
+    flash(cx,PLATE_Y);
+    spawnDebris(cx,PLATE_Y,12);
+    dead.forEach(p=>{ redraw(p,{shock:true}); p.el.classList.add('out'); });
+    setTimeout(()=>{
+      stage.classList.remove('shake-hard');
+      dead.forEach(p=>{ p.el.style.visibility='hidden'; });
+    },430);
+  }, CONTACT);
+
+  setTimeout(()=>bh.remove(), 1700);
+}
+
+function afterReveal(){
+  const s=players.filter(p=>p.alive);
+  if(!me.alive) return gameOver(false,s.length);
+  if(s.length<=1 || round>=TOTAL_STAGES) return gameOver(true,s.length);
+  round++; setTimeout(newRound,700);
+}
+function gameOver(win,aliveCount){
+  phase='over'; clearInterval(tick);
+  if(round>best){ best=round; localStorage.setItem('cari_ox_best',best); $("newbest").classList.remove('hidden'); }
+  else $("newbest").classList.add('hidden');
+  $("best").textContent=best;
+  $("overBadge").className='over-badge'+(win?' win':'');
+  $("overBadge").textContent=win?'CLEAR':'GAME OVER';
+  $("overImg").innerHTML=charSVG(CARI_SUIT,{cari:true, shock:!win});
+  $("overTitle").textContent=win?(round>=TOTAL_STAGES?'끝까지 살아남았어요!':'마지막 생존자!'):'여기서 발판이 무너졌어요!';
+  $("finalRound").textContent=round;
+  $("finalRank").textContent=win?'1위':(aliveCount+1)+'위';
+  $("finalAlive").textContent=aliveCount;
+  $("finalBest").textContent=best;
+  $("overOv").classList.remove('hidden');
+}
+function start(){
+  round=1; $("startOv").classList.add('hidden'); $("overOv").classList.add('hidden');
+  verdict.className='verdict';
+  zoneO.className='zone zoneO'; zoneX.className='zone zoneX';
+  buildPlayers(); renderTimer(); setTimeout(newRound,450);
+}
+$("startBtn").onclick=start; $("againBtn").onclick=start;
+})();
+</script>
+</body>
+</html>

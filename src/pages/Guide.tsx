@@ -34,6 +34,13 @@ const PYRAMID: { key: string; polygon: string; lblY: number; nmY: number; nmSize
   { key: 'beginner', polygon: '133.3,740 866.7,740 940,880 60,880', lblY: 790, nmY: 824, nmSize: 36 },
 ]
 
+// 피라미드 우측 그룹 브레이스( ] )+라벨. 위 3티어(y40~460)=피지컬 AI(CARIS-Ⅱ), 아래 3티어(y460~880)=AI·로봇 리터러시(CARIS-Ⅰ).
+//   viewBox 를 x1360 으로 넓혀(피라미드는 60~940 그대로) 오른쪽 여백 940~1360 에 배치 → 피라미드가 살짝 왼쪽으로.
+const PYRAMID_GROUPS: { key: string; tkey: string; y1: number; y2: number; color: string }[] = [
+  { key: 'phys', tkey: 'guide.group_physical', y1: 52, y2: 452, color: '#12a58c' },  // Zenith~Master
+  { key: 'lit', tkey: 'guide.group_literacy', y1: 468, y2: 868, color: '#1156bd' },  // Elite~Beginner
+]
+
 // gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
 // 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
 // primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff). 히어로 밴드 위 흰 버튼만 text-[#004ac6] 하드코딩 유지.
@@ -179,7 +186,7 @@ export default function Guide() {
               </div>
 
               <div className="gld-pyramid-wrap">
-                <svg className="gld-pyramid" viewBox="0 0 1000 900" role="group" aria-label={t('guide.cert_intro_title')}>
+                <svg className="gld-pyramid" viewBox="-240 0 1480 900" role="group" aria-label={t('guide.cert_intro_title')}>
                   <defs>
                     {PYRAMID.map((p) => {
                       const [from, to] = SPECTRUM[p.key]
@@ -206,23 +213,38 @@ export default function Guide() {
                       onPointerCancel={() => setPressKey(null)}
                     >
                       <polygon points={p.polygon} fill={`url(#gld-g-${p.key})`} stroke="var(--color-surface-container-lowest)" strokeWidth="7" strokeLinejoin="round" />
-                      <text className="gld-lbl" x="500" y={p.lblY} textAnchor="middle" fontSize={p.key === 'zenith' ? 12 : 14}>CARIS</text>
+                      {/* 조각 위 'CARIS' 라벨은 제거 — 티어명만 표시 */}
                       <text className="gld-nm" x="500" y={p.nmY} textAnchor="middle" fontSize={p.nmSize}>{tierByKey[p.key]?.name}</text>
                     </g>
                   ))}
+
+                  {/* 우측 그룹 브레이스 + 라벨(장식이라 pointer-events 없음) */}
+                  {PYRAMID_GROUPS.map((g) => {
+                    const lines = t(g.tkey).split('|')
+                    const mid = (g.y1 + g.y2) / 2
+                    const top = mid - (lines.length - 1) * 27 // 44px 줄 기준 세로 중앙
+                    return (
+                      <g key={g.key} className="gld-brace" aria-hidden="true">
+                        <path d={`M 985 ${g.y1} H 1008 V ${g.y2} H 985`} fill="none" stroke={g.color} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                        <text className="gld-brace-lbl" x="1044" y={top} fill={g.color}>
+                          {lines.map((w, i) => (
+                            <tspan key={i} x="1044" dy={i === 0 ? 0 : 54}>{w}</tspan>
+                          ))}
+                        </text>
+                      </g>
+                    )
+                  })}
                 </svg>
               </div>
 
               {TRACKS.map((tr) => (
                 <div key={tr.key}>
-                  <div className="gld-grp">
-                    <span className="gld-rail" style={{ background: `linear-gradient(90deg, ${TIER_BASE[tr.tiers[0].key]}, ${TIER_BASE[tr.tiers[tr.tiers.length - 1].key]})` }} />
-                    <h3 className="gld-grp-name">{tr.name}</h3>
-                    <span className="gld-grp-cap">{tr.tagline}</span>
-                  </div>
+                  {/* 트랙 헤더(CARIS-Ⅰ/Ⅱ + 태그라인)는 제거 — 트랙명은 각 카드 배너의 .gld-track 에 이미 나온다. */}
                   <div className="gld-cards">
                     {tr.tiers.map((tier) => {
-                      const sub = tier.target ?? tier.prereq ?? ''
+                      // 배너 문구: CARIS-Ⅰ(t1)은 트랙명 빼고 기존 대상(target)만, CARIS-Ⅱ(t2)는 '피지컬 AI 초/중/고급 전문가'.
+                      //   prereq(응시자격)는 응시화면(ExamApply/Prepare)에서 쓰이므로 데이터는 건드리지 않고 여기서만 라벨을 바꾼다.
+                      const trackText = tr.key === 't2' ? t(`guide.ptrack.${tier.key}`) : (tier.target ?? '')
                       return (
                         <article
                           key={tier.key}
@@ -234,7 +256,7 @@ export default function Guide() {
                           <div className="gld-banner">
                             <span className="material-symbols-outlined gld-seal">workspace_premium</span>
                             <div className="gld-nm2">{tier.name}</div>
-                            <span className="gld-track">{tr.name}{sub ? ` · ${sub}` : ''}</span>
+                            <span className="gld-track">{trackText}</span>
                           </div>
                           <div className="gld-body">
                             <div className="gld-subj-label">{t('caris.lbl.subjects')}</div>

@@ -117,7 +117,8 @@ html.dark .arena {
 .dokisland { stroke: var(--aa-geo-stroke); stroke-width: 1; }
 
 /* ── 하단 런처(이동 버튼 4개) ── */
-.aa-launch { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 16px; }
+/* 런처는 지도 위에 놓인다 → 여백은 아래쪽(지도와의 간격)으로 */
+.aa-launch { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 0 0 16px; }
 .aa-lbtn { display: flex; align-items: center; gap: 13px; padding: 15px 18px; border-radius: 18px;
   background: var(--aa-panel); border: 2.5px solid var(--aa-line); box-shadow: 0 4px 0 var(--aa-sh-solid);
   text-decoration: none; cursor: pointer; transition: transform .1s ease, box-shadow .1s ease; text-align: left; font: inherit; }

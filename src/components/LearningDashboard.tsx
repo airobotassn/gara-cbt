@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { emblemKeyForLevel, levelColor, DEMOTE_STRIKES, computePoints } from '../lib/scoring'
+import { emblemKeyForLevel, levelColor, DEMOTE_STRIKES, computeSkillScore, tierColor } from '../lib/scoring'
 import { axesForLevel, axisKeysForLevel } from '../lib/categories'
-import type { AxisMap } from '../lib/scoring'
+import type { AxisMap, Tier } from '../lib/scoring'
 import { useT } from '../lib/i18n'
 import RadarChartBox from '../components/RadarChartBox'
 import LineChart from '../components/LineChart'
@@ -52,6 +52,13 @@ export default function LearningDashboard() {
   const [page, setPage] = useState(0)
   const [radarIdx, setRadarIdx] = useState(0)
   const [showHints, setShowHints] = useState(false) // 점수 오르는 법 펼침
+  // 티어 히어로(시즌 총점/실력·활동 분해/다음 순위 게이지) — get-hub 응답 중 이 화면이 쓰는 것만.
+  const [tier, setTier] = useState<Tier | null>(null)
+  const [percentile, setPercentile] = useState<number | null>(null)
+  const [seasonTotal, setSeasonTotal] = useState<number | null>(null)
+  const [skillScore, setSkillScore] = useState<number | null>(null)
+  const [activityScore, setActivityScore] = useState<number | null>(null)
+  const [pointsToPass, setPointsToPass] = useState<number | null>(null)
 
   useEffect(() => {
     if (loading) return
@@ -71,6 +78,25 @@ export default function LearningDashboard() {
         setRadarIdx(i >= 0 ? i : Math.max(0, r.levelSkills.length - 1))
       })
       .catch((e) => setError(e instanceof Error ? e.message : t('result.load_failed')))
+    // 티어/시즌 총점/실력·활동 분해/다음 순위 게이지 — get-hub 가 단일 출처(Hub 와 동일 호출).
+    // 실패해도 무시(back-compat: 히어로가 레벨 기반 표시로 폴백).
+    callFunction<{
+      tier?: string | null
+      percentile?: number | null
+      seasonTotal?: number | null
+      skillScore?: number | null
+      activityScore?: number | null
+      pointsToPass?: number | null
+    }>('get-hub', {})
+      .then((h) => {
+        setTier((h.tier as Tier | null) ?? null)
+        setPercentile(h.percentile ?? null)
+        setSeasonTotal(h.seasonTotal ?? null)
+        setSkillScore(h.skillScore ?? null)
+        setActivityScore(h.activityScore ?? null)
+        setPointsToPass(h.pointsToPass ?? null)
+      })
+      .catch(() => {})
   }, [isFullUser, loading, navigate, t])
 
   const list = attempts ?? []
@@ -80,8 +106,9 @@ export default function LearningDashboard() {
   const monthTick = (m: number) =>
     lang === 'en' ? EN_MONTHS[m - 1] : lang === 'ja' ? `${m}月` : `${m}월`
 
-  // 랭킹 점수(0~10000) 추이: 응시마다 그 시점 등급 + 그 등급 최신 맞힌수로 환산
-  // (computePoints — scoring.ts 단일 출처). 마지막 점은 현재 랭킹 점수와 거의 일치.
+  // 실력점수(레벨가중, 0~10000) 추이: 응시마다 그 시점 등급 + 그 등급 최신 맞힌수로 환산
+  // (computeSkillScore — scoring.ts 단일 출처, computePoints 아님). 시즌 총점 자체의 이력은 없어
+  // 히어로에 현재 seasonTotal 단일 값으로 별도 표시한다.
   const trend = useMemo(() => {
     let last = -1
     const latestCorrect: Record<number, number> = {}
@@ -92,11 +119,12 @@ export default function LearningDashboard() {
       last = m
       latestCorrect[a.level] = a.totalCorrect
       const rank = a.rankAfter ?? a.level
-      const pts = computePoints(rank, latestCorrect[rank] ?? a.totalCorrect)
+      const pts = computeSkillScore(rank, latestCorrect[rank] ?? a.totalCorrect)
       return { v: pts, date: dt.toLocaleDateString(), tick }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, lang])
+
 
   if (loading || (!attempts && !error)) {
     return (
@@ -115,6 +143,9 @@ export default function LearningDashboard() {
         )
       : 0
 
+  // TODO(#5 미구현): 잔디는 현재 레벨테스트 응시(list)만으로 채워 leveltest(금색) 활동만 표시한다.
+  //   attendance/learn/minigame 은 get-hub 가 activity_ledger+daily_activity 기반 일별 breakdown 을
+  //   반환해야 여기서 dominant 색이 정확해진다(현재 get-hub 응답에 그 필드가 없음 — 생산자 미배선).
   const days = new Map<string, number>()
   for (const a of list) {
     const d = new Date(a.submittedAt)
@@ -163,17 +194,29 @@ export default function LearningDashboard() {
         </div>
       ) : (
         <>
-          {/* 등급 히어로 */}
+          {/* 티어 히어로: 현재 티어 + 시즌 총점(실력/활동 분해) + 다음 순위 게이지(요약) */}
           <div className="tierhero">
-            <TierEmblem tierKey={emblemKeyForLevel(rank ?? 1)} size={64} />
+            <TierEmblem tierKey={tier ?? emblemKeyForLevel(rank ?? 1)} size={64} />
             <div>
-              <div className="nm" style={{ color: levelColor(rank ?? 1) }}>
-                Lv.{rank ?? '-'}
+              <div className="nm" style={{ color: tier ? tierColor(tier) : levelColor(rank ?? 1) }}>
+                {tier ? t(`rank.tier_${tier}`) : `Lv.${rank ?? '-'}`}
               </div>
               <div className="sub">{t('db.cur_rank', { n: list.length })}</div>
               <div className="sub" style={{ fontWeight: 700, color: 'var(--ink)' }}>
-                {t('db.points', { p: points.toLocaleString() })}
+                {t('db.points', { p: (seasonTotal ?? points).toLocaleString() })}
               </div>
+              {skillScore != null || activityScore != null ? (
+                <div className="sub" style={{ display: 'flex', gap: 10 }}>
+                  <span>{t('db.skill_score')} {(skillScore ?? 0).toLocaleString()}</span>
+                  <span>{t('db.activity_score')} {(activityScore ?? 0).toLocaleString()}</span>
+                </div>
+              ) : null}
+              {percentile != null ? (
+                <div className="sub">
+                  {t('rank.top', { p: Math.max(1, Math.round(percentile * 100)) })}
+                  {pointsToPass != null && pointsToPass > 0 ? ` · ${t('rank.next_gap', { n: pointsToPass })}` : ''}
+                </div>
+              ) : null}
             </div>
 
             {/* '점수는 레벨 + 맞힌 개수로 정해진다'는 개념만 — 버튼 누르면 펼침(실제 수치 박지 않음) */}
@@ -250,12 +293,12 @@ export default function LearningDashboard() {
               </div>
             </div>
             <div className="stat">
-              <div className="k">{t('db.stat_lastchange')}</div>
-              <div className="v" style={{ color: lpOf(list[0]) >= 0 ? '#15803d' : '#dc2626' }}>
-                {lpOf(list[0]) >= 0 ? `+${lpOf(list[0])}` : lpOf(list[0])}
+              <div className="k">{t('rank.my_tier')}</div>
+              <div className="v" style={{ color: tier ? tierColor(tier) : 'var(--ink)' }}>
+                {tier ? t(`rank.tier_${tier}`) : '-'}
               </div>
               <div className="d" style={{ color: 'var(--muted)' }}>
-                {t('db.last_lp')}
+                {percentile != null ? t('rank.top', { p: Math.max(1, Math.round(percentile * 100)) }) : t('db.placed_before')}
               </div>
             </div>
           </div>

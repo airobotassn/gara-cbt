@@ -51,6 +51,13 @@ html.dark {
 }
 .pf-acct-btn svg { opacity: 0.85; }
 .pf-acct-btn:hover { color: var(--ink); }
+/* 마이페이지는 계정 패널의 주 동작 — 로그아웃(--dim)보다 진하고 살짝 크게.
+   · #000 이 아니라 --ink 를 쓰는 이유: 다크에서 자동으로 밝은 글자로 뒤집혀야 한다.
+   · --fs-md(16px)는 과해서 --fs-sm 에 1.5px 만 더한다. 리터럴 대신 calc 인 이유는
+     base.css 가 브레이크포인트마다 --fs-sm 을 키우는데 거기에 같이 따라가야 하기 때문.
+   · 아이콘(Layout.tsx 의 UserIcon size)도 이 크기에 맞춰 15px. */
+.pf-mypage-btn { color: var(--ink); font-size: calc(var(--fs-sm) + 1.5px); font-weight: 700; }
+.pf-mypage-btn svg { opacity: 1; }
 .pf-logout-btn:hover { color: var(--danger-fg); }
 /* 테마 토글: 헤더 우측 상단 구석의 아이콘 버튼 — 달/해는 노란색 */
 .pf-theme {

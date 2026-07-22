@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { levelColor, emblemKeyForLevel } from '../lib/scoring'
+import { levelColor, emblemKeyForLevel, tierColor, type Tier } from '../lib/scoring'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT, type TFunc } from '../lib/i18n'
@@ -12,16 +12,18 @@ interface HofUser {
   rank: number
   name: string
   level: number
-  rating: number
+  rating: number // 시즌 총점(season_total) — 서버 leaderboard 응답 필드명은 하위호환상 rating 유지
   color: string | null
   image: string | null
   mascot: string | null
   me: boolean
+  tier: Tier | null
+  percentile: number | null // 0~1, 낮을수록 상위
 }
 interface HofResponse {
   top: HofUser[]
   total: number
-  me: HofUser | null
+  me: (HofUser & { pointsToPass?: number | null }) | null
 }
 
 // 집계 버킷(지역·국가·학교) — 개인 식별 필드 없이 집계값만. member_count<5 는 서버가 이미 제외.
@@ -83,8 +85,8 @@ export default function Ranking() {
 
   return (
     <div className="wrap hof-wrap">
-      {/* 랭킹 진입점이 허브 도크 CTA 라 뒤로가기도 허브로 */}
-      <TopBar to="/hub" label={t('common.hub')} />
+      {/* 랭킹 진입점이 허브(CARI) 도크 CTA 라 뒤로가기도 허브로 */}
+      <TopBar to="/hub" label={t('common.cari')} />
 
       <header className="hof-head">
         <div className="hof-badge">
@@ -98,7 +100,8 @@ export default function Ranking() {
 
       {/* === 탭바: 개인 / 지역 / 국가 / 학교 === */}
       <div className="hof-tabs" role="tablist">
-        {(['personal', 'region', 'country', 'school'] as Tab[]).map((k) => (
+        {/* 학교 탭은 비활성화(숨김) — 되살리려면 배열에 'school' 을 다시 넣으면 된다(핸들러·카드 로직은 그대로). */}
+        {(['personal', 'region', 'country'] as Tab[]).map((k) => (
           <button
             key={k}
             role="tab"
@@ -146,7 +149,7 @@ function PersonalBoard({
   const rest = top.slice(3)
   const me = data?.me ?? null
   const total = data?.total ?? 0
-  const mePct = me && total > 0 ? Math.max(1, Math.round((me.rank / total) * 100)) : 0
+  const mePct = me?.percentile != null ? Math.max(1, Math.round(me.percentile * 100)) : me && total > 0 ? Math.max(1, Math.round((me.rank / total) * 100)) : 0
 
   return (
     <>
@@ -178,7 +181,7 @@ function PersonalBoard({
                   </div>
                   <div className="hof-pp-nm">{u.name}</div>
                   <div className="hof-pp-pt">{t('rank.pt', { n: u.rating })}</div>
-                  <div className="hof-ped" style={{ ['--lc' as string]: levelColor(u.level) }}>{u.rank}</div>
+                  <div className="hof-ped" style={{ ['--lc' as string]: u.tier ? tierColor(u.tier) : levelColor(u.level) }}>{u.rank}</div>
                 </div>
               ) : (
                 <div key={i} className={`hof-pp ${podClass[i]}`} />
@@ -218,7 +221,7 @@ function PersonalBoard({
                 <small>{t('rank.top_label')} {mePct}%</small>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
-                <TierEmblem tierKey={emblemKeyForLevel(me.level)} size={44} />
+                <TierEmblem tierKey={me.tier ?? emblemKeyForLevel(me.level)} size={44} />
                 <div className="pt">{t('rank.pt', { n: me.rating })}</div>
               </div>
             </>
@@ -300,8 +303,9 @@ function AggregateBoard({
 
 function BucketCard({ b, rank, label, t }: { b: Bucket; rank: number; label: string; t: TFunc }) {
   // 서버가 floor 를 제외하지만, 방어적으로 집계 미완 버킷은 '집계중' 표기(레벨 유출 방지).
-  const floored = !b.member_count || b.member_count < 5 || b.avg_level == null
-  const avg = Math.round((b.avg_level ?? 0) * 10) / 10
+  const floored = !b.member_count || b.member_count < 5 || b.score == null
+  // 베이지안 보정 점수(score) — 소형 그룹을 전체 평균으로 수렴시켜 협력 서사를 지키는 표시값(raw avg_level 대신).
+  const avg = Math.round(b.score ?? 0)
   const pct = Math.round((b.participation ?? 0) * 100)
   return (
     <div className="hof-bkt">
@@ -333,7 +337,7 @@ function HofRow({ u, t }: { u: HofUser; t: TFunc }) {
         {u.name}
         {u.me ? <span className="meflag">{t('rank.you')}</span> : null}
       </span>
-      <TierEmblem tierKey={emblemKeyForLevel(u.level)} size={44} />
+      <TierEmblem tierKey={u.tier ?? emblemKeyForLevel(u.level)} size={44} />
       <span className="pt">{t('rank.pt', { n: u.rating })}</span>
     </div>
   )

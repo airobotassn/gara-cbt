@@ -126,7 +126,7 @@ function demoData(fail = false): GradedData {
     totalCorrect: answers.filter((a) => a.isCorrect).length,
     totalQuestions: answers.length,
     answers,
-    examTitle: 'CARIS-Ⅰ Pro 자격시험',
+    examTitle: 'CARIS-Ⅰ Pro 자격검정',
   }
 }
 

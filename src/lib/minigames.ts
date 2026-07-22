@@ -31,6 +31,15 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/shoot-cari-cover.png',
     src: '/games/shoot-cari.html',
   },
+  {
+    id: 'pick-cari',
+    title: '골라라 CARI',
+    accent: 'CARI',
+    tagline: '발판이 무너지기 전에 O·X 를 골라라!',
+    badge: 'AI · 로봇 용어 OX 서바이벌',
+    art: '/games/pick-cari-cover.png',
+    src: '/games/pick-cari.html',
+  },
 ]
 
 export function findMiniGame(id: string | undefined): MiniGame | undefined {

@@ -7,6 +7,8 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
 import { Link } from 'react-router-dom'
+import { useT } from '../lib/i18n'
+import { ACTIVITY_DELTA, type Tier } from '../lib/scoring'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -56,7 +58,7 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[] }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; tier?: Tier | null; percentile?: number | null; pointsToPass?: number | null }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
@@ -74,14 +76,14 @@ function friendlyError(e: unknown): string {
 type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title'
 
 export default function Hub() {
-  const { isFullUser, loginWithGoogle, user } = useAuth()
+  const { isFullUser, loginWithGoogle, user, loading } = useAuth()
+  const { t } = useT()
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
   const [owned, setOwned] = useState<Set<string>>(new Set())
   const [pity, setPity] = useState(0)
   const [level, setLevel] = useState<number | null>(null)
-  const [rankPoints, setRankPoints] = useState(0)
   const [authed, setAuthed] = useState(false)
   const [titles, setTitles] = useState<{ track: string; grade: string }[]>([])
   const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
@@ -94,6 +96,12 @@ export default function Hub() {
   const [toast, setToast] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
+  const [skillScore, setSkillScore] = useState(0)
+  const [activityScore, setActivityScore] = useState(0)
+  const [seasonTotal, setSeasonTotal] = useState(0)
+  const [tier, setTier] = useState<Tier | null>(null)
+  const [percentile, setPercentile] = useState<number | null>(null)
+  const [pointsToPass, setPointsToPass] = useState<number | null>(null)
 
   const pushLog = (s: string) => {
     setToast(s)
@@ -118,13 +126,18 @@ export default function Hub() {
     setCheckedIn(!!h.dailyDone)
     setOwned(new Set(h.cosmetics ?? []))
     setLevel(h.level ?? null)
-    setRankPoints(h.rankPoints ?? 0)
     setAuthed(!!h.authed)
     setTitles(h.titles ?? [])
     setCoupons(h.coupons ?? [])
     setCatalog(h.catalog ?? [])
     setDust(h.dust ?? 0)
     setExclusives(h.exclusives ?? [])
+    setSkillScore(h.skillScore ?? 0)
+    setActivityScore(h.activityScore ?? 0)
+    setSeasonTotal(h.seasonTotal ?? 0)
+    setTier(h.tier ?? null)
+    setPercentile(h.percentile ?? null)
+    setPointsToPass(h.pointsToPass ?? null)
   }
   async function hydrate() {
     try {
@@ -202,8 +215,44 @@ export default function Hub() {
     }
   }
 
-  const unusedCoupons = coupons.filter((c) => !c.used).length
+  // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
+  // const unusedCoupons = coupons.filter((c) => !c.used).length
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {titles[0].track} {titles[0].grade}</span> : null
+  // 다음 순위 게이지: percentile(0~1, 상위일수록 작음) 기반 fill = 1 - percentile → 상위일수록 가득(단조).
+  //   percentile null(미배치)이면 0. tier 는 있는데 percentile 이 없고 pointsToPass 도 null(=1위 엣지케이스)이면 가득(1).
+  const aboveScore = seasonTotal + (pointsToPass ?? 0)
+  const gaugeFillPct =
+    percentile != null ? Math.max(0, Math.min(100, (1 - percentile) * 100)) : tier && pointsToPass == null ? 100 : 0
+  const gaugeLabel = !tier ? t('rank.unplaced') : pointsToPass == null ? t('rank.top_tier') : t('rank.next_gap', { n: pointsToPass })
+
+  // 허브는 로그인 전용(게스트는 출석·뽑기·상점이 전부 잠긴 빈 화면이라 진입 자체를 막는다).
+  //   로그인 후 /hub 로 복귀 — /auth/callback?next=/hub 로 왕복해도 next 가 URL 에 실려 안 날아간다.
+  //   loading 중엔 판정 보류(허브가 한 프레임 번쩍였다 게이트로 바뀌는 것 방지).
+  if (loading) {
+    return <div className="hub hub-gate"><div className="hub-gate-card">{t('common.loading')}</div></div>
+  }
+  if (!isFullUser) {
+    return (
+      <div className="hub hub-gate">
+        <div className="sky" aria-hidden="true">
+          <div className="sun" />
+          <div className="cloud c1" /><div className="cloud c2" /><div className="cloud c3" />
+        </div>
+        <div className="hub-gate-card">
+          <img className="hub-gate-char" src="/hub-char.png" alt="CARI" />
+          <h2 className="hub-gate-title">CARI</h2>
+          <p className="hub-gate-sub">로그인하고 출석·뽑기·상점을 이용해보세요</p>
+          <button
+            className="hub-gate-btn"
+            onClick={() => loginWithGoogle(`${window.location.origin}/auth/callback?next=/hub`)}
+          >
+            {t('common.login_google')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="hub">
       <div className="sky" aria-hidden="true">
@@ -216,7 +265,7 @@ export default function Hub() {
       {/* 허브는 아레나 런처(CARI 버튼)로 들어오는 화면 — 뒤로가기도 아레나로 */}
       <div className="hub-backrow">
         <Link className="hub-back" to="/arena">
-          <span className="ic">←</span>아레나
+          <span className="ic">←</span>WORLD ARENA
         </Link>
       </div>
 
@@ -236,9 +285,20 @@ export default function Hub() {
             <span className="hud-lv">Lv.{level ?? '—'}</span>
           </div>
           <div className="hud-mid">
-            <div className="hud-name">CARI {titleBadge}</div>
+            <div className="hud-name">CARI {titleBadge}{tier && <span className="tier-chip">{t(`rank.tier_${tier}`)}{percentile != null && <em>{t('rank.top', { p: Math.round(percentile * 100) })}</em>}</span>}</div>
             <div className="hud-xp">
-              <div className="exp"><div className="exp-fill" style={{ width: `${Math.min(100, ((rankPoints || 0) / 10000) * 100)}%` }} /><span className="exp-lab">경험치 {rankPoints.toLocaleString()} / 10000</span></div>
+              <div className="rank-gauge">
+                <div className="rank-gauge-lab">{gaugeLabel}</div>
+                <div className="rank-gauge-track">
+                  <span className="rank-gauge-end lo">{seasonTotal.toLocaleString()}</span>
+                  <div className="exp"><div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} /></div>
+                  <span className="rank-gauge-end hi">{aboveScore.toLocaleString()}</span>
+                </div>
+                <div className="rank-gauge-break">
+                  <span>{t('db.skill_score')} {skillScore.toLocaleString()}</span>
+                  <span>{t('db.activity_score')} {activityScore.toLocaleString()}</span>
+                </div>
+              </div>
               <span className="gchip"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
             </div>
           </div>
@@ -246,11 +306,10 @@ export default function Hub() {
 
         {/* 캐릭터 무대 + 양옆 레일 */}
         <div className="stage-zone">
-          <div className="rail rail-l">
-            <button className="ricon" onClick={doDaily}><Ic n="calendar" s={34} />{authed && !checkedIn && <span className="bd">1</span>}</button>
-            <button className="ricon" onClick={() => setModal('coupon')}><Ic n="ticket" s={34} />{unusedCoupons > 0 && <span className="bd">{unusedCoupons}</span>}</button>
-          </div>
+          {/* 왼쪽 레일 제거 — 출석을 오른쪽 뽑기 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
+          {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
           <div className="rail rail-r">
+            <button className="fcard f-daily" onClick={doDaily}><span className="fico"><Ic n="calendar" s={42} /></span>출석{authed && !checkedIn && <span className="bd">1</span>}</button>
             <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><Ic n="gift" s={42} /></span>뽑기</button>
             <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><Ic n="shop" s={42} /></span>상점</button>
             <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>칭호</button>
@@ -280,6 +339,37 @@ export default function Hub() {
             <span className="cta-star"><Ic n="trophy" s={24} /></span>
             랭킹
           </Link>
+        </div>
+        <div className="todo">
+          <div className="todo-head">{t('hub.today_todo')}</div>
+          <div className="todo-list">
+            <div className={`todo-item ${checkedIn ? 'done' : ''}`}>
+              <span className="todo-ic"><Ic n="calendar" s={22} /></span>
+              <span className="todo-name">{t('hub.todo_attendance')}</span>
+              <span className="todo-pt">+{ACTIVITY_DELTA.attendance}P</span>
+              {checkedIn ? <span className="todo-chk">✓</span> : (
+                <button className="todo-cta" onClick={doDaily}>GO</button>
+              )}
+            </div>
+            <div className="todo-item is-placeholder">
+              <span className="todo-ic"><Ic n="star" s={22} /></span>
+              <span className="todo-name">{t('hub.todo_problem')}</span>
+              <span className="todo-pt">—</span>
+              <span className="todo-soon">Soon</span>
+            </div>
+            <div className="todo-item">
+              <span className="todo-ic"><Ic n="book" s={22} /></span>
+              <span className="todo-name">{t('hub.todo_learn')}</span>
+              <span className="todo-pt">+{ACTIVITY_DELTA.daily_learn}P</span>
+              <Link className="todo-cta" to="/daily">GO</Link>
+            </div>
+            <div className="todo-item">
+              <span className="todo-ic"><Ic n="gift" s={22} /></span>
+              <span className="todo-name">{t('hub.todo_game')}</span>
+              <span className="todo-pt">+{ACTIVITY_DELTA.minigame}P</span>
+              <Link className="todo-cta" to="/arena">GO</Link>
+            </div>
+          </div>
         </div>
       </div>
 

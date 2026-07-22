@@ -33,6 +33,7 @@ import Onboarding from './pages/Onboarding'
 import Hub from './pages/Hub'
 import WorldArena from './pages/WorldArena'
 import MiniGame from './pages/MiniGame'
+import MiniGames from './pages/MiniGames'
 import Daily from './pages/Daily'
 const Admin = lazy(() => import('./pages/Admin'))
 
@@ -96,6 +97,7 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/arena" element={<WorldArena />} />
               <Route path="/hub" element={<Hub />} />
+              <Route path="/games" element={<MiniGames />} />
               <Route path="/games/:gameId" element={<MiniGame />} />
               <Route path="/daily" element={<Daily />} />
               <Route path="/login" element={<Login />} />

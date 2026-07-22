@@ -17,7 +17,12 @@
 .gld-hint .material-symbols-outlined { font-size: 19px; color: var(--color-primary); }
 
 /* 피라미드 */
-.gld-pyramid-wrap { position: relative; max-width: 700px; margin: 18px auto 2px; padding: 10px 0 6px; }
+/* 피라미드는 정중앙·원래 크기로 유지하고 우측 브레이스+라벨 공간만 확보한다.
+   viewBox 를 좌우 대칭(-240~1240)으로 넓혀 피라미드(x60~940, 중심500)가 정중앙에 오게 하고,
+   부모 .gld(720px)가 급수 카드와 공유라 못 넓히므로 wrap 만 부모 밖으로 확장(중앙 정렬 유지).
+   피라미드 렌더폭 = wrap(1036) × 880/1480 ≈ 616px 로 원래(700×880/1000)와 동일. */
+.gld-pyramid-wrap { position: relative; width: min(1036px, 94vw); margin: 18px 0 2px; margin-left: 50%; transform: translateX(-50%); padding: 10px 0 6px; }
+.gld-brace-lbl { font-family: var(--font-title-md); font-size: 42px; font-weight: 800; letter-spacing: -0.01em; }
 .gld-pyramid-wrap::before {
   content: ""; position: absolute; left: 50%; top: 54%; width: 78%; height: 66%;
   transform: translate(-50%, -50%); z-index: 0; border-radius: 50%;
@@ -63,7 +68,7 @@ html.dark .gld-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px
 }
 .gld-seal { position: absolute; right: 14px; top: 50%; transform: translateY(-50%) rotate(-8deg); font-size: 92px; opacity: 0.16; font-variation-settings: 'FILL' 1; pointer-events: none; }
 .gld-nm2 { font-size: clamp(22px, 4.4vw, 26px); font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
-.gld-track { display: inline-block; margin-top: 9px; font-size: 13.5px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); backdrop-filter: blur(2px); }
+.gld-track { display: inline-block; margin-top: 9px; font-size: 16px; font-weight: 800; padding: 5px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); backdrop-filter: blur(2px); }
 
 .gld-body { padding: 22px 24px 24px; }
 .gld-subj-label { font-size: 12.5px; font-weight: 800; color: var(--color-on-surface-variant); letter-spacing: 0.04em; margin-bottom: 14px; text-transform: uppercase; }
