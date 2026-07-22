@@ -18,14 +18,15 @@ export const EXTRA_AXES = 2
 
 // ----- 레벨별 6축 코드 (categories.ts 와 동일하게 유지!) -----
 export const LEVEL_AXES: Record<number, string[]> = {
-  1: ['l1_principle', 'l1_security', 'l1_ethics', 'l1_responsibility', 'l1_llm_eco', 'l1_prompt'],
-  2: ['l2_genai', 'l2_api', 'l2_algo', 'l2_sensor', 'l2_block', 'l2_python'],
-  3: ['l3_rag', 'l3_llm_ctrl', 'l3_vision_eval', 'l3_vision_data', 'l3_c_basic', 'l3_c_adv'],
-  4: ['l4_preproc', 'l4_stm32', 'l4_ros2', 'l4_plc', 'l4_sim', 'l4_smartfactory'],
-  5: ['l5_reasoning', 'l5_edge', 'l5_iiot', 'l5_dtwin', 'l5_sysopt', 'l5_ros2'],
-  // L6·L7 = 임시(더미). categories.ts 와 동일하게 유지.
-  6: ['l6_swarm', 'l6_hrc', 'l6_dtwin', 'l6_orchestration', 'l6_process_opt', 'l6_robosec'],
-  7: ['l7_standard', 'l7_arch', 'l7_phyfusion', 'l7_faulttol', 'l7_governance', 'l7_ethics'],
+  // L1 = 2026-07 사다리 한 칸 밀기로 신설된 입문 레벨(임시 축 — 콘텐츠 확정 시 교체).
+  1: ['l1_device', 'l1_internet', 'l1_chatbot', 'l1_search', 'l1_citizen', 'l1_aitool'],
+  2: ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt'],
+  3: ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python'],
+  4: ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv'],
+  5: ['l5_preproc', 'l5_stm32', 'l5_ros2', 'l5_plc', 'l5_sim', 'l5_smartfactory'],
+  6: ['l6_reasoning', 'l6_edge', 'l6_iiot', 'l6_dtwin', 'l6_sysopt', 'l6_ros2'],
+  // L7 = 임시(더미). categories.ts 와 동일하게 유지.
+  7: ['l7_swarm', 'l7_hrc', 'l7_dtwin', 'l7_orchestration', 'l7_process_opt', 'l7_robosec'],
 }
 export function axisKeysForLevel(level: number): string[] {
   return LEVEL_AXES[level] ?? []

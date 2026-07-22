@@ -4,10 +4,10 @@
 const SUPABASE_REF = 'jfvldoywvzvqhitcgalr'
 const AXES = ['prompt', 'model', 'verify', 'automation', 'data', 'ethics']
 const axisMap = (vals) => Object.fromEntries(AXES.map((k, i) => [k, vals[i]]))
-// 레벨별 실제 6축 코드(레이더가 제대로 그려지도록)
-const L1 = ['l1_principle', 'l1_security', 'l1_ethics', 'l1_responsibility', 'l1_llm_eco', 'l1_prompt']
-const L2 = ['l2_genai', 'l2_api', 'l2_algo', 'l2_sensor', 'l2_block', 'l2_python']
-const L3 = ['l3_rag', 'l3_llm_ctrl', 'l3_vision_eval', 'l3_vision_data', 'l3_c_basic', 'l3_c_adv']
+// 레벨별 실제 6축 코드(레이더가 제대로 그려지도록). 2026-07 사다리 한 칸 밀기 반영 — L1 변수 = 지금의 Lv.2 축.
+const L1 = ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt']
+const L2 = ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python']
+const L3 = ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv']
 const mapBy = (keys, vals) => Object.fromEntries(keys.map((k, i) => [k, vals[i]]))
 
 const DEVICES = {
@@ -42,10 +42,10 @@ async function seedAuthAndMocks(context) {
   await context.route('**/functions/v1/get-result', (r) =>
     r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({
-        attemptId: 'demo', level: 3, totalCorrect: 3, totalQuestions: 20, locked: false,
+        attemptId: 'demo', level: 4, totalCorrect: 3, totalQuestions: 20, locked: false,
         rating: mapBy(L3, [52, 45, 58, 40, 50, 38]), deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]),
         perf: mapBy(L3, [48, 40, 55, 35, 47, 33]), prevPerf: mapBy(L3, [60, 52, 50, 44, 41, 39]),
-        placed: true, rankBefore: 3, rankAfter: 3, rankDir: 'stay',
+        placed: true, rankBefore: 4, rankAfter: 4, rankDir: 'stay',
         warnStrikes: 2, // ← 강등 경고 2/3 (목)
         answers: Array.from({ length: 6 }, (_, i) => ({
           questionId: `q${i}`, category: L3[i % L3.length],
@@ -59,16 +59,16 @@ async function seedAuthAndMocks(context) {
     r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({
         attempts: Array.from({ length: 5 }, (_, i) => ({
-          attemptId: `a${i}`, level: 3, totalCorrect: i < 2 ? 3 : 9, totalQuestions: 20,
-          rankAfter: 3, rankDir: 'stay', deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]),
+          attemptId: `a${i}`, level: 4, totalCorrect: i < 2 ? 3 : 9, totalQuestions: 20,
+          rankAfter: 4, rankDir: 'stay', deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]),
           submittedAt: `2026-0${(i % 6) + 1}-15T10:00:00Z`,
         })),
-        currentRank: 3,
+        currentRank: 4,
         currentPoints: 3214, // ← 랭킹 점수(목)
         demotionStrikes: 2, // ← 강등 경고 2/3(목)
         levelSkills: [
-          { level: 2, ratings: mapBy(L2, [70, 65, 60, 72, 58, 68]), attemptsCount: 3 },
-          { level: 3, ratings: mapBy(L3, [72, 45, 58, 40, 57, 38]), attemptsCount: 5 }, // 잘함/평균/부족 섞이게(데모)
+          { level: 3, ratings: mapBy(L2, [70, 65, 60, 72, 58, 68]), attemptsCount: 3 },
+          { level: 4, ratings: mapBy(L3, [72, 45, 58, 40, 57, 38]), attemptsCount: 5 }, // 잘함/평균/부족 섞이게(데모)
         ],
       }) }))
 
@@ -120,7 +120,7 @@ async function seedAuthAndMocks(context) {
           title: i === 0 ? 'CARIS Master 1급' : i === 1 ? 'CARIS Pro 2급' : null,
         })),
         // me.title/titles = user_titles(본인) 파생 배지(실서버 leaderboard fn 이 부착).
-        me: { rank: 171, level: 2, rating: 14, name: '나 (Demo)', color: '#e3b23c', image: null, me: true,
+        me: { rank: 171, level: 3, rating: 14, name: '나 (Demo)', color: '#e3b23c', image: null, me: true,
           title: 'CARIS Pro 3급', titles: [{ track: 'Pro', grade: '3급', exam_title: 'CARIS Pro' }] },
         total: 980,
         // 구버전(리그 리스트) 호환 필드

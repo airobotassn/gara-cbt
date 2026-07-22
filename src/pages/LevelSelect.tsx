@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { MAX_LEVEL, QUESTIONS_PER_TEST } from '../lib/testConfigLevel'
+import { MAX_LEVEL, QUESTIONS_PER_TEST, COMING_SOON_LEVELS } from '../lib/testConfigLevel'
 import { promoteCut, DEMOTE_MAX, DEMOTE_STRIKES } from '../lib/scoring'
 import { useT } from '../lib/i18n'
 import TopBar from '../components/TopBar'
@@ -127,18 +127,19 @@ export default function LevelSelect() {
         <div className="ladder">
           {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((n) => {
             const c = LEVEL_COLORS[n]
+            const soon = COMING_SOON_LEVELS.includes(n) // 문제은행 준비 중 → 응시 차단
             const locked = n > unlocked
-            const tag = locked ? undefined : recMap.get(n)
+            const tag = locked || soon ? undefined : recMap.get(n)
             return (
               <button
                 key={n}
-                className={`step ${tag ? 'rec' : ''} ${locked ? 'locked' : ''}`}
-                disabled={loading !== null || locked}
+                className={`step ${tag ? 'rec' : ''} ${locked || soon ? 'locked' : ''}`}
+                disabled={loading !== null || locked || soon}
                 onClick={() => start(n)}
                 title={locked ? t('lv.locked_hint') : undefined}
               >
-                <span className="num" style={locked ? undefined : { background: c }}>
-                  {locked ? '🔒' : n}
+                <span className="num" style={locked || soon ? undefined : { background: c }}>
+                  {locked ? '🔒' : soon ? '⏳' : n}
                 </span>
                 <span className="body">
                   <span className="name">
@@ -155,9 +156,11 @@ export default function LevelSelect() {
                 <span className="go">
                   {locked
                     ? t('lv.locked')
-                    : loading === n
-                      ? t('lv.preparing')
-                      : t('lv.select')}
+                    : soon
+                      ? t('lv.coming_soon')
+                      : loading === n
+                        ? t('lv.preparing')
+                        : t('lv.select')}
                 </span>
               </button>
             )
