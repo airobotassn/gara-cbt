@@ -45,7 +45,7 @@ export default function LearningDashboard() {
   const navigate = useNavigate()
   const [attempts, setAttempts] = useState<AttemptSummary[] | null>(null)
   const [, setCurrentRank] = useState<number | null>(null)
-  const [points, setPoints] = useState(0)
+  const [, setPoints] = useState(0)
   const [strikes, setStrikes] = useState(0)
   const [levelSkills, setLevelSkills] = useState<LevelSkill[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -54,9 +54,9 @@ export default function LearningDashboard() {
   // 티어 히어로(시즌 총점/실력·활동 분해/다음 순위 게이지) — get-hub 응답 중 이 화면이 쓰는 것만.
   const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
-  const [seasonTotal, setSeasonTotal] = useState<number | null>(null)
-  const [skillScore, setSkillScore] = useState<number | null>(null)
-  const [activityScore, setActivityScore] = useState<number | null>(null)
+  const [, setSeasonTotal] = useState<number | null>(null)
+  const [, setSkillScore] = useState<number | null>(null)
+  const [, setActivityScore] = useState<number | null>(null)
   const [pointsToPass, setPointsToPass] = useState<number | null>(null)
 
   useEffect(() => {
@@ -200,15 +200,6 @@ export default function LearningDashboard() {
                 {t(`rank.tier_${tier ?? 'bronze'}`)}
               </div>
               <div className="sub">{t('db.cur_rank', { n: list.length })}</div>
-              <div className="sub" style={{ fontWeight: 700, color: 'var(--ink)' }}>
-                {t('db.points', { p: (seasonTotal ?? points).toLocaleString() })}
-              </div>
-              {skillScore != null || activityScore != null ? (
-                <div className="sub" style={{ display: 'flex', gap: 10 }}>
-                  <span>{t('db.skill_score')} {(skillScore ?? 0).toLocaleString()}</span>
-                  <span>{t('db.activity_score')} {(activityScore ?? 0).toLocaleString()}</span>
-                </div>
-              ) : null}
               <div className="sub">
                 {t('rank.top', { p: Math.max(1, Math.round((percentile ?? 1) * 100)) })}
                 {pointsToPass != null && pointsToPass > 0 ? ` · ${t('rank.next_gap', { n: pointsToPass })}` : ''}
