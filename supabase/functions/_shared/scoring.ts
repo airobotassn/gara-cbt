@@ -162,10 +162,13 @@ export function toAxisMap(obj: unknown, keys: string[]): AxisMap {
   return out
 }
 
-// 레벨별 노출 선택지 수 상한. 레벨1만 4지선다(5번째 선택지 숨김), 그 외는 제한 없음.
-// ⚠️ 정답이 잘리면 안 됨 → 레벨1은 정답=5번(correct_index 4) 문항을 비활성화해 둠.
+// 레벨별 노출 선택지 수 상한. 레벨1~3은 4지선다(5번째 선택지 숨김), 그 외는 제한 없음.
+// ⚠️ 정답이 잘리면 안 됨 → 레벨1~3에는 정답=5번(correct_index 4) 문항이 없어야 한다.
+//    레벨1·2는 해당 문항을 비활성화, 레벨3은 보기 스왑으로 번호를 옮겼다
+//    (migrations/20260723110000_leveltest_l3_four_choice.sql).
+//    레벨1~3 문항을 새로 넣을 때도 정답을 1~4번에 둘 것.
 //    (이 표시 컷은 채점에 영향 없음: 채점은 correct_index 로만 함)
-export const VISIBLE_OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4 }
+export const VISIBLE_OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4 }
 export function projOptionsForLevel(i18n: unknown, lang: string, level: number): string[] {
   const opts = projOptions(i18n, lang)
   const cap = VISIBLE_OPTIONS_BY_LEVEL[level]
