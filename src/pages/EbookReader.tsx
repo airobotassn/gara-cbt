@@ -1,5 +1,8 @@
 // 이북 뷰어 (/ebooks/read/:id) — 구매한 이북 HTML 을 전체화면 iframe 으로 연다.
 //   본문은 비공개 버킷이라 ebooks 함수가 소유 확인 후 발급한 서명 URL(1시간)만 열 수 있다.
+//   ⚠️ 서명 URL 을 iframe src 에 그대로 물리면 안 된다 — Supabase Storage 는 HTML 을
+//      `text/plain` + `nosniff` 로 내려보내(스토리지 도메인 XSS 방지) 소스코드가 그대로 보인다.
+//      그래서 여기서 텍스트로 받아 srcdoc 으로 넣는다(그래서 단일 HTML 파일 원칙 — 상대경로 리소스는 못 씀).
 //   상단 얇은 바(뒤로 + 제목)는 미니게임 플레이 화면과 같은 형태.
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -14,20 +17,27 @@ export default function EbookReader() {
   const { id } = useParams<{ id: string }>()
   const { isFullUser, loading: authLoading, loginWithGoogle } = useAuth()
   const [book, setBook] = useState<EbookReadResp | null>(null)
+  const [html, setHtml] = useState('')
   const [err, setErr] = useState('')
 
   useEffect(() => {
     if (authLoading || !isFullUser || !id) return
     let alive = true
-    callFunction<EbookReadResp>('ebooks', { action: 'read', id })
-      .then((b) => {
+    ;(async () => {
+      try {
+        const b = await callFunction<EbookReadResp>('ebooks', { action: 'read', id })
         if (!alive) return
         setBook(b)
+        const res = await fetch(b.url)
+        if (!res.ok) throw new Error(`본문을 불러오지 못했습니다 (${res.status})`)
+        const text = await res.text()
+        if (!alive) return
+        setHtml(text)
         setErr('')
-      })
-      .catch((e) => {
+      } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.')
-      })
+      }
+    })()
     return () => {
       alive = false
     }
@@ -106,12 +116,13 @@ export default function EbookReader() {
         <strong style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }}>{book?.title ?? ''}</strong>
         {book?.author && <span style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{book.author}</span>}
       </header>
-      {book ? (
+      {html ? (
         <iframe
-          src={book.url}
-          title={book.title}
-          // 책 HTML 은 스토리지 도메인(=우리 앱과 다른 오리진)에서 오지만, 최상위 이동만은 막는다.
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          srcDoc={html}
+          title={book?.title ?? ''}
+          // allow-same-origin 은 주지 않는다 — srcdoc 은 우리 오리진을 물려받으므로,
+          // 책 안의 스크립트가 앱 세션(로컬스토리지의 Supabase 토큰)에 닿지 못하게 격리한다.
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           style={{ flex: 1, width: '100%', border: 0, display: 'block', background: '#fff' }}
         />
       ) : (
