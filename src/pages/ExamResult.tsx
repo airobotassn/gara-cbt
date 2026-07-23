@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
 import { makeCertNo, tempSeq, gradeOfTitle, gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
-import type { ExamResultResponse, GradedAnswer, MyAttemptsResponse, SubmitExamResponse } from '../lib/types'
+import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
 // GARA Precision 톤으로 자체 디자인. 채점 로직/상태(공개 전·무효·에러) 보존.
@@ -153,29 +153,20 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   const issueDate = fmtCertDate(acquiredAt)
   const expiryDate = certExpiryDate(certLabel, acquiredAt)
 
-  async function goCertificate() {
-    // 발급 기록(서버) — 마이페이지 발급현황과 공유되는 '발급 완료' 상태. 미리보기는 기록 없음.
-    // 발급 응답에서 진위확인 토큰·확정 자격번호를 받아 자격증(QR)에 실어 보낸다.
-    let verifyToken: string | undefined
-    let issuedCertNo: string | undefined
-    if (attemptId && attemptId !== 'preview') {
-      try {
-        const r = await callFunction<MyAttemptsResponse>('my-attempts', { issue: attemptId })
-        verifyToken = r.issued?.verifyToken
-        issuedCertNo = r.issued?.certNo
-      } catch {
-        /* 기록 실패해도 증서 화면은 열어준다(QR 없이) */
-      }
-    }
+  function goCertificate() {
+    // 성적표에서는 바로 발급하지 않고 워터마크 견본(미리보기)을 먼저 연다 — 발급은 유료이므로
+    // 결제 게이트가 붙을 자리는 미리보기 화면의 '자격증 발급하기' 버튼(Certificate.issueNow).
+    // 여기서 verifyToken 을 넘기지 않는 게 핵심: 토큰 없는 캡처본은 /verify 조회가 안 된다.
     navigate('/certificate', {
       state: {
+        preview: true,
+        attemptId,
         name: certName,
         qualification: passed ? certLabel : t('mypage.exam_fallback'),
         grade: passed ? gradeDisplay(certLabel) : undefined,
-        certNo: issuedCertNo ?? certNo,
+        certNo,
         issueDate,
         expiryDate,
-        verifyToken,
         scoreText: `${scorePct}점 (${data.totalCorrect}/${data.totalQuestions})`,
       },
     })

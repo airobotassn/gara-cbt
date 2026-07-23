@@ -65,6 +65,37 @@
   gap: 10px;
 }
 
+/* 발급(결제) 전 견본 안내 — 워터마크가 왜 있는지, 발급하면 뭐가 풀리는지 */
+.cert-preview-note {
+  width: min(980px, 96vw);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+  background: color-mix(in srgb, var(--blue) 8%, transparent);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.cert-preview-note b {
+  color: var(--blue);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.cert-issue-err {
+  color: var(--red, #ba1a1a);
+  font-size: var(--fs-sm);
+}
+
+/* 워터마크는 드래그·선택으로 떼어낼 수 없게 */
+.cert-canvas text {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* 미리보기: 6개 언어 버전 전환 탭 */
 .cert-lang-tabs {
   display: flex;
@@ -103,9 +134,12 @@
   }
   .cert-page .exam-home,
   .cert-actions,
+  .cert-preview-note,
+  .cert-issue-err,
   .cert-lang-tabs {
     display: none !important;
   }
+  /* ⚠️ 미리보기 워터마크는 SVG 안에 있으므로 인쇄/PDF 저장에도 그대로 남는다(제거 금지). */
   /* 새 시안 비율(≈1.38)이 A4 가로(≈1.41)보다 세로로 살짝 길어 — 높이에 맞춰 한 장에 담는다.
      SVG viewBox+preserveAspectRatio(기본 meet)가 페이지 안에서 비율 유지·가운데 정렬. */
   .cert-canvas {
