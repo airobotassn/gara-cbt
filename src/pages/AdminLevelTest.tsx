@@ -2129,7 +2129,16 @@ function UploadTab() {
             </span>
           </div>
 
-          <table className="admin-table">
+          {/* 열 폭 고정(colgroup + .review-table) — 편집칸·검수 사유가 길어도 표가 카드 밖으로 안 넘치게 */}
+          <div className="review-wrap">
+          <table className="admin-table review-table">
+            <colgroup>
+              <col style={{ width: 44 }} />
+              <col style={{ width: '32%' }} />
+              <col style={{ width: '34%' }} />
+              <col style={{ width: '24%' }} />
+              <col style={{ width: 56 }} />
+            </colgroup>
             <thead><tr><th>#</th><th>한국어</th><th>{LANG_LABEL[reviewLang]} (편집)</th><th>상태</th><th>제외</th></tr></thead>
             <tbody>
               {shown.map(({ d, i }) => {
@@ -2160,6 +2169,7 @@ function UploadTab() {
               })}
             </tbody>
           </table>
+          </div>
 
           <div className="admin-row" style={{ marginTop: 14 }}>
             <button className="dl-btn" onClick={download}>엑셀 다운로드</button>
