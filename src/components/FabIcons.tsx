@@ -43,6 +43,17 @@ export function ChevronUpIcon(p: IcoProps) {
   )
 }
 
+// 이북(전자책) — 펼친 책
+export function BookIcon(p: IcoProps) {
+  return (
+    <Ico {...p}>
+      <path d="M12 6.5C10.6 5.2 8.7 4.5 6.5 4.5H4v13h2.5c2.2 0 4.1.7 5.5 2" />
+      <path d="M12 6.5c1.4-1.3 3.3-2 5.5-2H20v13h-2.5c-2.2 0-4.1.7-5.5 2" />
+      <path d="M12 6.5v13" />
+    </Ico>
+  )
+}
+
 export function ExamIcon(p: IcoProps) {
   return (
     <Ico {...p}>

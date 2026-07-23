@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, lazy, Suspense, type CSSProperties, t
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
-import { callFunction } from '../lib/supabase'
+import { callFunction, supabase } from '../lib/supabase'
 import type {
   AdminListResponse,
   AdminAttemptRow,
@@ -37,6 +37,10 @@ import type {
   CbtUsersResp,
   CbtUserDetailResp,
   I18nText,
+  AdminEbookRow,
+  AdminEbookListResp,
+  AdminEbookBuyer,
+  AdminEbookBuyersResp,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
 import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
@@ -117,8 +121,8 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 // CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
-type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'admins'
-const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'admins']
+type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'ebooks' | 'admins'
+const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'ebooks', 'admins']
 // 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
 type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
 const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
@@ -304,6 +308,9 @@ function CarisExamAdmin() {
         <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
           시험등록
         </button>
+        <button className={sub === 'ebooks' ? 'on' : ''} onClick={() => setSub('ebooks')}>
+          이북
+        </button>
         {isRoot && (
           <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
             관리자 관리
@@ -324,6 +331,8 @@ function CarisExamAdmin() {
         <FaqAdmin />
       ) : sub === 'rounds' ? (
         <RoundsAdmin />
+      ) : sub === 'ebooks' ? (
+        <EbooksAdmin />
       ) : sub === 'admins' ? (
         <AdminAccountsAdmin />
       ) : (
@@ -1477,7 +1486,7 @@ function RoundsAdmin() {
                   style={inpStyle}
                   value={draft.titleI18n.ko ?? ''}
                   onChange={(e) => patchField('titleI18n', e.target.value)}
-                  placeholder="예: 제 5회 정기시험"
+                  placeholder="예: 제 5회 CARIS"
                 />
               </label>
 
@@ -1717,6 +1726,349 @@ function AdminAccountsAdmin() {
           </tbody>
         </table>
       </div>
+    </>
+  )
+}
+
+// ── 이북(전자책) 관리 ──
+//   본문 HTML 1개 파일 = 비공개 버킷 'ebooks', 표지 이미지 = 공개 버킷 'ebook-covers'.
+//   파일은 클라에서 스토리지로 직접 올리고(관리자 전용 정책), 메타데이터만 admin 함수로 저장한다.
+//   ⚠️ 구매/열람 권한은 ebooks 함수가 판정 — 여기선 등록·공개 여부·가격만 다룬다.
+interface EbookDraft {
+  id?: string
+  title: string
+  author: string
+  description: string
+  coverUrl: string
+  price: number
+  storagePath: string
+  published: boolean
+  sortOrder: number
+}
+function emptyEbookDraft(): EbookDraft {
+  return { title: '', author: '', description: '', coverUrl: '', price: 0, storagePath: '', published: false, sortOrder: 0 }
+}
+
+function EbooksAdmin() {
+  const [rows, setRows] = useState<AdminEbookRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [draft, setDraft] = useState<EbookDraft | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState<'html' | 'cover' | null>(null)
+  const [buyersOf, setBuyersOf] = useState<{ book: AdminEbookRow; rows: AdminEbookBuyer[] } | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<AdminEbookListResp>('admin', { action: 'ebookList' })
+      setRows(res.ebooks)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function patch(p: Partial<EbookDraft>) {
+    setDraft((d) => (d ? { ...d, ...p } : d))
+  }
+
+  // 본문 HTML 업로드 — 파일마다 새 폴더(uuid)를 써서 덮어쓰기 사고를 막는다.
+  async function uploadHtml(file: File) {
+    if (!/\.html?$/i.test(file.name)) {
+      alert('HTML 파일(.html)만 업로드할 수 있습니다.')
+      return
+    }
+    setUploading('html')
+    try {
+      const path = `${crypto.randomUUID()}/${file.name.replace(/[^\w.-]/g, '_')}`
+      const { error } = await supabase.storage.from('ebooks').upload(path, file, { contentType: 'text/html', upsert: false })
+      if (error) throw error
+      patch({ storagePath: path })
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '업로드에 실패했습니다.')
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  async function uploadCover(file: File) {
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드할 수 있습니다.')
+      return
+    }
+    setUploading('cover')
+    try {
+      const path = `${crypto.randomUUID()}/${file.name.replace(/[^\w.-]/g, '_')}`
+      const { error } = await supabase.storage.from('ebook-covers').upload(path, file, { contentType: file.type, upsert: false })
+      if (error) throw error
+      const { data } = supabase.storage.from('ebook-covers').getPublicUrl(path)
+      patch({ coverUrl: data.publicUrl })
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '업로드에 실패했습니다.')
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  async function save() {
+    if (!draft) return
+    if (!draft.title.trim()) {
+      alert('제목은 필수입니다.')
+      return
+    }
+    if (!draft.storagePath) {
+      alert('이북 HTML 파일을 업로드해 주세요.')
+      return
+    }
+    setSaving(true)
+    try {
+      await callFunction('admin', { action: 'ebookUpsert', ebook: draft })
+      setDraft(null)
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove(b: AdminEbookRow) {
+    if (!confirm(`"${b.title}" 이북을 삭제할까요?\n구매 기록(${b.buyers}명)도 함께 사라집니다.`)) return
+    try {
+      await callFunction('admin', { action: 'ebookDelete', id: b.id })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+    }
+  }
+
+  async function showBuyers(b: AdminEbookRow) {
+    try {
+      const res = await callFunction<AdminEbookBuyersResp>('admin', { action: 'ebookBuyers', id: b.id })
+      setBuyersOf({ book: b, rows: res.buyers })
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '구매자를 불러올 수 없습니다.')
+    }
+  }
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>이북 관리</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">총 {rows.length}권</span>
+          <button className="admin-mini" onClick={load} disabled={loading}>
+            새로고침
+          </button>
+          <button className="admin-mini" onClick={() => setDraft(emptyEbookDraft())}>
+            + 새 이북
+          </button>
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>상태</th>
+              <th>표지</th>
+              <th>제목</th>
+              <th>가격</th>
+              <th>구매</th>
+              <th>정렬</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={b.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge st-${b.published ? 'submitted' : 'voided'}`}>{b.published ? '판매중' : '비공개'}</span>
+                </td>
+                <td>
+                  {b.coverUrl ? (
+                    <img src={b.coverUrl} alt="" style={{ width: 34, height: 51, objectFit: 'cover', borderRadius: 4, display: 'block' }} />
+                  ) : (
+                    <span style={{ color: 'var(--muted)' }}>-</span>
+                  )}
+                </td>
+                <td>
+                  <div style={{ fontWeight: 700 }}>{b.title}</div>
+                  {b.author && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{b.author}</div>}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? `${b.price.toLocaleString('ko-KR')}원` : '무료'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="admin-mini" onClick={() => showBuyers(b)}>{b.buyers}명</button>
+                </td>
+                <td>{b.sortOrder}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button
+                    className="admin-mini"
+                    onClick={() =>
+                      setDraft({
+                        id: b.id,
+                        title: b.title,
+                        author: b.author ?? '',
+                        description: b.description ?? '',
+                        coverUrl: b.coverUrl ?? '',
+                        price: b.price,
+                        storagePath: b.storagePath,
+                        published: b.published,
+                        sortOrder: b.sortOrder,
+                      })
+                    }
+                  >
+                    수정
+                  </button>{' '}
+                  <button className="admin-mini" onClick={() => remove(b)}>
+                    삭제
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!loading && rows.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  등록된 이북이 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {draft && (
+        <div className="admin-modal-bg">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setDraft(null)}>
+              ✕
+            </button>
+            <h2>{draft.id ? '이북 수정' : '새 이북'}</h2>
+            <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+              <label style={fieldStyle}>
+                제목
+                <input style={inpStyle} value={draft.title} onChange={(e) => patch({ title: e.target.value })} />
+              </label>
+              <label style={fieldStyle}>
+                지은이
+                <input style={inpStyle} value={draft.author} onChange={(e) => patch({ author: e.target.value })} />
+              </label>
+              <label style={fieldStyle}>
+                소개
+                <textarea style={{ ...inpStyle, minHeight: 80 }} value={draft.description} onChange={(e) => patch({ description: e.target.value })} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label style={fieldStyle}>
+                  가격(원) — 0 이면 무료
+                  <input style={inpStyle} type="number" min={0} value={draft.price} onChange={(e) => patch({ price: Number(e.target.value) || 0 })} />
+                </label>
+                <label style={fieldStyle}>
+                  정렬 순서(작을수록 앞)
+                  <input style={inpStyle} type="number" value={draft.sortOrder} onChange={(e) => patch({ sortOrder: Number(e.target.value) || 0 })} />
+                </label>
+              </div>
+
+              <label style={fieldStyle}>
+                이북 본문 (HTML 파일 1개)
+                <input
+                  type="file"
+                  accept=".html,.htm,text/html"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) uploadHtml(f)
+                    e.target.value = ''
+                  }}
+                />
+                <span style={{ fontSize: 12, color: draft.storagePath ? 'var(--muted)' : '#c0392b' }}>
+                  {uploading === 'html' ? '업로드 중…' : draft.storagePath ? `업로드됨 — ${draft.storagePath}` : '아직 업로드하지 않았습니다(필수).'}
+                </span>
+              </label>
+
+              <label style={fieldStyle}>
+                표지 이미지 (선택 · 없으면 자동 표지)
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) uploadCover(f)
+                    e.target.value = ''
+                  }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  {uploading === 'cover' ? '업로드 중…' : draft.coverUrl ? '업로드됨' : '없음'}
+                </span>
+              </label>
+
+              <label style={{ ...fieldStyle, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={draft.published} onChange={(e) => patch({ published: e.target.checked })} />
+                스토어에 공개(판매 시작)
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                <button className="admin-mini" onClick={() => setDraft(null)}>
+                  취소
+                </button>
+                <button className="admin-mini" onClick={save} disabled={saving || !!uploading}>
+                  {saving ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {buyersOf && (
+        <div className="admin-modal-bg">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setBuyersOf(null)}>
+              ✕
+            </button>
+            <h2>
+              {buyersOf.book.title} — 구매자 {buyersOf.rows.length}명
+            </h2>
+            <div className="admin-table-wrap" style={{ marginTop: 12 }}>
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>이름</th>
+                    <th>이메일</th>
+                    <th>결제</th>
+                    <th>구매일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {buyersOf.rows.map((b) => (
+                    <tr key={b.userId}>
+                      <td>{b.name ?? '-'}</td>
+                      <td>{b.email ?? '-'}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {b.pricePaid > 0 ? `${b.pricePaid.toLocaleString('ko-KR')}원` : '무료'} · {b.source}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(b.createdAt)}</td>
+                    </tr>
+                  ))}
+                  {buyersOf.rows.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
+                        아직 구매자가 없습니다.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

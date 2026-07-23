@@ -185,6 +185,18 @@ const SEED: { dest: string; phrases: string[] }[] = [
       'tôi muốn hỏi', 'chăm sóc khách hàng', 'hoàn tiền thế nào', 'vấn đề thanh toán', 'cần trợ giúp',
     ],
   },
+  {
+    dest: '/ebooks', // 이북(전자책): 구매·서재
+    phrases: [
+      '이북', '전자책', '이북 사고 싶어', '교재 사기', '책 구매', '전자 교재',
+      '내 이북', '이북 서재', '구매한 책 어디서 봐', '교재 어디서 사',
+      'ebook', 'e-book', 'buy an ebook', 'digital book', 'my ebook library', 'where can I read my book',
+      '電子書籍', 'eBookを買いたい', '教材を買う', '購入した本はどこ',
+      '电子书', '想买电子书', '教材购买', '我的电子书',
+      'ईबुक', 'ईबुक खरीदना है', 'डिजिटल किताब', 'मेरी ईबुक',
+      'sách điện tử', 'mua ebook', 'giáo trình điện tử', 'thư viện ebook của tôi',
+    ],
+  },
 ]
 
 // 단건 임베딩(무료 티어 OK) + 429 백오프. recommend-level 과 동일 파라미터.

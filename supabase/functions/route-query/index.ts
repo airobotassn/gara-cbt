@@ -45,6 +45,7 @@ const DEST: Record<string, string> = {
   about: '/about',              // 협회 소개
   notice: '/notice',            // 공지사항
   faq: '/faq',                  // 고객센터·문의
+  ebook: '/ebooks',             // 이북(전자책) 스토어 — 구매한 책 읽기는 마이페이지 서재
 }
 const VALID = new Set(Object.values(DEST))
 
@@ -95,9 +96,10 @@ const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색�
 - about      : 협회/기관 소개, 이 사이트가 뭔지. ("협회 소개", "무슨 협회야", "GARA가 뭐야")
 - notice     : 공지사항/소식/안내/점검 공지. ("공지사항", "새 소식", "점검 공지")
 - faq        : 문의·고객센터·환불·결제문제·시스템오류·도움. ("문의", "환불", "고객센터", "결제 문제", "도움 필요")
+- ebook      : 이북/전자책/교재를 사거나 읽고 싶다. ("이북", "전자책", "교재 사기", "책 구매", "내 이북", "eBook")
 - unknown    : 입력이 이 사이트(시험·자격·학습·내 정보 등)와 **정말로 무관**할 때만. (인사·잡담·욕설·무의미·사이트와 상관없는 질문 "오늘 점심 뭐먹지" 등)
 
-원칙: 입력이 조금이라도 관련 있으면 애매하더라도 **12개 중 가장 가까운 하나**를 골라라. unknown 은 최후의 수단이다.
+원칙: 입력이 조금이라도 관련 있으면 애매하더라도 **13개 중 가장 가까운 하나**를 골라라. unknown 은 최후의 수단이다.
 구분 팁: 시험 "정보"=guide, "일정"=schedule, "접수/신청"=apply, "지금 응시"=take_exam. 내 데이터(점수·자격증)=mypage/certificate.
 다국어 가능(한/영/일/중/힌/베). 반드시 JSON 으로만 답한다.`
 
@@ -127,6 +129,7 @@ function keywordRoute(q: string): string | null {
   if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
   if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
+  if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
   if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
   if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/guide'
   if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/guide'
@@ -152,7 +155,7 @@ async function classify(q: string): Promise<string> {
           properties: {
             intent: {
               type: 'STRING',
-              enum: ['level_test', 'guide', 'schedule', 'apply', 'take_exam', 'exam_check', 'mypage', 'certificate', 'ranking', 'about', 'notice', 'faq', 'unknown'],
+              enum: ['level_test', 'guide', 'schedule', 'apply', 'take_exam', 'exam_check', 'mypage', 'certificate', 'ranking', 'about', 'notice', 'faq', 'ebook', 'unknown'],
             },
             reason: { type: 'STRING' },
           },

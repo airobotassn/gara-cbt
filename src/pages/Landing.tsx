@@ -10,7 +10,7 @@ import { callFunction } from '../lib/supabase'
 // route-query 가 반환할 수 있는 목적지(응답 검증용). DEST(route-query) 와 동기화.
 const VALID_DESTS = new Set([
   '/test/select', '/guide', '/exam', '/exam/check',
-  '/mypage', '/certificate', '/ranking', '/about', '/notice', '/faq',
+  '/mypage', '/certificate', '/ranking', '/about', '/notice', '/faq', '/ebooks',
 ])
 
 // 최후 폴백: route-query 자체가 실패했을 때(함수 다운 등) 클라에서 키워드로.
@@ -24,6 +24,7 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
   if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
+  if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
   if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
   if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/guide'
   if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/guide'

@@ -1493,6 +1493,113 @@ async function setRegion(admin: any, body: any) {
   return json({ ok: true })
 }
 
+// ---------- 어드민: 이북(전자책) ----------
+// 본문 HTML·표지 파일은 클라가 스토리지에 직접 올리고(관리자 전용 정책), 여기선 메타데이터만 다룬다.
+async function ebookList(admin: any) {
+  const { data, error } = await admin
+    .from('ebooks')
+    .select('id, title, author, description, cover_url, price, storage_path, published, sort_order, created_at, updated_at')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false })
+  if (error) return json({ error: error.message }, 400)
+
+  // 책별 구매 수 — 권수가 많지 않으므로 전량 조회 후 집계.
+  const counts: Record<string, number> = {}
+  const { data: purchases } = await admin.from('ebook_purchases').select('ebook_id')
+  for (const p of purchases ?? []) counts[(p as any).ebook_id] = (counts[(p as any).ebook_id] ?? 0) + 1
+
+  const ebooks = (data ?? []).map((b: any) => ({
+    id: b.id,
+    title: b.title,
+    author: b.author ?? null,
+    description: b.description ?? null,
+    coverUrl: b.cover_url ?? null,
+    price: b.price ?? 0,
+    storagePath: b.storage_path,
+    published: !!b.published,
+    sortOrder: b.sort_order ?? 0,
+    createdAt: b.created_at,
+    buyers: counts[b.id] ?? 0,
+  }))
+  return json({ ebooks })
+}
+
+async function ebookUpsert(admin: any, body: any) {
+  const e = body?.ebook ?? {}
+  const title = String(e.title ?? '').trim()
+  const storagePath = String(e.storagePath ?? '').trim()
+  if (!title) return json({ error: '제목은 필수입니다.' }, 400)
+  if (!storagePath) return json({ error: '이북 HTML 파일을 업로드해 주세요.' }, 400)
+
+  const row = {
+    title,
+    author: e.author ? String(e.author).trim() : null,
+    description: e.description ? String(e.description).trim() : null,
+    cover_url: e.coverUrl ? String(e.coverUrl).trim() : null,
+    price: Math.max(0, Math.floor(Number(e.price ?? 0)) || 0),
+    storage_path: storagePath,
+    published: !!e.published,
+    sort_order: Math.floor(Number(e.sortOrder ?? 0)) || 0,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (e.id) {
+    const { error } = await admin.from('ebooks').update(row).eq('id', e.id)
+    if (error) return json({ error: error.message }, 400)
+    return json({ ok: true, id: e.id })
+  }
+  const { data, error } = await admin.from('ebooks').insert(row).select('id').maybeSingle()
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true, id: data?.id ?? null })
+}
+
+// 삭제 = 메타데이터 + 본문 파일. 구매 기록은 FK cascade 로 함께 사라진다(환불/회수와 동일 취급).
+async function ebookDelete(admin: any, body: any) {
+  const id = String(body?.id ?? '').trim()
+  if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
+  const { data: b } = await admin.from('ebooks').select('storage_path').eq('id', id).maybeSingle()
+  const { error } = await admin.from('ebooks').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 400)
+  if (b?.storage_path) {
+    try { await admin.storage.from('ebooks').remove([b.storage_path]) } catch { /* 파일만 남아도 무해 */ }
+  }
+  return json({ ok: true })
+}
+
+// 구매자 목록(책 1권) — 이름/이메일/구매일.
+async function ebookBuyers(admin: any, body: any) {
+  const id = String(body?.id ?? '').trim()
+  if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
+  const { data } = await admin
+    .from('ebook_purchases')
+    .select('user_id, price_paid, source, created_at')
+    .eq('ebook_id', id)
+    .order('created_at', { ascending: false })
+    .limit(500)
+  const rows = data ?? []
+  const userIds = [...new Set(rows.map((r: any) => r.user_id))]
+  const nameMap: Record<string, string> = {}
+  const emailMap: Record<string, string> = {}
+  if (userIds.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
+    for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
+    try {
+      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
+      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+    } catch { /* 이메일만 빈칸 */ }
+  }
+  return json({
+    buyers: rows.map((r: any) => ({
+      userId: r.user_id,
+      name: nameMap[r.user_id] ?? null,
+      email: emailMap[r.user_id] ?? null,
+      pricePaid: r.price_paid ?? 0,
+      source: r.source ?? 'demo',
+      createdAt: r.created_at,
+    })),
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -1550,6 +1657,10 @@ Deno.serve(async (req) => {
       case 'cbtUsers': return await cbtUsers(admin)
       case 'cbtUserDetail': return await cbtUserDetail(admin, body)
       case 'setRegion': return await setRegion(admin, body)
+      case 'ebookList': return await ebookList(admin)
+      case 'ebookUpsert': return await ebookUpsert(admin, body)
+      case 'ebookDelete': return await ebookDelete(admin, body)
+      case 'ebookBuyers': return await ebookBuyers(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

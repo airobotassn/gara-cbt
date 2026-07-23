@@ -35,6 +35,8 @@ import WorldArena from './pages/WorldArena'
 import MiniGame from './pages/MiniGame'
 import MiniGames from './pages/MiniGames'
 import Daily from './pages/Daily'
+import Ebooks from './pages/Ebooks'
+import EbookReader from './pages/EbookReader'
 const Admin = lazy(() => import('./pages/Admin'))
 
 // 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
@@ -111,7 +113,12 @@ export default function App() {
               <Route path="/exam/complete" element={<ExamComplete />} />
               <Route path="/exam/done" element={<ExamDone />} />
               <Route path="/certificate" element={<Certificate />} />
+              {/* 발급(유료) 전 워터마크 견본 — state 없이 직접 들어와도 미리보기로 열린다 */}
+              <Route path="/certificate/preview" element={<Certificate />} />
               <Route path="/verify/:token" element={<VerifyCert />} />
+              {/* 이북: 스토어(구매) ↔ 뷰어(열람). 내 서재는 마이페이지 탭(/mypage/ebooks). */}
+              <Route path="/ebooks" element={<Ebooks />} />
+              <Route path="/ebooks/read/:id" element={<EbookReader />} />
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/mypage/:section" element={<MyPage />} />
               {/* CARIS ARENA 모듈 (/test/*) + 랭킹 */}

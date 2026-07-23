@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
-import type { MyAttempt, MyAttemptsResponse } from '../lib/types'
+import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
+import EbookCover from '../components/EbookCover'
 import { makeCertNo, gradeOfTitle, gradeDisplay, certExpiryDate, tempSeq } from '../lib/certNo'
 import { searchSchools } from '../lib/schools'
 import { countryName } from '../lib/regions'
@@ -14,11 +15,14 @@ import { countryName } from '../lib/regions'
 // 원본: stitch_design_critique_assistant/gara_5/code.html
 // primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff) — 페이지별 오버라이드 제거.
 
+// 탭 순서 = 화면에 보이는 순서. 첫 탭(학습 대시보드)이 /mypage 기본 화면이다.
+//   ⚠️ '시험 응시 현황'은 예전 기본 탭이라 /mypage 였는데, 기본이 대시보드로 바뀌며 /mypage/attempts 로 이동했다.
 const TABS = [
-  { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage' },
+  { key: 'learning', labelKey: 'mypage.tab_learning', to: '/mypage' },
+  { key: 'ebooks', labelKey: 'mypage.tab_ebooks', to: '/mypage/ebooks' },
+  { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage/attempts' },
   { key: 'earned', labelKey: 'mypage.tab_earned', to: '/mypage/earned' },
   { key: 'issuance', labelKey: 'mypage.tab_issuance', to: '/mypage/issuance' },
-  { key: 'learning', labelKey: 'mypage.tab_learning', to: '/mypage/learning' },
 ]
 
 function fmtDT(iso?: string | null) {
@@ -184,10 +188,64 @@ function ProfileSection() {
   )
 }
 
+// 이북 서재 — 구매한 이북만 보인다(구매는 /ebooks 스토어에서). 읽기는 뷰어(/ebooks/read/:id).
+function EbookLibrary() {
+  const { t } = useT()
+  const navigate = useNavigate()
+  const [rows, setRows] = useState<EbookRow[] | null>(null)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    callFunction<EbookListResp>('ebooks', { action: 'library' })
+      .then((r) => setRows(r.ebooks))
+      .catch((e) => setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.'))
+  }, [])
+
+  if (err) return <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>
+  if (rows === null) return <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>
+
+  if (rows.length === 0) {
+    return (
+      <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
+        <p className="font-body-md text-on-surface-variant mb-5">{t('mypage.empty_ebooks')}</p>
+        <button onClick={() => navigate('/ebooks')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">{t('ebook.go_store')}</button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5 md:gap-6">
+        {rows.map((b) => (
+          <button
+            key={b.id}
+            onClick={() => navigate(`/ebooks/read/${b.id}`)}
+            className="group text-left flex flex-col gap-2.5"
+            aria-label={b.title}
+          >
+            <EbookCover title={b.title} coverUrl={b.coverUrl} className="w-full transition-transform duration-300 group-hover:-translate-y-1 ambient-shadow" />
+            <div>
+              <h3 className="font-title-md text-[15px] leading-snug font-bold text-on-surface break-keep line-clamp-2">{b.title}</h3>
+              {b.author && <p className="font-body-sm text-[12.5px] text-outline mt-0.5">{b.author}</p>}
+            </div>
+            <span className="font-label-md text-[13px] font-bold text-primary flex items-center gap-1">
+              {t('ebook.read')}
+              <span className="material-symbols-outlined text-[16px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-8 text-center">
+        <button onClick={() => navigate('/ebooks')} className="px-6 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:border-primary/30 hover:text-primary transition-all duration-200">{t('ebook.go_store')}</button>
+      </div>
+    </>
+  )
+}
+
 export default function MyPage() {
   const navigate = useNavigate()
   const { section } = useParams()
-  const tab = section && TABS.some((t) => t.key === section) ? section : 'attempts'
+  const tab = section && TABS.some((t) => t.key === section) ? section : 'learning'
   const { isFullUser, user } = useAuth()
   const { t } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
@@ -208,6 +266,23 @@ export default function MyPage() {
   async function goCert(a: MyAttempt) {
     let verifyToken = a.verifyToken ?? undefined
     let certNo = a.certNo ?? certNoOf(a)
+    // 아직 발급(유료) 전이면 워터마크 견본부터 — 발급은 미리보기 화면의 CTA 에서 한다.
+    if (!a.certIssuedAt) {
+      navigate('/certificate', {
+        state: {
+          preview: true,
+          attemptId: a.attemptId,
+          name,
+          qualification: a.examTitle ?? t('mypage.exam_fallback'),
+          grade: gradeDisplay(a.examTitle),
+          certNo,
+          issueDate: fmtDate(a.submittedAt),
+          expiryDate: certExpiryDate(a.examTitle, a.submittedAt ? new Date(a.submittedAt) : new Date()),
+          scoreText: `${a.totalCorrect} / ${a.totalQuestions}`,
+        },
+      })
+      return
+    }
     try {
       const r = await callFunction<MyAttemptsResponse>('my-attempts', { issue: a.attemptId })
       if (r.issued) {
@@ -238,6 +313,7 @@ export default function MyPage() {
   const attempts = list ?? []
   const earned = attempts.filter((a) => a.passed === true)
   const loading = !err && list === null
+  const selfLoaded = tab === 'learning' || tab === 'ebooks' // 자체 로딩 탭
 
   return (
     <div className="bg-background text-on-background min-h-screen relative overflow-x-hidden">
@@ -296,11 +372,15 @@ export default function MyPage() {
             ))}
           </div>
 
-          {err && tab !== 'learning' && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
-          {loading && tab !== 'learning' && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
+          {/* 학습 대시보드·이북 서재는 각자 데이터를 불러오므로 응시내역(my-attempts) 로딩/에러 배너 대상이 아니다. */}
+          {err && !selfLoaded && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
+          {loading && !selfLoaded && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
 
           {/* 학습 대시보드 (CARIS ARENA) — 자체적으로 list-attempts 로딩 */}
           {tab === 'learning' && <LearningDashboard />}
+
+          {/* 이북 서재 — 구매한 이북 */}
+          {tab === 'ebooks' && <EbookLibrary />}
 
           {/* 시험 응시 현황 */}
           {!loading && !err && tab === 'attempts' && (

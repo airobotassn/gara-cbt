@@ -433,3 +433,55 @@ export interface CbtUserAttempt {
 export interface CbtUserDetailResp {
   attempts: CbtUserAttempt[]
 }
+
+// ---------- 이북(전자책) ----------
+// 스토어(/ebooks) · 마이페이지 서재 · 뷰어가 공유. 본문 HTML 은 비공개 버킷 → 서명 URL 로만 열람.
+export interface EbookRow {
+  id: string
+  title: string
+  author: string | null
+  description: string | null
+  coverUrl: string | null
+  price: number // 원(KRW). 0 = 무료
+  owned: boolean
+  purchasedAt?: string // 서재(library) 응답에만
+}
+export interface EbookListResp {
+  ebooks: EbookRow[]
+}
+export interface EbookReadResp {
+  id: string
+  title: string
+  author: string | null
+  url: string // 서명 URL (기본 1시간)
+  expiresIn: number
+}
+
+// 관리자(admin 함수) — 이북 관리
+export interface AdminEbookRow {
+  id: string
+  title: string
+  author: string | null
+  description: string | null
+  coverUrl: string | null
+  price: number
+  storagePath: string
+  published: boolean
+  sortOrder: number
+  createdAt: string
+  buyers: number
+}
+export interface AdminEbookListResp {
+  ebooks: AdminEbookRow[]
+}
+export interface AdminEbookBuyer {
+  userId: string
+  name: string | null
+  email: string | null
+  pricePaid: number
+  source: string
+  createdAt: string
+}
+export interface AdminEbookBuyersResp {
+  buyers: AdminEbookBuyer[]
+}
