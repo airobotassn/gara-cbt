@@ -342,7 +342,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 <span className="ic"><InfoIcon /></span> {t('nav.caris')}
               </button>
               <button className="pf-item" onClick={() => go('/ebooks')}>
-                <span className="ic"><BookIcon /></span> {t('nav.ebooks')}
+                <span className="ic"><BookIcon /></span> {t('ebook.store_title')}
               </button>
             </div>
 

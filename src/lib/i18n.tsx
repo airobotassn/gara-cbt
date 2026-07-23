@@ -200,8 +200,8 @@ const D: Record<string, Record<Lang, string>> = {
   'lv.coming_soon': { ko: '오픈 예정', en: 'Coming soon', ja: '公開予定', zh: '即将开放', hi: 'जल्द आ रहा है', vi: 'Sắp mở' },
   'lv.start_failed': { ko: '시작에 실패했습니다.', en: 'Failed to start.', ja: '開始に失敗しました。', zh: '启动失败。', hi: 'शुरू करने में विफल।', vi: 'Không thể bắt đầu.' },
   'lv.1.name': { ko: '입문', en: 'Starter', ja: '入門', zh: '入门', hi: 'शुरुआती', vi: 'Nhập môn' },
-  // 신설 레벨 — 출제 영역 미정이라 설명도 비워둔 상태(확정되면 교체)
-  'lv.1.desc': { ko: '콘텐츠 준비 중', en: 'Content coming soon', ja: 'コンテンツ準備中', zh: '内容准备中', hi: 'सामग्री जल्द आ रही है', vi: 'Nội dung sắp có' },
+  // Lv.1 = 2축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해
+  'lv.1.desc': { ko: 'AI 도구 이해와 프롬프트 활용 입문', en: 'Intro to AI tools and prompt usage', ja: 'AIツールの理解とプロンプト活用入門', zh: 'AI 工具理解与提示词运用入门', hi: 'AI उपकरणों की समझ और प्रॉम्प्ट उपयोग की शुरुआत', vi: 'Nhập môn hiểu công cụ AI và dùng prompt' },
   'lv.2.name': { ko: '기초', en: 'Basic', ja: '基礎', zh: '基础', hi: 'बुनियादी', vi: 'Cơ bản' },
   'lv.2.desc': { ko: 'AI(생성형 AI 리터러시·AI 윤리), 프롬프트 엔지니어링 기초', en: 'Generative-AI literacy & ethics, prompt-engineering basics', ja: '生成AIリテラシー・AI倫理、プロンプトエンジニアリング基礎', zh: '生成式 AI 素养与伦理，提示工程基础', hi: 'जनरेटिव AI साक्षरता व नैतिकता, प्रॉम्प्ट इंजीनियरिंग की मूल बातें', vi: 'Hiểu biết & đạo đức AI tạo sinh, nền tảng prompt engineering' },
   'lv.3.name': { ko: '중급', en: 'Intermediate', ja: '中級', zh: '中级', hi: 'मध्यम', vi: 'Trung cấp' },
@@ -1175,7 +1175,6 @@ const D: Record<string, Record<Lang, string>> = {
   "nav.caris": { ko: "CARIS", en: "CARIS", ja: "CARIS", zh: "CARIS", hi: "CARIS", vi: "CARIS" },
   "nav.apply": { ko: "자격검정 접수", en: "Exam Registration", ja: "資格検定 申込", zh: "资格检定报名", hi: "परीक्षा पंजीकरण", vi: "Đăng ký dự thi" },
   "nav.mypage": { ko: "마이페이지", en: "My Page", ja: "マイページ", zh: "我的页面", hi: "माई पेज", vi: "Trang của tôi" },
-  "nav.ebooks": { ko: "이북", en: "eBooks", ja: "eBook", zh: "电子书", hi: "ईबुक", vi: "eBook" },
   "nav.certpreview": { ko: "자격증 미리보기", en: "Certificate preview", ja: "資格証プレビュー", zh: "证书预览", hi: "प्रमाणपत्र पूर्वावलोकन", vi: "Xem trước chứng chỉ" },
   "nav.certwatermarkpreview": { ko: "자격증 미리보기(워터마크)", en: "Certificate preview (watermark)", ja: "資格証プレビュー(透かし)", zh: "证书预览（水印）", hi: "प्रमाणपत्र पूर्वावलोकन (वॉटरमार्क)", vi: "Xem trước chứng chỉ (hình mờ)" },
   "nav.notice": { ko: "공지사항", en: "Notices", ja: "お知らせ", zh: "公告", hi: "सूचनाएँ", vi: "Thông báo" },
