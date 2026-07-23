@@ -12,8 +12,7 @@ import {
   projText,
   projOptionsForLevel,
   QUESTIONS_PER_TEST,
-  BASE_PER_AXIS,
-  EXTRA_AXES,
+  axisQuota,
   MIN_LEVEL,
   MAX_LEVEL,
 } from '../_shared/scoring.ts'
@@ -88,12 +87,13 @@ Deno.serve(async (req) => {
       if (byAxis.has(q.category)) byAxis.get(q.category)!.push(q)
     }
 
-    // 층화추출: 각 축 3개, 랜덤 2축은 4개
-    const extra = new Set(shuffle(axes).slice(0, EXTRA_AXES))
+    // 층화추출: 20문항을 축 수로 균등 배분(6축 → 3개씩·랜덤 2축만 4개 / Lv.1 2축 → 10개씩)
+    const quota = axisQuota(axes.length)
+    const extra = new Set(shuffle(axes).slice(0, quota.extraAxes))
     const picked: typeof pool = []
     const usedIds = new Set<string>()
     for (const ax of axes) {
-      const need = BASE_PER_AXIS + (extra.has(ax) ? 1 : 0)
+      const need = quota.base + (extra.has(ax) ? 1 : 0)
       const got = shuffle(byAxis.get(ax) ?? []).slice(0, need)
       for (const q of got) {
         picked.push(q)

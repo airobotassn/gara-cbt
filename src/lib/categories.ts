@@ -41,8 +41,17 @@ function axd(key: string, ko: string, en: string, koS: string, enS: string): Axi
 //   축 코드도 같이 밀었다 — 옛 l1_principle = 지금 l2_principle. 옛 l7_* 는 폐기.
 //   L1(신설)은 6축 미정이라 비워뒀다. L7(옛 L6)은 임시 축(ko·en 폴백).
 const LEVEL_CATEGORIES_RAW: Record<number, AxisRaw[]> = {
-  // 1: 신설 레벨 — 6축 미정(비워둠). 커리큘럼 확정되면 여기에 ax() 6개를 넣고
-  //    _shared/scoring.ts 의 LEVEL_AXES[1] 과 testConfigLevel.ts 의 COMING_SOON_LEVELS 를 같이 갱신할 것.
+  // ★ Lv.1(입문)만 2축이다(다른 레벨은 6축). 축 수가 다르면 아래 두 곳이 같이 반응한다:
+  //    · 출제 = QUESTIONS_PER_TEST 를 축 수로 나눠 균등 배분(2축 → 축당 10문항) — start-test/index.ts
+  //    · 결과 레이더 = 3축 미만이면 막대 그래프로 대체 — components/RadarChartBox.tsx
+  1: [
+    ax('l1_prompt',
+      ['AI 프롬프트 활용', 'Using AI prompts', 'AIプロンプト活用', 'AI提示词运用', 'AI प्रॉम्प्ट उपयोग', 'Sử dụng prompt AI'],
+      ['프롬프트활용', 'Prompts', 'プロンプト', '提示词', 'प्रॉम्प्ट', 'Prompt']),
+    ax('l1_tools',
+      ['AI 도구 이해', 'Understanding AI tools', 'AIツールの理解', 'AI工具理解', 'AI उपकरण समझ', 'Hiểu công cụ AI'],
+      ['도구이해', 'AI tools', 'AIツール', 'AI工具', 'AI उपकरण', 'Công cụ AI']),
+  ],
   2: [
     ax('l2_principle',
       ['생성형 AI 기본 원리', 'Generative AI basics', '生成AIの基礎', '生成式AI原理', 'जनरेटिव AI मूल', 'Nguyên lý AI tạo sinh'],

@@ -3,7 +3,7 @@ import type { AxisDef } from '../lib/categories'
 import type { AxisMap } from '../lib/scoring'
 
 interface Props {
-  axes: AxisDef[] // 그릴 축 세트(레벨별). 보통 6축.
+  axes: AxisDef[] // 그릴 축 세트(레벨별). 보통 6축, Lv.1 은 2축(→ 막대로 대체 렌더).
   rating: AxisMap // 내 누적 축별 (0~100), 키 = 축 코드
   ghost?: AxisMap | null // 점선 고스트(이전 내 레이팅)
   size?: number
@@ -59,6 +59,43 @@ export default function RadarChartBox({ axes, rating, ghost, size = 110, changes
     vals.map((v, i) => pt(i, rOf(v)).map((z) => z.toFixed(1)).join(',')).join(' ')
 
   const avg = ghost ? axes.map((c) => ghost[c.key] ?? 0) : null
+
+  // ── 2축 이하(Lv.1)는 다각형이 만들어지지 않는다(선으로 뭉개짐) → 가로 막대로 대체.
+  //    색/점선 고스트/상승·하락 색은 레이더와 같은 클래스(.ring·.me·.avg)를 써서 톤을 맞춘다.
+  if (axes.length < 3) {
+    const X0 = 40
+    const X1 = 280
+    const W = X1 - X0
+    const H = 26
+    const rowY = axes.length === 1 ? [132] : [104, 186]
+    return (
+      <svg viewBox="0 0 320 290" style={{ width: '100%', maxWidth: 360, display: 'block', margin: '0 auto' }}>
+        {axes.map((c, i) => {
+          const y = rowY[i] ?? 104 + i * 82
+          const v = meArr[i]
+          const d = changes ? (changes[c.key] ?? 0) : 0
+          const gx = avg ? X0 + (W * cl(avg[i])) / 100 : null
+          return (
+            <g key={c.key}>
+              <text className="axislabel" x={cx} y={y - 14}>{c.short}</text>
+              <rect className="ring" x={X0} y={y} width={W} height={H} rx={H / 2} />
+              <rect className="me" x={X0} y={y} width={Math.max(2, (W * cl(v)) / 100)} height={H} rx={H / 2} />
+              {gx !== null && <line className="avg" x1={gx.toFixed(1)} y1={y - 4} x2={gx.toFixed(1)} y2={y + H + 4} fill="none" />}
+              <text
+                x={X1}
+                y={y - 14}
+                style={{ textAnchor: 'end', dominantBaseline: 'middle', fontSize: 'var(--fs-sm)', fontWeight: 700 }}
+                fill={d > 0.5 ? 'rgb(34,197,94)' : d < -0.5 ? 'rgb(239,68,68)' : 'var(--blue)'}
+              >
+                {Math.round(v)}
+                {d > 0.5 ? ` ▲${Math.round(d)}` : d < -0.5 ? ` ▼${Math.round(-d)}` : ''}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    )
+  }
 
   return (
     <svg

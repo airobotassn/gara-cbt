@@ -12,13 +12,21 @@ export const ATTEMPT_TTL_MINUTES = 120
 export const MIN_LEVEL = 1
 export const MAX_LEVEL = 7
 
-// 층화추출: 6축 × 3 + 랜덤 2축 +1 = 20
+// 층화추출: 6축 × 3 + 랜덤 2축 +1 = 20 (아래 axisQuota 의 6축 결과와 동일)
 export const BASE_PER_AXIS = 3
 export const EXTRA_AXES = 2
 
-// ----- 레벨별 6축 코드 (categories.ts 와 동일하게 유지!) -----
+// 축 수가 레벨마다 다를 수 있어(Lv.1 = 2축) 축당 문항 수는 상수가 아니라 여기서 계산한다.
+//   6축 → 3개씩 + 랜덤 2축이 +1 = 20 (기존과 동일) · 2축 → 10개씩 = 20
+export function axisQuota(axisCount: number): { base: number; extraAxes: number } {
+  if (axisCount <= 0) return { base: 0, extraAxes: 0 }
+  const base = Math.floor(QUESTIONS_PER_TEST / axisCount)
+  return { base, extraAxes: QUESTIONS_PER_TEST - base * axisCount }
+}
+
+// ----- 레벨별 축 코드 (categories.ts 와 동일하게 유지!) — Lv.1 만 2축, 나머지는 6축 -----
 export const LEVEL_AXES: Record<number, string[]> = {
-  // 1: 2026-07 사다리 한 칸 밀기로 신설된 레벨 — 6축 미정(비워둠). categories.ts 와 같이 채울 것.
+  1: ['l1_prompt', 'l1_tools'],
   2: ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt'],
   3: ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python'],
   4: ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv'],
