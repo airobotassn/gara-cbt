@@ -91,6 +91,13 @@
 .hub .gchip .num { flex: 1; text-align: right; font-variant-numeric: tabular-nums; }
 .hub .gchip .plus { width: 20px; height: 20px; border-radius: 7px; background: var(--plus); color: #fff; border: 2.5px solid var(--line); display: grid; place-items: center; }
 .hub .gchip .plus svg { width: 13px; height: 13px; }
+/* 칩 호버 툴팁 — data-tip 이 있는 칩만(HUD 코인). 마우스 없는 기기에선 안 뜸(허용). */
+.hub .gchip[data-tip] { position: relative; }
+.hub .gchip[data-tip]::after { content: attr(data-tip); position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%);
+  white-space: nowrap; padding: 4px 9px; border-radius: 10px; background: var(--card); border: 2.5px solid var(--line);
+  font-size: 11.5px; font-weight: 900; color: var(--ink3); box-shadow: 0 3px 0 rgba(var(--shc), .2);
+  opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 20; }
+.hub .gchip[data-tip]:hover::after { opacity: 1; }
 /* 아이콘 크기(반응형): JSX s값 대신 CSS로 — 모바일 작게, PC 크게 */
 .hub .hud-av svg { width: 32px; height: 32px; }
 .hub .gchip svg { width: 19px; height: 19px; }

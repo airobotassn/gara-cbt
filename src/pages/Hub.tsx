@@ -294,7 +294,8 @@ export default function Hub() {
                 {gaugeLabel ? <div className="rank-gauge-lab">{gaugeLabel}</div> : null}
                 <div className="exp"><div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} /></div>
               </div>
-              <span className="gchip"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
+              {/* data-tip = 호버 툴팁("보유한 CARI 코인") — hub.css 의 .gchip[data-tip]::after */}
+              <span className="gchip" data-tip="보유한 CARI 코인"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
             </div>
           </div>
         </div>
@@ -418,7 +419,7 @@ export default function Hub() {
       {modal === 'shop' && (
         <Modal title="상점" onClose={() => setModal(null)}>
           <div className="hub-shop-head">
-            <span className="hub-shop-head-lab">보유 코인</span>
+            <span className="hub-shop-head-lab">보유 CARI 코인</span>
             <span className="gchip" style={{ margin: 0 }}><Ic n="coin" s={22} /><span className="num">{points.toLocaleString()}</span></span>
           </div>
           {catalog.length > 0 ? (

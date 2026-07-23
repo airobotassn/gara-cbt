@@ -28,26 +28,24 @@ export default function ExamApply() {
   const roundLabel = active?.title ?? st?.roundLabel ?? ''
   const dateLabel = (active ? active.dateText || active.note : '') || st?.dateLabel || ''
 
-  const [track, setTrack] = useState(0)
   const [level, setLevel] = useState(0)
   const [payNotice, setPayNotice] = useState(false)
+  // 트랙 선택 폐지 — 두 트랙의 티어를 한 줄로 이어 붙여(Beginner·Pro·Elite + Master·Grand Master·Zenith)
+  // 단일 선택으로 만든다. 트랙 정보는 티어에 붙여 두고 라벨·응시자격 문구에만 쓴다.
   const TRACKS = getTracks(lang)
-  const cur = TRACKS[track]
-  const lv = cur.tiers[level]
-  const isMaster = track === 1
+  const TIERS = TRACKS.flatMap((tr) => tr.tiers.map((tier) => ({ tier, track: tr })))
+  const sel = TIERS[level] ?? TIERS[0]
+  const cur = sel.track
+  const lv = sel.tier
+  const isMaster = cur.key === 't2'
   // 시험 구성(문항) / 시험 시간 분리 — format 은 "구성 · 시간" 패턴(마지막 조각이 시간, ' · ' 구분은 전 언어 공통)
   const fmtParts = lv.format ? lv.format.split(' · ') : []
   const fmtDuration = fmtParts.length > 1 ? fmtParts[fmtParts.length - 1] : ''
   const fmtComposition = fmtParts.length > 1 ? fmtParts.slice(0, -1).join(' · ') : lv.format ?? ''
-  const goTrack = (i: number) => {
-    setTrack((i + TRACKS.length) % TRACKS.length)
-    setLevel(0)
-  }
   const won = (n: number) => n.toLocaleString('ko-KR')
 
   // 응시료: caris.ts 티어 상수(단일 소스) 직접 사용 — 편집 불가·DB 미사용이라 어긋날 여지 없음.
   const fee = lv.fee ?? 0
-  const selLabel = `${cur.name} ${lv.name}`
 
   // 접수기간 가드: 특정 회차(?round=<id>)로 들어왔는데 그 회차가 '접수중(open)'이 아니면
   // (마감·예정·없음·지난 시험) 접수화면을 막고 일정으로 유도. 회차 미지정은 open 회차로 폴백하되
@@ -117,20 +115,10 @@ export default function ExamApply() {
             <section className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant/30 ambient-shadow">
               <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-6">{t('apply.select_cert')}</h2>
 
-              {/* 트랙 */}
-              <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.track')}</span>
-              <div className="flex gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit mt-2 mb-6">
-                {TRACKS.map((tr, i) => (
-                  <button key={tr.key} onClick={() => goTrack(i)} className={i === track ? 'px-5 py-2 rounded-full whitespace-nowrap bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full whitespace-nowrap text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
-                    {tr.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* 티어 선택 — 트랙 선택과 동일한 pill 바 스타일(크기 일치) */}
+              {/* 티어 선택 — 트랙 구분 없이 6개 티어를 한 줄에(Beginner … Zenith) */}
               <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.tier')}</span>
-              <div className="flex flex-nowrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full mt-2">
-                {cur.tiers.map((l, i) => (
+              <div className="flex flex-nowrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full mt-2 overflow-x-auto">
+                {TIERS.map(({ tier: l }, i) => (
                   <button key={l.key} onClick={() => setLevel(i)} className={i === level ? 'px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-bold transition-all' : 'px-5 py-2 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md font-semibold transition-all'}>
                     <span className="flex flex-col items-center leading-[1.05]">{l.name.split(' ').map((w, k) => <span key={k}>{w}</span>)}</span>
                   </button>
@@ -208,10 +196,6 @@ export default function ExamApply() {
               <h2 className="font-title-md text-title-md font-bold text-on-surface">{t('apply.pay_summary')}</h2>
 
               <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-start gap-3">
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t('apply.sel_cert')}</span>
-                  <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{selLabel}</span>
-                </div>
                 <div className="flex justify-between items-start gap-3">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t('apply.round')}</span>
                   <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{roundLabel}</span>
