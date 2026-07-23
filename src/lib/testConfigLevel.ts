@@ -19,10 +19,10 @@ export function axisQuota(axisCount: number): { base: number; extraAxes: number 
 
 export { MIN_LEVEL, MAX_LEVEL }
 
-// 문제은행이 아직 비어 있어 응시를 막아둔 레벨(레벨 선택 화면에서 '준비 중').
-//   2026-07 사다리 한 칸 밀기로 신설된 Lv.1 — 문항이 들어오면 이 배열을 비울 것.
-//   (없이 두면 start-test 가 '해당 레벨의 문제가 없습니다.' 로 400 을 낸다)
-export const COMING_SOON_LEVELS: number[] = [1]
+// 문제은행이 비어 있어 응시를 막아둘 레벨(레벨 선택 화면에서 '오픈 예정'). 비어 있으면 전 레벨 응시 가능.
+//   문항 없는 레벨을 여기 빼두면 start-test 가 '해당 레벨의 문제가 없습니다.' 로 400 을 낸다.
+//   2026-07-23 Lv.1 문항 등록(l1_prompt 20 · l1_tools 13) 완료 → 잠금 해제.
+export const COMING_SOON_LEVELS: number[] = []
 
 // 부정행위 방지 2층: 화면 이탈 N회 누적 시 자동 제출
 export const MAX_VIOLATIONS = 3
