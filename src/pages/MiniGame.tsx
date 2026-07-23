@@ -2,13 +2,19 @@
 //   상단 얇은 바에 '아레나로' 뒤로가기 + 게임명. 없는 id 도 /arena 로.
 //   (미니게임 진입점이 /arena 하단 런처라 돌아갈 곳도 아레나)
 //   게임 본체가 화면 하단 선택지/HUD 를 꽉 채워 FAB 과 겹치므로, /games/* 에선 Layout 이 FAB 을 숨긴다.
-import { useNavigate, useParams } from 'react-router-dom'
+//   ⚠️ 플레이는 로그인(정식 회원) 전용 — 목록(/games)은 누구나 보되 실행 직전에 게이트(허브와 동일 정책).
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { findMiniGame } from '../lib/minigames'
+import { useAuth } from '../context/AuthProvider'
+import { useT } from '../lib/i18n'
+import '../styles/minigame.css'
 
 export default function MiniGame() {
   const navigate = useNavigate()
   const { gameId } = useParams<{ gameId: string }>()
   const game = findMiniGame(gameId)
+  const { isFullUser, loading, loginWithGoogle } = useAuth()
+  const { t } = useT()
 
   if (!game) {
     return (
@@ -20,6 +26,45 @@ export default function MiniGame() {
         >
           아레나로 돌아가기
         </button>
+      </div>
+    )
+  }
+
+  // 세션 판정 전에 iframe 을 붙이면 게임이 한 프레임 떴다가 게이트로 바뀐다 → 알 때까지 대기.
+  if (loading) {
+    return (
+      <div className="mgp">
+        <div className="mgp-in" style={{ textAlign: 'center', color: 'var(--muted)', fontWeight: 800 }}>
+          {t('common.loading')}
+        </div>
+      </div>
+    )
+  }
+
+  // 로그인 게이트 — 게스트/익명은 플레이 불가. 로그인 후 이 게임으로 복귀.
+  if (!isFullUser) {
+    return (
+      <div className="mgp">
+        <div className="mgp-in">
+          <Link className="mgp-back" to="/games" aria-label="미니게임">
+            <span>‹</span> 미니게임
+          </Link>
+          <div className="mg-gate">
+            <img className="mg-gate-art" src={game.art} alt="" />
+            <h2 className="mg-gate-title">{game.title}</h2>
+            <p className="mg-gate-sub">미니게임은 로그인 후 플레이할 수 있어요.</p>
+            <button
+              className="mg-gate-btn"
+              onClick={() => {
+                // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(AuthCallback 참고).
+                try { sessionStorage.setItem('postLoginRedirect', `/games/${game.id}`) } catch { /* 무시 */ }
+                void loginWithGoogle(`${window.location.origin}/auth/callback`)
+              }}
+            >
+              {t('common.login_google')}
+            </button>
+          </div>
+        </div>
       </div>
     )
   }

@@ -119,3 +119,18 @@ html.dark .mg-cover { background: #1b2130; }
 .mg-play-tri { width: 0; height: 0; border-style: solid; border-width: 8px 0 8px 13px;
   border-color: transparent transparent transparent #fff; filter: drop-shadow(0 1px 1px rgba(0,40,120,.35)); }
 @keyframes mg-play-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+
+/* ── 로그인 게이트(/games/:id 를 비로그인으로 열었을 때) — 목록 커버와 같은 스티커 톤의 단일 카드 ── */
+.mg-gate { max-width: 420px; margin: 6vh auto 0; padding: 22px 20px 24px; text-align: center;
+  border-radius: 22px; border: 3px solid var(--line); background: var(--card);
+  box-shadow: 0 7px 0 rgba(var(--shc), .18); }
+.mg-gate-art { width: 100%; max-width: 240px; aspect-ratio: 92 / 92; object-fit: cover; object-position: center top;
+  border-radius: 16px; border: 2px solid var(--line); display: block; margin: 0 auto 14px; background: #e3ebf7; }
+.mg-gate-title { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -.02em; color: var(--ink); }
+.mg-gate-sub { margin: 6px 0 16px; font-size: 13.5px; font-weight: 700; color: var(--muted); }
+.mg-gate-btn { width: 100%; padding: 13px 16px; border-radius: 15px; cursor: pointer;
+  font-size: 15px; font-weight: 900; color: #fff;
+  background: linear-gradient(160deg, #4a82f0 0%, #1b55d0 55%, #003fb4 100%);
+  border: 2px solid rgba(255,255,255,.6);
+  box-shadow: 0 5px 0 #00318a, 0 9px 18px rgba(0,74,198,.42), inset 0 2px 3px rgba(255,255,255,.45); }
+.mg-gate-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #00318a, 0 4px 10px rgba(0,74,198,.4), inset 0 2px 3px rgba(255,255,255,.45); }
