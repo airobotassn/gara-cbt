@@ -1553,6 +1553,18 @@ async function ebookUpsert(admin: any, body: any) {
   return json({ ok: true, id: data?.id ?? null })
 }
 
+// 순서 재부여 — 목록에서 ↑↓ 로 바꾼 전체 순서(ids)를 받아 sort_order 를 10 단위로 다시 매긴다.
+// (FAQ 의 faqReorder 와 동일 패턴. ebooks 는 분류가 없어 단일 평면 목록.)
+async function ebookReorder(admin: any, body: any) {
+  const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
+  if (!ids.length) return json({ error: 'ids 필요' }, 400)
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await admin.from('ebooks').update({ sort_order: (i + 1) * 10 }).eq('id', ids[i])
+    if (error) return json({ error: error.message }, 400)
+  }
+  return json({ ok: true })
+}
+
 // 삭제 = 메타데이터 + 본문 파일. 구매 기록은 FK cascade 로 함께 사라진다(환불/회수와 동일 취급).
 async function ebookDelete(admin: any, body: any) {
   const id = String(body?.id ?? '').trim()
@@ -1598,6 +1610,100 @@ async function ebookBuyers(admin: any, body: any) {
       createdAt: r.created_at,
     })),
   })
+}
+// ---------- 유사채팅(pseudo-chat) 보드 관리 ----------
+// 신고 목록 — chat_reports + 대상 메시지 본문/작성자 합성. 최신순.
+async function chatReportList(admin: any, body: any) {
+  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 200)
+  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
+  const { data, count } = await admin
+    .from('chat_reports')
+    .select('id, message_id, reporter_id, reason, status, created_at', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  const rows = data ?? []
+  const messageIds = [...new Set(rows.map((r: any) => r.message_id).filter((v: unknown) => v != null))]
+  const msgMap: Record<string, any> = {}
+  if (messageIds.length) {
+    const { data: msgs } = await admin
+      .from('chat_messages')
+      .select('id, body, user_id, display_name, mod_status, deleted_at')
+      .in('id', messageIds)
+    for (const m of msgs ?? []) msgMap[(m as any).id] = m
+  }
+
+  const reports = rows.map((r: any) => ({
+    id: r.id,
+    messageId: r.message_id,
+    reporterId: r.reporter_id,
+    reason: r.reason,
+    status: r.status,
+    createdAt: r.created_at,
+    message: r.message_id != null ? msgMap[r.message_id] ?? null : null,
+  }))
+  return json({ reports, total: count ?? reports.length })
+}
+
+// 모더레이션 보류(pending) 메시지 목록 — 삭제되지 않은 것만.
+async function chatPendingList(admin: any, body: any) {
+  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 200)
+  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
+  const { data, count } = await admin
+    .from('chat_messages')
+    .select('id, user_id, display_name, is_anon, body, mod_status, created_at, updated_at', { count: 'exact' })
+    .eq('mod_status', 'pending')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+  return json({ messages: data ?? [], total: count ?? (data ?? []).length })
+}
+
+// 메시지 강제 숨김 — 소프트 삭제 + 관련 열린 신고를 resolved 로 정리.
+async function chatHide(admin: any, body: any) {
+  const messageId = Number(body?.message_id)
+  if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+  const nowIso = new Date().toISOString()
+  const { error } = await admin
+    .from('chat_messages')
+    .update({ deleted_at: nowIso, updated_at: nowIso })
+    .eq('id', messageId)
+  if (error) return json({ error: error.message }, 500)
+  await admin.from('chat_reports').update({ status: 'resolved' }).eq('message_id', messageId).eq('status', 'open')
+  return json({ ok: true })
+}
+
+// 숨김 해제.
+async function chatUnhide(admin: any, body: any) {
+  const messageId = Number(body?.message_id)
+  if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+  const { error } = await admin
+    .from('chat_messages')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', messageId)
+  if (error) return json({ error: error.message }, 500)
+  return json({ ok: true })
+}
+
+// 보류(pending) 메시지를 수동 승인 — mod_status='ok'.
+async function chatApprove(admin: any, body: any) {
+  const messageId = Number(body?.message_id)
+  if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+  const { error } = await admin
+    .from('chat_messages')
+    .update({ mod_status: 'ok', updated_at: new Date().toISOString() })
+    .eq('id', messageId)
+  if (error) return json({ error: error.message }, 500)
+  return json({ ok: true })
+}
+
+// 신고를 무효 처리(오신고 등) — dismissed.
+async function chatResolveReport(admin: any, body: any) {
+  const reportId = String(body?.report_id ?? '').trim()
+  if (!reportId) return json({ error: 'report_id 가 필요합니다.' }, 400)
+  const { error } = await admin.from('chat_reports').update({ status: 'dismissed' }).eq('id', reportId)
+  if (error) return json({ error: error.message }, 500)
+  return json({ ok: true })
 }
 
 Deno.serve(async (req) => {
@@ -1659,8 +1765,15 @@ Deno.serve(async (req) => {
       case 'setRegion': return await setRegion(admin, body)
       case 'ebookList': return await ebookList(admin)
       case 'ebookUpsert': return await ebookUpsert(admin, body)
+      case 'ebookReorder': return await ebookReorder(admin, body)
       case 'ebookDelete': return await ebookDelete(admin, body)
       case 'ebookBuyers': return await ebookBuyers(admin, body)
+      case 'chatReportList': return await chatReportList(admin, body)
+      case 'chatPendingList': return await chatPendingList(admin, body)
+      case 'chatHide': return await chatHide(admin, body)
+      case 'chatUnhide': return await chatUnhide(admin, body)
+      case 'chatApprove': return await chatApprove(admin, body)
+      case 'chatResolveReport': return await chatResolveReport(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

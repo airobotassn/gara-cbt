@@ -9,28 +9,45 @@ import { callFunction } from '../lib/supabase'
 //   서버가 죽어도(함수 미배포·장애) 클라 키워드 폴백으로 안 깨지게 한다.
 // route-query 가 반환할 수 있는 목적지(응답 검증용). DEST(route-query) 와 동기화.
 const VALID_DESTS = new Set([
-  '/test/select', '/guide', '/exam', '/exam/check',
-  '/mypage', '/certificate', '/ranking', '/about', '/notice', '/faq', '/ebooks',
+  // WORLD ARENA 계열
+  '/arena', '/test/select', '/ranking', '/hub', '/games', '/daily',
+  // CARIS 자격검정
+  '/guide', '/exam/apply', '/exam', '/exam/check', '/certificate',
+  // 내 정보
+  '/mypage', '/mypage/ebooks', '/ebooks', '/login',
+  // 사이트 정보
+  '/about', '/notice', '/faq', '/terms', '/privacy',
 ])
 
 // 최후 폴백: route-query 자체가 실패했을 때(함수 다운 등) 클라에서 키워드로.
-// 서버 keywordRoute 와 동일 순서 + 약관/개인정보/로그인 추가(서버 인텐트엔 없는 것).
+// ⚠️ 서버 route-query 의 keywordRoute 와 **완전 동일**(규칙·순서)하게 유지할 것.
+//   순서 주의: 아레나 고유어(지역랭킹)는 일반 '랭킹' 보다 먼저, 이북은 허브 '상점' 보다 먼저 걸러야 한다.
 function clientKeywordRoute(q: string): string | null {
   const s = q.toLowerCase()
   const h = (re: RegExp) => re.test(s)
+  // --- WORLD ARENA 계열 ---
+  if (h(/아레나|arena|đấu trường|세계\s?리그|월드\s?리그|world\s?league|世界リーグ|世界联赛|지역\s?(랭킹|순위)|우리\s?(지역|동네|나라)|지도\s?보|세계\s?지도|world\s?map|地図|地图|bản đồ/)) return '/arena'
+  if (h(/미니\s?게임|게임|mini\s?game|ゲーム|游戏|trò chơi|버텨라|쏴라|골라라/)) return '/games'
+  if (h(/오늘의?\s?(학습|문제|공부)|데일리|daily|今日の(学習|問題)|デイリー|今日学习|每日|học hôm nay|hằng ngày/)) return '/daily'
+  // --- 이북(허브 '상점' 보다 먼저) ---
+  if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재)|산\s?책|my\s?e-?book|e-?book\s?library|本棚|購入した本|我的电子书|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
+  if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
+  // --- 캐릭터 허브 ---
+  if (h(/허브|캐릭터|아바타|가챠|뽑기|코인|상점|출석|hub|character|avatar|gacha|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|ガチャ|コイン|ショップ|出席|角色|抽卡|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
+  // --- 이하 기존 순서 유지 ---
   if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
   if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage'
   if (h(/자격증|합격증|증명서|인증서|certificate|証明書|合格証|证书|chứng chỉ của/)) return '/certificate'
-  if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
+  if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|gara|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
   if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
-  if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
-  if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
+  if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|system\s?check|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
   if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/guide'
-  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/guide'
+  if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
   if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
-  if (h(/자격|급수|과목|자격검정|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
-  if (h(/카리스\s?아레나|caris[\s-]?arena|레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
+  // '카리스/caris' = 자격검정 브랜드명 → 안내로. ('카리스 아레나' 는 위 arena 규칙이 이미 가져갔다)
+  if (h(/자격|급수|과목|자격검정|카리스|caris|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
+  if (h(/레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
   if (h(/약관|이용약관|terms/)) return '/terms'
   if (h(/개인정보|프라이버시|privacy/)) return '/privacy'
   if (h(/로그인|로그아웃|login|sign\s?in/)) return '/login'

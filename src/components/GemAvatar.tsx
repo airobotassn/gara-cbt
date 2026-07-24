@@ -5,6 +5,30 @@ import { parseAvatar, colorForSeed } from '../lib/avatar'
 const DARK = '#2b2d42'
 const HEX = '50,7 89,28.5 89,71.5 50,93 11,71.5 11,28.5'
 
+// 젬 SVG 문자열(자립형 — 외부 이미지/폰트 참조 없음).
+// 컴포넌트와 공유 카드(lib/shareCard.ts)가 같은 마크업을 쓴다(둘이 어긋나지 않게 단일 출처).
+// eslint-disable-next-line react-refresh/only-export-components
+export function gemSvgMarkup(color: string, size: number): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}">` +
+    /* 몸통(둥근 육각 젬) */
+    `<polygon points="${HEX}" fill="${color}" stroke="${DARK}" stroke-width="6" stroke-linejoin="round"/>` +
+    /* 상단 컷 면 하이라이트 */
+    `<polygon points="50,7 89,28.5 50,50 11,28.5" fill="#fff" opacity="0.2"/>` +
+    /* 광택 */
+    `<ellipse cx="36" cy="29" rx="11" ry="5.5" fill="#fff" opacity="0.55" transform="rotate(-20 36 29)"/>` +
+    /* 볼터치 */
+    `<ellipse cx="31" cy="61" rx="6" ry="4" fill="#ff6f91" opacity="0.5"/>` +
+    `<ellipse cx="69" cy="61" rx="6" ry="4" fill="#ff6f91" opacity="0.5"/>` +
+    /* 눈 */
+    `<circle cx="39" cy="54" r="5" fill="${DARK}"/><circle cx="61" cy="54" r="5" fill="${DARK}"/>` +
+    `<circle cx="41" cy="52" r="1.6" fill="#fff"/><circle cx="63" cy="52" r="1.6" fill="#fff"/>` +
+    /* 미소 */
+    `<path d="M43 64 Q50 71 57 64" fill="none" stroke="${DARK}" stroke-width="3" stroke-linecap="round"/>` +
+    `</svg>`
+  )
+}
+
 export default function GemAvatar({
   color,
   size = 44,
@@ -13,49 +37,10 @@ export default function GemAvatar({
   size?: number
 }) {
   return (
-    <svg
-      viewBox="0 0 100 100"
-      width={size}
-      height={size}
-      style={{ display: 'block' }}
-    >
-      {/* 몸통(둥근 육각 젬) */}
-      <polygon
-        points={HEX}
-        fill={color}
-        stroke={DARK}
-        strokeWidth={6}
-        strokeLinejoin="round"
-      />
-      {/* 상단 컷 면 하이라이트 */}
-      <polygon points="50,7 89,28.5 50,50 11,28.5" fill="#fff" opacity="0.2" />
-      {/* 광택 */}
-      <ellipse
-        cx="36"
-        cy="29"
-        rx="11"
-        ry="5.5"
-        fill="#fff"
-        opacity="0.55"
-        transform="rotate(-20 36 29)"
-      />
-      {/* 볼터치 */}
-      <ellipse cx="31" cy="61" rx="6" ry="4" fill="#ff6f91" opacity="0.5" />
-      <ellipse cx="69" cy="61" rx="6" ry="4" fill="#ff6f91" opacity="0.5" />
-      {/* 눈 */}
-      <circle cx="39" cy="54" r="5" fill={DARK} />
-      <circle cx="61" cy="54" r="5" fill={DARK} />
-      <circle cx="41" cy="52" r="1.6" fill="#fff" />
-      <circle cx="63" cy="52" r="1.6" fill="#fff" />
-      {/* 미소 */}
-      <path
-        d="M43 64 Q50 71 57 64"
-        fill="none"
-        stroke={DARK}
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
+    <span
+      style={{ display: 'block', lineHeight: 0 }}
+      dangerouslySetInnerHTML={{ __html: gemSvgMarkup(color, size) }}
+    />
   )
 }
 

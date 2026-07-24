@@ -6,7 +6,7 @@
 //  ⚠️ 게이트웨이로 인해 함수가 보는 req.url 이 브라우저가 요청한 URL 과 다를 수 있어, 후보 URL 들로 비교한다.
 //     배포 후 실제 SEB 클라이언트로 반드시 검증할 것(docs/SEB설정.md).
 
-async function sha256Hex(s: string): Promise<string> {
+export async function sha256Hex(s: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, '0'))

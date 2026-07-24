@@ -10,6 +10,8 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
+// 채팅 검수·이북 관리는 Admin.tsx 에 정의된 컴포넌트를 그대로 노출(데이터는 admin 함수). 위치만 WORLD ARENA 로 이동.
+import { ChatModAdmin, EbooksAdmin } from './Admin'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
@@ -64,7 +66,7 @@ export interface Analytics {
   coverage: Record<string, number>
 }
 
-type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'reports' | 'admins'
+type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'reports' | 'chatmod' | 'ebooks' | 'admins'
 export default function LevelTestAdmin() {
   const { isFullUser } = useAuth()
   const [tab, setTab] = useState<LtTab>('dashboard')
@@ -99,6 +101,8 @@ export default function LevelTestAdmin() {
     { key: 'attempts', label: '응시 기록' },
     { key: 'questions', label: '문항' },
     { key: 'reports', label: '제보' },
+    { key: 'chatmod', label: '채팅 검수' },
+    { key: 'ebooks', label: '이북' },
     ...(isRoot ? [{ key: 'admins' as const, label: '관리자 관리' }] : []),
   ]
 
@@ -116,6 +120,9 @@ export default function LevelTestAdmin() {
       {tab === 'attempts' ? <AttemptsTab /> : null}
       {tab === 'questions' ? <QuestionsTab /> : null}
       {tab === 'reports' ? <ReportsTab /> : null}
+      {/* 채팅 검수·이북은 Admin.tsx(.admin-cbt 스코프) 컴포넌트라 .admin-head 가 먹도록 admin-cbt 로 감싼다. */}
+      {tab === 'chatmod' ? <div className="admin-cbt"><ChatModAdmin /></div> : null}
+      {tab === 'ebooks' ? <div className="admin-cbt"><EbooksAdmin /></div> : null}
       {tab === 'admins' && isRoot ? <AdminsTab /> : null}
     </div>
   )

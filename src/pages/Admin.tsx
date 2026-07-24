@@ -121,8 +121,9 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 // CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
-type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'ebooks' | 'admins'
-const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'ebooks', 'admins']
+// ⚠️ 채팅 검수(chatmod)·이북(ebooks)은 WORLD ARENA 관리자(AdminLevelTest.tsx)로 이동함 — 여기 서브탭에서 제외.
+type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'admins'
+const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'admins']
 // 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
 type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
 const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
@@ -308,9 +309,6 @@ function CarisExamAdmin() {
         <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
           시험등록
         </button>
-        <button className={sub === 'ebooks' ? 'on' : ''} onClick={() => setSub('ebooks')}>
-          이북
-        </button>
         {isRoot && (
           <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
             관리자 관리
@@ -331,8 +329,6 @@ function CarisExamAdmin() {
         <FaqAdmin />
       ) : sub === 'rounds' ? (
         <RoundsAdmin />
-      ) : sub === 'ebooks' ? (
-        <EbooksAdmin />
       ) : sub === 'admins' ? (
         <AdminAccountsAdmin />
       ) : (
@@ -533,8 +529,10 @@ function fmtDay(iso?: string | null): string {
 const inpStyle: CSSProperties = {
   padding: '8px 10px',
   borderRadius: 8,
-  border: '1px solid rgba(128,128,128,.35)',
-  background: 'transparent',
+  border: '1px solid var(--line2)',
+  // 배경을 transparent 로 두면 모달 배경(--page)과 같은 색이라 입력칸이 안 보인다.
+  // 회색 반투명 채움 → 라이트(밝은 배경 위)·다크(어두운 배경 위) 양쪽에서 배경과 대비된다.
+  background: 'rgba(128,128,128,.10)',
   color: 'inherit',
   font: 'inherit',
   width: '100%',
@@ -1133,6 +1131,265 @@ function FaqAdmin() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── 채팅 검수 (유사채팅 보드) — admin 함수의 chatReportList/chatPendingList/chatHide/chatUnhide/chatApprove/chatResolveReport ──
+//   ⚠️ 이 컴포넌트는 WORLD ARENA 관리자(AdminLevelTest.tsx)로 노출 위치를 옮겼다(export). 데이터는 여전히 admin 함수.
+interface ChatModMessage { id: number; body: string | null; user_id: string; display_name: string; mod_status: string; deleted_at: string | null }
+interface ChatReportRow { id: string; messageId: number | null; reporterId: string | null; reason: string | null; status: string; createdAt: string; message: ChatModMessage | null }
+interface ChatPendingRow { id: number; user_id: string; display_name: string; is_anon: boolean; body: string | null; mod_status: string; created_at: string; updated_at: string }
+const CHAT_REPORT_STATUS_LABEL: Record<string, string> = { open: '대기', resolved: '처리됨', dismissed: '무효' }
+const CHAT_PAGE = 50
+
+export function ChatModAdmin() {
+  const [reports, setReports] = useState<ChatReportRow[]>([])
+  const [reportsTotal, setReportsTotal] = useState(0)
+  const [reportsOffset, setReportsOffset] = useState(0)
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportsErr, setReportsErr] = useState('')
+
+  const [pending, setPending] = useState<ChatPendingRow[]>([])
+  const [pendingTotal, setPendingTotal] = useState(0)
+  const [pendingOffset, setPendingOffset] = useState(0)
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [pendingErr, setPendingErr] = useState('')
+
+  const [busyId, setBusyId] = useState<string | number | null>(null)
+
+  const loadReports = useCallback(async (off: number) => {
+    setReportsLoading(true)
+    setReportsErr('')
+    try {
+      const res = await callFunction<{ reports: ChatReportRow[]; total: number }>('admin', {
+        action: 'chatReportList',
+        limit: CHAT_PAGE,
+        offset: off,
+      })
+      setReports(res.reports)
+      setReportsTotal(res.total)
+      setReportsOffset(off)
+    } catch (e) {
+      setReportsErr(e instanceof Error ? e.message : '신고 목록을 불러올 수 없습니다.')
+    } finally {
+      setReportsLoading(false)
+    }
+  }, [])
+
+  const loadPending = useCallback(async (off: number) => {
+    setPendingLoading(true)
+    setPendingErr('')
+    try {
+      const res = await callFunction<{ messages: ChatPendingRow[]; total: number }>('admin', {
+        action: 'chatPendingList',
+        limit: CHAT_PAGE,
+        offset: off,
+      })
+      setPending(res.messages)
+      setPendingTotal(res.total)
+      setPendingOffset(off)
+    } catch (e) {
+      setPendingErr(e instanceof Error ? e.message : '검수 대기 목록을 불러올 수 없습니다.')
+    } finally {
+      setPendingLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadReports(0)
+    loadPending(0)
+  }, [loadReports, loadPending])
+
+  async function hide(messageId: number) {
+    setBusyId(messageId)
+    try {
+      await callFunction('admin', { action: 'chatHide', message_id: messageId })
+      await Promise.all([loadReports(reportsOffset), loadPending(pendingOffset)])
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '숨김 처리에 실패했습니다.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+  async function unhide(messageId: number) {
+    setBusyId(messageId)
+    try {
+      await callFunction('admin', { action: 'chatUnhide', message_id: messageId })
+      await Promise.all([loadReports(reportsOffset), loadPending(pendingOffset)])
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '숨김 해제에 실패했습니다.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+  async function approve(messageId: number) {
+    setBusyId(messageId)
+    try {
+      await callFunction('admin', { action: 'chatApprove', message_id: messageId })
+      await loadPending(pendingOffset)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '승인에 실패했습니다.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+  async function resolveReport(reportId: string) {
+    setBusyId(reportId)
+    try {
+      await callFunction('admin', { action: 'chatResolveReport', report_id: reportId })
+      await loadReports(reportsOffset)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '무효 처리에 실패했습니다.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const reportsPageNo = Math.floor(reportsOffset / CHAT_PAGE) + 1
+  const reportsPageMax = Math.max(1, Math.ceil(reportsTotal / CHAT_PAGE))
+  const pendingPageNo = Math.floor(pendingOffset / CHAT_PAGE) + 1
+  const pendingPageMax = Math.max(1, Math.ceil(pendingTotal / CHAT_PAGE))
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>채팅 검수</h1>
+        <div className="admin-head-actions">
+          <span className="admin-count">신고 {reportsTotal}건 · 검수 대기 {pendingTotal}건</span>
+          <button className="admin-mini" onClick={() => { loadReports(reportsOffset); loadPending(pendingOffset) }} disabled={reportsLoading || pendingLoading}>
+            새로고침
+          </button>
+        </div>
+      </div>
+
+      <h2 style={{ fontSize: 16, margin: '18px 0 10px' }}>신고 목록</h2>
+      {reportsErr && <div className="admin-section admin-empty">불러오기 실패 — {reportsErr}</div>}
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>상태</th>
+              <th>메시지 본문</th>
+              <th>작성자</th>
+              <th>신고자</th>
+              <th>사유</th>
+              <th>신고일시</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.map((r) => {
+              const msg = r.message
+              const hidden = !!msg && msg.deleted_at != null
+              return (
+                <tr key={r.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <span className={`admin-badge st-${r.status === 'open' ? 'in_progress' : r.status === 'dismissed' ? 'expired' : 'submitted'}`}>
+                      {CHAT_REPORT_STATUS_LABEL[r.status] ?? r.status}
+                    </span>
+                  </td>
+                  <td style={{ maxWidth: 360, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {msg ? (msg.body ?? <span style={{ color: 'var(--muted)' }}>(삭제됨)</span>) : <span style={{ color: 'var(--muted)' }}>(메시지 없음)</span>}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{msg?.display_name ?? '-'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{r.reporterId ?? '-'}</td>
+                  <td>{r.reason || '-'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(r.createdAt)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {msg && (
+                      hidden ? (
+                        <button className="admin-mini" disabled={busyId === msg.id} onClick={() => unhide(msg.id)}>
+                          숨김 해제
+                        </button>
+                      ) : (
+                        <button className="admin-mini" disabled={busyId === msg.id} onClick={() => hide(msg.id)}>
+                          숨김
+                        </button>
+                      )
+                    )}
+                    {r.status === 'open' && (
+                      <button className="admin-mini" style={{ marginLeft: 6 }} disabled={busyId === r.id} onClick={() => resolveReport(r.id)}>
+                        무효
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+            {!reports.length && !reportsLoading && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  신고 내역이 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {reportsPageMax > 1 && (
+        <div className="admin-pager">
+          <button className="admin-mini" disabled={reportsOffset === 0 || reportsLoading} onClick={() => loadReports(Math.max(0, reportsOffset - CHAT_PAGE))}>
+            ‹ 이전
+          </button>
+          <span>{reportsPageNo} / {reportsPageMax}</span>
+          <button className="admin-mini" disabled={reportsOffset + CHAT_PAGE >= reportsTotal || reportsLoading} onClick={() => loadReports(reportsOffset + CHAT_PAGE)}>
+            다음 ›
+          </button>
+        </div>
+      )}
+
+      <h2 style={{ fontSize: 16, margin: '26px 0 10px' }}>검수 대기(보류)</h2>
+      {pendingErr && <div className="admin-section admin-empty">불러오기 실패 — {pendingErr}</div>}
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>본문</th>
+              <th>작성자</th>
+              <th>작성일시</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pending.map((m) => (
+              <tr key={m.id}>
+                <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {m.body ?? <span style={{ color: 'var(--muted)' }}>(내용 없음)</span>}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>{m.is_anon ? `${m.display_name} (익명)` : m.display_name}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(m.created_at)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="admin-mini" disabled={busyId === m.id} onClick={() => approve(m.id)}>
+                    승인
+                  </button>
+                  <button className="admin-mini" style={{ marginLeft: 6 }} disabled={busyId === m.id} onClick={() => hide(m.id)}>
+                    숨김
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!pending.length && !pendingLoading && (
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  검수 대기 중인 메시지가 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {pendingPageMax > 1 && (
+        <div className="admin-pager">
+          <button className="admin-mini" disabled={pendingOffset === 0 || pendingLoading} onClick={() => loadPending(Math.max(0, pendingOffset - CHAT_PAGE))}>
+            ‹ 이전
+          </button>
+          <span>{pendingPageNo} / {pendingPageMax}</span>
+          <button className="admin-mini" disabled={pendingOffset + CHAT_PAGE >= pendingTotal || pendingLoading} onClick={() => loadPending(pendingOffset + CHAT_PAGE)}>
+            다음 ›
+          </button>
         </div>
       )}
     </>
@@ -1749,12 +2006,13 @@ function emptyEbookDraft(): EbookDraft {
   return { title: '', author: '', description: '', coverUrl: '', price: 0, storagePath: '', published: false, sortOrder: 0 }
 }
 
-function EbooksAdmin() {
+export function EbooksAdmin() {
   const [rows, setRows] = useState<AdminEbookRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<EbookDraft | null>(null)
   const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState(false) // 순서 변경 중(↑↓)
   const [uploading, setUploading] = useState<'html' | 'cover' | null>(null)
   const [buyersOf, setBuyersOf] = useState<{ book: AdminEbookRow; rows: AdminEbookBuyer[] } | null>(null)
 
@@ -1838,6 +2096,25 @@ function EbooksAdmin() {
     }
   }
 
+  // 목록에서 ↑(-1)/↓(+1) 이동 → 전체 순서 재구성해 서버가 sort_order 재부여(FAQ 의 move 와 동일 패턴).
+  // ebooks 는 분류가 없어 단일 평면 목록. rows 는 이미 sort_order 오름차순(서버 정렬).
+  async function move(b: AdminEbookRow, dir: -1 | 1) {
+    const idx = rows.findIndex((r) => r.id === b.id)
+    const swap = idx + dir
+    if (swap < 0 || swap >= rows.length) return
+    const g = [...rows]
+    ;[g[idx], g[swap]] = [g[swap], g[idx]]
+    setBusy(true)
+    try {
+      await callFunction('admin', { action: 'ebookReorder', ids: g.map((r) => r.id) })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '순서 변경에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function remove(b: AdminEbookRow) {
     if (!confirm(`"${b.title}" 이북을 삭제할까요?\n구매 기록(${b.buyers}명)도 함께 사라집니다.`)) return
     try {
@@ -1883,12 +2160,12 @@ function EbooksAdmin() {
               <th>제목</th>
               <th>가격</th>
               <th>구매</th>
-              <th>정렬</th>
+              <th style={{ textAlign: 'center' }}>순서</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((b) => (
+            {rows.map((b, i) => (
               <tr key={b.id}>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <span className={`admin-badge st-${b.published ? 'submitted' : 'voided'}`}>{b.published ? '판매중' : '비공개'}</span>
@@ -1908,7 +2185,14 @@ function EbooksAdmin() {
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => showBuyers(b)}>{b.buyers}명</button>
                 </td>
-                <td>{b.sortOrder}</td>
+                <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                  <button className="admin-mini" disabled={busy || i === 0} onClick={() => move(b, -1)} aria-label="위로" title="위로">
+                    ↑
+                  </button>
+                  <button className="admin-mini" style={{ marginLeft: 4 }} disabled={busy || i === rows.length - 1} onClick={() => move(b, 1)} aria-label="아래로" title="아래로">
+                    ↓
+                  </button>
+                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button
                     className="admin-mini"
@@ -1965,48 +2249,64 @@ function EbooksAdmin() {
                 소개
                 <textarea style={{ ...inpStyle, minHeight: 80 }} value={draft.description} onChange={(e) => patch({ description: e.target.value })} />
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <label style={fieldStyle}>
-                  가격(원) — 0 이면 무료
-                  <input style={inpStyle} type="number" min={0} value={draft.price} onChange={(e) => patch({ price: Number(e.target.value) || 0 })} />
-                </label>
-                <label style={fieldStyle}>
-                  정렬 순서(작을수록 앞)
-                  <input style={inpStyle} type="number" value={draft.sortOrder} onChange={(e) => patch({ sortOrder: Number(e.target.value) || 0 })} />
-                </label>
+              {/* 정렬 순서 입력칸은 제거 — 목록의 ↑↓(순서 열)로 관리(FAQ 방식). */}
+              <label style={{ ...fieldStyle, maxWidth: 220 }}>
+                가격(원) — 0 이면 무료
+                <input style={inpStyle} type="number" min={0} value={draft.price} onChange={(e) => patch({ price: Number(e.target.value) || 0 })} />
+              </label>
+
+              {/* 본문 HTML — 브라우저 기본 파일칸("선택된 파일 없음") 대신 버튼+상태로 정리 */}
+              <div style={fieldStyle}>
+                <span>이북 본문 <em style={{ color: 'var(--error, #d43a3a)', fontStyle: 'normal' }}>(HTML 파일 1개 · 필수)</em></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <label className="admin-mini" style={{ display: 'inline-block', cursor: uploading ? 'default' : 'pointer' }}>
+                    {uploading === 'html' ? '업로드 중…' : draft.storagePath ? 'HTML 다시 선택' : 'HTML 파일 선택'}
+                    <input
+                      type="file"
+                      accept=".html,.htm,text/html"
+                      style={{ display: 'none' }}
+                      disabled={!!uploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) uploadHtml(f)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <span style={{ fontSize: 13, color: draft.storagePath ? 'var(--ink)' : 'var(--muted)', wordBreak: 'break-all' }}>
+                    {draft.storagePath ? `✓ ${draft.storagePath.split('/').pop()}` : '선택된 파일 없음'}
+                  </span>
+                </div>
               </div>
 
-              <label style={fieldStyle}>
-                이북 본문 (HTML 파일 1개)
-                <input
-                  type="file"
-                  accept=".html,.htm,text/html"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) uploadHtml(f)
-                    e.target.value = ''
-                  }}
-                />
-                <span style={{ fontSize: 12, color: draft.storagePath ? 'var(--muted)' : '#c0392b' }}>
-                  {uploading === 'html' ? '업로드 중…' : draft.storagePath ? `업로드됨 — ${draft.storagePath}` : '아직 업로드하지 않았습니다(필수).'}
-                </span>
-              </label>
-
-              <label style={fieldStyle}>
-                표지 이미지 (선택 · 없으면 자동 표지)
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) uploadCover(f)
-                    e.target.value = ''
-                  }}
-                />
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  {uploading === 'cover' ? '업로드 중…' : draft.coverUrl ? '업로드됨' : '없음'}
-                </span>
-              </label>
+              {/* 표지 이미지(선택) — 업로드하면 썸네일로 확인 */}
+              <div style={fieldStyle}>
+                <span>표지 이미지 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(선택 · 없으면 자동 표지)</em></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {draft.coverUrl && (
+                    <img src={draft.coverUrl} alt="" style={{ width: 40, height: 60, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--line)', display: 'block' }} />
+                  )}
+                  <label className="admin-mini" style={{ display: 'inline-block', cursor: uploading ? 'default' : 'pointer' }}>
+                    {uploading === 'cover' ? '업로드 중…' : draft.coverUrl ? '표지 변경' : '표지 선택'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      disabled={!!uploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) uploadCover(f)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  {draft.coverUrl && (
+                    <button type="button" className="admin-mini" onClick={() => patch({ coverUrl: '' })}>
+                      표지 제거
+                    </button>
+                  )}
+                </div>
+              </div>
 
               <label style={{ ...fieldStyle, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <input type="checkbox" checked={draft.published} onChange={(e) => patch({ published: e.target.checked })} />

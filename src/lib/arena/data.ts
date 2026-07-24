@@ -29,9 +29,17 @@ export interface Region {
   real: boolean
 }
 
-/** 백엔드 집계 주입분: alpha2(국가) 또는 region_code(시도) → 값 */
+/**
+ * 백엔드 집계 주입분: alpha2(국가) 또는 region_code(시도) → 값.
+ *
+ * `score` = leaderboard RPC 의 `score` 필드 = **베이지안 보정된 season_total 평균**
+ * (season_total = 개인의 skill_score + activity_score, 즉 개인 랭킹과 같은 재료).
+ * 예전엔 같은 응답의 `avg_level`(보정 전 날것)을 썼는데, 그건 이름만 level 이지 실제로는
+ * 0~10000 스케일의 랭킹점수라 "Lv.2290" 같은 표시가 나왔고 소수 인원 버킷이 그대로 1위를 먹었다.
+ * RPC 쪽 보정(K=25 shrinkage + 일간창 참여율 가중)을 살리려면 반드시 `score` 를 써야 한다.
+ */
 export interface RealBucket {
-  level: number
+  score: number
   members: number
 }
 export interface RealData {
@@ -79,14 +87,98 @@ function h32(s: string): number {
   }
   return h >>> 0
 }
-const mockLevel = (k: string) => Math.round((1 + (h32('s' + k) % 601) / 100) * 10) / 10 // 1.0–7.0
+/** 목 점수 — season_total 스케일(0~10000)에 맞춘다. 실집계와 같은 축이어야 한 목록에서 섞인다. */
+const mockScore = (k: string, max: number) => Math.round((h32('s' + k) % (max * 100)) / 100)
 const mockTakers = (k: string) => 30 + (h32('n' + k) % 9970)
 
-/** 평균 레벨(1~7) → 지도 색. CSS 토큰이 아니라 값 스케일이라 테마와 무관하게 고정. */
-export const cscale = scaleLinear<string>()
-  .domain([1, 3, 5, 7])
-  .range(['#d9e8fd', '#9dc2f0', '#5b93e2', '#2e6bc8'])
-  .clamp(true)
+/**
+ * 데모용 국가 점수 고정표 — 해시 난수만 쓰면 지구본 1위가 말라위·소말리아로, 10위가 뉴칼레도니아로
+ * 잡혀 랭킹이 설득력을 잃는다. 그래서 주요국 ~40개를 그럴듯한 순서로 박아 두고, 나머지 소국은
+ * 아래 해시(MOCK_REST_MAX 이하)로 꼬리만 채운다. 키는 M49 코드(= world.json 의 feature id, 100 미만은 0 패딩).
+ *
+ * ⚠️ 전부 **데모용 임시값**이다. AI 활용능력 실측이 아니라 화면이 자연스러워 보이라고 손으로 매긴 순서다.
+ * ⚠️ 싱가포르(702)·홍콩(344)은 world.json(Natural Earth 110m, 177개국)에 없어서 못 넣는다(더 상세한 지도 필요).
+ * ⚠️ 실집계(leaderboard)가 있는 국가는 그쪽이 이 값을 덮는다. 대한민국(410)도 여기 값이 있지만, 백엔드가
+ *    실데이터를 주면 그걸 쓴다 — 백엔드 없이도 데모가 안 무너지게 목값을 같이 둔 것뿐이다.
+ */
+const MOCK_TOP_COUNTRY: Record<string, number> = {
+  '840': 3200, // 미국
+  '156': 2900, // 중국
+  '356': 2600, // 인도
+  '410': 2292, // 대한민국(실데이터 있으면 덮임)
+  '826': 2100, // 영국
+  '724': 1980, // 스페인
+  '784': 1880, // 아랍에미리트
+  '392': 1780, // 일본
+  '124': 1680, // 캐나다
+  '376': 1600, // 이스라엘
+  '276': 1560, // 독일
+  '250': 1500, // 프랑스
+  '380': 1440, // 이탈리아
+  '528': 1390, // 네덜란드
+  '752': 1340, // 스웨덴
+  '756': 1300, // 스위스
+  '246': 1250, // 핀란드
+  '036': 1200, // 호주
+  '076': 1150, // 브라질
+  '643': 1100, // 러시아
+  '616': 1050, // 폴란드
+  '792': 1000, // 터키
+  '682': 960, // 사우디아라비아
+  '372': 920, // 아일랜드
+  '578': 880, // 노르웨이
+  '208': 840, // 덴마크
+  '040': 800, // 오스트리아
+  '056': 760, // 벨기에
+  '620': 720, // 포르투갈
+  '484': 680, // 멕시코
+  '360': 640, // 인도네시아
+  '704': 600, // 베트남
+  '764': 560, // 태국
+  '818': 520, // 이집트
+  '566': 480, // 나이지리아
+  '032': 440, // 아르헨티나
+  '710': 400, // 남아프리카공화국
+  '804': 360, // 우크라이나
+  '458': 320, // 말레이시아
+  '608': 290, // 필리핀
+  '554': 270, // 뉴질랜드
+}
+/** 고정표에 없는 소국이 받을 상한 — 위 최저(뉴질랜드 270) 아래로 눌러 주요국 순위를 안 깨뜨린다. */
+const MOCK_REST_MAX = 255
+const mockCountryScore = (id: string, key: string) => MOCK_TOP_COUNTRY[id] ?? mockScore(key, MOCK_REST_MAX)
+
+/** 지도 색 램프 — 밝은 하늘색(하위) → 진한 파랑(상위). 범례 바(arena.css)도 이 세 색과 맞춰 둔다. */
+export const CSCALE_RAMP = ['#dceafb', '#7eaae6', '#2159c6'] as const
+
+/**
+ * 점수 → 지도 색. **백분위(등수 순서) 기반**이다.
+ *
+ * 점수를 min~max 에 선형으로 깔면 데이터가 몰린 구간(대부분 하위권)에서 색도 뭉쳐 지도가
+ * 한 톤으로 보였다. 그래서 값이 아니라 **그 값의 등수/전체**를 0~1 로 만들어 램프에 넣는다 →
+ * 몰린 구간이 강제로 펼쳐져 1등부터 꼴찌까지 색이 골고루 진해진다. 동점은 같은 색.
+ *
+ * CSS 토큰이 아니라 값 스케일이라 테마와 무관하게 고정.
+ */
+export function makeCscale(scores: number[]): Cscale {
+  const ramp = scaleLinear<string>().domain([0, 0.5, 1]).range(CSCALE_RAMP as unknown as string[]).clamp(true)
+  const sorted = [...scores].sort((a, b) => a - b)
+  const n = sorted.length
+  return (v: number) => {
+    if (n <= 1) return ramp(1)
+    // v 보다 '엄격히 작은' 개수(lower-bound 이진탐색) = 백분위 위치. 동점끼리는 같은 값이 나온다.
+    let lo = 0
+    let hi = n
+    while (lo < hi) {
+      const m = (lo + hi) >> 1
+      if (sorted[m] < v) lo = m + 1
+      else hi = m
+    }
+    return ramp(lo / (n - 1))
+  }
+}
+/** 색 함수 시그니처 — ArenaMap 등에 prop 으로 넘긴다. */
+export type Cscale = (v: number) => string
 
 // ── 지명 현지화 ──
 //   국가: Intl.DisplayNames(언어) → 실패 시 한글표 → 영문 원명
@@ -149,7 +241,10 @@ export function buildRegions({ level, lang, real, countries, provinces, municipa
   if (level === 0) {
     base = countries.map((f) => ({
       f,
-      key: 'C' + f.id,
+      // ⚠️ world.json 에는 id 없는 피처가 3개 있다(북키프로스·소말릴란드·코소보 — 미승인 국가).
+      //    'C' + undefined 로 두면 셋이 같은 키가 되어 React 리스트 키가 충돌하고(랭킹 목록 순서가
+      //    뒤섞인다) 목 점수도 셋이 같아진다 → id 없으면 지명으로 대체한다.
+      key: 'C' + (f.id ?? f.properties.name ?? ''),
       name: countryName(f, lang),
       drill: String(f.id) === KR_ID,
     }))
@@ -183,7 +278,8 @@ export function buildRegions({ level, lang, real, countries, provinces, municipa
       const iso = PROV_TO_ISO[r.code]
       if (iso) bucket = real.region[iso]
     }
-    if (bucket) return { ...r, score: bucket.level, takers: bucket.members, real: true }
-    return { ...r, score: mockLevel(r.key), takers: mockTakers(r.key), real: false }
+    if (bucket) return { ...r, score: bucket.score, takers: bucket.members, real: true }
+    const score = level === 0 ? mockCountryScore(String(r.f.id), r.key) : mockScore(r.key, MOCK_REST_MAX)
+    return { ...r, score, takers: mockTakers(r.key), real: false }
   })
 }

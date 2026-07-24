@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:responsive": "playwright test",
-    "test:db": "bun tests/db/t1-region-lock.mjs && bun tests/db/_parity-check.mjs && bun tests/db/regions-set-equality.mjs && bun tests/db/t4-setregion-guard.mjs && bun tests/db/t6-schools-seed.mjs && bun tests/db/t7-leaderboard-rpcs.mjs && bun tests/db/t9-admin-set-region.mjs && bun tests/db/t-phase2-datamodel.mjs && bun tests/db/t-complete-daily.mjs && bun tests/db/t-gacha-shop.mjs && bun tests/db/t-coupons.mjs && bun tests/db/t-titles.mjs && bun tests/db/t-lecture.mjs && bun tests/db/t-activity-ledger.mjs && bun tests/db/t-season-reset.mjs && bun tests/db/t-scoring-parity.mjs && bun tests/set-region-validate.mjs && bun tests/geo-mapping.mjs && bun tests/avatar-scheme.mjs && bun tests/cosmetic-only-gate.mjs && bun tests/lecture-qa-order.mjs"
+    "test:db": "bun tests/badwords-ko.mjs && bun tests/chat-moderation.mjs && bun tests/chat-xss-render.mjs && bun tests/db/t1-region-lock.mjs && bun tests/db/_parity-check.mjs && bun tests/db/regions-set-equality.mjs && bun tests/db/t4-setregion-guard.mjs && bun tests/db/t6-schools-seed.mjs && bun tests/db/t7-leaderboard-rpcs.mjs && bun tests/db/t9-admin-set-region.mjs && bun tests/db/t-phase2-datamodel.mjs && bun tests/db/t-complete-daily.mjs && bun tests/db/t-gacha-shop.mjs && bun tests/db/t-coupons.mjs && bun tests/db/t-titles.mjs && bun tests/db/t-lecture.mjs && bun tests/db/t-activity-ledger.mjs && bun tests/db/t-season-reset.mjs && bun tests/db/t-scoring-parity.mjs && bun tests/db/t-chat-board.mjs && bun tests/set-region-validate.mjs && bun tests/geo-mapping.mjs && bun tests/avatar-scheme.mjs && bun tests/cosmetic-only-gate.mjs && bun tests/lecture-qa-order.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",
@@ -23,12 +23,14 @@
     "d3-transition": "^3.0.1",
     "d3-zoom": "^3.0.0",
     "dompurify": "^3.4.11",
+    "earcut": "^3.2.3",
     "lucide-react": "^1.24.0",
     "qrcode-generator": "^2.0.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-quill-new": "^3.8.3",
     "react-router-dom": "^7.17.0",
+    "three": "^0.185.1",
     "topojson-client": "^3.1.0",
     "xlsx": "^0.18.5"
   },

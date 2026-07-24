@@ -9,6 +9,8 @@ import { Avatar } from '../components/GemAvatar'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { type Tier } from '../lib/scoring'
+import ShareCardModal from '../components/ShareCardModal'
+import { countryName } from '../lib/regions'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -26,6 +28,7 @@ const ICONS: Record<string, ReactNode> = {
   star: (<path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.9l6.5-.9L12 2.6Z" fill="#ffd15a" stroke={IK} strokeWidth="1.8" strokeLinejoin="round" />),
   coin: (<><circle cx="12" cy="12" r="9" fill="#ffc93c" stroke={IK} strokeWidth="2" /><circle cx="12" cy="12" r="6" fill="none" stroke={IK} strokeWidth="1.2" strokeOpacity=".5" /><path d="M9 8.5l3 4 3-4M12 12.5v3M9.7 12.5h4.6M9.7 14h4.6" stroke={IK} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></>),
   trophy: (<><path d="M7 3.5h10V9a5 5 0 0 1-10 0V3.5Z" fill="#ffd15a" stroke={IK} strokeWidth="2" strokeLinejoin="round" /><path d="M7 5.2H4.4c0 2 1.2 3.5 2.9 3.8M17 5.2h2.6c0 2-1.2 3.5-2.9 3.8" fill="none" stroke={IK} strokeWidth="1.7" strokeLinecap="round" /><path d="M12 14v3" stroke={IK} strokeWidth="2.2" strokeLinecap="round" /><rect x="8.2" y="17" width="7.6" height="3.5" rx="1.2" fill="#ff6b6b" stroke={IK} strokeWidth="2" /></>),
+  share: (<><circle cx="18" cy="5.5" r="2.8" fill="#86b2e2" stroke={IK} strokeWidth="1.8" /><circle cx="6" cy="12" r="2.8" fill="#f2c65e" stroke={IK} strokeWidth="1.8" /><circle cx="18" cy="18.5" r="2.8" fill="#74c6bf" stroke={IK} strokeWidth="1.8" /><path d="M8.5 10.7 15.5 6.9M8.5 13.3l7 3.8" stroke={IK} strokeWidth="1.8" strokeLinecap="round" /></>),
 }
 function Ic({ n, s = 24 }: { n: string; s?: number }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: 'block' }} aria-hidden="true">{ICONS[n]}</svg>
@@ -58,7 +61,7 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; tier?: Tier | null; percentile?: number | null; pointsToPass?: number | null }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; tier?: Tier | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
@@ -73,11 +76,11 @@ function friendlyError(e: unknown): string {
   return '오류가 발생했어요. 잠시 후 다시 시도해주세요'
 }
 
-type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title'
+type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share'
 
 export default function Hub() {
   const { isFullUser, loginWithGoogle, user, loading } = useAuth()
-  const { t } = useT()
+  const { t, lang } = useT()
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
@@ -95,26 +98,38 @@ export default function Hub() {
   const [purchased, setPurchased] = useState<{ partKey: string; kind: 'coin' | 'dust' } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+  // 공유 카드 하단 바용 프로필 값(가입일 · 국가). 국가만 노출하고 지역·학교는 넣지 않는다.
+  const [joinedAt, setJoinedAt] = useState<string | null>(null)
+  const [countryCode, setCountryCode] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [, setSkillScore] = useState(0)
   const [, setActivityScore] = useState(0)
-  const [, setSeasonTotal] = useState(0)
+  const [seasonTotal, setSeasonTotal] = useState(0) // 공유 카드의 시즌 점수 / 전투력
   const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
   const [pointsToPass, setPointsToPass] = useState<number | null>(null)
+  const [rank, setRank] = useState<number | null>(null)
+  const [rankTotal, setRankTotal] = useState<number | null>(null)
 
   const pushLog = (s: string) => {
     setToast(s)
     window.setTimeout(() => setToast((cur) => (cur === s ? null : cur)), 2600)
   }
 
-  // 프로필 아바타(본인 profiles.avatar_url) — 로그인 시 조회. setState 는 프라미스 콜백에서만.
+  // 프로필(본인 profiles) — 아바타는 HUD, 표시이름은 공유 카드에 쓴다. setState 는 프라미스 콜백에서만.
   useEffect(() => {
     const uid = user?.id
     if (!uid) return
     let alive = true
-    supabase.from('profiles').select('avatar_url').eq('id', uid).maybeSingle()
-      .then(({ data }) => { if (alive) setAvatarUrl((data?.avatar_url as string | null) ?? null) })
+    supabase.from('profiles').select('avatar_url, display_name, created_at, country_code').eq('id', uid).maybeSingle()
+      .then(({ data }) => {
+        if (!alive) return
+        setAvatarUrl((data?.avatar_url as string | null) ?? null)
+        setDisplayName((data?.display_name as string | null) ?? null)
+        setJoinedAt((data?.created_at as string | null) ?? null)
+        setCountryCode((data?.country_code as string | null) ?? null)
+      })
     return () => { alive = false }
   }, [user?.id])
 
@@ -138,6 +153,8 @@ export default function Hub() {
     setTier(h.tier ?? null)
     setPercentile(h.percentile ?? null)
     setPointsToPass(h.pointsToPass ?? null)
+    setRank(h.rank ?? null)
+    setRankTotal(h.rankTotal ?? null)
   }
   async function hydrate() {
     try {
@@ -270,6 +287,10 @@ export default function Hub() {
         <Link className="hub-back" to="/arena">
           <span className="ic">←</span>WORLD ARENA
         </Link>
+        {/* 공유 = 지금 순위·티어·칭호로 카드(PNG) 를 만들어 내보낸다(ShareCardModal) */}
+        <button className="hub-share" onClick={() => setModal('share')}>
+          <span className="ic"><Ic n="share" s={16} /></span>공유
+        </button>
       </div>
 
       {!isFullUser && (
@@ -466,6 +487,28 @@ export default function Hub() {
             </div>
           )}
         </Modal>
+      )}
+
+      {modal === 'share' && (
+        <ShareCardModal
+          onClose={() => setModal(null)}
+          data={{
+            name: displayName?.trim() || user?.user_metadata?.name || 'CARI',
+            avatarUrl,
+            seed: user?.id ?? 'guest',
+            level,
+            tier,
+            tierLabel: t(`rank.tier_${dispTier}`),
+            percentile,
+            rank,
+            rankTotal,
+            title: titles[0] ? `CARIS ${titles[0].track} ${titles[0].grade}` : null,
+            seasonTotal,
+            streak: stamps,
+            joinedAt,
+            country: countryCode ? countryName(countryCode, lang) : null,
+          }}
+        />
       )}
 
       {modal === 'title' && (

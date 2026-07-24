@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       issuedAt: c.issued_at as string,
     }))
     const titleList = Array.isArray(titles) ? titles : []
-    const rc = (rankCtx ?? null) as { tier?: string | null; percentile?: number | null; points_to_pass?: number | null } | null
+    const rc = (rankCtx ?? null) as { rank?: number | null; total?: number | null; tier?: string | null; percentile?: number | null; points_to_pass?: number | null } | null
     // TODO(#5 미구현): 응답에 일별 활동 breakdown(잔디 dominant 색)이 없다 — 잔디는 현재 프론트가
     //   list-attempts(레벨테스트) 응시일만으로 채워 leveltest(금색) 활동만 표시한다. attendance/learn/
     //   minigame 색을 살리려면 여기서 activity_ledger(day,kind,delta)+daily_activity(day,did_*) 를
@@ -98,6 +98,10 @@ Deno.serve(async (req) => {
       tier: rc?.tier ?? null,
       percentile: rc?.percentile ?? null,
       pointsToPass: rc?.points_to_pass ?? null,
+      // 공유 카드(ShareCardModal)의 "#127 / 3,410명 중" — total 은 my_rank_context 가 준다
+      // (20260723100000_my_rank_context_total.sql 미적용 DB 에서는 total 이 없어 null → 카드는 '집계 대기' 표기).
+      rank: rc?.rank ?? null,
+      rankTotal: rc?.total ?? null,
       points: Number(currency?.points ?? 0),
       dust: Number(currency?.dust ?? 0),
       cosmetics: (cosmetics ?? []).map((c) => c.part_key as string),

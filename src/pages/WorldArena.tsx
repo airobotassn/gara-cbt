@@ -9,6 +9,7 @@
 //
 // 상태는 이 컴포넌트가 소유하고, 그리기만 ArenaMap 에 맡긴다(제어 컴포넌트).
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import ChatBoard from '../components/ChatBoard'
 import { Link } from 'react-router-dom'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
@@ -16,7 +17,7 @@ import { useT } from '../lib/i18n'
 import { ArenaMap, DokdoInset, type ArenaMapHandle, type HoverInfo } from '../components/ArenaMap'
 import {
   buildRegions,
-  cscale,
+  makeCscale,
   EMPTY_REAL,
   koreaName,
   loadCountries,
@@ -29,11 +30,14 @@ import {
 } from '../lib/arena/data'
 import { M49_TO_ISO2 } from '../lib/arena/tables'
 import '../styles/arena.css'
-// ⚠️ 소스 일원화: 위 leaderboard 호출은 src/pages/Ranking.tsx 의 AggregateBoard(집계 탭)와
+// ⚠️ 소스 일원화: 아래 leaderboard 호출은 src/pages/Ranking.tsx 의 AggregateBoard(집계 탭)와
 //    완전히 동일한 RPC(region_/country_leaderboard, scope='region'|'country')를 쓴다 — 이중 fetch/별도 엔드포인트 없음.
-//    avg_level = 그 버킷의 원시 season_total 평균(레벨 아님, 필드명은 하위호환). 베이지안 보정값은 같은 응답의
-//    `score` 필드(Ranking.BucketCard 가 표시하는 값)로 별도 노출되며, 지도 색칠은 지금처럼 avg_level 을 그대로 쓴다.
-type ServerBucket = { code: string; avg_level: number; member_count: number }
+//
+// 쓰는 필드는 `score` = **베이지안 보정된 season_total 평균**(K=25 shrinkage, 일간창은 참여율 가중).
+// 개인 랭킹과 같은 재료(skill_score+activity_score)를 국가/지역 단위로 올린 값이라 이게 이 지도의 지표다.
+// ⚠️ 같은 응답의 `avg_level` 은 쓰지 않는다 — 이름과 달리 레벨이 아니라 보정 전 원시 평균이고
+//    (레벨테스트 시절 필드명이 하위호환으로 남은 것), 그걸 쓰면 5명짜리 버킷이 그대로 1위를 먹는다.
+type ServerBucket = { code: string; score: number; member_count: number }
 
 /** 랭킹 목록 한 줄 — hover 마다 60줄을 통째로 다시 그리지 않도록 memo */
 const RankRow = memo(function RankRow({
@@ -44,6 +48,8 @@ const RankRow = memo(function RankRow({
   hot,
   showFlag,
   count,
+  color,
+  scoreText,
   onActivate,
   onEnter,
   onLeave,
@@ -55,6 +61,8 @@ const RankRow = memo(function RankRow({
   hot: boolean
   showFlag: boolean
   count: string
+  color: string
+  scoreText: string
   onActivate(r: Region): void
   onEnter(key: string): void
   onLeave(): void
@@ -72,10 +80,10 @@ const RankRow = memo(function RankRow({
           {region.name}
           {showFlag ? ' 🇰🇷' : ''}
         </b>
-        <div className="bw" style={{ width: `${width}%`, background: cscale(region.score) }} />
+        <div className="bw" style={{ width: `${width}%`, background: color }} />
         <div className="cnt">👥 {count}</div>
       </div>
-      <span className="sc">{region.score.toFixed(1)}</span>
+      <span className="sc">{scoreText}</span>
     </li>
   )
 })
@@ -99,6 +107,7 @@ export default function WorldArena() {
   const [query, setQuery] = useState('')
   const [prompt, setPrompt] = useState('')
   const [hover, setHover] = useState<HoverInfo | null>(null)
+  const [rightPanel, setRightPanel] = useState<'league' | 'chat' | null>('league')
 
   // ── 백엔드 실데이터 ──
   const [real, setReal] = useState<RealData>(EMPTY_REAL)
@@ -107,6 +116,8 @@ export default function WorldArena() {
 
   const fmt = useCallback((n: number) => Number(n).toLocaleString(lang === 'ko' ? 'ko-KR' : lang), [lang])
   const ppl = useCallback((n: number) => fmt(n) + t('arena.ppl'), [fmt, t])
+  // 점수는 season_total 스케일(0~10000)이라 소수점이 의미 없다 — 정수 + 천단위 구분.
+  const fmtScore = useCallback((n: number) => fmt(Math.round(n)), [fmt])
 
   // 지구본·시도는 즉시, 시군구(177KB)는 시도까지 들어온 사람만 — 레벨1 도달 시 미리 받아둔다.
   useEffect(() => {
@@ -147,7 +158,7 @@ export default function WorldArena() {
         if (cancelled) return
         const toMap = (bs: ServerBucket[] | undefined) => {
           const out: RealData['country'] = {}
-          for (const b of bs ?? []) if (b?.code) out[b.code] = { level: Number(b.avg_level), members: Number(b.member_count) }
+          for (const b of bs ?? []) if (b?.code) out[b.code] = { score: Number(b.score), members: Number(b.member_count) }
           return out
         }
         setReal({ country: toMap(country.buckets), region: toMap(region.buckets) })
@@ -219,6 +230,10 @@ export default function WorldArena() {
     return { max: sorted[0].score, min: sorted[sorted.length - 1].score }
   }, [sorted])
 
+  // 색은 점수 선형이 아니라 **등수 순서(백분위)** 로 깐다 → 하위권에 몰린 점수가 강제로 펼쳐져
+  // 1등부터 꼴찌까지 색이 골고루 진해진다. 이 화면에 뜬 전 지역의 점수를 통째로 넘긴다.
+  const color = useMemo(() => makeCscale(sorted.map((r) => r.score)), [sorted])
+
   // ── 지도 → 화면 상태 반영 ──
   const handleDrill = useCallback((r: Region) => {
     setSelKey(null)
@@ -275,8 +290,8 @@ export default function WorldArena() {
     const show = level === 1 || (level === 2 && prov?.code === '37')
     if (!show) return null
     const parent = level === 2 ? regions.find((d) => d.code === '37430') : regions.find((d) => d.code === '37')
-    return { fill: parent ? cscale(parent.score) : '#5b93e2' }
-  }, [level, prov, regions])
+    return { fill: parent ? color(parent.score) : '#5b93e2' }
+  }, [level, prov, regions, color])
 
   const crumbs = useMemo(() => {
     if (level === 0) return []
@@ -333,7 +348,7 @@ export default function WorldArena() {
           </Link>
         </nav>
 
-        <div className="aa-grid">
+        <div className={`aa-grid${rightPanel ? '' : ' aa-solo'}`}>
           <section className="aa-card aa-stage">
             {crumbs.length > 0 && (
               <nav className="aa-crumb">
@@ -363,6 +378,7 @@ export default function WorldArena() {
                 onDrill={handleDrill}
                 onPrompt={(name) => setPrompt(t('arena.drillHint', { n: name }))}
                 onHover={handleHover}
+                color={color}
               />
             ) : (
               <div className="aa-loading">{t('arena.loading')}</div>
@@ -374,10 +390,10 @@ export default function WorldArena() {
               <span>{t('arena.low')}</span>
               <div className="bar" />
               <span>{t('arena.high')}</span>
-              <span style={{ marginLeft: 8 }}>{t('arena.avgLevel')}</span>
+              <span style={{ marginLeft: 8 }}>{t('arena.regionScore')}</span>
             </div>
 
-            <div className="aa-zoomctl" role="group" aria-label={t('arena.avgLevel')}>
+            <div className="aa-zoomctl" role="group" aria-label={t('arena.regionScore')}>
               <button type="button" aria-label={t('arena.zoom_in')} onClick={() => mapRef.current?.zoomIn()}>+</button>
               <button type="button" aria-label={t('arena.zoom_out')} onClick={() => mapRef.current?.zoomOut()}>−</button>
               <button type="button" aria-label={t('arena.zoom_reset')} onClick={() => mapRef.current?.zoomReset()}>⤾</button>
@@ -386,6 +402,7 @@ export default function WorldArena() {
             {dokdo && <DokdoInset fill={dokdo.fill} label={t('arena.dokdo')} />}
           </section>
 
+          {rightPanel === 'league' && (
           <aside className="aa-card aa-side">
             <h2>{scopeTitle}</h2>
 
@@ -403,7 +420,7 @@ export default function WorldArena() {
                     {t('arena.unit')}
                   </span>
                   <i>
-                    {t('arena.avg')} Lv.{our.region.score.toFixed(1)}
+                    {t('arena.avg')} {fmtScore(our.region.score)}
                   </i>
                 </div>
               </div>
@@ -443,6 +460,8 @@ export default function WorldArena() {
                   hot={d.key === hotKey}
                   showFlag={d.drill && level === 0}
                   count={fmt(d.takers)}
+                  color={color(d.score)}
+                  scoreText={fmtScore(d.score)}
                   onActivate={activate}
                   onEnter={onRowEnter}
                   onLeave={onRowLeave}
@@ -450,6 +469,38 @@ export default function WorldArena() {
               ))}
             </ul>
           </aside>
+          )}
+          {rightPanel === 'chat' && (
+            <aside className="aa-card aa-side aa-side-chat">
+              <h2>{t('chat.title')}</h2>
+              <ChatBoard />
+            </aside>
+          )}
+          {/* 아이콘만 있는 세로 레일 — 이름은 data-label 이 CSS 툴팁으로 띄운다(스크린리더는 aria-label). */}
+          <div className="aa-tabs" role="tablist" aria-label={t('arena.panelToggle')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanel === 'league'}
+              aria-label={t('arena.tabLeague')}
+              data-label={t('arena.tabLeague')}
+              className={`aa-tab aa-tab-league${rightPanel === 'league' ? ' on' : ''}`}
+              onClick={() => setRightPanel((p) => (p === 'league' ? null : 'league'))}
+            >
+              <span className="ti" aria-hidden="true">🌐</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanel === 'chat'}
+              aria-label={t('arena.tabChat')}
+              data-label={t('arena.tabChat')}
+              className={`aa-tab aa-tab-chat${rightPanel === 'chat' ? ' on' : ''}`}
+              onClick={() => setRightPanel((p) => (p === 'chat' ? null : 'chat'))}
+            >
+              <span className="ti" aria-hidden="true">💬</span>
+            </button>
+          </div>
         </div>
 
       </div>
@@ -459,8 +510,8 @@ export default function WorldArena() {
           <b>{hover.region.name}</b>
           {hover.region.real && <span className="real"> · {t('arena.real')}</span>}
           <div className="row">
-            <span>{t('arena.avgLevel')}</span>
-            <span>Lv.{hover.region.score.toFixed(1)}</span>
+            <span>{t('arena.regionScore')}</span>
+            <span>{fmtScore(hover.region.score)}</span>
           </div>
           <div className="row">
             <span>{t('arena.part')}</span>

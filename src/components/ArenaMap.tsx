@@ -9,6 +9,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react'
 import { select, type Selection } from 'd3-selection'
 import {
+  geoArea,
   geoCentroid,
   geoDistance,
   geoGraticule10,
@@ -21,7 +22,7 @@ import { zoom as d3Zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } fro
 import { timer as d3Timer, type Timer } from 'd3-timer'
 import { easeCubicIn, easeCubicInOut, easeCubicOut } from 'd3-ease'
 import 'd3-transition' // selection.transition() 부착(부수효과 import)
-import { cscale, type ArenaLevel, type GeoFeature, type Region } from '../lib/arena/data'
+import { type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
 import { DOKDO_GEO, M49_TO_ISO2 } from '../lib/arena/tables'
 
 export interface ArenaMapHandle {
@@ -52,10 +53,34 @@ interface Props {
   onDrill(r: Region): void
   onPrompt(name: string): void
   onHover(info: HoverInfo | null): void
+  /** 점수 → 색. 화면에 뜬 버킷 범위로 만든 상대 스케일이라 부모가 소유한다. */
+  color: Cscale
 }
 
 const SPIN_SPEED = 0.012 // deg/ms
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
+
+/** 지도 위 순위 숫자. `area`=구면 면적(스테라디안), `f`=바운딩박스를 재기 위한 원본 지오메트리. */
+type RankLabel = { rank: number; c: [number, number]; key: string; area: number; f: GeoFeature }
+
+/**
+ * 순위 숫자 크기 — **기본은 다 같은 크기, 땅이 좁은 곳만 줄인다.**
+ *
+ * 땅 넓이에 비례해 키우지는 않는다. 크기가 곧 중요도로 읽히기 때문에, 30등인 큰 나라가 3등인
+ * 작은 나라보다 크게 나오면 순위를 잘못 읽게 된다. 그래서 큰 나라는 전부 같은 기준 크기에서 멈추고,
+ * 자기 땅에 안 들어가는 좁은 나라만 들어갈 만큼 줄인다(그래도 안 되면 숨긴다).
+ *
+ * 기준 크기는 **지도 배율에 연동**된다 — 지도가 2배가 되면 숫자도 2배. 고정 px 로 두면
+ * 확대할 때 지도만 커지고 숫자는 그대로라 따로 논다.
+ *
+ * 땅 크기는 두 값 중 작은 쪽으로 잰다:
+ *   · √(투영 면적) — 칠레·토고처럼 가늘고 긴 땅은 실제 폭보다 과대평가한다.
+ *   · 화면상 바운딩박스의 짧은 변 — 그 과대평가를 잘라 준다.
+ */
+const LABEL_BASE = 14 // 기준 크기(px, 배율 1일 때) — 여기서 더 커지지 않는다
+const LABEL_RATIO = 0.3 // 땅이 좁을 때 "짧은 변의 몇 %까지 쓸지"
+const LABEL_FLOOR = 9 // 좁은 나라도 여기까지는 유지(아래 폭 상한에 걸리면 더 줄어든다)
+const LABEL_HIDE = 6 // 그래도 이보다 작으면(px) 읽을 수 없으니 숨긴다 — 확대하면 나타난다
 
 function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -80,6 +105,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     pendingFadeIn: false,
     fadeGuard: 0,
     centered: false, // 홈 국가로 한 번이라도 중앙 정렬했는지
+    vk: 1, // 평면 레벨(1·2)에서 viewport 그룹에 걸린 확대 배율 — 글자 크기 판정에 쓴다
+    labels: [] as RankLabel[],
   })
 
   const g = useRef<{
@@ -90,16 +117,23 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     grat: Selection<SVGGElement, unknown, null, undefined>
     geo: Selection<SVGGElement, unknown, null, undefined>
     mark: Selection<SVGGElement, unknown, null, undefined>
+    labels: Selection<SVGGElement, unknown, null, undefined>
     zoom: ZoomBehavior<SVGSVGElement, unknown>
   } | null>(null)
 
   const graticule = useMemo(() => geoGraticule10(), [])
 
   // d3 이벤트 핸들러가 호출할 최신 함수들(핸들러는 마운트 때 한 번만 등록되므로 ref 로 우회).
-  const fn = useRef<{ paint: () => void; draw: () => void; activate: (r: Region) => void }>({
+  const fn = useRef<{
+    paint: () => void
+    draw: () => void
+    activate: (r: Region) => void
+    resizeLabels: () => void
+  }>({
     paint: () => {},
     draw: () => {},
     activate: () => {},
+    resizeLabels: () => {},
   })
 
   const stopSpin = useCallback(() => {
@@ -138,6 +172,46 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       ],
       { type: 'FeatureCollection', features: regions.map((r) => r.f) } as never,
     )
+  }, [])
+
+  // ── 순위 숫자 크기: 지역이 화면에서 차지하는 크기에 선형 비례 ──
+  // paint() 와 평면 레벨의 줌 tick 이 공유한다(줌만 바뀔 땐 지오메트리를 다시 그릴 필요가 없다).
+  const sizeLabels = useCallback((path: ReturnType<typeof geoPath>) => {
+    const groups = g.current
+    const { proj } = st.current
+    if (!groups || !proj) return
+    const { level } = p.current
+    const lrot = proj.rotate()
+    const pscale = proj.scale()
+    // 레벨1·2 의 확대는 viewport 그룹 transform 이라 글자에도 이미 곱해진다. 계산은 그룹 안 좌표계로
+    // 하고, "화면에서 몇 px 인가"를 판정할 때만 tk 를 곱한다(그래서 마지막에 다시 나눈다).
+    const tk = level === 0 ? 1 : st.current.vk
+    groups.labels.selectAll<SVGTextElement, RankLabel>('text').each(function (d) {
+      // (1) 면적 기준 한 변 — 투영 왜곡 보정(지구본은 가장자리 단축 cos θ, 메르카토르는 고위도 팽창 1/cos²φ)
+      let a = d.area
+      if (level === 0) a *= Math.max(0.12, Math.cos(geoDistance(d.c, [-lrot[0], -lrot[1]])))
+      else {
+        const cosLat = Math.max(0.2, Math.cos((d.c[1] * Math.PI) / 180))
+        a /= cosLat * cosLat
+      }
+      // (2) 실제 바운딩박스의 짧은 변 — 가늘고 긴 땅에서 (1)의 과대평가를 잘라 준다
+      const bb = path.bounds(d.f)
+      const shortSide = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
+      const room = Math.min(Math.sqrt(a) * pscale, shortSide)
+
+      const screenRoom = room * tk
+      // 절대 넘치지 않게 하는 폭 상한. font-size 가 아니라 **그려지는 글자 폭**으로 재야 한다 —
+      // 두 자릿수는 폭이 font-size 의 1.4배쯤이라, font-size 만 땅 크기로 잘라 두면 그대로 삐져나온다.
+      // (0.62/자릿수 = 숫자 1글자 폭, 0.24 = 흰 테두리(.22em)가 좌우로 번지는 몫)
+      const widthCap = (screenRoom * 0.92) / (0.62 * String(d.rank).length + 0.24)
+      // 기준 크기는 지도 배율만큼 커진다(지구본은 투영 배율, 평면은 그룹 transform).
+      const cap = LABEL_BASE * (level === 0 ? st.current.globeK : st.current.vk)
+      // 좁은 땅은 비례로 줄이되 하한까지는 유지 → 기준 크기와 폭 상한, 둘 다 넘지 않게 자른다.
+      const px = Math.min(Math.max(screenRoom * LABEL_RATIO, LABEL_FLOOR), cap, widthCap)
+      const node = select(this)
+      if (px < LABEL_HIDE) node.style('display', 'none')
+      else node.style('display', null).style('font-size', `${(px / tk).toFixed(2)}px`)
+    })
   }, [])
 
   // ── 지오메트리 다시 칠하기(회전·줌 tick 마다 호출) ──
@@ -207,7 +281,24 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     } else {
       groups.mark.selectAll('*').remove()
     }
-  }, [graticule])
+    // ── 순위 숫자 ── (지구본에선 뒷면 지역을 걸러낸다)
+    const lrot = proj.rotate()
+    const labelData =
+      level === 0
+        ? st.current.labels.filter((l) => geoDistance(l.c, [-lrot[0], -lrot[1]]) < Math.PI / 2)
+        : st.current.labels
+    groups.labels
+      .selectAll<SVGTextElement, RankLabel>('text')
+      .data(labelData, (d) => d.key)
+      .join('text')
+      .attr('class', 'ranklab')
+      .attr('text-anchor', 'middle')
+      .attr('dy', '0.32em')
+      .attr('x', (d) => proj(d.c)?.[0] ?? -9999)
+      .attr('y', (d) => proj(d.c)?.[1] ?? -9999)
+      .text((d) => d.rank)
+    sizeLabels(path)
+  }, [graticule, sizeLabels])
 
   const startSpin = useCallback(() => {
     stopSpin()
@@ -252,6 +343,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
 
   const resetView = useCallback(() => {
     st.current.globeK = 1
+    st.current.vk = 1
     g.current?.viewport.attr('transform', null)
     const node = svgRef.current as (SVGSVGElement & { __zoom?: unknown }) | null
     if (node) node.__zoom = zoomIdentity
@@ -317,7 +409,21 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     const { regions, level, selKey, spinLocked } = p.current
     if (!regions.length) return
 
+    // 평면 레벨에서 확대해 둔 채 breadcrumb 로 지구본에 돌아오면 viewport transform 이 남는다 → 정리.
+    if (level === 0 && st.current.vk !== 1) resetView()
+
     st.current.proj = makeProjection(regions, level)
+    // 전 지역에 등수를 매긴다(예전엔 상위 60개만). 땅이 좁아 안 들어가는 라벨은 sizeLabels 가 숨기고,
+    // 확대하면 다시 나타난다.
+    st.current.labels = [...regions]
+      .sort((a, b) => b.score - a.score)
+      .map((r, i) => ({
+        rank: i + 1,
+        c: geoCentroid(r.f) as [number, number],
+        key: r.key,
+        area: geoArea(r.f),
+        f: r.f,
+      }))
 
     const sel = groups.geo.selectAll<SVGPathElement, Region>('path').data(regions, (d) => d.key)
     sel.exit().remove()
@@ -333,7 +439,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .merge(sel)
       .classed('dim', (d) => !d.drill && level === 0)
       .classed('sel', (d) => d.key === selKey)
-      .attr('fill', (d) => cscale(d.score))
+      .attr('fill', (d) => p.current.color(d.score))
 
     paint()
 
@@ -353,10 +459,18 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         .style('opacity', '1')
         .style('transform', 'scale(1)')
     }
-  }, [makeProjection, paint, reduceMotion, startSpin, stopSpin])
+  }, [makeProjection, paint, reduceMotion, resetView, startSpin, stopSpin])
 
   useLayoutEffect(() => {
-    fn.current = { paint, draw, activate }
+    fn.current = {
+      paint,
+      draw,
+      activate,
+      // 줌 tick 전용 — 지오메트리는 viewport transform 이 처리하므로 글자 크기만 다시 잡는다.
+      resizeLabels: () => {
+        if (st.current.proj) sizeLabels(geoPath(st.current.proj))
+      },
+    }
   })
 
   // ── 마운트: SVG 뼈대(그라디언트·그룹) + 줌/팬 + 리사이즈 관측 ──
@@ -401,6 +515,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       grat: viewport.append('g'),
       geo: viewport.append('g'),
       mark: viewport.append('g'),
+      labels: viewport.append('g').attr('class', 'ranklabs'),
       zoom: null as unknown as ZoomBehavior<SVGSVGElement, unknown>,
     }
 
@@ -427,7 +542,9 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
           st.current.proj?.scale(st.current.baseScale0 * st.current.globeK).rotate(st.current.rot)
           fn.current.paint()
         } else {
+          st.current.vk = t.k
           viewport.attr('transform', t.toString())
+          fn.current.resizeLabels()
         }
       })
       .on('end', () => {

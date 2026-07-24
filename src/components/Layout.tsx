@@ -333,7 +333,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
             <div className="pf-list">
               <button className="pf-item" onClick={() => go('/')}>
-                <span className="ic"><HomeIcon /></span> {t('common.home')}
+                <span className="ic"><HomeIcon /></span> {t('fab.home')}
               </button>
               <button className="pf-item" onClick={goArena}>
                 <span className="ic"><EarthIcon /></span> {t('common.leveltest')}
@@ -342,7 +342,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 <span className="ic"><InfoIcon /></span> {t('nav.caris')}
               </button>
               <button className="pf-item" onClick={() => go('/ebooks')}>
-                <span className="ic"><BookIcon /></span> {t('ebook.store_title')}
+                <span className="ic"><BookIcon /></span> {t('fab.ebookstore')}
               </button>
             </div>
 

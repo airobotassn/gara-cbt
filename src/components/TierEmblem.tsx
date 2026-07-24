@@ -186,7 +186,18 @@ function emblemSvg(cfg: Cfg, id: string, size: number): string {
   b += crown(cx, cy - cfg.gemR + 4, cfg.crown, c, 1 + (cfg.glow >= 3 ? 0.25 : 0))
   b += spikes(cx, cy, cfg.gemR + 3, cfg.gemR + 3 + (7 + cfg.spk * 0.4), cfg.spk, c)
   b += gem(cx, cy, cfg.gemR, c, cfg.bright, cfg.rough ?? false)
-  return `<svg viewBox="0 0 120 124" width="${size}" height="${size}">${defs}<g filter="url(#sh${id})">${b}</g></svg>`
+  // xmlns 필수 — 이 마크업을 data: URL <img> 로 래스터화하는 경로(공유 카드)가 있어서,
+  // 없으면 인라인(dangerouslySetInnerHTML)에서는 보이는데 카드에서만 조용히 안 그려진다.
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 124" width="${size}" height="${size}">${defs}<g filter="url(#sh${id})">${b}</g></svg>`
+}
+
+// 엠블렘 SVG 문자열(자립형 — 외부 이미지/폰트 참조 없음).
+// 공유 카드(lib/shareCard.ts)가 이걸 <img> 로 래스터화해 캔버스에 얹는다.
+// SVG-in-img 는 외부 리소스를 못 불러오므로 이 마크업은 반드시 자립형을 유지할 것.
+// eslint-disable-next-line react-refresh/only-export-components
+export function emblemSvgMarkup(tierKey: string | null | undefined, size: number): string {
+  const cfg = CFG[tierKey ?? 'iron'] ?? CFG.iron
+  return emblemSvg(cfg, `${tierKey ?? 'iron'}_${counter++}`, size)
 }
 
 export default function TierEmblem({

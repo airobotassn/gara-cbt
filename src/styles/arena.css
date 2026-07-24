@@ -64,12 +64,14 @@ html.dark .arena {
 .aa-head h1 { margin: 0; font-size: clamp(26px, 3.6vw, 36px); font-weight: 900; letter-spacing: -.02em; }
 
 /* ── 레이아웃 ── */
-.aa-grid { display: grid; grid-template-columns: 1fr 316px; gap: 16px; align-items: stretch; height: clamp(500px, 70vh, 720px); }
-.aa-stage, .aa-side { height: 100%; min-height: 0; }
+.aa-grid { display: grid; grid-template-columns: 1fr 316px 52px; gap: 16px; align-items: stretch; height: clamp(500px, 70vh, 720px); }
+.aa-grid.aa-solo { grid-template-columns: 1fr 52px; }
+.aa-stage, .aa-side, .aa-tabs { height: 100%; min-height: 0; }
 @media (max-width: 880px) {
-  .aa-grid { grid-template-columns: 1fr; height: auto; }
+  .aa-grid, .aa-grid.aa-solo { grid-template-columns: 1fr; height: auto; }
   .aa-stage { height: 60vh; }
   .aa-side { height: auto; max-height: 74vh; }
+  .aa-tabs { height: auto; width: 100%; flex-direction: row; }
 }
 .aa-card { background: var(--aa-panel); border: 2.5px solid var(--aa-line); border-radius: 20px; box-shadow: var(--aa-shadow); }
 
@@ -103,8 +105,9 @@ html.dark .arena {
 
 /* ── 범례 · 확대축소 ── */
 .aa-legend { display: flex; align-items: center; gap: 10px; padding: 10px 18px 15px; font-size: 11.5px; color: var(--aa-muted); font-weight: 700; }
+/* 범례 = 지도 색 램프(CSCALE_RAMP)와 동일한 3색. 지도 색이 JS 고정값이라 이 바도 테마와 무관하게 고정. */
 .aa-legend .bar { flex: 1; height: 8px; border-radius: 999px;
-  background: linear-gradient(90deg, var(--aa-c0), var(--aa-c1), var(--aa-c2), var(--aa-c3)); }
+  background: linear-gradient(90deg, #dceafb, #7eaae6, #2159c6); }
 .aa-zoomctl { position: absolute; left: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
 .aa-zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--aa-line); background: var(--aa-panel); color: var(--aa-ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--aa-sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .aa-zoomctl button:hover { background: var(--aa-panel-2); }
@@ -165,6 +168,47 @@ html.dark .arena {
 .aa-rank .nm .cnt { font-size: 11px; color: var(--aa-faint); font-weight: 600; margin-top: 3px; }
 .aa-rank .sc { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .aa-rank li.drill .sc::after { content: "›"; margin-left: 5px; color: var(--aa-faint); font-weight: 700; }
+.aa-side-chat { padding: 16px 16px 10px; }
+.aa-side-chat .chat-panel { flex: 1; min-height: 0; }
+.aa-side-chat .chat-list { flex: 1; height: auto; min-height: 0; }
+
+/* ── 우측 세로 탭(월드리그/채팅 토글) ──
+   원래는 세로쓰기 텍스트 + flex:1 이라 높이를 반씩 나눠 먹는 긴 막대였다. 아이콘 정사각 버튼으로
+   바꾸고 이름은 호버/포커스 툴팁으로 뺐다 — 막대가 지도 옆에서 시선을 끌던 문제와 세로쓰기
+   가독성 문제를 같이 없앤다. 켜짐 표시는 채도 대비: 꺼진 탭은 흑백+반투명, 켜진 탭은 원색+액센트 판. */
+.aa-tabs { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; width: 52px; }
+.aa-tab { position: relative; flex: 0 0 auto; width: 52px; height: 52px; padding: 0; display: grid; place-items: center;
+  font: inherit; font-size: 25px; line-height: 1; cursor: pointer;
+  background: var(--aa-panel); border: 2.5px solid var(--aa-line); border-radius: 16px;
+  box-shadow: 0 4px 0 var(--aa-sh-solid);
+  transition: transform .1s ease, box-shadow .1s ease, background .15s ease, border-color .15s ease; }
+.aa-tab .ti { display: block; filter: grayscale(1); opacity: .5; transition: filter .15s ease, opacity .15s ease, transform .15s ease; }
+.aa-tab:hover { background: var(--aa-panel-2); transform: translateY(-2px); box-shadow: 0 6px 0 var(--aa-sh-solid); }
+.aa-tab:hover .ti { filter: none; opacity: 1; transform: scale(1.08); }
+.aa-tab:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
+.aa-tab:focus-visible { outline: 2px solid var(--aa-accent); outline-offset: 2px; }
+.aa-tab.on { background: color-mix(in srgb, var(--aa-accent) 16%, var(--aa-surface-mix)); border-color: var(--aa-accent);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--aa-accent) 45%, var(--aa-surface-mix)); }
+.aa-tab.on:hover { box-shadow: 0 6px 0 color-mix(in srgb, var(--aa-accent) 45%, var(--aa-surface-mix)); }
+.aa-tab.on .ti { filter: none; opacity: 1; }
+/* 이름 툴팁 — 레일이 화면 오른쪽 끝이라 왼쪽으로 편다 */
+.aa-tab::after { content: attr(data-label); position: absolute; z-index: 12; right: calc(100% + 9px); top: 50%;
+  transform: translateY(-50%) translateX(5px);
+  background: var(--aa-ink); color: var(--aa-bg); font-size: 12px; font-weight: 800; letter-spacing: -.01em;
+  padding: 6px 10px; border-radius: 9px; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, .5); opacity: 0; transition: opacity .13s ease, transform .13s ease; }
+.aa-tab:hover::after, .aa-tab:focus-visible::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+@media (max-width: 880px) {
+  /* 패널이 지도 아래로 내려가는 폭 — 레일도 가로로 눕고 툴팁은 아래로 */
+  .aa-tabs { flex-direction: row; justify-content: flex-end; width: 100%; }
+  .aa-tab::after { right: auto; left: 50%; top: calc(100% + 8px); transform: translate(-50%, -5px); }
+  .aa-tab:hover::after, .aa-tab:focus-visible::after { transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aa-tab, .aa-tab .ti, .aa-tab::after { transition: none; }
+  .aa-tab:hover { transform: none; }
+  .aa-tab:hover .ti { transform: none; }
+}
 
 /* ── 툴팁 ── */
 .aa-tip { position: fixed; z-index: 20; pointer-events: none; transform: translate(-50%, -114%);
@@ -192,5 +236,17 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
 #arena-map #atmoGrad .a-out  { stop-color: var(--aa-atmo); stop-opacity: var(--aa-atmo-op); }
 #arena-map .grat { fill: none; stroke: var(--aa-sphere-line); stroke-width: .5; opacity: .5; }
 #arena-map .krmark { fill: none; stroke: var(--aa-gold); stroke-width: 2; }
+/* 순위 숫자 — 크기는 ArenaMap 이 .ranklabs 그룹의 font-size 로 한 번에 준다(지도 배율에 연동).
+   그래서 테두리 두께도 px 가 아니라 em 이다 — px 로 박으면 확대·축소할 때 지도와 따로 논다. */
+#arena-map .ranklab {
+  fill: #16324f;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, .9);
+  stroke-width: .22em;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
 
 .aa-loading { display: grid; place-items: center; height: 100%; color: var(--aa-muted); font-weight: 700; font-size: 14px; }
