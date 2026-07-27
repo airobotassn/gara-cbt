@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { renderEbookCover } from '../lib/ebookCover'
+import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
 import type {
   AdminListResponse,
   AdminAttemptRow,
@@ -42,6 +43,7 @@ import type {
   AdminEbookListResp,
   AdminEbookBuyer,
   AdminEbookBuyersResp,
+  EbookTranslation,
 } from '../lib/types'
 import LevelTestAdmin from './AdminLevelTest'
 import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
@@ -2003,9 +2005,10 @@ interface EbookDraft {
   storagePath: string
   published: boolean
   sortOrder: number
+  translations: Record<string, EbookTranslation>
 }
 function emptyEbookDraft(): EbookDraft {
-  return { title: '', author: '', description: '', coverUrl: '', price: 0, storagePath: '', published: false, sortOrder: 0 }
+  return { title: '', author: '', description: '', coverUrl: '', price: 0, storagePath: '', published: false, sortOrder: 0, translations: {} }
 }
 
 export function EbooksAdmin() {
@@ -2015,7 +2018,8 @@ export function EbooksAdmin() {
   const [draft, setDraft] = useState<EbookDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false) // 순서 변경 중(↑↓)
-  const [uploading, setUploading] = useState<'html' | 'cover' | null>(null)
+  const [uploading, setUploading] = useState<'html' | 'cover' | 'translate' | null>(null)
+  const [trStatus, setTrStatus] = useState('') // 번역 진행 문구
   const [buyersOf, setBuyersOf] = useState<{ book: AdminEbookRow; rows: AdminEbookBuyer[] } | null>(null)
 
   const load = useCallback(async () => {
@@ -2048,27 +2052,108 @@ export function EbooksAdmin() {
     return supabase.storage.from('ebook-covers').getPublicUrl(path).data.publicUrl
   }
 
+  // 본문을 5개 언어로 번역 → 언어별 HTML·표지·스토어 메타를 만들어 저장한다.
+  //   원문 폴더(<uuid>/) 안에 <lang>.html 로 넣어 삭제 시 함께 정리되게 한다.
+  async function runTranslation(html: string, d: EbookDraft): Promise<Record<string, EbookTranslation>> {
+    const folder = d.storagePath.split('/')[0]
+    const results = await translateEbook(
+      html,
+      { title: d.title, author: d.author, description: d.description },
+      EBOOK_LANGS,
+      (p) => {
+        if (p.phase === 'translate') setTrStatus(`번역 ${p.done}/${p.total} 조각`)
+        else if (p.phase === 'build') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 본문 생성 중…`)
+        else if (p.phase === 'check') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 페이지 넘침 검사 중…`)
+      },
+    )
+    const out: Record<string, EbookTranslation> = {}
+    for (const r of results) {
+      setTrStatus(`${EBOOK_LANG_LABEL[r.lang]} 저장 중…`)
+      const path = `${folder}/${r.lang}.html`
+      const { error } = await supabase.storage
+        .from('ebooks')
+        .upload(path, new Blob([r.html], { type: 'text/html' }), { contentType: 'text/html', upsert: true })
+      if (error) throw error
+      // 표지도 그 언어 1페이지로 굽는다 — 영어본을 읽는 사람에게 한국어 표지를 보이지 않게.
+      let coverUrl: string | undefined
+      try {
+        coverUrl = await bakeCover(r.html)
+      } catch {
+        // 표지 실패는 번역을 막지 않는다(한국어 표지로 폴백된다).
+      }
+      out[r.lang] = {
+        path,
+        coverUrl,
+        title: r.meta.title,
+        author: r.meta.author,
+        description: r.meta.description,
+        failed: r.failed,
+        overflowPages: r.overflowPages,
+        at: new Date().toISOString(),
+      }
+    }
+    return out
+  }
+
+  // 이미 등록된 책 다시 번역 — 본문을 비공개 버킷에서 내려받아 파이프라인을 다시 돌린다.
+  async function regenTranslations() {
+    if (!draft?.storagePath) return
+    if (!confirm('5개 언어(영어·일본어·중국어·힌디·베트남어)로 번역합니다. 몇 분 걸릴 수 있습니다. 진행할까요?')) return
+    setUploading('translate')
+    setTrStatus('본문 내려받는 중…')
+    try {
+      const { data, error } = await supabase.storage.from('ebooks').download(draft.storagePath)
+      if (error) throw error
+      patch({ translations: await runTranslation(await data.text(), draft) })
+      setTrStatus('')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '번역에 실패했습니다.')
+      setTrStatus('')
+    } finally {
+      setUploading(null)
+    }
+  }
+
   // 본문 HTML 업로드 — 파일마다 새 폴더(uuid)를 써서 덮어쓰기 사고를 막는다.
-  //   업로드가 끝나면 이어서 표지를 자동 생성한다(표지 생성이 실패해도 본문 등록은 유효 —
-  //   coverUrl 이 비면 스토어가 제목 그라데이션 표지로 대체한다).
+  //   업로드 → 표지 자동 생성 → 5개 언어 번역까지 한 흐름으로 이어진다.
+  //   각 단계는 앞 단계 결과만 있으면 되므로, 뒤 단계가 실패해도 앞 단계는 유효하게 남긴다
+  //   (표지 실패 → 제목 그라데이션 표지 / 번역 실패 → 한국어본만).
   async function uploadHtml(file: File) {
     if (!/\.html?$/i.test(file.name)) {
       alert('HTML 파일(.html)만 업로드할 수 있습니다.')
       return
     }
+    if (!draft) return
     setUploading('html')
     try {
       const html = await file.text()
       const path = `${crypto.randomUUID()}/${file.name.replace(/[^\w.-]/g, '_')}`
       const { error } = await supabase.storage.from('ebooks').upload(path, file, { contentType: 'text/html', upsert: false })
       if (error) throw error
+      // ⚠️ setState 는 비동기라 이 함수 안에서 draft 를 다시 읽으면 옛 값이다. 갱신본을 직접 들고 간다.
+      const next: EbookDraft = { ...draft, storagePath: path }
       patch({ storagePath: path })
+
       setUploading('cover')
-      patch({ coverUrl: await bakeCover(html) })
+      try {
+        patch({ coverUrl: await bakeCover(html) })
+      } catch (e) {
+        alert(`표지 생성 실패 — 본문은 등록됐습니다.\n${e instanceof Error ? e.message : ''}`)
+      }
+
+      setUploading('translate')
+      setTrStatus('번역 준비 중…')
+      try {
+        patch({ translations: await runTranslation(html, next) })
+      } catch (e) {
+        alert(`번역 실패 — 한국어본은 등록됐습니다. 저장 후 '다시 번역'으로 재시도할 수 있습니다.\n${e instanceof Error ? e.message : ''}`)
+      }
+      setTrStatus('')
     } catch (e) {
       alert(e instanceof Error ? e.message : '업로드에 실패했습니다.')
     } finally {
       setUploading(null)
+      setTrStatus('')
     }
   }
 
@@ -2221,6 +2306,7 @@ export function EbooksAdmin() {
                         storagePath: b.storagePath,
                         published: b.published,
                         sortOrder: b.sortOrder,
+                        translations: b.translations ?? {},
                       })
                     }
                   >
@@ -2308,6 +2394,45 @@ export function EbooksAdmin() {
                     {uploading === 'cover' ? '표지 만드는 중…' : '표지 다시 만들기'}
                   </button>
                 </div>
+              </div>
+
+              {/* 다국어 — 본문 텍스트를 5개 언어로 번역해 언어별 본문·표지·스토어 문구를 만든다. */}
+              <div style={fieldStyle}>
+                <span>다국어 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(본문 업로드 시 자동 번역)</em></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {EBOOK_LANGS.map((lg) => {
+                    const t = draft.translations[lg]
+                    const warn = !!t && ((t.failed ?? 0) > 0 || (t.overflowPages?.length ?? 0) > 0)
+                    const title = !t
+                      ? '번역 없음'
+                      : [
+                          (t.failed ?? 0) > 0 ? `번역 실패 조각 ${t.failed}개(한국어로 남음)` : '',
+                          (t.overflowPages?.length ?? 0) > 0 ? `글이 넘쳐 잘린 페이지: ${t.overflowPages!.join(', ')}` : '',
+                        ].filter(Boolean).join(' · ') || '이상 없음'
+                    return (
+                      <span
+                        key={lg}
+                        title={title}
+                        className={`admin-badge st-${!t ? 'expired' : warn ? 'voided' : 'submitted'}`}
+                        style={{ cursor: 'help' }}
+                      >
+                        {EBOOK_LANG_LABEL[lg]}
+                        {t ? (warn ? ' ⚠' : ' ✓') : ' –'}
+                      </span>
+                    )
+                  })}
+                  <button type="button" className="admin-mini" disabled={!draft.storagePath || !!uploading} onClick={regenTranslations}>
+                    {uploading === 'translate' ? '번역 중…' : '다시 번역'}
+                  </button>
+                </div>
+                {uploading === 'translate' && trStatus && (
+                  <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{trStatus}</span>
+                )}
+                {!uploading && EBOOK_LANGS.some((lg) => (draft.translations[lg]?.overflowPages?.length ?? 0) > 0) && (
+                  <span style={{ fontSize: 12.5, color: 'var(--error, #d43a3a)' }}>
+                    ⚠ 번역문이 길어 잘린 페이지가 있습니다 — 뱃지에 마우스를 올리면 페이지 번호가 보입니다.
+                  </span>
+                )}
               </div>
 
               <label style={{ ...fieldStyle, flexDirection: 'row', alignItems: 'center', gap: 8 }}>

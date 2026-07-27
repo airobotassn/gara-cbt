@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
 import type { EbookReadResp } from '../lib/types'
 
 // ── 반출 억제 레이어 ────────────────────────────────────────────────────────────
@@ -49,20 +50,25 @@ function protectHtml(raw: string, mark: string): string {
 }
 
 export default function EbookReader() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { user, isFullUser, loading: authLoading, loginWithGoogle } = useAuth()
   const [book, setBook] = useState<EbookReadResp | null>(null)
   const [html, setHtml] = useState('')
   const [err, setErr] = useState('')
+  // 읽을 언어. 기본 = 화면 언어(번역본이 없으면 서버가 한국어로 폴백해 준다).
+  //   화면 언어 타입(Lang)에 묶지 않는다 — 책이 가진 언어 목록에서 고르는 값이라 서버가 판정한다.
+  const [readLang, setReadLang] = useState<string>(lang)
+  useEffect(() => { setReadLang(lang) }, [lang])
 
   useEffect(() => {
     if (authLoading || !isFullUser || !id) return
     let alive = true
+    setHtml('')
     ;(async () => {
       try {
-        const b = await callFunction<EbookReadResp>('ebooks', { action: 'read', id })
+        const b = await callFunction<EbookReadResp>('ebooks', { action: 'read', id, lang: readLang })
         if (!alive) return
         setBook(b)
         const res = await fetch(b.url)
@@ -83,7 +89,7 @@ export default function EbookReader() {
     return () => {
       alive = false
     }
-  }, [id, isFullUser, authLoading, user])
+  }, [id, isFullUser, authLoading, user, readLang])
 
   if (authLoading) {
     return <div className="wrap"><div className="card pad" style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('common.loading')}</div></div>
@@ -160,6 +166,31 @@ export default function EbookReader() {
         </button>
         <strong style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }}>{book?.title ?? ''}</strong>
         {book?.author && <span style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{book.author}</span>}
+        {/* 번역본이 있는 책만 언어 선택을 띄운다(한 언어뿐이면 고를 게 없다). */}
+        {(book?.langs?.length ?? 0) > 1 && (
+          <select
+            value={book?.lang ?? readLang}
+            onChange={(e) => setReadLang(e.target.value)}
+            aria-label={t('ebook.reader_lang')}
+            style={{
+              marginLeft: 'auto',
+              padding: '6px 10px',
+              borderRadius: 999,
+              border: '1px solid #d9e0f0',
+              background: '#fff',
+              color: '#28324c',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            {book!.langs.map((lg) => (
+              <option key={lg} value={lg}>
+                {EBOOK_LANG_LABEL[lg] ?? lg}
+              </option>
+            ))}
+          </select>
+        )}
       </header>
       {html ? (
         <iframe

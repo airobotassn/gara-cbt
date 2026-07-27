@@ -12,7 +12,7 @@ import EbookCover from '../components/EbookCover'
 import type { EbookListResp, EbookRow } from '../lib/types'
 
 export default function Ebooks() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const navigate = useNavigate()
   const { isFullUser } = useAuth()
   const [rows, setRows] = useState<EbookRow[] | null>(null)
@@ -26,10 +26,10 @@ export default function Ebooks() {
   const [zoom, setZoom] = useState<EbookRow | null>(null)
 
   useEffect(() => {
-    callFunction<EbookListResp>('ebooks', { action: 'store' })
+    callFunction<EbookListResp>('ebooks', { action: 'store', lang })
       .then((r) => setRows(r.ebooks))
       .catch((e) => setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.'))
-  }, [isFullUser])
+  }, [isFullUser, lang])
 
   // 모달은 Esc 로도 닫는다.
   useEffect(() => {

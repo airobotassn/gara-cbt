@@ -1498,7 +1498,7 @@ async function setRegion(admin: any, body: any) {
 async function ebookList(admin: any) {
   const { data, error } = await admin
     .from('ebooks')
-    .select('id, title, author, description, cover_url, price, storage_path, published, sort_order, created_at, updated_at')
+    .select('id, title, author, description, cover_url, price, storage_path, published, sort_order, created_at, updated_at, translations')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) return json({ error: error.message }, 400)
@@ -1520,6 +1520,7 @@ async function ebookList(admin: any) {
     sortOrder: b.sort_order ?? 0,
     createdAt: b.created_at,
     buyers: counts[b.id] ?? 0,
+    translations: b.translations ?? {},
   }))
   return json({ ebooks })
 }
@@ -1541,6 +1542,8 @@ async function ebookUpsert(admin: any, body: any) {
     published: !!e.published,
     sort_order: Math.floor(Number(e.sortOrder ?? 0)) || 0,
     updated_at: new Date().toISOString(),
+    // 언어별 본문·표지·메타. 클라가 번역 파이프라인을 돌린 결과를 통째로 넘긴다(없으면 빈 객체 유지).
+    translations: e.translations && typeof e.translations === 'object' ? e.translations : {},
   }
 
   if (e.id) {
@@ -1565,15 +1568,20 @@ async function ebookReorder(admin: any, body: any) {
   return json({ ok: true })
 }
 
-// 삭제 = 메타데이터 + 본문 파일. 구매 기록은 FK cascade 로 함께 사라진다(환불/회수와 동일 취급).
+// 삭제 = 메타데이터 + 본문 파일(번역본 포함). 구매 기록은 FK cascade 로 함께 사라진다(환불/회수와 동일 취급).
 async function ebookDelete(admin: any, body: any) {
   const id = String(body?.id ?? '').trim()
   if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
-  const { data: b } = await admin.from('ebooks').select('storage_path').eq('id', id).maybeSingle()
+  const { data: b } = await admin.from('ebooks').select('storage_path, translations').eq('id', id).maybeSingle()
   const { error } = await admin.from('ebooks').delete().eq('id', id)
   if (error) return json({ error: error.message }, 400)
-  if (b?.storage_path) {
-    try { await admin.storage.from('ebooks').remove([b.storage_path]) } catch { /* 파일만 남아도 무해 */ }
+  // 원문 + 언어별 번역본을 함께 지운다(같은 uuid 폴더에 모여 있지만 경로를 직접 모아 지우는 게 확실하다).
+  const paths = [
+    b?.storage_path,
+    ...Object.values((b?.translations ?? {}) as Record<string, { path?: string }>).map((t) => t?.path),
+  ].filter(Boolean) as string[]
+  if (paths.length) {
+    try { await admin.storage.from('ebooks').remove(paths) } catch { /* 파일만 남아도 무해 */ }
   }
   return json({ ok: true })
 }

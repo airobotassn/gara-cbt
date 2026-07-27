@@ -29,7 +29,7 @@ export default function Result() {
   const { attemptId } = useParams()
   const location = useLocation()
   const { isFullUser, loginWithGoogle } = useAuth()
-  const { t } = useT()
+  const { t, lang } = useT()
   const initial = (location.state as ResultResponse | null) ?? null
 
   const [data, setData] = useState<ResultResponse | null>(initial)
@@ -119,7 +119,7 @@ export default function Result() {
         )}
 
         {/* 결과 아래 한 칸 — eBook Store 추천(잠금 여부와 무관하게 노출). */}
-        <EbookPicks t={t} />
+        <EbookPicks t={t} lang={lang} />
 
         <div className="result-actions">
           {isFullUser ? (
@@ -418,16 +418,16 @@ function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
 //   ⚠️ 이북에 레벨·6축 메타데이터가 없어서 '결과 기반 매칭'이 아니라 스토어 노출순(sort_order) 상위다.
 //      축별 추천으로 바꾸려면 ebooks 테이블에 대상 레벨/영역 컬럼을 먼저 붙여야 한다.
 const EBOOK_PICKS = 3
-function EbookPicks({ t }: { t: TFunc }) {
+function EbookPicks({ t, lang }: { t: TFunc; lang: string }) {
   const [books, setBooks] = useState<EbookRow[] | null>(null)
 
   useEffect(() => {
     let alive = true
-    callFunction<EbookListResp>('ebooks', { action: 'store' })
+    callFunction<EbookListResp>('ebooks', { action: 'store', lang })
       .then((r) => { if (alive) setBooks(r.ebooks.slice(0, EBOOK_PICKS)) })
       .catch(() => { if (alive) setBooks([]) })
     return () => { alive = false }
-  }, [])
+  }, [lang])
 
   // 아직 못 불러왔거나 등록된 이북이 없으면 칸 자체를 그리지 않는다(빈 카드 방지).
   if (!books || books.length === 0) return null

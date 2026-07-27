@@ -190,16 +190,17 @@ function ProfileSection() {
 
 // 이북 서재 — 구매한 이북만 보인다(구매는 /ebooks 스토어에서). 읽기는 뷰어(/ebooks/read/:id).
 function EbookLibrary() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const navigate = useNavigate()
   const [rows, setRows] = useState<EbookRow[] | null>(null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
-    callFunction<EbookListResp>('ebooks', { action: 'library' })
+    // 화면 언어의 번역본이 있으면 그 제목·표지로 보여준다(없으면 서버가 한국어로 폴백).
+    callFunction<EbookListResp>('ebooks', { action: 'library', lang })
       .then((r) => setRows(r.ebooks))
       .catch((e) => setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.'))
-  }, [])
+  }, [lang])
 
   if (err) return <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>
   if (rows === null) return <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>

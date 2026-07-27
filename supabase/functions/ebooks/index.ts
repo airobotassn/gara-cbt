@@ -12,14 +12,30 @@ const SIGNED_URL_TTL = 60 * 60
 
 type Row = Record<string, unknown>
 
-function shape(b: Row, owned: boolean) {
+interface TrEntry {
+  path?: string
+  coverUrl?: string
+  title?: string
+  author?: string
+  description?: string
+}
+type TrMap = Record<string, TrEntry>
+
+const trMap = (b: Row): TrMap => (b.translations as TrMap | null) ?? {}
+
+// 스토어·서재 카드는 **요청 언어**로 보여준다(제목·소개·표지 모두 그 언어본). 없으면 한국어 원문.
+//   langs = 이 책이 가진 번역 언어 목록 → 뷰어의 언어 선택에 쓴다.
+function shape(b: Row, owned: boolean, lang: string) {
+  const tr = trMap(b)
+  const t = tr[lang] ?? {}
   return {
     id: b.id as string,
-    title: b.title as string,
-    author: (b.author as string | null) ?? null,
-    description: (b.description as string | null) ?? null,
-    coverUrl: (b.cover_url as string | null) ?? null,
+    title: t.title || (b.title as string),
+    author: t.author || ((b.author as string | null) ?? null),
+    description: t.description || ((b.description as string | null) ?? null),
+    coverUrl: t.coverUrl || ((b.cover_url as string | null) ?? null),
     price: (b.price as number) ?? 0,
+    langs: ['ko', ...Object.keys(tr).filter((k) => tr[k]?.path)],
     owned,
   }
 }
@@ -34,6 +50,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
     const action = body?.action ?? 'store'
+    // 화면 언어. 스토어/서재 카드와 본문을 이 언어로 낸다(번역본이 없으면 한국어).
+    const lang = String(body?.lang ?? 'ko').trim() || 'ko'
     const admin = adminClient()
     const user = await getUser(req)
     // 익명(게스트) 세션은 구매/서재 대상이 아니다 — 정식 회원만.
@@ -42,13 +60,13 @@ Deno.serve(async (req) => {
     if (action === 'store') {
       const { data, error } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price, published, sort_order, created_at')
+        .select('id, title, author, description, cover_url, price, published, sort_order, created_at, translations')
         .eq('published', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
       if (error) return json({ error: error.message }, 400)
       const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
-      return json({ ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string))) })
+      return json({ ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string), lang)) })
     }
 
     if (action === 'library') {
@@ -62,14 +80,14 @@ Deno.serve(async (req) => {
       if (!ids.length) return json({ ebooks: [] })
       const { data: books } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price')
+        .select('id, title, author, description, cover_url, price, translations')
         .in('id', ids)
       const byId = new Map((books ?? []).map((b: Row) => [b.id as string, b]))
       // 구매 순(최신 먼저) 유지. 관리자가 삭제한 책은 건너뛴다.
       const ebooks = (purchases ?? [])
         .map((p: Row) => {
           const b = byId.get(p.ebook_id as string)
-          return b ? { ...shape(b, true), purchasedAt: p.created_at as string } : null
+          return b ? { ...shape(b, true, lang), purchasedAt: p.created_at as string } : null
         })
         .filter(Boolean)
       return json({ ebooks })
@@ -115,24 +133,32 @@ Deno.serve(async (req) => {
 
       const { data: book } = await admin
         .from('ebooks')
-        .select('id, title, author, storage_path')
+        .select('id, title, author, storage_path, translations')
         .eq('id', id)
         .maybeSingle()
       if (!book) return json({ error: '이북을 찾을 수 없습니다.' }, 404)
 
+      // 요청 언어의 번역본이 있으면 그걸, 없으면 원문(ko).
+      const tr = trMap(book)
+      const entry = tr[lang]
+      const path = entry?.path || (book.storage_path as string)
+
       const { data: signed, error: signErr } = await admin.storage
         .from('ebooks')
-        .createSignedUrl(book.storage_path as string, SIGNED_URL_TTL)
+        .createSignedUrl(path, SIGNED_URL_TTL)
       if (signErr || !signed?.signedUrl) {
         return json({ error: signErr?.message ?? '본문을 불러올 수 없습니다.' }, 400)
       }
 
       return json({
         id: book.id,
-        title: book.title,
-        author: book.author ?? null,
+        title: entry?.title || (book.title as string),
+        author: entry?.author || ((book.author as string | null) ?? null),
         url: signed.signedUrl,
         expiresIn: SIGNED_URL_TTL,
+        // 실제로 연 언어(요청 언어에 번역본이 없으면 'ko') + 이 책이 가진 언어 목록
+        lang: entry?.path ? lang : 'ko',
+        langs: ['ko', ...Object.keys(tr).filter((k) => tr[k]?.path)],
       })
     }
 

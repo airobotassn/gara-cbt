@@ -438,11 +438,12 @@ export interface CbtUserDetailResp {
 // 스토어(/ebooks) · 마이페이지 서재 · 뷰어가 공유. 본문 HTML 은 비공개 버킷 → 서명 URL 로만 열람.
 export interface EbookRow {
   id: string
-  title: string
+  title: string // 요청 언어의 번역본이 있으면 그 제목
   author: string | null
   description: string | null
-  coverUrl: string | null
+  coverUrl: string | null // 그 언어의 표지(본문 1페이지를 구운 것)
   price: number // 원(KRW). 0 = 무료
+  langs: string[] // 이 책이 가진 언어(항상 'ko' 포함)
   owned: boolean
   purchasedAt?: string // 서재(library) 응답에만
 }
@@ -455,6 +456,20 @@ export interface EbookReadResp {
   author: string | null
   url: string // 서명 URL (기본 1시간)
   expiresIn: number
+  lang: string // 실제로 연 언어(요청 언어에 번역본이 없으면 'ko')
+  langs: string[] // 이 책이 가진 언어
+}
+
+/** 이북 번역본 1건 — `ebooks.translations` jsonb 의 값. 원문(ko)은 여기 없다. */
+export interface EbookTranslation {
+  path: string
+  coverUrl?: string
+  title?: string
+  author?: string
+  description?: string
+  failed?: number // 번역 실패해 한국어로 남은 조각 수
+  overflowPages?: number[] // 번역문이 길어져 잘린 페이지 번호(1부터)
+  at?: string
 }
 
 // 관리자(admin 함수) — 이북 관리
@@ -470,6 +485,7 @@ export interface AdminEbookRow {
   sortOrder: number
   createdAt: string
   buyers: number
+  translations: Record<string, EbookTranslation>
 }
 export interface AdminEbookListResp {
   ebooks: AdminEbookRow[]

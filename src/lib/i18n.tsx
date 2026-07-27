@@ -1178,6 +1178,7 @@ const D: Record<string, Record<Lang, string>> = {
   "ebook.go_library": { ko: "이북 서재에서 보기", en: "Open in Library", ja: "ライブラリで見る", zh: "在书架中查看", hi: "लाइब्रेरी में खोलें", vi: "Xem trong thư viện" },
   "ebook.load_failed": { ko: "이북을 불러올 수 없습니다.", en: "Could not load the eBook.", ja: "eBookを読み込めません。", zh: "无法加载电子书。", hi: "ईबुक लोड नहीं हो सकी।", vi: "Không thể tải eBook." },
   "ebook.reader_back": { ko: "이북 서재", en: "Library", ja: "ライブラリ", zh: "书架", hi: "लाइब्रेरी", vi: "Thư viện" },
+  "ebook.reader_lang": { ko: "읽을 언어", en: "Reading language", ja: "表示言語", zh: "阅读语言", hi: "पढ़ने की भाषा", vi: "Ngôn ngữ đọc" },
   "mypage.reissue": { ko: "재발급", en: "Reissue", ja: "再発行", zh: "重新发放", hi: "पुनः जारी करें", vi: "Cấp lại" },
   "mypage.issue": { ko: "발급", en: "Issue", ja: "発行", zh: "发放", hi: "जारी करें", vi: "Cấp" },
   "gate.btn_check": { ko: "시험환경 테스트", en: "Test exam environment", ja: "試験環境テスト", zh: "考试环境测试", hi: "परीक्षा वातावरण परीक्षण", vi: "Kiểm tra môi trường thi" },
