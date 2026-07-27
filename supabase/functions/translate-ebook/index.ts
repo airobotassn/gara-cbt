@@ -12,8 +12,14 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { ROOT_ADMIN } from '../admin/constants.ts'
 
-// 번역 전용 키를 우선 쓰고(문항 번역과 같은 지갑), 없으면 공용 키로 폴백.
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY_TRANSLATE') || Deno.env.get('GEMINI_API_KEY')
+// 이북 전용 키를 먼저 본다.
+//   ⚠️ 문항 번역(GEMINI_API_KEY_TRANSLATE)과 **키를 나누는 게 중요하다** — 이북 한 권이 호출 25회를
+//      한 번에 쓰므로, 지갑을 같이 쓰면 이북 돌리다 일일 한도를 태워 문항 번역까지 같이 죽는다.
+//      아래 폴백은 키를 아직 안 넣었을 때 동작만 유지하기 위한 것이고, 운영에서는 EBOOK 키를 둘 것.
+const GEMINI_API_KEY =
+  Deno.env.get('GEMINI_API_KEY_EBOOK') ||
+  Deno.env.get('GEMINI_API_KEY_TRANSLATE') ||
+  Deno.env.get('GEMINI_API_KEY')
 const MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-3.1-flash-lite'
 const ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`
@@ -167,7 +173,7 @@ const shortReason = (e: unknown): string => {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    if (!GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY_TRANSLATE 미설정' }, 500)
+    if (!GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY_EBOOK 미설정' }, 500)
 
     // 관리자 게이트 — admin 함수와 동일 판정(루트 또는 admin_users 등록 이메일).
     const user = await getUser(req)
