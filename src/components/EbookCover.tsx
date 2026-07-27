@@ -1,5 +1,6 @@
 // 이북 표지 — 등록된 표지 이미지가 있으면 그걸, 없으면 제목으로 만든 그라데이션 표지를 그린다.
-//   스토어(/ebooks)·마이페이지 서재가 공유. 비율은 책 표지 관례(2:3).
+//   스토어(/ebooks)·마이페이지 서재가 공유. 비율은 **A4(210:297)** — 표지가 본문 1페이지를
+//   그대로 구운 것(lib/ebookCover.ts)이라 조판 비율을 그대로 따라간다. 2:3 으로 두면 좌우가 잘린다.
 //
 // 선명도: 표지 원본은 1500px대인데 썸네일 칸이 작으면 글자가 뭉갠다. 그래서
 //   (1) 칸을 충분히 크게 잡고(호출부), (2) Supabase Storage 이미지 변환으로
@@ -33,7 +34,7 @@ export default function EbookCover({
 }) {
   if (coverUrl) {
     return (
-      <div className={`relative aspect-[2/3] rounded-xl overflow-hidden border border-outline-variant/40 bg-surface-container-low ${className}`}>
+      <div className={`relative aspect-[210/297] rounded-xl overflow-hidden border border-outline-variant/40 bg-surface-container-low ${className}`}>
         <img
           src={sharpen(coverUrl, width)}
           alt=""
@@ -47,7 +48,7 @@ export default function EbookCover({
   const hue = hueOf(title)
   return (
     <div
-      className={`relative aspect-[2/3] rounded-xl overflow-hidden border border-outline-variant/40 flex items-end p-3 ${className}`}
+      className={`relative aspect-[210/297] rounded-xl overflow-hidden border border-outline-variant/40 flex items-end p-3 ${className}`}
       style={{ background: `linear-gradient(150deg, hsl(${hue} 62% 52%), hsl(${(hue + 28) % 360} 58% 34%))` }}
       aria-hidden="true"
     >

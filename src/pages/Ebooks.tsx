@@ -104,7 +104,7 @@ export default function Ebooks() {
             {(rows ?? []).map((b) => (
               <article key={b.id} className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col sm:flex-row gap-4 sm:gap-5">
                 {/* self-start 필수 — flex 자식은 기본이 stretch 라 표지 박스가 카드 높이만큼 늘어나
-                    aspect-[2/3] 이 무시된다(모바일에서 0.47까지 찌그러졌다).
+                    표지 박스의 aspect 비율이 무시된다(모바일에서 0.47까지 찌그러졌다).
                     폭은 기기 크기가 아니라 카드 폭에 비례(모바일 = 카드의 62%, 상한 240px). */}
                 <button
                   type="button"

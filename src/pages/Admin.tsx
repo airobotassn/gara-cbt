@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
+import { renderEbookCover } from '../lib/ebookCover'
 import type {
   AdminListResponse,
   AdminAttemptRow,
@@ -1991,6 +1992,7 @@ function AdminAccountsAdmin() {
 //   본문 HTML 1개 파일 = 비공개 버킷 'ebooks', 표지 이미지 = 공개 버킷 'ebook-covers'.
 //   파일은 클라에서 스토리지로 직접 올리고(관리자 전용 정책), 메타데이터만 admin 함수로 저장한다.
 //   ⚠️ 구매/열람 권한은 ebooks 함수가 판정 — 여기선 등록·공개 여부·가격만 다룬다.
+//   표지는 따로 올리지 않는다 — 본문 HTML 의 1페이지를 그대로 구워 쓴다(lib/ebookCover.ts).
 interface EbookDraft {
   id?: string
   title: string
@@ -2036,7 +2038,19 @@ export function EbooksAdmin() {
     setDraft((d) => (d ? { ...d, ...p } : d))
   }
 
+  // 본문 1페이지 → 표지 이미지로 굽고 공개 버킷에 올린다. 반환 = 공개 URL.
+  //   이전 표지 파일은 지우지 않는다(교체 도중 실패해도 옛 표지가 살아 있게).
+  async function bakeCover(html: string): Promise<string> {
+    const { blob, ext } = await renderEbookCover(html)
+    const path = `${crypto.randomUUID()}/cover.${ext}`
+    const { error } = await supabase.storage.from('ebook-covers').upload(path, blob, { contentType: blob.type, upsert: false })
+    if (error) throw error
+    return supabase.storage.from('ebook-covers').getPublicUrl(path).data.publicUrl
+  }
+
   // 본문 HTML 업로드 — 파일마다 새 폴더(uuid)를 써서 덮어쓰기 사고를 막는다.
+  //   업로드가 끝나면 이어서 표지를 자동 생성한다(표지 생성이 실패해도 본문 등록은 유효 —
+  //   coverUrl 이 비면 스토어가 제목 그라데이션 표지로 대체한다).
   async function uploadHtml(file: File) {
     if (!/\.html?$/i.test(file.name)) {
       alert('HTML 파일(.html)만 업로드할 수 있습니다.')
@@ -2044,10 +2058,13 @@ export function EbooksAdmin() {
     }
     setUploading('html')
     try {
+      const html = await file.text()
       const path = `${crypto.randomUUID()}/${file.name.replace(/[^\w.-]/g, '_')}`
       const { error } = await supabase.storage.from('ebooks').upload(path, file, { contentType: 'text/html', upsert: false })
       if (error) throw error
       patch({ storagePath: path })
+      setUploading('cover')
+      patch({ coverUrl: await bakeCover(html) })
     } catch (e) {
       alert(e instanceof Error ? e.message : '업로드에 실패했습니다.')
     } finally {
@@ -2055,20 +2072,17 @@ export function EbooksAdmin() {
     }
   }
 
-  async function uploadCover(file: File) {
-    if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다.')
-      return
-    }
+  // 이미 등록된 책의 표지 다시 굽기 — 본문을 비공개 버킷에서 내려받아 1페이지를 다시 렌더한다
+  // (관리자는 ebooks 버킷 전체 권한이 있다: storage 정책 ebooks_admin_all).
+  async function regenCover() {
+    if (!draft?.storagePath) return
     setUploading('cover')
     try {
-      const path = `${crypto.randomUUID()}/${file.name.replace(/[^\w.-]/g, '_')}`
-      const { error } = await supabase.storage.from('ebook-covers').upload(path, file, { contentType: file.type, upsert: false })
+      const { data, error } = await supabase.storage.from('ebooks').download(draft.storagePath)
       if (error) throw error
-      const { data } = supabase.storage.from('ebook-covers').getPublicUrl(path)
-      patch({ coverUrl: data.publicUrl })
+      patch({ coverUrl: await bakeCover(await data.text()) })
     } catch (e) {
-      alert(e instanceof Error ? e.message : '업로드에 실패했습니다.')
+      alert(e instanceof Error ? e.message : '표지를 만들지 못했습니다.')
     } finally {
       setUploading(null)
     }
@@ -2172,7 +2186,7 @@ export function EbooksAdmin() {
                 </td>
                 <td>
                   {b.coverUrl ? (
-                    <img src={b.coverUrl} alt="" style={{ width: 34, height: 51, objectFit: 'cover', borderRadius: 4, display: 'block' }} />
+                    <img src={b.coverUrl} alt="" style={{ width: 36, height: 51, objectFit: 'cover', borderRadius: 4, display: 'block' }} />
                   ) : (
                     <span style={{ color: 'var(--muted)' }}>-</span>
                   )}
@@ -2260,7 +2274,7 @@ export function EbooksAdmin() {
                 <span>이북 본문 <em style={{ color: 'var(--error, #d43a3a)', fontStyle: 'normal' }}>(HTML 파일 1개 · 필수)</em></span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <label className="admin-mini" style={{ display: 'inline-block', cursor: uploading ? 'default' : 'pointer' }}>
-                    {uploading === 'html' ? '업로드 중…' : draft.storagePath ? 'HTML 다시 선택' : 'HTML 파일 선택'}
+                    {uploading === 'html' ? '업로드 중…' : uploading === 'cover' ? '표지 만드는 중…' : draft.storagePath ? 'HTML 다시 선택' : 'HTML 파일 선택'}
                     <input
                       type="file"
                       accept=".html,.htm,text/html"
@@ -2279,32 +2293,20 @@ export function EbooksAdmin() {
                 </div>
               </div>
 
-              {/* 표지 이미지(선택) — 업로드하면 썸네일로 확인 */}
+              {/* 표지 — 따로 올리지 않는다. 본문 1페이지를 그대로 구워 쓴다. */}
               <div style={fieldStyle}>
-                <span>표지 이미지 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(선택 · 없으면 자동 표지)</em></span>
+                <span>표지 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(본문 1페이지에서 자동 생성)</em></span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  {draft.coverUrl && (
-                    <img src={draft.coverUrl} alt="" style={{ width: 40, height: 60, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--line)', display: 'block' }} />
+                  {draft.coverUrl ? (
+                    <img src={draft.coverUrl} alt="" style={{ width: 43, height: 60, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--line)', display: 'block' }} />
+                  ) : (
+                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                      {draft.storagePath ? '표지가 없습니다 — 아래 버튼으로 만들 수 있습니다.' : '본문 HTML 을 올리면 자동으로 만들어집니다.'}
+                    </span>
                   )}
-                  <label className="admin-mini" style={{ display: 'inline-block', cursor: uploading ? 'default' : 'pointer' }}>
-                    {uploading === 'cover' ? '업로드 중…' : draft.coverUrl ? '표지 변경' : '표지 선택'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      disabled={!!uploading}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0]
-                        if (f) uploadCover(f)
-                        e.target.value = ''
-                      }}
-                    />
-                  </label>
-                  {draft.coverUrl && (
-                    <button type="button" className="admin-mini" onClick={() => patch({ coverUrl: '' })}>
-                      표지 제거
-                    </button>
-                  )}
+                  <button type="button" className="admin-mini" disabled={!draft.storagePath || !!uploading} onClick={regenCover}>
+                    {uploading === 'cover' ? '표지 만드는 중…' : '표지 다시 만들기'}
+                  </button>
                 </div>
               </div>
 
