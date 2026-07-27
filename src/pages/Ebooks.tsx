@@ -14,11 +14,16 @@ import type { EbookListResp, EbookRow } from '../lib/types'
 export default function Ebooks() {
   const { t } = useT()
   const navigate = useNavigate()
-  const { isFullUser, loginWithGoogle } = useAuth()
+  const { isFullUser } = useAuth()
   const [rows, setRows] = useState<EbookRow[] | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
+  // 비로그인이 구매를 누르면 곧장 OAuth 로 튕기지 않고 이 모달을 먼저 띄운다.
+  const [loginOpen, setLoginOpen] = useState(false)
+  // 표지 확대 — 목록 썸네일은 어떤 기기에서든 표지 글자까지 읽히진 않는다(표지가 문서형 디자인).
+  // 기종별로 크기를 맞추는 대신, 탭하면 화면 가득 띄워 준다.
+  const [zoom, setZoom] = useState<EbookRow | null>(null)
 
   useEffect(() => {
     callFunction<EbookListResp>('ebooks', { action: 'store' })
@@ -26,10 +31,28 @@ export default function Ebooks() {
       .catch((e) => setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.'))
   }, [isFullUser])
 
+  // 모달은 Esc 로도 닫는다.
+  useEffect(() => {
+    if (!loginOpen && !zoom) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setLoginOpen(false)
+      setZoom(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [loginOpen, zoom])
+
+  // 로그인 수단이 구글만이 아니라서(카카오도 있음) 특정 provider 를 호출하지 않고 로그인 페이지로 보낸다.
+  //   /login 이 어느 수단으로 로그인하든 AuthCallback 이 이 키를 읽어 스토어로 되돌린다.
+  function goLogin() {
+    try { sessionStorage.setItem('postLoginRedirect', '/ebooks') } catch { /* 무시 */ }
+    navigate('/login')
+  }
+
   async function buy(b: EbookRow) {
     if (!isFullUser) {
-      try { sessionStorage.setItem('postLoginRedirect', '/ebooks') } catch { /* 무시 */ }
-      void loginWithGoogle(`${window.location.origin}/auth/callback`)
+      setLoginOpen(true) // 바로 OAuth 로 튕기지 않고 모달로 한 번 받아준다
       return
     }
     setBusy(b.id)
@@ -75,10 +98,22 @@ export default function Ebooks() {
             <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('ebook.empty_store')}</div>
           )}
 
+          {/* 카드: 좁은 화면은 세로 스택 — 가로 배치를 유지하면 표지 폭이 화면의 40% 이하로 눌려
+              어떤 기기에서도 표지 글자가 안 보인다. 640px 이상에서만 가로 배치. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {(rows ?? []).map((b) => (
-              <article key={b.id} className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex gap-5">
-                <EbookCover title={b.title} coverUrl={b.coverUrl} className="w-[104px] shrink-0" />
+              <article key={b.id} className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col sm:flex-row gap-4 sm:gap-5">
+                {/* self-start 필수 — flex 자식은 기본이 stretch 라 표지 박스가 카드 높이만큼 늘어나
+                    aspect-[2/3] 이 무시된다(모바일에서 0.47까지 찌그러졌다).
+                    폭은 기기 크기가 아니라 카드 폭에 비례(모바일 = 카드의 62%, 상한 240px). */}
+                <button
+                  type="button"
+                  onClick={() => setZoom(b)}
+                  aria-label={t('ebook.cover_zoom')}
+                  className="w-[62%] max-w-[240px] self-center sm:self-start sm:w-[184px] sm:max-w-none shrink-0 cursor-zoom-in"
+                >
+                  <EbookCover title={b.title} coverUrl={b.coverUrl} width={240} className="w-full" />
+                </button>
                 <div className="flex flex-col min-w-0 flex-1">
                   <h3 className="font-title-md text-lg font-bold text-on-surface break-keep mb-1">{b.title}</h3>
                   {b.author && <p className="font-body-sm text-[13px] text-outline mb-2">{b.author}</p>}
@@ -113,6 +148,61 @@ export default function Ebooks() {
           </div>
         </div>
       </main>
+
+      {/* 로그인 유도 모달 — 비로그인이 구매를 눌렀을 때. 배경 클릭·Esc·닫기로 취소(강제 이동 아님). */}
+      {/* 표지 확대 — 배경 아무 데나 누르면 닫힌다. 원본을 그대로 띄우되 화면을 넘지 않게. */}
+      {zoom && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm cursor-zoom-out"
+          role="dialog"
+          aria-modal="true"
+          aria-label={zoom.title}
+          onClick={() => setZoom(null)}
+        >
+          {zoom.coverUrl ? (
+            <img
+              src={zoom.coverUrl}
+              alt={zoom.title}
+              className="max-h-[92dvh] max-w-[min(100%,620px)] w-auto h-auto rounded-xl shadow-2xl"
+            />
+          ) : (
+            <div className="w-[min(90vw,360px)]">
+              <EbookCover title={zoom.title} coverUrl={null} className="w-full" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {loginOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ebook-login-title"
+          onClick={() => setLoginOpen(false)}
+        >
+          <div
+            className="w-full max-w-xs bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 ambient-shadow text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="ebook-login-title" className="font-title-md text-lg font-bold text-on-surface break-keep mb-5">
+              {t('ebook.login_modal_title')}
+            </h2>
+            <button
+              onClick={goLogin}
+              className="w-full px-5 py-3 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow"
+            >
+              {t('common.login')}
+            </button>
+            <button
+              onClick={() => setLoginOpen(false)}
+              className="mt-2.5 w-full px-5 py-2.5 text-on-surface-variant font-label-md text-[14px] font-bold rounded-xl hover:text-primary transition-colors"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <SiteFooter />
     </div>

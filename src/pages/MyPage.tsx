@@ -215,7 +215,8 @@ function EbookLibrary() {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5 md:gap-6">
+      {/* 표지 글자가 읽히도록 타일을 키운다(4열 → 3열, 모바일 2열 유지). */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-6">
         {rows.map((b) => (
           <button
             key={b.id}
@@ -223,7 +224,7 @@ function EbookLibrary() {
             className="group text-left flex flex-col gap-2.5"
             aria-label={b.title}
           >
-            <EbookCover title={b.title} coverUrl={b.coverUrl} className="w-full transition-transform duration-300 group-hover:-translate-y-1 ambient-shadow" />
+            <EbookCover title={b.title} coverUrl={b.coverUrl} width={320} className="w-full transition-transform duration-300 group-hover:-translate-y-1 ambient-shadow" />
             <div>
               <h3 className="font-title-md text-[15px] leading-snug font-bold text-on-surface break-keep line-clamp-2">{b.title}</h3>
               {b.author && <p className="font-body-sm text-[12.5px] text-outline mt-0.5">{b.author}</p>}

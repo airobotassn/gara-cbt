@@ -1,13 +1,20 @@
+// /test/select — 레벨 선택(D안: 결정 중심).
+//   화면 구성: 헤더 → '지금 도전' 응시 카드 1장 → 7단 사다리 스트립(위치만) → 지난 레벨 접이식 → SiteFooter.
+//   왜 목록이 아닌가: 내 등급보다 높은 레벨은 서버(start-test)가 403 으로 막고, 낮은 레벨은 잘 봐도
+//   승급이 안 된다(승급 조건 = 응시레벨 ≥ 내 등급). 즉 실질 선택지가 사실상 1개라 7장을 늘어놓을 이유가 없다.
+//   디자인 토큰은 최신 페이지(/notice·/ebooks)와 동일(Material). 레벨 색만 이 화면 전용 팔레트.
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { MAX_LEVEL, QUESTIONS_PER_TEST, COMING_SOON_LEVELS } from '../lib/testConfigLevel'
-import { promoteCut, DEMOTE_MAX, DEMOTE_STRIKES } from '../lib/scoring'
+import { MAX_LEVEL, COMING_SOON_LEVELS, DAILY_ATTEMPTS_BASE, questionsForLevel, durationMinutesForLevel } from '../lib/testConfigLevel'
+import { PROMOTE_RATE_LOW, PROMOTE_RATE_HIGH, DEMOTE_RATE, DEMOTE_STRIKES, promoteCut } from '../lib/scoring'
 import { useT } from '../lib/i18n'
-import TopBar from '../components/TopBar'
+import SiteFooter from '../components/SiteFooter'
 import type { StartTestResponse, ListAttemptsResponse } from '../lib/testTypes'
 
+// 이 화면 전용 레벨 색(연두 → 빨강 사다리). scoring.ts 의 levelColor(티어 계열)와는 다른 축이라
+// 여기서는 이 팔레트를 유지한다 — 2026-07-27 한 번 levelColor 로 바꿨다가 되돌렸다.
 const LEVEL_COLORS: Record<number, string> = {
   1: '#86efac',
   2: '#5fd98a',
@@ -25,10 +32,15 @@ export default function LevelSelect() {
   const { t, lang } = useT()
   const [loading, setLoading] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [ruleOpen, setRuleOpen] = useState(false) // 등급 규칙 접기(기본 접힘)
   // 해금된 최고 레벨 = 현재 등급(rank). 게스트/첫 유저 = 1. 승급 시 한 단계씩 해제.
   const [unlocked, setUnlocked] = useState(1)
+  // 사다리에서 직접 고른 레벨(null = 기본값인 '내 등급'을 따름)
+  const [picked, setPicked] = useState<number | null>(null)
+  // 오늘 남은 응시 횟수(서버 계산). 게스트/미지원이면 null → 표시 생략.
+  const [dailyLeft, setDailyLeft] = useState<number | null>(null)
 
-  // 메인(랜딩)에서 검색 추천을 받고 넘어온 경우. 해금 범위 안일 때만 강조.
+  // 메인(랜딩)에서 검색 추천을 받고 넘어온 경우. 해금 범위 안일 때만 반영.
   const navState = location.state as
     | { recommendedLevel?: number; alt?: number | null }
     | null
@@ -40,6 +52,7 @@ export default function LevelSelect() {
   useEffect(() => {
     if (!isFullUser) {
       setUnlocked(1)
+      setDailyLeft(null)
       return
     }
     // 관리자는 문항 확인용으로 전 레벨 해금(서버 start-test 도 면제).
@@ -47,26 +60,23 @@ export default function LevelSelect() {
       .then(() => setUnlocked(MAX_LEVEL))
       .catch(() => {
         callFunction<ListAttemptsResponse>('list-attempts', {})
-          .then(({ currentRank }) => setUnlocked(currentRank ?? 1))
+          .then((r) => {
+            setUnlocked(r.currentRank ?? 1)
+            setDailyLeft(r.dailyLeft ?? null)
+          })
           .catch(() => {})
       })
   }, [isFullUser])
 
-  // 추천 태그. 검색 추천이 해금 범위 안이면 우선, 아니면 현재 해금 최고 레벨(=승급 도전 레벨)을 추천.
-  const recMap = new Map<number, string>()
-  let bannerText: string | null = null
-  if (searchRec && searchRec.level <= unlocked) {
-    recMap.set(searchRec.level, t('lv.tag_rec'))
-    if (searchRec.alt && searchRec.alt <= unlocked) recMap.set(searchRec.alt, t('lv.tag_challenge'))
-    bannerText =
-      t('reco.result', {
-        n: searchRec.level,
-        name: t(`lv.${searchRec.level}.name`),
-      }) + (searchRec.alt ? t('reco.result_alt', { n: searchRec.alt }) : '')
-  }
-  if (recMap.size === 0) recMap.set(unlocked, t('lv.tag_rec'))
-
-  // 승급/강등 규칙 안내(숫자는 scoring 임계값에서 읽어 자동 동기화)
+  // 카드에 띄울 레벨 = 사다리에서 고른 것 > 검색 추천(해금 범위 안) > 내 등급(승급 도전 레벨).
+  //   해금 범위를 넘는 값은 버린다(등급이 늦게 로드돼 picked 가 잠긴 레벨을 가리키는 경우 방어).
+  const recommended = searchRec && searchRec.level <= unlocked ? searchRec.level : unlocked
+  const focus = picked != null && picked <= unlocked ? picked : recommended
+  const bannerText =
+    searchRec && searchRec.level <= unlocked
+      ? t('reco.result', { n: searchRec.level, name: t(`lv.${searchRec.level}.name`) }) +
+        (searchRec.alt ? t('reco.result_alt', { n: searchRec.alt }) : '')
+      : null
 
   async function start(level: number) {
     setError(null)
@@ -76,97 +86,237 @@ export default function LevelSelect() {
       const res = await callFunction<StartTestResponse>('start-test', { level, lang })
       navigate(`/test/${res.attemptId}`, { state: res })
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('lv.start_failed'))
+      // start-test 는 하루 응시 소진 시 error='daily_limit' 로 429 를 낸다(서버 문구 대신 현지화 문구로).
+      const raw = e instanceof Error ? e.message : ''
+      setError(raw === 'daily_limit' ? t('lv.daily_limit') : raw || t('lv.start_failed'))
     } finally {
       setLoading(null)
     }
   }
 
+  // 규칙 3줄(승급/강등/일일횟수) — 숫자는 scoring 임계값에서 읽어 자동 동기화.
+  const rules: { ico: string; tone: string; text: string }[] = [
+    {
+      ico: 'trending_up',
+      tone: 'text-primary bg-primary/10',
+      text: t('lv.rule_up', { p1: Math.round(PROMOTE_RATE_LOW * 100), p2: Math.round(PROMOTE_RATE_HIGH * 100) }),
+    },
+    {
+      ico: 'trending_down',
+      tone: 'text-error bg-error/10',
+      text: t('lv.rule_down', { d: Math.round(DEMOTE_RATE * 100), n: DEMOTE_STRIKES }),
+    },
+    {
+      ico: 'refresh',
+      tone: 'text-secondary bg-secondary/10',
+      text: t('lv.rule_daily', { n: DAILY_ATTEMPTS_BASE }),
+    },
+  ]
+
+  const focusSoon = COMING_SOON_LEVELS.includes(focus)
+  const focusQ = questionsForLevel(focus)
+  const MIN_PICK = 1 // 모바일 ‹ 버튼 하한
+
   return (
-    <div className="wrap">
-      {/* 레벨테스트는 아레나에서 들어오는 화면 — 뒤로가기도 아레나로 */}
-      <TopBar to="/arena" label={t('common.leveltest')} />
-      <div className="card pad">
-        {/* 랭킹 진입점은 /hub 도크 CTA 로 옮겼다(레벨선택 화면에서는 제거). */}
-        <div className="lv-head">
-          <h2 className="sc-title">{t('lv.title')}</h2>
-        </div>
+    <div className="bg-background text-on-surface min-h-screen relative overflow-x-hidden flex flex-col">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[-1]">
+        <div className="ambient-mesh bg-surface-mesh-blue top-[-20%] left-[-10%]"></div>
+        <div className="ambient-mesh bg-surface-mesh-cyan bottom-[-20%] right-[-10%]"></div>
+      </div>
 
-        <div className="lv-rule">
-          <div className="lv-rule-head">
-            <span>ⓘ {t('lv.rule_btn')}</span>
-            <span className="lv-rule-q">{t('lv.rule_head', { q: QUESTIONS_PER_TEST })}</span>
+      {/* flex-col + 사다리의 mt-auto → 모바일에서 카드는 위, 사다리는 아래로 갈라놓는다.
+          (안 그러면 둘이 위에 붙고 화면 절반이 빈 채로 남는다) */}
+      <main className="flex-grow flex flex-col pt-6 pb-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
+        {/* 헤더 한 줄 + 규칙 토글 */}
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-primary/10 text-primary shrink-0">
+              <span className="material-symbols-outlined text-[24px]">public</span>
+            </span>
+            <div className="min-w-0">
+              <div className="font-label-md text-[14px] font-bold tracking-[0.08em] text-primary">
+                {t('common.leveltest')}
+              </div>
+              <h1 className="font-title-md text-3xl md:text-4xl font-bold text-on-surface tracking-tight break-keep">
+                {t('lv.title')}
+              </h1>
+            </div>
           </div>
-          <ul>
-            <li className="up">▲ {t('lv.rule_up', { p1: promoteCut(1), p2: promoteCut(4), q: QUESTIONS_PER_TEST })}</li>
-            <li className="down">▼ {t('lv.rule_down', { d: DEMOTE_MAX, n: DEMOTE_STRIKES })}</li>
-          </ul>
-          <p className="lv-rule-note">{t('lv.rule_note', { max: MAX_LEVEL })}</p>
-          {!isFullUser ? (
-            <p className="lv-rule-login">🔒 {t('lv.login_to_save')}</p>
-          ) : null}
+          <button
+            onClick={() => setRuleOpen((v) => !v)}
+            aria-expanded={ruleOpen}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant font-label-md text-[15px] font-bold hover:border-primary hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">info</span>
+            {t('lv.rule_btn')}
+            <span className={`material-symbols-outlined text-[16px] transition-transform ${ruleOpen ? 'rotate-180' : ''}`}>
+              expand_more
+            </span>
+          </button>
         </div>
 
-        {bannerText ? <div className="reco-banner">✨ {bannerText}</div> : null}
+        {ruleOpen ? (
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-5 mb-4">
+            {/* 레벨별 문항 수·시간 표는 뺐다 — 선택한 레벨 기준으로 위 카드 칩에 이미 나온다. */}
+            <ul className="grid gap-2.5">
+              {rules.map((r) => (
+                <li key={r.ico} className="flex items-start gap-3">
+                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0 ${r.tone}`}>
+                    <span className="material-symbols-outlined text-[17px]">{r.ico}</span>
+                  </span>
+                  <span className="font-body-md text-[15px] text-on-surface-variant break-keep pt-0.5">{r.text}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3.5 pt-3.5 border-t border-outline-variant/30 font-body-sm text-[15px] text-outline">
+              {t('lv.rule_note', { max: MAX_LEVEL })}
+            </p>
+          </div>
+        ) : null}
+
+        {bannerText ? (
+          <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 font-body-sm text-[15px] text-primary break-keep">
+            ✨ {bannerText}
+          </div>
+        ) : null}
 
         {error ? (
-          <div
-            style={{
-              marginBottom: 18,
-              borderRadius: 12,
-              background: 'var(--danger-bg)',
-              color: 'var(--danger-fg)',
-              fontSize: 13,
-              padding: '10px 14px',
-            }}
-          >
+          <div className="mb-3 rounded-xl border border-error/20 bg-error/5 px-4 py-2.5 font-body-sm text-[15px] text-error break-keep">
             {error}
           </div>
         ) : null}
 
-        <div className="ladder">
-          {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((n) => {
-            const c = LEVEL_COLORS[n]
-            const soon = COMING_SOON_LEVELS.includes(n) // 문제은행 준비 중 → 응시 차단
-            const locked = n > unlocked
-            const tag = locked || soon ? undefined : recMap.get(n)
-            return (
-              <button
-                key={n}
-                className={`step ${tag ? 'rec' : ''} ${locked || soon ? 'locked' : ''}`}
-                disabled={loading !== null || locked || soon}
-                onClick={() => start(n)}
-                title={locked ? t('lv.locked_hint') : undefined}
+        {/* 응시 카드 — 이 화면의 유일한 결정.
+            모바일은 폭이 좁아 가로 사다리가 성립하지 않는다(원 7개가 붙어버림) → 카드 안에서
+            ‹ › 로 레벨을 넘기고, 사다리는 진행바 + 'N / 7' 로 압축한다. PC 는 아래 가로 사다리를 쓴다. */}
+        <div className="flex-1 flex flex-col justify-center md:block md:flex-none">
+        <div className="bg-surface-container-lowest rounded-2xl border border-primary/30 p-5 md:p-6 ambient-shadow">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setPicked(Math.max(MIN_PICK, focus - 1))}
+              disabled={focus <= MIN_PICK}
+              aria-label={t('lv.prev_level')}
+              className="md:hidden w-9 h-9 shrink-0 rounded-full grid place-items-center border border-outline-variant/50 text-on-surface-variant disabled:opacity-30 active:bg-surface-container-low"
+            >
+              <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+            </button>
+            <span
+              className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center font-title-md text-lg font-bold text-white"
+              style={{ background: LEVEL_COLORS[focus] }}
+            >
+              {focus}
+            </span>
+            <b className="font-title-md text-2xl md:text-[28px] font-bold text-on-surface tracking-tight break-keep">
+              Lv.{focus} {t(`lv.${focus}.name`)}
+            </b>
+            <button
+              onClick={() => setPicked(Math.min(unlocked, focus + 1))}
+              disabled={focus >= unlocked}
+              aria-label={t('lv.next_level')}
+              className="md:hidden w-9 h-9 shrink-0 rounded-full grid place-items-center border border-outline-variant/50 text-on-surface-variant ml-auto disabled:opacity-30 active:bg-surface-container-low"
+            >
+              <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+            </button>
+          </div>
+          {/* 카드 리드 — 본문(15px)보다 한 단 위. 제목과의 간격을 맞춘 크기다. */}
+          <p className="mt-3 font-body-md text-[17px] leading-relaxed text-on-surface-variant break-keep">
+            {t(`lv.${focus}.desc`)}
+          </p>
+
+          {/* 응시 직전에 알고 싶은 것 — 규칙 패널을 펼치지 않아도 여기서 읽힌다 */}
+          <div className="flex gap-2 flex-wrap mt-3.5">
+            {[
+              t('lv.fact_q', { n: focusQ }),
+              t('lv.fact_min', { n: durationMinutesForLevel(focus) }),
+              t('lv.fact_cut', { n: promoteCut(focus, focusQ) }),
+            ].map((s) => (
+              <span
+                key={s}
+                className="font-label-md text-[15px] font-bold text-on-surface-variant bg-surface-container-low rounded-lg px-3 py-1.5"
               >
-                <span className="num" style={locked || soon ? undefined : { background: c }}>
-                  {locked ? '🔒' : soon ? '⏳' : n}
-                </span>
-                <span className="body">
-                  <span className="name">
-                    Lv.{n} {t(`lv.${n}.name`)}
-                    {tag ? <span className="rec-tag">{tag}</span> : null}
-                    <span className="diffword">{t(`lv.${n}.desc`)}</span>
-                  </span>
-                  <span className="meter">
-                    {Array.from({ length: 7 }, (_, i) => (
-                      <i key={i} style={i < n && !locked ? { background: c } : undefined} />
-                    ))}
-                  </span>
-                </span>
-                <span className="go">
-                  {locked
-                    ? t('lv.locked')
-                    : soon
-                      ? t('lv.coming_soon')
-                      : loading === n
-                        ? t('lv.preparing')
-                        : t('lv.select')}
-                </span>
-              </button>
+                {s}
+              </span>
+            ))}
+          </div>
+
+          {/* 모바일은 버튼 풀폭 + 남은 횟수 아래 줄(한 줄에 붙이면 언어에 따라 줄바꿈이 터진다) */}
+          <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-3.5 mt-4">
+            <button
+              onClick={() => start(focus)}
+              disabled={loading !== null || focusSoon}
+              className="w-full md:w-auto px-6 py-3.5 md:py-3 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow disabled:opacity-60"
+            >
+              {focusSoon ? t('lv.coming_soon') : loading === focus ? t('lv.preparing') : t('lv.start_now')}
+            </button>
+            {dailyLeft != null ? (
+              <span className="font-label-md text-[15px] font-bold text-outline break-keep">
+                {t('lv.left_today', { n: Math.max(0, dailyLeft) })}
+              </span>
+            ) : null}
+          </div>
+
+          {/* 모바일 전용 사다리 요약 — 원 7개 대신 진행바 하나 */}
+          <div className="md:hidden mt-4 pt-4 border-t border-outline-variant/30 flex items-center gap-3">
+            <span className="flex-1 h-1.5 rounded-full bg-outline-variant/50 overflow-hidden">
+              <span
+                className="block h-full rounded-full transition-all duration-300"
+                style={{ width: `${(focus / MAX_LEVEL) * 100}%`, background: LEVEL_COLORS[focus] }}
+              />
+            </span>
+            <span className="font-label-md text-[15px] font-bold text-outline tabular-nums shrink-0">
+              {focus} / {MAX_LEVEL}
+            </span>
+          </div>
+        </div>
+
+        </div>
+
+        {/* 가로 사다리 — PC 전용. 모바일에선 폭이 안 나와 카드 안 ‹ › + 진행바로 대체한다.
+            레벨 이름은 안 적는다: 고른 레벨의 이름은 위 카드가 크게 보여주고, 잠긴 레벨은 이름을 알아도
+            누를 수 없다(서버가 403). 이름은 hover 툴팁·스크린리더 라벨로만 남긴다. */}
+        <div className="hidden md:flex mt-14 items-center">
+          {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((n) => {
+            const locked = n > unlocked
+            const on = n === focus
+            const name = `Lv.${n} ${t(`lv.${n}.name`)}`
+            return (
+              <div key={n} className={`flex items-center ${n < MAX_LEVEL ? 'flex-1' : ''}`}>
+                <button
+                  onClick={() => setPicked(n)}
+                  disabled={locked}
+                  aria-current={on ? 'true' : undefined}
+                  aria-label={name}
+                  title={locked ? `${name} · ${t('lv.locked_hint')}` : name}
+                  className={`w-12 h-12 shrink-0 rounded-full grid place-items-center font-title-md text-[17px] font-bold text-white transition-all duration-200 disabled:cursor-not-allowed ${
+                    on
+                      ? 'ring-4 ring-primary/25 scale-110 shadow-md'
+                      : locked
+                        ? 'opacity-70'
+                        : 'hover:scale-105 hover:shadow-sm'
+                  }`}
+                  style={{ background: locked ? 'var(--color-outline-variant)' : LEVEL_COLORS[n] }}
+                >
+                  {locked ? <span className="material-symbols-outlined text-[20px]">lock</span> : n}
+                </button>
+                {n < MAX_LEVEL ? (
+                  <span
+                    className={`flex-1 h-1 rounded-full ${n < unlocked ? 'bg-primary/40' : 'bg-outline-variant/60'}`}
+                  />
+                ) : null}
+              </div>
             )
           })}
         </div>
-      </div>
+
+        {!isFullUser ? (
+          <p className="mt-4 font-body-sm text-[15px] text-primary flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px]">lock</span>
+            {t('lv.login_to_save')}
+          </p>
+        ) : null}
+      </main>
+
+      <SiteFooter />
     </div>
   )
 }

@@ -7,14 +7,14 @@ import { qrMatrix } from '../lib/qr'
 import { gradeDisplay, fmtCertDate, certExpiryDate } from '../lib/certNo'
 import type { MyAttemptsResponse } from '../lib/types'
 
-// ===== 자격증 = 순수 벡터 SVG(값·문구·급수·워드마크) + logo.png 엠블럼 =====
-// 스크린샷 배경 없음. 프레임·네이비바·워터마크는 벡터, 글자는 전부 내장 폰트 벡터 → 배율/인쇄 선명.
-// 이름·급수·등록번호·취득일·유효기간은 서버가 내려준 값(CertData)을 주입.
+// ===== 자격증 = 확정 시안 PNG(배경·프레임·로고·문구·라벨) + 동적 필드 SVG 오버레이 =====
+// 배경 = public/cert-template.png (협회 확정 시안에서 값 5종을 지운 clean 판, 1448×1086).
+// 그 위에 서버가 내려준 값(CertData)만 얹는다: ①이름 ②영문이름 ③등록번호 ④취득일 ⑤유효기간
+// ⑥급수(BEGINNER/PRO/ELITE…) ⑦진위확인 QR. 좌표는 원본 시안을 픽셀 측정해 맞췄다(스크립트로 bbox 산출).
 //
-// ⚠️ 미리보기(preview) = 유료 발급 전 견본. 브라우저는 캡처를 감지할 수 없으므로(PrintScreen·캡처도구·
-// 폰 카메라 모두 웹에서 불가시) "캡처하면 워터마크"가 아니라 "발급 전에는 항상 워터마크"가 유일한 방어다.
-// 워터마크는 심리적 억제일 뿐이고, 실제 방어는 QR 진위확인 토큰(verify_token)을 발급 전에는 아예
-// 내려주지 않는 것 — 캡처본은 /verify/:token 조회가 안 되므로 위조증서임이 증명된다.
+// ⚠️ 미리보기(preview) = 유료 발급 전 견본. 캡처는 웹에서 감지 불가라 "발급 전에는 항상 워터마크"가 유일한 방어.
+// 진짜 방어는 QR 진위확인 토큰(verify_token)을 발급 전에는 아예 안 내려주는 것 — 캡처본은 /verify/:token
+// 조회가 안 되므로 위조증서임이 증명된다.
 export interface CertData {
   name: string
   qualification: string // 시험명(급수 폴백)
@@ -30,42 +30,51 @@ export interface CertData {
   attemptId?: string // 미리보기 → 발급 전환에 필요(응시 기록 id)
 }
 
-const VB = { w: 743, h: 538 }
-const WORDF = "'CariWord','Segoe UI',sans-serif" // CARIS 워드마크(Montserrat)
-const SERIF = "'CariSerif','Times New Roman',serif" // 급수(Tinos)
-const BODY = "'CariSerif','CertMyeongjo',serif" // 본문: 라틴→Tinos, 한글→명조
-const GOTHIC = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif" // 이름·라벨
-const WORD = '#182a4f', INK = '#141414', GRADE = '#1a3a72', NAVY = '#16305b'
-const GRAY = '#8a8f99', FLABEL = '#496fd3', VAL = '#3f4650', FRAME = '#9db6e0', FRAME2 = '#c6d5ee'
+// 배경 시안 픽셀 크기 = 뷰박스. 아래 좌표는 전부 이 좌표계(px).
+const VB = { w: 1448, h: 1086 }
+const GOTHIC = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif" // 이름·값·캡션
+const GRADEF = "'Segoe UI','Malgun Gothic',Arial,sans-serif" // 급수(굵은 산세리프)
+// 시안 잉크 색(픽셀 측정)
+const INK = '#16181d', ROMAN_C = '#565d6b', GRADE_C = '#123a86', VAL_C = '#33383f', CAP_C = '#6b7280', NAVY = '#16305b'
 
-const BODY_TEXT = ['위 사람은 Certification for AI & Robotics Integrated Skills', '(CARIS) 자격검정에 합격하였으므로 이 증서를 수여합니다.']
+// 오버레이 앵커(원본 시안 bbox 측정값)
+const NAME_Y = 528, NAME_CX = 419
+const ROMAN_Y = 636, ROMAN_CX = 419
+const GRADE_Y = 540, GRADE_CX = 1064
+const ULINE = { y: 576, x1: 179, x2: 661, cx: 420 }
+const QRB = { size: 132, x: 1171, y: 636 } // 구분선(y808) 위로 올린 위치
+const CAP_Y = 794, CAP_CX = 1236
+const VAL_X = 296, VAL_ROWS = [884, 938, 994] // 등록번호/취득일/유효기간 값 baseline (라벨은 배경에 있음)
 
 function todayStr() {
   return fmtCertDate(new Date())
 }
 
-// 이름 폭·크기 — CJK 짧은 이름은 시안 폭(3자=151)에 맞추고, 라틴/장문은 축소.
+// 이름 폭·크기 — 시안 3자(≈122px 높이, 폭 348)에 맞추고, 장문/라틴은 축소.
 function nameFit(raw: string): { text: string; size: number; len: number } {
   const s = raw.trim()
   const compact = s.replace(/\s+/g, '')
-  const cjk = /[\u3131-\uD79D\u3040-\u30FF\u4E00-\u9FFF]/.test(compact) && !/[A-Za-z]/.test(compact)
+  const cjk = /[ㄱ-힝぀-ヿ一-鿿]/.test(compact) && !/[A-Za-z]/.test(compact)
   if (cjk) {
     const n = compact.length
-    const size = n <= 3 ? 47 : n <= 4 ? 40 : n <= 6 ? 32 : 26
-    return { text: compact, size, len: Math.min(n * 50, 260) }
+    const size = n <= 3 ? 104 : n <= 4 ? 90 : n <= 6 ? 72 : 58
+    return { text: compact, size, len: Math.min(n * 100, 460) }
   }
-  const size = Math.max(20, Math.min(46, Math.round(250 / Math.max(1, s.length * 0.5))))
-  return { text: s, size, len: Math.min(s.length * size * 0.55, 300) }
+  const size = Math.max(52, Math.min(118, Math.round(660 / Math.max(1, s.length * 0.5))))
+  return { text: s, size, len: Math.min(s.length * size * 0.55, 560) }
 }
-// 급수 — 가용 폭(331) 채우고, 길면 폰트만 축소.
-function gradeFit(g: string): { size: number; len: number } {
-  const size = g.length <= 11 ? 54 : g.length <= 14 ? 42 : 32
-  return { size, len: 331 }
+// 급수 — 폰트 크기 고정(시안 BEGINNER 높이), 중앙 정렬. 짧은 급수(PRO)도 같은 크기 유지.
+function gradeSize(g: string): number {
+  return g.length <= 9 ? 108 : g.length <= 12 ? 88 : 70
 }
 
 // 등록번호 마스킹 — 마지막 일련번호 구획만 가린다. 예: CA-PRO-2026-0001 → CA-PRO-2026-••••
 function maskCertNo(s: string) {
   return s.replace(/[0-9A-Za-z]+$/, (m) => '•'.repeat(Math.max(4, m.length)))
+}
+// 급수 표시어 — "CARIS PRO" → "PRO"(시안엔 헤더에 CARIS가 이미 있어 급수 단어만 크게 표기).
+function gradeWord(full: string) {
+  return full.replace(/^CARIS\s+/i, '').trim().toUpperCase()
 }
 
 export default function Certificate() {
@@ -84,12 +93,12 @@ export default function Certificate() {
 
   const data: CertData = issuedData ?? passed ?? {
     name: user ? fallbackName : '안형준',
-    qualification: 'CARIS Pro',
-    grade: 'CARIS PRO',
+    qualification: 'CARIS Beginner',
+    grade: 'CARIS BEGINNER',
     nameRoman: (meta.name_roman as string) || (user ? undefined : 'Ahn Hyeongjun'),
-    certNo: 'CA-PRO-2026-0001',
+    certNo: 'CA-BEG-2026-0001',
     issueDate: todayStr(),
-    expiryDate: certExpiryDate('CARIS Pro', new Date()),
+    expiryDate: certExpiryDate('CARIS Beginner', new Date()),
     verifyToken: 'preview-sample',
   }
 
@@ -97,29 +106,21 @@ export default function Certificate() {
   // 발급을 마치면(issuedData) 무조건 원본.
   const preview = issuedData ? false : (data.preview ?? location.pathname.endsWith('/preview'))
 
-  const gradeText = data.grade || gradeDisplay(data.qualification)
+  const gradeFull = data.grade || gradeDisplay(data.qualification)
+  const gradeText = gradeWord(gradeFull)
   const expiryText = data.expiryDate ?? '무기한'
   const nm = nameFit(data.name)
-  const gf = gradeFit(gradeText)
+  const gsize = gradeSize(gradeText)
   const shownCertNo = preview ? maskCertNo(data.certNo) : data.certNo
-  const rows: [string, string][] = [
-    ['등록번호', shownCertNo],
-    ['취득일', data.issueDate],
-    ['유효기간', expiryText],
-  ]
+  const values = [shownCertNo, data.issueDate, expiryText]
   // 워터마크 2행: 고정 경고문 + 소유자 식별(이름 · 마스킹 등록번호) — 유출본 추적용
   const wmSub = `${data.name.trim()} · ${shownCertNo}`
 
   // 미리보기에는 QR 을 만들지 않는다(토큰 자체가 없음) — 캡처본은 진위확인이 불가능해진다.
   const qr = !preview && data.verifyToken ? qrMatrix(`${window.location.origin}/verify/${data.verifyToken}`, 'M') : null
-  const QRB = { x: 568, y: 360, size: 64 }
   const qm = qr ? QRB.size / qr.count : 0
-  const cn = (px: number, py: number, sx: number, sy: number) => (
-    <path key={`${px}-${py}`} d={`M${px + sx * 6} ${py} h${sx * 15} M${px} ${py + sy * 6} v${sy * 15}`} stroke="#8ca6d6" strokeWidth={1} fill="none" />
-  )
 
   // 발급 = 유료. 💳 결제 플로우가 붙으면 이 함수 첫머리에서 결제 성공을 확인한 뒤 issue 를 호출한다.
-  // 발급이 끝나야 서버가 verify_token·확정 등록번호를 만들어 주고, 그때 워터마크 없는 원본으로 바뀐다.
   async function issueNow() {
     const id = data.attemptId
     if (!id || id === 'preview') {
@@ -149,92 +150,49 @@ export default function Certificate() {
       <div className="cert-canvas">
         <svg viewBox={`0 0 ${VB.w} ${VB.h}`} className="cert-svg" role="img" aria-label={t('cert.alt')}>
           <defs>
-            <linearGradient id="cert-bar" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stopColor="#0a2f74" /><stop offset="0.55" stopColor="#164f9e" /><stop offset="1" stopColor="#2f74cf" />
-            </linearGradient>
-            <linearGradient id="cert-barhi" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#5b9be6" /><stop offset="1" stopColor="#2f74cf" />
-            </linearGradient>
-            {/* 미리보기 워터마크 — 45°에 가까운 대각선 반복 타일. SVG 안에 있으므로 화면·확대·인쇄(PDF) 어디서나 같이 찍힌다. */}
+            {/* 미리보기 워터마크 — 45°에 가까운 대각선 반복 타일. SVG 안이라 화면·확대·인쇄 어디서나 같이 찍힌다. */}
             {preview && (
-              <pattern id="cert-wm" x="0" y="0" width="290" height="104" patternUnits="userSpaceOnUse" patternTransform="rotate(-28)">
-                <text x="0" y="32" fontFamily={GOTHIC} fontWeight="700" fontSize="19" letterSpacing="1.5" fill={NAVY} opacity="0.17">{t('cert.wm_notice')}</text>
-                <text x="2" y="54" fontFamily={GOTHIC} fontWeight="400" fontSize="12.5" letterSpacing="0.4" fill={NAVY} opacity="0.15">{wmSub}</text>
+              <pattern id="cert-wm" x="0" y="0" width="566" height="203" patternUnits="userSpaceOnUse" patternTransform="rotate(-28)">
+                <text x="0" y="62" fontFamily={GOTHIC} fontWeight="700" fontSize="37" letterSpacing="3" fill={NAVY} opacity="0.17">{t('cert.wm_notice')}</text>
+                <text x="4" y="105" fontFamily={GOTHIC} fontWeight="400" fontSize="24" letterSpacing="0.8" fill={NAVY} opacity="0.15">{wmSub}</text>
               </pattern>
             )}
           </defs>
 
-          <rect x="0" y="0" width={VB.w} height={VB.h} fill="#ffffff" />
-          {/* 워터마크 엠블럼 */}
-          <image href="/logo.png" x="250" y="245" width="245" height="245" opacity="0.05" />
+          {/* 배경 = 확정 시안(값 없는 clean 판) */}
+          <image href="/cert-template.png" x="0" y="0" width={VB.w} height={VB.h} />
 
-          {/* 프레임 */}
-          <rect x="30" y="20" width="683" height="498" rx="6" fill="none" stroke={FRAME} strokeWidth="1.4" />
-          <rect x="38" y="28" width="667" height="482" rx="4" fill="none" stroke={FRAME2} strokeWidth="0.9" />
-          {cn(38, 28, 1, 1)}{cn(705, 28, -1, 1)}{cn(38, 510, 1, -1)}{cn(705, 510, -1, -1)}
-          <path d="M30 255 a14 14 0 0 0 0 28 z" fill="#9298a3" />
-          <path d="M713 255 a14 14 0 0 1 0 28 z" fill="#9298a3" />
-
-          {/* 네이비 바 */}
-          <rect x="38" y="161" width="667" height="19" fill="url(#cert-bar)" />
-          <polygon points="595,161 705,161 705,180 655,180" fill="url(#cert-barhi)" opacity="0.6" />
-
-          {/* 헤더 로고 락업 */}
-          <image href="/logo.png" x="226" y="30" width="108" height="108" />
-          <line x1="346" y1="58" x2="346" y2="118" stroke="#b9c4d8" strokeWidth="1" />
-          <text x="352" y="86" fontFamily={WORDF} fontWeight="800" fontSize="31" textLength="111" lengthAdjust="spacingAndGlyphs" fill={WORD}>CARIS</text>
-          <text x="360" y="104" fontFamily={GOTHIC} fontWeight="400" fontSize="10.5" fill={GRAY}>Certification for</text>
-          <text x="360" y="117" fontFamily={GOTHIC} fontWeight="400" fontSize="10.5" fill={GRAY}>AI &amp; Robotics Integrated Skills</text>
-
-          {/* 이름 */}
-          <text x="200" y="278" textAnchor="middle" fontFamily={GOTHIC} fontWeight="700" fontSize={nm.size} textLength={nm.len} lengthAdjust="spacingAndGlyphs" fill={INK}>{nm.text}</text>
-          <line x1="126" y1="300" x2="284" y2="300" stroke="#8fa8d4" strokeWidth="1" />
-          <path d="M205 295 l5 5 l-5 5 l-5 -5 z" fill={NAVY} />
+          {/* ① 이름 + 밑줄 장식(시안엔 있던 밑줄을 재현) */}
+          <text x={NAME_CX} y={NAME_Y} textAnchor="middle" fontFamily={GOTHIC} fontWeight="800" fontSize={nm.size} textLength={nm.len} lengthAdjust="spacingAndGlyphs" fill={INK}>{nm.text}</text>
+          <line x1={ULINE.x1} y1={ULINE.y} x2={ULINE.x2} y2={ULINE.y} stroke="#8fa8d4" strokeWidth="1.6" />
+          <path d={`M${ULINE.cx} ${ULINE.y - 6} l7 6 l-7 6 l-7 -6 z`} fill={NAVY} />
+          {/* ② 영문 이름 */}
           {data.nameRoman && (
-            <text x="201" y="326" textAnchor="middle" fontFamily={GOTHIC} fontWeight="400" fontSize="13" letterSpacing="1" fill={GRAY}>{data.nameRoman}</text>
+            <text x={ROMAN_CX} y={ROMAN_Y} textAnchor="middle" fontFamily={GOTHIC} fontWeight="400" fontSize="30" letterSpacing="1.5" fill={ROMAN_C}>{data.nameRoman}</text>
           )}
 
-          {/* 급수 */}
-          <text x="524" y="295" textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={gf.size} textLength={gf.len} lengthAdjust="spacingAndGlyphs" fill={GRADE}>{gradeText}</text>
+          {/* ⑥ 급수 */}
+          <text x={GRADE_CX} y={GRADE_Y} textAnchor="middle" fontFamily={GRADEF} fontWeight="700" fontSize={gsize} letterSpacing="1" fill={GRADE_C}>{gradeText}</text>
 
-          {/* 본문 */}
-          <g fontFamily={BODY} fontWeight="400" fontSize="18" fill="#20242c" textAnchor="middle">
-            <text x="337" y="391" textLength="381" lengthAdjust="spacingAndGlyphs">{BODY_TEXT[0]}</text>
-            <text x="337" y="415" textLength="397" lengthAdjust="spacingAndGlyphs">{BODY_TEXT[1]}</text>
-          </g>
-
-          {/* QR 진위확인 — 미리보기는 토큰이 없어 자리만 잠금 표시(캡처해도 진위확인 불가) */}
-          <rect x={QRB.x - 3} y={QRB.y - 3} width={QRB.size + 6} height={QRB.size + 6} fill="#ffffff" />
+          {/* ⑦ QR 진위확인 — 미리보기는 토큰이 없어 자리만 잠금 표시(캡처해도 진위확인 불가) */}
+          <rect x={QRB.x - 6} y={QRB.y - 6} width={QRB.size + 12} height={QRB.size + 12} rx="4" fill="#ffffff" />
           {preview ? (
             <>
-              <rect x={QRB.x} y={QRB.y} width={QRB.size} height={QRB.size} rx="4" fill="#f1f4fa" stroke="#c6d5ee" strokeWidth="1" strokeDasharray="4 3" />
-              <text x={QRB.x + QRB.size / 2} y={QRB.y + QRB.size / 2 + 4} textAnchor="middle" fontFamily={GOTHIC} fontWeight="700" fontSize="10" fill={GRAY}>{t('cert.qr_locked')}</text>
+              <rect x={QRB.x} y={QRB.y} width={QRB.size} height={QRB.size} rx="4" fill="#f1f4fa" stroke="#c6d5ee" strokeWidth="1.4" strokeDasharray="7 5" />
+              <text x={QRB.x + QRB.size / 2} y={QRB.y + QRB.size / 2 + 6} textAnchor="middle" fontFamily={GOTHIC} fontWeight="700" fontSize="16" fill={CAP_C}>{t('cert.qr_locked')}</text>
             </>
           ) : (
             qr && qr.dark.map(([r, c], i) => (
-              <rect key={i} x={QRB.x + c * qm} y={QRB.y + r * qm} width={qm + 0.3} height={qm + 0.3} fill="#141414" />
+              <rect key={i} x={QRB.x + c * qm} y={QRB.y + r * qm} width={qm + 0.4} height={qm + 0.4} fill="#141414" />
             ))
           )}
-          <text x={QRB.x + QRB.size / 2} y="438" textAnchor="middle" fontFamily={GOTHIC} fontWeight="400" fontSize="9" fill={GRAY}>진위여부 확인</text>
+          {/* "진위여부 확인" 캡션(시안 그대로 재현) */}
+          <text x={CAP_CX} y={CAP_Y} textAnchor="middle" fontFamily={GOTHIC} fontWeight="400" fontSize="21" fill={CAP_C}>진위여부 확인</text>
 
-          {/* 하단 구분선 */}
-          <line x1="110" y1="445" x2="636" y2="445" stroke="#cdd8ec" strokeWidth="1" />
-          <path d={`M${VB.w / 2} 440 l5 5 l-5 5 l-5 -5 z`} fill="#6f8bc0" />
-
-          {/* 하단 기재값 */}
-          {rows.map(([k, v], i) => {
-            const y = 477 + i * 16
-            return (
-              <g key={i}>
-                <text x="64" y={y} fontFamily={GOTHIC} fontWeight="700" fontSize="11" fill={FLABEL}>{k}</text>
-                <text x="112" y={y} fontFamily={GOTHIC} fontWeight="400" fontSize="11" fill={VAL}>:&#8194;{v}</text>
-              </g>
-            )
-          })}
-
-          {/* 하단 로고 */}
-          <image href="/logo.png" x="516" y="457" width="58" height="58" />
-          <text x="586" y="493" fontFamily={WORDF} fontWeight="800" fontSize="18" textLength="66" lengthAdjust="spacingAndGlyphs" letterSpacing="0.3" fill={WORD}>CARIS</text>
+          {/* ③④⑤ 하단 기재값 — 라벨(등록번호/취득일/유효기간)은 배경에 있고, 값만 콜론 뒤에 얹는다 */}
+          {values.map((v, i) => (
+            <text key={i} x={VAL_X} y={VAL_ROWS[i]} fontFamily={GOTHIC} fontWeight="400" fontSize="32" fill={VAL_C}>{v}</text>
+          ))}
 
           {/* 워터마크 오버레이 — 증서 내용 위에 덮는다(맨 마지막 = 최상단) */}
           {preview && (

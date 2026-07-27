@@ -5,6 +5,7 @@ import {
   getUser,
   toAxisMap,
   axisKeysForLevel,
+  dailyAttemptsLeft,
 } from '../_shared/scoring.ts'
 
 Deno.serve(async (req) => {
@@ -12,8 +13,9 @@ Deno.serve(async (req) => {
   try {
     const user = await getUser(req)
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
+    // 게스트는 일일 제한 대상이 아니라 dailyLeft=null(화면에서 표시 생략).
     if (user.is_anonymous)
-      return json({ attempts: [], currentRank: null, currentPoints: 0, demotionStrikes: 0, levelSkills: [] })
+      return json({ attempts: [], currentRank: null, currentPoints: 0, demotionStrikes: 0, levelSkills: [], dailyLeft: null })
 
     const admin = adminClient()
 
@@ -60,7 +62,10 @@ Deno.serve(async (req) => {
         attemptsCount: s.attempts_count as number,
       }))
 
-    return json({ attempts, currentRank, currentPoints, demotionStrikes, levelSkills })
+    // 레벨 선택 화면의 '오늘 N회 남음' 표시용. 강제는 start-test 가 같은 헬퍼로 한다.
+    const { left: dailyLeft } = await dailyAttemptsLeft(admin, user.id)
+
+    return json({ attempts, currentRank, currentPoints, demotionStrikes, levelSkills, dailyLeft })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)
   }

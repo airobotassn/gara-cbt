@@ -465,6 +465,19 @@
   color: var(--muted);
   margin-top: 2px;
 }
+/* 승급 실패 시 교재 유도 링크 */
+.rx-cta {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rx-cta:hover {
+  text-decoration: underline;
+}
 
 /* answer review */
 .qa {
@@ -593,4 +606,72 @@
   justify-content: center;
   flex-wrap: wrap;
   margin-top: 28px;
+}
+
+/* 이북 추천 칸 — 결과 하이라이트/처방 아래. 카드 클릭 = eBook Store(/ebooks) */
+.panel-card.rb .ph {
+  margin-bottom: 4px;
+}
+.rb-more {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rb-more:hover {
+  text-decoration: underline;
+}
+.rb-sub {
+  margin: 0 0 14px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.rb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.rb-item {
+  display: block;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.14s;
+}
+.rb-item:hover {
+  transform: translateY(-2px);
+}
+.rb-cover {
+  width: 100%;
+}
+.rb-title {
+  display: block;
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.rb-author {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs, 12px);
+  font-style: normal;
+  color: var(--dim);
+}
+.rb-price {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--accent);
+}
+@media (max-width: 520px) {
+  .rb-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rb-item:nth-child(3) {
+    display: none;
+  }
 }

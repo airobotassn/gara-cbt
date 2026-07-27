@@ -118,7 +118,7 @@ export default function LevelTestAdmin() {
       {tab === 'dashboard' ? <DashboardTab /> : null}
       {tab === 'users' ? <UsersTab /> : null}
       {tab === 'attempts' ? <AttemptsTab /> : null}
-      {tab === 'questions' ? <QuestionsTab /> : null}
+      {tab === 'questions' ? <QuestionsTab isRoot={isRoot} /> : null}
       {tab === 'reports' ? <ReportsTab /> : null}
       {/* 채팅 검수·이북은 Admin.tsx(.admin-cbt 스코프) 컴포넌트라 .admin-head 가 먹도록 admin-cbt 로 감싼다. */}
       {tab === 'chatmod' ? <div className="admin-cbt"><ChatModAdmin /></div> : null}
@@ -131,13 +131,15 @@ export default function LevelTestAdmin() {
 // ============================ 문항 탭 (목록·이력·생성·번역 통합) ============================
 // CARIS(CBT) 관리자의 '문항' 탭과 동일하게, 문항 관련 화면을 한 탭 안 서브탭으로 묶는다.
 type LtQSub = 'list' | 'events' | 'generate' | 'upload'
-function QuestionsTab() {
+// isRoot = 서버('admin-test' me 액션)가 판정한 루트 관리자 여부. 문항 엑셀 다운로드는 루트 전용.
+function QuestionsTab({ isRoot }: { isRoot: boolean }) {
   const [sub, setSub] = useState<LtQSub>('list')
   const SUBS: { key: LtQSub; label: string }[] = [
     { key: 'list', label: '문항 목록' },
     { key: 'events', label: '문항 이력' },
     { key: 'generate', label: '문항 생성' },
-    { key: 'upload', label: '번역' },
+    // 엑셀로 문항을 새로 올리면서 5개 언어를 자동 번역하는 탭 — '번역'만 쓰면 기존 문항만 손대는 것처럼 읽힌다.
+    { key: 'upload', label: '문항 추가 & 번역' },
   ]
   return (
     <>
@@ -157,7 +159,7 @@ function QuestionsTab() {
           </button>
         ))}
       </div>
-      {sub === 'list' ? <ListTab /> : null}
+      {sub === 'list' ? <ListTab isRoot={isRoot} /> : null}
       {sub === 'events' ? <EventsTab /> : null}
       {sub === 'generate' ? (
         <>
@@ -396,7 +398,7 @@ function DashboardTab() {
           </select>
         </div>
         <p className="admin-desc">
-          시험은 <b>레벨의 각 영역(6개)에서 문제를 무작위로 뽑아</b> 출제합니다. 그래서 <b>영역마다 활성 문항이 넉넉해야</b>(권장 4개 이상) 매번 다른 문제로 출제할 수 있어요. 아래는 <b>출제 가능한(활성) 문항 / 등록된 전체</b>입니다.
+          시험은 <b>레벨의 각 영역({axesForLevel(poolLevel, 'ko').length}개)에서 문제를 무작위로 뽑아</b> 출제합니다. 그래서 <b>영역마다 활성 문항이 넉넉해야</b>(권장 4개 이상) 매번 다른 문제로 출제할 수 있어요. 아래는 <b>출제 가능한(활성) 문항 / 등록된 전체</b>입니다.
         </p>
         {lowPools.length ? <div className="admin-warn">⚠ (전 레벨) 활성 문항 4개 미만: {lowPools.map(([k]) => catName(k)).join(' · ')}</div> : null}
         <table className="admin-table pool-table">
@@ -860,7 +862,40 @@ interface ListRow {
   active: boolean
   missing: string[]
 }
-function ListTab() {
+// 목록 다운로드 — 서버에 다시 묻지 않고 "화면에 보이는 그대로"(레벨·영역·검색 필터 적용분) 엑셀로 내보낸다.
+// 시트 = 언어별(ko 먼저 — 업로드 파서가 첫 시트를 읽으므로 열 구성도 업로드 템플릿과 맞춘다).
+const EXPORT_LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
+function todayKST(): string {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(/-/g, '') // YYYYMMDD
+}
+function safeFileName(s: string): string {
+  return s.replace(/[\\/:*?"<>|]/g, '_')
+}
+function exportQuestionsXlsx(rows: ListRow[], level: number, cat: string) {
+  const maxOpts = Math.max(4, ...rows.map((r) => Math.max(0, ...EXPORT_LANGS.map((l) => r.options_i18n?.[l]?.length ?? 0))))
+  const wb = XLSX.utils.book_new()
+  for (const lang of EXPORT_LANGS) {
+    // 한 문항도 번역이 없는 언어는 빈 시트를 만들지 않는다(ko 는 항상).
+    if (lang !== 'ko' && !rows.some((r) => (r.prompt_i18n?.[lang] ?? '').trim())) continue
+    const header = ['번호', '영역', '문제', ...Array.from({ length: maxOpts }, (_, i) => `보기${i + 1}`), '정답', '해설']
+    const body = rows.map((r) => {
+      const opts = r.options_i18n?.[lang] ?? []
+      return [
+        r.code ?? '',
+        axisDef(r.category, lang).short,
+        r.prompt_i18n?.[lang] ?? '',
+        ...Array.from({ length: maxOpts }, (_, i) => opts[i] ?? ''),
+        r.correct_index + 1,
+        r.explanation_i18n?.[lang] ?? '',
+      ]
+    })
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...body]), LANG_LABEL[lang] ?? lang)
+  }
+  const catName = cat === 'all' ? '전체영역' : axisDef(cat, 'ko').short
+  XLSX.writeFile(wb, safeFileName(`아레나문항_Lv${level}_${catName}_${todayKST()}.xlsx`))
+}
+
+function ListTab({ isRoot }: { isRoot: boolean }) {
   const [level, setLevel] = useState(1)
   const [cat, setCat] = useState('all')
   const [q, setQ] = useState('')
@@ -907,7 +942,9 @@ function ListTab() {
     .filter((r) => cat === 'all' || r.category === cat)
     .filter((r) => !qq || (r.code ?? '').toLowerCase().includes(qq) || (r.prompt_i18n?.ko ?? '').toLowerCase().includes(qq))
 
-  const selCount = filtered.filter((r) => sel.has(r.id)).length
+  // 일괄 처리·다운로드 대상 = 체크된 것 중 지금 화면에 보이는 것만.
+  const selRows = filtered.filter((r) => sel.has(r.id))
+  const selCount = selRows.length
   const allChecked = filtered.length > 0 && selCount === filtered.length
   function toggle(id: string) {
     setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -960,6 +997,15 @@ function ListTab() {
           </select></label>
           <input className="admin-search" placeholder="번호(L3-045)·문제 검색" value={q} onChange={(e) => setQ(e.target.value)} />
           <button className="admin-mini" onClick={() => setEdit('new')}>+ 문항 추가</button>
+          {/* 문항 반출은 루트 관리자 전용(체크박스 자체는 일괄 비활성·삭제에도 쓰이므로 그대로 둔다). */}
+          {isRoot && (
+            <button
+              className="admin-mini"
+              disabled={!selCount}
+              title={selCount ? '' : '다운로드할 문항을 체크하세요(머리글 체크박스 = 전체 선택)'}
+              onClick={() => exportQuestionsXlsx(selRows, level, cat)}
+            >엑셀 다운로드{selCount ? ` (${selCount})` : ''}</button>
+          )}
           <button className="admin-mini" onClick={load}>새로고침</button>
           <span className="admin-hint">{filtered.length}문항{loading ? ' · 불러오는 중…' : ''}</span>
         </div>
@@ -2067,7 +2113,7 @@ function UploadTab() {
             {distinctCats.length ? (
               <div className="up-step">
                 <div className="up-step-h"><span className="up-step-n">4</span> 카테고리 매핑</div>
-                <p className="admin-desc">엑셀 영역 → <b>Lv.{level} 6영역 코드</b>. 비슷한 걸 미리 골라뒀어요 — 확인/수정만 하면 됩니다.</p>
+                <p className="admin-desc">엑셀 영역 → <b>Lv.{level} 영역 코드({axes.length}개)</b>. 비슷한 걸 미리 골라뒀어요 — 확인/수정만 하면 됩니다.</p>
                 <div className="admin-catmap">
                   {distinctCats.map((c) => (
                     <div key={c} className={`admin-row ${catMap[c] ? '' : 'prob'}`}>

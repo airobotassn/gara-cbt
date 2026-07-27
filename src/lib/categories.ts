@@ -41,9 +41,10 @@ function axd(key: string, ko: string, en: string, koS: string, enS: string): Axi
 //   축 코드도 같이 밀었다 — 옛 l1_principle = 지금 l2_principle. 옛 l7_* 는 폐기.
 //   L1(신설)은 6축 미정이라 비워뒀다. L7(옛 L6)은 임시 축(ko·en 폴백).
 const LEVEL_CATEGORIES_RAW: Record<number, AxisRaw[]> = {
-  // ★ Lv.1(입문)만 2축이다(다른 레벨은 6축). 축 수가 다르면 아래 두 곳이 같이 반응한다:
-  //    · 출제 = QUESTIONS_PER_TEST 를 축 수로 나눠 균등 배분(2축 → 축당 10문항) — start-test/index.ts
+  // ★ Lv.1(입문)만 3축이다(다른 레벨은 6축). 축 수가 다르면 아래 두 곳이 같이 반응한다:
+  //    · 출제 = QUESTIONS_PER_TEST 를 축 수로 나눠 균등 배분(3축 → 6개씩 + 랜덤 2축 +1 = 20) — start-test/index.ts
   //    · 결과 레이더 = 3축 미만이면 막대 그래프로 대체 — components/RadarChartBox.tsx
+  //      (2026-07-27 l1_problem 추가로 3축이 되어 Lv.1 도 이제 레이더(삼각형)로 그려진다)
   1: [
     ax('l1_prompt',
       ['AI 프롬프트 활용', 'Using AI prompts', 'AIプロンプト活用', 'AI提示词运用', 'AI प्रॉम्प्ट उपयोग', 'Sử dụng prompt AI'],
@@ -51,6 +52,9 @@ const LEVEL_CATEGORIES_RAW: Record<number, AxisRaw[]> = {
     ax('l1_tools',
       ['AI 도구 이해', 'Understanding AI tools', 'AIツールの理解', 'AI工具理解', 'AI उपकरण समझ', 'Hiểu công cụ AI'],
       ['도구이해', 'AI tools', 'AIツール', 'AI工具', 'AI उपकरण', 'Công cụ AI']),
+    ax('l1_problem',
+      ['AI를 활용한 문제해결', 'Problem solving with AI', 'AIを活用した問題解決', '运用AI解决问题', 'AI से समस्या समाधान', 'Giải quyết vấn đề bằng AI'],
+      ['문제해결', 'Problem solving', '問題解決', '问题解决', 'समस्या समाधान', 'Giải quyết vấn đề']),
   ],
   2: [
     ax('l2_principle',

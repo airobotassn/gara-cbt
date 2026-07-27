@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { levelColor, emblemKeyForLevel, tierColor, type Tier } from '../lib/scoring'
+import { levelColor, tierColor, type Tier } from '../lib/scoring'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT, type TFunc } from '../lib/i18n'
 import TopBar from '../components/TopBar'
-import TierEmblem from '../components/TierEmblem'
+import TierBadge from '../components/TierBadge'
 import { Avatar } from '../components/GemAvatar'
 
 interface HofUser {
@@ -221,7 +221,7 @@ function PersonalBoard({
                 <small>{t('rank.top_label')} {mePct}%</small>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
-                <TierEmblem tierKey={me.tier ?? emblemKeyForLevel(me.level)} size={44} />
+                {me.tier ? <TierBadge tier={me.tier} size={44} alt={t(`rank.tier_${me.tier}`)} /> : null}
                 <div className="pt">{t('rank.pt', { n: me.rating })}</div>
               </div>
             </>
@@ -337,7 +337,7 @@ function HofRow({ u, t }: { u: HofUser; t: TFunc }) {
         {u.name}
         {u.me ? <span className="meflag">{t('rank.you')}</span> : null}
       </span>
-      <TierEmblem tierKey={u.tier ?? emblemKeyForLevel(u.level)} size={44} />
+      {u.tier ? <TierBadge tier={u.tier} size={44} alt={t(`rank.tier_${u.tier}`)} /> : <span style={{ width: 44 }} />}
       <span className="pt">{t('rank.pt', { n: u.rating })}</span>
     </div>
   )

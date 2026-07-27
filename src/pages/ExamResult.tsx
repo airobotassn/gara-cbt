@@ -126,7 +126,7 @@ function demoData(fail = false): GradedData {
     totalCorrect: answers.filter((a) => a.isCorrect).length,
     totalQuestions: answers.length,
     answers,
-    examTitle: 'CARIS-Ⅰ Pro 자격검정',
+    examTitle: 'CARIS-Ⅰ Pro', // 화면엔 gradeDisplay 로 "CARIS PRO" 로 표기된다
   }
 }
 
@@ -139,7 +139,10 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   const scorePct = Math.round((data.totalCorrect / total) * 100)
   // 합격 = 전체 문항의 60% 이상 정답(백엔드 my-attempts 의 PASS_RATIO=0.6 과 동일 규칙).
   const passed = data.totalCorrect >= Math.ceil(data.totalQuestions * 0.6)
-  const certLabel = data.examTitle || t('exresult.cert_fallback')
+  // 서버가 준 시험명(예: "CARIS-Ⅰ Pro")은 급수 판정용 원본으로만 쓰고, 화면 표기는 /guide 의 급수 이름과
+  // 같은 브랜드 표기(CARIS BEGINNER · CARIS PRO · CARIS ELITE …)로 통일한다.
+  const examTitleRaw = data.examTitle || t('exresult.cert_fallback')
+  const certLabel = gradeDisplay(examTitleRaw)
   const subjects = useMemo(() => subjectStats(data.answers), [data.answers])
 
   // 점수 카운트업 + 게이지 채움 동기화
@@ -149,9 +152,9 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
 
   // 취득일·유효기간·자격번호 — 시험명(급수)에서 등급 추정. 일련번호는 서버 시퀀스 연동 전까지 임시(tempSeq).
   const acquiredAt = new Date()
-  const certNo = makeCertNo(gradeOfTitle(certLabel), acquiredAt.getFullYear(), tempSeq(String(attemptId ?? '')))
+  const certNo = makeCertNo(gradeOfTitle(examTitleRaw), acquiredAt.getFullYear(), tempSeq(String(attemptId ?? '')))
   const issueDate = fmtCertDate(acquiredAt)
-  const expiryDate = certExpiryDate(certLabel, acquiredAt)
+  const expiryDate = certExpiryDate(examTitleRaw, acquiredAt)
 
   function goCertificate() {
     // 성적표에서는 바로 발급하지 않고 워터마크 견본(미리보기)을 먼저 연다 — 발급은 유료이므로
@@ -162,8 +165,8 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
         preview: true,
         attemptId,
         name: certName,
-        qualification: passed ? certLabel : t('mypage.exam_fallback'),
-        grade: passed ? gradeDisplay(certLabel) : undefined,
+        qualification: passed ? examTitleRaw : t('mypage.exam_fallback'),
+        grade: passed ? certLabel : undefined, // certLabel = gradeDisplay(원본) = "CARIS PRO" 등
         certNo,
         issueDate,
         expiryDate,

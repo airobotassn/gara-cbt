@@ -178,8 +178,10 @@ export default function Hub() {
     if (!isFullUser) { void loginWithGoogle(); return }
     if (checkedIn) return
     try {
-      await callFunction<DailyResp>('complete-daily', {})
-      pushLog(`출석 완료 · +${DAILY_POINTS}P · 스탬프 +1`)
+      // kind 명시 — 서버 기본값에 기대지 않는다(오늘의 학습과 종류가 갈린다).
+      const r = await callFunction<DailyResp>('complete-daily', { kind: 'attendance' })
+      // first=false 면 오늘 '오늘의 학습'으로 이미 재화를 받은 것 — 없는 적립을 있다고 쓰지 않는다.
+      pushLog(r.first ? `출석 완료 · +${DAILY_POINTS}P · 스탬프 +1` : '출석 완료 · 오늘 보상은 이미 받았어요')
       await hydrate()
     } catch (e) {
       pushLog(friendlyError(e))

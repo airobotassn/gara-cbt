@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
 import { useAntiCheat } from '../hooks/useAntiCheatLevel'
-import { MAX_VIOLATIONS, QUESTIONS_PER_TEST, TEST_DURATION_MINUTES } from '../lib/testConfigLevel'
+import { MAX_VIOLATIONS, durationMinutesForLevel } from '../lib/testConfigLevel'
 import { useT } from '../lib/i18n'
 import { axisDef } from '../lib/categories'
 import type {
@@ -123,12 +123,13 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     violationsRef.current = violations
   }, [violations])
 
-  // 제한시간 카운트다운 — started(시작) 시점부터 TEST_DURATION_MINUTES, 0 도달 시 자동 제출
+  // 제한시간 카운트다운 — 레벨 구간별(문항 수와 같은 값의 분, 문항당 1분). 0 도달 시 자동 제출.
+  const durationMin = durationMinutesForLevel(start.level)
   const deadlineRef = useRef<number | null>(null)
-  const [remainMs, setRemainMs] = useState(TEST_DURATION_MINUTES * 60000)
+  const [remainMs, setRemainMs] = useState(durationMin * 60000)
   useEffect(() => {
     if (!started || voided) return
-    if (deadlineRef.current == null) deadlineRef.current = Date.now() + TEST_DURATION_MINUTES * 60000
+    if (deadlineRef.current == null) deadlineRef.current = Date.now() + durationMin * 60000
     const tick = () => {
       const left = Math.max(0, (deadlineRef.current as number) - Date.now())
       setRemainMs(left)
@@ -137,7 +138,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     tick()
     const id = window.setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [started, voided, submit])
+  }, [started, voided, submit, durationMin])
 
   // 경고 게이트의 "시작" 버튼에서 호출 — 사용자 제스처라 전체화면 진입이 허용된다.
   async function begin() {
@@ -214,7 +215,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
           <div className="intro-ico">⚠️</div>
           <h2 className="sc-title">{t('intro.title')}</h2>
           <p className="intro-meta">
-            {t('intro.meta', { lv: start.level, q: QUESTIONS_PER_TEST, min: TEST_DURATION_MINUTES })}
+            {t('intro.meta', { lv: start.level, q: total, min: durationMin })}
           </p>
           <div className="intro-anticheat">{t('intro.anticheat')}</div>
           <ul className="intro-rules">
@@ -318,6 +319,8 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
           </div>
         </div>
 
+        {/* 문항 점프 — 문항 수가 레벨 구간별(10/20/30)이라 10열 그리드로 1~3줄이 된다. 번호를 찍어
+            30개여도 몇 번인지 바로 보이게 한다(예전엔 숫자 없는 점이라 개수가 늘면 못 알아봤다). */}
         <div className="qnav">
           {questions.map((_, i) => (
             <button
@@ -327,7 +330,9 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
                 selected[i] !== null ? 'answered' : ''
               }`}
               onClick={() => setIndex(i)}
-            />
+            >
+              {i + 1}
+            </button>
           ))}
         </div>
 

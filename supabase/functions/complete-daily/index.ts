@@ -1,6 +1,8 @@
 // complete-daily: 로그인 유저가 '오늘의 완료'를 1/일(KST) 로 확정하고 cosmetic 재화·스탬프를 적립한다.
-//  · daily_activity pk(user_id, day) = 1/day 가드. 오늘 최초 삽입일 때만 재화/스탬프 적립(멱등).
-//  · 적립은 원자 SECURITY DEFINER SQL fn(complete_daily) 로 위임 — 기존 JS select→절대값 upsert(read-modify-write)
+//  · 1/day 가드는 daily_activity 의 **종류 플래그**(did_attendance / did_learn) 다. 행 존재로 판정하면 안 된다 —
+//    그 행은 레벨테스트·미니게임도 만들기 때문(그 버그로 레벨테스트한 날 출석/학습이 잠겼다, 2026-07-27 수정).
+//    재화·스탬프는 출석·학습 통틀어 하루 1회(RPC 응답 first), 활동점수는 종류별로 각각 적립.
+//  · 적립은 원자 SECURITY DEFINER SQL fn(complete_daily_kind) 로 위임 — 기존 JS select→절대값 upsert(read-modify-write)
 //    는 동시 호출 시 적립을 유실할 수 있어, 증분(points = points + p_points)을 하나의 트랜잭션으로 처리한다.
 //  · cosmetic-only 하드 불변식: 실력 진척/스킬 레벨 테이블을 절대 읽거나 쓰지 않고,
 //    _shared/scoring.ts(applyAttempt/computeRankChange) 도 import 하지 않는다. 수치는 config-driven 상수.
@@ -21,10 +23,6 @@ const DAILY_POINTS = 10
 // _shared/scoring.ts ACTIVITY_DELTA 와 동일값 유지(수동 동기, 위 주석 참조).
 type LedgerKind = 'attendance' | 'daily_learn'
 const ACTIVITY_DELTA_SYNCED: Record<LedgerKind, number> = { attendance: 10, daily_learn: 30 }
-const FLAG_COL: Record<LedgerKind, 'did_attendance' | 'did_learn'> = {
-  attendance: 'did_attendance',
-  daily_learn: 'did_learn',
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -38,10 +36,13 @@ Deno.serve(async (req) => {
 
     const admin = adminClient()
 
-    // (2) 원자 적립: 1/일 가드 + 재화/스탬프 증분을 하나의 SQL 트랜잭션으로. RPC 반환 jsonb 를 그대로 전달.
-    const { data, error } = await admin.rpc('complete_daily', {
+    // (2) 원자 적립: 종류별 1/일 가드 + 플래그 세팅 + 재화/스탬프 증분을 하나의 SQL 트랜잭션으로.
+    //     ⚠️ 잠금 판정은 daily_activity 행 존재가 아니라 종류 플래그(did_attendance/did_learn) 다 —
+    //        행 자체는 레벨테스트·미니게임도 만들기 때문(20260727010000 마이그레이션). RPC 반환 jsonb 를 그대로 전달.
+    const { data, error } = await admin.rpc('complete_daily_kind', {
       p_uid: user.id,
       p_points: DAILY_POINTS,
+      p_kind: kind,
     })
     if (error) return json({ error: error.message }, 500)
 
@@ -67,10 +68,9 @@ Deno.serve(async (req) => {
         console.error('complete-daily: activity_ledger insert 실패', ledgerError)
         return json({ error: ledgerError.message }, 500)
       }
-      await admin
-        .from('daily_activity')
-        .upsert({ user_id: user.id, day: today, [FLAG_COL[kind]]: true }, { onConflict: 'user_id,day' })
     }
+    // ⚠️ daily_activity 의 종류 플래그는 위 RPC 가 세팅한다(예전엔 여기서 upsert 했는데, 활성 시즌이 없으면
+    //    이 블록을 통째로 스킵해 플래그가 영영 안 찍히는 구멍이 있었다).
 
     return json(data)
   } catch (e) {

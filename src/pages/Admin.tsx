@@ -322,7 +322,7 @@ function CarisExamAdmin() {
       ) : sub === 'users' ? (
         <UsersAdmin />
       ) : sub === 'questions' ? (
-        <QuestionsAdmin />
+        <QuestionsAdmin isRoot={isRoot} />
       ) : sub === 'notices' ? (
         <NoticesAdmin />
       ) : sub === 'faq' ? (
@@ -491,7 +491,7 @@ function CarisExamAdmin() {
 const NOTICE_CATS = ['guide', 'schedule', 'maintenance', 'event'] as const
 const NOTICE_CAT_LABEL: Record<string, string> = {
   guide: '안내',
-  schedule: '시험일정',
+  schedule: 'CARIS 일정',
   maintenance: '점검',
   event: '이벤트',
 }
@@ -3391,6 +3391,37 @@ function qFindHeaderRow(aoa: string[][], maxScan = 15): { idx: number; score: nu
   return best
 }
 
+// 목록 다운로드 — 서버에 다시 묻지 않고 "화면에 보이는 그대로"(과목·난이도·유형·검색 필터 적용분) 엑셀로.
+// 열 구성은 업로드 템플릿(downloadTemplate)과 동일 + 상태(활성/비활성). 주관식이 섞였을 때만 모범답안 열 추가.
+// ⚠️ 재업로드는 번호 upsert 가 아니라 은행 뒤에 이어붙이므로(questionsImport) 이 파일은 백업·검토용.
+function qTodayKST(): string {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(/-/g, '') // YYYYMMDD
+}
+function exportCbtQuestionsXlsx(rows: AdminQuestionRow[], tier: string | undefined, subject: string) {
+  const hasShort = rows.some((q) => q.kind === 'short')
+  const header = [
+    '번호', '과목', '난이도(상/중/하)', '지문', '보기1', '보기2', '보기3', '보기4', '정답(1~4)', '유형(객관식/주관식)',
+    ...(hasShort ? ['모범답안(주관식)'] : []), '해설', '상태',
+  ]
+  const body = rows.map((q) => [
+    q.number,
+    q.subject,
+    q.difficulty ?? '',
+    q.prompt,
+    ...Array.from({ length: 4 }, (_, i) => (q.kind === 'mc' ? q.choices?.[i] ?? '' : '')),
+    q.kind === 'mc' && q.correct_index != null ? q.correct_index + 1 : '',
+    q.kind === 'short' ? '주관식' : '객관식',
+    ...(hasShort ? [q.answer_key ?? ''] : []), // 허용답안 여러 개는 줄바꿈으로 한 칸에(업로드 때와 같은 형태)
+    q.explanation ?? '',
+    q.active ? '활성' : '비활성',
+  ])
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...body]), '문항')
+  const tierName = getTracks('ko').flatMap((tr) => tr.tiers).find((ti) => ti.key === tier)?.name ?? tier ?? '전체'
+  const name = `CBT문항_${tierName}_${subject === 'all' ? '전체과목' : subject}_${qTodayKST()}.xlsx`
+  XLSX.writeFile(wb, name.replace(/[\\/:*?"<>|]/g, '_'))
+}
+
 // 난이도(상/중/하) 배지 — 관리자 목록·미리보기 공용. 미지정은 흐린 '—'.
 const DIFF_STYLE: Record<string, { bg: string; fg: string }> = {
   '상': { bg: 'rgba(212,58,58,.14)', fg: '#c0392b' },
@@ -3523,7 +3554,8 @@ function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: Questi
 }
 
 // 2층: 문항 목록/이력/업로드 = 급수별 문제은행(bank), 시험문항 = 등록시험(회차×급수)의 뽑힌 세트.
-function QuestionsAdmin() {
+// isRoot = 서버('admin' me 액션)가 판정한 루트 관리자 여부. 문항 엑셀 다운로드는 루트 전용이라 목록까지 내려보낸다.
+function QuestionsAdmin({ isRoot }: { isRoot: boolean }) {
   const [banks, setBanks] = useState<QuestionBankItem[]>([])
   const [tierKey, setTierKey] = useState<string>(() => getTracks('ko').flatMap((tr) => tr.tiers)[0]?.key ?? '') // 단일 급수 선택 — 풀 현황·문항 목록·이력·업로드 공용
   const [exams, setExams] = useState<AdminExamItem[]>([])
@@ -3592,7 +3624,7 @@ function QuestionsAdmin() {
       ) : !bankId ? (
         <div className="admin-section admin-empty">문제은행이 없습니다.</div>
       ) : view === 'list' ? (
-        <QuestionListView bankId={bankId} tier={curBankTier} onChanged={bump} />
+        <QuestionListView bankId={bankId} tier={curBankTier} onChanged={bump} isRoot={isRoot} />
       ) : view === 'events' ? (
         <QuestionEventsView bankId={bankId} onChanged={bump} />
       ) : (
@@ -3703,12 +3735,13 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
   )
 }
 
-function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: string; onChanged: () => void }) {
+function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string; tier?: string; onChanged: () => void; isRoot: boolean }) {
   const [rows, setRows] = useState<AdminQuestionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [edit, setEdit] = useState<AdminQuestionRow | 'new' | null>(null)
+  const [sel, setSel] = useState<Set<string>>(new Set()) // 체크박스 선택(엑셀 다운로드 대상)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -3716,6 +3749,7 @@ function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: 
     try {
       const r = await callFunction<AdminQuestionListResp>('admin', { action: 'questionList', bankId })
       setRows(r.rows)
+      setSel(new Set())
     } catch (e) {
       setErr(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
@@ -3749,12 +3783,38 @@ function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: 
   const subjects = [...guideSubjects, ...extraSubjects]
   const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchDiff(q.difficulty) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
 
+  // 다운로드는 체크한 문항만. 화면 필터가 바뀌어 안 보이게 된 선택은 대상에서 빠진다(보이는 것만 받는다).
+  const selRows = filtered.filter((q) => sel.has(q.id))
+  const allChecked = filtered.length > 0 && selRows.length === filtered.length
+  function toggle(id: string) {
+    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function toggleAll() {
+    setSel((s) => {
+      const n = new Set(s)
+      if (allChecked) filtered.forEach((q) => n.delete(q.id))
+      else filtered.forEach((q) => n.add(q.id))
+      return n
+    })
+  }
+
   return (
     <>
       <div className="admin-head" style={{ marginTop: 0 }}>
-        <span className="admin-count">{filtered.length} / {rows.length}문항</span>
+        <span className="admin-count">{filtered.length} / {rows.length}문항{isRoot && selRows.length ? ` · ${selRows.length}개 선택됨` : ''}</span>
         <div className="admin-head-actions">
           <button className="admin-mini" onClick={() => setEdit('new')}>+ 문항 추가</button>
+          {/* 문항 반출은 루트 관리자 전용 — 일반 관리자에겐 체크박스 열도 버튼도 없다. */}
+          {isRoot && (
+            <button
+              className="admin-mini"
+              disabled={!selRows.length}
+              title={selRows.length ? '' : '다운로드할 문항을 체크하세요(머리글 체크박스 = 전체 선택)'}
+              onClick={() => exportCbtQuestionsXlsx(selRows, tier, f.subject)}
+            >
+              엑셀 다운로드{selRows.length ? ` (${selRows.length})` : ''}
+            </button>
+          )}
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
@@ -3766,6 +3826,7 @@ function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: 
         <table className="admin-table">
           <thead>
             <tr>
+              {isRoot && <th style={{ width: 34 }}><input type="checkbox" checked={allChecked} onChange={toggleAll} title="전체 선택" /></th>}
               <th>#</th>
               <th>유형</th>
               <th>과목</th>
@@ -3779,6 +3840,7 @@ function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: 
           <tbody>
             {filtered.map((q) => (
               <tr key={q.id} style={{ opacity: q.active ? 1 : 0.55 }}>
+                {isRoot && <td><input type="checkbox" checked={sel.has(q.id)} onChange={() => toggle(q.id)} /></td>}
                 <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{q.number}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <span className={`admin-badge st-${q.kind === 'short' ? 'short' : 'submitted'}`}>{q.kind === 'short' ? '주관식' : '객관식'}</span>
@@ -3812,7 +3874,7 @@ function QuestionListView({ bankId, tier, onChanged }: { bankId: string; tier?: 
             ))}
             {!filtered.length && !loading && (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={isRoot ? 9 : 8} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   {rows.length ? '이 급수·과목에 해당하는 문항이 없습니다.' : '문항이 없습니다. “+ 문항 추가” 또는 “엑셀 업로드”로 추가하세요.'}
                 </td>
               </tr>

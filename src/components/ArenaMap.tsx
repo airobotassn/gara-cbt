@@ -24,6 +24,7 @@ import { easeCubicIn, easeCubicInOut, easeCubicOut } from 'd3-ease'
 import 'd3-transition' // selection.transition() 부착(부수효과 import)
 import { type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
 import { DOKDO_GEO, M49_TO_ISO2 } from '../lib/arena/tables'
+import { labelAnchor } from '../lib/arena/labelPoint'
 
 export interface ArenaMapHandle {
   /** 사이드 랭킹 목록 클릭도 지도 클릭과 같은 경로를 타도록 노출 */
@@ -60,7 +61,11 @@ interface Props {
 const SPIN_SPEED = 0.012 // deg/ms
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 
-/** 지도 위 순위 숫자. `area`=구면 면적(스테라디안), `f`=바운딩박스를 재기 위한 원본 지오메트리. */
+/**
+ * 지도 위 순위 숫자. `c`=찍을 위치(labelAnchor), `area`=구면 면적(스테라디안),
+ * `f`=크기를 재기 위한 지오메트리 — **전체가 아니라 라벨이 놓인 덩어리**다.
+ * 섬이 흩어진 지역(인도네시아·신안 등)에서 전체 바운딩박스로 재면 숫자가 본토보다 커진다.
+ */
 type RankLabel = { rank: number; c: [number, number]; key: string; area: number; f: GeoFeature }
 
 /**
@@ -81,6 +86,12 @@ const LABEL_BASE = 14 // 기준 크기(px, 배율 1일 때) — 여기서 더 �
 const LABEL_RATIO = 0.3 // 땅이 좁을 때 "짧은 변의 몇 %까지 쓸지"
 const LABEL_FLOOR = 9 // 좁은 나라도 여기까지는 유지(아래 폭 상한에 걸리면 더 줄어든다)
 const LABEL_HIDE = 6 // 그래도 이보다 작으면(px) 읽을 수 없으니 숨긴다 — 확대하면 나타난다
+
+// 1~3위는 숫자 대신 금·은·동 트로피 이미지(public/trophy-1..3.png). 숫자보다 크게 = 그 나라 위 존재감.
+const TROPHY_RATIO = 0.5 // 땅 짧은 변 대비 트로피 크기
+const TROPHY_MIN = 22 // 좁은 1~3위여도 이만큼은 키운다
+const TROPHY_MAX = 54 // 미국·중국처럼 큰 땅에서 트로피만 비대해지는 걸 막는 상한(px)
+const TROPHY_HIDE = 12 // 너무 축소돼 이보다 작으면 숨긴다
 
 function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -174,7 +185,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     )
   }, [])
 
-  // ── 순위 숫자 크기: 지역이 화면에서 차지하는 크기에 선형 비례 ──
+  // ── 순위 라벨 크기·위치: 지역이 화면에서 차지하는 크기에 선형 비례 ──
+  // 숫자(4위~)는 font-size, 트로피(1~3위)는 정사각 이미지로 그린다.
   // paint() 와 평면 레벨의 줌 tick 이 공유한다(줌만 바뀔 땐 지오메트리를 다시 그릴 필요가 없다).
   const sizeLabels = useCallback((path: ReturnType<typeof geoPath>) => {
     const groups = g.current
@@ -183,10 +195,12 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     const { level } = p.current
     const lrot = proj.rotate()
     const pscale = proj.scale()
-    // 레벨1·2 의 확대는 viewport 그룹 transform 이라 글자에도 이미 곱해진다. 계산은 그룹 안 좌표계로
+    // 레벨1·2 의 확대는 viewport 그룹 transform 이라 라벨에도 이미 곱해진다. 계산은 그룹 안 좌표계로
     // 하고, "화면에서 몇 px 인가"를 판정할 때만 tk 를 곱한다(그래서 마지막에 다시 나눈다).
     const tk = level === 0 ? 1 : st.current.vk
-    groups.labels.selectAll<SVGTextElement, RankLabel>('text').each(function (d) {
+
+    // 그 지역이 그룹 좌표계에서 차지하는 "짧은 변" 근사치.
+    const roomOf = (d: RankLabel) => {
       // (1) 면적 기준 한 변 — 투영 왜곡 보정(지구본은 가장자리 단축 cos θ, 메르카토르는 고위도 팽창 1/cos²φ)
       let a = d.area
       if (level === 0) a *= Math.max(0.12, Math.cos(geoDistance(d.c, [-lrot[0], -lrot[1]])))
@@ -197,9 +211,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       // (2) 실제 바운딩박스의 짧은 변 — 가늘고 긴 땅에서 (1)의 과대평가를 잘라 준다
       const bb = path.bounds(d.f)
       const shortSide = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
-      const room = Math.min(Math.sqrt(a) * pscale, shortSide)
+      return Math.min(Math.sqrt(a) * pscale, shortSide)
+    }
 
-      const screenRoom = room * tk
+    groups.labels.selectAll<SVGTextElement, RankLabel>('text.ranklab').each(function (d) {
+      const screenRoom = roomOf(d) * tk
       // 절대 넘치지 않게 하는 폭 상한. font-size 가 아니라 **그려지는 글자 폭**으로 재야 한다 —
       // 두 자릿수는 폭이 font-size 의 1.4배쯤이라, font-size 만 땅 크기로 잘라 두면 그대로 삐져나온다.
       // (0.62/자릿수 = 숫자 1글자 폭, 0.24 = 흰 테두리(.22em)가 좌우로 번지는 몫)
@@ -211,6 +227,25 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       const node = select(this)
       if (px < LABEL_HIDE) node.style('display', 'none')
       else node.style('display', null).style('font-size', `${(px / tk).toFixed(2)}px`)
+    })
+
+    // 트로피(1~3위) — 정사각 이미지. 중심 정렬이라 크기가 정해져야 x·y 도 정해진다(여기서 같이 배치).
+    groups.labels.selectAll<SVGImageElement, RankLabel>('image.trophy').each(function (d) {
+      const xy = proj(d.c)
+      const screenRoom = roomOf(d) * tk
+      const px = clamp(screenRoom * TROPHY_RATIO, TROPHY_MIN, TROPHY_MAX)
+      const node = select(this)
+      if (!xy || px < TROPHY_HIDE) {
+        node.style('display', 'none')
+        return
+      }
+      const s = px / tk // 그룹 좌표계 크기
+      node
+        .style('display', null)
+        .attr('width', s.toFixed(2))
+        .attr('height', s.toFixed(2))
+        .attr('x', (xy[0] - s / 2).toFixed(2))
+        .attr('y', (xy[1] - s / 2).toFixed(2))
     })
   }, [])
 
@@ -281,15 +316,18 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     } else {
       groups.mark.selectAll('*').remove()
     }
-    // ── 순위 숫자 ── (지구본에선 뒷면 지역을 걸러낸다)
+    // ── 순위 라벨 ── (지구본에선 뒷면 지역을 걸러낸다) 1~3위=트로피 이미지, 4위~=숫자.
     const lrot = proj.rotate()
     const labelData =
       level === 0
         ? st.current.labels.filter((l) => geoDistance(l.c, [-lrot[0], -lrot[1]]) < Math.PI / 2)
         : st.current.labels
     groups.labels
-      .selectAll<SVGTextElement, RankLabel>('text')
-      .data(labelData, (d) => d.key)
+      .selectAll<SVGTextElement, RankLabel>('text.ranklab')
+      .data(
+        labelData.filter((d) => d.rank > 3),
+        (d) => d.key,
+      )
       .join('text')
       .attr('class', 'ranklab')
       .attr('text-anchor', 'middle')
@@ -297,6 +335,16 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .attr('x', (d) => proj(d.c)?.[0] ?? -9999)
       .attr('y', (d) => proj(d.c)?.[1] ?? -9999)
       .text((d) => d.rank)
+    groups.labels
+      .selectAll<SVGImageElement, RankLabel>('image.trophy')
+      .data(
+        labelData.filter((d) => d.rank <= 3),
+        (d) => d.key,
+      )
+      .join('image')
+      .attr('class', 'trophy')
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+      .attr('href', (d) => `/trophy-${d.rank}.png`) // 1=금 2=은 3=동
     sizeLabels(path)
   }, [graticule, sizeLabels])
 
@@ -417,13 +465,12 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     // 확대하면 다시 나타난다.
     st.current.labels = [...regions]
       .sort((a, b) => b.score - a.score)
-      .map((r, i) => ({
-        rank: i + 1,
-        c: geoCentroid(r.f) as [number, number],
-        key: r.key,
-        area: geoArea(r.f),
-        f: r.f,
-      }))
+      .map((r, i) => {
+        // 구면 중심이 아니라 '본체 안쪽' 점에 찍는다 — 섬에 끌려 바다로 나가거나(프랑스·인천)
+        // 오목한 모양에서 땅 밖으로 나가는(베트남·크로아티아) 것을 막는다. → lib/arena/labelPoint
+        const { point, part } = labelAnchor(r.f)
+        return { rank: i + 1, c: point, key: r.key, area: geoArea(part), f: part }
+      })
 
     const sel = groups.geo.selectAll<SVGPathElement, Region>('path').data(regions, (d) => d.key)
     sel.exit().remove()

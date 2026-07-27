@@ -141,8 +141,7 @@ export default function Notice() {
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary"><span className="material-symbols-outlined text-[16px]">campaign</span></span>
               {t('notice.eyebrow')}
             </span>
-            <h1 className="font-display-lg text-4xl md:text-display-lg text-on-surface mb-6 tracking-tight break-keep">{t('nav.notice')}</h1>
-            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">{t('notice.hero_sub')}</p>
+            <h1 className="font-display-lg text-4xl md:text-display-lg text-on-surface tracking-tight break-keep">{t('nav.notice')}</h1>
           </div>
         </div>
 

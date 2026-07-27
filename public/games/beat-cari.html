@@ -23,31 +23,38 @@
   }
   .stage{
     position:relative; width:min(460px,100vw); height:min(860px,100vh);
-    display:flex; flex-direction:column; background:var(--bg);
+    display:flex; flex-direction:column;
+    /* 동굴 배경을 스테이지 전체에 — 헤더 등 투명부로 그대로 노출.
+       ⚠️ cover 금지: 이미지(941x1672) 맨 위가 거의 검정(#23162a)인데 cover 는 세로 전체를 쓰므로
+          그 암흑부가 헤더 뒤에 깔려 검은 띠가 된다(.pit 은 자기 높이로 cover 해 위쪽이 잘려나감).
+          auto 200% + bottom 으로 위쪽 암흑부를 잘라낸다. */
+    background:url("beat-cari-bg.png") center bottom/auto 200% no-repeat;
     box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
   }
 
   /* HUD */
-  .hud{
-    display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; z-index:6;
-    background:linear-gradient(#ffffff,#f4f6fb); border-bottom:1px solid #e6e9f3;
+  .hud{ position:relative; z-index:6; width:100%; height:90px; }
+  /* inset 이 음수인 건 의도 — 헤더 PNG 는 알약 바깥이 투명이라 inset:0 이면 그 투명 여백으로
+     스테이지 배경이 비쳐 검은 띠·모서리가 생긴다. 스테이지 밖으로 넘겨서 overflow:hidden 으로 잘라낸다. */
+  .hud::before{ content:""; position:absolute; inset:-8px -14px -2px;   /* 9-slice: 왼쪽(별)·오른쪽(pill) 고정, 가운데만 늘림 */
+    border-style:solid; border-width:0 129px 0 107px;
+    border-image:url("beat-cari-header.png") 0 360 0 300 fill; border-image-repeat:stretch;
   }
-  .hud-score{ display:flex; align-items:center; gap:8px; }
-  .hs-ic{ width:28px; height:28px; border-radius:9px; display:grid; place-items:center;
-    background:linear-gradient(180deg,#ffd25a,#f0a91a); box-shadow:0 2px 6px rgba(230,160,20,.5); }
-  .hs-ic svg{ width:16px; height:16px; fill:#fff; }
-  .hs-num{ font-size:28px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; line-height:1; }
-  .hud-right{ display:flex; align-items:center; gap:7px; }
-  .hud-chip{ display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e2e7f1;
-    border-radius:20px; padding:5px 11px 5px 9px; box-shadow:0 2px 6px rgba(80,100,150,.06); }
-  .hud-chip svg{ width:14px; height:14px; fill:#f0a91a; flex:none; }
-  .hud-chip .hc-lab{ font-size:11px; color:var(--sub); font-weight:700; }
-  .hud-chip b{ font-size:13.5px; color:var(--ink); font-variant-numeric:tabular-nums; font-weight:800; }
-  .hud-chip.spd b{ color:var(--skip); }
+  .hud-score, .hud-right, .hud-chip{ display:block; }
+  .hs-ic, .hud-chip svg, .hc-lab{ display:none; }   /* 별·왕관·번개·라벨 = 이미지에 포함 */
+  .hs-num{ position:absolute; z-index:1; left:70px; top:54%; transform:translateY(-50%);
+    font-size:36px; font-weight:900; color:#6d3f7a; font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 2px rgba(255,255,255,.7); line-height:1; }
+  #best{ position:absolute; z-index:1; right:60px; top:37%; transform:translateY(-50%);
+    font-size:15px; font-weight:900; color:#6d3f7a; font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 1px rgba(255,255,255,.7); }
+  #spd{ position:absolute; z-index:1; right:60px; top:73%; transform:translateY(-50%);
+    font-size:14px; font-weight:900; color:#b06a1f; font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 1px rgba(255,255,255,.7); }
 
   /* PIT */
-  .pit{position:relative; flex:1; overflow:hidden; background:
-      linear-gradient(180deg,#eaf1fc 0%, #f4f1ea 100%);}
+  .pit{position:relative; flex:1; overflow:hidden;
+      background:url("beat-cari-bg.png") center bottom/cover no-repeat, #ece9e0;}
   .pit::after{ /* soft vignette */
     content:""; position:absolute; inset:0; pointer-events:none;
     box-shadow:inset 0 0 70px rgba(150,170,210,.25);
@@ -55,21 +62,10 @@
   .ceiling{position:absolute; left:0; right:0; top:0; will-change:transform;}
   .ceiling-body{
     height:100%;
-    background:
-      radial-gradient(38% 26% at 20% 22%, rgba(255,255,255,.34), transparent 62%),
-      radial-gradient(30% 22% at 68% 16%, rgba(255,255,255,.24), transparent 62%),
-      radial-gradient(34% 30% at 46% 60%, rgba(66,92,150,.30), transparent 66%),
-      radial-gradient(26% 24% at 84% 55%, rgba(66,92,150,.24), transparent 66%),
-      radial-gradient(22% 20% at 12% 72%, rgba(66,92,150,.20), transparent 66%),
-      repeating-linear-gradient(72deg, transparent 0 38px, rgba(60,80,130,.05) 38px 39px),
-      linear-gradient(180deg, #bccfee 0%, #97aed9 50%, #7d95ca 100%);
-    box-shadow:0 12px 26px rgba(80,105,165,.35), inset 0 7px 14px rgba(255,255,255,.20);
+    background:url("beat-cari-rock.png") center bottom / 100% 100% no-repeat;
+    filter:drop-shadow(0 6px 10px rgba(90,55,80,.4));
   }
-  .teeth{
-    position:absolute; left:0; right:0; bottom:-13px; height:26px;
-    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='26'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='%238ea3d2'/><stop offset='1' stop-color='%236a80bd'/></linearGradient></defs><path d='M0,0 H120 V7 Q105,45 90,7 Q75,30 60,7 Q45,40 30,7 Q15,32 0,7 Z' fill='url(%23g)'/></svg>") repeat-x bottom/120px 26px;
-    filter:drop-shadow(0 3px 2px rgba(80,105,165,.4));
-  }
+  .teeth{ display:none; } /* 돌 이미지(beat-cari-rock.png) 자체에 종유석 끝이 있어 미사용 */
   .dust{position:absolute; width:5px;height:5px;border-radius:50%;background:#b9c9e6;opacity:.55;}
 
   /* 충격 이펙트 (게임오버 직전) */
@@ -98,11 +94,7 @@
     filter:drop-shadow(0 6px 7px rgba(70,90,140,.30));
     transition:none;
   }
-  .floor{
-    position:absolute; left:0; right:0; bottom:0; height:14px; z-index:1;
-    background:linear-gradient(180deg,#e0e7d4,#ccd8bd);
-    border-top:3px solid #a7c58a;
-  }
+  .floor{ display:none; } /* 초록 풀떼기 바닥 제거 — 동굴 배경의 모래바닥을 실제 바닥으로 사용 */
   .danger{
     position:absolute; inset:0; pointer-events:none; opacity:0; z-index:3;
     background:radial-gradient(120% 60% at 50% 100%, rgba(242,102,79,.5), transparent 70%);
@@ -128,30 +120,39 @@
 
   /* QUESTION CARD */
   .qcard{
-    background:linear-gradient(#ffffff,#f7f8fc); border-top:1px solid #e6e9f3;
-    box-shadow:0 -6px 18px rgba(80,100,150,.06);
-    padding:14px 14px 16px; z-index:6;
+    background:transparent; z-index:6;
+    border-style:solid; border-width:16px 24px 28px 24px;   /* 문제 영역 전체를 문제창 패널로 9-slice 채움 (좌우 줄여 버튼 폭 확보) */
+    border-image:url("beat-cari-panel.png") 175 200 180 200 fill; border-image-repeat:stretch;
+    padding:0 6px 6px;
+    margin:-3px;   /* 헤더와 같은 이유 — 패널 PNG 바깥 1~2px 이 반투명이라 스테이지 배경이 어두운 실선으로 비친다 */
   }
-  .qmeta{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
-  .qmeta .streak{font-size:12px; color:var(--skip); font-weight:800;}
-  .qmeta .tag{font-size:11px; color:var(--brand); background:rgba(0,74,198,.08); border:1px solid rgba(0,74,198,.18); padding:2px 9px; border-radius:20px; font-weight:700;}
-  .prompt{font-size:19px; font-weight:700; color:var(--ink); line-height:1.45; min-height:56px; margin-bottom:14px;}
-  .choices{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .qmeta{display:flex; justify-content:flex-end; align-items:center; min-height:0; margin-bottom:0;}
+  .qmeta .streak{font-size:12px; color:#ffcf6b; font-weight:800; text-shadow:0 1px 2px rgba(0,0,0,.3);}
+  .qmeta .tag{display:none;}  /* 카테고리 안내 제거 */
+  .prompt{
+    font-size:18px; font-weight:800; color:#5c4463; line-height:1.4; margin-bottom:10px;
+    min-height:36px; text-align:left;
+    display:flex; align-items:center; justify-content:flex-start; padding:2px 8px;
+  }
+  .choices{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
   .choice{
-    position:relative; text-align:left; padding:15px 12px 15px 40px; border-radius:13px;
-    background:#f4f6fc; color:var(--ink); border:1px solid #d9e0f0; font-size:15.5px; font-weight:600;
-    cursor:pointer; transition:transform .05s, background .1s, border-color .1s; min-height:60px;
+    position:relative; text-align:left; padding:12px 6px 12px 54px; border:0;
+    background:url("beat-cari-choice.png") center/100% 100% no-repeat;
+    color:#3e2b52; font-size:15.5px; font-weight:800; line-height:1.2;
+    white-space:nowrap;   /* 한 줄 고정 — 개행 방지 */
+    cursor:pointer; transition:transform .05s, filter .12s; min-height:66px;
+    display:flex; align-items:center;
   }
   .choice:active{transform:scale(.97);}
-  .choice .num{
+  .choice .num{  /* 왼쪽 크리스탈 위 번호 */
     position:absolute; left:10px; top:50%; transform:translateY(-50%);
-    width:22px;height:22px;border-radius:7px;background:#e2e8f7;color:var(--brand);
-    font-size:12px;font-weight:800;display:grid;place-items:center;
+    width:30px; text-align:center; color:#4e2c5e; font-size:17px; font-weight:900;
+    text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 1px 1px #fff;
   }
-  .choice.correct{background:rgba(18,181,140,.16); border-color:var(--good);}
-  .choice.correct .num{background:var(--good); color:#fff;}
-  .choice.wrong{background:rgba(242,102,79,.14); border-color:var(--bad);}
-  .choice.wrong .num{background:var(--bad); color:#fff;}
+  .choice.correct{ filter:drop-shadow(0 0 4px var(--good)) drop-shadow(0 0 9px rgba(18,181,140,.6)); }
+  .choice.correct .num{ color:var(--good); }
+  .choice.wrong{ filter:drop-shadow(0 0 4px var(--bad)) drop-shadow(0 0 9px rgba(242,102,79,.6)); }
+  .choice.wrong .num{ color:var(--bad); }
   .skipbtn{
     margin-top:10px; width:100%; padding:10px; border-radius:10px; cursor:pointer;
     background:transparent; border:1px dashed #c3cbe0; color:var(--sub); font-weight:700; font-size:13px;
@@ -181,26 +182,64 @@
 
   /* 시작 인트로 (게임 타이틀 화면) */
   .intro{ gap:0; }
+  /* 배경 = 인트로/아웃트로 동굴 아트로 교체 (기존 반투명 흰 배경/블러 제거). 세로 941x1672 → cover */
+  .overlay.intro, .overlay.over{
+    backdrop-filter:none;
+    background:url("beat-cari-intro-bg.png") center/cover no-repeat;
+  }
   /* 마스코트 크기를 화면 높이에 연동 — 세로가 짧은 폰(예: 375x667)에서 앱 헤더까지 빠지면
      '버티기 시작' 버튼이 화면 밖으로 밀려 잘렸다. 높은 화면에서는 min() 이 284px 로 잡혀 원래 그대로. */
   .intro-mascot{ width:min(284px, 36vh); height:auto; margin-top:-6px; filter:drop-shadow(0 14px 18px rgba(70,90,140,.32)); animation:bob 2.6s ease-in-out infinite; }
   @keyframes bob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}}
   .intro-title{ font-size:44px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:10px 0 0;
     transform:rotate(-2.5deg); animation:titlePop .55s cubic-bezier(.2,1.7,.4,1) both; }
-  .intro-title .t1{ color:var(--ink); text-shadow:0 2px 0 #fff, 0 4px 10px rgba(80,100,150,.28); }
-  .intro-title .t2{ background:linear-gradient(180deg,#5b90ff,#004ac6); -webkit-background-clip:text; background-clip:text;
-    -webkit-text-fill-color:transparent; color:transparent; filter:drop-shadow(0 3px 7px rgba(0,74,198,.45)); }
+  /* 동굴 배경(분홍·보라)과 같은 색상 계열이라 명도로 띄운다: 짙은 자주 외곽선 + 밝은 속면.
+     -webkit-text-stroke 는 글자 안쪽을 깎아 획이 얇아지므로 쓰지 않고 8방향 text-shadow 로 외곽선을 만든다. */
+  .intro-title .t1, .intro-title .t2::before{
+    text-shadow:
+      -2px -2px 0 #4a2450, 0 -2px 0 #4a2450, 2px -2px 0 #4a2450,
+      -2px  0   0 #4a2450,                   2px  0   0 #4a2450,
+      -2px  2px 0 #4a2450, 0  2px 0 #4a2450, 2px  2px 0 #4a2450,
+      0 6px 15px rgba(60,24,54,.55);
+  }
+  .intro-title .t1{ color:#fff7ea; }
+  .intro-title .t2{ position:relative; display:inline-block;
+    background:linear-gradient(180deg,#fff2c8 4%,#ffc63f 48%,#e5921f 100%);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent; }
+  /* background-clip:text 는 '배경' 레이어라 text-shadow 가 그 위를 덮는다(= 금색이 사라짐).
+     그래서 외곽선은 같은 글자를 뒤에 한 벌 더 깐 ::before 로 그린다. */
+  .intro-title .t2::before{ content:attr(data-t); position:absolute; left:0; top:0; z-index:-1;
+    color:#4a2450; -webkit-text-fill-color:#4a2450; }
   @keyframes titlePop{0%{opacity:0; transform:scale(.5) rotate(-2.5deg)} 60%{transform:scale(1.08) rotate(-2.5deg)} 100%{opacity:1; transform:scale(1) rotate(-2.5deg)}}
-  .intro-tag{ font-size:14px; font-weight:700; color:var(--sub); margin:16px 0 22px; }
-  .intro-rules{ display:flex; flex-direction:column; gap:8px; width:100%; max-width:308px; margin-bottom:20px; }
-  .ir{ display:flex; align-items:center; gap:10px; text-align:left; font-size:13.5px; color:var(--ink);
-    background:#fff; border:1px solid #e6e9f3; border-radius:12px; padding:10px 13px; box-shadow:0 3px 10px rgba(80,100,150,.05); }
+  .intro-tag{ font-size:14.5px; font-weight:800; color:#fff4e4; margin:15px 0 22px; letter-spacing:.005em;
+    text-shadow:
+      -1px -1px 0 rgba(74,36,80,.9), 1px -1px 0 rgba(74,36,80,.9),
+      -1px  1px 0 rgba(74,36,80,.9), 1px  1px 0 rgba(74,36,80,.9),
+      0 3px 9px rgba(60,24,54,.6); }
+  /* 규칙 3줄을 흰 카드 3개 → 크리스탈 텍스트창 하나로. 원본 비율(1300x466) 유지해 좌우 하단 크리스탈이 눌리지 않게 */
+  .intro-rules{ display:flex; flex-direction:column; justify-content:center; gap:6px;
+    width:100%; max-width:330px; aspect-ratio:1300/466; margin-bottom:20px; padding:0 20px 8px;
+    background:url("beat-cari-intro-panel.png") center/100% 100% no-repeat; }
+  .ir{ display:flex; align-items:center; gap:9px; text-align:left; font-size:13.5px; color:#5c4463;
+    background:none; border:0; border-radius:0; padding:0; box-shadow:none;
+    text-shadow:0 1px 0 rgba(255,255,255,.85), 0 0 5px rgba(255,255,255,.8); }
   .ir b{ font-weight:800; }
-  .ir-ic{ flex:none; width:26px; height:26px; border-radius:8px; display:grid; place-items:center; font-size:12px; color:#fff; }
+  .ir-ic{ flex:none; width:24px; height:24px; border-radius:8px; display:grid; place-items:center; font-size:11px; color:#fff;
+    text-shadow:none; box-shadow:0 1px 3px rgba(120,90,140,.28); }
   .ir-ic.up{ background:var(--good); }
   .ir-ic.dn{ background:var(--bad); }
   .ir-ic.st{ background:var(--skip); }
   .btn.play{ padding:15px 48px; font-size:17px; }
+  /* 시작·다시도전 버튼 = 크리스탈 알약 이미지 (원본 932x227 비율 고정, 글자만 얹음) */
+  #startBtn, #againBtn{
+    margin-top:16px; padding:0; border:0; border-radius:0; box-shadow:none;
+    width:min(292px, 82%); aspect-ratio:932/227;
+    background:url("beat-cari-startbtn.png") center/100% 100% no-repeat;
+    color:#5c3a6b; font-size:19px; font-weight:900; letter-spacing:-.01em;
+    text-shadow:0 1px 0 rgba(255,255,255,.85), 0 0 8px rgba(255,255,255,.65);
+    filter:drop-shadow(0 7px 13px rgba(95,60,110,.28));
+  }
   .intro-keys{ margin-top:14px; font-size:12px; color:var(--sub); }
 
   /* 게임오버 화면 */
@@ -268,7 +307,7 @@
   <div class="overlay intro" id="startOv">
 
     <img class="intro-mascot" id="introMascot" src="beat-cari-main.png" alt="CARI" />
-    <div class="intro-title"><span class="t1">버텨라</span> <span class="t2">CARI</span></div>
+    <div class="intro-title"><span class="t1">버텨라</span> <span class="t2" data-t="CARI">CARI</span></div>
     <div class="intro-tag">쏟아지는 돌, 문제로 버텨라!</div>
     <div class="intro-rules">
       <div class="ir"><span class="ir-ic up">▲</span><span>문제 <b>맞히면</b> 천장이 올라가요</span></div>
@@ -428,7 +467,14 @@
   }
 
   function measure(){
-    PH = pit.clientHeight; yF = PH - 14;      // yF = 바닥(floor) 윗면 y
+    PH = pit.clientHeight;
+    const w = pit.clientWidth;
+    const SURF = 0.155, FLOORFRAC = 0.03;     // 배경 발판면 비율(cover 기준) / 캐릭터 발높이 비율(작을수록 바닥 아래 덜 보임)
+    const FLOOR = Math.max(8, Math.round(w * FLOORFRAC));
+    const bgShift = Math.round(w * (SURF - FLOORFRAC)); // 배경을 내려 발판면을 발 높이에 맞춤 → 바닥 아래 과다 노출 제거
+    pit.style.backgroundPosition = "center calc(100% + " + bgShift + "px)";
+    yF = PH - FLOOR;                          // yF = 발판 윗면 = 캐릭터 발 = 천장 닿는 바닥
+    player.style.bottom = FLOOR + "px";       // 캐릭터를 발판 위에 세움
     BH = player.offsetHeight || 78;           // 곰 렌더 높이
     ceiling.style.height = PH+"px";
   }
@@ -537,13 +583,14 @@
     if(crushed) return;
     const now = performance.now();
     const cx = pit.clientWidth/2, maxRun = Math.max(40, cx-46);
-    const teeth = v*yF, headY = (PH-6) - BH;
+    const PAD = 22;  // 곰 머리 위 투명여백·안테나 보정 — "살짝 더/덜 닿게"는 이 값만 조절(↑=더 닿음)
+    const teeth = v*yF, headY = yF - BH + PAD;   // 발 = yF(발판 윗면)
 
     // 접촉: 돌이 정수리를 누름 → 가운데로 모여 정면 놀람 → 압축
     if(teeth >= headY){
       runX += (0-runX)*Math.min(1, dt*11);
       lean += (0-lean)*Math.min(1, dt*11);
-      let sy=((PH-6)-teeth)/BH; sy=Math.max(0.08,sy);
+      let sy=(yF-teeth)/(BH-PAD); sy=Math.max(0.08,sy);
       const sx=1+(1-sy)*0.45, tr=Math.sin(now/38)*Math.min(2,(1-sy)*3);
       player.style.transform=`translateX(calc(-50% + ${(runX+tr).toFixed(1)}px)) rotate(${lean.toFixed(1)}deg) scaleX(${sx.toFixed(3)}) scaleY(${sy.toFixed(3)})`;
       setMood("😱", 1, cx+runX, headY+2);
@@ -663,7 +710,7 @@
     requestAnimationFrame(loop);
   }
 
-  function renderCeil(v){ ceiling.style.transform = `translateY(${(v*yF - PH - 13).toFixed(1)}px)`; }
+  function renderCeil(v){ ceiling.style.transform = `translateY(${(v*yF - PH).toFixed(1)}px)`; }
 
   // ---------- 입력 ----------
 

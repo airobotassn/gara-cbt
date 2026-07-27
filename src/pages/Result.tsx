@@ -4,27 +4,25 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import {
   weakestAxis,
-  emblemKeyForLevel,
-  levelColor,
+  promoteCut,
+  PROMOTE_RATE_LOW,
+  PROMOTE_RATE_HIGH,
   DEMOTE_STRIKES,
   type AxisMap,
 } from '../lib/scoring'
-import { axesForLevel, axisDef } from '../lib/categories'
+import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { useT, type TFunc } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
 import RadarChartBox from '../components/RadarChartBox'
-import TierEmblem from '../components/TierEmblem'
+import EbookCover from '../components/EbookCover'
 import TopBar from '../components/TopBar'
-import type { GradedAnswer, ResultResponse } from '../lib/testTypes'
+import type { ResultResponse } from '../lib/testTypes'
+import type { EbookListResp, EbookRow } from '../lib/types'
 
 const CLAIM_KEY = 'pendingClaim'
 interface PendingClaim {
   attemptId: string
   claimToken: string
-}
-
-function scrollToQ(i: number) {
-  document.getElementById(`q-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 export default function Result() {
@@ -104,7 +102,6 @@ export default function Result() {
   return (
     <div className="wrap">
       <TopBar />
-      {!locked && data.answers.length > 0 ? <ResultNav answers={data.answers} t={t} /> : null}
       <div className="card pad">
         <ScoreHeader
           level={data.level}
@@ -118,8 +115,11 @@ export default function Result() {
         {locked ? (
           <LockedPanel onLogin={handleLogin} blocked={data.cooldownBlocked} level={data.level} t={t} />
         ) : (
-          <UnlockedPanel data={data} pct={scorePct} t={t} />
+          <UnlockedPanel data={data} t={t} />
         )}
+
+        {/* 결과 아래 한 칸 — eBook Store 추천(잠금 여부와 무관하게 노출). */}
+        <EbookPicks t={t} />
 
         <div className="result-actions">
           {isFullUser ? (
@@ -211,36 +211,32 @@ function LockedPanel({
   )
 }
 
-// 점수 아래: ‹ › 로 넘기는 하이라이트 카드(등급 → 레이더 → 변동). 넘길 때마다 애니 재생.
-function UnlockedPanel({ data, pct, t }: { data: ResultResponse; pct: number; t: TFunc }) {
-  const { lang } = useT()
+// 점수 아래 구성(위→아래): 등급변동 배너(고정) → ‹ › 하이라이트 2장(레이더 → 변동) → 처방 → 이북 추천.
+//   ⚠️ 티어 엠블렘 슬라이드(Lv.N 크게 띄우던 화면)는 폐기됐다. 그 안에 있던 승급/강등·강등경고 배너는
+//      넘기지 않아도 늘 보이도록 슬라이드 **밖 상단**으로 분리했다(등급변동 규칙상 결과창 필수 노출).
+function UnlockedPanel({ data, t }: { data: ResultResponse; t: TFunc }) {
   const [step, setStep] = useState(0)
-  const SLIDES = 3
+  const SLIDES = 2
   const go = (s: number) => setStep(Math.max(0, Math.min(SLIDES - 1, s)))
 
   if (!data.rating) return null
 
   return (
     <div style={{ marginTop: 24 }}>
+      <RankBanner data={data} t={t} />
       <div className="hl">
         <button className="hl-arrow" onClick={() => go(step - 1)} disabled={step === 0}>
           ‹
         </button>
         <div className="hl-stage" key={step}>
-          {step === 0 ? (
-            <RankSlide data={data} pct={pct} t={t} />
-          ) : step === 1 ? (
-            <RadarSlide data={data} t={t} />
-          ) : (
-            <DeltaSlide data={data} t={t} />
-          )}
+          {step === 0 ? <RadarSlide data={data} t={t} /> : <DeltaSlide data={data} t={t} />}
         </div>
         <button className="hl-arrow" onClick={() => go(step + 1)} disabled={step === SLIDES - 1}>
           ›
         </button>
       </div>
       <div className="hl-dots">
-        {[0, 1, 2].map((i) => (
+        {[0, 1].map((i) => (
           <button
             key={i}
             className={`hl-dot ${step === i ? 'on' : ''}`}
@@ -249,109 +245,43 @@ function UnlockedPanel({ data, pct, t }: { data: ResultResponse; pct: number; t:
         ))}
       </div>
 
-      {/* 오답노트(전체, 스크롤) */}
-      <div className="panel-card">
-        <div className="ph">
-          <div className="t">{t('result.answers_title')}</div>
-        </div>
-        <div style={{ display: 'grid', gap: 12 }}>
-          {data.answers.map((a, i) => (
-            <div key={a.questionId} id={`q-${i}`} className={`qa ${a.isCorrect ? '' : 'wrong'}`}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  alignItems: 'flex-start',
-                }}
-              >
-                <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>
-                  {i + 1}. {a.prompt}
-                </p>
-                <span className={`tag ${a.isCorrect ? 'ok' : 'no'}`}>
-                  {a.isCorrect ? t('result.correct') : t('result.wrong')}
-                </span>
-              </div>
-              <p style={{ fontSize: 11, color: 'var(--dim)', margin: '4px 0 0' }}>
-                {axisDef(a.category, lang).label}
-              </p>
-              <div style={{ display: 'grid', gap: 4, marginTop: 10 }}>
-                {a.options.map((opt, oi) => {
-                  const isCorrect = oi === a.correctIndex
-                  const isPicked = oi === a.selectedIndex
-                  return (
-                    <div
-                      key={oi}
-                      className={`qa-opt ${isCorrect ? 'correct' : isPicked ? 'picked' : ''}`}
-                    >
-                      {opt}
-                      {isCorrect ? ' ✓' : isPicked ? ` ${t('result.mychoice')}` : ''}
-                    </div>
-                  )
-                })}
-              </div>
-              {a.explanation ? (
-                <p
-                  style={{
-                    marginTop: 10,
-                    background: 'var(--soft)',
-                    borderRadius: 8,
-                    padding: '8px 12px',
-                    fontSize: 13,
-                    color: 'var(--muted)',
-                  }}
-                >
-                  💡 {a.explanation}
-                </p>
-              ) : null}
-              <ReportBox attemptId={data.attemptId} questionId={a.questionId} t={t} />
-            </div>
-          ))}
-        </div>
-      </div>
+      <Prescription data={data} t={t} />
+
+      {/* 오답노트(문항별 정답·해설 리스트)는 제거됐다 — 결과창은 하이라이트/처방/이북 추천까지만.
+          같이 사라진 것: 문항 점프 내비(ResultNav)와 문항별 오류 제보(ReportBox, submit-report 진입점). */}
     </div>
   )
 }
 
-// 슬라이드 1: 등급(레벨) 엠블렘 + 승급/강등 연출 + 처방
-function RankSlide({ data, pct, t }: { data: ResultResponse; pct: number; t: TFunc }) {
+// 등급 변동 배너 — 슬라이드가 아니라 상단 고정. 변동도 경고도 없으면 아무것도 그리지 않는다.
+function RankBanner({ data, t }: { data: ResultResponse; t: TFunc }) {
   const rankAfter = data.rankAfter ?? data.level
   const rankBefore = data.rankBefore ?? rankAfter
   const dir = data.rankDir ?? 'stay'
   const warnStrikes = data.warnStrikes ?? 0
-  const color = levelColor(rankAfter)
+  if (dir === 'stay' && warnStrikes === 0) return null
   return (
-    <div>
-      <div style={{ textAlign: 'center' }}>
-        {dir !== 'stay' ? (
-          <div className={`tier-change ${dir}`}>
-            <span className="tc-label">
-              {dir === 'up' ? `🎉 ${t('result.promoted')}` : `⬇ ${t('result.demoted')}`}
-            </span>
-            <span className="tc-flow">
-              Lv.{rankBefore} <span className="tc-arrow">→</span> Lv.{rankAfter}
-            </span>
-          </div>
-        ) : warnStrikes > 0 ? (
-          <div className="tier-change down">
-            <span className="tc-label">⚠️ {t('result.demote_warn', { n: warnStrikes, max: DEMOTE_STRIKES })}</span>
-            <span className="tc-flow">{t('result.demote_warn_sub')}</span>
-          </div>
-        ) : null}
-        <div className={`emblem-pop ${dir === 'up' ? 'promote' : ''}`}>
-          <TierEmblem tierKey={emblemKeyForLevel(rankAfter)} size={108} />
+    <div style={{ textAlign: 'center' }}>
+      {dir !== 'stay' ? (
+        <div className={`tier-change ${dir}`}>
+          <span className="tc-label">
+            {dir === 'up' ? `🎉 ${t('result.promoted')}` : `⬇ ${t('result.demoted')}`}
+          </span>
+          <span className="tc-flow">
+            Lv.{rankBefore} <span className="tc-arrow">→</span> Lv.{rankAfter}
+          </span>
         </div>
-        <div className="tier-name" style={{ color }}>
-          Lv.{rankAfter}
+      ) : (
+        <div className="tier-change down">
+          <span className="tc-label">⚠️ {t('result.demote_warn', { n: warnStrikes, max: DEMOTE_STRIKES })}</span>
+          <span className="tc-flow">{t('result.demote_warn_sub')}</span>
         </div>
-        <div className="rating-line">{t('rank.cur_level', { n: rankAfter })}</div>
-      </div>
-      <Prescription data={data} pct={pct} t={t} />
+      )}
     </div>
   )
 }
 
-// 슬라이드 2: 레이더 — 실선 = 이번 시험 결과(per-test), 음영 = 직전 동레벨 시험(없으면 생략)
+// 슬라이드 1: 레이더 — 실선 = 이번 시험 결과(per-test), 음영 = 직전 동레벨 시험(없으면 생략)
 function RadarSlide({ data, t }: { data: ResultResponse; t: TFunc }) {
   const { lang } = useT()
   const axes = axesForLevel(data.level, lang)
@@ -374,7 +304,7 @@ function RadarSlide({ data, t }: { data: ResultResponse; t: TFunc }) {
   )
 }
 
-// 슬라이드 3: 축별 변동 (바 차오름 + 변동 팝업)
+// 슬라이드 2: 축별 변동 (바 차오름 + 변동 팝업)
 function DeltaSlide({ data, t }: { data: ResultResponse; t: TFunc }) {
   const { lang } = useT()
   const rating = data.rating!
@@ -432,17 +362,19 @@ function DeltaNumber({ d, delay }: { d: number; delay: number }) {
 }
 
 // 진단서 → 처방전
-function Prescription({ data, pct, t }: { data: ResultResponse; pct: number; t: TFunc }) {
+function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
   const { lang } = useT()
   const rating = data.rating!
   const axes = axesForLevel(data.level, lang)
   const focusKey = weakestAxis(rating, axes.map((a) => a.key))
   const focus = axisDef(focusKey).short
 
-  let nextLevel: string
-  if (pct >= 80) nextLevel = t('rx.next_up', { n: Math.min(data.level + 1, 7) })
-  else if (pct < 50) nextLevel = t('rx.next_down', { n: Math.max(data.level - 1, 1) })
-  else nextLevel = t('rx.next_same', { n: data.level })
+  // 승급했으면 다음 레벨 도전을 권하고, 승급 실패(유지·강등)면 교재 학습으로 유도한다.
+  //   승급 컷은 비율이라 '몇 개 모자랐는지'를 실제 출제 수 기준으로 계산해 보여준다.
+  const promoted = data.rankDir === 'up'
+  const total = data.totalQuestions
+  const cutRate = data.level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH
+  const need = Math.max(1, promoteCut(data.level, total) - data.totalCorrect)
 
   return (
     <div className="panel-card rx" style={{ marginTop: 18 }}>
@@ -456,86 +388,72 @@ function Prescription({ data, pct, t }: { data: ResultResponse; pct: number; t: 
             <b>{t('rx.focus', { axis: focus })}</b>
           </span>
         </li>
-        <li>
-          <span className="rx-ic">🎚️</span>
-          <span>{nextLevel}</span>
-        </li>
+        {promoted ? (
+          <li>
+            <span className="rx-ic">🎚️</span>
+            <span>{t('rx.next_up', { n: Math.min(data.level + 1, MAX_LEVEL) })}</span>
+          </li>
+        ) : (
+          <>
+            <li>
+              <span className="rx-ic">📕</span>
+              <span>{t('rx.study_weak', { axis: focus })}</span>
+            </li>
+            <li>
+              <span className="rx-ic">🎚️</span>
+              <span>
+                {t('rx.study_pass', { n: data.level, p: Math.round(cutRate * 100), need })}
+                {' '}
+                <Link className="rx-cta" to="/ebooks">{t('rx.study_cta')}</Link>
+              </span>
+            </li>
+          </>
+        )}
       </ul>
     </div>
   )
 }
 
-// 문항별 오류 제보(인라인). 본인 응시 문항에 한해 submit-report 호출.
-function ReportBox({ attemptId, questionId, t }: { attemptId: string; questionId: string; t: TFunc }) {
-  const [open, setOpen] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
+// 결과 아래 이북 추천 — eBook Store(/ebooks) 상위 몇 권. 비로그인도 조회 가능(ebooks store 액션).
+//   ⚠️ 이북에 레벨·6축 메타데이터가 없어서 '결과 기반 매칭'이 아니라 스토어 노출순(sort_order) 상위다.
+//      축별 추천으로 바꾸려면 ebooks 테이블에 대상 레벨/영역 컬럼을 먼저 붙여야 한다.
+const EBOOK_PICKS = 3
+function EbookPicks({ t }: { t: TFunc }) {
+  const [books, setBooks] = useState<EbookRow[] | null>(null)
 
-  if (state === 'done') {
-    return <p style={{ marginTop: 8, fontSize: 12, color: '#16a34a', fontWeight: 600 }}>{t('report.sent')}</p>
-  }
-  if (!open) {
-    return (
-      <button
-        className="report-link"
-        onClick={() => setOpen(true)}
-        style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--dim)', fontSize: 12, cursor: 'pointer', padding: 0 }}
-      >
-        {t('report.btn')}
-      </button>
-    )
-  }
-  async function send() {
-    if (!msg.trim()) return
-    setState('sending')
-    try {
-      await callFunction('submit-report', { attemptId, questionId, message: msg.trim() })
-      setState('done')
-    } catch {
-      setState('error')
-    }
-  }
+  useEffect(() => {
+    let alive = true
+    callFunction<EbookListResp>('ebooks', { action: 'store' })
+      .then((r) => { if (alive) setBooks(r.ebooks.slice(0, EBOOK_PICKS)) })
+      .catch(() => { if (alive) setBooks([]) })
+    return () => { alive = false }
+  }, [])
+
+  // 아직 못 불러왔거나 등록된 이북이 없으면 칸 자체를 그리지 않는다(빈 카드 방지).
+  if (!books || books.length === 0) return null
+
   return (
-    <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-      <textarea
-        value={msg}
-        onChange={(e) => setMsg(e.target.value)}
-        placeholder={t('report.placeholder')}
-        rows={2}
-        maxLength={1000}
-        style={{ width: '100%', fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', resize: 'vertical' }}
-      />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn-ink" onClick={send} disabled={state === 'sending' || !msg.trim()} style={{ padding: '6px 14px', fontSize: 13 }}>
-          {t('report.send')}
-        </button>
-        <button onClick={() => { setOpen(false); setMsg('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontSize: 13, cursor: 'pointer' }}>
-          {t('report.cancel')}
-        </button>
-        {state === 'error' ? <span style={{ fontSize: 12, color: '#dc2626' }}>{t('report.fail')}</span> : null}
+    <div className="panel-card rb" style={{ marginTop: 18 }}>
+      <div className="ph">
+        <div className="t">📚 {t('result.books_title')}</div>
+        <Link className="rb-more" to="/ebooks">
+          {t('result.books_more')} ›
+        </Link>
       </div>
-    </div>
-  )
-}
-
-function ResultNav({ answers, t }: { answers: GradedAnswer[]; t: TFunc }) {
-  return (
-    <div className="resnav">
-      <button className="rn-top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-        {t('resnav.top')}
-      </button>
-      <div className="rn-label">{t('resnav.label')}</div>
-      <div className="rn-grid">
-        {answers.map((a, i) => (
-          <button
-            key={a.questionId}
-            className={`rn-num ${a.isCorrect ? 'ok' : 'no'}`}
-            onClick={() => scrollToQ(i)}
-          >
-            {i + 1}
-          </button>
+      <p className="rb-sub">{t('result.books_sub')}</p>
+      <div className="rb-grid">
+        {books.map((b) => (
+          <Link key={b.id} className="rb-item" to="/ebooks">
+            <EbookCover title={b.title} coverUrl={b.coverUrl} className="rb-cover" />
+            <b className="rb-title">{b.title}</b>
+            {b.author ? <i className="rb-author">{b.author}</i> : null}
+            <span className="rb-price">
+              {b.price > 0 ? `₩${b.price.toLocaleString('ko-KR')}` : t('ebook.free')}
+            </span>
+          </Link>
         ))}
       </div>
     </div>
   )
 }
+

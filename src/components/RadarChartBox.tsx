@@ -3,7 +3,7 @@ import type { AxisDef } from '../lib/categories'
 import type { AxisMap } from '../lib/scoring'
 
 interface Props {
-  axes: AxisDef[] // 그릴 축 세트(레벨별). 보통 6축, Lv.1 은 2축(→ 막대로 대체 렌더).
+  axes: AxisDef[] // 그릴 축 세트(레벨별). 보통 6축, Lv.1 은 3축(삼각형). 2축 이하만 막대로 대체 렌더.
   rating: AxisMap // 내 누적 축별 (0~100), 키 = 축 코드
   ghost?: AxisMap | null // 점선 고스트(이전 내 레이팅)
   size?: number

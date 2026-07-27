@@ -2,18 +2,27 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { levelColor, DEMOTE_STRIKES, computeSkillScore, tierColor } from '../lib/scoring'
+import { levelColor, DEMOTE_STRIKES, computeSkillScore, tierColor, TIER_ORDER } from '../lib/scoring'
 import { axesForLevel, axisKeysForLevel } from '../lib/categories'
 import type { AxisMap, Tier } from '../lib/scoring'
 import { useT } from '../lib/i18n'
 import RadarChartBox from '../components/RadarChartBox'
 import LineChart from '../components/LineChart'
-import TierEmblem from '../components/TierEmblem'
+import TierBadge from '../components/TierBadge'
 import ContributionGraph from '../components/ContributionGraph'
 import type { ListAttemptsResponse, AttemptSummary, LevelSkill } from '../lib/testTypes'
 
 const PAGE_SIZE = 10
 const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// 랭킹 추이 기간. 시즌 = 6개월(별도 시즌 시작일 개념이 백엔드에 없어 최근 180일로 본다).
+type TrendRange = '1w' | '3m' | 'season'
+const TREND_DAYS: Record<TrendRange, number> = { '1w': 7, '3m': 90, season: 180 }
+const TREND_TABS: { key: TrendRange; label: string }[] = [
+  { key: '1w', label: 'db.trend_1w' },
+  { key: '3m', label: 'db.trend_3m' },
+  { key: 'season', label: 'db.trend_season' },
+]
 
 function lpOf(a: AttemptSummary): number {
   if (!a.deltas) return 0
@@ -51,6 +60,9 @@ export default function LearningDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [radarIdx, setRadarIdx] = useState(0)
+  const [trendRange, setTrendRange] = useState<TrendRange>('season') // 기본 = 시즌(6개월) 전체 흐름
+  // 기간 자르기 기준 시각은 화면 진입 때 한 번만 고정한다(렌더마다 Date.now() 를 읽으면 순수하지 않다).
+  const [nowTs] = useState(() => Date.now())
   // 티어 히어로(시즌 총점/실력·활동 분해/다음 순위 게이지) — get-hub 응답 중 이 화면이 쓰는 것만.
   const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
@@ -98,7 +110,7 @@ export default function LearningDashboard() {
       .catch(() => {})
   }, [isFullUser, loading, navigate, t])
 
-  const list = attempts ?? []
+  const list = useMemo(() => attempts ?? [], [attempts]) // 추이 memo 의 의존성이라 참조를 고정
   const radar = levelSkills[Math.min(radarIdx, Math.max(0, levelSkills.length - 1))] ?? null
   const radarAvg = radar ? dummyLevelAverage(radar.level) : null // 레벨 평균(음영+상태 공용)
 
@@ -108,21 +120,50 @@ export default function LearningDashboard() {
   // 실력점수(레벨가중, 0~10000) 추이: 응시마다 그 시점 등급 + 그 등급 최신 맞힌수로 환산
   // (computeSkillScore — scoring.ts 단일 출처, computePoints 아님). 시즌 총점 자체의 이력은 없어
   // 히어로에 현재 seasonTotal 단일 값으로 별도 표시한다.
+  //
+  // 점수 계산은 **항상 전체 이력**으로 돌린다(기간을 좁혔다고 과거 점수가 달라지면 안 되므로),
+  // 그 다음 고른 기간만 잘라낸다. x 위치는 개수가 아니라 **응시 시각**이라(주식 차트와 같은 시간축)
+  // 3개월을 고르면 3개월치 축 위 실제 날짜 자리에 점이 찍히고, 응시가 없던 구간은 비어 보인다.
+  const trendFrom = nowTs - TREND_DAYS[trendRange] * 86400000
   const trend = useMemo(() => {
-    let last = -1
     const latestCorrect: Record<number, number> = {}
-    return [...list].reverse().map((a) => {
-      const dt = new Date(a.submittedAt)
-      const m = dt.getMonth() + 1
-      const tick = m !== last ? monthTick(m) : undefined
-      last = m
-      latestCorrect[a.level] = a.totalCorrect
-      const rank = a.rankAfter ?? a.level
-      const pts = computeSkillScore(rank, latestCorrect[rank] ?? a.totalCorrect)
-      return { v: pts, date: dt.toLocaleDateString(), tick }
-    })
+    return [...list]
+      .reverse()
+      .map((a) => {
+        const dt = new Date(a.submittedAt)
+        latestCorrect[a.level] = a.totalCorrect
+        const rank = a.rankAfter ?? a.level
+        return {
+          v: computeSkillScore(rank, latestCorrect[rank] ?? a.totalCorrect),
+          t: dt.getTime(),
+          date: dt.toLocaleDateString(),
+        }
+      })
+      .filter((p) => p.t >= trendFrom)
+  }, [list, trendFrom])
+
+  // x축 눈금 — 1주일은 하루 간격(M/D), 3개월·시즌은 월 시작(월 이름).
+  const trendTicks = useMemo(() => {
+    const out: { t: number; label: string }[] = []
+    if (trendRange === '1w') {
+      const d = new Date(trendFrom)
+      d.setHours(0, 0, 0, 0)
+      d.setDate(d.getDate() + 1)
+      for (; d.getTime() <= nowTs; d.setDate(d.getDate() + 1)) {
+        out.push({ t: d.getTime(), label: `${d.getMonth() + 1}/${d.getDate()}` })
+      }
+    } else {
+      const d = new Date(trendFrom)
+      d.setHours(0, 0, 0, 0)
+      d.setDate(1)
+      d.setMonth(d.getMonth() + 1) // 구간 안에 온전히 들어오는 달의 1일부터
+      for (; d.getTime() <= nowTs; d.setMonth(d.getMonth() + 1)) {
+        out.push({ t: d.getTime(), label: monthTick(d.getMonth() + 1) })
+      }
+    }
+    return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, lang])
+  }, [trendRange, trendFrom, nowTs, lang])
 
 
   if (loading || (!attempts && !error)) {
@@ -194,7 +235,7 @@ export default function LearningDashboard() {
         <>
           {/* 티어 히어로: 현재 티어 + 시즌 총점(실력/활동 분해) + 다음 순위 게이지(요약) */}
           <div className="tierhero">
-            <TierEmblem tierKey={tier ?? 'bronze'} size={64} />
+            <TierBadge tier={tier ?? 'bronze'} size={64} alt={t(`rank.tier_${tier ?? 'bronze'}`)} />
             <div>
               <div className="nm" style={{ color: tierColor(tier ?? 'bronze') }}>
                 {t(`rank.tier_${tier ?? 'bronze'}`)}
@@ -206,6 +247,23 @@ export default function LearningDashboard() {
               </div>
             </div>
 
+            {/* 티어 사다리 — 브론즈→다이아 순, 내 티어만 원색+테두리, 나머지는 흑백 */}
+            <div className="tierlad">
+              {TIER_ORDER.map((k) => {
+                const on = (tier ?? 'bronze') === k
+                return (
+                  <div
+                    key={k}
+                    className={on ? 'it on' : 'it'}
+                    style={on ? { ['--tc' as string]: tierColor(k) } : undefined}
+                    aria-current={on ? 'true' : undefined}
+                  >
+                    <TierBadge tier={k} size={40} dim={!on} />
+                    <span className="nm">{t(`rank.tier_${k}`)}</span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           {/* 강등 경고 */}
@@ -262,13 +320,31 @@ export default function LearningDashboard() {
             </div>
           </div>
 
-          {/* 점수 추이 */}
+          {/* 점수 추이 — 1주일 / 3개월 / 시즌(6개월) */}
           <div className="panel-card">
             <div className="ph">
               <div className="t">{t('db.trend_title')}</div>
-              <div className="leg">{t('db.recent_n', { n: trend.length })}</div>
+              <div className="trend-seg" role="tablist" aria-label={t('db.trend_title')}>
+                {TREND_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={trendRange === tab.key}
+                    className={trendRange === tab.key ? 'on' : ''}
+                    title={tab.key === 'season' ? t('db.trend_season_hint') : undefined}
+                    onClick={() => setTrendRange(tab.key)}
+                  >
+                    {t(tab.label)}
+                  </button>
+                ))}
+              </div>
             </div>
-            <LineChart data={trend} />
+            <div className="ph" style={{ marginTop: -6 }}>
+              <div className="leg">{t('db.recent_n', { n: trend.length })}</div>
+              {trendRange === 'season' ? <div className="leg">{t('db.trend_season_hint')}</div> : null}
+            </div>
+            <LineChart data={trend} from={trendFrom} to={nowTs} ticks={trendTicks} emptyText={t('db.trend_empty')} />
           </div>
 
           {/* 활동 잔디 */}

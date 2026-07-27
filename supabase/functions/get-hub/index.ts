@@ -61,7 +61,14 @@ Deno.serve(async (req) => {
       admin.from('user_characters').select('base_key, equipped').eq('user_id', uid).maybeSingle(),
       admin.from('user_stamps').select('count').eq('user_id', uid).eq('stamp_kind', 'daily').maybeSingle(),
       admin.from('user_gacha_pity').select('counter').eq('user_id', uid).eq('pool_key', POOL_KEY).maybeSingle(),
-      admin.from('daily_activity').select('day').eq('user_id', uid).eq('day', today).maybeSingle(),
+      // ⚠️ 행 존재 여부로 '완료'를 판정하면 안 된다 — 이 행은 레벨테스트(did_leveltest)·미니게임(did_minigame)도
+      //    만든다. 출석/오늘의 학습 완료는 반드시 각 종류 플래그로 판정할 것(2026-07-27 버그 수정).
+      admin
+        .from('daily_activity')
+        .select('day, did_attendance, did_learn, did_minigame, did_leveltest')
+        .eq('user_id', uid)
+        .eq('day', today)
+        .maybeSingle(),
       admin
         .from('user_coupons')
         .select('issued_for_level, coupon_code, issued_at, used_at, coupons(discount)')
@@ -109,7 +116,12 @@ Deno.serve(async (req) => {
       equipped: (character?.equipped as Record<string, string>) ?? {},
       stamps: (stamp?.count as number) ?? 0,
       pity: (pity?.counter as number) ?? 0,
-      dailyDone: !!daily,
+      // dailyDone = 허브 '출석' 완료(did_attendance). learnDone = /daily 오늘의 학습 완료(did_learn).
+      // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).
+      dailyDone: !!daily?.did_attendance,
+      learnDone: !!daily?.did_learn,
+      minigameDone: !!daily?.did_minigame,
+      leveltestDone: !!daily?.did_leveltest,
       catalog,
       exclusives,
       coupons: couponList,

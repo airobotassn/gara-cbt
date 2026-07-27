@@ -47,14 +47,33 @@ export function weakestAxis(rating: AxisMap, keys: string[]): string {
 }
 
 // <scoring-sync> ⚠️ 등급/점수 공식 — _shared/lib.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
-// ── 등급(레벨) 변동 규칙 ──
-// 승급컷: 레벨1~3 = 16개, 레벨4~7 = 18개 (원점수 20점 만점).
-export function promoteCut(level: number): number {
-  return level <= 3 ? 16 : 18
+// ── 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). 문항당 1분. ──
+//   Lv.1~2 = 10문항/10분 · Lv.3~5 = 20문항/20분 · Lv.6~7 = 30문항/30분
+//   ⚠️ 문항 수가 레벨마다 다르므로 승급컷/강등선은 절대 개수가 아니라 **비율**이다(아래).
+export function questionsForLevel(level: number): number {
+  if (level <= 2) return 10
+  if (level <= 5) return 20
+  return 30
 }
-// 강등: 4개 이하(=5개 미만)를 연속 3번 받으면 한 단계 강등. 그 전 2번은 경고.
-//       중간에 5개 이상 맞히면 경고 리셋(연속 끊김). 레벨이 바뀌면 경고 리셋. Lv.1은 강등 없음.
-export const DEMOTE_MAX = 4 // 이 이하면 '부진'(경고 1회)
+export function durationMinutesForLevel(level: number): number {
+  return questionsForLevel(level) // 문항당 1분
+}
+
+// ── 등급(레벨) 변동 규칙 ──
+// 승급컷 비율: 레벨1~3 = 80%, 레벨4~7 = 90%.
+//   → Lv.1·2 8개 / Lv.3 16개 / Lv.4·5 18개 / Lv.6·7 27개.
+//   total 은 실제 출제 문항 수(문제은행이 모자라 덜 나간 경우 그 수)를 넘기면 그 기준으로 계산한다.
+export const PROMOTE_RATE_LOW = 0.8 // Lv.1~3
+export const PROMOTE_RATE_HIGH = 0.9 // Lv.4~7
+export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
+  return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
+}
+// 강등: 20% 이하(Lv.1~2 = 2개, Lv.3~5 = 4개, Lv.6~7 = 6개)를 연속 3번 받으면 한 단계 강등. 그 전 2번은 경고.
+//       중간에 그보다 잘 맞히면 경고 리셋(연속 끊김). 레벨이 바뀌면 경고 리셋. Lv.1은 강등 없음.
+export const DEMOTE_RATE = 0.2
+export function demoteMax(level: number, total: number = questionsForLevel(level)): number {
+  return Math.floor(total * DEMOTE_RATE)
+}
 export const DEMOTE_STRIKES = 3 // 경고가 이 횟수에 도달하면 강등
 
 export type RankDir = 'up' | 'down' | 'stay'
@@ -67,22 +86,24 @@ export interface RankChange {
 }
 
 // 등급 변동 + 강등 경고(3진 아웃):
-//   승급: 응시레벨 ≥ 내등급 & 그 레벨 승급컷 이상  → +1 (경고 리셋)
-//   강등: 응시레벨 ≤ 내등급 & 4개 이하 & 내등급 > 최저 → 경고 +1, 3회째면 −1
-//   그 외(5개 이상 등) → 유지 + 경고 리셋
+//   승급: 응시레벨 ≥ 내등급 & 그 레벨 승급컷(비율) 이상  → +1 (경고 리셋)
+//   강등: 응시레벨 ≤ 내등급 & 강등선(20%) 이하 & 내등급 > 최저 → 경고 +1, 3회째면 −1
+//   그 외 → 유지 + 경고 리셋
+//   total = 실제 출제 문항 수(생략 시 레벨 기준값). 문제은행 부족으로 덜 나간 시험도 같은 비율로 판정된다.
 export function computeRankChange(
   currentRank: number,
   testLevel: number,
   correct: number,
   strikes: number,
+  total: number = questionsForLevel(testLevel),
 ): RankChange {
   // 승급
-  if (testLevel >= currentRank && correct >= promoteCut(testLevel)) {
+  if (testLevel >= currentRank && correct >= promoteCut(testLevel, total)) {
     const next = Math.min(MAX_LEVEL, currentRank + 1)
     return { nextRank: next, dir: next > currentRank ? 'up' : 'stay', nextStrikes: 0, warned: false }
   }
   // 강등 경고(3진 아웃)
-  if (testLevel <= currentRank && correct <= DEMOTE_MAX && currentRank > MIN_LEVEL) {
+  if (testLevel <= currentRank && correct <= demoteMax(testLevel, total) && currentRank > MIN_LEVEL) {
     const s = strikes + 1
     if (s >= DEMOTE_STRIKES) {
       return { nextRank: currentRank - 1, dir: 'down', nextStrikes: 0, warned: false }
@@ -145,7 +166,7 @@ export function tierForPercentile(pct: number): Tier {
 // </scoring-sync>
 
 // ── 등급(레벨) 표시 메타 ──
-// 색은 TierEmblem(엠블렘) 팔레트와 일치시킨다(엠블렘 ↔ 배경/이름색 꼬임 방지).
+// 레벨 색. 티어 엠블렘(public/emblems/*)과는 다른 축이다 — 엠블렘은 티어(5단계) 전용.
 export const LEVEL_COLOR: Record<number, string> = {
   1: '#8b9099', // iron
   2: '#b8763e', // bronze
@@ -159,21 +180,10 @@ export function levelColor(level: number): string {
   return LEVEL_COLOR[level] ?? '#9ca3af'
 }
 
-// 레벨 → 엠블렘 비주얼 키(TierEmblem 재활용). 네이밍은 추후 확정.
-export const LEVEL_EMBLEM: Record<number, string> = {
-  1: 'iron',
-  2: 'bronze',
-  3: 'silver',
-  4: 'gold',
-  5: 'platinum',
-  6: 'diamond',
-  7: 'master',
-}
-export function emblemKeyForLevel(level: number): string {
-  return LEVEL_EMBLEM[level] ?? 'iron'
-}
+// (레벨→엠블렘 매핑 LEVEL_EMBLEM/emblemKeyForLevel 은 제거됐다 — 아이언·마스터가 없어지고
+//  엠블렘이 티어 5단계 이미지 public/emblems/<tier>.webp 단일 체계가 되면서 쓸 곳이 사라졌다.)
 
-// Tier(5단계) → 표시색. TierEmblem/LEVEL_COLOR 팔레트와 동일 hex(엠블렘 ↔ 색 꼬임 방지).
+// Tier(5단계) → 표시색. LEVEL_COLOR 팔레트와 동일 hex(엠블렘 ↔ 배경/이름색 꼬임 방지).
 export const TIER_COLOR: Record<Tier, string> = {
   bronze: '#b8763e',
   silver: '#aeb9c8',
@@ -184,3 +194,5 @@ export const TIER_COLOR: Record<Tier, string> = {
 export function tierColor(tier: Tier | null | undefined): string {
   return (tier && TIER_COLOR[tier]) || '#9ca3af'
 }
+/** 낮은 티어 → 높은 티어. 티어 사다리(대시보드) 노출 순서. */
+export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'platinum', 'diamond']

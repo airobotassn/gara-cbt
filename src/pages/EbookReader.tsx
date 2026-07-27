@@ -11,11 +11,48 @@ import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import type { EbookReadResp } from '../lib/types'
 
+// ── 반출 억제 레이어 ────────────────────────────────────────────────────────────
+// ⚠️ 완전 차단은 불가능하다(본문 HTML 이 이미 브라우저에 내려와 있어 devtools 로는 언제든 볼 수 있다).
+//    목표는 "무심코 인쇄·복사하는 것을 막고, 유출되면 누구 것인지 남긴다".
+//    이북 원본 파일은 건드리지 않고 srcdoc 에 넣기 직전에 스타일·스크립트를 덧붙인다
+//    → 관리자가 올린 어떤 책에도 자동 적용된다.
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+
+/** 구매자 표식을 사선 타일로 반복하는 워터마크 배경(SVG data URI). */
+function watermarkCss(mark: string): string {
+  // 읽기를 방해하지 않을 만큼 옅게(.05) — 캡처본에서는 확대하면 식별된다.
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="460" height="260">` +
+    `<text x="230" y="130" fill="rgba(20,30,60,.05)" font-size="15" font-weight="700" ` +
+    `font-family="system-ui,sans-serif" text-anchor="middle" transform="rotate(-24 230 130)">${esc(mark)}</text></svg>`
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`
+}
+
+function protectHtml(raw: string, mark: string): string {
+  const inject =
+    `<style>` +
+    // 인쇄: 본문을 통째로 숨긴다(Ctrl+P·메뉴 인쇄 모두 빈 페이지가 된다)
+    `@media print{html,body{display:none!important}}` +
+    // 복사·드래그 차단
+    `html,body{-webkit-user-select:none;-ms-user-select:none;user-select:none;-webkit-touch-callout:none}` +
+    // 구매자 워터마크(본문 위에 깔되 클릭은 통과)
+    `#__wm{position:fixed;inset:0;z-index:2147483646;pointer-events:none;background-image:${watermarkCss(mark)};background-repeat:repeat}` +
+    `</style><div id="__wm" aria-hidden="true"></div><script>(function(){` +
+    `var stop=function(e){e.preventDefault();return false};` +
+    `['contextmenu','copy','cut','selectstart','dragstart'].forEach(function(t){document.addEventListener(t,stop)});` +
+    `document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();` +
+    `if((e.ctrlKey||e.metaKey)&&(k==='p'||k==='s'||k==='c'||k==='x'||k==='u'||k==='a'))e.preventDefault()});` +
+    `window.addEventListener('beforeprint',function(){document.documentElement.style.display='none'});` +
+    `window.addEventListener('afterprint',function(){document.documentElement.style.display=''});` +
+    `})()</` + `script>` // 문자열에 </script> 가 그대로 들어가지 않게 쪼갠다
+  return /<\/body>/i.test(raw) ? raw.replace(/<\/body>/i, `${inject}</body>`) : raw + inject
+}
+
 export default function EbookReader() {
   const { t } = useT()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { isFullUser, loading: authLoading, loginWithGoogle } = useAuth()
+  const { user, isFullUser, loading: authLoading, loginWithGoogle } = useAuth()
   const [book, setBook] = useState<EbookReadResp | null>(null)
   const [html, setHtml] = useState('')
   const [err, setErr] = useState('')
@@ -32,7 +69,12 @@ export default function EbookReader() {
         if (!res.ok) throw new Error(`본문을 불러오지 못했습니다 (${res.status})`)
         const text = await res.text()
         if (!alive) return
-        setHtml(text)
+        // 워터마크 표식 = 구매자(이름 · 이메일) + 열람일. 유출본에서 누구 것인지 드러난다.
+        const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
+        const who = String(meta.full_name ?? meta.name ?? '') || (user?.email ?? '')
+        const mail = user?.email ?? ''
+        const stamp = new Date().toLocaleDateString('sv-SE')
+        setHtml(protectHtml(text, [who, mail !== who ? mail : '', stamp].filter(Boolean).join(' · ')))
         setErr('')
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.')
@@ -41,7 +83,7 @@ export default function EbookReader() {
     return () => {
       alive = false
     }
-  }, [id, isFullUser, authLoading])
+  }, [id, isFullUser, authLoading, user])
 
   if (authLoading) {
     return <div className="wrap"><div className="card pad" style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('common.loading')}</div></div>
@@ -81,6 +123,9 @@ export default function EbookReader() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f4f6fb' }}>
+      {/* 바깥(앱 셸)에서 인쇄를 걸어도 iframe 이 같이 찍히므로 뷰어가 떠 있는 동안은 페이지 자체를 인쇄에서 뺀다.
+          이 <style> 은 컴포넌트가 언마운트되면 사라지므로 다른 화면 인쇄에는 영향이 없다. */}
+      <style>{'@media print{body{display:none!important}}'}</style>
       <header
         style={{
           flex: '0 0 auto',

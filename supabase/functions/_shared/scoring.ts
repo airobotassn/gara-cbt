@@ -6,7 +6,20 @@ import { pickLang, projText, projOptions } from './lib.ts'
 export * from './lib.ts'
 
 // ----- 공통 상수 -----
+/** @deprecated 문항 수는 레벨 구간별(questionsForLevel). 이 값은 구코드 폴백용으로만 남긴다. */
 export const QUESTIONS_PER_TEST = 20
+// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1~2 = 10 · Lv.3~5 = 20 · Lv.6~7 = 30.
+//   ⚠️ 프론트 src/lib/scoring.ts 의 동명 함수와 항상 같이 고칠 것.
+export function questionsForLevel(level: number): number {
+  if (level <= 2) return 10
+  if (level <= 5) return 20
+  return 30
+}
+export function durationMinutesForLevel(level: number): number {
+  return questionsForLevel(level)
+}
+// 하루 응시 가능 횟수(정식 회원). 그날 승급할 때마다 1회씩 추가된다 — start-test 참고.
+export const DAILY_ATTEMPTS_BASE = 2
 export const COOLDOWN_DAYS = 3
 export const ATTEMPT_TTL_MINUTES = 120
 export const MIN_LEVEL = 1
@@ -16,17 +29,40 @@ export const MAX_LEVEL = 7
 export const BASE_PER_AXIS = 3
 export const EXTRA_AXES = 2
 
-// 축 수가 레벨마다 다를 수 있어(Lv.1 = 2축) 축당 문항 수는 상수가 아니라 여기서 계산한다.
-//   6축 → 3개씩 + 랜덤 2축이 +1 = 20 (기존과 동일) · 2축 → 10개씩 = 20
-export function axisQuota(axisCount: number): { base: number; extraAxes: number } {
+// 축 수도(Lv.1 = 3축) 문항 수도(10/20/30) 레벨마다 달라서 축당 문항 수는 상수가 아니라 여기서 계산한다.
+//   예) Lv.1 3축·10문항 → 3개씩 + 랜덤 1축이 +1 · Lv.2 6축·10문항 → 1개씩 + 랜덤 4축이 +1
+export function axisQuota(axisCount: number, total: number = QUESTIONS_PER_TEST): { base: number; extraAxes: number } {
   if (axisCount <= 0) return { base: 0, extraAxes: 0 }
-  const base = Math.floor(QUESTIONS_PER_TEST / axisCount)
-  return { base, extraAxes: QUESTIONS_PER_TEST - base * axisCount }
+  const base = Math.floor(total / axisCount)
+  return { base, extraAxes: total - base * axisCount }
 }
 
-// ----- 레벨별 축 코드 (categories.ts 와 동일하게 유지!) — Lv.1 만 2축, 나머지는 6축 -----
+// 오늘(KST) 남은 응시 횟수 = 기본 2회 + 그날 승급 수 − 그날 시작 수.
+//   · 별도 테이블 없이 test_attempts 로만 센다. 시작만 하고 이탈한 in_progress/expired 도 '소모'로 친다
+//     (시작→이탈 반복으로 무한 응시하는 걸 막으려면 이 방법뿐).
+//   · 승급하면 소모분을 돌려받는 셈이라 그날 안에 한 번 더 도전할 수 있다.
+//   · 게스트(익명)·관리자는 애초에 제한 대상이 아니므로 호출부에서 걸러 쓸 것.
+//   ⚠️ start-test(강제)와 list-attempts(표시)가 같은 값을 써야 해서 여기 한 곳에 둔다.
+export async function dailyAttemptsLeft(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<{ left: number; used: number; allowed: number }> {
+  const kstToday = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)
+  const { data } = await admin
+    .from('test_attempts')
+    .select('id, rank_dir')
+    .eq('user_id', userId)
+    .gte('started_at', `${kstToday}T00:00:00+09:00`)
+  const used = data?.length ?? 0
+  const promoted = (data ?? []).filter((a) => a.rank_dir === 'up').length
+  const allowed = DAILY_ATTEMPTS_BASE + promoted
+  return { left: allowed - used, used, allowed }
+}
+
+// ----- 레벨별 축 코드 (categories.ts 와 동일하게 유지!) — Lv.1 만 3축, 나머지는 6축 -----
 export const LEVEL_AXES: Record<number, string[]> = {
-  1: ['l1_prompt', 'l1_tools'],
+  // 2026-07-27 l1_problem(AI를 활용한 문제해결) 추가 — 프론트 categories.ts 와 순서까지 동일하게 유지할 것.
+  1: ['l1_prompt', 'l1_tools', 'l1_problem'],
   2: ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt'],
   3: ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python'],
   4: ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv'],
@@ -63,11 +99,17 @@ export function updateAxis(prev: number, perf: number, placed: boolean): number 
 }
 
 // ----- 등급(레벨) 변동 (scoring.ts 와 동일하게 유지!) -----
-// 승급컷: 레벨1~3 = 16, 레벨4~7 = 18. 강등: 4개 이하 연속 3번(앞 2번 경고). Lv.1 강등 없음.
-export function promoteCut(level: number): number {
-  return level <= 3 ? 16 : 18
+// 승급컷: 레벨1~3 = 80%, 레벨4~7 = 90%. 강등: 20% 이하 연속 3번(앞 2번 경고). Lv.1 강등 없음.
+//   문항 수가 레벨 구간마다 달라(10/20/30) 절대 개수가 아니라 비율로 판정한다.
+export const PROMOTE_RATE_LOW = 0.8
+export const PROMOTE_RATE_HIGH = 0.9
+export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
+  return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
-export const DEMOTE_MAX = 4
+export const DEMOTE_RATE = 0.2
+export function demoteMax(level: number, total: number = questionsForLevel(level)): number {
+  return Math.floor(total * DEMOTE_RATE)
+}
 export const DEMOTE_STRIKES = 3
 export type RankDir = 'up' | 'down' | 'stay'
 export interface RankChange {
@@ -81,12 +123,13 @@ export function computeRankChange(
   testLevel: number,
   correct: number,
   strikes: number,
+  total: number = questionsForLevel(testLevel),
 ): RankChange {
-  if (testLevel >= currentRank && correct >= promoteCut(testLevel)) {
+  if (testLevel >= currentRank && correct >= promoteCut(testLevel, total)) {
     const next = Math.min(MAX_LEVEL, currentRank + 1)
     return { nextRank: next, dir: next > currentRank ? 'up' : 'stay', nextStrikes: 0, warned: false }
   }
-  if (testLevel <= currentRank && correct <= DEMOTE_MAX && currentRank > MIN_LEVEL) {
+  if (testLevel <= currentRank && correct <= demoteMax(testLevel, total) && currentRank > MIN_LEVEL) {
     const s = strikes + 1
     if (s >= DEMOTE_STRIKES) {
       return { nextRank: currentRank - 1, dir: 'down', nextStrikes: 0, warned: false }
@@ -237,6 +280,8 @@ export async function applyAttempt(
   level: number,
   perf: AxisMap,
   totalCorrect: number,
+  // 실제 출제 문항 수. 승급컷/강등선이 비율이라 이 값이 판정 분모가 된다(생략 시 레벨 기준값).
+  totalQuestions: number = questionsForLevel(level),
 ): Promise<{
   ratings: AxisMap
   deltas: AxisMap
@@ -299,6 +344,7 @@ export async function applyAttempt(
     level,
     totalCorrect,
     strikesBefore,
+    totalQuestions,
   )
 
   // 랭킹 점수 = 새 등급 + 그 레벨 '최신' 맞힌 수. (이번 응시가 그 레벨이면 이번 값, 아니면 DB 최신)

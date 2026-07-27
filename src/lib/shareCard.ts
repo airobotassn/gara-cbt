@@ -5,7 +5,7 @@
 //  · 렌더러는 **캔버스 2D 하나뿐**이다. 미리보기도 이 캔버스를 CSS 로 축소해 보여준다
 //    (DOM 미리보기 + 캔버스 출력 을 따로 만들면 둘이 반드시 어긋난다 → WYSIWYG 보장).
 //  · 티어 엠블렘은 `public/emblems/<tier>.png`(배경 제거 완료, 512px). 5티어 = Tier 와 1:1.
-//    ⚠️ 레벨 엠블렘(7단계 iron~master, TierEmblem.tsx)과는 다른 축이다 — 카드는 티어만 쓴다.
+//    ⚠️ 화면 UI(TierBadge)는 같은 엠블렘의 256px webp 를 쓴다 — 카드만 큰 png 를 쓴다(캔버스 확대 대비).
 //  · 업로드 아바타는 교차출처(Supabase Storage) → crossOrigin='anonymous'. 실패하면 젬으로 폴백한다
 //    (여기서 폴백 안 하면 캔버스가 오염돼 toBlob 자체가 터진다).
 import { tierColor, type Tier } from './scoring'

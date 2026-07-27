@@ -1,4 +1,5 @@
-// start-test: 쿨다운 검사 → 이전 in_progress 만료 → 레벨 6축 층화추출 20문항(정답 제외, 응시 언어 투영) → attempt 생성
+// start-test: 일일 응시 제한 검사 → 이전 in_progress 만료 → 레벨 축 층화추출(레벨 구간별 10/20/30문항,
+//             정답 제외·응시 언어 투영) → attempt 생성
 import { corsHeaders, json } from '../_shared/cors.ts'
 import {
   adminClient,
@@ -11,7 +12,8 @@ import {
   pickLang,
   projText,
   projOptionsForLevel,
-  QUESTIONS_PER_TEST,
+  questionsForLevel,
+  dailyAttemptsLeft,
   axisQuota,
   MIN_LEVEL,
   MAX_LEVEL,
@@ -52,12 +54,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ⚠️ 테스트 단계: 쿨다운(3일 1회) 임시 비활성화. 정식 오픈 시 true 로 되돌리기.
+    // ⚠️ 옛 쿨다운(3일 1회)은 아래 '하루 N회'로 대체됐다. 되살릴 일이 있으면 true 로.
     const COOLDOWN_ENABLED = false
     if (COOLDOWN_ENABLED && !user.is_anonymous && !isCooldownExempt(user.email)) {
       if (await hasRecentSubmission(admin, user.id)) {
         return json({ error: '최근 3일 내 응시 기록이 있어 지금은 응시할 수 없습니다.' }, 429)
       }
+    }
+
+    // 하루 응시 제한 — 기본 2회, **그날 승급할 때마다 1회씩 추가**(승급하면 소모분을 돌려받는 셈).
+    //   별도 테이블 없이 test_attempts 로 계산한다: 남은 = 기본 + 오늘 승급수 − 오늘 시작수.
+    //   · 기준일 = KST 캘린더일(started_at)
+    //   · 시작만 하고 이탈한 in_progress/expired 도 '소모'로 센다(시작→이탈 반복으로 무한 응시 방지)
+    //   · 게스트(익명)와 관리자는 면제 — 게스트는 등급이 없어 '승급 시 +1' 규칙 자체가 성립하지 않고,
+    //     결과도 총점만 보이므로 제한 대상이 아니다(기존 쿨다운 정책과 동일한 취급).
+    if (!user.is_anonymous && !isAdmin) {
+      const { left, used, allowed } = await dailyAttemptsLeft(admin, user.id)
+      if (left <= 0) return json({ error: 'daily_limit', allowed, used }, 429)
     }
 
     // 같은 유저의 진행중 attempt는 모두 만료 처리(동시 1개 + 방치 정리)
@@ -87,8 +100,9 @@ Deno.serve(async (req) => {
       if (byAxis.has(q.category)) byAxis.get(q.category)!.push(q)
     }
 
-    // 층화추출: 20문항을 축 수로 균등 배분(6축 → 3개씩·랜덤 2축만 4개 / Lv.1 2축 → 10개씩)
-    const quota = axisQuota(axes.length)
+    // 층화추출: 그 레벨의 문항 수(10/20/30)를 축 수로 균등 배분하고 나머지는 랜덤 축에 +1
+    const totalQ = questionsForLevel(level)
+    const quota = axisQuota(axes.length, totalQ)
     const extra = new Set(shuffle(axes).slice(0, quota.extraAxes))
     const picked: typeof pool = []
     const usedIds = new Set<string>()
@@ -100,16 +114,17 @@ Deno.serve(async (req) => {
         usedIds.add(q.id)
       }
     }
-    // 축 부족으로 20개 미달이면 남은 풀에서 보충
-    if (picked.length < QUESTIONS_PER_TEST) {
+    // 축별 문항이 모자라 목표 수에 미달이면 남은 풀에서 보충(그래도 모자라면 그 수만큼만 출제 —
+    // 승급컷은 비율이라 실제 출제 수 기준으로 판정된다)
+    if (picked.length < totalQ) {
       const leftover = shuffle(pool.filter((q) => !usedIds.has(q.id)))
       for (const q of leftover) {
-        if (picked.length >= QUESTIONS_PER_TEST) break
+        if (picked.length >= totalQ) break
         picked.push(q)
         usedIds.add(q.id)
       }
     }
-    const final = shuffle(picked).slice(0, QUESTIONS_PER_TEST)
+    const final = shuffle(picked).slice(0, totalQ)
 
     // attempt 생성
     const { data: attempt, error: aErr } = await admin

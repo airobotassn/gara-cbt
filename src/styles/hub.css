@@ -195,8 +195,9 @@
 .hub .hub-modal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
 /* ── 공유 카드 모달 ──
-   미리보기 = 출력 캔버스(1080×1350) 자체를 CSS 로 축소한 것. 보이는 그대로 PNG 가 나간다. */
-.hub .share-modal { max-width: 520px; } /* 카드가 가로형(16:9)이라 세로 모달보다 넓게 */
+   미리보기 = 출력 캔버스(1600×900, 16:9) 자체를 CSS 로 축소한 것. 보이는 그대로 PNG 가 나간다.
+   가로 카드라 모달 폭이 곧 미리보기 크기 → 화면이 허용하는 만큼 넓게(96vw), 상한만 크게 둔다. */
+.hub .share-modal { max-width: min(96vw, 860px); }
 .hub .share-preview { position: relative; width: 100%; border-radius: 14px; overflow: hidden;
   border: 2.5px solid var(--line); background: #12161f; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
 .hub .share-canvas { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .25s ease; }
@@ -261,6 +262,8 @@
   .hub .ricon svg { width: 34px; height: 34px; }
   .hub .fcard svg { width: 42px; height: 42px; }
   .hub .hub-modal { max-width: 480px; }
+  /* 공유 카드는 가로형이라 이 미디어쿼리의 480px 상한을 받지 않는다(그러면 미리보기가 작아진다). */
+  .hub .share-modal { max-width: min(96vw, 860px); }
   .hub .hub-modal-grid { grid-template-columns: repeat(3, 1fr); }
 }
 

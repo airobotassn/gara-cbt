@@ -82,7 +82,8 @@ html.dark {
 .fab {
   position: fixed;
   left: max(24px, env(safe-area-inset-left));
-  bottom: max(24px, env(safe-area-inset-bottom));
+  /* --fab-bottom = SiteFooter 가 계산(푸터가 올라온 높이 + 24px) → 푸터 바로 위에서 멈춘다. */
+  bottom: max(var(--fab-bottom, 24px), env(safe-area-inset-bottom));
   z-index: 60;
   width: 58px;
   height: 58px;
@@ -93,13 +94,17 @@ html.dark {
   display: grid;
   place-items: center;
   box-shadow: var(--fab-shadow);
-  transition: 0.15s;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 .fab:hover {
   transform: translateY(-2px);
   border-color: rgba(var(--fab-accent), 0.5);
   box-shadow: 0 0 24px -6px rgba(var(--fab-accent), 0.5);
 }
+/* 푸터가 화면에 들어오면 FAB 이 비켜준다(SiteFooter 가 body 에 .footer-in-view 를 붙인다).
+   FAB 은 좌하단 고정이라 푸터 링크 위를 덮는데, 예전엔 푸터가 아래를 112px 비워 피하느라 푸터가 커졌다.
+   여백 대신 FAB 을 숨긴다 — 푸터에 같은 링크가 있어 네비는 안 끊긴다.
+   ⚠️ FAB 패널이 열려 있으면(.panel-open) 유지: 열어둔 채 스크롤하다 버튼만 사라지면 이상하다. */
 .fab .av {
   width: 34px;
   height: 34px;
@@ -115,7 +120,7 @@ html.dark {
 .fab-top {
   position: fixed;
   right: max(24px, env(safe-area-inset-right));
-  bottom: max(24px, env(safe-area-inset-bottom));
+  bottom: max(var(--fab-bottom, 24px), env(safe-area-inset-bottom));
   z-index: 60;
   width: 48px;
   height: 48px;
@@ -127,7 +132,7 @@ html.dark {
   display: grid;
   place-items: center;
   box-shadow: var(--fab-shadow);
-  transition: 0.15s;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 .fab-top:hover {
   transform: translateY(-2px);
@@ -137,7 +142,8 @@ html.dark {
 .panel {
   position: fixed;
   left: max(24px, env(safe-area-inset-left));
-  bottom: max(92px, env(safe-area-inset-bottom));
+  /* FAB(58px) 바로 위 — FAB 이 올라가면 패널도 같이 올라간다 */
+  bottom: max(calc(var(--fab-bottom, 24px) + 68px), env(safe-area-inset-bottom));
   z-index: 60;
   width: 290px;
   max-height: calc(100dvh - 120px);
@@ -536,4 +542,13 @@ html.dark .pf-more-link.pf-preview .pf-more-ext {
   letter-spacing: 0.08em;
   color: var(--dim);
   margin-top: 4px;
+}
+
+/* 인쇄(PDF 저장) 시 플로팅 UI 제외 — 어느 화면을 인쇄하든 FAB·맨 위로·패널이 문서(자격증 등)에 안 찍히게 */
+@media print {
+  .fab,
+  .fab-top,
+  .panel {
+    display: none !important;
+  }
 }

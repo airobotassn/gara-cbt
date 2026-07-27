@@ -18,7 +18,11 @@ const DAILY_POINTS = 10
 const STAMP_GOAL = 7 // 허브 도크의 7일 스탬프판과 동일
 
 // get-hub 응답 중 이 화면이 쓰는 것만. (전체 형태는 Hub.tsx 참고)
-interface HubState { authed: boolean; points?: number; stamps?: number; dailyDone?: boolean }
+//   ⚠️ 이 화면의 완료 판정은 learnDone(=daily_activity.did_learn) 이다. dailyDone(출석)이나 행 존재로
+//      판정하면 레벨테스트·미니게임만 해도 오늘의 문제가 잠긴다(2026-07-27 버그).
+interface HubState { authed: boolean; points?: number; stamps?: number; learnDone?: boolean }
+// complete-daily 응답. first = 이번 호출로 재화(코인·스탬프)가 실제 지급됐는지(출석·학습 통틀어 하루 1회).
+interface DailyResp { ok: boolean; day: string; first: boolean }
 
 const IK = '#33323f'
 const ICONS: Record<string, ReactNode> = {
@@ -42,6 +46,7 @@ export default function Daily() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [celebrate, setCelebrate] = useState(false) // 완료 직후 보상 연출(재방문 시엔 안 뜬다)
+  const [rewarded, setRewarded] = useState(true) // 이번 완료로 재화가 실제 지급됐는지(서버 응답 first)
   // 오늘의 문제 — 미니게임과 같은 용어 풀(lib/terms)에서 날짜별로 하나씩 순환. 마운트 시 1회 고정.
   const [term] = useState(() => dailyTerm())
   const [choices] = useState(() => dailyChoices()) // 보기 4개(정답+오답3), 날짜 시드로 섞임
@@ -53,7 +58,7 @@ export default function Daily() {
     setAuthed(!!h.authed)
     setPoints(h.points ?? 0)
     setStamps(h.stamps ?? 0)
-    setDone(!!h.dailyDone)
+    setDone(!!h.learnDone)
   }
 
   // 마운트 하이드레이트. setState 는 프라미스 콜백에서만(허브와 동일 규칙).
@@ -73,9 +78,11 @@ export default function Daily() {
     setBusy(true)
     setErr('')
     try {
-      await callFunction('complete-daily', {})
+      // kind 를 안 보내면 서버 기본값이 '출석'이라 학습이 출석으로 적립된다(did_learn 이 영영 안 찍힘).
+      const r = await callFunction<DailyResp>('complete-daily', { kind: 'daily_learn' })
       const h = await callFunction<HubState>('get-hub', {})
       applyHub(h)
+      setRewarded(!!r.first) // 오늘 출석으로 이미 재화를 받았으면 false — 보상 문구를 거짓말하지 않는다.
       setCelebrate(true)
     } catch {
       setErr('완료 처리에 실패했어요. 잠시 후 다시 시도해주세요')
@@ -188,10 +195,12 @@ export default function Daily() {
             <div className="dy-pop-burst"><Ic n="stamp" s={64} /></div>
             <b className="dy-pop-title">오늘 학습 완료!</b>
             <div className="dy-pop-gain">
-              <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>
+              {rewarded && <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>}
               <span><Ic n="stamp" s={22} />스탬프 {stamps} / {STAMP_GOAL}</span>
             </div>
-            <p className="dy-pop-msg">캐릭터가 오늘도 한 뼘 자랐어요.</p>
+            <p className="dy-pop-msg">
+              {rewarded ? '캐릭터가 오늘도 한 뼘 자랐어요.' : '오늘 출석으로 코인·스탬프는 이미 받았어요. 학습 기록은 남았습니다.'}
+            </p>
             <div className="dy-pop-btns">
               <button className="dy-btn dy-ghost" onClick={() => setCelebrate(false)}>닫기</button>
               <button className="dy-btn" onClick={() => navigate('/hub')}>허브로</button>

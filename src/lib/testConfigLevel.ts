@@ -1,20 +1,22 @@
 // 시험 공통 설정
 import { MIN_LEVEL, MAX_LEVEL } from './categories'
 
+// 문항 수·제한시간은 레벨 구간별 — 단일 출처는 scoring.ts 의 questionsForLevel/durationMinutesForLevel.
+//   Lv.1~2 = 10문항/10분 · Lv.3~5 = 20문항/20분 · Lv.6~7 = 30문항/30분
+export { questionsForLevel, durationMinutesForLevel } from './scoring'
+/** @deprecated 레벨 구간별로 갈렸다. 레벨을 모르는 자리의 표시용 폴백으로만 쓸 것. */
 export const QUESTIONS_PER_TEST = 20
 export const COOLDOWN_DAYS = 3
+// 하루 응시 가능 횟수(정식 회원 기준). 그날 승급하면 1회씩 추가된다 — 강제는 서버(start-test).
+export const DAILY_ATTEMPTS_BASE = 2
 
-// 시험 제한시간(분). 화면 카운트다운 + 0 도달 시 자동 제출.
-export const TEST_DURATION_MINUTES = 20
-
-// 층화추출: 20문항을 그 레벨의 축 수로 균등 배분한다(축 수는 레벨마다 다르다 — Lv.1 만 2축).
-//   6축 → 3개씩 + 랜덤 2축이 +1 = 20 · 2축 → 10개씩 = 20
+// 층화추출: 그 레벨의 문항 수를 축 수로 균등 배분한다(축 수도 레벨마다 다르다 — Lv.1 만 3축).
 //   ⚠️ 실제 배분은 함수쪽 단일 출처: supabase/functions/_shared/scoring.ts 의 axisQuota()
-export const AXES_PER_TEST = 6 // 표준 축 수(Lv.1 은 예외로 2)
-export function axisQuota(axisCount: number): { base: number; extraAxes: number } {
+export const AXES_PER_TEST = 6 // 표준 축 수(Lv.1 은 예외로 3)
+export function axisQuota(axisCount: number, total: number): { base: number; extraAxes: number } {
   if (axisCount <= 0) return { base: 0, extraAxes: 0 }
-  const base = Math.floor(QUESTIONS_PER_TEST / axisCount)
-  return { base, extraAxes: QUESTIONS_PER_TEST - base * axisCount }
+  const base = Math.floor(total / axisCount)
+  return { base, extraAxes: total - base * axisCount }
 }
 
 export { MIN_LEVEL, MAX_LEVEL }
@@ -22,6 +24,8 @@ export { MIN_LEVEL, MAX_LEVEL }
 // 문제은행이 비어 있어 응시를 막아둘 레벨(레벨 선택 화면에서 '오픈 예정'). 비어 있으면 전 레벨 응시 가능.
 //   문항 없는 레벨을 여기 빼두면 start-test 가 '해당 레벨의 문제가 없습니다.' 로 400 을 낸다.
 //   2026-07-23 Lv.1 문항 등록(l1_prompt 20 · l1_tools 13) 완료 → 잠금 해제.
+//   2026-07-27 Lv.1 에 l1_problem(AI를 활용한 문제해결) 축 추가 — 이 축은 아직 문항 0개라
+//   출제 시 부족분을 다른 축에서 채운다(start-test 폴백). 문항을 채우기 전엔 레이더 삼각형의 한 꼭짓점이 0 이다.
 export const COMING_SOON_LEVELS: number[] = []
 
 // 부정행위 방지 2층: 화면 이탈 N회 누적 시 자동 제출

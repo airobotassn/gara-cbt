@@ -110,6 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider: 'google',
       options: {
         redirectTo: redirectTo ?? `${window.location.origin}/auth/callback`,
+        // 구글에 로그인된 계정이 하나면 동의화면 없이 그 계정으로 바로 통과한다.
+        // 계정 선택창을 매번 띄워 어떤 계정으로 들어갈지 고르게 한다.
+        queryParams: { prompt: 'select_account' },
       },
     })
     if (error) throw error

@@ -81,6 +81,8 @@ Deno.serve(async (req) => {
           attempt.level,
           attempt.axis_perf as AxisMap, // 출제된 축만 담긴 객체
           attempt.total_correct ?? 0,
+          // 승급컷/강등선이 비율이라 실제 출제 문항 수가 판정 분모다.
+          attempt.total_questions ?? undefined,
         )
         const warnStrikes = applied.warned ? applied.demotionStrikes : 0
         await admin

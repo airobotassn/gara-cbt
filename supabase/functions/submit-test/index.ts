@@ -71,6 +71,9 @@ Deno.serve(async (req) => {
       return json({ error: '채점할 문항이 없습니다.' }, 400)
     }
 
+    // 실제 출제 문항 수 = 승급컷/강등선(비율) 판정의 분모.
+    const totalQuestions = assigned.length
+
     const submittedMap = new Map<string, InAnswer>()
     for (const a of answers as InAnswer[]) submittedMap.set(a.questionId, a)
 
@@ -130,7 +133,8 @@ Deno.serve(async (req) => {
 
     // 멱등 가드: 최초 1회만 반영
     if (await claimApply(admin, attemptId)) {
-      const applied = await applyAttempt(admin, user.id, attempt.level, perf, totalCorrect)
+      // 승급컷/강등선이 비율이라 실제 출제 문항 수를 판정 분모로 넘긴다.
+      const applied = await applyAttempt(admin, user.id, attempt.level, perf, totalCorrect, totalQuestions)
       const warnStrikes = applied.warned ? applied.demotionStrikes : 0
       await admin
         .from('test_attempts')
