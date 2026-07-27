@@ -42,13 +42,16 @@
   }
   .hud-score, .hud-right, .hud-chip{ display:block; }
   .hs-ic, .hud-chip svg, .hc-lab{ display:none; }   /* 별·왕관·번개·라벨 = 이미지에 포함 */
-  .hs-num{ position:absolute; z-index:1; left:70px; top:54%; transform:translateY(-50%);
+  /* top 값은 아트에 맞춘 실측치 — 헤더 이미지의 별 세로중심이 43px(=47.8%)이고
+     이 글꼴 숫자는 em 박스 중심보다 약 5% 아래에 찍혀서 그만큼 올려 잡았다. 눈대중으로 고치지 말 것. */
+  .hs-num{ position:absolute; z-index:1; left:70px; top:45.5%; transform:translateY(-50%);
     font-size:36px; font-weight:900; color:#6d3f7a; font-variant-numeric:tabular-nums;
     text-shadow:0 1px 2px rgba(255,255,255,.7); line-height:1; }
-  #best{ position:absolute; z-index:1; right:60px; top:37%; transform:translateY(-50%);
+  /* 최고·배속도 같은 실측 기준 — 왕관 세로중심 27px, 번개 세로중심 64px(=알약 가운데) */
+  #best{ position:absolute; z-index:1; right:60px; top:30%; transform:translateY(-50%);
     font-size:15px; font-weight:900; color:#6d3f7a; font-variant-numeric:tabular-nums;
     text-shadow:0 1px 1px rgba(255,255,255,.7); }
-  #spd{ position:absolute; z-index:1; right:60px; top:73%; transform:translateY(-50%);
+  #spd{ position:absolute; z-index:1; right:60px; top:70%; transform:translateY(-50%);
     font-size:14px; font-weight:900; color:#b06a1f; font-variant-numeric:tabular-nums;
     text-shadow:0 1px 1px rgba(255,255,255,.7); }
 
@@ -134,12 +137,16 @@
     min-height:36px; text-align:left;
     display:flex; align-items:center; justify-content:flex-start; padding:2px 8px;
   }
+  /* 1fr = minmax(auto,1fr) — 칸의 최소 너비가 '가장 긴 어절'이라
+     보통은 5:5 로 붙고, 한 어절이 반칸보다 길 때만 그 칸이 조금 넓어진다(옆 칸 찌그러짐 없음). */
   .choices{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
   .choice{
-    position:relative; text-align:left; padding:12px 6px 12px 54px; border:0;
+    position:relative; text-align:left; padding:12px 8px 12px 54px; border:0;
     background:url("beat-cari-choice.png") center/100% 100% no-repeat;
-    color:#3e2b52; font-size:15.5px; font-weight:800; line-height:1.2;
-    white-space:nowrap;   /* 한 줄 고정 — 개행 방지 */
+    color:#3e2b52; font-size:15.5px; font-weight:800; line-height:1.25;
+    /* 긴 보기(예: "시뮬레이션 투 리얼(Sim-to-Real)")는 줄바꿈.
+       keep-all = 한국어를 어절 단위로 끊고, break-word 는 한 어절이 칸보다 길 때만 강제로 끊는다. */
+    white-space:normal; word-break:keep-all; overflow-wrap:break-word;
     cursor:pointer; transition:transform .05s, filter .12s; min-height:66px;
     display:flex; align-items:center;
   }
@@ -191,7 +198,7 @@
      '버티기 시작' 버튼이 화면 밖으로 밀려 잘렸다. 높은 화면에서는 min() 이 284px 로 잡혀 원래 그대로. */
   .intro-mascot{ width:min(284px, 36vh); height:auto; margin-top:-6px; filter:drop-shadow(0 14px 18px rgba(70,90,140,.32)); animation:bob 2.6s ease-in-out infinite; }
   @keyframes bob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}}
-  .intro-title{ font-size:44px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:10px 0 0;
+  .intro-title{ font-size:44px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:2px 0 0;
     transform:rotate(-2.5deg); animation:titlePop .55s cubic-bezier(.2,1.7,.4,1) both; }
   /* 동굴 배경(분홍·보라)과 같은 색상 계열이라 명도로 띄운다: 짙은 자주 외곽선 + 밝은 속면.
      -webkit-text-stroke 는 글자 안쪽을 깎아 획이 얇아지므로 쓰지 않고 8방향 text-shadow 로 외곽선을 만든다. */
@@ -208,33 +215,50 @@
     -webkit-background-clip:text; background-clip:text;
     -webkit-text-fill-color:transparent; color:transparent; }
   /* background-clip:text 는 '배경' 레이어라 text-shadow 가 그 위를 덮는다(= 금색이 사라짐).
-     그래서 외곽선은 같은 글자를 뒤에 한 벌 더 깐 ::before 로 그린다. */
+     그래서 그림자는 같은 글자를 투명하게 한 벌 더 깐 ::before 에 준다. */
   .intro-title .t2::before{ content:attr(data-t); position:absolute; left:0; top:0; z-index:-1;
     color:#4a2450; -webkit-text-fill-color:#4a2450; }
   @keyframes titlePop{0%{opacity:0; transform:scale(.5) rotate(-2.5deg)} 60%{transform:scale(1.08) rotate(-2.5deg)} 100%{opacity:1; transform:scale(1) rotate(-2.5deg)}}
-  .intro-tag{ font-size:14.5px; font-weight:800; color:#fff4e4; margin:15px 0 22px; letter-spacing:.005em;
+  .intro-tag{ font-size:14.5px; font-weight:800; color:#fff4e4; margin:15px 0 30px; letter-spacing:.005em;
     text-shadow:
       -1px -1px 0 rgba(74,36,80,.9), 1px -1px 0 rgba(74,36,80,.9),
       -1px  1px 0 rgba(74,36,80,.9), 1px  1px 0 rgba(74,36,80,.9),
       0 3px 9px rgba(60,24,54,.6); }
-  /* 규칙 3줄을 흰 카드 3개 → 크리스탈 텍스트창 하나로. 원본 비율(1300x466) 유지해 좌우 하단 크리스탈이 눌리지 않게 */
-  .intro-rules{ display:flex; flex-direction:column; justify-content:center; gap:6px;
-    width:100%; max-width:330px; aspect-ratio:1300/466; margin-bottom:20px; padding:0 20px 8px;
+  /* 규칙 3줄 = 크리스탈 텍스트창 이미지 하나.
+     ⚠️ 원본(1775x886)은 투명 여백이 있어 잘라낸 1759x843 을 쓴다. 비율 고정 필수.
+     ⚠️ 아이콘(▲▼★ 원형 배지)이 이미지에 박혀 있다 → .ir-ic 는 숨기고 글자만 얹는다.
+        배지는 가로 7.5~17.5%, 세로중심 20%/48%/76% (실측). 3등분 그리드로 그 중심에 줄을 맞춘다:
+        본문 높이 84%·위 6%·아래 10% → 각 줄 중심이 정확히 20/48/76%.
+     ⚠️ padding 을 그냥 % 로 쓰면 안 된다 — % padding 은 '부모(오버레이) 폭' 기준이라
+        화면이 386px 을 넘어 패널이 330px 로 고정되는 순간부터 글자가 오른쪽으로 밀린다(460px 에서 14px 밀렸음).
+        그래서 패널 실폭을 --pw 로 잡아 calc 로 곱한다. 세로값은 비율(2.087)로 나눈 값. */
+  .intro-rules{ display:grid; grid-template-rows:repeat(3,1fr); align-items:center;
+    --pw:min(330px, 100%);
+    width:var(--pw); aspect-ratio:1759/843; margin-bottom:20px;
+    padding:calc(var(--pw)*.0287) calc(var(--pw)*.06) calc(var(--pw)*.0479) calc(var(--pw)*.205);
     background:url("beat-cari-intro-panel.png") center/100% 100% no-repeat; }
-  .ir{ display:flex; align-items:center; gap:9px; text-align:left; font-size:13.5px; color:#5c4463;
+  /* 텍스트창이 크림색 → 보라로 바뀌면서 기존 #5c4463 은 대비가 3.6:1 까지 떨어져 잘 안 보였다.
+     글자를 더 진하게 하고 흰 헤일로(5px)는 줄인다 — 헤일로가 클수록 글자 가장자리가 배경에 녹는다. */
+  .ir{ display:flex; align-items:center; text-align:left; font-size:13.5px; color:#3a2440;
     background:none; border:0; border-radius:0; padding:0; box-shadow:none;
-    text-shadow:0 1px 0 rgba(255,255,255,.85), 0 0 5px rgba(255,255,255,.8); }
+    text-shadow:0 1px 0 rgba(255,255,255,.7), 0 0 3px rgba(255,255,255,.5); }
+  .ir-ic{ display:none !important; }   /* 아이콘은 텍스트창 이미지에 포함 */
   .ir b{ font-weight:800; }
-  .ir-ic{ flex:none; width:24px; height:24px; border-radius:8px; display:grid; place-items:center; font-size:11px; color:#fff;
-    text-shadow:none; box-shadow:0 1px 3px rgba(120,90,140,.28); }
-  .ir-ic.up{ background:var(--good); }
-  .ir-ic.dn{ background:var(--bad); }
-  .ir-ic.st{ background:var(--skip); }
+  /* 규칙 아이콘 = 인라인 SVG(삼각형 위/아래·별). 크림 패널 위에서 튀지 않게
+     진한 색은 아이콘에만 주고 칩은 같은 색 옅은 원으로. 색은 인게임 정답/오답 색과 동일. */
+  /* 원은 반드시 불투명 — 반투명이면 크림 패널·하단 바위 그림에 아이콘이 묻힌다.
+     흰 원 + 같은 색 링 + 그림자로 배경에서 떼어내고, 색은 아이콘과 링에만 준다. */
+  .ir-ic{ flex:none; width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+    text-shadow:none; background:#fffdf8; box-shadow:0 1px 3px rgba(96,62,108,.3); }
+  .ir-ic svg{ width:15px; height:15px; display:block; }
+  .ir-ic.up{ color:var(--good); box-shadow:0 1px 3px rgba(96,62,108,.3), inset 0 0 0 1.5px rgba(18,181,140,.5); }
+  .ir-ic.dn{ color:var(--bad);  box-shadow:0 1px 3px rgba(96,62,108,.3), inset 0 0 0 1.5px rgba(242,102,79,.5); }
+  .ir-ic.st{ color:var(--skip); box-shadow:0 1px 3px rgba(96,62,108,.3), inset 0 0 0 1.5px rgba(229,155,23,.55); }
   .btn.play{ padding:15px 48px; font-size:17px; }
   /* 시작·다시도전 버튼 = 크리스탈 알약 이미지 (원본 932x227 비율 고정, 글자만 얹음) */
   #startBtn, #againBtn{
     margin-top:16px; padding:0; border:0; border-radius:0; box-shadow:none;
-    width:min(292px, 82%); aspect-ratio:932/227;
+    width:min(224px, 64%); aspect-ratio:932/227;   /* 가로로 너무 길어 축소 — 글자(100px)와 양끝 크리스탈 사이 여백 57px */
     background:url("beat-cari-startbtn.png") center/100% 100% no-repeat;
     color:#5c3a6b; font-size:19px; font-weight:900; letter-spacing:-.01em;
     text-shadow:0 1px 0 rgba(255,255,255,.85), 0 0 8px rgba(255,255,255,.65);
@@ -243,22 +267,49 @@
   .intro-keys{ margin-top:14px; font-size:12px; color:var(--sub); }
 
   /* 게임오버 화면 */
-  .over-badge{ font-size:12px; font-weight:900; letter-spacing:.14em; color:var(--bad);
-    background:rgba(242,102,79,.12); border:1px solid rgba(242,102,79,.3); padding:5px 14px; border-radius:20px; }
   .over-emoji{ font-size:56px; margin:12px 0 0; animation:titlePop .5s cubic-bezier(.2,1.7,.4,1) both; }
-  .over-img{ width:196px; height:auto; margin:4px 0 2px; animation:titlePop .5s cubic-bezier(.2,1.7,.4,1) both;
+  /* 액자가 커진 만큼 마스코트는 화면 높이에 연동 — 짧은 폰에서 '다시 도전'이 밀려 잘리는 것 방지 */
+  .over-img{ width:min(196px, 22vh); height:auto; margin:4px 0 2px; animation:titlePop .5s cubic-bezier(.2,1.7,.4,1) both;
     filter:drop-shadow(0 9px 13px rgba(70,90,140,.3)); }
   .over-title{ font-size:33px; font-weight:900; color:var(--ink); letter-spacing:-.02em; transform:rotate(-2deg);
     margin:2px 0 16px; text-shadow:0 2px 0 #fff, 0 4px 10px rgba(80,100,150,.25); }
-  .over-scorebox{ background:#fff; border:1px solid #e6e9f3; border-radius:18px; padding:14px 40px; margin-bottom:16px;
-    box-shadow:0 8px 22px rgba(80,100,150,.1); }
-  .os-lab{ font-size:11px; color:var(--sub); font-weight:800; letter-spacing:.06em; }
-  .os-num{ font-size:52px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; line-height:1.05; }
-  .os-new{ margin-top:4px; font-size:13px; font-weight:800; color:var(--good); }
-  .over-stats{ display:flex; gap:10px; margin-bottom:22px; }
-  .ost{ background:#f4f6fc; border:1px solid #e6e9f3; border-radius:13px; padding:10px 16px; min-width:76px; }
-  .ost-k{ font-size:10.5px; color:var(--sub); text-transform:uppercase; letter-spacing:.05em; font-weight:700; margin-bottom:3px; }
-  .ost-v{ font-size:20px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+  /* 아웃트로 타이틀은 동굴 배경 위 — 인트로 타이틀과 같은 처리(밝은 속면 + 짙은 자주 외곽선).
+     .over-title 은 일시정지 화면(흰 배경)도 함께 쓰므로 반드시 .over 안으로 한정할 것. */
+  .overlay.over .over-title{ color:#fff7ea; margin:6px 0 18px;
+    text-shadow:
+      -2px -2px 0 #4a2450, 0 -2px 0 #4a2450, 2px -2px 0 #4a2450,
+      -2px  0   0 #4a2450,                   2px  0   0 #4a2450,
+      -2px  2px 0 #4a2450, 0  2px 0 #4a2450, 2px  2px 0 #4a2450,
+      0 6px 15px rgba(60,24,54,.55); }
+  /* 점수/통계 = 크리스탈 액자 이미지. 상·하단 중앙 마름모와 하단 크리스탈이 특정 위치에 박혀 있어
+     9-slice(border-image)로 늘리면 장식이 뭉개진다 → 원본 비율 고정 + 통짜 스트레치로 쓴다.
+     두 액자 모두 안쪽이 투명(alpha=0)이라 ::before 로 옅은 판을 뒤에 깔아 글자 가독성을 확보한다. */
+  .over-scorebox, .ost{ position:relative; border:0; border-radius:0; box-shadow:none; padding:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  /* 뒷판은 프레임 '안쪽 구멍'보다 살짝 크게 잡아 금테 아래로 물리게 한다.
+     구멍보다 작으면 가장자리에 동굴 배경이 비쳐 빈칸처럼 보인다(실측: 점수 상하 11~92%, 통계 좌우 4~94%). */
+  .over-scorebox::before, .ost::before{ content:""; position:absolute; z-index:-1;
+    background:linear-gradient(180deg, rgba(252,246,255,.88), rgba(228,207,245,.82)); }
+
+  .over-scorebox{ width:min(320px, 86%, 44vh); aspect-ratio:931/529; margin-bottom:14px;
+    background:url("beat-cari-outro-score.png") center/100% 100% no-repeat; }
+  .over-scorebox::before{ inset:9% 6% 6% 6%; border-radius:18px; }
+  .os-lab{ font-size:15px; color:#7a5a86; font-weight:800; letter-spacing:.1em;
+    text-shadow:0 1px 0 rgba(255,255,255,.7); }
+  .os-num{ font-size:50px; font-weight:900; color:#6a45a5; font-variant-numeric:tabular-nums; line-height:1.05;
+    text-shadow:0 1px 0 rgba(255,255,255,.85), 0 3px 10px rgba(106,69,165,.28); }
+  .os-new{ margin-top:2px; font-size:12.5px; font-weight:800; color:#c07a1c;
+    text-shadow:0 1px 0 rgba(255,255,255,.8); }
+
+  .over-stats{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;
+    width:min(320px, 86%, 44vh); margin-bottom:18px; }
+  .ost{ aspect-ratio:784/762; min-width:0;
+    background:url("beat-cari-outro-stat.png") center/100% 100% no-repeat; }
+  .ost::before{ inset:9% 3% 6% 3%; border-radius:12px; }
+  .ost-k{ font-size:13px; color:#7a5a86; letter-spacing:0; font-weight:800; margin-bottom:2px;
+    text-transform:none; white-space:nowrap; text-shadow:0 1px 0 rgba(255,255,255,.7); }
+  .ost-v{ font-size:19px; font-weight:900; color:#6a45a5; font-variant-numeric:tabular-nums; line-height:1.1;
+    text-shadow:0 1px 0 rgba(255,255,255,.85); }
   .hidden{display:none!important;}
   .shake{animation:shk .28s linear infinite;}
   @keyframes shk{0%{transform:translate(0,0)}25%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}75%{transform:translate(-1px,-1px)}100%{transform:translate(0,0)}}
@@ -310,16 +361,15 @@
     <div class="intro-title"><span class="t1">버텨라</span> <span class="t2" data-t="CARI">CARI</span></div>
     <div class="intro-tag">쏟아지는 돌, 문제로 버텨라!</div>
     <div class="intro-rules">
-      <div class="ir"><span class="ir-ic up">▲</span><span>문제 <b>맞히면</b> 천장이 올라가요</span></div>
-      <div class="ir"><span class="ir-ic dn">▼</span><span>틀리거나 못 풀면 <b>내려와요</b></span></div>
-      <div class="ir"><span class="ir-ic st">★</span><span>깔리기 전까지 버텨 <b>점수</b>를 쌓아요</span></div>
+      <div class="ir"><span class="ir-ic up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.4 19.6 18.6H4.4Z" fill="currentColor" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round"/></svg></span><span>문제 <b>맞히면</b> 천장이 올라가요</span></div>
+      <div class="ir"><span class="ir-ic dn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18.6 4.4 5.4h15.2Z" fill="currentColor" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round"/></svg></span><span>틀리거나 못 풀면 <b>내려와요</b></span></div>
+      <div class="ir"><span class="ir-ic st"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.1l2.72 5.51 6.08.89-4.4 4.28 1.04 6.06L12 17.98l-5.44 2.86 1.04-6.06-4.4-4.28 6.08-.89z" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>깔리기 전까지 버텨 <b>점수</b>를 쌓아요</span></div>
     </div>
     <button class="btn play" id="startBtn">버티기 시작</button>
   </div>
 
   <!-- GAME OVER -->
   <div class="overlay over hidden" id="overOv">
-    <div class="over-badge">GAME OVER</div>
     <img class="over-img" src="beat-cari-over.png" alt="" />
     <div class="over-title">여기까지 버텼어요!</div>
     <div class="over-scorebox">
