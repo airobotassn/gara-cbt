@@ -468,7 +468,8 @@ export interface EbookTranslation {
   author?: string
   description?: string
   failed?: number // 번역 실패해 한국어로 남은 조각 수
-  overflowPages?: number[] // 번역문이 길어져 잘린 페이지 번호(1부터)
+  fittedPages?: number[] // 글이 넘쳐 자동 축소해 맞춘 페이지 번호(1부터)
+  overflowPages?: number[] // 축소 하한까지 줄여도 안 들어간 페이지 — 사람이 손봐야 함
   at?: string
 }
 

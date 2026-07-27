@@ -47,12 +47,14 @@ export interface LangResult {
   meta: EbookMeta
   /** 번역이 실패해 원문(한국어)이 그대로 남은 조각 수 */
   failed: number
-  /** 넘쳐서 잘린 페이지 번호(1부터). 조판이 `.page` 가 아니면 빈 배열 */
+  /** 글이 넘쳐 자동으로 축소해 맞춘 페이지 번호(1부터) */
+  fittedPages: number[]
+  /** 축소 하한까지 줄여도 안 들어간 페이지 번호 — 사람이 손봐야 하는 것만 남는다 */
   overflowPages: number[]
 }
 
 export interface TranslateProgress {
-  phase: 'extract' | 'translate' | 'build' | 'check'
+  phase: 'extract' | 'translate' | 'build' | 'fit'
   done: number
   total: number
   lang?: EbookLang
@@ -109,43 +111,120 @@ function serialize(doc: Document): string {
   return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`
 }
 
+/** 자동 축소 하한. 이보다 더 줄여야 하는 페이지는 원문 조판 자체가 감당 못 하는 분량이라 사람이 봐야 한다. */
+const MIN_ZOOM = 0.82
+/** 축소 → 재배치 → 재측정 반복 횟수. 줄이면 줄바꿈이 바뀌어 높이가 선형으로 줄지 않아 한 번으론 안 맞는다. */
+const FIT_ROUNDS = 5
+
 /**
- * 언어별 HTML 을 숨김 iframe 에 띄워 **잘린 페이지**를 찾는다.
- * 텍스트를 직접 품은 요소의 최하단이 페이지 바닥을 넘으면 그 페이지는 잘린 것.
- * (`.frame`·`.inner` 처럼 height:100% 인 구조 요소는 항상 바닥에 닿으므로 세면 안 된다.)
+ * 언어별 HTML 을 숨김 iframe 에 띄워 **넘친 페이지를 그 자리에서 맞춰 넣는다**(검사만 하지 않는다).
+ *
+ * 맞추는 법: `.page` 에 `zoom:z` 를 주고 width/height 를 1/z 로 키운다.
+ *   → 렌더 크기(210×297mm)는 그대로인데 내부 레이아웃 공간만 넓어져 글이 다 들어간다.
+ *     구조를 건드리지 않아 어떤 책에도 안전하고, z 가 0.95 수준이면 눈에 띄지 않는다.
+ *
+ * 넘침 판정은 **텍스트를 직접 품은 요소**의 최하단으로 한다
+ * (`.frame`·`.inner` 처럼 height:100% 인 구조 요소는 항상 바닥에 닿으므로 세면 안 된다).
+ *
+ * @returns 맞춘 결과 HTML · 축소한 페이지 번호 · 하한까지 줄여도 안 들어간 페이지 번호
  */
-async function findOverflowPages(html: string): Promise<number[]> {
+async function fitToPages(html: string): Promise<{ html: string; fitted: number[]; remaining: number[] }> {
   const frame = document.createElement('iframe')
   frame.setAttribute('sandbox', 'allow-same-origin') // 책 스크립트 실행 금지(관리자 세션 보호)
   frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;height:1123px;border:0;pointer-events:none'
   document.body.appendChild(frame)
   try {
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('넘침 검사 시간 초과')), 30000)
+      const timer = setTimeout(() => reject(new Error('페이지 맞춤 시간 초과')), 30000)
       frame.onload = () => { clearTimeout(timer); resolve() }
-      frame.onerror = () => { clearTimeout(timer); reject(new Error('넘침 검사용 렌더 실패')) }
+      frame.onerror = () => { clearTimeout(timer); reject(new Error('페이지 맞춤용 렌더 실패')) }
       frame.srcdoc = html
     })
     const doc = frame.contentDocument
-    if (!doc) return []
+    const win = frame.contentWindow
+    if (!doc || !win) return { html, fitted: [], remaining: [] }
     try { await doc.fonts?.ready } catch { /* 폰트 API 없으면 아래 rAF 대기로 갈음 */ }
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
-    const out: number[] = []
     const pages = Array.from(doc.querySelectorAll<HTMLElement>('.page'))
-    pages.forEach((pg, i) => {
+    if (!pages.length) return { html, fitted: [], remaining: [] }
+
+    const hasOwnText = (el: Element): boolean =>
+      Array.from(el.childNodes).some((c) => c.nodeType === 3 && (c.nodeValue ?? '').trim())
+
+    /**
+     * 글이 실제로 끝나는 지점 ÷ 쓸 수 있는 바닥까지의 높이. 1을 넘으면 잘리거나 겹친다.
+     *
+     * ⚠️ '쓸 수 있는 바닥'은 페이지 바닥이 아니다 — 쪽번호·러닝풋처럼 하단에 붙박이(absolute)로
+     *    놓인 요소는 글이 밀어내지 못하고 **그 위로 겹쳐진다**. 잘리진 않아 바닥 기준으로는
+     *    통과해버리므로(실제로 그렇게 새어나갔다), 붙박이의 윗변을 바닥으로 삼는다.
+     */
+    const fillRatio = (pg: HTMLElement): number => {
       const pr = pg.getBoundingClientRect()
+      // 붙박이 = absolute/fixed · 내용 있음 · 페이지 하단 30% 에 위치 · 페이지의 1/4 미만 높이.
+      //   마지막 조건이 없으면 본문을 통째로 감싼 absolute 컨테이너까지 붙박이로 오인한다.
+      const furniture: HTMLElement[] = []
+      for (const el of Array.from(pg.querySelectorAll<HTMLElement>('*'))) {
+        const pos = win.getComputedStyle(el).position
+        if (pos !== 'absolute' && pos !== 'fixed') continue
+        const r = el.getBoundingClientRect()
+        if (!r.height || r.height > pr.height * 0.25) continue
+        if (r.top < pr.top + pr.height * 0.7) continue
+        if (!(el.textContent ?? '').trim()) continue
+        furniture.push(el)
+      }
+      const limit = furniture.reduce((m, el) => Math.min(m, el.getBoundingClientRect().top), pr.bottom)
+
       let bottom = pr.top
       for (const el of Array.from(pg.querySelectorAll<HTMLElement>('*'))) {
-        // 자기 자식으로 직접 텍스트를 가진 요소만 = 실제 글이 끝나는 지점
-        const hasText = Array.from(el.childNodes).some((c) => c.nodeType === 3 && (c.nodeValue ?? '').trim())
-        if (!hasText) continue
+        if (!hasOwnText(el)) continue
+        if (furniture.some((f) => f === el || f.contains(el))) continue // 붙박이 자신은 흐름이 아니다
         const r = el.getBoundingClientRect()
         if (r.height > 0 && r.bottom > bottom) bottom = r.bottom
       }
-      if (bottom > pr.bottom + 1) out.push(i + 1)
-    })
-    return out
+      const usable = limit - pr.top
+      return usable > 0 ? (bottom - pr.top) / usable : 1
+    }
+
+    // 페이지별 누적 축소율. 원래 크기는 첫 회차에 재둔다(축소 후엔 width/height 를 우리가 덮어쓰므로).
+    const zoom = new Map<number, number>()
+    const baseSize = new Map<number, { w: number; h: number }>()
+    const fitted = new Set<number>()
+    let remaining: number[] = []
+
+    for (let round = 0; round < FIT_ROUNDS; round++) {
+      remaining = []
+      let changed = false
+      pages.forEach((pg, i) => {
+        const ratio = fillRatio(pg)
+        if (ratio <= 1.001) return
+        if (!baseSize.has(i)) {
+          const r = pg.getBoundingClientRect()
+          baseSize.set(i, { w: r.width, h: r.height })
+        }
+        const cur = zoom.get(i) ?? 1
+        // 1% 여유를 두고 줄인다. 줄바꿈이 바뀌며 다시 넘칠 수 있어 다음 회차에서 또 조인다.
+        const next = Math.max(MIN_ZOOM, cur / (ratio * 1.01))
+        if (next >= cur - 0.0005) { remaining.push(i + 1); return } // 하한 도달 — 더는 못 줄인다
+        zoom.set(i, next)
+        fitted.add(i + 1)
+        const base = baseSize.get(i)!
+        pg.style.width = `${base.w / next}px`
+        pg.style.height = `${base.h / next}px`
+        pg.style.zoom = String(next)
+        changed = true
+      })
+      if (!changed) break
+      // 축소 반영 후 재배치 대기
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+    }
+
+    // 맞춘 상태 그대로 직렬화 — 인라인 style 이 DOM 에 이미 들어가 있다.
+    return {
+      html: `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`,
+      fitted: [...fitted].sort((a, b) => a - b),
+      remaining: remaining.sort((a, b) => a - b),
+    }
   } finally {
     frame.remove()
   }
@@ -208,7 +287,7 @@ export async function translateEbook(
       node.nodeValue = `${lead}${tr}${trail}`
     })
     localizeDocument(doc, lang)
-    const langHtml = serialize(doc)
+    let langHtml = serialize(doc)
 
     // 메타는 실패 시 원문 유지(스토어 카드가 비지 않게).
     const metaOf = (key: (typeof metaKeys)[number]): string => {
@@ -221,14 +300,18 @@ export async function translateEbook(
       description: metaOf('description'),
     }
 
-    onProgress?.({ phase: 'check', done: out.length, total: langs.length, lang })
+    onProgress?.({ phase: 'fit', done: out.length, total: langs.length, lang })
+    let fittedPages: number[] = []
     let overflowPages: number[] = []
     try {
-      overflowPages = await findOverflowPages(langHtml)
+      const fit = await fitToPages(langHtml)
+      langHtml = fit.html
+      fittedPages = fit.fitted
+      overflowPages = fit.remaining
     } catch {
-      // 넘침 검사 실패는 번역 자체를 막지 않는다(검사는 보조 정보).
+      // 맞춤 실패는 번역 자체를 막지 않는다(원문 조판 그대로 저장된다).
     }
-    out.push({ lang, html: langHtml, meta: langMeta, failed, overflowPages })
+    out.push({ lang, html: langHtml, meta: langMeta, failed, fittedPages, overflowPages })
   }
   return out
 }

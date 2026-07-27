@@ -2063,7 +2063,7 @@ export function EbooksAdmin() {
       (p) => {
         if (p.phase === 'translate') setTrStatus(`번역 ${p.done}/${p.total} 조각`)
         else if (p.phase === 'build') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 본문 생성 중…`)
-        else if (p.phase === 'check') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 페이지 넘침 검사 중…`)
+        else if (p.phase === 'fit') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 페이지 맞추는 중…`)
       },
     )
     const out: Record<string, EbookTranslation> = {}
@@ -2088,6 +2088,7 @@ export function EbooksAdmin() {
         author: r.meta.author,
         description: r.meta.description,
         failed: r.failed,
+        fittedPages: r.fittedPages,
         overflowPages: r.overflowPages,
         at: new Date().toISOString(),
       }
@@ -2185,7 +2186,26 @@ export function EbooksAdmin() {
     }
     setSaving(true)
     try {
-      await callFunction('admin', { action: 'ebookUpsert', ebook: draft })
+      let d = draft
+      // 번역은 사람이 버튼을 눌러야 도는 게 아니라 **저장하면 반드시 있는 상태**가 되게 한다.
+      //   (업로드 직후엔 이미 돌았고, 여기 걸리는 건 번역 전에 등록된 옛 책·번역 실패 후 재저장뿐)
+      if (!Object.keys(d.translations).length) {
+        setUploading('translate')
+        setTrStatus('본문 내려받는 중…')
+        try {
+          const { data, error } = await supabase.storage.from('ebooks').download(d.storagePath)
+          if (error) throw error
+          d = { ...d, translations: await runTranslation(await data.text(), d) }
+          setDraft(d)
+        } catch (e) {
+          // 번역이 안 되더라도 한국어본 등록 자체는 막지 않는다.
+          alert(`번역에 실패해 한국어본만 저장합니다. '다시 번역'으로 재시도할 수 있습니다.\n${e instanceof Error ? e.message : ''}`)
+        } finally {
+          setUploading(null)
+          setTrStatus('')
+        }
+      }
+      await callFunction('admin', { action: 'ebookUpsert', ebook: d })
       setDraft(null)
       await load()
     } catch (e) {
@@ -2396,18 +2416,20 @@ export function EbooksAdmin() {
                 </div>
               </div>
 
-              {/* 다국어 — 본문 텍스트를 5개 언어로 번역해 언어별 본문·표지·스토어 문구를 만든다. */}
+              {/* 다국어 — 본문 업로드/저장 시 자동으로 돈다. 이 버튼은 다시 돌릴 때만 쓴다. */}
               <div style={fieldStyle}>
-                <span>다국어 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(본문 업로드 시 자동 번역)</em></span>
+                <span>다국어 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(업로드·저장 시 자동 번역 · 넘치는 페이지는 자동으로 맞춰 넣음)</em></span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {EBOOK_LANGS.map((lg) => {
                     const t = draft.translations[lg]
+                    // ⚠ 는 사람이 손봐야 하는 것에만 — 자동 축소로 해결된 페이지는 경고가 아니다.
                     const warn = !!t && ((t.failed ?? 0) > 0 || (t.overflowPages?.length ?? 0) > 0)
                     const title = !t
                       ? '번역 없음'
                       : [
                           (t.failed ?? 0) > 0 ? `번역 실패 조각 ${t.failed}개(한국어로 남음)` : '',
-                          (t.overflowPages?.length ?? 0) > 0 ? `글이 넘쳐 잘린 페이지: ${t.overflowPages!.join(', ')}` : '',
+                          (t.fittedPages?.length ?? 0) > 0 ? `자동 축소로 맞춘 페이지: ${t.fittedPages!.join(', ')}` : '',
+                          (t.overflowPages?.length ?? 0) > 0 ? `축소해도 안 들어간 페이지: ${t.overflowPages!.join(', ')} — 원문 조판을 손봐야 함` : '',
                         ].filter(Boolean).join(' · ') || '이상 없음'
                     return (
                       <span
@@ -2430,7 +2452,7 @@ export function EbooksAdmin() {
                 )}
                 {!uploading && EBOOK_LANGS.some((lg) => (draft.translations[lg]?.overflowPages?.length ?? 0) > 0) && (
                   <span style={{ fontSize: 12.5, color: 'var(--error, #d43a3a)' }}>
-                    ⚠ 번역문이 길어 잘린 페이지가 있습니다 — 뱃지에 마우스를 올리면 페이지 번호가 보입니다.
+                    ⚠ 축소 하한(82%)까지 줄여도 안 들어간 페이지가 있습니다 — 뱃지에 마우스를 올리면 페이지 번호가 보입니다.
                   </span>
                 )}
               </div>
