@@ -10,6 +10,10 @@ export interface MiniGame {
   badge: string // 커버 상단 카테고리 뱃지
   art: string // 커버 일러스트(캐릭터) PNG (public 경로)
   src: string // 게임 본체 정적 HTML (public 경로) — iframe src
+  /** 플레이 화면 상단 바 색 = 게임 바깥(레터박스) 색.
+   *  ⚠️ 게임 HTML 의 body 배경과 짝 — 한쪽만 바꾸면 상단에 이색 띠가 생긴다.
+   *  밝기는 자동 판정(어두우면 흰 글자) — MiniGame.tsx 의 isDark 참고. */
+  frame: string
 }
 
 export const MINIGAMES: MiniGame[] = [
@@ -21,6 +25,7 @@ export const MINIGAMES: MiniGame[] = [
     badge: 'AI · 로봇 용어 서바이벌',
     art: '/games/beat-cari-cover.png',
     src: '/games/beat-cari.html',
+    frame: '#241830', // 동굴 아트 암부색
   },
   {
     id: 'shoot-cari',
@@ -30,6 +35,7 @@ export const MINIGAMES: MiniGame[] = [
     badge: 'AI · 로봇 용어 슈팅',
     art: '/games/shoot-cari-cover.png',
     src: '/games/shoot-cari.html',
+    frame: '#05021c', // 게임 body 와 동일한 우주 남색
   },
   {
     id: 'pick-cari',
@@ -39,6 +45,7 @@ export const MINIGAMES: MiniGame[] = [
     badge: 'AI · 로봇 용어 OX 서바이벌',
     art: '/games/pick-cari-cover.png',
     src: '/games/pick-cari.html',
+    frame: '#e3ebf7', // 스테이지가 크림/밝은 톤이라 밝은 프레임 유지(게임 body 와 동일)
   },
 ]
 

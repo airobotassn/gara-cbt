@@ -9,6 +9,15 @@ import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import '../styles/minigame.css'
 
+/** #rrggbb 의 밝기로 글자색을 정한다 — 프레임 색을 게임마다 바꿔도 상단 바가 알아서 반전된다. */
+function isDark(hex: string): boolean {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return false
+  const n = parseInt(m[1], 16)
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
+}
+
 export default function MiniGame() {
   const navigate = useNavigate()
   const { gameId } = useParams<{ gameId: string }>()
@@ -69,8 +78,10 @@ export default function MiniGame() {
     )
   }
 
+  // 상단 바는 게임 프레임 색(= 게임 body 배경)을 그대로 입는다 — 흰 바가 남으면 게임 위에 이색 띠로 뜬다.
+  const dark = isDark(game.frame)
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#e3ebf7' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: game.frame }}>
       <header
         style={{
           flex: '0 0 auto',
@@ -78,9 +89,9 @@ export default function MiniGame() {
           alignItems: 'center',
           gap: 10,
           padding: '8px 12px',
-          background: 'linear-gradient(#ffffff,#f4f6fb)',
-          borderBottom: '1px solid #e6e9f3',
-          boxShadow: '0 2px 8px rgba(80,100,150,.08)',
+          background: dark ? game.frame : 'linear-gradient(#ffffff,#f4f6fb)',
+          borderBottom: `1px solid ${dark ? 'rgba(255,255,255,.10)' : '#e6e9f3'}`,
+          boxShadow: dark ? '0 2px 10px rgba(0,0,0,.35)' : '0 2px 8px rgba(80,100,150,.08)',
           zIndex: 2,
         }}
       >
@@ -93,9 +104,9 @@ export default function MiniGame() {
             gap: 6,
             padding: '7px 13px 7px 10px',
             borderRadius: 999,
-            border: '1px solid #d9e0f0',
-            background: '#fff',
-            color: '#28324c',
+            border: `1px solid ${dark ? 'rgba(255,255,255,.24)' : '#d9e0f0'}`,
+            background: dark ? 'rgba(255,255,255,.12)' : '#fff',
+            color: dark ? '#fff' : '#28324c',
             fontWeight: 800,
             fontSize: 13.5,
             cursor: 'pointer',
@@ -103,8 +114,8 @@ export default function MiniGame() {
         >
           <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> 아레나
         </button>
-        <strong style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }}>{game.title}</strong>
-        <span style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{game.tagline}</span>
+        <strong style={{ fontSize: 15, color: dark ? '#fff' : '#28324c', letterSpacing: '-.01em' }}>{game.title}</strong>
+        <span style={{ fontSize: 11.5, color: dark ? 'rgba(255,255,255,.6)' : '#7c869e', fontWeight: 700 }}>{game.tagline}</span>
       </header>
       <iframe
         src={game.src}

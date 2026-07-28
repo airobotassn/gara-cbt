@@ -16,7 +16,10 @@
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;}
   body{
-    background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);
+    /* 스테이지(460px) 바깥 = 레터박스. 사이트 하늘색을 그대로 쓰면 따뜻한 동굴 아트가 찬 파랑 위에
+       스티커처럼 붙어 보여, 동굴 아트의 암부색(샘플: #281a2f/#231729)으로 어둡게 덮는다.
+       ⚠️ 이 색은 /games 상단 바와 짝 — 바꾸면 src/lib/minigames.ts 의 frame 도 같이 고칠 것. */
+    background:radial-gradient(120% 80% at 50% 42%, #2e2038 0%, #241830 45%, #180f20 100%);
     color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
     display:flex; align-items:center; justify-content:center; min-height:100%; overflow:hidden;
     user-select:none;
@@ -29,7 +32,8 @@
           그 암흑부가 헤더 뒤에 깔려 검은 띠가 된다(.pit 은 자기 높이로 cover 해 위쪽이 잘려나감).
           auto 200% + bottom 으로 위쪽 암흑부를 잘라낸다. */
     background:url("beat-cari-bg.png") center bottom/auto 200% no-repeat;
-    box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
+    /* 어두운 레터박스 위에선 파란 글로우가 안 보인다 → 얇은 광택 테두리로 스테이지 경계를 세운다. */
+    box-shadow:0 0 0 1px rgba(255,255,255,.07), 0 18px 60px rgba(10,4,16,.6); overflow:hidden;
   }
 
   /* HUD */
@@ -70,6 +74,35 @@
   }
   .teeth{ display:none; } /* 돌 이미지(beat-cari-rock.png) 자체에 종유석 끝이 있어 미사용 */
   .dust{position:absolute; width:5px;height:5px;border-radius:50%;background:#b9c9e6;opacity:.55;}
+
+  /* 정답/오답 = 천장 밑면 흙먼지. 화면 흔들림은 쓰지 않는다(문제를 읽는 중이라 가독성이 먼저).
+     정답(밝은 먼지, 위로 피어오름) / 오답(.dark, 아래로 흩날림) */
+  /* 정답 = 머리 위 안테나(행성)에서 위로 퍼지는 빛 파동. 곰이 점프해서 천장을 밀 수는 없으니
+     '기(氣)로 밀어낸다'로 인과를 바꾼 것 — 파동이 천장에 닿는 순간 반동+먼지가 터진다. */
+  .wave{position:absolute; z-index:6; pointer-events:none; width:210px; height:58px; border-radius:50%;
+    /* 동굴 배경이 밝은 살구색이라 얇고 은은한 링은 그냥 묻힌다 — 굵게 + 흰 심 + 강한 글로우. */
+    border:5px solid rgba(226,248,255,.95); border-bottom-color:rgba(190,238,255,.35);
+    box-shadow:0 0 10px rgba(255,255,255,.9), 0 0 30px rgba(90,195,255,.85),
+               0 0 58px rgba(70,170,255,.5), inset 0 0 20px rgba(190,240,255,.55);}
+  .player.zap{animation:zap .36s ease-out;}
+  @keyframes zap{
+    0%  {filter:drop-shadow(0 6px 7px rgba(70,90,140,.30));}
+    28% {filter:drop-shadow(0 6px 7px rgba(70,90,140,.30)) drop-shadow(0 0 11px rgba(150,225,255,.95));}
+    100%{filter:drop-shadow(0 6px 7px rgba(70,90,140,.30));}}
+
+  /* 먼지 = 손그림 퍼프 4종(회색조 원본, 256² webp). CSS 원 그라디언트로 그렸더니 솜뭉치처럼 보여서
+     실제 아트로 교체했다. 색은 여기서 filter 로 입힌다 — 원본은 무채색이라 정답/오답을 같은 파일로 쓴다. */
+  .puff{position:absolute; z-index:5; pointer-events:none;
+    background-size:100% 100%; background-repeat:no-repeat;}
+  .puff.d1{background-image:url("beat-cari-dust-1.webp");}
+  .puff.d2{background-image:url("beat-cari-dust-2.webp");}
+  .puff.d3{background-image:url("beat-cari-dust-3.webp");}
+  .puff.d4{background-image:url("beat-cari-dust-4.webp");}
+  /* 정답 = 돌에서 튄 따뜻한 흙먼지 */
+  .puff{filter:sepia(.42) saturate(1.45) hue-rotate(-12deg) brightness(1.02);}
+  /* 오답 = 차갑게 내려앉는 재. ⚠️ 어둡게 하면 안 된다 — 천장 위쪽이 짙은 자주라 검은 먼지는 안 보인다.
+     정답과의 구분은 색이 아니라 방향(위로 피어오름 / 아래로 흘러내림)이 먼저다. */
+  .puff.dark{filter:grayscale(1) brightness(.97) contrast(1.05);}
 
   /* 충격 이펙트 (게임오버 직전) */
   .wflash{position:absolute; inset:0; z-index:8; pointer-events:none; background:#fff; animation:wf .28s ease-out forwards;}
@@ -473,6 +506,7 @@
   let level=1, levelProg=0, score=0, descCur=0;    // 레벨/레벨내진행/점수/현재속도
   let paused=false;
   let jumpT=0, flinchT=0, crushed=false;   // 곰 반응 타이머/상태
+  let kickT=-1e9;                          // 정답 시 천장 반동(살짝 더 올라갔다 내려앉음) 타이머
   let runX=0, targetX=0, dartT=0, lean=0, sweatT=0;    // 곰 이동/패닉 상태
   const moodEl = document.getElementById("mood");
   // 방향 스프라이트(좌/우/정면놀람) — window.CARI_FACES, 원본=평온
@@ -506,6 +540,9 @@
     }catch(e){}
   }
 
+  // 먼지 아트 미리 로드 — 안 하면 첫 정답의 먼지가 한 박자 늦게 뜬다.
+  ["1","2","3","4"].forEach(n=>{ const i=new Image(); i.src="beat-cari-dust-"+n+".webp"; });
+
   // ---------- 배경 먼지 ----------
   function initDust(){
     dust.forEach(d=>d.el.remove()); dust=[];
@@ -537,12 +574,13 @@
     level=1; levelProg=0; score=0; descCur=LEVEL_SPEED[0];
     paused=false; $("pauseOv").classList.add("hidden");
     running=true; locked=false; lastT=performance.now();
-    crushed=false; jumpT=0; flinchT=0;
+    crushed=false; jumpT=0; flinchT=0; kickT=-1e9;
     runX=0; targetX=0; dartT=0; lean=0; sweatT=0;
     player.style.transition="none"; player.style.transform="translateX(-50%)";
     player.src = CALM_SRC; curFace = "calm";
     if(moodEl) moodEl.style.opacity=0;
-    pit.querySelectorAll(".sweat,.debris,.shock,.wflash").forEach(e=>e.remove());
+    pit.querySelectorAll(".sweat,.debris,.shock,.wflash,.puff,.wave").forEach(e=>e.remove());
+    player.classList.remove("zap");
     reshuffleBag();
     scoreEl.textContent=0; streakEl.textContent="";
     $("startOv").classList.add("hidden"); $("overOv").classList.add("hidden");
@@ -588,12 +626,21 @@
       streakEl.textContent = streak>=2 ? `🔥 ${streak} 연속` : "";
       showFlash(streak>=3?`+정답! x${streak}`:"+정답!", "var(--good)");
       blip(660,.09,"triangle"); if(streak%5===0) blip(880,.12,"triangle");
-      jumpT = performance.now();          // 폴짝
+      jumpT = performance.now();          // 제자리 기합(웅크렸다 발돋움 — 뛰지 않는다)
+      // 웅크림(90ms)이 끝나 몸을 펴는 순간 = 파동 발사. 파동이 천장에 닿으면 그때 반동+먼지.
+      setTimeout(()=>{
+        if(!running) return;
+        player.classList.remove("zap"); void player.offsetWidth; player.classList.add("zap");
+        const reach = pushWave();
+        kickT = performance.now() + reach;
+        setTimeout(()=>{ if(running) dustBurst("up"); }, reach);
+      }, 90);
     }else{
       streak=0; streakEl.textContent="";
       p = Math.min(1, p + DROP_WRONG);
       showFlash("오답", "var(--bad)");
       blip(150,.18,"sawtooth",.18); flinchT = performance.now();  // 움찔
+      dustBurst("down");
     }
     setTimeout(()=>{ if(running) loadQuestion(); }, REVEAL_MS);
   }
@@ -607,17 +654,71 @@
     setTimeout(()=>{ if(running) loadQuestion(); }, REVEAL_MS/1.6);
   }
 
+  // 정답 파동 — 곰 머리에서 천장 밑면까지 올라간다. 도달 시간(ms)을 돌려주고, 호출부가 그 타이밍에
+  //   천장 반동·먼지를 맞춘다(파동이 닿아야 돌이 밀린다는 인과를 눈으로 보이게).
+  function pushWave(){
+    const cx = pit.clientWidth/2 + runX, headY = yF - BH + 16, topY = dispP*yF + 8;
+    const dist = Math.max(26, headY - topY);
+    const dur = Math.max(180, Math.min(400, dist*0.85));
+    const el=document.createElement("div"); el.className="wave";
+    el.style.left=cx+"px"; el.style.top=headY+"px";
+    pit.appendChild(el);
+    const anim = el.animate([
+      {transform:"translate(-50%,-50%) scale(.18,.22)", opacity:0, easing:"cubic-bezier(.25,.7,.4,1)"},
+      {transform:`translate(-50%,-50%) translateY(${(-dist*0.34).toFixed(0)}px) scale(.52,.55)`, opacity:.95, offset:.28},
+      // 끝까지 밝기를 붙잡는다 — 중간에 흐려지면 '천장에 닿아서 밀어냈다'가 안 보인다.
+      {transform:`translate(-50%,-50%) translateY(${(-dist*0.86).toFixed(0)}px) scale(.92,.92)`, opacity:.8, offset:.82},
+      {transform:`translate(-50%,-50%) translateY(${(-dist).toFixed(0)}px) scale(1.05,1)`, opacity:0}
+    ], {duration:dur, easing:"linear", fill:"forwards"});
+    anim.onfinish = () => el.remove();
+    return dur;
+  }
+
+  // 천장 밑면 먼지 — dir="up": 정답(돌이 밀려 올라가며 먼지가 피어오름) / "down": 오답(내려앉으며 아래로 흩날림).
+  //   ⚠️ 오답 연출로 화면을 흔들지 말 것 — 문제를 읽는 중이라 흔들리면 못 푼다. 인과는 먼지로만 보여준다.
+  function dustBurst(dir){
+    const w = pit.clientWidth, yUnder = dispP*yF;   // 천장 밑면 = 현재 압박선
+    const up = dir === "up", n = up ? 11 : 9;   // 알갱이가 많으면 벽처럼 뭉쳐 보인다
+    for(let i=0;i<n;i++){
+      const el=document.createElement("div");
+      // 4종 중 랜덤 + 회전/좌우반전 — 같은 그림이 반복되는 티를 없앤다.
+      const v = 1 + (Math.random()*4|0);
+      el.className = (up ? "puff d" : "puff dark d") + v;
+      const sz = (up?26:22) + Math.random()*(up?30:26);
+      el.style.width=el.style.height=sz+"px";
+      el.style.left=(w*(0.05+Math.random()*0.90))+"px";
+      el.style.top=(yUnder - sz*0.3)+"px";
+      pit.appendChild(el);
+      const dx=(Math.random()*2-1)*(up?42:26);
+      const dy=up ? -(22+Math.random()*30) : (34+Math.random()*46);
+      const rot=(Math.random()*360|0), flip=Math.random()<0.5?-1:1;
+      const T=(x,y,s)=>`translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) rotate(${rot}deg) scale(${(s*flip).toFixed(3)},${s.toFixed(3)})`;
+      // 중간 키프레임에서 불투명도를 붙잡아 둔다 — 바로 페이드하면 눈에 안 띄고 지나간다.
+      //   ⚠️ 전체 easing 을 ease-out 계열로 주면 타임라인이 앞으로 쏠려 350ms 만에 다 사라진다.
+      //      전체는 linear 로 두고, 튀어나오는 첫 구간에만 이징을 건다.
+      const anim = el.animate([
+        {transform:T(0, 0, .32), opacity:0, easing:"cubic-bezier(.2,.8,.4,1)"},
+        {transform:T((dx*0.35).toFixed(1), (dy*0.28).toFixed(1), 1), opacity:up?.46:.52, offset:.2},
+        {transform:T((dx*0.7).toFixed(1), (dy*0.62).toFixed(1), up?1.3:1.15), opacity:up?.32:.38, offset:.55},
+        {transform:T(dx.toFixed(1), dy.toFixed(1), up?1.6:1.35), opacity:0}
+      ], {duration:(up?820:940)+Math.random()*260, easing:"linear", fill:"forwards"});
+      // ⚠️ fill:"forwards" 필수 — 없으면 애니메이션이 끝나는 순간 요소가 기본 스타일(불투명도 1·원위치)로
+      //    되돌아와, 사라졌던 먼지가 제거될 때까지 한 번 더 번쩍인다. 제거도 타이머 말고 onfinish 로.
+      anim.onfinish = () => el.remove();
+    }
+  }
+
   // 땀방울 하나 튀기기
   function spawnSweat(x,y){
     const s=document.createElement("div"); s.className="sweat";
     s.style.left=x+"px"; s.style.top=y+"px"; pit.appendChild(s);
     const dir=(Math.random()<0.5?-1:1), dx=dir*(12+Math.random()*20);
-    s.animate([
+    const anim = s.animate([
       {transform:"translate(-50%,-50%) scale(.6)", opacity:0},
       {transform:`translate(calc(-50% + ${dx*0.6}px), -15px) scale(1)`, opacity:1, offset:.3},
       {transform:`translate(calc(-50% + ${dx}px), 20px) scale(.9)`, opacity:0}
-    ], {duration:580, easing:"ease-out"});
-    setTimeout(()=>s.remove(), 620);
+    ], {duration:580, easing:"ease-out", fill:"forwards"});   // fill 없으면 끝나는 순간 원위치로 번쩍
+    anim.onfinish = () => s.remove();
   }
   // 머리 위 무드 말풍선 (부드럽게 페이드)
   function setMood(txt, op, x, y){
@@ -663,8 +764,15 @@
     let dy = (fear>0.04 ? -Math.abs(Math.sin(now/freq))*3.2*fear : 0) + Math.sin(now/650)*2*(1-fear);
     let sx=1+0.03*fear, sy=1-0.05*fear, tx=0;
 
-    // 정답 폴짝 / 오답 플린치
-    const je=now-jumpT; if(je>=0&&je<380){ const k=Math.sin(je/380*Math.PI); dy-=24*k; sy*=1+0.09*k; }
+    // 정답 = 제자리 '기합'(웅크림 90ms → 발돋움 250ms). ⚠️ 발을 띄우지 않는다(dy 변화 없음) —
+    //   점프로는 저 높이의 천장에 닿을 수 없어서 뛰는 순간 인과가 깨진다. 돌을 밀어내는 건
+    //   안테나에서 나가는 파동(pushWave)이고, 곰은 기를 모으는 동작만 한다.
+    //   transform-origin 이 발바닥(50% 100%)이라 scaleY 만 키워도 몸이 솟아 보인다.
+    const je=now-jumpT;
+    if(je>=0&&je<340){
+      if(je<90){ const k=je/90;                        sy*=1-0.15*k; sx*=1+0.11*k; }   // 웅크림
+      else     { const k=Math.sin((je-90)/250*Math.PI); sy*=1+0.17*k; sx*=1-0.08*k; }   // 발돋움
+    }
     const fe=now-flinchT; if(fe>=0&&fe<240){ const k=Math.sin(fe/240*Math.PI); sy*=1-0.09*k; tx+=Math.sin(fe/240*Math.PI*4)*3; }
 
     player.style.transform=`translateX(calc(-50% + ${(runX+waddle+tx).toFixed(1)}px)) translateY(${dy.toFixed(1)}px) rotate(${lean.toFixed(1)}deg) scale(${sx.toFixed(3)},${sy.toFixed(3)})`;
@@ -701,12 +809,12 @@
       const sz=4+Math.random()*7; d.style.width=d.style.height=sz+"px";
       d.style.left=cx+"px"; d.style.top=cy+"px"; pit.appendChild(d);
       const vx=(Math.random()*2-1)*150, up=70+Math.random()*100;
-      d.animate([
+      const anim = d.animate([
         {transform:"translate(-50%,-50%) rotate(0deg)", opacity:1},
         {transform:`translate(calc(-50% + ${vx*0.5}px), -${up}px) rotate(160deg)`, opacity:1, offset:.4},
         {transform:`translate(calc(-50% + ${vx}px), 44px) rotate(320deg)`, opacity:0}
-      ], {duration:640+Math.random()*220, easing:"cubic-bezier(.2,.5,.4,1)"});
-      setTimeout(()=>d.remove(), 900);
+      ], {duration:640+Math.random()*220, easing:"cubic-bezier(.2,.5,.4,1)", fill:"forwards"});
+      anim.onfinish = () => d.remove();   // 타이머 제거 + fill 없으면 파편이 사라졌다 다시 번쩍인다
     }
     pit.classList.add("shake-hard");
     setTimeout(()=>pit.classList.remove("shake-hard"), 380);
@@ -739,7 +847,9 @@
     const desc = descCur;
     p = Math.min(1, p + desc*dt);
     dispP += (p-dispP)*Math.min(1,dt*12);
-    renderCeil(dispP);
+    // 반동은 '보이기만' 하는 값 — 접촉 판정(updateBear)·게임오버는 dispP 그대로 쓴다.
+    const ke = t - kickT, kick = (ke>=0 && ke<300) ? -0.018*Math.sin(ke/300*Math.PI) : 0;
+    renderCeil(Math.max(0, dispP + kick));
     updateBear(dispP, dt);
 
     // 먼지 낙하
