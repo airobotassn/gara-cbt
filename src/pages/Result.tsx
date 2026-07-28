@@ -17,7 +17,7 @@ import RadarChartBox from '../components/RadarChartBox'
 import EbookCover from '../components/EbookCover'
 import TopBar from '../components/TopBar'
 import type { ResultResponse } from '../lib/testTypes'
-import type { EbookListResp, EbookRow } from '../lib/types'
+import type { EbookPicksResp, EbookRow } from '../lib/types'
 
 const CLAIM_KEY = 'pendingClaim'
 interface PendingClaim {
@@ -119,7 +119,7 @@ export default function Result() {
         )}
 
         {/* 결과 아래 한 칸 — eBook Store 추천(잠금 여부와 무관하게 노출). */}
-        <EbookPicks t={t} lang={lang} />
+        <EbookPicks t={t} lang={lang} level={data.level} promoted={data.rankDir === 'up'} />
 
         <div className="result-actions">
           {isFullUser ? (
@@ -414,20 +414,21 @@ function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
   )
 }
 
-// 결과 아래 이북 추천 — eBook Store(/ebooks) 상위 몇 권. 비로그인도 조회 가능(ebooks store 액션).
-//   ⚠️ 이북에 레벨·6축 메타데이터가 없어서 '결과 기반 매칭'이 아니라 스토어 노출순(sort_order) 상위다.
-//      축별 추천으로 바꾸려면 ebooks 테이블에 대상 레벨/영역 컬럼을 먼저 붙여야 한다.
+// 결과 아래 이북 추천 — 응시 레벨에 맞는 책이 위로 온다(ebooks picks 액션). 비로그인도 조회 가능.
+//   승급했으면 다음 레벨 교재를, 아니면 지금 레벨 교재를 권한다. 이미 산 책은 서버가 제외.
+//   ⚠️ 레벨당 1권 체계라 매칭 기준은 레벨 하나뿐 — 6축 약점 기반으로 가려면 책이 레벨 안에서
+//      갈라진 뒤 ebooks 에 축 태그를 붙여야 한다.
 const EBOOK_PICKS = 3
-function EbookPicks({ t, lang }: { t: TFunc; lang: string }) {
+function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; level: number; promoted: boolean }) {
   const [books, setBooks] = useState<EbookRow[] | null>(null)
 
   useEffect(() => {
     let alive = true
-    callFunction<EbookListResp>('ebooks', { action: 'store', lang })
-      .then((r) => { if (alive) setBooks(r.ebooks.slice(0, EBOOK_PICKS)) })
+    callFunction<EbookPicksResp>('ebooks', { action: 'picks', lang, level, promoted, limit: EBOOK_PICKS })
+      .then((r) => { if (alive) setBooks(r.ebooks) })
       .catch(() => { if (alive) setBooks([]) })
     return () => { alive = false }
-  }, [lang])
+  }, [lang, level, promoted])
 
   // 아직 못 불러왔거나 등록된 이북이 없으면 칸 자체를 그리지 않는다(빈 카드 방지).
   if (!books || books.length === 0) return null

@@ -1,5 +1,6 @@
 // ebooks: 이북 스토어·서재·열람 API.
 //   - store   : 공개된 이북 목록 (로그인 시 owned 플래그 포함) — 비로그인도 조회 가능
+//   - picks   : 레벨테스트 결과창용 추천 목록 (응시 레벨 기준 정렬) — 비로그인도 조회 가능
 //   - library : 내가 구매한 이북 목록 (로그인 필수)
 //   - buy     : 구매 = 열람 권한 즉시 지급. ⚠️ 결제(PG) 미연동 데모 — 여기가 나중에 결제 검증이 들어갈 자리.
 //   - read    : 소유 확인 후 비공개 버킷 HTML 의 서명 URL 발급(뷰어 iframe 이 이걸 연다)
@@ -35,9 +36,18 @@ function shape(b: Row, owned: boolean, lang: string) {
     description: t.description || ((b.description as string | null) ?? null),
     coverUrl: t.coverUrl || ((b.cover_url as string | null) ?? null),
     price: (b.price as number) ?? 0,
+    targetLevel: (b.target_level as number | null) ?? null,
     langs: ['ko', ...Object.keys(tr).filter((k) => tr[k]?.path)],
     owned,
   }
+}
+
+// 추천 정렬 거리 — 목표 레벨과 얼마나 떨어진 책인가(작을수록 위).
+//   레벨 미지정(null) 책은 판단 근거가 없으니 맨 뒤로 민다.
+const NO_LEVEL_DIST = 99
+function levelDist(b: Row, want: number): number {
+  const lv = b.target_level as number | null
+  return lv == null ? NO_LEVEL_DIST : Math.abs(lv - want)
 }
 
 async function ownedIds(admin: ReturnType<typeof adminClient>, uid: string): Promise<Set<string>> {
@@ -60,13 +70,51 @@ Deno.serve(async (req) => {
     if (action === 'store') {
       const { data, error } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price, published, sort_order, created_at, translations')
+        .select('id, title, author, description, cover_url, price, target_level, published, sort_order, created_at, translations')
         .eq('published', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
       if (error) return json({ error: error.message }, 400)
       const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
       return json({ ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string), lang)) })
+    }
+
+    // 결과창 추천 — 응시 레벨에 맞는 책을 위로. 승급했으면 다음 레벨 책을 권한다.
+    //   이미 산 책은 빼고(추천할 이유가 없다), 남는 자리는 레벨이 가까운 순 → 스토어 노출순으로 채운다.
+    //   레벨 정보가 없으면(level 미전달) 스토어 순서 그대로 = 예전 동작.
+    if (action === 'picks') {
+      const rawLevel = Math.floor(Number(body?.level))
+      const hasLevel = Number.isFinite(rawLevel) && rawLevel >= 1 && rawLevel <= 7
+      // 승급자는 이미 그 레벨을 통과했으니 한 칸 위 교재가 맞다(Lv.7 은 그대로).
+      const want = hasLevel ? Math.min(7, rawLevel + (body?.promoted ? 1 : 0)) : 0
+      const limit = Math.min(12, Math.max(1, Math.floor(Number(body?.limit ?? 3)) || 3))
+
+      const { data, error } = await admin
+        .from('ebooks')
+        .select('id, title, author, description, cover_url, price, target_level, published, sort_order, created_at, translations')
+        .eq('published', true)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
+      if (error) return json({ error: error.message }, 400)
+
+      const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
+      const rows = (data ?? []).filter((b: Row) => !mine.has(b.id as string))
+      // 정렬 = ①목표 레벨과 가까운 순 ②거리가 같으면 위 레벨 먼저(이미 통과한 아래 레벨 교재는 뒤로)
+      //        ③그래도 같으면 스토어 노출순. 안정 정렬에 기대지 않고 2·3차 키를 명시한다.
+      if (hasLevel) {
+        rows.sort((a: Row, b: Row) => {
+          const d = levelDist(a, want) - levelDist(b, want)
+          if (d !== 0) return d
+          const up = ((b.target_level as number | null) ?? 0) - ((a.target_level as number | null) ?? 0)
+          if (up !== 0) return up
+          return ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0)
+        })
+      }
+      return json({
+        ebooks: rows.slice(0, limit).map((b: Row) => shape(b, false, lang)),
+        // 어떤 레벨을 기준으로 골랐는지(디버그·문구용). 레벨 없이 부르면 null.
+        forLevel: hasLevel ? want : null,
+      })
     }
 
     if (action === 'library') {

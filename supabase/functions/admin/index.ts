@@ -1498,7 +1498,7 @@ async function setRegion(admin: any, body: any) {
 async function ebookList(admin: any) {
   const { data, error } = await admin
     .from('ebooks')
-    .select('id, title, author, description, cover_url, price, storage_path, published, sort_order, created_at, updated_at, translations')
+    .select('id, title, author, description, cover_url, price, target_level, storage_path, published, sort_order, created_at, updated_at, translations')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) return json({ error: error.message }, 400)
@@ -1515,6 +1515,7 @@ async function ebookList(admin: any) {
     description: b.description ?? null,
     coverUrl: b.cover_url ?? null,
     price: b.price ?? 0,
+    targetLevel: b.target_level ?? null,
     storagePath: b.storage_path,
     published: !!b.published,
     sortOrder: b.sort_order ?? 0,
@@ -1523,6 +1524,12 @@ async function ebookList(admin: any) {
     translations: b.translations ?? {},
   }))
   return json({ ebooks })
+}
+
+// 추천 대상 레벨 파싱 — 1~7 밖이거나 빈 값이면 null(레벨 무관).
+function levelOrNull(v: any): number | null {
+  const n = Math.floor(Number(v))
+  return Number.isFinite(n) && n >= 1 && n <= 7 ? n : null
 }
 
 async function ebookUpsert(admin: any, body: any) {
@@ -1538,6 +1545,8 @@ async function ebookUpsert(admin: any, body: any) {
     description: e.description ? String(e.description).trim() : null,
     cover_url: e.coverUrl ? String(e.coverUrl).trim() : null,
     price: Math.max(0, Math.floor(Number(e.price ?? 0)) || 0),
+    // 추천 대상 레벨(1~7). 미지정 = null → 결과창 추천에서 뒤로 밀린다.
+    target_level: levelOrNull(e.targetLevel),
     storage_path: storagePath,
     published: !!e.published,
     sort_order: Math.floor(Number(e.sortOrder ?? 0)) || 0,

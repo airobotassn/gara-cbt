@@ -2002,13 +2002,14 @@ interface EbookDraft {
   description: string
   coverUrl: string
   price: number
+  targetLevel: number | null // 추천 대상 레벨(1~7) — 결과창 추천 정렬에 쓴다. null = 미지정
   storagePath: string
   published: boolean
   sortOrder: number
   translations: Record<string, EbookTranslation>
 }
 function emptyEbookDraft(): EbookDraft {
-  return { title: '', author: '', description: '', coverUrl: '', price: 0, storagePath: '', published: false, sortOrder: 0, translations: {} }
+  return { title: '', author: '', description: '', coverUrl: '', price: 0, targetLevel: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
 }
 
 export function EbooksAdmin() {
@@ -2277,6 +2278,7 @@ export function EbooksAdmin() {
               <th>상태</th>
               <th>표지</th>
               <th>제목</th>
+              <th>레벨</th>
               <th>가격</th>
               <th>구매</th>
               <th style={{ textAlign: 'center' }}>순서</th>
@@ -2299,6 +2301,9 @@ export function EbooksAdmin() {
                 <td>
                   <div style={{ fontWeight: 700 }}>{b.title}</div>
                   {b.author && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{b.author}</div>}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {b.targetLevel ? `Lv.${b.targetLevel}` : <span style={{ color: 'var(--muted)' }}>미지정</span>}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? `${b.price.toLocaleString('ko-KR')}원` : '무료'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
@@ -2323,6 +2328,7 @@ export function EbooksAdmin() {
                         description: b.description ?? '',
                         coverUrl: b.coverUrl ?? '',
                         price: b.price,
+                        targetLevel: b.targetLevel ?? null,
                         storagePath: b.storagePath,
                         published: b.published,
                         sortOrder: b.sortOrder,
@@ -2340,7 +2346,7 @@ export function EbooksAdmin() {
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   등록된 이북이 없습니다.
                 </td>
               </tr>
@@ -2373,6 +2379,22 @@ export function EbooksAdmin() {
               <label style={{ ...fieldStyle, maxWidth: 220 }}>
                 가격(원) — 0 이면 무료
                 <input style={inpStyle} type="number" min={0} value={draft.price} onChange={(e) => patch({ price: Number(e.target.value) || 0 })} />
+              </label>
+              {/* 추천 대상 레벨 — 레벨테스트 결과창이 응시자 레벨에 맞는 책을 위로 올릴 때 쓴다. */}
+              <label style={{ ...fieldStyle, maxWidth: 220 }}>
+                추천 대상 레벨
+                <select
+                  style={inpStyle}
+                  value={draft.targetLevel ?? ''}
+                  onChange={(e) => patch({ targetLevel: e.target.value ? Number(e.target.value) : null })}
+                >
+                  <option value="">미지정 (레벨 무관)</option>
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <option key={n} value={n}>
+                      Lv.{n}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               {/* 본문 HTML — 브라우저 기본 파일칸("선택된 파일 없음") 대신 버튼+상태로 정리 */}

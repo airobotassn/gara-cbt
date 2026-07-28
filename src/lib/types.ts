@@ -443,12 +443,18 @@ export interface EbookRow {
   description: string | null
   coverUrl: string | null // 그 언어의 표지(본문 1페이지를 구운 것)
   price: number // 원(KRW). 0 = 무료
+  targetLevel: number | null // 추천 대상 레벨(1~7). null = 레벨 무관
   langs: string[] // 이 책이 가진 언어(항상 'ko' 포함)
   owned: boolean
   purchasedAt?: string // 서재(library) 응답에만
 }
 export interface EbookListResp {
   ebooks: EbookRow[]
+}
+/** 결과창 추천(picks) — 응시 레벨 기준으로 고른 목록. */
+export interface EbookPicksResp {
+  ebooks: EbookRow[]
+  forLevel: number | null // 실제로 기준 삼은 레벨(승급 시 +1). 레벨 없이 부르면 null
 }
 export interface EbookReadResp {
   id: string
@@ -481,6 +487,7 @@ export interface AdminEbookRow {
   description: string | null
   coverUrl: string | null
   price: number
+  targetLevel: number | null // 추천 대상 레벨(1~7). null = 미지정
   storagePath: string
   published: boolean
   sortOrder: number

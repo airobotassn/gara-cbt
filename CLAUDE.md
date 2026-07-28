@@ -65,7 +65,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/faq` | `pages/Faq.tsx` | `shared.css` | `admin` |
 | `/about` · `/privacy` · `/terms` | `About/Privacy/Terms.tsx` | `policy.css` | — |
 | `/login` · `/auth/callback` | `Login.tsx` · `AuthCallback.tsx` | — | (Supabase Auth) |
-| `/onboarding` (국가·지역·학교) | `pages/Onboarding.tsx` | `shared.css` | `set-region` |
+| `/onboarding` (국가·지역) | `pages/Onboarding.tsx` | `shared.css` | `set-region` |
 | **CARIS 자격검정 (CBT 본선)** ||||
 | `/exam` (검정 게이트) | `pages/ExamGate.tsx` | `cbt.css` | — |
 | `/exam/apply` (원서접수) | `pages/ExamApply.tsx` | `cbt.css` | `admin` |
@@ -93,7 +93,8 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) | `admin.css` | `admin` · `admin-test` |
 
 - `/mypage` 탭(URL `/mypage/:section`) 순서 = `learning`(학습 대시보드, **기본 = `/mypage`**) · `ebooks`(이북 서재) · `attempts`(시험 응시 현황) · `earned` · `issuance`. ⚠️ 응시 현황은 예전 기본 탭이라 `/mypage` 였는데 지금은 `/mypage/attempts`.
-- **이북(전자책)**: 관리자가 HTML 1개 파일을 업로드(비공개 버킷 `ebooks`, 표지는 공개 버킷 `ebook-covers`) → 회원이 `/ebooks` 에서 구매 → 마이페이지 '이북 서재' 탭에서 열람(`/ebooks/read/:id` 뷰어가 서명 URL iframe). 테이블 `ebooks`·`ebook_purchases`, 함수 `ebooks`(store·library·buy·read) + `admin`(ebookList/Upsert/Delete/Buyers). ⚠️ **결제(PG) 미연동 — 구매 = 즉시 지급(데모)**. 결제 검증 자리는 `ebooks` 함수의 `buy` 액션.
+- **이북(전자책)**: 관리자가 HTML 1개 파일을 업로드(비공개 버킷 `ebooks`, 표지는 공개 버킷 `ebook-covers`) → 회원이 `/ebooks` 에서 구매 → 마이페이지 '이북 서재' 탭에서 열람(`/ebooks/read/:id` 뷰어가 서명 URL iframe). 테이블 `ebooks`·`ebook_purchases`, 함수 `ebooks`(store·picks·library·buy·read) + `admin`(ebookList/Upsert/Delete/Buyers). ⚠️ **결제(PG) 미연동 — 구매 = 즉시 지급(데모)**. 결제 검증 자리는 `ebooks` 함수의 `buy` 액션.
+  - **추천**: 레벨테스트 결과창(`Result.tsx` 의 `EbookPicks`)이 `picks` 액션으로 응시 레벨에 맞는 책을 받는다. 기준은 `ebooks.target_level`(1~7, null=무관) 하나 — 관리자 이북 탭에서 고른다. 정렬 = 목표 레벨(승급 시 +1)과 가까운 순 → 동률이면 위 레벨 → 스토어 노출순, 이미 산 책은 서버가 제외. 레벨당 1권 체계라 6축 태그는 일부러 안 넣었다(고를 대상이 없어 결과가 안 바뀜) — 한 레벨에 여러 권이 생기면 그때 축 태그 추가.
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
 - 온보딩 게이트(`App.tsx`의 `OnboardingGate`): 정식 회원이 지역 미확정이면 `/test/*` · `/ranking` · `/mypage` 접근 시 `/onboarding` 으로 강제. 그 외 라우트는 통과.
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
