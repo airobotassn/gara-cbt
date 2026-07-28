@@ -67,22 +67,15 @@ const D: Record<string, Record<Lang, string>> = {
   'onboarding.title': { ko: '어느 지역에서 함께 하시겠어요?', en: 'Which region will you join from?', ja: 'どの地域から参加しますか？', zh: '您想从哪个地区加入？', hi: 'आप किस क्षेत्र से जुड़ेंगे?', vi: 'Bạn tham gia từ khu vực nào?' },
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
   'onboarding.intro_title': { ko: '지역별로 순위를 겨뤄요', en: 'Rankings are by region', ja: '地域ごとに順位を競います', zh: '按地区进行排名', hi: 'रैंकिंग क्षेत्र के अनुसार होती है', vi: 'Xếp hạng theo khu vực' },
-  'onboarding.intro_body': { ko: '같은 지역·국가·학교 사람들과 순위가 매겨져요.', en: 'You’ll be ranked among people from your region, country, and school.', ja: '同じ地域・国・学校の人たちと順位がつきます。', zh: '您将与同地区、同国家、同学校的人一同排名。', hi: 'आपकी रैंक आपके क्षेत्र, देश और स्कूल के लोगों के बीच तय होगी।', vi: 'Bạn sẽ được xếp hạng cùng những người ở khu vực, quốc gia và trường của bạn.' },
+  'onboarding.intro_body': { ko: '같은 지역·국가 사람들과 순위가 매겨져요.', en: 'You’ll be ranked among people from your region and country.', ja: '同じ地域・国の人たちと順位がつきます。', zh: '您将与同地区、同国家的人一同排名。', hi: 'आपकी रैंक आपके क्षेत्र और देश के लोगों के बीच तय होगी।', vi: 'Bạn sẽ được xếp hạng cùng những người ở khu vực và quốc gia của bạn.' },
   'onboarding.intro_next': { ko: '시작', en: 'Start', ja: '始める', zh: '开始', hi: 'शुरू करें', vi: 'Bắt đầu' },
   'onboarding.country': { ko: '국가', en: 'Country', ja: '国', zh: '国家', hi: 'देश', vi: 'Quốc gia' },
   'onboarding.region': { ko: '지역', en: 'Region', ja: '地域', zh: '地区', hi: 'क्षेत्र', vi: 'Khu vực' },
-  'onboarding.school': { ko: '학교(선택)', en: 'School (optional)', ja: '学校（任意）', zh: '学校（可选）', hi: 'स्कूल (वैकल्पिक)', vi: 'Trường học (tùy chọn)' },
-  'onboarding.school_search': { ko: '학교 검색…', en: 'Search schools…', ja: '学校を検索…', zh: '搜索学校…', hi: 'स्कूल खोजें…', vi: 'Tìm trường…' },
   'onboarding.lock_warn': { ko: '지역은 한 번 정하면 바꿀 수 없어요.', en: "Your region can't be changed once set.", ja: '地域は一度決めると変更できません。', zh: '地区一旦确定便无法更改。', hi: 'क्षेत्र एक बार चुनने के बाद बदला नहीं जा सकता।', vi: 'Khu vực không thể thay đổi sau khi đã chọn.' },
   'onboarding.start': { ko: '이대로 시작', en: 'Start now', ja: 'このまま始める', zh: '就此开始', hi: 'ऐसे ही शुरू करें', vi: 'Bắt đầu ngay' },
   'onboarding.region_prefill_hint': { ko: 'IP 추정값이에요. 확인/수정하세요.', en: 'Estimated from your IP. Please check or edit.', ja: 'IPからの推定値です。確認・修正してください。', zh: '根据 IP 估算，请确认或修改。', hi: 'यह आपके IP से अनुमानित है। जांचें या संपादित करें।', vi: 'Ước tính từ IP của bạn. Vui lòng kiểm tra/sửa.' },
   'mypage.region_locked': { ko: '지역·국가는 변경할 수 없어요. 오배정은 문의해 주세요.', en: "Region and country can't be changed. Contact us if misassigned.", ja: '地域・国は変更できません。誤割当ての場合はお問い合わせください。', zh: '地区和国家无法更改。如有误分配请联系我们。', hi: 'क्षेत्र और देश बदले नहीं जा सकते। गलत आवंटन पर संपर्क करें।', vi: 'Không thể thay đổi khu vực và quốc gia. Liên hệ nếu bị gán sai.' },
   'mypage.profile_title': { ko: '내 정보', en: 'My Info', ja: '基本情報', zh: '我的信息', hi: 'मेरी जानकारी', vi: 'Thông tin của tôi' },
-  'mypage.school_label': { ko: '학교', en: 'School', ja: '学校', zh: '学校', hi: 'स्कूल', vi: 'Trường học' },
-  'mypage.school_none': { ko: '미설정', en: 'Not set', ja: '未設定', zh: '未设置', hi: 'सेट नहीं', vi: 'Chưa đặt' },
-  'mypage.school_saved': { ko: '저장되었습니다.', en: 'Saved.', ja: '保存しました。', zh: '已保存。', hi: 'सहेजा गया।', vi: 'Đã lưu.' },
-  'mypage.school_save_failed': { ko: '저장에 실패했어요.', en: 'Failed to save.', ja: '保存に失敗しました。', zh: '保存失败。', hi: 'सहेजने में विफल।', vi: 'Lưu thất bại.' },
-  'mypage.school_no_results': { ko: '검색 결과가 없어요.', en: 'No results.', ja: '検索結果がありません。', zh: '没有结果。', hi: 'कोई परिणाम नहीं।', vi: 'Không có kết quả.' },
 
   'landing.lead': {
     ko: '지금 바로 내 실력을 확인하세요.',
@@ -237,6 +230,10 @@ const D: Record<string, Record<Lang, string>> = {
     vi: 'Không tìm thấy dữ liệu bài kiểm tra đang làm. Tải lại sẽ hủy lượt làm.',
   },
   'test.restart': { ko: '다시 시작하기', en: 'Start over', ja: 'もう一度始める', zh: '重新开始', hi: 'फिर से शुरू करें', vi: 'Bắt đầu lại' },
+  // 응시 화면(레벨테스트·CBT 공용) 키보드 단축키 안내. 마우스 있는 기기에서만 노출.
+  //   hint_nav = 보기가 없는 주관식 문항용(숫자키 안 먹음).
+  'kbd.hint': { ko: '1–{n} 선택 · ←→ 이동', en: '1–{n} to answer · ←→ to move', ja: '1–{n}で選択・←→で移動', zh: '1–{n} 选择 · ←→ 切换', hi: '1–{n} चुनें · ←→ जाएँ', vi: '1–{n} chọn · ←→ chuyển' },
+  'kbd.hint_nav': { ko: '←→ 문항 이동', en: '←→ to move', ja: '←→ で移動', zh: '←→ 切换题目', hi: '←→ प्रश्न बदलें', vi: '←→ chuyển câu' },
   'test.guard': {
     ko: '전체화면 유지 · 이탈 {v}/3',
     en: 'Stay fullscreen · exits {v}/3',

@@ -11,15 +11,8 @@
   --aa-ink: #33323f; --aa-muted: #6c7188; --aa-faint: #9aa0b8;
   --aa-line: #33323f; --aa-line-2: #33323f;
   --aa-accent: #5f8ed0; --aa-gold: #f2c65e;
-  --aa-sphere-line: rgba(51, 50, 63, .18); --aa-land-none: #dfe6f4;
   --aa-c0: #dde8fb; --aa-c1: #a7c4ee; --aa-c2: #6f9fe0; --aa-c3: #3f6fc0;
   --aa-glow: rgba(0, 74, 198, .16);
-  /* 지구본(SVG 그라디언트)과 카드 표면 */
-  --aa-ocean-hi: #eaf4ff; --aa-ocean-mid: #9fc6f2; --aa-ocean-lo: #4f88d4;
-  --aa-geo-stroke: #ffffff;
-  --aa-spec-op: .72;
-  --aa-atmo: #9cc6ff; --aa-atmo-op: .6;
-  --aa-inset-grad: linear-gradient(160deg, #eaf4ff, #a9cef2);
   --aa-inset-lab-bg: rgba(255, 255, 255, .82);
   --aa-surface-mix: #fff;          /* color-mix 로 옅은 배경을 만들 때 섞는 바탕 */
   /* 원본은 라이트에서 --sh-solid 가 자기 자신을 참조(순환)해 그림자가 전부 무효였다(다크만 정상).
@@ -42,19 +35,26 @@ html.dark .arena {
   /* 카툰 외곽선: 어두운 면 위에서는 먹색이 사라지므로 밝은 회청색으로 */
   --aa-line: #5c6578; --aa-line-2: #454d5e;
   --aa-accent: #6f9ee0; --aa-gold: #d9b45f;
-  --aa-sphere-line: rgba(224, 230, 244, .16); --aa-land-none: #2b3444;
   /* 응시자수 단계색: 어두운 바다 위에서 어두움→밝음으로 올라가야 읽힌다(라이트의 역방향) */
   --aa-c0: #24354f; --aa-c1: #3a6099; --aa-c2: #5a8ed6; --aa-c3: #8fb9f5;
   --aa-glow: rgba(79, 141, 245, .14);
-  /* 바다는 --aa-c0(데이터 최저 단계)·--aa-land-none 보다 확실히 어두워야 대륙이 떠 보인다 */
-  --aa-ocean-hi: #1e2a3f; --aa-ocean-mid: #141d2e; --aa-ocean-lo: #0b1220;
-  --aa-geo-stroke: rgba(224, 230, 244, .45);
-  --aa-spec-op: .16;               /* 어두운 구체에 흰 하이라이트를 세게 주면 뿌옇게 뜬다 */
-  --aa-atmo: #5f8ed0; --aa-atmo-op: .45;
-  --aa-inset-grad: linear-gradient(160deg, #22304a, #131b29);
   --aa-inset-lab-bg: rgba(18, 21, 28, .82);
   --aa-surface-mix: #1c212c;
   --aa-sh-solid: rgba(0, 0, 0, .5);
+}
+
+/* ── 지도 표면(지구본·바다·대륙) ── **라이트/다크 공통으로 어둡다.**
+   페이지(카드·패널·글자)는 테마를 따르지만 지도만은 항상 딥블루다. 1~3위 테두리를 **흰빛으로
+   발광**시키려면 주변이 어두워야 하기 때문 — 밝은 바다 위에 흰 광채를 얹으면 아예 안 보인다.
+   바다는 램프 최하단(CSCALE_RAMP[0] = #2a63b4)보다 어두워야 대륙이 떠 보인다. */
+.arena {
+  --aa-ocean-hi: #1d59a5; --aa-ocean-mid: #174c90; --aa-ocean-lo: #0f386e;
+  --aa-land-none: #21538e;
+  --aa-sphere-line: rgba(200, 222, 255, .14);
+  --aa-geo-stroke: rgba(238, 247, 255, .55);
+  --aa-spec-op: .16;               /* 어두운 구체에 흰 하이라이트를 세게 주면 뿌옇게 뜬다 */
+  --aa-atmo: #5b9ae8; --aa-atmo-op: .5;
+  --aa-inset-grad: linear-gradient(160deg, #245ea6, #10386c);
 }
 
 .aa-wrap { max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 40px; }
@@ -107,7 +107,7 @@ html.dark .arena {
 .aa-legend { display: flex; align-items: center; gap: 10px; padding: 10px 18px 15px; font-size: 11.5px; color: var(--aa-muted); font-weight: 700; }
 /* 범례 = 지도 색 램프(CSCALE_RAMP)와 동일한 3색. 지도 색이 JS 고정값이라 이 바도 테마와 무관하게 고정. */
 .aa-legend .bar { flex: 1; height: 8px; border-radius: 999px;
-  background: linear-gradient(90deg, #dceafb, #7eaae6, #2159c6); }
+  background: linear-gradient(90deg, #2b64b6, #437bc7, #729fdb); }
 .aa-zoomctl { position: absolute; left: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
 .aa-zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--aa-line); background: var(--aa-panel); color: var(--aa-ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--aa-sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .aa-zoomctl button:hover { background: var(--aa-panel-2); }
@@ -223,6 +223,19 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
 /* ── 지도 SVG 내부 ── */
 #arena-map .geo { stroke: var(--aa-geo-stroke); stroke-width: 1; transition: fill .15s; cursor: pointer; vector-effect: non-scaling-stroke; }
 #arena-map .geo.hot { stroke: var(--aa-gold); stroke-width: 1.6; }
+
+/* ── 1·2·3위 경계 발광 ── 면은 JS(MEDAL_TONE)가 그라디언트로 주고, 여기선 **테두리선만** 빛낸다.
+   면 전체에 drop-shadow 를 걸면 덩어리가 뿌옇게 번져 얼룩으로 보인다 — 빛나는 건 선이다.
+   기본 흰 테두리는 지워 발광선과 겹치지 않게 한다. */
+/* 입자감(medalGrain)은 면을 균일한 단색으로 안 보이게 하는 몫. feTurbulence 는 비싸므로
+   회전·드래그 중에는 끈다 — 정지 화면에서만 보이면 되는 마감이다. */
+#arena-map .geo[data-podium] { stroke: none; filter: url(#medalGrain); }
+#arena-map.dragging .geo[data-podium] { filter: none; }
+/* 후광 — 흰빛을 좁게. 번짐을 키우면 덩어리가 뿌예지고 면까지 발광하는 것처럼 보인다.
+   심지 두께보다 조금만 넓게 잡아 '선이 빛난다' 정도로만 남긴다. */
+#arena-map .medalhalo { fill: none; stroke: #ffffff; stroke-width: 3.2; filter: blur(1.4px); opacity: .95; pointer-events: none; }
+/* 심지 — 또렷한 흰 선. 발광의 주인공은 번짐이 아니라 이 선이다. */
+#arena-map .medalline { fill: none; stroke: #ffffff; stroke-width: 1.8; stroke-linejoin: round; pointer-events: none; vector-effect: non-scaling-stroke; }
 #arena-map .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
 #arena-map .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--aa-line); stroke-width: 3; }
 #arena-map .spec { fill: url(#specGrad); pointer-events: none; }
@@ -236,17 +249,18 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
 #arena-map #atmoGrad .a-out  { stop-color: var(--aa-atmo); stop-opacity: var(--aa-atmo-op); }
 #arena-map .grat { fill: none; stroke: var(--aa-sphere-line); stroke-width: .5; opacity: .5; }
 #arena-map .krmark { fill: none; stroke: var(--aa-gold); stroke-width: 2; }
-/* 1~3위 트로피 이미지(금·은·동). 크기·위치는 ArenaMap 이 지도 배율에 맞춰 인라인으로 준다.
-   지도 조작을 막지 않게 pointer-events 제거, 지구본 위에서 뜨도록 옅은 그림자. */
-#arena-map .trophy { pointer-events: none; user-select: none; filter: drop-shadow(0 1px 1.5px rgba(10, 20, 40, .45)); }
+/* 1~3위 입체 트로피(public/rank-1..3.png). 크기·위치는 ArenaMap 이 지도 배율에 맞춰 인라인으로 준다.
+   이미지 자체가 입체라 그림자만 살짝 깔아 지도 위에 떠 보이게 한다. */
+#arena-map .rankobj { pointer-events: none; user-select: none; filter: drop-shadow(0 3px 4px rgba(6, 18, 40, .55)); }
 
 /* 순위 숫자 — 크기는 ArenaMap 이 .ranklabs 그룹의 font-size 로 한 번에 준다(지도 배율에 연동).
-   그래서 테두리 두께도 px 가 아니라 em 이다 — px 로 박으면 확대·축소할 때 지도와 따로 논다. */
+   그래서 테두리 두께도 px 가 아니라 em 이다 — px 로 박으면 확대·축소할 때 지도와 따로 논다.
+   ⚠️ 지도 바탕이 딥블루로 바뀌면서 글자/테두리가 예전(진남색 글자 + 흰 테두리)의 반대가 됐다. */
 #arena-map .ranklab {
-  fill: #16324f;
+  fill: #f2f7ff;
   font-weight: 800;
   paint-order: stroke;
-  stroke: rgba(255, 255, 255, .9);
+  stroke: rgba(5, 16, 34, .8);
   stroke-width: .22em;
   stroke-linejoin: round;
   pointer-events: none;

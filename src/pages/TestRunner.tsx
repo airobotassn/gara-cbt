@@ -146,7 +146,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     setStarted(true)
   }
 
-  function goNext() {
+  const goNext = useCallback(() => {
     if (index + 1 < total) {
       setIndex((i) => i + 1)
       return
@@ -155,10 +155,50 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     // 시간초과 자동제출은 submit() 직접 호출이라 여기 안 탐.
     if (submitting) return
     setAskSubmit(true)
-  }
-  function goPrev() {
+  }, [index, total, submitting])
+
+  const goPrev = useCallback(() => {
     if (index > 0) setIndex((i) => i - 1)
-  }
+  }, [index])
+
+  const choose = useCallback((optIdx: number) => {
+    setSelected((arr) => {
+      const next = [...arr]
+      next[index] = optIdx
+      return next
+    })
+  }, [index])
+
+  // 키보드 조작 — 숫자키(1~N)로 보기 선택, ←/→ 로 이전·다음 문항.
+  //   · 보기 버튼에 이미 번호 뱃지(.opt .key)가 찍혀 있어 숫자키 매핑이 그대로 보인다.
+  //   · 마지막 문항에서 → 는 goNext 가 제출 확인 모달을 띄운다(바로 제출 아님).
+  //   · 모달이 떠 있거나 제출 중이면 리스너를 아예 안 건다(모달 위에서 문항이 넘어가는 사고 방지).
+  //   · 마우스로 보기를 고른 뒤 →로 넘기면 그 버튼에 포커스가 남아 다음 문항에서 Enter 가
+  //     엉뚱한 보기를 누르므로, 문항 이동 시 포커스를 푼다(blur 는 버블링 안 해 이탈감지와 무관).
+  useEffect(() => {
+    if (!started || voided || submitting || askSubmit || askQuit) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return
+      const el = document.activeElement
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+
+      const n = Number(e.key) // 숫자열·넘패드 모두 e.key 는 '1'…'9'
+      if (Number.isInteger(n) && n >= 1 && n <= questions[index].options.length) {
+        e.preventDefault()
+        choose(n - 1)
+        return
+      }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (el instanceof HTMLElement) el.blur()
+        if (e.key === 'ArrowRight') goNext()
+        else goPrev()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [started, voided, submitting, askSubmit, askQuit, questions, index, choose, goNext, goPrev])
+
   function quit() {
     if (submitting) return
     setAskQuit(true)
@@ -250,25 +290,24 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
   }
 
   const q = questions[index]
-  const progress = ((index + 1) / total) * 100
+  // 상단 게이지 = **푼 문항 수** 기준(현재 위치 아님). 아래 문항 점프 그리드가 현재 위치를 이미 보여주고,
+  // CBT 응시 화면(CbtRunner)의 진행 게이지도 같은 기준이라 두 시험의 게이지 의미를 맞춘다.
+  const answered = selected.filter((s) => s !== null).length
+  const progress = (answered / total) * 100
   const remainSec = Math.ceil(remainMs / 1000)
   const timeStr = `${Math.floor(remainSec / 60)}:${String(remainSec % 60).padStart(2, '0')}`
   const timeLow = remainMs <= 60000
-
-  function choose(optIdx: number) {
-    setSelected((arr) => {
-      const next = [...arr]
-      next[index] = optIdx
-      return next
-    })
-  }
 
   return (
     <div className="wrap no-select">
       <div className="card" style={{ overflow: 'hidden' }}>
         <div className="qtop">
-          <div className="count">
-            <b>{index + 1}</b> / {total}
+          <div className="qtop-left">
+            <div className="count">
+              <b>{index + 1}</b> / {total}
+            </div>
+            {/* 키보드 단축키 안내 — 터치 기기에선 CSS 로 숨긴다(.kbd-hint) */}
+            <span className="kbd-hint">{t('kbd.hint', { n: q.options.length })}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span
@@ -287,10 +326,6 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
             </button>
           </div>
         </div>
-        <div className="pbar">
-          <i style={{ width: `${progress}%` }} />
-        </div>
-
         {lastWarning ? (
           <div className="warn">
             ⚠️{' '}
@@ -337,13 +372,14 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
         </div>
 
         <div className="qfoot">
-          <div className="count" style={{ color: 'var(--muted)', fontSize: 13 }}>
-            {t('test.solved', {
-              a: selected.filter((s) => s !== null).length,
-              t: total,
-            })}
+          {/* 진행 게이지 + 푼 문항 수 — 한 덩어리로 붙여 막대가 무슨 값인지 자명하게 한다. */}
+          <div className="qprog">
+            <span className="qprog-bar">
+              <i style={{ width: `${progress}%` }} />
+            </span>
+            <span className="count">{t('test.solved', { a: answered, t: total })}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               className="btn-ghost"
               onClick={goPrev}

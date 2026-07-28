@@ -27,15 +27,38 @@
   font-size: var(--fs-sm);
   color: var(--dim);
 }
-.pbar {
-  height: 4px;
-  background: var(--line);
+/* 진행 게이지 — 하단바의 '푼 문제 N/M' 텍스트 바로 왼쪽에 붙인다.
+   예전엔 카드 상단 풀폭 4px 막대(.pbar)였는데 '읽은 진도'처럼 읽혀서 옮겼다.
+   기준은 현재 위치가 아니라 **푼 문항 수** — CBT 응시화면(CbtRunner) 헤더 게이지와 같은 모양·같은 기준. */
+.qprog {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.pbar > i {
+.qprog .count {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.qprog-bar {
+  flex: none;
+  width: 56px; /* 모바일: 하단바가 [게이지+텍스트][이전][다음] 한 줄이라 더 넓히면 버튼이 아랫줄로 밀린다 */
+  height: 14px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+@media (min-width: 600px) {
+  .qprog-bar {
+    width: 260px;
+  }
+}
+.qprog-bar > i {
   display: block;
   height: 100%;
   background: var(--blue);
-  border-radius: 0 4px 4px 0;
+  border-radius: 999px;
   transition: width 0.2s;
 }
 .qbody {
@@ -123,6 +146,25 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 22px var(--pad-x) clamp(24px, 5vw, 34px);
+}
+/* 키보드 단축키 안내 — 마우스가 있는 기기에서만. 터치(폰·태블릿)엔 키보드가 없어 무의미하다.
+   숫자·화살표 글리프는 본문 폰트에서 폭이 들쭉날쭉해 tabular-nums 로 고정. */
+.qtop-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.kbd-hint {
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (pointer: coarse) {
+  .kbd-hint {
+    display: none;
+  }
 }
 .dotsteps {
   display: flex;

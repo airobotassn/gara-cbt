@@ -253,14 +253,49 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const { masked: leaveMasked } = useLeaveGuard({ enabled: guardEnabled })
   const masked = inputMasked || leaveMasked
 
-  function choose(qIdx: number, opt: number) {
+  const choose = useCallback((qIdx: number, opt: number) => {
     if (submitting) return
     setSelected((arr) => {
       const next = [...arr]
       next[qIdx] = opt
       return next
     })
-  }
+  }, [submitting])
+
+  // 키보드 조작 — 숫자키(1~4)로 보기 선택, ←/→ 로 이전·다음 문항. 레벨테스트(TestRunner)와 같은 규칙.
+  //   · 주관식(short)은 choices 가 [] 라 숫자키가 자연히 무시되고, 답안 textarea 에 포커스가 있는 동안엔
+  //     숫자·화살표를 전부 흘려보낸다(타이핑과 캐럿 이동이 우선).
+  //   · 첫/마지막 문항에서의 ←/→ 는 아무것도 안 한다 — 하단 이전·다음 버튼의 disabled 조건과 동일.
+  //     제출은 미응답 가드가 붙은 '제출' 버튼 전용이다(화살표로 시험이 끝나면 안 된다).
+  //   · 부정행위 가림(masked)·제출 중·종료 모달일 땐 리스너를 아예 안 건다.
+  //   · 마우스로 보기를 고른 뒤 →로 넘기면 그 버튼에 포커스가 남아 다음 문항에서 Enter 가 엉뚱한 보기를
+  //     누르므로 문항 이동 시 포커스를 푼다(blur 는 버블링 안 해 이탈감지와 무관).
+  useEffect(() => {
+    if (submitting || masked || askQuit) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return
+      const el = document.activeElement
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+
+      const cur = questions[index]
+      const n = Number(e.key) // 숫자열·넘패드 모두 e.key 는 '1'…'9'
+      if (cur.kind !== 'short' && Number.isInteger(n) && n >= 1 && n <= cur.choices.length) {
+        e.preventDefault()
+        choose(index, n - 1)
+        return
+      }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        const to = e.key === 'ArrowRight' ? index + 1 : index - 1
+        if (to < 0 || to >= total) return
+        e.preventDefault()
+        if (el instanceof HTMLElement) el.blur()
+        setIndex(to)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [submitting, masked, askQuit, questions, index, total, choose])
+
   function writeText(qIdx: number, v: string) {
     if (submitting) return
     setTexts((arr) => {
@@ -464,9 +499,16 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
 
       {/* Bottom Action Bar */}
       <footer className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 shrink-0 flex items-center justify-between z-50 relative">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-primary text-[16px]">{index + 1}</span>
-          <span className="text-outline text-[14px]">/ {total}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-primary text-[16px]">{index + 1}</span>
+            <span className="text-outline text-[14px]">/ {total}</span>
+          </div>
+          {/* 키보드 단축키 안내 — 이 화면은 isMobileDevice() 로 모바일을 막아 데스크톱 전제라 조건 없이 표시.
+              주관식은 보기가 없어 숫자키가 안 먹으므로 이동 안내만 띄운다. */}
+          <span className="text-[12px] text-outline tabular-nums whitespace-nowrap">
+            {q.kind === 'short' ? t('kbd.hint_nav') : t('kbd.hint', { n: q.choices.length })}
+          </span>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
           <button disabled={index === 0 || submitting} onClick={() => setIndex((i) => Math.max(0, i - 1))} className="px-6 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-semibold hover:bg-surface-container transition-colors disabled:opacity-40">{t('run.prev')}</button>

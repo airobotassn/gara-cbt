@@ -8,7 +8,6 @@ import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
 import { makeCertNo, gradeOfTitle, gradeDisplay, certExpiryDate, tempSeq } from '../lib/certNo'
-import { searchSchools } from '../lib/schools'
 import { countryName } from '../lib/regions'
 
 // gara_5 (마이페이지) 목업 디자인 그대로 + 실제 응시 데이터·탭·발급·로그인 게이트 로직 보존.
@@ -58,70 +57,31 @@ function statusInfo(a: MyAttempt) {
   return { icon: 'description', wrap: 'bg-primary/10 border-primary/20', color: 'text-primary', badge: a.status === 'in_progress' ? 'In progress' : 'Scoring', badgeClass: 'bg-primary/10 text-primary border-primary/20', greyed: false }
 }
 
-// 내 정보 — 국가/지역(읽기전용, 락) + 학교(클라이언트 수정 가능) 편집.
+// 내 정보 — 국가/지역(읽기전용, 락).
+//   ⚠️ 학교(school_id) 입력 UI 는 제거됨(2026-07-28). DB 컬럼·schools 테이블·school_leaderboard RPC 는 남아있고,
+//      랭킹의 학교 탭도 숨김 상태(Ranking.tsx) — 되살리려면 이 섹션에 자동완성 입력을 다시 붙이면 된다.
 function ProfileSection() {
   const { user } = useAuth()
   const { t, lang } = useT()
-  const [profile, setProfile] = useState<{ country_code: string | null; region_code: string | null; school_id: string | null } | null>(null)
-  const [schoolName, setSchoolName] = useState('')
-  const [q, setQ] = useState('')
-  const [results, setResults] = useState<{ id: string; name: string }[]>([])
-  const [open, setOpen] = useState(false)
-  const [searching, setSearching] = useState(false)
-  const [msg, setMsg] = useState('')
+  const [profile, setProfile] = useState<{ country_code: string | null; region_code: string | null } | null>(null)
 
-  // 프로필(국가/지역/학교) 로딩
+  // 프로필(국가/지역) 로딩
   useEffect(() => {
     if (!user) return
     let alive = true
     supabase
       .from('profiles')
-      .select('country_code,region_code,school_id')
+      .select('country_code,region_code')
       .eq('id', user.id)
       .maybeSingle()
-      .then(async ({ data }) => {
+      .then(({ data }) => {
         if (!alive) return
         setProfile(data ?? null)
-        if (data?.school_id) {
-          const { data: s } = await supabase.from('schools').select('name').eq('id', data.school_id).maybeSingle()
-          if (alive) setSchoolName(s?.name ?? '')
-        }
       })
     return () => {
       alive = false
     }
   }, [user?.id])
-
-  // 학교 자동완성(디바운스 250ms)
-  useEffect(() => {
-    const term = q.trim()
-    if (!term) {
-      setResults([])
-      return
-    }
-    setSearching(true)
-    const h = setTimeout(async () => {
-      const r = await searchSchools(term)
-      setResults(r)
-      setSearching(false)
-    }, 250)
-    return () => clearTimeout(h)
-  }, [q])
-
-  async function pick(s: { id: string; name: string }) {
-    if (!user) return
-    setOpen(false)
-    setQ('')
-    setResults([])
-    const { error } = await supabase.from('profiles').update({ school_id: s.id }).eq('id', user.id)
-    if (error) {
-      setMsg(t('mypage.school_save_failed'))
-      return
-    }
-    setSchoolName(s.name)
-    setProfile((p) => (p ? { ...p, school_id: s.id } : p))
-    setMsg(t('mypage.school_saved'))
-  }
 
   const countryLabel = profile?.country_code ? countryName(profile.country_code, lang) : '-'
   const regionLabel = profile?.region_code ? t(`region.${profile.region_code}`) : '-'
@@ -142,48 +102,10 @@ function ProfileSection() {
           <div className="w-full rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-on-surface-variant select-none cursor-not-allowed">{regionLabel}</div>
         </div>
       </div>
-      <p className="font-body-sm text-[13px] text-outline mb-6 flex items-center gap-1.5">
+      <p className="font-body-sm text-[13px] text-outline flex items-center gap-1.5">
         <span className="material-symbols-outlined text-[16px]">lock</span>
         {t('mypage.region_locked')}
       </p>
-
-      {/* 학교 (수정 가능) */}
-      <div className="relative">
-        <label className="block font-label-md text-[13px] font-semibold text-on-surface mb-1.5">{t('mypage.school_label')}</label>
-        {schoolName && (
-          <div className="mb-2 font-body-md text-on-surface">{schoolName}</div>
-        )}
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
-            setOpen(true)
-            setMsg('')
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder={schoolName ? t('onboarding.school_search') : `${t('mypage.school_none')} — ${t('onboarding.school_search')}`}
-          className="w-full rounded-xl bg-surface-container-lowest border border-outline-variant/60 px-4 py-3 font-body-md text-on-surface focus:border-primary focus:outline-none"
-        />
-        {open && q.trim() && (
-          <div className="absolute z-20 mt-1 w-full rounded-xl bg-surface-container-lowest border border-outline-variant/50 shadow-lg overflow-hidden max-h-72 overflow-y-auto">
-            {searching && <div className="px-4 py-3 font-body-md text-on-surface-variant">{t('common.loading')}</div>}
-            {!searching && results.length === 0 && <div className="px-4 py-3 font-body-md text-on-surface-variant">{t('mypage.school_no_results')}</div>}
-            {!searching &&
-              results.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => pick(s)}
-                  className="block w-full text-left px-4 py-3 font-body-md text-on-surface hover:bg-primary/5 transition-colors"
-                >
-                  {s.name}
-                </button>
-              ))}
-          </div>
-        )}
-        {msg && <p className="mt-2 font-body-sm text-[13px] text-primary">{msg}</p>}
-      </div>
     </section>
   )
 }
@@ -354,7 +276,7 @@ export default function MyPage() {
             <span className="material-symbols-outlined text-[28px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
           </button>
 
-          {/* 내 정보 — 국가/지역(락) + 학교 편집 */}
+          {/* 내 정보 — 국가/지역(락) */}
           <ProfileSection />
 
           {/* Tabs */}

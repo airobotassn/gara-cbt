@@ -22,7 +22,7 @@ import { zoom as d3Zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } fro
 import { timer as d3Timer, type Timer } from 'd3-timer'
 import { easeCubicIn, easeCubicInOut, easeCubicOut } from 'd3-ease'
 import 'd3-transition' // selection.transition() 부착(부수효과 import)
-import { type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
+import { MEDAL_TONE, type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
 import { DOKDO_GEO, M49_TO_ISO2 } from '../lib/arena/tables'
 import { labelAnchor } from '../lib/arena/labelPoint'
 
@@ -87,11 +87,14 @@ const LABEL_RATIO = 0.3 // 땅이 좁을 때 "짧은 변의 몇 %까지 쓸지"
 const LABEL_FLOOR = 9 // 좁은 나라도 여기까지는 유지(아래 폭 상한에 걸리면 더 줄어든다)
 const LABEL_HIDE = 6 // 그래도 이보다 작으면(px) 읽을 수 없으니 숨긴다 — 확대하면 나타난다
 
-// 1~3위는 숫자 대신 금·은·동 트로피 이미지(public/trophy-1..3.png). 숫자보다 크게 = 그 나라 위 존재감.
-const TROPHY_RATIO = 0.5 // 땅 짧은 변 대비 트로피 크기
-const TROPHY_MIN = 22 // 좁은 1~3위여도 이만큼은 키운다
-const TROPHY_MAX = 54 // 미국·중국처럼 큰 땅에서 트로피만 비대해지는 걸 막는 상한(px)
-const TROPHY_HIDE = 12 // 너무 축소돼 이보다 작으면 숨긴다
+// 1~3위 = **땅 색 + 흰 발광 테두리**(MEDAL_TONE) + 그 위에 **입체 숫자 트로피**(public/rank-1..3.png).
+// 숫자 라벨(ranklab)은 등수와 무관하게 전부 그리고, 1~3위만 트로피에 가리지 않게 아래로 비켜 찍는다.
+const OBJ_RATIO = 0.6 // 땅 짧은 변 대비 트로피 높이
+const OBJ_MIN = 26 // 좁은 1~3위여도 이만큼은 키운다
+const OBJ_MAX = 96 // 큰 땅에서 트로피만 비대해지는 걸 막는 상한(px)
+const OBJ_HIDE = 18 // 너무 축소돼 이보다 작으면 입체가 뭉개져 지저분하므로 숨긴다
+/** 트로피 이미지의 가로/세로 비 — 1·3등은 384×512, 2등은 366×512. 정사각으로 박으면 찌그러진다. */
+const OBJ_ASPECT = [0.75, 0.715, 0.75]
 
 function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -118,6 +121,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     centered: false, // 홈 국가로 한 번이라도 중앙 정렬했는지
     vk: 1, // 평면 레벨(1·2)에서 viewport 그룹에 걸린 확대 배율 — 글자 크기 판정에 쓴다
     labels: [] as RankLabel[],
+    rankOf: new Map<string, number>(), // key → 등수. 1~3위 별색 칠하기용(labels 와 같이 갱신)
   })
 
   const g = useRef<{
@@ -127,6 +131,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     spec: Selection<SVGGElement, unknown, null, undefined>
     grat: Selection<SVGGElement, unknown, null, undefined>
     geo: Selection<SVGGElement, unknown, null, undefined>
+    glow: Selection<SVGGElement, unknown, null, undefined>
     mark: Selection<SVGGElement, unknown, null, undefined>
     labels: Selection<SVGGElement, unknown, null, undefined>
     zoom: ZoomBehavior<SVGSVGElement, unknown>
@@ -229,23 +234,24 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       else node.style('display', null).style('font-size', `${(px / tk).toFixed(2)}px`)
     })
 
-    // 트로피(1~3위) — 정사각 이미지. 중심 정렬이라 크기가 정해져야 x·y 도 정해진다(여기서 같이 배치).
-    groups.labels.selectAll<SVGImageElement, RankLabel>('image.trophy').each(function (d) {
+    // 1~3위 입체 트로피 — 높이로 크기를 정하고 가로는 이미지 비율을 따른다(정사각으로 박으면 찌그러진다).
+    // 지역 중심에 세로로 얹되, 받침대가 중심에 오도록 살짝 위로 올린다.
+    groups.labels.selectAll<SVGImageElement, RankLabel>('image.rankobj').each(function (d) {
       const xy = proj(d.c)
-      const screenRoom = roomOf(d) * tk
-      const px = clamp(screenRoom * TROPHY_RATIO, TROPHY_MIN, TROPHY_MAX)
+      const h = clamp(roomOf(d) * tk * OBJ_RATIO, OBJ_MIN, OBJ_MAX)
       const node = select(this)
-      if (!xy || px < TROPHY_HIDE) {
+      if (!xy || h < OBJ_HIDE) {
         node.style('display', 'none')
         return
       }
-      const s = px / tk // 그룹 좌표계 크기
+      const gh = h / tk // 그룹 좌표계 높이
+      const gw = gh * OBJ_ASPECT[d.rank - 1]
       node
         .style('display', null)
-        .attr('width', s.toFixed(2))
-        .attr('height', s.toFixed(2))
-        .attr('x', (xy[0] - s / 2).toFixed(2))
-        .attr('y', (xy[1] - s / 2).toFixed(2))
+        .attr('width', gw.toFixed(2))
+        .attr('height', gh.toFixed(2))
+        .attr('x', (xy[0] - gw / 2).toFixed(2))
+        .attr('y', (xy[1] - gh * 0.62).toFixed(2))
     })
   }, [])
 
@@ -299,6 +305,24 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
 
     groups.geo.selectAll<SVGPathElement, Region>('path').attr('d', (d) => path(d.f))
 
+    // 시상대 경계 = **하얗게 빛나는 테두리선**. 면이 광채를 뿜는 게 아니라 나라 윤곽선이 빛난다.
+    // 두 겹으로 그린다: 좁고 흐린 흰 후광 → 그 위에 또렷하고 굵은 흰 심지.
+    // ⚠️ 이 그룹은 **모든 지역(.geo) 위**에 있어야 한다. 아래에 두면 나중에 그려지는 이웃 지역이
+    //    바깥으로 번진 빛을 덮어, 바다에 접한 쪽만 빛나고 국경 맞닿은 쪽은 사라진다.
+    // 색은 등수와 무관하게 흰색 하나라 CSS 가 갖는다(여기서는 모양만 준다).
+    const medals = regions
+      .map((r) => ({ r, rank: st.current.rankOf.get(r.key) ?? 99 }))
+      .filter((m) => m.rank <= 3)
+      .sort((a, b) => a.rank - b.rank)
+    for (const cls of ['medalhalo', 'medalline'] as const) {
+      groups.glow
+        .selectAll<SVGPathElement, (typeof medals)[number]>(`path.${cls}`)
+        .data(medals, (m) => m.rank)
+        .join('path')
+        .attr('class', cls)
+        .attr('d', (m) => path(m.r.f))
+    }
+
     // 홈 국가 표시 링 — 지구본 앞면에 있을 때만
     if (level === 0) {
       const homeR = regions.find((r) => M49_TO_ISO2[String(r.f.id)] === home) ?? regions.find((r) => r.drill)
@@ -316,7 +340,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     } else {
       groups.mark.selectAll('*').remove()
     }
-    // ── 순위 라벨 ── (지구본에선 뒷면 지역을 걸러낸다) 1~3위=트로피 이미지, 4위~=숫자.
+    // ── 순위 라벨 ── (지구본에선 뒷면 지역을 걸러낸다) 등수와 무관하게 전부 숫자로 그린다.
     const lrot = proj.rotate()
     const labelData =
       level === 0
@@ -324,6 +348,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         : st.current.labels
     groups.labels
       .selectAll<SVGTextElement, RankLabel>('text.ranklab')
+      // 1~3위는 트로피가 등수를 말해 주므로 숫자는 안 찍는다(겹치기만 한다).
       .data(
         labelData.filter((d) => d.rank > 3),
         (d) => d.key,
@@ -335,16 +360,17 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .attr('x', (d) => proj(d.c)?.[0] ?? -9999)
       .attr('y', (d) => proj(d.c)?.[1] ?? -9999)
       .text((d) => d.rank)
+    // 1~3위 입체 트로피. 크기·위치는 sizeLabels 가 지도 배율에 맞춰 잡는다.
     groups.labels
-      .selectAll<SVGImageElement, RankLabel>('image.trophy')
+      .selectAll<SVGImageElement, RankLabel>('image.rankobj')
       .data(
         labelData.filter((d) => d.rank <= 3),
         (d) => d.key,
       )
       .join('image')
-      .attr('class', 'trophy')
+      .attr('class', 'rankobj')
       .attr('preserveAspectRatio', 'xMidYMid meet')
-      .attr('href', (d) => `/trophy-${d.rank}.png`) // 1=금 2=은 3=동
+      .attr('href', (d) => `/rank-${d.rank}.png`) // 1=골드 2=블루 3=청록
     sizeLabels(path)
   }, [graticule, sizeLabels])
 
@@ -471,6 +497,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         const { point, part } = labelAnchor(r.f)
         return { rank: i + 1, c: point, key: r.key, area: geoArea(part), f: part }
       })
+    // 등수 역인덱스 — 색칠할 때 매번 다시 정렬하지 않도록 여기서 한 번만 만든다.
+    st.current.rankOf = new Map(st.current.labels.map((l) => [l.key, l.rank]))
 
     const sel = groups.geo.selectAll<SVGPathElement, Region>('path').data(regions, (d) => d.key)
     sel.exit().remove()
@@ -486,7 +514,15 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .merge(sel)
       .classed('dim', (d) => !d.drill && level === 0)
       .classed('sel', (d) => d.key === selKey)
-      .attr('fill', (d) => p.current.color(d.score))
+      // 1~3위만 시상대 별색(발광은 CSS 가 data-podium 으로 얹는다), 나머지는 부모가 준 백분위 램프
+      .attr('data-podium', (d) => {
+        const rank = st.current.rankOf.get(d.key) ?? 99
+        return rank <= 3 ? rank : null
+      })
+      .attr('fill', (d) => {
+        const rank = st.current.rankOf.get(d.key) ?? 99
+        return rank <= 3 ? `url(#medalGrad${rank})` : p.current.color(d.score)
+      })
 
     paint()
 
@@ -552,6 +588,52 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .attr('flood-color', '#33456b')
       .attr('flood-opacity', 0.3)
 
+    // 시상대 면의 미세 입자감 — 벡터 채우기는 픽셀 단위로 완벽하게 균일해서 "인쇄물 같은" 단색으로
+    // 보인다. 레퍼런스는 렌더 결과물이라 아주 옅은 얼룩이 있고, 그게 눈에 진짜로 읽힌다.
+    // 그래서 노이즈를 만들어 **면 안쪽에만**(operator="in") 가둔 뒤 overlay 로 섞는다.
+    // ⚠️ 세게 주면 지저분해진다 — 거의 안 보일 정도가 정답이라 slope 는 낮게 유지할 것.
+    const grain = defs
+      .append('filter')
+      .attr('id', 'medalGrain')
+      .attr('x', '-2%')
+      .attr('y', '-2%')
+      .attr('width', '104%')
+      .attr('height', '104%')
+    grain
+      .append('feTurbulence')
+      .attr('type', 'fractalNoise')
+      .attr('baseFrequency', '0.5')
+      .attr('numOctaves', 3)
+      .attr('seed', 7)
+      .attr('result', 'n')
+    grain.append('feColorMatrix').attr('in', 'n').attr('type', 'saturate').attr('values', 0).attr('result', 'm')
+    grain
+      .append('feComponentTransfer')
+      .attr('in', 'm')
+      .attr('result', 'g')
+      .append('feFuncA')
+      .attr('type', 'linear')
+      .attr('slope', 0.22)
+      .attr('intercept', 0)
+    grain.append('feComposite').attr('in', 'g').attr('in2', 'SourceGraphic').attr('operator', 'in').attr('result', 'gi')
+    grain.append('feBlend').attr('in', 'SourceGraphic').attr('in2', 'gi').attr('mode', 'overlay')
+
+    // 시상대(1~3위) 면 — 가운데가 살짝 밝고 바깥으로 완만하게 내려앉는다.
+    // ⚠️ 중간 스톱을 둬서 falloff 를 뒤쪽으로 미룬다: 안쪽 절반은 거의 같은 밝기로 넓게 두고
+    //    가장자리 근처에서만 떨어뜨리는 것. 이게 없으면 중심부터 바로 어두워져 볼록한 돔
+    //    (= 플라스틱 단추)처럼 보인다. 두 색 자체도 명도 차가 좁아야 '약하게 퍼지는' 느낌이 산다.
+    MEDAL_TONE.forEach(([lit, shade], i) => {
+      const grad = defs
+        .append('radialGradient')
+        .attr('id', `medalGrad${i + 1}`)
+        .attr('cx', '0.5')
+        .attr('cy', '0.45')
+        .attr('r', '0.78')
+      grad.append('stop').attr('offset', '0%').attr('stop-color', lit)
+      grad.append('stop').attr('offset', '28%').attr('stop-color', lit)
+      grad.append('stop').attr('offset', '100%').attr('stop-color', shade)
+    })
+
     // 평면 레벨의 팬/줌은 viewport 그룹에 transform 을 걸어 처리한다.
     const viewport = svg.append('g').attr('class', 'viewport')
     const groups = {
@@ -561,6 +643,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       spec: viewport.append('g'),
       grat: viewport.append('g'),
       geo: viewport.append('g'),
+      glow: viewport.append('g').attr('class', 'medalglow'),
       mark: viewport.append('g'),
       labels: viewport.append('g').attr('class', 'ranklabs'),
       zoom: null as unknown as ZoomBehavior<SVGSVGElement, unknown>,
