@@ -2061,7 +2061,7 @@ export function EbooksAdmin() {
       { title: d.title, author: d.author, description: d.description },
       EBOOK_LANGS,
       (p) => {
-        if (p.phase === 'translate') setTrStatus(`번역 ${p.done}/${p.total} 조각`)
+        if (p.phase === 'translate') setTrStatus(`번역 ${p.done}/${p.total} 조각${p.note ? ` · ${p.note}` : ''}`)
         else if (p.phase === 'build') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 본문 생성 중…`)
         else if (p.phase === 'fit') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 페이지 맞추는 중…`)
       },

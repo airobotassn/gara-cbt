@@ -31,8 +31,43 @@ const FONT_FALLBACK: Partial<Record<EbookLang, string>> = {
   hi: `"Noto Sans Devanagari","Nirmala UI","Mangal","Kohinoor Devanagari",sans-serif`,
 }
 
-/** HTTP 요청당 조각 수 — 함수의 MAX_TEXTS 와 맞출 것. */
-const CHUNK = 120
+// ── 호출 사다리 (문항 번역 `adminTranslate.ts` 와 같은 방식) ───────────────────────────
+// 실패한 조각만 **점점 작은 묶음으로** 다시 돌린다. 모델이 항목을 빠뜨리거나(모델항목누락)
+// 깨진 JSON 을 뱉는 사고는 묶음이 클수록 잘 나고, 작게 다시 물으면 대개 통과한다.
+//   1차 120 = 함수의 MAX_TEXTS(요청당 상한). 함수가 25개씩 묶어 병렬 호출 → 제일 빠름.
+//   2차 12 / 3차 4 = 함수의 GROUP_SIZE(25)보다 작아 그대로 한 묶음이 된다 → 실패율이 뚝 떨어진다.
+const SPLIT_STEPS = [120, 12, 4]
+/** 함수의 GROUP_SIZE(Gemini 호출 1회에 묶는 조각 수). 분당 호출 수를 세는 데만 쓴다. */
+const GROUP_SIZE = 25
+/** 동시에 띄우는 HTTP 요청 수. */
+const POOL = 2
+/** 분당 Gemini 호출 상한. 로그상 분당 18건에서 429 가 났다(2026-07-28) → 여유를 둔 값. */
+const RPM = 12
+
+/**
+ * 분당 호출 스로틀(토큰 버킷).
+ * ⚠️ **모듈 전역**이다 — 책마다 새로 만들면 3권을 연달아 번역할 때 각자 가득 찬 버킷으로 시작해
+ *    그대로 429 가 난다(실제로 그렇게 났다). 전역이라 연속 실행이 한도를 나눠 쓴다.
+ */
+const takeSlots = (() => {
+  let tokens = 2
+  let last = Date.now()
+  return async (n: number): Promise<void> => {
+    for (;;) {
+      const now = Date.now()
+      tokens = Math.min(RPM, tokens + ((now - last) * RPM) / 60000)
+      last = now
+      if (tokens >= n) {
+        tokens -= n
+        return
+      }
+      await new Promise((r) => setTimeout(r, 400))
+    }
+  }
+})()
+
+/** 일일 한도(RPD) 소진 — 오늘은 더 돌려도 소용없으므로 사다리를 즉시 중단시킨다. */
+class DailyQuotaError extends Error {}
 
 /** 스토어 카드에 쓰는 메타(제목·지은이·소개) — 본문과 같이 번역해 언어별로 저장한다. */
 export interface EbookMeta {
@@ -58,6 +93,8 @@ export interface TranslateProgress {
   done: number
   total: number
   lang?: EbookLang
+  /** 재시도 단계 표시(예: '재시도 12개씩'). 1차 통과 중에는 빈 문자열. */
+  note?: string
 }
 
 const SKIP_TAGS = new Set(['STYLE', 'SCRIPT', 'NOSCRIPT', 'TEMPLATE', 'TITLE'])
@@ -231,6 +268,68 @@ async function fitToPages(html: string): Promise<{ html: string; fitted: number[
 }
 
 /**
+ * 조각 배열 → 조각별 다국어 번역. 실패분은 사다리(SPLIT_STEPS)를 타고 더 작은 묶음으로 다시 돈다.
+ *
+ * 함수는 조각 단위로 성공/실패를 돌려준다({tr} 또는 {error}) — 성공분만 채우고,
+ * 아직 빈 자리를 다음 단계에서 다시 묻는다. 마지막 단계까지 못 채운 자리는 null(원문 유지).
+ *
+ * @returns 길이 = texts.length. 각 칸 = { en:'…', ja:'…' } 또는 null(실패)
+ */
+async function translateTexts(
+  texts: string[],
+  langs: readonly EbookLang[],
+  context: string,
+  onProgress?: (done: number, total: number, note: string) => void,
+): Promise<(Record<string, string> | null)[]> {
+  const out: (Record<string, string> | null)[] = new Array(texts.length).fill(null)
+  const filled = () => out.reduce((n, t) => (t ? n + 1 : n), 0)
+
+  // 배치 하나(인덱스 묶음) 처리. 실패해도 던지지 않는다 — 빈 자리는 다음 단계가 가져간다.
+  //   (예외: 일일 한도는 더 돌려도 소용없으니 위로 던져 사다리를 끝낸다)
+  async function handle(idxs: number[]): Promise<void> {
+    for (let attempt = 0; ; attempt++) {
+      await takeSlots(Math.ceil(idxs.length / GROUP_SIZE)) // 이 요청이 쓸 Gemini 호출 수만큼 슬롯 확보
+      try {
+        const res = await callFunction<{
+          results: ({ tr: Record<string, string> } | { error: string })[]
+        }>('translate-ebook', { texts: idxs.map((i) => texts[i]), langs, context })
+        res.results?.forEach((r, k) => {
+          if ('tr' in r) out[idxs[k]] = r.tr
+        })
+        return
+      } catch (e) {
+        // ⚠️ 일일 한도는 함수가 429 + {error:'quota_daily'} 로 준다 → callFunction 이 그 문자열을
+        //    그대로 메시지로 삼아 던진다(부분 결과는 이때 버려진다).
+        const msg = e instanceof Error ? e.message : String(e)
+        if (/quota_daily|일일한도/.test(msg)) {
+          throw new DailyQuotaError('Gemini 일일 한도를 다 썼습니다. 내일 다시 시도해 주세요.')
+        }
+        if (attempt >= 1) return // 네트워크·서버 오류는 1회만 재시도, 나머지는 다음 단계로 넘긴다
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+    }
+  }
+
+  for (const size of SPLIT_STEPS) {
+    const todo: number[] = []
+    for (let i = 0; i < texts.length; i++) if (!out[i]) todo.push(i)
+    if (!todo.length) break
+    const note = size === SPLIT_STEPS[0] ? '' : `재시도 ${size}개씩`
+    const batches: number[][] = []
+    for (let j = 0; j < todo.length; j += size) batches.push(todo.slice(j, j + size))
+    let bi = 0
+    const worker = async () => {
+      while (bi < batches.length) {
+        await handle(batches[bi++])
+        onProgress?.(filled(), texts.length, note)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(POOL, batches.length) }, worker))
+  }
+  return out
+}
+
+/**
  * 본문 HTML → 언어별 HTML.
  * @param html   원문(한국어) 이북 HTML
  * @param title  번역 품질용 문맥(책 제목)
@@ -253,20 +352,10 @@ export async function translateEbook(
   const bodyOffset = metaKeys.length
   onProgress?.({ phase: 'extract', done: texts.length, total: texts.length })
 
-  // ── 번역: 청크로 나눠 순차 호출(부분 실패는 인덱스별로 원문 유지) ──
-  const translated: (Record<string, string> | null)[] = new Array(texts.length).fill(null)
-  for (let i = 0; i < texts.length; i += CHUNK) {
-    const slice = texts.slice(i, i + CHUNK)
-    const res = await callFunction<{
-      results: ({ tr: Record<string, string> } | { error: string })[]
-      error?: string
-    }>('translate-ebook', { texts: slice, langs, context: meta.title })
-    res.results?.forEach((r, k) => {
-      if ('tr' in r) translated[i + k] = r.tr
-    })
-    onProgress?.({ phase: 'translate', done: Math.min(i + CHUNK, texts.length), total: texts.length })
-    if (res.error === 'quota_daily') throw new Error('Gemini 일일 한도를 다 썼습니다. 내일 다시 시도해 주세요.')
-  }
+  // ── 번역: 사다리(120 → 12 → 4)로 실패분만 다시 돈다. 끝까지 못 채운 조각은 원문 유지 ──
+  const translated = await translateTexts(texts, langs, meta.title, (done, total, note) =>
+    onProgress?.({ phase: 'translate', done, total, note }),
+  )
 
   // ── 언어별 문서 생성 ──
   const out: LangResult[] = []
