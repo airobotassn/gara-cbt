@@ -20,6 +20,7 @@ const D: Record<string, Record<Lang, string>> = {
   'common.home': { ko: '홈', en: 'Home', ja: 'ホーム', zh: '主页', hi: 'होम', vi: 'Trang chủ' },
   'common.dashboard': { ko: '학습 대시보드', en: 'Learning dashboard', ja: '学習ダッシュボード', zh: '学习仪表盘', hi: 'लर्निंग डैशबोर्ड', vi: 'Bảng điều khiển học tập' },
   'common.close': { ko: '닫기', en: 'Close', ja: '閉じる', zh: '关闭', hi: 'बंद करें', vi: 'Đóng' },
+  'common.cancel': { ko: '취소', en: 'Cancel', ja: 'キャンセル', zh: '取消', hi: 'रद्द करें', vi: 'Hủy' },
   'common.ranking': { ko: '랭킹', en: 'Ranking', ja: 'ランキング', zh: '排行榜', hi: 'रैंकिंग', vi: 'Xếp hạng' },
   'common.hub': { ko: '허브', en: 'Hub', ja: 'ハブ', zh: '角色中心', hi: 'हब', vi: 'Hub' },
   'common.cari': { ko: 'CARI', en: 'CARI', ja: 'CARI', zh: 'CARI', hi: 'CARI', vi: 'CARI' },
@@ -1471,6 +1472,15 @@ const D: Record<string, Record<Lang, string>> = {
   'chat.loginToJoin': { ko: "채팅에 참여하려면 로그인해주세요", en: "Sign in to join the chat", ja: "チャットに参加するにはログインしてください", zh: "登录后即可参与聊天", hi: "चैट में शामिल होने के लिए साइन इन करें", vi: "Đăng nhập để tham gia trò chuyện" },
   'chat.anonBadge': { ko: "익명", en: "Anon", ja: "匿名", zh: "匿名", hi: "गुमनाम", vi: "Ẩn danh" },
   'chat.confirmDelete': { ko: "이 메시지를 삭제할까요?", en: "Delete this message?", ja: "このメッセージを削除しますか？", zh: "确定要删除这条消息吗？", hi: "क्या इस संदेश को हटाना है?", vi: "Xóa tin nhắn này?" },
+  'chat.reportTitle': { ko: "신고 사유를 선택해주세요", en: "Why are you reporting this?", ja: "通報理由を選んでください", zh: "请选择举报原因", hi: "रिपोर्ट का कारण चुनें", vi: "Chọn lý do báo cáo" },
+  'chat.reportSpam': { ko: "스팸·광고", en: "Spam or advertising", ja: "スパム・広告", zh: "垃圾信息或广告", hi: "स्पैम या विज्ञापन", vi: "Spam hoặc quảng cáo" },
+  'chat.reportAbuse': { ko: "욕설·혐오 표현", en: "Abuse or hate speech", ja: "暴言・ヘイト表現", zh: "辱骂或仇恨言论", hi: "गाली-गलौज या घृणास्पद भाषा", vi: "Lăng mạ hoặc thù ghét" },
+  'chat.reportSexual': { ko: "음란·선정성", en: "Sexual content", ja: "わいせつ・性的表現", zh: "色情内容", hi: "अश्लील सामग्री", vi: "Nội dung khiêu dâm" },
+  'chat.reportFlood': { ko: "도배", en: "Flooding", ja: "連投・荒らし", zh: "刷屏", hi: "बार-बार पोस्टिंग", vi: "Spam liên tục" },
+  'chat.reportPrivacy': { ko: "개인정보 노출", en: "Personal information", ja: "個人情報の掲載", zh: "泄露个人信息", hi: "निजी जानकारी", vi: "Lộ thông tin cá nhân" },
+  'chat.reportOther': { ko: "기타", en: "Other", ja: "その他", zh: "其他", hi: "अन्य", vi: "Khác" },
+  'chat.reportDetail': { ko: "자세한 내용 (선택)", en: "Details (optional)", ja: "詳細（任意）", zh: "详细说明（选填）", hi: "विवरण (वैकल्पिक)", vi: "Chi tiết (tùy chọn)" },
+  'chat.reportSubmit': { ko: "신고하기", en: "Report", ja: "通報する", zh: "举报", hi: "रिपोर्ट करें", vi: "Báo cáo" },
 }
 
 // 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.

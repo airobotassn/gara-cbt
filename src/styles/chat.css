@@ -66,6 +66,18 @@
   color: var(--color-primary, #004ac6);
 }
 
+/* 이름 왼쪽 = 프로필(젬/업로드 이미지), 오른쪽 = 국가 국기. 국가 미등록이면 국기는 렌더하지 않는다. */
+.chat-avatar {
+  flex-shrink: 0;
+  line-height: 0;
+}
+.chat-flag {
+  font-size: 13px;
+  line-height: 1;
+  /* 컬러 이모지 폰트가 없는 환경(일부 리눅스)에서도 최소한 흑백 글리프로 보이게 */
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
 .chat-anon-badge {
   font-size: 10px;
   font-weight: 600;
@@ -169,8 +181,12 @@
   border-top: 1px solid var(--color-outline-variant, #c3c6d6);
   background: var(--color-surface-container-lowest, #fff);
 }
+/* ⚠️ min-width:0 이 없으면 input 이 자기 기본 너비(size 속성 유래 ~180px)를 최소값으로 고집해
+   좁은 칸(/arena 우측 316px)에서 보내기 버튼을 컨테이너 밖으로 밀어낸다 → .chat-panel 의
+   overflow:hidden 에 잘려 "보" 만 보였다. flex 아이템의 기본 min-width 는 auto 라는 점 때문. */
 .chat-composer input {
   flex: 1;
+  min-width: 0;
   border: 1px solid var(--color-outline-variant, #c3c6d6);
   border-radius: 999px;
   padding: 10px 16px;
@@ -182,6 +198,7 @@
   opacity: 0.6;
 }
 .chat-composer button {
+  flex-shrink: 0; /* 입력창이 아무리 길어도 버튼은 온전히 남는다 */
   border-radius: 999px;
   padding: 10px 20px;
   font-size: 14px;
@@ -216,6 +233,84 @@
   background: var(--color-primary, #004ac6);
   color: var(--color-on-primary, #fff);
   white-space: nowrap;
+}
+
+/* ── 신고 사유 팝업 ──
+   .chat-panel 이 overflow:hidden 이라 패널 안에 띄우면 잘린다 → 뷰포트 고정 오버레이. */
+.chat-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 24, 40, 0.45);
+}
+.chat-report-modal {
+  width: 100%;
+  max-width: 360px;
+  background: var(--color-surface-container-lowest, #fff);
+  color: var(--color-on-surface, #191b23);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.24);
+}
+.chat-report-modal h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 800;
+}
+.chat-report-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.chat-report-reasons label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.chat-report-reasons label:hover {
+  background: var(--color-surface-container-low, #f3f3fd);
+}
+.chat-report-modal textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--color-outline-variant, #c3c6d6);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--color-on-surface, #191b23);
+  resize: vertical;
+}
+.chat-report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.chat-report-actions button {
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--color-outline-variant, #c3c6d6);
+  background: var(--color-surface-container-lowest, #fff);
+  color: var(--color-on-surface, #191b23);
+}
+.chat-report-actions button.primary {
+  border-color: transparent;
+  background: var(--color-error, #ba1a1a);
+  color: #fff;
+}
+.chat-report-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 @media (max-width: 640px) {

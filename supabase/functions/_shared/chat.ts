@@ -7,6 +7,14 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0
 export const CHAT_REQUIRE_LOGIN = (Deno.env.get('CHAT_REQUIRE_LOGIN') ?? 'true') !== 'false'
 export const CHAT_MOD_FAILCLOSED = (Deno.env.get('CHAT_MOD_FAILCLOSED') ?? 'true') !== 'false'
 
+// AI 모더레이션 사용 여부. `CHAT_MOD_ENABLED=false` 면 OpenAI 를 **아예 호출하지 않고** 통과시킨다.
+//  · 로컬 배드워드 · 링크 차단 · 레이트리밋 · 신고는 그대로 살아 있다(끄는 건 AI 검사 하나뿐).
+//  · 끄면 CHAT_MOD_FAILCLOSED 는 의미가 없어진다(막을 일 자체가 없으므로).
+//  · ⚠️ fail-open(CHAT_MOD_FAILCLOSED=false)과 다르다 — fail-open 은 글이 pending 으로 들어가
+//    작성자 본인에게만 보이지만(chat-list 의 노출 필터), 이 토글은 ok 로 들어가 모두에게 보인다.
+//    "모더레이션 없이 채팅을 열어두고 싶다"면 fail-open 이 아니라 이쪽이다.
+export const CHAT_MOD_ENABLED = (Deno.env.get('CHAT_MOD_ENABLED') ?? 'true') !== 'false'
+
 // 링크/스팸 차단 — 설계 3종 세트의 '링크 필터'. moderation 과 무관하게 항상 동작(로컬).
 //  기본 차단; CHAT_ALLOW_LINKS=true 로 허용 전환 가능.
 export const CHAT_ALLOW_LINKS = (Deno.env.get('CHAT_ALLOW_LINKS') ?? 'false') === 'true'
@@ -46,6 +54,8 @@ let consecutiveFailures = 0
 let breakerOpenUntil = 0
 
 export async function moderateOpenAI(text: string): Promise<ModResult> {
+  // 토글이 꺼져 있으면 검사 없이 통과(ok). 호출부(chat-post·chat-edit)는 손댈 게 없다.
+  if (!CHAT_MOD_ENABLED) return { status: 'ok' }
   if (Date.now() < breakerOpenUntil) return { status: 'unavailable' }
 
   const apiKey = Deno.env.get('OPENAI_API_KEY')

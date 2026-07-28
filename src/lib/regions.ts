@@ -67,6 +67,17 @@ export const COUNTRY_CODES = [
   'VN', 'VU', 'WF', 'WS', 'YE', 'YT', 'ZA', 'ZM', 'ZW',
 ] as const;
 
+/**
+ * ISO 3166-1 alpha-2 → 국기 이모지. 'KR' → 🇰🇷
+ * 두 글자를 지역표시기호(Regional Indicator, U+1F1E6~)로 옮기면 브라우저가 국기로 합성한다.
+ * 코드가 없거나 두 글자 알파벳이 아니면 빈 문자열(호출부에서 렌더 생략).
+ */
+export function flagEmoji(code?: string | null): string {
+  const c = (code ?? '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c)) return '';
+  return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+}
+
 export function countryName(code: string, lang: string): string {
   try {
     const dn = new Intl.DisplayNames([lang], { type: 'region' });

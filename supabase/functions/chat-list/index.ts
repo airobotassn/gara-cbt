@@ -9,6 +9,26 @@ import { adminClient, getUser } from '../_shared/lib.ts'
 
 const MSG_COLUMNS = 'id, user_id, display_name, is_anon, body, mod_status, edited_at, created_at, updated_at, deleted_at'
 
+// 작성자 프로필(아바타·국가)을 한 번의 조회로 붙인다 — 이름 왼쪽 프로필, 오른쪽 국기용.
+//  · 익명 글에는 붙이지 않는다. 익명 배지를 달아놓고 아바타·국기를 노출하면 익명성이 무너진다.
+//  · 국가 미등록(country_code=null)이면 null 그대로 — 화면이 국기를 렌더하지 않는다.
+//  · profiles 는 메시지 수와 무관하게 작성자 수만큼만 조회한다(N+1 방지).
+async function attachProfiles<T extends { user_id: string | null; is_anon: boolean }>(
+  admin: ReturnType<typeof adminClient>,
+  rows: T[],
+): Promise<(T & { avatar_url: string | null; country_code: string | null })[]> {
+  const ids = [...new Set(rows.filter((r) => !r.is_anon && r.user_id).map((r) => r.user_id as string))]
+  const byId = new Map<string, { avatar_url: string | null; country_code: string | null }>()
+  if (ids.length > 0) {
+    const { data } = await admin.from('profiles').select('id, avatar_url, country_code').in('id', ids)
+    for (const p of data ?? []) byId.set(p.id, { avatar_url: p.avatar_url, country_code: p.country_code })
+  }
+  return rows.map((r) => {
+    const p = r.is_anon || !r.user_id ? undefined : byId.get(r.user_id)
+    return { ...r, avatar_url: p?.avatar_url ?? null, country_code: p?.country_code ?? null }
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -52,7 +72,7 @@ Deno.serve(async (req) => {
         .limit(50)
       if (error) return json({ error: error.message }, 500)
 
-      return json({ messages: (data ?? []).map(shapeRow) })
+      return json({ messages: await attachProfiles(admin, (data ?? []).map(shapeRow)) })
     }
 
     let query = admin
@@ -70,7 +90,7 @@ Deno.serve(async (req) => {
     const { data, error } = await query
     if (error) return json({ error: error.message }, 500)
 
-    return json({ messages: (data ?? []).reverse().map(shapeRow) })
+    return json({ messages: await attachProfiles(admin, (data ?? []).reverse().map(shapeRow)) })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'error' }, 500)
   }

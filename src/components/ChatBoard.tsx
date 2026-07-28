@@ -4,6 +4,8 @@ import { useT } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { linkify } from '../lib/linkify'
+import { Avatar } from './GemAvatar'
+import { countryName, flagEmoji } from '../lib/regions'
 
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
 // 초기 페이지 → 폴링(신규분 append) + reconcile(수정/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
@@ -19,9 +21,22 @@ interface Row {
   edited_at: string | null
   created_at: string
   updated_at: string
+  /** 작성자 프로필 — chat-list 가 붙여준다. 익명 글·국가 미등록이면 null(렌더 생략). */
+  avatar_url?: string | null
+  country_code?: string | null
   sending?: boolean
   deleted_at?: string | null
 }
+
+/** 신고 사유 — 코드는 서버(chat_reports.reason)에 그대로 저장되므로 언어와 무관한 값으로 보낸다. */
+const REPORT_REASONS = [
+  { code: 'spam', key: 'chat.reportSpam' },
+  { code: 'abuse', key: 'chat.reportAbuse' },
+  { code: 'sexual', key: 'chat.reportSexual' },
+  { code: 'flood', key: 'chat.reportFlood' },
+  { code: 'privacy', key: 'chat.reportPrivacy' },
+  { code: 'other', key: 'chat.reportOther' },
+] as const
 
 interface Tomb {
   id: number
@@ -57,7 +72,7 @@ const ERR_KEYS: Record<string, string> = {
 }
 
 export default function ChatBoard() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { user } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,6 +84,11 @@ export default function ChatBoard() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const [reportedIds, setReportedIds] = useState<Set<number>>(new Set())
+  // 신고 팝업: 대상 메시지 id · 선택한 사유 코드 · 자유 서술
+  const [reportFor, setReportFor] = useState<number | null>(null)
+  const [reportReason, setReportReason] = useState<string>(REPORT_REASONS[0].code)
+  const [reportDetail, setReportDetail] = useState('')
+  const [reporting, setReporting] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
   const listRef = useRef<HTMLDivElement>(null)
@@ -275,20 +295,36 @@ export default function ChatBoard() {
     setSending(false)
   }
 
-  async function onReport(id: number) {
+  // 신고 버튼 = 팝업 열기. 실제 전송은 사유를 고른 뒤 submitReport 에서.
+  function openReport(id: number) {
     if (reportedIds.has(id)) return
+    setReportFor(id)
+    setReportReason(REPORT_REASONS[0].code)
+    setReportDetail('')
+  }
+
+  async function submitReport() {
+    const id = reportFor
+    if (id == null || reporting) return
+    setReporting(true)
+    // 사유 코드 + 자유 서술을 한 문자열로(서버가 500자까지 저장). 코드가 앞에 와야 관리자가 훑기 쉽다.
+    const detail = reportDetail.trim()
+    const reason = detail ? `${reportReason}: ${detail}` : reportReason
     try {
-      await callFunction('chat-report', { message_id: id })
+      await callFunction('chat-report', { message_id: id, reason })
       setReportedIds((prev) => new Set(prev).add(id))
       showToast(t('chat.reported'))
+      setReportFor(null)
     } catch (e) {
       if (e instanceof Error && e.message === 'duplicate') {
         setReportedIds((prev) => new Set(prev).add(id))
         showToast(t('chat.reported'))
+        setReportFor(null)
       } else {
         showToast(errMsg(e instanceof Error ? e.message : 'error'))
       }
     }
+    setReporting(false)
   }
 
   function startEdit(row: Row) {
@@ -333,7 +369,17 @@ export default function ChatBoard() {
                 <div className="chat-bubble">
                   {!own && (
                     <div className="chat-meta">
+                      <span className="chat-avatar">
+                        {/* 익명 글은 고정 시드 — user_id 를 시드로 쓰면 같은 사람의 익명 글이
+                            늘 같은 색으로 나와 서로 이어붙일 수 있다(익명성 훼손). */}
+                        <Avatar avatarUrl={r.avatar_url} seed={r.is_anon ? 'anon' : r.user_id} size={20} />
+                      </span>
                       <span className="chat-name">{r.display_name}</span>
+                      {flagEmoji(r.country_code) && (
+                        <span className="chat-flag" title={countryName(r.country_code as string, lang)}>
+                          {flagEmoji(r.country_code)}
+                        </span>
+                      )}
                       {r.is_anon && <span className="chat-anon-badge">{t('chat.anonBadge')}</span>}
                     </div>
                   )}
@@ -361,7 +407,7 @@ export default function ChatBoard() {
                       </>
                     )}
                     {!r.sending && !deleted && !own && (
-                      <button type="button" className="chat-action" disabled={reportedIds.has(r.id)} onClick={() => onReport(r.id)}>
+                      <button type="button" className="chat-action" disabled={reportedIds.has(r.id)} onClick={() => openReport(r.id)}>
                         {reportedIds.has(r.id) ? t('chat.reported') : t('chat.report')}
                       </button>
                     )}
@@ -392,6 +438,44 @@ export default function ChatBoard() {
         <div className="chat-login-cta">
           <span>{t('chat.loginToJoin')}</span>
           <Link to="/login" className="chat-login-btn">{t('common.login_google')}</Link>
+        </div>
+      )}
+
+      {reportFor != null && (
+        // 배경 클릭으로 닫기. 모달 안쪽 클릭은 stopPropagation 으로 새어나가지 않게 한다.
+        <div className="chat-report-overlay" onClick={() => !reporting && setReportFor(null)}>
+          <div className="chat-report-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('chat.reportTitle')}</h3>
+            <div className="chat-report-reasons">
+              {REPORT_REASONS.map((r) => (
+                <label key={r.code}>
+                  <input
+                    type="radio"
+                    name="chat-report-reason"
+                    value={r.code}
+                    checked={reportReason === r.code}
+                    onChange={() => setReportReason(r.code)}
+                  />
+                  {t(r.key)}
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={reportDetail}
+              onChange={(e) => setReportDetail(e.target.value)}
+              placeholder={t('chat.reportDetail')}
+              maxLength={400}
+              rows={2}
+            />
+            <div className="chat-report-actions">
+              <button type="button" onClick={() => setReportFor(null)} disabled={reporting}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" className="primary" onClick={submitReport} disabled={reporting}>
+                {t('chat.reportSubmit')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
