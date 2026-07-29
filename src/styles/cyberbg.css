@@ -155,19 +155,24 @@
    Layout 이 그리는 전역 버튼이라 페이지에서 직접 못 건드린다 → 메인에만 걸리도록 body:has(.lp) 로 한정.
    (같은 방식이 hub.css 에 이미 있다: body:has(.hub) .fab-top)
    흰 버튼이 딥네이비 배경 위에서 떠 보이던 걸 Theme 04 표면색으로 맞춘다. */
+/* 어두운 면(딥네이비·네온 테두리)으로 맞춰 봤지만 배경에 묻혀서 **흰 버튼으로 되돌린다.**
+   원래 라이트 테마 모습 그대로다. 단 색은 --bg 를 따르지 않고 고정한다 — 메인 배경은 테마와
+   무관하게 항상 어두우므로, 다크 테마에서 --bg 를 쓰면 다시 어두워져 안 보인다. */
+/* 흰색은 유지하고 강도만 살짝 낮춘다 — 색을 회색으로 바꾸는 게 아니라 순백(#fff)에 투명도를
+   조금 줘서 어두운 배경이 아주 옅게 비치게 하는 방식(색감은 그대로 흰색으로 읽힌다). */
 body:has(.lp) .fab,
 body:has(.lp) .fab-top {
-  background: rgba(8, 16, 24, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-color: #173047;
-  color: #00d9ff;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #191b23;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 body:has(.lp) .fab:hover,
 body:has(.lp) .fab-top:hover {
-  border-color: rgba(0, 217, 255, 0.55);
-  box-shadow: 0 0 26px rgba(0, 217, 255, 0.45);
+  border-color: rgba(0, 217, 255, 0.7);
+  box-shadow: 0 0 24px rgba(0, 217, 255, 0.4);
 }
 
 /* 히어로 카피가 앉는 자리를 살짝 눌러 대비 확보 */
