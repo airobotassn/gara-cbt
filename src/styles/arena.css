@@ -112,6 +112,21 @@ html.dark .arena {
 .aa-zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--aa-line); background: var(--aa-panel); color: var(--aa-ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--aa-sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .aa-zoomctl button:hover { background: var(--aa-panel-2); }
 .aa-zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
+/* 호버 라벨 — 아이콘만으로는 무슨 버튼인지 안 읽힌다(예전 '원래대로' ⤾ 가 그랬다).
+   우측 레일(.aa-tab)과 같은 생김새·같은 방식(data-label)이되, 스택이 화면 왼쪽이라 오른쪽으로 편다. */
+.aa-zoomctl button { position: relative; }
+.aa-zoomctl button[data-label]::after { content: attr(data-label); position: absolute; z-index: 12;
+  left: calc(100% + 9px); top: 50%; transform: translateY(-50%) translateX(-5px);
+  background: var(--aa-ink); color: var(--aa-bg); font-size: 12px; font-weight: 800; letter-spacing: -.01em;
+  padding: 6px 10px; border-radius: 9px; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, .5); opacity: 0; transition: opacity .13s ease, transform .13s ease; }
+.aa-zoomctl button[data-label]:hover::after,
+.aa-zoomctl button[data-label]:focus-visible::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+/* 세계로 — 배율 조작이 아니라 이동이라 강조색으로 구분한다. */
+.aa-zoomctl button.aa-toworld { color: var(--aa-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .aa-zoomctl button[data-label]::after { transition: none; }
+}
 /* 순위 숫자 on/off — 확대/축소와 같은 스택. 글자(ON/OFF)가 3자라 폰트만 작게 잡는다.
    켜짐은 강조색, 꺼짐은 흐린 회색 — 글자 자체가 상태를 말하므로 별도 표식은 두지 않는다. */
 .aa-zoomctl button.aa-numtoggle { font-size: 11px; font-weight: 900; letter-spacing: -.02em; color: var(--aa-accent); }

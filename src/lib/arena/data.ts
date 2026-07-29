@@ -249,6 +249,19 @@ export function makeCscale(scores: number[]): Cscale {
 /** 색 함수 시그니처 — ArenaMap 등에 prop 으로 넘긴다. */
 export type Cscale = (v: number) => string
 
+/**
+ * 상위권 별색 — 지도가 그 등수를 램프에서 빼내 따로 칠하면 그 톤, 아니면 `null`(= 램프 그대로).
+ *
+ * 지도와 오른쪽 랭킹 목록은 **같은 지역을 같은 색으로** 보여야 한다. 목록 막대가 램프 색만 쓰면
+ * 상위 10개는 지도에서 금·시안·에메랄드·보라인데 목록에선 전부 같은 파랑이라 짝이 안 맞는다.
+ * 4~10위 묶음은 지도와 마찬가지로 **세계 단위에서만** 쓴다(시도 아래로는 지역이 적어 안 쓴다).
+ */
+export function rankTone(rank: number, level: ArenaLevel): readonly [string, string] | null {
+  if (rank >= 1 && rank <= 3) return MEDAL_TONE[rank - 1]
+  if (level === 0 && rank <= TOP10_CUT) return TOP10_TONE
+  return null
+}
+
 // ── 지명 현지화 ──
 //   국가: Intl.DisplayNames(언어) → 실패 시 한글표 → 영문 원명
 //   시도: ko=한글 / ja·zh=한자표 / 그 외=영문 로마자(name_eng)

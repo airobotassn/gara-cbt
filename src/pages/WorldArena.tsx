@@ -18,6 +18,7 @@ import { ArenaMap, DokdoInset, type ArenaMapHandle, type HoverInfo } from '../co
 import {
   buildRegions,
   makeCscale,
+  rankTone,
   TOP10_CUT,
   EMPTY_REAL,
   countryName,
@@ -302,6 +303,18 @@ export default function WorldArena() {
     return sorted.findIndex((x) => x.key === hover.region.key) + 1
   }, [hover, sorted])
 
+  // 랭킹 목록의 점수 막대 색 — 지도와 한 몸이어야 한다(1~3위 메달색, 세계 단위 4~10위 보라).
+  // 지도의 방사형(가운데 밝고 가장자리 어두움)을 5px 막대에서는 가로 선형으로 편다.
+  const barFill = useCallback(
+    (rank: number, score: number) => {
+      const tone = rankTone(rank, level)
+      if (!tone) return color(score)
+      const [lit, shade] = tone
+      return `linear-gradient(90deg, ${shade}, ${lit} 38%, ${lit} 62%, ${shade})`
+    },
+    [level, color],
+  )
+
   // 독도 확대도 — 대한민국을 파고들었을 때만. 색은 소속 지역(경북)과 동일.
   const dokdo = useMemo(() => {
     if (level !== 1 || drillCountry?.iso !== 'KR') return null
@@ -408,16 +421,34 @@ export default function WorldArena() {
             </div>
 
             <div className="aa-zoomctl" role="group" aria-label={t('arena.regionScore')}>
-              <button type="button" aria-label={t('arena.zoom_in')} onClick={() => mapRef.current?.zoomIn()}>+</button>
-              <button type="button" aria-label={t('arena.zoom_out')} onClick={() => mapRef.current?.zoomOut()}>−</button>
-              <button type="button" aria-label={t('arena.zoom_reset')} onClick={() => mapRef.current?.zoomReset()}>⤾</button>
+              {/* 세계로 — 나라 안에 들어와 있을 때만. 빵부스러기가 화면 위쪽에 있어 지도를 보다가
+                  돌아가려면 시선을 멀리 옮겨야 했다. 조작 버튼 옆에 같이 둔다. */}
+              {level > 0 && (
+                <button type="button" className="aa-toworld" data-label={t('arena.world')} aria-label={t('arena.world')} onClick={() => goto(0)}>
+                  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
+                    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+                      <circle cx="10" cy="10" r="7.2" />
+                      <ellipse cx="10" cy="10" rx="3.1" ry="7.2" />
+                      <path d="M2.9 10h14.2M4.3 6h11.4M4.3 14h11.4" />
+                    </g>
+                  </svg>
+                </button>
+              )}
+              <button type="button" data-label={t('arena.zoom_in')} aria-label={t('arena.zoom_in')} onClick={() => mapRef.current?.zoomIn()}>
+                +
+              </button>
+              <button type="button" data-label={t('arena.zoom_out')} aria-label={t('arena.zoom_out')} onClick={() => mapRef.current?.zoomOut()}>
+                −
+              </button>
+              {/* '원래대로' 버튼은 없앴다 — 이동 범위를 화면에 묶어(ArenaMap 의 setPanBound) 지도가
+                  화면 밖으로 사라지는 일이 없어졌고, 축소만으로 항상 제자리로 돌아온다. */}
               {/* 순위 숫자 on/off — 끄면 지도의 숫자·트로피가 사라지고 색(순위 램프)만 남는다. */}
               <button
                 type="button"
                 className={`aa-numtoggle${showNumbers ? '' : ' off'}`}
                 aria-pressed={showNumbers}
+                data-label={t(showNumbers ? 'arena.numbers_hide' : 'arena.numbers_show')}
                 aria-label={t(showNumbers ? 'arena.numbers_hide' : 'arena.numbers_show')}
-                title={t(showNumbers ? 'arena.numbers_hide' : 'arena.numbers_show')}
                 onClick={() => setShowNumbers((v) => !v)}
               >
                 {showNumbers ? 'ON' : 'OFF'}
@@ -475,23 +506,26 @@ export default function WorldArena() {
             />
 
             <ul className="aa-rank" ref={rankListRef}>
-              {shown.map((d) => (
-                <RankRow
-                  key={d.key}
-                  region={d}
-                  rank={sorted.indexOf(d) + 1}
-                  width={10 + 90 * ((d.score - scoreSpan.min) / (scoreSpan.max - scoreSpan.min || 1))}
-                  selected={d.key === selKey}
-                  hot={d.key === hotKey}
-                  showFlag={d.drill && level === 0}
-                  count={fmt(d.takers)}
-                  color={color(d.score)}
-                  scoreText={fmtScore(d.score)}
-                  onActivate={activate}
-                  onEnter={onRowEnter}
-                  onLeave={onRowLeave}
-                />
-              ))}
+              {shown.map((d) => {
+                const rank = sorted.indexOf(d) + 1
+                return (
+                  <RankRow
+                    key={d.key}
+                    region={d}
+                    rank={rank}
+                    width={10 + 90 * ((d.score - scoreSpan.min) / (scoreSpan.max - scoreSpan.min || 1))}
+                    selected={d.key === selKey}
+                    hot={d.key === hotKey}
+                    showFlag={d.drill && level === 0}
+                    count={fmt(d.takers)}
+                    color={barFill(rank, d.score)}
+                    scoreText={fmtScore(d.score)}
+                    onActivate={activate}
+                    onEnter={onRowEnter}
+                    onLeave={onRowLeave}
+                  />
+                )
+              })}
             </ul>
           </aside>
           )}

@@ -31,7 +31,6 @@ export interface ArenaMapHandle {
   activate(r: Region): void
   zoomIn(): void
   zoomOut(): void
-  zoomReset(): void
 }
 
 export interface HoverInfo {
@@ -489,6 +488,33 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     [stopSpin],
   )
 
+  /**
+   * 이동(팬) 가능 범위를 화면 크기로 묶는다 — 평면 레벨에서만.
+   *
+   * 예전엔 제한이 없어 지도를 화면 밖으로 끝없이 끌어낼 수 있었다. 그렇게 되면 축소 버튼으로도
+   * 못 돌아온다(축소는 중심 기준 배율만 바꾸고 위치는 그대로다) → 안 보이는 지도를 감으로
+   * 더듬어야 했다. 배율 1 에서는 이동이 아예 잠기고, 확대했을 때만 그 안에서 움직인다.
+   *
+   * ⚠️ 지구본(레벨0)은 드래그가 **회전**이라 여기 걸면 안 된다. 회전을 transform.x 증분으로
+   *    계산하는데 그 값이 잘리면 특정 각도에서 회전이 멈춘다.
+   */
+  const setPanBound = useCallback((level: ArenaLevel) => {
+    const z = g.current?.zoom
+    if (!z) return
+    const { W, H } = st.current
+    z.translateExtent(
+      level === 0 || !W || !H
+        ? [
+            [-Infinity, -Infinity],
+            [Infinity, Infinity],
+          ]
+        : [
+            [0, 0],
+            [W, H],
+          ],
+    )
+  }, [])
+
   const resetView = useCallback(() => {
     st.current.globeK = 1
     st.current.vk = 1
@@ -556,6 +582,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     if (level === 0 && st.current.vk !== 1) resetView()
 
     st.current.proj = makeProjection(regions, level)
+    setPanBound(level)
     // 전 지역에 등수를 매긴다(예전엔 상위 60개만). 땅이 좁아 안 들어가는 라벨은 sizeLabels 가 숨기고,
     // 확대하면 다시 나타난다.
     st.current.labels = [...regions]
@@ -621,7 +648,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         .style('opacity', '1')
         .style('transform', 'scale(1)')
     }
-  }, [makeProjection, paint, reduceMotion, resetView, startSpin, stopSpin])
+  }, [makeProjection, paint, reduceMotion, resetView, setPanBound, startSpin, stopSpin])
 
   useLayoutEffect(() => {
     fn.current = {
@@ -735,6 +762,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     let zStart: { k: number; x: number; y: number; rot: [number, number, number] } | null = null
     const zoomBehavior = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.4, 8])
+      // 이동 범위는 아래 setPanBound() 가 레벨에 따라 다시 잡는다(지구본은 드래그가 회전이라 무제한).
+      .translateExtent([
+        [-Infinity, -Infinity],
+        [Infinity, Infinity],
+      ])
       .on('start', (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
         if (p.current.level === 0) {
           stopSpin()
@@ -776,6 +808,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       st.current.W = r.width
       st.current.H = Math.max(420, r.height)
       svg.attr('viewBox', `0 0 ${st.current.W} ${st.current.H}`).attr('width', st.current.W).attr('height', st.current.H)
+      setPanBound(p.current.level) // 이동 한계는 화면 크기 기준이라 리사이즈마다 다시 잡는다
       // 지역 목록이 비어 있으면 투영을 다시 만들지 않는다(빈 데이터에 맞추면 배율이 깨진다).
       if (st.current.proj && p.current.regions.length) {
         st.current.proj = makeProjection(p.current.regions, p.current.level)
@@ -848,20 +881,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         const node = svgRef.current
         if (node && g.current) g.current.zoom.scaleBy(select(node).transition().duration(180), 1 / 1.6)
       },
-      zoomReset: () => {
-        const node = svgRef.current as (SVGSVGElement & { __zoom?: unknown }) | null
-        if (!node || !g.current) return
-        if (p.current.level === 0) {
-          st.current.globeK = 1
-          node.__zoom = zoomIdentity
-          st.current.proj?.scale(st.current.baseScale0).rotate(st.current.rot)
-          paint()
-        } else {
-          g.current.zoom.transform(select(node).transition().duration(220), zoomIdentity)
-        }
-      },
     }),
-    [paint],
+    [],
   )
 
   return <svg ref={svgRef} id="arena-map" role="img" aria-label="region average level map" />
