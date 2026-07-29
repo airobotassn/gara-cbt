@@ -92,7 +92,8 @@ const D: Record<string, Record<Lang, string>> = {
   'reco.button': { ko: '레벨 추천받기', en: 'Recommend a level', ja: 'レベルを提案', zh: '推荐等级', hi: 'लेवल सुझाएं', vi: 'Gợi ý cấp độ' },
   'reco.loading': { ko: '분석 중…', en: 'Analyzing…', ja: '分析中…', zh: '分析中…', hi: 'विश्लेषण…', vi: 'Đang phân tích…' },
   // 홈 검색 라우터(route-query) — 의미 기반 페이지 이동
-  'route.placeholder': { ko: '무엇을 찾으세요? WORLD ARENA·시험안내·문의…', en: 'What are you looking for? WORLD ARENA, exam guide, support…', ja: '何をお探しですか？ WORLD ARENA・試験案内・問い合わせ…', zh: '您在找什么？WORLD ARENA·考试指南·咨询…', hi: 'आप क्या ढूंढ रहे हैं? WORLD ARENA, परीक्षा गाइड, सहायता…', vi: 'Bạn đang tìm gì? WORLD ARENA, hướng dẫn thi, hỗ trợ…' },
+  // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
+  'route.placeholder': { ko: '무엇을 찾으세요?', en: 'What are you looking for?', ja: '何をお探しですか？', zh: '您在找什么？', hi: 'आप क्या ढूंढ रहे हैं?', vi: 'Bạn đang tìm gì?' },
   'route.notfound': { ko: '올바르지 않은 검색어예요. 다시 입력해 주세요.', en: "That's not a valid search. Please try again.", ja: '正しくない検索語です。もう一度入力してください。', zh: '无效的搜索词，请重新输入。', hi: 'अमान्य खोज शब्द। कृपया फिर से लिखें।', vi: 'Từ khóa không hợp lệ. Vui lòng thử lại.' },
   'mypage.tab_learning': { ko: '학습 대시보드', en: 'Learning', ja: '学習ダッシュボード', zh: '学习仪表板', hi: 'लर्निंग', vi: 'Bảng học tập' },
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
@@ -1167,6 +1168,14 @@ const D: Record<string, Record<Lang, string>> = {
   "mypage.view_score": { ko: "성적 확인", en: "View results", ja: "成績を確認", zh: "查看成绩", hi: "परिणाम देखें", vi: "Xem kết quả" },
   "mypage.empty_earned": { ko: "아직 취득한 자격이 없습니다.", en: "You have no certifications yet.", ja: "まだ取得した資格がありません。", zh: "暂无已取得的资格。", hi: "अभी तक कोई प्रमाणन प्राप्त नहीं हुआ।", vi: "Chưa có chứng chỉ nào." },
   "mypage.passed": { ko: "합격", en: "Passed", ja: "合格", zh: "合格", hi: "उत्तीर्ण", vi: "Đậu" },
+  // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
+  "mypage.lvcert_title": { ko: "WORLD ARENA 레벨 인증서", en: "WORLD ARENA Level Certificates", ja: "WORLD ARENA レベル認定証", zh: "WORLD ARENA 等级认证书", hi: "WORLD ARENA स्तर प्रमाणपत्र", vi: "Chứng nhận cấp độ WORLD ARENA" },
+  "mypage.lvcert_sub": { ko: "레벨테스트에서 승급할 때마다 인증서가 한 장씩 쌓입니다.", en: "You earn one certificate each time you rank up in the level test.", ja: "レベルテストで昇格するたびに認定証が1枚ずつ増えます。", zh: "每次在等级测试中晋级都会获得一张认证书。", hi: "लेवल टेस्ट में हर पदोन्नति पर एक प्रमाणपत्र मिलता है।", vi: "Mỗi lần thăng hạng trong bài kiểm tra cấp độ, bạn nhận thêm một chứng nhận." },
+  "mypage.lvcert_empty": { ko: "아직 승급한 레벨이 없습니다. 레벨테스트에서 승급하면 인증서를 받을 수 있어요.", en: "No rank-ups yet. Rank up in the level test to earn a certificate.", ja: "まだ昇格がありません。レベルテストで昇格すると認定証がもらえます。", zh: "还没有晋级记录。在等级测试中晋级即可获得认证书。", hi: "अभी कोई पदोन्नति नहीं। लेवल टेस्ट में पदोन्नत होकर प्रमाणपत्र पाएं।", vi: "Chưa có lần thăng hạng nào. Hãy thăng hạng để nhận chứng nhận." },
+  "mypage.lvcert_go": { ko: "레벨테스트 하러 가기", en: "Take the level test", ja: "レベルテストへ", zh: "去参加等级测试", hi: "लेवल टेस्ट लें", vi: "Làm bài kiểm tra" },
+  "mypage.lvcert_achieved": { ko: "달성", en: "Achieved", ja: "達成", zh: "达成", hi: "प्राप्त", vi: "Đã đạt" },
+  "mypage.lvcert_get": { ko: "인증서 받기", en: "Get certificate", ja: "認定証を受け取る", zh: "领取认证书", hi: "प्रमाणपत्र लें", vi: "Nhận chứng nhận" },
+  "mypage.lvcert_soon": { ko: "준비 중", en: "Coming soon", ja: "準備中", zh: "准备中", hi: "जल्द", vi: "Sắp có" },
   "mypage.cert_no": { ko: "인증번호", en: "Cert No.", ja: "認証番号", zh: "认证编号", hi: "प्रमाण संख्या", vi: "Số chứng nhận" },
   "mypage.empty_issuance": { ko: "발급 가능한 자격증이 없습니다.", en: "No certificates available for issuance.", ja: "発行可能な証明書がありません。", zh: "暂无可发放的证书。", hi: "जारी करने योग्य कोई प्रमाणपत्र नहीं है।", vi: "Không có chứng chỉ nào để cấp." },
   "mypage.tab_ebooks": { ko: "E-BOOK 서재", en: "E-BOOK Library", ja: "E-BOOKライブラリ", zh: "E-BOOK 书架", hi: "E-BOOK लाइब्रेरी", vi: "Thư viện E-BOOK" },

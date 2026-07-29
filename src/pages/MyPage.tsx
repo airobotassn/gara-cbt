@@ -5,6 +5,8 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
 import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
+import type { AttemptSummary, ListAttemptsResponse } from '../lib/testTypes'
+import { LEVEL_COLORS } from '../lib/testConfigLevel'
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
 import { makeCertNo, gradeOfTitle, gradeDisplay, certExpiryDate, tempSeq } from '../lib/certNo'
@@ -110,6 +112,94 @@ function ProfileSection() {
   )
 }
 
+// WORLD ARENA 레벨 인증서 — 레벨테스트에서 **승급한 순간**마다 한 장.
+//   데이터는 list-attempts 가 이미 다 준다(rankDir==='up' 인 응시 = 승급 이벤트, rankAfter = 달성 레벨).
+//   그래서 백엔드 추가 없이 화면만 붙였다. 같은 레벨을 강등 후 재승급했으면 **처음 달성한 날**로 묶는다.
+//   ⚠️ 인증서 원본(배경/서식)이 아직 없어서 발급 버튼은 '준비 중'으로 잠가 뒀다.
+//      원본이 오면 이 버튼의 onClick 만 증서 화면으로 연결하면 된다(아래 TODO).
+function LevelCerts() {
+  const { t } = useT()
+  const navigate = useNavigate()
+  const [data, setData] = useState<ListAttemptsResponse | null>(null)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    callFunction<ListAttemptsResponse>('list-attempts', {})
+      .then((r) => alive && setData(r))
+      .catch((e) => alive && setErr(e instanceof Error ? e.message : 'error'))
+    return () => { alive = false }
+  }, [])
+
+  // 승급 이벤트 → 레벨별 1장(처음 달성한 응시 기준)
+  const certs = (() => {
+    const byLevel = new Map<number, AttemptSummary>()
+    for (const a of data?.attempts ?? []) {
+      if (a.rankDir !== 'up' || a.rankAfter == null) continue
+      const cur = byLevel.get(a.rankAfter)
+      if (!cur || new Date(a.submittedAt) < new Date(cur.submittedAt)) byLevel.set(a.rankAfter, a)
+    }
+    return [...byLevel.entries()].sort((x, y) => y[0] - x[0]) // 높은 레벨부터
+  })()
+
+  return (
+    <section className="mb-10">
+      <div className="mb-5">
+        <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface">{t('mypage.lvcert_title')}</h2>
+        <p className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">{t('mypage.lvcert_sub')}</p>
+      </div>
+
+      {err ? (
+        <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>
+      ) : !data ? (
+        <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>
+      ) : certs.length === 0 ? (
+        <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
+          <p className="font-body-md text-on-surface-variant mb-5 break-keep">{t('mypage.lvcert_empty')}</p>
+          <button onClick={() => navigate('/test/select')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">
+            {t('mypage.lvcert_go')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {certs.map(([level, a]) => (
+            <article key={level} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+              <div className="flex items-start gap-5">
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 text-white" style={{ background: LEVEL_COLORS[level] }}>
+                  <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>military_tech</span>
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+                    <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface break-keep">
+                      Lv.{level} {t(`lv.${level}.name`)}
+                    </h3>
+                    <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20 shrink-0">
+                      {t('mypage.lvcert_achieved')}
+                    </span>
+                  </div>
+                  <p className="font-body-md text-body-md text-on-surface-variant">
+                    {fmtDate(a.submittedAt)} | {a.totalCorrect} / {a.totalQuestions}
+                  </p>
+                </div>
+              </div>
+              {/* TODO(인증서): 원본 서식이 준비되면 여기서 증서 화면으로 이동시킨다. */}
+              <button
+                disabled
+                title={t('mypage.lvcert_soon')}
+                className="shrink-0 px-6 py-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low text-outline font-label-md text-[15px] font-bold flex items-center gap-2 cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+                {t('mypage.lvcert_get')}
+                <span className="px-2 py-0.5 rounded-full bg-outline/10 text-[11px] font-bold">{t('mypage.lvcert_soon')}</span>
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // 이북 서재 — 구매한 이북만 보인다(구매는 /ebooks 스토어에서). 읽기는 뷰어(/ebooks/read/:id).
 function EbookLibrary() {
   const { t, lang } = useT()
@@ -170,7 +260,7 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { section } = useParams()
   const tab = section && TABS.some((t) => t.key === section) ? section : 'learning'
-  const { isFullUser, user } = useAuth()
+  const { isFullUser, user, loading: authLoading } = useAuth()
   const { t } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [err, setErr] = useState('')
@@ -232,6 +322,15 @@ export default function MyPage() {
   }
 
   // 로그인 안 된 상태 → 로그인 페이지로 이동 (자체 로그인 게이트 제거)
+  // ⚠️ 세션 복원(비동기)이 끝나기 전에는 판정하지 않는다. 예전엔 첫 프레임에서 isFullUser 가 false 라
+  //    /mypage/earned → /login → (로그인 상태라) /mypage 로 튕겨서 **탭이 학습 대시보드로 초기화**됐다.
+  if (authLoading) {
+    return (
+      <div className="wrap">
+        <div className="card pad" style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('common.loading')}</div>
+      </div>
+    )
+  }
   if (!isFullUser) return <Navigate to="/login" replace />
 
   const attempts = list ?? []
@@ -355,7 +454,11 @@ export default function MyPage() {
             )
           )}
 
-          {/* 자격 취득 현황 */}
+          {/* 자격 취득 현황 — ① WORLD ARENA 레벨 인증서(레벨테스트 승급) ② CARIS 자격검정 합격 */}
+          {tab === 'earned' && <LevelCerts />}
+          {tab === 'earned' && (
+            <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-5">{t('mypage.tab_earned')} · CARIS</h2>
+          )}
           {!loading && !err && tab === 'earned' && (
             earned.length === 0 ? (
               <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('mypage.empty_earned')}</div>
