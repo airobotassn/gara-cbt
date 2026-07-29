@@ -256,6 +256,9 @@ const D: Record<string, Record<Lang, string>> = {
   // 시작 전 경고 게이트 (TestRunner)
   'intro.title': { ko: '시작 전 꼭 읽어주세요', en: 'Please read before you start', ja: '開始前に必ずお読みください', zh: '开始前请务必阅读', hi: 'शुरू करने से पहले पढ़ें', vi: 'Vui lòng đọc trước khi bắt đầu' },
   'intro.meta': { ko: 'Lv.{lv} · 총 {q}문항 · 제한시간 {min}분', en: 'Lv.{lv} · {q} questions · {min} min limit', ja: 'Lv.{lv} · 全{q}問 · 制限時間{min}分', zh: 'Lv.{lv} · 共 {q} 题 · 限时 {min} 分钟', hi: 'Lv.{lv} · {q} प्रश्न · {min} मिनट सीमा', vi: 'Lv.{lv} · {q} câu · giới hạn {min} phút' },
+  // 응시 전 경고 화면의 시험 정보 줄(규칙 목록과 같은 행 모양으로 위에 붙는다)
+  'intro.fact_q': { ko: '총 {q}문항', en: '{q} questions in total', ja: '全{q}問', zh: '共 {q} 题', hi: 'कुल {q} प्रश्न', vi: 'Tổng {q} câu' },
+  'intro.fact_min': { ko: '제한시간 {min}분', en: '{min} min time limit', ja: '制限時間{min}分', zh: '限时 {min} 分钟', hi: '{min} मिनट की समय सीमा', vi: 'Giới hạn {min} phút' },
   'intro.anticheat': { ko: '🛡️ 부정행위 방지 시스템 구동 중 🛡️', en: '🛡️ Anti-cheating system active 🛡️', ja: '🛡️ 不正防止システム作動中 🛡️', zh: '🛡️ 防作弊系统运行中 🛡️', hi: '🛡️ नकल-रोधी सिस्टम सक्रिय 🛡️', vi: '🛡️ Hệ thống chống gian lận đang hoạt động 🛡️' },
   'intro.fullscreen': { ko: '전체화면 모드 필수', en: 'Fullscreen mode required', ja: '全画面モード必須', zh: '必须全屏模式', hi: 'फुलस्क्रीन मोड अनिवार्य', vi: 'Bắt buộc chế độ toàn màn hình' },
   'intro.rule_exit': { ko: '탭 전환 · 창 이동 · 전체화면 해제 시 경고 발생', en: 'Switching tabs, moving windows, or exiting fullscreen triggers a warning', ja: 'タブ切替・ウィンドウ移動・全画面解除で警告発生', zh: '切换标签、移动窗口或退出全屏将触发警告', hi: 'टैब बदलने, विंडो हटाने या फुलस्क्रीन छोड़ने पर चेतावनी', vi: 'Đổi tab · chuyển cửa sổ · thoát toàn màn hình sẽ bị cảnh báo' },
@@ -263,7 +266,8 @@ const D: Record<string, Record<Lang, string>> = {
   'intro.rule_block': { ko: '복사 · 우클릭 · 드래그 기능 제한', en: 'Copy, right-click and drag are restricted', ja: 'コピー・右クリック・ドラッグ機能を制限', zh: '限制复制、右键和拖拽功能', hi: 'कॉपी · राइट-क्लिक · ड्रैग प्रतिबंधित', vi: 'Hạn chế sao chép · chuột phải · kéo thả' },
   'intro.start': { ko: '전체화면으로 시작 →', en: 'Start in fullscreen →', ja: '全画面で開始 →', zh: '全屏开始 →', hi: 'फुलस्क्रीन में शुरू करें →', vi: 'Bắt đầu toàn màn hình →' },
   'intro.cancel': { ko: '취소', en: 'Cancel', ja: 'キャンセル', zh: '取消', hi: 'रद्द करें', vi: 'Hủy' },
-  'test.prev': { ko: '이전', en: 'Previous', ja: '前へ', zh: '上一题', hi: 'पिछला', vi: 'Trước' },
+  // 이동 한 쌍은 화살표를 같이 단다 — 한쪽만 달면 짝으로 안 읽힌다. 상단 키보드 안내(←→)와도 맞는다.
+  'test.prev': { ko: '← 이전', en: '← Previous', ja: '← 前へ', zh: '← 上一题', hi: '← पिछला', vi: '← Trước' },
   'test.next': { ko: '다음 →', en: 'Next →', ja: '次へ →', zh: '下一题 →', hi: 'अगला →', vi: 'Tiếp →' },
   'test.submit': { ko: '제출하기', en: 'Submit', ja: '提出する', zh: '提交', hi: 'जमा करें', vi: 'Nộp bài' },
   'test.submitting': { ko: '제출 중…', en: 'Submitting…', ja: '提出中…', zh: '提交中…', hi: 'जमा हो रहा है…', vi: 'Đang nộp…' },
@@ -364,6 +368,15 @@ const D: Record<string, Record<Lang, string>> = {
   'result.placing': { ko: ' · 배치 진행 중', en: ' · placement in progress', ja: ' · 配置中', zh: ' · 定级中', hi: ' · प्लेसमेंट जारी', vi: ' · đang xếp hạng' },
   'result.promoted': { ko: '승급!', en: 'Promoted!', ja: '昇格！', zh: '晋级！', hi: 'पदोन्नति!', vi: 'Thăng hạng!' },
   'result.demoted': { ko: '강등', en: 'Demoted', ja: '降格', zh: '降级', hi: 'पदावनति', vi: 'Xuống hạng' },
+  // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
+  'result.next_level': {
+    ko: 'Lv.{n} 도전하기 →',
+    en: 'Take Lv.{n} →',
+    ja: 'Lv.{n}に挑戦 →',
+    zh: '挑战 Lv.{n} →',
+    hi: 'Lv.{n} लें →',
+    vi: 'Thử Lv.{n} →',
+  },
   'result.demote_warn': { ko: '강등 경고 {n}/{max}', en: 'Demotion warning {n}/{max}', ja: '降格警告 {n}/{max}', zh: '降级警告 {n}/{max}', hi: 'पदावनति चेतावनी {n}/{max}', vi: 'Cảnh báo giáng hạng {n}/{max}' },
   'result.demote_warn_sub': { ko: '한 번 더 부진하면 강등돼요', en: 'One more low score and you drop a tier', ja: 'もう一度低得点で降格します', zh: '再低分一次将降级', hi: 'एक और कम स्कोर पर पदावनति', vi: 'Thêm một lần điểm thấp sẽ bị giáng hạng' },
   'rank.cur_level': { ko: '현재 등급 · 레벨 {n}', en: 'Current rank · Level {n}', ja: '現在の等級 · レベル{n}', zh: '当前等级 · Lv.{n}', hi: 'वर्तमान रैंक · स्तर {n}', vi: 'Hạng hiện tại · Cấp {n}' },

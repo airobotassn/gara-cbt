@@ -35,6 +35,14 @@
   align-items: center;
   gap: 10px;
 }
+/* 게이지는 하단바 전폭을 쓰고 '푼 문제 N/M' 은 오른쪽 끝에 — 남은 여백이 생기지 않게. */
+.qfoot .qprog-bar {
+  flex: 1;
+  width: auto;
+}
+.qfoot .qprog .count {
+  margin-left: auto;
+}
 .qprog .count {
   font-size: 15px;
   font-weight: 700;
@@ -139,13 +147,29 @@
   overflow-wrap: break-word;
   word-break: break-word;
 }
+/* 하단바 — 2행 고정. 예전엔 한 줄에 [게이지][이전][다음] 이었는데 제출 버튼이 붙으면서 폭이
+   넘쳐 줄바꿈됐고, 넘어간 줄이 왼쪽에 몰려 레이아웃이 무너졌다. 아예 행을 나눠 못 무너지게 한다. */
 .qfoot {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px var(--pad-x) clamp(24px, 5vw, 34px);
+}
+/* 액션 행 — 이동(왼쪽) / 제출(오른쪽). 둘 사이를 벌려 역할 차이를 위치로 못박는다. */
+.qacts {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
-  padding: 22px var(--pad-x) clamp(24px, 5vw, 34px);
+}
+.qmove {
+  display: flex;
+  gap: 8px;
+}
+/* 이동 버튼은 글자 길이가 달라도('이전' vs '다음 →') 폭이 같아야 한 쌍으로 읽힌다. */
+.qmove .btn-ghost {
+  min-width: 104px;
+  justify-content: center;
 }
 /* 키보드 단축키 안내 — 마우스가 있는 기기에서만. 터치(폰·태블릿)엔 키보드가 없어 무의미하다.
    숫자·화살표 글리프는 본문 폰트에서 폭이 들쭉날쭉해 tabular-nums 로 고정. */
@@ -197,6 +221,22 @@
 .btn-ink:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* 제출 버튼 — 모든 문항을 풀기 전에는 **회색 면**으로 죽여 둔다.
+   .btn-ink 의 기본 disabled(투명도 0.5)는 '흐린 코발트'라 아직 못 누른다는 게 덜 분명하다.
+   ⚠️ 회색 위 회색이 되지 않게 글자는 --muted 로 — --dim 은 대비가 모자라 글자가 사라진다. */
+.btn-submit {
+  min-width: 128px;
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.btn-submit:disabled {
+  background: var(--line);
+  color: var(--muted);
+  opacity: 1;
+}
+/* 다 풀면 코발트가 들어오고 은은한 글로우가 붙는다 — '이제 낼 수 있다'를 색과 빛으로 같이 알린다. */
+.btn-submit:not(:disabled) {
+  box-shadow: 0 4px 14px -4px rgba(0, 74, 198, 0.45);
 }
 .btn-ghost {
   border: 1px solid var(--line2);
@@ -301,10 +341,33 @@
   font-size: var(--fs-lg);
   margin-bottom: 6px;
 }
-.intro-meta {
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  margin: 6px 0 16px;
+/* 응시 레벨 알약 — 레벨 색(--lvc, /test/select 와 같은 팔레트)은 점과 옅은 배경으로만 쓴다.
+   글자를 레벨 색으로 칠하면 Lv.1~2 의 연두가 흰 카드 위에서 읽히지 않고, 다크 테마에서도 깨진다. */
+.intro-lv {
+  /* fit-content + auto 마진 = 알약 폭은 내용만큼, 자리는 한 줄 전체(부정행위 배지와 나란히 붙지 않게). */
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  gap: 9px;
+  margin: 10px auto 14px;
+  padding: 8px 16px 8px 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lvc) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lvc) 42%, transparent);
+}
+.intro-lv .dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lvc);
+}
+.intro-lv b {
+  font-size: clamp(16px, 2.4vw, 19px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  word-break: keep-all;
 }
 .intro-anticheat {
   display: inline-block;

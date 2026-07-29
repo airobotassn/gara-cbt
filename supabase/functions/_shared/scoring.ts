@@ -8,11 +8,11 @@ export * from './lib.ts'
 // ----- 공통 상수 -----
 /** @deprecated 문항 수는 레벨 구간별(questionsForLevel). 이 값은 구코드 폴백용으로만 남긴다. */
 export const QUESTIONS_PER_TEST = 20
-// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1~2 = 10 · Lv.3~5 = 20 · Lv.6~7 = 30.
+// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1 = 10 · Lv.2~3 = 20 · Lv.4~7 = 30.
 //   ⚠️ 프론트 src/lib/scoring.ts 의 동명 함수와 항상 같이 고칠 것.
 export function questionsForLevel(level: number): number {
-  if (level <= 2) return 10
-  if (level <= 5) return 20
+  if (level <= 1) return 10
+  if (level <= 3) return 20
   return 30
 }
 export function durationMinutesForLevel(level: number): number {

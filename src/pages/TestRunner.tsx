@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
 import { useAntiCheat } from '../hooks/useAntiCheatLevel'
-import { MAX_VIOLATIONS, durationMinutesForLevel } from '../lib/testConfigLevel'
+import { MAX_VIOLATIONS, LEVEL_COLORS, durationMinutesForLevel } from '../lib/testConfigLevel'
 import { useT } from '../lib/i18n'
 import { axisDef } from '../lib/categories'
 import type {
@@ -146,16 +146,11 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     setStarted(true)
   }
 
+  // 다음 = 문항 이동만 한다. 제출은 하단의 전용 버튼이 맡는다(예전엔 마지막 문항의 '다음'이
+  // 제출을 겸했는데, 전용 버튼이 생기면서 마지막 화면에 제출이 두 개 보이게 돼 갈랐다).
   const goNext = useCallback(() => {
-    if (index + 1 < total) {
-      setIndex((i) => i + 1)
-      return
-    }
-    // 마지막 문항: 페이지 내 모달로 확인(실수 제출 방지). 네이티브 confirm은 전체화면 해제+포커스 이탈로 부정행위 오탐 유발 → 금지.
-    // 시간초과 자동제출은 submit() 직접 호출이라 여기 안 탐.
-    if (submitting) return
-    setAskSubmit(true)
-  }, [index, total, submitting])
+    if (index + 1 < total) setIndex((i) => i + 1)
+  }, [index, total])
 
   const goPrev = useCallback(() => {
     if (index > 0) setIndex((i) => i - 1)
@@ -171,7 +166,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
 
   // 키보드 조작 — 숫자키(1~N)로 보기 선택, ←/→ 로 이전·다음 문항.
   //   · 보기 버튼에 이미 번호 뱃지(.opt .key)가 찍혀 있어 숫자키 매핑이 그대로 보인다.
-  //   · 마지막 문항에서 → 는 goNext 가 제출 확인 모달을 띄운다(바로 제출 아님).
+  //   · 마지막 문항에서 → 는 아무 일도 안 한다(제출은 하단 전용 버튼으로만 — 오제출 방지).
   //   · 모달이 떠 있거나 제출 중이면 리스너를 아예 안 건다(모달 위에서 문항이 넘어가는 사고 방지).
   //   · 마우스로 보기를 고른 뒤 →로 넘기면 그 버튼에 포커스가 남아 다음 문항에서 Enter 가
   //     엉뚱한 보기를 누르므로, 문항 이동 시 포커스를 푼다(blur 는 버블링 안 해 이탈감지와 무관).
@@ -254,11 +249,22 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
         <div className="card pad intro-gate">
           <div className="intro-ico">⚠️</div>
           <h2 className="sc-title">{t('intro.title')}</h2>
-          <p className="intro-meta">
-            {t('intro.meta', { lv: start.level, q: total, min: durationMin })}
-          </p>
+          {/* 응시 레벨 — 흰 숫자 사각 배지는 ⚠️·제목과 무게가 겹쳐 무거웠다. 레벨색은 점과 옅은 배경으로만
+              쓰고 글자는 본문색으로 두는 알약 하나(레벨 색 팔레트는 /test/select 와 공유). */}
+          <div className="intro-lv" style={{ '--lvc': LEVEL_COLORS[start.level] } as CSSProperties}>
+            <span className="dot" aria-hidden="true" />
+            <b>
+              Lv.{start.level} · {t(`lv.${start.level}.name`)}
+            </b>
+          </div>
           <div className="intro-anticheat">{t('intro.anticheat')}</div>
+          {/* 문항 수·제한시간도 규칙과 같은 행 모양으로 — 예전엔 제목 밑 회색 한 줄이라 잘 안 읽혔다.
+              둘은 같은 '시험 규격'이라 한 행에 묶는다(규칙 4줄과 섞이면 무엇이 규칙인지 흐려진다). */}
           <ul className="intro-rules">
+            <li>
+              <span className="ic">📝</span>
+              {t('intro.fact_q', { q: total })} · {t('intro.fact_min', { min: durationMin })}
+            </li>
             <li>
               <span className="ic">🖥️</span>
               {t('intro.fullscreen')}
@@ -371,28 +377,33 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
           ))}
         </div>
 
+        {/* 하단바 2행 — 위: 진행 게이지(전폭), 아래: 왼쪽 이동 / 오른쪽 제출.
+            한 줄에 다 넣으면 버튼 3개가 폭을 넘겨 줄바꿈되고, 넘어간 줄이 왼쪽에 몰려 무너진다. */}
         <div className="qfoot">
-          {/* 진행 게이지 + 푼 문항 수 — 한 덩어리로 붙여 막대가 무슨 값인지 자명하게 한다. */}
           <div className="qprog">
             <span className="qprog-bar">
               <i style={{ width: `${progress}%` }} />
             </span>
             <span className="count">{t('test.solved', { a: answered, t: total })}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="qacts">
+            {/* 이동 한 쌍 — 폭을 맞춰 붙여 한 덩어리로 읽히게 한다(제출과 역할이 다름을 형태로 구분). */}
+            <div className="qmove">
+              <button className="btn-ghost" onClick={goPrev} disabled={index === 0 || submitting}>
+                {t('test.prev')}
+              </button>
+              <button className="btn-ghost" onClick={goNext} disabled={submitting || index + 1 >= total}>
+                {t('test.next')}
+              </button>
+            </div>
+            {/* 제출 — 문항 위치와 무관하게 항상 같은 자리. 다 풀기 전에는 회색으로 죽어 있고,
+                남은 개수는 바로 위 진행 표시가 말해 준다. */}
             <button
-              className="btn-ghost"
-              onClick={goPrev}
-              disabled={index === 0 || submitting}
+              className="btn-ink btn-submit"
+              onClick={() => setAskSubmit(true)}
+              disabled={submitting || answered < total}
             >
-              {t('test.prev')}
-            </button>
-            <button className="btn-ink" onClick={goNext} disabled={submitting}>
-              {submitting
-                ? t('test.submitting')
-                : index + 1 >= total
-                  ? t('test.submit')
-                  : t('test.next')}
+              {submitting ? t('test.submitting') : t('test.submit')}
             </button>
           </div>
         </div>

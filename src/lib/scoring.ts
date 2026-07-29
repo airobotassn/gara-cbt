@@ -48,11 +48,12 @@ export function weakestAxis(rating: AxisMap, keys: string[]): string {
 
 // <scoring-sync> ⚠️ 등급/점수 공식 — _shared/lib.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
 // ── 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). 문항당 1분. ──
-//   Lv.1~2 = 10문항/10분 · Lv.3~5 = 20문항/20분 · Lv.6~7 = 30문항/30분
+//   Lv.1 = 10문항/10분 · Lv.2~3 = 20문항/20분 · Lv.4~7 = 30문항/30분
 //   ⚠️ 문항 수가 레벨마다 다르므로 승급컷/강등선은 절대 개수가 아니라 **비율**이다(아래).
+//   ⚠️ 구간 경계가 승급컷 비율의 경계(Lv.3/Lv.4)와 맞물려 있다 — 한쪽만 옮기면 컷이 어긋난다.
 export function questionsForLevel(level: number): number {
-  if (level <= 2) return 10
-  if (level <= 5) return 20
+  if (level <= 1) return 10
+  if (level <= 3) return 20
   return 30
 }
 export function durationMinutesForLevel(level: number): number {
@@ -61,14 +62,14 @@ export function durationMinutesForLevel(level: number): number {
 
 // ── 등급(레벨) 변동 규칙 ──
 // 승급컷 비율: 레벨1~3 = 80%, 레벨4~7 = 90%.
-//   → Lv.1·2 8개 / Lv.3 16개 / Lv.4·5 18개 / Lv.6·7 27개.
+//   → Lv.1 8개(10문) / Lv.2·3 16개(20문) / Lv.4~7 27개(30문).
 //   total 은 실제 출제 문항 수(문제은행이 모자라 덜 나간 경우 그 수)를 넘기면 그 기준으로 계산한다.
 export const PROMOTE_RATE_LOW = 0.8 // Lv.1~3
 export const PROMOTE_RATE_HIGH = 0.9 // Lv.4~7
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
   return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
-// 강등: 20% 이하(Lv.1~2 = 2개, Lv.3~5 = 4개, Lv.6~7 = 6개)를 연속 3번 받으면 한 단계 강등. 그 전 2번은 경고.
+// 강등: 20% 이하(Lv.1 = 2개, Lv.2·3 = 4개, Lv.4~7 = 6개)를 연속 3번 받으면 한 단계 강등. 그 전 2번은 경고.
 //       중간에 그보다 잘 맞히면 경고 리셋(연속 끊김). 레벨이 바뀌면 경고 리셋. Lv.1은 강등 없음.
 export const DEMOTE_RATE = 0.2
 export function demoteMax(level: number, total: number = questionsForLevel(level)): number {
