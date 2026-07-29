@@ -233,14 +233,18 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
    기본 흰 테두리는 지워 발광선과 겹치지 않게 한다. */
 /* 입자감(medalGrain)은 면을 균일한 단색으로 안 보이게 하는 몫. feTurbulence 는 비싸므로
    회전·드래그 중에는 끈다 — 정지 화면에서만 보이면 되는 마감이다. */
-#arena-map .geo[data-podium] { stroke: none; filter: url(#medalGrain); }
-#arena-map.dragging .geo[data-podium] { filter: none; }
+#arena-map .geo[data-podium], #arena-map .geo[data-tier='top10'] { filter: url(#medalGrain); }
+#arena-map .geo[data-podium] { stroke: none; }
+#arena-map.dragging .geo[data-podium], #arena-map.dragging .geo[data-tier='top10'] { filter: none; }
 /* 후광 — 흰빛을 좁게. 번짐을 키우면 덩어리가 뿌예지고 면까지 발광하는 것처럼 보인다.
    심지 두께보다 조금만 넓게 잡아 '선이 빛난다' 정도로만 남긴다.
    ⚠️ stroke-width 는 JS 가 지역 크기에 비례해 준다(고정 px 로 두면 작은 지역에서 빛이 과해진다). */
 #arena-map .medalhalo { fill: none; stroke: #ffffff; filter: blur(1.4px); opacity: .95; pointer-events: none; }
 /* 심지 — 또렷한 흰 선. 발광의 주인공은 번짐이 아니라 이 선이다. */
 #arena-map .medalline { fill: none; stroke: #ffffff; stroke-width: 1.8; stroke-linejoin: round; pointer-events: none; vector-effect: non-scaling-stroke; }
+/* 4~10위 — 메달보다 한 단계 약한 흰 테두리(후광 없음).
+   테두리 세기로 급을 나눈다: 1~3위(흰 심지 + 후광) > 4~10위(약한 흰 선) > 나머지(기본 선). */
+#arena-map .geo[data-tier='top10'] { stroke: rgba(255, 255, 255, .92); stroke-width: 1.7; }
 #arena-map .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
 #arena-map .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--aa-line); stroke-width: 3; }
 /* 평면 레벨(1·2)의 바탕 — 지구본 바다와 같은 그라디언트라 세 레벨의 인상이 일치한다.

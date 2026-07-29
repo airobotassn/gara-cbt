@@ -2,7 +2,7 @@
 //
 // 역할 분담: **React 가 상태(level·curProv·selKey·검색어)를 소유**하고, 이 컴포넌트는 그 상태를 받아
 // SVG 만 그린다(제어 컴포넌트). d3 는 여기 안에서만 명령형으로 돌고, 사용자의 지도 조작은
-// onSelect/onDrill/onPrompt 콜백으로 위에 올려보낸다.
+// onSelect/onDrill 콜백으로 위에 올려보낸다.
 //   · 레벨0: 정사영(지구본) — 드래그=회전, 자동 회전(홈 국가 확정 전까지), 휠/핀치=배율
 //   · 레벨1·2: 메르카토르 평면 — 드래그=이동, 휠/핀치=배율
 //   · 레벨 전환은 fadeTo() 가 페이드아웃 → 상태 변경 → 페이드인 순으로 감싼다(팍 넘어가지 않게).
@@ -22,7 +22,7 @@ import { zoom as d3Zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } fro
 import { timer as d3Timer, type Timer } from 'd3-timer'
 import { easeCubicIn, easeCubicInOut, easeCubicOut } from 'd3-ease'
 import 'd3-transition' // selection.transition() 부착(부수효과 import)
-import { MEDAL_TONE, TOP10_CUT, TOP10_FILL, type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
+import { MEDAL_TONE, TOP10_CUT, TOP10_TONE, type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
 import { DOKDO_GEO, M49_TO_ISO2 } from '../lib/arena/tables'
 import { labelAnchor } from '../lib/arena/labelPoint'
 
@@ -52,7 +52,6 @@ interface Props {
   hotKey: string | null
   onSelect(key: string): void
   onDrill(r: Region): void
-  onPrompt(name: string): void
   onHover(info: HoverInfo | null): void
   /** 지도 위 순위 표시(숫자 라벨 + 1~3위 트로피) on/off. 색·발광은 그대로 남는다. */
   showNumbers: boolean
@@ -532,19 +531,14 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   // ── 클릭 처리: 지도/사이드 목록 공통 경로 ──
   const activate = useCallback(
     (d: Region) => {
-      const { level, selKey, onSelect, onDrill, onPrompt } = p.current
+      const { level, onSelect, onDrill } = p.current
       if (level === 0) {
         onSelect(d.key)
         if (d.drill) rotateTo(d.f, () => fadeTo(() => onDrill(d)))
         else rotateTo(d.f)
-      } else if (level === 1) {
-        // 시도는 한 번 선택 → 다시 누르면 진입(오조작 방지). 안내는 onPrompt.
-        if (selKey === d.key) fadeTo(() => onDrill(d))
-        else {
-          onSelect(d.key)
-          onPrompt(d.name)
-        }
       } else {
+        // 1차 행정구역이 마지막 단계 — 선택만 한다. 예전엔 재클릭으로 시군구에 들어갔는데,
+        // 시군구를 걷어낸 뒤로는 같은 레벨로 되돌아와 페이드만 도는 헛동작이었다.
         onSelect(d.key)
       }
     },
@@ -594,13 +588,18 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         const rank = st.current.rankOf.get(d.key) ?? 99
         return rank <= 3 ? rank : null
       })
+      // 4~10위 표식 — 테두리를 메달보다 약하게 주기 위한 훅(CSS)
+      .attr('data-tier', (d) => {
+        const rank = st.current.rankOf.get(d.key) ?? Infinity
+        return level === 0 && rank > 3 && rank <= TOP10_CUT ? 'top10' : null
+      })
       // 1~3위=시상대 그라디언트 · 4~10위=한 색으로 묶은 상위권 · 그 아래=백분위 램프.
       // ⚠️ 4~10위 묶음은 **지구본(레벨0)에서만**. 시도는 17개뿐이라 상위 10개를 한 색으로 칠하면
       //    지도의 절반 이상이 같은 색이 되어 오히려 순위가 안 읽힌다.
       .attr('fill', (d) => {
         const rank = st.current.rankOf.get(d.key) ?? Infinity
         if (rank <= 3) return `url(#medalGrad${rank})`
-        if (level === 0 && rank <= TOP10_CUT) return TOP10_FILL
+        if (level === 0 && rank <= TOP10_CUT) return 'url(#tierGrad)'
         return p.current.color(d.score)
       })
 
@@ -702,13 +701,13 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     // ⚠️ 중간 스톱을 둬서 falloff 를 뒤쪽으로 미룬다: 안쪽 절반은 거의 같은 밝기로 넓게 두고
     //    가장자리 근처에서만 떨어뜨리는 것. 이게 없으면 중심부터 바로 어두워져 볼록한 돔
     //    (= 플라스틱 단추)처럼 보인다. 두 색 자체도 명도 차가 좁아야 '약하게 퍼지는' 느낌이 산다.
-    MEDAL_TONE.forEach(([lit, shade], i) => {
-      const grad = defs
-        .append('radialGradient')
-        .attr('id', `medalGrad${i + 1}`)
-        .attr('cx', '0.5')
-        .attr('cy', '0.45')
-        .attr('r', '0.78')
+    // 4~10위(TOP10_TONE)도 같은 그라디언트를 태워 한 식구로 보이게 한다 — 마지막 id 가 tierGrad.
+    const gradTones: Array<[readonly [string, string], string]> = [
+      ...MEDAL_TONE.map((t, i) => [t, `medalGrad${i + 1}`] as [readonly [string, string], string]),
+      [TOP10_TONE, 'tierGrad'],
+    ]
+    gradTones.forEach(([[lit, shade], id]) => {
+      const grad = defs.append('radialGradient').attr('id', id).attr('cx', '0.5').attr('cy', '0.45').attr('r', '0.78')
       grad.append('stop').attr('offset', '0%').attr('stop-color', lit)
       grad.append('stop').attr('offset', '28%').attr('stop-color', lit)
       grad.append('stop').attr('offset', '100%').attr('stop-color', shade)

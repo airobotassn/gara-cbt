@@ -2,7 +2,7 @@
 import { MIN_LEVEL, MAX_LEVEL } from './categories'
 
 // 문항 수·제한시간은 레벨 구간별 — 단일 출처는 scoring.ts 의 questionsForLevel/durationMinutesForLevel.
-//   Lv.1~2 = 10문항/10분 · Lv.3~5 = 20문항/20분 · Lv.6~7 = 30문항/30분
+//   Lv.1 = 10문항/10분 · Lv.2~3 = 20문항/20분 · Lv.4~7 = 30문항/30분 (문항당 1분)
 export { questionsForLevel, durationMinutesForLevel } from './scoring'
 /** @deprecated 레벨 구간별로 갈렸다. 레벨을 모르는 자리의 표시용 폴백으로만 쓸 것. */
 export const QUESTIONS_PER_TEST = 20
@@ -20,6 +20,18 @@ export function axisQuota(axisCount: number, total: number): { base: number; ext
 }
 
 export { MIN_LEVEL, MAX_LEVEL }
+
+// 레벨 사다리 색(연두 → 빨강). 레벨 선택(/test/select)의 배지·사다리와 응시 전 경고 화면이 같이 쓴다.
+//   ⚠️ scoring.ts 의 levelColor(티어 계열)와는 다른 축이라 따로 둔다 — 2026-07-27 한 번 통합했다가 되돌렸다.
+export const LEVEL_COLORS: Record<number, string> = {
+  1: '#86efac',
+  2: '#5fd98a',
+  3: '#d6c534',
+  4: '#e0a526',
+  5: '#f08a3f',
+  6: '#ef6b5f',
+  7: '#e0443a',
+}
 
 // 문제은행이 비어 있어 응시를 막아둘 레벨(레벨 선택 화면에서 '오픈 예정'). 비어 있으면 전 레벨 응시 가능.
 //   문항 없는 레벨을 여기 빼두면 start-test 가 '해당 레벨의 문제가 없습니다.' 로 400 을 낸다.

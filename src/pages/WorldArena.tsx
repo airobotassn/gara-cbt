@@ -108,7 +108,6 @@ export default function WorldArena() {
   const [selKey, setSelKey] = useState<string | null>(null)
   const [hotKey, setHotKey] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [prompt, setPrompt] = useState('')
   const [hover, setHover] = useState<HoverInfo | null>(null)
   const [rightPanel, setRightPanel] = useState<'league' | 'chat' | null>('league')
   // 지도 위 순위 표시(숫자 + 1~3위 트로피) on/off — 지도 모양만 보고 싶을 때 끈다.
@@ -256,7 +255,6 @@ export default function WorldArena() {
   const handleDrill = useCallback((r: Region) => {
     setSelKey(null)
     setQuery('')
-    setPrompt('')
     setLevel(1)
     // 이전 나라의 행정구역이 잠깐 비치지 않도록 목록을 비우고 새로 받는다.
     const iso = M49_TO_ISO2[String(r.f.id)]
@@ -269,7 +267,6 @@ export default function WorldArena() {
   const goto = useCallback((l: ArenaLevel) => {
     setSelKey(null)
     setQuery('')
-    setPrompt('')
     setLevel(l)
     if (l < 1) setDrillCountry(null)
   }, [])
@@ -395,7 +392,6 @@ export default function WorldArena() {
                 hotKey={hotKey}
                 onSelect={setSelKey}
                 onDrill={handleDrill}
-                onPrompt={(name) => setPrompt(t('arena.drillHint', { n: name }))}
                 onHover={handleHover}
                 showNumbers={showNumbers}
                 color={color}
@@ -403,8 +399,6 @@ export default function WorldArena() {
             ) : (
               <div className="aa-loading">{t('arena.loading')}</div>
             )}
-
-            <div className={`aa-prompt${prompt ? ' on' : ''}`}>{prompt}</div>
 
             <div className="aa-legend">
               <span>{t('arena.low')}</span>
