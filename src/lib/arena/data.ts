@@ -25,6 +25,8 @@ export interface GeoProps {
   name_zh?: string
   name_hi?: string
   name_vi?: string
+  /** adm1 전용 데모 순위 — 빌드 때 박는다(수도 1위 → 그 지역 도시 인구 합이 많은 순). */
+  ord?: number
 }
 export type GeoFeature = Feature<Geometry, GeoProps> & { id?: string | number }
 
@@ -178,13 +180,34 @@ const MOCK_REST_MAX = 255
 const mockCountryScore = (id: string, key: string) => MOCK_TOP_COUNTRY[id] ?? mockScore(key, MOCK_REST_MAX)
 
 /**
- * 지도 색 램프 — 짙은 남색(하위) → 밝은 파랑(상위). 범례 바(arena.css)도 이 세 색과 맞춰 둔다.
- *
- * ⚠️ 예전엔 반대(밝은 하늘색 → 진한 파랑, "진할수록 상위")였다. 1~3위 테두리를 **흰빛으로
- * 발광**시키려면 주변이 어두워야 해서 뒤집었다 — 밝은 바다 위에 흰 광채를 얹으면 아예 안 보인다.
- * 전 구간이 바다(--aa-ocean-*)보다 밝다: 육지가 바다 위에 떠 있는 밝은 색면이어야 하기 때문.
+ * 대한민국 시도의 데모 순위 — 1위부터 나열(코드는 kr-prov.json 기준).
+ * 경기·서울·부산은 지정값이고 그 아래는 인구순이다. 해외는 빌드 때 박아 둔 `ord`
+ * (수도 1위 → 도시 인구 합 순)를 쓰므로 여기 표가 필요 없다.
  */
-export const CSCALE_RAMP = ['#2b64b6', '#437bc7', '#729fdb'] as const
+const KR_PROV_ORDER = ['31', '11', '21', '38', '23', '37', '22', '34', '36', '35', '33', '32', '25', '24', '26', '39', '29']
+
+/**
+ * 지역 데모 점수 — **순위가 그대로 보이도록** 등수에서 역산한다.
+ * 예전엔 지역 코드 해시라 순서가 무작위였다("아무렇게나 되어 있다"는 지적).
+ * 실집계가 붙으면 이 값은 안 쓰인다.
+ */
+function mockRegionScore(r: Omit<Region, 'score' | 'takers' | 'real'>, total: number): number {
+  const kr = r.code ? KR_PROV_ORDER.indexOf(r.code) : -1
+  const ord = kr >= 0 ? kr + 1 : (r.f.properties.ord ?? total)
+  // 1위가 가장 높고 아래로 고르게 내려간다. 같은 등수가 없으니 동점도 없다.
+  const span = Math.max(1, total)
+  return Math.round(MOCK_REST_MAX * (1 - (ord - 1) / span) * 100) / 100
+}
+
+/**
+ * 지도 색 램프 — 밝은 파랑(하위) → 짙은 남색(상위). **진할수록 상위**(단계구분도의 통상 방향).
+ * 범례 바(arena.css)도 이 세 색을 같은 순서로 깐다 — 한쪽만 뒤집으면 지도와 범례가 어긋난다.
+ *
+ * ⚠️ 어느 방향이든 **전 구간이 바다(--aa-ocean-*)보다 밝아야 한다** — 육지가 바다 위에 떠 있는
+ * 밝은 색면이어야 하고, 1~3위 테두리의 **흰 발광**도 주변이 어두워야 보인다. 그래서 짙은 쪽
+ * 끝을 #2b64b6 아래로 더 내리지 말 것(바다 최상단 --aa-ocean-hi 와 붙어 대륙이 묻힌다).
+ */
+export const CSCALE_RAMP = ['#729fdb', '#437bc7', '#2b64b6'] as const
 
 /**
  * 1·2·3위 전용 색(프리미엄 골드·사이버 블루·에메랄드 그린) — `[윗쪽 밝은 톤, 아랫쪽 어두운 톤]`.
@@ -376,7 +399,7 @@ export function buildRegions({
       if (iso) bucket = real.region[iso]
     }
     if (bucket) return { ...r, score: bucket.score, takers: bucket.members, real: true }
-    const score = level === 0 ? mockCountryScore(String(r.f.id), r.key) : mockScore(r.key, MOCK_REST_MAX)
+    const score = level === 0 ? mockCountryScore(String(r.f.id), r.key) : mockRegionScore(r, base.length)
     return { ...r, score, takers: mockTakers(r.key), real: false }
   })
 }

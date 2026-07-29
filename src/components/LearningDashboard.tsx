@@ -195,9 +195,12 @@ export default function LearningDashboard() {
     days.set(k, Math.max(days.get(k) ?? 0, a.level))
   }
 
-  const pageCount = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  // 승급 기록 — 옛 '응시 기록'을 대체한다. 응시 목록(list, 최신순) 중 **승급한 순간만** 남긴다.
+  // 별도 백엔드 없이 list-attempts 의 rankDir/rankAfter 로 만든다(레벨 인증서 목록과 같은 출처).
+  const promos = list.filter((a) => a.rankDir === 'up')
+  const pageCount = Math.max(1, Math.ceil(promos.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount - 1)
-  const pageItems = list.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  const pageItems = promos.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
 
   return (
     <div className="wrap">
@@ -427,45 +430,47 @@ export default function LearningDashboard() {
             </div>
           ) : null}
 
-          {/* 응시 기록 (페이징) */}
+          {/* 승급 기록 (페이징) — 승급한 응시만. 유지·강등 응시는 목록에 없다. */}
           <div className="panel-card">
             <div className="ph">
-              <div className="t">{t('db.history_title')}</div>
-              <div className="leg">{t('db.total_n', { n: list.length })}</div>
+              <div className="t">{t('db.promo_title')}</div>
+              <div className="leg">{t('db.promo_total_n', { n: promos.length })}</div>
             </div>
-            <div className="hist">
-              {pageItems.map((a) => {
-                const lp = lpOf(a)
-                const col = levelColor(a.level)
-                return (
-                  <Link key={a.attemptId} to={`/test/result/${a.attemptId}`} className="hrow">
-                    <div className="lv" style={{ color: col }}>
-                      {a.level}
-                    </div>
-                    <div className="meta">
-                      <div className="dt">
-                        Lv.{a.level}
-                        {a.rankDir === 'up'
-                          ? ` · ▲${t('result.promoted')}`
-                          : a.rankDir === 'down'
-                            ? ` · ▼${t('result.demoted')}`
-                            : ''}
+            {promos.length === 0 ? (
+              <p className="promo-empty">{t('db.promo_empty')}</p>
+            ) : (
+              <div className="hist">
+                {pageItems.map((a) => {
+                  const lp = lpOf(a)
+                  const to = a.rankAfter ?? a.level
+                  const from = Math.max(1, to - 1) // 승급은 항상 한 단계(computeRankChange)
+                  const col = levelColor(to)
+                  return (
+                    <Link key={a.attemptId} to={`/test/result/${a.attemptId}`} className="hrow">
+                      <div className="lv" style={{ color: col }}>
+                        {to}
                       </div>
-                      <div className="sb">
-                        {new Date(a.submittedAt).toLocaleDateString()} ·{' '}
-                        {t('db.hist_correct', { a: a.totalCorrect, t: a.totalQuestions })}
+                      <div className="meta">
+                        <div className="dt">
+                          Lv.{from} → Lv.{to}
+                          <span className="promo-chip">▲ {t('result.promoted')}</span>
+                        </div>
+                        <div className="sb">
+                          {new Date(a.submittedAt).toLocaleDateString()} ·{' '}
+                          {t('db.hist_correct', { a: a.totalCorrect, t: a.totalQuestions })}
+                        </div>
                       </div>
-                    </div>
-                    <div className="sc2">
-                      {a.totalCorrect}/{a.totalQuestions}
-                    </div>
-                    <div className={`chg ${lp >= 0 ? 'up' : 'dn'}`}>
-                      {lp >= 0 ? `+${lp}` : lp}
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+                      <div className="sc2">
+                        {a.totalCorrect}/{a.totalQuestions}
+                      </div>
+                      <div className={`chg ${lp >= 0 ? 'up' : 'dn'}`}>
+                        {lp >= 0 ? `+${lp}` : lp}
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
             {pageCount > 1 ? (
               <div className="pager">
                 <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}>

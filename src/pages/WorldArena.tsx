@@ -19,6 +19,7 @@ import {
   buildRegions,
   makeCscale,
   rankTone,
+  MEDAL_TONE,
   TOP10_CUT,
   EMPTY_REAL,
   countryName,
@@ -49,7 +50,6 @@ const RankRow = memo(function RankRow({
   width,
   selected,
   hot,
-  showFlag,
   count,
   color,
   scoreText,
@@ -62,7 +62,6 @@ const RankRow = memo(function RankRow({
   width: number
   selected: boolean
   hot: boolean
-  showFlag: boolean
   count: string
   color: string
   scoreText: string
@@ -79,10 +78,7 @@ const RankRow = memo(function RankRow({
     >
       <span className="no">{rank}</span>
       <div className="nm">
-        <b>
-          {region.name}
-          {showFlag ? ' 🇰🇷' : ''}
-        </b>
+        <b>{region.name}</b>
         <div className="bw" style={{ width: `${width}%`, background: color }} />
         <div className="cnt">👥 {count}</div>
       </div>
@@ -210,12 +206,22 @@ export default function WorldArena() {
 
   const totalTakers = useMemo(() => regions.reduce((s, r) => s + r.takers, 0), [regions])
 
-  // 우리 순위 — 지구본은 홈 국가, 대한민국을 파고들면 서울
+  // 지구본에서 내 나라 찾기 — 국기·"우리 순위"·목록 하단 고정이 모두 이 하나를 쓴다.
+  // ⚠️ 예전엔 `drill`(파고들 수 있는 나라)로 찾았다. 자립형 HTML 시절엔 드릴 대상이 대한민국
+  //    하나뿐이라 그게 곧 "우리나라"였지만, 전 세계 adm1 을 지원하면서 200여 개국이 참이 됐다.
+  const homeRegion = useMemo(
+    () => (level === 0 ? regions.find((x) => M49_TO_ISO2[String(x.f.id)] === home) : undefined),
+    [level, regions, home],
+  )
+
+  // 우리 순위 — 지구본은 홈 국가, 대한민국을 파고들면 서울.
+  // ⚠️ 못 찾으면 아무 나라나 대신 세우지 않고 카드를 안 그린다. 지도(110m·177개국)에 없는
+  //    나라(싱가포르·홍콩 등)의 사용자에게 엉뚱한 나라를 "우리 순위"라고 하는 것보다 낫다.
   const our = useMemo(() => {
     let r: Region | undefined
     let label = ''
     if (level === 0) {
-      r = regions.find((x) => M49_TO_ISO2[String(x.f.id)] === home) ?? regions.find((x) => x.drill)
+      r = homeRegion
       if (r) label = '📍 ' + r.name + ' ' + t('arena.our0')
     } else if (home === 'KR' && drillCountry?.iso === 'KR') {
       r = regions.find((x) => x.code === '11')
@@ -223,18 +229,15 @@ export default function WorldArena() {
     }
     if (!r) return null
     return { region: r, label, rank: sorted.indexOf(r) + 1 }
-  }, [level, regions, sorted, home, drillCountry, t])
+  }, [level, regions, sorted, homeRegion, home, drillCountry, t])
 
-  // 상위 60개(검색 시 필터). 세계 단위에선 드릴 대상(대한민국)이 밖으로 밀려도 맨 아래 고정 노출.
+  // 상위 60개(검색 시 필터). 세계 단위에선 내 나라가 60위 밖으로 밀려도 맨 아래 고정 노출.
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
     const list = q ? sorted.filter((d) => d.name.toLowerCase().includes(q)).slice(0, 60) : sorted.slice(0, 60)
-    if (!q && level === 0) {
-      const kr = regions.find((d) => d.drill)
-      if (kr && !list.includes(kr)) return [...list, kr]
-    }
+    if (!q && level === 0 && homeRegion && !list.includes(homeRegion)) return [...list, homeRegion]
     return list
-  }, [query, sorted, level, regions])
+  }, [query, sorted, level, homeRegion])
 
   const scoreSpan = useMemo(() => {
     if (!sorted.length) return { max: 1, min: 0 }
@@ -451,9 +454,36 @@ export default function WorldArena() {
                 aria-label={t(showNumbers ? 'arena.numbers_hide' : 'arena.numbers_show')}
                 onClick={() => setShowNumbers((v) => !v)}
               >
-                {showNumbers ? 'ON' : 'OFF'}
+                <span className="nt" aria-hidden="true">123</span>
               </button>
             </div>
+
+            {/* 시상대 — 지도 왼쪽 아래. 오른쪽 리그 패널을 닫아도 1~3위는 남는다.
+                지도 위에 얹히는 판이라 흰 카드가 아니라 **어두운 유리 HUD**다(지도는 라이트/다크 공통 딥블루).
+                메달 보석은 지도와 같은 재료 — MEDAL_TONE 방사형 그라디언트 + 흰 발광 테두리. */}
+            {sorted.length > 0 && (
+              <div className="aa-top3">
+                <span className="cap">🏆 TOP 3</span>
+                {sorted.slice(0, 3).map((r, i) => {
+                  const [lit, shade] = MEDAL_TONE[i]
+                  return (
+                    <div className={`row r${i + 1}`} key={r.key}>
+                      <span
+                        className="md"
+                        style={{
+                          background: `radial-gradient(circle at 34% 28%, ${lit}, ${shade} 76%)`,
+                          boxShadow: `0 0 0 1.5px rgba(255,255,255,.55), 0 0 11px -1px ${lit}`,
+                        }}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="nm" style={i === 0 ? { color: lit } : undefined}>{r.name}</span>
+                      <span className="sc" style={{ textShadow: `0 0 10px ${lit}59` }}>{fmtScore(r.score)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {dokdo && <DokdoInset fill={dokdo.fill} label={t('arena.dokdo')} />}
           </section>
@@ -516,7 +546,6 @@ export default function WorldArena() {
                     width={10 + 90 * ((d.score - scoreSpan.min) / (scoreSpan.max - scoreSpan.min || 1))}
                     selected={d.key === selKey}
                     hot={d.key === hotKey}
-                    showFlag={d.drill && level === 0}
                     count={fmt(d.takers)}
                     color={barFill(rank, d.score)}
                     scoreText={fmtScore(d.score)}

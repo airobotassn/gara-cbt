@@ -297,6 +297,27 @@
   color: var(--dim);
 }
 
+/* 승급 기록 — 행 제목 옆 '승급' 칩 + 비었을 때 안내 */
+.hrow .promo-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs, 11px);
+  font-weight: 700;
+  color: var(--blue-hi);
+  background: color-mix(in srgb, var(--blue-hi) 12%, transparent);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.promo-empty {
+  margin: 6px 2px 2px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-align: center;
+  padding: 18px 0;
+}
+
 
 /* 대시보드 티어 히어로 */
 .tierhero {

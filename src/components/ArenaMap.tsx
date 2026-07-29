@@ -13,6 +13,7 @@ import {
   geoCentroid,
   geoDistance,
   geoGraticule10,
+  geoAzimuthalEqualArea,
   geoMercator,
   geoOrthographic,
   geoPath,
@@ -106,14 +107,14 @@ const MAINLAND_R = (35 * Math.PI) / 180
  * 미국은 알래스카가 단일 면적으로는 더 커서 그쪽이 본토로 뽑히고 정작 본토가 화면 밖으로 밀린다.
  * 각 지역 중심을 후보로 놓고 반경 안 면적을 합산해 최대인 곳을 본토로 삼는다.
  */
-function mainlandOf(feats: GeoFeature[]): { keep: GeoFeature[]; lon0: number } {
+function mainlandOf(feats: GeoFeature[]): { keep: GeoFeature[]; lon0: number; lat0: number } {
   const cs = feats.map((f) => geoCentroid(f))
   const as = feats.map((f) => geoArea(f))
   // ⚠️ 단순화 과정에서 면이 선/점으로 뭉개진 조각은 중심이 NaN 이 된다. 그대로 두면 비교가 전부
   //    false 가 되어 엉뚱한 지역이 본토로 뽑히고, 회전각까지 NaN 이 되면 지도 전체가 사라진다.
   const ok = feats.map((_, i) => Number.isFinite(cs[i][0]) && Number.isFinite(cs[i][1]) && Number.isFinite(as[i]))
   const first = ok.indexOf(true)
-  if (first < 0) return { keep: feats, lon0: 0 }
+  if (first < 0) return { keep: feats, lon0: 0, lat0: 0 }
   let best = first
   let bestSum = -1
   for (let i = 0; i < feats.length; i++) {
@@ -127,7 +128,7 @@ function mainlandOf(feats: GeoFeature[]): { keep: GeoFeature[]; lon0: number } {
   }
   // 중심이 망가진 조각은 화면 맞춤에서 빼되(투영이 오염된다) 지도에는 그대로 그린다.
   const keep = feats.filter((_, j) => ok[j] && geoDistance(cs[j], cs[best]) < MAINLAND_R)
-  return { keep: keep.length ? keep : feats, lon0: cs[best][0] }
+  return { keep: keep.length ? keep : feats, lon0: cs[best][0], lat0: cs[best][1] }
 }
 
 function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
@@ -151,6 +152,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     spin: null as Timer | null,
     anim: null as Timer | null,
     pendingFadeIn: false,
+    entering: false, // 나라 진입 연출이 도는 중 — 그 사이 클릭을 막는다(연타 시 지도가 멈췄다)
     fadeGuard: 0,
     centered: false, // 홈 국가로 한 번이라도 중앙 정렬했는지
     vk: 1, // 평면 레벨(1·2)에서 viewport 그룹에 걸린 확대 배율 — 글자 크기 판정에 쓴다
@@ -199,7 +201,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     [],
   )
 
-  // ── 투영: 레벨0=지구본(정사영), 레벨1·2=메르카토르 fit ──
+  // ── 투영: 레벨0=지구본(정사영), 레벨1=등면적 방위(본토 중심) fit ──
   const makeProjection = useCallback((regions: Region[], level: ArenaLevel): GeoProjection => {
     const { W, H } = st.current
     if (level === 0) {
@@ -218,14 +220,20 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     }
     // 평면 레벨은 **본토에만** 화면을 맞춘다. 전체에 맞추면 해외영토·원격 섬 때문에 본토가
     // 점만 해진다(프랑스=기아나·레위니옹, 미국=알래스카·괌, 뉴질랜드=채텀 제도).
-    // 그리고 본토의 중앙 경도만큼 회전시켜 날짜변경선 이음매를 피한다(러시아가 좌우로 찢어졌다).
+    //
+    // **등면적 방위 투영**을 본토 중심에 접선으로 놓는다(회전 = 본토 중심 경위도).
+    // ⚠️ 예전엔 메르카토르였는데, 고위도 땅이 1/cos²φ 로 부풀어 알래스카가 실제 15.8%(미국 전체
+    //    면적 대비) 인데 화면의 37.5% 를 먹었다(러시아 사하 18.1%→23.4%). 등면적으로 바꾸면
+    //    투영 면적이 구면 면적에 정비례해 어느 위도든 크기가 정직하게 나온다.
+    //    중심에서 멀수록 모양(각)이 눌리지만, 한 나라 범위에서는 거의 안 보인다.
+    // 회전은 날짜변경선 이음매도 같이 해결한다(러시아가 좌우로 찢어졌던 문제).
     const feats = regions.map((r) => r.f)
-    const proj = geoMercator()
+    const proj = geoAzimuthalEqualArea()
     // ⚠️ 빈 목록에 fitExtent 를 걸면 배율이 NaN/Infinity 가 되어 지도 전체가 사라진다.
     //    드릴다운 직후 새 나라 데이터가 도착하기 전 한 프레임 동안 실제로 빈다.
     if (!feats.length) return proj
-    const { keep, lon0 } = mainlandOf(feats)
-    return proj.rotate([-lon0, 0]).fitExtent(
+    const { keep, lon0, lat0 } = mainlandOf(feats)
+    return proj.rotate([-lon0, -lat0]).fitExtent(
       [
         [16, 16],
         [W - 16, H - 16],
@@ -250,13 +258,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
 
     // 그 지역이 그룹 좌표계에서 차지하는 "짧은 변" 근사치.
     const roomOf = (d: RankLabel) => {
-      // (1) 면적 기준 한 변 — 투영 왜곡 보정(지구본은 가장자리 단축 cos θ, 메르카토르는 고위도 팽창 1/cos²φ)
+      // (1) 면적 기준 한 변 — 지구본만 가장자리 단축(cos θ)을 보정한다.
+      // 평면 레벨은 등면적 투영이라 투영 면적 = 배율² × 구면 면적, 즉 보정이 필요 없다
+      // (메르카토르 시절엔 여기서 고위도 팽창 1/cos²φ 를 나눠 줬다).
       let a = d.area
       if (level === 0) a *= Math.max(0.12, Math.cos(geoDistance(d.c, [-lrot[0], -lrot[1]])))
-      else {
-        const cosLat = Math.max(0.2, Math.cos((d.c[1] * Math.PI) / 180))
-        a /= cosLat * cosLat
-      }
       // (2) 실제 바운딩박스의 짧은 변 — 가늘고 긴 땅에서 (1)의 과대평가를 잘라 준다
       const bb = path.bounds(d.f)
       const shortSide = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
@@ -532,6 +538,32 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         return
       }
       const svg = select(node)
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        window.clearTimeout(st.current.fadeGuard)
+        st.current.pendingFadeIn = true
+        resetView()
+        mut()
+        // mut 이 리렌더를 못 일으키는 예외 상황에서도 지도가 투명한 채 남지 않도록 보정.
+        st.current.fadeGuard = window.setTimeout(() => {
+          if (!st.current.pendingFadeIn) return
+          // 새 지역 데이터가 끝내 안 왔으면(로드 실패 등) draw 가 일찍 빠져나가 화면이 투명한
+          // 채로 남는다 → 최소한 되살려 놓고 클릭도 다시 받는다.
+          if (!p.current.regions.length) {
+            st.current.pendingFadeIn = false
+            st.current.entering = false
+            select(svgRef.current).interrupt().style('opacity', '1').style('transform', 'scale(1)')
+            return
+          }
+          fn.current.draw()
+        }, 800)
+      }
+      // ⚠️ 전환이 다른 전환에 끊기면 'end' 가 **오지 않는다**. 그때 mut 이 영영 안 불려
+      //    지도가 opacity 0 인 채로 얼어붙었다(나라를 빠르게 연타하면 재현). 타이머로 받쳐 둔다.
+      window.clearTimeout(st.current.fadeGuard)
+      st.current.fadeGuard = window.setTimeout(finish, 520)
       svg
         .interrupt()
         .style('transform-origin', '50% 50%')
@@ -540,16 +572,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         .ease(easeCubicIn)
         .style('opacity', '0')
         .style('transform', 'scale(1.16)')
-        .on('end', () => {
-          st.current.pendingFadeIn = true
-          resetView()
-          mut()
-          // mut 이 리렌더를 못 일으키는 예외 상황에서도 지도가 투명한 채 남지 않도록 보정.
-          window.clearTimeout(st.current.fadeGuard)
-          st.current.fadeGuard = window.setTimeout(() => {
-            if (st.current.pendingFadeIn) fn.current.draw()
-          }, 800)
-        })
+        .on('end', finish)
     },
     [resetView],
   )
@@ -559,9 +582,16 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     (d: Region) => {
       const { level, onSelect, onDrill } = p.current
       if (level === 0) {
+        // ⚠️ 진입 연출(회전 820ms → 페이드 420ms)이 도는 동안 다른 나라를 누르면 두 연출이
+        //    엉켜 지도가 멈췄다. 한 번 시작하면 끝날 때까지 클릭을 무시한다.
+        if (st.current.entering) return
         onSelect(d.key)
-        if (d.drill) rotateTo(d.f, () => fadeTo(() => onDrill(d)))
-        else rotateTo(d.f)
+        if (!d.drill) {
+          rotateTo(d.f)
+          return
+        }
+        st.current.entering = true
+        rotateTo(d.f, () => fadeTo(() => onDrill(d)))
       } else {
         // 1차 행정구역이 마지막 단계 — 선택만 한다. 예전엔 재클릭으로 시군구에 들어갔는데,
         // 시군구를 걷어낸 뒤로는 같은 레벨로 되돌아와 페이드만 도는 헛동작이었다.
@@ -637,6 +667,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
 
     if (st.current.pendingFadeIn) {
       st.current.pendingFadeIn = false
+      st.current.entering = false // 진입 완료 — 다시 클릭을 받는다
       window.clearTimeout(st.current.fadeGuard)
       select(svgRef.current)
         .interrupt()

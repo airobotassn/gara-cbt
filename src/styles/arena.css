@@ -46,7 +46,7 @@ html.dark .arena {
 /* ── 지도 표면(지구본·바다·대륙) ── **라이트/다크 공통으로 어둡다.**
    페이지(카드·패널·글자)는 테마를 따르지만 지도만은 항상 딥블루다. 1~3위 테두리를 **흰빛으로
    발광**시키려면 주변이 어두워야 하기 때문 — 밝은 바다 위에 흰 광채를 얹으면 아예 안 보인다.
-   바다는 램프 최하단(CSCALE_RAMP[0] = #2a63b4)보다 어두워야 대륙이 떠 보인다. */
+   바다는 램프에서 가장 어두운 색(#2b64b6 = 1위 쪽)보다 어두워야 대륙이 떠 보인다. */
 .arena {
   --aa-ocean-hi: #1d59a5; --aa-ocean-mid: #174c90; --aa-ocean-lo: #0f386e;
   --aa-land-none: #21538e;
@@ -105,18 +105,20 @@ html.dark .arena {
 
 /* ── 범례 · 확대축소 ── */
 .aa-legend { display: flex; align-items: center; gap: 10px; padding: 10px 18px 15px; font-size: 11.5px; color: var(--aa-muted); font-weight: 700; }
-/* 범례 = 지도 색 램프(CSCALE_RAMP)와 동일한 3색. 지도 색이 JS 고정값이라 이 바도 테마와 무관하게 고정. */
+/* 범례 = 지도 색 램프(CSCALE_RAMP)와 동일한 3색·동일한 순서(왼쪽 낮음 → 오른쪽 높음 = 진해짐).
+   지도 색이 JS 고정값이라 이 바도 테마와 무관하게 고정. 램프를 뒤집으면 여기도 같이 뒤집을 것. */
 .aa-legend .bar { flex: 1; height: 8px; border-radius: 999px;
-  background: linear-gradient(90deg, #2b64b6, #437bc7, #729fdb); }
-.aa-zoomctl { position: absolute; left: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
+  background: linear-gradient(90deg, #729fdb, #437bc7, #2b64b6); }
+/* 확대/축소 스택은 오른쪽 아래 — 왼쪽 아래는 TOP 3 패널(.aa-top3) 자리다. */
+.aa-zoomctl { position: absolute; right: 14px; bottom: 54px; z-index: 8; display: flex; flex-direction: column; gap: 6px; }
 .aa-zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--aa-line); background: var(--aa-panel); color: var(--aa-ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--aa-sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .aa-zoomctl button:hover { background: var(--aa-panel-2); }
 .aa-zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
 /* 호버 라벨 — 아이콘만으로는 무슨 버튼인지 안 읽힌다(예전 '원래대로' ⤾ 가 그랬다).
-   우측 레일(.aa-tab)과 같은 생김새·같은 방식(data-label)이되, 스택이 화면 왼쪽이라 오른쪽으로 편다. */
+   우측 레일(.aa-tab)과 같은 생김새·같은 방식(data-label). 스택이 지도 오른쪽 끝이라 왼쪽으로 편다. */
 .aa-zoomctl button { position: relative; }
 .aa-zoomctl button[data-label]::after { content: attr(data-label); position: absolute; z-index: 12;
-  left: calc(100% + 9px); top: 50%; transform: translateY(-50%) translateX(-5px);
+  right: calc(100% + 9px); top: 50%; transform: translateY(-50%) translateX(5px);
   background: var(--aa-ink); color: var(--aa-bg); font-size: 12px; font-weight: 800; letter-spacing: -.01em;
   padding: 6px 10px; border-radius: 9px; white-space: nowrap; pointer-events: none;
   box-shadow: 0 8px 20px -8px rgba(0, 0, 0, .5); opacity: 0; transition: opacity .13s ease, transform .13s ease; }
@@ -127,10 +129,44 @@ html.dark .arena {
 @media (prefers-reduced-motion: reduce) {
   .aa-zoomctl button[data-label]::after { transition: none; }
 }
-/* 순위 숫자 on/off — 확대/축소와 같은 스택. 글자(ON/OFF)가 3자라 폰트만 작게 잡는다.
-   켜짐은 강조색, 꺼짐은 흐린 회색 — 글자 자체가 상태를 말하므로 별도 표식은 두지 않는다. */
-.aa-zoomctl button.aa-numtoggle { font-size: 11px; font-weight: 900; letter-spacing: -.02em; color: var(--aa-accent); }
+/* 순위 숫자 on/off — 확대/축소와 같은 스택. 라벨은 ON/OFF 글자가 아니라 무엇을 켜고 끄는지
+   그대로 보여주는 '123'(+/− 와 같은 기호 계열). 켜짐은 강조색, 꺼짐은 흐린 회색 + 사선. */
+.aa-zoomctl button.aa-numtoggle { color: var(--aa-accent); }
+.aa-zoomctl button.aa-numtoggle .nt { font-size: 13px; font-weight: 900; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .aa-zoomctl button.aa-numtoggle.off { color: var(--aa-faint); }
+/* 꺼짐 표식 — 색만 흐려지면 상태가 안 읽혀서 숫자 위에 사선을 긋는다(::after 는 툴팁이 쓴다). */
+.aa-zoomctl button.aa-numtoggle.off::before { content: ''; position: absolute; left: 6px; right: 6px; top: calc(50% - 1px); height: 2px; border-radius: 2px; background: currentColor; transform: rotate(-24deg); }
+
+/* ── 시상대(TOP 3) — 지도 왼쪽 아래 ──
+   오른쪽 리그 패널을 닫아도 1~3위가 어디인지는 남아야 한다.
+   ⚠️ 흰 카드로 두면 딥블루 지구본 위에 종잇조각처럼 뜬다 → **어두운 유리 HUD**로 지도에 얹는다.
+      지도는 라이트/다크 공통으로 어두우므로(위 --aa-ocean-*) 이 판도 테마와 무관하게 고정색이다.
+   ⚠️ pointer-events: none — 지구본 위라서 여기서 드래그가 먹히면 지도가 안 돌아간다. */
+.aa-top3 { position: absolute; left: 14px; bottom: 54px; z-index: 8; width: 196px;
+  display: flex; flex-direction: column; gap: 2px; padding: 11px 12px 12px;
+  border: 1.5px solid rgba(150, 195, 255, .26); border-radius: 15px;
+  background: linear-gradient(158deg, rgba(18, 46, 92, .93), rgba(8, 22, 48, .93));
+  -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+  box-shadow: 0 14px 34px -16px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .13);
+  pointer-events: none; overflow: hidden; }
+.aa-top3 .cap { display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
+  font-size: 9.5px; font-weight: 900; letter-spacing: .19em; color: rgba(206, 224, 255, .72); }
+.aa-top3 .row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
+.aa-top3 .md { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 10.5px; font-weight: 900; color: #1b2436;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .45); }
+.aa-top3 .nm { flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 800; color: #e8f0ff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aa-top3 .sc { flex: 0 0 auto; font-size: 12px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+/* 1위 줄만 한 칸 높이고 옅은 금빛 바닥을 깐다 — 셋을 나란히 두면 시상대가 아니라 그냥 목록이 된다. */
+.aa-top3 .r1 { padding: 5px 0 4px; border-radius: 9px;
+  background: linear-gradient(90deg, rgba(240, 204, 116, .17), rgba(240, 204, 116, 0) 78%); }
+.aa-top3 .r1 .nm { font-size: 13.5px; font-weight: 900; }
+.aa-top3 .r1 .sc { font-size: 12.5px; }
+/* 좁은 화면에선 지도가 작아져 두 판이 지도를 다 덮는다 — 시상대만 접는다(오른쪽 목록에 그대로 있다). */
+@media (max-width: 560px) {
+  .aa-top3 { display: none; }
+}
 
 /* ── 독도 확대도 ── */
 .dokinset { position: absolute; top: 12px; right: 12px; width: 150px; height: 112px; border: 2px solid var(--aa-line); border-radius: 10px; overflow: hidden; z-index: 7; box-shadow: 0 3px 0 var(--aa-sh-solid); background: var(--aa-inset-grad); pointer-events: none; }

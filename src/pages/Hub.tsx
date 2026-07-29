@@ -498,7 +498,6 @@ export default function Hub() {
             name: displayName?.trim() || user?.user_metadata?.name || 'CARI',
             avatarUrl,
             seed: user?.id ?? 'guest',
-            level,
             tier,
             tierLabel: t(`rank.tier_${dispTier}`),
             percentile,

@@ -9,7 +9,6 @@
 //  · 업로드 아바타는 교차출처(Supabase Storage) → crossOrigin='anonymous'. 실패하면 젬으로 폴백한다
 //    (여기서 폴백 안 하면 캔버스가 오염돼 toBlob 자체가 터진다).
 import { tierColor, type Tier } from './scoring'
-import { MAX_LEVEL } from './categories'
 
 export const CARD_W = 1600
 export const CARD_H = 900
@@ -32,10 +31,10 @@ const PAGE_BG = '#faf8ff'
 //    fitSize() 로 줄어드는 건 예외 — 긴 닉네임/문장이 칸을 넘지 않게 하는 하향 조정이라 스케일을 깨지 않는다.
 const T = {
   display: 76, // 이름(세리프) — 카드에 하나뿐
-  hero: 40,    // 강조 숫자 — #순위 하나뿐
-  value: 30,   // 데이터 값(기록 행 · 하단 바 · 좌 플레이트 이름)
-  title: 24,   // 섹션 제목(시즌 기록 · 티어) · 티어명
-  label: 20,   // 라벨 · 태그라인 · 알약
+  hero: 40,    // 강조 숫자 — #순위 · 시즌 기록 행(라벨·값 같은 크기)
+  value: 30,   // 데이터 값(하단 바 · 좌 플레이트 이름)
+  title: 24,   // 섹션 제목(시즌 기록 · 티어) · 티어명 · 자격증 알약
+  label: 20,   // 태그라인 · 알약 · 기록 행 보조설명
   sub: 16,     // 보조(워드마크 · 분모 · 하단 라벨)
 } as const
 
@@ -43,7 +42,6 @@ export interface ShareCardData {
   name: string
   avatarUrl: string | null
   seed: string // 아바타 시드(uid) — avatar_url 이 없을 때 젬 색 결정
-  level: number | null
   tier: Tier | null
   tierLabel: string // 현지화된 티어명(t('rank.tier_*'))
   percentile: number | null // 0~1 (작을수록 상위)
@@ -121,36 +119,19 @@ function pill(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, bg
   text(ctx, s, x + w / 2, y + size * 0.36, { size, weight: 800, color: fg, align: 'center' })
   return w
 }
-// 만점이 있는 지표(레벨 1~7 · 연속출석 0~7)의 칸 표시.
-// ⚠️ 연속 진행 바를 쓰지 않는 이유: 만점이 눈에 안 보여서 "얼마 중 얼마"인지 읽히지 않는다.
-//    칸으로 끊으면 총 칸수 = 만점이라 별도 설명 없이 이해된다. 만점이 없는 점수류는 숫자만 쓴다.
-function pips(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, filled: number, total: number, color: string) {
-  const gap = 7
-  const pw = (w - gap * (total - 1)) / total
-  const ph = 14
-  for (let i = 0; i < total; i++) {
-    rr(ctx, x + i * (pw + gap), y - ph / 2, pw, ph, 5)
-    ctx.fillStyle = i < filled ? color : '#e8e9f0'
-    ctx.fill()
-  }
-}
-
 // 능력치 행 아이콘(이모지는 OS 마다 모양이 달라 직접 그린다). 각 함수는 (cx, cy) 중심에 24px 정도로 그린다.
-type IconKind = 'level' | 'streak' | 'score' | 'cert' | 'rank'
-function icon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy: number, color: string) {
+// `s` 로 배율만 준다 — 좌표를 다시 손대면 아이콘마다 비례가 어긋난다(선 굵기도 같이 커져야 맞다).
+type IconKind = 'streak' | 'score' | 'cert' | 'rank'
+function icon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy: number, color: string, s = 1) {
   ctx.save()
   ctx.translate(cx, cy)
+  if (s !== 1) ctx.scale(s, s)
   ctx.fillStyle = color
   ctx.strokeStyle = color
   ctx.lineWidth = 2.6
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  if (kind === 'level') {
-    // 상승 계단
-    ctx.beginPath()
-    ctx.moveTo(-11, 9); ctx.lineTo(-11, 1); ctx.lineTo(-3, 1); ctx.lineTo(-3, -5); ctx.lineTo(5, -5); ctx.lineTo(5, -11); ctx.lineTo(12, -11)
-    ctx.stroke()
-  } else if (kind === 'streak') {
+  if (kind === 'streak') {
     // 불꽃 — 위쪽을 뾰족하게(둥글면 물방울로 읽힌다)
     ctx.beginPath()
     ctx.moveTo(0, -13)
@@ -281,7 +262,7 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   ctx.fillStyle = '#fff'; ctx.fill()
 
   // 헤더: 태그라인 → 이름(세리프).
-  // Lv·티어 알약 줄은 뺐다 — 레벨은 기록 행, 티어는 오른쪽 박스에 있어 여기 두면 같은 값이 두 번 뜬다.
+  // Lv·티어 알약 줄은 뺐다 — 티어는 오른쪽 박스에 있어 여기 두면 같은 값이 두 번 뜬다(레벨은 카드에서 제외).
   // 대신 그 높이를 헤더가 흡수해 태그라인·이름을 크고 여유 있게 놓는다.
   const hx = wx + 40
   text(ctx, '✦', hx, BODY_T + 78, { size: T.title, weight: 900, color: C })
@@ -299,48 +280,46 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   ctx.strokeStyle = '#ececf5'; ctx.lineWidth = 2; ctx.stroke()
   text(ctx, '시즌 기록', hx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
 
-  // 행 = [아이콘][라벨] … [칸 or 값].
-  //   kind='pips'  만점이 있는 지표(레벨·연속출석) → 칸 표시
-  //   kind='num'   만점이 없는 점수류 → 숫자만(억지 게이지 금지)
+  // 행 = [아이콘][라벨] … [값].
+  //   kind='num'   숫자류 → 숫자만(억지 게이지 금지)
   //   kind='pill'  자격증 — 보유자만 노출(미보유는 행 자체를 만들지 않는다)
   type Row =
-    | { kind: 'pips'; icon: IconKind; label: string; filled: number; total: number; value: string }
     | { kind: 'num'; icon: IconKind; label: string; value: string; sub?: string }
     | { kind: 'pill'; icon: IconKind; label: string; value: string }
-  // 순서 = 랭킹(백분위) → 레벨 → 시즌 점수 → 연속 출석.
-  // 연속 출석은 칸이 아니라 수치다 — 7일에서 끝나는 값이 아니라 계속 쌓이므로 만점 표현이 거짓이 된다.
-  // (레벨만 칸을 쓴다. 1~7 로 진짜 상한이 있는 유일한 지표.)
+  // 순서 = 랭킹(백분위) → 시즌 점수 → 연속 출석.
+  // ⚠️ 레벨 행은 뺐다(무료 레벨테스트 지표라 이 카드의 성격과 어긋난다). 칸(pips) 표시를 쓰던
+  //    유일한 행이라 그 헬퍼도 같이 지웠다 — 되살리려면 git 이력에서 pips() 를 가져올 것.
   const rows: Row[] = [
     { kind: 'num', icon: 'rank', label: '랭킹', value: d.percentile != null ? `상위 ${Math.max(1, Math.round(d.percentile * 100))}%` : '—' },
-    { kind: 'pips', icon: 'level', label: '레벨', filled: d.level ?? 0, total: MAX_LEVEL, value: d.level != null ? `Lv.${d.level}` : '—' },
     { kind: 'num', icon: 'score', label: '시즌 점수', value: (d.seasonTotal ?? 0).toLocaleString() },
     { kind: 'num', icon: 'streak', label: '연속 출석', value: `${d.streak}일` },
   ]
   if (d.title) rows.push({ kind: 'pill', icon: 'cert', label: '자격증', value: d.title })
 
   // 행은 박스 높이에 균등 분산한다(고정 간격이면 행 수가 바뀔 때 아래가 텅 빈다).
+  // ⚠️ 레벨 행이 빠져 행이 줄면서 같은 박스가 헐거워졌다 → 행 글자·아이콘을 한 단씩 올려 칸을 채운다.
+  //    타입 스케일에 없는 숫자를 새로 만들지 않고 기존 단(title/hero)을 끌어 쓴다.
   const rowTop = boxT + 74
   const rowGap = (boxB - 20 - rowTop) / rows.length
   const valX = hx + statW - 26
-  const trackX = hx + 178
-  const trackW = statW - 178 - 132
+  // 알약(자격증)은 40px 라벨을 피해 시작한다 — 라벨과 겹치면 글자가 알약 밑으로 들어간다.
+  const trackX = hx + 250
+  const ICON_S = 1.35
   rows.forEach((r, i) => {
     const y = rowTop + rowGap * i + rowGap / 2
-    icon(ctx, r.icon, hx + 44, y - 6, C)
-    text(ctx, r.label, hx + 68, y, { size: T.label, weight: 800, color: INK })
-    if (r.kind === 'pips') {
-      pips(ctx, trackX, y - 5, trackW, r.filled, r.total, C)
-      text(ctx, r.value, valX, y + 4, { size: T.value, weight: 900, color: INK, align: 'right' })
-    } else if (r.kind === 'pill') {
-      pill(ctx, r.value, trackX, y - 6, 'rgba(242,198,94,.22)', '#8a6a12')
+    icon(ctx, r.icon, hx + 46, y - 7, C, ICON_S)
+    // 라벨은 값과 같은 크기(무게만 800/900 으로 갈라 값이 주인공인 건 유지).
+    text(ctx, r.label, hx + 78, y, { size: T.hero, weight: 800, color: INK })
+    if (r.kind === 'pill') {
+      pill(ctx, r.value, trackX, y - 6, 'rgba(242,198,94,.22)', '#8a6a12', T.title)
     } else {
       // 보조 설명은 라벨 옆에 붙인다(값 위에 얹으면 그 행만 2줄이 돼 행 리듬이 깨진다).
       if (r.sub) {
-        ctx.font = `800 ${T.label}px ${FONT}`
-        text(ctx, r.sub, hx + 68 + ctx.measureText(r.label).width + 10, y, { size: T.sub, weight: 700, color: SUB })
+        ctx.font = `800 ${T.hero}px ${FONT}`
+        text(ctx, r.sub, hx + 78 + ctx.measureText(r.label).width + 10, y, { size: T.label, weight: 700, color: SUB })
       }
-      const vSize = fitSize(ctx, r.value, T.value, 900, 200)
-      text(ctx, r.value, valX, y + 4, { size: vSize, weight: 900, color: INK, align: 'right' })
+      const vSize = fitSize(ctx, r.value, T.hero, 900, 260)
+      text(ctx, r.value, valX, y + 6, { size: vSize, weight: 900, color: INK, align: 'right' })
     }
   })
 

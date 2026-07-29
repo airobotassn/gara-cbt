@@ -105,8 +105,7 @@ export default function Daily() {
     <div className="dy-page">
       <div className="dy-wrap">
       <div className="dy-top">
-        {/* 뒤로 = 아레나. 아레나 하단 런처가 허브·레벨테스트·데일리·미니게임의 관문이라 그게 이 화면의 부모다.
-            (완료 팝업의 '허브로'는 뒤로가기가 아니라 보상 확인용 전진 동선이라 목적지가 다르다.) */}
+        {/* 뒤로 = 아레나. 아레나 하단 런처가 허브·레벨테스트·데일리·미니게임의 관문이라 그게 이 화면의 부모다. */}
         <button className="dy-back" onClick={() => navigate('/arena')} aria-label="WORLD ARENA">
           <span>‹</span> WORLD ARENA
         </button>
@@ -203,9 +202,9 @@ export default function Daily() {
             <p className="dy-pop-msg">
               {rewarded ? '캐릭터가 오늘도 한 뼘 자랐어요.' : '오늘 출석으로 코인·스탬프는 이미 받았어요. 학습 기록은 남았습니다.'}
             </p>
+            {/* 버튼은 '닫기' 하나 — 완료 보상이 이 화면에서 끝나므로 허브로 보낼 이유가 없다. */}
             <div className="dy-pop-btns">
-              <button className="dy-btn dy-ghost" onClick={() => setCelebrate(false)}>닫기</button>
-              <button className="dy-btn" onClick={() => navigate('/hub')}>허브로</button>
+              <button className="dy-btn" onClick={() => setCelebrate(false)}>닫기</button>
             </div>
           </div>
         </div>
