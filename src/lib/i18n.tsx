@@ -653,8 +653,10 @@ const D: Record<string, Record<Lang, string>> = {
   'db.vs_avg': { ko: '평균 대비', en: 'vs avg', ja: '平均比', zh: '较平均', hi: 'औसत से', vi: 'so với TB' },
   'db.cum_rating': { ko: '누적 레이팅', en: 'Cumulative', ja: '累積', zh: '累计', hi: 'संचयी', vi: 'Tích lũy' },
   'db.growth_title': { ko: '영역별 성장', en: 'Growth by area', ja: '領域別の成長', zh: '各领域成长', hi: 'क्षेत्र अनुसार वृद्धि', vi: 'Tăng trưởng theo lĩnh vực' },
-  'db.history_title': { ko: '응시 기록', en: 'Test history', ja: '受験履歴', zh: '应试记录', hi: 'टेस्ट इतिहास', vi: 'Lịch sử làm bài' },
-  'db.total_n': { ko: '총 {n}회', en: '{n} total', ja: '計{n}回', zh: '共 {n} 次', hi: 'कुल {n}', vi: 'Tổng {n} lần' },
+  // 대시보드 하단 = 승급 기록(옛 '응시 기록'은 삭제). 승급한 응시만 보여준다.
+  'db.promo_title': { ko: '승급 기록', en: 'Promotions', ja: '昇級履歴', zh: '升级记录', hi: 'प्रमोशन इतिहास', vi: 'Lịch sử thăng hạng' },
+  'db.promo_total_n': { ko: '총 {n}회 승급', en: '{n} promotions', ja: '計{n}回昇級', zh: '共升级 {n} 次', hi: 'कुल {n} प्रमोशन', vi: 'Thăng hạng {n} lần' },
+  'db.promo_empty': { ko: '아직 승급한 기록이 없어요. 승급하면 여기에 남습니다.', en: 'No promotions yet. Each promotion will show up here.', ja: 'まだ昇級の記録がありません。昇級するとここに残ります。', zh: '还没有升级记录。升级后会显示在这里。', hi: 'अभी कोई प्रमोशन नहीं। हर प्रमोशन यहाँ दिखेगा।', vi: 'Chưa có lần thăng hạng nào. Mỗi lần thăng hạng sẽ hiện ở đây.' },
   'db.hist_correct': { ko: '정답 {a}/{t}', en: 'Correct {a}/{t}', ja: '正解 {a}/{t}', zh: '正确 {a}/{t}', hi: 'सही {a}/{t}', vi: 'Đúng {a}/{t}' },
 
   'cal.summary': { ko: '최근 6개월 · {n}일 활동', en: 'Last 6 months · {n} active days', ja: '直近6ヶ月 · {n}日活動', zh: '最近 6 个月 · {n} 天活动', hi: 'पिछले 6 महीने · {n} सक्रिय दिन', vi: '6 tháng qua · {n} ngày hoạt động' },
@@ -1348,6 +1350,49 @@ const D: Record<string, Record<Lang, string>> = {
   "caris.rolling.pro_cbt.badge": { ko: "상시 접수", en: "Rolling", ja: "常時受付", zh: "常年报名", hi: "सतत पंजीकरण", vi: "Nhận thường trực" },
   "caris.rolling.pro_cbt.date": { ko: "연중 상시 · 예약일 응시", en: "Year-round · take on your booked date", ja: "通年 · 予約日に受験", zh: "全年常态 · 预约日应试", hi: "साल भर · बुक की गई तारीख पर परीक्षा", vi: "Quanh năm · thi vào ngày đã đặt" },
   "caris.rolling.pro_cbt.desc": { ko: "원하는 날짜를 예약해 온라인(CBT)으로 응시하는 상시 검정입니다.", en: "A rolling exam you take online (CBT) on a date you book.", ja: "ご希望の日付を予約してオンライン（CBT）で受験する常時検定です。", zh: "预约所需日期，通过在线(CBT)应试的常规检定。", hi: "अपनी पसंद की तारीख बुक कर ऑनलाइन (CBT) दी जाने वाली सतत परीक्षा।", vi: "Kỳ thi thường trực bạn dự online (CBT) vào ngày đã đặt." },
+
+  // ── Guide 히어로 (2026-07 개편: 로고 락업 + 일정 패널 → 카피 + CARIS PLAN 버튼 + 로봇 이미지) ──
+  // h1 은 2줄. 1줄은 브랜드 표기라 전 언어 'AI·Robot' 고정, 2줄만 번역 + 끝의 'CARIS' 는 컴포넌트가 파란색으로 붙인다.
+  "guide.hero_h1_l2": { ko: "융합역량", en: "Convergence Skills", ja: "融合力", zh: "融合能力", hi: "संगम दक्षता", vi: "Năng lực hội tụ" },
+  // 소개 문단 — '|' 로 줄바꿈(2줄). 1줄=지향점, 2줄=CARIS 가 하는 일.
+  "guide.hero_lead": {
+    ko: "AI와 로봇 기술을 이해하고 활용하는 미래형 인재로|CARIS가 당신의 융합역량을 검증하고 인증합니다.",
+    en: "Become the future talent who understands and applies AI and robotics|CARIS verifies and certifies your convergence skills.",
+    ja: "AIとロボット技術を理解し活用する未来型人材へ|CARISがあなたの融合力を検証し認証します。",
+    zh: "成为理解并运用AI与机器人技术的未来型人才|CARIS 检验并认证您的融合能力。",
+    hi: "AI और रोबोटिक्स को समझकर उपयोग करने वाले भविष्य के प्रतिभा बनें|CARIS आपकी संगम दक्षता को परखकर प्रमाणित करता है।",
+    vi: "Trở thành nhân tài tương lai hiểu và ứng dụng AI cùng robot|CARIS kiểm định và chứng nhận năng lực hội tụ của bạn.",
+  },
+  "guide.plan_cta": { ko: "CARIS PLAN", en: "CARIS PLAN", ja: "CARIS PLAN", zh: "CARIS PLAN", hi: "CARIS PLAN", vi: "CARIS PLAN" },
+
+  // ── Guide '무엇인가요' 섹션 — 제목 + 영문 정식명 + 한 줄 정의 + 특징 카드 8장 ──
+  "guide.what_title": { ko: "는 무엇인가요?", en: " — what is it?", ja: "とは？", zh: "是什么？", hi: "क्या है?", vi: "là gì?" },
+  "guide.what_def": { ko: "CARIS는 AI·Robot 융합역량 자격검정입니다.", en: "CARIS is the certification exam for AI·Robot convergence skills.", ja: "CARISはAI・Robot融合力の資格検定です。", zh: "CARIS 是 AI·Robot 融合能力资格检定。", hi: "CARIS, AI·Robot संगम दक्षता का प्रमाणन परीक्षण है।", vi: "CARIS là kỳ kiểm định năng lực hội tụ AI·Robot." },
+  "guide.f1.t": { ko: "AI·Robot 융합역량 인증", en: "AI·Robot convergence certification", ja: "AI・Robot融合力の認証", zh: "AI·Robot 融合能力认证", hi: "AI·Robot संगम दक्षता प्रमाणन", vi: "Chứng nhận năng lực hội tụ AI·Robot" },
+  "guide.f1.d": { ko: "체계적인 역량 검증 시스템", en: "A structured skill-verification system", ja: "体系的な能力検証システム", zh: "体系化的能力验证系统", hi: "व्यवस्थित दक्षता सत्यापन प्रणाली", vi: "Hệ thống kiểm định năng lực bài bản" },
+  "guide.f2.t": { ko: "체계적인 자격 등급", en: "Structured certification grades", ja: "体系的な資格等級", zh: "体系化的资格等级", hi: "व्यवस्थित प्रमाणन ग्रेड", vi: "Hệ cấp bậc chứng chỉ rõ ràng" },
+  "guide.f2.d": { ko: "단계별 성장 로드맵 제공", en: "A step-by-step growth roadmap", ja: "段階別の成長ロードマップ", zh: "提供阶梯式成长路线", hi: "चरणबद्ध विकास रोडमैप", vi: "Lộ trình phát triển theo từng bậc" },
+  "guide.f3.t": { ko: "누구나 응시 가능", en: "Open to everyone", ja: "誰でも受験可能", zh: "人人皆可应试", hi: "सभी के लिए खुला", vi: "Ai cũng có thể dự thi" },
+  "guide.f3.d": { ko: "연령·전공·경력 제한 없음", en: "No age, major or career limits", ja: "年齢・専攻・経歴の制限なし", zh: "无年龄·专业·经历限制", hi: "आयु·विषय·अनुभव की कोई सीमा नहीं", vi: "Không giới hạn tuổi·ngành·kinh nghiệm" },
+  "guide.f4.t": { ko: "글로벌 활용 가능", en: "Usable worldwide", ja: "グローバルに活用可能", zh: "可在全球使用", hi: "वैश्विक रूप से उपयोगी", vi: "Dùng được toàn cầu" },
+  "guide.f4.d": { ko: "국제적 표준 기반", en: "Built on international standards", ja: "国際標準に準拠", zh: "基于国际标准", hi: "अंतरराष्ट्रीय मानकों पर आधारित", vi: "Dựa trên chuẩn quốc tế" },
+  "guide.f5.t": { ko: "기술 이해", en: "Technical understanding", ja: "技術の理解", zh: "技术理解", hi: "तकनीकी समझ", vi: "Hiểu công nghệ" },
+  "guide.f5.d": { ko: "AI·로봇 기술의 기본 원리 이해", en: "Grasp the fundamentals of AI and robotics", ja: "AI・ロボット技術の基本原理を理解", zh: "理解AI·机器人技术的基本原理", hi: "AI·रोबोट तकनीक के मूल सिद्धांत", vi: "Nắm nguyên lý cơ bản của AI·robot" },
+  "guide.f6.t": { ko: "실무 활용", en: "Practical use", ja: "実務での活用", zh: "实务应用", hi: "व्यावहारिक उपयोग", vi: "Ứng dụng thực tế" },
+  "guide.f6.d": { ko: "업무·일상에 쓰는 실무 능력", en: "Skills you use at work and in daily life", ja: "業務・日常で使える実務力", zh: "用于工作·日常的实务能力", hi: "काम व रोज़मर्रा में काम आने वाला कौशल", vi: "Kỹ năng dùng trong công việc·đời sống" },
+  "guide.f7.t": { ko: "창의적 융합", en: "Creative convergence", ja: "創造的な融合", zh: "创意融合", hi: "रचनात्मक संगम", vi: "Hội tụ sáng tạo" },
+  "guide.f7.d": { ko: "AI·로봇 융합으로 새 가치 창출", en: "Create new value by fusing AI and robotics", ja: "AI・ロボットの融合で新たな価値を創出", zh: "以AI·机器人融合创造新价值", hi: "AI·रोबोट संगम से नया मूल्य", vi: "Tạo giá trị mới từ hội tụ AI·robot" },
+  "guide.f8.t": { ko: "미래 역량", en: "Future-ready skills", ja: "未来の力", zh: "未来素养", hi: "भविष्य की दक्षता", vi: "Năng lực tương lai" },
+  "guide.f8.d": { ko: "미래 사회의 핵심 역량 확보", en: "Secure the core skills of tomorrow", ja: "未来社会の中核能力を確保", zh: "掌握未来社会的核心能力", hi: "भावी समाज की मुख्य दक्षता", vi: "Nắm năng lực cốt lõi của xã hội tương lai" },
+
+  // ── Guide '자격 체계' 섹션 제목/부제 ──
+  "guide.ladder_title": { ko: "자격 체계", en: "certification ladder", ja: "資格体系", zh: "资格体系", hi: "प्रमाणन संरचना", vi: "hệ thống chứng chỉ" },
+  "guide.ladder_sub": { ko: "단계별로 차근차근, 당신의 꿈을 향해 나아가세요!", en: "Step by step — move toward the future you want.", ja: "一段ずつ着実に、あなたの夢へ進みましょう！", zh: "一步一个台阶，向着你的梦想前进！", hi: "कदम दर कदम, अपने सपने की ओर बढ़ें!", vi: "Từng bước một, tiến tới ước mơ của bạn!" },
+
+  // ── Plan(/plan · 시험 일정) ──
+  "plan.title": { ko: "CARIS PLAN", en: "CARIS PLAN", ja: "CARIS PLAN", zh: "CARIS PLAN", hi: "CARIS PLAN", vi: "CARIS PLAN" },
+  "plan.sub": { ko: "지금 접수할 수 있는 CARIS 일정입니다.", en: "CARIS sessions you can register for right now.", ja: "今お申し込みいただけるCARISの日程です。", zh: "当前可报名的 CARIS 日程。", hi: "अभी जिन CARIS सत्रों के लिए पंजीकरण खुला है।", vi: "Các đợt CARIS bạn có thể đăng ký ngay." },
+  "plan.back": { ko: "CARIS", en: "CARIS", ja: "CARIS", zh: "CARIS", hi: "CARIS", vi: "CARIS" },
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": { ko: "AI·Robot 융합역량 자격시험", en: "AI·Robotics Convergence Competency Exam", ja: "AI・ロボット融合力 資格試験", zh: "AI·机器人融合能力资格考试", hi: "AI·रोबोट संगम दक्षता परीक्षा", vi: "Kỳ thi năng lực hội tụ AI·robot" },

@@ -30,9 +30,16 @@ export default function SiteFooter() {
     apply()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
+    // ⚠️ 스크롤·리사이즈만 보면 '마운트 후 비동기 데이터가 도착해 본문이 길어지는' 경우를 놓친다.
+    //    (예: /plan 은 회차 목록이 늦게 와서 마운트 땐 푸터가 화면 중앙 → FAB 이 그 높이로 굳었다.)
+    //    ⚠️ document.body 는 안 됨 — 이 앱에선 body 박스가 100vh 로 고정돼 본문이 늘어도 크기가 안 변한다.
+    //       실제로 자라는 건 푸터가 속한 페이지 컨테이너라 그걸 관찰한다.
+    const ro = new ResizeObserver(onScroll)
+    ro.observe(el.parentElement ?? document.body)
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
+      ro.disconnect()
       if (raf) cancelAnimationFrame(raf)
       document.documentElement.style.removeProperty('--fab-bottom')
     }

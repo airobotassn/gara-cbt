@@ -1,26 +1,165 @@
-/* /guide 급수 피라미드 + 자격 플레이트 카드.
-   - 모든 셀렉터는 .gld 로 스코프(전역 .card/.slice 충돌 방지).
-   - 표면/텍스트는 토큰(var(--color-*)) 사용 → 다크모드 자동. 급수 스펙트럼 색만 고정 hex.
-   - 색은 Guide.tsx 의 SPECTRUM/TIER_BASE 와 동기화. 바꾸면 양쪽 같이. */
+/* /guide 자격검정 안내.
+   레퍼런스(2026-07): 페이지 전면이 옅은 하늘색 그라데이션이고 흰 카드가 그 위에 뜨는 구조.
+   ⚠️ 옛 구조(히어로만 파랑 → 본문 흰색, 히어로 우측 일정 패널, 상시시험 띠)는 폐기.
+      시험 일정은 /plan 으로 분리됐다(히어로 CARIS PLAN 버튼).
+   - 피라미드/카드 셀렉터는 .gld 로 스코프(전역 .card/.slice 충돌 방지).
+   - 급수 색은 Guide.tsx 의 SPECTRUM/TIER_BASE 와 동기화. 바꾸면 양쪽 같이. */
 
+/* ── 페이지 배경 ──
+   ⚠️ bg-background 토큰은 손대지 않는다 — 앱 전역이 쓰는 토큰이라 다른 페이지까지 바뀐다.
+   라디얼은 px 앵커(문서 상단 기준), 세로 그라데이션은 문서 전체 높이에 걸린다. */
+.guide-page {
+  --g-navy: #0f2a5f;
+  --g-blue: #1f74e8;
+  --g-blue-deep: #0f56c4;
+  --g-ink: #20334f;
+  --g-muted: #63758f;
+  --g-line: #dbe7f7;
+  --g-card: #ffffff;
+  --gld-gap: #e8f1fc; /* 피라미드 조각 사이 틈 = 페이지 배경색 */
+  background-color: #e4effb;
+  background-image:
+    radial-gradient(900px 440px at 78% 150px, rgba(255, 255, 255, .8), transparent 62%),
+    radial-gradient(1100px 520px at 10% 60px, rgba(255, 255, 255, .62), transparent 60%),
+    linear-gradient(180deg, #e9f3fd 0%, #e1edfb 22%, #e7f1fd 46%, #e0ebfa 72%, #e9f3fd 100%);
+  background-repeat: no-repeat;
+}
+/* 다크에서는 옅은 하늘색을 그대로 쓰면 눈이 부시고 글자가 안 읽힌다 → 딥 네이비로 반전 */
+html.dark .guide-page {
+  --g-navy: #cfe0ff;
+  --g-blue: #7aa9ff;
+  --g-blue-deep: #5b8ff0;
+  --g-ink: #dbe6f7;
+  --g-muted: #93a8c6;
+  --g-line: #23304a;
+  --g-card: #131a29;
+  --gld-gap: #0d1730;
+  background-color: #0d1730;
+  background-image:
+    radial-gradient(900px 440px at 78% 150px, rgba(87, 160, 250, .14), transparent 62%),
+    linear-gradient(180deg, #101c3a 0%, #0d1730 40%, #0b1428 100%);
+}
+
+/* ── 히어로 ── */
+.guide-hero { padding-block: 34px 8px; overflow: hidden; } /* ⚠️ padding 축약형은 px-margin-* 유틸의 좌우 패딩을 덮는다 */
+.guide-hero-grid {
+  display: grid; grid-template-columns: 1fr 480px; gap: 24px; align-items: center; min-height: 470px;
+}
+.guide-lockup { display: flex; align-items: center; gap: 6px; margin: 0 0 26px; }
+/* logo.png 는 상하좌우 여백이 39% 라 그대로 넣으면 작고 붕 뜬다 → 크게 잡고 음수 마진으로 상쇄 */
+.guide-lockup img { width: 74px; height: 74px; object-fit: contain; margin: -14px -6px -14px -14px; }
+.guide-lockup b { font-size: 34px; font-weight: 800; letter-spacing: .01em; color: var(--g-navy); }
+
+.guide-h1 { margin: 0; font-size: clamp(34px, 4.6vw, 57px); line-height: 1.16; font-weight: 900;
+  letter-spacing: -.02em; color: var(--g-navy); }
+.guide-h1 em { font-style: normal; color: var(--g-blue); }
+.guide-lead { margin: 26px 0 0; font-size: clamp(15.5px, 1.5vw, 18.5px); font-weight: 600;
+  line-height: 1.7; color: #35507a; word-break: keep-all; }
+html.dark .guide-lead { color: #a9c1e6; }
+
+.guide-plan-btn {
+  display: inline-flex; align-items: center; gap: 22px; margin-top: 34px; padding: 15px 26px;
+  border: 0; border-radius: 11px; font-size: 16px; font-weight: 800; color: #fff;
+  background: var(--g-blue-deep); box-shadow: 0 10px 22px -10px rgba(15, 86, 196, .7);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.guide-plan-btn svg { width: 17px; height: 17px; }
+.guide-plan-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 26px -10px rgba(15, 86, 196, .78); }
+
+/* 로봇(투명 PNG) + 손 위 CARIS 행성 오브를 겹치는 레이어.
+   오브 위치는 %라 로봇 이미지를 갈아도 비율만 맞으면 따라간다(팔 손바닥 중심 ≈ x15% / y70%). */
+.guide-hero-art { position: relative; justify-self: end; width: 100%; max-width: 520px; }
+/* ⚠️ 원본 PNG 가 아래(몸통)와 왼쪽(손가락 끝) 양쪽에서 잘려 있다 → 두 변을 배경으로 페이드해 직선 자국을 지운다.
+   근본 해결은 손이 안 잘린 더 넓은 원본으로 교체하는 것. 교체하면 아래 mask 는 지워도 된다. */
+.guide-hero-robot {
+  width: 100%; display: block;
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 99%), linear-gradient(to right, transparent 0%, #000 9%);
+          mask-image: linear-gradient(to bottom, #000 78%, transparent 99%), linear-gradient(to right, transparent 0%, #000 9%);
+  -webkit-mask-composite: source-in;
+          mask-composite: intersect;
+}
+/* 오브 래퍼 — 위치·부유만 담당하고, 실제 그림은 아래 3겹이 나눠 그린다.
+   빛을 로고 '뒤에만' 두면 스티커처럼 보인다 → 로고 자신이 빛을 머금게 겹친다. */
+.guide-hero-orb {
+  position: absolute; left: 14%; top: 52%; width: 25%; aspect-ratio: 1; z-index: 2;
+  transform: translate(-50%, -50%); pointer-events: none;
+  animation: guide-orb-float 4.5s ease-in-out infinite;
+}
+/* 로고 본체 — 원색 유지. 외곽광은 얇게만(진하게 주면 가장자리 색이 먹힌다). */
+.guide-hero-orb .orb-main { position: absolute; inset: 0; width: 100%; height: 100%;
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, .8)); }
+/* HUD 동심원 링 2개 — 레퍼런스의 홀로그램 테두리 */
+.guide-hero-orb .orb-ring {
+  position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%); pointer-events: none;
+}
+.guide-hero-orb .orb-ring-1 { width: 158%; border: 1.5px solid rgba(255, 255, 255, .85); }
+.guide-hero-orb .orb-ring-2 { width: 196%; border: 1px solid rgba(255, 255, 255, .5); }
+/* 후광 2겹 — 안쪽(::after)은 로고를 감싸는 밝은 코어, 바깥(::before)은 넓게 퍼지는 잔광.
+   ⚠️ ::after 에 z-index 필수. DOM 상 마지막이라 그냥 두면 로고 '위에' 칠해져 로고를 지운다. */
+.guide-hero-art::after {
+  content: ""; position: absolute; left: 14%; top: 52%; width: 68%; aspect-ratio: 1; z-index: 1;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side,
+    rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, .78) 30%, rgba(255, 255, 255, .4) 52%,
+    rgba(255, 255, 255, .14) 70%, transparent 84%);
+  filter: blur(14px);
+}
+.guide-hero-art::before {
+  content: ""; position: absolute; left: 14%; top: 52%; width: 124%; aspect-ratio: 1; z-index: 0;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side,
+    rgba(255, 255, 255, .66) 0%, rgba(255, 255, 255, .4) 42%, rgba(255, 255, 255, .14) 66%, transparent 82%);
+  filter: blur(34px);
+}
+@keyframes guide-orb-float {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, calc(-50% - 10px)); }
+}
+@media (prefers-reduced-motion: reduce) { .guide-hero-orb { animation: none; } }
+
+/* ── 공통 섹션 ── */
+.guide-sec { padding-block: 74px 0; }
+.guide-sec-last { padding-bottom: 92px; }
+.guide-sec-head { text-align: center; margin-bottom: 38px; }
+.guide-sec-head h2 { margin: 0; font-size: clamp(27px, 3vw, 35px); font-weight: 900;
+  letter-spacing: -.02em; color: var(--g-navy); }
+.guide-sec-head h2 .gh-hl { color: var(--g-blue); } /* ⚠️ .hl 은 result.css 가 전역으로 display:flex 를 먹여 못 씀 */
+.guide-sec-head p { margin: 16px 0 0; font-size: 15.5px; line-height: 1.75; color: var(--g-muted); }
+.guide-sec-head p b { display: inline-block; margin-top: 4px; font-size: 17px; font-weight: 800; color: var(--g-navy); }
+
+/* ── 특징 카드 8장(4×2) — 설명은 전부 1줄 기준이라 카드를 낮게 잡는다 ── */
+.guide-fcards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 1000px; margin: 0 auto; }
+.guide-fcard {
+  background: var(--g-card); border-radius: 16px; padding: 22px 16px; text-align: center;
+  box-shadow: 0 14px 28px -24px rgba(15, 60, 140, .3);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+@media (hover: hover) {
+  .guide-fcard:hover { transform: translateY(-4px); box-shadow: 0 20px 36px -22px rgba(15, 60, 140, .38); }
+}
+html.dark .guide-fcard { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 20px 44px -26px rgba(0, 0, 0, .7); }
+.guide-fcard svg { width: 36px; height: 36px; color: var(--g-blue); margin: 0 auto 11px; }
+.guide-fcard h3 { margin: 0 0 7px; font-size: 16px; font-weight: 800; color: var(--g-navy); }
+.guide-fcard p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--g-muted); word-break: keep-all; }
+
+/* ══════════ 급수 피라미드 + 자격 플레이트 카드 ══════════ */
 .gld { max-width: 720px; margin: 0 auto; }
 
 /* 안내 pill */
 .gld-hint {
   display: flex; align-items: center; justify-content: center; gap: 8px; width: fit-content;
   margin: 24px auto 0; padding: 9px 17px; border-radius: 999px;
-  background: var(--color-surface-container-lowest);
-  border: 1px solid color-mix(in srgb, var(--color-outline-variant) 60%, transparent);
+  background: var(--g-card);
+  border: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent);
   box-shadow: 0 1px 2px rgba(0, 74, 198, 0.06);
-  font-size: 14px; font-weight: 600; color: var(--color-on-surface-variant);
+  font-size: 14px; font-weight: 600; color: var(--g-muted);
 }
-.gld-hint .material-symbols-outlined { font-size: 19px; color: var(--color-primary); }
+.gld-hint .material-symbols-outlined { font-size: 19px; color: var(--g-blue); }
 
-/* 피라미드 */
 /* 피라미드는 정중앙·원래 크기로 유지하고 우측 브레이스+라벨 공간만 확보한다.
    viewBox 를 좌우 대칭(-240~1240)으로 넓혀 피라미드(x60~940, 중심500)가 정중앙에 오게 하고,
-   부모 .gld(720px)가 급수 카드와 공유라 못 넓히므로 wrap 만 부모 밖으로 확장(중앙 정렬 유지).
-   피라미드 렌더폭 = wrap(1036) × 880/1480 ≈ 616px 로 원래(700×880/1000)와 동일. */
+   부모 .gld(720px)가 급수 카드와 공유라 못 넓히므로 wrap 만 부모 밖으로 확장(중앙 정렬 유지). */
 .gld-pyramid-wrap { position: relative; width: min(1036px, 94vw); margin: 18px 0 2px; margin-left: 50%; transform: translateX(-50%); padding: 10px 0 6px; }
 .gld-brace-lbl { font-family: var(--font-title-md); font-size: 42px; font-weight: 800; letter-spacing: -0.01em; }
 .gld-pyramid-wrap::before {
@@ -34,7 +173,6 @@
 .gld-slice { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
 .gld-slice polygon { transition: filter 0.18s ease; }
 .gld-slice text { fill: #fff; font-family: var(--font-title-md); pointer-events: none; }
-.gld-lbl { font-size: 14px; font-weight: 700; letter-spacing: 0.24em; opacity: 0.8; }
 .gld-nm { font-weight: 800; letter-spacing: -0.01em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22); }
 @media (hover: hover) { .gld-slice:hover polygon { filter: brightness(1.08) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.22)); } }
 .gld-slice.pressing polygon { filter: brightness(1.14) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.26)); }
@@ -42,20 +180,14 @@
 .gld-slice:focus-visible polygon { filter: brightness(1.12); stroke: #fff; stroke-width: 3; }
 .gld-slice.is-active polygon { filter: brightness(1.12) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18)); }
 
-/* 그룹 헤더 */
-.gld-grp { display: flex; align-items: center; gap: 10px; margin: 56px 0 20px; }
-.gld-rail { width: 28px; height: 4px; border-radius: 999px; flex: none; }
-.gld-grp-name { font-size: 15px; font-weight: 800; margin: 0; letter-spacing: 0.02em; color: var(--color-on-surface); }
-.gld-grp-cap { color: var(--color-on-surface-variant); font-size: 13.5px; font-weight: 500; }
-
 /* 자격증 플레이트 카드 */
 .gld-cards { display: flex; flex-direction: column; gap: 18px; }
-/* 트랙(CARIS-Ⅰ/Ⅱ) 블록 사이 간격 — 옛 트랙 헤더(.gld-grp)를 없애며 사라진 구분을 대신한다.
-   카드 내부 간격(18px)보다 넓혀 Elite(Ⅰ 끝)와 Master(Ⅱ 시작)가 붙어 보이지 않게. */
+/* 트랙(CARIS-Ⅰ/Ⅱ) 블록 사이 간격 — 카드 내부 간격(18px)보다 넓혀
+   Elite(Ⅰ 끝)와 Master(Ⅱ 시작)가 붙어 보이지 않게. */
 .gld-track-block + .gld-track-block { margin-top: 36px; }
 .gld-card {
-  scroll-margin-top: 20px; background: var(--color-surface-container-lowest);
-  border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
+  scroll-margin-top: 20px; background: var(--g-card);
+  border: 1px solid color-mix(in srgb, var(--g-line) 40%, transparent);
   border-radius: 22px; overflow: hidden;
   box-shadow: 0 20px 40px -10px rgba(0, 74, 198, 0.08), 0 10px 15px -3px rgba(0, 74, 198, 0.05);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -74,9 +206,9 @@ html.dark .gld-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px
 .gld-track { display: inline-block; margin-top: 9px; font-size: 16px; font-weight: 800; padding: 5px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); backdrop-filter: blur(2px); }
 
 .gld-body { padding: 22px 24px 24px; }
-.gld-subj-label { font-size: 12.5px; font-weight: 800; color: var(--color-on-surface-variant); letter-spacing: 0.04em; margin-bottom: 14px; text-transform: uppercase; }
+.gld-subj-label { font-size: 12.5px; font-weight: 800; color: var(--g-muted); letter-spacing: 0.04em; margin-bottom: 14px; text-transform: uppercase; }
 .gld-subj { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
-.gld-subj li { display: flex; align-items: flex-start; gap: 13px; font-size: 16.5px; line-height: 1.5; color: var(--color-on-surface); }
+.gld-subj li { display: flex; align-items: flex-start; gap: 13px; font-size: 16.5px; line-height: 1.5; color: var(--g-ink); }
 .gld-idx { flex: none; width: 25px; height: 25px; border-radius: 8px; margin-top: 1px; display: grid; place-items: center; font-size: 12.5px; font-weight: 800; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); }
 html.dark .gld-idx { color: color-mix(in srgb, var(--c) 58%, white); background: color-mix(in srgb, var(--c) 22%, transparent); }
 
@@ -88,7 +220,19 @@ html.dark .gld-idx { color: color-mix(in srgb, var(--c) 58%, white); background:
 .gld-card.gld-flash { animation: gld-flash 1.35s ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  .gld-slice polygon, .gld-card, .gld-card.gld-flash { transition: none; animation: none; }
+  .gld-slice polygon, .gld-card, .gld-card.gld-flash, .guide-fcard, .guide-plan-btn { transition: none; animation: none; }
+}
+
+@media (max-width: 1000px) {
+  .guide-hero-grid { grid-template-columns: 1fr; min-height: 0; }
+  .guide-hero-art { justify-self: center; margin-top: 8px; }
+  .guide-fcards { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 620px) {
+  .guide-lockup img { width: 60px; height: 60px; margin: -11px -5px -11px -11px; }
+  .guide-lockup b { font-size: 28px; }
+  .guide-fcards { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .guide-sec { padding-top: 56px; }
 }
 @media (max-width: 480px) {
   .gld-banner { padding: 18px 20px; }
@@ -96,63 +240,3 @@ html.dark .gld-idx { color: color-mix(in srgb, var(--c) 58%, white); background:
   .gld-body { padding: 20px 20px 22px; }
   .gld-subj li { font-size: 15.5px; }
 }
-
-/* ── /guide 히어로 로고 락업 (레퍼런스: 바탕화면 dudfks3534@moate_20260721_141058674.png) ──
-   색은 레퍼런스 PNG 에서 직접 추출: 배경 #d4e5ee~#ddedfd / CARIS #00236e / 부제 #164691 / 바 #57a0fa
-   ⚠️ 배경을 .mesh-gradient-bg 로 두지 않는 이유: 그 클래스는 /mypage 와 공유라 고치면 그쪽까지 바뀐다. */
-.guide-hero {
-  --gh-title: #00236e;
-  --gh-sub: #164691;
-  --gh-bar: #57a0fa;
-  background-color: #ddedfd;
-  background-image:
-    linear-gradient(155deg, #d4e5ee 0%, #ddedfd 45%, #d7e8fc 100%),
-    radial-gradient(at 50% 0%, rgba(255, 255, 255, .55) 0px, transparent 60%);
-}
-/* 다크에서는 레퍼런스의 옅은 하늘색을 그대로 쓰면 눈이 부시고 글자가 안 읽힌다 → 딥 네이비로 반전 */
-html.dark .guide-hero {
-  --gh-title: #cfe0ff;
-  --gh-sub: #9dc0f0;
-  --gh-bar: #57a0fa;
-  background-color: #0d1730;
-  background-image:
-    linear-gradient(155deg, #101c3a 0%, #0d1730 45%, #0b1428 100%),
-    radial-gradient(at 50% 0%, rgba(87, 160, 250, .16) 0px, transparent 60%);
-}
-
-.guide-hero-lockup { display: flex; flex-direction: column; align-items: center; text-align: center; }
-/* logo.png 는 상하좌우 여백이 39% 라 그대로 넣으면 작고 붕 뜬다 → 크게 잡고 음수 마진으로 상쇄 */
-.guide-hero-logo { width: 168px; height: auto; display: block; margin: -22px 0 -14px; }
-.guide-hero-title { font-size: clamp(52px, 7vw, 86px); font-weight: 900; letter-spacing: .02em;
-  line-height: 1; color: var(--gh-title); margin: 0; }
-.guide-hero-sub { font-size: clamp(16px, 1.7vw, 22px); font-weight: 800; letter-spacing: -.01em;
-  color: var(--gh-sub); margin: 14px 0 0; word-break: keep-all; }
-.guide-hero-bar { display: block; width: 84px; height: 4px; border-radius: 999px;
-  background: var(--gh-bar); margin: 20px auto 0; }
-
-@media (max-width: 640px) {
-  .guide-hero-logo { width: 132px; margin: -18px 0 -11px; }
-  .guide-hero-bar { width: 68px; margin-top: 16px; }
-}
-
-/* ── 상시시험 띠 = 히어로(하늘색) → 본문(흰색) 전환 구간 ──
-   원래 bg-background(#faf8ff, 연보라)라 파란 히어로와 흰 본문 사이에서 혼자 떠 보이고
-   위아래 경계선이 두 줄 생겼다. 색을 하나 고르는 대신 '그라데이션 다리'로 바꾼다.
-   ⚠️ 시작색은 히어로 아래끝 실측값(좌 #dcecfd → 우 #d7e8fc)이라 이음매가 안 보인다.
-      히어로 배경(.guide-hero)을 바꾸면 이 값도 같이 맞춰야 함.
-   ⚠️ bg-background 토큰 자체는 손대지 않는다 — 앱 전역이 쓰는 토큰이라 다른 페이지까지 바뀐다. */
-.guide-band {
-  background-color: #ffffff;
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 88%),
-    linear-gradient(90deg, #dcecfd 0%, #d7e8fc 100%);
-}
-/* 다크: 히어로 아래끝(#0d172f→#0b1428) → 아래 본문 surface(#0d0f15) */
-html.dark .guide-band {
-  background-color: #0d0f15;
-  background-image:
-    linear-gradient(180deg, rgba(13, 15, 21, 0) 0%, #0d0f15 88%),
-    linear-gradient(90deg, #0d172f 0%, #0b1428 100%);
-}
-/* 상시시험 회차가 0개여도 전환 구간이 남아야 하므로 최소 높이를 준다(내용이 늘면 자연히 커짐). */
-.guide-band { min-height: 132px; }

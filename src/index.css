@@ -21,6 +21,7 @@
 @import './styles/cert.css';
 @import './styles/verify.css';
 @import './styles/guide.css';
+@import './styles/plan.css';
 @import './styles/chat.css';
 
 /* Tailwind v4 는 <button> 기본 커서가 default 로 바뀜 → 클릭 가능 요소는 pointer 복원(비활성 제외) */

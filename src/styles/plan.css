@@ -1,0 +1,100 @@
+/* /plan — CARIS 시험 일정(정기·상시).
+   원래 /guide 히어로 우측 패널 + 상시시험 섹션이던 것을 2026-07 개편에서 별도 페이지로 분리.
+   ⚠️ 페이지 배경/색 토큰(--g-*)은 .guide-page 가 단일 출처(guide.css). 두 페이지가 같은 표면을 공유한다. */
+
+.pl-wrap { padding-block: 34px 88px; } /* ⚠️ padding 축약형은 px-margin-* 유틸의 좌우 패딩을 덮는다 */
+
+.pl-back {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--g-line) 70%, transparent); border-radius: 999px;
+  background: var(--g-card); color: var(--g-muted); font-size: 13.5px; font-weight: 700;
+  box-shadow: 0 2px 6px rgba(15, 60, 140, .06); transition: border-color .16s ease, color .16s ease;
+}
+.pl-back .material-symbols-outlined { font-size: 18px; }
+.pl-back:hover { border-color: color-mix(in srgb, var(--g-blue) 45%, transparent); color: var(--g-blue-deep); }
+
+.pl-head { margin: 26px 0 34px; }
+.pl-head h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); font-weight: 900; letter-spacing: -.02em; color: var(--g-navy); }
+.pl-head h1 em { font-style: normal; color: var(--g-blue); }
+.pl-head p { margin: 12px 0 0; font-size: 15.5px; line-height: 1.7; color: var(--g-muted); word-break: keep-all; }
+
+.pl-empty { margin: 40px 0; text-align: center; font-size: 15px; color: var(--g-muted); }
+
+.pl-sec + .pl-sec { margin-top: 40px; }
+.pl-sec-head {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 16px;
+  font-size: 19px; font-weight: 800; color: var(--g-navy);
+}
+.pl-sec-head .material-symbols-outlined { font-size: 22px; color: var(--g-blue); }
+
+/* 정기시험 회차 카드 */
+.pl-rounds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.pl-rd {
+  position: relative; background: var(--g-card); border: 1px solid var(--g-line); border-radius: 16px;
+  padding: 20px 22px; box-shadow: 0 14px 30px -24px rgba(15, 60, 140, .3);
+  transition: border-color .16s ease, transform .16s ease;
+}
+.pl-rd.is-open { cursor: pointer; }
+.pl-rd.is-off { opacity: .66; }
+@media (hover: hover) {
+  .pl-rd.is-open:hover { border-color: color-mix(in srgb, var(--g-blue) 45%, transparent); transform: translateY(-3px); }
+}
+.pl-rd.is-open:focus-visible { outline: 2px solid var(--g-blue); outline-offset: 2px; }
+html.dark .pl-rd { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 20px 44px -26px rgba(0, 0, 0, .7); }
+
+.pl-rd-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 11px; }
+.pl-rd-title { font-size: 13px; font-weight: 800; color: var(--g-blue); }
+.pl-rd.is-off .pl-rd-title { color: var(--g-muted); }
+.pl-rd-date { font-size: 17px; font-weight: 800; color: var(--g-navy); }
+.pl-rd-apply { margin-top: 9px; font-size: 13px; color: var(--g-muted); }
+.pl-rd-apply b { display: block; margin-top: 2px; color: var(--g-ink); font-weight: 700; }
+
+.pl-pill {
+  font-size: 12px; font-weight: 800; padding: 4px 11px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in srgb, var(--g-blue) 12%, transparent); color: var(--g-blue-deep);
+}
+.pl-rd.is-off .pl-pill { background: color-mix(in srgb, var(--g-muted) 14%, transparent); color: var(--g-muted); }
+.pl-pill.is-rolling { background: #e2f6f1; color: #0d8873; }
+html.dark .pl-pill.is-rolling { background: rgba(18, 165, 140, .18); color: #4fd6bd; }
+
+.pl-go {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 12px;
+  font-size: 14px; font-weight: 800; color: var(--g-blue-deep); white-space: nowrap;
+}
+.pl-go .material-symbols-outlined { font-size: 18px; }
+
+/* 상시시험 */
+.pl-rollings { display: flex; flex-direction: column; gap: 14px; }
+.pl-rolling {
+  background: var(--g-card); border: 1px solid var(--g-line); border-radius: 16px; padding: 18px 22px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer;
+  box-shadow: 0 14px 30px -24px rgba(15, 60, 140, .3);
+  transition: border-color .16s ease, transform .16s ease;
+}
+@media (hover: hover) {
+  .pl-rolling:hover { border-color: color-mix(in srgb, var(--g-blue) 45%, transparent); transform: translateY(-3px); }
+}
+.pl-rolling:focus-visible { outline: 2px solid var(--g-blue); outline-offset: 2px; }
+html.dark .pl-rolling { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 20px 44px -26px rgba(0, 0, 0, .7); }
+.pl-rolling-l { display: flex; align-items: center; gap: 15px; min-width: 0; }
+.pl-rolling-ic {
+  flex: none; width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+  background: #e2f6f1; color: #0d8873;
+}
+html.dark .pl-rolling-ic { background: rgba(18, 165, 140, .18); color: #4fd6bd; }
+.pl-rolling h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--g-navy); }
+.pl-rolling p { margin: 3px 0 0; font-size: 13.5px; color: var(--g-muted); word-break: keep-all; }
+.pl-rolling-r { display: flex; align-items: center; gap: 12px; flex: none; }
+.pl-rolling-r .pl-go { margin-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-rd, .pl-rolling, .pl-back { transition: none; }
+}
+@media (max-width: 900px) {
+  .pl-rounds { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 620px) {
+  .pl-rounds { grid-template-columns: 1fr; }
+  .pl-rolling { flex-direction: column; align-items: flex-start; }
+  .pl-rolling-r { align-self: stretch; justify-content: space-between; }
+}

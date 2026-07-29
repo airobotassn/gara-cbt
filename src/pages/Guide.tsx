@@ -1,15 +1,8 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
 import { getTracks } from '../lib/caris'
-import { useExamRounds, type RoundStatus } from '../lib/rounds'
-
-const STATUS_KEY: Record<RoundStatus, string> = {
-  open: 'guide.status_open',
-  upcoming: 'guide.status_upcoming',
-  closed: 'guide.status_closed',
-}
 
 // 급수 스펙트럼(딥블루 → 그린). ⚠️ src/styles/guide.css 의 색과 동기화 필수(바꾸면 양쪽).
 const SPECTRUM: Record<string, [string, string]> = {
@@ -25,31 +18,46 @@ const TIER_BASE: Record<string, string> = {
   master: '#10b3ac', grandmaster: '#18bd6a', zenith: '#62c045',
 }
 // 피라미드 조각 기하(viewBox 1000×900, 위 Zenith → 아래 Beginner). polygon·텍스트 위치 고정.
-const PYRAMID: { key: string; polygon: string; lblY: number; nmY: number; nmSize: number }[] = [
-  { key: 'zenith', polygon: '500,40 573.3,180 426.7,180', lblY: 126, nmY: 156, nmSize: 26 },
-  { key: 'grandmaster', polygon: '426.7,180 573.3,180 646.7,320 353.3,320', lblY: 234, nmY: 266, nmSize: 31 },
-  { key: 'master', polygon: '353.3,320 646.7,320 720,460 280,460', lblY: 370, nmY: 404, nmSize: 36 },
-  { key: 'elite', polygon: '280,460 720,460 793.3,600 206.7,600', lblY: 510, nmY: 544, nmSize: 36 },
-  { key: 'pro', polygon: '206.7,600 793.3,600 866.7,740 133.3,740', lblY: 650, nmY: 684, nmSize: 36 },
-  { key: 'beginner', polygon: '133.3,740 866.7,740 940,880 60,880', lblY: 790, nmY: 824, nmSize: 36 },
+const PYRAMID: { key: string; polygon: string; nmY: number; nmSize: number }[] = [
+  { key: 'zenith', polygon: '500,40 573.3,180 426.7,180', nmY: 156, nmSize: 26 },
+  { key: 'grandmaster', polygon: '426.7,180 573.3,180 646.7,320 353.3,320', nmY: 266, nmSize: 31 },
+  { key: 'master', polygon: '353.3,320 646.7,320 720,460 280,460', nmY: 404, nmSize: 36 },
+  { key: 'elite', polygon: '280,460 720,460 793.3,600 206.7,600', nmY: 544, nmSize: 36 },
+  { key: 'pro', polygon: '206.7,600 793.3,600 866.7,740 133.3,740', nmY: 684, nmSize: 36 },
+  { key: 'beginner', polygon: '133.3,740 866.7,740 940,880 60,880', nmY: 824, nmSize: 36 },
 ]
 
-// 피라미드 우측 그룹 브레이스( ] )+라벨. 위 3티어(y40~460)=피지컬 AI(CARIS-Ⅱ), 아래 3티어(y460~880)=AI·로봇 리터러시(CARIS-Ⅰ).
-//   viewBox 를 x1360 으로 넓혀(피라미드는 60~940 그대로) 오른쪽 여백 940~1360 에 배치 → 피라미드가 살짝 왼쪽으로.
+// 피라미드 우측 그룹 브레이스( ] )+라벨. 위 3티어(y40~460)=피지컬 AI, 아래 3티어(y460~880)=AI·로봇 리터러시.
+//   viewBox 를 좌우 대칭으로 넓혀(피라미드는 60~940 그대로) 오른쪽 여백에 배치 → 피라미드는 정중앙 유지.
 const PYRAMID_GROUPS: { key: string; tkey: string; y1: number; y2: number; color: string }[] = [
   { key: 'phys', tkey: 'guide.group_physical', y1: 52, y2: 452, color: '#12a58c' },  // Zenith~Master
   { key: 'lit', tkey: 'guide.group_literacy', y1: 468, y2: 868, color: '#1156bd' },  // Elite~Beginner
 ]
 
-// gara_9 (자격검정 안내) 목업 디자인 그대로 + 라우팅·로그인 연결.
-// 원본: stitch_design_critique_assistant/gara_9/code.html (nav 활성 = 자격검정 안내)
-// primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff). 히어로 밴드 위 흰 버튼만 text-[#004ac6] 하드코딩 유지.
+// '무엇인가요' 특징 카드 8장 — 앞 4개는 제도 특징, 뒤 4개는 기르는 역량. i18n 키는 guide.f1~f8.
+const FEATURES: { k: string; icon: ReactNode }[] = [
+  { k: 'f1', icon: <><rect x="6.5" y="6.5" width="11" height="11" rx="2" /><path d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21" /><path d="M10.1 14.4l1.9-4.8 1.9 4.8M10.7 13h2.6" strokeWidth="1.3" /></> },
+  { k: 'f2', icon: <><path d="M3 20h18" /><rect x="4.5" y="12" width="3.4" height="6" /><rect x="10.3" y="9" width="3.4" height="9" /><rect x="16.1" y="13.5" width="3.4" height="4.5" /><path d="M5 8.6l4.6-3.5 3.4 2.2L20 2.6" /><path d="M16.4 2.6H20V6" /></> },
+  { k: 'f3', icon: <><circle cx="9" cy="8" r="3.3" /><path d="M2.8 19.5c0-3.2 2.8-5.4 6.2-5.4s6.2 2.2 6.2 5.4" /><path d="M16.2 5.2a3.3 3.3 0 010 6.2M17.4 14.6c2.3.6 3.8 2.4 3.8 4.9" /></> },
+  { k: 'f4', icon: <><circle cx="12" cy="12" r="9.2" /><path d="M2.8 12h18.4" /><ellipse cx="12" cy="12" rx="4" ry="9.2" /></> },
+  { k: 'f5', icon: <><path d="M4 4.6h6.2c1 0 1.8.8 1.8 1.8v13c0-1-.8-1.8-1.8-1.8H4z" /><path d="M20 4.6h-6.2c-1 0-1.8.8-1.8 1.8v13c0-1 .8-1.8 1.8-1.8H20z" /><path d="M6.3 12.6l1.6-4 1.6 4M6.8 11.4h2.2M15.4 8.6v4" strokeWidth="1.3" /></> },
+  { k: 'f6', icon: <><circle cx="12" cy="12" r="3.1" /><path d="M12 2.6l1.5 2.2a7.4 7.4 0 011.9.8l2.6-.5 1.7 2.9-1.7 2a7.4 7.4 0 010 2l1.7 2-1.7 2.9-2.6-.5a7.4 7.4 0 01-1.9.8L12 21.4l-1.5-2.2a7.4 7.4 0 01-1.9-.8l-2.6.5-1.7-2.9 1.7-2a7.4 7.4 0 010-2l-1.7-2 1.7-2.9 2.6.5a7.4 7.4 0 011.9-.8z" /></> },
+  { k: 'f7', icon: <><rect x="4.2" y="7.8" width="15.6" height="11.4" rx="3" /><path d="M12 3.2v4.6M8.6 2.9L12 3.2l3.4-.3" strokeWidth="1.4" /><circle cx="9" cy="12.6" r="1.25" fill="currentColor" stroke="none" /><circle cx="15" cy="12.6" r="1.25" fill="currentColor" stroke="none" /><path d="M9.4 16.2h5.2M1.9 11.4v4M22.1 11.4v4" /></> },
+  { k: 'f8', icon: <><circle cx="12" cy="12" r="8.4" /><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none" /><path d="M12 1.4v3.2M12 19.4v3.2M1.4 12h3.2M19.4 12h3.2" /></> },
+]
 
+// 라인 아이콘 공용 래퍼(레퍼런스가 얇은 아웃라인 스타일이라 Material Symbols 대신 인라인 SVG).
+function LineIcon({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
 
 export default function Guide() {
   const { t, lang } = useT()
   const navigate = useNavigate()
-  const { regular, rolling } = useExamRounds(lang)
   const TRACKS = getTracks(lang)
   const tierByKey = Object.fromEntries(TRACKS.flatMap((tr) => tr.tiers).map((tt) => [tt.key, tt]))
   const [activeKey, setActiveKey] = useState<string | null>(null)
@@ -77,108 +85,75 @@ export default function Guide() {
     return () => io.disconnect()
   }, [lang])
 
+  const [leadA, leadB] = t('guide.hero_lead').split('|')
+
   return (
-    <div className="bg-background text-on-background min-h-screen">
+    <div className="guide-page text-on-background min-h-screen">
       {/* 헤더 없음 — FAB이 네비 */}
       <main>
-        {/* Hero */}
-        <section className="relative min-h-[460px] flex items-center overflow-hidden guide-hero py-16 px-margin-mobile md:px-margin-desktop">
-          <div className="max-w-container-max mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-            {/* 로고 락업 — 오른쪽 일정 패널은 그대로 두고 이 칸만 가운데 정렬 */}
-            <div className="guide-hero-lockup">
-              <img className="guide-hero-logo" src="/logo.png" alt="CARIS" />
-              <h1 className="guide-hero-title">CARIS</h1>
-              <p className="guide-hero-sub">{t('guide.hero_lockup_sub')}</p>
-              <span className="guide-hero-bar" aria-hidden="true" />
+        {/* Hero — 좌: 로고 락업 + 카피 + CARIS PLAN / 우: 로봇 */}
+        <section className="guide-hero px-margin-mobile md:px-margin-desktop">
+          <div className="max-w-container-max mx-auto guide-hero-grid">
+            <div className="guide-hero-copy">
+              <div className="guide-lockup">
+                <img src="/logo.png" alt="" aria-hidden="true" />
+                <b>CARIS</b>
+              </div>
+              <h1 className="guide-h1">
+                AI·Robot<br />
+                {t('guide.hero_h1_l2')} <em>CARIS</em>
+              </h1>
+              <p className="guide-lead">{leadA}<br />{leadB}</p>
+              <button type="button" className="guide-plan-btn" onClick={() => navigate('/plan')}>
+                {t('guide.plan_cta')}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </button>
             </div>
-            <div className="glass-panel rounded-2xl p-8 ambient-shadow border border-white/40">
-              <h3 className="font-title-md text-title-md text-on-surface mb-6 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">calendar_month</span>
-                {t('guide.schedule_title')}
-              </h3>
-              <div className="space-y-4">
-                {/* 히어로 일정 패널은 가장 가까운 3개만(useExamRounds가 이미 가까운 순 정렬·지난 시험 제외). 상시시험은 아래 섹션에서 노출. */}
-                {regular.slice(0, 3).map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={s.clickable ? () => navigate(`/exam/apply?round=${s.id}`, { state: { roundId: s.id, roundLabel: s.title, dateLabel: s.dateText } }) : undefined}
-                    className={`rounded-xl p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2.5 sm:gap-3 border ${s.clickable ? 'bg-surface-container-lowest/60 border-white/50 hover:bg-surface-container-lowest/80 hover:border-primary/40 transition-colors cursor-pointer' : 'bg-surface-container-lowest/40 border-white/20 opacity-70'}`}
-                  >
-                    <div className="min-w-0">
-                      <div className={`font-label-sm text-label-sm mb-1 ${s.clickable ? 'text-primary' : 'text-on-surface-variant'}`}>{s.title}</div>
-                      <div className={`font-body-md text-body-md text-on-surface ${s.clickable ? 'font-semibold' : ''}`}>{s.dateText}</div>
-                      {s.applyText && (
-                        <div className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">
-                          {t('sched.apply_period')}
-                          <span className="block font-semibold text-on-surface">
-                            {(() => {
-                              const [a1, a2] = s.applyText.split('~')
-                              return a2 !== undefined
-                                ? <><span className="whitespace-nowrap">{a1.trim()}</span>{' ~ '}<span className="whitespace-nowrap">{a2.trim()}</span></>
-                                : s.applyText
-                            })()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                      <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm ${s.clickable ? 'bg-primary/10 text-primary' : 'bg-surface-dim text-on-surface-variant'}`}>{t(STATUS_KEY[s.status])}</span>
-                      {s.clickable && <span className="material-symbols-outlined text-primary text-[20px]">arrow_forward</span>}
-                    </div>
-                  </div>
-                ))}
+            {/* 로봇은 배경 투명 PNG. 손 위 CARIS 행성은 이미지에 굽지 않고 별도 레이어로 얹는다
+                (로고가 선명하게 유지되고 교체·부유 애니메이션이 쉬움). 위치는 guide.css 의 .guide-hero-orb. */}
+            <div className="guide-hero-art">
+              <img className="guide-hero-robot" src="/hero-robot.png" alt="" aria-hidden="true" />
+              {/* 오브 = 얇은 동심원 링 2개 + 로고. 빛은 전부 로고 '뒤'에만 있고 로고 자체는 원색 그대로.
+                  (레퍼런스 시안과 동일한 구성 — 로고를 덮는 층을 두면 색이 날아가 스티커처럼 보인다.) */}
+              <div className="guide-hero-orb" aria-hidden="true">
+                <span className="orb-ring orb-ring-1" />
+                <span className="orb-ring orb-ring-2" />
+                <img className="orb-main" src="/logo.png" alt="" />
               </div>
             </div>
           </div>
         </section>
 
-        {/* 상시시험 — 언제든 접수 가능한 회차(원서접수로 이동). 일정 페이지(/exam/schedule) 폐지로 여기서 노출.
-            이 섹션은 회차가 없어도 항상 렌더한다: 배경(.guide-band)이 히어로 하늘색 → 본문 흰색으로 넘어가는
-            전환 구간을 겸하기 때문. 회차가 늘면 섹션이 그만큼 높아지고 그라데이션도 %기준이라 같이 늘어난다. */}
-        <section className="py-12 guide-band px-margin-mobile md:px-margin-desktop">
-          {rolling.length > 0 && (
-            <div className="max-w-container-max mx-auto">
-              <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-5">{t('sched.rolling')}</h2>
-              <div className="flex flex-col gap-4">
-                {rolling.map((r) => (
-                  <div
-                    key={r.id}
-                    onClick={() => navigate(`/exam/apply?round=${r.id}`, { state: { roundId: r.id, roundLabel: r.title, dateLabel: r.note } })}
-                    className="rounded-2xl p-6 border bg-surface-container-lowest border-outline-variant/30 ambient-shadow hover:border-primary/50 hover:shadow-md transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined">event_repeat</span>
-                      </div>
-                      <div>
-                        <div className="font-title-md text-title-md font-bold text-on-surface">{r.title}</div>
-                        {r.note && <div className="font-body-md text-body-md text-on-surface-variant break-keep">{r.note}</div>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-end sm:self-auto">
-                      <span className="px-3 py-1.5 rounded-full font-label-md text-label-md font-bold bg-secondary/10 text-secondary whitespace-nowrap">{t('sched.rolling_badge')}</span>
-                      <span className="inline-flex items-center gap-1 font-label-md text-label-md text-primary font-bold whitespace-nowrap">
-                        {t('sched.apply')}<span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* CARIS 자격 소개 — Pro ↔ Master 전환 */}
-        <section className="py-16 bg-surface-container-lowest px-margin-mobile md:px-margin-desktop">
+        {/* CARIS 는 무엇인가요? — 정의 + 특징 카드 8장 */}
+        <section className="guide-sec px-margin-mobile md:px-margin-desktop">
           <div className="max-w-container-max mx-auto">
-            <div className="text-center max-w-3xl mx-auto mb-10">
-              <h2 className="font-headline-lg md:text-headline-lg text-headline-lg-mobile text-on-surface font-bold">{t('guide.cert_intro_title')}</h2>
-              <p className="font-title-md text-body-md md:text-title-md text-on-surface-variant tracking-wide break-keep mt-3">
-                Certification for AI &amp; Robotics Integrated Skills <span className="font-bold text-primary whitespace-nowrap">(CARIS)</span>
+            <div className="guide-sec-head">
+              <h2><span className="gh-hl">CARIS</span>{t('guide.what_title')}</h2>
+              <p>
+                Certification for AI &amp; Robotics Integrated Skills<br />
+                <b>{t('guide.what_def')}</b>
               </p>
             </div>
+            <div className="guide-fcards">
+              {FEATURES.map((f) => (
+                <article key={f.k} className="guide-fcard">
+                  <LineIcon>{f.icon}</LineIcon>
+                  <h3>{t(`guide.${f.k}.t`)}</h3>
+                  <p>{t(`guide.${f.k}.d`)}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
 
-            {/* 급수 지도: 피라미드(네비) + 급수별 자격 플레이트 카드 */}
+        {/* CARIS 자격 체계 — 피라미드(네비) + 급수별 자격 플레이트 카드 */}
+        <section className="guide-sec guide-sec-last px-margin-mobile md:px-margin-desktop">
+          <div className="max-w-container-max mx-auto">
+            <div className="guide-sec-head">
+              <h2><span className="gh-hl">CARIS</span> {t('guide.ladder_title')}</h2>
+              <p>{t('guide.ladder_sub')}</p>
+            </div>
+
             <div className="gld">
               <div className="gld-hint">
                 <span className="material-symbols-outlined">touch_app</span>
@@ -186,7 +161,7 @@ export default function Guide() {
               </div>
 
               <div className="gld-pyramid-wrap">
-                <svg className="gld-pyramid" viewBox="-240 0 1480 900" role="group" aria-label={t('guide.cert_intro_title')}>
+                <svg className="gld-pyramid" viewBox="-240 0 1480 900" role="group" aria-label={t('guide.ladder_title')}>
                   <defs>
                     {PYRAMID.map((p) => {
                       const [from, to] = SPECTRUM[p.key]
@@ -212,8 +187,7 @@ export default function Guide() {
                       onPointerLeave={() => setPressKey(null)}
                       onPointerCancel={() => setPressKey(null)}
                     >
-                      <polygon points={p.polygon} fill={`url(#gld-g-${p.key})`} stroke="var(--color-surface-container-lowest)" strokeWidth="7" strokeLinejoin="round" />
-                      {/* 조각 위 'CARIS' 라벨은 제거 — 티어명만 표시 */}
+                      <polygon points={p.polygon} fill={`url(#gld-g-${p.key})`} stroke="var(--gld-gap)" strokeWidth="7" strokeLinejoin="round" />
                       <text className="gld-nm" x="500" y={p.nmY} textAnchor="middle" fontSize={p.nmSize}>{tierByKey[p.key]?.name}</text>
                     </g>
                   ))}
@@ -222,7 +196,7 @@ export default function Guide() {
                   {PYRAMID_GROUPS.map((g) => {
                     const lines = t(g.tkey).split('|')
                     const mid = (g.y1 + g.y2) / 2
-                    const top = mid - (lines.length - 1) * 27 // 44px 줄 기준 세로 중앙
+                    const top = mid - (lines.length - 1) * 27 // 54px 줄 기준 세로 중앙
                     return (
                       <g key={g.key} className="gld-brace" aria-hidden="true">
                         <path d={`M 985 ${g.y1} H 1008 V ${g.y2} H 985`} fill="none" stroke={g.color} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
@@ -239,11 +213,9 @@ export default function Guide() {
 
               {TRACKS.map((tr) => (
                 <div key={tr.key} className="gld-track-block">
-                  {/* 트랙 헤더(CARIS-Ⅰ/Ⅱ + 태그라인)는 제거 — 트랙명은 각 카드 배너의 .gld-track 에 이미 나온다. */}
                   <div className="gld-cards">
                     {tr.tiers.map((tier) => {
-                      // 배너 문구: CARIS-Ⅰ(t1)은 트랙명 빼고 기존 대상(target)만, CARIS-Ⅱ(t2)는 '피지컬 AI 초/중/고급 전문가'.
-                      //   prereq(응시자격)는 응시화면(ExamApply/Prepare)에서 쓰이므로 데이터는 건드리지 않고 여기서만 라벨을 바꾼다.
+                      // 배너 문구: CARIS-Ⅰ(t1)은 기존 대상(target), CARIS-Ⅱ(t2)는 '피지컬 AI 초/중/고급 전문가'.
                       const trackText = tr.key === 't2' ? t(`guide.ptrack.${tier.key}`) : (tier.target ?? '')
                       return (
                         <article
