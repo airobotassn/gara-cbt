@@ -22,7 +22,7 @@ import { zoom as d3Zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } fro
 import { timer as d3Timer, type Timer } from 'd3-timer'
 import { easeCubicIn, easeCubicInOut, easeCubicOut } from 'd3-ease'
 import 'd3-transition' // selection.transition() 부착(부수효과 import)
-import { MEDAL_TONE, type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
+import { MEDAL_TONE, TOP10_CUT, TOP10_FILL, type ArenaLevel, type Cscale, type GeoFeature, type Region } from '../lib/arena/data'
 import { DOKDO_GEO, M49_TO_ISO2 } from '../lib/arena/tables'
 import { labelAnchor } from '../lib/arena/labelPoint'
 
@@ -54,6 +54,8 @@ interface Props {
   onDrill(r: Region): void
   onPrompt(name: string): void
   onHover(info: HoverInfo | null): void
+  /** 지도 위 순위 표시(숫자 라벨 + 1~3위 트로피) on/off. 색·발광은 그대로 남는다. */
+  showNumbers: boolean
   /** 점수 → 색. 화면에 뜬 버킷 범위로 만든 상대 스케일이라 부모가 소유한다. */
   color: Cscale
 }
@@ -96,6 +98,40 @@ const OBJ_HIDE = 18 // 너무 축소돼 이보다 작으면 입체가 뭉개져 
 /** 트로피 이미지의 가로/세로 비 — 1·3등은 384×512, 2등은 366×512. 정사각으로 박으면 찌그러진다. */
 const OBJ_ASPECT = [0.75, 0.715, 0.75]
 
+/** 본토 판별 반경(라디안). 러시아처럼 동서로 긴 나라도 한 덩어리로 묶이도록 넉넉히 잡는다. */
+const MAINLAND_R = (35 * Math.PI) / 180
+
+/**
+ * 화면을 맞출 **본토** 골라내기 — `[남길 지역들, 본토 중앙 경도]`.
+ *
+ * 본토 = **면적 합이 가장 큰 무리**다. "가장 큰 조각 하나"로 잡으면 안 된다 — 프랑스는 기아나,
+ * 미국은 알래스카가 단일 면적으로는 더 커서 그쪽이 본토로 뽑히고 정작 본토가 화면 밖으로 밀린다.
+ * 각 지역 중심을 후보로 놓고 반경 안 면적을 합산해 최대인 곳을 본토로 삼는다.
+ */
+function mainlandOf(feats: GeoFeature[]): { keep: GeoFeature[]; lon0: number } {
+  const cs = feats.map((f) => geoCentroid(f))
+  const as = feats.map((f) => geoArea(f))
+  // ⚠️ 단순화 과정에서 면이 선/점으로 뭉개진 조각은 중심이 NaN 이 된다. 그대로 두면 비교가 전부
+  //    false 가 되어 엉뚱한 지역이 본토로 뽑히고, 회전각까지 NaN 이 되면 지도 전체가 사라진다.
+  const ok = feats.map((_, i) => Number.isFinite(cs[i][0]) && Number.isFinite(cs[i][1]) && Number.isFinite(as[i]))
+  const first = ok.indexOf(true)
+  if (first < 0) return { keep: feats, lon0: 0 }
+  let best = first
+  let bestSum = -1
+  for (let i = 0; i < feats.length; i++) {
+    if (!ok[i]) continue
+    let sum = 0
+    for (let j = 0; j < feats.length; j++) if (ok[j] && geoDistance(cs[i], cs[j]) < MAINLAND_R) sum += as[j]
+    if (sum > bestSum) {
+      bestSum = sum
+      best = i
+    }
+  }
+  // 중심이 망가진 조각은 화면 맞춤에서 빼되(투영이 오염된다) 지도에는 그대로 그린다.
+  const keep = feats.filter((_, j) => ok[j] && geoDistance(cs[j], cs[best]) < MAINLAND_R)
+  return { keep: keep.length ? keep : feats, lon0: cs[best][0] }
+}
+
 function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -125,6 +161,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   })
 
   const g = useRef<{
+    backdrop: Selection<SVGGElement, unknown, null, undefined>
     viewport: Selection<SVGGElement, unknown, null, undefined>
     atmo: Selection<SVGGElement, unknown, null, undefined>
     sphere: Selection<SVGGElement, unknown, null, undefined>
@@ -181,12 +218,21 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       proj.scale(st.current.baseScale0 * st.current.globeK)
       return proj
     }
-    return geoMercator().fitExtent(
+    // 평면 레벨은 **본토에만** 화면을 맞춘다. 전체에 맞추면 해외영토·원격 섬 때문에 본토가
+    // 점만 해진다(프랑스=기아나·레위니옹, 미국=알래스카·괌, 뉴질랜드=채텀 제도).
+    // 그리고 본토의 중앙 경도만큼 회전시켜 날짜변경선 이음매를 피한다(러시아가 좌우로 찢어졌다).
+    const feats = regions.map((r) => r.f)
+    const proj = geoMercator()
+    // ⚠️ 빈 목록에 fitExtent 를 걸면 배율이 NaN/Infinity 가 되어 지도 전체가 사라진다.
+    //    드릴다운 직후 새 나라 데이터가 도착하기 전 한 프레임 동안 실제로 빈다.
+    if (!feats.length) return proj
+    const { keep, lon0 } = mainlandOf(feats)
+    return proj.rotate([-lon0, 0]).fitExtent(
       [
         [16, 16],
         [W - 16, H - 16],
       ],
-      { type: 'FeatureCollection', features: regions.map((r) => r.f) } as never,
+      { type: 'FeatureCollection', features: keep } as never,
     )
   }, [])
 
@@ -303,10 +349,24 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       groups.grat.selectAll('*').remove()
     }
 
+    // 평면 레벨(1·2)의 어두운 바탕 — 지구본과 같은 바다 그라디언트를 화면 전체에 깐다.
+    // 이게 없으면 대륙만 뜨고 주변이 카드의 흰 배경이라, 흰 발광 테두리가 바깥쪽에서 묻히고
+    // 같은 색인데도 지구본과 인상이 달라진다.
+    groups.backdrop
+      .selectAll<SVGRectElement, number>('rect')
+      .data(level === 0 ? [] : [0])
+      .join('rect')
+      .attr('class', 'mapbgfill')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', st.current.W)
+      .attr('height', st.current.H)
+
     groups.geo.selectAll<SVGPathElement, Region>('path').attr('d', (d) => path(d.f))
 
-    // 시상대 경계 = **하얗게 빛나는 테두리선**. 면이 광채를 뿜는 게 아니라 나라 윤곽선이 빛난다.
-    // 두 겹으로 그린다: 좁고 흐린 흰 후광 → 그 위에 또렷하고 굵은 흰 심지.
+    // 시상대 경계 = **하얀 테두리선**. 면이 광채를 뿜는 게 아니라 나라 윤곽선이 빛난다.
+    // ⚠️ 후광(흐린 겹)은 **지구본에서만** 쓴다. 시도·시군구는 경계가 촘촘해서 후광끼리 겹쳐
+    //    화면이 흐려진다 — 그 레벨에서는 또렷한 심지 하나로 충분하다.
     // ⚠️ 이 그룹은 **모든 지역(.geo) 위**에 있어야 한다. 아래에 두면 나중에 그려지는 이웃 지역이
     //    바깥으로 번진 빛을 덮어, 바다에 접한 쪽만 빛나고 국경 맞닿은 쪽은 사라진다.
     // 색은 등수와 무관하게 흰색 하나라 CSS 가 갖는다(여기서는 모양만 준다).
@@ -314,12 +374,25 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .map((r) => ({ r, rank: st.current.rankOf.get(r.key) ?? 99 }))
       .filter((m) => m.rank <= 3)
       .sort((a, b) => a.rank - b.rank)
-    for (const cls of ['medalhalo', 'medalline'] as const) {
+    // 선 굵기는 **지역이 화면에서 차지하는 크기에 비례**한다. 고정 px 로 두면 지구본처럼 지역이
+    // 작아졌을 때 상대적으로 빛이 과해져 덩어리를 잡아먹는다. 평면 레벨의 확대 배율(tk)만큼
+    // 그룹 좌표계로 되돌려 준다.
+    const tk = level === 0 ? 1 : st.current.vk
+    const widthOf = (m: (typeof medals)[number], ratio: number, lo: number, hi: number) => {
+      const bb = path.bounds(m.r.f)
+      const short = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1]) * tk
+      return clamp(short * ratio, lo, hi) / tk
+    }
+    for (const [cls, ratio, lo, hi] of [
+      ['medalhalo', 0.035, 1.2, 3.2],
+      ['medalline', 0.018, 0.7, 1.8],
+    ] as const) {
       groups.glow
         .selectAll<SVGPathElement, (typeof medals)[number]>(`path.${cls}`)
-        .data(medals, (m) => m.rank)
+        .data(cls === 'medalhalo' && level !== 0 ? [] : medals, (m) => m.rank)
         .join('path')
         .attr('class', cls)
+        .attr('stroke-width', (m) => widthOf(m, ratio, lo, hi).toFixed(2))
         .attr('d', (m) => path(m.r.f))
     }
 
@@ -341,9 +414,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       groups.mark.selectAll('*').remove()
     }
     // ── 순위 라벨 ── (지구본에선 뒷면 지역을 걸러낸다) 등수와 무관하게 전부 숫자로 그린다.
+    // showNumbers 가 꺼져 있으면 빈 데이터로 join → 숫자·트로피가 같이 사라진다(색·발광은 유지).
     const lrot = proj.rotate()
-    const labelData =
-      level === 0
+    const labelData = !p.current.showNumbers
+      ? []
+      : level === 0
         ? st.current.labels.filter((l) => geoDistance(l.c, [-lrot[0], -lrot[1]]) < Math.PI / 2)
         : st.current.labels
     groups.labels
@@ -519,9 +594,14 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         const rank = st.current.rankOf.get(d.key) ?? 99
         return rank <= 3 ? rank : null
       })
+      // 1~3위=시상대 그라디언트 · 4~10위=한 색으로 묶은 상위권 · 그 아래=백분위 램프.
+      // ⚠️ 4~10위 묶음은 **지구본(레벨0)에서만**. 시도는 17개뿐이라 상위 10개를 한 색으로 칠하면
+      //    지도의 절반 이상이 같은 색이 되어 오히려 순위가 안 읽힌다.
       .attr('fill', (d) => {
-        const rank = st.current.rankOf.get(d.key) ?? 99
-        return rank <= 3 ? `url(#medalGrad${rank})` : p.current.color(d.score)
+        const rank = st.current.rankOf.get(d.key) ?? Infinity
+        if (rank <= 3) return `url(#medalGrad${rank})`
+        if (level === 0 && rank <= TOP10_CUT) return TOP10_FILL
+        return p.current.color(d.score)
       })
 
     paint()
@@ -635,8 +715,12 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     })
 
     // 평면 레벨의 팬/줌은 viewport 그룹에 transform 을 걸어 처리한다.
+    // 평면 레벨(1·2)의 어두운 바탕. **viewport 밖**에 둔다 — 안에 넣으면 팬·줌 transform 을 같이
+    // 받아 배경이 따라 움직이고 가장자리가 비어 버린다. 지구본(레벨0)은 자기 구체가 있어 쓰지 않는다.
+    const backdrop = svg.append('g').attr('class', 'mapbg')
     const viewport = svg.append('g').attr('class', 'viewport')
     const groups = {
+      backdrop,
       viewport,
       atmo: viewport.append('g'),
       sphere: viewport.append('g'),
@@ -693,7 +777,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       st.current.W = r.width
       st.current.H = Math.max(420, r.height)
       svg.attr('viewBox', `0 0 ${st.current.W} ${st.current.H}`).attr('width', st.current.W).attr('height', st.current.H)
-      if (st.current.proj) {
+      // 지역 목록이 비어 있으면 투영을 다시 만들지 않는다(빈 데이터에 맞추면 배율이 깨진다).
+      if (st.current.proj && p.current.regions.length) {
         st.current.proj = makeProjection(p.current.regions, p.current.level)
         fn.current.paint()
       }
@@ -721,6 +806,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   useEffect(() => {
     fn.current.draw()
   }, [props.regions, props.level, draw])
+
+  // 숫자 on/off 는 지오메트리와 무관 → 다시 칠하기만(라벨 join 이 붙었다 떨어진다)
+  useEffect(() => {
+    fn.current.paint()
+  }, [props.showNumbers])
 
   // 홈 국가가 정해지면 지구본을 그쪽으로(첫 확정은 즉시 정렬, 이후 변경은 회전 연출)
   useEffect(() => {

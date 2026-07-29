@@ -8,12 +8,23 @@ import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Lang } from '../i18n'
 import { KR_ID, M49_TO_ISO2, NUM2KO, PROV_I18N, PROV_TO_ISO } from './tables'
 
-export type ArenaLevel = 0 | 1 | 2
+/**
+ * 지도 깊이 — 0=지구본(국가), 1=1차 행정구역(시도·주·성).
+ * ⚠️ 예전엔 2(시군구)가 있었는데 걷어냈다. 전 세계로 열면서 그 데이터가 대한민국에만 있어
+ * 다른 나라에서 한 단계 더 들어가면 빈 화면이 됐다.
+ */
+export type ArenaLevel = 0 | 1
 
 export interface GeoProps {
   name?: string
   name_eng?: string
   code?: string
+  /** adm1(해외 1차 행정구역) 전용 다국어 이름 — Natural Earth 가 6개국어를 다 갖고 있다. */
+  name_en?: string
+  name_ja?: string
+  name_zh?: string
+  name_hi?: string
+  name_vi?: string
 }
 export type GeoFeature = Feature<Geometry, GeoProps> & { id?: string | number }
 
@@ -75,8 +86,26 @@ export const loadCountries = (): Promise<GeoFeature[]> =>
   )
 /** 대한민국 시도 17개 — 레벨1 */
 export const loadProvinces = (): Promise<GeoFeature[]> => loadFeatures('/geo/kr-prov.json')
-/** 시군구 250개 — 레벨2(지연 로드) */
-export const loadMunicipalities = (): Promise<GeoFeature[]> => loadFeatures('/geo/kr-muni.json')
+
+/**
+ * 대한민국 외 국가의 1차 행정구역(주·성·현 등) — Natural Earth 10m admin-1 을 국가별로 쪼갠 것.
+ * 214개국 6MB 라 통째로 받으면 안 되고, **파고든 그 나라 것만** 지연 로드한다(나라당 평균 30KB).
+ *
+ * ⚠️ 대한민국은 여기 쓰지 않고 기존 `loadProvinces()`(kr-prov.json)를 그대로 쓴다 — 시군구(레벨2)
+ * 드릴다운과 실집계 매칭이 그 파일의 숫자 코드(`11`·`37`)에 묶여 있기 때문이다.
+ */
+export const loadAdm1 = (iso: string): Promise<GeoFeature[]> => loadFeatures(`/geo/adm1/${iso}.json`)
+
+/** 어느 나라에 1차 행정구역 데이터가 있는지: `{ 'US': 51, 'JP': 47, ... }`. 드릴다운 가능 여부 판정용. */
+let adm1IndexCache: Promise<Record<string, number>> | null = null
+export function loadAdm1Index(): Promise<Record<string, number>> {
+  if (!adm1IndexCache) {
+    adm1IndexCache = fetch('/geo/adm1/index.json')
+      .then((r) => (r.ok ? (r.json() as Promise<Record<string, number>>) : {}))
+      .catch(() => ({}))
+  }
+  return adm1IndexCache
+}
 
 // ── 실데이터 없을 때 쓰는 목값(지역 코드 해시 기반 — 새로고침해도 같은 값) ──
 function h32(s: string): number {
@@ -173,6 +202,19 @@ export const MEDAL_TONE = [
 ] as const
 
 /**
+ * 4~10위가 공유하는 한 가지 색(밝은 실버블루)과 그 경계 등수.
+ *
+ * 백분위 램프만 쓰면 4위와 40위의 색차가 미미해 "상위권"이 안 읽힌다. 그래서 4~10위를 한 색으로
+ * 묶어 **메달 3개 → 상위 10 덩어리 → 나머지 램프** 3층으로 만든다. 그 안의 순서는 숫자가 말한다.
+ *
+ * ⚠️ **채도가 관건이다.** 처음엔 밝은 실버블루(#aec8e2)를 썼는데 "상위"가 아니라 "색이 빠진 것 =
+ * 점수 없음/최하위"로 읽혔다. 주변 파랑보다 밝아도 채도가 낮으면 죽은 색으로 보인다.
+ * 그래서 램프(파랑)·메달(골드·시안·청록) 어디와도 겹치지 않는 **채도 있는 별개 색**을 쓴다.
+ */
+export const TOP10_FILL = '#8e9ef2'
+export const TOP10_CUT = 10
+
+/**
  * 점수 → 지도 색. **백분위(등수 순서) 기반**이다.
  *
  * 점수를 min~max 에 선형으로 깔면 데이터가 몰린 구간(대부분 하위권)에서 색도 뭉쳐 지도가
@@ -237,8 +279,20 @@ function provName(f: GeoFeature, lang: Lang): string {
   if (table && code && table[code]) return table[code]
   return f.properties.name_eng || f.properties.name || ''
 }
-const localName = (f: GeoFeature, lang: Lang): string =>
-  lang === 'ko' ? (f.properties.name ?? '') : (f.properties.name_eng || f.properties.name || '')
+
+/** 해외 1차 행정구역 이름 — 빌드 때 6개국어를 다 넣어 뒀으므로 언어 키만 고르면 된다(ko 는 `name`). */
+function adm1Name(f: GeoFeature, lang: Lang): string {
+  const p = f.properties
+  const byLang: Record<Lang, string | undefined> = {
+    ko: p.name,
+    en: p.name_en,
+    ja: p.name_ja,
+    zh: p.name_zh,
+    hi: p.name_hi,
+    vi: p.name_vi,
+  }
+  return byLang[lang] || p.name_en || p.name || ''
+}
 
 export function koreaName(countries: GeoFeature[], lang: Lang): string {
   const f = countries.find((x) => String(x.id) === KR_ID)
@@ -252,12 +306,21 @@ export interface BuildArgs {
   real: RealData
   countries: GeoFeature[]
   provinces: GeoFeature[]
-  municipalities: GeoFeature[]
-  /** 레벨2에서 파고든 시도 code(예: '37'=경북) */
-  provCode: string | null
+  /** 레벨1에서 파고든 나라(alpha-2). 'KR' 이면 기존 시도 데이터, 그 외는 adm1. */
+  drillIso: string | null
+  /** 1차 행정구역 데이터가 있는 나라 목록 — 지구본에서 어느 나라를 파고들 수 있는지 정한다. */
+  adm1Index: Record<string, number>
 }
 
-export function buildRegions({ level, lang, real, countries, provinces, municipalities, provCode }: BuildArgs): Region[] {
+export function buildRegions({
+  level,
+  lang,
+  real,
+  countries,
+  provinces,
+  drillIso,
+  adm1Index,
+}: BuildArgs): Region[] {
   let base: Omit<Region, 'score' | 'takers' | 'real'>[]
   if (level === 0) {
     base = countries.map((f) => ({
@@ -267,35 +330,29 @@ export function buildRegions({ level, lang, real, countries, provinces, municipa
       //    뒤섞인다) 목 점수도 셋이 같아진다 → id 없으면 지명으로 대체한다.
       key: 'C' + (f.id ?? f.properties.name ?? ''),
       name: countryName(f, lang),
-      drill: String(f.id) === KR_ID,
+      // 1차 행정구역 데이터가 있는 나라만 파고들 수 있다(대한민국은 전용 파일로 항상 가능).
+      drill: String(f.id) === KR_ID || !!adm1Index[M49_TO_ISO2[String(f.id)] ?? ''],
     }))
-  } else if (level === 1) {
+  } else {
+    // 대한민국은 기존 시도 파일(숫자 코드 → 실집계 매칭), 그 외는 adm1(ISO 3166-2 코드).
+    const isKR = drillIso === 'KR'
     base = provinces.map((f) => ({
       f,
       key: 'P' + f.properties.code,
-      name: provName(f, lang),
+      name: isKR ? provName(f, lang) : adm1Name(f, lang),
       code: f.properties.code,
-      drill: true,
+      drill: false, // 여기가 마지막 단계다
     }))
-  } else {
-    base = municipalities
-      .filter((f) => (f.properties.code ?? '').slice(0, 2) === provCode)
-      .map((f) => ({
-        f,
-        key: 'M' + f.properties.code,
-        name: localName(f, lang),
-        code: f.properties.code,
-        drill: false,
-      }))
   }
 
   return base.map((r) => {
-    // 실데이터 우선(국가=alpha2, 시도=ISO 3166-2). 시군구는 아직 집계 대상이 아니라 항상 목값.
+    // 실데이터 우선(국가=alpha2, 시도=ISO 3166-2).
     let bucket: RealBucket | undefined
     if (level === 0) {
       const iso = M49_TO_ISO2[String(r.f.id)]
       if (iso) bucket = real.country[iso]
     } else if (level === 1 && r.code) {
+      // 실집계는 아직 대한민국 시도만 있다. adm1(해외)은 코드 체계가 달라 매칭 대상이 없어 목값이 된다.
       const iso = PROV_TO_ISO[r.code]
       if (iso) bucket = real.region[iso]
     }

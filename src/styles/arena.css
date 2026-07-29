@@ -112,6 +112,10 @@ html.dark .arena {
 .aa-zoomctl button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 2px solid var(--aa-line); background: var(--aa-panel); color: var(--aa-ink); font-size: 18px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--aa-sh-solid); display: flex; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .aa-zoomctl button:hover { background: var(--aa-panel-2); }
 .aa-zoomctl button:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
+/* 순위 숫자 on/off — 확대/축소와 같은 스택. 글자(ON/OFF)가 3자라 폰트만 작게 잡는다.
+   켜짐은 강조색, 꺼짐은 흐린 회색 — 글자 자체가 상태를 말하므로 별도 표식은 두지 않는다. */
+.aa-zoomctl button.aa-numtoggle { font-size: 11px; font-weight: 900; letter-spacing: -.02em; color: var(--aa-accent); }
+.aa-zoomctl button.aa-numtoggle.off { color: var(--aa-faint); }
 
 /* ── 독도 확대도 ── */
 .dokinset { position: absolute; top: 12px; right: 12px; width: 150px; height: 112px; border: 2px solid var(--aa-line); border-radius: 10px; overflow: hidden; z-index: 7; box-shadow: 0 3px 0 var(--aa-sh-solid); background: var(--aa-inset-grad); pointer-events: none; }
@@ -232,12 +236,16 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
 #arena-map .geo[data-podium] { stroke: none; filter: url(#medalGrain); }
 #arena-map.dragging .geo[data-podium] { filter: none; }
 /* 후광 — 흰빛을 좁게. 번짐을 키우면 덩어리가 뿌예지고 면까지 발광하는 것처럼 보인다.
-   심지 두께보다 조금만 넓게 잡아 '선이 빛난다' 정도로만 남긴다. */
-#arena-map .medalhalo { fill: none; stroke: #ffffff; stroke-width: 3.2; filter: blur(1.4px); opacity: .95; pointer-events: none; }
+   심지 두께보다 조금만 넓게 잡아 '선이 빛난다' 정도로만 남긴다.
+   ⚠️ stroke-width 는 JS 가 지역 크기에 비례해 준다(고정 px 로 두면 작은 지역에서 빛이 과해진다). */
+#arena-map .medalhalo { fill: none; stroke: #ffffff; filter: blur(1.4px); opacity: .95; pointer-events: none; }
 /* 심지 — 또렷한 흰 선. 발광의 주인공은 번짐이 아니라 이 선이다. */
 #arena-map .medalline { fill: none; stroke: #ffffff; stroke-width: 1.8; stroke-linejoin: round; pointer-events: none; vector-effect: non-scaling-stroke; }
 #arena-map .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
 #arena-map .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--aa-line); stroke-width: 3; }
+/* 평면 레벨(1·2)의 바탕 — 지구본 바다와 같은 그라디언트라 세 레벨의 인상이 일치한다.
+   viewport 밖에 있어 팬·줌에 안 따라 움직인다(ArenaMap 의 backdrop 그룹). */
+#arena-map .mapbgfill { fill: url(#oceanGrad); }
 #arena-map .spec { fill: url(#specGrad); pointer-events: none; }
 #arena-map #specGrad .s-in  { stop-color: #ffffff; stop-opacity: var(--aa-spec-op); }
 #arena-map #specGrad .s-out { stop-color: #ffffff; stop-opacity: 0; }

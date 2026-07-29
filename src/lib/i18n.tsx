@@ -1054,9 +1054,9 @@ const D: Record<string, Record<Lang, string>> = {
   "about.cta_brochure": { ko: "협회 소개서 다운로드", en: "Download Association Brochure", ja: "協会案内をダウンロード", zh: "下载协会介绍手册", hi: "एसोसिएशन ब्रोशर डाउनलोड करें", vi: "Tải brochure giới thiệu hiệp hội" },
   // 히어로 로고 락업의 부제(큰 글씨 'CARIS' 는 브랜드명이라 번역하지 않는다).
   //   hero_title_l1/l2 는 락업 이전의 2줄 제목 — 현재 미사용이나 되돌릴 수 있게 남겨둔다.
-  "guide.hero_lockup_sub": { ko: "AI・Robot 융합역량 CARIS", en: "AI・Robotics Convergence Competency — CARIS", ja: "AI・ロボット 融合力 CARIS", zh: "AI・机器人 融合能力 CARIS", hi: "AI・रोबोटिक्स समेकित दक्षता — CARIS", vi: "Năng lực tích hợp AI・Robot — CARIS" },
+  "guide.hero_lockup_sub": { ko: "AI・Robot 융합역량 자격시험", en: "AI・Robotics Convergence Competency Exam", ja: "AI・ロボット 融合力 資格試験", zh: "AI・机器人 融合能力资格考试", hi: "AI・रोबोटिक्स समेकित दक्षता परीक्षा", vi: "Kỳ thi năng lực tích hợp AI・Robot" },
   "guide.hero_title_l1": { ko: "전세계 AI·Robot", en: "Global AI·Robotics", ja: "全世界のAI・ロボット", zh: "全球AI·机器人", hi: "वैश्विक AI·रोबोट", vi: "AI·robot toàn cầu" },
-  "guide.hero_title_l2": { ko: "융합역량 CARIS", en: "convergence competency CARIS", ja: "融合力 CARIS", zh: "融合能力 CARIS", hi: "संगम दक्षता CARIS", vi: "năng lực hội tụ CARIS" },
+  "guide.hero_title_l2": { ko: "융합역량 자격시험", en: "convergence competency exam", ja: "融合力 資格試験", zh: "融合能力资格考试", hi: "संगम दक्षता परीक्षा", vi: "kỳ thi năng lực hội tụ" },
   "guide.hero_subtitle": { ko: "GARA는 실무 중심의 생성형 AI 활용 능력을 객관적인 지표로 평가하는 국제 표준 자격입니다. 5가지 핵심 영역을 통해 당신의 완벽한 AI 경쟁력을 증명하세요.", en: "GARA is an international standard certification that objectively measures practical, hands-on generative AI skills. Prove your complete AI competitiveness across 5 core areas.", ja: "GARAは実務中心の生成AI活用能力を客観的な指標で評価する国際標準資格です。5つの核心領域を通じて、あなたの完璧なAI競争力を証明してください。", zh: "GARA是以客观指标评估实务导向生成式AI应用能力的国际标准资格认证。通过五大核心领域，证明你完整的AI竞争力。", hi: "GARA एक अंतरराष्ट्रीय मानक प्रमाणन है जो व्यावहारिक, हैंड्स-ऑन जेनरेटिव AI दक्षता को वस्तुनिष्ठ संकेतकों से मापता है। 5 मुख्य क्षेत्रों के माध्यम से अपनी संपूर्ण AI प्रतिस्पर्धात्मकता साबित करें।", vi: "GARA là chứng chỉ tiêu chuẩn quốc tế đánh giá năng lực ứng dụng AI tạo sinh hướng thực tiễn bằng các chỉ số khách quan. Hãy chứng minh năng lực cạnh tranh AI hoàn hảo của bạn qua 5 lĩnh vực cốt lõi." },
   "guide.btn_apply": { ko: "시험 접수하기", en: "Register for exam", ja: "試験を申し込む", zh: "报名考试", hi: "परीक्षा के लिए पंजीकरण करें", vi: "Đăng ký thi" },
   "guide.btn_mock": { ko: "모의 테스트", en: "Mock test", ja: "模擬テスト", zh: "模拟测试", hi: "अभ्यास परीक्षा", vi: "Thi thử" },
@@ -1327,7 +1327,7 @@ const D: Record<string, Record<Lang, string>> = {
   "caris.rolling.pro_cbt.desc": { ko: "원하는 날짜를 예약해 온라인(CBT)으로 응시하는 상시 검정입니다.", en: "A rolling exam you take online (CBT) on a date you book.", ja: "ご希望の日付を予約してオンライン（CBT）で受験する常時検定です。", zh: "预约所需日期，通过在线(CBT)应试的常规检定。", hi: "अपनी पसंद की तारीख बुक कर ऑनलाइन (CBT) दी जाने वाली सतत परीक्षा।", vi: "Kỳ thi thường trực bạn dự online (CBT) vào ngày đã đặt." },
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
-  "guide.cert_intro_title": { ko: "AI·Robot 융합역량 CARIS", en: "AI·Robotics Convergence Competency — CARIS", ja: "AI・ロボット融合力 CARIS", zh: "AI·机器人融合能力 CARIS", hi: "AI·रोबोट संगम दक्षता — CARIS", vi: "Năng lực hội tụ AI·robot — CARIS" },
+  "guide.cert_intro_title": { ko: "AI·Robot 융합역량 자격시험", en: "AI·Robotics Convergence Competency Exam", ja: "AI・ロボット融合力 資格試験", zh: "AI·机器人融合能力资格考试", hi: "AI·रोबोट संगम दक्षता परीक्षा", vi: "Kỳ thi năng lực hội tụ AI·robot" },
   // 피라미드 우측 그룹 라벨 — '|' 로 줄바꿈(브레이스 옆 2줄 세로 배치). 위 3티어=피지컬 AI, 아래 3티어=AI·로봇 리터러시
   "guide.group_physical": { ko: "피지컬 AI|전문가", en: "Physical AI|Expert", ja: "フィジカルAI|専門家", zh: "实体AI|专家", hi: "फिजिकल AI|विशेषज्ञ", vi: "Chuyên gia|AI vật lý" },
   "guide.group_literacy": { ko: "AI·로봇|리터러시", en: "AI·Robotics|Literacy", ja: "AI・ロボット|リテラシー", zh: "AI·机器人|素养", hi: "AI·रोबोटिक्स|साक्षरता", vi: "Hiểu biết|AI·robot" },
@@ -1440,6 +1440,8 @@ const D: Record<string, Record<Lang, string>> = {
   'arena.zoom_in': { ko: "확대", en: "Zoom in", ja: "拡大", zh: "放大", hi: "ज़ूम इन", vi: "Phóng to" },
   'arena.zoom_out': { ko: "축소", en: "Zoom out", ja: "縮小", zh: "缩小", hi: "ज़ूम आउट", vi: "Thu nhỏ" },
   'arena.zoom_reset': { ko: "원래대로", en: "Reset view", ja: "元に戻す", zh: "重置", hi: "रीसेट", vi: "Đặt lại" },
+  'arena.numbers_hide': { ko: "순위 숫자 끄기", en: "Hide rank numbers", ja: "順位番号を隠す", zh: "隐藏排名数字", hi: "रैंक नंबर छिपाएँ", vi: "Ẩn số hạng" },
+  'arena.numbers_show': { ko: "순위 숫자 켜기", en: "Show rank numbers", ja: "順位番号を表示", zh: "显示排名数字", hi: "रैंक नंबर दिखाएँ", vi: "Hiện số hạng" },
   'arena.tabLeague': { ko: "세계리그", en: "World League", ja: "世界リーグ", zh: "世界联赛", hi: "वर्ल्ड लीग", vi: "Giải đấu" },
   'arena.tabChat': { ko: "채팅", en: "Chat", ja: "チャット", zh: "聊天", hi: "चैट", vi: "Trò chuyện" },
   'arena.panelToggle': { ko: "패널 전환", en: "Toggle panel", ja: "パネル切替", zh: "切换面板", hi: "पैनल टॉगल", vi: "Chuyển bảng" },

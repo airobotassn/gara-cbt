@@ -18,10 +18,12 @@ import { ArenaMap, DokdoInset, type ArenaMapHandle, type HoverInfo } from '../co
 import {
   buildRegions,
   makeCscale,
+  TOP10_CUT,
   EMPTY_REAL,
-  koreaName,
+  countryName,
+  loadAdm1,
+  loadAdm1Index,
   loadCountries,
-  loadMunicipalities,
   loadProvinces,
   type ArenaLevel,
   type GeoFeature,
@@ -97,17 +99,20 @@ export default function WorldArena() {
   // ── 지도 경계 데이터 ──
   const [countries, setCountries] = useState<GeoFeature[]>([])
   const [provinces, setProvinces] = useState<GeoFeature[]>([])
-  const [municipalities, setMunicipalities] = useState<GeoFeature[]>([])
 
   // ── 화면 상태 ──
   const [level, setLevel] = useState<ArenaLevel>(0)
-  const [prov, setProv] = useState<{ code: string; name: string } | null>(null)
+  // 파고든 나라. 대한민국은 기존 시도 파일, 그 외는 adm1. 지도 깊이는 여기까지다(시군구는 없앴다).
+  const [drillCountry, setDrillCountry] = useState<{ iso: string; name: string } | null>(null)
+  const [adm1Index, setAdm1Index] = useState<Record<string, number>>({})
   const [selKey, setSelKey] = useState<string | null>(null)
   const [hotKey, setHotKey] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [prompt, setPrompt] = useState('')
   const [hover, setHover] = useState<HoverInfo | null>(null)
   const [rightPanel, setRightPanel] = useState<'league' | 'chat' | null>('league')
+  // 지도 위 순위 표시(숫자 + 1~3위 트로피) on/off — 지도 모양만 보고 싶을 때 끈다.
+  const [showNumbers, setShowNumbers] = useState(true)
 
   // ── 백엔드 실데이터 ──
   const [real, setReal] = useState<RealData>(EMPTY_REAL)
@@ -119,19 +124,22 @@ export default function WorldArena() {
   // 점수는 season_total 스케일(0~10000)이라 소수점이 의미 없다 — 정수 + 천단위 구분.
   const fmtScore = useCallback((n: number) => fmt(Math.round(n)), [fmt])
 
-  // 지구본·시도는 즉시, 시군구(177KB)는 시도까지 들어온 사람만 — 레벨1 도달 시 미리 받아둔다.
+  // 지구본은 즉시. 1차 행정구역은 어느 나라에 데이터가 있는지 목록만 먼저 받는다(드릴 가능 판정용).
   useEffect(() => {
     let alive = true
     loadCountries().then((f) => alive && setCountries(f)).catch(() => {})
-    loadProvinces().then((f) => alive && setProvinces(f)).catch(() => {})
+    loadAdm1Index().then((m) => alive && setAdm1Index(m)).catch(() => {})
     return () => { alive = false }
   }, [])
+  // 파고든 나라의 1차 행정구역 — 대한민국만 전용 파일(실집계 매칭이 그 파일의 숫자 코드에 묶여 있다).
   useEffect(() => {
-    if (level < 1) return
+    const iso = drillCountry?.iso
+    if (!iso) return
     let alive = true
-    loadMunicipalities().then((f) => alive && setMunicipalities(f)).catch(() => {})
+    const load = iso === 'KR' ? loadProvinces() : loadAdm1(iso)
+    load.then((f) => alive && setProvinces(f)).catch(() => alive && setProvinces([]))
     return () => { alive = false }
-  }, [level])
+  }, [drillCountry])
 
   // 리더보드 집계 + 로그인 계정 국가. 실패해도 목값으로 화면은 살아 있어야 한다.
   useEffect(() => {
@@ -178,41 +186,44 @@ export default function WorldArena() {
         real,
         countries,
         provinces,
-        municipalities,
-        provCode: prov?.code ?? null,
+        drillIso: drillCountry?.iso ?? null,
+        adm1Index,
       }),
-    [level, lang, real, countries, provinces, municipalities, prov],
+    [level, lang, real, countries, provinces, drillCountry, adm1Index],
   )
 
   // 점수 내림차순 — 순위·통계·목록이 모두 이걸 쓴다.
   const sorted = useMemo(() => regions.slice().sort((a, b) => b.score - a.score), [regions])
 
+  // 파고든 나라 이름 — 클릭 시점의 이름을 그대로 쓰면 언어를 바꿨을 때 낡으므로 매번 다시 만든다.
+  const drillName = useMemo(() => {
+    if (!drillCountry) return ''
+    const f = countries.find((x) => M49_TO_ISO2[String(x.id)] === drillCountry.iso)
+    return f ? countryName(f, lang) : drillCountry.name
+  }, [drillCountry, countries, lang])
+
   // ── 사이드 패널 파생값 ──
-  const scopeTitle = useMemo(() => {
-    if (level === 0) return t('arena.worldLeague')
-    if (level === 1) return koreaName(countries, lang) + t('arena.league')
-    return (prov?.name ?? '') + t('arena.league')
-  }, [level, countries, lang, prov, t])
+  const scopeTitle = useMemo(
+    () => (level === 0 ? t('arena.worldLeague') : drillName + t('arena.league')),
+    [level, drillName, t],
+  )
 
   const totalTakers = useMemo(() => regions.reduce((s, r) => s + r.takers, 0), [regions])
 
-  // 우리 순위 — 지구본은 홈 국가, 국내는 서울(레벨1)·강남구(레벨2)
+  // 우리 순위 — 지구본은 홈 국가, 대한민국을 파고들면 서울
   const our = useMemo(() => {
     let r: Region | undefined
     let label = ''
     if (level === 0) {
       r = regions.find((x) => M49_TO_ISO2[String(x.f.id)] === home) ?? regions.find((x) => x.drill)
       if (r) label = '📍 ' + r.name + ' ' + t('arena.our0')
-    } else if (level === 1 && home === 'KR') {
+    } else if (home === 'KR' && drillCountry?.iso === 'KR') {
       r = regions.find((x) => x.code === '11')
       if (r) label = '📍 ' + r.name + ' ' + t('arena.our1')
-    } else if (level === 2 && home === 'KR') {
-      r = regions.find((x) => x.code === '11230')
-      if (r) label = '🏠 ' + r.name + ' ' + t('arena.our2')
     }
     if (!r) return null
     return { region: r, label, rank: sorted.indexOf(r) + 1 }
-  }, [level, regions, sorted, home, t])
+  }, [level, regions, sorted, home, drillCountry, t])
 
   // 상위 60개(검색 시 필터). 세계 단위에선 드릴 대상(대한민국)이 밖으로 밀려도 맨 아래 고정 노출.
   const shown = useMemo(() => {
@@ -231,19 +242,28 @@ export default function WorldArena() {
   }, [sorted])
 
   // 색은 점수 선형이 아니라 **등수 순서(백분위)** 로 깐다 → 하위권에 몰린 점수가 강제로 펼쳐져
-  // 1등부터 꼴찌까지 색이 골고루 진해진다. 이 화면에 뜬 전 지역의 점수를 통째로 넘긴다.
-  const color = useMemo(() => makeCscale(sorted.map((r) => r.score)), [sorted])
+  // 위에서 아래까지 색이 골고루 퍼진다.
+  // ⚠️ 지구본에서는 상위 10개가 별도 색(메달 3개 + 상위권 한 색)이라 **램프 계산에서 뺀다** —
+  //    넣어두면 11위 이하가 램프의 아래쪽 90% 안에만 몰려 서로 구분이 흐려진다.
+  //    시도 아래로는 4~10위 묶음을 안 쓰므로(지역이 적어 절반이 한 색이 된다) 1~3위만 뺀다.
+  const color = useMemo(() => {
+    const cut = level === 0 ? TOP10_CUT : 3
+    const rest = sorted.length > cut ? sorted.slice(cut) : sorted
+    return makeCscale(rest.map((r) => r.score))
+  }, [sorted, level])
 
   // ── 지도 → 화면 상태 반영 ──
   const handleDrill = useCallback((r: Region) => {
     setSelKey(null)
     setQuery('')
     setPrompt('')
-    setLevel((cur) => {
-      if (cur === 0) return 1
-      return 2
-    })
-    if (r.code) setProv({ code: r.code, name: r.name })
+    setLevel(1)
+    // 이전 나라의 행정구역이 잠깐 비치지 않도록 목록을 비우고 새로 받는다.
+    const iso = M49_TO_ISO2[String(r.f.id)]
+    if (iso) {
+      setDrillCountry({ iso, name: r.name })
+      setProvinces([])
+    }
   }, [])
 
   const goto = useCallback((l: ArenaLevel) => {
@@ -251,7 +271,7 @@ export default function WorldArena() {
     setQuery('')
     setPrompt('')
     setLevel(l)
-    if (l < 2) setProv(null)
+    if (l < 1) setDrillCountry(null)
   }, [])
 
   // pointermove 마다 setState 하면 과한 렌더가 되므로 프레임당 1회로 묶는다.
@@ -273,7 +293,7 @@ export default function WorldArena() {
   const rankListRef = useRef<HTMLUListElement>(null)
   useEffect(() => {
     if (rankListRef.current) rankListRef.current.scrollTop = 0
-  }, [level, prov])
+  }, [level, drillCountry])
 
   const activate = useCallback((r: Region) => mapRef.current?.activate(r), [])
   const onRowEnter = useCallback((key: string) => setHotKey(key), [])
@@ -285,21 +305,20 @@ export default function WorldArena() {
     return sorted.findIndex((x) => x.key === hover.region.key) + 1
   }, [hover, sorted])
 
-  // 독도 확대도: 전국(레벨1)·경북(레벨2, code 37)에서만. 색은 소속 지역과 동일.
+  // 독도 확대도 — 대한민국을 파고들었을 때만. 색은 소속 지역(경북)과 동일.
   const dokdo = useMemo(() => {
-    const show = level === 1 || (level === 2 && prov?.code === '37')
-    if (!show) return null
-    const parent = level === 2 ? regions.find((d) => d.code === '37430') : regions.find((d) => d.code === '37')
+    if (level !== 1 || drillCountry?.iso !== 'KR') return null
+    const parent = regions.find((d) => d.code === '37')
     return { fill: parent ? color(parent.score) : '#5b93e2' }
-  }, [level, prov, regions, color])
+  }, [level, regions, color, drillCountry])
 
   const crumbs = useMemo(() => {
     if (level === 0) return []
-    const parts: { text: string; level: ArenaLevel }[] = [{ text: t('arena.world'), level: 0 }]
-    if (level >= 1) parts.push({ text: koreaName(countries, lang), level: 1 })
-    if (level >= 2 && prov) parts.push({ text: prov.name, level: 2 })
-    return parts
-  }, [level, countries, lang, prov, t])
+    return [
+      { text: t('arena.world'), level: 0 as ArenaLevel },
+      { text: drillName, level: 1 as ArenaLevel },
+    ]
+  }, [level, drillName, t])
 
   const ready = countries.length > 0
 
@@ -378,6 +397,7 @@ export default function WorldArena() {
                 onDrill={handleDrill}
                 onPrompt={(name) => setPrompt(t('arena.drillHint', { n: name }))}
                 onHover={handleHover}
+                showNumbers={showNumbers}
                 color={color}
               />
             ) : (
@@ -397,6 +417,17 @@ export default function WorldArena() {
               <button type="button" aria-label={t('arena.zoom_in')} onClick={() => mapRef.current?.zoomIn()}>+</button>
               <button type="button" aria-label={t('arena.zoom_out')} onClick={() => mapRef.current?.zoomOut()}>−</button>
               <button type="button" aria-label={t('arena.zoom_reset')} onClick={() => mapRef.current?.zoomReset()}>⤾</button>
+              {/* 순위 숫자 on/off — 끄면 지도의 숫자·트로피가 사라지고 색(순위 램프)만 남는다. */}
+              <button
+                type="button"
+                className={`aa-numtoggle${showNumbers ? '' : ' off'}`}
+                aria-pressed={showNumbers}
+                aria-label={t(showNumbers ? 'arena.numbers_hide' : 'arena.numbers_show')}
+                title={t(showNumbers ? 'arena.numbers_hide' : 'arena.numbers_show')}
+                onClick={() => setShowNumbers((v) => !v)}
+              >
+                {showNumbers ? 'ON' : 'OFF'}
+              </button>
             </div>
 
             {dokdo && <DokdoInset fill={dokdo.fill} label={t('arena.dokdo')} />}
