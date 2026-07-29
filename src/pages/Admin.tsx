@@ -1755,8 +1755,11 @@ function RoundsAdmin() {
                 <span>열리는 급수 <em style={{ color: 'var(--muted)' }}>(이 회차에 응시 가능한 시험 · 급수마다 문항 따로)</em></span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}>
                   {getTracks('ko').map((tr) => (
-                    <div key={tr.name}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>{tr.name}</div>
+                    <div key={tr.key}>
+                      {/* 트랙 표기에서 Ⅰ/Ⅱ 를 뺐으므로(둘 다 'CARIS') 그룹 머리는 트랙 성격으로 적는다. */}
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                        {tr.key === 't2' ? '피지컬 AI 전문가' : 'AI·로봇 리터러시'}
+                      </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                         {tr.tiers.map((ti) => {
                           const on = draft.tiers.includes(ti.key)
@@ -3046,8 +3049,8 @@ function TierAnalysis({ tiers }: { tiers: CbtTierStat[] }) {
       <div className="admin-sub">급수 분포 · 응시 수 <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>(막대 클릭 → 아래 상세 전환)</span></div>
       <div className="tier-dist">
         {dist.map((d) => (
-          <button key={d.key} className={`tdist ${d.key === sel ? 'on' : ''}`} onClick={() => setSel(d.key)} title={`${d.track} · ${d.name} · 응시 ${d.n}`}>
-            <span className="tdist-track">{d.track.replace('CARIS-', '')}</span>
+          <button key={d.key} className={`tdist ${d.key === sel ? 'on' : ''}`} onClick={() => setSel(d.key)} title={`${d.name} · 응시 ${d.n}`}>
+            {/* 트랙 뱃지(Ⅰ/Ⅱ)는 제거 — 이제 두 트랙 모두 'CARIS' 라 구분 정보가 없다. */}
             <span className="tdist-col"><span className="tdist-bar" style={{ height: `${(d.n / distMax) * 100}%` }} /></span>
             <span className="tdist-n">{d.n}</span>
             <span className="tdist-l">{d.name}</span>
@@ -3058,7 +3061,7 @@ function TierAnalysis({ tiers }: { tiers: CbtTierStat[] }) {
       {/* 선택 급수 상세 — 데이터 없어도 칸은 항상 표시, 값만 0/빈 */}
       <div className="tier-detail">
         <div className="tier-detail-head">
-          <b>{cur.track} · {cur.name}</b>
+          <b>{cur.name}</b>
           <span>응시 <b>{st?.attempts ?? 0}</b> · 합격 <b>{st?.pass ?? 0}</b> ({st?.passRate ?? 0}%)</span>
         </div>
         <div className="tier-panel">
@@ -3667,7 +3670,7 @@ function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: Questi
       <div className="admin-tabs" style={{ marginBottom: hasShort ? 8 : 14, flexWrap: 'wrap' }}>
         {tiers.map((t) => (
           <button key={t.key} className={t.key === tierKey ? 'on' : ''} onClick={() => onTierKey(t.key)}>
-            {t.track.replace('CARIS-', '')} · {t.name}
+            {t.name}
           </button>
         ))}
       </div>
@@ -4165,7 +4168,7 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
                 }}
               >
                 {tiers.map((t) => (
-                  <option key={t.key} value={t.key}>{t.track.replace('CARIS-', '')} · {t.name}</option>
+                  <option key={t.key} value={t.key}>{t.name}</option>
                 ))}
               </select>
             </div>
