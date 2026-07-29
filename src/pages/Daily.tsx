@@ -107,7 +107,9 @@ export default function Daily() {
       <div className="dy-top">
         {/* 뒤로 = 아레나. 아레나 하단 런처가 허브·레벨테스트·데일리·미니게임의 관문이라 그게 이 화면의 부모다.
             (완료 팝업의 '허브로'는 뒤로가기가 아니라 보상 확인용 전진 동선이라 목적지가 다르다.) */}
-        <button className="dy-back" onClick={() => navigate('/arena')} aria-label="아레나로">‹</button>
+        <button className="dy-back" onClick={() => navigate('/arena')} aria-label="WORLD ARENA">
+          <span>‹</span> WORLD ARENA
+        </button>
         <div className="dy-head">
           <b>오늘의 학습</b>
           <i>{today}</i>
