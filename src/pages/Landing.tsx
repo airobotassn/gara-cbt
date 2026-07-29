@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import CyberBg from '../components/CyberBg'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
@@ -108,6 +109,8 @@ export default function Landing() {
 
   return (
     <div className="lp">
+      {/* Theme 04 배경(이미지 + 광원). 이 단계에서는 배경만 교체하고 글자·버튼은 손대지 않았다. */}
+      <CyberBg />
       <div className="aura" />
       <h1>
         {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>

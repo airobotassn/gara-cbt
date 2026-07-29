@@ -1,0 +1,180 @@
+/* Theme 04(Cyber Future) — 메인(/) 히어로에 얹는 레이어.
+   지금까지 적용한 것: ① 배경(이미지 + 광원)  ② 메인 문구 색
+   아직 손대지 않은 것: 검색창 · CTA 버튼 · 그 아래 영역 (다음 단계) */
+
+/* .lp 에 스태킹 컨텍스트를 만들어, 아래 z-index:-1 배경이 페이지 배경 뒤로 새지 않게 한다.
+   (그래야 배경이 .lp 안에서 '콘텐츠 뒤 · 페이지 배경 앞'에 정확히 놓인다) */
+.lp {
+  isolation: isolate;
+}
+
+/* ⚠️ absolute 가 아니라 fixed 다. .lp 는 min-height: calc(100vh - 40px) 라서 absolute 로 깔면
+   화면 맨 아래 40px 이 페이지 배경(라이트=흰색)으로 남는다. fixed 는 뷰포트 전체를 덮어 그 띠를 없앤다.
+   (fixed 는 조상의 overflow:hidden 에 잘리지 않는다. z-index:-1 은 .lp 의 isolation 안에 갇힌다.) */
+.cbg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #04070d; /* 이미지가 늦게 뜨거나 비율이 안 맞을 때의 바탕 */
+}
+
+/* 질감 담당 — 아래(바닥 그리드)를 기준으로 붙인다. 화면비가 달라져도 지평선 위치가 크게 안 흔들린다. */
+.cbg-plate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+/* 지평선(소실점) 광원 — 이미지가 만들어 둔 밝은 지점에 겹쳐 호흡한다 */
+.cbg-horizon {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: min(1100px, 80%);
+  height: 200px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  filter: blur(8px);
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse at 50% 50%, rgba(140, 244, 255, 0.55), rgba(0, 217, 255, 0.16) 45%, transparent 72%);
+}
+
+/* 바닥을 타고 관객 쪽으로 밀려오는 빛(2줄, JS 가 위치를 준다) */
+.cbg-sweep {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: 120%;
+  height: 20px;
+  opacity: 0;
+  transform: translate(-50%, 0);
+  filter: blur(10px);
+  mix-blend-mode: screen;
+  background: linear-gradient(90deg, transparent, rgba(140, 244, 255, 0.5) 35%, rgba(140, 244, 255, 0.5) 65%, transparent);
+}
+
+/* ── 메인 문구 ─────────────────────────────────────────────────────────
+   목업 색 그대로: 기본은 흰색, 강조는 네온 그라디언트(#00D9FF → #2B8CFF) + 글로우.
+   ⚠️ 라이트/다크 공통으로 고정한다. 배경이 항상 딥네이비라 --ink(라이트=먹색)를 따르면 글자가 묻힌다. */
+.lp h1 {
+  color: #fff;
+  /* 가이드 Hero = 64px / 행간 72px / weight 700. 기존 --fs-lg(최대 52px)보다 한 단 크다.
+     좁은 화면에서는 줄바꿈이 터지므로 clamp 로 34px 까지 내려간다. */
+  font-size: clamp(34px, 5.2vw, 64px);
+  line-height: 1.125;
+  letter-spacing: -0.02em;
+}
+.lp h1 .em {
+  background: linear-gradient(90deg, #00d9ff 0%, #2b8cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 24px rgba(0, 217, 255, 0.45));
+}
+
+/* ── 검색창 ───────────────────────────────────────────────────────────
+   가이드: 폭 560 · 높이 60 · radius 999 · 배경 #081018 · 테두리 #173047 · placeholder #7E8EA0.
+   흰 알약이 딥네이비 위에 떠 있던 걸 바탕 안으로 앉힌다. */
+.lp .lp-search {
+  width: min(560px, 100%);
+  background: #081018;
+  border-color: #173047;
+  padding: 6px 8px 6px 26px;
+}
+.lp .lp-search:focus-within {
+  border-color: rgba(0, 217, 255, 0.55);
+  box-shadow: 0 0 26px rgba(0, 217, 255, 0.18);
+}
+.lp .lp-search-input {
+  color: #fff;
+  padding: 12px 0; /* 알약 높이 60px */
+}
+.lp .lp-search-input::placeholder {
+  color: #7e8ea0;
+}
+/* 검색 버튼 — 원형 네온 그라디언트 + 글로우 */
+.lp .lp-search-btn {
+  width: 44px;
+  height: 44px;
+  color: #03121a;
+  background: linear-gradient(90deg, #00d9ff 0%, #2b8cff 100%);
+  box-shadow: 0 0 18px rgba(0, 217, 255, 0.4);
+}
+.lp .lp-search-btn:hover:not(:disabled) {
+  filter: none;
+  transform: scale(1.06);
+}
+
+/* ── CTA 3버튼 ────────────────────────────────────────────────────────
+   WORLD ARENA = Primary(그라디언트 + 글로우) · 나머지 둘 = Secondary(투명 + 테두리). */
+.lp .cta {
+  color: #03121a;
+  background: linear-gradient(90deg, #00d9ff 0%, #2b8cff 100%);
+  font-weight: 700;
+  box-shadow: 0 0 22px rgba(0, 217, 255, 0.28);
+}
+.lp .cta:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 35px rgba(0, 217, 255, 0.45);
+}
+/* 투명이 아니라 검은 면으로 채운다 — 배경(딥네이비 + 격자)이 버튼 안으로 비쳐 글자가 지저분해진다.
+   면 색은 검색창(#081018)과 같은 값이라 히어로의 어두운 요소가 한 벌로 읽힌다. */
+.lp .cta-ghost {
+  background: #081018;
+  border-color: #2a4256;
+  color: #fff;
+  font-weight: 700;
+}
+.lp .cta-ghost:hover {
+  background: #0a1623;
+  border-color: rgba(0, 217, 255, 0.55);
+  color: #fff;
+}
+/* '학습 시작'(준비 중) — 강조하지 않는다. 글자·태그만 흐리게. */
+.lp .cta-ghost.soon {
+  color: #7e8ea0;
+}
+.lp .cta-ghost.soon:hover {
+  background: #081018;
+  border-color: #2a4256;
+  color: #7e8ea0;
+}
+.lp .cta-soon-tag {
+  color: #a8b6c8;
+  background: rgba(23, 48, 71, 0.9);
+}
+
+/* ── FAB · 맨 위로 버튼 ────────────────────────────────────────────────
+   Layout 이 그리는 전역 버튼이라 페이지에서 직접 못 건드린다 → 메인에만 걸리도록 body:has(.lp) 로 한정.
+   (같은 방식이 hub.css 에 이미 있다: body:has(.hub) .fab-top)
+   흰 버튼이 딥네이비 배경 위에서 떠 보이던 걸 Theme 04 표면색으로 맞춘다. */
+body:has(.lp) .fab,
+body:has(.lp) .fab-top {
+  background: rgba(8, 16, 24, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-color: #173047;
+  color: #00d9ff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+body:has(.lp) .fab:hover,
+body:has(.lp) .fab-top:hover {
+  border-color: rgba(0, 217, 255, 0.55);
+  box-shadow: 0 0 26px rgba(0, 217, 255, 0.45);
+}
+
+/* 히어로 카피가 앉는 자리를 살짝 눌러 대비 확보 */
+.cbg-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 900px 420px at 50% 40%, rgba(4, 7, 13, 0.55), transparent 72%),
+    linear-gradient(180deg, rgba(4, 7, 13, 0.6) 0%, transparent 26%);
+}
