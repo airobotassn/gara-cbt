@@ -7,7 +7,6 @@ import {
   promoteCut,
   PROMOTE_RATE_LOW,
   PROMOTE_RATE_HIGH,
-  DEMOTE_STRIKES,
   type AxisMap,
 } from '../lib/scoring'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
@@ -147,8 +146,9 @@ export default function Result() {
         <EbookPicks t={t} lang={lang} level={data.level} promoted={data.rankDir === 'up'} />
 
         <div className="result-actions">
+          {/* 학습 대시보드 = /mypage 기본 탭. 옛 /dashboard 는 라우트가 없어 catch-all 로 메인에 떨어졌다. */}
           {isFullUser ? (
-            <Link className="btn-ghost" to="/dashboard" style={{ textDecoration: 'none' }}>
+            <Link className="btn-ghost" to="/mypage" style={{ textDecoration: 'none' }}>
               {t('common.dashboard')}
             </Link>
           ) : null}
@@ -248,7 +248,7 @@ function LockedPanel({
 }
 
 // 점수 아래 구성(위→아래): 등급변동 배너(고정) → ‹ › 하이라이트 2장(레이더 → 변동) → 처방 → 이북 추천.
-//   ⚠️ 티어 엠블렘 슬라이드(Lv.N 크게 띄우던 화면)는 폐기됐다. 그 안에 있던 승급/강등·강등경고 배너는
+//   ⚠️ 티어 엠블렘 슬라이드(Lv.N 크게 띄우던 화면)는 폐기됐다. 그 안에 있던 승급 배너는
 //      넘기지 않아도 늘 보이도록 슬라이드 **밖 상단**으로 분리했다(등급변동 규칙상 결과창 필수 노출).
 function UnlockedPanel({ data, t }: { data: ResultResponse; t: TFunc }) {
   const [step, setStep] = useState(0)
@@ -289,30 +289,19 @@ function UnlockedPanel({ data, t }: { data: ResultResponse; t: TFunc }) {
   )
 }
 
-// 등급 변동 배너 — 슬라이드가 아니라 상단 고정. 변동도 경고도 없으면 아무것도 그리지 않는다.
+// 등급 변동 배너 — 슬라이드가 아니라 상단 고정. 승급했을 때만 그린다(강등이 없으므로 하락 배너도 없다).
 function RankBanner({ data, t }: { data: ResultResponse; t: TFunc }) {
   const rankAfter = data.rankAfter ?? data.level
   const rankBefore = data.rankBefore ?? rankAfter
-  const dir = data.rankDir ?? 'stay'
-  const warnStrikes = data.warnStrikes ?? 0
-  if (dir === 'stay' && warnStrikes === 0) return null
+  if (data.rankDir !== 'up') return null
   return (
     <div style={{ textAlign: 'center' }}>
-      {dir !== 'stay' ? (
-        <div className={`tier-change ${dir}`}>
-          <span className="tc-label">
-            {dir === 'up' ? `🎉 ${t('result.promoted')}` : `⬇ ${t('result.demoted')}`}
-          </span>
-          <span className="tc-flow">
-            Lv.{rankBefore} <span className="tc-arrow">→</span> Lv.{rankAfter}
-          </span>
-        </div>
-      ) : (
-        <div className="tier-change down">
-          <span className="tc-label">⚠️ {t('result.demote_warn', { n: warnStrikes, max: DEMOTE_STRIKES })}</span>
-          <span className="tc-flow">{t('result.demote_warn_sub')}</span>
-        </div>
-      )}
+      <div className="tier-change up">
+        <span className="tc-label">🎉 {t('result.promoted')}</span>
+        <span className="tc-flow">
+          Lv.{rankBefore} <span className="tc-arrow">→</span> Lv.{rankAfter}
+        </span>
+      </div>
     </div>
   )
 }
@@ -405,7 +394,7 @@ function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
   const focusKey = weakestAxis(rating, axes.map((a) => a.key))
   const focus = axisDef(focusKey).short
 
-  // 승급했으면 다음 레벨 도전을 권하고, 승급 실패(유지·강등)면 교재 학습으로 유도한다.
+  // 승급했으면 다음 레벨 도전을 권하고, 승급 못 했으면(유지) 교재 학습으로 유도한다.
   //   승급 컷은 비율이라 '몇 개 모자랐는지'를 실제 출제 수 기준으로 계산해 보여준다.
   const promoted = data.rankDir === 'up'
   const total = data.totalQuestions

@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       return json({ error: '채점할 문항이 없습니다.' }, 400)
     }
 
-    // 실제 출제 문항 수 = 승급컷/강등선(비율) 판정의 분모.
+    // 실제 출제 문항 수 = 승급컷(비율) 판정의 분모.
     const totalQuestions = assigned.length
 
     const submittedMap = new Map<string, InAnswer>()
@@ -133,9 +133,8 @@ Deno.serve(async (req) => {
 
     // 멱등 가드: 최초 1회만 반영
     if (await claimApply(admin, attemptId)) {
-      // 승급컷/강등선이 비율이라 실제 출제 문항 수를 판정 분모로 넘긴다.
+      // 승급컷이 비율이라 실제 출제 문항 수를 판정 분모로 넘긴다.
       const applied = await applyAttempt(admin, user.id, attempt.level, perf, totalCorrect, totalQuestions)
-      const warnStrikes = applied.warned ? applied.demotionStrikes : 0
       await admin
         .from('test_attempts')
         .update({
@@ -144,7 +143,6 @@ Deno.serve(async (req) => {
           rank_before: applied.rankBefore,
           rank_after: applied.rankAfter,
           rank_dir: applied.rankDir,
-          warn_strikes: warnStrikes,
         })
         .eq('id', attemptId)
       finalAttempt.deltas = applied.deltas
@@ -152,7 +150,6 @@ Deno.serve(async (req) => {
       finalAttempt.rank_before = applied.rankBefore
       finalAttempt.rank_after = applied.rankAfter
       finalAttempt.rank_dir = applied.rankDir
-      finalAttempt.warn_strikes = warnStrikes
       // 레벨테스트 = 실력점수 전용(활동점수 미적립) — 활동잔디엔 did_leveltest 플래그로만 금색 표시.
       await admin
         .from('daily_activity')

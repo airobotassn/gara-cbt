@@ -14,8 +14,6 @@ export const GUESS_BASELINE = 0.25 // 4지선다 무작위 정답 기댓값(추�
 export const EWMA_K_UP = 0.6
 export const EWMA_K_DOWN = 0.15
 export const PLACEMENT_K = 1 // 그 레벨 첫 응시(배치)는 perf를 그대로 박음
-// 강등 시 내려간 레벨을 이 점수로 시드(롤식: 하위 티어 상단에서 시작). 실제 적용은 서버(_shared/lib.ts applyAttempt).
-export const DEMOTE_SEED = 85
 
 // 한 축 성적(0~100). ratio = 그 축 정답률(0~1).
 // 추측 보정: 무작위 기댓값(25%)을 깎아 순수 찍기는 0에 수렴.
@@ -49,7 +47,7 @@ export function weakestAxis(rating: AxisMap, keys: string[]): string {
 // <scoring-sync> ⚠️ 등급/점수 공식 — _shared/lib.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
 // ── 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). 문항당 1분. ──
 //   Lv.1 = 10문항/10분 · Lv.2~3 = 20문항/20분 · Lv.4~7 = 30문항/30분
-//   ⚠️ 문항 수가 레벨마다 다르므로 승급컷/강등선은 절대 개수가 아니라 **비율**이다(아래).
+//   ⚠️ 문항 수가 레벨마다 다르므로 승급컷은 절대 개수가 아니라 **비율**이다(아래).
 //   ⚠️ 구간 경계가 승급컷 비율의 경계(Lv.3/Lv.4)와 맞물려 있다 — 한쪽만 옮기면 컷이 어긋난다.
 export function questionsForLevel(level: number): number {
   if (level <= 1) return 10
@@ -61,6 +59,8 @@ export function durationMinutesForLevel(level: number): number {
 }
 
 // ── 등급(레벨) 변동 규칙 ──
+// ⚠️ 강등은 없다(2026-07 제거). 등급은 오르거나 유지만 된다 — 강등선/경고(DEMOTE_*)·강등 시드·rank_dir='down' 이
+//    같이 사라졌다. DB 컬럼(user_progress.demotion_strikes · test_attempts.warn_strikes)은 남아있지만 읽지도 쓰지도 않는다.
 // 승급컷 비율: 레벨1~3 = 80%, 레벨4~7 = 90%.
 //   → Lv.1 8개(10문) / Lv.2·3 16개(20문) / Lv.4~7 27개(30문).
 //   total 은 실제 출제 문항 수(문제은행이 모자라 덜 나간 경우 그 수)를 넘기면 그 기준으로 계산한다.
@@ -69,50 +69,31 @@ export const PROMOTE_RATE_HIGH = 0.9 // Lv.4~7
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
   return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
-// 강등: 20% 이하(Lv.1 = 2개, Lv.2·3 = 4개, Lv.4~7 = 6개)를 연속 3번 받으면 한 단계 강등. 그 전 2번은 경고.
-//       중간에 그보다 잘 맞히면 경고 리셋(연속 끊김). 레벨이 바뀌면 경고 리셋. Lv.1은 강등 없음.
-export const DEMOTE_RATE = 0.2
-export function demoteMax(level: number, total: number = questionsForLevel(level)): number {
-  return Math.floor(total * DEMOTE_RATE)
-}
-export const DEMOTE_STRIKES = 3 // 경고가 이 횟수에 도달하면 강등
 
-export type RankDir = 'up' | 'down' | 'stay'
+export type RankDir = 'up' | 'stay'
 
 export interface RankChange {
   nextRank: number
   dir: RankDir
-  nextStrikes: number // 갱신된 강등 경고 누적(승급/강등/리셋 시 0)
-  warned: boolean // 이번 응시에서 강등 경고가 누적됐는가(아직 강등은 아님)
 }
 
-// 등급 변동 + 강등 경고(3진 아웃):
-//   승급: 응시레벨 ≥ 내등급 & 그 레벨 승급컷(비율) 이상  → +1 (경고 리셋)
-//   강등: 응시레벨 ≤ 내등급 & 강등선(20%) 이하 & 내등급 > 최저 → 경고 +1, 3회째면 −1
-//   그 외 → 유지 + 경고 리셋
+// 등급 변동:
+//   승급: 응시레벨 ≥ 내등급 & 그 레벨 승급컷(비율) 이상 → +1
+//   그 외 → 유지(점수가 낮아도 등급은 내려가지 않는다)
 //   total = 실제 출제 문항 수(생략 시 레벨 기준값). 문제은행 부족으로 덜 나간 시험도 같은 비율로 판정된다.
 export function computeRankChange(
   currentRank: number,
   testLevel: number,
   correct: number,
-  strikes: number,
   total: number = questionsForLevel(testLevel),
 ): RankChange {
   // 승급
   if (testLevel >= currentRank && correct >= promoteCut(testLevel, total)) {
     const next = Math.min(MAX_LEVEL, currentRank + 1)
-    return { nextRank: next, dir: next > currentRank ? 'up' : 'stay', nextStrikes: 0, warned: false }
+    return { nextRank: next, dir: next > currentRank ? 'up' : 'stay' }
   }
-  // 강등 경고(3진 아웃)
-  if (testLevel <= currentRank && correct <= demoteMax(testLevel, total) && currentRank > MIN_LEVEL) {
-    const s = strikes + 1
-    if (s >= DEMOTE_STRIKES) {
-      return { nextRank: currentRank - 1, dir: 'down', nextStrikes: 0, warned: false }
-    }
-    return { nextRank: currentRank, dir: 'stay', nextStrikes: s, warned: true }
-  }
-  // 그 외 → 유지 + 경고 리셋
-  return { nextRank: currentRank, dir: 'stay', nextStrikes: 0, warned: false }
+  // 그 외 → 유지
+  return { nextRank: currentRank, dir: 'stay' }
 }
 
 // ── 랭킹 점수(0~10000) ──
@@ -132,7 +113,8 @@ export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame'
 // minigame 값은 "정규화 상한"이다 — 실제 적립값은 게임별 서버 정규화 점수를 이 상한 이하로 스케일해서 쓴다(게임별 스코어링은 이 파일 밖 관심사).
 // 튜닝 근거(부등호 "실력 최고치 > 활동 최대 기여" 성립 확인):
 //   실력 최고치 = computeSkillScore(MAX_LEVEL, promoteCut(MAX_LEVEL)) = SKILL_LEVEL_STEP*MAX_LEVEL = MAX_POINTS = 10000.
-//   가정(assumption, 튜닝 필요시 갱신): 시즌 ≈ 60일, 활성 미니게임 2종(src/lib/minigames.ts 기준).
+//   가정(assumption, 튜닝 필요시 갱신): 시즌 ≈ 60일, 점수 적립이 배선된 미니게임 2종
+//   (기준은 레지스트리 개수가 아니라 submit-minigame 의 GAME_MAX — 레지스트리엔 6종이지만 나머지는 제출 배선이 없어 적립 0).
 //   활동 일일 최대 = ATTENDANCE(10) + DAILY_LEARN(30) + MINIGAME(50)×2종 = 140 → 시즌 누적 ≈ 8,400 (< 10,000, 여유 16%).
 //   ⚠️ 미니게임 종류가 늘어나면(예: 3종 이상) 이 여유가 줄거나 역전될 수 있다 — 레지스트리가 커지면 ACTIVITY_DELTA.minigame 을
 //      낮추거나 시즌 단위 활동 캡(추후 스테이지 과제)을 도입해 이 부등호를 재검증할 것. (미해결/가정으로 명시)

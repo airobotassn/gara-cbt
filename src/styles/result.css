@@ -330,7 +330,7 @@
   animation: badge-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-/* ===== 티어 엠블렘 + 승급/강등 연출 ===== */
+/* ===== 티어 엠블렘 + 승급 연출 ===== */
 .emblem-pop {
   display: inline-block;
   line-height: 0;
@@ -388,12 +388,7 @@
   box-shadow: 0 0 0 1px rgba(0, 74, 198, 0.4) inset;
   animation: tc-up 0.6s cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
-.tier-change.down {
-  background: var(--danger-bg);
-  color: var(--danger-fg);
-  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.4) inset;
-  animation: tc-down 0.5s ease both;
-}
+/* (.tier-change.down / @keyframes tc-down 은 강등 제거로 삭제됐다 — 배너는 승급만 뜬다) */
 @keyframes tc-up {
   0% {
     transform: translateY(10px) scale(0.8);
@@ -407,29 +402,6 @@
     opacity: 1;
   }
 }
-@keyframes tc-down {
-  0% {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  20% {
-    transform: translateX(-4px);
-  }
-  40% {
-    transform: translateX(4px);
-  }
-  60% {
-    transform: translateX(-3px);
-  }
-  80% {
-    transform: translateX(2px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
 /* 처방(다음 단계) 카드 */
 .panel-card.rx {
   background: linear-gradient(

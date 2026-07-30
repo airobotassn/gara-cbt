@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     // 구조화 데이터 수집(벡터 아님): 현재 등급 + 레벨별 6축 + 최근 응시 이력.
     const { data: progress } = await admin
       .from('user_progress')
-      .select('rank, points, demotion_strikes, updated_at')
+      .select('rank, points, updated_at')
       .eq('user_id', user.id)
       .maybeSingle()
 

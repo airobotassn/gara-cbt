@@ -43,6 +43,10 @@ Deno.serve(async (req) => {
 
     const uid = user.id
     const today = kstDay() // KST 캘린더일 — daily_activity(day) 경계와 동일.
+    // 출석 달력이 거슬러 올라갈 수 있는 하한(1년). today 가 'YYYY-MM-DD' 라 문자열 비교로 충분하지만 날짜로 계산한다.
+    const yearAgo = new Date(new Date(`${today}T00:00:00Z`).getTime() - 365 * 86400000)
+      .toISOString()
+      .slice(0, 10)
 
     const [
       { data: currency },
@@ -55,6 +59,7 @@ Deno.serve(async (req) => {
       { data: progress },
       { data: titles },
       { data: rankCtx },
+      { data: attendance },
     ] = await Promise.all([
       admin.from('user_currency').select('points, dust').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
@@ -79,6 +84,15 @@ Deno.serve(async (req) => {
       admin.rpc('user_titles', { p_uid: uid }),
       // 다음 순위 게이지(티어·백분위·points_to_pass) — season_total 기반 read-시점 파생, 실패해도 무시(back-compat).
       admin.rpc('my_rank_context', { p_uid: uid }),
+      // 마이페이지 활동 기록(달력)용 출석 이력 — 최근 1년, 출석한 날만. 출석은 하루 1회 플래그라 날짜 배열이면 충분하다.
+      admin
+        .from('daily_activity')
+        .select('day')
+        .eq('user_id', uid)
+        .eq('did_attendance', true)
+        .gte('day', yearAgo)
+        .order('day', { ascending: false })
+        .limit(400),
     ])
 
     const couponList = (coupons ?? []).map((c) => ({
@@ -90,10 +104,9 @@ Deno.serve(async (req) => {
     }))
     const titleList = Array.isArray(titles) ? titles : []
     const rc = (rankCtx ?? null) as { rank?: number | null; total?: number | null; tier?: string | null; percentile?: number | null; points_to_pass?: number | null } | null
-    // TODO(#5 미구현): 응답에 일별 활동 breakdown(잔디 dominant 색)이 없다 — 잔디는 현재 프론트가
-    //   list-attempts(레벨테스트) 응시일만으로 채워 leveltest(금색) 활동만 표시한다. attendance/learn/
-    //   minigame 색을 살리려면 여기서 activity_ledger(day,kind,delta)+daily_activity(day,did_*) 를
-    //   조인/집계해 유저별 일별 dominant kind + total 을 반환하는 생산자를 배선해야 한다(범위 제외, 후속).
+    // 마이페이지 '활동 기록' 달력은 **출석만** 표시한다(2026-07-29 결정) — 학습·게임·응시는 잔디에 안 찍는다.
+    //   그래서 dominant kind 집계(activity_ledger)는 필요 없고 출석일 배열 하나면 된다.
+    const attendanceDays = (attendance ?? []).map((r) => r.day as string)
 
     return json({
       authed: true,
@@ -118,6 +131,8 @@ Deno.serve(async (req) => {
       pity: (pity?.counter as number) ?? 0,
       // dailyDone = 허브 '출석' 완료(did_attendance). learnDone = /daily 오늘의 학습 완료(did_learn).
       // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).
+      // 활동 기록 달력(마이페이지) — 출석한 날짜('YYYY-MM-DD') 목록, 최근 1년.
+      attendanceDays,
       dailyDone: !!daily?.did_attendance,
       learnDone: !!daily?.did_learn,
       minigameDone: !!daily?.did_minigame,

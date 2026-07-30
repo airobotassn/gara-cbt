@@ -81,10 +81,9 @@ Deno.serve(async (req) => {
           attempt.level,
           attempt.axis_perf as AxisMap, // 출제된 축만 담긴 객체
           attempt.total_correct ?? 0,
-          // 승급컷/강등선이 비율이라 실제 출제 문항 수가 판정 분모다.
+          // 승급컷이 비율이라 실제 출제 문항 수가 판정 분모다.
           attempt.total_questions ?? undefined,
         )
-        const warnStrikes = applied.warned ? applied.demotionStrikes : 0
         await admin
           .from('test_attempts')
           .update({
@@ -93,7 +92,6 @@ Deno.serve(async (req) => {
             rank_before: applied.rankBefore,
             rank_after: applied.rankAfter,
             rank_dir: applied.rankDir,
-            warn_strikes: warnStrikes,
           })
           .eq('id', attemptId)
         attempt.deltas = applied.deltas
@@ -101,7 +99,6 @@ Deno.serve(async (req) => {
         attempt.rank_before = applied.rankBefore
         attempt.rank_after = applied.rankAfter
         attempt.rank_dir = applied.rankDir
-        attempt.warn_strikes = warnStrikes
         // 레벨테스트 = 실력점수 전용(활동점수 미적립) — 활동잔디엔 did_leveltest 플래그로만 금색 표시.
         await admin
           .from('daily_activity')

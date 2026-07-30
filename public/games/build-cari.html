@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>지어라 CARI</title>
+<style>
+:root{
+  --page:#e9eff9; --bg:#fbfaf5; --ink:#28324c; --sub:#7c869e;
+  --brand:#004ac6; --brand-hi:#1b55d0; --line:#e6e9f3;
+  --good:#12b58c; --bad:#f2664f; --skip:#e59b17;
+  --cream:#ece9e0; --tk:520ms;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);
+  color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+  display:flex; align-items:center; justify-content:center; min-height:100%; overflow:hidden; user-select:none;
+}
+.stage{
+  position:relative; width:min(460px,100vw); height:min(860px,100vh);
+  display:flex; flex-direction:column; background:var(--bg);
+  box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
+}
+.art{width:100%;height:100%;display:block;}
+
+/* HUD */
+.hud{display:flex; align-items:center; gap:10px; padding:12px 14px 4px; z-index:5;}
+.hud .cari-mini{width:40px;height:40px;flex:0 0 40px;}
+.hud .lvlbox{display:flex;flex-direction:column;line-height:1.05;}
+.hud .lvlbox b{font-size:16px;color:var(--ink);}
+.hud .lvlbox span{font-size:11px;color:var(--sub);}
+.hud .scorepill{margin-left:auto; background:#eef3fd; border:1px solid var(--line); color:var(--brand);
+  font-weight:800; font-size:12.5px; padding:8px 12px; border-radius:16px; text-align:right;
+  font-variant-numeric:tabular-nums; white-space:nowrap;}
+.scorepill .miss{color:var(--bad);}
+
+.hint{font-size:12px;color:var(--sub);text-align:center;padding:2px 16px 3px;line-height:1.35;}
+.hint b{color:var(--brand);}
+
+/* factory board */
+.gridwrap{display:flex;justify-content:center;margin:4px 0 2px;}
+.grid{position:relative;width:312px;height:416px;}
+.cells{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,52px);grid-template-rows:repeat(8,52px);}
+.cell{width:52px;height:52px;position:relative;cursor:pointer;box-shadow:inset 0 0 0 2px var(--bg);}
+.ci{position:absolute;inset:2px;border-radius:9px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.ci.empty{background:#eef1f7;box-shadow:inset 0 0 0 1px #e2e7f1;}
+.ci.conv{background:#e5edff;box-shadow:inset 0 0 0 1px #cfdcff;}
+.ci.conv .ar{color:var(--brand);font-size:22px;font-weight:900;line-height:1;}
+.ci.sensor{background:#efe7fb;box-shadow:inset 0 0 0 1.5px #c9b7ef;}
+.ci.sensor .ar{color:#6b52b0;font-size:18px;font-weight:900;position:absolute;}
+.ci.sensor .sdot{position:absolute;top:4px;left:4px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 5px rgba(0,0,0,.25);}
+.ci.sensor .sbr{position:absolute;bottom:2px;right:3px;font-size:15px;font-weight:900;}
+.ci.src{background:#28324c;flex-direction:column;gap:0;}
+.ci.src .cmini{width:34px;height:30px;margin-top:1px;}
+.ci.src .ar{color:#8fd0ff;font-size:15px;font-weight:900;line-height:.6;margin-bottom:2px;}
+.ci.bin{background:var(--cream);box-shadow:inset 0 0 0 1px #d8d2c4;}
+.ci.bin .binbox{width:34px;height:26px;border:2.5px solid;border-radius:5px;border-top:0;
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;background:#fff;}
+.ci.bin .bsw{width:16px;height:10px;border-radius:3px;}
+.ci.bin .bany{font-size:15px;font-weight:900;color:#b9c2d6;}
+
+.ilayer{position:absolute;inset:0;pointer-events:none;z-index:3;}
+.item{position:absolute;left:0;top:0;width:26px;height:26px;border-radius:8px;
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.55), 0 2px 5px rgba(40,50,76,.3);
+  transition:transform var(--tk) linear, opacity .28s ease;}
+.item::after{content:"";position:absolute;top:4px;left:5px;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.55);}
+.item.xgood{box-shadow:0 0 0 3px var(--good), 0 0 14px var(--good);}
+.item.xbad{opacity:.12;}
+.item.xmiss{opacity:.08;}
+
+/* palette */
+.palette{display:flex;gap:8px;justify-content:center;padding:3px 12px 2px;}
+.tool{display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid var(--line);
+  border-radius:14px;padding:6px 12px;cursor:pointer;transition:.12s;min-width:74px;}
+.tool .tico{font-size:19px;line-height:1;}
+.tool .tnm{font-size:10.5px;font-weight:800;color:var(--sub);}
+.tool.on{background:#eaf1ff;border-color:var(--brand);}
+.tool.on .tnm{color:var(--brand);}
+.tool.erase.on{background:#ffece7;border-color:var(--bad);}
+.tool.erase.on .tnm{color:var(--bad);}
+
+/* controls */
+.controls{padding:6px 14px 14px;margin-top:auto;display:flex;gap:10px;}
+.btn{flex:1;padding:14px 10px; border-radius:24px; border:0; cursor:pointer;
+  background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:16px; font-weight:800;
+  box-shadow:0 8px 20px rgba(0,74,198,.28);}
+.btn.ghost{flex:0 0 96px;background:#eef1f8;color:var(--brand);box-shadow:none;}
+.btn.stop{background:linear-gradient(120deg,#f2664f,#e0492f);box-shadow:0 8px 20px rgba(224,73,47,.28);}
+.btn:active{transform:scale(.97);}
+
+.toast{position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:15;
+  background:var(--brand);color:#fff;font-weight:800;font-size:13px;padding:9px 18px;border-radius:20px;
+  box-shadow:0 6px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .2s;pointer-events:none;text-align:center;}
+.toast.show{opacity:1;}
+
+/* overlays */
+.overlay{position:absolute; inset:0; z-index:20; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center; padding:26px;
+  background:radial-gradient(120% 80% at 50% 0%, #f2f6fd 0%, #e7eef9 70%);}
+.overlay.hide{display:none;}
+.floaty{width:128px;height:128px;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.t1{font-size:34px;font-weight:900;color:var(--ink);letter-spacing:-1px;}
+.t2{font-size:34px;font-weight:900;letter-spacing:-1px;
+  background:linear-gradient(120deg,#1b55d0,#004ac6);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.title{margin:8px 0 2px;}
+.tag{color:var(--sub);font-size:14px;margin:2px 0 16px;font-weight:600;}
+.rules{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 18px;text-align:left;
+  max-width:344px;box-shadow:0 6px 18px rgba(70,90,140,.10);}
+.rules div{font-size:13px;color:var(--ink);margin:7px 0;display:flex;gap:9px;align-items:flex-start;line-height:1.4;}
+.rules b{color:var(--brand);}
+.badge{font-size:26px;font-weight:900;margin:6px 0 2px;}
+.badge.win{color:var(--good);} .badge.lose{color:var(--bad);}
+.scorebox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 22px;margin:12px 0 4px;
+  box-shadow:0 6px 18px rgba(70,90,140,.10);max-width:352px;}
+.scorebox .big{font-size:15px;font-weight:800;color:var(--ink);}
+.scorebox .take{font-size:12.5px;color:var(--sub);margin-top:8px;line-height:1.5;}
+.scorebox .take b{color:var(--brand);}
+.scorebox .foot{font-size:11.5px;color:var(--sub);margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);line-height:1.5;}
+.scorebox .foot b{color:var(--brand);}
+.ovbtns{display:flex;gap:10px;margin-top:16px;}
+.ovbtns .btn{padding:13px 28px;flex:0 0 auto;}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <div class="hud">
+    <div class="cari-mini" id="hudCari"></div>
+    <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">직선 라인</span></div>
+    <div class="scorepill" id="scorePill"></div>
+  </div>
+
+  <div class="hint" id="hintLine"></div>
+
+  <div class="gridwrap">
+    <div class="grid">
+      <div class="cells" id="cells"></div>
+      <div class="ilayer" id="ilayer"></div>
+    </div>
+  </div>
+
+  <div class="palette">
+    <div class="tool on" data-tool="conv"><span class="tico">➡️</span><span class="tnm">컨베이어</span></div>
+    <div class="tool" data-tool="sensor"><span class="tico">🔀</span><span class="tnm">분기센서</span></div>
+    <div class="tool erase" data-tool="erase"><span class="tico">🧽</span><span class="tnm">지우기</span></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn ghost" id="btnReset">리셋</button>
+    <button class="btn" id="btnRun">가동</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- START -->
+  <div class="overlay" id="ovStart">
+    <div class="floaty" id="startCari"></div>
+    <div class="title"><span class="t1">지어라 </span><span class="t2">CARI</span></div>
+    <div class="tag">라인을 깔면 공장이 알아서 돌아가요!</div>
+    <div class="rules">
+      <div><b>①</b><span>칸을 <b>탭</b>해 컨베이어를 놓고, 다시 <b>탭</b>하면 방향(▲▶▼◀)이 돌아가요.</span></div>
+      <div><b>②</b><span><b>분기센서</b>는 색을 <b>읽어서</b> 맞으면 옆으로, 아니면 직진 — 라인의 판단 장치예요.</span></div>
+      <div><b>③</b><span><b>가동</b>을 누르면 상자가 <b>스스로</b> 흘러 각 출고함으로 정렬돼요. 사람 손 없이!</span></div>
+    </div>
+    <button class="btn" id="btnStart" style="flex:0 0 auto;margin-top:20px;padding:15px 50px;">시작하기</button>
+  </div>
+
+  <!-- RESULT -->
+  <div class="overlay hide" id="ovResult">
+    <div class="floaty" id="resCari"></div>
+    <div class="badge win" id="resBadge">가동 성공!</div>
+    <div class="scorebox">
+      <div class="big" id="resTitle"></div>
+      <div class="take" id="resTake"></div>
+      <div class="foot" id="resFoot"></div>
+    </div>
+    <div class="ovbtns">
+      <button class="btn ghost" id="btnRetry" style="flex:0 0 auto;padding:13px 26px;">다시</button>
+      <button class="btn" id="btnNext" style="flex:0 0 auto;padding:13px 30px;">다음</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================= CARI mascot ================= */
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg class="art" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+
+/* ================= Constants ================= */
+const COLS=6, ROWS=8, CELL=52, ITEM=26, SPAWN_EVERY=2;
+const DIRS=[[-1,0],[0,1],[1,0],[0,-1]];      // 0=up 1=right 2=down 3=left
+const ARROW=['▲','▶','▼','◀'];
+const FEAT={ R:{c:'#f2664f',n:'빨강'}, B:{c:'#1b55d0',n:'파랑'}, G:{c:'#12b58c',n:'초록'} };
+const branchOf=dir=>(dir+3)%4;              // matched item turns this way
+
+const FOOT="기계를 <b>배치·연결</b>해 사람 손 없이 라인이 스스로 도는 게 <b>자동화·시스템 설계</b>예요. 한 번 잘 만들면 계속 재현돼요.";
+
+/* ================= Levels ================= */
+const LEVELS=[
+  { name:'레벨 1', sub:'직선 라인', tick:500,
+    goal:'생산기 상자를 <b>컨베이어</b>로 아래 <b>출고함</b>까지 이어라',
+    source:{r:0,c:2,dir:2}, pattern:['B','B','B','B','B'], need:5, win:5, sense:null,
+    bins:[{r:7,c:2,want:null}],
+    sol:[[1,2,'conv',2],[2,2,'conv',2],[3,2,'conv',2],[4,2,'conv',2],[5,2,'conv',2],[6,2,'conv',2]],
+    take:'컨베이어만 깔았는데 상자가 <b>알아서</b> 흘러 출고됐어요 — 이게 자동 라인!' },
+
+  { name:'레벨 2', sub:'두 색 분류', tick:500,
+    goal:'센서로 <b>빨강</b>→오른쪽 함, <b>파랑</b>→아래 함으로 갈라라',
+    source:{r:0,c:1,dir:2}, pattern:['R','B','R','B','R','B'], need:6, win:6, sense:'R',
+    bins:[{r:3,c:3,want:'R'},{r:7,c:1,want:'B'}],
+    sol:[[1,1,'conv',2],[2,1,'conv',2],[3,1,'sensor',2],
+         [3,2,'conv',1],
+         [4,1,'conv',2],[5,1,'conv',2],[6,1,'conv',2]],
+    take:'센서 하나가 <b>빨강/파랑</b>을 스스로 갈라 보냈어요 — 판단하는 라인!' },
+
+  { name:'레벨 3', sub:'두 갈래 설계', tick:480,
+    goal:'센서+길을 설계해 <b>빨강·초록</b>을 양쪽 함으로 정렬하라',
+    source:{r:0,c:2,dir:2}, pattern:['R','G','R','G','R','G'], need:6, win:6, sense:'R',
+    bins:[{r:7,c:4,want:'R'},{r:7,c:0,want:'G'}],
+    sol:[[1,2,'conv',2],[2,2,'conv',2],[3,2,'sensor',2],
+         [3,3,'conv',1],[3,4,'conv',2],[4,4,'conv',2],[5,4,'conv',2],[6,4,'conv',2],
+         [4,2,'conv',2],[5,2,'conv',2],[6,2,'conv',3],[6,1,'conv',3],[6,0,'conv',2]],
+    take:'센서와 길만 설계했더니 공장이 <b>스스로</b> 두 갈래로 분류해요 — 시스템 설계!' },
+];
+
+/* ================= State ================= */
+let LI=0, L=null, grid=[], items=[], nextId=0, cellEls=[];
+let running=false, timer=null, tickN=0, spawnedCount=0;
+let good=0, bad=0, miss=0, routeLog=[], tool='conv', started=false;
+const $=id=>document.getElementById(id);
+
+/* ================= Board build ================= */
+function buildCells(){
+  const wrap=$('cells'); wrap.innerHTML='';
+  cellEls=[];
+  for(let r=0;r<ROWS;r++){ cellEls.push([]);
+    for(let c=0;c<COLS;c++){
+      const d=document.createElement('div');
+      d.className='cell'; d.dataset.r=r; d.dataset.c=c;
+      wrap.appendChild(d); cellEls[r].push(d);
+    }
+  }
+}
+function cellInner(r,c){
+  const g=grid[r][c];
+  if(g.type==='source') return `<div class="ci src"><div class="cmini">${charSVG(CARI_SUIT,{cari:true})}</div><span class="ar">${ARROW[g.dir]}</span></div>`;
+  if(g.type==='bin'){ const col=g.want?FEAT[g.want].c:null;
+    return `<div class="ci bin"><div class="binbox" style="border-color:${col||'#b9c2d6'}">`+
+      (col?`<span class="bsw" style="background:${col}"></span>`:`<span class="bany">?</span>`)+`</div></div>`; }
+  if(g.type==='conv') return `<div class="ci conv"><span class="ar">${ARROW[g.dir]}</span></div>`;
+  if(g.type==='sensor'){ const col=FEAT[L.sense].c;
+    return `<div class="ci sensor"><span class="sdot" style="background:${col}"></span><span class="ar">${ARROW[g.dir]}</span><span class="sbr" style="color:${col}">${ARROW[branchOf(g.dir)]}</span></div>`; }
+  return `<div class="ci empty"></div>`;
+}
+function renderCell(r,c){ cellEls[r][c].innerHTML=cellInner(r,c); }
+function renderBoard(){ for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)renderCell(r,c); }
+
+/* ================= Level load ================= */
+function startLevel(i){
+  stopSim(); LI=i; L=LEVELS[i];
+  $('ovResult').classList.add('hide');
+  document.documentElement.style.setProperty('--tk', L.tick+'ms');
+  grid=[]; for(let r=0;r<ROWS;r++){ grid.push([]); for(let c=0;c<COLS;c++) grid[r].push({type:'empty'}); }
+  grid[L.source.r][L.source.c]={type:'source',dir:L.source.dir};
+  L.bins.forEach(b=>grid[b.r][b.c]={type:'bin',want:b.want});
+  resetSim();
+  renderBoard();
+  $('lvlName').textContent=L.name; $('lvlSub').textContent=L.sub;
+  $('hintLine').innerHTML=L.goal;
+  setTool('conv');
+}
+
+/* ================= Simulation ================= */
+function tokenXY(r,c){ return [c*CELL+(CELL-ITEM)/2, r*CELL+(CELL-ITEM)/2]; }
+function makeToken(it){
+  const el=document.createElement('div'); el.className='item';
+  el.style.background=FEAT[it.feat].c;
+  const [x,y]=tokenXY(it.r,it.c); el.style.transform=`translate(${x}px,${y}px)`;
+  $('ilayer').appendChild(el); it.el=el;
+}
+function updateToken(it){ if(it.el){ const [x,y]=tokenXY(it.r,it.c); it.el.style.transform=`translate(${x}px,${y}px)`; } }
+
+function exitDir(it){
+  const g=grid[it.r][it.c];
+  if(g.type==='conv'||g.type==='source') return g.dir;
+  if(g.type==='sensor') return (it.feat===L.sense) ? branchOf(g.dir) : g.dir;
+  return null;
+}
+function killItem(it,fate,offgrid){
+  it.dead=true;
+  if(fate==='good')good++; else if(fate==='bad')bad++; else miss++;
+  if(fate==='good'||fate==='bad'){ const b=grid[it.r]&&grid[it.r][it.c]; routeLog.push({feat:it.feat,want:b?b.want:null,ok:fate==='good'}); }
+  if(it.el){ updateToken(it); const el=it.el; el.classList.add('x'+fate);
+    setTimeout(()=>el.remove(), Math.max(240, L.tick*0.9)); }
+  updateScore();
+}
+function tick(){
+  tickN++;
+  for(const it of items.slice()){
+    if(it.dead) continue;
+    const dir=exitDir(it);
+    if(dir===null){ killItem(it,'miss'); continue; }             // stuck on empty
+    const [nr,nc]=[it.r+DIRS[dir][0], it.c+DIRS[dir][1]];
+    it.r=nr; it.c=nc; it.steps=(it.steps||0)+1;
+    if(nr<0||nr>=ROWS||nc<0||nc>=COLS){ killItem(it,'miss',true); continue; }  // off edge
+    const t=grid[nr][nc];
+    if(t.type==='bin'){ killItem(it,(t.want==null||t.want===it.feat)?'good':'bad'); continue; }
+    if(t.type==='empty'){ killItem(it,'miss'); continue; }        // fell off belt
+    if(it.steps>ROWS*COLS+4){ killItem(it,'miss'); continue; }    // loop guard
+    updateToken(it);
+  }
+  if(spawnedCount<L.need && tickN%SPAWN_EVERY===1) spawn();
+  checkFinish();
+}
+function spawn(){
+  const s=L.source, feat=L.pattern[spawnedCount % L.pattern.length];
+  const it={id:nextId++, r:s.r, c:s.c, feat, dead:false, steps:0};
+  spawnedCount++; items.push(it); makeToken(it); updateScore();
+}
+function checkFinish(){
+  const live=items.some(it=>!it.dead);
+  if((spawnedCount>=L.need && !live) || tickN>200){ finish(); }
+}
+function resetSim(){
+  items.forEach(it=>it.el&&it.el.remove()); items=[];
+  good=bad=miss=0; tickN=0; spawnedCount=0; routeLog=[]; updateScore();
+}
+function startSim(){
+  if(running) return;
+  resetSim(); running=true; setEditable(false); updateRunBtn();
+  timer=setInterval(tick, L.tick);
+}
+function stopSim(){ running=false; if(timer){clearInterval(timer);timer=null;} setEditable(true); updateRunBtn(); }
+
+/* ================= UI ================= */
+function updateScore(){
+  const wrong=bad+miss;
+  $('scorePill').innerHTML=`맞음 <b>${good}</b>/${L?L.need:0}`+(wrong?` · <span class="miss">틀림 ${wrong}</span>`:'');
+}
+function updateRunBtn(){ const b=$('btnRun'); b.textContent=running?'멈춤':'가동'; b.classList.toggle('stop',running); }
+function setEditable(on){ $('cells').style.opacity=on?'1':'.92'; }
+function setTool(t){ tool=t; document.querySelectorAll('.tool').forEach(el=>el.classList.toggle('on', el.dataset.tool===t)); }
+
+$('cells').addEventListener('click',e=>{
+  if(running) return;
+  const cd=e.target.closest('.cell'); if(!cd) return;
+  const r=+cd.dataset.r, c=+cd.dataset.c, g=grid[r][c];
+  if(g.type==='source'||g.type==='bin') return;
+  if(tool==='erase'){ grid[r][c]={type:'empty'}; }
+  else if(g.type===tool){ g.dir=(g.dir+1)%4; }              // rotate same type
+  else { grid[r][c]={type:tool,dir:2}; }                    // place / replace
+  renderCell(r,c);
+});
+document.querySelector('.palette').addEventListener('click',e=>{
+  const t=e.target.closest('.tool'); if(t) setTool(t.dataset.tool);
+});
+$('btnRun').onclick=()=>{ running?stopSim():startSim(); };
+$('btnReset').onclick=()=>{ startLevel(LI); };
+
+/* ================= Result ================= */
+function finish(){
+  stopSim();
+  const win=good>=L.win;
+  $('resCari').innerHTML=charSVG(CARI_SUIT,{cari:true, shock:!win, dir:win?0:1});
+  $('resBadge').textContent=win?'가동 성공!':'라인 점검!';
+  $('resBadge').className='badge '+(win?'win':'lose');
+  $('resTitle').textContent=win ? (L.name+' 클리어 — 맞음 '+good+'/'+L.need)
+                                 : ('맞음 '+good+' · 틀림 '+(bad+miss)+' — 길을 고쳐볼까요?');
+  $('resTake').innerHTML=win?L.take:'상자가 엉뚱한 곳으로 갔어요. 컨베이어 방향과 센서 위치를 다시 이어보세요.';
+  $('resFoot').innerHTML=FOOT;
+  const nx=$('btnNext'); nx.textContent = !win ? '다시' : (LI>=LEVELS.length-1?'처음으로':'다음 레벨');
+  nx.dataset.win=win?'1':'0';
+  $('ovResult').classList.remove('hide');
+}
+$('btnRetry').onclick=()=>{ $('ovResult').classList.add('hide'); startLevel(LI); };
+$('btnNext').onclick=()=>{
+  const win=$('btnNext').dataset.win==='1';
+  $('ovResult').classList.add('hide');
+  startLevel(win ? (LI+1)%LEVELS.length : LI);
+};
+
+/* ================= Boot ================= */
+$('hudCari').innerHTML=charSVG(CARI_SUIT,{cari:true});
+$('startCari').innerHTML=charSVG(CARI_SUIT,{cari:true,dir:1});
+buildCells();
+startLevel(0);
+$('btnStart').onclick=()=>{ $('ovStart').classList.add('hide'); started=true; startLevel(0); };
+
+/* ================= test hooks ================= */
+window.LEVELS=LEVELS;
+window.__startLevel=startLevel;
+window.__auto=i=>{ startLevel(i); L.sol.forEach(([r,c,t,d])=>{ grid[r][c]={type:t,dir:d}; }); renderBoard(); };
+window.__tick=tick;
+window.__run=startSim;
+window.__stop=stopSim;
+window.__reset=resetSim;
+window.__stat=()=>({good,bad,miss,spawnedCount,tickN,running,LI,live:items.filter(x=>!x.dead).length,need:L.need});
+window.__routeLog=()=>routeLog.slice();
+window.__finished=()=>!$('ovResult').classList.contains('hide');
+window.__won=()=>$('resBadge').classList.contains('win');
+</script>
+</body>
+</html>

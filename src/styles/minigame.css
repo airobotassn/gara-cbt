@@ -85,9 +85,12 @@ html.dark .mgp {
 
 /* ── 표지 커버(일러스트 포스터, 가로 나란히) ── */
 .mg-shelf { display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 14px; }
-/* 페이지에선 화면이 좁으면 줄바꿈해 커버가 너무 얇아지지 않게 한다(모달은 한 줄 유지). */
-.mgp .mg-shelf { flex-wrap: wrap; gap: 16px; }
-.mgp .mg-cover { flex: 1 1 250px; max-width: 420px; }
+/* 페이지에선 폭에 맞춰 열 수가 줄어든다(모달은 한 줄 유지).
+   ⚠️ flex-wrap 이 아니라 **그리드**다 — flex 는 마지막 줄에 항목이 덜 차면 그것들만 늘어나서
+      커버 개수가 3의 배수가 아닐 때(예: 5개) 아래 줄이 위 줄보다 커진다. 그리드는 열 폭이 고정돼 모두 같다.
+      열 하한 230px = 900px 컨테이너에서 3열(≈276px), 좁아지면 2열 → 1열. */
+.mgp .mg-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.mgp .mg-cover { max-width: none; }
 /* 각 커버는 세로 포스터(게임 화면 위에 텍스트가 겹쳐 얹히는 오버레이). cqw 로 캡션이 커버 폭에 맞춰 스케일. */
 .mg-cover { position: relative; flex: 1 1 0; min-width: 0; max-width: 300px; aspect-ratio: 92 / 172; container-type: inline-size;
   overflow: hidden; cursor: pointer; border-radius: 20px; border: 3px solid var(--line); padding: 0; text-align: left; background: #e3ebf7;

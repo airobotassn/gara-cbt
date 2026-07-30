@@ -1,8 +1,7 @@
 // 승급 결과창 미리보기 — 실제로 승급하지 않고 '승급 → 다음 레벨 도전 → 응시 전 경고' 흐름을 눈으로 확인하는 용도.
 //
 //   node scripts/preview-promoted.mjs                 # 로컬 dev(5173) · 승급(up) 상태
-//   node scripts/preview-promoted.mjs stay            # 유지 상태(버튼이 안 나오는 걸 확인)
-//   node scripts/preview-promoted.mjs down            # 강등 상태
+//   node scripts/preview-promoted.mjs stay            # 유지 상태(버튼이 안 나오는 걸 확인) — 강등은 없어 up/stay 뿐이다
 //   node scripts/preview-promoted.mjs up http://localhost:5176
 //   node scripts/preview-promoted.mjs up https://gara-cbt.airobotassn.workers.dev   # 배포본에도 그대로 쓴다
 //
@@ -12,7 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 
-const MODE = (process.argv[2] ?? 'up').toLowerCase() // up | stay | down
+const MODE = (process.argv[2] ?? 'up').toLowerCase() // up | stay (강등 없음)
 const BASE = process.argv[3] ?? 'http://localhost:5173'
 const LEVEL = 3 // 응시한 레벨(= 승급 전 등급)
 
@@ -23,7 +22,7 @@ if (!ref) throw new Error('.env.local 에서 VITE_SUPABASE_URL 을 못 찾았습
 
 const AXES = ['prompt', 'model', 'verify', 'automation', 'data', 'ethics']
 const axisMap = (vals) => Object.fromEntries(AXES.map((k, i) => [k, vals[i]]))
-const rankAfter = MODE === 'up' ? LEVEL + 1 : MODE === 'down' ? LEVEL - 1 : LEVEL
+const rankAfter = MODE === 'up' ? LEVEL + 1 : LEVEL
 
 const browser = await chromium.launch({ headless: process.env.PREVIEW_HEADLESS === '1' })
 const page = await browser.newPage({ viewport: { width: 1180, height: 1000 } })
@@ -57,7 +56,7 @@ await page.route('**/functions/v1/get-result', (r) => r.fulfill(json({
   prevPerf: axisMap([58, 57, 44, 61, 55, 52]),
   deltas: axisMap([3, -2, 5, 1, 0, 2]),
   tierAvg: axisMap([50, 50, 50, 50, 50, 50]),
-  rankDir: MODE, rankBefore: LEVEL, rankAfter, warnStrikes: 0,
+  rankDir: MODE, rankBefore: LEVEL, rankAfter,
   answers: [],
 })))
 

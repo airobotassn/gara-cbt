@@ -92,7 +92,8 @@ function normalize(text) {
 }
 
 const FN_SYMBOLS = ['promoteCut', 'computeRankChange', 'computePoints', 'computeSkillScore', 'activityDelta', 'tierForPercentile'];
-const CONST_SYMBOLS = ['DEMOTE_MAX', 'DEMOTE_STRIKES', 'MAX_POINTS', 'ACTIVITY_DELTA', 'SKILL_LEVEL_STEP'];
+// 강등 관련 상수(DEMOTE_*)는 강등 제거로 사라졌다 — 남은 승급/점수 상수만 비교한다.
+const CONST_SYMBOLS = ['PROMOTE_RATE_LOW', 'PROMOTE_RATE_HIGH', 'MAX_POINTS', 'ACTIVITY_DELTA', 'SKILL_LEVEL_STEP'];
 
 for (const name of FN_SYMBOLS) {
   eq(normalize(extractFn(sharedSrc, name)), normalize(extractFn(feSrc, name)), `source parity: function ${name}`);
@@ -131,16 +132,22 @@ for (const kind of ['attendance', 'daily_learn', 'minigame']) {
   eq(Shared.activityDelta(kind), FE.activityDelta(kind), `activityDelta(${kind})`);
 }
 
+// 강등이 없어 strikes 인자도 없다 — (내등급, 응시레벨, 맞힌수) 만으로 승급/유지가 결정된다.
 const RANK_CASES = [
-  [1, 1, 20, 0], [1, 1, 16, 0], [1, 1, 4, 0], [1, 1, 4, 1], [1, 1, 4, 2],
-  [4, 4, 18, 0], [4, 4, 17, 0], [7, 7, 30, 0], [1, 1, 3, 2],
+  [1, 1, 20], [1, 1, 16], [1, 1, 8], [1, 1, 7], [1, 1, 0],
+  [4, 4, 18], [4, 4, 17], [7, 7, 30], [3, 2, 20], [2, 3, 16],
 ];
-for (const [currentRank, testLevel, correct, strikes] of RANK_CASES) {
+for (const [currentRank, testLevel, correct] of RANK_CASES) {
   eq(
-    Shared.computeRankChange(currentRank, testLevel, correct, strikes),
-    FE.computeRankChange(currentRank, testLevel, correct, strikes),
-    `computeRankChange(${currentRank},${testLevel},${correct},${strikes})`,
+    Shared.computeRankChange(currentRank, testLevel, correct),
+    FE.computeRankChange(currentRank, testLevel, correct),
+    `computeRankChange(${currentRank},${testLevel},${correct})`,
   );
+}
+
+// 강등 제거 확인: 최저점을 받아도 등급은 유지된다(어느 레벨에서든).
+for (const rank of [1, 3, 7]) {
+  eq(FE.computeRankChange(rank, rank, 0), { nextRank: rank, dir: 'stay' }, `no demotion: rank ${rank} · 0 correct → stay`);
 }
 
 const PCT_CASES = [0, 0.01, 0.05, 0.0500001, 0.049999, 0.2, 0.200001, 0.199999, 0.45, 0.450001, 0.75, 0.750001, 1];
@@ -164,7 +171,10 @@ eq(FE.tierForPercentile(1), 'bronze', 'tier boundary 1 -> bronze');
 const skillMax = FE.computeSkillScore(7, FE.promoteCut(7)); // 만렙 만점
 eq(skillMax, FE.MAX_POINTS, 'skillMax(만렙 만점) === MAX_POINTS(10000, 스케일 연속성)');
 
-const ACTIVE_MINIGAME_COUNT = 2; // 가정: src/lib/minigames.ts 현재 등록 게임 수(레지스트리 커지면 갱신 필요)
+// 가정: 활동점수 적립이 배선된 게임 수 = submit-minigame 의 GAME_MAX 항목 수(현재 beat-cari·shoot-cari 2종).
+//   ⚠️ 레지스트리(src/lib/minigames.ts)는 6종이지만 나머지는 점수 제출 배선이 없어 적립 0이다 —
+//      새 게임에 GAME_MAX 를 추가(=적립 배선)하면 이 수를 올리고 부등호를 다시 확인할 것.
+const ACTIVE_MINIGAME_COUNT = 2;
 const ASSUMED_SEASON_DAYS = 60; // 가정: 시즌 길이 ≈ 60일(고정 상수 아님 — reset_season() 은 운영자 트리거로 열림/닫힘)
 const dailyActivityMax = FE.activityDelta('attendance') + FE.activityDelta('daily_learn') + FE.activityDelta('minigame') * ACTIVE_MINIGAME_COUNT;
 const seasonActivityMax = dailyActivityMax * ASSUMED_SEASON_DAYS;

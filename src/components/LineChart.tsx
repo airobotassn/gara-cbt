@@ -23,12 +23,14 @@ export default function LineChart({
   to,
   ticks = [],
   emptyText,
+  height = 210,
 }: {
   data: Point[]
   from: number
   to: number
   ticks?: AxisTick[]
   emptyText?: string
+  height?: number // 카드 폭이 넓은 화면(학습 대시보드)에서 높이를 키우려고 뺀 값
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(340)
@@ -45,7 +47,7 @@ export default function LineChart({
   }, [])
 
   const W = Math.max(260, w)
-  const H = 210
+  const H = height
   const pl = 10
   const pr = 14
   const pt2 = 24

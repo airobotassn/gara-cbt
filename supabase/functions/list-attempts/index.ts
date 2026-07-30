@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
     // 게스트는 일일 제한 대상이 아니라 dailyLeft=null(화면에서 표시 생략).
     if (user.is_anonymous)
-      return json({ attempts: [], currentRank: null, currentPoints: 0, demotionStrikes: 0, levelSkills: [], dailyLeft: null })
+      return json({ attempts: [], currentRank: null, currentPoints: 0, levelSkills: [], dailyLeft: null })
 
     const admin = adminClient()
 
@@ -33,20 +33,20 @@ Deno.serve(async (req) => {
       totalCorrect: a.total_correct,
       totalQuestions: a.total_questions,
       rankAfter: a.rank_after ?? null,
-      rankDir: (a.rank_dir as 'up' | 'down' | 'stay' | null) ?? null,
+      // 강등 제거 전 기록의 'down' 은 'stay' 로 접는다(옛 이력에서도 강등이 안 보이게).
+      rankDir: a.rank_dir == null ? null : a.rank_dir === 'up' ? 'up' : 'stay',
       deltas: a.deltas ? toAxisMap(a.deltas, axisKeysForLevel(a.level)) : null,
       submittedAt: a.submitted_at,
     }))
 
-    // 현재 등급/점수/경고 (user_progress 한 줄). 응시 기록 없으면 등급 null.
+    // 현재 등급/점수 (user_progress 한 줄). 응시 기록 없으면 등급 null.
     const { data: prog } = await admin
       .from('user_progress')
-      .select('rank, points, demotion_strikes')
+      .select('rank, points')
       .eq('user_id', user.id)
       .maybeSingle()
     const currentRank = attempts.length > 0 ? ((prog?.rank as number) ?? 1) : null
     const currentPoints = (prog?.points as number) ?? 0
-    const demotionStrikes = (prog?.demotion_strikes as number) ?? 0
 
     // 레벨별 누적 레이더
     const { data: skills } = await admin
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     // 레벨 선택 화면의 '오늘 N회 남음' 표시용. 강제는 start-test 가 같은 헬퍼로 한다.
     const { left: dailyLeft } = await dailyAttemptsLeft(admin, user.id)
 
-    return json({ attempts, currentRank, currentPoints, demotionStrikes, levelSkills, dailyLeft })
+    return json({ attempts, currentRank, currentPoints, levelSkills, dailyLeft })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)
   }

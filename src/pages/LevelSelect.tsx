@@ -15,7 +15,7 @@ import {
   questionsForLevel,
   durationMinutesForLevel,
 } from '../lib/testConfigLevel'
-import { PROMOTE_RATE_LOW, PROMOTE_RATE_HIGH, DEMOTE_RATE, DEMOTE_STRIKES, promoteCut } from '../lib/scoring'
+import { PROMOTE_RATE_LOW, PROMOTE_RATE_HIGH, promoteCut } from '../lib/scoring'
 import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
 import type { StartTestResponse, ListAttemptsResponse } from '../lib/testTypes'
@@ -91,7 +91,7 @@ export default function LevelSelect() {
     }
   }
 
-  // 규칙 3줄(승급/강등/일일횟수) — 숫자는 scoring 임계값에서 읽어 자동 동기화.
+  // 규칙 3줄(승급/유지/일일횟수) — 숫자는 scoring 임계값에서 읽어 자동 동기화. 강등은 없다.
   const rules: { ico: string; tone: string; text: string }[] = [
     {
       ico: 'trending_up',
@@ -99,9 +99,9 @@ export default function LevelSelect() {
       text: t('lv.rule_up', { p1: Math.round(PROMOTE_RATE_LOW * 100), p2: Math.round(PROMOTE_RATE_HIGH * 100) }),
     },
     {
-      ico: 'trending_down',
-      tone: 'text-error bg-error/10',
-      text: t('lv.rule_down', { d: Math.round(DEMOTE_RATE * 100), n: DEMOTE_STRIKES }),
+      ico: 'shield',
+      tone: 'text-secondary bg-secondary/10',
+      text: t('lv.rule_nodown'),
     },
     {
       ico: 'refresh',

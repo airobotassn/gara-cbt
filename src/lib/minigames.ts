@@ -47,6 +47,37 @@ export const MINIGAMES: MiniGame[] = [
     src: '/games/pick-cari.html',
     frame: '#e3ebf7', // 스테이지가 크림/밝은 톤이라 밝은 프레임 유지(게임 body 와 동일)
   },
+  // 아래 둘은 용어 퀴즈가 아니라 로봇 조작/코딩 퍼즐이다(문제 은행을 쓰지 않는다) — 뱃지 문구도 그렇게 구분했다.
+  {
+    id: 'reach-cari',
+    title: '닿아라 CARI',
+    accent: 'CARI',
+    tagline: '관절을 움직여 목표에 닿아라',
+    badge: '로봇팔 · 기구학 퍼즐',
+    art: '/games/reach-cari-cover.png',
+    src: '/games/reach-cari.html',
+    frame: '#e3ebf7', // 게임 body 의 radial-gradient 바깥색과 동일(밝은 톤)
+  },
+  {
+    id: 'program-cari',
+    title: '프로그램해라 CARI',
+    accent: 'CARI',
+    tagline: '명령을 짜서 CARI를 움직여라',
+    badge: '로봇 · 블록 코딩 퍼즐',
+    art: '/games/program-cari-cover.png',
+    src: '/games/program-cari.html',
+    frame: '#e3ebf7', // 위와 동일 팔레트(같은 시안에서 나온 자매 게임)
+  },
+  {
+    id: 'build-cari',
+    title: '지어라 CARI',
+    accent: 'CARI',
+    tagline: '라인을 깔면 공장이 알아서 돌아가요!',
+    badge: '스마트팩토리 · 라인 설계 퍼즐',
+    art: '/games/build-cari-cover.png',
+    src: '/games/build-cari.html',
+    frame: '#e3ebf7', // 위와 동일 팔레트
+  },
 ]
 
 export function findMiniGame(id: string | undefined): MiniGame | undefined {

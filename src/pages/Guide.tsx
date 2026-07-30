@@ -46,6 +46,56 @@ const FEATURES: { k: string; icon: ReactNode }[] = [
   { k: 'f8', icon: <><circle cx="12" cy="12" r="8.4" /><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none" /><path d="M12 1.4v3.2M12 19.4v3.2M1.4 12h3.2M19.4 12h3.2" /></> },
 ]
 
+// 히어로 로봇 뒤 배경 플렉서스(별-네트워크) 좌표. 레퍼런스 시안 = 얇은 삼각망 + 교점의 작은 반짝이는 점.
+// 시드 고정 PRNG 라 매 렌더 같은 그림이 나온다(리렌더마다 배경이 튀는 것·스냅샷 흔들림 방지).
+// 좌표계는 0~100 정규값이고 화면 배치(왼쪽 비우기)는 guide.css 의 .guide-hero-fx mask 가 맡는다.
+const PLEXUS = (() => {
+  let s = 20260730
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 }
+  // 개수는 .guide-hero-fx 넓이에 맞춘 값 — 영역을 넓히면 같이 올려야 밀도가 유지된다
+  const nodes = Array.from({ length: 76 }, () => ({
+    // pow(_, .88) = x 를 살짝 오른쪽으로. 로봇이 오른쪽 절반을 가리므로 너무 치우치면 보이는 망이 없어진다.
+    x: 4 + 93 * Math.pow(rnd(), 0.88),
+    y: 3 + 94 * rnd(),
+    r: 0.22 + rnd() * 0.3,
+    halo: 3.4 + rnd() * 2.6, // 코어 반지름의 몇 배로 번질지 — 레퍼런스 점은 전부 글로우를 두르고 있다
+    dur: 3.6 + rnd() * 4.6,
+    delay: -rnd() * 7,
+    glint: false,
+    bokeh: false,
+  }))
+  // 반짝이는 십자 광선은 큰 점 6개만 (전부 반짝이면 눈이 아프다)
+  const bySize = nodes.slice().sort((a, b) => b.r - a.r)
+  bySize.slice(0, 6).forEach((n) => { n.glint = true })
+  // 레퍼런스에 있는 크게 번지는 보케 점 4개 — 코어는 흐리고 글로우만 넓다
+  bySize.slice(6, 10).forEach((n) => { n.bokeh = true; n.halo = 8 + n.r * 4 })
+  // 가까운 쌍부터 연결하되 노드당 3개까지 — 삼각망 느낌은 나면서 빽빽해지지 않는다.
+  // MAX_D 를 키우면 긴 직선이 늘어 기하도형처럼 보인다(레퍼런스는 거의 안 보이는 잔망).
+  const MAX_D = 13
+  const pairs: { i: number; j: number; d: number }[] = []
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y)
+      if (d < MAX_D) pairs.push({ i, j, d })
+    }
+  }
+  pairs.sort((p, q) => p.d - q.d)
+  const deg = nodes.map(() => 0)
+  const edges: { i: number; j: number; o: number }[] = []
+  for (const p of pairs) {
+    if (deg[p.i] >= 3 || deg[p.j] >= 3) continue
+    deg[p.i]++
+    deg[p.j]++
+    edges.push({ i: p.i, j: p.j, o: 0.38 + (1 - p.d / MAX_D) * 0.62 }) // 짧은 선이 더 진하다
+  }
+  // 레퍼런스에 있는 얇은 수평 광선 3줄(양끝이 페이드되는 가로선)
+  const streaks = Array.from({ length: 5 }, () => {
+    const len = 11 + rnd() * 11
+    return { x: 14 + rnd() * 52, y: 18 + rnd() * 66, len, o: 0.3 + rnd() * 0.35 }
+  })
+  return { nodes, edges, streaks }
+})()
+
 // 라인 아이콘 공용 래퍼(레퍼런스가 얇은 아웃라인 스타일이라 Material Symbols 대신 인라인 SVG).
 function LineIcon({ className, children }: { className?: string; children: ReactNode }) {
   return (
@@ -112,6 +162,54 @@ export default function Guide() {
             {/* 로봇은 배경 투명 PNG. 손 위 CARIS 행성은 이미지에 굽지 않고 별도 레이어로 얹는다
                 (로고가 선명하게 유지되고 교체·부유 애니메이션이 쉬움). 위치는 guide.css 의 .guide-hero-orb. */}
             <div className="guide-hero-art">
+              {/* 로봇 뒤 배경 플렉서스 — 청보라 필드 + 그 위 흰 삼각망·반짝이는 점(레퍼런스 시안).
+                  로봇 이미지 자체는 안 건드린다. 좌표=위 PLEXUS, 필드·색·페이드=guide.css 의 .guide-hero-fx / .hfx-*. */}
+              <div className="guide-hero-fx" aria-hidden="true">
+                <svg className="hfx-net" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <defs>
+                    {/* 점마다 두르는 글로우 — 레퍼런스 점은 딱딱한 원이 아니라 번지는 빛이다 */}
+                    <radialGradient id="hfxGlow">
+                      <stop offset="0" stopColor="#fff" stopOpacity=".6" />
+                      <stop offset=".42" stopColor="#fff" stopOpacity=".2" />
+                      <stop offset="1" stopColor="#fff" stopOpacity="0" />
+                    </radialGradient>
+                    <linearGradient id="hfxStreak" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0" stopColor="#fff" stopOpacity="0" />
+                      <stop offset=".5" stopColor="#fff" stopOpacity=".7" />
+                      <stop offset="1" stopColor="#fff" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {PLEXUS.edges.map((e, k) => (
+                    <line
+                      key={`e${k}`} className="hfx-line" style={{ opacity: e.o }}
+                      x1={PLEXUS.nodes[e.i].x} y1={PLEXUS.nodes[e.i].y}
+                      x2={PLEXUS.nodes[e.j].x} y2={PLEXUS.nodes[e.j].y}
+                    />
+                  ))}
+                  {PLEXUS.streaks.map((s, k) => (
+                    <line
+                      key={`s${k}`} className="hfx-streak" style={{ opacity: s.o }}
+                      x1={s.x} y1={s.y} x2={s.x + s.len} y2={s.y}
+                    />
+                  ))}
+                  {PLEXUS.nodes.map((n, k) => (
+                    <g
+                      key={`n${k}`} className={n.glint ? 'hfx-glint' : 'hfx-node'}
+                      transform={`translate(${n.x} ${n.y})`}
+                      style={{ animationDuration: `${n.dur}s`, animationDelay: `${n.delay}s` }}
+                    >
+                      <circle className="hfx-halo" r={n.r * n.halo} fill="url(#hfxGlow)" />
+                      {/* 십자 광선은 반투명 — 불투명하면 붙여넣은 반짝임 소재처럼 보인다 */}
+                      {n.glint ? (<>
+                        <path d="M0 -2.3 L.32 0 L0 2.3 L-.32 0 Z" opacity=".72" />
+                        <path d="M-2.3 0 L0 -.32 L2.3 0 L0 .32 Z" opacity=".72" />
+                      </>) : null}
+                      {/* 보케 점은 코어를 흐리게 — 넓은 글로우만 남는다 */}
+                      <circle r={n.r} opacity={n.bokeh ? 0.35 : 1} />
+                    </g>
+                  ))}
+                </svg>
+              </div>
               <img className="guide-hero-robot" src="/hero-robot.png" alt="" aria-hidden="true" />
               {/* 오브 = 얇은 동심원 링 2개 + 로고. 빛은 전부 로고 '뒤'에만 있고 로고 자체는 원색 그대로.
                   (레퍼런스 시안과 동일한 구성 — 로고를 덮는 층을 두면 색이 날아가 스티커처럼 보인다.) */}

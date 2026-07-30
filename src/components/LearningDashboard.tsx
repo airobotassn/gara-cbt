@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { levelColor, DEMOTE_STRIKES, computeSkillScore, tierColor, TIER_ORDER } from '../lib/scoring'
+import { levelColor, computeSkillScore, tierColor, TIER_ORDER } from '../lib/scoring'
 import { axesForLevel, axisKeysForLevel } from '../lib/categories'
 import type { AxisMap, Tier } from '../lib/scoring'
 import { useT } from '../lib/i18n'
@@ -13,6 +13,8 @@ import ContributionGraph from '../components/ContributionGraph'
 import type { ListAttemptsResponse, AttemptSummary, LevelSkill } from '../lib/testTypes'
 
 const PAGE_SIZE = 10
+// 영역 밸런스 카드의 고정 행 수 = Lv.2 이상의 축 수(6). Lv.1(3축)에서도 카드가 안 줄어들게 빈 행으로 채운다.
+const AXIS_ROWS_FIXED = 6
 const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 // 랭킹 추이 기간. 시즌 = 6개월(별도 시즌 시작일 개념이 백엔드에 없어 최근 180일로 본다).
@@ -55,7 +57,6 @@ export default function LearningDashboard() {
   const [attempts, setAttempts] = useState<AttemptSummary[] | null>(null)
   const [, setCurrentRank] = useState<number | null>(null)
   const [, setPoints] = useState(0)
-  const [strikes, setStrikes] = useState(0)
   const [levelSkills, setLevelSkills] = useState<LevelSkill[]>([])
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -70,6 +71,7 @@ export default function LearningDashboard() {
   const [, setSkillScore] = useState<number | null>(null)
   const [, setActivityScore] = useState<number | null>(null)
   const [pointsToPass, setPointsToPass] = useState<number | null>(null)
+  const [attendanceDays, setAttendanceDays] = useState<string[]>([]) // 활동 기록 달력(출석만)
 
   useEffect(() => {
     if (loading) return
@@ -82,7 +84,6 @@ export default function LearningDashboard() {
         setAttempts(r.attempts)
         setCurrentRank(r.currentRank)
         setPoints(r.currentPoints ?? 0)
-        setStrikes(r.demotionStrikes ?? 0)
         setLevelSkills(r.levelSkills)
         // 기본 선택 = 현재 등급 레벨(있으면), 없으면 마지막
         const i = r.levelSkills.findIndex((s) => s.level === r.currentRank)
@@ -98,6 +99,7 @@ export default function LearningDashboard() {
       skillScore?: number | null
       activityScore?: number | null
       pointsToPass?: number | null
+      attendanceDays?: string[] | null
     }>('get-hub', {})
       .then((h) => {
         setTier((h.tier as Tier | null) ?? null)
@@ -106,6 +108,7 @@ export default function LearningDashboard() {
         setSkillScore(h.skillScore ?? null)
         setActivityScore(h.activityScore ?? null)
         setPointsToPass(h.pointsToPass ?? null)
+        setAttendanceDays(h.attendanceDays ?? [])
       })
       .catch(() => {})
   }, [isFullUser, loading, navigate, t])
@@ -168,7 +171,7 @@ export default function LearningDashboard() {
 
   if (loading || (!attempts && !error)) {
     return (
-      <div className="wrap">
+      <div className="wrap db-wrap">
         <div className="card pad" style={{ textAlign: 'center', color: 'var(--muted)' }}>
           {t('common.loading')}
         </div>
@@ -183,17 +186,9 @@ export default function LearningDashboard() {
         )
       : 0
 
-  // TODO(#5 미구현): 잔디는 현재 레벨테스트 응시(list)만으로 채워 leveltest(금색) 활동만 표시한다.
-  //   attendance/learn/minigame 은 get-hub 가 activity_ledger+daily_activity 기반 일별 breakdown 을
-  //   반환해야 여기서 dominant 색이 정확해진다(현재 get-hub 응답에 그 필드가 없음 — 생산자 미배선).
-  const days = new Map<string, number>()
-  for (const a of list) {
-    const d = new Date(a.submittedAt)
-    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate(),
-    ).padStart(2, '0')}`
-    days.set(k, Math.max(days.get(k) ?? 0, a.level))
-  }
+  // 활동 기록 달력 = **출석만**(2026-07-29 결정). 응시·학습·미니게임은 찍지 않는다.
+  //   출처 = get-hub 의 attendanceDays(daily_activity.did_attendance, 최근 1년).
+  const days = new Set(attendanceDays)
 
   // 승급 기록 — 옛 '응시 기록'을 대체한다. 응시 목록(list, 최신순) 중 **승급한 순간만** 남긴다.
   // 별도 백엔드 없이 list-attempts 의 rankDir/rankAfter 로 만든다(레벨 인증서 목록과 같은 출처).
@@ -203,7 +198,8 @@ export default function LearningDashboard() {
   const pageItems = promos.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
 
   return (
-    <div className="wrap">
+    // db-wrap = 대시보드 전용 스케일(폭 1024px + 글씨/여백 한 단계 위). dashboard.css 참고.
+    <div className="wrap db-wrap">
       <div className="db-head">
         <div className="h">{t('db.title')}</div>
       </div>
@@ -269,22 +265,7 @@ export default function LearningDashboard() {
             </div>
           </div>
 
-          {/* 강등 경고 */}
-          {strikes > 0 ? (
-            <div
-              style={{
-                marginTop: 12,
-                borderRadius: 12,
-                background: 'var(--danger-bg)',
-                color: 'var(--danger-fg)',
-                fontSize: 13,
-                fontWeight: 600,
-                padding: '10px 14px',
-              }}
-            >
-              ⚠️ {t('result.demote_warn', { n: strikes, max: DEMOTE_STRIKES })} — {t('db.warn_hint')}
-            </div>
-          ) : null}
+          {/* (강등 경고 배너는 강등 제거로 삭제됐다 — 등급은 오르거나 유지만 된다) */}
 
           {/* 통계 */}
           <div className="stats">
@@ -347,19 +328,21 @@ export default function LearningDashboard() {
               <div className="leg">{t('db.recent_n', { n: trend.length })}</div>
               {trendRange === 'season' ? <div className="leg">{t('db.trend_season_hint')}</div> : null}
             </div>
-            <LineChart data={trend} from={trendFrom} to={nowTs} ticks={trendTicks} emptyText={t('db.trend_empty')} />
+            <LineChart data={trend} from={trendFrom} to={nowTs} ticks={trendTicks} emptyText={t('db.trend_empty')} height={250} />
           </div>
 
-          {/* 활동 잔디 */}
-          <div className="panel-card">
-            <div className="ph">
-              <div className="t">{t('db.activity_title')}</div>
+          {/* 활동 잔디 + 레벨별 레이더 — 둘 다 카드 폭을 다 쓰지 않아 넓은 화면에선 나란히 둔다.
+              (좁아지면 db-duo 의 auto-fit 이 알아서 한 줄씩으로 내린다) */}
+          <div className="db-duo">
+            <div className="panel-card">
+              <div className="ph">
+                <div className="t">{t('db.activity_title')}</div>
+              </div>
+              <ContributionGraph days={days} />
             </div>
-            <ContributionGraph days={days} />
-          </div>
 
-          {/* 레벨별 누적 레이더 (화살표 전환) */}
-          {radar ? (
+            {/* 레벨별 누적 레이더 (화살표 전환) */}
+            {radar ? (
             <div className="panel-card">
               <div className="ph">
                 <div className="t">{t('db.radar_title')} · Lv.{radar.level}</div>
@@ -389,6 +372,7 @@ export default function LearningDashboard() {
                 axes={axesForLevel(radar.level, lang)}
                 rating={radar.ratings}
                 ghost={radarAvg}
+                maxWidth={440}
               />
               {/* 음영 = 이 레벨 응시자 평균(현재는 더미) / 실선 = 내 점수 */}
               <div className="radar-leg">
@@ -402,7 +386,7 @@ export default function LearningDashboard() {
                   const s = avgVal != null ? cmpStatus(v, avgVal) : null
                   return (
                     <div className="ap" key={c.key}>
-                      <div className="lab">{c.short}</div>
+                      <div className="lab" title={c.short}>{c.short}</div>
                       <div className="track">
                         <div className="fill" style={{ width: `${v}%` }} />
                         {avgVal != null ? (
@@ -426,11 +410,29 @@ export default function LearningDashboard() {
                     </div>
                   )
                 })}
+                {/* Lv.1 은 3축이라 카드가 짧아진다 → Lv.2 이상(6축)과 같은 높이가 되도록 빈 행으로 채운다.
+                    (min-height 를 px 로 박으면 글씨 크기·언어에 따라 어긋나므로 실제 행으로 자리를 잡는다) */}
+                {Array.from({ length: Math.max(0, AXIS_ROWS_FIXED - axesForLevel(radar.level, lang).length) }).map((_, i) => (
+                  <div className="ap ap-ghost" key={`ghost${i}`} aria-hidden="true">
+                    <div className="lab">-</div>
+                    <div className="track" />
+                    {/* 실제 행과 같은 구조여야 높이가 정확히 같아진다(상태 배지 포함) */}
+                    <div className="val">
+                      <b>0</b>
+                      <span className="ap-status avg">
+                        <span className="ap-emoji">😐</span>
+                        <span className="ap-vs">-</span>
+                        <span className="ap-diff">0</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ) : null}
+            ) : null}
+          </div>
 
-          {/* 승급 기록 (페이징) — 승급한 응시만. 유지·강등 응시는 목록에 없다. */}
+          {/* 승급 기록 (페이징) — 승급한 응시만. 유지된 응시는 목록에 없다. */}
           <div className="panel-card">
             <div className="ph">
               <div className="t">{t('db.promo_title')}</div>

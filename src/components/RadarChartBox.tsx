@@ -8,9 +8,10 @@ interface Props {
   ghost?: AxisMap | null // 점선 고스트(이전 내 레이팅)
   size?: number
   changes?: AxisMap | null // 축별 변동: 양수=상승(초록)/음수=하락(빨강), 있으면 prev→cur 모핑 애니
+  maxWidth?: number // 렌더 폭 상한(px). viewBox 통째로 확대되므로 라벨·글자도 같이 커진다.
 }
 
-export default function RadarChartBox({ axes, rating, ghost, size = 110, changes }: Props) {
+export default function RadarChartBox({ axes, rating, ghost, size = 110, changes, maxWidth = 360 }: Props) {
   const cx = 160
   const cy = 150
   const R = size
@@ -69,7 +70,7 @@ export default function RadarChartBox({ axes, rating, ghost, size = 110, changes
     const H = 26
     const rowY = axes.length === 1 ? [132] : [104, 186]
     return (
-      <svg viewBox="0 0 320 290" style={{ width: '100%', maxWidth: 360, display: 'block', margin: '0 auto' }}>
+      <svg viewBox="0 0 320 290" style={{ width: '100%', maxWidth, display: 'block', margin: '0 auto' }}>
         {axes.map((c, i) => {
           const y = rowY[i] ?? 104 + i * 82
           const v = meArr[i]
@@ -100,7 +101,7 @@ export default function RadarChartBox({ axes, rating, ghost, size = 110, changes
   return (
     <svg
       viewBox="0 0 320 290"
-      style={{ width: '100%', maxWidth: 360, display: 'block', margin: '0 auto' }}
+      style={{ width: '100%', maxWidth, display: 'block', margin: '0 auto' }}
     >
       {rings.map((pts, i) => (
         <polygon key={i} className="ring" points={pts} />

@@ -135,9 +135,9 @@ const D: Record<string, Record<Lang, string>> = {
   // 레벨선택 페이지 제목 — 아레나 지도(WORLD ARENA)와 겹치지 않게 런처 버튼과 같은 '레벨 테스트'로.
   'lv.title': { ko: '레벨 테스트', en: 'Level Test', ja: 'レベルテスト', zh: '等级测试', hi: 'लेवल टेस्ट', vi: 'Kiểm tra cấp' },
   'lv.rule_btn': { ko: '등급 규칙', en: 'Tier rules', ja: '等級ルール', zh: '等级规则', hi: 'टियर नियम', vi: 'Luật hạng' },
-  // 문항 수는 레벨 구간별(10/20/30)이고 제한시간(분)이 그 수와 같다. 승급/강등은 개수가 아니라 정답률.
+  // 문항 수는 레벨 구간별(10/20/30)이고 제한시간(분)이 그 수와 같다. 승급은 개수가 아니라 정답률. 강등은 없다.
   'lv.rule_up': { ko: '정답률 {p1}% 이상이면 한 단계 올라가요 (Lv.4~7은 {p2}%)', en: 'Score {p1}%+ to move up a tier (Lv.4–7: {p2}%)', ja: '正答率{p1}%以上で1段階アップ（Lv.4~7は{p2}%）', zh: '正确率达 {p1}% 以上升一级（Lv.4~7 为 {p2}%）', hi: '{p1}%+ सही पर एक टियर ऊपर (Lv.4–7: {p2}%)', vi: 'Đúng {p1}%+ để lên 1 hạng (Lv.4–7: {p2}%)' },
-  'lv.rule_down': { ko: '정답률 {d}% 이하인 시험이 {n}번이면 한 단계 내려가요 (그 전까진 경고)', en: '{n} tests at {d}% or below drop you a tier (warnings until then)', ja: '正答率{d}%以下の試験が{n}回で1段階ダウン（それまでは警告）', zh: '正确率 {d}% 及以下的测试累计 {n} 次降一级（此前为警告）', hi: '{d}% या कम वाले {n} टेस्ट पर एक टियर नीचे (तब तक चेतावनी)', vi: '{n} bài đạt {d}% trở xuống sẽ tụt 1 hạng (trước đó là cảnh báo)' },
+  'lv.rule_nodown': { ko: '점수가 낮아도 등급은 내려가지 않아요', en: 'Your tier never goes down, even after a low score', ja: '点数が低くても等級は下がりません', zh: '即使分数很低，等级也不会下降', hi: 'कम स्कोर पर भी आपका टियर नीचे नहीं जाता', vi: 'Điểm thấp cũng không bị tụt hạng' },
   'lv.rule_daily': { ko: '하루 {n}회 응시할 수 있고, 승급하면 1회가 추가돼요', en: 'You get {n} attempts a day — each promotion adds one more', ja: '1日{n}回まで受験でき、昇級すると1回追加されます', zh: '每天可应试 {n} 次，升级可再加 1 次', hi: 'रोज़ {n} बार दे सकते हैं — हर प्रमोशन पर एक और', vi: 'Mỗi ngày {n} lượt thi — mỗi lần thăng hạng được cộng thêm 1' },
   // 레벨 선택(D안) — '지금 도전' 카드
   'lv.prev_level': { ko: '이전 레벨', en: 'Previous level', ja: '前のレベル', zh: '上一等级', hi: 'पिछला लेवल', vi: 'Cấp trước' },
@@ -148,7 +148,7 @@ const D: Record<string, Record<Lang, string>> = {
   'lv.fact_cut': { ko: '{n}개 맞히면 승급', en: '{n} correct to rank up', ja: '{n}問正解で昇級', zh: '答对 {n} 题升级', hi: '{n} सही पर प्रमोशन', vi: 'Đúng {n} câu để lên hạng' },
   'lv.left_today': { ko: '오늘 {n}회 남음 · 승급하면 1회 추가', en: '{n} left today · ranking up adds one', ja: '本日残り{n}回 · 昇級すると1回追加', zh: '今日剩 {n} 次 · 升级再加 1 次', hi: 'आज {n} बाकी · प्रमोशन पर एक और', vi: 'Còn {n} lượt hôm nay · thăng hạng được thêm 1' },
   'lv.daily_limit': { ko: '오늘 응시 횟수를 다 썼어요. 내일 다시 도전하거나, 승급하면 1회가 추가돼요.', en: "You've used today's attempts. Come back tomorrow — or earn one more by ranking up.", ja: '本日の受験回数を使い切りました。明日また挑戦するか、昇級すると1回追加されます。', zh: '今天的应试次数已用完。明天再来，或升级可再获得 1 次。', hi: 'आज के प्रयास खत्म हो गए। कल फिर आएं — या प्रमोशन पाकर एक और पाएं।', vi: 'Bạn đã dùng hết lượt thi hôm nay. Hãy quay lại ngày mai — hoặc thăng hạng để được thêm 1 lượt.' },
-  'lv.rule_note': { ko: 'Lv.1은 강등 없음 · Lv.{max}은 최고 등급', en: 'Lv.1 has no demotion · Lv.{max} is the top tier', ja: 'Lv.1は降格なし · Lv.{max}は最高等級', zh: 'Lv.1 无降级 · Lv.{max} 为最高级', hi: 'Lv.1 में कोई पदावनति नहीं · Lv.{max} सर्वोच्च', vi: 'Lv.1 không bị giáng · Lv.{max} là hạng cao nhất' },
+  'lv.rule_note': { ko: 'Lv.{max}은 최고 등급', en: 'Lv.{max} is the top tier', ja: 'Lv.{max}は最高等級', zh: 'Lv.{max} 为最高级', hi: 'Lv.{max} सर्वोच्च टियर है', vi: 'Lv.{max} là hạng cao nhất' },
   'lv.login_to_save': {
     ko: '테스트 결과를 저장하려면 로그인이 필요합니다',
     en: 'Log in to save your test results',
@@ -368,7 +368,6 @@ const D: Record<string, Record<Lang, string>> = {
   },
   'result.placing': { ko: ' · 배치 진행 중', en: ' · placement in progress', ja: ' · 配置中', zh: ' · 定级中', hi: ' · प्लेसमेंट जारी', vi: ' · đang xếp hạng' },
   'result.promoted': { ko: '승급!', en: 'Promoted!', ja: '昇格！', zh: '晋级！', hi: 'पदोन्नति!', vi: 'Thăng hạng!' },
-  'result.demoted': { ko: '강등', en: 'Demoted', ja: '降格', zh: '降级', hi: 'पदावनति', vi: 'Xuống hạng' },
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   'result.next_level': {
     ko: 'Lv.{n} 도전하기 →',
@@ -378,8 +377,6 @@ const D: Record<string, Record<Lang, string>> = {
     hi: 'Lv.{n} लें →',
     vi: 'Thử Lv.{n} →',
   },
-  'result.demote_warn': { ko: '강등 경고 {n}/{max}', en: 'Demotion warning {n}/{max}', ja: '降格警告 {n}/{max}', zh: '降级警告 {n}/{max}', hi: 'पदावनति चेतावनी {n}/{max}', vi: 'Cảnh báo giáng hạng {n}/{max}' },
-  'result.demote_warn_sub': { ko: '한 번 더 부진하면 강등돼요', en: 'One more low score and you drop a tier', ja: 'もう一度低得点で降格します', zh: '再低分一次将降级', hi: 'एक और कम स्कोर पर पदावनति', vi: 'Thêm một lần điểm thấp sẽ bị giáng hạng' },
   'rank.cur_level': { ko: '현재 등급 · 레벨 {n}', en: 'Current rank · Level {n}', ja: '現在の等級 · レベル{n}', zh: '当前等级 · Lv.{n}', hi: 'वर्तमान रैंक · स्तर {n}', vi: 'Hạng hiện tại · Cấp {n}' },
   'db.cur_rank': { ko: '현재 등급 · 응시 {n}회', en: 'Current rank · {n} attempts', ja: '現在の等級 · {n}回受験', zh: '当前等级 · 应试 {n} 次', hi: 'वर्तमान रैंक · {n} प्रयास', vi: 'Hạng hiện tại · {n} lần thi' },
   'db.points': { ko: '랭킹 점수 {p}', en: 'Ranking score {p}', ja: 'ランキングスコア {p}', zh: '排名分数 {p}', hi: 'रैंकिंग स्कोर {p}', vi: 'Điểm xếp hạng {p}' },
@@ -393,8 +390,6 @@ const D: Record<string, Record<Lang, string>> = {
   'db.eq_points': { ko: '점수', en: 'Score', ja: 'スコア', zh: '分数', hi: 'स्कोर', vi: 'Điểm' },
   'db.howto_up': { ko: '16개 이상 맞혀 레벨이 오르면 점수가 크게 올라요', en: 'Get 16+ right to level up and your score jumps a lot', ja: '16問以上正解でレベルが上がると点数が大きく上昇', zh: '答对 16 题以上升级，分数会大涨', hi: '16+ सही पर लेवल बढ़े तो स्कोर बहुत बढ़ता है', vi: 'Đúng 16+ để lên cấp thì điểm tăng mạnh' },
   'db.howto_within': { ko: '같은 레벨에선 많이 맞힐수록 점수가 조금씩 올라요', en: 'Same level → more correct nudges it up bit by bit', ja: '同じレベルでは正解が多いほど少しずつ上昇', zh: '同级时答对越多，分数一点点上升', hi: 'एक ही लेवल में ज़्यादा सही → थोड़ा-थोड़ा बढ़ता है', vi: 'Cùng cấp → đúng nhiều thì nhích lên từng chút' },
-  'db.howto_demote': { ko: '너무 적게 맞히면 점수가 떨어져요', en: 'Too few correct and your score drops', ja: '正解が少なすぎると点数が下がります', zh: '答对太少分数会下降', hi: 'बहुत कम सही होने पर स्कोर गिरता है', vi: 'Đúng quá ít thì điểm giảm' },
-  'db.warn_hint': { ko: '정답 4개 이하를 한 번 더 받으면 강등', en: 'one more score of 4 or fewer correct drops a tier', ja: 'もう一度正解4問以下で降格', zh: '再有一次答对4题及以下将降级', hi: 'एक बार और 4 या कम सही पर पदावनति', vi: 'thêm một lần đúng 4 câu trở xuống sẽ bị giáng hạng' },
   'result.radar_title': {
     ko: '영역별 시험 결과',
     en: 'Test result by area',
@@ -477,7 +472,7 @@ const D: Record<string, Record<Lang, string>> = {
     hi: 'Lv.{n} पर बुनियाद मज़बूत करें',
     vi: 'Xây nền tảng ở Lv.{n}',
   },
-  // 승급 실패(유지·강등) 시 처방 둘째 줄 — 약점 영역을 짚고 교재로 유도한다.
+  // 승급 못 했을 때(유지) 처방 둘째 줄 — 약점 영역을 짚고 교재로 유도한다.
   //   ⚠️ 이북에 레벨·영역 메타데이터가 없어 '이 축을 다루는 책'을 특정하지 못한다. 문구로만 연결하고
   //      실제 목록은 결과창 아래 추천 이북 칸(스토어 노출순)이다. 메타데이터가 생기면 여기서 매칭할 것.
   'rx.study_weak': {
@@ -662,6 +657,8 @@ const D: Record<string, Record<Lang, string>> = {
   'cal.summary': { ko: '최근 6개월 · {n}일 활동', en: 'Last 6 months · {n} active days', ja: '直近6ヶ月 · {n}日活動', zh: '最近 6 个月 · {n} 天活动', hi: 'पिछले 6 महीने · {n} सक्रिय दिन', vi: '6 tháng qua · {n} ngày hoạt động' },
   'cal.active': { ko: '활동한 날', en: 'Active day', ja: '活動日', zh: '活动日', hi: 'सक्रिय दिन', vi: 'Ngày hoạt động' },
   'cal.days_active': { ko: '이 달 {n}일 활동', en: '{n} active days this month', ja: '今月{n}日活動', zh: '本月 {n} 天活动', hi: 'इस महीने {n} सक्रिय दिन', vi: 'Tháng này {n} ngày hoạt động' },
+  // 활동 기록 달력은 출석만 표시한다 → 문구도 '활동'이 아니라 '출석'
+  'cal.days_attended': { ko: '이 달 {n}일 출석', en: '{n} days attended this month', ja: '今月{n}日出席', zh: '本月签到 {n} 天', hi: 'इस महीने {n} दिन उपस्थिति', vi: 'Tháng này điểm danh {n} ngày' },
   'cal.weekdays': { ko: '일,월,화,수,목,금,토', en: 'S,M,T,W,T,F,S', ja: '日,月,火,水,木,金,土', zh: '日,一,二,三,四,五,六', hi: 'र,सो,मं,बु,गु,शु,श', vi: 'CN,T2,T3,T4,T5,T6,T7' },
   'cal.did': { ko: '활동함', en: 'Active', ja: '活動あり', zh: '有活动', hi: 'सक्रिय', vi: 'Có hoạt động' },
   'cal.none': { ko: '활동 없음', en: 'No activity', ja: '活動なし', zh: '无活动', hi: 'कोई गतिविधि नहीं', vi: 'Không hoạt động' },
@@ -1503,7 +1500,8 @@ const D: Record<string, Record<Lang, string>> = {
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   'arena.title': { ko: "WORLD ARENA", en: "WORLD ARENA", ja: "WORLD ARENA", zh: "WORLD ARENA", hi: "WORLD ARENA", vi: "WORLD ARENA" },
   'arena.bGame': { ko: "미니게임", en: "Mini Games", ja: "ミニゲーム", zh: "小游戏", hi: "मिनी गेम्स", vi: "Trò chơi nhỏ" },
-  'arena.bGameS': { ko: "AI 로봇 용어로 한 판", en: "Play & learn terms", ja: "AI用語で一勝負", zh: "用AI术语来一局", hi: "खेलें और सीखें", vi: "Chơi & học thuật ngữ" },
+  // 용어 퀴즈 게임 3종 + 로봇 조작/코딩 퍼즐 2종이라 '용어'로 못 묶는다 → AI·로봇 전체로 넓힌 문구.
+  'arena.bGameS': { ko: "AI · 로봇을 게임으로 한 판", en: "Play & learn AI · robotics", ja: "AI・ロボットをゲームで", zh: "用游戏学AI与机器人", hi: "खेलें और AI · रोबोटिक्स सीखें", vi: "Chơi & học AI · robot" },
   'arena.loading': { ko: "지도를 불러오는 중…", en: "Loading map…", ja: "地図を読み込み中…", zh: "正在加载地图…", hi: "मानचित्र लोड हो रहा है…", vi: "Đang tải bản đồ…" },
   'arena.zoom_in': { ko: "확대", en: "Zoom in", ja: "拡大", zh: "放大", hi: "ज़ूम इन", vi: "Phóng to" },
   'arena.zoom_out': { ko: "축소", en: "Zoom out", ja: "縮小", zh: "缩小", hi: "ज़ूम आउट", vi: "Thu nhỏ" },

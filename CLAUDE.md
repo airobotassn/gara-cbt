@@ -26,7 +26,7 @@
 ## 프로젝트 한눈에
 
 **GARA · AI 활용능력 CARIS ARENA** — "당신의 AI 활용능력은 어느 정도인가요?"
-20문항으로 **레벨별 6개 영역**을 측정하고 **레벨 사다리(1~7, 원점수로 승급/유지/강등)** 로 등급을 부여하는 웹 서비스. 등급+그 레벨 진행도를 **랭킹 점수(0~10000)** 로 환산해 리더보드를 매긴다. 문항은 **6개국어 다국어**(화면 언어로 응시).
+20문항으로 **레벨별 6개 영역**을 측정하고 **레벨 사다리(1~7, 원점수로 승급/유지 — 강등 없음)** 로 등급을 부여하는 웹 서비스. 등급+그 레벨 진행도를 **랭킹 점수(0~10000)** 로 환산해 리더보드를 매긴다. 문항은 **6개국어 다국어**(화면 언어로 응시).
 
 - 비로그인(게스트) 응시 가능 → **총점만** 노출
 - 구글 로그인 시 **등급(레벨) · 레벨별 6축 레이더 · 오답노트** 잠금 해제(비로그인 결과 그대로 이관)
@@ -131,11 +131,11 @@ supabase/
 
 - **보안 모델**: `questions.correct_index`·`test_attempts`·`attempt_answers`·`user_level_skill`·`user_progress` 는 **클라 직접 SELECT 금지**(RLS 미부여 = service role 전용). 출제·채점·결과 서빙은 **Edge Function 에서만**. 익명 유저 응답에선 총점 외 데이터를 서버가 제외. 정답은 언어 무관 단일 컬럼(`correct_index`)이라 번역과 무관.
 - **스코어링 단일 출처**: 프론트 `src/lib/scoring.ts` 와 함수 `supabase/functions/_shared/lib.ts` 가 **동일 수식**을 유지해야 한다(둘 다 고칠 것). 만점=100 정규화·EWMA 누적은 `scoring.ts` 참고. ⚠️ 레벨별 6축 코드(`categories.ts` ↔ `_shared/lib.ts` 의 `LEVEL_AXES`)도 양쪽 동기화 필수.
-- **등급 변동 규칙**: 승급컷 = **Lv.1~3은 16개, Lv.4~7은 18개**(`promoteCut`). 강등 = **4개 이하(5개 미만)를 연속 3번이면 한 단계 강등, 앞 2번은 경고**(`computeRankChange`, 경고 카운터 = `user_progress.demotion_strikes`, 5개 이상/레벨변동 시 리셋, Lv.1 강등 없음). 경고는 결과창+대시보드에 표시(`warn_strikes`). **랭킹 점수**(`computePoints`, 0~10000) = `((등급-1) + 그 등급 최신 맞힌수/승급컷) / 7 × 10000` → `user_progress.points` 에 매 응시 저장, `leaderboard_v2` RPC가 이걸로 정렬(동점=먼저 도달). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
+- **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~3 80%, Lv.4~7 90% → Lv.1 8/10 · Lv.2·3 16/20 · Lv.4~7 27/30). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). **랭킹 점수**(`computePoints`, 0~10000) = `((등급-1) + 그 등급 최신 맞힌수/승급컷) / 7 × 10000` → `user_progress.points` 에 매 응시 저장, `leaderboard_v2` RPC가 이걸로 정렬(동점=먼저 도달). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
 - **i18n**: 라이브러리 없이 `src/lib/i18n.tsx` 의 `D` 사전. 6개국어(ko·en·ja·zh·hi·vi). 문구 추가 시 6개 다 채울 것. `{var}` 보간.
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
 - **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`). 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만 — 버킷·정책은 대시보드 SQL로 생성). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.
-- **등급 연출**: 결과창은 원점수 판정으로 **승급/강등 배너+애니**, 레벨별 누적 레이더(고스트=현재−deltas) 표시(`Result.tsx`). 대시보드는 레벨별 레이더를 ‹ ›로 전환.
+- **등급 연출**: 결과창은 원점수 판정으로 **승급 배너+애니**(강등이 없으니 하락 배너도 없다), 레벨별 누적 레이더(고스트=현재−deltas) 표시(`Result.tsx`). 대시보드는 레벨별 레이더를 ‹ ›로 전환.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.
 
 ## 운영에서 자주 막히는 것 (반드시 숙지)

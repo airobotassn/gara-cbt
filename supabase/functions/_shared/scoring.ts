@@ -84,7 +84,6 @@ const EWMA_K_DOWN = 0.15
 const PLACEMENT_K = 1
 const RATIO_EXPONENT = 1.2
 const GUESS_BASELINE = 0.25
-const DEMOTE_SEED = 85 // 강등 시 내려간 레벨을 이 점수로 시드(롤식: 하위 티어 상단에서 시작)
 
 // 축 점수 정규화: 그 레벨 만점 = 100 (추측 보정 포함)
 export function axisPerf(ratio: number): number {
@@ -99,44 +98,29 @@ export function updateAxis(prev: number, perf: number, placed: boolean): number 
 }
 
 // ----- 등급(레벨) 변동 (scoring.ts 와 동일하게 유지!) -----
-// 승급컷: 레벨1~3 = 80%, 레벨4~7 = 90%. 강등: 20% 이하 연속 3번(앞 2번 경고). Lv.1 강등 없음.
+// 승급컷: 레벨1~3 = 80%, 레벨4~7 = 90%. 강등은 없다(2026-07 제거) — 등급은 오르거나 유지만 된다.
 //   문항 수가 레벨 구간마다 달라(10/20/30) 절대 개수가 아니라 비율로 판정한다.
 export const PROMOTE_RATE_LOW = 0.8
 export const PROMOTE_RATE_HIGH = 0.9
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
   return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
-export const DEMOTE_RATE = 0.2
-export function demoteMax(level: number, total: number = questionsForLevel(level)): number {
-  return Math.floor(total * DEMOTE_RATE)
-}
-export const DEMOTE_STRIKES = 3
-export type RankDir = 'up' | 'down' | 'stay'
+export type RankDir = 'up' | 'stay'
 export interface RankChange {
   nextRank: number
   dir: RankDir
-  nextStrikes: number
-  warned: boolean
 }
 export function computeRankChange(
   currentRank: number,
   testLevel: number,
   correct: number,
-  strikes: number,
   total: number = questionsForLevel(testLevel),
 ): RankChange {
   if (testLevel >= currentRank && correct >= promoteCut(testLevel, total)) {
     const next = Math.min(MAX_LEVEL, currentRank + 1)
-    return { nextRank: next, dir: next > currentRank ? 'up' : 'stay', nextStrikes: 0, warned: false }
+    return { nextRank: next, dir: next > currentRank ? 'up' : 'stay' }
   }
-  if (testLevel <= currentRank && correct <= demoteMax(testLevel, total) && currentRank > MIN_LEVEL) {
-    const s = strikes + 1
-    if (s >= DEMOTE_STRIKES) {
-      return { nextRank: currentRank - 1, dir: 'down', nextStrikes: 0, warned: false }
-    }
-    return { nextRank: currentRank, dir: 'stay', nextStrikes: s, warned: true }
-  }
-  return { nextRank: currentRank, dir: 'stay', nextStrikes: 0, warned: false }
+  return { nextRank: currentRank, dir: 'stay' }
 }
 
 // 랭킹 점수(0~10000) — 레벨당 1/MAX_LEVEL, 레벨 내부는 승급컷 정규화.
@@ -154,7 +138,8 @@ export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame'
 // minigame 값은 "정규화 상한"이다 — 실제 적립값은 게임별 서버 정규화 점수를 이 상한 이하로 스케일해서 쓴다(게임별 스코어링은 이 파일 밖 관심사).
 // 튜닝 근거(부등호 "실력 최고치 > 활동 최대 기여" 성립 확인):
 //   실력 최고치 = computeSkillScore(MAX_LEVEL, promoteCut(MAX_LEVEL)) = SKILL_LEVEL_STEP*MAX_LEVEL = MAX_POINTS = 10000.
-//   가정(assumption, 튜닝 필요시 갱신): 시즌 ≈ 60일, 활성 미니게임 2종(src/lib/minigames.ts 기준).
+//   가정(assumption, 튜닝 필요시 갱신): 시즌 ≈ 60일, 점수 적립이 배선된 미니게임 2종
+//   (기준은 레지스트리 개수가 아니라 submit-minigame 의 GAME_MAX — 레지스트리엔 6종이지만 나머지는 제출 배선이 없어 적립 0).
 //   활동 일일 최대 = ATTENDANCE(10) + DAILY_LEARN(30) + MINIGAME(50)×2종 = 140 → 시즌 누적 ≈ 8,400 (< 10,000, 여유 16%).
 //   ⚠️ 미니게임 종류가 늘어나면(예: 3종 이상) 이 여유가 줄거나 역전될 수 있다 — 레지스트리가 커지면 ACTIVITY_DELTA.minigame 을
 //      낮추거나 시즌 단위 활동 캡(추후 스테이지 과제)을 도입해 이 부등호를 재검증할 것. (미해결/가정으로 명시)
@@ -280,7 +265,7 @@ export async function applyAttempt(
   level: number,
   perf: AxisMap,
   totalCorrect: number,
-  // 실제 출제 문항 수. 승급컷/강등선이 비율이라 이 값이 판정 분모가 된다(생략 시 레벨 기준값).
+  // 실제 출제 문항 수. 승급컷이 비율이라 이 값이 판정 분모가 된다(생략 시 레벨 기준값).
   totalQuestions: number = questionsForLevel(level),
 ): Promise<{
   ratings: AxisMap
@@ -290,8 +275,6 @@ export async function applyAttempt(
   rankDir: RankDir
   points: number
   skillScore: number
-  demotionStrikes: number // 갱신된 경고 누적
-  warned: boolean // 이번에 강등 경고가 떴는가
 }> {
   const keys = axisKeysForLevel(level)
 
@@ -331,21 +314,14 @@ export async function applyAttempt(
     { onConflict: 'user_id,level' },
   )
 
-  // 등급(레벨) 이동 + 강등 경고(3진 아웃)
+  // 등급(레벨) 이동 (승급 또는 유지 — 강등 없음)
   const { data: prog } = await admin
     .from('user_progress')
-    .select('rank, demotion_strikes, skill_score')
+    .select('rank, skill_score')
     .eq('user_id', userId)
     .maybeSingle()
   const rankBefore = (prog?.rank as number) ?? MIN_LEVEL
-  const strikesBefore = (prog?.demotion_strikes as number) ?? 0
-  const { nextRank, dir, nextStrikes, warned } = computeRankChange(
-    rankBefore,
-    level,
-    totalCorrect,
-    strikesBefore,
-    totalQuestions,
-  )
+  const { nextRank, dir } = computeRankChange(rankBefore, level, totalCorrect, totalQuestions)
 
   // 랭킹 점수 = 새 등급 + 그 레벨 '최신' 맞힌 수. (이번 응시가 그 레벨이면 이번 값, 아니면 DB 최신)
   let latestCorrect = 0
@@ -364,14 +340,14 @@ export async function applyAttempt(
     latestCorrect = (la?.total_correct as number) ?? 0
   }
   const points = computePoints(nextRank, latestCorrect)
-  // 실력점수(skill_score) — 레벨테스트 전용 트랙(활동점수와 별개). 최고성취만 유지(GREATEST, 강등으로 낮아지지 않음).
+  // 실력점수(skill_score) — 레벨테스트 전용 트랙(활동점수와 별개). 최고성취만 유지(GREATEST, 낮아지지 않음).
   const skillScore = Math.max((prog?.skill_score as number) ?? 0, computeSkillScore(nextRank, latestCorrect))
 
+  // demotion_strikes 컬럼은 강등 제거로 vestigial — 읽지도 쓰지도 않는다(default 0 유지).
   await admin.from('user_progress').upsert(
     {
       user_id: userId,
       rank: nextRank,
-      demotion_strikes: nextStrikes,
       points,
       skill_score: skillScore,
       updated_at: new Date().toISOString(),
@@ -380,7 +356,7 @@ export async function applyAttempt(
   )
 
   // 레벨 최초 도달마다 쿠폰 1장 발급(side-effect, 채점 공식 아님).
-  // 강등 후 재승급은 유니크(user_id,issued_for_level) 충돌로 무발급 → 최초 도달 1회만.
+  // 유니크(user_id,issued_for_level) 라 같은 레벨 재도달은 무발급 → 최초 도달 1회만.
   if (nextRank > rankBefore) {
     await admin
       .from('user_coupons')
@@ -388,17 +364,6 @@ export async function applyAttempt(
         { user_id: userId, issued_for_level: nextRank, coupon_code: 'LEVELUP10' },
         { onConflict: 'user_id,issued_for_level', ignoreDuplicates: true },
       )
-  }
-
-  // 강등이면: 내려간 레벨을 그 티어 상단(DEMOTE_SEED)으로 시드 — 위에서 내려온 값이라 0이 아닌 높은 데서 시작(롤식).
-  if (dir === 'down') {
-    const lkeys = axisKeysForLevel(nextRank)
-    const seeded: AxisMap = {}
-    for (const k of lkeys) seeded[k] = DEMOTE_SEED
-    await admin.from('user_level_skill').upsert(
-      { user_id: userId, level: nextRank, ratings: seeded, rating: avgRating(seeded, lkeys), placed: true, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,level' },
-    )
   }
 
   return {
@@ -409,8 +374,6 @@ export async function applyAttempt(
     rankDir: dir,
     points,
     skillScore,
-    demotionStrikes: nextStrikes,
-    warned,
   }
 }
 
@@ -448,7 +411,6 @@ export function lockedResult(
     rankBefore: null,
     rankAfter: null,
     rankDir: null,
-    warnStrikes: 0,
     answers: [],
     claimToken: includeClaimToken ? attempt.claim_token ?? null : null,
   }
@@ -471,7 +433,6 @@ export async function fullResult(
     rank_before?: number | null
     rank_after?: number | null
     rank_dir?: string | null
-    warn_strikes?: number | null
   },
 ) {
   const keys = axisKeysForLevel(attempt.level)
@@ -495,7 +456,8 @@ export async function fullResult(
 
   const rankAfter = attempt.rank_after ?? (await getRank(admin, attempt.user_id))
   const rankBefore = attempt.rank_before ?? rankAfter
-  const rankDir = (attempt.rank_dir as RankDir) ?? 'stay'
+  // 강등 제거 전 기록엔 rank_dir='down' 이 남아있다 → 'stay' 로 접어서 옛 결과창에도 강등이 안 보이게 한다.
+  const rankDir: RankDir = attempt.rank_dir === 'up' ? 'up' : 'stay'
 
   // 직전 "동레벨" 시험의 per-test 축 성적(레이더 음영용). 없으면 null.
   let prevPerf: AxisMap | null = null
@@ -550,7 +512,6 @@ export async function fullResult(
     rankBefore,
     rankAfter,
     rankDir,
-    warnStrikes: attempt.warn_strikes ?? 0, // 0 = 경고 없음, 1~2 = 강등 경고 N/3
     answers,
   }
 }

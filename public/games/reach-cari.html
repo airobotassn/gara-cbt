@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>닿아라 CARI</title>
+<style>
+:root{
+  --page:#e9eff9; --bg:#fbfaf5; --ink:#28324c; --sub:#7c869e;
+  --brand:#004ac6; --brand-hi:#1b55d0; --line:#e6e9f3;
+  --good:#12b58c; --bad:#f2664f; --skip:#e59b17;
+  --cream:#ece9e0;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);
+  color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+  display:flex; align-items:center; justify-content:center; min-height:100%; overflow:hidden; user-select:none;
+}
+.stage{
+  position:relative; width:min(460px,100vw); height:min(860px,100vh);
+  display:flex; flex-direction:column; background:var(--bg);
+  box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
+}
+.art{width:100%;height:100%;display:block;}
+
+/* HUD */
+.hud{display:flex; align-items:center; gap:10px; padding:12px 14px 8px; z-index:5;}
+.hud .cari-mini{width:40px;height:40px;flex:0 0 40px;}
+.hud .lvlbox{display:flex;flex-direction:column;line-height:1.05;}
+.hud .lvlbox b{font-size:16px;color:var(--ink);}
+.hud .lvlbox span{font-size:11px;color:var(--sub);}
+.hud .goalpill{margin-left:auto; background:#eef3fd; border:1px solid var(--line); color:var(--brand);
+  font-weight:800; font-size:12px; padding:7px 12px; border-radius:20px; text-align:center; max-width:180px;}
+.dofrow{display:flex;gap:5px;padding:0 14px 6px;align-items:center;}
+.dofrow .dl{font-size:11px;color:var(--sub);font-weight:700;}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:#d6ddec;margin-left:4px;vertical-align:middle;}
+.dot.on{background:var(--brand);}
+
+/* play area */
+.field{position:relative; flex:1; margin:2px 12px 6px; border-radius:18px; overflow:hidden;
+  background:linear-gradient(180deg,#f4f7fd,#eaf0fa); border:1px solid var(--line);}
+.field svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
+
+/* controls */
+.controls{padding:6px 14px 10px; z-index:5;}
+.modeseg{display:flex; background:#eef1f8; border-radius:14px; padding:4px; margin-bottom:8px;}
+.modeseg button{flex:1; border:0; background:transparent; color:var(--sub); font-weight:800; font-size:13px;
+  padding:9px 4px; border-radius:11px; cursor:pointer;}
+.modeseg button.act{background:#fff; color:var(--brand); box-shadow:0 2px 8px rgba(0,74,198,.14);}
+.jointpanel{display:flex;flex-direction:column;gap:7px; min-height:96px;}
+.jrow{display:flex;align-items:center;gap:10px;}
+.jrow label{font-size:12px;font-weight:800;color:var(--ink);width:34px;}
+.jrow input[type=range]{flex:1; accent-color:var(--brand); height:22px;}
+.jrow .deg{font-size:12px;color:var(--brand);font-weight:800;width:44px;text-align:right;
+  font-variant-numeric:tabular-nums;}
+.iktip{font-size:12px;color:var(--sub);text-align:center;padding:26px 10px;line-height:1.5;}
+.btnrow{display:flex;gap:8px;margin-top:9px;}
+.btn{flex:1; padding:13px 10px; border-radius:26px; border:0; cursor:pointer;
+  background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:15px; font-weight:800;
+  box-shadow:0 8px 20px rgba(0,74,198,.28);}
+.btn.ghost{background:#eef1f8;color:var(--brand);box-shadow:none;}
+.btn:active{transform:scale(.97);}
+
+/* overlays */
+.overlay{position:absolute; inset:0; z-index:20; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center; padding:26px;
+  background:radial-gradient(120% 80% at 50% 0%, #f2f6fd 0%, #e7eef9 70%);}
+.overlay.hide{display:none;}
+.floaty{width:132px;height:132px;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.t1{font-size:34px;font-weight:900;color:var(--ink);letter-spacing:-1px;}
+.t2{font-size:34px;font-weight:900;letter-spacing:-1px;
+  background:linear-gradient(120deg,#1b55d0,#004ac6);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.title{margin:8px 0 2px;}
+.tag{color:var(--sub);font-size:14px;margin:2px 0 16px;font-weight:600;}
+.rules{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 18px;text-align:left;
+  max-width:330px;box-shadow:0 6px 18px rgba(70,90,140,.10);}
+.rules div{font-size:13px;color:var(--ink);margin:7px 0;display:flex;gap:9px;align-items:flex-start;line-height:1.4;}
+.rules b{color:var(--brand);}
+.badge{font-size:26px;font-weight:900;margin:6px 0 2px;}
+.badge.win{color:var(--good);} .badge.lose{color:var(--bad);}
+.scorebox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 26px;margin:12px 0 4px;
+  box-shadow:0 6px 18px rgba(70,90,140,.10);max-width:340px;}
+.scorebox .big{font-size:15px;font-weight:800;color:var(--ink);}
+.scorebox .take{font-size:12.5px;color:var(--sub);margin-top:8px;line-height:1.5;}
+.scorebox .take b{color:var(--brand);}
+.ovbtns{display:flex;gap:10px;margin-top:16px;}
+.ovbtns .btn{padding:13px 30px;flex:0 0 auto;}
+.toast{position:absolute;top:96px;left:50%;transform:translateX(-50%);z-index:15;
+  background:var(--bad);color:#fff;font-weight:800;font-size:13px;padding:9px 18px;border-radius:20px;
+  box-shadow:0 6px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .2s;pointer-events:none;}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="cari-mini" id="hudCari"></div>
+    <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">관절 2 · 자유도 2</span></div>
+    <div class="goalpill" id="goalPill">별에 닿아라</div>
+  </div>
+  <div class="dofrow"><span class="dl">DOF</span><span id="dofDots"></span></div>
+
+  <!-- PLAY FIELD -->
+  <div class="field">
+    <svg id="svg" viewBox="0 0 400 520" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <div class="modeseg">
+      <button id="mFK" class="act">관절 제어 (순기구학)</button>
+      <button id="mIK">끝점 끌기 (역기구학)</button>
+    </div>
+    <div class="jointpanel" id="panel"></div>
+    <div class="btnrow">
+      <button class="btn ghost" id="btnReset">초기화</button>
+      <button class="btn" id="btnHint">힌트 자세</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">충돌!</div>
+
+  <!-- START OVERLAY -->
+  <div class="overlay" id="ovStart">
+    <div class="floaty" id="startCari"></div>
+    <div class="title"><span class="t1">닿아라 </span><span class="t2">CARI</span></div>
+    <div class="tag">관절을 움직여 목표에 닿아라</div>
+    <div class="rules">
+      <div><b>①</b><span>관절을 돌려 로봇팔 끝을 <b>별/배터리</b>에 닿게 하세요.</span></div>
+      <div><b>②</b><span><b>관절 제어</b>는 각 관절 각도를 직접(순기구학), <b>끝점 끌기</b>는 끝을 끌면 팔이 스스로 각도를 풉니다(역기구학).</span></div>
+      <div><b>③</b><span>벽·장애물에 <b>부딪히면 안 돼요</b>. 관절이 많을수록 어려운 자세도 가능!</span></div>
+    </div>
+    <button class="btn" id="btnStart" style="margin-top:20px;padding:15px 50px;flex:0 0 auto;">시작하기</button>
+  </div>
+
+  <!-- RESULT OVERLAY -->
+  <div class="overlay hide" id="ovResult">
+    <div class="floaty" id="resCari"></div>
+    <div class="badge win" id="resBadge">닿았다!</div>
+    <div class="scorebox">
+      <div class="big" id="resTitle">레벨 클리어</div>
+      <div class="take" id="resTake"></div>
+    </div>
+    <div class="ovbtns">
+      <button class="btn ghost" id="btnRetry" style="flex:0 0 auto;padding:13px 26px;">다시</button>
+      <button class="btn" id="btnNext" style="flex:0 0 auto;padding:13px 30px;">다음</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================= CARI mascot ================= */
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg class="art" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+
+/* ================= Level data ================= */
+// base at (bx,by) in 400x520 svg coords. angles in degrees (absolute per-joint delta chained).
+// segLens list; jointLimits [min,max] absolute? we use relative angle per joint w/ limits.
+const D2R=Math.PI/180, R2D=180/Math.PI;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+const LEVELS=[
+  { name:"레벨 1", sub:"관절 2 · 자유도 2", goal:"별에 닿아라",
+    base:{x:200,y:460}, segs:[115,100], limits:[[-165,165],[-155,155]],
+    start:[-94,25], solve:[-90,86], target:{x:300,y:340,r:20,kind:"star"}, obstacles:[],
+    take:"관절 2개면 평면에서 위치를 <b>겨우</b> 맞출 수 있어요. 이게 자유도(DOF) 2입니다." },
+
+  { name:"레벨 2", sub:"관절 3 · 자유도 3", goal:"장애물 넘어 별 집기",
+    base:{x:210,y:460}, segs:[100,88,70], limits:[[-160,160],[-150,150],[-150,150]],
+    start:[9,-123,-110], solve:[160,111,1], target:{x:120,y:320,r:19,kind:"star"}, obstacles:[
+      {x:210,y:360,w:120,h:24}],
+    take:"관절 3개는 <b>여분의 자유도</b>가 생겨요. 같은 목표라도 자세를 여러 개 만들 수 있죠." },
+
+  { name:"레벨 3", sub:"관절 4 · 감아 돌기", goal:"벽 뒤 배터리에 닿아라",
+    base:{x:110,y:460}, segs:[95,85,75,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
+    start:[-76,113,124,-22], solve:[-33,125,-104,-39], target:{x:300,y:430,r:20,kind:"batt"}, obstacles:[
+      {x:230,y:350,w:26,h:220}],
+    take:"짧은 팔로는 벽에 막혀 못 닿아요. 관절(자유도)을 늘려 벽을 <b>감아 돌아야</b> 닿아요. 자유도가 많을수록 <b>더 어려운 자세도 만들 수 있지만, 제어는 더 복잡</b>해져요." },
+
+  { name:"레벨 4", sub:"관절 4 · 좁은 통로", goal:"틈새로 넣어 배터리 집기",
+    base:{x:90,y:460}, segs:[95,85,74,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
+    start:[-60,-33,-43,-98], solve:[-50,-29,67,25], target:{x:300,y:300,r:18,kind:"batt"}, obstacles:[
+      {x:200,y:150,w:24,h:150},{x:200,y:400,w:24,h:120}],
+    take:"작업 공간이 좁을수록 여분의 자유도가 <b>충돌을 피하는 데</b> 쓰여요. 로봇팔이 여러 관절을 갖는 이유죠." },
+
+  { name:"레벨 5", sub:"관절 3 · 관절 떨림", goal:"흔들리는 관절로 별 맞추기",
+    base:{x:200,y:460}, segs:[110,90,66], limits:[[-160,160],[-150,150],[-150,150]],
+    start:[-110,-126,-103], solve:[-6,-117,72], target:{x:300,y:320,r:23,kind:"star"}, obstacles:[], noise:2.6,
+    take:"실제 모터엔 <b>떨림(노이즈)</b>이 있어요. 그래서 로봇은 센서로 자세를 <b>계속 피드백</b>하며 보정합니다." },
+];
+
+/* ================= State ================= */
+let LI=0, L=null, ang=[], mode="FK", won=false, rafId=0;
+const svg=document.getElementById('svg');
+const NS='http://www.w3.org/2000/svg';
+
+function fkPoints(a){
+  // returns array of points from base to tip
+  const pts=[{x:L.base.x,y:L.base.y}];
+  let acc=0;
+  for(let i=0;i<a.length;i++){
+    acc+=a[i]*D2R;
+    const p=pts[i];
+    pts.push({x:p.x+L.segs[i]*Math.cos(acc), y:p.y+L.segs[i]*Math.sin(acc)});
+  }
+  return pts;
+}
+
+/* segment vs rect collision */
+function segRect(p1,p2,r){
+  // expand rect slightly (arm thickness)
+  const pad=6;
+  const rx=r.x-r.w/2-pad, ry=r.y-r.h/2-pad, rw=r.w+pad*2, rh=r.h+pad*2;
+  // Liang-Barsky style: check if segment intersects axis-aligned rect
+  return segAABB(p1.x,p1.y,p2.x,p2.y,rx,ry,rx+rw,ry+rh);
+}
+function segAABB(x1,y1,x2,y2,xmin,ymin,xmax,ymax){
+  // if either endpoint inside
+  const inside=(x,y)=>x>=xmin&&x<=xmax&&y>=ymin&&y<=ymax;
+  if(inside(x1,y1)||inside(x2,y2)) return true;
+  // test against 4 edges
+  return segSeg(x1,y1,x2,y2,xmin,ymin,xmax,ymin)||
+         segSeg(x1,y1,x2,y2,xmax,ymin,xmax,ymax)||
+         segSeg(x1,y1,x2,y2,xmax,ymax,xmin,ymax)||
+         segSeg(x1,y1,x2,y2,xmin,ymax,xmin,ymin);
+}
+function segSeg(a,b,c,d,p,q,r,s){
+  const d1=(r-p)*(b-q)-(s-q)*(a-p);
+  const d2=(r-p)*(d-q)-(s-q)*(c-p);
+  const d3=(c-a)*(q-b)-(d-b)*(p-a);
+  const d4=(c-a)*(s-b)-(d-b)*(r-a);
+  if(((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0))) return true;
+  return false;
+}
+function armHitsAny(pts){
+  for(const ob of L.obstacles){
+    for(let i=0;i<pts.length-1;i++){
+      if(segRect(pts[i],pts[i+1],ob)) return true;
+    }
+  }
+  // walls of field (with margin)
+  for(let i=1;i<pts.length;i++){
+    if(pts[i].x<4||pts[i].x>396||pts[i].y<4||pts[i].y>516) return true;
+  }
+  return false;
+}
+
+/* ================= CCD inverse kinematics ================= */
+function ccdSolve(a, goal){
+  // work on a copy, iterate; returns new angle array respecting limits
+  const A=a.slice();
+  for(let iter=0;iter<24;iter++){
+    // later iterations use higher gain so the tip snaps in satisfyingly
+    const gain = iter<3 ? 0.5 : 0.85;
+    for(let j=A.length-1;j>=0;j--){
+      const pts=fkPoints(A);
+      const tip=pts[pts.length-1];
+      const piv=pts[j];
+      const v1x=tip.x-piv.x, v1y=tip.y-piv.y;
+      const v2x=goal.x-piv.x, v2y=goal.y-piv.y;
+      const a1=Math.atan2(v1y,v1x), a2=Math.atan2(v2y,v2x);
+      let delta=(a2-a1)*R2D;
+      // normalize
+      while(delta>180)delta-=360; while(delta<-180)delta+=360;
+      delta*=gain;
+      const nv=clamp(A[j]+delta, L.limits[j][0], L.limits[j][1]);
+      A[j]=nv;
+    }
+    const pts=fkPoints(A);
+    const tip=pts[pts.length-1];
+    if(Math.hypot(tip.x-goal.x,tip.y-goal.y)<0.8) break;
+  }
+  return A;
+}
+
+/* ================= Rendering ================= */
+function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+
+function draw(){
+  const pts=fkPoints(ang);
+  const hit=armHitsAny(pts);
+  const tip=pts[pts.length-1];
+  const tg=L.target;
+  const dist=Math.hypot(tip.x-tg.x,tip.y-tg.y);
+  const reached=dist<tg.r+9 && !hit;
+
+  let s='';
+  // grid backdrop faint
+  s+=`<defs>
+    <radialGradient id="tgg" cx="50%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="${tg.kind==='batt'?'#ffd45e':'#ffe08a'}"/>
+    </radialGradient>
+  </defs>`;
+
+  // reach-space hint circle (max reach)
+  const maxR=L.segs.reduce((s,v)=>s+v,0);
+  s+=`<circle cx="${L.base.x}" cy="${L.base.y}" r="${maxR}" fill="none" stroke="#c9d5ec" stroke-width="1.2" stroke-dasharray="4 6" opacity=".55"/>`;
+
+  // obstacles
+  for(const ob of L.obstacles){
+    s+=`<rect x="${ob.x-ob.w/2}" y="${ob.y-ob.h/2}" width="${ob.w}" height="${ob.h}" rx="6"
+        fill="#33415e" opacity=".92"/>
+        <rect x="${ob.x-ob.w/2}" y="${ob.y-ob.h/2}" width="${ob.w}" height="${ob.h}" rx="6"
+        fill="none" stroke="#1e2740" stroke-width="1.5"/>`;
+  }
+
+  // target
+  s+=`<circle cx="${tg.x}" cy="${tg.y}" r="${tg.r+7}" fill="${reached?'rgba(18,181,140,.25)':'rgba(0,74,198,.10)'}"/>`;
+  if(tg.kind==='star'){
+    s+=starPath(tg.x,tg.y,tg.r, reached?'#12b58c':'#f0b000');
+  }else{
+    // battery
+    const bw=tg.r*1.5, bh=tg.r*2.1;
+    s+=`<rect x="${tg.x-bw/2}" y="${tg.y-bh/2}" width="${bw}" height="${bh}" rx="4"
+         fill="url(#tgg)" stroke="${reached?'#12b58c':'#c98f00'}" stroke-width="2"/>
+        <rect x="${tg.x-bw*0.22}" y="${tg.y-bh/2-4}" width="${bw*0.44}" height="5" rx="2" fill="${reached?'#12b58c':'#c98f00'}"/>
+        <path d="M${tg.x-4} ${tg.y-6} l7 0 l-5 8 l7 0 l-11 12 l4 -12 l-6 0 z" fill="#c98f00" opacity=".85"/>`;
+  }
+
+  // arm segments
+  const armCol=hit?'#f2664f':'#004ac6';
+  const armColHi=hit?'#f78b78':'#3b74e0';
+  for(let i=0;i<pts.length-1;i++){
+    const p1=pts[i],p2=pts[i+1];
+    s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${armCol}"
+         stroke-width="15" stroke-linecap="round"/>`;
+    s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${armColHi}"
+         stroke-width="6" stroke-linecap="round" opacity=".55"/>`;
+  }
+  // joints
+  for(let i=0;i<pts.length-1;i++){
+    const isBase=i===0;
+    s+=`<circle cx="${pts[i].x}" cy="${pts[i].y}" r="${isBase?12:8.5}" fill="#fff" stroke="${armCol}" stroke-width="3"/>`;
+    if(!isBase) s+=`<circle cx="${pts[i].x}" cy="${pts[i].y}" r="3" fill="${armCol}"/>`;
+    // joint drag handles (FK drag on non-base joints)
+    if(mode==='FK') s+=`<circle class="jhandle" data-j="${i}" cx="${pts[i].x}" cy="${pts[i].y}" r="20" fill="transparent" style="cursor:grab"/>`;
+  }
+  // base mount
+  s+=`<rect x="${L.base.x-18}" y="${L.base.y+6}" width="36" height="20" rx="4" fill="#33415e"/>`;
+  s+=`<rect x="${L.base.x-24}" y="${L.base.y+24}" width="48" height="8" rx="3" fill="#1e2740"/>`;
+
+  // gripper / CARI tip
+  const tipAngle=Math.atan2(pts[pts.length-1].y-pts[pts.length-2].y, pts[pts.length-1].x-pts[pts.length-2].x)*R2D;
+  s+=gripper(tip.x,tip.y,tipAngle,reached);
+
+  // tip drag handle in IK mode
+  if(mode==='IK'){
+    s+=`<circle id="tipDrag" cx="${tip.x}" cy="${tip.y}" r="26" fill="rgba(0,74,198,.10)" stroke="#004ac6" stroke-width="1.5" stroke-dasharray="3 4" style="cursor:grab"/>`;
+  }
+
+  svg.innerHTML=s;
+
+  updatePanel(hit);
+  if(hit && !window._wasHit) toast('충돌! 벽을 피해요');
+  window._wasHit=hit;
+  if(reached && !won){ won=true; setTimeout(()=>result(true), 260); }
+  return {hit,reached,dist};
+}
+
+function starPath(cx,cy,r,fill){
+  let pth='';
+  for(let i=0;i<10;i++){
+    const rr=i%2===0?r:r*0.44;
+    const a=(-90+i*36)*D2R;
+    pth+=(i?'L':'M')+(cx+rr*Math.cos(a)).toFixed(1)+' '+(cy+rr*Math.sin(a)).toFixed(1)+' ';
+  }
+  pth+='Z';
+  return `<path d="${pth}" fill="${fill}" stroke="#c98f00" stroke-width="1.5"/>`;
+}
+
+function gripper(x,y,angDeg,reached){
+  // two pincers rotated to arm direction
+  const col=reached?'#12b58c':'#004ac6';
+  const open=reached?4:10;
+  return `<g transform="translate(${x} ${y}) rotate(${angDeg})">
+    <circle r="9" fill="#fff" stroke="${col}" stroke-width="3"/>
+    <path d="M2 -${open} q14 -4 16 -${open+2} M2 ${open} q14 4 16 ${open+2}"
+      fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="1" r="3.5" fill="${col}"/>
+  </g>`;
+}
+
+/* joint sliders panel (FK) / tip hint (IK) */
+function updatePanel(hit){
+  const panel=document.getElementById('panel');
+  if(mode==='IK'){
+    if(!panel.dataset.ik){
+      panel.dataset.ik='1'; panel.dataset.fk='';
+      panel.innerHTML=`<div class="iktip">끝점의 <b>파란 원</b>을 손끝/마우스로 끌어보세요.<br>팔이 스스로 관절 각도를 계산해 따라옵니다 (역기구학·CCD).<br>붉게 변하면 벽에 부딪힌 거예요.</div>`;
+    }
+    return;
+  }
+  // FK: build sliders once, then update values
+  if(panel.dataset.fk!==String(ang.length)){
+    panel.dataset.fk=String(ang.length); panel.dataset.ik='';
+    let h='';
+    for(let i=0;i<ang.length;i++){
+      h+=`<div class="jrow"><label>J${i+1}</label>
+        <input type="range" min="${L.limits[i][0]}" max="${L.limits[i][1]}" value="${ang[i]}" data-j="${i}">
+        <span class="deg" id="deg${i}">${Math.round(ang[i])}°</span></div>`;
+    }
+    panel.innerHTML=h;
+    panel.querySelectorAll('input[type=range]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        const j=+inp.dataset.j;
+        ang[j]=+inp.value;
+        draw();
+      });
+    });
+  }
+  for(let i=0;i<ang.length;i++){
+    const d=document.getElementById('deg'+i);
+    if(d) d.textContent=Math.round(ang[i])+'°';
+    const inp=panel.querySelector(`input[data-j="${i}"]`);
+    if(inp && +inp.value!==Math.round(ang[i])) inp.value=ang[i];
+  }
+}
+
+/* ================= Pointer interaction ================= */
+function svgPoint(evt){
+  const src=evt.touches&&evt.touches[0]?evt.touches[0]:(evt.changedTouches&&evt.changedTouches[0]?evt.changedTouches[0]:evt);
+  const cx=src.clientX, cy=src.clientY;
+  // use the SVG's screen transform so preserveAspectRatio letterboxing is honored
+  const ctm=svg.getScreenCTM();
+  if(ctm){
+    const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy;
+    const u=pt.matrixTransform(ctm.inverse());
+    return {x:u.x, y:u.y};
+  }
+  const r=svg.getBoundingClientRect(); const vb=svg.viewBox.baseVal;
+  return { x:(cx-r.left)/r.width*vb.width, y:(cy-r.top)/r.height*vb.height };
+}
+
+let dragJoint=-1, draggingTip=false;
+
+function onDown(e){
+  if(won) return;
+  const t=e.target;
+  if(mode==='IK' && (t.id==='tipDrag' || t.id==='tipDrag')){
+    draggingTip=true; e.preventDefault(); return;
+  }
+  if(mode==='IK'){
+    // allow grabbing anywhere near tip
+    const p=svgPoint(e); const pts=fkPoints(ang); const tip=pts[pts.length-1];
+    if(Math.hypot(p.x-tip.x,p.y-tip.y)<40){ draggingTip=true; e.preventDefault(); return; }
+  }
+  if(mode==='FK' && t.classList && t.classList.contains('jhandle')){
+    dragJoint=+t.dataset.j; e.preventDefault(); return;
+  }
+  if(mode==='FK'){
+    // nearest joint pivot: rotate the joint whose pivot is closest to the touch
+    const p=svgPoint(e); const pts=fkPoints(ang);
+    let best=-1,bd=26;
+    for(let i=0;i<ang.length;i++){
+      const d=Math.hypot(p.x-pts[i].x,p.y-pts[i].y);
+      if(d<bd){bd=d;best=i;}
+    }
+    if(best>=0){ dragJoint=best; e.preventDefault(); }
+  }
+}
+
+function onMove(e){
+  if(won) return;
+  if(draggingTip){
+    e.preventDefault();
+    const p=svgPoint(e);
+    const goal={x:clamp(p.x,6,394), y:clamp(p.y,6,514)};
+    const solved=ccdSolve(ang, goal);
+    // collision guard: only accept if not worse-colliding (allow but show red)
+    ang=solved;
+    draw();
+    return;
+  }
+  if(dragJoint>=0){
+    e.preventDefault();
+    const p=svgPoint(e);
+    const pts=fkPoints(ang);
+    const piv=pts[dragJoint];
+    // desired absolute angle of this segment
+    const desiredAbs=Math.atan2(p.y-piv.y, p.x-piv.x)*R2D;
+    // current absolute angle up to and including this joint = sum ang[0..dragJoint]
+    let baseAbs=0; for(let i=0;i<dragJoint;i++) baseAbs+=ang[i];
+    let rel=desiredAbs-baseAbs;
+    while(rel>180)rel-=360; while(rel<-180)rel+=360;
+    ang[dragJoint]=clamp(rel, L.limits[dragJoint][0], L.limits[dragJoint][1]);
+    draw();
+  }
+}
+function onUp(){ dragJoint=-1; draggingTip=false; }
+
+svg.addEventListener('mousedown',onDown);
+svg.addEventListener('touchstart',onDown,{passive:false});
+window.addEventListener('mousemove',onMove);
+window.addEventListener('touchmove',onMove,{passive:false});
+window.addEventListener('mouseup',onUp);
+window.addEventListener('touchend',onUp);
+
+/* ================= Noise (level 5) ================= */
+function tickNoise(){
+  if(L && L.noise && !won && document.getElementById('ovResult').classList.contains('hide')
+     && document.getElementById('ovStart').classList.contains('hide')){
+    // jitter last-but-one joint slightly, self-correct visually
+    const j=ang.length-1;
+    const noisy=ang.slice();
+    noisy[j]=clamp(ang[j]+(Math.random()-0.5)*L.noise*2, L.limits[j][0], L.limits[j][1]);
+    const pts=fkPoints(noisy);
+    const tip=pts[pts.length-1], tg=L.target;
+    const hit=armHitsAny(pts);
+    const reached=Math.hypot(tip.x-tg.x,tip.y-tg.y)<tg.r+9 && !hit;
+    // draw noisy version without committing (except when reached, commit)
+    renderFrom(noisy, reached);
+    if(reached && !won){ won=true; ang=noisy; setTimeout(()=>result(true),260); }
+  }
+  rafId=requestAnimationFrame(tickNoise);
+}
+function renderFrom(a, forceReached){
+  const save=ang; ang=a; draw(); ang=save;
+}
+
+/* ================= Mode / buttons ================= */
+function setMode(m){
+  mode=m;
+  document.getElementById('mFK').classList.toggle('act',m==='FK');
+  document.getElementById('mIK').classList.toggle('act',m==='IK');
+  const panel=document.getElementById('panel');
+  panel.dataset.fk=''; panel.dataset.ik='';
+  draw();
+}
+document.getElementById('mFK').onclick=()=>setMode('FK');
+document.getElementById('mIK').onclick=()=>setMode('IK');
+
+document.getElementById('btnReset').onclick=()=>{ ang=L.start.slice(); won=false; draw(); };
+let hintAnim=0;
+document.getElementById('btnHint').onclick=()=>{
+  if(won) return;
+  cancelAnimationFrame(hintAnim);
+  // animate current pose -> a validated collision-free solution pose
+  const goal = L.solve ? L.solve.slice() : ccdSolve(ang, L.target);
+  const from = ang.slice();
+  let t=0;
+  const step=()=>{
+    t+=0.06; const k=t<1?t*t*(3-2*t):1; // smoothstep
+    for(let i=0;i<ang.length;i++) ang[i]=from[i]+(goal[i]-from[i])*k;
+    draw();
+    if(t<1 && !won) hintAnim=requestAnimationFrame(step);
+  };
+  step();
+};
+
+/* ================= Toast ================= */
+let toastT=0;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),900);
+}
+
+/* ================= Load level ================= */
+function loadLevel(i){
+  LI=i; L=LEVELS[i]; ang=L.start.slice(); won=false; mode='FK';
+  document.getElementById('lvlName').textContent=L.name;
+  document.getElementById('lvlSub').textContent=L.sub;
+  document.getElementById('goalPill').textContent=L.goal;
+  document.getElementById('mFK').classList.add('act');
+  document.getElementById('mIK').classList.remove('act');
+  const panel=document.getElementById('panel'); panel.dataset.fk=''; panel.dataset.ik='';
+  // DOF dots
+  let dots=''; for(let k=0;k<L.segs.length;k++) dots+='<span class="dot on"></span>';
+  document.getElementById('dofDots').innerHTML=dots;
+  draw();
+}
+
+/* ================= Result ================= */
+function result(win){
+  const ov=document.getElementById('ovResult');
+  document.getElementById('resCari').innerHTML=charSVG(CARI_SUIT,{cari:true,dir:win?1:0,shock:!win});
+  const b=document.getElementById('resBadge');
+  b.textContent=win?'닿았다!':'실패';
+  b.className='badge '+(win?'win':'lose');
+  document.getElementById('resTitle').textContent=win?(L.name+' 클리어!'):'다시 도전';
+  document.getElementById('resTake').innerHTML=L.take;
+  const nextBtn=document.getElementById('btnNext');
+  nextBtn.textContent = (LI>=LEVELS.length-1)?'처음으로':'다음';
+  ov.classList.remove('hide');
+}
+document.getElementById('btnRetry').onclick=()=>{
+  document.getElementById('ovResult').classList.add('hide');
+  loadLevel(LI);
+};
+document.getElementById('btnNext').onclick=()=>{
+  document.getElementById('ovResult').classList.add('hide');
+  loadLevel((LI+1)%LEVELS.length);
+};
+
+/* ================= Start ================= */
+document.getElementById('startCari').innerHTML=charSVG(CARI_SUIT,{cari:true,dir:1});
+document.getElementById('hudCari').innerHTML=charSVG(CARI_SUIT,{cari:true});
+document.getElementById('btnStart').onclick=()=>{
+  document.getElementById('ovStart').classList.add('hide');
+  loadLevel(0);
+};
+
+loadLevel(0);
+rafId=requestAnimationFrame(tickNoise);
+</script>
+</body>
+</html>

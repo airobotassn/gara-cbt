@@ -56,8 +56,7 @@ export interface ResultResponse {
   placed: boolean | null // 그 레벨 배치 완료 여부(첫 응시면 false→true)
   rankBefore: number | null // 시험 전 내 등급(레벨)
   rankAfter: number | null // 시험 후 내 등급(레벨)
-  rankDir: RankDir | null // 승급/유지/강등
-  warnStrikes?: number // 강등 경고 누적(0=없음, 1~2=경고 N/3). 강등되면 rankDir='down'.
+  rankDir: RankDir | null // 승급/유지 (강등 없음)
   answers: GradedAnswer[]
 
   // 익명 소유자에게만 발급되는 일회성 이관 토큰
@@ -89,7 +88,6 @@ export interface ListAttemptsResponse {
   attempts: AttemptSummary[]
   currentRank: number | null // 현재 등급(레벨). 아직 응시 전이면 null
   currentPoints: number // 랭킹 점수(0~10000)
-  demotionStrikes: number // 현재 강등 경고 누적(0~2)
   levelSkills: LevelSkill[] // 응시한 레벨들의 누적 레이더
   dailyLeft?: number | null // 오늘 남은 응시 횟수(게스트/구버전 함수면 null·undefined)
 }

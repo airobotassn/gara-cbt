@@ -68,7 +68,8 @@ html.dark .guide-lead { color: #a9c1e6; }
 
 /* 로봇(투명 PNG) + 손 위 CARIS 행성 오브를 겹치는 레이어.
    오브 위치는 %라 로봇 이미지를 갈아도 비율만 맞으면 따라간다(팔 손바닥 중심 ≈ x15% / y70%). */
-.guide-hero-art { position: relative; justify-self: end; width: 100%; max-width: 520px; }
+/* isolation:isolate = 아래 .guide-hero-fx 의 z-index:-1 이 페이지 배경 밑으로 빠지지 않게 하는 스태킹 컨텍스트 */
+.guide-hero-art { position: relative; isolation: isolate; justify-self: end; width: 100%; max-width: 520px; }
 /* ⚠️ 원본 PNG 가 아래(몸통)와 왼쪽(손가락 끝) 양쪽에서 잘려 있다 → 두 변을 배경으로 페이드해 직선 자국을 지운다.
    근본 해결은 손이 안 잘린 더 넓은 원본으로 교체하는 것. 교체하면 아래 mask 는 지워도 된다. */
 .guide-hero-robot {
@@ -77,6 +78,57 @@ html.dark .guide-lead { color: #a9c1e6; }
           mask-image: linear-gradient(to bottom, #000 78%, transparent 99%), linear-gradient(to right, transparent 0%, #000 9%);
   -webkit-mask-composite: source-in;
           mask-composite: intersect;
+}
+
+/* ── 로봇 뒤 플렉서스(별-네트워크) ──
+   레퍼런스 시안 = ①오브 오른쪽~로봇 사이 띠에 깔린 진한 청보라 필드 + ②그 위에 얇은 흰 삼각망과
+   작은 흰 점(몇 개는 4갈래 반짝임). ①이 없으면 ②가 안 보인다 — 두 겹이 한 세트다.
+   실측(시안 픽셀): 망이 있는 띠 rgb(182,214,252) / 바깥 여백 rgb(228,241,253)=이 페이지 톤.
+   → 필드 피크는 --g-blue 30% 정도(#f2f7fd 위에 얹어 #b4d2fd 가 나오는 값).
+   ⚠️ .guide-hero-art 의 ::before/::after 는 이미 오브 후광이 쓰고 있다 → 효과는 별도 DOM(.guide-hero-fx).
+   ⚠️ 망 좌표는 Guide.tsx 의 PLEXUS(시드 고정 생성). 좌우 배치는 아래 mask 가 결정한다 —
+      레퍼런스대로 왼쪽(카피 쪽)은 비우고 코리도에 몰리게 페이드. mask 가 필드의 사각 테두리도 같이 지운다. */
+.guide-hero-fx {
+  --fx-tint: var(--g-blue);
+  /* 아트 박스(480px)보다 넓게 잡는다 — 박스 안에 가두면 효과가 가운데 뭉쳐 보인다.
+     왼쪽으로 가장 많이(-26%) 빼되 카피 컬럼까진 못 닿게. 아래(-10%)는 히어로 overflow:hidden 에 잘리지만
+     mask 가 요소 테두리에서 정확히 0 이 되므로 가로 자국은 남지 않는다. */
+  position: absolute; inset: -8% -8% -10% -26%; z-index: -1; pointer-events: none;
+  /* ⚠️ 중심은 '보이는 간격'(오브 오른쪽~얼굴 왼쪽) 쪽. 오른쪽에 두면 필드가 로봇 뒤로 숨는다. */
+  background: radial-gradient(72% 66% at 44% 54%,
+    color-mix(in srgb, var(--fx-tint) 30%, transparent) 0%,
+    color-mix(in srgb, var(--fx-tint) 20%, transparent) 40%,
+    color-mix(in srgb, var(--fx-tint) 11%, transparent) 64%,
+    color-mix(in srgb, var(--fx-tint) 4%, transparent) 82%,
+    transparent 96%);
+  /* 타원 mask — 세로는 44%/중심 46% 라 아래위 모두 요소 안쪽에서 alpha 0 이 된다.
+     ⚠️ 세로를 50%/50% 로 두면 히어로 overflow:hidden 밑변에서 잘려 옅은 가로 자국(Δ6/255)이 생긴다.
+     왼쪽 선형 페이드는 카피 쪽으로 흐르는 꼬리를 한 번 더 눌러준다. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 22%),
+    radial-gradient(50% 44% at 50% 46%, #000 0%, rgba(0, 0, 0, .92) 42%, rgba(0, 0, 0, .5) 72%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0%, #000 22%),
+    radial-gradient(50% 44% at 50% 46%, #000 0%, rgba(0, 0, 0, .92) 42%, rgba(0, 0, 0, .5) 72%, transparent 100%);
+  -webkit-mask-composite: source-in;
+          mask-composite: intersect;
+}
+html.dark .guide-hero-fx { --fx-tint: #7aa9ff; }
+/* viewBox 는 0~100 정규좌표 + preserveAspectRatio=none (아트 박스가 거의 정사각이라 왜곡 무시 가능).
+   선 두께는 non-scaling-stroke 라 확대해도 얇게 유지된다. */
+.hfx-net { display: block; width: 100%; height: 100%; animation: hfx-drift 26s ease-in-out infinite; }
+/* 마크는 레퍼런스대로 흰색 — 위 필드가 깔려 있어야 보인다(필드를 지우면 마크도 사라진다).
+   ⚠️ 선은 '거의 안 보이는' 정도가 레퍼런스다. 진하게 하면 와이어프레임 도형처럼 보인다 — 주역은 점. */
+.hfx-line { stroke: rgba(255, 255, 255, .5); stroke-width: .7; vector-effect: non-scaling-stroke; }
+.hfx-streak { stroke: url(#hfxStreak); stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+.hfx-node, .hfx-glint { fill: #fff; animation: hfx-twinkle 5s ease-in-out infinite; }
+.hfx-halo { stroke: none; } /* 글로우는 gradient fill 이라 twinkle 만 상속받는다 */
+@keyframes hfx-twinkle {
+  0%, 100% { opacity: .28; }
+  50% { opacity: 1; }
+}
+/* 망 전체가 아주 느리게 흐른다(레퍼런스는 정지 이미지라 여기까지가 상한) */
+@keyframes hfx-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-1.4%, -1.8%); }
 }
 /* 오브 래퍼 — 위치·부유만 담당하고, 실제 그림은 아래 3겹이 나눠 그린다.
    빛을 로고 '뒤에만' 두면 스티커처럼 보인다 → 로고 자신이 빛을 머금게 겹친다. */
@@ -97,26 +149,31 @@ html.dark .guide-lead { color: #a9c1e6; }
 .guide-hero-orb .orb-ring-2 { width: 196%; border: 1px solid rgba(255, 255, 255, .5); }
 /* 후광 2겹 — 안쪽(::after)은 로고를 감싸는 밝은 코어, 바깥(::before)은 넓게 퍼지는 잔광.
    ⚠️ ::after 에 z-index 필수. DOM 상 마지막이라 그냥 두면 로고 '위에' 칠해져 로고를 지운다. */
+/* ⚠️ 크기(68%/124%)를 키우면 후광이 오브 오른쪽 코리도까지 흰색으로 덮어 그 아래 배경 이펙트가 다 날아간다.
+   레퍼런스도 오브 바로 주변만 밝고 옆은 청보라가 살아 있다 → 오브 지름(25%)의 1.6배/2.6배로 묶어둔다. */
 .guide-hero-art::after {
-  content: ""; position: absolute; left: 14%; top: 52%; width: 68%; aspect-ratio: 1; z-index: 1;
+  content: ""; position: absolute; left: 14%; top: 52%; width: 40%; aspect-ratio: 1; z-index: 1;
   transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
   background: radial-gradient(closest-side,
-    rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, .78) 30%, rgba(255, 255, 255, .4) 52%,
-    rgba(255, 255, 255, .14) 70%, transparent 84%);
-  filter: blur(14px);
+    rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, .72) 30%, rgba(255, 255, 255, .34) 54%,
+    rgba(255, 255, 255, .1) 72%, transparent 86%);
+  filter: blur(12px);
 }
 .guide-hero-art::before {
-  content: ""; position: absolute; left: 14%; top: 52%; width: 124%; aspect-ratio: 1; z-index: 0;
+  content: ""; position: absolute; left: 14%; top: 52%; width: 66%; aspect-ratio: 1; z-index: 0;
   transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
   background: radial-gradient(closest-side,
-    rgba(255, 255, 255, .66) 0%, rgba(255, 255, 255, .4) 42%, rgba(255, 255, 255, .14) 66%, transparent 82%);
-  filter: blur(34px);
+    rgba(255, 255, 255, .4) 0%, rgba(255, 255, 255, .22) 44%, rgba(255, 255, 255, .07) 68%, transparent 84%);
+  filter: blur(26px);
 }
 @keyframes guide-orb-float {
   0%, 100% { transform: translate(-50%, -50%); }
   50% { transform: translate(-50%, calc(-50% - 10px)); }
 }
-@media (prefers-reduced-motion: reduce) { .guide-hero-orb { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .guide-hero-orb, .hfx-net { animation: none; }
+  .hfx-node, .hfx-glint { animation: none; opacity: .7; }
+}
 
 /* ── 공통 섹션 ── */
 .guide-sec { padding-block: 74px 0; }

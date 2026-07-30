@@ -1,32 +1,14 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { useT, type Lang } from '../lib/i18n'
 
-// 월 단위 달력형 활동 표시. days: 'YYYY-MM-DD' → 활동 강도.
-//   하위호환: 옛 시그니처(숫자=응시 레벨)와 신규 시그니처(지배 활동종류+총점+풀콤)를 유니온으로 함께 받는다.
-// TODO(#5 미구현): 신규 시그니처(dominant=attendance/learn/minigame)는 아직 실제 호출자가 없다 —
-//   현재 유일한 호출자(LearningDashboard)는 옛 시그니처(레벨테스트 응시일=숫자)만 넘겨 dominant='leveltest'
-//   (금색)만 나온다. attendance/learn/minigame 색을 살리려면 get-hub 가 activity_ledger+daily_activity
-//   기반 일별 활동 breakdown 을 반환하고 그걸 신규 시그니처로 매핑하는 생산자가 배선돼야 한다.
-export type DayActivity = { dominant?: 'attendance' | 'learn' | 'minigame' | 'leveltest'; total: number; full?: boolean }
-export type DayEntry = number | DayActivity
+// 월 단위 달력형 **출석** 표시. days = 출석한 날짜('YYYY-MM-DD') 집합.
+//   2026-07-29 결정: 잔디에 찍는 활동은 **출석 하나뿐**이다(학습·게임·응시는 표시하지 않는다).
+//   출석은 하루 1회 플래그라 강도(농도) 개념이 없어 색은 초록 단색이다.
+//   데이터 출처 = get-hub 의 `attendanceDays`(daily_activity.did_attendance, 최근 1년).
 
 const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// 지배 활동종류 → 색(설계 §7.3: 출석=회색 / 학습=파랑 / 게임=주황 / 응시=금색).
-const DOMINANT_COLOR: Record<NonNullable<DayActivity['dominant']>, string> = {
-  attendance: '#8b9099',
-  learn: 'var(--blue)',
-  minigame: '#e0912f',
-  leveltest: '#e3b23c',
-}
-// 활동점수 정규화 상한(오파시티 스케일용) — 하루 최대 기여 근사치(scoring.ts ACTIVITY_DELTA 상한 합과 정합).
-const MAX_DAY_SCORE = 90
-
-function normalizeEntry(v: DayEntry | undefined): DayActivity | null {
-  if (v === undefined) return null
-  if (typeof v === 'number') return v > 0 ? { dominant: 'leveltest', total: v } : null
-  return v.total > 0 || v.full ? v : null
-}
+// 출석 색(초록)은 CSS 변수 --attend 하나가 단일 출처 — calendar.css 참고.
 
 function pad(n: number) {
   return n < 10 ? '0' + n : '' + n
@@ -41,7 +23,7 @@ function headerLabel(y: number, m0: number, lang: Lang) {
   return `${EN_MONTHS[m0]} ${y}` // en · hi · vi
 }
 
-export default function ContributionGraph({ days }: { days: Map<string, DayEntry> }) {
+export default function ContributionGraph({ days }: { days: Set<string> }) {
   const { t, lang } = useT()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -71,10 +53,10 @@ export default function ContributionGraph({ days }: { days: Map<string, DayEntry
 
   const weekdays = t('cal.weekdays').split(',')
 
-  // 이 달의 활동 일수
+  // 이 달의 출석 일수
   let monthActive = 0
   for (let d = 1; d <= daysInMonth; d++) {
-    if (normalizeEntry(days.get(key(year, month, d)))) monthActive++
+    if (days.has(key(year, month, d))) monthActive++
   }
 
   return (
@@ -95,6 +77,9 @@ export default function ContributionGraph({ days }: { days: Map<string, DayEntry
         </button>
       </div>
 
+      {/* 이 달 출석 요약 — 달력 위에 크게. 색 범례는 없앴다(표시하는 활동이 출석 하나뿐이라 구분할 색이 없다). */}
+      <div className="calm-summary">{t('cal.days_attended', { n: monthActive })}</div>
+
       <div className="calm-grid">
         {weekdays.map((w, i) => (
           <div className="calm-wd" key={`wd${i}`}>
@@ -103,40 +88,20 @@ export default function ContributionGraph({ days }: { days: Map<string, DayEntry
         ))}
         {cells.map((d, i) => {
           if (d === null) return <div className="calm-cell empty" key={i} />
-          const entry = normalizeEntry(days.get(key(year, month, d)))
+          const attended = days.has(key(year, month, d))
           const cellDate = new Date(year, month, d)
           const isToday = cellDate.getTime() === today.getTime()
           const future = cellDate > today
-          const opacity = entry ? Math.min(1, 0.32 + 0.68 * Math.min(1, entry.total / MAX_DAY_SCORE)) : undefined
-          const style: CSSProperties | undefined = entry
-            ? { backgroundColor: DOMINANT_COLOR[entry.dominant ?? 'leveltest'], opacity, borderColor: entry.full ? '#e3b23c' : undefined }
-            : undefined
-          const tip = entry
-            ? `${t(`cal.dominant_${entry.dominant ?? 'leveltest'}`)} · ${entry.total}${entry.full ? ` · ${t('cal.full_combo')}` : ''}`
-            : t('cal.none')
           return (
             <div
               key={i}
-              className={`calm-cell ${entry ? 'active' : ''} ${entry?.full ? 'full' : ''} ${isToday ? 'today' : ''} ${future ? 'future' : ''}`}
-              style={style}
-              title={tip}
+              className={`calm-cell ${attended ? 'active' : ''} ${isToday ? 'today' : ''} ${future ? 'future' : ''}`}
+              title={attended ? t('cal.dominant_attendance') : t('cal.none')}
             >
               {d}
             </div>
           )
         })}
-      </div>
-
-      <div className="calm-legend">
-        <span>{t('cal.days_active', { n: monthActive })}</span>
-      </div>
-      <div className="calm-colorleg">
-        {(['attendance', 'learn', 'minigame', 'leveltest'] as const).map((k) => (
-          <span className="calm-cl" key={k}>
-            <i style={{ backgroundColor: DOMINANT_COLOR[k] }} />
-            {t(`cal.dominant_${k}`)}
-          </span>
-        ))}
       </div>
     </div>
   )

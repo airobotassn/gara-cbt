@@ -1,7 +1,8 @@
 // 촬영 — 화면 한 장을 base64 PNG로. 데이터 화면은 가짜 세션 + 함수 목킹으로 렌더.
 // (tests/responsive.spec.ts 의 목킹 패턴 재사용)
 
-const SUPABASE_REF = 'jfvldoywvzvqhitcgalr'
+// ⚠️ .env.local 의 VITE_SUPABASE_URL 프로젝트 ref 와 같아야 가짜 세션이 먹는다(다르면 로그아웃 화면이 찍힘).
+const SUPABASE_REF = 'lditytpxuuojfznwfnep'
 const AXES = ['prompt', 'model', 'verify', 'automation', 'data', 'ethics']
 const axisMap = (vals) => Object.fromEntries(AXES.map((k, i) => [k, vals[i]]))
 // 레벨별 실제 6축 코드(레이더가 제대로 그려지도록). 2026-07 사다리 한 칸 밀기 반영 — L1 변수 = 지금의 Lv.2 축.
@@ -46,7 +47,6 @@ async function seedAuthAndMocks(context) {
         rating: mapBy(L3, [52, 45, 58, 40, 50, 38]), deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]),
         perf: mapBy(L3, [48, 40, 55, 35, 47, 33]), prevPerf: mapBy(L3, [60, 52, 50, 44, 41, 39]),
         placed: true, rankBefore: 4, rankAfter: 4, rankDir: 'stay',
-        warnStrikes: 2, // ← 강등 경고 2/3 (목)
         answers: Array.from({ length: 6 }, (_, i) => ({
           questionId: `q${i}`, category: L3[i % L3.length],
           prompt: `샘플 문항 ${i + 1}`, options: ['A', 'B', 'C', 'D'],
@@ -58,18 +58,35 @@ async function seedAuthAndMocks(context) {
   await context.route('**/functions/v1/list-attempts', (r) =>
     r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({
-        attempts: Array.from({ length: 5 }, (_, i) => ({
-          attemptId: `a${i}`, level: 4, totalCorrect: i < 2 ? 3 : 9, totalQuestions: 20,
-          rankAfter: 4, rankDir: 'stay', deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]),
-          submittedAt: `2026-0${(i % 6) + 1}-15T10:00:00Z`,
-        })),
+        // 대시보드 하단이 '승급 기록'(rankDir==='up' 만)이라 승급 행이 섞여 있어야 빈 패널이 안 나온다.
+        attempts: [
+          { attemptId: 'a0', level: 4, totalCorrect: 9, totalQuestions: 20, rankAfter: 4, rankDir: 'stay', deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]), submittedAt: '2026-06-15T10:00:00Z' },
+          { attemptId: 'a1', level: 3, totalCorrect: 17, totalQuestions: 20, rankAfter: 4, rankDir: 'up', deltas: mapBy(L3, [4, 5, 3, 6, 2, 4]), submittedAt: '2026-05-15T10:00:00Z' },
+          { attemptId: 'a2', level: 3, totalCorrect: 3, totalQuestions: 20, rankAfter: 3, rankDir: 'stay', deltas: mapBy(L2, [-3, -5, -2, -4, -1, -3]), submittedAt: '2026-04-15T10:00:00Z' },
+          { attemptId: 'a3', level: 2, totalCorrect: 18, totalQuestions: 20, rankAfter: 3, rankDir: 'up', deltas: mapBy(L2, [5, 4, 6, 3, 5, 4]), submittedAt: '2026-03-15T10:00:00Z' },
+          { attemptId: 'a4', level: 1, totalCorrect: 16, totalQuestions: 20, rankAfter: 2, rankDir: 'up', deltas: mapBy(L2, [3, 3, 4, 2, 3, 3]), submittedAt: '2026-02-15T10:00:00Z' },
+        ],
         currentRank: 4,
         currentPoints: 3214, // ← 랭킹 점수(목)
-        demotionStrikes: 2, // ← 강등 경고 2/3(목)
         levelSkills: [
           { level: 3, ratings: mapBy(L2, [70, 65, 60, 72, 58, 68]), attemptsCount: 3 },
           { level: 4, ratings: mapBy(L3, [72, 45, 58, 40, 57, 38]), attemptsCount: 5 }, // 잘함/평균/부족 섞이게(데모)
         ],
+      }) }))
+
+  // 허브/대시보드 공용 — 티어 히어로 + 활동 기록 달력(출석일). 이게 없으면 대시보드 잔디가 텅 빈다.
+  //   ⚠️ attendanceDays 는 get-hub 가 daily_activity.did_attendance 로 채우는 실제 필드다(형태 바뀌면 여기도 수정).
+  const thisMonth = '2026-07'
+  await context.route('**/functions/v1/get-hub', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        authed: true, level: 4, tier: 'gold', percentile: 0.18,
+        seasonTotal: 5100, skillScore: 4200, activityScore: 900, pointsToPass: 120,
+        attendanceDays: [1, 2, 3, 6, 7, 10, 14, 15, 16, 20, 24, 27, 28, 29].map(
+          (d) => `${thisMonth}-${String(d).padStart(2, '0')}`,
+        ),
+        points: 1200, dust: 30, cosmetics: [], baseKey: 'default', equipped: {},
+        stamps: 3, pity: 0, dailyDone: true, learnDone: false, minigameDone: false, leveltestDone: false,
       }) }))
 
   // 리더보드(랭킹 화면) — 구버전(users)·신버전(top/me) 필드를 모두 담아 Before/After 둘 다 렌더되게.
