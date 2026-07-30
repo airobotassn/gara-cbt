@@ -375,17 +375,6 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/ebooks')}>
                 <span className="ic"><BookIcon /></span> {t('fab.ebookstore')}
               </button>
-              {/* 임시 — 레벨테스트 인증서 시안 미리보기(public/cert-preview.html).
-                  React 라우트가 아니라 정적 HTML 이라 window.open 으로 연다. 확정되면 페이지로 이관. */}
-              <button
-                className="pf-item"
-                onClick={() => {
-                  setOpen(false)
-                  window.open(`/cert-preview.html?name=${encodeURIComponent(name)}`, '_blank', 'noopener')
-                }}
-              >
-                <span className="ic">★</span> 인증서 미리보기
-              </button>
             </div>
 
             <div className="pf-langwrap">
@@ -442,6 +431,16 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>
               </button>
               {/* 개발/디자인 확인용 미리보기 — 런칭 시 제거 예정(앰버색으로 구분) */}
+              {/* 레벨테스트 인증서 시안 — React 라우트가 아니라 정적 HTML(public/cert-preview.html) */}
+              <button
+                className="pf-more-link pf-preview"
+                onClick={() => {
+                  setOpen(false); setMoreOpen(false)
+                  window.open(`/cert-preview.html?name=${encodeURIComponent(name)}`, '_blank', 'noopener')
+                }}
+              >
+                레벨테스트 인증서 미리보기 <span className="pf-more-ext">↗</span>
+              </button>
               <button className="pf-more-link pf-preview" onClick={() => go('/certificate')}>
                 {t('nav.certpreview')} <span className="pf-more-ext">↗</span>
               </button>
