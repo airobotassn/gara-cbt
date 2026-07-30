@@ -55,11 +55,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // FAB 숨김: 응시 화면(/exam/run/:id)·보안 브라우저(SEB)는 시험 중 이탈 차단, /games/* 는 게임 UI(하단 선택지)와 FAB 겹침 방지.
+  // FAB 숨김: 응시 화면(/exam/run/:id · /test/:attemptId)·보안 브라우저(SEB)는 시험 중 이탈 차단,
+  //   /games/* 는 게임 UI(하단 선택지)와 FAB 겹침 방지.
   //   이북 뷰어(/ebooks/read/:id)도 전체화면 iframe 이라 FAB 이 본문 위를 덮는다 → 숨김(스토어 /ebooks 는 유지).
   // 그 외 모든 페이지는 헤더 없이 FAB이 네비 역할을 한다.
+  //   ⚠️ 레벨테스트 응시는 폰에서 실제로 쓰는 시험 화면이고(CBT 응시는 데스크톱 전용), 하단 문항 점프 패드가
+  //      FAB·'맨 위로' 버튼에 가려 문항 1·2·11·12·9·10·19·20 을 못 누른다 → 여기서 같이 숨긴다.
+  //      /test/select(레벨 선택)·/test/result/:id(결과)는 응시 화면이 아니므로 제외.
+  const inLevelTestRun = /^\/test\/(?!select$|result\/)[^/]+$/.test(pathname)
   const inTest =
     pathname.startsWith('/exam/run/') ||
+    inLevelTestRun ||
     pathname.startsWith('/games/') ||
     pathname.startsWith('/ebooks/read/') ||
     isSEB()

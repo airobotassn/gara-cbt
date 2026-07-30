@@ -43,10 +43,12 @@
   border-radius: 12px;
 }
 /* 활동 기록 + 영역 밸런스 나란히. auto-fit 이라 한쪽만 있을 때(레이더 데이터 없음)는 폭을 다 쓰고,
-   폭이 두 칸을 못 담으면(≈760px 미만) 알아서 한 줄씩으로 내려간다 — 미디어쿼리 불필요. */
+   폭이 두 칸을 못 담으면(≈760px 미만) 알아서 한 줄씩으로 내려간다 — 미디어쿼리 불필요.
+   ⚠️ 하한은 반드시 min(360px, 100%) — 그냥 minmax(360px,1fr) 로 두면 뷰포트가 360px 보다 좁을 때
+      칸이 360px 아래로 못 줄어들어 카드가 화면 밖으로 나가고(모바일에서 오른쪽이 잘림) 만다. */
 .db-wrap .db-duo {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   gap: 18px;
   align-items: stretch; /* 두 카드 세로 길이를 맞춘다(짧은 쪽이 늘어남) */
   margin-top: 22px;
@@ -72,6 +74,14 @@
 /* 반 칸 폭에서는 축 라벨·상태 배지 칸을 줄여 막대 트랙을 확보 */
 .db-wrap .db-duo .axis-prog-cmp .ap {
   grid-template-columns: 88px 1fr 156px;
+}
+/* ⚠️ 위 3열 규칙은 특정도(0,4,0)가 높아서 result.css 의 모바일 2열 규칙(≤600px, 0,2,0)을 눌러버린다.
+   그대로 두면 폰에서도 88+1fr+156 3열이 유지돼 행 최소폭이 428px 로 굳고, 그 아래 폭에서는
+   '평균 대비' 배지 쪽이 화면 밖으로 나가 잘린다 → 같은 특정도로 2열을 되돌린다. */
+@media (max-width: 600px) {
+  .db-wrap .db-duo .axis-prog-cmp .ap {
+    grid-template-columns: 1fr auto;
+  }
 }
 /* 라벨은 무조건 한 줄 — 줄바꿈되면 그 행만 키가 커져 레벨/언어마다 카드 높이가 달라진다(전체 이름은 title 툴팁). */
 .db-wrap .db-duo .axis-prog-cmp .ap .lab {

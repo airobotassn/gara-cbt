@@ -171,6 +171,25 @@
   min-width: 104px;
   justify-content: center;
 }
+/* 폰 폭: [이전][다음] 최소폭(104×2 + 8) + [제출](128) = 356px 라 좌우 패딩까지 더하면 화면을 넘긴다.
+   .qacts 가 nowrap flex 라 줄지 못하고 제출 버튼이 카드 밖으로 밀려 **잘려서 못 누르는** 상태가 됐다
+   (카드가 overflow:hidden 이라 옆으로 스크롤해서 찾을 수도 없다).
+   → 두 줄로 쪼개고 제출을 전폭으로 내린다(주 동작이 엄지에 가장 가까운 자리로 온다). */
+@media (max-width: 430px) {
+  .qacts {
+    flex-wrap: wrap;
+  }
+  .qmove {
+    flex: 1 1 100%;
+  }
+  .qmove .btn-ghost {
+    flex: 1;
+    min-width: 0;
+  }
+  .qacts .btn-submit {
+    flex: 1 1 100%;
+  }
+}
 /* 키보드 단축키 안내 — 마우스가 있는 기기에서만. 터치(폰·태블릿)엔 키보드가 없어 무의미하다.
    숫자·화살표 글리프는 본문 폰트에서 폭이 들쭉날쭉해 tabular-nums 로 고정. */
 .qtop-left {
