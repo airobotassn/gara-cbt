@@ -82,7 +82,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/ebooks/read/:id` (이북 뷰어) | `pages/EbookReader.tsx` | (인라인) | `ebooks` |
 | **캐릭터 허브 / 미니게임** ||||
 | `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` |
-| `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` | — |
+| `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
 | `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
 | `/arena` (지도+지역랭킹) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx` · `lib/arena/*` | `arena.css` | `leaderboard` |
@@ -102,6 +102,11 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
 - 온보딩 게이트(`App.tsx`의 `OnboardingGate`): 정식 회원이 지역 미확정이면 `/test/*` · `/ranking` · `/mypage` 접근 시 `/onboarding` 으로 강제. 그 외 라우트는 통과.
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
+- **미니게임 게임별 랭킹**: 게임 HTML 의 인트로·아웃트로 오버레이 **우상단 '랭킹' 버튼** → `postMessage` → 부모(`MiniGame.tsx`)가 `components/MiniGameRankModal.tsx` 를 띄운다. 게임 안에 보드를 그리지 않는 이유 = 게임이 6개라 UI 를 6번 유지해야 하고 iframe 엔 세션·아바타가 없다.
+  - 게임 ↔ 앱 계약 = 각 `public/games/*.html` 끝의 **앱 브리지** 블록(`window.MGBridge`). `mg:rank`(랭킹 열기) · `mg:score`(점수/레벨 + 동률해소용 `tieMs`) 두 메시지뿐이고, 단독으로 HTML 을 열면 부모가 없어 버튼도 숨고 아무것도 보내지 않는다.
+  - 지표는 게임마다 다르다(`supabase/functions/_shared/minigames.ts` 의 `GAMES` 가 단일 출처): 버텨라·쏴라 = 점수, **골라라 = 도달 라운드(15)**, 닿아라(5)·지어라(3)·프로그램해라(6) = 도달 레벨. 레벨형은 레벨 수가 적어 전원 만점이 나오므로 **동률은 소요시간**으로 가른다.
+  - 저장 = 테이블 `minigame_scores`(통산 최고, 시즌 스코프 아님) + RPC `minigame_top`. `activity_ledger` 는 정규화 delta 라 줄 세우기에 못 쓴다.
+  - ⚠️ 제출은 **티켓 필수**(`submit-minigame` 의 `action:'start'` → HMAC 서명 티켓). 티켓은 **세션당 1개로 재사용** — 제출마다 새로 받으면 "플레이시간 대비 상한"이 리셋돼 레벨형 2번째 이후 정상 기록이 깎인다.
 - **`/arena` 는 더 이상 iframe 이 아니다**: 옛 `public/world-arena.html`(자립형 d3 HTML)을 React 로 포팅하고 삭제했다. 지도 경계는 `public/geo/*.json`(world·kr-prov 즉시, kr-muni 는 시도 진입 시 지연 로드), d3 는 npm 서브모듈(`d3-geo`·`d3-zoom` 등). 문구는 `i18n.tsx` 의 `arena.*`.
 - 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
 

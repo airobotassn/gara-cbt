@@ -166,14 +166,18 @@ html.dark .guide-hero-fx { --fx-tint: #7aa9ff; }
     rgba(255, 255, 255, .4) 0%, rgba(255, 255, 255, .22) 44%, rgba(255, 255, 255, .07) 68%, transparent 84%);
   filter: blur(26px);
 }
+/* 부유 진폭은 오브 높이의 12%(= -50% 에서 -62%) — translate 의 % 는 자기 크기 기준이라 화면이 커지면 같이 커진다.
+   ⚠️ 절대 px(옛 10px)로 두면 큰 PC 레이아웃에서 상대적으로 너무 작아 "안 움직인다"로 읽힌다.
+   12% 기준 = PC 약 14px / 모바일 약 10px(모바일은 종전과 비슷하게 유지). */
 @keyframes guide-orb-float {
   0%, 100% { transform: translate(-50%, -50%); }
-  50% { transform: translate(-50%, calc(-50% - 10px)); }
+  50% { transform: translate(-50%, -62%); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .guide-hero-orb, .hfx-net { animation: none; }
-  .hfx-node, .hfx-glint { animation: none; opacity: .7; }
-}
+/* ⚠️ 히어로 부유·플렉서스는 prefers-reduced-motion 으로 끄지 않는다.
+   이 저장소는 hub/result/daily/fab 등 다른 스타일시트가 전부 그 설정을 무시하고 있어서, 여기만 지키면
+   OS "동작 줄이기"를 켠 PC 에서 /guide 만 정지해 고장으로 보인다(실제 그렇게 신고됨).
+   대신 진폭을 작게(오브 12%·망 1.4%·점 opacity) 유지해 자극을 낮춘다. 사이트 전체가 이 설정을
+   지키는 방향으로 정리한다면 그때 여기도 같이 되살릴 것. 아래 블록(피라미드 플래시)은 그대로 둔다. */
 
 /* ── 공통 섹션 ── */
 .guide-sec { padding-block: 74px 0; }

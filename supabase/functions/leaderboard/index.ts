@@ -1,9 +1,13 @@
 // leaderboard:
-//  - scope 'global'(기본): 전체(모든 레벨) TOP N + 내 순위/총원. RPC global_top. 응답 { top, total, me } (기존 호출자 호환).
-//  - scope 'region'|'country'|'school': 집계 버킷 리더보드. RPC region_/country_/school_leaderboard.
+//  - scope 'global'(기본) | 'my-country' | 'my-region': **개인** 리더보드 TOP N + 내 순위/총원. RPC scoped_top.
+//      /ranking 의 세 탭(전세계 · 내 국가 · 내 지역)이 이걸 쓴다. 모수만 다르고 응답 형태는 같다
+//      → { top, total, me, scope, code }. code = 적용된 국가/지역 코드(전세계는 null).
+//      'my-*' 는 호출자 프로필(country_code·region_code)로 범위를 정한다 — 클라가 임의 범위를 지정할 수 없다.
+//      비로그인 → { needsAuth: true }, 지역/국가 미설정 → { needsRegion: true }(빈 보드).
+//  - scope 'region'|'country'|'school': 집계 버킷 리더보드(/arena 지도용). RPC region_/country_/school_leaderboard.
 //      개인 식별 필드 없이 집계값만(code·member_count·avg_level·active_today·participation·score, 학교는 label 추가).
 //      응답 { buckets, scope, window }. member_count<5 프라이버시 floor 버킷은 RPC 가 이미 제외.
-//  - 정렬(global): season_total(실력+활동 통합 랭킹점수) desc → 동점 먼저 도달. rating 필드에 season_total.
+//  - 정렬(개인): season_total(실력+활동 통합 랭킹점수) desc → 동점 먼저 도달. rating 필드에 season_total.
 //  - 닉네임·레벨·점수·아바타만 공개(이메일 비공개).
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/scoring.ts'
@@ -44,21 +48,45 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const body = (await req.json().catch(() => ({}))) as {
-      scope?: 'global' | 'region' | 'country' | 'school'
+      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school'
       window?: 'daily' | 'season'
       country?: string
     }
     const scope = body.scope ?? 'global'
     const admin = adminClient()
 
-    // 기본 경로 — 명예의 전당(개인 TOP N + 내 순위). 기존 호출자 호환.
-    if (scope === 'global') {
-      // 랭킹(명예의 전당)은 공개 — 비로그인도 열람 가능. 'me'(내 순위)는 로그인 시에만 채워진다.
+    // 개인 리더보드 — 전세계 / 내 국가 / 내 지역. 세 탭 모두 같은 RPC(scoped_top), 모수만 다르다.
+    if (scope === 'global' || scope === 'my-country' || scope === 'my-region') {
+      // 랭킹은 공개 — 비로그인도 전세계 보드는 열람 가능. 'me'(내 순위)는 로그인 시에만 채워진다.
       const user = await getUser(req)
-      const { data, error } = await admin.rpc('global_top', { p_uid: user?.id ?? null, p_limit: TOP_N })
+
+      // 범위 결정: 'my-*' 는 **서버가 호출자 프로필에서** 읽는다(클라가 남의 국가/지역을 지정할 수 없게).
+      let pCountry: string | null = null
+      let pRegion: string | null = null
+      if (scope !== 'global') {
+        if (!user?.id) return json({ top: [], total: 0, me: null, scope, code: null, needsAuth: true })
+        const { data: pr } = await admin
+          .from('profiles')
+          .select('country_code,region_code')
+          .eq('id', user.id)
+          .maybeSingle()
+        pCountry = (pr?.country_code as string | null) ?? null
+        if (scope === 'my-region') pRegion = (pr?.region_code as string | null) ?? null
+        // 온보딩 미완(국가·지역 미확정) → 빈 보드 + 안내 플래그. 지역 탭은 country 도 같이 걸어 안전하게 좁힌다.
+        if (scope === 'my-region' ? !pRegion : !pCountry) {
+          return json({ top: [], total: 0, me: null, scope, code: null, needsRegion: true })
+        }
+      }
+
+      const { data, error } = await admin.rpc('scoped_top', {
+        p_uid: user?.id ?? null,
+        p_limit: TOP_N,
+        p_country: pCountry,
+        p_region: pRegion,
+      })
       if (error) return json({ error: error.message }, 500)
 
-      const d = (data ?? {}) as { top?: RpcUser[]; total?: number; me?: RpcUser | null }
+      const d = (data ?? {}) as { top?: RpcUser[]; total?: number; me?: (RpcUser & { points_to_pass?: number | null }) | null }
       const top = (d.top ?? []).map((u) => mapUser(u))
       const me: Record<string, unknown> | null = d.me ? mapUser(d.me, true) : null
       // 칭호(자격증 트랙·급수): 개인 응답 me 에만 부착. exam_attempts 합격에서 ON READ 파생(user_titles).
@@ -71,13 +99,10 @@ Deno.serve(async (req) => {
           me.title = `CARIS ${arr[0].track} ${arr[0].grade}`
           me.titles = arr
         }
-        // 다음 순위 게이지(points_to_pass): global_top 의 me 는 tier/percentile 은 이미 포함하지만
-        // 바로 윗사람과의 점수차는 별도 경량 RPC(my_rank_context) 소관 — 실패해도 무시(back-compat).
-        const { data: rankCtx } = await admin.rpc('my_rank_context', { p_uid: user.id })
-        const rc = rankCtx as { points_to_pass?: number | null } | null
-        me.pointsToPass = rc?.points_to_pass ?? null
+        // 다음 순위 게이지: 그 **보드 안에서** 바로 윗사람과의 점수차(scoped_top 이 같이 내려준다).
+        me.pointsToPass = d.me?.points_to_pass ?? null
       }
-      return json({ top, total: d.total ?? 0, me })
+      return json({ top, total: d.total ?? 0, me, scope, code: pRegion ?? pCountry })
     }
 
     // 집계 버킷 리더보드 — 개인정보 없이 집계값만. RPC 가 프라이버시 floor(member_count<5) 를 이미 제외.

@@ -198,10 +198,11 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     if (submitting) return
     setAskQuit(true)
   }
+  // 나가기 = 응시 포기 → 들어온 자리인 레벨 선택으로 되돌린다(예전엔 메인으로 튕겼다).
   function doQuit() {
     submittedRef.current = true
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
-    navigate('/')
+    navigate('/test/select')
   }
 
   if (voided) {
@@ -315,17 +316,8 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
             {/* 키보드 단축키 안내 — 터치 기기에선 CSS 로 숨긴다(.kbd-hint) */}
             <span className="kbd-hint">{t('kbd.hint', { n: q.options.length })}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span
-              style={{
-                fontWeight: 800,
-                fontVariantNumeric: 'tabular-nums',
-                fontSize: 15,
-                color: timeLow ? '#dc2626' : 'var(--ink, #1a2230)',
-              }}
-            >
-              ⏱ {timeStr}
-            </span>
+          <div className="qtop-right">
+            <span className={`qtimer ${timeLow ? 'low' : ''}`}>⏱ {timeStr}</span>
             <span className="leave">{t('test.guard', { v: violations })}</span>
             <button className="quit-btn" onClick={quit} disabled={submitting}>
               {t('test.quit')}
@@ -344,7 +336,15 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
         ) : null}
 
         <div className="qbody">
-          <span className="qcat">◆ {axisDef(q.category, lang).short}</span>
+          {/* 영역(◆ 프롬프트 활용) 옆에 응시 레벨 — 어느 레벨로 들어왔는지 시험 중에도 보이게.
+              값은 /test/select 에서 고른 그대로(start.level), 색도 그 화면과 같은 팔레트. */}
+          <div className="qmeta">
+            <span className="qlv" style={{ '--lvc': LEVEL_COLORS[start.level] } as CSSProperties}>
+              <span className="dot" aria-hidden="true" />
+              Lv.{start.level}
+            </span>
+            <span className="qcat">◆ {axisDef(q.category, lang).short}</span>
+          </div>
           <div className="qtext">{q.prompt}</div>
           <div className="opts">
             {q.options.map((opt, i) => (

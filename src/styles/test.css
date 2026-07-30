@@ -14,18 +14,36 @@
     padding: 14px 16px;
   }
 }
+/* 상단바 3지표(문항 위치 · 남은 시간 · 이탈 횟수) — 응시 중 곁눈질로 읽혀야 해서 본문 메타보다 크게 잡는다.
+   .qprog 하단 게이지의 'N/M' 은 성격이 달라(진행률) 그대로 작게 둔다. */
 .qtop .count {
-  font-size: var(--fs-sm);
+  font-size: clamp(13px, 1.8vw, 15px);
   font-weight: 700;
   color: var(--muted);
 }
 .qtop .count b {
   color: var(--ink);
-  font-size: var(--fs-md);
+  font-size: clamp(18px, 3vw, 22px);
+}
+.qtop-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.qtimer {
+  font-size: clamp(16px, 2.6vw, 20px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink, #1a2230);
+}
+.qtimer.low {
+  color: #dc2626;
 }
 .qtop .leave {
-  font-size: var(--fs-sm);
-  color: var(--dim);
+  font-size: clamp(16px, 2.6vw, 20px); /* 타이머(.qtimer)와 같은 크기 — 상단바 지표를 한 세트로 */
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
 }
 /* 진행 게이지 — 하단바의 '푼 문제 N/M' 텍스트 바로 왼쪽에 붙인다.
    예전엔 카드 상단 풀폭 4px 막대(.pbar)였는데 '읽은 진도'처럼 읽혀서 옮겼다.
@@ -71,6 +89,34 @@
 }
 .qbody {
   padding: var(--pad-y) var(--pad-x) clamp(20px, 4vw, 30px);
+}
+/* 레벨 배지 + 영역 배지 한 줄 — 시작 전 게이트(.intro-lv)와 같은 '점 + 옅은 레벨색' 알약을 작게 쓴다. */
+.qmeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.qlv {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--lvc) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lvc) 42%, transparent);
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.qlv .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lvc);
 }
 .qcat {
   display: inline-flex;
@@ -199,7 +245,7 @@
   min-width: 0;
 }
 .kbd-hint {
-  font-size: 12px;
+  font-size: clamp(16px, 2.6vw, 20px); /* 타이머(.qtimer)와 같은 크기 */
   color: var(--dim);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;

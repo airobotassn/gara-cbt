@@ -137,3 +137,23 @@ html.dark .mg-cover { background: #1b2130; }
   border: 2px solid rgba(255,255,255,.6);
   box-shadow: 0 5px 0 #00318a, 0 9px 18px rgba(0,74,198,.42), inset 0 2px 3px rgba(255,255,255,.45); }
 .mg-gate-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #00318a, 0 4px 10px rgba(0,74,198,.4), inset 0 2px 3px rgba(255,255,255,.45); }
+
+/* ===== 게임별 랭킹 모달 (MiniGameRankModal) =====
+   ⚠️ 디자인을 새로 만들지 않는다 — 리스트는 /ranking 과 같은 .hof-*(ranking.css), 껍데기는 위 .mgm-*(이 파일).
+   여기 남는 건 그 둘로 안 되는 것만: 게임 위에 뜨는 모달이라 폭을 좁히고, 안내문 한 줄 스타일. */
+.mgr-modal { max-width: min(460px, 94vw); }
+/* .hof-mebar 는 sticky 라 모달 안에서는 스크롤 컨테이너에 붙는다 — 그대로 두면 하단에 고정돼 자연스럽다. */
+.mgr-note { margin: 0 0 12px; font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--ink2); }
+.mgr-mid { margin: 22px 0 6px; text-align: center; font-size: 13.5px; font-weight: 700; }
+
+/* ⚠️ .mgm-backdrop 이 스티커 팔레트로 --line/--ink 를 덮어쓴다(거의 검정 보더) → 그 안에서 .hof-* 를 그대로
+   쓰면 행 구분선이 검게 나온다. 리스트 서브트리만 base.css 의 전역 정의로 되돌린다(같은 식을 다시 쓴다). */
+.mgr-modal .hof-list, .mgr-modal .hof-mebar {
+  --line: rgba(var(--paper), .12); --line2: rgba(var(--paper), .2);
+  --ink: rgba(var(--paper), .98); --dim: rgba(var(--paper), .45); --muted: rgba(var(--paper), .62);
+  --bg: transparent;
+}
+/* 레벨형 게임은 값 아래에 동률 해소용 소요시간을 병기한다. ranking.css 의 small 스타일은 이름 칸(.nm small)에만
+   있어서 값 칸(.pt)엔 없다 → .hof-mebar .nm small 과 같은 톤으로 여기서만 정의(줄바꿈 + 흐린 보조색). */
+.mgr-modal .hof-row .pt { text-align: right; }
+.mgr-modal .hof-row .pt small { display: block; margin-top: 1px; font-weight: 600; color: var(--dim); }

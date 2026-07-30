@@ -896,7 +896,9 @@ function start(){
 }
 function gameOver(){
   running=false;
-  const nb=score>best; if(nb){best=score; save("shooter_best_v1",best); $("best").textContent=best;}
+  const nb=score>best;
+  if(window.MGBridge) MGBridge.submit(score); // 랭킹: 점수형
+  if(nb){best=score; save("shooter_best_v1",best); $("best").textContent=best;}
   $("finalScore").textContent=score; $("finalHits").textContent=hits;
   $("finalScore").classList.toggle("sm", String(score).length>4);
   $("finalCombo").textContent=maxCombo; $("finalBest").textContent=best;
@@ -920,6 +922,52 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden) pauseGame
 window.addEventListener("blur",pauseGame);
 $("resumeBtn").addEventListener("click",resumeGame);
 renderLives();
+</script>
+
+<!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 =====
+     이 HTML 은 자립형이라 세션도 supabase 클라도 없다 → 실제 제출/조회는 부모(/games/:id = MiniGame.tsx)가 한다.
+     여기서는 (1) 인트로·아웃트로 우상단에 '랭킹' 버튼을 얹고, (2) 점수가 나면 postMessage 로 알리기만 한다.
+     ⚠️ 이 파일을 단독으로 열면 부모가 없어 버튼도 숨고 아무것도 보내지 않는다(게임은 그대로 동작).
+     ⚠️ tieMs(레벨형 동률 해소용 소요시간)는 인트로에서 시작을 누른 시점부터 잰다. '처음으로'로 되돌아가
+       인트로를 다시 거치지 않으면 계속 누적된다 — 순위 1차 키가 아니라 동률 해소용이라 그대로 둔다. -->
+<style>
+.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; gap:6px;
+  padding:8px 13px; border-radius:999px; cursor:pointer; font:800 12.5px/1 system-ui,-apple-system,sans-serif;
+  border:1px solid rgba(40,50,76,.16); background:rgba(255,255,255,.92); color:#28324c;
+  box-shadow:0 4px 12px -4px rgba(20,30,60,.28); -webkit-tap-highlight-color:transparent;}
+.mg-rank.on{display:inline-flex;}
+.mg-rank:active{transform:translateY(1px);}
+</style>
+<script>
+(function(){
+  var EMBED = window.parent !== window;
+  var T0 = 0;
+  function post(m){ if(EMBED) window.parent.postMessage(m, window.location.origin); }
+  window.MGBridge = {
+    /** 점수 전송. timed:true 면 시작 이후 경과시간을 동률 해소용으로 같이 보낸다. */
+    submit: function(v, opts){
+      if(typeof v !== 'number' || !isFinite(v)) return;
+      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined });
+    }
+  };
+  function mount(id){
+    var ov = document.getElementById(id); if(!ov) return;
+    if(ov.querySelector('.mg-rank')) return;
+    var b = document.createElement('button');
+    b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
+    b.setAttribute('aria-label','이 게임 랭킹 보기');
+    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span> 랭킹';
+    b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
+    ov.appendChild(b);
+  }
+  mount('startOv'); mount('overOv');
+  // 인트로에서 (랭킹 버튼이 아닌) 무엇이든 누르면 = 플레이 시작 → 소요시간 기준점 리셋.
+  var intro = document.getElementById('startOv');
+  if(intro) intro.addEventListener('click', function(e){
+    if(e.target && e.target.closest && e.target.closest('.mg-rank')) return;
+    T0 = Date.now();
+  }, true);
+})();
 </script>
 </body>
 </html>

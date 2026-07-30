@@ -235,13 +235,15 @@ const D: Record<string, Record<Lang, string>> = {
   //   hint_nav = 보기가 없는 주관식 문항용(숫자키 안 먹음).
   'kbd.hint': { ko: '1–{n} 선택 · ←→ 이동', en: '1–{n} to answer · ←→ to move', ja: '1–{n}で選択・←→で移動', zh: '1–{n} 选择 · ←→ 切换', hi: '1–{n} चुनें · ←→ जाएँ', vi: '1–{n} chọn · ←→ chuyển' },
   'kbd.hint_nav': { ko: '←→ 문항 이동', en: '←→ to move', ja: '←→ で移動', zh: '←→ 切换题目', hi: '←→ प्रश्न बदलें', vi: '←→ chuyển câu' },
+  // 응시 화면 상단 이탈 카운터. '전체화면 유지' 안내 문구는 뺐다 — 시작 전 경고 게이트에서 이미 말하고,
+  // 응시 중 상단바는 숫자(문항·시간·이탈) 셋만 크게 보이는 게 목적.
   'test.guard': {
-    ko: '전체화면 유지 · 이탈 {v}/3',
-    en: 'Stay fullscreen · exits {v}/3',
-    ja: '全画面維持 · 離脱 {v}/3',
-    zh: '保持全屏 · 离开 {v}/3',
-    hi: 'फुलस्क्रीन रखें · बाहर {v}/3',
-    vi: 'Giữ toàn màn hình · thoát {v}/3',
+    ko: '이탈 {v}/3',
+    en: 'Exits {v}/3',
+    ja: '離脱 {v}/3',
+    zh: '离开 {v}/3',
+    hi: 'बाहर {v}/3',
+    vi: 'Thoát {v}/3',
   },
   'test.quit': { ko: '✕ 나가기', en: '✕ Quit', ja: '✕ 中断', zh: '✕ 退出', hi: '✕ बाहर', vi: '✕ Thoát' },
   'test.quit_confirm': {
@@ -597,12 +599,32 @@ const D: Record<string, Record<Lang, string>> = {
   'rank.pt': { ko: '{n}점', en: '{n} pt', ja: '{n}点', zh: '{n} 分', hi: '{n} अंक', vi: '{n} điểm' },
   'rank.you': { ko: '나', en: 'You', ja: 'あなた', zh: '我', hi: 'आप', vi: 'Bạn' },
   'rank.cta_test': { ko: '테스트로 랭킹에 배치받기', en: 'Take a test to get ranked', ja: 'テストでランク配置', zh: '做测试获得排名', hi: 'रैंक पाने के लिए टेस्ट दें', vi: 'Làm bài để được xếp hạng' },
-  // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음)
+  // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
   'rank.coop_header': { ko: '우리가 함께 올라갑니다', en: 'We rise together', ja: 'みんなで上がっていく', zh: '我们一起向上', hi: 'हम साथ मिलकर ऊपर उठते हैं', vi: 'Chúng ta cùng nhau vươn lên' },
-  'rank.tab_personal': { ko: '개인', en: 'Personal', ja: '個人', zh: '个人', hi: 'व्यक्तिगत', vi: 'Cá nhân' },
-  'rank.tab_region': { ko: '지역', en: 'Region', ja: '地域', zh: '地区', hi: 'क्षेत्र', vi: 'Khu vực' },
-  'rank.tab_country': { ko: '국가', en: 'Country', ja: '国', zh: '国家', hi: 'देश', vi: 'Quốc gia' },
+  // 랭킹 탭 = 전세계 / 내 국가 / 내 지역. 국가·지역 탭 라벨은 실제 이름(대한민국·서울)으로 치환되고,
+  // 아래 tab_region·tab_country 는 코드가 없을 때(비로그인·온보딩 전) 폴백이다.
+  'rank.tab_world': { ko: '전세계', en: 'Worldwide', ja: '世界全体', zh: '全球', hi: 'दुनिया भर', vi: 'Toàn thế giới' },
+  'rank.tab_region': { ko: '내 지역', en: 'My region', ja: '自分の地域', zh: '我的地区', hi: 'मेरा क्षेत्र', vi: 'Khu vực của tôi' },
+  'rank.tab_country': { ko: '내 국가', en: 'My country', ja: '自分の国', zh: '我的国家', hi: 'मेरा देश', vi: 'Quốc gia của tôi' },
   'rank.tab_school': { ko: '학교', en: 'School', ja: '学校', zh: '学校', hi: 'स्कूल', vi: 'Trường' },
+  'rank.scope_sub': { ko: '{name} TOP 10', en: '{name} TOP 10', ja: '{name} TOP10', zh: '{name} TOP 10', hi: '{name} TOP 10', vi: '{name} TOP 10' },
+  'rank.scope_guest': {
+    ko: '로그인하면 내 국가·지역 랭킹이 열려요',
+    en: 'Log in to see your country and region rankings',
+    ja: 'ログインすると自分の国・地域のランキングが見られます',
+    zh: '登录后可查看所在国家·地区排名',
+    hi: 'अपने देश और क्षेत्र की रैंकिंग देखने के लिए लॉगिन करें',
+    vi: 'Đăng nhập để xem xếp hạng quốc gia và khu vực của bạn',
+  },
+  'rank.scope_no_region': {
+    ko: '국가·지역을 설정하면 이 랭킹이 열려요',
+    en: 'Set your country and region to unlock this ranking',
+    ja: '国・地域を設定するとこのランキングが開きます',
+    zh: '设置国家·地区后即可查看此排名',
+    hi: 'यह रैंकिंग देखने के लिए अपना देश और क्षेत्र सेट करें',
+    vi: 'Đặt quốc gia và khu vực để mở xếp hạng này',
+  },
+  'rank.scope_set_region': { ko: '지역 설정하기', en: 'Set region', ja: '地域を設定', zh: '设置地区', hi: 'क्षेत्र सेट करें', vi: 'Đặt khu vực' },
   'rank.tier_diamond': { ko: '다이아', en: 'Diamond', ja: 'ダイヤ', zh: '钻石', hi: 'डायमंड', vi: 'Kim Cương' },
   'rank.tier_platinum': { ko: '플래티넘', en: 'Platinum', ja: 'プラチナ', zh: '铂金', hi: 'प्लैटिनम', vi: 'Bạch Kim' },
   'rank.tier_gold': { ko: '골드', en: 'Gold', ja: 'ゴールド', zh: '黄金', hi: 'गोल्ड', vi: 'Vàng' },
