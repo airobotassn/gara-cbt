@@ -39,10 +39,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [uploadErr, setUploadErr] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [moreOpen, setMoreOpen] = useState(false)
-  // 다크/라이트 모드 — 기본은 **폰/브라우저 설정**을 따르고, FAB 토글로 고른 값이 그 위에 얹힌다.
-  //   초기 적용은 index.html 의 부트스트랩 스크립트(플래시 방지)가 하고 여기선 그 결과를 읽어온다.
-  //   ⚠️ 저장값만 보던 예전 구조에서는 한 번 다크로 저장되면 폰을 라이트로 바꿔도 계속 검정이었다
-  //      (삼성인터넷에서 화이트 모드로 바꿔도 안 하얘지는 제보의 원인) → 시스템이 바뀌면 저장값을 버린다.
+  // 다크/라이트 모드 (html.dark 토글 + localStorage 저장, index.html 에서 초기 적용)
   const [dark, setDark] = useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
   )
@@ -52,32 +49,10 @@ export default function Layout({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle('dark', next)
     try {
       localStorage.setItem('theme', next ? 'dark' : 'light')
-      // 고른 시점의 시스템 값을 함께 남긴다 — 이후 시스템이 바뀌면 이 선택은 무효가 된다.
-      localStorage.setItem(
-        'themeSys',
-        window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
-      )
     } catch {
       /* 무시 */
     }
   }
-  // 폰/브라우저 설정이 바뀌면 즉시 따라간다(새로고침 없이). 사용자의 이전 토글 선택은 버린다.
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (e: MediaQueryListEvent) => {
-      const sys = e.matches
-      setDark(sys)
-      document.documentElement.classList.toggle('dark', sys)
-      try {
-        localStorage.removeItem('theme')
-        localStorage.removeItem('themeSys')
-      } catch {
-        /* 무시 */
-      }
-    }
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
   const navigate = useNavigate()
   const { pathname } = useLocation()
   // FAB 숨김: 응시 화면(/exam/run/:id · /test/:attemptId)·보안 브라우저(SEB)는 시험 중 이탈 차단,
