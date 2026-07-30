@@ -8,11 +8,19 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="color-scheme" content="light dark" />
-    <!-- 저장된 테마를 React 렌더 전에 적용 (플래시 방지). 기본=라이트 -->
+    <!-- 테마를 React 렌더 전에 적용(플래시 방지).
+         기본 = **폰/브라우저 설정(prefers-color-scheme)**. 앱 FAB 토글로 고른 값이 있으면 그게 우선이지만,
+         그 뒤 시스템 설정이 바뀌면 사용자 선택은 버린다 — 폰을 라이트로 바꾸면 사이트도 하얘져야 하므로
+         (그래서 고를 당시의 시스템 값 themeSys 를 같이 저장해 비교한다). -->
     <script>
       (function () {
         try {
-          if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark')
+          var sys =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          var saved = localStorage.getItem('theme')
+          var savedSys = localStorage.getItem('themeSys')
+          var use = saved && savedSys === sys ? saved : sys
+          if (use === 'dark') document.documentElement.classList.add('dark')
         } catch (e) {}
       })()
     </script>
