@@ -375,6 +375,17 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/ebooks')}>
                 <span className="ic"><BookIcon /></span> {t('fab.ebookstore')}
               </button>
+              {/* 임시 — 레벨테스트 인증서 시안 미리보기(public/cert-preview.html).
+                  React 라우트가 아니라 정적 HTML 이라 window.open 으로 연다. 확정되면 페이지로 이관. */}
+              <button
+                className="pf-item"
+                onClick={() => {
+                  setOpen(false)
+                  window.open(`/cert-preview.html?name=${encodeURIComponent(name)}`, '_blank', 'noopener')
+                }}
+              >
+                <span className="ic">★</span> 인증서 미리보기
+              </button>
             </div>
 
             <div className="pf-langwrap">
