@@ -98,10 +98,12 @@ export function updateAxis(prev: number, perf: number, placed: boolean): number 
 }
 
 // ----- 등급(레벨) 변동 (scoring.ts 와 동일하게 유지!) -----
-// 승급컷: 레벨1~3 = 80%, 레벨4~7 = 90%. 강등은 없다(2026-07 제거) — 등급은 오르거나 유지만 된다.
+// 승급컷: 레벨1~3 = 70%, 레벨4~7 = 80%. (2026-08-04 완화 — 이전 80/90%)
+//   → Lv.1 7개(10문) / Lv.2·3 14개(20문) / Lv.4~7 24개(30문).
+//   강등은 없다(2026-07 제거) — 등급은 오르거나 유지만 된다.
 //   문항 수가 레벨 구간마다 달라(10/20/30) 절대 개수가 아니라 비율로 판정한다.
-export const PROMOTE_RATE_LOW = 0.8
-export const PROMOTE_RATE_HIGH = 0.9
+export const PROMOTE_RATE_LOW = 0.7
+export const PROMOTE_RATE_HIGH = 0.8
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
   return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
@@ -204,15 +206,9 @@ export function arenaBand(level: number): [number, number] {
   return [lo, lv >= MAX_LEVEL ? SEASON_MAX_POINTS : lo + ARENA_BAND_STEP - 1]
 }
 
-// 백분위(0~1, 낮을수록 상위) → 티어 5단계. DB ranking_tier(pct)(reset_season_fn.sql)와 동일 밴드 — FE/백엔드 단일 출처.
-export type Tier = 'diamond' | 'platinum' | 'gold' | 'silver' | 'bronze'
-export function tierForPercentile(pct: number): Tier {
-  if (pct <= 0.05) return 'diamond'
-  if (pct <= 0.2) return 'platinum'
-  if (pct <= 0.45) return 'gold'
-  if (pct <= 0.75) return 'silver'
-  return 'bronze'
-}
+// (티어 5단계(브론즈~다이아)는 2026-08-04 제거됐다 — 엠블렘·티어명·티어색·티어사다리를 화면에서 통째로 뺐다.
+//  DB 의 ranking_tier(pct) 함수와 ranking_season_result.final_tier 컬럼, 서버 응답의 tier/percentile 필드는
+//  과거 시즌 기록 보존을 위해 남아있지만 클라이언트는 더 이상 읽지 않는다.)
 // </scoring-sync>
 
 export function emptyAxis(keys: string[]): AxisMap {

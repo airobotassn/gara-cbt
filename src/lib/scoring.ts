@@ -61,11 +61,11 @@ export function durationMinutesForLevel(level: number): number {
 // ── 등급(레벨) 변동 규칙 ──
 // ⚠️ 강등은 없다(2026-07 제거). 등급은 오르거나 유지만 된다 — 강등선/경고(DEMOTE_*)·강등 시드·rank_dir='down' 이
 //    같이 사라졌다. DB 컬럼(user_progress.demotion_strikes · test_attempts.warn_strikes)은 남아있지만 읽지도 쓰지도 않는다.
-// 승급컷 비율: 레벨1~3 = 80%, 레벨4~7 = 90%.
-//   → Lv.1 8개(10문) / Lv.2·3 16개(20문) / Lv.4~7 27개(30문).
+// 승급컷 비율: 레벨1~3 = 70%, 레벨4~7 = 80%. (2026-08-04 완화 — 이전 80/90%)
+//   → Lv.1 7개(10문) / Lv.2·3 14개(20문) / Lv.4~7 24개(30문).
 //   total 은 실제 출제 문항 수(문제은행이 모자라 덜 나간 경우 그 수)를 넘기면 그 기준으로 계산한다.
-export const PROMOTE_RATE_LOW = 0.8 // Lv.1~3
-export const PROMOTE_RATE_HIGH = 0.9 // Lv.4~7
+export const PROMOTE_RATE_LOW = 0.7 // Lv.1~3
+export const PROMOTE_RATE_HIGH = 0.8 // Lv.4~7
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
   return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
@@ -178,19 +178,12 @@ export function arenaBand(level: number): [number, number] {
   return [lo, lv >= MAX_LEVEL ? SEASON_MAX_POINTS : lo + ARENA_BAND_STEP - 1]
 }
 
-// 백분위(0~1, 낮을수록 상위) → 티어 5단계. DB ranking_tier(pct)(reset_season_fn.sql)와 동일 밴드 — FE/백엔드 단일 출처.
-export type Tier = 'diamond' | 'platinum' | 'gold' | 'silver' | 'bronze'
-export function tierForPercentile(pct: number): Tier {
-  if (pct <= 0.05) return 'diamond'
-  if (pct <= 0.2) return 'platinum'
-  if (pct <= 0.45) return 'gold'
-  if (pct <= 0.75) return 'silver'
-  return 'bronze'
-}
+// (티어 5단계(브론즈~다이아)는 2026-08-04 제거됐다 — 엠블렘·티어명·티어색·티어사다리를 화면에서 통째로 뺐다.
+//  DB 의 ranking_tier(pct) 함수와 ranking_season_result.final_tier 컬럼, 서버 응답의 tier/percentile 필드는
+//  과거 시즌 기록 보존을 위해 남아있지만 클라이언트는 더 이상 읽지 않는다.)
 // </scoring-sync>
 
 // ── 등급(레벨) 표시 메타 ──
-// 레벨 색. 티어 엠블렘(public/emblems/*)과는 다른 축이다 — 엠블렘은 티어(5단계) 전용.
 export const LEVEL_COLOR: Record<number, string> = {
   1: '#8b9099', // iron
   2: '#b8763e', // bronze
@@ -204,22 +197,7 @@ export function levelColor(level: number): string {
   return LEVEL_COLOR[level] ?? '#9ca3af'
 }
 
-// (레벨→엠블렘 매핑 LEVEL_EMBLEM/emblemKeyForLevel 은 제거됐다 — 아이언·마스터가 없어지고
-//  엠블렘이 티어 5단계 이미지 public/emblems/<tier>.webp 단일 체계가 되면서 쓸 곳이 사라졌다.)
-
-// Tier(5단계) → 표시색. LEVEL_COLOR 팔레트와 동일 hex(엠블렘 ↔ 배경/이름색 꼬임 방지).
-export const TIER_COLOR: Record<Tier, string> = {
-  bronze: '#b8763e',
-  silver: '#aeb9c8',
-  gold: '#e3b23c',
-  platinum: '#3fb8ad',
-  diamond: '#4aa0e8',
-}
-export function tierColor(tier: Tier | null | undefined): string {
-  return (tier && TIER_COLOR[tier]) || '#9ca3af'
-}
-/** 낮은 티어 → 높은 티어. 티어 사다리(대시보드) 노출 순서. */
-export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+// (티어 표시 메타(TIER_COLOR/tierColor/TIER_ORDER)와 레벨→엠블렘 매핑은 모두 제거됐다 — 위 <scoring-sync> 끝 주석 참고.)
 
 // ── 레벨별 보기 개수 고정 ──
 // ⚠️ supabase/functions/_shared/scoring.ts 의 VISIBLE_OPTIONS_BY_LEVEL 과 항상 같이 고칠 것.
