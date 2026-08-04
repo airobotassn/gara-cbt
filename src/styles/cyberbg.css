@@ -137,20 +137,6 @@
   border-color: rgba(0, 217, 255, 0.55);
   color: #fff;
 }
-/* '학습 시작'(준비 중) — 강조하지 않는다. 글자·태그만 흐리게. */
-.lp .cta-ghost.soon {
-  color: #7e8ea0;
-}
-.lp .cta-ghost.soon:hover {
-  background: #081018;
-  border-color: #2a4256;
-  color: #7e8ea0;
-}
-.lp .cta-soon-tag {
-  color: #a8b6c8;
-  background: rgba(23, 48, 71, 0.9);
-}
-
 /* ── FAB · 맨 위로 버튼 ────────────────────────────────────────────────
    Layout 이 그리는 전역 버튼이라 페이지에서 직접 못 건드린다 → 메인에만 걸리도록 body:has(.lp) 로 한정.
    (같은 방식이 hub.css 에 이미 있다: body:has(.hub) .fab-top)

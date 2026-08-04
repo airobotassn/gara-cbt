@@ -90,4 +90,12 @@ export interface ListAttemptsResponse {
   currentPoints: number // 랭킹 점수(0~10000)
   levelSkills: LevelSkill[] // 응시한 레벨들의 누적 레이더
   dailyLeft?: number | null // 오늘 남은 응시 횟수(게스트/구버전 함수면 null·undefined)
+  certificate?: LevelCertData | null // 레벨테스트 인증서 데이터(응시 기록 없으면 null)
+}
+
+// 레벨테스트 인증서 — 값은 전부 서버 계산분이다(클라 파라미터로 레벨·날짜를 못 바꾼다).
+export interface LevelCertData {
+  displayName: string // 닉네임(profiles.display_name)
+  level: number // 현재 도달 레벨 = 인증서에 각인되는 숫자
+  milestones: Record<string, string> // 레벨 → 최초 도달일(ISO). Lv.1 = 첫 응시일
 }

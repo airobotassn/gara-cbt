@@ -157,9 +157,9 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   const expiryDate = certExpiryDate(examTitleRaw, acquiredAt)
 
   function goCertificate() {
-    // 성적표에서는 바로 발급하지 않고 워터마크 견본(미리보기)을 먼저 연다 — 발급은 유료이므로
-    // 결제 게이트가 붙을 자리는 미리보기 화면의 '자격증 발급하기' 버튼(Certificate.issueNow).
-    // 여기서 verifyToken 을 넘기지 않는 게 핵심: 토큰 없는 캡처본은 /verify 조회가 안 된다.
+    // 성적표에서는 자격증을 바로 보여주지 않는다 — preview:true 로 결제 유도 화면(Certificate 의 cert-gate)을 연다.
+    // 결제 게이트가 붙을 자리는 그 화면의 '결제하고 발급받기' 버튼(Certificate.issueNow).
+    // 여기서 verifyToken 을 넘기지 않는 게 핵심: 토큰 없이는 /verify 조회가 안 된다.
     navigate('/certificate', {
       state: {
         preview: true,

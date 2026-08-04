@@ -99,9 +99,15 @@ export default function Hub() {
   const [toast, setToast] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
-  // 공유 카드 하단 바용 프로필 값(가입일 · 국가). 국가만 노출하고 지역·학교는 넣지 않는다.
+  // 공유 카드 하단 바용 프로필 값(가입일 · 국가 · 지역). 학교는 넣지 않는다.
   const [joinedAt, setJoinedAt] = useState<string | null>(null)
   const [countryCode, setCountryCode] = useState<string | null>(null)
+  const [regionCode, setRegionCode] = useState<string | null>(null)
+  // 공유 카드의 국가·지역 순위 — get-hub 는 전세계 순위만 준다. /ranking 의 두 탭과 같은 함수·같은 모수.
+  const [scopedRanks, setScopedRanks] = useState<{
+    country: { rank: number | null; total: number | null }
+    region: { rank: number | null; total: number | null }
+  } | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [, setSkillScore] = useState(0)
   const [, setActivityScore] = useState(0)
@@ -122,16 +128,37 @@ export default function Hub() {
     const uid = user?.id
     if (!uid) return
     let alive = true
-    supabase.from('profiles').select('avatar_url, display_name, created_at, country_code').eq('id', uid).maybeSingle()
+    supabase.from('profiles').select('avatar_url, display_name, created_at, country_code, region_code').eq('id', uid).maybeSingle()
       .then(({ data }) => {
         if (!alive) return
         setAvatarUrl((data?.avatar_url as string | null) ?? null)
         setDisplayName((data?.display_name as string | null) ?? null)
         setJoinedAt((data?.created_at as string | null) ?? null)
         setCountryCode((data?.country_code as string | null) ?? null)
+        setRegionCode((data?.region_code as string | null) ?? null)
       })
     return () => { alive = false }
   }, [user?.id])
+
+  // 국가·지역 순위는 공유 모달을 열 때만 가져온다 — 허브 진입마다 부르면 안 쓰는 조회가 2번 늘어난다.
+  // 온보딩 전(needsRegion)이면 me 가 null 로 오고 카드엔 '—' 가 찍힌다.
+  useEffect(() => {
+    if (modal !== 'share' || scopedRanks) return
+    let alive = true
+    type LbResp = { total?: number; me?: { rank?: number } | null }
+    Promise.all([
+      callFunction<LbResp>('leaderboard', { scope: 'my-country' }).catch(() => null),
+      callFunction<LbResp>('leaderboard', { scope: 'my-region' }).catch(() => null),
+    ]).then(([c, r]) => {
+      if (!alive) return
+      const pick = (d: LbResp | null) => ({
+        rank: d?.me?.rank ?? null,
+        total: d?.me?.rank != null ? d?.total ?? null : null,
+      })
+      setScopedRanks({ country: pick(c), region: pick(r) })
+    })
+    return () => { alive = false }
+  }, [modal, scopedRanks])
 
   // get-hub 응답을 상태에 반영(서버 권위값으로 동기화).
   function applyHub(h: HubState) {
@@ -242,6 +269,12 @@ export default function Hub() {
   const dispPct = percentile ?? 1 // 데이터 없으면 상위 100%(바닥)
   const gaugeFillPct = Math.max(0, Math.min(100, (1 - dispPct) * 100)) // 상위일수록 pct 작음 → 가득
   const gaugeLabel = pointsToPass != null && pointsToPass > 0 ? t('rank.next_gap', { n: pointsToPass }) : ''
+  // 지역 표시명 — /ranking 탭 라벨과 같은 규칙(사전에 없는 코드는 코드 그대로 노출).
+  const regionName = (code: string | null): string | null => {
+    if (!code) return null
+    const nm = t(`region.${code}`)
+    return nm === `region.${code}` ? code : nm
+  }
 
   // 허브는 로그인 전용(게스트는 출석·뽑기·상점이 전부 잠긴 빈 화면이라 진입 자체를 막는다).
   //   로그인 후 /hub 로 복귀 — /auth/callback?next=/hub 로 왕복해도 next 가 URL 에 실려 안 날아간다.
@@ -503,11 +536,14 @@ export default function Hub() {
             percentile,
             rank,
             rankTotal,
-            title: titles[0] ? `CARIS ${titles[0].track} ${titles[0].grade}` : null,
+            countryRank: scopedRanks?.country.rank ?? null,
+            countryTotal: scopedRanks?.country.total ?? null,
+            regionRank: scopedRanks?.region.rank ?? null,
+            regionTotal: scopedRanks?.region.total ?? null,
             seasonTotal,
-            streak: stamps,
             joinedAt,
             country: countryCode ? countryName(countryCode, lang) : null,
+            region: regionName(regionCode),
           }}
         />
       )}

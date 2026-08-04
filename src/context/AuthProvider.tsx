@@ -27,6 +27,11 @@ interface AuthState {
   // 온보딩 화면에서 지역 확정 성공 직후 호출. 이걸 안 하면 needsOnboarding 이 true 로 남아
   // OnboardingGate 가 목적지에서 다시 /onboarding 으로 튕긴다(새로고침해야 풀리는 버그).
   markOnboardingDone: () => void
+  // 닉네임 게이트: 정식 회원이 아직 닉네임을 정하지 않았으면 true(전 경로에서 강제).
+  // 가입 트리거가 구글 실명을 display_name 에 넣지만 nickname_set_at 이 null 이라 '미설정'이다.
+  needsNickname: boolean
+  // 닉네임 설정 성공 직후 호출(markOnboardingDone 과 같은 이유 — 안 하면 목적지에서 다시 튕긴다).
+  markNicknameDone: () => void
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -43,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [onboardingLoading, setOnboardingLoading] = useState(false)
+  const [needsNickname, setNeedsNickname] = useState(false)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -53,23 +59,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 익명/무세션은 게이트 대상 아님.
       if (!u || !computeIsFullUser(u)) {
         setNeedsOnboarding(false)
+        setNeedsNickname(false)
         setOnboardingLoading(false)
         return
       }
       setOnboardingLoading(true)
       const { data, error } = await supabase
         .from('profiles')
-        .select('region_locked_at,country_code,region_code')
+        .select('region_locked_at,country_code,region_code,nickname_set_at')
         .eq('id', u.id)
         .maybeSingle()
       // 조회 실패 → FAIL-OPEN: 유저를 가두지 않는다.
       if (error) {
         setNeedsOnboarding(false)
+        setNeedsNickname(false)
         setOnboardingLoading(false)
         return
       }
       // 프로필 행이 없으면(최초) 지역 미확정 → 온보딩 필요.
       setNeedsOnboarding(data == null ? true : data.region_locked_at == null)
+      // 닉네임은 '확정 시각'으로만 판정한다 — display_name 에는 가입 트리거가 넣은 구글 실명이 들어 있다.
+      setNeedsNickname(data == null ? true : data.nickname_set_at == null)
       setOnboardingLoading(false)
     }
     supabase.auth.getSession().then(({ data }) => {
@@ -86,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (event === 'SIGNED_OUT') {
         setNeedsOnboarding(false)
+        setNeedsNickname(false)
         setOnboardingLoading(false)
       }
     })
@@ -143,6 +154,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOnboardingLoading(false)
   }
 
+  // set-nickname 이 성공했다 = 서버 기준 확정. 재조회 없이 낙관적으로 해제.
+  function markNicknameDone() {
+    setNeedsNickname(false)
+  }
+
   const value: AuthState = {
     session,
     user,
@@ -151,6 +167,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     needsOnboarding,
     onboardingLoading,
     markOnboardingDone,
+    needsNickname,
+    markNicknameDone,
     ensureAnonymous,
     loginWithGoogle,
     loginWithKakao,

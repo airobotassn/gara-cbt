@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import CyberBg from '../components/CyberBg'
+import EarthHero from '../components/EarthHero'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
@@ -59,7 +59,6 @@ export default function Landing() {
   const navigate = useNavigate()
   const { isFullUser } = useAuth()
   const { t } = useT()
-  const [learnSoon, setLearnSoon] = useState(false)
   const [query, setQuery] = useState('')
   const [routing, setRouting] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -108,10 +107,12 @@ export default function Landing() {
   }
 
   return (
-    <div className="lp">
-      {/* Theme 04 배경(이미지 + 광원). 이 단계에서는 배경만 교체하고 글자·버튼은 손대지 않았다. */}
-      <CyberBg />
-      <div className="aura" />
+    // force-dark: 배경이 항상 검은 우주라 테마 토글과 무관하게 다크 팔레트로 고정한다.
+    //   색을 새로 정하는 게 아니라 기존 다크 모드 토큰을 그대로 쓴다(stitch.css 의 .force-dark).
+    //   글자색·버튼색·크기는 손대지 않았다 — 지금 다크 모드에서 보이는 그대로다.
+    <div className="lp force-dark">
+      {/* 우주 + NASA 지구 영상 히어로 */}
+      <EarthHero />
       <h1>
         {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>
         <br />
@@ -145,11 +146,10 @@ export default function Landing() {
         <button className="cta-ghost" onClick={() => navigate('/guide')}>
           {t('landing.cta_exam')} <span className="arr">→</span>
         </button>
-        <button className="cta-ghost soon" onClick={() => setLearnSoon(true)}>
-          {t('landing.cta_learn')} <span className="cta-soon-tag">{t('landing.soon')}</span>
+        <button className="cta-ghost" onClick={() => navigate('/ebooks')}>
+          {t('landing.cta_learn')} <span className="arr">→</span>
         </button>
       </div>
-      {learnSoon ? <div className="lp-soon-note">{t('landing.learn_soon')}</div> : null}
     </div>
   )
 }

@@ -27,10 +27,12 @@ import Notice from './pages/Notice'
 import NoticeDetail from './pages/NoticeDetail'
 import Faq from './pages/Faq'
 import LevelSelect from './pages/LevelSelect'
+import LevelCert from './pages/LevelCert'
 import TestRunner from './pages/TestRunner'
 import Result from './pages/Result'
 import Ranking from './pages/Ranking'
 import Onboarding from './pages/Onboarding'
+import NicknameSetup from './pages/NicknameSetup'
 import Hub from './pages/Hub'
 import WorldArena from './pages/WorldArena'
 import MiniGame from './pages/MiniGame'
@@ -60,6 +62,24 @@ const ONBOARDING_ENFORCED = [
   '/test', // 레벨 응시 (/test/select 등) — 랜딩 검색으로 직행하는 경로가 있어 함께 막는다
   '/ranking', // 명예의 전당
 ]
+
+// 닉네임 게이트 — 지역과 달리 **전 경로**에서 강제한다.
+// 이유: 가입 트리거가 구글 실명을 display_name 에 넣어서, 안 정하면 랭킹·채팅·레벨테스트 인증서에
+// 실명이 그대로 노출된다. 미루면 그사이 실명이 새어나가므로 로그인 직후 받는다.
+// 예외는 무한 루프를 막기 위한 최소한만(설정 화면 자신 · 로그인/콜백).
+const NICKNAME_EXEMPT = ['/onboarding/nickname', '/login', '/auth/callback']
+
+function NicknameGate({ children }: { children: ReactNode }) {
+  const { needsNickname, onboardingLoading, isFullUser, loading } = useAuth()
+  const { pathname, search } = useLocation()
+  if (NICKNAME_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return <>{children}</>
+  if (loading || (isFullUser && onboardingLoading)) return <GateSpinner />
+  if (isFullUser && needsNickname) {
+    const next = encodeURIComponent(pathname + search)
+    return <Navigate to={`/onboarding/nickname?next=${next}`} replace />
+  }
+  return <>{children}</>
+}
 
 function OnboardingGate({ children }: { children: ReactNode }) {
   const { needsOnboarding, onboardingLoading, isFullUser, loading } = useAuth()
@@ -95,6 +115,8 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           <Layout>
+            {/* 닉네임(전 경로) → 지역(아레나 계열) 순서. 아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
+            <NicknameGate>
             <OnboardingGate>
             <Routes>
               <Route path="/" element={<Landing />} />
@@ -114,8 +136,10 @@ export default function App() {
               <Route path="/exam/complete" element={<ExamComplete />} />
               <Route path="/exam/done" element={<ExamDone />} />
               <Route path="/certificate" element={<Certificate />} />
-              {/* 발급(유료) 전 워터마크 견본 — state 없이 직접 들어와도 미리보기로 열린다 */}
+              {/* 발급(유료) 전 결제 유도 — state 없이 직접 들어와도 결제 게이트로 열린다 */}
               <Route path="/certificate/preview" element={<Certificate />} />
+              {/* 디자인 견본 — 더미 인물(홍길동) + 진한 워터마크. 개인정보·진위확인 QR 없음 */}
+              <Route path="/certificate/sample" element={<Certificate />} />
               <Route path="/verify/:token" element={<VerifyCert />} />
               {/* 이북: 스토어(구매) ↔ 뷰어(열람). 내 서재는 마이페이지 탭(/mypage/ebooks). */}
               <Route path="/ebooks" element={<Ebooks />} />
@@ -124,6 +148,8 @@ export default function App() {
               <Route path="/mypage/:section" element={<MyPage />} />
               {/* CARIS ARENA 모듈 (/test/*) + 랭킹 */}
               <Route path="/test/select" element={<LevelSelect />} />
+              {/* 레벨테스트 인증서 — /test/:attemptId 보다 먼저 둔다(안 그러면 attemptId 로 잡힌다) */}
+              <Route path="/test/certificate" element={<LevelCert />} />
               <Route path="/test/:attemptId" element={<TestRunner />} />
               <Route path="/test/result/:attemptId" element={<Result />} />
               <Route path="/ranking" element={<Ranking />} />
@@ -145,9 +171,11 @@ export default function App() {
               />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/onboarding/nickname" element={<NicknameSetup />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             </OnboardingGate>
+            </NicknameGate>
           </Layout>
         </BrowserRouter>
       </AuthProvider>

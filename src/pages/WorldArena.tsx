@@ -106,7 +106,8 @@ export default function WorldArena() {
   const [hotKey, setHotKey] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [hover, setHover] = useState<HoverInfo | null>(null)
-  const [rightPanel, setRightPanel] = useState<'league' | 'chat' | null>('league')
+  // 오른쪽 패널 기본값 = 채팅(들어오자마자 사람이 보이는 쪽). 리그 순위는 🌐 탭으로 전환.
+  const [rightPanel, setRightPanel] = useState<'league' | 'chat' | null>('chat')
   // 지도 위 순위 표시(숫자 + 1~3위 트로피) on/off — 지도 모양만 보고 싶을 때 끈다.
   const [showNumbers, setShowNumbers] = useState(true)
 
@@ -566,17 +567,7 @@ export default function WorldArena() {
           )}
           {/* 아이콘만 있는 세로 레일 — 이름은 data-label 이 CSS 툴팁으로 띄운다(스크린리더는 aria-label). */}
           <div className="aa-tabs" role="tablist" aria-label={t('arena.panelToggle')}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rightPanel === 'league'}
-              aria-label={t('arena.tabLeague')}
-              data-label={t('arena.tabLeague')}
-              className={`aa-tab aa-tab-league${rightPanel === 'league' ? ' on' : ''}`}
-              onClick={() => setRightPanel((p) => (p === 'league' ? null : 'league'))}
-            >
-              <span className="ti" aria-hidden="true">🌐</span>
-            </button>
+            {/* 채팅이 기본 패널이라 레일에서도 위(첫 번째)에 둔다. */}
             <button
               type="button"
               role="tab"
@@ -587,6 +578,17 @@ export default function WorldArena() {
               onClick={() => setRightPanel((p) => (p === 'chat' ? null : 'chat'))}
             >
               <span className="ti" aria-hidden="true">💬</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanel === 'league'}
+              aria-label={t('arena.tabLeague')}
+              data-label={t('arena.tabLeague')}
+              className={`aa-tab aa-tab-league${rightPanel === 'league' ? ' on' : ''}`}
+              onClick={() => setRightPanel((p) => (p === 'league' ? null : 'league'))}
+            >
+              <span className="ti" aria-hidden="true">🌐</span>
             </button>
           </div>
         </div>

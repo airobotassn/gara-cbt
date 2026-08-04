@@ -35,4 +35,23 @@ dist-ssr
 .netlify
 
 # 개인 커리어 기록 (회사 repo에 커밋하지 않음)
+# ⚠️ career-log 스킬이 쓰는 건 한글 파일이지만, 영문 이름 파일도 따로 굴러다닌다.
+#    git 입장에선 완전히 다른 경로라 위 한 줄로는 안 걸린다 → 둘 다 적는다.
 docs/커리어기록.md
+docs/career-log.md
+
+# 작업 부산물 (git 에 넣지 않음 — 합쳐서 265MB, 한 번 들어가면 히스토리에 영구히 남는다)
+# scratchpad = 스크린샷·_dev.log / artifacts = 시안 PNG·HTML / .gjc = 세션 캐시
+scratchpad/
+artifacts/
+.gjc/
+
+# 리다이렉트 사고로 생긴 빈 파일들 (전부 0바이트). NUL 은 윈도 예약어.
+(1)
+(2)
+(3)
+(4)
+A
+NUL
+Negative
+Number

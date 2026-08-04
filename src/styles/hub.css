@@ -184,39 +184,41 @@
 .hub .todo-cta { flex: 0 0 auto; border: 2px solid var(--line); border-radius: 10px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 900; padding: 4px 12px; cursor: pointer; text-decoration: none; }
 .hub .todo-cta:active { transform: translateY(1px); }
 
-/* ── 모달(뽑기/상점/쿠폰/칭호 팝업) ── */
-.hub .hub-modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(26,28,36,.45); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.hub .hub-modal { position: relative; width: 100%; max-width: 420px; max-height: 86vh; overflow-y: auto; background: var(--card); border: 2.5px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: 0 4px 0 rgba(var(--shc), .12); }
-.hub .hub-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.hub .hub-modal-head h3 { margin: 0; font-size: 17px; font-weight: 900; }
-.hub .hub-modal-close { width: 30px; height: 30px; border-radius: 10px; border: 2.5px solid var(--line); background: var(--card); color: var(--ink); font-size: 16px; line-height: 1; font-weight: 900; cursor: pointer; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
-.hub .hub-modal-close:active { transform: translateY(2px); box-shadow: none; }
-.hub .hub-modal-help { font-size: 11.5px; color: var(--ink2); line-height: 1.5; margin: 10px 0 0; font-weight: 700; }
+/* ── 모달(뽑기/상점/쿠폰/칭호 팝업) ──
+   ⚠️ 공유 카드 모달은 허브 밖(/ranking 의 TOP10 카드)에서도 쓴다. 규칙이 전부 `.hub` 하위로 묶여 있어
+      그대로는 무스타일로 나온다 → 백드롭에 `.sc-host` 를 같이 걸면 어디서든 뜨도록 선택자를 넓혔다.
+      `.sc-host` 는 허브가 주던 스티커 토큰(--card/--line/--ink/--shc…)을 대신 공급하는 역할만 한다.
+      (규칙을 복제하지 않는 이유: 복제하면 반드시 둘이 어긋난다) */
+.sc-host {
+  --card: #fff; --line: #33323f; --ink: #33323f; --ink2: #6b5a48;
+  --brand: #004ac6; --shc: 43, 32, 21;
+}
+html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #aab3c6; --brand: #5680bd; --shc: 0, 0, 0; }
+.hub .hub-modal-backdrop, .hub-modal-backdrop.sc-host { position: fixed; inset: 0; z-index: 50; background: rgba(26,28,36,.45); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.hub .hub-modal , .sc-host .hub-modal { position: relative; width: 100%; max-width: 420px; max-height: 86vh; overflow-y: auto; background: var(--card); border: 2.5px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: 0 4px 0 rgba(var(--shc), .12); }
+.hub .hub-modal-head , .sc-host .hub-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.hub .hub-modal-head h3 , .sc-host .hub-modal-head h3 { margin: 0; font-size: 17px; font-weight: 900; }
+.hub .hub-modal-close , .sc-host .hub-modal-close { width: 30px; height: 30px; border-radius: 10px; border: 2.5px solid var(--line); background: var(--card); color: var(--ink); font-size: 16px; line-height: 1; font-weight: 900; cursor: pointer; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
+.hub .hub-modal-close:active , .sc-host .hub-modal-close:active { transform: translateY(2px); box-shadow: none; }
+.hub .hub-modal-help , .sc-host .hub-modal-help { font-size: 11.5px; color: var(--ink2); line-height: 1.5; margin: 10px 0 0; font-weight: 700; }
 .hub .hub-modal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
 /* ── 공유 카드 모달 ──
    미리보기 = 출력 캔버스(1600×900, 16:9) 자체를 CSS 로 축소한 것. 보이는 그대로 PNG 가 나간다.
    가로 카드라 모달 폭이 곧 미리보기 크기 → 화면이 허용하는 만큼 넓게(96vw), 상한만 크게 둔다. */
-.hub .share-modal { max-width: min(96vw, 860px); }
-.hub .share-preview { position: relative; width: 100%; border-radius: 14px; overflow: hidden;
+.hub .share-modal , .sc-host .share-modal { max-width: min(96vw, 860px); }
+.hub .share-preview , .sc-host .share-preview { position: relative; width: 100%; border-radius: 14px; overflow: hidden;
   border: 2.5px solid var(--line); background: #12161f; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
-.hub .share-canvas { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .25s ease; }
-.hub .share-preview.is-ready .share-canvas { opacity: 1; }
-.hub .share-preview-msg { position: absolute; inset: 0; display: grid; place-items: center;
+.hub .share-canvas , .sc-host .share-canvas { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .25s ease; }
+.hub .share-preview.is-ready .share-canvas , .sc-host .share-preview.is-ready .share-canvas { opacity: 1; }
+.hub .share-preview-msg , .sc-host .share-preview-msg { position: absolute; inset: 0; display: grid; place-items: center;
   color: rgba(255,255,255,.7); font-size: 12.5px; font-weight: 800; }
 /* 한마디 입력 — 카드 하단 바에 실시간 반영(저장은 아직 안 됨) */
-.hub .share-motto { display: block; margin-top: 12px; }
-.hub .share-motto-lab { display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 11.5px; font-weight: 900; color: var(--ink2); margin-bottom: 5px; }
-.hub .share-motto-lab em { font-style: normal; font-size: 11px; color: var(--ink2); opacity: .7; }
-.hub .share-motto-in { width: 100%; padding: 9px 12px; border-radius: 11px; font: inherit; font-size: 13.5px; font-weight: 800;
-  background: var(--card); color: var(--ink); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(var(--shc), .12); }
-.hub .share-motto-in:focus { outline: none; border-color: var(--brand); }
-
-.hub .share-actions { display: flex; gap: 8px; margin-top: 12px; }
-.hub .share-btn { flex: 1; background: #7d8aa5; padding: 11px 10px; font-size: 13.5px; }
-.hub .share-btn-primary { background: var(--brand); }
-.hub .share-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+/* (옛 .share-motto — '한마디' 입력은 제거됐다. 카드 하단 바가 그 자리를 지역으로 쓴다.) */
+.hub .share-actions , .sc-host .share-actions { display: flex; gap: 8px; margin-top: 12px; }
+.hub .share-btn , .sc-host .share-btn { flex: 1; background: #7d8aa5; padding: 11px 10px; font-size: 13.5px; }
+.hub .share-btn-primary , .sc-host .share-btn-primary { background: var(--brand); }
+.hub .share-btn:active:not(:disabled) , .sc-host .share-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
 .hub .share-note { margin: 8px 0 0; text-align: center; font-size: 11.5px; font-weight: 800; color: var(--brand-ink, #2f4a86); }
 
 /* HUD 우측 공유 칩 — 뒤로가기 칩과 같은 스티커 톤(같은 줄 오른쪽 끝) */

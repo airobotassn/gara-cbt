@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>랭킹 카드 시안 — 캐릭터 카드</title>
+<style>
+  :root {
+    --page: #0e1017;
+    --ink: #e8ecf6;
+    --dim: #8b93a8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 20px 80px;
+    background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .lede { margin: 0 0 6px; color: var(--dim); font-size: 13.5px; line-height: 1.7; max-width: 900px; }
+  h2 { font-size: 15px; margin: 40px 0 12px; padding-top: 20px; border-top: 1px solid #232838; color: #b9c2d6; }
+  .note { color: var(--dim); font-size: 12.5px; line-height: 1.7; margin: 0 0 16px; max-width: 900px; }
+  .note b { color: #ffd479; }
+
+  .deck { display: flex; flex-wrap: wrap; gap: 20px; }
+
+  /* ===================== 카드 ===================== */
+  /* 출력은 1600×900. 여기선 --w 로 축소해 보여주고 내부는 전부 em/% 라 비율이 유지된다. */
+  .card {
+    --w: 560px;
+    --tc: #4aa0e8;          /* 티어색 — 카드마다 이 한 값만 바뀐다 */
+    width: var(--w); aspect-ratio: 1600 / 900;
+    position: relative; overflow: hidden;
+    border-radius: calc(var(--w) * 0.028);
+    font-size: calc(var(--w) / 40);   /* 1em = 카드폭/40 → 모든 수치를 em 으로 */
+    /* 어두운 바탕 + 티어색 광원. 배경 자체를 티어색으로 칠하지 않는 이유 =
+       브론즈가 갈색 판때기가 된다(기존 shareCard.ts 주석의 우려). 광원만 티어색이면 안 그렇다. */
+    background:
+      radial-gradient(120% 90% at 22% 30%, color-mix(in srgb, var(--tc) 42%, transparent), transparent 62%),
+      radial-gradient(90% 70% at 88% 88%, color-mix(in srgb, var(--tc) 22%, transparent), transparent 60%),
+      linear-gradient(160deg, #131a2c 0%, #0a0d16 60%, #070911 100%);
+    box-shadow: 0 20px 50px -20px #000, 0 0 0 1px color-mix(in srgb, var(--tc) 30%, transparent) inset;
+  }
+  /* 프레임 — 나중에 PNG 프레임 에셋으로 교체할 자리 */
+  .card::after {
+    content: ''; position: absolute; inset: 0.9em; border-radius: calc(var(--w) * 0.02);
+    border: 0.09em solid color-mix(in srgb, var(--tc) 55%, transparent);
+    box-shadow: 0 0 1.4em color-mix(in srgb, var(--tc) 35%, transparent) inset;
+    pointer-events: none;
+  }
+  /* 배경 장식(빛줄기) — 티어별 배경 아트로 교체할 자리 */
+  .rays {
+    position: absolute; left: 24%; top: 50%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%);
+    background: conic-gradient(from 200deg, transparent 0deg,
+      color-mix(in srgb, var(--tc) 30%, transparent) 22deg, transparent 44deg, transparent 66deg,
+      color-mix(in srgb, var(--tc) 22%, transparent) 88deg, transparent 110deg);
+    mask-image: radial-gradient(closest-side, #000 20%, transparent 72%);
+    opacity: .8;
+  }
+
+  /* ── 주인공: 아바타 ── */
+  .hero { position: absolute; left: 5.5%; top: 50%; transform: translateY(-50%); width: 30%; text-align: center; }
+  .hero .ring {
+    position: relative; width: 100%; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--tc) 30%, transparent), transparent 74%);
+    display: grid; place-items: center;
+  }
+  .hero .ring::before {
+    content: ''; position: absolute; inset: 4%; border-radius: 50%;
+    border: 0.12em solid color-mix(in srgb, var(--tc) 70%, transparent);
+    box-shadow: 0 0 1.6em color-mix(in srgb, var(--tc) 45%, transparent);
+  }
+  .hero img, .hero .gem { width: 74%; height: 74%; border-radius: 50%; object-fit: cover; display: block; }
+
+  /* 순위 메달 — 1·2·3 위만. 시상대 그림에 이미 있는 형태라 별도 아트 없이도 됨 */
+  .medal {
+    position: absolute; right: -4%; bottom: 2%; width: 34%; aspect-ratio: 1; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 900; font-size: 1.5em; color: #3a2a06;
+    background: radial-gradient(circle at 34% 26%, #fff2c0, #f0c34a 46%, #b8862a 100%);
+    border: 0.1em solid #ffe9a8; box-shadow: 0 0.25em 0.6em rgba(0,0,0,.5);
+  }
+  .medal.s2 { background: radial-gradient(circle at 34% 26%, #ffffff, #d3dae6 46%, #8d97a8 100%); border-color: #eef2f8; color: #2f3644; }
+  .medal.s3 { background: radial-gradient(circle at 34% 26%, #ffd9b8, #d38f52 46%, #8f5a2a 100%); border-color: #ffcfa4; color: #3a2410; }
+
+  /* ── 정보: 4개뿐 ── */
+  .info { position: absolute; left: 39%; right: 5.5%; top: 50%; transform: translateY(-50%); }
+  .eyebrow { font-size: .62em; font-weight: 800; letter-spacing: .22em; color: color-mix(in srgb, var(--tc) 70%, #fff); }
+  .nm { font-size: 2.35em; font-weight: 800; line-height: 1.05; margin: .18em 0 .28em;
+        font-family: Georgia, 'Times New Roman', serif; text-shadow: 0 0.06em 0.3em rgba(0,0,0,.6); }
+  .statline { display: flex; align-items: flex-end; gap: 1.5em; }
+  .stat .k { font-size: .58em; font-weight: 800; letter-spacing: .12em; color: var(--dim); }
+  .stat .v { font-size: 1.9em; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: .45em; font-weight: 800; color: var(--dim); margin-left: .3em; }
+  .stat.rank .v { color: color-mix(in srgb, var(--tc) 55%, #fff); }
+
+  /* 티어 — 엠블렘이 정보의 일부로 들어간다(별도 박스 없음) */
+  .tierwrap { position: absolute; right: 5.5%; top: 50%; transform: translateY(-50%); width: 20%; text-align: center; }
+  .tierwrap img { width: 100%; display: block; filter: drop-shadow(0 0 0.7em color-mix(in srgb, var(--tc) 60%, transparent)); }
+  .tierwrap .t { margin-top: .3em; font-size: .78em; font-weight: 900; letter-spacing: .06em; }
+  .tierwrap .p { font-size: .62em; font-weight: 800; color: color-mix(in srgb, var(--tc) 60%, #fff); }
+
+  /* 하단 워터마크 — 다크 바 대신 얇게 */
+  .mark { position: absolute; left: 5.5%; bottom: 3.6%; font-size: .55em; font-weight: 800; letter-spacing: .06em; color: rgba(255,255,255,.42); }
+  .brand { position: absolute; right: 5.5%; bottom: 3.4%; font-size: .62em; font-weight: 900; letter-spacing: .12em; color: rgba(255,255,255,.5); }
+
+  /* 정보 폭 조정 — 티어 블록이 오른쪽을 먹으므로 */
+  .info { right: 28%; }
+
+  /* 에셋 슬롯 표시 모드 */
+  body.slots .rays { outline: 1px dashed #ff5da2; }
+  body.slots .card::after { border-color: #ff5da2 !important; }
+  body.slots .hero .ring::before { border-color: #ff5da2 !important; }
+  body.slots .medal { outline: 1px dashed #ff5da2; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 22px; cursor: pointer;
+            background: #1a2032; border: 1px solid #2c3448; color: #cfd6e6; padding: 8px 14px; border-radius: 999px;
+            font-size: 13px; font-weight: 800; }
+
+  table.spec { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  table.spec th, table.spec td { border: 1px solid #262c3d; padding: 8px 12px; text-align: left; vertical-align: top; }
+  table.spec th { background: #171c29; color: #9fb0cc; font-weight: 800; }
+  table.spec td b { color: #ffd479; }
+</style>
+</head>
+<body>
+
+<h1>랭킹 카드 시안 — 캐릭터 카드</h1>
+<p class="lede">
+  랭킹에서 사람을 누르면 뜨는 카드입니다. 지금 카드(정보 카드)와 다른 점 —
+  <b>아바타가 주인공</b>이고, <b>티어색이 카드 전체를 물들이고</b>, 정보는 <b>이름·순위·티어·점수 4개</b>뿐입니다.
+  배경을 티어색으로 칠하지 않고 어두운 바탕에 티어색 <b>광원</b>만 주기 때문에 브론즈도 갈색 판때기가 되지 않습니다.
+</p>
+<button class="toggle" onclick="document.body.classList.toggle('slots')">에셋으로 교체할 자리 표시 ↔</button>
+
+<h2>1. 티어별 — 같은 레이아웃, 다른 인상</h2>
+<p class="note">티어색 한 값(<code>--tc</code>)만 바뀝니다. 이게 지금 카드에 없던 변별점입니다.</p>
+<div class="deck" id="deck-tier"></div>
+
+<h2>2. 순위별 — 1·2·3위 메달</h2>
+<p class="note">4위 이하는 메달 없이 <b>#순위</b> 숫자만. 시상대 그림에 이미 있는 메달 형태라 새 아트 없이도 성립합니다.</p>
+<div class="deck" id="deck-rank"></div>
+
+<h2>3. 아바타 종류별</h2>
+<p class="note">젬(색만 다름) · 마스코트 이미지 · 업로드 사진 — 세 종류가 다 원 안에 들어갑니다.</p>
+<div class="deck" id="deck-ava"></div>
+
+<h2>필요한 에셋</h2>
+<p class="note">지금은 전부 CSS로 흉내 냈습니다. 아래 자리를 그림으로 주시면 그대로 얹습니다.
+  카드는 <b>1600×900 고정</b>이라 늘어나지 않습니다 — 랭킹 바처럼 좌표가 흔들릴 일이 없습니다.</p>
+<table class="spec">
+  <tr><th>자리</th><th>지금</th><th>필요한 것</th><th>크기</th></tr>
+  <tr><td><b>배경 아트</b></td><td>어두운 그라데이션 + 빛줄기(conic)</td><td>티어색이 얹힐 <b>무채색/단색</b> 배경 1장이면 충분. 티어별 5장으로 가도 됨</td><td>1600×900</td></tr>
+  <tr><td><b>프레임</b></td><td>티어색 1px 테두리 + 안쪽 글로우</td><td>카드 테두리 장식(투명 PNG). 가운데는 비어 있어야 함</td><td>1600×900</td></tr>
+  <tr><td><b>아바타 링</b></td><td>티어색 원 테두리 + 글로우</td><td>아바타를 감싸는 링(투명 PNG, 가운데 뚫림)</td><td>512×512</td></tr>
+  <tr><td><b>순위 메달</b></td><td>CSS 그라데이션 원</td><td>1·2·3위 메달 3장(투명 PNG). 없으면 시상대 그림에서 잘라 씀</td><td>256×256 ×3</td></tr>
+  <tr><td>티어 엠블렘</td><td><code>/emblems/&lt;tier&gt;.png</code></td><td>이미 있음 — 그대로 씀</td><td>512×512</td></tr>
+</table>
+
+<script>
+  const TIER = {
+    bronze:   { c: '#b8763e', label: '브론즈' },
+    silver:   { c: '#aeb9c8', label: '실버' },
+    gold:     { c: '#e3b23c', label: '골드' },
+    platinum: { c: '#3fb8ad', label: '플래티넘' },
+    diamond:  { c: '#4aa0e8', label: '다이아' },
+  };
+
+  // 젬 아바타 — 앱의 GemAvatar 와 같은 육각 젬(형태만 옮김)
+  function gem(color) {
+    return `<svg class="gem" viewBox="0 0 100 100">
+      <polygon points="50,7 89,28.5 89,71.5 50,93 11,71.5 11,28.5" fill="${color}" stroke="#2b2d42" stroke-width="6" stroke-linejoin="round"/>
+      <polygon points="50,7 89,28.5 50,50 11,28.5" fill="#fff" opacity=".2"/>
+      <ellipse cx="36" cy="29" rx="11" ry="5.5" fill="#fff" opacity=".55" transform="rotate(-20 36 29)"/>
+      <circle cx="39" cy="54" r="5" fill="#2b2d42"/><circle cx="61" cy="54" r="5" fill="#2b2d42"/>
+      <path d="M43 64 Q50 71 57 64" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round"/>
+    </svg>`;
+  }
+
+  function card({ name, tier, rank, total, score, pct, avatar, w }) {
+    const t = TIER[tier];
+    const medal = rank <= 3
+      ? `<div class="medal ${rank === 2 ? 's2' : rank === 3 ? 's3' : ''}">${rank}</div>` : '';
+    return `<div class="card" style="--tc:${t.c}${w ? ';--w:' + w : ''}">
+      <div class="rays"></div>
+      <div class="hero">
+        <div class="ring">${avatar}</div>
+        ${medal}
+      </div>
+      <div class="info">
+        <div class="eyebrow">CARIS WORLD ARENA</div>
+        <div class="nm">${name}</div>
+        <div class="statline">
+          <div class="stat rank"><div class="k">RANK</div><div class="v">#${rank}<small>/ ${total}</small></div></div>
+          <div class="stat"><div class="k">SCORE</div><div class="v">${score.toLocaleString()}</div></div>
+        </div>
+      </div>
+      <div class="tierwrap">
+        <img src="/emblems/${tier}.png" alt="">
+        <div class="t">${t.label}</div>
+        <div class="p">상위 ${pct}%</div>
+      </div>
+      <div class="mark">gara-cbt.airobotassn.workers.dev/arena</div>
+      <div class="brand">GARA</div>
+    </div>`;
+  }
+
+  const names = ['CARI', '최원석', '이영란', '형준', 'Ditto'];
+  const gems = ['#7fd1c4', '#f6a5c0', '#ffd479', '#9db8ff', '#c3a6ff'];
+
+  document.getElementById('deck-tier').innerHTML =
+    ['diamond', 'gold', 'bronze'].map((tier, i) => card({
+      name: names[i], tier, rank: [1, 12, 340][i], total: 1284, score: [3757, 2140, 820][i],
+      pct: [3, 31, 88][i], avatar: gem(gems[i]), w: '460px',
+    })).join('');
+
+  document.getElementById('deck-rank').innerHTML =
+    [1, 2, 3, 7].map((rank, i) => card({
+      name: names[i], tier: 'platinum', rank, total: 1284, score: 3757 - rank * 120,
+      pct: rank * 2, avatar: gem(gems[i]), w: '380px',
+    })).join('');
+
+  document.getElementById('deck-ava').innerHTML = [
+    { label: '젬', avatar: gem('#7fd1c4') },
+    { label: '마스코트', avatar: '<img src="/hub-char.png" alt="">' },
+    { label: '업로드 사진', avatar: '<img src="/hero-robot.png" alt="">' },
+  ].map((a, i) => card({
+    name: names[i], tier: 'gold', rank: i + 1, total: 1284, score: 3100 - i * 200,
+    pct: (i + 1) * 4, avatar: a.avatar, w: '380px',
+  })).join('');
+</script>
+</body>
+</html>

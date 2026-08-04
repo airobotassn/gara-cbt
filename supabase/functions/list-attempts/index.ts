@@ -1,4 +1,9 @@
-// list-attempts: 로그인(영구) 유저의 제출 기록 + 현재 등급 + 레벨별 누적 레이더. 익명은 빈 값.
+// list-attempts: 로그인(영구) 유저의 제출 기록 + 현재 등급 + 레벨별 누적 레이더 + 인증서 발자취. 익명은 빈 값.
+//
+// 발자취(milestones) = 레벨별 **최초 도달일**. 레벨테스트 인증서(/test/certificate)의 북두칠성 노드에
+// 찍히는 날짜다. Lv.2~7 은 승급 기록(rank_dir='up' → rank_after)의 가장 이른 제출일,
+// Lv.1 은 승급이라는 사건이 없으므로(모두 Lv.1 에서 시작) **첫 응시 제출일**을 여정의 시작으로 쓴다.
+// ⚠️ 클라가 보낸 값으로 인증서를 그리지 않는다 — 레벨·날짜는 전부 여기서 계산해 내려준다(위조 차단).
 import { corsHeaders, json } from '../_shared/cors.ts'
 import {
   adminClient,
@@ -15,7 +20,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
     // 게스트는 일일 제한 대상이 아니라 dailyLeft=null(화면에서 표시 생략).
     if (user.is_anonymous)
-      return json({ attempts: [], currentRank: null, currentPoints: 0, levelSkills: [], dailyLeft: null })
+      return json({ attempts: [], currentRank: null, currentPoints: 0, levelSkills: [], dailyLeft: null, certificate: null })
 
     const admin = adminClient()
 
@@ -65,7 +70,31 @@ Deno.serve(async (req) => {
     // 레벨 선택 화면의 '오늘 N회 남음' 표시용. 강제는 start-test 가 같은 헬퍼로 한다.
     const { left: dailyLeft } = await dailyAttemptsLeft(admin, user.id)
 
-    return json({ attempts, currentRank, currentPoints, levelSkills, dailyLeft })
+    // ── 인증서 발자취 ──────────────────────────────────────────────
+    // data 는 submitted_at 내림차순이라 덮어쓰며 훑으면 각 레벨의 '가장 이른' 날짜가 남는다.
+    const milestones: Record<number, string> = {}
+    for (const a of data ?? []) {
+      if (!a.submitted_at) continue
+      if (a.rank_dir === 'up' && a.rank_after) milestones[a.rank_after as number] = a.submitted_at as string
+    }
+    const firstAt = (data ?? []).filter((a) => a.submitted_at).at(-1)?.submitted_at as string | undefined
+    if (firstAt) milestones[1] = firstAt // Lv.1 = 여정의 시작(첫 응시)
+
+    const { data: prof } = await admin
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const certificate = currentRank
+      ? {
+          displayName: ((prof?.display_name as string | null) ?? '').trim(),
+          level: currentRank,
+          milestones,
+        }
+      : null
+
+    return json({ attempts, currentRank, currentPoints, levelSkills, dailyLeft, certificate })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)
   }

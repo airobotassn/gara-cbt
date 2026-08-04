@@ -52,6 +52,27 @@
   background-image: radial-gradient(circle at top center, rgba(112, 166, 255, 0.08) 0%, transparent 50%);
 }
 
+/* 협회 소개 히어로 워터마크 — GARA 워드마크를 배경에 흐릿하게 깐다.
+   public/gara-wordmark-black.png = 협회 공식 블랙 로고(원본 로고_GARA_블랙.png)의 투명 여백을
+   잘라낸 판(1423×370). 원본은 1536×1024 라 위아래 여백이 30%씩 있어 그대로 쓰면 워터마크가 작게 앉는다.
+   본문은 z-20 이라 이 레이어(z-0)는 항상 뒤에 깔린다. */
+.hero-watermark {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/gara-wordmark-black.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: min(1100px, 118%) auto;
+  opacity: 0.06;
+}
+html.dark .hero-watermark {
+  /* 블랙 로고라 딥다크에선 밝기를 올려도 검정 그대로다 → 반전해서 흰 워드마크로 깐다. */
+  opacity: 0.09;
+  filter: invert(1);
+}
+
 /* 코너 메시 배경 (자격검정 안내 등 — 옅은 코발트 radial) */
 .mesh-bg {
   background-image:
@@ -91,7 +112,12 @@
    다크 모드 — html.dark 에서 토큰 재정의 (FAB 토글로 .dark on/off)
    라이트는 그대로, .dark 일 때만 어두운 팔레트로 캐스케이드
    ============================================================ */
-html.dark {
+/* .force-dark = .force-light 의 반대. 테마와 무관하게 이 서브트리만 항상 다크 팔레트.
+   랜딩(/)이 쓴다 — 배경이 언제나 검은 우주(EarthHero)라 라이트 팔레트면 글자가 묻힌다.
+   ⚠️ 색을 새로 만들지 말고 여기 토큰을 그대로 쓸 것. 페이지에 색을 직접 박으면
+      다크 팔레트가 바뀔 때 랜딩만 따로 놀게 된다. */
+html.dark,
+.force-dark {
   color-scheme: dark;
 
   /* ── Material-3 @theme 색 → 다크 ──

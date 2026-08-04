@@ -1,9 +1,11 @@
-// /test/select — 레벨 선택(D안: 결정 중심).
+﻿// /test/select — 레벨 선택(D안: 결정 중심).
 //   화면 구성: 헤더 → '지금 도전' 응시 카드 1장 → 7단 사다리 스트립(위치만) → 지난 레벨 접이식 → SiteFooter.
 //   왜 목록이 아닌가: 내 등급보다 높은 레벨은 서버(start-test)가 403 으로 막고, 낮은 레벨은 잘 봐도
 //   승급이 안 된다(승급 조건 = 응시레벨 ≥ 내 등급). 즉 실질 선택지가 사실상 1개라 7장을 늘어놓을 이유가 없다.
-//   디자인 토큰은 최신 페이지(/notice·/ebooks)와 동일(Material). 레벨 색만 이 화면 전용 팔레트.
-import { useEffect, useState } from 'react'
+//   톤은 **레벨테스트 인증서(pages/LevelCert.tsx)와 같은 밤하늘** — 루트 .lvnight 가 Material 토큰을
+//   그 자리에서 갈아끼워 하위(공용 SiteFooter 포함)를 통째로 어둡게 만든다(수법 설명은 levelselect.css).
+//   금 = 획득/강조, 은 = 미획득. 레벨 고유색(LEVEL_COLORS)은 별 빛무리에만 남는다.
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -21,6 +23,28 @@ import SiteFooter from '../components/SiteFooter'
 import type { StartTestResponse, ListAttemptsResponse } from '../lib/testTypes'
 
 // 레벨 색(LEVEL_COLORS)은 응시 전 경고 화면과 공유 → lib/testConfigLevel.ts 가 단일 출처.
+// 이 화면에선 별 빛무리(--lv-c)에만 쓴다 — 배지·진행바는 금/은(인증서와 같은 규칙)이라 색을 안 받는다.
+
+// ===== 북두칠성 레벨 선택 =====
+// 별 순서·연결은 **인증서(pages/LevelCert.tsx)와 동일** — 국자 1‑2‑3‑4, 손잡이 4‑5‑6‑7.
+//   두 화면이 같은 그림으로 "어디까지 왔나"를 말해야 해서 좌표를 새로 그리지 않고 인증서 것을 옮겼다.
+//   다만 인증서 좌표계는 세로로 길고(893×1035) 이 화면의 빈자리는 가로로 넓다 →
+//   **Lv.1→Lv.7 축이 수평이 되도록 회전 + 좌우 반전**한 값이다(순서·연결은 그대로).
+//   반전인 이유: Lv.1 이 왼쪽 위에 와야 1→7 로 읽힌다. 회전만으로는 1 이 최상단이 되는 순간
+//   오른쪽으로 밀려간다(각도 전 구간에서 그렇다). 반전이라 손잡이(4‑5‑6‑7) 휘는 방향은 인증서와 반대다.
+//   ⚠️ **PC·폰이 같은 배치를 쓴다(한 벌).** 예전엔 폰용 세로 별자리를 따로 뒀는데, 두 화면이
+//      서로 다른 각도의 별자리를 보여주게 돼서 없앴다. 폭만 줄어들고 그림은 같다.
+//   선(SVG)은 이 좌표를 그대로 쓰고, 별은 %로 환산해 HTML 로 얹는다
+//   (별을 SVG 안에 넣으면 폭에 따라 별 크기가 같이 줄어 모바일에서 못 누른다).
+type DipperLayout = { box: { w: number; h: number }; at: Record<number, { x: number; y: number }> }
+const DIPPER: DipperLayout = {
+  box: { w: 1339, h: 538 },
+  at: {
+    1: { x: 70, y: 70 }, 2: { x: 74, y: 389 }, 3: { x: 436, y: 468 }, 4: { x: 547, y: 218 },
+    5: { x: 754, y: 99 }, 6: { x: 1019, y: 79 }, 7: { x: 1269, y: 70 },
+  },
+}
+const DIPPER_EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 1], [4, 5], [5, 6], [6, 7]]
 
 export default function LevelSelect() {
   const navigate = useNavigate()
@@ -36,6 +60,27 @@ export default function LevelSelect() {
   const [picked, setPicked] = useState<number | null>(null)
   // 오늘 남은 응시 횟수(서버 계산). 게스트/미지원이면 null → 표시 생략.
   const [dailyLeft, setDailyLeft] = useState<number | null>(null)
+  // 별자리 배치는 PC·폰 공통(DIPPER 한 벌). wideSky 는 **크기**에만 쓴다 —
+  // 별 지름(46/38px)과 링이 브레이크포인트마다 달라서 선을 자르는 계산에 필요하다.
+  const [wideSky, setWideSky] = useState(() => window.matchMedia('(min-width: 768px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const sync = () => setWideSky(mq.matches)
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+  const sky = DIPPER
+  // 별자리 선을 별 앞에서 끊으려면 **좌표계 1단위가 화면 몇 px 인지**를 알아야 한다.
+  // 별 크기는 px 고정(46/38)인데 viewBox 는 컨테이너 폭에 따라 늘어나므로 폭을 실제로 잰다.
+  const skyBoxRef = useRef<HTMLDivElement>(null)
+  const [skyW, setSkyW] = useState(0)
+  useEffect(() => {
+    const el = skyBoxRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setSkyW(e.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // 메인(랜딩)에서 검색 추천을 받고 넘어온 경우. 해금 범위 안일 때만 반영.
   const navState = location.state as
@@ -117,10 +162,14 @@ export default function LevelSelect() {
   const MIN_PICK = 1 // 모바일 ‹ 버튼 하한
 
   return (
-    <div className="bg-background text-on-surface min-h-screen relative overflow-x-hidden flex flex-col">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[-1]">
-        <div className="ambient-mesh bg-surface-mesh-blue top-[-20%] left-[-10%]"></div>
-        <div className="ambient-mesh bg-surface-mesh-cyan bottom-[-20%] right-[-10%]"></div>
+    <div className="lvnight text-on-surface min-h-screen relative overflow-x-hidden flex flex-col">
+      {/* 하늘 — 인증서·랭킹과 같은 밤하늘 사진(cert/bg.webp) + 비네트.
+          fixed 가 아니라 absolute 다: 문서 전체를 덮어야 아래로 스크롤해도 별이 계속 있고,
+          풀페이지 캡처에서도 화면 밖이 흰 종이로 남지 않는다.
+          라이트 톤의 ambient-mesh 두 덩이는 걷어냈다(밤하늘에선 파란 안개로만 보인다). */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-[-1]">
+        <div className="lvn-sky" />
+        <div className="lvn-vig" />
       </div>
 
       {/* flex-col + 사다리의 mt-auto → 모바일에서 카드는 위, 사다리는 아래로 갈라놓는다.
@@ -132,7 +181,7 @@ export default function LevelSelect() {
         <Link
           to="/arena"
           aria-label={t('arena.title')}
-          className="self-start inline-flex items-center gap-1.5 mb-4 pl-3 pr-4 py-2 rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant font-label-md text-[12.5px] font-bold tracking-[0.06em] hover:border-primary/50 hover:text-primary transition-colors"
+          className="lvn-chip self-start inline-flex items-center gap-1.5 mb-4 pl-3 pr-4 py-2 rounded-full font-label-md text-[12.5px] font-bold tracking-[0.06em] transition-colors"
         >
           <span className="text-[15px] leading-none">‹</span>
           {t('arena.title')}
@@ -145,26 +194,41 @@ export default function LevelSelect() {
               <span className="material-symbols-outlined text-[24px]">public</span>
             </span>
             <div className="min-w-0">
-              <h1 className="font-title-md text-3xl md:text-4xl font-bold text-on-surface tracking-tight break-keep">
+              {/* 제목은 인증서와 같은 명조(CertMyeongjo = NanumMyeongjo ExtraBold, cert.css 에 이미 선언).
+                  기본 --font-title-md 는 Hanken Grotesk → 한글이 없어 Pretendard 로 떨어진다.
+                  밤하늘·금박 화면에 두꺼운 고딕이 얹히면 그 순간 인증서 집안이 아니게 된다. */}
+              <h1 className="lvn-display text-[34px] md:text-[46px] text-on-surface tracking-tight break-keep">
                 {t('lv.title')}
               </h1>
             </div>
           </div>
-          <button
-            onClick={() => setRuleOpen((v) => !v)}
-            aria-expanded={ruleOpen}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant font-label-md text-[15px] font-bold hover:border-primary hover:text-primary transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">info</span>
-            {t('lv.rule_btn')}
-            <span className={`material-symbols-outlined text-[16px] transition-transform ${ruleOpen ? 'rotate-180' : ''}`}>
-              expand_more
-            </span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 레벨테스트 인증서 — 응시 여부와 무관하게 항상 있는 자리(기록이 없으면 인증서 화면이 안내한다).
+                ⚠️ 원래 금색(primary)이었는데 중립으로 내렸다 — 이 화면에서 금색은 '응시 시작' 하나여야 한다.
+                   금색 물건이 넷(인증서·규칙·배지·CTA)이면 뭐가 결정인지 안 보인다. */}
+            <button
+              onClick={() => navigate('/test/certificate')}
+              className="lvn-chip inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full font-label-md text-[15px] font-bold transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
+              {t('lcert.issue_btn')}
+            </button>
+            <button
+              onClick={() => setRuleOpen((v) => !v)}
+              aria-expanded={ruleOpen}
+              className="lvn-chip inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full font-label-md text-[15px] font-bold transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">info</span>
+              {t('lv.rule_btn')}
+              <span className={`material-symbols-outlined text-[16px] transition-transform ${ruleOpen ? 'rotate-180' : ''}`}>
+                expand_more
+              </span>
+            </button>
+          </div>
         </div>
 
         {ruleOpen ? (
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-5 mb-4">
+          <div className="lvn-card bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-5 mb-4">
             {/* 레벨별 문항 수·시간 표는 뺐다 — 선택한 레벨 기준으로 위 카드 칩에 이미 나온다. */}
             <ul className="grid gap-2.5">
               {rules.map((r) => (
@@ -198,7 +262,13 @@ export default function LevelSelect() {
             모바일은 폭이 좁아 가로 사다리가 성립하지 않는다(원 7개가 붙어버림) → 카드 안에서
             ‹ › 로 레벨을 넘기고, 사다리는 진행바 + 'N / 7' 로 압축한다. PC 는 아래 가로 사다리를 쓴다. */}
         <div className="flex-1 flex flex-col justify-center md:block md:flex-none">
-        <div className="bg-surface-container-lowest rounded-2xl border border-primary/30 p-5 md:p-6 ambient-shadow">
+        {/* PC 는 2단 — 왼쪽 '무슨 레벨인가' / 오른쪽 '응시할 것인가'.
+            1단으로 두면 1200px 카드의 오른쪽 2/3 이 빈 하늘로 남아 미완성으로 읽히고, CTA 가
+            왼쪽 아래 구석에 처박혀 아래 별자리한테 초점을 뺏긴다.
+            ⚠️ 금박 모서리 각인(lvn-orn)은 뺐다 — 카드가 1200×245 라 위/아래 장식이 1100px 씩 떨어져
+               액자가 아니라 부스러기 4점으로 읽혔다. 금박 정체성은 별 링·별자리 선이 이미 지고 있다. */}
+        <div className="lvn-card rounded-2xl border border-primary/30 p-5 md:p-7 ambient-shadow md:flex md:items-center md:gap-9">
+          <div className="md:flex-1 md:min-w-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setPicked(Math.max(MIN_PICK, focus - 1))}
@@ -208,13 +278,9 @@ export default function LevelSelect() {
             >
               <span className="material-symbols-outlined text-[20px]">chevron_left</span>
             </button>
-            <span
-              className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center font-title-md text-lg font-bold text-white"
-              style={{ background: focusLocked ? 'var(--color-outline-variant)' : LEVEL_COLORS[focus] }}
-            >
-              {focus}
-            </span>
-            <b className="font-title-md text-2xl md:text-[28px] font-bold text-on-surface tracking-tight break-keep">
+            {/* 레벨 번호 네모 배지는 삭제 — 바로 옆 "Lv.7 마스터" 가 같은 숫자를 이미 말한다(중복).
+                금색 사각형이 하나 줄면서 이 화면의 금색은 '응시 시작' 하나로 모인다. */}
+            <b className="lvn-display flex-1 min-w-0 text-[27px] md:text-[34px] text-on-surface tracking-tight break-keep">
               Lv.{focus} {t(`lv.${focus}.name`)}
             </b>
             <button
@@ -226,13 +292,15 @@ export default function LevelSelect() {
               <span className="material-symbols-outlined text-[20px]">chevron_right</span>
             </button>
           </div>
-          {/* 카드 리드 — 본문(15px)보다 한 단 위. 제목과의 간격을 맞춘 크기다. */}
-          <p className="mt-3 font-body-md text-[17px] leading-relaxed text-on-surface-variant break-keep">
+          {/* 위계 = 제목 34 → 설명 18 → 보조수치 15. 크기를 줄여서 위계를 만들지 말 것 —
+              전부 키우고 **간격**을 벌린다(작게 만들면 읽기만 힘들어지고 화면이 더 초라해진다). */}
+          <p className="mt-3 font-body-md text-[18px] leading-relaxed text-on-surface-variant break-keep max-w-[52ch]">
             {t(`lv.${focus}.desc`)}
           </p>
 
-          {/* 응시 직전에 알고 싶은 것 — 규칙 패널을 펼치지 않아도 여기서 읽힌다 */}
-          <div className="flex gap-2 flex-wrap mt-3.5">
+          {/* 응시 직전에 알고 싶은 것 — 규칙 패널을 펼치지 않아도 여기서 읽힌다.
+              굵은 15px 이면 설명문과 무게가 같아져서 '칩'이 아니라 두 번째 문단처럼 보인다. */}
+          <div className="flex gap-2 flex-wrap mt-4">
             {[
               t('lv.fact_q', { n: focusQ }),
               t('lv.fact_min', { n: durationMinutesForLevel(focus) }),
@@ -240,23 +308,24 @@ export default function LevelSelect() {
             ].map((s) => (
               <span
                 key={s}
-                className="font-label-md text-[15px] font-bold text-on-surface-variant bg-surface-container-low rounded-lg px-3 py-1.5"
+                className="lvn-fact font-label-md text-[15px] font-semibold rounded-lg px-3 py-1.5"
               >
                 {s}
               </span>
             ))}
           </div>
+          </div>
 
-          {/* 모바일은 버튼 풀폭 + 남은 횟수 아래 줄(한 줄에 붙이면 언어에 따라 줄바꿈이 터진다) */}
-          <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-3.5 mt-4">
+          {/* 오른쪽 = 결정 열. PC 에선 세로 구분선으로 정보/행동을 가른다 */}
+          <div className="flex flex-col gap-2.5 mt-4 md:mt-0 md:shrink-0 md:w-[236px] md:pl-9 md:border-l md:border-outline-variant/25">
             {/* 잠긴 레벨은 회색 비활성 버튼 — 내용은 다 보이지만 응시만 막힌다(서버 start-test 도 403). */}
             <button
               onClick={() => start(focus)}
               disabled={loading !== null || focusSoon || focusLocked}
-              className={`w-full md:w-auto px-6 py-3.5 md:py-3 inline-flex items-center justify-center gap-1.5 font-label-md text-[15px] font-bold rounded-xl transition-colors ambient-shadow ${
+              className={`w-full px-6 py-3.5 md:py-4 inline-flex items-center justify-center gap-1.5 font-label-md text-[17px] md:text-[18px] font-bold rounded-xl transition-colors ambient-shadow ${
                 focusLocked
                   ? 'bg-outline-variant text-on-surface-variant cursor-not-allowed'
-                  : 'bg-primary-container text-on-primary hover:bg-primary disabled:opacity-60'
+                  : 'lvn-cta disabled:opacity-60'
               }`}
             >
               {focusLocked ? (
@@ -273,68 +342,126 @@ export default function LevelSelect() {
               )}
             </button>
             {focusLocked ? (
-              <span className="font-label-md text-[15px] font-bold text-outline break-keep">{t('lv.locked_hint')}</span>
+              <span className="font-label-md text-[15px] font-bold text-outline break-keep md:text-center">
+                {t('lv.locked_hint')}
+              </span>
             ) : dailyLeft != null ? (
-              <span className="font-label-md text-[15px] font-bold text-outline break-keep">
+              <span className="font-label-md text-[15px] font-bold text-outline break-keep md:text-center">
                 {t('lv.left_today', { n: Math.max(0, dailyLeft) })}
               </span>
             ) : null}
-          </div>
 
           {/* 모바일 전용 사다리 요약 — 원 7개 대신 진행바 하나 */}
-          <div className="md:hidden mt-4 pt-4 border-t border-outline-variant/30 flex items-center gap-3">
+          <div className="md:hidden mt-1.5 pt-4 border-t border-outline-variant/30 flex items-center gap-3">
             <span className="flex-1 h-1.5 rounded-full bg-outline-variant/50 overflow-hidden">
               <span
-                className="block h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${(focus / MAX_LEVEL) * 100}%`,
-                  background: focusLocked ? 'var(--color-outline-variant)' : LEVEL_COLORS[focus],
-                }}
+                className={`lvn-bar${focusLocked ? ' is-locked' : ''} block h-full rounded-full transition-all duration-300`}
+                style={{ width: `${(focus / MAX_LEVEL) * 100}%` }}
               />
             </span>
             <span className="font-label-md text-[15px] font-bold text-outline tabular-nums shrink-0">
               {focus} / {MAX_LEVEL}
             </span>
           </div>
+          </div>
         </div>
 
         </div>
 
-        {/* 가로 사다리 — PC 전용. 모바일에선 폭이 안 나와 카드 안 ‹ › + 진행바로 대체한다.
+        {/* 북두칠성 사다리 — 별 하나 = 레벨 하나(가로 사다리를 대체). 좌표는 위 DIPPER 주석 참고.
             레벨 이름은 안 적는다: 고른 레벨의 이름은 위 카드가 크게 보여준다(hover 툴팁·스크린리더 라벨로만 남긴다).
-            잠긴 레벨도 눌러서 내용을 볼 수 있다 — 해금 여부는 **동그라미 색**이 말한다(뚫은 레벨만 레벨 색, 잠긴 건 회색+자물쇠). */}
-        <div className="hidden md:flex mt-14 items-center">
-          {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((n) => {
-            const locked = n > unlocked
-            const on = n === focus
-            const name = `Lv.${n} ${t(`lv.${n}.name`)}`
-            return (
-              <div key={n} className={`flex items-center ${n < MAX_LEVEL ? 'flex-1' : ''}`}>
-                <button
-                  onClick={() => setPicked(n)}
-                  aria-current={on ? 'true' : undefined}
-                  aria-label={locked ? `${name} · ${t('lv.locked')}` : name}
-                  title={locked ? `${name} · ${t('lv.locked_hint')}` : name}
-                  className={`w-12 h-12 shrink-0 rounded-full grid place-items-center font-title-md text-[17px] font-bold text-white transition-all duration-200 ${
-                    on
-                      ? 'ring-4 ring-primary/25 scale-110 shadow-md'
-                      : locked
-                        ? 'opacity-70 hover:opacity-100 hover:scale-105'
-                        : 'hover:scale-105 hover:shadow-sm'
-                  }`}
-                  style={{ background: locked ? 'var(--color-outline-variant)' : LEVEL_COLORS[n] }}
-                >
-                  {/* 자물쇠 아이콘 없이 숫자만 — 잠김 여부는 회색 배경 하나로 말한다. */}
-                  {n}
-                </button>
-                {n < MAX_LEVEL ? (
-                  <span
-                    className={`flex-1 h-1 rounded-full ${n < unlocked ? 'bg-primary/40' : 'bg-outline-variant/60'}`}
+            잠긴 레벨도 눌러서 내용을 볼 수 있다 — 해금 여부는 **별 색**이 말한다(뚫은 레벨만 레벨 색+빛무리, 잠긴 건 회색). */}
+        {/* shrink-0 필수 — main 이 flex-col 이라 이 블록이 세로로 눌리면서 폭까지 같이 줄어든다(aspect-ratio) */}
+        <div className="lvsky mt-8 md:mt-12 shrink-0">
+          {/* 정지 별은 배경 사진이 낸다 — 여기 얹는 건 별자리 근처만 느리게 깜빡이는 층 하나 */}
+          <div className="lvsky-twinkle" />
+
+          {/* 세로 별자리는 폭을 안 막으면 태블릿(700px)에서 세로 790px 로 화면을 다 잡아먹는다 */}
+          <div
+            ref={skyBoxRef}
+            className="relative w-full mx-auto"
+            style={{ aspectRatio: String(sky.box.w / sky.box.h), maxWidth: 980 }}
+          >
+            {/* 별자리 선 — 컨테이너와 viewBox 비율이 같아 좌표가 1:1 로 맞는다.
+                각인 선 조각(cert/edge-*.webp)을 구간마다 회전·신축 — 인증서와 같은 방식·같은 그림.
+                선은 별 뒤로 지나가고 별 중심이 불투명해서 가려진다(선 끝을 끊는 계산 불필요).
+                미달성 구간은 SVG 필터로 채도를 빼지 않고 **은색 에셋으로 갈아끼운다**(이유는 levelselect.css 참고). */}
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              viewBox={`0 0 ${sky.box.w} ${sky.box.h}`}
+              aria-hidden="true"
+            >
+              {DIPPER_EDGES.map(([a, b]) => {
+                const p = sky.at[a], q = sky.at[b]
+                // 두 끝이 다 해금된 구간만 금빛 — 1‑2‑3‑4‑5‑6‑7 이 곧 승급 순서라 이게 진행선이 된다.
+                const on = a <= unlocked && b <= unlocked
+                const dx = q.x - p.x, dy = q.y - p.y
+                // 선 굵기는 좌표계 폭에 비례(두 벌 공통 두께). /149 였는데 사진 배경 위에서 갈색 실오라기로
+                // 사라져서 /120 으로 올렸다 — 별을 잇는 '각인 막대'로 읽혀야 한다.
+                const th = sky.box.w / 120
+                const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2
+                const deg = (Math.atan2(dy, dx) * 180) / Math.PI
+                // 별 앞에서 선을 끊는다. 예전엔 별 뒤로 통과시키고 불투명 원반으로 가리려 했는데,
+                // 심(46px)과 링(64px) 사이가 비어 선이 그대로 비쳤고, 원반으로 덮으니 이번엔
+                // 선 끝이 링에 뭉툭하게 처박혔다. 실제 성도(星圖)처럼 **링 바깥에서 띄워 끊는다**.
+                // 심 + 링 inset 양쪽. PC = 46+9*2, 폰 = 30+7*2 (levelselect.css 와 짝)
+                const ringPx = wideSky ? 64 : 44
+                const unit = skyW > 0 ? sky.box.w / skyW : 0 // 좌표계 1단위 = 화면 몇 px 의 역수
+                const cut = (ringPx / 2 + 7) * unit
+                const raw = Math.hypot(dx, dy)
+                const len = Math.max(raw * 0.25, raw - cut * 2)
+                return (
+                  <image
+                    key={`e${a}-${b}`}
+                    href={on ? '/cert/edge-sm.webp' : '/cert/edge-silver-sm.webp'}
+                    x={-len / 2} y={-th / 2} width={len} height={th}
+                    preserveAspectRatio="none"
+                    opacity={on ? 1 : 0.55}
+                    style={on ? { filter: 'drop-shadow(0 0 3px rgba(240,205,130,.35))' } : undefined}
+                    transform={`translate(${mx},${my}) rotate(${deg})`}
                   />
-                ) : null}
-              </div>
-            )
-          })}
+                )
+              })}
+            </svg>
+
+            {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((n) => {
+              const locked = n > unlocked
+              const on = n === focus
+              const name = `Lv.${n} ${t(`lv.${n}.name`)}`
+              return (
+                <div
+                  key={n}
+                  className="absolute"
+                  style={{
+                    left: `${(sky.at[n].x / sky.box.w) * 100}%`,
+                    top: `${(sky.at[n].y / sky.box.h) * 100}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <button
+                    onClick={() => setPicked(n)}
+                    aria-current={on ? 'true' : undefined}
+                    aria-label={locked ? `${name} · ${t('lv.locked')}` : name}
+                    title={locked ? `${name} · ${t('lv.locked_hint')}` : name}
+                    className={`lvsky-star${on ? ' is-on' : ''}${locked ? ' is-locked' : ''}`}
+                    style={{ ['--lv-c' as string]: LEVEL_COLORS[n] }}
+                  >
+                    {on ? <span className="lvsky-pick" aria-hidden="true" /> : null}
+                    {/* 자물쇠 아이콘 없이 숫자만 — 잠김 여부는 은색 링 하나로 말한다.
+                        숫자는 인증서와 같은 금박 각인 에셋(num-N). 잠긴 레벨은 은색 파생본으로 갈아끼운다.
+                        alt 는 비운다 — 버튼 aria-label 이 이미 레벨을 읽는다. */}
+                    <img
+                      className="lvsky-num"
+                      src={`/cert/num-${n}${locked ? '-silver' : ''}-sm.webp`}
+                      alt=""
+                    />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          {/* 안내 문구('별을 눌러 레벨을 고르세요…')는 삭제 — 별이 버튼이고 금/은이 해금을 말한다.
+              그림이 이미 하는 말을 밑에 자막으로 또 다는 건 화면을 설명서로 만든다. */}
         </div>
 
         {!isFullUser ? (

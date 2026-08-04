@@ -9,6 +9,30 @@
 
 ---
 
+## 최우선 규칙 — 모르면 물어봐라
+
+**추측해서 만들지 말고 질문해라.** 아래 중 하나라도 해당되면 손대기 전에 **멈추고 묻는다**.
+
+- 요청의 의도가 확실하지 않다 (같은 말이 두 가지로 읽힌다)
+- 뭘 만들지는 알겠는데 **어떻게** 할지 선택지가 여러 개다
+- 내가 정할 문제가 아니라 **취향·판단**이 필요하다
+- 사용자가 쓴 단어를 내 식으로 번역해서 이해하고 있다
+- 근거가 내 감각뿐이다 (레퍼런스도 명시 요구도 없다)
+
+**"일단 만들어서 보여주고 반응 보기"는 금지다.** 그건 묻는 게 아니라 떠넘기는 거고, 빗나가면 사용자 시간만 버린다.
+시안을 여러 개 던지는 것도 질문의 대체물이 아니다 — 방향을 모르는 상태에서 만든 시안은 전부 빗나간다.
+
+질문은 이렇게 한다: **내가 뭘 이해했는지 한 줄로 적고 → 막힌 지점을 짚고 → 구체적 선택지를 준다.**
+"어떻게 할까요?" 같은 빈 질문 금지. 사용자가 한 단어로 답할 수 있게 만든다.
+
+> 실패 예시 (2026-08-03): "배경이랑 버튼이 따로 논다" → 원인을 안 묻고 색·테두리를 네 번 고쳐서 들이밈.
+> 전부 빗나감. "따로 논다"가 뭘 뜻하는지 처음에 물었으면 한 번에 끝났다.
+> "지구를 흐리게" → 물어보지 않고 `blur()` 로 픽셀을 뭉갬. 실제 뜻은 "톤 다운해서 뒤로 물러나게".
+
+한 번 물어보는 비용 < 잘못 만든 걸 되돌리는 비용. 항상.
+
+---
+
 ## 시각/레이아웃 작업 규칙 (레퍼런스 = 명령이다)
 
 사용자가 스크린샷·레퍼런스·명시 요구를 주면 그건 *참고*가 아니라 *구속 조건*이다.
@@ -20,6 +44,47 @@
 3. **명시 안 한 표면은 건드리지 않는다.** 요청한 것만. 색·간격·구조 임의 변경 금지.
 4. **검증 = "돌아간다"가 아니라 "레퍼런스와 일치".** 완료 전 스샷/diff로 1번 제약 목록을 하나씩 대조. 어긋나면 미완.
 5. **자가승인 금지.** 다 됐다고 내가 정하지 않는다. 결과를 사용자에게 넘겨 판정받는다.
+
+---
+
+## 이미지 에셋 프롬프트 규칙 (가드레일만 준다 · 조형은 모델에게 맡긴다)
+
+`public/` 에 들어갈 그림(시상대·프레임·배지·히어로 등)을 생성 AI로 뽑을 때의 규칙이다.
+**핵심: 나는 무엇을 위한 물건인지와 안 지키면 코드가 깨지는 것만 말한다. 어떻게 생겼는지는 모델이 정한다.**
+
+### 왜 (2026-08-03 실패에서)
+`/ranking` 시상대를 다시 뽑으면서 내가 `EMPTY ROUNDED PLATE / solid matte, no texture / no perspective, no shadow`
+\+ `x=17%, 50%, 83%` 좌표표 + `no crowns, no baroque, no filigree` 네거티브를 줬다.
+결과물이 **CSS div 박스 세 개**였다. 치수를 주면 모델은 조립만 하고, 스타일 네거티브는 물건을 물건답게 만드는 어휘를
+통째로 지운다. 반대로 잘 나온 프롬프트는 감정과 용도를 말하고 형태 결정권을 넘겼다.
+
+### 프롬프트 5블록
+
+1. **소속 한 줄** — 참조 이미지를 붙이고 `Match the attached X's art style and mood — …. This belongs to the same set.`
+   TAKE FROM / DO NOT COPY 표 만들지 말 것. 한 문장이면 된다.
+2. **브리프** — *무엇을 위한 물건이고, 어떤 기분이어야 하고, 무엇이 아닌지*. 치수가 아니라 감정과 용도로 쓴다.
+   좋은 예: `should feel like a ceremonial monument at night: dignified, celebratory but quiet, something you'd be
+   proud to be placed on. Not a toy, not a game prop.`
+3. **설계권 이양 한 줄** — `You choose the form; surprise me with the shape, the silhouette and the ornament.`
+   빠뜨리지 말 것. 이 문장이 있고 없고가 결과를 가른다.
+4. **Hard requirements** — 안 지키면 **코드가 깨지는 것만**. 그리고 **각 제약에 이유를 붙인다**
+   (`it will sit on a dark night-sky page, so it must read lighter than …`). 이유가 있으면 모델이 알아서 맞춰 온다.
+5. **출력 위생 네거티브** — `No haze, no fog, no glow cloud. Transparent right up to the edges.` 처럼
+   **알파·여백·텍스트**에 대한 것만.
+
+### 절대 쓰지 말 것
+- **부품 목록** — `empty plate` · `socket` · `blank area` · `no lines, no dividers`. 빈 사각형을 시키면 빈 사각형이 나온다.
+- **% 좌표·치수표** — `center circle diameter about 20% of canvas width`. 도면을 그리라는 지시가 된다.
+- **재질·조명 지정** — `matte navy / brushed brass / soft key light from upper front / chamfered bevel`.
+- **스타일 네거티브** — `no baroque, no gothic, no crown, no filigree`. 어휘 파괴. 톤을 낮추고 싶으면 금지가 아니라
+  느낌으로 쓴다: `restrained — the ornament should feel earned, not encrusted`.
+
+### 순서는 그림이 먼저, 코드가 나중
+슬롯 위치·크기를 프롬프트에 미리 못박지 않는다. **나온 그림을 알파로 실측해서 CSS %좌표를 맞춘다.**
+구멍이 안 뚫려 나왔으면 후처리로 파면 되고, 여백이 남았으면 트림하면 된다. 그림을 코드에 맞추려 들지 말 것.
+
+> 실제 좌표 실측·동기화가 필요한 곳: `src/styles/ranking.css` 의 시상대 구멍 좌표 · 티어바 소켓 좌표
+> (해당 블록 주석에 "그림을 갈면 이 값들을 다시 재야 한다" 라고 적혀 있다).
 
 ---
 

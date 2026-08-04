@@ -5,12 +5,11 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import SiteFooter from '../components/SiteFooter'
 import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
-import type { AttemptSummary, ListAttemptsResponse } from '../lib/testTypes'
-import { LEVEL_COLORS } from '../lib/testConfigLevel'
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
 import { makeCertNo, gradeOfTitle, gradeDisplay, certExpiryDate, tempSeq } from '../lib/certNo'
 import { countryName } from '../lib/regions'
+import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
 
 // gara_5 (마이페이지) 목업 디자인 그대로 + 실제 응시 데이터·탭·발급·로그인 게이트 로직 보존.
 // 원본: stitch_design_critique_assistant/gara_5/code.html
@@ -65,15 +64,25 @@ function statusInfo(a: MyAttempt) {
 function ProfileSection() {
   const { user } = useAuth()
   const { t, lang } = useT()
-  const [profile, setProfile] = useState<{ country_code: string | null; region_code: string | null } | null>(null)
+  const [profile, setProfile] = useState<{
+    country_code: string | null
+    region_code: string | null
+    display_name: string | null
+    nickname_changed_at: string | null
+  } | null>(null)
+  // 닉네임 변경 — 평생 1회. 서버(set-nickname)가 최종 판정하고 여기선 UI 상태만 잡는다.
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [nickErr, setNickErr] = useState('')
 
-  // 프로필(국가/지역) 로딩
+  // 프로필(국가/지역/닉네임) 로딩
   useEffect(() => {
     if (!user) return
     let alive = true
     supabase
       .from('profiles')
-      .select('country_code,region_code')
+      .select('country_code,region_code,display_name,nickname_changed_at')
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -87,10 +96,88 @@ function ProfileSection() {
 
   const countryLabel = profile?.country_code ? countryName(profile.country_code, lang) : '-'
   const regionLabel = profile?.region_code ? t(`region.${profile.region_code}`) : '-'
+  const nickUsed = !!profile?.nickname_changed_at // 변경권 소진
+
+  async function saveNick() {
+    const v = draft.trim()
+    if (saving || nicknameError(v)) return
+    setSaving(true)
+    setNickErr('')
+    try {
+      await callFunction('set-nickname', { nickname: v })
+      setProfile((p) => (p ? { ...p, display_name: v, nickname_changed_at: new Date().toISOString() } : p))
+      setEditing(false)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      const code = /taken/.test(msg) ? 'taken' : /reserved/.test(msg) ? 'reserved' : /locked/.test(msg) ? 'locked' : 'failed'
+      setNickErr(t(`nick.err_${code}`))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <section className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant/30 ambient-shadow mb-8 md:mb-10">
       <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-5">{t('mypage.profile_title')}</h2>
+
+      {/* 닉네임 — 유일한 변경 진입점(FAB 편집은 제거됨). 변경권 1회를 다 쓰면 잠긴다. */}
+      <div className="mb-4">
+        <label className="block font-label-md text-[13px] font-semibold text-outline mb-1.5">{t('nick.label')}</label>
+        {editing ? (
+          <>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 rounded-xl bg-surface border border-outline-variant px-4 py-3 font-body-md text-on-surface"
+                value={draft}
+                autoFocus
+                maxLength={NICK_MAX}
+                disabled={saving}
+                onChange={(e) => { setDraft(e.target.value); setNickErr('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveNick(); if (e.key === 'Escape') setEditing(false) }}
+              />
+              <button
+                onClick={saveNick}
+                disabled={saving || !!nicknameError(draft)}
+                className="px-5 py-3 rounded-xl bg-primary-container text-on-primary font-label-md text-[15px] font-bold disabled:opacity-40"
+              >
+                {saving ? t('nick.saving') : t('nick.confirm')}
+              </button>
+              <button
+                onClick={() => { setEditing(false); setNickErr('') }}
+                className="px-4 py-3 rounded-xl border border-outline-variant text-on-surface-variant font-label-md text-[15px] font-bold"
+              >
+                {t('intro.cancel')}
+              </button>
+            </div>
+            <p className="mt-2 font-body-sm text-[13px] text-outline break-keep">{t('nick.rule', { min: NICK_MIN, max: NICK_MAX })}</p>
+            <p className="mt-1 font-body-sm text-[13px] text-error font-bold break-keep">{t('nick.last_chance')}</p>
+            {(nickErr || (draft && nicknameError(draft))) && (
+              <p className="mt-1 font-body-sm text-[13px] text-error break-keep">
+                {nickErr || t(`nick.err_${nicknameError(draft)}`)}
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-[160px] rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-on-surface">
+              {profile?.display_name || '-'}
+            </div>
+            {nickUsed ? (
+              <span className="font-body-sm text-[13px] text-outline flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">lock</span>
+                {t('nick.used_up')}
+              </span>
+            ) : (
+              <button
+                onClick={() => { setDraft(profile?.display_name ?? ''); setEditing(true) }}
+                className="px-5 py-3 rounded-xl border border-outline-variant text-on-surface font-label-md text-[15px] font-bold hover:border-primary hover:text-primary transition-colors"
+              >
+                {t('nick.change_once')}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
         {/* 국가 (읽기전용) */}
@@ -108,94 +195,6 @@ function ProfileSection() {
         <span className="material-symbols-outlined text-[16px]">lock</span>
         {t('mypage.region_locked')}
       </p>
-    </section>
-  )
-}
-
-// WORLD ARENA 레벨 인증서 — 레벨테스트에서 **승급한 순간**마다 한 장.
-//   데이터는 list-attempts 가 이미 다 준다(rankDir==='up' 인 응시 = 승급 이벤트, rankAfter = 달성 레벨).
-//   그래서 백엔드 추가 없이 화면만 붙였다. 같은 레벨 승급 기록이 여럿이면(옛 강등 이력) **처음 달성한 날**로 묶는다.
-//   ⚠️ 인증서 원본(배경/서식)이 아직 없어서 발급 버튼은 '준비 중'으로 잠가 뒀다.
-//      원본이 오면 이 버튼의 onClick 만 증서 화면으로 연결하면 된다(아래 TODO).
-function LevelCerts() {
-  const { t } = useT()
-  const navigate = useNavigate()
-  const [data, setData] = useState<ListAttemptsResponse | null>(null)
-  const [err, setErr] = useState('')
-
-  useEffect(() => {
-    let alive = true
-    callFunction<ListAttemptsResponse>('list-attempts', {})
-      .then((r) => alive && setData(r))
-      .catch((e) => alive && setErr(e instanceof Error ? e.message : 'error'))
-    return () => { alive = false }
-  }, [])
-
-  // 승급 이벤트 → 레벨별 1장(처음 달성한 응시 기준)
-  const certs = (() => {
-    const byLevel = new Map<number, AttemptSummary>()
-    for (const a of data?.attempts ?? []) {
-      if (a.rankDir !== 'up' || a.rankAfter == null) continue
-      const cur = byLevel.get(a.rankAfter)
-      if (!cur || new Date(a.submittedAt) < new Date(cur.submittedAt)) byLevel.set(a.rankAfter, a)
-    }
-    return [...byLevel.entries()].sort((x, y) => y[0] - x[0]) // 높은 레벨부터
-  })()
-
-  return (
-    <section className="mb-10">
-      <div className="mb-5">
-        <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface">{t('mypage.lvcert_title')}</h2>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1 break-keep">{t('mypage.lvcert_sub')}</p>
-      </div>
-
-      {err ? (
-        <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>
-      ) : !data ? (
-        <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>
-      ) : certs.length === 0 ? (
-        <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
-          <p className="font-body-md text-on-surface-variant mb-5 break-keep">{t('mypage.lvcert_empty')}</p>
-          <button onClick={() => navigate('/test/select')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">
-            {t('mypage.lvcert_go')}
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {certs.map(([level, a]) => (
-            <article key={level} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
-              <div className="flex items-start gap-5">
-                <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 text-white" style={{ background: LEVEL_COLORS[level] }}>
-                  <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>military_tech</span>
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
-                    <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface break-keep">
-                      Lv.{level} {t(`lv.${level}.name`)}
-                    </h3>
-                    <span className="px-3 py-1 bg-secondary/10 text-secondary font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border border-secondary/20 shrink-0">
-                      {t('mypage.lvcert_achieved')}
-                    </span>
-                  </div>
-                  <p className="font-body-md text-body-md text-on-surface-variant">
-                    {fmtDate(a.submittedAt)} | {a.totalCorrect} / {a.totalQuestions}
-                  </p>
-                </div>
-              </div>
-              {/* TODO(인증서): 원본 서식이 준비되면 여기서 증서 화면으로 이동시킨다. */}
-              <button
-                disabled
-                title={t('mypage.lvcert_soon')}
-                className="shrink-0 px-6 py-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low text-outline font-label-md text-[15px] font-bold flex items-center gap-2 cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
-                {t('mypage.lvcert_get')}
-                <span className="px-2 py-0.5 rounded-full bg-outline/10 text-[11px] font-bold">{t('mypage.lvcert_soon')}</span>
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
     </section>
   )
 }
@@ -277,31 +276,43 @@ export default function MyPage() {
 
   // 발급 = 서버 기록(cert_issued_at) — 마이페이지/성적표 어디서 발급해도 '발급 완료'로 남고, 재발급도 가능.
   // 발급 응답에서 진위확인 토큰·확정 자격번호를 받아 자격증(QR)에 실어 보낸다.
+  // 결제 유도 화면(/certificate 의 cert-gate)에 넘길 state — 견본 화면의 CTA 도 이걸 그대로 재사용한다.
+  function gateState(a: MyAttempt) {
+    return {
+      preview: true,
+      attemptId: a.attemptId,
+      name,
+      qualification: a.examTitle ?? t('mypage.exam_fallback'),
+      grade: gradeDisplay(a.examTitle),
+      certNo: a.certNo ?? certNoOf(a),
+      issueDate: fmtDate(a.submittedAt),
+      expiryDate: certExpiryDate(a.examTitle, a.submittedAt ? new Date(a.submittedAt) : new Date()),
+      scoreText: `${a.totalCorrect} / ${a.totalQuestions}`,
+    }
+  }
+
+  // 디자인 견본 — 더미 인물(홍길동) + 진한 워터마크. 내 이름·자격번호는 싣지 않는다.
+  function goSample(a: MyAttempt) {
+    navigate('/certificate/sample', {
+      state: { sample: true, qualification: a.examTitle ?? '', grade: gradeDisplay(a.examTitle), name: '', certNo: '', issueDate: '', gate: gateState(a) },
+    })
+  }
+
   async function goCert(a: MyAttempt) {
     let verifyToken = a.verifyToken ?? undefined
     let certNo = a.certNo ?? certNoOf(a)
-    // 아직 발급(유료) 전이면 워터마크 견본부터 — 발급은 미리보기 화면의 CTA 에서 한다.
+    // 아직 발급(유료) 전이면 자격증 대신 결제 유도 화면으로 — 발급은 그 화면의 결제 CTA 에서 한다.
     if (!a.certIssuedAt) {
-      navigate('/certificate', {
-        state: {
-          preview: true,
-          attemptId: a.attemptId,
-          name,
-          qualification: a.examTitle ?? t('mypage.exam_fallback'),
-          grade: gradeDisplay(a.examTitle),
-          certNo,
-          issueDate: fmtDate(a.submittedAt),
-          expiryDate: certExpiryDate(a.examTitle, a.submittedAt ? new Date(a.submittedAt) : new Date()),
-          scoreText: `${a.totalCorrect} / ${a.totalQuestions}`,
-        },
-      })
+      navigate('/certificate', { state: gateState(a) })
       return
     }
+    let nameRoman = a.certNameRoman ?? undefined
     try {
       const r = await callFunction<MyAttemptsResponse>('my-attempts', { issue: a.attemptId })
       if (r.issued) {
         verifyToken = r.issued.verifyToken
         certNo = r.issued.certNo
+        nameRoman = r.issued.nameRoman ?? nameRoman
       }
       setList((prev) => prev?.map((x) => (x.attemptId === a.attemptId ? { ...x, certIssuedAt: new Date().toISOString(), certNo: r.issued?.certNo ?? x.certNo, verifyToken: r.issued?.verifyToken ?? x.verifyToken } : x)) ?? prev)
     } catch {
@@ -310,6 +321,8 @@ export default function MyPage() {
     navigate('/certificate', {
       state: {
         name,
+        // 자격증에 각인된 영문 성명 — 발급 때 저장한 스냅샷을 그대로 다시 쓴다(재발급도 같은 이름).
+        nameRoman,
         qualification: a.examTitle ?? t('mypage.exam_fallback'),
         grade: gradeDisplay(a.examTitle),
         certNo,
@@ -454,10 +467,10 @@ export default function MyPage() {
             )
           )}
 
-          {/* 자격 취득 현황 — ① WORLD ARENA 레벨 인증서(레벨테스트 승급) ② CARIS 자격검정 합격 */}
-          {tab === 'earned' && <LevelCerts />}
+          {/* 자격 취득 현황 = CARIS 자격검정 합격만.
+              WORLD ARENA 레벨 인증서 섹션은 뺐다(2026-08-03) — 레벨 인증서는 레벨테스트 결과 화면에서만 발급한다. */}
           {tab === 'earned' && (
-            <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-5">{t('mypage.tab_earned')} · CARIS</h2>
+            <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-5">{t('mypage.tab_earned')}</h2>
           )}
           {!loading && !err && tab === 'earned' && (
             earned.length === 0 ? (
@@ -484,10 +497,32 @@ export default function MyPage() {
 
           {/* 자격증 발급 현황 */}
           {!loading && !err && tab === 'issuance' && (
-            earned.length === 0 ? (
-              <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('mypage.empty_issuance')}</div>
-            ) : (
-              <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6">
+              {/* 자격증 견본 — 취득 여부와 무관하게 이 탭에 항상 있는 고정 진입점(목록 위).
+                  합격 건이 있으면 그 급수 견본으로, 없으면 기본 급수 견본으로 연다. */}
+              <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col md:flex-row md:items-center justify-between gap-5">
+                <div className="flex items-start gap-5">
+                  <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                  </div>
+                  <div>
+                    <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface mb-2 break-keep">{t('mypage.sample_title')}</h3>
+                    <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('mypage.sample_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => (earned[0] ? goSample(earned[0]) : navigate('/certificate/sample'))}
+                  className="shrink-0 px-6 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:border-primary/30 hover:text-primary transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  {t('mypage.view_sample')}
+                  <span className="material-symbols-outlined text-[18px]">visibility</span>
+                </button>
+              </section>
+
+              {earned.length === 0 ? (
+                <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('mypage.empty_issuance')}</div>
+              ) : (
+                <div className="flex flex-col gap-6">
                 {earned.map((a) => {
                   const certNo = a.certNo ?? certNoOf(a)
                   const issued = !!a.certIssuedAt
@@ -512,8 +547,9 @@ export default function MyPage() {
                     </article>
                   )
                 })}
-              </div>
-            )
+                </div>
+              )}
+            </div>
           )}
         </div>
       </main>

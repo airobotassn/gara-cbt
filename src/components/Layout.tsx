@@ -17,7 +17,6 @@ import {
   GlobeIcon,
   EarthIcon,
   ToolIcon,
-  BookIcon,
   MoreIcon,
   PencilIcon,
   CameraIcon,
@@ -32,8 +31,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     display_name: string | null
     avatar_url: string | null
   } | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
   const [picking, setPicking] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
@@ -153,14 +150,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     }
   }
 
-  async function saveName() {
-    const v = draft.trim()
-    if (v && user) {
-      await supabase.from('profiles').update({ display_name: v }).eq('id', user.id)
-      setProfile((p) => ({ avatar_url: p?.avatar_url ?? null, display_name: v }))
-    }
-    setEditing(false)
-  }
 
   function go(path: string) {
     setOpen(false)
@@ -199,40 +188,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                 <span className="pf-ava-badge"><PencilIcon size={11} /></span>
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
-                {isFullUser && editing ? (
-                  <div className="pf-edit-row">
-                    <input
-                      className="pf-input"
-                      value={draft}
-                      autoFocus
-                      maxLength={20}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveName()
-                        if (e.key === 'Escape') setEditing(false)
-                      }}
-                    />
-                    <button className="pf-save" onClick={saveName}>
-                      ✓
-                    </button>
-                  </div>
-                ) : (
-                  <div className="pf-name">
-                    <span className="pf-name-txt">{name}</span>
-                    {isFullUser ? (
-                      <button
-                        className="pf-edit"
-                        title={t('fab.editName')}
-                        onClick={() => {
-                          setDraft(profile?.display_name || '')
-                          setEditing(true)
-                        }}
-                      >
-                        ✎
-                      </button>
-                    ) : null}
-                  </div>
-                )}
+                {/* 닉네임은 여기서 못 고친다 — 변경권이 평생 1회뿐이라 진입점을 마이페이지 하나로 모았다.
+                    (서버도 display_name 쓰기를 set-nickname 함수로만 허용한다) */}
+                <div className="pf-name">
+                  <span className="pf-name-txt">{name}</span>
+                </div>
                 {!isFullUser ? (
                   <div className="pf-sub">{t('fab.loginhint')}</div>
                 ) : null}
@@ -347,9 +307,6 @@ export default function Layout({ children }: { children: ReactNode }) {
               <button className="pf-item" onClick={() => go('/guide')}>
                 <span className="ic"><InfoIcon /></span> {t('nav.caris')}
               </button>
-              <button className="pf-item" onClick={() => go('/ebooks')}>
-                <span className="ic"><BookIcon /></span> {t('fab.ebookstore')}
-              </button>
             </div>
 
             <div className="pf-langwrap">
@@ -406,7 +363,8 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>
               </button>
               {/* 개발/디자인 확인용 미리보기 — 런칭 시 제거 예정(앰버색으로 구분) */}
-              {/* 레벨테스트 인증서 시안 — React 라우트가 아니라 정적 HTML(public/cert-preview.html) */}
+              {/* 레벨테스트 인증서 시안 — React 라우트가 아니라 정적 HTML(public/cert-preview.html).
+                  레벨 1~7 을 버튼으로 넘겨보는 용도라 실데이터 라우트(/test/certificate)와 별도로 유지한다. */}
               <button
                 className="pf-more-link pf-preview"
                 onClick={() => {
@@ -420,7 +378,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {t('nav.certpreview')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link pf-preview" onClick={() => go('/certificate/preview')}>
-                {t('nav.certwatermarkpreview')} <span className="pf-more-ext">↗</span>
+                {t('nav.certgatepreview')} <span className="pf-more-ext">↗</span>
               </button>
               <button className="pf-more-link pf-preview" onClick={() => go('/verify/preview-sample')}>
                 진위확인(유효) 미리보기 <span className="pf-more-ext">↗</span>

@@ -1,0 +1,211 @@
+/* levelcert: LevelCert.tsx — 레벨테스트 인증서(북두칠성 발자취)
+   좌표계 1448×900 고정 + transform scale 로 축소. 정적 시안(public/cert-preview.html)과 같은 규격. */
+@font-face {
+  font-family: 'CertSerifKR';
+  font-weight: 700;
+  font-display: swap;
+  src: url('/cert/noto-serif-kr-korean-700-normal.woff2') format('woff2');
+}
+
+.lc-page {
+  min-height: 100dvh;
+  background: #0a0e16;
+  color: #dfe6f2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 28px 12px 56px;
+}
+.lc-msg {
+  color: #7d8ba3;
+  font-size: var(--fs-md);
+  margin-top: 60px;
+}
+
+/* 인증서 본체 — .lc-wrap 이 축소된 높이를 잡아주고, .lc-stage 는 원본 크기 그대로 scale 된다 */
+.lc-wrap {
+  width: 100%;
+  max-width: 1448px;
+  display: flex;
+  justify-content: center;
+}
+.lc-stage {
+  position: relative;
+  width: 1448px;
+  height: 900px;
+  flex: none;
+  transform-origin: top center;
+  overflow: hidden;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.lc-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lc-vig {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 45%, rgba(0, 0, 0, 0) 35%, rgba(3, 6, 12, 0.55) 78%, rgba(2, 4, 9, 0.86) 100%);
+}
+
+/* 모서리 장식 — corner.png 한 장을 네 방향으로 뒤집어 쓴다 */
+.lc-orn {
+  position: absolute;
+  width: 320px;
+  pointer-events: none;
+}
+.lc-orn.tl { left: 26px; top: 26px; }
+.lc-orn.tr { right: 26px; top: 26px; transform: scaleX(-1); }
+.lc-orn.bl { left: 26px; bottom: 26px; transform: scaleY(-1); }
+.lc-orn.br { right: 26px; bottom: 26px; transform: scale(-1); }
+
+/* 좌측 컬럼 — 폭 560px, 세로 정중앙 */
+.lc-col {
+  position: absolute;
+  left: 82px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 560px;
+  text-align: center;
+}
+.lc-brand {
+  display: block;
+  height: 52px;
+  margin: 0 auto 30px;
+  filter: drop-shadow(0 0 16px rgba(224, 192, 124, 0.3));
+}
+/* 제목·LEVEL·숫자는 확정 시안 에셋(PNG) — 여기서 서체·자간을 만들지 않는다.
+   ⚠️ 아래 크기 4종(.lc-title 폭 · .lc-mark 간격 · cap/num 높이)은 정적 시안
+   public/cert-preview.html 의 .title/.mark/.mark-cap/.mark-num 과 **같은 값이어야 한다**. */
+.lc-title {
+  display: block;
+  width: 440px;
+  margin: 0 auto;
+  filter: drop-shadow(0 0 26px rgba(230, 180, 80, 0.28));
+}
+.lc-name {
+  margin-top: 48px;
+  font: 700 58px CertSerifKR, 'Noto Serif KR', serif;
+  letter-spacing: 9px;
+  text-indent: 9px;
+  color: #fff;
+  text-shadow: 0 0 26px rgba(255, 235, 190, 0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-mark {
+  margin-top: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+/* cap 과 num 은 반드시 같은 높이. 예전 숫자가 가는 세리프라 58px 로 키워뒀던 값이 남아 있었는데,
+   지금은 둘 다 같은 굵은 산세리프라 크기가 다르면 한 줄 안에서 따로 논다. */
+.lc-mark-cap { height: 58px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+.lc-mark-num { height: 58px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+
+/* 발행기관 — 잔글씨. ⚠️ 금색으로 쓰지 말 것.
+   이 인증서의 금색은 전부 금박 각인 질감 + 광택 림을 가진 이미지 자산이라, CSS 금색 텍스트를 얹으면
+   혼자 납작해서 따로 논다(하이라이트 0%). 재질 경쟁을 피하려고 일부러 무채에 가까운 웜톤으로 뺐다. */
+.lc-issuer {
+  margin-top: 38px;
+  font: 400 20px CertSerifKR, 'Noto Serif KR', serif;
+  letter-spacing: 3.5px;
+  text-indent: 3.5px;
+  color: rgba(228, 216, 194, 0.58);
+  white-space: nowrap;
+}
+.lc-issuer::before {
+  content: '';
+  display: block;
+  width: 120px;
+  height: 1px;
+  margin: 0 auto 20px;
+  background: linear-gradient(90deg, transparent, rgba(224, 192, 124, 0.45), transparent);
+}
+
+/* 북두칠성 — 원본 배치값(중심 895, 720×760에 1.4배) 그대로 */
+.lc-dipbox {
+  position: absolute;
+  width: 1000px;
+  height: 856px;
+  left: 395px;
+  top: 22px;
+}
+.lc-dip {
+  width: 100%;
+  height: 100%;
+  filter: brightness(1.14) saturate(1.06);
+}
+
+/* 액션 */
+.lc-acts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.lc-btn {
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 11px 22px;
+  border-radius: 12px;
+  border: 1px solid #2a3547;
+  background: #131a26;
+  color: #cfd8e8;
+}
+.lc-btn:hover { border-color: #3a4a63; color: #fff; }
+.lc-btn.primary {
+  border-color: #c99433;
+  background: linear-gradient(135deg, #f6de9e, #c99433);
+  color: #201603;
+}
+
+/* 응시 기록 없음 / 오류 */
+.lc-empty {
+  margin-top: 60px;
+  max-width: 420px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 28px;
+  border: 1px solid #1c2534;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.lc-empty .material-symbols-outlined {
+  font-size: 42px;
+  color: #c99433;
+}
+.lc-empty p {
+  color: #93a3bd;
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+/* 인쇄 = PDF 저장: 인증서 한 장(A4 가로). 배경 그림이 있어 색 보정을 강제한다. */
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  .lc-page { min-height: auto; padding: 0; gap: 0; background: #0a0e16; display: block; }
+  .lc-acts { display: none !important; }
+  .lc-wrap { max-width: none; height: 700px !important; display: block; }
+  /* 인쇄 px = 1/96in → A4 가로 폭 ≈ 1122px. 1122/1448 ≈ 0.775 로 줄이면 900×0.775=698px 라 세로도 남는다.
+     내부 요소가 전부 1448×900 px 좌표라 컨테이너 크기를 mm 로 바꾸면 안 되고 scale 로만 줄인다. */
+  .lc-stage {
+    transform: scale(0.775) !important;
+    transform-origin: top left;
+    box-shadow: none;
+  }
+  .lc-stage * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

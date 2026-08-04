@@ -29,6 +29,24 @@ function watermarkCss(mark: string): string {
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`
 }
 
+// ── 모바일 폭 맞추기 ──────────────────────────────────────────────────────────
+// 실제 이북은 A4 인쇄 레이아웃이다(`.page{width:210mm;height:297mm;overflow:hidden}` = 794px 고정,
+// 글자 pt·여백 mm·절대배치). 390px 화면에 그대로 넣으면 오른쪽 404px 이 잘려 나가고 overflow:hidden
+// 이라 스크롤로도 못 본다 — 실측으로 확인한 증상이다.
+// → 콘텐츠 실폭을 재서 화면보다 넓을 때만 zoom 으로 축소해 한 페이지가 통째로 들어오게 한다.
+//   · 스크롤/패닝이 아니라 zoom 인 이유: overflow:hidden 이라 패닝이 불가능하고, 인쇄 페이지는
+//     '한 장을 통째로' 보는 게 원래 읽는 방식이다(PDF 리더와 동일).
+//   · 글자가 작아지는 건 핀치 확대로 해결된다 — index.html 이 user-scalable 을 막지 않는다.
+//   · 데스크톱(iframe 이 794px 보다 넓음)에서는 아무것도 하지 않는다.
+//   · 웹폰트가 늦게 로드되면 레이아웃이 바뀌므로 load·fonts.ready·resize 에서 다시 잰다.
+const FIT_SCRIPT =
+  `var __fit=function(){var d=document.documentElement;d.style.zoom='';` +
+  `var v=d.clientWidth,c=d.scrollWidth;if(c>v+2)d.style.zoom=(v/c).toFixed(4)};` +
+  `__fit();window.addEventListener('load',__fit);window.addEventListener('resize',__fit);` +
+  `window.addEventListener('orientationchange',__fit);` +
+  `if(document.fonts&&document.fonts.ready)document.fonts.ready.then(__fit);` +
+  `setTimeout(__fit,600);`
+
 function protectHtml(raw: string, mark: string): string {
   const inject =
     `<style>` +
@@ -45,6 +63,7 @@ function protectHtml(raw: string, mark: string): string {
     `if((e.ctrlKey||e.metaKey)&&(k==='p'||k==='s'||k==='c'||k==='x'||k==='u'||k==='a'))e.preventDefault()});` +
     `window.addEventListener('beforeprint',function(){document.documentElement.style.display='none'});` +
     `window.addEventListener('afterprint',function(){document.documentElement.style.display=''});` +
+    FIT_SCRIPT +
     `})()</` + `script>` // 문자열에 </script> 가 그대로 들어가지 않게 쪼갠다
   return /<\/body>/i.test(raw) ? raw.replace(/<\/body>/i, `${inject}</body>`) : raw + inject
 }
@@ -130,8 +149,27 @@ export default function EbookReader() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#f4f6fb' }}>
       {/* 바깥(앱 셸)에서 인쇄를 걸어도 iframe 이 같이 찍히므로 뷰어가 떠 있는 동안은 페이지 자체를 인쇄에서 뺀다.
-          이 <style> 은 컴포넌트가 언마운트되면 사라지므로 다른 화면 인쇄에는 영향이 없다. */}
-      <style>{'@media print{body{display:none!important}}'}</style>
+          이 <style> 은 컴포넌트가 언마운트되면 사라지므로 다른 화면 인쇄에는 영향이 없다.
+          ⚠️ 헤더 반응형도 여기 둔다 — 이 화면은 전용 CSS 파일이 없고(인라인 스타일) 미디어쿼리는 인라인으로 못 쓴다.
+             모바일(390px)에서 한 줄에 뒤로·제목·저자·언어 4개가 다 들어가 전부 눌렸다:
+             뒤로 라벨이 두 줄로 깨지고(87→60px), 제목이 두 줄로 늘어 헤더가 본문을 잡아먹었다. */}
+      <style>{`
+        @media print{body{display:none!important}}
+        /* 뒤로·언어는 절대 줄어들지 않는다. 줄어들 곳은 제목 하나뿐(말줄임). */
+        .ebr-back{flex:none;white-space:nowrap}
+        /* ⚠️ flex:1 을 주면 안 된다 — 데스크톱에서 제목이 남는 폭을 다 먹어 저자가 제목 옆이 아니라
+           오른쪽 끝(언어 옆)으로 밀린다. 기본 flex-shrink 만으로 좁을 때 알아서 줄어든다. */
+        .ebr-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ebr-author{flex:none;white-space:nowrap}
+        .ebr-lang{flex:none;margin-left:auto}
+        @media (max-width:600px){
+          /* 좁은 화면에선 제목에 폭을 몰아준다 — 저자는 목록·스토어에서 이미 보이므로 여기선 생략. */
+          .ebr-author{display:none}
+          /* 터치 타깃(권장 44px)에 맞춰 뒤로·셀렉트를 키운다. 데스크톱은 종전 크기 유지. */
+          .ebr-back{min-height:40px}
+          .ebr-lang{min-height:40px;padding-top:8px;padding-bottom:8px}
+        }
+      `}</style>
       <header
         style={{
           flex: '0 0 auto',
@@ -146,6 +184,7 @@ export default function EbookReader() {
         }}
       >
         <button
+          className="ebr-back"
           onClick={() => navigate('/mypage/ebooks')}
           aria-label={t('ebook.reader_back')}
           style={{
@@ -164,16 +203,18 @@ export default function EbookReader() {
         >
           <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> {t('ebook.reader_back')}
         </button>
-        <strong style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }}>{book?.title ?? ''}</strong>
-        {book?.author && <span style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{book.author}</span>}
+        <strong className="ebr-title" style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }} title={book?.title ?? ''}>
+          {book?.title ?? ''}
+        </strong>
+        {book?.author && <span className="ebr-author" style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{book.author}</span>}
         {/* 번역본이 있는 책만 언어 선택을 띄운다(한 언어뿐이면 고를 게 없다). */}
         {(book?.langs?.length ?? 0) > 1 && (
           <select
+            className="ebr-lang"
             value={book?.lang ?? readLang}
             onChange={(e) => setReadLang(e.target.value)}
             aria-label={t('ebook.reader_lang')}
             style={{
-              marginLeft: 'auto',
               padding: '6px 10px',
               borderRadius: 999,
               border: '1px solid #d9e0f0',

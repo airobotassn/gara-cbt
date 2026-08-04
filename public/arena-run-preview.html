@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WORLD ARENA 응시화면 시안 — 출정 · 도전</title>
+<style>
+/* ==========================================================================
+   WORLD ARENA 레벨테스트 응시화면 시안 (정적 HTML · 외부 의존 없음)
+   목적: "CBT 답안지"를 "아레나 도전"으로 바꿨을 때의 체감 확인.
+   제약: 서버가 문항별 정오답을 안 준다(제출 후 일괄 채점) → 정답 피드백 연출은 일절 없음.
+         게임감은 ①조작 촉감 ②시간 압박 ③플레이어 임장감 ④전진하는 진행 표시로만 낸다.
+   ========================================================================== */
+:root{
+  --bg:#070b14;
+  --surf:rgba(15,22,38,.72);
+  --surf-hi:rgba(24,34,56,.86);
+  --line:rgba(125,211,252,.16);
+  --line-hi:rgba(125,211,252,.34);
+  --txt:#e9eefc;
+  --muted:#93a4c3;
+  --dim:#66799b;
+  --cyan:#38bdf8;
+  --indigo:#818cf8;
+  --gold:#fbbf24;
+  --danger:#fb7185;
+  --lvc:#fbbf24;            /* 응시 레벨 색 — 실제로는 testConfigLevel.LEVEL_COLORS[level] */
+  --fs-q:clamp(19px,2.4vw,26px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'Pretendard','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+/* 배경 — 아레나 우주. 실제 적용 시 cyberbg.css 레이어를 재사용한다. */
+.sky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.sky::before,.sky::after{content:'';position:absolute;border-radius:50%;filter:blur(90px);opacity:.55}
+.sky::before{width:70vw;height:70vw;left:-18vw;top:-26vw;background:radial-gradient(circle,#1d4ed8 0%,transparent 65%)}
+.sky::after{width:60vw;height:60vw;right:-16vw;bottom:-24vw;background:radial-gradient(circle,#0e7490 0%,transparent 65%)}
+.grid{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(125,211,252,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(125,211,252,.07) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 78%);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 78%);
+}
+
+/* ── 시안 조작 바 (실제 화면엔 없음) ───────────────────────────── */
+.demobar{
+  position:fixed;left:0;right:0;top:0;z-index:90;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:9px 14px;
+  background:rgba(4,7,14,.92);
+  border-bottom:1px solid var(--line);
+  font-size:12.5px;
+}
+.demobar b{color:var(--cyan);letter-spacing:.4px}
+.demobar .sp{flex:1}
+.demobar button{
+  font:inherit;font-weight:700;cursor:pointer;
+  padding:6px 12px;border-radius:8px;
+  border:1px solid var(--line-hi);
+  background:rgba(56,189,248,.08);color:var(--txt);
+}
+.demobar button:hover{background:rgba(56,189,248,.18)}
+.demobar button.on{background:var(--cyan);border-color:var(--cyan);color:#04121e}
+
+.stage{position:relative;z-index:1;padding:64px 16px 40px;display:grid;place-items:center;min-height:100vh}
+.screen{display:none;width:100%}
+.screen.show{display:block}
+
+/* ══════════════════════════════════════════════════════════════
+   1) 출정 화면 — 지금은 ⚠️ 각서 5줄. 여기서 "도전을 건다"는 감각을 만든다.
+   ══════════════════════════════════════════════════════════════ */
+.intro{max-width:880px;margin:0 auto}
+.eyebrow{
+  display:flex;align-items:center;gap:9px;justify-content:center;
+  font-size:12px;font-weight:800;letter-spacing:3px;color:var(--cyan);
+}
+.eyebrow::before,.eyebrow::after{content:'';height:1px;width:52px;background:linear-gradient(90deg,transparent,var(--line-hi))}
+.eyebrow::after{transform:rotate(180deg)}
+.intro h1{
+  margin:16px 0 6px;text-align:center;
+  font-size:clamp(36px,7vw,64px);font-weight:900;letter-spacing:-1.5px;line-height:1.05;
+}
+.intro h1 em{
+  font-style:normal;
+  color:var(--lvc);
+  text-shadow:0 0 34px color-mix(in srgb,var(--lvc) 45%,transparent);
+}
+.intro-sub{text-align:center;color:var(--muted);font-size:15px;margin-bottom:30px}
+
+.duel{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;margin-bottom:26px}
+.side{
+  background:var(--surf);border:1px solid var(--line);border-radius:20px;
+  padding:20px;backdrop-filter:blur(12px);
+}
+.side .who{font-size:11.5px;font-weight:800;letter-spacing:2px;color:var(--dim);margin-bottom:14px}
+.avatar{
+  width:64px;height:64px;border-radius:18px;display:grid;place-items:center;margin-bottom:12px;
+  background:conic-gradient(from 200deg,#22d3ee,#6366f1,#22d3ee);
+  box-shadow:0 0 26px rgba(56,189,248,.45);font-size:30px;
+}
+.side .nm{font-size:19px;font-weight:800}
+.side .meta{margin-top:5px;color:var(--muted);font-size:13.5px}
+.side.foe{text-align:right}
+.side.foe .avatar{margin-left:auto;background:conic-gradient(from 20deg,var(--lvc),#f97316,var(--lvc));box-shadow:0 0 26px color-mix(in srgb,var(--lvc) 45%,transparent)}
+.vs{
+  font-size:22px;font-weight:900;letter-spacing:1px;color:var(--dim);
+  padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(4,7,14,.6);
+}
+
+.specs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.spec{
+  background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:16px 18px;
+  backdrop-filter:blur(12px);
+}
+.spec .k{font-size:11.5px;font-weight:800;letter-spacing:1.6px;color:var(--dim)}
+.spec .v{margin-top:7px;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
+.spec .v small{font-size:14px;font-weight:700;color:var(--muted);margin-left:3px}
+
+.reward{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  border:1px solid color-mix(in srgb,var(--gold) 34%,transparent);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--gold) 12%,transparent),transparent 70%);
+  border-radius:16px;padding:14px 18px;margin-bottom:16px;
+}
+.reward .tag{font-size:11.5px;font-weight:800;letter-spacing:1.6px;color:var(--gold)}
+.reward .txt{font-size:14.5px;color:var(--txt)}
+.reward .txt b{color:var(--gold)}
+
+.rules{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px}
+.rules li{
+  list-style:none;display:flex;align-items:center;gap:7px;
+  font-size:13px;color:var(--muted);
+  border:1px solid var(--line);border-radius:999px;padding:7px 13px;background:rgba(255,255,255,.02);
+}
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{
+  font:inherit;font-weight:800;cursor:pointer;border-radius:14px;padding:15px 30px;font-size:16px;
+  border:1px solid var(--line-hi);background:rgba(255,255,255,.04);color:var(--txt);
+  transition:transform .12s ease,box-shadow .2s ease,background .2s ease;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn-go{
+  border:none;padding:16px 46px;font-size:17px;letter-spacing:.5px;
+  background:linear-gradient(135deg,#22d3ee,#6366f1);color:#04121e;
+  box-shadow:0 10px 34px rgba(56,189,248,.4);
+  animation:breathe 2.6s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{box-shadow:0 10px 34px rgba(56,189,248,.36)}50%{box-shadow:0 12px 46px rgba(56,189,248,.62)}}
+
+/* ══════════════════════════════════════════════════════════════
+   2) 도전(응시) 화면 — HUD. 흰 카드·번호 그리드·회색 제출 버튼을 걷어낸다.
+   ══════════════════════════════════════════════════════════════ */
+.run{max-width:1000px;margin:0 auto;width:100%}
+.hud{
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;
+  padding:14px 18px;margin-bottom:14px;
+  background:var(--surf);border:1px solid var(--line);border-radius:20px;backdrop-filter:blur(12px);
+}
+.player{display:flex;align-items:center;gap:12px}
+.player .gem{
+  width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:21px;
+  background:conic-gradient(from 200deg,#22d3ee,#6366f1,#22d3ee);
+  box-shadow:0 0 18px rgba(56,189,248,.45);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1);
+}
+.player.react .gem{transform:scale(1.16) rotate(-6deg)}
+.player .nm{font-size:14.5px;font-weight:800;line-height:1.2}
+.player .lv{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* 타이머 링 — 남은 시간이 이 시험의 유일한 긴장 자원이라 화면 정중앙 상단에 크게 둔다 */
+.timer{position:relative;width:96px;height:96px;display:grid;place-items:center}
+.timer svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.timer circle{fill:none;stroke-width:7;stroke-linecap:round}
+.timer .track{stroke:rgba(125,211,252,.14)}
+.timer .fill{stroke:var(--cyan);transition:stroke-dashoffset 1s linear,stroke .3s}
+.timer .t{font-size:25px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.5px;line-height:1}
+.timer.low .fill{stroke:var(--danger)}
+.timer.low .t{color:var(--danger)}
+.timer.low{animation:beat 1s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1)}12%{transform:scale(1.07)}26%{transform:scale(1)}38%{transform:scale(1.05)}}
+
+.guard{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.guard .chip{
+  display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);
+  border:1px solid var(--line);border-radius:999px;padding:6px 11px;
+}
+.guard .chip i{width:6px;height:6px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80;font-style:normal}
+.guard .out{
+  font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--dim);
+  background:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;
+}
+.guard .out:hover{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,transparent)}
+
+/* 문항 패널 */
+.panel{
+  background:var(--surf-hi);border:1px solid var(--line);border-radius:24px;
+  padding:30px 34px 26px;backdrop-filter:blur(14px);
+  box-shadow:0 24px 60px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+.qhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.qcat{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:12.5px;font-weight:800;letter-spacing:.4px;color:var(--lvc);
+  border:1px solid color-mix(in srgb,var(--lvc) 32%,transparent);
+  background:color-mix(in srgb,var(--lvc) 10%,transparent);
+  border-radius:999px;padding:6px 13px;
+}
+.qno{font-size:13px;font-weight:800;color:var(--dim);font-variant-numeric:tabular-nums}
+.qno b{color:var(--txt);font-size:19px}
+
+.qtext{font-size:var(--fs-q);font-weight:700;line-height:1.55;letter-spacing:-.3px;margin-bottom:22px;word-break:keep-all}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{
+  display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+  font:inherit;font-size:16px;line-height:1.5;color:var(--txt);cursor:pointer;
+  background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:16px;
+  padding:15px 18px;
+  transition:border-color .16s,background .16s,transform .12s cubic-bezier(.34,1.56,.64,1);
+}
+.opt:hover{background:rgba(56,189,248,.08);border-color:var(--line-hi);transform:translateX(3px)}
+.opt .key{
+  width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;
+  font-size:13px;font-weight:900;color:var(--dim);
+  background:rgba(255,255,255,.05);border:1px solid var(--line);
+  transition:all .16s;
+}
+.opt.sel{
+  background:linear-gradient(90deg,rgba(56,189,248,.2),rgba(99,102,241,.12));
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px var(--cyan),0 8px 30px rgba(56,189,248,.22);
+}
+.opt.sel .key{background:var(--cyan);border-color:var(--cyan);color:#04121e}
+.opt.pop{animation:pop .34s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
+/* 선택 확정 파문 — 정답 여부와 무관한 '입력됐다'는 신호 */
+.opt .ripple{position:absolute;border-radius:50%;background:rgba(56,189,248,.35);transform:translate(-50%,-50%);pointer-events:none;animation:rip .5s ease-out forwards}
+@keyframes rip{from{width:0;height:0;opacity:.7}to{width:520px;height:520px;opacity:0}}
+.opt{position:relative;overflow:hidden}
+
+/* 문항 전환 — 즉시 교체는 '폼 입력', 밀려 들어오면 '전진' */
+.qbody.slide-in{animation:slidein .3s cubic-bezier(.22,1,.36,1)}
+.qbody.slide-out{animation:slideout .18s ease-in forwards}
+@keyframes slidein{from{opacity:0;transform:translateX(34px)}to{opacity:1;transform:none}}
+@keyframes slideout{to{opacity:0;transform:translateX(-28px)}}
+
+/* 스테이지 트랙 — 숫자 30칸 그리드 대신 '전진하는 길' */
+.track{
+  display:flex;align-items:center;gap:0;margin:22px 0 18px;padding:0 2px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.track::-webkit-scrollbar{display:none}
+.node{
+  flex:none;width:13px;height:13px;border-radius:50%;
+  background:rgba(255,255,255,.1);border:1px solid var(--line);
+  cursor:pointer;transition:all .2s;position:relative;
+}
+.node+.node{margin-left:0}
+.link{flex:1;min-width:10px;height:2px;background:rgba(255,255,255,.09)}
+.link.done{background:linear-gradient(90deg,var(--cyan),var(--indigo))}
+.node.done{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(56,189,248,.6)}
+.node.cur{
+  width:22px;height:22px;background:var(--lvc);border-color:#fff;
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--lvc) 26%,transparent),0 0 18px var(--lvc);
+}
+.node:hover{transform:scale(1.25)}
+
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.move{display:flex;gap:8px}
+.move button{
+  font:inherit;font-size:14.5px;font-weight:700;cursor:pointer;color:var(--muted);
+  background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:12px 20px;
+}
+.move button:hover:not(:disabled){color:var(--txt);border-color:var(--line-hi)}
+.move button:disabled{opacity:.35;cursor:default}
+.submit{
+  font:inherit;font-size:15.5px;font-weight:800;cursor:pointer;border:none;border-radius:13px;padding:13px 30px;
+  background:linear-gradient(135deg,#22d3ee,#6366f1);color:#04121e;
+  box-shadow:0 8px 26px rgba(56,189,248,.34);
+}
+.submit:disabled{
+  background:rgba(255,255,255,.06);color:var(--dim);box-shadow:none;cursor:default;
+  border:1px solid var(--line);
+}
+.solved{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.solved b{color:var(--txt)}
+
+/* 주석 카드 — 시안 설명 */
+.note{
+  max-width:1000px;margin:26px auto 0;padding:18px 22px;
+  border:1px dashed var(--line);border-radius:16px;background:rgba(255,255,255,.02);
+  color:var(--muted);font-size:13.5px;line-height:1.75;
+}
+.note b{color:var(--cyan)}
+.note ul{margin:8px 0 0;padding-left:18px}
+
+@media(max-width:820px){
+  .duel{grid-template-columns:1fr;gap:12px}
+  .vs{justify-self:center}
+  .side.foe{text-align:left}
+  .side.foe .avatar{margin-left:0}
+  .specs{grid-template-columns:1fr}
+  .hud{grid-template-columns:1fr auto;gap:10px}
+  .guard{grid-column:1/-1;justify-content:space-between}
+  .panel{padding:22px 18px 20px;border-radius:20px}
+}
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<div class="grid"></div>
+
+<!-- 시안 조작 바 (실제 화면엔 없음) -->
+<div class="demobar">
+  <b>시안</b>
+  <span style="color:#93a4c3">레벨테스트 응시화면 — 게임화 방향</span>
+  <span class="sp"></span>
+  <button id="tab-intro" class="on">① 출정</button>
+  <button id="tab-run">② 도전</button>
+  <button id="btn-low">막판 25초</button>
+  <button id="btn-sound" class="on">🔊 사운드 ON</button>
+</div>
+
+<div class="stage">
+
+  <!-- ═══════════ ① 출정 ═══════════ -->
+  <section class="screen show" id="scr-intro">
+    <div class="intro">
+      <div class="eyebrow">WORLD ARENA</div>
+      <h1><em>Lv.3</em> 도전</h1>
+      <p class="intro-sub">프롬프트를 설계해 원하는 결과를 얻어내는 단계입니다.</p>
+
+      <div class="duel">
+        <div class="side">
+          <div class="who">CHALLENGER</div>
+          <div class="avatar">🔷</div>
+          <div class="nm">안형준</div>
+          <div class="meta">현재 Lv.2 · 랭킹 3,140점 · 경기도 12위</div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="side foe">
+          <div class="who">STAGE</div>
+          <div class="avatar">🜂</div>
+          <div class="nm">Lv.3 프롬프트 설계</div>
+          <div class="meta">6개 영역 · 승급컷 16문항</div>
+        </div>
+      </div>
+
+      <div class="specs">
+        <div class="spec"><div class="k">문항</div><div class="v">20<small>문항</small></div></div>
+        <div class="spec"><div class="k">제한시간</div><div class="v">20:00</div></div>
+        <div class="spec"><div class="k">승급 조건</div><div class="v">16<small>/ 20 정답</small></div></div>
+      </div>
+
+      <div class="reward">
+        <span class="tag">REWARD</span>
+        <span class="txt">승급하면 <b>Lv.4</b> · 랭킹 점수 <b>+1,290</b> · 내 지역(경기도) 점수에 합산됩니다. <b>강등은 없습니다.</b></span>
+      </div>
+
+      <ul class="rules">
+        <li>🖥️ 전체화면으로 진행</li>
+        <li>🚪 화면을 벗어나면 경고</li>
+        <li>🚫 3회 누적 시 무효</li>
+        <li>📋 복사·붙여넣기 차단</li>
+      </ul>
+
+      <div class="actions">
+        <button class="btn">← 돌아가기</button>
+        <button class="btn btn-go" id="go">도전 시작</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ ② 도전(응시) ═══════════ -->
+  <section class="screen" id="scr-run">
+    <div class="run">
+      <div class="hud">
+        <div class="player" id="player">
+          <div class="gem">🔷</div>
+          <div>
+            <div class="nm">안형준</div>
+            <div class="lv">Lv.3 도전 중</div>
+          </div>
+        </div>
+
+        <div class="timer" id="timer">
+          <svg viewBox="0 0 100 100">
+            <circle class="track" cx="50" cy="50" r="44"></circle>
+            <circle class="fill" id="ring" cx="50" cy="50" r="44" stroke-dasharray="276.5" stroke-dashoffset="0"></circle>
+          </svg>
+          <span class="t" id="time">20:00</span>
+        </div>
+
+        <div class="guard">
+          <span class="chip"><i></i>감시 정상</span>
+          <button class="out">포기</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="qbody" id="qbody">
+          <div class="qhead">
+            <span class="qcat">◆ <span id="cat">프롬프트 활용</span></span>
+            <span class="qno"><b id="qi">7</b> / 20</span>
+          </div>
+          <div class="qtext" id="qtext"></div>
+          <div class="opts" id="opts"></div>
+        </div>
+
+        <div class="track" id="track"></div>
+
+        <div class="foot">
+          <div class="move">
+            <button id="prev">◀ 이전</button>
+            <button id="next">다음 ▶</button>
+          </div>
+          <span class="solved"><b id="solved">6</b> / 20 응답</span>
+          <button class="submit" id="submit" disabled>제출하기</button>
+        </div>
+      </div>
+
+      <div class="note">
+        <b>이 화면에서 게임감을 내는 네 가지</b> — 정답 피드백은 서버 구조상 불가능하므로 일절 쓰지 않았습니다.
+        <ul>
+          <li><b>조작 촉감</b> — 보기를 누르면 파문·글로우·소리로 "입력됐다"만 확실히 알린다(정답 여부 아님). 아바타도 반응한다.</li>
+          <li><b>시간 압박</b> — 텍스트 타이머를 링 게이지로. 30초 이하에서 붉게 변하며 심박처럼 뛰고 소리가 붙는다. (막판 25초 버튼으로 확인)</li>
+          <li><b>플레이어 임장감</b> — 좌상단에 내 아바타·레벨. 시험지가 아니라 내가 서 있는 전장이 된다.</li>
+          <li><b>전진하는 진행</b> — 번호 30칸 그리드 대신 스테이지 트랙. 지나온 길은 이어지고 현재 위치가 크게 표시된다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ── 시안용 더미 문항 ─────────────────────────────────────── */
+const TOTAL = 20, START_AT = 6; // 7번 문항부터 보여준다(진행 중인 느낌)
+const Q = {
+  cat:'프롬프트 활용',
+  text:'회의록 초안을 AI에게 맡길 때, 결과 품질을 가장 크게 좌우하는 지시는 무엇인가?',
+  opts:[
+    '"전문가처럼 작성해줘" 라고 역할을 부여한다',
+    '출력 형식(항목·분량·말투)과 판단 기준을 함께 제시한다',
+    '가능한 한 짧게 지시해 모델의 자유도를 높인다',
+    '같은 요청을 여러 번 반복해 가장 긴 답을 고른다',
+  ],
+};
+
+const state = { idx:START_AT, picked:new Array(TOTAL).fill(null), left:20*60, timer:null, sound:true };
+for(let i=0;i<START_AT;i++) state.picked[i]=1; // 앞 6문항은 이미 응답한 상태
+
+/* ── 사운드 (WebAudio · 외부 파일 없음) ───────────────────── */
+let AC=null;
+function beep(freq,dur,type,vol){
+  if(!state.sound) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type||'triangle'; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol||0.05,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+(dur||0.12));
+    o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+(dur||0.12));
+  }catch(e){}
+}
+const sfxPick =()=>{beep(660,.09,'triangle',.06); setTimeout(()=>beep(990,.09,'triangle',.045),55)};
+const sfxMove =()=>beep(420,.07,'sine',.035);
+const sfxTick =()=>beep(1180,.05,'square',.03);
+
+/* ── 렌더 ─────────────────────────────────────────────────── */
+const $=id=>document.getElementById(id);
+
+function renderQ(){
+  $('cat').textContent=Q.cat;
+  $('qi').textContent=state.idx+1;
+  $('qtext').textContent=Q.text;
+  const box=$('opts'); box.innerHTML='';
+  Q.opts.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'+(state.picked[state.idx]===i?' sel':'');
+    b.innerHTML='<span class="key">'+(i+1)+'</span><span class="lab">'+o+'</span>';
+    b.addEventListener('click',ev=>pick(i,b,ev));
+    box.appendChild(b);
+  });
+}
+function renderTrack(){
+  const t=$('track'); t.innerHTML='';
+  for(let i=0;i<TOTAL;i++){
+    if(i){const l=document.createElement('span'); l.className='link'+(state.picked[i-1]!==null&&i<=state.idx?' done':''); t.appendChild(l)}
+    const n=document.createElement('button');
+    n.className='node'+(state.picked[i]!==null?' done':'')+(i===state.idx?' cur':'');
+    n.title=(i+1)+'번';
+    n.addEventListener('click',()=>{state.idx=i;sfxMove();renderQ();renderTrack();});
+    t.appendChild(n);
+  }
+}
+function renderFoot(){
+  const done=state.picked.filter(v=>v!==null).length;
+  $('solved').textContent=done;
+  $('submit').disabled = done<TOTAL;
+  $('prev').disabled = state.idx===0;
+  $('next').disabled = state.idx>=TOTAL-1;
+}
+function pick(i,btn,ev){
+  state.picked[state.idx]=i;
+  // 파문 — 클릭 지점에서 퍼진다
+  const r=document.createElement('span'); r.className='ripple';
+  const box=btn.getBoundingClientRect();
+  r.style.left=(ev.clientX-box.left)+'px'; r.style.top=(ev.clientY-box.top)+'px';
+  btn.appendChild(r); setTimeout(()=>r.remove(),500);
+  [...document.querySelectorAll('.opt')].forEach(o=>o.classList.remove('sel'));
+  btn.classList.add('sel','pop'); setTimeout(()=>btn.classList.remove('pop'),340);
+  const p=$('player'); p.classList.add('react'); setTimeout(()=>p.classList.remove('react'),200);
+  sfxPick(); renderTrack(); renderFoot();
+}
+function move(d){
+  const ni=state.idx+d; if(ni<0||ni>=TOTAL) return;
+  const body=$('qbody');
+  body.classList.add('slide-out');
+  setTimeout(()=>{
+    state.idx=ni; renderQ(); renderTrack(); renderFoot();
+    body.classList.remove('slide-out'); body.classList.add('slide-in');
+    setTimeout(()=>body.classList.remove('slide-in'),300);
+  },160);
+  sfxMove();
+}
+
+/* ── 타이머 링 ────────────────────────────────────────────── */
+const CIRC=2*Math.PI*44;
+function renderTime(){
+  const m=Math.floor(state.left/60), s=state.left%60;
+  $('time').textContent=m+':'+String(s).padStart(2,'0');
+  $('ring').style.strokeDashoffset=String(CIRC*(1-state.left/(20*60)));
+  const low=state.left<=30;
+  $('timer').classList.toggle('low',low);
+  if(low && state.left>0) sfxTick();
+}
+function startTimer(){
+  clearInterval(state.timer);
+  state.timer=setInterval(()=>{ if(state.left>0){state.left--; renderTime();} },1000);
+}
+
+/* ── 화면 전환 ────────────────────────────────────────────── */
+function show(which){
+  $('scr-intro').classList.toggle('show',which==='intro');
+  $('scr-run').classList.toggle('show',which==='run');
+  $('tab-intro').classList.toggle('on',which==='intro');
+  $('tab-run').classList.toggle('on',which==='run');
+  if(which==='run') startTimer(); else clearInterval(state.timer);
+  window.scrollTo(0,0);
+}
+$('tab-intro').onclick=()=>show('intro');
+$('tab-run').onclick=()=>show('run');
+$('go').onclick=()=>{beep(520,.14,'triangle',.07);setTimeout(()=>beep(780,.18,'triangle',.06),110);show('run')};
+$('prev').onclick=()=>move(-1);
+$('next').onclick=()=>move(1);
+$('btn-low').onclick=()=>{state.left=25;renderTime();show('run')};
+$('btn-sound').onclick=e=>{state.sound=!state.sound;e.target.classList.toggle('on',state.sound);e.target.textContent=state.sound?'🔊 사운드 ON':'🔇 사운드 OFF'};
+
+// 숫자키 1~4 로 보기 선택, ←/→ 로 이동 (현행 응시화면의 조작 유지)
+window.addEventListener('keydown',e=>{
+  if(!$('scr-run').classList.contains('show')) return;
+  const n=Number(e.key);
+  if(n>=1&&n<=4){const b=document.querySelectorAll('.opt')[n-1]; if(b) b.click();}
+  if(e.key==='ArrowRight') move(1);
+  if(e.key==='ArrowLeft') move(-1);
+});
+
+renderQ(); renderTrack(); renderFoot(); renderTime();
+</script>
+</body>
+</html>

@@ -42,12 +42,14 @@ function shape(b: Row, owned: boolean, lang: string) {
   }
 }
 
-// 추천 정렬 거리 — 목표 레벨과 얼마나 떨어진 책인가(작을수록 위).
-//   레벨 미지정(null) 책은 판단 근거가 없으니 맨 뒤로 민다.
-const NO_LEVEL_DIST = 99
-function levelDist(b: Row, want: number): number {
+// 추천 대상 레벨 = 지금 도전할 레벨과 그 다음 레벨 두 칸.
+//   예) Lv.3 탈락 → 3·4 / Lv.3 승급(→4) → 4·5.
+//   ⚠️ 절댓값 거리로 정렬하면 안 된다 — 아래 레벨이 위 레벨과 같은 거리라 이미 통과한 교재가 끼어든다.
+//      (옛 동작: Lv.3 탈락에 3·4·2 가 나갔다.) 아래 레벨은 후보에서 아예 뺀다.
+const PICK_SPAN = 2
+function inPickRange(b: Row, want: number): boolean {
   const lv = b.target_level as number | null
-  return lv == null ? NO_LEVEL_DIST : Math.abs(lv - want)
+  return lv != null && lv >= want && lv < want + PICK_SPAN
 }
 
 async function ownedIds(admin: ReturnType<typeof adminClient>, uid: string): Promise<Set<string>> {
@@ -99,19 +101,24 @@ Deno.serve(async (req) => {
 
       const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
       const rows = (data ?? []).filter((b: Row) => !mine.has(b.id as string))
-      // 정렬 = ①목표 레벨과 가까운 순 ②거리가 같으면 위 레벨 먼저(이미 통과한 아래 레벨 교재는 뒤로)
-      //        ③그래도 같으면 스토어 노출순. 안정 정렬에 기대지 않고 2·3차 키를 명시한다.
+
+      let out = rows
       if (hasLevel) {
-        rows.sort((a: Row, b: Row) => {
-          const d = levelDist(a, want) - levelDist(b, want)
-          if (d !== 0) return d
-          const up = ((b.target_level as number | null) ?? 0) - ((a.target_level as number | null) ?? 0)
-          if (up !== 0) return up
+        // ①대상 두 레벨만 남기고 ②낮은 레벨(=지금 도전할 레벨) 먼저 ③같은 레벨이면 스토어 노출순.
+        //   안정 정렬에 기대지 않고 2차 키를 명시한다.
+        const ranged = rows.filter((b: Row) => inPickRange(b, want))
+        ranged.sort((a: Row, b: Row) => {
+          const lv = ((a.target_level as number) ?? 0) - ((b.target_level as number) ?? 0)
+          if (lv !== 0) return lv
           return ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0)
         })
+        // 해당 레벨 교재가 아직 없으면(상위 레벨 미출간) 빈 칸으로 두지 말고 '레벨 무관' 책으로만 채운다.
+        //   아래 레벨로는 채우지 않는다 — 이미 통과한 교재를 다시 권하는 게 추천의 실패 사례였다.
+        const anyLevel = rows.filter((b: Row) => (b.target_level as number | null) == null)
+        out = ranged.length >= limit ? ranged : [...ranged, ...anyLevel]
       }
       return json({
-        ebooks: rows.slice(0, limit).map((b: Row) => shape(b, false, lang)),
+        ebooks: out.slice(0, limit).map((b: Row) => shape(b, false, lang)),
         // 어떤 레벨을 기준으로 골랐는지(디버그·문구용). 레벨 없이 부르면 null.
         forLevel: hasLevel ? want : null,
       })

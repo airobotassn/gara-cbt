@@ -1,9 +1,9 @@
 // 미니게임 게임별 랭킹 모달 — 게임 인트로/아웃트로 우상단 '랭킹' 버튼이 열고, 전체 유저 보드를 보여준다.
 //   · 게임 HTML 안이 아니라 **부모(앱)** 에 그린다: 게임이 6개라 안에 그리면 같은 UI 를 6번 유지해야 하고
 //     아바타·다크모드·세션을 iframe 이 갖고 있지 않다. 게임은 postMessage 로 열기만 요청한다(MiniGame.tsx).
-//   · ⚠️ 디자인은 새로 만들지 않는다 — 리스트는 `/ranking` 과 **같은 `.hof-*`**(ranking.css), 모달 껍데기는
-//     이 화면의 기존 모달 `.mgm-*`(minigame.css)를 그대로 쓴다. 순위 숫자에 금·은·동 색을 넣지 말 것:
-//     ranking.css 가 "상위 3위는 빨강/금색 대신 옅은 블루 강조"로 이미 결정해 둔 규칙이다.
+//   · ⚠️ 디자인은 새로 만들지 않는다 — 시상대(TOP3)·리스트(4위~)·내 순위 바 전부 `/ranking` 과 **같은
+//     `.hof-*`**(ranking.css), 모달 껍데기는 이 화면의 기존 모달 `.mgm-*`(minigame.css)를 그대로 쓴다.
+//     시상대 메달색도 ranking.css 규칙대로 금·은·동이 아니라 코발트 3단계다(토큰은 minigame.css 의 .mgr-modal).
 //   · 지표(metric)에 따라 값 표기만 다르다: 'score'=점수, 'level'=도달 레벨(+동률 해소용 소요시간 병기).
 import { useEffect, useState } from 'react'
 import { callFunction } from '../lib/supabase'
@@ -85,7 +85,11 @@ export default function MiniGameRankModal({
 
   const metric = data?.metric ?? 'score'
   const val = (v: number) => (metric === 'level' ? `Lv.${v}` : v.toLocaleString())
-  const meInTop = !!data?.top.some((r) => r.me)
+  // 시상대 = 2·1·3 순서로 배치(가운데가 1위). 3명 미만이면 빈 칸으로 자리만 잡는다 — /ranking 과 동일.
+  const top = data?.top ?? []
+  const podium = [top[1], top[0], top[2]]
+  const podClass = ['p2', 'p1', 'p3']
+  const rest = top.slice(3)
   // '상위 N%' — Ranking.tsx 와 동일 계산(백분위 없으면 순위/총원으로 대체, 최소 1%).
   const mePct = data?.me
     ? data.me.percentile != null
@@ -120,43 +124,80 @@ export default function MiniGameRankModal({
         {!err && !data && <p className="mgr-note mgr-mid">불러오는 중…</p>}
 
         {data && !err && (
-          data.top.length === 0 ? (
+          top.length === 0 ? (
             <p className="mgr-note mgr-mid">아직 기록이 없어요. 첫 기록의 주인이 되어보세요!</p>
           ) : (
-            <div className="hof-list">
-              {data.top.map((r) => (
-                <div key={r.rank} className={`hof-row ${r.me ? 'me' : ''}`}>
-                  <span className="rk">{r.rank}</span>
-                  <Avatar avatarUrl={avatarUrlOf(r)} seed={r.name} size={36} />
-                  <span className="nm">
-                    {r.name}
-                    {r.me ? <span className="meflag">{t('rank.you')}</span> : null}
-                  </span>
-                  <span className="pt">
-                    {val(r.score)}
-                    {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
-                  </span>
+            <>
+              {/* === 시상대 TOP 3 — /ranking 과 같은 그림·좌표(ranking.css). 제목만 없다(모달 헤더가 대신한다). === */}
+              <div className="hof-podium">
+                <div className="hof-podium-art">
+                  <img src="/ranking/podium.png" alt="" className="hof-podium-img" />
+                  {podium.map((r, i) =>
+                    r ? (
+                      <span key={r.rank} className={`hof-slot ${podClass[i]}`}>
+                        <Avatar avatarUrl={avatarUrlOf(r)} seed={r.name} size={120} />
+                      </span>
+                    ) : null,
+                  )}
+                  {podium.map((r, i) =>
+                    r ? (
+                      <div key={`n${r.rank}`} className={`hof-pn ${podClass[i]}`}>
+                        <span className="hof-pn-txt">
+                          <b>{r.name}</b>
+                          <span>
+                            {val(r.score)}
+                            {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
+                          </span>
+                        </span>
+                      </div>
+                    ) : null,
+                  )}
                 </div>
-              ))}
-            </div>
+              </div>
+
+              {/* === 4위 ~ === 티어리스트 바. 미니게임엔 티어가 없어 방패 소켓은 비워 둔다. */}
+              {rest.length > 0 && (
+                <div className="hof-list">
+                  {rest.map((r) => (
+                    <div key={r.rank} className={`hof-row ${r.me ? 'me' : ''}`}>
+                      <div className="hof-bar">
+                        <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
+                        <span className="bar-rk">{r.rank}</span>
+                        <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(r)} seed={r.name} size={48} /></span>
+                        <span className="bar-nm">
+                          {r.name}
+                          {r.me ? <span className="meflag">{t('rank.you')}</span> : null}
+                        </span>
+                        <span className="bar-pt">
+                          {val(r.score)}
+                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )
         )}
 
-        {/* 내 순위 — TOP N 안에 있으면 위에서 이미 강조되므로 생략. /ranking 의 내 순위 바와 동일 컴포넌트. */}
+        {/* 내 순위 — TOP N 안에 있어도 항상 보여준다(/ranking 과 같은 규칙). 위 목록과 중복돼도
+            '내 기록이 지금 몇 등인지'를 찾아 스크롤하지 않게 하는 쪽이 낫다. */}
         {data && !err && (
           data.me ? (
-            !meInTop && (
-              // 구조·크기 전부 /ranking 의 내 순위 바와 동일: 이름 아래 small 로 '상위 N%'(meflag 대신).
-              <div className="hof-mebar">
-                <div className="rk">{data.me.rank}</div>
-                <Avatar avatarUrl={avatarUrlOf(data.me)} seed={data.me.name} size={38} />
-                <div className="nm">
+            // 구조·크기 전부 /ranking 의 내 순위 바와 동일: 이름 옆 small 로 '상위 N%'(meflag 대신).
+            <div className="hof-mebar">
+              <div className="hof-bar">
+                <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
+                <span className="bar-rk">{data.me.rank}</span>
+                <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(data.me)} seed={data.me.name} size={48} /></span>
+                <span className="bar-nm">
                   {data.me.name}
                   <small>{t('rank.top_label')} {mePct}%</small>
-                </div>
-                <div className="pt">{val(data.me.score)}</div>
+                </span>
+                <span className="bar-pt">{val(data.me.score)}</span>
               </div>
-            )
+            </div>
           ) : (
             <p className="mgr-note mgr-mid">
               {data.needsAuth ? '로그인하면 내 순위가 표시돼요.' : '아직 내 기록이 없어요 — 한 판 하고 오면 등록됩니다.'}

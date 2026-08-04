@@ -1,0 +1,127 @@
+/* earthhero: EarthHero.tsx — 랜딩 히어로 우주 배경 + 지구 영상 (다크 고정)
+ *
+ * 기하 상수의 출처 (건드리기 전에 반드시 읽을 것):
+ *   영상 프레임 1760x1760 안에서 구는 중심 (880.5, 880.5) = 50.03%, 반지름 855.5px.
+ *   화면에 보이는 구 반지름을 --R 이라 할 때
+ *     영상 폭   = R * 1760/855.5   = R * 2.05728
+ *     left/top  = 중심 - R * 880.5/855.5 = 중심 - R * 1.02922
+ *   NASA 4K 원본(3840x2160, 구 중심 1913.5/1076.5, 반지름 855.5)을
+ *   crop=1760:1760:1033:196 으로 잘라낸 결과다. 영상을 갈면 이 숫자를 다시 재야 한다.
+ */
+
+.eh {
+  /* ==== 조절 손잡이 ==== */
+  --R: 64vw; /* 화면에 보이는 지구 반지름 */
+  --cx: 50%; /* 지구 중심 가로 위치 */
+  /* 지구 꼭대기가 화면 44% 지점에 오도록.
+     ⚠️ 배경 구도는 레퍼런스 그대로 고정이다. 화면이 답답해 보여도 여기 값을 옮기지 말 것 —
+        UI 쪽(landing.css)에서 풀어야 한다. */
+  --cy: calc(44vh + var(--R));
+  --rot: -10deg; /* 지구 기울기 — 어느 지역이 위로 올라올지 */
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000208;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== 별 배경 (2겹) + 성운 빛 ===== */
+.eh-stars,
+.eh-stars2,
+.eh-streak {
+  position: absolute;
+  inset: 0;
+}
+.eh-stars {
+  background-image:
+    radial-gradient(1px 1px at 78% 18%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 64% 62%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 88% 40%, rgba(200, 220, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 70% 84%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 95% 70%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.2px 1.2px at 83% 8%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 58% 30%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 92% 22%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.4px 1.4px at 75% 50%, rgba(220, 230, 255, 0.65), transparent),
+    radial-gradient(1px 1px at 99% 88%, rgba(255, 255, 255, 0.45), transparent);
+}
+.eh-stars2 {
+  background-image:
+    radial-gradient(1px 1px at 8% 12%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.3px 1.3px at 22% 30%, rgba(220, 230, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 35% 8%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 12% 45%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 45% 20%, rgba(200, 220, 255, 0.85), transparent),
+    radial-gradient(1px 1px at 55% 5%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 30% 55%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.2px 1.2px at 5% 70%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 48% 42%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1.4px 1.4px at 68% 15%, rgba(220, 235, 255, 0.75), transparent),
+    radial-gradient(1px 1px at 90% 55%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 60% 33%, rgba(255, 255, 255, 0.4), transparent);
+}
+.eh-streak {
+  background:
+    radial-gradient(ellipse 40% 30% at 78% 12%, rgba(90, 140, 220, 0.07), transparent 70%),
+    radial-gradient(ellipse 30% 25% at 15% 20%, rgba(80, 120, 200, 0.05), transparent 70%);
+}
+
+/* ===== 지구 영상 — 구 중심을 (--cx, --cy) 에 고정 ===== */
+.eh-video {
+  position: absolute;
+  /* ⚠️ Tailwind preflight 가 video 에 max-width:100%; height:auto 를 걸어둔다.
+     그대로 두면 화면 폭에서 잘려 구 기하가 통째로 어긋난다(실제로 겪었다).
+     영상이 정사각이라 height 도 width 와 같은 값을 명시해 intrinsic 크기에 의존하지 않게 한다. */
+  max-width: none;
+  width: calc(var(--R) * 2.05728);
+  height: calc(var(--R) * 2.05728);
+  left: calc(var(--cx) - var(--R) * 1.02922);
+  top: calc(var(--cy) - var(--R) * 1.02922);
+  transform: rotate(var(--rot));
+  transform-origin: 50.03% 50.03%; /* 영상 속 구 중심 */
+  /* 프레임 경계가 보이지 않게 구 모양으로 잘라낸다 (구 반지름의 1.02배) */
+  -webkit-clip-path: circle(calc(var(--R) * 1.02) at 50.03% 50.03%);
+  clip-path: circle(calc(var(--R) * 1.02) at 50.03% 50.03%);
+  filter: saturate(1.25) brightness(1.02) contrast(1.16) url(#eh-sharpen);
+}
+.eh-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* 지구 표면 위 파란 앰비언트 */
+.eh-tint {
+  position: absolute;
+  width: calc(var(--R) * 2);
+  height: calc(var(--R) * 2);
+  left: calc(var(--cx) - var(--R));
+  top: calc(var(--cy) - var(--R));
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 8%,
+    rgba(70, 130, 230, 0.22) 0%,
+    rgba(40, 90, 190, 0.1) 30%,
+    transparent 55%
+  );
+  mix-blend-mode: screen;
+}
+
+/* 글자 가독성용 그늘 */
+.eh-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 48% 55% at 50% 40%, rgba(0, 2, 10, 0.35) 0%, transparent 70%),
+    linear-gradient(to bottom, transparent 60%, rgba(0, 3, 12, 0.35) 100%);
+}
+
+/* ===== 모바일 — 지구를 훨씬 크게 잡아 화면 아래를 채운다 ===== */
+@media (max-width: 768px) {
+  .eh {
+    --R: 160vw;
+    --cy: calc(46vh + var(--R));
+  }
+}

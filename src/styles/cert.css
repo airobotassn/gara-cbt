@@ -65,8 +65,8 @@
   gap: 10px;
 }
 
-/* 발급(결제) 전 견본 안내 — 워터마크가 왜 있는지, 발급하면 뭐가 풀리는지 */
-.cert-preview-note {
+/* 디자인 견본 안내 — 이 증서가 왜 내 이름이 아닌지, 발급하면 뭐가 달라지는지 */
+.cert-sample-note {
   width: min(980px, 96vw);
   display: flex;
   align-items: baseline;
@@ -80,14 +80,170 @@
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
-.cert-preview-note b {
+.cert-sample-note b {
   color: var(--blue);
   font-weight: 800;
   letter-spacing: 0.5px;
 }
+
+/* ===== 발급(결제) 전 = 결제 유도 화면 =====
+   자격증 SVG 는 아예 렌더하지 않고 이 카드만 뜬다(캡처로 새어나갈 증서 픽셀이 없음). */
+.cert-gate-page {
+  justify-content: center;
+  padding: 32px 16px 64px;
+}
+.cert-gate {
+  width: min(560px, 100%);
+  padding: 34px 28px 30px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+.cert-gate-lock {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--blue) 28%, transparent);
+  color: var(--blue);
+  font-size: 30px;
+}
+/* 카드 제목 — --fs-lg 는 히어로용(최대 52px)이라 이 카드엔 과하다 */
+.cert-gate-title {
+  font-size: clamp(21px, 2.6vw, 26px);
+  line-height: 1.35;
+  font-weight: 800;
+  color: var(--ink);
+  word-break: keep-all;
+}
+.cert-gate-lead {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+/* 취득 정보 요약 — 증서를 보여주지 않는 대신 "무엇이 준비돼 있는지"만 알린다 */
+.cert-gate-meta {
+  margin: 22px 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+  overflow: hidden;
+  text-align: left;
+}
+.cert-gate-meta > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+}
+.cert-gate-meta > div + div {
+  border-top: 1px solid var(--line);
+}
+.cert-gate-meta dt {
+  color: var(--dim);
+  font-size: var(--fs-sm);
+  flex: none;
+}
+.cert-gate-meta dd {
+  color: var(--ink);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  text-align: right;
+  word-break: break-all;
+}
+.cert-gate-masked {
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 영문 성명 입력 — 자격증에 각인되는 값이라 발급 신청 화면에서 가장 눈에 띄게 둔다 */
+.cert-gate-field {
+  text-align: left;
+  margin: 0 0 20px;
+}
+.cert-gate-field label {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+.cert-gate-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: var(--fs-md);
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+.cert-gate-field input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent);
+}
+.cert-gate-hint {
+  margin-top: 7px;
+  font-size: var(--fs-sm);
+  color: var(--dim);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+/* 발급하면 풀리는 것 */
+.cert-gate-perks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  list-style: none;
+  padding: 0;
+}
+.cert-gate-perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.cert-gate-perks .material-symbols-outlined {
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--blue);
+  flex: none;
+}
+.cert-gate-paid {
+  margin: 22px 0 4px;
+  color: var(--dim);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.cert-gate-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
 .cert-issue-err {
   color: var(--red, #ba1a1a);
   font-size: var(--fs-sm);
+}
+.cert-gate .cert-issue-err {
+  margin-top: 8px;
 }
 
 /* 워터마크는 드래그·선택으로 떼어낼 수 없게 */
@@ -134,12 +290,13 @@
   }
   .cert-page .exam-home,
   .cert-actions,
-  .cert-preview-note,
+  .cert-sample-note,
   .cert-issue-err,
   .cert-lang-tabs {
     display: none !important;
   }
-  /* ⚠️ 미리보기 워터마크는 SVG 안에 있으므로 인쇄/PDF 저장에도 그대로 남는다(제거 금지). */
+  /* ⚠️ 견본 워터마크는 SVG 안에 있으므로 인쇄/PDF 저장에도 그대로 남는다(제거 금지). */
+  /* ⚠️ 결제 유도 화면(.cert-gate)은 인쇄해봐야 자격증이 아니다 — 내 증서 SVG 는 발급 후에만 존재한다. */
   /* 새 시안 비율(≈1.38)이 A4 가로(≈1.41)보다 세로로 살짝 길어 — 높이에 맞춰 한 장에 담는다.
      SVG viewBox+preserveAspectRatio(기본 meet)가 페이지 안에서 비율 유지·가운데 정렬. */
   .cert-canvas {
@@ -554,5 +711,13 @@
   .cert-actions {
     flex-wrap: wrap;
     justify-content: center;
+  }
+  .cert-gate {
+    padding: 28px 20px 26px;
+    border-radius: 18px;
+  }
+  .cert-gate-actions .exam-btn,
+  .cert-gate-actions .exam-btn-ghost {
+    flex: 1 1 100%;
   }
 }

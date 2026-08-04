@@ -526,6 +526,9 @@ alter table profiles add column if not exists country_code     text;
 alter table profiles add column if not exists region_code      text references regions(code);
 alter table profiles add column if not exists school_id        text references schools(id) on delete set null;
 alter table profiles add column if not exists region_locked_at timestamptz;
+-- 닉네임 상태(최초 설정 / 1회 변경 소진) — 상세는 migrations/20260803010000_nickname_lock.sql
+alter table profiles add column if not exists nickname_set_at     timestamptz;
+alter table profiles add column if not exists nickname_changed_at timestamptz;
 
 -- (5) 부분 인덱스 (탈퇴자 제외)
 create index if not exists profiles_region_idx  on profiles (region_code)  where deactivated_at is null;
@@ -536,8 +539,10 @@ create index if not exists profiles_school_idx  on profiles (school_id)    where
 --   ⚠️ school_id 컬럼 추가(4) 이후에 emit (GRANT 목록이 school_id 를 참조).
 --   ⚠️ 테이블 REVOKE 후 허용 컬럼만 재부여 (컬럼-only revoke 는 무력화됨).
 --   service_role 은 revoke 대상이 아니므로 여전히 전 컬럼 쓰기 가능.
+-- ⚠️ display_name 은 목록에서 빠져 있다 — 닉네임은 set-nickname(service role)만 쓴다.
+--    (최초 1회 설정 + 이후 1회 변경 규칙: migrations/20260803010000_nickname_lock.sql)
 revoke update on public.profiles from authenticated, anon;
-grant  update (display_name, avatar_url, school_id, deactivated_at) on public.profiles to authenticated;
+grant  update (avatar_url, school_id, deactivated_at) on public.profiles to authenticated;
 
 -- (7) 락 방어심층 — 트리거. 락 이후 지역 컬럼이 실제 변경될 때만 차단(GUC 우회).
 --   deactivated_at 등 비지역 컬럼만 바뀌는 update(재활성/탈퇴)는 통과.

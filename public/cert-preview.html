@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CARIS 레벨 테스트 인증서 — 미리보기</title>
 <style>
-  /* 서체 — 제목·브랜드=송명, 이름·날짜=Noto Serif KR (둘 다 OFL) */
-  @font-face{font-family:SongMyung;font-weight:400;font-display:swap;src:url(cert/song-myung-korean-400-normal.woff2) format('woff2')}
+  /* 서체 — 이름·취득일용 Noto Serif KR(OFL) 하나뿐이다.
+     브랜드·제목·LEVEL·숫자는 전부 확정 시안 에셋(PNG)이라 영문 세리프를 따로 싣지 않는다. */
   @font-face{font-family:NotoSerifKR;font-weight:700;font-display:swap;src:url(cert/noto-serif-kr-korean-700-normal.woff2) format('woff2')}
 
   :root{ --ui:'Pretendard Variable',Pretendard,'Noto Sans KR','Malgun Gothic',system-ui,sans-serif; }
@@ -45,28 +45,38 @@
   /* 좌측 컬럼 — 폭 560px, 캔버스 세로 정중앙, 안의 요소는 같은 중심선에 가운데 정렬 */
   .col{position:absolute;left:82px;top:50%;transform:translateY(-50%);width:560px;text-align:center}
 
-  /* 브랜드 락업 — 'CARIS' 글자가 컬럼 중앙에 오도록 로고 폭의 절반만큼 왼쪽으로 민다 */
-  .brand{display:flex;align-items:center;justify-content:center;gap:2px;margin-bottom:26px;
-         transform:translateX(-40px)}
-  .brand img{height:52px;filter:drop-shadow(0 0 14px rgba(224,192,124,.3))}
-  .brand span{font:400 34px SongMyung,var(--ui);letter-spacing:9px;text-indent:9px;
-              background:linear-gradient(180deg,#fff6d9 0%,#f6de9e 30%,#e8bf65 52%,#c99433 76%,#f0d489 100%);
-              -webkit-background-clip:text;background-clip:text;color:transparent;
-              filter:drop-shadow(0 1px 0 rgba(0,0,0,.4))}
+  /* 발행기관 워드마크 — 제목 위 락업(옛 CARIS 락업 자리).
+     에셋은 원본에서 알파 여백을 잘라낸 판이라 높이만 주면 그대로 앉는다. */
+  .brand{display:block;height:52px;margin:0 auto 30px;
+         filter:drop-shadow(0 0 16px rgba(224,192,124,.3))}
 
-  .title{font:400 64px SongMyung,var(--ui);letter-spacing:6px;text-indent:6px;white-space:nowrap;
-         background:linear-gradient(180deg,#fff6d9 0%,#f6de9e 30%,#e8bf65 52%,#c99433 76%,#f0d489 100%);
-         -webkit-background-clip:text;background-clip:text;color:transparent;
-         filter:drop-shadow(0 1px 0 rgba(0,0,0,.4)) drop-shadow(0 0 24px rgba(230,180,80,.3))}
+  /* 제목 — 확정 시안 에셋(LEVEL TEST / CERTIFICATE 2줄 금박 각인).
+     CSS 금박 텍스트로 흉내내던 걸 그림으로 교체했다 → 서체·자간·그라디언트를 여기서 만지지 않는다.
+     ⚠️ 아래 크기 4종(.title 폭 · .mark 간격 · cap/num 높이)은 React 판 src/styles/levelcert.css 의
+     .lc-title/.lc-mark/.lc-mark-cap/.lc-mark-num 과 **같은 값이어야 한다**. */
+  .title{display:block;width:440px;margin:0 auto;
+         filter:drop-shadow(0 0 26px rgba(230,180,80,.28))}
 
   .name{margin-top:48px;font:700 58px NotoSerifKR,var(--ui);letter-spacing:9px;text-indent:9px;
         color:#fff;text-shadow:0 0 26px rgba(255,235,190,.3);
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  /* LEVEL 워드마크 + 숫자 — 둘 다 에셋 */
-  .mark{margin-top:46px;display:flex;align-items:center;justify-content:center;gap:26px}
-  .mark-cap{height:52px;filter:drop-shadow(0 0 18px rgba(224,192,124,.28))}
+  /* LEVEL 워드마크 + 숫자 — 둘 다 에셋.
+     크기는 폭이 아니라 **높이**로 잡는다. 숫자 폭이 글자마다 달라(1=21px, 4=37px) 줄 폭을 고정하면
+     레벨을 바꿀 때마다 LEVEL 워드마크가 커졌다 작아졌다 한다.
+     cap 과 num 은 반드시 같은 높이 — 예전 숫자가 가는 세리프라 58px 로 키워뒀던 게 지금은 안 맞는다. */
+  .mark{margin-top:44px;display:flex;align-items:center;justify-content:center;gap:24px}
+  .mark-cap{height:58px;filter:drop-shadow(0 0 18px rgba(224,192,124,.28))}
   .mark-num{height:58px;filter:drop-shadow(0 0 18px rgba(224,192,124,.28))}
+
+  /* 발행기관 — 잔글씨. ⚠️ 금색으로 쓰지 말 것.
+     이 인증서의 금색은 전부 금박 각인 질감 + 광택 림을 가진 이미지 자산이라, CSS 금색 텍스트를 얹으면
+     혼자 납작해서 따로 논다(하이라이트 0%). 재질 경쟁을 피하려고 일부러 무채에 가까운 웜톤으로 뺐다.
+     구분선만 아주 옅은 금빛 헤어라인 — 면적이 없어 질감이 문제되지 않는다. */
+  .issuer{margin-top:38px;font:400 20px NotoSerifKR,var(--ui);letter-spacing:3.5px;text-indent:3.5px;
+          color:rgba(228,216,194,.58);white-space:nowrap}
+  .issuer::before{content:'';display:block;width:120px;height:1px;margin:0 auto 20px;
+                  background:linear-gradient(90deg,transparent,rgba(224,192,124,.45),transparent)}
 
   /* 북두칠성 SVG — 좌표계는 원본 dipper.png(1122×1402) 그대로 */
   .dipper{left:690px;top:96px;width:720px;height:760px}
@@ -89,13 +99,14 @@
   <img class="orn bl" src="cert/corner.png" alt=""><img class="orn br" src="cert/corner.png" alt="">
 
   <div class="col">
-    <div class="brand"><img src="cert/logo-gold.png" alt=""><span>CARIS</span></div>
-    <div class="title">레벨 테스트 인증서</div>
+    <img class="brand" src="cert/logo-gara.png" alt="GARA">
+    <img class="title" src="cert/title-word.png" alt="LEVEL TEST CERTIFICATE">
     <div class="name" id="name">홍길동</div>
     <div class="mark">
       <img class="mark-cap" src="cert/level-word.png" alt="LEVEL">
       <img class="mark-num" id="lv-num" src="cert/num-3.png" alt="3">
     </div>
+    <div class="issuer">Global AI &amp; Robotics Association</div>
   </div>
 
   <div class="abs dipper">

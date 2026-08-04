@@ -7,7 +7,9 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/scoring.ts'
 import { gameSpec } from '../_shared/minigames.ts'
 
-const TOP_N = 20
+// /ranking 의 leaderboard 함수와 같은 값으로 맞춘다 — 같은 구성(시상대+나머지+내 순위)을 쓰는데
+// 여기만 20이면 게임 중에 뜨는 모달에서 스크롤이 두 배로 길어진다.
+const TOP_N = 10
 
 interface RankRow {
   rank: number

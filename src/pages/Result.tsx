@@ -443,7 +443,9 @@ function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
 //   승급했으면 다음 레벨 교재를, 아니면 지금 레벨 교재를 권한다. 이미 산 책은 서버가 제외.
 //   ⚠️ 레벨당 1권 체계라 매칭 기준은 레벨 하나뿐 — 6축 약점 기반으로 가려면 책이 레벨 안에서
 //      갈라진 뒤 ebooks 에 축 태그를 붙여야 한다.
-const EBOOK_PICKS = 3
+// 2권 = 지금 도전할 레벨 + 다음 레벨. 3권이던 시절엔 남는 칸을 이미 통과한 아래 레벨이 채웠다.
+//   ⚠️ 개수를 바꾸면 result.css 의 .rb-grid 열 수도 같이 맞출 것(빈 칸이 생긴다).
+const EBOOK_PICKS = 2
 function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; level: number; promoted: boolean }) {
   const [books, setBooks] = useState<EbookRow[] | null>(null)
 
