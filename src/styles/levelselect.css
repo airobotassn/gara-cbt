@@ -467,6 +467,15 @@
   color: #a9b6cf;
 }
 
+/* 카드 제목(Lv.N 이름) — 금박 명판을 둘렀다가 뺀 자리다(이유는 LevelSelect.tsx 주석).
+   남은 건 아래 금선 하나뿐: '금 = 강조' 라는 이 화면의 규칙은 지키되, 물건이 아니라 선이라
+   옆에 붙는 응시 버튼(금박 에셋)과 안 싸운다. */
+.lvn-title {
+  display: inline-block;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(240, 212, 147, 0.42);
+}
+
 /* 표시용 서체 = 인증서와 같은 명조(cert.css 의 CertMyeongjo = NanumMyeongjo ExtraBold).
    ⚠️ 657KB 짜리 한글 웹폰트다. 이 화면에선 h1 과 카드 제목 딱 둘에만 쓴다 — 본문까지 물리면 안 된다.
    font-display: swap 이라 받는 동안엔 Pretendard 로 먼저 그려진다. */

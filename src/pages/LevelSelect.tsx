@@ -280,7 +280,11 @@ export default function LevelSelect() {
             </button>
             {/* 레벨 번호 네모 배지는 삭제 — 바로 옆 "Lv.7 마스터" 가 같은 숫자를 이미 말한다(중복).
                 금색 사각형이 하나 줄면서 이 화면의 금색은 '응시 시작' 하나로 모인다. */}
-            <b className="lvn-display flex-1 min-w-0 text-[27px] md:text-[34px] text-on-surface tracking-tight break-keep">
+            {/* 제목에 금박 명판을 둘렀다가 뺐다 — 카드가 2단이라 제목(왼쪽)과 응시 버튼(오른쪽)이
+                나란히 붙는데, 버튼이 금박 에셋이라 둘 다 판을 두르면 금색 덩어리 둘이 정면으로 싸운다.
+                밑에 별자리까지 금이라 화면에 화려한 게 셋이 된다. 제목은 금선 하나만 남긴다.
+                (에셋은 public/cert/cta-plate2.webp 에 남아있다) */}
+            <b className="lvn-title lvn-display min-w-0 text-[27px] md:text-[34px] text-on-surface tracking-tight break-keep">
               Lv.{focus} {t(`lv.${focus}.name`)}
             </b>
             <button

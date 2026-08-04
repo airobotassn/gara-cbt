@@ -20,7 +20,23 @@ export default function EarthHero() {
     const el = vid.current
     if (!el) return
     // muted+playsInline 이라 대개 통과하지만, 막히면 poster 로 떨어지게 조용히 무시한다.
-    el.play().catch(() => {})
+    //
+    // ⚠️ 마운트 때 한 번만 부르면 안 된다. 크롬은 백그라운드 탭의 미디어를 정지시키는데,
+    //    돌아와도 스스로 재개하지 않아 지구가 멈춘 채로 남는다(탭 전환하면 재현된다).
+    //    그래서 ① 탭이 다시 보일 때 ② 누가 됐든 pause 가 걸릴 때 다시 튼다.
+    //    항상 play() 를 부르지 않고 paused 일 때만 부르는 이유 = 재생 중에 부르면
+    //    프레임이 튀고, 실패한 play() 프로미스가 콘솔을 채운다.
+    const kick = () => {
+      if (document.visibilityState !== 'visible') return
+      if (el.paused) el.play().catch(() => {})
+    }
+    kick()
+    document.addEventListener('visibilitychange', kick)
+    el.addEventListener('pause', kick)
+    return () => {
+      document.removeEventListener('visibilitychange', kick)
+      el.removeEventListener('pause', kick)
+    }
   }, [])
 
   // ⚠️ prefers-reduced-motion 으로 재생을 막지 않는다.
