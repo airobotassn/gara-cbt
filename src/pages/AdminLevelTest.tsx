@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
+import { optionCapForLevel } from '../lib/scoring'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 // 채팅 검수·이북 관리는 Admin.tsx 에 정의된 컴포넌트를 그대로 노출(데이터는 admin 함수). 위치만 WORLD ARENA 로 이동.
 import { ChatModAdmin, EbooksAdmin } from './Admin'
@@ -1075,6 +1076,8 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
   const [busy, setBusy] = useState(false)
   const axes = axesForLevel(level, 'ko')
   const koCount = Math.max(1, (oi.ko ?? []).length)
+  // 레벨1~3은 보기 4개 고정(4지선다). 서버도 같은 값으로 막는다 — lib/scoring.ts 의 OPTIONS_BY_LEVEL.
+  const cap = optionCapForLevel(level)
   const ALL_LANGS = ['ko', ...LANGS]
   const koOpts = (oi.ko ?? []).map((s) => (s ?? '').trim())
   const koReady = !!(pi.ko ?? '').trim() && koOpts.length >= 2 && koOpts.every(Boolean)
@@ -1144,6 +1147,7 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
   async function save() {
     if (!(pi.ko ?? '').trim()) { setMsg('문제(한국어)를 입력하세요.'); return }
     if (koOpts.length < 2 || koOpts.some((s) => !s)) { setMsg('보기(한국어)를 모두 채우세요. (2개 이상)'); return }
+    if (cap != null && koOpts.length !== cap) { setMsg(`레벨 ${level}은 보기 ${cap}개 고정입니다. (현재 ${koOpts.length}개 — ✕ 로 지우세요)`); return }
     if (!cat) { setMsg('영역을 선택하세요.'); return }
     const { P, O, E, dropped } = buildI18n()
     setBusy(true)
@@ -1180,6 +1184,18 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
               const lv = +e.target.value
               setLevel(lv)
               setCat(axesForLevel(lv, 'ko')[0]?.key ?? '')
+              // 보기 개수가 고정인 레벨로 바꾸면 배열 길이도 맞춘다(모자라면 빈칸 추가, 넘치면 뒤를 자름)
+              const c = optionCapForLevel(lv)
+              if (c != null) {
+                setOi((o) => {
+                  const next: Record<string, string[]> = {}
+                  for (const [l, arr] of Object.entries(o)) {
+                    next[l] = Array.from({ length: c }, (_, i) => arr[i] ?? '')
+                  }
+                  return next
+                })
+                setCorrect((x) => (x >= c ? 0 : x))
+              }
             }}>
               {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
             </select></label>
@@ -1207,7 +1223,9 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
         </div>
         <div className="admin-sub" style={{ marginTop: 8 }}>문제 ({LANG_LABEL[lang]})</div>
         <input className="admin-in" value={pi[lang] ?? ''} placeholder="문제" onChange={(e) => setPi((p) => ({ ...p, [lang]: e.target.value }))} />
-        <div className="admin-sub">보기 <span className="admin-hint">◉ 표시가 정답 · 보기 개수/정답은 모든 언어 공통</span></div>
+        <div className="admin-sub">보기 <span className="admin-hint">
+          ◉ 표시가 정답 · 보기 개수/정답은 모든 언어 공통{cap != null ? ` · 레벨 ${level}은 ${cap}지선다 고정` : ''}
+        </span></div>
         <div className="opt-editor">
           {Array.from({ length: koCount }, (_, k) => k).map((k) => (
             <div key={k} className={`opt-row ${correct === k ? 'is-correct' : ''}`}>
@@ -1216,10 +1234,11 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
               </label>
               <span className="opt-num">{k + 1}</span>
               <input className="opt-in" value={(oi[lang] ?? [])[k] ?? ''} placeholder={`보기 ${k + 1}`} onChange={(e) => setOptText(lang, k, e.target.value)} />
-              <button className="opt-del" title="삭제" disabled={koCount <= 2} onClick={() => removeOpt(k)}>✕</button>
+              <button className="opt-del" title="삭제" disabled={koCount <= (cap ?? 2)} onClick={() => removeOpt(k)}>✕</button>
             </div>
           ))}
-          <button className="admin-mini" onClick={addOpt}>+ 보기 추가</button>
+          {/* 보기 개수가 고정인 레벨(1~3)에선 추가 자체를 막는다 — 저장해도 서버가 400 으로 되돌린다 */}
+          {cap == null ? <button className="admin-mini" onClick={addOpt}>+ 보기 추가</button> : null}
         </div>
         <div className="admin-sub">해설</div>
         <textarea className="admin-ta" rows={3} value={ei[lang] ?? ''} onChange={(e) => setEi((x) => ({ ...x, [lang]: e.target.value }))} />

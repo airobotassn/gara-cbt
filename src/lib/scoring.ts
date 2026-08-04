@@ -179,3 +179,13 @@ export function tierColor(tier: Tier | null | undefined): string {
 }
 /** 낮은 티어 → 높은 티어. 티어 사다리(대시보드) 노출 순서. */
 export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+
+// ── 레벨별 보기 개수 고정 ──
+// ⚠️ supabase/functions/_shared/scoring.ts 의 VISIBLE_OPTIONS_BY_LEVEL 과 항상 같이 고칠 것.
+// 레벨1~3은 4지선다다. 옛 5지선다 시절 5번째 보기는 2026-08-04 마이그레이션으로 DB 에서 제거됐고
+// (migrations/20260804120000_leveltest_l1_l3_drop_fifth_option.sql), 이 표는 다시 5번째가 생기는 걸 막는다.
+// 값이 없는 레벨(4~7)은 제한 없음 = 5지선다 그대로.
+export const OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4 }
+export function optionCapForLevel(level: number): number | null {
+  return OPTIONS_BY_LEVEL[level] ?? null
+}

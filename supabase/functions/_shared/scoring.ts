@@ -190,12 +190,14 @@ export function toAxisMap(obj: unknown, keys: string[]): AxisMap {
   return out
 }
 
-// 레벨별 노출 선택지 수 상한. 레벨1~3은 4지선다(5번째 선택지 숨김), 그 외는 제한 없음.
-// ⚠️ 정답이 잘리면 안 됨 → 레벨1~3에는 정답=5번(correct_index 4) 문항이 없어야 한다.
-//    레벨1·2는 해당 문항을 비활성화, 레벨3은 보기 스왑으로 번호를 옮겼다
-//    (migrations/20260723110000_leveltest_l3_four_choice.sql).
-//    레벨1~3 문항을 새로 넣을 때도 정답을 1~4번에 둘 것.
-//    (이 표시 컷은 채점에 영향 없음: 채점은 correct_index 로만 함)
+// 레벨별 선택지 수 상한. 레벨1~3은 4지선다, 그 외는 제한 없음(5지선다).
+// ⚠️ 프론트 src/lib/scoring.ts 의 OPTIONS_BY_LEVEL 과 항상 같이 고칠 것.
+// 이제 DB 도 실제로 4개다 — 옛 5지선다 시절 5번째 보기는 6개 언어 전부에서 제거했고,
+// 정답이 5번이던 문항은 그 전에 1~4번으로 스왑했다
+// (migrations/20260804120000_leveltest_l1_l3_drop_fifth_option.sql).
+// 그래서 아래 slice 는 이제 사실상 no-op 이고, 옛 데이터·수동 입력에 대한 안전망으로만 남는다.
+// 새로 넣는 것도 admin-test 의 upsert 검증이 보기 4개·정답 1~4번을 강제한다.
+// (이 컷은 채점에 영향 없음: 채점은 correct_index 로만 함)
 export const VISIBLE_OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4 }
 export function projOptionsForLevel(i18n: unknown, lang: string, level: number): string[] {
   const opts = projOptions(i18n, lang)

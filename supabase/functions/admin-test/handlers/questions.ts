@@ -2,7 +2,7 @@
 //  변경(수정/비활성/활성/삭제)은 question_events 에 한 줄씩 적재 → "문항 이력" 탭의 원천.
 //  CARIS ARENA 이관: questions→test_questions (question_events 는 유지).
 import { json } from '../../_shared/cors.ts'
-import { axisKeysForLevel, SUPPORTED_LANGS, MAX_LEVEL } from '../../_shared/scoring.ts'
+import { axisKeysForLevel, SUPPORTED_LANGS, MAX_LEVEL, VISIBLE_OPTIONS_BY_LEVEL } from '../../_shared/scoring.ts'
 
 interface QRow {
   id?: string
@@ -115,6 +115,12 @@ export async function upsertQuestions(admin: any, body: any, actor: string) {
     }
     if (typeof r.correct_index !== 'number' || r.correct_index < 0 || r.correct_index >= koOpts.length) {
       return json({ error: `#${i + 1}: 정답 인덱스 범위 오류` }, 400)
+    }
+    // 레벨1~3은 4지선다 고정 — 5번째 보기가 다시 생기면 응시 화면에서 잘려 나가고,
+    // 정답이 거기 걸리면 아무도 못 맞히는 문항이 된다.
+    const cap = VISIBLE_OPTIONS_BY_LEVEL[r.level]
+    if (typeof cap === 'number' && koOpts.length !== cap) {
+      return json({ error: `#${i + 1}: 레벨 ${r.level}은 보기 ${cap}개 고정입니다(받은 값 ${koOpts.length}개).` }, 400)
     }
     for (const lang of SUPPORTED_LANGS) {
       const o = r.options_i18n?.[lang]
