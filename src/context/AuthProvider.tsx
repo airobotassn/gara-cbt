@@ -14,7 +14,10 @@ interface AuthState {
   loading: boolean
   // 구글 계정 보유 = 정식 회원. 익명 유저는 false.
   isFullUser: boolean
-  // 세션이 없으면 익명 세션 생성(CARIS ARENA 게스트 응시 시작 직전 호출). CBT 자격검정은 사용 안 함.
+  // 세션이 없으면 익명 세션 생성. ⚠️ 남은 호출부는 SEB 응시(/exam/seb) **하나뿐**이다 —
+  // 레벨테스트 게스트 응시는 2026-08-05 폐지했다(App.tsx LoginGate + start-test 익명 401).
+  // SEB 는 새 브라우저 프로필이라 세션이 없는데 본인인증 수단이 아직 없어 임시로 이걸 쓴다.
+  // 본인인증이 붙으면 SebStart 의 호출을 교체하고 이 함수와 Supabase 익명 로그인 설정을 같이 끌 것.
   ensureAnonymous: () => Promise<void>
   // 결과창 등에서 구글로 로그인/승격.
   loginWithGoogle: (redirectTo?: string) => Promise<void>
@@ -105,7 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const user = session?.user ?? null
 
-  // 세션이 전혀 없을 때만 익명 세션 생성(CARIS ARENA 게스트 응시용). 이미 세션 있으면 no-op.
+  // 세션이 전혀 없을 때만 익명 세션 생성. 이미 세션 있으면 no-op.
+  // ⚠️ 호출부는 SebStart(/exam/seb) 하나뿐 — 레벨테스트 게스트 응시는 폐지됐다(위 인터페이스 주석 참고).
   async function ensureAnonymous() {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { data } = await supabase.auth.getSession()

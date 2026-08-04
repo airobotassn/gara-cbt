@@ -49,16 +49,16 @@ const DIPPER_EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 1], [4, 5]
 export default function LevelSelect() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { ensureAnonymous, isFullUser } = useAuth()
+  const { isFullUser } = useAuth()
   const { t, lang } = useT()
   const [loading, setLoading] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ruleOpen, setRuleOpen] = useState(false) // 등급 규칙 접기(기본 접힘)
-  // 해금된 최고 레벨 = 현재 등급(rank). 게스트/첫 유저 = 1. 승급 시 한 단계씩 해제.
+  // 해금된 최고 레벨 = 현재 등급(rank). 첫 유저 = 1. 승급 시 한 단계씩 해제.
   const [unlocked, setUnlocked] = useState(1)
   // 사다리에서 직접 고른 레벨(null = 기본값인 '내 등급'을 따름)
   const [picked, setPicked] = useState<number | null>(null)
-  // 오늘 남은 응시 횟수(서버 계산). 게스트/미지원이면 null → 표시 생략.
+  // 오늘 남은 응시 횟수(서버 계산). 미지원이면 null → 표시 생략.
   const [dailyLeft, setDailyLeft] = useState<number | null>(null)
   // 별자리 배치는 PC·폰 공통(DIPPER 한 벌). wideSky 는 **크기**에만 쓴다 —
   // 별 지름(46/38px)과 링이 브레이크포인트마다 달라서 선을 자르는 계산에 필요하다.
@@ -124,7 +124,9 @@ export default function LevelSelect() {
     setError(null)
     setLoading(level)
     try {
-      await ensureAnonymous()
+      // 익명(게스트) 응시 폐지(2026-08-05) — 예전엔 여기서 ensureAnonymous() 로 세션을 즉석에서 만들어
+      // 비로그인도 응시가 됐다. 지금은 App.tsx 의 LoginGate 가 이 화면 진입 자체를 막고,
+      // 뚫려도 서버(start-test)가 익명을 401 로 되돌린다.
       const res = await callFunction<StartTestResponse>('start-test', { level, lang })
       navigate(`/test/${res.attemptId}`, { state: res })
     } catch (e) {
@@ -195,7 +197,7 @@ export default function LevelSelect() {
             </span>
             <div className="min-w-0">
               {/* 제목은 인증서와 같은 명조(CertMyeongjo = NanumMyeongjo ExtraBold, cert.css 에 이미 선언).
-                  기본 --font-title-md 는 Hanken Grotesk → 한글이 없어 Pretendard 로 떨어진다.
+                  본문 서체는 Pretendard 하나로 통일됐지만 이 h1 은 일부러 남긴 예외다 —
                   밤하늘·금박 화면에 두꺼운 고딕이 얹히면 그 순간 인증서 집안이 아니게 된다. */}
               <h1 className="lvn-display text-[34px] md:text-[46px] text-on-surface tracking-tight break-keep">
                 {t('lv.title')}

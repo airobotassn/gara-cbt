@@ -54,14 +54,35 @@ function ScrollToTop() {
 // 온보딩(지역) 게이트 — 아레나 진입 시에만.
 // 지역(country_code/region_code)은 아레나 집계 랭킹(지역·국가·학교 탭)과 월드맵에서만 쓰인다.
 // 자격검정 경로(/exam/*·/certificate·verify-cert)는 이 값을 아예 읽지 않으므로 막지 않는다 —
-// 자격증만 따고 나가는 응시자에게 되돌릴 수 없는 선택을 강요하지 않기 위함.
-// 마이페이지도 제외(표시 전용, null 이면 '-'). 익명 게스트는 needsOnboarding=false 라 응시에 지장 없음.
+// 인증서만 따고 나가는 응시자에게 되돌릴 수 없는 선택을 강요하지 않기 위함.
+// 마이페이지도 제외(표시 전용, null 이면 '-').
 // 지역은 나중에 정해도 집계 RPC 가 조회 시점에 profiles 를 조인하므로 과거 기록까지 소급 반영된다.
 const ONBOARDING_ENFORCED = [
   '/arena', // 월드 아레나 지도 (랜딩 CTA · FAB 🌍)
   '/test', // 레벨 응시 (/test/select 등) — 랜딩 검색으로 직행하는 경로가 있어 함께 막는다
   '/ranking', // 명예의 전당
 ]
+
+// 로그인 게이트 — 익명(게스트) 응시 폐지(2026-08-05)로 레벨테스트 경로는 정식 회원 전용이다.
+// 예전엔 링크를 직접 열면 '응시 시작' 시점에 익명 세션이 즉석에서 생겨(LevelSelect 의 ensureAnonymous)
+// 로그인·지역 확인을 전부 건너뛰고 응시가 됐다. 그 구멍을 여기서 막는다.
+// ⚠️ 화면 게이트는 편의일 뿐이고 **실제 차단은 서버(start-test 의 익명 401)** 다 —
+//    익명 로그인 자체는 SEB 응시(/exam/seb)가 아직 쓰고 있어 Supabase 설정에서 못 끈다.
+const LOGIN_REQUIRED = ['/test']
+
+function LoginGate({ children }: { children: ReactNode }) {
+  const { isFullUser, loading } = useAuth()
+  const { pathname, search } = useLocation()
+  const enforced = LOGIN_REQUIRED.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  if (!enforced) return <>{children}</>
+  if (loading) return <GateSpinner />
+  if (!isFullUser) {
+    // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 OAuth 왕복 중 ?next= 를 유실시킨다(AuthCallback 참고).
+    try { sessionStorage.setItem('postLoginRedirect', pathname + search) } catch { /* 무시 */ }
+    return <Navigate to="/login" replace />
+  }
+  return <>{children}</>
+}
 
 // 닉네임 게이트 — 지역과 달리 **전 경로**에서 강제한다.
 // 이유: 가입 트리거가 구글 실명을 display_name 에 넣어서, 안 정하면 랭킹·채팅·레벨테스트 인증서에
@@ -115,7 +136,9 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           <Layout>
-            {/* 닉네임(전 경로) → 지역(아레나 계열) 순서. 아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
+            {/* 로그인(/test) → 닉네임(전 경로) → 지역(아레나 계열) 순서.
+                아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
+            <LoginGate>
             <NicknameGate>
             <OnboardingGate>
             <Routes>
@@ -176,6 +199,7 @@ export default function App() {
             </Routes>
             </OnboardingGate>
             </NicknameGate>
+            </LoginGate>
           </Layout>
         </BrowserRouter>
       </AuthProvider>

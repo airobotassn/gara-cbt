@@ -40,10 +40,16 @@ Deno.serve(async (req) => {
 
     const user = await getUser(req)
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
+    // 익명(게스트) 응시 폐지(2026-08-05). **여기가 실제 차단선이다** —
+    // 화면 게이트(App.tsx LoginGate)는 우회 가능하고, 익명 로그인 자체는 SEB 응시(/exam/seb)가
+    // 아직 써서 Supabase 설정에서 끌 수 없다. 익명 세션을 직접 만들어 이 함수를 때려도 여기서 막힌다.
+    // ⚠️ 막지 않으면: 익명은 시크릿창으로 무한 생성되는데 아래 일일 제한까지 면제였다 →
+    //    Lv.1 문제은행을 통째로 긁어갈 수 있었다.
+    if (user.is_anonymous) return json({ error: 'login_required' }, 401)
 
     const admin = adminClient()
 
-    // 레벨 잠금: 현재 등급(rank)까지만 응시 가능. 게스트/첫 유저 = MIN_LEVEL(1).
+    // 레벨 잠금: 현재 등급(rank)까지만 응시 가능. 첫 유저 = MIN_LEVEL(1).
     // 승급 시 한 단계씩 해제. 클라가 우회해 잠긴 레벨을 시작하지 못하게 서버에서 강제.
     // 관리자는 문항 확인용으로 전 레벨 면제.
     const isAdmin = await isAdminUser(admin, user)
@@ -56,7 +62,7 @@ Deno.serve(async (req) => {
 
     // ⚠️ 옛 쿨다운(3일 1회)은 아래 '하루 N회'로 대체됐다. 되살릴 일이 있으면 true 로.
     const COOLDOWN_ENABLED = false
-    if (COOLDOWN_ENABLED && !user.is_anonymous && !isCooldownExempt(user.email)) {
+    if (COOLDOWN_ENABLED && !isCooldownExempt(user.email)) {
       if (await hasRecentSubmission(admin, user.id)) {
         return json({ error: '최근 3일 내 응시 기록이 있어 지금은 응시할 수 없습니다.' }, 429)
       }
@@ -66,9 +72,9 @@ Deno.serve(async (req) => {
     //   별도 테이블 없이 test_attempts 로 계산한다: 남은 = 기본 + 오늘 승급수 − 오늘 시작수.
     //   · 기준일 = KST 캘린더일(started_at)
     //   · 시작만 하고 이탈한 in_progress/expired 도 '소모'로 센다(시작→이탈 반복으로 무한 응시 방지)
-    //   · 게스트(익명)와 관리자는 면제 — 게스트는 등급이 없어 '승급 시 +1' 규칙 자체가 성립하지 않고,
-    //     결과도 총점만 보이므로 제한 대상이 아니다(기존 쿨다운 정책과 동일한 취급).
-    if (!user.is_anonymous && !isAdmin) {
+    //   · 관리자만 면제. 옛 게스트(익명) 면제는 익명 응시 폐지(2026-08-05)와 함께 제거했다 —
+    //     그 면제가 곧 무제한 응시 구멍이었다.
+    if (!isAdmin) {
       const { left, used, allowed } = await dailyAttemptsLeft(admin, user.id)
       if (left <= 0) return json({ error: 'daily_limit', allowed, used }, 429)
     }
