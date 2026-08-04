@@ -1,12 +1,14 @@
 // chat-post: 유사채팅 보드에 새 메시지 작성.
-//  파이프라인(순서대로 short-circuit): 로그인 게이트 → 입력 검증 → 로컬 배드워드 → OpenAI 모더레이션
-//  → (fail-closed 기본) 모더레이션 장애 시 503으로 즉시 중단, 삽입 없음 → chat_post_atomic RPC(레이트/중복/IP 가드).
+//  파이프라인(순서대로 short-circuit): 로그인 게이트 → 입력 검증 → 로컬 배드워드 → 방 쓰기 권한
+//  → OpenAI 모더레이션 → (fail-closed 기본) 모더레이션 장애 시 503으로 즉시 중단, 삽입 없음
+//  → chat_post_atomic RPC(레이트/중복/IP 가드).
+//  ⚠️ 방 권한 검사가 모더레이션보다 앞이다 — 어차피 거절할 글에 OpenAI 호출을 태우지 않기 위해서.
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang } from '../_shared/lib.ts'
 import { checkBadword, normalizeKo } from '../_shared/badwords_ko.ts'
 import { sha256Hex } from '../_shared/seb.ts'
-import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, CHAT_REQUIRE_LOGIN, containsLink, moderateOpenAI, resolveDisplayName, resolveIpHash } from '../_shared/chat.ts'
+import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, CHAT_REQUIRE_LOGIN, canPostToRoom, containsLink, moderateOpenAI, normalizeRoom, resolvePoster, resolveIpHash } from '../_shared/chat.ts'
 
 const MAX_LEN = 500
 
@@ -17,7 +19,8 @@ Deno.serve(async (req) => {
     if (user == null) return json({ error: 'login_required' }, 401)
     if (CHAT_REQUIRE_LOGIN && user.is_anonymous) return json({ error: 'login_required' }, 401)
 
-    const { body, lang } = await req.json()
+    const { body, lang, room: roomIn } = await req.json()
+    const room = normalizeRoom(roomIn)
     const text = String(body ?? '').trim()
     if (!text) return json({ error: 'empty' }, 400)
     if (text.length > MAX_LEN) return json({ error: 'too_long' }, 400)
@@ -26,6 +29,11 @@ Deno.serve(async (req) => {
     if (!CHAT_ALLOW_LINKS && containsLink(text)) return json({ error: 'blocked_link' }, 422)
 
     const admin = adminClient()
+    const isAnon = !!user.is_anonymous
+    // 익명 글은 이름을 쓰지 않지만 국가는 필요하다(나라 방 권한). 조회는 어차피 한 번뿐.
+    const poster = await resolvePoster(admin, user.id)
+    if (!canPostToRoom(room, poster.country)) return json({ error: 'not_my_country' }, 403)
+
     const mod = await moderateOpenAI(text)
     let modStatus: 'ok' | 'pending' = 'ok'
     if (mod.status === 'flagged') return json({ error: 'blocked_mod' }, 422)
@@ -36,10 +44,9 @@ Deno.serve(async (req) => {
       await admin.from('chat_incidents').insert({ kind: 'mod_unavailable' })
     }
 
-    const isAnon = !!user.is_anonymous
     const contentHash = await sha256Hex(normalizeKo(text))
     const ipHash = await resolveIpHash(req)
-    const displayName = isAnon ? `익명#${user.id.slice(0, 4)}` : await resolveDisplayName(admin, user.id)
+    const displayName = isAnon ? `익명#${user.id.slice(0, 4)}` : poster.name
 
     const { data, error } = await admin.rpc('chat_post_atomic', {
       p_user: user.id,
@@ -50,6 +57,7 @@ Deno.serve(async (req) => {
       p_is_anon: isAnon,
       p_display_name: displayName,
       p_lang: pickLang(lang),
+      p_room: room,
     })
     if (error) {
       const msg = error.message ?? ''

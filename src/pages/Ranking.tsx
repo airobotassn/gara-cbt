@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type Tier } from '../lib/scoring'
 import { useAuth } from '../context/AuthProvider'
@@ -116,14 +116,8 @@ export default function Ranking() {
 
   // 제목 블록 — 시상대가 보일 땐 시상대 그림의 '날개 사이'에 얹히고(PersonalBoard),
   // 로딩·빈 보드·안내 화면에선 평범한 헤더로 그린다. 어느 상태에서도 제목이 사라지지 않게.
-  const titleNode = (
-    <>
-      <h1 className="hof-title">{t('rank.hall')}</h1>
-      <p className="hof-sub">
-        {scope === 'global' ? t('rank.hall_sub') : t('rank.scope_sub', { name: labelOf(scope) })}
-      </p>
-    </>
-  )
+  // 부제('전체 TOP 10' / '경기도 TOP 10')는 제거했다 — 어느 보드인지는 위 탭바가 이미 말해준다.
+  const titleNode = <h1 className="hof-title">{t('rank.hall')}</h1>
 
   // 4~10위 창 안에서 내 행으로 스크롤 — 하단 '내 순위' 바를 탭했을 때(게임 리더보드 관습).
   const listRef = useRef<HTMLDivElement>(null)
@@ -164,6 +158,11 @@ export default function Ranking() {
       {/* 랭킹 진입점이 허브(CARI) 도크 CTA 라 뒤로가기도 허브로 */}
       <TopBar to="/hub" label={t('common.cari')} />
 
+      {/* 제목은 페이지 전체의 제목이라 탭바 **위**, 전체 폭 가운데다.
+          (한때 본문 안에 있었는데, 2단이 되면서 왼쪽 칸 안에 갇혀 화면 기준으로 왼쪽에 치우쳐 보였다.
+           위계도 이쪽이 맞다 — 제목 → 보드 고르는 탭 → 내용) */}
+      <header className="hof-head">{titleNode}</header>
+
       <div className="hof-tabs" role="tablist">
         {SCOPES.map((s) => (
           <button
@@ -181,9 +180,13 @@ export default function Ranking() {
       {/* 방패 엠블럼은 뺐다 — 시상대 1등 링에 이미 왕관이 얹혀 있어 중복이고,
           한 화면 고정 틀에서 110px 을 먹어 4~10위 창이 1줄밖에 안 남았다(2026-08-03). */}
 
+      {/* 본문 래퍼 — 폰에서는 display:contents 라 아무것도 안 하고(지금까지의 세로 흐름 그대로),
+          데스크톱에서만 2단 그리드가 된다: 왼쪽 제목+시상대 / 오른쪽 4~10위+내 순위 바.
+          래퍼가 필요한 이유 = 두 칸에 들어갈 요소(head·podium·listwin·mebar)가 조건부 분기 세 갈래에
+          흩어져 있어서, 공통 부모 없이는 그리드 영역을 지정할 수가 없다. */}
+      <div className="hof-body">
       {data?.needsAuth ? (
         <>
-          <header className="hof-head">{titleNode}</header>
           <div className="panel-card" style={{ textAlign: 'center' }}>
             <p style={{ color: 'var(--muted)', fontSize: 14 }}>{t('rank.scope_guest')}</p>
             <button
@@ -197,7 +200,6 @@ export default function Ranking() {
         </>
       ) : data?.needsRegion ? (
         <>
-          <header className="hof-head">{titleNode}</header>
           <div className="panel-card" style={{ textAlign: 'center' }}>
             <p style={{ color: 'var(--muted)', fontSize: 14 }}>{t('rank.scope_no_region')}</p>
             <Link to="/onboarding" className="btn-ink" style={{ display: 'inline-block', marginTop: 12, textDecoration: 'none' }}>
@@ -206,12 +208,13 @@ export default function Ranking() {
           </div>
         </>
       ) : (
-        <PersonalBoard t={t} data={data} err={err} title={titleNode} listRef={listRef} onPick={setCardOf} />
+        <PersonalBoard t={t} data={data} err={err} listRef={listRef} onPick={setCardOf} />
       )}
 
       {data && !gated ? (
         <MeBar t={t} data={data} isFullUser={isFullUser} loginWithGoogle={loginWithGoogle} onJumpToMe={jumpToMe} />
       ) : null}
+      </div>
 
       {cardData ? (
         <ShareCardModal data={cardData} title={`${cardOf?.name} 카드`} readOnly onClose={() => setCardOf(null)} />
@@ -298,19 +301,18 @@ function MeBar({
 }
 
 // ===== 개인 리더보드 본문(시상대 + 4~10위) — 세 범위가 같은 뷰를 공유한다.
-//       '내 순위' 바는 스크롤 영역 밖이라 여기 없다(MeBar). =====
+//       '내 순위' 바는 스크롤 영역 밖이라 여기 없다(MeBar).
+//       제목도 여기 없다 — 탭바 위 페이지 헤더로 올라갔다(Ranking 본체). =====
 function PersonalBoard({
   t,
   data,
   err,
-  title,
   listRef,
   onPick,
 }: {
   t: TFunc
   data: HofResponse | null
   err: boolean
-  title: ReactNode
   listRef: React.RefObject<HTMLDivElement | null>
   onPick: (u: HofUser) => void
 }) {
@@ -323,19 +325,16 @@ function PersonalBoard({
     <>
       {err ? (
         <>
-          <header className="hof-head">{title}</header>
           <div className="panel-card" style={{ textAlign: 'center', color: 'var(--muted)' }}>
             {t('result.load_failed')}
           </div>
         </>
       ) : !data ? (
         <>
-          <header className="hof-head">{title}</header>
           <div className="panel-card" style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('common.loading')}</div>
         </>
       ) : top.length === 0 ? (
         <>
-          <header className="hof-head">{title}</header>
           <div className="panel-card" style={{ textAlign: 'center' }}>
             <p style={{ color: 'var(--muted)', fontSize: 14 }}>{t('rank.no_record')}</p>
             <Link to="/test/select" className="btn-ink" style={{ display: 'inline-block', marginTop: 12, textDecoration: 'none' }}>
@@ -346,10 +345,8 @@ function PersonalBoard({
       ) : (
         <>
           {/* === 시상대 TOP 3 ===
-              그림 = public/ranking/podium.png (링 3개가 뚫린 투명 PNG).
-              아바타는 링 구멍에, 이름·점수는 그림에 있는 빈 명판에 — 둘 다 그림 기준 %좌표(ranking.css 주석).
-              제목은 시상대 위 일반 헤더 — 옛 시상대의 '날개 사이' 자리는 새 그림엔 없다. */}
-          <header className="hof-head">{title}</header>
+              그림 = public/ranking/podium.png. 아바타는 링 위에, 이름·점수·티어는 그림의 크림 명판 안에.
+              둘 다 그림 기준 %좌표(실측값은 ranking.css 주석). 글자 크기는 cqw 라 그림과 같이 줄어든다. */}
           <div className="hof-podium">
             <div className="hof-podium-art">
               <img src="/ranking/podium.png" alt="" className="hof-podium-img" />
@@ -367,37 +364,38 @@ function PersonalBoard({
                   </button>
                 ) : null,
               )}
-            </div>
-            {/* 이름·점수는 그림 밖 3칸. 그림 안 명판은 폰에서 54×15px 까지 줄어 글자가 안 들어간다. */}
-            <div className="hof-podium-names">
-              {podium.map((u, i) => (
-                <div key={i} className={`hof-pn ${podClass[i]}`}>
-                  {u ? (
-                    <>
-                      {u.tier ? (
-                        <span className="hof-pn-em">
-                          <TierBadge tier={u.tier} size={u.rank === 1 ? 34 : 28} alt={t(`rank.tier_${u.tier}`)} />
-                        </span>
-                      ) : null}
-                      <span className="hof-pn-txt">
-                        <b>{u.name}</b>
-                        <span>{t('rank.pt', { n: u.rating })}</span>
+              {/* 이름·점수·티어 = 그림 안 크림 명판 위. 명판은 1등이 크고 2·3등이 작아서
+                  1등만 두 줄(이름/점수)로, 2·3등은 한 줄로 그린다. */}
+              {podium.map((u, i) =>
+                u ? (
+                  <div key={`pl${u.rank}`} className={`hof-plate ${podClass[i]}`}>
+                    {u.tier ? (
+                      <span className="hof-plate-em">
+                        <TierBadge tier={u.tier} size={40} alt={t(`rank.tier_${u.tier}`)} />
                       </span>
-                    </>
-                  ) : null}
-                </div>
-              ))}
+                    ) : null}
+                    <span className="hof-plate-txt">
+                      <b>{u.name}</b>
+                      <span>{t('rank.pt', { n: u.rating })}</span>
+                    </span>
+                  </div>
+                ) : null,
+              )}
             </div>
           </div>
 
-          {/* === 4 ~ 10 — 화면에서 유일하게 스크롤되는 '창' === */}
-          <div className="hof-listwin" ref={listRef}>
-            <div className="hof-list">
-              {rest.map((u) => (
-                <HofRow key={u.rank} u={u} t={t} onPick={onPick} />
-              ))}
+          {/* === 4 ~ 10 — 화면에서 유일하게 스크롤되는 '창' ===
+              4위 이하가 아예 없으면(지역 보드처럼 인원이 3명 이하) 창을 아예 그리지 않는다.
+              빈 창은 큰 빈 상자(세로 고정 시절) 아니면 얇은 선(2단 이후)이라 둘 다 사고처럼 보인다. */}
+          {rest.length > 0 ? (
+            <div className="hof-listwin" ref={listRef}>
+              <div className="hof-list">
+                {rest.map((u) => (
+                  <HofRow key={u.rank} u={u} t={t} onPick={onPick} />
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
         </>
       )}
     </>

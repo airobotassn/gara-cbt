@@ -11,7 +11,7 @@
 //     사람이 포맷을 다르게 베껴 실수로 의미를 바꾸는 경우를 못 잡으므로 이중 방어).
 //  4) 티어 경계값(0.05/0.20/0.45/0.75, 동률 포함) 단위테스트 — DB ranking_tier(pct)(reset_season_fn.sql)와
 //     동일 밴드여야 한다.
-//  5) 부등호 "실력 최고치 > 활동 최대 기여"가 상수 기본값에서 성립하는지(문서화된 가정 하에) 검증.
+//  5) 원안 점수표(2026-08-04) 자체 검증 — 레벨테스트 7,000 / 활동 6,570 / 전체 13,570 과 ARENA 밴드 경계.
 //
 // 실행: bun tests/db/t-scoring-parity.mjs  (또는 npm test:db 체인의 일부)
 
@@ -91,9 +91,17 @@ function normalize(text) {
     .trim();
 }
 
-const FN_SYMBOLS = ['promoteCut', 'computeRankChange', 'computePoints', 'computeSkillScore', 'activityDelta', 'tierForPercentile'];
+const FN_SYMBOLS = [
+  'promoteCut', 'computeRankChange', 'computePoints', 'computeSkillScore',
+  'activityDelta', 'activityPerDay', 'arenaLevelForScore', 'arenaBand', 'tierForPercentile',
+];
 // 강등 관련 상수(DEMOTE_*)는 강등 제거로 사라졌다 — 남은 승급/점수 상수만 비교한다.
-const CONST_SYMBOLS = ['PROMOTE_RATE_LOW', 'PROMOTE_RATE_HIGH', 'MAX_POINTS', 'ACTIVITY_DELTA', 'SKILL_LEVEL_STEP'];
+// SKILL_LEVEL_STEP 은 2026-08-04 원안 반영(레벨 클리어당 정액 1,000)으로 사라졌다.
+const CONST_SYMBOLS = [
+  'PROMOTE_RATE_LOW', 'PROMOTE_RATE_HIGH', 'MAX_POINTS', 'SEASON_DAYS',
+  'ACTIVITY_DELTA', 'ACTIVITY_PER_DAY', 'ACTIVITY_SEASON_MAX',
+  'LEVELTEST_CLEAR_POINTS', 'ARENA_BAND_STEP',
+];
 
 for (const name of FN_SYMBOLS) {
   eq(normalize(extractFn(sharedSrc, name)), normalize(extractFn(feSrc, name)), `source parity: function ${name}`);
@@ -125,11 +133,25 @@ const SAMPLE_LEVEL_CORRECT = [
 for (const [level, correct] of SAMPLE_LEVEL_CORRECT) {
   eq(Shared.promoteCut(level), FE.promoteCut(level), `promoteCut(${level})`);
   eq(Shared.computePoints(level, correct), FE.computePoints(level, correct), `computePoints(${level},${correct})`);
-  eq(Shared.computeSkillScore(level, correct), FE.computeSkillScore(level, correct), `computeSkillScore(${level},${correct})`);
 }
 
-for (const kind of ['attendance', 'daily_learn', 'minigame']) {
+// 레벨테스트 트랙은 이제 "클리어한 레벨 수" 단일 인자다(부분점수 없음).
+for (const cleared of [-1, 0, 1, 3, 6, 7, 8, 99]) {
+  eq(Shared.computeSkillScore(cleared), FE.computeSkillScore(cleared), `computeSkillScore(${cleared})`);
+}
+
+for (const kind of ['attendance', 'daily_learn', 'minigame', 'referral']) {
   eq(Shared.activityDelta(kind), FE.activityDelta(kind), `activityDelta(${kind})`);
+  eq(Shared.activityPerDay(kind), FE.activityPerDay(kind), `activityPerDay(${kind})`);
+}
+
+// ARENA 레벨 밴드(시즌 총점 → 표시 레벨) — 경계값 위주.
+const BAND_CASES = [-100, 0, 1, 999, 1000, 1999, 2000, 4999, 5000, 5999, 6000, 13570, 99999];
+for (const total of BAND_CASES) {
+  eq(Shared.arenaLevelForScore(total), FE.arenaLevelForScore(total), `arenaLevelForScore(${total})`);
+}
+for (const lv of [0, 1, 2, 6, 7, 8]) {
+  eq(Shared.arenaBand(lv), FE.arenaBand(lv), `arenaBand(${lv})`);
 }
 
 // 강등이 없어 strikes 인자도 없다 — (내등급, 응시레벨, 맞힌수) 만으로 승급/유지가 결정된다.
@@ -167,23 +189,39 @@ eq(FE.tierForPercentile(0.75), 'silver', 'tier boundary 0.75 -> silver (동률 �
 eq(FE.tierForPercentile(0.750001), 'bronze', 'tier boundary just above 0.75 -> bronze');
 eq(FE.tierForPercentile(1), 'bronze', 'tier boundary 1 -> bronze');
 
-// ---------- 4) 부등호 근거: 실력 최고치 > 활동 최대 기여(문서화된 가정 하) ----------
-const skillMax = FE.computeSkillScore(7, FE.promoteCut(7)); // 만렙 만점
-eq(skillMax, FE.MAX_POINTS, 'skillMax(만렙 만점) === MAX_POINTS(10000, 스케일 연속성)');
+// ---------- 4) 원안 점수표 자체 검증 (2026-08-04 반영본) ----------
+// 레벨테스트 트랙: 레벨 클리어 1회당 +1,000 · 7단계 전부 = 7,000. 부분점수 없음.
+eq(FE.computeSkillScore(7), FE.LEVELTEST_MAX, 'computeSkillScore(7) === LEVELTEST_MAX');
+eq(FE.LEVELTEST_MAX, 7000, 'LEVELTEST_MAX === 7,000 (원안 "레벨테스트 시즌 Max")');
+eq(FE.computeSkillScore(0), 0, '미클리어 = 0 (컷 미달은 부분점수 없음)');
 
-// 가정: 활동점수 적립이 배선된 게임 수 = submit-minigame 의 GAME_MAX 항목 수(현재 beat-cari·shoot-cari 2종).
-//   ⚠️ 레지스트리(src/lib/minigames.ts)는 6종이지만 나머지는 점수 제출 배선이 없어 적립 0이다 —
-//      새 게임에 GAME_MAX 를 추가(=적립 배선)하면 이 수를 올리고 부등호를 다시 확인할 것.
-const ACTIVE_MINIGAME_COUNT = 2;
-const ASSUMED_SEASON_DAYS = 60; // 가정: 시즌 길이 ≈ 60일(고정 상수 아님 — reset_season() 은 운영자 트리거로 열림/닫힘)
-const dailyActivityMax = FE.activityDelta('attendance') + FE.activityDelta('daily_learn') + FE.activityDelta('minigame') * ACTIVE_MINIGAME_COUNT;
-const seasonActivityMax = dailyActivityMax * ASSUMED_SEASON_DAYS;
-if (!(skillMax > seasonActivityMax)) {
-  failed++;
-  console.error(`FAIL inequality: skillMax(${skillMax}) must be > seasonActivityMax(${seasonActivityMax})`);
-} else {
-  console.log(`ok inequality: skillMax(${skillMax}) > seasonActivityMax(${seasonActivityMax}) [dailyMax=${dailyActivityMax} x ${ASSUMED_SEASON_DAYS}일 가정, 미니게임 ${ACTIVE_MINIGAME_COUNT}종 가정]`);
+// 활동 트랙: seasonMax = delta × perDay × SEASON_DAYS 가 원안 표와 정확히 떨어져야 한다.
+const EXPECTED_SEASON_MAX = { minigame: 2190, daily_learn: 730, referral: 1825, attendance: 1825 };
+for (const [kind, expected] of Object.entries(EXPECTED_SEASON_MAX)) {
+  const derived = FE.activityDelta(kind) * FE.activityPerDay(kind) * FE.SEASON_DAYS;
+  eq(derived, expected, `활동 시즌상한 ${kind} = ${FE.activityDelta(kind)}점 × ${FE.activityPerDay(kind)}회 × ${FE.SEASON_DAYS}일`);
+  eq(FE.ACTIVITY_SEASON_MAX[kind], expected, `ACTIVITY_SEASON_MAX.${kind} === ${expected}`);
 }
+eq(FE.ACTIVITY_MAX, 6570, 'ACTIVITY_MAX(활동 4종 합) === 6,570');
+eq(FE.SEASON_MAX_POINTS, 13570, 'SEASON_MAX_POINTS === 13,570 (= 원안 Lv.7 최고점)');
+
+// ARENA 밴드 경계 — 원안 표 그대로 1,000점 균등.
+eq(FE.arenaLevelForScore(0), 1, 'band 0 -> Lv.1');
+eq(FE.arenaLevelForScore(999), 1, 'band 999 -> Lv.1');
+eq(FE.arenaLevelForScore(1000), 2, 'band 1,000 -> Lv.2');
+eq(FE.arenaLevelForScore(5999), 6, 'band 5,999 -> Lv.6');
+eq(FE.arenaLevelForScore(6000), 7, 'band 6,000 -> Lv.7');
+eq(FE.arenaLevelForScore(FE.SEASON_MAX_POINTS), 7, 'band 상한 -> Lv.7');
+eq(FE.arenaBand(1), [0, 999], 'arenaBand(1) === [0, 999]');
+eq(FE.arenaBand(6), [5000, 5999], 'arenaBand(6) === [5,000, 5,999]');
+eq(FE.arenaBand(7), [6000, 13570], 'arenaBand(7) === [6,000, 13,570]');
+
+// ⚠️ 옛 부등호 검사("실력 최고치 > 활동 최대 기여")는 삭제했다 — 원안은 그 부등호를 **깨는 안**이라
+//    그대로 두면 원안 반영이 실패로 뜬다. 대신 그 성질을 명시적으로 고정해 회귀만 감시한다:
+//    활동만 채워도(6,570) 최상위 밴드(6,000 이상)에 들어간다. 이건 보류중인 수정안의 핵심 쟁점이다
+//    (바탕화면 WORLD_ARENA_점수체계_수정제안.html — 레벨테스트 총합을 활동 상한 위로 올리는 안).
+eq(FE.ACTIVITY_MAX > FE.LEVELTEST_MAX - 1000, true, '활동 상한(6,570)이 레벨테스트 트랙(7,000)과 맞먹는다 — 원안의 성질');
+eq(FE.arenaLevelForScore(FE.ACTIVITY_MAX), 7, '활동만으로 ARENA Lv.7 도달 가능 — 원안이 의도한 성질(수정안의 쟁점)');
 
 if (failed > 0) {
   console.error(`\n${failed} scoring-parity test(s) FAILED`);

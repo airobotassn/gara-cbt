@@ -22,7 +22,7 @@ const DAILY_POINTS = 10
 
 // _shared/scoring.ts ACTIVITY_DELTA 와 동일값 유지(수동 동기, 위 주석 참조).
 type LedgerKind = 'attendance' | 'daily_learn'
-const ACTIVITY_DELTA_SYNCED: Record<LedgerKind, number> = { attendance: 10, daily_learn: 30 }
+const ACTIVITY_DELTA_SYNCED: Record<LedgerKind, number> = { attendance: 5, daily_learn: 2 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })

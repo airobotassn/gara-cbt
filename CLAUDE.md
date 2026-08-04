@@ -91,7 +91,7 @@
 ## 프로젝트 한눈에
 
 **GARA · AI 활용능력 CARIS ARENA** — "당신의 AI 활용능력은 어느 정도인가요?"
-20문항으로 **레벨별 6개 영역**을 측정하고 **레벨 사다리(1~7, 원점수로 승급/유지 — 강등 없음)** 로 등급을 부여하는 웹 서비스. 등급+그 레벨 진행도를 **랭킹 점수(0~10000)** 로 환산해 리더보드를 매긴다. 문항은 **6개국어 다국어**(화면 언어로 응시).
+20문항으로 **레벨별 6개 영역**을 측정하고 **레벨 사다리(1~7, 원점수로 승급/유지 — 강등 없음)** 로 등급을 부여하는 웹 서비스. 레벨테스트 클리어(레벨당 +1,000)와 일일 활동을 합친 **시즌 점수(0~13,570)** 로 리더보드를 매긴다. 문항은 **6개국어 다국어**(화면 언어로 응시).
 
 - 비로그인(게스트) 응시 가능 → **총점만** 노출
 - 구글 로그인 시 **등급(레벨) · 레벨별 6축 레이더 · 오답노트** 잠금 해제(비로그인 결과 그대로 이관)
@@ -146,11 +146,11 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/ebooks` (이북 스토어·구매) | `pages/Ebooks.tsx` | (Tailwind 유틸) | `ebooks` |
 | `/ebooks/read/:id` (이북 뷰어) | `pages/EbookReader.tsx` | (인라인) | `ebooks` |
 | **캐릭터 허브 / 미니게임** ||||
-| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` |
+| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` · `redeem-referral` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
 | `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
-| `/arena` (지도+지역랭킹) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx` · `lib/arena/*` | `arena.css` | `leaderboard` |
+| `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-edit`·`chat-delete`·`chat-report` |
 | `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
 | `/test/:attemptId` (응시) | `pages/TestRunner.tsx` | `test.css` | `start-test` · `submit-test` |
 | `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` · `submit-report` |
@@ -167,12 +167,33 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
 - 온보딩 게이트(`App.tsx`의 `OnboardingGate`): 정식 회원이 지역 미확정이면 `/test/*` · `/ranking` · `/mypage` 접근 시 `/onboarding` 으로 강제. 그 외 라우트는 통과.
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
+- **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 5칸 `출석·뽑기·상점·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
+  - ⚠️ **오른쪽 레일은 `position:absolute` 라 무대 높이를 늘리지 못한다** — 버튼을 추가·삭제하면 `hub.css` 의 `.hub-main .stage-zone` 높이(모바일 420 / PC 520)와 `.rail-r` gap 을 다시 실측할 것. 넘치면 아래 출석 스탬프를 덮는다(실제로 5칸이 되며 터졌던 버그).
+  - 미션 3종 완료 판정은 `get-hub` 의 `dailyDone`·`learnDone`·`minigameDone`(daily_activity 종류별 플래그), 점수 표기는 `scoring.ts` 의 `ACTIVITY_DELTA` 파생이라 하드코딩이 없다.
+  - **HUD 경험치 바 = ARENA 레벨 진행도**(`arenaLevelForScore`/`arenaBand`, 시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체했고 `pointsToPass`·`level`(시험 등급)은 화면에서 빠졌다(서버는 계속 내려줌).
+    - ⚠️ **`Lv.` 이름이 레벨테스트 등급과 겹친다** — 그래서 바 안 왼쪽에 `ARENA Lv.N` 을 박아 어느 축인지 밝힌다(원안 표의 표기와 동일). 바 안 글자는 `.exp-txt` 한 flex 줄에 넣어야 한다(각각 absolute 로 두면 좁은 화면에서 겹친다). 모바일은 `.exp-next`(분모)를 감춰 `ARENA Lv.N` 이 안 잘리게 한다.
+    - ⚠️ **한 줄에 서는 세 요소(`.exp` · `.hub-help` · `.gchip`)는 높이가 같아야 한다**(모바일 28 / PC 40). 하나만 바꾸면 바로 티 난다.
+    - ⚠️ **채움(`.exp-fill`)은 원색 블록이 아니라 옅은 틴트 + 원색 3px 진행선**이다. 글자가 바 위에 얹히므로 원색으로 꽉 채우면 채움 경계에서 글자가 묻힌다.
+    - `?` 는 **바 뒤·코인 앞**이다. 코인 옆에 두면 코인 설명으로 읽힌다 — 코인(뽑기·상점 재화)과 점수(랭킹)는 별개 지갑이다.
+    - 티어는 텍스트가 아니라 **엠블렘 이미지 단독**(`<TierBadge>`, 백분위 '상위 N%' 는 제거 — 순위 맥락은 랭킹 화면 소관). ⚠️ `TierBadge` 가 인라인 style 로 크기를 박으므로 `.tier-chip img` 는 `!important` 없이는 못 키운다.
+    - 아바타 밑 `Lv.` 배지(`.hud-lv`)는 제거했다 — 바가 이미 `ARENA Lv.N` 을 말한다.
+  - ⚠️ **미션은 한 줄 얇은 바(`.mission-bar`)다 — 카드로 키우지 말 것.** 좌측 세로 카드는 캐릭터를 옆으로 밀어서, 큰 가로 타일은 무대를 눌러서 각각 반려됐다(2026-08-04). 지금은 칩 3개 한 줄이고 chrome 은 하단 `.reward`(출석 보상)와 같은 값이라 위아래가 한 쌍으로 읽힌다. 모바일은 `.ms-chips` 를 `order:3 / flex-basis:100%` 로 통째로 둘째 줄에 내린다. 시안의 CTA 배너("미션 완료하고…")와 코인/점수 구분 안내문은 중복이라 삭제.
+  - **친구 초대는 도크 `초대하기` 모달 하나에서 다 끝난다** — 화면에 카드로 꺼내지 않는다(진입점 중복 제거). 모달 = 위(내 코드 + 복사) + 아래(친구 코드 입력).
+    - 내 코드 = `profiles.referral_code` + `ensure_referral_code(uid)` RPC. **계정 귀속·영구 고정**이다(값이 있으면 그대로 반환, 없을 때만 1회 생성). 형식 `CARI`+4자.
+    - 등록 = `redeem-referral` 함수. `profiles.referred_by` 가 비어있을 때만 박히고 **계정당 1회·되돌릴 수 없다** → 그때부터 입력칸이 잠긴다(FE 도 `referralUsed` 를 한 번 true 면 안 푼다).
+    - ⚠️ **여기선 실패를 사용자에게 알려준다**(`not_found`·`self`·`already`). 온보딩에 안 넣은 이유가 이거다 — 한 번뿐인 화면에서 오타를 조용히 삼키면 기회를 영영 잃는다. 모달은 다시 열 수 있으니 알려주는 게 맞다.
+    - 보상은 **초대자에게만 +5**(원안). 하루 1회 캡·중복 계산 방지는 코드가 아니라 `activity_ledger` 의 두 unique 인덱스가 건다(걸리면 23505 → 등록은 성공, 점수만 미적립).
 - **미니게임 게임별 랭킹**: 게임 HTML 의 인트로·아웃트로 오버레이 **우상단 '랭킹' 버튼** → `postMessage` → 부모(`MiniGame.tsx`)가 `components/MiniGameRankModal.tsx` 를 띄운다. 게임 안에 보드를 그리지 않는 이유 = 게임이 6개라 UI 를 6번 유지해야 하고 iframe 엔 세션·아바타가 없다.
   - 게임 ↔ 앱 계약 = 각 `public/games/*.html` 끝의 **앱 브리지** 블록(`window.MGBridge`). `mg:rank`(랭킹 열기) · `mg:score`(점수/레벨 + 동률해소용 `tieMs`) 두 메시지뿐이고, 단독으로 HTML 을 열면 부모가 없어 버튼도 숨고 아무것도 보내지 않는다.
   - 지표는 게임마다 다르다(`supabase/functions/_shared/minigames.ts` 의 `GAMES` 가 단일 출처): 버텨라·쏴라 = 점수, **골라라 = 도달 라운드(15)**, 닿아라(5)·지어라(3)·프로그램해라(6) = 도달 레벨. 레벨형은 레벨 수가 적어 전원 만점이 나오므로 **동률은 소요시간**으로 가른다.
   - 저장 = 테이블 `minigame_scores`(통산 최고, 시즌 스코프 아님) + RPC `minigame_top`. `activity_ledger` 는 정규화 delta 라 줄 세우기에 못 쓴다.
   - ⚠️ 제출은 **티켓 필수**(`submit-minigame` 의 `action:'start'` → HMAC 서명 티켓). 티켓은 **세션당 1개로 재사용** — 제출마다 새로 받으면 "플레이시간 대비 상한"이 리셋돼 레벨형 2번째 이후 정상 기록이 깎인다.
 - **`/arena` 는 더 이상 iframe 이 아니다**: 옛 `public/world-arena.html`(자립형 d3 HTML)을 React 로 포팅하고 삭제했다. 지도 경계는 `public/geo/*.json`(world·kr-prov 즉시, kr-muni 는 시도 진입 시 지연 로드), d3 는 npm 서브모듈(`d3-geo`·`d3-zoom` 등). 문구는 `i18n.tsx` 의 `arena.*`.
+- **`/arena` 채팅(유사채팅 · `components/ChatBoard.tsx`)**: 웹소켓이 아니라 **3.5~4.5초 폴링**이다(신규분 `after` + 수정/삭제 reconcile `ids+since` 두 번). 함수 `chat-list`·`chat-post`·`chat-edit`(10분 내 본인)·`chat-delete`(소프트)·`chat-report`, 공용 헬퍼 `_shared/chat.ts`, 테이블 `chat_messages`·`chat_reports`·`chat_incidents`(RLS 정책 없음 = 함수 전용). 삽입 경로는 RPC `chat_post_atomic` 하나뿐. 검수는 `/admin?top=level&tab=chatmod`(`Admin.tsx` 의 `ChatModAdmin`).
+  - **방(room) = 전세계 1개 + 나라별 1개** (`chat_messages.room` = `'global'` 또는 ISO2 대문자, 방 도입 전 글은 전부 global). 방 목록을 만들지 않는 이유 = **방은 지도 선택이 정한다** — 지구본에서 아무 나라도 안 고르면 전세계, 나라를 고르면 그 나라 방. 나라 안에서 시도를 골라도 방은 나라 단위로 유지. 전세계로 돌아가는 길은 채팅 머리말의 `전세계로` 버튼 하나(= `goto(0)`, 지도도 같이 나간다).
+  - **쓰기는 내 나라 + 전세계만**(`profiles.country_code` 기준). 남의 나라 방은 읽기 전용 — 프론트는 입력칸을 안내문으로 바꾸고, 서버(`chat-post`)가 `not_my_country`(403)로 다시 막는다. 권한 검사는 **모더레이션보다 앞**이다(거절할 글에 OpenAI 호출을 태우지 않으려고).
+  - ⚠️ **레이트리밋·중복·IP 바닥선 가드는 방을 안 본다(계정 단위 전역)** — 방마다 상한이 리셋되면 방을 옮겨다니며 도배할 수 있다. `chat_post_atomic` 안의 주석과 `tests/db/t-chat-rooms.mjs` 가 이걸 지킨다.
+  - ⚠️ 방이 바뀌면 `<ChatBoard key={room}>` 로 **다시 마운트**한다. 목록·커서·폴링 타이머가 한 방을 가리키는 상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청 결과가 새 방 목록에 섞인다.
 - 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
 
 ## 구조 맵
@@ -189,8 +210,8 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   31개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
-               · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy) · 검색라우터(route-query·route-seed)
+  functions/   32개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+               · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral) · 검색라우터(route-query·route-seed)
                · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용)
 ```
@@ -201,7 +222,15 @@ supabase/
 
 - **보안 모델**: `questions.correct_index`·`test_attempts`·`attempt_answers`·`user_level_skill`·`user_progress` 는 **클라 직접 SELECT 금지**(RLS 미부여 = service role 전용). 출제·채점·결과 서빙은 **Edge Function 에서만**. 익명 유저 응답에선 총점 외 데이터를 서버가 제외. 정답은 언어 무관 단일 컬럼(`correct_index`)이라 번역과 무관.
 - **스코어링 단일 출처**: 프론트 `src/lib/scoring.ts` 와 함수 `supabase/functions/_shared/lib.ts` 가 **동일 수식**을 유지해야 한다(둘 다 고칠 것). 만점=100 정규화·EWMA 누적은 `scoring.ts` 참고. ⚠️ 레벨별 6축 코드(`categories.ts` ↔ `_shared/lib.ts` 의 `LEVEL_AXES`)도 양쪽 동기화 필수.
-- **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~3 80%, Lv.4~7 90% → Lv.1 8/10 · Lv.2·3 16/20 · Lv.4~7 27/30). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). **랭킹 점수**(`computePoints`, 0~10000) = `((등급-1) + 그 등급 최신 맞힌수/승급컷) / 7 × 10000` → `user_progress.points` 에 매 응시 저장, `leaderboard_v2` RPC가 이걸로 정렬(동점=먼저 도달). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
+- **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~3 80%, Lv.4~7 90% → Lv.1 8/10 · Lv.2·3 16/20 · Lv.4~7 27/30). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
+- **시즌 점수 (2026-08-04 원안 반영)**: 리더보드 정렬 단일 출처 = `user_progress.season_total` = **레벨테스트 트랙**(`skill_score`) + **활동 트랙**(`activity_score`).
+  - 레벨테스트 = 레벨 클리어 1회당 **+1,000**(부분점수 없음 — 승급컷 미달은 0) · 7단계 전부 = **7,000**. `applyAttempt` 가 "클리어한 레벨 수 = 도달 등급−1, 단 천장에서 Lv.7 을 통과하면 7" 로 계산해 GREATEST 로 쌓는다.
+  - 활동 = 미니게임 +2(일 3회) · 오늘의 학습 +2(일 1회) · 친구 초대 +5(일 1회) · 출석 +5(일 1회) → 시즌(365일) 상한 **6,570**. 적립값·일일횟수·시즌상한 3표가 한 벌이다(`ACTIVITY_DELTA`/`ACTIVITY_PER_DAY`/`ACTIVITY_SEASON_MAX`, `seasonMax = delta × perDay × SEASON_DAYS`).
+  - 전체 상한 **13,570**. 표시 레벨 `ARENA Lv.N` = 시즌 총점 1,000점 균등 밴드(`arenaLevelForScore`/`arenaBand`) — **시험 사다리 등급(`user_progress.rank`)과 별개 축**이다(결과창 승급 연출은 계속 rank 기준). ⚠️ 활동만 채워도(6,570) Lv.7 밴드에 들어간다 — 원안이 그런 안이다(수정 제안은 바탕화면 `WORLD_ARENA_점수체계_수정제안.html`).
+  - ⚠️ 미니게임은 **참여 횟수당 고정 적립**이라 성적이 활동점수에 반영되지 않는다(게임 실력은 `minigame_scores` 랭킹 전용). 하루 캡은 `activity_ledger` 의 `unique(user_id, day, source_ref)` 를 회차 슬롯(`play:1`…`play:3`)으로 써서 건다.
+  - ⚠️ 친구 초대(`referral`)는 **점수 규칙만 선반영** — 초대코드 발급·가입 귀속 플로우가 없어 적립 호출부가 아직 없다.
+  - 옛 `computePoints`(0~10000)는 `user_progress.points` 컬럼 전용으로만 남았다(`leaderboard_v2` 등 구코드용).
+  - 값을 바꾸면 **양쪽 `scoring.ts` + `tests/db/t-scoring-parity.mjs`** 를 같이 고쳐야 한다 — 패리티 테스트가 두 파일의 소스 바이트 동일성까지 본다.
 - **i18n**: 라이브러리 없이 `src/lib/i18n.tsx` 의 `D` 사전. 6개국어(ko·en·ja·zh·hi·vi). 문구 추가 시 6개 다 채울 것. `{var}` 보간.
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
 - **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`). 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만 — 버킷·정책은 대시보드 SQL로 생성). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.

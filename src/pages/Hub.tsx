@@ -8,7 +8,19 @@ import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
-import { type Tier } from '../lib/scoring'
+import TierBadge from '../components/TierBadge'
+import {
+  type Tier,
+  type ActivityKind,
+  arenaLevelForScore,
+  arenaBand,
+  ACTIVITY_DELTA,
+  ACTIVITY_PER_DAY,
+  ACTIVITY_SEASON_MAX,
+  LEVELTEST_CLEAR_POINTS,
+  LEVELTEST_MAX,
+  SEASON_MAX_POINTS,
+} from '../lib/scoring'
 import ShareCardModal from '../components/ShareCardModal'
 import { countryName } from '../lib/regions'
 
@@ -61,7 +73,7 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; tier?: Tier | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; tier?: Tier | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
@@ -76,7 +88,16 @@ function friendlyError(e: unknown): string {
   return '오류가 발생했어요. 잠시 후 다시 시도해주세요'
 }
 
-type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share'
+type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite'
+
+// 점수 획득 방법 모달의 활동 표 — 값은 전부 scoring.ts(원안 반영본) 파생이라 상수를 다시 적지 않는다.
+//   ⚠️ 여기 '점수'는 랭킹 점수(user_progress.activity_score)다. HUD 의 코인(뽑기·상점 재화)과는 별개 지갑이다.
+const EARN_ROWS: { kind: ActivityKind; icon: string; label: string }[] = [
+  { kind: 'attendance', icon: 'calendar', label: '출석하기' },
+  { kind: 'daily_learn', icon: 'book', label: '오늘의 학습 완료' },
+  { kind: 'minigame', icon: 'star', label: '미니게임 플레이' },
+  { kind: 'referral', icon: 'gift', label: '친구 초대' },
+]
 
 export default function Hub() {
   const { isFullUser, loginWithGoogle, user, loading } = useAuth()
@@ -84,9 +105,21 @@ export default function Hub() {
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
+  // 오늘의 미션 3종 완료 플래그(daily_activity 의 종류별 플래그 — 행 존재로 판정하면 안 된다).
+  const [learnDone, setLearnDone] = useState(false)
+  const [minigameDone, setMinigameDone] = useState(false)
+  const [referralCode, setReferralCode] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  // 초대코드 등록(받는 쪽) — used 는 계정당 1회라 한 번 true 가 되면 입력칸이 영구 비활성.
+  const [referralUsed, setReferralUsed] = useState(false)
+  const [redeemInput, setRedeemInput] = useState('')
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [redeeming, setRedeeming] = useState(false)
   const [owned, setOwned] = useState<Set<string>>(new Set())
   const [pity, setPity] = useState(0)
-  const [level, setLevel] = useState<number | null>(null)
+  // 시험 사다리 등급(user_progress.rank). HUD 의 Lv 는 이제 ARENA 레벨(점수 밴드)이라 화면에는 안 쓴다
+  // — 서버는 계속 내려주므로 받아만 둔다(기존 skillScore/activityScore 와 같은 패턴).
+  const [, setLevel] = useState<number | null>(null)
   const [authed, setAuthed] = useState(false)
   const [titles, setTitles] = useState<{ track: string; grade: string }[]>([])
   const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
@@ -114,7 +147,8 @@ export default function Hub() {
   const [seasonTotal, setSeasonTotal] = useState(0) // 공유 카드의 시즌 점수 / 전투력
   const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
-  const [pointsToPass, setPointsToPass] = useState<number | null>(null)
+  // '다음 순위까지 N점' — 옛 랭킹 게이지 라벨. 경험치 바가 ARENA 레벨 진행도로 바뀌면서 화면에서 빠졌다.
+  const [, setPointsToPass] = useState<number | null>(null)
   const [rank, setRank] = useState<number | null>(null)
   const [rankTotal, setRankTotal] = useState<number | null>(null)
 
@@ -122,6 +156,63 @@ export default function Hub() {
     setToast(s)
     window.setTimeout(() => setToast((cur) => (cur === s ? null : cur)), 2600)
   }
+
+  // 초대코드 복사 — navigator.clipboard 는 보안 컨텍스트(https/localhost)에서만 동작해 실패 시 폴백한다.
+  async function copyInvite() {
+    if (!referralCode) return
+    try {
+      await navigator.clipboard.writeText(referralCode)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = referralCode
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1600)
+  }
+
+  // 초대코드 등록(받는 쪽). 온보딩과 달리 **실패를 그대로 알려준다** — 모달은 다시 열 수 있으니
+  // 왜 안 됐는지 말해줘야 다시 칠 수 있다. 성공하면 계정당 1회라 입력칸이 영구 잠긴다.
+  const REDEEM_ERR: Record<string, string> = {
+    not_found: '없는 초대코드예요. 다시 확인해주세요',
+    self: '내 초대코드는 쓸 수 없어요',
+    already: '이미 초대코드를 등록했어요',
+    unauthorized: '로그인이 필요해요',
+  }
+  async function redeemReferral() {
+    const code = redeemInput.trim().toUpperCase()
+    if (!code || redeeming || referralUsed) return
+    setRedeeming(true)
+    setRedeemMsg(null)
+    try {
+      const r = await callFunction<{ ok?: boolean; error?: string; credited?: boolean }>('redeem-referral', { code })
+      if (r.ok) {
+        setReferralUsed(true)
+        setRedeemInput('')
+        setRedeemMsg({ ok: true, text: '등록 완료! 초대해준 친구에게 점수가 들어갔어요' })
+        void hydrate()
+      } else {
+        setRedeemMsg({ ok: false, text: REDEEM_ERR[r.error ?? ''] ?? '등록하지 못했어요' })
+      }
+    } catch {
+      setRedeemMsg({ ok: false, text: '등록하지 못했어요' })
+    }
+    setRedeeming(false)
+  }
+
+  // 오늘의 미션 3종(시안 좌상단 카드). to=null 인 출석은 이 화면에서 바로 처리(doDaily), 나머지는 해당 화면으로 보낸다.
+  //   ⚠️ 미니게임 진입점은 /arena 하단 런처다(허브에는 미니게임 진입점이 없다 — 중복 제거 결정).
+  const missions: { kind: ActivityKind; icon: string; label: string; done: boolean; to: string | null }[] = [
+    { kind: 'attendance', icon: 'calendar', label: '출석', done: checkedIn, to: null },
+    { kind: 'daily_learn', icon: 'book', label: '오늘의 학습', done: learnDone, to: '/daily' },
+    { kind: 'minigame', icon: 'star', label: '미니게임', done: minigameDone, to: '/arena' },
+  ]
+  const missionDone = missions.filter((m) => m.done).length
 
   // 프로필(본인 profiles) — 아바타는 HUD, 표시이름은 공유 카드에 쓴다. setState 는 프라미스 콜백에서만.
   useEffect(() => {
@@ -166,6 +257,11 @@ export default function Hub() {
     setStamps(h.stamps ?? 0)
     setPity(h.pity ?? 0)
     setCheckedIn(!!h.dailyDone)
+    setLearnDone(!!h.learnDone)
+    setMinigameDone(!!h.minigameDone)
+    setReferralCode(h.referralCode ?? null)
+    // referred_by 는 되돌릴 수 없다 — 한 번 true 면 서버 응답으로도 풀지 않는다(등록 직후 hydrate 가 덮어쓰는 것 방지).
+    setReferralUsed((cur) => cur || !!h.referralUsed)
     setOwned(new Set(h.cosmetics ?? []))
     setLevel(h.level ?? null)
     setAuthed(!!h.authed)
@@ -266,9 +362,15 @@ export default function Hub() {
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {titles[0].track} {titles[0].grade}</span> : null
   // 다음 순위 게이지: 신규/무점수 유저는 '미배치'가 아니라 백분위 100%(꼴찌)·브론즈에서 시작 — 콘텐츠로 위로 올라간다.
   const dispTier: Tier = tier ?? 'bronze'
-  const dispPct = percentile ?? 1 // 데이터 없으면 상위 100%(바닥)
-  const gaugeFillPct = Math.max(0, Math.min(100, (1 - dispPct) * 100)) // 상위일수록 pct 작음 → 가득
-  const gaugeLabel = pointsToPass != null && pointsToPass > 0 ? t('rank.next_gap', { n: pointsToPass }) : ''
+  // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
+  //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
+  const arenaLv = arenaLevelForScore(seasonTotal)
+  const [bandLo, bandHi] = arenaBand(arenaLv)
+  // ⚠️ 라벨은 **바와 같은 기준**이어야 한다 — 구간 내 진행분/구간 폭. 절대 총점(5,700/6,000)을 쓰면
+  //    사용자는 95% 로 읽는데 바는 70%(구간 5,000~6,000 안에서 700) 라 눈에 바로 어긋나 보인다.
+  const bandSpan = bandHi + 1 - bandLo
+  const bandCur = Math.max(0, Math.min(bandSpan, seasonTotal - bandLo))
+  const gaugeFillPct = Math.max(0, Math.min(100, (bandCur / bandSpan) * 100))
   // 지역 표시명 — /ranking 탭 라벨과 같은 규칙(사전에 없는 코드는 코드 그대로 노출).
   const regionName = (code: string | null): string | null => {
     if (!code) return null
@@ -340,37 +442,79 @@ export default function Hub() {
         {/* 상단 HUD */}
         <div className="hud">
           <div className="hud-av">
+            {/* 아바타 밑 Lv 배지는 뺐다 — 경험치 바가 'ARENA Lv.N' 을 이미 말한다(중복 + Lv 축 혼동). */}
             <div className="av"><Avatar avatarUrl={avatarUrl} seed={user?.id ?? 'guest'} size={44} /></div>
-            <span className="hud-lv">Lv.{level ?? '—'}</span>
           </div>
           <div className="hud-mid">
-            <div className="hud-name">CARI {titleBadge}<span className="tier-chip">{t(`rank.tier_${dispTier}`)}<em>{t('rank.top', { p: Math.round(dispPct * 100) })}</em></span></div>
+            <div className="hud-name">
+              CARI {titleBadge}
+              {/* 티어 = 엠블렘 이미지 단독(public/emblems/<tier>.webp). 백분위(상위 N%)는 뺐다 —
+                  허브에서 굳이 알려줄 값이 아니고, 순위 맥락은 랭킹 화면이 담당한다. */}
+              <span className="tier-chip"><TierBadge tier={dispTier} size={26} alt={t(`rank.tier_${dispTier}`)} /></span>
+            </div>
             <div className="hud-xp">
-              <div className="rank-gauge">
-                {gaugeLabel ? <div className="rank-gauge-lab">{gaugeLabel}</div> : null}
-                <div className="exp"><div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} /></div>
+              {/* ARENA 레벨 경험치 바. 라벨은 바 안 오른쪽(exp-lab) — 바깥에 맨텍스트로 두면 덜렁거린다. */}
+              {/* 바 안 왼쪽에 'ARENA Lv.N' — 레벨테스트 등급(Lv.1~7)과 이름이 겹쳐서, 이 바의 Lv 가 어느 축인지
+                  바 스스로 밝히게 했다(원안 표의 표기도 'ARENA Lv.N' 이다). 오른쪽은 진행 점수. */}
+              <div className="exp">
+                <div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} />
+                <span className="exp-txt">
+                  <span className="exp-lv">ARENA Lv.{arenaLv}</span>
+                  {/* 좁은 화면은 분수를 넣으면 'ARENA Lv.N' 이 잘려서 %로 줄인다(둘 다 같은 값이라 어긋나지 않는다). */}
+                  <span className="exp-lab">
+                    <span className="exp-pct">{Math.round(gaugeFillPct)}%</span>
+                    <span className="exp-frac">{bandCur.toLocaleString()} / {bandSpan.toLocaleString()}</span>
+                  </span>
+                </span>
               </div>
+              {/* '?' 는 점수(경험치 바) 쪽 도움말이다 — 코인 옆에 두면 코인 설명으로 읽혀서 바 바로 뒤에 붙였다. */}
+              <button className="hub-help" onClick={() => setModal('earn')} aria-label="점수 획득 방법">?</button>
               {/* data-tip = 호버 툴팁("보유한 CARI 코인") — hub.css 의 .gchip[data-tip]::after */}
               <span className="gchip" data-tip="보유한 CARI 코인"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
             </div>
           </div>
         </div>
 
-        {/* 캐릭터 무대 + 양옆 레일 */}
+        {/* 오늘의 미션 — 무대 **위 가로 한 줄**(하단 '출석 보상' 스트립과 같은 형태).
+            좌측 열로 두면 카드 하나 때문에 캐릭터가 옆으로 밀려서 전체 폭 한 줄로 옮겼다 → 캐릭터는 정중앙 유지.
+            완료 판정은 서버 플래그(daily_activity 종류별), 점수는 scoring.ts 의 ACTIVITY_DELTA 파생. */}
+        <div className="mission-bar">
+          <span className="ms-title"><Ic n="star" s={16} /> 오늘의 미션</span>
+          <div className="ms-chips">
+          {missions.map((m) => {
+            const body = (
+              <>
+                <Ic n={m.icon} s={16} />
+                <span className="ms-chip-lab">{m.label}</span>
+                <span className="ms-chip-pt">+{ACTIVITY_DELTA[m.kind]}</span>
+                {m.done && <span className="ms-chip-chk">✓</span>}
+              </>
+            )
+            const cls = `ms-chip${m.done ? ' on' : ''}`
+            return m.to
+              ? <Link key={m.kind} className={cls} to={m.to}>{body}</Link>
+              : <button key={m.kind} className={cls} onClick={doDaily}>{body}</button>
+          })}
+          </div>
+          <span className="ms-n">{missionDone}/{missions.length}</span>
+        </div>
+
+        {/* 친구 초대는 화면에 카드로 꺼내지 않는다 — 도크 '초대하기' 버튼 모달 하나로 모았다(진입점 중복 제거). */}
         <div className="stage-zone">
-          {/* 왼쪽 레일 제거 — 출석을 오른쪽 뽑기 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
-          {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
-          <div className="rail rail-r">
-            <button className="fcard f-daily" onClick={doDaily}><span className="fico"><Ic n="calendar" s={42} /></span>출석{authed && !checkedIn && <span className="bd">1</span>}</button>
-            <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><Ic n="gift" s={42} /></span>뽑기</button>
-            <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><Ic n="shop" s={42} /></span>상점</button>
-            <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>칭호</button>
-          </div>
-          <div className="stage">
-            <div className="pedestal" />
-            <img className="hero-char" src="/hub-char.png" alt="CARI" />
-            <div className="nameplate"><b>CARI</b> {titleBadge}</div>
-          </div>
+            {/* 왼쪽 레일 제거 — 출석을 오른쪽 뽑기 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
+            {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
+            <div className="rail rail-r">
+              <button className="fcard f-daily" onClick={doDaily}><span className="fico"><Ic n="calendar" s={42} /></span>출석{authed && !checkedIn && <span className="bd">1</span>}</button>
+              <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><Ic n="gift" s={42} /></span>뽑기</button>
+              <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><Ic n="shop" s={42} /></span>상점</button>
+              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>칭호</button>
+              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><Ic n="share" s={42} /></span>초대하기</button>
+            </div>
+            <div className="stage">
+              <div className="pedestal" />
+              <img className="hero-char" src="/hub-char.png" alt="CARI" />
+              <div className="nameplate"><b>CARI</b> {titleBadge}</div>
+            </div>
         </div>
 
         {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
@@ -564,6 +708,79 @@ export default function Hub() {
               <p className="hub-modal-help">{authed ? '아직 획득한 칭호가 없어요 — 자격증에 합격하면 채워져요' : '로그인하면 칭호 보관소가 보여요.'}</p>
             </div>
           )}
+        </Modal>
+      )}
+
+      {/* 점수 획득 방법 — 표의 모든 수치는 scoring.ts(원안 반영본) 파생이라 여기서 하드코딩하지 않는다. */}
+      {modal === 'earn' && (
+        <Modal title="점수 획득 방법" onClose={() => setModal(null)}>
+          <p className="hub-modal-help earn-lead">다양한 활동에 참여하고 점수를 모아 랭킹에 도전하세요!</p>
+          <table className="earn-tb">
+            <thead><tr><th>활동 항목</th><th>획득 점수</th></tr></thead>
+            <tbody>
+              {EARN_ROWS.map((r) => (
+                <tr key={r.kind}>
+                  <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{r.label}</td>
+                  <td className="earn-v">
+                    +{ACTIVITY_DELTA[r.kind]}점
+                    <em>일 {ACTIVITY_PER_DAY[r.kind]}회 · 시즌 최대 {ACTIVITY_SEASON_MAX[r.kind].toLocaleString()}점</em>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="earn-lv">
+            <div className="earn-lv-head"><Ic n="trophy" s={18} /> 레벨테스트 <em>레벨 클리어 시</em></div>
+            <div className="earn-lv-grid">
+              {[1, 2, 3, 4, 5, 6, 7].map((lv) => (
+                <div key={lv} className="earn-lv-cell"><b>Lv.{lv}</b>+{LEVELTEST_CLEAR_POINTS.toLocaleString()}</div>
+              ))}
+            </div>
+            <p className="hub-modal-help">7단계를 모두 통과하면 {LEVELTEST_MAX.toLocaleString()}점 · 활동까지 더한 시즌 만점은 {SEASON_MAX_POINTS.toLocaleString()}점이에요.</p>
+          </div>
+
+        </Modal>
+      )}
+
+      {modal === 'invite' && (
+        <Modal title="친구 초대" onClose={() => setModal(null)}>
+          <div className="iv-title">친구와 함께 CARIS 하세요!</div>
+          <p className="hub-modal-help">내 초대코드를 알려주면 친구가 바로 시작할 수 있어요.</p>
+          <div className="iv-code iv-code-lg">
+            <span className="iv-code-lab">내 초대코드</span>
+            <b className="iv-code-v">{referralCode ?? '––––'}</b>
+            <button className="iv-copy" onClick={copyInvite} disabled={!referralCode}>{copied ? '복사됨' : '복사'}</button>
+          </div>
+          {!referralCode && <p className="hub-modal-help">{authed ? '초대코드를 발급하는 중이에요.' : '로그인하면 초대코드가 발급돼요.'}</p>}
+
+          {/* 받는 쪽 — 계정당 1회, 성공하면 영구 잠금. 실패는 이유를 그대로 알려준다. */}
+          <div className="iv-redeem">
+            <div className="iv-redeem-head">친구 초대코드 입력</div>
+            {referralUsed ? (
+              <p className="iv-redeem-done">✓ 초대코드를 등록했어요 (한 번만 가능해요)</p>
+            ) : (
+              <>
+                <div className="iv-code">
+                  <input
+                    className="iv-redeem-in"
+                    value={redeemInput}
+                    onChange={(e) => { setRedeemInput(e.target.value); setRedeemMsg(null) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void redeemReferral() }}
+                    placeholder="CARIXXXX"
+                    maxLength={8}
+                    disabled={redeeming}
+                    aria-label="친구 초대코드"
+                  />
+                  <button className="iv-copy" onClick={redeemReferral} disabled={redeeming || !redeemInput.trim()}>
+                    {redeeming ? '확인 중' : '등록'}
+                  </button>
+                </div>
+                <p className="hub-modal-help iv-redeem-hint">한 번 등록하면 바꿀 수 없어요.</p>
+              </>
+            )}
+            {redeemMsg && <p className={`iv-redeem-msg${redeemMsg.ok ? ' is-ok' : ''}`}>{redeemMsg.text}</p>}
+          </div>
         </Modal>
       )}
 

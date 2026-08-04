@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { levelColor, computeSkillScore, tierColor, TIER_ORDER } from '../lib/scoring'
-import { axesForLevel, axisKeysForLevel } from '../lib/categories'
+import { levelColor, computeSkillScore, promoteCut, tierColor, TIER_ORDER } from '../lib/scoring'
+import { axesForLevel, axisKeysForLevel, MAX_LEVEL } from '../lib/categories'
 import type { AxisMap, Tier } from '../lib/scoring'
 import { useT } from '../lib/i18n'
 import RadarChartBox from '../components/RadarChartBox'
@@ -120,8 +120,9 @@ export default function LearningDashboard() {
   const monthTick = (m: number) =>
     lang === 'en' ? EN_MONTHS[m - 1] : lang === 'ja' ? `${m}月` : `${m}월`
 
-  // 실력점수(레벨가중, 0~10000) 추이: 응시마다 그 시점 등급 + 그 등급 최신 맞힌수로 환산
-  // (computeSkillScore — scoring.ts 단일 출처, computePoints 아님). 시즌 총점 자체의 이력은 없어
+  // 레벨테스트 점수(0~7,000) 추이: 응시마다 그 시점까지 클리어한 레벨 수 × 1,000 으로 환산
+  // (computeSkillScore — scoring.ts 단일 출처, computePoints 아님). 클리어당 정액이라 계단형으로 오르고,
+  // 부분점수가 없어 컷을 못 넘은 응시는 직전 값을 유지한다. 시즌 총점 자체의 이력은 없어
   // 히어로에 현재 seasonTotal 단일 값으로 별도 표시한다.
   //
   // 점수 계산은 **항상 전체 이력**으로 돌린다(기간을 좁혔다고 과거 점수가 달라지면 안 되므로),
@@ -129,15 +130,16 @@ export default function LearningDashboard() {
   // 3개월을 고르면 3개월치 축 위 실제 날짜 자리에 점이 찍히고, 응시가 없던 구간은 비어 보인다.
   const trendFrom = nowTs - TREND_DAYS[trendRange] * 86400000
   const trend = useMemo(() => {
-    const latestCorrect: Record<number, number> = {}
     return [...list]
       .reverse()
       .map((a) => {
         const dt = new Date(a.submittedAt)
-        latestCorrect[a.level] = a.totalCorrect
+        // 클리어한 레벨 수 = 도달 등급 − 1(사다리가 순차라 1회 응시 = 최대 +1등급).
+        // 예외는 천장뿐 — 이미 Lv.7 인 사람이 Lv.7 을 통과하면 등급은 그대로지만 클리어 수는 7이다.
         const rank = a.rankAfter ?? a.level
+        const clearedTop = rank >= MAX_LEVEL && a.level >= MAX_LEVEL && a.totalCorrect >= promoteCut(a.level)
         return {
-          v: computeSkillScore(rank, latestCorrect[rank] ?? a.totalCorrect),
+          v: computeSkillScore(clearedTop ? MAX_LEVEL : rank - 1),
           t: dt.getTime(),
           date: dt.toLocaleDateString(),
         }

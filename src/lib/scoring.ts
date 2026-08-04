@@ -96,9 +96,18 @@ export function computeRankChange(
   return { nextRank: currentRank, dir: 'stay' }
 }
 
-// ── 랭킹 점수(0~10000) ──
-// 사다리 전체를 0~MAX_POINTS 로. 레벨당 1/MAX_LEVEL, 레벨 내부는 그 레벨 승급컷으로 정규화
-// (→ 승급하는 순간이 다음 밴드 바닥과 이어져 빈 천장이 사라짐).
+// ── 시즌 점수 체계 (2026-08-04 원안 반영) ──
+// 시즌 총점(user_progress.season_total) = 레벨테스트 트랙(skill_score) + 활동 트랙(activity_score).
+//   레벨테스트 : 레벨 클리어 1회당 +1,000 · 7단계 전부 = 7,000
+//   활동      : 미니게임 +2(일 3회) · 오늘의 학습 +2(일 1회) · 친구 초대 +5(일 1회) · 출석 +5(일 1회)
+//               → 시즌(365일) 상한 2,190 + 730 + 1,825 + 1,825 = 6,570
+//   전체 상한  = 7,000 + 6,570 = 13,570  (= ARENA Lv.7 최고점. 아래 밴드표와 맞물린다)
+// ⚠️ 시즌 길이가 365일이 아니면 ACTIVITY_SEASON_MAX 가 실제 도달 가능 상한과 어긋난다 —
+//    reset_season() 주기를 바꾸면 이 표를 다시 계산할 것.
+export const SEASON_DAYS = 365
+
+// ── 랭킹 점수(0~10000) — 옛 트랙, points 컬럼 전용 ──
+// 사다리 전체를 0~MAX_POINTS 로. 레벨당 1/MAX_LEVEL, 레벨 내부는 그 레벨 승급컷으로 정규화.
 export const MAX_POINTS = 10000
 /** @deprecated skill_score/computeSkillScore 로 전환 예정. 보존 사유는 FE 폴백이 아니라 백엔드
  *  applyAttempt() 가 여전히 이 값으로 points 컬럼을 채우기 때문(_shared/scoring.ts 의 동일 함수·호출부 참조) —
@@ -108,33 +117,65 @@ export function computePoints(level: number, correct: number): number {
   const frac = Math.min(Math.max(0, correct) / promoteCut(lv), 1)
   return Math.round(((lv - 1 + frac) / MAX_LEVEL) * MAX_POINTS)
 }
-export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame'
-// 활동 종류별 적립값(활동 최대 기여의 상한). attendance < daily_learn < minigame 부등호 유지.
-// minigame 값은 "정규화 상한"이다 — 실제 적립값은 게임별 서버 정규화 점수를 이 상한 이하로 스케일해서 쓴다(게임별 스코어링은 이 파일 밖 관심사).
-// 튜닝 근거(부등호 "실력 최고치 > 활동 최대 기여" 성립 확인):
-//   실력 최고치 = computeSkillScore(MAX_LEVEL, promoteCut(MAX_LEVEL)) = SKILL_LEVEL_STEP*MAX_LEVEL = MAX_POINTS = 10000.
-//   가정(assumption, 튜닝 필요시 갱신): 시즌 ≈ 60일, 점수 적립이 배선된 미니게임 2종
-//   (기준은 레지스트리 개수가 아니라 submit-minigame 의 GAME_MAX — 레지스트리엔 6종이지만 나머지는 제출 배선이 없어 적립 0).
-//   활동 일일 최대 = ATTENDANCE(10) + DAILY_LEARN(30) + MINIGAME(50)×2종 = 140 → 시즌 누적 ≈ 8,400 (< 10,000, 여유 16%).
-//   ⚠️ 미니게임 종류가 늘어나면(예: 3종 이상) 이 여유가 줄거나 역전될 수 있다 — 레지스트리가 커지면 ACTIVITY_DELTA.minigame 을
-//      낮추거나 시즌 단위 활동 캡(추후 스테이지 과제)을 도입해 이 부등호를 재검증할 것. (미해결/가정으로 명시)
+// ── 활동 트랙 ──
+// 원안 표 그대로. 적립값·일일 횟수·시즌 상한 세 표가 한 벌이고, seasonMax = delta × perDay × SEASON_DAYS 로 떨어진다.
+// ⚠️ 미니게임은 **참여 횟수당 고정 적립**이다(성적 무관) — 예전의 "게임별 정규화 점수 비례"는 원안 채택으로 제거됐다.
+//    성적 반영안(게임당 0~2점 · 서로 다른 3종)은 보류 상태다.
+// ⚠️ referral(친구 초대)은 점수 규칙만 선반영된 상태다 — 초대코드 발급·가입 귀속 플로우가 아직 없어 적립 호출부가 없다.
+export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame' | 'referral'
 export const ACTIVITY_DELTA: Record<ActivityKind, number> = {
-  attendance: 10,
-  daily_learn: 30,
-  minigame: 50,
+  attendance: 5,
+  daily_learn: 2,
+  minigame: 2,
+  referral: 5,
+}
+export const ACTIVITY_PER_DAY: Record<ActivityKind, number> = {
+  attendance: 1,
+  daily_learn: 1,
+  minigame: 3,
+  referral: 1,
+}
+export const ACTIVITY_SEASON_MAX: Record<ActivityKind, number> = {
+  attendance: 1825,
+  daily_learn: 730,
+  minigame: 2190,
+  referral: 1825,
 }
 export function activityDelta(kind: ActivityKind): number {
   return ACTIVITY_DELTA[kind]
 }
+export function activityPerDay(kind: ActivityKind): number {
+  return ACTIVITY_PER_DAY[kind]
+}
+/** 활동 트랙 시즌 상한 합 = 6,570 */
+export const ACTIVITY_MAX = Object.values(ACTIVITY_SEASON_MAX).reduce((a, b) => a + b, 0)
 
-// 레벨가중 실력점수(최고성취 기반). computePoints 와 스케일 연속성 유지
-// (SKILL_LEVEL_STEP*MAX_LEVEL === MAX_POINTS) — STAGE1 백필(points→skill_score 그대로 복사)과 이어짐.
-// level 은 하한만 clamp(MIN_LEVEL)하고 상한은 두지 않는다("상한 없음") — 향후 MAX_LEVEL 이 늘어도 재작성 불필요.
-export const SKILL_LEVEL_STEP = MAX_POINTS / MAX_LEVEL // 튜닝 대상: 레벨당 계단 폭
-export function computeSkillScore(level: number, correct: number): number {
-  const lv = Math.max(MIN_LEVEL, level)
-  const frac = Math.min(Math.max(0, correct) / promoteCut(lv), 1)
-  return Math.round(SKILL_LEVEL_STEP * (lv - 1) + SKILL_LEVEL_STEP * frac)
+// ── 레벨테스트 트랙 ──
+// 레벨 하나를 클리어(승급컷 통과)할 때마다 +1,000. 부분점수 없다 — 컷을 못 넘으면 0이다.
+// 사다리가 순차라 "클리어한 레벨 수" = 도달 등급 − 1 이고, 최고 레벨(Lv.7) 자체를 통과하면 7이 되어 7,000 이 만점이다.
+export const LEVELTEST_CLEAR_POINTS = 1000
+export const LEVELTEST_MAX = LEVELTEST_CLEAR_POINTS * MAX_LEVEL // 7,000
+export function computeSkillScore(clearedLevels: number): number {
+  const n = Math.max(0, Math.min(MAX_LEVEL, Math.floor(clearedLevels)))
+  return n * LEVELTEST_CLEAR_POINTS
+}
+
+// ── ARENA 레벨 밴드 — 시즌 총점 → 표시 레벨 ──
+// 원안 표 그대로 1,000점 균등 밴드: Lv.1 0~999 · Lv.2 1,000~1,999 · … · Lv.6 5,000~5,999 · Lv.7 6,000~13,570.
+// ⚠️ 이건 **표시용 레벨**이고, 시험 사다리 등급(user_progress.rank — 승급으로만 오름)과는 별개 축이다.
+//    결과창의 승급 연출은 계속 rank 기준이다.
+export const ARENA_BAND_STEP = 1000
+/** 시즌 총점 상한 = 레벨테스트 7,000 + 활동 6,570 = 13,570 (= Lv.7 최고점) */
+export const SEASON_MAX_POINTS = LEVELTEST_MAX + ACTIVITY_MAX
+export function arenaLevelForScore(total: number): number {
+  const t = Math.max(0, Math.floor(total))
+  return Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, Math.floor(t / ARENA_BAND_STEP) + 1))
+}
+/** 그 밴드의 [최저점, 최고점]. 최상위(Lv.7)는 위가 열려 있어 시즌 상한까지. */
+export function arenaBand(level: number): [number, number] {
+  const lv = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level))
+  const lo = (lv - 1) * ARENA_BAND_STEP
+  return [lo, lv >= MAX_LEVEL ? SEASON_MAX_POINTS : lo + ARENA_BAND_STEP - 1]
 }
 
 // 백분위(0~1, 낮을수록 상위) → 티어 5단계. DB ranking_tier(pct)(reset_season_fn.sql)와 동일 밴드 — FE/백엔드 단일 출처.

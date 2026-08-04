@@ -1142,10 +1142,12 @@ function FaqAdmin() {
 
 // ── 채팅 검수 (유사채팅 보드) — admin 함수의 chatReportList/chatPendingList/chatHide/chatUnhide/chatApprove/chatResolveReport ──
 //   ⚠️ 이 컴포넌트는 WORLD ARENA 관리자(AdminLevelTest.tsx)로 노출 위치를 옮겼다(export). 데이터는 여전히 admin 함수.
-interface ChatModMessage { id: number; body: string | null; user_id: string; display_name: string; mod_status: string; deleted_at: string | null }
+interface ChatModMessage { id: number; body: string | null; user_id: string; display_name: string; room?: string | null; mod_status: string; deleted_at: string | null }
 interface ChatReportRow { id: string; messageId: number | null; reporterId: string | null; reason: string | null; status: string; createdAt: string; message: ChatModMessage | null }
-interface ChatPendingRow { id: number; user_id: string; display_name: string; is_anon: boolean; body: string | null; mod_status: string; created_at: string; updated_at: string }
+interface ChatPendingRow { id: number; user_id: string; display_name: string; is_anon: boolean; body: string | null; room?: string | null; mod_status: string; created_at: string; updated_at: string }
 const CHAT_REPORT_STATUS_LABEL: Record<string, string> = { open: '대기', resolved: '처리됨', dismissed: '무효' }
+// 방 표기 — 'global'(전세계) 또는 ISO2 국가코드. 방 도입 전 글은 room 이 비어 있을 수 있다.
+const chatRoomLabel = (room?: string | null) => (!room || room === 'global' ? '🌍 전세계' : `🏳 ${room}`)
 const CHAT_PAGE = 50
 
 export function ChatModAdmin() {
@@ -1275,6 +1277,7 @@ export function ChatModAdmin() {
           <thead>
             <tr>
               <th>상태</th>
+              <th>방</th>
               <th>메시지 본문</th>
               <th>작성자</th>
               <th>신고자</th>
@@ -1294,6 +1297,7 @@ export function ChatModAdmin() {
                       {CHAT_REPORT_STATUS_LABEL[r.status] ?? r.status}
                     </span>
                   </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{msg ? chatRoomLabel(msg.room) : '-'}</td>
                   <td style={{ maxWidth: 360, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                     {msg ? (msg.body ?? <span style={{ color: 'var(--muted)' }}>(삭제됨)</span>) : <span style={{ color: 'var(--muted)' }}>(메시지 없음)</span>}
                   </td>
@@ -1324,7 +1328,7 @@ export function ChatModAdmin() {
             })}
             {!reports.length && !reportsLoading && (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   신고 내역이 없습니다.
                 </td>
               </tr>
@@ -1350,6 +1354,7 @@ export function ChatModAdmin() {
         <table className="admin-table">
           <thead>
             <tr>
+              <th>방</th>
               <th>본문</th>
               <th>작성자</th>
               <th>작성일시</th>
@@ -1359,6 +1364,7 @@ export function ChatModAdmin() {
           <tbody>
             {pending.map((m) => (
               <tr key={m.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>{chatRoomLabel(m.room)}</td>
                 <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                   {m.body ?? <span style={{ color: 'var(--muted)' }}>(내용 없음)</span>}
                 </td>
@@ -1376,7 +1382,7 @@ export function ChatModAdmin() {
             ))}
             {!pending.length && !pendingLoading && (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   검수 대기 중인 메시지가 없습니다.
                 </td>
               </tr>

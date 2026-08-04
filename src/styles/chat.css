@@ -213,6 +213,17 @@
   cursor: default;
 }
 
+/* 남의 나라 방 — 입력칸 자리에 들어가는 안내(읽기 전용) */
+.chat-readonly {
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-outline-variant, #c3c6d6);
+  background: var(--color-surface-container-low, #f3f3fd);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--color-on-surface-variant, #434654);
+}
+
 .chat-login-cta {
   display: flex;
   align-items: center;

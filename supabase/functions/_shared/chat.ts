@@ -40,11 +40,33 @@ export async function resolveIpHash(req: Request): Promise<string> {
   return await sha256Hex(ip + dailySalt)
 }
 
-// display_name 조회 — profiles.display_name 없으면(익명/미설정) '익명#'+uid 앞 4자.
-export async function resolveDisplayName(admin: SupabaseClient, userId: string): Promise<string> {
-  const { data } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle()
+// ── 방(room) ──
+// 방은 전세계('global') 하나 + 나라별 하나(ISO2 대문자)뿐이다. 클라가 보낸 값을 그대로 쓰면
+// 오타·장난 문자열이 그때마다 새 방을 만들어내므로, 모양이 안 맞으면 전부 전세계로 접는다.
+export const GLOBAL_ROOM = 'global'
+
+export function normalizeRoom(v: unknown): string {
+  const s = String(v ?? '').trim()
+  if (!s || s.toLowerCase() === GLOBAL_ROOM) return GLOBAL_ROOM
+  const up = s.toUpperCase()
+  return /^[A-Z]{2}$/.test(up) ? up : GLOBAL_ROOM
+}
+
+// 작성자 프로필 — 표시 이름 + 국가(방 쓰기 권한 판정용). 한 번의 조회로 둘 다 가져온다.
+//   display_name 이 없으면(익명/미설정) '익명#'+uid 앞 4자.
+export async function resolvePoster(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<{ name: string; country: string | null }> {
+  const { data } = await admin.from('profiles').select('display_name, country_code').eq('id', userId).maybeSingle()
   const name = (data?.display_name ?? '').trim()
-  return name || `익명#${userId.slice(0, 4)}`
+  const cc = (data?.country_code ?? '').trim()
+  return { name: name || `익명#${userId.slice(0, 4)}`, country: cc ? cc.toUpperCase() : null }
+}
+
+// 나라 방은 그 나라 사람만 쓴다(읽기는 누구나). 전세계 방은 로그인만 하면 누구나.
+export function canPostToRoom(room: string, country: string | null): boolean {
+  return room === GLOBAL_ROOM || (country != null && country === room)
 }
 
 type ModResult = { status: 'flagged' | 'ok' | 'unavailable' }

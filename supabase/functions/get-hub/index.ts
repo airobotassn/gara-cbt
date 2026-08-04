@@ -60,6 +60,8 @@ Deno.serve(async (req) => {
       { data: titles },
       { data: rankCtx },
       { data: attendance },
+      { data: referralCode },
+      { data: referredRow },
     ] = await Promise.all([
       admin.from('user_currency').select('points, dust').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
@@ -93,6 +95,11 @@ Deno.serve(async (req) => {
         .gte('day', yearAgo)
         .order('day', { ascending: false })
         .limit(400),
+      // 친구 초대 코드 — 없으면 최초 1회 발급하고 이후 고정(ensure_referral_code, 20260804150000).
+      //   ⚠️ cosmetic-only 불변식 예외 아님: profiles 는 실력/진척 테이블이 아니다(user_progress·user_level_skill 은 여전히 읽기 전용).
+      admin.rpc('ensure_referral_code', { p_uid: uid }),
+      // 초대코드를 이미 등록했는지 — 허브 모달의 입력칸 잠금 판정(계정당 1회, 되돌릴 수 없음).
+      admin.from('profiles').select('referred_by').eq('id', uid).maybeSingle(),
     ])
 
     const couponList = (coupons ?? []).map((c) => ({
@@ -133,6 +140,8 @@ Deno.serve(async (req) => {
       // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).
       // 활동 기록 달력(마이페이지) — 출석한 날짜('YYYY-MM-DD') 목록, 최근 1년.
       attendanceDays,
+      referralCode: (referralCode as string | null) ?? null,
+      referralUsed: !!referredRow?.referred_by,
       dailyDone: !!daily?.did_attendance,
       learnDone: !!daily?.did_learn,
       minigameDone: !!daily?.did_minigame,

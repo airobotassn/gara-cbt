@@ -17,6 +17,9 @@ const DDL_MIGRATIONS = [
   'supabase/migrations/20260721030000_ranking_season_archive.sql',
   'supabase/migrations/20260721040000_daily_activity_flags.sql',
   'supabase/migrations/20260721050000_reset_season_fn.sql',
+  'supabase/migrations/20260804140000_activity_referral_kind.sql',
+  'supabase/migrations/20260804150000_referral_code.sql',
+  'supabase/migrations/20260804160000_referred_by.sql',
 ];
 
 const stripped = (text) => text.split('\n').map((l) => l.replace(/\s+$/, ''))

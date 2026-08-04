@@ -1645,7 +1645,7 @@ async function chatReportList(admin: any, body: any) {
   if (messageIds.length) {
     const { data: msgs } = await admin
       .from('chat_messages')
-      .select('id, body, user_id, display_name, mod_status, deleted_at')
+      .select('id, body, user_id, display_name, room, mod_status, deleted_at')
       .in('id', messageIds)
     for (const m of msgs ?? []) msgMap[(m as any).id] = m
   }
@@ -1668,7 +1668,7 @@ async function chatPendingList(admin: any, body: any) {
   const offset = Math.max(0, Math.floor(body?.offset ?? 0))
   const { data, count } = await admin
     .from('chat_messages')
-    .select('id, user_id, display_name, is_anon, body, mod_status, created_at, updated_at', { count: 'exact' })
+    .select('id, user_id, display_name, is_anon, body, room, mod_status, created_at, updated_at', { count: 'exact' })
     .eq('mod_status', 'pending')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })

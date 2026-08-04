@@ -157,4 +157,5 @@ html.dark .mg-cover { background: #1b2130; }
 .mgr-modal .hof-podium { max-width: 100%; margin: 0 auto 12px; }
 /* 레벨형 게임은 값 아래에 동률 해소용 소요시간을 병기한다(줄바꿈 + 흐린 보조색). */
 .mgr-modal .bar-pt small { display: block; margin-top: -2px; font-weight: 700; font-size: 11px; color: #5b6f9e; }
-.mgr-modal .hof-pn-txt small { display: block; margin-top: 1px; font-weight: 600; color: var(--dim); }
+/* 시상대 명판은 크림 바탕이라 글자색이 고정 남색이다(ranking.css) → 여기 소요시간도 같은 계열로. */
+.mgr-modal .hof-plate-txt small { display: block; margin-top: 0.2cqw; font-weight: 700; font-size: 0.8em; color: #5b6f9e; }

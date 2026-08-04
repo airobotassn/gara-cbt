@@ -338,3 +338,13 @@
   border-color: rgba(0, 217, 255, 0.55);
   color: #fff;
 }
+
+/* FAB 은 Layout 이 .lp 바깥에 그리므로 .force-dark 를 못 받는다. 라이트 테마에서는
+   --fab-accent 가 진한 코발트(#004ac6)라 검은 우주 위에서 글로우가 사실상 안 보인다
+   (맥동 연출도, 호버 피드백도 같이 죽는다).
+   랜딩 배경은 테마와 무관하게 항상 검으므로 여기서만 다크 accent 로 고정한다.
+   ⚠️ 색을 새로 만들지 않는다 — fab.css 의 html.dark 가 쓰는 값 그대로다.
+   (같은 페이지-스코프 수법이 hub.css 에 있다: body:has(.hub) .fab-top) */
+body:has(.lp) {
+  --fab-accent: 79, 141, 245;
+}

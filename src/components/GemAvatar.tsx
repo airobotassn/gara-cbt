@@ -76,7 +76,10 @@ export function Avatar({
     )
   }
   if (spec.kind === 'mascot') {
-    // 전신 마스코트(비정사각) → 원형 안에 contain 으로 전체가 보이게, 연한 배경으로 여백 정리.
+    // ⚠️ contain 금지. 마스코트 그림은 282×428 세로 직사각이고 배경까지 불투명(거의 흰색)이라,
+    //    contain 으로 넣으면 정사각 박스 안에 세로 직사각형으로 앉는다. 거기에 원형 마스크가 걸리면
+    //    '세로 직사각형 ∩ 원' = 좌우 직선 + 위아래 호 = 타원(달걀)이 된다.
+    //    cover 는 박스를 꽉 채우므로 어떤 비율의 그림이 와도 온전한 원이 나온다(업로드 이미지와 동일 규칙).
     return (
       <img
         src={spec.url}
@@ -89,8 +92,8 @@ export function Avatar({
           width: size,
           height: size,
           borderRadius: '50%',
-          objectFit: 'contain',
-          background: '#eef1f6',
+          objectFit: 'cover',
+          objectPosition: 'center top', // 전신 그림에서 얼굴이 살아남게
           display: 'block',
         }}
       />

@@ -87,6 +87,9 @@ async function seedAuthAndMocks(context) {
         ),
         points: 1200, dust: 30, cosmetics: [], baseKey: 'default', equipped: {},
         stamps: 3, pity: 0, dailyDone: true, learnDone: false, minigameDone: false, leveltestDone: false,
+        // 허브 '초대하기' 모달 — get-hub 가 ensure_referral_code 로 채우는 실제 필드.
+        //   referralUsed = 초대코드를 이미 등록했는지(true 면 입력칸이 영구 잠김).
+        referralCode: 'CARIK7M2', referralUsed: false,
       }) }))
 
   // 리더보드(랭킹 화면) — 구버전(users)·신버전(top/me) 필드를 모두 담아 Before/After 둘 다 렌더되게.

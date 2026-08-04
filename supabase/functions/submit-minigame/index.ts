@@ -1,11 +1,13 @@
 // submit-minigame: 미니게임(자립형 iframe HTML) 클리어 후 활동점수 적립.
 //  · 인증 유저 전용(익명 거부). 클라 HTML 은 신뢰경계 밖 — 원점수를 곧이곧대로 믿지 않는다:
 //    (1) 서버 clamp — game_id 별 선언된 상한(GAME_MAX)으로 [0, max] 자름.
-//    (2) 하루 기여 cap — activity_ledger 부분 unique(user_id, day, source_ref) 로 게임별 1행/일.
-//        같은 날 재제출은 그 행을 "하루 최고"로만 갱신(낮은 점수로는 깎이지 않음, GREATEST).
+//    (2) 하루 기여 cap — activity_ledger unique(user_id, day, source_ref) 를 **회차 슬롯**으로 써서 하루 N회.
 //    (3) rate-limit — 짧은 시간에 반복 제출을 인스턴스 단위로 저지(아래 한계 주석 참조).
-//  · 정규화: delta = round(activityDelta('minigame') * clamp(raw,0,max)/max) — 상한은 _shared/scoring.ts
-//    (activityDelta) 소관, 여기는 게임별 raw→[0,1] 비율만 담당.
+//  · 적립(2026-08-04 원안 반영): **참여 횟수당 고정 +2, 하루 3회까지**. 성적은 활동점수에 반영되지 않는다
+//    (값·횟수는 _shared/scoring.ts 의 ACTIVITY_DELTA/ACTIVITY_PER_DAY 소관).
+//    ⚠️ 예전엔 delta = round(activityDelta('minigame') × clamp(raw,0,max)/max) 로 **성적 비례**였고 하루 cap 도
+//       게임별 1행/일("하루 최고" 갱신)이었다 — 원안 채택으로 둘 다 바뀌었다. 게임 실력은 이제 활동점수가 아니라
+//       게임별 랭킹(minigame_scores, 아래 (4))에만 반영된다.
 //  · activity_ledger insert/update 가 트리거(activity_ledger_apply, STAGE1b)를 태워 user_progress.activity_score 를
 //    원자 증분한다. 그 트리거는 AFTER INSERT OR UPDATE 로 걸려있고 new.delta − old.delta 차분을 증분하므로,
 //    하루 두 번째 이후 제출(= upsert 의 UPDATE 경로, "하루 최고" 갱신)도 개선분만큼 activity_score 에 정상 반영된다
@@ -18,11 +20,12 @@
 //        발급 직후 즉시 제출을 막는다(../_shared/minigames.ts), (c) **플레이 시간 대비 상한** — 티켓 나이 ×
 //        게임별 perSec 로 점수를 한 번 더 깎는다(거부가 아니라 clamp: 정상 플레이 오차를 죽이지 않기 위해),
 //    (d) 레벨형 게임의 clamp 상한은 실제 LEVELS.length 와 일치시켜 존재하지 않는 레벨 신고를 막는다,
-//    (e) 활동점수는 종전대로 게임별 하루 1행 "하루 최고" upsert 로 하루 누적 상한을 넘지 못한다.
+//    (e) 활동점수는 하루 회차 슬롯(play:1..N) unique 로 하루 누적 상한을 넘지 못한다 — 점수를 위조해도
+//        활동점수는 참여 고정값이라 이득이 없다(위조 유인은 게임별 랭킹 쪽에만 남는다).
 //    ⚠️ 남은 구멍: 게임을 오래 켜둔 뒤 큰 점수를 신고하면 (c) 를 통과한다. 완전 방어는 게임 내 텔레메트리
 //      서명(플레이 이벤트 자체를 서버가 검증)이 필요하고 자립형 게임 HTML 로직을 다 손봐야 해서 후속 과제로 둔다.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser, getActiveSeasonId, activityDelta } from '../_shared/scoring.ts'
+import { adminClient, getUser, getActiveSeasonId, activityDelta, activityPerDay } from '../_shared/scoring.ts'
 import { kstDay } from '../_shared/kst.ts'
 import { gameSpec, issueTicket, verifyTicket, plausibleCap } from '../_shared/minigames.ts'
 
@@ -78,8 +81,8 @@ Deno.serve(async (req) => {
     // (2b) 서버 clamp — 신뢰 불가 원점수를 [0, spec.max] 로 자르고, 플레이 시간 대비 상한으로 한 번 더 깎는다.
     const raw = typeof rawScore === 'number' && isFinite(rawScore) ? rawScore : 0
     const hardMax = spec.max
+    // clamped 는 이제 활동점수와 무관하다 — 게임별 랭킹(minigame_scores) 기록용으로만 쓴다.
     const clamped = Math.max(0, Math.min(hardMax, Math.min(raw, plausibleCap(spec, tk.ageSec))))
-    const delta = Math.round(activityDelta('minigame') * (clamped / hardMax))
     // 퍼즐(레벨형) 동률 해소용 소요시간. 점수형은 저장하지 않는다(achieved_at 으로만 갈림).
     const tie =
       spec.metric === 'level' && typeof tieMs === 'number' && isFinite(tieMs) && tieMs >= 0
@@ -92,23 +95,36 @@ Deno.serve(async (req) => {
 
     const today = kstDay()
 
-    // (3) 하루 최고만 유지 — 기존 행보다 낮으면 갱신하지 않는다(트리거 재발화 방지 목적도 겸함, 상단 주석 참조).
-    const { data: existing } = await admin
+    // (3) 활동점수 — 참여 횟수당 고정 적립, 하루 perDay 회까지(성적 무관, 게임 종류도 무관).
+    //     하루 캡은 activity_ledger 의 unique(user_id, day, source_ref) 를 **회차 슬롯**으로 재사용해서 건다
+    //     (source_ref = 'play:1' … 'play:N'). 예전엔 source_ref = gameId 라 게임 종수만큼 적립됐다.
+    //     오늘 찍힌 행 수를 세어 그다음 빈 슬롯부터 insert 하고, 동시 제출로 이미 찬 슬롯이면(23505) 다음 슬롯으로
+    //     넘어간다 → 레이스가 나도 하루 적립 행은 N개를 넘지 못한다(unique 인덱스가 최종 방어선).
+    //     ⚠️ 옛 source_ref=gameId 행도 오늘치 카운트에 포함된다(전환기 과적립 방지 — 의도된 동작).
+    const perDay = activityPerDay('minigame')
+    const delta = activityDelta('minigame')
+    const { count: playsToday } = await admin
       .from('activity_ledger')
-      .select('delta')
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('day', today)
-      .eq('source_ref', gameId)
-      .maybeSingle()
-    const prevDelta = (existing?.delta as number) ?? 0
-    const finalDelta = Math.max(prevDelta, delta)
+      .eq('kind', 'minigame')
 
-    if (!existing || finalDelta > prevDelta) {
-      const { error } = await admin.from('activity_ledger').upsert(
-        { user_id: user.id, season_id: seasonId, kind: 'minigame', delta: finalDelta, day: today, source_ref: gameId },
-        { onConflict: 'user_id,day,source_ref' },
-      )
-      if (error) return json({ error: error.message }, 500)
+    let credited = 0
+    for (let slot = (playsToday ?? 0) + 1; slot <= perDay; slot++) {
+      const { error } = await admin.from('activity_ledger').insert({
+        user_id: user.id,
+        season_id: seasonId,
+        kind: 'minigame',
+        delta,
+        day: today,
+        source_ref: `play:${slot}`,
+      })
+      if (!error) {
+        credited = delta
+        break
+      }
+      if (error.code !== '23505') return json({ error: error.message }, 500)
     }
 
     await admin
@@ -155,8 +171,9 @@ Deno.serve(async (req) => {
       ok: true,
       gameId,
       clamped,
-      delta: finalDelta,
-      isNewBest: finalDelta > prevDelta,
+      delta: credited, // 이번 제출로 실제 적립된 활동점수(하루 캡이 찼으면 0)
+      playsToday: Math.min((playsToday ?? 0) + (credited > 0 ? 1 : 0), perDay),
+      perDay,
       isRankBest,
       metric: spec.metric,
     })

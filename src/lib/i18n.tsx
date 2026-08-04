@@ -1662,6 +1662,11 @@ const D: Record<string, Record<Lang, string>> = {
   'chat.duplicate': { ko: "방금 같은 내용을 보냈어요", en: "You just sent the same message", ja: "同じ内容を送信済みです", zh: "你刚发送过相同内容", hi: "आपने अभी वही संदेश भेजा है", vi: "Bạn vừa gửi nội dung giống hệt" },
   'chat.rateLimited': { ko: "요청이 너무 많아요. 잠시 후 다시 시도해주세요", en: "Too many requests. Please try again shortly", ja: "リクエストが多すぎます。しばらくして再度お試しください", zh: "请求过于频繁，请稍后重试", hi: "बहुत अधिक अनुरोध, कृपया बाद में पुनः प्रयास करें", vi: "Quá nhiều yêu cầu, vui lòng thử lại sau" },
   'chat.loginToJoin': { ko: "채팅에 참여하려면 로그인해주세요", en: "Sign in to join the chat", ja: "チャットに参加するにはログインしてください", zh: "登录后即可参与聊天", hi: "चैट में शामिल होने के लिए साइन इन करें", vi: "Đăng nhập để tham gia trò chuyện" },
+  // 방(room) — 전세계 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
+  'chat.roomGlobal': { ko: "전세계", en: "Global", ja: "全世界", zh: "全球", hi: "वैश्विक", vi: "Toàn cầu" },
+  'chat.roomBack': { ko: "전세계로", en: "Go global", ja: "全世界へ", zh: "回到全球", hi: "वैश्विक पर जाएँ", vi: "Về toàn cầu" },
+  'chat.readOnlyRoom': { ko: "{country} 채팅은 읽기만 할 수 있어요 — 글은 내 나라와 전세계 방에만 쓸 수 있어요", en: "{country} chat is read-only — you can post in your own country's room and the global room", ja: "{country}のチャットは閲覧のみです — 投稿は自国の部屋と全世界の部屋でできます", zh: "{country}聊天室仅可阅读 — 只能在本国聊天室和全球聊天室发言", hi: "{country} चैट केवल पढ़ने के लिए है — आप अपने देश और वैश्विक कक्ष में लिख सकते हैं", vi: "Phòng {country} chỉ để đọc — bạn chỉ đăng được ở phòng nước mình và phòng toàn cầu" },
+  'chat.notMyCountry': { ko: "내 나라 방과 전세계 방에만 글을 쓸 수 있어요", en: "You can only post in your own country's room and the global room", ja: "投稿できるのは自国の部屋と全世界の部屋だけです", zh: "只能在本国聊天室和全球聊天室发言", hi: "आप केवल अपने देश और वैश्विक कक्ष में लिख सकते हैं", vi: "Bạn chỉ có thể đăng ở phòng nước mình và phòng toàn cầu" },
   'chat.anonBadge': { ko: "익명", en: "Anon", ja: "匿名", zh: "匿名", hi: "गुमनाम", vi: "Ẩn danh" },
   'chat.confirmDelete': { ko: "이 메시지를 삭제할까요?", en: "Delete this message?", ja: "このメッセージを削除しますか？", zh: "确定要删除这条消息吗？", hi: "क्या इस संदेश को हटाना है?", vi: "Xóa tin nhắn này?" },
   'chat.reportTitle': { ko: "신고 사유를 선택해주세요", en: "Why are you reporting this?", ja: "通報理由を選んでください", zh: "请选择举报原因", hi: "रिपोर्ट का कारण चुनें", vi: "Chọn lý do báo cáo" },

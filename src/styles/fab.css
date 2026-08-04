@@ -101,6 +101,59 @@ html.dark {
   border-color: rgba(var(--fab-accent), 0.5);
   box-shadow: 0 0 24px -6px rgba(var(--fab-accent), 0.5);
 }
+
+/* ===== 평상시 맥동 =====
+ * 좌하단에 가만히 있으면 눈에 안 들어와서 존재를 모른다. 천천히 커졌다 작아졌다를 반복한다.
+ * 쉬는 구간 없이 계속 부드럽게 오간다(끊기면 '박동'처럼 튀어서 시끄럽다).
+ * ⚠️ transform 이 아니라 개별 속성 scale 로 준다 — transform 을 쓰면 :hover 의
+ *    translateY(-2px) 와 같은 속성을 두고 싸워서 호버가 먹통이 된다. 둘은 따로 합성된다. */
+@keyframes fab-pulse {
+  0%,
+  100% { scale: 1; }
+  50%  { scale: 1.16; }
+}
+.fab {
+  animation: fab-pulse 2.6s ease-in-out infinite;
+}
+/* 크기만으로는 존재감이 약하다(1.08 로는 티가 안 난다는 지적). 같은 리듬으로 빛도 같이 번지게 한다.
+   ⚠️ box-shadow 를 keyframes 로 애니메이션하면 안 된다 — 애니메이션 값이 캐스케이드에서
+      :hover 의 box-shadow 를 이겨서 호버 피드백이 죽는다(멈춰 있어도 현재값을 계속 적용한다).
+      그래서 빛은 ::after 링에 따로 얹고, .fab 의 box-shadow 는 호버 몫으로 비워둔다.
+   색은 새로 만들지 않고 호버가 쓰는 --fab-accent 를 그대로 쓴다(라이트/다크 자동 대응). */
+.fab::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: fab-glow 2.6s ease-in-out infinite;
+}
+@keyframes fab-glow {
+  0%,
+  100% { box-shadow: 0 0 0 0 rgba(var(--fab-accent), 0); }
+  50%  { box-shadow: 0 0 26px 6px rgba(var(--fab-accent), 0.45); }
+}
+/* 누르려고 마우스를 올렸는데 표적이 계속 움직이면 방해된다. 패널이 열려 있을 때도 멈춘다. */
+/* ⚠️ 패널 열림 판정은 body:has(.panel.open) 뿐이다. 이 파일 다른 주석에 나오는 `.panel-open` 은
+   코드 어디에도 안 붙는 클래스라(Layout.tsx 는 `panel open` 을 쓴다) 쓰면 안 된다. */
+.fab:hover,
+.fab:focus-visible,
+body:has(.panel.open) .fab,
+.fab:hover::after,
+.fab:focus-visible::after,
+body:has(.panel.open) .fab::after {
+  animation-play-state: paused;
+}
+/* 멈출 때는 링을 아예 지운다 — paused 는 '그 순간의 값'을 유지하므로, 크게 번진 상태에서
+   멈추면 호버 글로우와 겹쳐 두 겹으로 보인다. */
+.fab:hover::after,
+.fab:focus-visible::after,
+body:has(.panel.open) .fab::after {
+  box-shadow: none;
+}
+/* ⚠️ prefers-reduced-motion 으로 끄지 않는다. 윈도우 "애니메이션 효과" 를 꺼둔 PC 가 흔한데
+   그러면 이 연출이 통째로 사라진다(EarthHero 에서 같은 이유로 겪었다). 진폭이 9% 라 어지럼증을
+   유발하는 종류가 아니라고 보고 항상 재생한다. */
 /* 푸터가 화면에 들어오면 FAB 이 비켜준다(SiteFooter 가 body 에 .footer-in-view 를 붙인다).
    FAB 은 좌하단 고정이라 푸터 링크 위를 덮는데, 예전엔 푸터가 아래를 112px 비워 피하느라 푸터가 커졌다.
    여백 대신 FAB 을 숨긴다 — 푸터에 같은 링크가 있어 네비는 안 끊긴다.

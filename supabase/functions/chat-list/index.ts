@@ -1,11 +1,14 @@
 // chat-list: 유사채팅 보드 조회 — 공개 읽기(로그인 불필요, service role 로 읽음).
 //  3가지 모드(우선순위 순): ids[] → reconcile(삭제/수정 tombstone), after → 폴링(신규분, 오름차순),
 //  else(initial/before) → 커서 페이지(최신 limit개 내림차순 조회 후 오름차순으로 뒤집어 반환).
+//  방(room): 목록·폴링은 항상 한 방으로 좁힌다(기본 전세계). 읽기는 방 제한이 없다 — 남의 나라 방도 볼 수 있다.
+//  reconcile 만 방 조건이 없다(PK 조회이고, 클라는 자기가 띄운 방의 id 만 보낸다).
 //  본문 게이트: mod_status='ok' 이거나 본인 글이면 노출, 아니면(pending/hidden 이며 타인) body=null.
 //  reporter_id/ip_hash/content_hash 는 응답에 절대 포함하지 않는다.
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
+import { normalizeRoom } from '../_shared/chat.ts'
 
 const MSG_COLUMNS = 'id, user_id, display_name, is_anon, body, mod_status, edited_at, created_at, updated_at, deleted_at'
 
@@ -37,7 +40,8 @@ Deno.serve(async (req) => {
     // mod_status='ok' 이거나 본인 글이면 노출(공개 아닌 글은 타인에게 행 자체를 안 보여줌).
     const visibilityFilter = caller != null ? `mod_status.eq.ok,user_id.eq.${caller}` : 'mod_status.eq.ok'
 
-    const { after, before, limit, ids, since } = await req.json().catch(() => ({}))
+    const { after, before, limit, ids, since, room: roomIn } = await req.json().catch(() => ({}))
+    const room = normalizeRoom(roomIn)
     const admin = adminClient()
 
     if (Array.isArray(ids) && ids.length > 0) {
@@ -65,6 +69,7 @@ Deno.serve(async (req) => {
       const { data, error } = await admin
         .from('chat_messages')
         .select(MSG_COLUMNS)
+        .eq('room', room)
         .is('deleted_at', null)
         .or(visibilityFilter)
         .gt('id', after)
@@ -78,6 +83,7 @@ Deno.serve(async (req) => {
     let query = admin
       .from('chat_messages')
       .select(MSG_COLUMNS)
+      .eq('room', room)
       .is('deleted_at', null)
       .or(visibilityFilter)
       .order('id', { ascending: false })

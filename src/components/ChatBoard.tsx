@@ -10,6 +10,10 @@ import { countryName, flagEmoji } from '../lib/regions'
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
 // 초기 페이지 → 폴링(신규분 append) + reconcile(수정/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
 // 본문은 항상 React 텍스트 child 로만 렌더(자동 이스케이프) — URL 만 NoticeDetail.linkify 방식으로 링크화.
+//
+// 방(room): 전세계('global') 하나 + 나라별 하나(ISO2). 어느 방인지는 부모가 정해서 내려준다.
+//  ⚠️ 방이 바뀌면 부모가 key={room} 으로 **다시 마운트**시킨다 — 목록·커서·폴링 타이머가 한 방을 가리키는
+//     상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청이 새 방 목록에 섞여 들어온다.
 
 interface Row {
   id: number
@@ -69,9 +73,19 @@ const ERR_KEYS: Record<string, string> = {
   ip_floor: 'chat.rateLimited',
   duplicate: 'chat.duplicate',
   edit_window: 'chat.editWindow',
+  not_my_country: 'chat.notMyCountry',
 }
 
-export default function ChatBoard() {
+interface Props {
+  /** 방 키 — 'global'(전세계) 또는 ISO2 국가코드 */
+  room?: string
+  /** 이 방에 글을 쓸 수 있는지(서버도 같은 규칙으로 다시 막는다 — 여기선 입력칸을 감추는 용도) */
+  canPost?: boolean
+  /** 못 쓰는 방일 때 입력칸 자리에 띄울 안내 문구 */
+  readOnlyHint?: string
+}
+
+export default function ChatBoard({ room = 'global', canPost = true, readOnlyHint }: Props) {
   const { t, lang } = useT()
   const { user } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
@@ -129,7 +143,7 @@ export default function ChatBoard() {
   useEffect(() => {
     let alive = true
     setLoading(true)
-    callFunction<{ messages: Row[] }>('chat-list', { limit: 30 })
+    callFunction<{ messages: Row[] }>('chat-list', { room, limit: 30 })
       .then((res) => {
         if (!alive) return
         setRows(res.messages)
@@ -146,7 +160,7 @@ export default function ChatBoard() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [room])
 
   // 폴링: 신규분(after) + reconcile(ids+since). 탭 비활성 시 중단, 지터 3.5~4.5s.
   useEffect(() => {
@@ -165,7 +179,7 @@ export default function ChatBoard() {
         if (typeof lastId === 'number') {
           const el = listRef.current
           const atBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : true
-          const res = await callFunction<{ messages: Row[] }>('chat-list', { after: lastId })
+          const res = await callFunction<{ messages: Row[] }>('chat-list', { room, after: lastId })
           if (res.messages.length) {
             setRows((prev) => {
               const seen = new Set(prev.map((r) => r.id))
@@ -180,7 +194,7 @@ export default function ChatBoard() {
         if (visible.length) {
           const ids = visible.map((r) => r.id)
           const since = visible.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), '1970-01-01T00:00:00Z')
-          const rec = await callFunction<{ tombstones?: Tomb[] }>('chat-list', { ids, since })
+          const rec = await callFunction<{ tombstones?: Tomb[] }>('chat-list', { room, ids, since })
           if (rec.tombstones?.length) {
             const byId = new Map(rec.tombstones.map((tm) => [tm.id, tm]))
             setRows((prev) =>
@@ -204,7 +218,7 @@ export default function ChatBoard() {
     return () => {
       if (pollRef.current) clearTimeout(pollRef.current)
     }
-  }, [])
+  }, [room])
 
   // 위로 스크롤 시 이전 페이지 prepend(스크롤 위치 보존)
   const loadOlder = useCallback(async () => {
@@ -214,7 +228,7 @@ export default function ChatBoard() {
     const prevHeight = el?.scrollHeight ?? 0
     setLoadingOlder(true)
     try {
-      const res = await callFunction<{ messages: Row[] }>('chat-list', { before: oldestId, limit: 30 })
+      const res = await callFunction<{ messages: Row[] }>('chat-list', { room, before: oldestId, limit: 30 })
       if (res.messages.length) {
         setRows((prev) => {
           const seen = new Set(prev.map((r) => r.id))
@@ -231,7 +245,7 @@ export default function ChatBoard() {
       /* noop */
     }
     setLoadingOlder(false)
-  }, [loadingOlder, loading, hasMore, rows])
+  }, [loadingOlder, loading, hasMore, rows, room])
 
   function onScroll() {
     const el = listRef.current
@@ -241,7 +255,7 @@ export default function ChatBoard() {
   async function onSend(e: React.FormEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text || sending || !user) return
+    if (!text || sending || !user || !canPost) return
     if (text.length > MAX_LEN) {
       showToast(errMsg('too_long'))
       return
@@ -268,7 +282,7 @@ export default function ChatBoard() {
       if (atBottom && el) el.scrollTop = el.scrollHeight
     })
     try {
-      const res = await callFunction<{ id: number; created_at: string; updated_at: string; display_name: string; is_anon: boolean; mod_status: 'ok' | 'pending' }>('chat-post', { body: text })
+      const res = await callFunction<{ id: number; created_at: string; updated_at: string; display_name: string; is_anon: boolean; mod_status: 'ok' | 'pending' }>('chat-post', { room, body: text })
       setRows((prev) => {
         const withoutTemp = prev.filter((r) => r.id !== tempId)
         if (withoutTemp.some((r) => r.id === res.id)) return withoutTemp
@@ -420,7 +434,17 @@ export default function ChatBoard() {
 
       {toast && <div className="chat-toast">{toast}</div>}
 
-      {user ? (
+      {!user ? (
+        <div className="chat-login-cta">
+          <span>{t('chat.loginToJoin')}</span>
+          <Link to="/login" className="chat-login-btn">{t('common.login_google')}</Link>
+        </div>
+      ) : !canPost ? (
+        // 남의 나라 방 — 읽기만. 서버도 같은 규칙으로 막지만, 쓸 수 없는 칸을 띄워놓고 보낸 뒤에
+        // 튕기는 것보다 애초에 입력칸을 걷어내는 편이 낫다.
+        // 안내문은 부모가 나라 이름을 넣어 넘긴다 — 없으면 나라 이름 없는 일반 문구로.
+        <div className="chat-readonly">{readOnlyHint ?? t('chat.notMyCountry')}</div>
+      ) : (
         <form className="chat-composer" onSubmit={onSend}>
           <input
             type="text"
@@ -434,11 +458,6 @@ export default function ChatBoard() {
             {sending ? t('chat.sending') : t('chat.send')}
           </button>
         </form>
-      ) : (
-        <div className="chat-login-cta">
-          <span>{t('chat.loginToJoin')}</span>
-          <Link to="/login" className="chat-login-btn">{t('common.login_google')}</Link>
-        </div>
       )}
 
       {reportFor != null && (

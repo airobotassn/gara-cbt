@@ -280,12 +280,13 @@ alter table question_reports enable row level security;
 
 -- ============================================================
 -- 유사채팅(pseudo-chat) board — chat_messages / chat_reports / chat_incidents
---   · chat_messages: 커서 기반 조회(id) 전용. updated_at 인덱스 없음 — reconcile 은 PK 로 처리.
+--   · chat_messages: 커서 기반 조회((room, id)) 전용. updated_at 인덱스 없음 — reconcile 은 PK 로 처리.
+--   · room: 방 = 전세계('global') 하나 + 나라별 하나(ISO2 대문자). 조회는 항상 방 단위.
 --   · chat_reports: (message_id, reporter_id) 1인 1신고.
 --   · chat_incidents: 모더레이션 장애(모드 API 불가 등) 기록.
 --   · RLS: 전부 활성화 + 클라 정책 없음 → service role(Edge Function)만 접근.
 --   · chat_post_atomic: rate-limit/dup/ip-floor 가드를 원자적으로 수행하는 유일한 삽입 경로.
---   멱등(재실행 안전) — migrations/20260723120000_chat_board.sql 과 DDL 동일.
+--   멱등(재실행 안전) — migrations/20260723120000_chat_board.sql + 20260804170000_chat_rooms.sql 과 DDL 동일.
 -- ============================================================
 
 create table if not exists chat_messages (
@@ -296,6 +297,7 @@ create table if not exists chat_messages (
   is_anon boolean not null default false,
   body text not null,
   lang text,
+  room text not null default 'global',
   mod_status text not null default 'ok',
   content_hash text,
   edited_at timestamptz,
@@ -304,8 +306,12 @@ create table if not exists chat_messages (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists chat_messages_cursor_idx
-  on chat_messages (id) where deleted_at is null;
+-- 기존 DB(방 도입 전)에 이 파일을 다시 돌려도 컬럼이 생기도록 — create table if not exists 는 컬럼을 못 늘린다.
+alter table chat_messages add column if not exists room text not null default 'global';
+drop index if exists chat_messages_cursor_idx;
+
+create index if not exists chat_messages_room_cursor_idx
+  on chat_messages (room, id) where deleted_at is null;
 create index if not exists chat_messages_rate_idx
   on chat_messages (user_id, created_at desc);
 create index if not exists chat_messages_dup_idx
@@ -341,6 +347,8 @@ alter table chat_incidents enable row level security;
 -- chat_post_atomic — 원자적 채팅 삽입: 최소 간격 / 60초 창 상한 / 중복 / IP 바닥선 가드.
 --   advisory xact lock(user, ip) 으로 동시 요청 직렬화 후 가드 평가 → insert.
 --   raise exception '<code>' (기본 errcode) 로 supabase-js 가 error.message 로 코드를 그대로 받는다.
+--   ⚠️ 가드는 방(room)을 보지 않는다(계정 단위 전역) — 방을 옮겨다니며 상한을 리셋하는 도배 방지.
+drop function if exists public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text);
 create or replace function public.chat_post_atomic(
   p_user uuid,
   p_ip_hash text,
@@ -349,12 +357,14 @@ create or replace function public.chat_post_atomic(
   p_mod_status text,
   p_is_anon boolean,
   p_display_name text,
-  p_lang text
+  p_lang text,
+  p_room text
 ) returns table(id bigint, created_at timestamptz, updated_at timestamptz)
 language plpgsql security definer set search_path = public as $$
 declare
   v_min_interval int := case when p_is_anon then 5 else 3 end;
   v_window_cap   int := case when p_is_anon then 5 else 10 end;
+  v_room text := coalesce(nullif(p_room, ''), 'global');
   v_last_at timestamptz;
   v_window_count int;
   v_dup_count int;
@@ -407,14 +417,14 @@ begin
   end if;
 
   return query
-    insert into chat_messages(user_id, ip_hash, display_name, is_anon, body, lang, mod_status, content_hash)
-    values (p_user, p_ip_hash, p_display_name, p_is_anon, p_body, p_lang, p_mod_status, p_content_hash)
+    insert into chat_messages(user_id, ip_hash, display_name, is_anon, body, lang, mod_status, content_hash, room)
+    values (p_user, p_ip_hash, p_display_name, p_is_anon, p_body, p_lang, p_mod_status, p_content_hash, v_room)
     returning chat_messages.id, chat_messages.created_at, chat_messages.updated_at;
 end;
 $$;
 
-revoke execute on function public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text) from public, anon, authenticated;
-grant execute on function public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text) to service_role;
+revoke execute on function public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text,text) from public, anon, authenticated;
+grant execute on function public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text,text) to service_role;
 
 -- reco_cache / reco_shadow_log — 레벨 추천 시맨틱 캐시 (key=입력 임베딩, value=레벨)
 create table if not exists reco_cache (
@@ -1181,6 +1191,77 @@ create trigger activity_ledger_apply_trg
   for each row execute function activity_ledger_apply();
 
 revoke execute on function activity_ledger_apply() from public, anon, authenticated;
+
+-- 시즌 점수 체계 원안 반영(2026-08-04) — activity_ledger 에 'referral'(친구 초대) 종류 추가.
+-- (migrations/20260804140000_activity_referral_kind.sql 과 DDL 동일 — 위 원 블록은 이력 보존을 위해 그대로 둔다.)
+--  · referral 은 하루 1회라 attendance/daily_learn 과 같은 daycap 부분 인덱스에 편입한다.
+--  · minigame 은 하루 1회 → 3회로 늘었지만 인덱스 변경이 없다: source_ref 가 게임id 에서 회차 슬롯
+--    ('play:1'…'play:3')으로 바뀌었을 뿐이고 unique(user_id, day, source_ref) 가 그대로 하루 캡이 된다.
+alter table activity_ledger drop constraint if exists activity_ledger_kind_check;
+alter table activity_ledger
+  add constraint activity_ledger_kind_check
+  check (kind in ('attendance', 'daily_learn', 'minigame', 'referral'));
+
+drop index if exists activity_ledger_daycap_idx;
+create unique index if not exists activity_ledger_daycap_idx
+  on activity_ledger (user_id, kind, day)
+  where kind in ('attendance', 'daily_learn', 'referral');
+
+-- skill_score 스케일 전환 백필 — 옛 값(0~10,000: 레벨당 1,428 + 레벨내 부분점수)을 새 값(레벨당 정액 1,000)으로.
+--  ⚠️ 이게 없으면 applyAttempt 의 GREATEST 때문에 옛 값(최대 10,000)이 새 만점(7,000)을 영영 넘는다.
+--  · where 절이 멱등성을 만든다 — 이미 새 스케일인 행은 건드리지 않는다.
+update user_progress
+   set skill_score = greatest(rank - 1, 0) * 1000
+ where skill_score <> greatest(rank - 1, 0) * 1000
+   and not (rank >= 7 and skill_score = 7000);
+
+-- 친구 초대(2026-08-04 허브 시안) — 계정별 초대코드 발급. 코드는 서버 권위(클라가 만들지 않는다).
+-- ⚠️ 여기까지가 "코드 발급·표시"다. 초대 성립(가입 귀속 → activity_ledger.referral 적립)은 아직 없다.
+alter table profiles add column if not exists referral_code text;
+create unique index if not exists profiles_referral_code_idx
+  on profiles (referral_code) where referral_code is not null;
+
+create or replace function public.ensure_referral_code(p_uid uuid) returns text
+  language plpgsql security definer set search_path = public as $$
+declare
+  v_code text;
+  v_alpha text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  i int;
+begin
+  select referral_code into v_code from profiles where id = p_uid;
+  if v_code is not null then
+    return v_code;
+  end if;
+
+  for _try in 1..12 loop
+    v_code := 'CARI';
+    for i in 1..4 loop
+      v_code := v_code || substr(v_alpha, 1 + floor(random() * length(v_alpha))::int, 1);
+    end loop;
+    begin
+      update profiles set referral_code = v_code where id = p_uid and referral_code is null;
+      if found then
+        return v_code;
+      end if;
+      select referral_code into v_code from profiles where id = p_uid;
+      if v_code is not null then
+        return v_code;
+      end if;
+    exception when unique_violation then
+      null;
+    end;
+  end loop;
+  return null;
+end
+$$;
+
+revoke execute on function public.ensure_referral_code(uuid) from public, anon, authenticated;
+grant execute on function public.ensure_referral_code(uuid) to service_role;
+
+-- 친구 초대 귀속 — 피초대자가 온보딩에서 입력한 코드를 계정에 1회 박는다(set-region 이 처리).
+-- ⚠️ 유입용 기능이라 코드가 틀려도 온보딩을 막지 않는다 — 서버가 조용히 무시한다.
+alter table profiles add column if not exists referred_by uuid references auth.users(id) on delete set null;
+create index if not exists profiles_referred_by_idx on profiles (referred_by);
 
 -- 랭킹 통합 재설계 STAGE 1c — 시즌 아카이브: ranking_season(시즌 메타) + ranking_season_result(시즌 종료 스냅샷).
 --  · 개인 누적(업적 박제)·역대 최고 티어는 이 result 테이블에서 파생. reset_season() 이 스냅샷을 쓴다(STAGE1e).

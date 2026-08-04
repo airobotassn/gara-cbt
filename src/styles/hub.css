@@ -57,22 +57,38 @@
 .hub .home { position: relative; display: flex; flex-direction: column; }
 
 /* ── 상단 HUD ── */
-.hub .hud { display: flex; align-items: flex-start; gap: 10px; }
+/* 아바타 밑 Lv 배지를 뺀 뒤로는 flex-start 로 두면 아바타가 위로 떠 보인다 — 이름줄+게이지 블록에 세로 중앙 정렬. */
+.hub .hud { display: flex; align-items: center; gap: 10px; }
 .hub .hud-av { position: relative; width: 48px; height: 48px; flex: 0 0 auto; }
 .hub .hud-av .av { width: 100%; height: 100%; border-radius: 50%; background: #45412e; border: 3px solid var(--line); display: grid; place-items: center; }
-.hub .hud-lv { position: absolute; bottom: -13px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-  background: #3a3628; color: #fff; border: 2.5px solid var(--line); border-radius: 999px; font-size: 13px; font-weight: 900; padding: 2px 10px; }
-.hub .hud-mid { flex: 1; min-width: 0; padding-top: 2px; }
+/* (.hud-lv 아바타 Lv 배지는 제거 — 경험치 바가 'ARENA Lv.N' 을 말하므로 중복이었다.) */
+.hub .hud-mid { flex: 1; min-width: 0; }
 .hub .hud-name { display: flex; align-items: center; gap: 6px; font-size: 18px; font-weight: 900; }
 .hub .tt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; color: #fff; white-space: nowrap;
   background: var(--orange); border: 3px solid var(--line); border-radius: 999px; padding: 2px 10px; }
-.hub .tier-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 900; color: var(--ink); white-space: nowrap;
-  background: var(--yellow); border: 2.5px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+/* 티어 = 엠블렘 이미지 단독(칩 배경 없음). 백분위 텍스트를 뺐으므로 노란 알약도 같이 없앴다. */
+.hub .tier-chip { display: inline-flex; align-items: center; line-height: 0; }
+/* ⚠️ !important 필수 — TierBadge 가 인라인 style 로 width/height 를 박아서(size prop) 클래스로는 못 이긴다.
+   위 .hud-av .av img 규칙과 같은 이유. */
+.hub .tier-chip img { display: block; width: 34px !important; height: 34px !important; flex: 0 0 auto; }
 .hub .tier-chip em { font-style: normal; opacity: .75; }
-.hub .exp { position: relative; margin-top: 6px; height: 22px; border-radius: 999px; overflow: hidden; background: var(--card); border: 3px solid var(--line); }
-.hub .exp-fill { height: 100%; background-color: var(--exp);
-  background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.28) 0 6px, transparent 6px 12px); }
-.hub .exp-lab { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 11px; font-size: 12px; font-weight: 900; color: var(--ink); }
+/* ⚠️ 바 높이는 옆 코인 칩(.gchip)과 같아야 한다 — 한 줄에 나란히 서는 두 요소라 높이가 어긋나면 바로 보인다.
+   .gchip 높이(모바일 28 / PC 40)를 바꾸면 여기도 같이 바꿀 것. */
+.hub .exp { position: relative; margin-top: 6px; height: 28px; border-radius: 999px; overflow: hidden; background: var(--card); border: 3px solid var(--line); }
+/* ⚠️ 바 위에 글자('ARENA Lv.N' + 점수)가 얹히므로 채움은 **진한 블록이 아니라 옅은 틴트 + 또렷한 진행선**이다.
+   원래처럼 --exp 원색으로 꽉 채우면 채움 경계에서 글자가 반쯤 묻혀 읽히지 않는다.
+   면은 --card 와 섞어 연하게, 경계만 원색 3px 로 세워 진행도를 읽게 한다. */
+/* ⚠️ 채움은 **민무늬 그라데이션 하나**다. 넣지 말 것(둘 다 2026-08-04 반려):
+   · 사선 스트라이프 — 글자가 바 위에 얹혀서 무늬가 자획과 겹치면 읽기 나빠진다.
+   · 끝단 진행선(border-right) — 글자 사이를 가르는 선처럼 보인다. */
+.hub .exp-fill { height: 100%; background-image: linear-gradient(90deg, var(--green), var(--exp)); }
+/* 바 안 글자 = 왼쪽 'ARENA Lv.N'(이 Lv 가 레벨테스트 등급이 아니라 아레나 레벨임을 밝힌다) + 오른쪽 진행 점수.
+   ⚠️ 둘을 각각 absolute 로 두면 좁은 화면에서 서로를 모르고 겹친다 — 한 flex 줄에 넣어 양끝으로 밀어낸다. */
+.hub .exp-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 0 11px; font-weight: 900; color: var(--ink); }
+.hub .exp-lv { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; letter-spacing: .01em; }
+.hub .exp-lab { flex: 0 0 auto; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.hub .exp-frac { display: none; } /* 모바일은 %만 — 분수를 넣으면 왼쪽 'ARENA Lv.N' 이 잘린다 */
 .hub .rank-gauge { flex: 1; min-width: 0; }
 .hub .rank-gauge-lab { font-size: 11px; font-weight: 900; color: var(--ink2); margin-bottom: 3px; }
 .hub .rank-gauge-track { display: flex; align-items: center; gap: 6px; }
@@ -241,9 +257,14 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .hud-av { width: 68px; height: 68px; }
   .hub .hud-name { font-size: 26px; }
   .hub .tt { font-size: 16px; }
-  .hub .exp { height: 30px; }
+  .hub .exp { height: 40px; } /* = .gchip 높이 (위 주석 참고) */
   .hub .exp-lab { font-size: 16px; }
+  .hub .exp-txt { padding: 0 16px; gap: 12px; }
+  .hub .exp-pct { display: none; }
+  .hub .exp-frac { display: inline; }
   .hub .gchip { width: 128px; height: 40px; font-size: 18px; }
+  .hub .tier-chip img { width: 48px !important; height: 48px !important; }
+  .hub .exp-lv { font-size: 15px; }
   .hub .stage-zone { height: 470px; margin-top: 8px; }
   .hub .ricon { width: 62px; height: 62px; }
   .hub .fcard { width: 84px; font-size: 17px; }
@@ -399,6 +420,105 @@ body:has(.hub) .fab-top { display: none; }
 @keyframes buy-pop-in { 0% { opacity: 0; transform: scale(.6) translateY(10px) } 100% { opacity: 1; transform: scale(1) translateY(0) } }
 
 /* ============================================================
+   오늘의 미션 스트립 + 점수 획득 방법 모달 — 2026-08-04 허브 시안 반영.
+   색은 전부 토큰(하드코딩 금지) — 다크는 아래 블록이 토큰만 갈아끼워 자동 적용된다.
+   ============================================================ */
+/* ⚠️ 무대 높이는 오른쪽 레일이 넘치지 않을 만큼 잡아야 한다 — 레일은 absolute 라 무대 높이를 늘리지 못하고,
+   넘치면 아래 도크(출석 보상 스탬프)를 덮는다. 레일이 5칸이 되면서 옛 350/470px 로는 모자라 키웠다.
+   레일 버튼을 추가·삭제하면 이 높이(와 아래 gap)를 다시 실측할 것: 필요높이 = top(14) + n×버튼높이 + (n−1)×gap. */
+.hub .stage-zone { height: 420px; }
+.hub .rail-r { gap: 10px; }
+
+/* 오늘의 미션 — **한 줄 얇은 바**. 카드/타일로 키우면 화면을 잡아먹어서 칩 3개로 눌렀다(2026-08-04 반려 2회).
+   ⚠️ 세로 카드(좌측 열)로 두면 캐릭터가 옆으로 밀리고, 큰 타일로 두면 무대를 눌러버린다 — 둘 다 되돌리지 말 것. */
+/* 바깥 틀 = 하단 '출석 보상'(.reward)과 같은 chrome(4px 외곽선·radius 16·오프셋 그림자) → 위아래가 한 쌍으로 읽힌다. */
+.hub .mission-bar { margin-top: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  background: var(--card); border: 4px solid var(--line); border-radius: 16px; padding: 8px 12px;
+  box-shadow: 0 4px 0 rgba(var(--shc2), .16); }
+.hub .ms-title { display: flex; align-items: center; gap: 5px; margin-right: 2px;
+  font-size: 14px; font-weight: 900; color: var(--ink); white-space: nowrap; }
+.hub .ms-n { margin-left: auto; font-size: 14px; font-weight: 900; color: var(--ink); }
+/* 모바일: 칩 묶음을 통째로 둘째 줄로 내린다(order+100%) → 1줄=제목·진행도, 2줄=칩. 칩이 제목 옆에 하나만 붙는
+   어중간한 줄바꿈을 막는다. 768px↑ 에서는 order 를 풀어 한 줄로 되돌린다. */
+.hub .ms-chips { order: 3; flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 7px; }
+/* 칩 = 네임플레이트와 같은 스티커 룩(그라데이션 면 + 오프셋 그림자 + 윗면 하이라이트). */
+.hub .ms-chip { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; text-decoration: none;
+  background: var(--card-grad); color: var(--ink); border: 3px solid var(--line); border-radius: 999px;
+  padding: 4px 11px; font-size: 13px; font-weight: 900; white-space: nowrap;
+  box-shadow: 0 3px 0 rgba(var(--shc), .18), inset 0 1px 0 rgba(255,255,255,.85);
+  transition: transform .07s, box-shadow .1s; }
+.hub .ms-chip:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc), .18); }
+.hub .ms-chip.on { background: var(--yellow); }
+.hub .ms-chip svg { width: 16px; height: 16px; }
+.hub .ms-chip-pt { color: var(--plus); }
+/* 완료 체크는 출석 스탬프(.day .chk)와 같은 초록 — 두 스트립의 '완료' 신호를 하나로 맞춘다. */
+.hub .ms-chip-chk { color: #1f9d55; font-size: 14px; }
+
+/* 친구 초대 — 도크 '초대하기' 모달 전용(화면에 카드로 꺼내지 않는다). */
+.hub .iv-title { font-size: 16px; font-weight: 900; color: var(--ink); }
+.hub .iv-code { display: flex; align-items: center; gap: 8px; background: var(--card); border: 3px solid var(--line); border-radius: 13px; padding: 7px 8px 7px 11px; }
+.hub .iv-code-lab { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--ink2); }
+.hub .iv-code-v { flex: 1; min-width: 0; font-size: 16px; font-weight: 900; color: var(--ink); letter-spacing: .06em; }
+.hub .iv-copy { flex: 0 0 auto; cursor: pointer; background: var(--brand); color: #fff; border: 2.5px solid var(--line);
+  border-radius: 9px; padding: 4px 10px; font-size: 12.5px; font-weight: 900; }
+.hub .iv-copy:disabled { background: var(--ink2); cursor: default; opacity: .7; }
+.hub .iv-code-lg { margin-top: 6px; }
+/* 받는 쪽 입력칸 — 계정당 1회라 성공하면 칸이 사라지고 완료 문구만 남는다. */
+.hub .iv-redeem { margin-top: 16px; padding-top: 14px; border-top: 2.5px dashed var(--line); }
+.hub .iv-redeem-head { font-size: 14px; font-weight: 900; color: var(--ink); margin-bottom: 7px; }
+.hub .iv-redeem-in { flex: 1; min-width: 0; width: 100%; border: 0; outline: none; background: transparent;
+  font-size: 16px; font-weight: 900; color: var(--ink); letter-spacing: .06em; text-transform: uppercase; }
+.hub .iv-redeem-in::placeholder { color: var(--ink2); font-weight: 700; letter-spacing: .04em; }
+.hub .iv-redeem-hint { margin-top: 6px; }
+.hub .iv-redeem-done { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--plus); }
+.hub .iv-redeem-msg { margin: 8px 0 0; font-size: 13px; font-weight: 800; color: var(--red); }
+.hub .iv-redeem-msg.is-ok { color: var(--plus); }
+
+/* 도크 5번째 버튼(초대하기) + 코인 옆 도움말 */
+.hub .f-invite { background: var(--red); }
+.hub .f-invite .ev { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  padding: 1px 6px; border-radius: 999px; background: var(--gold); color: var(--ink); border: 2.5px solid var(--line);
+  font-size: 9.5px; font-weight: 900; }
+/* 높이는 옆 경험치 바(.exp)·코인 칩(.gchip)과 맞춘다 — 한 줄에 나란히 서는 세 요소다. */
+.hub .hub-help { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border-radius: 999px; cursor: pointer;
+  background: var(--card); color: var(--ink2); border: 2.5px solid var(--line);
+  font-size: 13px; font-weight: 900; display: grid; place-items: center; }
+
+/* 점수 획득 방법 모달 */
+.hub .earn-lead { margin-top: 0; }
+.hub .earn-tb { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.hub .earn-tb th { background: var(--card-alt); border: 2.5px solid var(--line); padding: 6px 10px; font-size: 12.5px; font-weight: 900; color: var(--ink); }
+.hub .earn-tb td { border: 2.5px solid var(--line); padding: 7px 10px; font-size: 13px; font-weight: 800; color: var(--ink); vertical-align: middle; }
+/* ⚠️ td 에 display:flex 를 걸면 그 셀이 행 높이 계산에서 빠져 좌우 칸이 어긋난다 — 아이콘은 inline-block 으로 붙인다. */
+.hub .earn-ic { display: inline-block; vertical-align: middle; margin-right: 7px; line-height: 0; }
+.hub .earn-nm { vertical-align: middle; }
+.hub .earn-v { text-align: right; white-space: nowrap; color: var(--plus); }
+.hub .earn-v em { display: block; margin-top: 1px; font-style: normal; font-size: 11px; font-weight: 700; color: var(--ink2); }
+.hub .earn-lv { margin-top: 14px; border: 2.5px solid var(--line); border-radius: 13px; padding: 9px 10px 10px; background: var(--card-alt); }
+.hub .earn-lv-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 900; color: var(--ink); }
+.hub .earn-lv-head em { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--ink2); }
+.hub .earn-lv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.hub .earn-lv-cell { border: 2.5px solid var(--line); border-radius: 10px; background: var(--card); padding: 6px 2px;
+  text-align: center; font-size: 12px; font-weight: 900; color: var(--plus); }
+.hub .earn-lv-cell b { display: block; font-size: 11.5px; font-weight: 800; color: var(--ink2); }
+
+@media (min-width: 768px) {
+  .hub .stage-zone { height: 520px; }
+  .hub .rail-r { gap: 12px; }
+  .hub .mission-bar { gap: 8px; padding: 7px 16px; }
+  .hub .ms-chips { order: 0; flex: 0 1 auto; gap: 8px; }
+  .hub .ms-title { font-size: 15px; }
+  .hub .ms-n { font-size: 15px; }
+  .hub .ms-chip { font-size: 15px; padding: 4px 12px; gap: 5px; }
+  .hub .ms-chip svg { width: 18px; height: 18px; }
+  .hub .iv-title { font-size: 18px; }
+  .hub .iv-code-v { font-size: 19px; }
+  .hub .iv-copy { font-size: 14px; padding: 6px 13px; }
+  .hub .hub-help { width: 40px; height: 40px; font-size: 18px; }
+  .hub .f-invite .ev { font-size: 11px; }
+}
+
+/* ============================================================
    다크 모드 — 토큰만 갈아끼운다. 카툰 스티커 룩(두꺼운 외곽선 + 오프셋 그림자)은 유지하되,
    외곽선을 어두운 먹색 대신 밝은 회청색으로 올려야 어두운 면 위에서 살아난다.
    ============================================================ */
@@ -436,8 +556,10 @@ html.dark .hub {
 }
 /* 다크에서 흰색 고정이던 잔여 표면 보정 */
 html.dark .hub .hud-av .av { background: var(--card); }
-html.dark .hub .hud-lv { background: #4a4636; }
 html.dark .hub .day.on { color: #1b1f28; }
+/* 완료 칩(노랑)은 밝은 면이라 다크에서도 글자를 어둡게 — .day.on 과 같은 규칙. 위쪽 흰 하이라이트도 눌러준다. */
+html.dark .hub .ms-chip.on { color: #1b1f28; }
+html.dark .hub .ms-chip { box-shadow: 0 3px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.07); }
 html.dark .hub .nameplate { box-shadow: 0 4px 0 rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.08); }
 html.dark .hub .title-badge { box-shadow: 0 4px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
 html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }

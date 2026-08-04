@@ -432,23 +432,49 @@
    ⚠️ 금박 결 텍스처(gold-foil.webp)를 overlay 로 섞어봤다가 뺐다 — 버튼이 121×46 이라 결이 한 올도
       안 보이고, overlay 가 그라디언트의 어두운 끝(#c99433)을 들어올려 **평평한 노랑**으로 만들어버린다.
       살릴 만한 면적이 이 화면엔 없다. 파일은 public/cert/gold-foil.webp 에 남아있다. */
+/* 판 자체는 이미지 에셋(cta-gold.webp, 1009×247). CSS 그라디언트로는 금속 엣지가 안 나온다.
+   ⚠️ 원본 해상도 그대로 쓴다. 한 번 160px 로 줄였다가 되돌렸다 — 버튼이 60px 라 충분해 보였지만
+      고해상도 화면(DPR 2~3)에서 엣지가 물러진다. 21KB 니까 줄일 이유가 없다.
+   ⚠️ border-image 9-slice — **좌우 24px 만 고정, 가운데는 늘어난다.**
+      버튼 폭이 언어마다 다르기 때문이다("응시 시작" vs "Bắt đầu kiểm tra").
+      에셋에 하이라이트·장식이 없어서 늘려도 번질 게 없다(그게 이 그림을 고른 이유다).
+   ⚠️ 상태는 filter 로만 만든다 — 에셋을 3장 뽑지 않으려고. background 를 건드리면 판이 사라진다.
+   ⚠️ border-radius 는 이미지가 이미 가지고 있다. CSS 로 또 주면 모서리가 잘린다. */
 .lvn-cta {
-  /* 2-stop 그라디언트 한 줄로는 '금속판'이 안 된다 — 위 하이라이트 / 중간 몸통 / 아래 그늘 3단 +
-     안쪽 1px 광택선과 바깥 어두운 테두리가 있어야 눌리는 금속으로 읽힌다. */
-  background: linear-gradient(168deg, #fbe9b4 0%, #edd087 36%, #d3a343 72%, #bd8a28 100%);
-  color: #2a1c04;
-  border: 1px solid rgba(122, 86, 18, 0.5);
+  /* ⚠️ border-image 9-slice 를 쓰지 않는다. 에셋의 테두리는 폭 8~10px 짜리 3D 베벨이라
+     59px 버튼에 넣으면 4.2배로 줄어 **2px 흐릿한 그라디언트**가 된다 — 원본 해상도를 올려도
+     흐림이 원본에 그렇게 그려져 있어서 안 없어진다.
+     그래서 이미지는 **면(재질)만** 쓰고, 실루엣과 테두리는 CSS 가 그린다:
+       · background-size 를 104%/128% 로 잡아 에셋의 흐린 가장자리를 프레임 밖으로 밀어낸다
+       · border-radius + overflow:hidden 으로 모서리를 브라우저가 자른다(무조건 선명)
+       · inset 1px 로 짙은 금색 외곽선, 위쪽에 광택선 한 줄 */
+  background: url('/cert/cta-gold.webp') center / 104% 128% no-repeat;
+  border: 0;
+  border-radius: 11px;
+  overflow: hidden;
   box-shadow:
-    inset 0 1px 0 rgba(255, 252, 236, 0.6),
-    inset 0 -1px 0 rgba(120, 84, 16, 0.3),
-    0 12px 26px -14px rgba(226, 180, 90, 0.7);
+    inset 0 0 0 1px rgba(108, 74, 12, 0.85),
+    inset 0 1px 0 rgba(255, 250, 225, 0.5);
+  color: #2a1c04;
   letter-spacing: 0.01em;
+  /* 밤하늘에서 유일하게 누를 수 있는 물건 — 발광이 없으면 어둠에 묻힌다 */
+  filter: drop-shadow(0 10px 20px rgba(226, 180, 90, 0.32));
+  transition: filter 0.16s ease;
 }
 .lvn-cta:hover:not(:disabled) {
-  background: linear-gradient(168deg, #fff5d3 0%, #f5dc9e 36%, #e0b453 72%, #ca9832 100%);
+  filter: brightness(1.07) drop-shadow(0 10px 22px rgba(240, 200, 110, 0.45));
 }
 .lvn-cta:active:not(:disabled) {
-  box-shadow: inset 0 2px 5px rgba(103, 70, 10, 0.35);
+  filter: brightness(0.93) drop-shadow(0 4px 10px rgba(226, 180, 90, 0.25));
+}
+/* 공용 .ambient-shadow(사각형 그림자)를 덮어쓴다 — 바깥 그림자는 filter: drop-shadow 가 맡고,
+   여기 남는 건 테두리를 선명하게 만드는 inset 두 줄뿐이다.
+   ⚠️ 선택자에 .lvnight 를 붙인 이유 = .lvnight .ambient-shadow 와 명시도를 맞추기 위해서다.
+      이 줄이 없으면 공용 ambient-shadow 가 이겨서 위 .lvn-cta 의 inset 테두리가 통째로 사라진다. */
+.lvnight .lvn-cta {
+  box-shadow:
+    inset 0 0 0 1px rgba(108, 74, 12, 0.85),
+    inset 0 1px 0 rgba(255, 250, 225, 0.5);
 }
 
 /* 헤더 칩(아레나로·인증서 발급·등급 규칙) — 배경이 사진이라 테두리가 흐리면 형태가 안 잡힌다.
@@ -503,7 +529,6 @@
   padding: 12px 14px;
   word-break: keep-all; /* 한국어: 단어(어절) 중간에서 끊기지 않게 */
 }
-
 
 
 /* ===== 공용 footer 는 밤하늘 톤에서 빼낸다 =====

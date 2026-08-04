@@ -33,6 +33,8 @@ import {
   type Region,
 } from '../lib/arena/data'
 import { M49_TO_ISO2 } from '../lib/arena/tables'
+// 채팅 방 머리말의 국기 — 지도 쪽 countryName(피처+언어)과 다른 계열이라 lib/regions 에서 가져온다.
+import { flagEmoji } from '../lib/regions'
 import '../styles/arena.css'
 // ⚠️ 소스 일원화: 아래 leaderboard 호출은 src/pages/Ranking.tsx 의 AggregateBoard(집계 탭)와
 //    완전히 동일한 RPC(region_/country_leaderboard, scope='region'|'country')를 쓴다 — 이중 fetch/별도 엔드포인트 없음.
@@ -326,6 +328,25 @@ export default function WorldArena() {
     return { fill: parent ? color(parent.score) : '#5b93e2' }
   }, [level, regions, color, drillCountry])
 
+  // ── 채팅 방 ──
+  // 방은 지도 상태가 그대로 정한다(별도 방 선택 UI 없음): 지구본에서 아무 나라도 안 고르면 전세계,
+  // 나라를 고르면 그 나라. 나라 안에 들어가 시도를 골라도 방은 나라 단위로 유지된다 — 방이 거기까지만 있다.
+  const chatRoom = useMemo(() => {
+    if (level > 0) return drillCountry?.iso ?? 'global'
+    if (!selKey) return 'global'
+    const r = regions.find((x) => x.key === selKey)
+    return (r ? M49_TO_ISO2[String(r.f.id)] : undefined) ?? 'global'
+  }, [level, drillCountry, selKey, regions])
+
+  const chatRoomName = useMemo(() => {
+    if (chatRoom === 'global') return t('chat.roomGlobal')
+    if (level > 0) return drillName
+    return regions.find((x) => x.key === selKey)?.name ?? chatRoom
+  }, [chatRoom, level, drillName, regions, selKey, t])
+
+  // 쓰기는 내 나라 방 + 전세계 방만(서버가 같은 규칙으로 다시 막는다).
+  const canChat = !!user && (chatRoom === 'global' || chatRoom === home)
+
   const crumbs = useMemo(() => {
     if (level === 0) return []
     return [
@@ -562,7 +583,21 @@ export default function WorldArena() {
           {rightPanel === 'chat' && (
             <aside className="aa-card aa-side aa-side-chat">
               <h2>{t('chat.title')}</h2>
-              <ChatBoard />
+              {/* 지금 어느 방인지 + 전세계로 돌아가는 길. 방 선택 UI 를 따로 두지 않는 대신,
+                  「전세계」를 누르면 지도도 같이 세계로 나간다(goto(0)) — 지도와 방이 늘 한 몸이다. */}
+              <div className="aa-chatroom">
+                <span className="rm">{chatRoom === 'global' ? '🌍' : flagEmoji(chatRoom) || '📍'} {chatRoomName}</span>
+                {chatRoom !== 'global' && (
+                  <button type="button" onClick={() => goto(0)}>{t('chat.roomBack')}</button>
+                )}
+              </div>
+              {/* key={chatRoom} — 방이 바뀌면 목록·커서·폴링을 통째로 새로 시작한다(전 방 응답 섞임 방지) */}
+              <ChatBoard
+                key={chatRoom}
+                room={chatRoom}
+                canPost={canChat}
+                readOnlyHint={t('chat.readOnlyRoom', { country: chatRoomName })}
+              />
             </aside>
           )}
           {/* 아이콘만 있는 세로 레일 — 이름은 data-label 이 CSS 툴팁으로 띄운다(스크린리더는 aria-label). */}
