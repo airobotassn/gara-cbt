@@ -162,12 +162,24 @@ export default function LevelCert() {
       .catch(() => setState('err'))
   }, [authLoading, isFullUser])
 
-  // 1448×900 고정 좌표계를 뷰포트 폭에 맞춰 축소(확대는 안 한다). 정적 시안과 같은 방식.
+  // 1448×900 고정 좌표계를 뷰포트에 맞춰 축소(확대는 안 한다). 정적 시안과 같은 방식.
+  //
+  // ⚠️ 폭만 보면 안 된다. 넓고 낮은 창(노트북 1920×855 등)에서는 폭이 1448 보다 커서
+  //    축소가 거의 안 걸리는데, 900px 인증서 + 버튼줄이 화면 높이를 넘어가 'PDF 저장/인쇄'가
+  //    화면 밖으로 밀려난다(스크롤은 되지만 인증서가 화면을 꽉 채워 더 있다는 신호가 없다).
+  //    그래서 세로도 같이 보고 둘 중 작은 배율을 쓴다.
   useEffect(() => {
     function fit() {
       const st = stageRef.current, wr = wrapRef.current
       if (!st || !wr) return
-      const s = Math.min(1, (wr.clientWidth - 8) / VB.w)
+      // 인증서 위아래로 들어가는 것들: .lc-page 패딩(28+56) + gap(20) + 버튼줄(44)
+      const CHROME = 148
+      const byWidth = (wr.clientWidth - 8) / VB.w
+      // 0.35 하한은 **세로에만** 건다 — 아주 낮은 창에서 글자가 못 읽을 만큼 작아지느니
+      // 세로 스크롤을 남긴다. 가로에 걸면 모바일(폭 390 → 배율 0.247)에서 하한이 이겨서
+      // 인증서가 화면보다 넓어진다(가로 스크롤은 세로 스크롤보다 훨씬 나쁘다).
+      const byHeight = Math.max(0.35, (window.innerHeight - CHROME) / VB.h)
+      const s = Math.min(1, byWidth, byHeight)
       st.style.transform = `scale(${s})`
       wr.style.height = `${VB.h * s}px`
     }
