@@ -551,3 +551,30 @@
   .pool-table td:first-child { flex-basis: 100%; display: block; min-width: 0; white-space: normal; font-weight: 600; color: var(--txt); }
   .pool-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 400; }
 }
+
+/* ── 유저 상세: 레벨별 누적 레이팅 ────────────────────────────
+   알약 나열을 막대로 바꾼 이유 = 알약은 축마다 폭이 달라 레벨끼리 세로로 안 맞고,
+   숫자만 있어 0~100 중 어디인지 안 보였다. 축 이름 폭을 고정해 열을 맞춘다. */
+.rt-lv { border: 1px solid var(--a-bd); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; background: var(--bg); }
+/* 헤더 = 접기 토글 버튼. 접어도 평균이 남아 접은 채로 레벨끼리 비교된다. */
+.rt-lv-h { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 10px; padding: 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; }
+.rt-lv.is-shut .rt-lv-h { margin-bottom: 0; }
+.rt-caret { color: var(--dim); font-size: var(--fs-sm); width: 10px; }
+.rt-avg { margin-left: auto; font-size: var(--fs-sm); font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rt-lv-h b { font-size: var(--fs-md); font-weight: 800; }
+.rt-axis { display: grid; grid-template-columns: 96px 1fr 30px; align-items: center; gap: 10px; padding: 3px 0; }
+.rt-axis-n { font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-axis-v { font-size: var(--fs-sm); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.rt-bar { display: block; height: 6px; border-radius: 999px; background: var(--soft); overflow: hidden; }
+.rt-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+/* 점수가 하나도 없는 레벨 — 펼치지 않고 한 줄로 접는다(화면을 0으로 도배하지 않기 위함) */
+.rt-blank { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+
+/* 응시 이력 머리말 — 제목 + 건수 + '미완료 포함' 토글이 한 줄 */
+.rt-hist-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 0 4px; }
+.rt-toggle { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }
+.rt-toggle input { width: auto; margin: 0; cursor: pointer; }
+
+@media (max-width: 640px) {
+  .rt-axis { grid-template-columns: 76px 1fr 28px; gap: 8px; }
+}

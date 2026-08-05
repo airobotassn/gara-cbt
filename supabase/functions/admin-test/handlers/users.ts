@@ -71,7 +71,9 @@ export async function userDetail(admin: any, body: any) {
     admin.from('test_attempts')
       .select('id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, submitted_at, created_at')
       .eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
-    admin.from('user_level_skill').select('level, ratings, attempts_count, placed').eq('user_id', uid),
+    // ⚠️ order 필수 — 없으면 DB 반환 순서 그대로라 화면에 Lv.7→4→5→6→2→3→1 로 뒤섞여 나온다.
+    admin.from('user_level_skill').select('level, ratings, attempts_count, placed')
+      .eq('user_id', uid).order('level', { ascending: true }),
     admin.from('user_progress').select('rank').eq('user_id', uid).maybeSingle(),
   ])
   return json({ attempts: attRes.data ?? [], skills: skillRes.data ?? [], rank: (progRes.data as any)?.rank ?? 1 })

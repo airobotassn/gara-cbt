@@ -582,34 +582,135 @@ function UserDetail({ user, onClose }: { user: UserRow; onClose: () => void }) {
           <button className="admin-mini" onClick={saveRank}>저장</button>
           {msg ? <span className="admin-msg">{msg}</span> : null}
         </div>
-        {data?.skills?.length ? (
-          <>
-            <div className="admin-sub" style={{ marginTop: 12 }}>레벨별 누적 레이팅</div>
-            {data.skills.map((s) => (
-              <div key={s.level} className="admin-row">
-                <b>Lv.{s.level}</b><span className="admin-hint">{s.attempts_count}회</span>
-                {Object.entries(s.ratings || {}).map(([k, v]) => <span key={k} className="admin-pill">{axisDef(k, 'ko').short} {Math.round(v)}</span>)}
-              </div>
-            ))}
-          </>
-        ) : null}
-        <div className="admin-sub" style={{ marginTop: 12 }}>응시 이력</div>
-        <table className="admin-table">
-          <thead><tr><th>일시</th><th>레벨</th><th>언어</th><th>점수</th><th>등급변동</th></tr></thead>
-          <tbody>
-            {(data?.attempts || []).map((a) => (
-              <tr key={a.id}>
-                <td>{fmtDT(a.submitted_at || a.created_at)}</td>
-                <td>Lv.{a.level}</td><td>{a.lang}</td>
-                <td>{a.total_correct}/{a.total_questions}</td>
-                <td>{a.rank_before != null ? `${a.rank_before}→${a.rank_after}` : '-'}</td>
-              </tr>
-            ))}
-            {!data?.attempts?.length ? <tr><td colSpan={5} className="admin-empty">응시 이력 없음</td></tr> : null}
-          </tbody>
-        </table>
+        {data?.skills?.length ? <RatingByLevel skills={data.skills} /> : null}
+        <AttemptHistory attempts={data?.attempts ?? []} />
       </div>
     </div>
+  )
+}
+
+// 레벨별 누적 레이팅 — 레벨 오름차순.
+//  · 값이 있는 레벨만 펼친다. 전 축이 0인 레벨(=배치만 되고 점수가 없음)은 한 줄로 접는다 —
+//    전에는 0짜리 알약이 화면을 다 먹어서 정작 값이 있는 레벨이 스크롤 아래로 밀렸다.
+//  · 알약 대신 막대. 0~100 척도가 보이고, 축 이름 폭이 고정이라 레벨끼리 세로로 줄이 맞는다.
+function RatingByLevel({ skills }: { skills: UserDetailData['skills'] }) {
+  const rows = [...skills].sort((a, b) => a.level - b.level)
+  const scored = rows.filter((s) => Object.values(s.ratings || {}).some((v) => Math.round(v) > 0))
+  const blank = rows.filter((s) => !Object.values(s.ratings || {}).some((v) => Math.round(v) > 0))
+  // 레벨 카드 접기. 기본은 전부 펼침(닫힌 레벨만 담는다) — 열어봐야 알 수 있는 걸 기본으로 숨기지 않는다.
+  const [shut, setShut] = useState<Record<number, boolean>>({})
+  const allShut = scored.length > 0 && scored.every((s) => shut[s.level])
+  function toggleAll() {
+    setShut(allShut ? {} : Object.fromEntries(scored.map((s) => [s.level, true])))
+  }
+  return (
+    <>
+      <div className="rt-hist-h">
+        <div className="admin-sub" style={{ margin: 0 }}>레벨별 누적 레이팅</div>
+        {scored.length > 1 ? (
+          <button className="admin-mini" style={{ marginLeft: 'auto' }} onClick={toggleAll}>
+            {allShut ? '모두 펼치기' : '모두 접기'}
+          </button>
+        ) : null}
+      </div>
+      {scored.map((s) => {
+        const vals = Object.values(s.ratings || {}).map((v) => Math.round(v))
+        const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0
+        const open = !shut[s.level]
+        return (
+          <div key={s.level} className={`rt-lv ${open ? '' : 'is-shut'}`}>
+            {/* 헤더 전체가 토글. 접었을 때도 평균이 남아 있어야 접은 채로 레벨 비교가 된다. */}
+            <button
+              type="button"
+              className="rt-lv-h"
+              aria-expanded={open}
+              onClick={() => setShut((m) => ({ ...m, [s.level]: open }))}
+            >
+              <span className="rt-caret">{open ? '▾' : '▸'}</span>
+              <b>Lv.{s.level}</b>
+              <span className="admin-hint">{s.attempts_count}회 응시</span>
+              {!s.placed ? <span className="badge low">미배치</span> : null}
+              <span className="rt-avg">평균 {avg}</span>
+            </button>
+            {open
+              ? Object.entries(s.ratings || {}).map(([k, v]) => {
+                  const n = Math.round(v)
+                  return (
+                    <div key={k} className="rt-axis">
+                      <span className="rt-axis-n">{axisDef(k, 'ko').short}</span>
+                      <span className="rt-bar"><i style={{ width: `${Math.max(0, Math.min(100, n))}%` }} /></span>
+                      <span className="rt-axis-v">{n}</span>
+                    </div>
+                  )
+                })
+              : null}
+          </div>
+        )
+      })}
+      {blank.length ? (
+        <div className="rt-blank">
+          {blank.map((s) => (
+            <span key={s.level} className="admin-pill">Lv.{s.level} <em>{s.attempts_count}회 · 점수 없음</em></span>
+          ))}
+        </div>
+      ) : null}
+      {!scored.length && !blank.length ? <div className="admin-empty">레이팅 없음</div> : null}
+    </>
+  )
+}
+
+// 응시 이력 — 기본은 완료(submitted)만. 시작만 하고 이탈한 건(in_progress·expired)이 섞이면
+// 목록이 0/30 으로 도배돼 실제 성적이 안 보인다. 상태·등급변동은 응시 기록 탭과 같은 배지를 쓴다.
+const HIST_PAGE = 10
+function AttemptHistory({ attempts }: { attempts: Omit<AttemptRow, 'name'>[] }) {
+  const [withIncomplete, setWithIncomplete] = useState(false)
+  const [page, setPage] = useState(0)
+  const doneCount = attempts.filter((a) => a.status === 'submitted').length
+  const shown = withIncomplete ? attempts : attempts.filter((a) => a.status === 'submitted')
+  const pageCount = Math.max(1, Math.ceil(shown.length / HIST_PAGE))
+  const safePage = Math.min(page, pageCount - 1)
+  const slice = shown.slice(safePage * HIST_PAGE, safePage * HIST_PAGE + HIST_PAGE)
+  return (
+    <>
+      <div className="rt-hist-h">
+        <div className="admin-sub" style={{ margin: 0 }}>응시 이력</div>
+        <span className="admin-hint">완료 {doneCount}건 / 전체 {attempts.length}건</span>
+        <label className="rt-toggle">
+          <input
+            type="checkbox"
+            checked={withIncomplete}
+            onChange={(e) => { setWithIncomplete(e.target.checked); setPage(0) }}
+          />
+          미완료 포함
+        </label>
+      </div>
+      <table className="admin-table">
+        <thead><tr><th>일시</th><th>레벨</th><th>언어</th><th>점수</th><th>상태</th><th>등급변동</th></tr></thead>
+        <tbody>
+          {slice.map((a) => (
+            <tr key={a.id}>
+              <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(a.submitted_at || a.created_at)}</td>
+              <td>Lv.{a.level}</td>
+              <td>{a.lang}</td>
+              {/* 미완료는 0/30 이 '0점'으로 읽히므로 점수를 아예 안 쓴다 */}
+              <td>{a.status === 'submitted' ? `${a.total_correct}/${a.total_questions}` : <span className="rc-none">–</span>}</td>
+              <td><OutcomeBadge status={a.status} v={a.violation_count} /></td>
+              <td><RankBadge before={a.rank_before} after={a.rank_after} dir={a.rank_dir} /></td>
+            </tr>
+          ))}
+          {!slice.length ? (
+            <tr><td colSpan={6} className="admin-empty">{attempts.length ? '완료된 응시 없음' : '응시 이력 없음'}</td></tr>
+          ) : null}
+        </tbody>
+      </table>
+      {pageCount > 1 ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 12 }}>
+          <button className="admin-mini" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage <= 0}>‹</button>
+          <span className="admin-hint">{safePage + 1} / {pageCount}</span>
+          <button className="admin-mini" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1}>›</button>
+        </div>
+      ) : null}
+    </>
   )
 }
 
@@ -830,6 +931,7 @@ function ListTab({ isRoot }: { isRoot: boolean }) {
   const [edit, setEdit] = useState<ListRow | 'new' | null>(null) // 'new' = 문항 추가
   const [sel, setSel] = useState<Set<string>>(new Set()) // 체크박스 선택(일괄 비활성·삭제용)
   const [bulk, setBulk] = useState('')
+  const [page, setPage] = useState(0) // 클라 페이징 — 검색·필터는 전체 기준 그대로다
 
   async function load() {
     setLoading(true)
@@ -866,6 +968,15 @@ function ListTab({ isRoot }: { isRoot: boolean }) {
   const filtered = rows
     .filter((r) => cat === 'all' || r.category === cat)
     .filter((r) => !qq || (r.code ?? '').toLowerCase().includes(qq) || (r.prompt_i18n?.ko ?? '').toLowerCase().includes(qq))
+
+  // ⚠️ 페이징은 **클라이언트 전용**이다(CBT 문항 목록과 같은 방식) — 영역·검색 필터, 전체선택, 일괄 처리,
+  //    엑셀 다운로드는 전부 `filtered`(전체) 기준으로 돌고 `shown` 은 화면에 그릴 줄만 잘라낸 것이다.
+  //    서버 페이징으로 바꾸면 검색이 현재 페이지만 뒤지게 되니 주의. (레벨 필터만 서버가 처리 — admin-test list,
+  //    거기 .limit(2000) 상한이 있어 한 레벨 문항이 2000을 넘으면 초과분은 조용히 안 내려온다.)
+  const PER = 50
+  const pageMax = Math.max(1, Math.ceil(filtered.length / PER))
+  const pageSafe = Math.min(page, pageMax - 1) // 필터가 좁아져 페이지 수가 줄면 빈 화면이 되는 걸 막는다
+  const shown = filtered.slice(pageSafe * PER, pageSafe * PER + PER)
 
   // 일괄 처리·다운로드 대상 = 체크된 것 중 지금 화면에 보이는 것만.
   const selRows = filtered.filter((r) => sel.has(r.id))
@@ -950,7 +1061,7 @@ function ListTab({ isRoot }: { isRoot: boolean }) {
             <th>번호</th><th>영역</th><th>문제(ko)</th><th>정답</th><th>미번역</th><th></th>
           </tr></thead>
           <tbody>
-            {filtered.map((r) => (
+            {shown.map((r) => (
               <tr key={r.id} className={r.missing.length ? 'prob' : ''}>
                 <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} /></td>
                 <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#3f8fd6' }}>{r.code ?? '-'}</td>
@@ -968,6 +1079,15 @@ function ListTab({ isRoot }: { isRoot: boolean }) {
           </tbody>
         </table>
         {filtered.length === 0 && !loading ? <div className="admin-empty">조건에 맞는 문항이 없습니다.</div> : null}
+        {pageMax > 1 && (
+          <div className="admin-pager">
+            {/* ⚠️ page 가 아니라 pageSafe 기준 — 필터를 좁혀 페이지 수가 줄면 page 는 범위 밖에 남아 있어서
+                그 값으로 +1 하면 화면은 그대로인 채 버튼만 눌린 것처럼 보인다. */}
+            <button className="admin-mini" disabled={pageSafe === 0} onClick={() => setPage(Math.max(0, pageSafe - 1))}>‹ 이전</button>
+            <span>{pageSafe + 1} / {pageMax}</span>
+            <button className="admin-mini" disabled={pageSafe + 1 >= pageMax} onClick={() => setPage(pageSafe + 1)}>다음 ›</button>
+          </div>
+        )}
         <p className="admin-hint" style={{ marginTop: 8 }}>비활성·삭제한 문항은 <b>문항 이력</b> 탭에서 확인·되돌리기 할 수 있어요.</p>
       </div>
       {edit ? (
