@@ -5,6 +5,7 @@
 //  - KB 파이프라인(kb-extract/generate/save/publish/embed-backfill)·translate-questions 는 관리자 인증만으로 호출한다
 //    (옛 x-passcode 입력칸은 제거 — 서버 시크릿 KB_PASSCODE/TRANSLATE_PASSCODE 미설정이라 검사 자체를 안 함).
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -68,9 +69,22 @@ export interface Analytics {
 }
 
 type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'chatmod' | 'ebooks' | 'admins'
+const LT_TABS: LtTab[] = ['dashboard', 'users', 'attempts', 'questions', 'chatmod', 'ebooks', 'admins']
+
 export default function LevelTestAdmin() {
   const { isFullUser } = useAuth()
-  const [tab, setTab] = useState<LtTab>('dashboard')
+  // 탭 상태를 URL 쿼리(?tab)로 — Admin.tsx(CARIS 쪽)와 같은 방식.
+  // 전엔 useState 라 새로고침·뒤로가기마다 대시보드로 되돌아갔고, 탭 주소를 공유할 수도 없었다.
+  // ⚠️ 'admins' 는 루트 전용이라 권한 없이 주소로 들어오면 화면이 비어버린다 → 대시보드로 접는다.
+  const [params, setParams] = useSearchParams()
+  const setTab = (t: LtTab) =>
+    setParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.set('top', 'level') // 아레나 백오피스에 머무른다(Admin.tsx 가 top 으로 갈라본다)
+      if (t === 'dashboard') p.delete('tab')
+      else p.set('tab', t)
+      return p
+    })
   // 관리자 권한은 서버(admin-test 'me')가 판별 — CBT admin 과 동일한 게이트(admin_users/ROOT).
   const [gate, setGate] = useState<'loading' | 'ok' | 'denied'>('loading')
   const [isRoot, setIsRoot] = useState(false)
@@ -95,6 +109,11 @@ export default function LevelTestAdmin() {
       </div>
     )
   }
+
+  // 주소가 먼저다. 없거나 모르는 값이면 대시보드, 루트가 아닌데 admins 면 대시보드.
+  const raw = params.get('tab') as LtTab | null
+  const wanted = raw && LT_TABS.includes(raw) ? raw : 'dashboard'
+  const tab: LtTab = wanted === 'admins' && !isRoot ? 'dashboard' : wanted
 
   const TABS: { key: LtTab; label: string }[] = [
     { key: 'dashboard', label: '대시보드' },
