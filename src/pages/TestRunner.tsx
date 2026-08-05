@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { callFunction } from '../lib/supabase'
-import { useAntiCheat } from '../hooks/useAntiCheatLevel'
+import { callFunction, callFunctionBeacon } from '../lib/supabase'
+import { useAntiCheat, type ViolationLog } from '../hooks/useAntiCheatLevel'
 import { MAX_VIOLATIONS, LEVEL_COLORS, durationMinutesForLevel } from '../lib/testConfigLevel'
 import { useT } from '../lib/i18n'
 import { axisDef } from '../lib/categories'
@@ -82,6 +82,10 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     }))
   }, [questions, selected, index])
 
+  // 위반 내역(사유+시각). 훅이 돌려주는 배열을 그대로 가리킨다 —
+  // submit/voidByCheat 이 훅 호출보다 위에 선언돼 있어 직접 못 읽으므로 한 칸 거친다.
+  const vLogRef = useRef<ViolationLog[]>([])
+
   const submit = useCallback(async () => {
     if (submittedRef.current) return
     submittedRef.current = true
@@ -91,6 +95,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
         attemptId: start.attemptId,
         answers: buildAnswers(),
         violationCount: violationsRef.current,
+        violations: vLogRef.current,
       })
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
       navigate(`/test/result/${start.attemptId}`, { state: res, replace: true })
@@ -110,14 +115,16 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
       attemptId: start.attemptId,
       answers: [],
       violationCount: violationsRef.current,
+      violations: vLogRef.current,
       voided: true,
     }).catch(() => {})
   }, [start.attemptId])
 
-  const { violations, lastWarning, enterFullscreen } = useAntiCheat({
+  const { violations, lastWarning, logRef, enterFullscreen } = useAntiCheat({
     enabled: started && !submitting && !voided,
     onLimitReached: voidByCheat,
   })
+  vLogRef.current = logRef.current // 훅의 배열은 제자리 변형이라 참조만 물려주면 된다
 
   useEffect(() => {
     violationsRef.current = violations
@@ -199,9 +206,18 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     setAskQuit(true)
   }
   // 나가기 = 응시 포기 → 들어온 자리인 레벨 선택으로 되돌린다(예전엔 메인으로 튕겼다).
+  //  · 서버에 '자진 종료'를 남긴다. 이게 없으면 브라우저를 닫은 것과 구분이 안 돼
+  //    관리자 화면에서 전부 '무단 이탈'로 보인다.
+  //  · keepalive 로 보내는 이유 = 바로 navigate 하면 일반 fetch 는 취소된다.
   function doQuit() {
     submittedRef.current = true
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    callFunctionBeacon('submit-test', {
+      attemptId: start.attemptId,
+      quit: true,
+      violationCount: violationsRef.current,
+      violations: vLogRef.current,
+    })
     navigate('/test/select')
   }
 

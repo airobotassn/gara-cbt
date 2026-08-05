@@ -687,17 +687,25 @@ function AttemptHistory({ attempts }: { attempts: Omit<AttemptRow, 'name'>[] }) 
       <table className="admin-table">
         <thead><tr><th>일시</th><th>레벨</th><th>언어</th><th>점수</th><th>상태</th><th>등급변동</th></tr></thead>
         <tbody>
-          {slice.map((a) => (
-            <tr key={a.id}>
-              <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(a.submitted_at || a.created_at)}</td>
-              <td>Lv.{a.level}</td>
-              <td>{a.lang}</td>
-              {/* 미완료는 0/30 이 '0점'으로 읽히므로 점수를 아예 안 쓴다 */}
-              <td>{a.status === 'submitted' ? `${a.total_correct}/${a.total_questions}` : <span className="rc-none">–</span>}</td>
-              <td><OutcomeBadge status={a.status} v={a.violation_count} /></td>
-              <td><RankBadge before={a.rank_before} after={a.rank_after} dir={a.rank_dir} /></td>
-            </tr>
-          ))}
+          {slice.map((a) => {
+            const logs = a.violations ?? []
+            const vs = logs.length ? violationSummary(logs) : null
+            return (
+              <tr key={a.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(a.submitted_at || a.created_at)}</td>
+                <td>Lv.{a.level}</td>
+                <td>{a.lang}</td>
+                {/* 미완료는 0/30 이 '0점'으로 읽히므로 점수를 아예 안 쓴다 */}
+                <td>{a.status === 'submitted' ? `${a.total_correct}/${a.total_questions}` : <span className="rc-none">–</span>}</td>
+                <td>
+                  <OutcomeBadge status={a.status} v={a.violation_count} endReason={a.end_reason} />
+                  {/* 왜 걸렸는지 — 마우스를 올리면 시각까지 나온다 */}
+                  {vs ? <div className="vio-sum" title={vs.detail}>{vs.text}</div> : null}
+                </td>
+                <td><RankBadge before={a.rank_before} after={a.rank_after} dir={a.rank_dir} /></td>
+              </tr>
+            )
+          })}
           {!slice.length ? (
             <tr><td colSpan={6} className="admin-empty">{attempts.length ? '완료된 응시 없음' : '응시 이력 없음'}</td></tr>
           ) : null}
@@ -715,11 +723,36 @@ function AttemptHistory({ attempts }: { attempts: Omit<AttemptRow, 'name'>[] }) 
 }
 
 // ============================ 응시 기록 탭 ============================
-interface AttemptRow { id: string; name: string; email?: string | null; level: number; lang: string; status: string; total_correct: number; total_questions: number; rank_before: number | null; rank_after: number | null; rank_dir: string | null; violation_count?: number; submitted_at: string | null; created_at: string }
-function OutcomeBadge({ status, v }: { status: string; v?: number }) {
+/** 부정행위 감지 1건(서버 test_attempts.violations). reason = tab|blur|fs */
+interface ViolationLog { at: string; reason: string }
+interface AttemptRow { id: string; name: string; email?: string | null; level: number; lang: string; status: string; total_correct: number; total_questions: number; rank_before: number | null; rank_after: number | null; rank_dir: string | null; violation_count?: number; violations?: ViolationLog[]; end_reason?: string | null; submitted_at: string | null; created_at: string }
+
+const VIOLATION_LABEL: Record<string, string> = { tab: '탭 전환', blur: '창 이탈', fs: '전체화면 해제', unknown: '기타' }
+/** 위반 내역을 "탭 전환 2회 · 전체화면 해제 1회" 로. 시각은 툴팁(title)에 붙인다. */
+function violationSummary(logs: ViolationLog[]): { text: string; detail: string } {
+  const by: Record<string, string[]> = {}
+  for (const v of logs) {
+    const k = VIOLATION_LABEL[v.reason] ?? v.reason
+    ;(by[k] ??= []).push(new Date(v.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+  }
+  const parts = Object.entries(by)
+  return {
+    text: parts.map(([k, times]) => `${k} ${times.length}회`).join(' · '),
+    detail: parts.map(([k, times]) => `${k}: ${times.join(', ')}`).join('\n'),
+  }
+}
+
+// 종료 사유까지 반영한 배지.
+//  · 완료           = submitted
+//  · 경고중단       = voided (경고 3회 누적 → 무효)
+//  · 중단(자진)     = 나가기 버튼을 눌러 end_reason='quit' 이 찍힘
+//  · 중단(무단)     = 아무 신호 없이 사라짐(브라우저 닫기·방치). end_reason 이 비어 있다.
+//    ⚠️ 2026-08-05 이전 기록은 end_reason 이 없어 전부 '중단(무단)' 으로 보인다.
+function OutcomeBadge({ status, v, endReason }: { status: string; v?: number; endReason?: string | null }) {
   if (status === 'submitted') return <span className="badge ok">완료</span>
   if (status === 'voided') return <span className="badge none">⚠ 경고중단{v ? ` ${v}회` : ''}</span>
-  return <span className="badge low">중단</span> // in_progress · expired = 미완료 이탈
+  if (endReason === 'quit') return <span className="badge low">중단 <em>자진</em></span>
+  return <span className="badge low">중단 <em>무단</em></span>
 }
 function RankBadge({ before, after, dir }: { before: number | null; after: number | null; dir: string | null }) {
   if (before == null || after == null) return <span className="rc-none">–</span>
@@ -795,7 +828,12 @@ function AttemptsTab() {
                 <td>Lv.{a.level}</td>
                 <td>{LANG_LABEL[a.lang] ?? a.lang}</td>
                 <td>{a.status === 'submitted' ? `${a.total_correct}/${a.total_questions}` : '–'}</td>
-                <td><OutcomeBadge status={a.status} v={a.violation_count} /></td>
+                <td>
+                  <OutcomeBadge status={a.status} v={a.violation_count} endReason={a.end_reason} />
+                  {a.violations?.length
+                    ? (() => { const vs = violationSummary(a.violations!); return <div className="vio-sum" title={vs.detail}>{vs.text}</div> })()
+                    : null}
+                </td>
                 <td>{a.status === 'submitted' ? <RankBadge before={a.rank_before} after={a.rank_after} dir={a.rank_dir} /> : <span className="rc-none">–</span>}</td>
                 <td>{fmtDT(a.submitted_at || a.created_at)}</td>
                 <td><button className="admin-mini" onClick={() => setOpen(a)}>상세</button></td>

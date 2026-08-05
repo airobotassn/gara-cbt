@@ -218,6 +218,10 @@ create table if not exists test_attempts (
   warn_strikes int default 0,
   applied boolean not null default false,
   violation_count int default 0,
+  -- 종료 사유: quit=나가기 버튼(자진) · cheat=경고 누적 무효 · null=신호 없음(무단 이탈/정상 제출)
+  end_reason text,
+  -- [{at,reason}] 부정행위 감지 내역(reason = tab|blur|fs). 클라 신호라 증거가 아닌 참고 지표.
+  violations jsonb not null default '[]'::jsonb,
   claim_token uuid not null default gen_random_uuid(),  -- 게스트→로그인 결과 이관용
   created_at timestamptz default now()
 );
@@ -299,10 +303,15 @@ create table if not exists chat_messages (
 
 -- 기존 DB(방 도입 전)에 이 파일을 다시 돌려도 컬럼이 생기도록 — create table if not exists 는 컬럼을 못 늘린다.
 alter table chat_messages add column if not exists room text not null default 'global';
+-- 누가 숨겼는지: 'self'(본인 삭제) | 'admin'(관리자 강제 숨김) | null(옛 기록).
+-- 관리자 '숨김 해제'는 hidden_by <> 'self' 인 것만 되돌린다 — 사용자가 지운 글을 되살리지 않기 위해서.
+alter table chat_messages add column if not exists hidden_by text;
 drop index if exists chat_messages_cursor_idx;
 
 create index if not exists chat_messages_room_cursor_idx
   on chat_messages (room, id) where deleted_at is null;
+create index if not exists chat_messages_modq_idx
+  on chat_messages (mod_status, created_at desc) where deleted_at is null;
 create index if not exists chat_messages_rate_idx
   on chat_messages (user_id, created_at desc);
 create index if not exists chat_messages_dup_idx
@@ -322,6 +331,9 @@ create table if not exists chat_reports (
 
 create unique index if not exists chat_reports_once_idx
   on chat_reports (message_id, reporter_id);
+-- 검수 큐 = "열린 신고가 달린 메시지" 를 message_id 로 모은다.
+create index if not exists chat_reports_open_msg_idx
+  on chat_reports (message_id) where status = 'open';
 
 create table if not exists chat_incidents (
   id uuid primary key default gen_random_uuid(),

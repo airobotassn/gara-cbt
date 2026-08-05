@@ -6,9 +6,17 @@ interface Options {
   onLimitReached: () => void // 위반 누적 한계 도달 시(무효 처리)
 }
 
+/** 위반 1건. 제출·무효 시 서버로 보내 test_attempts.violations 에 쌓인다(관리자 상세의 원천). */
+export interface ViolationLog {
+  at: string // ISO
+  reason: string // 'tab' | 'blur' | 'fs'
+}
+
 interface AntiCheatState {
   violations: number
   lastWarning: string | null
+  /** 누적 내역. 렌더에 안 쓰이고 제출 시점에 그대로 실어보내기만 해서 state 가 아니라 ref 다. */
+  logRef: React.RefObject<ViolationLog[]>
   enterFullscreen: () => Promise<void>
 }
 
@@ -20,6 +28,7 @@ export function useAntiCheat({ enabled, onLimitReached }: Options): AntiCheatSta
   const submittedRef = useRef(false)
   const countRef = useRef(0)
   const lastAtRef = useRef(0)
+  const logRef = useRef<ViolationLog[]>([])
   const onLimitRef = useRef(onLimitReached)
   onLimitRef.current = onLimitReached
 
@@ -46,6 +55,7 @@ export function useAntiCheat({ enabled, onLimitReached }: Options): AntiCheatSta
 
       countRef.current += 1
       const next = countRef.current
+      logRef.current.push({ at: new Date(now).toISOString(), reason: reasonKey })
       setViolations(next)
       setLastWarning(reasonKey)
       if (next >= MAX_VIOLATIONS) {
@@ -82,5 +92,5 @@ export function useAntiCheat({ enabled, onLimitReached }: Options): AntiCheatSta
     }
   }
 
-  return { violations, lastWarning, enterFullscreen }
+  return { violations, lastWarning, logRef, enterFullscreen }
 }

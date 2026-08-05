@@ -23,10 +23,23 @@ interface InAnswer {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const { attemptId, answers, violationCount, voided } = await req.json()
-    if (!attemptId || (!voided && !Array.isArray(answers))) {
+    const { attemptId, answers, violationCount, violations, voided, quit } = await req.json()
+    if (!attemptId || (!voided && !quit && !Array.isArray(answers))) {
       return json({ error: '잘못된 요청입니다.' }, 400)
     }
+
+    // 위반 내역 정규화 — 클라가 보내는 값이라 그대로 믿지 않고 형태·개수만 통과시킨다.
+    // (감지 자체가 클라 신호라 어차피 우회 가능하다. 증거가 아니라 참고 지표.)
+    const REASONS = ['tab', 'blur', 'fs']
+    const vlog = (Array.isArray(violations) ? violations : [])
+      .filter((v: unknown) => !!v && typeof v === 'object')
+      .map((v: { at?: unknown; reason?: unknown }) => ({
+        at: typeof v.at === 'string' ? v.at.slice(0, 32) : null,
+        reason: REASONS.includes(String(v.reason)) ? String(v.reason) : 'unknown',
+      }))
+      .filter((v: { at: string | null }) => !!v.at)
+      .slice(0, 50)
+    const vcount = Math.max(0, Math.floor(violationCount ?? 0))
 
     const user = await getUser(req)
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
@@ -56,10 +69,24 @@ Deno.serve(async (req) => {
         .update({
           status: 'voided',
           submitted_at: new Date().toISOString(),
-          violation_count: Math.max(0, Math.floor(violationCount ?? 0)),
+          violation_count: vcount,
+          violations: vlog,
+          end_reason: 'cheat',
         })
         .eq('id', attemptId)
       return json({ ok: true, voided: true })
+    }
+
+    // '나가기' 버튼으로 자진 종료 — 채점하지 않고 사유만 남긴다.
+    //  status 는 in_progress 로 둔다(다음 응시 때 expired 로 밀린다) — 여기서 바꾸면
+    //  '완료'도 '무효'도 아닌 제3의 상태가 생겨 기존 집계(일일 횟수·통계)가 다 흔들린다.
+    //  관리자 화면은 end_reason 으로 자진/무단을 가른다.
+    if (quit) {
+      await admin
+        .from('test_attempts')
+        .update({ violation_count: vcount, violations: vlog, end_reason: 'quit' })
+        .eq('id', attemptId)
+      return json({ ok: true, quit: true })
     }
 
     // 출제된(고정된) 문항 + 정답
@@ -120,7 +147,9 @@ Deno.serve(async (req) => {
         submitted_at: submittedAt,
         total_correct: totalCorrect,
         axis_perf: perf,
-        violation_count: Math.max(0, Math.floor(violationCount ?? 0)),
+        // 완료해도 경고 1~2회는 있을 수 있다(3회면 무효라 여기 못 온다) — 내역을 같이 남긴다.
+        violation_count: vcount,
+        violations: vlog,
       })
       .eq('id', attemptId)
 

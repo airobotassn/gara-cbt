@@ -69,7 +69,7 @@ export async function userDetail(admin: any, body: any) {
   if (!uid) return json({ error: 'userId 필요' }, 400)
   const [attRes, skillRes, progRes] = await Promise.all([
     admin.from('test_attempts')
-      .select('id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, submitted_at, created_at')
+      .select('id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at')
       .eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
     // ⚠️ order 필수 — 없으면 DB 반환 순서 그대로라 화면에 Lv.7→4→5→6→2→3→1 로 뒤섞여 나온다.
     admin.from('user_level_skill').select('level, ratings, attempts_count, placed')

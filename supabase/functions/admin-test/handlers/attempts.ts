@@ -6,7 +6,7 @@ import { pickLang, projText, projOptionsForLevel } from '../../_shared/scoring.t
 export async function listAttempts(admin: any) {
   const { data } = await admin
     .from('test_attempts')
-    .select('id, user_id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, submitted_at, created_at')
+    .select('id, user_id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at')
     .order('created_at', { ascending: false })
     .limit(200)
   const ids = [...new Set((data ?? []).map((a: any) => a.user_id))]

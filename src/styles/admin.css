@@ -583,3 +583,46 @@
 @media (max-width: 640px) {
   .rt-axis { grid-template-columns: 76px 1fr 28px; gap: 8px; }
 }
+
+/* ===== 채팅 검수 — 방별 건수 칩 =====
+   드롭다운을 대신한다. 열지 않아도 어느 방에 몇 건인지 보여야 새 방에서 터진 신고를 놓치지 않는다.
+   ⚠️ 탭(.admin-tabs)과 톤을 맞추되 한 단계 약하게 — 탭이 1차 분기(대기/완료), 칩은 그 안의 2차 필터다.
+   칩 개수는 "큐에 실제로 뜬 방" 만큼이라 보통 한 줄이지만, 터지면 줄바꿈으로 흐른다. */
+.chatmod-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+.chatmod-rooms button {
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  transition: 0.15s;
+}
+.chatmod-rooms button b {
+  margin-left: 5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.chatmod-rooms button:hover {
+  border-color: var(--blue);
+  color: var(--ink);
+}
+.chatmod-rooms button.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--on-accent);
+}
+.chatmod-rooms button.on b { color: var(--on-accent); }
+
+/* 부정행위 감지 요약 — 상태 배지 밑에 한 줄. 시각은 title 툴팁. */
+.vio-sum { margin-top: 4px; font-size: var(--fs-sm); color: var(--danger-fg); cursor: help; white-space: nowrap; }
+/* 중단 배지의 자진/무단 꼬리표 */
+.badge em { font-style: normal; font-weight: 700; opacity: .7; margin-left: 3px; }

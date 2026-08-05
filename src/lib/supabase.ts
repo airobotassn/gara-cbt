@@ -51,3 +51,26 @@ export async function callFunction<T>(
   }
   return json as T
 }
+
+/**
+ * 페이지를 떠나면서 보내는 fire-and-forget 호출(keepalive).
+ * 일반 fetch 는 navigate/unload 시 브라우저가 취소해버려서, 응시 '나가기' 같은
+ * "떠나기 직전 한 줄"이 유실된다 → 자진 종료가 무단 이탈로 기록되는 문제.
+ * sendBeacon 은 Authorization 헤더를 못 붙여서 쓸 수 없다(함수가 401).
+ * 응답은 보지 않는다 — 실패해도 사용자 흐름을 막지 않는다.
+ */
+export function callFunctionBeacon(name: string, body: unknown): void {
+  if (!isSupabaseConfigured) return
+  void supabase.auth.getSession().then(({ data: { session } }) => {
+    void fetch(`${fnBase}/${name}`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey as string,
+        Authorization: `Bearer ${session?.access_token ?? anonKey}`,
+      },
+      body: JSON.stringify(body),
+    }).catch(() => {})
+  })
+}
