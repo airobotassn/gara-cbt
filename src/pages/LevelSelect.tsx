@@ -54,6 +54,9 @@ export default function LevelSelect() {
   const [loading, setLoading] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ruleOpen, setRuleOpen] = useState(false) // 등급 규칙 접기(기본 접힘)
+  // 비로그인이 '응시 시작'을 눌렀을 때. 곧장 OAuth·로그인화면으로 튕기지 않고 이 모달을 먼저 띄운다
+  // (/exam 의 ExamGate 와 같은 패턴). 화면 진입 자체는 막지 않는다 — 레벨 정보는 누구나 봐야 한다.
+  const [loginNotice, setLoginNotice] = useState(false)
   // 해금된 최고 레벨 = 현재 등급(rank). 첫 유저 = 1. 승급 시 한 단계씩 해제.
   const [unlocked, setUnlocked] = useState(1)
   // 사다리에서 직접 고른 레벨(null = 기본값인 '내 등급'을 따름)
@@ -120,13 +123,23 @@ export default function LevelSelect() {
         (searchRec.alt ? t('reco.result_alt', { n: searchRec.alt }) : '')
       : null
 
+  // 로그인 안내 모달의 '로그인' — 수단이 구글만이 아니라서(카카오도 있음) provider 를 직접 부르지 않고
+  // 로그인 화면으로 보낸다. 복귀 경로는 sessionStorage(AuthCallback 이 읽음) — Supabase 가 ?next= 를 유실시킨다.
+  function goLogin() {
+    try { sessionStorage.setItem('postLoginRedirect', '/test/select') } catch { /* 무시 */ }
+    navigate('/login')
+  }
+
   async function start(level: number) {
+    // 익명(게스트) 응시 폐지(2026-08-05) — 예전엔 여기서 ensureAnonymous() 로 세션을 즉석에서 만들어
+    // 비로그인도 응시가 됐다. 실제 차단은 서버(start-test 익명 401)고, 여기선 안내만 한다.
+    if (!isFullUser) {
+      setLoginNotice(true)
+      return
+    }
     setError(null)
     setLoading(level)
     try {
-      // 익명(게스트) 응시 폐지(2026-08-05) — 예전엔 여기서 ensureAnonymous() 로 세션을 즉석에서 만들어
-      // 비로그인도 응시가 됐다. 지금은 App.tsx 의 LoginGate 가 이 화면 진입 자체를 막고,
-      // 뚫려도 서버(start-test)가 익명을 401 로 되돌린다.
       const res = await callFunction<StartTestResponse>('start-test', { level, lang })
       navigate(`/test/${res.attemptId}`, { state: res })
     } catch (e) {
@@ -174,6 +187,45 @@ export default function LevelSelect() {
         <div className="lvn-vig" />
       </div>
 
+      {/* 로그인 안내 모달 — '응시 시작'을 비로그인이 눌렀을 때. /exam 의 ExamGate 와 같은 모양.
+          배경 클릭·닫기로 취소된다(강제 이동 아님) — 레벨 구경은 계속할 수 있어야 한다. */}
+      {loginNotice && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setLoginNotice(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lv-login-title"
+        >
+          <div
+            className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+            </div>
+            <h3 id="lv-login-title" className="font-title-md text-title-md font-bold text-on-surface mb-2">
+              {t('gate.login_modal_title')}
+            </h3>
+            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.login_modal_desc')}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center"
+                onClick={goLogin}
+              >
+                {t('fab.login_cta')}
+              </button>
+              <button
+                className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors"
+                onClick={() => setLoginNotice(false)}
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* flex-col + 사다리의 mt-auto → 모바일에서 카드는 위, 사다리는 아래로 갈라놓는다.
           (안 그러면 둘이 위에 붙고 화면 절반이 빈 채로 남는다) */}
       <main className="flex-grow flex flex-col pt-6 pb-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
@@ -196,9 +248,8 @@ export default function LevelSelect() {
               <span className="material-symbols-outlined text-[24px]">public</span>
             </span>
             <div className="min-w-0">
-              {/* 제목은 인증서와 같은 명조(CertMyeongjo = NanumMyeongjo ExtraBold, cert.css 에 이미 선언).
-                  본문 서체는 Pretendard 하나로 통일됐지만 이 h1 은 일부러 남긴 예외다 —
-                  밤하늘·금박 화면에 두꺼운 고딕이 얹히면 그 순간 인증서 집안이 아니게 된다. */}
+              {/* .lvn-display = 크기·굵기만. 서체는 화면 공통 Pretendard 다(2026-08-05 통일).
+                  예전엔 인증서와 같은 명조를 썼는데, 명조는 이제 인증서 안에서만 쓴다. */}
               <h1 className="lvn-display text-[34px] md:text-[46px] text-on-surface tracking-tight break-keep">
                 {t('lv.title')}
               </h1>

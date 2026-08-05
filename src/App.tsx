@@ -63,26 +63,9 @@ const ONBOARDING_ENFORCED = [
   '/ranking', // 명예의 전당
 ]
 
-// 로그인 게이트 — 익명(게스트) 응시 폐지(2026-08-05)로 레벨테스트 경로는 정식 회원 전용이다.
-// 예전엔 링크를 직접 열면 '응시 시작' 시점에 익명 세션이 즉석에서 생겨(LevelSelect 의 ensureAnonymous)
-// 로그인·지역 확인을 전부 건너뛰고 응시가 됐다. 그 구멍을 여기서 막는다.
-// ⚠️ 화면 게이트는 편의일 뿐이고 **실제 차단은 서버(start-test 의 익명 401)** 다 —
-//    익명 로그인 자체는 SEB 응시(/exam/seb)가 아직 쓰고 있어 Supabase 설정에서 못 끈다.
-const LOGIN_REQUIRED = ['/test']
-
-function LoginGate({ children }: { children: ReactNode }) {
-  const { isFullUser, loading } = useAuth()
-  const { pathname, search } = useLocation()
-  const enforced = LOGIN_REQUIRED.some((p) => pathname === p || pathname.startsWith(p + '/'))
-  if (!enforced) return <>{children}</>
-  if (loading) return <GateSpinner />
-  if (!isFullUser) {
-    // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 OAuth 왕복 중 ?next= 를 유실시킨다(AuthCallback 참고).
-    try { sessionStorage.setItem('postLoginRedirect', pathname + search) } catch { /* 무시 */ }
-    return <Navigate to="/login" replace />
-  }
-  return <>{children}</>
-}
+// ⚠️ 레벨테스트(/test)를 라우트 단에서 막지 않는다 — 화면은 누구나 들어와 레벨·문항수·승급컷을
+//    볼 수 있어야 한다(그게 응시 동기다). 로그인은 **'응시 시작' 버튼에서만** 요구하고,
+//    LevelSelect 가 /exam(ExamGate) 와 같은 로그인 안내 모달을 띄운다. 실제 차단은 서버(start-test 익명 401).
 
 // 닉네임 게이트 — 지역과 달리 **전 경로**에서 강제한다.
 // 이유: 가입 트리거가 구글 실명을 display_name 에 넣어서, 안 정하면 랭킹·채팅·레벨테스트 인증서에
@@ -136,9 +119,7 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           <Layout>
-            {/* 로그인(/test) → 닉네임(전 경로) → 지역(아레나 계열) 순서.
-                아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
-            <LoginGate>
+            {/* 닉네임(전 경로) → 지역(아레나 계열) 순서. 아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
             <NicknameGate>
             <OnboardingGate>
             <Routes>
@@ -199,7 +180,6 @@ export default function App() {
             </Routes>
             </OnboardingGate>
             </NicknameGate>
-            </LoginGate>
           </Layout>
         </BrowserRouter>
       </AuthProvider>
