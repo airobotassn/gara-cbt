@@ -557,9 +557,14 @@
    숫자만 있어 0~100 중 어디인지 안 보였다. 축 이름 폭을 고정해 열을 맞춘다. */
 .rt-lv { border: 1px solid var(--a-bd); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; background: var(--bg); }
 /* 헤더 = 접기 토글 버튼. 접어도 평균이 남아 접은 채로 레벨끼리 비교된다. */
-.rt-lv-h { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 10px; padding: 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; }
-.rt-lv.is-shut .rt-lv-h { margin-bottom: 0; }
-.rt-caret { color: var(--dim); font-size: var(--fs-sm); width: 10px; }
+/* 헤더 전체가 클릭 영역이다. 눌리는 자리라는 게 보여야 해서 hover 면과 모서리를 준다
+   (처음엔 캐럿만 10px 로 뒀더니 안 보였다). */
+.rt-lv-h { display: flex; align-items: center; gap: 9px; width: 100%; margin: -4px -6px 8px; padding: 5px 6px; background: none; border: 0; border-radius: 9px; color: inherit; text-align: left; cursor: pointer; transition: background .12s; }
+.rt-lv-h:hover { background: var(--soft); }
+.rt-lv.is-shut .rt-lv-h { margin-bottom: -4px; }
+/* 캐럿 = 네모 버튼. 배경이 있어야 어두운 카드에서 화살표가 묻히지 않는다. */
+.rt-caret { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--soft); border: 1px solid var(--a-bd); color: var(--txt); font-size: 15px; line-height: 1; }
+.rt-lv-h:hover .rt-caret { border-color: var(--accent); color: var(--accent); }
 .rt-avg { margin-left: auto; font-size: var(--fs-sm); font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rt-lv-h b { font-size: var(--fs-md); font-weight: 800; }
 .rt-axis { display: grid; grid-template-columns: 96px 1fr 30px; align-items: center; gap: 10px; padding: 3px 0; }
