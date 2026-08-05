@@ -3334,7 +3334,6 @@ function UsersAdmin() {
               <th>가입</th>
               <th style={{ textAlign: 'right' }}>응시</th>
               <th>취득 급수</th>
-              <th>마지막 응시</th>
               <th></th>
             </tr>
           </thead>
@@ -3350,7 +3349,6 @@ function UsersAdmin() {
                     3건이 "세 번 붙었다" 가 아니라 "Pro·Elite·Master 를 각각 땄다" 일 수 있다.
                     그래서 숫자 대신 취득 급수를 칩으로 보여준다(중복 제거). */}
                 <td>{gradeChips(u.passedTitles)}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.lastActive)}</td>
                 <td>
                   <button className="admin-mini" onClick={() => setOpen(u)}>상세</button>
                 </td>
