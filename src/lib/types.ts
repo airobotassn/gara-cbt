@@ -418,6 +418,8 @@ export interface CbtUserRow {
   anon: boolean
   created: string
   attempts: number
+  /** 합격 건수(전체 문항의 60% 이상). 서버 admin 함수의 CBT_PASS_RATIO 와 같은 규칙. */
+  passed: number
   lastActive: string | null
 }
 export interface CbtUsersResp {
@@ -431,6 +433,10 @@ export interface CbtUserAttempt {
   totalQuestions: number | null
   submittedAt: string | null
   createdAt: string
+  /** 합격 여부. 미제출·미채점이면 null. */
+  passed: boolean | null
+  /** 결과 공개일이 지났는지 — 자격증은 별도 테이블 없이 '합격 + 공개' 로 판단한다. */
+  released: boolean
 }
 export interface CbtUserDetailResp {
   attempts: CbtUserAttempt[]

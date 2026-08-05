@@ -1408,6 +1408,10 @@ async function cbtAnalytics(admin: any) {
 }
 
 // 회원 목록 — 프로필 + 이메일 + 응시수 + 마지막 활동.
+// 합격선 — my-attempts/index.ts 의 PASS_RATIO 와 같은 값(0.6)을 유지할 것.
+// 자격증은 별도 테이블이 없어 "합격 + 결과공개일 경과" 를 발급 가능으로 본다(응시 기록에서 계산).
+const CBT_PASS_RATIO = 0.6
+
 async function cbtUsers(admin: any) {
   // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → CARIS ARENA 게스트(is_anonymous)는 회원목록에서 제외.
   const { data: profiles } = await admin
@@ -1418,14 +1422,17 @@ async function cbtUsers(admin: any) {
     .limit(5000)
   const { data: atts } = await admin
     .from('exam_attempts')
-    .select('user_id, submitted_at')
+    .select('user_id, submitted_at, total_correct, total_questions')
     .eq('status', 'submitted')
     .limit(20000)
   const cnt: Record<string, number> = {}
+  const pass: Record<string, number> = {} // 합격 건수(60% 이상)
   const last: Record<string, string> = {}
   for (const a of atts ?? []) {
     const u = (a as any).user_id
     cnt[u] = (cnt[u] || 0) + 1
+    const tq = (a as any).total_questions, tc = (a as any).total_correct
+    if (tq && tc != null && tc >= Math.ceil(tq * CBT_PASS_RATIO)) pass[u] = (pass[u] || 0) + 1
     const s = (a as any).submitted_at
     if (s && (!last[u] || s > last[u])) last[u] = s
   }
@@ -1445,6 +1452,7 @@ async function cbtUsers(admin: any) {
     anon: p.is_anonymous,
     created: p.created_at,
     attempts: cnt[p.id] ?? 0,
+    passed: pass[p.id] ?? 0,
     lastActive: last[p.id] ?? null,
   }))
   return json({ users })
@@ -1456,7 +1464,7 @@ async function cbtUserDetail(admin: any, body: any) {
   if (!uid) return json({ error: 'userId 필요' }, 400)
   const { data: atts } = await admin
     .from('exam_attempts')
-    .select('id, exam_id, status, total_correct, total_questions, submitted_at, created_at')
+    .select('id, exam_id, status, total_correct, total_questions, submitted_at, created_at, result_release_at')
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(50)
@@ -1474,6 +1482,12 @@ async function cbtUserDetail(admin: any, body: any) {
     totalQuestions: a.total_questions,
     submittedAt: a.submitted_at,
     createdAt: a.created_at,
+    // 합격 = 전체의 60% 이상(my-attempts 의 PASS_RATIO 와 같은 규칙). 미채점·미제출은 null.
+    passed: a.status === 'submitted' && a.total_questions
+      ? a.total_correct >= Math.ceil(a.total_questions * CBT_PASS_RATIO)
+      : null,
+    // 자격증은 테이블이 없고 응시 기록에서 계산한다 — 합격 + 결과 공개일 경과.
+    released: !a.result_release_at || new Date(a.result_release_at) <= new Date(),
   }))
   return json({ attempts })
 }

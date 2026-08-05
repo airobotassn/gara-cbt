@@ -13,7 +13,7 @@ import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { optionCountForLevel } from '../lib/scoring'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 // 채팅 검수·이북 관리는 Admin.tsx 에 정의된 컴포넌트를 그대로 노출(데이터는 admin 함수). 위치만 WORLD ARENA 로 이동.
-import { ChatModAdmin, EbooksAdmin } from './Admin'
+import { ChatModAdmin, EbooksAdmin, RegionFixForm } from './Admin'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
@@ -511,6 +511,9 @@ function UsersTab() {
         <div className="admin-card"><div className="k">구글 로그인</div><div className="v">{googleN}</div></div>
         <div className="admin-card"><div className="k">게스트</div><div className="v">{users.length - googleN}</div></div>
       </div>
+      {/* 지역 오배정 정정 — CARIS 회원 탭에 있던 걸 옮겨왔다(2026-08-05).
+          지역은 아레나 랭킹·월드맵 전용이라 자격검정 화면에 있을 이유가 없었다. */}
+      <div className="admin-cbt"><RegionFixForm /></div>
       <div className="admin-section">
         <div className="admin-toolbar">
           <input className="admin-search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />

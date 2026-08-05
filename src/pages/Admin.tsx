@@ -1449,7 +1449,7 @@ export function ChatModAdmin() {
             })}
             {!rows.length && !loading && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   {tab === 'queue' ? '처리할 신고가 없습니다.' : '처리한 내역이 없습니다.'}
                 </td>
               </tr>
@@ -3312,8 +3312,6 @@ function UsersAdmin() {
         <span className="admin-hint">{filtered.length}명</span>
       </div>
 
-      <RegionFixForm />
-
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -3321,7 +3319,8 @@ function UsersAdmin() {
               <th>이름</th>
               <th>이메일</th>
               <th>가입</th>
-              <th style={{ textAlign: 'right' }}>응시</th>
+              <th style={{ textAlign: 'right' }}>응시</th>
+              <th style={{ textAlign: 'right' }}>합격</th>
               <th>마지막 활동</th>
               <th></th>
             </tr>
@@ -3332,7 +3331,9 @@ function UsersAdmin() {
                 <td>{u.name || '-'}</td>
                 <td style={{ color: 'var(--muted)' }}>{u.email || '-'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.created)}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.attempts}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.attempts}</td>
+                {/* 합격 0건은 굳이 눈에 띌 필요 없어 흐리게 */}
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: u.passed ? 'var(--blue-hi)' : 'var(--dim)', fontWeight: u.passed ? 800 : 400 }}>{u.passed}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.lastActive)}</td>
                 <td>
                   <button className="admin-mini" onClick={() => setOpen(u)}>상세</button>
@@ -3366,7 +3367,10 @@ function UsersAdmin() {
 }
 
 // ── 지역 오배정 정정 (T9) — 락된 회원의 지역을 어드민 CS 로 강제 정정 ──
-function RegionFixForm() {
+// ⚠️ 화면 위치는 WORLD ARENA 백오피스(AdminLevelTest 의 유저 탭)다. 정의만 여기 두고 export 한다
+//    — 지역(country_code/region_code)은 아레나 랭킹·월드맵 전용이고 자격검정은 이 값을 읽지 않는다.
+//    ChatModAdmin·EbooksAdmin 과 같은 재사용 방식(서버는 계속 admin 함수를 부른다).
+export function RegionFixForm() {
   const [uid, setUid] = useState('')
   const [region, setRegion] = useState('')
   const [busy, setBusy] = useState(false)
@@ -3446,6 +3450,8 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
                   <th>시험</th>
                   <th>상태</th>
                   <th>점수</th>
+                  <th>결과</th>
+                  <th>자격증</th>
                   <th>제출</th>
                 </tr>
               </thead>
@@ -3457,6 +3463,12 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
                       <span className={`admin-badge st-${at.status}`}>{STATUS_LABEL[at.status] ?? at.status}</span>
                     </td>
                     <td>{at.totalCorrect != null ? `${at.totalCorrect} / ${at.totalQuestions}` : '-'}</td>
+                    {/* 합격선 60%(서버 CBT_PASS_RATIO). 미제출·미채점은 판정 자체가 없다. */}
+                    <td>{at.passed == null ? <span style={{ color: 'var(--dim)' }}>–</span>
+                      : at.passed ? <span className="badge ok">합격</span> : <span className="badge low">불합격</span>}</td>
+                    {/* 자격증 테이블이 따로 없다 — 합격 + 결과공개일 경과 = 발급 가능. */}
+                    <td>{at.passed !== true ? <span style={{ color: 'var(--dim)' }}>–</span>
+                      : at.released ? <span className="badge ok">발급 가능</span> : <span className="badge low">공개 대기</span>}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(at.submittedAt)}</td>
                   </tr>
                 ))}
