@@ -420,6 +420,9 @@ export interface CbtUserRow {
   attempts: number
   /** 합격 건수(전체 문항의 60% 이상). 서버 admin 함수의 CBT_PASS_RATIO 와 같은 규칙. */
   passed: number
+  /** 합격한 시험명. 급수 파싱은 certNo.ts 의 gradeOfTitle 이 단일 출처라 제목 그대로 내려온다. */
+  passedTitles: string[]
+  /** 마지막으로 시험을 **제출**한 시각. 로그인·접속은 안 본다. */
   lastActive: string | null
 }
 export interface CbtUsersResp {

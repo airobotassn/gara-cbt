@@ -1422,17 +1422,32 @@ async function cbtUsers(admin: any) {
     .limit(5000)
   const { data: atts } = await admin
     .from('exam_attempts')
-    .select('user_id, submitted_at, total_correct, total_questions')
+    .select('user_id, exam_id, submitted_at, total_correct, total_questions')
     .eq('status', 'submitted')
     .limit(20000)
+  // 합격 시험의 급수를 알려면 시험명이 필요하다(exam_attempts 엔 exam_id 만 있다).
+  const examTitle: Record<string, string> = {}
+  {
+    const ids = [...new Set((atts ?? []).map((a: any) => a.exam_id).filter(Boolean))]
+    if (ids.length) {
+      const { data: ex } = await admin.from('exams').select('id, title').in('id', ids)
+      for (const e of ex ?? []) examTitle[(e as any).id] = (e as any).title
+    }
+  }
   const cnt: Record<string, number> = {}
   const pass: Record<string, number> = {} // 합격 건수(60% 이상)
+  const passTitles: Record<string, string[]> = {} // 합격한 시험명(→ 프론트에서 급수 칩으로)
   const last: Record<string, string> = {}
   for (const a of atts ?? []) {
     const u = (a as any).user_id
     cnt[u] = (cnt[u] || 0) + 1
     const tq = (a as any).total_questions, tc = (a as any).total_correct
-    if (tq && tc != null && tc >= Math.ceil(tq * CBT_PASS_RATIO)) pass[u] = (pass[u] || 0) + 1
+    if (tq && tc != null && tc >= Math.ceil(tq * CBT_PASS_RATIO)) {
+      pass[u] = (pass[u] || 0) + 1
+      // 급수는 시험명에서 파싱한다 — 규칙은 프론트 certNo.ts(gradeOfTitle) 한 곳에만 둔다.
+      const t = (a as any).exam_id ? examTitle[(a as any).exam_id] : null
+      if (t) (passTitles[u] ??= []).push(t)
+    }
     const s = (a as any).submitted_at
     if (s && (!last[u] || s > last[u])) last[u] = s
   }
@@ -1453,6 +1468,7 @@ async function cbtUsers(admin: any) {
     created: p.created_at,
     attempts: cnt[p.id] ?? 0,
     passed: pass[p.id] ?? 0,
+    passedTitles: passTitles[p.id] ?? [],
     lastActive: last[p.id] ?? null,
   }))
   return json({ users })

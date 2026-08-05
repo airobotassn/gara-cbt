@@ -650,3 +650,10 @@
   background: var(--danger-bg);
   border-color: var(--danger-fg);
 }
+
+/* 회원 상세 — 보유 자격증(응시 이력 위에 모아 보여준다) */
+.cert-own { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 4px; }
+.cert-own-item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--a-bd); border-left: 3px solid var(--blue); border-radius: 10px; background: var(--soft); }
+.cert-own-item b { font-weight: 800; letter-spacing: -0.01em; }
+.cert-own-item span { font-size: var(--fs-sm); color: var(--muted); }
+.cert-own-item span:last-child { margin-left: auto; color: var(--dim); }
