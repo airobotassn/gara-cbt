@@ -241,7 +241,7 @@ html.dark .guide-fcard { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 2
 .gld-slice:focus-visible polygon { filter: brightness(1.12); stroke: #fff; stroke-width: 3; }
 .gld-slice.is-active polygon { filter: brightness(1.12) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18)); }
 
-/* 자격증 플레이트 카드 */
+/* 인증서 플레이트 카드 */
 .gld-cards { display: flex; flex-direction: column; gap: 18px; }
 /* 트랙(CARIS-Ⅰ/Ⅱ) 블록 사이 간격 — 카드 내부 간격(18px)보다 넓혀
    Elite(Ⅰ 끝)와 Master(Ⅱ 시작)가 붙어 보이지 않게. */

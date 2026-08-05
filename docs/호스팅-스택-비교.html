@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GARA · 호스팅/스택 4개 안 비교</title>
+<style>
+  :root{
+    --bg:#0b1020; --bg2:#111935; --card:#151d38; --line:#25305a;
+    --tx:#e8ecfb; --tx2:#a8b3d6; --tx3:#6f7ca8;
+    --o1:#f0743a; --o2:#39d98a; --o3:#4aa3f0; --o4:#f0b429;
+    --bad:#ff5f6d; --warn:#f0b429; --ok:#39d98a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:'Pretendard','Malgun Gothic',-apple-system,system-ui,sans-serif;
+    line-height:1.7; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px 100px}
+  header{
+    padding:56px 0 32px;border-bottom:1px solid var(--line);margin-bottom:44px;
+  }
+  header .eyebrow{color:var(--tx3);font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+  h1{font-size:clamp(26px,4vw,40px);margin:0 0 14px;letter-spacing:-.02em;line-height:1.25}
+  header p{color:var(--tx2);margin:0;font-size:15px;max-width:760px}
+  h2{
+    font-size:22px;margin:56px 0 6px;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:12px;
+  }
+  h2 .n{
+    font:600 13px/1 var(--mono);color:var(--tx3);border:1px solid var(--line);
+    border-radius:6px;padding:6px 8px;flex:none;
+  }
+  h2+.sub{color:var(--tx3);font-size:14px;margin:0 0 24px}
+  h3{font-size:16px;margin:32px 0 12px;color:var(--tx)}
+
+  .verdict{
+    background:linear-gradient(135deg,rgba(57,217,138,.1),rgba(74,163,240,.06));
+    border:1px solid rgba(57,217,138,.32);border-radius:14px;padding:22px 24px;margin:0 0 8px;
+  }
+  .verdict b{color:var(--ok)}
+  .verdict p{margin:0 0 10px}
+  .verdict p:last-child{margin:0}
+
+  /* ---- 실측 카드 ---- */
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .fact{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .fact .v{font:700 24px/1.2 var(--mono);color:var(--tx);letter-spacing:-.02em}
+  .fact .v small{font-size:13px;color:var(--tx3);font-weight:500}
+  .fact .k{font-size:12.5px;color:var(--tx3);margin-top:6px}
+
+  /* ---- 계산기 ---- */
+  .calc{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:20px}
+  .ctrls{display:grid;grid-template-columns:1fr;gap:20px}
+  @media(min-width:800px){.ctrls{grid-template-columns:1.4fr 1fr}}
+  .ctrl label{display:block;font-size:13px;color:var(--tx2);margin-bottom:10px}
+  .ctrl .now{font:700 20px/1 var(--mono);color:var(--o3)}
+  input[type=range]{width:100%;accent-color:var(--o3);height:22px}
+  .ticks{display:flex;justify-content:space-between;font:11px/1 var(--mono);color:var(--tx3);margin-top:2px}
+  .toggle{
+    display:flex;gap:8px;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;padding:4px;
+  }
+  .toggle button{
+    flex:1;background:none;border:0;color:var(--tx3);padding:9px 6px;border-radius:7px;
+    font:500 13px/1.3 inherit;cursor:pointer;transition:.15s;
+  }
+  .toggle button[aria-pressed=true]{background:var(--o3);color:#06122a;font-weight:700}
+  .fxrow{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;color:var(--tx3)}
+  .fxrow input{
+    width:90px;background:var(--bg);border:1px solid var(--line);color:var(--tx);
+    border-radius:7px;padding:6px 9px;font:600 13px var(--mono);
+  }
+  .load{
+    margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;
+    font-size:12.5px;color:var(--tx3);
+  }
+  .load b{display:block;font:700 17px/1.3 var(--mono);color:var(--tx2)}
+
+  /* ---- 결과 카드 ---- */
+  .opts{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:720px){.opts{grid-template-columns:1fr 1fr}}
+  @media(min-width:1080px){.opts{grid-template-columns:repeat(4,1fr)}}
+  .opt{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;
+    display:flex;flex-direction:column;position:relative;overflow:hidden;
+  }
+  .opt::before{content:'';position:absolute;inset:0 0 auto;height:3px;background:var(--c)}
+  .opt .tag{font:700 11px/1 var(--mono);color:var(--c);letter-spacing:.1em;margin-bottom:8px}
+  .opt h4{margin:0 0 2px;font-size:15px;letter-spacing:-.01em}
+  .opt .stack{font-size:12px;color:var(--tx3);margin-bottom:14px;min-height:32px}
+  .opt .price{font:800 27px/1.1 var(--mono);letter-spacing:-.03em}
+  .opt .price small{font-size:13px;color:var(--tx3);font-weight:500}
+  .opt .pnote{font-size:12px;color:var(--tx3);margin-top:4px;min-height:34px}
+  .opt .bar{height:6px;border-radius:4px;background:var(--bg);margin:14px 0 8px;overflow:hidden}
+  .opt .bar i{display:block;height:100%;background:var(--c);border-radius:4px;transition:width .25s}
+  .opt .lim{font-size:12px;color:var(--tx2);display:flex;justify-content:space-between;gap:8px}
+  .opt .lim.over{color:var(--bad);font-weight:700}
+  .opt ul{margin:14px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--tx2)}
+  .opt ul li{padding:4px 0 4px 18px;position:relative}
+  .opt ul li::before{content:'·';position:absolute;left:6px;color:var(--tx3)}
+  .opt ul li.no::before{content:'✕';color:var(--bad);font-size:10px;left:4px;top:5px}
+  .opt ul li.yes::before{content:'✓';color:var(--ok);font-size:11px;left:4px;top:5px}
+  .badge{
+    position:absolute;top:14px;right:14px;font:700 10px/1 var(--mono);
+    padding:5px 7px;border-radius:5px;letter-spacing:.06em;
+  }
+  .badge.dead{background:rgba(255,95,109,.16);color:var(--bad);border:1px solid rgba(255,95,109,.35)}
+  .badge.best{background:rgba(57,217,138,.16);color:var(--ok);border:1px solid rgba(57,217,138,.35)}
+
+  /* ---- 표 ---- */
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--bg2);color:var(--tx2);font-weight:600;font-size:12.5px;white-space:nowrap;position:sticky;top:0}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:rgba(74,163,240,.045)}
+  td.feat{font-weight:600;color:var(--tx);white-space:nowrap}
+  code{font:12px var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#9ecbff}
+  .pill{display:inline-block;font:700 11px/1 var(--mono);padding:5px 8px;border-radius:5px;white-space:nowrap}
+  .p-dead{background:rgba(255,95,109,.15);color:var(--bad)}
+  .p-hard{background:rgba(240,180,41,.15);color:var(--warn)}
+  .p-loss{background:rgba(240,116,58,.15);color:var(--o1)}
+  .p-ok{background:rgba(57,217,138,.13);color:var(--ok)}
+
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .filters button{
+    background:var(--card);border:1px solid var(--line);color:var(--tx2);
+    padding:8px 14px;border-radius:20px;font:500 13px inherit;cursor:pointer;transition:.15s;
+  }
+  .filters button[aria-pressed=true]{background:var(--o3);border-color:var(--o3);color:#06122a;font-weight:700}
+  tr.hide{display:none}
+
+  .note{
+    background:var(--bg2);border-left:3px solid var(--o4);border-radius:0 10px 10px 0;
+    padding:14px 18px;margin:18px 0;font-size:13.5px;color:var(--tx2);
+  }
+  .note b{color:var(--tx)}
+  .note.bad{border-left-color:var(--bad)}
+  .note.good{border-left-color:var(--ok)}
+
+  .src{font-size:12.5px;color:var(--tx3);margin-top:44px;padding-top:20px;border-top:1px solid var(--line)}
+  .src a{color:#7fb0e8}
+  .src ul{padding-left:18px;margin:8px 0 0}
+  .src li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">GARA · CARIS CBT — 인프라 의사결정</div>
+  <h1>호스팅/스택 4개 안 비교</h1>
+  <p>PHP+카페24 · 현행 Cloudflare+Supabase · Spring Boot+네이버클라우드 · Spring Boot+AWS.
+     비용·트래픽 한도·기능 손실을 실제 코드베이스 실측치 기준으로 비교한다. 2026-08-04 작성.</p>
+</header>
+
+<div class="verdict">
+  <p><b>결론부터.</b> 4개 중 <b>2번(현행 Cloudflare + Supabase)이 비용·기능 양쪽에서 압도적</b>이다.
+     정적 트래픽이 무제한 무료라 방문자가 늘어도 비용이 0에서 시작하고, 나머지 3개는 전부 트래픽에 돈을 낸다.</p>
+  <p><b>1번(PHP+카페24)은 돈 문제가 아니라 기능 문제로 탈락한다.</b>
+     카페24 웹호스팅은 MySQL이라 <code>pgvector</code>가 없다 →
+     <b>메인 검색 레벨추천과 강의 Q&amp;A가 기능 자체로 사라진다.</b> 구글/게스트 로그인도 직접 다시 만들어야 한다.</p>
+  <p>카페24를 쓰고 싶은 게 목적이라면 <b>PHP로 바꿀 필요가 없다</b> — 이 앱의 프론트는 이미 순수 정적 빌드라
+     <code>dist/</code>를 그대로 올리면 된다(§6 하이브리드 안).</p>
+</div>
+
+<!-- ===================== 1 ===================== -->
+<h2><span class="n">01</span> 먼저, 우리 앱이 실제로 얼마나 무거운가</h2>
+<p class="sub">아래 숫자는 추정이 아니라 이 저장소에서 직접 측정한 값이다. 비교의 모든 계산이 여기서 출발한다.</p>
+
+<div class="facts">
+  <div class="fact"><div class="v">78<small> MB</small></div><div class="k">빌드 산출물 <code>dist/</code> 전체</div></div>
+  <div class="fact"><div class="v">21.6<small> MB</small></div><div class="k"><code>public/earth.mp4</code> — 랜딩 히어로 지구 영상 <b style="color:var(--bad)">단일 최대</b></div></div>
+  <div class="fact"><div class="v">0.45<small> MB</small></div><div class="k">JS+CSS gzip 실측 (raw 1.59MB → 압축 후)</div></div>
+  <div class="fact"><div class="v">20<small> MB</small></div><div class="k"><code>public/games/</code> 미니게임 6종 + 배경 이미지</div></div>
+  <div class="fact"><div class="v">43<small> 개</small></div><div class="k">Supabase Edge Function (Deno TS 9,014줄)</div></div>
+  <div class="fact"><div class="v">26<small> 개</small></div><div class="k">DB 함수/RPC (plpgsql, <code>schema.sql</code> 1,773줄)</div></div>
+  <div class="fact"><div class="v">27,042<small> 줄</small></div><div class="k">프론트 TS/TSX — <b>어느 안에서도 재사용</b></div></div>
+  <div class="fact"><div class="v">4<small> s</small></div><div class="k">채팅 폴링 주기(3.5~4.5s) × 요청 2회 — 함수 호출 최대 소비처</div></div>
+</div>
+
+<div class="note">
+  <b>방문자 1명이 뽑아가는 양.</b>
+  메인만 보고 나가도 지구 영상 21.6MB + 코드 0.45MB. 아레나 지도(2.9MB)나 미니게임(4.8MB)까지 가면 30MB를 넘는다.
+  <b>평균 25MB</b>로 잡는다. 반대로 무거운 에셋(영상·게임·자격증 템플릿)을 외부 스토리지로 빼면
+  gzip된 코드 + API JSON만 남아 <b>1MB 남짓</b>이 된다. <b>25배 차이</b>이며, 아래 계산기의 토글이 이걸 반영한다.
+</div>
+
+<!-- ===================== 2 ===================== -->
+<h2><span class="n">02</span> 비용 계산기 — 트래픽을 넣어보면 판이 갈린다</h2>
+<p class="sub">일일 방문자(DAU)를 움직이면 4개 안의 월 비용이 같이 움직인다. 회색 막대는 각 안의 한도 소진율이다.</p>
+
+<div class="calc">
+  <div class="ctrls">
+    <div class="ctrl">
+      <label>일일 방문자 (DAU) — <span class="now" id="dauLbl">1,000명</span></label>
+      <input type="range" id="dau" min="0" max="100" value="50">
+      <div class="ticks"><span>10</span><span>100</span><span>1,000</span><span>1만</span><span>10만</span></div>
+    </div>
+    <div class="ctrl">
+      <label>무거운 에셋(영상·게임·자격증 템플릿) 처리</label>
+      <div class="toggle" id="split">
+        <button data-v="0" aria-pressed="true">전부 자체 호스팅<br><small style="opacity:.7">25MB/명</small></button>
+        <button data-v="1" aria-pressed="false">외부 스토리지 분리<br><small style="opacity:.7">1MB/명</small></button>
+      </div>
+      <div class="fxrow">환율 가정 <input type="number" id="fx" value="1400" step="10"> 원/USD</div>
+    </div>
+  </div>
+  <div class="load">
+    <div>일 트래픽<b id="dGB">—</b></div>
+    <div>월 트래픽<b id="mGB">—</b></div>
+    <div>월 함수 호출<b id="calls">—</b></div>
+    <div>방문자당 전송<b id="mbv">—</b></div>
+  </div>
+</div>
+
+<div class="opts" id="opts">
+  <div class="opt" style="--c:var(--o1)" id="c1">
+    <div class="badge dead">기능 손실</div>
+    <div class="tag">안 1</div>
+    <h4>PHP + 카페24</h4>
+    <div class="stack">뉴아우토반 웹호스팅 · PHP + MySQL · 백엔드 전면 재작성</div>
+    <div class="price" id="p1">—</div>
+    <div class="pnote" id="n1">—</div>
+    <div class="bar"><i id="b1" style="width:0"></i></div>
+    <div class="lim" id="l1"><span>일 트래픽</span><span>—</span></div>
+    <ul>
+      <li class="no">레벨추천·강의 Q&amp;A 소멸 (pgvector 없음)</li>
+      <li class="no">구글/게스트 로그인 직접 구현</li>
+      <li class="yes">DB 용량 무제한 · 국내 최저가</li>
+      <li>서버 한국 1곳 — 해외 응답 저하</li>
+    </ul>
+  </div>
+
+  <div class="opt" style="--c:var(--o2)" id="c2">
+    <div class="badge best">현행 · 권장</div>
+    <div class="tag">안 2</div>
+    <h4>Cloudflare + Supabase</h4>
+    <div class="stack">Workers 정적자산 · Postgres+Auth+Edge Functions</div>
+    <div class="price" id="p2">—</div>
+    <div class="pnote" id="n2">—</div>
+    <div class="bar"><i id="b2" style="width:0"></i></div>
+    <div class="lim" id="l2"><span>함수 호출</span><span>—</span></div>
+    <ul>
+      <li class="yes">정적 트래픽 <b>무제한 무료</b> — 영상 21.6MB도 공짜</li>
+      <li class="yes">전 세계 엣지 (6개국어 서비스에 유리)</li>
+      <li class="yes">추가 개발 공수 0</li>
+      <li>단일 벤더 종속</li>
+    </ul>
+  </div>
+
+  <div class="opt" style="--c:var(--o3)" id="c3">
+    <div class="tag">안 3</div>
+    <h4>Spring Boot + 네이버클라우드</h4>
+    <div class="stack">Server + Cloud DB for PostgreSQL + Object Storage</div>
+    <div class="price" id="p3">—</div>
+    <div class="pnote" id="n3">—</div>
+    <div class="bar"><i id="b3" style="width:0"></i></div>
+    <div class="lim" id="l3"><span>트래픽 과금</span><span>—</span></div>
+    <ul>
+      <li class="yes">pgvector 지원 → DB 스키마 26개 함수 그대로 이전</li>
+      <li class="yes">국내 리전 · 한국어 지원 · 공공/금융 레퍼런스</li>
+      <li class="no">트래픽 100원/GB — 무료 구간 없음</li>
+      <li class="no">고정비가 가장 높다 (트래픽 0이어도 발생)</li>
+    </ul>
+  </div>
+
+  <div class="opt" style="--c:var(--o4)" id="c4">
+    <div class="tag">안 4</div>
+    <h4>Spring Boot + AWS</h4>
+    <div class="stack">EC2 + RDS PostgreSQL + S3 + CloudFront</div>
+    <div class="price" id="p4">—</div>
+    <div class="pnote" id="n4">—</div>
+    <div class="bar"><i id="b4" style="width:0"></i></div>
+    <div class="lim" id="l4"><span>CloudFront 무료 1TB</span><span>—</span></div>
+    <ul>
+      <li class="yes">CloudFront 월 1TB 상시 무료 → 중간 규모까지 저렴</li>
+      <li class="yes">pgvector(RDS) 지원 · 글로벌 엣지</li>
+      <li class="yes">인력 구하기 가장 쉬움</li>
+      <li class="no">구성요소가 많아 운영 복잡도 최고</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note" id="insight"></div>
+
+<!-- ===================== 3 ===================== -->
+<h2><span class="n">03</span> 카페24 뉴아우토반 요금표</h2>
+<p class="sub">일일 한도와 월 한도가 <b>따로</b> 있다. 월이 남아도 하루 한도를 넘기면 그날 사이트가 막힌다(자이언트플러스만 종량제 무중단).</p>
+
+<div class="tblwrap">
+<table>
+  <thead><tr>
+    <th>플랜</th><th>월 요금</th><th>웹용량</th><th>DB용량</th><th>일 트래픽</th><th>월 트래픽</th>
+    <th>지금 그대로 (25MB/명)</th><th>에셋 분리 후 (1MB/명)</th>
+  </tr></thead>
+  <tbody>
+    <tr><td class="feat">절약형</td><td>500원</td><td>700MB</td><td>무제한</td><td>1.6GB</td><td>48GB</td><td>하루 <b>65명</b></td><td>하루 1,638명</td></tr>
+    <tr><td class="feat">일반형</td><td>1,500원</td><td>1.4GB</td><td>무제한</td><td>4GB</td><td>120GB</td><td>하루 <b>163명</b></td><td>하루 4,096명</td></tr>
+    <tr><td class="feat">비즈니스</td><td>7,000원</td><td>4GB</td><td>무제한</td><td>10GB</td><td>300GB</td><td>하루 <b>409명</b></td><td>하루 10,240명</td></tr>
+    <tr><td class="feat">퍼스트클래스</td><td>12,000원</td><td>8GB</td><td>무제한</td><td>20GB</td><td>600GB</td><td>하루 <b>819명</b></td><td>하루 20,480명</td></tr>
+    <tr><td class="feat">자이언트</td><td>24,000원</td><td>14GB</td><td>무제한</td><td>40GB</td><td>1.2TB</td><td>하루 <b>1,638명</b></td><td>하루 40,960명</td></tr>
+    <tr><td class="feat">자이언트플러스</td><td>40,000원</td><td>18GB</td><td>무제한</td><td colspan="2">월 1.2TB · 초과분 165원/GB 무중단 종량제</td><td>하루 1,638명 <small>(+초과과금)</small></td><td>하루 40,960명</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note good">
+  <b>디스크는 걱정할 게 없다.</b> 사이트 전체가 78MB라 가장 싼 절약형(700MB)에도 들어간다.
+  문제는 오직 트래픽이고, <b>그 절반 이상이 <code>earth.mp4</code> 하나다.</b>
+  이 파일 하나만 외부로 빼면 1,500원짜리 일반형이 24,000원짜리 자이언트보다 더 많은 사람을 받는다.
+</div>
+
+<!-- ===================== 4 ===================== -->
+<h2><span class="n">04</span> PHP + 카페24로 갔을 때 죽거나 힘들어지는 기능</h2>
+<p class="sub">코드베이스에서 실제로 확인한 것만 적었다. 판정을 눌러 걸러볼 수 있다.</p>
+
+<div class="filters" id="filters">
+  <button data-f="all" aria-pressed="true">전체</button>
+  <button data-f="dead" aria-pressed="false">사실상 불가</button>
+  <button data-f="hard" aria-pressed="false">직접 재구현</button>
+  <button data-f="loss" aria-pressed="false">품질·안전망 저하</button>
+  <button data-f="ok" aria-pressed="false">이식 가능</button>
+</div>
+
+<div class="tblwrap">
+<table id="featTbl">
+  <thead><tr>
+    <th>기능</th><th>지금 어떻게 도는가</th><th>PHP + 카페24(MySQL)에서</th><th>판정</th><th>공수</th>
+  </tr></thead>
+  <tbody>
+    <tr data-f="dead">
+      <td class="feat">메인 검색<br>레벨 추천</td>
+      <td>Gemini 임베딩 → <code>reco_cache</code> 의 <code>vector(768)</code> 컬럼 + hnsw 코사인 인덱스, RPC <code>match_reco_cache</code></td>
+      <td>MySQL에는 벡터 타입도 근사최근접 인덱스도 없다. 임베딩을 PHP 메모리로 전부 끌어와 매번 코사인을 돌리는 편법 외엔 길이 없고, 데이터가 늘면 무너진다.</td>
+      <td><span class="pill p-dead">사실상 불가</span></td><td>재설계</td>
+    </tr>
+    <tr data-f="dead">
+      <td class="feat">강의 Q&amp;A<br>(lecture-qa)</td>
+      <td><code>lecture_chunks.embedding vector(768)</code> hnsw + RPC <code>match_lecture_chunks</code> 로 관련 청크 검색</td>
+      <td>위와 동일. 청크 수가 레벨 7개와 달리 계속 늘어나는 데이터라 편법조차 성립하지 않는다.</td>
+      <td><span class="pill p-dead">사실상 불가</span></td><td>재설계</td>
+    </tr>
+    <tr data-f="hard">
+      <td class="feat">구글 로그인</td>
+      <td>Supabase Auth <code>signInWithOAuth</code> — 토큰 발급·갱신·검증을 플랫폼이 처리</td>
+      <td>OAuth2 인가코드 플로우, 토큰 저장/갱신, 세션 관리, CSRF·리다이렉트 검증을 전부 직접. 보안 사고가 가장 잘 나는 구간이다.</td>
+      <td><span class="pill p-hard">직접 재구현</span></td><td>3~5일</td>
+    </tr>
+    <tr data-f="hard">
+      <td class="feat">게스트(익명) 응시</td>
+      <td><code>signInAnonymously</code> → 로그인 시 claim 토큰으로 결과 이관 (<code>AuthProvider.tsx</code>)</td>
+      <td>익명 신원 발급·수명 관리·정식계정 병합을 직접 설계. 이관이 틀어지면 게스트 응시 결과가 유실된다.</td>
+      <td><span class="pill p-hard">직접 재구현</span></td><td>3~4일</td>
+    </tr>
+    <tr data-f="hard">
+      <td class="feat">이북 보안 열람</td>
+      <td>비공개 버킷 <code>ebooks</code> + <code>createSignedUrl</code>(TTL) — 구매자만 한시적 URL</td>
+      <td>웹루트 밖 저장 + PHP 프록시로 권한검사·스트리밍·만료를 직접. 가능하지만 파일 전송이 전부 카페24 트래픽으로 잡힌다.</td>
+      <td><span class="pill p-hard">직접 재구현</span></td><td>2~3일</td>
+    </tr>
+    <tr data-f="hard">
+      <td class="feat">아바타·표지·공지 이미지 업로드</td>
+      <td>Storage 버킷 4종(<code>avatars</code>·<code>ebook-covers</code>·<code>ebooks</code>·<code>notice-images</code>) + RLS 본인 폴더 제한</td>
+      <td>업로드 검증·경로 격리·MIME 검사·용량 제한 직접. 카페24 웹용량(플랜별 700MB~18GB)을 잠식한다.</td>
+      <td><span class="pill p-hard">직접 재구현</span></td><td>2~3일</td>
+    </tr>
+    <tr data-f="loss">
+      <td class="feat">채팅 도배 방지</td>
+      <td>RPC <code>chat_post_atomic</code> 하나가 유일한 삽입 경로 — 레이트리밋·중복·IP 가드를 단일 트랜잭션 안에서 원자적으로 판정</td>
+      <td>MySQL 트랜잭션으로 재작성 가능하지만, 원자성이 깨지면 동시요청으로 상한을 우회할 수 있다. <code>t-chat-rooms.mjs</code> 가 지키던 불변식을 새로 세워야 한다.</td>
+      <td><span class="pill p-loss">위험 구간</span></td><td>3~4일</td>
+    </tr>
+    <tr data-f="loss">
+      <td class="feat">스코어링 이중 검증</td>
+      <td><code>src/lib/scoring.ts</code> ↔ <code>_shared/scoring.ts</code> 를 <code>t-scoring-parity.mjs</code> 가 <b>소스 바이트 동일성</b>까지 자동 검사</td>
+      <td>한쪽이 PHP가 되면 이 테스트가 성립하지 않는다. 승급컷·시즌점수 수식 두 벌을 사람이 눈으로 맞춰야 하고, 어긋나도 아무도 모른다.</td>
+      <td><span class="pill p-loss">안전망 상실</span></td><td>—</td>
+    </tr>
+    <tr data-f="loss">
+      <td class="feat">학교명 자동완성</td>
+      <td><code>pg_trgm</code> gin 인덱스(<code>schools_name_trgm</code>) 유사도 검색 — 오타에 강함</td>
+      <td>MySQL FULLTEXT 또는 LIKE로 대체. 부분일치·오타 내성이 떨어진다.</td>
+      <td><span class="pill p-loss">품질 저하</span></td><td>1일</td>
+    </tr>
+    <tr data-f="loss">
+      <td class="feat">다국어 문항 저장</td>
+      <td>JSONB 53곳 — 6개국어 문항/보기를 한 컬럼에, 연산자·인덱스 지원</td>
+      <td>MySQL JSON 타입으로 옮기면 저장은 되나 인덱싱·연산자 지원이 약해 쿼리를 다시 짜야 한다.</td>
+      <td><span class="pill p-loss">품질 저하</span></td><td>2~3일</td>
+    </tr>
+    <tr data-f="loss">
+      <td class="feat">응답 속도 (해외)</td>
+      <td>Cloudflare 전 세계 엣지에서 정적 서빙</td>
+      <td>카페24 한국 단일 서버. ko·en·ja·zh·hi·vi 6개국어 서비스인데 해외 체감이 눈에 띄게 나빠진다.</td>
+      <td><span class="pill p-loss">품질 저하</span></td><td>—</td>
+    </tr>
+    <tr data-f="ok">
+      <td class="feat">시험 출제·채점</td>
+      <td><code>start-exam</code>/<code>submit-exam</code>/<code>get-exam-result</code> — 정답은 서버에만</td>
+      <td>평범한 CRUD + 채점 로직이라 PHP로 그대로 옮겨진다.</td>
+      <td><span class="pill p-ok">이식 가능</span></td><td>1~2주</td>
+    </tr>
+    <tr data-f="ok">
+      <td class="feat">자격증 발급·진위확인</td>
+      <td><code>verify-cert</code> — HMAC 토큰 서명/검증</td>
+      <td>PHP <code>hash_hmac</code> 로 동일 구현.</td>
+      <td><span class="pill p-ok">이식 가능</span></td><td>2~3일</td>
+    </tr>
+    <tr data-f="ok">
+      <td class="feat">미니게임 점수 제출</td>
+      <td><code>submit-minigame</code> HMAC 서명 티켓 + <code>minigame_scores</code> / RPC <code>minigame_top</code></td>
+      <td>티켓 서명은 동일. 랭킹 쿼리는 MySQL 윈도우 함수로 재작성.</td>
+      <td><span class="pill p-ok">이식 가능</span></td><td>3~4일</td>
+    </tr>
+    <tr data-f="ok">
+      <td class="feat">활동점수 일일 캡</td>
+      <td><code>activity_ledger</code> 의 unique 인덱스 2개가 중복 적립을 DB 레벨에서 차단</td>
+      <td>MySQL unique 인덱스로 동일하게 이식된다.</td>
+      <td><span class="pill p-ok">이식 가능</span></td><td>1~2일</td>
+    </tr>
+    <tr data-f="ok">
+      <td class="feat">프론트엔드 전체</td>
+      <td>React 19 SPA 27,042줄 — 빌드하면 순수 정적 파일</td>
+      <td><b>손댈 필요 없다.</b> PHP는 서버 언어라 SPA를 대체하지 않는다. 카페24에 <code>dist/</code>를 올리고 <code>.htaccess</code> 리라이트만 넣으면 그대로 돈다.</td>
+      <td><span class="pill p-ok">그대로 사용</span></td><td>0</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note bad">
+  <b>합치면.</b> 사실상 불가 2건(레벨추천·강의 Q&amp;A), 직접 재구현 4건(로그인 2 + 스토리지 2),
+  안전망·품질 저하 5건. 이식 가능한 것까지 다 합쳐 <b>백엔드 재작성 6~10주</b>이고,
+  그 대가로 기능 2개를 영구히 잃는다. 얻는 것은 월 1,500~24,000원짜리 호스팅이다.
+</div>
+
+<!-- ===================== 5 ===================== -->
+<h2><span class="n">05</span> 4개 안 종합</h2>
+<p class="sub">비용은 에셋 분리 전(25MB/명) 기준이며 §2 계산기와 같은 식으로 계산했다. 환율 1,400원/USD 가정.</p>
+
+<div class="tblwrap">
+<table>
+  <thead><tr>
+    <th>항목</th><th>1 · PHP+카페24</th><th>2 · Cloudflare+Supabase</th><th>3 · Spring+NCP</th><th>4 · Spring+AWS</th>
+  </tr></thead>
+  <tbody>
+    <tr><td class="feat">DAU 100 월 비용</td><td>1,500원<br><small>일반형</small></td><td><b style="color:var(--ok)">0원</b><br><small>Free 티어 내</small></td><td>약 25만원</td><td>약 5.6만원</td></tr>
+    <tr><td class="feat">DAU 1,000 월 비용</td><td><b>2.4만원</b><br><small>자이언트</small></td><td><b style="color:var(--ok)">3.5만원</b><br><small>Pro $25</small></td><td>약 31만원</td><td>약 5.6만원</td></tr>
+    <tr><td class="feat">DAU 1만 월 비용</td><td>약 105만원<br><small>자이언트플러스 종량 초과분</small></td><td><b style="color:var(--ok)">6.3만원</b><br><small>Pro + 호출 초과</small></td><td>약 97만원</td><td>약 111만원</td></tr>
+    <tr><td class="feat">규모가 커질 때</td><td>트래픽 종량제로 폭발</td><td><b>정적이 공짜라 거의 안 오름</b></td><td>트래픽 100원/GB로 폭발</td><td>1TB 넘는 순간 폭발</td></tr>
+    <tr><td class="feat">트래픽 성격</td><td>일·월 한도 초과 시 차단</td><td><b>정적 무제한 무료</b></td><td>100원/GB 전량 과금</td><td>월 1TB 무료 후 $0.12/GB</td></tr>
+    <tr><td class="feat">DB</td><td>MySQL (용량 무제한)</td><td>Postgres 8GB(Pro)</td><td>Cloud DB for PostgreSQL</td><td>RDS PostgreSQL</td></tr>
+    <tr><td class="feat">pgvector</td><td><span class="pill p-dead">없음</span></td><td><span class="pill p-ok">있음</span></td><td><span class="pill p-ok">있음</span></td><td><span class="pill p-ok">있음</span></td></tr>
+    <tr><td class="feat">DB 함수 26개</td><td>PHP로 재작성</td><td>그대로</td><td>그대로 이전</td><td>그대로 이전</td></tr>
+    <tr><td class="feat">인증</td><td>직접 구현</td><td>Auth 내장</td><td>Spring Security 직접</td><td>Spring Security 또는 Cognito</td></tr>
+    <tr><td class="feat">파일 스토리지</td><td>웹용량 잠식 + 직접</td><td>Storage 내장</td><td>Object Storage</td><td>S3</td></tr>
+    <tr><td class="feat">서버 위치</td><td>한국 1곳</td><td><b>전 세계 엣지</b></td><td>한국(+일부 해외)</td><td>서울 + CloudFront 엣지</td></tr>
+    <tr><td class="feat">백엔드 재작성</td><td><b style="color:var(--bad)">6~10주</b></td><td><b style="color:var(--ok)">0</b></td><td>4~7주</td><td>4~7주</td></tr>
+    <tr><td class="feat">프론트 재작성</td><td>0 (정적 그대로)</td><td>0</td><td>0</td><td>0</td></tr>
+    <tr><td class="feat">배포</td><td>FTP 수동<br><small>자동배포 직접 구성</small></td><td>git push 자동</td><td>CI 직접 구성</td><td>CI 직접 구성</td></tr>
+    <tr><td class="feat">운영 난이도</td><td>낮음(단순)</td><td>낮음</td><td>중간</td><td>높음</td></tr>
+    <tr><td class="feat">기능 손실</td><td><span class="pill p-dead">2건 영구</span></td><td><span class="pill p-ok">없음</span></td><td><span class="pill p-ok">없음</span></td><td><span class="pill p-ok">없음</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ===================== 6 ===================== -->
+<h2><span class="n">06</span> 권고 — 그리고 표에 없는 5번째 안</h2>
+<p class="sub">4개 안을 다 계산해본 뒤의 판단이다.</p>
+
+<div class="note good">
+  <b>① 그대로 두는 게 맞다 (안 2).</b>
+  이 앱은 트래픽의 97%가 정적 파일이고 Cloudflare는 그걸 무제한 공짜로 준다.
+  DAU 1만 명이어도 월 6.3만원인데, 같은 조건에서 카페24는 105만원, NCP는 97만원, AWS는 111만원이다.
+  <b>16배 차이가 나며, 나머지 3개 안은 전부 돈을 더 내고 기능을 잃거나 공수를 쓴다.</b>
+</div>
+
+<div class="note">
+  <b>② 그래도 카페24를 써야 한다면 — PHP로 바꾸지 말고 프론트만 올려라 (하이브리드).</b><br>
+  프론트는 이미 순수 정적 빌드다(<code>wrangler.jsonc</code>가 하는 일은 <code>./dist</code> 서빙 + SPA 라우팅이 전부, 워커 스크립트도 SSR도 없다).
+  <br>· <code>npm run build</code> → <code>dist/</code> FTP 업로드
+  <br>· <code>.htaccess</code> 에 SPA 리라이트 (없으면 <code>/guide</code> 새로고침이 404)
+  <br>· Supabase Auth → Site URL / Redirect URLs 에 카페24 도메인 추가
+  <br>· CORS는 <code>_shared/cors.ts</code> 가 <code>*</code> 라 손댈 게 없다
+  <br><br>백엔드 43개 함수는 Supabase에 그대로 두면 되고, <b>잃는 기능이 0이며 작업은 반나절이다.</b>
+  단, <code>earth.mp4</code> 를 먼저 빼야 한다(§3 참고).
+</div>
+
+<div class="note">
+  <b>③ 어느 안을 고르든 지금 당장 할 일: <code>earth.mp4</code> 21.6MB 처리.</b>
+  이건 인프라 선택과 무관하게 이득이다. 지금은 Cloudflare가 공짜로 날라주니 안 보일 뿐,
+  안 1·3·4 어디로 가든 이 파일 하나가 트래픽 비용의 절반 이상을 만든다.
+  webm/AV1 재인코딩으로 3~5MB로 줄이거나, Cloudflare R2(egress 무료)에 두는 두 가지 길이 있다.
+</div>
+
+<div class="note">
+  <b>④ Spring Boot로 가야 할 이유가 따로 있다면(팀 역량·발주처 요구) — 안 3과 안 4는 규모에 따라 순위가 뒤집힌다.</b><br>
+  · <b>DAU 7,000명 아래에서는 AWS(안 4)가 압도적</b>이다. 고정비가 낮고(월 $40) CloudFront 월 1TB가 상시 무료라
+  DAU 1,000명 기준 NCP 31만원 vs AWS 5.6만원으로 <b>5.5배</b> 차이가 난다. NCP는 무료 구간이 없어 첫 1GB부터 과금된다.<br>
+  · <b>그 위로 가면 NCP가 역전한다.</b> NCP 트래픽은 100원/GB(≈$0.071)로 CloudFront의 $0.12/GB보다 싸다.
+  DAU 1만 명에서 NCP 97만원 vs AWS 111만원으로 뒤집히고, 이후 격차는 벌어진다.<br>
+  · 단, <b>에셋만 분리하면(§6 ③) 이 역전은 일어나지 않는다</b> — 트래픽이 1TB 무료 구간을 못 넘어서 AWS가 계속 이긴다.<br>
+  · 공통으로, 둘 다 pgvector를 지원하므로 <b>DB 스키마의 26개 함수를 그대로 이전할 수 있고</b>
+  PHP안처럼 기능을 잃지는 않는다. 재작성 대상은 Edge Function 43개(9,014줄)와 인증뿐이다.
+</div>
+
+<div class="src">
+  <b>계산 가정</b> — 방문자당 전송량: 전부 자체 호스팅 25MB / 에셋 분리 1MB(gzip 실측 0.45MB + API JSON). 월 30일.
+  방문자당 함수 호출 40회(페이지 API 20 + 채팅 폴링 진입률 20% 반영).
+  서버형(안 3·4)은 DAU 1만 명당 인스턴스 1대로 가정.
+  NCP 서버 2vCPU/4GB 160원/시간, Cloud DB 월 12만원, 트래픽 100원/GB로 개산 — <b>NCP·AWS 요금은 구성에 따라 크게 달라지므로 공식 계산기로 재확인할 것</b>.
+  AWS는 EC2 t4g.small $15 + RDS db.t4g.micro $23 기준이며 프리티어 첫 해는 더 저렴하다.
+  <ul>
+    <li><a href="https://hosting.cafe24.com/?controller=new_product_page&page=newautobahn">카페24 뉴아우토반 호스팅 공식 요금표</a></li>
+    <li><a href="https://www.thewordcracker.com/miscellaneous/webhosting/%EC%B9%B4%ED%8E%9824-%EC%9B%B9%ED%98%B8%EC%8A%A4%ED%8C%85-%EB%89%B4%EC%95%84%EC%9A%B0%ED%86%A0%EB%B0%98-%ED%98%B8%EC%8A%A4%ED%8C%85-%EC%83%81%ED%92%88-%EC%B6%9C%EC%8B%9C/">뉴아우토반 상품 출시 · 구 광아우토반 대비 변화</a></li>
+    <li><a href="https://developers.cloudflare.com/workers/platform/pricing/">Cloudflare Workers 요금 — 정적 자산 요청 무제한 무료</a></li>
+    <li><a href="https://www.jetadmin.io/blog/supabase-pricing-2026-guide-to-plans-limits-and-real-world-costs/">Supabase 2026 요금 · Pro $25 / egress 250GB / 함수 200만 호출</a></li>
+    <li><a href="https://guide.ncloud-docs.com/docs/en/clouddbforpostgresql-postgresqlextension">NCP Cloud DB for PostgreSQL 지원 확장 — pgvector·pg_trgm·pgcrypto 지원 확인</a></li>
+    <li><a href="https://egresscost.com/aws/cloudfront-pricing/">AWS CloudFront 2026 리전별 요금 · 한국 $0.120/GB · 상시 무료 1TB</a></li>
+    <li><a href="https://medium.com/@dongju08/ncp-vs-alibaba-cloud-%EA%B0%80%EA%B2%A9-%EB%B9%84%EA%B5%90-09f89e7c96f5">NCP 외부전송 트래픽 약 100원/GB</a></li>
+  </ul>
+</div>
+
+</div>
+
+<script>
+(function(){
+  var CAFE24=[
+    {n:'절약형',w:500,d:1.6},{n:'일반형',w:1500,d:4},{n:'비즈니스',w:7000,d:10},
+    {n:'퍼스트클래스',w:12000,d:20},{n:'자이언트',w:24000,d:40}
+  ];
+  var $=function(id){return document.getElementById(id)};
+  var split=0;
+
+  // 로그 슬라이더: 0~100 → 10 ~ 100,000
+  function dauFromSlider(v){ return Math.round(Math.pow(10, 1 + (v/100)*4)); }
+  function won(n){
+    if(n===0) return '0<small>원</small>';
+    if(n>=100000000) return (n/100000000).toFixed(1)+'<small>억원</small>';
+    if(n>=10000) return (n/10000).toFixed(n<1000000?1:0)+'<small>만원</small>';
+    return Math.round(n).toLocaleString()+'<small>원</small>';
+  }
+  function num(n){ return Math.round(n).toLocaleString(); }
+  function gb(n){ return n>=1024 ? (n/1024).toFixed(2)+' TB' : n.toFixed(n<10?2:1)+' GB'; }
+  function pct(a,b){ return Math.min(100, b>0 ? a/b*100 : 0); }
+
+  function bar(id,limId,ratio,label,val,over){
+    var b=$(id); b.style.width=Math.min(100,ratio)+'%';
+    b.style.background = ratio>=100 ? 'var(--bad)' : '';
+    var l=$(limId);
+    l.className='lim'+(over?' over':'');
+    l.innerHTML='<span>'+label+'</span><span>'+val+'</span>';
+  }
+
+  function render(){
+    var dau=dauFromSlider(+$('dau').value);
+    var fx=+$('fx').value||1400;
+    var mbv=split?1:25;
+    var dailyGB=dau*mbv/1024;
+    var monthGB=dailyGB*30;
+    var calls=dau*40*30;
+
+    $('dauLbl').textContent=num(dau)+'명';
+    $('dGB').textContent=gb(dailyGB);
+    $('mGB').textContent=gb(monthGB);
+    $('calls').textContent=num(calls);
+    $('mbv').textContent=mbv+' MB';
+
+    /* ---- 1. PHP + 카페24 ---- */
+    var plan=null;
+    for(var i=0;i<CAFE24.length;i++){ if(dailyGB<=CAFE24[i].d){ plan=CAFE24[i]; break; } }
+    var c1, note1, r1, lbl1, val1, over1=false;
+    if(plan){
+      c1=plan.w; note1=plan.n+' · 일 '+plan.d+'GB 한도';
+      r1=pct(dailyGB,plan.d); lbl1='일 트래픽'; val1=gb(dailyGB)+' / '+plan.d+'GB';
+    }else{
+      var overGB=Math.max(0,monthGB-1200);
+      c1=40000+overGB*165;
+      note1='자이언트플러스 종량제 · 초과 '+gb(overGB)+' × 165원';
+      r1=100; lbl1='월 1.2TB 초과'; val1='+'+gb(overGB); over1=overGB>0;
+    }
+    $('p1').innerHTML=won(c1);
+    $('n1').innerHTML=note1+'<br><b style="color:var(--bad)">+ 기능 2건 영구 손실</b>';
+    bar('b1','l1',r1,lbl1,val1,over1);
+
+    /* ---- 2. Cloudflare + Supabase ---- */
+    var apiGB=dau*0.2/1024*30;                 // 정적은 CF 무료, API JSON만 Supabase egress
+    var c2usd=0, note2, r2, val2, over2=false;
+    if(apiGB<=5 && calls<=500000){
+      c2usd=0; note2='Free 티어 내 · 정적 트래픽은 전액 무료';
+    }else{
+      c2usd=25;
+      var eOver=Math.max(0,apiGB-250), cOver=Math.max(0,calls-2000000);
+      c2usd+=eOver*0.09 + cOver/1000000*2;
+      note2='Pro $25'+(eOver>0?' + egress '+gb(eOver):'')+(cOver>0?' + 호출 '+num(cOver):'');
+      note2+='<br>정적 트래픽은 여전히 0원';
+    }
+    r2=pct(calls, calls<=500000?500000:2000000);
+    val2=num(calls)+' / '+(calls<=500000?'50만':'200만');
+    over2=calls>2000000;
+    $('p2').innerHTML=won(c2usd*fx);
+    $('n2').innerHTML=note2;
+    bar('b2','l2',r2,'함수 호출',val2,over2);
+
+    /* ---- 3. Spring Boot + NCP ---- */
+    var srv=Math.max(1,Math.ceil(dau/10000));
+    var ncpSrv=115200*srv, ncpDB=120000, ncpObj=5000, ncpTraf=monthGB*100;
+    var c3=ncpSrv+ncpDB+ncpObj+ncpTraf;
+    $('p3').innerHTML=won(c3);
+    $('n3').innerHTML='서버 '+srv+'대 '+won(ncpSrv).replace(/<[^>]+>/g,'')+' + DB 12만원<br>트래픽 '+gb(monthGB)+' × 100원 = '+won(ncpTraf).replace(/<[^>]+>/g,'');
+    bar('b3','l3',Math.min(100,ncpTraf/c3*100),'트래픽이 차지하는 비중',Math.round(ncpTraf/c3*100)+'%',false);
+
+    /* ---- 4. Spring Boot + AWS ---- */
+    var ec2=15*srv, rds=23, s3=2;
+    var cfOver=Math.max(0,monthGB-1024);
+    var cf=cfOver*0.12;
+    var c4usd=ec2+rds+s3+cf;
+    $('p4').innerHTML=won(c4usd*fx);
+    $('n4').innerHTML='EC2 '+srv+'대 $'+ec2+' + RDS $'+rds+(cf>0?' + CloudFront $'+cf.toFixed(0):'')+'<br>= $'+c4usd.toFixed(0)+'/월';
+    bar('b4','l4',pct(monthGB,1024),'CloudFront 무료 1TB',gb(Math.min(monthGB,1024))+' / 1TB',cfOver>0);
+
+    /* ---- 인사이트 ---- */
+    var ins='';
+    var cheapest=[['PHP+카페24',c1],['Cloudflare+Supabase',c2usd*fx],['Spring+NCP',c3],['Spring+AWS',c4usd*fx]]
+      .sort(function(a,b){return a[1]-b[1]})[0];
+    if(!split && dau>=400){
+      ins='<b>지금 이 조건에서 최저가는 '+cheapest[0]+' ('+won(cheapest[1]).replace(/<[^>]+>/g,'')+')다.</b> '
+        +'그런데 <code>earth.mp4</code> 를 외부로 빼기만 하면 트래픽이 25분의 1로 줄어 순위가 통째로 바뀐다. '
+        +'위 토글을 "외부 스토리지 분리"로 바꿔보라 — 카페24는 한 플랜 아래로 내려가고, NCP·AWS 트래픽 비용은 거의 사라진다.';
+    }else if(split){
+      ins='<b>에셋을 분리하면 트래픽이 병목에서 빠진다.</b> 이때 남는 차이는 순수하게 '
+        +'<b>고정비와 기능</b>이다 — 안 2는 0원에서 시작하고 기능이 온전하며, 안 3·4는 트래픽이 0이어도 서버·DB 고정비가 나가고, '
+        +'안 1은 가장 싸지만 레벨추천과 강의 Q&amp;A가 없다.';
+    }else{
+      ins='<b>DAU가 작을 땐 어느 안이든 감당된다.</b> 하지만 안 1은 비용이 아니라 기능으로 갈린다 — '
+        +'pgvector가 없어 메인 검색 레벨추천과 강의 Q&amp;A가 규모와 무관하게 처음부터 동작하지 않는다.';
+    }
+    $('insight').innerHTML=ins;
+  }
+
+  $('dau').addEventListener('input',render);
+  $('fx').addEventListener('input',render);
+  Array.prototype.forEach.call($('split').children,function(b){
+    b.addEventListener('click',function(){
+      Array.prototype.forEach.call($('split').children,function(x){x.setAttribute('aria-pressed','false')});
+      b.setAttribute('aria-pressed','true'); split=+b.dataset.v; render();
+    });
+  });
+
+  // 기능표 필터
+  var rows=document.querySelectorAll('#featTbl tbody tr');
+  Array.prototype.forEach.call($('filters').children,function(b){
+    b.addEventListener('click',function(){
+      Array.prototype.forEach.call($('filters').children,function(x){x.setAttribute('aria-pressed','false')});
+      b.setAttribute('aria-pressed','true');
+      var f=b.dataset.f;
+      Array.prototype.forEach.call(rows,function(r){
+        r.classList.toggle('hide', f!=='all' && r.dataset.f!==f);
+      });
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

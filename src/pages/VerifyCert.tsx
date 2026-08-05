@@ -18,7 +18,7 @@ function fmtDateTime(d: Date) {
   return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}. ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
-// 미리보기 자격증 QR(preview-sample)용 데모 — 실제 조회 없이 '유효' 예시를 그대로 보여준다.
+// 미리보기 인증서 QR(preview-sample)용 데모 — 실제 조회 없이 '유효' 예시를 그대로 보여준다.
 const DEMO_TOKEN = 'preview-sample'
 const DEMO_BAD_TOKEN = 'preview-invalid'
 function demoResult(): VerifyCertResponse {
@@ -66,7 +66,8 @@ function Seal({ tone }: { tone: 'ok' | 'warn' | 'bad' }) {
       <circle cx="70" cy="70" r="66" fill="none" stroke={ring} strokeWidth="2.4" />
       <circle cx="70" cy="70" r="54" fill="none" stroke={ring} strokeWidth="0.9" opacity="0.75" />
       {ticks}
-      <text fontFamily="'CertGaramond', Georgia, serif" fontSize="7.2" letterSpacing="1.6" fontWeight="600" fill={ring}>
+      {/* ⚠️ 2026-08-05 세리프(CertGaramond) 제거 — 화면 글씨체는 Pretendard 하나로 통일했다. */}
+      <text fontFamily="'Pretendard Variable', Pretendard, sans-serif" fontSize="7.2" letterSpacing="1.6" fontWeight="600" fill={ring}>
         <textPath href="#vrf-arc" startOffset="50%" textAnchor="middle">
           CERTIFICATE&nbsp;·&nbsp;VERIFICATION
         </textPath>

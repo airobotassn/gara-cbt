@@ -1131,7 +1131,7 @@ async function examPreview(admin: any, body: any) {
   })
 }
 
-// 대시보드 분석 — 추이·점수분포·합격률·급수·자격증·회차 퍼널·소요시간·문항 난이도·과목·풀.
+// 대시보드 분석 — 추이·점수분포·합격률·급수·인증서·회차 퍼널·소요시간·문항 난이도·과목·풀.
 async function cbtAnalytics(admin: any) {
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
@@ -1172,7 +1172,7 @@ async function cbtAnalytics(admin: any) {
   // 채점 완료 판정(합격컷 60) 헬퍼
   const pctOf = (a: any) => (a.total_questions && a.total_correct != null ? Math.round((a.total_correct / a.total_questions) * 100) : null)
 
-  // 추이(90일): 가입 · 제출 · 자격증 발급
+  // 추이(90일): 가입 · 제출 · 인증서 발급
   const signupByDay: Record<string, number> = {}
   const submitByDay: Record<string, number> = {}
   const certByDay: Record<string, number> = {}
@@ -1217,7 +1217,7 @@ async function cbtAnalytics(admin: any) {
   }
   const byExamArr = exams.map((e: any) => ({ title: e.title, slug: e.slug, count: byExam[e.id] || 0 }))
 
-  // 자격증 발급 · 미발급(합격했으나 미발급) · 결과 미공개 · 진행중 응시
+  // 인증서 발급 · 미발급(합격했으나 미발급) · 결과 미공개 · 진행중 응시
   let certIssued = 0
   let certPending = 0
   let resultPending = 0
@@ -1629,80 +1629,212 @@ async function ebookBuyers(admin: any, body: any) {
   })
 }
 // ---------- 유사채팅(pseudo-chat) 보드 관리 ----------
-// 신고 목록 — chat_reports + 대상 메시지 본문/작성자 합성. 최신순.
-async function chatReportList(admin: any, body: any) {
-  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 200)
-  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
-  const { data, count } = await admin
-    .from('chat_reports')
-    .select('id, message_id, reporter_id, reason, status, created_at', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+// 2026-08-05 개편. 옛 구조(신고 건별 목록 + 보류 목록 두 표)의 문제:
+//   · 같은 메시지에 신고 3건이면 똑같은 줄이 3개 생겼다(버튼도 3벌 → 하나 누르면 셋이 같이 바뀜).
+//   · 처리한 것과 안 한 것이 한 표에 섞여 있어 할 일이 몇 개인지 셀 수 없었다.
+// 지금은 **메시지 1건 = 1줄**, 그리고 `처리 대기 / 처리 완료` 두 큐로 나눈다.
+//
+// 큐 판정(단일 출처):
+//   대기 = 삭제 안 됨 AND (열린 신고가 있음 OR mod_status <> 'ok')   ← 관리자 결정이 남은 것
+//   완료 = 대기가 아니면서, 관리자가 손댄 흔적이 있는 것
+//          (hidden_by='admin' 이거나, resolved/dismissed 신고가 달려 있음)
+// ⚠️ 평범한 메시지(신고 0건·ok)는 어느 큐에도 안 뜬다 — 여긴 채팅 로그 뷰어가 아니다.
+const CHAT_SCAN_CAP = 1000 // 후보 id 스캔 상한. 초과분은 잘린다(관리자 화면이라 실용 우선).
 
-  const rows = data ?? []
-  const messageIds = [...new Set(rows.map((r: any) => r.message_id).filter((v: unknown) => v != null))]
-  const msgMap: Record<string, any> = {}
-  if (messageIds.length) {
-    const { data: msgs } = await admin
-      .from('chat_messages')
-      .select('id, body, user_id, display_name, room, mod_status, deleted_at')
-      .in('id', messageIds)
-    for (const m of msgs ?? []) msgMap[(m as any).id] = m
+// 후보 메시지 id 를 모아 한 벌의 화면 행으로 만든다. 메시지·신고·신고자 이름을 각각 한 번씩만 조회한다.
+async function chatBuildRows(admin: any, ids: number[], room: string | null) {
+  if (!ids.length) return []
+  let q = admin
+    .from('chat_messages')
+    .select('id, user_id, display_name, is_anon, body, room, mod_status, deleted_at, hidden_by, created_at')
+    .in('id', ids)
+  if (room) q = q.eq('room', room)
+  const { data: msgs } = await q
+  const rows = msgs ?? []
+  if (!rows.length) return []
+
+  const msgIds = rows.map((m: any) => m.id)
+  const { data: reps } = await admin
+    .from('chat_reports')
+    .select('id, message_id, reporter_id, reason, status, created_at')
+    .in('message_id', msgIds)
+    .order('created_at', { ascending: false })
+  const repRows = reps ?? []
+
+  // 신고자 이름 — chat_reports 엔 uuid 만 있다. uuid 를 모아 profiles 를 한 번에 읽는다(N+1 방지).
+  const reporterIds = [...new Set(repRows.map((r: any) => r.reporter_id).filter((v: unknown) => v != null))]
+  const nameMap: Record<string, string> = {}
+  if (reporterIds.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', reporterIds)
+    for (const p of profs ?? []) {
+      const nm = String((p as any).display_name ?? '').trim()
+      if (nm) nameMap[(p as any).id] = nm
+    }
   }
 
-  const reports = rows.map((r: any) => ({
-    id: r.id,
-    messageId: r.message_id,
-    reporterId: r.reporter_id,
-    reason: r.reason,
-    status: r.status,
-    createdAt: r.created_at,
-    message: r.message_id != null ? msgMap[r.message_id] ?? null : null,
-  }))
-  return json({ reports, total: count ?? reports.length })
+  const byMsg: Record<string, any[]> = {}
+  for (const r of repRows) {
+    ;(byMsg[r.message_id] ??= []).push({
+      id: r.id,
+      reporterId: r.reporter_id,
+      // 프로필이 없거나 이름이 비어 있으면 null → 화면이 uuid 앞 8자로 폴백한다(탈퇴 계정 등).
+      reporterName: r.reporter_id != null ? nameMap[r.reporter_id] ?? null : null,
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.created_at,
+    })
+  }
+
+  return rows
+    .map((m: any) => {
+      const reports = byMsg[m.id] ?? []
+      const openCount = reports.filter((r: any) => r.status === 'open').length
+      return {
+        id: m.id,
+        userId: m.user_id,
+        displayName: m.display_name,
+        isAnon: m.is_anon,
+        body: m.body,
+        room: m.room,
+        modStatus: m.mod_status,
+        deletedAt: m.deleted_at,
+        hiddenBy: m.hidden_by,
+        createdAt: m.created_at,
+        reportCount: reports.length,
+        openCount,
+        reports,
+      }
+    })
+    .sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)))
 }
 
-// 모더레이션 보류(pending) 메시지 목록 — 삭제되지 않은 것만.
-async function chatPendingList(admin: any, body: any) {
-  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 200)
-  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
-  const { data, count } = await admin
+// 큐별 후보 id 집합. 두 축(열린 신고 / 공개 안 된 메시지)을 각각 훑어 합집합을 만든다.
+async function chatQueueIds(admin: any): Promise<number[]> {
+  const { data: openReps } = await admin
+    .from('chat_reports')
+    .select('message_id')
+    .eq('status', 'open')
+    .not('message_id', 'is', null)
+    .limit(CHAT_SCAN_CAP)
+  const { data: notOk } = await admin
     .from('chat_messages')
-    .select('id, user_id, display_name, is_anon, body, room, mod_status, created_at, updated_at', { count: 'exact' })
-    .eq('mod_status', 'pending')
+    .select('id')
+    .neq('mod_status', 'ok')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
-  return json({ messages: data ?? [], total: count ?? (data ?? []).length })
+    .limit(CHAT_SCAN_CAP)
+  const ids = new Set<number>()
+  for (const r of openReps ?? []) ids.add(Number((r as any).message_id))
+  for (const m of notOk ?? []) ids.add(Number((m as any).id))
+  return [...ids]
+}
+
+async function chatDoneIds(admin: any, queue: Set<number>): Promise<number[]> {
+  const { data: adminHidden } = await admin
+    .from('chat_messages')
+    .select('id')
+    .eq('hidden_by', 'admin')
+    .order('created_at', { ascending: false })
+    .limit(CHAT_SCAN_CAP)
+  const { data: closedReps } = await admin
+    .from('chat_reports')
+    .select('message_id')
+    .in('status', ['resolved', 'dismissed'])
+    .not('message_id', 'is', null)
+    .limit(CHAT_SCAN_CAP)
+  const ids = new Set<number>()
+  for (const m of adminHidden ?? []) ids.add(Number((m as any).id))
+  for (const r of closedReps ?? []) ids.add(Number((r as any).message_id))
+  // 대기에 있는 건 완료에 넣지 않는다 — 한 메시지가 두 탭에 동시에 뜨면 옛 구조의 중복 문제가 되살아난다.
+  return [...ids].filter((id) => !queue.has(id))
+}
+
+// 검수 목록 — tab='queue'(기본) | 'done'. 방 필터는 두 탭 공통.
+// 합집합 + 방 필터 때문에 총건수를 SQL count 로 못 낸다 → 후보를 모아 메모리에서 자르고 센다(상한 CHAT_SCAN_CAP).
+//
+// ⚠️ 방별 건수(rooms)는 **방 필터를 적용하기 전 값**이다. 화면이 이걸 칩 줄로 깔아
+//    "안 열어봐도 어느 방에 몇 건인지" 를 보여주기 때문 — 필터 후 값으로 세면
+//    한 방을 고르는 순간 나머지 방 칩이 사라져서 새 신고를 놓친다.
+//    나라가 170개여도 칩은 **큐에 실제로 뜬 방만** 생기므로 평소엔 한 줄이다.
+async function chatModList(admin: any, body: any) {
+  const tab = body?.tab === 'done' ? 'done' : 'queue'
+  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 200)
+  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
+  const roomRaw = String(body?.room ?? '').trim()
+  const room = !roomRaw || roomRaw === 'all' ? null : roomRaw
+
+  const queueIds = await chatQueueIds(admin)
+  const queueSet = new Set(queueIds)
+  const doneIds = await chatDoneIds(admin, queueSet)
+
+  // 방 무관 전체를 한 번씩만 만들고, 방 필터는 메모리에서 건다(같은 조회를 두 번 하지 않기 위해).
+  const queueAll = await chatBuildRows(admin, queueIds, null)
+  const doneAll = await chatBuildRows(admin, doneIds, null)
+  const all = tab === 'queue' ? queueAll : doneAll
+
+  const inRoom = room ? all.filter((r: any) => (r.room || 'global') === room) : all
+  const rows = inRoom.slice(offset, offset + limit)
+
+  // 방별 건수 — 현재 탭 기준. 건수 많은 순(동수면 방 이름 순)으로 정렬해 터진 방이 항상 앞에 온다.
+  const perRoom: Record<string, number> = {}
+  for (const r of all) {
+    const k = (r as any).room || 'global'
+    perRoom[k] = (perRoom[k] ?? 0) + 1
+  }
+  const rooms = Object.entries(perRoom)
+    .map(([k, n]) => ({ room: k, count: n }))
+    .sort((a, b) => b.count - a.count || a.room.localeCompare(b.room))
+
+  return json({
+    tab,
+    rows,
+    total: inRoom.length,
+    counts: { queue: queueAll.length, done: doneAll.length },
+    rooms,
+    truncated: queueIds.length >= CHAT_SCAN_CAP,
+  })
 }
 
 // 메시지 강제 숨김 — 소프트 삭제 + 관련 열린 신고를 resolved 로 정리.
+//  hidden_by='admin' 을 남긴다: 이게 있어야 '숨김 해제'가 본인 삭제 글을 되살리지 않는다.
 async function chatHide(admin: any, body: any) {
   const messageId = Number(body?.message_id)
   if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
   const nowIso = new Date().toISOString()
   const { error } = await admin
     .from('chat_messages')
-    .update({ deleted_at: nowIso, updated_at: nowIso })
+    .update({ deleted_at: nowIso, updated_at: nowIso, hidden_by: 'admin' })
     .eq('id', messageId)
   if (error) return json({ error: error.message }, 500)
   await admin.from('chat_reports').update({ status: 'resolved' }).eq('message_id', messageId).eq('status', 'open')
   return json({ ok: true })
 }
 
-// 숨김 해제.
+// 숨김 해제 — 관리자가 숨긴 것만. 작성자가 스스로 지운 글(hidden_by='self')은 되살리지 않는다.
+//  hidden_by 가 null 인 옛 기록은 허용한다(개편 전엔 구분이 없었다 — 기존 동작 유지).
 async function chatUnhide(admin: any, body: any) {
   const messageId = Number(body?.message_id)
   if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+  const { data: row } = await admin
+    .from('chat_messages')
+    .select('id, hidden_by')
+    .eq('id', messageId)
+    .maybeSingle()
+  if (!row) return json({ error: '메시지를 찾을 수 없습니다.' }, 404)
+  if (row.hidden_by === 'self') {
+    return json({ error: '작성자가 스스로 지운 글이라 되살릴 수 없습니다.' }, 409)
+  }
   const { error } = await admin
     .from('chat_messages')
-    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .update({ deleted_at: null, hidden_by: null, updated_at: new Date().toISOString() })
     .eq('id', messageId)
   if (error) return json({ error: error.message }, 500)
   return json({ ok: true })
 }
 
-// 보류(pending) 메시지를 수동 승인 — mod_status='ok'.
+// 문제없음 — 공개 상태로 되돌리고(mod_status='ok') 열린 신고를 전부 무효 처리한다.
+//  옛 '승인'(보류 해제)과 '무효'(오신고)를 하나로 합쳤다. 관리자가 내리는 결정은 어차피
+//  "이 글 그냥 둬도 된다" 하나이고, 둘을 갈라두면 신고가 남아 큐에서 안 빠졌다.
 async function chatApprove(admin: any, body: any) {
   const messageId = Number(body?.message_id)
   if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
@@ -1711,14 +1843,21 @@ async function chatApprove(admin: any, body: any) {
     .update({ mod_status: 'ok', updated_at: new Date().toISOString() })
     .eq('id', messageId)
   if (error) return json({ error: error.message }, 500)
+  await admin.from('chat_reports').update({ status: 'dismissed' }).eq('message_id', messageId).eq('status', 'open')
   return json({ ok: true })
 }
 
-// 신고를 무효 처리(오신고 등) — dismissed.
-async function chatResolveReport(admin: any, body: any) {
-  const reportId = String(body?.report_id ?? '').trim()
-  if (!reportId) return json({ error: 'report_id 가 필요합니다.' }, 400)
-  const { error } = await admin.from('chat_reports').update({ status: 'dismissed' }).eq('id', reportId)
+// 완전 삭제 — 행 자체를 지운다. **되돌릴 수 없다.**
+//  숨김(소프트 삭제)과 나눠둔 이유: 숨김은 오판정 복구·반복 위반자 추적·처리 기록이 남아야 해서 행을 남기는데,
+//  개인정보·불법물이 본문에 담긴 경우엔 그 행이 남아 있는 것 자체가 문제라 물리 삭제가 필요하다.
+//  ⚠️ chat_reports.message_id 는 on delete set null 이라, 메시지만 지우면 신고가 고아로 남아
+//     '처리 완료' 큐에 message 없는 유령 줄이 생긴다 → 신고를 먼저 지운다.
+async function chatPurge(admin: any, body: any) {
+  const messageId = Number(body?.message_id)
+  if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+  const { error: repErr } = await admin.from('chat_reports').delete().eq('message_id', messageId)
+  if (repErr) return json({ error: repErr.message }, 500)
+  const { error } = await admin.from('chat_messages').delete().eq('id', messageId)
   if (error) return json({ error: error.message }, 500)
   return json({ ok: true })
 }
@@ -1785,12 +1924,11 @@ Deno.serve(async (req) => {
       case 'ebookReorder': return await ebookReorder(admin, body)
       case 'ebookDelete': return await ebookDelete(admin, body)
       case 'ebookBuyers': return await ebookBuyers(admin, body)
-      case 'chatReportList': return await chatReportList(admin, body)
-      case 'chatPendingList': return await chatPendingList(admin, body)
+      case 'chatModList': return await chatModList(admin, body)
       case 'chatHide': return await chatHide(admin, body)
       case 'chatUnhide': return await chatUnhide(admin, body)
       case 'chatApprove': return await chatApprove(admin, body)
-      case 'chatResolveReport': return await chatResolveReport(admin, body)
+      case 'chatPurge': return await chatPurge(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

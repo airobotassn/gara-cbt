@@ -1269,6 +1269,21 @@ export function ChatModAdmin() {
     }
   }
 
+  // 완전삭제 — 되돌릴 수 없으므로 본문 일부를 보여주며 한 번 확인받는다.
+  async function purgeRow(r: ChatModRow) {
+    const preview = (r.body ?? '').slice(0, 30)
+    if (!window.confirm(`완전삭제하면 되돌릴 수 없습니다.\n\n"${preview}"\n\n이 메시지와 딸린 신고 ${r.reportCount}건을 지웁니다.`)) return
+    setBusyId(r.id)
+    try {
+      await callFunction('admin', { action: 'chatPurge', message_id: r.id })
+      await load(tab, room, offset)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   function toggleDetail(id: number) {
     setOpenDetail((prev) => {
       const next = new Set(prev)
@@ -1345,54 +1360,71 @@ export function ChatModAdmin() {
               return (
                 <Fragment key={r.id}>
                   <tr>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {tab === 'queue' ? (
-                        badge ? <span className={`admin-badge ${badge.tone}`}>{badge.label}</span> : '-'
-                      ) : (
-                        <span className={`admin-badge ${hidden ? 'st-expired' : 'st-submitted'}`}>{chatDoneLabel(r)}</span>
-                      )}
-                    </td>
+                    {/* 사유 배지가 곧 펼치기 버튼이다 — 배지가 이미 "신고 2건"이라고 말하는데
+                        본문 옆에 '신고 2건 보기' 버튼을 또 두면 같은 말이 두 번이고 본문이 밀려 개행된다. */}
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const lbl = tab === 'queue' ? badge?.label : chatDoneLabel(r)
+                        const tone = tab === 'queue' ? badge?.tone ?? '' : hidden ? 'st-expired' : 'st-submitted'
+                        if (!lbl) return '-'
+                        if (!r.reportCount) return <span className={`admin-badge ${tone}`}>{lbl}</span>
+                        return (
+                          <button
+                            className={`admin-badge chatmod-badge-btn ${tone}`}
+                            onClick={() => toggleDetail(r.id)}
+                            title="신고 상세 펼치기"
+                          >
+                            {lbl} <span className="chatmod-caret">{detail ? '▴' : '▾'}</span>
+                          </button>
+                        )
+                      })()}
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{chatRoomLabel(r.room)}</td>
                     <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                       {r.body ?? <span style={{ color: 'var(--muted)' }}>(내용 없음)</span>}
-                      {r.reportCount > 0 && (
-                        <button
-                          className="admin-mini"
-                          style={{ marginLeft: 8 }}
-                          onClick={() => toggleDetail(r.id)}
-                        >
-                          신고 {r.reportCount}건 {detail ? '접기' : '보기'}
-                        </button>
-                      )}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{r.isAnon ? `${r.displayName} (익명)` : r.displayName}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(r.createdAt)}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {hidden ? (
-                        // 작성자가 스스로 지운 글은 되살릴 수 없다(서버도 409 로 막는다) — 버튼 자체를 안 낸다.
-                        r.hiddenBy === 'self' ? (
-                          <span style={{ color: 'var(--muted)', fontSize: 12 }}>작성자 삭제</span>
-                        ) : (
-                          <button className="admin-mini" disabled={busyId === r.id} onClick={() => act('unhide', r.id)}>
-                            숨김 해제
-                          </button>
-                        )
-                      ) : (
-                        <>
-                          <button className="admin-mini" disabled={busyId === r.id} onClick={() => act('hide', r.id)}>
-                            숨김
-                          </button>
-                          <button
-                            className="admin-mini"
-                            style={{ marginLeft: 6 }}
-                            disabled={busyId === r.id}
-                            onClick={() => act('approve', r.id)}
-                          >
-                            문제없음
-                          </button>
-                        </>
-                      )}
-                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {/* 결정 3종. 숨김/완전삭제를 나눠 둔 이유:
+                          · 숨김 = 소프트 삭제. 채팅창에선 완전히 사라지지만 행은 남는다 →
+                            오판정 복구 · 반복 위반자 추적 · 처리 기록이 필요해서다.
+                          · 완전삭제 = 행 자체를 지운다. 되돌릴 수 없다. 개인정보·불법물처럼
+                            "남아 있는 것 자체가 문제"인 건에만 쓴다. */}
+                      {hidden ? (
+                        r.hiddenBy === 'self' ? (
+                          // 작성자가 스스로 지운 글은 되살릴 수 없다(서버도 409 로 막는다) — 숨김 해제를 안 낸다.
+                          <span style={{ color: 'var(--muted)', fontSize: 12 }}>작성자 삭제</span>
+                        ) : (
+                          <button className="admin-mini" disabled={busyId === r.id} onClick={() => act('unhide', r.id)}>
+                            숨김 해제
+                          </button>
+                        )
+                      ) : (
+                        <>
+                          <button className="admin-mini" disabled={busyId === r.id} onClick={() => act('hide', r.id)}>
+                            숨김
+                          </button>
+                          <button
+                            className="admin-mini"
+                            style={{ marginLeft: 6 }}
+                            disabled={busyId === r.id}
+                            onClick={() => act('approve', r.id)}
+                          >
+                            문제없음
+                          </button>
+                        </>
+                      )}
+                      {/* 완전삭제는 숨김 여부와 무관하게 항상 낸다 — 이미 숨긴 글도 지워야 할 때가 있다. */}
+                      <button
+                        className="admin-mini chatmod-danger"
+                        style={{ marginLeft: 6 }}
+                        disabled={busyId === r.id}
+                        onClick={() => purgeRow(r)}
+                      >
+                        완전삭제
+                      </button>
+                    </td>
                   </tr>
                   {detail && (
                     <tr>

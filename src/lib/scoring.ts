@@ -183,6 +183,18 @@ export function arenaBand(level: number): [number, number] {
 //  과거 시즌 기록 보존을 위해 남아있지만 클라이언트는 더 이상 읽지 않는다.)
 // </scoring-sync>
 
+// ── 백분위 표기 게이트 ──
+// 모수가 적으면 "상위 N%" 가 의미를 잃는다 — 3명뿐이면 1등도 상위 33%라 1등인데 못한 것처럼 읽힌다.
+// 그래서 이 수 미만이면 백분위를 **아예 안 보여준다**(2026-08-05 결정).
+// ⚠️ "N명 중 M위" 같은 대체 문구도 넣지 않는다 — 초라해 보인다고 반려됐다. 사람이 모이면 조용히 나타난다.
+//   20명 = 1등이 상위 5% → 어색하지 않은 최소 지점. 더 깐깐하게 가려면 50.
+// ⚠️ 보드(전세계/국가/지역)마다 모수가 달라 지역 보드는 한동안 이 게이트에 걸린다 — 의도된 동작이다.
+export const PERCENTILE_MIN_POPULATION = 20
+/** 백분위를 보여줘도 되는 모수인가. total 을 모르면(null) 보수적으로 false. */
+export function showPercentile(total: number | null | undefined): boolean {
+  return (total ?? 0) >= PERCENTILE_MIN_POPULATION
+}
+
 // ── 등급(레벨) 표시 메타 ──
 export const LEVEL_COLOR: Record<number, string> = {
   1: '#8b9099', // iron

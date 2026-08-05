@@ -2,16 +2,14 @@
 // <scoring-sync> 영역이 항상 같이(동일 수식으로) 수정되는지 검증한다. 과거 guard.mjs(커밋훅)는 실존하지 않으므로
 // 이 parity 테스트가 그 역할을 대체한다.
 //
-//  1) 심볼별(promoteCut/computeRankChange/computePoints/computeSkillScore/activityDelta/tierForPercentile 및
+//  1) 심볼별(promoteCut/computeRankChange/computePoints/computeSkillScore/activityDelta 및
 //     관련 상수) 소스 텍스트를 두 파일에서 정규식으로 추출해 바이트 동일성을 비교한다.
 //  2) _shared/scoring.ts 는 Deno 전용 import(esm.sh, ./lib.ts)를 갖고 있어 그대로 import 할 수 없다 →
 //     <scoring-sync> 블록까지만 잘라내고 그 3개 import 줄만 제거한 사본을 임시 .ts 파일로 떠서 동적 import
 //     한다(순수 함수만 남기므로 Deno.env 등 부작용 있는 코드는 애초에 포함되지 않음).
 //  3) 두 구현을 동일 샘플 입력으로 실제 실행해 출력이 값 동일한지도 검증한다(소스 텍스트 동일성만으로는
 //     사람이 포맷을 다르게 베껴 실수로 의미를 바꾸는 경우를 못 잡으므로 이중 방어).
-//  4) 티어 경계값(0.05/0.20/0.45/0.75, 동률 포함) 단위테스트 — DB ranking_tier(pct)(reset_season_fn.sql)와
-//     동일 밴드여야 한다.
-//  5) 원안 점수표(2026-08-04) 자체 검증 — 레벨테스트 7,000 / 활동 6,570 / 전체 13,570 과 ARENA 밴드 경계.
+//  4) 원안 점수표(2026-08-04) 자체 검증 — 레벨테스트 7,000 / 활동 6,570 / 전체 13,570 과 ARENA 밴드 경계.
 //
 // 실행: bun tests/db/t-scoring-parity.mjs  (또는 npm test:db 체인의 일부)
 
@@ -93,7 +91,7 @@ function normalize(text) {
 
 const FN_SYMBOLS = [
   'promoteCut', 'computeRankChange', 'computePoints', 'computeSkillScore',
-  'activityDelta', 'activityPerDay', 'arenaLevelForScore', 'arenaBand', 'tierForPercentile',
+  'activityDelta', 'activityPerDay', 'arenaLevelForScore', 'arenaBand',
 ];
 // 강등 관련 상수(DEMOTE_*)는 강등 제거로 사라졌다 — 남은 승급/점수 상수만 비교한다.
 // SKILL_LEVEL_STEP 은 2026-08-04 원안 반영(레벨 클리어당 정액 1,000)으로 사라졌다.
@@ -172,22 +170,7 @@ for (const rank of [1, 3, 7]) {
   eq(FE.computeRankChange(rank, rank, 0), { nextRank: rank, dir: 'stay' }, `no demotion: rank ${rank} · 0 correct → stay`);
 }
 
-const PCT_CASES = [0, 0.01, 0.05, 0.0500001, 0.049999, 0.2, 0.200001, 0.199999, 0.45, 0.450001, 0.75, 0.750001, 1];
-for (const pct of PCT_CASES) {
-  eq(Shared.tierForPercentile(pct), FE.tierForPercentile(pct), `tierForPercentile(${pct})`);
-}
-
-// ---------- 3) 티어 경계값 명시 단위테스트 (DB ranking_tier(pct), reset_season_fn.sql 과 동일 밴드) ----------
-eq(FE.tierForPercentile(0), 'diamond', 'tier boundary 0 -> diamond');
-eq(FE.tierForPercentile(0.05), 'diamond', 'tier boundary 0.05 -> diamond (동률 포함)');
-eq(FE.tierForPercentile(0.050001), 'platinum', 'tier boundary just above 0.05 -> platinum');
-eq(FE.tierForPercentile(0.2), 'platinum', 'tier boundary 0.20 -> platinum (동률 포함)');
-eq(FE.tierForPercentile(0.200001), 'gold', 'tier boundary just above 0.20 -> gold');
-eq(FE.tierForPercentile(0.45), 'gold', 'tier boundary 0.45 -> gold (동률 포함)');
-eq(FE.tierForPercentile(0.450001), 'silver', 'tier boundary just above 0.45 -> silver');
-eq(FE.tierForPercentile(0.75), 'silver', 'tier boundary 0.75 -> silver (동률 포함)');
-eq(FE.tierForPercentile(0.750001), 'bronze', 'tier boundary just above 0.75 -> bronze');
-eq(FE.tierForPercentile(1), 'bronze', 'tier boundary 1 -> bronze');
+// (3) 티어 경계값 테스트는 제거 — 티어 5단계 자체가 2026-08-04 에 없어졌다(scoring.ts 참고).
 
 // ---------- 4) 원안 점수표 자체 검증 (2026-08-04 반영본) ----------
 // 레벨테스트 트랙: 레벨 클리어 1회당 +1,000 · 7단계 전부 = 7,000. 부분점수 없음.

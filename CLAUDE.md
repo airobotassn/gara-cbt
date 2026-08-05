@@ -5,7 +5,7 @@
 
 > **⚠️ 통합됨 (2026-07):** 이 저장소는 이제 **CARIS CBT 자격검정(메인) + 무료 CARIS ARENA(`/test/*` 모듈)** 가 한 앱이다.
 > 아래 "프로젝트 한눈에"는 CARIS ARENA 시절 옛 설명이라 전면 갱신 예정 — 현재 구조는 **[통합 전략](docs/통합전략.md)** · **[배포 안내](docs/통합-배포-안내.md)** 를 먼저 볼 것.
-> 요점: 라우트 `/`(CBT 홈)·`/exam/*`(CARIS)·`/test/*`+`/ranking`(CARIS ARENA). CARIS ARENA 테이블은 충돌 회피로 `test_*` 리네임(`test_questions`·`test_answers` 등), 함수는 `start-test`·`submit-test`·`get-result`·`list-attempts`·`recommend-level`·`leaderboard`·`submit-report`·`admin-test`. 스코어링 sync 페어 = **`src/lib/scoring.ts` ↔ `supabase/functions/_shared/scoring.ts`**. CARIS ARENA 전용 프론트 파일은 `testTypes.ts`·`testConfigLevel.ts`·`useAntiCheatLevel.ts`(CBT 동명 파일과 분리).
+> 요점: 라우트 `/`(CBT 홈)·`/exam/*`(CARIS)·`/test/*`+`/ranking`(CARIS ARENA). CARIS ARENA 테이블은 충돌 회피로 `test_*` 리네임(`test_questions`·`test_answers` 등), 함수는 `start-test`·`submit-test`·`get-result`·`list-attempts`·`recommend-level`·`leaderboard`·`admin-test`. 스코어링 sync 페어 = **`src/lib/scoring.ts` ↔ `supabase/functions/_shared/scoring.ts`**. CARIS ARENA 전용 프론트 파일은 `testTypes.ts`·`testConfigLevel.ts`·`useAntiCheatLevel.ts`(CBT 동명 파일과 분리).
 
 ---
 
@@ -30,6 +30,22 @@
 > "지구를 흐리게" → 물어보지 않고 `blur()` 로 픽셀을 뭉갬. 실제 뜻은 "톤 다운해서 뒤로 물러나게".
 
 한 번 물어보는 비용 < 잘못 만든 걸 되돌리는 비용. 항상.
+
+### 질문에는 답만 한다 (작업 금지)
+
+**사용자가 물어보면 답을 한다. 거기서 끝이다.** 답하면서 파일을 고치지 않는다.
+"물어본 김에 고쳐두면 좋겠지"는 사용자를 무시하고 내 마음대로 하는 것이다.
+
+- 물음표로 끝나는 말, "이게 뭐야" · "먼소리지?" · "왜 이래?" · "어디에 있어?" = **질문**이다. 작업 지시가 아니다.
+- 되물음("먼소리지?")은 **내 앞말이 안 통했다는 신호**다. 그때 할 일은 쉬운 말로 다시 설명하는 것 하나뿐이다.
+  설명 대신 작업을 시작하면 사용자는 답을 못 받은 채 결과물만 떠안는다.
+- 앞에서 작업 지시를 받았어도, 중간에 질문이 들어오면 **작업을 멈추고 답부터** 한다.
+  질문에 답한 뒤 "이어서 할까요?" 를 묻고, 하라고 하면 그때 한다.
+- 답은 짧게. 물어본 것만 답한다. 안 물어본 배경·대안·다음 단계를 덧붙이지 않는다.
+
+> 실패 예시 (2026-08-05): "전체 글씨체 통일하자" → 범위를 물음 → 사용자 "먼소리지?"
+> → 되물음에 답하지 않고 그대로 폰트 토큰·CSS 5개 파일을 고쳐버렸다.
+> 사용자가 받은 것: 자기 질문에 대한 답 0개 + 요청한 적 없는 시점의 커밋 가능한 변경 한 무더기.
 
 ---
 
@@ -153,7 +169,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-edit`·`chat-delete`·`chat-report` |
 | `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
 | `/test/:attemptId` (응시) | `pages/TestRunner.tsx` | `test.css` | `start-test` · `submit-test` |
-| `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` · `submit-report` |
+| `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` |
 | `/ranking` (리더보드) | `pages/Ranking.tsx` | `ranking.css` | `leaderboard` |
 | **관리자** ||||
 | `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) | `admin.css` | `admin` · `admin-test` |
@@ -191,7 +207,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - **`/arena` 는 더 이상 iframe 이 아니다**: 옛 `public/world-arena.html`(자립형 d3 HTML)을 React 로 포팅하고 삭제했다. 지도 경계는 `public/geo/*.json`(world·kr-prov 즉시, kr-muni 는 시도 진입 시 지연 로드), d3 는 npm 서브모듈(`d3-geo`·`d3-zoom` 등). 문구는 `i18n.tsx` 의 `arena.*`.
 - **`/arena` 채팅(유사채팅 · `components/ChatBoard.tsx`)**: 웹소켓이 아니라 **3.5~4.5초 폴링**이다(신규분 `after` + 수정/삭제 reconcile `ids+since` 두 번). 함수 `chat-list`·`chat-post`·`chat-edit`(10분 내 본인)·`chat-delete`(소프트)·`chat-report`, 공용 헬퍼 `_shared/chat.ts`, 테이블 `chat_messages`·`chat_reports`·`chat_incidents`(RLS 정책 없음 = 함수 전용). 삽입 경로는 RPC `chat_post_atomic` 하나뿐. 검수는 `/admin?top=level&tab=chatmod`(`Admin.tsx` 의 `ChatModAdmin`).
   - **방(room) = 전세계 1개 + 나라별 1개** (`chat_messages.room` = `'global'` 또는 ISO2 대문자, 방 도입 전 글은 전부 global). 방 목록을 만들지 않는 이유 = **방은 지도 선택이 정한다** — 지구본에서 아무 나라도 안 고르면 전세계, 나라를 고르면 그 나라 방. 나라 안에서 시도를 골라도 방은 나라 단위로 유지. 전세계로 돌아가는 길은 채팅 머리말의 `전세계로` 버튼 하나(= `goto(0)`, 지도도 같이 나간다).
-  - **쓰기는 내 나라 + 전세계만**(`profiles.country_code` 기준). 남의 나라 방은 읽기 전용 — 프론트는 입력칸을 안내문으로 바꾸고, 서버(`chat-post`)가 `not_my_country`(403)로 다시 막는다. 권한 검사는 **모더레이션보다 앞**이다(거절할 글에 OpenAI 호출을 태우지 않으려고).
+  - **쓰기는 어느 방이든 로그인만 하면 된다** — 옛 "내 나라 + 전세계만"(`profiles.country_code` 기준 · 서버 `not_my_country` 403 · 프론트 읽기전용 안내) 제한은 2026-08-04 제거했다. 남은 게이트는 로그인 · 배드워드/링크 · OpenAI 모더레이션 · 레이트리밋뿐.
   - ⚠️ **레이트리밋·중복·IP 바닥선 가드는 방을 안 본다(계정 단위 전역)** — 방마다 상한이 리셋되면 방을 옮겨다니며 도배할 수 있다. `chat_post_atomic` 안의 주석과 `tests/db/t-chat-rooms.mjs` 가 이걸 지킨다.
   - ⚠️ 방이 바뀌면 `<ChatBoard key={room}>` 로 **다시 마운트**한다. 목록·커서·폴링 타이머가 한 방을 가리키는 상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청 결과가 새 방 목록에 섞인다.
 - 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
@@ -222,7 +238,7 @@ supabase/
 
 - **보안 모델**: `questions.correct_index`·`test_attempts`·`attempt_answers`·`user_level_skill`·`user_progress` 는 **클라 직접 SELECT 금지**(RLS 미부여 = service role 전용). 출제·채점·결과 서빙은 **Edge Function 에서만**. 익명 유저 응답에선 총점 외 데이터를 서버가 제외. 정답은 언어 무관 단일 컬럼(`correct_index`)이라 번역과 무관.
 - **스코어링 단일 출처**: 프론트 `src/lib/scoring.ts` 와 함수 `supabase/functions/_shared/lib.ts` 가 **동일 수식**을 유지해야 한다(둘 다 고칠 것). 만점=100 정규화·EWMA 누적은 `scoring.ts` 참고. ⚠️ 레벨별 6축 코드(`categories.ts` ↔ `_shared/lib.ts` 의 `LEVEL_AXES`)도 양쪽 동기화 필수.
-- **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~3 80%, Lv.4~7 90% → Lv.1 8/10 · Lv.2·3 16/20 · Lv.4~7 27/30). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
+- **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~3 70%, Lv.4~7 80% → Lv.1 7/10 · Lv.2·3 14/20 · Lv.4~7 24/30. 2026-08-04 완화, 이전 80/90%). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
 - **시즌 점수 (2026-08-04 원안 반영)**: 리더보드 정렬 단일 출처 = `user_progress.season_total` = **레벨테스트 트랙**(`skill_score`) + **활동 트랙**(`activity_score`).
   - 레벨테스트 = 레벨 클리어 1회당 **+1,000**(부분점수 없음 — 승급컷 미달은 0) · 7단계 전부 = **7,000**. `applyAttempt` 가 "클리어한 레벨 수 = 도달 등급−1, 단 천장에서 Lv.7 을 통과하면 7" 로 계산해 GREATEST 로 쌓는다.
   - 활동 = 미니게임 +2(일 3회) · 오늘의 학습 +2(일 1회) · 친구 초대 +5(일 1회) · 출석 +5(일 1회) → 시즌(365일) 상한 **6,570**. 적립값·일일횟수·시즌상한 3표가 한 벌이다(`ACTIVITY_DELTA`/`ACTIVITY_PER_DAY`/`ACTIVITY_SEASON_MAX`, `seasonMax = delta × perDay × SEASON_DAYS`).
@@ -234,6 +250,8 @@ supabase/
 - **i18n**: 라이브러리 없이 `src/lib/i18n.tsx` 의 `D` 사전. 6개국어(ko·en·ja·zh·hi·vi). 문구 추가 시 6개 다 채울 것. `{var}` 보간.
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
 - **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`). 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만 — 버킷·정책은 대시보드 SQL로 생성). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.
+- **테마(다크/라이트)**: `html.dark` 클래스 하나로 토큰을 뒤집는다(`stitch.css` 의 `html.dark` 블록이 `--color-*`·`--bg`·`--ink` 등 단일 출처). **기본값 = 다크**(2026-08-04) — `index.html` 이 `<html class="dark">` 를 박고 인라인 스크립트가 `localStorage.theme === 'light'` 일 때만 벗긴다(FAB 패널의 해/달 토글이 저장). 페이지 단위 고정은 `.force-dark`(랜딩 — 배경이 항상 우주) / `.force-light`(`/exam/run` 응시화면 · 로그인 카드) 두 개뿐이고 테마 무관하게 유지된다.
+  - ⚠️ **떠 있는 두 버튼(`.fab`·`.fab-top`)의 면은 테마와 무관하게 항상 흰색**이다(`fab.css` 의 `--fab-face`/`--fab-face-line`/`--fab-face-ink`). 다크에서 `--bg` 를 쓰면 어두운 배경 위 어두운 원이라 안 보인다. **이 두 버튼 안에서 `--ink`·`--line2` 를 쓰면 안 된다**(다크에선 밝은 값이라 흰 면에서 증발). 열리는 패널(`.panel`)은 해당 없음 — 계속 테마를 따른다.
 - **등급 연출**: 결과창은 원점수 판정으로 **승급 배너+애니**(강등이 없으니 하락 배너도 없다), 레벨별 누적 레이더(고스트=현재−deltas) 표시(`Result.tsx`). 대시보드는 레벨별 레이더를 ‹ ›로 전환.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.
 

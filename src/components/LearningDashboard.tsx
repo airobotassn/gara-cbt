@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import { levelColor, computeSkillScore, promoteCut, tierColor, TIER_ORDER } from '../lib/scoring'
+import { levelColor, computeSkillScore, promoteCut, showPercentile } from '../lib/scoring'
 import { axesForLevel, axisKeysForLevel, MAX_LEVEL } from '../lib/categories'
-import type { AxisMap, Tier } from '../lib/scoring'
+import type { AxisMap } from '../lib/scoring'
 import { useT } from '../lib/i18n'
 import RadarChartBox from '../components/RadarChartBox'
 import LineChart from '../components/LineChart'
-import TierBadge from '../components/TierBadge'
 import ContributionGraph from '../components/ContributionGraph'
 import type { ListAttemptsResponse, AttemptSummary, LevelSkill } from '../lib/testTypes'
 
@@ -64,13 +63,15 @@ export default function LearningDashboard() {
   const [trendRange, setTrendRange] = useState<TrendRange>('season') // 기본 = 시즌(6개월) 전체 흐름
   // 기간 자르기 기준 시각은 화면 진입 때 한 번만 고정한다(렌더마다 Date.now() 를 읽으면 순수하지 않다).
   const [nowTs] = useState(() => Date.now())
-  // 티어 히어로(시즌 총점/실력·활동 분해/다음 순위 게이지) — get-hub 응답 중 이 화면이 쓰는 것만.
-  const [tier, setTier] = useState<Tier | null>(null)
+  // 순위 히어로(백분위/다음 순위 게이지) — get-hub 응답 중 이 화면이 쓰는 것만. (티어는 2026-08-04 제거)
   const [percentile, setPercentile] = useState<number | null>(null)
   const [, setSeasonTotal] = useState<number | null>(null)
   const [, setSkillScore] = useState<number | null>(null)
   const [, setActivityScore] = useState<number | null>(null)
   const [pointsToPass, setPointsToPass] = useState<number | null>(null)
+  // 백분위 표기 게이트용 — 모수가 적으면 '내 순위' 칸을 통째로 감춘다(scoring.ts 의 showPercentile).
+  const [, setMyRank] = useState<number | null>(null)
+  const [rankTotal, setRankTotal] = useState<number | null>(null)
   const [attendanceDays, setAttendanceDays] = useState<string[]>([]) // 활동 기록 달력(출석만)
 
   useEffect(() => {
@@ -99,15 +100,18 @@ export default function LearningDashboard() {
       skillScore?: number | null
       activityScore?: number | null
       pointsToPass?: number | null
+      rank?: number | null
+      rankTotal?: number | null
       attendanceDays?: string[] | null
     }>('get-hub', {})
       .then((h) => {
-        setTier((h.tier as Tier | null) ?? null)
         setPercentile(h.percentile ?? null)
         setSeasonTotal(h.seasonTotal ?? null)
         setSkillScore(h.skillScore ?? null)
         setActivityScore(h.activityScore ?? null)
         setPointsToPass(h.pointsToPass ?? null)
+        setMyRank(h.rank ?? null)
+        setRankTotal(h.rankTotal ?? null)
         setAttendanceDays(h.attendanceDays ?? [])
       })
       .catch(() => {})
@@ -234,38 +238,8 @@ export default function LearningDashboard() {
         </div>
       ) : (
         <>
-          {/* 티어 히어로: 현재 티어 + 시즌 총점(실력/활동 분해) + 다음 순위 게이지(요약) */}
-          <div className="tierhero">
-            <TierBadge tier={tier ?? 'bronze'} size={64} alt={t(`rank.tier_${tier ?? 'bronze'}`)} />
-            <div>
-              <div className="nm" style={{ color: tierColor(tier ?? 'bronze') }}>
-                {t(`rank.tier_${tier ?? 'bronze'}`)}
-              </div>
-              <div className="sub">{t('db.cur_rank', { n: list.length })}</div>
-              <div className="sub">
-                {t('rank.top', { p: Math.max(1, Math.round((percentile ?? 1) * 100)) })}
-                {pointsToPass != null && pointsToPass > 0 ? ` · ${t('rank.next_gap', { n: pointsToPass })}` : ''}
-              </div>
-            </div>
-
-            {/* 티어 사다리 — 브론즈→다이아 순, 내 티어만 원색+테두리, 나머지는 흑백 */}
-            <div className="tierlad">
-              {TIER_ORDER.map((k) => {
-                const on = (tier ?? 'bronze') === k
-                return (
-                  <div
-                    key={k}
-                    className={on ? 'it on' : 'it'}
-                    style={on ? { ['--tc' as string]: tierColor(k) } : undefined}
-                    aria-current={on ? 'true' : undefined}
-                  >
-                    <TierBadge tier={k} size={40} dim={!on} />
-                    <span className="nm">{t(`rank.tier_${k}`)}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          {/* (옛 티어 히어로 — 엠블렘·티어명·티어 사다리를 2026-08-04 제거하고 나니 아래 '내 순위' 통계 카드와
+              같은 내용만 남아 통째로 뺐다. 백분위·다음 순위까지는 그 카드가 전담한다.) */}
 
           {/* (강등 경고 배너는 강등 제거로 삭제됐다 — 등급은 오르거나 유지만 된다) */}
 
@@ -295,15 +269,19 @@ export default function LearningDashboard() {
                 {t('db.recent_n', { n: list.length })}
               </div>
             </div>
+            {/* 모수가 적으면 이 칸 자체를 감춘다 — 백분위가 의미를 잃는데 "N명 중 M위" 같은 대체 문구를 넣으면
+                오히려 초라해 보인다. 사람이 모이면 조용히 나타난다(scoring.ts 의 showPercentile). */}
+            {showPercentile(rankTotal) && (
             <div className="stat">
-              <div className="k">{t('rank.my_tier')}</div>
-              <div className="v" style={{ color: tierColor(tier ?? 'bronze') }}>
-                {t(`rank.tier_${tier ?? 'bronze'}`)}
-              </div>
+              <div className="k">{t('rank.my_rank')}</div>
+              <div className="v">{t('rank.top', { p: Math.max(1, Math.round((percentile ?? 1) * 100)) })}</div>
               <div className="d" style={{ color: 'var(--muted)' }}>
-                {t('rank.top', { p: Math.max(1, Math.round((percentile ?? 1) * 100)) })}
+                {pointsToPass != null && pointsToPass > 0
+                  ? t('rank.next_gap', { n: pointsToPass })
+                  : t('db.cur_rank', { n: list.length })}
               </div>
             </div>
+            )}
           </div>
 
           {/* 점수 추이 — 1주일 / 3개월 / 시즌(6개월) */}

@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     if (!attempt) return json({ error: '결과를 찾을 수 없습니다.' }, 404)
     if (attempt.user_id !== user.id) return json({ error: '권한이 없습니다.' }, 403)
 
-    // 응시한 시험(=자격/티어) 제목 — 결과화면 자격 라벨·자격증 발급에 사용.
+    // 응시한 시험(=자격/티어) 제목 — 결과화면 자격 라벨·인증서 발급에 사용.
     let examTitle: string | null = null
     if (attempt.exam_id) {
       const { data: exam } = await admin.from('exams').select('title').eq('id', attempt.exam_id).maybeSingle()

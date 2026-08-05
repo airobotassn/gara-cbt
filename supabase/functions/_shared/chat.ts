@@ -19,6 +19,17 @@ export const CHAT_MOD_ENABLED = (Deno.env.get('CHAT_MOD_ENABLED') ?? 'true') !==
 //  기본 차단; CHAT_ALLOW_LINKS=true 로 허용 전환 가능.
 export const CHAT_ALLOW_LINKS = (Deno.env.get('CHAT_ALLOW_LINKS') ?? 'false') === 'true'
 
+// 자동 가림 임계치 — 서로 다른 사람 N명이 신고하면 관리자 손을 안 거치고 즉시 채팅창에서 내린다.
+//  · 예전엔 임계치가 없어서 100명이 신고해도 관리자가 화면을 열 때까지 글이 그대로 보였다.
+//  · 1인 1신고(unique(message_id, reporter_id))라 신고 행 수 = 서로 다른 신고자 수다.
+//  · 무효(dismissed) 처리된 신고는 세지 않는다 — 오신고가 쌓여 자동 가림을 밀어올리면 안 된다.
+export const CHAT_AUTO_HIDE_REPORTS = Number(Deno.env.get('CHAT_AUTO_HIDE_REPORTS') ?? '3')
+
+// mod_status 값. 'ok' 만 남에게 보인다(chat-list 의 노출 필터) — 나머지는 작성자 본인에게만 보인다.
+//  · 'pending'     = OpenAI 모더레이션 장애로 검사 못 하고 올라간 글(fail-open)
+//  · 'auto_hidden' = 신고 누적으로 자동 가림. pending 과 이유가 달라서 관리자 화면 배지를 가르려고 분리했다.
+export const MOD_AUTO_HIDDEN = 'auto_hidden'
+
 // URL 감지: http(s):// · www. · 흔한 TLD 의 맨도메인(스팸/피싱). 오탐 최소화 위해 TLD 화이트리스트로 제한.
 const LINK_RE =
   /(?:https?:\/\/|www\.)\S+|\b[a-z0-9][a-z0-9-]*\.(?:com|net|org|kr|io|co|me|gg|xyz|top|link|shop|site|online|info|biz|tv|cc|ly|to|app|dev|ru|cn|jp)\b(?:[/?#]\S*)?/i
@@ -52,21 +63,16 @@ export function normalizeRoom(v: unknown): string {
   return /^[A-Z]{2}$/.test(up) ? up : GLOBAL_ROOM
 }
 
-// 작성자 프로필 — 표시 이름 + 국가(방 쓰기 권한 판정용). 한 번의 조회로 둘 다 가져온다.
+// 작성자 프로필 — 표시 이름.
 //   display_name 이 없으면(익명/미설정) '익명#'+uid 앞 4자.
+//   ⚠️ 예전엔 country_code 도 같이 읽어 "내 나라 방에만 쓰기" 판정에 썼는데, 그 제한이 풀리면서 빠졌다.
 export async function resolvePoster(
   admin: SupabaseClient,
   userId: string,
-): Promise<{ name: string; country: string | null }> {
-  const { data } = await admin.from('profiles').select('display_name, country_code').eq('id', userId).maybeSingle()
+): Promise<{ name: string }> {
+  const { data } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle()
   const name = (data?.display_name ?? '').trim()
-  const cc = (data?.country_code ?? '').trim()
-  return { name: name || `익명#${userId.slice(0, 4)}`, country: cc ? cc.toUpperCase() : null }
-}
-
-// 나라 방은 그 나라 사람만 쓴다(읽기는 누구나). 전세계 방은 로그인만 하면 누구나.
-export function canPostToRoom(room: string, country: string | null): boolean {
-  return room === GLOBAL_ROOM || (country != null && country === room)
+  return { name: name || `익명#${userId.slice(0, 4)}` }
 }
 
 type ModResult = { status: 'flagged' | 'ok' | 'unavailable' }

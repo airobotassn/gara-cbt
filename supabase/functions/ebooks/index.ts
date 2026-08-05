@@ -46,11 +46,8 @@ function shape(b: Row, owned: boolean, lang: string) {
 //   예) Lv.3 탈락 → 3·4 / Lv.3 승급(→4) → 4·5.
 //   ⚠️ 절댓값 거리로 정렬하면 안 된다 — 아래 레벨이 위 레벨과 같은 거리라 이미 통과한 교재가 끼어든다.
 //      (옛 동작: Lv.3 탈락에 3·4·2 가 나갔다.) 아래 레벨은 후보에서 아예 뺀다.
+//   (판정은 이제 DB 쿼리의 .in('target_level', [want … want+PICK_SPAN-1]) 이 한다 — 옛 inPickRange 는 제거됐다.)
 const PICK_SPAN = 2
-function inPickRange(b: Row, want: number): boolean {
-  const lv = b.target_level as number | null
-  return lv != null && lv >= want && lv < want + PICK_SPAN
-}
 
 async function ownedIds(admin: ReturnType<typeof adminClient>, uid: string): Promise<Set<string>> {
   const { data } = await admin.from('ebook_purchases').select('ebook_id').eq('user_id', uid)
@@ -91,34 +88,63 @@ Deno.serve(async (req) => {
       const want = hasLevel ? Math.min(7, rawLevel + (body?.promoted ? 1 : 0)) : 0
       const limit = Math.min(12, Math.max(1, Math.floor(Number(body?.limit ?? 3)) || 3))
 
-      const { data, error } = await admin
-        .from('ebooks')
-        .select('id, title, author, description, cover_url, price, target_level, published, sort_order, created_at, translations')
-        .eq('published', true)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false })
-      if (error) return json({ error: error.message }, 400)
+      // ⚠️ 전량 조회 금지 — 예전엔 published 이북을 통째로 받아 메모리에서 걸렀다(limit 도 없었다).
+      //    필요한 건 대상 레벨 몇 권 + 모자랄 때 채울 '레벨 무관' 몇 권뿐이라 **DB 에서 좁혀서 필요한 만큼만** 받는다.
+      //    한 방 OR 쿼리로 합치지 않는 이유: 정렬이 sort_order 라, 노출순이 앞선 '레벨 무관' 책이 많으면
+      //    limit 안에서 정작 대상 레벨 책을 밀어내 잘못된 폴백이 나온다. 그래서 두 쿼리로 나눈다.
+      const SELECT = 'id, title, author, description, cover_url, price, target_level, published, sort_order, created_at, translations'
+      let rows: Row[] = []
 
-      const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
-      const rows = (data ?? []).filter((b: Row) => !mine.has(b.id as string))
-
-      let out = rows
       if (hasLevel) {
-        // ①대상 두 레벨만 남기고 ②낮은 레벨(=지금 도전할 레벨) 먼저 ③같은 레벨이면 스토어 노출순.
-        //   안정 정렬에 기대지 않고 2차 키를 명시한다.
-        const ranged = rows.filter((b: Row) => inPickRange(b, want))
-        ranged.sort((a: Row, b: Row) => {
-          const lv = ((a.target_level as number) ?? 0) - ((b.target_level as number) ?? 0)
-          if (lv !== 0) return lv
-          return ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0)
-        })
-        // 해당 레벨 교재가 아직 없으면(상위 레벨 미출간) 빈 칸으로 두지 말고 '레벨 무관' 책으로만 채운다.
-        //   아래 레벨로는 채우지 않는다 — 이미 통과한 교재를 다시 권하는 게 추천의 실패 사례였다.
-        const anyLevel = rows.filter((b: Row) => (b.target_level as number | null) == null)
-        out = ranged.length >= limit ? ranged : [...ranged, ...anyLevel]
+        // ① 대상 레벨: want ~ want+PICK_SPAN-1 (7 초과는 없음). 낮은 레벨(=지금 도전할 레벨) 먼저, 같으면 노출순.
+        const wanted = Array.from({ length: PICK_SPAN }, (_, i) => want + i).filter((l) => l <= 7)
+        const { data, error } = await admin
+          .from('ebooks')
+          .select(SELECT)
+          .eq('published', true)
+          .in('target_level', wanted)
+          .order('target_level', { ascending: true })
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        if (error) return json({ error: error.message }, 400)
+        rows = data ?? []
+
+        // ② 모자라면 '레벨 무관'(target_level IS NULL) 으로만 채운다.
+        //    아래 레벨로는 채우지 않는다 — 이미 통과한 교재를 다시 권하는 게 추천의 실패 사례였다.
+        if (rows.length < limit) {
+          const { data: anyLevel, error: e2 } = await admin
+            .from('ebooks')
+            .select(SELECT)
+            .eq('published', true)
+            .is('target_level', null)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: false })
+            .limit(limit - rows.length)
+          if (e2) return json({ error: e2.message }, 400)
+          rows = [...rows, ...(anyLevel ?? [])]
+        }
+      } else {
+        // 레벨을 안 주면(디버그·미상) 노출순 앞에서부터.
+        const { data, error } = await admin
+          .from('ebooks')
+          .select(SELECT)
+          .eq('published', true)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        if (error) return json({ error: error.message }, 400)
+        rows = data ?? []
       }
+
+      // ⚠️ 보유한 책도 **빼지 않는다**(2026-08-05). 예전엔 제외했는데, 그러면 레벨당 1권 체계에서
+      //    한 권만 나오거나 아예 안 뜨는 일이 생겨 "2권 나와야 하는 자리"가 비어 보였다.
+      //    대신 owned 플래그로 내려서 화면이 '보유중'으로 구분할 수 있게 한다.
+      const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
+      const out = rows
+
       return json({
-        ebooks: out.slice(0, limit).map((b: Row) => shape(b, false, lang)),
+        ebooks: out.slice(0, limit).map((b: Row) => shape(b, mine.has(b.id as string), lang)),
         // 어떤 레벨을 기준으로 골랐는지(디버그·문구용). 레벨 없이 부르면 null.
         forLevel: hasLevel ? want : null,
       })

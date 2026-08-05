@@ -10,7 +10,7 @@ const SUBJECT_CODE: Record<GradeCode, SubjectCode> = {
   MAS: 'CM', GMA: 'CM', ZEN: 'CM',
 }
 
-// 자격증 유효기간(개월) — 등급별. null = 무기한. 정책 변경 시 이 표 한 곳만 수정.
+// 인증서 유효기간(개월) — 등급별. null = 무기한. 정책 변경 시 이 표 한 곳만 수정.
 //   CARIS-Ⅰ: Beginner·Pro = 6개월, Elite = 12개월. CARIS-Ⅱ(Master 계열) = 무기한(내용 미확정).
 const EXPIRY_MONTHS: Record<GradeCode, number | null> = {
   BEG: 6, PRO: 6, ELT: 12, MAS: null, GMA: null, ZEN: null,

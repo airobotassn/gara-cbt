@@ -275,7 +275,7 @@ export default function MyPage() {
   const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')
 
   // 발급 = 서버 기록(cert_issued_at) — 마이페이지/성적표 어디서 발급해도 '발급 완료'로 남고, 재발급도 가능.
-  // 발급 응답에서 진위확인 토큰·확정 자격번호를 받아 자격증(QR)에 실어 보낸다.
+  // 발급 응답에서 진위확인 토큰·확정 자격번호를 받아 인증서(QR)에 실어 보낸다.
   // 결제 유도 화면(/certificate 의 cert-gate)에 넘길 state — 견본 화면의 CTA 도 이걸 그대로 재사용한다.
   function gateState(a: MyAttempt) {
     return {
@@ -301,7 +301,7 @@ export default function MyPage() {
   async function goCert(a: MyAttempt) {
     let verifyToken = a.verifyToken ?? undefined
     let certNo = a.certNo ?? certNoOf(a)
-    // 아직 발급(유료) 전이면 자격증 대신 결제 유도 화면으로 — 발급은 그 화면의 결제 CTA 에서 한다.
+    // 아직 발급(유료) 전이면 인증서 대신 결제 유도 화면으로 — 발급은 그 화면의 결제 CTA 에서 한다.
     if (!a.certIssuedAt) {
       navigate('/certificate', { state: gateState(a) })
       return
@@ -321,7 +321,7 @@ export default function MyPage() {
     navigate('/certificate', {
       state: {
         name,
-        // 자격증에 각인된 영문 성명 — 발급 때 저장한 스냅샷을 그대로 다시 쓴다(재발급도 같은 이름).
+        // 인증서에 각인된 영문 성명 — 발급 때 저장한 스냅샷을 그대로 다시 쓴다(재발급도 같은 이름).
         nameRoman,
         qualification: a.examTitle ?? t('mypage.exam_fallback'),
         grade: gradeDisplay(a.examTitle),
@@ -495,10 +495,10 @@ export default function MyPage() {
             )
           )}
 
-          {/* 자격증 발급 현황 */}
+          {/* 인증서 발급 현황 */}
           {!loading && !err && tab === 'issuance' && (
             <div className="flex flex-col gap-6">
-              {/* 자격증 견본 — 취득 여부와 무관하게 이 탭에 항상 있는 고정 진입점(목록 위).
+              {/* 인증서 견본 — 취득 여부와 무관하게 이 탭에 항상 있는 고정 진입점(목록 위).
                   합격 건이 있으면 그 급수 견본으로, 없으면 기본 급수 견본으로 연다. */}
               <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col md:flex-row md:items-center justify-between gap-5">
                 <div className="flex items-start gap-5">

@@ -626,3 +626,27 @@
 .vio-sum { margin-top: 4px; font-size: var(--fs-sm); color: var(--danger-fg); cursor: help; white-space: nowrap; }
 /* 중단 배지의 자진/무단 꼬리표 */
 .badge em { font-style: normal; font-weight: 700; opacity: .7; margin-left: 3px; }
+
+/* 사유 배지 = 펼치기 버튼. 배지 모양을 그대로 쓰되 눌리는 물건임을 커서·캐럿으로 알린다. */
+.chatmod-badge-btn {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chatmod-badge-btn:hover { filter: brightness(1.15); }
+/* 캐럿 — 10px + opacity .7 은 배지 안에서 안 보였다(2026-08-05 지적).
+   배지 글자와 같은 크기로 올리고 불투명하게 둔다. */
+.chatmod-caret { font-size: var(--fs-sm); line-height: 1; opacity: 1; }
+
+/* 완전삭제 — 되돌릴 수 없는 동작이라 나머지 버튼과 색으로 갈라 놓는다. */
+.admin-mini.chatmod-danger {
+  color: var(--danger-fg);
+  border-color: color-mix(in srgb, var(--danger-fg) 45%, transparent);
+}
+.admin-mini.chatmod-danger:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger-fg);
+}

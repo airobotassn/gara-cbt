@@ -1,6 +1,6 @@
 import qrcode from 'qrcode-generator'
 
-// QR 코드를 모듈(격자) 정보로 반환 — 자격증 SVG 안에 <rect> 로 직접 인라인(벡터, 인쇄 선명).
+// QR 코드를 모듈(격자) 정보로 반환 — 인증서 SVG 안에 <rect> 로 직접 인라인(벡터, 인쇄 선명).
 //   text: 인코딩할 문자열(진위확인 URL)
 //   ecc:  오차정정 레벨(기본 M — 인쇄/스캔 균형)
 export function qrMatrix(text: string, ecc: 'L' | 'M' | 'Q' | 'H' = 'M') {

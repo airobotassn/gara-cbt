@@ -25,9 +25,11 @@ Deno.serve(async (req) => {
     if (row.user_id !== user.id) return json({ error: 'forbidden' }, 403)
 
     const nowIso = new Date().toISOString()
+    // hidden_by='self' — 관리자 강제 숨김(chatHide 의 'admin')과 구분한다.
+    // 이 표식이 없으면 관리자 화면의 '숨김 해제'가 **사용자가 스스로 지운 글을 되살린다**(2026-08-05 수정).
     const { error } = await admin
       .from('chat_messages')
-      .update({ deleted_at: nowIso, updated_at: nowIso })
+      .update({ deleted_at: nowIso, updated_at: nowIso, hidden_by: 'self' })
       .eq('id', messageId)
     if (error) return json({ error: error.message }, 500)
 

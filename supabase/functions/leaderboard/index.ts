@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       const d = (data ?? {}) as { top?: RpcUser[]; total?: number; me?: (RpcUser & { points_to_pass?: number | null }) | null }
       const top = (d.top ?? []).map((u) => mapUser(u))
       const me: Record<string, unknown> | null = d.me ? mapUser(d.me, true) : null
-      // 칭호(자격증 트랙·급수): 개인 응답 me 에만 부착. exam_attempts 합격에서 ON READ 파생(user_titles).
+      // 칭호(인증서 트랙·급수): 개인 응답 me 에만 부착. exam_attempts 합격에서 ON READ 파생(user_titles).
       //   · 로그인 사용자만 조회(비로그인 me=null). 실패 시 무시(back-compat: title 미포함).
       //   · top 행은 user_id 를 노출하지 않으므로(프라이버시) 칭호 미부착. me(본인)만 노출.
       if (me && user?.id) {

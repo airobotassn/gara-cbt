@@ -41,8 +41,9 @@
   /* ===== 폰트 ===== */
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
     system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
-  /* GARA Precision: 라틴·숫자는 Hanken Grotesk, CJK·힌디는 Pretendard(--font-sans)로 자연 폴백 */
-  --font-grotesk: 'Hanken Grotesk', 'Space Grotesk', var(--font-sans);
+  /* --font-grotesk 는 2026-08-04 부터 --font-sans 와 같은 값이다(글씨체 Pretendard 통일).
+     이름만 남긴 이유 = apex/policy/guide 등 15곳이 이 토큰을 쓰고 있어서다. 새 코드는 --font-sans 를 쓸 것. */
+  --font-grotesk: var(--font-sans);
 
   /* ===== 반응형 유동 토큰 ===== */
   --container: 760px;

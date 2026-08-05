@@ -344,9 +344,6 @@ export default function WorldArena() {
     return regions.find((x) => x.key === selKey)?.name ?? chatRoom
   }, [chatRoom, level, drillName, regions, selKey, t])
 
-  // 쓰기는 내 나라 방 + 전세계 방만(서버가 같은 규칙으로 다시 막는다).
-  const canChat = !!user && (chatRoom === 'global' || chatRoom === home)
-
   const crumbs = useMemo(() => {
     if (level === 0) return []
     return [
@@ -592,12 +589,7 @@ export default function WorldArena() {
                 )}
               </div>
               {/* key={chatRoom} — 방이 바뀌면 목록·커서·폴링을 통째로 새로 시작한다(전 방 응답 섞임 방지) */}
-              <ChatBoard
-                key={chatRoom}
-                room={chatRoom}
-                canPost={canChat}
-                readOnlyHint={t('chat.readOnlyRoom', { country: chatRoomName })}
-              />
+              <ChatBoard key={chatRoom} room={chatRoom} />
             </aside>
           )}
           {/* 아이콘만 있는 세로 레일 — 이름은 data-label 이 CSS 툴팁으로 띄운다(스크린리더는 aria-label). */}

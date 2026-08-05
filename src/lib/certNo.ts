@@ -19,13 +19,13 @@ const SUBJECT_CODE: Record<GradeCode, 'CA' | 'CM'> = {
   MAS: 'CM', GMA: 'CM', ZEN: 'CM',
 }
 
-// 자격증 유효기간(개월) — 등급별. null = 무기한. 정책 변경 시 이 표 한 곳만 수정.
+// 인증서 유효기간(개월) — 등급별. null = 무기한. 정책 변경 시 이 표 한 곳만 수정.
 //   CARIS-Ⅰ: Beginner·Pro = 6개월, Elite = 12개월. CARIS-Ⅱ(Master 계열) = 무기한(내용 미확정).
 const EXPIRY_MONTHS: Record<GradeCode, number | null> = {
   BEG: 6, PRO: 6, ELT: 12, MAS: null, GMA: null, ZEN: null,
 }
 
-// 등급 표시명(브랜드 고정, 언어 무관) — 자격증 급수 라벨("CARIS PRO" 등)에 사용.
+// 등급 표시명(브랜드 고정, 언어 무관) — 인증서 급수 라벨("CARIS PRO" 등)에 사용.
 const GRADE_NAME: Record<GradeCode, string> = {
   BEG: 'BEGINNER', PRO: 'PRO', ELT: 'ELITE', MAS: 'MASTER', GMA: 'GRAND MASTER', ZEN: 'ZENITH',
 }
@@ -41,7 +41,7 @@ export function gradeOfTitle(title?: string | null): GradeCode {
   return 'PRO'
 }
 
-// 자격증 표시용 급수명 — "CARIS PRO" 등(브랜드 고정).
+// 인증서 표시용 급수명 — "CARIS PRO" 등(브랜드 고정).
 export function gradeDisplay(title?: string | null): string {
   return `CARIS ${GRADE_NAME[gradeOfTitle(title)]}`
 }
@@ -56,7 +56,7 @@ export function expiryMonths(grade: GradeCode): number | null {
   return EXPIRY_MONTHS[grade]
 }
 
-// 날짜 표기 "2026. 07. 15" — 자격증/성적표 공용 포맷.
+// 날짜 표기 "2026. 07. 15" — 인증서/성적표 공용 포맷.
 export function fmtCertDate(d: Date): string {
   return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
 }

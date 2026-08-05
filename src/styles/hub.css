@@ -29,7 +29,7 @@
   --shc2: 26, 28, 36;
   position: relative; max-width: 480px; margin: 0 auto; min-height: 100vh;
   padding: 14px 14px 20px; box-sizing: border-box; overflow: clip; color: var(--ink);
-  font-family: system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 800;
+  font-family: var(--font-sans); font-weight: 800;
   background-color: var(--pagebg);
   background-image: radial-gradient(circle 480px at 50% 120px, var(--glow), rgba(0, 74, 198, 0) 62%);
   background-repeat: no-repeat;
@@ -66,18 +66,9 @@
 .hub .hud-name { display: flex; align-items: center; gap: 6px; font-size: 18px; font-weight: 900; }
 .hub .tt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; color: #fff; white-space: nowrap;
   background: var(--orange); border: 3px solid var(--line); border-radius: 999px; padding: 2px 10px; }
-/* 티어 = 엠블렘 이미지 단독(칩 배경 없음). 백분위 텍스트를 뺐으므로 노란 알약도 같이 없앴다. */
-.hub .tier-chip { display: inline-flex; align-items: center; line-height: 0; }
-/* ⚠️ !important 필수 — TierBadge 가 인라인 style 로 width/height 를 박아서(size prop) 클래스로는 못 이긴다.
-   위 .hud-av .av img 규칙과 같은 이유. */
-.hub .tier-chip img { display: block; width: 34px !important; height: 34px !important; flex: 0 0 auto; }
-.hub .tier-chip em { font-style: normal; opacity: .75; }
 /* ⚠️ 바 높이는 옆 코인 칩(.gchip)과 같아야 한다 — 한 줄에 나란히 서는 두 요소라 높이가 어긋나면 바로 보인다.
    .gchip 높이(모바일 28 / PC 40)를 바꾸면 여기도 같이 바꿀 것. */
 .hub .exp { position: relative; margin-top: 6px; height: 28px; border-radius: 999px; overflow: hidden; background: var(--card); border: 3px solid var(--line); }
-/* ⚠️ 바 위에 글자('ARENA Lv.N' + 점수)가 얹히므로 채움은 **진한 블록이 아니라 옅은 틴트 + 또렷한 진행선**이다.
-   원래처럼 --exp 원색으로 꽉 채우면 채움 경계에서 글자가 반쯤 묻혀 읽히지 않는다.
-   면은 --card 와 섞어 연하게, 경계만 원색 3px 로 세워 진행도를 읽게 한다. */
 /* ⚠️ 채움은 **민무늬 그라데이션 하나**다. 넣지 말 것(둘 다 2026-08-04 반려):
    · 사선 스트라이프 — 글자가 바 위에 얹혀서 무늬가 자획과 겹치면 읽기 나빠진다.
    · 끝단 진행선(border-right) — 글자 사이를 가르는 선처럼 보인다. */
@@ -262,9 +253,7 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .exp-txt { padding: 0 16px; gap: 12px; }
   .hub .exp-pct { display: none; }
   .hub .exp-frac { display: inline; }
-  .hub .gchip { width: 128px; height: 40px; font-size: 18px; }
-  .hub .tier-chip img { width: 48px !important; height: 48px !important; }
-  .hub .exp-lv { font-size: 15px; }
+  .hub .gchip { width: 128px; height: 40px; font-size: 18px; }  .hub .exp-lv { font-size: 15px; }
   .hub .stage-zone { height: 470px; margin-top: 8px; }
   .hub .ricon { width: 62px; height: 62px; }
   .hub .fcard { width: 84px; font-size: 17px; }

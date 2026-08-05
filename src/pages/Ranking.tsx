@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { type Tier } from '../lib/scoring'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { countryName } from '../lib/regions'
+import { showPercentile } from '../lib/scoring'
 import { useT, type TFunc } from '../lib/i18n'
 import TopBar from '../components/TopBar'
-import TierBadge from '../components/TierBadge'
 import { Avatar } from '../components/GemAvatar'
 import ShareCardModal from '../components/ShareCardModal'
 import type { ShareCardData } from '../lib/shareCard'
@@ -20,7 +19,7 @@ interface HofUser {
   image: string | null
   mascot: string | null
   me: boolean
-  tier: Tier | null
+  // ⚠️ 서버는 아직 tier 를 내려주지만(DB ranking_tier) 티어 표시는 2026-08-04 제거돼 읽지 않는다.
   percentile: number | null // 0~1, 낮을수록 상위 (해당 보드 범위 안 기준)
 }
 interface HofResponse {
@@ -137,8 +136,6 @@ export default function Ranking() {
         name: cardOf.name,
         avatarUrl: avatarUrlOf(cardOf),
         seed: cardOf.name,
-        tier: cardOf.tier,
-        tierLabel: cardOf.tier ? t(`rank.tier_${cardOf.tier}`) : '',
         percentile: cardOf.percentile,
         rank: cardOf.rank,
         rankTotal: data?.total ?? null,
@@ -289,12 +286,11 @@ function MeBar({
         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(me)} seed={me.name} size={48} /></span>
         <span className="bar-nm">
           {me.name}
-          <small>{t('rank.top_label')} {mePct}%</small>
+          {/* 모수가 적으면 백분위 자체를 감춘다 — 3명뿐인데 1등이 '상위 33%' 로 찍히면 오히려 못한 것처럼 읽힌다.
+              대체 문구("N명 중 M위")도 넣지 않는다: 사람이 모이면 그때 조용히 나타나는 게 낫다(scoring.ts 참고). */}
+          {showPercentile(total) && <small>{t('rank.top_label')} {mePct}%</small>}
         </span>
         <span className="bar-pt">{t('rank.pt', { n: me.rating })}</span>
-        <span className="bar-tier">
-          {me.tier ? <TierBadge tier={me.tier} size={40} alt={t(`rank.tier_${me.tier}`)} /> : null}
-        </span>
       </div>
     </div>
   )
@@ -369,11 +365,6 @@ function PersonalBoard({
               {podium.map((u, i) =>
                 u ? (
                   <div key={`pl${u.rank}`} className={`hof-plate ${podClass[i]}`}>
-                    {u.tier ? (
-                      <span className="hof-plate-em">
-                        <TierBadge tier={u.tier} size={40} alt={t(`rank.tier_${u.tier}`)} />
-                      </span>
-                    ) : null}
                     <span className="hof-plate-txt">
                       <b>{u.name}</b>
                       <span>{t('rank.pt', { n: u.rating })}</span>
@@ -423,9 +414,6 @@ function HofRow({ u, t, onPick }: { u: HofUser; t: TFunc; onPick: (u: HofUser) =
           {u.me ? <span className="meflag">{t('rank.you')}</span> : null}
         </span>
         <span className="bar-pt">{t('rank.pt', { n: u.rating })}</span>
-        <span className="bar-tier">
-          {u.tier ? <TierBadge tier={u.tier} size={40} alt={t(`rank.tier_${u.tier}`)} /> : null}
-        </span>
       </div>
     </div>
   )

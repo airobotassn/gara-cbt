@@ -98,13 +98,13 @@ export interface MyAttempt {
   totalCorrect: number | null
   totalQuestions: number
   passed: boolean | null
-  certIssuedAt: string | null // 자격증 발급 완료 시각(서버 기록) — null=미발급
+  certIssuedAt: string | null // 인증서 발급 완료 시각(서버 기록) — null=미발급
   certNo?: string | null // 발급 시 확정된 자격번호(미발급이면 null → 프론트 임시 계산)
   verifyToken?: string | null // QR 진위확인 토큰(발급 후에만)
-  certNameRoman?: string | null // 자격증에 각인된 영문 성명(발급 신청 때 입력한 값)
+  certNameRoman?: string | null // 인증서에 각인된 영문 성명(발급 신청 때 입력한 값)
 }
 
-// my-attempts 응답 — 목록 + (issue 요청 시) 방금 발급된 자격증 토큰·번호
+// my-attempts 응답 — 목록 + (issue 요청 시) 방금 발급된 인증서 토큰·번호
 export interface IssuedCert {
   verifyToken: string
   certNo: string

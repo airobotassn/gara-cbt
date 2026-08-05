@@ -29,10 +29,6 @@
 .db-wrap .panel-card .ph {
   margin-bottom: 18px;
 }
-.db-wrap .tierhero {
-  gap: 22px;
-  padding: 20px 26px;
-}
 .db-wrap .hrow {
   gap: 16px;
   padding: 16px 4px;
@@ -105,10 +101,6 @@
   .db-wrap .panel-card {
     padding: 18px;
   }
-  .db-wrap .tierhero {
-    gap: 14px;
-    padding: 16px 18px;
-  }
   .db-wrap .hrow {
     gap: 12px;
     padding: 14px 4px;
@@ -120,9 +112,6 @@
   }
   .db-wrap .panel-card {
     padding: 15px;
-  }
-  .db-wrap .tierhero {
-    padding: 16px;
   }
 }
 
@@ -447,93 +436,14 @@
 
 
 /* 대시보드 티어 히어로 */
-.tierhero {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 18px;
-  border: 1px solid var(--line2);
-  border-radius: 18px;
-  padding: 16px 22px;
-  margin-top: 6px;
-  background: var(--bg);
-}
 @media (max-width: 600px) {
-  .tierhero {
-    gap: 14px;
-    padding: 16px 18px;
-  }
 }
 @media (max-width: 400px) {
-  .tierhero {
-    flex-wrap: wrap;
-    padding: 16px;
-  }
-}
-.tierhero > div {
-  min-width: 0;
-}
-.tierhero .nm {
-  font-size: var(--fs-md);
-  font-weight: 820;
-  letter-spacing: 0.02em;
-  overflow-wrap: anywhere;
-}
-.tierhero .sub {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  margin-top: 3px;
 }
 
 /* ===== 티어 사다리(히어로 오른쪽): 브론즈→다이아, 내 티어만 하이라이트 ===== */
-.tierlad {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  margin-left: auto;
-}
-.tierlad .it {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 7px 9px 6px;
-  border: 1px solid transparent;
-  border-radius: 13px;
-}
-.tierlad .it .nm {
-  font-size: var(--fs-xs, 11.5px);
-  font-weight: 700;
-  color: var(--dim);
-  white-space: nowrap;
-}
-.tierlad .it.on {
-  border-color: color-mix(in srgb, var(--tc) 55%, transparent);
-  background: color-mix(in srgb, var(--tc) 12%, transparent);
-}
-.tierlad .it.on .nm {
-  color: var(--tc);
-  font-weight: 850;
-}
 @media (max-width: 700px) {
   /* 히어로가 좁아지면 사다리를 아래 줄로 내리고 5칸이 폭에 맞게 균등 분배 */
-  .tierlad {
-    width: 100%;
-    margin-left: 0;
-    justify-content: space-between;
-    gap: 2px;
-  }
-  .tierlad .it {
-    flex: 1;
-    padding: 6px 2px 5px;
-  }
-  .tierlad .it img {
-    width: 34px !important;
-    height: 34px !important;
-  }
-  .tierlad .it .nm {
-    font-size: 10.5px;
-  }
 }
 
 /* ===== 랭킹 점수 분해(히어로 옆): Lv + 맞힌 개수 = 점수 ===== */

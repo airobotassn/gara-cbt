@@ -475,8 +475,13 @@ function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; leve
             <EbookCover title={b.title} coverUrl={b.coverUrl} className="rb-cover" />
             <b className="rb-title">{b.title}</b>
             {b.author ? <i className="rb-author">{b.author}</i> : null}
-            <span className="rb-price">
-              {b.price > 0 ? `₩${b.price.toLocaleString('ko-KR')}` : t('ebook.free')}
+            {/* 보유한 책도 추천에서 빼지 않는다(칸이 비어 보이지 않게) — 대신 가격 자리를 '보유중'으로 바꾼다. */}
+            <span className={`rb-price${b.owned ? ' is-owned' : ''}`}>
+              {b.owned
+                ? t('ebook.owned')
+                : b.price > 0
+                  ? `₩${b.price.toLocaleString('ko-KR')}`
+                  : t('ebook.free')}
             </span>
           </Link>
         ))}

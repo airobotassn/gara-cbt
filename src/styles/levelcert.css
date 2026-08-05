@@ -197,6 +197,11 @@
 /* 인쇄 = PDF 저장: 인증서 한 장(A4 가로). 배경 그림이 있어 색 보정을 강제한다. */
 @media print {
   @page { size: A4 landscape; margin: 0; }
+  /* ⚠️ 2026-08-05 버그: PDF 저장이 항상 2페이지로 나왔다(둘째 장에 세로 조각이 찍힘).
+     원인은 별자리 SVG 가 페이지 폭(A4 가로 ≈ 1122.5px)을 6~7px 넘긴 것. .lc-stage 의 overflow:hidden 은
+     scale 전 좌표계(1448×900)에서 잘라서 이 넘침을 못 막는다 → 문서 레벨에서 잘라야 한다.
+     ⚠️ 이 파일은 index.css 가 전역 import 하므로 :has() 로 이 화면에만 건다(다른 인쇄 화면을 건드리면 안 된다). */
+  html:has(.lc-page), body:has(.lc-page) { overflow: hidden !important; }
   .lc-page { min-height: auto; padding: 0; gap: 0; background: #0a0e16; display: block; }
   .lc-acts { display: none !important; }
   .lc-wrap { max-width: none; height: 700px !important; display: block; }

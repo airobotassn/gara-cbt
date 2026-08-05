@@ -30,7 +30,7 @@
   --shc: 43, 32, 21;
   --shc2: 26, 28, 36;
   position: relative; min-height: 100vh; box-sizing: border-box; color: var(--ink);
-  font-family: system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 800;
+  font-family: var(--font-sans); font-weight: 800;
   background-color: var(--pagebg);
   background-image: radial-gradient(circle 720px at 50% 0, var(--glow), rgba(0, 74, 198, 0) 62%);
   background-repeat: no-repeat;

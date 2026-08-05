@@ -8,9 +8,7 @@ import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
-import TierBadge from '../components/TierBadge'
 import {
-  type Tier,
   type ActivityKind,
   arenaLevelForScore,
   arenaBand,
@@ -73,7 +71,7 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; tier?: Tier | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
@@ -145,7 +143,6 @@ export default function Hub() {
   const [, setSkillScore] = useState(0)
   const [, setActivityScore] = useState(0)
   const [seasonTotal, setSeasonTotal] = useState(0) // 공유 카드의 시즌 점수 / 전투력
-  const [tier, setTier] = useState<Tier | null>(null)
   const [percentile, setPercentile] = useState<number | null>(null)
   // '다음 순위까지 N점' — 옛 랭킹 게이지 라벨. 경험치 바가 ARENA 레벨 진행도로 바뀌면서 화면에서 빠졌다.
   const [, setPointsToPass] = useState<number | null>(null)
@@ -273,7 +270,6 @@ export default function Hub() {
     setSkillScore(h.skillScore ?? 0)
     setActivityScore(h.activityScore ?? 0)
     setSeasonTotal(h.seasonTotal ?? 0)
-    setTier(h.tier ?? null)
     setPercentile(h.percentile ?? null)
     setPointsToPass(h.pointsToPass ?? null)
     setRank(h.rank ?? null)
@@ -360,8 +356,6 @@ export default function Hub() {
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
   // const unusedCoupons = coupons.filter((c) => !c.used).length
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {titles[0].track} {titles[0].grade}</span> : null
-  // 다음 순위 게이지: 신규/무점수 유저는 '미배치'가 아니라 백분위 100%(꼴찌)·브론즈에서 시작 — 콘텐츠로 위로 올라간다.
-  const dispTier: Tier = tier ?? 'bronze'
   // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
   //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
   const arenaLv = arenaLevelForScore(seasonTotal)
@@ -448,9 +442,6 @@ export default function Hub() {
           <div className="hud-mid">
             <div className="hud-name">
               CARI {titleBadge}
-              {/* 티어 = 엠블렘 이미지 단독(public/emblems/<tier>.webp). 백분위(상위 N%)는 뺐다 —
-                  허브에서 굳이 알려줄 값이 아니고, 순위 맥락은 랭킹 화면이 담당한다. */}
-              <span className="tier-chip"><TierBadge tier={dispTier} size={26} alt={t(`rank.tier_${dispTier}`)} /></span>
             </div>
             <div className="hud-xp">
               {/* ARENA 레벨 경험치 바. 라벨은 바 안 오른쪽(exp-lab) — 바깥에 맨텍스트로 두면 덜렁거린다. */}
@@ -675,8 +666,6 @@ export default function Hub() {
             name: displayName?.trim() || user?.user_metadata?.name || 'CARI',
             avatarUrl,
             seed: user?.id ?? 'guest',
-            tier,
-            tierLabel: t(`rank.tier_${dispTier}`),
             percentile,
             rank,
             rankTotal,
@@ -705,7 +694,7 @@ export default function Hub() {
               {[1, 2, 3].map((i) => (
                 <span key={i} className="title-slot">🔒</span>
               ))}
-              <p className="hub-modal-help">{authed ? '아직 획득한 칭호가 없어요 — 자격증에 합격하면 채워져요' : '로그인하면 칭호 보관소가 보여요.'}</p>
+              <p className="hub-modal-help">{authed ? '아직 획득한 칭호가 없어요 — 인증서에 합격하면 채워져요' : '로그인하면 칭호 보관소가 보여요.'}</p>
             </div>
           )}
         </Modal>

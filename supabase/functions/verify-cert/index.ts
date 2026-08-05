@@ -1,4 +1,4 @@
-// verify-cert: QR 진위확인 — 공개(로그인 불필요). body { token } → 자격증 원본 조회.
+// verify-cert: QR 진위확인 — 공개(로그인 불필요). body { token } → 인증서 원본 조회.
 //   토큰(verify_token)으로 exam_attempts 를 찾아 발급여부·만료를 서버가 판정.
 //   공개 안전 필드만 반환(이름 마스킹, 점수/정답/PII 미노출). 진위 판정의 단일 소스.
 //   무효/에러도 HTTP 200 + { valid:false } 로 반환(프론트가 valid 만 보게).

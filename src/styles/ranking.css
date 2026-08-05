@@ -18,18 +18,6 @@
     padding: 20px 18px;
   }
 }
-.rk-emblem {
-  width: 64px;
-  height: 64px;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  display: grid;
-  place-items: center;
-  flex: none;
-  box-shadow: 0 0 26px rgba(0, 74, 198, 0.5);
-  font-weight: 800;
-  font-size: var(--fs-sm);
-  color: var(--on-accent);
-}
 .rk-hero .who {
   flex: 1;
 }
@@ -243,16 +231,6 @@
   to {
     transform: translateX(-50%) rotate(360deg);
   }
-}
-.lb-hero-emblem {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 112px;
-  height: 112px;
-  filter: drop-shadow(0 0 22px color-mix(in srgb, var(--tc) 70%, transparent));
-  animation: lb-float 4.5s ease-in-out infinite;
 }
 @keyframes lb-float {
   50% {
@@ -660,7 +638,12 @@
       같은 그림을 쓰는 게 두 화면을 한 집안으로 묶는 가장 확실한 방법이다. /test/select 도 같은 파일이다.
    ⚠️ 원본 bg.png(2MB) 가 아니라 WebP 변환본(68KB)이다 — 같은 그림·같은 해상도. 원본은 인증서가 아직 쓴다.
    ⚠️ 배경은 body 에 건다 — .hof-wrap 은 960px 로 좁아서 넓은 화면에선 양옆에 밝은 페이지가 샌다. */
-body:has(.hof-wrap) {
+/* ⚠️ 선택자를 html 까지 올려야 한다 — stitch.css 의 `html.dark body`(우선순위 0,1,2)가 다크에서
+   background-image 를 앰비언트 그라데이션으로 덮어써 별하늘이 통째로 사라졌다(2026-08-05 버그).
+   `body:has(.hof-wrap)` 는 0,1,1 이라 그걸 못 이긴다. 이 화면은 테마와 무관하게 항상 이 배경이어야 하므로
+   다크 전용 선택자(0,2,2)를 같이 둬서 어느 테마에서도 이긴다. 둘 중 하나만 지우지 말 것. */
+html body:has(.hof-wrap),
+html.dark body:has(.hof-wrap) {
   background-color: #050a16;
   background-image: url('/cert/bg.webp');
   background-size: cover;
@@ -774,11 +757,10 @@ body:has(.hof-wrap) {
 /* (방패 엠블럼 .hof-badge 는 제거됨 — 시상대 왕관과 중복이고 고정 틀에서 110px 을 먹었다.
     에셋 public/ranking/emblem.png 는 남겨둔다.) */
 
-/* 단색 제목. 폰트는 인증서와 같은 명조(CertMyeongjo = NanumMyeongjo, cert.css 에서 전역 선언).
-   앤티크 금 시상대와 결이 맞고, '명예의 전당'·인증서가 같은 집안으로 읽힌다.
-   ⚠️ 저장소의 다른 폰트(Cormorant·Montserrat·Tinos)는 전부 라틴 전용이라 한글이 안 나온다. */
+/* 단색 제목. ⚠️ 2026-08-05 명조(CertMyeongjo) 제거 — 화면 글씨체는 Pretendard 하나로 통일했다.
+   명조는 인증서(자격증·레벨 인증서) 안에서만 쓴다. */
 .hof-title {
-  font-family: 'CertMyeongjo', serif;
+  font-family: var(--font-sans);
   font-size: var(--fs-lg); font-weight: 800; margin: 0 0 7px;
   letter-spacing: .01em; color: var(--ink);
 }
@@ -848,8 +830,6 @@ body:has(.hof-wrap) {
   display: flex; align-items: center; justify-content: center; gap: 1cqw;
   overflow: hidden; color: #1b2340; line-height: 1.06;
 }
-.hof-plate-em { flex: none; display: grid; place-items: center; }
-.hof-plate-em > *, .hof-plate-em img { width: 100% !important; height: 100% !important; display: block; }
 .hof-plate-txt { min-width: 0; text-align: center; }
 .hof-plate b { display: block; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ⚠️ nowrap 필수. 점수 단위가 언어마다 길다(ko '점' 1자 · vi 'điểm' · hi 'अंक') → 베트남어·힌디어에서
@@ -861,7 +841,6 @@ body:has(.hof-wrap) {
 
 /* 세 판 모두 두 줄(이름 위 / 점수 아래). 판 크기의 92% 정도만 써서 테두리에 글자가 붙지 않게 한다. */
 .hof-plate.p1 { left: 49.45%; top: 79.66%; width: 40.5%; height: 16%; }
-.hof-plate.p1 .hof-plate-em { width: 9.5cqw; }
 .hof-plate.p1 b { font-size: 4cqw; }
 .hof-plate.p1 .hof-plate-txt > span { font-size: 3cqw; margin-top: 0.3cqw; }
 
@@ -871,9 +850,7 @@ body:has(.hof-wrap) {
 /* ⚠️ 2·3등 글자는 아래 4~10위 행 이름(약 16px)보다 커야 한다. 작으면 2등이 4등보다 덜 보이는
    순위 역전이 난다. 600px 폭 기준 3.0cqw = 18px 로 잡아 위계를 지킨다(시상대 폭을 줄이면 여기도 올릴 것). */
 /* 엠블럼은 판 높이를 거의 채운다. 여기서 더 키우면 이름·점수 칸이 좁아진다
-   (판 폭 16.3% 중 엠블럼 5.6% + 간격을 빼면 이름·점수에 약 10%만 남는다).
    점수 글자는 긴 단위(vi 'điểm')가 한 줄에 들어가는 크기로 잡았다 — 여기서 키우면 말줄임표가 뜬다. */
-.hof-plate.p2 .hof-plate-em, .hof-plate.p3 .hof-plate-em { width: 6.6cqw; }
 .hof-plate.p2 b, .hof-plate.p3 b { font-size: 3cqw; }
 .hof-plate.p2 .hof-plate-txt > span, .hof-plate.p3 .hof-plate-txt > span { font-size: 1.9cqw; margin-top: 0.2cqw; }
 
@@ -925,8 +902,8 @@ body:has(.hof-wrap) {
 .hof-bar { position: relative; width: 100%; container-type: inline-size; }
 .bar-frame { display: block; width: 100%; height: auto; }
 .bar-nm {
-  position: absolute; left: 23.5%; top: 49.6%; transform: translateY(-50%);
-  max-width: 42%;
+  position: absolute; left: 23.8%; top: 49.6%; transform: translateY(-50%);
+  max-width: 52%;
   display: flex; align-items: center; gap: 1.2cqw;
   /* 판은 양 테마에서 늘 밝은 크림이므로 글자색은 테마 토큰(--ink)이 아니라 고정 남색 */
   font-weight: 800; font-size: 3.2cqw; color: #1b2340;
@@ -934,24 +911,23 @@ body:has(.hof-wrap) {
 }
 .bar-nm small { font-weight: 700; font-size: 2.5cqw; color: #5b6f9e; }
 .bar-pt {
-  position: absolute; right: 11.5%; top: 49.6%; transform: translateY(-50%);
+  position: absolute; right: 4.5%; top: 49.6%; transform: translateY(-50%);
   font-weight: 850; font-size: 3.2cqw; color: #2b3766; font-variant-numeric: tabular-nums;
 }
-.bar-rk, .bar-ava, .bar-tier { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; }
-/* 아바타·티어 엠블렘은 px 고정으로 그려지므로 소켓 크기에 맞춰 늘린다(인라인 style 이라 !important 필요) */
-.bar-ava > *, .bar-ava img, .bar-ava svg,
-.bar-tier > *, .bar-tier img, .bar-tier svg { width: 100% !important; height: 100% !important; display: block; }
+.bar-rk, .bar-ava { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; }
+/* 아바타는 px 고정으로 그려지므로 소켓 크기에 맞춰 늘린다(인라인 style 이라 !important 필요) */
+.bar-ava > *, .bar-ava img, .bar-ava svg { width: 100% !important; height: 100% !important; display: block; }
 /* 순위 숫자 칸은 둥근 사각이고 어두운 검정이다(옛 바는 밝은 하늘색 원이었다) → 글자색은 금빛.
    토큰(--fs-lg 는 데스크톱에서 52px까지 커진다) 대신 고정값. 폰 크기는 아래 미디어쿼리에서. */
-.bar-rk { left: 5.37%; top: 49.59%; width: 7.9%; aspect-ratio: 1; font-weight: 900; font-size: 4.4cqw; color: #f2dfa6; }
-.bar-ava { left: 14.77%; top: 49.59%; width: 7.26%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; }
-/* 방패는 세로로 길다(132×174) → 세로에 맞춰 넣는다(가로 기준으로 잡으면 33px 밖에 안 돼 엠블럼이 안 읽힌다).
-   가로로 조금 넘치지만 방패 금테 위에 살짝 걸치는 정도다. */
-.bar-tier { left: 95.73%; top: 50.83%; height: 66%; width: auto; aspect-ratio: 1; }
-/* 티어 엠블럼은 어두운 금속 그림이라 어두운 소켓 위에서 뭉개진다 → 밝기·채도를 올리고 옅은 광채를 준다 */
-.bar-tier img, .hof-plate-em img {
-  filter: brightness(1.28) saturate(1.15) drop-shadow(0 0 3px rgba(255, 236, 186, 0.5));
-}
+/* ⚠️ 아래 %는 프레임 그림(public/ranking/tierbar.png)의 소켓을 알파로 실측한 값이다.
+   그림을 갈면 반드시 다시 재야 한다 — 2026-08-05 교체본(2127×246) 실측:
+     순위 소켓 x 36~201(중심 5.57% · 폭 7.76%) · 아바타 소켓 x 247~408(중심 15.40% · 폭 7.57%)
+     크림 이름판 x 454~2082(21.35% ~ 97.93%) — .bar-nm/.bar-pt 의 좌우 여백이 여기서 나온다. */
+.bar-rk { left: 5.57%; top: 49.59%; width: 7.76%; aspect-ratio: 1; font-weight: 900; font-size: 4.4cqw; color: #f2dfa6; }
+.bar-ava { left: 15.40%; top: 49.59%; width: 7.57%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; }
+/* ⚠️ 티어 엠블렘(.bar-tier, 좌표 left:95.73%)은 2026-08-04 제거됐다.
+   배경 그림 public/ranking/tierbar.png 오른쪽 끝에 **엠블렘이 들어가던 빈 방패 소켓이 그대로 남아있다** —
+   그림을 다시 뽑거나 그 자리에 다른 걸 넣기 전까지는 빈 채로 보인다. */
 /* 내 행 — 배경을 못 깔므로(프레임이 이미지) 광채로 표시.
    ⚠️ filter 를 바에 걸면 프레임 이미지가 한 번 더 래스터화돼 선이 지글거린다 → 뒤에 깔린 글로우로 처리. */
 .hof-row.me { position: relative; }

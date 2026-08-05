@@ -7,14 +7,14 @@ import { qrMatrix } from '../lib/qr'
 import { gradeDisplay, fmtCertDate, certExpiryDate, makeCertNo, gradeOfTitle } from '../lib/certNo'
 import type { MyAttemptsResponse } from '../lib/types'
 
-// ===== 자격증 = 확정 시안 PNG(배경·프레임·로고·문구·라벨) + 동적 필드 SVG 오버레이 =====
+// ===== 인증서 = 확정 시안 PNG(배경·프레임·로고·문구·라벨) + 동적 필드 SVG 오버레이 =====
 // 배경 = public/cert-template-v2.png (2026-08 협회 신규 시안 — 좌측 다크 패널 + 우측 영문 서식, 1448×1086).
 // 그 위에 값만 얹는다: ①영문 성명 ②급수 ③Certificate ID ④Issue Date ⑤Valid Until ⑥진위확인 QR.
 // 좌표는 템플릿을 픽셀 계측해 뽑았다(scratchpad/measure-cert-v2.mjs — 잉크 있는 행 구간 = 기존 텍스트 줄).
 // ⚠️ 이름은 **영문만** 각인한다(신규 시안이 영문 서식). 값은 발급 신청 화면에서 입력받아
 //    exam_attempts.cert_name_roman 에 저장된 스냅샷 — 자동 로마자 변환은 하지 않는다(성씨 표기가 제각각).
 //
-// ⚠️ 발급(결제) 전에는 자격증을 **아예 렌더하지 않는다**(preview=true → 결제 유도 화면만).
+// ⚠️ 발급(결제) 전에는 인증서를 **아예 렌더하지 않는다**(preview=true → 결제 유도 화면만).
 // 옛 방식(워터마크 얹은 견본 노출)은 캡처 한 장이면 쓸 만한 이미지가 남아 결제할 이유가 약했다.
 // 지금은 결제 전 화면에 증서 픽셀 자체가 존재하지 않고, QR 진위확인 토큰(verify_token)도 발급 후에만
 // 내려온다 — 어떤 캡처본도 /verify/:token 조회가 안 되므로 위조증서임이 증명된다.
@@ -29,7 +29,7 @@ export interface CertData {
   birth?: string
   scoreText?: string
   verifyToken?: string
-  preview?: boolean // true = 발급(결제) 전 — 자격증 대신 결제 유도 화면
+  preview?: boolean // true = 발급(결제) 전 — 인증서 대신 결제 유도 화면
   attemptId?: string // 결제 유도 화면 → 발급 전환에 필요(응시 기록 id)
   sample?: boolean // true = 디자인 견본 — 더미 인물 + 진한 워터마크(개인정보·QR 없음)
   gate?: CertData // 견본 화면의 '발급 신청' CTA 가 넘길 결제 게이트 state
@@ -38,7 +38,7 @@ export interface CertData {
 // 견본에 쓰는 더미 인물 — 실제 응시자 정보는 견본에 싣지 않는다(캡처 유출 시에도 새어나갈 개인정보 0).
 // 급수만 진입한 카드의 급수를 따라간다(급수는 시험명이라 개인정보가 아니고, 견본의 목적이 "내 급수 증서 모양"이라서).
 const SAMPLE_NAME = '홍길동'
-const SAMPLE_ROMAN = 'Hong Gildong'
+const SAMPLE_ROMAN = 'Gildong Hong' // 각인 순서 = 이름 성
 const SAMPLE_SEQ = 0 // makeCertNo 가 0001 로 채운다 — 예시 번호임이 드러나게
 
 // 배경 시안 픽셀 크기 = 뷰박스. 아래 좌표는 전부 이 좌표계(px).
@@ -83,7 +83,14 @@ function maskCertNo(s: string) {
   return s.replace(/[0-9A-Za-z]+$/, (m) => '•'.repeat(Math.max(4, m.length)))
 }
 // 영문 성명 형식 — 여권 표기 관행(라틴 문자·공백·하이픈·아포스트로피·마침표). 서버와 같은 규칙.
+// 서버(my-attempts)는 합쳐진 한 줄만 검증하므로, 아래 합성 결과가 이 규칙을 만족해야 한다.
 const ROMAN_RE = /^[A-Za-z][A-Za-z .'-]{1,39}$/
+// 성·이름 각 칸 — 한 칸 안에도 공백이 올 수 있다(Van Der Berg · Mary Jane). 첫 글자는 라틴 문자.
+const ROMAN_PART_RE = /^[A-Za-z][A-Za-z .'-]{0,38}$/
+// 입력 두 칸 → 증서에 각인할 한 줄. ⚠️ 순서는 **이름 성**(2026-08-04 지시) — 화면 입력 순서(성→이름)와 반대다.
+function joinRoman(first: string, last: string) {
+  return `${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, ' ')
+}
 
 // 견본 데이터 — 급수만 승계하고 인물·번호·날짜는 전부 예시값으로 갈아끼운다.
 function sampleCert(base: CertData): CertData {
@@ -112,8 +119,15 @@ export default function Certificate() {
   const [issuedData, setIssuedData] = useState<CertData | null>(null)
   const [issuing, setIssuing] = useState(false)
   const [issueErr, setIssueErr] = useState('')
-  // 발급 신청 화면에서 입력받는 영문 성명 — 자격증에 각인되는 유일한 이름이다.
-  const [romanDraft, setRomanDraft] = useState('')
+  // 발급 신청 화면에서 입력받는 영문 성명 — 증서에 각인되는 유일한 이름이다.
+  // 성·이름을 따로 받는다: 여권 표기를 옮겨 적을 때 어디까지가 성인지 사람마다 달라 한 칸이면 순서가 뒤죽박죽이 된다.
+  const [lastDraft, setLastDraft] = useState('')
+  const [firstDraft, setFirstDraft] = useState('')
+  // 발급 직전 각인 확인 — 이름은 발급 후 못 고치므로 결제 버튼과 실제 발급 사이에 한 단계 둔다.
+  const [confirming, setConfirming] = useState(false)
+  const romanJoined = joinRoman(firstDraft, lastDraft)
+  const romanOk =
+    ROMAN_PART_RE.test(lastDraft.trim()) && ROMAN_PART_RE.test(firstDraft.trim()) && ROMAN_RE.test(romanJoined)
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const fallbackName = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || '응시자'
@@ -122,8 +136,8 @@ export default function Certificate() {
     name: user ? fallbackName : '안형준',
     qualification: 'CARIS Beginner',
     grade: 'CARIS BEGINNER',
-    // 개발용 미리보기(state 없이 /certificate 직접 진입)엔 영문 이름이 없으므로 예시값을 채운다.
-    nameRoman: (meta.name_roman as string) || 'Ahn Hyeongjun',
+    // 개발용 미리보기(state 없이 /certificate 직접 진입)엔 영문 이름이 없으므로 예시값을 채운다(이름 성 순).
+    nameRoman: (meta.name_roman as string) || 'Hyeongjun Ahn',
     certNo: 'CA-BEG-2026-0001',
     issueDate: todayStr(),
     expiryDate: certExpiryDate('CARIS Beginner', new Date()),
@@ -140,7 +154,7 @@ export default function Certificate() {
 
   const gradeFull = data.grade || gradeDisplay(data.qualification)
   const expiryText = data.expiryDate ?? '무기한'
-  // 자격증에 각인되는 이름 = 영문 성명 하나뿐(신규 시안이 영문 서식).
+  // 인증서에 각인되는 이름 = 영문 성명 하나뿐(신규 시안이 영문 서식).
   const nm = romanFit(data.nameRoman ?? '')
   const gradeText = gradeWord(gradeFull)
   const gsize = gradeSize(gradeText)
@@ -150,17 +164,29 @@ export default function Certificate() {
   const qr = !preview && data.verifyToken ? qrMatrix(`${window.location.origin}/verify/${data.verifyToken}`, 'M') : null
   const qm = qr ? QRB.size / qr.count : 0
 
+  // 발급 버튼 → 바로 발급하지 않고 각인될 이름을 한 번 보여준다.
+  // 이유: 이름은 발급 후 수정이 불가능한데, 입력칸 순서(성→이름)와 각인 순서(이름 성)가 반대라
+  //       칸을 바꿔 적어도 화면상 티가 안 난다. 굳기 전에 실제로 새겨질 모양 그대로 보여주는 게 유일한 방어선이다.
+  function askConfirm() {
+    if (!romanOk) {
+      setIssueErr(t('cert.roman_invalid'))
+      return
+    }
+    setIssueErr('')
+    setConfirming(true)
+  }
+
   // 발급 = 유료. 💳 PG 미연동이라 지금은 "결제 성공"을 가정하고 바로 발급한다(이북 구매와 같은 데모 방식).
   // 결제 연동 시 이 함수 첫머리에 결제창 호출 + 결제 검증을 넣고, 검증 성공 뒤에만 issue 를 호출할 것.
-  //   nameRoman = 자격증에 각인할 영문 성명. 서버가 형식을 다시 검증하고 발급 스냅샷으로 저장한다.
+  //   nameRoman = 증서에 각인할 영문 성명. 서버가 형식을 다시 검증하고 발급 스냅샷으로 저장한다.
   async function issueNow() {
     const id = data.attemptId
     if (!id || id === 'preview') {
       setIssueErr(t('cert.issue_no_attempt'))
       return
     }
-    const roman = romanDraft.trim().replace(/\s+/g, ' ')
-    if (!ROMAN_RE.test(roman)) {
+    const roman = romanJoined
+    if (!romanOk) {
       setIssueErr(t('cert.roman_invalid'))
       return
     }
@@ -178,12 +204,13 @@ export default function Certificate() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
       setIssueErr(/name_roman/.test(msg) ? t('cert.roman_invalid') : msg || t('cert.issue_failed'))
+      setConfirming(false) // 확인창을 닫아야 카드 안의 에러 문구가 보인다
     } finally {
       setIssuing(false)
     }
   }
 
-  // ===== 발급(결제) 전 = 결제 유도 화면 — 자격증은 한 픽셀도 그리지 않는다 =====
+  // ===== 발급(결제) 전 = 결제 유도 화면 — 인증서는 한 픽셀도 그리지 않는다 =====
   // 취득 사실(급수·이름·취득일)과 발급하면 풀리는 것만 알려주고 결제로 보낸다.
   // 등록번호는 뒷자리를 가려 "내 번호가 준비돼 있다"는 것만 전달한다.
   if (preview) {
@@ -213,21 +240,40 @@ export default function Certificate() {
             </div>
           </dl>
 
-          {/* 영문 성명 — 자격증에 각인되는 유일한 이름이라 발급 신청 단계에서 받는다.
-              여권 표기와 맞춰 본인이 직접 적는다(자동 로마자 변환 금지: 이 = Lee/Yi/Rhee 로 제각각). */}
+          {/* 영문 성명 — 증서에 각인되는 유일한 이름이라 발급 신청 단계에서 받는다.
+              여권 표기와 맞춰 본인이 직접 적는다(자동 로마자 변환 금지: 이 = Lee/Yi/Rhee 로 제각각).
+              ⚠️ 입력 순서는 성 → 이름인데 증서 각인은 "이름 성" 이다 — hint 가 그 순서를 밝힌다. */}
           <div className="cert-gate-field">
-            <label htmlFor="cert-roman">{t('cert.roman_label')}</label>
-            <input
-              id="cert-roman"
-              value={romanDraft}
-              onChange={(e) => { setRomanDraft(e.target.value); setIssueErr('') }}
-              onKeyDown={(e) => { if (e.key === 'Enter') issueNow() }}
-              placeholder={t('cert.roman_ph')}
-              maxLength={40}
-              autoComplete="off"
-              spellCheck={false}
-              disabled={issuing}
-            />
+            <div className="cert-gate-names">
+              <div>
+                <label htmlFor="cert-roman-last">{t('cert.roman_last_label')}</label>
+                <input
+                  id="cert-roman-last"
+                  value={lastDraft}
+                  onChange={(e) => { setLastDraft(e.target.value); setIssueErr('') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') askConfirm() }}
+                  placeholder={t('cert.roman_last_ph')}
+                  maxLength={20}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={issuing}
+                />
+              </div>
+              <div>
+                <label htmlFor="cert-roman-first">{t('cert.roman_first_label')}</label>
+                <input
+                  id="cert-roman-first"
+                  value={firstDraft}
+                  onChange={(e) => { setFirstDraft(e.target.value); setIssueErr('') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') askConfirm() }}
+                  placeholder={t('cert.roman_first_ph')}
+                  maxLength={20}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={issuing}
+                />
+              </div>
+            </div>
             <p className="cert-gate-hint">{t('cert.roman_hint')}</p>
           </div>
 
@@ -244,12 +290,38 @@ export default function Certificate() {
           {issueErr && <p className="cert-issue-err">{issueErr}</p>}
 
           <div className="cert-gate-actions">
-            <button className="exam-btn" onClick={issueNow} disabled={issuing || !ROMAN_RE.test(romanDraft.trim().replace(/\s+/g, ' '))}>
+            <button className="exam-btn" onClick={askConfirm} disabled={issuing || !romanOk}>
               {issuing ? t('cert.issuing') : t('cert.gate_pay')}
             </button>
             <button className="exam-btn-ghost" onClick={() => navigate(-1)}>{t('cert.gate_later')}</button>
           </div>
         </section>
+
+        {/* 각인 확인 — 결제/발급 직전 마지막 관문. 실제 증서와 같은 세리프로 같은 순서(이름 성)로 보여준다.
+            발급 중에는 배경 클릭으로 못 닫는다(요청은 이미 날아갔는데 창만 사라지면 상태를 오해한다). */}
+        {confirming && (
+          <div className="cert-confirm-overlay" onClick={() => !issuing && setConfirming(false)}>
+            <div
+              className="cert-confirm"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cert-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="cert-confirm-title" className="cert-confirm-title">{t('cert.confirm_title')}</h2>
+              <p className="cert-confirm-name">{romanJoined}</p>
+              <p className="cert-confirm-note">{t('cert.confirm_note')}</p>
+              <div className="cert-confirm-actions">
+                <button className="exam-btn" onClick={issueNow} disabled={issuing}>
+                  {issuing ? t('cert.issuing') : t('cert.confirm_ok')}
+                </button>
+                <button className="exam-btn-ghost" onClick={() => setConfirming(false)} disabled={issuing}>
+                  {t('cert.confirm_edit')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

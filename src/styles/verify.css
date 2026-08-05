@@ -1,4 +1,4 @@
-/* 자격 진위확인 포털 — 새 CARIS 자격증(연블루·남색·엠블럼)과 같은 격의 공식 조회 화면.
+/* 자격 진위확인 포털 — 새 CARIS 인증서(연블루·남색·엠블럼)과 같은 격의 공식 조회 화면.
    신뢰가 핵심이라 라이트 톤으로 확정(앱 다크모드와 무관하게 자체 배경). */
 .vrf-page {
   --v-navy: #16305b;
@@ -20,7 +20,7 @@
   padding: 44px 16px 88px;
   background: radial-gradient(1100px 460px at 50% -8%, #f4f8ff 0%, var(--v-bg) 62%);
   color: var(--v-ink);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .vrf-doc {
@@ -32,7 +32,7 @@
   box-shadow: 0 22px 56px -34px rgba(15, 33, 64, 0.4);
   position: relative;
 }
-/* 연블루 내부 이중 프레임(새 자격증 프레임 호응) */
+/* 연블루 내부 이중 프레임(새 인증서 프레임 호응) */
 .vrf-doc::before {
   content: '';
   position: absolute;
@@ -58,12 +58,12 @@
 .vrf-rule::before { background: linear-gradient(90deg, transparent, var(--v-blue)); }
 .vrf-rule::after { background: linear-gradient(90deg, var(--v-blue), transparent); }
 .vrf-rule span { color: var(--v-blue); font-size: 7px; }
-.vrf-sys { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 22px; font-weight: 700; color: var(--v-navy-deep); letter-spacing: 0.01em; }
+.vrf-sys { font-family: var(--font-sans); font-size: 22px; font-weight: 700; color: var(--v-navy-deep); letter-spacing: 0.01em; }
 
 /* ── 판정 ── */
 .vrf-verdict { text-align: center; margin: 26px 0 8px; }
 .vrf-seal { width: 124px; height: 124px; display: block; margin: 0 auto 16px; }
-.vrf-headline { font-family: 'CertMyeongjo', 'CertGaramond', serif; font-size: 23px; font-weight: 700; color: var(--v-navy-deep); margin: 0 0 14px; word-break: keep-all; line-height: 1.35; }
+.vrf-headline { font-family: var(--font-sans); font-size: 23px; font-weight: 700; color: var(--v-navy-deep); margin: 0 0 14px; word-break: keep-all; line-height: 1.35; }
 .vrf-chip {
   display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700;
   letter-spacing: 0.09em; text-transform: uppercase; padding: 6px 16px 6px 13px; border-radius: 999px;

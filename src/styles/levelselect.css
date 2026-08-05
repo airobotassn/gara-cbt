@@ -502,11 +502,11 @@
   border-bottom: 1px solid rgba(240, 212, 147, 0.42);
 }
 
-/* 표시용 서체 = 인증서와 같은 명조(cert.css 의 CertMyeongjo = NanumMyeongjo ExtraBold).
-   ⚠️ 657KB 짜리 한글 웹폰트다. 이 화면에선 h1 과 카드 제목 딱 둘에만 쓴다 — 본문까지 물리면 안 된다.
-   font-display: swap 이라 받는 동안엔 Pretendard 로 먼저 그려진다. */
+/* 표시용 = h1 과 카드 제목. 크기·굵기만 잡고 서체는 본문과 같다.
+   ⚠️ 2026-08-05 명조(CertMyeongjo) 제거 — 화면 글씨체는 Pretendard 하나로 통일했다.
+      명조는 인증서(자격증·레벨 인증서) 안에서만 쓴다. 여기에 다시 끌어오지 말 것. */
 .lvn-display {
-  font-family: 'CertMyeongjo', 'Pretendard Variable', Pretendard, serif;
+  font-family: var(--font-sans);
   font-weight: 800;
   line-height: 1.25;
 }

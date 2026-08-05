@@ -2,7 +2,7 @@
    · 라이트 sticky GNB(white/90+blur) + 라이트 본문(메시 그라데이션·교차 밴드) + 라이트 푸터
    · 컨테이너 1280 · 흰 카드+옅은 보더+앰비언트 그림자 · 넘버드 리스트 · 코발트 콜아웃
    · 팔레트: 코발트(#004ac6/#003594) · 서피스(#faf8ff/#fff/#f3f3fd) · 잉크(#191b23/#434654)
-   · 폰트: Hanken Grotesk(라틴·숫자) + Pretendard(CJK 폴백) */
+   · 폰트: Pretendard 단일(라틴·한글 모두). --font-grotesk 는 --font-sans 의 별칭으로만 남아있다. */
 
 .ax-page {
   color-scheme: light; /* 라이트 페이지에서 네이티브 UI(스크롤바·폼) 라이트로 */
@@ -1004,16 +1004,8 @@
   color: var(--ax-blue);
 }
 
-/* ===================== 라이트 페이지에서 전역 FAB 보이게 보정 ===================== */
-.ax-page ~ .fab {
-  background: #fff;
-  border-color: rgba(115, 118, 133, 0.28);
-  box-shadow: 0 2px 8px rgba(14, 22, 38, 0.1), 0 12px 28px rgba(14, 22, 38, 0.12);
-}
-.ax-page ~ .fab:hover {
-  border-color: rgba(0, 74, 198, 0.55);
-  box-shadow: 0 0 24px -6px rgba(0, 74, 198, 0.4);
-}
+/* (옛 '라이트 페이지에서 전역 FAB 보이게 보정'(.ax-page ~ .fab)은 제거했다 —
+    2026-08-04 부터 FAB 면이 테마와 무관하게 흰색이라(fab.css 의 --fab-face) 페이지별 보정이 필요 없다.) */
 
 /* ===================== 반응형 ===================== */
 @media (max-width: 980px) {
@@ -1072,10 +1064,4 @@ html.dark .ax-header {
 html.dark .ax-page .ax-card {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.45),
     0 24px 52px -30px rgba(0, 0, 0, 0.72);
-}
-/* 라이트 페이지용 흰 FAB 보정 무효화 → 전역 다크 FAB 그대로 */
-html.dark .ax-page ~ .fab {
-  background: var(--color-surface-container);
-  border-color: var(--color-outline-variant);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 12px 28px rgba(0, 0, 0, 0.5);
 }

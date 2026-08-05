@@ -4,17 +4,17 @@
 //  · 레이아웃 레퍼런스 = 캐릭터 프로필 카드(좌 캐릭터 패널 / 중앙 흰 카드: 이름+능력치 / 우 랭킹 박스 / 하단 다크 바).
 //  · 렌더러는 **캔버스 2D 하나뿐**이다. 미리보기도 이 캔버스를 CSS 로 축소해 보여준다
 //    (DOM 미리보기 + 캔버스 출력 을 따로 만들면 둘이 반드시 어긋난다 → WYSIWYG 보장).
-//  · 티어 엠블렘은 `public/emblems/<tier>.png`(배경 제거 완료, 512px). 5티어 = Tier 와 1:1.
-//    ⚠️ 화면 UI(TierBadge)는 같은 엠블렘의 256px webp 를 쓴다 — 카드만 큰 png 를 쓴다(캔버스 확대 대비).
 //  · 업로드 아바타는 교차출처(Supabase Storage) → crossOrigin='anonymous'. 실패하면 젬으로 폴백한다
 //    (여기서 폴백 안 하면 캔버스가 오염돼 toBlob 자체가 터진다).
-import { tierColor, type Tier } from './scoring'
+
+
+import { showPercentile } from './scoring'
 
 export const CARD_W = 1600
 export const CARD_H = 900
 
 const FONT = `system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`
-// 이름은 레퍼런스처럼 세리프. 자격증(cert.css)에 이미 @font-face 로 등록된 얼굴을 재사용한다
+// 이름은 레퍼런스처럼 세리프. 인증서(cert.css)에 이미 @font-face 로 등록된 얼굴을 재사용한다
 // — CertGaramond 는 한글 글리프가 없어 한글 이름은 CertMyeongjo 로 자동 폴백된다.
 const SERIF = `'CertGaramond', 'CertMyeongjo', Georgia, serif`
 const SHARE_URL = 'gara-cbt.airobotassn.workers.dev/arena'
@@ -32,7 +32,7 @@ const T = {
   display: 76, // 이름(세리프) — 카드에 하나뿐
   hero: 40,    // 강조 숫자 — #순위 · 시즌 기록 행(라벨·값 같은 크기)
   value: 30,   // 데이터 값(하단 바 · 좌 플레이트 이름)
-  title: 24,   // 섹션 제목(시즌 기록 · 티어) · 티어명 · 자격증 알약
+  title: 24,   // 섹션 제목(시즌 기록 · 순위) · 인증서 알약(제거됨)
   label: 20,   // 태그라인 · 알약 · 기록 행 보조설명
   sub: 16,     // 보조(워드마크 · 분모 · 하단 라벨)
 } as const
@@ -41,8 +41,6 @@ export interface ShareCardData {
   name: string
   avatarUrl: string | null
   seed: string // 아바타 시드(uid) — avatar_url 이 없을 때 젬 색 결정
-  tier: Tier | null
-  tierLabel: string // 현지화된 티어명(t('rank.tier_*'))
   percentile: number | null // 0~1 (작을수록 상위) — 전세계 기준
   // 랭킹 3종 = /ranking 의 세 탭과 같은 범위(전세계 · 내 국가 · 내 지역). 순위와 모수를 짝으로 받는다.
   //   국가·지역은 온보딩 전이거나 미집계면 null → 카드에 '—' 로 나간다(빈 줄을 만들지 않는다).
@@ -153,7 +151,7 @@ function icon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy: num
     ctx.rect(-12, -1, 7.5, 12); ctx.rect(-3.75, -9, 7.5, 20); ctx.rect(4.5, -4.5, 7.5, 15.5)
     ctx.fill()
   } else {
-    // 인장(자격증)
+    // 인장(인증서)
     ctx.beginPath(); ctx.arc(0, -3, 8.5, 0, Math.PI * 2); ctx.stroke()
     ctx.beginPath(); ctx.moveTo(-5, 4); ctx.lineTo(-7, 13); ctx.lineTo(0, 9.5); ctx.lineTo(7, 13); ctx.lineTo(5, 4)
     ctx.fill()
@@ -193,8 +191,8 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas 2d unavailable')
 
-  const tier: Tier = d.tier ?? 'bronze'
-  const C = tierColor(tier)                      // 티어색 = 액센트 전용
+  // 액센트는 브랜드 고정색이다 — 옛 티어색(tierColor)이 정하던 자리인데 티어가 2026-08-04 제거됐다.
+  const C = '#5f8ed0'
   const DEEP = mix(BRAND_DEEP, BRAND, 0.14)      // 프레임/좌패널/하단바 = 브랜드 딥 네이비(티어 무관)
   const INK = '#191b23'                          // base.css --paper
   const SUB = '#8b8ba3'
@@ -268,11 +266,12 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   const hx = wx + 40
   text(ctx, '✦', hx, BODY_T + 78, { size: T.title, weight: 900, color: C })
   text(ctx, 'CARIS WORLD ARENA', hx + 38, BODY_T + 78, { size: T.label, weight: 800, color: SUB, spacing: 0.5 })
-  // 헤더 우측 = 발급기관 GARA 워드마크. 원본 png(2172×724, 배경 투명)는 여백이 커서 그대로 그리면 작아 보인다
-  // → 잉크 bounding box 로 크롭해 그린다. 로고 파일을 갈면 아래 SX/SY/SW/SH 를 다시 재야 한다.
+  // 헤더 우측 = 발급기관 GARA 워드마크(블랙 버전). 원본 png(1536×1024, 배경 투명)는 여백이 커서
+  // 그대로 그리면 작아 보인다 → 잉크 bounding box 로 크롭해 그린다.
+  // ⚠️ 로고 파일을 갈면 아래 SX/SY/SW/SH 를 알파로 다시 실측할 것(파일마다 여백이 다르다).
   try {
     const gara = await loadImage('/gara-logo.png')
-    const [SX, SY, SW, SH] = [164, 180, 1877, 383]
+    const [SX, SY, SW, SH] = [58, 298, 1421, 367]
     const LH = 44
     const LW = (SW / SH) * LH
     ctx.drawImage(gara, SX, SY, SW, SH, wx + ww - 40 - LW, BODY_T + 70 - LH / 2, LW, LH)
@@ -290,24 +289,25 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   ctx.strokeStyle = '#ececf5'; ctx.lineWidth = 2; ctx.stroke()
   text(ctx, '시즌 기록', hx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
 
-  // 행 = [아이콘][라벨][모수] … [값].
+  // 행 = [아이콘][라벨] … [값].
   // 순서 = 랭킹 3종(전세계 → 국가 → 지역) → 시즌 점수. 딱 4행이다.
   // ⚠️ 라벨은 '전세계/국가/지역' 으로 일반명만 쓴다 — 실제 국가·지역 이름은 하단 바에 한 번만 나온다.
-  // ⚠️ 레벨·연속 출석·자격증 행은 뺐다(각각 무료 레벨테스트 지표 / 랭킹과 무관한 활동 지표 / 알약 UI).
+  // ⚠️ 모수('3,410명 중')는 뺐다 — 사람이 적을 때 '7명 중' 이 그대로 나가서 순위를 깎아먹는다.
+  // ⚠️ 레벨·연속 출석·인증서 행은 뺐다(각각 무료 레벨테스트 지표 / 랭킹과 무관한 활동 지표 / 알약 UI).
   //    되살리려면 git 이력에서 pips()·pill() 을 가져올 것.
-  interface Row { icon: IconKind; label: string; value: string; sub?: string }
-  const rk = (n: number | null) => (n != null ? `#${n.toLocaleString()}` : '—')
-  const of = (n: number | null, total: number | null) => (n != null && total != null ? `${total.toLocaleString()}명 중` : undefined)
+  interface Row { icon: IconKind; label: string; value: string }
+  // 값 표기는 한국어로 통일한다 — 카드의 다른 글자가 전부 한국어라 '#127' 만 영어권 표기로 튄다.
+  const rk = (n: number | null) => (n != null ? `${n.toLocaleString()}위` : '—')
   // 남의 카드(publicOnly)는 국가·지역 행을 통째로 뺀다 — 아래 rowGap 이 행 수로 나누므로 2행이 균등하게 커진다.
   const rows: Row[] = d.publicOnly
     ? [
-        { icon: 'rank', label: '전세계', value: rk(d.rank), sub: of(d.rank, d.rankTotal) },
+        { icon: 'rank', label: '전세계', value: rk(d.rank) },
         { icon: 'score', label: '시즌 점수', value: (d.seasonTotal ?? 0).toLocaleString() },
       ]
     : [
-        { icon: 'rank', label: '전세계', value: rk(d.rank), sub: of(d.rank, d.rankTotal) },
-        { icon: 'rank', label: '국가', value: rk(d.countryRank), sub: of(d.countryRank, d.countryTotal) },
-        { icon: 'rank', label: '지역', value: rk(d.regionRank), sub: of(d.regionRank, d.regionTotal) },
+        { icon: 'rank', label: '전세계', value: rk(d.rank) },
+        { icon: 'rank', label: '국가', value: rk(d.countryRank) },
+        { icon: 'rank', label: '지역', value: rk(d.regionRank) },
         { icon: 'score', label: '시즌 점수', value: (d.seasonTotal ?? 0).toLocaleString() },
       ]
 
@@ -323,11 +323,6 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
     icon(ctx, r.icon, hx + 46, y - 7, C, ICON_S)
     // 라벨은 값과 같은 크기(무게만 800/900 으로 갈라 값이 주인공인 건 유지).
     text(ctx, r.label, hx + 78, y, { size: T.hero, weight: 800, color: INK })
-    // 보조 설명(모수)은 라벨 옆에 붙인다 — 값 위에 얹으면 그 행만 2줄이 돼 행 리듬이 깨진다.
-    if (r.sub) {
-      ctx.font = `800 ${T.hero}px ${FONT}`
-      text(ctx, r.sub, hx + 78 + ctx.measureText(r.label).width + 14, y, { size: T.label, weight: 700, color: SUB })
-    }
     const vSize = fitSize(ctx, r.value, T.hero, 900, 260)
     text(ctx, r.value, valX, y + 6, { size: vSize, weight: 900, color: INK, align: 'right' })
   })
@@ -337,29 +332,20 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   rr(ctx, rx, boxT, rankW, boxB - boxT, 22)
   ctx.fillStyle = '#fafaff'; ctx.fill()
   ctx.strokeStyle = '#ececf5'; ctx.lineWidth = 2; ctx.stroke()
-  text(ctx, '티어', rx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
+  text(ctx, '순위', rx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
 
-  // 엠블렘은 이 박스의 주인공 — 박스 높이를 채우도록 크게(작으면 아래에 빈 공간이 남는다).
-  // 상위% 줄이 없는 유저(미집계)는 그만큼 아래로 내려 세로 중앙을 맞춘다.
+  // 옛 티어 박스 자리 — 엠블렘·티어명은 2026-08-04 제거됐고 상위%만 남아 박스의 주인공이 됐다.
+  //   #순위 3종은 왼쪽 기록 박스가 전담한다. 여기 다시 쓰면 같은 숫자가 카드에 두 번 나온다.
   const pct = d.percentile != null ? Math.max(1, Math.round(d.percentile * 100)) : null
   const emCx = rx + rankW / 2
-  const emCy = boxT + (pct != null ? 186 : 232)
-  const EM = 224
-  try {
-    const em = await loadImage(`/emblems/${tier}.png`)
-    ctx.save()
-    ctx.shadowColor = rgba(C, 0.45); ctx.shadowBlur = 26; ctx.shadowOffsetY = 4
-    ctx.drawImage(em, emCx - EM / 2, emCy - EM / 2, EM, EM)
-    ctx.restore()
-  } catch { /* 엠블렘 실패해도 카드는 완성된다 */ }
-  // 티어명은 남긴다 — 엠블렘 5종이 형태가 같고 색만 달라, 처음 보는 사람은 단독으로 티어를 못 읽는다.
-  // 대신 크기를 줄여 엠블렘이 주인공인 건 유지. (빼려면 이 한 줄만 지우면 된다.)
-  text(ctx, d.tierLabel, emCx, emCy + EM / 2 + 40, { size: T.title, weight: 900, color: INK, align: 'center' })
-
-  // 상위%는 있을 때만 그린다 — 미집계 유저에게 '집계 대기' 같은 빈 상태를 보여주지 않는다(티어명까지만).
-  //   #순위 3종은 왼쪽 기록 박스가 전담한다. 여기 다시 쓰면 같은 숫자가 카드에 두 번 나온다.
-  if (pct != null) {
-    text(ctx, `상위 ${pct}%`, emCx, boxB - 44, { size: T.hero, weight: 900, color: C, align: 'center' })
+  const emCy = (boxT + boxB) / 2
+  // ⚠️ 모수가 적으면 백분위를 그리지 않는다(3명이면 1등도 상위 33%라 초라해 보인다).
+  //    "N명 중 M위" 같은 대체 문구도 넣지 않는다 — 사람이 모이면 그때 나타난다(scoring.ts 의 showPercentile).
+  if (pct != null && showPercentile(d.rankTotal)) {
+    text(ctx, `상위 ${pct}%`, emCx, emCy + 26, { size: T.hero, weight: 900, color: C, align: 'center' })
+  } else {
+    // 티어명이 사라져 미집계 유저는 박스가 통째로 비어버린다 — 최소한의 상태 문구를 남긴다.
+    text(ctx, '집계 대기', emCx, emCy + 14, { size: T.title, weight: 900, color: SUB, align: 'center' })
   }
 
   // ── 하단 다크 바: 가입일 / 국가 / 지역 ──

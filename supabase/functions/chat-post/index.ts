@@ -1,14 +1,14 @@
 // chat-post: 유사채팅 보드에 새 메시지 작성.
-//  파이프라인(순서대로 short-circuit): 로그인 게이트 → 입력 검증 → 로컬 배드워드 → 방 쓰기 권한
+//  파이프라인(순서대로 short-circuit): 로그인 게이트 → 입력 검증 → 로컬 배드워드
 //  → OpenAI 모더레이션 → (fail-closed 기본) 모더레이션 장애 시 503으로 즉시 중단, 삽입 없음
 //  → chat_post_atomic RPC(레이트/중복/IP 가드).
-//  ⚠️ 방 권한 검사가 모더레이션보다 앞이다 — 어차피 거절할 글에 OpenAI 호출을 태우지 않기 위해서.
+//  ⚠️ 방 쓰기 권한(내 나라 + 전세계만)은 2026-08-04 해제됐다 — 어느 나라 방이든 로그인만 하면 쓴다.
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang } from '../_shared/lib.ts'
 import { checkBadword, normalizeKo } from '../_shared/badwords_ko.ts'
 import { sha256Hex } from '../_shared/seb.ts'
-import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, CHAT_REQUIRE_LOGIN, canPostToRoom, containsLink, moderateOpenAI, normalizeRoom, resolvePoster, resolveIpHash } from '../_shared/chat.ts'
+import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, CHAT_REQUIRE_LOGIN, containsLink, moderateOpenAI, normalizeRoom, resolvePoster, resolveIpHash } from '../_shared/chat.ts'
 
 const MAX_LEN = 500
 
@@ -30,9 +30,7 @@ Deno.serve(async (req) => {
 
     const admin = adminClient()
     const isAnon = !!user.is_anonymous
-    // 익명 글은 이름을 쓰지 않지만 국가는 필요하다(나라 방 권한). 조회는 어차피 한 번뿐.
     const poster = await resolvePoster(admin, user.id)
-    if (!canPostToRoom(room, poster.country)) return json({ error: 'not_my_country' }, 403)
 
     const mod = await moderateOpenAI(text)
     let modStatus: 'ok' | 'pending' = 'ok'

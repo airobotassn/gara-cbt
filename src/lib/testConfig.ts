@@ -14,7 +14,7 @@ export const TEST_DURATION_MINUTES = 120
 // 채점 결과 공개까지 대기일 (서버 result_release_at = 제출 + N일 과 일치시킬 것)
 export const RESULT_RELEASE_DAYS = 7
 
-// 합격 기준 비율(맞힌 비율). 이 이상이면 합격(자격증 발급). 문항 수가 바뀌어도 비율로 판정.
+// 합격 기준 비율(맞힌 비율). 이 이상이면 합격(인증서 발급). 문항 수가 바뀌어도 비율로 판정.
 export const PASS_RATIO = 0.6
 
 // in_progress attempt 만료(서버측 안전장치, 화면 타이머 아님)

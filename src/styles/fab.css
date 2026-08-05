@@ -13,6 +13,16 @@
   --fab-pop-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   --fab-badge-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.5);
   --fab-on-accent: var(--on-accent);
+
+  /* ── 떠 있는 두 버튼(.fab · .fab-top)의 면 = 항상 흰색 ──
+     2026-08-04 기본 테마가 다크로 바뀌면서, --bg(다크에선 #14171f)를 쓰던 이 둘이
+     어두운 배경 위 어두운 원이 돼 존재가 안 보였다. 면은 테마와 무관하게 흰색으로 고정한다.
+     값은 라이트 모드의 --bg/--line2/--ink 와 동일 → 라이트에서는 보이는 게 그대로다.
+     ⚠️ 흰 면 위에 --line2/--ink 를 쓰면 안 된다(다크에선 밝은 값이라 흰 배경에서 증발한다).
+        이 두 버튼 안에서는 아래 짝 토큰만 쓸 것. 패널(.panel)은 해당 없음 — 계속 테마를 따른다. */
+  --fab-face: #ffffff;
+  --fab-face-line: rgba(25, 27, 35, 0.2);
+  --fab-face-ink: rgba(25, 27, 35, 0.98);
 }
 html.dark {
   --theme-toggle: #fbbf24;        /* 다크: 달 아이콘 — 어두운 패널에서 빛나는 앰버 */
@@ -89,8 +99,8 @@ html.dark {
   height: 58px;
   border-radius: 50%;
   cursor: pointer;
-  border: 1px solid var(--line2);
-  background: var(--bg);
+  border: 1px solid var(--fab-face-line);
+  background: var(--fab-face);
   display: grid;
   place-items: center;
   box-shadow: var(--fab-shadow);
@@ -179,9 +189,9 @@ body:has(.panel.open) .fab::after {
   height: 48px;
   border-radius: 50%;
   cursor: pointer;
-  border: 1px solid var(--line2);
-  background: var(--bg);
-  color: var(--ink);
+  border: 1px solid var(--fab-face-line);
+  background: var(--fab-face);
+  color: var(--fab-face-ink);
   display: grid;
   place-items: center;
   box-shadow: var(--fab-shadow);
@@ -597,7 +607,7 @@ html.dark .pf-more-link.pf-preview .pf-more-ext {
   margin-top: 4px;
 }
 
-/* 인쇄(PDF 저장) 시 플로팅 UI 제외 — 어느 화면을 인쇄하든 FAB·맨 위로·패널이 문서(자격증 등)에 안 찍히게 */
+/* 인쇄(PDF 저장) 시 플로팅 UI 제외 — 어느 화면을 인쇄하든 FAB·맨 위로·패널이 문서(인증서 등)에 안 찍히게 */
 @media print {
   .fab,
   .fab-top,

@@ -35,15 +35,18 @@
 
 /* Stitch 목업 Tailwind 토큰 — v4 @theme (진입 파일에 직접 둬야 인식됨) */
 @theme {
-  /* fontFamily (Latin/숫자 Hanken Grotesk, 한글 Pretendard 폴백) */
-  --font-display-lg: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-headline-lg: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-headline-lg-mobile: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-title-md: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-body-lg: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-body-md: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-label-md: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
-  --font-label-sm: 'Hanken Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
+  /* fontFamily — 라틴·한글 모두 Pretendard 하나로 통일(2026-08-04).
+     ⚠️ 예전엔 라틴/숫자만 Hanken Grotesk 를 태우고 한글은 Pretendard 로 폴백시켰다. 한 버튼 안에서
+        "응시 시작"(Pretendard)과 "→"(Hanken)이 다른 서체로 그려져 자폭·굵기가 미묘하게 어긋났다.
+        Pretendard 가 라틴도 같이 담고 있으므로 폰트를 하나만 쓴다. 여기에 다른 얼굴을 끼워넣지 말 것. */
+  --font-display-lg: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-headline-lg: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-headline-lg-mobile: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-title-md: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-body-lg: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-body-md: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-label-md: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-label-sm: 'Pretendard Variable', Pretendard, sans-serif;
 
   /* fontSize (+ line-height / letter-spacing / weight) */
   --text-display-lg: 48px;

@@ -1,7 +1,7 @@
 // my-attempts: 로그인 유저 본인의 응시 내역. 점수/합격은 결과 공개일 이후에만 노출.
 //   - 조회 시점에 TTL(240분) 지나도록 미제출인 진행중 응시는 만료(expired) 처리.
-//   - body { issue: attemptId, nameRoman } 로 자격증 발급 기록(공개 후 + 합격만, 재발급은 시각 갱신).
-//     nameRoman = 자격증에 각인할 영문 성명(발급 신청 화면에서 입력). 발급 시점 스냅샷이라 응시 기록에 저장한다.
+//   - body { issue: attemptId, nameRoman } 로 인증서 발급 기록(공개 후 + 합격만, 재발급은 시각 갱신).
+//     nameRoman = 인증서에 각인할 영문 성명(발급 신청 화면에서 입력). 발급 시점 스냅샷이라 응시 기록에 저장한다.
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       .eq('status', 'in_progress')
       .lt('started_at', cutoff)
 
-    // 자격증 발급 기록 — 결과 공개 후 + 합격만 가능. 발급 완료여도 재발급 허용(시각 갱신).
+    // 인증서 발급 기록 — 결과 공개 후 + 합격만 가능. 발급 완료여도 재발급 허용(시각 갱신).
     // 최초 발급 시 진위확인용 토큰·자격번호를 확정 저장(재발급은 기존 값 유지 → QR 불변).
     let issued: { verifyToken: string; certNo: string; nameRoman: string | null } | null = null
     if (body?.issue) {
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
         released && a.total_correct != null && a.total_questions
           ? a.total_correct >= Math.ceil(a.total_questions * PASS_RATIO)
           : false
-      if (!passed) return json({ error: '자격증은 결과 공개 후 합격한 응시만 발급할 수 있습니다.' }, 409)
+      if (!passed) return json({ error: '인증서는 결과 공개 후 합격한 응시만 발급할 수 있습니다.' }, 409)
 
       let verifyToken = (a.verify_token as string | null) ?? null
       let certNo = (a.cert_no as string | null) ?? null
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
         verifyToken = verifyToken ?? crypto.randomUUID()
         certNo = certNo ?? makeCertNo(gradeOfTitle(title), year, tempSeq(a.id))
       }
-      // 영문 성명 — 자격증에 각인되는 유일한 이름이라 발급 시 필수. 재발급은 저장된 값을 그대로 쓴다.
+      // 영문 성명 — 인증서에 각인되는 유일한 이름이라 발급 시 필수. 재발급은 저장된 값을 그대로 쓴다.
       // 규칙: 라틴 문자·공백·하이픈·아포스트로피·마침표만(여권 표기 관행), 2~40자.
       const stored = (a.cert_name_roman as string | null) ?? null
       const input = typeof body.nameRoman === 'string' ? body.nameRoman.trim().replace(/\s+/g, ' ') : ''

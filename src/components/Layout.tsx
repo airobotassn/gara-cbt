@@ -10,6 +10,7 @@ import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
 import {
   HomeIcon,
+  BookIcon,
   InfoIcon,
   UserIcon,
   SunIcon,
@@ -306,6 +307,11 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-item" onClick={() => go('/guide')}>
                 <span className="ic"><InfoIcon /></span> {t('nav.caris')}
+              </button>
+              {/* 랜딩 CTA 3종(WORLD ARENA · CARIS · Learning Library)과 같은 목록·같은 순서로 맞춘다.
+                  라벨은 새 키를 만들지 않고 랜딩이 쓰는 landing.cta_learn 을 그대로 재사용(6개국어 동일 문구). */}
+              <button className="pf-item" onClick={() => go('/ebooks')}>
+                <span className="ic"><BookIcon /></span> {t('landing.cta_learn')}
               </button>
             </div>
 

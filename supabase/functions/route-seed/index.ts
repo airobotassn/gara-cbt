@@ -117,7 +117,7 @@ const SEED: { dest: string; phrases: string[] }[] = [
     dest: '/guide', // 자격검정 안내: 시험 종류·급수·과목·응시자격·CARIS 소개 (정보성)
     phrases: [
       '어떤 시험이 있어', '무슨 자격증 있나요', '시험 종류', '자격검정 안내', '응시 자격이 뭐야',
-      '급수가 어떻게 돼', 'CARIS가 뭐야', '자격증 어떻게 따', '시험 과목', '자격 종류 궁금해',
+      '급수가 어떻게 돼', 'CARIS가 뭐야', '자격증 어떻게 따', '인증서 어떻게 따', '시험 과목', '자격 종류 궁금해',
       'Pro랑 Master 차이', '시험 정보 보고싶어', '어떤 급수들이 있어', '합격 기준이 뭐야',
       'what exams are there', 'what certifications do you offer', 'certification guide', 'eligibility requirements',
       'how to get certified', 'exam subjects', 'CARIS levels', 'what is CARIS', 'types of exams',
@@ -191,6 +191,7 @@ const SEED: { dest: string; phrases: string[] }[] = [
     phrases: [
       '자격증 발급', '자격증 확인', '자격증 출력', '인증서 뽑기', '합격증 발급',
       '자격증 다운로드', '내 자격증 보기', '증명서 발급받기',
+      '인증서 발급', '인증서 확인', '인증서 출력', '인증서 다운로드', '내 인증서 보기',
       'issue certificate', 'download my certificate', 'print certificate', 'view my certificate',
       '資格証発行', '証明書をダウンロード', '合格証',
       '证书发放', '下载证书', '打印证书', '我的证书',
