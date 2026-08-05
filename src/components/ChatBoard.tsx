@@ -73,21 +73,19 @@ const ERR_KEYS: Record<string, string> = {
   ip_floor: 'chat.rateLimited',
   duplicate: 'chat.duplicate',
   edit_window: 'chat.editWindow',
-  not_my_country: 'chat.notMyCountry',
 }
 
 interface Props {
   /** 방 키 — 'global'(전세계) 또는 ISO2 국가코드 */
   room?: string
-  /** 이 방에 글을 쓸 수 있는지(서버도 같은 규칙으로 다시 막는다 — 여기선 입력칸을 감추는 용도) */
-  canPost?: boolean
-  /** 못 쓰는 방일 때 입력칸 자리에 띄울 안내 문구 */
-  readOnlyHint?: string
 }
 
-export default function ChatBoard({ room = 'global', canPost = true, readOnlyHint }: Props) {
+export default function ChatBoard({ room = 'global' }: Props) {
   const { t, lang } = useT()
-  const { user } = useAuth()
+  // ⚠️ 쓰기 가능 판정은 user 가 아니라 isFullUser 다.
+  //    익명 세션도 user 는 truthy 라 !user 로 검사하면 입력창이 열리고, 서버(chat-post 의
+  //    CHAT_REQUIRE_LOGIN)가 login_required 로 되돌려서 다 치고 나서야 실패한다.
+  const { user, isFullUser } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -255,7 +253,7 @@ export default function ChatBoard({ room = 'global', canPost = true, readOnlyHin
   async function onSend(e: React.FormEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text || sending || !user || !canPost) return
+    if (!text || sending || !user || !isFullUser) return
     if (text.length > MAX_LEN) {
       showToast(errMsg('too_long'))
       return
@@ -376,7 +374,9 @@ export default function ChatBoard({ room = 'global', canPost = true, readOnlyHin
         {!loading && rows.length === 0 && <div className="chat-hint">{t('chat.empty')}</div>}
         {!loading &&
           rows.map((r) => {
-            const own = !!user && r.user_id === user.id
+            // isFullUser 까지 보는 이유는 위 composer 와 같다 — 익명 세션으로 쓴 옛 글에
+            // 수정·삭제 버튼이 뜨는데 서버(chat-edit/chat-delete)는 login_required 로 막는다.
+            const own = !!user && isFullUser && r.user_id === user.id
             const deleted = r.body === null
             return (
               <div key={r.id} className={`chat-bubble-row ${own ? 'own' : 'other'}`}>
@@ -434,16 +434,11 @@ export default function ChatBoard({ room = 'global', canPost = true, readOnlyHin
 
       {toast && <div className="chat-toast">{toast}</div>}
 
-      {!user ? (
+      {!isFullUser ? (
         <div className="chat-login-cta">
           <span>{t('chat.loginToJoin')}</span>
           <Link to="/login" className="chat-login-btn">{t('common.login_google')}</Link>
         </div>
-      ) : !canPost ? (
-        // 남의 나라 방 — 읽기만. 서버도 같은 규칙으로 막지만, 쓸 수 없는 칸을 띄워놓고 보낸 뒤에
-        // 튕기는 것보다 애초에 입력칸을 걷어내는 편이 낫다.
-        // 안내문은 부모가 나라 이름을 넣어 넘긴다 — 없으면 나라 이름 없는 일반 문구로.
-        <div className="chat-readonly">{readOnlyHint ?? t('chat.notMyCountry')}</div>
       ) : (
         <form className="chat-composer" onSubmit={onSend}>
           <input
