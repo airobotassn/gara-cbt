@@ -257,26 +257,17 @@ create table if not exists user_progress (
 );
 create index if not exists user_progress_points_idx on user_progress (points desc, updated_at asc);
 
--- question_reports (SEMI-CARIS 문항 오류 제보)
-create table if not exists question_reports (
-  id uuid primary key default gen_random_uuid(),
-  question_id uuid references test_questions(id) on delete set null,
-  code text,
-  attempt_id uuid,
-  user_id uuid,
-  lang text,
-  message text not null,
-  status text not null default 'open',
-  created_at timestamptz not null default now()
-);
+-- (question_reports = 문항 오류 제보. 2026-08-05 제거 — 결과창에서 오답노트를 걷어낼 때
+--  제보 입력창(ReportBox)도 같이 사라져 진입점이 없었고, 실제 제보도 0건이었다.
+--  관리자 '제보' 탭·submit-report 함수·admin-test 의 reports 액션도 같이 삭제.
+--  되살릴 거면 진입점부터 만들 것 — 표만 있으면 또 빈 탭이 된다.)
 
 alter table test_questions   enable row level security;
 alter table test_attempts    enable row level security;
 alter table test_answers     enable row level security;
 alter table user_level_skill enable row level security;
 alter table user_progress    enable row level security;
-alter table question_reports enable row level security;
--- test_* / user_* / question_reports: 클라 정책 없음 → service role(Edge Function)만 접근.
+-- test_* / user_*: 클라 정책 없음 → service role(Edge Function)만 접근.
 
 -- ============================================================
 -- 유사채팅(pseudo-chat) board — chat_messages / chat_reports / chat_incidents

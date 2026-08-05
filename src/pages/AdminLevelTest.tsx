@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
-import { optionCapForLevel } from '../lib/scoring'
+import { optionCountForLevel } from '../lib/scoring'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 // 채팅 검수·이북 관리는 Admin.tsx 에 정의된 컴포넌트를 그대로 노출(데이터는 admin 함수). 위치만 WORLD ARENA 로 이동.
 import { ChatModAdmin, EbooksAdmin } from './Admin'
@@ -67,7 +67,7 @@ export interface Analytics {
   coverage: Record<string, number>
 }
 
-type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'reports' | 'chatmod' | 'ebooks' | 'admins'
+type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'chatmod' | 'ebooks' | 'admins'
 export default function LevelTestAdmin() {
   const { isFullUser } = useAuth()
   const [tab, setTab] = useState<LtTab>('dashboard')
@@ -101,7 +101,6 @@ export default function LevelTestAdmin() {
     { key: 'users', label: '유저' },
     { key: 'attempts', label: '응시 기록' },
     { key: 'questions', label: '문항' },
-    { key: 'reports', label: '제보' },
     { key: 'chatmod', label: '채팅 검수' },
     { key: 'ebooks', label: '이북' },
     ...(isRoot ? [{ key: 'admins' as const, label: '관리자 관리' }] : []),
@@ -120,7 +119,6 @@ export default function LevelTestAdmin() {
       {tab === 'users' ? <UsersTab /> : null}
       {tab === 'attempts' ? <AttemptsTab /> : null}
       {tab === 'questions' ? <QuestionsTab isRoot={isRoot} /> : null}
-      {tab === 'reports' ? <ReportsTab /> : null}
       {/* 채팅 검수·이북은 Admin.tsx(.admin-cbt 스코프) 컴포넌트라 .admin-head 가 먹도록 admin-cbt 로 감싼다. */}
       {tab === 'chatmod' ? <div className="admin-cbt"><ChatModAdmin /></div> : null}
       {tab === 'ebooks' ? <div className="admin-cbt"><EbooksAdmin /></div> : null}
@@ -776,80 +774,6 @@ function AttemptDetail({ attempt, onClose }: { attempt: AttemptRow; onClose: () 
   )
 }
 
-// ============================ 제보 탭 ============================
-interface ReportRow { id: string; code: string | null; questionId: string; message: string; status: 'open' | 'resolved' | 'dismissed'; lang: string | null; created_at: string; level: number | null; category: string | null; prompt: string }
-function ReportsTab() {
-  const [rows, setRows] = useState<ReportRow[]>([])
-  const [openCount, setOpenCount] = useState(0)
-  const [status, setStatus] = useState<'open' | 'resolved' | 'dismissed' | 'all'>('open')
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState('')
-
-  async function load() {
-    setLoading(true); setErr('')
-    try {
-      const r = await callFunction<{ reports: ReportRow[]; openCount: number }>('admin-test', { action: 'reports', status })
-      setRows(r.reports); setOpenCount(r.openCount)
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-  useEffect(() => { load() }, [status]) // eslint-disable-line
-
-  async function setStat(id: string, s: ReportRow['status']) {
-    try {
-      await callFunction('admin-test', { action: 'reportStatus', id, status: s })
-      load()
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
-  }
-
-  if (err) return <ErrBox msg={err} />
-  const TABS: [typeof status, string][] = [['open', '미처리'], ['resolved', '해결'], ['dismissed', '무시'], ['all', '전체']]
-  return (
-    <div>
-      <div className="admin-section">
-        <div className="admin-toolbar">
-          <div className="admin-period">
-            {TABS.map(([s, label]) => (
-              <button key={s} className={status === s ? 'on' : ''} onClick={() => setStatus(s)}>
-                {label}{s === 'open' && openCount ? ` (${openCount})` : ''}
-              </button>
-            ))}
-          </div>
-          <span className="admin-hint">{rows.length}건{loading ? ' · 불러오는 중…' : ''}</span>
-        </div>
-        <div className="report-list">
-          {rows.map((r) => {
-            const stTag = r.status === 'open'
-              ? <span className="badge none">미처리</span>
-              : r.status === 'resolved' ? <span className="badge ok">해결</span> : <span className="badge low">무시</span>
-            return (
-              <div key={r.id} className="report-card" style={{ border: '1px solid var(--a-bd)', borderLeft: `4px solid ${r.status === 'open' ? '#dc2626' : '#dfe3ea'}`, borderRadius: 12, padding: '14px 16px', marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <span style={{ fontWeight: 800, color: '#3f8fd6' }}>{r.code ?? '번호없음'}</span>
-                  {r.level ? <span className="admin-hint">Lv.{r.level} · {r.category ? axisDef(r.category, 'ko').short : '-'}</span> : null}
-                  <span className="admin-hint">· {r.lang ? (LANG_LABEL[r.lang] ?? r.lang) : '-'}</span>
-                  <span className="admin-hint">· {fmtDT(r.created_at)}</span>
-                  <span style={{ marginLeft: 'auto' }}>{stTag}</span>
-                </div>
-                <div className="admin-hint" style={{ marginBottom: 8 }}>📄 {r.prompt}</div>
-                <div style={{ background: 'var(--a-bg)', border: '1px solid var(--a-bd)', borderRadius: 10, padding: '10px 12px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#1a2230' }}>
-                  {r.message}
-                </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  {r.status !== 'resolved' ? <button className="admin-mini" onClick={() => setStat(r.id, 'resolved')}>✓ 해결</button> : null}
-                  {r.status !== 'dismissed' ? <button className="admin-mini" onClick={() => setStat(r.id, 'dismissed')}>무시</button> : null}
-                  {r.status !== 'open' ? <button className="admin-mini" onClick={() => setStat(r.id, 'open')}>다시 열기</button> : null}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        {rows.length === 0 && !loading ? <div className="admin-empty">해당 상태의 제보가 없습니다.</div> : null}
-      </div>
-    </div>
-  )
-}
-
 // ============================ 문항 목록 탭 ============================
 interface ListRow {
   id: string
@@ -1070,14 +994,18 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
   const [correct, setCorrect] = useState(row?.correct_index ?? 0)
   const [active, setActive] = useState(row?.active ?? true)
   const [pi, setPi] = useState<Record<string, string>>({ ...(row?.prompt_i18n ?? {}) })
-  const [oi, setOi] = useState<Record<string, string[]>>(row ? { ...row.options_i18n } : { ko: ['', '', '', ''] })
+  // 신규는 그 레벨의 보기 개수만큼 빈칸을 띄운다(Lv.1~3 4개 / Lv.4~7 5개).
+  const [oi, setOi] = useState<Record<string, string[]>>(
+    row ? { ...row.options_i18n } : { ko: Array.from({ length: optionCountForLevel(listLevel) }, () => '') },
+  )
   const [ei, setEi] = useState<Record<string, string>>({ ...(row?.explanation_i18n ?? {}) })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const axes = axesForLevel(level, 'ko')
   const koCount = Math.max(1, (oi.ko ?? []).length)
-  // 레벨1~3은 보기 4개 고정(4지선다). 서버도 같은 값으로 막는다 — lib/scoring.ts 의 OPTIONS_BY_LEVEL.
-  const cap = optionCapForLevel(level)
+  // 보기 개수는 레벨이 정한다 — lib/scoring.ts 의 OPTIONS_BY_LEVEL(서버도 같은 값으로 강제).
+  // 그래서 '보기 추가' 버튼이 없다. 개수가 어긋난 옛 문항만 ✕ 로 줄일 수 있게 남겨둔다.
+  const need = optionCountForLevel(level)
   const ALL_LANGS = ['ko', ...LANGS]
   const koOpts = (oi.ko ?? []).map((s) => (s ?? '').trim())
   const koReady = !!(pi.ko ?? '').trim() && koOpts.length >= 2 && koOpts.every(Boolean)
@@ -1085,9 +1013,6 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
 
   function setOptText(l: string, k: number, val: string) {
     setOi((o) => { const arr = [...(o[l] ?? [])]; arr[k] = val; return { ...o, [l]: arr } })
-  }
-  function addOpt() {
-    setOi((o) => { const next = { ...o }; for (const l of ALL_LANGS) next[l] = [...(o[l] ?? []), '']; return next })
   }
   function removeOpt(k: number) {
     setOi((o) => { const next = { ...o }; for (const l of ALL_LANGS) if (o[l]) next[l] = o[l].filter((_, i) => i !== k); return next })
@@ -1147,7 +1072,7 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
   async function save() {
     if (!(pi.ko ?? '').trim()) { setMsg('문제(한국어)를 입력하세요.'); return }
     if (koOpts.length < 2 || koOpts.some((s) => !s)) { setMsg('보기(한국어)를 모두 채우세요. (2개 이상)'); return }
-    if (cap != null && koOpts.length !== cap) { setMsg(`레벨 ${level}은 보기 ${cap}개 고정입니다. (현재 ${koOpts.length}개 — ✕ 로 지우세요)`); return }
+    if (koOpts.length !== need) { setMsg(`레벨 ${level}은 보기 ${need}개 고정입니다. (현재 ${koOpts.length}개 — ✕ 로 지우세요)`); return }
     if (!cat) { setMsg('영역을 선택하세요.'); return }
     const { P, O, E, dropped } = buildI18n()
     setBusy(true)
@@ -1184,18 +1109,17 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
               const lv = +e.target.value
               setLevel(lv)
               setCat(axesForLevel(lv, 'ko')[0]?.key ?? '')
-              // 보기 개수가 고정인 레벨로 바꾸면 배열 길이도 맞춘다(모자라면 빈칸 추가, 넘치면 뒤를 자름)
-              const c = optionCapForLevel(lv)
-              if (c != null) {
-                setOi((o) => {
-                  const next: Record<string, string[]> = {}
-                  for (const [l, arr] of Object.entries(o)) {
-                    next[l] = Array.from({ length: c }, (_, i) => arr[i] ?? '')
-                  }
-                  return next
-                })
-                setCorrect((x) => (x >= c ? 0 : x))
-              }
+              // 레벨을 바꾸면 보기 칸 수도 그 레벨 값으로 맞춘다(모자라면 빈칸 추가, 넘치면 뒤를 자름).
+              // Lv.3↔Lv.4 를 오가면 4↔5 로 바뀐다.
+              const c = optionCountForLevel(lv)
+              setOi((o) => {
+                const next: Record<string, string[]> = {}
+                for (const [l, arr] of Object.entries(o)) {
+                  next[l] = Array.from({ length: c }, (_, i) => arr[i] ?? '')
+                }
+                return next
+              })
+              setCorrect((x) => (x >= c ? 0 : x))
             }}>
               {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
             </select></label>
@@ -1224,7 +1148,7 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
         <div className="admin-sub" style={{ marginTop: 8 }}>문제 ({LANG_LABEL[lang]})</div>
         <input className="admin-in" value={pi[lang] ?? ''} placeholder="문제" onChange={(e) => setPi((p) => ({ ...p, [lang]: e.target.value }))} />
         <div className="admin-sub">보기 <span className="admin-hint">
-          ◉ 표시가 정답 · 보기 개수/정답은 모든 언어 공통{cap != null ? ` · 레벨 ${level}은 ${cap}지선다 고정` : ''}
+          ◉ 표시가 정답 · 보기 개수/정답은 모든 언어 공통 · 레벨 {level}은 {need}지선다 고정
         </span></div>
         <div className="opt-editor">
           {Array.from({ length: koCount }, (_, k) => k).map((k) => (
@@ -1234,11 +1158,10 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
               </label>
               <span className="opt-num">{k + 1}</span>
               <input className="opt-in" value={(oi[lang] ?? [])[k] ?? ''} placeholder={`보기 ${k + 1}`} onChange={(e) => setOptText(lang, k, e.target.value)} />
-              <button className="opt-del" title="삭제" disabled={koCount <= (cap ?? 2)} onClick={() => removeOpt(k)}>✕</button>
+              <button className="opt-del" title="삭제" disabled={koCount <= need} onClick={() => removeOpt(k)}>✕</button>
             </div>
           ))}
           {/* 보기 개수가 고정인 레벨(1~3)에선 추가 자체를 막는다 — 저장해도 서버가 400 으로 되돌린다 */}
-          {cap == null ? <button className="admin-mini" onClick={addOpt}>+ 보기 추가</button> : null}
         </div>
         <div className="admin-sub">해설</div>
         <textarea className="admin-ta" rows={3} value={ei[lang] ?? ''} onChange={(e) => setEi((x) => ({ ...x, [lang]: e.target.value }))} />

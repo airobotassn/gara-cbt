@@ -11,7 +11,6 @@ import { overview, analytics } from './handlers/analytics.ts'
 import { listUsers, userDetail, setRank } from './handlers/users.ts'
 import { listAttempts, attemptDetail } from './handlers/attempts.ts'
 import { manageAdmins } from './handlers/admins.ts'
-import { listReports, setReportStatus } from './handlers/reports.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -51,8 +50,6 @@ Deno.serve(async (req) => {
       case 'setRank': return await setRank(admin, body)
       case 'attempts': return await listAttempts(admin)
       case 'attemptDetail': return await attemptDetail(admin, body)
-      case 'reports': return await listReports(admin, body)
-      case 'reportStatus': return await setReportStatus(admin, body)
       default: return json({ error: '알 수 없는 action' }, 400)
     }
   } catch (e) {

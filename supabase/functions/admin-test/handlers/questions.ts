@@ -116,8 +116,8 @@ export async function upsertQuestions(admin: any, body: any, actor: string) {
     if (typeof r.correct_index !== 'number' || r.correct_index < 0 || r.correct_index >= koOpts.length) {
       return json({ error: `#${i + 1}: 정답 인덱스 범위 오류` }, 400)
     }
-    // 레벨1~3은 4지선다 고정 — 5번째 보기가 다시 생기면 응시 화면에서 잘려 나가고,
-    // 정답이 거기 걸리면 아무도 못 맞히는 문항이 된다.
+    // 보기 개수는 레벨이 정한다(Lv.1~3 4개 / Lv.4~7 5개). 개수가 어긋나면 응시 화면에서
+    // 잘려 나가고, 정답이 잘린 자리에 있으면 아무도 못 맞히는 문항이 된다.
     const cap = VISIBLE_OPTIONS_BY_LEVEL[r.level]
     if (typeof cap === 'number' && koOpts.length !== cap) {
       return json({ error: `#${i + 1}: 레벨 ${r.level}은 보기 ${cap}개 고정입니다(받은 값 ${koOpts.length}개).` }, 400)

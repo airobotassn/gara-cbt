@@ -199,12 +199,14 @@ export function levelColor(level: number): string {
 
 // (티어 표시 메타(TIER_COLOR/tierColor/TIER_ORDER)와 레벨→엠블렘 매핑은 모두 제거됐다 — 위 <scoring-sync> 끝 주석 참고.)
 
-// ── 레벨별 보기 개수 고정 ──
+// ── 레벨별 보기 개수 ──
 // ⚠️ supabase/functions/_shared/scoring.ts 의 VISIBLE_OPTIONS_BY_LEVEL 과 항상 같이 고칠 것.
-// 레벨1~3은 4지선다다. 옛 5지선다 시절 5번째 보기는 2026-08-04 마이그레이션으로 DB 에서 제거됐고
-// (migrations/20260804120000_leveltest_l1_l3_drop_fifth_option.sql), 이 표는 다시 5번째가 생기는 걸 막는다.
-// 값이 없는 레벨(4~7)은 제한 없음 = 5지선다 그대로.
-export const OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4 }
-export function optionCapForLevel(level: number): number | null {
-  return OPTIONS_BY_LEVEL[level] ?? null
+// 보기 개수는 **문항이 아니라 레벨이 정한다** — Lv.1~3 4지선다, Lv.4~7 5지선다.
+// 2026-08-05 DB 실측에서 예외가 0건이었다(Lv.1~3 232문항 전부 4개 / Lv.4~7 281문항 전부 5개).
+// 그래서 관리자 문항 편집기는 '보기 추가/삭제'가 아니라 레벨에 맞는 개수를 그냥 띄운다.
+// Lv.1~3 의 옛 5번째 보기는 2026-08-04 마이그레이션으로 DB 에서 제거됐다
+// (migrations/20260804120000_leveltest_l1_l3_drop_fifth_option.sql).
+export const OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4, 4: 5, 5: 5, 6: 5, 7: 5 }
+export function optionCountForLevel(level: number): number {
+  return OPTIONS_BY_LEVEL[level] ?? 4
 }
