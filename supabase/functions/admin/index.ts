@@ -1,9 +1,12 @@
 // admin: 관리자 전용 백오피스 API (service role). CBT(자격검정) 응시 조회용.
 //  - 인증: 루트(ROOT_ADMIN) 또는 admin_users 테이블 등록 이메일만 통과(기존 게이트 유지)
-//  - 액션: me · list · detail
+//  - ⚠️ 게이트에 **액션별 권한이 없다** — admin_users 에 이메일만 있으면 아래 액션 대부분이 열린다.
+//    그래서 돈·응시 자격을 만드는 액션(manageAdmins · examTicketGrant · examTicketVoid)만
+//    isRoot 를 인자로 넘겨 루트 전용으로 따로 막는다. 새 액션을 추가할 때 이 구분을 확인할 것.
 //  - ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
+import { EXAM_ROUND_COLS, examWindowState, grantExamTicket, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { ROOT_ADMIN } from './constants.ts'
 
 // 응시 행 → 프론트 표시용 형태(공통). attempts 배열에 exams/profiles/email 을 합쳐 매핑.
@@ -517,7 +520,11 @@ function shapeExamRound(r: any, tiers: string[] = []) {
     id: r.id,
     kind: r.kind,
     titleI18n: r.title_i18n ?? {},
-    examDate: r.exam_date, // 'YYYY-MM-DD' | null
+    examDate: r.exam_date, // 'YYYY-MM-DD' | null — 대표 표기일(카드·목록용)
+    // 응시 창. 정기시험은 '시험일 하루'가 아니라 11~20일 10일 구간이라 대표일과 별도 컬럼이 필요하다.
+    // 회차마다 다를 수 있어서 상수로 박지 않는다. null 이면 exam_date 의 KST 하루로 폴백한다.
+    examStartAt: r.exam_start_at ?? null, // ISO | null
+    examEndAt: r.exam_end_at ?? null, // ISO | null
     applyStartAt: r.apply_start_at, // ISO | null
     applyEndAt: r.apply_end_at, // ISO | null
     noteI18n: r.note_i18n ?? {},
@@ -576,6 +583,10 @@ async function examRoundUpsert(admin: any, body: any) {
     title_i18n,
     note_i18n,
     exam_date: r.examDate || null,
+    // 응시 창(정기시험 전용). 화면이 KST 오프셋(+09:00)을 붙여 보낸다 —
+    // 오프셋 없는 문자열을 timestamptz 에 넣으면 UTC 로 해석돼 9시간 어긋난다.
+    exam_start_at: r.examStartAt || null,
+    exam_end_at: r.examEndAt || null,
     apply_start_at: r.applyStartAt || null,
     apply_end_at: r.applyEndAt || null,
     published: r.published !== false,
@@ -598,26 +609,62 @@ async function examRoundUpsert(admin: any, body: any) {
   // 회차가 연 급수(tiers) 동기화 → 급수마다 exams 행 생성/재활성/소프트클로즈.
   // r.tiers 가 배열일 때만 건드린다(구 호출이 실수로 급수를 비우지 않도록).
   let tierKeys: string[] = []
+  let tierWarning: string | null = null
   if (saved?.id && Array.isArray(r.tiers)) {
     const tiersInput = (r.tiers as any[])
       .filter((t) => t && typeof t.key === 'string')
       .map((t) => ({ key: t.key as string, title: String(t.title ?? t.key), total: Number(t.total) || 0, durationMin: Number(t.durationMin) || 120 }))
     try {
-      tierKeys = await syncRoundExams(admin, saved.id, tiersInput)
+      const sync = await syncRoundExams(admin, saved.id, tiersInput)
+      tierKeys = sync.tiers
+      tierWarning = sync.warning
     } catch (e) {
-      // 급수 동기화 실패는 회차 저장을 무르지 않고 경고만.
-      translateWarning = (translateWarning ? translateWarning + ' / ' : '') + '급수 동기화 실패: ' + (e instanceof Error ? e.message : '오류')
+      // 급수 동기화 실패는 회차 저장을 무르지 않는다. 단 **번역 경고와 한 문자열로 섞지 않는다** —
+      // 섞었더니 '접수가 있어 급수를 못 지웠다' 가 화면에서 '자동 번역을 건너뛰었습니다' 로 읽혔다.
+      tierWarning = '급수 동기화 실패: ' + (e instanceof Error ? e.message : '오류')
+      tierKeys = tiersInput.map((t) => t.key) // 실제 상태를 모르므로 요청값으로 되돌린다(화면은 새로고침이 정본)
     }
   }
-  return json({ round: saved ? shapeExamRound(saved, tierKeys) : null, translateWarning })
+  return json({ round: saved ? shapeExamRound(saved, tierKeys) : null, translateWarning, tierWarning })
+}
+
+/**
+ * 이 (회차 × 급수)에 '접수'가 있는가 = 살아있는 응시권 + 아직 응시권이 안 된 진행 중 결제.
+ *
+ * 결제까지 세는 이유: pending/waiting_deposit 은 승인되면 그대로 응시권이 된다. 응시권만 보면
+ * "결제창은 떠 있는데 아직 티켓이 없는" 몇 초~며칠 구간이 통째로 비어, 그 사이 급수를 해제하면
+ * 존재하지 않는 시험의 응시권이 발급된다(돈은 받고 응시는 불가).
+ * ⚠️ 실패하면 0 이 아니라 throw 다 — 돈을 막는 가드가 조용히 꺼지면 안 된다.
+ */
+async function roundTierSold(admin: any, roundId: string, tier: string): Promise<number> {
+  const [t, p] = await Promise.all([
+    admin.from('exam_tickets').select('id', { count: 'exact', head: true })
+      .eq('round_id', roundId).eq('tier', tier).in('status', ['issued', 'consumed']),
+    admin.from('payments').select('id', { count: 'exact', head: true })
+      .eq('product_type', 'exam').eq('product_ref', `${roundId}:${tier}`)
+      .in('status', ['pending', 'waiting_deposit', 'paid']),
+  ])
+  if (t.error) throw new Error(`응시권 조회 실패: ${t.error.message}`)
+  if (p.error) throw new Error(`결제 조회 실패: ${p.error.message}`)
+  return (t.count ?? 0) + (p.count ?? 0)
 }
 
 // 회차의 열린 급수 ↔ exams 동기화. tiers = [{key, title}].
 //  · 요청에 있고 없던 급수 → exams insert(활성)
 //  · 요청에 있고 이미 있던 급수 → title 갱신 + 재활성
-//  · 요청에서 빠진 급수 → 세트·응시 없으면 삭제(오등록 정리), 있으면 active=false(보존)
+//  · 요청에서 빠진 급수 → **접수 0건일 때만** 세트·응시 없으면 삭제(오등록 정리), 있으면 active=false(보존)
 //  · 구성(total/durationMin)은 클라가 TIER_EXAM_SPEC 에서 실어 보냄(Deno는 caris.ts 못 읽음)
-async function syncRoundExams(admin: any, roundId: string, tiers: { key: string; title: string; total?: number; durationMin?: number }[]): Promise<string[]> {
+//
+// ⚠️ 해제 가드가 여기 있는 이유: 응시권은 (round_id, tier) 로 귀속되는데 exams 행은 체크박스 한 번에
+//    **실제로 DELETE 된다**. 그리고 응시권을 판 직후가 정확히 '문항 0 · 응시 0' 구간이라, 가드가 없으면
+//    팔린 응시권이 존재하지 않는 시험을 가리키게 된다.
+// ⚠️ 막힌 급수는 **해제하지 않고 그대로 둔다**(throw 로 중간에 끊지 않는다) — 루프 안에서 순차로
+//    insert/update/delete 를 하므로 중간에 끊으면 앞쪽 급수만 반영된 부분 적용 상태가 남는다.
+async function syncRoundExams(
+  admin: any,
+  roundId: string,
+  tiers: { key: string; title: string; total?: number; durationMin?: number }[],
+): Promise<{ tiers: string[]; blocked: string[]; warning: string | null }> {
   const { data: existing, error } = await admin.from('exams').select('id, tier, active').eq('round_id', roundId)
   if (error) throw new Error(error.message)
   const cur = (existing ?? []) as any[]
@@ -638,19 +685,44 @@ async function syncRoundExams(admin: any, roundId: string, tiers: { key: string;
     }
   }
 
+  const blocked: string[] = []
   for (const e of cur) {
     if (wantKeys.has(e.tier)) continue
+    if (await roundTierSold(admin, roundId, e.tier) > 0) {
+      blocked.push(e.tier) // 접수분이 있는 급수는 손대지 않는다 → 아래에서 사람이 읽을 문구로 알린다
+      continue
+    }
     const [q, a] = await Promise.all([
       admin.from('exam_questions').select('id', { count: 'exact', head: true }).eq('exam_id', e.id),
       admin.from('exam_attempts').select('id', { count: 'exact', head: true }).eq('exam_id', e.id),
     ])
     if ((q.count ?? 0) === 0 && (a.count ?? 0) === 0) {
-      await admin.from('exams').delete().eq('id', e.id) // 한 번도 안 쓴 오등록 → 정리
+      // 예전엔 delete 결과를 안 봤다 — 실패해도 화면에선 지워진 것처럼 보여 다음 편집 때 상태가 갈렸다.
+      const { error: de } = await admin.from('exams').delete().eq('id', e.id) // 한 번도 안 쓴 오등록 → 정리
+      if (de) throw new Error(de.message)
     } else if (e.active) {
-      await admin.from('exams').update({ active: false }).eq('id', e.id) // 사용 이력 있으면 보존
+      const { error: ue } = await admin.from('exams').update({ active: false }).eq('id', e.id) // 사용 이력 있으면 보존
+      if (ue) throw new Error(ue.message)
     }
   }
-  return tiers.map((t) => t.key)
+
+  // 해제하지 못한 급수는 계속 열려 있는 상태라 '연 급수' 목록에 남아야 한다.
+  const keys = [...tiers.map((t) => t.key), ...blocked]
+
+  // exams 는 RLS 정책 0개라 프론트가 못 읽는다 → 공개화면(원서접수)이 볼 수 있게 회차에 비정규화해 둔다.
+  // 판매 가능 판정의 정본은 계속 서버(resolveExamOffer)이고 이건 화면 표시용이라, 실패해도
+  // 회차 저장을 무르지 않고 경고로만 올린다.
+  const { error: oe } = await admin.from('exam_rounds').update({ open_tiers: keys }).eq('id', roundId)
+
+  const parts: string[] = []
+  if (oe) parts.push(`열린 급수 목록(open_tiers) 갱신 실패: ${oe.message}`)
+  if (blocked.length) {
+    parts.push(
+      `${blocked.join(', ')} 급수는 이미 접수(응시권 또는 진행 중인 결제)가 있어 해제하지 못했습니다. ` +
+      `해당 응시권을 회수·환불한 뒤 다시 시도하세요. 접수를 그대로 두고 노출만 막으려면 회차 ‘공개’를 해제하세요.`,
+    )
+  }
+  return { tiers: keys, blocked, warning: parts.length ? parts.join(' / ') : null }
 }
 
 async function examRoundReorder(admin: any, body: any) {
@@ -671,8 +743,24 @@ async function examRoundDelete(admin: any, body: any) {
   if ((count ?? 0) > 0) {
     return json({ error: '이 회차에 등록된 급수 시험이 있어 삭제할 수 없습니다. 먼저 회차 편집에서 급수를 모두 해제하세요.' }, 400)
   }
+  // 응시권은 회차를 FK(ON DELETE 없음)로 잡고 있어 **무효·만료분까지** 삭제를 막는다.
+  // 급수를 다 해제해도(=exams 0건) 여기서 걸리므로, 안내를 나누지 않으면
+  // '급수를 모두 해제하세요'(이미 했다)만 반복돼 관리자가 지울 방법을 못 찾는다.
+  const { count: tk } = await admin.from('exam_tickets').select('id', { count: 'exact', head: true }).eq('round_id', id)
+  if ((tk ?? 0) > 0) {
+    return json({
+      error: `이 회차에는 응시권 ${tk}장이 발급된 이력이 있어 삭제할 수 없습니다(환불·분쟁 추적을 위해 보존합니다). ` +
+        `목록에서 감추려면 회차 편집에서 ‘공개’를 해제하세요.`,
+    }, 400)
+  }
   const { error } = await admin.from('exam_rounds').delete().eq('id', id)
-  if (error) return json({ error: error.message }, 400)
+  if (error) {
+    // 23503 을 그대로 노출하면 뜻을 알 수 없다 — 판정은 DB 가 하고, 코드는 문구로만 바꾼다.
+    const msg = (error as { code?: string }).code === '23503'
+      ? '이 회차를 참조하는 데이터(응시권·결제 등)가 남아 있어 삭제할 수 없습니다.'
+      : error.message
+    return json({ error: msg }, 400)
+  }
   return json({ ok: true })
 }
 
@@ -696,6 +784,436 @@ async function examFeeSave(admin: any, body: any) {
     if (error) return json({ error: error.message }, 400)
   }
   return json({ ok: true })
+}
+
+// ---------- 응시권(exam_tickets) · 결제(payments) 백오피스 ----------
+// 돈과 응시 자격이 걸린 화면이라 규칙 셋을 지킨다.
+//  ① **만료(expired)는 조회 시점 계산이다.** 여기서 DB status 를 눕히는 쓰기를 하지 않는다 —
+//     구매자 화면(my-attempts)도 같은 규칙으로 접어 보여주는데, 관리자만 저장값을 기준으로 세면
+//     같은 응시권이 관리자에겐 '미사용', 사용자에겐 '만료'로 보인다.
+//  ② **회차 접수 수의 단일 집계원은 examTicketSummary 하나다.** 대시보드 퍼널도 여기서 가져간다 —
+//     두 화면이 각자 세면 숫자가 어긋나고 어느 쪽도 못 믿게 된다.
+//  ③ **발급·회수는 루트 전용이다.** admin_users 게이트에는 액션별 권한이 없어서, 등록된 이메일이면
+//     전 액션이 열린다. '무료 응시권을 찍는 버튼'을 그 게이트에 그대로 얹으면 안 된다.
+
+/**
+ * 표시용 상태 — issued 인데 만료됐으면 expired 로 접는다. **저장값은 건드리지 않는다.**
+ *
+ * ⚠️ 만료 판정은 `_shared/exam-tickets.ts` 의 `ticketExpired` **하나만** 쓴다.
+ *    구매자 화면(my-attempts)·응시 게이트(start-exam)가 같은 함수를 쓰므로, 여기서 규칙을 복제하면
+ *    같은 응시권이 관리자에겐 '미사용', 사용자에겐 '만료'로 보이는 순간이 반드시 온다.
+ *    (시간은 전부 KST — exam_date 는 bare date 라 오프셋 없이 파싱하면 9시간 어긋난다.)
+ */
+function effTicketStatus(t: any, round: any, at: number): string {
+  if (t.status !== 'issued') return t.status
+  return ticketExpired(t, round ?? null, at) ? 'expired' : 'issued'
+}
+
+const TICKET_COLS =
+  'id, user_id, round_id, tier, status, source, payment_id, price_paid, granted_by, note, expires_at, issued_at, consumed_at, voided_at, void_reason'
+
+/** 응시권 목록 — 회차·급수·상태·검색어 필터 + range 페이지네이션(하드캡은 넘치면 조용히 잘려서 안 쓴다). */
+async function examTicketList(admin: any, body: any) {
+  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 500)
+  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
+  const roundId = String(body?.roundId ?? '').trim()
+  const tier = String(body?.tier ?? '').trim()
+  const status = String(body?.status ?? '').trim()
+  const q = String(body?.q ?? '').trim().toLowerCase()
+
+  // 회차는 수십 건이라 통째로 읽는다(만료 판정과 회차명 표시에 둘 다 쓴다).
+  const { data: roundRows } = await admin.from('exam_rounds').select(EXAM_ROUND_COLS)
+  const rounds = (roundRows ?? []) as any[]
+  const now = Date.now()
+  const roundById = new Map<string, any>(rounds.map((r) => [r.id, r]))
+  // 응시 창이 끝난 회차 = 그 회차의 issued 응시권이 '만료'로 보이는 회차.
+  // ⚠️ 응시권별 expires_at override 는 이 집합에 반영되지 않는다 — 상태 **필터**만 살짝 어긋날 뿐,
+  //    각 줄에 찍히는 상태는 아래 effTicketStatus 가 응시권 단위로 정확히 판정한다.
+  //    (수기 발급이 override 를 안 쓰기 때문에 지금은 어긋날 행 자체가 없다.)
+  const endedIds = rounds.filter((r) => examWindowState(r, now) === 'closed').map((r) => r.id)
+
+  // 검색어는 이름·이메일이라 exam_tickets 안에 없다 → 먼저 user_id 집합으로 바꾼 뒤 .in() 으로 건다.
+  let userFilter: string[] | null = null
+  if (q) {
+    const ids = new Set<string>()
+    const { data: profs } = await admin.from('profiles').select('id').ilike('display_name', `%${q}%`).limit(500)
+    for (const p of profs ?? []) ids.add((p as any).id)
+    try {
+      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
+      for (const u of au?.users ?? []) if ((u.email ?? '').toLowerCase().includes(q)) ids.add(u.id)
+    } catch { /* 이메일 검색만 포기 */ }
+    userFilter = [...ids].slice(0, 500) // .in() 이 무한정 길어지지 않게 자른다(관리자 검색이라 실용 우선)
+    if (!userFilter.length) return json({ tickets: [], total: 0 })
+  }
+
+  let sel = admin.from('exam_tickets').select(TICKET_COLS, { count: 'exact' })
+  if (roundId) sel = sel.eq('round_id', roundId)
+  if (tier) sel = sel.eq('tier', tier)
+  if (userFilter) sel = sel.in('user_id', userFilter)
+  // 만료는 저장값이 아니라 계산이라, 필터도 '응시 창이 끝난 회차' 집합으로 DB 에 밀어 넣는다.
+  // 메모리에서 거르면 total 과 페이지 경계가 어긋난다.
+  const endedIn = `(${endedIds.join(',')})`
+  if (status === 'issued') {
+    sel = sel.eq('status', 'issued')
+    if (endedIds.length) sel = sel.not('round_id', 'in', endedIn)
+  } else if (status === 'expired') {
+    sel = endedIds.length
+      ? sel.or(`status.eq.expired,and(status.eq.issued,round_id.in.${endedIn})`)
+      : sel.eq('status', 'expired')
+  } else if (status) {
+    sel = sel.eq('status', status)
+  }
+
+  const { data, count, error } = await sel
+    .order('issued_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+  if (error) return json({ error: error.message }, 400)
+  const rows = (data ?? []) as any[]
+
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  const emailMap: Record<string, string> = {}
+  if (userIds.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
+    for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
+    try {
+      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
+      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+    } catch { /* 이메일만 빈칸 */ }
+  }
+
+  // 회수(void) 판단에 연결 결제 상태가 필요하다 — 환불 없이 회수하면 재구매가 영구히 막히기 때문.
+  const payIds = [...new Set(rows.map((r) => r.payment_id).filter(Boolean))]
+  const payMap: Record<string, any> = {}
+  if (payIds.length) {
+    const { data: pays } = await admin.from('payments').select('id, order_id, status, amount, method, fulfilled_at').in('id', payIds)
+    for (const p of pays ?? []) payMap[(p as any).id] = p
+  }
+
+  // 한 응시권에 응시가 여러 개 달릴 수 있다(재시작으로 expired 된 것들). 살아있는 것을 우선 보여준다.
+  const atMap: Record<string, any> = {}
+  if (rows.length) {
+    const { data: ats } = await admin
+      .from('exam_attempts')
+      .select('id, ticket_id, status, started_at, submitted_at')
+      .in('ticket_id', rows.map((r) => r.id))
+    const rank = (s: string) => (s === 'submitted' ? 0 : s === 'in_progress' ? 1 : 2)
+    for (const a of (ats ?? []) as any[]) {
+      if (!a.ticket_id) continue
+      const prev = atMap[a.ticket_id]
+      if (!prev || rank(a.status) < rank(prev.status)) atMap[a.ticket_id] = a
+    }
+  }
+
+  const tickets = rows.map((t) => {
+    const r = roundById.get(t.round_id)
+    const pay = t.payment_id ? payMap[t.payment_id] ?? null : null
+    const at = atMap[t.id] ?? null
+    return {
+      ticketId: t.id,
+      userId: t.user_id,
+      name: nameMap[t.user_id] ?? null,
+      email: emailMap[t.user_id] ?? null,
+      roundId: t.round_id,
+      roundTitle: (r?.title_i18n?.ko as string) ?? '',
+      roundKind: r?.kind ?? null,
+      examDate: r?.exam_date ?? null,
+      examEndAt: r?.exam_end_at ?? null,
+      tier: t.tier,
+      status: t.status, // DB 저장값
+      effStatus: effTicketStatus(t, r, now), // 화면 표시값(만료 접기 반영)
+      source: t.source,
+      pricePaid: t.price_paid ?? 0,
+      grantedBy: t.granted_by ?? null,
+      note: t.note ?? null,
+      issuedAt: t.issued_at,
+      consumedAt: t.consumed_at,
+      voidedAt: t.voided_at,
+      voidReason: t.void_reason ?? null,
+      expiresAt: t.expires_at,
+      paymentId: t.payment_id ?? null,
+      paymentOrderId: pay?.order_id ?? null,
+      paymentStatus: pay?.status ?? null,
+      paymentFulfilled: pay ? !!pay.fulfilled_at : null,
+      attemptId: at?.id ?? null,
+      attemptStatus: at?.status ?? null,
+    }
+  })
+  return json({ tickets, total: count ?? tickets.length })
+}
+
+/**
+ * 회차 접수 현황 — (회차 × 급수) 발급/미사용/소진/무효/만료 + 매출.
+ * **회차 지표의 단일 집계원**이라 대시보드 퍼널도 이걸 부른다.
+ * roundId 를 주면 그 회차의 급수별 문항 준비 상태(N/M)까지 같이 준다 —
+ * '판매 가능(exams 행 존재)'과 '응시 가능(문항 세트 존재)' 사이에 관리자 작업 한 단계가 비어 있어서,
+ * 이걸 안 보여주면 시험 당일에 전원이 '아직 문항이 출제되지 않은 시험입니다'를 받는다.
+ */
+async function examTicketSummary(admin: any, body: any) {
+  const roundId = String(body?.roundId ?? '').trim()
+  const { data: roundRows } = await admin
+    .from('exam_rounds')
+    .select(`${EXAM_ROUND_COLS}, sort`)
+    .order('sort', { ascending: true })
+  const rounds = ((roundRows ?? []) as any[]).filter((r) => !roundId || r.id === roundId)
+  const now = Date.now()
+  const roundById = new Map<string, any>(rounds.map((r) => [r.id, r]))
+
+  type Cell = { sold: number; unused: number; used: number; expired: number; voided: number; revenue: number; free: number }
+  const cell = (): Cell => ({ sold: 0, unused: 0, used: 0, expired: 0, voided: 0, revenue: 0, free: 0 })
+  const byTier = new Map<string, Cell>() // `${roundId}|${tier}`
+  const byRound = new Map<string, Cell>()
+  const at = (m: Map<string, Cell>, k: string): Cell => {
+    let v = m.get(k)
+    if (!v) { v = cell(); m.set(k, v) }
+    return v
+  }
+
+  // 청크로 훑어 메모리에서 센다(부분 유니크·lazy 만료 때문에 DB group by 로는 같은 규칙을 못 만든다).
+  const CHUNK = 1000
+  const MAX_ROWS = 50000 // 관리자 화면이라 상한을 두고, 넘치면 truncated 로 알린다.
+  let truncated = false
+  for (let from = 0; ; from += CHUNK) {
+    if (from >= MAX_ROWS) { truncated = true; break }
+    let sel = admin.from('exam_tickets').select('round_id, tier, status, price_paid, expires_at, source')
+    if (roundId) sel = sel.eq('round_id', roundId)
+    const { data, error } = await sel.order('issued_at', { ascending: true }).range(from, from + CHUNK - 1)
+    if (error) return json({ error: error.message }, 400)
+    const rows = (data ?? []) as any[]
+    for (const t of rows) {
+      const eff = effTicketStatus(t, roundById.get(t.round_id) ?? null, now)
+      for (const m of [at(byTier, `${t.round_id}|${t.tier}`), at(byRound, t.round_id)]) {
+        if (eff === 'void') m.voided++
+        else {
+          m.sold++ // 접수 = 무효를 뺀 발급분(살아있음 + 사용함 + 만료). 무효까지 세면 판매 수가 부풀려진다.
+          m.revenue += t.price_paid ?? 0
+          if (eff === 'consumed') m.used++
+          else if (eff === 'expired') m.expired++
+          else m.unused++
+          if (t.source !== 'pg') m.free++ // 수기·무료 발급분(매출과 구분해서 봐야 한다)
+        }
+      }
+    }
+    if (rows.length < CHUNK) break
+  }
+
+  // 문항 준비 상태는 회차를 특정했을 때만 센다(전체 회차면 exams 수만큼 쿼리가 늘어난다).
+  const sets: Record<string, { total: number; loaded: number; active: boolean }> = {}
+  if (roundId) {
+    const { data: exs } = await admin.from('exams').select('id, tier, total_questions, active').eq('round_id', roundId)
+    for (const e of (exs ?? []) as any[]) {
+      const { count } = await admin.from('exam_questions').select('id', { count: 'exact', head: true }).eq('exam_id', e.id)
+      sets[e.tier] = { total: e.total_questions ?? 0, loaded: count ?? 0, active: !!e.active }
+    }
+  }
+
+  return json({
+    rounds: rounds.map((r) => ({
+      roundId: r.id,
+      title: (r.title_i18n?.ko as string) ?? '',
+      kind: r.kind,
+      examDate: r.exam_date,
+      examStartAt: r.exam_start_at ?? null,
+      examEndAt: r.exam_end_at ?? null,
+      ...(byRound.get(r.id) ?? cell()),
+    })),
+    tiers: [...byTier.entries()].map(([k, v]) => {
+      const i = k.indexOf('|')
+      return { roundId: k.slice(0, i), tier: k.slice(i + 1), ...v }
+    }),
+    sets,
+    truncated,
+  })
+}
+
+/**
+ * 수기 발급 — 단체 접수·시험 당일 장애 보상용. **루트 전용**(위 규칙 ③).
+ * price_paid=0, source='admin', granted_by=처리자 이메일. 회차·응시료 변경엔 로그가 아예 없어서
+ * 분쟁 때 추적할 게 granted_by/note 두 칸뿐이다 — 사유를 꼭 남기게 한다.
+ * 만료 override(expires_at)는 일부러 안 받는다. 받으면 '회차 종료가 만료를 정한다'는 규칙이 화면마다 갈린다.
+ */
+async function examTicketGrant(admin: any, body: any, actorEmail: string, isRoot: boolean) {
+  if (!isRoot) return json({ error: '루트 관리자만 응시권을 발급할 수 있습니다.' }, 403)
+  const roundId = String(body?.roundId ?? '').trim()
+  const tier = String(body?.tier ?? '').trim()
+  const note = String(body?.note ?? '').trim()
+  const emailIn = String(body?.email ?? '').trim().toLowerCase()
+  let userId = String(body?.userId ?? '').trim()
+  if (!roundId || !tier) return json({ error: '회차와 급수를 선택하세요.' }, 400)
+  if (!userId && !emailIn) return json({ error: '발급 대상 이메일이 필요합니다.' }, 400)
+  if (!note) return json({ error: '발급 사유를 적어주세요(무료 응시권이라 기록이 남아야 합니다).' }, 400)
+
+  if (!userId) {
+    try {
+      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
+      const hit = (au?.users ?? []).find((u: any) => (u.email ?? '').toLowerCase() === emailIn && !u.is_anonymous)
+      if (hit) userId = hit.id
+    } catch { /* 아래에서 404 */ }
+    if (!userId) return json({ error: `가입된 계정을 찾을 수 없습니다: ${emailIn}` }, 404)
+  }
+
+  const { data: round } = await admin.from('exam_rounds').select('id, kind').eq('id', roundId).maybeSingle()
+  if (!round) return json({ error: '회차를 찾을 수 없습니다.' }, 404)
+  // 상시(rolling) 회차는 응시권을 팔지 않기로 했다 → 응시 창(만료)을 정할 근거가 없어
+  // 여기서 찍으면 기한 없는 무료 응시권이 된다. 발급이 필요하면 정기 회차를 만들어서 준다.
+  if (round.kind === 'rolling') {
+    return json({ error: '상시 회차에는 응시권을 발급하지 않습니다(응시 기간이 없어 만료를 정할 수 없습니다). 정기 회차를 사용하세요.' }, 400)
+  }
+  // exams 행이 없으면 응시권만 있고 응시할 시험이 없는 상태가 된다(start-exam 이 400 을 뱉는다).
+  const { data: exam } = await admin.from('exams').select('id, active').eq('round_id', roundId).eq('tier', tier).maybeSingle()
+  if (!exam || !exam.active) {
+    return json({ error: '이 회차에 해당 급수 시험이 열려 있지 않습니다. 회차 편집에서 급수를 먼저 여세요.' }, 400)
+  }
+
+  // 발급도 상태 전이라 _shared 헬퍼로만 한다 — 중복·오타 판정은 전부 DB 제약이 하고,
+  // 헬퍼가 23505 를 '같은 결제 재시도'와 '슬롯 선점'으로 갈라준다(여기서 다시 구현하면 규칙이 갈린다).
+  const res = await grantExamTicket(admin, {
+    userId, roundId, tier,
+    source: 'admin',
+    pricePaid: 0, // 무상 발급. 매출 집계에서 결제분과 섞이면 안 된다.
+    grantedBy: actorEmail,
+    note,
+  })
+  if (!res.ok) {
+    return json({
+      error: res.code === 'live_conflict'
+        ? '이 사용자는 이미 이 회차·급수의 응시권을 갖고 있습니다(사용 완료 포함). 회수한 뒤 다시 발급하세요.'
+        : res.error,
+    }, res.code === 'live_conflict' ? 409 : 400)
+  }
+  return json({ ok: true, ticketId: res.ticket.id, userId })
+}
+
+/**
+ * 회수(void) — 오등록·본인확인 실패·부정 응시. **루트 전용**(위 규칙 ③).
+ *
+ * ⚠️ 연결 결제를 어떻게 할지 반드시 같이 정하게 한다. 결제를 paid 로 그냥 두면
+ *    payments_paid_product_uniq 가 계속 걸려 사용자는 같은 회차·급수를 **영구히 다시 살 수 없다**
+ *    (화면 문구는 '이미 결제가 완료된 상품입니다' 라 상황과 정반대로 읽힌다).
+ * ⚠️ 여기서 실제 환불이 일어나지는 않는다 — 토스 취소 API 는 의도적으로 안 붙였다.
+ *    'refunded' 는 "PG 에서 환불을 끝냈으니 원장을 맞춘다" 는 뜻이다.
+ */
+async function examTicketVoid(admin: any, body: any, actorEmail: string, isRoot: boolean) {
+  if (!isRoot) return json({ error: '루트 관리자만 응시권을 회수할 수 있습니다.' }, 403)
+  const id = String(body?.id ?? '').trim()
+  const reason = String(body?.reason ?? '').trim()
+  const settle = body?.settlePayment === 'refunded' ? 'refunded' : 'keep'
+  if (!id) return json({ error: 'id 필요' }, 400)
+  if (!reason) return json({ error: '회수 사유를 적어주세요(분쟁 때 추적할 게 이것뿐입니다).' }, 400)
+
+  const { data: t } = await admin.from('exam_tickets').select('id, status, payment_id').eq('id', id).maybeSingle()
+  if (!t) return json({ error: '응시권을 찾을 수 없습니다.' }, 404)
+  if (t.status === 'void') return json({ error: '이미 회수된 응시권입니다.' }, 409)
+
+  // 상태 전이는 _shared/exam-tickets.ts 의 헬퍼로만 한다(voided_at·void_reason 을 빼먹지 않게).
+  // 처리자를 담을 별도 컬럼이 없어(granted_by 는 발급자 자리) 사유 문자열에 붙여 추적한다.
+  const { voided } = await voidTicket(admin, id, `${reason} · 처리자 ${actorEmail}`)
+  if (!voided) return json({ error: '회수할 수 없는 상태입니다(이미 회수됐거나 만료 처리됨).' }, 409)
+
+  const now = new Date().toISOString()
+  let paymentNote: string | null = null
+  if (t.payment_id) {
+    if (settle === 'refunded') {
+      const { error: pe } = await admin.from('payments')
+        .update({ status: 'refunded', updated_at: now })
+        .eq('id', t.payment_id)
+        .eq('status', 'paid')
+      paymentNote = pe
+        ? `결제 원장 갱신 실패: ${pe.message}`
+        : '연결 결제를 환불(refunded)로 표시했습니다. 실제 환불은 PG 관리자에서 별도로 처리하세요. 이 사용자는 같은 회차·급수를 다시 결제할 수 있습니다.'
+    } else {
+      paymentNote = '연결 결제는 손대지 않았습니다. 결제가 paid 로 남아 있으면 이 사용자는 같은 회차·급수를 다시 결제할 수 없으니, 응시가 필요하면 수기 발급으로 다시 주세요.'
+    }
+  }
+  return json({ ok: true, paymentNote })
+}
+
+/**
+ * 결제 원장 조회 + 30일 집계.
+ * queue 는 '돈이 새는' 두 목록이다 — 목록이 사람 눈에 안 닿으면 방어 장치가 아니다.
+ *   · unfulfilled = 승인은 났는데 지급이 안 된 건(돈은 받았는데 응시권이 0장)
+ *   · revoked     = 환불·취소인데 지급이 살아있는 건(자동 회수를 안 하기로 한 방침의 뒷정리 큐)
+ */
+async function paymentList(admin: any, body: any) {
+  const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 500)
+  const offset = Math.max(0, Math.floor(body?.offset ?? 0))
+  const productType = String(body?.productType ?? '').trim()
+  const status = String(body?.status ?? '').trim()
+  const queue = String(body?.queue ?? '').trim()
+
+  let sel = admin.from('payments').select(
+    'id, user_id, order_id, order_name, product_type, product_ref, amount, status, method, confirmed_at, fulfilled_at, fail_code, fail_message, created_at',
+    { count: 'exact' },
+  )
+  if (productType) sel = sel.eq('product_type', productType)
+  if (status) sel = sel.eq('status', status)
+  if (queue === 'unfulfilled') sel = sel.eq('status', 'paid').is('fulfilled_at', null)
+  else if (queue === 'revoked') sel = sel.in('status', ['refunded', 'canceled']).not('fulfilled_at', 'is', null)
+
+  const { data, count, error } = await sel.order('created_at', { ascending: false }).range(offset, offset + limit - 1)
+  if (error) return json({ error: error.message }, 400)
+  const rows = (data ?? []) as any[]
+
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  const emailMap: Record<string, string> = {}
+  if (userIds.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
+    for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
+    try {
+      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
+      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+    } catch { /* 이메일만 빈칸 */ }
+  }
+
+  // 30일 집계. 환불은 매출에서 빼지 않고 옆에 세운다 — 정산 기준일이 달라 단순 상계하면 값이 어긋난다.
+  const since = new Date(Date.now() - 30 * 86400e3).toISOString()
+  const stats = { paidN: 0, paidAmount: 0, refundN: 0, refundAmount: 0 }
+  const CHUNK = 1000
+  for (let from = 0; from < 50000; from += CHUNK) {
+    const { data: chunk, error: ce } = await admin
+      .from('payments')
+      .select('amount, status')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .range(from, from + CHUNK - 1)
+    if (ce) break
+    const cr = (chunk ?? []) as any[]
+    for (const p of cr) {
+      if (p.status === 'paid') { stats.paidN++; stats.paidAmount += p.amount ?? 0 }
+      else if (p.status === 'refunded') { stats.refundN++; stats.refundAmount += p.amount ?? 0 }
+    }
+    if (cr.length < CHUNK) break
+  }
+
+  const [unf, rev] = await Promise.all([
+    admin.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'paid').is('fulfilled_at', null),
+    admin.from('payments').select('id', { count: 'exact', head: true }).in('status', ['refunded', 'canceled']).not('fulfilled_at', 'is', null),
+  ])
+
+  return json({
+    payments: rows.map((p) => ({
+      id: p.id,
+      userId: p.user_id,
+      name: nameMap[p.user_id] ?? null,
+      email: emailMap[p.user_id] ?? null,
+      orderId: p.order_id,
+      orderName: p.order_name,
+      productType: p.product_type,
+      productRef: p.product_ref,
+      amount: p.amount ?? 0,
+      status: p.status,
+      method: p.method ?? null,
+      confirmedAt: p.confirmed_at,
+      fulfilledAt: p.fulfilled_at,
+      failCode: p.fail_code ?? null,
+      failMessage: p.fail_message ?? null,
+      createdAt: p.created_at,
+    })),
+    total: count ?? rows.length,
+    stats30d: stats,
+    queues: { unfulfilled: unf.count ?? 0, revoked: rev.count ?? 0 },
+  })
 }
 
 // ---------- 관리자 계정 관리 (루트 전용) ----------
@@ -1933,6 +2451,13 @@ Deno.serve(async (req) => {
       case 'examRoundDelete': return await examRoundDelete(admin, body)
       case 'examFeeList': return await examFeeList(admin)
       case 'examFeeSave': return await examFeeSave(admin, body)
+      case 'examTicketList': return await examTicketList(admin, body)
+      case 'examTicketSummary': return await examTicketSummary(admin, body)
+      // ⚠️ 발급·회수는 isRoot 를 넘겨 루트 전용으로 막는다(manageAdmins 와 같은 방식).
+      //    admin_users 게이트에는 액션별 권한이 없어서, 이 둘을 그냥 얹으면 등록 이메일 = 무료 응시권 발급기다.
+      case 'examTicketGrant': return await examTicketGrant(admin, body, email, isRoot)
+      case 'examTicketVoid': return await examTicketVoid(admin, body, email, isRoot)
+      case 'paymentList': return await paymentList(admin, body)
       case 'examListForAdmin': return await examListForAdmin(admin)
       case 'bankListForAdmin': return await bankListForAdmin(admin)
       case 'examDraw': return await examDraw(admin, body, email)

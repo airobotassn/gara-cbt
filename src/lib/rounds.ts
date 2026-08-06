@@ -12,6 +12,7 @@ interface RawRound {
   apply_start_at: string | null
   apply_end_at: string | null
   note_i18n: Record<string, string> | null
+  open_tiers: string[] | null
   sort: number
 }
 
@@ -26,6 +27,15 @@ export interface RoundView {
   applyText: string // 접수기간 "YYYY. MM. DD ~ YYYY. MM. DD" / 상시·미설정: ''
   status: RoundStatus
   clickable: boolean // 접수중일 때만 원서접수로 이동
+  // 이 회차가 연 급수(exam_tiers.tier 키). 빈 배열 = 아직 아무 급수도 안 열린 회차.
+  // ⚠️ exams 는 RLS 정책 0개라 프론트가 못 읽는다 → 관리자(syncRoundExams)가 exam_rounds.open_tiers 에
+  //    비정규화해 둔 값을 그대로 읽는다. 화면 표시용이고 판매 가능 판정의 정본은 서버(resolveExamOffer)다.
+  openTiers: string[]
+  // 응시권을 팔 수 있는 회차인가(표시용).
+  // ⚠️ 상시(rolling)는 statusOf 가 항상 'open' 을 주지만 **응시권을 팔지 않는다**(2026-08 결정).
+  //    정기시험은 접수(1~10일)·응시(11~20일) 창이 있어야 응시권 만료 기준이 서는데 상시엔 그 창이 없다.
+  //    기존 rolling 행·표시 코드는 그대로 두고 결제 진입만 막는다.
+  sellable: boolean
 }
 
 // 우리 언어코드 → BCP-47 (Intl 날짜 포맷용)
@@ -76,6 +86,8 @@ function fmtApply(r: RawRound, lang: Lang): string {
 }
 
 // 접수 상태: 상시는 항상 open, 정기는 접수기간(now) 기준.
+// ⚠️ 상시의 'open' 은 '늘 열려 있는 안내'라는 뜻이지 결제 가능이 아니다 — 판매 여부는 sellable 을 볼 것.
+//    이 함수를 고치면 /plan 의 상태 배지 문구까지 같이 바뀌므로 판매 판정은 여기 얹지 않았다.
 function statusOf(r: RawRound): RoundStatus {
   if (r.kind === 'rolling') return 'open'
   const now = Date.now()
@@ -100,7 +112,7 @@ export function useExamRounds(lang: Lang) {
       }
       const { data } = await supabase
         .from('exam_rounds')
-        .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, note_i18n, sort')
+        .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, note_i18n, open_tiers, sort')
         .eq('published', true)
         // 정기시험은 시험일 오름차순(가까운 순). 상시(exam_date=null)는 뒤로 밀고 sort로 정렬.
         .order('exam_date', { ascending: true, nullsFirst: false })
@@ -139,6 +151,10 @@ export function useExamRounds(lang: Lang) {
           applyText: fmtApply(r, lang),
           status,
           clickable: status === 'open',
+          openTiers: r.open_tiers ?? [],
+          // clickable 과 일부러 분리했다 — clickable 은 '카드를 눌러 접수화면으로 갈 수 있는가'(/plan),
+          // sellable 은 '거기서 결제까지 갈 수 있는가'다. 정기 회차에선 둘이 같지만 상시에선 갈린다.
+          sellable: r.kind === 'regular' && status === 'open',
         }
       })
   }, [raw, lang])

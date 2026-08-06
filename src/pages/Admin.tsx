@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { renderEbookCover } from '../lib/ebookCover'
+import { krw } from '../lib/money'
+import { feeKey } from '../lib/fees'
 import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
 import type {
   AdminListResponse,
@@ -130,8 +132,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 // CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
 // ⚠️ 채팅 검수(chatmod)·이북(ebooks)은 WORLD ARENA 관리자(AdminLevelTest.tsx)로 이동함 — 여기 서브탭에서 제외.
-type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'admins'
-const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'admins']
+type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'tickets' | 'admins'
+// ⚠️ 유니언에만 넣고 이 배열에 빠뜨리면 URL 화이트리스트(:sub)가 걸러 항상 대시보드로 떨어진다.
+const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'tickets', 'admins']
 // 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
 type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
 const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
@@ -317,6 +320,9 @@ function CarisExamAdmin() {
         <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
           시험등록
         </button>
+        <button className={sub === 'tickets' ? 'on' : ''} onClick={() => setSub('tickets')}>
+          접수·응시권
+        </button>
         {isRoot && (
           <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
             관리자 관리
@@ -337,6 +343,8 @@ function CarisExamAdmin() {
         <FaqAdmin />
       ) : sub === 'rounds' ? (
         <RoundsAdmin />
+      ) : sub === 'tickets' ? (
+        <TicketsAdmin isRoot={isRoot} />
       ) : sub === 'admins' ? (
         <AdminAccountsAdmin />
       ) : (
@@ -1510,11 +1518,40 @@ interface RoundDraft {
   examDate: string // YYYY-MM-DD
   applyStart: string // YYYY-MM-DD
   applyEnd: string // YYYY-MM-DD
+  examStart: string // YYYY-MM-DD — 응시 창 시작(KST)
+  examEnd: string // YYYY-MM-DD — 응시 창 종료(KST)
   tiers: string[] // 이 회차가 여는 급수(getTracks 티어 key)
 }
 
+// 서버가 회차에 얹어 내려주는 응시 창. types.ts 의 ExamRoundRow 는 다른 작업이 만지고 있어 여기서 로컬로 넓힌다.
+type ExamRoundRowX = ExamRoundRow & { examStartAt?: string | null; examEndAt?: string | null }
+
+// 정기시험 일정은 전부 KST 기준이다. 오프셋 없이 저장하면 timestamptz 가 UTC 로 읽어 9시간 어긋난다
+// (예전엔 `${날짜}T23:59:59` 를 그대로 보내서 마감이 다음날 08:59 KST 로 저장됐다).
+const KST_OFFSET = '+09:00'
+/** ISO(timestamptz) → KST 날짜 'YYYY-MM-DD'. slice(0,10) 은 UTC 날짜라 밤 시각에서 하루 어긋난다. */
+function dayKST(iso?: string | null): string {
+  if (!iso) return ''
+  const t = Date.parse(iso)
+  return Number.isNaN(t) ? '' : new Date(t + 9 * 3600e3).toISOString().slice(0, 10)
+}
+/** KST 기준 오늘. 브라우저 시간대를 믿으면 해외 접속 관리자가 다른 달을 본다. */
+function kstToday(): { y: number; m: number } {
+  const k = new Date(Date.now() + 9 * 3600e3)
+  return { y: k.getUTCFullYear(), m: k.getUTCMonth() + 1 }
+}
+const ymd = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+
 function emptyRoundDraft(kind: 'regular' | 'rolling'): RoundDraft {
-  return { kind, sort: 9999, published: true, titleI18n: {}, noteI18n: {}, examDate: '', applyStart: '', applyEnd: '', tiers: [] }
+  // 정기시험은 월 3구간(1~10 접수 / 11~20 응시 / 21~말일 채점)으로 돈다 → 응시 창을 그 달 11~20일로 미리 채운다.
+  // 상수로 박는 게 아니라 기본값일 뿐이다 — 회차마다 다를 수 있어 관리자가 그대로 고칠 수 있어야 한다.
+  const t = kstToday()
+  return {
+    kind, sort: 9999, published: true, titleI18n: {}, noteI18n: {},
+    examDate: '', applyStart: '', applyEnd: '',
+    examStart: ymd(t.y, t.m, 11), examEnd: ymd(t.y, t.m, 20),
+    tiers: [],
+  }
 }
 
 // 티어 key → 표시명(6개, getTracks 단일출처). 회차 목록 배지·라벨용.
@@ -1524,6 +1561,106 @@ const TIER_LABEL: Record<string, string> = Object.fromEntries(
 // 급수 진행 순서(Beginner→Pro→Elite→Master→GM→Zenith) — 드롭다운·목록 정렬 기준(알파벳순 방지).
 const TIER_ORDER: string[] = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ti.key))
 const tierRank = (t?: string | null) => { const i = TIER_ORDER.indexOf(t ?? ''); return i < 0 ? 999 : i }
+
+/** 응시료 편집 — 티어별 금액(원)만 다룬다. **정가 단일 소스가 DB `exam_fees` 라 여기가 유일한 입력구**다.
+ *
+ *  ⚠️ 통화는 원(KRW) 하나다. 달러로 적어두고 환율을 곱하는 방식은 쓰지 않는다 — 주문 시점과 승인 시점의
+ *     환율이 다르면 금액 불일치로 결제 승인이 튕기고, 여기 적은 값과 실제 청구액이 달라진다.
+ *  ⚠️ **비운 티어는 결제가 막힌다**(원서접수 화면이 '준비 중'을 띄우고 결제 버튼을 잠근다). 이건 버그가 아니라
+ *     의도다 — 금액 미설정을 임시값으로 때우면 엉뚱한 돈이 청구된다. 지금 CARIS-Ⅱ 3개가 여기 해당한다.
+ *  키 규칙은 src/lib/fees.ts 의 feeKey() = `${트랙키}_${티어키}` 와 반드시 같아야 한다.
+ */
+function ExamFeeBox() {
+  const TRACKS = getTracks('ko')
+  const TIERS = TRACKS.flatMap((tr) => tr.tiers.map((tier) => ({ track: tr, tier })))
+  const [amounts, setAmounts] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setMsg('')
+    try {
+      const res = await callFunction<{ fees: { key: string; amount: number }[] }>('admin', { action: 'examFeeList' })
+      const m: Record<string, string> = {}
+      for (const f of res.fees ?? []) m[f.key] = String(f.amount)
+      setAmounts(m)
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '응시료를 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  async function save() {
+    // 빈칸은 "저장 안 함"이 아니라 **그 티어를 아직 안 연다**는 뜻이라 0 으로 밀지 않고 그냥 빼고 보낸다.
+    const fees = Object.entries(amounts)
+      .map(([key, v]) => ({ key, amount: Number(v) }))
+      .filter((f) => String(amounts[f.key] ?? '').trim() !== '' && Number.isFinite(f.amount) && f.amount > 0)
+    if (!fees.length) { setMsg('저장할 금액이 없습니다.'); return }
+    setSaving(true)
+    setMsg('')
+    try {
+      await callFunction('admin', { action: 'examFeeSave', fees })
+      await load()
+      setMsg('저장했습니다.')
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="admin-section" style={{ marginBottom: 20 }}>
+      <div className="admin-head" style={{ marginBottom: 12 }}>
+        <h1 style={{ fontSize: 18 }}>응시료 (원)</h1>
+        <div className="admin-head-actions">
+          <button className="admin-mini" onClick={load} disabled={loading || saving}>새로고침</button>
+          <button className="admin-mini" onClick={save} disabled={loading || saving}>
+            {saving ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </div>
+      <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 12px' }}>
+        원(KRW) 단위 정수로 입력하세요. <b>비워두면 그 급수는 원서접수에서 ‘준비 중’으로 표시되고 결제가 막힙니다.</b>
+      </p>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr><th>트랙</th><th>급수</th><th>요금 키</th><th style={{ width: 160 }}>응시료(원)</th></tr>
+          </thead>
+          <tbody>
+            {TIERS.map(({ track, tier }) => {
+              const k = feeKey(track.key, tier.key)
+              return (
+                <tr key={k}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{track.name}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{tier.name}</td>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{k}</td>
+                  <td>
+                    <input
+                      style={inpStyle}
+                      type="number"
+                      min={0}
+                      step={100}
+                      placeholder="미설정"
+                      value={amounts[k] ?? ''}
+                      onChange={(e) => setAmounts((m) => ({ ...m, [k]: e.target.value }))}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {msg && <div style={{ marginTop: 10, fontSize: 14 }}>{msg}</div>}
+    </div>
+  )
+}
 
 function RoundsAdmin() {
   const [rows, setRows] = useState<ExamRoundRow[]>([])
@@ -1554,6 +1691,7 @@ function RoundsAdmin() {
     setDraft(emptyRoundDraft(kindFilter === 'rolling' ? 'rolling' : 'regular'))
   }
   function openEdit(r: ExamRoundRow) {
+    const rx = r as ExamRoundRowX
     setDraft({
       id: r.id,
       kind: r.kind,
@@ -1562,8 +1700,10 @@ function RoundsAdmin() {
       titleI18n: { ...r.titleI18n },
       noteI18n: { ...r.noteI18n },
       examDate: r.examDate ?? '',
-      applyStart: r.applyStartAt ? r.applyStartAt.slice(0, 10) : '',
-      applyEnd: r.applyEndAt ? r.applyEndAt.slice(0, 10) : '',
+      applyStart: dayKST(r.applyStartAt),
+      applyEnd: dayKST(r.applyEndAt),
+      examStart: dayKST(rx.examStartAt),
+      examEnd: dayKST(rx.examEndAt),
       tiers: r.tiers ?? [],
     })
   }
@@ -1598,7 +1738,7 @@ function RoundsAdmin() {
       .map((ti) => ({ key: ti.key, title: `${roundKo} · ${ti.name}`, total: tierTotal(ti.key), durationMin: TIER_EXAM_SPEC[ti.key]?.durationMin ?? 120 }))
     setSaving(true)
     try {
-      const res = await callFunction<{ translateWarning?: string | null }>('admin', {
+      const res = await callFunction<{ translateWarning?: string | null; tierWarning?: string | null }>('admin', {
         action: 'examRoundUpsert',
         round: {
           id: draft.id,
@@ -1608,13 +1748,20 @@ function RoundsAdmin() {
           titleI18n: draft.titleI18n,
           noteI18n: isReg ? {} : draft.noteI18n,
           examDate: isReg ? draft.examDate || null : null,
-          applyStartAt: isReg && draft.applyStart ? `${draft.applyStart}T00:00:00` : null,
-          applyEndAt: isReg && draft.applyEnd ? `${draft.applyEnd}T23:59:59` : null,
+          // ⚠️ 오프셋(+09:00)을 반드시 붙인다 — 이 값들이 이제 결제·응시 게이트의 판정 기준이라,
+          //    UTC 로 저장되면 접수·응시가 9시간씩 어긋나서 열리고 닫힌다.
+          applyStartAt: isReg && draft.applyStart ? `${draft.applyStart}T00:00:00${KST_OFFSET}` : null,
+          applyEndAt: isReg && draft.applyEnd ? `${draft.applyEnd}T23:59:59${KST_OFFSET}` : null,
+          examStartAt: isReg && draft.examStart ? `${draft.examStart}T00:00:00${KST_OFFSET}` : null,
+          examEndAt: isReg && draft.examEnd ? `${draft.examEnd}T23:59:59${KST_OFFSET}` : null,
           tiers,
         },
       })
       setDraft(null)
       await load()
+      // 급수 경고는 번역 경고와 따로 띄운다 — 한 문자열로 합쳤더니 '접수가 있어 급수를 못 지웠다'가
+      // '자동 번역을 건너뛰었습니다'로 읽혀서, 관리자가 해제된 줄 알고 넘어갔다.
+      if (res?.tierWarning) alert('⚠️ 급수 설정이 일부 반영되지 않았습니다.\n\n' + res.tierWarning)
       if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
     } catch (e) {
       alert(e instanceof Error ? e.message : '저장에 실패했습니다.')
@@ -1669,6 +1816,8 @@ function RoundsAdmin() {
 
   return (
     <>
+      <ExamFeeBox />
+
       <div className="admin-head">
         <h1>시험 등록</h1>
         <div className="admin-head-actions">
@@ -1705,6 +1854,7 @@ function RoundsAdmin() {
               <th>회차명 (한국어)</th>
               <th>시험일</th>
               <th>접수기간</th>
+              <th>응시기간</th>
               <th>열린 급수</th>
               {kindFilter === 'rolling' && <th style={{ textAlign: 'center' }}>순서</th>}
               <th></th>
@@ -1720,12 +1870,20 @@ function RoundsAdmin() {
                 </td>
                 <td>{r.titleI18n.ko || <span style={{ color: 'var(--muted)' }}>(회차명 없음)</span>}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{r.kind === 'rolling' ? '상시' : r.examDate ?? '-'}</td>
-                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 13 }}>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 14 }}>
                   {r.kind === 'rolling'
                     ? '연중'
                     : r.applyStartAt || r.applyEndAt
-                      ? `${r.applyStartAt?.slice(0, 10) ?? '?'} ~ ${r.applyEndAt?.slice(0, 10) ?? '?'}`
+                      ? `${dayKST(r.applyStartAt) || '?'} ~ ${dayKST(r.applyEndAt) || '?'}`
                       : '-'}
+                </td>
+                {/* 응시기간이 실제 응시 가능 여부를 정한다(시험일은 대표 표기일일 뿐). 비면 시험일 하루로 처리된다. */}
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 14 }}>
+                  {r.kind === 'rolling'
+                    ? '-'
+                    : (r as ExamRoundRowX).examStartAt || (r as ExamRoundRowX).examEndAt
+                      ? `${dayKST((r as ExamRoundRowX).examStartAt) || '?'} ~ ${dayKST((r as ExamRoundRowX).examEndAt) || '?'}`
+                      : <span title="응시기간 미설정 — 시험일 하루만 응시할 수 있습니다.">시험일 하루</span>}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {r.tiers?.length
@@ -1771,7 +1929,7 @@ function RoundsAdmin() {
             ))}
             {!group.length && !loading && (
               <tr>
-                <td colSpan={kindFilter === 'rolling' ? 7 : 6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                <td colSpan={kindFilter === 'rolling' ? 8 : 7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   {kindFilter === 'past' ? '지난 시험이 없습니다.' : '이 유형의 회차가 없습니다. “+ 새 회차”로 추가하세요.'}
                 </td>
               </tr>
@@ -1860,20 +2018,37 @@ function RoundsAdmin() {
               </div>
 
               {isReg ? (
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                    시험일
-                    <input type="date" style={inpStyle} value={draft.examDate} onChange={(e) => patch({ examDate: e.target.value })} />
-                  </label>
-                  <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                    접수 시작
-                    <input type="date" style={inpStyle} value={draft.applyStart} onChange={(e) => patch({ applyStart: e.target.value })} />
-                  </label>
-                  <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                    접수 마감
-                    <input type="date" style={inpStyle} value={draft.applyEnd} onChange={(e) => patch({ applyEnd: e.target.value })} />
-                  </label>
-                </div>
+                <>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                      시험일
+                      <input type="date" style={inpStyle} value={draft.examDate} onChange={(e) => patch({ examDate: e.target.value })} />
+                    </label>
+                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                      접수 시작
+                      <input type="date" style={inpStyle} value={draft.applyStart} onChange={(e) => patch({ applyStart: e.target.value })} />
+                    </label>
+                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                      접수 마감
+                      <input type="date" style={inpStyle} value={draft.applyEnd} onChange={(e) => patch({ applyEnd: e.target.value })} />
+                    </label>
+                  </div>
+                  {/* 응시 창 — '시험일'은 안내용 대표일이고, 실제로 응시가 열리고 닫히는 건 이 두 날짜다. */}
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                      응시 시작
+                      <input type="date" style={inpStyle} value={draft.examStart} onChange={(e) => patch({ examStart: e.target.value })} />
+                    </label>
+                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
+                      응시 종료
+                      <input type="date" style={inpStyle} value={draft.examEnd} onChange={(e) => patch({ examEnd: e.target.value })} />
+                    </label>
+                    <div style={{ flex: 2, minWidth: 220, alignSelf: 'flex-end', paddingBottom: 6, fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
+                      정기시험은 <b>1~10일 접수 · 11~20일 응시 · 21~말일 채점</b>으로 돕니다.<br />
+                      비워두면 <b>시험일 하루</b>만 응시할 수 있습니다.
+                    </div>
+                  </div>
+                </>
               ) : (
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0 }}>
                   상시시험은 시험일·접수기간이 없습니다(연중 접수).
@@ -1898,8 +2073,12 @@ function RoundsAdmin() {
                 🌐 {isReg ? '회차명은' : '회차명·설명은'} 저장 시 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다. 날짜는 화면 언어에 맞게 자동 표기됩니다.
               </p>
               {isReg && (
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
                   ⓘ 접수 시작~마감 기간이면 “접수중”, 시작 전이면 “예정”, 마감 후면 “마감”으로 표시됩니다.
+                  <br />
+                  ⓘ 이 날짜들은 표시용이 아니라 <b>실제 게이트</b>입니다 — 접수기간 밖이면 결제가 막히고, 응시기간 밖이면 응시가 막힙니다(모두 KST 기준).
+                  <br />
+                  ⓘ 이미 접수(응시권·진행 중 결제)가 있는 급수는 체크를 해제해도 <b>닫히지 않습니다</b>. 접수분을 먼저 회수·환불하세요.
                 </p>
               )}
             </div>
@@ -1916,6 +2095,523 @@ function RoundsAdmin() {
         </div>
       )}
     </>
+  )
+}
+
+// ── 접수·응시권 관리 ──────────────────────────────────────────────
+// 응시권(exam_tickets) = "결제했다"와 "응시했다" 사이를 담는 유일한 행. 이 탭이 그 원장 화면이다.
+//
+// ⚠️ 새 타입은 types.ts 가 아니라 여기 로컬 interface 로 둔다(그 파일은 다른 작업이 만지고 있다).
+// ⚠️ 금액은 전부 **원화(krw)** 다. 구매자 화면은 달러로 표시하지만 관리자는 실제 청구액을 봐야 한다.
+// ⚠️ 상태는 서버가 계산해 내려주는 `effStatus` 를 찍는다. 저장값(`status`)을 그대로 쓰면
+//    응시 창이 끝난 응시권이 관리자에겐 '미사용', 사용자 마이페이지에선 '만료'로 보인다.
+
+interface TicketRow {
+  ticketId: string
+  userId: string
+  name: string | null
+  email: string | null
+  roundId: string
+  roundTitle: string
+  roundKind: string | null
+  examDate: string | null
+  examEndAt: string | null
+  tier: string
+  status: string // DB 저장값
+  effStatus: string // 화면 표시값(만료 접기 반영)
+  source: string
+  pricePaid: number
+  grantedBy: string | null
+  note: string | null
+  issuedAt: string
+  consumedAt: string | null
+  voidedAt: string | null
+  voidReason: string | null
+  expiresAt: string | null
+  paymentId: string | null
+  paymentOrderId: string | null
+  paymentStatus: string | null
+  paymentFulfilled: boolean | null
+  attemptId: string | null
+  attemptStatus: string | null
+}
+interface TicketListResp { tickets: TicketRow[]; total: number }
+
+interface TicketCounts { sold: number; unused: number; used: number; expired: number; voided: number; revenue: number; free: number }
+interface TicketRoundSummary extends TicketCounts {
+  roundId: string
+  title: string
+  kind: string
+  examDate: string | null
+  examStartAt: string | null
+  examEndAt: string | null
+}
+interface TicketTierSummary extends TicketCounts { roundId: string; tier: string }
+interface TicketSummaryResp {
+  rounds: TicketRoundSummary[]
+  tiers: TicketTierSummary[]
+  sets: Record<string, { total: number; loaded: number; active: boolean }> // 회차 지정 시에만 채워진다
+  truncated: boolean
+}
+
+const TICKET_STATUS_LABEL: Record<string, string> = { issued: '미사용', consumed: '응시 완료', void: '무효', expired: '만료' }
+const TICKET_STATUS_CLASS: Record<string, string> = { issued: 'st-in_progress', consumed: 'st-submitted', void: 'st-voided', expired: 'st-expired' }
+const TICKET_SOURCE_LABEL: Record<string, string> = { pg: '결제', admin: '관리자 발급', free: '무료' }
+const TICKET_STATUS_FILTERS: { key: string; label: string }[] = [
+  { key: '', label: '전체' },
+  { key: 'issued', label: '미사용' },
+  { key: 'consumed', label: '응시 완료' },
+  { key: 'expired', label: '만료' },
+  { key: 'void', label: '무효' },
+]
+
+function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
+  const [rounds, setRounds] = useState<ExamRoundRow[]>([])
+  const [roundId, setRoundId] = useState('')
+  const [sum, setSum] = useState<TicketSummaryResp | null>(null)
+  const [rows, setRows] = useState<TicketRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const [tier, setTier] = useState('')
+  const [status, setStatus] = useState('')
+  const [q, setQ] = useState('') // 확정된 검색어(입력 중 값은 qLive)
+  const [qLive, setQLive] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [grantDraft, setGrantDraft] = useState<{ roundId: string; tier: string; email: string; note: string } | null>(null)
+  const [voidDraft, setVoidDraft] = useState<TicketRow | null>(null)
+
+  const loadSummary = useCallback(async (rid: string) => {
+    try {
+      setSum(await callFunction<TicketSummaryResp>('admin', { action: 'examTicketSummary', roundId: rid || undefined }))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '접수 현황을 불러올 수 없습니다.')
+    }
+  }, [])
+
+  const loadList = useCallback(async (off: number, f: { roundId: string; tier: string; status: string; q: string }) => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<TicketListResp>('admin', {
+        action: 'examTicketList',
+        limit: PAGE,
+        offset: off,
+        roundId: f.roundId || undefined,
+        tier: f.tier || undefined,
+        status: f.status || undefined,
+        q: f.q || undefined,
+      })
+      setRows(res.tickets)
+      setTotal(res.total)
+      setOffset(off)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '응시권 목록을 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    callFunction<AdminExamRoundListResponse>('admin', { action: 'examRoundList' })
+      .then((r) => setRounds(r.rounds))
+      .catch(() => { /* 필터 옵션이 없어도 목록은 나온다 */ })
+  }, [])
+  useEffect(() => { loadSummary(roundId) }, [roundId, loadSummary])
+  useEffect(() => { loadList(0, { roundId, tier, status, q }) }, [roundId, tier, status, q, loadList])
+
+  function refresh() {
+    loadSummary(roundId)
+    loadList(offset, { roundId, tier, status, q })
+  }
+
+  async function doGrant() {
+    if (!grantDraft) return
+    try {
+      const res = await callFunction<{ ok: boolean }>('admin', {
+        action: 'examTicketGrant',
+        roundId: grantDraft.roundId,
+        tier: grantDraft.tier,
+        email: grantDraft.email,
+        note: grantDraft.note,
+      })
+      if (res?.ok) {
+        setGrantDraft(null)
+        refresh()
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '발급에 실패했습니다.')
+    }
+  }
+
+  async function doVoid(reason: string, settlePayment: 'refunded' | 'keep') {
+    if (!voidDraft) return
+    try {
+      const res = await callFunction<{ ok: boolean; paymentNote?: string | null }>('admin', {
+        action: 'examTicketVoid',
+        id: voidDraft.ticketId,
+        reason,
+        settlePayment,
+      })
+      setVoidDraft(null)
+      if (res?.paymentNote) alert(res.paymentNote)
+      refresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '회수에 실패했습니다.')
+    }
+  }
+
+  const roundOpts = rounds.slice().sort((a, b) => (b.examDate ?? '').localeCompare(a.examDate ?? ''))
+  const curRound = rounds.find((r) => r.id === roundId) ?? null
+  // 접수 0건인 급수도 줄을 세운다 — '문항 미추출' 경고는 표를 파는 **전에** 보여야 쓸모가 있다.
+  // (응시권 집계만으로 줄을 만들면 아직 안 팔린 급수가 표에서 통째로 사라진다.)
+  const tierRows: TicketTierSummary[] = roundId
+    ? (() => {
+        const byKey = new Map((sum?.tiers ?? []).filter((t) => t.roundId === roundId).map((t) => [t.tier, t]))
+        const keys = new Set<string>([...byKey.keys(), ...Object.keys(sum?.sets ?? {})])
+        return [...keys]
+          .sort((a, b) => tierRank(a) - tierRank(b))
+          .map((k) => byKey.get(k) ?? { roundId, tier: k, sold: 0, unused: 0, used: 0, expired: 0, voided: 0, revenue: 0, free: 0 })
+      })()
+    : []
+  const pageNo = Math.floor(offset / PAGE) + 1
+  const pageMax = Math.max(1, Math.ceil(total / PAGE))
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>접수·응시권</h1>
+        <div className="admin-head-actions">
+          <label className="grade-round">
+            <span className="grade-round-lab">회차</span>
+            <select value={roundId} onChange={(e) => setRoundId(e.target.value)}>
+              <option value="">전체 회차</option>
+              {roundOpts.map((r) => (
+                <option key={r.id} value={r.id}>{r.titleI18n.ko || '(회차명 없음)'}</option>
+              ))}
+            </select>
+          </label>
+          <span className="admin-count">응시권 {total}장</span>
+          <button className="admin-mini" onClick={refresh} disabled={loading}>새로고침</button>
+          {isRoot && (
+            <button
+              className="admin-mini"
+              onClick={() => {
+                const reg = roundOpts.filter((r) => r.kind === 'regular')
+                const pre = reg.some((r) => r.id === roundId) ? roundId : reg[0]?.id ?? ''
+                setGrantDraft({ roundId: pre, tier: '', email: '', note: '' })
+              }}
+            >
+              + 수기 발급
+            </button>
+          )}
+        </div>
+      </div>
+
+      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+      {sum?.truncated && (
+        <div className="admin-section admin-empty">
+          응시권이 너무 많아 집계를 일부만 셌습니다. 회차를 골라서 보세요.
+        </div>
+      )}
+
+      {/* 접수 현황 — 회차 지표의 단일 집계원(examTicketSummary). 대시보드 퍼널도 같은 값을 쓴다. */}
+      <div className="admin-section" style={{ marginBottom: 20 }}>
+        <div className="admin-section-head">
+          <h3 style={{ margin: 0 }}>접수 현황 {curRound ? `· ${curRound.titleI18n.ko ?? ''}` : ''}</h3>
+          <span className="admin-hint">접수 = 무효를 뺀 발급분(미사용 + 응시 완료 + 만료)</span>
+        </div>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              {roundId ? (
+                <tr>
+                  <th>급수</th>
+                  <th style={{ textAlign: 'right' }}>접수</th>
+                  <th style={{ textAlign: 'right' }}>미사용</th>
+                  <th style={{ textAlign: 'right' }}>응시 완료</th>
+                  <th style={{ textAlign: 'right' }}>만료</th>
+                  <th style={{ textAlign: 'right' }}>무효</th>
+                  <th style={{ textAlign: 'right' }}>결제액</th>
+                  <th>문항 세트</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>회차</th>
+                  <th>응시기간</th>
+                  <th style={{ textAlign: 'right' }}>접수</th>
+                  <th style={{ textAlign: 'right' }}>미사용</th>
+                  <th style={{ textAlign: 'right' }}>응시 완료</th>
+                  <th style={{ textAlign: 'right' }}>만료</th>
+                  <th style={{ textAlign: 'right' }}>무효</th>
+                  <th style={{ textAlign: 'right' }}>결제액</th>
+                </tr>
+              )}
+            </thead>
+            <tbody>
+              {roundId
+                ? tierRows.map((t) => {
+                    const set = sum?.sets?.[t.tier]
+                    // 문항 세트가 비어 있으면 응시권을 팔아도 시험 당일 전원이 400 을 받는다 — 여기서 미리 보이게 한다.
+                    const short = !!set && set.loaded < set.total
+                    return (
+                      <tr key={t.tier}>
+                        <td style={{ whiteSpace: 'nowrap' }}><b>{TIER_LABEL[t.tier] ?? t.tier}</b></td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><b>{t.sold}</b></td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.unused}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.used}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.expired}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.voided}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {krw(t.revenue)}
+                          {t.free > 0 && <span style={{ color: 'var(--muted)', fontSize: 14 }}> · 무료 {t.free}</span>}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap', fontSize: 14, color: short ? 'var(--k-amber, #d98a00)' : 'var(--muted)' }}>
+                          {set ? `${set.loaded} / ${set.total}${short ? ' ⚠ 미추출' : ''}` : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })
+                : (sum?.rounds ?? []).filter((r) => r.sold > 0 || r.voided > 0).map((r) => (
+                    <tr key={r.roundId}>
+                      <td><b>{r.title || '(회차명 없음)'}</b></td>
+                      <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 14 }}>
+                        {r.kind === 'rolling'
+                          ? '상시'
+                          : r.examStartAt || r.examEndAt
+                            ? `${dayKST(r.examStartAt) || '?'} ~ ${dayKST(r.examEndAt) || '?'}`
+                            : r.examDate ?? '-'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><b>{r.sold}</b></td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.unused}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.used}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.expired}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.voided}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{krw(r.revenue)}</td>
+                    </tr>
+                  ))}
+              {((roundId && !tierRows.length) || (!roundId && !(sum?.rounds ?? []).some((r) => r.sold > 0 || r.voided > 0))) && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: 26, color: 'var(--muted)' }}>
+                    접수된 응시권이 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 응시권 목록 */}
+      <div className="admin-head" style={{ marginTop: 4 }}>
+        <h1 style={{ fontSize: 18 }}>응시권 목록</h1>
+        <div className="admin-head-actions">
+          <label className="grade-round">
+            <span className="grade-round-lab">급수</span>
+            <select value={tier} onChange={(e) => setTier(e.target.value)}>
+              <option value="">전체 급수</option>
+              {TIER_ORDER.map((k) => <option key={k} value={k}>{TIER_LABEL[k] ?? k}</option>)}
+            </select>
+          </label>
+          <label className="grade-round">
+            <span className="grade-round-lab">상태</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              {TICKET_STATUS_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+          </label>
+          <input
+            style={{ ...inpStyle, width: 200 }}
+            placeholder="이름·이메일 검색"
+            value={qLive}
+            onChange={(e) => setQLive(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') setQ(qLive.trim()) }}
+          />
+          <button className="admin-mini" onClick={() => setQ(qLive.trim())} disabled={loading}>검색</button>
+        </div>
+      </div>
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>상태</th>
+              <th>응시자</th>
+              <th>회차 · 급수</th>
+              <th>발급</th>
+              <th>결제</th>
+              <th>응시</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((t) => (
+              <tr key={t.ticketId}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <span className={`admin-badge ${TICKET_STATUS_CLASS[t.effStatus] ?? ''}`}>
+                    {TICKET_STATUS_LABEL[t.effStatus] ?? t.effStatus}
+                  </span>
+                </td>
+                <td>
+                  <div>{t.name || <span style={{ color: 'var(--muted)' }}>(이름 없음)</span>}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 14 }}>{t.email ?? '-'}</div>
+                </td>
+                <td>
+                  <div>{t.roundTitle || '(회차명 없음)'}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 14 }}>{TIER_LABEL[t.tier] ?? t.tier}</div>
+                </td>
+                <td style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
+                  <div>{fmtDT(t.issuedAt)}</div>
+                  <div style={{ color: 'var(--muted)' }}>
+                    {TICKET_SOURCE_LABEL[t.source] ?? t.source}
+                    {t.grantedBy ? ` · ${t.grantedBy}` : ''}
+                  </div>
+                </td>
+                <td style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
+                  <div>{t.pricePaid > 0 ? krw(t.pricePaid) : <span style={{ color: 'var(--muted)' }}>무상</span>}</div>
+                  {t.paymentStatus && (
+                    <div style={{ color: 'var(--muted)' }}>
+                      {t.paymentStatus}
+                      {t.paymentFulfilled === false ? ' · 미지급' : ''}
+                    </div>
+                  )}
+                </td>
+                <td style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
+                  {t.attemptId
+                    ? <span>{STATUS_LABEL[t.attemptStatus ?? ''] ?? t.attemptStatus}</span>
+                    : <span style={{ color: 'var(--muted)' }}>—</span>}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {isRoot && t.status !== 'void' && (
+                    <button className="admin-mini" onClick={() => setVoidDraft(t)}>회수</button>
+                  )}
+                  {t.status === 'void' && t.voidReason && (
+                    <span style={{ color: 'var(--muted)', fontSize: 14 }} title={t.voidReason}>회수됨</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!rows.length && !loading && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  조건에 맞는 응시권이 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {pageMax > 1 && (
+        <div className="admin-pager" style={{ marginTop: 12 }}>
+          <button className="admin-mini" disabled={loading || pageNo === 1} onClick={() => loadList(offset - PAGE, { roundId, tier, status, q })}>‹ 이전</button>
+          <span>{pageNo} / {pageMax}</span>
+          <button className="admin-mini" disabled={loading || pageNo >= pageMax} onClick={() => loadList(offset + PAGE, { roundId, tier, status, q })}>다음 ›</button>
+        </div>
+      )}
+
+      {/* 수기 발급 (루트 전용) — 단체 접수·장애 보상용 무료 응시권 */}
+      {grantDraft && (
+        <div className="admin-modal-bg" onClick={() => setGrantDraft(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setGrantDraft(null)}>✕</button>
+            <h2>응시권 수기 발급</h2>
+            <p style={{ color: 'var(--muted)', fontSize: 14, margin: '6px 0 14px', lineHeight: 1.6 }}>
+              결제 없이 응시권을 만듭니다(무상, 결제 원장에 남지 않음). 단체 접수·시험 당일 장애 보상에만 쓰세요.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <label style={fieldStyle}>
+                회차
+                {/* 상시 회차는 응시 기간이 없어 만료를 정할 수 없다 → 서버도 400 으로 막는다. 목록에서 빼둔다. */}
+                <select style={inpStyle} value={grantDraft.roundId} onChange={(e) => setGrantDraft({ ...grantDraft, roundId: e.target.value })}>
+                  <option value="">선택하세요</option>
+                  {roundOpts.filter((r) => r.kind === 'regular').map((r) => (
+                    <option key={r.id} value={r.id}>{r.titleI18n.ko || '(회차명 없음)'}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldStyle}>
+                급수 <em style={{ color: 'var(--muted)' }}>(회차에 열려 있는 급수만 발급됩니다)</em>
+                <select style={inpStyle} value={grantDraft.tier} onChange={(e) => setGrantDraft({ ...grantDraft, tier: e.target.value })}>
+                  <option value="">선택하세요</option>
+                  {(rounds.find((r) => r.id === grantDraft.roundId)?.tiers ?? TIER_ORDER)
+                    .slice().sort((a, b) => tierRank(a) - tierRank(b))
+                    .map((k) => <option key={k} value={k}>{TIER_LABEL[k] ?? k}</option>)}
+                </select>
+              </label>
+              <label style={fieldStyle}>
+                대상 이메일 <em style={{ color: 'var(--muted)' }}>(가입된 계정)</em>
+                <input type="email" style={inpStyle} value={grantDraft.email} placeholder="user@example.com"
+                  onChange={(e) => setGrantDraft({ ...grantDraft, email: e.target.value })} />
+              </label>
+              <label style={fieldStyle}>
+                발급 사유 <em style={{ color: 'var(--error, #d43a3a)' }}>(필수)</em>
+                <input type="text" style={inpStyle} value={grantDraft.note} placeholder="예: 제5회 단체접수 · 사내 결재 #123"
+                  onChange={(e) => setGrantDraft({ ...grantDraft, note: e.target.value })} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button className="admin-mini" onClick={() => setGrantDraft(null)}>취소</button>
+              <button className="btn-ink" onClick={doGrant}>발급</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {voidDraft && <VoidTicketModal row={voidDraft} onClose={() => setVoidDraft(null)} onSubmit={doVoid} />}
+    </>
+  )
+}
+
+// 응시권 회수 모달 — 사유 + **연결 결제를 어떻게 할지**를 반드시 같이 고르게 한다.
+// 결제를 paid 로 두면 payments 의 부분 유니크가 계속 걸려 그 사용자는 같은 회차·급수를 영구히 다시 못 산다.
+function VoidTicketModal({ row, onClose, onSubmit }: {
+  row: TicketRow
+  onClose: () => void
+  onSubmit: (reason: string, settlePayment: 'refunded' | 'keep') => void
+}) {
+  const [reason, setReason] = useState('')
+  const [settle, setSettle] = useState<'refunded' | 'keep'>('keep')
+  const paid = row.paymentStatus === 'paid'
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2>응시권 회수</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 14, margin: '6px 0 14px', lineHeight: 1.6 }}>
+          {row.name ?? '(이름 없음)'} · {row.email ?? '-'}<br />
+          {row.roundTitle} · {TIER_LABEL[row.tier] ?? row.tier} · {row.pricePaid > 0 ? krw(row.pricePaid) : '무상'}
+          {row.attemptId && <><br /><b>이미 응시한 응시권입니다.</b> 성적·인증서는 자동으로 무효가 되지 않습니다 — 따로 처리하세요.</>}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <label style={fieldStyle}>
+            회수 사유 <em style={{ color: 'var(--error, #d43a3a)' }}>(필수)</em>
+            <input type="text" style={inpStyle} value={reason} placeholder="예: 본인확인 실패 · 오등록 정정"
+              onChange={(e) => setReason(e.target.value)} />
+          </label>
+          {row.paymentId && (
+            <div style={fieldStyle}>
+              <span>연결 결제 처리 <em style={{ color: 'var(--muted)' }}>(주문 {row.paymentOrderId ?? '-'} · 현재 {row.paymentStatus ?? '-'})</em></span>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, lineHeight: 1.6, color: 'inherit' }}>
+                <input type="radio" name="settle" checked={settle === 'keep'} onChange={() => setSettle('keep')} />
+                <span>결제는 그대로 둔다 — 이 사용자는 같은 회차·급수를 <b>다시 결제할 수 없습니다</b>. 재응시가 필요하면 수기 발급으로 주세요.</span>
+              </label>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, lineHeight: 1.6, color: 'inherit' }}>
+                <input type="radio" name="settle" checked={settle === 'refunded'} onChange={() => setSettle('refunded')} disabled={!paid} />
+                <span>
+                  환불 완료로 표시한다 — 결제를 <code>refunded</code> 로 바꿔 <b>재구매를 열어줍니다</b>.
+                  {' '}<b>실제 환불은 여기서 일어나지 않습니다</b>(PG 관리자에서 먼저 처리하세요).
+                  {!paid && <><br /><span style={{ color: 'var(--muted)' }}>이 결제는 paid 상태가 아니라 선택할 수 없습니다.</span></>}
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+          <button className="admin-mini" onClick={onClose}>취소</button>
+          <button className="btn-ink" disabled={!reason.trim()} onClick={() => onSubmit(reason.trim(), settle)}>회수</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -2383,7 +3079,8 @@ export function EbooksAdmin() {
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {b.targetLevel ? `Lv.${b.targetLevel}` : <span style={{ color: 'var(--muted)' }}>미지정</span>}
                 </td>
-                <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? `$${b.price.toLocaleString('en-US')}` : '무료'}</td>
+                {/* 이북 가격은 원(KRW)이다 — `$` 로 찍고 있던 걸 2026-08-06 바로잡았다. */}
+                <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? krw(b.price, 'ko') : '무료'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => showBuyers(b)}>{b.buyers}명</button>
                 </td>
@@ -2600,7 +3297,7 @@ export function EbooksAdmin() {
                       <td>{b.name ?? '-'}</td>
                       <td>{b.email ?? '-'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        {b.pricePaid > 0 ? `$${b.pricePaid.toLocaleString('en-US')}` : '무료'} · {b.source}
+                        {b.pricePaid > 0 ? krw(b.pricePaid, 'ko') : '무료'} · {b.source}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(b.createdAt)}</td>
                     </tr>
@@ -2972,8 +3669,36 @@ function DiffRows({ rows, empty }: { rows: CbtQDiff[]; empty: string }) {
   )
 }
 
+// 결제 원장 응답 — 대시보드와 접수·응시권 탭이 같이 쓴다(로컬 타입, 위 TicketsAdmin 주석 참고).
+interface PaymentAdminRow {
+  id: string
+  userId: string
+  name: string | null
+  email: string | null
+  orderId: string
+  orderName: string
+  productType: string
+  productRef: string
+  amount: number
+  status: string
+  method: string | null
+  confirmedAt: string | null
+  fulfilledAt: string | null
+  failCode: string | null
+  failMessage: string | null
+  createdAt: string
+}
+interface PaymentListResp {
+  payments: PaymentAdminRow[]
+  total: number
+  stats30d: { paidN: number; paidAmount: number; refundN: number; refundAmount: number }
+  queues: { unfulfilled: number; revoked: number }
+}
+
 function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => void }) {
   const [a, setA] = useState<CbtAnalytics | null>(null)
+  const [pay, setPay] = useState<PaymentListResp | null>(null)
+  const [sold, setSold] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
 
@@ -2981,7 +3706,16 @@ function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => voi
     setLoading(true)
     setErr('')
     try {
-      setA(await callFunction<CbtAnalytics>('admin', { action: 'cbtAnalytics' }))
+      // 결제·접수 집계는 실패해도 대시보드 전체를 막지 않는다(응시권 마이그레이션 전이면 그냥 빈 상태).
+      const [an, p, s] = await Promise.all([
+        callFunction<CbtAnalytics>('admin', { action: 'cbtAnalytics' }),
+        callFunction<PaymentListResp>('admin', { action: 'paymentList', limit: 5 }).catch(() => null),
+        callFunction<TicketSummaryResp>('admin', { action: 'examTicketSummary' }).catch(() => null),
+      ])
+      setA(an)
+      setPay(p)
+      // 회차 접수 수는 examTicketSummary 한 곳에서만 가져온다 — 퍼널과 접수·응시권 탭이 같은 값을 봐야 한다.
+      setSold(Object.fromEntries((s?.rounds ?? []).map((r) => [r.roundId, r.sold])))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
@@ -3004,17 +3738,21 @@ function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => voi
       </div>
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       {loading && !a && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
-      {a && <DashboardBody a={a} onNav={onNav} />}
+      {a && <DashboardBody a={a} pay={pay} sold={sold} onNav={onNav} />}
     </>
   )
 }
 
-// ── 금액 표기 헬퍼 (결제 백엔드 미구현 — 결제 화면은 값 없이 빈 상태로 표시) ──
-const usd = (n: number) => `$${n.toLocaleString('en-US')}`
-
-function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?: SubsFilter) => void }) {
+// ⚠️ 관리자 화면 금액은 **원화(krw)** 다. 구매자 화면은 $1 = 1,500원 고정 환산으로 달러를 보여주지만,
+//    관리자는 실제 청구·정산 금액을 봐야 한다. 예전엔 여기가 원화 값에 `$` 를 붙이고 있었다.
+function DashboardBody({ a, pay, sold, onNav }: {
+  a: CbtAnalytics
+  pay: PaymentListResp | null
+  sold: Record<string, number>
+  onNav: (t: CarisSub, f?: SubsFilter) => void
+}) {
   const o = a.overview
-  // 전부 admin.cbtAnalytics 실집계(값 없으면 0). 결제는 백엔드 미구현 → 빈 상태.
+  // 전부 admin.cbtAnalytics 실집계(값 없으면 0). 결제·접수는 paymentList / examTicketSummary 실데이터.
   const signups7d = o.signups7d ?? 0
   const certIssued = o.certIssued ?? 0
   const certPending = o.certPending ?? 0
@@ -3035,7 +3773,13 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
     { ico: 'assignment_turned_in', k: '응시 제출', v: o.attemptsAll.toLocaleString(), sub: `최근 7일 ${o.attempts7d}건`, accent: 'violet' },
     { ico: 'verified', k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건 · 평균 ${avgScore}점`, accent: 'green' },
     { ico: 'workspace_premium', k: '인증서 발급', v: certIssued.toLocaleString(), sub: `미발급 ${certPending}건`, accent: 'amber' },
-    { ico: 'payments', k: '매출(30일)', v: usd(0), sub: '결제 연동 전', accent: 'green' },
+    {
+      ico: 'payments',
+      k: '매출(30일)',
+      v: krw(pay?.stats30d.paidAmount ?? 0),
+      sub: pay ? `결제 ${pay.stats30d.paidN}건 · 환불 ${pay.stats30d.refundN}건` : '결제 데이터 없음',
+      accent: 'green',
+    },
   ]
 
   return (
@@ -3060,8 +3804,8 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
         ))}
       </div>
 
-      {/* 결제 현황 (결제 백엔드 미구현 — 빈 상태) */}
-      <PaymentSection />
+      {/* 결제 현황 — payments 원장 실데이터(30일) */}
+      <PaymentSection data={pay} />
 
       {/* 추이 */}
       <div className="admin-grid2">
@@ -3075,8 +3819,8 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
 
       {/* 회차별 현황 퍼널 */}
       <div className="admin-section">
-        <h3>회차별 현황 <span className="admin-hint">응시 → 합격 → 인증서 발급</span></h3>
-        <RoundFunnel rows={rounds} />
+        <h3>회차별 현황 <span className="admin-hint">접수 → 응시 → 합격 → 인증서 발급</span></h3>
+        <RoundFunnel rows={rounds} sold={sold} />
       </div>
     </div>
   )
@@ -3172,8 +3916,12 @@ function TierAnalysis({ tiers }: { tiers: CbtTierStat[] }) {
   )
 }
 
-// 회차별 응시→합격→발급 퍼널 표 (페이징 5행/쪽).
-function RoundFunnel({ rows }: { rows: CbtRoundStat[] }) {
+// 회차별 접수→응시→합격→발급 퍼널 표 (페이징 5행/쪽).
+// ⚠️ '접수' 숫자는 examTicketSummary 에서만 온다(sold). 같은 지표를 여기서 따로 세면
+//    접수·응시권 탭과 값이 어긋나고, 어긋나는 순간 둘 다 못 믿게 된다.
+// ⚠️ 행 자체는 cbtAnalytics 기준이라 **응시가 0건인 회차는 여기 안 뜬다** —
+//    "팔렸는데 아무도 안 봤다" 를 보려면 접수·응시권 탭을 봐야 한다.
+function RoundFunnel({ rows, sold }: { rows: CbtRoundStat[]; sold: Record<string, number> }) {
   const [page, setPage] = useState(0)
   const PER = 5
   if (!rows.length) return <div className="admin-empty">회차 응시 데이터가 없습니다.</div>
@@ -3187,6 +3935,7 @@ function RoundFunnel({ rows }: { rows: CbtRoundStat[] }) {
           <tr>
             <th>회차</th>
             <th>시험일</th>
+            <th style={{ textAlign: 'right' }}>접수</th>
             <th style={{ textAlign: 'right' }}>응시</th>
             <th style={{ textAlign: 'right' }}>합격</th>
             <th style={{ textAlign: 'right' }}>합격률</th>
@@ -3202,6 +3951,7 @@ function RoundFunnel({ rows }: { rows: CbtRoundStat[] }) {
               <tr key={r.id}>
                 <td><b>{r.title}</b></td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.kind === 'rolling' ? '상시' : r.examDate ?? '-'}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{sold[r.id] ?? 0}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.attempts}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.pass}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{passRate}%</td>
@@ -3229,23 +3979,71 @@ function RoundFunnel({ rows }: { rows: CbtRoundStat[] }) {
   )
 }
 
-// 결제 현황 — 결제/접수 백엔드 미구현. 값 없이 빈 상태(0)로 표시. 실연동 시 이 컴포넌트를 서버 데이터로 채움.
-function PaymentSection() {
+// 결제 현황 — payments 원장 30일 집계 + 최근 결제 + '돈이 새는' 두 큐.
+// ⚠️ 환불은 매출에서 빼지 않고 옆에 세운다 — 결제일과 환불일이 다른 달에 걸리면 상계한 값이 정산과 안 맞는다.
+// ⚠️ 두 큐(미지급·환불 후 지급 잔존)는 자동 회수를 안 하기로 한 방침의 **유일한 뒷정리 장치**다.
+//    목록이 사람 눈에 안 닿으면 방어 장치가 아니므로 0 이 아닐 때 눈에 띄게 띄운다.
+function PaymentSection({ data }: { data: PaymentListResp | null }) {
+  const s = data?.stats30d
+  const avg = s && s.paidN > 0 ? Math.round(s.paidAmount / s.paidN) : 0
+  const unfulfilled = data?.queues.unfulfilled ?? 0
+  const revoked = data?.queues.revoked ?? 0
   return (
     <div className="admin-section pay-sec">
       <div className="admin-section-head">
-        <h3><span className="material-symbols-outlined pay-ico">credit_card</span>결제 현황</h3>
-        <span className="admin-badge-demo">연동 전</span>
+        <h3><span className="material-symbols-outlined pay-ico">credit_card</span>결제 현황 <span className="admin-hint">최근 30일 · 원화</span></h3>
+        {!data && <span className="admin-badge-demo">데이터 없음</span>}
       </div>
       <div className="pay-kpis">
-        <div><span className="pk-k">매출</span><span className="pk-v">{usd(0)}</span></div>
-        <div><span className="pk-k">결제 건수</span><span className="pk-v">0건</span></div>
-        <div><span className="pk-k">환불</span><span className="pk-v">0건</span></div>
-        <div><span className="pk-k">객단가</span><span className="pk-v">{usd(0)}</span></div>
+        <div><span className="pk-k">매출</span><span className="pk-v">{krw(s?.paidAmount ?? 0)}</span></div>
+        <div><span className="pk-k">결제 건수</span><span className="pk-v">{s?.paidN ?? 0}건</span></div>
+        <div><span className="pk-k">환불</span><span className="pk-v">{s?.refundN ?? 0}건 · {krw(s?.refundAmount ?? 0)}</span></div>
+        <div><span className="pk-k">객단가</span><span className="pk-v">{krw(avg)}</span></div>
       </div>
-      <div className="admin-empty" style={{ marginTop: 4 }}>
-        결제·접수 연동 전입니다. 결제 데이터가 쌓이면 매출·결제 수단·최근 결제 내역이 여기에 표시됩니다.
-      </div>
+
+      {(unfulfilled > 0 || revoked > 0) && (
+        <div className="admin-empty" style={{ marginTop: 4, color: 'var(--k-amber, #d98a00)', lineHeight: 1.7 }}>
+          {unfulfilled > 0 && <div>⚠ <b>승인됐는데 지급 안 된 결제 {unfulfilled}건</b> — 돈은 받았는데 응시권/이북이 안 나갔습니다. 확인이 필요합니다.</div>}
+          {revoked > 0 && <div>⚠ <b>환불·취소인데 지급이 살아있는 결제 {revoked}건</b> — 응시권/열람권을 손으로 회수해야 합니다.</div>}
+        </div>
+      )}
+
+      {data && data.payments.length > 0 ? (
+        <div className="admin-table-wrap" style={{ marginTop: 10 }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>일시</th>
+                <th>구매자</th>
+                <th>상품</th>
+                <th style={{ textAlign: 'right' }}>금액</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.payments.map((p) => (
+                <tr key={p.id}>
+                  <td style={{ whiteSpace: 'nowrap', fontSize: 14, color: 'var(--muted)' }}>{fmtDT(p.createdAt)}</td>
+                  <td style={{ fontSize: 14 }}>{p.name || p.email || '-'}</td>
+                  <td style={{ fontSize: 14 }}>
+                    {p.orderName}
+                    <span style={{ color: 'var(--muted)' }}> · {p.productType === 'exam' ? '응시료' : '이북'}</span>
+                  </td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{krw(p.amount)}</td>
+                  <td style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
+                    {p.status}
+                    {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="admin-empty" style={{ marginTop: 4 }}>
+          아직 결제 내역이 없습니다. 결제가 쌓이면 매출·최근 결제 내역이 여기에 표시됩니다.
+        </div>
+      )}
     </div>
   )
 }

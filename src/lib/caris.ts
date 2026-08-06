@@ -21,7 +21,9 @@ export type Tier = {
   method?: string // CARIS-Ⅱ: 검정 방법(필기/실기)
   practical?: string // CARIS-Ⅱ: 실기 내용
   pass: string // 합격 기준
-  fee?: number // 티어별 응시료(USD) — 현재 전 티어 $1 고정(런칭/결제 테스트용). 실값은 DB exam_fees
+  // ⚠️ 응시료(fee)는 여기 없다. 정가 단일 소스 = **DB `exam_fees`**(2026-08-06).
+  //    예전엔 이 타입에 `fee?: number`(달러 임시값 $1)가 있었고 화면이 그걸 썼는데, DB 테이블과
+  //    값·단위가 따로 놀았다. 금액이 필요하면 src/lib/fees.ts 의 useExamFees()/feeKey() 를 쓸 것.
 }
 
 export type Track = {
@@ -34,16 +36,16 @@ export type Track = {
   tiers: Tier[]
 }
 
-// 티어 목록(이름·응시료). 이름/키는 언어 무관 고정. fee 는 현재 전 티어 $1 고정(런칭/결제 테스트용, 실값은 DB exam_fees).
+// 티어 목록(이름만). 이름/키는 브랜드 고유명이라 언어 무관 고정. **금액은 여기 두지 않는다**(DB exam_fees).
 const T1_TIERS = [
-  { key: 'beginner', name: 'Beginner', fee: 1 },
-  { key: 'pro', name: 'Pro', fee: 1 },
-  { key: 'elite', name: 'Elite', fee: 1 },
+  { key: 'beginner', name: 'Beginner' },
+  { key: 'pro', name: 'Pro' },
+  { key: 'elite', name: 'Elite' },
 ] as const
 const T2_TIERS = [
-  { key: 'master', name: 'Master', fee: 1 },
-  { key: 'grandmaster', name: 'Grand Master', fee: 1 },
-  { key: 'zenith', name: 'Zenith', fee: 1 },
+  { key: 'master', name: 'Master' },
+  { key: 'grandmaster', name: 'Grand Master' },
+  { key: 'zenith', name: 'Zenith' },
 ] as const
 
 // 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.
@@ -98,7 +100,6 @@ export function getTracks(lang: Lang): Track[] {
       subjects: [0, 1, 2].map((i) => tr(lang, `caris.t1.${tier.key}.subj.${i}`)),
       format: tr(lang, `caris.t1.${tier.key}.format`),
       pass: tr(lang, `caris.t1.${tier.key}.pass`),
-      fee: tier.fee,
     })),
   }
   const track2: Track = {
@@ -116,7 +117,6 @@ export function getTracks(lang: Lang): Track[] {
       subjects: [0, 1].map((i) => tr(lang, `caris.t2.${tier.key}.subj.${i}`)),
       practical: tier.key === 'zenith' ? undefined : tr(lang, `caris.t2.${tier.key}.practical`),
       pass: tr(lang, `caris.t2.${tier.key}.pass`),
-      fee: tier.fee,
     })),
   }
   return [track1, track2]

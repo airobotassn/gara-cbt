@@ -176,6 +176,10 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | **관리자** ||||
 | `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) | `admin.css` | `admin` · `admin-test` |
 
+- **메인 히어로 지구본 교체 — 검토 중(2026-08-06, 아직 코드 미반영)**: 옛 NASA 밤지구 영상(`EarthHero.tsx` + `public/earth.mp4` 21.6MB)을 **밤지구 순위 지구본**으로 갈아치우는 안. 시안 = **`docs/globe-mock.html`**(브라우저로 바로 열리는 단독 HTML, 값 슬라이더 포함). 실제 랜딩에는 아직 손대지 않았다.
+  - ⚠️ **위성사진을 깔면 안 된다**(`public/earth/*.webp` 3장은 그 시도의 잔재). 사하라 갈색·아마존 초록·구름 흰색이 순위색과 같은 세기로 튀어서, 지구가 사실적일수록 순위가 안 읽힌다. 밤지구는 "불 켜진 곳 = 순위" 한 겹만 남아 사진보다 잘 읽힌다.
+  - ⚠️ **나라 면을 칠해 순위를 표현하면 안 된다.** 밝기가 곧 국토 면적이 되어 6위 중국이 1위 한국보다 밝아지고 16위 호주가 화면에서 제일 크게 빛난다(시안에서 실제로 그랬다). **광점**(반지름·밝기가 순위만의 함수) + **빛기둥 높이 = 순위**로 표현할 것.
+  - 전송량 추산 21.6MB → 약 40KB(`geo/world.json` brotli 32KB + 렌더러 7KB). 경계 파일은 `/arena` 가 이미 받는 것이라 실질 추가분은 더 작다.
 - **`/guide` 개편(2026-07)**: 히어로(로고 락업 + 카피 + `CARIS PLAN` 버튼 + 로봇 이미지) → "CARIS는 무엇인가요?"(특징 카드 8장) → "CARIS 자격 체계"(피라미드 + 급수별 검정과목 카드) 3단 구성. **시험 일정은 `/plan` 으로 분리**됐다(옛 히어로 우측 일정 패널·상시시험 띠는 삭제). `/guide` 에서 원서접수로 가는 경로 = `CARIS PLAN` 버튼 → `/plan` → 회차 카드 → `/exam/apply`. 페이지 배경/색 토큰(`--g-*`)은 `.guide-page`(guide.css)가 단일 출처고 `/plan` 도 그걸 쓴다.
   - 히어로 이미지 = `public/hero-robot.png`(배경 투명). **손 위 CARIS 행성은 이미지에 없다** — `logo.png` 를 CSS 로 겹친 별도 레이어(`.guide-hero-orb`, %좌표 + 글로우 + 부유 애니메이션). 로봇 이미지를 갈면 손바닥 비율에 맞춰 `.guide-hero-orb`/`.guide-hero-art::after` 의 `left`·`top` 을 다시 맞출 것.
   - ⚠️ 클래스명에 `.hl` 쓰지 말 것 — `result.css` 가 전역으로 `.hl { display:flex }` 를 잡고 있다(`.gh-hl` 로 우회).
@@ -261,7 +265,8 @@ supabase/
   - 값을 바꾸면 **양쪽 `scoring.ts` + `tests/db/t-scoring-parity.mjs`** 를 같이 고쳐야 한다 — 패리티 테스트가 두 파일의 소스 바이트 동일성까지 본다.
 - **i18n**: 라이브러리 없이 `src/lib/i18n.tsx` 의 `D` 사전. 6개국어(ko·en·ja·zh·hi·vi). 문구 추가 시 6개 다 채울 것. `{var}` 보간.
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
-- **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`). 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만 — 버킷·정책은 대시보드 SQL로 생성). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.
+- **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`).
+  - ⚠️ **아바타를 %크기 소켓에 넣을 땐 `aspect-ratio: 1 !important` 를 반드시 같이 걸 것 — 안 그러면 달걀이 된다.** `<Avatar>` 는 인라인 style 로 px 크기 + `border-radius:50%` 를 박기 때문에, `width/height:100%` 만 덮어쓰면 퍼센트 높이가 auto 로 떨어지는 순간 박스가 세로로 눌려 **원이 타원**이 된다. 반복해서 재발한 버그다(시상대 → 티어바). `ranking.css` 의 '아바타 달걀 방지' 블록에 소켓 선택자를 **모아서** 관리한다 — 소켓을 새로 만들면 그 블록에 선택자만 추가하고, 소켓마다 규칙을 따로 쓰지 말 것. 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만 — 버킷·정책은 대시보드 SQL로 생성). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.
 - **테마(다크/라이트)**: `html.dark` 클래스 하나로 토큰을 뒤집는다(`stitch.css` 의 `html.dark` 블록이 `--color-*`·`--bg`·`--ink` 등 단일 출처). **기본값 = 다크**(2026-08-04) — `index.html` 이 `<html class="dark">` 를 박고 인라인 스크립트가 `localStorage.theme === 'light'` 일 때만 벗긴다(FAB 패널의 해/달 토글이 저장). 페이지 단위 고정은 `.force-dark`(랜딩 — 배경이 항상 우주) / `.force-light`(`/exam/run` 응시화면 · 로그인 카드) 두 개뿐이고 테마 무관하게 유지된다.
   - ⚠️ **떠 있는 두 버튼(`.fab`·`.fab-top`)의 면은 테마와 무관하게 항상 흰색**이다(`fab.css` 의 `--fab-face`/`--fab-face-line`/`--fab-face-ink`). 다크에서 `--bg` 를 쓰면 어두운 배경 위 어두운 원이라 안 보인다. **이 두 버튼 안에서 `--ink`·`--line2` 를 쓰면 안 된다**(다크에선 밝은 값이라 흰 면에서 증발). 열리는 패널(`.panel`)은 해당 없음 — 계속 테마를 따른다.
 - **등급 연출**: 결과창은 원점수 판정으로 **승급 배너+애니**(강등이 없으니 하락 배너도 없다), 레벨별 누적 레이더(고스트=현재−deltas) 표시(`Result.tsx`). 대시보드는 레벨별 레이더를 ‹ ›로 전환.
@@ -280,8 +285,40 @@ supabase/
 - ⚠️ **`payments-webhook` 만 `verify_jwt=false` 로 배포**한다(토스는 Supabase JWT 를 못 싣는다). `route-seed` 에 이은 두 번째 예외라 URL 시크릿(`?k=`)이 필수다. 나머지 함수엔 `--no-verify-jwt` 금지.
 - **일반 결제 웹훅에는 서명 헤더가 없다**(그건 지급대행/셀러 웹훅 전용). 본문을 믿지 말고 식별자만 꺼내 **토스에 다시 조회**해 판정한다(`resettle`). 웹훅은 중복·역순·미도착이 다 가능하므로 웹훅만으론 부족 — `payments/reconcile`(헤더 `x-reconcile-key`)을 주기적으로 돌려야 한다.
 - **시크릿**: `TOSS_SECRET_KEY`·`TOSS_WEBHOOK_SECRET`·`PAYMENTS_RECONCILE_KEY` 는 **Supabase 함수 시크릿**. 프론트엔 클라이언트 키(`VITE_TOSS_CLIENT_KEY`)만 — 브라우저 노출값이라 상관없다. ⚠️ **결제위젯 연동 키**를 쓸 것('API 개별 연동 키'와 다른 값이다).
+- ⚠️ **현재 붙어 있는 건 토스 '문서용 공개 테스트 키'**(`test_gck_docs_…` / `test_gsk_docs_…`)다. 내 상점 테스트 키는 개발자센터에서 **전자결제 신청(실계약)** 을 해야 값이 보이기 때문이다(가입만으로는 안 나온다 — 2026-08-06 확인). 문서 키의 한계가 하나 있다:
+  - **승인(confirm) API 는 정상 동작**한다(가짜 paymentKey 에 `NOT_FOUND_PAYMENT_SESSION` 이 온다 = 인증 통과).
+  - **조회(query) API 는 안 된다** — 모든 조회가 `NOT_FOUND_MERCHANT` 404 다. 즉 **웹훅 재조회·대사가 문서 키로는 무의미**하다(내 상점 키로 바꾸면 정상화된다).
+  - 그래서 `resettle` 은 HTTP 404 가 아니라 **`ORDER_ABSENT_CODES`(NOT_FOUND_PAYMENT·NOT_FOUND_PAYMENT_SESSION)일 때만** 주문을 만료로 접는다. 404 만 보고 접으면 문서 키 환경에서 **결제된 주문까지 전부 만료로 접힌다.**
+- ⚠️ **약관 위젯의 초기 상태는 이벤트로 오지 않는다.** `agreementStatusChange` 는 이름 그대로 '변경'에만 오고 SDK 에 초기 상태 getter 가 없다. "동의했을 때만 결제 버튼 열기" 로 만들면 위젯이 처음부터 동의된 상태로 그려질 때 **버튼이 영영 잠긴다**(실제로 겪음). `Checkout.tsx` 는 미동의로 **확인된** 경우에만 잠근다.
 - **금액 표시는 `src/lib/money.ts` 의 `krw()` 로만.** 이북 가격은 원(KRW)인데 화면이 `$` 로 찍고 있었다(2026-08-06 수정). 화면 언어가 영어여도 통화는 원이다.
-- ⚠️ **응시료는 아직 미연결** — `resolveProduct` 의 `exam` 갈래가 400 을 던진다. 붙이려면 ① 정가 소스를 `exam_fees` 로 확정하고 키를 구 급수(`pro`·`master_g4`~`g1`)에서 새 티어(`t1_beginner`…)로 옮기고 ② 금액을 원화로 못박고(방향: Beginner/Pro/Elite = $1/$2/$3 → 원화 고정 환산가. Master 이상 3개는 결제 미연결) ③ `ExamApply.tsx` 의 `$` 표시를 `krw()` 로 바꾼다. 지금 화면 값은 `caris.ts` 의 `fee: 1`(USD 임시값)이고, `src/lib/fees.ts`(`useExamFees`/`feeKey`)는 **아무데서도 import 되지 않는 죽은 코드**다.
+- **정가(2026-08-06 정리)**: 환산 기준 **$1 = 1,500원**. 이북 = `ebooks.price`(관리자 이북 탭), 응시료 = **`exam_fees`**(관리자 → 시험등록 탭 상단 `ExamFeeBox`). 둘 다 **원 정수**이고 코드에 하드코딩된 금액·폴백은 없다. `caris.ts` 의 `fee`(달러 상수)는 제거됐고 `src/lib/fees.ts`(`useExamFees`/`feeKey`)가 살아났다. 요금 키 = `${트랙키}_${티어키}`(`t1_beginner`·`t1_pro`·`t1_elite`) — 구 급수 키(`pro`·`master_g4`~`g1`)는 삭제됐다.
+  - ⚠️ **`exam_fees` 에 행이 없는 티어는 결제가 막힌다**(원서접수가 '준비 중' 표시 + 결제 버튼 비활성). 버그가 아니라 의도다 — 금액 미설정을 임시값으로 때우면 엉뚱한 돈이 청구된다. 현재 CARIS-Ⅱ(Master·Grand Master·Zenith) 3개가 여기 해당하며, 열려면 관리자 화면에서 금액만 채우면 된다.
+### 응시권 (exam_tickets) — 응시료 결제의 본체 (2026-08-07)
+
+결제와 응시 사이에 **`exam_tickets` 한 행**을 둔다. 이 행이 응시 자격의 **유일한 출처**다.
+
+- `product_ref = "<round_id>:<tier>"`. `payments_paid_product_uniq` 가 text 원문 비교라 **정규화가 필수** — `resolveProduct` 가 DB 에서 읽은 값을 되돌려주고 insert 는 그 값만 쓴다(이북도 같은 구멍이었다).
+- 응시권은 `exams.id` 가 아니라 **(회차 × 급수)** 에 묶는다. 관리자가 회차 편집에서 급수를 해제하면 `exams` 행이 **실제로 DELETE** 되는데, 응시권을 막 판 직후가 정확히 그 구간이라 체크박스 한 번에 팔린 응시권이 미아가 된다.
+- **판정은 전부 DB 제약이 한다.** 코드는 23505/23503 을 사람 말로 옮기기만 한다.
+
+| 막는 것 | 제약 |
+|---|---|
+| 같은 (사람×회차×급수) 응시권 2장 (수기·무료 발급 포함) | `exam_tickets_live_uniq` |
+| 한 결제로 응시권 2장 (승인·웹훅·대사 3중 호출) | `exam_tickets_payment_uniq` |
+| **한 응시권으로 응시 2개 — 상태 무관** | `exam_attempts_ticket_live_uniq` |
+| 오타 티어 발급 (`exams.tier` 엔 CHECK 이 없다) | `exam_tickets.tier` → `exam_tiers` FK |
+| 응시권 팔린 회차 삭제 | `round_id` FK (NO ACTION) |
+
+- ⚠️ **`exam_attempts_ticket_live_uniq` 의 조건은 `where ticket_id is not null` — 상태를 넣지 마라.** `status in ('in_progress','submitted')` 로 두면 제출 안 하고 나갔다가 TTL 뒤 재진입할 때 옛 응시를 expired 로 눕히고 **같은 응시권으로 새 응시를 또 만들 수 있다.** 문항 세트가 고정이라 시험창(10일) 내내 반복하면 제한시간·1인1회가 통째로 무의미해진다(2026-08-06 검증에서 실제로 잡힘). 재진입 = '새로 만들기'가 아니라 '그 응시로 돌아가기'다.
+- ⚠️ **지급 실패를 결제 실패로 만들지 마라.** 승인이 끝났으면 돈은 이미 빠졌다. 접수 마감 직후 승인·급수 해제 등으로 지급이 막히면 `paid + fulfilled_at=null` 로 남겨 대사에 걸고, 화면은 **'결제 완료 · 발급 보류'**(`pay.hold_*`)를 보여준다. 실패로 표시하면 사용자가 재결제를 시도하다 '이미 결제 완료'를 보게 돼 두 화면이 정반대로 말한다.
+- ⚠️ **살아있는 결제 = `paid` + `waiting_deposit`.** 중복 검사에서 `paid` 만 보면 가상계좌 주문이 안 잡혀 "VA 로 주문해두고 카드로 또 결제" → 나중에 입금 시 **두 번 청구**가 된다.
+- ⚠️ **웹훅은 영구 오류에 500 을 주면 안 된다** — 토스가 무한 재시도한다. 중복키 같은 건 200 + 사유로 닫는다.
+- **정기시험 = 월 3구간**(1–10 접수 / 11–20 시험 / 21–말일 채점). 응시창은 `exam_rounds.exam_start_at`·`exam_end_at`(KST). ⚠️ 기존 회차 중 시험일이 11~20 밖인 것(제4·5회)은 백필이 **시험일 당일만** 열었다 — 11~20 을 그대로 밀면 시험창이 시험일을 안 포함해 아무도 응시 못 한다.
+- **상시(rolling)는 판매하지 않는다**(2026-08 폐지). 행·표시 코드는 두고 결제 진입만 막는다.
+- **응시료는 카드·간편결제만**(D3). 가상계좌는 입금이 끝나도 응시권을 발급하지 않고 대사로 넘긴다 — VA 는 접수 마감 뒤 입금이 정상이라 마감이 무의미해진다.
+- **0원은 판매 불가**(무료 아님). `exam_fees.amount` 는 default 0 이라 오타 한 번이 무제한 무료 응시권이 된다. 이북만 0원 즉시지급을 허용한다.
+- SEB 익명 응시 경로는 응시권 도입으로 자연히 막혔다(원래 결제 없이 응시가 됐다). SEB 세션 인계는 **미결** — 재검토 중.
+- 검증: `tests/db/t-exam-tickets.mjs`(22건) · `tests/db/t-payments.mjs`(39건).
 - 실키 심사 전 채워야 하는 것(코드 아님): 전자상거래법 사업자정보 표기, 이북 청약철회 제한 문구·응시료 환불규정(`/terms`), 미성년자 결제 동의.
 
 ---

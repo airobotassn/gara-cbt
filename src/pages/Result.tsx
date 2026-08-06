@@ -11,6 +11,7 @@ import {
 } from '../lib/scoring'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { useT, type TFunc } from '../lib/i18n'
+import { krw } from '../lib/money'
 import { useCountUp } from '../hooks/useCountUp'
 import RadarChartBox from '../components/RadarChartBox'
 import EbookCover from '../components/EbookCover'
@@ -480,7 +481,7 @@ function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; leve
               {b.owned
                 ? t('ebook.owned')
                 : b.price > 0
-                  ? `$${b.price.toLocaleString('en-US')}`
+                  ? krw(b.price, lang) /* 값은 원(KRW) — `$` 로 찍으면 안 된다 */
                   : t('ebook.free')}
             </span>
           </Link>

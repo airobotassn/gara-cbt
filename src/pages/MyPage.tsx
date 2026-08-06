@@ -10,6 +10,16 @@ import EbookCover from '../components/EbookCover'
 import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../lib/certNo'
 import { countryName } from '../lib/regions'
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
+import { usd } from '../lib/money'
+import {
+  examDateText,
+  ticketReasonText,
+  ticketSourceKey,
+  ticketStatusKey,
+  tierDisplay,
+  type ExamTicketView,
+} from '../lib/tickets'
+import type { Lang, TFunc } from '../lib/i18n'
 
 // gara_5 (마이페이지) 목업 디자인 그대로 + 실제 응시 데이터·탭·발급·로그인 게이트 로직 보존.
 // 원본: stitch_design_critique_assistant/gara_5/code.html
@@ -203,6 +213,78 @@ function ProfileSection() {
   )
 }
 
+// 보유 응시권 한 장.
+//   ⚠️ 응시 카드(아래 attempts)와 **같은 급의 크기**로 만든다. "장수가 늘어날 테니 작게" 는 금지 —
+//      개수는 스크롤이 푸는 문제다(2026-08-06 반려 사유 두 건이 정확히 이거다). 11~13px 잔글씨도 금지.
+//   ⚠️ 쓸 수 있는지(usable)와 그 이유는 **서버 판정을 그대로 표시만** 한다. 시험일을 브라우저에서 다시
+//      비교하면 KST 기준 판정과 최대 9시간 어긋난다(lib/tickets.ts 머리 주석 참고).
+function TicketCard({ tk, t, lang, onGo }: { tk: ExamTicketView; t: TFunc; lang: Lang; onGo: () => void }) {
+  const dead = tk.status === 'void' || tk.status === 'expired'
+  const statusKey = ticketStatusKey(tk.status)
+  const sourceKey = ticketSourceKey(tk.source)
+  const reason = ticketReasonText(tk, t, lang)
+  // 진행 중인 응시도 버튼을 남긴다 — 돌아갈 길이 화면에 없으면 사용자가 갇힌다(서버는 새 응시를 막을 뿐이다).
+  const canGo = tk.usable || tk.usableReason === 'in_progress'
+
+  return (
+    <article
+      className={`bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${dead ? 'opacity-75' : ''}`}
+    >
+      <div className="flex items-start gap-5 flex-1">
+        <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border ${dead ? 'bg-outline/10 border-outline/20' : 'bg-primary/10 border-primary/20'}`}>
+          <span className={`material-symbols-outlined text-[28px] ${dead ? 'text-outline' : 'text-primary'}`} style={{ fontVariationSettings: "'FILL' 1" }}>confirmation_number</span>
+        </div>
+        <div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+            <h3 className={`font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold break-keep ${dead ? 'text-on-surface-variant' : 'text-on-surface'}`}>
+              {tierDisplay(tk.tier, lang)}
+            </h3>
+            {/* 상태 배지만 11px 이다 — 바로 아래 응시 카드의 배지와 **같은 값**이어야 한 화면으로 읽힌다.
+                본문·보조 문구는 전부 body-md(15~16px)로 유지(잔글씨 반려 이력, CLAUDE.md 2026-08-06). */}
+            <span className={`px-3 py-1 font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border shrink-0 ${dead ? 'bg-outline/10 text-outline border-outline/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
+              {statusKey ? t(statusKey) : tk.status}
+            </span>
+            {sourceKey && (
+              <span className="px-3 py-1 bg-tertiary/10 text-tertiary border border-tertiary/20 font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full shrink-0">
+                {t(sourceKey)}
+              </span>
+            )}
+          </div>
+          {/* 회차명은 그 자체가 '무슨 회차'라 라벨(ticket.round)을 앞에 또 붙이지 않는다.
+              시험일 라벨은 일정 화면과 같은 말이어야 해서 기존 sched.exam_date 를 그대로 쓴다. */}
+          <p className="font-body-md text-body-md text-on-surface-variant mb-1">
+            {tk.roundTitle} | {t('sched.exam_date')} {examDateText(tk.examDate, lang)}
+          </p>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-3">
+            {t('ticket.issued_at')} {fmtDate(tk.issuedAt)}
+            {/* 관리자·무료 발급분은 0원이라 금액 자리를 통째로 비운다 — `$0` 은 '무료로 팔았다'로 읽힌다.
+                ⚠️ pricePaid 는 원화 스냅샷이다. 표시만 달러로 환산한다(실제 청구액 고지는 결제 화면 소관). */}
+            {tk.pricePaid > 0 ? ` | ${t('ticket.price_paid')} ${usd(tk.pricePaid, lang)}` : ''}
+          </p>
+          {reason && (
+            tk.usable ? (
+              <p className="font-label-md text-[15px] leading-[22px] text-primary font-semibold flex items-center gap-1.5 bg-primary/5 px-3 py-1.5 rounded-lg w-fit">
+                <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                {reason}
+              </p>
+            ) : (
+              <p className="font-body-md text-body-md text-outline break-keep">{reason}</p>
+            )
+          )}
+        </div>
+      </div>
+      {canGo && (
+        <div className="shrink-0">
+          <button onClick={onGo} className="px-6 py-2.5 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow flex items-center gap-2">
+            {t('ticket.go_exam')}
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </div>
+      )}
+    </article>
+  )
+}
+
 // 이북 서재 — 구매한 이북만 보인다(구매는 /ebooks 스토어에서). 읽기는 뷰어(/ebooks/read/:id).
 function EbookLibrary() {
   const { t, lang } = useT()
@@ -264,16 +346,22 @@ export default function MyPage() {
   const { section } = useParams()
   const tab = section && TABS.some((t) => t.key === section) ? section : 'learning'
   const { isFullUser, user, loading: authLoading } = useAuth()
-  const { t } = useT()
+  const { t, lang } = useT()
   const [list, setList] = useState<MyAttempt[] | null>(null)
+  const [tickets, setTickets] = useState<ExamTicketView[]>([])
   const [err, setErr] = useState('')
 
+  // 응시 + 보유 응시권을 한 번에 받는다(같은 함수라 왕복이 안 늘어난다).
+  //   lang 을 보내는 이유 = 회차 제목이 다국어 JSONB 라 서버가 그 언어로 투영해 내려준다.
   useEffect(() => {
     if (!isFullUser) return
-    callFunction<{ attempts: MyAttempt[] }>('my-attempts', {})
-      .then((r) => setList(r.attempts))
+    callFunction<MyAttemptsResponse>('my-attempts', { lang })
+      .then((r) => {
+        setList(r.attempts)
+        setTickets(r.tickets ?? []) // 옛 함수가 떠 있으면 없다 — 그때는 응시권 블록이 통째로 안 뜬다
+      })
       .catch((e) => setErr(e instanceof Error ? e.message : t('my.load_failed')))
-  }, [isFullUser])
+  }, [isFullUser, lang])
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')
@@ -422,12 +510,40 @@ export default function MyPage() {
           {/* 이북 서재 — 구매한 이북 */}
           {tab === 'ebooks' && <EbookLibrary />}
 
-          {/* 시험 응시 현황 */}
+          {/* 보유 응시권 — 결제했지만 아직 안 쓴 것. 탭을 6개로 늘리지 않은 이유: 탭 줄이 overflow-x-auto 라
+              모바일에서 잘리고, 응시권↔응시기록은 같은 물건의 앞뒤 상태(결제 → 응시 → 결과)다. */}
+          {!loading && !err && tab === 'attempts' && tickets.length > 0 && (
+            <section className="mb-8 md:mb-10">
+              <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-2">{t('ticket.section_title')}</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant mb-5 break-keep">{t('ticket.section_sub')}</p>
+              <div className="flex flex-col gap-6">
+                {tickets.map((tk) => (
+                  // ⚠️ 어느 응시권으로 가는지 반드시 넘긴다. 같은 회차에서 여러 급수를 살 수 있어서
+                  //    지정 없이 들어가면 start-exam 이 409 pick_ticket 으로 튕기고 고를 화면이 없다.
+                  <TicketCard
+                    key={tk.ticketId}
+                    tk={tk}
+                    t={t}
+                    lang={lang}
+                    onGo={() => navigate(`/exam/prepare?ticket=${encodeURIComponent(tk.ticketId)}`, { state: { ticketId: tk.ticketId } })}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 시험 응시 현황.
+              응시권 블록이 위에 섰을 때만 제목을 단다 — 없으면 탭 이름이 이미 이 목록을 가리키고 있어
+              제목을 상시로 넣으면 기존 화면에 없던 줄이 하나 생긴다. */}
+          {!loading && !err && tab === 'attempts' && tickets.length > 0 && attempts.length > 0 && (
+            <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-5">{t('mypage.tab_attempts')}</h2>
+          )}
           {!loading && !err && tab === 'attempts' && (
             attempts.length === 0 ? (
+              // 응시권이 있으면 다음 할 일은 '응시', 없으면 '접수'다 — 빈 화면에서 길이 갈린다.
               <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
-                <p className="font-body-md text-on-surface-variant mb-5">{t('mypage.empty_attempts')}</p>
-                <button onClick={() => navigate('/exam')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">{t('mypage.go_exam')}</button>
+                <p className="font-body-md text-on-surface-variant mb-5">{tickets.length > 0 ? t('mypage.empty_attempts') : t('ticket.empty')}</p>
+                <button onClick={() => navigate(tickets.length > 0 ? '/exam' : '/plan')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">{tickets.length > 0 ? t('mypage.go_exam') : t('ticket.empty_cta')}</button>
               </div>
             ) : (
               <div className="flex flex-col gap-6">

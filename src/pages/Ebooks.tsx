@@ -3,8 +3,11 @@
 //   **자기 안에서 세로로 스크롤**한다(페이지를 내려서 레벨이 바뀌는 구조가 아니다).
 //   좁은 화면은 3열이 안 들어가므로 레벨을 상단 가로 칩으로 빼고 교재↔강의를 탭으로 접는다.
 //
-//   ⚠️ 결제(PG) 미연동: '구매하기'를 누르면 ebooks 함수가 즉시 열람 권한을 지급한다(데모).
-//      실제 결제가 붙으면 이 버튼 뒤에 결제창을 끼우고 ebooks/buy 에 paymentRef 를 넘기면 된다.
+//   결제(2026-08-06 연동): 유료책 '구매하기' → /checkout?type=ebook&ref=<id> (토스 결제위젯) → 승인 후 지급.
+//      0원 책만 이 화면에서 ebooks/buy 로 즉시 지급한다(0원은 결제창을 탈 수 없다). 서버도 무료책만 허용.
+//      ⚠️ DB·결제는 원(KRW)이고 **구매자 화면 표시만 달러**다($1 = 1,500원 고정 환산 · 2026-08-07 결정).
+//         금액은 반드시 lib/money.ts 의 usd() 로 찍는다 — 문자열에 `$`·`₩` 를 직접 박지 말 것.
+//         실제 청구액(원화) 고지는 결제 화면(/checkout)의 주문요약 아래에서 한다.
 //   ⚠️ 강의는 아직 DB 가 없다 — `lib/lectures.ts` 하드코딩(데모). 관리자 등록으로 옮길 때 그 파일 주석 참고.
 //   구매한 책을 읽는 곳은 여기가 아니라 마이페이지 › E-BOOK 서재(/mypage/ebooks).
 import { useEffect, useMemo, useState } from 'react'
@@ -12,7 +15,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import type { TFunc } from '../lib/i18n'
+import type { TFunc, Lang } from '../lib/i18n'
+import { usd } from '../lib/money'
 import SiteFooter from '../components/SiteFooter'
 import EbookCover from '../components/EbookCover'
 import { LEVEL_COLORS, MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
@@ -91,6 +95,12 @@ export default function Ebooks() {
       setLoginOpen(true) // 바로 OAuth 로 튕기지 않고 모달로 한 번 받아준다
       return
     }
+    // 유료책은 결제 화면으로 넘긴다. 금액은 URL 로 넘기지 않는다 — 서버가 상품ID로 다시 계산한다.
+    if (b.price > 0) {
+      navigate(`/checkout?type=ebook&ref=${encodeURIComponent(b.id)}`)
+      return
+    }
+    // 0원 책만 이 자리에서 즉시 지급(결제창을 탈 수 없으므로). 서버도 무료책만 허용한다.
     setBusy(b.id)
     setMsg('')
     try {
@@ -115,6 +125,7 @@ export default function Ebooks() {
           key={b.id}
           b={b}
           t={t}
+          lang={lang}
           busy={busy === b.id}
           onZoom={() => setZoom(b)}
           onBuy={() => buy(b)}
@@ -152,8 +163,10 @@ export default function Ebooks() {
             <h1 className="font-display-lg text-3xl md:text-display-lg font-bold text-on-surface mb-2 tracking-tight break-keep">{t('ebook.store_title')}</h1>
             {/* 화면을 보면 아는 걸 글로 또 쓰지 않는다 — "레벨을 고르면 …" 설명문은 2026-08-06 삭제됐다.
                 ⚠️ 11~13px 짜리 잔글씨 금지(같은 날 반려) — 보조 문구도 15px 아래로 내리지 말 것. */}
+            {/* 가격을 달러로 찍는 목록이라 고정 환산이라는 사실을 여기서 한 번 밝힌다 —
+                실제 청구액(원화) 고지는 결제 화면(/checkout)이 결제 버튼 직전에 다시 한다. */}
             <p className="font-body-md text-[15px] text-on-surface-variant break-keep">
-              {!isFullUser ? t('ebook.login_to_buy') : t('ebook.store_sub')}
+              {!isFullUser ? t('ebook.login_to_buy') : t('ebook.store_sub')} {t('pay.currency_hint')}
             </p>
           </header>
 
@@ -334,10 +347,11 @@ function PaneEmpty({ text }: { text: string }) {
 /** 교재 한 줄 — 표지(탭하면 확대) + 제목 + 가격/버튼.
  *    표지는 열 폭의 1/3 정도로 크게 세운다. 목록이라고 썸네일을 줄이면 표지 글자가 아무 데서도 안 읽힌다. */
 function BookRow({
-  b, t, busy, onZoom, onBuy, onLibrary,
+  b, t, lang, busy, onZoom, onBuy, onLibrary,
 }: {
   b: EbookRow
   t: TFunc
+  lang: Lang
   busy: boolean
   onZoom: () => void
   onBuy: () => void
@@ -362,7 +376,9 @@ function BookRow({
             </span>
           ) : (
             <span className="font-title-md text-[19px] font-bold text-on-surface">
-              {b.price > 0 ? `$${b.price.toLocaleString('en-US')}` : t('ebook.free')}
+              {/* ⚠️ b.price 는 **원(KRW) 정수**다. 표시가만 달러로 환산한다 — 직접 나누지 말고 usd() 를 쓸 것
+                  (환산율 1,500 은 lib/money.ts 한 곳에만 있다). */}
+              {b.price > 0 ? usd(b.price, lang) : t('ebook.free')}
             </span>
           )}
           {b.owned ? (

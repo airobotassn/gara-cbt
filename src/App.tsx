@@ -40,6 +40,8 @@ import MiniGames from './pages/MiniGames'
 import Daily from './pages/Daily'
 import Ebooks from './pages/Ebooks'
 import EbookReader from './pages/EbookReader'
+import Checkout from './pages/Checkout'
+import PayResult from './pages/PayResult'
 const Admin = lazy(() => import('./pages/Admin'))
 
 // 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
@@ -148,6 +150,11 @@ export default function App() {
               {/* 이북: 스토어(구매) ↔ 뷰어(열람). 내 서재는 마이페이지 탭(/mypage/ebooks). */}
               <Route path="/ebooks" element={<Ebooks />} />
               <Route path="/ebooks/read/:id" element={<EbookReader />} />
+              {/* 결제: 상품ID만 받아 서버가 주문을 만들고(금액은 서버가 계산) 토스 결제위젯을 띄운다.
+                  /pay/success · /pay/fail 은 토스 결제창이 돌아오는 자리 — 주소를 바꾸면 successUrl/failUrl 도 같이 고칠 것. */}
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/pay/success" element={<PayResult />} />
+              <Route path="/pay/fail" element={<PayResult />} />
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/mypage/:section" element={<MyPage />} />
               {/* CARIS ARENA 모듈 (/test/*) + 랭킹 */}

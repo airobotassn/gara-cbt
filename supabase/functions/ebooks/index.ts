@@ -2,7 +2,7 @@
 //   - store   : 공개된 이북 목록 (로그인 시 owned 플래그 포함) — 비로그인도 조회 가능
 //   - picks   : 레벨테스트 결과창용 추천 목록 (응시 레벨 기준 정렬) — 비로그인도 조회 가능
 //   - library : 내가 구매한 이북 목록 (로그인 필수)
-//   - buy     : 구매 = 열람 권한 즉시 지급. ⚠️ 결제(PG) 미연동 데모 — 여기가 나중에 결제 검증이 들어갈 자리.
+//   - buy     : **무료(0원) 이북 전용** 즉시 지급. 유료책은 402 로 막고 payments 함수(토스 결제)만 지급한다.
 //   - read    : 소유 확인 후 비공개 버킷 HTML 의 서명 URL 발급(뷰어 iframe 이 이걸 연다)
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
@@ -186,13 +186,18 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (!book || !book.published) return json({ error: '판매 중인 이북이 아닙니다.' }, 404)
 
-      // TODO(결제): PG 연동 시 여기서 body.paymentRef 를 검증하고 source='pg' 로 남길 것.
-      //   지금은 데모 — 버튼을 누르면 즉시 지급한다. 이미 산 책이면 그대로 성공(멱등).
+      // ⚠️ **무료책 전용 경로다.** 결제가 붙은 뒤로 유료책을 여기서 지급하면 결제를 통째로 우회할 수 있다
+      //    (프론트를 안 거치고 이 함수를 직접 부르면 그만이다). 유료책은 payments 함수만 지급한다.
+      if ((book.price as number) > 0) {
+        return json({ error: '결제가 필요한 이북입니다.', needsPayment: true }, 402)
+      }
+
+      // 0원 책은 결제창을 탈 수 없으므로 여기서 바로 지급한다. 이미 산 책이면 그대로 성공(멱등).
       const { error } = await admin.from('ebook_purchases').insert({
         user_id: uid,
         ebook_id: id,
-        price_paid: book.price ?? 0,
-        source: 'demo',
+        price_paid: 0,
+        source: 'free',
       })
       // 23505 = unique 위반(이미 보유) → 성공으로 취급.
       if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)

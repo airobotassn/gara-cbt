@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { isMobileDevice, getDesktopOS } from '../lib/device'
@@ -23,8 +23,13 @@ const STEP_KEYS = [
 // 국가공인 CBT 형태의 응시 전 단계 플로우 (창을 하나씩 넘기며 진행)
 export default function ExamPrepare() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [params] = useSearchParams()
   const { isFullUser, loginWithGoogle } = useAuth()
   const { t, lang } = useT()
+  // 어느 응시권으로 들어왔는지. state 는 마이페이지 카드 클릭 경로, ?ticket= 는 새로고침에도 살아남는 durable 소스.
+  const ticketId =
+    (location.state as { ticketId?: string } | null)?.ticketId ?? params.get('ticket') ?? ''
   // 결제한 시험 → 안내 표시용 트랙·티어(현재 CARIS-Ⅰ Pro 고정). 결제 연동 시 getPrepareExam 인자 교체.
   const { track: examTrack, tier: examTier } = getPrepareExam(lang)
   const [step, setStep] = useState(0)
@@ -93,8 +98,13 @@ export default function ExamPrepare() {
       } catch {
         /* 무시 */
       }
+      // ⚠️ ticketId 를 반드시 실어보낸다. 같은 회차에서 여러 급수를 접수할 수 있어서(2026-08 결정)
+      //    응시권이 2장 이상이면 서버가 어느 걸 쓸지 몰라 409 pick_ticket 으로 튕긴다.
+      //    그 상태에서 고를 화면이 없으면 **돈은 다 냈는데 어느 시험도 시작 못 하는** 상태가 된다.
+      //    값은 마이페이지 응시권 카드 → navigate state, 또는 URL ?ticket= 로 들어온다.
       const res = await callFunction<StartExamResponse>('start-exam', {
         examSlug: DEFAULT_EXAM_SLUG,
+        ...(ticketId ? { ticketId } : {}),
       })
       navigate(`/exam/run/${res.attemptId}`, { state: res })
     } catch (e) {

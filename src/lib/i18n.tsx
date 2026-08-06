@@ -207,12 +207,12 @@ const D: Record<string, Record<Lang, string>> = {
   'lcert.print': { ko: '📄 PDF로 저장 / 인쇄', en: '📄 Save as PDF / Print', ja: '📄 PDFで保存 / 印刷', zh: '📄 保存为 PDF / 打印', hi: '📄 PDF सहेजें / प्रिंट', vi: '📄 Lưu PDF / In' },
   'lcert.no_name': { ko: '이름 없음', en: 'Unnamed', ja: '名前未設定', zh: '未设置昵称', hi: 'नाम नहीं', vi: 'Chưa đặt tên' },
   'lcert.empty': {
-    ko: '아직 발급할 인증서가 없습니다. 레벨테스트를 한 번 완료하면 여정의 첫 별이 켜집니다.',
-    en: 'No certificate yet. Finish one level test and the first star of your journey lights up.',
-    ja: 'まだ発行できる認証書がありません。レベルテストを一度完了すると旅の最初の星が灯ります。',
-    zh: '尚无可领取的认证书。完成一次等级测试，旅程的第一颗星就会点亮。',
-    hi: 'अभी कोई प्रमाणपत्र नहीं है। एक लेवल टेस्ट पूरा करें और आपकी यात्रा का पहला तारा जगमगाएगा।',
-    vi: 'Chưa có chứng nhận. Hoàn thành một bài kiểm tra cấp độ, ngôi sao đầu tiên của hành trình sẽ sáng lên.',
+    ko: '아직 발급할 인증서가 없습니다. 레벨테스트에서 한 단계를 통과하면 여정의 첫 별이 켜집니다.',
+    en: 'No certificate yet. Clear one level in the level test and the first star of your journey lights up.',
+    ja: 'まだ発行できる認証書がありません。レベルテストで1段階を突破すると旅の最初の星が灯ります。',
+    zh: '尚无可领取的认证书。在等级测试中通过一个等级，旅程的第一颗星就会点亮。',
+    hi: 'अभी कोई प्रमाणपत्र नहीं है। लेवल टेस्ट में एक लेवल पास करें और आपकी यात्रा का पहला तारा जगमगाएगा।',
+    vi: 'Chưa có chứng nhận. Vượt qua một cấp độ trong bài kiểm tra, ngôi sao đầu tiên của hành trình sẽ sáng lên.',
   },
   'lcert.load_failed': { ko: '인증서를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.', en: 'Could not load the certificate. Please try again shortly.', ja: '認証書を読み込めませんでした。しばらくしてからお試しください。', zh: '无法加载认证书，请稍后再试。', hi: 'प्रमाणपत्र लोड नहीं हो सका। कृपया बाद में पुनः प्रयास करें।', vi: 'Không tải được chứng nhận. Vui lòng thử lại sau.' },
   'lcert.go_test': { ko: '레벨테스트 하러 가기', en: 'Take a level test', ja: 'レベルテストへ', zh: '去参加等级测试', hi: 'लेवल टेस्ट दें', vi: 'Đi làm bài kiểm tra' },
@@ -1335,6 +1335,35 @@ const D: Record<string, Record<Lang, string>> = {
   "ebook.go_store": { ko: "Learning Library 가기", en: "Go to Learning Library", ja: "Learning Library へ", zh: "前往 Learning Library", hi: "Learning Library पर जाएँ", vi: "Đến Learning Library" },
   "ebook.go_library": { ko: "E-BOOK 서재에서 보기", en: "Open in E-BOOK Library", ja: "E-BOOKライブラリで見る", zh: "在 E-BOOK 书架中查看", hi: "E-BOOK लाइब्रेरी में खोलें", vi: "Xem trong Thư viện E-BOOK" },
   "ebook.load_failed": { ko: "이북을 불러올 수 없습니다.", en: "Could not load the E-Book.", ja: "E-Bookを読み込めません。", zh: "无法加载电子书。", hi: "ईबुक लोड नहीं हो सकी।", vi: "Không thể tải eBook." },
+
+  // ---- 결제(/checkout · /pay/success · /pay/fail) ----
+  // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
+  "pay.title": { ko: "결제", en: "Checkout", ja: "お支払い", zh: "结算", hi: "भुगतान", vi: "Thanh toán" },
+  "pay.back": { ko: "돌아가기", en: "Back", ja: "戻る", zh: "返回", hi: "वापस", vi: "Quay lại" },
+  "pay.order": { ko: "주문 내역", en: "Order summary", ja: "注文内容", zh: "订单明细", hi: "ऑर्डर विवरण", vi: "Chi tiết đơn hàng" },
+  "pay.preparing": { ko: "결제창을 준비하고 있어요…", en: "Preparing checkout…", ja: "決済画面を準備しています…", zh: "正在准备结算…", hi: "भुगतान तैयार हो रहा है…", vi: "Đang chuẩn bị thanh toán…" },
+  "pay.pay_button": { ko: "결제하기", en: "Pay", ja: "支払う", zh: "支付", hi: "भुगतान करें", vi: "Thanh toán" },
+  "pay.moving": { ko: "결제창으로 이동 중…", en: "Opening payment window…", ja: "決済画面へ移動中…", zh: "正在打开支付窗口…", hi: "भुगतान विंडो खुल रही है…", vi: "Đang mở cửa sổ thanh toán…" },
+  // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
+  "pay.test_mode": { ko: "테스트 결제 환경입니다 — 실제로 결제되지 않습니다.", en: "Test mode — no real payment will be made.", ja: "テスト環境です — 実際には決済されません。", zh: "测试环境 — 不会产生真实扣款。", hi: "टेस्ट मोड — वास्तविक भुगतान नहीं होगा।", vi: "Chế độ thử nghiệm — không có thanh toán thật." },
+  "pay.not_configured": { ko: "결제가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.", en: "Payments aren't set up yet. Please try again later.", ja: "決済はまだ準備中です。しばらくしてからお試しください。", zh: "支付尚未开通，请稍后再试。", hi: "भुगतान अभी उपलब्ध नहीं है। कृपया बाद में प्रयास करें।", vi: "Thanh toán chưa sẵn sàng. Vui lòng thử lại sau." },
+  "pay.bad_request": { ko: "결제 정보가 올바르지 않습니다.", en: "The payment details are invalid.", ja: "決済情報が正しくありません。", zh: "支付信息不正确。", hi: "भुगतान जानकारी सही नहीं है।", vi: "Thông tin thanh toán không hợp lệ." },
+  "pay.error_generic": { ko: "결제를 진행할 수 없습니다.", en: "The payment could not be processed.", ja: "決済を進められません。", zh: "无法继续支付。", hi: "भुगतान पूरा नहीं हो सका।", vi: "Không thể tiến hành thanh toán." },
+  "pay.confirming": { ko: "결제를 확인하고 있어요", en: "Confirming your payment", ja: "決済を確認しています", zh: "正在确认支付", hi: "भुगतान की पुष्टि हो रही है", vi: "Đang xác nhận thanh toán" },
+  "pay.confirming_body": { ko: "창을 닫지 말고 잠시만 기다려주세요.", en: "Please don't close this page.", ja: "画面を閉じずにお待ちください。", zh: "请不要关闭此页面。", hi: "कृपया यह पेज बंद न करें।", vi: "Vui lòng không đóng trang này." },
+  "pay.success_title": { ko: "결제가 완료됐어요", en: "Payment complete", ja: "決済が完了しました", zh: "支付完成", hi: "भुगतान पूरा हुआ", vi: "Thanh toán hoàn tất" },
+  "pay.free_title": { ko: "담았어요", en: "Added to your library", ja: "追加しました", zh: "已加入书架", hi: "लाइब्रेरी में जोड़ा गया", vi: "Đã thêm vào thư viện" },
+  "pay.free_body": { ko: "무료 자료라 바로 서재에 담겼어요.", en: "It's free, so it went straight to your library.", ja: "無料資料のため、そのままライブラリに追加されました。", zh: "免费资料，已直接加入书架。", hi: "यह मुफ़्त है, इसलिए सीधे आपकी लाइब्रेरी में चला गया।", vi: "Tài liệu miễn phí nên đã vào thẳng thư viện của bạn." },
+  // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
+  "pay.waiting_title": { ko: "입금을 기다리고 있어요", en: "Waiting for your deposit", ja: "入金をお待ちしています", zh: "等待入款", hi: "आपकी जमा राशि की प्रतीक्षा है", vi: "Đang chờ bạn chuyển khoản" },
+  // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
+  // 실패로 읽히면 사용자가 다시 결제하려다 '이미 결제 완료'를 보고 두 화면이 정반대로 말하게 된다.
+  "pay.hold_title": { ko: "결제는 완료됐어요", en: "Payment received", ja: "決済は完了しました", zh: "支付已完成", hi: "भुगतान प्राप्त हुआ", vi: "Đã nhận thanh toán" },
+  "pay.hold_body": { ko: "다만 지급 처리가 보류됐어요. 운영팀이 확인 후 처리해 드립니다 — 다시 결제하지 마세요.", en: "Delivery is on hold pending review. Our team will sort it out — please don't pay again.", ja: "ただし付与処理が保留されています。運営が確認して対応します — 再決済はしないでください。", zh: "但发放处理已暂缓，我们的团队会处理 — 请不要重复支付。", hi: "लेकिन डिलीवरी समीक्षा के लिए रोकी गई है। हमारी टीम इसे संभाल लेगी — दोबारा भुगतान न करें।", vi: "Tuy nhiên việc cấp phát đang tạm giữ để kiểm tra. Đội ngũ sẽ xử lý — vui lòng đừng thanh toán lại." },
+  "pay.waiting_body": { ko: "발급된 가상계좌로 입금하면 자동으로 지급됩니다.", en: "Once your deposit arrives, access is granted automatically.", ja: "発行された仮想口座へ入金されると自動的に付与されます。", zh: "款项到账后将自动发放。", hi: "जमा राशि मिलते ही एक्सेस अपने आप मिल जाएगा।", vi: "Khi nhận được tiền, quyền truy cập sẽ được cấp tự động." },
+  "pay.fail_title": { ko: "결제하지 못했어요", en: "Payment didn't go through", ja: "決済できませんでした", zh: "支付未完成", hi: "भुगतान नहीं हो सका", vi: "Thanh toán chưa thành công" },
+  "pay.fail_body": { ko: "결제가 취소되었거나 승인되지 않았습니다.", en: "The payment was cancelled or declined.", ja: "決済がキャンセルされたか、承認されませんでした。", zh: "支付已取消或未获批准。", hi: "भुगतान रद्द हुआ या स्वीकृत नहीं हुआ।", vi: "Thanh toán đã bị hủy hoặc không được chấp nhận." },
+  "pay.retry": { ko: "다시 시도", en: "Try again", ja: "もう一度", zh: "重试", hi: "फिर से करें", vi: "Thử lại" },
   "ebook.reader_back": { ko: "E-BOOK 서재", en: "E-BOOK Library", ja: "E-BOOKライブラリ", zh: "E-BOOK 书架", hi: "E-BOOK लाइब्रेरी", vi: "Thư viện E-BOOK" },
   "ebook.reader_lang": { ko: "읽을 언어", en: "Reading language", ja: "表示言語", zh: "阅读语言", hi: "पढ़ने की भाषा", vi: "Ngôn ngữ đọc" },
   "ebook.reader_fs": { ko: "전체화면", en: "Fullscreen", ja: "全画面", zh: "全屏", hi: "फुलस्क्रीन", vi: "Toàn màn hình" },
@@ -1588,6 +1617,9 @@ const D: Record<string, Record<Lang, string>> = {
   "apply.sel_cert": { ko: "선택 자격", en: "Selected certification", ja: "選択資格", zh: "所选资格", hi: "चयनित प्रमाणन", vi: "Chứng chỉ đã chọn" },
   "apply.round": { ko: "회차", en: "Session", ja: "回次", zh: "场次", hi: "सत्र", vi: "Đợt" },
   "apply.fee": { ko: "응시료", en: "Exam fee", ja: "受験料", zh: "应试费", hi: "परीक्षा शुल्क", vi: "Lệ phí thi" },
+  // exam_fees 에 그 티어의 행이 없을 때 — 금액 자리에 숫자를 지어내지 않고 이걸 띄우고 결제를 막는다.
+  // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
+  "apply.fee_tbd": { ko: "준비 중", en: "Coming soon", ja: "準備中", zh: "准备中", hi: "जल्द आ रहा है", vi: "Sắp có" },
   "apply.total": { ko: "총 결제금액", en: "Total", ja: "合計金額", zh: "应付总额", hi: "कुल राशि", vi: "Tổng thanh toán" },
   "apply.pay_btn": { ko: "결제하기", en: "Pay", ja: "決済する", zh: "去支付", hi: "भुगतान करें", vi: "Thanh toán" },
   "apply.pay_note": { ko: "결제 시 본인인증이 필요합니다. 응시료·본인인증·결제는 추후 연결(미리보기).", en: "Identity verification is required for payment. Fees, verification, and payment will be connected later (preview).", ja: "決済には本人認証が必要です。受験料・本人認証・決済は後日連携予定（プレビュー）。", zh: "支付需实名认证。应试费·实名认证·支付将于稍后接入（预览）。", hi: "भुगतान के लिए पहचान सत्यापन आवश्यक है। शुल्क·सत्यापन·भुगतान बाद में जोड़े जाएंगे (पूर्वावलोकन)।", vi: "Cần xác minh danh tính để thanh toán. Lệ phí·xác minh·thanh toán sẽ kết nối sau (bản xem trước)." },
@@ -1713,6 +1745,109 @@ const D: Record<string, Record<Lang, string>> = {
   'chat.reportOther': { ko: "기타", en: "Other", ja: "その他", zh: "其他", hi: "अन्य", vi: "Khác" },
   'chat.reportDetail': { ko: "자세한 내용 (선택)", en: "Details (optional)", ja: "詳細（任意）", zh: "详细说明（选填）", hi: "विवरण (वैकल्पिक)", vi: "Chi tiết (tùy chọn)" },
   'chat.reportSubmit': { ko: "신고하기", en: "Report", ja: "通報する", zh: "举报", hi: "रिपोर्ट करें", vi: "Báo cáo" },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  응시권(exam_tickets) · 응시료 결제 — 2026-08 추가
+  //  한 기능이 여러 화면(원서접수 · 결제 · 마이페이지 · 응시 게이트)에 걸쳐 있어서
+  //  네임스페이스별로 흩지 않고 여기 한 덩어리로 모았다. 위쪽 apply.* / pay.* / gate.* /
+  //  prep.* / mypage.* 블록에도 같은 접두사의 옛 키가 있으니 검색으로 찾을 것.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── 응시권 상태·라벨 (ticket.*) — 마이페이지 '보유 응시권' 블록이 주 사용처 ──
+  "ticket.section_title": { ko: "보유 응시권", en: "My exam tickets", ja: "保有中の受験チケット", zh: "我的应试券", hi: "मेरे परीक्षा टिकट", vi: "Vé dự thi của tôi" },
+  "ticket.section_sub": { ko: "결제한 시험이 여기 쌓여요. 응시 기간이 되면 바로 응시할 수 있어요.", en: "Exams you've paid for appear here. You can start once the exam window opens.", ja: "お支払い済みの試験がここに表示されます。受験期間になればすぐ受験できます。", zh: "已支付的考试会显示在这里。到了应试期间即可直接应试。", hi: "आपने जिन परीक्षाओं का भुगतान किया है वे यहाँ दिखती हैं। परीक्षा अवधि शुरू होते ही आप दे सकते हैं।", vi: "Các kỳ thi bạn đã thanh toán sẽ hiện ở đây. Bạn có thể dự thi khi đến thời gian thi." },
+  "ticket.empty": { ko: "아직 보유한 응시권이 없습니다.", en: "You don't have any exam tickets yet.", ja: "まだ受験チケットがありません。", zh: "您还没有应试券。", hi: "आपके पास अभी कोई परीक्षा टिकट नहीं है।", vi: "Bạn chưa có vé dự thi nào." },
+  "ticket.empty_cta": { ko: "접수하러 가기", en: "Register for an exam", ja: "申し込みへ", zh: "去报名", hi: "पंजीकरण करें", vi: "Đi đăng ký" },
+  "ticket.count": { ko: "보유 {n}장", en: "{n} tickets", ja: "{n}枚", zh: "{n} 张", hi: "{n} टिकट", vi: "{n} vé" },
+  // status_issued 를 '발급됨' 이 아니라 '미사용' 으로 쓰는 이유: 목록에 서는 모든 응시권은 이미 발급된 것이라
+  // '발급됨' 은 정보가 0이다. 사용자가 알아야 하는 건 "아직 안 썼다" 는 사실이다.
+  "ticket.status_issued": { ko: "미사용", en: "Unused", ja: "未使用", zh: "未使用", hi: "अप्रयुक्त", vi: "Chưa dùng" },
+  // consumed 는 '응시 완료' 가 아니다 — 응시를 시작한 순간 소진되므로 진행 중일 수도 있다.
+  "ticket.status_consumed": { ko: "사용됨", en: "Used", ja: "使用済み", zh: "已使用", hi: "प्रयुक्त", vi: "Đã dùng" },
+  "ticket.status_void": { ko: "무효", en: "Void", ja: "無効", zh: "已作废", hi: "रद्द", vi: "Đã hủy" },
+  "ticket.status_expired": { ko: "기간 만료", en: "Expired", ja: "期限切れ", zh: "已过期", hi: "समय समाप्त", vi: "Hết hạn" },
+  // 서버(my-attempts)가 내려주는 usableReason 코드 5종과 1:1 로 대응한다.
+  //   before_exam_day · window_closed · already_taken · in_progress · expired
+  // 서버는 코드만 주고 문구는 여기가 정한다 — 새 코드가 생기면 여기에도 키를 추가할 것.
+  "ticket.usable": { ko: "지금 응시할 수 있어요", en: "You can take this exam now", ja: "今すぐ受験できます", zh: "现在即可应试", hi: "आप अभी परीक्षा दे सकते हैं", vi: "Bạn có thể dự thi ngay" },
+  "ticket.reason_before_exam_day": { ko: "{date}부터 응시할 수 있어요", en: "You can start on {date}", ja: "{date}から受験できます", zh: "{date} 起可以应试", hi: "{date} से आप परीक्षा दे सकते हैं", vi: "Bạn có thể dự thi từ {date}" },
+  "ticket.reason_window_closed": { ko: "응시 기간이 지났어요", en: "The exam window has closed", ja: "受験期間が終了しました", zh: "应试期间已结束", hi: "परीक्षा अवधि समाप्त हो गई", vi: "Thời gian dự thi đã kết thúc" },
+  "ticket.reason_already_taken": { ko: "이미 응시했어요", en: "You've already taken this exam", ja: "すでに受験済みです", zh: "您已经应试过了", hi: "आप यह परीक्षा दे चुके हैं", vi: "Bạn đã dự thi rồi" },
+  "ticket.reason_in_progress": { ko: "응시가 진행 중이에요", en: "Your exam is in progress", ja: "受験が進行中です", zh: "应试正在进行中", hi: "आपकी परीक्षा चल रही है", vi: "Bài thi đang diễn ra" },
+  "ticket.reason_expired": { ko: "응시권이 만료됐어요", en: "This ticket has expired", ja: "受験チケットの有効期限が切れました", zh: "该应试券已过期", hi: "यह टिकट समाप्त हो चुका है", vi: "Vé dự thi đã hết hạn" },
+  "ticket.go_exam": { ko: "응시하러 가기", en: "Go to the exam", ja: "受験へ進む", zh: "去应试", hi: "परीक्षा पर जाएँ", vi: "Vào thi" },
+  // 필드 라벨 — 회차·등급은 원서접수 화면(apply.round / apply.tier)과 같은 말을 써야 한다.
+  "ticket.round": { ko: "회차", en: "Session", ja: "回次", zh: "场次", hi: "सत्र", vi: "Đợt" },
+  "ticket.tier": { ko: "등급", en: "Level", ja: "等級", zh: "等级", hi: "स्तर", vi: "Bậc" },
+  "ticket.issued_at": { ko: "발급일", en: "Issued", ja: "発行日", zh: "发放日期", hi: "जारी तिथि", vi: "Ngày cấp" },
+  "ticket.exam_period": { ko: "응시 기간", en: "Exam window", ja: "受験期間", zh: "应试期间", hi: "परीक्षा अवधि", vi: "Thời gian thi" },
+  "ticket.price_paid": { ko: "결제금액", en: "Paid", ja: "お支払い金額", zh: "支付金额", hi: "भुगतान राशि", vi: "Số tiền đã trả" },
+  // 발급 출처(exam_tickets.source) — pg 는 평상시 굳이 안 띄우지만, 관리자/무료 발급과 구분이 필요할 때 쓴다.
+  "ticket.source_pg": { ko: "결제로 발급", en: "From payment", ja: "決済で発行", zh: "支付发放", hi: "भुगतान से जारी", vi: "Cấp qua thanh toán" },
+  "ticket.source_admin": { ko: "관리자 발급", en: "Issued by admin", ja: "管理者発行", zh: "管理员发放", hi: "व्यवस्थापक द्वारा जारी", vi: "Do quản trị viên cấp" },
+  "ticket.source_free": { ko: "무료 응시권", en: "Free ticket", ja: "無料受験チケット", zh: "免费应试券", hi: "निःशुल्क टिकट", vi: "Vé miễn phí" },
+
+  // ── 원서접수(/exam/apply) 추가분 ──
+  // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
+  // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
+  "apply.tier_not_open": { ko: "이 회차 미개설", en: "Not offered this session", ja: "この回次は未開設", zh: "本场次未开设", hi: "इस सत्र में उपलब्ध नहीं", vi: "Không mở đợt này" },
+  "apply.tier_not_open_hint": { ko: "이 회차에서는 접수할 수 없는 급수예요. 다른 회차를 확인해 주세요.", en: "This level isn't open for this session. Please check another session.", ja: "この回次では申し込めない等級です。他の回次をご確認ください。", zh: "该等级本场次不接受报名，请查看其他场次。", hi: "यह स्तर इस सत्र में उपलब्ध नहीं है। कृपया कोई अन्य सत्र देखें।", vi: "Bậc này không mở trong đợt thi này. Vui lòng xem đợt khác." },
+  "apply.owned": { ko: "구매 완료", en: "Purchased", ja: "購入済み", zh: "已购买", hi: "खरीदा गया", vi: "Đã mua" },
+  "apply.owned_cta": { ko: "내 응시권 보기", en: "View my tickets", ja: "受験チケットを見る", zh: "查看我的应试券", hi: "मेरे टिकट देखें", vi: "Xem vé của tôi" },
+  "apply.already_applied": { ko: "이미 접수한 급수입니다", en: "You've already registered for this level", ja: "すでに申し込み済みの等級です", zh: "您已报名该等级", hi: "आप इस स्तर के लिए पहले ही पंजीकरण कर चुके हैं", vi: "Bạn đã đăng ký bậc này rồi" },
+  "apply.login_required": { ko: "로그인 후 접수할 수 있어요.", en: "Sign in to register.", ja: "ログイン後に申し込めます。", zh: "登录后即可报名。", hi: "पंजीकरण के लिए साइन इन करें।", vi: "Đăng nhập để đăng ký." },
+  // 짧은 인라인 배지용. 전체 화면 안내는 기존 apply.closed_title / apply.closed_body 를 쓴다.
+  "apply.period_closed": { ko: "접수기간이 아닙니다", en: "Registration is closed", ja: "申込期間ではありません", zh: "不在报名期间", hi: "पंजीकरण अवधि नहीं है", vi: "Không trong thời gian đăng ký" },
+  "apply.pay_go": { ko: "결제하러 가기", en: "Go to payment", ja: "お支払いへ進む", zh: "去支付", hi: "भुगतान पर जाएँ", vi: "Đến thanh toán" },
+  // ⚠️ 기존 apply.pay_note 는 '결제는 추후 연결(미리보기)' 라고 적혀 있어 결제가 실동작하면 거짓말이 된다.
+  //    실결제 연결 후에는 이 키로 갈아끼울 것(옛 키는 지우지 않고 남겨둔다).
+  //    문구 안의 '마이페이지 › 시험 응시 현황' 은 mypage.tab_attempts 와 같은 말이어야 한다.
+  "apply.pay_note_live": { ko: "결제하면 마이페이지 › 시험 응시 현황에서 응시권을 확인할 수 있어요.", en: "After payment, your ticket appears in My Page › Exam Status.", ja: "お支払い後、マイページ › 受験状況で受験チケットを確認できます。", zh: "支付完成后，可在个人中心 › 考试应试现况中查看应试券。", hi: "भुगतान के बाद आपका टिकट माय पेज › परीक्षा स्थिति में दिखेगा।", vi: "Sau khi thanh toán, vé sẽ hiện ở Trang cá nhân › Tình trạng dự thi." },
+
+  // ── 결제(/checkout · /pay/success) 추가분 ──
+  "pay.go_tickets": { ko: "내 응시권 보기", en: "View my tickets", ja: "受験チケットを見る", zh: "查看我的应试券", hi: "मेरे टिकट देखें", vi: "Xem vé của tôi" },
+  "pay.go_plan": { ko: "시험 일정 보기", en: "View exam schedule", ja: "試験日程を見る", zh: "查看考试日程", hi: "परीक्षा कार्यक्रम देखें", vi: "Xem lịch thi" },
+  "pay.exam_success_title": { ko: "응시권이 발급됐어요", en: "Your exam ticket is ready", ja: "受験チケットが発行されました", zh: "应试券已发放", hi: "आपका परीक्षा टिकट तैयार है", vi: "Vé dự thi đã được cấp" },
+  "pay.exam_success_body": { ko: "마이페이지 › 시험 응시 현황에서 확인하고, 응시 기간이 되면 응시하세요.", en: "Find it in My Page › Exam Status and start when the exam window opens.", ja: "マイページ › 受験状況で確認し、受験期間になったら受験してください。", zh: "请在个人中心 › 考试应试现况中查看，到应试期间即可应试。", hi: "इसे माय पेज › परीक्षा स्थिति में देखें और परीक्षा अवधि आने पर परीक्षा दें।", vi: "Xem tại Trang cá nhân › Tình trạng dự thi và dự thi khi đến thời gian thi." },
+  // 응시료는 카드·간편결제만 판다(가상계좌 제외). 그래도 가상계좌 결제가 들어오면 응시권을 발급하지 않으므로
+  // 이북과 같은 '입금하면 자동 지급' 문구(pay.waiting_body)를 쓰면 안 된다.
+  "pay.exam_waiting_body": { ko: "응시료는 카드·간편결제만 지원해요. 가상계좌로 입금해도 응시권이 자동 발급되지 않으니 문의해 주세요.", en: "Exam fees support cards and easy-pay only. A bank transfer will not issue a ticket automatically — please contact us.", ja: "受験料はカード・簡単決済のみ対応しています。仮想口座へ入金しても受験チケットは自動発行されませんので、お問い合わせください。", zh: "应试费仅支持银行卡和便捷支付。即使汇入虚拟账户也不会自动发放应试券，请联系客服。", hi: "परीक्षा शुल्क केवल कार्ड और ईज़ी-पे से लिया जाता है। वर्चुअल खाते में जमा करने पर टिकट स्वतः जारी नहीं होगा — कृपया संपर्क करें।", vi: "Lệ phí thi chỉ hỗ trợ thẻ và thanh toán nhanh. Chuyển khoản vào tài khoản ảo sẽ không tự động cấp vé — vui lòng liên hệ với chúng tôi." },
+  // 통화 고지 — 화면 가격은 달러인데 토스 결제창은 원화로 뜬다. 이 문구가 없으면 사용자는 금액이 다르다고 느낀다.
+  //   {krw} = lib/money.ts 의 krw() 로 찍은 실제 청구액 문자열.
+  // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.
+  // ⚠️ '○월○일 기준 환율' 이라고 쓰지 마라. 시장 환율이 아니라 우리가 정한 고정 환산값이다.
+  "pay.currency_note": { ko: "실제 청구 금액 {krw} · 표시 가격은 $1 = 1,500원 고정 환산가입니다.", en: "You will be charged {krw}. Prices are shown at a fixed rate of $1 = 1,500 KRW.", ja: "実際の請求額は {krw} です。表示価格は $1 = 1,500ウォンの固定換算です。", zh: "实际扣款金额为 {krw}。显示价格按 $1 = 1,500韩元 的固定汇率换算。", hi: "वास्तविक शुल्क {krw} लिया जाएगा। दिखाई गई कीमतें $1 = 1,500 KRW की निश्चित दर पर हैं।", vi: "Số tiền thực tế bị trừ là {krw}. Giá hiển thị quy đổi theo tỷ giá cố định $1 = 1.500 KRW." },
+  // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
+  "pay.currency_hint": { ko: "표시 가격은 $1 = 1,500원 고정 환산가입니다.", en: "Prices are shown at a fixed rate of $1 = 1,500 KRW.", ja: "表示価格は $1 = 1,500ウォンの固定換算です。", zh: "显示价格按 $1 = 1,500韩元 的固定汇率换算。", hi: "कीमतें $1 = 1,500 KRW की निश्चित दर पर दिखाई गई हैं।", vi: "Giá hiển thị theo tỷ giá cố định $1 = 1.500 KRW." },
+
+  // ── 응시 게이트(/exam) 거절 안내 ──
+  // 여기서 막는 건 보안이 아니라 UX 다(준비 7단계를 다 밟고 마지막에 403 을 받지 않게 하는 것).
+  // 실제 차단은 start-exam 이 응시권으로 한다.
+  "gate.no_ticket_title": { ko: "응시권이 없어요", en: "No exam ticket", ja: "受験チケットがありません", zh: "没有应试券", hi: "कोई परीक्षा टिकट नहीं", vi: "Chưa có vé dự thi" },
+  "gate.no_ticket_body": { ko: "응시하려면 먼저 원서접수와 응시료 결제가 필요해요.", en: "To take the exam, register and pay the exam fee first.", ja: "受験するには、まず願書受付と受験料のお支払いが必要です。", zh: "应试前需先完成报名并支付应试费。", hi: "परीक्षा देने के लिए पहले पंजीकरण और शुल्क का भुगतान करें।", vi: "Để dự thi, bạn cần đăng ký và thanh toán lệ phí trước." },
+  "gate.no_ticket_cta": { ko: "접수하러 가기", en: "Register for an exam", ja: "申し込みへ", zh: "去报名", hi: "पंजीकरण करें", vi: "Đi đăng ký" },
+  "gate.pick_ticket_title": { ko: "응시할 시험을 고르세요", en: "Choose which exam to take", ja: "受験する試験を選んでください", zh: "请选择要应试的考试", hi: "चुनें कि कौन-सी परीक्षा देनी है", vi: "Chọn kỳ thi bạn muốn dự" },
+  "gate.pick_ticket_body": { ko: "보유한 응시권이 여러 장이에요. 응시할 시험을 선택해 주세요.", en: "You have more than one ticket. Please pick the exam you want to take.", ja: "受験チケットが複数あります。受験する試験を選択してください。", zh: "您有多张应试券，请选择要应试的考试。", hi: "आपके पास एक से अधिक टिकट हैं। कृपया परीक्षा चुनें।", vi: "Bạn có nhiều vé. Vui lòng chọn kỳ thi muốn dự." },
+  "gate.not_exam_period_title": { ko: "지금은 응시 기간이 아니에요", en: "The exam window isn't open", ja: "現在は受験期間ではありません", zh: "当前不在应试期间", hi: "अभी परीक्षा अवधि नहीं है", vi: "Hiện không trong thời gian dự thi" },
+  "gate.not_exam_period_body": { ko: "응시 기간은 {from} ~ {to} 예요.", en: "The exam window is {from} – {to}.", ja: "受験期間は {from} ～ {to} です。", zh: "应试期间为 {from} ~ {to}。", hi: "परीक्षा अवधि {from} – {to} है।", vi: "Thời gian dự thi là {from} – {to}." },
+  // 익명(게스트) 세션에는 응시권이 붙을 수 없다 — 결제 자체가 로그인 계정에만 열려 있기 때문이다.
+  "gate.login_paid_title": { ko: "결제한 계정으로 로그인해 주세요", en: "Sign in with the account you paid with", ja: "決済したアカウントでログインしてください", zh: "请使用支付时的账号登录", hi: "जिस खाते से भुगतान किया, उसी से साइन इन करें", vi: "Hãy đăng nhập bằng tài khoản đã thanh toán" },
+  "gate.login_paid_body": { ko: "응시권은 결제한 계정에 발급돼요. 게스트(비로그인)로는 응시할 수 없어요.", en: "Tickets are issued to the account that paid. You can't take the exam as a guest.", ja: "受験チケットは決済したアカウントに発行されます。ゲスト（未ログイン）では受験できません。", zh: "应试券发放至支付账号。访客（未登录）无法应试。", hi: "टिकट उसी खाते को जारी होता है जिससे भुगतान हुआ। अतिथि (बिना साइन-इन) परीक्षा नहीं दे सकते।", vi: "Vé được cấp cho tài khoản đã thanh toán. Bạn không thể dự thi với tư cách khách." },
+
+  // ── 응시 준비(/exam/prepare) — start-exam 이 돌려주는 에러 코드를 사람이 읽을 문구로 ──
+  //   no_ticket · pick_ticket · attempt_exists · (응시창 밖) · (익명)
+  "prep.err_no_ticket": { ko: "응시권이 없어 시험을 시작할 수 없습니다.", en: "You need an exam ticket to start.", ja: "受験チケットがないため試験を開始できません。", zh: "没有应试券，无法开始考试。", hi: "टिकट के बिना परीक्षा शुरू नहीं हो सकती।", vi: "Bạn cần vé dự thi để bắt đầu." },
+  "prep.err_pick_ticket": { ko: "응시할 시험을 선택해 주세요.", en: "Please choose which exam to take.", ja: "受験する試験を選択してください。", zh: "请选择要应试的考试。", hi: "कृपया चुनें कि कौन-सी परीक्षा देनी है।", vi: "Vui lòng chọn kỳ thi bạn muốn dự." },
+  "prep.err_exam_closed": { ko: "지금은 응시 기간이 아닙니다.", en: "The exam window isn't open right now.", ja: "現在は受験期間ではありません。", zh: "当前不在应试期间。", hi: "अभी परीक्षा अवधि नहीं है।", vi: "Hiện không trong thời gian dự thi." },
+  "prep.err_login_paid": { ko: "결제한 계정으로 로그인해야 응시할 수 있습니다.", en: "You must sign in with the account that paid to take the exam.", ja: "決済したアカウントでログインしないと受験できません。", zh: "必须使用支付账号登录才能应试。", hi: "परीक्षा देने के लिए भुगतान वाले खाते से साइन इन करना होगा।", vi: "Bạn phải đăng nhập bằng tài khoản đã thanh toán để dự thi." },
+  "prep.err_attempt_exists": { ko: "이미 응시한 시험입니다.", en: "You've already taken this exam.", ja: "すでに受験済みの試験です。", zh: "该考试您已应试过。", hi: "आप यह परीक्षा दे चुके हैं।", vi: "Bạn đã dự kỳ thi này rồi." },
+
+  // ── SEB 진입로(/exam/seb) — 익명 세션으로는 응시권을 가질 수 없어 로그인으로 돌린다 ──
+  "seb.login_required": { ko: "응시하려면 결제한 계정으로 로그인해 주세요.", en: "Sign in with the account that paid to take the exam.", ja: "受験するには決済したアカウントでログインしてください。", zh: "应试请使用支付账号登录。", hi: "परीक्षा देने के लिए भुगतान वाले खाते से साइन इन करें।", vi: "Hãy đăng nhập bằng tài khoản đã thanh toán để dự thi." },
+
+  // ── 마이페이지 '시험 응시 현황' 빈 상태 분기 (응시권 없음 → 접수 / 응시권 있음 → 기존 mypage.go_exam) ──
+  "mypage.empty_no_ticket": { ko: "아직 접수한 시험이 없습니다.", en: "You haven't registered for any exam yet.", ja: "まだ申し込んだ試験がありません。", zh: "您还没有报名任何考试。", hi: "आपने अभी तक किसी परीक्षा के लिए पंजीकरण नहीं किया।", vi: "Bạn chưa đăng ký kỳ thi nào." },
+  "mypage.go_apply": { ko: "시험 접수하기", en: "Register for an exam", ja: "試験に申し込む", zh: "报名考试", hi: "परीक्षा हेतु पंजीकरण करें", vi: "Đăng ký dự thi" },
 }
 
 // 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.

@@ -1,6 +1,10 @@
 // Edge Function 이 클라이언트로 내려주는 CBT 타입.
 // 보안: correct_index 는 응시 중 절대 내려가지 않음(채점은 서버, 결과는 1주일 후 get-exam-result).
 
+// 응시권 타입은 `lib/tickets.ts` 가 단일 출처다(표시 헬퍼와 같이 살아야 갈리지 않는다).
+// `import type` 이라 런타임 의존이 생기지 않는다 — types.ts 는 어디서나 import 되는 파일이라 중요하다.
+import type { ExamTicketView } from './tickets'
+
 // 응시 중 클라가 받는 문제 (정답 제외)
 export interface CbtQuestion {
   id: string
@@ -19,11 +23,17 @@ export interface ExamMeta {
 }
 
 // start-exam 응답
+//   tier·ticket 은 응시권 게이트(2026-08-07)가 붙으면서 추가됐다 — 준비/응시/결과 화면이
+//   '실제로 산 급수'를 표시하려면 필요하다. 옛 함수가 아직 떠 있을 수 있어 optional 로 둔다.
 export interface StartExamResponse {
   attemptId: string
   exam: ExamMeta
   startedAt: string
   questions: CbtQuestion[]
+  /** 응시한 급수 key(exams.tier). 지금까지 화면은 항상 'pro' 로 안내하고 있었다. */
+  tier?: string | null
+  /** 이 응시를 열어준 응시권. 소진(consumed)된 그 행이다. */
+  ticket?: { id: string; roundId: string; tier: string } | null
 }
 
 // 제출 시 보내는 답안
@@ -113,6 +123,8 @@ export interface IssuedCert {
 export interface MyAttemptsResponse {
   attempts: MyAttempt[]
   issued?: IssuedCert | null
+  /** 보유 응시권(결제했지만 아직 안 쓴 것 포함). 옛 함수가 떠 있으면 없을 수 있어 optional. */
+  tickets?: ExamTicketView[]
 }
 
 // verify-cert 응답 — QR 진위확인 결과(공개 안전 필드만)
