@@ -11,7 +11,8 @@ import { useNavigate } from 'react-router-dom'
 import '../styles/daily.css'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
-import { dailyTerm, dailyChoices } from '../lib/terms'
+import { dailyTerm, dailyChoices, termTheory, TERMS } from '../lib/terms'
+import DailyVisual from '../components/DailyVisual'
 
 // ⚠️ 서버(complete-daily)의 DAILY_POINTS 와 같은 값이어야 한다. 적립 권위는 서버, 여기는 예고 표시용.
 const DAILY_POINTS = 10
@@ -48,11 +49,23 @@ export default function Daily() {
   const [celebrate, setCelebrate] = useState(false) // 완료 직후 보상 연출(재방문 시엔 안 뜬다)
   const [rewarded, setRewarded] = useState(true) // 이번 완료로 재화가 실제 지급됐는지(서버 응답 first)
   // 오늘의 문제 — 미니게임과 같은 용어 풀(lib/terms)에서 날짜별로 하나씩 순환. 마운트 시 1회 고정.
-  const [term] = useState(() => dailyTerm())
-  const [choices] = useState(() => dailyChoices()) // 보기 4개(정답+오답3), 날짜 시드로 섞임
+  // ⚠️ `?term=N` 은 **개발 서버에서만** 도는 미리보기다(해설·그림을 하루씩 기다리며 확인할 수 없어서).
+  //    import.meta.env.DEV 가 false 인 빌드에서는 분기 자체가 트리셰이킹으로 사라진다.
+  const [term] = useState(() => {
+    if (import.meta.env.DEV) {
+      const n = Number(new URLSearchParams(window.location.search).get('term'))
+      if (Number.isInteger(n) && n >= 0) return TERMS[n % TERMS.length]
+    }
+    return dailyTerm()
+  })
+  const [choices] = useState(() =>
+    term === dailyTerm() ? dailyChoices() : [term.answer, ...term.distractors],
+  ) // 보기 4개(정답+오답3), 날짜 시드로 섞임
   const [picked, setPicked] = useState<string | null>(null) // 이번 방문에 고른 보기
   // 정답 공개 조건 = 이번에 골랐거나 / 서버가 이미 오늘 완료로 기록(재방문)한 경우.
   const answered = picked !== null || done
+  // 풀고 나서 읽는 해설. 아직 안 쓴 용어면 null 이고, 그날은 해설 블록이 아예 안 나온다.
+  const theory = termTheory(term)
 
   function applyHub(h: HubState) {
     setAuthed(!!h.authed)
@@ -158,6 +171,38 @@ export default function Daily() {
           </p>
         )}
       </div>
+
+      {/* 해설 — 문제를 덮지 않고 카드 아래로 펼친다(내가 뭘 골랐는지 보면서 읽을 수 있게).
+          ⚠️ answered 로 조건부 마운트하면 펼침 연출이 안 돈다(0 높이에서 시작할 프레임이 없다).
+             항상 붙여 두고 .open 클래스만 토글해 grid-template-rows 0fr→1fr 로 늘린다. */}
+      {theory && (
+        <section className={`dy-theory${answered ? ' open' : ''}`} aria-hidden={!answered}>
+          <div className="dy-th-clip">
+            <div className="dy-th-card">
+              <div className="dy-th-head">
+                <span className="dy-th-badge">이론</span>
+                <b>{term.answer}</b>
+              </div>
+              {/* 그림이 먼저다 — 2초에 읽히는 건 이쪽이고, 아래 한 줄은 그 캡션이다. */}
+              <DailyVisual name={theory.visual} />
+              <p className="dy-th-point">{theory.point}</p>
+              {theory.why && theory.why.length > 0 && (
+                <ul className="dy-th-why">
+                  {theory.why.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              )}
+              {theory.compare && (
+                <p className="dy-th-cmp">
+                  <span>헷갈리면</span>
+                  {theory.compare}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
       </main>
 
       <aside className="dy-rail">

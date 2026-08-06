@@ -42,7 +42,7 @@ export default function ExamApply() {
   const fmtParts = lv.format ? lv.format.split(' · ') : []
   const fmtDuration = fmtParts.length > 1 ? fmtParts[fmtParts.length - 1] : ''
   const fmtComposition = fmtParts.length > 1 ? fmtParts.slice(0, -1).join(' · ') : lv.format ?? ''
-  const won = (n: number) => n.toLocaleString('ko-KR')
+  const usd = (n: number) => n.toLocaleString('en-US')
 
   // 응시료: caris.ts 티어 상수(단일 소스) 직접 사용 — 편집 불가·DB 미사용이라 어긋날 여지 없음.
   const fee = lv.fee ?? 0
@@ -206,13 +206,13 @@ export default function ExamApply() {
                 </div>
                 <div className="flex justify-between items-start gap-3">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t('apply.fee')}</span>
-                  <span className="font-body-md text-body-md text-on-surface font-semibold">$ {won(fee)}</span>
+                  <span className="font-body-md text-body-md text-on-surface font-semibold">${usd(fee)}</span>
                 </div>
               </div>
 
               <div className="border-t border-outline-variant/30 pt-4 flex justify-between items-baseline">
                 <span className="font-title-md text-title-md text-on-surface font-bold">{t('apply.total')}</span>
-                <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-black">$ {won(fee)}</span>
+                <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-black">${usd(fee)}</span>
               </div>
 
               <button onClick={() => setPayNotice(true)} className="w-full bg-primary text-on-primary font-title-md text-title-md font-bold px-6 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">

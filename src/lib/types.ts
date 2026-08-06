@@ -453,7 +453,7 @@ export interface EbookRow {
   author: string | null
   description: string | null
   coverUrl: string | null // 그 언어의 표지(본문 1페이지를 구운 것)
-  price: number // 원(KRW). 0 = 무료
+  price: number // 달러(USD). 0 = 무료
   targetLevel: number | null // 추천 대상 레벨(1~7). null = 레벨 무관
   langs: string[] // 이 책이 가진 언어(항상 'ko' 포함)
   owned: boolean

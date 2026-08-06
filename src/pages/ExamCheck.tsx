@@ -39,14 +39,9 @@ export default function ExamCheck() {
         <div className="glass-panel rounded-2xl p-8 md:p-10 ambient-shadow flex flex-col gap-12 max-w-4xl mx-auto border-white/40">
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-6">
-            <div className="relative w-32 aspect-square rounded-full bg-surface-container-lowest flex items-center justify-center overflow-hidden border border-surface-container-highest shadow-xl shadow-primary-container/5">
-              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary-container via-transparent to-transparent"></div>
-              <div className="z-10 w-full h-full flex items-center justify-center p-3 rounded-full overflow-hidden">
-                <img alt="CARIS Logo" className="w-full h-full object-cover rounded-full scale-105" src="/logo.png" />
-              </div>
-              <div className="absolute w-full h-full border border-primary-container/10 rounded-full" style={{ transform: 'scale(0.8)' }}></div>
-              <div className="absolute w-full h-full border border-primary-container/5 rounded-full" style={{ transform: 'scale(0.6)' }}></div>
-            </div>
+            {/* 로고만 — 감싸던 원판(테두리·그림자·방사 그라디언트)과 동심원 2개는 제거(2026-08-05).
+                object-contain: logo.png 는 자체 여백이 39% 라 cover 로 채우면 행성이 잘린다. */}
+            <img alt="CARIS Logo" className="w-44 aspect-square object-contain" src="/logo.png" />
             <div>
               <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t('check.title')}</h1>
               <p className="font-body-lg text-body-lg text-on-surface-variant break-keep leading-relaxed max-w-2xl mx-auto">{t('check.sub')}</p>

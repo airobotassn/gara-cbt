@@ -97,38 +97,149 @@ const OBJ_HIDE = 18 // 너무 축소돼 이보다 작으면 입체가 뭉개져 
 /** 트로피 이미지의 가로/세로 비 — 1·3등은 384×512, 2등은 366×512. 정사각으로 박으면 찌그러진다. */
 const OBJ_ASPECT = [0.75, 0.715, 0.75]
 
-/** 본토 판별 반경(라디안). 러시아처럼 동서로 긴 나라도 한 덩어리로 묶이도록 넉넉히 잡는다. */
-const MAINLAND_R = (35 * Math.PI) / 180
+// 본토 밖 덩어리를 담는 코너 액자(px). 지도 왼쪽 위에 한 줄로 늘어놓는다 —
+// 왼쪽 아래는 TOP 3 패널, 오른쪽 아래는 확대/축소, 오른쪽 위는 독도 인셋 자리라 거기만 비어 있다.
+const INSET_W = 104
+const INSET_H = 82
+const INSET_GAP = 7
+const INSET_M = 12
+const INSET_MAX = 4 // 프랑스 해외영토처럼 덩어리가 많으면 큰 것부터 이만큼만
 
 /**
- * 화면을 맞출 **본토** 골라내기 — `[남길 지역들, 본토 중앙 경도]`.
- *
- * 본토 = **면적 합이 가장 큰 무리**다. "가장 큰 조각 하나"로 잡으면 안 된다 — 프랑스는 기아나,
- * 미국은 알래스카가 단일 면적으로는 더 커서 그쪽이 본토로 뽑히고 정작 본토가 화면 밖으로 밀린다.
- * 각 지역 중심을 후보로 놓고 반경 안 면적을 합산해 최대인 곳을 본토로 삼는다.
+ * 본토를 잇는 거리(라디안). 두 지역의 중심이 이 안이면 **같은 덩어리**로 본다.
+ * 이웃끼리만 이어져도 사슬로 엮이므로, 러시아·칠레처럼 길게 뻗은 나라는 한 덩어리가 된다.
  */
-function mainlandOf(feats: GeoFeature[]): { keep: GeoFeature[]; lon0: number; lat0: number } {
+const LINK_R = (15 * Math.PI) / 180
+
+/**
+ * 화면을 맞출 **본토** 골라내기 — `{남길 지역들, 본토 중심 경위도}`.
+ *
+ * 본토 = **면적 합이 가장 큰 덩어리**. 덩어리는 "가까운 것끼리 사슬로 잇기"(단일연결 군집)로 만든다.
+ * "가장 큰 조각 하나"로 잡으면 안 된다 — 프랑스는 기아나, 미국은 알래스카가 단일 면적으로는 더 커서
+ * 그쪽이 본토로 뽑히고 정작 본토가 화면 밖으로 밀린다.
+ *
+ * ⚠️ 예전엔 "후보점에서 반경 35° 안의 면적 합이 최대인 곳"을 본토로 삼았다. 그러면 **멀리 있는 큰 땅까지
+ *    닿는 가장자리 지역이 유리해진다** — 미국이 실제로 그랬다. 워싱턴주가 뽑히고(거기서 알래스카까지
+ *    24°) 알래스카가 화면 맞춤에 끼어들어 본토가 눌리고 북서쪽으로 쏠렸다.
+ *    사슬로 묶으면 알래스카는 본토(48주)와 24° 떨어져 따로 놀고(→ 빠짐), 반대로 러시아는 이웃을 타고
+ *    칼리닌그라드·캅카스까지 한 덩어리가 된다(예전엔 10개 지역이 화면 맞춤에서 잘려나갔다).
+ */
+function mainlandOf(feats: GeoFeature[]): { keep: GeoFeature[]; lon0: number; lat0: number; rest: number[][] } {
   const cs = feats.map((f) => geoCentroid(f))
   const as = feats.map((f) => geoArea(f))
   // ⚠️ 단순화 과정에서 면이 선/점으로 뭉개진 조각은 중심이 NaN 이 된다. 그대로 두면 비교가 전부
   //    false 가 되어 엉뚱한 지역이 본토로 뽑히고, 회전각까지 NaN 이 되면 지도 전체가 사라진다.
   const ok = feats.map((_, i) => Number.isFinite(cs[i][0]) && Number.isFinite(cs[i][1]) && Number.isFinite(as[i]))
-  const first = ok.indexOf(true)
-  if (first < 0) return { keep: feats, lon0: 0, lat0: 0 }
-  let best = first
+  const live = feats.map((_, i) => i).filter((i) => ok[i])
+  if (!live.length) return { keep: feats, lon0: 0, lat0: 0, rest: [] }
+
+  // 유니온-파인드로 덩어리 묶기(지역 수가 수십~수백이라 O(n²) 비교로 충분).
+  const parent = feats.map((_, i) => i)
+  const find = (x: number): number => {
+    let r = x
+    while (parent[r] !== r) r = parent[r]
+    while (parent[x] !== r) [x, parent[x]] = [parent[x], r] // 경로 압축
+    return r
+  }
+  for (let a = 0; a < live.length; a++) {
+    for (let b = a + 1; b < live.length; b++) {
+      const i = live[a]
+      const j = live[b]
+      if (geoDistance(cs[i], cs[j]) >= LINK_R) continue
+      const ri = find(i)
+      const rj = find(j)
+      if (ri !== rj) parent[ri] = rj
+    }
+  }
+  const areaOf = new Map<number, number>()
+  for (const i of live) {
+    const r = find(i)
+    areaOf.set(r, (areaOf.get(r) ?? 0) + as[i])
+  }
+  let root = find(live[0])
   let bestSum = -1
-  for (let i = 0; i < feats.length; i++) {
-    if (!ok[i]) continue
-    let sum = 0
-    for (let j = 0; j < feats.length; j++) if (ok[j] && geoDistance(cs[i], cs[j]) < MAINLAND_R) sum += as[j]
-    if (sum > bestSum) {
-      bestSum = sum
-      best = i
+  for (const [r, s] of areaOf) {
+    if (s > bestSum) {
+      bestSum = s
+      root = r
     }
   }
   // 중심이 망가진 조각은 화면 맞춤에서 빼되(투영이 오염된다) 지도에는 그대로 그린다.
-  const keep = feats.filter((_, j) => ok[j] && geoDistance(cs[j], cs[best]) < MAINLAND_R)
-  return { keep: keep.length ? keep : feats, lon0: cs[best][0], lat0: cs[best][1] }
+  const keep = feats.filter((_, i) => ok[i] && find(i) === root)
+  // 본토 밖 덩어리들 — 큰 것부터. 코너 액자(인셋)로 따로 그린다(미국=알래스카·하와이).
+  const byRoot = new Map<number, number[]>()
+  for (const i of live) {
+    const r = find(i)
+    if (r === root) continue
+    const arr = byRoot.get(r)
+    if (arr) arr.push(i)
+    else byRoot.set(r, [i])
+  }
+  const rest = [...byRoot.values()].sort(
+    (a, b) => b.reduce((s, i) => s + as[i], 0) - a.reduce((s, i) => s + as[i], 0),
+  )
+  // 회전 중심 = 남긴 덩어리의 **면적 가중 중심**. 조각 하나의 중심을 쓰면 가장자리로 치우친다.
+  const c = geoCentroid({ type: 'FeatureCollection', features: keep } as never)
+  const lon0 = Number.isFinite(c[0]) ? c[0] : cs[live[0]][0]
+  const lat0 = Number.isFinite(c[1]) ? c[1] : cs[live[0]][1]
+  return { keep: keep.length ? keep : feats, lon0, lat0, rest }
+}
+
+/** 액자 화면맞춤에서 뺄 '티끌' 기준 — 그 덩어리에서 가장 큰 조각 면적의 이 비율 미만이면 무시. */
+const SPECK_RATIO = 0.012
+
+/**
+ * 액자를 맞출 대상 = 그 덩어리에서 **티끌을 뺀 조각들**.
+ *
+ * ⚠️ 전체 bbox 로 맞추면 안 된다 — 하와이 데이터에는 북서 하와이 제도(미드웨이 방향)의 무인 암초가
+ *    **넓이 0 인 점 6개**로 붙어 있어서, bbox 가 경도 23.5°(본섬 폭의 4배)로 벌어진다. 그러면 정작
+ *    본섬 8개가 액자 구석의 티끌이 되어 "하와이 액자인데 하와이가 안 보인다"가 된다.
+ *    (알래스카의 알류샨 열도도 같은 이유로 화면맞춤에서 빠진다 — 본토가 액자를 채운다)
+ * 뺀 조각도 **그리기는 그대로** 한다. 액자 밖으로 나가면 클립이 잘라줄 뿐이다.
+ */
+function insetFitTarget(features: GeoFeature[]) {
+  const parts: { f: GeoFeature; a: number }[] = []
+  for (const f of features) {
+    const g = f.geometry
+    if (g.type !== 'MultiPolygon' && g.type !== 'Polygon') continue
+    const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
+    for (const coordinates of polys) {
+      const part = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates } } as unknown as GeoFeature
+      parts.push({ f: part, a: geoArea(part) })
+    }
+  }
+  const max = parts.reduce((m, p) => Math.max(m, p.a), 0)
+  const keep = max > 0 ? parts.filter((p) => p.a >= max * SPECK_RATIO) : []
+  return { type: 'FeatureCollection', features: (keep.length ? keep : parts).map((p) => p.f) }
+}
+
+/**
+ * 액자 줄을 **왼쪽 위 / 오른쪽 위 중 본토를 덜 가리는 쪽**에 놓는다 → 줄 시작 x.
+ *
+ * 아래쪽 두 모서리는 이미 임자가 있다(왼쪽=TOP 3 패널, 오른쪽=확대/축소). 위쪽 둘 중에서 고르는데,
+ * 나라마다 땅이 몰린 방향이 달라 한쪽으로 못 박으면 누군가는 항상 가린다(미국은 왼쪽 위가 워싱턴주).
+ * 그래서 액자가 덮게 될 사각형과 겹치는 지역 수를 양쪽에서 세어 적은 쪽을 쓴다.
+ *
+ * ⚠️ 매 프레임이 아니라 **다시 그릴 때 한 번만** 계산한다(줌 tick 마다 전 지역 bounds 를 재면 버벅인다).
+ */
+function insetLaneX(proj: GeoProjection | null, regions: Region[], count: number, W: number): number {
+  if (!proj || count <= 0) return INSET_M
+  const laneW = count * INSET_W + (count - 1) * INSET_GAP
+  const path = geoPath(proj)
+  const hits = (x0: number) => {
+    const x1 = x0 + laneW
+    const y1 = INSET_M + INSET_H
+    let n = 0
+    for (const r of regions) {
+      const b = path.bounds(r.f)
+      if (!Number.isFinite(b[0][0])) continue
+      if (b[1][0] < x0 || b[0][0] > x1 || b[1][1] < INSET_M || b[0][1] > y1) continue
+      n++
+    }
+    return n
+  }
+  const right = W - INSET_M - laneW
+  return hits(INSET_M) <= hits(right) ? INSET_M : right
 }
 
 function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
@@ -158,6 +269,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     vk: 1, // 평면 레벨(1·2)에서 viewport 그룹에 걸린 확대 배율 — 글자 크기 판정에 쓴다
     labels: [] as RankLabel[],
     rankOf: new Map<string, number>(), // key → 등수. 1~3위 별색 칠하기용(labels 와 같이 갱신)
+    outliers: [] as Region[][], // 본토 밖 덩어리(큰 것부터) — 코너 액자로 그린다
+    insetX: INSET_M, // 액자 줄의 시작 x — 본토를 덜 가리는 쪽 위 모서리(draw 에서 정한다)
   })
 
   const g = useRef<{
@@ -171,6 +284,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     glow: Selection<SVGGElement, unknown, null, undefined>
     mark: Selection<SVGGElement, unknown, null, undefined>
     labels: Selection<SVGGElement, unknown, null, undefined>
+    insets: Selection<SVGGElement, unknown, null, undefined>
     zoom: ZoomBehavior<SVGSVGElement, unknown>
   } | null>(null)
 
@@ -204,6 +318,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   // ── 투영: 레벨0=지구본(정사영), 레벨1=등면적 방위(본토 중심) fit ──
   const makeProjection = useCallback((regions: Region[], level: ArenaLevel): GeoProjection => {
     const { W, H } = st.current
+    st.current.outliers = []
     if (level === 0) {
       const proj = geoOrthographic()
         .fitExtent(
@@ -232,7 +347,9 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     // ⚠️ 빈 목록에 fitExtent 를 걸면 배율이 NaN/Infinity 가 되어 지도 전체가 사라진다.
     //    드릴다운 직후 새 나라 데이터가 도착하기 전 한 프레임 동안 실제로 빈다.
     if (!feats.length) return proj
-    const { keep, lon0, lat0 } = mainlandOf(feats)
+    const { keep, lon0, lat0, rest } = mainlandOf(feats)
+    // 본토 밖 덩어리는 화면 맞춤에서 빠져 카드 밖으로 나간다 → 코너 액자(paintInsets)로 따로 보여준다.
+    st.current.outliers = rest.map((idx) => idx.map((i) => regions[i]))
     return proj.rotate([-lon0, -lat0]).fitExtent(
       [
         [16, 16],
@@ -304,6 +421,93 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         .attr('y', (xy[1] - gh * 0.62).toFixed(2))
     })
   }, [])
+
+  /** 지역 채우기 — 본 지도와 인셋이 같은 규칙을 쓰도록 한 곳에 둔다. */
+  const fillOf = useCallback((d: Region, level: ArenaLevel) => {
+    const rank = st.current.rankOf.get(d.key) ?? Infinity
+    if (rank <= 3) return `url(#medalGrad${rank})`
+    if (level === 0 && rank <= TOP10_CUT) return 'url(#tierGrad)'
+    return p.current.color(d.score)
+  }, [])
+
+  /**
+   * 본토 밖 덩어리 = **코너 액자**(미국의 알래스카·하와이). 독도 인셋(.dokinset)과 같은 방식이다.
+   *
+   * 왜 액자인가: 본토를 크게 유지하면서 원격지를 같은 화면에 넣는 방법이 이것뿐이다. 한 화면에
+   * 다 넣으면(=화면 맞춤에 포함) 본토가 절반 크기로 눌리고(미국 실측 59%), 그렇다고 빼 버리면
+   * 카드 밖으로 나가 있는 줄도 모른다.
+   *
+   * ⚠️ viewport **밖**에 그린다 — 안에 넣으면 팬·줌을 같이 받아 액자가 지도와 함께 떠다닌다.
+   *    액자 안 지역도 본 지도와 같은 색·같은 클릭/호버를 받는다(순위 정보가 살아 있어야 한다).
+   */
+  const paintInsets = useCallback(() => {
+    const groups = g.current
+    if (!groups) return
+    const { level } = p.current
+    // 한 줄에 들어갈 만큼만. 넘치면 자른다(잘린 지역도 오른쪽 랭킹 목록에는 그대로 있다).
+    const room = Math.floor((st.current.W - INSET_M * 2 + INSET_GAP) / (INSET_W + INSET_GAP))
+    const shown = level === 0 ? [] : st.current.outliers.slice(0, Math.max(0, Math.min(INSET_MAX, room)))
+
+    const x0 = st.current.insetX
+    const sel = groups.insets.selectAll<SVGGElement, Region[]>('g.rinset').data(shown, (d) => d[0].key)
+    sel.exit().remove()
+    const ent = sel.enter().append('g').attr('class', 'rinset')
+    ent.append('rect').attr('class', 'rin-frame').attr('width', INSET_W).attr('height', INSET_H).attr('rx', 10)
+    ent.append('g').attr('class', 'rin-body').attr('clip-path', 'url(#rinClip)')
+    ent
+      .append('rect')
+      .attr('class', 'rin-labbg')
+      .attr('x', 1)
+      .attr('y', INSET_H - 15)
+      .attr('width', INSET_W - 2)
+      .attr('height', 14)
+    ent
+      .append('text')
+      .attr('class', 'rin-lab')
+      .attr('x', INSET_W / 2)
+      .attr('y', INSET_H - 8)
+
+    ent
+      .merge(sel)
+      .attr('transform', (_d, i) => `translate(${x0 + i * (INSET_W + INSET_GAP)},${INSET_M})`)
+      .each(function (cluster) {
+        const node = select(this)
+        // 액자 하나에 하나의 투영 — 그 덩어리만 액자에 꽉 맞춘다(라벨 줄 자리는 비워 둔다).
+        // 맞춤 대상은 티끌을 뺀 조각들(insetFitTarget) — 그리는 건 아래에서 원본 그대로 그린다.
+        const fit = insetFitTarget(cluster.map((r) => r.f))
+        const c = geoCentroid(fit as never)
+        const pj = geoAzimuthalEqualArea()
+        if (Number.isFinite(c[0]) && Number.isFinite(c[1])) pj.rotate([-c[0], -c[1]])
+        pj.fitExtent(
+          [
+            [7, 7],
+            [INSET_W - 7, INSET_H - 19],
+          ],
+          fit as never,
+        )
+        const path = geoPath(pj)
+        const ps = node.select('g.rin-body').selectAll<SVGPathElement, Region>('path').data(cluster, (d) => d.key)
+        ps.exit().remove()
+        ps.enter()
+          .append('path')
+          .attr('class', 'geo')
+          .on('pointermove', function (event: PointerEvent, d: Region) {
+            p.current.onHover({ region: d, x: event.clientX, y: event.clientY })
+          })
+          .on('pointerleave', () => p.current.onHover(null))
+          .on('click', (_event: PointerEvent, d: Region) => fn.current.activate(d))
+          .merge(ps)
+          .classed('sel', (d) => d.key === p.current.selKey)
+          .attr('data-podium', (d) => {
+            const rank = st.current.rankOf.get(d.key) ?? 99
+            return rank <= 3 ? rank : null
+          })
+          .attr('fill', (d) => fillOf(d, p.current.level))
+          .attr('d', (d) => path(d.f))
+        // 덩어리가 여럿이면 대표(면적 최대)만 적고 나머지는 숫자로 — 액자가 좁아 다 못 적는다.
+        node.select('text.rin-lab').text(cluster.length > 1 ? `${cluster[0].name} 외 ${cluster.length - 1}` : cluster[0].name)
+      })
+  }, [fillOf])
 
   // ── 지오메트리 다시 칠하기(회전·줌 tick 마다 호출) ──
   const paint = useCallback(() => {
@@ -451,7 +655,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .attr('preserveAspectRatio', 'xMidYMid meet')
       .attr('href', (d) => `/rank-${d.rank}.png`) // 1=골드 2=블루 3=청록
     sizeLabels(path)
-  }, [graticule, sizeLabels])
+    paintInsets()
+  }, [graticule, sizeLabels, paintInsets])
 
   const startSpin = useCallback(() => {
     stopSpin()
@@ -612,6 +817,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     if (level === 0 && st.current.vk !== 1) resetView()
 
     st.current.proj = makeProjection(regions, level)
+    st.current.insetX = insetLaneX(st.current.proj, regions, st.current.outliers.length, st.current.W)
     setPanBound(level)
     // 전 지역에 등수를 매긴다(예전엔 상위 60개만). 땅이 좁아 안 들어가는 라벨은 sizeLabels 가 숨기고,
     // 확대하면 다시 나타난다.
@@ -653,12 +859,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       // 1~3위=시상대 그라디언트 · 4~10위=한 색으로 묶은 상위권 · 그 아래=백분위 램프.
       // ⚠️ 4~10위 묶음은 **지구본(레벨0)에서만**. 시도는 17개뿐이라 상위 10개를 한 색으로 칠하면
       //    지도의 절반 이상이 같은 색이 되어 오히려 순위가 안 읽힌다.
-      .attr('fill', (d) => {
-        const rank = st.current.rankOf.get(d.key) ?? Infinity
-        if (rank <= 3) return `url(#medalGrad${rank})`
-        if (level === 0 && rank <= TOP10_CUT) return 'url(#tierGrad)'
-        return p.current.color(d.score)
-      })
+      .attr('fill', (d) => fillOf(d, level))
 
     paint()
 
@@ -679,7 +880,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         .style('opacity', '1')
         .style('transform', 'scale(1)')
     }
-  }, [makeProjection, paint, reduceMotion, resetView, setPanBound, startSpin, stopSpin])
+  }, [fillOf, makeProjection, paint, reduceMotion, resetView, setPanBound, startSpin, stopSpin])
 
   useLayoutEffect(() => {
     fn.current = {
@@ -707,6 +908,20 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     const atmoGrad = defs.append('radialGradient').attr('id', 'atmoGrad').attr('cx', '0.5').attr('cy', '0.5').attr('r', '0.5')
     atmoGrad.append('stop').attr('class', 'a-in').attr('offset', '74%')
     atmoGrad.append('stop').attr('class', 'a-out').attr('offset', '100%')
+    // 코너 액자 — 바탕 그라디언트 + 액자 밖으로 지오메트리가 새지 않게 자를 클립.
+    // 클립은 하나면 된다: 각 액자 그룹이 자기 transform 을 갖고, 클립은 그 좌표계에서 잘린다.
+    const insetGrad = defs.append('linearGradient').attr('id', 'insetGrad').attr('x1', '0').attr('y1', '0').attr('x2', '0.6').attr('y2', '1')
+    insetGrad.append('stop').attr('offset', '0%').attr('stop-color', '#245ea6')
+    insetGrad.append('stop').attr('offset', '100%').attr('stop-color', '#10386c')
+    defs
+      .append('clipPath')
+      .attr('id', 'rinClip')
+      .append('rect')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', INSET_W)
+      .attr('height', INSET_H)
+      .attr('rx', 10)
     const specGrad = defs.append('radialGradient').attr('id', 'specGrad').attr('cx', '0.5').attr('cy', '0.5').attr('r', '0.5')
     specGrad.append('stop').attr('class', 's-in').attr('offset', '0%')
     specGrad.append('stop').attr('class', 's-out').attr('offset', '100%')
@@ -787,6 +1002,8 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       glow: viewport.append('g').attr('class', 'medalglow'),
       mark: viewport.append('g'),
       labels: viewport.append('g').attr('class', 'ranklabs'),
+      // 코너 액자 — viewport 밖(팬·줌에 안 따라감) + 맨 위(지도 위에 얹힌다)
+      insets: svg.append('g').attr('class', 'rinsets'),
       zoom: null as unknown as ZoomBehavior<SVGSVGElement, unknown>,
     }
 
@@ -893,11 +1110,16 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   }, [props.home, props.spinLocked, props.level, props.regions, paint, rotateTo, stopSpin])
 
   // 선택/강조 표시만 갱신(다시 그리지 않는다)
+  // ⚠️ 코너 액자(본토 밖 지역)도 같이 칠해야 한다 — 액자는 별도 그룹이라 여기서 빠뜨리면
+  //    목록에선 선택됐는데 액자 안 알래스카만 그대로인 상태가 된다.
   useEffect(() => {
-    g.current?.geo
-      .selectAll<SVGPathElement, Region>('path')
-      .classed('sel', (d) => d.key === props.selKey)
-      .classed('hot', (d) => d.key === props.hotKey)
+    const mark = (s: Selection<SVGGElement, unknown, null, undefined> | undefined) =>
+      s
+        ?.selectAll<SVGPathElement, Region>('path.geo')
+        .classed('sel', (d) => d.key === props.selKey)
+        .classed('hot', (d) => d.key === props.hotKey)
+    mark(g.current?.geo)
+    mark(g.current?.insets)
   }, [props.selKey, props.hotKey, props.regions])
 
   useImperativeHandle(

@@ -4,7 +4,7 @@
 //      `text/plain` + `nosniff` 로 내려보내(스토리지 도메인 XSS 방지) 소스코드가 그대로 보인다.
 //      그래서 여기서 텍스트로 받아 srcdoc 으로 넣는다(그래서 단일 HTML 파일 원칙 — 상대경로 리소스는 못 씀).
 //   상단 얇은 바(뒤로 + 제목)는 미니게임 플레이 화면과 같은 형태.
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -110,6 +110,46 @@ export default function EbookReader() {
     }
   }, [id, isFullUser, authLoading, user, readLang])
 
+  // ── 전체화면 ────────────────────────────────────────────────────────────────
+  // 레벨테스트(TestRunner)와 같은 브라우저 Fullscreen API. 다만 응시처럼 '전체화면으로 시작'
+  // 게이트를 한 장 더 두진 않는다 — 서재에서 책을 누른 게 이미 시작이라, 화면을 하나 더 끼우면
+  // 읽기 전에 확인창만 늘어난다. 대신 그 클릭의 사용자 제스처가 살아 있는 동안(마운트 직후)
+  // 요청한다. 제스처가 만료돼 브라우저가 거절하면 헤더의 '전체화면' 버튼이 남는다.
+  // 나가면 = 책을 덮은 것 → 곧장 서재로. ESC·F11·시스템 UI 어느 쪽으로 나가든 같다.
+  const [fsOn, setFsOn] = useState(false)
+  const enteredFsRef = useRef(false)
+  const fsSupported = !!document.fullscreenEnabled
+
+  const goLibrary = useCallback(() => {
+    enteredFsRef.current = false // 아래 리스너가 서재로 한 번 더 보내지 않게
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    navigate('/mypage/ebooks')
+  }, [navigate])
+
+  useEffect(() => {
+    if (authLoading || !isFullUser) return
+    const onChange = () => {
+      const on = !!document.fullscreenElement
+      setFsOn(on)
+      if (on) {
+        enteredFsRef.current = true
+        return
+      }
+      if (enteredFsRef.current) {
+        enteredFsRef.current = false
+        navigate('/mypage/ebooks')
+      }
+    }
+    document.addEventListener('fullscreenchange', onChange)
+    void document.documentElement.requestFullscreen?.().catch(() => {})
+    return () => {
+      // ⚠️ 리스너를 먼저 뗀 뒤에 나간다 — 안 그러면 다른 화면으로 떠나는 언마운트에서도
+      //    전체화면 해제가 감지돼 방금 고른 목적지 대신 서재로 튕긴다.
+      document.removeEventListener('fullscreenchange', onChange)
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    }
+  }, [authLoading, isFullUser, navigate])
+
   if (authLoading) {
     return <div className="wrap"><div className="card pad" style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('common.loading')}</div></div>
   }
@@ -137,7 +177,7 @@ export default function EbookReader() {
       <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', padding: 24, textAlign: 'center', gap: 12 }}>
         <p style={{ fontWeight: 800, color: 'var(--ink, #28324c)' }}>{err}</p>
         <button
-          onClick={() => navigate('/mypage/ebooks')}
+          onClick={goLibrary}
           style={{ padding: '10px 20px', borderRadius: 999, border: 0, cursor: 'pointer', background: '#004ac6', color: '#fff', fontWeight: 800 }}
         >
           {t('ebook.reader_back')}
@@ -161,8 +201,14 @@ export default function EbookReader() {
            오른쪽 끝(언어 옆)으로 밀린다. 기본 flex-shrink 만으로 좁을 때 알아서 줄어든다. */
         .ebr-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .ebr-author{flex:none;white-space:nowrap}
+        /* 전체화면 버튼과 언어 셀렉트는 둘 다 오른쪽 끝. 남는 폭은 먼저 나오는 auto 가 다 먹으므로
+           둘 다 margin-left:auto 를 줘도 붙어서 선다(하나만 보일 때도 오른쪽 정렬 유지). */
+        .ebr-fs{flex:none;margin-left:auto}
         .ebr-lang{flex:none;margin-left:auto}
         @media (max-width:600px){
+          /* 좁으면 아이콘만 — 제목에 폭을 몰아준다 */
+          .ebr-fs .lb{display:none}
+          .ebr-fs{min-height:40px}
           /* 좁은 화면에선 제목에 폭을 몰아준다 — 저자는 목록·스토어에서 이미 보이므로 여기선 생략. */
           .ebr-author{display:none}
           /* 터치 타깃(권장 44px)에 맞춰 뒤로·셀렉트를 키운다. 데스크톱은 종전 크기 유지. */
@@ -185,7 +231,7 @@ export default function EbookReader() {
       >
         <button
           className="ebr-back"
-          onClick={() => navigate('/mypage/ebooks')}
+          onClick={goLibrary}
           aria-label={t('ebook.reader_back')}
           style={{
             display: 'inline-flex',
@@ -207,6 +253,30 @@ export default function EbookReader() {
           {book?.title ?? ''}
         </strong>
         {book?.author && <span className="ebr-author" style={{ fontSize: 11.5, color: '#7c869e', fontWeight: 700 }}>{book.author}</span>}
+        {/* 자동 진입이 막혔을 때만 보이는 보조 버튼(전체화면이면 숨는다) — 이건 사용자 클릭이라 브라우저가 거절하지 않는다 */}
+        {fsSupported && !fsOn && (
+          <button
+            className="ebr-fs"
+            onClick={() => { void document.documentElement.requestFullscreen?.().catch(() => {}) }}
+            aria-label={t('ebook.reader_fs')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              borderRadius: 999,
+              border: '1px solid #d9e0f0',
+              background: '#fff',
+              color: '#28324c',
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }}>⛶</span>
+            <span className="lb">{t('ebook.reader_fs')}</span>
+          </button>
+        )}
         {/* 번역본이 있는 책만 언어 선택을 띄운다(한 언어뿐이면 고를 게 없다). */}
         {(book?.langs?.length ?? 0) > 1 && (
           <select

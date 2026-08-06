@@ -203,11 +203,13 @@ export default function Hub() {
   }
 
   // 오늘의 미션 3종(시안 좌상단 카드). to=null 인 출석은 이 화면에서 바로 처리(doDaily), 나머지는 해당 화면으로 보낸다.
-  //   ⚠️ 미니게임 진입점은 /arena 하단 런처다(허브에는 미니게임 진입점이 없다 — 중복 제거 결정).
+  //   ⚠️ 미니게임은 **목록 페이지(/games)로 바로** 보낸다. 예전엔 /arena 로 보냈는데, 그때는
+  //      아레나 하단 런처가 유일한 진입점이었기 때문이다. 지금은 /games 가 목록 페이지라
+  //      /arena 로 보내면 지도만 뜨고 미션은 한 단계 더 찾아 들어가야 끝난다.
   const missions: { kind: ActivityKind; icon: string; label: string; done: boolean; to: string | null }[] = [
     { kind: 'attendance', icon: 'calendar', label: '출석', done: checkedIn, to: null },
     { kind: 'daily_learn', icon: 'book', label: '오늘의 학습', done: learnDone, to: '/daily' },
-    { kind: 'minigame', icon: 'star', label: '미니게임', done: minigameDone, to: '/arena' },
+    { kind: 'minigame', icon: 'star', label: '미니게임', done: minigameDone, to: '/games' },
   ]
   const missionDone = missions.filter((m) => m.done).length
 
@@ -677,6 +679,7 @@ export default function Hub() {
             joinedAt,
             country: countryCode ? countryName(countryCode, lang) : null,
             region: regionName(regionCode),
+            referralCode,
           }}
         />
       )}

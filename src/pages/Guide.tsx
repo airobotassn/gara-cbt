@@ -211,11 +211,10 @@ export default function Guide() {
                 </svg>
               </div>
               <img className="guide-hero-robot" src="/hero-robot.png" alt="" aria-hidden="true" />
-              {/* 오브 = 얇은 동심원 링 2개 + 로고. 빛은 전부 로고 '뒤'에만 있고 로고 자체는 원색 그대로.
-                  (레퍼런스 시안과 동일한 구성 — 로고를 덮는 층을 두면 색이 날아가 스티커처럼 보인다.) */}
+              {/* 오브 = 로고 + 뒤에 깔린 후광. 빛은 전부 로고 '뒤'에만 있고 로고 자체는 원색 그대로.
+                  (로고를 덮는 층을 두면 색이 날아가 스티커처럼 보인다.)
+                  동심원 링 2개는 제거했다(2026-08-05) — CSS 의 .orb-ring 규칙도 같이 지웠다. */}
               <div className="guide-hero-orb" aria-hidden="true">
-                <span className="orb-ring orb-ring-1" />
-                <span className="orb-ring orb-ring-2" />
                 <img className="orb-main" src="/logo.png" alt="" />
               </div>
             </div>

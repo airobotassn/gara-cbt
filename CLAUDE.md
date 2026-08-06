@@ -159,7 +159,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/certificate` (자격증 발급) | `pages/Certificate.tsx` | `cert.css` | `get-exam-result` |
 | `/verify/:token` (자격증 진위확인) | `pages/VerifyCert.tsx` | `verify.css` | `verify-cert` |
 | `/mypage` · `/mypage/:section` | `pages/MyPage.tsx` | `dashboard.css` | `my-attempts` · `mypage-ai` · `ebooks` |
-| `/ebooks` (이북 스토어·구매) | `pages/Ebooks.tsx` | (Tailwind 유틸) | `ebooks` |
+| `/ebooks` (러닝 라이브러리 = 교재+강의) | `pages/Ebooks.tsx` | (Tailwind 유틸) | `ebooks` |
 | `/ebooks/read/:id` (이북 뷰어) | `pages/EbookReader.tsx` | (인라인) | `ebooks` |
 | **캐릭터 허브 / 미니게임** ||||
 | `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` · `redeem-referral` |
@@ -178,6 +178,15 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - 히어로 이미지 = `public/hero-robot.png`(배경 투명). **손 위 CARIS 행성은 이미지에 없다** — `logo.png` 를 CSS 로 겹친 별도 레이어(`.guide-hero-orb`, %좌표 + 글로우 + 부유 애니메이션). 로봇 이미지를 갈면 손바닥 비율에 맞춰 `.guide-hero-orb`/`.guide-hero-art::after` 의 `left`·`top` 을 다시 맞출 것.
   - ⚠️ 클래스명에 `.hl` 쓰지 말 것 — `result.css` 가 전역으로 `.hl { display:flex }` 를 잡고 있다(`.gh-hl` 로 우회).
 - `/mypage` 탭(URL `/mypage/:section`) 순서 = `learning`(학습 대시보드, **기본 = `/mypage`**) · `ebooks`(이북 서재) · `attempts`(시험 응시 현황) · `earned` · `issuance`. ⚠️ 응시 현황은 예전 기본 탭이라 `/mypage` 였는데 지금은 `/mypage/attempts`.
+- **`/ebooks` = 러닝 라이브러리(2026-08-06 개편)**: 옛 '이북 스토어'(카드 그리드)를 **가로 3열 — `레벨 | 교재(E-BOOK) | 강의`** 로 바꿨다. 왼쪽에서 레벨을 고르면 가운데·오른쪽이 그 레벨 것으로 갈리고, 각 열은 카페 게시판처럼 자기 안에서 세로 스크롤한다(페이지를 내려서 레벨이 바뀌는 구조가 **아니다**). 좁은 화면은 레벨을 상단 가로 칩으로 빼고 교재↔강의를 탭으로 접는다. 레벨 나누는 기준은 `ebooks.target_level` 하나 — 서버 변경 없이 `store` 응답의 `targetLevel` 로 프론트에서 묶는다(`null` 인 책은 맨 뒤 '레벨 무관').
+  - ⚠️ **강의는 아직 DB 가 없다 — `src/lib/lectures.ts` 하드코딩(데모)**. 유튜브 임베드라 영상 트래픽은 구글이 부담한다(우리는 `<iframe>` 태그 몇 KB만 내보냄). 관리자 등록으로 옮길 때의 주의는 그 파일 머리 주석 참고.
+  - ⚠️ **열 높이를 `h-[...]` 로 못박지 말 것 + `items-start` 필수.** 레벨당 교재가 1권이라 높이를 화면에 맞춰 고정하거나 stretch 로 두면 교재 열 아래가 수백 px 텅 빈 검은 상자가 된다(그렇게 만들었다가 반려). 각 열은 내용만큼만 서고 `max-h` 를 넘길 때만 스크롤한다.
+  - ⚠️ **표지·썸네일을 "항목이 많아질 테니" 작게 줄이지 말 것.** 개수는 열 스크롤(또는 나중에 페이지 나누기)이 푸는 문제다. 표지는 열 폭의 1/3, 강의 썸네일은 열 폭 꽉 채운 16:9 가 현재 기준.
+  - ⚠️ 하단에 안내문을 깔면 떠 있는 FAB(왼쪽 아래)·맨위로 버튼(오른쪽 아래)에 덮여 글자가 잘린다 — 안내문은 머리말이나 열 꼬리말에 둔다.
+  - ⚠️ **11~13px 잔글씨 금지.** 열 제목은 18px 굵게(대문자 캡션 아님), 보조 문구·개수·채널명도 14~15px 아래로 내리지 말 것(2026-08-06 "저런 작은 글씨 쓰지마"로 반려).
+  - ⚠️ **열 배경은 `surface-container-low`**(+ 진한 `outline-variant` 테두리). 다크가 기본인데 `surface-container-lowest`(#0d0f15)는 페이지 배경(#0a0c11)과 거의 같아 세 열의 경계가 안 보인다(2026-08-06 반려). 다른 페이지에서 카드에 `lowest` 를 쓰는 건 그 페이지 배경이 달라서다 — 여기 값을 그쪽에 맞추지 말 것.
+  - 화면 보면 아는 사용법 설명문("레벨을 고르면 …")은 넣지 않는다 — 넣었다가 삭제됨.
+  - 현재 데이터는 **레벨당 교재 1권 · 강의 1편**(`lectures.ts` 가 레벨당 1개). 늘려도 화면은 손댈 게 없다 — 열이 알아서 스크롤한다.
 - **이북(전자책)**: 관리자가 HTML 1개 파일을 업로드(비공개 버킷 `ebooks`, 표지는 공개 버킷 `ebook-covers`) → 회원이 `/ebooks` 에서 구매 → 마이페이지 '이북 서재' 탭에서 열람(`/ebooks/read/:id` 뷰어가 서명 URL iframe). 테이블 `ebooks`·`ebook_purchases`, 함수 `ebooks`(store·picks·library·buy·read) + `admin`(ebookList/Upsert/Delete/Buyers). ⚠️ **결제(PG) 미연동 — 구매 = 즉시 지급(데모)**. 결제 검증 자리는 `ebooks` 함수의 `buy` 액션.
   - **추천**: 레벨테스트 결과창(`Result.tsx` 의 `EbookPicks`)이 `picks` 액션으로 응시 레벨에 맞는 책을 받는다. 기준은 `ebooks.target_level`(1~7, null=무관) 하나 — 관리자 이북 탭에서 고른다. 정렬 = 목표 레벨(승급 시 +1)과 가까운 순 → 동률이면 위 레벨 → 스토어 노출순, 이미 산 책은 서버가 제외. 레벨당 1권 체계라 6축 태그는 일부러 안 넣었다(고를 대상이 없어 결과가 안 바뀜) — 한 레벨에 여러 권이 생기면 그때 축 태그 추가.
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.

@@ -73,6 +73,8 @@ const RankRow = memo(function RankRow({
 }) {
   return (
     <li
+      // 지도에서 고른 지역으로 목록을 스크롤할 때 이 줄을 찾는 표식
+      data-key={region.key}
       className={[region.drill ? 'drill' : '', selected ? 'sel' : '', hot ? 'hot' : ''].filter(Boolean).join(' ')}
       onClick={() => onActivate(region)}
       onMouseEnter={() => onEnter(region.key)}
@@ -235,12 +237,17 @@ export default function WorldArena() {
   }, [level, regions, sorted, homeRegion, home, drillCountry, t])
 
   // 상위 60개(검색 시 필터). 세계 단위에선 내 나라가 60위 밖으로 밀려도 맨 아래 고정 노출.
+  // ⚠️ 지도에서 고른 지역도 같은 방식으로 고정한다 — 61위 이하나 검색어에 안 걸리는 지역을
+  //    지도에서 누르면 목록에 줄 자체가 없어서 "선택했는데 랭킹은 그대로"로 보였다.
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
     const list = q ? sorted.filter((d) => d.name.toLowerCase().includes(q)).slice(0, 60) : sorted.slice(0, 60)
-    if (!q && level === 0 && homeRegion && !list.includes(homeRegion)) return [...list, homeRegion]
-    return list
-  }, [query, sorted, level, homeRegion])
+    const pinned: Region[] = []
+    if (!q && level === 0 && homeRegion && !list.includes(homeRegion)) pinned.push(homeRegion)
+    const selRegion = selKey ? sorted.find((d) => d.key === selKey) : undefined
+    if (selRegion && !list.includes(selRegion) && !pinned.includes(selRegion)) pinned.push(selRegion)
+    return pinned.length ? [...list, ...pinned] : list
+  }, [query, sorted, level, homeRegion, selKey])
 
   const scoreSpan = useMemo(() => {
     if (!sorted.length) return { max: 1, min: 0 }
@@ -298,6 +305,42 @@ export default function WorldArena() {
   useEffect(() => {
     if (rankListRef.current) rankListRef.current.scrollTop = 0
   }, [level, drillCountry])
+
+  // 지도에서 지역을 고르면 랭킹 목록도 그 줄로 따라간다(지도 → 목록 방향. 반대 방향은
+  // 목록 클릭이 곧 지도 클릭이라 activate 가 이미 잇고 있다).
+  // ⚠️ li.scrollIntoView 를 쓰면 안 된다 — 목록만이 아니라 조상 스크롤러(페이지)까지 같이 굴려서
+  //    지도가 화면 위로 밀려 나간다. 목록 자기 스크롤만 움직인다.
+  // ⚠️ 브라우저 기본 `behavior:'smooth'` 도 안 쓴다 — 거리와 무관하게 짧고 빨라서 툭 끊겨 보이고,
+  //    OS 애니메이션이 꺼져 있으면 통째로 무시돼 순간이동한다. 직접 이징으로 굴린다.
+  const scrollAnim = useRef(0)
+  useEffect(() => () => { if (scrollAnim.current) cancelAnimationFrame(scrollAnim.current) }, [])
+  useEffect(() => {
+    if (!selKey || rightPanel !== 'league') return
+    const ul = rankListRef.current
+    const li = ul?.querySelector<HTMLLIElement>(`li[data-key="${CSS.escape(selKey)}"]`)
+    if (!ul || !li) return
+    const ur = ul.getBoundingClientRect()
+    const lr = li.getBoundingClientRect()
+    // 이미 눈에 다 보이는 줄은 건드리지 않는다(누를 때마다 목록이 꿈틀거리는 게 더 거슬린다).
+    if (lr.top >= ur.top && lr.bottom <= ur.bottom) return
+    const from = ul.scrollTop
+    const to = Math.max(
+      0,
+      Math.min(ul.scrollHeight - ul.clientHeight, from + (lr.top - ur.top) - (ur.height - lr.height) / 2),
+    )
+    if (Math.abs(to - from) < 1) return
+    if (scrollAnim.current) cancelAnimationFrame(scrollAnim.current)
+    // 거리에 따라 시간을 늘린다(한 칸 옆인데 0.6초를 끄는 것도, 60줄을 0.3초에 날리는 것도 어색하다).
+    const dur = Math.min(900, 320 + Math.abs(to - from) * 0.45)
+    const t0 = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / dur)
+      const k = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 // easeInOutCubic
+      ul.scrollTop = from + (to - from) * k
+      scrollAnim.current = t < 1 ? requestAnimationFrame(step) : 0
+    }
+    scrollAnim.current = requestAnimationFrame(step)
+  }, [selKey, rightPanel, shown])
 
   const activate = useCallback((r: Region) => mapRef.current?.activate(r), [])
   const onRowEnter = useCallback((key: string) => setHotKey(key), [])
@@ -357,6 +400,13 @@ export default function WorldArena() {
   return (
     <div className="arena">
       <div className="aa-wrap">
+        {/* 홈으로 — 위치·모양은 앱 공용 TopBar(원형 화살표 칩 + 라벨, 제목 위 왼쪽)와 같게 두고
+            색만 아레나 토큰으로 짠다(공용 .topbar 는 전역 토큰이라 이 페이지 톤과 따로 논다). */}
+        <Link className="aa-home" to="/">
+          <span className="ic" aria-hidden="true">←</span>
+          {t('common.home')}
+        </Link>
+
         <header className="aa-head">
           <h1>{t('arena.title')}</h1>
         </header>

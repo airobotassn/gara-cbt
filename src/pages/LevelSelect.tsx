@@ -49,15 +49,12 @@ const DIPPER_EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 1], [4, 5]
 export default function LevelSelect() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isFullUser } = useAuth()
+  const { isFullUser, ensureAnonymous } = useAuth()
   const { t, lang } = useT()
   const [loading, setLoading] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ruleOpen, setRuleOpen] = useState(false) // 등급 규칙 접기(기본 접힘)
-  // 비로그인이 '응시 시작'을 눌렀을 때. 곧장 OAuth·로그인화면으로 튕기지 않고 이 모달을 먼저 띄운다
-  // (/exam 의 ExamGate 와 같은 패턴). 화면 진입 자체는 막지 않는다 — 레벨 정보는 누구나 봐야 한다.
-  const [loginNotice, setLoginNotice] = useState(false)
-  // 해금된 최고 레벨 = 현재 등급(rank). 첫 유저 = 1. 승급 시 한 단계씩 해제.
+  // 해금된 최고 레벨 = 현재 등급(rank). 게스트/첫 유저 = 1. 승급 시 한 단계씩 해제.
   const [unlocked, setUnlocked] = useState(1)
   // 사다리에서 직접 고른 레벨(null = 기본값인 '내 등급'을 따름)
   const [picked, setPicked] = useState<number | null>(null)
@@ -123,23 +120,15 @@ export default function LevelSelect() {
         (searchRec.alt ? t('reco.result_alt', { n: searchRec.alt }) : '')
       : null
 
-  // 로그인 안내 모달의 '로그인' — 수단이 구글만이 아니라서(카카오도 있음) provider 를 직접 부르지 않고
-  // 로그인 화면으로 보낸다. 복귀 경로는 sessionStorage(AuthCallback 이 읽음) — Supabase 가 ?next= 를 유실시킨다.
-  function goLogin() {
-    try { sessionStorage.setItem('postLoginRedirect', '/test/select') } catch { /* 무시 */ }
-    navigate('/login')
-  }
-
   async function start(level: number) {
-    // 익명(게스트) 응시 폐지(2026-08-05) — 예전엔 여기서 ensureAnonymous() 로 세션을 즉석에서 만들어
-    // 비로그인도 응시가 됐다. 실제 차단은 서버(start-test 익명 401)고, 여기선 안내만 한다.
-    if (!isFullUser) {
-      setLoginNotice(true)
-      return
-    }
     setError(null)
     setLoading(level)
     try {
+      // 게스트 응시 — 세션이 없으면 익명 세션을 즉석에서 만든다(2026-08-06 부활).
+      //   응시는 되지만 **결과는 총점만** 나오고 누적(등급·6축)에는 반영되지 않는다
+      //   — 잠금 판정은 서버(submit-test·get-result 의 lockedResult)가 하고, 화면은 손댈 것이 없다.
+      //   결과창에서 구글 로그인하면 claim_token 으로 그 응시가 그대로 계정에 이관된다.
+      await ensureAnonymous()
       const res = await callFunction<StartTestResponse>('start-test', { level, lang })
       navigate(`/test/${res.attemptId}`, { state: res })
     } catch (e) {
@@ -186,45 +175,6 @@ export default function LevelSelect() {
         <div className="lvn-sky" />
         <div className="lvn-vig" />
       </div>
-
-      {/* 로그인 안내 모달 — '응시 시작'을 비로그인이 눌렀을 때. /exam 의 ExamGate 와 같은 모양.
-          배경 클릭·닫기로 취소된다(강제 이동 아님) — 레벨 구경은 계속할 수 있어야 한다. */}
-      {loginNotice && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
-          onClick={() => setLoginNotice(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lv-login-title"
-        >
-          <div
-            className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
-            </div>
-            <h3 id="lv-login-title" className="font-title-md text-title-md font-bold text-on-surface mb-2">
-              {t('gate.login_modal_title')}
-            </h3>
-            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.login_modal_desc')}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center"
-                onClick={goLogin}
-              >
-                {t('fab.login_cta')}
-              </button>
-              <button
-                className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors"
-                onClick={() => setLoginNotice(false)}
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* flex-col + 사다리의 mt-auto → 모바일에서 카드는 위, 사다리는 아래로 갈라놓는다.
           (안 그러면 둘이 위에 붙고 화면 절반이 빈 채로 남는다) */}
@@ -467,14 +417,27 @@ export default function LevelSelect() {
                 const cut = (ringPx / 2 + 7) * unit
                 const raw = Math.hypot(dx, dy)
                 const len = Math.max(raw * 0.25, raw - cut * 2)
+                // 1↔4 를 잇는 한 구간만 옅게. 이 선은 국자를 닫는 변이라 1→2→3→4→5… 로 읽는
+                // 진행 순서에 없다(다른 선들과 같은 농도면 4 에서 1 로 되돌아가는 길처럼 보인다).
+                const faint = (a === 1 && b === 4) || (a === 4 && b === 1)
+                // 나머지 진행선은 한 단계 밝게 — 은하수 사진 위에서 각인 막대가 하늘에 묻힌다.
+                // 금색 구간은 이미 opacity 1 이라 더 올릴 데가 없어 brightness + 번짐으로 올린다.
+                const op = faint ? (on ? 0.55 : 0.3) : on ? 1 : 0.72
+                const filter = faint
+                  ? on
+                    ? 'drop-shadow(0 0 3px rgba(240,205,130,.18))'
+                    : undefined
+                  : on
+                    ? 'brightness(1.2) drop-shadow(0 0 4px rgba(240,205,130,.5))'
+                    : 'brightness(1.14)'
                 return (
                   <image
                     key={`e${a}-${b}`}
                     href={on ? '/cert/edge-sm.webp' : '/cert/edge-silver-sm.webp'}
                     x={-len / 2} y={-th / 2} width={len} height={th}
                     preserveAspectRatio="none"
-                    opacity={on ? 1 : 0.55}
-                    style={on ? { filter: 'drop-shadow(0 0 3px rgba(240,205,130,.35))' } : undefined}
+                    opacity={op}
+                    style={filter ? { filter } : undefined}
                     transform={`translate(${mx},${my}) rotate(${deg})`}
                   />
                 )

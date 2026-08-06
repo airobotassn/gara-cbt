@@ -14,10 +14,11 @@ interface AuthState {
   loading: boolean
   // 구글 계정 보유 = 정식 회원. 익명 유저는 false.
   isFullUser: boolean
-  // 세션이 없으면 익명 세션 생성. ⚠️ 남은 호출부는 SEB 응시(/exam/seb) **하나뿐**이다 —
-  // 레벨테스트 게스트 응시는 2026-08-05 폐지했다(App.tsx LoginGate + start-test 익명 401).
-  // SEB 는 새 브라우저 프로필이라 세션이 없는데 본인인증 수단이 아직 없어 임시로 이걸 쓴다.
-  // 본인인증이 붙으면 SebStart 의 호출을 교체하고 이 함수와 Supabase 익명 로그인 설정을 같이 끌 것.
+  // 세션이 없으면 익명 세션 생성. 호출부 셋:
+  //   · LevelSelect(/test/select) — 게스트 응시. 결과는 총점만, 누적 미반영(2026-08-06 부활).
+  //   · MiniGame(/games/:id)      — 게스트 플레이. 티켓을 안 받아 랭킹에 안 올라간다.
+  //   · SebStart(/exam/seb)       — SEB 는 새 브라우저 프로필이라 세션이 없는데 본인인증 수단이 아직 없다.
+  //                                 본인인증이 붙으면 이 호출만 교체할 것.
   ensureAnonymous: () => Promise<void>
   // 결과창 등에서 구글로 로그인/승격.
   loginWithGoogle: (redirectTo?: string) => Promise<void>
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOnboardingLoading(true)
       const { data, error } = await supabase
         .from('profiles')
-        .select('region_locked_at,country_code,region_code,nickname_set_at')
+        .select('region_locked_at,country_code,region_code,nickname_set_at,age_band')
         .eq('id', u.id)
         .maybeSingle()
       // 조회 실패 → FAIL-OPEN: 유저를 가두지 않는다.
@@ -80,7 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       // 프로필 행이 없으면(최초) 지역 미확정 → 온보딩 필요.
-      setNeedsOnboarding(data == null ? true : data.region_locked_at == null)
+      // 연령대도 같은 화면에서 받으므로 둘 중 하나라도 비면 보낸다 — 지역만 확정한 기존 회원이
+      // 아레나에 들어오면 그 화면이 연령대만 물어본다. '공개 안 함'(=age_band 'private')도
+      // 답한 것이라 다시 묻지 않는다(null 일 때만 묻는다).
+      setNeedsOnboarding(data == null ? true : data.region_locked_at == null || data.age_band == null)
       // 닉네임은 '확정 시각'으로만 판정한다 — display_name 에는 가입 트리거가 넣은 구글 실명이 들어 있다.
       setNeedsNickname(data == null ? true : data.nickname_set_at == null)
       setOnboardingLoading(false)
@@ -109,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = session?.user ?? null
 
   // 세션이 전혀 없을 때만 익명 세션 생성. 이미 세션 있으면 no-op.
-  // ⚠️ 호출부는 SebStart(/exam/seb) 하나뿐 — 레벨테스트 게스트 응시는 폐지됐다(위 인터페이스 주석 참고).
   async function ensureAnonymous() {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { data } = await supabase.auth.getSession()

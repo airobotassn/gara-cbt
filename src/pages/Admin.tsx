@@ -2383,7 +2383,7 @@ export function EbooksAdmin() {
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {b.targetLevel ? `Lv.${b.targetLevel}` : <span style={{ color: 'var(--muted)' }}>미지정</span>}
                 </td>
-                <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? `${b.price.toLocaleString('ko-KR')}원` : '무료'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? `$${b.price.toLocaleString('en-US')}` : '무료'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => showBuyers(b)}>{b.buyers}명</button>
                 </td>
@@ -2455,7 +2455,7 @@ export function EbooksAdmin() {
               </label>
               {/* 정렬 순서 입력칸은 제거 — 목록의 ↑↓(순서 열)로 관리(FAQ 방식). */}
               <label style={{ ...fieldStyle, maxWidth: 220 }}>
-                가격(원) — 0 이면 무료
+                가격($) — 0 이면 무료
                 <input style={inpStyle} type="number" min={0} value={draft.price} onChange={(e) => patch({ price: Number(e.target.value) || 0 })} />
               </label>
               {/* 추천 대상 레벨 — 레벨테스트 결과창이 응시자 레벨에 맞는 책을 위로 올릴 때 쓴다. */}
@@ -2600,7 +2600,7 @@ export function EbooksAdmin() {
                       <td>{b.name ?? '-'}</td>
                       <td>{b.email ?? '-'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        {b.pricePaid > 0 ? `${b.pricePaid.toLocaleString('ko-KR')}원` : '무료'} · {b.source}
+                        {b.pricePaid > 0 ? `$${b.pricePaid.toLocaleString('en-US')}` : '무료'} · {b.source}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(b.createdAt)}</td>
                     </tr>
@@ -3010,7 +3010,7 @@ function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => voi
 }
 
 // ── 금액 표기 헬퍼 (결제 백엔드 미구현 — 결제 화면은 값 없이 빈 상태로 표시) ──
-const won = (n: number) => `₩${n.toLocaleString()}`
+const usd = (n: number) => `$${n.toLocaleString('en-US')}`
 
 function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?: SubsFilter) => void }) {
   const o = a.overview
@@ -3035,7 +3035,7 @@ function DashboardBody({ a, onNav }: { a: CbtAnalytics; onNav: (t: CarisSub, f?:
     { ico: 'assignment_turned_in', k: '응시 제출', v: o.attemptsAll.toLocaleString(), sub: `최근 7일 ${o.attempts7d}건`, accent: 'violet' },
     { ico: 'verified', k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건 · 평균 ${avgScore}점`, accent: 'green' },
     { ico: 'workspace_premium', k: '인증서 발급', v: certIssued.toLocaleString(), sub: `미발급 ${certPending}건`, accent: 'amber' },
-    { ico: 'payments', k: '매출(30일)', v: won(0), sub: '결제 연동 전', accent: 'green' },
+    { ico: 'payments', k: '매출(30일)', v: usd(0), sub: '결제 연동 전', accent: 'green' },
   ]
 
   return (
@@ -3238,10 +3238,10 @@ function PaymentSection() {
         <span className="admin-badge-demo">연동 전</span>
       </div>
       <div className="pay-kpis">
-        <div><span className="pk-k">매출</span><span className="pk-v">{won(0)}</span></div>
+        <div><span className="pk-k">매출</span><span className="pk-v">{usd(0)}</span></div>
         <div><span className="pk-k">결제 건수</span><span className="pk-v">0건</span></div>
         <div><span className="pk-k">환불</span><span className="pk-v">0건</span></div>
-        <div><span className="pk-k">객단가</span><span className="pk-v">{won(0)}</span></div>
+        <div><span className="pk-k">객단가</span><span className="pk-v">{usd(0)}</span></div>
       </div>
       <div className="admin-empty" style={{ marginTop: 4 }}>
         결제·접수 연동 전입니다. 결제 데이터가 쌓이면 매출·결제 수단·최근 결제 내역이 여기에 표시됩니다.
@@ -3488,7 +3488,8 @@ function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => v
         {/* 보유 자격증 — 응시 이력 줄마다 배지를 훑지 않아도 되게 맨 위에 모아둔다.
             (30번 떨어지고 1번 붙은 사람을 표에서 찾아내는 건 한눈이 아니다)
             자격증 테이블이 없어 "합격 + 결과공개일 경과" 인 응시에서 계산한다.
-            ⚠️ 자격번호는 뺐다 — certNo.ts 의 tempSeq 가 아직 해시라 순차 번호가 아니다. */}
+            ⚠️ 자격번호는 아직 안 띄운다 — 발급한 건만 진짜 번호(exam_attempts.cert_no)가 있고
+               미발급 건은 번호 자체가 없어서(발급 시 DB 채번), 한 열에 섞으면 빈칸이 더 많아진다. */}
         {!loading ? <EarnedCerts attempts={detail?.attempts ?? []} /> : null}
         {loading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>

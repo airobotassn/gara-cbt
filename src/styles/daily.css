@@ -108,6 +108,121 @@
 .dy-page .dy-q-result.no, .dy-page .dy-q-result.seen { color: var(--ink2); }
 .dy-page .dy-q-result b { color: var(--ink); }
 
+/* ── 풀고 나서 읽는 해설 ──
+   문제 카드를 덮지 않고 그 아래로 스르르 펼쳐진다.
+   높이를 모르는 내용이라 max-height 로 흉내내지 않고 grid-template-rows 0fr→1fr 을 쓴다
+   (max-height 는 넉넉한 값을 찍어 둬야 해서, 짧은 해설이면 다 열린 뒤에도 시간이 남아 굼떠 보인다).
+   ⚠️ 접힌 상태를 만드는 건 .dy-th-clip 의 overflow:hidden 이다. 여기에 여백·테두리를 주면
+      0fr 에서도 그만큼 삐져나오므로, 보이는 장식은 전부 안쪽 .dy-th-card 가 갖는다. */
+.dy-page .dy-theory { display: grid; grid-template-rows: 0fr; opacity: 0;
+  transition: grid-template-rows .5s cubic-bezier(.4, 0, .2, 1), opacity .35s ease; }
+.dy-page .dy-theory.open { grid-template-rows: 1fr; opacity: 1; }
+.dy-page .dy-th-clip { min-height: 0; overflow: hidden; }
+.dy-page .dy-th-card { margin-top: 14px; padding: 18px 20px 20px;
+  background: var(--slot-bg); border: 4px solid var(--line); border-radius: 20px;
+  box-shadow: 0 5px 0 rgba(var(--shc2), .16); }
+.dy-page .dy-th-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.dy-page .dy-th-badge { font-size: 12.5px; font-weight: 900; color: var(--ink); background: var(--gold);
+  border: 3px solid var(--line); border-radius: 999px; padding: 3px 12px; }
+.dy-page .dy-th-head b { font-size: 17px; font-weight: 900; letter-spacing: -.01em; }
+/* ── 해설 그림(components/DailyVisual.tsx) ──
+   ⚠️ SVG presentation attribute 에는 var() 가 안 먹는다(속성값은 CSS 값 파싱을 안 탄다).
+      그래서 **선은 stroke="currentColor"** 로 두고 .vz 가 color 를 잡고, **면은 아래 .vz-* 클래스**로 칠한다.
+      이렇게 해야 다크모드에서 토큰만 갈아끼워도 그림이 같이 따라온다. */
+/* ⚠️ 판 색은 --slot-bg 다. --card 로 두면 안에서 --card 로 칠한 것들(관절·손가락 끝·팔 안쪽)이
+   배경과 같은 색이 되어 통째로 사라진다(실제로 팔이 안 보였음). 그림 요소가 쓰는 색과 겹치지 말 것. */
+.dy-page .dy-viz { margin: 0 0 14px; padding: 10px 10px 6px;
+  background: var(--slot-bg); border: 3px solid var(--line); border-radius: 16px; }
+.dy-page .vz { display: block; width: 100%; height: auto; color: var(--line); }
+.dy-page .vz-grab { cursor: grab; }
+.dy-page .vz-grab:active { cursor: grabbing; }
+/* 조작줄 — 칩·슬라이더가 그림 바로 아래 붙는다. */
+.dy-page .dy-viz-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 8px; padding-bottom: 4px; }
+.dy-page .dy-viz-chip { padding: 7px 13px; font-size: 12.5px; font-weight: 900; color: var(--ink);
+  background: var(--slot-bg); border: 3px solid var(--line); border-radius: 999px; cursor: pointer; line-height: 1; }
+.dy-page .dy-viz-chip.on { background: var(--brand); color: #fff; }
+.dy-page .dy-viz-chip.mv.on { background: var(--teal); color: #fff; }
+.dy-page .dy-viz-chip.tn.on { background: var(--gold); }
+.dy-page .dy-viz-chip.act { background: var(--gold); }
+.dy-page .dy-viz-chip:active { transform: translateY(2px); }
+.dy-page .dy-viz-hint { font-size: 12px; font-weight: 800; color: var(--ink2); }
+.dy-page .dy-viz-range { flex: 1 1 130px; min-width: 110px; accent-color: var(--brand); }
+.dy-page .dy-viz-state { flex: 0 0 auto; min-width: 78px; text-align: center; padding: 6px 10px; font-size: 12px; font-weight: 900;
+  border: 3px solid var(--line); border-radius: 999px; color: #fff; background: var(--teal); }
+.dy-page .dy-viz-state.drop { background: var(--ink2); }
+.dy-page .dy-viz-state.crack { background: var(--wrong); }
+
+/* 면 색 — 이름은 daily.css 토큰과 1:1 */
+.dy-page .vz-card { fill: var(--card); }
+.dy-page .vz-mute { fill: var(--slot-bg); }
+/* 팔 안쪽 — 판(--slot-bg)·외곽선(--line) 어느 쪽과도 안 겹치는 중간 밝기여야 형태가 보인다. */
+.dy-page .vz-limb { stroke: var(--slot-line); }
+.dy-page .vz-brand { fill: var(--brand); }
+.dy-page .vz-brand-hi { fill: color-mix(in srgb, var(--brand) 78%, #fff); }
+.dy-page .vz-brand-lo { fill: color-mix(in srgb, var(--brand) 72%, #000); }
+.dy-page .vz-teal { fill: var(--teal); }
+.dy-page .vz-gold-f { fill: var(--gold); }
+.dy-page .vz-spark { stroke: var(--gold); }
+.dy-page .vz-dash { stroke: var(--slot-line); stroke-dasharray: 6 6; fill: none; }
+.dy-page .vz-arrow { stroke: var(--teal); }
+.dy-page .vz-turn { stroke: var(--gold); }
+.dy-page .vz-fb { stroke: var(--teal); }
+.dy-page .vz-goal { stroke: var(--wrong); }
+.dy-page .vz-crack { stroke: var(--wrong); }
+/* 계란은 흰자 색이어야 계란으로 읽힌다 — 다크의 --yellow(#4a4326)를 그대로 쓰면 진흙덩이가 된다. */
+.dy-page .vz-egg-b { fill: color-mix(in srgb, var(--gold) 45%, #fff); }
+.dy-page .vz-web { stroke: var(--slot-line); opacity: .5; }
+.dy-page .vz-col { fill: transparent; }
+.dy-page .vz-colsel { fill: color-mix(in srgb, var(--brand) 16%, transparent); }
+.dy-page .vz-node { fill: var(--slot-bg); }
+.dy-page .vz-node-on { fill: var(--brand); }
+.dy-page .vz-scope1 { fill: color-mix(in srgb, var(--brand) 10%, transparent); }
+.dy-page .vz-scope2 { fill: color-mix(in srgb, var(--brand) 22%, transparent); }
+.dy-page .vz-scope3 { fill: var(--brand); }
+.dy-page .vz-target { fill: color-mix(in srgb, var(--wrong) 30%, transparent); stroke: var(--wrong); }
+.dy-page .vz-target-c { fill: var(--wrong); }
+/* 글자 — SVG 안이라 font-weight 를 따로 준다(page 전역 800 이 안 내려온다) */
+.dy-page .vz text { font-size: 11px; font-weight: 800; }
+.dy-page .vz-lab { fill: var(--ink2); }
+.dy-page .vz-lab-hot { fill: var(--brand); font-weight: 900; }
+.dy-page .vz-lab-ok { fill: var(--teal); }
+.dy-page .vz-lab-bad { fill: var(--wrong); }
+.dy-page .vz-lab-inv { fill: #fff; font-weight: 900; }
+
+/* 움직임 — 값이 바뀌면 튀지 않고 미끄러진다(무엇이 어디로 갔는지 눈이 따라갈 수 있게) */
+.dy-page .vz-tcp { stroke: var(--brand); fill: none; transition: transform .3s cubic-bezier(.4, 0, .2, 1); }
+.dy-page .vz-box { transform-origin: 160px 70px; transition: transform .45s cubic-bezier(.34, 1.4, .5, 1); }
+.dy-page .vz-fing { transition: transform .18s ease-out; }
+/* 놓치면 떨어지면서 사라진다 — 안 사라지면 아래 캡션 위에 걸터앉아 그림이 지저분해진다. */
+.dy-page .vz-egg { transition: transform .45s ease-in, opacity .3s ease-in .22s; }
+.dy-page .vz-egg.drop { transform: translateY(54px) rotate(16deg); opacity: 0; }
+.dy-page .vz-needle { transition: transform .38s cubic-bezier(.34, 1.3, .5, 1); }
+.dy-page .vz-orbit { animation: dy-orbit 5s linear infinite; }
+@keyframes dy-orbit { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) {
+  .dy-page .vz-orbit { animation: none; }
+  .dy-page .vz-tcp, .dy-page .vz-box, .dy-page .vz-egg, .dy-page .vz-needle { transition: none; }
+}
+/* 결론 한 줄 — 카드에서 제일 큰 글씨. 여기까지만 읽고 나가도 하나는 건지게 한다.
+   ⚠️ 줄글 문단으로 되돌리지 말 것(2026-08-05 반려). 이 화면은 30초짜리다. */
+.dy-page .dy-th-point { margin: 0; font-size: 16.5px; font-weight: 900; line-height: 1.6; letter-spacing: -.01em; }
+/* 근거 — 한 줄에 한 사실. 앞의 점이 '여기가 새 항목'을 알려 줘서 눈이 뛰어다닐 수 있다. */
+.dy-page .dy-th-why { list-style: none; margin: 13px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dy-page .dy-th-why li { position: relative; padding-left: 17px;
+  font-size: 13.5px; font-weight: 700; line-height: 1.65; color: var(--ink2); }
+.dy-page .dy-th-why li::before { content: ""; position: absolute; left: 0; top: .55em;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--brand);
+  border: 2px solid var(--line); box-sizing: content-box; }
+/* 헷갈리는 짝 대조 — 본문과 같은 톤이면 그냥 세 번째 문단으로 읽힌다. 색 띠로 분리한다. */
+.dy-page .dy-th-cmp { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 14px 0 0;
+  padding: 11px 14px; font-size: 13.5px; font-weight: 700; line-height: 1.7; color: var(--ink);
+  background: var(--yellow); border: 3px solid var(--line); border-radius: 13px; }
+.dy-page .dy-th-cmp > span { flex: 0 0 auto; font-size: 12px; font-weight: 900; color: var(--ink2); }
+@media (prefers-reduced-motion: reduce) {
+  .dy-page .dy-theory { transition: none; }
+}
+
 /* ── 보상 예고 ── */
 .dy-page .dy-reward { background: var(--card); border: 4px solid var(--line); border-radius: 18px;
   padding: 14px 14px 16px; box-shadow: 0 5px 0 rgba(var(--shc2), .16); }
@@ -177,6 +292,10 @@
   .dy-page .dy-slot-desc { font-size: 13px; }
   .dy-page .dy-quiz { min-height: 0; }
   .dy-page .dy-q-desc { font-size: 16.5px; }
+  .dy-page .dy-th-card { padding: 15px 15px 17px; }
+  .dy-page .dy-th-point { font-size: 15.5px; }
+  .dy-page .dy-th-why li { font-size: 13px; }
+  .dy-page .dy-th-cmp { font-size: 12.5px; padding: 10px 12px; }
   .dy-page .dy-q-opt { font-size: 15px; padding: 12px 14px; }
   .dy-page .dy-cta { font-size: 17px; padding: 14px 16px; }
 }

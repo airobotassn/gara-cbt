@@ -48,12 +48,29 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const body = (await req.json().catch(() => ({}))) as {
-      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school'
+      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school' | 'user'
       window?: 'daily' | 'season'
       country?: string
+      uid?: string
     }
     const scope = body.scope ?? 'global'
     const admin = adminClient()
+
+    // 한 사람의 전세계 순위 — /arena 채팅에서 아바타를 누르면 그 사람 카드를 그리는 데 쓴다.
+    //   · scoped_top 은 p_uid 를 **인자로** 받으므로 호출자 본인이 아니어도 된다. p_limit=0 이면 top 은 빈 배열,
+    //     me 칸만 채워져 내려온다 → 목록을 통째로 받지 않고 한 사람만 집어 온다.
+    //   · 노출값은 /ranking TOP10 이 이미 공개하는 것과 동일(이름·아바타·순위·백분위·시즌점수)이고
+    //     user_id 는 응답에 담지 않는다(mapUser 가 애초에 안 넣는다).
+    //   ⚠️ 익명·탈퇴 계정은 scoped_top 의 base 가 이미 걸러서(is_anonymous=false, deactivated_at is null)
+    //      me=null 로 나온다 → { user: null }. 익명 채팅글의 신원이 카드로 새지 않는다.
+    if (scope === 'user') {
+      const uid = String(body.uid ?? '')
+      if (!/^[0-9a-f-]{36}$/i.test(uid)) return json({ error: 'bad_uid' }, 400)
+      const { data, error } = await admin.rpc('scoped_top', { p_uid: uid, p_limit: 0, p_country: null, p_region: null })
+      if (error) return json({ error: error.message }, 500)
+      const d = (data ?? {}) as { total?: number; me?: RpcUser | null }
+      return json({ user: d.me ? mapUser(d.me) : null, total: d.total ?? 0 })
+    }
 
     // 개인 리더보드 — 전세계 / 내 국가 / 내 지역. 세 탭 모두 같은 RPC(scoped_top), 모수만 다르다.
     if (scope === 'global' || scope === 'my-country' || scope === 'my-region') {

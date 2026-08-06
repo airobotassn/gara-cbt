@@ -8,7 +8,7 @@
 //    (여기서 폴백 안 하면 캔버스가 오염돼 toBlob 자체가 터진다).
 
 
-import { showPercentile } from './scoring'
+import { qrMatrix } from './qr'
 
 export const CARD_W = 1600
 export const CARD_H = 900
@@ -17,7 +17,8 @@ const FONT = `system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', 
 // 이름은 레퍼런스처럼 세리프. 인증서(cert.css)에 이미 @font-face 로 등록된 얼굴을 재사용한다
 // — CertGaramond 는 한글 글리프가 없어 한글 이름은 CertMyeongjo 로 자동 폴백된다.
 const SERIF = `'CertGaramond', 'CertMyeongjo', Georgia, serif`
-const SHARE_URL = 'gara-cbt.airobotassn.workers.dev/arena'
+// QR 목적지 = 메인(랜딩). 카드를 본 사람이 스캔하면 바로 서비스로 온다 — 이 카드의 유일한 유입 경로다.
+const SITE_URL = 'https://gara-cbt.airobotassn.workers.dev/'
 
 // 사이트 브랜드 팔레트(styles/base.css 의 --blue/--blue-deep/--ink-bg). 프레임·좌패널·하단바는 항상 이 색이다.
 // ⚠️ 티어색으로 카드 전체를 물들이면 브론즈가 갈색 카드가 된다 → 티어색은 액센트(엠블렘 글로우·값·핍·알약)에만.
@@ -28,13 +29,16 @@ const PAGE_BG = '#faf8ff'
 // 타입 스케일 — 카드에 쓰는 글자 크기는 이 6단이 전부다.
 // ⚠️ 여기 없는 숫자를 직접 쓰지 말 것. 한 번 예외를 두면 크기가 다시 흩어진다(실제로 14종까지 늘어났었다).
 //    fitSize() 로 줄어드는 건 예외 — 긴 닉네임/문장이 칸을 넘지 않게 하는 하향 조정이라 스케일을 깨지 않는다.
+// ⚠️ 이 카드는 1600px 로 그리지만 **소비되는 크기는 훨씬 작다** — 모달 미리보기 823px(1.9배 축소),
+//    카톡에서 폰으로 보면 360px 안팎(4.4배 축소)이다. 그래서 아래 단은 "1600 기준"이 아니라
+//    "360 으로 줄었을 때도 읽히는가" 로 정해야 한다. 옛 값(sub 16)은 폰에서 3.6px 라 통째로 뭉개졌다.
 const T = {
   display: 76, // 이름(세리프) — 카드에 하나뿐
-  hero: 40,    // 강조 숫자 — #순위 · 시즌 기록 행(라벨·값 같은 크기)
-  value: 30,   // 데이터 값(하단 바 · 좌 플레이트 이름)
-  title: 24,   // 섹션 제목(시즌 기록 · 순위) · 인증서 알약(제거됨)
-  label: 20,   // 태그라인 · 알약 · 기록 행 보조설명
-  sub: 16,     // 보조(워드마크 · 분모 · 하단 라벨)
+  hero: 48,    // 강조 숫자 — 순위 · 시즌 기록 행(라벨·값 같은 크기)
+  value: 38,   // 데이터 값(하단 바 · 좌 플레이트 이름)
+  title: 32,   // 섹션 제목(시즌 기록 · QR 박스)
+  label: 26,   // 태그라인 · 기록 행 보조설명
+  sub: 22,     // 보조(워드마크 · 하단 라벨)
 } as const
 
 export interface ShareCardData {
@@ -54,6 +58,7 @@ export interface ShareCardData {
   joinedAt: string | null // profiles.created_at
   country: string | null // 국가 표시명
   region: string | null // 지역 표시명(시·도)
+  referralCode: string | null // 내 초대 코드(profiles.referral_code) — 하단 바 마지막 칸
   /** 남의 카드(랭킹 TOP10 클릭)면 true — 랭킹 화면에 없던 정보(국가·지역 순위, 가입일, 지역)는 아예 안 그린다.
    *  '—' 로 비워 두면 빈 줄만 남아 카드가 헐거워지고, 채우려면 그 사람의 프로필을 새로 노출해야 한다. */
   publicOnly?: boolean
@@ -172,7 +177,7 @@ function footIcon(ctx: CanvasRenderingContext2D, i: number, cx: number, cy: numb
     ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, Math.PI * 2); ctx.stroke()
     ctx.beginPath(); ctx.moveTo(-9.5, 0); ctx.lineTo(9.5, 0); ctx.stroke()
     ctx.beginPath(); ctx.ellipse(0, 0, 4.6, 9.5, 0, 0, Math.PI * 2); ctx.stroke()
-  } else { // 지도 핀(지역)
+  } else if (i === 3) { // 지도 핀(지역)
     ctx.beginPath()
     ctx.moveTo(0, 12)
     ctx.bezierCurveTo(-7.5, 2, -9, -1, -9, -4.5)
@@ -180,6 +185,11 @@ function footIcon(ctx: CanvasRenderingContext2D, i: number, cx: number, cy: numb
     ctx.bezierCurveTo(9, -1, 7.5, 2, 0, 12)
     ctx.closePath(); ctx.stroke()
     ctx.beginPath(); ctx.arc(0, -4.5, 3.4, 0, Math.PI * 2); ctx.fill()
+  } else { // 두 사람(친구 코드)
+    ctx.beginPath(); ctx.arc(-4, -5, 4.6, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath(); ctx.arc(6.5, -6.5, 3.6, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(-11.5, 9); ctx.bezierCurveTo(-11.5, 1.5, 3.5, 1.5, 3.5, 9); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(6.5, 1.5); ctx.bezierCurveTo(12, 1.5, 12.5, 5, 12.5, 9); ctx.stroke()
   }
   ctx.restore()
 }
@@ -327,26 +337,45 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
     text(ctx, r.value, valX, y + 6, { size: vSize, weight: 900, color: INK, align: 'right' })
   })
 
-  // 티어 박스: 엠블렘 → 티어명 → 상위%
+  // QR 박스 — 옛 티어 엠블렘 자리. 정사각에 가까운 칸이라 QR 이 그대로 들어맞는다.
+  //   이 카드가 카톡·인스타로 나가면 이미지 한 장만 남는다 → 스캔 말고는 여기로 오는 길이 없다.
   const rx = hx + statW + 22
   rr(ctx, rx, boxT, rankW, boxB - boxT, 22)
   ctx.fillStyle = '#fafaff'; ctx.fill()
   ctx.strokeStyle = '#ececf5'; ctx.lineWidth = 2; ctx.stroke()
-  text(ctx, '순위', rx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
+  // ⚠️ 제목 문구를 넣지 말 것. QR 은 설명이 필요 없고, 한국어 명령형('나도 해보기' 등)을 붙이면 광고로 읽힌다.
+  //    '상위 N%' 도 넣지 않는다 — 왼쪽에 '전세계 N위' 가 이미 있어 같은 사실을 두 번 말하는 데다,
+  //    이 칸의 용도(들어오는 길)와 무관한 값이 섞여 제목·값 정렬이 어긋나 보였다.
+  // 대신 QR 아래 **주소 한 줄**. 카드를 폰으로 받은 사람은 자기 화면이라 QR 을 못 찍는다 → 그 사람에겐
+  // 주소가 유일한 길이고, QR 은 PC 화면·인쇄물에서 쓰인다. 둘이 서로를 메운다.
+  const qrCx = rx + rankW / 2
 
-  // 옛 티어 박스 자리 — 엠블렘·티어명은 2026-08-04 제거됐고 상위%만 남아 박스의 주인공이 됐다.
-  //   #순위 3종은 왼쪽 기록 박스가 전담한다. 여기 다시 쓰면 같은 숫자가 카드에 두 번 나온다.
-  const pct = d.percentile != null ? Math.max(1, Math.round(d.percentile * 100)) : null
-  const emCx = rx + rankW / 2
-  const emCy = (boxT + boxB) / 2
-  // ⚠️ 모수가 적으면 백분위를 그리지 않는다(3명이면 1등도 상위 33%라 초라해 보인다).
-  //    "N명 중 M위" 같은 대체 문구도 넣지 않는다 — 사람이 모이면 그때 나타난다(scoring.ts 의 showPercentile).
-  if (pct != null && showPercentile(d.rankTotal)) {
-    text(ctx, `상위 ${pct}%`, emCx, emCy + 26, { size: T.hero, weight: 900, color: C, align: 'center' })
-  } else {
-    // 티어명이 사라져 미집계 유저는 박스가 통째로 비어버린다 — 최소한의 상태 문구를 남긴다.
-    text(ctx, '집계 대기', emCx, emCy + 14, { size: T.title, weight: 900, color: SUB, align: 'center' })
+  // QR — 흰 판 위에 모듈을 사각형으로 직접 찍는다(이미지 로드 없음 → 실패 지점이 없다).
+  //   ⚠️ 여백(quiet zone) 4모듈은 규격이다. 없으면 스캐너가 못 읽는다.
+  const CAP_H = 56 // QR 아래 주소 줄이 차지하는 높이
+  const qrTop = boxT + 34
+  const qrBox = Math.min(rankW - 64, boxB - 24 - CAP_H - qrTop)
+  const qrY = qrTop + (boxB - 24 - CAP_H - qrTop - qrBox) / 2
+  const qrX = qrCx - qrBox / 2
+  rr(ctx, qrX, qrY, qrBox, qrBox, 12)
+  ctx.fillStyle = '#ffffff'; ctx.fill()
+  ctx.strokeStyle = '#e6e6f2'; ctx.lineWidth = 2; ctx.stroke()
+  try {
+    const { count, dark } = qrMatrix(SITE_URL, 'M')
+    const quiet = 4
+    const unit = qrBox / (count + quiet * 2)
+    const ox = qrX + unit * quiet
+    const oy = qrY + unit * quiet
+    ctx.fillStyle = INK
+    // +0.5 로 모듈을 살짝 겹쳐 찍는다 — 소수 좌표에서 모듈 사이에 흰 실선이 생기는 것을 막는다.
+    for (const [r, c] of dark) ctx.fillRect(ox + c * unit, oy + r * unit, unit + 0.5, unit + 0.5)
+  } catch {
+    text(ctx, 'QR', qrCx, qrY + qrBox / 2, { size: T.title, weight: 900, color: SUB, align: 'center' })
   }
+  // 주소 — 스킴(https://)과 끝 슬래시는 뗀다. 읽을 것이지 복붙할 것이 아니다.
+  const shown = SITE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const aSize = fitSize(ctx, shown, T.label, 800, rankW - 40)
+  text(ctx, shown, qrCx, qrY + qrBox + 40, { size: aSize, weight: 800, color: SUB, align: 'center' })
 
   // ── 하단 다크 바: 가입일 / 국가 / 지역 ──
   const fy = CARD_H - P - FOOT_H - 2
@@ -363,9 +392,8 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
         { label: '국가', value: d.country || '—' },
         { label: '지역', value: d.region || '—' },
       ]
-  // 값 3칸 + 오른쪽 끝 주소 칸. 주소는 **이 카드의 유일한 유입 경로**라 프레임 밖 여백이 아니라
-  // 하단 바 안에 정식 칸으로 넣는다 — 카톡·인스타·저장·복사 어느 경로로 나가도 이미지에 같이 실린다.
-  // ⚠️ 예전엔 프레임 아래 여백에 alpha 0 으로 그려 사실상 없었다. 지우지 말 것.
+  // 값 3칸 + 오른쪽 끝 친구 코드 칸. 주소 텍스트는 위 QR 박스가 대신하므로 여기서 뺐다
+  // — 같은 링크를 카드에 두 번 쓰지 않는다.
   const fw = CARD_W - IN * 2
   const URL_W = foots.length ? 400 : fw
   const cellW = foots.length ? (fw - URL_W) / foots.length : 0
@@ -382,14 +410,17 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
     text(ctx, f.value, fx + 80, fy + 76, { size: vs, weight: 900, color: '#fff' })
     fx += widths[i]
   })
-  // 주소 칸 — 값 칸과 같은 [라벨/값] 리듬을 쓰되, 값을 티어색으로 띄워 링크처럼 읽히게 한다.
-  if (foots.length) {
+  // 친구 코드 칸 — 값 칸과 같은 [라벨/값] 리듬. 값은 코드라 자간을 벌리고 액센트색으로 띄운다.
+  //   ⚠️ 남의 카드(publicOnly)에는 그리지 않는다 — 남의 카드에 내 코드가 박히면 안 된다.
+  //   코드가 아직 없으면(발급 전) 칸을 통째로 비운다. 'CARI0000' 같은 가짜 값을 넣지 말 것.
+  if (!d.publicOnly && d.referralCode) {
     ctx.beginPath(); ctx.moveTo(fx, fy + 26); ctx.lineTo(fx, fy + FOOT_H - 26)
     ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 2; ctx.stroke()
+    footIcon(ctx, 4, fx + 52, fy + FOOT_H / 2, rgba(lt(C, 0.42), 0.9))
+    text(ctx, '친구 코드', fx + 80, fy + 44, { size: T.sub, weight: 800, color: 'rgba(255,255,255,.5)' })
+    const cSize = fitSize(ctx, d.referralCode, T.value, 900, URL_W - 130)
+    text(ctx, d.referralCode, fx + 80, fy + 76, { size: cSize, weight: 900, color: lt(C, 0.35), spacing: 2 })
   }
-  text(ctx, '내 등급 확인하기', fx + 34, fy + 44, { size: T.sub, weight: 800, color: 'rgba(255,255,255,.5)' })
-  const uSize = fitSize(ctx, SHARE_URL, T.label, 900, URL_W - 60)
-  text(ctx, SHARE_URL, fx + 34, fy + 76, { size: uSize, weight: 900, color: lt(C, 0.35) })
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {

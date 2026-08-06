@@ -1,13 +1,14 @@
 // 자격번호 규격 (협회 규정 제80조)
-//   형식: {자격종목코드}-{등급코드}-{발급연도(4자리)}-{일련번호(4자리 이상)}
+//   형식: {자격종목코드}-{등급코드}-{발급연도(4자리)}-{일련번호(6자리)}
 //   자격종목코드: CARIS → "CA", CARIS Master → "CM"
 //   등급코드: Beginner "BEG" · Pro "PRO" · Elite "ELT" · Master "MAS" · Grand Master "GMA" · Zenith "ZEN"
-//   일련번호: 자격종목·등급·발급연도별로 순차 부여(중복 없이), 1만을 넘으면 5자리 이상으로 자연 확장.
-//   예: CA-BEG-2026-0001
+//   일련번호: 자격종목·등급·발급연도별로 1부터 순차 부여(중복 없이). 100만을 넘으면 7자리로 자연 확장.
+//   예: CA-BEG-2026-000001
 //
-// ⚠️ 일련번호의 "순차·무중복"은 서버(Supabase)가 단일 소스여야 한다(경쟁 상태 방지).
-//    makeCertNo 는 형식 조합만 담당하고 seq 는 서버가 부여한 값을 받는다.
-//    tempSeq 는 서버 시퀀스 연동 전까지 형식 미리보기에 쓰는 임시값(순차 아님).
+// ⚠️ 일련번호의 "순차·무중복"은 **DB 가 단일 소스**다 — 발급 시 RPC `next_cert_seq(종목,등급,연도)`
+//    가 원자적으로 채번하고(schema.sql 의 cert_serials 테이블), `exam_attempts.cert_no` 에는
+//    unique 인덱스가 걸려 있다. 이 파일은 **형식 조합만** 담당한다.
+//    → 앱(프론트/서버)이 번호를 스스로 지어내면 안 된다. 발급 전 화면은 certNoPending 을 쓴다.
 //
 // ⚠️ 서버 supabase/functions/_shared/cert.ts 와 동일 로직(등급판정·자격번호·유효기간) — 양쪽 동기화 유지.
 //    종목↔등급 배치: CARIS(CA)=Beginner·Pro·Elite / CARIS Master(CM)=Master·Grand Master·Zenith.
@@ -46,9 +47,12 @@ export function gradeDisplay(title?: string | null): string {
   return `CARIS ${GRADE_NAME[gradeOfTitle(title)]}`
 }
 
+/** 일련번호 자릿수 — 여기만 고치면 형식·자리 가림(certNoPending)이 같이 따라온다. */
+export const SEQ_DIGITS = 6
+
 // 형식 조합. seq 는 서버가 부여한 종목·등급·연도별 순차 번호.
 export function makeCertNo(grade: GradeCode, year: number, seq: number): string {
-  return `${SUBJECT_CODE[grade]}-${grade}-${year}-${String(Math.max(1, seq)).padStart(4, '0')}`
+  return `${SUBJECT_CODE[grade]}-${grade}-${year}-${String(Math.max(1, seq)).padStart(SEQ_DIGITS, '0')}`
 }
 
 // 등급 유효기간(개월). null=무기한.
@@ -70,9 +74,14 @@ export function certExpiryDate(title: string | null | undefined, acquiredAt: Dat
   return fmtCertDate(d)
 }
 
-// 서버 시퀀스 연동 전 임시 일련번호 — attemptId 해시(순차 아님, 형식 미리보기용).
-export function tempSeq(attemptId: string): number {
-  let h = 0
-  for (const ch of attemptId.replace(/-/g, '')) h = (h * 31 + ch.charCodeAt(0)) % 100000
-  return h || 1
+/**
+ * 발급 **전** 화면에 쓰는 자격번호 — 일련번호 자리를 가린 형태(`CA-PRO-2026-••••••`).
+ *
+ * ⚠️ 발급 전에는 번호가 존재하지 않는다. 채번은 발급 순간에 서버가 한다.
+ *    예전엔 attemptId 해시로 그럴듯한 번호를 만들어 보여줬는데, 사용자는 그걸 자기 번호로 읽는다
+ *    — 실제 발급하면 다른 번호가 나오고, 해시라 남과 겹칠 수도 있었다.
+ *    그래서 '아직 정해지지 않았다'를 그대로 보여준다.
+ */
+export function certNoPending(grade: GradeCode, year: number): string {
+  return `${SUBJECT_CODE[grade]}-${grade}-${year}-${'•'.repeat(SEQ_DIGITS)}`
 }

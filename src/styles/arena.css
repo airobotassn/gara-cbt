@@ -60,6 +60,19 @@ html.dark .arena {
 .aa-wrap { max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 40px; }
 
 /* ── 헤더 ── */
+/* 홈으로(제목 위 왼쪽) — 앱 공용 .topbar 와 같은 모양이지만 그 클래스를 그대로 못 쓴다:
+   .topbar 는 전역 토큰(--soft/--line/--ink)을 써서 이 페이지의 두꺼운 외곽선 + 단색 그림자
+   톤과 따로 논다. 모양만 맞추고 색·그림자는 --aa-* 로 다시 짠다(런처 버튼과 같은 값). */
+.aa-home { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 14px;
+  text-decoration: none; color: var(--aa-muted); font-weight: 800; font-size: 13.5px; transition: color .14s; }
+.aa-home .ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 16px; line-height: 1; color: var(--aa-ink);
+  background: var(--aa-panel); border: 2.5px solid var(--aa-line); box-shadow: 0 3px 0 var(--aa-sh-solid);
+  transition: transform .1s ease, box-shadow .1s ease; }
+.aa-home:hover { color: var(--aa-ink); }
+.aa-home:hover .ic { transform: translateY(-2px); box-shadow: 0 5px 0 var(--aa-sh-solid); }
+.aa-home:active .ic { transform: translateY(2px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
+
 .aa-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
 .aa-head h1 { margin: 0; font-size: clamp(26px, 3.6vw, 36px); font-weight: 900; letter-spacing: -.02em; }
 
@@ -173,6 +186,16 @@ html.dark .arena {
 .dokinset svg { width: 100%; height: 100%; display: block; }
 .dokinset .doklab { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 10.5px; font-weight: 800; color: var(--aa-ink); background: var(--aa-inset-lab-bg); padding: 1px 0; }
 .dokisland { stroke: var(--aa-geo-stroke); stroke-width: 1; }
+
+/* ── 본토 밖 지역 액자(알래스카·하와이·해외영토) ──
+   독도 인셋(.dokinset)과 같은 언어지만 SVG 안에 그린다 — 순위 색·클릭·호버를 본 지도와
+   똑같이 받아야 해서(HTML 액자로 빼면 색·이벤트를 두 벌 유지해야 한다).
+   ⚠️ 위치·크기는 ArenaMap.tsx 의 INSET_* 상수가 정한다. 여기선 색만. */
+#arena-map .rin-frame { fill: url(#insetGrad); stroke: var(--aa-line); stroke-width: 2; }
+#arena-map .rin-labbg { fill: var(--aa-inset-lab-bg); }
+#arena-map .rin-lab { fill: var(--aa-ink); font-size: 10.5px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+/* 액자 안 땅은 본 지도보다 테두리를 얇게 — 작은 그림에 1px 선이 들어가면 형태가 뭉개진다. */
+#arena-map .rinset .geo { stroke-width: .8; }
 
 /* ── 하단 런처(이동 버튼 4개) ── */
 /* 런처는 지도 위에 놓인다 → 여백은 아래쪽(지도와의 간격)으로 */

@@ -6,6 +6,8 @@ import { callFunction } from '../lib/supabase'
 import { linkify } from '../lib/linkify'
 import { Avatar } from './GemAvatar'
 import { countryName, flagEmoji } from '../lib/regions'
+import ShareCardModal from './ShareCardModal'
+import type { ShareCardData } from '../lib/shareCard'
 
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
 // 초기 페이지 → 폴링(신규분 append) + reconcile(수정/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
@@ -102,6 +104,9 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const [reportDetail, setReportDetail] = useState('')
   const [reporting, setReporting] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  // 아바타를 누르면 뜨는 그 사람 카드(/ranking TOP10 클릭과 같은 카드·같은 모달).
+  const [card, setCard] = useState<ShareCardData | null>(null)
+  const cardBusy = useRef(false)
 
   const listRef = useRef<HTMLDivElement>(null)
   const rowsRef = useRef<Row[]>([])
@@ -307,6 +312,45 @@ export default function ChatBoard({ room = 'global' }: Props) {
     setSending(false)
   }
 
+  // 아바타 탭 → 그 사람 카드. 카드에 필요한 값(순위·백분위·시즌점수)이 채팅 행엔 없어서 한 번 조회한다.
+  //   ⚠️ 누르는 건 **아바타뿐**이다. 말풍선 전체를 누르게 하면 관성 스크롤을 멈추려고 톡 친 손가락에
+  //      모달이 열린다(작은 원이라 거기 정확히 떨어질 일이 드물다).
+  //   ⚠️ 익명 글은 아예 대상이 아니다 — 익명으로 쓴 글에서 실명 카드가 나오면 익명성이 깨진다.
+  //      (서버도 같은 판단: scoped_top 이 익명 계정을 제외해서 user:null 로 되돌린다. 이중 방어)
+  async function openCard(r: Row) {
+    if (r.is_anon || r.sending || cardBusy.current) return
+    cardBusy.current = true
+    try {
+      const res = await callFunction<{
+        user: { rank: number; name: string; rating: number; color: string | null; image: string | null; percentile: number | null } | null
+        total: number
+      }>('leaderboard', { scope: 'user', uid: r.user_id })
+      if (!res.user) {
+        showToast(t('chat.noCard'))
+        return
+      }
+      const u = res.user
+      setCard({
+        name: u.name,
+        // 카드 아바타는 서버가 준 원본 문자열을 다시 조립해 쓴다(채팅 행의 avatar_url 과 같은 형식).
+        avatarUrl: u.image ? `img:${u.image}` : u.color ? `gem:${u.color}` : (r.avatar_url ?? null),
+        seed: r.user_id,
+        percentile: u.percentile,
+        rank: u.rank,
+        rankTotal: res.total,
+        // 남의 카드라 국가·지역 순위, 가입일, 초대코드는 안 그린다(publicOnly).
+        countryRank: null, countryTotal: null, regionRank: null, regionTotal: null,
+        seasonTotal: u.rating,
+        joinedAt: null, country: null, region: null, referralCode: null,
+        publicOnly: true,
+      })
+    } catch {
+      showToast(t('chat.noCard'))
+    } finally {
+      cardBusy.current = false
+    }
+  }
+
   // 신고 버튼 = 팝업 열기. 실제 전송은 사유를 고른 뒤 submitReport 에서.
   function openReport(id: number) {
     if (reportedIds.has(id)) return
@@ -383,11 +427,23 @@ export default function ChatBoard({ room = 'global' }: Props) {
                 <div className="chat-bubble">
                   {!own && (
                     <div className="chat-meta">
-                      <span className="chat-avatar">
-                        {/* 익명 글은 고정 시드 — user_id 를 시드로 쓰면 같은 사람의 익명 글이
-                            늘 같은 색으로 나와 서로 이어붙일 수 있다(익명성 훼손). */}
-                        <Avatar avatarUrl={r.avatar_url} seed={r.is_anon ? 'anon' : r.user_id} size={20} />
-                      </span>
+                      {/* 익명 글은 고정 시드 — user_id 를 시드로 쓰면 같은 사람의 익명 글이
+                          늘 같은 색으로 나와 서로 이어붙일 수 있다(익명성 훼손).
+                          같은 이유로 익명 글의 아바타는 누를 수 없다(카드 = 실명 정보). */}
+                      {r.is_anon ? (
+                        <span className="chat-avatar">
+                          <Avatar avatarUrl={r.avatar_url} seed="anon" size={20} />
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="chat-avatar chat-avatar-btn"
+                          onClick={() => openCard(r)}
+                          aria-label={t('chat.cardOf', { name: r.display_name })}
+                        >
+                          <Avatar avatarUrl={r.avatar_url} seed={r.user_id} size={20} />
+                        </button>
+                      )}
                       <span className="chat-name">{r.display_name}</span>
                       {flagEmoji(r.country_code) && (
                         <span className="chat-flag" title={countryName(r.country_code as string, lang)}>
@@ -433,6 +489,11 @@ export default function ChatBoard({ room = 'global' }: Props) {
       </div>
 
       {toast && <div className="chat-toast">{toast}</div>}
+
+      {/* 남의 카드라 보기 전용(저장·공유 버튼 없음) — /ranking TOP10 클릭과 같은 취급. */}
+      {card && (
+        <ShareCardModal data={card} title={t('chat.cardOf', { name: card.name })} readOnly onClose={() => setCard(null)} />
+      )}
 
       {!isFullUser ? (
         <div className="chat-login-cta">

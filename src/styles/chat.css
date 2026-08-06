@@ -71,6 +71,19 @@
   flex-shrink: 0;
   line-height: 0;
 }
+/* 아바타를 누르면 그 사람 카드가 뜬다 — 눌리는 건 이 원 하나뿐이다(말풍선 전체가 아니라).
+   그림은 20px 그대로 두고 padding 으로 손가락 닿는 면적만 넓힌다(음수 마진으로 줄 높이는 유지). */
+.chat-avatar-btn {
+  display: inline-flex;
+  padding: 6px;
+  margin: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.chat-avatar-btn:hover { background: rgba(255, 255, 255, .1); }
+.chat-avatar-btn:focus-visible { outline: 2px solid var(--ch-accent, #5b93e2); outline-offset: 0; }
 .chat-flag {
   font-size: 13px;
   line-height: 1;

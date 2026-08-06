@@ -40,13 +40,12 @@ Deno.serve(async (req) => {
 
     const user = await getUser(req)
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
-    // 익명(게스트) 응시 폐지(2026-08-05). **여기가 실제 차단선이다** —
-    // 화면 게이트(App.tsx LoginGate)는 우회 가능하고, 익명 로그인 자체는 SEB 응시(/exam/seb)가
-    // 아직 써서 Supabase 설정에서 끌 수 없다. 익명 세션을 직접 만들어 이 함수를 때려도 여기서 막힌다.
-    // ⚠️ 막지 않으면: 익명은 시크릿창으로 무한 생성되는데 아래 일일 제한까지 면제였다 →
-    //    Lv.1 문제은행을 통째로 긁어갈 수 있었다.
-    if (user.is_anonymous) return json({ error: 'login_required' }, 401)
-
+    // 게스트(익명) 응시 허용(2026-08-06 부활). 결과는 총점만 나가고 누적은 안 된다
+    // — 잠금은 submit-test·get-result 의 lockedResult 가 건다.
+    // ⚠️ 익명을 **일일 제한에서 면제하지 말 것**(아래 dailyAttemptsLeft 는 익명에도 그대로 적용한다).
+    //    2026-08-05 에 익명을 통째로 막았던 이유가 그 면제였다 — 시크릿창으로 세션을 계속 만들면서
+    //    무제한으로 응시해 Lv.1 문제은행을 긁어갈 수 있었다. 세션마다 새 계정이라 제한이 만능은 아니지만,
+    //    적어도 한 세션으로 무한히 뽑는 경로는 닫힌다.
     const admin = adminClient()
 
     // 레벨 잠금: 현재 등급(rank)까지만 응시 가능. 첫 유저 = MIN_LEVEL(1).
@@ -72,8 +71,7 @@ Deno.serve(async (req) => {
     //   별도 테이블 없이 test_attempts 로 계산한다: 남은 = 기본 + 오늘 승급수 − 오늘 시작수.
     //   · 기준일 = KST 캘린더일(started_at)
     //   · 시작만 하고 이탈한 in_progress/expired 도 '소모'로 센다(시작→이탈 반복으로 무한 응시 방지)
-    //   · 관리자만 면제. 옛 게스트(익명) 면제는 익명 응시 폐지(2026-08-05)와 함께 제거했다 —
-    //     그 면제가 곧 무제한 응시 구멍이었다.
+    //   · 관리자만 면제. **게스트(익명)도 면제하지 않는다** — 옛 익명 면제가 곧 무제한 응시 구멍이었다.
     if (!isAdmin) {
       const { left, used, allowed } = await dailyAttemptsLeft(admin, user.id)
       if (left <= 0) return json({ error: 'daily_limit', allowed, used }, 429)

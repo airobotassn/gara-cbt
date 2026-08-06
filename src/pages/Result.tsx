@@ -480,7 +480,7 @@ function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; leve
               {b.owned
                 ? t('ebook.owned')
                 : b.price > 0
-                  ? `₩${b.price.toLocaleString('ko-KR')}`
+                  ? `$${b.price.toLocaleString('en-US')}`
                   : t('ebook.free')}
             </span>
           </Link>

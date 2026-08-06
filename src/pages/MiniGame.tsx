@@ -6,7 +6,7 @@
 //   ⚠️ 게임 ↔ 앱 통신은 postMessage 계약(아래 GAME_MSG). 게임 HTML 은 자립형이라 세션도 supabase 클라도
 //     없다 → 점수 제출과 랭킹 조회는 전부 이 부모가 대신한다. 게임은 "점수 났다 / 랭킹 열어달라"만 알린다.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { findMiniGame } from '../lib/minigames'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
@@ -32,9 +32,13 @@ export default function MiniGame() {
   const navigate = useNavigate()
   const { gameId } = useParams<{ gameId: string }>()
   const game = findMiniGame(gameId)
-  const { isFullUser, loading, loginWithGoogle } = useAuth()
+  const { isFullUser, loading, loginWithGoogle, ensureAnonymous } = useAuth()
   const { t } = useT()
   const [rankOpen, setRankOpen] = useState(false)
+  // 게스트가 한 판 끝냈을 때 뜨는 잠금 안내. 한 번 닫으면 그 세션에선 다시 띄우지 않는다
+  // — 판마다 막아서면 플레이를 방해한다(레벨테스트는 결과가 화면 하나라 그럴 일이 없다).
+  const [guestScored, setGuestScored] = useState(false)
+  const guestNoticeDone = useRef(false)
   // 제출 티켓 — 화면 진입 시 한 번 받아 이 세션 내내 재사용한다(서버가 서명·나이를 검증).
   //   ⚠️ 제출마다 새로 받으면 안 된다: 서버의 "플레이 시간 대비 점수 상한"이 티켓 나이 기준이라,
   //     티켓을 리셋하면 레벨형 게임의 2번째 이후 클리어가 정상 기록인데도 깎인다(레벨 3 → 2).
@@ -50,10 +54,17 @@ export default function MiniGame() {
     }
   }, [])
 
-  const playable = !!game && !loading && isFullUser
+  // 게스트(익명) 플레이 허용(2026-08-06 부활) — 레벨테스트와 같은 규칙이다: 플레이는 되고 기록은 안 남는다.
+  //   · 세션이 없으면 익명 세션을 만든다(게임 iframe 자체는 세션이 필요 없지만, 로그인 후 이어서 하는
+  //     흐름과 레벨테스트 쪽 동작을 맞추기 위해 동일하게 잡는다).
+  //   · 티켓은 정식 회원만 받는다 — submit-minigame 이 익명을 401 로 막으므로 받아봐야 실패한다.
+  //     티켓이 없으면 아래 mg:score 핸들러가 조용히 넘겨서 랭킹에 안 올라간다(= 기록 미저장).
+  const playable = !!game && !loading
   useEffect(() => {
-    if (playable && game) void fetchTicket(game.id)
-  }, [playable, game, fetchTicket])
+    if (!playable || !game) return
+    if (isFullUser) void fetchTicket(game.id)
+    else void ensureAnonymous().catch(() => { /* 익명 세션 실패해도 플레이는 막지 않는다 */ })
+  }, [playable, game, isFullUser, fetchTicket, ensureAnonymous])
 
   // 게임(iframe) → 앱 메시지 수신. 같은 오리진에서 서비스되므로 오리진 검사로 외부 프레임을 배제한다.
   useEffect(() => {
@@ -67,6 +78,12 @@ export default function MiniGame() {
         return
       }
       if (m.t === 'mg:score' && typeof m.score === 'number' && isFinite(m.score)) {
+        // 게스트 — 여기서 조용히 넘기면 게임 자체 결과창이 평소처럼 떠서 "기록됐다"로 읽힌다.
+        // 레벨테스트 결과창(LockedPanel)과 같은 규칙으로, 저장 안 됐음을 알리고 로그인 경로를 준다.
+        if (!isFullUser) {
+          if (!guestNoticeDone.current) setGuestScored(true)
+          return
+        }
         const ticket = ticketRef.current
         if (!ticket) return // 티켓 없으면 조용히 넘긴다(플레이는 계속)
         void callFunction('submit-minigame', {
@@ -79,7 +96,7 @@ export default function MiniGame() {
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [playable, game, fetchTicket])
+  }, [playable, game, isFullUser, fetchTicket])
 
   if (!game) {
     return (
@@ -106,33 +123,9 @@ export default function MiniGame() {
     )
   }
 
-  // 로그인 게이트 — 게스트/익명은 플레이 불가. 로그인 후 이 게임으로 복귀.
-  if (!isFullUser) {
-    return (
-      <div className="mgp">
-        <div className="mgp-in">
-          <Link className="mgp-back" to="/games" aria-label="미니게임">
-            <span>‹</span> 미니게임
-          </Link>
-          <div className="mg-gate">
-            <img className="mg-gate-art" src={game.art} alt="" />
-            <h2 className="mg-gate-title">{game.title}</h2>
-            <p className="mg-gate-sub">미니게임은 로그인 후 플레이할 수 있어요.</p>
-            <button
-              className="mg-gate-btn"
-              onClick={() => {
-                // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(AuthCallback 참고).
-                try { sessionStorage.setItem('postLoginRedirect', `/games/${game.id}`) } catch { /* 무시 */ }
-                void loginWithGoogle(`${window.location.origin}/auth/callback`)
-              }}
-            >
-              {t('common.login_google')}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // 옛 로그인 게이트(게스트 플레이 불가)는 2026-08-06 제거했다 — 게스트도 바로 플레이한다.
+  // 대신 상단 바에 '기록이 안 남는다'는 한 줄을 달아, 로그인하면 뭐가 달라지는지 플레이 전에 알린다.
+  // ⚠️ 플레이를 막지 말 것. 미니게임은 서비스를 처음 만난 사람이 제일 먼저 눌러보는 곳이다.
 
   // 상단 바는 게임 프레임 색(= 게임 body 배경)을 그대로 입는다 — 흰 바가 남으면 게임 위에 이색 띠로 뜬다.
   const dark = isDark(game.frame)
@@ -172,6 +165,30 @@ export default function MiniGame() {
         </button>
         <strong style={{ fontSize: 15, color: dark ? '#fff' : '#28324c', letterSpacing: '-.01em' }}>{game.title}</strong>
         <span style={{ fontSize: 11.5, color: dark ? 'rgba(255,255,255,.6)' : '#7c869e', fontWeight: 700 }}>{game.tagline}</span>
+        {/* 게스트 안내 — 태그라인 자리를 뺏지 않게 오른쪽 끝으로 민다. 플레이를 막지 않으므로 배너가 아니라 칩이다. */}
+        {!isFullUser && (
+          <button
+            onClick={() => {
+              // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(AuthCallback 참고).
+              try { sessionStorage.setItem('postLoginRedirect', `/games/${game.id}`) } catch { /* 무시 */ }
+              void loginWithGoogle(`${window.location.origin}/auth/callback`)
+            }}
+            style={{
+              marginLeft: 'auto',
+              flex: '0 0 auto',
+              padding: '6px 12px',
+              borderRadius: 999,
+              border: `1px solid ${dark ? 'rgba(255,255,255,.24)' : '#d9e0f0'}`,
+              background: dark ? 'rgba(255,255,255,.12)' : '#fff',
+              color: dark ? '#fff' : '#28324c',
+              fontWeight: 800,
+              fontSize: 11.5,
+              cursor: 'pointer',
+            }}
+          >
+            기록이 안 남아요 · 로그인
+          </button>
+        )}
       </header>
       <iframe
         src={game.src}
@@ -180,6 +197,47 @@ export default function MiniGame() {
       />
       {rankOpen && (
         <MiniGameRankModal gameId={game.id} title={game.title} onClose={() => setRankOpen(false)} />
+      )}
+
+      {/* 게스트 한 판 종료 — 게임 자체 결과창 위에 얹는다. 레벨테스트의 LockedPanel 과 같은 구성
+          (자물쇠 → 무엇이 잠겼는지 → 로그인 CTA). 점수는 적지 않는다 — 게임마다 지표가 달라서
+          (점수/도달 레벨) 여기서 다시 쓰면 게임 결과창과 표기가 어긋난다. */}
+      {guestScored && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(10,12,20,.72)', display: 'grid', placeItems: 'center', padding: 20 }}
+          onClick={() => { guestNoticeDone.current = true; setGuestScored(false) }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 18, padding: '26px 22px', textAlign: 'center', boxShadow: '0 18px 50px rgba(0,0,0,.35)' }}
+          >
+            <div style={{ fontSize: 34, lineHeight: 1 }}>🔒</div>
+            <h3 style={{ margin: '12px 0 6px', fontSize: 17, fontWeight: 900, color: '#28324c' }}>
+              이 기록은 저장되지 않았어요
+            </h3>
+            <p style={{ margin: '0 0 18px', fontSize: 13.5, fontWeight: 600, lineHeight: 1.6, color: '#6b7488' }}>
+              로그인하면 최고 기록이 남고 게임 랭킹에 올라가요. 지금은 구경만 할 수 있어요.
+            </p>
+            <button
+              onClick={() => {
+                // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(AuthCallback 참고).
+                try { sessionStorage.setItem('postLoginRedirect', `/games/${game.id}`) } catch { /* 무시 */ }
+                void loginWithGoogle(`${window.location.origin}/auth/callback`)
+              }}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: 0, background: '#004ac6', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+            >
+              {t('common.login_google')}
+            </button>
+            <button
+              onClick={() => { guestNoticeDone.current = true; setGuestScored(false) }}
+              style={{ marginTop: 8, width: '100%', padding: '10px 16px', borderRadius: 12, border: '1px solid #d9e0f0', background: '#fff', color: '#6b7488', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+            >
+              그냥 계속 할래요
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

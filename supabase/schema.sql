@@ -542,6 +542,13 @@ alter table profiles add column if not exists region_locked_at timestamptz;
 -- 닉네임 상태(최초 설정 / 1회 변경 소진) — 상세는 migrations/20260803010000_nickname_lock.sql
 alter table profiles add column if not exists nickname_set_at     timestamptz;
 alter table profiles add column if not exists nickname_changed_at timestamptz;
+-- 연령대(밴드만 · 공개 안 함 포함) — 상세는 migrations/20260805160000_profile_age_band.sql
+--   지역과 달리 잠그지 않는다. 'private' 도 답한 것으로 치고, null 일 때만 온보딩이 다시 묻는다.
+alter table profiles add column if not exists age_band text;
+alter table profiles drop constraint if exists profiles_age_band_chk;
+alter table profiles add constraint profiles_age_band_chk
+  check (age_band is null or age_band in ('10s', '20s', '30s', '40s', '50s', '60s', 'private'));
+create index if not exists profiles_age_band_idx on profiles (age_band) where deactivated_at is null;
 
 -- (5) 부분 인덱스 (탈퇴자 제외)
 create index if not exists profiles_region_idx  on profiles (region_code)  where deactivated_at is null;
@@ -1774,3 +1781,50 @@ select jsonb_build_object(
   )
 );
 $$;
+
+-- ---------- 자격번호 채번 (협회 규정 제80조) ----------
+-- 자격번호 = {종목}-{등급}-{발급연도}-{일련번호 6자리}  예) CA-BEG-2026-000001
+-- 일련번호는 **종목·등급·발급연도별로 1부터** 순차 부여한다(형식 조합은 앱: src/lib/certNo.ts ↔
+-- supabase/functions/_shared/cert.ts, 번호 자체는 여기가 단일 소스).
+--
+-- ⚠️ 앱에서 번호를 지어내면 안 된다. 예전엔 attemptId 해시(tempSeq)로 만들었는데 순차도 아니고
+--    10만 공간이라 **서로 다른 사람에게 같은 번호가 나갈 수 있었다**. 자격번호는 한번 나가면
+--    회수가 안 되므로 채번은 DB 원자 연산(아래 next_cert_seq) + unique 인덱스로 이중 방어한다.
+
+-- 인증서 발급 컬럼 — 운영 DB 에는 먼저 들어가 있고 이 파일엔 빠져 있었다(신규 환경 재현용).
+alter table exam_attempts add column if not exists cert_issued_at   timestamptz;
+alter table exam_attempts add column if not exists verify_token     text;   -- /verify/:token 진위확인
+alter table exam_attempts add column if not exists cert_no          text;   -- 발급 시 확정(재발급해도 불변)
+alter table exam_attempts add column if not exists cert_name_roman  text;   -- 증서에 각인된 영문 성명
+
+-- 같은 번호가 두 번 나가는 것을 DB 가 최종 차단(미발급 null 은 제외).
+create unique index if not exists exam_attempts_cert_no_uidx on exam_attempts(cert_no) where cert_no is not null;
+create unique index if not exists exam_attempts_verify_token_uidx on exam_attempts(verify_token) where verify_token is not null;
+
+-- 채번 카운터. RLS 정책 없음 = service role(Edge Function) 전용.
+create table if not exists cert_serials (
+  subject    text not null,               -- 'CA' | 'CM'
+  grade      text not null,               -- BEG | PRO | ELT | MAS | GMA | ZEN
+  year       int  not null,               -- 발급연도(4자리)
+  last_seq   int  not null default 0,     -- 마지막으로 나간 일련번호
+  updated_at timestamptz not null default now(),
+  primary key (subject, grade, year)
+);
+alter table cert_serials enable row level security;
+
+-- 다음 일련번호를 원자적으로 하나 뽑는다. 동시에 여러 명이 발급해도 같은 값이 두 번 나오지 않는다
+-- (upsert 가 행 잠금을 잡고 증가시킨 뒤 그 값을 돌려준다 — 앱에서 읽고-더하고-쓰면 경쟁 상태가 난다).
+create or replace function public.next_cert_seq(p_subject text, p_grade text, p_year int)
+returns int
+language sql
+security definer
+set search_path = public
+as $$
+  insert into cert_serials as s (subject, grade, year, last_seq)
+  values (p_subject, p_grade, p_year, 1)
+  on conflict (subject, grade, year)
+    do update set last_seq = s.last_seq + 1, updated_at = now()
+  returning s.last_seq;
+$$;
+revoke all on function public.next_cert_seq(text, text, int) from public, anon, authenticated;
+grant execute on function public.next_cert_seq(text, text, int) to service_role;

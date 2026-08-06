@@ -13,50 +13,65 @@ import type { ListAttemptsResponse, LevelCertData } from '../lib/testTypes'
 // ⚠️ URL 파라미터(?level=7)로 그리지 않는 게 핵심 — 공유·자랑용이라 위조가 쉬우면 인증서가 무의미하다.
 // 에셋은 public/cert/*.png 공용(정적 시안과 같은 파일).
 
-// 북두칠성 좌표 = 원본 dipper.png(1122×1402)의 링 중심 픽셀 측정값. 건드리지 말 것.
+// 북두칠성 좌표 = 원본 dipper.png(1122×1402)의 링 중심 픽셀 측정값. **좌표는 건드리지 말 것.**
+// ⚠️ 방향을 바꾸고 싶으면 좌표가 아니라 아래 ROT(회전각)만 손댄다.
+//    좌표의 x 나 y 를 뒤집으면 국자를 1→2→3→4 로 도는 방향이 반대가 되어 **거울상**이 된다 —
+//    방향이 바뀌는 게 아니라 다른 별자리가 되는 것이다. (2026-08-06 에 실제로 이 사고를 냈다.)
+// ⚠️ /test/select 은 자기 좌표를 따로 들고 있다. 여기를 고쳐도 그 화면은 안 움직인다 — 건드리지 말 것.
+// 좌표 = **레벨 선택(/test/select)의 별 배치 그대로.** 두 화면의 방향이 같아야 하므로 그쪽을 따른다.
+//   (LevelSelect.tsx 의 DIPPER 와 같은 값. 그 화면은 자기 좌표를 따로 들고 있으니 여기를 고쳐도 안 움직인다.)
 const NODES = [
-  { n: 1, x: 992, y: 923 }, { n: 2, x: 776, y: 1158 }, { n: 3, x: 454, y: 975 },
-  { n: 4, x: 538, y: 715 }, { n: 5, x: 463, y: 488 }, { n: 6, x: 279, y: 296 },
-  { n: 7, x: 99, y: 123 },
+  { n: 1, x: 70, y: 70 }, { n: 2, x: 74, y: 389 }, { n: 3, x: 436, y: 468 },
+  { n: 4, x: 547, y: 218 }, { n: 5, x: 754, y: 99 }, { n: 6, x: 1019, y: 79 },
+  { n: 7, x: 1269, y: 70 },
 ]
 const EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 1], [4, 5], [5, 6], [6, 7]] // 국자 + 손잡이
 const R = 28
-const ROTC = { x: 546, y: 665 }
-const ROT = -12
+const ROTC = { x: 670, y: 269 }
+// 기울기 = 대각선. 배치(어느 별이 어디)는 레벨 선택을 따르고 회전만 여기서 준다.
+// 45° 는 너무 가팔라서 국자가 세로로 서고 아래쪽 별이 하단 테두리까지 내려갔다 → 30° 로 완만하게(2026-08-06).
+const ROT = -30
 const VB = { w: 1448, h: 900 } // 인증서 고정 좌표계
 
-const NEI: Record<number, number[]> = {}
-EDGES.forEach(([a, b]) => { (NEI[a] = NEI[a] || []).push(b); (NEI[b] = NEI[b] || []).push(a) })
-const at = (n: number) => NODES.find((p) => p.n === n)!
+// 회전을 **좌표에 먼저 먹인다**. 예전엔 <g transform=rotate> 로 통째로 돌리고 글자만 반대로 되돌렸는데,
+// 그러면 라벨의 정렬·여백 계산이 회전 전 좌표를 보게 돼서 각도를 바꿀 때마다 날짜가 잘리고 겹쳤다.
+// 여기서 한 번 돌려 놓으면 아래는 전부 '화면에 보이는 그대로'의 좌표라 그런 어긋남이 없다.
+const RAD = (ROT * Math.PI) / 180
+const P = NODES.map((p) => {
+  const dx = p.x - ROTC.x, dy = p.y - ROTC.y
+  return { n: p.n, x: ROTC.x + dx * Math.cos(RAD) - dy * Math.sin(RAD), y: ROTC.y + dx * Math.sin(RAD) + dy * Math.cos(RAD) }
+})
+const at = (n: number) => P.find((p) => p.n === n)!
 
-// 이웃 반대 방향 = 날짜를 놓을 바깥쪽
-function outward(p: { n: number; x: number; y: number }) {
-  let vx = 0, vy = 0
-  ;(NEI[p.n] || []).forEach((n) => {
-    const q = at(n), dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1
-    vx += dx / L; vy += dy / L
-  })
-  const L = Math.hypot(vx, vy)
-  if (L < 0.02) return { x: 0, y: 1 }
-  return { x: -vx / L, y: -vy / L }
+// 취득일 라벨 자리 — **손으로 박는다.** 별이 7개뿐이라 한 번 정하면 끝이고, 자동 계산(이웃 반대 방향)은
+// 손잡이처럼 이웃이 일직선인 별에서 옆 라벨과 겹친다(4·5 가 실제로 겹쳤다).
+// ⚠️ 위 ROT 을 바꾸면 별 위치가 통째로 움직이므로 **이 7줄도 다시 잡아야 한다.**
+const TW = 205 // 날짜 한 줄의 대략적인 폭(여백 계산용)
+// 원칙: 그 별에 붙은 **연결선의 반대쪽**, 그리고 국자 안쪽(1-2-3-4 사각형 내부)이 아닌 바깥쪽.
+const LABEL: Record<number, { dx: number; dy: number; anchor: 'start' | 'middle' | 'end' }> = {
+  1: { dx: -44, dy: 12, anchor: 'end' },    // 국자 왼쪽 끝 — 왼쪽으로(1→2 선이 아래로 지나간다)
+  2: { dx: 0, dy: 68, anchor: 'middle' },   // 국자 바닥 — 아래로
+  3: { dx: 46, dy: 12, anchor: 'start' },   // 국자 오른쪽 — 오른쪽으로
+  4: { dx: -46, dy: -24, anchor: 'end' },   // 이음매 — 왼쪽 위(4→1 선 위로 띄운다)
+  5: { dx: -46, dy: -8, anchor: 'end' },    // 손잡이 — 왼쪽 위. 오른쪽에 두면 글자 기둥을 침범한다
+  6: { dx: -46, dy: -8, anchor: 'end' },    // 손잡이 — 5 와 같은 쪽
+  7: { dx: 0, dy: -46, anchor: 'middle' },  // 끝 별 — 위로(옆으로 빼면 GARA 로고에 붙는다)
 }
 
-// 기울인 콘텐츠의 bbox 로 viewBox 를 잡는다 → 돌려도 틀 안에 딱 맞음
+// 별 + 라벨이 전부 들어가는 최소 사각형 = viewBox. 좌표가 이미 회전된 값이라 그냥 최대·최소만 잡으면 된다.
 function fitViewBox(): string {
-  const rad = (ROT * Math.PI) / 180, cos = Math.cos(rad), sin = Math.sin(rad)
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9
-  NODES.forEach((p) => {
-    const pad = R + 18, u = outward(p), D = R + 34, TW = 205
-    const lx = u.x * D, ly = u.y * D + 9
-    const l0 = u.x > 0.35 ? lx : u.x < -0.35 ? lx - TW : lx - TW / 2
-    const l1 = l0 + TW
-    ;([[-pad, -pad], [pad, -pad], [-pad, pad], [pad, pad],
-      [l0, ly + 10], [l1, ly + 10], [l0, ly - 28], [l1, ly - 28]] as [number, number][]).forEach(([ox, oy]) => {
-      const x = p.x + ox - ROTC.x, y = p.y + oy - ROTC.y
-      const rx = ROTC.x + x * cos - y * sin, ry = ROTC.y + x * sin + y * cos
-      if (rx < minx) minx = rx; if (rx > maxx) maxx = rx
-      if (ry < miny) miny = ry; if (ry > maxy) maxy = ry
-    })
+  const hit = (x: number, y: number) => {
+    if (x < minx) minx = x; if (x > maxx) maxx = x
+    if (y < miny) miny = y; if (y > maxy) maxy = y
+  }
+  P.forEach((p) => {
+    const pad = R + 18
+    hit(p.x - pad, p.y - pad); hit(p.x + pad, p.y + pad)
+    const L = LABEL[p.n]
+    const ax = p.x + L.dx, ay = p.y + L.dy
+    const x0 = L.anchor === 'start' ? ax : L.anchor === 'end' ? ax - TW : ax - TW / 2
+    hit(x0, ay - 28); hit(x0 + TW, ay + 10)
   })
   return `${minx} ${miny} ${maxx - minx} ${maxy - miny}`
 }
@@ -91,56 +106,58 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
         </filter>
       </defs>
 
-      <g transform={`rotate(${ROT} ${ROTC.x} ${ROTC.y})`}>
-        {/* ① 연결선 — 각인 선 조각을 구간마다 회전·신축. 링 앞에서 끊어 여백을 준다 */}
-        {EDGES.map(([a, b]) => {
-          const p = at(a), q = at(b), on = lit(a) && lit(b)
-          const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy)
-          const seg = len - GAP * 2, th = 9
-          const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2
-          const deg = (Math.atan2(dy, dx) * 180) / Math.PI
-          return (
-            <image
-              key={`e${a}-${b}`} href="/cert/edge.png" x={-seg / 2} y={-th / 2} width={seg} height={th}
-              preserveAspectRatio="none" opacity={on ? 1 : 0.62} filter={on ? undefined : 'url(#lc-ash)'}
-              transform={`translate(${mx},${my}) rotate(${deg})`}
-            />
-          )
-        })}
+      {/* ① 연결선 — 각인 선 조각을 구간마다 회전·신축. 링 앞에서 끊어 여백을 준다 */}
+      {EDGES.map(([a, b]) => {
+        const p = at(a), q = at(b), on = lit(a) && lit(b)
+        const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy)
+        const seg = len - GAP * 2, th = 9
+        const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2
+        const deg = (Math.atan2(dy, dx) * 180) / Math.PI
+        return (
+          <image
+            key={`e${a}-${b}`} href="/cert/edge.png" x={-seg / 2} y={-th / 2} width={seg} height={th}
+            preserveAspectRatio="none" opacity={on ? 1 : 0.62} filter={on ? undefined : 'url(#lc-ash)'}
+            transform={`translate(${mx},${my}) rotate(${deg})`}
+          />
+        )
+      })}
 
-        {/* ② 발광 별 — flare 의 빛 중심이 (0.502, 0.371) 이라 그만큼 보정 */}
-        {NODES.filter((p) => lit(p.n)).map((p) => {
-          const s = 430
-          return <image key={`f${p.n}`} href="/cert/flare-gold.png" x={p.x - s * 0.502} y={p.y - s * 0.371} width={s} height={s} />
-        })}
+      {/* ② 발광 별 — flare 의 빛 중심이 (0.502, 0.371) 이라 그만큼 보정 */}
+      {P.filter((p) => lit(p.n)).map((p) => {
+        const s = 430
+        return <image key={`f${p.n}`} href="/cert/flare-gold.png" x={p.x - s * 0.502} y={p.y - s * 0.371} width={s} height={s} />
+      })}
 
-        {/* ③ 링 + 숫자 + 취득일 — 레벨과 무관하게 항상 같은 좌표, 글자만 수평 유지 */}
-        {NODES.map((p) => {
-          const on = lit(p.n)
-          const rw = (637 / 630) * (R * 2.45), rh = R * 2.45
-          const u = outward(p), D = R + 34
-          const lx = p.x + u.x * D, ly = p.y + u.y * D + 9
-          const anchor = u.x > 0.35 ? 'start' : u.x < -0.35 ? 'end' : 'middle'
-          const date = on ? fmtMilestone(milestones[String(p.n)]) : null
-          return (
-            <g key={`n${p.n}`}>
-              <circle cx={p.x} cy={p.y} r={R} fill="rgba(3,11,20,.72)" />
-              <image href="/cert/node.png" x={p.x - rw / 2} y={p.y - rh / 2} width={rw} height={rh}
-                opacity={on ? 1 : 0.72} filter={on ? undefined : 'url(#lc-ash)'} />
-              <text x={p.x} y={p.y + 11} textAnchor="middle" fontFamily="CertSerifKR,serif" fontSize={32}
-                fontWeight={on ? 700 : 500} fill={on ? '#fff4dd' : 'rgba(206,216,230,.82)'}
-                transform={`rotate(${-ROT} ${p.x} ${p.y})`}>{p.n}</text>
-              {date && (
-                <text x={lx} y={ly} textAnchor={anchor} fontFamily="CertSerifKR,serif" fontSize={26}
-                  letterSpacing={1.8} fontWeight={400} fill="url(#lc-gold)"
-                  transform={`rotate(${-ROT} ${lx} ${ly})`}>{date}</text>
-              )}
-            </g>
-          )
-        })}
-      </g>
+      {/* ③ 링 + 숫자 + 취득일 — 좌표가 이미 회전된 값이라 글자를 되돌릴 필요가 없다 */}
+      {P.map((p) => {
+        const on = lit(p.n)
+        const rw = (637 / 630) * (R * 2.45), rh = R * 2.45
+        const L = LABEL[p.n]
+        const date = on ? fmtMilestone(milestones[String(p.n)]) : null
+        return (
+          <g key={`n${p.n}`}>
+            <circle cx={p.x} cy={p.y} r={R} fill="rgba(3,11,20,.72)" />
+            <image href="/cert/node.png" x={p.x - rw / 2} y={p.y - rh / 2} width={rw} height={rh}
+              opacity={on ? 1 : 0.72} filter={on ? undefined : 'url(#lc-ash)'} />
+            <text x={p.x} y={p.y + 11} textAnchor="middle" fontFamily="CertSerifKR,serif" fontSize={32}
+              fontWeight={on ? 700 : 500} fill={on ? '#fff4dd' : 'rgba(206,216,230,.82)'}>{p.n}</text>
+            {date && (
+              <text x={p.x + L.dx} y={p.y + L.dy} textAnchor={L.anchor} fontFamily="CertSerifKR,serif" fontSize={26}
+                letterSpacing={1.8} fontWeight={400} fill="url(#lc-gold)">{date}</text>
+            )}
+          </g>
+        )
+      })}
     </svg>
   )
+}
+
+// ⚠️ 개발 서버 전용 미리보기 — 실제 응시 기록 없이 인증서를 보려고 둔 것이다.
+//    `?preview=3` = Lv.3 인증서를 가짜 값으로 그린다 · `?layout=a|b|c` = 아래 3배치 비교.
+//    import.meta.env.DEV 가 false 인 빌드에서는 분기 자체가 트리셰이킹으로 사라진다.
+const DEV_MILESTONES: Record<string, string> = {
+  '1': '2026-03-02', '2': '2026-05-11', '3': '2026-07-15', '4': '2026-08-01',
+  '5': '2026-08-14', '6': '2026-09-03', '7': '2026-09-28',
 }
 
 export default function LevelCert() {
@@ -151,9 +168,19 @@ export default function LevelCert() {
   const [state, setState] = useState<'load' | 'ok' | 'empty' | 'err'>('load')
   const stageRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // 배치 비교용 — 하나로 확정되면 이 스위치와 나머지 두 배치의 CSS 를 지운다.
+  const layout = import.meta.env.DEV ? (new URLSearchParams(window.location.search).get('layout') || 'a') : 'a'
 
   useEffect(() => {
     if (authLoading) return
+    if (import.meta.env.DEV) {
+      const lv = Number(new URLSearchParams(window.location.search).get('preview'))
+      if (Number.isInteger(lv) && lv >= 1 && lv <= 7) {
+        setData({ displayName: '홍길동', level: lv, milestones: DEV_MILESTONES })
+        setState('ok')
+        return
+      }
+    }
     if (!isFullUser) { setState('empty'); return }
     callFunction<ListAttemptsResponse>('list-attempts', {})
       .then((r) => {
@@ -212,7 +239,7 @@ export default function LevelCert() {
   return (
     <div className="lc-page">
       <div className="lc-wrap" ref={wrapRef}>
-        <div className="lc-stage" ref={stageRef}>
+        <div className={`lc-stage lc-lay-${layout}`} ref={stageRef}>
           <img className="lc-bg" src="/cert/bg.png" alt="" />
           <div className="lc-vig" />
 

@@ -60,10 +60,11 @@ export default function Ranking() {
   const [profile, setProfile] = useState<{ uid: string; country: string | null; region: string | null } | null>(null)
   const uid = user?.id ?? null
   const myCode = uid && isFullUser && profile?.uid === uid ? profile : { country: null, region: null }
-  // 프로필(국가·지역)이 확정됐나 — 확정 전에 조회하면 기본 탭이 뒤늦게 바뀌며 헛조회가 난다.
-  const profileReady = !isFullUser || !uid || profile?.uid === uid
-  // 기본 탭 = 내 지역. 단 비로그인·지역 미설정이면 안내문만 뜨는 탭이 첫 화면이 되므로 전세계로.
-  const defaultScope: Scope = myCode.region ? 'my-region' : 'global'
+  // 기본 탭 = **전세계**. 랭킹은 "내가 몇 등이냐"보다 "여기가 얼마나 큰 판이냐"를 먼저 보여주는 화면이다.
+  // ⚠️ 예전엔 내 지역(`myCode.region ? 'my-region' : 'global'`)이었다. 그 탓에 첫 화면이 사람 몇 명뿐인
+  //    좁은 보드였고, 프로필(국가·지역) 조회가 끝날 때까지 보드 조회 자체를 미뤄야 해서 첫 화면도 늦었다.
+  //    상수가 되면서 그 대기(profileReady 게이트)도 같이 없앴다 — 내 지역은 탭으로 한 번 누르면 된다.
+  const defaultScope: Scope = 'global'
   const scope = picked ?? defaultScope
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function Ranking() {
   // 보드 조회 — 랭킹은 공개라 비로그인도 전세계 탭은 본다(서버가 me 만 비움).
   const cacheKey = `${isFullUser ? 'u' : 'g'}:${scope}`
   useEffect(() => {
-    if (loading || !profileReady) return
+    if (loading) return
     if (boards[cacheKey] || errs[cacheKey]) return
     let alive = true
     callFunction<HofResponse>('leaderboard', { scope })
@@ -99,7 +100,7 @@ export default function Ranking() {
     return () => {
       alive = false
     }
-  }, [scope, cacheKey, loading, profileReady, boards, errs])
+  }, [scope, cacheKey, loading, boards, errs])
 
   // 탭 라벨: 전세계는 고정, 국가·지역은 **실제 이름**(대한민국 · 서울). 코드가 없으면 일반 라벨로 폴백.
   const labelOf = (s: Scope): string => {
@@ -142,6 +143,7 @@ export default function Ranking() {
         countryRank: null, countryTotal: null, regionRank: null, regionTotal: null,
         seasonTotal: cardOf.rating,
         joinedAt: null, country: null, region: null,
+        referralCode: null, // 남의 카드에 내 초대 코드를 박지 않는다
         publicOnly: true,
       }
     : null

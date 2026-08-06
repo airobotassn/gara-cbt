@@ -7,7 +7,7 @@ import SiteFooter from '../components/SiteFooter'
 import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
-import { makeCertNo, gradeOfTitle, gradeDisplay, certExpiryDate, tempSeq } from '../lib/certNo'
+import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../lib/certNo'
 import { countryName } from '../lib/regions'
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
 
@@ -41,10 +41,14 @@ function daysLeft(iso?: string | null) {
   if (!iso) return 0
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
 }
+/**
+ * 아직 발급하지 않은 응시의 자격번호 표기 — 일련번호 자리를 가린 형태(`CA-PRO-2026-••••••`).
+ * 진짜 번호는 발급 순간 서버가 채번하므로(certNo.ts 주석 참고) 그 전에는 만들어 보여주지 않는다.
+ * 발급된 건은 호출부가 `a.certNo`(서버 확정값)를 먼저 쓴다.
+ */
 function certNoOf(a: MyAttempt) {
-  // 시험명(급수)에서 등급 추정 → 종목·등급코드. 일련번호는 서버 연동 전까지 임시(tempSeq).
   const year = (a.submittedAt ? new Date(a.submittedAt).getFullYear() : 0) || new Date().getFullYear()
-  return makeCertNo(gradeOfTitle(a.examTitle), year, tempSeq(a.attemptId))
+  return certNoPending(gradeOfTitle(a.examTitle), year)
 }
 
 // 상태 → 카드 비주얼

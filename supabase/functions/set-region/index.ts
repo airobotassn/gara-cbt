@@ -10,7 +10,13 @@ import { isValidRegionCountryPair } from '../_shared/regions.ts'
 interface Body {
   country_code?: unknown
   region_code?: unknown
+  age_band?: unknown
 }
+
+// 연령대 — 밴드만 받는다(생년월일·정확한 나이는 안 받는다). 'private' = 공개 안 함.
+//   'private' 도 저장한다: null 로 두면 온보딩 게이트가 매번 다시 물어 거부 의사를 무시하게 된다.
+//   DB check 제약(profiles_age_band_chk)과 같은 목록이라 한쪽만 늘리면 500 이 난다.
+const AGE_BANDS = ['10s', '20s', '30s', '40s', '50s', '60s', 'private']
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -26,12 +32,22 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as Body
     const country_code = typeof body.country_code === 'string' ? body.country_code : ''
     const region_code = typeof body.region_code === 'string' ? body.region_code : ''
+    const age_band = typeof body.age_band === 'string' ? body.age_band : ''
     if (!isValidRegionCountryPair(country_code, region_code)) {
       return json({ error: 'invalid' }, 400)
     }
+    if (age_band && !AGE_BANDS.includes(age_band)) return json({ error: 'invalid' }, 400)
 
-    // (3) 최초 1회만 잠금: region_locked_at IS NULL 인 행만 갱신.
     const admin = adminClient()
+
+    // (3) 연령대 — 지역 잠금과 **분리해서 먼저** 쓴다.
+    //   지역은 최초 1회 잠금이라, 이미 잠근 유저(연령대만 비어 있는 기존 회원)에게 같은 update 로
+    //   묶어 보내면 409 에 걸려 연령대가 영영 안 들어간다. 잠금 대상이 아니므로 따로 갱신한다.
+    if (age_band) {
+      await admin.from('profiles').update({ age_band }).eq('id', user.id)
+    }
+
+    // (4) 지역 — 최초 1회만 잠금: region_locked_at IS NULL 인 행만 갱신.
     const patch = {
       country_code,
       region_code,
@@ -45,9 +61,10 @@ Deno.serve(async (req) => {
       .is('region_locked_at', null)
       .select()
     if (error) return json({ error: 'server' }, 500)
+    // 이미 잠긴 경우에도 위 연령대 저장은 끝났다 → 프론트는 409 를 '확정됨'으로 보고 그대로 진행한다.
     if (!data || data.length === 0) return json({ error: 'already_locked' }, 409)
 
-    return json({ ok: true, country_code, region_code }, 200)
+    return json({ ok: true, country_code, region_code, age_band: age_band || null }, 200)
   } catch {
     return json({ error: 'server' }, 500)
   }

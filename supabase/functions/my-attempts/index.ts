@@ -5,7 +5,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { makeCertNo, tempSeq, gradeOfTitle } from '../_shared/cert.ts'
+import { makeCertNo, subjectOf, gradeOfTitle } from '../_shared/cert.ts'
 
 const PASS_RATIO = 0.6
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
@@ -61,7 +61,18 @@ Deno.serve(async (req) => {
         }
         const year = a.submitted_at ? new Date(a.submitted_at).getFullYear() : new Date().getFullYear()
         verifyToken = verifyToken ?? crypto.randomUUID()
-        certNo = certNo ?? makeCertNo(gradeOfTitle(title), year, tempSeq(a.id))
+        if (!certNo) {
+          // 일련번호는 DB 가 채번한다(종목·등급·연도별 원자 증가). 여기서 만들어내면 중복이 나간다.
+          const grade = gradeOfTitle(title)
+          const { data: seq, error: seqErr } = await admin.rpc('next_cert_seq', {
+            p_subject: subjectOf(grade),
+            p_grade: grade,
+            p_year: year,
+          })
+          // 채번 실패 시 임시 번호로 때우지 않는다 — 자격번호는 한번 나가면 회수가 안 된다.
+          if (seqErr || typeof seq !== 'number') return json({ error: 'cert_seq_failed' }, 500)
+          certNo = makeCertNo(grade, year, seq)
+        }
       }
       // 영문 성명 — 인증서에 각인되는 유일한 이름이라 발급 시 필수. 재발급은 저장된 값을 그대로 쓴다.
       // 규칙: 라틴 문자·공백·하이픈·아포스트로피·마침표만(여권 표기 관행), 2~40자.

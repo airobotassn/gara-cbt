@@ -30,7 +30,7 @@ function demoResult(): VerifyCertResponse {
     status: 'valid',
     name: '홍*동',
     grade: 'CARIS PRO',
-    certNo: 'CA-PRO-2026-0001',
+    certNo: 'CA-PRO-2026-000001',
     issuedAt: now.toISOString(),
     expiresAt: exp.toISOString(),
   }

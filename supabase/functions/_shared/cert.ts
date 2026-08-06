@@ -27,16 +27,19 @@ export function gradeOfTitle(title?: string | null): GradeCode {
   return 'PRO'
 }
 
-// 서버 시퀀스 연동 전 임시 일련번호 — attemptId 해시(순차 아님). 프론트 certNo.ts 와 동일.
-export function tempSeq(attemptId: string): number {
-  let h = 0
-  for (const ch of attemptId.replace(/-/g, '')) h = (h * 31 + ch.charCodeAt(0)) % 100000
-  return h || 1
+/** 등급 → 자격종목 코드. 채번 RPC 에 넘길 값이라 밖에서도 쓴다. */
+export function subjectOf(grade: GradeCode): SubjectCode {
+  return SUBJECT_CODE[grade]
 }
 
-// 자격번호 형식 조합 — {종목}-{등급}-{연도}-{일련(4자리+)}.
+/** 일련번호 자릿수 — 프론트 certNo.ts 의 SEQ_DIGITS 와 같은 값이어야 한다. */
+export const SEQ_DIGITS = 6
+
+// 자격번호 형식 조합 — {종목}-{등급}-{연도}-{일련(6자리)}.
+// ⚠️ seq 는 **DB RPC `next_cert_seq` 가 부여한 값만** 넣는다. 여기서 만들어내지 말 것
+//    (해시·타임스탬프 같은 임시 번호를 넣으면 중복이 나가고, 되돌릴 수 없다).
 export function makeCertNo(grade: GradeCode, year: number, seq: number): string {
-  return `${SUBJECT_CODE[grade]}-${grade}-${year}-${String(Math.max(1, seq)).padStart(4, '0')}`
+  return `${SUBJECT_CODE[grade]}-${grade}-${year}-${String(Math.max(1, seq)).padStart(SEQ_DIGITS, '0')}`
 }
 
 // 등급 → 유효기간(개월). null=무기한.

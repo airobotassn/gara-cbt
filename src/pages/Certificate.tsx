@@ -78,7 +78,7 @@ function gradeSize(g: string): number {
   return g.length <= 8 ? 86 : g.length <= 12 ? 74 : 62
 }
 
-// 등록번호 마스킹 — 결제 유도 화면에서 마지막 일련번호 구획만 가린다. 예: CA-PRO-2026-0001 → CA-PRO-2026-••••
+// 등록번호 마스킹 — 결제 유도 화면에서 마지막 일련번호 구획만 가린다. 예: CA-PRO-2026-000001 → CA-PRO-2026-••••••
 function maskCertNo(s: string) {
   return s.replace(/[0-9A-Za-z]+$/, (m) => '•'.repeat(Math.max(4, m.length)))
 }
@@ -138,7 +138,7 @@ export default function Certificate() {
     grade: 'CARIS BEGINNER',
     // 개발용 미리보기(state 없이 /certificate 직접 진입)엔 영문 이름이 없으므로 예시값을 채운다(이름 성 순).
     nameRoman: (meta.name_roman as string) || 'Hyeongjun Ahn',
-    certNo: 'CA-BEG-2026-0001',
+    certNo: 'CA-BEG-2026-000001',
     issueDate: todayStr(),
     expiryDate: certExpiryDate('CARIS Beginner', new Date()),
     verifyToken: 'preview-sample',

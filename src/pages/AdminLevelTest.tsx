@@ -573,7 +573,15 @@ function UsersTab() {
   )
 }
 
-interface UserDetailData { rank: number; skills: { level: number; attempts_count: number; placed: boolean; ratings: Record<string, number> }[]; attempts: Omit<AttemptRow, 'name'>[] }
+interface UserDetailData { rank: number; skills: { level: number; attempts_count: number; placed: boolean; ratings: Record<string, number> }[]; attempts: Omit<AttemptRow, 'name'>[]; ageBand: string | null }
+
+// 연령대 표기 — 값은 온보딩에서 받은 밴드(profiles.age_band) 그대로다.
+//  ⚠️ '공개 안 함'(private)과 '미수집'(null)은 다른 뜻이다. 전자는 답한 것이고 후자는 아직 안 물어본
+//     계정(연령대 도입 전 가입자 중 아레나에 안 들어온 사람)이라, 통계에서 분모가 갈린다.
+const AGE_BAND_LABEL: Record<string, string> = {
+  '10s': '10대 이하', '20s': '20대', '30s': '30대', '40s': '40대', '50s': '50대', '60s': '60대 이상',
+  private: '공개 안 함',
+}
 function UserDetail({ user, onClose }: { user: UserRow; onClose: () => void }) {
   const [data, setData] = useState<UserDetailData | null>(null)
   const [rank, setRank] = useState(user.rank)
@@ -595,6 +603,10 @@ function UserDetail({ user, onClose }: { user: UserRow; onClose: () => void }) {
           <b>{user.name || '유저'}</b>
           <span className="admin-hint">{user.email || (user.anon ? '게스트' : '')}</span>
           <button className="admin-x" onClick={onClose}>✕</button>
+        </div>
+        <div className="admin-row" style={{ marginTop: 4 }}>
+          <span>연령대</span>
+          <b>{data ? (AGE_BAND_LABEL[data.ageBand ?? ''] ?? '미수집') : '…'}</b>
         </div>
         <div className="admin-row" style={{ marginTop: 4 }}>
           <span>등급 수동 조정</span>

@@ -67,7 +67,7 @@ export async function listUsers(admin: any) {
 export async function userDetail(admin: any, body: any) {
   const uid = body.userId
   if (!uid) return json({ error: 'userId 필요' }, 400)
-  const [attRes, skillRes, progRes] = await Promise.all([
+  const [attRes, skillRes, progRes, profRes] = await Promise.all([
     admin.from('test_attempts')
       .select('id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at')
       .eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
@@ -75,8 +75,16 @@ export async function userDetail(admin: any, body: any) {
     admin.from('user_level_skill').select('level, ratings, attempts_count, placed')
       .eq('user_id', uid).order('level', { ascending: true }),
     admin.from('user_progress').select('rank').eq('user_id', uid).maybeSingle(),
+    // 연령대 — 온보딩에서 1회 수집한 밴드. null(미수집)과 'private'(공개 안 함)은 서로 다른 값이라
+    // 그대로 내려보내고 표기는 화면이 정한다.
+    admin.from('profiles').select('age_band').eq('id', uid).maybeSingle(),
   ])
-  return json({ attempts: attRes.data ?? [], skills: skillRes.data ?? [], rank: (progRes.data as any)?.rank ?? 1 })
+  return json({
+    attempts: attRes.data ?? [],
+    skills: skillRes.data ?? [],
+    rank: (progRes.data as any)?.rank ?? 1,
+    ageBand: (profRes.data as any)?.age_band ?? null,
+  })
 }
 
 export async function setRank(admin: any, body: any) {

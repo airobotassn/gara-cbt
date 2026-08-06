@@ -5,7 +5,7 @@ import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
-import { makeCertNo, tempSeq, gradeOfTitle, gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
+import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
@@ -150,9 +150,11 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
   const CIRC = 2 * Math.PI * 45
   const dashoffset = CIRC * (1 - anim / 100)
 
-  // 취득일·유효기간·자격번호 — 시험명(급수)에서 등급 추정. 일련번호는 서버 시퀀스 연동 전까지 임시(tempSeq).
+  // 취득일·유효기간·자격번호 — 시험명(급수)에서 등급 추정.
+  // ⚠️ 여기는 **발급 전** 화면이라 일련번호가 아직 없다(발급 순간 DB 가 채번). 그래서 그 자리를
+  //    가린 형태로 넘긴다 — 예전엔 해시로 만든 가짜 번호를 보여줘서, 발급 후 번호가 바뀌었다.
   const acquiredAt = new Date()
-  const certNo = makeCertNo(gradeOfTitle(examTitleRaw), acquiredAt.getFullYear(), tempSeq(String(attemptId ?? '')))
+  const certNo = certNoPending(gradeOfTitle(examTitleRaw), acquiredAt.getFullYear())
   const issueDate = fmtCertDate(acquiredAt)
   const expiryDate = certExpiryDate(examTitleRaw, acquiredAt)
 
