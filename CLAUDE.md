@@ -161,6 +161,8 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/mypage` · `/mypage/:section` | `pages/MyPage.tsx` | `dashboard.css` | `my-attempts` · `mypage-ai` · `ebooks` |
 | `/ebooks` (러닝 라이브러리 = 교재+강의) | `pages/Ebooks.tsx` | (Tailwind 유틸) | `ebooks` |
 | `/ebooks/read/:id` (이북 뷰어) | `pages/EbookReader.tsx` | (인라인) | `ebooks` |
+| `/checkout?type=&ref=` (결제) | `pages/Checkout.tsx` | (Tailwind 유틸) | `payments` |
+| `/pay/success` · `/pay/fail` (결제 결과) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
 | **캐릭터 허브 / 미니게임** ||||
 | `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` · `redeem-referral` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
@@ -187,7 +189,8 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - ⚠️ **열 배경은 `surface-container-low`**(+ 진한 `outline-variant` 테두리). 다크가 기본인데 `surface-container-lowest`(#0d0f15)는 페이지 배경(#0a0c11)과 거의 같아 세 열의 경계가 안 보인다(2026-08-06 반려). 다른 페이지에서 카드에 `lowest` 를 쓰는 건 그 페이지 배경이 달라서다 — 여기 값을 그쪽에 맞추지 말 것.
   - 화면 보면 아는 사용법 설명문("레벨을 고르면 …")은 넣지 않는다 — 넣었다가 삭제됨.
   - 현재 데이터는 **레벨당 교재 1권 · 강의 1편**(`lectures.ts` 가 레벨당 1개). 늘려도 화면은 손댈 게 없다 — 열이 알아서 스크롤한다.
-- **이북(전자책)**: 관리자가 HTML 1개 파일을 업로드(비공개 버킷 `ebooks`, 표지는 공개 버킷 `ebook-covers`) → 회원이 `/ebooks` 에서 구매 → 마이페이지 '이북 서재' 탭에서 열람(`/ebooks/read/:id` 뷰어가 서명 URL iframe). 테이블 `ebooks`·`ebook_purchases`, 함수 `ebooks`(store·picks·library·buy·read) + `admin`(ebookList/Upsert/Delete/Buyers). ⚠️ **결제(PG) 미연동 — 구매 = 즉시 지급(데모)**. 결제 검증 자리는 `ebooks` 함수의 `buy` 액션.
+- **이북(전자책)**: 관리자가 HTML 1개 파일을 업로드(비공개 버킷 `ebooks`, 표지는 공개 버킷 `ebook-covers`) → 회원이 `/ebooks` 에서 구매 → 마이페이지 '이북 서재' 탭에서 열람(`/ebooks/read/:id` 뷰어가 서명 URL iframe). 테이블 `ebooks`·`ebook_purchases`, 함수 `ebooks`(store·picks·library·buy·read) + `admin`(ebookList/Upsert/Delete/Buyers).
+  - **결제 연동됨(2026-08-06, 토스페이먼츠)**: 유료책은 `/checkout?type=ebook&ref=<id>` → 결제위젯 → `/pay/success` → 서버 승인 → 지급. `ebooks` 함수의 `buy` 는 이제 **0원 책 전용**이고 유료책엔 402 를 준다(안 막으면 함수를 직접 불러 결제를 통째로 우회할 수 있다). 아래 "결제" 절 참고.
   - **추천**: 레벨테스트 결과창(`Result.tsx` 의 `EbookPicks`)이 `picks` 액션으로 응시 레벨에 맞는 책을 받는다. 기준은 `ebooks.target_level`(1~7, null=무관) 하나 — 관리자 이북 탭에서 고른다. 정렬 = 목표 레벨(승급 시 +1)과 가까운 순 → 동률이면 위 레벨 → 스토어 노출순, 이미 산 책은 서버가 제외. 레벨당 1권 체계라 6축 태그는 일부러 안 넣었다(고를 대상이 없어 결과가 안 바뀜) — 한 레벨에 여러 권이 생기면 그때 축 태그 추가.
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
 - 온보딩 게이트(`App.tsx`의 `OnboardingGate`): 정식 회원이 지역 미확정이면 `/test/*` · `/ranking` · `/mypage` 접근 시 `/onboarding` 으로 강제. 그 외 라우트는 통과.
@@ -235,10 +238,10 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   32개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+  functions/   34개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral) · 검색라우터(route-query·route-seed)
                · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
-  functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용)
+  functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · toss.ts(토스 API 래퍼) · payments.ts(주문·금액검증·지급·대사)
 ```
 
 **DB 테이블**(요약): `profiles`, `questions`(다국어 JSONB·정답 클라 비노출), `test_attempts`(응시 언어·등급변동 스냅샷), `attempt_answers`, `user_level_skill`(레벨별 누적 6축 레이팅), `user_progress`(현재 등급=레벨).
@@ -264,10 +267,30 @@ supabase/
 - **등급 연출**: 결과창은 원점수 판정으로 **승급 배너+애니**(강등이 없으니 하락 배너도 없다), 레벨별 누적 레이더(고스트=현재−deltas) 표시(`Result.tsx`). 대시보드는 레벨별 레이더를 ‹ ›로 전환.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.
 
+## 결제 (토스페이먼츠 · 2026-08-06 연동)
+
+**코드 쓰기 전에 [`docs/토스페이먼츠-연동-가드레일.md`](./docs/토스페이먼츠-연동-가드레일.md) §8(LLM이 자주 틀리는 패턴 20개)을 먼저 볼 것.** 더 깊은 내용은 `.mcp.json` 의 토스 MCP 서버로 문서를 직접 조회한다.
+
+- **범위**: 1차는 **국내 원화(KRW)만**. 토스 V2 표준 SDK 가 `amount.currency: "KRW"` 만 받기 때문이다(해외카드·페이팔은 MID 1개당 통화 1개라 상점·위젯을 따로 만들어야 하고 카드사 심사가 붙는다). 해외 PG는 나중에 얹되 `payments.provider` 컬럼을 처음부터 둬서 테이블을 안 갈아엎게 했다.
+- **흐름**: `/checkout?type=&ref=` → `payments/create`(서버가 금액 계산) → 결제위젯 → `/pay/success` → `payments/confirm`(승인) → 지급.
+- **금액을 요청으로 받지 않는다.** `create` 는 상품ID만 받고 `_shared/payments.ts` 의 `resolveProduct` 가 DB에서 다시 뽑는다. `confirm` 은 successUrl 의 `amount` 를 **저장된 주문 금액과 대조한 뒤**, 승인 API 에는 **저장된 값**을 넘긴다. 소유자(`user_id`) 확인도 필수 — 안 하면 남의 주문에 결제를 붙일 수 있다.
+- **중복 지급은 코드가 아니라 DB가 막는다** — `payments` 의 부분 유니크 인덱스 `(user_id, product_type, product_ref) where status='paid'` + `ebook_purchases.unique(user_id, ebook_id)`. Idempotency-Key 는 토스 쪽 중복 승인만 막지 우리 DB 이중지급은 못 막는다.
+- **지급 순서 = 지급 먼저, `fulfilled_at` 나중.** 반대로 하면 지급이 실패했을 때 "이미 줬다"는 기록만 남아 미지급을 영영 못 찾는다. `status='paid' AND fulfilled_at IS NULL` 이 "돈은 받았는데 안 준 것" 신호이고 대사가 이걸 본다.
+- ⚠️ **가상계좌**: 승인 응답이 와도 `WAITING_FOR_DEPOSIT` 이면 계좌가 **발급**된 것이지 결제된 게 아니다. 여기서 지급하면 돈 안 받고 물건을 준다 → `waiting_deposit` 로 두고 입금 웹훅에서 지급한다.
+- ⚠️ **`payments-webhook` 만 `verify_jwt=false` 로 배포**한다(토스는 Supabase JWT 를 못 싣는다). `route-seed` 에 이은 두 번째 예외라 URL 시크릿(`?k=`)이 필수다. 나머지 함수엔 `--no-verify-jwt` 금지.
+- **일반 결제 웹훅에는 서명 헤더가 없다**(그건 지급대행/셀러 웹훅 전용). 본문을 믿지 말고 식별자만 꺼내 **토스에 다시 조회**해 판정한다(`resettle`). 웹훅은 중복·역순·미도착이 다 가능하므로 웹훅만으론 부족 — `payments/reconcile`(헤더 `x-reconcile-key`)을 주기적으로 돌려야 한다.
+- **시크릿**: `TOSS_SECRET_KEY`·`TOSS_WEBHOOK_SECRET`·`PAYMENTS_RECONCILE_KEY` 는 **Supabase 함수 시크릿**. 프론트엔 클라이언트 키(`VITE_TOSS_CLIENT_KEY`)만 — 브라우저 노출값이라 상관없다. ⚠️ **결제위젯 연동 키**를 쓸 것('API 개별 연동 키'와 다른 값이다).
+- **금액 표시는 `src/lib/money.ts` 의 `krw()` 로만.** 이북 가격은 원(KRW)인데 화면이 `$` 로 찍고 있었다(2026-08-06 수정). 화면 언어가 영어여도 통화는 원이다.
+- ⚠️ **응시료는 아직 미연결** — `resolveProduct` 의 `exam` 갈래가 400 을 던진다. 붙이려면 ① 정가 소스를 `exam_fees` 로 확정하고 키를 구 급수(`pro`·`master_g4`~`g1`)에서 새 티어(`t1_beginner`…)로 옮기고 ② 금액을 원화로 못박고(방향: Beginner/Pro/Elite = $1/$2/$3 → 원화 고정 환산가. Master 이상 3개는 결제 미연결) ③ `ExamApply.tsx` 의 `$` 표시를 `krw()` 로 바꾼다. 지금 화면 값은 `caris.ts` 의 `fee: 1`(USD 임시값)이고, `src/lib/fees.ts`(`useExamFees`/`feeKey`)는 **아무데서도 import 되지 않는 죽은 코드**다.
+- 실키 심사 전 채워야 하는 것(코드 아님): 전자상거래법 사업자정보 표기, 이북 청약철회 제한 문구·응시료 환불규정(`/terms`), 미성년자 결제 동의.
+
+---
+
 ## 운영에서 자주 막히는 것 (반드시 숙지)
 
 - **프론트는 `master` push → Cloudflare 자동배포**(빌드 수 분 소요). 함수는 **별도 CLI 배포** 필요. git push 로 함수 안 올라감. SPA 라우팅은 `wrangler.jsonc`(`not_found_handling`)로 처리 — `_redirects` 금지(무한루프).
 - `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
+- **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 토스 개발자센터 웹훅 URL 은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<TOSS_WEBHOOK_SECRET>`.
 - **`GEMINI_API_KEY` 는 Supabase 함수 시크릿**(프론트 금지). 키 무효면 추천이 500.
 - **OAuth localhost 튕김** = Supabase Site URL 설정 문제. **모바일 인앱 브라우저 차단** = 구글 정책(기본 브라우저로 열어야 함).
 - **쿨다운(3일 1회)** 토글 = `start-test` 의 `COOLDOWN_ENABLED`. 게스트는 원래 쿨다운 없음.
@@ -298,6 +321,7 @@ supabase/
 | [`docs/제품구상.md`](./docs/제품구상.md) | **제품 구상**(캐릭터 허브: 자격증·Lecture·CARIS ARENA) — excalidraw 캔버스 전사 + 확정 설계 결정(`[확정]`/`[제안]` 태그). 원본=`docs/design/제품구상.excalidraw` |
 | [`docs/구현계획.md`](./docs/구현계획.md) | **구현 계획** — Phase 1(국가·지역·학교 온보딩 + 지역 경쟁) 상세 + 이후 로드맵. `제품구상.md`의 "어떻게" 짝 문서 |
 | [`docs/구글_계정_워크스페이스_가이드.html`](./docs/구글_계정_워크스페이스_가이드.html) | 구글 로그인(OAuth) 계정 소유권·2FA·Workspace (생성물, 브라우저로 열 것) |
+| [`docs/토스페이먼츠-연동-가드레일.md`](./docs/토스페이먼츠-연동-가드레일.md) | **결제 코드 짜기 전 필독**(토스 공식 LLM Quick Reference 사본) — 흐름 모델·SDK 버전/상품 선택 규칙·시나리오 진입점 + **LLM이 자주 틀리는 패턴 20개**(§8). 더 깊은 내용은 저장소 루트 `.mcp.json` 의 토스 MCP 서버로 문서를 직접 조회할 것 |
 | [`docs/review-report.html`](./docs/review-report.html) | 코드 리뷰 리포트(생성물) |
 
 > 새 기능/운영 사항을 추가하면 해당 문서를 갱신하고, 큰 변화는 이 표에 매핑한다.
