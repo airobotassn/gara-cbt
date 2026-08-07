@@ -70,10 +70,13 @@ export interface PaymentProvider {
 
 // 어댑터 등록. 새 PG 는 여기 한 줄 + 어댑터 파일 하나면 끝이다.
 import { tossProvider } from './toss.ts'
+import { eximbayProvider } from './eximbay.ts'
 
 const PROVIDERS: Record<string, PaymentProvider> = {
   toss: tossProvider,
-  // eximbay: eximbayProvider,   // ← 해외 결제 붙일 때. 토스 코드는 건드리지 않는다.
+  // ⚠️ 엑심베이 어댑터는 공개 문서 기반으로 작성됐고 **테스트키로 아직 실검증 안 됨**(eximbay.ts 머리 주석).
+  //    등록만 해둔다 — create 배선·프론트 결제창·통화(달러) 환산이 붙어야 실제로 결제가 돈다.
+  eximbay: eximbayProvider,
 }
 
 /**
