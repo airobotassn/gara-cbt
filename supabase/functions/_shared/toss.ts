@@ -1,8 +1,13 @@
-// 토스페이먼츠 코어 API 래퍼 — **서버 전용**(시크릿 키를 쓴다).
+// 토스페이먼츠 코어 API 래퍼 + **PaymentProvider 포트의 토스 어댑터**.
 //   붙이기 전 필독: docs/토스페이먼츠-연동-가드레일.md (특히 §8 자주 틀리는 패턴)
 //
 // 여기 담긴 것은 "API 를 정확히 부르는 코드"까지다. 사고는 그다음, 우리 DB 의 상태 관리에서 난다 —
 // 지급·멱등·수습은 _shared/payments.ts 가 맡는다.
+//
+// ⚠️ 이 파일의 위쪽(confirmPayment·getPaymentBy*·mapTossStatus 등)은 실제 검증을 거친 코드다 — **건드리지 마라.**
+//    아래 tossProvider 는 그 함수들을 **호출만** 하는 얇은 어댑터다(로직을 옮기지 않는다). 그래서 포트를 도입해도
+//    토스 동작이 틀어질 수가 없다. 엑심베이를 붙일 땐 이 파일을 열지 않고 _shared/eximbay.ts 를 새로 쓴다.
+import type { PaymentProvider, ProviderPayment, ProviderResult } from './payment-provider.ts'
 //
 // ⚠️ 취소(cancel) API 는 일부러 안 넣었다. 승인은 됐는데 지급이 불가능한 경우(관리자가 그 사이 책을
 //    내렸다든지) 자동 환불이 맞아 보이지만, 돈을 되돌리는 건 되돌릴 수 없는 동작이라 자동화하지 않는다.
@@ -148,4 +153,47 @@ export function mapTossStatus(
     default:
       return 'pending'
   }
+}
+
+// ---------- PaymentProvider 포트 구현 (토스 어댑터) ----------
+// 위 함수들을 호출만 하는 얇은 껍데기다. 새 로직은 "토스 응답 → 중립 형태" 변환 하나뿐이다.
+
+/** TossPayment → ProviderPayment(PG 중립). status 는 mapTossStatus 를 **그대로**(fulfilled:false) 불러 뽑는다.
+ *  refunded 업그레이드(canceled + 지급됨)는 여기서 하지 않는다 — settleFromProvider 가 우리 DB 의 fulfilled 를 보고 한다.
+ *  이렇게 하면 mapTossStatus 를 한 줄도 고치지 않고 동작이 이전과 동일하게 유지된다. */
+function normalize(t: TossPayment): ProviderPayment {
+  return {
+    providerKey: t.paymentKey ?? null,
+    orderId: t.orderId,
+    status: mapTossStatus(t.status, { fulfilled: false }),
+    method: (t.method as string | null) ?? null,
+    // 가상계좌 판별(PG 응답 기준) — method 문자열만 믿지 않고 virtualAccount 객체도 본다.
+    //   우리 DB 직전 상태(waiting_deposit)까지 보는 건 settleFromProvider 가 OR 로 더한다(여긴 PG 정보만).
+    isVirtualAccount: Boolean((t as { virtualAccount?: unknown }).virtualAccount) || (t.method ?? '').includes('가상계좌'),
+    approvedAt: (t.approvedAt as string | null) ?? null,
+    raw: t,
+  }
+}
+
+/** TossResult → ProviderResult. 오류의 absent(주문 부재 확정 여부)는 ORDER_ABSENT_CODES 로 판정해 실어준다. */
+function toResult(r: TossResult<TossPayment>): ProviderResult {
+  if (r.ok) return { ok: true, data: normalize(r.data) }
+  return {
+    ok: false,
+    error: {
+      code: r.error.code,
+      message: r.error.message,
+      httpStatus: r.status,
+      absent: ORDER_ABSENT_CODES.has(r.error.code),
+    },
+  }
+}
+
+export const tossProvider: PaymentProvider = {
+  name: 'toss',
+  env: tossEnv,
+  confirm: (a) =>
+    confirmPayment({ paymentKey: a.providerKey, orderId: a.orderId, amount: a.amount, idempotencyKey: a.idempotencyKey }).then(toResult),
+  queryByKey: (k) => getPaymentByKey(k).then(toResult),
+  queryByOrderId: (o) => getPaymentByOrderId(o).then(toResult),
 }

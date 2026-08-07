@@ -131,6 +131,25 @@ const paidUniq = idxDefs.find((r) => r.indexname === 'payments_paid_product_uniq
 rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'",
   /user_id, product_type, product_ref/.test(paidUniq) && /status = 'paid'/.test(paidUniq), true);
 
+// --- (11) 환불 자동 회수 — **결제 링크(payment_id)로 특정한 것 하나만** 지워지는가 ---
+//     settleFromProvider→revokeForRefund 이 실제로 쓰는 삭제문의 타깃팅을 SQL 수준에서 검증한다.
+//     제일 무서운 건 "환불 한 건 회수하다 남의 구매까지 지우는 것" → 그게 안 되는지 본다.
+{
+  const bookX = '00000000-0000-0000-0000-0000000b0011', bookY = '00000000-0000-0000-0000-0000000b0022';
+  await db.query(`insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+    values ($1,'rev-x','x','ebook',$2,3000,'refunded','k'), ($1,'rev-y','y','ebook',$3,3000,'paid','k')`,
+    [U1, bookX, bookY]);
+  const idX = (await db.query(`select id from payments where order_id='rev-x'`)).rows[0].id;
+  const idY = (await db.query(`select id from payments where order_id='rev-y'`)).rows[0].id;
+  // 같은 유저가 두 책을 각각 다른 결제로 샀다. payX 만 환불됐다.
+  await db.query(`insert into ebook_purchases (user_id, ebook_id, payment_id, source) values ($1,$2,$3,'pg'),($1,$4,$5,'pg')`,
+    [U1, bookX, idX, bookY, idY]);
+  // revokeForRefund 의 이북 삭제문 그대로: payment_id + user_id 로만.
+  await db.query(`delete from ebook_purchases where payment_id=$1 and user_id=$2`, [idX, U1]);
+  rec('환불건 이북만 회수됨(payX 삭제)', (await db.query(`select count(*)::int c from ebook_purchases where payment_id=$1`, [idX])).rows[0].c, 0);
+  rec('⭐ 다른 결제의 이북은 무사(payY 유지)', (await db.query(`select count(*)::int c from ebook_purchases where payment_id=$1`, [idY])).rows[0].c, 1);
+}
+
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);
 const failed = results.filter((x) => !x.pass).length;
 console.log(`\nT-PAYMENTS: ${results.length - failed}/${results.length} passed`);

@@ -13,14 +13,8 @@
 // ⚠️ 버전은 _shared/lib.ts 와 **같은 핀**이어야 한다 — 다르면 Deno 가 모듈을 두 벌 받아
 //    adminClient() 가 준 클라이언트와 여기 타입이 서로 안 맞는다.
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import {
-  ORDER_ABSENT_CODES,
-  getPaymentByKey,
-  getPaymentByOrderId,
-  mapTossStatus,
-  type TossPayment,
-} from './toss.ts'
-import { grantExamTicket, parseExamRef, resolveExamOffer } from './exam-tickets.ts'
+import { getProvider, type ProviderPayment } from './payment-provider.ts'
+import { grantExamTicket, parseExamRef, resolveExamOffer, voidTicket } from './exam-tickets.ts'
 
 export type ProductType = 'ebook' | 'exam'
 
@@ -216,6 +210,69 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
   throw new Error(`지급 경로가 없는 상품 유형: ${row.product_type}`)
 }
 
+// ---------- ②-b 환불 시 자동 회수 ----------
+
+/**
+ * 환불된 결제(refunded)에 딸린 지급물을 **되돌린다.** 환불은 사람이 토스 대시보드에서 하고(코드는 안 함),
+ * 그 결과 웹훅이 status 를 refunded 로 바꾸는 순간 여기가 불린다.
+ *
+ * ⛔ **회수 대상은 이 결제(row.id)로 지급된 것 하나뿐이다.** 사용자·상품이 아니라 **payment_id 로만** 특정한다.
+ *    grant 가 지급물마다 payment_id 를 박아두므로(ebook_purchases.payment_id · exam_tickets.payment_id),
+ *    이 한 건만 정확히 짚을 수 있다. 다른 구매·다른 응시권은 절대 건드리지 않는다.
+ *
+ * 안 쓴 것만 자동으로 회수한다:
+ *   · 이북 → 열람권 삭제(열람은 소모가 아니라 접근권이라, 환불이면 그냥 회수).
+ *   · 미사용(issued) 응시권 → void.
+ *   · **이미 소비(consumed)된 응시권은 자동 회수하지 않는다** — 시험을 시작한 뒤라 성적·자격증 처리가
+ *     정책 판단이다. 대사 목록에 남겨 사람이 본다(fulfilled_at 을 그대로 둬서 회수 스캔에 계속 뜨게 한다).
+ *
+ * @returns fulfilled — 회수 후에도 지급물이 남아있나(=사람 손이 더 필요한가). note — 대사·로그용 사유.
+ */
+async function revokeForRefund(
+  admin: SupabaseClient,
+  row: PaymentRow,
+): Promise<{ fulfilled: boolean; note: string }> {
+  const clearFulfilled = async () => {
+    // 회수를 마쳤으면 fulfilled_at 을 비운다 → reconcile 의 '회수 필요' 스캔에서 빠진다(처리됨 표시).
+    await admin.from('payments').update({ fulfilled_at: null, updated_at: new Date().toISOString() }).eq('id', row.id)
+  }
+
+  if (row.product_type === 'ebook') {
+    // payment_id + user_id 로 **이 결제분 한 행만** 삭제. 같은 책을 다른 경로로 또 샀어도 그건 안 건드린다.
+    await admin.from('ebook_purchases').delete().eq('payment_id', row.id).eq('user_id', row.user_id)
+    await clearFulfilled()
+    return { fulfilled: false, note: '환불 — 이북 열람권 자동 회수' }
+  }
+
+  if (row.product_type === 'exam') {
+    // 이 결제로 발급된 응시권 하나(payment_id 로 특정).
+    const { data: t } = await admin
+      .from('exam_tickets')
+      .select('id, status')
+      .eq('payment_id', row.id)
+      .maybeSingle()
+    const ticket = t as { id: string; status: string } | null
+    if (!ticket) {
+      await clearFulfilled()
+      return { fulfilled: false, note: '환불 — 회수할 응시권 없음' }
+    }
+    if (ticket.status === 'consumed') {
+      // 시험을 이미 시작함 — 자동 회수 금지. 사람이 성적·자격증까지 보고 판단한다(fulfilled 유지).
+      return { fulfilled: true, note: '환불 — 응시 후 건이라 자동 회수 안 함(성적·자격증 판단 필요)' }
+    }
+    if (ticket.status === 'issued') {
+      await voidTicket(admin, ticket.id, '결제 환불로 자동 회수')
+      await clearFulfilled()
+      return { fulfilled: false, note: '환불 — 미사용 응시권 자동 회수(void)' }
+    }
+    // 이미 void/expired — 회수할 게 없다.
+    await clearFulfilled()
+    return { fulfilled: false, note: `환불 — 응시권이 이미 ${ticket.status}` }
+  }
+
+  return { fulfilled: Boolean(row.fulfilled_at), note: '환불 — 회수 경로 없는 상품' }
+}
+
 /**
  * 토스가 알려준 결제 상태를 우리 DB 에 반영하고, 지급까지 필요한 만큼 진행한다.
  * 승인 응답으로 불려도, 웹훅으로 불려도, 수습(sweep)으로 불려도 결과가 같아야 한다.
@@ -224,24 +281,32 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
  * 반대로 하면 지급 도중 실패했을 때 "이미 줬다"고 기록만 남아 미지급을 영영 못 찾는다.
  * 지급은 유니크 제약 덕에 두 번 불려도 안전하므로 이 순서가 손해가 없다.
  */
-export async function settleFromToss(
+export async function settleFromProvider(
   admin: SupabaseClient,
   row: PaymentRow,
-  toss: TossPayment,
+  pp: ProviderPayment,
 ): Promise<{ status: string; fulfilled: boolean; note?: string }> {
+  // 종결(환불·취소)된 주문은 settle 이 되살리지 않는다 — PG 재조회/desync 로 뒤늦게 불려도
+  //   상태를 덮거나 재지급하지 않는다(무단 지급·회수신호 언두 방지). paid 재지급은 아래 fulfilled 로 막힌다.
+  if (row.status === 'refunded' || row.status === 'canceled') {
+    return { status: row.status, fulfilled: Boolean(row.fulfilled_at) }
+  }
   const fulfilled = Boolean(row.fulfilled_at)
-  const next = mapTossStatus(toss.status, { fulfilled })
+  // ⚠️ 어댑터는 취소를 늘 'canceled' 로 준다(우리 DB 를 모르니까). **지급까지 갔다가 취소된 건 환불**이므로
+  //    여기서만 canceled→refunded 로 업그레이드한다. 예전 mapTossStatus(status,{fulfilled}) 와 결과가 동일하다
+  //    — 취소가 아닌 상태는 fulfilled 를 안 봤고, 취소일 때만 fulfilled 로 갈렸다.
+  const next = pp.status === 'canceled' && fulfilled ? 'refunded' : pp.status
 
   const patch: Record<string, unknown> = {
     status: next,
-    payment_key: toss.paymentKey ?? row.payment_key,
-    raw: toss as unknown as Record<string, unknown>,
+    payment_key: pp.providerKey ?? row.payment_key,
+    raw: pp.raw as Record<string, unknown>,
     updated_at: new Date().toISOString(),
   }
   // 응답에 결제수단이 없을 때 null 로 덮어쓰면 이미 알던 값을 잃는다 — 있을 때만 쓴다.
-  if (toss.method) patch.method = toss.method
+  if (pp.method) patch.method = pp.method
   if ((next === 'paid' || next === 'waiting_deposit') && !row.confirmed_at) {
-    patch.confirmed_at = (toss.approvedAt as string | null) ?? new Date().toISOString()
+    patch.confirmed_at = pp.approvedAt ?? new Date().toISOString()
   }
   const { error: upErr } = await admin.from('payments').update(patch).eq('id', row.id)
   if (upErr) {
@@ -251,6 +316,13 @@ export async function settleFromToss(
     //    reconcile 이 매번 '고쳤다'고 보고하는 유령 루프가 됐다. 여기서 멈춘다.
     const dup = (upErr as { code?: string }).code === '23505'
     throw new Error(dup ? '같은 상품에 이미 완료된 결제가 있습니다(중복 결제).' : upErr.message)
+  }
+
+  // ⛔ 환불로 넘어온 건: **이 결제로 지급된 것만** 자동 회수한다(안 쓴 이북·미사용 응시권).
+  //    fulfilled 였을 때만 회수할 게 있다. 회수 대상은 payment_id 로만 특정 → 다른 구매는 안 건드린다.
+  //    응시 후(consumed) 건은 자동 회수하지 않고 대사 목록에 남는다(revokeForRefund 안에서 fulfilled 유지).
+  if (next === 'refunded' && fulfilled) {
+    return { status: next, ...(await revokeForRefund(admin, row)) }
   }
 
   // 여기서 가상계좌(waiting_deposit)가 걸러진다 — **발급됐을 뿐 입금 전**이라 지급하면 돈 안 받고 물건을 준다.
@@ -263,8 +335,8 @@ export async function settleFromToss(
   //      note 로 돌려주면 resettle→reconcile 이 mismatched 목록에 담아 사람 눈에 띈다.
   //    판별은 method 문자열('가상계좌')만 믿지 않는다 — 응답에 method 가 없을 수 있어 virtualAccount 객체와
   //    직전 상태(waiting_deposit)까지 같이 본다.
-  const isVirtualAccount =
-    Boolean(toss.virtualAccount) || (toss.method ?? '').includes('가상계좌') || row.status === 'waiting_deposit'
+  //    판별: PG 응답 기준(pp.isVirtualAccount)에 우리 DB 직전 상태(waiting_deposit)를 OR 로 더한다.
+  const isVirtualAccount = pp.isVirtualAccount || row.status === 'waiting_deposit'
   if (row.product_type === 'exam' && isVirtualAccount) {
     return { status: next, fulfilled: false, note: '가상계좌로 결제된 응시료 — 자동 발급 대상이 아님(환불 필요)' }
   }
@@ -275,7 +347,7 @@ export async function settleFromToss(
   //    그래서 지급 실패는 **결제 성공 + 발급 보류**로 돌려준다. payments 는 paid 인데 fulfilled_at 이 비어 있으니
   //    대사(reconcile)의 '미지급' 목록에 그대로 걸리고, 사람이 수기 발급이나 환불을 판단한다.
   try {
-    await grant(admin, { ...row, payment_key: toss.paymentKey ?? row.payment_key })
+    await grant(admin, { ...row, payment_key: pp.providerKey ?? row.payment_key })
   } catch (e) {
     return {
       status: next,
@@ -301,18 +373,19 @@ export async function resettle(
   admin: SupabaseClient,
   row: PaymentRow,
 ): Promise<{ orderId: string; status: string; fulfilled: boolean; note?: string }> {
+  const provider = getProvider(row.provider)
   const res = row.payment_key
-    ? await getPaymentByKey(row.payment_key)
-    : await getPaymentByOrderId(row.order_id)
+    ? await provider.queryByKey(row.payment_key)
+    : await provider.queryByOrderId(row.order_id)
 
   if (!res.ok) {
     // ⚠️ 만료로 접는 조건이 좁은 데는 이유가 있다. expired 가 되면 다음 대사 대상에서 빠지므로,
     //    잘못 접으면 실제로 승인된 결제를 영영 못 찾는다(= 돈은 받고 물건은 안 준 채로 모르는 상태).
-    //    그래서 **"그런 결제가 없다"고 토스가 확인해준 코드일 때만** 접는다.
-    //    HTTP 404 만 보면 안 된다 — NOT_FOUND_MERCHANT(상점/키 설정 문제)도 404 로 오고,
-    //    그건 결제가 살아있어도 뜬다. 일시적 5xx·타임아웃은 당연히 제외.
+    //    그래서 **"그런 결제가 없다"고 PG 가 확인해준 오류일 때만**(error.absent) 접는다.
+    //    HTTP 404 만 보면 안 된다 — 토스 NOT_FOUND_MERCHANT(상점/키 설정 문제)도 404 로 오고,
+    //    그건 결제가 살아있어도 뜬다. absent 판정은 어댑터가 한다. 일시적 5xx·타임아웃은 당연히 제외.
     const ageMin = (Date.now() - new Date(row.created_at).getTime()) / 60000
-    if (ORDER_ABSENT_CODES.has(res.error.code) && row.status === 'pending' && ageMin > STALE_ORDER_MIN) {
+    if (res.error.absent && row.status === 'pending' && ageMin > STALE_ORDER_MIN) {
       await admin
         .from('payments')
         .update({ status: 'expired', fail_code: res.error.code, updated_at: new Date().toISOString() })
@@ -322,7 +395,7 @@ export async function resettle(
     }
     return { orderId: row.order_id, status: row.status, fulfilled: Boolean(row.fulfilled_at), note: res.error.code }
   }
-  const out = await settleFromToss(admin, row, res.data)
+  const out = await settleFromProvider(admin, row, res.data)
   return { orderId: row.order_id, ...out }
 }
 
@@ -373,16 +446,19 @@ export async function reconcile(
   //          → 그 다음 payments.fulfilled_at 을 null 로. 그래야 다음 대사에서 빠진다.
   // ⚠️ 응시권은 회수해도 payments 는 paid 그대로라 payments_paid_product_uniq 가 계속 걸린다 —
   //    같은 회차·급수를 다시 팔아야 한다면 결제 행 상태까지 같이 정리해야 한다.
+  // '지급됐는데(fulfilled) 살아있는 결제(paid)가 아닌' 모든 행 = 물건은 나갔는데 결제가 환불·취소·실패·만료.
+  //   refunded 만 보면, 어떤 경로로 refunded→failed 로 덮인 고아(status=failed & fulfilled)는 놓친다.
+  //   그래서 종결 4상태를 전부 훑어 "돈은 안 살아있는데 물건은 살아있는" 건을 회수 목록에 담는다.
   const { data: paidRows } = await admin
     .from('payments')
     .select(PAYMENT_COLS)
-    .eq('status', 'refunded')
+    .in('status', ['refunded', 'canceled', 'failed', 'expired'])
     .not('fulfilled_at', 'is', null)
     .order('created_at', { ascending: true }) // 오래된 것부터 — limit 로 잘릴 때 최신만 남으면 옛 건이 영영 안 보인다
     .limit(limit)
   for (const r of (paidRows ?? []) as PaymentRow[]) {
     const what = r.product_type === 'exam' ? '응시권' : '이북 열람권'
-    mismatched.push({ orderId: r.order_id, status: r.status, reason: `환불됐지만 ${what}이 남아있음 — 회수 필요` })
+    mismatched.push({ orderId: r.order_id, status: r.status, reason: `결제가 ${r.status}인데 ${what}이 남아있음 — 회수 필요` })
   }
 
   return { checked: list.length, fixed, mismatched }

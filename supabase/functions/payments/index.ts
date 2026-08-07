@@ -11,14 +11,14 @@
 //   붙이기 전 필독: docs/토스페이먼츠-연동-가드레일.md
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { confirmPayment, getPaymentByOrderId, tossEnv } from '../_shared/toss.ts'
+import { getProvider, DEFAULT_PROVIDER } from '../_shared/payment-provider.ts'
 import {
   PAYMENT_COLS,
   ensureCustomerKey,
   newOrderId,
   reconcile,
   resolveProduct,
-  settleFromToss,
+  settleFromProvider,
   type PaymentRow,
   type ProductType,
 } from '../_shared/payments.ts'
@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       }
       const limit = Math.min(Math.max(Number(body?.limit ?? 50), 1), 200)
       const out = await reconcile(admin, limit)
-      return json({ env: tossEnv(), ...out })
+      return json({ env: getProvider(DEFAULT_PROVIDER).env(), ...out })
     }
 
     // ---------- 여기부터 로그인 필수 ----------
@@ -146,7 +146,8 @@ Deno.serve(async (req) => {
       const orderId = newOrderId(productType)
       const { error: insErr } = await admin.from('payments').insert({
         user_id: uid,
-        provider: 'toss',
+        // 새 주문을 어느 PG 로 열지. 지금은 토스 하나뿐이라 기본값 고정(라우팅이 필요하면 payment-provider 에서 분기).
+        provider: DEFAULT_PROVIDER,
         order_id: orderId,
         order_name: product.orderName,
         product_type: productType,
@@ -173,7 +174,7 @@ Deno.serve(async (req) => {
         amount: product.amount,
         currency: 'KRW',
         customerKey,
-        env: tossEnv(), // 테스트키/실키 혼용을 화면에서도 알아챌 수 있게 같이 내려준다
+        env: getProvider(DEFAULT_PROVIDER).env(), // 테스트키/실키 혼용을 화면에서도 알아챌 수 있게 같이 내려준다
       })
     }
 
@@ -193,6 +194,13 @@ Deno.serve(async (req) => {
       // 이미 끝난 주문 — 결과 화면 새로고침/뒤로가기로 다시 들어온 경우다. 승인 API 를 또 부르지 않는다.
       if (row.status === 'paid') {
         return json({ status: 'paid', fulfilled: Boolean(row.fulfilled_at), productType: row.product_type, productRef: row.product_ref })
+      }
+      // ⛔ confirm 은 **pending 주문만** 승인한다. paid 외의 비-pending 상태(refunded·canceled·failed·
+      //    expired·waiting_deposit)를 재진입시키면 (1) 종결 행을 덮어써 대사 회수 신호가 깨지고,
+      //    (2) 실패했던 주문이 토스 재승인으로 paid+지급으로 되살아나는 무단 지급이 열린다.
+      //    이 상태들은 토스를 부르지 않고 저장된 결과를 그대로 돌려준다(멱등).
+      if (row.status !== 'pending') {
+        return json({ status: row.status, fulfilled: Boolean(row.fulfilled_at), productType: row.product_type, productRef: row.product_ref })
       }
 
       // ② successUrl 의 amount 를 그대로 승인에 넘기지 않는다 — 저장된 주문 금액과 대조부터 한다.
@@ -248,10 +256,13 @@ Deno.serve(async (req) => {
         )
       }
 
+      // 이 주문이 어느 PG 로 열렸는지에 따라 어댑터를 고른다(지금은 전부 'toss'). 아래는 PG 를 모른다.
+      const provider = getProvider(row.provider)
+
       // 승인에 넘기는 금액은 **저장된 주문 금액**(row.amount). 멱등키는 주문마다 고정(row.id)이라
-      // 사용자가 새로고침으로 두 번 눌러도 토스에서 두 번 승인되지 않는다.
-      const res = await confirmPayment({
-        paymentKey,
+      // 사용자가 새로고침으로 두 번 눌러도 PG 에서 두 번 승인되지 않는다.
+      const res = await provider.confirm({
+        providerKey: paymentKey,
         orderId,
         amount: row.amount,
         idempotencyKey: row.id,
@@ -260,23 +271,25 @@ Deno.serve(async (req) => {
       if (!res.ok) {
         // 승인 실패를 곧바로 '결제 실패'로 단정하지 않는다 — 이미 승인된 건인데 응답만 못 받았을 수 있다.
         // 조회 API 로 실제 상태를 확인하고 분기한다.
-        const check = await getPaymentByOrderId(orderId)
+        const check = await provider.queryByOrderId(orderId)
         if (check.ok) {
-          const out = await settleFromToss(admin, row, check.data)
+          const out = await settleFromProvider(admin, row, check.data)
           if (out.status === 'paid') {
             return json({ status: 'paid', fulfilled: out.fulfilled, productType: row.product_type, productRef: row.product_ref })
           }
           return json({ error: res.error.message, code: res.error.code, status: out.status }, 400)
         }
+        // pending 일 때만 failed 로 내린다 — 종결 상태(refunded/canceled/paid/…)를 덮어쓰지 않는다.
+        //   (위 confirm 진입부가 이미 non-pending 을 단락시키지만, 동시성으로 그사이 바뀐 경우까지 막는다.)
         await admin
           .from('payments')
           .update({ status: 'failed', fail_code: res.error.code, fail_message: res.error.message, payment_key: paymentKey, updated_at: new Date().toISOString() })
           .eq('id', row.id)
-          .neq('status', 'paid')
+          .eq('status', 'pending')
         return json({ error: res.error.message, code: res.error.code }, 400)
       }
 
-      const out = await settleFromToss(admin, row, res.data)
+      const out = await settleFromProvider(admin, row, res.data)
       return json({
         status: out.status,
         fulfilled: out.fulfilled,

@@ -177,6 +177,27 @@ rec('재실행이 관리자가 조정한 응시창을 안 되돌린다',
   (await db.query(`select (exam_start_at at time zone 'Asia/Seoul')::text s from exam_rounds where id=$1`, [R_IN])).rows[0].s,
   '2026-08-12 00:00:00');
 
+// --- (11) 환불 자동 회수 — 응시권도 **결제 링크(payment_id)로 특정한 것 하나만** void 되는가 ---
+//     revokeForRefund 의 응시권 회수: payment_id 로 찾은 그 티켓만 void, 다른 티켓·다른 사람 건 무사.
+{
+  // 앞 섹션이 남긴 살아있는 응시권을 비워 slate 를 깨끗이 한다(live_uniq 충돌 방지).
+  await db.query(`update exam_tickets set status='void' where status in ('issued','consumed')`);
+  const payR = (await db.query(`insert into payments (user_id, order_id, status) values ($1,'rt-refund','refunded') returning id`, [U1])).rows[0].id;
+  const payK = (await db.query(`insert into payments (user_id, order_id, status) values ($1,'rt-keep','paid') returning id`, [U1])).rows[0].id;
+  // 같은 유저가 같은 회차에서 두 급수를 각각 다른 결제로 샀다. payR(pro)만 환불.
+  const tR = await mkTicket(U1, { tier: 'pro', paymentId: payR });
+  const tK = await mkTicket(U1, { tier: 'elite', paymentId: payK });
+  // revokeForRefund 가 하는 것: payment_id 로 티켓 찾고 → 그 id 로만 void.
+  const found = (await db.query(`select id, status from exam_tickets where payment_id=$1`, [payR])).rows[0];
+  rec('환불 결제로 응시권 정확히 특정됨', found?.id, tR);
+  await db.query(`update exam_tickets set status='void', voided_at=now(), void_reason='환불' where id=$1 and status in ('issued','consumed')`, [found.id]);
+  rec('환불건 응시권만 void', (await db.query(`select status from exam_tickets where id=$1`, [tR])).rows[0].status, 'void');
+  rec('⭐ 다른 결제의 응시권은 무사(issued 유지)', (await db.query(`select status from exam_tickets where id=$1`, [tK])).rows[0].status, 'issued');
+  // 다른 사람 것도 절대 안 건드림
+  const tOther = await mkTicket(U2, { tier: 'pro', paymentId: null });
+  rec('⭐ 남의 응시권은 손도 안 댐', (await db.query(`select status from exam_tickets where id=$1`, [tOther])).rows[0].status, 'issued');
+}
+
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);
 const failed = results.filter((x) => !x.pass).length;
 console.log(`\nT-EXAM-TICKETS: ${results.length - failed}/${results.length} passed`);
