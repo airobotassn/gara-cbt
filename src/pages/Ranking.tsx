@@ -343,8 +343,10 @@ function PersonalBoard({
       ) : (
         <>
           {/* === 시상대 TOP 3 ===
-              그림 = public/ranking/podium.png. 아바타는 링 위에, 이름·점수·티어는 그림의 크림 명판 안에.
-              둘 다 그림 기준 %좌표(실측값은 ranking.css 주석). 글자 크기는 cqw 라 그림과 같이 줄어든다. */}
+              그림 = public/ranking/podium.png. 아바타는 각 단 **위에 떠서** 윗면에 살짝 걸치고,
+              이름·점수는 그림 **아래** 3칸에 둔다(새 그림엔 글자를 얹을 빈 면이 없다 — 단 앞면은
+              큼직한 1·2·3 숫자가 차지한다). 둘 다 그림 기준 %좌표(실측값은 ranking.css 주석).
+              글자 크기는 cqw 라 그림과 같이 줄어든다. */}
           <div className="hof-podium">
             <div className="hof-podium-art">
               <img src="/ranking/podium.png" alt="" className="hof-podium-img" />
@@ -362,15 +364,14 @@ function PersonalBoard({
                   </button>
                 ) : null,
               )}
-              {/* 이름·점수·티어 = 그림 안 크림 명판 위. 명판은 1등이 크고 2·3등이 작아서
-                  1등만 두 줄(이름/점수)로, 2·3등은 한 줄로 그린다. */}
+            </div>
+            {/* 이름·점수 = 그림 아래 3칸. 각 칸은 단 중심 %에 맞춰 절대배치라 그림이 줄어도 안 어긋난다. */}
+            <div className="hof-podium-names">
               {podium.map((u, i) =>
                 u ? (
-                  <div key={`pl${u.rank}`} className={`hof-plate ${podClass[i]}`}>
-                    <span className="hof-plate-txt">
-                      <b>{u.name}</b>
-                      <span>{t('rank.pt', { n: u.rating })}</span>
-                    </span>
+                  <div key={`pl${u.rank}`} className={`hof-pn ${podClass[i]}`}>
+                    <b>{u.name}</b>
+                    <span>{t('rank.pt', { n: u.rating })}</span>
                   </div>
                 ) : null,
               )}

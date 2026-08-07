@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
       { data: attendance },
       { data: referralCode },
       { data: referredRow },
+      { data: giftRows },
     ] = await Promise.all([
       admin.from('user_currency').select('points, dust').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
@@ -100,6 +101,18 @@ Deno.serve(async (req) => {
       admin.rpc('ensure_referral_code', { p_uid: uid }),
       // 초대코드를 이미 등록했는지 — 허브 모달의 입력칸 잠금 판정(계정당 1회, 되돌릴 수 없음).
       admin.from('profiles').select('referred_by').eq('id', uid).maybeSingle(),
+      // 아직 확인 안 한 받은 선물(coin_transfers). 코인 선물은 **즉시 이체**라 받는 사람은 아무 동작도
+      // 안 했는데 잔액이 늘어난다 — 이 목록이 없으면 원인 불명의 숫자 변화로만 보인다.
+      //   ⚠️ 여기서 '오늘'로 자르지 않는다. 하루 안 들어온 사람의 알림이 통째로 사라지기 때문이다.
+      //     자르는 건 화면 쪽 일이고(오늘치만 상세, 그 이전은 건수만), 서버는 미확인 전부를 준다.
+      //   limit 200 = 도배 상한. 10초 쿨다운(coin_gift)이 있어 정상 사용으로는 닿지 않는다.
+      admin
+        .from('coin_transfers')
+        .select('sender_name, amount, created_at')
+        .eq('recipient_id', uid)
+        .is('seen_at', null)
+        .order('created_at', { ascending: false })
+        .limit(200),
     ])
 
     const couponList = (coupons ?? []).map((c) => ({
@@ -114,6 +127,23 @@ Deno.serve(async (req) => {
     // 마이페이지 '활동 기록' 달력은 **출석만** 표시한다(2026-07-29 결정) — 학습·게임·응시는 잔디에 안 찍는다.
     //   그래서 dominant kind 집계(activity_ledger)는 필요 없고 출석일 배열 하나면 된다.
     const attendanceDays = (attendance ?? []).map((r) => r.day as string)
+
+    // 받은 선물 — 저장은 건별, **표시는 사람별 합산**이다.
+    //   같은 사람이 10번 보내면 원장에는 10행이 남지만 화면에 10줄이 뜨면 도배가 된다.
+    //   오늘 것만 상세(이름 + 합계)로 주고, 그 이전 미확인은 건수만 준다(허브는 오늘치만 보여주고
+    //   나머지는 '이력'으로 넘긴다는 결정). 이렇게 해야 하루 안 들어와도 받은 사실이 사라지지 않는다.
+    const todayStart = Date.parse(`${today}T00:00:00.000+09:00`) // KST 하루 경계 — daily_activity 와 같은 기준
+    const giftAgg = new Map<string, { name: string; amount: number; count: number }>()
+    let giftsOlderCount = 0
+    for (const g of (giftRows ?? []) as { sender_name: string; amount: number; created_at: string }[]) {
+      if (Date.parse(g.created_at) < todayStart) { giftsOlderCount += 1; continue }
+      const name = g.sender_name || 'CARI'
+      const cur = giftAgg.get(name) ?? { name, amount: 0, count: 0 }
+      cur.amount += Number(g.amount ?? 0)
+      cur.count += 1
+      giftAgg.set(name, cur)
+    }
+    const giftsToday = [...giftAgg.values()].sort((a, b) => b.amount - a.amount)
 
     return json({
       authed: true,
@@ -142,6 +172,10 @@ Deno.serve(async (req) => {
       attendanceDays,
       referralCode: (referralCode as string | null) ?? null,
       referralUsed: !!referredRow?.referred_by,
+      // 코인 선물 — 오늘 받은 것(사람별 합산) · 그 이전 미확인 건수 · 뱃지용 총 미확인 건수.
+      giftsToday,
+      giftsOlder: giftsOlderCount,
+      giftsUnseen: (giftRows ?? []).length,
       dailyDone: !!daily?.did_attendance,
       learnDone: !!daily?.did_learn,
       minigameDone: !!daily?.did_minigame,

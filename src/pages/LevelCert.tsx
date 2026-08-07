@@ -8,8 +8,9 @@ import type { ListAttemptsResponse, LevelCertData } from '../lib/testTypes'
 // ===== 레벨테스트 인증서 =====
 // 시안 원본 = public/cert-preview.html(정적). 좌표·에셋은 그대로 옮겨왔고, **값만 서버에서 받는다**.
 //   · 이름  = profiles.display_name
-//   · 레벨  = user_progress.rank (도달 레벨까지만 금색으로 켜진다)
-//   · 발자취 = 레벨별 최초 도달일 (Lv.1 = 첫 응시일, Lv.2~7 = 승급 기록의 가장 이른 제출일)
+//   · 레벨  = **취득한(깬) 최고 레벨**까지만 금색으로 켜진다. ⚠️ user_progress.rank 가 아니다 —
+//            rank 는 '지금 서 있는 칸'이라 Lv.1 을 깨면 2가 된다(취득 = rank − 1). 서버가 계산해 내려준다.
+//   · 발자취 = 레벨별 최초 취득일 (그 레벨을 깨서 등급이 한 칸 오른 응시의 제출일)
 // ⚠️ URL 파라미터(?level=7)로 그리지 않는 게 핵심 — 공유·자랑용이라 위조가 쉬우면 인증서가 무의미하다.
 // 에셋은 public/cert/*.png 공용(정적 시안과 같은 파일).
 

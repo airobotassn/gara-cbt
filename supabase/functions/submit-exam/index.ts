@@ -6,8 +6,10 @@ import { adminClient, getUser } from '../_shared/lib.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
 import { matchShort, parseAcceptedAnswers } from '../_shared/normalize.ts'
 
-// 응시 TTL(분) — submit-test(120분)보다 여유. 만료 시 제출 거부.
+// 응시 TTL(분) — 전역 상한/안전망. 실제 제한시간은 시험별 exams.duration_minutes 로 강제한다.
 const ATTEMPT_TTL_MINUTES = 240
+// 제출 왕복·네트워크 지연 흡수용 유예(분). 표기 제한시간에 이만큼만 더 허용.
+const GRACE_MIN = 1
 // 결과(점수/오답) 공개까지 대기(일) — 시크릿 RESULT_RELEASE_DAYS 로 조정(테스트 0=즉시 공개)
 const RESULT_RELEASE_DAYS = Number(Deno.env.get('RESULT_RELEASE_DAYS') ?? 7)
 
@@ -43,8 +45,20 @@ Deno.serve(async (req) => {
     if (attempt.status !== 'in_progress') {
       return json({ error: '이미 종료된 시험입니다.' }, 409)
     }
+    // 제한시간은 시험별 duration_minutes 를 서버가 강제한다(클라 카운트다운·240 상수 단독 신뢰 금지).
+    //   전역 TTL(240)은 상한이고, 시험이 표방한 시간(exams.duration_minutes)이 실제 강제선이다.
+    let limitMin = ATTEMPT_TTL_MINUTES
+    if (attempt.exam_id) {
+      const { data: ex } = await admin
+        .from('exams')
+        .select('duration_minutes')
+        .eq('id', attempt.exam_id)
+        .maybeSingle()
+      const dur = (ex as { duration_minutes?: number } | null)?.duration_minutes
+      if (typeof dur === 'number' && dur > 0) limitMin = Math.min(ATTEMPT_TTL_MINUTES, dur + GRACE_MIN)
+    }
     const ageMin = (Date.now() - new Date(attempt.started_at).getTime()) / 60000
-    if (ageMin > ATTEMPT_TTL_MINUTES) {
+    if (ageMin > limitMin) {
       await admin.from('exam_attempts').update({ status: 'expired' }).eq('id', attemptId)
       return json({ error: '시험 제한시간이 만료되었습니다.' }, 410)
     }

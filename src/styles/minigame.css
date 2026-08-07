@@ -155,7 +155,8 @@ html.dark .mg-cover { background: #1b2130; }
 }
 /* 모달엔 페이지 제목이 없어 시상대 날개 위 여백이 필요 없다 → 위 마진을 없애고 폭만 모달에 맞춘다. */
 .mgr-modal .hof-podium { max-width: 100%; margin: 0 auto 12px; }
-/* 레벨형 게임은 값 아래에 동률 해소용 소요시간을 병기한다(줄바꿈 + 흐린 보조색). */
-.mgr-modal .bar-pt small { display: block; margin-top: -2px; font-weight: 700; font-size: 11px; color: #5b6f9e; }
-/* 시상대 명판은 크림 바탕이라 글자색이 고정 남색이다(ranking.css) → 여기 소요시간도 같은 계열로. */
-.mgr-modal .hof-plate-txt small { display: block; margin-top: 0.2cqw; font-weight: 700; font-size: 0.8em; color: #5b6f9e; }
+/* 레벨형 게임은 값 아래에 동률 해소용 소요시간을 병기한다(줄바꿈 + 흐린 보조색).
+   ⚠️ 2026-08-06 바 교체로 판이 어두워졌다 → 옛 남색(#5b6f9e)이 아니라 밝은 쪽이어야 보인다. */
+.mgr-modal .bar-pt small { display: block; margin-top: -2px; font-weight: 700; font-size: 12px; color: #8ea4cc; }
+/* 시상대 이름칸이 그림 밖으로 나오면서 배경이 페이지(어두움)가 됐다 → 소요시간도 밝은 보조색. */
+.mgr-modal .hof-pn small { display: block; margin-top: 0.2cqw; font-weight: 700; font-size: 0.8em; color: #8ea4cc; }

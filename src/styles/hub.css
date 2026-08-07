@@ -236,6 +236,10 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   font-size: 12.5px; font-weight: 900; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
 .hub .hub-share:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc), .18); }
 .hub .hub-share .ic { line-height: 0; }
+/* 뒤로가기 줄 오른쪽 버튼 묶음(선물·공유). .hub-backrow 가 space-between 이라 낱개로 두면 셋이 흩어진다. */
+.hub .hub-backrow-act { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+/* 선물 버튼 — .bd(미확인 건수 뱃지)가 absolute 라 기준 박스가 필요하다. */
+.hub .hub-gift { position: relative; }
 
 /* ============================================================
    데스크톱(PC): 화면 꽉 채우는 와이드 (레퍼 01 처럼 가로)
@@ -462,6 +466,70 @@ body:has(.hub) .fab-top { display: none; }
 .hub .iv-redeem-done { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--plus); }
 .hub .iv-redeem-msg { margin: 8px 0 0; font-size: 13px; font-weight: 800; color: var(--red); }
 .hub .iv-redeem-msg.is-ok { color: var(--plus); }
+
+/* ---------- 코인 선물 모달 ----------
+   즉시 이체라 되돌릴 수 없다 → 화면이 지는 책임은 "누구에게 얼마" 를 착각할 수 없게 만드는 것 하나다.
+   그래서 코드 밑 이름(.gf-to)과 확인 단계(.gf-confirm)는 크게, 나머지는 조용하게 둔다. */
+.hub .gf-bal { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 13px;
+  background: var(--card); border: 3px solid var(--line); }
+.hub .gf-bal-n { font-size: 20px; font-weight: 900; color: var(--ink); }
+.hub .gf-bal-lab { font-size: 13px; font-weight: 800; color: var(--ink2); }
+
+.hub .gf-got { margin-top: 14px; padding: 11px 13px; border-radius: 13px;
+  background: var(--card); border: 3px solid var(--line); }
+.hub .gf-got-head { font-size: 14px; font-weight: 900; color: var(--ink); margin-bottom: 7px; }
+.hub .gf-got-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.hub .gf-got-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 900; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub .gf-got-amt { flex: 0 0 auto; font-size: 15px; font-weight: 900; color: var(--plus); }
+.hub .gf-got-n { flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--ink2); }
+.hub .gf-older { margin-top: 6px; width: 100%; text-align: left; cursor: pointer; background: none; border: 0;
+  padding: 5px 0 0; font-size: 13.5px; font-weight: 800; color: var(--ink2); }
+
+.hub .gf-send { margin-top: 16px; padding-top: 14px; border-top: 2.5px dashed var(--line); }
+.hub .gf-send-head { font-size: 14px; font-weight: 900; color: var(--ink); margin-bottom: 9px; }
+.hub .gf-lab { display: block; font-size: 13px; font-weight: 800; color: var(--ink2); margin: 10px 0 5px; }
+.hub .gf-in { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 11px;
+  background: var(--card); border: 3px solid var(--line); outline: none;
+  font-size: 16px; font-weight: 900; color: var(--ink); letter-spacing: .04em; }
+.hub .gf-in::placeholder { color: var(--ink2); font-weight: 700; }
+/* 코드 8자를 다 치면 뜨는 상대 이름. 오타를 잡는 유일한 지점이라 본문 크기로 키운다. */
+.hub .gf-to { margin: 7px 0 0; font-size: 14px; font-weight: 800; color: var(--red); }
+.hub .gf-to.is-ok { color: var(--plus); }
+
+.hub .gf-btn { cursor: pointer; padding: 10px 16px; border-radius: 11px;
+  background: var(--brand); color: #fff; border: 3px solid var(--line);
+  font-size: 14.5px; font-weight: 900; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
+.hub .gf-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc), .18); }
+.hub .gf-btn:disabled { background: var(--ink2); cursor: default; opacity: .6; box-shadow: none; transform: none; }
+.hub .gf-btn-ghost { background: var(--card); color: var(--ink); }
+.hub .gf-send > .gf-btn { margin-top: 13px; width: 100%; }
+
+.hub .gf-confirm { margin-top: 13px; padding: 12px 13px; border-radius: 13px;
+  background: var(--card); border: 3px solid var(--red); }
+.hub .gf-confirm-q { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); line-height: 1.5; }
+.hub .gf-confirm-warn { margin: 6px 0 0; font-size: 13.5px; font-weight: 800; color: var(--red); }
+.hub .gf-confirm-act { display: flex; gap: 8px; margin-top: 11px; }
+.hub .gf-confirm-act .gf-btn { flex: 1; }
+.hub .gf-msg { margin: 10px 0 0; font-size: 13.5px; font-weight: 800; color: var(--red); }
+.hub .gf-msg.is-ok { color: var(--plus); }
+
+.hub .gf-hist-toggle { margin-top: 16px; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 0; border-top: 2.5px dashed var(--line); padding: 13px 0 0;
+  font-size: 14px; font-weight: 900; color: var(--ink); }
+.hub .gf-chev { display: inline-block; font-weight: 900; transition: transform .15s; }
+.hub .gf-chev.is-open { transform: rotate(90deg); }
+.hub .gf-hist { margin-top: 8px; }
+.hub .gf-hist-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 2px solid var(--line); }
+.hub .gf-hist-row:last-child { border-bottom: 0; }
+.hub .gf-hist-dir { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; font-size: 12.5px; font-weight: 900;
+  background: var(--card); border: 2px solid var(--line); color: var(--ink2); }
+.hub .gf-hist-row.is-in .gf-hist-dir { color: var(--plus); }
+.hub .gf-hist-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 900; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub .gf-hist-amt { flex: 0 0 auto; font-size: 14.5px; font-weight: 900; color: var(--ink); }
+.hub .gf-hist-row.is-in .gf-hist-amt { color: var(--plus); }
+.hub .gf-hist-at { flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--ink2); }
 
 /* 도크 5번째 버튼(초대하기) + 코인 옆 도움말 */
 .hub .f-invite { background: var(--red); }

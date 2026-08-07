@@ -42,8 +42,9 @@
 
   .abs{position:absolute}
 
-  /* 좌측 컬럼 — 폭 560px, 캔버스 세로 정중앙, 안의 요소는 같은 중심선에 가운데 정렬 */
-  .col{position:absolute;left:82px;top:50%;transform:translateY(-50%);width:560px;text-align:center}
+  /* 텍스트 컬럼 — 폭 560px, 캔버스 세로 정중앙, 안의 요소는 같은 중심선에 가운데 정렬.
+     **오른쪽**(별자리를 왼쪽으로 보냈다 — React 판 .lc-col 과 같은 배치) */
+  .col{position:absolute;right:82px;top:50%;transform:translateY(-50%);width:560px;text-align:center}
 
   /* 발행기관 워드마크 — 제목 위 락업(옛 CARIS 락업 자리).
      에셋은 원본에서 알파 여백을 잘라낸 판이라 높이만 주면 그대로 앉는다. */
@@ -78,8 +79,9 @@
   .issuer::before{content:'';display:block;width:120px;height:1px;margin:0 auto 20px;
                   background:linear-gradient(90deg,transparent,rgba(224,192,124,.45),transparent)}
 
-  /* 북두칠성 SVG — 좌표계는 원본 dipper.png(1122×1402) 그대로 */
-  .dipper{left:690px;top:96px;width:720px;height:760px}
+  /* 북두칠성 SVG — 왼쪽. ⚠️ 이 3값은 React 판 src/styles/levelcert.css 의 .lc-dipbox 와 같아야 한다
+     (viewBox 가 별+날짜에 딱 맞게 잘려 나오므로 내용이 늘 이 상자의 좌우 끝에 닿는다). */
+  .dipper{left:62px;top:8px;width:979px;height:856px}
   .dipper svg{width:100%;height:100%;filter:brightness(1.14) saturate(1.06)}
 </style>
 </head>
@@ -130,11 +132,15 @@
 
 <script>
 /* ── 북두칠성 ────────────────────────────────────────────────
-   좌표 = 원본 dipper.png(1122×1402)의 링 중심을 픽셀 분석으로 뽑은 값 그대로. */
+   ⚠️ 아래 좌표·회전·라벨표는 React 판 src/pages/LevelCert.tsx 와 **같은 값이어야 한다.**
+   좌표 = 레벨 선택(/test/select)의 별 배치 그대로. 옛 dipper.png 실측 좌표(1=오른쪽 아래 → 7=왼쪽 위)를
+   좌우 반전한 배치이며, 그 반전은 의도한 것이다(글자 기둥이 오른쪽으로 갔다).
+   ⚠️ 좌표의 x 나 y 를 뒤집어 방향을 바꾸려 들지 말 것 — 국자를 1→2→3→4 로 도는 방향이 반대가 되어
+      다른 별자리가 된다. 방향은 아래 ROT(회전각)로만 손댄다. */
 const NODES = [
-  { n:1, x:992, y: 923 }, { n:2, x:776, y:1158 }, { n:3, x:454, y: 975 },
-  { n:4, x:538, y: 715 }, { n:5, x:463, y: 488 }, { n:6, x:279, y: 296 },
-  { n:7, x: 99, y: 123 },
+  { n:1, x:  70, y: 70 }, { n:2, x:  74, y:389 }, { n:3, x: 436, y:468 },
+  { n:4, x: 547, y:218 }, { n:5, x: 754, y: 99 }, { n:6, x:1019, y: 79 },
+  { n:7, x:1269, y: 70 },
 ];
 const EDGES = [[1,2],[2,3],[3,4],[4,1],[4,5],[5,6],[6,7]];  // 국자(1-2-3-4) + 손잡이(4-5-6-7)
 const R = 28;
@@ -142,42 +148,51 @@ const R = 28;
 const DATES = { 1:'2026.03.02', 2:'2026.05.11', 3:'2026.07.15',
                 4:'2026.09.20', 5:'2026.11.08', 6:'2027.01.17', 7:'2027.03.05' };
 
-const NEI = {};
-EDGES.forEach(([a, b]) => { (NEI[a] = NEI[a] || []).push(b); (NEI[b] = NEI[b] || []).push(a); });
-const at = n => NODES.find(p => p.n === n);
-function outward(p){                                   // 이웃 방향의 반대 = 날짜를 놓을 바깥쪽
-  let vx = 0, vy = 0;
-  (NEI[p.n] || []).forEach(n => {
-    const q = at(n), dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1;
-    vx += dx / L; vy += dy / L;
-  });
-  const L = Math.hypot(vx, vy);
-  if (L < 0.02) return { x: 0, y: 1 };
-  return { x: -vx / L, y: -vy / L };
-}
-
 const SVGNS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const e = document.createElementNS(SVGNS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
 
-const ROTC = { x: 546, y: 665 };
-const ROT = -12;
+const ROTC = { x: 670, y: 269 };
+const ROT = -30;   // 45° 는 국자가 세로로 서서 아래 별이 하단 테두리까지 내려갔다 → 30°(2026-08-06)
 
-/* 기울기를 반영한 콘텐츠 bbox 로 viewBox 를 잡는다 → 돌려도 틀 안에 딱 맞음 */
+/* 회전을 **좌표에 먼저 먹인다**. 예전엔 <g transform=rotate> 로 통째로 돌리고 글자만 반대로 되돌렸는데,
+   그러면 라벨의 정렬·여백 계산이 회전 전 좌표를 보게 돼서 각도를 바꿀 때마다 날짜가 잘리고 겹쳤다. */
+const RAD = ROT * Math.PI / 180;
+const P = NODES.map(p => {
+  const dx = p.x - ROTC.x, dy = p.y - ROTC.y;
+  return { n: p.n,
+    x: ROTC.x + dx * Math.cos(RAD) - dy * Math.sin(RAD),
+    y: ROTC.y + dx * Math.sin(RAD) + dy * Math.cos(RAD) };
+});
+const at = n => P.find(p => p.n === n);
+
+/* 취득일 라벨 자리 — **손으로 박는다.** 별이 7개뿐이라 한 번 정하면 끝이고, 자동 계산(이웃 반대 방향)은
+   손잡이처럼 이웃이 일직선인 별에서 옆 라벨과 겹친다.
+   원칙: 그 별에 붙은 연결선의 반대쪽, 그리고 국자 안쪽(1-2-3-4 사각형 내부)이 아닌 바깥쪽.
+   ⚠️ 위 ROT 을 바꾸면 별 위치가 통째로 움직이므로 이 7줄도 다시 잡아야 한다. */
+const TW = 205;   // 날짜 한 줄의 대략적인 폭(여백 계산용)
+const LABEL = {
+  1: { dx:-44, dy: 12, anchor:'end'    },  // 국자 왼쪽 끝 — 왼쪽으로(1→2 선이 아래로 지나간다)
+  2: { dx:  0, dy: 68, anchor:'middle' },  // 국자 바닥 — 아래로
+  3: { dx: 46, dy: 12, anchor:'start'  },  // 국자 오른쪽 — 오른쪽으로
+  4: { dx:-46, dy:-24, anchor:'end'    },  // 이음매 — 왼쪽 위(4→1 선 위로 띄운다)
+  5: { dx:-46, dy: -8, anchor:'end'    },  // 손잡이 — 왼쪽 위. 오른쪽에 두면 글자 기둥을 침범한다
+  6: { dx:-46, dy: -8, anchor:'end'    },  // 손잡이 — 5 와 같은 쪽
+  7: { dx:  0, dy:-46, anchor:'middle' },  // 끝 별 — 위로(옆으로 빼면 GARA 로고에 붙는다)
+};
+
+/* 별 + 라벨이 전부 들어가는 최소 사각형 = viewBox. 좌표가 이미 회전된 값이라 최대·최소만 잡으면 된다. */
 function refitViewBox(){
-  const rad = ROT * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
-  NODES.forEach(p => {
-    const pad = R + 18, u = outward(p), D = R + 34, TW = 205;
-    const lx = u.x * D, ly = u.y * D + 9;
-    const l0 = u.x > 0.35 ? lx : u.x < -0.35 ? lx - TW : lx - TW / 2;
-    const l1 = l0 + TW;
-    [[-pad,-pad],[pad,-pad],[-pad,pad],[pad,pad],
-     [l0, ly+10],[l1, ly+10],[l0, ly-28],[l1, ly-28]].forEach(([ox, oy]) => {
-      const x = p.x + ox - ROTC.x, y = p.y + oy - ROTC.y;
-      const rx = ROTC.x + x * cos - y * sin, ry = ROTC.y + x * sin + y * cos;
-      if (rx < minx) minx = rx; if (rx > maxx) maxx = rx;
-      if (ry < miny) miny = ry; if (ry > maxy) maxy = ry;
-    });
+  const hit = (x, y) => {
+    if (x < minx) minx = x; if (x > maxx) maxx = x;
+    if (y < miny) miny = y; if (y > maxy) maxy = y;
+  };
+  P.forEach(p => {
+    const pad = R + 18;
+    hit(p.x - pad, p.y - pad); hit(p.x + pad, p.y + pad);
+    const L = LABEL[p.n], ax = p.x + L.dx, ay = p.y + L.dy;
+    const x0 = L.anchor === 'start' ? ax : L.anchor === 'end' ? ax - TW : ax - TW / 2;
+    hit(x0, ay - 28); hit(x0 + TW, ay + 10);
   });
   document.getElementById('dip').setAttribute('viewBox', `${minx} ${miny} ${maxx - minx} ${maxy - miny}`);
 }
@@ -185,10 +200,8 @@ function refitViewBox(){
 function draw(level){
   const g = document.getElementById('dip-g');
   g.textContent = '';
-  g.setAttribute('transform', `rotate(${ROT} ${ROTC.x} ${ROTC.y})`);
   refitViewBox();
-  const upright = (x, y) => ({ transform:`rotate(${-ROT} ${x} ${y})` });   // 글자는 수평 유지
-  const lit = n => n <= level;
+  const lit = n => n <= level;   // 좌표가 이미 회전된 값이라 글자를 되돌릴 필요가 없다
 
   // ① 연결선 — 각인 선 조각(edge.png)을 구간마다 회전·신축해 깐다. 링 앞에서 끊어 여백을 준다.
   const GAP = R + 12;
@@ -204,13 +217,13 @@ function draw(level){
   });
 
   // ② 발광 별 — flare-gold.png 의 빛 중심이 (0.502, 0.371) 지점이라 그만큼 보정
-  NODES.filter(p => lit(p.n)).forEach(p => {
+  P.filter(p => lit(p.n)).forEach(p => {
     const s = 430;
     g.appendChild(el('image', { href:'cert/flare-gold.png', x:p.x-s*0.502, y:p.y-s*0.371, width:s, height:s }));
   });
 
   // ③ 링 + 숫자 + 취득일 — 레벨과 무관하게 항상 같은 좌표
-  NODES.forEach(p => {
+  P.forEach(p => {
     const on = lit(p.n);
     g.appendChild(el('circle', { cx:p.x, cy:p.y, r:R, fill:'rgba(3,11,20,.72)' }));
     const rw = 637 / 630 * (R * 2.45), rh = R * 2.45;
@@ -218,17 +231,14 @@ function draw(level){
       opacity: on ? 1 : 0.72, ...(on ? {} : { filter:'url(#ash)' }) }));
     const num = el('text', { x:p.x, y:p.y+11, 'text-anchor':'middle',
       'font-family':'NotoSerifKR,serif', 'font-size':32, 'font-weight': on ? 700 : 500,
-      fill: on ? '#fff4dd' : 'rgba(206,216,230,.82)', ...upright(p.x, p.y) });
+      fill: on ? '#fff4dd' : 'rgba(206,216,230,.82)' });
     num.textContent = p.n; g.appendChild(num);
 
-    const u = outward(p), D = R + 34;
-    const lx = p.x + u.x * D, ly = p.y + u.y * D + 9;
-    const anchor = u.x > 0.35 ? 'start' : u.x < -0.35 ? 'end' : 'middle';
-    const d = DATES[p.n];
+    const L = LABEL[p.n], d = DATES[p.n];
     if (on && d) {
-      const dt = el('text', { x:lx, y:ly, 'text-anchor':anchor,
+      const dt = el('text', { x:p.x + L.dx, y:p.y + L.dy, 'text-anchor':L.anchor,
         'font-family':'NotoSerifKR,serif', 'font-size':26, 'letter-spacing':1.8,
-        'font-weight':400, fill:'url(#goldg)', ...upright(lx, ly) });
+        'font-weight':400, fill:'url(#goldg)' });
       dt.textContent = d.replace(/\./g, ' · '); g.appendChild(dt);
     }
     // 미달성 레벨은 은색 링만으로 구분된다
@@ -254,15 +264,10 @@ function setLevel(n){
   draw(n);
 }
 
-/* 북두칠성 박스 배치 + 뷰포트에 맞춰 축소 */
+/* 뷰포트에 맞춰 축소. 북두칠성 박스는 CSS(.dipper)가 단일 출처 — 여기서 다시 계산하지 않는다
+   (React 판 .lc-dipbox 와 값을 맞춰야 해서 JS 로 덮어쓰면 두 곳이 어긋난다). */
 const stage = document.getElementById('stage');
-const dipperBox = document.querySelector('.dipper');
-const DIP = { cx: 895, w: 720, h: 760 }, H = 900, K = 1.4;
-(function placeDipper(){
-  const h = Math.min(H - 44, DIP.h * K), w = Math.min(1000, DIP.w * K);
-  dipperBox.style.width = w + 'px'; dipperBox.style.height = h + 'px';
-  dipperBox.style.left = (DIP.cx - w / 2) + 'px'; dipperBox.style.top = ((H - h) / 2) + 'px';
-})();
+const H = 900;
 function fit(){
   const s = Math.min(1, (window.innerWidth - 24) / 1448);
   stage.style.transform = `scale(${s})`;

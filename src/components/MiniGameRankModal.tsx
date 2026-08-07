@@ -139,17 +139,17 @@ export default function MiniGameRankModal({
                       </span>
                     ) : null,
                   )}
-                  {/* 이름·점수는 그림 안 크림 명판 위(=/ranking 과 같은 .hof-plate).
-                      미니게임엔 티어가 없어 엠블럼 칸은 아예 그리지 않는다. */}
+                </div>
+                {/* 이름·점수는 그림 **아래** 3칸(=/ranking 과 같은 .hof-podium-names).
+                    2026-08-06 시상대 교체로 그림 안 크림 명판이 없어졌다 — 옛 .hof-plate 는 삭제됐다. */}
+                <div className="hof-podium-names">
                   {podium.map((r, i) =>
                     r ? (
-                      <div key={`n${r.rank}`} className={`hof-plate ${podClass[i]}`}>
-                        <span className="hof-plate-txt">
-                          <b>{r.name}</b>
-                          <span>
-                            {val(r.score)}
-                            {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
-                          </span>
+                      <div key={`n${r.rank}`} className={`hof-pn ${podClass[i]}`}>
+                        <b>{r.name}</b>
+                        <span>
+                          {val(r.score)}
+                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
                         </span>
                       </div>
                     ) : null,

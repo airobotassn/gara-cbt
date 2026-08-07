@@ -96,6 +96,8 @@ export interface ListAttemptsResponse {
 // 레벨테스트 인증서 — 값은 전부 서버 계산분이다(클라 파라미터로 레벨·날짜를 못 바꾼다).
 export interface LevelCertData {
   displayName: string // 닉네임(profiles.display_name)
-  level: number // 현재 도달 레벨 = 인증서에 각인되는 숫자
-  milestones: Record<string, string> // 레벨 → 최초 도달일(ISO). Lv.1 = 첫 응시일
+  // 취득한(깬) 최고 레벨 = 인증서에 각인되는 숫자. ⚠️ currentRank 와 다르다 — rank 는 '지금 서 있는 칸'이라
+  // Lv.1 을 깨면 2가 된다(취득 = rank − 1, 천장에서 Lv.7 을 통과하면 7). 하나도 못 깼으면 인증서가 null.
+  level: number
+  milestones: Record<string, string> // 레벨 → 최초 취득일(ISO)
 }

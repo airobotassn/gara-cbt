@@ -9,6 +9,9 @@ const targets = [
   'supabase/functions/complete-daily/index.ts',
   'supabase/functions/gacha-draw/index.ts',
   'supabase/functions/shop-buy/index.ts',
+  // 코인 선물도 같은 범주다 — 재화를 옮기지만 실력/랭킹 데이터는 건드리지 않아야 한다.
+  // (코인이 시즌 점수와 별개 지갑이라는 게 "한도 없이 선물해도 순위는 안 흔들린다"의 근거다.)
+  'supabase/functions/coin-gift/index.ts',
 ];
 
 // 주석(문서화)에 등장하는 테이블명은 오탐이므로 코드 검사 전 주석을 제거한다.

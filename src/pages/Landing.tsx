@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import EarthHero from '../components/EarthHero'
+import RankGlobe from '../components/RankGlobe'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
@@ -111,8 +111,8 @@ export default function Landing() {
     //   색을 새로 정하는 게 아니라 기존 다크 모드 토큰을 그대로 쓴다(stitch.css 의 .force-dark).
     //   글자색·버튼색·크기는 손대지 않았다 — 지금 다크 모드에서 보이는 그대로다.
     <div className="lp force-dark">
-      {/* 우주 + NASA 지구 영상 히어로 */}
-      <EarthHero />
+      {/* 우주 + 밤지구 순위 지구본 히어로 (옛 NASA 영상 21.6MB → 경계 데이터 + 렌더러 약 40KB) */}
+      <RankGlobe />
       <h1>
         {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>
         <br />

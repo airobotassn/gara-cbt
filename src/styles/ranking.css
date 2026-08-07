@@ -631,32 +631,31 @@
 /* 메달 1·2·3등 — 블루 농도 차등(강→약)으로 위계 표현 */
 .hof-wrap { --gold: var(--blue); --gold-l: var(--blue-hi); --silver: var(--blue-deep); --silver-l: var(--blue); --bronze: rgba(0, 74, 198, 0.45); --bronze-l: rgba(0, 74, 198, 0.7); }
 
-/* ===== 랭킹 = 밤하늘 고정 =====
-   WORLD ARENA 의 시각 축이 우주다(랜딩=지구·아레나=세계·인증서=별자리). 랭킹도 그 집안이라
+/* ===== 랭킹 = 다크 고정 =====
    테마 토글과 무관하게 항상 어둡다 — 랜딩(.lp)이 이미 같은 방식이고, 반대로 CBT 응시는 .force-light 다.
-   ⚠️ 배경은 그라데이션으로 흉내내지 않고 **인증서와 같은 별하늘 에셋**(public/cert/bg.webp)을 쓴다.
-      같은 그림을 쓰는 게 두 화면을 한 집안으로 묶는 가장 확실한 방법이다. /test/select 도 같은 파일이다.
-   ⚠️ 원본 bg.png(2MB) 가 아니라 WebP 변환본(68KB)이다 — 같은 그림·같은 해상도. 원본은 인증서가 아직 쓴다.
+   ⚠️ 배경은 **사이트 기본 다크 표면**(stitch.css 의 `html.dark body` 와 같은 값)이다.
+      옛 별하늘 에셋(public/cert/bg.webp — 인증서·/test/select 와 공유)은 2026-08-06 제거했다:
+      "너무 게임 같다, 사무적으로" 라는 요구가 들어와 우주 장식을 걷어냈다.
+      인증서·/test/select 는 계속 별하늘을 쓴다 — 저쪽 파일을 따라 지우지 말 것.
    ⚠️ 배경은 body 에 건다 — .hof-wrap 은 960px 로 좁아서 넓은 화면에선 양옆에 밝은 페이지가 샌다. */
-/* ⚠️ 선택자를 html 까지 올려야 한다 — stitch.css 의 `html.dark body`(우선순위 0,1,2)가 다크에서
-   background-image 를 앰비언트 그라데이션으로 덮어써 별하늘이 통째로 사라졌다(2026-08-05 버그).
-   `body:has(.hof-wrap)` 는 0,1,1 이라 그걸 못 이긴다. 이 화면은 테마와 무관하게 항상 이 배경이어야 하므로
+/* ⚠️ 선택자를 html 까지 올려야 한다 — stitch.css 의 `html.dark body`(우선순위 0,1,2)를 이겨야 하고,
+   `body:has(.hof-wrap)` 는 0,1,1 이라 그걸 못 이긴다. 이 화면은 테마와 무관하게 항상 어두워야 하므로
    다크 전용 선택자(0,2,2)를 같이 둬서 어느 테마에서도 이긴다. 둘 중 하나만 지우지 말 것. */
 html body:has(.hof-wrap),
 html.dark body:has(.hof-wrap) {
-  background-color: #050a16;
-  background-image: url('/cert/bg.webp');
-  background-size: cover;
-  background-position: center;
+  background-color: #0a0c11;
+  background-image:
+    radial-gradient(125% 80% at 50% -12%, rgba(64, 110, 220, 0.12), transparent 58%),
+    radial-gradient(80% 55% at 100% 0%, rgba(40, 170, 230, 0.06), transparent 55%);
   background-attachment: fixed;
 }
-/* 페이지 토큰을 다크로 고정(html.dark 의 레거시 토큰과 같은 값 계열 — 밤하늘에 맞춰 남색 쪽으로) */
+/* 페이지 토큰을 다크로 고정 — 값은 stitch.css 의 `html.dark` 와 같다(별하늘을 걷었으니 남색으로 틀 이유가 없다) */
 .hof-wrap {
   --paper: 224, 230, 244;
-  --page: #050a16;
-  --bg: #101a2e;          /* 카드 표면 */
-  --soft: #14203a;
-  --soft2: #0b1324;
+  --page: #0a0c11;
+  --bg: #14171f;          /* 카드 표면 */
+  --soft: #191d26;
+  --soft2: #0f1219;
   --line: rgba(var(--paper), 0.12);
   --line2: rgba(var(--paper), 0.2);
   --ink: rgba(var(--paper), 0.96);
@@ -777,20 +776,23 @@ html.dark body:has(.hof-wrap) {
 .hof-sub::after { transform: scaleX(-1); }
 
 /* ===== 시상대 =====
-   그림 = public/ranking/podium.png (트림 후 1427×729). 밤하늘 남색 + 앤티크 금 + 크림 명판.
-   ⚠️ 2026-08-04 교체: 옛 그림은 963×883(높이÷폭 0.92)이라 폭이 넓은 폰에서 시상대 혼자
-      화면 세로의 62%를 먹고 '내 순위' 바를 화면 밖으로 밀어냈다. 새 그림은 0.51 이라 같은 폭에서
-      세로가 절반 이하다(500px 폭 기준 459px → 256px).
-   링 좌표(알파 구멍을 컴포넌트 탐지해 실측):
-     2등 11.75%,57.34% · 폭 11.33% (174px) | 1등 49.48%,34.25% · 16.21% (249px) | 3등 86.75%,57.39% · 11.46%
-   명판 좌표(크림색 영역 컴포넌트 탐지):
-     2등 12.5%,87.21% · 17.77%×11.62% (273×114px) | 1등 49.45%,79.66% · 44.01%×17.53% (676×172px)
-     3등 86.43%,87.21% · 17.71%×11.62% (272×114px)
+   그림 = public/ranking/podium.png (1424×874 · 높이÷폭 0.614). 남색 메탈 단 3개 + 네온.
+   ⚠️ 2026-08-06 교체: 옛 그림(밤하늘 남색 + 앤티크 금 + 크림 명판)은 "너무 게임 같다"로 반려됐다.
+   ⚠️ **아바타 링도 크림 명판도 없는 그림이다.** 그래서 얹는 방식이 이전과 다르다:
+        · 아바타 = 각 단 **위에 떠서** 윗면에 살짝 걸친다(단 앞면은 큼직한 1·2·3 숫자가 차지).
+        · 이름·점수 = 그림 **밖 아래** 3칸(.hof-podium-names). 얹을 빈 면이 그림에 없다.
+   ⚠️ 그림 위쪽 투명 여백 240px 은 **일부러 남긴 것**이다 — 1등 아바타+링이 뜰 자리다.
+      알파 트림을 다시 돌리면 그 여백이 잘려 1등 아바타가 그림 밖으로 나간다.
+   단 좌표(알파 스팬 실측 — `_span.mjs`):
+     2등 좌8.85% 상47.94% 중심22.4% | 1등 좌36.45~우64.89% 상27.57% 중심50.67% | 3등 우91.01% 상56.52% 중심78.5%
    ⚠️ 그림을 갈면 이 값들을 다시 재야 한다. */
 /* ⚠️ width:100% 필수. 가로 margin:auto 가 있으면 이 박스는 '내용 크기로 줄어드는' 상태가 되는데,
    아래 .hof-podium-art 가 container-type 을 쓰는 순간 그 내용이 부모에게 보고하는 고유 너비가 0이 된다
    (인라인 사이즈 컨테인먼트). 그러면 시상대가 통째로 폭 0으로 사라진다. */
-.hof-podium { flex: none; width: 100%; max-width: 500px; margin: 4px auto 6px; }
+/* ⚠️ container-type 은 여기(그림+이름칸을 함께 감싸는 상자)에도 필요하다 — 아래 .hof-podium-names 의
+   높이·글자를 cqw 로 잡는데, 이 상자가 컨테이너가 아니면 cqw 가 **뷰포트 폭**으로 떨어져
+   이름칸이 150px 짜리 빈 띠가 된다(2026-08-06 버그). width:100% 라 폭 붕괴는 안 난다. */
+.hof-podium { flex: none; width: 100%; max-width: 500px; margin: 4px auto 6px; container-type: inline-size; }
 /* 데스크톱에선 히어로답게 키운다. 원본이 1536px 라 이 정도는 2배 화면에서도 안 뭉갠다.
    ⚠️ 폭이 곧 세로다(높이 = 폭 × 0.639). 660px 로 잡았더니 422px 이 돼서 화면을 너무 먹었다.
       또 시상대 글자 크기가 cqw(=그림 폭) 라 폭을 줄이면 2·3등 이름이 4~10위 행보다 작아진다
@@ -801,77 +803,96 @@ html.dark body:has(.hof-wrap) {
    (vw 로 잡으면 데스크톱 2단처럼 그림 폭과 화면 폭이 따로 노는 곳에서 어긋난다). */
 .hof-podium-art { position: relative; container-type: inline-size; }
 .hof-podium-img { display: block; width: 100%; height: auto; }
-/* 링 = 그 사람 카드를 여는 버튼(button 리셋 포함) */
+/* 링 = 그 사람 카드를 여는 버튼(button 리셋 포함).
+   ⚠️ overflow 는 visible 이어야 한다 — 아래 ::after(프로필 링 테두리)가 슬롯 밖으로 삐져나오게
+      그려지는데, hidden 이면 통째로 잘려서 링이 안 보인다. 아바타 자체는 각자 원형이라(이미지는
+      인라인 border-radius, 젬은 원 안에 들어가는 육각형) 슬롯이 잘라줄 필요가 없다. */
 .hof-slot {
   position: absolute; transform: translate(-50%, -50%);
-  aspect-ratio: 1; border-radius: 50%; overflow: hidden;
+  aspect-ratio: 1; border-radius: 50%; overflow: visible;
   display: grid; place-items: center;
   appearance: none; border: 0; padding: 0; background: transparent; cursor: pointer;
 }
 .hof-slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-/* Avatar 는 px 고정으로 그려지므로 구멍 크기에 맞춰 늘린다(인라인 style 이라 !important 필요).
-   ⚠️ height:100% 만 믿으면 안 된다. 부모(.hof-slot)의 높이가 aspect-ratio 로 생긴 값이라
+/* ===== 프로필 링 테두리 (TOP 3 전용) =====
+   그림 = public/ranking/ring.png (1162×1162 정사각 · 가운데 구멍은 알파로 뚫려 있다).
+   구멍 지름 = 그림 폭의 **71.86%**, 구멍 중심 = 정중앙. 따라서 구멍을 슬롯(=아바타)에 딱 맞추려면
+   링 그림은 슬롯의 1/0.7186 = 1.3916배여야 하고, 사방으로 (1.3916−1)/2 = 19.58% 씩 넘쳐야 한다.
+   ⚠️ 링 그림을 갈면 구멍 비율을 다시 재서(`_span.mjs`) 이 inset 을 다시 계산할 것.
+   ⚠️ 아바타 위가 아니라 **아바타를 감싸는 테두리**다 — 구멍이 뚫려 있어 얼굴을 가리지 않는다. */
+.hof-slot::after {
+  content: ''; position: absolute; inset: -19.58%;
+  background: url('/ranking/ring.png') center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+/* ===== ⚠️ 아바타 달걀 방지 — 아바타 소켓은 **전부 이 규칙 하나**를 쓴다 =====
+   Avatar 는 px 고정으로 그려지므로 구멍 크기에 맞춰 늘린다(인라인 style 이라 !important 필요).
+   ⚠️ height:100% 만 믿으면 안 된다. 부모 소켓의 높이가 aspect-ratio 로 생긴 값이라
       퍼센트 높이가 auto 로 떨어지는 경우가 있고, 그러면 아바타 박스가 정사각이 아니게 된다.
       아바타에는 인라인으로 border-radius:50% 가 걸려 있어서, 박스가 97×148 이 되는 순간
-      원이 아니라 **타원**이 그려진다(달걀로 보이던 원인). aspect-ratio 로 정사각을 못박는다. */
-.hof-slot > *, .hof-slot img, .hof-slot svg {
+      원이 아니라 **타원**이 그려진다(= 달걀). aspect-ratio 로 정사각을 못박는다.
+   ⚠️ **소켓을 새로 만들면 반드시 아래 선택자 목록에 추가할 것.** 시상대(.hof-slot)에만 걸어놨더니
+      티어바(.bar-ava)가 규칙 없이 만들어져 4~10위 아바타가 전부 달걀이 됐다(2026-08-06).
+      소켓별로 따로 쓰지 말고 이 한 블록에 모은다 — 빠뜨리면 바로 달걀이 된다. */
+.hof-slot > *, .hof-slot img, .hof-slot svg,
+.bar-ava > *, .bar-ava img, .bar-ava svg {
   width: 100% !important; height: 100% !important;
   aspect-ratio: 1 !important; object-fit: cover; display: block;
 }
-.hof-slot.p1 { left: 49.48%; top: 34.25%; width: 16.21%; }
-.hof-slot.p2 { left: 11.75%; top: 57.34%; width: 11.33%; }
-.hof-slot.p3 { left: 86.75%; top: 57.39%; width: 11.46%; }
+/* 아바타 = 단 **위**에 뜬 채로 윗면에 살짝 걸친다(시상대 그림엔 아바타 구멍이 없다).
+   ⚠️ 아래 width 는 **아바타(구멍)** 크기다. 화면에 보이는 덩어리는 링까지 쳐서 이 값의 1.39배다
+      → 링을 붙이면서 아바타를 그만큼 줄였다(15/12 → 12/9.5). 링을 떼면 다시 키울 것.
+   top 은 '단 윗변 − **링** 반지름' 이다(아바타 반지름이 아니다) — 링이 단에 안 파묻히고 완전히 위에 뜬다. */
+.hof-slot.p1 { left: 50.67%; top: 14.4%; width: 11.6%; }
+.hof-slot.p2 { left: 22.4%; top: 37.2%; width: 9.5%; }
+.hof-slot.p3 { left: 78.5%; top: 45.8%; width: 9.5%; }
 
-/* ===== 이름·점수·티어 = 그림 안 크림 명판 위 =====
-   글자는 전부 cqw(컨테이너=그림 폭) 단위다 → 그림이 줄면 글자도 같은 비율로 줄어 어디서나 판에 들어간다.
-   판 위는 늘 밝은 크림이라 글자색은 테마 토큰이 아니라 고정 남색이다(다크/라이트 무관). */
-.hof-plate {
-  position: absolute; transform: translate(-50%, -50%);
-  display: flex; align-items: center; justify-content: center; gap: 1cqw;
-  overflow: hidden; color: #1b2340; line-height: 1.06;
+/* ===== 이름·점수 = 그림 **아래** 3칸 =====
+   새 시상대엔 글자를 얹을 빈 면이 없다(단 앞면 = 1·2·3 숫자). 그래서 그림 밖으로 내렸다.
+   ⚠️ 절대배치인 이유 = 각 칸이 **단 중심 %** 에 정확히 맞아야 한다. flex/grid 로 3등분하면
+      단 간격이 균등하지 않아(22.4 / 50.67 / 78.5) 이름이 단과 어긋난다.
+   글자 크기는 cqw(컨테이너 = 이 줄의 폭 = 그림 폭)라 그림과 같은 비율로 줄어든다.
+   색은 그림의 숫자 색을 그대로 따라간다 — 1등 금 · 2등 은 · 3등 동. */
+.hof-podium-names {
+  position: relative; container-type: inline-size;
+  height: 9.6cqw; min-height: 52px; margin-top: 1cqw;
 }
-.hof-plate-txt { min-width: 0; text-align: center; }
-.hof-plate b { display: block; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* ⚠️ nowrap 필수. 점수 단위가 언어마다 길다(ko '점' 1자 · vi 'điểm' · hi 'अंक') → 베트남어·힌디어에서
-   '3582 điểm' 이 판 폭을 넘겨 두 줄로 접히고, 판은 두 줄(이름/점수)까지만 들어가서 글자가 판 밖으로 나갔다. */
-.hof-plate-txt > span {
-  display: block; font-weight: 700; color: #4a5578;
+.hof-pn {
+  position: absolute; top: 0; transform: translateX(-50%);
+  width: 26%; text-align: center; line-height: 1.15;
+}
+.hof-pn b {
+  display: block; font-weight: 900;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
-/* 세 판 모두 두 줄(이름 위 / 점수 아래). 판 크기의 92% 정도만 써서 테두리에 글자가 붙지 않게 한다. */
-.hof-plate.p1 { left: 49.45%; top: 79.66%; width: 40.5%; height: 16%; }
-.hof-plate.p1 b { font-size: 4cqw; }
-.hof-plate.p1 .hof-plate-txt > span { font-size: 3cqw; margin-top: 0.3cqw; }
-
-.hof-plate.p2, .hof-plate.p3 { height: 10.6%; gap: 0.8cqw; }
-.hof-plate.p2 { left: 12.5%; top: 87.21%; width: 16.3%; }
-.hof-plate.p3 { left: 86.43%; top: 87.21%; width: 16.3%; }
-/* ⚠️ 2·3등 글자는 아래 4~10위 행 이름(약 16px)보다 커야 한다. 작으면 2등이 4등보다 덜 보이는
-   순위 역전이 난다. 600px 폭 기준 3.0cqw = 18px 로 잡아 위계를 지킨다(시상대 폭을 줄이면 여기도 올릴 것). */
-/* 엠블럼은 판 높이를 거의 채운다. 여기서 더 키우면 이름·점수 칸이 좁아진다
-   점수 글자는 긴 단위(vi 'điểm')가 한 줄에 들어가는 크기로 잡았다 — 여기서 키우면 말줄임표가 뜬다. */
-.hof-plate.p2 b, .hof-plate.p3 b { font-size: 3cqw; }
-.hof-plate.p2 .hof-plate-txt > span, .hof-plate.p3 .hof-plate-txt > span { font-size: 1.9cqw; margin-top: 0.2cqw; }
-
-/* (옛 .hof-podium-names / .hof-pn — 이름·점수를 그림 **밖** 3칸에 두던 것 — 은 제거됐다.
-    옛 그림의 명판이 75×20px 라 글자가 안 들어가서 밖에 뒀던 건데, 새 그림은 명판이 커서 안으로 들어갔다.) */
+/* ⚠️ nowrap 필수. 점수 단위가 언어마다 길다(ko '점' 1자 · vi 'điểm' · hi 'अंक') → 칸을 넘기면
+   두 줄로 접혀 아래 목록과 붙는다. 넘치면 접지 말고 말줄임표. */
+.hof-pn span {
+  display: block; font-weight: 700; margin-top: 0.4cqw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.hof-pn.p1 { left: 50.67%; }
+.hof-pn.p2 { left: 22.4%; }
+.hof-pn.p3 { left: 78.5%; }
+/* ⚠️ 2·3등 글자는 아래 4~10위 행 이름보다 커야 한다. 작으면 2등이 4등보다 덜 보이는 순위 역전이 난다. */
+.hof-pn.p1 b { font-size: 4.2cqw; color: #ffcc7a; }
+.hof-pn.p1 span { font-size: 3.2cqw; color: #d9b892; }
+.hof-pn.p2 b, .hof-pn.p3 b { font-size: 3.3cqw; }
+.hof-pn.p2 span, .hof-pn.p3 span { font-size: 2.7cqw; color: var(--muted); }
+.hof-pn.p2 b { color: #dbe7ff; }
+.hof-pn.p3 b { color: #ffb894; }
 
 /* ===== 티어리스트 바 (4~10위 행 · 내 순위 바 공용) =====
-   프레임 = public/ranking/tierbar.png (1506×326 — 원본 1536×1024 에서 여백만 잘라낸 것, 축소 금지).
-   ⚠️ 2026-08-04 교체: 옛 바는 하늘색 유리라 검정·금 시상대와 따로 놀았고, 실제 바 픽셀이 1120×191
-      뿐이라 조금만 넓게 그려도 뭉갰다. 새 바는 1506px 라 여유가 있다.
+   프레임 = public/ranking/tierbar.png (2137×296 — 원본에서 투명 여백만 잘라낸 것, 축소 금지).
+   ⚠️ 2026-08-06 교체: 시상대와 같이 갈았다(앤티크 금 → 남색 메탈 + 네온). 소켓 배치는 그대로라
+      순위칸·아바타·이름판 세 자리는 옛 바와 같은 역할이고, **오른쪽 끝 빈 방패 소켓은 사라졌다**.
+   ⚠️ 판이 크림색에서 **어두운 남색**으로 바뀌었다 → 이 안의 글자색은 전부 밝은 쪽으로 뒤집혔다.
+      옛 고정 남색(#1b2340 등)을 되살리면 검은 판에 검은 글씨가 된다.
    **그리는 방식 = 시상대와 동일하게 그림을 통으로 깔고 그 위에 %좌표로 얹는다.**
    예전엔 border-image 9-slice 로 잘라 늘였는데, 같은 PNG 를 <img> 로 그린 것보다 눈에 띄게 뭉갰다
    (브라우저의 border-image 스케일러가 이미지 스케일러보다 나쁘다). 통짜 <img> 라 축소 품질이 최선이고,
-   비율이 자동으로 지켜져 예전처럼 납작하게 눌릴 일도 없다.
-   소켓 좌표 = 그림(2356×241) 기준 % — 폭이 바뀌어도 그대로 따라간다.
-   (어두운 소켓 세 개는 컴포넌트 탐지로 실측했다 — `_sock.mjs` 로 구간을 잘라 재면 다시 나온다)
-     순위 칸(둥근 사각) 5.37%, 49.59% · 186×174px
-     아바타 원          14.77%, 49.59% · 171×170px
-     이름판             중심 55.9%, 49.6% · 가로 20.5%~91.2%
-     방패               95.73%, 50.83% · 132×174px (세로로 길다)
-   ⚠️ 그림을 갈면 이 %들을 다시 재야 한다. */
+   비율이 자동으로 지켜져 예전처럼 납작하게 눌릴 일도 없다. */
 /* 4~10위 '창' — 화면에서 유일하게 스크롤되는 영역. 페이지보다 한 톤 어둡고 푸른 '눌린 홈'.
    표면을 한 톤 내리는 건 경계 표시 겸 대비 확보다 — 판(밝기 223~255)이 페이지(250) 위에선
    흰 바탕에 흰 판이라 흐려 보였다. */
@@ -886,9 +907,10 @@ html.dark body:has(.hof-wrap) {
   width: 100%; max-width: 780px; margin: 0 auto;
   padding: 12px 18px;
   border-radius: 20px;
-  /* 밤하늘에 파인 창 — 배경보다 더 어둡게 눌러 넣고, 시상대와 같은 앤티크 금 헤어라인으로 테두리를 잡는다 */
+  /* 페이지에 파인 창 — 배경보다 더 어둡게 눌러 넣고, 바 프레임과 같은 집안의 푸른 헤어라인으로 테두리를 잡는다
+     (금 헤어라인이었는데 바가 네온 블루로 바뀌며 혼자 따로 놀았다 — 2026-08-06) */
   background: rgba(3, 8, 18, 0.5);
-  border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
+  border: 1px solid rgba(90, 140, 220, 0.22);
   box-shadow: inset 0 10px 22px -14px #000, 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
 }
@@ -902,32 +924,31 @@ html.dark body:has(.hof-wrap) {
 .hof-bar { position: relative; width: 100%; container-type: inline-size; }
 .bar-frame { display: block; width: 100%; height: auto; }
 .bar-nm {
-  position: absolute; left: 23.8%; top: 49.6%; transform: translateY(-50%);
-  max-width: 52%;
+  position: absolute; left: 29.5%; top: 50.17%; transform: translateY(-50%);
+  max-width: 48%;
   display: flex; align-items: center; gap: 1.2cqw;
-  /* 판은 양 테마에서 늘 밝은 크림이므로 글자색은 테마 토큰(--ink)이 아니라 고정 남색 */
-  font-weight: 800; font-size: 3.2cqw; color: #1b2340;
+  /* 판은 양 테마에서 늘 어두운 남색이므로 글자색은 테마 토큰(--ink)이 아니라 고정 밝은 색 */
+  font-weight: 800; font-size: 3.2cqw; color: #e6eeff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.bar-nm small { font-weight: 700; font-size: 2.5cqw; color: #5b6f9e; }
+.bar-nm small { font-weight: 700; font-size: 2.5cqw; color: #8ea4cc; }
 .bar-pt {
-  position: absolute; right: 4.5%; top: 49.6%; transform: translateY(-50%);
-  font-weight: 850; font-size: 3.2cqw; color: #2b3766; font-variant-numeric: tabular-nums;
+  position: absolute; right: 3.5%; top: 50.17%; transform: translateY(-50%);
+  font-weight: 850; font-size: 3.2cqw; color: #9ac4ff; font-variant-numeric: tabular-nums;
 }
 .bar-rk, .bar-ava { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; }
-/* 아바타는 px 고정으로 그려지므로 소켓 크기에 맞춰 늘린다(인라인 style 이라 !important 필요) */
-.bar-ava > *, .bar-ava img, .bar-ava svg { width: 100% !important; height: 100% !important; display: block; }
-/* 순위 숫자 칸은 둥근 사각이고 어두운 검정이다(옛 바는 밝은 하늘색 원이었다) → 글자색은 금빛.
+/* ⚠️ .bar-ava 안쪽(아바타 자체) 규칙은 여기 없다 — 위 '아바타 달걀 방지' 블록이 .hof-slot 과 함께 잡는다.
+   여기에 따로 쓰면 그 블록과 갈라져서 또 aspect-ratio 를 빠뜨리게 된다. */
+/* 순위 숫자 칸은 둥근 사각이고 어두운 남색이다 → 글자색은 프레임 모서리 브래킷과 같은 호박색.
    토큰(--fs-lg 는 데스크톱에서 52px까지 커진다) 대신 고정값. 폰 크기는 아래 미디어쿼리에서. */
-/* ⚠️ 아래 %는 프레임 그림(public/ranking/tierbar.png)의 소켓을 알파로 실측한 값이다.
-   그림을 갈면 반드시 다시 재야 한다 — 2026-08-05 교체본(2127×246) 실측:
-     순위 소켓 x 36~201(중심 5.57% · 폭 7.76%) · 아바타 소켓 x 247~408(중심 15.40% · 폭 7.57%)
-     크림 이름판 x 454~2082(21.35% ~ 97.93%) — .bar-nm/.bar-pt 의 좌우 여백이 여기서 나온다. */
-.bar-rk { left: 5.57%; top: 49.59%; width: 7.76%; aspect-ratio: 1; font-weight: 900; font-size: 4.4cqw; color: #f2dfa6; }
-.bar-ava { left: 15.40%; top: 49.59%; width: 7.57%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; }
-/* ⚠️ 티어 엠블렘(.bar-tier, 좌표 left:95.73%)은 2026-08-04 제거됐다.
-   배경 그림 public/ranking/tierbar.png 오른쪽 끝에 **엠블렘이 들어가던 빈 방패 소켓이 그대로 남아있다** —
-   그림을 다시 뽑거나 그 자리에 다른 걸 넣기 전까지는 빈 채로 보인다. */
+/* ⚠️ 아래 %는 프레임 그림(public/ranking/tierbar.png)의 소켓을 밝기 스캔으로 실측한 값이다.
+   그림을 갈면 반드시 다시 재야 한다 — 2026-08-06 교체본(2137×296) 실측(`_sock2.mjs`):
+     순위 소켓 x 54~255(중심 7.23% · 폭 9.45% · 202px 정사각)
+     아바타 원  x 308~498(중심 18.86% · 폭 8.94% · 191px)
+     이름판     x 581~2102(27.19% ~ 98.41%) — .bar-nm/.bar-pt 의 좌우 여백이 여기서 나온다.
+     세로는 셋 다 중심 50.17%. */
+.bar-rk { left: 7.23%; top: 50.17%; width: 9.45%; aspect-ratio: 1; font-weight: 900; font-size: 4.4cqw; color: #ffbe63; }
+.bar-ava { left: 18.86%; top: 50.17%; width: 8.94%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; }
 /* 내 행 — 배경을 못 깔므로(프레임이 이미지) 광채로 표시.
    ⚠️ filter 를 바에 걸면 프레임 이미지가 한 번 더 래스터화돼 선이 지글거린다 → 뒤에 깔린 글로우로 처리. */
 .hof-row.me { position: relative; }
@@ -935,12 +956,12 @@ html.dark body:has(.hof-wrap) {
   content: ''; position: absolute; inset: 6px 10px; z-index: -1; border-radius: 999px;
   box-shadow: 0 0 16px 4px color-mix(in srgb, var(--accent) 55%, transparent);
 }
-/* '나' 배지 — 크림 판 위에 얹히므로 파란 칩은 튄다. 판과 같은 집안(남색 바탕 + 금 테두리)으로,
+/* '나' 배지 — 어두운 판 위에 얹히므로 판보다 밝은 파란 칩으로. 판과 같은 집안(네온 블루),
    글자 높이에 맞춰 작게. 크기는 바 폭에 비례(cqw)라 어느 폭에서도 이름 옆에 얌전히 붙는다. */
 .hof-bar .meflag {
   flex: none; font-size: 2.2cqw; font-weight: 900; line-height: 1;
-  background: #1b2340; color: #f2dfa6;
-  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  background: rgba(58, 128, 255, 0.22); color: #bcd8ff;
+  border: 1px solid rgba(90, 160, 255, 0.55);
   padding: 0.5cqw 1cqw; border-radius: 999px;
 }
 

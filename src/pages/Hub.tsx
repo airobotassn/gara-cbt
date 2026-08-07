@@ -71,7 +71,7 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
@@ -86,7 +86,14 @@ function friendlyError(e: unknown): string {
   return '오류가 발생했어요. 잠시 후 다시 시도해주세요'
 }
 
-type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite'
+type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
+
+// 코인 선물 — 받은 것(오늘, 사람별 합산) / 이력 한 줄.
+type GiftToday = { name: string; amount: number; count: number }
+type GiftRow = { id: string; dir: 'in' | 'out'; name: string; amount: number; at: string }
+type GiftLookupResp = { name?: string; error?: string }
+type GiftSendResp = { duplicate: boolean; amount: number; recipient_name: string; points_after: number }
+type GiftHistoryResp = { rows: GiftRow[]; next: string | null }
 
 // 점수 획득 방법 모달의 활동 표 — 값은 전부 scoring.ts(원안 반영본) 파생이라 상수를 다시 적지 않는다.
 //   ⚠️ 여기 '점수'는 랭킹 점수(user_progress.activity_score)다. HUD 의 코인(뽑기·상점 재화)과는 별개 지갑이다.
@@ -113,6 +120,26 @@ export default function Hub() {
   const [redeemInput, setRedeemInput] = useState('')
   const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [redeeming, setRedeeming] = useState(false)
+  // 코인 선물. giftNonce 는 **모달을 열 때 한 번** 만들고 전송이 성공할 때까지 고정한다 —
+  // 뽑기·상점처럼 호출마다 randomUUID() 를 만들면 타임아웃 후 재시도가 두 번 보내기가 되고,
+  // 즉시 이체라 회수할 방법이 없다. 서버 멱등(unique(sender_id, client_nonce))은 같은 값이 와야 걸린다.
+  const [giftNonce, setGiftNonce] = useState<string | null>(null)
+  const [giftCode, setGiftCode] = useState('')
+  const [giftTo, setGiftTo] = useState<{ ok: boolean; text: string } | null>(null) // 코드 8자 완성 시 자동 조회 결과
+  const [giftAmount, setGiftAmount] = useState('')
+  const [giftConfirm, setGiftConfirm] = useState(false) // 되돌릴 수 없어서 확인 단계를 반드시 거친다
+  const [giftSending, setGiftSending] = useState(false)
+  const [giftMsg, setGiftMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [giftsToday, setGiftsToday] = useState<GiftToday[]>([])
+  const [giftsOlder, setGiftsOlder] = useState(0)
+  const [giftsUnseen, setGiftsUnseen] = useState(0)
+  // 모달을 연 시점의 '받은 선물' 스냅샷. 화면은 이걸 그린다.
+  //   서버 값(giftsToday)을 직접 그리면, 모달 안에서 선물을 보낸 뒤 hydrate() 가 돌 때
+  //   이미 seen 처리된 목록이 빈 배열로 돌아와 **보고 있던 블록이 눈앞에서 사라진다.**
+  const [giftGot, setGiftGot] = useState<GiftToday[]>([])
+  const [giftGotOlder, setGiftGotOlder] = useState(0)
+  const [giftHistory, setGiftHistory] = useState<GiftRow[] | null>(null)
+  const [giftHistoryOpen, setGiftHistoryOpen] = useState(false)
   const [owned, setOwned] = useState<Set<string>>(new Set())
   const [pity, setPity] = useState(0)
   // 시험 사다리 등급(user_progress.rank). HUD 의 Lv 는 이제 ARENA 레벨(점수 밴드)이라 화면에는 안 쓴다
@@ -276,6 +303,9 @@ export default function Hub() {
     setPointsToPass(h.pointsToPass ?? null)
     setRank(h.rank ?? null)
     setRankTotal(h.rankTotal ?? null)
+    setGiftsToday(h.giftsToday ?? [])
+    setGiftsOlder(h.giftsOlder ?? 0)
+    setGiftsUnseen(h.giftsUnseen ?? 0)
   }
   async function hydrate() {
     try {
@@ -355,6 +385,99 @@ export default function Hub() {
     }
   }
 
+  // ---------- 코인 선물 ----------
+  // 즉시 이체다. 취소·회수 경로가 없어서 방어선은 (a) 코드 8자 완성 시 닉네임 노출 (b) 확인 단계
+  // (c) nonce 재사용 셋뿐이다. 서버는 잠금 순서·잔액·멱등·원장을 전부 RPC 한 트랜잭션에서 처리한다.
+  function openGift() {
+    if (!isFullUser) { void loginWithGoogle(); return }
+    setGiftNonce(crypto.randomUUID()) // ⚠️ 여기서 한 번만. 전송 성공 전까지 이 값을 재사용한다.
+    setGiftGot(giftsToday); setGiftGotOlder(giftsOlder) // 연 시점으로 고정 — 아래 seen 처리에 지워지지 않게
+    setGiftCode(''); setGiftTo(null); setGiftAmount('')
+    setGiftConfirm(false); setGiftMsg(null)
+    setGiftHistory(null); setGiftHistoryOpen(false)
+    setModal('gift')
+    // 받은 선물은 모달을 여는 것으로 '확인'된다. 실패해도 무시 — 다음에 열면 다시 시도된다.
+    if (giftsUnseen > 0) {
+      callFunction('coin-gift', { action: 'seen' })
+        .then(() => { setGiftsUnseen(0); setGiftsOlder(0) })
+        .catch(() => {})
+    }
+  }
+
+  // 코드 8자가 채워지면 자동 조회 — 조회 버튼을 따로 두지 않는다(동선 하나 줄이고, 이름이 곧 확인 절차다).
+  // 서버 쿼터는 10분 30회라 사람이 타이핑하는 속도로는 닿지 않는다.
+  useEffect(() => {
+    if (modal !== 'gift') return
+    const code = giftCode.trim().toUpperCase()
+    // 8자 미만이면 아무것도 하지 않는다 — 이전 이름을 지우는 건 onChange 가 맡는다.
+    // (이 파일 규칙: 이펙트 본문에서 동기 setState 금지. setState 는 프라미스 콜백에서만.)
+    if (code.length !== 8) return
+    let alive = true
+    const timer = window.setTimeout(() => {
+      callFunction<GiftLookupResp>('coin-gift', { action: 'lookup', code })
+        .then((r) => {
+          if (!alive) return
+          if (r.name) { setGiftTo({ ok: true, text: r.name }); return }
+          const map: Record<string, string> = {
+            not_found: '없는 코드예요',
+            self: '내 코드예요',
+            too_many: '조회가 너무 많아요. 잠시 후 다시 시도해주세요',
+          }
+          setGiftTo({ ok: false, text: map[r.error ?? ''] ?? '확인할 수 없어요' })
+        })
+        .catch(() => { if (alive) setGiftTo({ ok: false, text: '확인할 수 없어요' }) })
+    }, 250)
+    return () => { alive = false; window.clearTimeout(timer) }
+  }, [giftCode, modal])
+
+  async function doGift() {
+    if (!giftNonce || giftSending) return
+    const amount = Math.floor(Number(giftAmount))
+    if (!Number.isFinite(amount) || amount <= 0) { setGiftMsg({ ok: false, text: '보낼 금액을 입력해주세요' }); return }
+    try {
+      setGiftSending(true)
+      setGiftMsg(null)
+      const r = await callFunction<GiftSendResp>('coin-gift', {
+        action: 'send',
+        code: giftCode.trim().toUpperCase(),
+        amount,
+        client_nonce: giftNonce, // ⚠️ 재시도에도 같은 값 — 새로 만들면 두 번 보내진다.
+      })
+      setGiftMsg({ ok: true, text: `${r.recipient_name}님에게 ${r.amount.toLocaleString()}코인을 보냈어요` })
+      // 성공했으니 이 nonce 는 소진됐다. 이어서 또 보내려면 새 값이 필요하다.
+      setGiftNonce(crypto.randomUUID())
+      setGiftCode(''); setGiftTo(null); setGiftAmount(''); setGiftConfirm(false)
+      setGiftHistory(null) // 이력을 펼쳐놨다면 다음에 열 때 새로 받는다
+      await hydrate()
+    } catch (e) {
+      const code = e instanceof Error ? e.message : ''
+      const map: Record<string, string> = {
+        insufficient: '코인이 부족해요',
+        not_found: '없는 코드예요',
+        self: '나에게는 보낼 수 없어요',
+        invalid_amount: '보낼 금액이 올바르지 않아요',
+        too_fast: '같은 친구에게 너무 자주 보내고 있어요. 잠시 후 다시 시도해주세요',
+        unauthorized: '로그인이 필요해요',
+      }
+      setGiftMsg({ ok: false, text: map[code] ?? '보내지 못했어요' })
+      setGiftConfirm(false)
+    } finally {
+      setGiftSending(false)
+    }
+  }
+
+  async function toggleGiftHistory() {
+    const next = !giftHistoryOpen
+    setGiftHistoryOpen(next)
+    if (!next || giftHistory) return
+    try {
+      const r = await callFunction<GiftHistoryResp>('coin-gift', { action: 'history', limit: 30 })
+      setGiftHistory(r.rows ?? [])
+    } catch {
+      setGiftHistory([])
+    }
+  }
+
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
   // const unusedCoupons = coupons.filter((c) => !c.used).length
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {titles[0].track} {titles[0].grade}</span> : null
@@ -420,10 +543,19 @@ export default function Hub() {
         <Link className="hub-back" to="/arena">
           <span className="ic">←</span>WORLD ARENA
         </Link>
-        {/* 공유 = 지금 순위·티어·칭호로 카드(PNG) 를 만들어 내보낸다(ShareCardModal) */}
-        <button className="hub-share" onClick={() => setModal('share')}>
-          <span className="ic"><Ic n="share" s={16} /></span>공유
-        </button>
+        {/* 오른쪽 두 버튼은 묶어둔다 — .hub-backrow 가 space-between 이라 낱개로 넣으면 셋이 흩어진다.
+            선물은 초대하기 모달에 넣지 않고 여기 독립 진입점으로 둔다(2026-08-07 결정). */}
+        <div className="hub-backrow-act">
+          {/* 코인 선물 = 친구코드로 CARI 코인을 즉시 이체. 뱃지 = 아직 확인 안 한 받은 선물 건수. */}
+          <button className="hub-share hub-gift" onClick={openGift}>
+            <span className="ic"><Ic n="coin" s={16} /></span>선물
+            {giftsUnseen > 0 && <span className="bd">{giftsUnseen}</span>}
+          </button>
+          {/* 공유 = 지금 순위·티어·칭호로 카드(PNG) 를 만들어 내보낸다(ShareCardModal) */}
+          <button className="hub-share" onClick={() => setModal('share')}>
+            <span className="ic"><Ic n="share" s={16} /></span>공유
+          </button>
+        </div>
       </div>
 
       {!isFullUser && (
@@ -773,6 +905,106 @@ export default function Hub() {
             )}
             {redeemMsg && <p className={`iv-redeem-msg${redeemMsg.ok ? ' is-ok' : ''}`}>{redeemMsg.text}</p>}
           </div>
+        </Modal>
+      )}
+
+      {modal === 'gift' && (
+        <Modal title="코인 선물" onClose={() => setModal(null)}>
+          <div className="gf-bal">
+            <Ic n="coin" s={22} /><span className="gf-bal-n">{points.toLocaleString()}</span><span className="gf-bal-lab">보유 코인</span>
+          </div>
+
+          {/* 받은 선물 — 오늘 것만 상세로. 저장은 건별이지만 표시는 사람별 합산이라 도배돼도 한 줄이다. */}
+          {(giftGot.length > 0 || giftGotOlder > 0) && (
+            <div className="gf-got">
+              <div className="gf-got-head">받은 선물</div>
+              {giftGot.map((g) => (
+                <div className="gf-got-row" key={g.name}>
+                  <b className="gf-got-name">{g.name}</b>
+                  <span className="gf-got-amt">+{g.amount.toLocaleString()}</span>
+                  {g.count > 1 && <span className="gf-got-n">{g.count}건</span>}
+                </div>
+              ))}
+              {giftGotOlder > 0 && (
+                <button className="gf-older" onClick={toggleGiftHistory}>
+                  이전에 받은 선물 {giftGotOlder}건 <span className="gf-chev">›</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* 보내기 — 되돌릴 수 없으니 코드 → 이름 확인 → 금액 → 확인 순서를 강제한다. */}
+          <div className="gf-send">
+            <div className="gf-send-head">코인 보내기</div>
+            <label className="gf-lab" htmlFor="gf-code">친구 초대코드</label>
+            <input
+              id="gf-code"
+              className="gf-in"
+              value={giftCode}
+              /* 코드가 바뀌면 앞서 띄운 이름은 그 자리에서 무효다 — 여기서 지운다(이펙트가 아니라).
+                 남겨두면 코드를 고치는 도중에도 옛 이름이 붙어 있어 엉뚱한 사람 이름을 보고 보내게 된다. */
+              onChange={(e) => { setGiftCode(e.target.value.toUpperCase()); setGiftTo(null); setGiftConfirm(false); setGiftMsg(null) }}
+              placeholder="CARIXXXX"
+              maxLength={8}
+              disabled={giftSending}
+              autoComplete="off"
+            />
+            {/* 8자를 다 치면 여기 이름이 뜬다. 이게 오타를 막는 유일한 장치라 반드시 실명(닉네임)을 보여준다. */}
+            {giftTo && <p className={`gf-to${giftTo.ok ? ' is-ok' : ''}`}>{giftTo.ok ? `${giftTo.text}님에게 보냅니다` : giftTo.text}</p>}
+
+            <label className="gf-lab" htmlFor="gf-amt">보낼 코인</label>
+            <input
+              id="gf-amt"
+              className="gf-in"
+              value={giftAmount}
+              onChange={(e) => { setGiftAmount(e.target.value.replace(/[^0-9]/g, '')); setGiftConfirm(false); setGiftMsg(null) }}
+              placeholder="0"
+              inputMode="numeric"
+              disabled={giftSending}
+              autoComplete="off"
+            />
+
+            {!giftConfirm ? (
+              <button
+                className="gf-btn"
+                onClick={() => { setGiftMsg(null); setGiftConfirm(true) }}
+                disabled={giftSending || !giftTo?.ok || !giftAmount || Number(giftAmount) <= 0}
+              >
+                보내기
+              </button>
+            ) : (
+              <div className="gf-confirm">
+                <p className="gf-confirm-q">
+                  <b>{giftTo?.text}</b>님에게 <b>{Number(giftAmount).toLocaleString()}코인</b>을 보낼까요?
+                </p>
+                <p className="gf-confirm-warn">보내고 나면 되돌릴 수 없어요.</p>
+                <div className="gf-confirm-act">
+                  <button className="gf-btn gf-btn-ghost" onClick={() => setGiftConfirm(false)} disabled={giftSending}>취소</button>
+                  <button className="gf-btn" onClick={doGift} disabled={giftSending}>{giftSending ? '보내는 중' : '보내기'}</button>
+                </div>
+              </div>
+            )}
+            {giftMsg && <p className={`gf-msg${giftMsg.ok ? ' is-ok' : ''}`}>{giftMsg.text}</p>}
+          </div>
+
+          {/* 전체 이력 — 오늘 것 말고는 전부 여기. 보낸 것·받은 것이 건별로 다 남는다. */}
+          <button className="gf-hist-toggle" onClick={toggleGiftHistory}>
+            선물 내역 <span className={`gf-chev${giftHistoryOpen ? ' is-open' : ''}`}>›</span>
+          </button>
+          {giftHistoryOpen && (
+            <div className="gf-hist">
+              {giftHistory === null && <p className="hub-modal-help">불러오는 중…</p>}
+              {giftHistory?.length === 0 && <p className="hub-modal-help">아직 주고받은 선물이 없어요.</p>}
+              {giftHistory?.map((r) => (
+                <div className={`gf-hist-row is-${r.dir}`} key={r.id}>
+                  <span className="gf-hist-dir">{r.dir === 'in' ? '받음' : '보냄'}</span>
+                  <b className="gf-hist-name">{r.name}</b>
+                  <span className="gf-hist-amt">{r.dir === 'in' ? '+' : '−'}{r.amount.toLocaleString()}</span>
+                  <span className="gf-hist-at">{r.at.slice(0, 10)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
 

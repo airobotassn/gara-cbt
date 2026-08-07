@@ -1,0 +1,49 @@
+/* rankglobe: RankGlobe.tsx — 랜딩 히어로 밤지구 순위 지구본 (다크 고정)
+ *
+ * 옛 `earthhero.css` 를 대체한다. 그쪽은 영상 프레임 안 구의 위치를 %로 맞추느라 기하 상수가
+ * 잔뜩 필요했는데, 여기서는 캔버스가 지구를 직접 그리므로 **CSS 에 기하가 하나도 없다**.
+ * 지구 중심·반지름·기울기는 RankGlobe.tsx 의 `CFG`·`geom()` 한 곳에서만 정한다.
+ */
+
+.rg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #03050b;
+  z-index: 0;
+}
+
+.rg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* 끌어서 돌린다(/arena 와 같은 조작). 문구·검색창·버튼은 이 위(z-index 1)에 있어 가려지지 않고,
+     그 위에서 시작한 드래그는 캔버스로 오지 않으므로 입력·버튼 조작을 방해하지 않는다. */
+  cursor: grab;
+  /* ⚠️ 없으면 모바일에서 지구를 끌 때 브라우저가 페이지 스크롤·확대로 가로채 회전이 끊긴다. */
+  touch-action: none;
+}
+.rg-canvas.is-drag {
+  cursor: grabbing;
+}
+
+/* 히어로 문구가 얹히는 가운데 띠만 아주 옅게 눌러 글자 가독성을 받친다.
+   ⚠️ 진하게 깔지 말 것 — 상위권 불빛이 바로 그 높이에서 빛나는데 같이 죽는다.
+      글자 쪽은 landing.css 의 `.lp h1` text-shadow 가 이미 받치고 있어서 이 정도면 충분하다. */
+.rg-veil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18%;
+  height: 46%;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(3, 5, 11, 0) 0%,
+    rgba(3, 5, 11, 0.32) 32%,
+    rgba(3, 5, 11, 0.32) 68%,
+    rgba(3, 5, 11, 0) 100%
+  );
+}

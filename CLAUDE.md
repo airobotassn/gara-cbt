@@ -140,7 +140,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 
 | URL | 페이지 파일 | CSS | 주 Edge Function |
 |---|---|---|---|
-| `/` (메인·랜딩) | `pages/Landing.tsx` | `landing.css` | `route-query`(의미 검색 라우터) |
+| `/` (메인·랜딩) | `pages/Landing.tsx` + `components/RankGlobe.tsx` | `landing.css` · `rankglobe.css` | `route-query`(의미 검색 라우터) · `leaderboard` |
 | `/guide` (자격검정 안내) | `pages/Guide.tsx` | `guide.css` ⚠️급수 색 양쪽 동기화 | — |
 | `/plan` (시험 일정·접수) | `pages/Plan.tsx` | `plan.css` (배경은 `.guide-page` 공유) | — |
 | `/notice` · `/notice/:id` | `Notice.tsx` · `NoticeDetail.tsx` | `shared.css` | `admin`(운영 CRUD) |
@@ -164,7 +164,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/checkout?type=&ref=` (결제) | `pages/Checkout.tsx` | (Tailwind 유틸) | `payments` |
 | `/pay/success` · `/pay/fail` (결제 결과) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
 | **캐릭터 허브 / 미니게임** ||||
-| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` · `redeem-referral` |
+| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` · `redeem-referral` · `coin-gift` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
 | `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
@@ -176,10 +176,16 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | **관리자** ||||
 | `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) | `admin.css` | `admin` · `admin-test` |
 
-- **메인 히어로 지구본 교체 — 검토 중(2026-08-06, 아직 코드 미반영)**: 옛 NASA 밤지구 영상(`EarthHero.tsx` + `public/earth.mp4` 21.6MB)을 **밤지구 순위 지구본**으로 갈아치우는 안. 시안 = **`docs/globe-mock.html`**(브라우저로 바로 열리는 단독 HTML, 값 슬라이더 포함). 실제 랜딩에는 아직 손대지 않았다.
-  - ⚠️ **위성사진을 깔면 안 된다**(`public/earth/*.webp` 3장은 그 시도의 잔재). 사하라 갈색·아마존 초록·구름 흰색이 순위색과 같은 세기로 튀어서, 지구가 사실적일수록 순위가 안 읽힌다. 밤지구는 "불 켜진 곳 = 순위" 한 겹만 남아 사진보다 잘 읽힌다.
-  - ⚠️ **나라 면을 칠해 순위를 표현하면 안 된다.** 밝기가 곧 국토 면적이 되어 6위 중국이 1위 한국보다 밝아지고 16위 호주가 화면에서 제일 크게 빛난다(시안에서 실제로 그랬다). **광점**(반지름·밝기가 순위만의 함수) + **빛기둥 높이 = 순위**로 표현할 것.
-  - 전송량 추산 21.6MB → 약 40KB(`geo/world.json` brotli 32KB + 렌더러 7KB). 경계 파일은 `/arena` 가 이미 받는 것이라 실질 추가분은 더 작다.
+- **메인 히어로 = 밤지구 순위 지구본(2026-08-06 반영)**: 옛 NASA 밤지구 **영상**(`EarthHero.tsx` + `public/earth.mp4` 21.6MB)을 캔버스 렌더러 `components/RankGlobe.tsx` 로 갈아치웠다. 지구를 사진으로 깔지 않고 그 자리에서 그린다 — 바다는 거의 검게, 모든 나라는 균일한 어두운 판, **상위 10개국의 국토 면이 빛나고** 1·2·3위는 금·은·동 + 그 땅 위에 `1st`·`2nd`·`3rd`. 전송량 21.6MB → 약 40KB(`geo/world.json` brotli 32KB + 렌더러)이고 그 경계 파일은 `/arena` 가 이미 받는 것이라 실질 추가분은 더 작다.
+  - **모든 수치의 단일 출처 = `RankGlobe.tsx` 의 `CFG`**(바다·대륙 밝기, 발광, 색조, 크기·위치, 자전 속도 …). CSS 에는 기하가 하나도 없다(옛 `earthhero.css` 와 정반대). 값은 시안 **`docs/globe-mock.html`** 에서 슬라이더로 맞춘 뒤 '설정값 복사'로 옮긴 것이라, 바꿀 때도 시안에서 먼저 맞추는 게 빠르다. `CFG` 키 이름 = 시안 컨트롤 항목명.
+  - ⚠️ **위성사진을 깔면 안 된다**(`public/earth/*.webp` 3장은 그 시도의 잔재). 사하라 갈색·아마존 초록·구름 흰색이 순위색과 같은 세기로 튀어서, 지구가 사실적일수록 순위가 안 읽힌다.
+  - ⚠️ **면 발광은 면적 편향이 있다** — 보정(`AREA_REF` 기준 `^0.42`)을 끄면 6위 중국이 1위 한국보다 압도적으로 밝고 16위 호주가 화면에서 제일 크게 빛난다(시안에서 실제로 그랬다). 순위를 면적과 무관하게 읽히게 하려면 광점 모드가 맞고, 지금은 "땅이 빛나는" 그림을 택한 대신 면적 보정으로 누르고 있다.
+  - ⚠️ **구면 클리핑(`clipAngle(90)`)은 필수다.** 뒷면 점을 테두리로 밀어붙이는 근사를 쓰면 러시아·남극처럼 경도로 긴 땅이 넘어갈 때 폴리곤이 넓적하게 늘어나 **바다를 덮었다 벗겨졌다** 한다(자전하니 얼룩이 표면을 훑는 것처럼 보인다 — 실제로 겪고 d3-geo 로 교체했다).
+  - 초기 경도 `ROT_LON0 = -80`(동경 80° 정면)은 유럽·인도·중국·한국을 한 화면에 넣으려는 값이다. 태평양(-150)으로 두면 상위권이 전부 뒤편이라 **불빛이 하나도 안 보인다.**
+  - 순위 소스는 `/arena` 와 **동일**(`buildRegions` — 실집계 `leaderboard` `scope:'country'` 우선, 없는 나라는 `data.ts` 의 데모 목값). ⚠️ 실집계는 현재 **대한민국 한 곳뿐**이라 화면에 보이는 순위는 대부분 목값이다.
+  - ⚠️ `landing.css` 의 `.lp > *:not(.eh):not(.rg)` — 배경 레이어를 예외에서 빠뜨리면 flex 아이템으로 접혀 **0×0** 이 된다(실제로 `.rg` 를 그렇게 잃었다). 같은 파일의 `padding-bottom: 34vh`(옛 영상 구도에서 문구를 위로 밀던 우회)도 제거해 스택이 화면 한가운데 선다.
+  - **조작 = 끌어서 돌리기**(`/arena` 와 같은 감각). 누르면 페이지 이동하는 동작은 없다 — `/arena` 로 가는 길은 `WORLD ARENA` 버튼이다. 드래그 중에는 자동 회전이 멈추고, 손을 뗀 각도를 새 기준(`spinBase`/`spinFrom`)으로 삼아 `RESUME_MS`(2.2초) 뒤 이어서 돈다. ⚠️ 기준을 안 잡으면 손 떼는 순간 원래 궤도로 순간이동한다. ⚠️ 캔버스에 `touch-action:none` 이 없으면 모바일에서 브라우저가 스크롤로 가로채 회전이 끊긴다.
+  - 절약은 **화면 밖이면 렌더 정지** 하나만 넣었다(대가 없는 유일한 것). 30fps 제한은 자전이 끊겨 보이고, WebGL 은 폴백을 두 벌 유지해야 해서 안 했다.
 - **`/guide` 개편(2026-07)**: 히어로(로고 락업 + 카피 + `CARIS PLAN` 버튼 + 로봇 이미지) → "CARIS는 무엇인가요?"(특징 카드 8장) → "CARIS 자격 체계"(피라미드 + 급수별 검정과목 카드) 3단 구성. **시험 일정은 `/plan` 으로 분리**됐다(옛 히어로 우측 일정 패널·상시시험 띠는 삭제). `/guide` 에서 원서접수로 가는 경로 = `CARIS PLAN` 버튼 → `/plan` → 회차 카드 → `/exam/apply`. 페이지 배경/색 토큰(`--g-*`)은 `.guide-page`(guide.css)가 단일 출처고 `/plan` 도 그걸 쓴다.
   - 히어로 이미지 = `public/hero-robot.png`(배경 투명). **손 위 CARIS 행성은 이미지에 없다** — `logo.png` 를 CSS 로 겹친 별도 레이어(`.guide-hero-orb`, %좌표 + 글로우 + 부유 애니메이션). 로봇 이미지를 갈면 손바닥 비율에 맞춰 `.guide-hero-orb`/`.guide-hero-art::after` 의 `left`·`top` 을 다시 맞출 것.
   - ⚠️ 클래스명에 `.hl` 쓰지 말 것 — `result.css` 가 전역으로 `.hl { display:flex }` 를 잡고 있다(`.gh-hl` 로 우회).
@@ -210,6 +216,16 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
     - 티어는 텍스트가 아니라 **엠블렘 이미지 단독**(`<TierBadge>`, 백분위 '상위 N%' 는 제거 — 순위 맥락은 랭킹 화면 소관). ⚠️ `TierBadge` 가 인라인 style 로 크기를 박으므로 `.tier-chip img` 는 `!important` 없이는 못 키운다.
     - 아바타 밑 `Lv.` 배지(`.hud-lv`)는 제거했다 — 바가 이미 `ARENA Lv.N` 을 말한다.
   - ⚠️ **미션은 한 줄 얇은 바(`.mission-bar`)다 — 카드로 키우지 말 것.** 좌측 세로 카드는 캐릭터를 옆으로 밀어서, 큰 가로 타일은 무대를 눌러서 각각 반려됐다(2026-08-04). 지금은 칩 3개 한 줄이고 chrome 은 하단 `.reward`(출석 보상)와 같은 값이라 위아래가 한 쌍으로 읽힌다. 모바일은 `.ms-chips` 를 `order:3 / flex-basis:100%` 로 통째로 둘째 줄에 내린다. 시안의 CTA 배너("미션 완료하고…")와 코인/점수 구분 안내문은 중복이라 삭제.
+  - **코인 선물(2026-08-07)**: 뒤로가기 줄 오른쪽 `선물` 버튼(공유 옆) → 모달. **친구 초대 모달에 넣지 않는다**(같은 친구코드를 쓰지만 별개 진입점으로 두기로 결정). 두 버튼은 `.hub-backrow-act` 로 묶는다 — `.hub-backrow` 가 `space-between` 이라 낱개로 넣으면 셋이 흩어진다.
+    - **즉시 이체다. 취소·회수 경로가 없다.** 방어선은 ① 코드 8자 완성 시 상대 **닉네임 자동 표시** ② 확인 단계 ③ nonce 재사용 셋뿐이다.
+    - ⚠️ **`client_nonce` 를 호출마다 새로 만들면 안 된다.** 뽑기·상점은 `crypto.randomUUID()` 를 호출 시점에 만들지만(재시도해도 손해가 작다), 선물은 그러면 타임아웃 후 재시도가 **두 번 보내기**가 되고 되돌릴 수 없다. `Hub.tsx` 는 **모달을 열 때 1회** 만들어 전송 성공까지 고정한다(`giftNonce`).
+    - ⚠️ **잠금 순서가 이 기능의 핵심 한 줄이다.** 이체는 처음으로 두 사람의 `user_currency` 행을 잠근다 — `least/greatest` 로 **uuid 오름차순 고정**이 아니면 A→B / B→A 동시 실행이 데드락이다.
+    - ⚠️ **원장(`coin_transfers`)은 `on delete set null` + 닉네임 스냅샷**이다. 다른 테이블의 `cascade` 관례를 여기 적용하면 발신자가 탈퇴하는 순간 받은 사람의 이력이 사라져 "이 코인 왜 늘었지"에 영영 못 답한다. self CHECK 도 `sender_id <> recipient_id` 로 쓰면 양쪽 null 일 때 CHECK 이 깨져 SET NULL 자체가 실패한다.
+    - **저장은 건별, 표시는 사람별 합산.** 허브는 **오늘 받은 것**만 상세로 보여주고 그 이전 미확인은 건수만(`giftsToday`/`giftsOlder`/`giftsUnseen` — `get-hub`). 서버는 미확인 전부를 내려준다(오늘로 자르면 하루 안 들어온 사람의 알림이 통째로 사라진다). 전체 이력은 모달 안 `선물 내역 ›`(`coin-gift` 의 `history`).
+    - **금액 한도는 없다**(잔액이 곧 한도 — 코인은 시즌 점수·랭킹과 별개 지갑이라 파밍해도 순위가 안 흔들린다). 대신 **같은 사람에게 10초 쿨다운**만 건다 — 돈이 아니라 받는 사람의 알림을 지키는 장치다. 한도를 나중에 얹고 싶으면 원장이 이미 있으니 쿼리만 추가하면 된다.
+    - **가루(dust)는 선물 대상이 아니다** — 뽑기 천장·한정템 교환가(150)가 설계 전제라 이체되면 천장이 무의미해진다.
+    - 익명 계정은 송·수신 둘 다 불가. 수신은 따로 막지 않아도 된다 — `get-hub` 가 익명을 먼저 컷해서 `ensure_referral_code` 가 안 불리고, **코드가 없으면 지정 자체가 성립하지 않는다.**
+    - 검증: `tests/db/t-coin-gift.mjs`(48건, pglite). ⚠️ pglite 는 단일 커넥션이라 **진짜 동시 실행은 재현 못 한다** — 잠금 순서는 코드 리뷰 사항이다.
   - **친구 초대는 도크 `초대하기` 모달 하나에서 다 끝난다** — 화면에 카드로 꺼내지 않는다(진입점 중복 제거). 모달 = 위(내 코드 + 복사) + 아래(친구 코드 입력).
     - 내 코드 = `profiles.referral_code` + `ensure_referral_code(uid)` RPC. **계정 귀속·영구 고정**이다(값이 있으면 그대로 반환, 없을 때만 1회 생성). 형식 `CARI`+4자.
     - 등록 = `redeem-referral` 함수. `profiles.referred_by` 가 비어있을 때만 박히고 **계정당 1회·되돌릴 수 없다** → 그때부터 입력칸이 잠긴다(FE 도 `referralUsed` 를 한 번 true 면 안 푼다).
@@ -242,8 +258,8 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   34개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
-               · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral) · 검색라우터(route-query·route-seed)
+  functions/   35개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+               · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
                · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · toss.ts(토스 API 래퍼) · payments.ts(주문·금액검증·지급·대사)
 ```
@@ -281,6 +297,8 @@ supabase/
 - **금액을 요청으로 받지 않는다.** `create` 는 상품ID만 받고 `_shared/payments.ts` 의 `resolveProduct` 가 DB에서 다시 뽑는다. `confirm` 은 successUrl 의 `amount` 를 **저장된 주문 금액과 대조한 뒤**, 승인 API 에는 **저장된 값**을 넘긴다. 소유자(`user_id`) 확인도 필수 — 안 하면 남의 주문에 결제를 붙일 수 있다.
 - **중복 지급은 코드가 아니라 DB가 막는다** — `payments` 의 부분 유니크 인덱스 `(user_id, product_type, product_ref) where status='paid'` + `ebook_purchases.unique(user_id, ebook_id)`. Idempotency-Key 는 토스 쪽 중복 승인만 막지 우리 DB 이중지급은 못 막는다.
 - **지급 순서 = 지급 먼저, `fulfilled_at` 나중.** 반대로 하면 지급이 실패했을 때 "이미 줬다"는 기록만 남아 미지급을 영영 못 찾는다. `status='paid' AND fulfilled_at IS NULL` 이 "돈은 받았는데 안 준 것" 신호이고 대사가 이걸 본다.
+- **PG 어댑터(포트) 구조** — 승인·조회·상태정규화는 `_shared/payment-provider.ts`(포트) 뒤에 있고, 토스 구현은 `_shared/toss.ts` 의 `tossProvider` 다. `payments.ts`·`payments` 함수는 PG 를 모르고 `getProvider(row.provider)` 로만 부른다. **엑심베이 등 새 PG = `_shared/eximbay.ts` 새 파일 + `PROVIDERS` 에 한 줄. 토스 코드는 열지 않는다**(그래서 검증된 토스 동작이 안 틀어진다). ⚠️ 프론트 결제창은 PG 마다 달라 포트로 못 숨긴다 — 그건 그때 컴포넌트 추가. `settleFromToss`→`settleFromProvider`, `TossPayment`→`ProviderPayment`(중립). status 정규화 중 `canceled→refunded` 업그레이드만 settle 이 한다(어댑터는 취소를 늘 canceled 로 준다 — 우리 DB 의 fulfilled 를 모르니까).
+- **환불 자동 회수** — 사람이 토스 대시보드에서 환불하면 웹훅→`settleFromProvider` 가 `refunded` 로 바꾸는 순간, **그 결제로 지급된 것만 자동 회수**한다(`revokeForRefund`). ⛔ 대상은 사용자·상품이 아니라 **`payment_id` 로만** 특정 — 다른 구매·남의 것은 절대 안 건드린다. 안 쓴 것만 자동: 이북=열람권 삭제, **미사용(issued)** 응시권=void. **이미 소비(consumed)된 응시권은 자동 회수 안 함**(응시 후 건이라 성적·자격증 판단 필요) → 대사 목록에 남긴다. 환불을 **일으키는** 코드(토스 취소 API)는 일부러 없다 — 돈 되돌리는 건 수동. 앱 안에 고객용 '환불 요청' UI 도 아직 없다(요청은 앱 밖).
 - ⚠️ **가상계좌**: 승인 응답이 와도 `WAITING_FOR_DEPOSIT` 이면 계좌가 **발급**된 것이지 결제된 게 아니다. 여기서 지급하면 돈 안 받고 물건을 준다 → `waiting_deposit` 로 두고 입금 웹훅에서 지급한다.
 - ⚠️ **`payments-webhook` 만 `verify_jwt=false` 로 배포**한다(토스는 Supabase JWT 를 못 싣는다). `route-seed` 에 이은 두 번째 예외라 URL 시크릿(`?k=`)이 필수다. 나머지 함수엔 `--no-verify-jwt` 금지.
 - **일반 결제 웹훅에는 서명 헤더가 없다**(그건 지급대행/셀러 웹훅 전용). 본문을 믿지 말고 식별자만 꺼내 **토스에 다시 조회**해 판정한다(`resettle`). 웹훅은 중복·역순·미도착이 다 가능하므로 웹훅만으론 부족 — `payments/reconcile`(헤더 `x-reconcile-key`)을 주기적으로 돌려야 한다.

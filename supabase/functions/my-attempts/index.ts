@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     if (body?.issue) {
       const { data: a } = await admin
         .from('exam_attempts')
-        .select('id, user_id, exam_id, status, result_release_at, submitted_at, total_correct, total_questions, verify_token, cert_no, cert_name_roman')
+        .select('id, user_id, exam_id, ticket_id, status, result_release_at, submitted_at, total_correct, total_questions, verify_token, cert_no, cert_name_roman')
         .eq('id', body.issue)
         .maybeSingle()
       if (!a || a.user_id !== user.id) return json({ error: '권한이 없습니다.' }, 403)
@@ -101,31 +101,32 @@ Deno.serve(async (req) => {
           : false
       if (!passed) return json({ error: '인증서는 결과 공개 후 합격한 응시만 발급할 수 있습니다.' }, 409)
 
-      let verifyToken = (a.verify_token as string | null) ?? null
-      let certNo = (a.cert_no as string | null) ?? null
-      if (!verifyToken || !certNo) {
-        // 시험명으로 트랙 추정 → 자격번호. 연도는 취득(제출) 연도.
-        let title: string | null = null
-        if (a.exam_id) {
-          const { data: ex } = await admin.from('exams').select('title').eq('id', a.exam_id).maybeSingle()
-          title = (ex as { title?: string } | null)?.title ?? null
-        }
-        const year = a.submitted_at ? new Date(a.submitted_at).getFullYear() : new Date().getFullYear()
-        verifyToken = verifyToken ?? crypto.randomUUID()
-        if (!certNo) {
-          // 일련번호는 DB 가 채번한다(종목·등급·연도별 원자 증가). 여기서 만들어내면 중복이 나간다.
-          const grade = gradeOfTitle(title)
-          const { data: seq, error: seqErr } = await admin.rpc('next_cert_seq', {
-            p_subject: subjectOf(grade),
-            p_grade: grade,
-            p_year: year,
-          })
-          // 채번 실패 시 임시 번호로 때우지 않는다 — 자격번호는 한번 나가면 회수가 안 된다.
-          if (seqErr || typeof seq !== 'number') return json({ error: 'cert_seq_failed' }, 500)
-          certNo = makeCertNo(grade, year, seq)
+      // 결제·응시권 생존 재확인 — start-exam 은 응시 시작 때 강제하지만, 그 뒤 환불(차지백)·관리자
+      // 회수(void)는 시간상 더 뒤라 발급 시점에 다시 본다. 자격번호는 한번 나가면 회수 불가라 여기서 막는다.
+      if (a.ticket_id) {
+        const { data: tk } = await admin
+          .from('exam_tickets')
+          .select('status, source, payment_id')
+          .eq('id', a.ticket_id)
+          .maybeSingle()
+        if (tk) {
+          if (tk.status === 'void') {
+            return json({ error: '취소·회수된 응시권의 자격증은 발급할 수 없습니다.' }, 409)
+          }
+          if (tk.source === 'pg' && tk.payment_id) {
+            const { data: pay } = await admin
+              .from('payments')
+              .select('status')
+              .eq('id', tk.payment_id)
+              .maybeSingle()
+            if (pay && pay.status !== 'paid') {
+              return json({ error: '결제가 취소·환불된 응시의 자격증은 발급할 수 없습니다.' }, 409)
+            }
+          }
         }
       }
-      // 영문 성명 — 인증서에 각인되는 유일한 이름이라 발급 시 필수. 재발급은 저장된 값을 그대로 쓴다.
+
+      // 영문 성명 검증 — 채번보다 먼저 통과시킨다. 검증 실패(400)가 자격번호 시퀀스를 소각하면 안 된다.
       // 규칙: 라틴 문자·공백·하이픈·아포스트로피·마침표만(여권 표기 관행), 2~40자.
       const stored = (a.cert_name_roman as string | null) ?? null
       const input = typeof body.nameRoman === 'string' ? body.nameRoman.trim().replace(/\s+/g, ' ') : ''
@@ -138,12 +139,60 @@ Deno.serve(async (req) => {
       }
       if (!nameRoman) return json({ error: 'name_roman_required' }, 400)
 
-      const { error: issueErr } = await admin
-        .from('exam_attempts')
-        .update({ cert_issued_at: new Date().toISOString(), verify_token: verifyToken, cert_no: certNo, cert_name_roman: nameRoman })
-        .eq('id', a.id)
-      if (issueErr) return json({ error: issueErr.message }, 400)
-      issued = { verifyToken, certNo, nameRoman }
+      // 이미 발급된 건 = 재발급: 채번을 다시 부르지 않고(시퀀스 안 새게) 시각·이름만 갱신, 번호·토큰 불변.
+      if (a.verify_token && a.cert_no) {
+        const { error: reErr } = await admin
+          .from('exam_attempts')
+          .update({ cert_issued_at: new Date().toISOString(), cert_name_roman: nameRoman })
+          .eq('id', a.id)
+        if (reErr) return json({ error: reErr.message }, 400)
+        issued = { verifyToken: a.verify_token as string, certNo: a.cert_no as string, nameRoman }
+      } else {
+        // 최초 발급 — 위 검증(소유·합격·생존·이름)을 전부 통과한 뒤에만 채번한다.
+        // 시험명으로 트랙 추정 → 자격번호. 연도는 취득(제출) 연도.
+        let title: string | null = null
+        if (a.exam_id) {
+          const { data: ex } = await admin.from('exams').select('title').eq('id', a.exam_id).maybeSingle()
+          title = (ex as { title?: string } | null)?.title ?? null
+        }
+        const year = a.submitted_at ? new Date(a.submitted_at).getFullYear() : new Date().getFullYear()
+        const grade = gradeOfTitle(title)
+        // 일련번호는 DB 가 채번한다(종목·등급·연도별 원자 증가). 여기서 만들어내면 중복이 나간다.
+        const { data: seq, error: seqErr } = await admin.rpc('next_cert_seq', {
+          p_subject: subjectOf(grade),
+          p_grade: grade,
+          p_year: year,
+        })
+        // 채번 실패 시 임시 번호로 때우지 않는다 — 자격번호는 한번 나가면 회수가 안 된다.
+        if (seqErr || typeof seq !== 'number') return json({ error: 'cert_seq_failed' }, 500)
+        const verifyToken = crypto.randomUUID()
+        const certNo = makeCertNo(grade, year, seq)
+
+        // 선점형 UPDATE — cert_no 가 아직 비어 있을 때만 내 값을 박는다. 동시 발급이 먼저 채웠으면
+        // 0행이 돌아오고, 그땐 이미 확정된 값을 재조회해 반환한다(응답=저장 보장, 중복 번호·죽은 QR 방지).
+        const { data: won, error: issueErr } = await admin
+          .from('exam_attempts')
+          .update({ cert_issued_at: new Date().toISOString(), verify_token: verifyToken, cert_no: certNo, cert_name_roman: nameRoman })
+          .eq('id', a.id)
+          .is('cert_no', null)
+          .select('cert_no, verify_token, cert_name_roman')
+        if (issueErr) return json({ error: issueErr.message }, 400)
+        if (won && won.length > 0) {
+          issued = { verifyToken, certNo, nameRoman }
+        } else {
+          // 경쟁에서 짐 — 내 seq 는 갭이 되지만(무해), 발급 번호는 이미 확정된 하나로 통일한다.
+          const { data: fin } = await admin
+            .from('exam_attempts')
+            .select('cert_no, verify_token, cert_name_roman')
+            .eq('id', a.id)
+            .maybeSingle()
+          issued = {
+            verifyToken: (fin?.verify_token as string) ?? verifyToken,
+            certNo: (fin?.cert_no as string) ?? certNo,
+            nameRoman: (fin?.cert_name_roman as string | null) ?? nameRoman,
+          }
+        }
+      }
     }
 
     const { data } = await admin

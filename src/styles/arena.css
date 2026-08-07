@@ -84,6 +84,12 @@ html.dark .arena {
   .aa-grid, .aa-grid.aa-solo { grid-template-columns: 1fr; height: auto; }
   .aa-stage { height: 60vh; }
   .aa-side { height: auto; max-height: 74vh; }
+  /* ⚠️ 채팅만은 높이를 **못 박는다**(height:auto 금지). 목록이 3.5~4.5초마다 폴링으로 늘어나므로
+     내용에 높이를 맡기면 글이 올라올 때마다 패널이 커지고 지워지면 줄어서 화면이 계속 들썩인다.
+     데스크톱엔 없던 문제 — 거기선 .aa-grid 가 높이를 잡아준다.
+     단위는 svh(주소창이 펴진 최소 뷰포트) — 스크롤 중 주소창이 접혀도, 키보드가 올라와도 안 변한다.
+     ⚠️ dvh 로 바꾸지 말 것: 주소창 접힘에 따라 값이 실시간으로 변해서 오히려 더 흔들린다. */
+  .aa-side-chat { max-height: none; height: 74vh; height: clamp(360px, 74svh, 680px); }
   .aa-tabs { height: auto; width: 100%; flex-direction: row; }
 }
 .aa-card { background: var(--aa-panel); border: 2.5px solid var(--aa-line); border-radius: 20px; box-shadow: var(--aa-shadow); }
