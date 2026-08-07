@@ -4,13 +4,15 @@
 // 왜 있나: 국내는 토스(원화), 해외는 엑심베이(달러). payments.ts·payments 함수는 포트만 알고 PG 를 모른다.
 //   이 파일을 추가하고 payment-provider 의 PROVIDERS 에 등록하면 토스 코드를 한 줄도 안 열고 해외 결제가 붙는다.
 //
-// ⚠️⚠️ **이 파일은 공개 문서만 보고 작성했고, 테스트 MID/키로 아직 실검증하지 못했다.**
-//    토스는 문서키로 실제 때려보며 맞췄는데(특성화 13케이스), 엑심베이는 테스트키가 없어 그걸 못 했다.
-//    아래 `TODO(verify)` 표시가 붙은 곳은 **실제 테스트키로 한 번 확인해야 확정**되는 지점이다:
-//      · Basic 인증 문자열의 정확한 형태(mid:apikey 인지, apikey: 인지)
-//      · 금액 단위(USD 를 달러로 보내는지 센트로 보내는지)
-//      · confirm(=/verify)에 SDK 콜백 필드를 어떻게 넘기는지
-//    나머지(엔드포인트·상태값·조회)는 문서가 명확해 그대로 옮겼다.
+// **실검증 상태(2026-08-07, 문서용 공개 테스트키 mid=1849705C64 / api-test.eximbay.com):**
+//    ✅ 인증 형태 = `base64(apikey:)` (문서 본문 'mid:apikey' 는 틀림 — 실측으로 확정)
+//    ✅ /ready → rescode 0000 + fgkey 정상 발급
+//    ✅ 조회 '주문 없음' = rescode Q004 + status NONE → absent 정규화
+//    아직 **미확정(TODO)** — 결제를 실제로 완주해야 확인되는 것:
+//      · 금액 단위(USD 100 이 $100 인지 $1.00 인지 — /ready 는 통과했지만 완주 전엔 모른다)
+//      · confirm(=/verify)에 SDK 콜백 필드 배선(포트 confirm 인자 확장 필요)
+//      · retrieve 의 currency/amount 를 resettle 이 넘기도록 포트 queryBy* 확장
+//    ⚠️ 위 공개 테스트키는 **여러 사람이 공유하는 샌드박스**다(토스 문서키와 같은 성격). 계약 후 전용 키로 재확인할 것.
 //
 // ⚠️ 통화: 지금 시스템은 원(KRW) 전제다(exam_fees·표시·amount 전부). 엑심베이는 달러 고정으로 갈 것이라,
 //    "원화 정가 → 달러 환산" 은 이 어댑터가 아니라 **결제 레이어(resolveProduct/create)** 에서 해야 한다.
@@ -42,11 +44,11 @@ function secretKey(): string {
   return v
 }
 
-/** ⚠️ TODO(verify): 문서는 `Basic base64(mid:apikey)` 라는데, 예시 값을 디코드하면 `<값>:`(뒤가 빈) 형태라
- *   토스처럼 `base64(apikey:)` 일 가능성도 있다. 실제 테스트키로 한 번 확인해 둘 중 하나로 확정할 것.
- *   지금은 문서 표기(mid:apikey)를 따른다. */
+/** ✅ 실검증 완료(2026-08-07, api-test.eximbay.com) — 인증은 **`base64(apikey:)`** 다(apikey + 콜론, 토스와 동일).
+ *   문서 본문엔 `base64(mid:apikey)` 라고 써 있지만 **그건 틀렸다** — 그 형태로 보내면 `EC1000 Authorization is invalid`.
+ *   문서의 Basic 예시 값을 디코드하면 `apikey:` 가 나오고, 그 형태만 200 을 받는다. mid 는 인증이 아니라 **본문**에 넣는다. */
 function authHeader(): string {
-  return `Basic ${btoa(`${mid()}:${secretKey()}`)}`
+  return `Basic ${btoa(`${secretKey()}:`)}`
 }
 
 // 엑심베이 결제 응답의 payment 블록 — 우리가 읽는 필드만.
@@ -186,25 +188,31 @@ export const eximbayProvider: PaymentProvider = {
     }
   },
 
+  // ⚠️ 엑심베이 retrieve 는 currency·amount 도 **필수**다(실검증 확인). 포트 queryBy* 는 값 하나만 받아서
+  //    지금은 그 둘을 못 넘긴다 → resettle 에 엑심베이를 물리려면 포트 시그니처를 (value,{currency,amount})로
+  //    넓혀야 한다(create/프론트 배선 때 같이). 그 전엔 엑심베이 조회가 필수필드 누락으로 실패한다.
   queryByKey: (transactionId) => retrieve('transaction_id', transactionId),
   queryByOrderId: (orderId) => retrieve('order_id', orderId),
 }
 
-/** 조회 — order_id 또는 transaction_id 로. status=NONE 이면 **주문 부재(absent)** 로 접어 우리 resettle 규격에 맞춘다. */
-async function retrieve(keyField: 'order_id' | 'transaction_id', value: string): Promise<ProviderResult> {
-  // ⚠️ TODO(verify): retrieve 는 currency·amount 도 mandatory 다. 조회 시점에 우리가 그 값을 알아야 하는데
-  //    지금 시그니처(값 하나)로는 부족하다. 실배선 때 조회 헬퍼에 currency/amount 를 같이 넘기도록 넓힐 것.
+/** 조회 — order_id 또는 transaction_id 로. status=NONE/Q004 이면 **주문 부재(absent)** 로 접어 resettle 규격에 맞춘다. */
+async function retrieve(
+  keyField: 'order_id' | 'transaction_id',
+  value: string,
+  extra?: { currency: string; amount: string },
+): Promise<ProviderResult> {
   const { http, data } = await call('/v1/payments/retrieve', {
     mid: mid(),
     key_field: keyField,
-    payment: { [keyField]: value },
+    payment: { [keyField]: value, currency: extra?.currency, amount: extra?.amount, lang: 'EN' },
   })
-  if (data?.rescode !== '0000') return errResult(http, data)
-  const p = data.payment ?? {}
-  // 엑심베이는 "주문 없음"을 오류가 아니라 status=NONE 으로 준다 — 우리 포트에선 이걸 absent 오류로 정규화한다
-  // (그래야 resettle 이 '그런 결제 없음'으로 판정해 오래된 pending 을 만료로 접을 수 있다).
-  if ((p.status ?? 'NONE') === 'NONE') {
-    return errResult(http, { rescode: 'NONE', resmsg: '존재하지 않는 주문' }, true)
+  // ✅ 실검증(2026-08-07): "주문 없음"은 rescode **Q004**("No Transaction") + payment.status **NONE** 으로 온다
+  //    (rescode 0000 + NONE 이 아니다 — 처음 가정이 틀렸다). 우리 포트에선 이걸 **absent 오류**로 정규화한다
+  //    (그래야 resettle 이 '그런 결제 없음'으로 판정해 오래된 pending 을 만료로 접는다).
+  const p = data?.payment ?? {}
+  if ((p.status ?? 'NONE') === 'NONE' || data?.rescode === 'Q004') {
+    return errResult(http, { rescode: data?.rescode ?? 'NONE', resmsg: data?.resmsg ?? '존재하지 않는 주문' }, true)
   }
+  if (data?.rescode !== '0000') return errResult(http, data)
   return { ok: true, data: normalize(p) }
 }
