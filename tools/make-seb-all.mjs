@@ -20,11 +20,24 @@ const outDir = process.argv[3] || 'public'
 const maxDisplays = Math.max(1, Number(process.argv[4] || 8))
 const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
 
-// 수동 종료(창닫기·Ctrl+Q) 시 비밀번호 요구 → 응시자가 임의로 SEB 를 끌 수 없음.
-// 시험 종료(quitURL=/exam/done)는 비밀번호 없이 자동 종료(quitURLConfirm=false)로 유지.
-// 감독관/관리자만 이 비밀번호로 강제 종료 가능.
-const QUIT_PASSWORD = 'gara-exit-2026'
-const hashedQuitPassword = sha('sha256').update(QUIT_PASSWORD).digest('hex')
+// ⛔ 종료 비밀번호(hashedQuitPassword)를 **일부러 넣지 않는다.** 넣으면 SEB 의 종료(X) 버튼이
+//    비밀번호를 묻고, 그 순간 응시자는 나갈 방법이 없어진다 — 우리 시험은 **감독관이 없는 10일 자율응시**라
+//    그 비밀번호를 대신 쳐줄 사람이 현장에 아무도 없다. 앱이 죽기라도 하면 응시자는 재부팅해야 한다
+//    (2026-08-10 테스트에서 실제로 두 번 그랬다).
+//
+//    없애서 잃는 것 = "나갔다가 검색해보고 돌아오기"를 막는 효과. 하지만 무감독 자율응시에서는
+//    옆에 폰 한 대만 있어도 성립하는 일이라, 이미 열린 구멍에 비해 실익이 없다.
+//    (되돌아오는 건 '새 응시'가 아니다 — start-exam 이 같은 응시로 재진입시키고 started_at 이 유지돼
+//     나가 있는 동안에도 제한시간은 계속 흐른다. 그게 실질적인 억제책이다.)
+//
+//    SEB 소스의 분기: hasQuitPassword ? 비밀번호창 : 예/아니오 확인창
+//      (SafeExamBrowser.Client/Responsibilities/ShellResponsibility.cs · TryInitiateShutdown)
+//    → 비워두면 X 버튼이 "정말 종료할까요?" 확인 후 닫힌다. 잠금화면(SEB LOCKED)도 비번이 없으면
+//      자동으로 통과된다(ClientResponsibility.WaitForLockScreenResolution).
+//
+//    ⚠️ 감독 체계를 갖춘 시험을 열게 되면 그때 다시 넣을 것. 그때는 감독관이 비번을 들고 있어야 한다.
+//
+// 시험 종료(quitURL=/exam/done)는 계속 비밀번호 없이 자동 종료(quitURLConfirm=false).
 
 function plistFor(startURL) {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -56,8 +69,6 @@ function plistFor(startURL) {
 \t<true/>
 \t<key>allowQuit</key>
 \t<true/>
-\t<key>hashedQuitPassword</key>
-\t<string>${hashedQuitPassword}</string>
 \t<key>quitURL</key>
 \t<string>${origin}/exam/done</string>
 \t<key>quitURLConfirm</key>
