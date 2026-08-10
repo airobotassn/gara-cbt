@@ -18,6 +18,19 @@ SEB는 뒤로가기·새로고침·주소창·앱전환이 전부 막혀 있다.
    - 이 값은 `tools/make-seb-all.mjs` 의 `QUIT_PASSWORD` 다. 바꾸면 `.seb` 를 다시 뽑고 **이 문서도 같이 고칠 것.**
 3. 위 둘이 다 안 되면 그때가 재부팅이다. (2026-08-10 테스트에서 실제로 여기까지 갔다 — 그래서 1번을 만들었다.)
 
+### 빨간 `SEB LOCKED` 화면이 뜬다면 (앱 문제가 아니다)
+
+> The last session with the currently active configuration or start URL was not terminated properly!
+
+**시험이 고장난 게 아니다.** SEB 가 "지난 세션이 정상 종료되지 않았다"고 판단해 시작 직후 잠금화면을 **덮은** 것이고,
+그 밑에서 시험 페이지는 이미 정상으로 열려 있다(로그의 `Browser Window #1 Navigated` 로 확인).
+
+- 지금 여는 법: **`gara-exit-2026`** 입력 → Unlock → 잠금만 걷히고 그대로 응시로 이어진다.
+- ⚠️ **한 번 강제종료·재부팅하면 그다음부터 매번 막힌다.** 플래그는 정상 종료된 세션이 있어야 지워지는데,
+  잠금 때문에 정상 종료를 못 해서 스스로 못 빠져나온다. 비밀번호로 한 번 끊어줘야 한다.
+- 그래서 `.seb` 에서 이 검사를 껐다(`enableSessionVerification=false`). **실제 감독 시험 전에는 다시 켤 것.**
+- 로그 위치: `%LOCALAPPDATA%\SafeExamBrowser\Logs` — `Client.log` 의 `IntegrityResponsibility` 줄이 이 판정을 남긴다.
+
 > ⚠️ 응시 중(`/exam/run/*`)에는 1번이 뜨지 않는다. 시험 도중 나가는 건 '종료(포기)' 이고 그건 응시를 무효로 기록해야 하기 때문이다.
 > ⚠️ 막다른 화면(오류·데이터 유실 등)을 새로 만들 때는 `<SebExitButton>` 을 같이 둘 것. 전역 안전망(`<SebEscapeHatch>`)이 받쳐주지만, 그 화면에서 바로 보이는 게 낫다.
 

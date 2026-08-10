@@ -41,6 +41,15 @@ function plistFor(startURL) {
 \t        받는 쪽(SebStart·i18n)이 두 경우를 다 견디게 해놨다 — 그 방어를 지울 거면 실기기로 먼저 확인할 것. -->
 \t<key>startURLAppendQueryParameter</key>
 \t<true/>
+\t<!-- 세션 무결성 검사 끔.
+\t     켜져 있으면 SEB 가 "지난 세션이 정상 종료됐나"를 보고, 아니면 시작하자마자 빨간 잠금화면
+\t     (SEB LOCKED)을 덮어 종료 비밀번호를 요구한다. 문제는 **한 번 강제종료·재부팅하면
+\t     그다음부터 매번 막힌다**는 것이다 — 플래그는 정상 종료된 세션이 있어야 지워지는데
+\t     잠금 때문에 정상 종료를 못 하니 스스로 빠져나올 수 없다(2026-08-10 실제로 이 고리에 갇혔다).
+\t     ⚠️ 이건 "누가 시험 도중 SEB 를 죽이고 다시 켰다"를 잡는 부정행위 신호다.
+\t        실제 감독 시험을 열기 전에 다시 켤 것(그때는 감독관이 비밀번호를 들고 있어야 한다). -->
+\t<key>enableSessionVerification</key>
+\t<false/>
 \t<key>sebConfigPurpose</key>
 \t<integer>0</integer>
 \t<key>sendBrowserExamKey</key>
