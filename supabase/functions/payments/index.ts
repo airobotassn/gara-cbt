@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
           .from('payments')
           .update({ status: 'failed', fail_code: 'AMOUNT_MISMATCH', fail_message: `요청 ${clientAmount} ≠ 주문 ${row.amount}`, updated_at: new Date().toISOString() })
           .eq('id', row.id)
-          .eq('status', 'pending')
+          .eq('status', 'pending')  // 금액 검사는 선점 전이라 여기선 pending 만 본다
         return json({ error: '결제 금액이 주문과 일치하지 않습니다.' }, 400)
       }
 
@@ -249,9 +249,9 @@ Deno.serve(async (req) => {
       //    ※ create 에서 '살아있는 pending 주문 재사용'도 검토했지만 넣지 않았다 — 토스 결제 세션은 10분 만료라
       //      만료분을 판별할 방법이 우리 쪽에 없고(주문 나이만 봐선 알 수 없다), 살아있는 세션을 재사용하려다
       //      죽은 orderId 를 돌려주면 결제가 시작조차 안 된다. 돈이 빠지는 걸 막는 건 이 승인 전 검사로 충분하다.
-      //    ※ 남는 구멍: **두 주문의 confirm 이 동시에** 들어오면 둘 다 이 검사를 통과한다(그 순간 paid 행이 없다).
-      //      완전히 막으려면 승인 전에 주문을 선점하는 상태('confirming')가 필요한데 payments.status CHECK 에 없다.
-      //      그 경우엔 뒤늦은 UPDATE 가 payments_paid_product_uniq 에 걸려 settleFromToss 가 던지고 대사에 올라간다.
+      //    ※ 이 검사만으로는 **두 confirm 이 동시에** 들어오는 경우를 못 막는다(그 순간 paid 행이 없어 둘 다 통과).
+      //      그래서 아래에서 PG 를 부르기 직전에 주문을 'confirming' 으로 선점한다 — 그게 최종 방어선이고
+      //      이 검사는 사용자에게 이유를 알려주는 앞단이다(2026-08-10 마이그레이션 payments_confirming).
       //    ⚠️ 'paid' 만 보면 안 된다. **가상계좌 주문은 'waiting_deposit' 으로 살아 있다** — 입금 전이라
       //      paid 도 아니고 부분 유니크에도 안 걸린다. 그래서 "가상계좌로 주문해두고 기다리기 싫어 카드로 또 결제"
       //      가 그대로 성립하고, 나중에 그 계좌에 입금하면 실제로 두 번 청구된 것이 된다.
@@ -284,6 +284,54 @@ Deno.serve(async (req) => {
         )
       }
 
+      // ⛔ **PG 를 부르기 전에 주문을 선점한다.** 위 dupPaid 검사는 원자적이지 않다 —
+      //    같은 상품의 confirm 두 개가 동시에 들어오면 둘 다 "완료된 결제 없음"을 보고 통과하고,
+      //    토스가 두 건 다 승인해서 **돈이 두 번 빠진다**(두 번째는 우리 DB 유니크에서만 터진다).
+      //    선점은 payments_confirming_product_uniq 가 (사람 × 상품) 단위로 막으므로 한 번에 하나만
+      //    PG 로 나간다 — 진 쪽은 결제가 아예 시작되지 않는다.
+      //  ⚠️ 'confirming' 은 일시 상태다. 선점만 하고 끊기면 행이 여기 남는데, 그건 reconcile 이
+      //     미완결 대상에 포함해 PG 에 다시 물어 수렴시키고, 아래 실패 경로들이 잠금을 풀어준다.
+      //     (안 풀면 그 상품은 영영 잠겨 사용자가 재시도할 수 없다.)
+      {
+        const { data: claimed, error: claimErr } = await admin
+          .from('payments')
+          .update({ status: 'confirming', updated_at: new Date().toISOString() })
+          .eq('id', row.id)
+          .eq('status', 'pending')
+          .select('id')
+        if (claimErr) {
+          // 23505 = payments_confirming_product_uniq = 같은 상품의 승인이 이미 PG 로 나가 있다.
+          if ((claimErr as { code?: string }).code === '23505') {
+            await admin
+              .from('payments')
+              .update({
+                status: 'failed',
+                fail_code: 'DUPLICATE_PRODUCT',
+                fail_message: '같은 상품의 승인이 이미 진행 중입니다.',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', row.id)
+              .eq('status', 'pending')
+            return json(
+              { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
+              400,
+            )
+          }
+          return json({ error: claimErr.message }, 400)
+        }
+        // 0행 = 그사이 이 주문이 pending 이 아니게 됐다. 저장된 현재 상태를 그대로 돌려준다(멱등).
+        if (!claimed || claimed.length === 0) {
+          const { data: now } = await admin.from('payments').select(PAYMENT_COLS).eq('id', row.id).maybeSingle()
+          const cur = (now ?? row) as PaymentRow
+          return json({
+            status: cur.status,
+            fulfilled: Boolean(cur.fulfilled_at),
+            productType: cur.product_type,
+            productRef: cur.product_ref,
+          })
+        }
+      }
+
       // 이 주문이 어느 PG 로 열렸는지에 따라 어댑터를 고른다(지금은 전부 'toss'). 아래는 PG 를 모른다.
       const provider = getProvider(row.provider)
 
@@ -313,7 +361,8 @@ Deno.serve(async (req) => {
           .from('payments')
           .update({ status: 'failed', fail_code: res.error.code, fail_message: res.error.message, payment_key: paymentKey, updated_at: new Date().toISOString() })
           .eq('id', row.id)
-          .eq('status', 'pending')
+          // 여기까지 왔으면 이 주문은 위에서 'confirming' 으로 선점돼 있다 — 실패로 접으면서 잠금도 푼다.
+          .in('status', ['pending', 'confirming'])
         return json({ error: res.error.message, code: res.error.code }, 400)
       }
 

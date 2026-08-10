@@ -3,6 +3,7 @@
 // 여기서 보는 건 "코드가 잘 짜였나"가 아니라 **코드가 실수해도 DB 가 막아주나**다.
 // 결제에서 복구 불가능한 사고는 하나뿐 — 어긋난 걸 모르는 상태 — 이고, 아래 제약들이 그걸 없앤다.
 //  · 같은 사람이 같은 상품을 두 번 '결제 완료'로 가질 수 없다 (부분 유니크 인덱스)
+//  · 같은 상품의 승인이 동시에 두 건 PG 로 나갈 수 없다 (선점 상태 'confirming' + 부분 유니크)
 //  · 환불된 뒤에는 다시 살 수 있다 (부분 인덱스라 refunded 는 대상에서 빠진다)
 //  · 0원/음수 금액 행이 원장에 못 들어온다
 //  · status 는 정해진 값만 (오타 상태가 조용히 저장되면 대사가 그 행을 영영 못 본다)
@@ -13,6 +14,8 @@ import { readFileSync } from 'node:fs';
 const raw = readFileSync('supabase/migrations/20260806170000_payments.sql', 'utf8');
 // 자격증 발급비(cert) — product_type 을 넓히는 후속 마이그레이션. 같이 적용해야 원장이 실제 운영과 같은 모양이 된다.
 const rawCert = readFileSync('supabase/migrations/20260807130000_payments_cert.sql', 'utf8');
+// 승인 선점(confirming) — 같은 상품의 동시 승인이 둘 다 PG 로 나가는 걸 막는 후속 마이그레이션.
+const rawClaim = readFileSync('supabase/migrations/20260810180000_payments_confirming.sql', 'utf8');
 
 // pglite 엔 auth 스키마가 없다 — FK 만 떼고 나머지 DDL 은 원본 그대로 적용한다.
 const strip = (sql) => sql.replace(/\s+references auth\.users\(id\)(\s+on delete cascade)?/g, '');
@@ -36,6 +39,7 @@ await db.exec(`
 `);
 await db.exec(strip(raw));
 await db.exec(strip(rawCert));
+await db.exec(strip(rawClaim));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -162,6 +166,49 @@ rec('paid 상품 부분 유니크 인덱스 존재', names.includes('payments_pa
 const paidUniq = idxDefs.find((r) => r.indexname === 'payments_paid_product_uniq')?.indexdef ?? '';
 rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'",
   /user_id, product_type, product_ref/.test(paidUniq) && /status = 'paid'/.test(paidUniq), true);
+
+// --- (10-b) 승인 선점(confirming) — **돈이 두 번 빠지는 것**을 DB 가 막는 자리 ---
+//   주문은 pending 으로 생기고 중복 유니크는 paid 에만 걸린다. 그래서 결제창을 두 개 띄우고 동시에
+//   승인하면 두 요청이 나란히 "완료된 결제 없음"을 보고 통과해 토스가 두 건 다 승인한다.
+//   payments/index.ts 는 PG 를 부르기 직전에 주문을 'confirming' 으로 선점하고, 아래 유니크가
+//   (사람 × 상품) 단위로 그 선점을 하나로 제한한다 — 진 쪽은 결제가 아예 시작되지 않는다.
+{
+  rec("confirming 이 status 허용값에 있음", (await db.query(
+    `select 1 c from pg_constraint where conname='payments_status_check'
+      and pg_get_constraintdef(oid) like '%confirming%'`)).rows.length, 1);
+  rec('선점 부분 유니크 인덱스 존재', names.includes('payments_confirming_product_uniq'), true);
+  const claimUniq = idxDefs.find((r) => r.indexname === 'payments_confirming_product_uniq')?.indexdef ?? '';
+  rec("선점 유니크가 (user_id, product_type, product_ref) where status='confirming'",
+    /user_id, product_type, product_ref/.test(claimUniq) && /status = 'confirming'/.test(claimUniq), true);
+
+  const CLAIM = '00000000-0000-0000-0000-0000000c0001';
+  await insertPayment(U2, { status: 'pending', ref: CLAIM, orderId: 'claim-a' });
+  await insertPayment(U2, { status: 'pending', ref: CLAIM, orderId: 'claim-b' });
+  const idA = (await db.query(`select id from payments where order_id='claim-a'`)).rows[0].id;
+  const idB = (await db.query(`select id from payments where order_id='claim-b'`)).rows[0].id;
+
+  // 첫 승인이 선점한다 — 여기까지는 두 주문 다 pending 이라 코드 검사로는 구분이 안 된다.
+  await db.query(`update payments set status='confirming' where id=$1 and status='pending'`, [idA]);
+  rec('첫 승인 선점 성공', (await db.query(`select status from payments where id=$1`, [idA])).rows[0].status, 'confirming');
+
+  // 두 번째가 같은 상품을 선점하려 한다 → DB 가 막는다(= PG 를 부르기 전에 끊긴다).
+  let blocked = false;
+  try {
+    await db.query(`update payments set status='confirming' where id=$1 and status='pending'`, [idB]);
+  } catch (e) {
+    blocked = /unique|중복|duplicate/i.test(String(e?.message ?? ''));
+  }
+  rec('⭐ 같은 상품 동시 승인 선점이 막힘(돈이 두 번 안 빠진다)', blocked, true);
+
+  // 실패로 접으면 잠금이 풀려야 한다 — 안 그러면 그 상품은 영영 다시 결제할 수 없다.
+  await db.query(`update payments set status='failed' where id=$1 and status in ('pending','confirming')`, [idA]);
+  await db.query(`update payments set status='confirming' where id=$1 and status='pending'`, [idB]);
+  rec('선점 해제 후 다음 주문이 선점 가능', (await db.query(`select status from payments where id=$1`, [idB])).rows[0].status, 'confirming');
+
+  // 선점된 채로 완료되는 정상 경로: confirming → paid 는 paid 유니크만 보면 된다.
+  await db.query(`update payments set status='paid' where id=$1`, [idB]);
+  rec('선점 후 승인 완료(confirming → paid)', (await db.query(`select status from payments where id=$1`, [idB])).rows[0].status, 'paid');
+}
 
 // --- (11) 환불 자동 회수 — **결제 링크(payment_id)로 특정한 것 하나만** 지워지는가 ---
 //     settleFromProvider→revokeForRefund 이 실제로 쓰는 삭제문의 타깃팅을 SQL 수준에서 검증한다.

@@ -431,12 +431,14 @@ export async function resettle(
     //    HTTP 404 만 보면 안 된다 — 토스 NOT_FOUND_MERCHANT(상점/키 설정 문제)도 404 로 오고,
     //    그건 결제가 살아있어도 뜬다. absent 판정은 어댑터가 한다. 일시적 5xx·타임아웃은 당연히 제외.
     const ageMin = (Date.now() - new Date(row.created_at).getTime()) / 60000
-    if (res.error.absent && row.status === 'pending' && ageMin > STALE_ORDER_MIN) {
+    // 선점만 하고 끊긴 주문('confirming')도 여기서 수렴시킨다 — 안 그러면 그 상품이 영영 잠긴다.
+    const onItsWay = row.status === 'pending' || row.status === 'confirming'
+    if (res.error.absent && onItsWay && ageMin > STALE_ORDER_MIN) {
       await admin
         .from('payments')
         .update({ status: 'expired', fail_code: res.error.code, updated_at: new Date().toISOString() })
         .eq('id', row.id)
-        .eq('status', 'pending') // 그 사이 승인됐으면 건드리지 않는다
+        .in('status', ['pending', 'confirming']) // 그 사이 승인됐으면 건드리지 않는다
       return { orderId: row.order_id, status: 'expired', fulfilled: false }
     }
     return { orderId: row.order_id, status: row.status, fulfilled: Boolean(row.fulfilled_at), note: res.error.code }
@@ -463,7 +465,8 @@ export async function reconcile(
   const { data: rows } = await admin
     .from('payments')
     .select(PAYMENT_COLS)
-    .or('status.in.(pending,waiting_deposit),and(status.eq.paid,fulfilled_at.is.null)')
+    // 'confirming' 은 선점만 하고 끊긴 주문이다. 대사가 유일한 수습 경로라 반드시 포함해야 한다.
+    .or('status.in.(pending,confirming,waiting_deposit),and(status.eq.paid,fulfilled_at.is.null)')
     .order('created_at', { ascending: true })
     .limit(limit)
 
