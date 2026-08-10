@@ -38,6 +38,7 @@ dist-ssr
 # ⚠️ career-log 스킬이 쓰는 건 한글 파일이지만, 영문 이름 파일도 따로 굴러다닌다.
 #    git 입장에선 완전히 다른 경로라 위 한 줄로는 안 걸린다 → 둘 다 적는다.
 docs/커리어기록.md
+docs/커리어기록-*.md
 docs/career-log.md
 
 # 작업 부산물 (git 에 넣지 않음 — 합쳐서 265MB, 한 번 들어가면 히스토리에 영구히 남는다)
@@ -45,6 +46,18 @@ docs/career-log.md
 scratchpad/
 artifacts/
 .gjc/
+
+# 루트에 굴러다니는 1회용 작업 스크립트 (에셋 자르기·화면 재보기·소켓 찔러보기 등).
+# 지우지는 않는다 — 쓰던 걸 계속 쓰되 git 에만 안 올린다.
+/_*.mjs
+/pick-play6.png
+
+# Supabase CLI 가 잘못된 위치(supabase/functions/)에서 실행됐을 때 만드는 찌꺼기.
+# linked-project.json 에 프로젝트 ref 가 들어있다.
+supabase/functions/supabase/
+
+# 이 기기에서만 쓰는 설정 (MCP 서버 활성화 목록 등)
+.claude/settings.local.json
 
 # 리다이렉트 사고로 생긴 빈 파일들 (전부 0바이트). NUL 은 윈도 예약어.
 (1)
