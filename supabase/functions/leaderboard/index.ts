@@ -11,6 +11,8 @@
 //  - 닉네임·레벨·점수·아바타만 공개(이메일 비공개).
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/scoring.ts'
+// 티어 key → 표시 이름. 칭호가 key 만 오므로 여기서 이름을 붙인다(프론트 짝 = src/lib/caris.ts 의 tierName).
+import { TIER_LABEL } from '../_shared/exam-tickets.ts'
 
 const TOP_N = 10
 
@@ -110,10 +112,13 @@ Deno.serve(async (req) => {
       //   · 로그인 사용자만 조회(비로그인 me=null). 실패 시 무시(back-compat: title 미포함).
       //   · top 행은 user_id 를 노출하지 않으므로(프라이버시) 칭호 미부착. me(본인)만 노출.
       if (me && user?.id) {
+        // ⚠️ 급수(1급~4급)는 없다 — 2026-07 체계 개편으로 티어 6개가 각각 독립 자격이 됐고
+        //    user_titles 도 그에 맞게 티어 key 만 돌려준다(20260807130000). 표시 이름은 TIER_LABEL 이 단일 출처.
+        //    RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
         const { data: titles } = await admin.rpc('user_titles', { p_uid: user.id })
-        const arr = Array.isArray(titles) ? (titles as Array<{ track: string; grade: string; exam_title?: string }>) : []
+        const arr = Array.isArray(titles) ? (titles as Array<{ tier: string; exam_title?: string }>) : []
         if (arr.length) {
-          me.title = `CARIS ${arr[0].track} ${arr[0].grade}`
+          me.title = `CARIS ${TIER_LABEL[arr[0].tier] ?? arr[0].tier}`
           me.titles = arr
         }
         // 다음 순위 게이지: 그 **보드 안에서** 바로 윗사람과의 점수차(scoped_top 이 같이 내려준다).

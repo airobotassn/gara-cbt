@@ -48,6 +48,16 @@ const T2_TIERS = [
   { key: 'zenith', name: 'Zenith' },
 ] as const
 
+/** 티어 key → 표시 이름. 칭호(user_titles)가 **key 만** 돌려주므로 화면은 여기서 이름을 얻는다.
+ *  티어 이름은 브랜드 고유명이라 언어 무관 고정이고, 그래서 i18n 사전이 아니라 이 표가 단일 출처다.
+ *  (서버 쪽 짝은 supabase/functions/_shared/exam-tickets.ts 의 TIER_LABEL — 티어를 추가하면 둘 다.) */
+const TIER_NAME: Record<string, string> = Object.fromEntries(
+  [...T1_TIERS, ...T2_TIERS].map((t) => [t.key, t.name]),
+)
+export function tierName(key: string): string {
+  return TIER_NAME[key] ?? key
+}
+
 // 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.
 //  Beginner=객40, Pro=객50, Elite=객50+주10. T2(Master~Zenith)는 필기+실기 미확정 → 잠정 0(추후 확정).
 //  ⚠️ format 문자열 바꾸면 여기 수치도 같이 갱신할 것.
