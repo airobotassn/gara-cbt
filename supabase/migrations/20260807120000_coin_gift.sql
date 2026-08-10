@@ -169,16 +169,7 @@ begin
   select coalesce(nullif(trim(display_name), ''), 'CARI') into v_sender_name
     from profiles where id = p_uid;
 
-  -- (3) 스팸 가드 — 같은 사람에게 연속 전송만 막는다(다른 사람에게는 제한 없음).
-  if exists (
-    select 1 from coin_transfers
-     where sender_id = p_uid and recipient_id = v_recipient
-       and created_at > now() - make_interval(secs => c_cooldown_sec)
-  ) then
-    raise exception 'too_fast';
-  end if;
-
-  -- (4) ⛔ **두 행을 uuid 오름차순으로 잠근다.** 이 순서가 이 함수에서 제일 중요한 한 줄이다.
+  -- (3) ⛔ **두 행을 uuid 오름차순으로 잠근다.** 이 순서가 이 함수에서 제일 중요한 한 줄이다.
   --     "내 행 먼저, 상대 행 나중" 으로 짜면 A→B 와 B→A 가 동시에 들어올 때 서로 상대 행을 기다려
   --     데드락이 난다(Postgres 가 한쪽을 죽여서 사용자에게는 원인 불명의 실패로 보인다).
   --     보내는 쪽이 누구든 항상 같은 순서로 잠그면 그 교착이 성립할 수 없다.
@@ -190,17 +181,44 @@ begin
   perform 1 from user_currency where user_id = v_lo for update;
   perform 1 from user_currency where user_id = v_hi for update;
 
-  -- (5) 잔액은 **잠근 뒤에** 읽는다. 잠그기 전에 읽으면 두 창에서 동시에 보낼 때 둘 다 통과한다.
+  -- (4) ⛔ **멱등 재확인 — 쿨다운보다 반드시 먼저.**
+  --     (0) 의 검사는 잠금 전이라, 같은 nonce 요청 둘이 나란히 통과할 수 있다. 그 상태로 아래
+  --     쿨다운을 먼저 만나면 **재시도가 too_fast 로 거절된다** — 돈은 이미 나갔는데 화면은
+  --     "너무 자주 보냈어요"를 띄우는, 사용자가 다시 보내게 만드는 최악의 조합이다
+  --     (2026-08-07 동시성 테스트에서 8발 중 4발이 실제로 그렇게 거절됐다).
+  --     여기는 잠금을 쥔 뒤라 새 스냅샷이 커밋된 원장을 본다 → 원래 결과를 그대로 돌려준다.
+  select * into v_row from coin_transfers where sender_id = p_uid and client_nonce = p_nonce;
+  if found then
+    return jsonb_build_object(
+      'duplicate', true, 'amount', v_row.amount,
+      'recipient_name', v_row.recipient_name, 'points_after', v_row.sender_balance_after
+    );
+  end if;
+
+  -- (5) 스팸 가드 — 같은 사람에게 연속 전송만 막는다(다른 사람에게는 제한 없음).
+  --     ⚠️ **반드시 잠금 뒤에 온다.** 잠금 앞에 두면 같은 발신자의 동시 요청 둘이 나란히
+  --     "직전 전송 없음"을 보고 **둘 다 통과한다**(2026-08-07 동시성 테스트에서 실제로 재현됐다).
+  --     잠금 뒤면 둘째 요청이 발신자 행에서 첫째를 기다렸다가, READ COMMITTED 라 이 SELECT 가
+  --     새 스냅샷을 잡아 **커밋된 첫째 원장 행을 본다** → too_fast 로 정상 차단된다.
+  if exists (
+    select 1 from coin_transfers
+     where sender_id = p_uid and recipient_id = v_recipient
+       and created_at > now() - make_interval(secs => c_cooldown_sec)
+  ) then
+    raise exception 'too_fast';
+  end if;
+
+  -- (6) 잔액은 **잠근 뒤에** 읽는다. 잠그기 전에 읽으면 두 창에서 동시에 보낼 때 둘 다 통과한다.
   select points into v_points from user_currency where user_id = p_uid;
   if coalesce(v_points, 0) < p_amount then raise exception 'insufficient_points'; end if;
 
-  -- (6) 이동. 차감·적립·원장이 한 트랜잭션이라 "빠졌는데 안 들어간" 중간 상태가 존재하지 않는다.
+  -- (7) 이동. 차감·적립·원장이 한 트랜잭션이라 "빠졌는데 안 들어간" 중간 상태가 존재하지 않는다.
   update user_currency set points = points - p_amount, updated_at = now()
    where user_id = p_uid returning points into v_sender_after;
   update user_currency set points = points + p_amount, updated_at = now()
    where user_id = v_recipient returning points into v_recipient_after;
 
-  -- (7) 원장.
+  -- (8) 원장.
   insert into coin_transfers (
     sender_id, recipient_id, sender_name, recipient_name,
     amount, client_nonce, sender_balance_after, recipient_balance_after
