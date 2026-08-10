@@ -527,7 +527,6 @@ interface InterruptionResp {
     reinstated_at: string | null
     reinstated_by: string | null
     reinstate_note: string | null
-    elapsed_sec: number | null
     resume_deadline: string | null
   }
   events: { kind: string; at: string; detail: Record<string, unknown> }[]
@@ -649,8 +648,7 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
           {attempt.resume_deadline && (
             <>
               <br />
-              응시 기한 <b>{fmtDT(attempt.resume_deadline)}</b> 까지 · 남은 시간{' '}
-              {attempt.elapsed_sec != null ? `이미 쓴 ${Math.floor(attempt.elapsed_sec / 60)}분 제외` : '-'} ·
+              응시 기한 <b>{fmtDT(attempt.resume_deadline)}</b> 까지 · 제한시간은 처음부터 다시 ·
               시계는 응시자가 다시 들어오는 순간부터 갑니다.
             </>
           )}
@@ -660,12 +658,8 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
           {/* ⚠️ 새 응시가 아니다 — 문항 세트는 그대로고 이미 쓴 시간도 돌려주지 않는다(남은 시간만 복원).
               "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다. */}
           <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.6 }}>
-            복구하면 <b>중단 시점에 멈춘 시계</b>로 다시 들어갈 수 있습니다 — 이미 쓴{' '}
-            <b>{Math.floor(((attempt.last_seen_at && attempt.started_at
-              ? Math.max(0, Date.parse(attempt.last_seen_at) - Date.parse(attempt.started_at))
-              : 0) / 60000))}분</b>
-            을 뺀 남은 시간이고, 시계는 <b>응시자가 실제로 다시 들어오는 순간부터</b> 갑니다.
-            아래 기한 안에는 <b>응시 기간이 끝났어도</b> 들어갈 수 있습니다.
+            복구하면 <b>제한시간을 처음부터 다시</b> 받고, 시계는 <b>응시자가 실제로 다시 들어오는 순간부터</b> 갑니다.
+            아래 기한 안에는 <b>응시 기간이 끝났어도</b> 들어갈 수 있습니다. 문항 세트는 그대로입니다.
           </p>
           <input
             value={note}

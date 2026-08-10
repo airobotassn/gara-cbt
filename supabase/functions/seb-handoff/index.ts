@@ -15,6 +15,7 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { issueExamToken } from '../_shared/exam-token.ts'
 import { LIVE_TICKET_STATUSES } from '../_shared/exam-tickets.ts'
+import { blockOnReentry } from '../_shared/exam-reentry.ts'
 
 /** nonce 수명. 버튼을 누르고 SEB 가 떠서 첫 화면을 부르기까지의 시간만 덮으면 된다.
  *  ⚠️ 길게 잡을 이유가 없다 — 만료돼도 일반 브라우저에서 버튼을 다시 누르면 그만이다(복구가 싸다). */
@@ -67,6 +68,12 @@ Deno.serve(async (req) => {
         .in('status', LIVE_TICKET_STATUSES)
         .maybeSingle()
       if (!ticket) return json({ error: '사용할 수 있는 응시권이 아닙니다.', code: 'no_ticket' }, 403)
+
+      // ⛔ **SEB 를 켜기 전에** 재진입을 잡는다. 시험 시작(start-exam)에서만 잡으면 SEB 가 켜지고,
+      //    잠긴 화면 안에서 "무효입니다" 를 본 뒤 다시 SEB 를 빠져나와야 한다 — 헛걸음이다.
+      //    판정 자체는 _shared/exam-reentry.ts 한 곳에 있다(start-exam 도 같은 함수를 쓴다).
+      const blocked = await blockOnReentry(admin, user.id, ticket.id as string)
+      if (blocked) return json(blocked, 409)
 
       // 만료된 옛 행 청소(best-effort) — 실패해도 발급은 계속한다.
       await admin

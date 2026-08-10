@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
-import { callFunction } from '../lib/supabase'
+import { callFunction, isFunctionCode } from '../lib/supabase'
 import { isMobileDevice, getDesktopOS } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { SEB_REQUIRED, isSEB, sebConfigured, sebLaunchUrl, sebInstaller } from '../lib/seb'
@@ -37,6 +37,8 @@ export default function ExamPrepare() {
   const [practice, setPractice] = useState<number | null>(null)
   const [starting, setStarting] = useState(false)
   const [err, setErr] = useState('')
+  // 재진입 무효 — SEB 를 켜기 전에 여기서 끝낸다. 재시도가 의미 없으므로 안내만 보여준다.
+  const [voided, setVoided] = useState(false)
   const [sebNotice, setSebNotice] = useState(false)
 
   // 준비 화면에 오래(15분) 아무 조작 없이 방치되면(예: SEB 로 나가고 남은 탭) 자동으로 메인으로.
@@ -92,6 +94,9 @@ export default function ExamPrepare() {
       setSebNotice(true)
     } catch (e) {
       setStarting(false)
+      // ⛔ 재진입 무효는 **SEB 를 켜기 전에** 여기서 끝난다. 시험 시작에서만 잡으면 SEB 가 켜지고,
+      //    잠긴 화면 안에서 무효 안내를 본 뒤 다시 SEB 를 빠져나와야 한다 — 헛걸음이다.
+      if (isFunctionCode(e, 'reentry_voided')) setVoided(true)
       setErr(e instanceof Error ? e.message : t('prep.err_start'))
     }
   }
@@ -377,6 +382,12 @@ export default function ExamPrepare() {
               </label>
               {!isFullUser && <p className="prep-warn">{t('prep.login_warn')}</p>}
               {err && <p className="prep-warn">{err}</p>}
+              {/* 무효는 다시 눌러도 같은 답이 온다 — 사유와 문의 경로를 그 자리에서 알려준다. */}
+              {voided && (
+                <p className="font-body-md text-body-md text-on-surface-variant" style={{ marginTop: 8, lineHeight: 1.65 }}>
+                  {t('seb.voided_how')}
+                </p>
+              )}
             </div>
           )}
         </div>
