@@ -7,7 +7,7 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
 import { Link } from 'react-router-dom'
-import { useT } from '../lib/i18n'
+import { useT, type TFunc } from '../lib/i18n'
 import {
   type ActivityKind,
   arenaLevelForScore,
@@ -21,6 +21,7 @@ import {
 } from '../lib/scoring'
 import ShareCardModal from '../components/ShareCardModal'
 import { countryName } from '../lib/regions'
+import { tierName } from '../lib/caris'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -48,17 +49,19 @@ const DRAW_COST = 20
 const PITY_CEILING = 15
 const DAILY_POINTS = 10
 
-type Part = { key: string; name: string; rare: boolean; weight: number; price: number }
+// 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
+type Part = { key: string; rare: boolean; weight: number; price: number }
 const POOL: Part[] = [
-  { key: 'hat_common_01', name: '새싹 모자', rare: false, weight: 40, price: 200 },
-  { key: 'hat_common_02', name: '비니', rare: false, weight: 40, price: 200 },
-  { key: 'shoe_common_01', name: '포근 양말', rare: false, weight: 30, price: 200 },
-  { key: 'glasses_common_01', name: '동글 안경', rare: false, weight: 30, price: 200 },
-  { key: 'wing_rare_01', name: '빛나는 날개', rare: true, weight: 5, price: 800 },
-  { key: 'crown_rare_01', name: '작은 왕관', rare: true, weight: 5, price: 800 },
+  { key: 'hat_common_01', rare: false, weight: 40, price: 200 },
+  { key: 'hat_common_02', rare: false, weight: 40, price: 200 },
+  { key: 'shoe_common_01', rare: false, weight: 30, price: 200 },
+  { key: 'glasses_common_01', rare: false, weight: 30, price: 200 },
+  { key: 'wing_rare_01', rare: true, weight: 5, price: 800 },
+  { key: 'crown_rare_01', rare: true, weight: 5, price: 800 },
 ]
-function partName(key: string) {
-  return POOL.find((p) => p.key === key)?.name ?? key
+// 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
+function partName(key: string, t: TFunc) {
+  return t(`hub.part.${key}`)
 }
 function partEmoji(key: string) {
   if (key.startsWith('hat')) return '🧢'
@@ -71,20 +74,19 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: { track: string; grade: string }[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
 interface DailyResp { ok: boolean; day: string; first: boolean }
 
-function friendlyError(e: unknown): string {
+const FRIENDLY_ERR = new Set(['insufficient_points', 'insufficient_dust', 'already_owned', 'unauthorized'])
+function friendlyError(e: unknown, t: TFunc): string {
   const msg = e instanceof Error ? e.message : ''
-  if (msg === 'insufficient_points') return '포인트가 부족해요'
-  if (msg === 'insufficient_dust') return '가루가 부족해요'
-  if (msg === 'already_owned') return '이미 보유한 한정템이에요'
-  if (msg === 'unauthorized') return '로그인이 필요해요'
-  return '오류가 발생했어요. 잠시 후 다시 시도해주세요'
+  return FRIENDLY_ERR.has(msg) ? t(`hub.err.${msg}`) : t('hub.err.generic')
 }
+
+type TitleItem = { tier: string; exam_title?: string }
 
 type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
 
@@ -97,11 +99,12 @@ type GiftHistoryResp = { rows: GiftRow[]; next: string | null }
 
 // 점수 획득 방법 모달의 활동 표 — 값은 전부 scoring.ts(원안 반영본) 파생이라 상수를 다시 적지 않는다.
 //   ⚠️ 여기 '점수'는 랭킹 점수(user_progress.activity_score)다. HUD 의 코인(뽑기·상점 재화)과는 별개 지갑이다.
-const EARN_ROWS: { kind: ActivityKind; icon: string; label: string }[] = [
-  { kind: 'attendance', icon: 'calendar', label: '출석하기' },
-  { kind: 'daily_learn', icon: 'book', label: '오늘의 학습 완료' },
-  { kind: 'minigame', icon: 'star', label: '미니게임 플레이' },
-  { kind: 'referral', icon: 'gift', label: '친구 초대' },
+// 라벨은 사전 키(hub.earn.row.<kind>)로 조립한다 — kind 가 곧 키라서 표를 두 벌 관리하지 않는다.
+const EARN_ROWS: { kind: ActivityKind; icon: string }[] = [
+  { kind: 'attendance', icon: 'calendar' },
+  { kind: 'daily_learn', icon: 'book' },
+  { kind: 'minigame', icon: 'star' },
+  { kind: 'referral', icon: 'gift' },
 ]
 
 export default function Hub() {
@@ -125,7 +128,10 @@ export default function Hub() {
   // 즉시 이체라 회수할 방법이 없다. 서버 멱등(unique(sender_id, client_nonce))은 같은 값이 와야 걸린다.
   const [giftNonce, setGiftNonce] = useState<string | null>(null)
   const [giftCode, setGiftCode] = useState('')
-  const [giftTo, setGiftTo] = useState<{ ok: boolean; text: string } | null>(null) // 코드 8자 완성 시 자동 조회 결과
+  // 코드 8자 완성 시 자동 조회 결과. 실패는 **문구가 아니라 사전 키**로 들고 있는다 —
+  // 그래야 조회 이펙트가 t 에 의존하지 않는다(t 는 렌더마다 새로 만들어져서 deps 에 넣으면 이펙트가 매 렌더 돈다).
+  // 덤으로 조회 후 언어를 바꿔도 메시지가 같이 바뀐다.
+  const [giftTo, setGiftTo] = useState<{ ok: true; name: string } | { ok: false; errKey: string } | null>(null)
   const [giftAmount, setGiftAmount] = useState('')
   const [giftConfirm, setGiftConfirm] = useState(false) // 되돌릴 수 없어서 확인 단계를 반드시 거친다
   const [giftSending, setGiftSending] = useState(false)
@@ -146,7 +152,8 @@ export default function Hub() {
   // — 서버는 계속 내려주므로 받아만 둔다(기존 skillScore/activityScore 와 같은 패턴).
   const [, setLevel] = useState<number | null>(null)
   const [authed, setAuthed] = useState(false)
-  const [titles, setTitles] = useState<{ track: string; grade: string }[]>([])
+  // 칭호 = 합격한 티어. 급수(1급~4급)는 2026-07 체계 개편으로 사라졌다(20260807130000).
+  const [titles, setTitles] = useState<TitleItem[]>([])
   const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [dust, setDust] = useState(0)
@@ -154,7 +161,7 @@ export default function Hub() {
   const [lastDraw, setLastDraw] = useState<{ dust: number; part: Part | null } | null>(null)
   const [drawing, setDrawing] = useState(false)
   const [purchased, setPurchased] = useState<{ partKey: string; kind: 'coin' | 'dust' } | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
   // 공유 카드 하단 바용 프로필 값(가입일 · 국가 · 지역). 학교는 넣지 않는다.
@@ -176,10 +183,14 @@ export default function Hub() {
   const [rank, setRank] = useState<number | null>(null)
   const [rankTotal, setRankTotal] = useState<number | null>(null)
 
-  const pushLog = (s: string) => {
-    setToast(s)
-    window.setTimeout(() => setToast((cur) => (cur === s ? null : cur)), 2600)
+  // ⚠️ 토스트는 **종류를 같이 들고 다닌다.** 예전엔 아이콘을 문구 정규식(/부족|필요|오류/)으로 골랐는데,
+  //    그건 화면이 한국어일 때만 성립하는 판정이라 i18n 이관과 동시에 전부 ✅ 로 깨진다(2026-08-07).
+  const pushLog = (s: string, bad = false) => {
+    const next = { text: s, bad }
+    setToast(next)
+    window.setTimeout(() => setToast((cur) => (cur === next ? null : cur)), 2600)
   }
+  const pushErr = (s: string) => pushLog(s, true)
 
   // 초대코드 복사 — navigator.clipboard 는 보안 컨텍스트(https/localhost)에서만 동작해 실패 시 폴백한다.
   async function copyInvite() {
@@ -203,10 +214,10 @@ export default function Hub() {
   // 초대코드 등록(받는 쪽). 온보딩과 달리 **실패를 그대로 알려준다** — 모달은 다시 열 수 있으니
   // 왜 안 됐는지 말해줘야 다시 칠 수 있다. 성공하면 계정당 1회라 입력칸이 영구 잠긴다.
   const REDEEM_ERR: Record<string, string> = {
-    not_found: '없는 초대코드예요. 다시 확인해주세요',
-    self: '내 초대코드는 쓸 수 없어요',
-    already: '이미 초대코드를 등록했어요',
-    unauthorized: '로그인이 필요해요',
+    not_found: t('hub.invite.err_not_found'),
+    self: t('hub.invite.err_self'),
+    already: t('hub.invite.err_already'),
+    unauthorized: t('hub.err.unauthorized'),
   }
   async function redeemReferral() {
     const code = redeemInput.trim().toUpperCase()
@@ -218,13 +229,13 @@ export default function Hub() {
       if (r.ok) {
         setReferralUsed(true)
         setRedeemInput('')
-        setRedeemMsg({ ok: true, text: '등록 완료! 초대해준 친구에게 점수가 들어갔어요' })
+        setRedeemMsg({ ok: true, text: t('hub.invite.ok') })
         void hydrate()
       } else {
-        setRedeemMsg({ ok: false, text: REDEEM_ERR[r.error ?? ''] ?? '등록하지 못했어요' })
+        setRedeemMsg({ ok: false, text: REDEEM_ERR[r.error ?? ''] ?? t('hub.invite.fail') })
       }
     } catch {
-      setRedeemMsg({ ok: false, text: '등록하지 못했어요' })
+      setRedeemMsg({ ok: false, text: t('hub.invite.fail') })
     }
     setRedeeming(false)
   }
@@ -234,9 +245,9 @@ export default function Hub() {
   //      아레나 하단 런처가 유일한 진입점이었기 때문이다. 지금은 /games 가 목록 페이지라
   //      /arena 로 보내면 지도만 뜨고 미션은 한 단계 더 찾아 들어가야 끝난다.
   const missions: { kind: ActivityKind; icon: string; label: string; done: boolean; to: string | null }[] = [
-    { kind: 'attendance', icon: 'calendar', label: '출석', done: checkedIn, to: null },
-    { kind: 'daily_learn', icon: 'book', label: '오늘의 학습', done: learnDone, to: '/daily' },
-    { kind: 'minigame', icon: 'star', label: '미니게임', done: minigameDone, to: '/games' },
+    { kind: 'attendance', icon: 'calendar', label: t('hub.mission.attendance'), done: checkedIn, to: null },
+    { kind: 'daily_learn', icon: 'book', label: t('hub.mission.daily_learn'), done: learnDone, to: '/daily' },
+    { kind: 'minigame', icon: 'star', label: t('hub.mission.minigame'), done: minigameDone, to: '/games' },
   ]
   const missionDone = missions.filter((m) => m.done).length
 
@@ -332,16 +343,16 @@ export default function Hub() {
       // kind 명시 — 서버 기본값에 기대지 않는다(오늘의 학습과 종류가 갈린다).
       const r = await callFunction<DailyResp>('complete-daily', { kind: 'attendance' })
       // first=false 면 오늘 '오늘의 학습'으로 이미 재화를 받은 것 — 없는 적립을 있다고 쓰지 않는다.
-      pushLog(r.first ? `출석 완료 · +${DAILY_POINTS}P · 스탬프 +1` : '출석 완료 · 오늘 보상은 이미 받았어요')
+      pushLog(r.first ? t('hub.toast.checkin_done', { n: DAILY_POINTS }) : t('hub.toast.checkin_already'))
       await hydrate()
     } catch (e) {
-      pushLog(friendlyError(e))
+      pushErr(friendlyError(e, t))
     }
   }
   // 뽑기 → gacha-draw (서버권위/멱등 nonce/천장/환급). 서버 결과로 토스트, get-hub 로 재동기화.
   async function doGacha() {
     if (!isFullUser) { void loginWithGoogle(); return }
-    if (points < DRAW_COST) { pushLog('코인이 부족해요'); return }
+    if (points < DRAW_COST) { pushErr(t('hub.toast.no_coin')); return }
     try {
       setDrawing(true)
       setLastDraw(null)
@@ -354,20 +365,20 @@ export default function Hub() {
       await hydrate()
     } catch (e) {
       setDrawing(false)
-      pushLog(friendlyError(e))
+      pushErr(friendlyError(e, t))
     }
   }
   // 상점 → shop-buy (가격은 서버 카탈로그 권위).
   async function doBuy(partKey: string, price: number) {
     if (!isFullUser) { void loginWithGoogle(); return }
     if (owned.has(partKey)) return
-    if (points < price) { pushLog(`포인트가 부족해요: ${partName(partKey)} (${price}P)`); return }
+    if (points < price) { pushErr(t('hub.toast.no_points_item', { name: partName(partKey, t), price })); return }
     try {
       await callFunction<ShopResp>('shop-buy', { part_key: partKey, client_nonce: crypto.randomUUID() })
       setPurchased({ partKey, kind: 'coin' })
       await hydrate()
     } catch (e) {
-      pushLog(friendlyError(e))
+      pushErr(friendlyError(e, t))
     }
   }
 
@@ -375,13 +386,13 @@ export default function Hub() {
   async function doExchange(partKey: string, price: number) {
     if (!isFullUser) { void loginWithGoogle(); return }
     if (owned.has(partKey)) return
-    if (dust < price) { pushLog('가루가 부족해요'); return }
+    if (dust < price) { pushErr(t('hub.toast.no_dust')); return }
     try {
       await callFunction<ExchangeResp>('gacha-exchange', { part_key: partKey, client_nonce: crypto.randomUUID() })
       setPurchased({ partKey, kind: 'dust' })
       await hydrate()
     } catch (e) {
-      pushLog(friendlyError(e))
+      pushErr(friendlyError(e, t))
     }
   }
 
@@ -417,15 +428,15 @@ export default function Hub() {
       callFunction<GiftLookupResp>('coin-gift', { action: 'lookup', code })
         .then((r) => {
           if (!alive) return
-          if (r.name) { setGiftTo({ ok: true, text: r.name }); return }
+          if (r.name) { setGiftTo({ ok: true, name: r.name }); return }
           const map: Record<string, string> = {
-            not_found: '없는 코드예요',
-            self: '내 코드예요',
-            too_many: '조회가 너무 많아요. 잠시 후 다시 시도해주세요',
+            not_found: 'hub.gift.err_not_found',
+            self: 'hub.gift.err_self_code',
+            too_many: 'hub.gift.err_too_many',
           }
-          setGiftTo({ ok: false, text: map[r.error ?? ''] ?? '확인할 수 없어요' })
+          setGiftTo({ ok: false, errKey: map[r.error ?? ''] ?? 'hub.gift.err_lookup' })
         })
-        .catch(() => { if (alive) setGiftTo({ ok: false, text: '확인할 수 없어요' }) })
+        .catch(() => { if (alive) setGiftTo({ ok: false, errKey: 'hub.gift.err_lookup' }) })
     }, 250)
     return () => { alive = false; window.clearTimeout(timer) }
   }, [giftCode, modal])
@@ -433,7 +444,7 @@ export default function Hub() {
   async function doGift() {
     if (!giftNonce || giftSending) return
     const amount = Math.floor(Number(giftAmount))
-    if (!Number.isFinite(amount) || amount <= 0) { setGiftMsg({ ok: false, text: '보낼 금액을 입력해주세요' }); return }
+    if (!Number.isFinite(amount) || amount <= 0) { setGiftMsg({ ok: false, text: t('hub.gift.err_amount_required') }); return }
     try {
       setGiftSending(true)
       setGiftMsg(null)
@@ -443,7 +454,7 @@ export default function Hub() {
         amount,
         client_nonce: giftNonce, // ⚠️ 재시도에도 같은 값 — 새로 만들면 두 번 보내진다.
       })
-      setGiftMsg({ ok: true, text: `${r.recipient_name}님에게 ${r.amount.toLocaleString()}코인을 보냈어요` })
+      setGiftMsg({ ok: true, text: t('hub.gift.sent_ok', { name: r.recipient_name, n: r.amount.toLocaleString() }) })
       // 성공했으니 이 nonce 는 소진됐다. 이어서 또 보내려면 새 값이 필요하다.
       setGiftNonce(crypto.randomUUID())
       setGiftCode(''); setGiftTo(null); setGiftAmount(''); setGiftConfirm(false)
@@ -452,14 +463,14 @@ export default function Hub() {
     } catch (e) {
       const code = e instanceof Error ? e.message : ''
       const map: Record<string, string> = {
-        insufficient: '코인이 부족해요',
-        not_found: '없는 코드예요',
-        self: '나에게는 보낼 수 없어요',
-        invalid_amount: '보낼 금액이 올바르지 않아요',
-        too_fast: '같은 친구에게 너무 자주 보내고 있어요. 잠시 후 다시 시도해주세요',
-        unauthorized: '로그인이 필요해요',
+        insufficient: t('hub.gift.err_insufficient'),
+        not_found: t('hub.gift.err_not_found'),
+        self: t('hub.gift.err_self'),
+        invalid_amount: t('hub.gift.err_invalid_amount'),
+        too_fast: t('hub.gift.err_too_fast'),
+        unauthorized: t('hub.err.unauthorized'),
       }
-      setGiftMsg({ ok: false, text: map[code] ?? '보내지 못했어요' })
+      setGiftMsg({ ok: false, text: map[code] ?? t('hub.gift.err_send_fail') })
       setGiftConfirm(false)
     } finally {
       setGiftSending(false)
@@ -480,7 +491,8 @@ export default function Hub() {
 
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
   // const unusedCoupons = coupons.filter((c) => !c.used).length
-  const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {titles[0].track} {titles[0].grade}</span> : null
+  // RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
+  const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {tierName(titles[0].tier)}</span> : null
   // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
   //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
   const arenaLv = arenaLevelForScore(seasonTotal)
@@ -513,7 +525,7 @@ export default function Hub() {
         <div className="hub-gate-card">
           <img className="hub-gate-char" src="/hub-char.png" alt="CARI" />
           <h2 className="hub-gate-title">CARI</h2>
-          <p className="hub-gate-sub">로그인하고 출석·뽑기·상점을 이용해보세요</p>
+          <p className="hub-gate-sub">{t('hub.gate_sub')}</p>
           <button
             className="hub-gate-btn"
             onClick={() => {
@@ -548,20 +560,20 @@ export default function Hub() {
         <div className="hub-backrow-act">
           {/* 코인 선물 = 친구코드로 CARI 코인을 즉시 이체. 뱃지 = 아직 확인 안 한 받은 선물 건수. */}
           <button className="hub-share hub-gift" onClick={openGift}>
-            <span className="ic"><Ic n="coin" s={16} /></span>선물
+            <span className="ic"><Ic n="coin" s={16} /></span>{t('hub.gift_btn')}
             {giftsUnseen > 0 && <span className="bd">{giftsUnseen}</span>}
           </button>
           {/* 공유 = 지금 순위·티어·칭호로 카드(PNG) 를 만들어 내보낸다(ShareCardModal) */}
           <button className="hub-share" onClick={() => setModal('share')}>
-            <span className="ic"><Ic n="share" s={16} /></span>공유
+            <span className="ic"><Ic n="share" s={16} /></span>{t('hub.share')}
           </button>
         </div>
       </div>
 
       {!isFullUser && (
         <div className="slim-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <span>로그인해야 출석·뽑기·상점이 작동해요</span>
-          <button className="pbtn" style={{ background: '#4b7bf5', padding: '7px 14px', fontSize: 13 }} onClick={() => loginWithGoogle()}>구글로 로그인</button>
+          <span>{t('hub.banner_login')}</span>
+          <button className="pbtn" style={{ background: '#4b7bf5', padding: '7px 14px', fontSize: 13 }} onClick={() => loginWithGoogle()}>{t('common.login_google')}</button>
         </div>
       )}
 
@@ -593,9 +605,9 @@ export default function Hub() {
                 </span>
               </div>
               {/* '?' 는 점수(경험치 바) 쪽 도움말이다 — 코인 옆에 두면 코인 설명으로 읽혀서 바 바로 뒤에 붙였다. */}
-              <button className="hub-help" onClick={() => setModal('earn')} aria-label="점수 획득 방법">?</button>
+              <button className="hub-help" onClick={() => setModal('earn')} aria-label={t('hub.help_aria')}>?</button>
               {/* data-tip = 호버 툴팁("보유한 CARI 코인") — hub.css 의 .gchip[data-tip]::after */}
-              <span className="gchip" data-tip="보유한 CARI 코인"><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
+              <span className="gchip" data-tip={t('hub.coin_tip')}><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
             </div>
           </div>
         </div>
@@ -604,7 +616,7 @@ export default function Hub() {
             좌측 열로 두면 카드 하나 때문에 캐릭터가 옆으로 밀려서 전체 폭 한 줄로 옮겼다 → 캐릭터는 정중앙 유지.
             완료 판정은 서버 플래그(daily_activity 종류별), 점수는 scoring.ts 의 ACTIVITY_DELTA 파생. */}
         <div className="mission-bar">
-          <span className="ms-title"><Ic n="star" s={16} /> 오늘의 미션</span>
+          <span className="ms-title"><Ic n="star" s={16} /> {t('hub.mission_title')}</span>
           <div className="ms-chips">
           {missions.map((m) => {
             const body = (
@@ -629,11 +641,11 @@ export default function Hub() {
             {/* 왼쪽 레일 제거 — 출석을 오른쪽 뽑기 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
             {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
             <div className="rail rail-r">
-              <button className="fcard f-daily" onClick={doDaily}><span className="fico"><Ic n="calendar" s={42} /></span>출석{authed && !checkedIn && <span className="bd">1</span>}</button>
-              <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><Ic n="gift" s={42} /></span>뽑기</button>
-              <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><Ic n="shop" s={42} /></span>상점</button>
-              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>칭호</button>
-              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><Ic n="share" s={42} /></span>초대하기</button>
+              <button className="fcard f-daily" onClick={doDaily}><span className="fico"><Ic n="calendar" s={42} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
+              <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><Ic n="gift" s={42} /></span>{t('hub.rail.gacha')}</button>
+              <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><Ic n="shop" s={42} /></span>{t('hub.rail.shop')}</button>
+              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>{t('hub.rail.title')}</button>
+              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><Ic n="share" s={42} /></span>{t('hub.rail.invite')}</button>
             </div>
             <div className="stage">
               <div className="pedestal" />
@@ -645,12 +657,12 @@ export default function Hub() {
         {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
         <div className="dock">
           <div className="reward">
-            <div className="rw-top"><Ic n="fire" s={20} /> 출석 보상 <span className="rw-streak">{stamps}일 연속!</span><span className="rw-n">{stamps} / 7</span></div>
+            <div className="rw-top"><Ic n="fire" s={20} /> {t('hub.reward_head')} <span className="rw-streak">{t('hub.streak', { n: stamps })}</span><span className="rw-n">{stamps} / 7</span></div>
             <div className="streak">
               {[1, 2, 3, 4, 5, 6, 7].map((d) => (
                 <div key={d} className={`day ${d <= stamps ? 'on' : ''}`}>
                   {d === 7 && <span className="gift"><Ic n="gift" s={26} /></span>}
-                  {d}일<span className="chk">{d <= stamps ? '✓' : ''}</span>
+                  {t('hub.day_n', { n: d })}<span className="chk">{d <= stamps ? '✓' : ''}</span>
                 </div>
               ))}
             </div>
@@ -658,16 +670,17 @@ export default function Hub() {
           {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
           <Link className="cta-main" to="/ranking">
             <span className="cta-star"><Ic n="trophy" s={24} /></span>
-            랭킹
+            {t('common.ranking')}
           </Link>
         </div>
       </div>
 
       {toast && (
         <div className="hub-toast" onClick={() => setToast(null)}>
-          <span className="hub-toast-ic">{/부족|필요|오류/.test(toast) ? '⚠️' : '✅'}</span>
-          <span>{toast}</span>
-          <button className="hub-toast-x" onClick={() => setToast(null)} aria-label="닫기">×</button>
+          {/* 아이콘은 문구가 아니라 toast.bad 가 정한다 — 문구 정규식은 번역되는 순간 무의미해진다. */}
+          <span className="hub-toast-ic">{toast.bad ? '⚠️' : '✅'}</span>
+          <span>{toast.text}</span>
+          <button className="hub-toast-x" onClick={() => setToast(null)} aria-label={t('common.close')}>×</button>
         </div>
       )}
 
@@ -675,24 +688,24 @@ export default function Hub() {
         <div className="hub-modal-backdrop buy-pop-backdrop" onClick={() => setPurchased(null)}>
           <div className="buy-pop" onClick={(e) => e.stopPropagation()}>
             <div className="buy-pop-spark"><span>✨</span><span>🎉</span><span>✨</span></div>
-            <div className="buy-pop-title">{purchased.kind === 'dust' ? '교환 완료!' : '구매 완료!'}</div>
+            <div className="buy-pop-title">{t(purchased.kind === 'dust' ? 'hub.buy.exchanged' : 'hub.buy.purchased')}</div>
             <div className="buy-pop-thumb">{partEmoji(purchased.partKey)}</div>
-            <div className="buy-pop-name">{partName(purchased.partKey)}</div>
+            <div className="buy-pop-name">{partName(purchased.partKey, t)}</div>
 
-            <button className="pbtn buy-pop-ok" style={btn('#6bbf9a')} onClick={() => setPurchased(null)}>확인</button>
+            <button className="pbtn buy-pop-ok" style={btn('#6bbf9a')} onClick={() => setPurchased(null)}>{t('hub.confirm')}</button>
           </div>
         </div>
       )}
 
       {modal === 'gacha' && (
-        <Modal title="뽑기" onClose={() => setModal(null)}>
+        <Modal title={t('hub.gacha.title')} onClose={() => setModal(null)}>
           <div className="gacha-head">
-            <span className="gchip gchip-dust"><span className="dust-ic">✨</span><span className="num">{dust.toLocaleString()}</span><span className="dust-lab">가루</span></span>
-            <span className="chip" style={{ margin: 0 }}>보유 {owned.size}종</span>
+            <span className="gchip gchip-dust"><span className="dust-ic">✨</span><span className="num">{dust.toLocaleString()}</span><span className="dust-lab">{t('hub.gacha.dust')}</span></span>
+            <span className="chip" style={{ margin: 0 }}>{t('hub.gacha.owned_n', { n: owned.size })}</span>
           </div>
           <div className="gacha-gauge">
             <div className="gacha-gauge-bar"><div className="gacha-gauge-fill" style={{ width: `${Math.min(100, (pity / PITY_CEILING) * 100)}%` }} /></div>
-            <span className="gacha-gauge-lab">천장까지 {Math.max(0, PITY_CEILING - pity)}회</span>
+            <span className="gacha-gauge-lab">{t('hub.gacha.pity', { n: Math.max(0, PITY_CEILING - pity) })}</span>
           </div>
           <div className="gacha-stage">
             {drawing && (
@@ -703,91 +716,91 @@ export default function Hub() {
             {!drawing && lastDraw && (
               lastDraw.part ? (
                 <div className="gacha-result is-rare">
-                  <span className="gacha-ribbon">한정템!</span>
+                  <span className="gacha-ribbon">{t('hub.gacha.limited')}</span>
                   <span className="gacha-spark s1">✨</span><span className="gacha-spark s2">✨</span><span className="gacha-spark s3">✨</span>
                   <div className="gacha-result-icon">{partEmoji(lastDraw.part.key)}</div>
-                  <b>{lastDraw.part.name}</b>
-                  <span className="gacha-dustgain">가루 +{lastDraw.dust}</span>
+                  <b>{partName(lastDraw.part.key, t)}</b>
+                  <span className="gacha-dustgain">{t('hub.gacha.dust_gain', { n: lastDraw.dust })}</span>
                 </div>
               ) : (
                 <div className="gacha-result is-dust">
                   <div className="gacha-result-icon">✨</div>
-                  <b>가루 +{lastDraw.dust}</b>
-                  <span className="gacha-dust-hint">모아서 한정템 교환!</span>
+                  <b>{t('hub.gacha.dust_gain', { n: lastDraw.dust })}</b>
+                  <span className="gacha-dust-hint">{t('hub.gacha.dust_hint')}</span>
                 </div>
               )
             )}
           </div>
-          <button className="pbtn gacha-draw-btn gacha-draw-full" onClick={doGacha} disabled={drawing}>{drawing ? '뽑는 중…' : `뽑기 (${DRAW_COST} 🪙)`}</button>
+          <button className="pbtn gacha-draw-btn gacha-draw-full" onClick={doGacha} disabled={drawing}>{drawing ? t('hub.gacha.drawing') : t('hub.gacha.draw', { n: DRAW_COST })}</button>
           <div className="gacha-exchange">
-            <div className="gacha-ex-head">✨ 가루 교환소 <span className="gacha-ex-sub">뽑기 전용 한정템</span></div>
+            <div className="gacha-ex-head">✨ {t('hub.gacha.ex_head')} <span className="gacha-ex-sub">{t('hub.gacha.ex_sub')}</span></div>
             <div className="gacha-ex-list">
               {exclusives.map((e) => {
                 const has = owned.has(e.partKey)
                 const canAfford = dust >= e.dustPrice
                 return (
                   <div key={e.partKey} className={`gacha-ex-item ${has ? 'is-owned' : ''}`}>
-                    {has && <span className="gacha-ex-owned">보유중</span>}
+                    {has && <span className="gacha-ex-owned">{t('hub.gacha.have')}</span>}
                     <div className="gacha-ex-thumb">{partEmoji(e.partKey)}</div>
-                    <div className="gacha-ex-name">{partName(e.partKey)}</div>
+                    <div className="gacha-ex-name">{partName(e.partKey, t)}</div>
                     <div className="gacha-ex-price">✨ {e.dustPrice}</div>
-                    <button className="pbtn gacha-ex-buy" style={btn(has || !canAfford ? '#c3cbe0' : '#7b6bd6')} onClick={() => doExchange(e.partKey, e.dustPrice)} disabled={has}>{has ? '보유중' : '교환'}</button>
+                    <button className="pbtn gacha-ex-buy" style={btn(has || !canAfford ? '#c3cbe0' : '#7b6bd6')} onClick={() => doExchange(e.partKey, e.dustPrice)} disabled={has}>{t(has ? 'hub.gacha.have' : 'hub.gacha.exchange')}</button>
                   </div>
                 )
               })}
             </div>
           </div>
-          <p className="hub-modal-help">뽑기하면 항상 가루가 쌓여요. 천장(15회)엔 한정템이 확정! 가루로 원하는 한정템을 바로 교환할 수도 있어요.</p>
+          <p className="hub-modal-help">{t('hub.gacha.help', { n: PITY_CEILING })}</p>
         </Modal>
       )}
 
       {modal === 'shop' && (
-        <Modal title="상점" onClose={() => setModal(null)}>
+        <Modal title={t('hub.shop.title')} onClose={() => setModal(null)}>
           <div className="hub-shop-head">
-            <span className="hub-shop-head-lab">보유 CARI 코인</span>
+            <span className="hub-shop-head-lab">{t('hub.shop.balance')}</span>
             <span className="gchip" style={{ margin: 0 }}><Ic n="coin" s={22} /><span className="num">{points.toLocaleString()}</span></span>
           </div>
           {catalog.length > 0 ? (
             <div className="hub-modal-grid">
               {catalog.map((c) => (
                 <div key={c.partKey} className={`hub-shop-item ${c.rare ? 'is-rare' : ''}`}>
-                  {c.rare && <span className="hub-shop-ribbon">레어</span>}
-                  {owned.has(c.partKey) && <span className="hub-shop-owned">보유중</span>}
+                  {c.rare && <span className="hub-shop-ribbon">{t('hub.shop.rare')}</span>}
+                  {owned.has(c.partKey) && <span className="hub-shop-owned">{t('hub.shop.owned')}</span>}
 
                   <div className="hub-shop-thumb">{partEmoji(c.partKey)}</div>
-                  <div className="hub-shop-name">{partName(c.partKey)}</div>
+                  <div className="hub-shop-name">{partName(c.partKey, t)}</div>
                   <div className="hub-shop-price">🪙 {c.price}</div>
                   <button className="pbtn hub-shop-buy" style={btn(owned.has(c.partKey) ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={owned.has(c.partKey)}>
-                    {owned.has(c.partKey) ? '보유중' : '구매'}
+                    {t(owned.has(c.partKey) ? 'hub.shop.owned' : 'hub.shop.buy')}
                   </button>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="hub-modal-help">{isFullUser ? '상점에 물건이 없어요.' : '로그인하면 상점을 이용할 수 있어요.'}</p>
+            <p className="hub-modal-help">{t(isFullUser ? 'hub.shop.empty' : 'hub.shop.login')}</p>
           )}
         </Modal>
       )}
 
       {modal === 'coupon' && (
-        <Modal title="쿠폰함" onClose={() => setModal(null)}>
+        <Modal title={t('hub.coupon.title')} onClose={() => setModal(null)}>
           {coupons.length > 0 ? (
             <div className="ticket-shelf">
               {coupons.map((c) => (
                 <div key={c.level} className={`ticket ${c.used ? 'is-used' : ''}`}>
                   <div className="ticket-stub">Lv.{c.level}</div>
                   <div className="ticket-main">
-                    <b className="ticket-pct">{c.discount}% 할인</b>
-                    <span className="ticket-sub">Lv.{c.level} 달성 보상</span>
+                    <b className="ticket-pct">{t('hub.coupon.discount', { n: c.discount })}</b>
+                    <span className="ticket-sub">{t('hub.coupon.sub', { n: c.level })}</span>
                   </div>
-                  <span className="ticket-stamp">{c.used ? '사용함' : '보유'}</span>
+                  <span className="ticket-stamp">{t(c.used ? 'hub.coupon.used' : 'hub.coupon.have')}</span>
                 </div>
               ))}
             </div>
           ) : (
             <div className="ticket-shelf ticket-shelf-empty">
               <div className="ticket ticket-ghost"><span className="ticket-ghost-ic">🎫</span></div>
-              <p className="hub-modal-help">{authed ? '아직 모은 쿠폰이 없어요. 레벨업하면 할인 쿠폰을 받아요!' : '로그인하면 쿠폰함이 보여요.'}</p>
+              <p className="hub-modal-help">{t(authed ? 'hub.coupon.empty' : 'hub.coupon.login')}</p>
             </div>
           )}
         </Modal>
@@ -797,6 +810,7 @@ export default function Hub() {
         <ShareCardModal
           onClose={() => setModal(null)}
           data={{
+            lang,
             name: displayName?.trim() || user?.user_metadata?.name || 'CARI',
             avatarUrl,
             seed: user?.id ?? 'guest',
@@ -817,11 +831,11 @@ export default function Hub() {
       )}
 
       {modal === 'title' && (
-        <Modal title="칭호" onClose={() => setModal(null)}>
+        <Modal title={t('hub.title.title')} onClose={() => setModal(null)}>
           {titles.length > 0 ? (
             <div className="title-vault">
               {titles.map((tt, i) => (
-                <span key={i} className="title-badge">🏅<b>CARIS {tt.track}</b><span className="title-badge-grade">{tt.grade}</span></span>
+                <span key={i} className="title-badge">🏅<b>CARIS {tierName(tt.tier)}</b></span>
               ))}
             </div>
           ) : (
@@ -829,7 +843,7 @@ export default function Hub() {
               {[1, 2, 3].map((i) => (
                 <span key={i} className="title-slot">🔒</span>
               ))}
-              <p className="hub-modal-help">{authed ? '아직 획득한 칭호가 없어요 — 인증서에 합격하면 채워져요' : '로그인하면 칭호 보관소가 보여요.'}</p>
+              <p className="hub-modal-help">{t(authed ? 'hub.title.empty' : 'hub.title.login')}</p>
             </div>
           )}
         </Modal>
@@ -837,17 +851,17 @@ export default function Hub() {
 
       {/* 점수 획득 방법 — 표의 모든 수치는 scoring.ts(원안 반영본) 파생이라 여기서 하드코딩하지 않는다. */}
       {modal === 'earn' && (
-        <Modal title="점수 획득 방법" onClose={() => setModal(null)}>
-          <p className="hub-modal-help earn-lead">다양한 활동에 참여하고 점수를 모아 랭킹에 도전하세요!</p>
+        <Modal title={t('hub.earn.title')} onClose={() => setModal(null)}>
+          <p className="hub-modal-help earn-lead">{t('hub.earn.lead')}</p>
           <table className="earn-tb">
-            <thead><tr><th>활동 항목</th><th>획득 점수</th></tr></thead>
+            <thead><tr><th>{t('hub.earn.col_act')}</th><th>{t('hub.earn.col_pt')}</th></tr></thead>
             <tbody>
               {EARN_ROWS.map((r) => (
                 <tr key={r.kind}>
-                  <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{r.label}</td>
+                  <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{t(`hub.earn.row.${r.kind}`)}</td>
                   <td className="earn-v">
-                    +{ACTIVITY_DELTA[r.kind]}점
-                    <em>일 {ACTIVITY_PER_DAY[r.kind]}회 · 시즌 최대 {ACTIVITY_SEASON_MAX[r.kind].toLocaleString()}점</em>
+                    {t('hub.earn.pt', { n: ACTIVITY_DELTA[r.kind] })}
+                    <em>{t('hub.earn.limit', { n: ACTIVITY_PER_DAY[r.kind], max: ACTIVITY_SEASON_MAX[r.kind].toLocaleString() })}</em>
                   </td>
                 </tr>
               ))}
@@ -855,34 +869,34 @@ export default function Hub() {
           </table>
 
           <div className="earn-lv">
-            <div className="earn-lv-head"><Ic n="trophy" s={18} /> 레벨테스트 <em>레벨 클리어 시</em></div>
+            <div className="earn-lv-head"><Ic n="trophy" s={18} /> {t('hub.earn.lv_head')} <em>{t('hub.earn.lv_sub')}</em></div>
             <div className="earn-lv-grid">
               {[1, 2, 3, 4, 5, 6, 7].map((lv) => (
                 <div key={lv} className="earn-lv-cell"><b>Lv.{lv}</b>+{LEVELTEST_CLEAR_POINTS.toLocaleString()}</div>
               ))}
             </div>
-            <p className="hub-modal-help">7단계를 모두 통과하면 {LEVELTEST_MAX.toLocaleString()}점 · 활동까지 더한 시즌 만점은 {SEASON_MAX_POINTS.toLocaleString()}점이에요.</p>
+            <p className="hub-modal-help">{t('hub.earn.foot', { a: LEVELTEST_MAX.toLocaleString(), b: SEASON_MAX_POINTS.toLocaleString() })}</p>
           </div>
 
         </Modal>
       )}
 
       {modal === 'invite' && (
-        <Modal title="친구 초대" onClose={() => setModal(null)}>
-          <div className="iv-title">친구와 함께 CARIS 하세요!</div>
-          <p className="hub-modal-help">내 초대코드를 알려주면 친구가 바로 시작할 수 있어요.</p>
+        <Modal title={t('hub.invite.title')} onClose={() => setModal(null)}>
+          <div className="iv-title">{t('hub.invite.lead')}</div>
+          <p className="hub-modal-help">{t('hub.invite.help')}</p>
           <div className="iv-code iv-code-lg">
-            <span className="iv-code-lab">내 초대코드</span>
+            <span className="iv-code-lab">{t('hub.invite.my_code')}</span>
             <b className="iv-code-v">{referralCode ?? '––––'}</b>
-            <button className="iv-copy" onClick={copyInvite} disabled={!referralCode}>{copied ? '복사됨' : '복사'}</button>
+            <button className="iv-copy" onClick={copyInvite} disabled={!referralCode}>{t(copied ? 'hub.invite.copied' : 'hub.invite.copy')}</button>
           </div>
-          {!referralCode && <p className="hub-modal-help">{authed ? '초대코드를 발급하는 중이에요.' : '로그인하면 초대코드가 발급돼요.'}</p>}
+          {!referralCode && <p className="hub-modal-help">{t(authed ? 'hub.invite.issuing' : 'hub.invite.login')}</p>}
 
           {/* 받는 쪽 — 계정당 1회, 성공하면 영구 잠금. 실패는 이유를 그대로 알려준다. */}
           <div className="iv-redeem">
-            <div className="iv-redeem-head">친구 초대코드 입력</div>
+            <div className="iv-redeem-head">{t('hub.invite.redeem_head')}</div>
             {referralUsed ? (
-              <p className="iv-redeem-done">✓ 초대코드를 등록했어요 (한 번만 가능해요)</p>
+              <p className="iv-redeem-done">{t('hub.invite.redeem_done')}</p>
             ) : (
               <>
                 <div className="iv-code">
@@ -894,13 +908,13 @@ export default function Hub() {
                     placeholder="CARIXXXX"
                     maxLength={8}
                     disabled={redeeming}
-                    aria-label="친구 초대코드"
+                    aria-label={t('hub.gift.code_label')}
                   />
                   <button className="iv-copy" onClick={redeemReferral} disabled={redeeming || !redeemInput.trim()}>
-                    {redeeming ? '확인 중' : '등록'}
+                    {t(redeeming ? 'hub.invite.checking' : 'hub.invite.register')}
                   </button>
                 </div>
-                <p className="hub-modal-help iv-redeem-hint">한 번 등록하면 바꿀 수 없어요.</p>
+                <p className="hub-modal-help iv-redeem-hint">{t('hub.invite.hint')}</p>
               </>
             )}
             {redeemMsg && <p className={`iv-redeem-msg${redeemMsg.ok ? ' is-ok' : ''}`}>{redeemMsg.text}</p>}
@@ -909,25 +923,25 @@ export default function Hub() {
       )}
 
       {modal === 'gift' && (
-        <Modal title="코인 선물" onClose={() => setModal(null)}>
+        <Modal title={t('hub.gift.title')} onClose={() => setModal(null)}>
           <div className="gf-bal">
-            <Ic n="coin" s={22} /><span className="gf-bal-n">{points.toLocaleString()}</span><span className="gf-bal-lab">보유 코인</span>
+            <Ic n="coin" s={22} /><span className="gf-bal-n">{points.toLocaleString()}</span><span className="gf-bal-lab">{t('hub.gift.balance')}</span>
           </div>
 
           {/* 받은 선물 — 오늘 것만 상세로. 저장은 건별이지만 표시는 사람별 합산이라 도배돼도 한 줄이다. */}
           {(giftGot.length > 0 || giftGotOlder > 0) && (
             <div className="gf-got">
-              <div className="gf-got-head">받은 선물</div>
+              <div className="gf-got-head">{t('hub.gift.received')}</div>
               {giftGot.map((g) => (
                 <div className="gf-got-row" key={g.name}>
                   <b className="gf-got-name">{g.name}</b>
                   <span className="gf-got-amt">+{g.amount.toLocaleString()}</span>
-                  {g.count > 1 && <span className="gf-got-n">{g.count}건</span>}
+                  {g.count > 1 && <span className="gf-got-n">{t('hub.gift.count_n', { n: g.count })}</span>}
                 </div>
               ))}
               {giftGotOlder > 0 && (
                 <button className="gf-older" onClick={toggleGiftHistory}>
-                  이전에 받은 선물 {giftGotOlder}건 <span className="gf-chev">›</span>
+                  {t('hub.gift.older', { n: giftGotOlder })} <span className="gf-chev">›</span>
                 </button>
               )}
             </div>
@@ -935,8 +949,8 @@ export default function Hub() {
 
           {/* 보내기 — 되돌릴 수 없으니 코드 → 이름 확인 → 금액 → 확인 순서를 강제한다. */}
           <div className="gf-send">
-            <div className="gf-send-head">코인 보내기</div>
-            <label className="gf-lab" htmlFor="gf-code">친구 초대코드</label>
+            <div className="gf-send-head">{t('hub.gift.send_head')}</div>
+            <label className="gf-lab" htmlFor="gf-code">{t('hub.gift.code_label')}</label>
             <input
               id="gf-code"
               className="gf-in"
@@ -950,9 +964,9 @@ export default function Hub() {
               autoComplete="off"
             />
             {/* 8자를 다 치면 여기 이름이 뜬다. 이게 오타를 막는 유일한 장치라 반드시 실명(닉네임)을 보여준다. */}
-            {giftTo && <p className={`gf-to${giftTo.ok ? ' is-ok' : ''}`}>{giftTo.ok ? `${giftTo.text}님에게 보냅니다` : giftTo.text}</p>}
+            {giftTo && <p className={`gf-to${giftTo.ok ? ' is-ok' : ''}`}>{giftTo.ok ? t('hub.gift.to_ok', { name: giftTo.name }) : t(giftTo.errKey)}</p>}
 
-            <label className="gf-lab" htmlFor="gf-amt">보낼 코인</label>
+            <label className="gf-lab" htmlFor="gf-amt">{t('hub.gift.amount_label')}</label>
             <input
               id="gf-amt"
               className="gf-in"
@@ -970,17 +984,18 @@ export default function Hub() {
                 onClick={() => { setGiftMsg(null); setGiftConfirm(true) }}
                 disabled={giftSending || !giftTo?.ok || !giftAmount || Number(giftAmount) <= 0}
               >
-                보내기
+                {t('hub.gift.send')}
               </button>
             ) : (
               <div className="gf-confirm">
+                {/* 강조를 위한 인라인 <b> 는 뺐다 — 어순이 언어마다 달라서 문장을 쪼개면 번역이 불가능해진다. */}
                 <p className="gf-confirm-q">
-                  <b>{giftTo?.text}</b>님에게 <b>{Number(giftAmount).toLocaleString()}코인</b>을 보낼까요?
+                  {t('hub.gift.confirm_q', { name: giftTo?.ok ? giftTo.name : '', n: Number(giftAmount).toLocaleString() })}
                 </p>
-                <p className="gf-confirm-warn">보내고 나면 되돌릴 수 없어요.</p>
+                <p className="gf-confirm-warn">{t('hub.gift.confirm_warn')}</p>
                 <div className="gf-confirm-act">
-                  <button className="gf-btn gf-btn-ghost" onClick={() => setGiftConfirm(false)} disabled={giftSending}>취소</button>
-                  <button className="gf-btn" onClick={doGift} disabled={giftSending}>{giftSending ? '보내는 중' : '보내기'}</button>
+                  <button className="gf-btn gf-btn-ghost" onClick={() => setGiftConfirm(false)} disabled={giftSending}>{t('common.cancel')}</button>
+                  <button className="gf-btn" onClick={doGift} disabled={giftSending}>{t(giftSending ? 'hub.gift.sending' : 'hub.gift.send')}</button>
                 </div>
               </div>
             )}
@@ -989,15 +1004,15 @@ export default function Hub() {
 
           {/* 전체 이력 — 오늘 것 말고는 전부 여기. 보낸 것·받은 것이 건별로 다 남는다. */}
           <button className="gf-hist-toggle" onClick={toggleGiftHistory}>
-            선물 내역 <span className={`gf-chev${giftHistoryOpen ? ' is-open' : ''}`}>›</span>
+            {t('hub.gift.history')} <span className={`gf-chev${giftHistoryOpen ? ' is-open' : ''}`}>›</span>
           </button>
           {giftHistoryOpen && (
             <div className="gf-hist">
-              {giftHistory === null && <p className="hub-modal-help">불러오는 중…</p>}
-              {giftHistory?.length === 0 && <p className="hub-modal-help">아직 주고받은 선물이 없어요.</p>}
+              {giftHistory === null && <p className="hub-modal-help">{t('common.loading')}</p>}
+              {giftHistory?.length === 0 && <p className="hub-modal-help">{t('hub.gift.empty')}</p>}
               {giftHistory?.map((r) => (
                 <div className={`gf-hist-row is-${r.dir}`} key={r.id}>
-                  <span className="gf-hist-dir">{r.dir === 'in' ? '받음' : '보냄'}</span>
+                  <span className="gf-hist-dir">{t(r.dir === 'in' ? 'hub.gift.dir_in' : 'hub.gift.dir_out')}</span>
                   <b className="gf-hist-name">{r.name}</b>
                   <span className="gf-hist-amt">{r.dir === 'in' ? '+' : '−'}{r.amount.toLocaleString()}</span>
                   <span className="gf-hist-at">{r.at.slice(0, 10)}</span>
@@ -1013,12 +1028,14 @@ export default function Hub() {
 }
 
 function Modal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
+  // Hub() 밖이라 t 를 물려받지 못한다 — 여기서 다시 훅을 부른다(닫기 버튼 aria-label 용).
+  const { t } = useT()
   return (
     <div className="hub-modal-backdrop" onClick={onClose}>
       <div className={`hub-modal${className ? ' ' + className : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="hub-modal-head">
           <h3>{title}</h3>
-          <button className="hub-modal-close" onClick={onClose} aria-label="닫기">×</button>
+          <button className="hub-modal-close" onClick={onClose} aria-label={t('common.close')}>×</button>
         </div>
         <div className="hub-modal-body">{children}</div>
       </div>

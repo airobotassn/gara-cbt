@@ -27,26 +27,27 @@ export default function MiniGames() {
 
         <div className="mg-shelf">
           {MINIGAMES.map((g) => {
-          // 제목 중 accent 토큰(예: 'CARI')만 색을 달리 준다.
+          // 제목은 사전에서 온다(데이터에 한국어를 두지 않는다) — accent 토큰만 색을 달리 준다.
+          const gTitle = t(`mg.${g.id}.title`)
           const [pre, post] =
-            g.accent && g.title.includes(g.accent)
-              ? [g.title.slice(0, g.title.indexOf(g.accent)), g.accent]
-              : [g.title, '']
+            g.accent && gTitle.includes(g.accent)
+              ? [gTitle.slice(0, gTitle.indexOf(g.accent)), g.accent]
+              : [gTitle, '']
           return (
             <button
               key={g.id}
               className="mg-cover"
               onClick={() => navigate(`/games/${g.id}`)}
-              aria-label={g.title}
+              aria-label={gTitle}
             >
               <img className="mg-art" src={g.art} alt="" />
               <span className="mg-caption">
-                <span className="mg-badge">{g.badge}</span>
+                <span className="mg-badge">{t(`mg.${g.id}.badge`)}</span>
                 <b className="mg-name">
                   {pre}
                   {post && <i className="mg-accent">{post}</i>}
                 </b>
-                <span className="mg-tag">{g.tagline}</span>
+                <span className="mg-tag">{t(`mg.${g.id}.tagline`)}</span>
                 <span className="mg-play">
                   <b className="mg-play-tri" />
                   PLAY

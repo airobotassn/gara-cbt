@@ -134,6 +134,7 @@ export default function Ranking() {
   const [cardOf, setCardOf] = useState<HofUser | null>(null)
   const cardData: ShareCardData | null = cardOf
     ? {
+        lang,
         name: cardOf.name,
         avatarUrl: avatarUrlOf(cardOf),
         seed: cardOf.name,

@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import { callFunction } from '../lib/supabase'
 import { Avatar } from './GemAvatar'
-import { useT } from '../lib/i18n'
+import { useT, type TFunc } from '../lib/i18n'
 
 interface Row {
   rank: number
@@ -43,12 +43,13 @@ function avatarUrlOf(r: Pick<Row, 'color' | 'image' | 'mascot' | 'character'>): 
   return null
 }
 
-function fmtMs(ms: number | null): string {
+// 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다(단위 표기가 언어마다 다르다).
+function fmtMs(ms: number | null, t: TFunc): string {
   if (ms == null) return ''
   const s = Math.round(ms / 100) / 10
-  if (s < 60) return `${s.toFixed(1)}초`
+  if (s < 60) return t('mg.sec', { n: s.toFixed(1) })
   const m = Math.floor(s / 60)
-  return `${m}분 ${Math.round(s - m * 60)}초`
+  return t('mg.min_sec', { m, s: Math.round(s - m * 60) })
 }
 
 export default function MiniGameRankModal({
@@ -62,7 +63,11 @@ export default function MiniGameRankModal({
 }) {
   const { t } = useT()
   const [data, setData] = useState<RankResp | null>(null)
+  // 서버가 준 사유는 그대로, 그 외 실패는 사전 키로 표시한다.
+  //   ⚠️ 이펙트 안에서 t() 를 부르면 t 를 deps 에 넣어야 하는데, t 는 렌더마다 새로 만들어져서
+  //     넣는 순간 이펙트가 매 렌더 돈다(= 랭킹을 계속 다시 부른다). 그래서 번역은 렌더에서 한다.
   const [err, setErr] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -72,7 +77,7 @@ export default function MiniGameRankModal({
         if (d.error) setErr(d.error)
         else setData(d)
       })
-      .catch((e) => { if (alive) setErr(e instanceof Error ? e.message : '랭킹을 불러오지 못했어요.') })
+      .catch((e) => { if (!alive) return; setFailed(true); setErr(e instanceof Error ? e.message : null) })
     return () => { alive = false }
   }, [gameId])
 
@@ -106,26 +111,26 @@ export default function MiniGameRankModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`${title} 랭킹`}
+        aria-label={t('mg.rank_title', { title })}
       >
         <div className="mgm-head">
-          <h3>{title} 랭킹</h3>
-          <button className="mgm-close" onClick={onClose} aria-label="닫기">✕</button>
+          <h3>{t('mg.rank_title', { title })}</h3>
+          <button className="mgm-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         <p className="mgr-note">
           {metric === 'level'
-            ? '도달 레벨이 높은 순 · 같으면 걸린 시간이 짧은 순'
-            : '점수가 높은 순 · 같으면 먼저 도달한 순'}
-          {data ? ` · 참가 ${data.total.toLocaleString()}명` : ''}
+            ? t('mg.rank_rule_level')
+            : t('mg.rank_rule_score')}
+          {data ? t('mg.rank_players', { n: data.total.toLocaleString() }) : ''}
         </p>
 
-        {err && <p className="mgr-note mgr-mid">{err}</p>}
-        {!err && !data && <p className="mgr-note mgr-mid">불러오는 중…</p>}
+        {(err || failed) && <p className="mgr-note mgr-mid">{err ?? t('mg.rank_fail')}</p>}
+        {!err && !failed && !data && <p className="mgr-note mgr-mid">{t('common.loading')}</p>}
 
-        {data && !err && (
+        {data && !err && !failed && (
           top.length === 0 ? (
-            <p className="mgr-note mgr-mid">아직 기록이 없어요. 첫 기록의 주인이 되어보세요!</p>
+            <p className="mgr-note mgr-mid">{t('mg.rank_empty')}</p>
           ) : (
             <>
               {/* === 시상대 TOP 3 — /ranking 과 같은 그림·좌표(ranking.css). 제목만 없다(모달 헤더가 대신한다). === */}
@@ -149,7 +154,7 @@ export default function MiniGameRankModal({
                         <b>{r.name}</b>
                         <span>
                           {val(r.score)}
-                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
+                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs, t)}</small> : null}
                         </span>
                       </div>
                     ) : null,
@@ -172,7 +177,7 @@ export default function MiniGameRankModal({
                         </span>
                         <span className="bar-pt">
                           {val(r.score)}
-                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs)}</small> : null}
+                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs, t)}</small> : null}
                         </span>
                       </div>
                     </div>
@@ -185,7 +190,7 @@ export default function MiniGameRankModal({
 
         {/* 내 순위 — TOP N 안에 있어도 항상 보여준다(/ranking 과 같은 규칙). 위 목록과 중복돼도
             '내 기록이 지금 몇 등인지'를 찾아 스크롤하지 않게 하는 쪽이 낫다. */}
-        {data && !err && (
+        {data && !err && !failed && (
           data.me ? (
             // 구조·크기 전부 /ranking 의 내 순위 바와 동일: 이름 옆 small 로 '상위 N%'(meflag 대신).
             <div className="hof-mebar">
@@ -202,7 +207,7 @@ export default function MiniGameRankModal({
             </div>
           ) : (
             <p className="mgr-note mgr-mid">
-              {data.needsAuth ? '로그인하면 내 순위가 표시돼요.' : '아직 내 기록이 없어요 — 한 판 하고 오면 등록됩니다.'}
+              {t(data.needsAuth ? 'mg.rank_need_login' : 'mg.rank_no_mine')}
             </p>
           )
         )}

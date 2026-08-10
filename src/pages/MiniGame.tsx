@@ -33,7 +33,7 @@ export default function MiniGame() {
   const { gameId } = useParams<{ gameId: string }>()
   const game = findMiniGame(gameId)
   const { isFullUser, loading, loginWithGoogle, ensureAnonymous } = useAuth()
-  const { t } = useT()
+  const { t, lang } = useT()
   const [rankOpen, setRankOpen] = useState(false)
   // 게스트가 한 판 끝냈을 때 뜨는 잠금 안내. 한 번 닫으면 그 세션에선 다시 띄우지 않는다
   // — 판마다 막아서면 플레이를 방해한다(레벨테스트는 결과가 화면 하나라 그럴 일이 없다).
@@ -101,12 +101,12 @@ export default function MiniGame() {
   if (!game) {
     return (
       <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', padding: 24, textAlign: 'center', gap: 12 }}>
-        <p style={{ fontWeight: 800, color: '#28324c' }}>준비 중인 미니게임이에요.</p>
+        <p style={{ fontWeight: 800, color: '#28324c' }}>{t('mg.preparing')}</p>
         <button
           onClick={() => navigate('/games')}
           style={{ padding: '10px 20px', borderRadius: 999, border: 0, cursor: 'pointer', background: '#004ac6', color: '#fff', fontWeight: 800 }}
         >
-          미니게임 목록으로
+          {t('mg.to_list')}
         </button>
       </div>
     )
@@ -146,7 +146,7 @@ export default function MiniGame() {
       >
         <button
           onClick={() => navigate('/games')}
-          aria-label="미니게임"
+          aria-label={t('mg.title')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -161,10 +161,10 @@ export default function MiniGame() {
             cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> 미니게임
+          <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> {t('mg.title')}
         </button>
-        <strong style={{ fontSize: 15, color: dark ? '#fff' : '#28324c', letterSpacing: '-.01em' }}>{game.title}</strong>
-        <span style={{ fontSize: 11.5, color: dark ? 'rgba(255,255,255,.6)' : '#7c869e', fontWeight: 700 }}>{game.tagline}</span>
+        <strong style={{ fontSize: 15, color: dark ? '#fff' : '#28324c', letterSpacing: '-.01em' }}>{t(`mg.${game.id}.title`)}</strong>
+        <span style={{ fontSize: 11.5, color: dark ? 'rgba(255,255,255,.6)' : '#7c869e', fontWeight: 700 }}>{t(`mg.${game.id}.tagline`)}</span>
         {/* 게스트 안내 — 태그라인 자리를 뺏지 않게 오른쪽 끝으로 민다. 플레이를 막지 않으므로 배너가 아니라 칩이다. */}
         {!isFullUser && (
           <button
@@ -186,17 +186,20 @@ export default function MiniGame() {
               cursor: 'pointer',
             }}
           >
-            기록이 안 남아요 · 로그인
+            {t('mg.guest_hint')}
           </button>
         )}
       </header>
       <iframe
-        src={game.src}
-        title={game.title}
+        /* 게임은 자립형 HTML(iframe)이라 앱 사전을 못 쓴다 → 화면 언어를 쿼리로 넘긴다.
+           게임 쪽은 public/games/i18n.js 가 ?lang= 를 읽어 인트로·아웃트로 문구를 갈아끼운다.
+           ⚠️ 문항(POOL)은 여기 해당 없음 — 그건 아직 한국어이고 콘텐츠 파이프라인 몫이다. */
+        src={`${game.src}?lang=${lang}`}
+        title={t(`mg.${game.id}.title`)}
         style={{ flex: 1, width: '100%', border: 0, display: 'block' }}
       />
       {rankOpen && (
-        <MiniGameRankModal gameId={game.id} title={game.title} onClose={() => setRankOpen(false)} />
+        <MiniGameRankModal gameId={game.id} title={t(`mg.${game.id}.title`)} onClose={() => setRankOpen(false)} />
       )}
 
       {/* 게스트 한 판 종료 — 게임 자체 결과창 위에 얹는다. 레벨테스트의 LockedPanel 과 같은 구성
@@ -215,10 +218,10 @@ export default function MiniGame() {
           >
             <div style={{ fontSize: 34, lineHeight: 1 }}>🔒</div>
             <h3 style={{ margin: '12px 0 6px', fontSize: 17, fontWeight: 900, color: '#28324c' }}>
-              이 기록은 저장되지 않았어요
+              {t('mg.not_saved')}
             </h3>
             <p style={{ margin: '0 0 18px', fontSize: 13.5, fontWeight: 600, lineHeight: 1.6, color: '#6b7488' }}>
-              로그인하면 최고 기록이 남고 게임 랭킹에 올라가요. 지금은 구경만 할 수 있어요.
+              {t('mg.not_saved_body')}
             </p>
             <button
               onClick={() => {
@@ -234,7 +237,7 @@ export default function MiniGame() {
               onClick={() => { guestNoticeDone.current = true; setGuestScored(false) }}
               style={{ marginTop: 8, width: '100%', padding: '10px 16px', borderRadius: 12, border: '1px solid #d9e0f0', background: '#fff', color: '#6b7488', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
             >
-              그냥 계속 할래요
+              {t('mg.keep_playing')}
             </button>
           </div>
         </div>

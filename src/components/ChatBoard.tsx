@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useT } from '../lib/i18n'
+import { useT, localeOf, type Lang } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { linkify } from '../lib/linkify'
@@ -59,8 +59,22 @@ const POLL_MAX_MS = 4500
 
 // 본문 렌더(URL 링크화 + 자동 이스케이프)는 ../lib/linkify 로 분리(단위 테스트 가능).
 
-const kstTime = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })
-const kstDay = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' })
+// 시각은 **항상 KST**(아레나 채팅은 한국 시간 기준 하나로 읽힌다)지만 **표기 언어는 화면 언어**다.
+//   ⚠️ 로케일에 'ko-KR' 을 박아두면 언어를 바꿔도 '8월 10일' 처럼 날짜만 한국어로 남는다(2026-08-07 수정).
+//   포매터는 만드는 비용이 있어 언어별로 캐시한다(메시지마다 새로 만들면 폴링 때 낭비가 크다).
+const FMT_CACHE = new Map<string, { time: Intl.DateTimeFormat; day: Intl.DateTimeFormat }>()
+function kstFmt(lang: Lang) {
+  const key = localeOf(lang)
+  let f = FMT_CACHE.get(key)
+  if (!f) {
+    f = {
+      time: new Intl.DateTimeFormat(key, { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' }),
+      day: new Intl.DateTimeFormat(key, { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' }),
+    }
+    FMT_CACHE.set(key, f)
+  }
+  return f
+}
 
 // chat-post/chat-edit 에러 코드 → i18n 키 매핑(없으면 e.message 그대로 노출)
 const ERR_KEYS: Record<string, string> = {
@@ -139,6 +153,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
     if (diff < 60_000) return t('chat.justNow')
     if (diff < 3_600_000) return t('chat.minutesAgo', { n: String(Math.floor(diff / 60_000)) })
     const d = new Date(iso)
+    const { time: kstTime, day: kstDay } = kstFmt(lang)
     return kstDay.format(d) === kstDay.format(new Date(now)) ? kstTime.format(d) : `${kstDay.format(d)} ${kstTime.format(d)}`
   }
 
@@ -331,6 +346,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
       }
       const u = res.user
       setCard({
+        lang,
         name: u.name,
         // 카드 아바타는 서버가 준 원본 문자열을 다시 조립해 쓴다(채팅 행의 avatar_url 과 같은 형식).
         avatarUrl: u.image ? `img:${u.image}` : u.color ? `gem:${u.color}` : (r.avatar_url ?? null),

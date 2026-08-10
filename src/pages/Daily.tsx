@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import '../styles/daily.css'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
+import { useT, localeOf } from '../lib/i18n'
 import { dailyTerm, dailyChoices, termTheory, TERMS } from '../lib/terms'
 import DailyVisual from '../components/DailyVisual'
 
@@ -39,6 +40,7 @@ function Ic({ n, s = 24 }: { n: string; s?: number }) {
 export default function Daily() {
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle } = useAuth()
+  const { t, lang } = useT()
   const [authed, setAuthed] = useState(false)
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
@@ -112,7 +114,8 @@ export default function Daily() {
     void complete()
   }
 
-  const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+  // ⚠️ 로케일을 'ko-KR' 로 박아두면 화면 언어를 바꿔도 이 날짜만 한국어로 남는다(2026-08-07 수정).
+  const today = new Date().toLocaleDateString(localeOf(lang), { month: 'long', day: 'numeric', weekday: 'short' })
 
   return (
     <div className="dy-page">
@@ -123,7 +126,7 @@ export default function Daily() {
           <span>‹</span> WORLD ARENA
         </button>
         <div className="dy-head">
-          <b>오늘의 학습</b>
+          <b>{t('daily.title')}</b>
           <i>{today}</i>
         </div>
         <span className="dy-coin"><Ic n="coin" s={20} />{points.toLocaleString()}</span>
@@ -131,8 +134,8 @@ export default function Daily() {
 
       {!loading && !authed && (
         <div className="dy-banner">
-          <span>로그인해야 학습 완료가 기록돼요</span>
-          <button className="dy-btn dy-btn-sm" onClick={() => loginWithGoogle()}>구글로 로그인</button>
+          <span>{t('daily.login_note')}</span>
+          <button className="dy-btn dy-btn-sm" onClick={() => loginWithGoogle()}>{t('common.login_google')}</button>
         </div>
       )}
 
@@ -143,7 +146,7 @@ export default function Daily() {
       <div className="dy-quiz">
         <div className="dy-q-head">
           <span className="dy-q-badge">{term.field}</span>
-          <span className="dy-q-label">오늘의 용어</span>
+          <span className="dy-q-label">{t('daily.term_label')}</span>
         </div>
         <p className="dy-q-desc">{term.desc}</p>
         <div className="dy-q-opts">
@@ -164,10 +167,10 @@ export default function Daily() {
         {answered && (
           <p className={`dy-q-result ${picked === term.answer ? 'ok' : picked ? 'no' : 'seen'}`}>
             {picked === term.answer
-              ? '정답이에요! 🎉 오늘 학습 완료.'
+              ? t('daily.correct')
               : picked
-              ? <>아쉬워요 — 정답은 <b>{term.answer}</b> 예요. 시도했으니 완료!</>
-              : <>오늘 학습은 이미 완료했어요. 정답은 <b>{term.answer}</b> 예요.</>}
+              ? t('daily.wrong', { answer: term.answer })
+              : t('daily.already', { answer: term.answer })}
           </p>
         )}
       </div>
@@ -180,7 +183,7 @@ export default function Daily() {
           <div className="dy-th-clip">
             <div className="dy-th-card">
               <div className="dy-th-head">
-                <span className="dy-th-badge">이론</span>
+                <span className="dy-th-badge">{t('daily.theory')}</span>
                 <b>{term.answer}</b>
               </div>
               {/* 그림이 먼저다 — 2초에 읽히는 건 이쪽이고, 아래 한 줄은 그 캡션이다. */}
@@ -195,7 +198,7 @@ export default function Daily() {
               )}
               {theory.compare && (
                 <p className="dy-th-cmp">
-                  <span>헷갈리면</span>
+                  <span>{t('daily.hint_lead')}</span>
                   {theory.compare}
                 </p>
               )}
@@ -208,12 +211,12 @@ export default function Daily() {
       <aside className="dy-rail">
       {/* 보상 예고 — 완료하면 뭘 받는지 미리. */}
       <div className="dy-reward">
-        <div className="dy-rw-top">완료하면</div>
+        <div className="dy-rw-top">{t('daily.reward_head')}</div>
         <div className="dy-rw-row">
           <span className="dy-rw-item"><Ic n="coin" s={26} /><b>+{DAILY_POINTS}P</b></span>
-          <span className="dy-rw-item"><Ic n="stamp" s={26} /><b>스탬프 +1</b></span>
+          <span className="dy-rw-item"><Ic n="stamp" s={26} /><b>{t('daily.stamp_plus')}</b></span>
         </div>
-        <div className="dy-streak" aria-label={`스탬프 ${stamps} / ${STAMP_GOAL}`}>
+        <div className="dy-streak" aria-label={t('daily.stamp_aria', { n: stamps, max: STAMP_GOAL })}>
           {Array.from({ length: STAMP_GOAL }, (_, i) => i + 1).map((d) => (
             <span key={d} className={`dy-day ${d <= stamps ? 'on' : ''}`}>{d <= stamps ? '✓' : d}</span>
           ))}
@@ -225,10 +228,10 @@ export default function Daily() {
       {/* 완료 트리거는 문제 시도(왼쪽 카드)로 옮겨졌다. 여기는 상태 안내만. */}
       <p className="dy-note">
         {done
-          ? '오늘 학습 완료 ✓ 내일 새 문제가 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).'
+          ? t('daily.done_note')
           : busy
-          ? '기록하는 중…'
-          : '정답을 고르면 오늘 학습이 완료돼요. 맞히지 않아도 시도하면 적립돼요.'}
+          ? t('daily.saving')
+          : t('daily.pick_note')}
       </p>
       </aside>
       </div>
@@ -239,17 +242,17 @@ export default function Daily() {
         <div className="dy-pop-bd" onClick={() => setCelebrate(false)}>
           <div className="dy-pop" onClick={(e) => e.stopPropagation()}>
             <div className="dy-pop-burst"><Ic n="stamp" s={64} /></div>
-            <b className="dy-pop-title">오늘 학습 완료!</b>
+            <b className="dy-pop-title">{t('daily.pop_title')}</b>
             <div className="dy-pop-gain">
               {rewarded && <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>}
-              <span><Ic n="stamp" s={22} />스탬프 {stamps} / {STAMP_GOAL}</span>
+              <span><Ic n="stamp" s={22} />{t('daily.pop_stamp', { n: stamps, max: STAMP_GOAL })}</span>
             </div>
             <p className="dy-pop-msg">
-              {rewarded ? '캐릭터가 오늘도 한 뼘 자랐어요.' : '오늘 출석으로 코인·스탬프는 이미 받았어요. 학습 기록은 남았습니다.'}
+              {t(rewarded ? 'daily.pop_grew' : 'daily.pop_already')}
             </p>
             {/* 버튼은 '닫기' 하나 — 완료 보상이 이 화면에서 끝나므로 허브로 보낼 이유가 없다. */}
             <div className="dy-pop-btns">
-              <button className="dy-btn" onClick={() => setCelebrate(false)}>닫기</button>
+              <button className="dy-btn" onClick={() => setCelebrate(false)}>{t('common.close')}</button>
             </div>
           </div>
         </div>

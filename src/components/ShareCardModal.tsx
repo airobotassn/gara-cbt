@@ -6,11 +6,12 @@ import {
   renderShareCard, canvasToBlob, cardFileName, downloadBlob, shareBlob, copyBlob,
   CARD_W, CARD_H, type ShareCardData,
 } from '../lib/shareCard'
+import { useT } from '../lib/i18n'
 
 export default function ShareCardModal({
   data,
   onClose,
-  title = '내 카드 공유',
+  title,
   // 남의 카드(랭킹 TOP10 클릭)는 보기 전용 — 저장·공유·복사 버튼을 감춘다.
   // 남의 이미지를 내가 받아서 뿌리는 건 자연스럽지 않고, 게임들도 남의 프로필은 보기만 한다.
   readOnly = false,
@@ -20,6 +21,7 @@ export default function ShareCardModal({
   title?: string
   readOnly?: boolean
 }) {
+  const { t } = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
@@ -53,7 +55,7 @@ export default function ShareCardModal({
       setBusy(true)
       await fn(await canvasToBlob(cv))
     } catch {
-      flash('이미지를 만들지 못했어요')
+      flash(t('share.img_fail'))
     } finally {
       setBusy(false)
     }
@@ -62,42 +64,42 @@ export default function ShareCardModal({
   const file = cardFileName(data.name)
   const doShare = () => withBlob(async (b) => {
     // 공유 시트 미지원/거부 → 저장으로 폴백(빈손으로 끝나지 않게)
-    if (!(await shareBlob(b, file, 'CARIS WORLD ARENA'))) { downloadBlob(b, file); flash('이미지를 저장했어요') }
+    if (!(await shareBlob(b, file, 'CARIS WORLD ARENA'))) { downloadBlob(b, file); flash(t('share.saved')) }
   })
-  const doSave = () => withBlob(async (b) => { downloadBlob(b, file); flash('이미지를 저장했어요') })
-  const doCopy = () => withBlob(async (b) => { flash(await copyBlob(b) ? '클립보드에 복사했어요' : '복사를 지원하지 않는 브라우저예요') })
+  const doSave = () => withBlob(async (b) => { downloadBlob(b, file); flash(t('share.saved')) })
+  const doCopy = () => withBlob(async (b) => { flash(t(await copyBlob(b) ? 'share.copied' : 'share.copy_unsupported')) })
 
   return (
     // sc-host = 허브 밖(/ranking)에서도 스타일이 먹도록 토큰을 공급하는 클래스(hub.css)
     <div className="hub-modal-backdrop sc-host" onClick={onClose}>
       <div className="hub-modal share-modal" onClick={(e) => e.stopPropagation()}>
         <div className="hub-modal-head">
-          <h3>{title}</h3>
-          <button className="hub-modal-close" onClick={onClose} aria-label="닫기">×</button>
+          <h3>{title ?? t('share.modal_title')}</h3>
+          <button className="hub-modal-close" onClick={onClose} aria-label={t('common.close')}>×</button>
         </div>
         <div className="hub-modal-body">
           <div className={`share-preview ${state === 'ready' ? 'is-ready' : ''}`} style={{ aspectRatio: `${CARD_W} / ${CARD_H}` }}>
             <canvas ref={canvasRef} className="share-canvas" />
-            {state === 'loading' && <div className="share-preview-msg">카드 만드는 중…</div>}
-            {state === 'error' && <div className="share-preview-msg">카드를 만들지 못했어요</div>}
+            {state === 'loading' && <div className="share-preview-msg">{t('share.making')}</div>}
+            {state === 'error' && <div className="share-preview-msg">{t('share.make_fail')}</div>}
           </div>
 
           {!readOnly && (
             <div className="share-actions">
               {canShareFiles && (
-                <button className="pbtn share-btn share-btn-primary" onClick={doShare} disabled={state !== 'ready' || busy}>공유하기</button>
+                <button className="pbtn share-btn share-btn-primary" onClick={doShare} disabled={state !== 'ready' || busy}>{t('share.do_share')}</button>
               )}
-              <button className={`pbtn share-btn${canShareFiles ? '' : ' share-btn-primary'}`} onClick={doSave} disabled={state !== 'ready' || busy}>이미지 저장</button>
+              <button className={`pbtn share-btn${canShareFiles ? '' : ' share-btn-primary'}`} onClick={doSave} disabled={state !== 'ready' || busy}>{t('share.do_save')}</button>
               {canCopy && (
-                <button className="pbtn share-btn" onClick={doCopy} disabled={state !== 'ready' || busy}>이미지 복사</button>
+                <button className="pbtn share-btn" onClick={doCopy} disabled={state !== 'ready' || busy}>{t('share.do_copy')}</button>
               )}
             </div>
           )}
           {note && <p className="share-note">{note}</p>}
           <p className="hub-modal-help">
             {readOnly
-              ? '지금 순위·티어 기준으로 만든 카드예요.'
-              : '카드는 지금 순위·티어 기준이에요. 응시하면 다시 만들어서 공유할 수 있어요.'}
+              ? t('share.note')
+              : t('share.note_retry')}
           </p>
         </div>
       </div>

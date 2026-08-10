@@ -9,6 +9,8 @@
 
 
 import { qrMatrix } from './qr'
+// 캔버스에 그리는 글자도 화면 언어를 따른다. 훅을 못 쓰는 계층이라 lang 을 받아 비-훅 번역기(tr)를 쓴다.
+import { tr, type Lang } from './i18n'
 
 export const CARD_W = 1600
 export const CARD_H = 900
@@ -42,6 +44,8 @@ const T = {
 } as const
 
 export interface ShareCardData {
+  /** 카드에 그릴 글자의 언어. 카드는 이미지로 밖에 나가는 물건이라 만든 사람의 화면 언어를 따른다. */
+  lang: Lang
   name: string
   avatarUrl: string | null
   seed: string // 아바타 시드(uid) — avatar_url 이 없을 때 젬 색 결정
@@ -297,7 +301,7 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   rr(ctx, hx, boxT, statW, boxB - boxT, 22)
   ctx.fillStyle = '#fafaff'; ctx.fill()
   ctx.strokeStyle = '#ececf5'; ctx.lineWidth = 2; ctx.stroke()
-  text(ctx, '시즌 기록', hx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
+  text(ctx, tr(d.lang, 'share.card.title'), hx + 28, boxT + 46, { size: T.title, weight: 900, color: INK })
 
   // 행 = [아이콘][라벨] … [값].
   // 순서 = 랭킹 3종(전세계 → 국가 → 지역) → 시즌 점수. 딱 4행이다.
@@ -307,18 +311,18 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   //    되살리려면 git 이력에서 pips()·pill() 을 가져올 것.
   interface Row { icon: IconKind; label: string; value: string }
   // 값 표기는 한국어로 통일한다 — 카드의 다른 글자가 전부 한국어라 '#127' 만 영어권 표기로 튄다.
-  const rk = (n: number | null) => (n != null ? `${n.toLocaleString()}위` : '—')
+  const rk = (n: number | null) => (n != null ? tr(d.lang, 'share.card.rank_n', { n: n.toLocaleString() }) : '—')
   // 남의 카드(publicOnly)는 국가·지역 행을 통째로 뺀다 — 아래 rowGap 이 행 수로 나누므로 2행이 균등하게 커진다.
   const rows: Row[] = d.publicOnly
     ? [
-        { icon: 'rank', label: '전세계', value: rk(d.rank) },
-        { icon: 'score', label: '시즌 점수', value: (d.seasonTotal ?? 0).toLocaleString() },
+        { icon: 'rank', label: tr(d.lang, 'share.card.world'), value: rk(d.rank) },
+        { icon: 'score', label: tr(d.lang, 'share.card.season_score'), value: (d.seasonTotal ?? 0).toLocaleString() },
       ]
     : [
-        { icon: 'rank', label: '전세계', value: rk(d.rank) },
-        { icon: 'rank', label: '국가', value: rk(d.countryRank) },
-        { icon: 'rank', label: '지역', value: rk(d.regionRank) },
-        { icon: 'score', label: '시즌 점수', value: (d.seasonTotal ?? 0).toLocaleString() },
+        { icon: 'rank', label: tr(d.lang, 'share.card.world'), value: rk(d.rank) },
+        { icon: 'rank', label: tr(d.lang, 'share.card.country'), value: rk(d.countryRank) },
+        { icon: 'rank', label: tr(d.lang, 'share.card.region'), value: rk(d.regionRank) },
+        { icon: 'score', label: tr(d.lang, 'share.card.season_score'), value: (d.seasonTotal ?? 0).toLocaleString() },
       ]
 
   // 행은 박스 높이에 균등 분산한다(고정 간격이면 행 수가 바뀔 때 아래가 텅 빈다).
@@ -388,9 +392,9 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   const foots = d.publicOnly
     ? []
     : [
-        { label: '가입일', value: joined },
-        { label: '국가', value: d.country || '—' },
-        { label: '지역', value: d.region || '—' },
+        { label: tr(d.lang, 'share.card.joined'), value: joined },
+        { label: tr(d.lang, 'share.card.country'), value: d.country || '—' },
+        { label: tr(d.lang, 'share.card.region'), value: d.region || '—' },
       ]
   // 값 3칸 + 오른쪽 끝 친구 코드 칸. 주소 텍스트는 위 QR 박스가 대신하므로 여기서 뺐다
   // — 같은 링크를 카드에 두 번 쓰지 않는다.
@@ -417,7 +421,7 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
     ctx.beginPath(); ctx.moveTo(fx, fy + 26); ctx.lineTo(fx, fy + FOOT_H - 26)
     ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 2; ctx.stroke()
     footIcon(ctx, 4, fx + 52, fy + FOOT_H / 2, rgba(lt(C, 0.42), 0.9))
-    text(ctx, '친구 코드', fx + 80, fy + 44, { size: T.sub, weight: 800, color: 'rgba(255,255,255,.5)' })
+    text(ctx, tr(d.lang, 'share.card.friend_code'), fx + 80, fy + 44, { size: T.sub, weight: 800, color: 'rgba(255,255,255,.5)' })
     const cSize = fitSize(ctx, d.referralCode, T.value, 900, URL_W - 130)
     text(ctx, d.referralCode, fx + 80, fy + 76, { size: cSize, weight: 900, color: lt(C, 0.35), spacing: 2 })
   }
