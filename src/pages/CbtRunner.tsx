@@ -8,6 +8,7 @@ import SebRequired from '../components/SebRequired'
 import SebExitButton from '../components/SebExitButton'
 import { SEB_REQUIRED, isSEB } from '../lib/seb'
 import { examAuthHeaders } from '../lib/examToken'
+import { HEARTBEAT_MS, primeExamSession, sendClosed, sendPing } from '../lib/examSession'
 import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
@@ -123,6 +124,40 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const paperRef = useRef<HTMLElement>(null)
   const omrRef = useRef<HTMLDivElement>(null)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  // 답한 문항 수 — 하트비트/종료신호에 같이 실어 "끊긴 시점에 어디까지 풀었나"를 남긴다.
+  //   (아무것도 안 풀고 훑기만 하다 나갔는지가 복구 판단에서 갈리는 지점이다.)
+  const answeredNow = useCallback(
+    () => questions.reduce((n, q, i) => n + ((q.kind === 'short' ? texts[i].trim() !== '' : selected[i] !== null) ? 1 : 0), 0),
+    [questions, selected, texts],
+  )
+  // 최신 값을 ref 로 복사해 둔다 — 아래 하트비트/언로드 핸들러가 답안이 바뀔 때마다
+  // 재등록되지 않게 하려는 것이다(30초 타이머가 매 클릭마다 리셋되면 하트비트가 안 나간다).
+  const answeredRef = useRef(0)
+  useEffect(() => {
+    answeredRef.current = answeredNow()
+  }, [answeredNow])
+
+  // 생존 신호 — 실제 응시에서만. 미리보기·모의는 서버에 기록할 게 없다.
+  const traced = !preview && start.attemptId !== 'practice'
+  useEffect(() => {
+    if (!traced) return
+    // 떠나는 순간 쓸 인증 헤더를 미리 만들어 둔다(그때 만들면 늦는다 — examSession.ts 주석 참고).
+    void primeExamSession()
+    sendPing(start.attemptId, answeredRef.current)
+    const id = window.setInterval(() => sendPing(start.attemptId, answeredRef.current), HEARTBEAT_MS)
+    // ⚠️ `pagehide` 를 쓴다. `beforeunload` 는 SEB·모바일에서 안 오는 경우가 있고,
+    //    `unload` 는 keepalive 요청이 씹히는 브라우저가 있다.
+    const onHide = () => {
+      if (submittedRef.current) return // 제출·종료로 끝낸 건은 이미 서버가 안다
+      sendClosed(start.attemptId, answeredRef.current, 'unload')
+    }
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('pagehide', onHide)
+    }
+  }, [traced, start.attemptId])
 
   // 문항별 체류시간(초)
   const startTimeRef = useRef<number[]>(Array(total).fill(0))

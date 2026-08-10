@@ -70,12 +70,15 @@ Deno.serve(async (req) => {
 
     const submittedAt = new Date().toISOString()
 
-    // 부정행위 등으로 무효 처리 — 채점 없이 voided 기록
+    // 응시자가 스스로 종료(포기)하거나 부정행위로 무효 처리 — 채점 없이 voided 기록.
+    // ⚠️ 사유를 반드시 남긴다. 관리자 복구 화면에서 '스스로 그만둔 것(quit)' 과
+    //    '나갔다 와서 무효된 것(reentry)' 은 판단이 정반대라, 사유 없이 voided 만 보면 구분이 안 된다.
     if (voided) {
       await admin
         .from('exam_attempts')
         .update({
           status: 'voided',
+          void_reason: 'quit',
           submitted_at: submittedAt,
         })
         .eq('id', attemptId)

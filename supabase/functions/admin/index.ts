@@ -1128,6 +1128,111 @@ async function examTicketVoid(admin: any, body: any, actorEmail: string, isRoot:
   return json({ ok: true, paymentNote })
 }
 
+// ---------- 응시 중단 조회 · 복구 ----------
+//
+// 배경: 감독관 없는 자율응시라 "응시 화면을 벗어났다 돌아오면 무효"가 기본값이다(start-exam).
+//   서버는 **PC 가 뻗은 것과 일부러 나간 것을 구분할 수 없다** — 그래서 자동으로 봐주지 않고,
+//   문의가 오면 사람이 아래 자료를 보고 푼다. 자료가 없으면 감으로 결정하게 되므로 같이 만들었다.
+//
+// ⚠️ 여기 값들은 **증거가 아니라 정황**이다. 랜선을 뽑으면 종료 신호도 안 남는다.
+//    그래도 "닫힘 신호가 남아 있다" = 사람이 창을 닫았다는 뜻이고, 공백 길이·진행률과 같이 보면
+//    아무 자료 없이 판단하는 것과는 다르다. 상습적인 사람은 이력에 패턴이 남는다.
+
+/** 무효된 응시 하나의 중단 정황 — 마지막 생존 시각, 공백, 종료 신호 유무, 진행률, 이력 전체. */
+async function examInterruption(admin: any, body: any) {
+  const attemptId = String(body?.attemptId ?? '').trim()
+  if (!attemptId) return json({ error: 'attemptId 필요' }, 400)
+
+  const { data: a } = await admin
+    .from('exam_attempts')
+    .select(
+      'id, user_id, exam_id, status, void_reason, started_at, submitted_at, last_seen_at, answered_count, total_questions, entry_count, reinstated_at, reinstated_by, reinstate_note',
+    )
+    .eq('id', attemptId)
+    .maybeSingle()
+  if (!a) return json({ error: '응시를 찾을 수 없습니다.' }, 404)
+
+  const { data: events } = await admin
+    .from('exam_session_events')
+    .select('kind, at, detail')
+    .eq('attempt_id', attemptId)
+    .order('at', { ascending: true })
+    .limit(200)
+
+  const rows = (events ?? []) as { kind: string; at: string; detail: Record<string, unknown> }[]
+  // ⭐ 판단의 핵심 한 줄 — 닫힘 신호가 있었나.
+  //    있으면 사람이 창을 닫은 것이고, 없이 끊겼으면 알릴 틈이 없었던 것(전원 차단·PC 정지)이다.
+  const closed = rows.filter((r) => r.kind === 'closed')
+  const reentries = rows.filter((r) => r.kind === 'reentry')
+
+  return json({
+    attempt: a,
+    events: rows,
+    summary: {
+      // 마지막 생존 이후 재진입까지 비어 있던 시간(초). 사고는 대개 짧고, 찾아보고 온 건 길다.
+      gapSec: (reentries.at(-1)?.detail?.gapSec as number | null) ?? null,
+      // 끊긴 시점의 진행률. "하나도 안 풀고 훑기만 하다 나갔다" 가 여기서 드러난다.
+      answered: (a.answered_count as number) ?? 0,
+      totalQuestions: (a.total_questions as number) ?? 0,
+      hadCloseSignal: closed.length > 0,
+      closeVia: (closed.at(-1)?.detail?.via as string | undefined) ?? null,
+      reentryCount: reentries.length,
+    },
+  })
+}
+
+/**
+ * 무효된 응시를 풀어 재응시(정확히는 그 응시로 재진입)를 허용한다.
+ *
+ * ⚠️ 새 응시를 만들지 않는다 — 같은 응시로 돌아가므로 **started_at 이 유지되고 제한시간도 이어진다.**
+ *    문항 세트도 그대로다. "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다(examTicketGrant).
+ * ⚠️ 사유를 반드시 받는다. 이 기능은 "특정인만 살려줬다" 는 말이 나올 수 있는 자리라,
+ *    누가·언제·왜가 남지 않으면 나중에 아무것도 해명할 수 없다.
+ */
+async function examReinstate(admin: any, body: any, actorEmail: string) {
+  const attemptId = String(body?.attemptId ?? '').trim()
+  const note = String(body?.note ?? '').trim()
+  if (!attemptId) return json({ error: 'attemptId 필요' }, 400)
+  if (!note) return json({ error: '복구 사유를 적어주세요(나중에 근거가 될 것이 이것뿐입니다).' }, 400)
+
+  const { data: a } = await admin
+    .from('exam_attempts')
+    .select('id, status, void_reason, submitted_at')
+    .eq('id', attemptId)
+    .maybeSingle()
+  if (!a) return json({ error: '응시를 찾을 수 없습니다.' }, 404)
+  if (a.status !== 'voided') {
+    return json({ error: `무효 상태가 아닙니다(현재 ${a.status}). 복구할 것이 없습니다.` }, 409)
+  }
+  const now = new Date().toISOString()
+  const { data: won } = await admin
+    .from('exam_attempts')
+    .update({
+      status: 'in_progress',
+      // 무효로 찍혔던 제출시각을 되돌린다 — 남겨두면 '제출한 응시'로 보여 목록·집계가 어긋난다.
+      submitted_at: null,
+      reinstated_at: now,
+      reinstated_by: actorEmail,
+      reinstate_note: note.slice(0, 500),
+    })
+    .eq('id', attemptId)
+    .eq('status', 'voided') // 그 사이 상태가 바뀌었으면 덮어쓰지 않는다
+    .select('id')
+    .maybeSingle()
+  if (!won) return json({ error: '복구할 수 없는 상태입니다(이미 처리됨).' }, 409)
+
+  await admin.from('exam_session_events').insert({
+    attempt_id: attemptId,
+    kind: 'reinstate',
+    detail: { by: actorEmail, note: note.slice(0, 500), prevVoidReason: a.void_reason ?? null },
+  })
+  return json({
+    ok: true,
+    // 응시자에게 뭐라고 안내할지가 갈리는 지점이라 서버가 명시한다.
+    note: '이 응시로 다시 들어갈 수 있습니다. 제한시간은 처음 시작 시각 기준으로 계속 흐르므로, 시간이 이미 지났다면 응시권을 새로 발급해 주세요.',
+  })
+}
+
 /**
  * 결제 원장 조회 + 30일 집계.
  * queue 는 '돈이 새는' 두 목록이다 — 목록이 사람 눈에 안 닿으면 방어 장치가 아니다.
@@ -2457,6 +2562,8 @@ Deno.serve(async (req) => {
       //    admin_users 게이트에는 액션별 권한이 없어서, 이 둘을 그냥 얹으면 등록 이메일 = 무료 응시권 발급기다.
       case 'examTicketGrant': return await examTicketGrant(admin, body, email, isRoot)
       case 'examTicketVoid': return await examTicketVoid(admin, body, email, isRoot)
+      case 'examInterruption': return await examInterruption(admin, body)
+      case 'examReinstate': return await examReinstate(admin, body, email)
       case 'paymentList': return await paymentList(admin, body)
       case 'examListForAdmin': return await examListForAdmin(admin)
       case 'bankListForAdmin': return await bankListForAdmin(admin)

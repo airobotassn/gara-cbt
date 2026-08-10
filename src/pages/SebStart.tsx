@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { callFunction } from '../lib/supabase'
+import { callFunction, isFunctionCode } from '../lib/supabase'
 import SebExitButton from '../components/SebExitButton'
 import { SEB_REQUIRED, isSEB } from '../lib/seb'
 import { DEFAULT_EXAM_SLUG } from '../lib/testConfig'
@@ -32,6 +32,8 @@ export default function SebStart() {
   const navigate = useNavigate()
   const { t } = useT()
   const [err, setErr] = useState('')
+  // 재진입 무효(서버 code='reentry_voided') — 재시도가 의미 없는 상태라 화면 구성이 달라진다.
+  const [voided, setVoided] = useState(false)
   const [starting, setStarting] = useState(false)
   const started = useRef(false)
 
@@ -79,6 +81,8 @@ export default function SebStart() {
     } catch (e) {
       started.current = false
       setStarting(false)
+      // 재진입 무효는 재시도로 풀리지 않는다 — 버튼을 감추고 문의 안내로 바꾼다.
+      if (isFunctionCode(e, 'reentry_voided')) setVoided(true)
       setErr(e instanceof Error ? e.message : t('prep.err_start'))
     }
   }
@@ -89,9 +93,16 @@ export default function SebStart() {
         {err ? (
           <>
             <p className="prep-warn" style={{ marginBottom: 16 }}>{err}</p>
+            {/* 재진입 무효 — 재시도해봐야 같은 답이 온다. 다시 시도 버튼 대신 문의 경로만 남긴다.
+                ⚠️ 응시자 입장에서 "왜 무효인지" 가 안 보이면 문의조차 못 한다. 사유를 반드시 말해준다. */}
+            {voided && (
+              <p className="font-body-md text-body-md text-on-surface-variant" style={{ marginBottom: 16, lineHeight: 1.65 }}>
+                {t('seb.voided_how')}
+              </p>
+            )}
             {/* 표도 토큰도 없으면 재시도해봐야 같은 곳에서 막힌다 — SEB 를 닫고 다시 시작하라고 말해준다.
                 (토큰이 있으면 교환은 이미 끝난 것이라, 실패한 건 응시 시작 쪽이고 재시도가 의미 있다.) */}
-            {nonce || getExamToken() ? (
+            {voided ? null : nonce || getExamToken() ? (
               <button className="exam-btn" onClick={begin}>{t('seb.entry_retry')}</button>
             ) : (
               <p className="font-body-md text-body-md text-on-surface-variant" style={{ marginBottom: 16 }}>

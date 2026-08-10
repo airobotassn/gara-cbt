@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
     //    즉 응시권 1장으로는 **끝까지 같은 응시 하나**만 존재한다 — 재개는 그 응시로 돌아가는 것이다.
     const { data: live } = await admin
       .from('exam_attempts')
-      .select('id, started_at, status')
+      .select('id, started_at, status, last_seen_at, answered_count, entry_count, reinstated_at')
       .eq('ticket_id', ticket.id)
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
@@ -337,11 +337,68 @@ Deno.serve(async (req) => {
           409,
         )
       }
-      // in_progress / expired 어느 쪽이든 **그 응시로 돌아간다.** 새로 만들지 않으므로 started_at 이 유지되고
+
+      // ⛔ **재진입 = 무효.** 응시를 시작한 뒤 화면을 벗어났다가 다시 들어온 경우다.
+      //
+      //    왜 여기서 잡나: SEB 는 사용자가 종료(X)했다고 우리에게 알려주지 않는다. 하지만 **다시 들어올 땐
+      //    반드시 이 함수를 또 탄다.** 그래서 "나갔다 왔다"는 서버가 확실히 아는 유일한 사실이다.
+      //
+      //    왜 자동으로 봐주지 않나: 서버 입장에서 "PC 가 뻗은 것"과 "검색하러 나간 것"은 완전히 같아 보인다
+      //    (세션이 끊겼다 다시 들어왔다, 그게 전부). 구분할 신호가 없으므로 횟수 같은 걸로 봐주는 규칙은
+      //    구분하는 척하는 것일 뿐이다. 그래서 **기본은 엄격하게, 예외는 사람이** 푼다(관리자 복구).
+      //
+      //    ⚠️ 관리자가 복구(reinstated_at)한 응시는 이 검사를 건너뛴다 — 안 그러면 풀어주자마자 다시 무효가 돼
+      //       복구 기능이 무의미해진다. 복구 후 또 나갔다 오면? 그때는 다시 무효가 되는 게 맞다
+      //       (복구 시점에 reinstated_at 을 지우지 않고 entry_count 를 기준선으로 올려 그 판정을 만든다).
+      const entries = (live.entry_count as number) ?? 1
+      const reinstated = Boolean(live.reinstated_at)
+      if (!reinstated) {
+        const lastSeen = live.last_seen_at ? new Date(live.last_seen_at as string).getTime() : null
+        await admin
+          .from('exam_attempts')
+          .update({
+            status: 'voided',
+            void_reason: 'reentry',
+            submitted_at: new Date().toISOString(),
+            entry_count: entries + 1,
+          })
+          .eq('id', live.id)
+          .eq('status', live.status) // 동시 요청이 이미 상태를 바꿨으면 덮어쓰지 않는다
+        // 복구 판단에 필요한 정황을 그대로 남긴다. 사람이 이걸 보고 풀어줄지 정한다.
+        await admin.from('exam_session_events').insert({
+          attempt_id: live.id,
+          kind: 'reentry',
+          detail: {
+            // 마지막으로 살아있던 시각과 지금 사이의 공백(초). 사고는 보통 짧고, 찾아보고 온 건 길다.
+            gapSec: lastSeen ? Math.max(0, Math.round((now - lastSeen) / 1000)) : null,
+            lastSeenAt: live.last_seen_at ?? null,
+            // 끊긴 시점의 진행률. "하나도 안 풀고 다 보기만 하고 나갔다" 가 여기서 드러난다.
+            answered: (live.answered_count as number) ?? 0,
+            prevStatus: live.status,
+            entryCount: entries + 1,
+          },
+        })
+        return json(
+          {
+            error:
+              '응시 중 시험 화면을 벗어나 응시가 무효 처리되었습니다. 기기·네트워크 문제로 중단된 경우 문의해 주시면 확인 후 재응시를 도와드립니다.',
+            code: 'reentry_voided',
+            attemptId: live.id,
+          },
+          409,
+        )
+      }
+
+      // 복구된 응시 — 그 응시로 돌아간다. 새로 만들지 않으므로 started_at 이 유지되고
       // 제한시간이 초기화되지 않는다(TTL 을 넘겼으면 submit-exam 이 제출을 거부한다 — 그게 정상 동작이다).
       if (live.status === 'expired') {
         await admin.from('exam_attempts').update({ status: 'in_progress' }).eq('id', live.id).eq('status', 'expired')
       }
+      // 복구분을 다 쓰면 다음 이탈부터는 다시 무효다 — 복구는 1회권이라는 뜻.
+      await admin
+        .from('exam_attempts')
+        .update({ entry_count: entries + 1, reinstated_at: null })
+        .eq('id', live.id)
       attemptId = live.id as string
       startedAt = live.started_at as string
     } else {
@@ -392,6 +449,12 @@ Deno.serve(async (req) => {
       }
       attemptId = attempt.id as string
       startedAt = attempt.started_at as string
+      // 시작 시각을 이력에도 남긴다 — 나중에 중단·복귀를 시간순으로 읽으려면 기준점이 있어야 한다.
+      await admin.from('exam_session_events').insert({
+        attempt_id: attemptId,
+        kind: 'start',
+        detail: { totalQuestions: served.length, seb: Boolean(actor.ticketId) },
+      })
     }
 
     // ---------- ⑨ 응시권 소진 ----------

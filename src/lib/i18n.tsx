@@ -667,7 +667,8 @@ const D: Record<string, Record<Lang, string>> = {
   'rank.top': { ko: '상위 {p}%', en: 'Top {p}%', ja: '上位{p}%', zh: '前 {p}%', hi: 'शीर्ष {p}%', vi: 'Top {p}%' },
   'rank.top_label': { ko: '상위', en: 'TOP', ja: '上位', zh: '前', hi: 'शीर्ष', vi: 'Top' },
   'rank.among': { ko: '전체 응시자 중', en: 'among all users', ja: '全受験者中', zh: '在所有应试者中', hi: 'सभी यूज़र में', vi: 'trong tất cả người dùng' },
-  'rank.me_pct': { ko: '나 · {v}%', en: 'You · {v}%', ja: 'あなた · {v}%', zh: '我 · {v}%', hi: 'आप · {v}%', vi: 'Bạn · {v}%' },  'rank.league': { ko: '{tier} 리그', en: '{tier} League', ja: '{tier}リーグ', zh: '{tier} 联赛', hi: '{tier} लीग', vi: 'Giải {tier}' },
+  'rank.me_pct': { ko: '나 · {v}%', en: 'You · {v}%', ja: 'あなた · {v}%', zh: '我 · {v}%', hi: 'आप · {v}%', vi: 'Bạn · {v}%' },
+  'rank.league': { ko: '{tier} 리그', en: '{tier} League', ja: '{tier}リーグ', zh: '{tier} 联赛', hi: '{tier} लीग', vi: 'Giải {tier}' },
   'rank.league_pop': { ko: '리그 인원', en: 'Players', ja: 'リーグ人数', zh: '联赛人数', hi: 'खिलाड़ी', vi: 'Số người' },
   'rank.tier_total': { ko: '참가자 {n}명', en: '{n} players', ja: '参加者{n}人', zh: '{n} 名参赛者', hi: '{n} खिलाड़ी', vi: '{n} người chơi' },
   'rank.my_rank': { ko: '내 순위', en: 'My rank', ja: '自分の順位', zh: '我的排名', hi: 'मेरी रैंक', vi: 'Thứ hạng của tôi' },
@@ -707,7 +708,8 @@ const D: Record<string, Record<Lang, string>> = {
     hi: 'यह रैंकिंग देखने के लिए अपना देश और क्षेत्र सेट करें',
     vi: 'Đặt quốc gia và khu vực để mở xếp hạng này',
   },
-  'rank.scope_set_region': { ko: '지역 설정하기', en: 'Set region', ja: '地域を設定', zh: '设置地区', hi: 'क्षेत्र सेट करें', vi: 'Đặt khu vực' },  'rank.next_gap': { ko: '다음까지 {n}점', en: '{n} pt to next', ja: '次まで{n}点', zh: '距下一档 {n} 分', hi: 'अगले तक {n} अंक', vi: 'Còn {n} điểm đến hạng kế' },
+  'rank.scope_set_region': { ko: '지역 설정하기', en: 'Set region', ja: '地域を設定', zh: '设置地区', hi: 'क्षेत्र सेट करें', vi: 'Đặt khu vực' },
+  'rank.next_gap': { ko: '다음까지 {n}점', en: '{n} pt to next', ja: '次まで{n}点', zh: '距下一档 {n} 分', hi: 'अगले तक {n} अंक', vi: 'Còn {n} điểm đến hạng kế' },
   'hub.today_todo': { ko: '오늘 할 일', en: "Today's to-do", ja: '今日のやること', zh: '今日待办', hi: 'आज का काम', vi: 'Việc hôm nay' },
   'hub.todo_attendance': { ko: '출석', en: 'Attendance', ja: '出席', zh: '签到', hi: 'उपस्थिति', vi: 'Điểm danh' },
   'hub.todo_problem': { ko: '오늘의 문제', en: "Today's problem", ja: '今日の問題', zh: '今日一题', hi: 'आज की समस्या', vi: 'Bài toán hôm nay' },
@@ -1661,6 +1663,8 @@ const D: Record<string, Record<Lang, string>> = {
   "seb.exit": { ko: "보안 브라우저 종료", en: "Exit secure browser", ja: "セキュアブラウザを終了", zh: "退出安全浏览器", hi: "सुरक्षित ब्राउज़र से बाहर निकलें", vi: "Thoát trình duyệt bảo mật" },
   // SEB 로 로그인을 넘기는 인계표가 주소에 없을 때. 옛 .seb 파일로 들어왔거나 설정에서
   // startURLAppendQueryParameter 가 빠진 경우다 — SEB 안에서는 로그인할 방법이 없으므로 나가서 다시 시작해야 한다.
+  // 재진입 무효 안내 — 사유와 다음 행동(문의)까지 말해줘야 한다. 무감독이라 옆에서 설명해 줄 사람이 없다.
+  "seb.voided_how": { ko: "기기 고장·정전·네트워크 끊김으로 중단된 경우에는 문의해 주시면 중단 기록을 확인한 뒤 재응시를 도와드립니다.", en: "If your exam was interrupted by a device failure, power loss, or network drop, contact us — we'll review the interruption record and help you retake it.", ja: "機器の故障・停電・ネットワーク切断で中断された場合は、お問い合わせいただければ中断記録を確認のうえ再受験をご案内します。", zh: "如果是设备故障、断电或网络中断导致的中断，请联系我们，我们将核查中断记录并协助您重新应试。", hi: "यदि डिवाइस खराबी, बिजली जाने या नेटवर्क कटने से परीक्षा रुकी हो, तो हमसे संपर्क करें — हम रिकॉर्ड जाँचकर दोबारा परीक्षा में मदद करेंगे।", vi: "Nếu bài thi bị gián đoạn do hỏng thiết bị, mất điện hoặc mất mạng, hãy liên hệ với chúng tôi — chúng tôi sẽ kiểm tra bản ghi gián đoạn và hỗ trợ bạn thi lại." },
   "seb.err_no_handoff": { ko: "응시 정보를 확인하지 못했습니다.", en: "We couldn't verify your exam session.", ja: "受験情報を確認できませんでした。", zh: "无法确认应试信息。", hi: "आपका परीक्षा सत्र सत्यापित नहीं हो सका।", vi: "Không xác minh được phiên thi của bạn." },
   "seb.err_no_handoff_how": { ko: "보안 브라우저를 닫고, 원래 브라우저의 응시 준비 화면에서 다시 시작해 주세요.", en: "Close the secure browser and start again from the exam preparation page in your normal browser.", ja: "セキュアブラウザを閉じて、通常のブラウザの受験準備画面から再度開始してください。", zh: "请关闭安全浏览器，并从原浏览器的应试准备页面重新开始。", hi: "सुरक्षित ब्राउज़र बंद करें और अपने सामान्य ब्राउज़र के परीक्षा तैयारी पेज से दोबारा शुरू करें।", vi: "Hãy đóng trình duyệt bảo mật và bắt đầu lại từ trang chuẩn bị thi trên trình duyệt thường." },
 
@@ -1862,6 +1866,93 @@ const D: Record<string, Record<Lang, string>> = {
   "mypage.empty_no_ticket": { ko: "아직 접수한 시험이 없습니다.", en: "You haven't registered for any exam yet.", ja: "まだ申し込んだ試験がありません。", zh: "您还没有报名任何考试。", hi: "आपने अभी तक किसी परीक्षा के लिए पंजीकरण नहीं किया।", vi: "Bạn chưa đăng ký kỳ thi nào." },
   "mypage.go_apply": { ko: "시험 접수하기", en: "Register for an exam", ja: "試験に申し込む", zh: "报名考试", hi: "परीक्षा हेतु पंजीकरण करें", vi: "Đăng ký dự thi" },
 
+  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
+  //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
+  //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
+  //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
+  'daily.title': { ko: '오늘의 학습', en: "Today's lesson", ja: '今日の学習', zh: '今日学习', hi: 'आज की पढ़ाई', vi: 'Bài học hôm nay' },
+  'daily.login_note': { ko: '로그인해야 학습 완료가 기록돼요', en: 'Sign in to have your completion recorded', ja: 'ログインすると学習完了が記録されます', zh: '登录后才会记录学习完成', hi: 'पूरा होना दर्ज करने के लिए साइन इन करें', vi: 'Đăng nhập để ghi nhận hoàn thành' },
+  'daily.term_label': { ko: '오늘의 용어', en: "Today's term", ja: '今日の用語', zh: '今日术语', hi: 'आज का शब्द', vi: 'Thuật ngữ hôm nay' },
+  'daily.correct': { ko: '정답이에요! 🎉 오늘 학습 완료.', en: 'Correct! 🎉 Today’s lesson is done.', ja: '正解です！🎉 今日の学習完了。', zh: '答对了！🎉 今日学习完成。', hi: 'सही! 🎉 आज की पढ़ाई पूरी।', vi: 'Chính xác! 🎉 Xong bài hôm nay.' },
+  'daily.wrong': { ko: '아쉬워요 — 정답은 {answer} 예요. 시도했으니 완료!', en: 'Not quite — the answer is {answer}. You tried, so it counts!', ja: '惜しい — 正解は {answer} です。挑戦したので完了！', zh: '差一点 — 正确答案是 {answer}。尝试过就算完成！', hi: 'लगभग — सही उत्तर {answer} है। कोशिश की, तो पूरा!', vi: 'Chưa đúng — đáp án là {answer}. Bạn đã thử nên vẫn tính!' },
+  'daily.already': { ko: '오늘 학습은 이미 완료했어요. 정답은 {answer} 예요.', en: "You've already finished today's lesson. The answer is {answer}.", ja: '今日の学習は完了済みです。正解は {answer} です。', zh: '今日学习已完成。正确答案是 {answer}。', hi: 'आज की पढ़ाई पूरी हो चुकी है। सही उत्तर {answer} है।', vi: 'Bạn đã hoàn thành bài hôm nay. Đáp án là {answer}.' },
+  'daily.theory': { ko: '이론', en: 'Theory', ja: '理論', zh: '理论', hi: 'सिद्धांत', vi: 'Lý thuyết' },
+  'daily.hint_lead': { ko: '헷갈리면', en: 'Not sure?', ja: '迷ったら', zh: '拿不准的话', hi: 'उलझन हो तो', vi: 'Nếu phân vân' },
+  'daily.reward_head': { ko: '완료하면', en: 'On completion', ja: '完了すると', zh: '完成后', hi: 'पूरा करने पर', vi: 'Khi hoàn thành' },
+  'daily.stamp_plus': { ko: '스탬프 +1', en: '+1 stamp', ja: 'スタンプ+1', zh: '印章 +1', hi: '+1 स्टैम्प', vi: '+1 tem' },
+  'daily.stamp_aria': { ko: '스탬프 {n} / {max}', en: 'Stamps {n} / {max}', ja: 'スタンプ {n} / {max}', zh: '印章 {n} / {max}', hi: 'स्टैम्प {n} / {max}', vi: 'Tem {n} / {max}' },
+  'daily.done_note': { ko: '오늘 학습 완료 ✓ 내일 새 문제가 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).', en: "Today's lesson is done ✓ A new question opens tomorrow. You can revisit today's (reward is once a day).", ja: '今日の学習完了 ✓ 明日新しい問題が開きます。今日の分は見返せます（報酬は1日1回）。', zh: '今日学习完成 ✓ 明天开放新题。今天的可以再看（奖励每日一次）。', hi: 'आज की पढ़ाई पूरी ✓ कल नया सवाल खुलेगा। आज का दोबारा देख सकते हैं (इनाम दिन में एक बार)।', vi: 'Xong bài hôm nay ✓ Mai có câu mới. Bạn xem lại được (thưởng mỗi ngày một lần).' },
+  'daily.saving': { ko: '기록하는 중…', en: 'Saving…', ja: '記録中…', zh: '记录中…', hi: 'दर्ज हो रहा है…', vi: 'Đang ghi…' },
+  'daily.pick_note': { ko: '정답을 고르면 오늘 학습이 완료돼요. 맞히지 않아도 시도하면 적립돼요.', en: "Pick an answer to finish today's lesson — you earn it just for trying.", ja: '答えを選ぶと今日の学習が完了します。正解でなくても挑戦すれば加算されます。', zh: '选择答案即可完成今日学习。即使答错，尝试也会计入。', hi: 'उत्तर चुनते ही आज की पढ़ाई पूरी। गलत होने पर भी कोशिश गिनी जाती है।', vi: 'Chọn đáp án là xong bài hôm nay. Sai vẫn được tính vì đã thử.' },
+  'daily.pop_title': { ko: '오늘 학습 완료!', en: "Today's lesson complete!", ja: '今日の学習完了！', zh: '今日学习完成！', hi: 'आज की पढ़ाई पूरी!', vi: 'Hoàn thành bài hôm nay!' },
+  'daily.pop_stamp': { ko: '스탬프 {n} / {max}', en: 'Stamps {n} / {max}', ja: 'スタンプ {n} / {max}', zh: '印章 {n} / {max}', hi: 'स्टैम्प {n} / {max}', vi: 'Tem {n} / {max}' },
+  'daily.pop_grew': { ko: '캐릭터가 오늘도 한 뼘 자랐어요.', en: 'Your character grew a little more today.', ja: 'キャラクターが今日もひとまわり成長しました。', zh: '你的角色今天又长大了一点。', hi: 'आपका किरदार आज फिर थोड़ा बढ़ा।', vi: 'Nhân vật của bạn lại lớn thêm một chút.' },
+  'daily.pop_already': { ko: '오늘 출석으로 코인·스탬프는 이미 받았어요. 학습 기록은 남았습니다.', en: "You already got coins and a stamp from today's check-in. The lesson is still recorded.", ja: '本日の出席でコイン・スタンプは受け取り済みです。学習記録は残りました。', zh: '今天签到已领取硬币和印章。学习记录已保存。', hi: 'आज के चेक-इन से कॉइन और स्टैम्प मिल चुके हैं। पढ़ाई दर्ज हो गई।', vi: 'Bạn đã nhận coin và tem từ điểm danh hôm nay. Bài học vẫn được ghi nhận.' },
+
+  'mg.title': { ko: '미니게임', en: 'Mini games', ja: 'ミニゲーム', zh: '小游戏', hi: 'मिनी गेम', vi: 'Mini game' },
+  'mg.preparing': { ko: '준비 중인 미니게임이에요.', en: 'This mini game is not ready yet.', ja: '準備中のミニゲームです。', zh: '这个小游戏还在准备中。', hi: 'यह मिनी गेम अभी तैयार नहीं है।', vi: 'Mini game này chưa sẵn sàng.' },
+  'mg.to_list': { ko: '미니게임 목록으로', en: 'Back to mini games', ja: 'ミニゲーム一覧へ', zh: '返回小游戏列表', hi: 'मिनी गेम सूची पर', vi: 'Về danh sách mini game' },
+  'mg.guest_hint': { ko: '기록이 안 남아요 · 로그인', en: 'Scores are not saved · sign in', ja: '記録は残りません · ログイン', zh: '成绩不会保存 · 登录', hi: 'स्कोर सेव नहीं होगा · साइन इन', vi: 'Không lưu điểm · đăng nhập' },
+  'mg.not_saved': { ko: '이 기록은 저장되지 않았어요', en: 'This score was not saved', ja: 'この記録は保存されませんでした', zh: '本次成绩未保存', hi: 'यह स्कोर सेव नहीं हुआ', vi: 'Điểm này chưa được lưu' },
+  'mg.not_saved_body': { ko: '로그인하면 최고 기록이 남고 게임 랭킹에 올라가요. 지금은 구경만 할 수 있어요.', en: 'Sign in to keep your best score and enter the game ranking. Right now you can only look around.', ja: 'ログインすると最高記録が残り、ゲームランキングに載ります。今は見るだけです。', zh: '登录后可保存最高分并进入游戏排行榜。目前只能浏览。', hi: 'साइन इन करें तो बेस्ट स्कोर सेव होगा और रैंकिंग में आएगा। अभी सिर्फ देख सकते हैं।', vi: 'Đăng nhập để lưu điểm cao nhất và vào bảng xếp hạng. Hiện bạn chỉ xem được.' },
+  'mg.keep_playing': { ko: '그냥 계속 할래요', en: 'Keep playing anyway', ja: 'このまま続ける', zh: '继续玩就好', hi: 'ऐसे ही खेलते रहें', vi: 'Cứ chơi tiếp' },
+  'mg.rank_title': { ko: '{title} 랭킹', en: '{title} ranking', ja: '{title} ランキング', zh: '{title} 排行榜', hi: '{title} रैंकिंग', vi: 'Xếp hạng {title}' },
+  'mg.rank_fail': { ko: '랭킹을 불러오지 못했어요.', en: "Couldn't load the ranking.", ja: 'ランキングを読み込めませんでした。', zh: '排行榜加载失败。', hi: 'रैंकिंग लोड नहीं हो सकी।', vi: 'Không tải được bảng xếp hạng.' },
+  'mg.rank_rule_level': { ko: '도달 레벨이 높은 순 · 같으면 걸린 시간이 짧은 순', en: 'Highest level reached · ties broken by fastest time', ja: '到達レベルが高い順 · 同じなら所要時間が短い順', zh: '按到达关卡由高到低 · 相同则用时短者优先', hi: 'सबसे ऊँचा लेवल · बराबरी पर कम समय', vi: 'Cấp đạt cao nhất · hòa thì thời gian ngắn hơn' },
+  'mg.rank_rule_score': { ko: '점수가 높은 순 · 같으면 먼저 도달한 순', en: 'Highest score · ties broken by who got there first', ja: 'スコアが高い順 · 同じなら先に到達した順', zh: '按分数由高到低 · 相同则先达成者优先', hi: 'सबसे ज़्यादा स्कोर · बराबरी पर पहले पहुँचने वाला', vi: 'Điểm cao nhất · hòa thì ai đạt trước' },
+  'mg.rank_players': { ko: ' · 참가 {n}명', en: ' · {n} players', ja: ' · 参加 {n}人', zh: ' · {n} 人参与', hi: ' · {n} खिलाड़ी', vi: ' · {n} người chơi' },
+  'mg.rank_empty': { ko: '아직 기록이 없어요. 첫 기록의 주인이 되어보세요!', en: 'No scores yet — be the first!', ja: 'まだ記録がありません。最初の記録を作りましょう！', zh: '还没有成绩，来当第一个吧！', hi: 'अभी कोई स्कोर नहीं — पहले बनिए!', vi: 'Chưa có điểm nào — hãy là người đầu tiên!' },
+  'mg.rank_need_login': { ko: '로그인하면 내 순위가 표시돼요.', en: 'Sign in to see your rank.', ja: 'ログインすると自分の順位が表示されます。', zh: '登录后可查看我的排名。', hi: 'अपनी रैंक देखने के लिए साइन इन करें।', vi: 'Đăng nhập để xem hạng của bạn.' },
+  'mg.rank_no_mine': { ko: '아직 내 기록이 없어요 — 한 판 하고 오면 등록됩니다.', en: "You don't have a score yet — play a round and it'll show up.", ja: 'まだ自分の記録がありません — 一度プレイすると登録されます。', zh: '你还没有成绩 — 玩一局就会出现。', hi: 'आपका स्कोर नहीं है — एक बार खेलें, दर्ज हो जाएगा।', vi: 'Bạn chưa có điểm — chơi một ván là có.' },
+  'mg.sec': { ko: '{n}초', en: '{n}s', ja: '{n}秒', zh: '{n} 秒', hi: '{n}से', vi: '{n} giây' },
+  'mg.min_sec': { ko: '{m}분 {s}초', en: '{m}m {s}s', ja: '{m}分{s}秒', zh: '{m} 分 {s} 秒', hi: '{m}मि {s}से', vi: '{m} phút {s} giây' },
+
+  // 미니게임 카드(제목·소개·뱃지) — 'CARI' 는 캐릭터 이름이라 번역하지 않는다.
+  'mg.beat-cari.title': { ko: '버텨라 CARI', en: 'Hold On, CARI', ja: '耐えろ CARI', zh: '撑住吧 CARI', hi: 'डटे रहो CARI', vi: 'Trụ vững, CARI' },
+  'mg.beat-cari.tagline': { ko: '쏟아지는 돌, 문제로 버텨라!', en: 'Rocks are falling — answer to survive!', ja: '降り注ぐ岩を、問題で耐えろ！', zh: '落石不断，用答题撑下去！', hi: 'पत्थर बरस रहे हैं — जवाब देकर टिको!', vi: 'Đá rơi ào ạt — trả lời để trụ lại!' },
+  'mg.beat-cari.badge': { ko: 'AI · 로봇 용어 서바이벌', en: 'AI · robotics term survival', ja: 'AI · ロボット用語サバイバル', zh: 'AI · 机器人术语生存', hi: 'AI · रोबोटिक्स शब्द सर्वाइवल', vi: 'Sinh tồn thuật ngữ AI · robot' },
+  'mg.shoot-cari.title': { ko: '쏴라 CARI', en: 'Shoot, CARI', ja: '撃て CARI', zh: '射击吧 CARI', hi: 'मारो CARI', vi: 'Bắn đi, CARI' },
+  'mg.shoot-cari.tagline': { ko: '쏟아지는 운석을 정답으로 격추!', en: 'Shoot down meteors with the right answer!', ja: '降り注ぐ隕石を正解で撃ち落とせ！', zh: '用正确答案击落陨石！', hi: 'सही जवाब से उल्काएँ गिराओ!', vi: 'Bắn hạ thiên thạch bằng đáp án đúng!' },
+  'mg.shoot-cari.badge': { ko: 'AI · 로봇 용어 슈팅', en: 'AI · robotics term shooter', ja: 'AI · ロボット用語シューティング', zh: 'AI · 机器人术语射击', hi: 'AI · रोबोटिक्स शब्द शूटर', vi: 'Bắn thuật ngữ AI · robot' },
+  'mg.pick-cari.title': { ko: '골라라 CARI', en: 'Choose, CARI', ja: '選べ CARI', zh: '快选吧 CARI', hi: 'चुनो CARI', vi: 'Chọn đi, CARI' },
+  'mg.pick-cari.tagline': { ko: '발판이 무너지기 전에 O·X 를 골라라!', en: 'Pick true or false before the floor gives way!', ja: '足場が崩れる前に ○×を選べ！', zh: '在踏板塌陷前选出对错！', hi: 'फर्श गिरने से पहले सही/गलत चुनो!', vi: 'Chọn đúng/sai trước khi sàn sập!' },
+  'mg.pick-cari.badge': { ko: 'AI · 로봇 용어 OX 서바이벌', en: 'AI · robotics true-or-false survival', ja: 'AI · ロボット用語○×サバイバル', zh: 'AI · 机器人术语判断生存', hi: 'AI · रोबोटिक्स सही-गलत सर्वाइवल', vi: 'Sinh tồn đúng/sai thuật ngữ AI · robot' },
+  'mg.reach-cari.title': { ko: '닿아라 CARI', en: 'Reach, CARI', ja: '届け CARI', zh: '够到吧 CARI', hi: 'पहुँचो CARI', vi: 'Vươn tới, CARI' },
+  'mg.reach-cari.tagline': { ko: '관절을 움직여 목표에 닿아라', en: 'Move the joints and reach the target', ja: '関節を動かして目標に届かせろ', zh: '转动关节，够到目标', hi: 'जोड़ घुमाकर लक्ष्य तक पहुँचो', vi: 'Xoay khớp để chạm tới mục tiêu' },
+  'mg.reach-cari.badge': { ko: '로봇팔 · 기구학 퍼즐', en: 'Robot arm · kinematics puzzle', ja: 'ロボットアーム · 運動学パズル', zh: '机械臂 · 运动学解谜', hi: 'रोबोट आर्म · काइनेमैटिक्स पहेली', vi: 'Cánh tay robot · giải đố động học' },
+  'mg.program-cari.title': { ko: '프로그램해라 CARI', en: 'Program, CARI', ja: 'プログラムしろ CARI', zh: '来编程吧 CARI', hi: 'प्रोग्राम करो CARI', vi: 'Lập trình đi, CARI' },
+  'mg.program-cari.tagline': { ko: '명령을 짜서 CARI를 움직여라', en: 'Stack commands and move CARI', ja: '命令を組んで CARI を動かせ', zh: '编排指令让 CARI 动起来', hi: 'कमांड जोड़कर CARI को चलाओ', vi: 'Ghép lệnh để điều khiển CARI' },
+  'mg.program-cari.badge': { ko: '로봇 · 블록 코딩 퍼즐', en: 'Robotics · block coding puzzle', ja: 'ロボット · ブロックコーディングパズル', zh: '机器人 · 积木编程解谜', hi: 'रोबोटिक्स · ब्लॉक कोडिंग पहेली', vi: 'Robot · giải đố lập trình khối' },
+  'mg.build-cari.title': { ko: '지어라 CARI', en: 'Build, CARI', ja: '築け CARI', zh: '建造吧 CARI', hi: 'बनाओ CARI', vi: 'Xây đi, CARI' },
+  'mg.build-cari.tagline': { ko: '라인을 깔면 공장이 알아서 돌아가요!', en: 'Lay the lines and the factory runs itself!', ja: 'ラインを敷けば工場が自動で動きます！', zh: '铺好产线，工厂自动运转！', hi: 'लाइन बिछाओ, फैक्ट्री खुद चलेगी!', vi: 'Đặt dây chuyền là nhà máy tự chạy!' },
+  'mg.build-cari.badge': { ko: '스마트팩토리 · 라인 설계 퍼즐', en: 'Smart factory · line design puzzle', ja: 'スマートファクトリー · ライン設計パズル', zh: '智能工厂 · 产线设计解谜', hi: 'स्मार्ट फैक्ट्री · लाइन डिज़ाइन पहेली', vi: 'Nhà máy thông minh · giải đố thiết kế dây chuyền' },
+
+  // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
+  // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
+  //    카드는 이미지로 밖으로 나가는 물건이라, 만든 사람의 화면 언어를 그대로 따라가는 게 맞다.
+  'share.modal_title': { ko: '내 카드 공유', en: 'Share my card', ja: 'マイカードを共有', zh: '分享我的卡片', hi: 'मेरा कार्ड शेयर करें', vi: 'Chia sẻ thẻ của tôi' },
+  'share.making': { ko: '카드 만드는 중…', en: 'Creating your card…', ja: 'カードを作成中…', zh: '正在生成卡片…', hi: 'कार्ड बन रहा है…', vi: 'Đang tạo thẻ…' },
+  'share.make_fail': { ko: '카드를 만들지 못했어요', en: "Couldn't create the card", ja: 'カードを作成できませんでした', zh: '卡片生成失败', hi: 'कार्ड नहीं बन सका', vi: 'Không tạo được thẻ' },
+  'share.img_fail': { ko: '이미지를 만들지 못했어요', en: "Couldn't create the image", ja: '画像を作成できませんでした', zh: '图片生成失败', hi: 'छवि नहीं बन सकी', vi: 'Không tạo được ảnh' },
+  'share.saved': { ko: '이미지를 저장했어요', en: 'Image saved', ja: '画像を保存しました', zh: '已保存图片', hi: 'छवि सहेजी गई', vi: 'Đã lưu ảnh' },
+  'share.copied': { ko: '클립보드에 복사했어요', en: 'Copied to clipboard', ja: 'クリップボードにコピーしました', zh: '已复制到剪贴板', hi: 'क्लिपबोर्ड पर कॉपी हुआ', vi: 'Đã sao chép vào clipboard' },
+  'share.copy_unsupported': { ko: '복사를 지원하지 않는 브라우저예요', en: "This browser doesn't support copying", ja: 'コピーに対応していないブラウザです', zh: '此浏览器不支持复制', hi: 'यह ब्राउज़र कॉपी सपोर्ट नहीं करता', vi: 'Trình duyệt này không hỗ trợ sao chép' },
+  'share.do_share': { ko: '공유하기', en: 'Share', ja: '共有する', zh: '分享', hi: 'शेयर करें', vi: 'Chia sẻ' },
+  'share.do_save': { ko: '이미지 저장', en: 'Save image', ja: '画像を保存', zh: '保存图片', hi: 'छवि सहेजें', vi: 'Lưu ảnh' },
+  'share.do_copy': { ko: '이미지 복사', en: 'Copy image', ja: '画像をコピー', zh: '复制图片', hi: 'छवि कॉपी करें', vi: 'Sao chép ảnh' },
+  'share.note': { ko: '지금 순위·티어 기준으로 만든 카드예요.', en: 'This card reflects your current rank and tier.', ja: '現在の順位・ティアで作ったカードです。', zh: '这张卡片基于您当前的排名与段位。', hi: 'यह कार्ड आपकी मौजूदा रैंक और टियर पर आधारित है।', vi: 'Thẻ này dựa trên thứ hạng và hạng hiện tại của bạn.' },
+  'share.note_retry': { ko: '카드는 지금 순위·티어 기준이에요. 응시하면 다시 만들어서 공유할 수 있어요.', en: 'The card reflects your current rank and tier — take a test and you can make a new one.', ja: 'カードは現在の順位・ティア基準です。受験すればまた作って共有できます。', zh: '卡片基于当前排名与段位。参加测试后可重新生成并分享。', hi: 'कार्ड मौजूदा रैंक और टियर पर आधारित है — टेस्ट देकर नया बना सकते हैं।', vi: 'Thẻ dựa trên thứ hạng và hạng hiện tại — làm bài kiểm tra để tạo thẻ mới.' },
+  // 카드 안(캔버스)에 그려지는 글자
+  'share.card.title': { ko: '시즌 기록', en: 'Season record', ja: 'シーズン記録', zh: '赛季记录', hi: 'सीज़न रिकॉर्ड', vi: 'Thành tích mùa' },
+  'share.card.rank_n': { ko: '{n}위', en: '#{n}', ja: '{n}位', zh: '第 {n} 名', hi: '#{n}', vi: 'Hạng {n}' },
+  'share.card.world': { ko: '전세계', en: 'Global', ja: '世界', zh: '全球', hi: 'वैश्विक', vi: 'Toàn cầu' },
+  'share.card.country': { ko: '국가', en: 'Country', ja: '国', zh: '国家', hi: 'देश', vi: 'Quốc gia' },
+  'share.card.region': { ko: '지역', en: 'Region', ja: '地域', zh: '地区', hi: 'क्षेत्र', vi: 'Khu vực' },
+  'share.card.season_score': { ko: '시즌 점수', en: 'Season score', ja: 'シーズン点数', zh: '赛季积分', hi: 'सीज़न स्कोर', vi: 'Điểm mùa' },
+  'share.card.joined': { ko: '가입일', en: 'Joined', ja: '登録日', zh: '注册日', hi: 'शामिल हुए', vi: 'Ngày tham gia' },
+  'share.card.friend_code': { ko: '친구 코드', en: 'Friend code', ja: 'フレンドコード', zh: '好友代码', hi: 'फ्रेंड कोड', vi: 'Mã bạn bè' },
+
   // ── 캐릭터 허브(/hub) ─────────────────────────────────────────────────────
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
@@ -2034,6 +2125,14 @@ export function tr(lang: Lang, key: string, vars?: Record<string, string | numbe
     }
   }
   return s
+}
+
+/** 우리 언어코드 → BCP-47. Intl(날짜·시각·숫자) 에 넘길 때 쓴다.
+ *  ⚠️ 'ko-KR' 을 코드에 직접 박으면 화면 언어를 바꿔도 날짜만 한국어로 남는다(/daily 헤더가 실제로 그랬다).
+ *  (src/lib/rounds.ts 에도 같은 표가 사본으로 있다 — 그쪽을 손볼 일이 생기면 이걸 쓰도록 합칠 것.) */
+// eslint-disable-next-line react-refresh/only-export-components
+export function localeOf(lang: Lang): string {
+  return { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN', hi: 'hi-IN', vi: 'vi-VN' }[lang] ?? 'en-US'
 }
 
 export type TFunc = (key: string, vars?: Record<string, string | number>) => string

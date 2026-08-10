@@ -479,6 +479,7 @@ function CarisExamAdmin() {
                     ? `${detail.attempt.totalCorrect}/${detail.attempt.totalQuestions}점`
                     : '미채점'}
                 </p>
+                <InterruptionPanel attemptId={detail.attempt.attemptId} />
                 <div className="admin-ans-list">
                   {detail.answers.map((a) => (
                     <div key={a.number} className={`admin-ans ${a.isCorrect ? 'ok' : 'no'}`}>
@@ -499,6 +500,165 @@ function CarisExamAdmin() {
       )}
         </>
       )}
+    </div>
+  )
+}
+
+// ── 응시 중단 정황 · 복구 ──
+//
+// 감독관 없는 자율응시라 "응시 화면을 벗어났다 돌아오면 무효" 가 기본값이다(start-exam).
+// 서버는 **PC 가 뻗은 것과 일부러 나간 것을 구분할 수 없으므로** 자동으로 봐주지 않고,
+// 문의가 오면 여기 자료를 보고 사람이 푼다.
+//
+// ⚠️ 여기 값은 **증거가 아니라 정황**이다. 랜선을 뽑으면 종료 신호도 안 남는다.
+//    그래도 아래 세 가지를 같이 보면 판단이 선다:
+//      · 닫힘 신호 — 있으면 사람이 창을 닫은 것. 없이 끊겼으면 알릴 틈이 없었던 것(정전·정지).
+//      · 공백 길이 — 사고는 대개 짧고, 찾아보고 온 건 길다.
+//      · 진행률   — 하나도 안 풀고 훑기만 하다 나갔는지.
+interface InterruptionResp {
+  attempt: {
+    status: string
+    void_reason: string | null
+    started_at: string | null
+    last_seen_at: string | null
+    answered_count: number
+    total_questions: number | null
+    entry_count: number
+    reinstated_at: string | null
+    reinstated_by: string | null
+    reinstate_note: string | null
+  }
+  events: { kind: string; at: string; detail: Record<string, unknown> }[]
+  summary: {
+    gapSec: number | null
+    answered: number
+    totalQuestions: number
+    hadCloseSignal: boolean
+    closeVia: string | null
+    reentryCount: number
+  }
+}
+
+const EVENT_LABEL: Record<string, string> = {
+  start: '응시 시작',
+  closed: '화면 닫힘(사용자가 닫음)',
+  reentry: '재진입 → 무효 처리',
+  reinstate: '관리자 복구',
+}
+
+function fmtGap(sec: number | null): string {
+  if (sec == null) return '알 수 없음'
+  if (sec < 60) return `${sec}초`
+  const m = Math.floor(sec / 60)
+  if (m < 60) return `${m}분 ${sec % 60}초`
+  return `${Math.floor(m / 60)}시간 ${m % 60}분`
+}
+
+function InterruptionPanel({ attemptId }: { attemptId: string }) {
+  const [data, setData] = useState<InterruptionResp | null>(null)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setData(await callFunction<InterruptionResp>('admin', { action: 'examInterruption', attemptId }))
+    } catch {
+      /* 이력이 없거나 옛 응시 — 패널을 통째로 감춘다 */
+    }
+  }, [attemptId])
+  // Checkout.tsx 와 같은 모양 — 조회는 effect 바깥(비동기 콜백)에서 상태를 만진다.
+  useEffect(() => { ;(async () => { await load() })() }, [load])
+
+  if (!data) return null
+  const { attempt, summary, events } = data
+  // 중단 흔적이 전혀 없는 평범한 응시에는 아무것도 띄우지 않는다(모달을 어지럽히지 않기 위해).
+  if (attempt.status !== 'voided' && summary.reentryCount === 0 && !attempt.reinstated_at) return null
+
+  async function reinstate() {
+    if (!note.trim()) { setMsg('복구 사유를 적어주세요.'); return }
+    setBusy(true)
+    setMsg('')
+    try {
+      const r = await callFunction<{ note?: string }>('admin', { action: 'examReinstate', attemptId, note })
+      setMsg(r.note ?? '복구했습니다.')
+      setNote('')
+      await load()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '복구하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="admin-card" style={{ margin: '12px 0', padding: 14, border: '1px solid var(--line2)', borderRadius: 10 }}>
+      <b style={{ display: 'block', marginBottom: 8 }}>응시 중단 기록</b>
+
+      <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', margin: 0, fontSize: 14 }}>
+        <dt>무효 사유</dt>
+        <dd style={{ margin: 0 }}>
+          {attempt.void_reason === 'reentry'
+            ? '응시 화면을 벗어났다 다시 들어옴'
+            : attempt.void_reason === 'quit'
+              ? '응시자가 스스로 종료(포기)'
+              : (attempt.void_reason ?? '-')}
+        </dd>
+
+        {/* ⭐ 판단의 핵심 — 이 한 줄이 '사고'와 '일부러 나감'을 가른다 */}
+        <dt>닫힘 신호</dt>
+        <dd style={{ margin: 0 }}>
+          {summary.hadCloseSignal
+            ? `있음 — 사람이 창을 닫았다는 뜻${summary.closeVia ? ` (${summary.closeVia})` : ''}`
+            : '없음 — 알릴 틈이 없이 끊김(정전·PC 정지 등에서 나타나는 모양)'}
+        </dd>
+
+        <dt>비어 있던 시간</dt>
+        <dd style={{ margin: 0 }}>{fmtGap(summary.gapSec)}</dd>
+
+        <dt>끊긴 시점 진행률</dt>
+        <dd style={{ margin: 0 }}>
+          {summary.answered} / {summary.totalQuestions} 문항
+          {summary.answered === 0 && summary.totalQuestions > 0 && ' — 한 문항도 답하지 않음'}
+        </dd>
+
+        <dt>재진입 횟수</dt>
+        <dd style={{ margin: 0 }}>{summary.reentryCount}회</dd>
+      </dl>
+
+      <div style={{ marginTop: 10, fontSize: 13, color: 'var(--muted)' }}>
+        {events.map((e, i) => (
+          <div key={i}>
+            {fmtDT(e.at)} · {EVENT_LABEL[e.kind] ?? e.kind}
+          </div>
+        ))}
+      </div>
+
+      {attempt.reinstated_at ? (
+        <p style={{ marginTop: 10, fontSize: 13 }}>
+          <b>복구됨</b> — {fmtDT(attempt.reinstated_at)} · {attempt.reinstated_by} · 사유: {attempt.reinstate_note}
+        </p>
+      ) : attempt.status === 'voided' ? (
+        <div style={{ marginTop: 12 }}>
+          {/* ⚠️ 새 응시를 만들지 않는다 — 같은 응시로 돌아가므로 제한시간이 이어진다.
+              "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다. */}
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
+            복구하면 <b>그 응시로 다시 들어갈 수 있습니다</b>. 제한시간은 처음 시작 시각 기준으로 계속 흐릅니다 —
+            시간이 이미 지났다면 응시권을 새로 발급해 주세요.
+          </p>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="복구 사유 (예: 정전 문의 접수, 닫힘 신호 없음 확인)"
+            style={{ width: '100%', padding: '8px 10px', marginBottom: 6 }}
+          />
+          <button className="admin-mini" onClick={reinstate} disabled={busy}>
+            {busy ? '복구 중…' : '이 응시 복구'}
+          </button>
+        </div>
+      ) : null}
+
+      {msg && <p style={{ marginTop: 8, fontSize: 13 }}>{msg}</p>}
     </div>
   )
 }
