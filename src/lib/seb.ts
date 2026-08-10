@@ -64,7 +64,11 @@ export function sebLaunchUrl(lang?: string, nonce?: string): string {
   const base = lang && typeof window !== 'undefined'
     ? `${window.location.origin}/gara-${lang}.seb`
     : sebConfigUrl()
-  return toScheme(nonce ? `${base}?h=${encodeURIComponent(nonce)}` : base)
+  // ⚠️ **물음표가 두 개여야 한다(`??h=`).** SEB 는 설정 URL 의 쿼리에서 `LastIndexOf('?') > 0` 일 때만
+  //    뒷부분을 startURL 로 옮긴다(ConfigurationOperation.HandleStartUrlQuery). `?h=` 하나면 위치가 0 이라
+  //    조건이 거짓이 되어 **표가 조용히 사라지고**, SEB 안에서 "응시 정보를 확인하지 못했습니다" 가 뜬다.
+  //    (2026-08-10 실기기에서 실제로 이 증상을 겪고 소스로 확인했다.)
+  return toScheme(nonce ? `${base}??h=${encodeURIComponent(nonce)}` : base)
 }
 
 /**
