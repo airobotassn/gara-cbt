@@ -29,49 +29,50 @@
 
   /* ===== HUD — 가운데에 큰 타이머 ===== */
   .hud{position:relative; display:flex; align-items:center; justify-content:space-between;
-    gap:8px; padding:7px 12px; z-index:6; min-height:66px;
-    background:linear-gradient(#ffffff,#f4f6fb); border-bottom:1px solid var(--line);}
-  .hud-score{display:flex; align-items:center; gap:7px;}
-  .hs-ic{width:26px; height:26px; border-radius:9px; display:grid; place-items:center;
-    background:linear-gradient(180deg,#ffd25a,#f0a91a); box-shadow:0 2px 6px rgba(230,160,20,.5);}
-  .hs-ic svg{width:15px; height:15px; fill:#fff;}
-  .hs-num{font-size:24px; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; line-height:1;}
-  .hs-unit{font-size:11px; font-weight:800; color:var(--sub); margin-left:-1px;}
-  .hud-right{display:flex; align-items:center; gap:6px;}
-  .hud-chip{display:flex; align-items:center; gap:4px; background:#fff; border:1px solid #e2e7f1;
-    border-radius:20px; padding:4px 9px 4px 7px; box-shadow:0 2px 6px rgba(80,100,150,.06);}
-  .hud-chip svg{width:13px; height:13px; fill:#f0a91a; flex:none;}
-  .hud-chip .hc-lab{font-size:10.5px; color:var(--sub); font-weight:700;}
-  .hud-chip b{font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; font-weight:800;}
-  .hud-chip.alive svg{fill:var(--good);} .hud-chip.alive b{color:var(--good);}
+    gap:8px; padding:9px 25px; z-index:6; min-height:88px;
+    background:#071a43 url("pick-cari-hud-v2.png") center/100% 100% no-repeat; border:0; box-shadow:none;}
+  .hud::before{display:none;}
+  .hud>*{position:relative; z-index:1;}
+  .hud-score{position:absolute; left:3.5%; top:50%; width:27.5%; transform:translateY(-50%);
+    display:flex; align-items:baseline; justify-content:center; gap:5px; padding:0;}
+  .hs-num{font-size:28px; font-weight:900; color:#fff; font-variant-numeric:tabular-nums; line-height:1; text-shadow:0 0 8px rgba(81,214,255,.55);}
+  .hs-unit{font-size:11px; font-weight:900; color:#b9d4f1; letter-spacing:-.04em;}
+  .hud-right{position:absolute; left:55%; top:50%; width:40%; transform:translateY(-50%);
+    display:flex; align-items:center; justify-content:center; gap:0; margin:0;}
+  .hud-chip{width:100%; display:flex; flex-direction:row; align-items:center; justify-content:center; gap:11px;
+    background:transparent; border:0; padding:2px 4px; box-shadow:none; white-space:nowrap;}
+  .hud-chip .hc-lab{font-size:11px; line-height:1; color:#b9d8f5; font-weight:900; letter-spacing:.03em;}
+  .hud-chip b{min-width:34px; font-size:27px; line-height:1; color:#70f0cc;
+    font-variant-numeric:tabular-nums; font-weight:900; text-align:center;
+    text-shadow:0 0 10px rgba(73,241,196,.55);}
   /* HUD 정중앙 절대배치 — 좌우 내용 길이에 안 흔들리게 */
-  .timer{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    width:56px; height:56px; border-radius:50%; display:grid; place-items:center;
-    --p:1; --tcol:var(--brand);
-    background:conic-gradient(var(--tcol) calc(var(--p) * 1turn), #e4eaf4 0);
-    box-shadow:0 3px 10px rgba(80,100,150,.18); transition:background .3s linear;}
-  .timer::before{content:""; position:absolute; inset:5px; border-radius:50%; background:#fff;}
-  .timer b{position:relative; font-size:25px; font-weight:900; line-height:1;
-    color:var(--tcol); font-variant-numeric:tabular-nums;}
+  .timer{position:absolute; left:42.4%; top:49.4%; z-index:2; transform:translate(-50%,-50%);
+    width:49px; height:49px; border-radius:50%; display:grid; place-items:center;
+    --p:1; --tcol:#fff; background:transparent; box-shadow:none; transition:none;}
+  .timer::before{display:none;}
+  .timer b{position:relative; font-size:28px; font-weight:900; line-height:1;
+    color:var(--tcol); text-shadow:0 0 10px color-mix(in srgb,var(--tcol) 72%,transparent);
+    font-variant-numeric:tabular-nums; transition:color .18s,text-shadow .18s;}
   .timer.crit{animation:tpulse .5s ease-in-out infinite;}
   @keyframes tpulse{50%{transform:translate(-50%,-50%) scale(1.1);}}
 
   /* ===== 문제판 (위) — 용어를 먼저 크게, 설명을 아래. 'A — 이것은 B 이다' 문장은 폐기. ===== */
-  .qboard{padding:14px 18px 16px; background:linear-gradient(#ffffff,#f7f8fc);
-    border-bottom:1px solid var(--line); box-shadow:0 4px 14px rgba(80,100,150,.05); z-index:6;}
-  .qrule{width:34px; height:3px; border-radius:2px; margin-bottom:9px;
-    background:linear-gradient(90deg,var(--brand),#5b90ff);}
-  .qterm{font-size:29px; font-weight:900; color:var(--brand); letter-spacing:-.035em;
+  .qboard{position:relative; margin:0; padding:23px 28px 22px;
+    background:#071a43 url("pick-cari-qpanel-v2.png") center/100% 100% no-repeat;
+    border:0; box-shadow:none; z-index:6; min-height:156px;}
+  .qrule{width:34px; height:3px; border-radius:2px; margin-bottom:8px;
+    background:linear-gradient(90deg,#5edfff,#d9f8ff); box-shadow:0 0 8px rgba(94,223,255,.55);}
+  .qterm{font-size:27px; font-weight:900; color:#fff; letter-spacing:-.035em;
     line-height:1.14; margin-bottom:9px; word-break:keep-all;}
-  .qdesc{font-size:15.5px; font-weight:500; color:#42506f; line-height:1.62;
-    letter-spacing:-.005em; min-height:76px; word-break:keep-all;}
+  .qdesc{font-size:14.5px; font-weight:600; color:#dceaff; line-height:1.55;
+    letter-spacing:-.005em; min-height:66px; word-break:keep-all;}
 
   /* ===== 필드 = 우주 ===== */
   .field{position:relative; flex:1; overflow:hidden; z-index:1;
-    background:linear-gradient(180deg,#131a35 0%, #0d1226 42%, #080b1a 78%, #05070f 100%);}
+    background:url("pick-cari-game-bg-v2.png") center/cover no-repeat;}
 
   /* --- 우주 배경 --- */
-  .void{position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
+  .void{display:none; position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
   /* 성운 — 크게 흐린 색 구름 */
   .neb{position:absolute; border-radius:50%; filter:blur(38px);}
   .neb.n1{left:-22%; top:-14%; width:86%; height:56%;
@@ -107,41 +108,26 @@
     100%{opacity:0; transform:translate(230px,102px) rotate(24deg);}}
 
   /* --- 발판 --- */
-  .zone{position:absolute; top:var(--zone-top); height:var(--zone-h); width:40%; z-index:2;}
-  .zoneO{left:4%; --tilt:-7deg;} .zoneX{right:4%; --tilt:7deg;}
+  .zone{position:absolute; top:var(--zone-top); height:var(--zone-h); width:56%; z-index:2;}
+  .zoneO{left:-6%; --tilt:-7deg;} .zoneX{right:-6%; --tilt:7deg;}
   /* 우주에 떠 있는 정거장 발판 — 밝은 상판(어두운 우주에서 튐) + 색 림 글로우 + 패널 라인 */
-  .plate{position:absolute; inset:0; display:grid; place-items:center; overflow:hidden;
-    border-radius:15px; transition:box-shadow .25s, filter .25s;
-    background:
-      repeating-linear-gradient(90deg, rgba(90,120,175,.07) 0 1px, transparent 1px 30px),
-      repeating-linear-gradient(0deg, rgba(90,120,175,.07) 0 1px, transparent 1px 30px),
-      linear-gradient(180deg,#eef4fd 0%, #d3dff4 58%, #b8cbe9 100%);
-    box-shadow:0 13px 0 #6a82b8, 0 15px 3px rgba(4,8,20,.5), 0 26px 40px rgba(4,8,20,.7),
-               0 0 30px rgba(91,144,255,.4), inset 0 2px 0 rgba(255,255,255,.95),
-               inset 0 0 0 2px rgba(91,144,255,.35);}
+  .plate{position:absolute; inset:0; display:grid; place-items:center; overflow:visible;
+    border-radius:15px; transition:filter .25s;
+    background:url("pick-cari-platform-o-v2.png") center/100% 100% no-repeat;
+    filter:drop-shadow(0 18px 18px rgba(1,8,28,.58));}
   .zoneX .plate{
-    background:
-      repeating-linear-gradient(90deg, rgba(175,95,80,.07) 0 1px, transparent 1px 30px),
-      repeating-linear-gradient(0deg, rgba(175,95,80,.07) 0 1px, transparent 1px 30px),
-      linear-gradient(180deg,#fdeee9 0%, #f9d3c8 58%, #f2b6a4 100%);
-    box-shadow:0 13px 0 #b96a54, 0 15px 3px rgba(4,8,20,.5), 0 26px 40px rgba(4,8,20,.7),
-               0 0 30px rgba(242,102,79,.4), inset 0 2px 0 rgba(255,255,255,.95),
-               inset 0 0 0 2px rgba(242,102,79,.35);}
-  .zone-mark{font-size:96px; font-weight:900; line-height:1; letter-spacing:-.04em; opacity:.2;}
+    background-image:url("pick-cari-platform-x-v2.png");}
+  .zone-mark{position:absolute; left:50%; top:30%; transform:translate(-50%,-50%);
+    font-size:82px; font-weight:900; line-height:1; letter-spacing:0; opacity:.18;}
   .zoneO .zone-mark{color:var(--brand);} .zoneX .zone-mark{color:#c2452c;}
   /* 발판·대기 공통 명패 */
-  .zone-tag{position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:4;
-    display:flex; align-items:baseline; gap:2px; padding:5px 17px; border-radius:22px;
-    color:#fff; font-size:12.5px; font-weight:800; white-space:nowrap;
-    font-variant-numeric:tabular-nums; box-shadow:0 4px 12px rgba(6,12,30,.5);}
+  .zone-tag{position:absolute; top:-17px; left:50%; transform:translateX(-50%); z-index:4;
+    width:72px; height:34px; display:flex; align-items:center; justify-content:center; gap:2px; padding:0 8px;
+    color:#fff; font-size:11.5px; font-weight:900; white-space:nowrap; background:url("pick-cari-tag-v2.png") center/100% 100% no-repeat;
+    font-variant-numeric:tabular-nums; text-shadow:0 1px 3px #00183f; box-shadow:none;}
   .zone-tag b{font-size:18px; font-weight:900; line-height:1;}
-  .zoneO .zone-tag{background:linear-gradient(160deg,#2f6be0,var(--brand));
-    box-shadow:0 4px 12px rgba(6,12,30,.5), 0 0 18px rgba(60,120,240,.5);}
-  .zoneX .zone-tag{background:linear-gradient(160deg,#f4826e,var(--bad));
-    box-shadow:0 4px 12px rgba(6,12,30,.5), 0 0 18px rgba(242,102,79,.5);}
-  .zone.safe .plate{filter:saturate(1.15) brightness(1.06);
-    box-shadow:0 13px 0 #4a9e86, 0 0 0 3px var(--good), 0 0 30px rgba(18,181,140,.55),
-               0 28px 36px rgba(8,14,30,.55);}
+  .zoneO .zone-tag,.zoneX .zone-tag{background-image:url("pick-cari-tag-v2.png");}
+  .zone.safe .plate{filter:saturate(1.18) brightness(1.12) drop-shadow(0 0 18px rgba(73,255,198,.85));}
   .zone.collapse .zone-tag{opacity:0; transition:opacity .2s;}
   /* 발판이 나선을 그리며 사건의 지평선으로 빨려든다 */
   .zone.collapse .plate{animation:plateSuck 1.2s cubic-bezier(.55,0,.85,.5) forwards;}
@@ -153,24 +139,17 @@
   /* ===== 블랙홀 ===== */
   .bh{position:absolute; z-index:28; pointer-events:none; transform:translate(-50%,-50%);
     width:0; height:0;}
-  .bh-core{position:absolute; left:50%; top:50%; width:190px; height:190px; border-radius:50%;
-    transform:translate(-50%,-50%) scale(0); background:#02030a;
-    box-shadow:0 0 40px 10px rgba(2,3,10,.9), 0 0 0 2px rgba(180,140,255,.5);
-    animation:bhCore 1.55s cubic-bezier(.2,.8,.3,1) forwards;}
-  @keyframes bhCore{0%{transform:translate(-50%,-50%) scale(0);}
-    22%{transform:translate(-50%,-50%) scale(1.06);}
-    62%{transform:translate(-50%,-50%) scale(1);}
-    100%{transform:translate(-50%,-50%) scale(0); opacity:.6;}}
-  .bh-disk{position:absolute; left:50%; top:50%; width:300px; height:300px; border-radius:50%;
-    transform:translate(-50%,-50%) scale(0) rotate(0);
-    background:conic-gradient(from 0deg, rgba(255,190,120,0) 0deg, rgba(255,170,90,.85) 70deg,
-      rgba(210,130,255,.9) 150deg, rgba(120,180,255,.8) 230deg, rgba(255,190,120,0) 330deg);
-    -webkit-mask:radial-gradient(circle, transparent 30%, #000 38%, #000 52%, transparent 62%);
-    mask:radial-gradient(circle, transparent 30%, #000 38%, #000 52%, transparent 62%);
-    filter:blur(2px); animation:bhDisk 1.55s cubic-bezier(.2,.8,.3,1) forwards;}
-  @keyframes bhDisk{0%{transform:translate(-50%,-50%) scale(0) rotate(0); opacity:0;}
-    18%{opacity:1;} 62%{transform:translate(-50%,-50%) scale(1.05) rotate(420deg); opacity:1;}
-    100%{transform:translate(-50%,-50%) scale(.1) rotate(760deg); opacity:0;}}
+  .bh-portal{position:absolute; left:50%; top:50%; width:310px; height:310px;
+    transform:translate(-50%,-50%) scale(0) rotate(-25deg);
+    background:url("pick-cari-blackhole-v3.png") center/contain no-repeat;
+    filter:drop-shadow(0 0 22px rgba(69,170,255,.9)) drop-shadow(0 0 38px rgba(114,72,255,.55));
+    animation:bhPortal 1.55s cubic-bezier(.2,.8,.3,1) forwards;}
+  @keyframes bhPortal{
+    0%{transform:translate(-50%,-50%) scale(.05) rotate(-25deg); opacity:0;}
+    18%{opacity:1;}
+    44%{transform:translate(-50%,-50%) scale(1.08) rotate(28deg); opacity:1;}
+    72%{transform:translate(-50%,-50%) scale(1) rotate(58deg); opacity:1;}
+    100%{transform:translate(-50%,-50%) scale(.08) rotate(145deg); opacity:0;}}
   .bh-charge{position:absolute; left:50%; top:50%; width:60px; height:60px; border-radius:50%;
     transform:translate(-50%,-50%) scale(0);
     background:radial-gradient(circle, #fff 0%, rgba(200,170,255,.9) 40%, transparent 70%);
@@ -181,42 +160,41 @@
 
 
   /* --- 대기 발판 — 표면은 홀로그램(우주), 형태는 O/X 와 같은 두께 있는 슬랩 --- */
-  .waitzone{position:absolute; left:6%; right:6%; top:var(--wait-top); height:var(--wait-h);
+  .waitzone{position:absolute; left:0; right:0; top:var(--wait-top); height:var(--wait-h);
     z-index:1; border-radius:15px;
-    background:linear-gradient(180deg, rgba(120,195,255,.26) 0%, rgba(70,140,230,.14) 60%, rgba(50,110,200,.16) 100%);
-    box-shadow:
-      0 13px 0 rgba(38,92,158,.8),          /* 발판 두께 */
-      0 15px 3px rgba(4,8,20,.5),
-      0 26px 40px rgba(4,8,20,.7),
-      0 0 34px rgba(90,170,255,.5),         /* 홀로 글로우 */
-      inset 0 2px 0 rgba(200,240,255,.6),
-      inset 0 0 36px rgba(90,170,255,.2),
-      inset 0 0 0 2px rgba(125,200,255,.45);}
+    background:url("pick-cari-platform-o-v2.png") center/100% 100% no-repeat;
+    filter:saturate(.42) brightness(.68) drop-shadow(0 17px 16px rgba(1,8,28,.58)); box-shadow:none;}
   /* 그리드·스캔라인만 잘라내는 내부 레이어 — waitzone 에 overflow:hidden 을 걸면 명패가 잘린다 */
   .wz-fx{position:absolute; inset:0; border-radius:15px; overflow:hidden; pointer-events:none;}
-  .wz-fx::before{content:""; position:absolute; inset:0;
-    background:repeating-linear-gradient(90deg, rgba(165,220,255,.2) 0 1px, transparent 1px 28px),
-               repeating-linear-gradient(0deg, rgba(165,220,255,.14) 0 1px, transparent 1px 24px);}
+  .wz-fx::before{content:""; position:absolute; inset:12% 4% 21%;
+    background:repeating-linear-gradient(90deg, rgba(165,220,255,.16) 0 1px, transparent 1px 28px),
+               repeating-linear-gradient(0deg, rgba(165,220,255,.12) 0 1px, transparent 1px 24px);}
   .wz-fx::after{content:""; position:absolute; left:0; right:0; height:26%;
     background:linear-gradient(180deg, transparent, rgba(185,228,255,.32), transparent);
     animation:scan 3.6s ease-in-out infinite;}
   @keyframes scan{0%,100%{top:-14%;} 50%{top:88%;}}
   /* 명패는 발판 명패와 같은 규격 */
-  .waitzone .wl{position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:4;
-    padding:5px 17px; border-radius:22px; color:#fff; font-size:14px; font-weight:800;
-    white-space:nowrap; background:linear-gradient(160deg,#4f8fd4,#2b5f9e);
-    box-shadow:0 4px 12px rgba(6,12,30,.5), 0 0 18px rgba(110,190,255,.5);}
+  .waitzone .wl{position:absolute; top:-17px; left:50%; transform:translateX(-50%); z-index:4;
+    width:72px; height:34px; display:grid; place-items:center; padding:0 8px; color:#fff; font-size:12px; font-weight:900;
+    white-space:nowrap; background:url("pick-cari-tag-v2.png") center/100% 100% no-repeat;
+    text-shadow:0 1px 3px #00183f; box-shadow:none;}
 
   /* ===== 캐릭터 — 나 = CARI, 나머지 = 같은 우주복의 응시생(슈트 색으로 구분) ===== */
-  .ch{position:absolute; z-index:10; width:38px; transform:translate(-50%,-50%);
+  .ch{position:absolute; z-index:10; width:34px; transform:translate(-50%,-50%);
     transition:left .5s cubic-bezier(.4,1.4,.5,1), top .5s cubic-bezier(.4,1.4,.5,1); will-change:left,top;
     filter:drop-shadow(0 3px 4px rgba(6,12,30,.55));}
   .ch .art{width:100%; height:auto; display:block; transform-origin:50% 92%; animation:hop 1.5s ease-in-out infinite;}
   @keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .ch .npc-art{--face:1; animation:npcHop 1.5s ease-in-out infinite;
+    image-rendering:auto; object-fit:contain;}
+  @keyframes npcHop{
+    0%,100%{transform:translateY(0) scaleX(var(--face));}
+    50%{transform:translateY(-3px) scaleX(var(--face));}}
+  .ch .npc-art.shock{filter:brightness(1.18) drop-shadow(0 0 5px rgba(255,120,100,.72));}
   .ch .lab{position:absolute; top:-11px; left:50%; transform:translateX(-50%); white-space:nowrap;
     font-size:9px; font-weight:800; color:#eaf0fb; background:rgba(18,26,48,.78);
     padding:0 5px; border-radius:7px;}
-  .ch.me{width:52px; z-index:12;}
+  .ch.me{width:44px; z-index:12;}
   .ch.me .lab{color:#fff; background:var(--brand); top:-12px;}
   /* 나를 항상 찾을 수 있게 — 크림 슈트가 밝은 발판 위에서 묻혀서 발밑 글로우를 깔았다 */
   .ch.me::before{content:""; position:absolute; left:50%; top:58%; width:165%; height:62%;
@@ -247,72 +225,110 @@
     50%{transform:translate(4px,-2px)}75%{transform:translate(-3px,-1px)}100%{transform:translate(3px,1px)}}
 
   /* ===== 정답 공개 카드 ===== */
-  .verdict{position:absolute; top:56%; left:50%; z-index:22; opacity:0;
-    transform:translate(-50%,-50%) scale(0); display:flex; align-items:center; gap:12px;
-    padding:9px 20px 9px 10px; border-radius:20px; white-space:nowrap;
-    background:rgba(255,255,255,.97); box-shadow:0 14px 36px rgba(6,12,30,.6);}
+  .verdict{position:absolute; top:50.5%; left:50%; z-index:22; opacity:0;
+    transform:translate(-50%,-50%) scale(0); display:flex; align-items:center; gap:10px;
+    min-width:196px; height:64px; padding:7px 17px 7px 8px; border-radius:18px; white-space:nowrap;
+    background:linear-gradient(145deg,rgba(10,37,82,.98),rgba(3,17,48,.98));
+    border:2px solid #58d6ff; box-shadow:0 0 0 3px rgba(20,117,210,.25),0 13px 30px rgba(0,8,32,.72);}
+  .verdict.x{border-color:#ff806b; box-shadow:0 0 0 3px rgba(242,102,79,.22),0 13px 30px rgba(0,8,32,.72);}
   .verdict.show{animation:vPop .5s cubic-bezier(.2,1.7,.4,1) forwards;}
   @keyframes vPop{0%{opacity:0; transform:translate(-50%,-50%) scale(0) rotate(-9deg);}
     60%{opacity:1; transform:translate(-50%,-50%) scale(1.1) rotate(2.5deg);}
     100%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(0);}}
   .verdict.hide{animation:vOut .28s ease-in forwards;}
   @keyframes vOut{to{opacity:0; transform:translate(-50%,-50%) scale(.86);}}
-  .v-mark{position:relative; width:48px; height:48px; border-radius:15px; display:grid;
-    place-items:center; font-size:29px; font-weight:900; color:#fff; line-height:1;}
-  .verdict.o .v-mark{background:linear-gradient(160deg,var(--brand-hi),var(--brand));}
-  .verdict.x .v-mark{background:linear-gradient(160deg,#f4826e,var(--bad));}
-  .v-mark::after{content:""; position:absolute; inset:0; border-radius:15px;
+  .v-mark{position:relative; width:48px; height:48px; border-radius:50%; display:grid;
+    place-items:center; font-size:29px; font-weight:900; color:#fff; line-height:1;
+    border:3px solid rgba(255,255,255,.88);}
+  .verdict.o .v-mark{background:radial-gradient(circle,#168cff,#003ca6); box-shadow:0 0 12px rgba(60,194,255,.75);}
+  .verdict.x .v-mark{background:radial-gradient(circle,#ff806b,#bc2d25); box-shadow:0 0 12px rgba(255,92,70,.7);}
+  .v-mark::after{content:""; position:absolute; inset:0; border-radius:50%;
     border:3px solid currentColor; opacity:0;}
   .verdict.show .v-mark::after{animation:vRing .62s ease-out .12s;}
   @keyframes vRing{0%{transform:scale(1); opacity:.85;} 100%{transform:scale(2.3); opacity:0;}}
-  .v-lab{font-size:10.5px; font-weight:800; letter-spacing:.12em; color:var(--sub);}
-  .v-sub{font-size:16.5px; font-weight:900; color:var(--ink); letter-spacing:-.01em; margin-top:1px;}
+  .v-lab{font-size:9px; font-weight:900; letter-spacing:.16em; color:#8ebbe5;}
+  .v-sub{font-size:17px; font-weight:900; color:#fff; letter-spacing:-.03em; margin-top:2px;
+    text-shadow:0 0 8px rgba(80,201,255,.35);}
 
   /* ===== 답 버튼 (아래 — 엄지 닿는 자리) ===== */
-  .answerbar{display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:11px 14px 15px;
-    background:linear-gradient(#f7f8fc,#ffffff); border-top:1px solid var(--line);
-    box-shadow:0 -6px 18px rgba(80,100,150,.07); z-index:6;}
-  .choice{display:flex; align-items:center; justify-content:center; gap:9px; padding:14px 10px;
-    border-radius:14px; background:#f4f6fc; border:1px solid #d9e0f0; color:var(--ink);
-    font-size:15.5px; font-weight:800; cursor:pointer; min-height:62px;
+  .answerbar{display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:8px 14px 12px;
+    background:#071a42; border-top:1px solid #447fc1;
+    box-shadow:0 -8px 18px rgba(2,12,38,.3); z-index:6;}
+  .choice{position:relative; display:block; padding:0;
+    border:0; border-radius:0; background:url("pick-cari-choice-o-v2.png") center/100% 100% no-repeat; color:#fff;
+    font-size:17px; font-weight:900; cursor:pointer; min-height:66px;
     transition:transform .05s, background .12s, border-color .12s, box-shadow .12s;}
   .choice:active{transform:scale(.97);}
-  .choice svg{width:26px; height:26px; flex:none; fill:none;}
+  .choice svg{position:absolute; left:15.2%; top:50%; width:31px; height:31px;
+    transform:translate(-50%,-50%); fill:none; stroke-width:7.5;}
+  .choice-label{position:absolute; left:28%; right:4%; top:50%; transform:translateY(-50%); text-align:center;}
   .choice.o svg{stroke:var(--brand);} .choice.x svg{stroke:var(--bad);}
-  .choice.sel{background:#fff; box-shadow:0 0 0 3px rgba(0,74,198,.22); border-color:var(--brand);}
-  .choice.x.sel{box-shadow:0 0 0 3px rgba(242,102,79,.22); border-color:var(--bad);}
-  .choice.correct{background:rgba(18,181,140,.16); border-color:var(--good); box-shadow:none;}
-  .choice .kbd{font-size:10.5px; font-weight:700; color:var(--sub); background:#fff;
-    border:1px solid var(--line); border-radius:5px; padding:1px 5px;}
+  .answerbar:has(.choice.sel) .choice:not(.sel){filter:saturate(.48) brightness(.66); opacity:.72;}
+  .choice.sel{z-index:2; background-image:url("pick-cari-choice-o-v2.png");
+    transform:translateY(-3px) scale(1.035); filter:brightness(1.2) saturate(1.2)
+      drop-shadow(0 0 9px rgba(42,190,255,.92)); box-shadow:none;}
+  .choice.sel svg{filter:drop-shadow(0 0 9px #42caff);}
+  .choice.sel .choice-label{text-shadow:0 0 12px #62d8ff,0 2px 3px #001c58;}
+  .choice.sel::after{content:"✓"; position:absolute; right:8px; top:4px; color:#c9f7ff;
+    font-size:28px; font-weight:1000; line-height:1; text-shadow:0 0 10px #009dff,0 2px 2px #001944;}
+  .choice.x{background-image:url("pick-cari-choice-x-v2.png");}
+  .choice.x.sel{background-image:url("pick-cari-choice-x-v2.png");
+    filter:brightness(1.2) saturate(1.2) drop-shadow(0 0 8px rgba(255,86,65,.92));
+    box-shadow:none;}
+  .choice.x.sel svg{filter:drop-shadow(0 0 7px #ff806b);}
+  .choice.x.sel .choice-label{text-shadow:0 0 9px #ff8f79,0 2px 3px #4d0803;}
+  .choice.x.sel::after{color:#ff9b87; text-shadow:0 0 8px #ff4f34,0 2px 2px #4d0803;}
+  .choice.correct{z-index:2; transform:translateY(-3px) scale(1.035);
+    filter:brightness(1.3) saturate(1.25) drop-shadow(0 0 11px rgba(78,255,199,.95)); box-shadow:none;}
+  .choice.wrong{transform:none; filter:saturate(.35) brightness(.48); opacity:.62; box-shadow:none;}
+  .choice.wrong::after{content:"×"; position:absolute; right:9px; top:3px; color:#ff8c7b;
+    font-size:30px; font-weight:1000; line-height:1; text-shadow:0 0 8px rgba(255,72,50,.8);}
+  .choice .kbd{display:none;}
 
   /* ===== 오버레이 (껍데기 = CARI 그대로) ===== */
   .overlay{position:absolute; inset:0; z-index:40; display:flex; flex-direction:column;
     align-items:center; justify-content:center; text-align:center; padding:28px;
     background:rgba(245,247,252,.9); backdrop-filter:blur(4px);}
+  #startOv{justify-content:center; padding:74px 24px 28px;
+    background:url("pick-cari-intro-bg-v2.png") center/cover no-repeat; backdrop-filter:none;}
   .btn{margin-top:18px; padding:15px 48px; border-radius:30px; border:0; cursor:pointer;
     background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:17px; font-weight:800;
     box-shadow:0 10px 24px rgba(0,74,198,.32);}
+  #startBtn{width:190px; height:59px; margin-top:13px; padding:0 20px; border-radius:0;
+    background:url("pick-cari-start-v2.png") center/100% 100% no-repeat;
+    color:#fff; font-family:"Malgun Gothic",system-ui,sans-serif; font-size:18px; font-weight:900; letter-spacing:-.04em;
+    text-shadow:0 2px 4px rgba(0,28,88,.75); box-shadow:none;
+    filter:drop-shadow(0 8px 12px rgba(5,35,95,.3));}
   .btn:active{transform:scale(.97);}
-  .intro-mascot{width:min(178px,22vh); height:auto; filter:drop-shadow(0 14px 18px rgba(70,90,140,.32));
+  .intro-mascot{width:min(190px,22vh); height:auto; filter:drop-shadow(0 14px 18px rgba(48,83,140,.3));
     animation:bob 2.6s ease-in-out infinite;}
   @keyframes bob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}}
-  .intro-title{font-size:44px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:10px 0 0;
+  .intro-title{font-size:42px; font-weight:900; letter-spacing:-.02em; line-height:1; margin:5px 0 0;
     transform:rotate(-2.5deg); animation:titlePop .55s cubic-bezier(.2,1.7,.4,1) both;}
-  .intro-title .t1{color:var(--ink); text-shadow:0 2px 0 #fff, 0 4px 10px rgba(80,100,150,.28);}
-  .intro-title .t2{background:linear-gradient(180deg,#5b90ff,#004ac6); -webkit-background-clip:text;
+  .intro-title .t1{color:#fff; -webkit-text-stroke:2px #14396f;
+    text-shadow:0 3px 0 #173c72,0 5px 12px rgba(0,20,60,.5);}
+  .intro-title .t2{background:linear-gradient(180deg,#fff5b8 0%,#ffc945 52%,#e99000 100%); -webkit-background-clip:text;
     background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
-    filter:drop-shadow(0 3px 7px rgba(0,74,198,.45));}
+    -webkit-text-stroke:1px rgba(78,45,0,.45); filter:drop-shadow(0 3px 5px rgba(52,30,0,.45));}
   @keyframes titlePop{0%{opacity:0; transform:scale(.5) rotate(-2.5deg)}
     60%{transform:scale(1.08) rotate(-2.5deg)} 100%{opacity:1; transform:scale(1) rotate(-2.5deg)}}
-  .intro-tag{font-size:14px; font-weight:700; color:var(--sub); margin:16px 0 22px;}
-  .intro-rules{display:flex; flex-direction:column; gap:8px; width:100%; max-width:308px; margin-bottom:20px;}
-  .ir{display:flex; align-items:center; gap:10px; text-align:left; font-size:13.5px; color:var(--ink);
-    background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 13px;
-    box-shadow:0 3px 10px rgba(80,100,150,.05);}
+  .intro-tag{font-size:14px; font-weight:900; color:#fff; margin:11px 0 14px;
+    text-shadow:0 2px 4px #082755,0 0 2px #082755;}
+  .intro-rules{display:flex; flex-direction:column; justify-content:center; gap:3px;
+    width:min(100%,330px); min-height:172px; margin:0; padding:22px 25px 20px;
+    background:url("pick-cari-intro-panel-v2.png") center/100% 100% no-repeat;
+    filter:drop-shadow(0 10px 16px rgba(4,24,72,.25));}
+  .ir{display:flex; align-items:center; gap:9px; text-align:left; font-size:12.5px; line-height:1.25; color:var(--ink);
+    min-height:39px; background:transparent; border:0; border-radius:10px; padding:5px 7px;
+    color:#edf6ff; text-shadow:0 1px 2px rgba(0,18,58,.8); box-shadow:none;}
   .ir b{font-weight:800;}
-  .ir-ic{flex:none; width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
-    font-size:12px; font-weight:900; color:#fff;}
-  .ir-ic.o{background:var(--brand);} .ir-ic.dn{background:var(--bad);} .ir-ic.st{background:var(--skip);}
+  .ir-ic{flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
+    color:#dff8ff; background:linear-gradient(160deg,#173c78,#071d49); border:1px solid #7edfff;
+    box-shadow:inset 0 0 0 2px rgba(126,223,255,.12),0 0 8px rgba(56,190,255,.24);}
+  .ir-ic svg{width:20px; height:20px; display:block; fill:none; stroke:currentColor;
+    stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;}
+  .ir-ic.dn{color:#ffd7cf; border-color:#ff9b87; box-shadow:inset 0 0 0 2px rgba(255,155,135,.1),0 0 8px rgba(255,105,85,.2);}
+  .ir-ic.st{color:#ffe6a1; border-color:#f8c960; box-shadow:inset 0 0 0 2px rgba(248,201,96,.1),0 0 8px rgba(248,188,70,.2);}
   .over-badge{font-size:12px; font-weight:900; letter-spacing:.14em; color:var(--bad);
     background:rgba(242,102,79,.12); border:1px solid rgba(242,102,79,.3); padding:5px 14px; border-radius:20px;}
   .over-badge.win{color:var(--good); background:rgba(18,181,140,.12); border-color:rgba(18,181,140,.3);}
@@ -329,6 +345,30 @@
   .ost{background:#f4f6fc; border:1px solid var(--line); border-radius:13px; padding:10px 15px; min-width:74px;}
   .ost-k{font-size:10.5px; color:var(--sub); letter-spacing:.05em; font-weight:700; margin-bottom:3px;}
   .ost-v{font-size:19px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums;}
+  #overOv{justify-content:flex-start; padding:36px 24px 22px;
+    background:linear-gradient(rgba(5,20,54,.24),rgba(3,10,28,.58)),
+      url("pick-cari-intro-bg-v2.png") center/cover no-repeat; backdrop-filter:none;}
+  .over-console{position:relative; width:min(340px,86vw); height:min(650px,76vh); min-height:520px;
+    display:block; padding:0;
+    background:url("pick-cari-outro-console-v2.png") center/100% 100% no-repeat;
+    filter:drop-shadow(0 16px 24px rgba(0,10,42,.5));}
+  #overOv .over-badge{display:none;}
+  #overOv .over-img{position:absolute; top:3.8%; left:50%; transform:translateX(-50%);
+    width:min(124px,15.5vh); margin:0; animation:none; filter:drop-shadow(0 8px 11px rgba(0,12,40,.55));}
+  #overOv .over-title{display:none;}
+  #overOv .over-scorebox{position:absolute; top:33%; left:15%; width:70%; height:34%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 18px; margin:0;
+    background:rgba(4,22,58,.38); border:1px solid rgba(83,205,255,.26); box-shadow:none;}
+  #overOv .os-lab{color:#c6e1f8; font-size:15px; font-weight:900;} #overOv .os-num{font-size:86px; color:#fff; text-shadow:0 0 14px rgba(58,194,255,.8);}
+  #overOv .os-new{font-size:16px; font-weight:900;}
+  #overOv .over-stats{position:absolute; left:10.5%; top:75.3%; width:78.9%; height:16.3%; margin:0; gap:0;}
+  #overOv .ost{flex:1; min-width:0; padding:8px 3px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; background:transparent; border:0;}
+  #overOv .ost-k{color:#c4dcf2; font-size:12.5px; font-weight:900; margin-bottom:6px; letter-spacing:-.04em;}
+  #overOv .ost-v{color:#fff; font-size:22px;}
+  #againBtn{width:190px; height:59px; margin-top:8px; padding:0 20px; border-radius:0;
+    background:url("pick-cari-start-v2.png") center/100% 100% no-repeat; box-shadow:none;
+    text-shadow:0 2px 4px rgba(0,28,88,.75); filter:drop-shadow(0 8px 12px rgba(0,14,55,.4));}
   .hidden{display:none!important;}
 </style>
 </head>
@@ -338,19 +378,17 @@
 
   <div class="hud">
     <div class="hud-score">
-      <span class="hs-ic"><svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26H20.66l-5.37 3.88 2.09 6.26L12 14.52l-5.38 3.88 2.09-6.26L3.34 8.26H9.91z"/></svg></span>
-      <span class="hs-num" id="stageNum">1</span><span class="hs-unit">스테이지</span>
+      <span class="hs-num" id="stageNum">1</span><span class="hs-unit" data-i18n="pick.stage">스테이지</span>
     </div>
     <div class="timer" id="timer"><b id="tnum">10</b></div>
     <div class="hud-right">
-      <div class="hud-chip alive"><svg viewBox="0 0 24 24"><path d="M12 21C7 17 3 13.5 3 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 9 2.5C21 13.5 17 17 12 21z"/></svg><b id="aliveN">16</b></div>
-      <div class="hud-chip"><svg viewBox="0 0 24 24"><path d="M5 19L3.6 8.5 8 11.5 12 5 16 11.5 20.4 8.5 19 19z"/></svg><span class="hc-lab">최고</span><b id="best">0</b></div>
+      <div class="hud-chip alive"><span class="hc-lab">생존 인원</span><b id="aliveN">16</b></div>
     </div>
   </div>
 
   <div class="qboard">
     <div class="qrule"></div>
-    <div class="qterm" id="qterm">준비되면 시작하세요</div>
+    <div class="qterm" id="qterm" data-i18n="mg.ready">준비되면 시작하세요</div>
     <div class="qdesc" id="qdesc"></div>
   </div>
 
@@ -362,57 +400,60 @@
     </div>
     <div class="zone zoneO" id="zoneO"><div class="plate"><span class="zone-mark">O</span></div><div class="zone-tag" id="tagO"><b>0</b>명</div></div>
     <div class="zone zoneX" id="zoneX"><div class="plate"><span class="zone-mark">X</span></div><div class="zone-tag" id="tagX"><b>0</b>명</div></div>
-    <div class="waitzone"><i class="wz-fx"></i><span class="wl">대기</span></div>
+    <div class="waitzone"><i class="wz-fx"></i><span class="wl" data-i18n="pick.wait">대기</span></div>
     <div class="verdict" id="verdict">
       <div class="v-mark" id="vMark">O</div>
-      <div><div class="v-lab">정답</div><div class="v-sub" id="vSub">맞는 설명이에요</div></div>
+      <div><div class="v-lab" data-i18n="pick.answer">정답</div><div class="v-sub" id="vSub" data-i18n="pick.desc_true">맞는 설명이에요</div></div>
     </div>
   </div>
 
   <div class="answerbar">
     <button class="choice o" id="btnO">
       <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" stroke-width="7"/></svg>
-      맞다 <span class="kbd">1</span>
+      <span class="choice-label" data-i18n="pick.yes">맞다</span><span class="kbd">1</span>
     </button>
     <button class="choice x" id="btnX">
       <svg viewBox="0 0 40 40"><path d="M10 10 L30 30 M30 10 L10 30" stroke-width="7" stroke-linecap="round"/></svg>
-      아니다 <span class="kbd">2</span>
+      <span class="choice-label" data-i18n="pick.no">아니다</span><span class="kbd">2</span>
     </button>
   </div>
 
   <!-- START -->
   <div class="overlay" id="startOv">
-    <div class="intro-mascot" id="introMascot"></div>
-    <div class="intro-title"><span class="t1">골라라</span> <span class="t2">CARI</span></div>
-    <div class="intro-tag">발판이 무너지기 전에 O·X 를 골라라!</div>
+    <img class="intro-mascot" id="introMascot" src="pick-cari-intro-cari-v3.png" alt="O와 X를 든 CARI" />
+    <div class="intro-title"><span class="t1" data-i18n="pick.title">골라라</span> <span class="t2">CARI</span></div>
+    <div class="intro-tag" data-i18n="pick.tagline">발판이 무너지기 전에 O·X 를 골라라!</div>
     <div class="intro-rules">
-      <div class="ir"><span class="ir-ic o">O</span><span>용어 뜻이 <b>맞으면 O</b>, 틀리면 <b>X</b> 발판으로</span></div>
-      <div class="ir"><span class="ir-ic dn">▼</span><span>10초 뒤 <b>틀린 발판이 무너져요</b></span></div>
-      <div class="ir"><span class="ir-ic st">★</span><span>15 스테이지 버티면 <b>승리</b></span></div>
+      <div class="ir"><span class="ir-ic o" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="4"/><path d="m15.5 8 5 8m0-8-5 8"/></svg></span><span data-i18n="pick.rule1">뜻이 <b>맞으면 O</b>, 틀리면 <b>X 발판</b>으로</span></div>
+      <div class="ir"><span class="ir-ic dn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5h16v4H4zM7 14l5 5 5-5m-5-2v7"/></svg></span><span data-i18n="pick.rule2">10초 뒤 <b>틀린 발판이 무너져요</b></span></div>
+      <div class="ir"><span class="ir-ic st" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 21V4m1 1h11l-2.5 4L18 13H7"/><path d="m10 16 1.2 2.1 2.4.5-1.7 1.7.3 2.4"/></svg></span><span>15 스테이지 버티면 <b>승리</b></span></div>
     </div>
-    <button class="btn" id="startBtn">골라보기</button>
+    <button class="btn" id="startBtn" data-i18n="pick.start">골라보기</button>
   </div>
 
   <!-- GAME OVER -->
   <div class="overlay hidden" id="overOv">
-    <div class="over-badge" id="overBadge">GAME OVER</div>
-    <div class="over-img" id="overImg"></div>
-    <div class="over-title" id="overTitle">여기서 발판이 무너졌어요!</div>
-    <div class="over-scorebox">
-      <div class="os-lab">생존 스테이지</div>
-      <div class="os-num" id="finalRound">0</div>
-      <div id="newbest" class="os-new hidden">🏆 신기록!</div>
+    <div class="over-console">
+      <div class="over-badge" id="overBadge">GAME OVER</div>
+      <img class="over-img" id="overImg" src="pick-cari-outro-cari-v3.png" alt="균형을 잃은 CARI" />
+      <div class="over-title" id="overTitle" data-i18n="pick.over">여기서 발판이 무너졌어요!</div>
+      <div class="over-scorebox">
+        <div class="os-lab" data-i18n="pick.stage_reached">생존 스테이지</div>
+        <div class="os-num" id="finalRound">0</div>
+        <div id="newbest" class="os-new hidden" data-i18n="pick.newbest">신기록!</div>
+      </div>
+      <div class="over-stats">
+        <div class="ost"><div class="ost-k" data-i18n="pick.final_rank">최종 순위</div><div class="ost-v" id="finalRank">-</div></div>
+        <div class="ost"><div class="ost-k" data-i18n="pick.remaining">남은 인원</div><div class="ost-v" id="finalAlive">0</div></div>
+        <div class="ost"><div class="ost-k" data-i18n="pick.best_record">최고 기록</div><div class="ost-v" id="finalBest">0</div></div>
+      </div>
     </div>
-    <div class="over-stats">
-      <div class="ost"><div class="ost-k">최종 순위</div><div class="ost-v" id="finalRank">-</div></div>
-      <div class="ost"><div class="ost-k">남은 인원</div><div class="ost-v" id="finalAlive">0</div></div>
-      <div class="ost"><div class="ost-k">최고 기록</div><div class="ost-v" id="finalBest">0</div></div>
-    </div>
-    <button class="btn" id="againBtn">다시 도전</button>
+    <button class="btn" id="againBtn" data-i18n="mg.retry">다시 도전</button>
   </div>
 
 </div>
 
+<script src="i18n.js"></script>
 <script>
 (() => {
 const $=id=>document.getElementById(id);
@@ -424,7 +465,7 @@ const zoneO=$("zoneO"), zoneX=$("zoneX"), tagO=$("tagO"), tagX=$("tagX");
 const verdict=$("verdict"), vMark=$("vMark"), vSub=$("vSub");
 
 /* ===== 필드 지오메트리 — 단일 출처. CSS 변수로 주입하고 망치 접촉 좌표도 여기서 유도. ===== */
-const GEO={ zoneTop:8, zoneH:46, waitTop:64, waitH:30 };
+const GEO={ zoneTop:3, zoneH:46, waitTop:56, waitH:40 };
 { const s=document.documentElement.style;
   s.setProperty('--zone-top',GEO.zoneTop+'%'); s.setProperty('--zone-h',GEO.zoneH+'%');
   s.setProperty('--wait-top',GEO.waitTop+'%'); s.setProperty('--wait-h',GEO.waitH+'%'); }
@@ -501,6 +542,8 @@ const SUITS=[                     // [슈트, 슈트그림자, 귀]
   ['#f7d5f0','#d3a3ca','#c977b8'], ['#dbe2ec','#a9b4c6','#7b8aa3'],
 ];
 const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+const PLAYER_ASSET='pick-cari-player-v4.png';
+const NPC_ASSETS=Array.from({length:8},(_,i)=>`pick-cari-npc-${i+1}-v4.png`);
 
 function charSVG(suit,o={}){
   const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
@@ -544,6 +587,11 @@ function charSVG(suit,o={}){
     ${eyes}${mouth}${badge}</svg>`;
 }
 
+function npcArt(asset,o={}){
+  const face=o.dir===-1?-1:1;
+  return `<img class="art npc-art${o.shock?' shock':''}" src="${asset}" alt="" draggable="false" style="--face:${face}" />`;
+}
+
 const NAMES=['두두','뽀뽀','냥이','토토','메로','콩이','삐약','루피','모모','치치','두부','까망','하양','방울','초코','설탕','호두','바니'];
 const T0=10, TOTAL_STAGES=15;
 
@@ -554,6 +602,11 @@ const recent=[];
 const rand=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function shuffle(a){
+  const out=[...a];
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
+  return out;
+}
 
 /* 우주 배경 — 별 + 유성 (성운·은하수·행성은 CSS 고정) */
 function buildStars(){
@@ -578,9 +631,9 @@ function buildStars(){
 /* 랜덤 배치는 이름표가 서로 뭉개져서 격자 패킹으로 바꿨다.
    대기 구역은 넓고 낮아서 정사각 배치를 쓰면 세로로 겹친다 → maxRows 로 줄 수를 강제. */
 const AREA={
-  O:{x0:6, x1:42, y0:GEO.zoneTop+5, y1:GEO.zoneTop+GEO.zoneH-3, maxCols:4},
-  X:{x0:58, x1:94, y0:GEO.zoneTop+5, y1:GEO.zoneTop+GEO.zoneH-3, maxCols:4},
-  W:{x0:9,  x1:91, y0:GEO.waitTop+4, y1:GEO.waitTop+GEO.waitH-3, maxCols:8, maxRows:2},
+  O:{x0:8, x1:42, y0:GEO.zoneTop+10, y1:GEO.zoneTop+21, maxCols:4},
+  X:{x0:58, x1:92, y0:GEO.zoneTop+10, y1:GEO.zoneTop+21, maxCols:4},
+  W:{x0:7, x1:93, y0:GEO.waitTop+4, y1:GEO.waitTop+16, maxCols:8, maxRows:2},
 };
 function packInto(list,r){
   const n=list.length; if(!n) return;
@@ -602,9 +655,6 @@ function relayout(){
   packInto(alive.filter(p=>!p.choice),      AREA.W);
 }
 
-$("best").textContent=best;
-$("introMascot").innerHTML=charSVG(CARI_SUIT,{cari:true});
-$("overImg").innerHTML=charSVG(CARI_SUIT,{cari:true,shock:true});
 buildStars();
 
 function makeQuestion(){
@@ -623,13 +673,22 @@ function buildPlayers(){
   field.querySelectorAll('.ch,.bh,.debris,.hitflash').forEach(e=>e.remove());
   players=[];
   const names=[...NAMES].sort(()=>Math.random()-.5);
-  const suits=[...SUITS].sort(()=>Math.random()-.5);
+  /* 15명을 같은 8종으로 채우되 반복 순서를 그대로 쓰지 않는다.
+     시작 대기석의 좌우 이웃·위아래 같은 열에 같은 종이 서지 않을 때까지 다시 섞는다. */
+  let assetBag=[];
+  for(let attempt=0;attempt<30;attempt++){
+    const candidate=[...shuffle(NPC_ASSETS),...shuffle(NPC_ASSETS)].slice(0,15);
+    const spread=candidate.every((asset,i)=>
+      (i===0||asset!==candidate[i-1]) && (i<8||asset!==candidate[i-8]));
+    assetBag=candidate; if(spread) break;
+  }
   for(let i=0;i<16;i++){
     const isMe=i===0;
-    const suit=isMe?CARI_SUIT:suits[i%suits.length];
+    const suit=null;
+    const asset=isMe?PLAYER_ASSET:assetBag[i-1];
     const el=document.createElement('div'); el.className='ch'+(isMe?' me':'');
-    const p={el,isMe,alive:true,choice:null,suit,assign:null,jx:rand(-1,1),jy:rand(-1,1)};
-    el.innerHTML=charSVG(suit,{cari:isMe})+`<div class="lab">${isMe?'나':names[i%names.length]}</div>`;
+    const p={el,isMe,alive:true,choice:null,suit,asset,assign:null,jx:rand(-1,1),jy:rand(-1,1)};
+    el.innerHTML=npcArt(asset)+`<div class="lab">${isMe?MGI18N.t('pick.me'):names[i%names.length]}</div>`;
     el.querySelector('.art').style.animationDelay=(Math.random()*1.4).toFixed(2)+'s';
     field.appendChild(el);
     players.push(p); if(isMe) me=p;
@@ -639,14 +698,14 @@ function buildPlayers(){
 function place(el,x,y){ el.style.left=x+'%'; el.style.top=y+'%'; }
 function redraw(p,opt){
   const a=p.el.querySelector('.art'); if(!a) return;
-  a.outerHTML=charSVG(p.suit,{cari:p.isMe,...opt});
+  a.outerHTML=npcArt(p.asset,opt);
   const n=p.el.querySelector('.art'); if(n) n.style.animationDelay=(Math.random()*1.4).toFixed(2)+'s';
 }
 function faceDir(p,c){ redraw(p,{dir:c==='O'?-1:c==='X'?1:0}); }
 function updateCounts(){
   let o=0,x=0,alive=0;
   players.forEach(p=>{ if(!p.alive)return; alive++; if(p.choice==='O')o++; else if(p.choice==='X')x++; });
-  tagO.innerHTML=`<b>${o}</b>명`; tagX.innerHTML=`<b>${x}</b>명`; $("aliveN").textContent=alive;
+  tagO.innerHTML=MGI18N.t('pick.people',{n:'<b>'+o+'</b>'}); tagX.innerHTML=MGI18N.t('pick.people',{n:'<b>'+x+'</b>'}); $("aliveN").textContent=alive;
 }
 function moveTo(p,choice){ p.choice=choice; faceDir(p,choice); relayout(); updateCounts(); }
 
@@ -671,7 +730,7 @@ function newRound(){
   const aliveList=players.filter(p=>p.alive);
   aliveList.forEach(p=>{ p.choice=null; faceDir(p,null); });
   relayout(); updateCounts();
-  btnO.classList.remove('sel','correct'); btnX.classList.remove('sel','correct');
+  btnO.classList.remove('sel','correct','wrong'); btnX.classList.remove('sel','correct','wrong');
 
   const target=planSurvivors(aliveList.length);
   const dummies=aliveList.filter(p=>!p.isMe);
@@ -693,8 +752,8 @@ function renderTimer(){
   const t=Math.max(0,tLeft);
   tnum.textContent=t;
   timerEl.style.setProperty('--p', t/T0);
-  timerEl.style.setProperty('--tcol', t<=3?'var(--bad)':t<=5?'var(--skip)':'var(--brand)');
-  timerEl.classList.toggle('crit', t<=3 && t>0);
+  timerEl.style.setProperty('--tcol', t<=5?'#ff5b48':'#fff');
+  timerEl.classList.toggle('crit', t<=5 && t>0);
 }
 
 function choose(c){
@@ -712,10 +771,14 @@ window.addEventListener('keydown',e=>{
 
 function reveal(){
   phase='reveal';
-  (curAns==='O'?btnO:btnX).classList.add('correct');
+  const correctBtn=curAns==='O'?btnO:btnX;
+  const wrongBtn=curAns==='O'?btnX:btnO;
+  btnO.classList.remove('sel'); btnX.classList.remove('sel');
+  correctBtn.classList.add('correct');
+  if(me.choice && me.choice!==curAns) wrongBtn.classList.add('wrong');
   (curAns==='O'?zoneO:zoneX).classList.add('safe');
   vMark.textContent=curAns;
-  vSub.textContent = curAns==='O' ? '맞는 설명이에요' : '틀린 설명이에요';
+  vSub.textContent = MGI18N.t(curAns==='O' ? 'pick.desc_true' : 'pick.desc_false');
   verdict.className='verdict '+(curAns==='O'?'o':'x')+' show';
   setTimeout(()=>verdict.classList.add('hide'),1900);
   const loseSide=curAns==='O'?'X':'O';
@@ -767,7 +830,7 @@ function smashSide(side,dead){
   setTimeout(()=>{
     stage.classList.add('shake-hard');
     zone.classList.add('collapse');
-    bh.innerHTML='<div class="bh-disk"></div><div class="bh-core"></div>';
+    bh.innerHTML='<div class="bh-portal"></div>';
     flash(cx,PLATE_Y);
     spawnDebris(cx,PLATE_Y,12);
     dead.forEach(p=>{ redraw(p,{shock:true}); p.el.classList.add('out'); });
@@ -791,13 +854,12 @@ function gameOver(win,aliveCount){
   if(window.MGBridge) MGBridge.submit(round, {timed:true}); // 랭킹: 도달 라운드(동률=시간)
   if(round>best){ best=round; localStorage.setItem('cari_ox_best',best); $("newbest").classList.remove('hidden'); }
   else $("newbest").classList.add('hidden');
-  $("best").textContent=best;
   $("overBadge").className='over-badge'+(win?' win':'');
   $("overBadge").textContent=win?'CLEAR':'GAME OVER';
-  $("overImg").innerHTML=charSVG(CARI_SUIT,{cari:true, shock:!win});
-  $("overTitle").textContent=win?(round>=TOTAL_STAGES?'끝까지 살아남았어요!':'마지막 생존자!'):'여기서 발판이 무너졌어요!';
+  $("overImg").src=win?'pick-cari-intro-cari-v3.png':'pick-cari-outro-cari-v3.png';
+  $("overTitle").textContent=MGI18N.t(win?(round>=TOTAL_STAGES?'pick.cleared':'pick.last'):'pick.over');
   $("finalRound").textContent=round;
-  $("finalRank").textContent=win?'1위':(aliveCount+1)+'위';
+  $("finalRank").textContent=MGI18N.t('pick.rank_n',{n:win?1:(aliveCount+1)});
   $("finalAlive").textContent=aliveCount;
   $("finalBest").textContent=best;
   $("overOv").classList.remove('hidden');
@@ -819,12 +881,15 @@ $("startBtn").onclick=start; $("againBtn").onclick=start;
      ⚠️ tieMs(레벨형 동률 해소용 소요시간)는 인트로에서 시작을 누른 시점부터 잰다. '처음으로'로 되돌아가
        인트로를 다시 거치지 않으면 계속 누적된다 — 순위 1차 키가 아니라 동률 해소용이라 그대로 둔다. -->
 <style>
-.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; gap:6px;
-  padding:8px 13px; border-radius:999px; cursor:pointer; font:800 12.5px/1 system-ui,-apple-system,sans-serif;
-  border:1px solid rgba(40,50,76,.16); background:rgba(255,255,255,.92); color:#28324c;
-  box-shadow:0 4px 12px -4px rgba(20,30,60,.28); -webkit-tap-highlight-color:transparent;}
+.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; justify-content:center;
+  box-sizing:border-box; width:112px; height:34px; padding:0; border:0; cursor:pointer;
+  font:850 11.5px/1 system-ui,-apple-system,sans-serif; letter-spacing:.025em; color:#fff;
+  background:url("rank-button.png") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
+  filter:drop-shadow(0 3px 4px rgba(8,20,60,.24)); -webkit-tap-highlight-color:transparent;}
 .mg-rank.on{display:inline-flex;}
-.mg-rank:active{transform:translateY(1px);}
+.mg-rank span{display:block; transform:translateX(7px);}
+.mg-rank:hover{filter:brightness(1.06) drop-shadow(0 3px 5px rgba(8,20,60,.28));}
+.mg-rank:active{transform:translateY(1px) scale(.98);}
 </style>
 <script>
 (function(){
@@ -843,8 +908,8 @@ $("startBtn").onclick=start; $("againBtn").onclick=start;
     if(ov.querySelector('.mg-rank')) return;
     var b = document.createElement('button');
     b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
-    b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span> 랭킹';
+    b.setAttribute('aria-label', window.MGI18N ? MGI18N.t('mg.rank_aria') : '이 게임 랭킹 보기');
+    b.innerHTML='<span>'+(window.MGI18N ? MGI18N.t('mg.rank') : '랭킹')+'</span>';
     b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
     ov.appendChild(b);
   }
@@ -857,5 +922,6 @@ $("startBtn").onclick=start; $("againBtn").onclick=start;
   }, true);
 })();
 </script>
+<script>if (window.MGI18N) MGI18N.apply();</script>
 </body>
 </html>
