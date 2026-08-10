@@ -1146,7 +1146,7 @@ async function examInterruption(admin: any, body: any) {
   const { data: a } = await admin
     .from('exam_attempts')
     .select(
-      'id, user_id, exam_id, status, void_reason, started_at, submitted_at, last_seen_at, answered_count, total_questions, entry_count, reinstated_at, reinstated_by, reinstate_note',
+      'id, user_id, exam_id, status, void_reason, started_at, submitted_at, last_seen_at, answered_count, total_questions, entry_count, reinstated_at, reinstated_by, reinstate_note, elapsed_sec, resume_deadline',
     )
     .eq('id', attemptId)
     .maybeSingle()
@@ -1181,55 +1181,96 @@ async function examInterruption(admin: any, body: any) {
   })
 }
 
+/** 복구 유예 기본값(일). 문의를 처리하고 응시자가 다시 앉기까지의 현실적인 여유. */
+const REINSTATE_GRACE_DAYS = 7
+
 /**
- * 무효된 응시를 풀어 재응시(정확히는 그 응시로 재진입)를 허용한다.
+ * 무효된 응시를 풀어 다시 들어갈 수 있게 한다.
  *
- * ⚠️ 새 응시를 만들지 않는다 — 같은 응시로 돌아가므로 **started_at 이 유지되고 제한시간도 이어진다.**
- *    문항 세트도 그대로다. "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다(examTicketGrant).
- * ⚠️ 사유를 반드시 받는다. 이 기능은 "특정인만 살려줬다" 는 말이 나올 수 있는 자리라,
+ * ⛔ **시계를 멈춘 상태로 돌려준다.** 중단 시점까지 쓴 시간(elapsed_sec)만 남기고, 응시자가 실제로
+ *    다시 들어오는 순간 start-exam 이 `started_at = 그때 − 쓴 시간` 으로 옮긴다.
+ *    이렇게 하지 않으면 밤 8시 사고를 다음 날 아침에 처리했을 때 그 사이 12시간이 제한시간에서
+ *    흘러가 **복구해도 이미 만료**다. 관리자가 24시간 상주하지 않는 한 그게 기본값이 된다.
+ * ⛔ **응시 기간이 닫혔어도 들어갈 수 있게** resume_deadline 을 준다. 마지막 날 사고는 처리 시점에
+ *    이미 회차가 끝나 있어서, 이게 없으면 복구가 성립하지 않는다.
+ *
+ * ⚠️ 새 응시가 아니다 — 문항 세트는 그대로고 **이미 쓴 시간도 돌려주지 않는다**(남은 시간만 복원).
+ *    "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다(examTicketGrant).
+ * ⚠️ 사유를 반드시 받는다. "특정인만 살려줬다" 는 말이 나올 수 있는 자리라,
  *    누가·언제·왜가 남지 않으면 나중에 아무것도 해명할 수 없다.
  */
 async function examReinstate(admin: any, body: any, actorEmail: string) {
   const attemptId = String(body?.attemptId ?? '').trim()
   const note = String(body?.note ?? '').trim()
+  const days = Math.min(Math.max(1, Math.floor(Number(body?.graceDays ?? REINSTATE_GRACE_DAYS))), 30)
   if (!attemptId) return json({ error: 'attemptId 필요' }, 400)
   if (!note) return json({ error: '복구 사유를 적어주세요(나중에 근거가 될 것이 이것뿐입니다).' }, 400)
 
   const { data: a } = await admin
     .from('exam_attempts')
-    .select('id, status, void_reason, submitted_at')
+    .select('id, status, void_reason, started_at, last_seen_at, submitted_at')
     .eq('id', attemptId)
     .maybeSingle()
   if (!a) return json({ error: '응시를 찾을 수 없습니다.' }, 404)
-  if (a.status !== 'voided') {
-    return json({ error: `무효 상태가 아닙니다(현재 ${a.status}). 복구할 것이 없습니다.` }, 409)
+  // ⚠️ voided 만 받으면 안 된다. **응시 기간이 닫힌 뒤 사고가 처리되는 경우**, 응시자는 재진입 자체가
+  //    티켓 필터에서 막혀(start-exam 의 resume_blocked) 무효 판정에 닿지도 못한 채 in_progress 로 남는다.
+  //    그게 정확히 "마지막 날 저녁 사고" 의 모양이라, 여기서 거절하면 도와줄 방법이 사라진다.
+  //    복구는 '무효를 푸는 것' 이 아니라 **다시 볼 수 있게 시계와 기한을 주는 것**이다.
+  if (a.status === 'submitted') {
+    return json({ error: '이미 제출된 응시입니다. 복구 대상이 아닙니다.' }, 409)
   }
+
+  // 중단 시점까지 실제로 쓴 시간. 기준은 **마지막 생존 신호(last_seen_at)** 다 —
+  // 무효로 찍힌 시각(submitted_at)은 '나갔다가 돌아온 순간' 이라, 그걸 쓰면 나가 있던 시간까지
+  // 쓴 것으로 계산돼 복구의 의미가 사라진다. 하트비트가 한 번도 없었으면(시작 직후 사고) 0 으로 본다.
+  const startedMs = a.started_at ? Date.parse(a.started_at) : NaN
+  const deadMs = a.last_seen_at ? Date.parse(a.last_seen_at) : NaN
+  const elapsedSec =
+    Number.isFinite(startedMs) && Number.isFinite(deadMs) && deadMs > startedMs
+      ? Math.floor((deadMs - startedMs) / 1000)
+      : 0
+
   const now = new Date().toISOString()
+  const deadline = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
   const { data: won } = await admin
     .from('exam_attempts')
     .update({
       status: 'in_progress',
       // 무효로 찍혔던 제출시각을 되돌린다 — 남겨두면 '제출한 응시'로 보여 목록·집계가 어긋난다.
       submitted_at: null,
+      elapsed_sec: elapsedSec,
+      resume_deadline: deadline,
       reinstated_at: now,
       reinstated_by: actorEmail,
       reinstate_note: note.slice(0, 500),
     })
     .eq('id', attemptId)
-    .eq('status', 'voided') // 그 사이 상태가 바뀌었으면 덮어쓰지 않는다
+    .neq('status', 'submitted') // 그 사이 제출됐으면 덮어쓰지 않는다
     .select('id')
     .maybeSingle()
-  if (!won) return json({ error: '복구할 수 없는 상태입니다(이미 처리됨).' }, 409)
+  if (!won) return json({ error: '복구할 수 없는 상태입니다(이미 제출됨).' }, 409)
 
   await admin.from('exam_session_events').insert({
     attempt_id: attemptId,
     kind: 'reinstate',
-    detail: { by: actorEmail, note: note.slice(0, 500), prevVoidReason: a.void_reason ?? null },
+    detail: {
+      by: actorEmail,
+      note: note.slice(0, 500),
+      prevVoidReason: a.void_reason ?? null,
+      elapsedSec,
+      resumeDeadline: deadline,
+    },
   })
+  const usedMin = Math.floor(elapsedSec / 60)
   return json({
     ok: true,
-    // 응시자에게 뭐라고 안내할지가 갈리는 지점이라 서버가 명시한다.
-    note: '이 응시로 다시 들어갈 수 있습니다. 제한시간은 처음 시작 시각 기준으로 계속 흐르므로, 시간이 이미 지났다면 응시권을 새로 발급해 주세요.',
+    elapsedSec,
+    resumeDeadline: deadline,
+    // 응시자에게 뭐라고 안내할지가 갈리는 지점이라 서버가 문장으로 명시한다.
+    note:
+      `복구했습니다. 이미 쓴 ${usedMin}분을 뺀 남은 시간으로 다시 응시할 수 있고, ` +
+      `시계는 응시자가 실제로 다시 들어오는 순간부터 갑니다. ` +
+      `응시 기간이 이미 끝났더라도 ${days}일 안에는 들어갈 수 있습니다.`,
   })
 }
 

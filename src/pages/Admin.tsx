@@ -527,6 +527,8 @@ interface InterruptionResp {
     reinstated_at: string | null
     reinstated_by: string | null
     reinstate_note: string | null
+    elapsed_sec: number | null
+    resume_deadline: string | null
   }
   events: { kind: string; at: string; detail: Record<string, unknown> }[]
   summary: {
@@ -557,6 +559,9 @@ function fmtGap(sec: number | null): string {
 function InterruptionPanel({ attemptId }: { attemptId: string }) {
   const [data, setData] = useState<InterruptionResp | null>(null)
   const [note, setNote] = useState('')
+  // 복구 후 응시 가능 기한(일). **회차 응시 기간과 무관하게** 이 기간은 열린다 —
+  // 마지막 날 사고를 다음 날 처리하면 회차가 이미 끝나 있어서, 이게 없으면 복구가 성립하지 않는다.
+  const [graceDays, setGraceDays] = useState(7)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -573,14 +578,17 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
   if (!data) return null
   const { attempt, summary, events } = data
   // 중단 흔적이 전혀 없는 평범한 응시에는 아무것도 띄우지 않는다(모달을 어지럽히지 않기 위해).
-  if (attempt.status !== 'voided' && summary.reentryCount === 0 && !attempt.reinstated_at) return null
+  // 진행중인데 오래 끊겨 있는 응시도 보여준다 — 응시창이 닫힌 뒤 사고가 접수되면 무효가 아니라
+  // in_progress 로 남아 있고, 그게 바로 복구가 필요한 상태다(start-exam 의 resume_blocked).
+  const stalled = attempt.status === 'in_progress' && Boolean(attempt.last_seen_at)
+  if (attempt.status !== 'voided' && !stalled && summary.reentryCount === 0 && !attempt.reinstated_at) return null
 
   async function reinstate() {
     if (!note.trim()) { setMsg('복구 사유를 적어주세요.'); return }
     setBusy(true)
     setMsg('')
     try {
-      const r = await callFunction<{ note?: string }>('admin', { action: 'examReinstate', attemptId, note })
+      const r = await callFunction<{ note?: string }>('admin', { action: 'examReinstate', attemptId, note, graceDays })
       setMsg(r.note ?? '복구했습니다.')
       setNote('')
       await load()
@@ -635,16 +643,29 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
       </div>
 
       {attempt.reinstated_at ? (
-        <p style={{ marginTop: 10, fontSize: 13 }}>
+        <p style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
           <b>복구됨</b> — {fmtDT(attempt.reinstated_at)} · {attempt.reinstated_by} · 사유: {attempt.reinstate_note}
+          {/* 아직 안 들어온 상태 = 시계가 멈춰 있다. 언제까지 들어와야 하는지가 문의 응대의 핵심이다. */}
+          {attempt.resume_deadline && (
+            <>
+              <br />
+              응시 기한 <b>{fmtDT(attempt.resume_deadline)}</b> 까지 · 남은 시간{' '}
+              {attempt.elapsed_sec != null ? `이미 쓴 ${Math.floor(attempt.elapsed_sec / 60)}분 제외` : '-'} ·
+              시계는 응시자가 다시 들어오는 순간부터 갑니다.
+            </>
+          )}
         </p>
-      ) : attempt.status === 'voided' ? (
+      ) : attempt.status !== 'submitted' ? (
         <div style={{ marginTop: 12 }}>
-          {/* ⚠️ 새 응시를 만들지 않는다 — 같은 응시로 돌아가므로 제한시간이 이어진다.
+          {/* ⚠️ 새 응시가 아니다 — 문항 세트는 그대로고 이미 쓴 시간도 돌려주지 않는다(남은 시간만 복원).
               "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다. */}
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
-            복구하면 <b>그 응시로 다시 들어갈 수 있습니다</b>. 제한시간은 처음 시작 시각 기준으로 계속 흐릅니다 —
-            시간이 이미 지났다면 응시권을 새로 발급해 주세요.
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.6 }}>
+            복구하면 <b>중단 시점에 멈춘 시계</b>로 다시 들어갈 수 있습니다 — 이미 쓴{' '}
+            <b>{Math.floor(((attempt.last_seen_at && attempt.started_at
+              ? Math.max(0, Date.parse(attempt.last_seen_at) - Date.parse(attempt.started_at))
+              : 0) / 60000))}분</b>
+            을 뺀 남은 시간이고, 시계는 <b>응시자가 실제로 다시 들어오는 순간부터</b> 갑니다.
+            아래 기한 안에는 <b>응시 기간이 끝났어도</b> 들어갈 수 있습니다.
           </p>
           <input
             value={note}
@@ -652,6 +673,18 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
             placeholder="복구 사유 (예: 정전 문의 접수, 닫힘 신호 없음 확인)"
             style={{ width: '100%', padding: '8px 10px', marginBottom: 6 }}
           />
+          <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>
+            응시 기한{' '}
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={graceDays}
+              onChange={(e) => setGraceDays(Number(e.target.value))}
+              style={{ width: 64, padding: '4px 6px' }}
+            />{' '}
+            일 이내
+          </label>
           <button className="admin-mini" onClick={reinstate} disabled={busy}>
             {busy ? '복구 중…' : '이 응시 복구'}
           </button>

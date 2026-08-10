@@ -177,6 +177,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ---------- ④-b 복구 유예 ----------
+    // 관리자가 복구해 준 응시는 **회차의 응시 기간이 닫혔어도** 들어갈 수 있어야 한다.
+    // 안 그러면 "마지막 날 저녁에 PC 가 뻗음 → 다음 날 처리 → 응시창이 이미 닫힘" 에서
+    // 복구가 아무 의미가 없다(관리자가 24시간 상주하지 않는 한 그게 흔한 경우다).
+    // 유예 기한은 복구할 때 관리자가 정한다(exam_attempts.resume_deadline).
+    const resumeGrace = new Map<string, string>() // ticket_id → 유예 기한
+    {
+      const { data: gRows } = await admin
+        .from('exam_attempts')
+        .select('ticket_id, resume_deadline')
+        .eq('user_id', user.id)
+        .not('reinstated_at', 'is', null)
+        .not('ticket_id', 'is', null)
+        .gt('resume_deadline', new Date(now).toISOString())
+      for (const r of (gRows ?? []) as { ticket_id: string | null; resume_deadline: string }[]) {
+        if (r.ticket_id) resumeGrace.set(r.ticket_id, r.resume_deadline)
+      }
+    }
+
     // ---------- ⑤ 지금 쓸 수 있는 응시권만 남기기 ----------
     const usable: { ticket: TicketRow; round: RoundRow }[] = []
     let blocked: string | null = null // 후보가 0장일 때 사용자에게 보여줄 첫 번째 사유
@@ -193,7 +212,10 @@ Deno.serve(async (req) => {
         blocked ??= '결제가 취소·환불된 응시권입니다. 운영팀에 문의해 주세요.'
         continue
       }
-      if (t.expires_at && Date.parse(t.expires_at) < now) {
+      // 관리자가 복구해 준 응시권 — 아래 기간 검사들을 건너뛴다(그게 복구의 의미다).
+      // 유효기간·응시창은 둘 다 회차 일정에서 나오는 값이라, 복구 유예가 있으면 둘 다 넘긴다.
+      const grace = resumeGrace.get(t.id)
+      if (!grace && t.expires_at && Date.parse(t.expires_at) < now) {
         blocked ??= '응시권 유효기간이 지났습니다.'
         continue
       }
@@ -202,7 +224,7 @@ Deno.serve(async (req) => {
         continue
       }
       // 응시 창(KST) 판정의 정본. 여기서 직접 날짜를 비교하지 않는다.
-      const open: boolean = examWindowOpen(round)
+      const open: boolean = examWindowOpen(round) || Boolean(grace)
       if (!open) {
         const b = windowBounds(round)
         // 경계가 아예 없는 회차(일정 미정·상시)는 '아직/지남' 어느 쪽도 아니다 — 뭉뚱그리지 말고 따로 말한다.
@@ -215,6 +237,30 @@ Deno.serve(async (req) => {
     }
 
     if (usable.length === 0) {
+      // ⚠️ 진행 중이던 응시가 있는데 기간이 닫혀 못 들어가는 경우를 '응시권 없음' 으로 끝내면 안 된다.
+      //    (마지막 날 저녁에 PC 가 뻗은 사람이 정확히 여기로 온다.) 그냥 '기간이 지났습니다' 를 보면
+      //    응시자는 자기 응시가 어떻게 됐는지 모른 채 끝나고, 무효 판정도 안 나서 관리자가 복구할 대상도 없다.
+      //    사유와 문의 경로를 주고, 관리자가 이 응시를 집어 복구할 수 있게 id 를 같이 내려준다.
+      const { data: stuck } = await admin
+        .from('exam_attempts')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('status', ['in_progress', 'expired'])
+        .not('ticket_id', 'is', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (stuck) {
+        return json(
+          {
+            error:
+              '진행 중이던 응시가 있으나 지금은 들어갈 수 없습니다(응시 기간 종료 등). 기기·네트워크 문제로 중단되셨다면 문의해 주세요 — 중단 기록을 확인해 남은 시간 그대로 다시 응시하실 수 있게 처리해 드립니다.',
+            code: 'resume_blocked',
+            attemptId: stuck.id,
+          },
+          403,
+        )
+      }
       return json({ error: blocked ?? '사용할 수 있는 응시권이 없습니다.', code: 'no_ticket' }, 403)
     }
 
@@ -320,7 +366,7 @@ Deno.serve(async (req) => {
     //    즉 응시권 1장으로는 **끝까지 같은 응시 하나**만 존재한다 — 재개는 그 응시로 돌아가는 것이다.
     const { data: live } = await admin
       .from('exam_attempts')
-      .select('id, started_at, status, last_seen_at, answered_count, entry_count, reinstated_at')
+      .select('id, started_at, status, last_seen_at, answered_count, entry_count, reinstated_at, elapsed_sec')
       .eq('ticket_id', ticket.id)
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
@@ -389,18 +435,29 @@ Deno.serve(async (req) => {
         )
       }
 
-      // 복구된 응시 — 그 응시로 돌아간다. 새로 만들지 않으므로 started_at 이 유지되고
-      // 제한시간이 초기화되지 않는다(TTL 을 넘겼으면 submit-exam 이 제출을 거부한다 — 그게 정상 동작이다).
-      if (live.status === 'expired') {
-        await admin.from('exam_attempts').update({ status: 'in_progress' }).eq('id', live.id).eq('status', 'expired')
-      }
-      // 복구분을 다 쓰면 다음 이탈부터는 다시 무효다 — 복구는 1회권이라는 뜻.
+      // 복구된 응시 — 그 응시로 돌아간다(문항 세트는 그대로).
+      //
+      // ⛔ **시계를 여기서 되돌린다.** 복구 시점이 아니라 **지금(재진입 시점)** 이어야 한다 —
+      //    관리자가 복구를 눌러놓고 응시자가 몇 시간 뒤에 들어오면, 복구 때 맞춰둔 시간은
+      //    이미 다 흘러가 있다. 끊긴 순간 멈춰둔 시계를 응시자가 돌아온 지금 다시 트는 것이다.
+      //    elapsed_sec = 중단 시점까지 실제로 쓴 시간이므로, started_at 을 `지금 - 쓴 시간` 으로 옮기면
+      //    **남은 시간이 그대로 복원**된다(처음부터 다시가 아니다 — 이미 쓴 시간은 돌려주지 않는다).
+      const elapsed = Math.max(0, Math.floor(Number((live as { elapsed_sec?: number }).elapsed_sec ?? 0)))
+      const resumedStart = new Date(now - elapsed * 1000).toISOString()
       await admin
         .from('exam_attempts')
-        .update({ entry_count: entries + 1, reinstated_at: null })
+        .update({
+          status: 'in_progress',
+          started_at: resumedStart,
+          // 복구분을 다 쓰면 다음 이탈부터는 다시 무효다 — 복구는 1회권이라는 뜻.
+          reinstated_at: null,
+          resume_deadline: null,
+          elapsed_sec: null,
+          entry_count: entries + 1,
+        })
         .eq('id', live.id)
       attemptId = live.id as string
-      startedAt = live.started_at as string
+      startedAt = resumedStart
     } else {
       // 이 응시권으로 만든 응시가 아직 없다. 다른 응시권으로 진행중인 응시가 있으면 정리한다(동시 1개 강제).
       await admin
