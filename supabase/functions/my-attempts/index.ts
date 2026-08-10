@@ -7,7 +7,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang, projText } from '../_shared/lib.ts'
 import { makeCertNo, subjectOf, gradeOfTitle } from '../_shared/cert.ts'
-import { examWindowOpen } from '../_shared/exam-tickets.ts'
+import { examWindowOpen, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
 const PASS_RATIO = 0.6
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
@@ -103,27 +103,24 @@ Deno.serve(async (req) => {
 
       // 결제·응시권 생존 재확인 — start-exam 은 응시 시작 때 강제하지만, 그 뒤 환불(차지백)·관리자
       // 회수(void)는 시간상 더 뒤라 발급 시점에 다시 본다. 자격번호는 한번 나가면 회수 불가라 여기서 막는다.
-      if (a.ticket_id) {
-        const { data: tk } = await admin
-          .from('exam_tickets')
-          .select('status, source, payment_id')
-          .eq('id', a.ticket_id)
+      // ⚠️ 같은 판정을 payments/create(발급비 결제)도 쓴다 — 판정이 갈리면 "결제는 됐는데 발급만 거절"이 생긴다.
+      const alive = await ticketSourceAlive(admin, (a.ticket_id as string | null) ?? null)
+      if (!alive.ok) return json({ error: alive.error }, 409)
+
+      // 자격증 발급비 — 최초 발급은 발급비 결제(cert paid)가 있어야 한다. 재발급(이미 cert_no·토큰 있음)은 무료.
+      //   결제 우회로 발급하지 못하게, 채번 전에 이 응시(product_ref = attempt id)의 paid cert 주문을 확인한다.
+      if (!(a.verify_token && a.cert_no)) {
+        const { data: certPaid } = await admin
+          .from('payments')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('product_type', 'cert')
+          .eq('product_ref', a.id)
+          .eq('status', 'paid')
           .maybeSingle()
-        if (tk) {
-          if (tk.status === 'void') {
-            return json({ error: '취소·회수된 응시권의 자격증은 발급할 수 없습니다.' }, 409)
-          }
-          if (tk.source === 'pg' && tk.payment_id) {
-            const { data: pay } = await admin
-              .from('payments')
-              .select('status')
-              .eq('id', tk.payment_id)
-              .maybeSingle()
-            if (pay && pay.status !== 'paid') {
-              return json({ error: '결제가 취소·환불된 응시의 자격증은 발급할 수 없습니다.' }, 409)
-            }
-          }
-        }
+        // ⚠️ 프론트(Certificate.tsx)가 이 문자열로 결제 화면 전환을 판단한다 — 같은 핸들러의
+        //    invalid_name_roman·name_roman_required 와 같은 기계 코드 관례다. 문구로 바꾸지 말 것.
+        if (!certPaid) return json({ error: 'cert_fee_required', needsPayment: true }, 402)
       }
 
       // 영문 성명 검증 — 채번보다 먼저 통과시킨다. 검증 실패(400)가 자격번호 시퀀스를 소각하면 안 된다.

@@ -5,7 +5,9 @@ import { useInputGuard, useLeaveGuard } from '../hooks/useAntiCheat'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import SebRequired from '../components/SebRequired'
+import SebExitButton from '../components/SebExitButton'
 import { SEB_REQUIRED, isSEB } from '../lib/seb'
+import { examAuthHeaders } from '../lib/examToken'
 import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
@@ -62,9 +64,15 @@ export default function CbtRunner() {
           <div className="text-[40px] mb-3">⚠️</div>
           <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('run.lost_title')}</h2>
           <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('run.lost_sub')}</p>
-          <button className="bg-primary text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:shadow-lg transition-all" onClick={() => navigate('/exam')}>
-            {t('run.to_exam')}
-          </button>
+          {/* ⚠️ SEB 안에서는 '/exam' 으로 보내봐야 거기도 나가는 길이 없다 — 잠금 브라우저에선
+              종료 버튼만 준다(뒤로가기·주소창이 막혀 있어 이게 유일한 탈출구다). */}
+          {isSEB() ? (
+            <SebExitButton className="bg-primary text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:shadow-lg transition-all" />
+          ) : (
+            <button className="bg-primary text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:shadow-lg transition-all" onClick={() => navigate('/exam')}>
+              {t('run.to_exam')}
+            </button>
+          )}
         </div>
       </div>
     )
@@ -163,10 +171,12 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       return
     }
     try {
+      // ⚠️ SEB 안에는 로그인 세션이 없다 — /exam/seb 가 받아둔 시험 전용 토큰을 헤더로 실어야 제출이 된다.
+      //    일반 브라우저에서는 토큰이 없어 헤더가 undefined 이고, 서버가 평소처럼 세션을 본다.
       const res = await callFunction<SubmitExamResponse>('submit-exam', {
         attemptId: start.attemptId,
         answers: buildAnswers(),
-      })
+      }, examAuthHeaders())
       // 보안 브라우저: 완료 화면을 거쳐 SEB 종료(결과는 발표일 이후 마이페이지). 일반 브라우저(개발): 결과 페이지로.
       if (isSEB()) {
         navigate('/exam/complete', { state: { mode: 'submitted', seb: true }, replace: true })
@@ -195,7 +205,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     // 실제 시험만 서버에 무효 기록(모의는 백엔드 호출 없음). 기록 실패해도 응시자는 나가도록 둔다(서버는 TTL 만료로 정리).
     if (!practice) {
       try {
-        await callFunction('submit-exam', { attemptId: start.attemptId, answers: [], voided: true })
+        await callFunction('submit-exam', { attemptId: start.attemptId, answers: [], voided: true }, examAuthHeaders())
       } catch {
         /* 무효 기록 실패 — 그래도 종료 진행 */
       }

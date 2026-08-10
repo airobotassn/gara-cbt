@@ -183,6 +183,45 @@ export function ticketExpired(ticket: ExamTicketRow, round: ExamRoundRow | null,
 
 // ---------- 판매 가능 판정 ----------
 
+/**
+ * (트랙 × 급수) → 정가(원). **정가 단일 소스 = exam_fees** 이고 키 규칙 `${track}_${tier}` 는
+ * src/lib/fees.ts 의 feeKey() 와 같은 규칙이다. 행이 없으면 0 을 돌려준다 —
+ * "0/미설정이면 판매 불가" 판정은 호출부가 한다(응시료·발급비가 같은 문구를 쓰지 않기 때문).
+ * ⚠️ 폴백 금액을 지어내는 코드를 여기든 호출부든 넣지 말 것. 돈 받는 값이라 폴백이 곧 사고다.
+ */
+export async function lookupExamFee(admin: SupabaseClient, track: string, tier: string): Promise<number> {
+  const { data } = await admin.from('exam_fees').select('amount').eq('key', `${track}_${tier}`).maybeSingle()
+  const amount = Math.floor(Number(data?.amount ?? 0))
+  return Number.isFinite(amount) ? amount : 0
+}
+
+export type ExamFeeErrorCode = 'tier_unknown' | 'no_fee'
+
+export type ExamFeeResult =
+  | { ok: true; tier: string; track: string; amount: number }
+  | { ok: false; code: ExamFeeErrorCode; error: string; status: number }
+
+/**
+ * 급수 하나의 정가만 뽑는다 — **회차·접수창과 무관**하다.
+ *
+ * ⚠️ 자격증 발급비(payments 의 cert)가 이걸 쓴다. 발급비는 "그 급수의 응시료와 같은 금액"인데,
+ *    발급 시점은 성적 공개 후 = **접수 기간이 이미 끝난 뒤**라 resolveExamOffer 를 쓰면
+ *    apply_closed 로 막혀 자격증을 영영 못 산다. 판매 가능 판정(회차·접수창·1인1권)은
+ *    응시권 갈래의 규칙이지 발급비의 규칙이 아니다.
+ */
+export async function resolveExamFee(admin: SupabaseClient, tier: string): Promise<ExamFeeResult> {
+  const tkey = String(tier ?? '').trim().toLowerCase()
+  const { data: tierRow } = await admin.from('exam_tiers').select('tier, track').eq('tier', tkey).maybeSingle()
+  if (!tierRow) return { ok: false, code: 'tier_unknown', error: '알 수 없는 급수입니다.', status: 404 }
+  const tierKey = tierRow.tier as string
+  const track = tierRow.track as string
+  const amount = await lookupExamFee(admin, track, tierKey)
+  if (amount <= 0) {
+    return { ok: false, code: 'no_fee', error: '아직 금액이 책정되지 않은 급수입니다.', status: 400 }
+  }
+  return { ok: true, tier: tierKey, track, amount }
+}
+
 export type ExamOfferErrorCode =
   | 'bad_ref'
   | 'round_not_found'
@@ -271,13 +310,11 @@ export async function resolveExamOffer(
     return { ok: false, code: 'apply_closed', error: '접수 기간이 아닙니다.', status: 400 }
   }
 
-  // 정가 단일 소스 = exam_fees. 키 규칙 `${트랙}_${티어}` 는 src/lib/fees.ts 의 feeKey() 와 같은 규칙이다.
+  // 정가 단일 소스 = exam_fees(위 lookupExamFee 가 키 규칙의 유일한 정의처).
   // ⚠️ 행이 없거나 0원이면 **판매 불가**다. CARIS-Ⅱ(t2_*)는 일부러 행이 없고(결제 미개방),
   //    0원은 exam_fees 의 default·관리자 빈 입력으로 자연스럽게 생긴다 — 둘 다 무료 응시권이 되면 안 된다.
-  const feeKey = `${track}_${tierKey}`
-  const { data: fee } = await admin.from('exam_fees').select('amount').eq('key', feeKey).maybeSingle()
-  const amount = Math.floor(Number(fee?.amount ?? 0))
-  if (!Number.isFinite(amount) || amount <= 0) {
+  const amount = await lookupExamFee(admin, track, tierKey)
+  if (amount <= 0) {
     return { ok: false, code: 'no_fee', error: '아직 응시료가 책정되지 않은 급수입니다.', status: 400 }
   }
 
@@ -480,6 +517,38 @@ export async function voidTicket(
     .select('id')
     .maybeSingle()
   return { voided: Boolean(data) }
+}
+
+/**
+ * 이 응시의 근거(응시권·그 결제)가 아직 살아 있나. **자격증 갈래 전용 판정**이다.
+ *
+ * start-exam 은 응시 시작 시점에 응시권을 강제하지만, 환불(차지백)·관리자 회수(void)는 그보다 뒤라
+ * 자격증을 팔거나(payments/create) 발급할(my-attempts) 때 다시 봐야 한다. 자격번호는 한번 나가면
+ * 회수가 안 되고, 돈은 받았는데 발급을 거절하면 환불거리가 되므로 **두 곳이 같은 판정을 써야 한다**
+ * (한쪽에만 있으면 결제는 통과하고 발급만 막히는 구간이 생긴다).
+ *
+ * ticketId 가 없는 응시(응시권 도입 전 기록·SEB 익명 경로 잔재)는 막지 않는다 — 근거가 없는 것과
+ * 근거가 죽은 것은 다르고, 옛 합격자의 자격증을 소급해 막을 이유가 없다.
+ */
+export async function ticketSourceAlive(
+  admin: SupabaseClient,
+  ticketId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!ticketId) return { ok: true }
+  const { data: tk } = await admin
+    .from('exam_tickets')
+    .select('status, source, payment_id')
+    .eq('id', ticketId)
+    .maybeSingle()
+  if (!tk) return { ok: true } // 응시권 행이 사라진 건 판정 불가 — 자격증을 막을 근거로 쓰지 않는다
+  if (tk.status === 'void') return { ok: false, error: '취소·회수된 응시권의 자격증은 발급할 수 없습니다.' }
+  if (tk.source === 'pg' && tk.payment_id) {
+    const { data: pay } = await admin.from('payments').select('status').eq('id', tk.payment_id).maybeSingle()
+    if (pay && pay.status !== 'paid') {
+      return { ok: false, error: '결제가 취소·환불된 응시의 자격증은 발급할 수 없습니다.' }
+    }
+  }
+  return { ok: true }
 }
 
 /** 단건 조회(소유자 확인 포함). 소진 실패 후 재진입 판정에 쓴다. */

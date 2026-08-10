@@ -2,7 +2,8 @@
 //   결과 공개 시각 = 제출 +7일. ⚠️ 점수는 반환하지 않는다(공개일 이후 get-exam-result 로만).
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser } from '../_shared/lib.ts'
+import { adminClient } from '../_shared/lib.ts'
+import { getExamActor } from '../_shared/exam-token.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
 import { matchShort, parseAcceptedAnswers } from '../_shared/normalize.ts'
 
@@ -30,8 +31,12 @@ Deno.serve(async (req) => {
       return json({ error: '잘못된 요청입니다.' }, 400)
     }
 
-    const user = await getUser(req)
-    if (!user) return json({ error: '인증이 필요합니다.' }, 401)
+    // 평소엔 로그인 세션, SEB 안에서는 시험 전용 토큰(_shared/exam-token.ts).
+    // ⚠️ 토큰의 응시권 묶임은 여기서 다시 확인하지 않는다 — 아래 소유자 검사(attempt.user_id)가
+    //    이미 "내 응시만" 으로 좁히고, 응시권↔응시 짝은 start-exam 이 만들 때 확정했다.
+    const actor = await getExamActor(req)
+    if (!actor) return json({ error: '인증이 필요합니다.' }, 401)
+    const user = actor.user
 
     const admin = adminClient()
 

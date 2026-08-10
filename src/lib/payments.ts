@@ -9,7 +9,7 @@ import { callFunction } from './supabase'
 export const TOSS_CLIENT_KEY = (import.meta.env.VITE_TOSS_CLIENT_KEY as string | undefined) ?? ''
 export const isPaymentConfigured = Boolean(TOSS_CLIENT_KEY)
 
-export type ProductType = 'ebook' | 'exam'
+export type ProductType = 'ebook' | 'exam' | 'cert'
 
 export interface CreateOrderResp {
   /** 0원 상품 — 결제창을 타지 않고 서버가 바로 지급했다는 뜻. */

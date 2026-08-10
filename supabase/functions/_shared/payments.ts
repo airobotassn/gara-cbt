@@ -14,9 +14,9 @@
 //    adminClient() 가 준 클라이언트와 여기 타입이 서로 안 맞는다.
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { getProvider, type ProviderPayment } from './payment-provider.ts'
-import { grantExamTicket, parseExamRef, resolveExamOffer, voidTicket } from './exam-tickets.ts'
+import { grantExamTicket, parseExamRef, resolveExamFee, resolveExamOffer, voidTicket } from './exam-tickets.ts'
 
-export type ProductType = 'ebook' | 'exam'
+export type ProductType = 'ebook' | 'exam' | 'cert'
 
 export interface PaymentRow {
   id: string
@@ -87,6 +87,45 @@ export async function resolveProduct(
       // orderName 은 결제창·카드 명세서에 뜬다. 토스 상한 100자.
       orderName: title.slice(0, 100),
       ref: book.id as string,
+    }
+  }
+
+  // 자격증 발급비 — product_ref = attemptId(응시 하나). **발급비 = 그 응시 급수의 응시료와 동일**하다.
+  //   금액을 여기서 지어내지 않고 exam_fees 를 그대로 다시 읽는다(정가 단일 출처).
+  //   소유자·합격 판정은 create 핸들러가 uid 로 한다(여기선 금액만 뽑는다).
+  //
+  // ⚠️ **resolveExamOffer 를 쓰면 안 된다.** 그건 "응시권을 지금 팔 수 있나"까지 보는 함수라
+  //    접수창(applyWindowOpen)을 강제하는데, 자격증 발급은 성적 공개 후 = 접수가 끝난 지 한참 뒤다.
+  //    그대로 두면 모든 자격증 결제가 '접수 기간이 아닙니다'(400)로 막힌다. 급수 정가만 필요하다.
+  // ⚠️ 응시권의 price_paid(실제 낸 돈)를 쓰지 않는 이유 = 관리자 수기 발급분이 0원이라 그대로 쓰면
+  //    발급비 0원 = 무료 자격증이 된다. 정가표에 없는 급수는 아래에서 판매 불가로 접는다.
+  if (productType === 'cert') {
+    const { data: att } = await admin
+      .from('exam_attempts')
+      .select('id, exam_id')
+      .eq('id', productRef)
+      .maybeSingle()
+    if (!att || !att.exam_id) return { ok: false, error: '응시 정보를 찾을 수 없습니다.', status: 404 }
+    const { data: ex } = await admin
+      .from('exams')
+      .select('tier, title')
+      .eq('id', att.exam_id as string)
+      .maybeSingle()
+    if (!ex) return { ok: false, error: '시험 정보를 찾을 수 없습니다.', status: 404 }
+    const fee = await resolveExamFee(admin, ex.tier as string)
+    if (!fee.ok) {
+      // 정가 미책정 급수(관리자 수기 발급으로만 응시한 t2 등) — 임시 금액으로 때우지 않고 막는다.
+      // 열려면 관리자 화면에서 그 급수 금액만 채우면 된다(코드 변경 불필요).
+      const error = fee.code === 'no_fee' ? '자격증 발급비가 아직 책정되지 않았습니다.' : fee.error
+      return { ok: false, error, status: fee.status }
+    }
+    return {
+      ok: true,
+      amount: fee.amount,
+      // 결제창·카드 명세서에 뜨는 문구. exams.title 은 관리자가 넣은 한국어 고정값이라 그대로 쓴다
+      // (회차명 다국어 투영은 응시료 쪽 규칙이고, 여기선 급수명이 곧 자격명이라 브랜드 표기가 맞다).
+      orderName: `자격증 발급 · ${(ex.title as string) ?? ''}`.slice(0, 100),
+      ref: productRef, // attemptId(UUID) — 정규화 대상 아님
     }
   }
 
@@ -174,6 +213,13 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
     })
     // 23505 = unique 위반 = 이미 보유 → 지급 완료로 본다.
     if (error && (error as { code?: string }).code !== '23505') throw new Error(error.message)
+    return
+  }
+
+  // 자격증 발급비 — 지급물은 '발급 권한'이다. 실제 자격번호 채번은 my-attempts {issue} 가
+  //   이 cert 결제(status='paid')를 확인한 뒤에 한다. 여기선 만들 지급물이 없다(멱등 no-op).
+  //   결제가 paid + fulfilled 로 남고, 그게 "발급비를 냈다"는 게이트 증표다.
+  if (row.product_type === 'cert') {
     return
   }
 

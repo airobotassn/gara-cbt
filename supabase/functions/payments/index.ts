@@ -4,7 +4,8 @@
 //   - status    : 결과 화면 새로고침·재진입용(승인은 하지 않는다)
 //   - reconcile : 미완결/어긋난 결제를 토스에 다시 물어 수렴(운영·크론 전용, 시크릿 헤더 필요)
 //
-//   상품은 두 종류다: ebook(이북 열람권) · exam(자격검정 응시권, product_ref="<round_id>:<tier>").
+//   상품은 세 종류다: ebook(이북 열람권) · exam(자격검정 응시권, product_ref="<round_id>:<tier>")
+//                    · cert(자격증 발급비, product_ref=attemptId — 지급물이 없고 결제 행 자체가 발급 게이트다).
 //   응시료 갈래의 판매 가능 판정·금액·응시권 발급은 전부 _shared/exam-tickets.ts 가 단일 출처다.
 //
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것. verify_jwt 는 켜둔 채로 배포한다(관례).
@@ -22,9 +23,9 @@ import {
   type PaymentRow,
   type ProductType,
 } from '../_shared/payments.ts'
-import { findLiveTickets } from '../_shared/exam-tickets.ts'
+import { findLiveTickets, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
-const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam']
+const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert']
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -123,6 +124,33 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle()
         if (done) return json({ error: '이미 응시를 완료한 시험입니다.', owned: true }, 409)
+      }
+
+      // 자격증 발급비 — 본인의 '합격한·아직 미발급' 응시에만 결제창을 연다.
+      //   실제 자격번호 채번은 결제 성공 후 my-attempts {issue} 가 하고, 여기선 결제 자격만 건다.
+      if (productType === 'cert') {
+        const { data: att } = await admin
+          .from('exam_attempts')
+          .select('user_id, ticket_id, status, result_release_at, total_correct, total_questions, cert_no')
+          .eq('id', product.ref)
+          .maybeSingle()
+        if (!att || att.user_id !== uid) {
+          return json({ error: '본인의 응시만 자격증을 발급할 수 있습니다.' }, 403)
+        }
+        if (att.cert_no) return json({ error: '이미 발급된 자격증입니다.', owned: true }, 409)
+        const released =
+          att.status === 'submitted' &&
+          !!att.result_release_at &&
+          Date.now() >= new Date(att.result_release_at as string).getTime()
+        const passed =
+          released && att.total_correct != null && att.total_questions
+            ? (att.total_correct as number) >= Math.ceil((att.total_questions as number) * 0.6)
+            : false
+        if (!passed) return json({ error: '합격한 응시만 자격증을 발급할 수 있습니다.' }, 400)
+        // ⚠️ my-attempts 의 발급 게이트와 **같은 판정**을 결제 전에 미리 돌린다. 여기서 안 보면
+        //    환불·회수된 응시로 발급비를 받아놓고 발급 단계에서 거절하는 구간이 생긴다(= 환불거리).
+        const alive = await ticketSourceAlive(admin, (att.ticket_id as string | null) ?? null)
+        if (!alive.ok) return json({ error: alive.error }, 409)
       }
 
       // 무료 상품은 결제창을 타지 않는다(0원 결제는 애초에 불가). 바로 지급하고 끝낸다.

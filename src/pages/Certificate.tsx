@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
@@ -92,6 +92,33 @@ function joinRoman(first: string, last: string) {
   return `${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, ' ')
 }
 
+// 발급비 결제로 나갔다 돌아올 때 입력값을 넘기는 자리. 결제창은 페이지를 통째로 갈아엎으므로
+// React state 로는 못 넘기고, 돌아오는 경로도 /pay/success → /mypage → 여기라 location.state 도 못 쓴다.
+// ⚠️ **표시·재입력 편의용이다.** 발급 권한은 서버가 payments(cert·paid)로만 판정한다 — 이 값이 조작돼도
+//    발급이 열리지 않는다. 성·이름을 따로 담는 이유 = 실패 시 입력칸 두 개를 그대로 되살리기 위해서다.
+const PAY_KEY = { attempt: 'certIssueAttempt', last: 'certIssueLast', first: 'certIssueFirst' } as const
+
+function stashPayDraft(attemptId: string, last: string, first: string) {
+  try {
+    sessionStorage.setItem(PAY_KEY.attempt, attemptId)
+    sessionStorage.setItem(PAY_KEY.last, last)
+    sessionStorage.setItem(PAY_KEY.first, first)
+  } catch { /* 프라이빗 모드 — 결제 후 이름을 다시 입력받는다(발급 자체는 된다) */ }
+}
+
+/** 이 응시로 저장된 입력값을 꺼내고 **즉시 지운다**(아래 자동 발급의 무한 루프 방지 — 호출부 주석 참고). */
+function takePayDraft(attemptId: string): { last: string; first: string } | null {
+  try {
+    if (sessionStorage.getItem(PAY_KEY.attempt) !== attemptId) return null
+    const last = sessionStorage.getItem(PAY_KEY.last) ?? ''
+    const first = sessionStorage.getItem(PAY_KEY.first) ?? ''
+    for (const k of Object.values(PAY_KEY)) sessionStorage.removeItem(k)
+    return { last, first }
+  } catch {
+    return null
+  }
+}
+
 // 견본 데이터 — 급수만 승계하고 인물·번호·날짜는 전부 예시값으로 갈아끼운다.
 function sampleCert(base: CertData): CertData {
   const gradeFull = base.grade || gradeDisplay(base.qualification)
@@ -119,10 +146,14 @@ export default function Certificate() {
   const [issuedData, setIssuedData] = useState<CertData | null>(null)
   const [issuing, setIssuing] = useState(false)
   const [issueErr, setIssueErr] = useState('')
+  // 발급비 결제를 마치고 돌아온 경우 — 결제 전에 입력한 이름을 **첫 렌더에** 되살린다.
+  // effect 로 채우면 렌더가 한 번 더 돌고(set-state-in-effect), 그 사이 빈 입력칸이 한 번 깜빡인다.
+  // 꺼내는 즉시 세션에서 지운다 — 아래 자동 발급의 되풀이를 끊는 장치다(effect 주석 참고).
+  const [payDraft] = useState(() => takePayDraft(((location.state as CertData | null)?.attemptId) ?? ''))
   // 발급 신청 화면에서 입력받는 영문 성명 — 증서에 각인되는 유일한 이름이다.
   // 성·이름을 따로 받는다: 여권 표기를 옮겨 적을 때 어디까지가 성인지 사람마다 달라 한 칸이면 순서가 뒤죽박죽이 된다.
-  const [lastDraft, setLastDraft] = useState('')
-  const [firstDraft, setFirstDraft] = useState('')
+  const [lastDraft, setLastDraft] = useState(payDraft?.last ?? '')
+  const [firstDraft, setFirstDraft] = useState(payDraft?.first ?? '')
   // 발급 직전 각인 확인 — 이름은 발급 후 못 고치므로 결제 버튼과 실제 발급 사이에 한 단계 둔다.
   const [confirming, setConfirming] = useState(false)
   const romanJoined = joinRoman(firstDraft, lastDraft)
@@ -176,17 +207,17 @@ export default function Certificate() {
     setConfirming(true)
   }
 
-  // 발급 = 유료. 💳 PG 미연동이라 지금은 "결제 성공"을 가정하고 바로 발급한다(이북 구매와 같은 데모 방식).
-  // 결제 연동 시 이 함수 첫머리에 결제창 호출 + 결제 검증을 넣고, 검증 성공 뒤에만 issue 를 호출할 것.
+  // 발급 = 유료. 발급비를 아직 안 냈으면 서버가 402(cert_fee_required)를 주고, 그때 결제 화면으로 나간다.
+  // 결제가 끝나면 /pay/success → /mypage/attempts?cert=<id> → 이 화면으로 돌아와 아래 effect 가 자동 발급한다.
   //   nameRoman = 증서에 각인할 영문 성명. 서버가 형식을 다시 검증하고 발급 스냅샷으로 저장한다.
-  async function issueNow() {
+  //   ⚠️ 인자를 받으므로 onClick 에 그대로 물리지 말 것(MouseEvent 가 roman 으로 들어간다) — 반드시 () => issueNow().
+  async function issueNow(roman: string = romanJoined) {
     const id = data.attemptId
     if (!id || id === 'preview') {
       setIssueErr(t('cert.issue_no_attempt'))
       return
     }
-    const roman = romanJoined
-    if (!romanOk) {
+    if (!ROMAN_RE.test(roman)) {
       setIssueErr(t('cert.roman_invalid'))
       return
     }
@@ -203,12 +234,35 @@ export default function Certificate() {
       })
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
+      // 발급비 미결제(402) — 결제 화면으로 보낸다. 입력한 이름을 남겨 결제 후 다시 타이핑하지 않게 한다.
+      if (/cert_fee_required/.test(msg)) {
+        stashPayDraft(id, lastDraft, firstDraft)
+        navigate(`/checkout?type=cert&ref=${id}`)
+        return
+      }
       setIssueErr(/name_roman/.test(msg) ? t('cert.roman_invalid') : msg || t('cert.issue_failed'))
       setConfirming(false) // 확인창을 닫아야 카드 안의 에러 문구가 보인다
     } finally {
       setIssuing(false)
     }
   }
+
+  // 결제 후 복귀 — 결제 전에 입력·확인까지 마친 이름 그대로, 한 번 더 묻지 않고 바로 발급한다.
+  // ⚠️ 이름은 위 payDraft 가 세션에서 **꺼내면서 지웠다.** 남겨두면 결제를 취소하고 돌아온 사람이
+  //    이 화면에 들어올 때마다 자동발급 → 402 → 체크아웃 으로 튕겨 발급 화면을 영영 못 본다.
+  // 실패하면 입력칸이 채워진 이 화면에 에러가 남아 그대로 다시 누를 수 있다.
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    if (resumedRef.current || !payDraft || !preview) return
+    const id = data.attemptId
+    if (!id || id === 'preview') return
+    resumedRef.current = true
+    // Checkout.tsx 와 같은 모양 — 발급 요청은 effect 바깥(비동기 콜백)에서 상태를 만진다.
+    ;(async () => { await issueNow(joinRoman(payDraft.first, payDraft.last)) })()
+    // issueNow 는 매 렌더 새로 만들어지는 함수라 의존성에서 뺀다(넣으면 렌더마다 재실행된다).
+    // 실행 조건은 resumedRef 와 payDraft 의 1회성이 이미 묶고 있다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payDraft, preview, data.attemptId])
 
   // ===== 발급(결제) 전 = 결제 유도 화면 — 인증서는 한 픽셀도 그리지 않는다 =====
   // 취득 사실(급수·이름·취득일)과 발급하면 풀리는 것만 알려주고 결제로 보낸다.
@@ -312,7 +366,7 @@ export default function Certificate() {
               <p className="cert-confirm-name">{romanJoined}</p>
               <p className="cert-confirm-note">{t('cert.confirm_note')}</p>
               <div className="cert-confirm-actions">
-                <button className="exam-btn" onClick={issueNow} disabled={issuing}>
+                <button className="exam-btn" onClick={() => issueNow()} disabled={issuing}>
                   {issuing ? t('cert.issuing') : t('cert.confirm_ok')}
                 </button>
                 <button className="exam-btn-ghost" onClick={() => setConfirming(false)} disabled={issuing}>

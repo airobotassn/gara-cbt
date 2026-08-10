@@ -11,6 +11,8 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
 const raw = readFileSync('supabase/migrations/20260806170000_payments.sql', 'utf8');
+// 자격증 발급비(cert) — product_type 을 넓히는 후속 마이그레이션. 같이 적용해야 원장이 실제 운영과 같은 모양이 된다.
+const rawCert = readFileSync('supabase/migrations/20260807130000_payments_cert.sql', 'utf8');
 
 // pglite 엔 auth 스키마가 없다 — FK 만 떼고 나머지 DDL 은 원본 그대로 적용한다.
 const strip = (sql) => sql.replace(/\s+references auth\.users\(id\)(\s+on delete cascade)?/g, '');
@@ -33,6 +35,7 @@ await db.exec(`
   );
 `);
 await db.exec(strip(raw));
+await db.exec(strip(rawCert));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -77,6 +80,35 @@ for (const s of ['pending', 'waiting_deposit', 'paid', 'canceled', 'refunded', '
   const err = await failsWith(() => insertPayment(U2, { status: s, ref: `ref-${s}` }));
   rec(`status '${s}' 허용`, err, null);
 }
+
+// --- (3-b) product_type 은 세 가지만 ---
+// cert(자격증 발급비)는 지급물이 없어 "결제 행 자체가 발급 게이트"다 — 오타 타입이 저장되면
+// my-attempts 의 게이트 조회가 조용히 빗나가 발급비를 낸 사람이 발급을 못 받는다.
+const insertTyped = (type, ref) =>
+  db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1, $2, '테스트', $3, $4, 3000, 'pending', 'cus-test') returning id`,
+    [U2, `type-order-${++seq}`, type, ref],
+  );
+for (const ty of ['ebook', 'exam', 'cert']) {
+  rec(`product_type '${ty}' 허용`, await failsWith(() => insertTyped(ty, `tref-${ty}`)), null);
+}
+rec('알 수 없는 product_type 거부', (await failsWith(() => insertTyped('lecture', 'tref-x'))) !== null, true);
+// 같은 응시(product_ref)에 발급비를 두 번 낼 수 없다 — cert 도 기존 부분 유니크가 그대로 막는다.
+const ATT = '00000000-0000-0000-0000-0000000000c1';
+await db.query(
+  `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+   values ($1, 'cert-order-1', '자격증 발급', 'cert', $2, 3000, 'paid', 'cus-test')`,
+  [U1, ATT],
+);
+const dupCert = await failsWith(() =>
+  db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1, 'cert-order-2', '자격증 발급', 'cert', $2, 3000, 'paid', 'cus-test')`,
+    [U1, ATT],
+  ),
+);
+rec('⭐ 같은 응시의 발급비 이중 결제 거부', dupCert !== null, true);
 
 // --- (4) order_id 유니크 ---
 await insertPayment(U1, { orderId: 'ebook-dup-order' });

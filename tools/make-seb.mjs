@@ -21,6 +21,12 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <dict>
 \t<key>startURL</key>
 \t<string>${startURL}</string>
+\t<!-- SEB 실행 링크(sebs://…?h=<nonce>)의 쿼리스트링을 startURL 뒤에 붙여준다.
+\t     이게 켜져 있어야 SEB 안으로 로그인 인계표가 넘어간다 — 끄면 /exam/seb 가 표를 못 받아
+\t     "응시권을 결제한 계정으로 로그인하라"는 안내에서 더 못 나간다. 반드시 유지할 것.
+\t     (SEB 매뉴얼 Exam ▸ Query String Parameter ▸ Allow Query Parameter) -->
+\t<key>startURLAppendQueryParameter</key>
+\t<true/>
 \t<key>sebConfigPurpose</key>
 \t<integer>0</integer>
 \t<key>sendBrowserExamKey</key>

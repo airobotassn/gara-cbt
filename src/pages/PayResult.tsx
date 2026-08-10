@@ -80,12 +80,27 @@ export default function PayResult() {
         ? productHint()
         : ''
   const isExam = productType === 'exam'
+  const isCert = productType === 'cert'
 
   const goLibrary = () => navigate('/mypage/ebooks')
   const goStore = () => navigate('/ebooks')
   // 응시권은 마이페이지 '시험 응시 현황' 탭에 있다(별도 탭을 만들지 않았다 — 같은 물건의 앞뒤 상태라서).
   const goTickets = () => navigate('/mypage/attempts')
   const goPlan = () => navigate('/plan')
+
+  // 자격증 발급비는 **지급물이 없는 결제**다(정본 = payments 행 하나). 사용자에게 남은 마무리는
+  // "발급 버튼을 한 번 더 누르는 것"이라, 결제한 그 응시로 되돌려 발급이 자동으로 이어지게 한다.
+  //   ?cert=<attemptId> → MyPage 가 그 응시의 발급 화면을 열고 → Certificate 가 결제 전에 입력한
+  //   영문 성명으로 곧바로 발급한다. 응시 id 가 없으면(실패 화면 등) 목록까지만 데려간다.
+  const certRef = view.kind === 'done' && view.res.productType === 'cert' ? view.res.productRef : ''
+  const goCert = () => navigate(certRef ? `/mypage/attempts?cert=${certRef}` : '/mypage/attempts')
+
+  // CTA 는 상품이 셋(이북·응시권·자격증)이라 삼항을 화면마다 늘어놓지 않고 여기서 한 번만 고른다.
+  const okGo = isCert ? goCert : isExam ? goTickets : goLibrary
+  const okLabel = isCert ? t('pay.go_cert') : isExam ? t('pay.go_tickets') : t('ebook.go_library')
+  // 실패·재시도 — 자격증은 응시 내역에서 다시 발급을 누르는 게 재시도 경로다.
+  const retryGo = isCert ? goTickets : isExam ? goPlan : goStore
+  const retryLabel = isCert ? t('pay.go_attempts') : isExam ? t('pay.go_plan') : t('pay.retry')
 
   return (
     <div className="bg-background text-on-surface min-h-screen flex flex-col">
@@ -119,23 +134,23 @@ export default function PayResult() {
               <Icon name="hourglass_top" tone="neutral" />
               <Title>{t('pay.hold_title')}</Title>
               <Body>{t('pay.hold_body')}</Body>
-              <Cta onClick={isExam ? goTickets : goLibrary}>
-                {isExam ? t('pay.go_tickets') : t('ebook.go_library')}
-              </Cta>
+              <Cta onClick={okGo}>{okLabel}</Cta>
             </>
           )}
 
           {view.kind === 'done' && view.res.status === 'paid' && view.res.fulfilled && (
             <>
               <Icon name="check_circle" tone="ok" />
-              <Title>{isExam ? t('pay.exam_success_title') : t('pay.success_title')}</Title>
+              <Title>{isCert ? t('pay.cert_success_title') : isExam ? t('pay.exam_success_title') : t('pay.success_title')}</Title>
               <Body>
                 {view.res.orderName}
                 {typeof view.res.amount === 'number' ? ` · ${usd(view.res.amount, lang)}` : ''}
-                {/* 응시료는 '결제 완료'로 끝나면 안 된다 — 응시권이 어디 있고 언제 쓰는지까지 말해줘야 한다. */}
+                {/* 응시료는 '결제 완료'로 끝나면 안 된다 — 응시권이 어디 있고 언제 쓰는지까지 말해줘야 한다.
+                    자격증도 마찬가지로 아직 한 걸음 남았다(발급). 결제로 끝났다고 읽히면 안 된다. */}
                 {isExam && <span className="block mt-2">{t('pay.exam_success_body')}</span>}
+                {isCert && <span className="block mt-2">{t('pay.cert_success_body')}</span>}
               </Body>
-              <Cta onClick={isExam ? goTickets : goLibrary}>{isExam ? t('pay.go_tickets') : t('ebook.go_library')}</Cta>
+              <Cta onClick={okGo}>{okLabel}</Cta>
             </>
           )}
 
@@ -146,8 +161,10 @@ export default function PayResult() {
             <>
               <Icon name="account_balance" tone="neutral" />
               <Title>{t('pay.waiting_title')}</Title>
-              <Body>{isExam ? t('pay.exam_waiting_body') : t('pay.waiting_body')}</Body>
-              <Cta onClick={isExam ? goTickets : goStore}>{isExam ? t('pay.go_tickets') : t('ebook.go_store')}</Cta>
+              <Body>{isCert ? t('pay.cert_waiting_body') : isExam ? t('pay.exam_waiting_body') : t('pay.waiting_body')}</Body>
+              <Cta onClick={isCert ? goTickets : isExam ? goTickets : goStore}>
+                {isCert ? t('pay.go_attempts') : isExam ? t('pay.go_tickets') : t('ebook.go_store')}
+              </Cta>
             </>
           )}
 
@@ -156,7 +173,7 @@ export default function PayResult() {
               <Icon name="error" tone="bad" />
               <Title>{t('pay.fail_title')}</Title>
               <Body>{t('pay.fail_body')}</Body>
-              <Cta onClick={isExam ? goPlan : goStore}>{isExam ? t('pay.go_plan') : t('pay.retry')}</Cta>
+              <Cta onClick={retryGo}>{retryLabel}</Cta>
             </>
           )}
 
@@ -168,7 +185,7 @@ export default function PayResult() {
               {view.code && (
                 <p className="font-body-md text-[14px] text-on-surface-variant/70 mb-6">{view.code}</p>
               )}
-              <Cta onClick={isExam ? goPlan : goStore}>{isExam ? t('pay.go_plan') : t('pay.retry')}</Cta>
+              <Cta onClick={retryGo}>{retryLabel}</Cta>
             </>
           )}
         </div>

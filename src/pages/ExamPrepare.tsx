@@ -70,6 +70,32 @@ export default function ExamPrepare() {
     { ok: navigator.onLine, label: t('prep.chk_net') },
   ]
 
+  // SEB 열기 — 실행 링크에 **일회용 로그인 인계표**를 실어 보낸다.
+  //
+  // ⚠️ SEB 는 별도 브라우저 프로필이라 여기서 만든 로그인이 안 넘어가고, 그 안에서 구글 로그인도 불가능하다
+  //    (SEB 가 외부 사이트를 막고 구글도 이런 브라우저를 거부한다). 표가 없으면 SEB 안에서 응시를
+  //    시작할 방법이 아예 없다. 표는 SEB 안에서 시험 전용 토큰으로 교환된다(functions/seb-handoff).
+  // ⚠️ ticketId 는 필수다 — 어느 응시권으로 들어가는지 표에 박아야 토큰이 새어도 그 한 장 밖으로 못 나간다.
+  // ⚠️ 표는 **매번 새로 받는다**(재사용 금지). 1회용이고 수명도 짧아서, 안내 팝업의 '다시 열기' 가
+  //    앞서 쓴 표를 재사용하면 두 번째 클릭이 조용히 실패한다.
+  async function openSeb() {
+    if (!ticketId) {
+      setErr(t('prep.err_no_ticket'))
+      return
+    }
+    setStarting(true)
+    try {
+      const h = await callFunction<{ nonce: string }>('seb-handoff', { action: 'issue', ticketId })
+      setStarting(false)
+      // SEB 실행 시도 + 설치/실행 안내 팝업(안 열리면 여기서 바로 설치). SEB 안에선 /exam/seb 로 진입.
+      window.location.href = sebLaunchUrl(lang, h.nonce)
+      setSebNotice(true)
+    } catch (e) {
+      setStarting(false)
+      setErr(e instanceof Error ? e.message : t('prep.err_start'))
+    }
+  }
+
   async function startExam() {
     if (!isFullUser) {
       localStorage.setItem('examIntent', '1')
@@ -85,9 +111,7 @@ export default function ExamPrepare() {
         setErr(t('prep.err_seb_not_ready'))
         return
       }
-      // SEB 실행 시도 + 설치/실행 안내 팝업(안 열리면 여기서 바로 설치). SEB 안에선 /exam/seb 로 진입.
-      window.location.href = sebLaunchUrl(lang)
-      setSebNotice(true)
+      await openSeb()
       return
     }
 
@@ -129,7 +153,8 @@ export default function ExamPrepare() {
             </div>
             {/* 실행이 주 동작(재실행), 다운로드는 미설치일 때만 쓰는 보조 동작 */}
             <div className="flex flex-col gap-2.5">
-              <button onClick={() => { window.location.href = sebLaunchUrl(lang) }} className="w-full bg-primary-container text-on-primary font-title-md text-title-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center gap-2">
+              {/* ⚠️ 여기서도 openSeb() 을 부른다 — 인계표는 1회용·단명이라 앞서 만든 걸 다시 쓰면 조용히 실패한다. */}
+              <button onClick={() => { void openSeb() }} className="w-full bg-primary-container text-on-primary font-title-md text-title-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined text-[20px]">lock_open</span>
                 {t('seb.launch_btn')}
               </button>

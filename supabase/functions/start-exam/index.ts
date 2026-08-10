@@ -7,7 +7,8 @@
 //    exam_attempts 는 RLS 정책 0개라 이 함수가 유일한 생성 경로다 — 여기만 막으면 우회로가 없다.
 // ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser, pickLang, projText } from '../_shared/lib.ts'
+import { adminClient, pickLang, projText } from '../_shared/lib.ts'
+import { getExamActor } from '../_shared/exam-token.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
 import { EXAM_TICKET_COLS, consumeTicket, examWindowOpen } from '../_shared/exam-tickets.ts'
 import { ROOT_ADMIN } from '../admin/constants.ts'
@@ -69,12 +70,17 @@ Deno.serve(async (req) => {
 
     // body 에서 읽는 건 응시권 id(선택)와 표시 언어뿐이다.
     const body = await req.json().catch(() => ({}))
-    const reqTicketId: string | null =
+    const bodyTicketId: string | null =
       typeof body?.ticketId === 'string' && body.ticketId ? body.ticketId : null
     const lang = pickLang(body?.lang)
 
-    const user = await getUser(req)
-    if (!user) return json({ error: '인증이 필요합니다.' }, 401)
+    // 평소엔 로그인 세션, SEB 안에서는 시험 전용 토큰(_shared/exam-token.ts).
+    const actor = await getExamActor(req)
+    if (!actor) return json({ error: '인증이 필요합니다.' }, 401)
+    const user = actor.user
+    // ⚠️ SEB 토큰으로 들어왔으면 **토큰에 박힌 응시권만** 쓴다. body 값을 우선하면 토큰 하나로
+    //    그 계정의 다른 응시권까지 태울 수 있어, "표는 이 응시권 하나로 묶인다"는 전제가 무너진다.
+    const reqTicketId: string | null = actor.ticketId ?? bodyTicketId
     // 익명 세션에는 응시권이 붙을 수 없다(결제가 익명을 403 으로 막는다).
     // "로그인이 필요합니다" 만 쓰면 이미 익명 세션이 있는 사용자는 로그인된 줄 알고 같은 화면을 맴돈다 —
     // **결제한 그 계정** 으로 들어와야 한다는 뜻이 전달돼야 한다.

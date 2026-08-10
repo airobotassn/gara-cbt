@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -344,6 +344,7 @@ function EbookLibrary() {
 export default function MyPage() {
   const navigate = useNavigate()
   const { section } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const tab = section && TABS.some((t) => t.key === section) ? section : 'learning'
   const { isFullUser, user, loading: authLoading } = useAuth()
   const { t, lang } = useT()
@@ -362,6 +363,25 @@ export default function MyPage() {
       })
       .catch((e) => setErr(e instanceof Error ? e.message : t('my.load_failed')))
   }, [isFullUser, lang])
+
+  // 발급비 결제를 마치고 돌아온 길 — /pay/success 가 `?cert=<attemptId>` 를 달아 보낸다.
+  // 그 응시의 발급 화면을 대신 열어준다(거기서 결제 전에 입력한 이름으로 자동 발급된다).
+  // ⚠️ 목록이 도착한 뒤에만 움직인다 — attemptId 만으로는 증서에 넣을 급수·취득일을 만들 수 없다.
+  //    없는 id 면 아무 일도 안 한다(남의 응시 id 를 넣어봐야 내 목록에 없으니 열리지 않는다).
+  const certResumeRef = useRef(false)
+  useEffect(() => {
+    const id = searchParams.get('cert')
+    if (!id || !list || certResumeRef.current) return
+    const a = list.find((x) => x.attemptId === id)
+    if (!a) return
+    certResumeRef.current = true
+    // 파라미터를 지우고(주소만 교체) 발급 화면으로 넘긴다 — 안 지우면 발급 화면에서 뒤로가기 했을 때
+    // 이 화면이 다시 마운트되며 또 발급 화면으로 튕겨(ref 는 마운트마다 초기화) 뒤로가기가 막힌다.
+    setSearchParams({}, { replace: true })
+    void goCert(a)
+    // goCert 는 매 렌더 새로 만들어지는 함수라 의존성에서 뺀다(넣으면 목록이 바뀔 때마다 재실행).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, list])
 
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>
   const name = (meta.full_name as string) || (meta.name as string) || user?.email?.split('@')[0] || t('mypage.default_name')

@@ -219,13 +219,21 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - **코인 선물(2026-08-07)**: 뒤로가기 줄 오른쪽 `선물` 버튼(공유 옆) → 모달. **친구 초대 모달에 넣지 않는다**(같은 친구코드를 쓰지만 별개 진입점으로 두기로 결정). 두 버튼은 `.hub-backrow-act` 로 묶는다 — `.hub-backrow` 가 `space-between` 이라 낱개로 넣으면 셋이 흩어진다.
     - **즉시 이체다. 취소·회수 경로가 없다.** 방어선은 ① 코드 8자 완성 시 상대 **닉네임 자동 표시** ② 확인 단계 ③ nonce 재사용 셋뿐이다.
     - ⚠️ **`client_nonce` 를 호출마다 새로 만들면 안 된다.** 뽑기·상점은 `crypto.randomUUID()` 를 호출 시점에 만들지만(재시도해도 손해가 작다), 선물은 그러면 타임아웃 후 재시도가 **두 번 보내기**가 되고 되돌릴 수 없다. `Hub.tsx` 는 **모달을 열 때 1회** 만들어 전송 성공까지 고정한다(`giftNonce`).
-    - ⚠️ **잠금 순서가 이 기능의 핵심 한 줄이다.** 이체는 처음으로 두 사람의 `user_currency` 행을 잠근다 — `least/greatest` 로 **uuid 오름차순 고정**이 아니면 A→B / B→A 동시 실행이 데드락이다.
+    - ⚠️ **잠금 순서가 이 기능의 핵심 한 줄이다.** 이체는 처음으로 두 사람의 `user_currency` 행을 잠근다 — `least/greatest` 로 **uuid 오름차순 고정**이 아니면 A→B / B→A 동시 실행이 데드락이다(동시성 테스트의 음성 대조군이 실제로 데드락을 낸다).
+    - ⚠️ **`coin_gift` 안의 순서가 곧 정확성이다 — 잠금 → 멱등 재확인 → 쿨다운 → 잔액.** 셋 다 잠금 앞에 두면 동시 요청에서 조용히 깨진다(2026-08-07 실측):
+      · **쿨다운이 잠금 앞**이면 같은 발신자의 동시 2발이 나란히 "직전 없음"을 보고 **둘 다 통과**한다.
+      · **멱등 재확인이 쿨다운 뒤**면 같은 nonce 재시도가 `too_fast` 로 거절된다 — **돈은 이미 나갔는데 화면은 "너무 자주 보냈어요"** 를 띄워 사용자가 다시 보내게 만든다(8발 중 4발이 그렇게 거절됐다). 함수 머리의 `(0)` 검사는 잠금 전이라 경합에서 못 막는다.
     - ⚠️ **원장(`coin_transfers`)은 `on delete set null` + 닉네임 스냅샷**이다. 다른 테이블의 `cascade` 관례를 여기 적용하면 발신자가 탈퇴하는 순간 받은 사람의 이력이 사라져 "이 코인 왜 늘었지"에 영영 못 답한다. self CHECK 도 `sender_id <> recipient_id` 로 쓰면 양쪽 null 일 때 CHECK 이 깨져 SET NULL 자체가 실패한다.
     - **저장은 건별, 표시는 사람별 합산.** 허브는 **오늘 받은 것**만 상세로 보여주고 그 이전 미확인은 건수만(`giftsToday`/`giftsOlder`/`giftsUnseen` — `get-hub`). 서버는 미확인 전부를 내려준다(오늘로 자르면 하루 안 들어온 사람의 알림이 통째로 사라진다). 전체 이력은 모달 안 `선물 내역 ›`(`coin-gift` 의 `history`).
     - **금액 한도는 없다**(잔액이 곧 한도 — 코인은 시즌 점수·랭킹과 별개 지갑이라 파밍해도 순위가 안 흔들린다). 대신 **같은 사람에게 10초 쿨다운**만 건다 — 돈이 아니라 받는 사람의 알림을 지키는 장치다. 한도를 나중에 얹고 싶으면 원장이 이미 있으니 쿼리만 추가하면 된다.
     - **가루(dust)는 선물 대상이 아니다** — 뽑기 천장·한정템 교환가(150)가 설계 전제라 이체되면 천장이 무의미해진다.
     - 익명 계정은 송·수신 둘 다 불가. 수신은 따로 막지 않아도 된다 — `get-hub` 가 익명을 먼저 컷해서 `ensure_referral_code` 가 안 불리고, **코드가 없으면 지정 자체가 성립하지 않는다.**
-    - 검증: `tests/db/t-coin-gift.mjs`(48건, pglite). ⚠️ pglite 는 단일 커넥션이라 **진짜 동시 실행은 재현 못 한다** — 잠금 순서는 코드 리뷰 사항이다.
+    - 검증 두 벌. **pglite 로는 부족하다** — 단일 커넥션이라 트랜잭션을 두 개 못 열어서 이 기능에서 제일 위험한 것들을 구조적으로 재현할 수 없다.
+      · `tests/db/t-coin-gift.mjs` (48건, pglite · `test:db` 에 포함) — 제약·에러코드·원장 보존 등 단일 실행 규칙.
+      · `tests/db/t-coin-gift-concurrency.mjs` (17건, **진짜 Postgres** · `npm run test:concurrency`) — 데드락·같은 nonce 동시 8발·잔액 경합·쿨다운 경합·무작위 부하(총량 보존/음수 없음/원장 정합). Postgres 클라이언트는 Bun 내장(`Bun.sql`)이라 의존성이 없고, 커넥션마다 별도 `SQL` 인스턴스(`max:1`)를 만든다 — 풀에 맡기면 두 요청이 같은 커넥션을 타서 **동시 실행이 아니라 순차 실행**이 되고 테스트가 조용히 무의미해진다.
+      · 실행: `docker run -d --name cari-pgtest -e POSTGRES_PASSWORD=test -e POSTGRES_DB=caritest -p 55432:5432 postgres:17-alpine` (다른 DB 는 `CARI_TEST_PG`. ⚠️ 스키마를 지우므로 운영 DB 금지). `test:db` 에는 넣지 않았다 — Docker 가 없으면 실패하는 테스트를 기본 스위트에 두면 전체가 빨간불이 된다.
+      · ⚠️ **동시성 테스트에는 음성 대조군이 필수다.** 일부러 틀린 잠금 순서(`gift_naive`)가 실제로 데드락을 내는지 먼저 확인한다 — 이게 없으면 "데드락 0건"이 *순서가 옳아서*인지 *테스트가 애초에 경쟁을 못 만들어서*인지 구분할 수 없다. 같은 이유로 부하 단계는 "이체가 실제로 150건 넘게 일어났다"를 같이 본다(0건이어도 총량은 당연히 보존된다).
+      · ⚠️ 부하 단계는 시작 전 원장·잔액을 리셋한다. 앞 단계의 대조군 함수와 수동 UPDATE 가 원장을 안 거치고 잔액을 바꿔서, 안 지우면 **제품이 아니라 테스트 자신의 조작**을 총량 불일치로 잡아낸다.
   - **친구 초대는 도크 `초대하기` 모달 하나에서 다 끝난다** — 화면에 카드로 꺼내지 않는다(진입점 중복 제거). 모달 = 위(내 코드 + 복사) + 아래(친구 코드 입력).
     - 내 코드 = `profiles.referral_code` + `ensure_referral_code(uid)` RPC. **계정 귀속·영구 고정**이다(값이 있으면 그대로 반환, 없을 때만 1회 생성). 형식 `CARI`+4자.
     - 등록 = `redeem-referral` 함수. `profiles.referred_by` 가 비어있을 때만 박히고 **계정당 1회·되돌릴 수 없다** → 그때부터 입력칸이 잠긴다(FE 도 `referralUsed` 를 한 번 true 면 안 푼다).
@@ -258,7 +266,7 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   35개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+  functions/   36개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
                · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · toss.ts(토스 API 래퍼) · payments.ts(주문·금액검증·지급·대사)
@@ -280,6 +288,11 @@ supabase/
   - 옛 `computePoints`(0~10000)는 `user_progress.points` 컬럼 전용으로만 남았다(`leaderboard_v2` 등 구코드용).
   - 값을 바꾸면 **양쪽 `scoring.ts` + `tests/db/t-scoring-parity.mjs`** 를 같이 고쳐야 한다 — 패리티 테스트가 두 파일의 소스 바이트 동일성까지 본다.
 - **i18n**: 라이브러리 없이 `src/lib/i18n.tsx` 의 `D` 사전. 6개국어(ko·en·ja·zh·hi·vi). 문구 추가 시 6개 다 채울 것. `{var}` 보간.
+  - `/hub` 는 오래 한국어 하드코딩이었는데 2026-08-07 에 `hub.*` 132개로 일괄 이관했다. 그때 나온 함정 셋:
+    - ⚠️ **문구를 정규식으로 검사해 분기하지 말 것.** 허브 토스트가 아이콘을 `/부족|필요|오류/.test(문구)` 로 골랐는데, 번역하는 순간 전부 한쪽으로 쏠린다. 지금은 `toast.bad` 플래그를 들고 다닌다.
+    - ⚠️ **`t` 를 이펙트 의존성에 넣지 말 것.** 프로바이더가 `t` 를 렌더마다 새로 만들어서 deps 에 넣으면 이펙트가 매 렌더 돈다(선물 코드 자동조회가 그랬다). 실패 메시지를 **문구가 아니라 사전 키**로 state 에 담으면 이펙트가 `t` 를 안 쓰게 되고, 덤으로 언어를 바꿔도 메시지가 따라 바뀐다.
+    - ⚠️ **문장을 쪼개서 인라인 `<b>` 를 끼우지 말 것** — 어순이 언어마다 달라 번역이 불가능해진다(선물 확인 문구에서 뺐다).
+  - 파츠 이름은 `hub.part.<partKey>`, 활동 라벨은 `hub.earn.row.<kind>` 로 **키를 조립**한다. 상수 배열에 라벨을 같이 두면 표를 두 벌 관리하게 된다.
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
 - **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`).
   - ⚠️ **아바타를 %크기 소켓에 넣을 땐 `aspect-ratio: 1 !important` 를 반드시 같이 걸 것 — 안 그러면 달걀이 된다.** `<Avatar>` 는 인라인 style 로 px 크기 + `border-radius:50%` 를 박기 때문에, `width/height:100%` 만 덮어쓰면 퍼센트 높이가 auto 로 떨어지는 순간 박스가 세로로 눌려 **원이 타원**이 된다. 반복해서 재발한 버그다(시상대 → 티어바). `ranking.css` 의 '아바타 달걀 방지' 블록에 소켓 선택자를 **모아서** 관리한다 — 소켓을 새로 만들면 그 블록에 선택자만 추가하고, 소켓마다 규칙을 따로 쓰지 말 것. 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만 — 버킷·정책은 대시보드 SQL로 생성). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.
@@ -335,9 +348,45 @@ supabase/
 - **상시(rolling)는 판매하지 않는다**(2026-08 폐지). 행·표시 코드는 두고 결제 진입만 막는다.
 - **응시료는 카드·간편결제만**(D3). 가상계좌는 입금이 끝나도 응시권을 발급하지 않고 대사로 넘긴다 — VA 는 접수 마감 뒤 입금이 정상이라 마감이 무의미해진다.
 - **0원은 판매 불가**(무료 아님). `exam_fees.amount` 는 default 0 이라 오타 한 번이 무제한 무료 응시권이 된다. 이북만 0원 즉시지급을 허용한다.
-- SEB 익명 응시 경로는 응시권 도입으로 자연히 막혔다(원래 결제 없이 응시가 됐다). SEB 세션 인계는 **미결** — 재검토 중.
-- 검증: `tests/db/t-exam-tickets.mjs`(22건) · `tests/db/t-payments.mjs`(39건).
+- SEB 익명 응시 경로는 응시권 도입으로 자연히 막혔다(원래 결제 없이 응시가 됐다). 인계는 아래 참고.
+
+### SEB 세션 인계 (2026-08-10)
+
+SEB 는 **별도 브라우저 프로필이라 세션이 없고, 그 안에서 로그인할 방법도 없다**(SEB 가 외부 사이트를 막고 구글도 이런 브라우저를 거부한다). 그래서 켜기 전에 자격을 쥐어줘야 한다. 옛 코드는 `ensureAnonymous()` 로 익명 세션을 만들었는데 응시권 도입 후 `start-exam` 이 익명을 403 으로 막으면서 **SEB 경로가 통째로 죽어 있었다.**
+
+흐름 = `ExamPrepare` 에서 **1회용 인계표(nonce)** 발급 → SEB 실행 링크에 실어 보냄 → SEB 가 그 쿼리를 startURL 로 옮겨줌 → `/exam/seb` 가 표를 **시험 전용 토큰**으로 교환 → `start-exam`·`submit-exam` 이 그 토큰을 받는다.
+
+- ⚠️ **`.seb` 의 `startURLAppendQueryParameter` 가 이 구조의 전제다.** 끄면 표가 SEB 안으로 못 넘어가 응시가 시작조차 안 된다. `tools/make-seb*.mjs` 에 있고 `public/*.seb` 를 다시 뽑아야 반영된다.
+- ⚠️ **정식 Supabase 세션을 넘기지 말 것.** 그 세션은 결제·코인 선물·마이페이지까지 전부 가능하고 회수 수단이 없다. 시험 전용 토큰(`_shared/exam-token.ts`)은 **`start-exam`·`submit-exam` 두 곳만** 받아주고 표에 박힌 응시권 하나로 묶인다. `getExamActor` 를 응시 계열 밖에서 쓰면 이 토큰의 존재 이유가 사라진다.
+- ⚠️ **주소에 싣는 건 nonce 지 토큰이 아니다.** 표는 startURL 을 타고 주소창·접속 로그에 남는다. 그래서 5분·1회용이고, 진짜 인증수단은 SEB 안에서 교환해 받는다. 토큰 수명은 6시간 — **응시 TTL(240분)보다 짧게 잡으면 시험 도중 제출이 실패한다.**
+- ⚠️ **표는 매번 새로 받는다.** 안내 팝업의 '다시 열기' 도 `openSeb()` 을 다시 부른다 — 1회용이라 재사용하면 두 번째 클릭이 조용히 실패한다.
+- ⚠️ startURL 에 이미 `?lang=` 이 있어 SEB 가 `?` 로 붙일지 `&` 로 붙일지가 버전마다 다를 수 있다. 받는 쪽(`examToken.ts` 의 `readHandoffNonce`, `i18n.tsx` 의 `detect`)이 **둘 다 견디게** 해뒀다 — 그 방어를 지우려면 실기기로 먼저 확인할 것.
+- `redeem` 에 레이트리밋이 없는 건 의도다 — nonce 가 32바이트 난수라 추측 불가고, 세션이 없어 계정 단위로 셀 수 없으며, IP 로 세면 같은 시험장 응시자끼리 서로를 막는다.
+- ⛔ **대리응시는 이 구조가 막지 못한다.** 표를 남에게 넘기면 그만이다 — 그건 본인인증이 풀 문제고, `/exam/seb` 의 `[본인인증수단 개발중]` 안내가 그 자리를 잡아두고 있다.
+- 검증: `tests/db/t-seb-handoff.mjs`(17건). **실기기 확인은 아직 안 했다** — 배포 후 실제 SEB 로 링크를 눌러봐야 한다.
+
+**🚪 탈출구 (2026-08-10 — 테스트 중 갇혀서 재부팅한 뒤 추가)**
+SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 수동 종료엔 비밀번호가 걸려 있다. 화면에 나가는 버튼이 없으면 **재부팅 말고 방법이 없다.**
+- `<SebEscapeHatch>`(App.tsx) — SEB 안 **모든 화면** 오른쪽 아래에 뜨는 전역 안전망. 라우트가 안 맞아 랜딩으로 튕겨도 살아남는다. 페이지 CSS 없이 보이도록 인라인 스타일 + 최대 z-index.
+- `<SebExitButton>` — 막다른 화면에 직접 붙이는 버튼(`/exam/seb` 오류·시작 화면, CbtRunner '출제 데이터 유실'). **막다른 화면을 새로 만들면 여기도 붙일 것.**
+- ⚠️ **응시 중(`/exam/run/*`)·종료 화면에는 안 뜬다.** 시험 도중 나가는 건 '종료(포기)'라 응시 무효 기록이 남아야 하고, 한 번에 나가는 길을 주면 잠금이 무의미해진다.
+- ⚠️ 종료 주소는 `lib/seb.ts` 의 `sebQuitUrl()` **한 곳**에서만 만든다 — `tools/make-seb-all.mjs` 의 `quitURL` 과 글자가 어긋나면 SEB 가 안 닫힌다.
+- 앱이 아예 안 뜬 경우의 최후 수단 = `Ctrl+Q` + 종료 비밀번호 **`gara-exit-2026`**(`make-seb-all.mjs` 의 `QUIT_PASSWORD`). → `docs/SEB설정.md` 맨 앞 절.
+- 검증: `tests/db/t-exam-tickets.mjs`(26건) · `tests/db/t-payments.mjs`(46건).
 - 실키 심사 전 채워야 하는 것(코드 아님): 전자상거래법 사업자정보 표기, 이북 청약철회 제한 문구·응시료 환불규정(`/terms`), 미성년자 결제 동의.
+
+### 자격증 발급비 (cert) — 지급물이 없는 유일한 상품 (2026-08-07)
+
+`product_type='cert'`, `product_ref = exam_attempts.id`. **금액 = 그 급수의 응시료와 동일**(`exam_fees` 재조회).
+지급(`grant`)이 **no-op** 이고, `payments` 행(`paid`) 자체가 발급 게이트다 — `my-attempts {issue}` 가 채번 직전에 그 행을 찾는다.
+
+- ⚠️ **`resolveExamOffer` 를 쓰면 안 된다.** 그건 접수창(`applyWindowOpen`)까지 보는 판매 판정이라, 성적 공개 후(=접수 마감 후)에 사는 발급비가 통째로 `apply_closed` 로 막힌다. 급수 정가만 필요하므로 `resolveExamFee`(회차·접수창 무관)를 쓴다. 지금 개발 회차는 접수창이 열려 있어 **테스트로는 안 잡히는 버그**다.
+- **최초 발급만 유료, 재발급은 무료**(`verify_token`·`cert_no` 가 이미 있으면 결제를 안 본다 — 번호·QR 불변이라 새로 파는 물건이 아니다).
+- 응시권 생존 판정은 `ticketSourceAlive`(exam-tickets.ts) **하나**를 결제 전(`payments/create`)과 발급 시(`my-attempts`) 양쪽이 쓴다. 한쪽에만 있으면 "결제는 통과, 발급만 거절" 구간이 생겨 곧 환불거리다.
+- **정가 미책정 급수(t2 등)는 발급도 막힌다** — 임시 금액으로 때우지 않는다. 열려면 관리자 화면에서 금액만 채우면 된다.
+- 402 응답 `error:'cert_fee_required'` 는 **기계 코드**다(같은 핸들러의 `invalid_name_roman` 관례). 프론트가 이걸로 결제 화면 전환을 판단하므로 문구로 바꾸지 말 것.
+- 결제 후 복귀: `/pay/success` → `/mypage/attempts?cert=<attemptId>` → 그 응시의 발급 화면 → **결제 전에 입력한 영문 성명으로 자동 발급**. 이름은 `sessionStorage`(`certIssueAttempt/Last/First`)로 넘기고 **꺼내는 즉시 지운다** — 남기면 결제를 취소하고 돌아온 사람이 자동발급 → 402 → 체크아웃 으로 영원히 튕긴다.
+- ⚠️ **환불해도 자격증은 자동 회수하지 않는다**(`revokeForRefund` 에 cert 경로 없음 = fulfilled 유지 → 대사 목록에 남아 사람이 판단). 자격번호·QR 은 회수가 안 되는 물건이라 자동화하지 않는다.
 
 ---
 
@@ -346,6 +395,7 @@ supabase/
 - **프론트는 `master` push → Cloudflare 자동배포**(빌드 수 분 소요). 함수는 **별도 CLI 배포** 필요. git push 로 함수 안 올라감. SPA 라우팅은 `wrangler.jsonc`(`not_found_handling`)로 처리 — `_redirects` 금지(무한루프).
 - `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
 - **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 토스 개발자센터 웹훅 URL 은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<TOSS_WEBHOOK_SECRET>`.
+- **SEB 인계 함수 배포**: `npx.cmd supabase functions deploy seb-handoff` (플래그 없이 — `verify_jwt` 켠 채로 맞다). SEB 안에서도 anon 키가 실려 오므로 공개 예외가 필요 없다. `--no-verify-jwt` 로 올리지 말 것.
 - **`GEMINI_API_KEY` 는 Supabase 함수 시크릿**(프론트 금지). 키 무효면 추천이 500.
 - **OAuth localhost 튕김** = Supabase Site URL 설정 문제. **모바일 인앱 브라우저 차단** = 구글 정책(기본 브라우저로 열어야 함).
 - **쿨다운(3일 1회)** 토글 = `start-test` 의 `COOLDOWN_ENABLED`. 게스트는 원래 쿨다운 없음.

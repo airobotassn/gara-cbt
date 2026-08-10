@@ -54,11 +54,30 @@ function toScheme(url: string): string {
 
 // 설정 URL → SEB 실행 스킴(https→sebs://, http→seb://). 클릭 시 설치된 SEB 가 열려 시험을 로드.
 // lang 을 주면 언어별 .seb(gara-<lang>.seb)를 사용 — SEB 안에서도 화면 언어가 유지된다.
-export function sebLaunchUrl(lang?: string): string {
-  if (lang && typeof window !== 'undefined') {
-    return toScheme(`${window.location.origin}/gara-${lang}.seb`)
-  }
-  return toScheme(sebConfigUrl())
+//
+// nonce 를 주면 링크 끝에 `?h=<nonce>` 를 붙인다. SEB 는 이 쿼리스트링을 **startURL 뒤에 그대로 옮겨**
+// 주고(.seb 의 startURLAppendQueryParameter), 그래서 /exam/seb 가 로그인 인계표를 받는다.
+// 이게 없으면 SEB 안에는 세션도 표도 없어 응시 자체를 시작하지 못한다(SEB 는 별도 브라우저 프로필이다).
+// ⚠️ 표는 주소를 타고 다니므로 접속 로그에 남는다 — 그래서 **수 분짜리 1회용 nonce** 이지 인증수단 본체가
+//    아니다. 진짜 인증수단(시험 전용 토큰)은 SEB 안에서 교환해 받는다(seb-handoff).
+export function sebLaunchUrl(lang?: string, nonce?: string): string {
+  const base = lang && typeof window !== 'undefined'
+    ? `${window.location.origin}/gara-${lang}.seb`
+    : sebConfigUrl()
+  return toScheme(nonce ? `${base}?h=${encodeURIComponent(nonce)}` : base)
+}
+
+/**
+ * SEB 종료 URL — 이 주소에 도달하면 SEB 가 **비밀번호 없이** 스스로 닫힌다(.seb 의 quitURLConfirm=false).
+ *
+ * ⚠️ `tools/make-seb-all.mjs` 의 `quitURL` 과 **글자 그대로 같아야** 한다. 어긋나면 SEB 는 그냥 평범한
+ *    페이지로 알고 안 닫히고, 응시자는 잠긴 화면에 남는다. .seb 를 다시 뽑을 때 양쪽을 같이 볼 것.
+ * ⚠️ 이게 앱이 제공하는 **유일한 탈출구**다. SEB 는 뒤로가기·새로고침·주소창이 전부 막혀 있고
+ *    수동 종료(Ctrl+Q)에는 비밀번호가 걸려 있어서, 화면에 나가는 버튼이 없으면 재부팅 말고는 방법이 없다
+ *    (2026-08-10 실제로 겪음). 막다른 화면을 새로 만들 때는 반드시 <SebExitButton> 을 같이 둘 것.
+ */
+export function sebQuitUrl(): string {
+  return `${window.location.origin}/exam/done`
 }
 
 // 모의 응시용 .seb (gara-practice[-<lang>].seb) — 실제와 같은 SEB 잠금 환경에서 연습 문제를 연다.

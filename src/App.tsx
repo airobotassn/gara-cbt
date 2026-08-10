@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { I18nProvider, useT } from './lib/i18n'
 import { AuthProvider, useAuth } from './context/AuthProvider'
 import Layout from './components/Layout'
+import SebEscapeHatch from './components/SebEscapeHatch'
 import Landing from './pages/Landing'
 import ExamGate from './pages/ExamGate'
 import ExamApply from './pages/ExamApply'
@@ -120,6 +121,9 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <ScrollToTop />
+          {/* SEB(잠금 브라우저) 안에서만 뜨는 탈출 버튼. 라우트가 안 맞아 랜딩으로 튕겨도 나갈 길이 남는다.
+              응시 중(/exam/run/*)에는 뜨지 않는다 — 그 화면의 종료는 '포기'라 응시 무효 기록이 따로 남아야 한다. */}
+          <SebEscapeHatch />
           <Layout>
             {/* 닉네임(전 경로) → 지역(아레나 계열) 순서. 아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
             <NicknameGate>

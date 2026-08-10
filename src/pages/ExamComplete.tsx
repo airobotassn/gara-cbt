@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useT } from '../lib/i18n'
-import { isSEB } from '../lib/seb'
+import { isSEB, sebQuitUrl } from '../lib/seb'
 
 // 응시 종료 후 "끝났다"는 확실한 마무리 화면. SEB 안에서도 보이도록 quitURL(/exam/done)과 분리한 별도 경로다.
 // SEB: 이 화면을 보여준 뒤 버튼/자동 카운트다운으로 /exam/done 으로 이동 → SEB 가 그 URL 에서 자동 종료.
@@ -23,8 +23,9 @@ export default function ExamComplete() {
   const mode: Mode = st.mode ?? 'submitted'
   const seb = st.seb ?? isSEB()
 
+  // 종료 주소는 lib/seb.ts 한 곳에서만 만든다 — .seb 의 quitURL 과 글자가 어긋나면 SEB 가 안 닫힌다.
   const quitSeb = () => {
-    window.location.href = `${window.location.origin}/exam/done` // SEB 종료 URL
+    window.location.href = sebQuitUrl()
   }
 
   // SEB: 응시자가 버튼을 안 눌러도 갇히지 않도록 일정 시간 후 자동 종료
@@ -35,7 +36,7 @@ export default function ExamComplete() {
       setLeft((n) => {
         if (n <= 1) {
           window.clearInterval(id)
-          window.location.href = `${window.location.origin}/exam/done`
+          window.location.href = sebQuitUrl()
           return 0
         }
         return n - 1

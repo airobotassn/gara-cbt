@@ -1657,6 +1657,12 @@ const D: Record<string, Record<Lang, string>> = {
   "seb.fact_install": { ko: "설치", en: "Install", ja: "インストール", zh: "安装", hi: "इंस्टॉल", vi: "Cài đặt" },
   "seb.entry_loading": { ko: "시험을 준비하고 있어요…", en: "Preparing your exam…", ja: "試験を準備しています…", zh: "正在准备考试…", hi: "आपकी परीक्षा तैयार की जा रही है…", vi: "Đang chuẩn bị bài thi…" },
   "seb.entry_retry": { ko: "다시 시도", en: "Try again", ja: "再試行", zh: "重试", hi: "पुनः प्रयास करें", vi: "Thử lại" },
+  // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
+  "seb.exit": { ko: "보안 브라우저 종료", en: "Exit secure browser", ja: "セキュアブラウザを終了", zh: "退出安全浏览器", hi: "सुरक्षित ब्राउज़र से बाहर निकलें", vi: "Thoát trình duyệt bảo mật" },
+  // SEB 로 로그인을 넘기는 인계표가 주소에 없을 때. 옛 .seb 파일로 들어왔거나 설정에서
+  // startURLAppendQueryParameter 가 빠진 경우다 — SEB 안에서는 로그인할 방법이 없으므로 나가서 다시 시작해야 한다.
+  "seb.err_no_handoff": { ko: "응시 정보를 확인하지 못했습니다.", en: "We couldn't verify your exam session.", ja: "受験情報を確認できませんでした。", zh: "无法确认应试信息。", hi: "आपका परीक्षा सत्र सत्यापित नहीं हो सका।", vi: "Không xác minh được phiên thi của bạn." },
+  "seb.err_no_handoff_how": { ko: "보안 브라우저를 닫고, 원래 브라우저의 응시 준비 화면에서 다시 시작해 주세요.", en: "Close the secure browser and start again from the exam preparation page in your normal browser.", ja: "セキュアブラウザを閉じて、通常のブラウザの受験準備画面から再度開始してください。", zh: "请关闭安全浏览器，并从原浏览器的应试准备页面重新开始。", hi: "सुरक्षित ब्राउज़र बंद करें और अपने सामान्य ब्राउज़र के परीक्षा तैयारी पेज से दोबारा शुरू करें।", vi: "Hãy đóng trình duyệt bảo mật và bắt đầu lại từ trang chuẩn bị thi trên trình duyệt thường." },
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
@@ -1812,6 +1818,13 @@ const D: Record<string, Record<Lang, string>> = {
   // 응시료는 카드·간편결제만 판다(가상계좌 제외). 그래도 가상계좌 결제가 들어오면 응시권을 발급하지 않으므로
   // 이북과 같은 '입금하면 자동 지급' 문구(pay.waiting_body)를 쓰면 안 된다.
   "pay.exam_waiting_body": { ko: "응시료는 카드·간편결제만 지원해요. 가상계좌로 입금해도 응시권이 자동 발급되지 않으니 문의해 주세요.", en: "Exam fees support cards and easy-pay only. A bank transfer will not issue a ticket automatically — please contact us.", ja: "受験料はカード・簡単決済のみ対応しています。仮想口座へ入金しても受験チケットは自動発行されませんので、お問い合わせください。", zh: "应试费仅支持银行卡和便捷支付。即使汇入虚拟账户也不会自动发放应试券，请联系客服。", hi: "परीक्षा शुल्क केवल कार्ड और ईज़ी-पे से लिया जाता है। वर्चुअल खाते में जमा करने पर टिकट स्वतः जारी नहीं होगा — कृपया संपर्क करें।", vi: "Lệ phí thi chỉ hỗ trợ thẻ và thanh toán nhanh. Chuyển khoản vào tài khoản ảo sẽ không tự động cấp vé — vui lòng liên hệ với chúng tôi." },
+  // 자격증 발급비 — 결제로 끝나는 게 아니라 **발급이 한 걸음 남아 있다**. '결제 완료'로만 닫으면
+  // 사용자는 자격증이 어디 있는지 못 찾는다(지급물이 따로 없는 유일한 상품이라 더 그렇다).
+  "pay.go_cert": { ko: "자격증 발급받기", en: "Get my certificate", ja: "資格証を発行する", zh: "领取证书", hi: "मेरा प्रमाणपत्र लें", vi: "Nhận chứng chỉ của tôi" },
+  "pay.go_attempts": { ko: "응시 내역 보기", en: "View my exam history", ja: "受験履歴を見る", zh: "查看应试记录", hi: "मेरा परीक्षा इतिहास देखें", vi: "Xem lịch sử dự thi" },
+  "pay.cert_success_title": { ko: "발급비 결제가 완료됐어요", en: "Issuing fee paid", ja: "発行料のお支払いが完了しました", zh: "发放费用支付完成", hi: "जारी करने का शुल्क भुगतान हो गया", vi: "Đã thanh toán phí cấp chứng chỉ" },
+  "pay.cert_success_body": { ko: "이어서 자격증을 발급합니다. 아래 버튼을 눌러주세요.", en: "Your certificate is issued next — tap the button below.", ja: "続けて資格証を発行します。下のボタンを押してください。", zh: "接下来将发放证书，请点击下方按钮。", hi: "अब आपका प्रमाणपत्र जारी होगा — नीचे बटन दबाएँ।", vi: "Tiếp theo là cấp chứng chỉ — hãy nhấn nút bên dưới." },
+  "pay.cert_waiting_body": { ko: "발급된 가상계좌로 입금하면 자격증을 발급할 수 있어요.", en: "Once your deposit arrives, you can issue the certificate.", ja: "発行された仮想口座へ入金されると資格証を発行できます。", zh: "款项到账后即可发放证书。", hi: "जमा राशि मिलते ही आप प्रमाणपत्र जारी कर सकते हैं।", vi: "Khi nhận được tiền, bạn có thể cấp chứng chỉ." },
   // 통화 고지 — 화면 가격은 달러인데 토스 결제창은 원화로 뜬다. 이 문구가 없으면 사용자는 금액이 다르다고 느낀다.
   //   {krw} = lib/money.ts 의 krw() 로 찍은 실제 청구액 문자열.
   // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.
@@ -1848,6 +1861,166 @@ const D: Record<string, Record<Lang, string>> = {
   // ── 마이페이지 '시험 응시 현황' 빈 상태 분기 (응시권 없음 → 접수 / 응시권 있음 → 기존 mypage.go_exam) ──
   "mypage.empty_no_ticket": { ko: "아직 접수한 시험이 없습니다.", en: "You haven't registered for any exam yet.", ja: "まだ申し込んだ試験がありません。", zh: "您还没有报名任何考试。", hi: "आपने अभी तक किसी परीक्षा के लिए पंजीकरण नहीं किया।", vi: "Bạn chưa đăng ký kỳ thi nào." },
   "mypage.go_apply": { ko: "시험 접수하기", en: "Register for an exam", ja: "試験に申し込む", zh: "报名考试", hi: "परीक्षा हेतु पंजीकरण करें", vi: "Đăng ký dự thi" },
+
+  // ── 캐릭터 허브(/hub) ─────────────────────────────────────────────────────
+  // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
+  // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
+  //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
+  'hub.err.insufficient_points': { ko: '포인트가 부족해요', en: 'Not enough points', ja: 'ポイントが足りません', zh: '积分不足', hi: 'पर्याप्त पॉइंट नहीं', vi: 'Không đủ điểm' },
+  'hub.err.insufficient_dust': { ko: '가루가 부족해요', en: 'Not enough dust', ja: 'かけらが足りません', zh: '碎片不足', hi: 'पर्याप्त डस्ट नहीं', vi: 'Không đủ bụi' },
+  'hub.err.already_owned': { ko: '이미 보유한 한정템이에요', en: 'You already own this limited item', ja: 'すでに持っている限定アイテムです', zh: '您已拥有该限定道具', hi: 'यह लिमिटेड आइटम आपके पास पहले से है', vi: 'Bạn đã có vật phẩm giới hạn này' },
+  'hub.err.unauthorized': { ko: '로그인이 필요해요', en: 'Sign in required', ja: 'ログインが必要です', zh: '需要登录', hi: 'साइन इन आवश्यक है', vi: 'Cần đăng nhập' },
+  'hub.err.generic': { ko: '오류가 발생했어요. 잠시 후 다시 시도해주세요', en: 'Something went wrong. Please try again in a moment.', ja: 'エラーが発生しました。しばらくしてからもう一度お試しください', zh: '发生错误，请稍后再试', hi: 'कुछ गड़बड़ हुई। थोड़ी देर बाद फिर कोशिश करें', vi: 'Đã xảy ra lỗi. Vui lòng thử lại sau giây lát' },
+
+  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
+  'hub.part.hat_common_01': { ko: '새싹 모자', en: 'Sprout Cap', ja: 'ふたばキャップ', zh: '嫩芽帽', hi: 'स्प्राउट कैप', vi: 'Mũ Mầm Cây' },
+  'hub.part.hat_common_02': { ko: '비니', en: 'Beanie', ja: 'ニット帽', zh: '毛线帽', hi: 'बीनी', vi: 'Mũ Len' },
+  'hub.part.shoe_common_01': { ko: '포근 양말', en: 'Cozy Socks', ja: 'ぬくぬく靴下', zh: '暖暖袜子', hi: 'कोज़ी सॉक्स', vi: 'Tất Ấm' },
+  'hub.part.glasses_common_01': { ko: '동글 안경', en: 'Round Glasses', ja: 'まる眼鏡', zh: '圆框眼镜', hi: 'गोल चश्मा', vi: 'Kính Tròn' },
+  'hub.part.wing_rare_01': { ko: '빛나는 날개', en: 'Shining Wings', ja: '輝く翼', zh: '闪耀之翼', hi: 'चमकते पंख', vi: 'Đôi Cánh Rực Rỡ' },
+  'hub.part.crown_rare_01': { ko: '작은 왕관', en: 'Little Crown', ja: '小さな王冠', zh: '小王冠', hi: 'छोटा मुकुट', vi: 'Vương Miện Nhỏ' },
+
+  // 상단·공통
+  'hub.gate_sub': { ko: '로그인하고 출석·뽑기·상점을 이용해보세요', en: 'Sign in to use check-in, draws and the shop', ja: 'ログインして出席・ガチャ・ショップを使いましょう', zh: '登录后即可使用签到、抽奖和商店', hi: 'चेक-इन, ड्रॉ और शॉप के लिए साइन इन करें', vi: 'Đăng nhập để dùng điểm danh, quay thưởng và cửa hàng' },
+  'hub.banner_login': { ko: '로그인해야 출석·뽑기·상점이 작동해요', en: 'Check-in, draws and the shop need you signed in', ja: '出席・ガチャ・ショップはログインが必要です', zh: '签到、抽奖和商店需要登录后使用', hi: 'चेक-इन, ड्रॉ और शॉप के लिए साइन इन ज़रूरी है', vi: 'Điểm danh, quay thưởng và cửa hàng cần đăng nhập' },
+  'hub.share': { ko: '공유', en: 'Share', ja: 'シェア', zh: '分享', hi: 'शेयर', vi: 'Chia sẻ' },
+  'hub.gift_btn': { ko: '선물', en: 'Gift', ja: 'ギフト', zh: '赠送', hi: 'गिफ्ट', vi: 'Tặng' },
+  'hub.help_aria': { ko: '점수 획득 방법', en: 'How to earn points', ja: 'ポイントの獲得方法', zh: '如何获得积分', hi: 'पॉइंट कैसे कमाएं', vi: 'Cách kiếm điểm' },
+  'hub.coin_tip': { ko: '보유한 CARI 코인', en: 'Your CARI coins', ja: '保有CARIコイン', zh: '持有的 CARI 币', hi: 'आपके CARI कॉइन', vi: 'CARI coin của bạn' },
+  'hub.mission_title': { ko: '오늘의 미션', en: "Today's missions", ja: '今日のミッション', zh: '今日任务', hi: 'आज के मिशन', vi: 'Nhiệm vụ hôm nay' },
+  'hub.confirm': { ko: '확인', en: 'OK', ja: 'OK', zh: '确定', hi: 'ठीक है', vi: 'Đồng ý' },
+
+  // 오른쪽 레일
+  'hub.rail.daily': { ko: '출석', en: 'Check in', ja: '出席', zh: '签到', hi: 'चेक-इन', vi: 'Điểm danh' },
+  'hub.rail.gacha': { ko: '뽑기', en: 'Draw', ja: 'ガチャ', zh: '抽奖', hi: 'ड्रॉ', vi: 'Quay thưởng' },
+  'hub.rail.shop': { ko: '상점', en: 'Shop', ja: 'ショップ', zh: '商店', hi: 'शॉप', vi: 'Cửa hàng' },
+  'hub.rail.title': { ko: '칭호', en: 'Titles', ja: '称号', zh: '称号', hi: 'उपाधियाँ', vi: 'Danh hiệu' },
+  'hub.rail.invite': { ko: '초대하기', en: 'Invite', ja: '招待する', zh: '邀请好友', hi: 'आमंत्रित करें', vi: 'Mời bạn' },
+
+  // 오늘의 미션 칩
+  'hub.mission.attendance': { ko: '출석', en: 'Check in', ja: '出席', zh: '签到', hi: 'चेक-इन', vi: 'Điểm danh' },
+  'hub.mission.daily_learn': { ko: '오늘의 학습', en: "Today's lesson", ja: '今日の学習', zh: '今日学习', hi: 'आज की पढ़ाई', vi: 'Bài học hôm nay' },
+  'hub.mission.minigame': { ko: '미니게임', en: 'Mini game', ja: 'ミニゲーム', zh: '小游戏', hi: 'मिनी गेम', vi: 'Mini game' },
+
+  // 도크(출석 보상)
+  'hub.reward_head': { ko: '출석 보상', en: 'Check-in rewards', ja: '出席報酬', zh: '签到奖励', hi: 'चेक-इन इनाम', vi: 'Thưởng điểm danh' },
+  'hub.streak': { ko: '{n}일 연속!', en: '{n}-day streak!', ja: '{n}日連続！', zh: '连续 {n} 天！', hi: '{n} दिन लगातार!', vi: 'Chuỗi {n} ngày!' },
+  'hub.day_n': { ko: '{n}일', en: 'Day {n}', ja: '{n}日', zh: '第 {n} 天', hi: 'दिन {n}', vi: 'Ngày {n}' },
+
+  // 토스트
+  'hub.toast.checkin_done': { ko: '출석 완료 · +{n}P · 스탬프 +1', en: 'Checked in · +{n}P · +1 stamp', ja: '出席完了 · +{n}P · スタンプ+1', zh: '签到完成 · +{n}P · 印章 +1', hi: 'चेक-इन हुआ · +{n}P · +1 स्टैम्प', vi: 'Đã điểm danh · +{n}P · +1 tem' },
+  'hub.toast.checkin_already': { ko: '출석 완료 · 오늘 보상은 이미 받았어요', en: "Checked in · you've already claimed today's reward", ja: '出席完了 · 本日の報酬は受け取り済みです', zh: '签到完成 · 今日奖励已领取', hi: 'चेक-इन हुआ · आज का इनाम पहले ही मिल चुका है', vi: 'Đã điểm danh · phần thưởng hôm nay đã nhận' },
+  'hub.toast.no_coin': { ko: '코인이 부족해요', en: 'Not enough coins', ja: 'コインが足りません', zh: '硬币不足', hi: 'पर्याप्त कॉइन नहीं', vi: 'Không đủ coin' },
+  'hub.toast.no_points_item': { ko: '포인트가 부족해요: {name} ({price}P)', en: 'Not enough points: {name} ({price}P)', ja: 'ポイントが足りません：{name}（{price}P）', zh: '积分不足：{name}（{price}P）', hi: 'पर्याप्त पॉइंट नहीं: {name} ({price}P)', vi: 'Không đủ điểm: {name} ({price}P)' },
+  'hub.toast.no_dust': { ko: '가루가 부족해요', en: 'Not enough dust', ja: 'かけらが足りません', zh: '碎片不足', hi: 'पर्याप्त डस्ट नहीं', vi: 'Không đủ bụi' },
+
+  // 구매/교환 완료 팝업
+  'hub.buy.exchanged': { ko: '교환 완료!', en: 'Exchanged!', ja: '交換完了！', zh: '兑换成功！', hi: 'बदल लिया!', vi: 'Đã đổi!' },
+  'hub.buy.purchased': { ko: '구매 완료!', en: 'Purchased!', ja: '購入完了！', zh: '购买成功！', hi: 'खरीद लिया!', vi: 'Đã mua!' },
+
+  // 뽑기 모달
+  'hub.gacha.title': { ko: '뽑기', en: 'Draw', ja: 'ガチャ', zh: '抽奖', hi: 'ड्रॉ', vi: 'Quay thưởng' },
+  'hub.gacha.dust': { ko: '가루', en: 'Dust', ja: 'かけら', zh: '碎片', hi: 'डस्ट', vi: 'Bụi' },
+  'hub.gacha.owned_n': { ko: '보유 {n}종', en: '{n} owned', ja: '{n}種 保有', zh: '已拥有 {n} 种', hi: '{n} प्रकार', vi: 'Sở hữu {n} loại' },
+  'hub.gacha.pity': { ko: '천장까지 {n}회', en: '{n} to guarantee', ja: '天井まで{n}回', zh: '距保底 {n} 次', hi: 'गारंटी तक {n}', vi: 'Còn {n} lần đến bảo đảm' },
+  'hub.gacha.limited': { ko: '한정템!', en: 'Limited!', ja: '限定！', zh: '限定！', hi: 'लिमिटेड!', vi: 'Giới hạn!' },
+  'hub.gacha.dust_gain': { ko: '가루 +{n}', en: 'Dust +{n}', ja: 'かけら +{n}', zh: '碎片 +{n}', hi: 'डस्ट +{n}', vi: 'Bụi +{n}' },
+  'hub.gacha.dust_hint': { ko: '모아서 한정템 교환!', en: 'Collect it to claim limited items!', ja: '集めて限定アイテムと交換！', zh: '收集后可兑换限定道具！', hi: 'जमा करके लिमिटेड आइटम लें!', vi: 'Tích lũy để đổi vật phẩm giới hạn!' },
+  'hub.gacha.drawing': { ko: '뽑는 중…', en: 'Drawing…', ja: '抽選中…', zh: '抽奖中…', hi: 'ड्रॉ हो रहा है…', vi: 'Đang quay…' },
+  'hub.gacha.draw': { ko: '뽑기 ({n} 🪙)', en: 'Draw ({n} 🪙)', ja: 'ガチャ（{n} 🪙）', zh: '抽奖（{n} 🪙）', hi: 'ड्रॉ ({n} 🪙)', vi: 'Quay ({n} 🪙)' },
+  'hub.gacha.ex_head': { ko: '가루 교환소', en: 'Dust exchange', ja: 'かけら交換所', zh: '碎片兑换所', hi: 'डस्ट एक्सचेंज', vi: 'Đổi bụi' },
+  'hub.gacha.ex_sub': { ko: '뽑기 전용 한정템', en: 'Draw-only limited items', ja: 'ガチャ限定アイテム', zh: '抽奖专属限定道具', hi: 'केवल ड्रॉ के लिमिटेड आइटम', vi: 'Vật phẩm giới hạn chỉ có khi quay' },
+  'hub.gacha.have': { ko: '보유중', en: 'Owned', ja: '保有中', zh: '已拥有', hi: 'आपके पास है', vi: 'Đã có' },
+  'hub.gacha.exchange': { ko: '교환', en: 'Exchange', ja: '交換', zh: '兑换', hi: 'बदलें', vi: 'Đổi' },
+  'hub.gacha.help': { ko: '뽑기하면 항상 가루가 쌓여요. 천장({n}회)엔 한정템이 확정! 가루로 원하는 한정템을 바로 교환할 수도 있어요.', en: 'Every draw earns dust. At the guarantee ({n} draws) a limited item is certain — or spend dust to claim the one you want right away.', ja: 'ガチャを引くと必ずかけらが貯まります。天井（{n}回）で限定アイテム確定！かけらで好きな限定アイテムと直接交換もできます。', zh: '每次抽奖都会累积碎片。达到保底（{n} 次）必得限定道具！也可用碎片直接兑换想要的限定道具。', hi: 'हर ड्रॉ पर डस्ट मिलती है। गारंटी ({n} ड्रॉ) पर लिमिटेड आइटम पक्का! या डस्ट से मनचाहा आइटम तुरंत लें।', vi: 'Mỗi lần quay đều tích bụi. Đến mốc bảo đảm ({n} lần) chắc chắn nhận vật phẩm giới hạn! Hoặc dùng bụi đổi ngay món bạn muốn.' },
+
+  // 상점 모달
+  'hub.shop.title': { ko: '상점', en: 'Shop', ja: 'ショップ', zh: '商店', hi: 'शॉप', vi: 'Cửa hàng' },
+  'hub.shop.balance': { ko: '보유 CARI 코인', en: 'Your CARI coins', ja: '保有CARIコイン', zh: '持有的 CARI 币', hi: 'आपके CARI कॉइन', vi: 'CARI coin của bạn' },
+  'hub.shop.rare': { ko: '레어', en: 'Rare', ja: 'レア', zh: '稀有', hi: 'रेयर', vi: 'Hiếm' },
+  'hub.shop.owned': { ko: '보유중', en: 'Owned', ja: '保有中', zh: '已拥有', hi: 'आपके पास है', vi: 'Đã có' },
+  'hub.shop.buy': { ko: '구매', en: 'Buy', ja: '購入', zh: '购买', hi: 'खरीदें', vi: 'Mua' },
+  'hub.shop.empty': { ko: '상점에 물건이 없어요.', en: 'The shop is empty.', ja: 'ショップに商品がありません。', zh: '商店暂无商品。', hi: 'शॉप में कुछ नहीं है।', vi: 'Cửa hàng chưa có sản phẩm.' },
+  'hub.shop.login': { ko: '로그인하면 상점을 이용할 수 있어요.', en: 'Sign in to use the shop.', ja: 'ログインするとショップを利用できます。', zh: '登录后即可使用商店。', hi: 'शॉप इस्तेमाल करने के लिए साइन इन करें।', vi: 'Đăng nhập để dùng cửa hàng.' },
+
+  // 쿠폰함
+  'hub.coupon.title': { ko: '쿠폰함', en: 'Coupons', ja: 'クーポン', zh: '优惠券', hi: 'कूपन', vi: 'Phiếu giảm giá' },
+  'hub.coupon.discount': { ko: '{n}% 할인', en: '{n}% off', ja: '{n}%割引', zh: '{n}% 折扣', hi: '{n}% छूट', vi: 'Giảm {n}%' },
+  'hub.coupon.sub': { ko: 'Lv.{n} 달성 보상', en: 'Reward for reaching Lv.{n}', ja: 'Lv.{n}達成報酬', zh: '达成 Lv.{n} 奖励', hi: 'Lv.{n} पाने का इनाम', vi: 'Thưởng khi đạt Lv.{n}' },
+  'hub.coupon.used': { ko: '사용함', en: 'Used', ja: '使用済み', zh: '已使用', hi: 'इस्तेमाल हुआ', vi: 'Đã dùng' },
+  'hub.coupon.have': { ko: '보유', en: 'Available', ja: '保有', zh: '持有', hi: 'उपलब्ध', vi: 'Đang có' },
+  'hub.coupon.empty': { ko: '아직 모은 쿠폰이 없어요. 레벨업하면 할인 쿠폰을 받아요!', en: 'No coupons yet — rank up to earn discount coupons!', ja: 'まだクーポンがありません。レベルアップで割引クーポンがもらえます！', zh: '还没有优惠券，升级即可获得折扣券！', hi: 'अभी कोई कूपन नहीं — लेवल बढ़ाएं और छूट कूपन पाएं!', vi: 'Chưa có phiếu nào — lên hạng để nhận phiếu giảm giá!' },
+  'hub.coupon.login': { ko: '로그인하면 쿠폰함이 보여요.', en: 'Sign in to see your coupons.', ja: 'ログインするとクーポンが表示されます。', zh: '登录后即可查看优惠券。', hi: 'कूपन देखने के लिए साइन इन करें।', vi: 'Đăng nhập để xem phiếu của bạn.' },
+
+  // 칭호
+  'hub.title.title': { ko: '칭호', en: 'Titles', ja: '称号', zh: '称号', hi: 'उपाधियाँ', vi: 'Danh hiệu' },
+  'hub.title.empty': { ko: '아직 획득한 칭호가 없어요 — 인증서에 합격하면 채워져요', en: 'No titles yet — pass a certification to earn one', ja: 'まだ称号がありません — 認定に合格すると増えます', zh: '还没有称号 — 通过认证即可获得', hi: 'अभी कोई उपाधि नहीं — प्रमाणन पास करें और पाएं', vi: 'Chưa có danh hiệu — đạt chứng nhận để nhận' },
+  'hub.title.login': { ko: '로그인하면 칭호 보관소가 보여요.', en: 'Sign in to see your title collection.', ja: 'ログインすると称号コレクションが表示されます。', zh: '登录后即可查看称号收藏。', hi: 'उपाधि संग्रह देखने के लिए साइन इन करें।', vi: 'Đăng nhập để xem bộ sưu tập danh hiệu.' },
+
+  // 점수 획득 방법
+  'hub.earn.title': { ko: '점수 획득 방법', en: 'How to earn points', ja: 'ポイントの獲得方法', zh: '如何获得积分', hi: 'पॉइंट कैसे कमाएं', vi: 'Cách kiếm điểm' },
+  'hub.earn.lead': { ko: '다양한 활동에 참여하고 점수를 모아 랭킹에 도전하세요!', en: 'Join the activities, stack up points and climb the ranking!', ja: 'いろいろな活動に参加してポイントを貯め、ランキングに挑戦しよう！', zh: '参与各种活动累积积分，冲击排行榜！', hi: 'गतिविधियों में भाग लें, पॉइंट जमा करें और रैंकिंग में चढ़ें!', vi: 'Tham gia hoạt động, tích điểm và leo bảng xếp hạng!' },
+  'hub.earn.col_act': { ko: '활동 항목', en: 'Activity', ja: '活動項目', zh: '活动项目', hi: 'गतिविधि', vi: 'Hoạt động' },
+  'hub.earn.col_pt': { ko: '획득 점수', en: 'Points', ja: '獲得ポイント', zh: '获得积分', hi: 'पॉइंट', vi: 'Điểm nhận' },
+  'hub.earn.pt': { ko: '+{n}점', en: '+{n} pts', ja: '+{n}点', zh: '+{n} 分', hi: '+{n} अंक', vi: '+{n} điểm' },
+  'hub.earn.limit': { ko: '일 {n}회 · 시즌 최대 {max}점', en: '{n}/day · up to {max} pts a season', ja: '1日{n}回 · シーズン最大{max}点', zh: '每日 {n} 次 · 赛季最多 {max} 分', hi: 'रोज़ {n} बार · सीज़न में अधिकतम {max} अंक', vi: '{n} lần/ngày · tối đa {max} điểm mỗi mùa' },
+  'hub.earn.lv_head': { ko: '레벨테스트', en: 'Level test', ja: 'レベルテスト', zh: '等级测试', hi: 'लेवल टेस्ट', vi: 'Bài kiểm tra cấp độ' },
+  'hub.earn.lv_sub': { ko: '레벨 클리어 시', en: 'per level cleared', ja: 'レベルクリア時', zh: '通关每个等级', hi: 'हर लेवल पूरा करने पर', vi: 'mỗi cấp vượt qua' },
+  'hub.earn.foot': { ko: '7단계를 모두 통과하면 {a}점 · 활동까지 더한 시즌 만점은 {b}점이에요.', en: 'Clearing all 7 levels gives {a} pts — with activities the season max is {b} pts.', ja: '7段階すべて突破で{a}点 · 活動を合わせたシーズン満点は{b}点です。', zh: '通过全部 7 个等级可得 {a} 分 · 加上活动的赛季满分为 {b} 分。', hi: 'सभी 7 लेवल पास करने पर {a} अंक · गतिविधियों सहित सीज़न का अधिकतम {b} अंक है।', vi: 'Vượt cả 7 cấp được {a} điểm · cộng hoạt động thì điểm tối đa mùa là {b}.' },
+  'hub.earn.row.attendance': { ko: '출석하기', en: 'Check in', ja: '出席する', zh: '签到', hi: 'चेक-इन करें', vi: 'Điểm danh' },
+  'hub.earn.row.daily_learn': { ko: '오늘의 학습 완료', en: "Finish today's lesson", ja: '今日の学習を完了', zh: '完成今日学习', hi: 'आज की पढ़ाई पूरी करें', vi: 'Hoàn thành bài học hôm nay' },
+  'hub.earn.row.minigame': { ko: '미니게임 플레이', en: 'Play a mini game', ja: 'ミニゲームをプレイ', zh: '玩小游戏', hi: 'मिनी गेम खेलें', vi: 'Chơi mini game' },
+  'hub.earn.row.referral': { ko: '친구 초대', en: 'Invite a friend', ja: '友達を招待', zh: '邀请好友', hi: 'दोस्त को बुलाएं', vi: 'Mời bạn bè' },
+
+  // 친구 초대 모달
+  'hub.invite.title': { ko: '친구 초대', en: 'Invite friends', ja: '友達招待', zh: '邀请好友', hi: 'दोस्तों को बुलाएं', vi: 'Mời bạn bè' },
+  'hub.invite.lead': { ko: '친구와 함께 CARIS 하세요!', en: 'Do CARIS together with a friend!', ja: '友達と一緒にCARISを！', zh: '和朋友一起玩 CARIS！', hi: 'दोस्त के साथ CARIS करें!', vi: 'Cùng bạn bè chơi CARIS!' },
+  'hub.invite.help': { ko: '내 초대코드를 알려주면 친구가 바로 시작할 수 있어요.', en: 'Share your invite code and your friend can start right away.', ja: '招待コードを教えると友達がすぐ始められます。', zh: '把邀请码告诉朋友，他就能立刻开始。', hi: 'अपना इनवाइट कोड दें और दोस्त तुरंत शुरू कर सकता है।', vi: 'Chia sẻ mã mời để bạn của bạn bắt đầu ngay.' },
+  'hub.invite.my_code': { ko: '내 초대코드', en: 'My invite code', ja: '私の招待コード', zh: '我的邀请码', hi: 'मेरा इनवाइट कोड', vi: 'Mã mời của tôi' },
+  'hub.invite.copied': { ko: '복사됨', en: 'Copied', ja: 'コピー済み', zh: '已复制', hi: 'कॉपी हुआ', vi: 'Đã sao chép' },
+  'hub.invite.copy': { ko: '복사', en: 'Copy', ja: 'コピー', zh: '复制', hi: 'कॉपी', vi: 'Sao chép' },
+  'hub.invite.issuing': { ko: '초대코드를 발급하는 중이에요.', en: 'Issuing your invite code…', ja: '招待コードを発行しています。', zh: '正在生成邀请码。', hi: 'इनवाइट कोड बन रहा है।', vi: 'Đang tạo mã mời.' },
+  'hub.invite.login': { ko: '로그인하면 초대코드가 발급돼요.', en: 'Sign in to get your invite code.', ja: 'ログインすると招待コードが発行されます。', zh: '登录后即可生成邀请码。', hi: 'इनवाइट कोड पाने के लिए साइन इन करें।', vi: 'Đăng nhập để nhận mã mời.' },
+  'hub.invite.redeem_head': { ko: '친구 초대코드 입력', en: "Enter a friend's invite code", ja: '友達の招待コードを入力', zh: '输入好友邀请码', hi: 'दोस्त का इनवाइट कोड डालें', vi: 'Nhập mã mời của bạn bè' },
+  'hub.invite.redeem_done': { ko: '✓ 초대코드를 등록했어요 (한 번만 가능해요)', en: '✓ Invite code registered (one time only)', ja: '✓ 招待コードを登録しました（1回のみ）', zh: '✓ 邀请码已登记（仅限一次）', hi: '✓ इनवाइट कोड दर्ज हुआ (सिर्फ एक बार)', vi: '✓ Đã đăng ký mã mời (chỉ một lần)' },
+  'hub.invite.checking': { ko: '확인 중', en: 'Checking', ja: '確認中', zh: '确认中', hi: 'जाँच रहे हैं', vi: 'Đang kiểm tra' },
+  'hub.invite.register': { ko: '등록', en: 'Register', ja: '登録', zh: '登记', hi: 'दर्ज करें', vi: 'Đăng ký' },
+  'hub.invite.hint': { ko: '한 번 등록하면 바꿀 수 없어요.', en: "Once registered it can't be changed.", ja: '一度登録すると変更できません。', zh: '登记后无法更改。', hi: 'एक बार दर्ज करने पर बदला नहीं जा सकता।', vi: 'Đã đăng ký thì không đổi được.' },
+  'hub.invite.err_not_found': { ko: '없는 초대코드예요. 다시 확인해주세요', en: "That invite code doesn't exist. Please check it again", ja: '存在しない招待コードです。もう一度ご確認ください', zh: '邀请码不存在，请重新确认', hi: 'यह इनवाइट कोड मौजूद नहीं। दोबारा जाँचें', vi: 'Mã mời không tồn tại. Vui lòng kiểm tra lại' },
+  'hub.invite.err_self': { ko: '내 초대코드는 쓸 수 없어요', en: "You can't use your own invite code", ja: '自分の招待コードは使えません', zh: '不能使用自己的邀请码', hi: 'अपना ही कोड इस्तेमाल नहीं कर सकते', vi: 'Không thể dùng mã mời của chính mình' },
+  'hub.invite.err_already': { ko: '이미 초대코드를 등록했어요', en: "You've already registered an invite code", ja: 'すでに招待コードを登録済みです', zh: '您已登记过邀请码', hi: 'आप पहले ही इनवाइट कोड दर्ज कर चुके हैं', vi: 'Bạn đã đăng ký mã mời rồi' },
+  'hub.invite.ok': { ko: '등록 완료! 초대해준 친구에게 점수가 들어갔어요', en: 'Registered! Your friend earned points for inviting you', ja: '登録完了！招待してくれた友達にポイントが入りました', zh: '登记成功！邀请你的朋友获得了积分', hi: 'दर्ज हुआ! बुलाने वाले दोस्त को अंक मिले', vi: 'Đã đăng ký! Người mời bạn đã nhận điểm' },
+  'hub.invite.fail': { ko: '등록하지 못했어요', en: "Couldn't register", ja: '登録できませんでした', zh: '登记失败', hi: 'दर्ज नहीं हो सका', vi: 'Không đăng ký được' },
+
+  // 코인 선물 모달
+  'hub.gift.title': { ko: '코인 선물', en: 'Gift coins', ja: 'コインギフト', zh: '赠送硬币', hi: 'कॉइन गिफ्ट', vi: 'Tặng coin' },
+  'hub.gift.balance': { ko: '보유 코인', en: 'Your coins', ja: '保有コイン', zh: '持有硬币', hi: 'आपके कॉइन', vi: 'Coin của bạn' },
+  'hub.gift.received': { ko: '받은 선물', en: 'Gifts received', ja: '受け取ったギフト', zh: '收到的赠礼', hi: 'मिले हुए गिफ्ट', vi: 'Quà đã nhận' },
+  'hub.gift.count_n': { ko: '{n}건', en: '{n}×', ja: '{n}件', zh: '{n} 笔', hi: '{n} बार', vi: '{n} lần' },
+  'hub.gift.older': { ko: '이전에 받은 선물 {n}건', en: '{n} earlier gifts', ja: '以前受け取ったギフト{n}件', zh: '此前收到的 {n} 笔赠礼', hi: 'पहले मिले {n} गिफ्ट', vi: '{n} món quà trước đó' },
+  'hub.gift.send_head': { ko: '코인 보내기', en: 'Send coins', ja: 'コインを送る', zh: '赠送硬币', hi: 'कॉइन भेजें', vi: 'Gửi coin' },
+  'hub.gift.code_label': { ko: '친구 초대코드', en: "Friend's invite code", ja: '友達の招待コード', zh: '好友邀请码', hi: 'दोस्त का इनवाइट कोड', vi: 'Mã mời của bạn bè' },
+  'hub.gift.to_ok': { ko: '{name}님에게 보냅니다', en: 'Sending to {name}', ja: '{name}さんに送ります', zh: '将赠送给 {name}', hi: '{name} को भेजा जाएगा', vi: 'Gửi tới {name}' },
+  'hub.gift.amount_label': { ko: '보낼 코인', en: 'Coins to send', ja: '送るコイン', zh: '赠送数量', hi: 'भेजने के कॉइन', vi: 'Số coin gửi' },
+  'hub.gift.send': { ko: '보내기', en: 'Send', ja: '送る', zh: '赠送', hi: 'भेजें', vi: 'Gửi' },
+  'hub.gift.sending': { ko: '보내는 중', en: 'Sending', ja: '送信中', zh: '赠送中', hi: 'भेजा जा रहा है', vi: 'Đang gửi' },
+  'hub.gift.confirm_q': { ko: '{name}님에게 {n}코인을 보낼까요?', en: 'Send {n} coins to {name}?', ja: '{name}さんに{n}コインを送りますか？', zh: '要赠送 {n} 枚硬币给 {name} 吗？', hi: '{name} को {n} कॉइन भेजें?', vi: 'Gửi {n} coin cho {name}?' },
+  'hub.gift.confirm_warn': { ko: '보내고 나면 되돌릴 수 없어요.', en: "Once sent it can't be undone.", ja: '送信後は取り消せません。', zh: '赠送后无法撤回。', hi: 'भेजने के बाद वापस नहीं लिया जा सकता।', vi: 'Đã gửi thì không thể hoàn lại.' },
+  'hub.gift.history': { ko: '선물 내역', en: 'Gift history', ja: 'ギフト履歴', zh: '赠礼记录', hi: 'गिफ्ट इतिहास', vi: 'Lịch sử quà tặng' },
+  'hub.gift.empty': { ko: '아직 주고받은 선물이 없어요.', en: 'No gifts sent or received yet.', ja: 'まだやり取りしたギフトがありません。', zh: '还没有赠送或收到过赠礼。', hi: 'अभी तक कोई गिफ्ट नहीं भेजा या मिला।', vi: 'Chưa có quà nào được gửi hay nhận.' },
+  'hub.gift.dir_in': { ko: '받음', en: 'Received', ja: '受取', zh: '收到', hi: 'मिला', vi: 'Nhận' },
+  'hub.gift.dir_out': { ko: '보냄', en: 'Sent', ja: '送信', zh: '赠出', hi: 'भेजा', vi: 'Gửi' },
+  'hub.gift.sent_ok': { ko: '{name}님에게 {n}코인을 보냈어요', en: 'Sent {n} coins to {name}', ja: '{name}さんに{n}コインを送りました', zh: '已赠送 {n} 枚硬币给 {name}', hi: '{name} को {n} कॉइन भेज दिए', vi: 'Đã gửi {n} coin cho {name}' },
+  'hub.gift.err_not_found': { ko: '없는 코드예요', en: "That code doesn't exist", ja: '存在しないコードです', zh: '该代码不存在', hi: 'यह कोड मौजूद नहीं', vi: 'Mã không tồn tại' },
+  'hub.gift.err_self_code': { ko: '내 코드예요', en: "That's your own code", ja: '自分のコードです', zh: '这是您自己的代码', hi: 'यह आपका ही कोड है', vi: 'Đây là mã của bạn' },
+  'hub.gift.err_too_many': { ko: '조회가 너무 많아요. 잠시 후 다시 시도해주세요', en: 'Too many lookups. Please try again in a moment', ja: '照会が多すぎます。しばらくしてからお試しください', zh: '查询次数过多，请稍后再试', hi: 'बहुत ज़्यादा जाँच। थोड़ी देर बाद कोशिश करें', vi: 'Tra cứu quá nhiều. Vui lòng thử lại sau' },
+  'hub.gift.err_lookup': { ko: '확인할 수 없어요', en: "Couldn't verify", ja: '確認できません', zh: '无法确认', hi: 'जाँच नहीं हो सकी', vi: 'Không xác minh được' },
+  'hub.gift.err_amount_required': { ko: '보낼 금액을 입력해주세요', en: 'Enter the amount to send', ja: '送る金額を入力してください', zh: '请输入赠送数量', hi: 'भेजने की राशि डालें', vi: 'Hãy nhập số coin muốn gửi' },
+  'hub.gift.err_insufficient': { ko: '코인이 부족해요', en: 'Not enough coins', ja: 'コインが足りません', zh: '硬币不足', hi: 'पर्याप्त कॉइन नहीं', vi: 'Không đủ coin' },
+  'hub.gift.err_self': { ko: '나에게는 보낼 수 없어요', en: "You can't send to yourself", ja: '自分には送れません', zh: '不能赠送给自己', hi: 'खुद को नहीं भेज सकते', vi: 'Không thể tự gửi cho mình' },
+  'hub.gift.err_invalid_amount': { ko: '보낼 금액이 올바르지 않아요', en: 'That amount is not valid', ja: '送る金額が正しくありません', zh: '赠送数量不正确', hi: 'यह राशि सही नहीं है', vi: 'Số coin không hợp lệ' },
+  'hub.gift.err_too_fast': { ko: '같은 친구에게 너무 자주 보내고 있어요. 잠시 후 다시 시도해주세요', en: "You're sending to the same friend too often. Please try again in a moment", ja: '同じ友達に送りすぎです。しばらくしてからお試しください', zh: '向同一位好友赠送过于频繁，请稍后再试', hi: 'एक ही दोस्त को बहुत बार भेज रहे हैं। थोड़ी देर बाद कोशिश करें', vi: 'Bạn gửi cho cùng một người quá thường xuyên. Vui lòng thử lại sau' },
+  'hub.gift.err_send_fail': { ko: '보내지 못했어요', en: "Couldn't send", ja: '送れませんでした', zh: '赠送失败', hi: 'भेजा नहीं जा सका', vi: 'Không gửi được' },
 }
 
 // 비-훅 번역기 — caris.ts 등 lib 계층에서 lang 을 넘겨 D 사전을 직접 조회한다. t() 도 이걸 재사용.
@@ -1876,8 +2049,12 @@ const Ctx = createContext<I18nState | undefined>(undefined)
 function detect(): Lang {
   // URL ?lang= 우선 — 보안 브라우저(SEB)는 새 프로필이라 저장값이 없으므로,
   // 응시 진입 URL에 실어 보낸 언어로 SEB 안에서도 동일 언어가 적용된다.
+  // ⚠️ 값 뒤를 잘라내는 이유 — SEB 가 로그인 인계표를 startURL 뒤에 붙일 때 '?' 를 쓰면
+  //    `?lang=ko?h=<표>` 가 돼서 표준 파서는 lang 을 "ko?h=…" 로 읽는다. 그러면 언어가 통째로 폴백된다.
+  //    첫 '?'·'&' 앞까지만 보면 SEB 가 어느 쪽으로 붙이든 언어가 살아남는다(src/lib/examToken.ts 와 같은 방어).
   try {
-    const q = new URLSearchParams(window.location.search).get('lang') as Lang | null
+    const raw = new URLSearchParams(window.location.search).get('lang')
+    const q = (raw ? raw.split(/[?&]/)[0] : null) as Lang | null
     if (q && LANGS.some((l) => l.code === q)) {
       localStorage.setItem('lang', q)
       return q
