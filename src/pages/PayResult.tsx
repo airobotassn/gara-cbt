@@ -73,17 +73,43 @@ export default function PayResult() {
     }
     return { kind: 'working' }
   })
+  // ⛔ 엑심베이는 결제창을 **팝업으로 연다.** 그 팝업이 결과 주소로 돌아오는데, 그냥 두면 팝업이
+  //    우리 사이트를 통째로 띄운 두 번째 브라우저가 된다 — 결제 후 마이페이지·이북까지 그 작은 창
+  //    안에서 돌아다니게 되고, 정작 원래 창은 결제 화면에 멈춰 있다(2026-08-11 실기기에서 겪음).
+  //    그래서 결과를 원래 창에 넘기고 팝업은 닫는다. 승인도 원래 창에서 한 번만 돈다.
+  //  ⚠️ **엑심베이 콜백일 때만** 넘긴다. `window.opener` 만 보면 안 된다 — 사용자가 다른 사이트에서
+  //     새 탭으로 우리를 열었어도 opener 가 있어서, 토스로 결제한 사람의 탭을 닫아버린다.
+  //  ⚠️ 넘기기를 **초기화 함수 안에서** 시도한다. 이펙트로 미루면 실패했을 때 "이 창에서 계속"으로
+  //     되돌리려고 setState 를 해야 하는데(react-hooks/set-state-in-effect 위반), 그러면 승인이
+  //     한 박자 늦게 돌아 결과 화면이 깜빡인다. 같은 주소로 replace 하는 것뿐이라 두 번 돌아도 무해하다.
+  const [handoff] = useState(() => {
+    try {
+      if (!isEximbay) return false
+      const op = window.opener as Window | null
+      if (!op || op === window) return false
+      op.location.replace(window.location.href)
+      return true
+    } catch {
+      return false // 못 넘겼으면(창이 닫혔거나 막혔거나) 이 창에서 그대로 승인까지 진행한다
+    }
+  })
+
+  useEffect(() => {
+    if (handoff) window.close()
+  }, [handoff])
+
   const ranRef = useRef(false) // StrictMode 중복 실행 방지(서버도 멱등이지만 호출을 아낀다)
 
   useEffect(() => {
     // 승인해야 할 게 있을 때만 움직인다. failUrl 로 온 건은 절대 승인을 부르지 않는다.
-    if (view.kind !== 'working' || ranRef.current) return
+    // 팝업이면 여기서 부르지 않는다 — 원래 창이 같은 주소를 받아 부른다.
+    if (handoff || view.kind !== 'working' || ranRef.current) return
     ranRef.current = true
 
     confirmOrder({ paymentKey, orderId, amount, rawQuery: isEximbay ? rawQuery : undefined })
       .then((res) => setView({ kind: 'done', res }))
       .catch((e) => setView({ kind: 'failed', message: e instanceof Error ? e.message : t('pay.error_generic') }))
-  }, [view.kind, paymentKey, orderId, amount, isEximbay, rawQuery, t])
+  }, [handoff, view.kind, paymentKey, orderId, amount, isEximbay, rawQuery, t])
 
   // 상품 종류 — 승인 응답이 정본이고, 실패 화면에서만 세션 힌트로 대신한다.
   //   'free'(0원 즉시지급)는 이북 전용이라 힌트를 보지 않는다 — 응시료는 0원 분기를 타지 않게 서버가 막는다.
@@ -120,7 +146,16 @@ export default function PayResult() {
     <div className="bg-background text-on-surface min-h-screen flex flex-col">
       <main className="flex-grow flex items-center justify-center px-margin-mobile py-24">
         <div className="max-w-md w-full text-center bg-surface-container-low border border-outline-variant/30 rounded-2xl p-10 ambient-shadow">
-          {view.kind === 'working' && (
+          {/* 팝업이 스스로 닫히기 직전에 잠깐 보이는 화면. 브라우저가 닫기를 막으면 이 문구가 남는다. */}
+          {handoff && (
+            <>
+              <Icon name="hourglass_top" tone="neutral" />
+              <Title>{t('pay.confirming')}</Title>
+              <Body>{t('pay.confirming_body')}</Body>
+            </>
+          )}
+
+          {!handoff && view.kind === 'working' && (
             <>
               <Icon name="hourglass_top" tone="neutral" />
               <Title>{t('pay.confirming')}</Title>
