@@ -1,4 +1,4 @@
-// 결제 결과 (/pay/success · /pay/fail) — 토스 결제창이 돌아오는 자리.
+// 결제 결과 (/pay/success · /pay/fail) — 결제창이 돌아오는 자리(토스 successUrl/failUrl · 엑심베이 return_url).
 //
 // ⚠️ 여기 도착한 것만으로는 결제가 된 게 아니다. 인증만 끝났을 뿐이라, **서버가 승인 API 를 호출해
 //    성공해야** 비로소 결제이고 그때 지급된다. 그래서 이 화면은 도착하자마자 confirm 을 부른다.
@@ -39,9 +39,18 @@ export default function PayResult() {
   const { t, lang } = useT()
 
   const isFail = location.pathname.endsWith('/fail')
-  const paymentKey = params.get('paymentKey') ?? ''
-  const orderId = params.get('orderId') ?? ''
+
+  // 어느 PG 가 돌려보낸 콜백인가 — 파라미터 이름이 다르다. 엑심베이는 order_id·transaction_id(스네이크케이스)를
+  // 쓰고, **실패도 이 주소로 돌아온다**(토스처럼 failUrl 이 따로 없다). 그래서 rescode 로 성패를 먼저 가른다.
+  const exOrderId = params.get('order_id') ?? ''
+  const isEximbay = Boolean(exOrderId)
+  const exCode = params.get('rescode') ?? ''
+  const paymentKey = isEximbay ? params.get('transaction_id') ?? '' : params.get('paymentKey') ?? ''
+  const orderId = isEximbay ? exOrderId : params.get('orderId') ?? ''
   const amount = Number(params.get('amount') ?? NaN)
+  // 엑심베이 /verify 는 이 **원문**을 통째로 받아 fgkey 로 위변조를 판정한다. 파싱해서 재조립하면
+  // 인코딩·순서가 달라져 검증이 깨지므로 브라우저가 준 문자열을 손대지 않고 그대로 넘긴다.
+  const rawQuery = location.search
 
   // 첫 화면은 URL 만 보면 정해진다(실패·무료·정보부족). effect 안에서 동기 setState 를 하지 않도록
   // 초기값으로 계산해 두고, effect 는 승인 호출이 필요한 경우에만 일한다.
@@ -54,6 +63,11 @@ export default function PayResult() {
       }
     }
     if (params.get('free')) return { kind: 'free' } // 0원 상품 — 서버가 이미 지급했다
+    // 엑심베이가 실패로 돌아온 경우. 토스의 failUrl 과 같은 자리이므로 **승인을 부르지 않는다**.
+    // (주문은 pending 으로 남고 대사가 만료로 접는다 — 결제가 안 된 건을 우리가 failed 로 단정하지 않는다.)
+    if (isEximbay && exCode !== '0000') {
+      return { kind: 'failed', code: exCode || undefined, message: params.get('resmsg') || t('pay.fail_body') }
+    }
     if (!paymentKey || !orderId || !Number.isFinite(amount)) {
       return { kind: 'failed', message: t('pay.bad_request') }
     }
@@ -66,10 +80,10 @@ export default function PayResult() {
     if (view.kind !== 'working' || ranRef.current) return
     ranRef.current = true
 
-    confirmOrder({ paymentKey, orderId, amount })
+    confirmOrder({ paymentKey, orderId, amount, rawQuery: isEximbay ? rawQuery : undefined })
       .then((res) => setView({ kind: 'done', res }))
       .catch((e) => setView({ kind: 'failed', message: e instanceof Error ? e.message : t('pay.error_generic') }))
-  }, [view.kind, paymentKey, orderId, amount, t])
+  }, [view.kind, paymentKey, orderId, amount, isEximbay, rawQuery, t])
 
   // 상품 종류 — 승인 응답이 정본이고, 실패 화면에서만 세션 힌트로 대신한다.
   //   'free'(0원 즉시지급)는 이북 전용이라 힌트를 보지 않는다 — 응시료는 0원 분기를 타지 않게 서버가 막는다.

@@ -50,6 +50,15 @@ export type ProviderResult =
   | { ok: true; data: ProviderPayment }
   | { ok: false; error: ProviderError }
 
+/**
+ * 조회에 함께 넘기는 주문 정보. **엑심베이 retrieve 는 currency·amount 가 필수**라 식별자 하나로는 조회가 안 된다.
+ * 토스는 무시한다(paymentKey/orderId 만으로 조회된다). 값의 출처는 언제나 **저장된 주문 행**이다 — 클라 값 금지.
+ */
+export interface ProviderQueryOpts {
+  currency: string
+  amount: number
+}
+
 /** PG 어댑터가 구현하는 포트. 결제 시작은 없다(프론트 소관) — 승인·조회·환경표시만. */
 export interface PaymentProvider {
   readonly name: string
@@ -60,12 +69,21 @@ export interface PaymentProvider {
     providerKey: string
     orderId: string
     amount: number
+    currency: string
     idempotencyKey: string
+    /**
+     * PG 결제창이 브라우저로 되돌려준 **원문 쿼리스트링**(`order_id=…&rescode=0000&fgkey=…`).
+     * 엑심베이 `/verify` 는 이 원문을 통째로 받아 fgkey 로 위변조를 검증한다 — 파싱해서 다시 조립하면
+     * 인코딩·순서가 달라져 검증이 깨질 수 있으므로 **받은 문자열 그대로** 실어 보낸다.
+     * ⚠️ 토스는 쓰지 않는다(paymentKey·orderId·amount 로 승인이 끝난다). 브라우저를 거쳐 온 값이라
+     *    이것만으로 결제를 인정하면 안 되고, 어댑터가 PG 에 되물어 확인한 결과만 신뢰한다.
+     */
+    rawQuery?: string
   }): Promise<ProviderResult>
   /** PG 결제 식별자로 조회(웹훅 검증·미완결 수습). */
-  queryByKey(providerKey: string): Promise<ProviderResult>
+  queryByKey(providerKey: string, opts?: ProviderQueryOpts): Promise<ProviderResult>
   /** 주문번호로 조회(우리는 pending 인데 PG 에선 승인됐을 수 있는 경우). */
-  queryByOrderId(orderId: string): Promise<ProviderResult>
+  queryByOrderId(orderId: string, opts?: ProviderQueryOpts): Promise<ProviderResult>
 }
 
 // 어댑터 등록. 새 PG 는 여기 한 줄 + 어댑터 파일 하나면 끝이다.
@@ -74,10 +92,14 @@ import { eximbayProvider } from './eximbay.ts'
 
 const PROVIDERS: Record<string, PaymentProvider> = {
   toss: tossProvider,
-  // ⚠️ 엑심베이 어댑터는 공개 문서 기반으로 작성됐고 **테스트키로 아직 실검증 안 됨**(eximbay.ts 머리 주석).
-  //    등록만 해둔다 — create 배선·프론트 결제창·통화(달러) 환산이 붙어야 실제로 결제가 돈다.
+  // ⚠️ 엑심베이는 **개발 단계 비교용**으로 열어둔 것이다(2026-08-11). 준비·결제창·검증·조회·승인까지
+  //    한 바퀴가 돌지만 아직 공개 샌드박스 키이고, status_url(서버-서버 통지) 경로는 실기기 확인 전이다.
   eximbay: eximbayProvider,
 }
+
+/** 프론트가 고를 수 있는 PG. 여기 없는 값은 create 가 거절한다(임의 문자열이 payments.provider 에 박히면
+ *  나중에 getProvider 가 던져서 그 주문은 승인도 대사도 안 된다). */
+export const SELECTABLE_PROVIDERS = ['toss', 'eximbay'] as const
 
 /**
  * payments.provider 값 → 어댑터. 없는 값이면 **크게 실패**한다(조용히 토스로 폴백하지 않는다).

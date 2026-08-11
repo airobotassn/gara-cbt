@@ -1,4 +1,4 @@
-// payments-webhook: 토스페이먼츠가 결제 상태 변경을 알려주는 엔드포인트.
+// payments-webhook: PG 가 결제 상태 변경을 알려주는 엔드포인트(토스 웹훅 · 엑심베이 status_url 공용).
 //
 // 왜 필요한가 — 웹훅 없이 확실히 새는 두 구멍이 있다:
 //   · 사용자가 가상계좌를 받고 나중에 입금 → 승인 시점엔 지급하면 안 되고, 입금 시점을 우리가 알 방법이 이것뿐
@@ -25,11 +25,30 @@ import { PAYMENT_COLS, resettle, type PaymentRow } from '../_shared/payments.ts'
 function pickIds(body: unknown): { orderId?: string; paymentKey?: string } {
   const b = (body ?? {}) as Record<string, unknown>
   const data = (b.data ?? {}) as Record<string, unknown>
-  const orderId = (b.orderId ?? data.orderId) as string | undefined
-  const paymentKey = (b.paymentKey ?? data.paymentKey) as string | undefined
+  // 엑심베이(status_url)는 스네이크케이스로 준다 — order_id · transaction_id. 이름만 다를 뿐 하는 일은 같다.
+  const payment = (b.payment ?? {}) as Record<string, unknown>
+  const orderId = (b.orderId ?? data.orderId ?? b.order_id ?? payment.order_id) as string | undefined
+  const paymentKey = (b.paymentKey ?? data.paymentKey ?? b.transaction_id ?? payment.transaction_id) as
+    | string
+    | undefined
   return {
     orderId: typeof orderId === 'string' ? orderId : undefined,
     paymentKey: typeof paymentKey === 'string' ? paymentKey : undefined,
+  }
+}
+
+/**
+ * 본문을 객체로 만든다. 토스는 JSON 이지만 **엑심베이 status_url 의 본문 형식은 아직 실기기로 확인하지 못했다**
+ * (문서가 명시하지 않는다). JSON 이 아니면 폼/쿼리스트링으로 한 번 더 시도한다 — 형식을 잘못 짚어
+ * 식별자를 못 꺼내면 그 통지는 조용히 버려지고, 브라우저가 닫힌 결제를 영영 못 찾는다.
+ */
+async function readBody(req: Request): Promise<unknown> {
+  const text = await req.text().catch(() => '')
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return Object.fromEntries(new URLSearchParams(text))
   }
 }
 
@@ -40,7 +59,7 @@ Deno.serve(async (req) => {
     const given = new URL(req.url).searchParams.get('k') ?? ''
     if (!secret || given !== secret) return json({ error: 'forbidden' }, 403)
 
-    const body = await req.json().catch(() => ({}))
+    const body = await readBody(req)
     const { orderId, paymentKey } = pickIds(body)
     if (!orderId && !paymentKey) {
       // 우리가 못 읽는 이벤트 — 재시도를 받아봐야 똑같으니 200 으로 닫는다.

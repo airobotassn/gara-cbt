@@ -12,7 +12,8 @@
 //   붙이기 전 필독: docs/토스페이먼츠-연동-가드레일.md
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { getProvider, DEFAULT_PROVIDER } from '../_shared/payment-provider.ts'
+import { getProvider, DEFAULT_PROVIDER, SELECTABLE_PROVIDERS } from '../_shared/payment-provider.ts'
+import { eximbayReady, eximbaySdkUrl, type EximbayReadyPayload } from '../_shared/eximbay.ts'
 import {
   PAYMENT_COLS,
   ensureCustomerKey,
@@ -26,6 +27,13 @@ import {
 import { findLiveTickets, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
 const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert']
+
+/** 구매자 표기를 ASCII 로만 만든다 — 한글이 PG·카드사 구간에서 깨져 돌아오면 대사할 때 사람이 못 읽는다.
+ *  이름 자체가 결제 판정에 쓰이지 않으므로 이메일 아이디로 충분하다(비면 상수). */
+function asciiBuyerName(email: string): string {
+  const id = email.split('@')[0]?.replace(/[^\x20-\x7E]/g, '').trim() ?? ''
+  return id.slice(0, 40) || 'CARIS'
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -170,12 +178,19 @@ Deno.serve(async (req) => {
         return json({ free: true, granted: true })
       }
 
+      // 새 주문을 어느 PG 로 열지. **개발 단계 비교용**으로 프론트가 고를 수 있게 열어뒀다(2026-08-11).
+      // ⚠️ 받은 문자열을 그대로 저장하면 안 된다 — getProvider 가 모르는 값이 박히면 그 주문은 승인도 대사도
+      //    못 하고 영영 pending 으로 남는다. 목록에 없으면 조용히 기본값(토스)으로 떨어뜨린다.
+      const pgAsked = String(body?.pg ?? '').trim()
+      const providerName: string = (SELECTABLE_PROVIDERS as readonly string[]).includes(pgAsked)
+        ? pgAsked
+        : DEFAULT_PROVIDER
+
       const customerKey = await ensureCustomerKey(admin, uid)
       const orderId = newOrderId(productType)
       const { error: insErr } = await admin.from('payments').insert({
         user_id: uid,
-        // 새 주문을 어느 PG 로 열지. 지금은 토스 하나뿐이라 기본값 고정(라우팅이 필요하면 payment-provider 에서 분기).
-        provider: DEFAULT_PROVIDER,
+        provider: providerName,
         order_id: orderId,
         order_name: product.orderName,
         product_type: productType,
@@ -196,13 +211,57 @@ Deno.serve(async (req) => {
         return json({ error: insErr.message }, 400)
       }
 
+      // 엑심베이는 결제창을 띄우기 전에 **서버가 준비(/ready)** 를 한 단계 더 밟는다(토스엔 없는 단계).
+      // FGKey 는 여기 보낸 값들에 대한 서명이라, 프론트가 SDK 에 넣을 페이로드도 **서버가 만든 그 객체 그대로**
+      // 내려준다(프론트가 다시 조립하면 값 하나만 어긋나도 FGKey 불일치로 결제창이 실패한다).
+      let eximbay: { sdkUrl: string; fgkey: string; payload: EximbayReadyPayload } | undefined
+      if (providerName === 'eximbay') {
+        // 콜백 주소는 브라우저가 보낸 Origin 을 쓴다 — 로컬(5173)과 배포를 같은 코드로 돌리기 위해서다.
+        // ⚠️ 여기서 오는 값을 신뢰해서 지급을 판단하는 곳은 없다. 결제 인정은 어댑터가 PG 에 되물어 확인한다.
+        const origin = (req.headers.get('origin') ?? '').trim()
+        if (!origin) return json({ error: '결제 준비에 필요한 주소를 확인할 수 없습니다.' }, 400)
+        const fnBase = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '')
+        const hookKey = (Deno.env.get('TOSS_WEBHOOK_SECRET') ?? '').trim()
+
+        const ready = await eximbayReady({
+          orderId,
+          amount: String(product.amount),
+          currency: 'KRW',
+          // 엑심베이에 넘어가는 구매자 표기. 한글 닉네임이 그대로 나가면 PG·카드사 구간에서 깨질 수 있어 ASCII 로만 만든다.
+          buyerName: asciiBuyerName((user as { email?: string }).email ?? ''),
+          buyerEmail: (user as { email?: string }).email ?? 'noreply@example.com',
+          returnUrl: `${origin}/pay/success`,
+          // 서버-서버 통지. 브라우저가 닫혀 return_url 이 안 돌아온 경우를 덮는 유일한 경로다.
+          statusUrl: `${fnBase}/functions/v1/payments-webhook?k=${encodeURIComponent(hookKey)}`,
+          lang: lang === 'ko' ? 'KO' : 'EN',
+        })
+        if (!ready.ok) {
+          // 준비가 실패하면 결제창 자체를 못 띄운다. 방금 만든 주문은 접어둔다 —
+          // pending 으로 남기면 대사가 존재하지도 않는 결제를 계속 PG 에 물어본다.
+          await admin
+            .from('payments')
+            .update({
+              status: 'failed',
+              fail_code: ready.code,
+              fail_message: ready.message,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('order_id', orderId)
+            .eq('status', 'pending')
+          return json({ error: `결제 준비에 실패했습니다. (${ready.code}) ${ready.message}` }, 502)
+        }
+        eximbay = { sdkUrl: eximbaySdkUrl(), fgkey: ready.fgkey, payload: ready.payload }
+      }
+
       return json({
         orderId,
         orderName: product.orderName,
         amount: product.amount,
         currency: 'KRW',
         customerKey,
-        env: getProvider(DEFAULT_PROVIDER).env(), // 테스트키/실키 혼용을 화면에서도 알아챌 수 있게 같이 내려준다
+        provider: providerName,
+        eximbay, // 토스면 undefined — 프론트는 이 값 유무로 결제창 종류를 고르지 않는다(provider 를 본다)
+        env: getProvider(providerName).env(), // 테스트키/실키 혼용을 화면에서도 알아챌 수 있게 같이 내려준다
       })
     }
 
@@ -341,13 +400,17 @@ Deno.serve(async (req) => {
         providerKey: paymentKey,
         orderId,
         amount: row.amount,
+        currency: row.currency,
         idempotencyKey: row.id,
+        // 엑심베이 전용 — 결제창이 브라우저로 돌려준 쿼리스트링 원문. 어댑터가 /verify 로 위변조를 검증하고
+        // 상태는 PG 에 다시 물어 확인한다(이 문자열 자체를 결제 성공 근거로 쓰지 않는다). 토스는 무시한다.
+        rawQuery: typeof body?.rawQuery === 'string' ? body.rawQuery : undefined,
       })
 
       if (!res.ok) {
         // 승인 실패를 곧바로 '결제 실패'로 단정하지 않는다 — 이미 승인된 건인데 응답만 못 받았을 수 있다.
         // 조회 API 로 실제 상태를 확인하고 분기한다.
-        const check = await provider.queryByOrderId(orderId)
+        const check = await provider.queryByOrderId(orderId, { currency: row.currency, amount: row.amount })
         if (check.ok) {
           const out = await settleFromProvider(admin, row, check.data)
           if (out.status === 'paid') {

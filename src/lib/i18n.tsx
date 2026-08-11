@@ -1837,6 +1837,14 @@ const D: Record<string, Record<Lang, string>> = {
   // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.
   // ⚠️ '○월○일 기준 환율' 이라고 쓰지 마라. 시장 환율이 아니라 우리가 정한 고정 환산값이다.
   "pay.currency_note": { ko: "실제 청구 금액 {krw} · 표시 가격은 $1 = 1,500원 고정 환산가입니다.", en: "You will be charged {krw}. Prices are shown at a fixed rate of $1 = 1,500 KRW.", ja: "実際の請求額は {krw} です。表示価格は $1 = 1,500ウォンの固定換算です。", zh: "实际扣款金额为 {krw}。显示价格按 $1 = 1,500韩元 的固定汇率换算。", hi: "वास्तविक शुल्क {krw} लिया जाएगा। दिखाई गई कीमतें $1 = 1,500 KRW की निश्चित दर पर हैं।", vi: "Số tiền thực tế bị trừ là {krw}. Giá hiển thị quy đổi theo tỷ giá cố định $1 = 1.500 KRW." },
+  // 결제대행사 선택 — **개발 단계 비교용**으로 열어둔 것이다(2026-08-11). 실제 서비스에서는 통화·카드 국적이
+  //   결정할 자리라, 정식 오픈 때는 문구를 '국내/해외'로만 남기고 회사명을 빼거나 자동 선택으로 바꿀 것.
+  // ⚠️ 회사명(TossPayments·Eximbay)은 브랜드라 번역하지 않는다.
+  "pay.pg_label": { ko: "결제수단", en: "Payment gateway", ja: "決済手段", zh: "支付方式", hi: "भुगतान गेटवे", vi: "Cổng thanh toán" },
+  "pay.pg_toss": { ko: "국내 결제 (TossPayments)", en: "Domestic (TossPayments)", ja: "国内決済 (TossPayments)", zh: "国内支付 (TossPayments)", hi: "घरेलू (TossPayments)", vi: "Trong nước (TossPayments)" },
+  "pay.pg_eximbay": { ko: "해외 결제 (Eximbay)", en: "International (Eximbay)", ja: "海外決済 (Eximbay)", zh: "海外支付 (Eximbay)", hi: "अंतरराष्ट्रीय (Eximbay)", vi: "Quốc tế (Eximbay)" },
+  // 엑심베이는 토스와 달리 화면 안에 결제수단 위젯을 그리지 않는다 — 안내가 없으면 빈 화면으로 읽힌다.
+  "pay.pg_eximbay_note": { ko: "결제하기를 누르면 Eximbay 결제창이 열리고, 결제수단은 그 창에서 고릅니다.", en: "Pressing Pay opens the Eximbay payment window, where you choose how to pay.", ja: "「決済する」を押すと Eximbay の決済画面が開き、そこで支払い方法を選びます。", zh: "点击“支付”后将打开 Eximbay 支付窗口，在该窗口中选择支付方式。", hi: "भुगतान करें दबाने पर Eximbay विंडो खुलेगी, जहाँ आप भुगतान का तरीका चुनेंगे।", vi: "Nhấn Thanh toán để mở cửa sổ Eximbay, bạn chọn phương thức tại đó." },
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": { ko: "표시 가격은 $1 = 1,500원 고정 환산가입니다.", en: "Prices are shown at a fixed rate of $1 = 1,500 KRW.", ja: "表示価格は $1 = 1,500ウォンの固定換算です。", zh: "显示价格按 $1 = 1,500韩元 的固定汇率换算。", hi: "कीमतें $1 = 1,500 KRW की निश्चित दर पर दिखाई गई हैं।", vi: "Giá hiển thị theo tỷ giá cố định $1 = 1.500 KRW." },
 

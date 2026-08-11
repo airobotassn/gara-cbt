@@ -11,6 +11,18 @@ export const isPaymentConfigured = Boolean(TOSS_CLIENT_KEY)
 
 export type ProductType = 'ebook' | 'exam' | 'cert'
 
+/** 결제대행사. **개발 단계 비교용**으로 체크아웃에서 고를 수 있게 열어둔 것이다(2026-08-11).
+ *  실제 서비스에서는 통화·카드 국적으로 갈릴 자리다 — 국내 원화=토스, 해외=엑심베이. */
+export type Pg = 'toss' | 'eximbay'
+
+/** 엑심베이 결제창에 그대로 넘길 값. **서버가 /ready 에 보낸 것과 글자 하나까지 같아야 한다** —
+ *  FGKey 가 그 값들의 서명이라 프론트가 하나라도 고치면 결제창이 실패한다. 그래서 여기서 조립하지 않는다. */
+export interface EximbayLaunch {
+  sdkUrl: string
+  fgkey: string
+  payload: Record<string, unknown>
+}
+
 export interface CreateOrderResp {
   /** 0원 상품 — 결제창을 타지 않고 서버가 바로 지급했다는 뜻. */
   free?: boolean
@@ -20,6 +32,10 @@ export interface CreateOrderResp {
   amount?: number
   currency?: string
   customerKey?: string
+  /** 이 주문이 열린 PG. 프론트는 이 값으로 결제창 종류를 고른다. */
+  provider?: Pg
+  /** provider==='eximbay' 일 때만 온다. */
+  eximbay?: EximbayLaunch
   /** 'test' | 'live' — 실키/테스트키 혼용을 화면에서 알아채기 위한 표시용. */
   env?: 'test' | 'live'
   owned?: boolean
@@ -35,12 +51,21 @@ export interface PaymentStatusResp {
   currency?: string
 }
 
-export function createOrder(productType: ProductType, productRef: string, lang: string) {
-  return callFunction<CreateOrderResp>('payments', { action: 'create', productType, productRef, lang })
+export function createOrder(productType: ProductType, productRef: string, lang: string, pg: Pg) {
+  return callFunction<CreateOrderResp>('payments', { action: 'create', productType, productRef, lang, pg })
 }
 
-/** successUrl 에서 받은 값을 서버로 넘겨 승인시킨다. 서버가 저장된 주문 금액과 대조한 뒤에만 토스를 부른다. */
-export function confirmOrder(args: { paymentKey: string; orderId: string; amount: number }) {
+/**
+ * successUrl 에서 받은 값을 서버로 넘겨 승인시킨다. 서버가 저장된 주문 금액과 대조한 뒤에만 PG 를 부른다.
+ * `rawQuery` 는 엑심베이 전용 — 결제창이 돌려준 쿼리스트링 **원문**이다(서버가 /verify 로 위변조를 검증한다).
+ * ⚠️ 손대지 말고 받은 그대로 넘길 것. 파싱해서 다시 조립하면 인코딩·순서가 달라져 검증이 깨진다.
+ */
+export function confirmOrder(args: {
+  paymentKey: string
+  orderId: string
+  amount: number
+  rawQuery?: string
+}) {
   return callFunction<PaymentStatusResp>('payments', { action: 'confirm', ...args })
 }
 

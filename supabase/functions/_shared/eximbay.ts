@@ -4,19 +4,18 @@
 // 왜 있나: 국내는 토스(원화), 해외는 엑심베이(달러). payments.ts·payments 함수는 포트만 알고 PG 를 모른다.
 //   이 파일을 추가하고 payment-provider 의 PROVIDERS 에 등록하면 토스 코드를 한 줄도 안 열고 해외 결제가 붙는다.
 //
-// **실검증 상태(2026-08-07, 문서용 공개 테스트키 mid=1849705C64 / api-test.eximbay.com):**
+// **실검증 상태(2026-08-11, 문서용 공개 테스트키 mid=1849705C64 / api-test.eximbay.com):**
 //    ✅ 인증 형태 = `base64(apikey:)` (문서 본문 'mid:apikey' 는 틀림 — 실측으로 확정)
-//    ✅ /ready → rescode 0000 + fgkey 정상 발급
+//    ✅ /ready → rescode 0000 + fgkey 정상 발급. **KRW 로도 통과한다** — 달러 환산이 필요 없다.
 //    ✅ 조회 '주문 없음' = rescode Q004 + status NONE → absent 정규화
-//    아직 **미확정(TODO)** — 결제를 실제로 완주해야 확인되는 것:
-//      · 금액 단위(USD 100 이 $100 인지 $1.00 인지 — /ready 는 통과했지만 완주 전엔 모른다)
-//      · confirm(=/verify)에 SDK 콜백 필드 배선(포트 confirm 인자 확장 필요)
-//      · retrieve 의 currency/amount 를 resettle 이 넘기도록 포트 queryBy* 확장
+//    ✅ confirm(= /verify 위변조검증 + /retrieve 상태확인) 배선 완료
+//    아직 **미확정** — 실제 카드로 완주해야 확인되는 것:
+//      · 금액 단위(KRW "1000" 이 1,000원인지 — /ready 는 통과했지만 매출 확정 전엔 모른다)
+//      · status_url(서버-서버 통지)의 본문 형식 — payments-webhook 이 JSON·폼 양쪽을 견디게는 해뒀다
 //    ⚠️ 위 공개 테스트키는 **여러 사람이 공유하는 샌드박스**다(토스 문서키와 같은 성격). 계약 후 전용 키로 재확인할 것.
 //
-// ⚠️ 통화: 지금 시스템은 원(KRW) 전제다(exam_fees·표시·amount 전부). 엑심베이는 달러 고정으로 갈 것이라,
-//    "원화 정가 → 달러 환산" 은 이 어댑터가 아니라 **결제 레이어(resolveProduct/create)** 에서 해야 한다.
-//    이 어댑터는 넘겨받은 amount·currency 를 그대로 PG 규격으로 보낼 뿐이다.
+// ⚠️ 통화: 이 어댑터는 넘겨받은 amount·currency 를 그대로 PG 규격으로 보낼 뿐이다. 나중에 해외 카드용으로
+//    달러를 받게 되면 "원화 정가 → 달러 환산" 은 여기가 아니라 **결제 레이어(resolveProduct/create)** 소관이다.
 import type { PaymentProvider, ProviderPayment, ProviderResult } from './payment-provider.ts'
 
 // 환경별 호스트. 테스트/실서버가 **URL 로** 갈린다(토스처럼 키 접두사가 아니다).
@@ -120,10 +119,21 @@ function isoFromEximbayDate(s: string): string | null {
   return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`
 }
 
+/** 프론트 JS SDK(`EXIMBAY.request_pay`)에 그대로 넘길 페이로드. /ready 에 보낸 것과 **글자 하나까지 같아야** 한다. */
+export interface EximbayReadyPayload {
+  payment: { transaction_type: string; order_id: string; currency: string; amount: string; lang: string }
+  merchant: { mid: string }
+  buyer: { name: string; email: string }
+  url: { return_url: string; status_url: string }
+}
+
 /**
  * 결제 준비 — 엑심베이 전용. **create 단계**에서 부른다(토스엔 없는 단계).
  *   FGKey 를 받아 프론트 JS SDK 가 결제창을 띄운다. 포트 인터페이스엔 없다(엑심베이만 필요) — create 분기에서 직접 부른다.
- * ⚠️ 아직 create 에 배선하지 않았다(프론트 결제창·통화 환산과 같이 붙일 것). 여기선 API 호출 형태만 확정해 둔다.
+ *
+ * ⚠️ **FGKey 는 여기 보낸 값들에 대한 서명이다.** 프론트가 `request_pay` 에 조금이라도 다른 값을 넣으면
+ *    (금액 형식·언어·URL 끝의 슬래시 하나까지) FGKey 불일치로 결제창이 그냥 실패한다. 그래서 프론트가
+ *    페이로드를 직접 조립하게 두지 않고, **서버가 /ready 에 보낸 그 객체를 통째로 돌려준다.**
  */
 export async function eximbayReady(input: {
   orderId: string
@@ -134,8 +144,10 @@ export async function eximbayReady(input: {
   returnUrl: string
   statusUrl: string
   lang?: string
-}): Promise<{ ok: true; fgkey: string } | { ok: false; code: string; message: string }> {
-  const { data } = await call('/v1/payments/ready', {
+}): Promise<
+  { ok: true; fgkey: string; payload: EximbayReadyPayload } | { ok: false; code: string; message: string }
+> {
+  const payload: EximbayReadyPayload = {
     payment: {
       transaction_type: 'PAYMENT', // 준비→SDK→검증→승인→매입 자동 단일 플로우
       order_id: input.orderId,
@@ -146,9 +158,15 @@ export async function eximbayReady(input: {
     merchant: { mid: mid() },
     buyer: { name: input.buyerName, email: input.buyerEmail },
     url: { return_url: input.returnUrl, status_url: input.statusUrl },
-  })
-  if (data?.rescode === '0000' && data.fgkey) return { ok: true, fgkey: data.fgkey }
+  }
+  const { data } = await call('/v1/payments/ready', payload)
+  if (data?.rescode === '0000' && data.fgkey) return { ok: true, fgkey: data.fgkey, payload }
   return { ok: false, code: data?.rescode ?? 'UNKNOWN', message: data?.resmsg ?? '결제 준비 실패' }
+}
+
+/** 프론트가 로드할 SDK 스크립트. 호스트가 test/live 로 갈리는 건 API 와 같다. */
+export function eximbaySdkUrl(): string {
+  return `${apiBase()}/v2/javascriptSDK.js`
 }
 
 /** rescode → ProviderResult 오류. absent(주문 부재 확정) 판정은 retrieve 의 status=NONE 에서 따로 한다. */
@@ -169,30 +187,54 @@ export const eximbayProvider: PaymentProvider = {
   env,
 
   /**
-   * 승인/검증 — 엑심베이는 SDK 콜백(status_url) 후 `/verify` 로 결과를 검증한다(토스의 confirm 자리).
-   * ⚠️ TODO(verify): /verify 는 콜백에서 온 필드(fgkey·rescode·transaction_id·auth_code·email)를 같이 넘겨야 한다.
-   *    그 값들은 포트의 confirm 인자에 아직 없다 — create/confirm 배선(+ 프론트 콜백 수신)을 붙일 때 포트 인자를
-   *    optional raw 로 넓히고 여기서 꺼내 쓴다. 그 전엔 이 메서드를 실제로 부르면 안 된다(형태만 확정).
+   * 승인 — 토스의 confirm 자리이지만 하는 일이 다르다. 엑심베이는 결제창에서 **승인·매입까지 이미 끝내고**
+   * 그 결과를 return_url 쿼리스트링으로 브라우저에 돌려준다. 그래서 여기서 할 일은 "승인시키기"가 아니라
+   * **돌아온 결과가 진짜인지 확인하기** 두 단계다:
+   *
+   *   ① `/verify` — 받은 쿼리스트링 **원문**을 통째로 넘기면 엑심베이가 fgkey 로 위변조를 판정한다.
+   *      브라우저를 거쳐 온 값이라 이 검증 없이는 `rescode=0000` 을 손으로 붙여 무료 지급을 만들 수 있다.
+   *   ② `/retrieve` — **실제 상태(SALE/AUTH/REGISTERED)는 return_url 에 없다.** 매출확정인지 승인만인지
+   *      가르는 값이 조회에만 있어서, 검증을 통과해도 상태는 서버-서버로 다시 물어야 한다.
+   *      (AUTH 를 paid 로 읽으면 매입 전 건에 물건을 준다.)
    */
   confirm: async (a) => {
-    // 지금은 최소 필드만으로 호출 형태를 남겨둔다. 실제 배선 전 호출을 막기 위해 명시적으로 실패시킨다.
-    void a
-    return {
-      ok: false,
-      error: {
-        code: 'NOT_WIRED',
-        message: '엑심베이 confirm 은 SDK 콜백 필드 배선 후 사용 가능합니다(어댑터 주석 TODO 참고).',
-        httpStatus: 501,
-        absent: false,
-      },
+    const raw = (a.rawQuery ?? '').replace(/^\?/, '')
+    if (!raw) {
+      return {
+        ok: false,
+        error: {
+          code: 'CALLBACK_MISSING',
+          message: '엑심베이 결제 결과가 전달되지 않았습니다.',
+          httpStatus: 400,
+          absent: false,
+        },
+      }
     }
+
+    // 결제창이 실패로 돌아온 경우 — 검증할 것도 없다. PG 사유를 그대로 올려 사용자에게 보여준다.
+    const q = new URLSearchParams(raw)
+    const cbCode = q.get('rescode') ?? ''
+    if (cbCode && cbCode !== '0000') {
+      return errResult(400, { rescode: cbCode, resmsg: q.get('resmsg') ?? '결제가 완료되지 않았습니다.' })
+    }
+
+    // ① 위변조 검증. 원문을 **그대로** 넘긴다(파싱 후 재조립하면 인코딩·순서가 달라져 fgkey 가 어긋난다).
+    const ver = await call('/v1/payments/verify', { data: raw })
+    if (ver.data?.rescode !== '0000') {
+      return errResult(ver.http, ver.data ?? { rescode: 'VERIFY_FAILED', resmsg: '결제 결과 검증에 실패했습니다.' })
+    }
+
+    // ② 실제 상태 조회. 우리 주문 기준값(저장된 금액·통화)으로 묻는다 — 콜백이 준 금액으로 물으면
+    //    검증을 통과한 값이라도 우리 원장과 어긋난 건을 그대로 승인해버린다.
+    return retrieve('order_id', a.orderId, { currency: a.currency, amount: String(a.amount) })
   },
 
-  // ⚠️ 엑심베이 retrieve 는 currency·amount 도 **필수**다(실검증 확인). 포트 queryBy* 는 값 하나만 받아서
-  //    지금은 그 둘을 못 넘긴다 → resettle 에 엑심베이를 물리려면 포트 시그니처를 (value,{currency,amount})로
-  //    넓혀야 한다(create/프론트 배선 때 같이). 그 전엔 엑심베이 조회가 필수필드 누락으로 실패한다.
-  queryByKey: (transactionId) => retrieve('transaction_id', transactionId),
-  queryByOrderId: (orderId) => retrieve('order_id', orderId),
+  // 엑심베이 retrieve 는 currency·amount 가 **필수**다(실검증 확인). opts 없이 부르면 그 둘이 빠져 실패하므로,
+  // 호출부(resettle·reconcile)는 저장된 주문 행의 값을 반드시 같이 넘긴다.
+  queryByKey: (transactionId, opts) =>
+    retrieve('transaction_id', transactionId, opts && { currency: opts.currency, amount: String(opts.amount) }),
+  queryByOrderId: (orderId, opts) =>
+    retrieve('order_id', orderId, opts && { currency: opts.currency, amount: String(opts.amount) }),
 }
 
 /** 조회 — order_id 또는 transaction_id 로. status=NONE/Q004 이면 **주문 부재(absent)** 로 접어 resettle 규격에 맞춘다. */

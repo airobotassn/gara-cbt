@@ -420,9 +420,12 @@ export async function resettle(
   row: PaymentRow,
 ): Promise<{ orderId: string; status: string; fulfilled: boolean; note?: string }> {
   const provider = getProvider(row.provider)
+  // 조회에 주문의 금액·통화를 같이 넘긴다 — 엑심베이 retrieve 는 이 둘이 **필수**라 없으면 조회 자체가 실패한다.
+  // 출처는 반드시 저장된 행이다(콜백·요청 값 금지). 토스 어댑터는 이 인자를 무시한다.
+  const q = { currency: row.currency, amount: row.amount }
   const res = row.payment_key
-    ? await provider.queryByKey(row.payment_key)
-    : await provider.queryByOrderId(row.order_id)
+    ? await provider.queryByKey(row.payment_key, q)
+    : await provider.queryByOrderId(row.order_id, q)
 
   if (!res.ok) {
     // ⚠️ 만료로 접는 조건이 좁은 데는 이유가 있다. expired 가 되면 다음 대사 대상에서 빠지므로,
