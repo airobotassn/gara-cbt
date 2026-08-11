@@ -98,12 +98,56 @@ function mapStatus(s: string | undefined): ProviderPayment['status'] {
   }
 }
 
+/**
+ * 결제수단 코드 → 사람이 읽는 이름. 엑심베이는 `payment_method` 를 **`P101` 같은 코드**로 준다.
+ *
+ * 왜 여기서 이름으로 바꾸나 — `payments.method` 는 대사·분쟁 때 **사람이 읽는 칸**이고, 토스 어댑터는
+ * 이미 `카드`·`가상계좌` 처럼 읽히는 값을 넣는다. 한쪽만 코드로 두면 같은 컬럼을 볼 때마다 코드표를
+ * 찾아야 하고, 화면에 그대로 내보내면 사용자에게 `P101` 이 보인다.
+ * ⚠️ 원문이 사라지는 건 아니다 — PG 응답 전체는 `payments.raw` 에 그대로 저장된다.
+ * ⚠️ 모르는 코드는 **코드 그대로 남긴다**(빈칸·'기타'로 만들면 새 수단이 붙었을 때 알아챌 방법이 없다).
+ *
+ * 출처: developer.eximbay.com 의 결제수단 코드표(2026-08-11 확인). 엑심베이가 수단을 추가하면 여기 추가.
+ */
+const METHOD_NAMES: Record<string, string> = {
+  // 공통·해외 카드
+  P000: '신용카드', P101: 'VISA', P102: 'MasterCard', P103: 'AMEX', P104: 'JCB',
+  P106: 'Diners', P107: 'Discover', P108: 'Mir', P109: 'UnionPay',
+  // 국내 카드사
+  P110: 'BC카드', P111: 'KB카드', P112: '하나카드', P113: '삼성카드', P114: '신한카드',
+  P115: '현대카드', P116: '롯데카드', P117: '농협카드', P119: '씨티카드', P120: '우리카드',
+  P121: '수협카드', P122: '제주카드', P123: 'JB카드', P124: '광주은행카드',
+  P125: '카카오뱅크', P126: '케이뱅크', P127: '미래에셋대우', P128: '코나카드',
+  P129: '토스카드', P130: '차이카드',
+  // 국내 간편결제·이체
+  P301: '실시간 계좌이체', P302: '카카오페이', P303: '토스', P304: 'PAYCO', P305: '가상계좌',
+  P015: '네이버페이', P307: '네이버페이(카드)', P308: '네이버페이(포인트)',
+  // 해외 간편결제
+  P001: 'PayPal', P002: 'CUP(UPOP)', P003: 'Alipay', P006: 'ECONTEXT',
+  P141: 'WeChat Pay(PC)', P142: 'WeChat Pay(모바일)', P143: 'WeChat Pay(POP)', P144: 'WeChat Pay(MINI)',
+  P174: 'Alipay+(Alipay CN)', P175: 'Alipay+(TrueMoney)', P176: 'Alipay+(DANA)',
+  P177: 'Alipay+(Alipay HK)', P178: 'Alipay+(TNG)', P179: 'Alipay+(GCash)', P195: 'Alipay+(MINI)',
+  P197: 'Klarna',
+  P198: 'Apple Pay', P091: 'Apple Pay(VISA)', P092: 'Apple Pay(MasterCard)',
+  P093: 'Apple Pay(AMEX)', P094: 'Apple Pay(JCB)', P095: 'Apple Pay(UnionPay)',
+  P199: '삼성페이', P096: '삼성페이(VISA)', P097: '삼성페이(MasterCard)', P098: '삼성페이(AMEX)',
+  P300: 'Unifipay', P310: '가상계좌(해외)',
+  P350: 'GrabPay(MYR)', P351: 'GrabPay(SGD)', P352: 'ShopeePay(THB)', P353: 'JKOPAY(TWD)', P354: 'PayPay',
+}
+
+/** 코드표에 없으면 받은 값을 그대로 돌려준다(정보를 지우지 않는다). */
+export function eximbayMethodName(code: string | null | undefined): string | null {
+  const c = (code ?? '').trim()
+  if (!c) return null
+  return METHOD_NAMES[c.toUpperCase()] ?? c
+}
+
 function normalize(p: EximbayPayment): ProviderPayment {
   return {
     providerKey: p.transaction_id ?? null,
     orderId: p.order_id ?? '',
     status: mapStatus(p.status),
-    method: (p.payment_method as string | undefined) ?? null,
+    method: eximbayMethodName(p.payment_method as string | undefined),
     // REGISTERED(입금 후 확정)는 토스 가상계좌와 같은 성격 — 발급됐을 뿐 아직 돈이 안 들어온 상태.
     isVirtualAccount: p.status === 'REGISTERED',
     // YYYYMMDDHHMMSS → ISO 로 대충 변환(정확한 tz 는 실검증 때). 없으면 null.
