@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>시켜라 CARI — CARI 공방</title>
+<!--
+  ─────────────────────────────────────────────────────────────
+  시켜라 CARI (prompt-cari) — 프로토타입 v3
+  ─────────────────────────────────────────────────────────────
+  세계관 = CARI 공방. 손님이 도면을 들고 오고, 당신은 CARI 에게 **말로 시켜서** 만든다.
+
+  v2 → v3 에서 바뀐 것과 그 이유:
+   ① **요구 목록(힌트)을 없앴다.** "바퀴로 굴러간다" 같은 체크리스트가 떠 있으면
+      카드 문구와 글자가 겹쳐서 읽지도 않고 정답이 나왔다. 이제 단서는 **도면 그림**과
+      **손님 대사** 뿐이다. 그림을 말로 옮기는 것이 이 게임의 전부다.
+   ② **카드에 부위별 색을 넣었다.** 단, ⚠️ 색이 함정을 알려주면 ①이 무의미해진다 —
+      그래서 카테고리를 '재량·품질'(함정 전용) 에서 **부위(이동·팔·머리·마감·전체)** 로 갈아엎고
+      같은 부위 안에 정상 카드와 함정을 섞었다. 새 카드를 추가할 때도 이 규칙을 깨지 말 것.
+   ③ 별점(첫 판에 맞히면 ★★★)을 넣어 "그냥 다 눌러보기" 대신 한 번에 맞힐 이유를 만들었다.
+
+  ⚠️ 실제 LLM 호출은 없다. 카드가 조립 스펙을 바꾸고 그 스펙을 SVG 로 그린다.
+  ⚠️ 적용 순서가 곧 교훈이다 — 정상 카드를 먼저 적용하고 **함정이 그 위를 덮어쓴다.**
+     "좋은 지시를 넣어도 나쁜 지시 하나가 결과를 가져간다."
+  지표: 도달 레벨 (5) · 동률은 소요시간
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(120% 90% at 50% 0%,#f8fafd 0%,#e6ecf7 60%,#d5dded 100%);
+    color:#232b40;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  /* 앱 안에서는 세로 화면 iframe 이지만, 파일을 그냥 열면 데스크톱 전체 폭이 된다.
+     폭을 안 묶으면 도면과 완성품이 화면 양 끝으로 흩어져 대조가 안 된다. */
+  #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;
+    display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 0 80px -20px rgba(20,30,60,.18)}
+
+  /* ── 상단 ─────────────────────────────────── */
+  .top{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 13px 5px}
+  .ordno{padding:4px 10px;border-radius:7px;background:#16233d;color:#fff;font-weight:900;font-size:11.5px;
+    letter-spacing:.03em}
+  .ordname{font-weight:900;font-size:14.5px;letter-spacing:-.02em}
+  .stars{margin-left:auto;font-size:13px;letter-spacing:1px;color:#e0a92a;font-weight:900}
+  .stars b{color:#c8d0e0}
+
+  /* ── 손님 ─────────────────────────────────── */
+  .cust{flex:0 0 auto;display:flex;align-items:flex-start;gap:8px;padding:0 13px 8px}
+  .cust .who{flex:0 0 auto;padding:5px 9px;border-radius:8px;background:#16233d;color:#cfe0ff;
+    font-size:11px;font-weight:900;white-space:nowrap}
+  .cust .say{flex:1 1 auto;position:relative;background:#fff;border:1px solid rgba(35,43,64,.12);
+    border-radius:11px;padding:8px 11px;font-size:12.5px;font-weight:700;line-height:1.5;
+    color:#3b4560;box-shadow:0 4px 12px -8px rgba(20,30,60,.5);word-break:keep-all}
+  .cust .say::before{content:'';position:absolute;left:-5px;top:12px;width:9px;height:9px;
+    background:#fff;border-left:1px solid rgba(35,43,64,.12);border-bottom:1px solid rgba(35,43,64,.12);
+    transform:rotate(45deg)}
+
+  /* ── 도면 vs 완성품 ───────────────────────── */
+  /* 화면이 길면 도면·완성품이 커진다 — 이 둘을 대조하는 게 게임의 본체라 남는 세로는 여기가 먹는다. */
+  .stage{flex:1 1 auto;min-height:172px;max-height:300px;display:flex;align-items:stretch;gap:8px;padding:0 13px 9px}
+  .slot{flex:1 1 0;min-width:0;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+  .slot .cap{font-size:10px;font-weight:900;letter-spacing:.08em;text-align:center;padding:6px 4px 2px}
+  .bot{flex:1 1 auto;min-height:0;display:grid;place-items:center;overflow:hidden;padding:0 6px 6px}
+  .bot svg{width:100%;height:100%;display:block}
+
+  /* 도면 = 청사진. 손님이 그려온 그림이라는 게 한눈에 보여야 결과와 안 헷갈린다. */
+  .slot.plan{background:
+      linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px) 0 0/100% 13px,
+      linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px) 0 0/13px 100%,
+      linear-gradient(#12305c,#0d2447);
+    border:1px solid #0a1c38}
+  .slot.plan .cap{color:#7fb0ee}
+  .slot.made{background:linear-gradient(#fff,#f4f8ff);border:1px solid rgba(35,43,64,.12)}
+  .slot.made .cap{color:#5f6c8a}
+
+  .paint{display:flex;align-items:center;justify-content:center;gap:5px;padding:0 0 6px}
+  .paint i{width:12px;height:12px;border-radius:50%;border:1.5px solid rgba(255,255,255,.7);display:block}
+  .paint span{font-size:9.5px;font-weight:900;color:#9cc4f2;letter-spacing:.04em}
+
+  .bot.build svg{animation:build .5s cubic-bezier(.2,1.2,.3,1)}
+  @keyframes build{0%{transform:translateY(-22px) scale(.88);opacity:0}60%{transform:translateY(3px) scale(1.03);opacity:1}100%{transform:none}}
+  .bot.fall svg{animation:fall .85s ease-in .3s forwards;transform-origin:50% 92%}
+  @keyframes fall{0%{transform:rotate(0)}25%{transform:rotate(-7deg)}100%{transform:rotate(-56deg) translateY(9px)}}
+  .bot.wob svg{animation:wob .55s ease-in-out .25s 2}
+  @keyframes wob{0%,100%{transform:rotate(0)}25%{transform:rotate(3.5deg)}75%{transform:rotate(-3.5deg)}}
+  .empty{font-size:11px;font-weight:800;color:#aeb8cc;text-align:center;line-height:1.6}
+
+  /* ── 시킬 말 ──────────────────────────────── */
+  .sayhead{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 13px 7px}
+  .sayhead h2{margin:0;font-size:14px;font-weight:900;letter-spacing:-.02em;color:#232b40}
+  .sayhead h2 small{display:block;font-size:10.5px;font-weight:800;color:#8590a8;margin-top:2px;
+    letter-spacing:0}
+  .cnt{margin-left:auto;padding:5px 11px;border-radius:999px;background:#16233d;color:#fff;
+    font-size:11.5px;font-weight:900}
+  .cnt.zero{background:#e2e7f1;color:#8590a8}
+
+  .scroll{flex:1 1 auto;overflow-y:auto;padding:0 13px 8px;min-height:0;-webkit-overflow-scrolling:touch}
+  .tray{display:flex;flex-direction:column;gap:7px}
+  .pc{display:flex;align-items:stretch;gap:0;border-radius:12px;cursor:pointer;overflow:hidden;
+    background:#fff;border:1.5px solid rgba(35,43,64,.13);text-align:left;font:inherit;color:inherit;
+    transition:transform .07s,border-color .12s,box-shadow .12s}
+  .pc:active{transform:translateY(1px)}
+  .pc .bar{flex:0 0 auto;width:5px}
+  .pc .in{flex:1 1 auto;display:flex;align-items:flex-start;gap:8px;padding:10px 11px}
+  .pc .tag{flex:0 0 auto;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:900;
+    color:#fff;margin-top:1px;letter-spacing:.02em}
+  .pc .txt{flex:1 1 auto;font-size:13px;font-weight:700;line-height:1.45;word-break:keep-all}
+  .pc .chk{flex:0 0 auto;width:19px;height:19px;border-radius:6px;margin-top:1px;
+    border:1.5px solid #cdd5e4;display:grid;place-items:center;font-size:11px;color:transparent}
+  .pc.on{border-color:#16233d;box-shadow:0 0 0 3px rgba(22,35,61,.10)}
+  .pc.on .chk{background:#16233d;border-color:#16233d;color:#fff}
+  .pc.on .in{background:#f5f8ff}
+
+  /* ── 시키기 ───────────────────────────────── */
+  .sendwrap{flex:0 0 auto;padding:7px 13px calc(11px + env(safe-area-inset-bottom));
+    background:linear-gradient(rgba(230,236,247,0),#e6ecf7 45%)}
+  .send{width:100%;padding:14px;border:0;border-radius:13px;cursor:pointer;background:#16233d;color:#fff;
+    font:900 15px/1 system-ui,sans-serif;box-shadow:0 4px 0 #0a1327,0 10px 22px -10px rgba(10,20,50,.8)}
+  .send:active{transform:translateY(2px);box-shadow:0 2px 0 #0a1327}
+  .send:disabled{background:#aab4c8;box-shadow:0 4px 0 #8d97ad;cursor:default}
+
+  /* ── 판정 ─────────────────────────────────── */
+  /* ⚠️ 시트가 미끄러져 나가는 동안에도 버튼이 눌려서 두 번 탭하면 한 단계를 건너뛴다.
+     보이지 않을 때는 클릭을 안 받게 막는다. */
+  .fb{position:absolute;left:13px;right:13px;bottom:13px;z-index:30;background:#fff;
+    border:1px solid rgba(35,43,64,.12);border-radius:16px;padding:13px 15px;
+    box-shadow:0 22px 46px -18px rgba(20,30,60,.55);transform:translateY(155%);
+    pointer-events:none;transition:transform .24s cubic-bezier(.2,.9,.3,1)}
+  .fb.on{transform:translateY(0);pointer-events:auto}
+  .fbhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .fbhead b{font-size:15px;font-weight:900;letter-spacing:-.02em}
+  .fbhead .st{margin-left:auto;font-size:14px;color:#e0a92a;font-weight:900;letter-spacing:1px}
+  .fb.yes .fbhead b{color:#0b8a4b} .fb.no .fbhead b{color:#d8443a}
+  .fbwhy{margin:0 0 11px;font-size:12.5px;font-weight:700;line-height:1.55;color:#5b6a8a;word-break:keep-all}
+  .fbwhy em{font-style:normal;color:#d8443a;font-weight:900}
+  .fbwhy q{color:#232b40;font-weight:900;quotes:'「' '」'}
+  .diff{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 11px}
+  .diff span{padding:4px 9px;border-radius:7px;background:#fff2f0;border:1px solid #ffd0c8;
+    color:#c0392b;font-size:11.5px;font-weight:900}
+  .fbbtn{width:100%;padding:12px;border:0;border-radius:12px;cursor:pointer;background:#16233d;color:#fff;
+    font:900 14px/1 system-ui,sans-serif}
+  .fbbtn.ghost{background:#eef1f7;color:#5b6a8a}
+
+  /* ── 오버레이 ─────────────────────────────── */
+  .ov{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:18px;
+    background:rgba(14,22,42,.6);backdrop-filter:blur(3px)}
+  .ov.hidden{display:none}
+  .sheet{width:100%;max-width:410px;max-height:100%;overflow-y:auto;background:#fff;border-radius:20px;
+    padding:20px 18px;box-shadow:0 24px 60px -20px rgba(10,20,50,.7)}
+  .art{width:74px;height:74px;display:block;margin:0 auto}
+  .ttl{text-align:center;font-size:23px;font-weight:900;letter-spacing:-.03em;margin:10px 0 4px}
+  .ttl i{font-style:normal;color:#16233d}
+  .lead{text-align:center;font-size:13.5px;font-weight:700;line-height:1.6;color:#6b7488;margin:0 0 14px}
+  .rules{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .rules li{display:flex;gap:9px;align-items:flex-start;font-size:13px;font-weight:700;line-height:1.5;
+    background:#f3f6fc;border-radius:11px;padding:9px 11px}
+  .rules li span{flex:0 0 auto;color:#16233d;font-weight:900}
+  .big{text-align:center;font-size:34px;font-weight:900;letter-spacing:1px;color:#e0a92a;line-height:1.1}
+  .biglab{text-align:center;font-size:11.5px;font-weight:800;color:#7c869e;margin:4px 0 13px;letter-spacing:.05em}
+  .note{background:#f0f5ff;border:1px solid #cfdcff;border-radius:12px;padding:10px 12px;
+    font-size:12.5px;line-height:1.6;font-weight:700;color:#28477f;margin-bottom:14px}
+  .btn{width:100%;padding:13px;border:0;border-radius:13px;cursor:pointer;background:#16233d;color:#fff;
+    font:900 14.5px/1 system-ui,sans-serif}
+
+  .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
+    padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
+    border:1px solid rgba(35,43,64,.16);background:rgba(255,255,255,.92);color:#232b40}
+  .mg-rank.on{display:inline-flex}
+
+  /* ⚠️ .hidden 은 반드시 스타일시트 **맨 끝**에 둔다. 특정도가 같은 .paint / .ov / .diff 보다
+     뒤에 있어야 이긴다 — 위에 두면 숨겨야 할 것이 안 숨는다(실제로 '지정 도장색' 칩이 그랬다). */
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="top">
+    <span class="ordno">주문 <b id="ordNum">1</b>/5</span>
+    <span class="ordname" id="ordName">—</span>
+    <span class="stars" id="starEl"></span>
+  </div>
+
+  <div class="cust">
+    <span class="who" id="custWho">—</span>
+    <span class="say" id="custSay">—</span>
+  </div>
+
+  <div class="stage">
+    <div class="slot plan">
+      <p class="cap">손님이 가져온 도면</p>
+      <div class="bot" id="goalBot"></div>
+      <div class="paint hidden" id="paintChip"><i id="paintDot"></i><span id="paintTxt">지정 도장색</span></div>
+    </div>
+    <div class="slot made">
+      <p class="cap">CARI 가 만든 것</p>
+      <div class="bot" id="madeBot"><p class="empty">아직 아무 말도<br/>안 했다</p></div>
+    </div>
+  </div>
+
+  <div class="sayhead">
+    <h2>CARI 에게 시킬 말<small>도면대로 나오게 고른다 · 많이 고른다고 좋아지지 않는다</small></h2>
+    <span class="cnt zero" id="cntEl">0개</span>
+  </div>
+
+  <div class="scroll"><div class="tray" id="tray"></div></div>
+
+  <div class="sendwrap"><button class="send" id="sendBtn">CARI 에게 시키기</button></div>
+
+  <div class="fb" id="fb">
+    <div class="fbhead"><b id="fbTtl">—</b><span class="st" id="fbStar"></span></div>
+    <div class="diff hidden" id="fbDiff"></div>
+    <p class="fbwhy" id="fbWhy">—</p>
+    <button class="fbbtn" id="fbBtn">다음</button>
+  </div>
+</div>
+
+<!-- 인트로 -->
+<div class="ov" id="startOv">
+  <div class="sheet">
+    <div id="sArt"></div>
+    <p class="ttl">시켜라 <i>CARI</i></p>
+    <p class="lead">여기는 CARI 공방.<br/>손님이 도면을 들고 온다. 만드는 건 CARI 다.<br/>당신이 할 일은 <b>말로 시키는 것</b> 하나다.</p>
+    <ul class="rules">
+      <li><span>①</span><div>왼쪽 <b>도면</b>을 봐라. 답은 거기 다 그려져 있다. 손님 말도 흘리지 마라.</div></li>
+      <li><span>②</span><div>시킬 말을 골라 CARI 에게 넘긴다. <b>안 시킨 건 안 만들어진다.</b></div></li>
+      <li><span>③</span><div>말이 많다고 좋아지지 않는다. <b>결과를 망치는 말</b>이 섞여 있다.</div></li>
+      <li><span>④</span><div>한 번에 맞히면 <b>★★★</b>. 다시 시킬 때마다 별이 하나씩 준다.</div></li>
+    </ul>
+    <button class="btn" id="startBtn">공방 열기</button>
+  </div>
+</div>
+
+<!-- 종료 -->
+<div class="ov hidden" id="overOv">
+  <div class="sheet">
+    <div id="oArt"></div>
+    <p class="ttl">주문 다섯 건 완료</p>
+    <p class="big" id="oStars">★★★★★</p>
+    <p class="biglab" id="oStarLab">별 15 / 15</p>
+    <div class="note">프롬프트는 길게 쓰는 기술이 아니라 <b>빠뜨리지 않고, 서로 부딪히지 않게</b> 적는 기술이다. 방금 고른 말들이 그 조건이었다.</div>
+    <button class="btn" id="oAgain">처음부터 다시</button>
+  </div>
+</div>
+
+<script>
+/* ================= CARI mascot (기존 게임과 동일 자산) ================= */
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:74px;height:74px">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+
+/* ===================== 조립 로봇 =====================
+   spec = {base:'none|wheel|leg|track', arms:0|1|2|4, head:'plain|cam|many',
+           size:'normal|huge', color:'#rrggbb'}
+   ⚠️ 도면과 완성품을 **같은 함수**로 그린다. 두 벌로 그리면 "도면엔 팔이 둘인데
+      판정은 하나" 같은 어긋남이 바로 생긴다. plan 모드는 선만 남긴 청사진.
+   ⚠️ huge 는 일부러 프레임 밖으로 넘치게 그린다 — 숫자가 아니라 넘치는 그림으로 읽혀야 한다.
+==================================================== */
+function robotSVG(s,o={}){
+  const plan=!!o.plan;
+  const fill = plan?'none':(s.color||'#93a0b8');
+  const solid= plan?'none':'#5b6a8a';
+  const line = plan?'#8fc4ff':'#5b6a8a';
+  const ink  = plan?'none':'#28324c';
+  const inkL = plan?'#8fc4ff':'#28324c';
+  const lens = plan?'none':'#1f6dff';
+  const sw   = plan?1.6:1.5;
+  const g=[];
+
+  if(!plan) g.push(`<ellipse cx="60" cy="140" rx="34" ry="4.6" fill="rgba(30,45,80,.16)"/>`);
+
+  if(s.base==='wheel'){
+    g.push(`<circle cx="42" cy="124" r="14" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<circle cx="42" cy="124" r="6" fill="${plan?'none':'#e8edf7'}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<circle cx="78" cy="124" r="14" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<circle cx="78" cy="124" r="6" fill="${plan?'none':'#e8edf7'}" stroke="${line}" stroke-width="${sw}"/>`);
+  } else if(s.base==='leg'){
+    g.push(`<rect x="40" y="104" width="12" height="26" rx="5" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<rect x="68" y="104" width="12" height="26" rx="5" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<rect x="33" y="126" width="24" height="9" rx="4.5" fill="${ink}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<rect x="63" y="126" width="24" height="9" rx="4.5" fill="${ink}" stroke="${line}" stroke-width="${sw}"/>`);
+  } else if(s.base==='track'){
+    g.push(`<rect x="24" y="110" width="72" height="26" rx="13" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    [38,60,82].forEach(x=>g.push(`<circle cx="${x}" cy="123" r="6.5" fill="${plan?'none':'#e8edf7'}" stroke="${line}" stroke-width="${sw}"/>`));
+  }
+
+  const arm=(x,y,w,flip)=>`
+    <rect x="${x}" y="${y}" width="${w}" height="10" rx="5" fill="${fill}" stroke="${line}" stroke-width="${sw}"/>
+    <rect x="${flip?x-9:x+w-1}" y="${y-3}" width="10" height="16" rx="4" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`;
+  if(s.arms>=1) g.push(arm(86,74,20,false));
+  if(s.arms>=2) g.push(arm(14,74,20,true));
+  if(s.arms>=4){
+    g.push(`<g transform="rotate(-34 60 80)">${arm(86,74,18,false)}</g>`);
+    g.push(`<g transform="rotate(34 60 80)">${arm(16,74,18,true)}</g>`);
+  }
+
+  g.push(`<rect x="36" y="62" width="48" height="50" rx="13" fill="${fill}" stroke="${line}" stroke-width="${sw+.1}"/>`);
+  g.push(`<rect x="46" y="80" width="28" height="16" rx="5" fill="${plan?'none':'rgba(255,255,255,.5)'}" stroke="${line}" stroke-width="${plan?1:0}"/>`);
+  g.push(`<rect x="55" y="52" width="10" height="10" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+  g.push(`<rect x="40" y="24" width="40" height="32" rx="11" fill="${fill}" stroke="${line}" stroke-width="${sw+.1}"/>`);
+
+  if(s.head==='cam'){
+    g.push(`<circle cx="60" cy="40" r="10" fill="${ink}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<circle cx="60" cy="40" r="5.4" fill="${lens}" stroke="${line}" stroke-width="${plan?1.2:0}"/>`);
+    if(!plan) g.push(`<circle cx="57.6" cy="37.6" r="1.8" fill="#fff" opacity=".85"/>`);
+  } else if(s.head==='many'){
+    g.push(`<circle cx="60" cy="40" r="7" fill="${ink}" stroke="${line}" stroke-width="${sw}"/>`);
+    [[45,32],[75,32],[45,48],[75,48],[52,26],[68,26]].forEach(([x,y])=>
+      g.push(`<circle cx="${x}" cy="${y}" r="4.2" fill="${ink}" stroke="${line}" stroke-width="${sw}"/>`));
+    g.push(`<path d="M46 24 v-9 M74 24 v-9" stroke="${line}" stroke-width="2.4" stroke-linecap="round"/>`);
+    g.push(`<circle cx="46" cy="13" r="3.4" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<circle cx="74" cy="13" r="3.4" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+  } else {
+    g.push(`<circle cx="52" cy="40" r="3.6" fill="${inkL}"/><circle cx="68" cy="40" r="3.6" fill="${inkL}"/>`);
+  }
+
+  const inner=g.join('');
+  const wrap = s.size==='huge'
+    ? `<g transform="translate(60,140) scale(1.42) translate(-60,-140)">${inner}</g>` : inner;
+  return `<svg viewBox="0 0 120 148" xmlns="http://www.w3.org/2000/svg">${wrap}</svg>`;
+}
+
+/* ===================== 카드 부위 =====================
+   ⚠️ 색은 **부위**를 뜻한다. 절대 '좋은 말/나쁜 말'을 뜻하게 만들지 마라 —
+      그 순간 색이 정답표가 되고 도면을 안 본다. 같은 부위에 정상과 함정을 섞을 것.
+==================================================== */
+const PART={
+  move  :{label:'이동',c:'#2f7de1'},
+  arm   :{label:'팔',  c:'#12a06a'},
+  head  :{label:'머리',c:'#8257e5'},
+  finish:{label:'마감',c:'#e0891a'},
+  whole :{label:'전체',c:'#6b7589'}
+};
+const PARTNAME={base:'이동부',arms:'팔',head:'머리',color:'도장색',size:'크기'};
+
+const GRAY='#93a0b8', YELLOW='#f5c518', BLUE='#4a86ff';
+const BASE_SPEC={base:'none',arms:0,head:'plain',size:'normal',color:GRAY};
+const ALSSEO={base:'leg',arms:4,head:'many'};
+
+const LEVELS=[
+{
+  name:'창고 심부름꾼', who:'박 반장',
+  say:'창고에서 부품 좀 날라줄 놈이 필요해. 바닥은 평평하니까 복잡할 것 없어.',
+  goal:{base:'wheel',arms:0,head:'plain',size:'normal',color:GRAY},
+  cards:[
+    {p:'move',  t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
+    {p:'whole', t:'나머지는 네가 알아서 멋있게 만들어줘.', bad:1, set:ALSSEO,
+     why:'<q>알아서</q> 는 지시가 아니다. 기준을 안 주면 CARI 가 임의로 정하고, 시킬 때마다 다른 게 나온다.'},
+    {p:'finish',t:'기왕이면 크고 튼튼하게 만들어줘.', bad:1, set:{size:'huge'},
+     why:'크게 만들라 하면 <em>진짜로 크게</em> 만든다. 쓸 자리를 안 알려주면 “좋게”가 “과하게”가 된다.'},
+    {p:'arm',   t:'혹시 모르니 팔도 몇 개 달아줘.', bad:1, set:{arms:4},
+     why:'<q>혹시 모르니</q> 붙인 말은 반드시 결과에 나타난다. 필요 없으면 <em>안 적는 것</em>이 맞다.'}
+  ]
+},
+{
+  name:'상자 집는 손', who:'박 반장',
+  say:'이제 물건도 좀 집어 들었으면 해. 한 손이면 충분하고, 바닥은 전과 같아.',
+  goal:{base:'wheel',arms:1,head:'plain',size:'normal',color:GRAY},
+  cards:[
+    {p:'move',  t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
+    {p:'arm',   t:'물건 집을 팔을 하나만 달아줘.', set:{arms:1}},
+    {p:'arm',   t:'팔은 넉넉히 달아줘, 많을수록 좋지.', bad:1, set:{arms:4},
+     why:'수량을 <q>넉넉히</q> 로 맡기면 CARI 는 최대로 간다. 개수는 숫자로 못 박아야 한다.'},
+    {p:'whole', t:'세부는 알아서 채워줘.', bad:1, set:ALSSEO,
+     why:'정상적인 말을 아무리 넣어도 <em>“알아서” 한 줄이 그 위를 덮는다.</em> 나쁜 지시가 좋은 지시를 이긴다.'},
+    {p:'finish',t:'튼튼한 게 좋으니 크게 만들어줘.', bad:1, set:{size:'huge'},
+     why:'“튼튼함”은 크기가 아니다. 원하는 성질은 <em>결과로 확인할 수 있는 말</em>로 바꿔 적어야 한다.'}
+  ]
+},
+{
+  name:'검사대의 눈', who:'한 검사장',
+  say:'불량을 눈으로 걸러야 해. 집는 손은 양쪽에 하나씩. 바닥은 평평한 라인이야.',
+  goal:{base:'wheel',arms:2,head:'cam',size:'normal',color:GRAY},
+  cards:[
+    {p:'move',  t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
+    {p:'arm',   t:'팔은 양쪽에 하나씩, 두 개만.', set:{arms:2}},
+    {p:'head',  t:'앞을 볼 수 있게 카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'head',  t:'센서는 많을수록 정확하니 최대한 많이 달아줘.', bad:1, set:{head:'many'},
+     why:'<em>많을수록 정확하다는 건 사실이 아니다.</em> 근거 없는 통념을 지시에 넣으면 결과가 그 통념대로 망가진다.'},
+    {p:'finish',t:'크고 튼튼하게 만들어줘.', bad:1, set:{size:'huge'},
+     why:'같은 함정이 주문마다 나온다. 습관처럼 붙이는 <q>튼튼하게</q> 가 제일 자주 결과를 망친다.'},
+    {p:'whole', t:'나머지 세부는 알아서 채워줘.', bad:1, set:ALSSEO,
+     why:'채울 여지를 주면 CARI 는 <em>반드시 채운다.</em> 비워두길 원하면 비워두라고 적어야 한다.'}
+  ]
+},
+{
+  name:'2층 점검원', who:'오 안전관리자',
+  say:'설비가 2층에 있어. 계단을 올라야 해. 그리고 우리 현장은 안전 노랑만 쓴다.',
+  goal:{base:'leg',arms:1,head:'cam',size:'normal',color:YELLOW}, paint:'안전 노랑',
+  cards:[
+    {p:'move',  t:'계단을 오를 수 있게 다리를 달아줘.', set:{base:'leg'}},
+    {p:'arm',   t:'팔은 하나만 달아줘.', set:{arms:1}},
+    {p:'head',  t:'카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'finish',t:'현장 규정대로 안전 노랑으로 칠해줘.', set:{color:YELLOW}},
+    {p:'move',  t:'바퀴가 다리보다 빠르니 바퀴로 바꿔서 만들어줘.', bad:1, set:{base:'wheel'},
+     why:'맞는 말이지만 <em>계단을 못 오른다.</em> CARI 가 내미는 “더 나은 방법”이 내 제약을 부수는 경우다.'},
+    {p:'finish',t:'색은 어울리는 걸로 네가 골라줘.', bad:1, set:{color:'#ff4fa3'},
+     why:'취향을 맡기면 규정이 사라진다. 지켜야 하는 값은 <em>고르게 두지 말고 지정</em>해야 한다.'},
+    {p:'whole', t:'튼튼하게, 크게 만들어줘.', bad:1, set:{size:'huge'},
+     why:'습관처럼 붙는 말이 또 결과를 가져갔다.'}
+  ]
+},
+{
+  name:'좁은 통로 순찰대', who:'문 순찰반장',
+  say:'바닥이 울퉁불퉁하고 통로가 아주 좁아. 손은 양쪽에 하나씩, 우리 팀 색은 파랑이다.',
+  goal:{base:'track',arms:2,head:'cam',size:'normal',color:BLUE}, paint:'식별 파랑',
+  cards:[
+    {p:'move',  t:'바닥이 고르지 않으니 무한궤도로 만들어줘.', set:{base:'track'}},
+    {p:'arm',   t:'팔은 양쪽에 하나씩 두 개.', set:{arms:2}},
+    {p:'head',  t:'카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'finish',t:'식별용 파랑으로 칠해줘.', set:{color:BLUE}},
+    {p:'move',  t:'무한궤도는 느리니까 바퀴가 낫겠어. 그렇게 해줘.', bad:1, set:{base:'wheel'},
+     why:'그럴듯한 개선 제안이 제약을 지웠다. <em>바꿀 수 없는 조건은 바꾸지 말라고 같이 적어야</em> 한다.'},
+    {p:'head',  t:'감지 범위를 넓히려면 센서가 더 필요할 것 같아. 추가해줘.', bad:1, set:{head:'many'},
+     why:'<q>필요할 것 같아</q> 로 시작한 추측이 요구가 되어 결과에 박힌다. <em>확실하지 않으면 시키지 않는다.</em>'},
+    {p:'finish',t:'기왕이면 크게 만들어줘.', bad:1, set:{size:'huge'},
+     why:'통로가 좁다고 했는데 크게 만들었다. <q>기왕이면</q> 이 제약을 이겼다.'}
+  ]
+}
+];
+
+/* ===================== 상태 ===================== */
+const $=id=>document.getElementById(id);
+const KEYS=['base','arms','head','size','color'];
+let LI=0,picked=new Set(),busy=false,tries=0,starTotal=0,starsPer=[];
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function starStr(n){return '★'.repeat(n)+'<b>'+'☆'.repeat(3-n)+'</b>';}
+
+/** 고른 말로 만들어질 스펙 — 정상 카드 먼저, 함정이 그 위를 덮는다(이 순서가 교훈이다). */
+function buildSpec(){
+  const C=LEVELS[LI].cards, spec={...BASE_SPEC};
+  const ch=[...picked].sort((a,b)=>a-b).map(i=>C[i]);
+  ch.filter(c=>!c.bad).forEach(c=>Object.assign(spec,c.set));
+  ch.filter(c=>c.bad).forEach(c=>Object.assign(spec,c.set));
+  return spec;
+}
+
+function renderCount(){
+  const n=picked.size;
+  $('cntEl').textContent=n+'개';
+  $('cntEl').className='cnt'+(n?'':' zero');
+}
+
+function loadLevel(){
+  const L=LEVELS[LI];
+  picked=new Set(); busy=false; tries=0;
+  $('ordNum').textContent=LI+1;
+  $('ordName').textContent=L.name;
+  $('custWho').textContent=L.who;
+  $('custSay').textContent=L.say;
+  $('starEl').innerHTML='이번 주문 '+starStr(3);
+  $('goalBot').innerHTML=robotSVG(L.goal,{plan:true});
+  if(L.paint){ $('paintChip').classList.remove('hidden');
+    $('paintDot').style.background=L.goal.color; $('paintTxt').textContent=L.paint; }
+  else $('paintChip').classList.add('hidden');
+  $('madeBot').className='bot';
+  $('madeBot').innerHTML='<p class="empty">아직 아무 말도<br/>안 했다</p>';
+  $('tray').innerHTML=L.cards.map((c,i)=>{
+    const P=PART[c.p];
+    return `<button class="pc" data-i="${i}"><span class="bar" style="background:${P.c}"></span>`+
+      `<span class="in"><span class="tag" style="background:${P.c}">${P.label}</span>`+
+      `<span class="txt">${esc(c.t)}</span><span class="chk">✓</span></span></button>`;
+  }).join('');
+  $('tray').querySelectorAll('.pc').forEach(b=>{
+    b.onclick=()=>{ if(busy) return;
+      const i=+b.dataset.i;
+      if(picked.has(i)) picked.delete(i); else picked.add(i);
+      b.classList.toggle('on',picked.has(i));
+      renderCount();
+    };
+  });
+  renderCount();
+  $('sendBtn').disabled=false;
+  $('fb').classList.remove('on');
+  document.querySelector('.scroll').scrollTop=0;
+}
+
+/* ===================== 시키기 ===================== */
+function send(){
+  if(busy) return;
+  busy=true; tries++; $('sendBtn').disabled=true;
+  // 딸 수 있는 별이 시도마다 준다 — 상단에서 바로 보여야 "일단 다 눌러보기" 를 망설인다.
+  $('starEl').innerHTML='이번 주문 '+starStr(Math.max(1,4-tries));
+  const L=LEVELS[LI], spec=buildSpec();
+  const bads=[...picked].map(i=>L.cards[i]).filter(c=>c.bad);
+  const wrong=KEYS.filter(k=>spec[k]!==L.goal[k]);
+  const ok=wrong.length===0;
+
+  const made=$('madeBot');
+  made.className='bot';
+  made.innerHTML='<p class="empty">CARI 가<br/>만드는 중…</p>';
+  setTimeout(()=>{
+    made.innerHTML=robotSVG(spec);
+    made.className='bot build';
+    setTimeout(()=>{
+      if(!ok) made.className=(spec.base==='none')?'bot fall':'bot wob';
+      const fb=$('fb');
+      fb.className='fb '+(ok?'yes on':'no on');
+      $('fbTtl').textContent = ok?'손님이 받아 갔다':'손님이 고개를 젓는다';
+      if(ok){
+        const st=Math.max(1,4-tries);
+        starsPer[LI]=st; starTotal=starsPer.reduce((a,b)=>a+(b||0),0);
+        $('fbStar').innerHTML=starStr(st);
+        $('starEl').innerHTML='이번 주문 '+starStr(st);
+        $('fbDiff').classList.add('hidden');
+        $('fbWhy').innerHTML = bads.length?'':'도면대로 나왔다. 필요한 말만 정확히 시켰다.';
+        if(!bads.length&&tries===1) $('fbWhy').innerHTML='한 번에 도면대로 나왔다. 필요한 말만 정확히 시켰다.';
+        if(window.MGBridge) MGBridge.submit(LI+1,{timed:true}); // 랭킹: 도달 레벨(동률=시간)
+      } else {
+        // 다음 시도에 딸 수 있는 별로 바로 낮춘다 — 시키기 직전이 아니라 실패한 순간 보여야 체감된다.
+        $('starEl').innerHTML='이번 주문 '+starStr(Math.max(1,3-tries));
+        $('fbStar').innerHTML='';
+        $('fbDiff').classList.remove('hidden');
+        $('fbDiff').innerHTML=wrong.map(k=>`<span>${PARTNAME[k]}</span>`).join('');
+        // 함정이 섞였으면 그것부터 짚는다 — 안 그러면 "덜 시켰나?" 하고 더 넣게 된다.
+        $('fbWhy').innerHTML = bads.length
+          ? `<q>${esc(bads[0].t)}</q> 이 말이 결과를 가져갔다. ${bads[0].why}`
+          : '안 시킨 것은 안 만들어진다. CARI 의 기본값은 <em>내 머릿속이 아니다</em> — 도면을 다시 봐라.';
+      }
+      $('fbBtn').textContent = ok?(LI+1>=LEVELS.length?'결과 보기':'다음 주문 ›'):'다시 시키기';
+      $('fbBtn').className='fbbtn'+(ok?'':' ghost');
+      fb.dataset.ok=ok?'1':'0';
+    },600);
+  },500);
+}
+
+/* ===================== 배선 ===================== */
+$('sendBtn').onclick=send;
+$('fbBtn').onclick=()=>{
+  const ok=$('fb').dataset.ok==='1';
+  $('fb').classList.remove('on');
+  if(!ok){ busy=false; $('sendBtn').disabled=false; return; }
+  if(LI+1>=LEVELS.length){
+    $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+    starTotal=starsPer.reduce((a,b)=>a+(b||0),0);
+    $('oStars').textContent='★ '+starTotal;
+    const full=LEVELS.length*3;
+    $('oStarLab').textContent = starTotal>=full ? '별 '+starTotal+' / '+full+' — 전부 한 번에 맞혔다'
+                                                : '별 '+starTotal+' / '+full;
+    $('overOv').classList.remove('hidden');
+  } else { LI++; loadLevel(); }
+};
+$('oAgain').onclick=()=>{ LI=0; starsPer=[]; starTotal=0; $('overOv').classList.add('hidden'); loadLevel(); };
+$('startBtn').onclick=()=>$('startOv').classList.add('hidden');
+
+$('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+loadLevel();
+</script>
+
+<!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 ===== -->
+<script>
+(function(){
+  var EMBED=window.parent!==window, T0=Date.now();
+  function post(m){ if(EMBED) window.parent.postMessage(m,window.location.origin); }
+  window.MGBridge={submit:function(v,opts){
+    if(typeof v!=='number'||!isFinite(v)) return;
+    post({t:'mg:score',score:v,tieMs:(opts&&opts.timed&&T0)?(Date.now()-T0):undefined});
+  }};
+  function mount(id){
+    var ov=document.getElementById(id); if(!ov||ov.querySelector('.mg-rank')) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
+    b.setAttribute('aria-label','이 게임 랭킹 보기');
+    b.innerHTML='<span aria-hidden="true">🏆</span> 랭킹';
+    b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
+    ov.appendChild(b);
+  }
+  mount('startOv'); mount('overOv');
+  var intro=document.getElementById('startOv');
+  if(intro) intro.addEventListener('click',function(e){
+    if(e.target.closest&&e.target.closest('.mg-rank')) return;
+    T0=Date.now();
+  });
+})();
+</script>
+</body>
+</html>

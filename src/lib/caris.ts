@@ -58,6 +58,13 @@ export function tierName(key: string): string {
   return TIER_NAME[key] ?? key
 }
 
+/** 급수 대표색(딥블루 → 그린 사다리). /guide 피라미드와 러닝 라이브러리(/ebooks) 급수 열이 같이 쓴다.
+ *  ⚠️ src/styles/guide.css · Guide.tsx 의 SPECTRUM(그라데이션 두 끝점)과 동기화 — 바꾸면 셋 다. */
+export const TIER_COLORS: Record<string, string> = {
+  beginner: '#0d54bd', pro: '#1a80d6', elite: '#14a2e0',
+  master: '#10b3ac', grandmaster: '#18bd6a', zenith: '#62c045',
+}
+
 // 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.
 //  Beginner=객40, Pro=객50, Elite=객50+주10. T2(Master~Zenith)는 필기+실기 미확정 → 잠정 0(추후 확정).
 //  ⚠️ format 문자열 바꾸면 여기 수치도 같이 갱신할 것.

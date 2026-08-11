@@ -38,6 +38,12 @@ export interface ExamTicketView {
   attemptId: string | null // 이 응시권으로 만들어진 응시(있으면)
   usable: boolean
   usableReason?: TicketUnusableReason | null
+  /**
+   * 시험환경 점검을 마쳤는가.
+   * ⚠️ 이게 false 면 응시 버튼을 열지 않는다 — 잠금 브라우저가 안 켜지는 PC 라는 걸
+   *    시험 당일에 알면 손쓸 방법이 없다. 미리 걸러야 한다.
+   */
+  envChecked?: boolean
 }
 
 const STATUS_KEY: Record<ExamTicketStatus, string> = {

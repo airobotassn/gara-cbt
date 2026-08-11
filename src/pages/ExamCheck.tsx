@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
@@ -6,6 +6,8 @@ import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl } from '../lib/seb'
 import SebInstall from '../components/SebInstall'
 import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
+import { callFunction } from '../lib/supabase'
+import { useAuth } from '../context/AuthProvider'
 
 // gara_3 (시험환경 테스트) 목업 디자인 그대로 + 실제 점검 로직(SEB 감지·환경체크·모의응시) 보존.
 // 원본: stitch_design_critique_assistant/gara_3/code.html
@@ -14,6 +16,11 @@ type Check = { ok: boolean; label: string; note: string }
 export default function ExamCheck() {
   const navigate = useNavigate()
   const { t, lang } = useT()
+  // 어느 응시권으로 점검하러 왔는지 — 응시권 카드가 `?ticket=` 로 넘긴다.
+  // 없어도 된다(그냥 체험). 그때도 "이 PC 는 된다"는 사실은 남긴다.
+  const [params] = useSearchParams()
+  const ticketId = params.get('ticket')
+  const { isFullUser } = useAuth()
   if (isMobileDevice()) return <MobileBlock />
 
   const inSeb = isSEB()
@@ -25,6 +32,18 @@ export default function ExamCheck() {
   ]
 
   function startPractice() {
+    // ⚠️ 점검 완료는 **모의 응시를 시작한 시점**에 남긴다.
+    //    끝까지 풀었는지는 서버가 알 수 없고(모의는 채점도 제출도 없다), 여기까지 왔다는 건
+    //    이 PC 에서 응시 화면이 실제로 떴다는 뜻이라 그게 우리가 확인하려던 것이다.
+    //    ⚠️ 기록 실패가 모의 응시를 막지 않는다 — 점검이 목적이지 기록이 목적이 아니다.
+    if (isFullUser) {
+      callFunction('exam-env-check', {
+        ticketId,
+        ua: navigator.userAgent,
+        screen: `${window.screen.width}x${window.screen.height}`,
+        detail: { inSeb: isSEB(), fullscreen: !!document.fullscreenEnabled, online: navigator.onLine },
+      }).catch(() => { /* 기록 실패는 무시 */ })
+    }
     if (SEB_REQUIRED && !isSEB()) {
       window.location.href = sebPracticeLaunchUrl(lang)
       return

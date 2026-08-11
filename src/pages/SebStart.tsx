@@ -81,8 +81,8 @@ export default function SebStart() {
     } catch (e) {
       started.current = false
       setStarting(false)
-      // 재진입 무효는 재시도로 풀리지 않는다 — 버튼을 감추고 문의 안내로 바꾼다.
-      if (isFunctionCode(e, 'reentry_voided')) setVoided(true)
+      // 무효는 재시도로 풀리지 않는다 — 버튼을 감추고 문의 안내로 바꾼다.
+      if (isFunctionCode(e, 'reentry_voided') || isFunctionCode(e, 'attempt_voided')) setVoided(true)
       setErr(e instanceof Error ? e.message : t('prep.err_start'))
     }
   }

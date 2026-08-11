@@ -26,6 +26,11 @@ export const GAMES: Record<string, GameSpec> = {
   'reach-cari': { max: 5, metric: 'level', perSec: 0.35 },
   'build-cari': { max: 3, metric: 'level', perSec: 0.25 },
   'program-cari': { max: 6, metric: 'level', perSec: 0.3 },
+  // 막아라 = 서류를 읽고 규정 위반을 가리는 점수형. 문서 102장 × 최대 150점(100 + 완벽 보너스 50)이 이론상 천장.
+  //   perSec 는 "한 장을 2초에 처리" 를 상한으로 본 값 — 읽고 판단하는 게임이라 실제로는 훨씬 느리다.
+  'block-cari': { max: 16000, metric: 'score', perSec: 75 },
+  // 시켜라 = 지시를 골라 도면대로 만드는 레벨제(5레벨). 전원 만점이 나오므로 동률은 소요시간으로 가른다.
+  'order-cari': { max: 5, metric: 'level', perSec: 0.3 },
 }
 
 export function gameSpec(id: unknown): GameSpec | undefined {

@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
-import { getTracks } from '../lib/caris'
+import { getTracks, TIER_COLORS } from '../lib/caris'
 
 // 급수 스펙트럼(딥블루 → 그린). ⚠️ src/styles/guide.css 의 색과 동기화 필수(바꾸면 양쪽).
 const SPECTRUM: Record<string, [string, string]> = {
@@ -13,10 +13,8 @@ const SPECTRUM: Record<string, [string, string]> = {
   grandmaster: ['#2ecb7d', '#13a95b'],
   zenith: ['#7fd05f', '#54b830'],
 }
-const TIER_BASE: Record<string, string> = {
-  beginner: '#0d54bd', pro: '#1a80d6', elite: '#14a2e0',
-  master: '#10b3ac', grandmaster: '#18bd6a', zenith: '#62c045',
-}
+// 급수 대표색은 caris.ts(TIER_COLORS)가 단일 출처 — /ebooks 급수 열도 같은 색을 쓴다.
+const TIER_BASE = TIER_COLORS
 // 피라미드 조각 기하(viewBox 1000×900, 위 Zenith → 아래 Beginner). polygon·텍스트 위치 고정.
 const PYRAMID: { key: string; polygon: string; nmY: number; nmSize: number }[] = [
   { key: 'zenith', polygon: '500,40 573.3,180 426.7,180', nmY: 156, nmSize: 26 },

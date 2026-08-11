@@ -89,6 +89,14 @@
   color: var(--muted);
   margin-bottom: 5px;
 }
+/* 항목 아래 세부 목록(개인정보처리방침 2·4조) — 상위 항목과 마커를 달리해 층을 구분한다. */
+.doc-article .doc-sub {
+  margin: 5px 0 8px;
+  list-style: circle;
+}
+.doc-article .doc-sub li {
+  margin-bottom: 3px;
+}
 .doc-updated {
   margin-top: 26px;
   padding-top: 16px;

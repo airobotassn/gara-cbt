@@ -7,6 +7,7 @@ import SiteFooter from '../components/SiteFooter'
 import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
+import InquiryBoard from '../components/InquiryBoard'
 import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../lib/certNo'
 import { countryName } from '../lib/regions'
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
@@ -33,6 +34,7 @@ const TABS = [
   { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage/attempts' },
   { key: 'earned', labelKey: 'mypage.tab_earned', to: '/mypage/earned' },
   { key: 'issuance', labelKey: 'mypage.tab_issuance', to: '/mypage/issuance' },
+  { key: 'inquiry', labelKey: 'mypage.tab_inquiry', to: '/mypage/inquiry' },
 ]
 
 function fmtDT(iso?: string | null) {
@@ -218,7 +220,9 @@ function ProfileSection() {
 //      개수는 스크롤이 푸는 문제다(2026-08-06 반려 사유 두 건이 정확히 이거다). 11~13px 잔글씨도 금지.
 //   ⚠️ 쓸 수 있는지(usable)와 그 이유는 **서버 판정을 그대로 표시만** 한다. 시험일을 브라우저에서 다시
 //      비교하면 KST 기준 판정과 최대 9시간 어긋난다(lib/tickets.ts 머리 주석 참고).
-function TicketCard({ tk, t, lang, onGo }: { tk: ExamTicketView; t: TFunc; lang: Lang; onGo: () => void }) {
+function TicketCard({ tk, t, lang, onGo, onCheck }: {
+  tk: ExamTicketView; t: TFunc; lang: Lang; onGo: () => void; onCheck: () => void
+}) {
   const dead = tk.status === 'void' || tk.status === 'expired'
   const statusKey = ticketStatusKey(tk.status)
   const sourceKey = ticketSourceKey(tk.source)
@@ -274,11 +278,35 @@ function TicketCard({ tk, t, lang, onGo }: { tk: ExamTicketView; t: TFunc; lang:
         </div>
       </div>
       {canGo && (
-        <div className="shrink-0">
-          <button onClick={onGo} className="px-6 py-2.5 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow flex items-center gap-2">
+        <div className="shrink-0 flex flex-col items-stretch gap-2">
+          {/* ⛔ 시험환경 점검을 마치기 전에는 응시 버튼을 열지 않는다.
+              잠금 브라우저가 안 켜지는 PC 라는 걸 시험 당일에 알면 손쓸 방법이 없다. */}
+          <button
+            onClick={onCheck}
+            className={`px-6 py-2.5 font-label-md text-[15px] font-bold rounded-xl transition-colors flex items-center justify-center gap-2 border ${
+              tk.envChecked
+                ? 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
+                : 'bg-primary-container text-on-primary border-transparent ambient-shadow hover:bg-primary'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">{tk.envChecked ? 'check_circle' : 'monitor_heart'}</span>
+            {t(tk.envChecked ? 'ticket.env_done' : 'ticket.env_do')}
+          </button>
+          <button
+            onClick={onGo}
+            disabled={!tk.envChecked}
+            className={`px-6 py-2.5 font-label-md text-[15px] font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${
+              tk.envChecked
+                ? 'bg-primary-container text-on-primary hover:bg-primary ambient-shadow'
+                : 'bg-outline/15 text-outline cursor-not-allowed'
+            }`}
+          >
             {t('ticket.go_exam')}
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
           </button>
+          {!tk.envChecked && (
+            <p className="font-body-md text-[13px] text-outline text-center max-w-[220px] break-keep">{t('ticket.env_required')}</p>
+          )}
         </div>
       )}
     </article>
@@ -351,6 +379,8 @@ export default function MyPage() {
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [tickets, setTickets] = useState<ExamTicketView[]>([])
   const [err, setErr] = useState('')
+  // 지금 응시할 수 있는 응시권 — 다른 탭에 있어도 이게 있으면 알려준다.
+  const openTickets = tickets.filter((tk) => tk.usable)
 
   // 응시 + 보유 응시권을 한 번에 받는다(같은 함수라 왕복이 안 늘어난다).
   //   lang 을 보내는 이유 = 회차 제목이 다국어 JSONB 라 서버가 그 언어로 투영해 내려준다.
@@ -481,24 +511,29 @@ export default function MyPage() {
             </p>
           </header>
 
-          {/* CARIS 자격검정 응시 진입 — FAB에서 이관한 상단 CTA 배너 */}
-          {/* TODO(응시권): 결제/응시권 백엔드 생기면 '결제된 시험 있으면 /exam, 없으면 /guide' 분기.
-              단, 실제 게이팅은 여기(버튼)가 아니라 ExamGate(/exam) 의 onStart 훅에서 일괄 처리 예정 → 지금은 /exam 유지. */}
-          <button
-            onClick={() => navigate('/exam')}
-            className="group w-full mb-8 md:mb-10 flex items-center justify-between gap-4 rounded-2xl bg-primary-container text-on-primary px-6 py-5 md:px-8 md:py-6 ambient-shadow hover:translate-y-[-2px] transition-transform duration-200 text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>edit_document</span>
+          {/* ⛔ 옛 `CARIS 응시하기` 배너는 없앴다(2026-08-11).
+              그 배너는 **어느 응시권으로 가는지 모른 채** /exam 으로 보냈고, 응시권이 2장 이상이면
+              서버가 "어느 걸 쓸지 골라라"로 튕기는데 고를 화면이 없어 그대로 막혔다.
+              이제 입구는 아래 **보유 응시권 카드** 하나뿐이고, 카드가 곧 선택 화면이다.
+              대신 응시 기간이 열린 응시권이 있으면 아래 줄로 알린다 — 안 그러면
+              결제하고도 어디서 응시하는지 못 찾는다(기본 탭이 학습 대시보드라 카드가 안 보인다). */}
+          {openTickets.length > 0 && tab !== 'attempts' && (
+            <button
+              onClick={() => navigate('/mypage/attempts')}
+              className="group w-full mb-8 md:mb-10 flex items-center justify-between gap-4 rounded-2xl bg-primary-container text-on-primary px-6 py-5 md:px-8 md:py-6 ambient-shadow hover:translate-y-[-2px] transition-transform duration-200 text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>confirmation_number</span>
+                </div>
+                <div>
+                  <div className="font-title-md text-lg md:text-[22px] font-bold">{t('ticket.open_now', { n: openTickets.length })}</div>
+                  <div className="font-body-md text-body-md opacity-90">{t('ticket.open_now_sub')}</div>
+                </div>
               </div>
-              <div>
-                <div className="font-title-md text-lg md:text-[22px] font-bold">{t('mypage.go_exam')}</div>
-                <div className="font-body-md text-body-md opacity-90">{t('mypage.cta_sub')}</div>
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-[28px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
-          </button>
+              <span className="material-symbols-outlined text-[28px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </button>
+          )}
 
           {/* 내 정보 — 국가/지역(락) */}
           <ProfileSection />
@@ -527,6 +562,9 @@ export default function MyPage() {
           {/* 학습 대시보드 (CARIS ARENA) — 자체적으로 list-attempts 로딩 */}
           {tab === 'learning' && <LearningDashboard />}
 
+          {/* 1:1 문의 — 쓴 사람과 운영자만 본다. */}
+          {tab === 'inquiry' && <InquiryBoard />}
+
           {/* 이북 서재 — 구매한 이북 */}
           {tab === 'ebooks' && <EbookLibrary />}
 
@@ -545,7 +583,9 @@ export default function MyPage() {
                     tk={tk}
                     t={t}
                     lang={lang}
-                    onGo={() => navigate(`/exam/prepare?ticket=${encodeURIComponent(tk.ticketId)}`, { state: { ticketId: tk.ticketId } })}
+                    // 커버 화면(/exam)을 거쳐 간다 — 바로 준비창으로 떨어지면 시험 진입이 너무 급하다.
+                    onGo={() => navigate(`/exam?ticket=${encodeURIComponent(tk.ticketId)}`)}
+                    onCheck={() => navigate(`/exam/check?ticket=${encodeURIComponent(tk.ticketId)}`)}
                   />
                 ))}
               </div>

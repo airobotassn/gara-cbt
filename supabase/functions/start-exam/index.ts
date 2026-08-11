@@ -98,6 +98,28 @@ Deno.serve(async (req) => {
     const admin = adminClient()
     const now = Date.now()
 
+    // ---------- ⓪ 응시 시작 잠금 ----------
+    // 배포·DB 작업 중에 새 응시가 시작되면 그 사람 시험이 날아간다. 관리자가 켜면 **새 응시만** 막는다.
+    // ⚠️ 이미 보고 있는 사람은 막지 않는다 — 아래 재진입 경로(같은 응시로 돌아가기)는 이 검사보다 뒤에 있고,
+    //    여기서 걸리는 건 '새로 시작'뿐이다. 잠금 때문에 시험 중인 사람이 제출을 못 하면 더 큰 사고다.
+    {
+      const { data: lock } = await admin
+        .from('site_settings')
+        .select('key, value')
+        .in('key', ['exam_start_locked', 'exam_start_lock_note'])
+      const map: Record<string, string> = {}
+      for (const r of (lock ?? []) as { key: string; value: string }[]) map[r.key] = r.value
+      if (map.exam_start_locked === '1') {
+        return json(
+          {
+            error: map.exam_start_lock_note?.trim() || '지금은 시스템 점검 중이라 응시를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+            code: 'exam_locked',
+          },
+          503,
+        )
+      }
+    }
+
     // ---------- ① 내 응시권 ----------
     // ⚠️ ticketId 로 먼저 좁히지 않는다. 남의 ticketId 를 넣어도 이 user_id 스코프 밖으로 나가지 못해야 한다 —
     //    ticketId 는 마이페이지 응답·응시 준비 화면 등 클라 표면에 상시 노출되는 값이라
@@ -377,17 +399,9 @@ Deno.serve(async (req) => {
     let attemptId: string
     let startedAt: string
     if (live) {
-      // 이미 끝난(제출·무효) 응시면 재개가 아니라 거절이다 — 1인 1회.
-      if (live.status === 'submitted' || live.status === 'voided') {
-        return json(
-          { error: '이미 응시를 완료하셨습니다. 자격검정은 1회만 응시할 수 있습니다.', alreadyDone: true },
-          409,
-        )
-      }
-
-      // ⛔ **재진입 = 무효.** 판정은 _shared/exam-reentry.ts 한 곳에 있고, 응시 준비 화면(seb-handoff)이
-      //    SEB 를 켜기 전에 같은 함수로 먼저 잡는다. 여기는 **준비 화면을 건너뛰고 옛 링크로 바로 들어온
-      //    경우의 최후 방어선**이다 — 사용자가 보통 만나는 자리는 준비 화면 쪽이다.
+      // ⛔ 들어갈 수 없는 사유(제출 완료·이미 무효·재진입)는 전부 _shared/exam-reentry.ts 한 곳이 판정한다.
+      //    응시 준비 화면(seb-handoff)이 **SEB 를 켜기 전에** 같은 함수로 먼저 잡고, 여기는
+      //    준비 화면을 건너뛰고 옛 링크로 바로 들어온 경우의 **최후 방어선**이다.
       const entries = (live.entry_count as number) ?? 1
       const blocked = await blockOnReentry(admin, user.id, ticket.id, now)
       if (blocked) return json(blocked, 409)

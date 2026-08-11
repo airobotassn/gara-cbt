@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>막아라 CARI — 검문소</title>
+<!--
+  ─────────────────────────────────────────────────────────────
+  막아라 CARI (block-cari) — 프로토타입
+  ─────────────────────────────────────────────────────────────
+  Papers, Please 구조를 그대로 가져온다. 다만 검사하는 것이 여권이 아니라
+  **AI 에 넣기 직전의 사내 문서**다.
+
+    · 왼쪽 규정집이 날마다 한 줄씩 늘어난다 (외울 수 없게 되는 것이 핵심)
+    · 서류에서 규정에 걸리는 곳을 찍어 가린다
+    · 도장 두 개 — [AI 전송] / [반려]
+    · 틀리면 경고장. 세 장이면 끝.
+
+  ⚠️ 이 게임이 퀴즈가 되지 않는 이유는 "동사"에 있다. 읽고 고르는 게 아니라
+     **규정집과 서류를 왔다 갔다 하며 걸리는 곳을 찍어내는 작업**이다.
+     그래서 규칙은 반드시 누적돼야 한다 — 한두 개만 있으면 그냥 찾기 퀴즈가 된다.
+
+  ⚠️ 설계상 반드시 지킬 것 세 가지:
+    ① **위반이 하나도 없는 서류를 섞는다.** 전부 뭔가 걸리면 "일단 칠하고 본다"가 최적 전략이 된다.
+    ② **다 칠하면 실패해야 한다.** 핵심 정보(k)를 가리면 CARI 가 맥락을 잃고 엉뚱한 답을 낸다.
+       "지울 것과 남길 것을 가르는 것"이 실력이고, 과잉 마스킹은 실무에서 실제로 흔한 실패다.
+    ③ **아직 규정에 없는 것은 통과다.** 3일차에 단가가 나와도 5일차 규정이 생기기 전엔 위반이 아니다.
+       규정이 자라난다는 걸 몸으로 알게 하는 장치라, 편의로 미리 막지 말 것.
+
+  지표: 점수 (처리 건수 × 정확도) · 통산 최고
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(115% 85% at 50% 0%, #2b2f3c 0%, #1d2029 55%, #14161d 100%);
+    color:#e9ecf3;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  /* 앱 안에서는 세로 화면 iframe 이지만, 파일을 그냥 열면 데스크톱 전체 폭이 된다.
+     폭을 안 묶으면 요소가 화면 양 끝으로 흩어져 한눈에 안 들어온다. */
+  #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 80px -20px rgba(0,0,0,.45)}
+  .hidden{display:none}
+
+  #flash{position:absolute;inset:0;z-index:40;pointer-events:none;background:#ff3b2a;opacity:0}
+  #flash.on{animation:fl .5s ease-out}
+  @keyframes fl{0%{opacity:.34}100%{opacity:0}}
+
+  /* ── 상단 ─────────────────────────────────── */
+  .top{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:10px 13px 7px}
+  .day{padding:6px 13px;border-radius:9px;background:#b9903f;color:#221a08;font-weight:900;font-size:14.5px}
+  .prog{font-size:14px;font-weight:800;color:#9aa2b6}
+  .strikes{margin-left:auto;display:flex;gap:4px;align-items:center}
+  .strikes span{width:16px;height:16px;border-radius:4px;border:2px solid rgba(255,255,255,.28)}
+  .strikes span.on{background:#e3453a;border-color:#e3453a;box-shadow:0 0 10px rgba(227,69,58,.6)}
+  .sc{font-size:16px;font-weight:900;color:#e9ecf3;margin-left:7px}
+
+  /* ── 규정집 ───────────────────────────────── */
+  .book{flex:0 0 auto;margin:0 13px 8px;background:#20242f;border:1px solid rgba(255,255,255,.10);
+    border-radius:13px;padding:8px 10px}
+  .brow{display:flex;align-items:flex-start;gap:7px;margin-bottom:5px}
+  .brow:last-child{margin-bottom:0}
+  .blab{flex:0 0 auto;font-size:12.5px;font-weight:900;letter-spacing:.02em;color:#8b93a8;
+    padding:5px 0;width:62px}
+  .blab.red{color:#f08a80}
+  .chips{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:4px}
+  .chip{padding:6px 12px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;
+    background:rgba(255,255,255,.09);color:#cfd6e6;border:1px solid rgba(255,255,255,.10)}
+  .chip.blk{background:rgba(227,69,58,.16);color:#ffb1a8;border-color:rgba(227,69,58,.4)}
+  .chip.new{animation:glow 1.4s ease-in-out 3}
+  @keyframes glow{0%,100%{box-shadow:0 0 0 rgba(185,144,63,0)}50%{box-shadow:0 0 0 3px rgba(185,144,63,.5)}}
+  .bnone{font-size:13.5px;font-weight:700;color:#6b7387;padding:5px 0}
+
+  /* ── 서류 ─────────────────────────────────── */
+  .desk{flex:1 1 auto;min-height:0;padding:0 13px 8px;display:flex;align-items:flex-start}
+  /* 내용만큼만 서되 한 장의 서류로 보일 만큼은 확보한다 — 짧은 문서가 쪽지처럼 보이면 안 된다. */
+  .paper{flex:0 1 auto;width:100%;max-height:100%;min-height:min(100%,330px);background:#f6f2e8;color:#2a2620;border-radius:6px;
+    padding:15px 16px 18px;overflow-y:auto;box-shadow:0 14px 30px -12px rgba(0,0,0,.75);
+    transform-origin:50% 50%}
+  .paper.in{animation:pin .32s ease-out}
+  @keyframes pin{0%{transform:translateY(26px) rotate(-1.5deg);opacity:0}100%{transform:none;opacity:1}}
+  .paper.out{animation:pout .34s ease-in forwards}
+  @keyframes pout{100%{transform:translateX(115%) rotate(7deg);opacity:0}}
+  .paper.rej{animation:prej .34s ease-in forwards}
+  @keyframes prej{100%{transform:translateX(-115%) rotate(-7deg);opacity:0}}
+
+  .phead{display:flex;align-items:center;gap:7px;padding-bottom:8px;margin-bottom:9px;
+    border-bottom:1.5px dashed #cdc4b0}
+  .pfrom{font-size:16px;font-weight:900;color:#4a4335}
+  .pstamp{margin-left:auto;padding:4px 10px;border:2.5px solid #c0392b;color:#c0392b;border-radius:5px;
+    font-size:13px;font-weight:900;transform:rotate(-6deg);letter-spacing:.04em}
+  .pask{font-size:15px;font-weight:800;color:#7a6f57;margin:0 0 13px;line-height:1.5}
+  .pask b{color:#4a4335}
+  .ptext{font-size:17.5px;line-height:1.95;font-weight:600;word-break:keep-all}
+  /* 검사 대상 — 점선 밑줄. 이게 없으면 어디를 봐야 할지 몰라 게임이 성립하지 않는다. */
+  .tk{display:inline-block;padding:2px 5px;margin:0 1px;border-radius:4px;cursor:pointer;
+    border-bottom:2px dotted #b3a68a;background:rgba(180,160,110,.13);transition:background .1s}
+  .tk:active{background:rgba(180,160,110,.32)}
+  .tk.mk{background:#221f1a;color:transparent;border-bottom-color:#221f1a;text-shadow:none;
+    box-shadow:inset 0 0 0 1px #000}
+  .tk.leak{animation:leak .5s ease-out 3;background:rgba(224,60,45,.35);border-bottom-color:#c0392b}
+  @keyframes leak{0%,100%{background:rgba(224,60,45,.14)}50%{background:rgba(224,60,45,.5)}}
+  .tk.over{background:rgba(255,170,40,.4);border-bottom-color:#d08a12}
+  .paper.done .tk{cursor:default}
+
+  /* ── 도장 ─────────────────────────────────── */
+  .stamps{flex:0 0 auto;display:flex;gap:9px;padding:0 13px calc(12px + env(safe-area-inset-bottom))}
+  .st{flex:1 1 0;padding:17px 8px;border:0;border-radius:14px;cursor:pointer;
+    font:900 17px/1 system-ui,sans-serif;letter-spacing:-.01em}
+  .st.send{background:linear-gradient(#3f86e8,#245fc0);color:#fff;box-shadow:0 4px 0 #16407f}
+  .st.rej{background:linear-gradient(#d9534a,#b23a31);color:#fff;box-shadow:0 4px 0 #7d251e}
+  .st:active{transform:translateY(2px)}
+  .st:disabled{opacity:.4;cursor:default;transform:none}
+
+  /* ── 판정 시트 ────────────────────────────── */
+  /* ⚠️ 시트가 미끄러져 나가는 동안에도 버튼이 눌려서 두 번 탭하면 한 단계를 건너뛴다.
+     보이지 않을 때는 클릭을 안 받게 막는다. */
+  .fb{position:absolute;left:13px;right:13px;bottom:13px;z-index:30;background:#20242f;
+    border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:13px 15px;
+    box-shadow:0 22px 46px -18px rgba(0,0,0,.9);transform:translateY(160%);
+    pointer-events:none;transition:transform .24s cubic-bezier(.2,.9,.3,1)}
+  .fb.on{transform:translateY(0);pointer-events:auto}
+  .fbhead{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .fbhead b{font-size:17.5px;font-weight:900;letter-spacing:-.02em}
+  .fbhead .pt{margin-left:auto;font-size:16px;font-weight:900;color:#8fe0a8}
+  .fb.no .fbhead b{color:#ff9a8a} .fb.no .pt{color:#ff9a8a}
+  .fb.yes .fbhead b{color:#8fe0a8}
+  .fbwhy{margin:0 0 13px;font-size:15px;font-weight:700;line-height:1.6;color:#aeb7ca;word-break:keep-all}
+  .fbwhy em{font-style:normal;color:#ffcf8a;font-weight:900}
+  .fbbtn{width:100%;padding:15px;border:0;border-radius:13px;cursor:pointer;
+    background:#3f86e8;color:#fff;font:900 16px/1 system-ui,sans-serif}
+
+  /* ── 오버레이 ─────────────────────────────── */
+  .ov{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:18px;
+    background:rgba(8,10,16,.76);backdrop-filter:blur(4px)}
+  /* ⚠️ .hidden 은 위에 있어 .ov 와 특정도가 같다 → 순서상 .ov 가 이긴다.
+     이 줄이 없으면 오버레이 셋이 처음부터 전부 떠서 맨 뒤의 '해고' 화면이 게임을 덮는다. */
+  .ov.hidden{display:none}
+  .sheet{width:100%;max-width:400px;max-height:100%;overflow-y:auto;
+    background:linear-gradient(#262b38,#1b1f29);border:1px solid rgba(255,255,255,.12);
+    border-radius:19px;padding:20px 18px;box-shadow:0 26px 60px -20px rgba(0,0,0,.95)}
+  .art{width:74px;height:74px;display:block;margin:0 auto}
+  .ttl{text-align:center;font-size:25px;font-weight:900;letter-spacing:-.03em;margin:11px 0 5px}
+  .ttl i{font-style:normal;color:#e3b45a}
+  .lead{text-align:center;font-size:15px;font-weight:700;line-height:1.6;color:#a3abbe;margin:0 0 15px}
+  .rules{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .rules li{display:flex;gap:10px;align-items:flex-start;font-size:15px;font-weight:700;line-height:1.55;
+    background:rgba(255,255,255,.05);border-radius:12px;padding:11px 13px;color:#cbd2e2}
+  .rules li span{flex:0 0 auto;color:#e3b45a}
+  .memo{background:#f6f2e8;color:#2a2620;border-radius:8px;padding:13px 14px;margin-bottom:14px}
+  .memo h4{margin:0 0 9px;font-size:15.5px;font-weight:900;color:#4a4335;letter-spacing:.02em}
+  .memo ul{margin:0;padding-left:17px;display:flex;flex-direction:column;gap:6px}
+  .memo li{font-size:15px;font-weight:700;line-height:1.55}
+  .memo li b{color:#b23a31}
+  .memo li i{font-style:normal;display:block;font-weight:600;color:#6f6555;font-size:13.5px;margin-top:2px}
+  .stats{display:flex;gap:8px;margin:0 0 14px}
+  .stat{flex:1;background:rgba(255,255,255,.05);border-radius:12px;padding:11px 6px;text-align:center}
+  .stat b{display:block;font-size:24px;font-weight:900;line-height:1.1}
+  .stat span{display:block;font-size:12.5px;font-weight:800;color:#8b93a8;margin-top:5px}
+  .bigscore{text-align:center;font-size:50px;font-weight:900;letter-spacing:-.03em;color:#e3b45a;line-height:1}
+  .biglab{text-align:center;font-size:13px;font-weight:800;color:#8b93a8;margin:6px 0 14px;letter-spacing:.06em}
+  .note{background:rgba(227,180,90,.10);border:1px solid rgba(227,180,90,.26);border-radius:12px;
+    padding:12px 14px;font-size:14.5px;line-height:1.65;font-weight:700;color:#e0c99a;margin-bottom:15px}
+  .btn{width:100%;padding:15px;border:0;border-radius:13px;cursor:pointer;
+    background:linear-gradient(#e0b158,#c1913a);color:#241b06;font:900 16.5px/1 system-ui,sans-serif}
+  .newbest{text-align:center;font-size:14px;font-weight:900;color:#e3b45a;margin:-6px 0 13px}
+
+  .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
+    padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.12);color:#e9ecf3}
+  .mg-rank.on{display:inline-flex}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="flash"></div>
+
+  <div class="top">
+    <span class="day" id="dayEl">1일차</span>
+    <span class="prog" id="progEl">0 / 4</span>
+    <span class="strikes" id="strEl"></span>
+    <span class="sc" id="scEl">0</span>
+  </div>
+
+  <div class="book">
+    <div class="brow"><span class="blab">가릴 것</span><span class="chips" id="maskChips"></span></div>
+    <div class="brow"><span class="blab red">전송 금지</span><span class="chips" id="blockChips"></span></div>
+  </div>
+
+  <div class="desk">
+    <div class="paper" id="paper"></div>
+  </div>
+
+  <div class="stamps">
+    <button class="st rej" id="rejBtn">반려</button>
+    <button class="st send" id="sendBtn">AI 전송</button>
+  </div>
+
+  <div class="fb" id="fb">
+    <div class="fbhead"><b id="fbTtl">—</b><span class="pt" id="fbPt"></span></div>
+    <p class="fbwhy" id="fbWhy">—</p>
+    <button class="fbbtn" id="fbBtn">다음 서류</button>
+  </div>
+</div>
+
+<!-- 인트로 -->
+<div class="ov" id="startOv">
+  <div class="sheet">
+    <div id="sArt"></div>
+    <p class="ttl">막아라 <i>CARI</i></p>
+    <p class="lead">동료들이 서류를 들고 온다.<br/>“이거 AI로 정리해 주세요.”</p>
+    <ul class="rules">
+      <li><span>①</span><div>위 <b>규정집</b>에 오늘 지킬 규칙이 있다. <b>날마다 한 줄씩 는다.</b></div></li>
+      <li><span>②</span><div>서류에서 규정에 걸리는 곳을 <b>눌러서 가린다.</b> 밑줄 친 것만 누를 수 있다.</div></li>
+      <li><span>③</span><div>다 됐으면 <b>AI 전송</b>. 가려도 넘기면 안 되는 서류는 <b>반려</b>다.</div></li>
+      <li><span>④</span><div>놓치면 새어 나가고, <b>과하게 가리면</b> CARI 가 헛소리를 한다. 둘 다 경고장이다.</div></li>
+      <li><span>⑤</span><div>경고장 <b>세 장이면 끝.</b></div></li>
+    </ul>
+    <button class="btn" id="startBtn">출근하기</button>
+  </div>
+</div>
+
+<!-- 일차 브리핑 -->
+<div class="ov hidden" id="dayOv">
+  <div class="sheet">
+    <p class="ttl" id="dTtl">2일차</p>
+    <p class="lead">사내 공지가 붙었다.</p>
+    <div class="memo">
+      <h4 id="dMemoTtl">■ 추가 지침</h4>
+      <ul id="dMemo"></ul>
+    </div>
+    <button class="btn" id="dBtn">일 시작</button>
+  </div>
+</div>
+
+<!-- 종료 -->
+<div class="ov hidden" id="overOv">
+  <div class="sheet">
+    <div id="oArt"></div>
+    <p class="ttl" id="oTtl">해고</p>
+    <p class="bigscore" id="oScore">0</p>
+    <p class="biglab">점수</p>
+    <p class="newbest hidden" id="newbest">최고 기록 경신!</p>
+    <div class="stats">
+      <div class="stat"><b id="oDay">1</b><span>버틴 일수</span></div>
+      <div class="stat"><b id="oDocs">0</b><span>처리 서류</span></div>
+      <div class="stat"><b id="oPerf">0</b><span>완벽 처리</span></div>
+    </div>
+    <div class="note" id="oNote">—</div>
+    <button class="btn" id="againBtn">다시 출근</button>
+  </div>
+</div>
+
+<script>
+/* ================= CARI mascot (기존 게임과 동일 자산) ================= */
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:74px;height:74px">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+
+/* ===================== 규정 =====================
+   MASK  — 가리고 보내면 되는 것
+   BLOCK — 가려도 못 보내는 것(반려)
+================================================ */
+const MASK={
+  name :{label:'실명',        desc:'고객·직원 이름'},
+  acct :{label:'계좌·카드',   desc:'금융 정보 일체'},
+  pii  :{label:'연락처·주민번호', desc:'개인을 특정하는 정보'},
+  perf :{label:'미공개 수치', desc:'아직 발표 안 한 매출·목표·가입자'},
+  price:{label:'단가·계약금액', desc:'협력사 거래 조건'}
+};
+const BLOCK={
+  hr :{label:'인사 평가·징계', desc:'가려도 전송 금지 — 반려'},
+  src:{label:'개발 중 코드',  desc:'가려도 전송 금지 — 반려'}
+};
+
+/* ===================== 서류 =====================
+   본문 표기 — {규칙|텍스트} 위반 · {k|텍스트} 핵심(가리면 맥락 손상) · {d|텍스트} 무해
+   ⚠️ 하루에 최소 한 장은 **위반 0** 인 서류를 넣는다(설계 규칙 ①).
+   ⚠️ k 는 넉넉히 넣는다 — 이게 "일단 다 칠하기" 를 막는 유일한 장치다(설계 규칙 ②).
+================================================ */
+const DAYS=[
+{ n:1, newMask:['name'], newBlock:[], docs:[
+  {from:'김 대리', ask:'이 문의 메일 <b>3줄로 요약</b>해 주세요',
+   text:'{d|3월 2일} 접수 건입니다. {name|박서연} 고객님이 {k|배송이 일주일 넘게 지연}되고 있다며 {k|정확한 도착 예정일}을 알려달라고 하십니다. {d|주문번호 A-2291}도 함께 확인 부탁드립니다.'},
+  {from:'이 과장', ask:'회의록 <b>핵심만</b> 뽑아 주세요',
+   text:'{d|주간 정기회의}입니다. 안건은 {k|신규 배송 파트너 검토}였고, {k|다음 주까지 후보 3곳을 비교}하기로 했습니다. {d|다음 회의는 화요일}입니다.'},
+  {from:'최 사원', ask:'답변 초안 좀 써 주세요',
+   text:'{name|정민호} 고객님과 {name|한지우} 고객님이 같은 건으로 문의하셨습니다. 요지는 {k|반품 접수 후 회수가 오지 않는다}는 것이고, {k|둘 다 같은 지역}입니다.'},
+  {from:'박 주임', ask:'후기들 <b>한 문단으로</b> 정리해 주세요',
+   text:'{d|스마트스토어} 후기 모음입니다. {name|윤서진} 님 “{k|포장이 꼼꼼했다}”, 익명 “{k|배송이 빨랐다}”, {name|오세라} 님 “{k|설명서가 부실하다}”.'}
+]},
+{ n:2, newMask:['acct','pii'], newBlock:[], docs:[
+  {from:'김 대리', ask:'환불 처리 <b>절차 정리</b> 부탁해요',
+   text:'{name|강도윤} 고객님 환불 건입니다. 환불 계좌는 {acct|국민 604702-01-338291} 이고, {k|결제 취소가 두 번 실패}했습니다. {k|카드사 승인 내역 확인}이 필요합니다.'},
+  {from:'상담팀', ask:'상담 이력 <b>요약</b>해 주세요',
+   text:'{name|서지안} 고객님 상담 기록입니다. 연락처는 {pii|010-4872-9031}. {k|같은 문제로 세 번째 전화}시고, {k|보상 요구}가 있었습니다.'},
+  {from:'마케팅', ask:'배너 문구 <b>다듬어</b> 주세요',
+   text:'{d|봄 프로모션} 문구 후보입니다. {k|무료 배송}과 {k|첫 구매 10% 할인}을 앞세우는 방향이고, {d|기간은 4월 한 달}입니다.'},
+  {from:'법무', ask:'민원 내용 <b>쟁점만</b> 뽑아 주세요',
+   text:'{name|임하늘} 님 민원입니다. 주민등록번호 {pii|980412-2334512}, 주소 {pii|서울 마포구 성산로 41}. 요지는 {k|개인정보 삭제 요청}이고 {k|기한을 못 박아} 왔습니다.'}
+]},
+{ n:3, newMask:['perf'], newBlock:[], docs:[
+  {from:'기획팀', ask:'주간 보고 <b>초안</b> 만들어 주세요',
+   text:'{perf|3월 매출 12억 4천만원}으로 {perf|전월 대비 18% 상승}했습니다. {k|배송 지연 클레임은 절반으로 감소}했고, {k|반품률은 변동 없음}입니다.'},
+  {from:'CS팀', ask:'대응 방안 <b>정리</b> 부탁드립니다',
+   text:'{name|노가온} 고객님이 {k|같은 제품을 세 번 교환}받으셨습니다. 환불 계좌 {acct|신한 110-482-773901}. {k|본사 차원 대응}이 필요해 보입니다.'},
+  {from:'홍보팀', ask:'보도자료 <b>문장 다듬기</b>',
+   text:'{d|보도자료} 초안입니다. {k|지난해 공개된 연 매출 1,200억}을 근거로 {k|업계 3위}임을 강조하려 합니다. {d|발표는 다음 주 월요일}.'},
+  {from:'전략팀', ask:'발표 슬라이드 <b>구성 추천</b>해 주세요',
+   text:'{perf|4월 예상 매출 15억}과 {perf|신규 가입자 2만 3천명} 자료로 {k|사내 발표용 슬라이드}를 만들려 합니다. {k|그래프 형태} 추천 부탁드립니다.'}
+]},
+{ n:4, newMask:[], newBlock:['hr'], docs:[
+  {from:'인사팀', ask:'평가 코멘트 <b>요약</b>해 주세요', stamp:'인사 평가', block:'hr',
+   text:'{d|2026년 상반기} 팀원 평가표입니다. 등급과 코멘트가 길어서 {k|사람별로 세 줄씩 요약}했으면 합니다.'},
+  {from:'CS팀', ask:'FAQ 문장 <b>정리</b>해 주세요',
+   text:'{d|고객센터} FAQ 초안입니다. {k|교환 절차}와 {k|반품 기한}, {k|배송비 부담 기준}을 정리했습니다.'},
+  {from:'영업팀', ask:'회의록 <b>3줄 요약</b>',
+   text:'{name|백서우} 팀장 주재 회의입니다. {perf|2분기 목표 22억}이 언급됐고, {k|인력 충원 논의}와 {k|채널 확대}가 있었습니다.'},
+  {from:'채용', ask:'지원자 <b>경력만</b> 뽑아 주세요',
+   text:'{name|조은비} 지원자 서류입니다. 연락처 {pii|010-2201-8834}. {k|물류 경력 5년}과 {k|재고 시스템 구축 경험}이 있습니다.'}
+]},
+{ n:5, newMask:['price'], newBlock:['src'], docs:[
+  {from:'구매팀', ask:'견적 <b>비교표</b>로 만들어 주세요',
+   text:'{d|A사} 견적서입니다. 단가는 {price|개당 3,200원}, 조건은 {price|월 최소 물량 5만개}. {k|납기 2주}이고 {k|불량 교환은 무상}입니다.'},
+  {from:'개발팀', ask:'주석 좀 <b>정리</b>해 주세요', stamp:'개발 중 코드', block:'src',
+   text:'{k|결제 모듈} 리팩터링 중인 코드입니다. {k|함수 주석}을 통일된 형식으로 바꾸고 싶습니다.'},
+  {from:'법무', ask:'계약서 <b>위험 조항</b> 짚어 주세요',
+   text:'{name|하시윤} 담당자와 협의한 초안입니다. {price|연 계약금 8,400만원}, 대금은 {acct|하나 391-910022-84}로 입금. {k|위약 조항}과 {k|자동 갱신 여부}를 봐 주세요.'},
+  {from:'품질팀', ask:'재발 방지 대책 <b>초안</b>',
+   text:'{name|구민재} 고객 클레임과 {perf|이번 달 반품률 7.2%} 자료입니다. {k|같은 라인에서 반복}되고 있어 {k|원인 분석}이 필요합니다.'}
+]}
+];
+
+/* ===================== 상태 ===================== */
+const $=id=>document.getElementById(id);
+const MAX_STRIKE=3;
+let di=0, qi=0, strikes=0, score=0, docsDone=0, perfect=0;
+let activeMask=new Set(), activeBlock=new Set(), cur=null, locked=true, lastSent=true;
+let best=(()=>{try{return +localStorage.getItem('cari_block_best')||0}catch(e){return 0}})();
+
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+/** 본문 표기 → 토큰 span. 밑줄 친 것만 누를 수 있다. */
+function renderText(src){
+  let out='',i=0;
+  const re=/\{([a-z]+)\|([^}]*)\}/g; let m;
+  while((m=re.exec(src))){
+    out+=esc(src.slice(i,m.index));
+    out+=`<span class="tk" data-kind="${m[1]}">${esc(m[2])}</span>`;
+    i=m.index+m[0].length;
+  }
+  out+=esc(src.slice(i));
+  return out;
+}
+
+function renderBook(newOnes){
+  const mk=[...activeMask];
+  $('maskChips').innerHTML = mk.length
+    ? mk.map(k=>`<span class="chip${newOnes&&newOnes.includes(k)?' new':''}" title="${esc(MASK[k].desc)}">${esc(MASK[k].label)}</span>`).join('')
+    : '<span class="bnone">아직 없음</span>';
+  const bk=[...activeBlock];
+  $('blockChips').innerHTML = bk.length
+    ? bk.map(k=>`<span class="chip blk${newOnes&&newOnes.includes(k)?' new':''}" title="${esc(BLOCK[k].desc)}">${esc(BLOCK[k].label)}</span>`).join('')
+    : '<span class="bnone">아직 없음</span>';
+}
+
+function renderHud(){
+  $('dayEl').textContent=DAYS[di].n+'일차';
+  $('progEl').textContent=qi+' / '+DAYS[di].docs.length;
+  $('scEl').textContent=score.toLocaleString();
+  $('strEl').innerHTML=Array.from({length:MAX_STRIKE},(_,i)=>`<span class="${i<strikes?'on':''}"></span>`).join('');
+}
+
+function loadDoc(){
+  const d=DAYS[di].docs[qi];
+  cur=d;
+  const p=$('paper');
+  p.className='paper in';
+  p.innerHTML=
+    `<div class="phead"><span class="pfrom">${esc(d.from)}</span>`+
+    (d.stamp?`<span class="pstamp">${esc(d.stamp)}</span>`:'')+`</div>`+
+    `<p class="pask">“${d.ask}”</p>`+
+    `<div class="ptext">${renderText(d.text)}</div>`;
+  p.querySelectorAll('.tk').forEach(t=>{
+    t.onclick=()=>{ if(locked) return; t.classList.toggle('mk'); };
+  });
+  p.scrollTop=0;
+  locked=false;
+  $('sendBtn').disabled=false; $('rejBtn').disabled=false;
+  renderHud();
+}
+
+/* ===================== 판정 =====================
+   전송: ① 활성 block 서류면 실패(유출 사고)
+         ② 활성 mask 위반이 안 가려져 있으면 실패(유출)
+         ③ k 를 가렸으면 실패(맥락 손상) — 다 칠하기 방지
+         ④ 전부 통과 + 불필요한 마스킹 0 이면 완벽(+보너스)
+   반려: 활성 block 서류일 때만 정답. 아니면 업무 마비.
+   ⚠️ 아직 도입 안 된 규칙은 위반이 아니다(활성 집합만 본다) — 의도된 동작.
+=============================================== */
+function judge(sent){
+  if(locked) return;
+  locked=true; lastSent=sent;
+  $('sendBtn').disabled=true; $('rejBtn').disabled=true;
+  const p=$('paper'), toks=[...p.querySelectorAll('.tk')];
+  const isBlock = cur.block && activeBlock.has(cur.block);
+  let ok=false, ttl, why, pt='', flash=false;
+
+  if(!sent){
+    if(isBlock){ ok=true; ttl='반려 처리'; why=`<em>${esc(BLOCK[cur.block].label)}</em> 자료는 가려도 넘길 수 없다. 잘 막았다.`; }
+    else { ttl='업무 마비'; why='넘겨도 되는 서류를 반려했다. 안 되는 것만 막아야 일이 돌아간다.'; }
+  } else if(isBlock){
+    ttl='유출 사고';
+    why=`<em>${esc(BLOCK[cur.block].label)}</em> 자료다. 이건 가린다고 되는 게 아니라 <em>아예 넣으면 안 되는</em> 종류다.`;
+    flash=true;
+  } else {
+    const leaked=toks.filter(t=>activeMask.has(t.dataset.kind)&&!t.classList.contains('mk'));
+    const over=toks.filter(t=>t.dataset.kind==='k'&&t.classList.contains('mk'));
+    if(leaked.length){
+      leaked.forEach(t=>t.classList.add('leak'));
+      ttl='유출됐다'; flash=true;
+      why=`<em>${esc(MASK[leaked[0].dataset.kind].label)}</em> 이(가) 그대로 넘어갔다. 규정집에 오늘 추가된 줄을 다시 봐라.`;
+    } else if(over.length){
+      over.forEach(t=>t.classList.add('over'));
+      ttl='CARI 가 헛소리를 한다';
+      why='필요한 내용까지 가렸다. CARI 는 남은 것만 보고 답한다 — <em>지울 것과 남길 것을 가르는 게 일</em>이다.';
+    } else {
+      ok=true;
+      const extra=toks.filter(t=>t.dataset.kind!=='k'&&!activeMask.has(t.dataset.kind)&&t.classList.contains('mk'));
+      const gain=100+(extra.length?0:50);
+      score+=gain; pt='+'+gain; docsDone++;
+      if(!extra.length){ perfect++; ttl='통과'; why='필요한 것만 정확히 가렸다.'; }
+      else { ttl='통과'; why='새어 나간 건 없다. 다만 안 가려도 될 것까지 가렸다 — 보너스는 없다.'; }
+    }
+  }
+
+  if(ok&&!sent){ score+=100; pt='+100'; docsDone++; }
+  if(!ok) strikes++;
+  if(flash){ $('flash').classList.remove('on'); void $('flash').offsetWidth; $('flash').classList.add('on'); }
+  p.classList.add('done');
+  renderHud();
+
+  const fb=$('fb');
+  fb.className='fb '+(ok?'yes on':'no on');
+  $('fbTtl').textContent=ttl; $('fbPt').textContent=pt; $('fbWhy').innerHTML=why;
+  $('fbBtn').textContent = strikes>=MAX_STRIKE ? '결과 보기'
+    : (qi+1>=DAYS[di].docs.length ? (di+1>=DAYS.length?'결과 보기':'퇴근') : '다음 서류');
+  fb.dataset.ok=ok?'1':'0';
+}
+
+function nextStep(){
+  $('fb').classList.remove('on');
+  if(strikes>=MAX_STRIKE) return gameOver(false);
+  const p=$('paper');
+  // 전송한 서류는 오른쪽(AI 쪽)으로, 반려한 서류는 왼쪽(되돌려주는 쪽)으로 빠진다.
+  p.classList.add(lastSent?'out':'rej');
+  setTimeout(()=>{
+    qi++;
+    if(qi>=DAYS[di].docs.length){
+      di++; qi=0;
+      if(di>=DAYS.length) return gameOver(true);
+      openDay();
+    } else loadDoc();
+  },320);
+}
+
+function openDay(){
+  const D=DAYS[di];
+  const news=[...D.newMask,...D.newBlock];
+  D.newMask.forEach(k=>activeMask.add(k));
+  D.newBlock.forEach(k=>activeBlock.add(k));
+  renderBook(news);
+  renderHud();
+  if(!news.length){ loadDoc(); return; }
+  $('dTtl').textContent=D.n+'일차';
+  $('dMemo').innerHTML=
+    D.newMask.map(k=>`<li><b>${esc(MASK[k].label)}</b> 은(는) 가리고 보낼 것<i>${esc(MASK[k].desc)}</i></li>`).join('')+
+    D.newBlock.map(k=>`<li><b>${esc(BLOCK[k].label)}</b> 자료는 전송 금지<i>${esc(BLOCK[k].desc)}</i></li>`).join('');
+  $('dayOv').classList.remove('hidden');
+}
+
+function start(){
+  di=0;qi=0;strikes=0;score=0;docsDone=0;perfect=0;
+  activeMask=new Set(); activeBlock=new Set();
+  $('startOv').classList.add('hidden');
+  $('overOv').classList.add('hidden');
+  $('fb').classList.remove('on');
+  openDay();
+}
+
+function gameOver(cleared){
+  locked=true;
+  $('fb').classList.remove('on');
+  if(window.MGBridge) MGBridge.submit(score); // 랭킹: 점수형
+  $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true,shock:!cleared});
+  $('oTtl').textContent=cleared?'무사히 한 주를 넘겼다':'해고';
+  $('oScore').textContent=score.toLocaleString();
+  $('oDay').textContent=DAYS[Math.min(di,DAYS.length-1)].n;
+  $('oDocs').textContent=docsDone;
+  $('oPerf').textContent=perfect;
+  if(score>best){best=score;try{localStorage.setItem('cari_block_best',best)}catch(e){}
+    $('newbest').classList.remove('hidden');}
+  else $('newbest').classList.add('hidden');
+  $('oNote').innerHTML=cleared
+    ? '실무에서 AI 사고가 나는 자리가 정확히 여기다. <b>넣기 전에 한 번 더 보는 습관</b>이 전부다.'
+    : '규정은 자란다. 어제 괜찮던 것이 오늘 걸린다 — <b>서류보다 규정집을 먼저</b> 봐야 하는 이유다.';
+  $('overOv').classList.remove('hidden');
+}
+
+/* ===================== 배선 ===================== */
+$('sendBtn').onclick=()=>judge(true);
+$('rejBtn').onclick=()=>judge(false);
+$('fbBtn').onclick=nextStep;
+$('startBtn').onclick=start;
+$('againBtn').onclick=start;
+$('dBtn').onclick=()=>{ $('dayOv').classList.add('hidden'); loadDoc(); };
+
+$('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+renderBook(); renderHud();
+</script>
+
+<!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 ===== -->
+<script>
+(function(){
+  var EMBED=window.parent!==window;
+  function post(m){ if(EMBED) window.parent.postMessage(m,window.location.origin); }
+  window.MGBridge={submit:function(v){ if(typeof v==='number'&&isFinite(v)) post({t:'mg:score',score:v}); }};
+  function mount(id){
+    var ov=document.getElementById(id); if(!ov||ov.querySelector('.mg-rank')) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
+    b.setAttribute('aria-label','이 게임 랭킹 보기');
+    b.innerHTML='<span aria-hidden="true">🏆</span> 랭킹';
+    b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
+    ov.appendChild(b);
+  }
+  mount('startOv'); mount('overOv');
+})();
+</script>
+</body>
+</html>

@@ -1,35 +1,53 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import { useT } from '../lib/i18n'
+import { callFunction } from '../lib/supabase'
+import { tierDisplay, type ExamTicketView } from '../lib/tickets'
+import type { MyAttemptsResponse } from '../lib/types'
 
 // gara_4 (CARIS 자격검정 응시 안내/원서접수) 목업 디자인 + 응시 게이트 로직 보존. 헤더 없음(FAB이 네비).
 // 원본: stitch_design_critique_assistant/gara_4/code.html
 export default function ExamGate() {
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle } = useAuth()
-  const { t } = useT()
+  const { t, lang } = useT()
   const [loginNotice, setLoginNotice] = useState(false)
 
   if (isMobileDevice()) return <MobileBlock />
 
-  // 응시 시작: 로그인 체크 → prepare.
-  // SEB 실행/설치 안내는 prepare 마지막 단계("시작하기")로 이동. SEB 안에서는 /exam/seb 가 진입점.
-  // TODO(응시권): 결제/응시권 백엔드가 생기면 여기서 "결제된(접수 완료) 시험이 있는지" 확인해
-  //   - 있으면 그대로 /exam/prepare 로 진행
-  //   - 없으면 /guide 로 보내 접수부터 하게 한다(응시게이트로 들어온 모든 진입점을 여기서 일괄 게이팅).
-  //   지금은 exam_attempts 가 '응시 시작 후에만' 생겨 '결제했지만 미응시' 상태를 판별할 데이터가 없음
-  //   (start-exam 도 과도기라 결제 확인 없이 활성 회차+pro 로 바로 생성) → 데모로 무조건 통과.
+  // 이 화면은 **자립한다** — 어디서 들어오든(마이페이지·북마크·안내 메일) 서버에 응시권을 물어
+  // 목록을 스스로 그린다. 넘겨받은 값에 기대면 새로고침 한 번에 상태가 날아간다.
+  const [params] = useSearchParams()
+  const preferTicket = params.get('ticket')
+  const [tickets, setTickets] = useState<ExamTicketView[] | null>(null)
+  useEffect(() => {
+    if (!isFullUser) { setTickets([]); return }
+    callFunction<MyAttemptsResponse>('my-attempts', { lang })
+      .then((r) => setTickets(r.tickets ?? []))
+      .catch(() => setTickets([]))
+  }, [isFullUser, lang])
+
+  // 응시할 수 있는 응시권 — 넘겨받은 것이 있으면 그걸 맨 위로.
+  const usable = (tickets ?? [])
+    .filter((tk) => tk.usable)
+    .sort((a, b) => (b.ticketId === preferTicket ? 1 : 0) - (a.ticketId === preferTicket ? 1 : 0))
+
+  // 응시 시작: 로그인 체크 → prepare. SEB 실행/설치 안내는 prepare 마지막 단계("시작하기").
+  // ⚠️ 응시권을 **반드시 실어 보낸다** — 안 실으면 응시권이 2장 이상일 때 start-exam 이
+  //    "어느 걸 쓸지 골라라"로 튕기는데 그걸 고를 화면이 없다.
+  function goPrepare(ticketId: string) {
+    navigate(`/exam/prepare?ticket=${encodeURIComponent(ticketId)}`, { state: { ticketId } })
+  }
   function onStart() {
-    if (isFullUser) {
-      navigate('/exam/prepare')
-    } else {
-      setLoginNotice(true)
-    }
+    if (!isFullUser) { setLoginNotice(true); return }
+    if (usable.length === 1) { goPrepare(usable[0].ticketId); return }
+    // 응시권이 없거나 여러 장이면 아래 목록에서 고르게 한다.
+    document.getElementById('my-tickets')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   // 로그인 안내 팝업에서 실제 구글 로그인 실행
@@ -78,12 +96,83 @@ export default function ExamGate() {
                   {t('gate.btn_start')}
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </button>
-                <button onClick={() => navigate('/exam/check')} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary-container font-title-md text-title-md px-10 py-4 rounded-xl transition-all border border-outline-variant hover:border-primary-container hover:shadow-md flex items-center justify-center gap-2">
-                  {t('gate.btn_check')}
-                </button>
+                {/* ⚠️ 시험환경 테스트는 **응시권마다** 하는 것이라 아래 응시권 카드로 옮겼다.
+                    여기 남겨두면 어느 응시권으로 점검한 건지 기록이 안 남아 "점검 완료" 가 안 붙는다.
+                    응시권이 없는 사람만 이 버튼으로 미리 체험한다. */}
+                {isFullUser && usable.length > 0 ? null : (
+                  <button onClick={() => navigate('/exam/check')} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary-container font-title-md text-title-md px-10 py-4 rounded-xl transition-all border border-outline-variant hover:border-primary-container hover:shadow-md flex items-center justify-center gap-2">
+                    {t('gate.btn_check')}
+                  </button>
+                )}
               </div>
             </div>
           </section>
+
+          <hr className="border-outline-variant/20" />
+
+          {/* 내 응시권 — 어느 시험으로 응시할지 여기서 고른다.
+              ⛔ 환경 점검을 안 한 응시권은 **목록에서 빼지 않는다**(빼면 "내가 산 시험이 왜 없지"가 된다).
+                 회색으로 두고 그 자리에 점검 버튼을 놓는다. */}
+          {isFullUser && (
+            <section id="my-tickets" className="flex flex-col gap-6">
+              <h3 className="font-title-md text-title-md text-on-surface border-l-4 border-primary-container pl-4">{t('gate.my_tickets')}</h3>
+              {tickets === null ? (
+                <p className="font-body-md text-on-surface-variant">{t('common.loading')}</p>
+              ) : usable.length === 0 ? (
+                <div className="p-8 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 text-center">
+                  <p className="font-body-lg text-on-surface-variant mb-5 break-keep">{t('gate.no_ticket')}</p>
+                  <button onClick={() => navigate('/plan')} className="bg-primary-container text-on-primary font-label-md font-bold px-6 py-3 rounded-xl hover:bg-primary transition-colors ambient-shadow">
+                    {t('ticket.empty_cta')}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {usable.map((tk) => {
+                    const ready = !!tk.envChecked
+                    return (
+                      <div
+                        key={tk.ticketId}
+                        className={`p-6 rounded-2xl border flex flex-col gap-4 transition-all ${
+                          ready
+                            ? 'bg-surface-container-lowest border-primary-container/40 shadow-sm'
+                            : 'bg-surface-container-lowest/60 border-outline-variant/30 opacity-70'
+                        }`}
+                      >
+                        <div>
+                          <h4 className={`font-title-md text-title-md mb-1 ${ready ? 'text-on-surface' : 'text-on-surface-variant'}`}>
+                            {tierDisplay(tk.tier, lang)}
+                          </h4>
+                          <p className="font-body-md text-body-md text-on-surface-variant break-keep">
+                            {tk.roundTitle}{tk.examDate ? ` · ${t('sched.exam_date')} ${tk.examDate}` : ''}
+                          </p>
+                        </div>
+                        {ready ? (
+                          <button
+                            onClick={() => goPrepare(tk.ticketId)}
+                            className="w-full bg-primary-container text-on-primary font-title-md text-title-md px-6 py-3 rounded-xl hover:translate-y-[-2px] transition-transform ambient-shadow flex items-center justify-center gap-2"
+                          >
+                            {t('gate.btn_start')}
+                            <span className="material-symbols-outlined">arrow_forward</span>
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => navigate(`/exam/check?ticket=${encodeURIComponent(tk.ticketId)}`)}
+                              className="w-full bg-surface-container-lowest border border-primary-container text-primary-container font-title-md text-title-md px-6 py-3 rounded-xl hover:bg-primary-container hover:text-on-primary transition-colors flex items-center justify-center gap-2"
+                            >
+                              <span className="material-symbols-outlined">monitor_heart</span>
+                              {t('ticket.env_do')}
+                            </button>
+                            <p className="font-body-md text-body-md text-outline break-keep">{t('ticket.env_required')}</p>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
           <hr className="border-outline-variant/20" />
 

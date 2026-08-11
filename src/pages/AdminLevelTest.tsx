@@ -5,15 +5,11 @@
 //  - KB 파이프라인(kb-extract/generate/save/publish/embed-backfill)·translate-questions 는 관리자 인증만으로 호출한다
 //    (옛 x-passcode 입력칸은 제거 — 서버 시크릿 KB_PASSCODE/TRANSLATE_PASSCODE 미설정이라 검사 자체를 안 함).
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { optionCountForLevel } from '../lib/scoring'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
-// 채팅 검수·이북 관리는 Admin.tsx 에 정의된 컴포넌트를 그대로 노출(데이터는 admin 함수). 위치만 WORLD ARENA 로 이동.
-import { ChatModAdmin, EbooksAdmin, RegionFixForm } from './Admin'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
@@ -25,11 +21,6 @@ function fmtDT(iso?: string | null): string {
   if (!iso) return '-'
   const d = new Date(iso)
   return isNaN(d.getTime()) ? '-' : d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
-}
-function fmtDate(iso?: string | null): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 // "3/l3_rag" → "Lv.3 · RAG·검색" (사람 언어)
@@ -68,83 +59,16 @@ export interface Analytics {
   coverage: Record<string, number>
 }
 
-type LtTab = 'dashboard' | 'users' | 'attempts' | 'questions' | 'chatmod' | 'ebooks' | 'admins'
-const LT_TABS: LtTab[] = ['dashboard', 'users', 'attempts', 'questions', 'chatmod', 'ebooks', 'admins']
+// 2026-08-11 재편 — 이 파일은 더 이상 자기 껍데기(탭 줄·권한 게이트·wrap)를 갖지 않는다.
+//   화면들은 Admin.tsx 의 대메뉴 `WORLD ARENA` 아래에 개별 컴포넌트로 꽂힌다.
+//   · 대시보드 → WORLD ARENA > 대시보드
+//   · 응시 기록 + 문항 → WORLD ARENA > 레벨테스트 (아래 ArenaLevelTest 가 한 화면에서 전환)
+//   · 유저 → **회원관리 > 회원 으로 흡수**(CARIS 목록과 한 벌로 합침). 여기엔 상세 패널만 남는다.
+//   · 채팅 검수 → WORLD ARENA > 채팅 관리 / 이북 → Learning Library / 관리자 관리 → 홈페이지 관리
+//   ⚠️ 권한 확인도 Admin.tsx 한 곳으로 올라갔다. 여기서 `admin-test me` 를 다시 부르지 않는다.
 
-export default function LevelTestAdmin() {
-  const { isFullUser } = useAuth()
-  // 탭 상태를 URL 쿼리(?tab)로 — Admin.tsx(CARIS 쪽)와 같은 방식.
-  // 전엔 useState 라 새로고침·뒤로가기마다 대시보드로 되돌아갔고, 탭 주소를 공유할 수도 없었다.
-  // ⚠️ 'admins' 는 루트 전용이라 권한 없이 주소로 들어오면 화면이 비어버린다 → 대시보드로 접는다.
-  const [params, setParams] = useSearchParams()
-  const setTab = (t: LtTab) =>
-    setParams((prev) => {
-      const p = new URLSearchParams(prev)
-      p.set('top', 'level') // 아레나 백오피스에 머무른다(Admin.tsx 가 top 으로 갈라본다)
-      if (t === 'dashboard') p.delete('tab')
-      else p.set('tab', t)
-      return p
-    })
-  // 관리자 권한은 서버(admin-test 'me')가 판별 — CBT admin 과 동일한 게이트(admin_users/ROOT).
-  const [gate, setGate] = useState<'loading' | 'ok' | 'denied'>('loading')
-  const [isRoot, setIsRoot] = useState(false)
-
-  useEffect(() => {
-    if (!isFullUser) { setGate('denied'); return }
-    callFunction<{ isRoot: boolean }>('admin-test', { action: 'me' })
-      .then((r) => { setGate('ok'); setIsRoot(!!r.isRoot) })
-      .catch(() => setGate('denied'))
-  }, [isFullUser])
-
-  if (gate === 'loading') {
-    return <div className="wrap admin"><div className="admin-section">권한 확인 중…</div></div>
-  }
-  if (gate === 'denied') {
-    return (
-      <div className="wrap admin">
-        <div className="admin-section" style={{ textAlign: 'center' }}>
-          <h3>관리자 전용</h3>
-          <p className="admin-hint">WORLD ARENA 관리자 계정으로 로그인해야 합니다.</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 주소가 먼저다. 없거나 모르는 값이면 대시보드, 루트가 아닌데 admins 면 대시보드.
-  const raw = params.get('tab') as LtTab | null
-  const wanted = raw && LT_TABS.includes(raw) ? raw : 'dashboard'
-  const tab: LtTab = wanted === 'admins' && !isRoot ? 'dashboard' : wanted
-
-  const TABS: { key: LtTab; label: string }[] = [
-    { key: 'dashboard', label: '대시보드' },
-    { key: 'users', label: '유저' },
-    { key: 'attempts', label: '응시 기록' },
-    { key: 'questions', label: '문항' },
-    { key: 'chatmod', label: '채팅 검수' },
-    { key: 'ebooks', label: '이북' },
-    ...(isRoot ? [{ key: 'admins' as const, label: '관리자 관리' }] : []),
-  ]
-
-  return (
-    <div className="wrap admin">
-      <div className="admin-tabs">
-        {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {tab === 'dashboard' ? <DashboardTab /> : null}
-      {tab === 'users' ? <UsersTab /> : null}
-      {tab === 'attempts' ? <AttemptsTab /> : null}
-      {tab === 'questions' ? <QuestionsTab isRoot={isRoot} /> : null}
-      {/* 채팅 검수·이북은 Admin.tsx(.admin-cbt 스코프) 컴포넌트라 .admin-head 가 먹도록 admin-cbt 로 감싼다. */}
-      {tab === 'chatmod' ? <div className="admin-cbt"><ChatModAdmin /></div> : null}
-      {tab === 'ebooks' ? <div className="admin-cbt"><EbooksAdmin /></div> : null}
-      {tab === 'admins' && isRoot ? <AdminsTab /> : null}
-    </div>
-  )
-}
+// WORLD ARENA > 레벨테스트 아래 두 세부(참여 현황 · 문항 관리)는 상위 메뉴 줄이 직접 고른다.
+export { DashboardTab as ArenaDashboard, AttemptsTab as ArenaAttempts, QuestionsTab as ArenaQuestions }
 
 // ============================ 문항 탭 (목록·이력·생성·번역 통합) ============================
 // CARIS(CBT) 관리자의 '문항' 탭과 동일하게, 문항 관련 화면을 한 탭 안 서브탭으로 묶는다.
@@ -451,126 +375,13 @@ function DashboardTab() {
   )
 }
 
-// ============================ 유저 탭 ============================
-interface UserRow {
+// ============================ 유저(아레나 쪽) ============================
+// 목록은 **회원관리 > 회원**(Admin.tsx 의 MembersAdmin)으로 흡수됐다 — CARIS 목록과 두 벌이던 것을 합쳤다.
+// 여기 남은 건 그 상세 모달 안에서 쓰는 `WORLD ARENA` 탭 본문뿐이다.
+/** `admin-test users` 응답 한 줄. 회원 목록이 CARIS 쪽 행과 이 행을 사람 기준으로 겹쳐 쓴다. */
+export interface ArenaUserRow {
   id: string; name: string | null; email: string | null; anon: boolean
   created: string; rank: number; attempts: number; lastActive: string | null
-}
-function UsersTab() {
-  const [users, setUsers] = useState<UserRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState('')
-  const [q, setQ] = useState('')
-  const [type, setType] = useState<'all' | 'google' | 'guest'>('google')
-  const [rankF, setRankF] = useState(0)
-  const [sort, setSort] = useState<'created' | 'rank' | 'attempts'>('created')
-  const [open, setOpen] = useState<UserRow | null>(null)
-  const [page, setPage] = useState(0)
-
-  useEffect(() => {
-    callFunction<{ users: UserRow[] }>('admin-test', { action: 'users' })
-      .then((r) => setUsers(r.users))
-      .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false))
-  }, [])
-  // 필터·정렬 바뀌면 1페이지로
-  useEffect(() => { setPage(0) }, [q, type, rankF, sort])
-
-  if (err) return <ErrBox msg={err} />
-
-  const filtered = users
-    .filter((u) => {
-      if (type === 'google' && u.anon) return false
-      if (type === 'guest' && !u.anon) return false
-      if (rankF && u.rank !== rankF) return false
-      if (q) {
-        const s = q.toLowerCase()
-        if (!(u.name || '').toLowerCase().includes(s) && !(u.email || '').toLowerCase().includes(s)) return false
-      }
-      return true
-    })
-    .sort((a, b) =>
-      sort === 'rank' ? b.rank - a.rank : sort === 'attempts' ? b.attempts - a.attempts : (b.created || '').localeCompare(a.created || ''),
-    )
-  const googleN = users.filter((u) => !u.anon).length
-  const PER = 50
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER))
-  const safePage = Math.min(page, pageCount - 1)
-  const pageItems = filtered.slice(safePage * PER, safePage * PER + PER)
-  // 표시할 페이지 번호: 처음·끝·현재±2 만 (나머지는 … 로 접음)
-  const pageNums: (number | '…')[] = []
-  for (let i = 0; i < pageCount; i++) {
-    if (i === 0 || i === pageCount - 1 || (i >= safePage - 2 && i <= safePage + 2)) pageNums.push(i)
-    else if (pageNums[pageNums.length - 1] !== '…') pageNums.push('…')
-  }
-
-  return (
-    <div>
-      <div className="admin-cards">
-        <div className="admin-card"><div className="k">전체 유저</div><div className="v">{users.length}</div></div>
-        <div className="admin-card"><div className="k">구글 로그인</div><div className="v">{googleN}</div></div>
-        <div className="admin-card"><div className="k">게스트</div><div className="v">{users.length - googleN}</div></div>
-      </div>
-      {/* 지역 오배정 정정 — CARIS 회원 탭에 있던 걸 옮겨왔다(2026-08-05).
-          지역은 아레나 랭킹·월드맵 전용이라 자격검정 화면에 있을 이유가 없었다. */}
-      <div className="admin-cbt"><RegionFixForm /></div>
-      <div className="admin-section">
-        <div className="admin-toolbar">
-          <input className="admin-search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
-          <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
-            <option value="google">가입유저</option><option value="guest">게스트</option><option value="all">전체(게스트 포함)</option>
-          </select>
-          <select value={rankF} onChange={(e) => setRankF(+e.target.value)}>
-            <option value={0}>전체 등급</option>
-            {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
-          </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="created">최신가입순</option><option value="rank">등급순</option><option value="attempts">응시많은순</option>
-          </select>
-          <span className="admin-hint">{filtered.length}명{loading ? ' · 불러오는 중…' : ''}</span>
-        </div>
-        <table className="admin-table">
-          <thead><tr><th>이름</th><th>이메일</th><th>유형</th><th>등급</th><th>응시</th><th>마지막 활동</th><th>가입</th><th></th></tr></thead>
-          <tbody>
-            {pageItems.map((u) => (
-              <tr key={u.id}>
-                <td>{u.name || '-'}</td>
-                <td>{u.email || '-'}</td>
-                <td>{u.anon ? '게스트' : '구글'}</td>
-                <td>Lv.{u.rank}</td>
-                <td>{u.attempts}</td>
-                <td>{fmtDate(u.lastActive)}</td>
-                <td>{fmtDate(u.created)}</td>
-                <td><button className="admin-mini" onClick={() => setOpen(u)}>상세</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length === 0 && !loading ? <div className="admin-empty">조건에 맞는 유저가 없습니다.</div> : null}
-        {pageCount > 1 ? (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
-            <button className="admin-mini" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}>‹</button>
-            {pageNums.map((n, i) =>
-              n === '…' ? (
-                <span key={`e${i}`} className="admin-hint">…</span>
-              ) : (
-                <button
-                  key={n}
-                  className="admin-mini"
-                  onClick={() => setPage(n)}
-                  style={n === safePage ? { fontWeight: 800, background: 'var(--accent)', color: '#fff' } : undefined}
-                >
-                  {n + 1}
-                </button>
-              ),
-            )}
-            <button className="admin-mini" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1}>›</button>
-          </div>
-        ) : null}
-      </div>
-      {open ? <UserDetail user={open} onClose={() => setOpen(null)} /> : null}
-    </div>
-  )
 }
 
 interface UserDetailData { rank: number; skills: { level: number; attempts_count: number; placed: boolean; ratings: Record<string, number> }[]; attempts: Omit<AttemptRow, 'name'>[]; ageBand: string | null }
@@ -582,43 +393,40 @@ const AGE_BAND_LABEL: Record<string, string> = {
   '10s': '10대 이하', '20s': '20대', '30s': '30대', '40s': '40대', '50s': '50대', '60s': '60대 이상',
   private: '공개 안 함',
 }
-function UserDetail({ user, onClose }: { user: UserRow; onClose: () => void }) {
+/**
+ * 회원 상세 모달의 `WORLD ARENA` 탭 본문 — 연령대 · 등급 수동조정 · 레벨별 레이팅 · 레벨테스트 응시 이력.
+ * ⚠️ 모달 껍데기(닫기·배경)를 갖지 않는다. 감싸는 쪽(MembersAdmin)이 이미 모달 안이다.
+ */
+export function ArenaUserPanel({ userId, initialRank }: { userId: string; initialRank: number }) {
   const [data, setData] = useState<UserDetailData | null>(null)
-  const [rank, setRank] = useState(user.rank)
+  const [rank, setRank] = useState(initialRank)
   const [msg, setMsg] = useState('')
   useEffect(() => {
-    callFunction<UserDetailData>('admin-test', { action: 'userDetail', userId: user.id })
+    callFunction<UserDetailData>('admin-test', { action: 'userDetail', userId })
       .then((d) => { setData(d); setRank(d.rank) })
       .catch((e) => setMsg('불러오기 실패: ' + (e instanceof Error ? e.message : String(e))))
-  }, []) // eslint-disable-line
+  }, [userId])
   async function saveRank() {
     setMsg('저장 중…')
-    try { await callFunction('admin-test', { action: 'setRank', userId: user.id, rank }); setMsg('✅ 등급 변경됨') }
+    try { await callFunction('admin-test', { action: 'setRank', userId, rank }); setMsg('✅ 등급 변경됨') }
     catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
   }
   return (
-    <div className="lt-modal" onClick={onClose}>
-      <div className="lt-modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="admin-modal-h">
-          <b>{user.name || '유저'}</b>
-          <span className="admin-hint">{user.email || (user.anon ? '게스트' : '')}</span>
-          <button className="admin-x" onClick={onClose}>✕</button>
-        </div>
-        <div className="admin-row" style={{ marginTop: 4 }}>
-          <span>연령대</span>
-          <b>{data ? (AGE_BAND_LABEL[data.ageBand ?? ''] ?? '미수집') : '…'}</b>
-        </div>
-        <div className="admin-row" style={{ marginTop: 4 }}>
-          <span>등급 수동 조정</span>
-          <select value={rank} onChange={(e) => setRank(+e.target.value)}>
-            {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
-          </select>
-          <button className="admin-mini" onClick={saveRank}>저장</button>
-          {msg ? <span className="admin-msg">{msg}</span> : null}
-        </div>
-        {data?.skills?.length ? <RatingByLevel skills={data.skills} /> : null}
-        <AttemptHistory attempts={data?.attempts ?? []} />
+    <div>
+      <div className="admin-row" style={{ marginTop: 4 }}>
+        <span>연령대</span>
+        <b>{data ? (AGE_BAND_LABEL[data.ageBand ?? ''] ?? '미수집') : '…'}</b>
       </div>
+      <div className="admin-row" style={{ marginTop: 4 }}>
+        <span>등급 수동 조정</span>
+        <select value={rank} onChange={(e) => setRank(+e.target.value)}>
+          {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((l) => <option key={l} value={l}>Lv.{l}</option>)}
+        </select>
+        <button className="admin-mini" onClick={saveRank}>저장</button>
+        {msg ? <span className="admin-msg">{msg}</span> : null}
+      </div>
+      {data?.skills?.length ? <RatingByLevel skills={data.skills} /> : null}
+      <AttemptHistory attempts={data?.attempts ?? []} />
     </div>
   )
 }
@@ -1557,83 +1365,7 @@ function EventsTab() {
   )
 }
 
-// ============================ 관리자 관리 탭 (루트 전용) ============================
-interface AdminRow { email: string; role: 'root' | 'admin'; added_by: string | null; created_at: string | null }
-function AdminsTab() {
-  const [rows, setRows] = useState<AdminRow[] | null>(null)
-  const [candidates, setCandidates] = useState<string[]>([])
-  const [email, setEmail] = useState('')
-  const [msg, setMsg] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function load() {
-    try {
-      const r = await callFunction<{ admins: AdminRow[]; candidates?: string[] }>('admin-test', { action: 'admins' })
-      setRows(r.admins); setCandidates(r.candidates ?? [])
-    } catch (e) { setMsg('불러오기 실패: ' + (e instanceof Error ? e.message : String(e))); setRows([]) }
-  }
-  useEffect(() => { load() }, [])
-
-  async function add() {
-    const t = email.trim().toLowerCase()
-    if (!t) return
-    setBusy(true); setMsg('')
-    try {
-      const r = await callFunction<{ admins: AdminRow[]; candidates?: string[] }>('admin-test', { action: 'addAdmin', email: t })
-      setRows(r.admins); setCandidates(r.candidates ?? []); setEmail(''); setMsg(`✅ ${t} 추가됨`)
-    } catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
-    setBusy(false)
-  }
-  async function remove(target: string) {
-    if (!confirm(`${target} 을(를) 관리자에서 삭제할까요?`)) return
-    setBusy(true); setMsg('')
-    try {
-      const r = await callFunction<{ admins: AdminRow[]; candidates?: string[] }>('admin-test', { action: 'removeAdmin', email: target })
-      setRows(r.admins); setCandidates(r.candidates ?? []); setMsg(`🗑 ${target} 삭제됨`)
-    } catch (e) { setMsg('실패: ' + (e instanceof Error ? e.message : String(e))) }
-    setBusy(false)
-  }
-
-  return (
-    <div>
-      <div className="admin-section">
-        <h3>관리자 추가</h3>
-        <p className="admin-desc">이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있어요. 추가하면 그 계정으로 로그인 시 관리자 페이지를 쓸 수 있습니다. (추가·삭제는 루트 관리자만)</p>
-        <div className="admin-toolbar">
-          <input className="admin-search" list="admin-candidates" placeholder="가입 유저 이메일 선택/입력" value={email}
-            onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
-          <datalist id="admin-candidates">
-            {candidates.map((c) => <option key={c} value={c} />)}
-          </datalist>
-          <button className="btn-ink" onClick={add} disabled={busy || !email.trim()}>추가</button>
-          <span className="admin-hint">지정 가능 {candidates.length}명</span>
-          {msg ? <span className="admin-msg">{msg}</span> : null}
-        </div>
-      </div>
-      <div className="admin-section">
-        <h3>관리자 목록 <span className="admin-hint">{rows ? `${rows.length}명` : ''}</span></h3>
-        <table className="admin-table">
-          <thead><tr><th>이메일</th><th>권한</th><th>추가한 사람</th><th>추가일</th><th></th></tr></thead>
-          <tbody>
-            {(rows ?? []).map((a) => (
-              <tr key={a.email}>
-                <td>{a.email}</td>
-                <td>{a.role === 'root' ? <span className="badge ok">루트</span> : <span className="badge low">관리자</span>}</td>
-                <td>{a.added_by ?? '-'}</td>
-                <td>{fmtDate(a.created_at)}</td>
-                <td>{a.role === 'root'
-                  ? <span className="admin-hint">삭제 불가</span>
-                  : <button className="admin-mini" onClick={() => remove(a.email)} disabled={busy}>삭제</button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows && rows.length === 0 ? <div className="admin-empty">불러오기 실패 또는 비어 있음</div> : null}
-      </div>
-    </div>
-  )
-}
-
+// 관리자 관리는 홈페이지 관리 대메뉴의 한 벌(Admin.tsx 의 AdminAccountsAdmin)로 통일했다 — 여기 있던 아레나 전용 화면은 제거(2026-08-11).
 // ============================ 번역 탭 (엑셀 업로드 + 자동번역) ============================
 // ── 번역 작업 자동저장/이어서하기 (localStorage) ──
 const XLATE_JOB_KEY = 'gara_xlate_job_v1'

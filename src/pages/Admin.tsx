@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { renderEbookCover } from '../lib/ebookCover'
-import { krw } from '../lib/money'
+import { krw, usd, usdToKrw, krwToUsdInput, KRW_PER_USD } from '../lib/money'
 import { feeKey } from '../lib/fees'
 import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
 import type {
@@ -37,7 +37,6 @@ import type {
   CbtRoundStat,
   CbtTierStat,
   CbtQDiff,
-  CbtUserRow,
   CbtUsersResp,
   CbtUserDetailResp,
   CbtUserAttempt,
@@ -48,145 +47,93 @@ import type {
   AdminEbookBuyersResp,
   EbookTranslation,
 } from '../lib/types'
-import LevelTestAdmin from './AdminLevelTest'
-import { getTracks, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
+// WORLD ARENA 화면들 — 옛 <LevelTestAdmin/> 껍데기는 없어지고 개별 컴포넌트가 대메뉴 아래로 꽂힌다.
+import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaUserPanel, type ArenaUserRow } from './AdminLevelTest'
+// 재편으로 새로 만든 화면들(Admin.tsx 가 이미 6천 줄이라 분리) — 라우팅만 여기서 한다.
+import {
+  PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, TermPoolAdmin, CoinPolicyAdmin,
+  CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
+} from './AdminReform'
+import { useAdminData, payStatusLabel, productLabel } from '../lib/adminData'
+import { getTracks, tierName, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 import { REGIONS, countryName, flagEmoji } from '../lib/regions'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 
-// 관리자 최상위 = 두 제품 백오피스 탭 분리: CARIS 시험(CBT) / CARIS ARENA.
-//  - "CARIS 시험" = 기존 CBT 관리(<CarisExamAdmin/>, admin 함수 호출) — 그대로 유지.
-//  - "CARIS ARENA" = 이관된 CARIS ARENA 관리(<LevelTestAdmin/>, admin-test 함수 호출).
-type TopTab = 'caris' | 'level'
+// 관리자 최상위 = **대메뉴 6개 + 홈 대시보드** (2026-08-11 재편 · PPT `관리자 페이지 수정사항` 1페이지).
+//   옛 구조는 상단 2탭(`CARIS 시험` / `WORLD ARENA`) + 각자의 서브탭이었다. 화면 자체는 그대로 두고
+//   **어느 대메뉴 밑에 서는가만** 바꾼 것이다 — 그래야 나중 단계에서 신규 화면을 자리에 얹기만 하면 된다.
+//
+// ⚠️ 홈(대시보드)은 대메뉴 6개 어디에도 없다. **좌상단 시스템 이름이 홈으로 가는 유일한 길**이다.
+//    PPT 가 "이름 클릭 시 대시보드 표출" 이라고 못박았고, 6개 목록에도 대시보드가 없다.
+// ⚠️ 각 제품의 상세 대시보드(CARIS 분석 · 아레나 분석)는 없어지지 않고 그 대메뉴 안에 남는다.
+//    홈은 전체 요약, 대메뉴 안은 그 제품 상세 — 합치면 CARIS 분석이 묻힌다.
+type TopMenu = 'members' | 'arena' | 'caris' | 'library' | 'board' | 'site'
+interface SubItem { key: string; label: string; root?: boolean; children?: { key: string; label: string }[] }
+
+const MENUS: { key: TopMenu; label: string }[] = [
+  { key: 'members', label: '회원관리' },
+  { key: 'arena', label: 'WORLD ARENA' },
+  { key: 'caris', label: 'CARIS' },
+  { key: 'library', label: 'Learning Library' },
+  { key: 'board', label: '게시판 관리' },
+  { key: 'site', label: '홈페이지 관리' },
+]
+
+// 대메뉴 → 하위메뉴 → 세부. **각 단계의 첫 항목이 기본**(?tab·?sub 없이 들어오면 여기로).
+// ⚠️ 세부(3단)는 **자기 줄에 따로 선다.** 하위메뉴와 같은 줄에 붙이면 어느 게 상위인지 안 보인다.
+//    (미니게임의 현황/문항, 제출답안/주관식채점, 고객센터의 FAQ/Q&A, 러닝라이브러리의 이북/콘텐츠가 전부 3단이다.)
+const SUBS: Record<TopMenu, SubItem[]> = {
+  members: [
+    { key: 'users', label: '회원' },
+    { key: 'payments', label: '결제관리' },
+  ],
+  arena: [
+    { key: 'dash', label: '대시보드' },
+    // PPT 2페이지 도형 그대로 — '미니게임' 이 상위고 게임 현황·게임 문항이 그 아래다.
+    { key: 'minigame', label: '미니게임', children: [{ key: 'stat', label: '게임 현황' }, { key: 'quiz', label: '게임 문항' }] },
+    { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
+    { key: 'daily', label: '오늘의 학습', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
+    { key: 'chat', label: '채팅 관리' },
+    { key: 'coin', label: '코인 관리' },
+  ],
+  caris: [
+    { key: 'dash', label: '대시보드' },
+    { key: 'plan', label: 'CARIS PLAN' },
+    { key: 'status', label: 'CARIS 현황', children: [{ key: 'tickets', label: '접수·응시권' }, { key: 'env', label: '시험환경 점검' }] },
+    { key: 'subs', label: '제출답안/채점', children: [{ key: 'list', label: '제출 답안' }, { key: 'grading', label: '주관식 채점' }] },
+    { key: 'questions', label: '문항관리' },
+    { key: 'cert', label: '인증서 관리' },
+  ],
+  // ⚠️ 겨냥하는 시험(LEVEL TEST / CARIS)이 상위다. 교재·강의는 그 안의 종류일 뿐이라 아래로 간다.
+  library: [
+    { key: 'lt', label: 'LEVEL TEST', children: [{ key: 'ebooks', label: 'E-BOOK 관리' }, { key: 'contents', label: '콘텐츠 관리' }] },
+    { key: 'caris', label: 'CARIS', children: [{ key: 'ebooks', label: 'E-BOOK 관리' }, { key: 'contents', label: '콘텐츠 관리' }] },
+  ],
+  board: [
+    { key: 'notice', label: '공지사항' },
+    { key: 'support', label: '고객센터', children: [{ key: 'faq', label: 'FAQ' }, { key: 'qna', label: 'Q&A' }] },
+    { key: 'about', label: '협회소개' },
+    { key: 'privacy', label: '개인정보처리방침' },
+    { key: 'terms', label: '이용약관' },
+  ],
+  site: [
+    { key: 'info', label: '사이트 정보' },
+    { key: 'popup', label: '팝업 관리' },
+    { key: 'admins', label: '관리자 관리', root: true },
+  ],
+}
+
+const isTopMenu = (v: string): v is TopMenu => MENUS.some((m) => m.key === v)
+/** 메뉴 이동 — 화면들이 서로를 딥링크할 때 쓴다(대시보드 '처리 대기' 카드 등). `sub` 은 3단 키. */
+export type AdminGo = (top: TopMenu | '', tab?: string, sub?: string, extra?: Record<string, string>) => void
+
 export default function Admin() {
   const { isFullUser, loginWithGoogle } = useAuth()
-  // 탭 상태를 URL 쿼리(?top)로 → 브라우저 뒤로/앞으로가 탭 사이를 오간다.
+  // 대메뉴·하위메뉴 상태를 URL 쿼리(?top·?tab)로 → 브라우저 뒤로/앞으로가 메뉴 사이를 오간다.
   const [params, setParams] = useSearchParams()
-  const topTab: TopTab = params.get('top') === 'level' ? 'level' : 'caris'
-  const setTopTab = (t: TopTab) =>
-    setParams((prev) => {
-      const p = new URLSearchParams(prev)
-      if (t === 'caris') p.delete('top')
-      else p.set('top', t)
-      // 제품을 갈아탈 땐 서브탭을 항상 버린다 — 두 화면이 ?tab 을 공유하는데 탭 이름이 서로 달라
-      // 남겨두면 엉뚱한 탭으로 떨어진다(아레나도 ?tab 을 쓰게 되면서 양방향 문제가 됐다).
-      p.delete('tab')
-      return p
-    })
-
-  // 로그인 게이트는 최상위에서 공유(두 탭 공통). 세부 권한은 각 탭이 서버로 확인.
-  if (!isFullUser) {
-    return (
-      <div className="wrap">
-        <div className="exam-card" style={{ textAlign: 'center', maxWidth: 420, margin: '40px auto' }}>
-          <h2 className="exam-title">관리자 로그인</h2>
-          <p className="exam-sub">관리자 계정으로 로그인해 주세요.</p>
-          <button className="btn-ink" style={{ marginTop: 16 }} onClick={() => loginWithGoogle()}>
-            구글로 로그인
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className="wrap" style={{ paddingBottom: 0 }}>
-        <div className="admin-tabs admin-tabs-top" style={{ marginTop: 10 }}>
-          <button className={topTab === 'caris' ? 'on' : ''} onClick={() => setTopTab('caris')}>
-            CARIS 시험
-          </button>
-          <button className={topTab === 'level' ? 'on' : ''} onClick={() => setTopTab('level')}>
-            WORLD ARENA
-          </button>
-        </div>
-      </div>
-      {topTab === 'caris' ? <CarisExamAdmin /> : <LevelTestAdmin />}
-    </>
-  )
-}
-
-const PAGE = 50
-
-function fmtDT(iso?: string | null): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  return isNaN(d.getTime())
-    ? '-'
-    : d.toLocaleString('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        year: '2-digit',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      })
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  in_progress: '응시 중',
-  submitted: '제출 완료',
-  voided: '무효',
-  expired: '만료',
-}
-
-// CARIS 백오피스 서브탭 — DashboardBody 액션 카드가 탭 이동에 재사용.
-// ⚠️ 채팅 검수(chatmod)·이북(ebooks)은 WORLD ARENA 관리자(AdminLevelTest.tsx)로 이동함 — 여기 서브탭에서 제외.
-type CarisSub = 'dash' | 'subs' | 'grading' | 'users' | 'questions' | 'notices' | 'faq' | 'rounds' | 'tickets' | 'admins'
-// ⚠️ 유니언에만 넣고 이 배열에 빠뜨리면 URL 화이트리스트(:sub)가 걸러 항상 대시보드로 떨어진다.
-const CARIS_SUBS: CarisSub[] = ['dash', 'subs', 'grading', 'users', 'questions', 'notices', 'faq', 'rounds', 'tickets', 'admins']
-// 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 딥링크로 지정.
-type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
-const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'in_progress', label: '진행중' },
-  { key: 'result_pending', label: '결과공개 대기' },
-  { key: 'passed', label: '합격' },
-  { key: 'failed', label: '불합격' },
-]
-function matchSubsFilter(r: AdminAttemptRow, f: SubsFilter): boolean {
-  const pct = r.totalQuestions && r.totalCorrect != null ? (r.totalCorrect / r.totalQuestions) * 100 : null
-  const releasePending = !r.resultReleaseAt || new Date(r.resultReleaseAt).getTime() > Date.now()
-  switch (f) {
-    case 'in_progress': return r.status === 'in_progress'
-    case 'result_pending': return r.status === 'submitted' && releasePending
-    case 'passed': return r.status === 'submitted' && pct != null && pct >= 60
-    case 'failed': return r.status === 'submitted' && pct != null && pct < 60
-    default: return true
-  }
-}
-
-// CARIS 시험(CBT) 백오피스 — 제출 답안 조회. (기존 Admin 본문 그대로, admin 함수 호출)
-function CarisExamAdmin() {
-  const { isFullUser, loginWithGoogle } = useAuth()
-  // 서브탭도 URL 쿼리(?tab)로 → 대시보드→문항 후 뒤로가기 시 대시보드로 복귀.
-  const [params, setParams] = useSearchParams()
-  const rawTab = params.get('tab') ?? ''
-  const sub: CarisSub = (CARIS_SUBS as string[]).includes(rawTab) ? (rawTab as CarisSub) : 'dash'
-  const setSub = (t: CarisSub) =>
-    setParams((prev) => {
-      const p = new URLSearchParams(prev)
-      if (t === 'dash') p.delete('tab')
-      else p.set('tab', t)
-      return p
-    })
+  // 권한 확인은 여기 한 번뿐이다. 옛 구조는 두 화면이 각자 `me` 를 불러 로그인 게이트가 두 벌이었다.
   const [state, setState] = useState<'checking' | 'denied' | 'ok'>('checking')
-  const [rows, setRows] = useState<AdminAttemptRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState('')
-  const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [subsFilter, setSubsFilter] = useState<SubsFilter>('all')
-  const [subsRound, setSubsRound] = useState<string>('') // 회차 필터: '' 전체 · roundId · 'none' 미배정
-  const [subsExam, setSubsExam] = useState<string>('') // 급수(등록시험) 필터: '' 전체 · examId
-  const [subRounds, setSubRounds] = useState<ExamRoundRow[]>([])
-  const [subExams, setSubExams] = useState<AdminExamItem[]>([])
   const [isRoot, setIsRoot] = useState(false)
-
-  // 대시보드 액션 카드 → 탭 이동(+제출답안 필터 프리셋)
-  const nav = (t: CarisSub, f: SubsFilter = 'all') => { setSubsFilter(f); setSub(t) }
 
   useEffect(() => {
     if (!isFullUser) {
@@ -201,53 +148,28 @@ function CarisExamAdmin() {
       .catch(() => setState('denied'))
   }, [isFullUser])
 
-  const load = useCallback(async (off: number) => {
-    setLoading(true)
-    setErr('')
-    try {
-      const res = await callFunction<AdminListResponse>('admin', {
-        action: 'list',
-        limit: PAGE,
-        offset: off,
-      })
-      setRows(res.attempts)
-      setTotal(res.total)
-      setOffset(off)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '목록을 불러올 수 없습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const rawTop = params.get('top') ?? ''
+  const top: TopMenu | '' = isTopMenu(rawTop) ? rawTop : ''
+  // ⚠️ 루트 전용 항목은 목록에서 빼야 한다 — 남겨두면 권한 없는 사람이 주소로 들어와 빈 화면을 본다.
+  const subs = top ? SUBS[top].filter((s) => !s.root || isRoot) : []
+  const rawTab = params.get('tab') ?? ''
+  const tab = subs.some((s) => s.key === rawTab) ? rawTab : subs[0]?.key ?? ''
+  const kids = subs.find((s) => s.key === tab)?.children ?? []
+  const rawSub = params.get('sub') ?? ''
+  const sub = kids.some((k) => k.key === rawSub) ? rawSub : kids[0]?.key ?? ''
 
-  useEffect(() => {
-    if (state === 'ok') load(0)
-  }, [state, load])
-
-  // 회차·급수 필터 옵션(등록시험 기준)
-  useEffect(() => {
-    if (state !== 'ok') return
-    Promise.all([
-      callFunction<AdminExamRoundListResponse>('admin', { action: 'examRoundList' }),
-      callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' }),
-    ])
-      .then(([r, e]) => { setSubRounds(r.rounds); setSubExams(e.exams) })
-      .catch(() => { /* 필터 옵션 실패해도 목록은 나옴 */ })
-  }, [state])
-
-  // 회차 바뀌면 급수 필터 초기화
-  useEffect(() => { setSubsExam('') }, [subsRound])
-
-  async function openDetail(id: string) {
-    setDetailLoading(true)
-    try {
-      setDetail(await callFunction<AdminDetailResponse>('admin', { action: 'detail', attemptId: id }))
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '상세를 불러올 수 없습니다.')
-    } finally {
-      setDetailLoading(false)
-    }
-  }
+  const go: AdminGo = (t, nextTab, nextSub, extra) =>
+    setParams(() => {
+      // 이동할 땐 이전 화면의 보조 파라미터를 버린다 — 남기면 엉뚱한 화면에 필터가 걸린 채 열린다.
+      const p = new URLSearchParams()
+      if (t) {
+        p.set('top', t)
+        if (nextTab) p.set('tab', nextTab)
+        if (nextSub) p.set('sub', nextSub)
+      }
+      for (const [k, v] of Object.entries(extra ?? {})) p.set(k, v)
+      return p
+    })
 
   // ── 게이트 ──
   if (!isFullUser) {
@@ -282,6 +204,331 @@ function CarisExamAdmin() {
     )
   }
 
+  return (
+    // `admin` = 폭·토큰(admin.css), `admin-cbt` = --a-* 보강 + .admin-head 레이아웃(cbt.css).
+    // 옛 CARIS 화면이 이미 둘을 같이 쓰고 있었다 — 이제 아레나 화면도 같은 껍데기 안에 서므로 여기로 올린다.
+    <div className="wrap admin admin-cbt">
+      {/* ⚠️ 아이콘을 Material Symbols 로 쓰지 않는다 — 이 화면들 대부분에서 여기가 유일한 아이콘이라
+          웹폰트가 붙기 전까지 `space_dashboard` 라는 **글자**가 그대로 보인다(실제로 그랬다).
+          관리자페이지임을 알리는 첫 표기라 폰트 로딩에 기대면 안 된다. */}
+      <button className="admin-brand" onClick={() => go('')} title="대시보드로">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <path d="M3 3h8v8H3V3zm10 0h8v5h-8V3zM3 13h8v8H3v-8zm10-3h8v11h-8V10z" />
+        </svg>
+        GARA 통합관리시스템
+      </button>
+
+      <div className="admin-tabs admin-tabs-top">
+        {MENUS.map((m) => (
+          <button key={m.key} className={top === m.key ? 'on' : ''} onClick={() => go(m.key)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {subs.length > 0 && (
+        <div className="admin-tabs" style={{ marginBottom: kids.length ? 10 : 18, flexWrap: 'wrap' }}>
+          {subs.map((s) => (
+            <button key={s.key} className={tab === s.key ? 'on' : ''} onClick={() => go(top as TopMenu, s.key)}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 3단(세부) — 자기 줄에 따로 선다. 하위메뉴와 같은 줄에 붙이면 상하 관계가 안 보인다. */}
+      {kids.length > 0 && (
+        <div className="admin-tabs admin-tabs-sub">
+          {kids.map((k) => (
+            <button key={k.key} className={sub === k.key ? 'on' : ''} onClick={() => go(top as TopMenu, tab, k.key)}>
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <AdminScreen top={top} tab={tab} sub={sub} isRoot={isRoot} go={go} />
+    </div>
+  )
+}
+
+// 대메뉴/하위메뉴/세부 → 화면. 옛 서브탭 화면들이 여기로 모인다.
+function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: string; sub: string; isRoot: boolean; go: AdminGo }) {
+  if (!top) return <HomeDashboard go={go} />
+  switch (`${top}/${tab}${sub ? `/${sub}` : ''}`) {
+    // ── 회원관리 ──
+    case 'members/users': return <MembersAdmin />
+    case 'members/payments': return <PaymentsAdmin />
+    // ── WORLD ARENA ──
+    case 'arena/dash': return <ArenaDashboard />
+    case 'arena/minigame/stat': return <MinigameStatAdmin />
+    case 'arena/minigame/quiz': return <TermPoolAdmin scope="minigame" />
+    case 'arena/leveltest/stat': return <ArenaAttempts />
+    case 'arena/leveltest/quiz': return <ArenaQuestions isRoot={isRoot} />
+    case 'arena/daily/stat': return <DailyStatAdmin />
+    case 'arena/daily/quiz': return <TermPoolAdmin scope="daily" />
+    case 'arena/chat': return <ChatModAdmin />
+    case 'arena/coin': return <CoinPolicyAdmin />
+    // ── CARIS ──
+    case 'caris/dash': return <DashboardAdmin go={go} />
+    case 'caris/plan': return <RoundsAdmin />
+    case 'caris/status/tickets': return <TicketsAdmin isRoot={isRoot} />
+    case 'caris/status/env': return <EnvCheckAdmin />
+    case 'caris/subs/list': return <SubmissionList />
+    case 'caris/subs/grading': return <GradingAdmin />
+    case 'caris/questions': return <QuestionsAdmin isRoot={isRoot} />
+    case 'caris/cert': return <CertAdmin />
+    // ── Learning Library ──
+    case 'library/lt/ebooks': return <EbooksAdmin key="lt" catalog="leveltest" />
+    case 'library/lt/contents': return <LecturesAdmin key="lt" catalog="leveltest" />
+    case 'library/caris/ebooks': return <EbooksAdmin key="caris" catalog="caris" />
+    case 'library/caris/contents': return <LecturesAdmin key="caris" catalog="caris" />
+    // ── 게시판 관리 ──
+    case 'board/notice': return <NoticesAdmin />
+    case 'board/support/faq': return <FaqAdmin />
+    case 'board/support/qna': return <QnaAdmin />
+    // ⚠️ key 가 없으면 세 문서가 **같은 컴포넌트 인스턴스**를 재사용해 본문(state)이 그대로 남는다 —
+    //    협회소개를 보다 이용약관으로 넘어가면 협회소개 글이 그대로 보인다(실제로 그랬다).
+    case 'board/about': return <PolicyAdmin key="about" doc="about" />
+    case 'board/privacy': return <PolicyAdmin key="privacy" doc="privacy" />
+    case 'board/terms': return <PolicyAdmin key="terms" doc="terms" />
+    // ── 홈페이지 관리 ──
+    case 'site/info': return <SiteInfoAdmin />
+    case 'site/popup': return <PopupAdmin />
+    case 'site/admins': return isRoot ? <AdminAccountsAdmin /> : <HomeDashboard go={go} />
+    default: return <HomeDashboard go={go} />
+  }
+}
+
+// 홈 대시보드 — PPT 1페이지가 요구한 6가지(오늘 접속자 · 신규/휴면 회원 · 최근 문의 · 시스템 알림 ·
+// 매출 · 인기 이북/콘텐츠). 각 제품의 상세 분석은 그 대메뉴 안에 따로 있다.
+interface HomeStats {
+  users: number; todayVisitors: number; newUsers7d: number; dormant: number
+  revenue30d: number; paid30d: number; refund30d: number; unfulfilled: number
+  topEbooks: { id: string; title: string; n: number }[]
+  alerts: { id: string; severity: string; source: string; message: string; link: string | null; at: string }[]
+  inquiries: { id: string; title: string; status: string; at: string }[]
+}
+function HomeDashboard({ go }: { go: AdminGo }) {
+  const { data, loading, err, reload } = useAdminData<HomeStats>('homeStats')
+  const kpis = [
+    { k: '오늘 접속자', v: `${data?.todayVisitors ?? 0}명`, sub: `누적 회원 ${(data?.users ?? 0).toLocaleString()}명`, accent: 'blue' },
+    { k: '신규 회원', v: `${data?.newUsers7d ?? 0}명`, sub: '최근 7일', accent: 'violet' },
+    { k: '휴면 회원', v: `${data?.dormant ?? 0}명`, sub: '90일 이상 미접속', accent: 'muted' },
+    { k: '매출(30일)', v: krw(data?.revenue30d ?? 0), sub: `결제 ${data?.paid30d ?? 0}건 · 환불 ${data?.refund30d ?? 0}건`, accent: 'green' },
+  ]
+  return (
+    <>
+      <AdminHead title="대시보드" onReload={reload} loading={loading} />
+      {err && <div className="admin-section admin-empty">{err}</div>}
+
+      <div className="admin-cards">
+        {kpis.map((c) => (
+          <div key={c.k} className={`admin-card k-${c.accent}`}>
+            <div className="k">{c.k}</div>
+            <div className="v">{c.v}</div>
+            <div className="s">{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 시스템 알림 — 관리자가 안 보면 사고 나는 것들. 모니터링 웹훅이 밀어넣은 것도 여기 같이 선다. */}
+      <div className="admin-section">
+        <div className="admin-section-head">
+          <h3>시스템 알림</h3>
+          {(data?.unfulfilled ?? 0) > 0 && (
+            <button className="admin-mini" onClick={() => go('members', 'payments', undefined, { queue: 'unfulfilled' })}>
+              미지급 결제 {data!.unfulfilled}건 보기
+            </button>
+          )}
+        </div>
+        {data?.alerts.length ? (
+          <table className="admin-table">
+            <tbody>
+              {data.alerts.map((a) => (
+                <tr key={a.id}>
+                  <td style={{ width: 90 }}>
+                    <span className={`badge ${a.severity === 'error' ? 'low' : a.severity === 'warn' ? '' : 'ok'}`}>{a.severity}</span>
+                  </td>
+                  <td style={{ width: 120, color: 'var(--muted)' }}>{a.source}</td>
+                  <td>{a.message}</td>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(a.at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="admin-empty">
+            {(data?.unfulfilled ?? 0) > 0
+              ? `미확인 알림은 없지만 미지급 결제가 ${data!.unfulfilled}건 있습니다.`
+              : '미확인 알림이 없습니다.'}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+        <div className="admin-section">
+          <div className="admin-section-head">
+            <h3>최근 문의</h3>
+            <button className="admin-mini" onClick={() => go('board', 'support', 'qna')}>전체 보기</button>
+          </div>
+          {data?.inquiries.length ? (
+            <table className="admin-table">
+              <tbody>
+                {data.inquiries.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.title}</td>
+                    <td style={{ width: 90 }}>{i.status === 'open' ? <span className="badge low">대기</span> : <span className="badge ok">완료</span>}</td>
+                    <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(i.at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <div className="admin-empty">문의가 없습니다.</div>}
+        </div>
+
+        <div className="admin-section">
+          <div className="admin-section-head">
+            <h3>인기 이북</h3>
+            <button className="admin-mini" onClick={() => go('library', 'lt', 'ebooks')}>이북 관리</button>
+          </div>
+          {data?.topEbooks.length ? (
+            <table className="admin-table">
+              <tbody>
+                {data.topEbooks.map((b) => (
+                  <tr key={b.id}><td>{b.title}</td><td style={{ width: 80, textAlign: 'right' }}>{b.n}명</td></tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <div className="admin-empty">구매 기록이 없습니다.</div>}
+          {/* 인기 콘텐츠(강의)는 아직 조회 기록을 남기지 않는다 — 유튜브 임베드라 재생 수가 우리 쪽에 안 남는다. */}
+          <p className="admin-hint" style={{ marginTop: 10 }}>강의는 유튜브 임베드라 재생 수가 우리 쪽에 남지 않습니다.</p>
+        </div>
+      </div>
+
+    </>
+  )
+}
+
+
+const PAGE = 50
+
+function fmtDT(iso?: string | null): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  return isNaN(d.getTime())
+    ? '-'
+    : d.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: '2-digit',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  in_progress: '응시 중',
+  submitted: '제출 완료',
+  voided: '무효',
+  expired: '만료',
+}
+
+// 제출답안 목록 빠른 필터 — 대시보드 '처리 대기' 카드가 URL(`?f=`)로 프리셋을 넘긴다.
+//   ⚠️ state 가 아니라 URL 인 이유: 대시보드와 제출답안이 이제 서로 다른 하위메뉴라
+//      부모 state 로 넘길 방법이 없다(옛 구조는 한 컴포넌트 안이라 됐다).
+type SubsFilter = 'all' | 'in_progress' | 'result_pending' | 'passed' | 'failed'
+const SUBS_FILTERS: { key: SubsFilter; label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'in_progress', label: '진행중' },
+  { key: 'result_pending', label: '결과공개 대기' },
+  { key: 'passed', label: '합격' },
+  { key: 'failed', label: '불합격' },
+]
+function matchSubsFilter(r: AdminAttemptRow, f: SubsFilter): boolean {
+  const pct = r.totalQuestions && r.totalCorrect != null ? (r.totalCorrect / r.totalQuestions) * 100 : null
+  const releasePending = !r.resultReleaseAt || new Date(r.resultReleaseAt).getTime() > Date.now()
+  switch (f) {
+    case 'in_progress': return r.status === 'in_progress'
+    case 'result_pending': return r.status === 'submitted' && releasePending
+    case 'passed': return r.status === 'submitted' && pct != null && pct >= 60
+    case 'failed': return r.status === 'submitted' && pct != null && pct < 60
+    default: return true
+  }
+}
+
+// 제출 답안 목록 — 옛 CarisExamAdmin 본문 그대로(admin 함수 호출). 게이트·탭은 최상위로 올라갔다.
+function SubmissionList() {
+  const [params, setParams] = useSearchParams()
+  // 빠른 필터는 URL(`?f=`)에서 읽는다 — 대시보드 '처리 대기' 카드가 이 값으로 딥링크한다.
+  const rawF = params.get('f') ?? ''
+  const subsFilter: SubsFilter = (SUBS_FILTERS.some((x) => x.key === rawF) ? rawF : 'all') as SubsFilter
+  const setSubsFilter = (f: SubsFilter) =>
+    setParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (f === 'all') p.delete('f')
+      else p.set('f', f)
+      return p
+    })
+  const [rows, setRows] = useState<AdminAttemptRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [detail, setDetail] = useState<AdminDetailResponse | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [subsRound, setSubsRound] = useState<string>('') // 회차 필터: '' 전체 · roundId · 'none' 미배정
+  const [subsExam, setSubsExam] = useState<string>('') // 급수(등록시험) 필터: '' 전체 · examId
+  const [subRounds, setSubRounds] = useState<ExamRoundRow[]>([])
+  const [subExams, setSubExams] = useState<AdminExamItem[]>([])
+
+  const load = useCallback(async (off: number) => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<AdminListResponse>('admin', {
+        action: 'list',
+        limit: PAGE,
+        offset: off,
+      })
+      setRows(res.attempts)
+      setTotal(res.total)
+      setOffset(off)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '목록을 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load(0) }, [load])
+
+  // 회차·급수 필터 옵션(등록시험 기준)
+  useEffect(() => {
+    Promise.all([
+      callFunction<AdminExamRoundListResponse>('admin', { action: 'examRoundList' }),
+      callFunction<AdminExamListResp>('admin', { action: 'examListForAdmin' }),
+    ])
+      .then(([r, e]) => { setSubRounds(r.rounds); setSubExams(e.exams) })
+      .catch(() => { /* 필터 옵션 실패해도 목록은 나옴 */ })
+  }, [])
+
+  // 회차 바뀌면 급수 필터 초기화
+  useEffect(() => { setSubsExam('') }, [subsRound])
+
+  async function openDetail(id: string) {
+    setDetailLoading(true)
+    try {
+      setDetail(await callFunction<AdminDetailResponse>('admin', { action: 'detail', attemptId: id }))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '상세를 불러올 수 없습니다.')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   const pageNo = Math.floor(offset / PAGE) + 1
   const pageMax = Math.max(1, Math.ceil(total / PAGE))
   // 제출답안 회차·급수 필터
@@ -294,61 +541,7 @@ function CarisExamAdmin() {
   const subRegular = subRounds.filter((r) => r.kind === 'regular').sort((a, b) => (b.examDate ?? '').localeCompare(a.examDate ?? ''))
 
   return (
-    <div className="wrap admin admin-cbt">
-      <div className="admin-tabs" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
-        <button className={sub === 'dash' ? 'on' : ''} onClick={() => setSub('dash')}>
-          대시보드
-        </button>
-        <button className={sub === 'subs' ? 'on' : ''} onClick={() => setSub('subs')}>
-          제출 답안
-        </button>
-        <button className={sub === 'grading' ? 'on' : ''} onClick={() => setSub('grading')}>
-          주관식 채점
-        </button>
-        <button className={sub === 'users' ? 'on' : ''} onClick={() => setSub('users')}>
-          회원
-        </button>
-        <button className={sub === 'questions' ? 'on' : ''} onClick={() => setSub('questions')}>
-          문항
-        </button>
-        <button className={sub === 'notices' ? 'on' : ''} onClick={() => setSub('notices')}>
-          공지사항
-        </button>
-        <button className={sub === 'faq' ? 'on' : ''} onClick={() => setSub('faq')}>
-          FAQ
-        </button>
-        <button className={sub === 'rounds' ? 'on' : ''} onClick={() => setSub('rounds')}>
-          시험등록
-        </button>
-        <button className={sub === 'tickets' ? 'on' : ''} onClick={() => setSub('tickets')}>
-          접수·응시권
-        </button>
-        {isRoot && (
-          <button className={sub === 'admins' ? 'on' : ''} onClick={() => setSub('admins')}>
-            관리자 관리
-          </button>
-        )}
-      </div>
-      {sub === 'dash' ? (
-        <DashboardAdmin onNav={nav} />
-      ) : sub === 'grading' ? (
-        <GradingAdmin />
-      ) : sub === 'users' ? (
-        <UsersAdmin />
-      ) : sub === 'questions' ? (
-        <QuestionsAdmin isRoot={isRoot} />
-      ) : sub === 'notices' ? (
-        <NoticesAdmin />
-      ) : sub === 'faq' ? (
-        <FaqAdmin />
-      ) : sub === 'rounds' ? (
-        <RoundsAdmin />
-      ) : sub === 'tickets' ? (
-        <TicketsAdmin isRoot={isRoot} />
-      ) : sub === 'admins' ? (
-        <AdminAccountsAdmin />
-      ) : (
-        <>
+    <>
       <div className="admin-head">
         <h1>제출 답안 관리</h1>
         <div className="admin-head-actions">
@@ -498,9 +691,7 @@ function CarisExamAdmin() {
           </div>
         </div>
       )}
-        </>
-      )}
-    </div>
+    </>
   )
 }
 
@@ -1381,10 +1572,10 @@ interface ChatModResponse {
   truncated: boolean
 }
 const CHAT_REPORT_STATUS_LABEL: Record<string, string> = { open: '대기', resolved: '처리됨', dismissed: '무효' }
-// 방 표기 — 'global'(전세계) 또는 ISO2 국가코드. 방 도입 전 글은 room 이 비어 있을 수 있다.
+// 방 표기 — 'global'(World) 또는 ISO2 국가코드. 방 도입 전 글은 room 이 비어 있을 수 있다.
 // 국기·나라이름은 채팅/아레나가 쓰는 lib/regions 의 것을 그대로 쓴다(표기가 화면마다 달라지면 안 된다).
 const chatRoomLabel = (room?: string | null) =>
-  !room || room === 'global' ? '🌍 전세계' : `${flagEmoji(room) || '🏳'} ${countryName(room, 'ko') || room}`
+  !room || room === 'global' ? '🌍 World' : `${flagEmoji(room) || '🏳'} ${countryName(room, 'ko') || room}`
 // 신고자 표기 — 서버가 profiles 에서 이름을 붙여준다. 없으면(탈퇴·프로필 미생성) uuid 앞 8자로 폴백.
 // uuid 전체를 찍으면 칸을 다 먹고 어차피 사람이 못 읽는다. 툴팁(title)에 전체 uuid 를 남겨 대조는 가능하게.
 function chatReporterLabel(r: ChatModReport): string {
@@ -2963,17 +3154,51 @@ interface EbookDraft {
   description: string
   coverUrl: string
   price: number
+  catalog: 'leveltest' | 'caris' // 러닝 라이브러리(/ebooks)의 어느 탭에 서는가
   targetLevel: number | null // 추천 대상 레벨(1~7) — 결과창 추천 정렬에 쓴다. null = 미지정
+  targetTier: string | null // 대상 급수(beginner..zenith). null = 미지정
   storagePath: string
   published: boolean
   sortOrder: number
   translations: Record<string, EbookTranslation>
 }
-function emptyEbookDraft(): EbookDraft {
-  return { title: '', author: '', description: '', coverUrl: '', price: 0, targetLevel: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
+function emptyEbookDraft(catalog: EbookCatalog): EbookDraft {
+  return { title: '', author: '', description: '', coverUrl: '', price: 0, catalog, targetLevel: null, targetTier: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
 }
 
-export function EbooksAdmin() {
+// ── 이북 관리는 카탈로그마다 **화면이 따로**다(2026-08-11) ──────────────
+//   CARIS 이북 = CARIS 시험 탭, LEVELTEST 이북 = WORLD ARENA 탭. 한 화면에서 섞어 다루면
+//   목록·순서·등록이 전부 "지금 어느 쪽 얘기인가"를 물고 가야 하고, 등록할 때 카탈로그를 잘못 고르면
+//   엉뚱한 스토어에 책이 뜬다. 화면이 갈리면 그 실수 자체가 성립하지 않는다.
+type EbookCatalog = 'leveltest' | 'caris'
+const EBOOK_CATALOG_LABEL: Record<EbookCatalog, string> = { leveltest: 'LEVELTEST E-BOOK', caris: 'CARIS E-BOOK' }
+
+// 분류 셀렉트 = (레벨 또는 급수) 한 칸. 카탈로그는 화면이 이미 정했으므로 고르지 않는다
+//   — 반대쪽 값이 남아 DB CHECK 에 걸리는 조합을 화면에서 만들 수 없다.
+type EbookSlot = { value: string; label: string; level: number | null; tier: string | null }
+const EBOOK_SLOTS: Record<EbookCatalog, EbookSlot[]> = {
+  leveltest: [
+    { value: 'any', label: '레벨 무관', level: null, tier: null },
+    ...[1, 2, 3, 4, 5, 6, 7].map((n) => ({ value: `lv:${n}`, label: `Lv.${n}`, level: n, tier: null })),
+  ],
+  // 급수 목록·순서·이름은 caris.ts 가 단일 출처(tierName). 여기 이름을 손으로 적지 않는다.
+  caris: [
+    { value: 'any', label: '급수 무관', level: null, tier: null },
+    ...['beginner', 'pro', 'elite', 'master', 'grandmaster', 'zenith'].map((k) => ({
+      value: `tier:${k}`, label: tierName(k), level: null, tier: k,
+    })),
+  ],
+}
+const ebookSlotValue = (d: EbookDraft) =>
+  d.catalog === 'caris' ? (d.targetTier ? `tier:${d.targetTier}` : 'any') : (d.targetLevel ? `lv:${d.targetLevel}` : 'any')
+/** 목록의 '분류' 열 — 화면이 이미 카탈로그를 말하고 있으므로 레벨/급수만 찍는다. */
+function ebookSlotLabel(b: AdminEbookRow): string {
+  return b.catalog === 'caris'
+    ? (b.targetTier ? tierName(b.targetTier) : '')
+    : (b.targetLevel ? `Lv.${b.targetLevel}` : '')
+}
+
+export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog }) {
   const [rows, setRows] = useState<AdminEbookRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -2983,11 +3208,14 @@ export function EbooksAdmin() {
   const [uploading, setUploading] = useState<'html' | 'cover' | 'translate' | null>(null)
   const [trStatus, setTrStatus] = useState('') // 번역 진행 문구
   const [buyersOf, setBuyersOf] = useState<{ book: AdminEbookRow; rows: AdminEbookBuyer[] } | null>(null)
+  const [preview, setPreview] = useState<AdminEbookRow | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setErr('')
     try {
+      // 서버는 두 카탈로그를 다 준다 — 순서 재부여(move)가 전체 목록을 알아야 하기 때문이다.
+      // 화면에 세우는 건 아래 list(이 카탈로그) 뿐.
       const res = await callFunction<AdminEbookListResp>('admin', { action: 'ebookList' })
       setRows(res.ebooks)
     } catch (e) {
@@ -2999,6 +3227,9 @@ export function EbooksAdmin() {
   useEffect(() => {
     load()
   }, [load])
+
+  // 이 화면이 다루는 책만. catalog 가 없는 옛 응답은 레벨테스트로 읽는다(함수 배포 전 대비).
+  const list = rows.filter((r) => (r.catalog ?? 'leveltest') === catalog)
 
   function patch(p: Partial<EbookDraft>) {
     setDraft((d) => (d ? { ...d, ...p } : d))
@@ -3178,16 +3409,20 @@ export function EbooksAdmin() {
   }
 
   // 목록에서 ↑(-1)/↓(+1) 이동 → 전체 순서 재구성해 서버가 sort_order 재부여(FAQ 의 move 와 동일 패턴).
-  // ebooks 는 분류가 없어 단일 평면 목록. rows 는 이미 sort_order 오름차순(서버 정렬).
+  //   ⚠️ 순서는 **이 카탈로그 안에서만** 바뀌지만, 서버로는 두 카탈로그를 합친 **전체 ids** 를 보내야 한다
+  //      (ebookReorder 가 받은 순서대로 sort_order 를 다시 매기므로, 빠진 책은 순서가 뒤엉킨다).
+  //      그래서 반대쪽 책들은 원래 자리에 그대로 두고, 이 카탈로그 자리에만 바뀐 순서를 끼워 넣는다.
   async function move(b: AdminEbookRow, dir: -1 | 1) {
-    const idx = rows.findIndex((r) => r.id === b.id)
+    const idx = list.findIndex((r) => r.id === b.id)
     const swap = idx + dir
-    if (swap < 0 || swap >= rows.length) return
-    const g = [...rows]
+    if (swap < 0 || swap >= list.length) return
+    const g = [...list]
     ;[g[idx], g[swap]] = [g[swap], g[idx]]
+    let k = 0
+    const ids = rows.map((r) => ((r.catalog ?? 'leveltest') === catalog ? g[k++].id : r.id))
     setBusy(true)
     try {
-      await callFunction('admin', { action: 'ebookReorder', ids: g.map((r) => r.id) })
+      await callFunction('admin', { action: 'ebookReorder', ids })
       await load()
     } catch (e) {
       alert(e instanceof Error ? e.message : '순서 변경에 실패했습니다.')
@@ -3217,14 +3452,16 @@ export function EbooksAdmin() {
 
   return (
     <>
+      {preview && <EbookPreviewModal book={preview} onClose={() => setPreview(null)} />}
       <div className="admin-head">
-        <h1>이북 관리</h1>
+        {/* 어느 스토어를 다루는 화면인지 제목이 말한다 — 두 화면이 생김새가 같아서 이게 없으면 헷갈린다. */}
+        <h1>이북 관리 · {EBOOK_CATALOG_LABEL[catalog]}</h1>
         <div className="admin-head-actions">
-          <span className="admin-count">총 {rows.length}권</span>
+          <span className="admin-count">총 {list.length}권</span>
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
-          <button className="admin-mini" onClick={() => setDraft(emptyEbookDraft())}>
+          <button className="admin-mini" onClick={() => setDraft(emptyEbookDraft(catalog))}>
             + 새 이북
           </button>
         </div>
@@ -3239,15 +3476,16 @@ export function EbooksAdmin() {
               <th>상태</th>
               <th>표지</th>
               <th>제목</th>
-              <th>레벨</th>
+              <th>분류</th>
               <th>가격</th>
               <th>구매</th>
+              <th>본문</th>
               <th style={{ textAlign: 'center' }}>순서</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((b, i) => (
+            {list.map((b, i) => (
               <tr key={b.id}>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <span className={`admin-badge st-${b.published ? 'submitted' : 'voided'}`}>{b.published ? '판매중' : '비공개'}</span>
@@ -3264,18 +3502,32 @@ export function EbooksAdmin() {
                   {b.author && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{b.author}</div>}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {b.targetLevel ? `Lv.${b.targetLevel}` : <span style={{ color: 'var(--muted)' }}>미지정</span>}
+                  {ebookSlotLabel(b) || <span style={{ color: 'var(--muted)' }}>{catalog === 'caris' ? '급수 무관' : '레벨 무관'}</span>}
                 </td>
-                {/* 이북 가격은 원(KRW)이다 — `$` 로 찍고 있던 걸 2026-08-06 바로잡았다. */}
-                <td style={{ whiteSpace: 'nowrap' }}>{b.price > 0 ? krw(b.price, 'ko') : '무료'}</td>
+                {/* 구매자가 보는 값($)과 통장에 찍히는 값(원)을 같이 — 어느 한쪽만 두면 단위를 오해한다. */}
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {b.price > 0 ? (
+                    <>
+                      <div style={{ fontWeight: 700 }}>{usd(b.price, 'ko')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{krw(b.price, 'ko')}</div>
+                    </>
+                  ) : '무료'}
+                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => showBuyers(b)}>{b.buyers}명</button>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {/* 올린 책이 실제로 어떻게 보이는지 확인할 길이 없었다 — 관리자는 구매를 안 하므로
+                      사용자용 뷰어(구매자 전용)로는 못 연다. 전용 미리보기로 연다. */}
+                  <button className="admin-mini" disabled={!b.storagePath} onClick={() => setPreview(b)}>
+                    미리보기
+                  </button>
                 </td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                   <button className="admin-mini" disabled={busy || i === 0} onClick={() => move(b, -1)} aria-label="위로" title="위로">
                     ↑
                   </button>
-                  <button className="admin-mini" style={{ marginLeft: 4 }} disabled={busy || i === rows.length - 1} onClick={() => move(b, 1)} aria-label="아래로" title="아래로">
+                  <button className="admin-mini" style={{ marginLeft: 4 }} disabled={busy || i === list.length - 1} onClick={() => move(b, 1)} aria-label="아래로" title="아래로">
                     ↓
                   </button>
                 </td>
@@ -3290,7 +3542,9 @@ export function EbooksAdmin() {
                         description: b.description ?? '',
                         coverUrl: b.coverUrl ?? '',
                         price: b.price,
+                        catalog: b.catalog ?? 'leveltest',
                         targetLevel: b.targetLevel ?? null,
+                        targetTier: b.targetTier ?? null,
                         storagePath: b.storagePath,
                         published: b.published,
                         sortOrder: b.sortOrder,
@@ -3306,7 +3560,7 @@ export function EbooksAdmin() {
                 </td>
               </tr>
             ))}
-            {!loading && rows.length === 0 && (
+            {!loading && list.length === 0 && (
               <tr>
                 <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                   등록된 이북이 없습니다.
@@ -3338,22 +3592,38 @@ export function EbooksAdmin() {
                 <textarea style={{ ...inpStyle, minHeight: 80 }} value={draft.description} onChange={(e) => patch({ description: e.target.value })} />
               </label>
               {/* 정렬 순서 입력칸은 제거 — 목록의 ↑↓(순서 열)로 관리(FAQ 방식). */}
-              <label style={{ ...fieldStyle, maxWidth: 220 }}>
+              {/* 가격은 **달러로 입력**한다(2026-08-11) — 구매자 화면이 달러로만 말하는데 여기만 원이면
+                  `2` 를 넣고 "$2 로 팔린다" 고 믿는 사고가 난다(실제로 $0.01 짜리 책이 그렇게 생겼다).
+                  저장·결제는 계속 원이라 옆에 환산액을 같이 찍어 통장에 찍힐 값도 보이게 한다. */}
+              <label style={{ ...fieldStyle, maxWidth: 260 }}>
                 가격($) — 0 이면 무료
-                <input style={inpStyle} type="number" min={0} value={draft.price} onChange={(e) => patch({ price: Number(e.target.value) || 0 })} />
+                <input
+                  style={inpStyle}
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={krwToUsdInput(draft.price)}
+                  onChange={(e) => patch({ price: usdToKrw(Number(e.target.value) || 0) })}
+                />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  실제 청구액 {draft.price > 0 ? krw(draft.price, 'ko') : '무료'} ($1 = {KRW_PER_USD.toLocaleString('ko')}원 고정)
+                </span>
               </label>
-              {/* 추천 대상 레벨 — 레벨테스트 결과창이 응시자 레벨에 맞는 책을 위로 올릴 때 쓴다. */}
-              <label style={{ ...fieldStyle, maxWidth: 220 }}>
-                추천 대상 레벨
+              {/* 분류 — 러닝 라이브러리(/ebooks)에서 어느 칸에 서는가. **카탈로그는 이 화면이 이미 정했다.**
+                  LEVELTEST 쪽 레벨은 레벨테스트 결과창 추천 정렬에도 쓰인다(CARIS 교재는 추천에서 빠진다). */}
+              <label style={{ ...fieldStyle, maxWidth: 280 }}>
+                {catalog === 'caris' ? '대상 급수' : '대상 레벨'}
                 <select
                   style={inpStyle}
-                  value={draft.targetLevel ?? ''}
-                  onChange={(e) => patch({ targetLevel: e.target.value ? Number(e.target.value) : null })}
+                  value={ebookSlotValue(draft)}
+                  onChange={(e) => {
+                    const s = EBOOK_SLOTS[catalog].find((x) => x.value === e.target.value)
+                    if (s) patch({ catalog, targetLevel: s.level, targetTier: s.tier })
+                  }}
                 >
-                  <option value="">미지정 (레벨 무관)</option>
-                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                    <option key={n} value={n}>
-                      Lv.{n}
+                  {EBOOK_SLOTS[catalog].map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
                     </option>
                   ))}
                 </select>
@@ -3508,6 +3778,68 @@ export function EbooksAdmin() {
 
 // ── 주관식 채점 (admin 함수의 gradeQueue/gradeAnswer) ──
 //   대기 목록에서 O/X 채점, "채점 완료 포함" 토글로 재채점(수정), 각 항목에서 그 응시의 객관식 답안 참고 조회.
+// 이북 미리보기 — 관리자가 올린 책이 실제로 어떻게 보이는지 확인한다.
+//   ⚠️ 서명 URL 을 iframe src 에 그대로 물리면 안 된다 — Supabase Storage 는 HTML 을 `text/plain` 으로
+//      내려보내 소스코드가 그대로 보인다. 그래서 텍스트로 받아 srcdoc 에 넣는다(사용자 뷰어와 같은 방식).
+//   ⚠️ sandbox 에 allow-same-origin 을 주지 않는다 — 책 안 스크립트가 관리자 세션에 닿으면 안 된다.
+interface EbookPreviewResp { id: string; title: string; url: string; langs: string[]; lang: string }
+function EbookPreviewModal({ book, onClose }: { book: AdminEbookRow; onClose: () => void }) {
+  const [html, setHtml] = useState('')
+  const [meta, setMeta] = useState<EbookPreviewResp | null>(null)
+  const [lang, setLang] = useState('ko')
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true); setErr(''); setHtml('')
+    callFunction<EbookPreviewResp>('admin', { action: 'ebookPreview', id: book.id, lang })
+      .then(async (r) => {
+        if (!alive) return
+        setMeta(r)
+        const res = await fetch(r.url)
+        if (!res.ok) throw new Error(`본문을 받지 못했습니다 (${res.status})`)
+        const text = await res.text()
+        if (alive) setHtml(text)
+      })
+      .catch((e) => { if (alive) setErr(e instanceof Error ? e.message : '불러오기 실패') })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [book.id, lang])
+
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div
+        className="admin-modal admin-modal-wide"
+        style={{ maxWidth: 'min(1180px, 96vw)', height: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2 style={{ marginBottom: 4 }}>{book.title}</h2>
+        <p className="admin-modal-meta" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          미리보기 — 구매자가 보는 화면과 같습니다
+          {(meta?.langs.length ?? 0) > 1 && (
+            <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ padding: '4px 8px' }}>
+              {meta!.langs.map((l) => <option key={l} value={l}>{EBOOK_LANG_LABEL[l] ?? l}</option>)}
+            </select>
+          )}
+          {meta && meta.lang !== lang && <span style={{ color: 'var(--k-amber, #d98a00)' }}>이 언어 번역본이 없어 한국어를 보여줍니다</span>}
+        </p>
+        {err && <div className="admin-section admin-empty">{err}</div>}
+        {loading && <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>}
+        {html && (
+          <iframe
+            title="이북 미리보기"
+            srcDoc={html}
+            sandbox="allow-scripts"
+            style={{ flex: 1, width: '100%', border: '1px solid var(--line2)', borderRadius: 10, background: '#fff' }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
 function fmtDTShort(iso?: string | null) {
   if (!iso) return '-'
   const d = new Date(iso)
@@ -3882,7 +4214,7 @@ interface PaymentListResp {
   queues: { unfulfilled: number; revoked: number }
 }
 
-function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => void }) {
+function DashboardAdmin({ go }: { go: AdminGo }) {
   const [a, setA] = useState<CbtAnalytics | null>(null)
   const [pay, setPay] = useState<PaymentListResp | null>(null)
   const [sold, setSold] = useState<Record<string, number>>({})
@@ -3925,18 +4257,18 @@ function DashboardAdmin({ onNav }: { onNav: (t: CarisSub, f?: SubsFilter) => voi
       </div>
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       {loading && !a && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
-      {a && <DashboardBody a={a} pay={pay} sold={sold} onNav={onNav} />}
+      {a && <DashboardBody a={a} pay={pay} sold={sold} go={go} />}
     </>
   )
 }
 
 // ⚠️ 관리자 화면 금액은 **원화(krw)** 다. 구매자 화면은 $1 = 1,500원 고정 환산으로 달러를 보여주지만,
 //    관리자는 실제 청구·정산 금액을 봐야 한다. 예전엔 여기가 원화 값에 `$` 를 붙이고 있었다.
-function DashboardBody({ a, pay, sold, onNav }: {
+function DashboardBody({ a, pay, sold, go }: {
   a: CbtAnalytics
   pay: PaymentListResp | null
   sold: Record<string, number>
-  onNav: (t: CarisSub, f?: SubsFilter) => void
+  go: AdminGo
 }) {
   const o = a.overview
   // 전부 admin.cbtAnalytics 실집계(값 없으면 0). 결제·접수는 paymentList / examTicketSummary 실데이터.
@@ -3950,10 +4282,11 @@ function DashboardBody({ a, pay, sold, onNav }: {
   const rounds = a.rounds ?? []
 
   const actions = [
-    { ico: 'rate_review', label: '주관식 채점 대기', n: pendingGrading, tone: 'amber', go: () => onNav('grading') },
-    { ico: 'workspace_premium', label: '인증서 미발급(합격)', n: certPending, tone: 'blue', go: () => onNav('subs', 'passed') },
-    { ico: 'schedule', label: '결과 공개 대기', n: resultPending, tone: 'muted', go: () => onNav('subs', 'result_pending') },
-    { ico: 'timelapse', label: '응시 진행 중', n: inProgress, tone: 'muted', go: () => onNav('subs', 'in_progress') },
+    // 제출답안 화면의 빠른필터는 URL(`?f=`)로 넘긴다 — 이제 서로 다른 메뉴라 state 로 못 넘긴다.
+    { ico: 'rate_review', label: '주관식 채점 대기', n: pendingGrading, tone: 'amber', go: () => go('caris', 'subs', 'grading') },
+    { ico: 'workspace_premium', label: '인증서 미발급(합격)', n: certPending, tone: 'blue', go: () => go('caris', 'cert') },
+    { ico: 'schedule', label: '결과 공개 대기', n: resultPending, tone: 'muted', go: () => go('caris', 'subs', 'list', { f: 'result_pending' }) },
+    { ico: 'timelapse', label: '응시 진행 중', n: inProgress, tone: 'muted', go: () => go('caris', 'subs', 'list', { f: 'in_progress' }) },
   ]
   const kpis = [
     { ico: 'group', k: '누적 회원', v: o.users.toLocaleString(), sub: `이번주 신규 +${signups7d}명`, accent: 'blue', delta: signups7d > 0 ? `+${signups7d}` : undefined },
@@ -4247,67 +4580,125 @@ function gradeChips(titles: string[] | undefined) {
   )
 }
 
-function UsersAdmin() {
-  const [users, setUsers] = useState<CbtUserRow[]>([])
+// GARA 가입 회원 **전체** 한 벌 (2026-08-11 통합).
+//   옛 구조엔 같은 사람을 보는 목록이 두 개였다 — `CARIS 시험 > 회원`(응시·취득급수)과
+//   `WORLD ARENA > 유저`(등급·레벨테스트 응시). 사람은 하나인데 화면이 둘이라 "이 회원 뭐 했지"에
+//   두 군데를 오가야 했다. 목록을 합치고, 갈리는 정보는 **상세 모달의 탭**으로 내렸다.
+// ⚠️ 두 서버 함수의 응답을 **사람(id) 기준으로 겹쳐 쓴다.** 한쪽이 실패해도 다른 쪽 정보는 보여야 하므로
+//    각각 catch 해서 빈 배열로 접는다 — 통짜 Promise.all 로 묶으면 아레나 함수 하나 때문에 회원 목록이 통째로 빈다.
+interface MemberRow {
+  id: string
+  name: string | null
+  email: string | null
+  anon: boolean
+  created: string
+  carisAttempts: number
+  passedTitles: string[]
+  arenaRank: number | null
+  arenaAttempts: number
+  lastActive: string | null
+}
+
+function MembersAdmin() {
+  const [rows, setRows] = useState<MemberRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState<'created' | 'attempts'>('created')
+  const [type, setType] = useState<'all' | 'google' | 'guest'>('google')
+  const [sort, setSort] = useState<'created' | 'caris' | 'arena'>('created')
   const [page, setPage] = useState(0)
-  const [open, setOpen] = useState<CbtUserRow | null>(null)
+  const [open, setOpen] = useState<MemberRow | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setErr('')
-    try {
-      const r = await callFunction<CbtUsersResp>('admin', { action: 'cbtUsers' })
-      setUsers(r.users)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '불러오기 실패')
-    } finally {
+    const [cbt, arena] = await Promise.all([
+      callFunction<CbtUsersResp>('admin', { action: 'cbtUsers' }).catch(() => null),
+      callFunction<{ users: ArenaUserRow[] }>('admin-test', { action: 'users' }).catch(() => null),
+    ])
+    if (!cbt && !arena) {
+      setErr('회원 목록을 불러올 수 없습니다.')
       setLoading(false)
+      return
     }
+    const merged = new Map<string, MemberRow>()
+    for (const u of cbt?.users ?? []) {
+      merged.set(u.id, {
+        id: u.id, name: u.name, email: u.email, anon: u.anon, created: u.created,
+        carisAttempts: u.attempts, passedTitles: u.passedTitles ?? [],
+        arenaRank: null, arenaAttempts: 0, lastActive: u.lastActive,
+      })
+    }
+    for (const a of arena?.users ?? []) {
+      const prev = merged.get(a.id)
+      if (prev) {
+        prev.arenaRank = a.rank
+        prev.arenaAttempts = a.attempts
+        // 마지막 활동은 둘 중 **늦은 쪽**. CARIS 는 '마지막 제출', 아레나는 '마지막 활동' 이라 기준이 다르다.
+        if (a.lastActive && (!prev.lastActive || a.lastActive > prev.lastActive)) prev.lastActive = a.lastActive
+        prev.name ??= a.name
+        prev.email ??= a.email
+      } else {
+        // CARIS 목록엔 없는 사람 = 게스트(익명). cbtUsers 가 익명을 빼고 주기 때문이다.
+        merged.set(a.id, {
+          id: a.id, name: a.name, email: a.email, anon: a.anon, created: a.created,
+          carisAttempts: 0, passedTitles: [],
+          arenaRank: a.rank, arenaAttempts: a.attempts, lastActive: a.lastActive,
+        })
+      }
+    }
+    setRows([...merged.values()])
+    setLoading(false)
   }, [])
-  useEffect(() => {
-    load()
-  }, [load])
-  useEffect(() => {
-    setPage(0)
-  }, [q, sort])
+  useEffect(() => { load() }, [load])
+  useEffect(() => { setPage(0) }, [q, type, sort])
 
-  const filtered = users
+  const filtered = rows
     .filter((u) => {
+      if (type === 'google' && u.anon) return false
+      if (type === 'guest' && !u.anon) return false
       if (q) {
         const s = q.toLowerCase()
         if (!(u.name || '').toLowerCase().includes(s) && !(u.email || '').toLowerCase().includes(s)) return false
       }
       return true
     })
-    .sort((x, y) => (sort === 'attempts' ? y.attempts - x.attempts : (y.created || '').localeCompare(x.created || '')))
+    .sort((x, y) =>
+      sort === 'caris' ? y.carisAttempts - x.carisAttempts
+        : sort === 'arena' ? (y.arenaRank ?? 0) - (x.arenaRank ?? 0)
+          : (y.created || '').localeCompare(x.created || ''))
   const PER = 50
   const pageMax = Math.max(1, Math.ceil(filtered.length / PER))
   const shown = filtered.slice(page * PER, page * PER + PER)
+  const googleN = rows.filter((u) => !u.anon).length
 
   return (
     <>
       <div className="admin-head">
         <h1>회원 관리</h1>
         <div className="admin-head-actions">
-          <span className="admin-count">회원 {users.length}명</span>
-          <button className="admin-mini" onClick={load} disabled={loading}>
-            새로고침
-          </button>
+          <span className="admin-count">가입 {googleN}명 · 게스트 {rows.length - googleN}명</span>
+          <button className="admin-mini" onClick={load} disabled={loading}>새로고침</button>
         </div>
       </div>
-      {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
+      {err && <div className="admin-section admin-empty">{err}</div>}
+
+      {/* 지역 오배정 정정 — 옛 아레나 유저 탭에 있던 것. 회원 하나를 CS 로 손보는 일이라 여기 자리가 맞다. */}
+      <RegionFixForm />
 
       <div className="admin-toolbar">
-        <select value={sort} onChange={(e) => setSort(e.target.value as 'created' | 'attempts')}>
-          <option value="created">가입 최신순</option>
-          <option value="attempts">응시 많은순</option>
-        </select>
         <input className="admin-search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
-        <span className="admin-hint">{filtered.length}명</span>
+        <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+          <option value="google">가입 회원</option>
+          <option value="guest">게스트</option>
+          <option value="all">전체(게스트 포함)</option>
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          <option value="created">가입 최신순</option>
+          <option value="caris">CARIS 응시 많은순</option>
+          <option value="arena">ARENA 등급순</option>
+        </select>
+        <span className="admin-hint">{filtered.length}명{loading ? ' · 불러오는 중…' : ''}</span>
       </div>
 
       <div className="admin-table-wrap">
@@ -4316,9 +4707,12 @@ function UsersAdmin() {
             <tr>
               <th>이름</th>
               <th>이메일</th>
+              <th>유형</th>
               <th>가입</th>
-              <th style={{ textAlign: 'right' }}>응시</th>
+              <th style={{ textAlign: 'right' }}>CARIS 응시</th>
               <th>취득 급수</th>
+              <th style={{ textAlign: 'right' }}>ARENA</th>
+              <th>마지막 활동</th>
               <th></th>
             </tr>
           </thead>
@@ -4327,22 +4721,24 @@ function UsersAdmin() {
               <tr key={u.id}>
                 <td>{u.name || '-'}</td>
                 <td style={{ color: 'var(--muted)' }}>{u.email || '-'}</td>
+                <td>{u.anon ? '게스트' : '가입'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.created)}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.attempts}</td>
-                {/* 합격 0건은 굳이 눈에 띌 필요 없어 흐리게 */}
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{u.carisAttempts}</td>
                 {/* 합격 "횟수" 는 급수마다 시험이 갈리는 구조에서 뜻이 흐리다 —
                     3건이 "세 번 붙었다" 가 아니라 "Pro·Elite·Master 를 각각 땄다" 일 수 있다.
                     그래서 숫자 대신 취득 급수를 칩으로 보여준다(중복 제거). */}
                 <td>{gradeChips(u.passedTitles)}</td>
-                <td>
-                  <button className="admin-mini" onClick={() => setOpen(u)}>상세</button>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                  {u.arenaRank == null ? <span style={{ color: 'var(--dim)' }}>–</span> : `Lv.${u.arenaRank} · ${u.arenaAttempts}회`}
                 </td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(u.lastActive)}</td>
+                <td><button className="admin-mini" onClick={() => setOpen(u)}>상세</button></td>
               </tr>
             ))}
             {!shown.length && !loading && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  회원이 없습니다.
+                <td colSpan={9} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  조건에 맞는 회원이 없습니다.
                 </td>
               </tr>
             )}
@@ -4351,16 +4747,12 @@ function UsersAdmin() {
       </div>
       {pageMax > 1 && (
         <div className="admin-pager">
-          <button className="admin-mini" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            ‹ 이전
-          </button>
+          <button className="admin-mini" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>‹ 이전</button>
           <span>{page + 1} / {pageMax}</span>
-          <button className="admin-mini" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>
-            다음 ›
-          </button>
+          <button className="admin-mini" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>다음 ›</button>
         </div>
       )}
-      {open && <UserDetailModal user={open} onClose={() => setOpen(null)} />}
+      {open && <MemberDetailModal user={open} onClose={() => setOpen(null)} />}
     </>
   )
 }
@@ -4449,77 +4841,145 @@ function EarnedCerts({ attempts }: { attempts: CbtUserAttempt[] }) {
   )
 }
 
-function UserDetailModal({ user, onClose }: { user: CbtUserRow; onClose: () => void }) {
-  const [detail, setDetail] = useState<CbtUserDetailResp | null>(null)
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    callFunction<CbtUserDetailResp>('admin', { action: 'cbtUserDetail', userId: user.id })
-      .then(setDetail)
-      .catch(() => setDetail({ attempts: [] }))
-      .finally(() => setLoading(false))
-  }, [user.id])
+// 회원 상세 — 한 사람을 세 관점으로 본다. 목록을 합친 대신 여기서 갈랐다.
+//   ⚠️ 탭마다 자기 데이터를 자기가 부른다(열어야 부른다). 셋을 한 번에 부르면 CARIS 만 볼 사람도
+//      아레나·결제까지 기다린다.
+function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => void }) {
+  const [tab, setTab] = useState<'caris' | 'arena' | 'pay'>('caris')
   return (
     <div className="admin-modal-bg" onClick={onClose}>
-      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="admin-modal-x" onClick={onClose}>
-          ✕
-        </button>
+      {/* 안에 표가 셋(응시 이력·레벨테스트 이력·결제 내역) 들어가므로 넓게 쓴다 — 기본 폭이면 가로 스크롤이 생긴다. */}
+      <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
         <h2>
           {user.name || '-'} <span className="admin-modal-email">{user.email}</span>
         </h2>
         <p className="admin-modal-meta">
-          가입 {fmtDT(user.created)} · 응시 {user.attempts}건
+          가입 {fmtDT(user.created)} · {user.anon ? '게스트' : '가입 회원'}
+          {user.arenaRank != null ? ` · ARENA Lv.${user.arenaRank}` : ''}
         </p>
-        {/* 보유 자격증 — 응시 이력 줄마다 배지를 훑지 않아도 되게 맨 위에 모아둔다.
-            (30번 떨어지고 1번 붙은 사람을 표에서 찾아내는 건 한눈이 아니다)
-            자격증 테이블이 없어 "합격 + 결과공개일 경과" 인 응시에서 계산한다.
-            ⚠️ 자격번호는 아직 안 띄운다 — 발급한 건만 진짜 번호(exam_attempts.cert_no)가 있고
-               미발급 건은 번호 자체가 없어서(발급 시 DB 채번), 한 열에 섞으면 빈칸이 더 많아진다. */}
-        {!loading ? <EarnedCerts attempts={detail?.attempts ?? []} /> : null}
-        {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
-        ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>시험</th>
-                  <th>상태</th>
-                  <th>점수</th>
-                  <th>결과</th>
-                  <th>자격증</th>
-                  <th>제출</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(detail?.attempts ?? []).map((at) => (
-                  <tr key={at.id}>
-                    <td>{at.examTitle || '-'}</td>
-                    <td>
-                      <span className={`admin-badge st-${at.status}`}>{STATUS_LABEL[at.status] ?? at.status}</span>
-                    </td>
-                    <td>{at.totalCorrect != null ? `${at.totalCorrect} / ${at.totalQuestions}` : '-'}</td>
-                    {/* 합격선 60%(서버 CBT_PASS_RATIO). 미제출·미채점은 판정 자체가 없다. */}
-                    <td>{at.passed == null ? <span style={{ color: 'var(--dim)' }}>–</span>
-                      : at.passed ? <span className="badge ok">합격</span> : <span className="badge low">불합격</span>}</td>
-                    {/* 자격증 테이블이 따로 없다 — 합격 + 결과공개일 경과 = 발급 가능. */}
-                    <td>{at.passed !== true ? <span style={{ color: 'var(--dim)' }}>–</span>
-                      : at.released ? <span className="badge ok">발급 가능</span> : <span className="badge low">공개 대기</span>}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(at.submittedAt)}</td>
-                  </tr>
-                ))}
-                {!(detail?.attempts ?? []).length && (
-                  <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
-                      응시 이력이 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="admin-tabs" style={{ marginBottom: 14 }}>
+          <button className={tab === 'caris' ? 'on' : ''} onClick={() => setTab('caris')}>CARIS</button>
+          <button className={tab === 'arena' ? 'on' : ''} onClick={() => setTab('arena')}>WORLD ARENA</button>
+          <button className={tab === 'pay' ? 'on' : ''} onClick={() => setTab('pay')}>결제·구매</button>
+        </div>
+        {tab === 'caris' ? <MemberCarisPanel userId={user.id} /> : null}
+        {tab === 'arena' ? <ArenaUserPanel userId={user.id} initialRank={user.arenaRank ?? 1} /> : null}
+        {tab === 'pay' ? <MemberPayPanel userId={user.id} /> : null}
       </div>
+    </div>
+  )
+}
+
+function MemberCarisPanel({ userId }: { userId: string }) {
+  const [detail, setDetail] = useState<CbtUserDetailResp | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    setLoading(true)
+    callFunction<CbtUserDetailResp>('admin', { action: 'cbtUserDetail', userId })
+      .then(setDetail)
+      .catch(() => setDetail({ attempts: [] }))
+      .finally(() => setLoading(false))
+  }, [userId])
+  return (
+    <>
+      {/* 보유 자격증 — 응시 이력 줄마다 배지를 훑지 않아도 되게 맨 위에 모아둔다.
+          (30번 떨어지고 1번 붙은 사람을 표에서 찾아내는 건 한눈이 아니다)
+          자격증 테이블이 없어 "합격 + 결과공개일 경과" 인 응시에서 계산한다.
+          ⚠️ 자격번호는 아직 안 띄운다 — 발급한 건만 진짜 번호(exam_attempts.cert_no)가 있고
+             미발급 건은 번호 자체가 없어서(발급 시 DB 채번), 한 열에 섞으면 빈칸이 더 많아진다. */}
+      {!loading ? <EarnedCerts attempts={detail?.attempts ?? []} /> : null}
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>시험</th>
+                <th>상태</th>
+                <th>점수</th>
+                <th>결과</th>
+                <th>자격증</th>
+                <th>제출</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(detail?.attempts ?? []).map((at) => (
+                <tr key={at.id}>
+                  <td>{at.examTitle || '-'}</td>
+                  <td>
+                    <span className={`admin-badge st-${at.status}`}>{STATUS_LABEL[at.status] ?? at.status}</span>
+                  </td>
+                  <td>{at.totalCorrect != null ? `${at.totalCorrect} / ${at.totalQuestions}` : '-'}</td>
+                  {/* 합격선 60%(서버 CBT_PASS_RATIO). 미제출·미채점은 판정 자체가 없다. */}
+                  <td>{at.passed == null ? <span style={{ color: 'var(--dim)' }}>–</span>
+                    : at.passed ? <span className="badge ok">합격</span> : <span className="badge low">불합격</span>}</td>
+                  {/* 자격증 테이블이 따로 없다 — 합격 + 결과공개일 경과 = 발급 가능. */}
+                  <td>{at.passed !== true ? <span style={{ color: 'var(--dim)' }}>–</span>
+                    : at.released ? <span className="badge ok">발급 가능</span> : <span className="badge low">공개 대기</span>}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(at.submittedAt)}</td>
+                </tr>
+              ))}
+              {!(detail?.attempts ?? []).length && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
+                    응시 이력이 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
+// 결제·구매 — 이 사람 결제 내역. `paymentList` 에 userId 필터를 얹어 쓴다.
+//   ⚠️ 목록 화면(회원관리 > 결제관리)은 아직 없다(3단계). 여기는 "이 회원이 뭘 샀나" 만 본다.
+function MemberPayPanel({ userId }: { userId: string }) {
+  const [data, setData] = useState<PaymentListResp | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    setLoading(true)
+    callFunction<PaymentListResp>('admin', { action: 'paymentList', userId, limit: 100 })
+      .then(setData)
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오기 실패'))
+      .finally(() => setLoading(false))
+  }, [userId])
+  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+  if (err) return <div className="admin-empty">{err}</div>
+  // ⚠️ 클라에서 한 번 더 거른다. `userId` 필터는 admin 함수를 **배포해야** 먹는데, 배포 전 응답은
+  //    전체 결제를 그대로 돌려준다 — 그러면 남의 결제가 이 회원 것으로 보인다. 돈 얘기라 서버만 믿지 않는다.
+  const rows = (data?.payments ?? []).filter((p) => p.userId === userId)
+  if (!rows.length) return <div className="admin-empty">결제 내역이 없습니다.</div>
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr><th>일시</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>상태</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((p) => (
+            <tr key={p.id}>
+              <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.createdAt)}</td>
+              <td>
+                {p.orderName}
+                <span style={{ color: 'var(--muted)' }}> · {productLabel(p.productType)}</span>
+              </td>
+              <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{krw(p.amount)}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                {/* ⚠️ 영문 코드(paid·pending)를 그대로 내보내지 않는다 — 이 화면은 사무 담당자가 본다. */}
+                <span className="badge">{payStatusLabel(p.status)}</span>
+                {/* 돈은 받았는데 물건이 안 나간 건 — 대사에서 잡히는 그 신호다. */}
+                {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

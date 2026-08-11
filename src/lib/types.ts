@@ -466,13 +466,29 @@ export interface EbookRow {
   description: string | null
   coverUrl: string | null // 그 언어의 표지(본문 1페이지를 구운 것)
   price: number // 달러(USD). 0 = 무료
-  targetLevel: number | null // 추천 대상 레벨(1~7). null = 레벨 무관
+  /** 러닝 라이브러리의 탭 — 'leveltest' = LEVELTEST E-BOOK(레벨 1~7) · 'caris' = CARIS E-BOOK(급수) */
+  catalog: 'leveltest' | 'caris'
+  targetLevel: number | null // 추천 대상 레벨(1~7). null = 레벨 무관. catalog='caris' 면 항상 null
+  targetTier: string | null // 대상 급수(beginner..zenith). null = 급수 무관. catalog='leveltest' 면 항상 null
   langs: string[] // 이 책이 가진 언어(항상 'ko' 포함)
   owned: boolean
   purchasedAt?: string // 서재(library) 응답에만
 }
+/** 관리자가 등록한 강의 한 건(lectures 테이블). 코드에 박힌 lib/lectures.ts 를 대체한다. */
+export interface ServerLecture {
+  id: string
+  catalog: 'leveltest' | 'caris'
+  targetLevel: number | null
+  targetTier: string | null
+  youtubeId: string
+  title: string
+  channel: string
+  description: string
+}
 export interface EbookListResp {
   ebooks: EbookRow[]
+  /** ⚠️ ebooks 함수를 다시 배포해야 내려온다 — 그 전 응답엔 없다(그때는 코드 목록을 쓴다). */
+  lectures?: ServerLecture[]
 }
 /** 결과창 추천(picks) — 응시 레벨 기준으로 고른 목록. */
 export interface EbookPicksResp {
@@ -510,7 +526,9 @@ export interface AdminEbookRow {
   description: string | null
   coverUrl: string | null
   price: number
+  catalog: 'leveltest' | 'caris' // 러닝 라이브러리 탭. 기존 책은 전부 'leveltest'
   targetLevel: number | null // 추천 대상 레벨(1~7). null = 미지정
+  targetTier: string | null // 대상 급수(beginner..zenith). null = 미지정
   storagePath: string
   published: boolean
   sortOrder: number

@@ -72,6 +72,16 @@ Deno.serve(async (req) => {
     const admin = adminClient()
     const now = Date.now()
 
+    // ── 접속 기록 ──
+    // 관리자 대시보드의 "오늘 접속자 · 휴면 회원"의 유일한 출처. 이걸 안 남기면 그 두 값은 영원히 0이다.
+    // ⚠️ 이력 테이블이 아니라 `profiles` 의 컬럼 하나다 — 접속마다 행을 쌓으면 금방 수십만 줄이 된다.
+    // ⚠️ 익명 세션은 세지 않는다(게스트는 회원이 아니다).
+    if (body?.action === 'seen') {
+      if (user.is_anonymous) return json({ ok: true })
+      await admin.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', user.id)
+      return json({ ok: true })
+    }
+
     // 방치된 진행중 응시 만료 — 제한시간을 훌쩍 넘긴 것(TTL)만
     const cutoff = new Date(now - ATTEMPT_TTL_MINUTES * 60000).toISOString()
     await admin
@@ -252,6 +262,23 @@ Deno.serve(async (req) => {
       .limit(TICKET_LIMIT)
     const ticketRows = (tRows ?? []) as TicketRow[]
 
+    // 시험환경 점검 여부 — 응시권 카드가 "점검 먼저" 게이트를 그리는 데 쓴다.
+    //   ⚠️ 응시권에 묶인 기록이 우선이고, 없으면 그 사람이 어떤 식으로든 점검을 마친 적이 있는지 본다
+    //      (응시권 없이 체험만 한 경우도 점검은 점검이다 — 두 번 시키지 않는다).
+    const envDone = new Set<string>()
+    let envAny = false
+    {
+      const { data: checks } = await admin
+        .from('exam_env_checks')
+        .select('ticket_id')
+        .eq('user_id', user.id)
+        .limit(500)
+      for (const c of (checks ?? []) as { ticket_id: string | null }[]) {
+        envAny = true
+        if (c.ticket_id) envDone.add(c.ticket_id)
+      }
+    }
+
     const roundMap: Record<string, RoundRow> = {}
     const roundIds = [...new Set(ticketRows.map((t) => t.round_id).filter(Boolean))]
     if (roundIds.length) {
@@ -334,6 +361,8 @@ Deno.serve(async (req) => {
         attemptId: at?.id ?? null,
         usable,
         usableReason,
+        // 시험환경 점검을 마쳤는가 — 마치기 전에는 응시 버튼을 열지 않는다.
+        envChecked: envDone.has(t.id) || envAny,
       }
     })
 

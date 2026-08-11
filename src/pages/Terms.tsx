@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
+import { usePolicyDoc } from '../lib/policyDocs'
 import { useT, type TFunc } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabase'
@@ -57,7 +58,7 @@ function WithdrawButton({ t }: { t: TFunc }) {
 }
 
 // 글로벌 AI 로봇협회 서비스 이용약관. (개인정보처리방침 Privacy.tsx 와 동일한 doc 패턴)
-const ARTICLES: { title: string; lead?: string; items?: string[] }[] = [
+export const ARTICLES: { title: string; lead?: string; items?: string[] }[] = [
   {
     title: '제1조 (목적)',
     lead: '본 약관은 글로벌 AI 로봇협회(이하 "협회")가 제공하는 웹사이트 및 관련 서비스(이하 "서비스")의 이용과 관련하여 "협회"와 이용자(이하 "회원") 간의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.',
@@ -169,6 +170,7 @@ const ARTICLES: { title: string; lead?: string; items?: string[] }[] = [
 
 export default function Terms() {
   const { t } = useT()
+  const live = usePolicyDoc('terms')
 
   return (
     <div className="ax-page">
@@ -176,20 +178,26 @@ export default function Terms() {
       <div className="ax-wrap">
       <div className="card pad doc" style={{ maxWidth: 860, margin: '0 auto' }}>
         <h1 className="doc-title">글로벌 AI 로봇협회 서비스 이용약관</h1>
-        {ARTICLES.map((a) => (
-          <section className="doc-article" key={a.title}>
-            <h2>{a.title}</h2>
-            {a.lead ? <p>{a.lead}</p> : null}
-            {a.items ? (
-              <ul>
-                {a.items.map((it, j) => (
-                  <li key={j}>{it}</li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-        ))}
-        <p className="doc-updated">시행일: [입력 예정]</p>
+        {/* 관리자가 저장한 개정판이 있으면 그것을, 없으면 아래 코드 본문을 보여준다.
+            ⚠️ 개정판은 시행일이 지나야 공개된다(policy_docs 읽기 정책) — 미리 써둔 판은 안 보인다. */}
+        {live ? (
+          <div className="doc-article" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.9 }}>{live.body}</div>
+        ) : (
+          ARTICLES.map((a) => (
+            <section className="doc-article" key={a.title}>
+              <h2>{a.title}</h2>
+              {a.lead ? <p>{a.lead}</p> : null}
+              {a.items ? (
+                <ul>
+                  {a.items.map((it, j) => (
+                    <li key={j}>{it}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ))
+        )}
+        <p className="doc-updated">시행일: {live ? `${live.effectiveAt} (제${live.version}판)` : '[입력 예정]'}</p>
 
         <WithdrawButton t={t} />
       </div>

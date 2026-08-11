@@ -6,7 +6,7 @@
 <title>닿아라 CARI</title>
 <style>
 :root{
-  --page:#e9eff9; --bg:#fbfaf5; --ink:#28324c; --sub:#7c869e;
+  --page:#09172c; --bg:#f7f9fc; --ink:#172642; --sub:#71809a;
   --brand:#004ac6; --brand-hi:#1b55d0; --line:#e6e9f3;
   --good:#12b58c; --bad:#f2664f; --skip:#e59b17;
   --cream:#ece9e0;
@@ -14,72 +14,89 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;}
 body{
-  background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);
+  background:radial-gradient(120% 80% at 50% -10%, #24466e 0%, #09172c 68%);
   color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
   display:flex; align-items:center; justify-content:center; min-height:100%; overflow:hidden; user-select:none;
 }
 .stage{
   position:relative; width:min(460px,100vw); height:min(860px,100vh);
   display:flex; flex-direction:column; background:var(--bg);
-  box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
+  box-shadow:0 0 70px rgba(0,0,0,.48); overflow:hidden;
 }
 .art{width:100%;height:100%;display:block;}
 
 /* HUD */
-.hud{display:flex; align-items:center; gap:10px; padding:12px 14px 8px; z-index:5;}
-.hud .cari-mini{width:40px;height:40px;flex:0 0 40px;}
+.hud{position:relative;display:flex;align-items:center;gap:9px;height:65px;margin:6px 10px 2px;padding:12px 31px 11px;z-index:5;
+  background:url('/games/reach-cari-hud-v4.png') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 6px 8px rgba(0,20,60,.3));}
+.hud .cari-mini{display:none;}
 .hud .lvlbox{display:flex;flex-direction:column;line-height:1.05;}
-.hud .lvlbox b{font-size:16px;color:var(--ink);}
-.hud .lvlbox span{font-size:11px;color:var(--sub);}
-.hud .goalpill{margin-left:auto; background:#eef3fd; border:1px solid var(--line); color:var(--brand);
-  font-weight:800; font-size:12px; padding:7px 12px; border-radius:20px; text-align:center; max-width:180px;}
-.dofrow{display:flex;gap:5px;padding:0 14px 6px;align-items:center;}
-.dofrow .dl{font-size:11px;color:var(--sub);font-weight:700;}
+.hud .lvlbox b{font-size:17px;color:#fff;text-shadow:0 1px 3px #001b51;}
+.hud .lvlbox span{font-size:11.5px;color:#bfe9ff;margin-top:3px;}
+.hud .goalpill{margin-left:auto;width:26%;color:#ffe273;font-weight:900;font-size:13px;padding:7px 0;text-align:center;text-shadow:0 0 8px #c67a00;}
+.dofrow{display:none;}
+.dofrow .dl{font-size:10.5px;color:#61738e;font-weight:900;}
 .dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:#d6ddec;margin-left:4px;vertical-align:middle;}
 .dot.on{background:var(--brand);}
 
 /* play area */
 .field{position:relative; flex:1; margin:2px 12px 6px; border-radius:18px; overflow:hidden;
-  background:linear-gradient(180deg,#f4f7fd,#eaf0fa); border:1px solid var(--line);}
+  background:#eaf2fb url('/games/reach-cari-lab-v2.png') center/cover no-repeat; border:1px solid #cddced;
+  box-shadow:inset 0 0 30px rgba(14,65,125,.12),0 8px 24px rgba(30,60,110,.12);}
 .field svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
 
 /* controls */
-.controls{padding:6px 14px 10px; z-index:5;}
-.modeseg{display:flex; background:#eef1f8; border-radius:14px; padding:4px; margin-bottom:8px;}
-.modeseg button{flex:1; border:0; background:transparent; color:var(--sub); font-weight:800; font-size:13px;
-  padding:9px 4px; border-radius:11px; cursor:pointer;}
-.modeseg button.act{background:#fff; color:var(--brand); box-shadow:0 2px 8px rgba(0,74,198,.14);}
-.jointpanel{display:flex;flex-direction:column;gap:7px; min-height:96px;}
+.controls{position:relative;flex:0 0 230px;padding:0;z-index:5;background:url('/games/reach-cari-controls-v5.png') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 -5px 10px rgba(0,20,60,.28));}
+.modeseg{position:absolute;left:38px;right:38px;top:12px;height:35px;display:flex;background:transparent;border-radius:10px;padding:1px;margin:0;}
+.modeseg button{flex:1;border:0;background:transparent;color:#8ec9ed;font-weight:900;font-size:11.5px;
+  padding:5px 4px;border-radius:9px;cursor:pointer;}
+.modeseg button.act{background:rgba(42,181,255,.18);color:#fff;box-shadow:inset 0 0 0 1px rgba(106,221,255,.55),0 0 10px rgba(23,170,255,.3);}
+.jointpanel{position:absolute;left:39px;right:39px;top:52px;height:112px;display:flex;flex-direction:column;justify-content:center;gap:4px;min-height:0;}
 .jrow{display:flex;align-items:center;gap:10px;}
-.jrow label{font-size:12px;font-weight:800;color:var(--ink);width:34px;}
+.jrow label{font-size:11.5px;font-weight:900;color:#d7efff;width:64px;line-height:1.05;text-shadow:0 1px 2px #001735;}
 .jrow input[type=range]{flex:1; accent-color:var(--brand); height:22px;}
-.jrow .deg{font-size:12px;color:var(--brand);font-weight:800;width:44px;text-align:right;
+.jrow .deg{font-size:12px;color:#ffe273;font-weight:900;width:44px;text-align:right;
   font-variant-numeric:tabular-nums;}
-.iktip{font-size:12px;color:var(--sub);text-align:center;padding:26px 10px;line-height:1.5;}
-.btnrow{display:flex;gap:8px;margin-top:9px;}
+.jrow.hint{border-radius:10px;background:rgba(255,205,53,.16);box-shadow:0 0 0 1px rgba(255,220,92,.7),0 0 14px rgba(255,191,31,.48);animation:hintPulse .65s ease-in-out 3;}
+.jrow.hint label,.jrow.hint .deg{color:#fff09a;text-shadow:0 0 7px #d88b00;}
+@keyframes hintPulse{50%{filter:brightness(1.35);transform:scale(1.015)}}
+.iktip{font-size:12px;color:#c9e9ff;text-align:center;padding:10px;line-height:1.45;}
+.btnrow{position:absolute;left:39px;right:39px;bottom:8px;height:48px;display:flex;gap:7px;margin:0;}
 .btn{flex:1; padding:13px 10px; border-radius:26px; border:0; cursor:pointer;
   background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:15px; font-weight:800;
   box-shadow:0 8px 20px rgba(0,74,198,.28);}
 .btn.ghost{background:#eef1f8;color:var(--brand);box-shadow:none;}
+.btnrow .btn{height:49px;margin:0;padding:0 8px;border-radius:0;background:url('/games/reach-cari-start-btn-v3.png') center/100% 100% no-repeat;color:#fff;font-size:14px;text-shadow:0 2px 4px #001b55;box-shadow:none;filter:drop-shadow(0 5px 7px rgba(0,12,45,.35));}
 .btn:active{transform:scale(.97);}
 
 /* overlays */
 .overlay{position:absolute; inset:0; z-index:20; display:flex; flex-direction:column;
   align-items:center; justify-content:center; text-align:center; padding:26px;
-  background:radial-gradient(120% 80% at 50% 0%, #f2f6fd 0%, #e7eef9 70%);}
+  background:url('/games/reach-cari-intro-bg-v3.png') center/cover no-repeat;color:#fff;}
 .overlay.hide{display:none;}
-.floaty{width:132px;height:132px;animation:float 3s ease-in-out infinite;}
+.floaty{width:190px;height:205px;object-fit:contain;animation:float 3s ease-in-out infinite;filter:drop-shadow(0 16px 18px rgba(0,0,0,.35));}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
-.t1{font-size:34px;font-weight:900;color:var(--ink);letter-spacing:-1px;}
-.t2{font-size:34px;font-weight:900;letter-spacing:-1px;
-  background:linear-gradient(120deg,#1b55d0,#004ac6);-webkit-background-clip:text;background-clip:text;color:transparent;}
-.title{margin:8px 0 2px;}
-.tag{color:var(--sub);font-size:14px;margin:2px 0 16px;font-weight:600;}
-.rules{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 18px;text-align:left;
-  max-width:330px;box-shadow:0 6px 18px rgba(70,90,140,.10);}
-.rules div{font-size:13px;color:var(--ink);margin:7px 0;display:flex;gap:9px;align-items:flex-start;line-height:1.4;}
-.rules b{color:var(--brand);}
-.badge{font-size:26px;font-weight:900;margin:6px 0 2px;}
+.t1,.t2{font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;font-size:35px;font-weight:900;letter-spacing:-2px;-webkit-text-stroke:0;filter:none;}
+.t1{color:#132d55;text-shadow:0 2px 0 rgba(255,255,255,.9),0 4px 9px rgba(19,45,85,.22);}
+.t2{background:none;-webkit-background-clip:initial;background-clip:initial;-webkit-text-fill-color:#0874d8;color:#0874d8;text-shadow:0 2px 0 #dff5ff,0 4px 9px rgba(0,74,160,.25);}
+.title{margin:8px 0 3px;line-height:1.12;}
+.tag{color:#25456f;font-size:14.5px;margin:2px 0 15px;font-weight:900;text-shadow:0 1px 0 rgba(255,255,255,.9);}
+.rules{display:grid;grid-template-rows:repeat(3,1fr);align-items:center;gap:0;width:min(342px,88vw);height:150px;
+  background:url('/games/reach-cari-rule-panel-v3.png') center/100% 100% no-repeat;padding:19px 31px 18px;text-align:left;
+  filter:drop-shadow(0 11px 16px rgba(0,20,60,.3));}
+.rules div{font-size:12.5px;font-weight:800;color:#e9f7ff;margin:0;display:flex;gap:10px;align-items:center;line-height:1.25;text-shadow:0 1px 3px #00173c;}
+.rules>div>b{flex:none;width:25px;height:25px;display:grid;place-items:center;border-radius:50%;color:#fff;background:#0874d8;
+  border:1px solid #84e6ff;box-shadow:inset 0 0 0 2px rgba(132,230,255,.12),0 0 8px rgba(38,181,255,.35);text-shadow:none;}
+.rules div span b{color:#ffe477;}
+.overlay #btnStart{width:190px;height:60px;margin-top:12px;padding:0;border-radius:0;background:url('/games/reach-cari-start-btn-v3.png') center/100% 100% no-repeat;box-shadow:none;text-shadow:0 2px 4px #001b55;filter:drop-shadow(0 9px 11px rgba(0,15,55,.45));}
+.result-console{position:relative;width:min(330px,78vw);height:min(430px,55vh);background:url('/games/reach-cari-result-console-v3.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(0,10,42,.55));}
+#ovResult .floaty{position:absolute;top:6%;left:50%;transform:translateX(-50%);width:145px;height:155px;animation:none;}
+#ovResult .badge{position:absolute;top:40%;left:0;width:100%;font-size:29px;color:#6fffd2;text-shadow:0 0 12px #00b97e;}
+#ovResult .scorebox{position:absolute;top:51%;left:12%;width:76%;margin:0;padding:11px 10px;background:transparent;border:0;box-shadow:none;color:#fff;}
+#ovResult .scorebox .big{color:#fff;font-size:17px;text-shadow:0 2px 4px #00102f;} #ovResult .scorebox .take{color:#e5f6ff;font-size:11.5px;background:rgba(0,20,60,.45);border-radius:9px;padding:7px 8px;text-shadow:0 1px 3px #00102f;}
+#ovResult .scorebox .take b{color:#ffe47d;}
+#ovResult .ovbtns{position:absolute;left:8%;bottom:9%;width:84%;height:52px;margin:0;display:block;} #ovResult .ovbtns .btn{position:absolute;display:grid;place-items:center;height:50px;margin:0;padding:0!important;line-height:1;box-shadow:none;background:transparent;color:#fff;text-align:center;font-size:18px;}
+#ovResult #btnRetry{left:-1%;top:2px;width:52%;} #ovResult #btnNext{left:47%;top:2px;width:52%;}
+.badge{font-size:28px;font-weight:900;margin:6px 0 2px;}
 .badge.win{color:var(--good);} .badge.lose{color:var(--bad);}
 .scorebox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 26px;margin:12px 0 4px;
   box-shadow:0 6px 18px rgba(70,90,140,.10);max-width:340px;}
@@ -99,11 +116,11 @@ body{
 
   <!-- HUD -->
   <div class="hud">
-    <div class="cari-mini" id="hudCari"></div>
-    <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">관절 2 · 자유도 2</span></div>
+    <img class="cari-mini" id="hudCari" src="/games/reach-cari-hero-v2.png" alt=""/>
+    <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">관절 2개 · 쉬움</span></div>
     <div class="goalpill" id="goalPill">별에 닿아라</div>
   </div>
-  <div class="dofrow"><span class="dl">DOF</span><span id="dofDots"></span></div>
+  <div class="dofrow"><span class="dl">움직이는 관절</span><span id="dofDots"></span></div>
 
   <!-- PLAY FIELD -->
   <div class="field">
@@ -113,13 +130,13 @@ body{
   <!-- CONTROLS -->
   <div class="controls">
     <div class="modeseg">
-      <button id="mFK" class="act">관절 제어 (순기구학)</button>
-      <button id="mIK">끝점 끌기 (역기구학)</button>
+      <button id="mFK" class="act">관절 하나씩 돌리기</button>
+      <button id="mIK">손끝 잡고 움직이기</button>
     </div>
     <div class="jointpanel" id="panel"></div>
     <div class="btnrow">
-      <button class="btn ghost" id="btnReset">초기화</button>
-      <button class="btn" id="btnHint">힌트 자세</button>
+      <button class="btn ghost" id="btnReset">처음 자세</button>
+      <button class="btn" id="btnHint">관절 힌트</button>
     </div>
   </div>
 
@@ -127,28 +144,30 @@ body{
 
   <!-- START OVERLAY -->
   <div class="overlay" id="ovStart">
-    <div class="floaty" id="startCari"></div>
+    <img class="floaty" id="startCari" src="/games/reach-cari-hero-v2.png" alt="CARI와 로봇팔"/>
     <div class="title"><span class="t1">닿아라 </span><span class="t2">CARI</span></div>
-    <div class="tag">관절을 움직여 목표에 닿아라</div>
+    <div class="tag">로봇팔을 움직여 별에 닿아라!</div>
     <div class="rules">
-      <div><b>①</b><span>관절을 돌려 로봇팔 끝을 <b>별/배터리</b>에 닿게 하세요.</span></div>
-      <div><b>②</b><span><b>관절 제어</b>는 각 관절 각도를 직접(순기구학), <b>끝점 끌기</b>는 끝을 끌면 팔이 스스로 각도를 풉니다(역기구학).</span></div>
-      <div><b>③</b><span>벽·장애물에 <b>부딪히면 안 돼요</b>. 관절이 많을수록 어려운 자세도 가능!</span></div>
+      <div><b>1</b><span>관절을 돌려 손끝을 <b>목표에 맞춰요</b></span></div>
+      <div><b>2</b><span>손끝을 끌면 팔 전체가 <b>함께 움직여요</b></span></div>
+      <div><b>3</b><span>벽에 닿지 않게 <b>피해서 이동!</b></span></div>
     </div>
     <button class="btn" id="btnStart" style="margin-top:20px;padding:15px 50px;flex:0 0 auto;">시작하기</button>
   </div>
 
   <!-- RESULT OVERLAY -->
   <div class="overlay hide" id="ovResult">
-    <div class="floaty" id="resCari"></div>
-    <div class="badge win" id="resBadge">닿았다!</div>
-    <div class="scorebox">
-      <div class="big" id="resTitle">레벨 클리어</div>
-      <div class="take" id="resTake"></div>
-    </div>
-    <div class="ovbtns">
-      <button class="btn ghost" id="btnRetry" style="flex:0 0 auto;padding:13px 26px;">다시</button>
-      <button class="btn" id="btnNext" style="flex:0 0 auto;padding:13px 30px;">다음</button>
+    <div class="result-console">
+      <img class="floaty" id="resCari" src="/games/reach-cari-win-v3.png" alt="기뻐하는 CARI"/>
+      <div class="badge win" id="resBadge">목표 포착!</div>
+      <div class="scorebox">
+        <div class="big" id="resTitle">레벨 클리어</div>
+        <div class="take" id="resTake"></div>
+      </div>
+      <div class="ovbtns">
+        <button class="btn ghost" id="btnRetry">다시</button>
+        <button class="btn" id="btnNext">다음</button>
+      </div>
     </div>
   </div>
 
@@ -203,33 +222,33 @@ const D2R=Math.PI/180, R2D=180/Math.PI;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
 const LEVELS=[
-  { name:"레벨 1", sub:"관절 2 · 자유도 2", goal:"별에 닿아라",
+  { name:"레벨 1", sub:"관절 2개 · 쉬움", goal:"별에 닿아라",
     base:{x:200,y:460}, segs:[115,100], limits:[[-165,165],[-155,155]],
     start:[-94,25], solve:[-90,86], target:{x:300,y:340,r:20,kind:"star"}, obstacles:[],
-    take:"관절 2개면 평면에서 위치를 <b>겨우</b> 맞출 수 있어요. 이게 자유도(DOF) 2입니다." },
+    take:"<b>아래 관절</b>과 <b>위 관절</b>을 함께 움직여 목표 위치를 정확히 맞췄어요." },
 
-  { name:"레벨 2", sub:"관절 3 · 자유도 3", goal:"장애물 넘어 별 집기",
+  { name:"레벨 2", sub:"관절 3개 · 장애물", goal:"장애물 넘어 별 집기",
     base:{x:210,y:460}, segs:[100,88,70], limits:[[-160,160],[-150,150],[-150,150]],
     start:[9,-123,-110], solve:[160,111,1], target:{x:120,y:320,r:19,kind:"star"}, obstacles:[
       {x:210,y:360,w:120,h:24}],
-    take:"관절 3개는 <b>여분의 자유도</b>가 생겨요. 같은 목표라도 자세를 여러 개 만들 수 있죠." },
+    take:"관절이 하나 늘어나면 같은 목표에도 <b>여러 자세</b>로 닿을 수 있어요." },
 
-  { name:"레벨 3", sub:"관절 4 · 감아 돌기", goal:"벽 뒤 배터리에 닿아라",
+  { name:"레벨 3", sub:"관절 4개 · 벽 돌아가기", goal:"벽 뒤 배터리에 닿아라",
     base:{x:110,y:460}, segs:[95,85,75,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
     start:[-76,113,124,-22], solve:[-33,125,-104,-39], target:{x:300,y:430,r:20,kind:"batt"}, obstacles:[
       {x:230,y:350,w:26,h:220}],
-    take:"짧은 팔로는 벽에 막혀 못 닿아요. 관절(자유도)을 늘려 벽을 <b>감아 돌아야</b> 닿아요. 자유도가 많을수록 <b>더 어려운 자세도 만들 수 있지만, 제어는 더 복잡</b>해져요." },
+    take:"관절들을 차례로 꺾어 벽을 <b>감아 돌아</b> 목표에 닿았어요." },
 
-  { name:"레벨 4", sub:"관절 4 · 좁은 통로", goal:"틈새로 넣어 배터리 집기",
+  { name:"레벨 4", sub:"관절 4개 · 좁은 통로", goal:"틈새로 넣어 배터리 집기",
     base:{x:90,y:460}, segs:[95,85,74,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
     start:[-60,-33,-43,-98], solve:[-50,-29,67,25], target:{x:300,y:300,r:18,kind:"batt"}, obstacles:[
       {x:200,y:150,w:24,h:150},{x:200,y:400,w:24,h:120}],
-    take:"작업 공간이 좁을수록 여분의 자유도가 <b>충돌을 피하는 데</b> 쓰여요. 로봇팔이 여러 관절을 갖는 이유죠." },
+    take:"여러 관절을 세밀하게 움직이면 <b>좁은 틈</b>도 안전하게 통과할 수 있어요." },
 
-  { name:"레벨 5", sub:"관절 3 · 관절 떨림", goal:"흔들리는 관절로 별 맞추기",
+  { name:"레벨 5", sub:"관절 3개 · 흔들림", goal:"흔들리는 관절로 별 맞추기",
     base:{x:200,y:460}, segs:[110,90,66], limits:[[-160,160],[-150,150],[-150,150]],
     start:[-110,-126,-103], solve:[-6,-117,72], target:{x:300,y:320,r:23,kind:"star"}, obstacles:[], noise:2.6,
-    take:"실제 모터엔 <b>떨림(노이즈)</b>이 있어요. 그래서 로봇은 센서로 자세를 <b>계속 피드백</b>하며 보정합니다." },
+    take:"흔들리는 손끝을 계속 조절해 목표를 맞췄어요. 실제 로봇도 센서로 자세를 반복해서 고쳐요." },
 ];
 
 /* ================= State ================= */
@@ -333,6 +352,29 @@ function draw(){
     <radialGradient id="tgg" cx="50%" cy="40%" r="60%">
       <stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="${tg.kind==='batt'?'#ffd45e':'#ffe08a'}"/>
     </radialGradient>
+    <linearGradient id="armMetal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#69c7ff"/><stop offset=".35" stop-color="#1471e8"/><stop offset="1" stop-color="#003d9f"/>
+    </linearGradient>
+    <filter id="armShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#071b38" flood-opacity=".38"/>
+    </filter>
+    <filter id="goalGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#ffc629" flood-opacity=".95"/>
+    </filter>
+    <filter id="hitRed" x="-35%" y="-35%" width="170%" height="170%">
+      <feColorMatrix type="matrix" values="1.35 0 0 0 .28  0 .08 0 0 0  0 0 .08 0 0  0 0 0 1 0"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ff1f2d" flood-opacity="1"/>
+    </filter>
+    <linearGradient id="obMetal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#52647e"/><stop offset=".16" stop-color="#263750"/>
+      <stop offset=".72" stop-color="#111b2d"/><stop offset="1" stop-color="#354a68"/>
+    </linearGradient>
+    <linearGradient id="obEdge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#55d9ff"/><stop offset=".5" stop-color="#0875dc"/><stop offset="1" stop-color="#00377e"/>
+    </linearGradient>
+    <pattern id="hazard" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(25)">
+      <rect width="8" height="16" fill="#ffc321"/><rect x="8" width="8" height="16" fill="#1b1d24"/>
+    </pattern>
   </defs>`;
 
   // reach-space hint circle (max reach)
@@ -341,50 +383,43 @@ function draw(){
 
   // obstacles
   for(const ob of L.obstacles){
-    s+=`<rect x="${ob.x-ob.w/2}" y="${ob.y-ob.h/2}" width="${ob.w}" height="${ob.h}" rx="6"
-        fill="#33415e" opacity=".92"/>
-        <rect x="${ob.x-ob.w/2}" y="${ob.y-ob.h/2}" width="${ob.w}" height="${ob.h}" rx="6"
-        fill="none" stroke="#1e2740" stroke-width="1.5"/>`;
+    s+=obstacleMarkup(ob);
   }
 
   // target
-  s+=`<circle cx="${tg.x}" cy="${tg.y}" r="${tg.r+7}" fill="${reached?'rgba(18,181,140,.25)':'rgba(0,74,198,.10)'}"/>`;
   if(tg.kind==='star'){
-    s+=starPath(tg.x,tg.y,tg.r, reached?'#12b58c':'#f0b000');
+    const sz=tg.r*3.2;
+    s+=`<image href="/games/reach-cari-target-star-v3.png" x="${tg.x-sz/2}" y="${tg.y-sz/2}" width="${sz}" height="${sz}" filter="url(#goalGlow)"/>`;
   }else{
-    // battery
-    const bw=tg.r*1.5, bh=tg.r*2.1;
-    s+=`<rect x="${tg.x-bw/2}" y="${tg.y-bh/2}" width="${bw}" height="${bh}" rx="4"
-         fill="url(#tgg)" stroke="${reached?'#12b58c':'#c98f00'}" stroke-width="2"/>
-        <rect x="${tg.x-bw*0.22}" y="${tg.y-bh/2-4}" width="${bw*0.44}" height="5" rx="2" fill="${reached?'#12b58c':'#c98f00'}"/>
-        <path d="M${tg.x-4} ${tg.y-6} l7 0 l-5 8 l7 0 l-11 12 l4 -12 l-6 0 z" fill="#c98f00" opacity=".85"/>`;
+    const bw=tg.r*2, bh=tg.r*3.1;
+    s+=`<image href="/games/reach-cari-target-battery-v3.png" x="${tg.x-bw/2}" y="${tg.y-bh/2}" width="${bw}" height="${bh}"/>`;
   }
 
   // arm segments
   const armCol=hit?'#f2664f':'#004ac6';
   const armColHi=hit?'#f78b78':'#3b74e0';
+  s+=`<g filter="${hit?'url(#hitRed)':'url(#armShadow)'}">`;
   for(let i=0;i<pts.length-1;i++){
     const p1=pts[i],p2=pts[i+1];
-    s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${armCol}"
-         stroke-width="15" stroke-linecap="round"/>`;
-    s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${armColHi}"
-         stroke-width="6" stroke-linecap="round" opacity=".55"/>`;
+    const len=Math.hypot(p2.x-p1.x,p2.y-p1.y), rot=Math.atan2(p2.y-p1.y,p2.x-p1.x)*R2D;
+    s+=`<image href="/games/reach-cari-arm-link-v4.png" x="0" y="-11" width="${len}" height="22"
+      preserveAspectRatio="none" transform="translate(${p1.x} ${p1.y}) rotate(${rot})"/>`;
+    if(hit) s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#ff1727" stroke-width="24" stroke-linecap="round" opacity=".82"/>`;
   }
-  // joints
+  s+='</g>';
+  // base mount: draw it before the base joint so both pieces overlap as one mechanism
+  s+=`<image href="/games/reach-cari-arm-base-v3.png" x="${L.base.x-38}" y="${L.base.y-10}" width="76" height="59" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
+
+  // joints: cover both segment ends with one larger bearing
   for(let i=0;i<pts.length-1;i++){
-    const isBase=i===0;
-    s+=`<circle cx="${pts[i].x}" cy="${pts[i].y}" r="${isBase?12:8.5}" fill="#fff" stroke="${armCol}" stroke-width="3"/>`;
-    if(!isBase) s+=`<circle cx="${pts[i].x}" cy="${pts[i].y}" r="3" fill="${armCol}"/>`;
+    s+=`<image href="/games/reach-cari-arm-joint-v3.png" x="${pts[i].x-18}" y="${pts[i].y-18}" width="36" height="36" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
     // joint drag handles (FK drag on non-base joints)
     if(mode==='FK') s+=`<circle class="jhandle" data-j="${i}" cx="${pts[i].x}" cy="${pts[i].y}" r="20" fill="transparent" style="cursor:grab"/>`;
   }
-  // base mount
-  s+=`<rect x="${L.base.x-18}" y="${L.base.y+6}" width="36" height="20" rx="4" fill="#33415e"/>`;
-  s+=`<rect x="${L.base.x-24}" y="${L.base.y+24}" width="48" height="8" rx="3" fill="#1e2740"/>`;
-
   // gripper / CARI tip
   const tipAngle=Math.atan2(pts[pts.length-1].y-pts[pts.length-2].y, pts[pts.length-1].x-pts[pts.length-2].x)*R2D;
-  s+=gripper(tip.x,tip.y,tipAngle,reached);
+  s+=gripper(tip.x,tip.y,tipAngle,reached,hit);
+  if(reached) s+=`<image href="/games/reach-cari-contact-vfx-v3.png" x="${tip.x-34}" y="${tip.y-34}" width="68" height="68"/>`;
 
   // tip drag handle in IK mode
   if(mode==='IK'){
@@ -400,6 +435,25 @@ function draw(){
   return {hit,reached,dist};
 }
 
+function obstacleMarkup(ob){
+  const x=ob.x-ob.w/2, y=ob.y-ob.h/2;
+  const horizontal=ob.w>=ob.h;
+  const radius=Math.min(7,ob.w/4,ob.h/4);
+  let h=`<g filter="url(#armShadow)">
+    <rect x="${x}" y="${y}" width="${ob.w}" height="${ob.h}" rx="${radius}" fill="url(#obEdge)"/>
+    <rect x="${x+2}" y="${y+2}" width="${Math.max(1,ob.w-4)}" height="${Math.max(1,ob.h-4)}" rx="${Math.max(1,radius-2)}" fill="url(#obMetal)"/>
+    <path d="M${x+radius} ${y+3} H${x+ob.w-radius}" stroke="#9cecff" stroke-width="1.2" opacity=".65"/>`;
+  if(horizontal){
+    const bh=Math.min(7,Math.max(4,ob.h*.32));
+    h+=`<rect x="${x+5}" y="${y+ob.h-bh-2}" width="${Math.max(1,ob.w-10)}" height="${bh}" rx="2" fill="url(#hazard)"/>`;
+  }else{
+    const bw=Math.min(7,Math.max(4,ob.w*.32));
+    h+=`<rect x="${x+ob.w-bw-2}" y="${y+5}" width="${bw}" height="${Math.max(1,ob.h-10)}" rx="2" fill="url(#hazard)"/>`;
+  }
+  if(ob.w>34) h+=`<circle cx="${x+7}" cy="${y+7}" r="2" fill="#a9bdd4"/><circle cx="${x+ob.w-7}" cy="${y+7}" r="2" fill="#a9bdd4"/>`;
+  return h+'</g>';
+}
+
 function starPath(cx,cy,r,fill){
   let pth='';
   for(let i=0;i<10;i++){
@@ -411,16 +465,9 @@ function starPath(cx,cy,r,fill){
   return `<path d="${pth}" fill="${fill}" stroke="#c98f00" stroke-width="1.5"/>`;
 }
 
-function gripper(x,y,angDeg,reached){
-  // two pincers rotated to arm direction
-  const col=reached?'#12b58c':'#004ac6';
-  const open=reached?4:10;
-  return `<g transform="translate(${x} ${y}) rotate(${angDeg})">
-    <circle r="9" fill="#fff" stroke="${col}" stroke-width="3"/>
-    <path d="M2 -${open} q14 -4 16 -${open+2} M2 ${open} q14 4 16 ${open+2}"
-      fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round"/>
-    <circle cx="1" r="3.5" fill="${col}"/>
-  </g>`;
+function gripper(x,y,angDeg,reached,hit){
+  return `<image href="/games/reach-cari-arm-gripper-v3.png" x="-8" y="-18" width="48" height="36"
+    preserveAspectRatio="xMidYMid meet" transform="translate(${x} ${y}) rotate(${angDeg})" filter="${hit?'url(#hitRed)':''}"/>`;
 }
 
 /* joint sliders panel (FK) / tip hint (IK) */
@@ -429,7 +476,7 @@ function updatePanel(hit){
   if(mode==='IK'){
     if(!panel.dataset.ik){
       panel.dataset.ik='1'; panel.dataset.fk='';
-      panel.innerHTML=`<div class="iktip">끝점의 <b>파란 원</b>을 손끝/마우스로 끌어보세요.<br>팔이 스스로 관절 각도를 계산해 따라옵니다 (역기구학·CCD).<br>붉게 변하면 벽에 부딪힌 거예요.</div>`;
+      panel.innerHTML=`<div class="iktip">로봇의 <b>손끝</b>을 손가락이나 마우스로 끌어보세요.<br>관절들이 손끝을 따라 함께 움직여요.<br>팔이 붉어지면 장애물에 닿은 거예요.</div>`;
     }
     return;
   }
@@ -437,8 +484,11 @@ function updatePanel(hit){
   if(panel.dataset.fk!==String(ang.length)){
     panel.dataset.fk=String(ang.length); panel.dataset.ik='';
     let h='';
+    const jointNames=ang.length===2?['아래 관절','위 관절']:
+      ang.length===3?['아래 관절','가운데 관절','손목 관절']:
+      ['아래 관절','가운데 1','가운데 2','손목 관절'];
     for(let i=0;i<ang.length;i++){
-      h+=`<div class="jrow"><label>J${i+1}</label>
+      h+=`<div class="jrow"><label>${jointNames[i]||('관절 '+(i+1))}</label>
         <input type="range" min="${L.limits[i][0]}" max="${L.limits[i][1]}" value="${ang[i]}" data-j="${i}">
         <span class="deg" id="deg${i}">${Math.round(ang[i])}°</span></div>`;
     }
@@ -573,21 +623,25 @@ document.getElementById('mFK').onclick=()=>setMode('FK');
 document.getElementById('mIK').onclick=()=>setMode('IK');
 
 document.getElementById('btnReset').onclick=()=>{ ang=L.start.slice(); won=false; draw(); };
-let hintAnim=0;
 document.getElementById('btnHint').onclick=()=>{
   if(won) return;
-  cancelAnimationFrame(hintAnim);
-  // animate current pose -> a validated collision-free solution pose
-  const goal = L.solve ? L.solve.slice() : ccdSolve(ang, L.target);
-  const from = ang.slice();
-  let t=0;
-  const step=()=>{
-    t+=0.06; const k=t<1?t*t*(3-2*t):1; // smoothstep
-    for(let i=0;i<ang.length;i++) ang[i]=from[i]+(goal[i]-from[i])*k;
-    draw();
-    if(t<1 && !won) hintAnim=requestAnimationFrame(step);
-  };
-  step();
+  if(mode!=='FK') setMode('FK');
+  const goal=L.solve ? L.solve : ccdSolve(ang,L.target);
+  let pick=0, gap=-1;
+  for(let i=0;i<ang.length;i++){
+    const range=L.limits[i][1]-L.limits[i][0];
+    const d=Math.abs(goal[i]-ang[i])/range;
+    if(d>gap){gap=d;pick=i;}
+  }
+  const rows=[...document.querySelectorAll('.jrow')];
+  rows.forEach(r=>r.classList.remove('hint'));
+  const row=rows[pick];
+  if(row){
+    row.classList.add('hint');
+    setTimeout(()=>row.classList.remove('hint'),2100);
+  }
+  const name=row?.querySelector('label')?.textContent||('관절 '+(pick+1));
+  toast(`${name}을 ${goal[pick]>ang[pick]?'오른쪽':'왼쪽'}으로 돌려보세요`);
 };
 
 /* ================= Toast ================= */
@@ -615,9 +669,8 @@ function loadLevel(i){
 /* ================= Result ================= */
 function result(win){
   const ov=document.getElementById('ovResult');
-  document.getElementById('resCari').innerHTML=charSVG(CARI_SUIT,{cari:true,dir:win?1:0,shock:!win});
   const b=document.getElementById('resBadge');
-  b.textContent=win?'닿았다!':'실패';
+  b.textContent=win?'목표 포착!':'다시 조정해요';
   b.className='badge '+(win?'win':'lose');
   document.getElementById('resTitle').textContent=win?(L.name+' 클리어!'):'다시 도전';
   document.getElementById('resTake').innerHTML=L.take;
@@ -636,8 +689,6 @@ document.getElementById('btnNext').onclick=()=>{
 };
 
 /* ================= Start ================= */
-document.getElementById('startCari').innerHTML=charSVG(CARI_SUIT,{cari:true,dir:1});
-document.getElementById('hudCari').innerHTML=charSVG(CARI_SUIT,{cari:true});
 document.getElementById('btnStart').onclick=()=>{
   document.getElementById('ovStart').classList.add('hide');
   loadLevel(0);
@@ -654,12 +705,15 @@ rafId=requestAnimationFrame(tickNoise);
      ⚠️ tieMs(레벨형 동률 해소용 소요시간)는 인트로에서 시작을 누른 시점부터 잰다. '처음으로'로 되돌아가
        인트로를 다시 거치지 않으면 계속 누적된다 — 순위 1차 키가 아니라 동률 해소용이라 그대로 둔다. -->
 <style>
-.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; gap:6px;
-  padding:8px 13px; border-radius:999px; cursor:pointer; font:800 12.5px/1 system-ui,-apple-system,sans-serif;
-  border:1px solid rgba(40,50,76,.16); background:rgba(255,255,255,.92); color:#28324c;
-  box-shadow:0 4px 12px -4px rgba(20,30,60,.28); -webkit-tap-highlight-color:transparent;}
+.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; justify-content:center;
+  box-sizing:border-box; width:112px; height:34px; padding:0; border:0; cursor:pointer;
+  font:850 11.5px/1 system-ui,-apple-system,sans-serif; letter-spacing:.025em; color:#fff;
+  background:url("rank-button.png") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
+  filter:drop-shadow(0 3px 4px rgba(8,20,60,.24)); -webkit-tap-highlight-color:transparent;}
 .mg-rank.on{display:inline-flex;}
-.mg-rank:active{transform:translateY(1px);}
+.mg-rank span{display:block; transform:translateX(7px);}
+.mg-rank:hover{filter:brightness(1.06) drop-shadow(0 3px 5px rgba(8,20,60,.28));}
+.mg-rank:active{transform:translateY(1px) scale(.98);}
 </style>
 <script>
 (function(){
@@ -679,7 +733,7 @@ rafId=requestAnimationFrame(tickNoise);
     var b = document.createElement('button');
     b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
     b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span> 랭킹';
+    b.innerHTML='<span>랭킹</span>';
     b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
     ov.appendChild(b);
   }

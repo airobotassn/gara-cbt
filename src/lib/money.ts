@@ -40,6 +40,21 @@ export const KRW_PER_USD = 1500
  *    vi 에서 `1 US$` 로 찍는데 체크아웃 고지문이 "$1 = 1,500원" 이라고 못박고 있어 글자가 어긋난다.
  *    숫자 서식(자릿수 구분·소수점)만 로케일을 따른다.
  */
+/** 달러 입력 → 저장할 원화 정수. **관리자 이북 가격칸이 유일한 사용처**다.
+ *  구매자 화면이 달러로만 말하는데 관리자만 원으로 입력하면, `2` 를 넣고 "$2 로 팔린다" 고 믿는
+ *  사고가 난다(실제로 20원 = $0.01 짜리 책이 그렇게 생겼다). 입력 단위를 표시 단위와 같게 맞춘다.
+ *  ⚠️ 저장·결제·환불의 단위는 계속 원이다 — 바뀐 건 관리자가 타이핑하는 단위뿐. */
+export function usdToKrw(usdAmount: number): number {
+  const v = Number.isFinite(usdAmount) ? Math.max(0, usdAmount) : 0
+  return Math.round(v * KRW_PER_USD)
+}
+
+/** 원화 정수 → 달러 입력칸에 되돌려 넣을 숫자(문자열 아님). 소수 둘째 자리까지. */
+export function krwToUsdInput(krwAmount: number): number {
+  const won = Number.isFinite(krwAmount) ? Math.max(0, krwAmount) : 0
+  return Math.round((won * 100) / KRW_PER_USD) / 100
+}
+
 export function usd(krwAmount: number, lang: string = 'ko'): string {
   const won = Number.isFinite(krwAmount) ? Math.max(0, krwAmount) : 0
   // 나눗셈보다 곱셈을 먼저 해 부동소수 오차를 없앤다 — 4,500 → 정확히 300센트라야 `$3.01` 이 안 나온다.

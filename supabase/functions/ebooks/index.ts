@@ -36,7 +36,11 @@ function shape(b: Row, owned: boolean, lang: string) {
     description: t.description || ((b.description as string | null) ?? null),
     coverUrl: t.coverUrl || ((b.cover_url as string | null) ?? null),
     price: (b.price as number) ?? 0,
+    // 카탈로그 = 화면 맨 위 전환 버튼(LEVELTEST / CARIS). 분류값은 카탈로그마다 한 쪽만 채워진다
+    // (DB CHECK ebooks_catalog_target_chk). 서재(library)처럼 컬럼을 안 뽑는 곳에선 옛 동작으로 읽힌다.
+    catalog: ((b.catalog as string | null) ?? 'leveltest') as 'leveltest' | 'caris',
     targetLevel: (b.target_level as number | null) ?? null,
+    targetTier: (b.target_tier as string | null) ?? null,
     langs: ['ko', ...Object.keys(tr).filter((k) => tr[k]?.path)],
     owned,
   }
@@ -67,15 +71,31 @@ Deno.serve(async (req) => {
     const uid = user && !user.is_anonymous ? user.id : null
 
     if (action === 'store') {
+      // 두 카탈로그를 한 번에 내려주고 화면이 전환 버튼으로 가른다 — 권수가 적어 나눠 부를 이유가 없고,
+      // 탭을 눌렀을 때 다시 기다리지 않는다.
       const { data, error } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price, target_level, published, sort_order, created_at, translations')
+        .select('id, title, author, description, cover_url, price, catalog, target_level, target_tier, published, sort_order, created_at, translations')
         .eq('published', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
       if (error) return json({ error: error.message }, 400)
       const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
-      return json({ ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string), lang)) })
+      // 강의도 같이 내려준다 — 화면이 교재·강의를 나란히 그리므로 한 번에 받는 게 맞다.
+      //   ⚠️ 관리자 등록(lectures 테이블)이 생기기 전엔 프론트가 코드에 박힌 목록(lib/lectures.ts)을 썼다.
+      //      DB 에 공개된 강의가 하나라도 있으면 **DB 가 이긴다**(관리자가 등록했는데 안 보이면 안 된다).
+      const { data: lec } = await admin
+        .from('lectures')
+        .select('id, catalog, target_level, target_tier, youtube_id, title, channel, description, sort_order')
+        .eq('published', true)
+        .order('sort_order', { ascending: true })
+      return json({
+        ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string), lang)),
+        lectures: (lec ?? []).map((l: Record<string, unknown>) => ({
+          id: l.id, catalog: l.catalog, targetLevel: l.target_level, targetTier: l.target_tier,
+          youtubeId: l.youtube_id, title: l.title, channel: l.channel, description: l.description,
+        })),
+      })
     }
 
     // 결과창 추천 — 응시 레벨에 맞는 책을 위로. 승급했으면 다음 레벨 책을 권한다.
@@ -92,7 +112,11 @@ Deno.serve(async (req) => {
       //    필요한 건 대상 레벨 몇 권 + 모자랄 때 채울 '레벨 무관' 몇 권뿐이라 **DB 에서 좁혀서 필요한 만큼만** 받는다.
       //    한 방 OR 쿼리로 합치지 않는 이유: 정렬이 sort_order 라, 노출순이 앞선 '레벨 무관' 책이 많으면
       //    limit 안에서 정작 대상 레벨 책을 밀어내 잘못된 폴백이 나온다. 그래서 두 쿼리로 나눈다.
-      const SELECT = 'id, title, author, description, cover_url, price, target_level, published, sort_order, created_at, translations'
+      const SELECT = 'id, title, author, description, cover_url, price, catalog, target_level, target_tier, published, sort_order, created_at, translations'
+      // ⚠️ 추천은 **레벨테스트 카탈로그만** 본다. CARIS 교재는 급수(자격검정)에 묶인 물건이라
+      //    레벨테스트 결과창에 섞이면 "Lv.3 탈락자에게 Elite 교재" 같은 추천이 나간다.
+      //    특히 '레벨 무관' 폴백(②)이 위험하다 — CARIS 책은 target_level 이 항상 null 이라 전부 걸린다.
+      const CATALOG = 'leveltest'
       let rows: Row[] = []
 
       if (hasLevel) {
@@ -102,6 +126,7 @@ Deno.serve(async (req) => {
           .from('ebooks')
           .select(SELECT)
           .eq('published', true)
+          .eq('catalog', CATALOG)
           .in('target_level', wanted)
           .order('target_level', { ascending: true })
           .order('sort_order', { ascending: true })
@@ -117,6 +142,7 @@ Deno.serve(async (req) => {
             .from('ebooks')
             .select(SELECT)
             .eq('published', true)
+            .eq('catalog', CATALOG)
             .is('target_level', null)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false })
@@ -130,6 +156,7 @@ Deno.serve(async (req) => {
           .from('ebooks')
           .select(SELECT)
           .eq('published', true)
+          .eq('catalog', CATALOG)
           .order('sort_order', { ascending: true })
           .order('created_at', { ascending: false })
           .limit(limit)

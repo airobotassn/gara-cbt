@@ -685,9 +685,10 @@ const D: Record<string, Record<Lang, string>> = {
   'rank.cta_test': { ko: '테스트로 랭킹에 배치받기', en: 'Take a test to get ranked', ja: 'テストでランク配置', zh: '做测试获得排名', hi: 'रैंक पाने के लिए टेस्ट दें', vi: 'Làm bài để được xếp hạng' },
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
   'rank.coop_header': { ko: '우리가 함께 올라갑니다', en: 'We rise together', ja: 'みんなで上がっていく', zh: '我们一起向上', hi: 'हम साथ मिलकर ऊपर उठते हैं', vi: 'Chúng ta cùng nhau vươn lên' },
-  // 랭킹 탭 = 전세계 / 내 국가 / 내 지역. 국가·지역 탭 라벨은 실제 이름(대한민국·서울)으로 치환되고,
+  // 랭킹 탭 = World / 내 국가 / 내 지역. 국가·지역 탭 라벨은 실제 이름(대한민국·서울)으로 치환되고,
   // 아래 tab_region·tab_country 는 코드가 없을 때(비로그인·온보딩 전) 폴백이다.
-  'rank.tab_world': { ko: '전세계', en: 'Worldwide', ja: '世界全体', zh: '全球', hi: 'दुनिया भर', vi: 'Toàn thế giới' },
+  // ⚠️ 'World' 는 WORLD ARENA 와 같은 **브랜드 영문 고정**이다(2026-08-11) — 6개국어 모두 같은 글자.
+  'rank.tab_world': { ko: 'World', en: 'World', ja: 'World', zh: 'World', hi: 'World', vi: 'World' },
   'rank.tab_region': { ko: '내 지역', en: 'My region', ja: '自分の地域', zh: '我的地区', hi: 'मेरा क्षेत्र', vi: 'Khu vực của tôi' },
   'rank.tab_country': { ko: '내 국가', en: 'My country', ja: '自分の国', zh: '我的国家', hi: 'मेरा देश', vi: 'Quốc gia của tôi' },
   'rank.tab_school': { ko: '학교', en: 'School', ja: '学校', zh: '学校', hi: 'स्कूल', vi: 'Trường' },
@@ -806,6 +807,8 @@ const D: Record<string, Record<Lang, string>> = {
   "gate.note_pc": { ko: "• 모바일·태블릿에서는 응시할 수 없으며, PC(데스크톱·노트북)에서만 응시할 수 있습니다.", en: "• You cannot take the exam on mobile or tablet — only on a PC (desktop or laptop).", ja: "• モバイル・タブレットでは受験できず、PC（デスクトップ・ノートPC）でのみ受験できます。", zh: "• 无法在手机或平板上应试，仅可在 PC（台式机·笔记本）上应试。", hi: "• मोबाइल या टैबलेट पर परीक्षा नहीं दी जा सकती, केवल PC (डेस्कटॉप·लैपटॉप) पर ही।", vi: "• Không thể thi trên điện thoại hay máy tính bảng — chỉ trên PC (máy bàn hoặc laptop)." },
   "gate.btn_seb": { ko: "보안 브라우저로 응시 시작", en: "Start exam in secure browser", ja: "セキュアブラウザで受験開始", zh: "用安全浏览器开始应试", hi: "सुरक्षित ब्राउज़र में परीक्षा शुरू करें", vi: "Bắt đầu thi bằng trình duyệt bảo mật" },
   "gate.btn_start": { ko: "CARIS 응시하기", en: "Take CARIS", ja: "CARISを受ける", zh: "参加 CARIS", hi: "CARIS दें", vi: "Tham gia CARIS" },
+  "gate.my_tickets": { ko: "내 응시권", en: "My exam tickets", ja: "マイ受験券", zh: "我的应试券", hi: "मेरे परीक्षा टिकट", vi: "Vé thi của tôi" },
+  "gate.no_ticket": { ko: "지금 응시할 수 있는 시험이 없습니다. 원서접수를 하면 여기에 나옵니다.", en: "No exam is available right now. Once you register, it will appear here.", ja: "今すぐ受験できる試験はありません。申し込むとここに表示されます。", zh: "目前没有可应试的考试。报名后会显示在这里。", hi: "अभी कोई परीक्षा उपलब्ध नहीं है। पंजीकरण करने पर यहाँ दिखेगी।", vi: "Hiện chưa có kỳ thi nào. Sau khi đăng ký, kỳ thi sẽ hiện ở đây." },
   "gate.btn_login": { ko: "로그인 후 응시하기", en: "Sign in to take the exam", ja: "ログインして受験する", zh: "登录后应试", hi: "साइन इन करके परीक्षा दें", vi: "Đăng nhập để thi" },
   "gate.login_hint": { ko: "CARIS는 본인 확인을 위해 구글 로그인 후 응시합니다.", en: "CARIS requires Google sign-in to verify your identity.", ja: "CARISは本人確認のためGoogleログイン後に受験します。", zh: "为核实身份，CARIS 需先用 Google 登录后应试。", hi: "पहचान सत्यापन के लिए CARIS Google साइन-इन के बाद दी जाती है।", vi: "CARIS yêu cầu đăng nhập Google để xác minh danh tính." },
   "gate.check_link": { ko: "🧪 처음이신가요? 시험환경 테스트(사전 점검) →", en: "🧪 First time? Test your exam environment (pre-check) →", ja: "🧪 初めてですか？ 試験環境テスト（事前点検）→", zh: "🧪 第一次？测试考试环境（预检）→", hi: "🧪 पहली बार? परीक्षा वातावरण जांचें (पूर्व-जांच) →", vi: "🧪 Lần đầu? Kiểm tra môi trường thi (kiểm tra trước) →" },
@@ -1293,7 +1296,8 @@ const D: Record<string, Record<Lang, string>> = {
   "faq.q7.tag": { ko: "응시 중", en: "During the Exam", ja: "受験中", zh: "应试中", hi: "परीक्षा के दौरान", vi: "Trong khi thi" },
   "mypage.tab_attempts": { ko: "시험 응시 현황", en: "Exam Status", ja: "受験状況", zh: "考试应试现况", hi: "परीक्षा स्थिति", vi: "Tình trạng dự thi" },
   "mypage.tab_earned": { ko: "자격 취득 현황", en: "Certifications Earned", ja: "資格取得状況", zh: "资格取得现况", hi: "प्राप्त प्रमाणन", vi: "Chứng chỉ đã đạt" },
-  "mypage.tab_issuance": { ko: "인증서 발급 현황", en: "Certificate Issuance", ja: "証明書発行状況", zh: "证书发放现况", hi: "प्रमाणपत्र जारी", vi: "Cấp chứng chỉ" },
+  "mypage.tab_issuance": { ko: "인증서 발급 현황", en: "Certificate Issuance", ja: "証明書発行状況", zh: "证书发放现况", hi: "प्रमाणपत्र जारी", vi: "Cấp chứng chỉ" },
+  "mypage.tab_inquiry": { ko: "1:1 문의", en: "Support", ja: "1:1 お問い合わせ", zh: "1对1咨询", hi: "सहायता", vi: "Hỗ trợ 1:1" },
   "mypage.default_name": { ko: "응시자", en: "Examinee", ja: "受験者", zh: "应试者", hi: "परीक्षार्थी", vi: "Thí sinh" },
   "mypage.exam_fallback": { ko: "CARIS", en: "CARIS", ja: "CARIS", zh: "CARIS", hi: "CARIS", vi: "CARIS" },
   "mypage.login_required": { ko: "로그인이 필요합니다", en: "Login required", ja: "ログインが必要です", zh: "需要登录", hi: "लॉगिन आवश्यक है", vi: "Cần đăng nhập" },
@@ -1371,15 +1375,26 @@ const D: Record<string, Record<Lang, string>> = {
   "ebook.reader_fs": { ko: "전체화면", en: "Fullscreen", ja: "全画面", zh: "全屏", hi: "फुलस्क्रीन", vi: "Toàn màn hình" },
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
   //   ⚠️ "레벨을 고르면 교재와 강의가 나타납니다" 같은 사용법 설명문은 넣지 않는다 — 화면을 보면 아는 것이다(2026-08-06 삭제).
+  //   카탈로그 이름(LEVELTEST E-BOOK / CARIS E-BOOK)은 여기 없다 — 급수 이름(Beginner…)처럼 브랜드
+  //   고유명이라 언어 무관 영문 고정이고, 단일 출처는 Ebooks.tsx 의 CATALOG_LABEL 이다.
+  "ll.catalog": { ko: "교재 종류", en: "Catalog", ja: "教材の種類", zh: "教材类别", hi: "कैटलॉग", vi: "Loại giáo trình" },
   "ll.level_col": { ko: "레벨", en: "Level", ja: "レベル", zh: "等级", hi: "लेवल", vi: "Cấp" },
+  "ll.tier_col": { ko: "급수", en: "Tier", ja: "級", zh: "级别", hi: "श्रेणी", vi: "Hạng" },
   "ll.books": { ko: "교재", en: "Books", ja: "教材", zh: "教材", hi: "किताबें", vi: "Giáo trình" },
   "ll.lectures": { ko: "강의", en: "Lectures", ja: "講義", zh: "课程", hi: "लेक्चर", vi: "Bài giảng" },
   "ll.no_books": { ko: "이 레벨의 교재는 준비 중이에요.", en: "Books for this level are on the way.", ja: "このレベルの教材は準備中です。", zh: "该等级的教材正在准备中。", hi: "इस लेवल की किताबें तैयार की जा रही हैं।", vi: "Giáo trình cho cấp này đang được chuẩn bị." },
   "ll.no_lectures": { ko: "이 레벨의 강의는 준비 중이에요.", en: "Lectures for this level are on the way.", ja: "このレベルの講義は準備中です。", zh: "该等级的课程正在准备中。", hi: "इस लेवल के लेक्चर तैयार किए जा रहे हैं।", vi: "Bài giảng cho cấp này đang được chuẩn bị." },
+  "ll.no_books_tier": { ko: "이 급수의 교재는 준비 중이에요.", en: "Books for this tier are on the way.", ja: "この級の教材は準備中です。", zh: "该级别的教材正在准备中。", hi: "इस श्रेणी की किताबें तैयार की जा रही हैं।", vi: "Giáo trình cho hạng này đang được chuẩn bị." },
+  "ll.no_lectures_tier": { ko: "이 급수의 강의는 준비 중이에요.", en: "Lectures for this tier are on the way.", ja: "この級の講義は準備中です。", zh: "该级别的课程正在准备中。", hi: "इस श्रेणी के लेक्चर तैयार किए जा रहे हैं।", vi: "Bài giảng cho hạng này đang được chuẩn bị." },
   "ll.any_level": { ko: "레벨 무관", en: "Any level", ja: "レベル問わず", zh: "不限等级", hi: "किसी भी लेवल", vi: "Mọi cấp" },
   "ll.any_level_desc": { ko: "레벨과 상관없이 볼 수 있는 자료예요.", en: "Material you can use at any level.", ja: "レベルに関係なく使える資料です。", zh: "不限等级都可以看的资料。", hi: "किसी भी लेवल पर काम आने वाली सामग्री।", vi: "Tài liệu dùng được ở mọi cấp." },
+  "ll.any_tier": { ko: "급수 무관", en: "Any tier", ja: "級問わず", zh: "不限级别", hi: "किसी भी श्रेणी", vi: "Mọi hạng" },
+  "ll.any_tier_desc": { ko: "급수와 상관없이 볼 수 있는 자료예요.", en: "Material you can use for any tier.", ja: "級に関係なく使える資料です。", zh: "不限级别都可以看的资料。", hi: "किसी भी श्रेणी पर काम आने वाली सामग्री।", vi: "Tài liệu dùng được ở mọi hạng." },
   "ll.count": { ko: "교재 {b} · 강의 {v}", en: "{b} books · {v} lectures", ja: "教材{b} · 講義{v}", zh: "教材 {b} · 课程 {v}", hi: "{b} किताबें · {v} लेक्चर", vi: "{b} giáo trình · {v} bài giảng" },
   "ll.play": { ko: "재생", en: "Play", ja: "再生", zh: "播放", hi: "चलाएँ", vi: "Phát" },
+  // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
+  "ll.prev": { ko: "이전", en: "Previous", ja: "前へ", zh: "上一个", hi: "पिछला", vi: "Trước" },
+  "ll.next": { ko: "다음", en: "Next", ja: "次へ", zh: "下一个", hi: "अगला", vi: "Tiếp" },
   "ll.watch_yt": { ko: "유튜브에서 보기", en: "Watch on YouTube", ja: "YouTubeで見る", zh: "在 YouTube 上观看", hi: "YouTube पर देखें", vi: "Xem trên YouTube" },
   "ll.demo_note": { ko: "강의는 데모용 샘플 영상입니다.", en: "Lectures are sample videos for this demo.", ja: "講義はデモ用のサンプル動画です。", zh: "课程为演示用示例视频。", hi: "लेक्चर इस डेमो के लिए सैंपल वीडियो हैं।", vi: "Bài giảng là video mẫu cho bản demo." },
   "mypage.reissue": { ko: "재발급", en: "Reissue", ja: "再発行", zh: "重新发放", hi: "पुनः जारी करें", vi: "Cấp lại" },
@@ -1744,9 +1759,11 @@ const D: Record<string, Record<Lang, string>> = {
   'chat.duplicate': { ko: "방금 같은 내용을 보냈어요", en: "You just sent the same message", ja: "同じ内容を送信済みです", zh: "你刚发送过相同内容", hi: "आपने अभी वही संदेश भेजा है", vi: "Bạn vừa gửi nội dung giống hệt" },
   'chat.rateLimited': { ko: "요청이 너무 많아요. 잠시 후 다시 시도해주세요", en: "Too many requests. Please try again shortly", ja: "リクエストが多すぎます。しばらくして再度お試しください", zh: "请求过于频繁，请稍后重试", hi: "बहुत अधिक अनुरोध, कृपया बाद में पुनः प्रयास करें", vi: "Quá nhiều yêu cầu, vui lòng thử lại sau" },
   'chat.loginToJoin': { ko: "채팅에 참여하려면 로그인해주세요", en: "Sign in to join the chat", ja: "チャットに参加するにはログインしてください", zh: "登录后即可参与聊天", hi: "चैट में शामिल होने के लिए साइन इन करें", vi: "Đăng nhập để tham gia trò chuyện" },
-  // 방(room) — 전세계 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
-  'chat.roomGlobal': { ko: "전세계", en: "Global", ja: "全世界", zh: "全球", hi: "वैश्विक", vi: "Toàn cầu" },
-  'chat.roomBack': { ko: "전세계로", en: "Go global", ja: "全世界へ", zh: "回到全球", hi: "वैश्विक पर जाएँ", vi: "Về toàn cầu" },
+  // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
+  // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
+  //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
+  'chat.roomGlobal': { ko: "World", en: "World", ja: "World", zh: "World", hi: "World", vi: "World" },
+  'chat.roomBack': { ko: "World", en: "World", ja: "World", zh: "World", hi: "World", vi: "World" },
   'chat.anonBadge': { ko: "익명", en: "Anon", ja: "匿名", zh: "匿名", hi: "गुमनाम", vi: "Ẩn danh" },
   'chat.confirmDelete': { ko: "이 메시지를 삭제할까요?", en: "Delete this message?", ja: "このメッセージを削除しますか？", zh: "确定要删除这条消息吗？", hi: "क्या इस संदेश को हटाना है?", vi: "Xóa tin nhắn này?" },
   'chat.reportTitle': { ko: "신고 사유를 선택해주세요", en: "Why are you reporting this?", ja: "通報理由を選んでください", zh: "请选择举报原因", hi: "रिपोर्ट का कारण चुनें", vi: "Chọn lý do báo cáo" },
@@ -1789,6 +1806,13 @@ const D: Record<string, Record<Lang, string>> = {
   "ticket.reason_in_progress": { ko: "응시가 진행 중이에요", en: "Your exam is in progress", ja: "受験が進行中です", zh: "应试正在进行中", hi: "आपकी परीक्षा चल रही है", vi: "Bài thi đang diễn ra" },
   "ticket.reason_expired": { ko: "응시권이 만료됐어요", en: "This ticket has expired", ja: "受験チケットの有効期限が切れました", zh: "该应试券已过期", hi: "यह टिकट समाप्त हो चुका है", vi: "Vé dự thi đã hết hạn" },
   "ticket.go_exam": { ko: "응시하러 가기", en: "Go to the exam", ja: "受験へ進む", zh: "去应试", hi: "परीक्षा पर जाएँ", vi: "Vào thi" },
+  // 시험환경 점검 게이트 — 점검을 마쳐야 응시 버튼이 열린다(2026-08-11).
+  //   잠금 브라우저가 안 켜지는 PC 라는 걸 시험 당일에 알면 손쓸 방법이 없어서 미리 걸러낸다.
+  "ticket.env_do": { ko: "시험환경 테스트", en: "Test your setup", ja: "受験環境テスト", zh: "考试环境测试", hi: "सेटअप जाँचें", vi: "Kiểm tra thiết bị" },
+  "ticket.env_done": { ko: "환경 테스트 완료", en: "Setup checked", ja: "環境テスト済み", zh: "环境测试完成", hi: "सेटअप जाँचा गया", vi: "Đã kiểm tra" },
+  "ticket.env_required": { ko: "시험환경 테스트를 마쳐야 응시할 수 있어요.", en: "Finish the setup test before you can start the exam.", ja: "受験環境テストを終えると受験できます。", zh: "完成考试环境测试后才能应试。", hi: "परीक्षा शुरू करने से पहले सेटअप जाँच पूरी करें।", vi: "Hoàn tất kiểm tra thiết bị trước khi vào thi." },
+  "ticket.open_now": { ko: "지금 응시할 수 있는 시험 {n}개", en: "{n} exam(s) you can take now", ja: "今すぐ受験できる試験 {n}件", zh: "现在可应试的考试 {n} 个", hi: "अभी दे सकने वाली {n} परीक्षा", vi: "{n} kỳ thi có thể vào ngay" },
+  "ticket.open_now_sub": { ko: "보유 응시권에서 시험환경 테스트 후 응시하세요.", en: "Check your setup on the ticket, then start.", ja: "受験券から環境テストの後に受験してください。", zh: "在应试券中完成环境测试后应试。", hi: "टिकट में सेटअप जाँचकर शुरू करें।", vi: "Kiểm tra thiết bị ở vé thi rồi vào thi." },
   // 필드 라벨 — 회차·등급은 원서접수 화면(apply.round / apply.tier)과 같은 말을 써야 한다.
   "ticket.round": { ko: "회차", en: "Session", ja: "回次", zh: "场次", hi: "सत्र", vi: "Đợt" },
   "ticket.tier": { ko: "등급", en: "Level", ja: "等級", zh: "等级", hi: "स्तर", vi: "Bậc" },
@@ -1938,6 +1962,12 @@ const D: Record<string, Record<Lang, string>> = {
   'mg.build-cari.title': { ko: '지어라 CARI', en: 'Build, CARI', ja: '築け CARI', zh: '建造吧 CARI', hi: 'बनाओ CARI', vi: 'Xây đi, CARI' },
   'mg.build-cari.tagline': { ko: '라인을 깔면 공장이 알아서 돌아가요!', en: 'Lay the lines and the factory runs itself!', ja: 'ラインを敷けば工場が自動で動きます！', zh: '铺好产线，工厂自动运转！', hi: 'लाइन बिछाओ, फैक्ट्री खुद चलेगी!', vi: 'Đặt dây chuyền là nhà máy tự chạy!' },
   'mg.build-cari.badge': { ko: '스마트팩토리 · 라인 설계 퍼즐', en: 'Smart factory · line design puzzle', ja: 'スマートファクトリー · ライン設計パズル', zh: '智能工厂 · 产线设计解谜', hi: 'स्मार्ट फैक्ट्री · लाइन डिज़ाइन पहेली', vi: 'Nhà máy thông minh · giải đố thiết kế dây chuyền' },
+  'mg.block-cari.title': { ko: '막아라 CARI', en: 'Block It, CARI', ja: '止めろ CARI', zh: '拦住吧 CARI', hi: 'रोको CARI', vi: 'Chặn lại, CARI' },
+  'mg.block-cari.tagline': { ko: '규정에 걸리는 곳을 가리고 넘겨라!', en: 'Redact what breaks the rules, then send!', ja: '規定に触れる箇所を隠して送れ！', zh: '遮住违规内容再发送！', hi: 'नियम तोड़ने वाला हिस्सा छिपाकर भेजो!', vi: 'Che phần vi phạm rồi gửi đi!' },
+  'mg.block-cari.badge': { ko: 'AI 입력 전 정보 가리기', en: 'Redacting before AI input', ja: 'AI に渡す前の情報マスキング', zh: '输入 AI 前的信息遮蔽', hi: 'AI में डालने से पहले जानकारी छिपाना', vi: 'Che thông tin trước khi đưa vào AI' },
+  'mg.order-cari.title': { ko: '시켜라 CARI', en: 'Tell CARI What To Do', ja: '指示しろ CARI', zh: '下指令吧 CARI', hi: 'निर्देश दो CARI', vi: 'Ra lệnh đi, CARI' },
+  'mg.order-cari.tagline': { ko: '도면대로 나오게 지시를 골라라!', en: 'Pick the instructions that match the blueprint!', ja: '図面どおりになる指示を選べ！', zh: '选出能照图纸做出来的指令！', hi: 'ब्लूप्रिंट से मेल खाते निर्देश चुनो!', vi: 'Chọn chỉ dẫn khớp với bản vẽ!' },
+  'mg.order-cari.badge': { ko: 'AI 지시문 설계 퍼즐', en: 'AI prompting design puzzle', ja: 'AI 指示文の設計パズル', zh: 'AI 指令设计解谜', hi: 'AI निर्देश डिज़ाइन पहेली', vi: 'Giải đố thiết kế câu lệnh AI' },
 
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
@@ -1957,7 +1987,8 @@ const D: Record<string, Record<Lang, string>> = {
   // 카드 안(캔버스)에 그려지는 글자
   'share.card.title': { ko: '시즌 기록', en: 'Season record', ja: 'シーズン記録', zh: '赛季记录', hi: 'सीज़न रिकॉर्ड', vi: 'Thành tích mùa' },
   'share.card.rank_n': { ko: '{n}위', en: '#{n}', ja: '{n}位', zh: '第 {n} 名', hi: '#{n}', vi: 'Hạng {n}' },
-  'share.card.world': { ko: '전세계', en: 'Global', ja: '世界', zh: '全球', hi: 'वैश्विक', vi: 'Toàn cầu' },
+  // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자.
+  'share.card.world': { ko: 'World', en: 'World', ja: 'World', zh: 'World', hi: 'World', vi: 'World' },
   'share.card.country': { ko: '국가', en: 'Country', ja: '国', zh: '国家', hi: 'देश', vi: 'Quốc gia' },
   'share.card.region': { ko: '지역', en: 'Region', ja: '地域', zh: '地区', hi: 'क्षेत्र', vi: 'Khu vực' },
   'share.card.season_score': { ko: '시즌 점수', en: 'Season score', ja: 'シーズン点数', zh: '赛季积分', hi: 'सीज़न स्कोर', vi: 'Điểm mùa' },

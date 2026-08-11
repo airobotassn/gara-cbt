@@ -167,6 +167,13 @@ Deno.serve(async (req) => {
       .upsert(row, { onConflict: 'user_id,game_id' })
     if (bestErr) return json({ error: bestErr.message }, 500)
 
+    // (5) 매 판 기록 — 관리자 통계(평균 플레이 시간·실제 이용 시간대)의 유일한 출처.
+    //     ⚠️ 최고기록 테이블로는 그 두 값을 낼 수 없다(거긴 사람당 한 줄이고 '최고기록 세운 판'만 안다).
+    //     ⚠️ 실패해도 제출을 막지 않는다 — 통계 때문에 게임이 안 되면 안 된다.
+    await admin.from('minigame_plays').insert({
+      user_id: user.id, game_id: gameId, score: clamped, duration_ms: tie ?? null,
+    }).then(undefined, () => { /* 통계 기록 실패는 삼킨다 */ })
+
     return json({
       ok: true,
       gameId,

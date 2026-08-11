@@ -43,12 +43,12 @@ export const MINIGAMES: MiniGame[] = [
     accent: 'CARI',
     art: '/games/reach-cari-cover.png',
     src: '/games/reach-cari.html',
-    frame: '#e3ebf7', // 게임 body 의 radial-gradient 바깥색과 동일(밝은 톤)
+    frame: '#09172c', // 게임 body 의 연구실 외곽 남색과 동일
   },
   {
     id: 'program-cari',
     accent: 'CARI',
-    art: '/games/program-cari-cover.png',
+    art: '/games/program-cari-cover-v2.png',
     src: '/games/program-cari.html',
     frame: '#e3ebf7', // 위와 동일 팔레트(같은 시안에서 나온 자매 게임)
   },
@@ -58,6 +58,22 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/build-cari-cover.png',
     src: '/games/build-cari.html',
     frame: '#e3ebf7', // 위와 동일 팔레트
+  },
+  // 아래 둘은 용어 퀴즈도 조작 퍼즐도 아닌 '판단' 계열이다 —
+  // 규정을 읽고 서류를 가리거나(막아라), 지시를 골라 결과를 맞춘다(시켜라).
+  {
+    id: 'block-cari',
+    accent: 'CARI',
+    art: '/games/block-cari-cover.png',
+    src: '/games/block-cari.html',
+    frame: '#14161d', // 게임 body 그라디언트의 가장 어두운 끝
+  },
+  {
+    id: 'order-cari',
+    accent: 'CARI',
+    art: '/games/order-cari-cover.png',
+    src: '/games/order-cari.html',
+    frame: '#d5dded', // 게임 body 그라디언트의 가장 진한 끝(밝은 공방 톤)
   },
 ]
 

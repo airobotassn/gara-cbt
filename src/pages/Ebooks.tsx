@@ -1,4 +1,9 @@
-// 러닝 라이브러리 (/ebooks) — **가로 3열**: 레벨 | 교재(E-BOOK) | 강의.
+// 러닝 라이브러리 (/ebooks) — **가로 3열**: 레벨(급수) | 교재(E-BOOK) | 강의.
+//   맨 위 전환 버튼으로 카탈로그가 둘이다(2026-08-11):
+//     · LEVELTEST E-BOOK — 무료 레벨테스트용. 왼쪽 열 = 레벨 1~7 (+레벨 무관)
+//     · CARIS E-BOOK     — 자격검정용.       왼쪽 열 = 급수 Beginner~Zenith (+급수 무관)
+//   책이 어느 쪽에 서는지는 `ebooks.catalog` 한 컬럼이 정한다(관리자 이북 탭에서 고른다).
+//   ⚠️ 급수별 강의는 아직 없다 — lectures.ts 는 레벨만 안다. CARIS 탭의 강의 열은 비어 있는 게 맞다.
 //   왼쪽에서 레벨을 고르면 가운데·오른쪽이 그 레벨 것으로 갈리고, 각 열은 카페 게시판처럼
 //   **자기 안에서 세로로 스크롤**한다(페이지를 내려서 레벨이 바뀌는 구조가 아니다).
 //   좁은 화면은 3열이 안 들어가므로 레벨을 상단 가로 칩으로 빼고 교재↔강의를 탭으로 접는다.
@@ -20,12 +25,35 @@ import { usd } from '../lib/money'
 import SiteFooter from '../components/SiteFooter'
 import EbookCover from '../components/EbookCover'
 import { LEVEL_COLORS, MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
+import { getTracks, TIER_COLORS } from '../lib/caris'
 import { lecturesForLevel, ytEmbed, ytThumb, ytWatch, type Lecture } from '../lib/lectures'
-import type { EbookListResp, EbookRow } from '../lib/types'
+import type { EbookListResp, EbookRow, ServerLecture } from '../lib/types'
 
-/** 레벨 1~7 + 맨 뒤의 '레벨 무관'(target_level = null 인 교재가 있을 때만). */
-type LevelKey = number | 'any'
-const ANY_COLOR = 'rgb(148 163 184)' // slate-400 — 레벨 색 사다리 밖이라는 뜻으로 무채색
+type Catalog = 'leveltest' | 'caris'
+/** 카탈로그 이름은 급수 이름(Beginner…)과 같은 브랜드 고유명이라 **언어 무관 영문 고정**이다(i18n 사전 아님). */
+const CATALOG_LABEL: Record<Catalog, string> = {
+  leveltest: 'LEVELTEST E-BOOK',
+  caris: 'CARIS E-BOOK',
+}
+const ANY_COLOR = 'rgb(148 163 184)' // slate-400 — 레벨/급수 색 사다리 밖이라는 뜻으로 무채색
+
+/** 교재 표지 폭(열 본문 폭 대비). 강의 썸네일은 이 값을 쓰지 않는다 — 영상은 가로가 긴 물건이라
+ *  열 폭을 꽉 채우고 제목을 그 밑에 둔다(2026-08-11 지시).
+ *  ⚠️ 51% 는 **줄 높이를 강의 줄과 맞추려고 역산한 값**이다(표지 A4 → 폭×1.414 + 패딩 32 ≒ 썸네일 16:9 + 제목·채널).
+ *     줄여 놓으면 교재 줄이 짧아 박스 아래가 100px 씩 텅 빈다(실제로 그렇게 만들었다가 지적받음).
+ *     ⚠️ max-w 를 걸지 말 것 — 열이 넓어질 때 표지만 안 커져 다시 어긋난다. 상한은 페이지 폭(1240)이 이미 준다. */
+const MEDIA_W = 'w-[51%] shrink-0 self-start'
+
+/** 왼쪽 열 한 칸 — 레벨(1~7·무관) 또는 급수(Beginner~Zenith·무관). 두 카탈로그가 같은 모양을 쓴다. */
+type Group = {
+  key: string // 레벨은 '1'~'7', 급수는 티어 key. 'any' = 그 카탈로그의 '무관' 자리
+  label: string // 왼쪽 열 · 좁은 화면 설명줄에 쓰는 이름
+  short: string // 좁은 화면 가로 칩(폭이 좁아 짧게)
+  desc: string
+  color: string
+  books: number
+  lectures: number
+}
 
 export default function Ebooks() {
   const { t, lang } = useT()
@@ -39,13 +67,27 @@ export default function Ebooks() {
   const [zoom, setZoom] = useState<EbookRow | null>(null)
   // 재생 중인 강의 — 한 번에 하나만(iframe 을 여러 개 띄우면 소리가 겹치고 페이지가 무거워진다).
   const [playing, setPlaying] = useState<string | null>(null)
-  const [level, setLevel] = useState<LevelKey>(MIN_LEVEL)
+  // 카탈로그 전환. 기본은 LEVELTEST — 지금 책이 다 그쪽에 있다(빈 탭으로 시작하지 않는다).
+  const [cat, setCat] = useState<Catalog>('leveltest')
+  // 선택은 카탈로그마다 따로 기억한다 — 탭을 왔다 갔다 해도 보던 자리로 돌아온다.
+  const [levelSel, setLevelSel] = useState(String(MIN_LEVEL))
+  const [tierSel, setTierSel] = useState('beginner')
+  // 교재·강의 각각의 페이지(0부터). 한 페이지에 한 개씩 — 아래 clamp 를 거쳐 쓴다.
+  const [bookPageRaw, setBookPage] = useState(0)
+  const [lecPageRaw, setLecPage] = useState(0)
   // 좁은 화면 전용 — 3열을 못 세우니 가운데·오른쪽 열을 탭으로 번갈아 보여준다.
   const [pane, setPane] = useState<'books' | 'lectures'>('books')
+  // 관리자가 등록한 강의(lectures 테이블). ⚠️ 하나라도 있으면 코드에 박힌 목록(lib/lectures.ts)보다 이게 우선이다.
+  const [dbLectures, setDbLectures] = useState<ServerLecture[] | null>(null)
 
   useEffect(() => {
     callFunction<EbookListResp>('ebooks', { action: 'store', lang })
-      .then((r) => setRows(r.ebooks))
+      // ⚠️ catalog·targetTier 는 함수를 다시 배포해야 내려온다 — 그 전 응답은 옛 모양(둘 다 없음)이라
+      //    여기서 레벨테스트 카탈로그로 읽어준다. 안 그러면 배포 순서에 따라 목록이 통째로 빈다.
+      .then((r) => {
+        setRows(r.ebooks.map((b) => ({ ...b, catalog: b.catalog ?? 'leveltest', targetTier: b.targetTier ?? null })))
+        setDbLectures(r.lectures ?? [])
+      })
       .catch((e) => setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.'))
   }, [isFullUser, lang])
 
@@ -61,28 +103,85 @@ export default function Ebooks() {
     return () => window.removeEventListener('keydown', onKey)
   }, [loginOpen, zoom])
 
-  // 왼쪽 열에 세울 레벨 목록. 교재가 없는 레벨도 남긴다 — 사다리가 중간에 비면 레벨이 몇 개인지부터 헷갈린다.
-  const levels = useMemo(() => {
-    const list = rows ?? []
-    const out: { key: LevelKey; color: string; books: number; lectures: number }[] = []
-    for (let lv = MIN_LEVEL; lv <= MAX_LEVEL; lv++) {
-      out.push({
-        key: lv,
-        color: LEVEL_COLORS[lv] ?? ANY_COLOR,
-        books: list.filter((b) => b.targetLevel === lv).length,
-        lectures: lecturesForLevel(lv).length,
-      })
-    }
-    const free = list.filter((b) => b.targetLevel == null).length
-    if (free) out.push({ key: 'any', color: ANY_COLOR, books: free, lectures: 0 })
-    return out
-  }, [rows])
+  const catRows = useMemo(() => (rows ?? []).filter((b) => b.catalog === cat), [rows, cat])
 
-  const books = useMemo(
-    () => (rows ?? []).filter((b) => (level === 'any' ? b.targetLevel == null : b.targetLevel === level)),
-    [rows, level],
-  )
-  const lectures = useMemo(() => (level === 'any' ? [] : lecturesForLevel(level)), [level])
+  // 왼쪽 열 목록. 교재가 없는 레벨·급수도 남긴다 — 사다리가 중간에 비면 몇 칸짜리인지부터 헷갈린다.
+  //   '무관' 칸만은 해당 교재가 있을 때만 세운다(항상 있으면 빈 칸이 하나 더 있는 것으로 읽힌다).
+  const groups = useMemo<Group[]>(() => {
+    if (cat === 'leveltest') {
+      const out: Group[] = []
+      for (let lv = MIN_LEVEL; lv <= MAX_LEVEL; lv++) {
+        out.push({
+          key: String(lv),
+          label: `Lv.${lv} ${t(`lv.${lv}.name`)}`,
+          short: `Lv.${lv}`,
+          desc: t(`lv.${lv}.desc`),
+          color: LEVEL_COLORS[lv] ?? ANY_COLOR,
+          books: catRows.filter((b) => b.targetLevel === lv).length,
+          lectures: lecturesForLevel(lv).length,
+        })
+      }
+      const free = catRows.filter((b) => b.targetLevel == null).length
+      if (free) out.push({ key: 'any', label: t('ll.any_level'), short: t('ll.any_level'), desc: t('ll.any_level_desc'), color: ANY_COLOR, books: free, lectures: 0 })
+      return out
+    }
+    // 급수 목록·설명은 /guide 와 같은 출처(getTracks)를 쓴다 — 여기서 새로 쓰면 문구가 두 벌이 된다.
+    const out: Group[] = getTracks(lang).flatMap((track) =>
+      track.tiers.map((tier) => ({
+        key: tier.key,
+        label: tier.name, // 급수 이름은 브랜드 고유명(언어 무관 영문)
+        short: tier.name,
+        desc: tier.target ?? tier.prereq ?? track.name,
+        color: TIER_COLORS[tier.key] ?? ANY_COLOR,
+        books: catRows.filter((b) => b.targetTier === tier.key).length,
+        lectures: 0, // 급수별 강의는 아직 데이터가 없다(lectures.ts 는 레벨만 안다)
+      })),
+    )
+    const free = catRows.filter((b) => b.targetTier == null).length
+    if (free) out.push({ key: 'any', label: t('ll.any_tier'), short: t('ll.any_tier'), desc: t('ll.any_tier_desc'), color: ANY_COLOR, books: free, lectures: 0 })
+    return out
+  }, [cat, catRows, lang, t])
+
+  // 고른 칸이 사라졌으면(예: '무관' 칸의 마지막 책이 없어짐) 맨 앞으로 — 빈 화면을 보여주지 않는다.
+  const sel = cat === 'leveltest' ? levelSel : tierSel
+  const setSel = cat === 'leveltest' ? setLevelSel : setTierSel
+  const active = groups.find((g) => g.key === sel) ?? groups[0]
+
+  const books = useMemo(() => {
+    if (!active) return []
+    if (cat === 'leveltest') {
+      return catRows.filter((b) => (active.key === 'any' ? b.targetLevel == null : b.targetLevel === Number(active.key)))
+    }
+    return catRows.filter((b) => (active.key === 'any' ? b.targetTier == null : b.targetTier === active.key))
+  }, [catRows, cat, active])
+  // 강의 = 관리자 등록(DB)이 우선, 하나도 없으면 코드에 박힌 기본 목록.
+  //   ⚠️ 급수(CARIS)별 강의는 코드 목록엔 아예 없다 — 그건 DB 로만 채워진다.
+  const lectures = useMemo(() => {
+    if (!active) return []
+    const db = (dbLectures ?? []).filter((l) => l.catalog === cat)
+    if (db.length) {
+      return db
+        .filter((l) => (cat === 'leveltest'
+          ? (active.key === 'any' ? l.targetLevel == null : l.targetLevel === Number(active.key))
+          : (active.key === 'any' ? l.targetTier == null : l.targetTier === active.key)))
+        .map((l) => ({ id: l.youtubeId, title: l.title, channel: l.channel, level: l.targetLevel ?? 0 }))
+    }
+    return cat === 'leveltest' && active.key !== 'any' ? lecturesForLevel(Number(active.key)) : []
+  }, [cat, active, dbLectures])
+
+  // 한 화면에 **한 개씩**, 나머지는 페이지로 넘긴다(2026-08-11 결정 — 열 안 스크롤 대신).
+  //   ⚠️ 페이지 번호는 state 에 두되 **범위를 벗어나면 그때그때 접는다**(clamp). 레벨을 바꿀 때마다
+  //      useEffect 로 0 을 다시 밀어넣으면 렌더가 한 번 더 돌고, 그 사이 빈 화면이 스친다.
+  const bookPage = Math.min(bookPageRaw, Math.max(0, books.length - 1))
+  const lecPage = Math.min(lecPageRaw, Math.max(0, lectures.length - 1))
+  const pagedBooks = books.slice(bookPage, bookPage + 1)
+  const pagedLectures = lectures.slice(lecPage, lecPage + 1)
+  // ⚠️ 넘길 게 없으면 **undefined 를 넘긴다** — `<Pager>` 가 내부에서 null 을 반환해도 엘리먼트 객체 자체는
+  //    truthy 라, 꼬리말 자리가 "그릴 게 있다"고 판단해 빈 띠만 남는다.
+  const bookPager = books.length > 1 ? <Pager page={bookPage} total={books.length} onGo={setBookPage} t={t} /> : undefined
+  const lecPager = lectures.length > 1
+    ? <Pager page={lecPage} total={lectures.length} onGo={(p) => { setLecPage(p); setPlaying(null) }} t={t} />
+    : undefined
 
   // 로그인 수단이 구글만이 아니라서(카카오도 있음) 특정 provider 를 호출하지 않고 로그인 페이지로 보낸다.
   function goLogin() {
@@ -115,12 +214,20 @@ export default function Ebooks() {
   }
 
   const loading = !err && rows === null
-  const levelName = (k: LevelKey) => (k === 'any' ? t('ll.any_level') : `Lv.${k} ${t(`lv.${k}.name`)}`)
-  const levelDesc = level === 'any' ? t('ll.any_level_desc') : t(`lv.${level}.desc`)
+  const noBooks = t(cat === 'caris' ? 'll.no_books_tier' : 'll.no_books')
+  const noLectures = t(cat === 'caris' ? 'll.no_lectures_tier' : 'll.no_lectures')
+
+  // 레벨·급수를 바꾸면 목록이 통째로 갈리므로 페이지도 1쪽으로 돌린다(3쪽을 보다 옮겼는데 3쪽이 없는 칸이면 헷갈린다).
+  function pick(g: Group) {
+    setSel(g.key)
+    setPlaying(null)
+    setBookPage(0)
+    setLecPage(0)
+  }
 
   const bookList = (
     <ul className="divide-y divide-outline-variant/70">
-      {books.map((b) => (
+      {pagedBooks.map((b) => (
         <BookRow
           key={b.id}
           b={b}
@@ -136,7 +243,7 @@ export default function Ebooks() {
   )
   const lectureList = (
     <ul className="divide-y divide-outline-variant/70">
-      {lectures.map((lec) => (
+      {pagedLectures.map((lec) => (
         <LectureRow
           key={lec.id}
           lec={lec}
@@ -170,6 +277,26 @@ export default function Ebooks() {
             </p>
           </header>
 
+          {/* 카탈로그 전환 — 자격검정(CARIS) 교재와 레벨테스트 교재는 겨냥하는 시험이 다르다.
+              한 목록에 섞으면 왼쪽 열이 '레벨 7칸 + 급수 6칸' 13칸짜리가 돼 무엇을 고르는 화면인지 흐려진다. */}
+          <div
+            className="mb-4 inline-flex flex-wrap gap-1 rounded-full border border-outline-variant bg-surface-container-low p-1"
+            role="group"
+            aria-label={t('ll.catalog')}
+          >
+            {(['leveltest', 'caris'] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => { setCat(k); setPlaying(null); setBookPage(0); setLecPage(0) }}
+                aria-pressed={cat === k}
+                className={`rounded-full px-5 py-2.5 font-label-md text-[16px] font-bold tracking-tight transition-colors ${cat === k ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                {CATALOG_LABEL[k]}
+              </button>
+            ))}
+          </div>
+
           {msg && <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-5 py-3 font-body-md text-primary">{msg}</div>}
           {err && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
           {loading && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
@@ -179,27 +306,31 @@ export default function Ebooks() {
               {/* ── 넓은 화면: 레벨 | 교재 | 강의 3열.
                   ⚠️ 열 높이를 h-[...] 로 못박지 말 것. 레벨당 교재가 1권이라 화면 높이로 고정하면
                      한 줄 밑으로 수백 px 가 텅 빈 검은 상자가 된다(2026-08-06 그렇게 만들었다가 반려).
-                  ⚠️ items-start 도 필수 — 안 주면 세 열이 stretch 로 가장 긴 열(강의)에 맞춰져
-                     교재 열 아래가 또 빈다. 각 열은 자기 내용만큼만 서고, max-h 를 넘길 때만 스크롤한다.
+                  ⚠️ 교재·강의 **두 박스는 서로 높이를 맞춘다**(2026-08-11 요청) — 짧은 쪽이 긴 쪽만큼 선다.
+                     그래서 둘을 한 겹으로 묶었다(기본 stretch). 레벨 열은 여기 들어가지 않는다 —
+                     칸 수가 고정이라 같이 늘리면 아래가 통째로 빈다.
+                     ⚠️ 화면 높이에 맞춰 늘리는 게 아니다(그게 2026-08-06 반려된 것). **긴 쪽 내용만큼**이다.
                   ⚠️ "항목이 많아지면?" 은 표지·썸네일을 줄일 이유가 아니다 — 그건 이 열 스크롤(또는 나중에
                      페이지 나누기)이 푸는 문제다. 크기를 다시 줄이지 말 것. */}
-              <div className="hidden lg:flex gap-4 items-start [&>section]:max-h-[calc(100dvh-208px)]">
-                <Pane title={t('ll.level_col')} className="w-[276px] shrink-0">
+              {/* ⚠️ max-h 는 카탈로그 전환 버튼 줄(52px + 여백 16)까지 뺀 값이다 — 위에 뭘 더 얹으면 여기도 다시 잴 것.
+                  두 열을 묶은 겹에도 같이 걸린다(&>*) — 안 걸면 그 겹만 화면 밖으로 자란다. */}
+              <div className="hidden lg:flex gap-4 items-start [&>*]:max-h-[calc(100dvh-276px)]">
+                <Pane title={t(cat === 'caris' ? 'll.tier_col' : 'll.level_col')} className="w-[276px] shrink-0">
                   <ul className="p-2.5">
-                    {levels.map((lv) => {
-                      const on = lv.key === level
+                    {groups.map((g) => {
+                      const on = g.key === active?.key
                       return (
-                        <li key={String(lv.key)}>
+                        <li key={g.key}>
                           <button
                             type="button"
-                            onClick={() => { setLevel(lv.key); setPlaying(null) }}
+                            onClick={() => pick(g)}
                             aria-current={on ? 'true' : undefined}
                             className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${on ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}
                           >
-                            <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: lv.color, opacity: on ? 1 : 0.42 }} />
+                            <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
                             <span className="min-w-0 flex-1">
-                              <span className={`block truncate font-title-md text-[17px] ${on ? 'font-bold' : 'font-semibold'}`}>{levelName(lv.key)}</span>
-                              <span className="mt-0.5 block font-body-md text-[14px] text-outline">{t('ll.count', { b: lv.books, v: lv.lectures })}</span>
+                              <span className={`block truncate font-title-md text-[17px] ${on ? 'font-bold' : 'font-semibold'}`}>{g.label}</span>
+                              <span className="mt-0.5 block font-body-md text-[14px] text-outline">{t('ll.count', { b: g.books, v: g.lectures })}</span>
                             </span>
                           </button>
                         </li>
@@ -208,40 +339,58 @@ export default function Ebooks() {
                   </ul>
                 </Pane>
 
-                <Pane title={t('ll.books')} count={books.length} className="flex-1 min-w-0">
-                  {books.length === 0 ? <PaneEmpty text={t('ll.no_books')} /> : bookList}
-                </Pane>
+                {/* 교재·강의를 묶는 겹. 이 겹의 높이 = 둘 중 긴 쪽이고, 두 열이 그 높이로 함께 선다. */}
+                <div className="flex min-w-0 flex-1 gap-4">
+                  <Pane
+                    title={t('ll.books')}
+                    count={books.length}
+                    className="flex-1 min-w-0"
+                    pager={bookPager}
+                  >
+                    {books.length === 0 ? <PaneEmpty text={noBooks} /> : bookList}
+                  </Pane>
 
-                <Pane title={t('ll.lectures')} count={lectures.length} className="flex-1 min-w-0" foot={t('ll.demo_note')}>
-                  {lectures.length === 0 ? <PaneEmpty text={t('ll.no_lectures')} /> : lectureList}
-                </Pane>
+                  {/* 데모 안내 꼬리말은 강의가 실제로 있을 때만 — 한 편도 없는 칸(CARIS 급수·레벨 무관)에서는
+                      없는 영상을 두고 "샘플입니다" 라고 말하는 꼴이 된다. */}
+                  <Pane
+                    title={t('ll.lectures')}
+                    count={lectures.length}
+                    className="flex-1 min-w-0"
+                    foot={lectures.length ? t('ll.demo_note') : undefined}
+                    pager={lecPager}
+                  >
+                    {lectures.length === 0 ? <PaneEmpty text={noLectures} /> : lectureList}
+                  </Pane>
+                </div>
               </div>
 
               {/* ── 좁은 화면: 레벨은 가로 칩, 교재/강의는 탭 하나로 접는다. */}
               <div className="lg:hidden">
                 <div className="mb-3 flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {levels.map((lv) => {
-                    const on = lv.key === level
+                  {groups.map((g) => {
+                    const on = g.key === active?.key
                     return (
                       <button
-                        key={String(lv.key)}
+                        key={g.key}
                         type="button"
-                        onClick={() => { setLevel(lv.key); setPlaying(null) }}
+                        onClick={() => pick(g)}
                         className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 font-label-md text-[16px] transition-colors ${on ? 'bg-surface-container-high text-on-surface font-bold' : 'text-on-surface-variant'}`}
                       >
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: lv.color, opacity: on ? 1 : 0.42 }} />
-                        {lv.key === 'any' ? t('ll.any_level') : `Lv.${lv.key}`}
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
+                        {g.short}
                       </button>
                     )
                   })}
                 </div>
 
-                <p className="mb-3 px-1 font-body-md text-[16px] leading-[24px] text-on-surface-variant break-keep">
-                  <b className="text-on-surface">{levelName(level)}</b> — {levelDesc}
-                </p>
+                {active && (
+                  <p className="mb-3 px-1 font-body-md text-[16px] leading-[24px] text-on-surface-variant break-keep">
+                    <b className="text-on-surface">{active.label}</b> — {active.desc}
+                  </p>
+                )}
 
                 {/* 여기도 h-[...] 고정 금지 — 위 3열과 같은 이유(항목 1개일 때 빈 검은 상자가 된다). */}
-                <div className="flex flex-col max-h-[calc(100dvh-268px)] rounded-2xl border border-outline-variant bg-surface-container-low ambient-shadow overflow-hidden">
+                <div className="flex flex-col max-h-[calc(100dvh-336px)] rounded-2xl border border-outline-variant bg-surface-container-low ambient-shadow overflow-hidden">
                   <div className="flex shrink-0 border-b border-outline-variant/70">
                     {(['books', 'lectures'] as const).map((k) => (
                       <button
@@ -257,11 +406,17 @@ export default function Ebooks() {
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
                     {pane === 'books'
-                      ? (books.length === 0 ? <PaneEmpty text={t('ll.no_books')} /> : bookList)
-                      : (lectures.length === 0 ? <PaneEmpty text={t('ll.no_lectures')} /> : lectureList)}
+                      ? (books.length === 0 ? <PaneEmpty text={noBooks} /> : bookList)
+                      : (lectures.length === 0 ? <PaneEmpty text={noLectures} /> : lectureList)}
                   </div>
-                  {pane === 'lectures' && (
-                    <p className="shrink-0 border-t border-outline-variant/70 px-4 py-2.5 font-body-md text-[14px] text-outline">{t('ll.demo_note')}</p>
+                  {/* 꼬리말 = 안내문(강의 탭에서만) + 지금 보고 있는 탭의 페이지 넘김. 둘 다 없으면 띠 자체를 안 그린다. */}
+                  {((pane === 'lectures' && lectures.length > 0) || (pane === 'books' ? bookPager : lecPager)) && (
+                    <div className="shrink-0 flex items-center justify-between gap-3 border-t border-outline-variant/70 px-4 py-2">
+                      <p className="min-w-0 font-body-md text-[14px] text-outline">
+                        {pane === 'lectures' && lectures.length > 0 ? t('ll.demo_note') : ''}
+                      </p>
+                      {pane === 'books' ? bookPager : lecPager}
+                    </div>
                   )}
                 </div>
               </div>
@@ -313,13 +468,15 @@ export default function Ebooks() {
   )
 }
 
-/** 열 한 칸 — 머리말(고정) + 본문(넘칠 때만 자기 안에서 세로 스크롤) + 선택적 꼬리말. */
+/** 열 한 칸 — 머리말(고정) + 본문 + 꼬리말(안내문 왼쪽 · 페이지 넘김 오른쪽).
+ *  본문은 한 번에 한 항목이라 보통 안 넘치지만, 항목 자체가 화면보다 길면 그때는 여기서 스크롤한다. */
 function Pane({
-  title, count, foot, className = '', children,
+  title, count, foot, pager, className = '', children,
 }: {
   title: string
   count?: number
   foot?: string
+  pager?: React.ReactNode
   className?: string
   children: React.ReactNode
 }) {
@@ -333,10 +490,27 @@ function Pane({
         {count !== undefined && <span className="font-body-md text-[15px] text-outline">{count}</span>}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</div>
-      {foot && (
-        <p className="shrink-0 border-t border-outline-variant/70 px-4 py-2.5 font-body-md text-[14px] text-outline">{foot}</p>
+      {(foot || pager) && (
+        <div className="shrink-0 flex items-center justify-between gap-3 border-t border-outline-variant/70 px-4 py-2">
+          <p className="min-w-0 font-body-md text-[14px] text-outline">{foot ?? ''}</p>
+          {pager}
+        </div>
       )}
     </section>
+  )
+}
+
+/** 페이지 넘김 — 한 페이지에 한 개라 페이지 수 = 항목 수다. 한 개뿐이면 아예 그리지 않는다. */
+function Pager({ page, total, onGo, t }: { page: number; total: number; onGo: (p: number) => void; t: TFunc }) {
+  if (total <= 1) return null
+  const btn = 'flex h-9 w-9 items-center justify-center rounded-lg text-[20px] leading-none text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-30 disabled:hover:bg-transparent'
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <button type="button" onClick={() => onGo(page - 1)} disabled={page <= 0} aria-label={t('ll.prev')} className={btn}>‹</button>
+      {/* tabular-nums — 자릿수가 바뀌어도 버튼이 좌우로 흔들리지 않는다. */}
+      <span className="px-1.5 font-body-md text-[15px] tabular-nums text-on-surface-variant">{page + 1} / {total}</span>
+      <button type="button" onClick={() => onGo(page + 1)} disabled={page >= total - 1} aria-label={t('ll.next')} className={btn}>›</button>
+    </div>
   )
 }
 
@@ -345,7 +519,8 @@ function PaneEmpty({ text }: { text: string }) {
 }
 
 /** 교재 한 줄 — 표지(탭하면 확대) + 제목 + 가격/버튼.
- *    표지는 열 폭의 1/3 정도로 크게 세운다. 목록이라고 썸네일을 줄이면 표지 글자가 아무 데서도 안 읽힌다. */
+ *    표지 폭은 강의 썸네일과 같은 MEDIA_W 다(2026-08-11 — 두 열의 항목 크기를 맞췄다).
+ *    목록이라고 더 줄이지 말 것 — 표지 글자가 아무 데서도 안 읽힌다. */
 function BookRow({
   b, t, lang, busy, onZoom, onBuy, onLibrary,
 }: {
@@ -360,8 +535,9 @@ function BookRow({
   return (
     <li className="flex gap-4 px-4 py-4 transition-colors hover:bg-surface-container/60">
       {/* self-start 필수 — flex 자식 기본값 stretch 라 표지 박스가 줄 높이만큼 늘어나 A4 비율이 깨진다. */}
-      <button type="button" onClick={onZoom} aria-label={t('ebook.cover_zoom')} className="w-[34%] max-w-[168px] shrink-0 self-start cursor-zoom-in">
-        <EbookCover title={b.title} coverUrl={b.coverUrl} width={336} className="w-full" />
+      <button type="button" onClick={onZoom} aria-label={t('ebook.cover_zoom')} className={`${MEDIA_W} cursor-zoom-in`}>
+        {/* width = 표시 폭(약 222)의 2배 — 고밀도 화면에서 표지 글자가 뭉개지지 않게 스토리지 변환으로 받는다. */}
+        <EbookCover title={b.title} coverUrl={b.coverUrl} width={444} className="w-full" />
       </button>
       <div className="flex min-w-0 flex-1 flex-col">
         <h3 className="font-title-md text-[19px] font-bold text-on-surface break-keep line-clamp-2">{b.title}</h3>
@@ -396,9 +572,11 @@ function BookRow({
   )
 }
 
-/** 강의 한 줄 — 열 폭을 꽉 채운 16:9 썸네일 + 제목. 누르면 **그 자리에서** 유튜브 플레이어로 바뀐다.
- *    처음부터 iframe 을 깔지 않는 이유: 줄 수만큼 플레이어가 로드돼 열이 눈에 띄게 무거워진다.
- *    ⚠️ 목록이라고 썸네일을 작게 줄이지 말 것 — 강의가 많아지는 건 이 열의 스크롤이 푸는 문제다. */
+/** 강의 한 줄 — **열 폭을 꽉 채운 가로 16:9 썸네일** + 그 **밑에** 제목·채널(2026-08-11 지시).
+ *    누르면 그 자리에서 유튜브 플레이어로 바뀐다. 처음부터 iframe 을 깔지 않는 이유:
+ *    줄 수만큼 플레이어가 로드돼 열이 눈에 띄게 무거워진다.
+ *    ⚠️ 교재 표지처럼 왼쪽으로 세우지 말 것 — 영상은 가로가 긴 물건이라 옆에 글을 붙이면 그림이 작아진다.
+ *       (표지는 계속 왼쪽 + 오른쪽 글. 두 열은 **박스 높이**로 맞추지 항목 배치로 맞추지 않는다.) */
 function LectureRow({
   lec, t, playing, onPlay,
 }: {

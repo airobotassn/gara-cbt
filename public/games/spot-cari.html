@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>가려내라 CARI — 확산 저지</title>
+<!--
+  ─────────────────────────────────────────────────────────────
+  가려내라 CARI (spot-cari) — 프로토타입 v2
+  ─────────────────────────────────────────────────────────────
+  v1 은 "답 두 개 중 거짓 고르기" 였고, 그건 게임이 아니라 퀴즈였다(고르면 글자가 나옴).
+  v2 의 규칙: **거짓말은 가만두면 퍼진다.**
+    · 화면 아래 마을 CARI 16명. 답을 못 고르는 동안 거짓이 한 명씩 물들인다.
+    · 거짓을 지목하면 그 자리에서 터진다. 진짜를 지목하면 두 명이 한꺼번에 물든다.
+    · 전원 물들면 끝. 시간 제한이 아니라 **버티기**다 — 오래 버틸수록 점수.
+  주제와 연출이 같은 말을 하게 만든 것이 v2 의 핵심:
+  환각은 틀렸다는 게 문제가 아니라 **빨리 안 잡으면 번진다는 것**이 문제다.
+
+  ⚠️ 문항 설계 원칙 — 거짓은 반드시 그럴듯해야 한다. 네 가지 방식으로만 만든다:
+     ① 원인·결과 뒤바꾸기 ② 비슷한 개념 바꿔치기 ③ '항상·전혀' 과한 단정 ④ 숫자 조작
+  ⚠️ 캔버스에 글자를 그리지 않는다 — 전부 DOM 이라 나중에 번역이 통째로 덮인다.
+  지표: 점수 (버틴 라운드 × 콤보 × 속도)
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(120% 80% at 50% -10%, #1b2547 0%, #101731 55%, #0a0f22 100%);
+    color:#e7edfb;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;
+  }
+  /* 앱 안에서는 세로 화면 iframe 이지만, 파일을 그냥 열면 데스크톱 전체 폭이 된다.
+     폭을 안 묶으면 요소가 화면 양 끝으로 흩어져 한눈에 안 들어온다. */
+  #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 80px -20px rgba(0,0,0,.45)}
+
+  /* 오염이 번지면 화면 가장자리부터 붉게 스며든다 — 숫자 말고 이걸로 위기를 읽게 한다 */
+  #vig{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;
+    background:radial-gradient(120% 90% at 50% 108%, rgba(255,60,40,.55) 0%, rgba(255,40,30,.18) 42%, transparent 72%);
+    transition:opacity .5s}
+  #flash{position:absolute;inset:0;z-index:6;pointer-events:none;background:#ff3b2a;opacity:0}
+  #flash.on{animation:fl .42s ease-out}
+  @keyframes fl{0%{opacity:.30}100%{opacity:0}}
+
+  /* ── HUD ─────────────────────────────────── */
+  .hud{flex:0 0 auto;padding:11px 14px 6px;position:relative;z-index:10}
+  .hudrow{display:flex;align-items:flex-end;gap:10px}
+  .score{font-size:24px;font-weight:900;letter-spacing:-.02em;line-height:1}
+  .score small{font-size:11px;font-weight:800;color:#7d8dba;margin-left:3px}
+  .rnd{font-size:11px;font-weight:800;color:#7d8dba;letter-spacing:.05em;margin-bottom:2px}
+  .combo{margin-left:auto;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:900;
+    background:rgba(255,255,255,.07);color:#8fa3d0;transition:transform .15s}
+  .combo.hot{background:linear-gradient(#ffb020,#ff7a1a);color:#2a1400;box-shadow:0 0 18px rgba(255,140,30,.5)}
+  .combo.pop{transform:scale(1.18)}
+
+  /* ── 문항 ────────────────────────────────── */
+  .body{flex:1 1 auto;display:flex;flex-direction:column;gap:9px;padding:4px 14px 8px;min-height:0;position:relative;z-index:10}
+  .qwrap{flex:0 0 auto;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+    border-radius:14px;padding:11px 13px}
+  .qlab{font-size:10px;font-weight:900;letter-spacing:.1em;color:#7d8dba;margin:0 0 4px}
+  .q{margin:0;font-size:14.5px;font-weight:800;line-height:1.45;letter-spacing:-.01em;word-break:keep-all}
+
+  .opts{flex:1 1 auto;display:flex;flex-direction:column;gap:9px;min-height:0}
+  .opt{position:relative;flex:1 1 0;display:flex;align-items:center;gap:10px;padding:10px 13px 10px 10px;
+    border-radius:15px;cursor:pointer;overflow:hidden;
+    background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.10);color:#e7edfb;
+    font:inherit;text-align:left;transition:transform .08s,border-color .15s,background .15s}
+  .opt:active{transform:translateY(1px)}
+  .opt .face{flex:0 0 auto;width:46px;height:46px;position:relative}
+  .opt .face svg{width:100%;height:100%;display:block;animation:bob 2.6s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .opt .a{font-size:13px;font-weight:700;line-height:1.5;word-break:keep-all}
+  .opt.hit{border-color:#ff5a48;background:rgba(255,90,72,.2);animation:burst .5s ease-out forwards}
+  @keyframes burst{0%{transform:scale(1)}35%{transform:scale(1.04)}100%{transform:scale(.9);opacity:0}}
+  .opt.wrong{border-color:#ff5a48;animation:shk .4s}
+  @keyframes shk{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+  .opt.safe{border-color:#12c476;background:rgba(18,196,118,.14)}
+  .opts.locked .opt{cursor:default}
+
+  /* 거짓 쪽에서 스멀스멀 새어 나오는 기운 — 정답을 알려주진 않고(양쪽 다 뜬다) 시간이 간다는 것만 보여준다 */
+  .creep{position:absolute;left:0;top:0;bottom:0;width:0%;pointer-events:none;
+    background:linear-gradient(90deg,rgba(255,60,40,.30),rgba(255,60,40,0));transition:width .9s linear}
+
+  /* ── 마을(군중) ──────────────────────────── */
+  .town{flex:0 0 auto;padding:9px 12px calc(11px + env(safe-area-inset-bottom));position:relative;z-index:10;
+    background:linear-gradient(rgba(10,15,34,0),rgba(10,15,34,.75) 40%)}
+  .townhead{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .townhead b{font-size:11px;font-weight:900;letter-spacing:.06em;color:#8fa3d0}
+  .townhead i{margin-left:auto;font-style:normal;font-size:11.5px;font-weight:900;color:#ff9a8a}
+  .crowd{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}
+  .cz{aspect-ratio:1;position:relative}
+  .cz svg{width:100%;height:100%;display:block;transition:filter .35s,opacity .35s}
+  .cz.sick svg{filter:hue-rotate(-52deg) saturate(3.4) brightness(.86)}
+  .cz.just{animation:infect .5s ease-out}
+  @keyframes infect{0%{transform:scale(1)}30%{transform:scale(1.32) rotate(-9deg)}100%{transform:scale(1)}}
+
+  /* ── 해설 ────────────────────────────────── */
+  /* ⚠️ 시트가 미끄러져 나가는 동안에도 버튼이 눌려서 두 번 탭하면 한 단계를 건너뛴다.
+     보이지 않을 때는 클릭을 안 받게 막는다. */
+  .fb{position:absolute;left:14px;right:14px;bottom:14px;z-index:30;
+    background:#151d3a;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:12px 14px;
+    box-shadow:0 20px 44px -18px rgba(0,0,0,.9);transform:translateY(140%);
+    pointer-events:none;transition:transform .22s cubic-bezier(.2,.9,.3,1)}
+  .fb.on{transform:translateY(0);pointer-events:auto}
+  .fbhead{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .fbhead b{font-size:14px;font-weight:900;letter-spacing:-.01em}
+  .fbhead .plus{margin-left:auto;font-size:14px;font-weight:900;color:#7ee0a0}
+  .fb.no .fbhead b{color:#ff9a8a} .fb.no .plus{color:#ff9a8a}
+  .fb.yes .fbhead b{color:#7ee0a0}
+  .fbwhy{margin:0;font-size:12.5px;font-weight:700;line-height:1.55;color:#b9c7ea;word-break:keep-all}
+  .fbwhy em{font-style:normal;color:#ffd08a;font-weight:900}
+
+  /* ── 오버레이 ────────────────────────────── */
+  .ov{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:18px;
+    background:rgba(6,10,24,.74);backdrop-filter:blur(4px)}
+  .hidden{display:none}
+  .sheet{width:100%;max-width:400px;max-height:100%;overflow-y:auto;
+    background:linear-gradient(#1a2445,#131a35);border:1px solid rgba(255,255,255,.12);
+    border-radius:20px;padding:20px 18px;box-shadow:0 26px 60px -20px rgba(0,0,0,.9)}
+  .art{width:74px;height:74px;display:block;margin:0 auto}
+  .ttl{text-align:center;font-size:23px;font-weight:900;letter-spacing:-.03em;margin:10px 0 4px}
+  .ttl i{font-style:normal;color:#7ec8ff}
+  .lead{text-align:center;font-size:13.5px;font-weight:700;line-height:1.6;color:#9fb0d8;margin:0 0 14px}
+  .rules{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .rules li{display:flex;gap:9px;align-items:flex-start;font-size:13px;font-weight:700;line-height:1.5;
+    background:rgba(255,255,255,.05);border-radius:11px;padding:9px 11px;color:#cbd6f0}
+  .rules li span{flex:0 0 auto;color:#7ec8ff}
+  .stats{display:flex;gap:8px;margin:0 0 14px}
+  .stat{flex:1;background:rgba(255,255,255,.05);border-radius:13px;padding:11px 8px;text-align:center}
+  .stat b{display:block;font-size:21px;font-weight:900;letter-spacing:-.02em;line-height:1.1}
+  .stat span{display:block;font-size:10px;font-weight:800;color:#7d8dba;margin-top:4px;letter-spacing:.04em}
+  .bigscore{text-align:center;font-size:46px;font-weight:900;letter-spacing:-.03em;color:#7ec8ff;line-height:1}
+  .biglab{text-align:center;font-size:11.5px;font-weight:800;color:#7d8dba;margin:5px 0 12px;letter-spacing:.06em}
+  .note{background:rgba(126,200,255,.10);border:1px solid rgba(126,200,255,.24);border-radius:12px;
+    padding:10px 12px;font-size:12.5px;line-height:1.6;font-weight:700;color:#a8cdf2;margin-bottom:14px}
+  .btn{width:100%;padding:13px;border:0;border-radius:13px;cursor:pointer;
+    background:linear-gradient(#3a8bff,#1f63e0);color:#fff;font:900 14.5px/1 system-ui,sans-serif;
+    box-shadow:0 4px 0 #14459e}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #14459e}
+  .newbest{text-align:center;font-size:12px;font-weight:900;color:#ffd08a;margin:-6px 0 12px;letter-spacing:.04em}
+
+  .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
+    padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.12);color:#e7edfb}
+  .mg-rank.on{display:inline-flex}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="vig"></div>
+  <div id="flash"></div>
+
+  <div class="hud">
+    <div class="hudrow">
+      <div>
+        <div class="rnd">라운드 <b id="rndEl">1</b></div>
+        <span class="score" id="scoreEl">0<small>점</small></span>
+      </div>
+      <span class="combo" id="comboEl">연속 0</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="qwrap">
+      <p class="qlab">CARI 둘이 서로 다른 말을 한다</p>
+      <p class="q" id="qEl">—</p>
+    </div>
+    <div class="opts" id="opts">
+      <button class="opt" data-i="0"><span class="creep"></span><span class="face"></span><span class="a"></span></button>
+      <button class="opt" data-i="1"><span class="creep"></span><span class="face"></span><span class="a"></span></button>
+    </div>
+  </div>
+
+  <div class="town">
+    <div class="townhead"><b>마을</b><i id="sickEl">0 / 16 물듦</i></div>
+    <div class="crowd" id="crowd"></div>
+  </div>
+
+  <div class="fb" id="fb">
+    <div class="fbhead"><b id="fbTtl">—</b><span class="plus" id="fbPlus"></span></div>
+    <p class="fbwhy" id="fbWhy">—</p>
+  </div>
+</div>
+
+<!-- 인트로 -->
+<div class="ov" id="startOv">
+  <div class="sheet">
+    <div id="sArt"></div>
+    <p class="ttl">가려내라 <i>CARI</i></p>
+    <p class="lead">거짓말은 가만두면 퍼진다.<br/>마을이 다 물들기 전에 잡아라.</p>
+    <ul class="rules">
+      <li><span>①</span><div>CARI 둘이 서로 다른 말을 한다. 하나는 <b>사실</b>, 하나는 <b>지어낸 말</b>.</div></li>
+      <li><span>②</span><div>고민하는 동안 거짓이 <b>마을 사람을 한 명씩 물들인다</b>. 라운드가 갈수록 빨라진다.</div></li>
+      <li><span>③</span><div>거짓을 지목하면 터진다. <b>진짜를 지목하면 두 명이 한꺼번에</b> 물든다.</div></li>
+      <li><span>④</span><div>16명이 다 물들면 끝. 빨리 잡을수록 점수가 높다.</div></li>
+    </ul>
+    <button class="btn" id="startBtn">시작하기</button>
+  </div>
+</div>
+
+<!-- 결과 -->
+<div class="ov hidden" id="overOv">
+  <div class="sheet">
+    <div id="oArt"></div>
+    <p class="ttl" id="oTtl">마을이 다 물들었다</p>
+    <p class="bigscore" id="oScore">0</p>
+    <p class="biglab">점수</p>
+    <p class="newbest hidden" id="newbest">최고 기록 경신!</p>
+    <div class="stats">
+      <div class="stat"><b id="oRnd">0</b><span>버틴 라운드</span></div>
+      <div class="stat"><b id="oAcc">0%</b><span>적중률</span></div>
+      <div class="stat"><b id="oCombo">0</b><span>최고 연속</span></div>
+    </div>
+    <div class="note" id="oNote">—</div>
+    <button class="btn" id="againBtn">다시 하기</button>
+  </div>
+</div>
+
+<script>
+/* ================= CARI mascot (기존 게임과 동일 자산) ================= */
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+/* 마을 사람 — 16개를 그려야 하므로 형태만 남긴 경량 버전(감염은 CSS 필터로 붉힌다) */
+function miniCari(){
+  return `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="12" r="5" fill="#e9e3d6"/><circle cx="32" cy="12" r="5" fill="#e9e3d6"/>
+    <circle cx="8" cy="12" r="2.6" fill="#9fb6de"/><circle cx="32" cy="12" r="2.6" fill="#9fb6de"/>
+    <path d="M20 5 C30 5 35 11.5 35 20 C35 27.5 31 33 20 33 C9 33 5 27.5 5 20 C5 11.5 10 5 20 5Z"
+          fill="#f4efe4" stroke="#cfc6b4" stroke-width="1.1"/>
+    <ellipse cx="20" cy="18.5" rx="10" ry="9" fill="#141a2b"/>
+    <ellipse cx="16" cy="18" rx="2.4" ry="3" fill="#d3ecff"/><ellipse cx="24" cy="18" rx="2.4" ry="3" fill="#d3ecff"/>
+  </svg>`;
+}
+
+/* ===================== 문제 풀 =====================
+   {q, real, fake, why} — why 는 "왜 틀렸나" 가 아니라 "어떻게 알아채나" 를 적는다.
+   ⚠️ real 과 fake 는 길이를 비슷하게 맞춘다. 한쪽만 길면 길이로 찍게 된다.
+================================================== */
+const POOL=[
+ {q:'딥러닝 모델의 층(layer)을 늘리면 어떻게 되나?',
+  real:'복잡한 패턴을 배울 수 있지만, 데이터가 부족하면 과적합이 심해진다.',
+  fake:'층이 깊어질수록 정확도는 항상 오르며, 과적합은 층 수와 무관하다.',
+  why:'<em>“항상”, “무관하다”</em> 같은 단정이 나오면 의심하라. 기술 설명은 거의 언제나 조건부다.'},
+ {q:'GPU 가 딥러닝에 유리한 이유는?',
+  real:'같은 연산을 수천 개씩 동시에 처리하는 병렬 구조라 행렬 연산에 강하다.',
+  fake:'코어 하나하나가 CPU 보다 훨씬 빨라 순차 계산을 빠르게 끝내기 때문이다.',
+  why:'GPU 코어는 오히려 CPU 코어보다 느리다. 강점은 <em>속도가 아니라 병렬성</em>이다.'},
+ {q:'로봇의 자유도(DOF)란?',
+  real:'로봇이 독립적으로 움직일 수 있는 방향·축의 개수를 뜻한다.',
+  fake:'로봇이 사람 개입 없이 스스로 판단하는 정도를 0~1 로 나타낸 값이다.',
+  why:'자유도는 <em>자율성이 아니라 기구학</em>의 용어다. 어감으로 바꿔치기하는 수법.'},
+ {q:'SLAM 이 하는 일은?',
+  real:'이동하면서 지도를 만드는 동시에 그 지도 안 자기 위치를 추정한다.',
+  fake:'미리 만들어둔 정밀 지도를 내려받아 그 위에서 자기 위치만 맞춘다.',
+  why:'미리 만든 지도를 쓰면 그건 단순 측위다. <em>지도와 위치를 “동시에”</em> 가 핵심.'},
+ {q:'LLM 이 환각을 일으키는 근본 이유는?',
+  real:'사실을 조회하는 게 아니라 다음에 올 그럴듯한 말을 확률로 이어붙이기 때문이다.',
+  fake:'학습에 없던 질문이면 내부에 “모름” 신호가 떠서 임의의 답을 뽑기 때문이다.',
+  why:'모델 안에 <em>“모름” 신호는 없다.</em> 그래서 모를 때도 평소처럼 자신 있게 말한다.'},
+ {q:'파인튜닝과 프롬프트 엔지니어링의 차이는?',
+  real:'파인튜닝은 모델 가중치를 바꾸고, 프롬프트는 모델을 둔 채 입력만 바꾼다.',
+  fake:'둘 다 가중치를 바꾸는데 파인튜닝이 더 많은 층을 한꺼번에 바꾼다.',
+  why:'프롬프트는 <em>가중치를 안 건드린다.</em> 그래서 즉시 되돌릴 수 있고 비용도 거의 없다.'},
+ {q:'과적합을 줄이는 방법으로 맞는 것은?',
+  real:'데이터를 늘리거나, 모델을 단순하게 하거나, 학습을 일찍 멈춘다.',
+  fake:'학습을 더 오래 돌려서 학습 손실값을 끝까지 낮춘다.',
+  why:'오래 돌릴수록 학습 데이터에 달라붙는다 — <em>과적합은 심해진다.</em> 방향이 반대다.'},
+ {q:'라이다(LiDAR)의 측정 원리는?',
+  real:'레이저를 쏘고 반사되어 돌아오는 시간을 재서 거리를 계산한다.',
+  fake:'주변 사물이 내뿜는 적외선 열을 감지해 거리와 형상을 계산한다.',
+  why:'열을 읽는 건 열화상 카메라다. 라이다는 <em>스스로 빛을 쏘는</em> 능동 센서.'},
+ {q:'강화학습의 학습 신호는?',
+  real:'행동의 결과로 받는 보상. 정답이 아니라 잘했다/못했다는 점수다.',
+  fake:'각 상황마다 사람이 미리 붙여둔 “이럴 땐 이렇게” 정답 행동 라벨이다.',
+  why:'정답 라벨로 배우면 그건 <em>지도학습</em>이다. 강화학습엔 정답이 없다.'},
+ {q:'협동로봇이 사람 옆에서 안전한 이유는?',
+  real:'힘과 토크를 감지해 부딪히면 즉시 멈추도록 출력이 제한돼 있다.',
+  fake:'사람이 가까이 오면 전원이 자동 차단돼 전기가 흐르지 않기 때문이다.',
+  why:'전원을 끊으면 팔이 <em>그대로 떨어진다.</em> 끊는 게 아니라 힘을 제한하는 쪽이다.'},
+ {q:'디지털 트윈이란?',
+  real:'실제 설비·공정을 가상 공간에 복제해 시뮬레이션하고 예측한다.',
+  fake:'같은 사양의 실물 설비를 하나 더 만들어 예비로 돌려두는 방식이다.',
+  why:'트윈은 <em>가상</em>이다. 실물을 하나 더 두는 건 이중화로 다른 개념.'},
+ {q:'엣지 컴퓨팅을 쓰는 이유는?',
+  real:'데이터가 생기는 기기 근처에서 처리해 지연시간과 통신량을 줄인다.',
+  fake:'클라우드보다 훨씬 큰 연산 자원으로 더 무거운 모델을 돌리기 위해서다.',
+  why:'엣지는 오히려 <em>자원이 작다.</em> 얻는 건 성능이 아니라 속도와 독립성.'},
+ {q:'토크(torque)란?',
+  real:'회전축을 중심으로 물체를 돌리려는 힘을 말한다.',
+  fake:'모터의 축이 1분 동안 회전하는 횟수를 나타내는 값이다.',
+  why:'1분당 회전수는 <em>회전속도(RPM)</em>다. 힘과 속도를 바꿔치기한 함정.'},
+ {q:'역기구학(IK)이 푸는 문제는?',
+  real:'손끝을 원하는 위치에 두려면 각 관절을 몇 도로 돌려야 하는지 구한다.',
+  fake:'각 관절 각도가 주어졌을 때 손끝이 최종적으로 어디에 오는지 구한다.',
+  why:'그건 <em>순기구학(FK)</em>이다. 방향이 정반대인데 문장만 보면 둘 다 그럴듯하다.'},
+ {q:'멀티모달 모델이란?',
+  real:'이미지·텍스트·음성처럼 종류가 다른 데이터를 함께 입력받아 이해한다.',
+  fake:'여러 개의 모델을 동시에 돌려 그 결과를 투표로 합치는 방식이다.',
+  why:'여러 모델의 투표는 <em>앙상블</em>이다. 멀티모달은 입력 종류가 여럿인 것.'},
+ {q:'트랜스포머가 RNN 보다 학습이 빠른 이유는?',
+  real:'단어들을 순서대로 하나씩이 아니라 한 번에 병렬로 처리할 수 있어서다.',
+  fake:'앞 단어를 참조하지 않아 계산량 자체가 크게 줄어들기 때문이다.',
+  why:'어텐션은 오히려 <em>모든 단어를 서로 참조</em>한다. 이득은 병렬성에서 온다.'},
+ {q:'학습 데이터에 특정 집단이 거의 없으면?',
+  real:'그 집단에서만 성능이 떨어지는 편향이 생기고, 겉으로 잘 안 드러난다.',
+  fake:'모델이 부족한 부분을 자동으로 보정해 전체적으로 균형을 맞춘다.',
+  why:'<em>자동 보정 같은 건 없다.</em> 데이터에 없으면 모델도 모른다.'},
+ {q:'피지컬 AI 가 기존 AI 와 다른 점은?',
+  real:'화면 안이 아니라 실제 몸을 갖고 물리 세계와 직접 상호작용한다.',
+  fake:'물리 법칙 계산만 전담하고 언어나 이미지는 다루지 않는다.',
+  why:'피지컬 AI 도 언어·시각을 쓴다. 차이는 <em>다루는 것이 아니라 실체</em>다.'},
+ {q:'임베딩(embedding)이란?',
+  real:'단어나 문장을 의미가 가까울수록 가까이 놓이는 숫자 벡터로 바꾼 것이다.',
+  fake:'모델을 작은 기기에 넣을 수 있게 크기를 줄여 심는 경량화 기법이다.',
+  why:'기기에 심어 줄이는 건 <em>경량화·온디바이스</em>다. 영어 어감으로 낚는 함정.'},
+ {q:'엔드 이펙터(end effector)란?',
+  real:'로봇팔 끝에 붙어 실제 작업을 하는 도구 부분(그리퍼·용접건 등)이다.',
+  fake:'로봇의 동작 순서를 마지막에 정리해 실행하는 제어 소프트웨어다.',
+  why:'“end” 를 <em>마지막 단계</em>로 읽게 만든 함정. 실제로는 팔의 물리적 끝이다.'}
+];
+
+/* ===================== 상태 ===================== */
+const $=id=>document.getElementById(id);
+const TOWN=16;            // 마을 인구 = 목숨
+const SPREAD0=3400;       // 1라운드 확산 간격(ms)
+const SPREAD_MIN=1100;    // 아무리 빨라져도 이 밑으로는 안 간다
+const SPREAD_STEP=180;    // 라운드마다 줄어드는 간격
+const WRONG_COST=2;       // 진짜를 지목했을 때 한꺼번에 물드는 사람 수
+
+let deck=[],cur=null,score=0,combo=0,bestCombo=0,hit=0,tried=0,round=1;
+let sick=0,spreadTimer=null,roundStart=0,locked=true,playing=false;
+let best=(()=>{try{return +localStorage.getItem('cari_spot_best')||0}catch(e){return 0}})();
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+function mult(){return Math.min(5,1+Math.floor(combo/3));}
+function spreadMs(){return Math.max(SPREAD_MIN, SPREAD0-(round-1)*SPREAD_STEP);}
+
+function buildTown(){
+  $('crowd').innerHTML=Array.from({length:TOWN},(_,i)=>`<div class="cz" data-i="${i}">${miniCari()}</div>`).join('');
+}
+function renderTown(){
+  $('sickEl').textContent=`${sick} / ${TOWN} 물듦`;
+  $('vig').style.opacity=String(Math.min(1,sick/TOWN*1.15));
+}
+/** 한 명 물들이기 — 게임의 유일한 실패 경로다. n 명이 물들면 그만큼 목숨이 준다. */
+function infect(n){
+  for(let k=0;k<n;k++){
+    if(sick>=TOWN) break;
+    const cell=$('crowd').querySelector('.cz:not(.sick)');
+    if(!cell) break;
+    cell.classList.add('sick','just');
+    setTimeout(()=>cell.classList.remove('just'),520);
+    sick++;
+  }
+  $('flash').classList.remove('on'); void $('flash').offsetWidth; $('flash').classList.add('on');
+  renderTown();
+  if(sick>=TOWN) gameOver();
+}
+
+function stopSpread(){ clearInterval(spreadTimer); spreadTimer=null; }
+function startSpread(){
+  stopSpread();
+  const ms=spreadMs();
+  const t0=performance.now();
+  // 카드에 스며드는 붉은 기운 — 양쪽 다 채워진다(정답을 알려주지 않는다). 시간이 간다는 신호일 뿐.
+  const creeps=$('opts').querySelectorAll('.creep');
+  const anim=()=>{
+    if(!playing||locked) return;
+    const p=Math.min(1,(performance.now()-t0)%ms/ms);
+    creeps.forEach(c=>c.style.width=(p*100)+'%');
+    requestAnimationFrame(anim);
+  };
+  requestAnimationFrame(anim);
+  spreadTimer=setInterval(()=>{ if(playing&&!locked) infect(1); }, ms);
+}
+
+function nextQ(){
+  if(!deck.length) deck=shuffle(POOL.slice());
+  const item=deck.pop();
+  const fakeAt=Math.random()<.5?0:1;
+  cur={item,fakeAt};
+  $('rndEl').textContent=round;
+  $('qEl').textContent=item.q;
+  $('opts').querySelectorAll('.opt').forEach((o,i)=>{
+    o.className='opt';
+    o.querySelector('.face').innerHTML=charSVG(CARI_SUIT,{cari:i===0,dir:i===0?-1:1});
+    o.querySelector('.a').textContent=(i===fakeAt)?item.fake:item.real;
+    o.querySelector('.creep').style.width='0%';
+  });
+  $('opts').classList.remove('locked');
+  locked=false; roundStart=performance.now();
+  startSpread();
+}
+
+function choose(i){
+  if(locked||!playing) return;
+  locked=true; stopSpread(); $('opts').classList.add('locked');
+  tried++;
+  const opts=$('opts').querySelectorAll('.opt');
+  const ok=(i===cur.fakeAt);
+  const fb=$('fb');
+
+  if(ok){
+    // 빨리 잡을수록 점수가 크다 — 고민하면 사람이 물드는 데다 점수도 깎이는 이중 압박.
+    const sec=(performance.now()-roundStart)/1000;
+    const speed=Math.max(0,Math.round((spreadMs()/1000-sec)*40));
+    const gained=(100+speed)*mult();
+    score+=gained; hit++; combo++; bestCombo=Math.max(bestCombo,combo);
+    opts[cur.fakeAt].classList.add('hit');
+    opts[1-cur.fakeAt].classList.add('safe');
+    fb.className='fb yes on';
+    $('fbTtl').textContent='터뜨렸다';
+    $('fbPlus').textContent='+'+gained;
+  } else {
+    combo=0;
+    opts[i].classList.add('wrong');
+    opts[cur.fakeAt].classList.add('hit');
+    fb.className='fb no on';
+    $('fbTtl').textContent='퍼졌다';
+    $('fbPlus').textContent='마을 '+WRONG_COST+'명';
+    infect(WRONG_COST);
+  }
+  $('fbWhy').innerHTML=cur.item.why;
+  renderHud(true);
+
+  if(sick>=TOWN) return;   // gameOver 는 infect 안에서 이미 호출됨
+  setTimeout(()=>{
+    fb.classList.remove('on');
+    if(playing){ round++; nextQ(); }
+  }, ok?1350:2300);
+}
+
+function renderHud(pop){
+  $('scoreEl').innerHTML=score.toLocaleString()+'<small>점</small>';
+  const c=$('comboEl');
+  c.textContent=combo>0?`연속 ${combo} · ×${mult()}`:'연속 0';
+  c.classList.toggle('hot',combo>=3);
+  if(pop){c.classList.add('pop');setTimeout(()=>c.classList.remove('pop'),150);}
+}
+
+function start(){
+  score=0;combo=0;bestCombo=0;hit=0;tried=0;round=1;sick=0;playing=true;
+  deck=shuffle(POOL.slice());
+  buildTown(); renderTown(); renderHud();
+  $('startOv').classList.add('hidden');
+  $('overOv').classList.add('hidden');
+  $('fb').classList.remove('on');
+  nextQ();
+}
+
+function gameOver(){
+  if(!playing) return;
+  playing=false; locked=true; stopSpread();
+  $('fb').classList.remove('on');
+  if(window.MGBridge) MGBridge.submit(score); // 랭킹: 점수형
+
+  const acc=tried?Math.round(hit/tried*100):0;
+  $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true,shock:true});
+  $('oScore').textContent=score.toLocaleString();
+  $('oRnd').textContent=round;
+  $('oAcc').textContent=acc+'%';
+  $('oCombo').textContent=bestCombo;
+  $('oTtl').textContent=round>=15?'거의 다 막아냈다':round>=8?'마을이 다 물들었다':'너무 빨리 퍼졌다';
+  if(score>best){best=score;try{localStorage.setItem('cari_spot_best',best)}catch(e){}
+    $('newbest').classList.remove('hidden');}
+  else $('newbest').classList.add('hidden');
+  $('oNote').innerHTML=acc>=80
+    ? '이 감각이 실무에서 제일 쓸모 있다. AI 답변에서 <b>숫자·단정·비슷한 용어</b> 세 곳만 다시 봐도 대부분 걸러진다.'
+    : '거짓은 대개 <b>“항상·전혀” 단정</b>, <b>비슷한 개념 바꿔치기</b>, <b>슬쩍 바꾼 숫자</b> 중 하나다. 그 세 곳부터 보라.';
+  $('overOv').classList.remove('hidden');
+}
+
+/* ===================== 배선 ===================== */
+$('opts').querySelectorAll('.opt').forEach(o=>{o.onclick=()=>choose(+o.dataset.i);});
+document.addEventListener('keydown',e=>{
+  const k=(e.key||'').toLowerCase();
+  if(k==='1'||k==='a') choose(0);
+  if(k==='2'||k==='b') choose(1);
+});
+$('startBtn').onclick=start;
+$('againBtn').onclick=start;
+// 탭을 벗어나면 확산도 멈춘다 — 안 보는 동안 마을이 죽어 있으면 억울하다.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) stopSpread();
+  else if(playing&&!locked) startSpread();
+});
+
+$('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+buildTown(); renderTown(); renderHud();
+</script>
+
+<!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 ===== -->
+<script>
+(function(){
+  var EMBED=window.parent!==window;
+  function post(m){ if(EMBED) window.parent.postMessage(m,window.location.origin); }
+  window.MGBridge={submit:function(v){ if(typeof v==='number'&&isFinite(v)) post({t:'mg:score',score:v}); }};
+  function mount(id){
+    var ov=document.getElementById(id); if(!ov||ov.querySelector('.mg-rank')) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
+    b.setAttribute('aria-label','이 게임 랭킹 보기');
+    b.innerHTML='<span aria-hidden="true">🏆</span> 랭킹';
+    b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
+    ov.appendChild(b);
+  }
+  mount('startOv'); mount('overOv');
+})();
+</script>
+</body>
+</html>

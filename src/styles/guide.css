@@ -3,7 +3,8 @@
    ⚠️ 옛 구조(히어로만 파랑 → 본문 흰색, 히어로 우측 일정 패널, 상시시험 띠)는 폐기.
       시험 일정은 /plan 으로 분리됐다(히어로 CARIS PLAN 버튼).
    - 피라미드/카드 셀렉터는 .gld 로 스코프(전역 .card/.slice 충돌 방지).
-   - 급수 색은 Guide.tsx 의 SPECTRUM/TIER_BASE 와 동기화. 바꾸면 양쪽 같이. */
+   - 급수 색은 Guide.tsx 의 SPECTRUM(그라데이션) · lib/caris.ts 의 TIER_COLORS(대표색, /ebooks 도 씀)와
+     동기화. 바꾸면 셋 다 같이. */
 
 /* ── 페이지 배경 ──
    ⚠️ bg-background 토큰은 손대지 않는다 — 앱 전역이 쓰는 토큰이라 다른 페이지까지 바뀐다.

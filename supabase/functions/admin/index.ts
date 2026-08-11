@@ -8,6 +8,7 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { EXAM_ROUND_COLS, examWindowState, grantExamTicket, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { ROOT_ADMIN } from './constants.ts'
+import { handleReform } from './reform.ts'
 
 // 응시 행 → 프론트 표시용 형태(공통). attempts 배열에 exams/profiles/email 을 합쳐 매핑.
 function shapeAttempt(
@@ -67,8 +68,8 @@ async function listAttempts(admin: any, body: any) {
     const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
     for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+      const { data: au } = await admin.rpc('admin_user_emails')
+      for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* listUsers 실패해도 이메일만 빈칸 */ }
   }
 
@@ -210,8 +211,8 @@ async function gradeQueue(admin: any, body: any) {
     const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
     for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+      const { data: au } = await admin.rpc('admin_user_emails')
+      for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* 이메일만 빈칸 */ }
   }
   const examTitleMap: Record<string, string> = {}
@@ -839,8 +840,8 @@ async function examTicketList(admin: any, body: any) {
     const { data: profs } = await admin.from('profiles').select('id').ilike('display_name', `%${q}%`).limit(500)
     for (const p of profs ?? []) ids.add((p as any).id)
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      for (const u of au?.users ?? []) if ((u.email ?? '').toLowerCase().includes(q)) ids.add(u.id)
+      const { data: au } = await admin.rpc('admin_user_emails')
+      for (const u of au ?? []) if (((u as any).email ?? '').toLowerCase().includes(q)) ids.add((u as any).id)
     } catch { /* 이메일 검색만 포기 */ }
     userFilter = [...ids].slice(0, 500) // .in() 이 무한정 길어지지 않게 자른다(관리자 검색이라 실용 우선)
     if (!userFilter.length) return json({ tickets: [], total: 0 })
@@ -877,8 +878,8 @@ async function examTicketList(admin: any, body: any) {
     const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
     for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+      const { data: au } = await admin.rpc('admin_user_emails')
+      for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* 이메일만 빈칸 */ }
   }
 
@@ -1045,9 +1046,10 @@ async function examTicketGrant(admin: any, body: any, actorEmail: string, isRoot
 
   if (!userId) {
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      const hit = (au?.users ?? []).find((u: any) => (u.email ?? '').toLowerCase() === emailIn && !u.is_anonymous)
-      if (hit) userId = hit.id
+      // admin_user_emails 는 이메일이 있는 계정만 준다 = 익명 계정은 애초에 안 나온다.
+      const { data: au } = await admin.rpc('admin_user_emails')
+      const hit = (au ?? []).find((u: any) => (u.email ?? '').toLowerCase() === emailIn)
+      if (hit) userId = (hit as any).id
     } catch { /* 아래에서 404 */ }
     if (!userId) return json({ error: `가입된 계정을 찾을 수 없습니다: ${emailIn}` }, 404)
   }
@@ -1272,11 +1274,15 @@ async function paymentList(admin: any, body: any) {
   const productType = String(body?.productType ?? '').trim()
   const status = String(body?.status ?? '').trim()
   const queue = String(body?.queue ?? '').trim()
+  // 회원 상세의 '결제·구매' 탭이 한 사람 것만 본다. 30일 집계(stats30d)는 이 필터와 무관하게 전체 기준이다 —
+  // 그건 대시보드용 숫자라 사람별로 자르면 뜻이 달라진다.
+  const userId = String(body?.userId ?? '').trim()
 
   let sel = admin.from('payments').select(
     'id, user_id, order_id, order_name, product_type, product_ref, amount, status, method, confirmed_at, fulfilled_at, fail_code, fail_message, created_at',
     { count: 'exact' },
   )
+  if (userId) sel = sel.eq('user_id', userId)
   if (productType) sel = sel.eq('product_type', productType)
   if (status) sel = sel.eq('status', status)
   if (queue === 'unfulfilled') sel = sel.eq('status', 'paid').is('fulfilled_at', null)
@@ -1293,8 +1299,8 @@ async function paymentList(admin: any, body: any) {
     const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
     for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+      const { data: au } = await admin.rpc('admin_user_emails')
+      for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* 이메일만 빈칸 */ }
   }
 
@@ -1362,12 +1368,12 @@ async function manageAdmins(
   // 가입(이메일 보유·비익명) 유저 집합 — 관리자 지정 후보 검증용
   const registered = new Set<string>()
   try {
-    const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-    for (const u of au?.users ?? []) {
-      const e = (u.email ?? '').trim().toLowerCase()
-      if (e && !u.is_anonymous) registered.add(e)
+    const { data: au } = await admin.rpc('admin_user_emails')
+    for (const u of au ?? []) {
+      const e = ((u as any).email ?? '').trim().toLowerCase()
+      if (e) registered.add(e)
     }
-  } catch { /* listUsers 실패해도 목록은 반환 */ }
+  } catch { /* 조회 실패해도 목록은 반환 */ }
 
   if (action === 'addAdmin') {
     const target = String(body?.email ?? '').trim().toLowerCase()
@@ -2103,12 +2109,10 @@ async function cbtUsers(admin: any) {
   }
   const emailMap: Record<string, string> = {}
   try {
-    for (let page = 1; ; page++) {
-      const { data: au } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
-      const list = au?.users ?? []
-      for (const x of list) emailMap[x.id] = x.email ?? ''
-      if (list.length < 1000) break
-    }
+    // ⚠️ 옛 코드는 auth 관리 API 를 페이지네이션으로 훑었는데, 실패가 조용히 삼켜져
+    //    **회원 목록의 이메일이 통째로 빈칸**이 됐다(auth.users 엔 실제로 들어 있었다).
+    const { data: au } = await admin.rpc('admin_user_emails')
+    for (const x of (au ?? []) as any[]) emailMap[x.id] = x.email ?? ''
   } catch { /* 이메일만 빈칸 */ }
   const users = (profiles ?? []).map((p: any) => ({
     id: p.id,
@@ -2178,7 +2182,7 @@ async function setRegion(admin: any, body: any) {
 async function ebookList(admin: any) {
   const { data, error } = await admin
     .from('ebooks')
-    .select('id, title, author, description, cover_url, price, target_level, storage_path, published, sort_order, created_at, updated_at, translations')
+    .select('id, title, author, description, cover_url, price, catalog, target_level, target_tier, storage_path, published, sort_order, created_at, updated_at, translations')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) return json({ error: error.message }, 400)
@@ -2195,7 +2199,9 @@ async function ebookList(admin: any) {
     description: b.description ?? null,
     coverUrl: b.cover_url ?? null,
     price: b.price ?? 0,
+    catalog: b.catalog ?? 'leveltest',
     targetLevel: b.target_level ?? null,
+    targetTier: b.target_tier ?? null,
     storagePath: b.storage_path,
     published: !!b.published,
     sortOrder: b.sort_order ?? 0,
@@ -2211,6 +2217,11 @@ function levelOrNull(v: any): number | null {
   const n = Math.floor(Number(v))
   return Number.isFinite(n) && n >= 1 && n <= 7 ? n : null
 }
+// 급수 키 — 값의 정당성은 여기서 안 본다. exam_tiers FK 가 오타를 23503 으로 튕기므로
+// 목록을 여기 한 벌 더 두면 티어를 추가할 때 고칠 곳만 늘어난다(_shared/exam-tickets.ts · caris.ts 에 이미 있다).
+function tierOrNull(v: any): string | null {
+  return String(v ?? '').trim() || null
+}
 
 async function ebookUpsert(admin: any, body: any) {
   const e = body?.ebook ?? {}
@@ -2218,6 +2229,7 @@ async function ebookUpsert(admin: any, body: any) {
   const storagePath = String(e.storagePath ?? '').trim()
   if (!title) return json({ error: '제목은 필수입니다.' }, 400)
   if (!storagePath) return json({ error: '이북 HTML 파일을 업로드해 주세요.' }, 400)
+  const catalog = e.catalog === 'caris' ? 'caris' : 'leveltest'
 
   const row = {
     title,
@@ -2225,8 +2237,14 @@ async function ebookUpsert(admin: any, body: any) {
     description: e.description ? String(e.description).trim() : null,
     cover_url: e.coverUrl ? String(e.coverUrl).trim() : null,
     price: Math.max(0, Math.floor(Number(e.price ?? 0)) || 0),
+    // 카탈로그 = 러닝 라이브러리의 어느 탭에 서는가(LEVELTEST / CARIS).
+    //   반대쪽 분류값은 **여기서 비운다** — 레벨을 골라뒀다 CARIS 로 바꾼 책이 두 값을 다 들고 있으면
+    //   DB CHECK(ebooks_catalog_target_chk)에 걸려 저장이 통째로 실패한다.
+    catalog,
     // 추천 대상 레벨(1~7). 미지정 = null → 결과창 추천에서 뒤로 밀린다.
-    target_level: levelOrNull(e.targetLevel),
+    target_level: catalog === 'leveltest' ? levelOrNull(e.targetLevel) : null,
+    // 대상 급수(beginner..zenith). 미지정 = null(급수 무관).
+    target_tier: catalog === 'caris' ? tierOrNull(e.targetTier) : null,
     storage_path: storagePath,
     published: !!e.published,
     sort_order: Math.floor(Number(e.sortOrder ?? 0)) || 0,
@@ -2293,8 +2311,8 @@ async function ebookBuyers(admin: any, body: any) {
     const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', userIds)
     for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
     try {
-      const { data: au } = await admin.auth.admin.listUsers({ page: 1, perPage: 2000 })
-      for (const x of au?.users ?? []) emailMap[x.id] = x.email ?? ''
+      const { data: au } = await admin.rpc('admin_user_emails')
+      for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* 이메일만 빈칸 */ }
   }
   return json({
@@ -2618,7 +2636,12 @@ Deno.serve(async (req) => {
       case 'chatUnhide': return await chatUnhide(admin, body)
       case 'chatApprove': return await chatApprove(admin, body)
       case 'chatPurge': return await chatPurge(admin, body)
-      default: return json({ error: '알 수 없는 action' }, 400)
+      default: {
+        // 관리자페이지 재편(2026-08-11)으로 생긴 액션들은 reform.ts 로 뺐다 — index.ts 가 이미 2.6k줄이다.
+        const r = await handleReform(admin, action, body, { email, isRoot, uid: user?.id ?? null })
+        if (r) return r
+        return json({ error: '알 수 없는 action' }, 400)
+      }
     }
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)

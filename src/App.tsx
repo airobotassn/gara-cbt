@@ -2,8 +2,11 @@ import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { I18nProvider, useT } from './lib/i18n'
 import { AuthProvider, useAuth } from './context/AuthProvider'
+import { loadSiteSettings, applySiteHead } from './lib/siteSettings'
+import { callFunction } from './lib/supabase'
 import Layout from './components/Layout'
 import SebEscapeHatch from './components/SebEscapeHatch'
+import SitePopups from './components/SitePopups'
 import Landing from './pages/Landing'
 import ExamGate from './pages/ExamGate'
 import ExamApply from './pages/ExamApply'
@@ -115,11 +118,34 @@ function GateSpinner() {
   )
 }
 
+/**
+ * 사이트 정보 적용 + 접속 기록.
+ * ⚠️ 접속 기록은 **로그인 사용자만**, **하루 한 번만** 남긴다 — 매 이동마다 쓰면 접속자 수만큼 쓰기가 생긴다.
+ *    이 값이 관리자 대시보드의 "오늘 접속자 · 휴면 회원"의 유일한 출처다(없으면 항상 0명).
+ */
+function SiteBoot() {
+  const { isFullUser } = useAuth()
+  useEffect(() => { loadSiteSettings().then(applySiteHead) }, [])
+  useEffect(() => {
+    if (!isFullUser) return
+    // 오늘 이미 찍었으면 건너뛴다(브라우저별 판단이라 완벽하진 않지만 쓰기를 하루 1회로 누른다).
+    const todayKst = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)
+    if (localStorage.getItem('gara_seen_day') === todayKst) return
+    callFunction('my-attempts', { action: 'seen' })
+      .then(() => localStorage.setItem('gara_seen_day', todayKst))
+      .catch(() => { /* 접속 기록 실패는 무시 */ })
+  }, [isFullUser])
+  return null
+}
+
 export default function App() {
   return (
     <I18nProvider>
       <AuthProvider>
         <BrowserRouter>
+          <SiteBoot />
+          {/* 관리자가 등록한 팝업. ⛔ 응시 화면에는 컴포넌트 안에서 라우트로 막는다. */}
+          <SitePopups />
           <ScrollToTop />
           {/* SEB(잠금 브라우저) 안에서만 뜨는 탈출 버튼. 라우트가 안 맞아 랜딩으로 튕겨도 나갈 길이 남는다.
               응시 중(/exam/run/*)에는 뜨지 않는다 — 그 화면의 종료는 '포기'라 응시 무효 기록이 따로 남아야 한다. */}

@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
+import { useSiteSettings } from '../lib/siteSettings'
 
 // 전 페이지 공통 푸터 (Stitch GARA Precision 톤). 모든 페이지에서 동일하게 사용.
 export default function SiteFooter() {
   const { t } = useT()
   const ref = useRef<HTMLElement>(null)
+  // 사업자 정보 — 관리자(홈페이지 관리 > 사이트 정보)가 입력한 값. 결제를 받는 사이트는 표기 의무가 있다.
+  const s = useSiteSettings()
 
   // 좌하단 FAB 이 푸터를 덮지 않도록, 푸터가 올라오면 그 위에서 멈추게 한다.
   //   푸터가 화면에 보이는 높이만큼 --fab-bottom 을 올려주면 fab.css 의 bottom 이 따라간다.
@@ -63,6 +66,21 @@ export default function SiteFooter() {
             <img src="/logo.png" alt="CARIS" className="h-9 w-9 object-cover rounded-full" />
             <span className="font-title-md text-title-md font-bold text-on-surface group-hover:text-primary transition-colors">CARIS</span>
           </Link>
+          {/* 전자상거래법 표기 — 관리자가 채우기 전에는 줄 자체가 안 나온다(빈 라벨만 남는 게 더 나쁘다). */}
+          {(() => {
+            const j = (...xs: (string | undefined)[]) => xs.filter((x) => x && x.trim()).join(' · ')
+            const lines = [
+              j(s.company_name && `상호 ${s.company_name}`, s.company_ceo && `대표 ${s.company_ceo}`),
+              j(s.company_reg_no && `사업자등록번호 ${s.company_reg_no}`, s.company_sales_no && `통신판매업신고 ${s.company_sales_no}`),
+              j(s.company_addr, s.company_tel, s.company_email),
+              j(s.privacy_officer && `개인정보보호책임자 ${s.privacy_officer}`),
+            ].filter(Boolean)
+            return lines.length ? (
+              <div className="font-body-md text-[13px] text-outline leading-relaxed">
+                {lines.map((l, i) => <div key={i}>{l}</div>)}
+              </div>
+            ) : null
+          })()}
           <p className="font-body-md text-[13px] text-outline">{t('footer.rights')}</p>
         </div>
         <nav className="flex flex-wrap gap-x-5 gap-y-2">

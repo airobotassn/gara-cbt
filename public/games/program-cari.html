@@ -14,15 +14,17 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;}
 body{
-  background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);
+  background:radial-gradient(120% 80% at 50% -10%, #152d53 0%, #09172c 68%);
   color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
   display:flex; align-items:center; justify-content:center; min-height:100%; overflow:hidden; user-select:none;
 }
 .stage{
   position:relative; width:min(460px,100vw); height:min(860px,100vh);
-  display:flex; flex-direction:column; background:var(--bg);
+  display:flex; flex-direction:column; background:#d9e6f3 url('program-cari-workshop-ui-v7.png') center/100% 100% no-repeat;
   box-shadow:0 0 60px rgba(70,90,140,.25); overflow:hidden;
 }
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background:transparent;}
+.hud,.goaltxt,.gridwrap,.progtitle,.program,.palette,.controls,.takeaway{position:relative;z-index:1;}
 .art{width:100%;height:100%;display:block;}
 .btn{padding:15px 44px; border-radius:30px; border:0; cursor:pointer;
   background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:17px; font-weight:800;
@@ -35,7 +37,8 @@ body{
   align-items:center;justify-content:center;text-align:center;padding:26px;
   background:radial-gradient(120% 80% at 50% -10%, #eff4fc 0%, #e3ebf7 60%);}
 .overlay.hidden{display:none;}
-.float{width:128px;height:128px;animation:bob 2.6s ease-in-out infinite;}
+.float{width:138px;height:138px;animation:bob 2.6s ease-in-out infinite;display:flex;align-items:center;justify-content:center;}
+.float img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 12px 16px rgba(27,63,125,.22));}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
 .t1{font-size:34px;font-weight:900;letter-spacing:-1px;margin:14px 0 0;}
 .t2{font-size:34px;font-weight:900;letter-spacing:-1px;margin:0 0 6px;
@@ -45,88 +48,136 @@ body{
   text-align:left;box-shadow:0 8px 22px rgba(70,90,140,.10);max-width:330px;}
 .rules div{font-size:14px;color:var(--ink);margin:7px 0;font-weight:600;line-height:1.35;}
 .rules b{color:var(--brand);}
+#startOv{justify-content:center;padding:38px 24px 22px;background:url('program-cari-intro-bg-v7.png') center/cover no-repeat;color:#17345d;}
+#startOv .float{width:178px;height:202px;margin-bottom:0;animation:bob 2.8s ease-in-out infinite;}
+#startOv .intro-title{font-family:"Arial Black","Malgun Gothic",system-ui,sans-serif;font-size:41px;font-weight:1000;line-height:1.12;letter-spacing:-2.5px;transform:none;margin:4px 0 0;text-shadow:0 3px 0 #fff,0 6px 12px rgba(34,73,120,.24);white-space:nowrap;}
+#startOv .intro-title .t1{color:#102d57;-webkit-text-stroke:0;text-shadow:0 3px 0 #fff,0 6px 12px rgba(34,73,120,.24);}
+#startOv .intro-title .t2{background:linear-gradient(180deg,#fff5b8,#ffc945 55%,#e99000);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1px rgba(78,45,0,.45);}
+#startOv .tag{color:#31577e;margin:13px 0 12px;text-shadow:0 1px 0 #fff;}
+#startOv .rules{width:340px;max-width:88vw;padding:12px 19px;background:rgba(4,25,61,.88);border:1px solid #54c9ff;color:#fff;
+  box-shadow:inset 0 0 18px rgba(33,151,255,.16),0 10px 25px rgba(0,7,28,.45);}
+#startOv .rules div{color:#e9f6ff;margin:5px 0;font-size:13px;}#startOv .rules b{color:#63dcff;}
+#startOv #startBtn{width:190px;height:60px;margin-top:12px!important;padding:0;text-align:center;background:url('reach-cari-start-btn-v3.png') center/100% 100% no-repeat;
+  border:0;border-radius:0;box-shadow:none;filter:drop-shadow(0 8px 11px rgba(0,8,32,.5));text-shadow:0 2px 5px #001244;}
 
 /* HUD */
-.hud{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px;}
-.hud .lv{font-size:12px;color:var(--sub);font-weight:700;}
-.hud .lvn{font-size:19px;font-weight:900;color:var(--ink);}
-.hud .mid{text-align:center;font-size:14px;font-weight:800;color:var(--ink);}
-.hud .slots{text-align:right;}
-.hud .slots .n{font-size:21px;font-weight:900;color:var(--brand);font-variant-numeric:tabular-nums;}
-.hud .slots .lab{font-size:11px;color:var(--sub);font-weight:700;}
-.goaltxt{font-size:13px;color:var(--sub);font-weight:700;padding:0 16px 4px;text-align:center;min-height:18px;}
+.hud{position:absolute;left:48px;right:48px;top:24px;height:102px;margin:0;padding:0;background:none;filter:none;}
+.hud>div{position:absolute;top:50%;transform:translateY(-48%);text-align:center;}
+.hud>div:first-child{left:7%;width:27%;}.hud .mid{left:36%;width:28%;}.hud .slots{left:65%;width:28%;}
+.hud .lv{font-size:12px;color:#9bd4ff;font-weight:800;}
+.hud .lvn{font-size:23px;font-weight:950;color:#fff;}
+.hud .mid{text-align:center;font-size:14px;font-weight:850;color:#fff;}
+.hud .slots{text-align:center;}
+.hud .slots .n{font-size:24px;font-weight:950;color:#79dfff;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(37,185,255,.55);}
+.hud .slots .lab{font-size:12px;color:#9bd4ff;font-weight:800;}
+.goaltxt{position:absolute;left:108px;right:108px;top:140px;height:48px;display:grid;place-items:center;font-size:14px;color:#fff;font-weight:900;padding:0 10px;text-align:center;min-height:0;
+  text-shadow:0 1px 5px #00112c;}
 
 /* grid */
-.gridwrap{display:flex;align-items:center;justify-content:center;padding:2px 16px 4px;}
-.grid{position:relative;background:#dfe6f2;border-radius:14px;box-shadow:inset 0 2px 8px rgba(70,90,140,.14);}
+.gridwrap{position:absolute;left:54px;right:54px;top:198px;height:240px;display:flex;align-items:center;justify-content:center;padding:8px;}
+.grid{position:relative;background:transparent;border:0;border-radius:0;box-shadow:none;}
 .cell{position:absolute;border-radius:8px;}
-.tile{background:#f3f6fc;box-shadow:inset 0 0 0 1px #e3e9f4;}
+.tile{background:linear-gradient(145deg,#eff9ff,#bcd9ef);border:1px solid rgba(255,255,255,.72);
+  box-shadow:inset 0 0 0 1px rgba(70,141,205,.28),0 4px 8px rgba(0,8,28,.34),0 0 8px rgba(70,191,255,.25);}
 .gap{background:transparent;}
 .goal{position:absolute;pointer-events:none;display:flex;align-items:center;justify-content:center;}
 .goal svg{width:72%;height:72%;}
+.goal img{width:86%;height:86%;object-fit:contain;filter:drop-shadow(0 0 8px rgba(50,213,255,.78));animation:goalPulse 1.7s ease-in-out infinite;}
+@keyframes goalPulse{50%{transform:scale(1.08);filter:drop-shadow(0 0 13px rgba(50,213,255,.95));}}
 .item{position:absolute;pointer-events:none;display:flex;align-items:center;justify-content:center;transition:opacity .2s,transform .2s;}
 .item svg{width:64%;height:64%;}
+.item img{width:72%;height:72%;object-fit:contain;filter:drop-shadow(0 0 7px rgba(255,202,41,.7));}
 .item.gone{opacity:0;transform:scale(.2);}
 .cari{position:absolute;transition:left .26s ease,top .26s ease,transform .26s ease;z-index:5;
   display:flex;align-items:center;justify-content:center;}
-.cari .art{width:84%;height:84%;filter:drop-shadow(0 4px 6px rgba(40,50,80,.3));}
+.cari img{width:114%;height:114%;object-fit:contain;display:block;filter:drop-shadow(0 4px 7px rgba(0,8,28,.48));}
+.cari.shock img{filter:drop-shadow(0 0 8px #ff755e) saturate(.75);}
+.cari::after{content:"";position:absolute;left:5%;top:5%;width:90%;height:90%;z-index:-1;opacity:0;
+  background:url('reach-cari-contact-vfx-v3.png') center/contain no-repeat;pointer-events:none;}
+.cari.stepfx::after{animation:stepBurst .3s ease-out;}
+@keyframes stepBurst{0%{opacity:.95;transform:scale(.45) rotate(0)}100%{opacity:0;transform:scale(1.45) rotate(90deg)}}
 
 /* program area */
-.progtitle{display:flex;justify-content:space-between;align-items:center;padding:2px 16px;}
-.progtitle .h{font-size:13px;font-weight:800;color:var(--ink);}
-.progtitle .hint{font-size:11px;color:var(--sub);font-weight:600;}
-.program{margin:4px 14px;background:#f0f3fa;border:1.5px dashed #c7d2e8;border-radius:12px;
-  padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;
-  min-height:80px;max-height:150px;overflow-y:auto;}
+.progtitle{display:flex;justify-content:space-between;align-items:center;padding:3px 16px;}
+.progtitle .h{font-size:13px;font-weight:850;color:#fff;text-shadow:0 1px 4px #00112c;}
+.progtitle .hint{font-size:10.5px;color:#b8d8f2;font-weight:650;text-shadow:0 1px 3px #00112c;}
+.console{position:absolute;left:55px;right:55px;top:510px;z-index:1;height:328px;margin:0;background:none;filter:none;}
+.console .progtitle{position:absolute;left:40px;right:40px;top:31px;padding:0;z-index:3;}
+.console .progtitle .hint{display:none;}
+.console .program{position:absolute;left:32px;right:32px;top:56px;height:77px;margin:0;background:transparent;border:0;border-radius:9px;
+  padding:8px;display:flex;flex-wrap:nowrap;gap:6px;align-items:center;align-content:center;min-height:0;max-height:none;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;box-shadow:none;backdrop-filter:none;}
+.console .program::-webkit-scrollbar{display:none;}
+.console .program{gap:6px}.console .slot.simple{width:43px;height:43px;padding:0;font-size:0;line-height:0;text-shadow:none;background-size:41px 41px!important;background-position:center!important;box-shadow:none;}
+.console .slot.simple>div:last-child{display:none;}
+.console .slot.simple .ic{display:none}.mini:not(.iff){font-size:0;}
+.console .slot.block.lp{background:linear-gradient(145deg,#f3a512,#a95d00)!important;border:1px solid #ffd76b;}.console .slot.block.iff{background:linear-gradient(145deg,#ed6a52,#9f3024)!important;border:1px solid #ffad9e;}
 .program.empty{align-items:center;justify-content:center;}
-.program.empty::before{content:"명령을 눌러 프로그램을 만들어라";color:var(--sub);font-size:12px;font-weight:600;}
+.program.empty::before{content:"＋  명령을 선택하세요";color:#bfe8ff;font-size:13px;font-weight:850;letter-spacing:.02em;transform:translateY(-5px);}
 .slot{position:relative;border-radius:10px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;cursor:pointer;
   box-shadow:0 3px 7px rgba(40,50,80,.16);}
 .slot.simple{width:44px;height:44px;}
 .slot .ic{font-size:18px;line-height:1;}
 .slot.run{outline:3px solid #ffd54a;outline-offset:1px;z-index:2;}
-.slot.mv{background:#3a72e0;} .slot.tl{background:#7a5bd6;} .slot.tr{background:#c65bd6;}
-.slot.pk{background:#12a37a;} .slot.lp{background:#e59b17;} .slot.iff{background:#e0674a;}
+.slot.mv,.pbtn.mv,.mini.mv{background-image:url('program-cari-key-mv-v4.png')!important;}.slot.tl,.pbtn.tl,.mini.tl{background-image:url('program-cari-key-tl-v4.png')!important;}
+.slot.tr,.pbtn.tr,.mini.tr{background-image:url('program-cari-key-tr-v4.png')!important;}.slot.pk,.pbtn.pk,.mini.pk{background-image:url('program-cari-key-pk-v4.png')!important;}
+.slot.lp,.pbtn.lp{background-image:url('program-cari-key-lp-v4.png')!important;}.slot.iff,.pbtn.iff,.mini.iff{background-image:url('program-cari-key-if-v4.png')!important;}
+.slot.simple,.pbtn,.mini{background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;background-color:transparent!important;}
 .slot .cnt{position:absolute;top:-6px;right:-6px;background:#fff;color:#e59b17;border-radius:8px;
   font-size:9px;font-weight:900;padding:1px 4px;box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;}
 .slot.iff .cnt{color:#e0674a;}
-.slot.block{flex-direction:column;padding:5px 6px 6px;min-width:48px;gap:4px;}
+.slot.block{flex:0 0 auto;flex-direction:column;padding:4px 5px 5px;min-width:48px;max-height:61px;gap:3px;}
 .slot.block .blab{font-size:9px;font-weight:900;opacity:.95;}
 .slot.block .body{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;
   background:rgba(255,255,255,.22);border-radius:7px;padding:3px;min-width:26px;min-height:26px;}
 .mini{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
   font-size:12px;color:#fff;background:rgba(0,0,0,.18);}
-.mini.mv{background:#3a72e0;} .mini.tl{background:#7a5bd6;} .mini.tr{background:#c65bd6;}
-.mini.pk{background:#12a37a;} .mini.iff{background:#e0674a;position:relative;padding:0 2px;}
+.mini.iff{position:relative;padding:0 2px;}
 .mini.iff .q{font-size:9px;font-weight:900;}
 .slot.open{outline:2.5px solid #ffd54a;outline-offset:1px;}
 
 /* palette */
-.palette{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;padding:6px 14px 4px;}
+.palette{position:absolute!important;left:18px;right:18px;top:145px;height:58px;display:flex;flex-wrap:nowrap;gap:4px;justify-content:flex-start;padding:5px 7px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;background:transparent;border:0;border-radius:0;box-shadow:none;}
+.palette::-webkit-scrollbar{display:none;}
 .pbtn{width:52px;height:54px;border-radius:12px;border:0;cursor:pointer;color:#fff;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   font-size:10px;font-weight:800;box-shadow:0 4px 9px rgba(40,50,80,.18);}
 .pbtn:active{transform:scale(.94);}
-.pbtn .pic{font-size:20px;line-height:1;}
-.pbtn:disabled{opacity:.32;cursor:default;}
-.pbtn.mv{background:#3a72e0;} .pbtn.tl{background:#7a5bd6;} .pbtn.tr{background:#c65bd6;}
-.pbtn.pk{background:#12a37a;} .pbtn.lp{background:#e59b17;} .pbtn.iff{background:#e0674a;}
+.pbtn .pic{display:none;}
+.pbtn:disabled{opacity:.62;cursor:default;}
 .pbtn.close{background:#5b6784;}
 
-.controls{display:flex;gap:10px;justify-content:center;padding:8px 16px 12px;}
-.controls .btn{padding:13px 0;font-size:15px;}
-.controls .btn.run{flex:1;max-width:230px;}
-.controls .btn.small{flex:0 0 auto;padding:13px 20px;}
+.console .pbtn{flex:0 0 47px;width:47px;height:48px;padding:0;border-radius:7px;box-shadow:none;background-size:42px 42px!important;background-position:center!important;
+  font-size:0;line-height:0;color:transparent;text-shadow:none;overflow:visible;}
+.console .pbtn .pic{font-size:18px}
+.console .pbtn.close{position:relative;right:auto;top:auto;flex:0 0 48px;width:48px;height:38px;padding:0;background:transparent!important;border:1px solid #9bb6d0;color:#fff;z-index:5;}
+.console .pbtn.close[hidden]{display:none!important;}
+.controls{position:absolute!important;left:18px;right:18px;top:232px;height:68px;display:flex;gap:23px;justify-content:center;padding:0;transform:translate(-2px,-3px);}
+.controls .btn{display:grid;place-items:center;padding:0!important;line-height:1;font-size:15px;}
+.controls .btn.run{flex:1;max-width:none;background:transparent;box-shadow:none;text-shadow:0 2px 4px #073d9b;border-radius:7px;font-size:18px;transform:translateY(-1px);}
+.controls .btn.small{flex:0 0 25%;background:transparent;color:#174477;border:0;box-shadow:none;text-shadow:0 1px 2px #fff;border-radius:7px;font-size:15px;transform:translateY(-1px);}
 
 /* takeaway toast */
-.takeaway{position:absolute;left:50%;bottom:92px;transform:translateX(-50%) translateY(20px);
+.takeaway{position:absolute;left:50%;top:108px;bottom:auto;transform:translateX(-50%) translateY(-12px);
   background:#28324c;color:#fff;padding:12px 20px;border-radius:16px;font-size:14px;font-weight:700;
   box-shadow:0 12px 30px rgba(0,0,0,.28);z-index:15;opacity:0;transition:.35s;max-width:86%;text-align:center;
   line-height:1.4;pointer-events:none;}
 .takeaway.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
 /* result */
+.result-console{position:relative;width:300px;height:507px;background:url('program-cari-result-console-v3.png') center/100% 100% no-repeat;
+  filter:drop-shadow(0 18px 25px rgba(0,7,30,.58));}
+#resultOv{background:linear-gradient(rgba(238,248,255,.08),rgba(222,239,250,.18)),url('program-cari-intro-bg-v7.png') center/cover no-repeat;}
+.result-console .float{position:absolute;left:50%;top:calc(6% + 10px);transform:translateX(-50%);width:142px;height:142px;animation:none;}
+.result-console .badge{position:absolute;left:12%;top:calc(32% + 10px);width:76%;text-align:center;}
+.result-console .stars{position:absolute;left:12%;top:calc(38% + 10px);width:76%;text-align:center;}
+.result-console .rbox{position:absolute;left:10%;top:calc(45% + 10px);width:80%;margin:0;padding:8px;background:transparent;border:0;box-shadow:none;}
+.result-console .rbox .rn{color:#fff;text-shadow:0 2px 4px #00102f}.result-console .rbox .rmsg{color:#c9e8ff;}
+.result-console .result-strip{position:absolute;left:13%;top:calc(65.7% + 4px);width:74%;height:7.2%;display:grid;place-items:center;
+  color:#d9f5ff;font-size:16px;font-weight:950;text-shadow:0 1px 4px #001442;}
+.result-console .rrow{position:absolute;left:9.5%;right:9.5%;bottom:calc(6.5% + 5px);height:66px;margin:0;display:flex;align-items:center;gap:7px;}
+.result-console .rrow .btn{display:grid;place-items:center;height:100%;flex:1;padding:0 8px;background:transparent!important;color:#fff!important;border:0!important;box-shadow:none;text-shadow:0 2px 4px #001442;font-size:18px;line-height:1;}
+.result-console .rrow .btn:first-child{flex:0 0 64%;}.result-console .rrow .btn:last-child{flex:1;font-size:16px;white-space:nowrap;}
 .badge{font-size:26px;font-weight:900;margin:8px 0 2px;}
 .badge.win{color:var(--good);} .badge.lose{color:var(--bad);}
 .stars{font-size:30px;letter-spacing:4px;margin:2px 0;color:#f5c518;}
@@ -143,14 +194,12 @@ body{
   <!-- START -->
   <div class="overlay" id="startOv">
     <div class="float" id="startCari"></div>
-    <div class="t1">프로그램해라</div>
-    <div class="t2">CARI</div>
+    <div class="intro-title"><span class="t1">프로그램해라</span> <span class="t2">CARI</span></div>
     <div class="tag">명령을 짜서 CARI를 움직여라</div>
     <div class="rules">
       <div>1. 명령을 눌러 <b>프로그램</b>을 만들어라</div>
       <div>2. <b>실행</b>하면 CARI가 순서대로 움직인다</div>
       <div>3. 별을 모두 먹고 <b>목표 칸</b>에 도착하면 성공</div>
-      <div>4. 칸이 부족하면? <b>반복·조건</b>으로 짧게 짜라</div>
     </div>
     <button class="btn" id="startBtn" style="margin-top:20px;">시작하기</button>
   </div>
@@ -165,74 +214,42 @@ body{
 
   <div class="gridwrap"><div class="grid" id="grid"></div></div>
 
-  <div class="progtitle"><div class="h">내 프로그램</div><div class="hint">블록 탭=삭제 · ×N 탭=값변경</div></div>
-  <div class="program empty" id="program"></div>
-
-  <div class="palette" id="palette"></div>
-
-  <div class="controls">
-    <button class="btn run" id="runBtn">실행 ▶</button>
-    <button class="btn ghost small" id="resetBtn">리셋</button>
+  <div class="console">
+    <div class="progtitle"><div class="h">내 프로그램</div><div class="hint"></div></div>
+    <div class="program empty" id="program"></div>
+    <div class="palette" id="palette"></div>
+    <div class="controls">
+      <button class="btn run" id="runBtn">실행</button>
+      <button class="btn ghost small" id="resetBtn">리셋</button>
+    </div>
   </div>
 
   <div class="takeaway" id="takeaway"></div>
 
   <!-- RESULT -->
   <div class="overlay hidden" id="resultOv">
-    <div class="float" id="resCari"></div>
-    <div class="badge" id="resBadge">성공!</div>
-    <div class="stars" id="resStars"></div>
-    <div class="rbox"><div class="rn" id="resN"></div><div class="rmsg" id="resMsg"></div></div>
-    <div class="rrow" id="resRow"></div>
+    <div class="result-console">
+      <div class="float" id="resCari"></div>
+      <div class="badge" id="resBadge">성공!</div>
+      <div class="stars" id="resStars"></div>
+      <div class="rbox"><div class="rn" id="resN"></div><div class="rmsg" id="resMsg"></div></div>
+      <div class="result-strip" id="resStrip"></div>
+      <div class="rrow" id="resRow"></div>
+    </div>
   </div>
 
 </div>
 
 <script>
-/* ===================== CARI mascot ===================== */
-function charSVG(suit,o={}){
-  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
-  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
-  const ex=dir*2.2;
-  const eyes = shock
-    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
-       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
-    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
-       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
-       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
-       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
-  const mouth = shock
-    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
-    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
-  const antenna = isCari ? `
-    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
-    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
-    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
-  const badge = isCari ? `
-    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
-    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
-  return `<svg class="art" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
-      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
-      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
-    </radialGradient></defs>
-    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
-    ${antenna}
-    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
-    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
-    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
-    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
-             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
-          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
-    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
-    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
-    ${eyes}${mouth}${badge}</svg>`;
+function cariPNG(kind='play'){
+  const src=kind==='intro'?'program-cari-intro-hero-v4.png':kind==='win'?'program-cari-win-v5.png':kind==='fail'?'program-cari-fail-v5.png':'program-cari-dir-down-v4.png';
+  return `<img src="${src}" alt="" draggable="false">`;
 }
-const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+const DIR_ASSET=['up','right','down','left'];
 
 /* ===================== tile icons ===================== */
-function goalSVG(){return `<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#12b58c" stroke-width="4" stroke-dasharray="6 5"/><circle cx="32" cy="32" r="13" fill="#12b58c" opacity=".26"/><circle cx="32" cy="32" r="6" fill="#12b58c"/></svg>`;}
-function starSVG(){return `<svg viewBox="0 0 64 64"><path d="M32 6 L39.5 24 L59 26 L44 39 L48.5 58 L32 47.5 L15.5 58 L20 39 L5 26 L24.5 24 Z" fill="#f5c518" stroke="#d99b00" stroke-width="2" stroke-linejoin="round"/></svg>`;}
+function goalSVG(){return `<img src="program-cari-goal-v3.png" alt="목표 지점" draggable="false">`;}
+function starSVG(){return `<img src="reach-cari-target-star-v3.png" alt="별" draggable="false">`;}
 
 /* ===================== instruction defs ===================== */
 const OPS={
@@ -247,34 +264,34 @@ const OPS={
 /* ===================== levels ===================== */
 /* dir: 0=up 1=right 2=down 3=left */
 const LEVELS=[
- {name:'첫 걸음', cols:5, rows:3, limit:6, ops:['MV','TL','TR'],
+ {name:'첫 걸음', cols:5, rows:3, limit:6, par:4, ops:['MV','TL','TR'],
   goal:'앞으로 명령으로 목표까지 가라',
   start:{x:0,y:1,dir:1}, goalPos:[4,1], stars:[],
   tiles:[[0,1],[1,1],[2,1],[3,1],[4,1]]},
 
- {name:'모퉁이', cols:5, rows:5, limit:8, ops:['MV','TL','TR'],
+ {name:'모퉁이', cols:5, rows:5, limit:8, par:7, ops:['MV','TL','TR'],
   goal:'꺾어 돌아 위로 올라가라',
   start:{x:0,y:4,dir:1}, goalPos:[2,0], stars:[],
   tiles:[[0,4],[1,4],[2,4],[2,3],[2,2],[2,1],[2,0]]},
 
- {name:'별 줍기', cols:5, rows:5, limit:10, ops:['MV','TL','TR','PK'],
+ {name:'별 줍기', cols:5, rows:5, limit:10, par:6, ops:['MV','TL','TR','PK'],
   goal:'별 2개를 집고 목표로 가라',
   start:{x:0,y:2,dir:1}, goalPos:[4,2], stars:[[2,2],[3,2]],
   tiles:[[0,2],[1,2],[2,2],[3,2],[4,2]]},
 
- {name:'긴 복도', cols:7, rows:3, limit:4, ops:['MV','TL','TR','LP'],
+ {name:'긴 복도', cols:7, rows:3, limit:4, par:2, ops:['MV','TL','TR','LP'],
   goal:'칸이 부족하다! 반복으로 묶어라',
   start:{x:0,y:1,dir:1}, goalPos:[6,1], stars:[],
   tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]],
   teach:'똑같은 걸 여러 번? 반복으로 묶으면 짧아져요'},
 
- {name:'꺾인 길', cols:5, rows:6, limit:6, ops:['MV','TL','TR','LP','IF'],
+ {name:'꺾인 길', cols:5, rows:6, limit:6, par:4, ops:['MV','TL','TR','LP','IF'],
   goal:'꺾이는 자리가 제각각! 조건으로 판단하라',
   start:{x:0,y:5,dir:0}, goalPos:[2,4], stars:[],
   tiles:[[0,5],[0,4],[0,3],[1,3],[2,3],[2,4]],
   teach:'상황마다 다르게? 조건으로 판단하게 해요'},
 
- {name:'마지막 미션', cols:6, rows:6, limit:8, ops:['MV','TL','TR','PK','LP','IF'],
+ {name:'마지막 미션', cols:6, rows:6, limit:8, par:8, ops:['MV','TL','TR','PK','LP','IF'],
   goal:'반복+조건+집기, 모두 써서 통과하라',
   start:{x:0,y:5,dir:0}, goalPos:[5,0], stars:[[0,4],[0,2],[0,0]],
   tiles:[[0,5],[0,4],[0,3],[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[4,0],[5,0]],
@@ -293,7 +310,7 @@ const grid=document.getElementById('grid');
 let CELL=52, GAP=5, cariEl=null, itemEls={};
 function buildGrid(){
   const L=lv();
-  const maxW=424, maxH=248;
+  const maxW=340, maxH=238;
   CELL=Math.floor(Math.min((maxW-(L.cols-1)*GAP)/L.cols,(maxH-(L.rows-1)*GAP)/L.rows));
   CELL=Math.max(30,Math.min(CELL,58));
   const W=L.cols*CELL+(L.cols-1)*GAP, H=L.rows*CELL+(L.rows-1)*GAP;
@@ -315,16 +332,19 @@ function buildGrid(){
   });
   cariEl=document.createElement('div'); cariEl.className='cari';
   cariEl.style.cssText=`width:${CELL}px;height:${CELL}px`;
-  cariEl.innerHTML=charSVG(CARI_SUIT,{cari:true});
+  cariEl.innerHTML=`<img src="program-cari-dir-${DIR_ASSET[L.start.dir]}-v4.png" alt="CARI" draggable="false">`;
   grid.appendChild(cariEl);
   placeCari(L.start.x,L.start.y,L.start.dir,false);
 }
-const ROT=[0,90,180,270];
-function placeCari(x,y,dir,shock){
+function placeCari(x,y,dir,shock,fx=false){
   cariEl.style.left=(x*(CELL+GAP))+'px';
   cariEl.style.top=(y*(CELL+GAP))+'px';
-  cariEl.style.transform='rotate('+ROT[dir]+'deg)'+(shock?' scale(.9)':'');
-  if(shock) cariEl.innerHTML=charSVG(CARI_SUIT,{cari:true,shock:true});
+  const img=cariEl.querySelector('img');
+  if(img) img.src=`program-cari-dir-${DIR_ASSET[dir]}-v4.png`;
+  cariEl.style.transform=shock?'scale(.9)':'';
+  cariEl.classList.toggle('shock',!!shock);
+  cariEl.classList.remove('stepfx');
+  if(fx){void cariEl.offsetWidth;cariEl.classList.add('stepfx');}
 }
 
 /* ===================== program helpers ===================== */
@@ -337,24 +357,25 @@ function condLabel(c){return c==='blocked'?'막힘?':'별?';}
 
 /* ===================== program render ===================== */
 const programEl=document.getElementById('program');
-function miniHTML(ins){
+function miniHTML(ins,parentIdx,childIdx){
   if(ins.op==='IF'){
     const inner=ins.body.map(b=>OPS[b.op].ic).join('');
-    return `<div class="mini iff"><span class="q">?${inner}</span></div>`;
+    const cond=ins.cond==='star'?'★':'▥';
+    return `<div class="mini iff" data-parent="${parentIdx}" data-child="${childIdx}" title="탭해서 조건 변경"><span class="q">${cond}${inner}</span></div>`;
   }
-  return `<div class="mini ${OPS[ins.op].cls}">${OPS[ins.op].ic}</div>`;
+  return `<div class="mini ${OPS[ins.op].cls}" data-parent="${parentIdx}" data-child="${childIdx}" title="탭해서 삭제">${OPS[ins.op].ic}</div>`;
 }
 function slotHTML(ins,idx){
   if(ins.op==='LP'){
     const open=openStack.includes(ins)?' open':'';
-    const body=ins.body.map(miniHTML).join('')||'<div class="mini">·</div>';
+    const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
     return `<div class="slot block lp${open}" data-i="${idx}">
       <div class="blab">반복<span class="cnt">×${ins.count}</span></div>
       <div class="body">${body}</div></div>`;
   }
   if(ins.op==='IF'){
     const open=openStack.includes(ins)?' open':'';
-    const body=ins.body.map(miniHTML).join('')||'<div class="mini">·</div>';
+    const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
     return `<div class="slot block iff${open}" data-i="${idx}">
       <div class="blab">조건<span class="cnt">${condLabel(ins.cond)}</span></div>
       <div class="body">${body}</div></div>`;
@@ -370,6 +391,15 @@ function renderProgram(){
 /* single click handler: badge -> cycle value ; block/ simple -> delete (top level) */
 programEl.onclick=function(e){
   if(S.running)return;
+  const mini=e.target.closest('.mini[data-parent]');
+  if(mini){
+    const parent=S.prog[+mini.dataset.parent];
+    const child=parent&&parent.body&&parent.body[+mini.dataset.child];
+    if(!child)return;
+    if(child.op==='IF') child.cond=child.cond==='blocked'?'star':'blocked';
+    else parent.body.splice(+mini.dataset.child,1);
+    renderProgram();buildPalette();return;
+  }
   const slot=e.target.closest('.slot'); if(!slot)return;
   const i=+slot.dataset.i; const ins=S.prog[i]; if(!ins)return;
   if(e.target.classList.contains('cnt')){
@@ -403,7 +433,7 @@ function updatePalette(){
   const inIf   = curContainer() && curContainer().op==='IF';
   paletteEl.querySelectorAll('.pbtn').forEach(b=>{
     const op=b.dataset.op;
-    if(op==='CLOSE'){ b.disabled=openStack.length===0; return; }
+    if(op==='CLOSE'){ b.hidden=openStack.length===0; b.disabled=openStack.length===0; return; }
     let dis=full;
     // block-nesting rules: LP only at top level; IF at top level or inside a loop; no block inside IF
     if(op==='LP' && curContainer()) dis=true;
@@ -469,7 +499,7 @@ function runProgram(){
   function finish(win){
     S.running=false; clearInterval(vmTimer);
     programEl.querySelectorAll('.slot').forEach(el=>el.classList.remove('run'));
-    document.getElementById('runBtn').textContent='실행 ▶';
+    document.getElementById('runBtn').textContent='실행';
     setTimeout(()=>showResult(win),400);
   }
   vmTimer=setInterval(()=>{
@@ -484,7 +514,7 @@ function runProgram(){
     if(step.op==='MV'){
       const nx=st.x+DX[st.dir], ny=st.y+DY[st.dir];
       if(!isTile(nx,ny)){ placeCari(st.x,st.y,st.dir,true); finish(false); return; }
-      st.x=nx; st.y=ny; placeCari(st.x,st.y,st.dir,false);
+      st.x=nx; st.y=ny; placeCari(st.x,st.y,st.dir,false,true);
     }else if(step.op==='TL'){ st.dir=(st.dir+3)%4; placeCari(st.x,st.y,st.dir,false);
     }else if(step.op==='TR'){ st.dir=(st.dir+1)%4; placeCari(st.x,st.y,st.dir,false);
     }else if(step.op==='PK'){
@@ -504,14 +534,14 @@ function toast(msg,ms=1600){
 
 /* ===================== result ===================== */
 function starsFor(){
-  const used=countOps(), lim=lv().limit;
-  if(used<=Math.ceil(lim*0.6)) return 3;
-  if(used<=Math.ceil(lim*0.85)) return 2;
+  const used=countOps(), L=lv();
+  if(used<=L.par) return 3;
+  if(used<=Math.min(L.limit,L.par+2)) return 2;
   return 1;
 }
 function showResult(win){
   const ov=document.getElementById('resultOv'); ov.classList.remove('hidden');
-  document.getElementById('resCari').innerHTML=charSVG(CARI_SUIT,{cari:true,shock:!win});
+  document.getElementById('resCari').innerHTML=cariPNG(win?'win':'fail');
   const badge=document.getElementById('resBadge'), rn=document.getElementById('resN'),
         rmsg=document.getElementById('resMsg'), stEl=document.getElementById('resStars'),
         row=document.getElementById('resRow');
@@ -522,16 +552,19 @@ function showResult(win){
     stEl.textContent = '★★★'.slice(0,s)+'☆☆☆'.slice(0,3-s);
     rn.textContent='명령 '+countOps()+'개 사용 (제한 '+lv().limit+')';
     rmsg.textContent = s>=3?'완벽! 아주 짧고 똑똑한 프로그램!' : s===2?'좋아요. 더 줄일 수 있을까?' : '성공! 반복·조건으로 더 짧게 도전!';
+    document.getElementById('resStrip').textContent='레벨 '+(S.lv+1)+' 완료';
     const isLast=S.lv>=LEVELS.length-1;
     if(window.MGBridge) MGBridge.submit(S.lv+1, {timed:true}); // 랭킹: 도달 레벨(동률=시간)
-    row.appendChild(btn('다시 짜기','ghost',()=>{ov.classList.add('hidden');resetProgram();}));
-    row.appendChild(btn(isLast?'처음으로':'다음 ▶','',()=>{ov.classList.add('hidden'); if(isLast) goStart(); else {S.lv++; loadLevel();}}));
+    row.appendChild(btn('다시 도전','ghost',()=>{ov.classList.add('hidden');resetProgram();}));
+    row.appendChild(btn(isLast?'처음으로':'다음','',()=>{ov.classList.add('hidden'); if(isLast) goStart(); else {S.lv++; loadLevel();}}));
   }else{
     badge.textContent='실패…'; badge.className='badge lose';
     stEl.textContent='';
     rn.textContent='CARI가 길을 잃었다';
     rmsg.textContent='프로그램을 고쳐서 다시 실행해봐';
-    row.appendChild(btn('다시 짜기','',()=>{ov.classList.add('hidden');resetProgram();}));
+    document.getElementById('resStrip').textContent='프로그램 정지';
+    row.appendChild(btn('다시 도전','',()=>{ov.classList.add('hidden');resetProgram();}));
+    row.appendChild(btn('처음으로','ghost',()=>{ov.classList.add('hidden');goStart();}));
   }
 }
 function btn(txt,cls,fn){const b=document.createElement('button');b.className='btn'+(cls?' '+cls:'');b.textContent=txt;b.onclick=fn;return b;}
@@ -540,22 +573,22 @@ function btn(txt,cls,fn){const b=document.createElement('button');b.className='b
 function loadLevel(){
   const L=lv();
   S.prog=[]; openStack=[]; S.running=false; clearInterval(vmTimer);
-  document.getElementById('runBtn').textContent='실행 ▶';
+  document.getElementById('runBtn').textContent='실행';
   document.getElementById('lvNum').textContent=(S.lv+1)+' / '+LEVELS.length;
   document.getElementById('lvName').textContent=L.name;
   document.getElementById('goalTxt').textContent='🎯 '+L.goal;
   buildGrid(); buildPalette(); renderProgram();
-  if(L.teach) setTimeout(()=>toast(L.teach,2800),450);
+  if(L.teach) setTimeout(()=>toast(L.teach,1800),450);
 }
 function resetProgram(){
   S.prog=[]; openStack=[]; S.running=false; clearInterval(vmTimer);
-  document.getElementById('runBtn').textContent='실행 ▶';
+  document.getElementById('runBtn').textContent='실행';
   buildGrid(); buildPalette(); renderProgram();
 }
 function goStart(){ S.lv=0; document.getElementById('startOv').classList.remove('hidden'); }
 
 /* ===================== wire ===================== */
-document.getElementById('startCari').innerHTML=charSVG(CARI_SUIT,{cari:true});
+document.getElementById('startCari').innerHTML=cariPNG('intro');
 document.getElementById('startBtn').onclick=()=>{ document.getElementById('startOv').classList.add('hidden'); S.lv=0; loadLevel(); };
 document.getElementById('runBtn').onclick=runProgram;
 document.getElementById('resetBtn').onclick=resetProgram;
@@ -569,10 +602,11 @@ loadLevel();
      ⚠️ tieMs(레벨형 동률 해소용 소요시간)는 인트로에서 시작을 누른 시점부터 잰다. '처음으로'로 되돌아가
        인트로를 다시 거치지 않으면 계속 누적된다 — 순위 1차 키가 아니라 동률 해소용이라 그대로 둔다. -->
 <style>
-.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; gap:6px;
-  padding:8px 13px; border-radius:999px; cursor:pointer; font:800 12.5px/1 system-ui,-apple-system,sans-serif;
-  border:1px solid rgba(40,50,76,.16); background:rgba(255,255,255,.92); color:#28324c;
-  box-shadow:0 4px 12px -4px rgba(20,30,60,.28); -webkit-tap-highlight-color:transparent;}
+.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; justify-content:center;
+  box-sizing:border-box;width:112px;height:34px;padding:0;border:0;cursor:pointer;font:850 11.5px/1 system-ui,-apple-system,sans-serif;letter-spacing:.025em;
+  background:url('rank-button.png') center/100% 100% no-repeat;color:#fff;text-shadow:0 1px 3px #001c55;
+  filter:drop-shadow(0 5px 7px rgba(0,8,32,.42));-webkit-tap-highlight-color:transparent;}
+.mg-rank span{display:block;transform:translateX(7px);}
 .mg-rank.on{display:inline-flex;}
 .mg-rank:active{transform:translateY(1px);}
 </style>
@@ -594,7 +628,7 @@ loadLevel();
     var b = document.createElement('button');
     b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
     b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span> 랭킹';
+    b.innerHTML='<span>랭킹</span>';
     b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
     ov.appendChild(b);
   }

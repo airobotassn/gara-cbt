@@ -13,8 +13,10 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0
 
 export interface ReentryBlock {
   error: string
-  code: 'reentry_voided'
+  /** already_done = 제출 완료(1인 1회) · attempt_voided = 이미 무효 · reentry_voided = 이번에 무효 처리됨 */
+  code: 'reentry_voided' | 'already_done' | 'attempt_voided'
   attemptId: string
+  alreadyDone?: boolean
 }
 
 /** 응시자에게 그대로 보여지는 문구. 사유와 다음 행동(문의)까지 말해야 한다 — 옆에서 설명해 줄 사람이 없다. */
@@ -46,10 +48,23 @@ export async function blockOnReentry(
     .limit(1)
     .maybeSingle()
 
-  // 아직 시작한 적 없거나(첫 응시), 이미 끝난 응시(제출·무효)면 여기서 볼 게 없다.
-  // ⚠️ 끝난 응시의 '1인 1회' 거절은 start-exam 이 한다 — 그건 재진입이 아니라 다른 규칙이다.
-  if (!live || live.status === 'submitted' || live.status === 'voided') return null
+  if (!live) return null // 아직 시작한 적 없다 — 첫 응시
   if (live.reinstated_at) return null // 관리자가 풀어준 건 — 들어가게 둔다
+
+  // ⚠️ 끝난 응시도 **여기서** 막는다. 예전엔 이 둘을 start-exam 에만 뒀는데, 그러면 제출까지 마친
+  //    사람이 준비 화면에서 다시 시작을 눌렀을 때 **SEB 가 켜지고 나서야** "이미 완료" 를 본다.
+  //    잠금 브라우저를 왕복시키는 헛걸음이라, 들어가지 못하는 사유는 전부 켜기 전에 끝내야 한다.
+  if (live.status === 'submitted') {
+    return {
+      error: '이미 응시를 완료하셨습니다. 자격검정은 1회만 응시할 수 있습니다.',
+      code: 'already_done',
+      attemptId: live.id as string,
+      alreadyDone: true,
+    }
+  }
+  if (live.status === 'voided') {
+    return { error: MESSAGE, code: 'attempt_voided', attemptId: live.id as string }
+  }
 
   const lastSeen = live.last_seen_at ? new Date(live.last_seen_at as string).getTime() : null
   const entries = (live.entry_count as number) ?? 1
