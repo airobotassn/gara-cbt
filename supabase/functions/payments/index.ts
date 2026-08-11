@@ -230,7 +230,10 @@ Deno.serve(async (req) => {
           // 엑심베이에 넘어가는 구매자 표기. 한글 닉네임이 그대로 나가면 PG·카드사 구간에서 깨질 수 있어 ASCII 로만 만든다.
           buyerName: asciiBuyerName((user as { email?: string }).email ?? ''),
           buyerEmail: (user as { email?: string }).email ?? 'noreply@example.com',
-          returnUrl: `${origin}/pay/success`,
+          // ⚠️ 결과 화면(/pay/success)을 직접 주면 안 된다 — 엑심베이는 결과를 **POST 로** 던지는데
+          //    정적 SPA 는 GET 만 페이지를 돌려주므로 그대로 404 다(2026-08-11 실측). POST 를 받아
+          //    303 으로 결과 화면에 넘겨주는 함수를 한 칸 세운다. `to` 는 그 함수가 화이트리스트로 거른다.
+          returnUrl: `${fnBase}/functions/v1/payments-return?to=${encodeURIComponent(origin)}`,
           // 서버-서버 통지. 브라우저가 닫혀 return_url 이 안 돌아온 경우를 덮는 유일한 경로다.
           statusUrl: `${fnBase}/functions/v1/payments-webhook?k=${encodeURIComponent(hookKey)}`,
           lang: lang === 'ko' ? 'KO' : 'EN',
