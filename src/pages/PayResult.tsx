@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { usd } from '../lib/money'
-import { confirmOrder, type PaymentStatusResp, type ProductType } from '../lib/payments'
+import { confirmOrder, orderStatus, type PaymentStatusResp, type ProductType } from '../lib/payments'
 import SiteFooter from '../components/SiteFooter'
 
 // 실패(failUrl) 콜백에는 **상품 정보가 없다** — 토스가 주는 건 code·message·orderId 뿐이라,
@@ -108,7 +108,25 @@ export default function PayResult() {
 
     confirmOrder({ paymentKey, orderId, amount, rawQuery: isEximbay ? rawQuery : undefined })
       .then((res) => setView({ kind: 'done', res }))
-      .catch((e) => setView({ kind: 'failed', message: e instanceof Error ? e.message : t('pay.error_generic') }))
+      .catch(async (e) => {
+        // ⛔ **승인 호출이 끊긴 것과 결제가 실패한 것은 다르다.** 엑심베이는 결제창에서 이미 승인·매입을
+        //    마치고 결과만 돌려주는 구조라, 이 호출이 네트워크에서 끊겨도 돈은 이미 빠져 있다. 게다가
+        //    서버-서버 통지(status_url)가 우리 상태를 따로 맞추므로 **대개는 이미 지급까지 끝나 있다.**
+        //    여기서 곧장 '결제 실패'를 띄우면 화면만 정반대로 말하고, 사용자는 다시 결제하려 든다
+        //    (2026-08-11 실제로 그랬다 — 창이 닫히며 요청이 끊겨 502, 결제는 정상 완료).
+        //    그래서 실패로 단정하기 전에 **저장된 주문 상태를 다시 읽는다**(조회일 뿐 승인하지 않는다).
+        for (const wait of [600, 2000]) {
+          await new Promise((r) => setTimeout(r, wait))
+          try {
+            const st = await orderStatus(orderId)
+            if (st.status !== 'pending') {
+              setView({ kind: 'done', res: st })
+              return
+            }
+          } catch { /* 조회까지 실패하면 아래 실패 화면으로 떨어진다 */ }
+        }
+        setView({ kind: 'failed', message: e instanceof Error ? e.message : t('pay.error_generic') })
+      })
   }, [handoff, view.kind, paymentKey, orderId, amount, isEximbay, rawQuery, t])
 
   // 상품 종류 — 승인 응답이 정본이고, 실패 화면에서만 세션 힌트로 대신한다.
