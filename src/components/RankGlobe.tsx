@@ -39,8 +39,10 @@ const CFG = {
 } as const
 
 /**
- * 1·2·3위 글자 크기의 **상한**(지구 반지름 대비, markSize 가 곱해진다).
- * 실제 크기는 이 값과 "그 나라 땅 크기에 맞춘 값" 중 **작은 쪽**이다 — 아래 ORD_FIT 참고.
+ * 1·2·3위 표시 크기(지구 반지름 대비, markSize 가 곱해진다).
+ * ⚠️ **그 나라 땅 크기에 맞춰 줄이지 않는다.** 옛 버전은 글자를 그려서 좁은 땅(한국·영국)에 맞췄는데,
+ *    지금 표시는 궤도와 RANK 라벨까지 품은 에셋이라 땅에 맞추면 숫자가 점처럼 뭉개진다.
+ *    (그래서 땅 크기를 재던 ORD_FIT 은 제거됐다 — 아래 draw 의 주석 참고.)
  */
 const ORD_SZ: Record<number, number> = { 1: 0.18, 2: 0.155, 3: 0.14 }
 const RANK_ASSET = [
@@ -48,12 +50,7 @@ const RANK_ASSET = [
   '/landing/rank-node-2.svg',
   '/landing/rank-node-3.svg',
 ] as const
-/**
- * 땅에 맞추는 비율 — 화면에 보이는 그 나라 **짧은 변**의 이만큼을 글자 높이로 쓴다.
- * 큰 나라(중국·미국·러시아)는 상한에 먼저 걸리고, 작은 나라(한국·영국)만 이 값이 지배한다.
- */
-const ORD_FIT = 0.5
-/** 그래도 이보다 작아지지는 않는다. 몇 px 짜리 글자는 읽히지 않고 지저분하기만 하다. */
+/** 이보다 작아지지는 않는다. 몇 px 짜리 표시는 읽히지 않고 지저분하기만 하다. */
 const ORD_MIN = 11
 
 /** 첫 화면에 보이는 경도(정면 경도 = -이 값). -180 = **날짜변경선(180°)이 정면**.
@@ -335,15 +332,11 @@ export default function RankGlobe() {
         if (fz <= 0.2) continue
         const p = projection(c.c)
         if (!p) continue
-        // 글자 크기 = min(순위별 상한, 그 나라 땅 크기) — 아래로만 열려 있다.
-        //   · 위로 열어두면 중국·러시아 위에서 글자가 화면을 잡아먹어 추해진다 → 상한을 건다.
-        //   · 아래로는 땅을 따라간다 → 한국·영국처럼 좁은 땅에서 글자가 나라 밖으로 넘치지 않는다.
-        // 땅 크기는 **지금 화면에 보이는 만큼**으로 잰다(가장자리에 걸려 잘리면 그만큼 작아진다).
-        const bb = pathMain.bounds(c.g as never)
-        const room = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
+        // 표시 크기는 **지구 반지름 기준 하나**로 정한다.
+        //   ⚠️ 옛 코드는 여기서 그 나라 땅의 짧은 변(pathMain.bounds)을 재서 작은 쪽을 골랐다.
+        //      에셋이 궤도와 RANK 라벨을 품은 지금은 그렇게 줄이면 숫자가 점처럼 뭉개진다 →
+        //      땅 크기 측정을 통째로 걷어냈다. 되살리려면 글자로 돌아가는 얘기부터 해야 한다.
         const cap = g.R * ORD_SZ[c.rank] * mk
-        // 생성 에셋은 내부에 궤도와 RANK 라벨까지 포함하므로 나라 면적에 맞춰 줄이면
-        // 실제 랜딩 화면에서 숫자가 점처럼 뭉개진다. 지구 반지름 기준 크기를 그대로 유지한다.
         const h = Math.max(ORD_MIN * 3.2, cap)
         const img = rankImgs[c.rank - 1]
         const aspect = img?.naturalWidth && img?.naturalHeight ? img.naturalWidth / img.naturalHeight : 0.74
