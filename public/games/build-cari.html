@@ -122,13 +122,90 @@ body{
 .scorebox .foot b{color:var(--brand);}
 .ovbtns{display:flex;gap:10px;margin-top:16px;}
 .ovbtns .btn{padding:13px 28px;flex:0 0 auto;}
+
+/* v2 asset direction — the interactive rules stay intact while the presentation
+   now belongs to the same cinematic CARI family as the other finished games. */
+.stage{
+  background:
+    linear-gradient(rgba(6,20,42,.12),rgba(6,20,42,.3)),
+    url('/games/build-cari-game-bg-v7.png') center/cover no-repeat;
+}
+.hud,.hint,.palette,.controls{background:none;backdrop-filter:none;}
+.hud{padding-top:10px;}
+.gridwrap{padding:5px 8px;border-radius:20px;margin-inline:auto;background:rgba(8,28,58,.32);backdrop-filter:blur(5px);}
+.cell{box-shadow:inset 0 0 0 2px rgba(8,28,58,.68);}
+.ci.empty{background:rgba(230,240,252,.86);}
+.overlay{
+  color:#fff;
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+}
+#ovStart .floaty,#ovResult .floaty{display:none;}
+#ovStart .title{margin-top:0;text-shadow:0 3px 18px rgba(0,0,0,.45);}
+#ovStart .t1{color:#fff;}
+#ovStart .t2{background:linear-gradient(120deg,#8fdcff,#55a6ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+#ovStart .tag{color:#d7e9ff;text-shadow:0 2px 10px rgba(0,0,0,.7);}
+.rules,.scorebox{backdrop-filter:none;}
+#ovResult .badge{text-shadow:0 2px 12px rgba(0,0,0,.55);}
+@media (max-height:720px){
+  .grid{transform:scale(.86);transform-origin:top center;margin-bottom:-58px;}
+  .overlay{padding:18px;}
+  .rules{padding:10px 14px;}
+}
+
+/* v3 — finished-game UI language */
+.hud{position:relative;flex:0 0 78px;margin:5px 7px 0;padding:0;background:url('/games/build-cari-hud-v10.png') center/contain no-repeat;backdrop-filter:none;}
+.hud .cari-mini{display:none;}
+.hud .lvlbox{position:absolute;left:23%;top:50%;width:50%;transform:translateY(-50%);text-align:center;line-height:1.08;}
+.hud .lvlbox b{font-size:18px;color:#fff;text-shadow:0 2px 4px #00133a;}.hud .lvlbox span{font-size:11px;color:#a8ddff;font-weight:800;}
+.hud .scorepill{position:absolute;right:4.8%;top:50%;width:16%;height:60px;transform:translateY(-50%);margin:0;padding:1px 0;background:none;border:0;box-shadow:none;display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;align-items:center;text-align:center;white-space:normal;text-shadow:0 2px 4px #00133a;}
+.scorepill .metric{display:flex;min-width:0;height:28px;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.scorepill small{font-size:5.5px;line-height:1;color:#9bcbe8;font-weight:800;letter-spacing:0}.scorepill b{font-size:8px;line-height:1;font-variant-numeric:tabular-nums}.scorepill .ok b{color:#7de8ff}.scorepill .err b{color:#ff9b87}
+.hint{margin:3px 28px;padding:6px 9px;border:0;border-radius:8px;background:rgba(29,40,43,.88)!important;color:#fff;font-size:10.5px;font-weight:800;backdrop-filter:none;text-shadow:none;}
+.hint b{color:#ffe477;}
+.gridwrap{margin:2px auto 0;padding:4px 7px;transform:scale(.9);transform-origin:top center;margin-bottom:-42px;}
+.ci.src .cmini{width:44px;height:40px}.ci.src .cmini img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45));}
+.ci.conv,.ci.sensor{background:transparent!important;box-shadow:none!important;overflow:visible}.ci .tile-asset{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,8,30,.5));}.ci.sensor .tile-asset{transform:rotate(var(--rot));}
+.control-console{position:relative;flex:0 0 112px;margin:0 8px 5px;padding:0;z-index:6;overflow:hidden;}
+.control-console .palette{height:55px;padding:0 20px;display:flex;gap:12px;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;background:none;backdrop-filter:none;overscroll-behavior-x:contain;scroll-padding-inline:20px}.control-console .palette::-webkit-scrollbar{display:none}
+.control-console .tool{position:relative;flex:0 0 52px;width:52px;height:52px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;}
+.control-console .tool .tico{width:100%;height:100%;display:block;object-fit:contain;filter:none;}
+.control-console .tool .tnm{display:none}.control-console .tool.on{filter:brightness(1.13) drop-shadow(0 0 4px #66dfff)}.control-console .tool.on .tico{transform:scale(1.04)}
+.control-console .controls{height:49px;padding:0;margin:5px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:7px;background:none;backdrop-filter:none;}
+.control-console .controls .btn{width:auto!important;height:49px;padding:0 0 0 30px;border:0;border-radius:0;background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;box-shadow:none;color:#fff;text-shadow:0 2px 3px #111;font-size:15px;}.control-console #btnRun{background-image:url('/games/build-cari-run-v9.png')!important}.control-console #btnReset{background-image:url('/games/build-cari-reset-v9.png')!important}
+
+#ovStart{justify-content:flex-start;padding:0;background-image:linear-gradient(rgba(18,28,36,.08),rgba(18,28,36,.18)),url('/games/build-cari-intro-bg-v7.png');}
+#ovStart .intro-console{position:absolute;left:50%;top:50%;height:min(620px,92vh);aspect-ratio:955/1413;max-width:90vw;transform:translate(-50%,-50%);background:url('/games/build-cari-intro-v10.png') center/contain no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));}
+#ovStart .floaty{display:none}
+#ovStart .title{position:absolute;z-index:1;left:9%;top:48.5%;width:82%;margin:0;line-height:1.02;}#ovStart .t1,#ovStart .t2{font-size:28px;font-weight:950;}#ovStart .t1{color:#fff}#ovStart .t2{color:#ffd253;background:none;-webkit-text-fill-color:initial}
+#ovStart .tag{position:absolute;z-index:1;left:10%;top:54%;width:80%;margin:0;color:#d9e8f8;font-size:10.5px;font-weight:800;text-shadow:none;}
+#ovStart .rules{position:absolute;z-index:1;left:12%;top:62.5%;width:76%;height:20%;padding:0;background:transparent!important;border:0;box-shadow:none;display:grid;grid-template-rows:repeat(3,1fr);}
+#ovStart .rules div{margin:0;padding-left:33px;color:#29313b;font-size:9.5px;font-weight:800;line-height:1.15;align-items:center;}#ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
+#ovStart #btnStart{position:absolute;z-index:1;left:25%;top:86%;width:50%;height:9%;margin:0!important;padding:0 0 0 42px!important;border:0;background:none;color:#fff;box-shadow:none;filter:none;text-shadow:0 2px 3px #111;font-size:15px;display:grid;place-items:center;}
+
+#ovResult{padding:18px;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
+.result-console{position:relative;width:min(330px,84vw);height:min(500px,76vh);background:url('/games/build-cari-result-win-v9.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
+#ovResult.fail .result-console{background-image:url('/games/build-cari-result-fail-v9.png')}
+#ovResult .floaty{display:none;}
+#ovResult .badge{position:absolute;left:10%;top:53%;width:80%;margin:0;font-size:23px;text-shadow:0 2px 4px #00102f;}
+#ovResult .scorebox{position:absolute;left:13%;top:61%;width:74%;margin:0;padding:4px;background:transparent;border:0;box-shadow:none;backdrop-filter:none;}
+#ovResult .scorebox .big{color:#fff;font-size:16px;text-shadow:0 2px 4px #00102f;}#ovResult .scorebox .take{color:#dff3ff;font-size:11.5px;line-height:1.35;margin-top:5px;}#ovResult .scorebox .foot{display:none;}
+#ovResult .ovbtns{position:absolute;left:8%;right:8%;bottom:5%;height:67px;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#ovResult .ovbtns .btn{width:100%!important;height:100%!important;margin:0!important;padding:0 0 0 30px!important;border:0;background:none!important;filter:none;color:#fff;font-size:15px;text-shadow:0 2px 3px #111;}
+#ovResult.fail .ovbtns{left:11%;right:11%;grid-template-columns:1fr}#ovResult.fail #btnNext{display:none;}
+
+.mg-rank{top:11px!important;right:11px!important;width:126px!important;height:38px!important;padding:0!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.png') center/100% 100% no-repeat!important;color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;font-size:12px!important;display:none;grid-template-columns:42px 1fr;align-items:center;}
+.mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{display:block;grid-column:2;text-align:center;width:100%;padding-right:7px;}
+@media (max-width:380px){.control-console{margin-inline:5px}.control-console .tool{flex-basis:54px;width:54px;height:54px}}
+@media (max-height:740px){.hud{flex-basis:72px}.grid{transform:scale(.82);transform-origin:top center;margin-bottom:-76px}.control-console{flex-basis:122px}.control-console .palette{height:61px}.control-console .tool{width:52px;height:52px;flex-basis:52px}.control-console .controls,.control-console .controls .btn{height:49px}#ovStart .floaty{width:128px;height:158px}#ovStart .rules{padding:7px 14px}#ovStart #btnStart{margin-top:7px!important}.result-console{height:min(430px,70vh)}}
 </style>
 </head>
 <body>
 <div class="stage" id="stage">
 
   <div class="hud">
-    <div class="cari-mini" id="hudCari"></div>
+    <img class="cari-mini" id="hudCari" src="/games/build-cari-play-v5.png" alt="CARI"/>
     <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">직선 라인</span></div>
     <div class="scorepill" id="scorePill"></div>
   </div>
@@ -142,44 +219,45 @@ body{
     </div>
   </div>
 
-  <div class="palette">
-    <div class="tool on" data-tool="conv"><span class="tico">➡️</span><span class="tnm">컨베이어</span></div>
-    <div class="tool" data-tool="sensor"><span class="tico">🔀</span><span class="tnm">분기센서</span></div>
-    <div class="tool erase" data-tool="erase"><span class="tico">🧽</span><span class="tnm">지우기</span></div>
-  </div>
-
-  <div class="controls">
-    <button class="btn ghost" id="btnReset">리셋</button>
-    <button class="btn" id="btnRun">가동</button>
+  <div class="control-console">
+    <div class="palette" id="palette"></div>
+    <div class="controls">
+      <button class="btn" id="btnRun">가동</button>
+      <button class="btn ghost" id="btnReset">리셋</button>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
   <!-- START -->
   <div class="overlay" id="ovStart">
-    <div class="floaty" id="startCari"></div>
-    <div class="title"><span class="t1">지어라 </span><span class="t2">CARI</span></div>
-    <div class="tag">라인을 깔면 공장이 알아서 돌아가요!</div>
-    <div class="rules">
-      <div><b>①</b><span>칸을 <b>탭</b>해 컨베이어를 놓고, 다시 <b>탭</b>하면 방향(▲▶▼◀)이 돌아가요.</span></div>
-      <div><b>②</b><span><b>분기센서</b>는 색을 <b>읽어서</b> 맞으면 옆으로, 아니면 직진 — 라인의 판단 장치예요.</span></div>
-      <div><b>③</b><span><b>가동</b>을 누르면 상자가 <b>스스로</b> 흘러 각 출고함으로 정렬돼요. 사람 손 없이!</span></div>
+    <div class="intro-console">
+      <div class="floaty" id="startCari"><img src="/games/build-cari-intro-hero-v5.png" alt="컨베이어를 든 CARI"/></div>
+      <div class="title"><span class="t1">지어라 </span><span class="t2">CARI</span></div>
+      <div class="tag">라인을 깔면 공장이 알아서 돌아가요!</div>
+      <div class="rules">
+        <div><b>1</b><span>칸을 눌러 <b>컨베이어</b>를 놓아요</span></div>
+        <div><b>2</b><span>다시 누르면 <b>방향이 회전</b>해요</span></div>
+        <div><b>3</b><span><b>분기센서</b>로 색상별 출고함에 보내요</span></div>
+      </div>
+      <button class="btn" id="btnStart">시작하기</button>
     </div>
-    <button class="btn" id="btnStart" style="flex:0 0 auto;margin-top:20px;padding:15px 50px;">시작하기</button>
   </div>
 
   <!-- RESULT -->
   <div class="overlay hide" id="ovResult">
-    <div class="floaty" id="resCari"></div>
-    <div class="badge win" id="resBadge">가동 성공!</div>
-    <div class="scorebox">
-      <div class="big" id="resTitle"></div>
-      <div class="take" id="resTake"></div>
-      <div class="foot" id="resFoot"></div>
-    </div>
-    <div class="ovbtns">
-      <button class="btn ghost" id="btnRetry" style="flex:0 0 auto;padding:13px 26px;">다시</button>
-      <button class="btn" id="btnNext" style="flex:0 0 auto;padding:13px 30px;">다음</button>
+    <div class="result-console">
+      <img class="floaty" id="resCari" src="/games/build-cari-intro-hero-v5.png" alt="CARI"/>
+      <div class="badge win" id="resBadge">가동 성공!</div>
+      <div class="scorebox">
+        <div class="big" id="resTitle"></div>
+        <div class="take" id="resTake"></div>
+        <div class="foot" id="resFoot"></div>
+      </div>
+      <div class="ovbtns">
+        <button class="btn ghost" id="btnRetry">다시</button>
+        <button class="btn" id="btnNext">다음</button>
+      </div>
     </div>
   </div>
 
@@ -229,6 +307,14 @@ const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
 
 /* ================= Constants ================= */
 const COLS=6, ROWS=8, CELL=52, ITEM=26, SPAWN_EVERY=2;
+const TOOL_DEFS=[
+  ['conv-0','/games/build-cari-tool-up-v9.png','위쪽 컨베이어'],
+  ['conv-1','/games/build-cari-tool-right-v9.png','오른쪽 컨베이어'],
+  ['conv-2','/games/build-cari-tool-down-v9.png','아래쪽 컨베이어'],
+  ['conv-3','/games/build-cari-tool-left-v9.png','왼쪽 컨베이어'],
+  ['sensor','/games/build-cari-tool-sensor-v9.png','분기 센서'],
+  ['erase','/games/build-cari-tool-erase-v9.png','지우기']
+];
 const DIRS=[[-1,0],[0,1],[1,0],[0,-1]];      // 0=up 1=right 2=down 3=left
 const ARROW=['▲','▶','▼','◀'];
 const FEAT={ R:{c:'#f2664f',n:'빨강'}, B:{c:'#1b55d0',n:'파랑'}, G:{c:'#12b58c',n:'초록'} };
@@ -267,7 +353,7 @@ const LEVELS=[
 /* ================= State ================= */
 let LI=0, L=null, grid=[], items=[], nextId=0, cellEls=[];
 let running=false, timer=null, tickN=0, spawnedCount=0;
-let good=0, bad=0, miss=0, routeLog=[], tool='conv', started=false;
+let good=0, bad=0, miss=0, routeLog=[], tool='conv-2', started=false;
 const $=id=>document.getElementById(id);
 
 /* ================= Board build ================= */
@@ -282,15 +368,20 @@ function buildCells(){
     }
   }
 }
+function buildPalette(){
+  $('palette').innerHTML=TOOL_DEFS.map(([id,src,label])=>
+    `<button type="button" class="tool" data-tool="${id}" aria-label="${label}" title="${label}"><img class="tico" src="${src}" alt="" draggable="false"></button>`
+  ).join('');
+}
 function cellInner(r,c){
   const g=grid[r][c];
-  if(g.type==='source') return `<div class="ci src"><div class="cmini">${charSVG(CARI_SUIT,{cari:true})}</div><span class="ar">${ARROW[g.dir]}</span></div>`;
+  if(g.type==='source') return `<div class="ci src"><div class="cmini"><img src="/games/build-cari-play-v5.png" alt="" draggable="false"></div><span class="ar">${ARROW[g.dir]}</span></div>`;
   if(g.type==='bin'){ const col=g.want?FEAT[g.want].c:null;
     return `<div class="ci bin"><div class="binbox" style="border-color:${col||'#b9c2d6'}">`+
       (col?`<span class="bsw" style="background:${col}"></span>`:`<span class="bany">?</span>`)+`</div></div>`; }
-  if(g.type==='conv') return `<div class="ci conv"><span class="ar">${ARROW[g.dir]}</span></div>`;
+  if(g.type==='conv'){ const dn=['up','right','down','left'][g.dir]; return `<div class="ci conv"><img class="tile-asset" src="/games/build-cari-tool-${dn}-v9.png" alt=""></div>`; }
   if(g.type==='sensor'){ const col=FEAT[L.sense].c;
-    return `<div class="ci sensor"><span class="sdot" style="background:${col}"></span><span class="ar">${ARROW[g.dir]}</span><span class="sbr" style="color:${col}">${ARROW[branchOf(g.dir)]}</span></div>`; }
+    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="/games/build-cari-tool-sensor-v9.png" alt=""><span class="sdot" style="background:${col}"></span></div>`; }
   return `<div class="ci empty"></div>`;
 }
 function renderCell(r,c){ cellEls[r][c].innerHTML=cellInner(r,c); }
@@ -308,7 +399,7 @@ function startLevel(i){
   renderBoard();
   $('lvlName').textContent=L.name; $('lvlSub').textContent=L.sub;
   $('hintLine').innerHTML=L.goal;
-  setTool('conv');
+  setTool('conv-2');
 }
 
 /* ================= Simulation ================= */
@@ -376,7 +467,7 @@ function stopSim(){ running=false; if(timer){clearInterval(timer);timer=null;} s
 /* ================= UI ================= */
 function updateScore(){
   const wrong=bad+miss;
-  $('scorePill').innerHTML=`맞음 <b>${good}</b>/${L?L.need:0}`+(wrong?` · <span class="miss">틀림 ${wrong}</span>`:'');
+  $('scorePill').innerHTML=`<span class="metric ok"><small>출고</small><b>${good}/${L?L.need:0}</b></span><span class="metric err"><small>오류</small><b>${wrong}</b></span>`;
 }
 function updateRunBtn(){ const b=$('btnRun'); b.textContent=running?'멈춤':'가동'; b.classList.toggle('stop',running); }
 function setEditable(on){ $('cells').style.opacity=on?'1':'.92'; }
@@ -388,8 +479,9 @@ $('cells').addEventListener('click',e=>{
   const r=+cd.dataset.r, c=+cd.dataset.c, g=grid[r][c];
   if(g.type==='source'||g.type==='bin') return;
   if(tool==='erase'){ grid[r][c]={type:'empty'}; }
-  else if(g.type===tool){ g.dir=(g.dir+1)%4; }              // rotate same type
-  else { grid[r][c]={type:tool,dir:2}; }                    // place / replace
+  else if(tool.startsWith('conv-')){ grid[r][c]={type:'conv',dir:+tool.slice(5)}; }
+  else if(tool==='sensor' && g.type==='sensor'){ g.dir=(g.dir+1)%4; }
+  else { grid[r][c]={type:'sensor',dir:2}; }
   renderCell(r,c);
 });
 document.querySelector('.palette').addEventListener('click',e=>{
@@ -402,16 +494,18 @@ $('btnReset').onclick=()=>{ startLevel(LI); };
 function finish(){
   stopSim();
   const win=good>=L.win;
-  $('resCari').innerHTML=charSVG(CARI_SUIT,{cari:true, shock:!win, dir:win?0:1});
-  $('resBadge').textContent=win?'가동 성공!':'라인 점검!';
+  $('resCari').src=win?'/games/build-cari-intro-hero-v5.png':'/games/build-cari-fail-v5.png';
+  $('resBadge').textContent=win?'출고 완료!':'출고 실패';
   $('resBadge').className='badge '+(win?'win':'lose');
-  $('resTitle').textContent=win ? (L.name+' 클리어 — 맞음 '+good+'/'+L.need)
-                                 : ('맞음 '+good+' · 틀림 '+(bad+miss)+' — 길을 고쳐볼까요?');
-  $('resTake').innerHTML=win?L.take:'상자가 엉뚱한 곳으로 갔어요. 컨베이어 방향과 센서 위치를 다시 이어보세요.';
-  $('resFoot').innerHTML=FOOT;
+  $('resTitle').textContent=win ? `${L.name} · ${good}/${L.need} 출고` : `${good}/${L.need} 출고`;
+  $('resTake').textContent=win?'모든 상자가 제자리에 도착했어요.':'경로를 다시 연결해요.';
+  $('resFoot').textContent='';
   const nx=$('btnNext');
   if(win && window.MGBridge) MGBridge.submit(LI+1, {timed:true}); // 랭킹: 도달 레벨(동률=시간)
-  nx.textContent = !win ? '다시' : (LI>=LEVELS.length-1?'처음으로':'다음 레벨');
+  $('btnRetry').textContent=win?'다시':'다시 시작';
+  $('ovResult').classList.toggle('fail',!win);
+  nx.hidden=!win;
+  nx.textContent = LI>=LEVELS.length-1?'처음으로':'다음';
   nx.dataset.win=win?'1':'0';
   $('ovResult').classList.remove('hide');
 }
@@ -423,8 +517,7 @@ $('btnNext').onclick=()=>{
 };
 
 /* ================= Boot ================= */
-$('hudCari').innerHTML=charSVG(CARI_SUIT,{cari:true});
-$('startCari').innerHTML=charSVG(CARI_SUIT,{cari:true,dir:1});
+buildPalette();
 buildCells();
 startLevel(0);
 $('btnStart').onclick=()=>{ $('ovStart').classList.add('hide'); started=true; startLevel(0); };
@@ -475,7 +568,7 @@ window.__won=()=>$('resBadge').classList.contains('win');
     var b = document.createElement('button');
     b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
     b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span> 랭킹';
+    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span><span class="rank-label">랭킹</span>';
     b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
     ov.appendChild(b);
   }

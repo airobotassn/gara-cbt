@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
+import { markInquirySeen, refreshInquiryAlert } from '../lib/inquiryAlert'
 
 interface Row {
   id: string
@@ -15,6 +16,7 @@ interface Row {
   status: string
   answer: string | null
   answered_at: string | null
+  answer_seen_at: string | null
   created_at: string
 }
 
@@ -40,12 +42,26 @@ export default function InquiryBoard() {
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('inquiries')
-      .select('id, category, title, body, status, answer, answered_at, created_at')
+      .select('id, category, title, body, status, answer, answered_at, answer_seen_at, created_at')
       .order('created_at', { ascending: false })
     if (error) { setErr(error.message); setRows([]); return }
     setRows((data ?? []) as Row[])
+    // 목록을 받은 김에 알림 점 개수도 맞춘다 — 다른 기기에서 이미 읽었으면 여기서 꺼진다.
+    refreshInquiryAlert(true)
   }, [])
   useEffect(() => { if (isFullUser) load() }, [isFullUser, load])
+
+  // 펼치는 순간이 곧 '읽음'이다 — 탭에 들어온 것만으로 끄면 목록만 스쳐본 사람의 답변이 조용히 사라진다.
+  //   ⚠️ 낙관적으로 화면부터 끄고 서버를 부른다. 실패해도 다음 조회에서 점이 되살아날 뿐 잃는 게 없다.
+  function toggle(r: Row) {
+    if (open === r.id) { setOpen(null); return }
+    setOpen(r.id)
+    if (r.status === 'answered' && !r.answer_seen_at) {
+      const now = new Date().toISOString()
+      setRows((prev) => (prev ?? []).map((x) => (x.id === r.id ? { ...x, answer_seen_at: now } : x)))
+      markInquirySeen(r.id)
+    }
+  }
 
   async function submit() {
     if (!title.trim() || !body.trim()) { setErr('제목과 내용을 모두 입력해 주세요.'); return }
@@ -126,7 +142,7 @@ export default function InquiryBoard() {
             const opened = open === r.id
             return (
               <article key={r.id} className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-hidden">
-                <button onClick={() => setOpen(opened ? null : r.id)} className="w-full text-left p-6 flex items-start justify-between gap-4">
+                <button onClick={() => toggle(r)} className="w-full text-left p-6 flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <span className="px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-label-sm text-[11px] font-bold uppercase tracking-wider">
@@ -135,6 +151,14 @@ export default function InquiryBoard() {
                       {r.status === 'open'
                         ? <span className="px-3 py-1 rounded-full bg-outline/10 text-outline border border-outline/20 font-label-sm text-[11px] font-bold">답변 대기</span>
                         : <span className="px-3 py-1 rounded-full bg-primary-container/15 text-primary-container border border-primary-container/30 font-label-sm text-[11px] font-bold">답변 완료</span>}
+                      {/* 아직 안 펼쳐본 답변 — '답변 완료'만으로는 새로 온 건지 예전에 읽은 건지 구분이 안 된다.
+                          여기 점이 FAB·탭의 점과 같은 것이고, 펼치는 순간 셋이 같이 꺼진다. */}
+                      {r.status === 'answered' && !r.answer_seen_at ? (
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-error/10 text-error border border-error/25 font-label-sm text-[11px] font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-error" aria-hidden="true" />
+                          새 답변
+                        </span>
+                      ) : null}
                     </div>
                     <h3 className="font-title-md text-lg font-bold text-on-surface break-keep">{r.title}</h3>
                     <p className="font-body-md text-body-md text-on-surface-variant mt-1">{fmt(r.created_at)}</p>

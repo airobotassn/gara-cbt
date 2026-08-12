@@ -10,6 +10,8 @@ import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { optionCountForLevel } from '../lib/scoring'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
+import { useDraft } from '../lib/adminDraft'
+import DraftBar from '../components/DraftBar'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
@@ -1001,6 +1003,13 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
   const [ei, setEi] = useState<Record<string, string>>({ ...(row?.explanation_i18n ?? {}) })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  // 임시저장 — 문제·보기·해설에 6개국어까지 얹히는 화면이라 날리면 손해가 가장 크다.
+  const draft = useDraft({
+    kind: 'lt-question',
+    refId: row?.id,
+    value: { level, cat, correct, active, pi, oi, ei },
+    title: (pi.ko ?? '').trim().slice(0, 40) || (row ? row.code ?? `Lv.${row.level}` : '새 문항'),
+  })
   const axes = axesForLevel(level, 'ko')
   const koCount = Math.max(1, (oi.ko ?? []).length)
   // 보기 개수는 레벨이 정한다 — lib/scoring.ts 의 OPTIONS_BY_LEVEL(서버도 같은 값으로 강제).
@@ -1088,6 +1097,7 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
       })
       setMsg(`✅ ${isNew ? '추가' : '저장'}됨`)
       if (dropped.length) alert(`${dropped.map((l) => LANG_LABEL[l]).join('·')} 은(는) 문제·보기가 덜 채워져 저장에서 제외했습니다.`)
+      draft.clear()
       onSaved()
     } catch (e) {
       setMsg('실패: ' + (e instanceof Error ? e.message : String(e)))
@@ -1101,6 +1111,17 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
         <div className="admin-modal-h">
           <b>{isNew ? '문항 추가' : '문항 수정'}</b>
           <span className="admin-hint">{row ? row.code ?? `Lv.${row.level}` : '번호(L1-001…)는 저장 시 자동 부여'}</span>
+          {/* 6개국어를 번역까지 채운 뒤 날리면 손해가 특히 크다. */}
+          <DraftBar
+            status={draft.status}
+            savedAt={draft.savedAt}
+            drafts={draft.drafts}
+            onRefresh={draft.refresh}
+            onRestore={(p: { level: number; cat: string; correct: number; active: boolean; pi: Record<string, string>; oi: Record<string, string[]>; ei: Record<string, string> }) => {
+              setLevel(p.level); setCat(p.cat); setCorrect(p.correct); setActive(p.active)
+              setPi(p.pi); setOi(p.oi); setEi(p.ei)
+            }}
+          />
           <button className="admin-x" onClick={onClose}>✕</button>
         </div>
         <div className="admin-row">

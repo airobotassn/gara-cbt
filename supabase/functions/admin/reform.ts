@@ -127,8 +127,11 @@ async function inquiryAnswer(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const answer = String(body?.answer ?? '').trim()
   if (!id || !answer) return json({ error: '답변 내용을 입력하세요.' }, 400)
+  // ⚠️ answer_seen_at 을 null 로 되돌린다 — 답변을 **고쳐 쓰면** 사용자 화면에 빨간 점이 다시 떠야 한다.
+  //    안 그러면 한 번 읽은 문의는 답이 바뀌어도 영영 조용하다.
   const { error } = await admin.from('inquiries').update({
     answer, status: 'answered', answered_at: new Date().toISOString(), answered_by: ctx.uid,
+    answer_seen_at: null,
   }).eq('id', id)
   if (error) return json({ error: error.message }, 500)
   await audit(admin, ctx, 'inquiryAnswer', id)
@@ -461,7 +464,7 @@ async function bannedWordSave(admin: any, body: any, ctx: Ctx) {
 }
 async function suspendUser(admin: any, body: any, ctx: Ctx) {
   const uid = String(body?.userId ?? '')
-  if (!uid) return json({ error: '회원을 지정하세요.' }, 400)
+  if (!uid) return json({ error: '유저를 지정하세요.' }, 400)
   const days = Number(body?.days ?? 0)
   // days=0 이면 정지 해제. 사유는 정지할 때만 필수다.
   if (days > 0 && !String(body?.reason ?? '').trim()) return json({ error: '정지 사유를 적어주세요.' }, 400)

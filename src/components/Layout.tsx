@@ -6,6 +6,7 @@ import { supabase, callFunction } from '../lib/supabase'
 import GemAvatar, { Avatar } from './GemAvatar'
 import { GEM_COLORS, ADMIN_MASCOT_COUNT, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
+import { clearInquiryAlert, refreshInquiryAlert, useInquiryAlert } from '../lib/inquiryAlert'
 import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
 import {
@@ -91,6 +92,21 @@ export default function Layout({ children }: { children: ReactNode }) {
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => setProfile(data ?? null))
+  }, [isFullUser, user])
+
+  // 1:1 문의 '새 답변' 빨간 점 — FAB 은 로그인한 모든 화면에 떠 있으므로 여기가 셈의 자리다.
+  //   ⚠️ 답변은 사용자가 화면을 켜둔 동안에도 달린다. 폴링은 하지 않고(관리자 답변은 하루 몇 건이다)
+  //      **창으로 돌아올 때** 다시 센다 — 실제로 다른 탭에서 메일·메신저를 보고 오는 동선이다.
+  const inquiryAlert = useInquiryAlert()
+  useEffect(() => {
+    if (!isFullUser) {
+      clearInquiryAlert()
+      return
+    }
+    refreshInquiryAlert(true)
+    const onFocus = () => refreshInquiryAlert()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [isFullUser, user])
 
   // 패널 외부 클릭 시 닫기 + '더보기' 팝오버는 자기 밖을 누르면 항상 접기(모바일에서 계속 떠 방해)
@@ -207,6 +223,9 @@ export default function Layout({ children }: { children: ReactNode }) {
                       {/* 아이콘 크기는 옆 글자 크기(fab.css 의 .pf-mypage-btn)와 맞춘다 */}
                       <UserIcon size={15} />
                       {t('nav.mypage')}
+                      {/* 새 답변이 있으면 여기까지 점을 끌고 온다 — FAB 만 찍어두면 패널을 연 사람이
+                          "무슨 일인지" 알 길이 없다. 실제 목적지는 마이페이지 1:1 문의 탭이다. */}
+                      {inquiryAlert > 0 ? <span className="pf-dot" aria-hidden="true" /> : null}
                     </button>
                     <button
                       className="pf-acct-btn pf-logout-btn"
@@ -425,12 +444,18 @@ export default function Layout({ children }: { children: ReactNode }) {
             <ChevronUpIcon size={24} />
           </button>
 
-          <button className="fab" onClick={() => setOpen((o) => !o)} aria-label="menu">
+          <button
+            className="fab"
+            onClick={() => setOpen((o) => !o)}
+            aria-label={inquiryAlert > 0 ? t('fab.newanswer') : 'menu'}
+            title={inquiryAlert > 0 ? t('fab.newanswer') : undefined}
+          >
             <img
               src="/logo.png"
               alt="CARIS"
               style={{ width: 40, height: 40, borderRadius: '50%' }}
             />
+            {inquiryAlert > 0 ? <span className="fab-dot" aria-hidden="true" /> : null}
           </button>
         </>
       )}

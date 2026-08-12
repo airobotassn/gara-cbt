@@ -8,8 +8,10 @@ import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
 import InquiryBoard from '../components/InquiryBoard'
+import { useInquiryAlert } from '../lib/inquiryAlert'
 import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../lib/certNo'
-import { countryName } from '../lib/regions'
+import { countryName, countryOptions } from '../lib/regions'
+import { loadRegionIndex, loadRegions, type RegionOption } from '../lib/regionCatalog'
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
 import { usd } from '../lib/money'
 import {
@@ -85,12 +87,20 @@ function ProfileSection() {
     region_code: string | null
     display_name: string | null
     nickname_changed_at: string | null
+    region_locked_at: string | null
+    region_changed_at: string | null
   } | null>(null)
   // 닉네임 변경 — 평생 1회. 서버(set-nickname)가 최종 판정하고 여기선 UI 상태만 잡는다.
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [nickErr, setNickErr] = useState('')
+  // 국가·지역 변경 — 이것도 평생 1회(닉네임과 같은 성격). 판정은 서버 RPC 한 문장이 한다.
+  const [geoEditing, setGeoEditing] = useState(false)
+  const [geoCountry, setGeoCountry] = useState('')
+  const [geoRegion, setGeoRegion] = useState('')
+  const [geoSaving, setGeoSaving] = useState(false)
+  const [geoErr, setGeoErr] = useState('')
 
   // 프로필(국가/지역/닉네임) 로딩
   useEffect(() => {
@@ -98,7 +108,7 @@ function ProfileSection() {
     let alive = true
     supabase
       .from('profiles')
-      .select('country_code,region_code,display_name,nickname_changed_at')
+      .select('country_code,region_code,display_name,nickname_changed_at,region_locked_at,region_changed_at')
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -110,9 +120,68 @@ function ProfileSection() {
     }
   }, [user?.id])
 
+  // 지역 목록·이름은 아레나 지도 파일에서 온다(regionCatalog) — 지역 이름을 여기서 다시 만들지 않는다.
+  const [regionIndex, setRegionIndex] = useState<Record<string, number> | null>(null)
+  const [geoRegionList, setGeoRegionList] = useState<RegionOption[]>([])
+  const [savedRegionName, setSavedRegionName] = useState('')
+  useEffect(() => {
+    let alive = true
+    loadRegionIndex().then((idx) => { if (alive) setRegionIndex(idx) })
+    return () => { alive = false }
+  }, [])
+  // 지금 저장돼 있는 지역의 표시 이름(고르는 목록과 별개 — 나라를 바꾸는 중에도 원래 값이 보여야 한다).
+  useEffect(() => {
+    let alive = true
+    const { country_code: c, region_code: r } = profile ?? {}
+    if (!c || !r) { setSavedRegionName(''); return }
+    loadRegions(c, lang).then((list) => {
+      if (alive) setSavedRegionName(list.find((x) => x.code === r)?.name ?? r)
+    })
+    return () => { alive = false }
+  }, [profile?.country_code, profile?.region_code, lang])
+  // 편집 중 고른 나라의 지역 목록.
+  useEffect(() => {
+    let alive = true
+    if (!geoEditing || !geoCountry || !regionIndex?.[geoCountry]) { setGeoRegionList([]); return }
+    loadRegions(geoCountry, lang).then((list) => { if (alive) setGeoRegionList(list) })
+    return () => { alive = false }
+  }, [geoEditing, geoCountry, lang, regionIndex])
+
   const countryLabel = profile?.country_code ? countryName(profile.country_code, lang) : '-'
-  const regionLabel = profile?.region_code ? t(`region.${profile.region_code}`) : '-'
+  // 지역 데이터가 없는 나라는 지역이 비어 있는 게 정상이다 — '-' 로 두고 없는 칸처럼 보이게 한다.
+  const regionLabel = savedRegionName || '-'
   const nickUsed = !!profile?.nickname_changed_at // 변경권 소진
+  const geoNeedRegion = !!regionIndex && !!regionIndex[geoCountry]
+  const geoList = countryOptions(lang, profile?.country_code ?? null)
+  // 확정 전(온보딩을 아직 안 지난 회원)에는 변경 버튼을 띄우지 않는다 — 그 경로는 온보딩 소관이고,
+  // 서버 RPC 도 region_locked_at 이 있는 행만 고친다.
+  const geoLocked = !!profile?.region_locked_at
+  const geoUsed = !!profile?.region_changed_at
+
+  async function saveGeo() {
+    if (geoSaving || !geoCountry || (geoNeedRegion && !geoRegion)) return
+    setGeoSaving(true)
+    setGeoErr('')
+    try {
+      await callFunction('set-region', {
+        action: 'change',
+        country_code: geoCountry,
+        region_code: geoNeedRegion ? geoRegion : '',
+      })
+      setProfile((p) => (p ? {
+        ...p,
+        country_code: geoCountry,
+        region_code: geoNeedRegion ? geoRegion : null,
+        region_changed_at: new Date().toISOString(),
+      } : p))
+      setGeoEditing(false)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setGeoErr(t(/change_unavailable|409/.test(msg) ? 'mypage.region_change_used' : 'nick.err_failed'))
+    } finally {
+      setGeoSaving(false)
+    }
+  }
 
   async function saveNick() {
     const v = draft.trim()
@@ -195,22 +264,90 @@ function ProfileSection() {
         )}
       </div>
 
+      {/* 국가·지역 — 평생 1회 변경. 닉네임과 같은 자리·같은 규칙이라 생김새도 맞춘다. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
-        {/* 국가 (읽기전용) */}
         <div>
-          <label className="block font-label-md text-[13px] font-semibold text-outline mb-1.5">{t('onboarding.country')}</label>
-          <div className="w-full rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-on-surface-variant select-none cursor-not-allowed">{countryLabel}</div>
+          <label className="block font-label-md text-[13px] font-semibold text-outline mb-1.5" htmlFor={geoEditing ? 'mp-country' : undefined}>{t('onboarding.country')}</label>
+          {geoEditing ? (
+            <select
+              id="mp-country"
+              className="w-full rounded-xl bg-surface border border-outline-variant px-4 py-3 font-body-md text-on-surface"
+              value={geoCountry}
+              // 나라를 바꾸면 지역을 비운다 — 안 비우면 옛 나라의 지역이 남아 서버가 거절한다.
+              onChange={(e) => { setGeoCountry(e.target.value); setGeoRegion(''); setGeoErr('') }}
+              disabled={geoSaving}
+            >
+              {geoList.pinned && <option value={geoList.pinned.code}>{geoList.pinned.name}</option>}
+              {geoList.rest.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+            </select>
+          ) : (
+            <div className="w-full rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-on-surface-variant select-none">{countryLabel}</div>
+          )}
         </div>
-        {/* 지역 (읽기전용) */}
         <div>
-          <label className="block font-label-md text-[13px] font-semibold text-outline mb-1.5">{t('onboarding.region')}</label>
-          <div className="w-full rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-on-surface-variant select-none cursor-not-allowed">{regionLabel}</div>
+          <label className="block font-label-md text-[13px] font-semibold text-outline mb-1.5" htmlFor={geoEditing && geoNeedRegion ? 'mp-region' : undefined}>{t('onboarding.region')}</label>
+          {geoEditing ? (
+            geoNeedRegion ? (
+              <select
+                id="mp-region"
+                className="w-full rounded-xl bg-surface border border-outline-variant px-4 py-3 font-body-md text-on-surface"
+                value={geoRegion}
+                onChange={(e) => { setGeoRegion(e.target.value); setGeoErr('') }}
+                disabled={geoSaving || !geoRegionList.length}
+              >
+                <option value="" disabled>{t('onboarding.region')}</option>
+                {geoRegionList.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+              </select>
+            ) : (
+              // 지역 목록이 없는 나라 — 고를 게 없다는 걸 빈 셀렉트가 아니라 문장으로 말한다.
+              <div className="w-full rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-outline select-none break-keep">
+                {t('mypage.region_none')}
+              </div>
+            )
+          ) : (
+            <div className="w-full rounded-xl bg-surface-container-low border border-outline-variant/40 px-4 py-3 font-body-md text-on-surface-variant select-none">{regionLabel}</div>
+          )}
         </div>
       </div>
-      <p className="font-body-sm text-[13px] text-outline flex items-center gap-1.5">
-        <span className="material-symbols-outlined text-[16px]">lock</span>
-        {t('mypage.region_locked')}
-      </p>
+
+      {geoEditing ? (
+        <>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={saveGeo}
+              disabled={geoSaving || !geoCountry || (geoNeedRegion && !geoRegion)}
+              className="px-5 py-3 rounded-xl bg-primary-container text-on-primary font-label-md text-[15px] font-bold disabled:opacity-40"
+            >
+              {geoSaving ? t('nick.saving') : t('nick.confirm')}
+            </button>
+            <button
+              onClick={() => { setGeoEditing(false); setGeoErr('') }}
+              className="px-4 py-3 rounded-xl border border-outline-variant text-on-surface-variant font-label-md text-[15px] font-bold"
+            >
+              {t('intro.cancel')}
+            </button>
+          </div>
+          <p className="mt-2 font-body-sm text-[13px] text-error font-bold break-keep">{t('mypage.region_change_warn')}</p>
+          {geoErr && <p className="mt-1 font-body-sm text-[13px] text-error break-keep">{geoErr}</p>}
+        </>
+      ) : geoLocked && !geoUsed ? (
+        <button
+          onClick={() => {
+            setGeoCountry(profile?.country_code ?? '')
+            setGeoRegion(profile?.region_code ?? '')
+            setGeoErr('')
+            setGeoEditing(true)
+          }}
+          className="px-5 py-3 rounded-xl border border-outline-variant text-on-surface font-label-md text-[15px] font-bold hover:border-primary hover:text-primary transition-colors"
+        >
+          {t('mypage.region_change_once')}
+        </button>
+      ) : (
+        <p className="font-body-sm text-[13px] text-outline flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[16px]">lock</span>
+          {geoUsed ? t('mypage.region_change_used') : t('mypage.region_locked')}
+        </p>
+      )}
     </section>
   )
 }
@@ -376,6 +513,8 @@ export default function MyPage() {
   const tab = section && TABS.some((t) => t.key === section) ? section : 'learning'
   const { isFullUser, user, loading: authLoading } = useAuth()
   const { t, lang } = useT()
+  // 1:1 문의 새 답변 개수 — 세는 곳은 Layout(FAB) 한 곳이고 여기는 같은 값을 구독만 한다.
+  const inquiryAlert = useInquiryAlert()
   const [list, setList] = useState<MyAttempt[] | null>(null)
   const [tickets, setTickets] = useState<ExamTicketView[]>([])
   const [err, setErr] = useState('')
@@ -551,6 +690,11 @@ export default function MyPage() {
                 }
               >
                 {t(tb.labelKey)}
+                {/* 새 답변 알림 점 — FAB 의 점을 보고 들어온 사람이 **어느 탭인지** 찾는 자리다.
+                    점을 끄는 건 문의를 펼쳐본 순간이지 이 탭을 여는 순간이 아니다(InquiryBoard). */}
+                {tb.key === 'inquiry' && inquiryAlert > 0 ? (
+                  <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-error align-middle" aria-hidden="true" />
+                ) : null}
               </Link>
             ))}
           </div>

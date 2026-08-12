@@ -30,9 +30,9 @@ const CFG = {
   glow: 75, // 발광 세기
   bleed: 29, // 번짐
   hue: 211, // 불빛 색조
-  markSize: 41, // 1·2·3위 표시 크기
+  markSize: 54, // 1st·2nd·3rd 표시 크기
   stars: 50, // 별 밝기
-  spin: 45, // 자전 속도
+  spin: 75, // 자전 속도
   size: 150, // 지구 크기
   posx: 50, // 가로 위치
   posy: 53, // 세로 위치
@@ -42,8 +42,12 @@ const CFG = {
  * 1·2·3위 글자 크기의 **상한**(지구 반지름 대비, markSize 가 곱해진다).
  * 실제 크기는 이 값과 "그 나라 땅 크기에 맞춘 값" 중 **작은 쪽**이다 — 아래 ORD_FIT 참고.
  */
-const ORD_SZ: Record<number, number> = { 1: 0.115, 2: 0.095, 3: 0.082 }
-const ORD_TXT: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd' }
+const ORD_SZ: Record<number, number> = { 1: 0.18, 2: 0.155, 3: 0.14 }
+const RANK_ASSET = [
+  '/landing/rank-node-1.svg',
+  '/landing/rank-node-2.svg',
+  '/landing/rank-node-3.svg',
+] as const
 /**
  * 땅에 맞추는 비율 — 화면에 보이는 그 나라 **짧은 변**의 이만큼을 글자 높이로 쓴다.
  * 큰 나라(중국·미국·러시아)는 상한에 먼저 걸리고, 작은 나라(한국·영국)만 이 값이 지배한다.
@@ -115,6 +119,13 @@ export default function RankGlobe() {
     const ctx = cv.getContext('2d')
     const glowCtx = glowCv.getContext('2d')
     if (!ctx || !glowCtx) return
+
+    const rankImgs = RANK_ASSET.map((src) => {
+      const img = new Image()
+      img.decoding = 'async'
+      img.src = src
+      return img
+    })
 
     let dead = false
     let raf = 0
@@ -315,12 +326,13 @@ export default function RankGlobe() {
 
       // ── 1st · 2nd · 3rd — 그 나라 땅 위에.
       const mk = CFG.markSize / 100
-      type Mark = { x: number; y: number; ty: number; w: number; size: number; rank: number; fade: number }
+      type Mark = { x: number; y: number; ty: number; w: number; h: number; rank: number; fade: number }
       const marks: Mark[] = []
-      for (const c of lit) {
+      for (const c of W < 720 ? [] : lit) {
         if (c.rank > 3) continue
         const fz = facing(c.c)
-        if (fz <= 0.06) continue
+        // 지구 가장자리에서는 에셋이 반쯤 잘려 보이므로 정면에 충분히 들어온 뒤 표시한다.
+        if (fz <= 0.2) continue
         const p = projection(c.c)
         if (!p) continue
         // 글자 크기 = min(순위별 상한, 그 나라 땅 크기) — 아래로만 열려 있다.
@@ -330,16 +342,20 @@ export default function RankGlobe() {
         const bb = pathMain.bounds(c.g as never)
         const room = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
         const cap = g.R * ORD_SZ[c.rank] * mk
-        const size = Math.max(ORD_MIN, Math.min(cap, Number.isFinite(room) ? room * ORD_FIT : cap))
-        ctx.font = `800 ${size.toFixed(1)}px system-ui, sans-serif`
+        // 생성 에셋은 내부에 궤도와 RANK 라벨까지 포함하므로 나라 면적에 맞춰 줄이면
+        // 실제 랜딩 화면에서 숫자가 점처럼 뭉개진다. 지구 반지름 기준 크기를 그대로 유지한다.
+        const h = Math.max(ORD_MIN * 3.2, cap)
+        const img = rankImgs[c.rank - 1]
+        const aspect = img?.naturalWidth && img?.naturalHeight ? img.naturalWidth / img.naturalHeight : 0.74
         marks.push({
           x: p[0],
           y: p[1],
-          ty: p[1],
-          w: ctx.measureText(ORD_TXT[c.rank]).width,
-          size,
+          // 중앙 카피와 겹치는 국가는 제목 바로 위까지만 피한다.
+          ty: p[1] > H * 0.285 && p[1] < H * 0.49 ? Math.max(H * 0.265, p[1] - H * 0.085) : p[1],
+          w: h * aspect,
+          h,
           rank: c.rank,
-          fade: Math.min(1, fz * 2.2),
+          fade: Math.min(1, Math.max(0, (fz - 0.2) * 3.2)),
         })
       }
       // 겹침 해소 — 한국·일본처럼 이웃한 상위권은 글자가 통째로 포개진다.
@@ -350,8 +366,8 @@ export default function RankGlobe() {
         while (moved) {
           moved = false
           for (const q of placed) {
-            if (Math.abs(m.x - q.x) < (m.w + q.w) * 0.5 && Math.abs(m.ty - q.ty) < (m.size + q.size) * 0.52) {
-              m.ty = q.ty + (m.size + q.size) * 0.55
+            if (Math.abs(m.x - q.x) < (m.w + q.w) * 0.58 && Math.abs(m.ty - q.ty) < (m.h + q.h) * 0.48) {
+              m.ty = q.ty + (m.h + q.h) * 0.5
               moved = true
             }
           }
@@ -362,23 +378,16 @@ export default function RankGlobe() {
       ctx.textBaseline = 'middle'
       for (const m of marks.slice().sort((a, b) => b.rank - a.rank)) {
         const col = litColor(m.rank)
+        const img = rankImgs[m.rank - 1]
+        if (!img?.complete || !img.naturalWidth) continue
         // 밀린 글자가 어느 땅의 것인지 잃지 않게 짧은 선으로 잇는다.
-        if (Math.abs(m.ty - m.y) > 1) {
-          ctx.strokeStyle = hsl(col.h, 40, 78, 0.4 * m.fade)
-          ctx.lineWidth = 1.2
-          ctx.beginPath()
-          ctx.moveTo(m.x, m.y)
-          ctx.lineTo(m.x, m.ty - m.size * 0.5)
-          ctx.stroke()
-        }
-        ctx.font = `800 ${m.size.toFixed(1)}px system-ui, sans-serif`
         // 어두운 테두리를 먼저 깔아야 밝은 불빛 위에 얹혀도 글자가 안 묻힌다.
-        ctx.lineJoin = 'round'
-        ctx.lineWidth = m.size * 0.17
-        ctx.strokeStyle = `rgba(4,8,18,${(0.62 * m.fade).toFixed(3)})`
-        ctx.strokeText(ORD_TXT[m.rank], m.x, m.ty)
-        ctx.fillStyle = hsl(col.h, Math.min(96, col.s + 8), Math.min(88, col.l + 16), 0.98 * m.fade)
-        ctx.fillText(ORD_TXT[m.rank], m.x, m.ty)
+        ctx.save()
+        ctx.globalAlpha = 0.98 * m.fade
+        ctx.shadowColor = hsl(col.h, 94, 66, 0.22 * m.fade)
+        ctx.shadowBlur = m.h * 0.035
+        ctx.drawImage(img, m.x - m.w / 2, m.ty - m.h * 0.9, m.w, m.h)
+        ctx.restore()
       }
     }
 

@@ -55,9 +55,9 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'build-cari',
     accent: 'CARI',
-    art: '/games/build-cari-cover.png',
+    art: '/games/build-cari-cover-v7.png',
     src: '/games/build-cari.html',
-    frame: '#e3ebf7', // 위와 동일 팔레트
+    frame: '#d8d4ca', // 지상형 스마트팩토리 작업실 가장자리 색
   },
   // 아래 둘은 용어 퀴즈도 조작 퍼즐도 아닌 '판단' 계열이다 —
   // 규정을 읽고 서류를 가리거나(막아라), 지시를 골라 결과를 맞춘다(시켜라).

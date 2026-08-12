@@ -16,7 +16,9 @@ export const LANGS: { code: Lang; label: string }[] = [
 ]
 
 // 사전: key → { ko, en, ja, zh, hi, vi }
-const D: Record<string, Record<Lang, string>> = {
+// export 인 이유: 사전에 그 키가 **있는지**를 밖에서 물어봐야 하는 자리가 하나 있다
+//   (lib/regionCatalog.ts — 한국 시도만 사전 이름을 쓰고 나머지 나라는 지도 파일 이름을 쓴다).
+export const D: Record<string, Record<Lang, string>> = {
   'common.home': { ko: '홈', en: 'Home', ja: 'ホーム', zh: '主页', hi: 'होम', vi: 'Trang chủ' },
   'common.dashboard': { ko: '학습 대시보드', en: 'Learning dashboard', ja: '学習ダッシュボード', zh: '学习仪表盘', hi: 'लर्निंग डैशबोर्ड', vi: 'Bảng điều khiển học tập' },
   'common.close': { ko: '닫기', en: 'Close', ja: '閉じる', zh: '关闭', hi: 'बंद करें', vi: 'Đóng' },
@@ -65,6 +67,8 @@ const D: Record<string, Record<Lang, string>> = {
   'region.KR-49': { ko: '제주특별자치도', en: 'Jeju', ja: '済州特別自治道', zh: '济州特别自治道', hi: 'जेजू', vi: 'Jeju' },
   'region.KR-50': { ko: '세종특별자치시', en: 'Sejong', ja: '世宗特別自治市', zh: '世宗特别自治市', hi: 'सेजोंग', vi: 'Sejong' },
   'onboarding.title': { ko: '어느 지역에서 함께 하시겠어요?', en: 'Which region will you join from?', ja: 'どの地域から参加しますか？', zh: '您想从哪个地区加入？', hi: 'आप किस क्षेत्र से जुड़ेंगे?', vi: 'Bạn tham gia từ khu vực nào?' },
+  // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
+  'onboarding.title_country': { ko: '어느 나라에서 함께 하시겠어요?', en: 'Which country will you join from?', ja: 'どの国から参加しますか？', zh: '您想从哪个国家加入？', hi: 'आप किस देश से जुड़ेंगे?', vi: 'Bạn tham gia từ quốc gia nào?' },
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
   'onboarding.intro_title': { ko: '지역별로 순위를 겨뤄요', en: 'Rankings are by region', ja: '地域ごとに順位を競います', zh: '按地区进行排名', hi: 'रैंकिंग क्षेत्र के अनुसार होती है', vi: 'Xếp hạng theo khu vực' },
   'onboarding.intro_body': { ko: '같은 지역·국가 사람들과 순위가 매겨져요.', en: 'You’ll be ranked among people from your region and country.', ja: '同じ地域・国の人たちと順位がつきます。', zh: '您将与同地区、同国家的人一同排名。', hi: 'आपकी रैंक आपके क्षेत्र और देश के लोगों के बीच तय होगी।', vi: 'Bạn sẽ được xếp hạng cùng những người ở khu vực và quốc gia của bạn.' },
@@ -83,10 +87,17 @@ const D: Record<string, Record<Lang, string>> = {
   'onboarding.age_50s': { ko: '50대', en: '50s', ja: '50代', zh: '50–59岁', hi: '50–59', vi: '50–59' },
   'onboarding.age_60s': { ko: '60대 이상', en: '60 or older', ja: '60代以上', zh: '60岁以上', hi: '60 या अधिक', vi: 'Từ 60 trở lên' },
   'onboarding.age_private': { ko: '공개 안 함', en: 'Prefer not to say', ja: '回答しない', zh: '不愿透露', hi: 'नहीं बताना चाहता', vi: 'Không muốn tiết lộ' },
-  'onboarding.lock_warn': { ko: '지역은 한 번 정하면 바꿀 수 없어요.', en: "Your region can't be changed once set.", ja: '地域は一度決めると変更できません。', zh: '地区一旦确定便无法更改。', hi: 'क्षेत्र एक बार चुनने के बाद बदला नहीं जा सकता।', vi: 'Khu vực không thể thay đổi sau khi đã chọn.' },
+  // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
+  //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
+  'onboarding.lock_warn': { ko: '나중에 마이페이지에서 딱 한 번만 바꿀 수 있어요.', en: 'You can change this only once later, in My Page.', ja: '後でマイページから一度だけ変更できます。', zh: '之后只能在“我的页面”更改一次。', hi: 'बाद में माय पेज से केवल एक बार बदल सकते हैं।', vi: 'Sau này bạn chỉ có thể đổi một lần trong Trang của tôi.' },
   'onboarding.start': { ko: '이대로 시작', en: 'Start now', ja: 'このまま始める', zh: '就此开始', hi: 'ऐसे ही शुरू करें', vi: 'Bắt đầu ngay' },
   'onboarding.region_prefill_hint': { ko: 'IP 추정값이에요. 확인/수정하세요.', en: 'Estimated from your IP. Please check or edit.', ja: 'IPからの推定値です。確認・修正してください。', zh: '根据 IP 估算，请确认或修改。', hi: 'यह आपके IP से अनुमानित है। जांचें या संपादित करें।', vi: 'Ước tính từ IP của bạn. Vui lòng kiểm tra/sửa.' },
   'mypage.region_locked': { ko: '지역·국가는 변경할 수 없어요. 오배정은 문의해 주세요.', en: "Region and country can't be changed. Contact us if misassigned.", ja: '地域・国は変更できません。誤割当ての場合はお問い合わせください。', zh: '地区和国家无法更改。如有误分配请联系我们。', hi: 'क्षेत्र और देश बदले नहीं जा सकते। गलत आवंटन पर संपर्क करें।', vi: 'Không thể thay đổi khu vực và quốc gia. Liên hệ nếu bị gán sai.' },
+  // 국가·지역 1회 변경(2026-08-12). 닉네임 1회 변경과 같은 성격이라 문구 결도 맞춘다.
+  'mypage.region_change_once': { ko: '국가·지역 변경 (1회)', en: 'Change country & region (once)', ja: '国・地域を変更（1回）', zh: '更改国家和地区（1 次）', hi: 'देश व क्षेत्र बदलें (एक बार)', vi: 'Đổi quốc gia & khu vực (1 lần)' },
+  'mypage.region_change_warn': { ko: '저장하면 다시는 바꿀 수 없어요. 변경 기회는 한 번뿐이에요.', en: 'Once saved you cannot change it again. This is your only chance.', ja: '保存すると二度と変更できません。チャンスは一度だけです。', zh: '保存后将无法再更改，机会仅有一次。', hi: 'सहेजने के बाद दोबारा नहीं बदल सकते। यह एकमात्र मौका है।', vi: 'Sau khi lưu bạn không thể đổi lại. Đây là cơ hội duy nhất.' },
+  'mypage.region_change_used': { ko: '변경 기회를 이미 사용했어요.', en: 'You have already used your one change.', ja: '変更の機会はすでに使用済みです。', zh: '您已用完唯一一次更改机会。', hi: 'आप अपना एकमात्र बदलाव उपयोग कर चुके हैं।', vi: 'Bạn đã dùng lượt thay đổi duy nhất.' },
+  'mypage.region_none': { ko: '이 국가는 지역을 나누지 않아요.', en: 'This country has no regional divisions yet.', ja: 'この国は地域を分けていません。', zh: '该国家暂不划分地区。', hi: 'इस देश के लिए क्षेत्र नहीं हैं।', vi: 'Quốc gia này chưa chia theo khu vực.' },
   'mypage.profile_title': { ko: '내 정보', en: 'My Info', ja: '基本情報', zh: '我的信息', hi: 'मेरी जानकारी', vi: 'Thông tin của tôi' },
 
   'landing.lead': {
@@ -129,9 +140,9 @@ const D: Record<string, Record<Lang, string>> = {
   'nav.terms': { ko: '이용약관', en: 'Terms of Service', ja: '利用規約', zh: '服务条款', hi: 'सेवा की शर्तें', vi: 'Điều khoản dịch vụ' },
   'terms.title': { ko: '이용약관', en: 'Terms of Service', ja: '利用規約', zh: '服务条款', hi: 'सेवा की शर्तें', vi: 'Điều khoản dịch vụ' },
   'terms.todo': { ko: '내용 준비 중입니다.', en: 'Coming soon.', ja: '準備中です。', zh: '内容准备中。', hi: 'जल्द आ रहा है।', vi: 'Đang chuẩn bị.' },
-  'withdraw.title': { ko: '회원탈퇴', en: 'Delete account', ja: '退会', zh: '注销账户', hi: 'खाता हटाएं', vi: 'Xóa tài khoản' },
+  'withdraw.title': { ko: '탈퇴', en: 'Delete account', ja: '退会', zh: '注销账户', hi: 'खाता हटाएं', vi: 'Xóa tài khoản' },
   'withdraw.desc': { ko: '탈퇴 시 계정이 비활성화되고 {d}일 보관 후 영구 삭제됩니다. 그 전에 다시 로그인하면 복구돼요.', en: 'On withdrawal your account is deactivated and permanently deleted after {d} days. Log in again before then to restore it.', ja: '退会するとアカウントは無効化され、{d}日間の保管後に完全削除されます。それまでに再ログインすれば復元できます。', zh: '注销后账户将被停用，保留 {d} 天后永久删除。在此之前重新登录可恢复。', hi: 'खाता हटाने पर खाता निष्क्रिय होकर {d} दिन बाद स्थायी रूप से हट जाता है। उससे पहले फिर लॉगिन करें तो बहाल हो जाता है।', vi: 'Khi xóa, tài khoản bị vô hiệu hóa và xóa vĩnh viễn sau {d} ngày. Đăng nhập lại trước đó để khôi phục.' },
-  'withdraw.button': { ko: '회원탈퇴', en: 'Delete my account', ja: '退会する', zh: '注销账户', hi: 'मेरा खाता हटाएं', vi: 'Xóa tài khoản của tôi' },
+  'withdraw.button': { ko: '탈퇴', en: 'Delete my account', ja: '退会する', zh: '注销账户', hi: 'मेरा खाता हटाएं', vi: 'Xóa tài khoản của tôi' },
   'withdraw.confirm': { ko: '정말 탈퇴하시겠어요? 계정이 비활성화되고 {d}일 후 영구 삭제됩니다. 그 전에 다시 로그인하면 복구돼요.', en: 'Delete your account? It will be deactivated and permanently deleted after {d} days. Log in again before then to restore it.', ja: '本当に退会しますか？ アカウントは無効化され、{d}日後に完全削除されます。それまでに再ログインすれば復元できます。', zh: '确定要注销吗？账户将被停用，{d} 天后永久删除。在此之前重新登录可恢复。', hi: 'क्या वाकई खाता हटाएं? खाता निष्क्रिय होकर {d} दिन बाद स्थायी रूप से हट जाएगा। उससे पहले लॉगिन करें तो बहाल हो जाएगा।', vi: 'Xóa tài khoản? Tài khoản sẽ bị vô hiệu hóa và xóa vĩnh viễn sau {d} ngày. Đăng nhập lại trước đó để khôi phục.' },
   'withdraw.done': { ko: '탈퇴 처리됐어요. 그동안 이용해 주셔서 감사합니다.', en: 'Your account has been deactivated. Thank you for using our service.', ja: '退会処理が完了しました。ご利用ありがとうございました。', zh: '已完成注销。感谢您的使用。', hi: 'खाता निष्क्रिय कर दिया गया। हमारी सेवा का उपयोग करने के लिए धन्यवाद।', vi: 'Đã xử lý xóa tài khoản. Cảm ơn bạn đã sử dụng dịch vụ.' },
   'withdraw.failed': { ko: '탈퇴 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.', en: 'Something went wrong. Please try again later.', ja: 'エラーが発生しました。後ほど再度お試しください。', zh: '处理出错，请稍后重试。', hi: 'कुछ गड़बड़ हो गई। कृपया बाद में पुनः प्रयास करें।', vi: 'Đã xảy ra lỗi. Vui lòng thử lại sau.' },
@@ -1296,7 +1307,7 @@ const D: Record<string, Record<Lang, string>> = {
   "faq.q7.tag": { ko: "응시 중", en: "During the Exam", ja: "受験中", zh: "应试中", hi: "परीक्षा के दौरान", vi: "Trong khi thi" },
   "mypage.tab_attempts": { ko: "시험 응시 현황", en: "Exam Status", ja: "受験状況", zh: "考试应试现况", hi: "परीक्षा स्थिति", vi: "Tình trạng dự thi" },
   "mypage.tab_earned": { ko: "자격 취득 현황", en: "Certifications Earned", ja: "資格取得状況", zh: "资格取得现况", hi: "प्राप्त प्रमाणन", vi: "Chứng chỉ đã đạt" },
-  "mypage.tab_issuance": { ko: "인증서 발급 현황", en: "Certificate Issuance", ja: "証明書発行状況", zh: "证书发放现况", hi: "प्रमाणपत्र जारी", vi: "Cấp chứng chỉ" },
+  "mypage.tab_issuance": { ko: "인증서 발급 현황", en: "Certificate Issuance", ja: "証明書発行状況", zh: "证书发放现况", hi: "प्रमाणपत्र जारी", vi: "Cấp chứng chỉ" },
   "mypage.tab_inquiry": { ko: "1:1 문의", en: "Support", ja: "1:1 お問い合わせ", zh: "1对1咨询", hi: "सहायता", vi: "Hỗ trợ 1:1" },
   "mypage.default_name": { ko: "응시자", en: "Examinee", ja: "受験者", zh: "应试者", hi: "परीक्षार्थी", vi: "Thí sinh" },
   "mypage.exam_fallback": { ko: "CARIS", en: "CARIS", ja: "CARIS", zh: "CARIS", hi: "CARIS", vi: "CARIS" },
@@ -1375,7 +1386,7 @@ const D: Record<string, Record<Lang, string>> = {
   "ebook.reader_fs": { ko: "전체화면", en: "Fullscreen", ja: "全画面", zh: "全屏", hi: "फुलस्क्रीन", vi: "Toàn màn hình" },
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
   //   ⚠️ "레벨을 고르면 교재와 강의가 나타납니다" 같은 사용법 설명문은 넣지 않는다 — 화면을 보면 아는 것이다(2026-08-06 삭제).
-  //   카탈로그 이름(LEVELTEST E-BOOK / CARIS E-BOOK)은 여기 없다 — 급수 이름(Beginner…)처럼 브랜드
+  //   카탈로그 이름(LEVELTEST / CARIS)은 여기 없다 — 급수 이름(Beginner…)처럼 브랜드
   //   고유명이라 언어 무관 영문 고정이고, 단일 출처는 Ebooks.tsx 의 CATALOG_LABEL 이다.
   "ll.catalog": { ko: "교재 종류", en: "Catalog", ja: "教材の種類", zh: "教材类别", hi: "कैटलॉग", vi: "Loại giáo trình" },
   "ll.level_col": { ko: "레벨", en: "Level", ja: "レベル", zh: "等级", hi: "लेवल", vi: "Cấp" },
@@ -1476,6 +1487,8 @@ const D: Record<string, Record<Lang, string>> = {
   "fab.uploadImg": { ko: "이미지 업로드", en: "Upload image", ja: "画像アップロード", zh: "上传图片", hi: "छवि अपलोड करें", vi: "Tải ảnh lên" },
   "fab.uploadFail": { ko: "업로드에 실패했습니다.", en: "Upload failed.", ja: "アップロードに失敗しました。", zh: "上传失败。", hi: "अपलोड विफल रहा।", vi: "Tải lên thất bại." },
   "fab.toTop": { ko: "맨 위로", en: "Back to top", ja: "トップへ", zh: "回到顶部", hi: "ऊपर जाएँ", vi: "Lên đầu trang" },
+  // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
+  "fab.newanswer": { ko: "문의에 새 답변이 있습니다", en: "You have a new reply to your inquiry", ja: "お問い合わせに新しい返信があります", zh: "您的咨询有新回复", hi: "आपकी पूछताछ का नया उत्तर आया है", vi: "Có phản hồi mới cho câu hỏi của bạn" },
   "landing.hero_pre": { ko: "피지컬 AI 시대,", en: "In the age of Physical AI,", ja: "フィジカルAIの時代、", zh: "实体 AI 时代，", hi: "फिजिकल AI के युग में,", vi: "Trong kỷ nguyên AI vật lý," },
   "landing.hero_em": { ko: "당신의 능력을", en: "your ability", ja: "あなたの能力を", zh: "你的能力", hi: "अपनी क्षमता", vi: "năng lực của bạn" },
   "landing.hero_post": { ko: "CARIS로 확인하세요", en: "Verify it with CARIS", ja: "CARISで確かめよう", zh: "用 CARIS 来验证", hi: "CARIS से जाँचें", vi: "hãy kiểm chứng bằng CARIS" },
@@ -1922,6 +1935,7 @@ const D: Record<string, Record<Lang, string>> = {
   'daily.pick_note': { ko: '정답을 고르면 오늘 학습이 완료돼요. 맞히지 않아도 시도하면 적립돼요.', en: "Pick an answer to finish today's lesson — you earn it just for trying.", ja: '答えを選ぶと今日の学習が完了します。正解でなくても挑戦すれば加算されます。', zh: '选择答案即可完成今日学习。即使答错，尝试也会计入。', hi: 'उत्तर चुनते ही आज की पढ़ाई पूरी। गलत होने पर भी कोशिश गिनी जाती है।', vi: 'Chọn đáp án là xong bài hôm nay. Sai vẫn được tính vì đã thử.' },
   'daily.pop_title': { ko: '오늘 학습 완료!', en: "Today's lesson complete!", ja: '今日の学習完了！', zh: '今日学习完成！', hi: 'आज की पढ़ाई पूरी!', vi: 'Hoàn thành bài hôm nay!' },
   'daily.pop_stamp': { ko: '스탬프 {n} / {max}', en: 'Stamps {n} / {max}', ja: 'スタンプ {n} / {max}', zh: '印章 {n} / {max}', hi: 'स्टैम्प {n} / {max}', vi: 'Tem {n} / {max}' },
+  'daily.pop_bonus': { ko: '7일 완주 +{b}P', en: '7-day bonus +{b}P', ja: '7日達成 +{b}P', zh: '满 7 天 +{b}P', hi: '7-दिन बोनस +{b}P', vi: 'Đủ 7 ngày +{b}P' },
   'daily.pop_grew': { ko: '캐릭터가 오늘도 한 뼘 자랐어요.', en: 'Your character grew a little more today.', ja: 'キャラクターが今日もひとまわり成長しました。', zh: '你的角色今天又长大了一点。', hi: 'आपका किरदार आज फिर थोड़ा बढ़ा।', vi: 'Nhân vật của bạn lại lớn thêm một chút.' },
   'daily.pop_already': { ko: '오늘 출석으로 코인·스탬프는 이미 받았어요. 학습 기록은 남았습니다.', en: "You already got coins and a stamp from today's check-in. The lesson is still recorded.", ja: '本日の出席でコイン・スタンプは受け取り済みです。学習記録は残りました。', zh: '今天签到已领取硬币和印章。学习记录已保存。', hi: 'आज के चेक-इन से कॉइन और स्टैम्प मिल चुके हैं। पढ़ाई दर्ज हो गई।', vi: 'Bạn đã nhận coin và tem từ điểm danh hôm nay. Bài học vẫn được ghi nhận.' },
 
@@ -2037,11 +2051,11 @@ const D: Record<string, Record<Lang, string>> = {
 
   // 도크(출석 보상)
   'hub.reward_head': { ko: '출석 보상', en: 'Check-in rewards', ja: '出席報酬', zh: '签到奖励', hi: 'चेक-इन इनाम', vi: 'Thưởng điểm danh' },
-  'hub.streak': { ko: '{n}일 연속!', en: '{n}-day streak!', ja: '{n}日連続！', zh: '连续 {n} 天！', hi: '{n} दिन लगातार!', vi: 'Chuỗi {n} ngày!' },
   'hub.day_n': { ko: '{n}일', en: 'Day {n}', ja: '{n}日', zh: '第 {n} 天', hi: 'दिन {n}', vi: 'Ngày {n}' },
 
   // 토스트
   'hub.toast.checkin_done': { ko: '출석 완료 · +{n}P · 스탬프 +1', en: 'Checked in · +{n}P · +1 stamp', ja: '出席完了 · +{n}P · スタンプ+1', zh: '签到完成 · +{n}P · 印章 +1', hi: 'चेक-इन हुआ · +{n}P · +1 स्टैम्प', vi: 'Đã điểm danh · +{n}P · +1 tem' },
+  'hub.toast.checkin_bonus': { ko: '출석 완료 · +{n}P · 7일 완주 보너스 +{b}P', en: 'Checked in · +{n}P · 7-day bonus +{b}P', ja: '出席完了 · +{n}P · 7日達成ボーナス +{b}P', zh: '签到完成 · +{n}P · 满 7 天奖励 +{b}P', hi: 'चेक-इन हुआ · +{n}P · 7-दिन बोनस +{b}P', vi: 'Đã điểm danh · +{n}P · thưởng đủ 7 ngày +{b}P' },
   'hub.toast.checkin_already': { ko: '출석 완료 · 오늘 보상은 이미 받았어요', en: "Checked in · you've already claimed today's reward", ja: '出席完了 · 本日の報酬は受け取り済みです', zh: '签到完成 · 今日奖励已领取', hi: 'चेक-इन हुआ · आज का इनाम पहले ही मिल चुका है', vi: 'Đã điểm danh · phần thưởng hôm nay đã nhận' },
   'hub.toast.no_coin': { ko: '코인이 부족해요', en: 'Not enough coins', ja: 'コインが足りません', zh: '硬币不足', hi: 'पर्याप्त कॉइन नहीं', vi: 'Không đủ coin' },
   'hub.toast.no_points_item': { ko: '포인트가 부족해요: {name} ({price}P)', en: 'Not enough points: {name} ({price}P)', ja: 'ポイントが足りません：{name}（{price}P）', zh: '积分不足：{name}（{price}P）', hi: 'पर्याप्त पॉइंट नहीं: {name} ({price}P)', vi: 'Không đủ điểm: {name} ({price}P)' },

@@ -142,7 +142,6 @@
 .hub .dock { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .hub .reward { flex: 1; min-width: 0; background: var(--card); border: 4px solid var(--line); border-radius: 16px; padding: 9px 12px 11px; box-shadow: 0 4px 0 rgba(var(--shc2), .16); }
 .hub .rw-top { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 900; }
-.hub .rw-streak { font-size: 13px; color: var(--red); border: 2px solid var(--red); border-radius: 999px; padding: 1px 8px; font-weight: 900; }
 .hub .rw-n { margin-left: auto; font-weight: 900; }
 .hub .streak { display: flex; gap: 5px; margin-top: 8px; }
 .hub .day { position: relative; flex: 1; text-align: center; border: 3px solid var(--line); border-radius: 11px; padding: 7px 0 5px; font-size: 13px; font-weight: 900; background: var(--card); line-height: 1.15; }
@@ -265,7 +264,6 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .pedestal { width: 320px; height: 56px; bottom: 34px; }
   .hub .nameplate b { font-size: 26px; }
   .hub .rw-top { font-size: 18px; }
-  .hub .rw-streak { font-size: 15px; }
   .hub .day { font-size: 17px; padding: 12px 0 10px; }
   .hub .cta-main { flex: 0 0 auto; flex-direction: column; gap: 4px; font-size: 26px; padding: 10px 44px; }
   .hub .cta-main small { font-size: 15px; }

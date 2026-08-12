@@ -55,6 +55,8 @@ import {
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
 } from './AdminReform'
 import { useAdminData, payStatusLabel, productLabel } from '../lib/adminData'
+import { useDraft } from '../lib/adminDraft'
+import DraftBar from '../components/DraftBar'
 import { getTracks, tierName, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 import { REGIONS, countryName, flagEmoji } from '../lib/regions'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
@@ -71,7 +73,7 @@ type TopMenu = 'members' | 'arena' | 'caris' | 'library' | 'board' | 'site'
 interface SubItem { key: string; label: string; root?: boolean; children?: { key: string; label: string }[] }
 
 const MENUS: { key: TopMenu; label: string }[] = [
-  { key: 'members', label: '회원관리' },
+  { key: 'members', label: '유저관리' },
   { key: 'arena', label: 'WORLD ARENA' },
   { key: 'caris', label: 'CARIS' },
   { key: 'library', label: 'Learning Library' },
@@ -84,7 +86,7 @@ const MENUS: { key: TopMenu; label: string }[] = [
 //    (미니게임의 현황/문항, 제출답안/주관식채점, 고객센터의 FAQ/Q&A, 러닝라이브러리의 이북/콘텐츠가 전부 3단이다.)
 const SUBS: Record<TopMenu, SubItem[]> = {
   members: [
-    { key: 'users', label: '회원' },
+    { key: 'users', label: '유저' },
     { key: 'payments', label: '결제관리' },
   ],
   arena: [
@@ -312,9 +314,9 @@ interface HomeStats {
 function HomeDashboard({ go }: { go: AdminGo }) {
   const { data, loading, err, reload } = useAdminData<HomeStats>('homeStats')
   const kpis = [
-    { k: '오늘 접속자', v: `${data?.todayVisitors ?? 0}명`, sub: `누적 회원 ${(data?.users ?? 0).toLocaleString()}명`, accent: 'blue' },
-    { k: '신규 회원', v: `${data?.newUsers7d ?? 0}명`, sub: '최근 7일', accent: 'violet' },
-    { k: '휴면 회원', v: `${data?.dormant ?? 0}명`, sub: '90일 이상 미접속', accent: 'muted' },
+    { k: '오늘 접속자', v: `${data?.todayVisitors ?? 0}명`, sub: `누적 유저 ${(data?.users ?? 0).toLocaleString()}명`, accent: 'blue' },
+    { k: '신규 유저', v: `${data?.newUsers7d ?? 0}명`, sub: '최근 7일', accent: 'violet' },
+    { k: '휴면 유저', v: `${data?.dormant ?? 0}명`, sub: '90일 이상 미접속', accent: 'muted' },
     { k: '매출(30일)', v: krw(data?.revenue30d ?? 0), sub: `결제 ${data?.paid30d ?? 0}건 · 환불 ${data?.refund30d ?? 0}건`, accent: 'green' },
   ]
   return (
@@ -965,27 +967,19 @@ function NoticesAdmin() {
     load()
   }, [load])
 
-  // 작성 중 자동 임시저장(localStorage) — 실수로 닫히거나 새로고침해도 복구(새 공지에만).
-  useEffect(() => {
-    if (!draft || draft.id) return
-    const id = setTimeout(() => localStorage.setItem('notice-draft', JSON.stringify(draft)), 600)
-    return () => clearTimeout(id)
-  }, [draft])
+  // 작성 중 자동 임시저장.
+  //   ⚠️ 옛 방식(`notice-draft` 키 하나 + 새로 쓸 때 confirm 한 번)은 ① 저장되고 있는지 알 수 없고
+  //      ② 그 confirm 을 놓치면 초안이 영영 묻혔고 ③ **편집 중인 공지는 아예 안 지켜졌다**(새 공지만 저장).
+  //      지금은 공용 훅으로 바꿔 새 글·편집 모두 지키고, 목록에서 골라 불러온다.
+  const noticeDraft = useDraft({
+    kind: 'notice',
+    refId: draft?.id,
+    value: draft,
+    title: draft?.titleI18n?.ko?.trim() || '제목 없는 공지',
+    enabled: !!draft,
+  })
 
   function openNew() {
-    const saved = localStorage.getItem('notice-draft')
-    if (saved) {
-      try {
-        const d = JSON.parse(saved) as NoticeDraft
-        const hasContent = !!(d.titleI18n?.ko?.trim() || d.bodyI18n?.ko?.trim())
-        if (!d.id && hasContent && confirm('작성 중이던 공지가 있습니다. 이어서 작성할까요?')) {
-          setDraft(d)
-          return
-        }
-      } catch {
-        /* 무시 */
-      }
-    }
     setDraft(emptyDraft())
   }
   function openEdit(n: NoticeRow) {
@@ -1027,7 +1021,7 @@ function NoticesAdmin() {
             : null,
         },
       })
-      localStorage.removeItem('notice-draft')
+      noticeDraft.clear() // 저장됐으니 초안은 더 필요 없다
       setDraft(null)
       await load()
       if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
@@ -1129,7 +1123,16 @@ function NoticesAdmin() {
             <button className="admin-modal-x" onClick={() => setDraft(null)}>
               ✕
             </button>
-            <h2>{draft.id ? '공지 편집' : '새 공지'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>{draft.id ? '공지 편집' : '새 공지'}</h2>
+              <DraftBar
+                status={noticeDraft.status}
+                savedAt={noticeDraft.savedAt}
+                drafts={noticeDraft.drafts}
+                onRefresh={noticeDraft.refresh}
+                onRestore={(p: NoticeDraft) => setDraft(p)}
+              />
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -1251,6 +1254,7 @@ function FaqAdmin() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<FaqDraft | null>(null)
+  const faqDraft = useDraft({ kind: 'faq', refId: draft?.id, value: draft, title: draft?.questionI18n?.ko?.trim() || '새 FAQ', enabled: !!draft })
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
   const [catFilter, setCatFilter] = useState<string>('schedule')
@@ -1304,6 +1308,7 @@ function FaqAdmin() {
         action: 'faqUpsert',
         faq: draft,
       })
+      faqDraft.clear()
       setDraft(null)
       await load()
       if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
@@ -1447,12 +1452,13 @@ function FaqAdmin() {
       </div>
 
       {draft && (
-        <div className="admin-modal-bg" onClick={() => !saving && setDraft(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setDraft(null)}>
               ✕
             </button>
-            <h2>{draft.id ? 'FAQ 편집' : '새 FAQ'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><h2 style={{ margin: 0 }}>{draft.id ? 'FAQ 편집' : '새 FAQ'}</h2><DraftBar status={faqDraft.status} savedAt={faqDraft.savedAt} drafts={faqDraft.drafts} onRefresh={faqDraft.refresh} onRestore={(p: FaqDraft) => setDraft(p)} /></div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -2045,6 +2051,7 @@ function RoundsAdmin() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<RoundDraft | null>(null)
+  const roundDraft = useDraft({ kind: 'exam-round', refId: draft?.id, value: draft, title: draft?.titleI18n?.ko?.trim() || '새 회차', enabled: !!draft })
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
   const [kindFilter, setKindFilter] = useState<RoundFilter>('regular')
@@ -2135,6 +2142,7 @@ function RoundsAdmin() {
           tiers,
         },
       })
+      roundDraft.clear()
       setDraft(null)
       await load()
       // 급수 경고는 번역 경고와 따로 띄운다 — 한 문자열로 합쳤더니 '접수가 있어 급수를 못 지웠다'가
@@ -2317,12 +2325,13 @@ function RoundsAdmin() {
       </div>
 
       {draft && (
-        <div className="admin-modal-bg" onClick={() => !saving && setDraft(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setDraft(null)}>
               ✕
             </button>
-            <h2>{draft.id ? '회차 편집' : '새 회차'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><h2 style={{ margin: 0 }}>{draft.id ? '회차 편집' : '새 회차'}</h2><DraftBar status={roundDraft.status} savedAt={roundDraft.savedAt} drafts={roundDraft.drafts} onRefresh={roundDraft.refresh} onRestore={(p: RoundDraft) => setDraft(p)} /></div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -2889,7 +2898,8 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
 
       {/* 수기 발급 (루트 전용) — 단체 접수·장애 보상용 무료 응시권 */}
       {grantDraft && (
-        <div className="admin-modal-bg" onClick={() => setGrantDraft(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setGrantDraft(null)}>✕</button>
             <h2>응시권 수기 발급</h2>
@@ -2951,7 +2961,8 @@ function VoidTicketModal({ row, onClose, onSubmit }: {
   const [settle, setSettle] = useState<'refunded' | 'keep'>('keep')
   const paid = row.paymentStatus === 'paid'
   return (
-    <div className="admin-modal-bg" onClick={onClose}>
+    <div className="admin-modal-bg">
+    {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
       <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
         <button className="admin-modal-x" onClick={onClose}>✕</button>
         <h2>응시권 회수</h2>
@@ -3069,7 +3080,7 @@ function AdminAccountsAdmin() {
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
-        이미 <b>로그인(회원가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·WORLD ARENA 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
+        이미 <b>로그인(가입)한 유저</b>만 관리자로 지정할 수 있습니다. 추가하면 그 계정으로 CARIS·WORLD ARENA 관리자 페이지를 모두 쓸 수 있어요. (추가·삭제는 루트 관리자만)
       </p>
 
       <div className="admin-section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
@@ -3203,6 +3214,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<EbookDraft | null>(null)
+  const ebookDraft = useDraft({ kind: 'ebook', refId: draft?.id, value: draft, title: draft?.title?.trim() || '새 이북', enabled: !!draft })
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false) // 순서 변경 중(↑↓)
   const [uploading, setUploading] = useState<'html' | 'cover' | 'translate' | null>(null)
@@ -3399,6 +3411,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
         }
       }
       await callFunction('admin', { action: 'ebookUpsert', ebook: d })
+      ebookDraft.clear()
       setDraft(null)
       await load()
     } catch (e) {
@@ -3577,7 +3590,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
             <button className="admin-modal-x" onClick={() => setDraft(null)}>
               ✕
             </button>
-            <h2>{draft.id ? '이북 수정' : '새 이북'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><h2 style={{ margin: 0 }}>{draft.id ? '이북 수정' : '새 이북'}</h2><DraftBar status={ebookDraft.status} savedAt={ebookDraft.savedAt} drafts={ebookDraft.drafts} onRefresh={ebookDraft.refresh} onRestore={(p: EbookDraft) => setDraft(p)} /></div>
             <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
               <label style={fieldStyle}>
                 제목
@@ -4289,7 +4302,7 @@ function DashboardBody({ a, pay, sold, go }: {
     { ico: 'timelapse', label: '응시 진행 중', n: inProgress, tone: 'muted', go: () => go('caris', 'subs', 'list', { f: 'in_progress' }) },
   ]
   const kpis = [
-    { ico: 'group', k: '누적 회원', v: o.users.toLocaleString(), sub: `이번주 신규 +${signups7d}명`, accent: 'blue', delta: signups7d > 0 ? `+${signups7d}` : undefined },
+    { ico: 'group', k: '누적 유저', v: o.users.toLocaleString(), sub: `이번주 신규 +${signups7d}명`, accent: 'blue', delta: signups7d > 0 ? `+${signups7d}` : undefined },
     { ico: 'assignment_turned_in', k: '응시 제출', v: o.attemptsAll.toLocaleString(), sub: `최근 7일 ${o.attempts7d}건`, accent: 'violet' },
     { ico: 'verified', k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건 · 평균 ${avgScore}점`, accent: 'green' },
     { ico: 'workspace_premium', k: '인증서 발급', v: certIssued.toLocaleString(), sub: `미발급 ${certPending}건`, accent: 'amber' },
@@ -4617,7 +4630,7 @@ function MembersAdmin() {
       callFunction<{ users: ArenaUserRow[] }>('admin-test', { action: 'users' }).catch(() => null),
     ])
     if (!cbt && !arena) {
-      setErr('회원 목록을 불러올 수 없습니다.')
+      setErr('유저 목록을 불러올 수 없습니다.')
       setLoading(false)
       return
     }
@@ -4675,7 +4688,7 @@ function MembersAdmin() {
   return (
     <>
       <div className="admin-head">
-        <h1>회원 관리</h1>
+        <h1>유저 관리</h1>
         <div className="admin-head-actions">
           <span className="admin-count">가입 {googleN}명 · 게스트 {rows.length - googleN}명</span>
           <button className="admin-mini" onClick={load} disabled={loading}>새로고침</button>
@@ -4689,7 +4702,7 @@ function MembersAdmin() {
       <div className="admin-toolbar">
         <input className="admin-search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
-          <option value="google">가입 회원</option>
+          <option value="google">가입 유저</option>
           <option value="guest">게스트</option>
           <option value="all">전체(게스트 포함)</option>
         </select>
@@ -4738,7 +4751,7 @@ function MembersAdmin() {
             {!shown.length && !loading && (
               <tr>
                 <td colSpan={9} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  조건에 맞는 회원이 없습니다.
+                  조건에 맞는 유저가 없습니다.
                 </td>
               </tr>
             )}
@@ -4769,7 +4782,7 @@ export function RegionFixForm() {
 
   async function submit() {
     const id = uid.trim()
-    if (!id || !region) { setMsg('회원 UID·지역을 입력하세요.'); return }
+    if (!id || !region) { setMsg('유저 UID·지역을 입력하세요.'); return }
     setBusy(true)
     setMsg('')
     try {
@@ -4787,11 +4800,11 @@ export function RegionFixForm() {
   return (
     <div className="admin-section">
       <h3>지역 오배정 정정</h3>
-      <p className="admin-hint">락된 회원의 지역을 강제로 바로잡습니다(어드민 CS 전용).</p>
+      <p className="admin-hint">락된 유저의 지역을 강제로 바로잡습니다(어드민 CS 전용).</p>
       <div className="admin-toolbar">
         <input
           className="admin-search"
-          placeholder="회원 UID"
+          placeholder="유저 UID"
           value={uid}
           onChange={(e) => setUid(e.target.value)}
         />
@@ -4855,7 +4868,7 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
           {user.name || '-'} <span className="admin-modal-email">{user.email}</span>
         </h2>
         <p className="admin-modal-meta">
-          가입 {fmtDT(user.created)} · {user.anon ? '게스트' : '가입 회원'}
+          가입 {fmtDT(user.created)} · {user.anon ? '게스트' : '가입 유저'}
           {user.arenaRank != null ? ` · ARENA Lv.${user.arenaRank}` : ''}
         </p>
         <div className="admin-tabs" style={{ marginBottom: 14 }}>
@@ -5709,6 +5722,14 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
+  // 임시저장 — 문제·보기 4개·해설을 다 쓴 뒤 날리면 되돌릴 방법이 없다.
+  const draft = useDraft({
+    kind: 'cbt-question',
+    refId: row?.id,
+    value: { kind, tierKey, subject, difficulty, prompt, choices, correctIndex, answerKey, explanation },
+    title: prompt.trim().slice(0, 40) || (row ? `${row.number}번 문항` : '새 문항'),
+  })
+
   async function save() {
     setErr('')
     setSaving(true)
@@ -5717,6 +5738,7 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
         action: 'questionUpsert',
         question: { id: row?.id, bankId, number, kind, subject, difficulty, prompt, choices, correctIndex, answerKey, explanation, active: row ? row.active : true },
       })
+      draft.clear()
       onSaved()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '저장 실패')
@@ -5725,10 +5747,28 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
   }
 
   return (
-    <div className="admin-modal-bg" onClick={onClose}>
+    <div className="admin-modal-bg">
+    {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
       <div className="admin-modal" style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
         <button className="admin-modal-x" onClick={onClose}>✕</button>
-        <h2>{row ? `${row.number}번 문항 수정` : '문항 추가'}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>{row ? `${row.number}번 문항 수정` : '문항 추가'}</h2>
+          <DraftBar
+            status={draft.status}
+            savedAt={draft.savedAt}
+            drafts={draft.drafts}
+            onRefresh={draft.refresh}
+            onRestore={(p: {
+              kind: 'mc' | 'short'; tierKey: string; subject: string
+              difficulty: '' | '상' | '중' | '하'; prompt: string; choices: string[]
+              correctIndex: number; answerKey: string; explanation: string
+            }) => {
+              setKind(p.kind); setTierKey(p.tierKey); setSubject(p.subject)
+              setDifficulty(p.difficulty); setPrompt(p.prompt); setChoices(p.choices)
+              setCorrectIndex(p.correctIndex); setAnswerKey(p.answerKey); setExplanation(p.explanation)
+            }}
+          />
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12, textAlign: 'left' }}>
           <div style={QE.row}>

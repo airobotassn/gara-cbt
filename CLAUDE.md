@@ -189,9 +189,15 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - **`/guide` 개편(2026-07)**: 히어로(로고 락업 + 카피 + `CARIS PLAN` 버튼 + 로봇 이미지) → "CARIS는 무엇인가요?"(특징 카드 8장) → "CARIS 자격 체계"(피라미드 + 급수별 검정과목 카드) 3단 구성. **시험 일정은 `/plan` 으로 분리**됐다(옛 히어로 우측 일정 패널·상시시험 띠는 삭제). `/guide` 에서 원서접수로 가는 경로 = `CARIS PLAN` 버튼 → `/plan` → 회차 카드 → `/exam/apply`. 페이지 배경/색 토큰(`--g-*`)은 `.guide-page`(guide.css)가 단일 출처고 `/plan` 도 그걸 쓴다.
   - 히어로 이미지 = `public/hero-robot.png`(배경 투명). **손 위 CARIS 행성은 이미지에 없다** — `logo.png` 를 CSS 로 겹친 별도 레이어(`.guide-hero-orb`, %좌표 + 글로우 + 부유 애니메이션). 로봇 이미지를 갈면 손바닥 비율에 맞춰 `.guide-hero-orb`/`.guide-hero-art::after` 의 `left`·`top` 을 다시 맞출 것.
   - ⚠️ 클래스명에 `.hl` 쓰지 말 것 — `result.css` 가 전역으로 `.hl { display:flex }` 를 잡고 있다(`.gh-hl` 로 우회).
-- `/mypage` 탭(URL `/mypage/:section`) 순서 = `learning`(학습 대시보드, **기본 = `/mypage`**) · `ebooks`(이북 서재) · `attempts`(시험 응시 현황) · `earned` · `issuance`. ⚠️ 응시 현황은 예전 기본 탭이라 `/mypage` 였는데 지금은 `/mypage/attempts`.
+- `/mypage` 탭(URL `/mypage/:section`) 순서 = `learning`(학습 대시보드, **기본 = `/mypage`**) · `ebooks`(이북 서재) · `attempts`(시험 응시 현황) · `earned` · `issuance` · `inquiry`(1:1 문의). ⚠️ 응시 현황은 예전 기본 탭이라 `/mypage` 였는데 지금은 `/mypage/attempts`.
+  - **1:1 문의 '새 답변' 빨간 점(2026-08-12)**: 점이 뜨는 곳 셋(FAB · FAB 패널의 마이페이지 버튼 · 마이페이지 문의 탭)은 전부 `src/lib/inquiryAlert.ts` 하나를 구독한다 — 화면마다 따로 세면 점이 서로 다른 말을 한다. 세는 질의는 `inquiries` 직접 조회(RLS 가 본인 행만 준다), 끄는 건 RPC `inquiry_mark_seen` 하나뿐.
+    - ⚠️ **사용자에게 `inquiries` UPDATE 를 열지 말 것.** RLS 는 컬럼 단위로 못 막아서 본인 행 update 를 허용하면 자기 문의의 `answer`·`status` 까지 직접 쓴다. 그래서 읽음 처리만 SECURITY DEFINER 함수로 뚫어 놨다.
+    - ⚠️ **읽음 시점 = 문의를 펼친 순간**이지 탭에 들어온 순간이 아니다. 탭 진입으로 끄면 목록만 스쳐본 사람의 답변이 조용히 사라진다.
+    - ⚠️ 관리자가 답변을 **고쳐 쓰면** `answer_seen_at` 을 null 로 되돌린다(`admin` 의 `inquiryAnswer`) — 안 그러면 한 번 읽은 문의는 답이 바뀌어도 영영 조용하다.
+    - 폴링하지 않는다. 로그인 직후 + **창 포커스 복귀** 때만 다시 센다(30초 스로틀) — 관리자 답변은 하루 몇 건이라 상시 폴링이 아깝다.
+    - ⚠️ FAB 점(`.fab-dot`)은 **테마 무관 고정색**(`--fab-dot`)이다. 그 두 버튼의 면이 항상 흰색이라 `--danger-fg`(다크에선 연분홍)를 쓰면 흰 면에서 힘을 잃는다. 패널 안 점(`.pf-dot`)은 테마를 따르므로 거기선 `--danger-fg` 를 쓴다.
 - **`/ebooks` = 러닝 라이브러리(2026-08-06 개편)**: 옛 '이북 스토어'(카드 그리드)를 **가로 3열 — `레벨(급수) | 교재(E-BOOK) | 강의`** 로 바꿨다. 왼쪽에서 레벨을 고르면 가운데·오른쪽이 그 레벨 것으로 갈리고, 각 열은 카페 게시판처럼 자기 안에서 세로 스크롤한다(페이지를 내려서 레벨이 바뀌는 구조가 **아니다**). 좁은 화면은 레벨을 상단 가로 칩으로 빼고 교재↔강의를 탭으로 접는다.
-  - **카탈로그가 둘이다(2026-08-11)** — 제목 아래 전환 버튼 `LEVELTEST E-BOOK`(왼쪽 열 = 레벨 1~7 + 레벨 무관) / `CARIS E-BOOK`(왼쪽 열 = 급수 Beginner~Zenith + 급수 무관). 기본은 LEVELTEST. 이름 두 개는 급수 이름처럼 **브랜드 영문 고정**이라 i18n 사전이 아니라 `Ebooks.tsx` 의 `CATALOG_LABEL` 이 단일 출처다.
+  - **카탈로그가 둘이다(2026-08-11)** — 제목 아래 전환 버튼 `LEVELTEST`(왼쪽 열 = 레벨 1~7 + 레벨 무관) / `CARIS`(왼쪽 열 = 급수 Beginner~Zenith + 급수 무관). 기본은 LEVELTEST. 이름 두 개는 급수 이름처럼 **브랜드 영문 고정**이라 i18n 사전이 아니라 `Ebooks.tsx` 의 `CATALOG_LABEL` 이 단일 출처다.
     - 갈리는 기준은 **`ebooks.catalog` 한 컬럼**이고 분류값은 카탈로그마다 한 쪽만 채운다(`target_level` ↔ `target_tier`, DB CHECK `ebooks_catalog_target_chk`). 관리자 이북 폼은 그래서 셀렉트가 **한 칸**(`LEVELTEST · Lv.3` / `CARIS · Pro`) — 칸을 둘로 쪼개면 화면에서 CHECK 에 걸리는 조합을 만들 수 있다.
     - ⚠️ **레벨테스트 결과창 추천(`picks`)은 `catalog='leveltest'` 로 걸러야 한다.** CARIS 책은 `target_level` 이 항상 null 이라 '레벨 무관' 폴백에 통째로 걸린다.
     - ⚠️ **급수별 강의는 아직 없다** — `lectures.ts` 는 레벨만 안다. CARIS 탭의 강의 열이 비어 있는 건 정상이다.
@@ -215,6 +221,21 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `tickets`(접수·응시권) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
   - ⚠️ **이북 탭은 양쪽 관리자에 하나씩 있다(2026-08-11)** — `?top=caris&tab=ebooks` = CARIS E-BOOK, `?top=level&tab=ebooks` = LEVELTEST E-BOOK. 같은 `EbooksAdmin` 에 `catalog` 만 다르게 넘긴 것이고, 각 화면은 자기 카탈로그 책만 보여주고 등록도 그 카탈로그로 고정한다(등록할 때 카탈로그를 잘못 고를 길이 없다). 순서(↑↓)는 자기 카탈로그 안에서만 바뀌지만 서버로는 **두 카탈로그 합친 전체 ids** 를 보내야 한다(`ebookReorder` 가 받은 순서대로 sort_order 를 다시 매긴다).
 - 온보딩 게이트(`App.tsx`의 `OnboardingGate`): 정식 회원이 지역 미확정이면 `/test/*` · `/ranking` · `/mypage` 접근 시 `/onboarding` 으로 강제. 그 외 라우트는 통과.
+  - **국가·지역 모두 전 세계(2026-08-12)**: 예전엔 국가가 지역코드(`KR-11`)에서 파생된 **읽기 전용**이라 화면에 늘 '대한민국'이 떴고 외국 사용자는 서울·부산 중 하나를 골라야 넘어갔다(서버도 한국 밖 조합을 400으로 거절). 지금은 국가 셀렉트(249개, **화면 언어로 정렬** + IP 로 알아낸 나라를 맨 위 + 기본 선택) → 그 나라의 지역 셀렉트다.
+    - **지역 데이터는 새로 만들지 않았다 — `/arena` 지도가 이미 쓰는 `public/geo/adm1/<ISO>.json`(211개국 · 3,504구역 · 6개국어 이름)을 그대로 읽는다**(`src/lib/regionCatalog.ts`). 나라를 고른 뒤 그 나라 파일만 받는다(전부 받으면 6MB). 아레나가 같은 파일을 캐시로 공유한다.
+    - ⚠️ **이 구멍이 왜 생겼었나**: 아레나는 아무 나라나 파고들어 주(州) 랭킹을 그리는데 온보딩만 한국을 특별취급했다. 그래서 사우디 사용자는 자기 나라 주 랭킹 화면을 보면서 거기에 **영영 못 들어갔다**. 화면 한쪽만 나라를 늘리면 이 상태가 다시 만들어진다.
+    - ⚠️ **지역 코드 모양이 나라마다 다르다** — `KR-11`(ISO) · `AE-X01~`(ISO 없는 구역의 Natural Earth 임시코드) · `ES.CE`(점 표기) · `Est`(이름 그대로). **'국가 = 코드 앞 두 글자' 파싱 금지**(스페인·부르키나파소에서 깨진다). 어느 나라 것인지는 `regions.country_code` 가 답한다.
+    - **정답지는 DB `regions` 테이블 하나**(지도 파일에서 뽑아 넣은 3,504행 — `20260812130000`). 코드를 소스에 복제하지 않으므로 `_shared/regions.ts` 는 **모양만** 보고(`isValidRegionCountryPair`), 실재·소속·"그 나라에 지역이 있나"는 `set-region` 이 DB 에 물어본다.
+      - ⚠️ 코드가 **그 나라 것인지**까지 봐야 한다. FK 는 "실재하는 코드"만 보장한다 — 안 보면 스페인 사람이 `KR-11` 로 서울 순위에 섞인다.
+      - ⚠️ 지역이 있는 나라에서 지역을 비우면 **거절**(`region_required`)한다. 안 막으면 위의 '아레나에 있는데 못 들어가는' 상태가 그대로 재현된다.
+      - 지도 데이터가 없는 소수 국가만 `region_code = null` 로 저장한다(`''` 를 넣으면 `regions` FK 위반). `region_leaderboard` 가 이미 `region_code is not null` 로 걸러 빈 버킷이 안 생긴다.
+    - **한국 시도 이름만 i18n 사전(`region.KR-11`)이 이긴다** — 지도 파일은 옛 이름('강원도')이고 사전은 현행 공식 명칭('강원특별자치도')이라 앱의 다른 화면과도 맞는다. `src/lib/regions.ts` 의 `REGION_CODES`(한국 17개)는 이제 **관리자 시도 필터 같은 한국 전제 화면 전용**이다.
+    - ⚠️ IP 로 나라를 못 알아내면 **비워 둔다.** 예전처럼 `KR` 로 떨어뜨리면 외국 사용자가 화면에 뜬 '대한민국'을 그대로 확정한다.
+    - ⚠️ 지역 색인(`/geo/adm1/index.json`)을 **받기 전에는 '지역 없음'이 아니라 '모른다'** 로 다룬다 — 모르는 동안 다음 단계를 열면 한국 사용자가 지역 없이 확정해 버린다.
+  - **국가·지역 1회 변경(마이페이지 › 내 정보)**: 닉네임 1회 변경과 같은 성격. `profiles.region_changed_at` 이 소진 표시고, 경로는 `set-region` 의 `action:'change'` → RPC `change_region_once` 하나뿐이다.
+    - ⚠️ **국가·지역은 `enforce_region_lock` 트리거가 막아서 service role 로도 직접 못 고친다.** `admin_set_region` 과 같은 방식(트랜잭션 로컬 GUC `app.allow_region_change`)으로만 쓴다.
+    - ⚠️ **1회 판정을 `UPDATE ... where region_changed_at is null` 한 문장에 넣는다.** select 로 먼저 확인하고 update 하면 두 번 눌린 요청이 나란히 통과해 2회 변경이 된다. `region_locked_at`(최초 확정 시각)은 건드리지 않는다.
+    - ⚠️ 나라를 바꾸면 화면이 지역을 **반드시 비운다** — 안 비우면 옛 나라의 지역이 남아 서버가 거절하고 사용자는 이유 없는 오류만 본다.
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
 - **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 5칸 `출석·뽑기·상점·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
   - ⚠️ **오른쪽 레일은 `position:absolute` 라 무대 높이를 늘리지 못한다** — 버튼을 추가·삭제하면 `hub.css` 의 `.hub-main .stage-zone` 높이(모바일 420 / PC 520)와 `.rail-r` gap 을 다시 실측할 것. 넘치면 아래 출석 스탬프를 덮는다(실제로 5칸이 되며 터졌던 버그).

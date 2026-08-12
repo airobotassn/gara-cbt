@@ -7,6 +7,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
+import { TIER_LABEL } from '../_shared/exam-tickets.ts'
 
 // 서명 URL 유효시간(초). 길면 링크 유출 시 그만큼 오래 열람 가능 → 짧게 두고 재발급.
 const SIGNED_URL_TTL = 60 * 60
@@ -52,6 +53,17 @@ function shape(b: Row, owned: boolean, lang: string) {
 //      (옛 동작: Lv.3 탈락에 3·4·2 가 나갔다.) 아래 레벨은 후보에서 아예 뺀다.
 //   (판정은 이제 DB 쿼리의 .in('target_level', [want … want+PICK_SPAN-1]) 이 한다 — 옛 inPickRange 는 제거됐다.)
 const PICK_SPAN = 2
+
+/** 서재(library) 진열 순서 = **레벨 사다리 1→7**. 낮을수록 앞(2026-08-12).
+ *  옛 동작은 구매순(최신 먼저)이었는데 카드에 구매일이 안 보여서 "무슨 순인지 모르겠다"가 됐다.
+ *  ⚠️ 레벨/급수 무관(null)은 맨 뒤 — 사다리에 안 서는 책을 앞에 두면 Lv.1 교재로 읽힌다.
+ *  ⚠️ CARIS 책은 레벨이 없고 급수를 쓴다(DB CHECK 상 둘 중 한 쪽만 찬다). 그래서 레벨 묶음이 끝난
+ *     뒤에 급수 사다리(Beginner→Zenith) 순으로 선다 — 두 사다리를 한 줄에 섞으면 순서가 다시 흐려진다.
+ *  급수 순서의 출처는 TIER_LABEL 키 순서다(표를 새로 쓰면 두 벌이 된다). */
+const SHELF_LAST = 99
+const TIER_RANK: Record<string, number> = Object.fromEntries(Object.keys(TIER_LABEL).map((k, i) => [k, i]))
+const shelfKey = (b: { catalog: string; targetLevel: number | null; targetTier: string | null }): number =>
+  b.catalog === 'caris' ? 100 + (TIER_RANK[b.targetTier ?? ''] ?? SHELF_LAST) : (b.targetLevel ?? SHELF_LAST)
 
 async function ownedIds(admin: ReturnType<typeof adminClient>, uid: string): Promise<Set<string>> {
   const { data } = await admin.from('ebook_purchases').select('ebook_id').eq('user_id', uid)
@@ -186,18 +198,21 @@ Deno.serve(async (req) => {
         .order('created_at', { ascending: false })
       const ids = (purchases ?? []).map((p: Row) => p.ebook_id as string)
       if (!ids.length) return json({ ebooks: [] })
+      // ⚠️ catalog·target_* 를 같이 뽑아야 한다 — 안 뽑으면 shape() 가 전부 '레벨 무관 leveltest'로 읽어
+      //    아래 진열 순서가 통째로 무너진다(옛 select 가 그랬다).
       const { data: books } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price, translations')
+        .select('id, title, author, description, cover_url, price, translations, catalog, target_level, target_tier')
         .in('id', ids)
       const byId = new Map((books ?? []).map((b: Row) => [b.id as string, b]))
-      // 구매 순(최신 먼저) 유지. 관리자가 삭제한 책은 건너뛴다.
-      const ebooks = (purchases ?? [])
-        .map((p: Row) => {
-          const b = byId.get(p.ebook_id as string)
-          return b ? { ...shape(b, true, lang), purchasedAt: p.created_at as string } : null
-        })
-        .filter(Boolean)
+      // 관리자가 삭제한 책은 건너뛴다.
+      const ebooks = (purchases ?? []).flatMap((p: Row) => {
+        const b = byId.get(p.ebook_id as string)
+        return b ? [{ ...shape(b, true, lang), purchasedAt: p.created_at as string }] : []
+      })
+      // 레벨 사다리 순으로 진열(shelfKey 주석 참고). sort 가 안정 정렬이라 같은 레벨끼리는
+      // 위 쿼리가 준 구매순(최신 먼저)이 그대로 남는다.
+      ebooks.sort((a, b) => shelfKey(a) - shelfKey(b))
       return json({ ebooks })
     }
 

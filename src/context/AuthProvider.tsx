@@ -94,10 +94,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       loadOnboarding(data.session?.user ?? null)
     })
+    // ⚠️ Supabase 는 **탭이 다시 보일 때마다** 세션을 재검증하고 `SIGNED_IN`/`TOKEN_REFRESHED` 를 쏜다.
+    //    그때마다 `setSession(새 객체)` 를 하면 컨텍스트 값이 바뀌어 **화면 전체가 리렌더**되고,
+    //    `SIGNED_IN` 부수효과(profiles UPDATE + 온보딩 재조회)까지 매번 돈다 —
+    //    관리자 화면에서 다른 탭 갔다 오면 "새로고침된 것처럼" 보이던 원인이다.
+    //    → 사람이 실제로 바뀌었을 때만 반영한다(토큰만 갱신된 건 무시).
+    let lastUserId: string | null = null
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      setSession(s)
-      // 탈퇴(soft delete) 복구: 보관기간 내 재로그인하면 비활성 플래그 해제
-      if (event === 'SIGNED_IN' && s?.user && !s.user.is_anonymous) {
+      const uid = s?.user?.id ?? null
+      const changed = uid !== lastUserId
+      lastUserId = uid
+      // 토큰만 새로 발급된 경우엔 세션 객체를 갈아끼우지 않는다 — 값이 같으면 리렌더도 필요 없다.
+      if (changed || event === 'SIGNED_OUT') setSession(s)
+      // 탈퇴(soft delete) 복구: 보관기간 내 재로그인하면 비활성 플래그 해제.
+      //   ⚠️ `changed` 를 안 보면 탭 전환마다 UPDATE 가 나간다.
+      if (changed && event === 'SIGNED_IN' && s?.user && !s.user.is_anonymous) {
         supabase.from('profiles').update({ deactivated_at: null }).eq('id', s.user.id).then(() => {})
         loadOnboarding(s.user)
       }

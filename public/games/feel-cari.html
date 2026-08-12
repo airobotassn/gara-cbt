@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>더듬어라 CARI — 센서를 골라 켜라</title>
+<!--
+  ─────────────────────────────────────────────────────────────
+  더듬어라 CARI (feel-cari) — 프로토타입 v3
+  ─────────────────────────────────────────────────────────────
+  검정과목 **"에지 AI 디바이스와 센서 데이터 처리"**(CARIS-Ⅰ Elite).
+
+  판을 두 번 갈아엎었고, 그 이유가 곧 이 게임의 설계다:
+   v1 센서를 **정보량**으로 다뤘다(1개→3개→8개) → 난이도 조절일 뿐 매 판 하는 일이 같았다.
+   v2 출발 전에 **골라서 달고** 들어갔다 → 결정이 판당 한 번뿐이라 플레이 중엔 여전히 할 게 없었다.
+   v3 **센서를 전부 주고 플레이 중에 켜고 끈다.** 다 켜두면 고를 이유가 없으므로 **배터리**를 건다 —
+      라이다·카메라는 전기를 많이 먹고 초음파·적외선은 거의 안 먹는다(실제로 그렇다).
+      그래서 매 순간 "지금 뭘 켤까"가 생기고, 그게 에지 디바이스를 다루는 일 그 자체다.
+
+  ⚠️ 설계상 지킬 것:
+   ① 미로로 만들지 말 것. 넓은 공간 + 장애물. 목표 방향은 나침반이 알려준다.
+   ② 감지 지점은 화면에 남긴다 — 어떤 센서를 켰느냐에 따라 지도가 완전히 다르게 그려진다.
+   ③ 캔버스에 글자를 그리지 않는다(지형=SVG 도형, 숫자=DOM). 나중에 번역이 통째로 덮인다.
+   ④ 센서의 강약은 **데이터표(SENSORS)** 한 곳에만 둔다. 코드에 "라이다는 유리를 못 본다" 같은 특례 금지.
+   ⑤ 배터리를 다 켜고도 남게 만들지 말 것. 다 켤 수 있으면 이 게임엔 결정이 없다.
+   ⑥ **만능인 센서를 두지 말 것.** v3 까지 초음파가 모든 재질을 보고 어느 환경에서도 안 죽고 제일 쌌다 —
+      그래서 초음파만 켜고 전 구역을 깰 수 있었다. 천(C) 재질로 초음파의 눈을 하나 막아서 끊었다.
+   ⑦ **작동 방식도 달라야 한다.** 각도만 다르고 전부 '즉시·상시' 면 결국 같은 물건이다.
+      초음파는 메아리를 기다리고(0.15초), 라이다는 회전하며 훑고(한 바퀴), 카메라는 셔터가 있고(0.10초),
+      적외선·레이더만 실시간이다. 그래서 **빨리 달릴 땐 켜야 할 센서가 달라진다.**
+  지표: 도달 구역 (6) · 동률은 소요시간
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(120% 80% at 50% -10%,#141c2e 0%,#0b1020 55%,#070a14 100%);
+    color:#dfe7f5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 80px -20px rgba(0,0,0,.7)}
+
+  .top{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 13px 4px}
+  .lv{padding:5px 11px;border-radius:8px;background:#1f6dff;color:#fff;font-weight:900;font-size:13.5px}
+  .lvname{font-weight:900;font-size:15px;letter-spacing:-.02em}
+  .envt{padding:4px 9px;border-radius:7px;font-size:12px;font-weight:900;background:#3a2a12;color:#f0c078}
+  .hits{margin-left:auto;font-size:13.5px;font-weight:900;color:#ff9a8a}
+
+  /* ── 배터리 ───────────────────────────────── */
+  .batt{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 13px 7px}
+  .batt .cap{font-size:12px;font-weight:900;color:#7f93bd}
+  .batt .bar{flex:1 1 auto;height:9px;border-radius:5px;background:rgba(255,255,255,.09);overflow:hidden}
+  .batt .bar i{display:block;height:100%;background:linear-gradient(90deg,#3ddc84,#8fe0a8);
+    transition:width .15s linear}
+  .batt.low .bar i{background:linear-gradient(90deg,#ff5a48,#ffb020)}
+  .batt .pct{font-size:13px;font-weight:900;width:44px;text-align:right}
+  .batt.low .pct{color:#ff8a7a}
+  .batt .rate{font-size:11.5px;font-weight:800;color:#7f93bd;width:52px;text-align:right}
+
+  /* ── 시야 ─────────────────────────────────── */
+  .view{flex:1 1 auto;min-height:0;margin:0 13px;border-radius:14px;overflow:hidden;
+    background:#05070e;border:1px solid rgba(255,255,255,.08);display:grid;place-items:center;position:relative}
+  .view svg{width:100%;height:100%;display:block}
+  .view.bump{animation:bmp .45s}
+  @keyframes bmp{0%,100%{transform:translate(0,0)}20%{transform:translate(-5px,3px)}45%{transform:translate(4px,-2px)}70%{transform:translate(-2px,1px)}}
+  .compass{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:6px;
+    background:rgba(10,16,32,.8);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 11px}
+  .compass svg{width:17px;height:17px}
+  .compass span{font-size:13px;font-weight:900;color:#cfe0ff}
+  .drift{position:absolute;top:8px;left:8px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:900;
+    background:rgba(255,120,60,.16);border:1px solid rgba(255,140,80,.4);color:#ffb98a}
+  .blind{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:6px 13px;border-radius:999px;
+    font-size:13px;font-weight:900;background:rgba(255,90,72,.18);border:1px solid rgba(255,120,90,.45);color:#ffb1a4}
+
+  /* ── 센서 (토글 = 판독기) ──────────────────── */
+  .sens{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 13px 6px}
+  .s{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:11px;cursor:pointer;
+    background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);
+    text-align:left;font:inherit;color:inherit;min-width:0}
+  .s .si{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px}
+  .s .bd{flex:1 1 auto;min-width:0}
+  .s .sn{display:block;font-size:12.5px;font-weight:900;letter-spacing:-.01em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .s .sv{display:block;font-size:17px;font-weight:900;line-height:1.15;color:#5c6b8c}
+  .s .sv small{font-size:10.5px;font-weight:800;margin-left:1px}
+  .s .sp{flex:0 0 auto;font-size:9px;letter-spacing:1px;color:#57648a}
+  .s.on{background:rgba(255,255,255,.09)}
+  .s.on .sv{color:#eaf1ff}
+  .s.on.near .sv{color:#ff8a7a}
+  .s.on.dead .sv{font-size:13px;color:#ff8a7a;line-height:1.5}
+  .s.on.touch .sv{font-size:13px;line-height:1.5}
+  /* 펄스/셔터가 실제로 "찰칵" 하는 순간 — 값이 그때만 갱신된다는 걸 눈으로 알려준다 */
+  .s.ping{background:rgba(255,255,255,.20)}
+
+  /* ── 조종 ─────────────────────────────────── */
+  .pad{flex:0 0 auto;display:flex;gap:8px;padding:0 13px calc(11px + env(safe-area-inset-bottom))}
+  .ctl{flex:1 1 0;padding:15px 8px;border:0;border-radius:13px;cursor:pointer;font:900 19px/1 system-ui,sans-serif;
+    background:#1c2740;color:#cfe0ff;border:1px solid rgba(255,255,255,.10);touch-action:none}
+  .ctl.go{flex:1.5 1 0;background:linear-gradient(#2f7de1,#1c56b8);color:#fff;border-color:transparent;
+    box-shadow:0 4px 0 #123a80}
+  .ctl.on{filter:brightness(1.25)}
+  .ctl.go.on{transform:translateY(2px);box-shadow:0 2px 0 #123a80}
+
+  /* ── 판정 ─────────────────────────────────── */
+  .fb{position:absolute;left:13px;right:13px;bottom:13px;z-index:30;background:#141d33;
+    border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px 16px;
+    box-shadow:0 22px 46px -18px rgba(0,0,0,.9);transform:translateY(170%);
+    pointer-events:none;transition:transform .24s cubic-bezier(.2,.9,.3,1)}
+  .fb.on{transform:translateY(0);pointer-events:auto}
+  .fbhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .fbhead b{font-size:17px;font-weight:900;letter-spacing:-.02em;color:#8fe0a8}
+  .fb.no .fbhead b{color:#ff9a8a}
+  .fbhead .st{margin-left:auto;font-size:15px;color:#e0a92a;font-weight:900;letter-spacing:1px}
+  .fbhead .st i{font-style:normal;color:#4a5570}
+  .fbwhy{margin:0 0 13px;font-size:14.5px;font-weight:700;line-height:1.6;color:#aebbd6;word-break:keep-all}
+  .fbwhy em{font-style:normal;color:#ffd08a;font-weight:900}
+  .fbbtn{width:100%;padding:14px;border:0;border-radius:13px;cursor:pointer;background:#2f7de1;color:#fff;
+    font:900 16px/1 system-ui,sans-serif}
+
+  /* ── 오버레이 ─────────────────────────────── */
+  .ov{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:16px;
+    background:rgba(5,8,18,.82);backdrop-filter:blur(4px)}
+  .sheet{width:100%;max-width:430px;max-height:100%;overflow-y:auto;
+    background:linear-gradient(#18213a,#111829);border:1px solid rgba(255,255,255,.12);
+    border-radius:20px;padding:18px 16px;box-shadow:0 26px 60px -20px rgba(0,0,0,.95)}
+  .art{width:74px;height:74px;display:block;margin:0 auto}
+  .ttl{text-align:center;font-size:25px;font-weight:900;letter-spacing:-.03em;margin:11px 0 5px}
+  .ttl i{font-style:normal;color:#5aa3ff}
+  .lead{text-align:center;font-size:15px;font-weight:700;line-height:1.6;color:#9fb0d8;margin:0 0 15px}
+  .rules{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .rules li{display:flex;gap:10px;align-items:flex-start;font-size:15px;font-weight:700;line-height:1.55;
+    background:rgba(255,255,255,.05);border-radius:12px;padding:11px 13px;color:#cbd6f0}
+  .rules li span{flex:0 0 auto;color:#5aa3ff;font-weight:900}
+  .btn{width:100%;padding:15px;border:0;border-radius:13px;cursor:pointer;
+    background:linear-gradient(#3a8bff,#1f63e0);color:#fff;font:900 16.5px/1 system-ui,sans-serif}
+
+  .zhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .zhead b{font-size:20px;font-weight:900;letter-spacing:-.02em}
+  .zhead span{padding:4px 9px;border-radius:7px;font-size:12px;font-weight:900;background:#3a2a12;color:#f0c078}
+  .zdesc{font-size:14.5px;font-weight:700;line-height:1.6;color:#a9b8d6;margin:0 0 13px;word-break:keep-all}
+  .known{background:rgba(255,150,80,.09);border:1px solid rgba(255,160,90,.26);border-radius:13px;
+    padding:11px 13px;margin-bottom:14px}
+  .known h4{margin:0 0 7px;font-size:13px;font-weight:900;color:#ffb98a;letter-spacing:.02em}
+  .known div{font-size:13.5px;font-weight:700;line-height:1.55;color:#e6d2c2;margin-bottom:3px}
+  .known div b{font-weight:900}
+
+  .big{text-align:center;font-size:34px;font-weight:900;color:#e0a92a;line-height:1.1;letter-spacing:2px}
+  .biglab{text-align:center;font-size:13px;font-weight:800;color:#7d8dba;margin:6px 0 14px}
+  .note{background:rgba(90,163,255,.10);border:1px solid rgba(90,163,255,.28);border-radius:13px;
+    padding:12px 14px;font-size:14.5px;line-height:1.6;font-weight:700;color:#bcd6ff;margin-bottom:15px}
+  .note b{color:#fff}
+
+  .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
+    padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.12);color:#dfe7f5}
+  .mg-rank.on{display:inline-flex}
+
+  /* ⚠️ .hidden 은 스타일시트 맨 끝 — 특정도가 같은 .ov / .drift 보다 뒤에 있어야 이긴다. */
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="top">
+    <span class="lv">구역 <b id="lvNum">1</b>/6</span>
+    <span class="lvname" id="lvName">—</span>
+    <span class="envt hidden" id="envTag">—</span>
+    <span class="hits">부딪힘 <b id="hitEl">0</b>/3</span>
+  </div>
+
+  <div class="batt" id="battBox">
+    <span class="cap">배터리</span>
+    <span class="bar"><i id="battFill" style="width:100%"></i></span>
+    <span class="pct" id="battPct">100%</span>
+    <span class="rate" id="battRate">0.0/s</span>
+  </div>
+
+  <div class="view" id="view">
+    <svg id="svg" viewBox="0 0 338 442" xmlns="http://www.w3.org/2000/svg">
+      <g id="gWall"></g><g id="gMark"></g><polyline id="gTrail" fill="none"
+        stroke="rgba(90,163,255,.26)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <g id="gBeam"></g><g id="gGoal"></g><g id="gBot"></g>
+    </svg>
+    <div class="compass">
+      <svg viewBox="0 0 24 24"><g id="cArrow"><path d="M12 3 L17 19 L12 15.5 L7 19 Z" fill="#5aa3ff"/></g></svg>
+      <span id="cDist">—</span>
+    </div>
+    <div class="drift hidden" id="driftTag">위치 추정 흔들림</div>
+    <div class="blind hidden" id="blindTag">센서를 하나도 안 켰다</div>
+  </div>
+
+  <div class="sens" id="sens"></div>
+
+  <div class="pad">
+    <button class="ctl" id="bL">↰</button>
+    <button class="ctl go" id="bF">▲ 전진</button>
+    <button class="ctl" id="bR">↱</button>
+  </div>
+
+  <div class="fb" id="fb">
+    <div class="fbhead"><b id="fbTtl">도착</b><span class="st" id="fbStar"></span></div>
+    <p class="fbwhy" id="fbWhy">—</p>
+    <button class="fbbtn" id="fbBtn">다음</button>
+  </div>
+</div>
+
+<!-- 인트로 -->
+<div class="ov" id="startOv">
+  <div class="sheet">
+    <div id="sArt"></div>
+    <p class="ttl">더듬어라 <i>CARI</i></p>
+    <p class="lead">CARI 는 앞을 못 본다.<br/>센서는 전부 달려 있지만 <b>배터리가 하나</b>다.</p>
+    <ul class="rules">
+      <li><span>①</span><div>화면은 까맣다. <b>센서를 켜야</b> 거리가 보인다. 아무거나 눌러서 켜고 끈다.</div></li>
+      <li><span>②</span><div>켜둔 만큼 <b>배터리가 닳는다.</b> 라이다·카메라는 많이 먹고 초음파는 거의 안 먹는다.</div></li>
+      <li><span>③</span><div>구역마다 환경이 다르다. 깜깜하거나, 유리거나, 연기가 낀다. <b>켜봤는데 먹통이면 전기만 버린 것.</b></div></li>
+      <li><span>④</span><div>센서마다 <b>갱신 속도가 다르다.</b> 초음파·카메라는 한 박자 늦고, 라이다는 한 바퀴 돌아야, 적외선·레이더는 즉시. <b>빨리 달리면 느린 센서는 옛 값을 보여준다.</b></div></li>
+      <li><span>⑤</span><div>센서가 닿은 자리는 <b>점으로 남는다.</b> 뭘 켰느냐에 따라 지도가 달라진다.</div></li>
+      <li><span>⑥</span><div>배터리가 떨어지거나 <b>3번</b> 부딪히면 되돌아온다. 한 번도 안 부딪히면 <b>★★★</b>.</div></li>
+    </ul>
+    <button class="btn" id="startBtn">시작하기</button>
+  </div>
+</div>
+
+<!-- 구역 브리핑 -->
+<div class="ov hidden" id="brOv">
+  <div class="sheet">
+    <div class="zhead"><b id="zName">—</b><span class="hidden" id="zEnv">—</span></div>
+    <p class="zdesc" id="zDesc">—</p>
+    <div class="known hidden" id="zKnown"><h4>지금까지 겪어서 아는 것</h4><div id="zKnownBody"></div></div>
+    <button class="btn" id="zGo">들어가기</button>
+  </div>
+</div>
+
+<!-- 종료 -->
+<div class="ov hidden" id="overOv">
+  <div class="sheet">
+    <div id="oArt"></div>
+    <p class="ttl">다섯 구역 통과</p>
+    <p class="big" id="oStars">★</p>
+    <p class="biglab" id="oLab">별 0 / 15</p>
+    <div class="note">센서는 세상을 알려주지 않는다. <b>자기가 잴 수 있는 것만</b>, 그것도 <b>전기를 쓰면서</b> 알려준다. 무엇을 언제 켤지 정하는 게 일이다.</div>
+    <button class="btn" id="oAgain">처음부터 다시</button>
+  </div>
+</div>
+
+<script>
+/* ================= CARI mascot (기존 게임과 동일 자산) ================= */
+function charSVG(suit,o={}){
+  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
+  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
+  const ex=dir*2.2;
+  const eyes = shock
+    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
+       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
+    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
+       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
+       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
+  const mouth = shock
+    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
+    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+  const antenna = isCari ? `
+    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
+    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
+  const badge = isCari ? `
+    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
+    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
+  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:74px;height:74px">
+    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
+      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
+    </radialGradient></defs>
+    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
+    ${antenna}
+    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
+    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
+    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
+             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
+          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
+    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
+    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
+    ${eyes}${mouth}${badge}</svg>`;
+}
+const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+
+
+/* ===================== 센서표 =====================
+   ⚠️ 센서의 강약은 **여기 한 곳**에만 둔다. 코드에 "라이다는 유리를 못 본다" 같은 특례를 쓰지 말 것.
+   sees  — 재질별 감지 여부(1 감지 / 0 통과해서 못 봄)
+   envFail — 이 환경에서는 통째로 먹통
+   재질: # 콘크리트 · G 유리 · B 검은 고무 · M 금속
+==================================================== */
+const SENSORS={
+  ultra:{nm:'초음파', pw:0.4, cone:1, fov:30, rays:5, dotR:3, jit:9, tick:0.15, ic:'🔊', c:'#5aa3ff',
+         hw:'소리를 쏘고 메아리를 기다린다. 초당 예닐곱 번만 갱신 — 빨리 달리면 옛 값을 본다. 유리도 잡지만 천에 먹힌다.',
+         range:78,  sees:{'#':1,'G':1,'B':1,'M':1,'C':0}, envFail:[]},
+  lidar:{nm:'라이다', pw:2, fov:360, rays:28, dotR:1.4, jit:0, spin:300, ic:'🟢', c:'#3ddc84',
+         hw:'빙글 돌며 훑는다. 한 바퀴 돌아야 사방이 보인다. 유리·검은 것을 못 보고 연기에 먹통.',
+         range:230, sees:{'#':1,'G':0,'B':0,'M':1,'C':1}, envFail:['smoke']},
+  cam  :{nm:'카메라', pw:1.6, area:1, fov:66, rays:9, dotR:2.3, jit:10, tick:0.10, ic:'👁', c:'#c8a6ff',
+         hw:'빛을 모아 본다. 제일 멀리 보지만 셔터가 있어 조금 늦게 갱신. 유리를 못 보고 어둠·연기에 먹통.',
+         range:320, sees:{'#':1,'G':0,'B':1,'M':1,'C':1}, envFail:['dark','smoke']},
+  ir   :{nm:'적외선', pw:0.3, fov:4, rays:1, dotR:2, jit:0, tick:0, ic:'🔶', c:'#ffb020',
+         hw:'한 점을 콕 집는다. 지연이 없어 빨리 달려도 값이 맞다. 좁은 문을 정확히 집는다. 햇빛에 먹통.',
+         range:98,  sees:{'#':1,'G':0,'B':0,'M':1,'C':0}, envFail:['bright']},
+  radar:{nm:'레이더', pw:1.2, cone:1, fov:84, rays:7, dotR:6, jit:16, tick:0, ic:'📡', c:'#ff7ab0',
+         hw:'전파를 쏜다. 지연이 없고 연기를 뚫는다. 금속은 두 배 멀리 본다. 대신 위치가 뭉개진다.',
+         range:270, sees:{'#':1,'G':0,'B':1,'M':1,'C':1}, envFail:[], fuzzy:16, boost:{'M':2}},
+  bump :{nm:'범퍼',   pw:0, fov:0, rays:0, dotR:3.4, jit:0, tick:0, ic:'🛡', c:'#ff8a7a',
+         hw:'부딪혀야 안다. 대신 무조건 맞다. 전기를 안 쓰고, 어긋난 위치를 다시 잡는 유일한 수단.',
+         contact:true, sees:{'#':1,'G':1,'B':1,'M':1,'C':1}, envFail:[]}
+};
+const ENVLBL={dark:'깜깜함',bright:'햇빛',smoke:'연기',slip:'미끄러움'};
+
+/* ===================== 구역 =====================
+   reveals — 그 센서를 달고 들어갔을 때 카드에 남는 메모(실패가 자산이 되게 하는 장치)
+================================================ */
+const LEVELS=[
+{
+  name:'물류창고', envs:[], slots:3,
+  desc:'방이 벽으로 나뉘어 있고 <b>벽마다 문이 하나씩</b> 뚫려 있다. 나침반은 방향만 알려줄 뿐 <b>문이 어디인지는 안 알려준다</b> — 벽을 훑어서 찾아라. 여기선 어떤 센서든 다 통한다.',
+  reveals:{ultra:'사거리가 매우 짧다',lidar:'멀리·정밀하게 본다',cam:'제일 멀리 본다',
+           ir:'가까이만 본다',radar:'멀리 보지만 값이 뭉뚱그려진다',bump:'닿기 전엔 아무것도 모른다'},
+  after:'같은 벽인데 센서마다 <em>보이는 거리가 다르다.</em> 여기까진 아무거나 골라도 된다 — 다음부터가 진짜다.',
+  grid:[
+  '#############',
+  '#S..........#',
+  '#...........#',
+  '#####..######',
+  '#...........#',
+  '#...........#',
+  '######..#####',
+  '#...........#',
+  '#...........#',
+  '##..#########',
+  '#...........#',
+  '#...........#',
+  '#########..##',
+  '#...........#',
+  '#...........#',
+  '#..........E#',
+  '#############']
+},
+{
+  name:'정전된 지하', envs:['dark'], slots:2,
+  desc:'<b>빛이 하나도 없다.</b> 벽은 평범한 콘크리트고 문은 <b>한 칸뿐</b>이다.',
+  reveals:{cam:'<b>깜깜하면 먹통</b>'},
+  after:'카메라는 <em>빛을 받는</em> 물건이다. 빛이 없으면 아무것도 못 한다. 스스로 쏘는 센서라야 어둠에서 산다.',
+  grid:[
+  '#############',
+  '#S..........#',
+  '#...........#',
+  '########.####',
+  '#...........#',
+  '#...........#',
+  '#.###########',
+  '#...........#',
+  '#...........#',
+  '######.######',
+  '#...........#',
+  '#...........#',
+  '###########.#',
+  '#...........#',
+  '#...........#',
+  '#..........E#',
+  '#############']
+},
+{
+  name:'유리 전시장', envs:[], slots:2,
+  desc:'칸막이가 전부 <b>유리</b>다. 조명은 밝은데, <b>벽이 안 보이면 거기 뚫린 문도 안 보인다.</b>',
+  reveals:{lidar:'<b>유리를 통과해 못 봄</b>',cam:'<b>유리를 통과해 못 봄</b>',ir:'<b>유리를 통과해 못 봄</b>',
+           radar:'<b>유리를 통과해 못 봄</b>',ultra:'<b>유리도 잡는다</b>'},
+  after:'빛도 전파도 유리를 <em>그냥 통과한다.</em> “앞이 비었다”는 말은 “아무것도 못 봤다”는 뜻일 수도 있다 — 소리는 유리에 튕긴다.',
+  grid:[
+  '#############',
+  '#S..........#',
+  '#...........#',
+  '#GGGG.GGGGGG#',
+  '#...........#',
+  '#...........#',
+  '#GGGGGGGGG.G#',
+  '#...........#',
+  '#...........#',
+  '#G.GGGGGGGGG#',
+  '#...........#',
+  '#...........#',
+  '#GGGGGGG.GGG#',
+  '#...........#',
+  '#...........#',
+  '#..........E#',
+  '#############']
+},
+{
+  name:'천 덮인 창고', envs:['bright'], slots:2,
+  desc:'짐이 전부 <b>두꺼운 천</b>으로 덮여 있다. 천창으로 <b>햇빛</b>이 쏟아진다. <b>천은 소리를 삼킨다</b> — 초음파가 "앞이 비었다"고 해도 믿지 마라.',
+  reveals:{ultra:'<b>천에 먹힌다 — 벽인데 안 보임</b>',ir:'<b>천에 먹히고 햇빛에도 먹통</b>',
+           lidar:'천은 잘 본다',cam:'천은 잘 본다',radar:'천은 잘 본다'},
+  after:'소리는 딱딱한 것에 튕기고 <em>푹신한 것에 먹힌다.</em> 여태 만능이던 초음파가 여기서 처음으로 아무것도 못 봤다 — 만능인 센서는 없다.',
+  grid:[
+  '#############',
+  '#S..........#',
+  '#...........#',
+  '#CCC.CCCCCCC#',
+  '#...........#',
+  '#...........#',
+  '#CCCCCCCC.CC#',
+  '#...........#',
+  '#...........#',
+  '#C.CCCCCCCCC#',
+  '#...........#',
+  '#...........#',
+  '#CCCCCC.CCCC#',
+  '#...........#',
+  '#...........#',
+  '#..........E#',
+  '#############']
+},
+{
+  name:'검은 고무 창고', envs:[], slots:2,
+  desc:'벽이 전부 <b>검은 고무</b>다. 검정은 <b>빛을 삼킨다</b> — 레이저를 쏴봐야 아무것도 안 돌아온다.',
+  reveals:{lidar:'<b>검은 물체를 못 봄</b>',ir:'<b>검은 물체를 못 봄</b>',cam:'검은 물체도 본다',
+           radar:'검은 물체도 본다',ultra:'색과 상관없다'},
+  after:'라이다는 <em>빛이 되돌아와야</em> 잰다. 검은 것은 빛을 삼켜서 아무것도 안 돌아온다. 소리와 전파는 색을 안 가린다.',
+  grid:[
+  '#############',
+  '#S..........#',
+  '#...........#',
+  '#BBB.BBBBBBB#',
+  '#...........#',
+  '#...........#',
+  '#BBBBBBBB.BB#',
+  '#...........#',
+  '#...........#',
+  '#B.BBBBBBBBB#',
+  '#...........#',
+  '#...........#',
+  '#BBBBBB.BBBB#',
+  '#...........#',
+  '#...........#',
+  '#..........E#',
+  '#############']
+},
+{
+  name:'연기 낀 공장', envs:['smoke','slip'], slots:3,
+  desc:'용접 <b>연기</b>가 자욱하고 바닥엔 기름이 흘러 <b>미끄럽다</b>. 벽은 <b>금속</b>이라 <b>레이더가 두 배 멀리</b> 본다. 문이 멀리 있어서 코앞만 보는 센서로는 한참 걸리고, 미끄러지면 <b>자기 위치를 잘못 알게 된다.</b>',
+  reveals:{cam:'<b>연기에 먹통</b>',lidar:'<b>연기에 먹통</b>',radar:'<b>연기를 뚫는다</b>',
+           bump:'닿으면 <b>위치를 다시 잡는다</b>'},
+  after:'연기는 빛을 흩어버리지만 전파는 뚫는다. 그리고 미끄러진 만큼 <em>내가 아는 내 위치가 틀어진다</em> — 벽에 닿아 다시 잡는 것 말고 방법이 없다. 로봇이 SLAM 을 하는 이유다.',
+  grid:[
+  '#############',
+  '#S..........#',
+  '#...........#',
+  '#MMMMMMMMM.M#',
+  '#...........#',
+  '#...........#',
+  '#M.MMMMMMMMM#',
+  '#...........#',
+  '#...........#',
+  '#MMMMMMM.MMM#',
+  '#...........#',
+  '#...........#',
+  '#MM.MMMMMMMM#',
+  '#...........#',
+  '#...........#',
+  '#..........E#',
+  '#############']
+}
+];
+
+
+/* ===================== 상태 ===================== */
+const $=id=>document.getElementById(id);
+const CELL=26, D2R=Math.PI/180, BOT_R=6, SPEED=1.35, TURN=2.8, MAX_HIT=3, BATT_MAX=100;
+let LI=0, L=null, grid=[], W=0, H=0;
+let bot={x:0,y:0,a:0}, err={x:0,y:0}, driftDir=0, goal={x:0,y:0};
+let on={}, batt=BATT_MAX, hits=0, marks=new Set(), trail=[], held={l:0,f:0,r:0}, touching=false;
+let markDom=0, trailStr='', botG=null;
+const MARK_MAX=1400;
+const markFrag=document.createDocumentFragment();
+let meas={}, scanA=0;   // meas=센서별 마지막 측정 캐시 · scanA=라이다 회전각(누적)
+let raf=null, running=false, bumpUntil=0, lastT=0, starsPer=[], learned={};
+
+function starStr(n){return '★'.repeat(n)+'<i>'+'☆'.repeat(3-n)+'</i>';}
+function envOn(k){ return L && L.envs.indexOf(k)>=0; }
+function estX(){ return bot.x+err.x; }
+function estY(){ return bot.y+err.y; }
+function cellAt(px,py){
+  const cx=Math.floor(px/CELL), cy=Math.floor(py/CELL);
+  if(cx<0||cy<0||cy>=H||cx>=W) return '#';
+  return grid[cy][cx];
+}
+const SOLID='#GBMC';
+function solid(ch){ return SOLID.indexOf(ch)>=0; }
+/** 센서가 그 재질을 감지하나 — 판단은 전부 SENSORS.sees 표에서 나온다(코드에 특례 금지). */
+function detects(sk,ch){ return solid(ch) && SENSORS[sk].sees[ch]===1; }
+function dead(sk){ return SENSORS[sk].envFail.some(e=>envOn(e)); }
+
+/** 광선 하나. `boost` 가 있으면 그 재질만 사거리가 늘어난다(레이더는 금속에 두 배 멀리 닿는다). */
+function ray(sk,ang,ox,oy){
+  const S=SENSORS[sk], dx=Math.cos(ang), dy=Math.sin(ang);
+  const bx=ox===undefined?bot.x:ox, by=oy===undefined?bot.y:oy;
+  const far=S.boost?S.range*Math.max(...Object.values(S.boost)):S.range;
+  for(let t=BOT_R;t<far;t+=2){
+    const px=bx+dx*t, py=by+dy*t;
+    const ch=cellAt(px,py);
+    if(!detects(sk,ch)) continue;
+    const lim=S.range*((S.boost&&S.boost[ch])||1);
+    if(t<=lim) return {d:t,x:px,y:py,hit:true};
+    break;  // 벽이 가로막았는데 사거리 밖 — 아무것도 못 본 것
+  }
+  return {d:S.range,x:bx+dx*S.range,y:by+dy*S.range,hit:false};
+}
+function hitsWall(x,y){
+  for(let i=0;i<8;i++){
+    const a=i*45*D2R;
+    if(solid(cellAt(x+Math.cos(a)*BOT_R,y+Math.sin(a)*BOT_R))) return true;
+  }
+  return solid(cellAt(x,y));
+}
+function drainRate(){
+  // ⚠️ 먹통인 센서도 켜두면 전기를 먹는다. 그게 "잘못 켰다"의 대가다.
+  return Object.keys(SENSORS).reduce((a,k)=>a+(on[k]?SENSORS[k].pw:0),0);
+}
+function pwDots(k){ const p=SENSORS[k].pw; const n=p>=1.6?3:p>=0.9?2:p>0?1:0;
+  return '●'.repeat(n)+'○'.repeat(3-n); }
+
+/** 센서가 쏘는 방향들 — **화면에서 센서를 구분하는 건 숫자가 아니라 이 모양이다.**
+ *  적외선은 한 줄기, 초음파는 짧고 좁은 부채, 카메라는 넓고 긴 부채, 라이다는 사방 스캔, 레이더는 넓고 흐리다.
+ *  ⚠️ 전부 선 하나로 그리면 어느 센서를 켜도 화면이 똑같아져서 이 게임이 성립하지 않는다. */
+function rayAngles(k){
+  const S=SENSORS[k];
+  if(!S.rays) return [];
+  if(S.fov>=360) return Array.from({length:S.rays},(_,i)=>i*360/S.rays);
+  if(S.rays<2) return [0];
+  return Array.from({length:S.rays},(_,i)=>-S.fov/2+i*S.fov/(S.rays-1));
+}
+
+/* ===================== 센서 판 ===================== */
+function buildSensors(){
+  $('sens').innerHTML=Object.keys(SENSORS).map(k=>{
+    const S=SENSORS[k];
+    return `<button class="s" data-k="${k}" id="s_${k}">
+      <span class="si" style="background:${S.c}22;color:${S.c}">${S.ic}</span>
+      <span class="bd"><span class="sn" style="color:${S.c}">${S.nm}</span>
+      <span class="sv" id="v_${k}">꺼짐</span></span>
+      <span class="sp">${pwDots(k)}</span></button>`;
+  }).join('');
+  $('sens').querySelectorAll('.s').forEach(b=>{
+    b.onclick=()=>{ const k=b.dataset.k; on[k]=!on[k]; b.classList.toggle('on',!!on[k]);
+      if(!on[k]){ $('v_'+k).textContent='꺼짐'; b.classList.remove('near','dead','touch'); delete meas[k]; } };
+  });
+}
+
+/* ===================== 구역 적재 ===================== */
+function loadLevel(){
+  L=LEVELS[LI]; grid=L.grid; H=grid.length; W=grid[0].length;
+  $('lvNum').textContent=LI+1; $('lvName').textContent=L.name;
+  const envTxt=L.envs.map(e=>ENVLBL[e]).join(' · ');
+  $('envTag').textContent=envTxt; $('envTag').classList.toggle('hidden',!envTxt);
+  $('driftTag').classList.toggle('hidden',!envOn('slip'));
+  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={l:0,f:0,r:0}; touching=false;
+  batt=BATT_MAX; on={}; meas={}; scanA=0;
+  driftDir=Math.random()*Math.PI*2;   // 드리프트는 한 방향으로 쏠린다 — 랜덤워크면 상쇄돼 아무 일도 안 난다
+  $('hitEl').textContent='0';
+  $('svg').setAttribute('viewBox',`0 0 ${W*CELL} ${H*CELL}`);
+  buildSensors();
+
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    if(grid[y][x]==='S') bot={x:x*CELL+CELL/2,y:y*CELL+CELL/2,a:0};
+    if(grid[y][x]==='E') goal={x:x*CELL+CELL/2,y:y*CELL+CELL/2};
+  }
+  const FILL={'#':'#3c4a6a','G':'#2f7f8e','B':'#23262e','M':'#7a6a4a','C':'#6a5a52'};
+  let w='';
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const c=grid[y][x];
+    if(FILL[c]) w+=`<rect x="${x*CELL}" y="${y*CELL}" width="${CELL}" height="${CELL}" fill="${FILL[c]}"/>`;
+  }
+  $('gWall').innerHTML=w; $('gWall').setAttribute('opacity','0');
+  $('gGoal').innerHTML=`<circle cx="${goal.x}" cy="${goal.y}" r="10" fill="none" stroke="#3ddc84" stroke-width="2.5"/>
+    <circle cx="${goal.x}" cy="${goal.y}" r="4" fill="#3ddc84"/>`;
+  $('gMark').innerHTML=''; $('gBeam').innerHTML=''; $('gTrail').setAttribute('points','');
+  $('gBot').innerHTML='<g id="botG"><circle r="'+BOT_R+'" fill="#eaf1ff"/><path d="M0 -3 L9 0 L0 3 Z" fill="#1f6dff"/></g>';
+  botG=$('botG');
+
+  $('fb').classList.remove('on');
+  running=true; lastT=performance.now();
+  cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+}
+
+/* ===================== 루프 ===================== */
+function loop(){
+  if(!running) return;
+  const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  const nowS=now/1000;
+
+  if(held.l) bot.a-=TURN*D2R;
+  if(held.r) bot.a+=TURN*D2R;
+  touching=false;
+  if(held.f){
+    const nx=bot.x+Math.cos(bot.a)*SPEED, ny=bot.y+Math.sin(bot.a)*SPEED;
+    if(hitsWall(nx,ny)){
+      touching=true;
+      // 범퍼를 켜뒀으면 접촉이 곧 정보다 — 벽을 지도에 남기고 위치 추정을 다시 잡는다.
+      if(on.bump){
+        addMark(bot.x+Math.cos(bot.a)*BOT_R, bot.y+Math.sin(bot.a)*BOT_R, SENSORS.bump.c, SENSORS.bump.dotR, 0);
+        err.x*=0.3; err.y*=0.3;
+      }
+      if(now>bumpUntil){
+        hits++; $('hitEl').textContent=hits;
+        bumpUntil=now+900;
+        $('gWall').setAttribute('opacity','.55');
+        $('view').classList.add('bump');
+        setTimeout(()=>{ $('gWall').setAttribute('opacity','0'); $('view').classList.remove('bump'); },700);
+        if(hits>=MAX_HIT) return fail('부딪힘 3번');
+      }
+      bot.x-=Math.cos(bot.a)*1.6; bot.y-=Math.sin(bot.a)*1.6;
+    } else {
+      bot.x=nx; bot.y=ny;
+      // 미끄러운 바닥 — 바퀴가 헛돌아 "내가 아는 내 위치"가 한쪽으로 밀린다(오도메트리 드리프트).
+      if(envOn('slip')){ err.x+=Math.cos(driftDir)*0.09; err.y+=Math.sin(driftDir)*0.09; }
+    }
+    const last=trail[trail.length-1];
+    if(!last||Math.hypot(last[0]-estX(),last[1]-estY())>4){
+      trail.push([estX(),estY()]);
+      trailStr+=(trailStr?' ':'')+estX().toFixed(1)+','+estY().toFixed(1);
+      $('gTrail').setAttribute('points',trailStr);
+    }
+  }
+
+  // 배터리 — 켜둔 센서만큼 닳는다
+  const rate=drainRate();
+  batt=Math.max(0,batt-rate*dt);
+  $('battFill').style.width=(batt/BATT_MAX*100)+'%';
+  $('battPct').textContent=Math.ceil(batt)+'%';
+  $('battRate').textContent=rate?('-'+rate.toFixed(1)+'/s'):'0.0/s';
+  $('battBox').classList.toggle('low',batt<30);
+  if(batt<=0) return fail('배터리 방전');
+
+  const beams=[]; let anyOn=false;
+  Object.keys(SENSORS).forEach(k=>{
+    const S=SENSORS[k], box=$('s_'+k), el=$('v_'+k);
+    if(!on[k]) return;
+    anyOn=true;
+    if(dead(k)){ box.classList.add('dead'); box.classList.remove('near','touch');
+      el.textContent='먹통'; return; }
+    box.classList.remove('dead');
+    if(S.contact){ box.classList.add('touch');
+      el.textContent=touching?'접촉!':'닿지 않음'; return; }
+    const m=meas[k]||(meas[k]={d:S.range,seg:[],sm:null,r:undefined,t:-9});
+    const op = S.rays>12 ? '2e' : S.rays>4 ? '44' : '66';
+
+    if(S.spin){
+      // ── 회전 스캔 (라이다) ────────────────────────────────
+      // 실제 라이다는 빙글 돌며 훑는다. 그래서 **한 바퀴 돌아야 사방이 보이고**,
+      // 빨리 움직이면 도는 사이에 로봇이 이동해 지도가 뒤틀린다. 그게 이 센서의 값과 대가다.
+      const from=scanA, to=scanA+S.spin*dt;
+      for(let a=Math.ceil(from/1.6)*1.6;a<to;a+=1.6){
+        const r=ray(k,bot.a+a*D2R);
+        if(r.hit) addMark(r.x,r.y,S.c,S.dotR,S.jit);
+      }
+      if(Math.floor(to/360)>Math.floor(from/360)){ m.d=ray(k,bot.a).d; m.t=nowS; } // 정면은 한 바퀴에 한 번만 갱신
+      scanA=to;
+      const sa=bot.a+(to%360)*D2R;
+      beams.push(`<line x1="${estX()}" y1="${estY()}" x2="${estX()+Math.cos(sa)*S.range}" y2="${estY()+Math.sin(sa)*S.range}" stroke="${S.c}88" stroke-width="1.6"/>`);
+    } else if(nowS-m.t >= (S.tick||0)){
+      // ── 펄스/셔터 ─────────────────────────────────────────
+      // 초음파는 메아리를 기다리고 카메라는 셔터를 연다. tick 이 0 인 적외선·레이더만 실시간이다.
+      // ⚠️ 잰 결과는 **로봇 기준 상대 거리**로만 담는다. 절대 좌표로 담아두면 로봇이 앞서 나갈 때
+      //   부채꼴이 뒤에 못 박혀 툭툭 끊겨 보인다 — 지연이 아니라 고장으로 읽힌다.
+      m.t=nowS; m.seg=[];
+      m.d=ray(k,bot.a).d;
+      rayAngles(k).forEach(ad=>{
+        const r=ray(k,bot.a+ad*D2R);
+        if(r.hit) addMark(r.x,r.y,S.c,S.dotR,S.jit);
+        m.seg.push(r.d);
+      });
+      if(S.tick) box.classList.add('ping'), setTimeout(()=>box.classList.remove('ping'),110);
+    }
+    // ⚠️ 그리는 모양이 곧 그 센서가 아는 것의 정확도다. 선으로 그리면 "그 방향을 정확히 쟀다"는 뜻이라
+    //   원뿔로 퍼지는 센서를 선으로 그리면 물리를 거꾸로 가르친다.
+    // ⚠️ 그리는 거리는 목표값으로 **부드럽게 따라간다**. 측정 순간에 툭 바꾸면 눈엔 버벅임으로 보인다 —
+    //   지연은 숫자와 펄스 링으로 보여주고, 도형은 매끄럽게 움직이게 한다.
+    const cx=estX(), cy=estY(), k2=Math.min(1,dt*14);
+    m.r = m.r===undefined ? m.d : m.r+(m.d-m.r)*k2;
+    if(!m.sm) m.sm=m.seg.slice();
+    m.seg.forEach((v,i)=>{ m.sm[i] = m.sm[i]===undefined ? v : m.sm[i]+(v-m.sm[i])*k2; });
+
+    if(S.cone){
+      // 소리·전파 — 원뿔로 퍼진다. 거리는 알아도 **그 안 어디인지는 모른다** → 균일한 부채꼴
+      const half=S.fov/2*D2R, R=Math.max(6,m.r);
+      const a0=bot.a-half, a1=bot.a+half;
+      beams.push(`<path d="M ${cx},${cy} L ${cx+Math.cos(a0)*R},${cy+Math.sin(a0)*R}`
+        +` A ${R},${R} 0 0 1 ${cx+Math.cos(a1)*R},${cy+Math.sin(a1)*R} Z"`
+        +` fill="${S.c}" opacity="${S.fuzzy?.13:.20}" stroke="${S.c}55" stroke-width="1"/>`);
+      // 펄스 링 — "지금 쐈다"가 보여야 값이 계단처럼 뛰는 이유가 납득된다
+      const age=nowS-m.t;
+      if(S.tick && age<S.tick*0.7){
+        const p=age/(S.tick*0.7), rr=Math.max(6,m.r*p);
+        beams.push(`<path d="M ${cx+Math.cos(a0)*rr},${cy+Math.sin(a0)*rr}`
+          +` A ${rr},${rr} 0 0 1 ${cx+Math.cos(a1)*rr},${cy+Math.sin(a1)*rr}"`
+          +` fill="none" stroke="${S.c}" stroke-width="2" opacity="${(1-p)*0.75}"/>`);
+      }
+    } else if(S.area && m.sm.length){
+      // 카메라 — 각도는 정확하고(그림이니까) 거리가 어림이다 → 벽 모양을 따라가는 면
+      const ang=rayAngles(k);
+      beams.push(`<path d="M ${cx},${cy} L `
+        +m.sm.map((d,i)=>{ const a=bot.a+ang[i]*D2R;
+            return (cx+Math.cos(a)*d).toFixed(1)+','+(cy+Math.sin(a)*d).toFixed(1); }).join(' L ')
+        +` Z" fill="${S.c}" opacity=".14" stroke="${S.c}44" stroke-width="1"/>`);
+    } else if(!S.spin){
+      // 레이저·적외선 — 진짜 직선. 한 점을 정확히 집는다
+      const ang=rayAngles(k);
+      m.sm.forEach((d,i)=>{ const a=bot.a+ang[i]*D2R;
+        beams.push(`<line x1="${cx}" y1="${cy}" x2="${cx+Math.cos(a)*d}" y2="${cy+Math.sin(a)*d}" stroke="${S.c}${op}" stroke-width="1.3"/>`); });
+    }
+
+    // 레이더는 해상도가 낮아 값이 뭉뚱그려진다 — 있다는 건 알아도 정확히 어디인지는 흐리다.
+    const shown = S.fuzzy ? m.d+(Math.random()-0.5)*S.fuzzy : m.d;
+    el.innerHTML=Math.round(Math.max(0,shown)/2)+'<small>cm</small>';
+    box.classList.toggle('near',shown<32);
+  });
+  $('blindTag').classList.toggle('hidden',anyOn);
+  flushMarks();
+  $('gBeam').innerHTML=beams.join('');
+  // ⚠️ 로봇은 transform 만 갱신한다. innerHTML 로 다시 그리면 매 프레임 SVG 를 새로 파싱한다.
+  if(botG) botG.setAttribute('transform',`translate(${estX()},${estY()}) rotate(${bot.a/D2R})`);
+
+  // 나침반도 로봇이 **믿는 위치** 기준이다 — 그래서 미끄러지면 방향까지 틀어진다.
+  const ga=Math.atan2(goal.y-estY(),goal.x-estX())-bot.a;
+  $('cArrow').setAttribute('transform',`rotate(${ga/D2R+90} 12 12)`);
+  $('cDist').textContent=Math.round(Math.hypot(goal.x-estX(),goal.y-estY())/2)+'cm';
+
+  if(Math.hypot(goal.x-bot.x,goal.y-bot.y)<CELL*0.7) return clear();
+  raf=requestAnimationFrame(loop);
+}
+
+/** 감지 지점 누적.
+ *  · 로봇이 **믿는 위치** 기준으로 찍히므로 드리프트가 쌓이면 지도가 통째로 어긋난다.
+ *  · 점 크기·흐림이 센서마다 다르다 — 라이다는 가늘고 또렷한 윤곽을, 레이더는 뭉개진 덩어리를 남긴다.
+ *    **같은 벽을 훑어도 남는 지도가 다르다는 게 이 게임에서 센서 차이를 보여주는 핵심이다.** */
+function addMark(x,y,c,r,jit){
+  const rad=r||1.9;
+  if(jit){ x+=(Math.random()-0.5)*jit; y+=(Math.random()-0.5)*jit; }
+  const g=Math.max(3,Math.round(rad*1.7));   // 점이 클수록 성기게 눌러 담는다(안 그러면 큰 점이 화면을 덮는다)
+  const kx=Math.round((x+err.x)/g), ky=Math.round((y+err.y)/g), key=c+kx+','+ky;
+  // ⚠️ 중복 검사는 반드시 Set 이어야 한다. 배열 indexOf 로 두면 라이다가 매 프레임 수십 번 찍는 동안
+  //   점 수만큼 선형 탐색이 돌아서, 지도가 채워질수록 게임이 느려진다(실제로 렉이 났다).
+  if(marks.has(key)) return;
+  marks.add(key);
+  if(markDom>=MARK_MAX) return;              // DOM 노드 상한 — 원소가 너무 많아도 렌더가 느려진다
+  markDom++;
+  const n=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  n.setAttribute('cx',kx*g); n.setAttribute('cy',ky*g); n.setAttribute('r',rad);
+  n.setAttribute('fill',c); n.setAttribute('opacity',jit?'.42':'.78');
+  markFrag.appendChild(n);                   // 프레임당 한 번만 붙인다(아래 flushMarks)
+}
+/** 이 프레임에 생긴 점들을 한 번에 붙인다 — appendChild 를 점마다 하면 레이아웃이 그만큼 돈다. */
+function flushMarks(){ if(markFrag.childNodes.length) $('gMark').appendChild(markFrag); }
+
+/* ===================== 판정 ===================== */
+function noteLearned(){
+  const r=LEVELS[LI].reveals||{};
+  Object.keys(r).forEach(k=>{
+    if(!on[k]&&!usedOnce[k]) return;      // 켜본 적 있는 센서만 배운다
+    learned[k]=learned[k]||[];
+    if(learned[k].indexOf(r[k])<0) learned[k].push(r[k]);
+  });
+}
+let usedOnce={};
+function stop(){ running=false; cancelAnimationFrame(raf); held={l:0,f:0,r:0};
+  document.querySelectorAll('.ctl').forEach(b=>b.classList.remove('on')); }
+
+function clear(){
+  Object.keys(on).forEach(k=>{ if(on[k]) usedOnce[k]=1; });
+  stop(); noteLearned();
+  const st=hits===0?3:hits<=2?2:1;
+  starsPer[LI]=st;
+  $('gWall').setAttribute('opacity','.35');
+  $('fb').className='fb on';
+  $('fbTtl').textContent=hits===0?'한 번도 안 부딪혔다':'도착';
+  $('fbStar').innerHTML=starStr(st);
+  $('fbWhy').innerHTML=LEVELS[LI].after+' <em>배터리 '+Math.ceil(batt)+'% 남음.</em>';
+  $('fbBtn').textContent=LI+1>=LEVELS.length?'결과 보기':'다음 구역 ›';
+  $('fb').dataset.ok='1';
+  if(window.MGBridge) MGBridge.submit(LI+1,{timed:true}); // 랭킹: 도달 구역(동률=시간)
+}
+function fail(why){
+  Object.keys(on).forEach(k=>{ if(on[k]) usedOnce[k]=1; });
+  stop(); noteLearned();
+  $('gWall').setAttribute('opacity','.35');
+  $('fb').className='fb no on';
+  $('fbTtl').textContent=why;
+  $('fbStar').innerHTML='';
+  const deads=Object.keys(SENSORS).filter(k=>on[k]&&dead(k)).map(k=>SENSORS[k].nm);
+  $('fbWhy').innerHTML = deads.length
+    ? `<em>${deads.join(' · ')}</em> 을(를) 켜둔 채였다. 이 환경에선 먹통인데 전기는 그대로 먹는다.`
+    : (why==='배터리 방전'
+       ? '센 센서를 오래 켜뒀다. <em>필요할 때만 켜고 끄면</em> 훨씬 오래 간다.'
+       : '켜둔 센서로는 이 장애물이 안 잡혔다. <em>무엇이 안 보였는지</em> 생각하고 다른 걸 켜라.');
+  $('fbBtn').textContent='다시 들어가기';
+  $('fb').dataset.ok='0';
+}
+
+/* ===================== 조종 ===================== */
+function bind(btn,key){
+  const el=$(btn);
+  const on2=e=>{ e.preventDefault(); held[key]=1; el.classList.add('on'); };
+  const off=()=>{ held[key]=0; el.classList.remove('on'); };
+  el.addEventListener('pointerdown',on2);
+  ['pointerup','pointerleave','pointercancel'].forEach(t=>el.addEventListener(t,off));
+}
+bind('bL','l'); bind('bF','f'); bind('bR','r');
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft')held.l=1; if(e.key==='ArrowRight')held.r=1;
+  if(e.key==='ArrowUp'){held.f=1;e.preventDefault();}
+  const n=parseInt(e.key,10); if(n>=1&&n<=6){ const k=Object.keys(SENSORS)[n-1]; $('s_'+k)&&$('s_'+k).click(); }
+});
+document.addEventListener('keyup',e=>{
+  if(e.key==='ArrowLeft')held.l=0; if(e.key==='ArrowRight')held.r=0; if(e.key==='ArrowUp')held.f=0;
+});
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) held={l:0,f:0,r:0}; });
+
+/* ===================== 흐름 ===================== */
+function openBrief(){
+  const l=LEVELS[LI];
+  $('zName').textContent=(LI+1)+'구역 · '+l.name;
+  const envTxt=l.envs.map(e=>ENVLBL[e]).join(' · ');
+  $('zEnv').textContent=envTxt; $('zEnv').classList.toggle('hidden',!envTxt);
+  $('zDesc').innerHTML=l.desc;
+  const ks=Object.keys(learned).filter(k=>learned[k].length);
+  $('zKnown').classList.toggle('hidden',!ks.length);
+  $('zKnownBody').innerHTML=ks.map(k=>
+    `<div><b style="color:${SENSORS[k].c}">${SENSORS[k].nm}</b> — ${learned[k].join(' · ')}</div>`).join('');
+  $('brOv').classList.remove('hidden');
+}
+$('zGo').onclick=()=>{ $('brOv').classList.add('hidden'); loadLevel(); };
+$('startBtn').onclick=()=>{ $('startOv').classList.add('hidden'); LI=0; starsPer=[]; learned={}; usedOnce={}; openBrief(); };
+$('fbBtn').onclick=()=>{
+  const ok=$('fb').dataset.ok==='1';
+  $('fb').classList.remove('on');
+  if(!ok) return loadLevel();           // 실패 — 같은 구역 다시
+  if(LI+1>=LEVELS.length){
+    const tot=starsPer.reduce((a,b)=>a+(b||0),0);
+    $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+    $('oStars').innerHTML=starStr(Math.max(1,Math.round(tot/5)));
+    $('oLab').textContent='별 '+tot+' / '+(LEVELS.length*3);
+    $('overOv').classList.remove('hidden');
+  } else { LI++; openBrief(); }
+};
+$('oAgain').onclick=()=>{ $('overOv').classList.add('hidden'); LI=0; starsPer=[]; learned={}; usedOnce={}; openBrief(); };
+
+$('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+buildSensors();
+</script>
+
+<!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 ===== -->
+<script>
+(function(){
+  var EMBED=window.parent!==window, T0=Date.now();
+  function post(m){ if(EMBED) window.parent.postMessage(m,window.location.origin); }
+  window.MGBridge={submit:function(v,opts){
+    if(typeof v!=='number'||!isFinite(v)) return;
+    post({t:'mg:score',score:v,tieMs:(opts&&opts.timed&&T0)?(Date.now()-T0):undefined});
+  }};
+  function mount(id){
+    var ov=document.getElementById(id); if(!ov||ov.querySelector('.mg-rank')) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
+    b.setAttribute('aria-label','이 게임 랭킹 보기');
+    b.innerHTML='<span aria-hidden="true">🏆</span> 랭킹';
+    b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
+    ov.appendChild(b);
+  }
+  mount('startOv'); mount('overOv');
+  var intro=document.getElementById('startOv');
+  if(intro) intro.addEventListener('click',function(e){
+    if(e.target.closest&&e.target.closest('.mg-rank')) return;
+    T0=Date.now();
+  });
+})();
+</script>
+</body>
+</html>

@@ -78,7 +78,8 @@ interface HubState { authed: boolean; level?: number | null; rankPoints?: number
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
-interface DailyResp { ok: boolean; day: string; first: boolean }
+// stamps = 적립 뒤 7일 사이클 위치(1..7), bonus = 7일 완주 보너스 코인(0 이면 없음).
+interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
 
 const FRIENDLY_ERR = new Set(['insufficient_points', 'insufficient_dust', 'already_owned', 'unauthorized'])
 function friendlyError(e: unknown, t: TFunc): string {
@@ -343,7 +344,13 @@ export default function Hub() {
       // kind 명시 — 서버 기본값에 기대지 않는다(오늘의 학습과 종류가 갈린다).
       const r = await callFunction<DailyResp>('complete-daily', { kind: 'attendance' })
       // first=false 면 오늘 '오늘의 학습'으로 이미 재화를 받은 것 — 없는 적립을 있다고 쓰지 않는다.
-      pushLog(r.first ? t('hub.toast.checkin_done', { n: DAILY_POINTS }) : t('hub.toast.checkin_already'))
+      // 보너스 금액은 서버가 준 값을 그대로 쓴다(화면에 상수를 또 두면 서버와 어긋난다).
+      const bonus = r.bonus ?? 0
+      pushLog(
+        !r.first ? t('hub.toast.checkin_already')
+          : bonus > 0 ? t('hub.toast.checkin_bonus', { n: DAILY_POINTS, b: bonus })
+            : t('hub.toast.checkin_done', { n: DAILY_POINTS }),
+      )
       await hydrate()
     } catch (e) {
       pushErr(friendlyError(e, t))
@@ -657,7 +664,7 @@ export default function Hub() {
         {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
         <div className="dock">
           <div className="reward">
-            <div className="rw-top"><Ic n="fire" s={20} /> {t('hub.reward_head')} <span className="rw-streak">{t('hub.streak', { n: stamps })}</span><span className="rw-n">{stamps} / 7</span></div>
+            <div className="rw-top"><Ic n="fire" s={20} /> {t('hub.reward_head')}<span className="rw-n">{stamps} / 7</span></div>
             <div className="streak">
               {[1, 2, 3, 4, 5, 6, 7].map((d) => (
                 <div key={d} className={`day ${d <= stamps ? 'on' : ''}`}>

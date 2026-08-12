@@ -37,6 +37,10 @@ export function isValidRegion(code: string): boolean {
   return (REGION_CODES as readonly string[]).includes(code);
 }
 
+// ⚠️ 여기 REGION_CODES 는 **한국 17개**뿐이다 — 관리자 화면의 시도 필터처럼 한국을 전제로 한 자리에서만 쓴다.
+//    온보딩·마이페이지의 지역 선택은 전 세계를 다루므로 lib/regionCatalog.ts (지도 파일 기반)를 쓸 것.
+//    그쪽이 211개국·3,504개 구역을 6개국어 이름과 함께 알고 있고, 정답지는 DB regions 테이블이다.
+
 // Full ISO 3166-1 alpha-2 country codes (uppercase). Static array so it works in
 // any runtime without relying on Intl availability for the list itself.
 export const COUNTRY_CODES = [
@@ -76,6 +80,28 @@ export function flagEmoji(code?: string | null): string {
   const c = (code ?? '').trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(c)) return '';
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+}
+
+/**
+ * 국가 셀렉트가 그리는 목록 — 화면 언어로 이름을 매겨 **그 언어 기준으로 정렬**한다
+ * (코드 순으로 두면 한국어 화면에서 AD·AE·AF… 로 나와 자기 나라를 찾을 수가 없다).
+ * `first` 를 주면 그 나라를 맨 위로 끌어올린다 — IP 로 알아낸 접속 국가를 맨 앞에 세우는 용도이고,
+ * 목록에 두 번 나오지 않도록 아래 정렬 목록에서는 빼서 돌려준다.
+ */
+export function countryOptions(
+  lang: string,
+  first?: string | null,
+): { pinned: { code: string; name: string } | null; rest: { code: string; name: string }[] } {
+  const named = (COUNTRY_CODES as readonly string[]).map((code) => ({ code, name: countryName(code, lang) }));
+  let collator: Intl.Collator;
+  try {
+    collator = new Intl.Collator(lang);
+  } catch {
+    collator = new Intl.Collator();
+  }
+  const top = first ? named.find((c) => c.code === first) ?? null : null;
+  const rest = named.filter((c) => c.code !== top?.code).sort((a, b) => collator.compare(a.name, b.name));
+  return { pinned: top, rest };
 }
 
 export function countryName(code: string, lang: string): string {

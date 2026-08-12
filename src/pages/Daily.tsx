@@ -24,7 +24,8 @@ const STAMP_GOAL = 7 // 허브 도크의 7일 스탬프판과 동일
 //      판정하면 레벨테스트·미니게임만 해도 오늘의 문제가 잠긴다(2026-07-27 버그).
 interface HubState { authed: boolean; points?: number; stamps?: number; learnDone?: boolean }
 // complete-daily 응답. first = 이번 호출로 재화(코인·스탬프)가 실제 지급됐는지(출석·학습 통틀어 하루 1회).
-interface DailyResp { ok: boolean; day: string; first: boolean }
+// bonus = 7일 스탬프를 채운 날 붙는 완주 보너스 코인(0 이면 없음). 금액 권위는 서버다.
+interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
 
 const IK = '#33323f'
 const ICONS: Record<string, ReactNode> = {
@@ -50,6 +51,7 @@ export default function Daily() {
   const [err, setErr] = useState('')
   const [celebrate, setCelebrate] = useState(false) // 완료 직후 보상 연출(재방문 시엔 안 뜬다)
   const [rewarded, setRewarded] = useState(true) // 이번 완료로 재화가 실제 지급됐는지(서버 응답 first)
+  const [bonus, setBonus] = useState(0) // 7일 완주 보너스 코인(서버 응답 bonus)
   // 오늘의 문제 — 미니게임과 같은 용어 풀(lib/terms)에서 날짜별로 하나씩 순환. 마운트 시 1회 고정.
   // ⚠️ `?term=N` 은 **개발 서버에서만** 도는 미리보기다(해설·그림을 하루씩 기다리며 확인할 수 없어서).
   //    import.meta.env.DEV 가 false 인 빌드에서는 분기 자체가 트리셰이킹으로 사라진다.
@@ -98,6 +100,7 @@ export default function Daily() {
       const h = await callFunction<HubState>('get-hub', {})
       applyHub(h)
       setRewarded(!!r.first) // 오늘 출석으로 이미 재화를 받았으면 false — 보상 문구를 거짓말하지 않는다.
+      setBonus(r.bonus ?? 0)
       setCelebrate(true)
     } catch {
       setErr('완료 처리에 실패했어요. 잠시 후 다시 시도해주세요')
@@ -245,6 +248,7 @@ export default function Daily() {
             <b className="dy-pop-title">{t('daily.pop_title')}</b>
             <div className="dy-pop-gain">
               {rewarded && <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>}
+              {bonus > 0 && <span><Ic n="coin" s={22} />{t('daily.pop_bonus', { b: bonus })}</span>}
               <span><Ic n="stamp" s={22} />{t('daily.pop_stamp', { n: stamps, max: STAMP_GOAL })}</span>
             </div>
             <p className="dy-pop-msg">

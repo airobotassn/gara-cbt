@@ -24,7 +24,7 @@ import type { TFunc, Lang } from '../lib/i18n'
 import { usd } from '../lib/money'
 import SiteFooter from '../components/SiteFooter'
 import EbookCover from '../components/EbookCover'
-import { LEVEL_COLORS, MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
+import { MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
 import { getTracks, TIER_COLORS } from '../lib/caris'
 import { lecturesForLevel, ytEmbed, ytThumb, ytWatch, type Lecture } from '../lib/lectures'
 import type { EbookListResp, EbookRow, ServerLecture } from '../lib/types'
@@ -32,10 +32,23 @@ import type { EbookListResp, EbookRow, ServerLecture } from '../lib/types'
 type Catalog = 'leveltest' | 'caris'
 /** 카탈로그 이름은 급수 이름(Beginner…)과 같은 브랜드 고유명이라 **언어 무관 영문 고정**이다(i18n 사전 아님). */
 const CATALOG_LABEL: Record<Catalog, string> = {
-  leveltest: 'LEVELTEST E-BOOK',
-  caris: 'CARIS E-BOOK',
+  leveltest: 'LEVELTEST',
+  caris: 'CARIS',
 }
 const ANY_COLOR = 'rgb(148 163 184)' // slate-400 — 레벨/급수 색 사다리 밖이라는 뜻으로 무채색
+
+/** 레벨 칸의 색 점 — **그 레벨 교재 표지의 네온색**에서 뽑은 값이다(표지 그림에서 실측).
+ *  ⚠️ testConfigLevel 의 LEVEL_COLORS(연두→빨강)를 쓰지 않는다. 이 화면은 바로 옆에 표지가 서 있어서
+ *     사다리색을 쓰면 점과 표지가 서로 다른 색을 말한다. 표지를 새로 뽑으면 이 값도 다시 재야 한다. */
+const COVER_COLORS: Record<number, string> = {
+  1: '#2edef9', // 시안
+  2: '#0632f1', // 파랑
+  3: '#755ef4', // 보라
+  4: '#8d49f7', // 자주
+  5: '#f52c8f', // 핑크
+  6: '#f35907', // 주황
+  7: '#da1919', // 빨강
+}
 
 /** 교재 표지 폭(열 본문 폭 대비). 강의 썸네일은 이 값을 쓰지 않는다 — 영상은 가로가 긴 물건이라
  *  열 폭을 꽉 채우고 제목을 그 밑에 둔다(2026-08-11 지시).
@@ -116,7 +129,7 @@ export default function Ebooks() {
           label: `Lv.${lv} ${t(`lv.${lv}.name`)}`,
           short: `Lv.${lv}`,
           desc: t(`lv.${lv}.desc`),
-          color: LEVEL_COLORS[lv] ?? ANY_COLOR,
+          color: COVER_COLORS[lv] ?? ANY_COLOR,
           books: catRows.filter((b) => b.targetLevel === lv).length,
           lectures: lecturesForLevel(lv).length,
         })

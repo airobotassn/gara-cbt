@@ -4,6 +4,8 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, productLabel } from '../lib/adminData'
+import { useDraft } from '../lib/adminDraft'
+import DraftBar from '../components/DraftBar'
 import { krw } from '../lib/money'
 import { getTracks } from '../lib/caris'
 import { MAX_LEVEL } from '../lib/categories'
@@ -426,6 +428,7 @@ const TERM_TARGETS: [string, string][] = [
 export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
   const { data, loading, err, reload } = useAdminData<{ terms: TermRow[]; counts: Record<string, number> }>('termList')
   const [edit, setEdit] = useState<TermDraft | null>(null)
+  const draft = useDraft({ kind: 'term-question', refId: edit?.id, value: edit, title: edit?.answer_i18n?.ko?.trim() || '새 용어 문항', enabled: !!edit })
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   // 어느 게임의 세트를 편집 중인가. 기본은 이 메뉴가 속한 곳.
@@ -471,6 +474,7 @@ export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
           active: edit.active !== false, sortOrder: edit.sort_order ?? 0,
         },
       })
+      draft.clear()
       setEdit(null)
       await reload()
     } catch (e) {
@@ -588,10 +592,14 @@ export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
       </div>
 
       {edit && (
-        <div className="admin-modal-bg" onClick={() => setEdit(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setEdit(null)}>✕</button>
-            <h2>{edit._new ? '새 문항' : '문항 수정'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>{edit._new ? '새 문항' : '문항 수정'}</h2>
+              <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh} onRestore={(p: TermDraft) => setEdit(p)} />
+            </div>
             <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
               <label style={fld}>분야
                 <select style={inp} value={edit.field ?? 'AI'} onChange={(e) => setEdit({ ...edit, field: e.target.value })}>
@@ -639,6 +647,7 @@ interface RewardRow { wallet: 'coin' | 'score'; kind: string; label: string; amo
 export function CoinPolicyAdmin() {
   const { data, loading, err, reload } = useAdminData<{ policy: RewardRow[] }>('rewardPolicy')
   const [rows, setRows] = useState<RewardRow[] | null>(null)
+  const draft = useDraft({ kind: 'reward-policy', value: rows, title: '코인·점수 적립 정책', enabled: !!rows })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   useEffect(() => { if (data) setRows(data.policy) }, [data])
@@ -655,6 +664,7 @@ export function CoinPolicyAdmin() {
         rows: rows.map((r) => ({ wallet: r.wallet, kind: r.kind, amount: r.amount, perDay: r.per_day, active: r.active })),
       })
       setMsg('✅ 저장했습니다')
+      draft.clear()
       await reload()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '저장 실패')
@@ -735,6 +745,8 @@ export function CoinPolicyAdmin() {
     <>
       <AdminHead title="코인 관리" onReload={reload} loading={loading}>
         {msg && <span className="admin-msg">{msg}</span>}
+        <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
+          onRestore={(p: RewardRow[]) => setRows(p)} />
         <button className="btn-ink" onClick={save} disabled={busy || !rows}>{busy ? '저장 중…' : '저장'}</button>
       </AdminHead>
       <ErrBox msg={err} />
@@ -937,6 +949,7 @@ const ytThumbUrl = (id: string) => `https://img.youtube.com/vi/${id}/mqdefault.j
 export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
   const { data, loading, err, reload } = useAdminData<{ lectures: LectureRow[] }>('lectureList', { catalog })
   const [edit, setEdit] = useState<LectureDraft | null>(null)
+  const draft = useDraft({ kind: 'lecture', refId: edit?.id, value: edit, title: edit?.title?.trim() || '새 강의', enabled: !!edit })
   const [busy, setBusy] = useState(false)
   const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ key: ti.key, name: ti.name })))
   const rows = data?.lectures ?? []
@@ -957,6 +970,7 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
           published: edit.published !== false, sortOrder: edit.sort_order ?? rows.length,
         },
       })
+      draft.clear()
       setEdit(null)
       await reload()
     } catch (e) {
@@ -1007,10 +1021,14 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
       </div>
 
       {edit && (
-        <div className="admin-modal-bg" onClick={() => setEdit(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setEdit(null)}>✕</button>
-            <h2>{edit._new ? '새 강의' : '강의 수정'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>{edit._new ? '새 강의' : '강의 수정'}</h2>
+              <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh} onRestore={(p: LectureDraft) => setEdit(p)} />
+            </div>
             <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
               <label style={fld}>유튜브 주소 또는 영상 ID
                 <input style={inp} placeholder="https://youtu.be/…" value={edit.youtube_id ?? ''}
@@ -1071,6 +1089,8 @@ export function QnaAdmin() {
   const [open, setOpen] = useState<InquiryRow | null>(null)
   const [answer, setAnswer] = useState('')
   const [busy, setBusy] = useState(false)
+  // 답변도 길게 쓰다 날아갈 수 있다 — 문의 건별로 초안을 잡는다.
+  const draft = useDraft({ kind: 'inquiry-answer', refId: open?.id, value: answer, title: open?.title ?? '문의 답변', enabled: !!open })
   const rows = data?.inquiries ?? []
   const pending = rows.filter((r) => r.status === 'open').length
 
@@ -1079,6 +1099,7 @@ export function QnaAdmin() {
     setBusy(true)
     try {
       await callFunction('admin', { action: 'inquiryAnswer', id: open.id, answer })
+      draft.clear()
       setOpen(null); setAnswer('')
       await reload()
     } catch (e) {
@@ -1122,10 +1143,15 @@ export function QnaAdmin() {
       </div>
 
       {open && (
-        <div className="admin-modal-bg" onClick={() => setOpen(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setOpen(null)}>✕</button>
-            <h2>{open.title}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>{open.title}</h2>
+              <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
+                onRestore={(p: string) => setAnswer(p)} />
+            </div>
             <p className="admin-modal-meta">
               {open.name || '-'} · {INQ_CAT[open.category] ?? open.category} · {fmtDT(open.createdAt)}
             </p>
@@ -1183,6 +1209,14 @@ export function PolicyAdmin({ doc }: { doc: 'terms' | 'privacy' | 'about' }) {
   const docs = data?.docs ?? []
   const latest = docs[0]
 
+  // 임시저장 — 본문이 제일 긴 화면이라 여기가 제일 급하다(수천 자를 날리면 되돌릴 방법이 없다).
+  const draft = useDraft({
+    kind: `policy:${doc}`,
+    value: { body, note, effective },
+    title: POLICY_TITLE[doc],
+    enabled: !loading,
+  })
+
   // 편집 시작점 = 마지막 판. 아직 한 판도 없으면 **지금 사이트에 떠 있는 내용**을 깔아준다.
   useEffect(() => {
     if (loading || seeded) return
@@ -1199,6 +1233,7 @@ export function PolicyAdmin({ doc }: { doc: 'terms' | 'privacy' | 'about' }) {
       })
       setMsg(`✅ 제${r.version}판으로 저장했습니다`)
       setNote('')
+      draft.clear() // 저장됐으니 초안은 더 필요 없다
       await reload()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '저장 실패')
@@ -1212,7 +1247,19 @@ export function PolicyAdmin({ doc }: { doc: 'terms' | 'privacy' | 'about' }) {
         count={latest ? `현재 제${latest.version}판 · 시행 ${latest.effective_at}` : '지금 게시 중인 내용(코드) · 아직 개정판 없음'}
         onReload={reload}
         loading={loading}
-      />
+      >
+        <DraftBar
+          status={draft.status}
+          savedAt={draft.savedAt}
+          drafts={draft.drafts}
+          onRefresh={draft.refresh}
+          onRestore={(p: { body: string; note: string; effective: string }) => {
+            setBody(p.body ?? '')
+            setNote(p.note ?? '')
+            setEffective(p.effective ?? '')
+          }}
+        />
+      </AdminHead>
       <ErrBox msg={err} />
       <p className="admin-hint" style={{ marginBottom: 12, lineHeight: 1.7 }}>
         지금 사이트에 올라와 있는 본문입니다. 고치고 저장하면 바로 반영되고, 이전 내용은 아래 이력에 남습니다.
@@ -1368,6 +1415,7 @@ function MailComposeModal({ targets, roundId, onClose }: { targets: EnvPerson[];
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [seeded, setSeeded] = useState(false)
+  const draft = useDraft({ kind: 'mail-nudge', value: { subject, body }, title: subject || '독려 메일' })
   useEffect(() => {
     if (!data || seeded) return
     setSeeded(true)
@@ -1402,10 +1450,15 @@ function MailComposeModal({ targets, roundId, onClose }: { targets: EnvPerson[];
   }
 
   return (
-    <div className="admin-modal-bg" onClick={onClose}>
+    <div className="admin-modal-bg">
+    {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
       <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
         <button className="admin-modal-x" onClick={onClose}>✕</button>
-        <h2>독려 메일 보내기</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>독려 메일 보내기</h2>
+          <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
+            onRestore={(p: { subject: string; body: string }) => { setSubject(p.subject); setBody(p.body) }} />
+        </div>
         <p className="admin-modal-meta">
           받는 사람 {sendable.length}명
           {targets.length - sendable.length > 0 && ` · 이메일이 없어 제외 ${targets.length - sendable.length}명`}
@@ -1614,6 +1667,7 @@ function SitePreview({ kind, v }: { kind: 'browser' | 'footer' | 'mail'; v: Reco
 export function SiteInfoAdmin() {
   const { data, loading, err, reload } = useAdminData<{ settings: Record<string, string> }>('siteSettings')
   const [form, setForm] = useState<Record<string, string> | null>(null)
+  const draft = useDraft({ kind: 'site-settings', value: form, title: '사이트 정보', enabled: !!form })
   const [msg, setMsg] = useState('')
   useEffect(() => { if (data) setForm(data.settings) }, [data])
 
@@ -1638,6 +1692,7 @@ export function SiteInfoAdmin() {
       for (const k of changed) patch[k] = form[k]
       await callFunction('admin', { action: 'siteSettingsSave', settings: patch })
       setMsg(`✅ ${groupName} 저장했습니다`)
+      draft.clear()
       await reload()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '저장 실패')
@@ -1662,6 +1717,8 @@ export function SiteInfoAdmin() {
         loading={loading}
       >
         {msg && <span className="admin-msg">{msg}</span>}
+        <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
+          onRestore={(p: Record<string, string>) => setForm(p)} />
       </AdminHead>
       <ErrBox msg={err} />
       <p className="admin-hint" style={{ marginBottom: 14, lineHeight: 1.7 }}>
@@ -1760,6 +1817,7 @@ const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : undefined
 export function PopupAdmin() {
   const { data, loading, err, reload } = useAdminData<{ popups: PopupRow[] }>('popupList')
   const [edit, setEdit] = useState<PopupDraft | null>(null)
+  const draft = useDraft({ kind: 'popup', refId: edit?.id, value: edit, title: edit?.title?.trim() || '새 팝업', enabled: !!edit })
   const [busy, setBusy] = useState(false)
   const rows = data?.popups ?? []
 
@@ -1778,6 +1836,7 @@ export function PopupAdmin() {
           active: edit.active !== false, sortOrder: edit.sort_order ?? 0,
         },
       })
+      draft.clear()
       setEdit(null)
       await reload()
     } catch (e) {
@@ -1840,10 +1899,14 @@ export function PopupAdmin() {
       </div>
 
       {edit && (
-        <div className="admin-modal-bg" onClick={() => setEdit(null)}>
+        <div className="admin-modal-bg">
+        {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <button className="admin-modal-x" onClick={() => setEdit(null)}>✕</button>
-            <h2>{edit._new ? '새 팝업' : '팝업 수정'}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>{edit._new ? '새 팝업' : '팝업 수정'}</h2>
+              <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh} onRestore={(p: PopupDraft) => setEdit(p)} />
+            </div>
             <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
               <label style={fld}>제목
                 <input style={inp} value={edit.title ?? ''} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
