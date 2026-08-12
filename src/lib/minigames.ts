@@ -75,6 +75,14 @@ export const MINIGAMES: MiniGame[] = [
     src: '/games/order-cari.html',
     frame: '#d5dded', // 게임 body 그라디언트의 가장 진한 끝(밝은 공방 톤)
   },
+  {
+    id: 'feel-cari',
+    accent: 'CARI',
+    // ⚠️ 임시 커버(SVG). 게임 자체가 도형뿐이라 급한 대로 그린 것 — 다른 6종처럼 생성 PNG 로 갈아끼울 것.
+    art: '/games/feel-cari-cover.svg',
+    src: '/games/feel-cari.html',
+    frame: '#070a14', // 게임 body 그라디언트의 가장 어두운 끝
+  },
 ]
 
 export function findMiniGame(id: string | undefined): MiniGame | undefined {

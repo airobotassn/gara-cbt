@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 860" width="460" height="860">
+<!--
+  더듬어라 CARI 커버 — 게임 자체가 도형뿐이라 커버도 SVG 로 그렸다.
+  ⚠️ 임시 아트다. 다른 6종처럼 생성 AI 로 뽑은 PNG 로 갈아끼울 것.
+  아래 40% 는 목록 화면의 캡션 그라디언트가 덮으므로 볼거리는 위쪽에 둔다.
+-->
+<defs>
+  <radialGradient id="bg" cx="50%" cy="34%" r="78%">
+    <stop offset="0" stop-color="#1b2540"/><stop offset="55%" stop-color="#0d1428"/><stop offset="1" stop-color="#06080f"/>
+  </radialGradient>
+  <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="#5aa3ff" stop-opacity=".55"/><stop offset="1" stop-color="#5aa3ff" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#06080f" stop-opacity="0"/><stop offset="1" stop-color="#06080f" stop-opacity=".92"/>
+  </linearGradient>
+  <clipPath id="box"><rect width="460" height="860"/></clipPath>
+</defs>
+
+<g clip-path="url(#box)">
+  <rect width="460" height="860" fill="url(#bg)"/>
+
+  <!-- 격자 바닥 — 안 보이는 공간이라는 느낌 -->
+  <g stroke="#ffffff" stroke-opacity=".045" stroke-width="1">
+    <path d="M0 120h460M0 200h460M0 280h460M0 360h460M0 440h460M0 520h460M0 600h460"/>
+    <path d="M60 0v860M140 0v860M220 0v860M300 0v860M380 0v860"/>
+  </g>
+
+  <!-- 라이다가 훑고 지나간 벽 윤곽(초록 점) -->
+  <g fill="#3ddc84" fill-opacity=".82">
+    <g id="wallTop">
+      <circle cx="96" cy="196" r="3"/><circle cx="112" cy="196" r="3"/><circle cx="128" cy="196" r="3"/>
+      <circle cx="144" cy="196" r="3"/><circle cx="160" cy="196" r="3"/><circle cx="176" cy="196" r="3"/>
+      <circle cx="192" cy="196" r="3"/><circle cx="208" cy="196" r="3"/><circle cx="224" cy="196" r="3"/>
+      <circle cx="288" cy="196" r="3"/><circle cx="304" cy="196" r="3"/><circle cx="320" cy="196" r="3"/>
+      <circle cx="336" cy="196" r="3"/><circle cx="352" cy="196" r="3"/><circle cx="368" cy="196" r="3"/>
+    </g>
+    <g>
+      <circle cx="96" cy="212" r="3"/><circle cx="96" cy="240" r="3"/><circle cx="96" cy="268" r="3"/>
+      <circle cx="96" cy="296" r="3"/><circle cx="96" cy="324" r="3"/><circle cx="96" cy="352" r="3"/>
+      <circle cx="368" cy="212" r="3"/><circle cx="368" cy="240" r="3"/><circle cx="368" cy="268" r="3"/>
+      <circle cx="368" cy="296" r="3"/><circle cx="368" cy="324" r="3"/><circle cx="368" cy="352" r="3"/>
+    </g>
+  </g>
+
+  <!-- 레이더가 남긴 뭉개진 덩어리(분홍) — 같은 벽인데 센서마다 지도가 다르다 -->
+  <g fill="#ff7ab0" fill-opacity=".30">
+    <circle cx="128" cy="466" r="13"/><circle cx="152" cy="470" r="13"/><circle cx="176" cy="464" r="13"/>
+    <circle cx="300" cy="468" r="13"/><circle cx="324" cy="462" r="13"/><circle cx="348" cy="470" r="13"/>
+  </g>
+
+  <!-- 라이다 회전 스캔선 -->
+  <g stroke="#3ddc84" stroke-opacity=".55" stroke-width="2">
+    <path d="M230 392 L392 268"/>
+  </g>
+  <path d="M230 392 L360 300 A162 162 0 0 1 386 350 Z" fill="#3ddc84" fill-opacity=".10"/>
+
+  <!-- 초음파 부채꼴 + 파동 3겹 -->
+  <path d="M230 392 L146 300 A124 124 0 0 1 314 300 Z" fill="#5aa3ff" fill-opacity=".16" stroke="#5aa3ff" stroke-opacity=".34"/>
+  <g fill="none" stroke="#5aa3ff" stroke-width="3">
+    <path d="M168 322 A100 100 0 0 1 292 322" stroke-opacity=".62"/>
+    <path d="M186 344 A72 72 0 0 1 274 344" stroke-opacity=".42"/>
+    <path d="M203 364 A44 44 0 0 1 257 364" stroke-opacity=".24"/>
+  </g>
+
+  <!-- 로봇 -->
+  <circle cx="230" cy="392" r="52" fill="url(#glow)"/>
+  <circle cx="230" cy="392" r="15" fill="#eaf1ff"/>
+  <path d="M230 380 L252 392 L230 404 Z" fill="#1f6dff"/>
+
+  <!-- 배터리 게이지 — 이 게임의 두 번째 축 -->
+  <g transform="translate(150 566)">
+    <rect x="0" y="0" width="160" height="16" rx="8" fill="#ffffff" fill-opacity=".10"/>
+    <rect x="0" y="0" width="58" height="16" rx="8" fill="#ff7a4d"/>
+    <rect x="166" y="3" width="6" height="10" rx="2" fill="#ffffff" fill-opacity=".22"/>
+  </g>
+
+  <!-- 아래쪽은 캡션이 덮으므로 어둡게 내린다 -->
+  <rect y="520" width="460" height="340" fill="url(#fade)"/>
+</g>
+</svg>

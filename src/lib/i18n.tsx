@@ -1982,6 +1982,9 @@ export const D: Record<string, Record<Lang, string>> = {
   'mg.order-cari.title': { ko: '시켜라 CARI', en: 'Tell CARI What To Do', ja: '指示しろ CARI', zh: '下指令吧 CARI', hi: 'निर्देश दो CARI', vi: 'Ra lệnh đi, CARI' },
   'mg.order-cari.tagline': { ko: '도면대로 나오게 지시를 골라라!', en: 'Pick the instructions that match the blueprint!', ja: '図面どおりになる指示を選べ！', zh: '选出能照图纸做出来的指令！', hi: 'ब्लूप्रिंट से मेल खाते निर्देश चुनो!', vi: 'Chọn chỉ dẫn khớp với bản vẽ!' },
   'mg.order-cari.badge': { ko: 'AI 지시문 설계 퍼즐', en: 'AI prompting design puzzle', ja: 'AI 指示文の設計パズル', zh: 'AI 指令设计解谜', hi: 'AI निर्देश डिज़ाइन पहेली', vi: 'Giải đố thiết kế câu lệnh AI' },
+  'mg.feel-cari.title': { ko: '더듬어라 CARI', en: 'Feel Your Way, CARI', ja: '手探りで進め CARI', zh: '摸索前进吧 CARI', hi: 'टटोलकर बढ़ो CARI', vi: 'Lần mò đi, CARI' },
+  'mg.feel-cari.tagline': { ko: '앞이 안 보인다. 센서만 믿고 가라!', en: 'You can’t see a thing — trust the sensors!', ja: '前が見えない。センサーだけが頼りだ！', zh: '前方一片漆黑，只能靠传感器！', hi: 'कुछ दिखता नहीं — बस सेंसर पर भरोसा!', vi: 'Không thấy gì — chỉ tin vào cảm biến!' },
+  'mg.feel-cari.badge': { ko: '센서 · 에지 AI 탐사', en: 'Sensors · edge-AI navigation', ja: 'センサー · エッジAI探査', zh: '传感器 · 边缘AI探索', hi: 'सेंसर · एज-AI नेविगेशन', vi: 'Cảm biến · điều hướng edge-AI' },
 
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.

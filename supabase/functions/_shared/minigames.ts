@@ -31,6 +31,10 @@ export const GAMES: Record<string, GameSpec> = {
   'block-cari': { max: 16000, metric: 'score', perSec: 75 },
   // 시켜라 = 지시를 골라 도면대로 만드는 레벨제(5레벨). 전원 만점이 나오므로 동률은 소요시간으로 가른다.
   'order-cari': { max: 5, metric: 'level', perSec: 0.3 },
+  // 더듬어라 = 센서를 켜고 끄며 어두운 구역을 통과하는 레벨제(6구역).
+  //   한 구역이 1분 안팎이라 6구역이면 5분 넘게 걸린다 — perSec 0.25 는 20초면 6까지 인정하는 넉넉한 상한이라
+  //   정상 플레이를 깎지 않으면서 무플레이 만점 제출만 막는다(다른 레벨형과 같은 기준).
+  'feel-cari': { max: 6, metric: 'level', perSec: 0.25 },
 }
 
 export function gameSpec(id: unknown): GameSpec | undefined {
