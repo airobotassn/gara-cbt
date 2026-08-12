@@ -261,7 +261,9 @@ body{
 #ovResult.fail .scorebox{top:67.4%;height:8.8%;gap:calc(var(--rh)*.014)}
 #ovResult.fail .ovbtns{left:10.3%;top:78.9%;width:76.3%;height:14.6%;grid-template-columns:1fr}
 #ovResult.fail #btnNext{display:none;}
-#ovResult.fail #btnRetry{overflow:visible;text-indent:0;padding:0 0 0 27%!important;display:grid;place-items:center;color:#fff;font-size:calc(var(--rh)*.032);text-shadow:0 2px 3px #111;}
+/* 실패창 버튼만 글자를 보여준다(아이콘이 왼쪽이라 자리가 있다). 글자는 버튼 정중앙 —
+   아이콘이 버튼 폭의 27% 에서 끝나므로 겹치지 않는다. */
+#ovResult.fail #btnRetry{overflow:visible;text-indent:0;padding:0!important;display:grid;place-items:center;color:#fff;font-size:calc(var(--rh)*.032);text-shadow:0 2px 3px #111;}
 
 /* 랭킹 버튼 — 트로피가 왼쪽에 박힌 그림이라 글자는 남색판 중앙(=버튼 폭의 59.4%)에 온다. */
 .mg-rank{top:11px!important;right:11px!important;width:auto!important;height:38px!important;aspect-ratio:1701/494;
