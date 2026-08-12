@@ -68,3 +68,9 @@ A
 NUL
 Negative
 Number
+
+# 작업 중 생기는 디버그 산출물 (스샷·목빌드·임시 스크립트) — 저장소에 올리지 않는다
+.codex-*.png
+_shots/
+_mockbuild/
+_mchk.cjs
