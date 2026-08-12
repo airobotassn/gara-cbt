@@ -144,61 +144,122 @@ body{
 #ovStart .floaty,#ovResult .floaty{display:none;}
 #ovStart .title{margin-top:0;text-shadow:0 3px 18px rgba(0,0,0,.45);}
 #ovStart .t1{color:#fff;}
-#ovStart .t2{background:linear-gradient(120deg,#8fdcff,#55a6ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
 #ovStart .tag{color:#d7e9ff;text-shadow:0 2px 10px rgba(0,0,0,.7);}
 .rules,.scorebox{backdrop-filter:none;}
-#ovResult .badge{text-shadow:0 2px 12px rgba(0,0,0,.55);}
-@media (max-height:720px){
-  .grid{transform:scale(.86);transform-origin:top center;margin-bottom:-58px;}
-  .overlay{padding:18px;}
-  .rules{padding:10px 14px;}
-}
 
-/* v3 — finished-game UI language */
-.hud{position:relative;flex:0 0 78px;margin:5px 7px 0;padding:0;background:url('/games/build-cari-hud-v10.png') center/contain no-repeat;backdrop-filter:none;}
+/* ===== v4 — 아트 좌표를 실측해서 맞춘 배치 (2026-08-12) =====
+   아래 %좌표는 전부 PNG 를 픽셀 스캔해서 뽑은 값이다. 그림을 갈면 다시 재야 한다.
+     hud-v10        1735×473 : 가운데 남색판 x23.2~74.6 y8.7~91.3 · 오른쪽 칸 x76.7~97.5(위 y8.7~45.9 / 아래 y54.1~91.3)
+     intro-v10       955×1413: 남색판 x9~90.6 y49.5~61.6 · 규칙 3줄 중심 y67.6/74.7/81.8(뱃지 오른쪽 끝 x21.2) · 시작=초록원 cx49.8 cy92
+     result-win-v9  1086×1448: 남색판 x11.9~87.8 y52.9~75.7 · 버튼 y78.2~93.4(x11.7~47.9 / x51.8~88)
+     result-fail-v9           : 남색판 x12.7~87.2 y59.8~76.6 · 버튼 1개 x10.3~86.6 y78.9~93.5
+     run/reset-v9    810×352 : 아이콘 x13.6~26.4 → 글자 자리는 x26.4~93 의 중앙 = 버튼 폭의 59.7%
+   ⚠️ 배경은 contain 이 아니라 `100% 100%` + 박스를 그림 비율로 고정한다. contain 은 박스가 그림보다
+      넓으면 그림만 가운데로 줄어드는데 %좌표는 박스 기준이라 글자가 통째로 어긋난다(v3 의 실제 버그 —
+      점수판이 HUD 그림 밖 허공에 떠 있었다).
+   ⚠️ 글자 크기는 px 이 아니라 콘솔 크기(--ch/--rh/--hh)의 비율이다. 화면이 작아지면 콘솔이 줄어드는데
+      글자만 안 줄면 칸을 넘친다.
+   ⚠️ 승리 결과창의 다시/다음 버튼과 인트로 시작 버튼은 그림이 아이콘을 버튼 정중앙에 박아놔서
+      글자 자리가 없다 → 아이콘 단독으로 두고 라벨은 스크린리더용으로만 남긴다(text-indent).
+      실패창 버튼은 아이콘이 왼쪽이라 글자를 넣는다. */
+
+/* --- HUD --- */
+.stage{--sw:min(460px,100vw);--sh:min(860px,100vh);}
+.hud{--hw:calc(var(--sw) - 16px);--hh:calc(var(--hw) / 3.668);
+  position:relative;flex:0 0 auto;width:var(--hw);height:var(--hh);margin:6px auto 0;padding:0;
+  background:url('/games/build-cari-hud-v10.png') center/100% 100% no-repeat;backdrop-filter:none;}
 .hud .cari-mini{display:none;}
-.hud .lvlbox{position:absolute;left:23%;top:50%;width:50%;transform:translateY(-50%);text-align:center;line-height:1.08;}
-.hud .lvlbox b{font-size:18px;color:#fff;text-shadow:0 2px 4px #00133a;}.hud .lvlbox span{font-size:11px;color:#a8ddff;font-weight:800;}
-.hud .scorepill{position:absolute;right:4.8%;top:50%;width:16%;height:60px;transform:translateY(-50%);margin:0;padding:1px 0;background:none;border:0;box-shadow:none;display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;align-items:center;text-align:center;white-space:normal;text-shadow:0 2px 4px #00133a;}
-.scorepill .metric{display:flex;min-width:0;height:28px;flex-direction:column;align-items:center;justify-content:center;gap:0}
-.scorepill small{font-size:5.5px;line-height:1;color:#9bcbe8;font-weight:800;letter-spacing:0}.scorepill b{font-size:8px;line-height:1;font-variant-numeric:tabular-nums}.scorepill .ok b{color:#7de8ff}.scorepill .err b{color:#ff9b87}
-.hint{margin:3px 28px;padding:6px 9px;border:0;border-radius:8px;background:rgba(29,40,43,.88)!important;color:#fff;font-size:10.5px;font-weight:800;backdrop-filter:none;text-shadow:none;}
+.hud .lvlbox{position:absolute;left:23.2%;top:8.7%;width:51.4%;height:82.6%;transform:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--hh)*.02);text-align:center;line-height:1.06;}
+.hud .lvlbox b{font-size:calc(var(--hh)*.175);color:#fff;text-shadow:0 2px 4px #00133a;}
+.hud .lvlbox span{font-size:calc(var(--hh)*.115);color:#a8ddff;font-weight:800;}
+.hud .scorepill{position:absolute;left:76.7%;top:8.7%;width:20.8%;height:82.6%;transform:none;margin:0;padding:0;
+  background:none;border:0;box-shadow:none;display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;
+  text-align:center;white-space:nowrap;text-shadow:0 2px 4px #00133a;}
+.scorepill .metric{display:flex;height:auto;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--hh)*.02)}
+.scorepill small{font-size:calc(var(--hh)*.105);line-height:1;color:#9bcbe8;font-weight:800;}
+.scorepill b{font-size:calc(var(--hh)*.165);line-height:1;font-variant-numeric:tabular-nums}
+.scorepill .ok b{color:#7de8ff}.scorepill .err b{color:#ff9b87}
+
+.hint{margin:5px 14px;padding:7px 10px;border:0;border-radius:9px;background:rgba(29,40,43,.88)!important;color:#fff;font-size:12px;font-weight:800;line-height:1.35;backdrop-filter:none;text-shadow:none;}
 .hint b{color:#ffe477;}
-.gridwrap{margin:2px auto 0;padding:4px 7px;transform:scale(.9);transform-origin:top center;margin-bottom:-42px;}
+
+/* --- 보드 --- ⚠️ 칸 좌표(CELL=52)는 JS 가 쓰므로 크기는 transform 으로만 줄인다.
+       래퍼 높이를 같이 줄이지 않으면 아래가 빈 칸으로 남는다(옛 코드의 음수 margin 우회를 대체). */
+.gridwrap{--gs:1;flex:0 0 auto;margin:auto;padding:4px 7px;border-radius:20px;
+  width:calc(312px*var(--gs) + 14px);height:calc(416px*var(--gs) + 8px);
+  background:rgba(8,28,58,.32);backdrop-filter:blur(5px);}
+/* ⚠️ flex:0 0 auto 필수 — 래퍼가 flex 라 줄어든 폭에 맞춰 .grid 가 한 번 더 눌린다(52px 칸이 밖으로 밀림). */
+.grid{flex:0 0 auto;transform:scale(var(--gs));transform-origin:top center;}
 .ci.src .cmini{width:44px;height:40px}.ci.src .cmini img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45));}
 .ci.conv,.ci.sensor{background:transparent!important;box-shadow:none!important;overflow:visible}.ci .tile-asset{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,8,30,.5));}.ci.sensor .tile-asset{transform:rotate(var(--rot));}
-.control-console{position:relative;flex:0 0 112px;margin:0 8px 5px;padding:0;z-index:6;overflow:hidden;}
-.control-console .palette{height:55px;padding:0 20px;display:flex;gap:12px;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;background:none;backdrop-filter:none;overscroll-behavior-x:contain;scroll-padding-inline:20px}.control-console .palette::-webkit-scrollbar{display:none}
-.control-console .tool{position:relative;flex:0 0 52px;width:52px;height:52px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;}
+
+/* --- 조작 콘솔 --- ⚠️ 도구 6개(지우기 포함)가 항상 한 줄에 다 보여야 한다.
+       가로 스크롤로 두면 좁은 화면에서 분기센서·지우기가 화면 밖으로 나가 게임이 막힌다. */
+.control-console{position:relative;flex:0 0 auto;margin:0 8px 8px;padding:0;z-index:6;display:flex;flex-direction:column;gap:6px;}
+.control-console .palette{height:auto;padding:0;display:flex;gap:2%;justify-content:center;background:none;backdrop-filter:none;}
+/* ⚠️ min-width:0 필수 — 기본 .tool 이 min-width:74px 을 들고 있어서 안 풀면 6개가 폭을 넘어 잘린다. */
+.control-console .tool{position:relative;flex:0 0 auto;width:min(60px,14.5%);min-width:0;height:auto;aspect-ratio:305/328;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;}
 .control-console .tool .tico{width:100%;height:100%;display:block;object-fit:contain;filter:none;}
-.control-console .tool .tnm{display:none}.control-console .tool.on{filter:brightness(1.13) drop-shadow(0 0 4px #66dfff)}.control-console .tool.on .tico{transform:scale(1.04)}
-.control-console .controls{height:49px;padding:0;margin:5px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:7px;background:none;backdrop-filter:none;}
-.control-console .controls .btn{width:auto!important;height:49px;padding:0 0 0 30px;border:0;border-radius:0;background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;box-shadow:none;color:#fff;text-shadow:0 2px 3px #111;font-size:15px;}.control-console #btnRun{background-image:url('/games/build-cari-run-v9.png')!important}.control-console #btnReset{background-image:url('/games/build-cari-reset-v9.png')!important}
+.control-console .tool .tnm{display:none}.control-console .tool.on{filter:brightness(1.13) drop-shadow(0 0 5px #66dfff)}.control-console .tool.on .tico{transform:scale(1.04)}
+.control-console .controls{height:auto;padding:0;margin:0;display:flex;justify-content:center;gap:10px;background:none;backdrop-filter:none;}
+/* ⚠️ background-color 를 반드시 죽일 것 — .btn.ghost(리셋)가 배경색 #eef1f8 을 들고 있어서
+      투명 PNG 뒤로 흰 상자가 비친다(실제로 리셋 버튼만 흰 테두리가 보였다). */
+.control-console .controls .btn{flex:0 0 auto;width:auto!important;height:64px;aspect-ratio:810/352;
+  padding:0 0 0 19.4%!important;border:0;border-radius:0;background-color:transparent!important;
+  background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;
+  box-shadow:none;color:#fff;text-shadow:0 2px 3px #111;font-size:16px;display:grid;place-items:center;}
+.control-console #btnRun{background-image:url('/games/build-cari-run-v9.png')!important}
+.control-console #btnReset{background-image:url('/games/build-cari-reset-v9.png')!important}
 
+/* --- 인트로 --- */
 #ovStart{justify-content:flex-start;padding:0;background-image:linear-gradient(rgba(18,28,36,.08),rgba(18,28,36,.18)),url('/games/build-cari-intro-bg-v7.png');}
-#ovStart .intro-console{position:absolute;left:50%;top:50%;height:min(620px,92vh);aspect-ratio:955/1413;max-width:90vw;transform:translate(-50%,-50%);background:url('/games/build-cari-intro-v10.png') center/contain no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));}
+#ovStart .intro-console{--ch:min(calc(var(--sh)*.92),calc(var(--sw)*1.3316));
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:calc(var(--ch)*.67587);height:var(--ch);
+  background:url('/games/build-cari-intro-v10.png') center/100% 100% no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));}
 #ovStart .floaty{display:none}
-#ovStart .title{position:absolute;z-index:1;left:9%;top:48.5%;width:82%;margin:0;line-height:1.02;}#ovStart .t1,#ovStart .t2{font-size:28px;font-weight:950;}#ovStart .t1{color:#fff}#ovStart .t2{color:#ffd253;background:none;-webkit-text-fill-color:initial}
-#ovStart .tag{position:absolute;z-index:1;left:10%;top:54%;width:80%;margin:0;color:#d9e8f8;font-size:10.5px;font-weight:800;text-shadow:none;}
-#ovStart .rules{position:absolute;z-index:1;left:12%;top:62.5%;width:76%;height:20%;padding:0;background:transparent!important;border:0;box-shadow:none;display:grid;grid-template-rows:repeat(3,1fr);}
-#ovStart .rules div{margin:0;padding-left:33px;color:#29313b;font-size:9.5px;font-weight:800;line-height:1.15;align-items:center;}#ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
-#ovStart #btnStart{position:absolute;z-index:1;left:25%;top:86%;width:50%;height:9%;margin:0!important;padding:0 0 0 42px!important;border:0;background:none;color:#fff;box-shadow:none;filter:none;text-shadow:0 2px 3px #111;font-size:15px;display:grid;place-items:center;}
+#ovStart .title{position:absolute;z-index:1;left:9%;top:50.25%;width:81.6%;height:7%;margin:0;
+  display:flex;align-items:center;justify-content:center;gap:.26em;line-height:1;}
+#ovStart .t1,#ovStart .t2{font-size:calc(var(--ch)*.046);font-weight:950;}
+#ovStart .t2{color:#ffd253;background:none;-webkit-text-fill-color:initial}
+#ovStart .tag{position:absolute;z-index:1;left:10%;top:57.25%;width:80%;height:3.6%;margin:0;
+  display:flex;align-items:center;justify-content:center;color:#d9e8f8;font-size:calc(var(--ch)*.019);font-weight:800;text-shadow:none;}
+#ovStart .rules{position:absolute;z-index:1;left:12%;top:64.05%;width:76%;height:21.3%;padding:0;background:transparent!important;border:0;box-shadow:none;display:grid;grid-template-rows:repeat(3,1fr);}
+#ovStart .rules div{margin:0;padding:0 2% 0 14.5%;color:#29313b;font-size:calc(var(--ch)*.023);font-weight:800;line-height:1.2;display:flex;align-items:center;}
+#ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
+#ovStart #btnStart{position:absolute;z-index:1;left:38%;top:86.5%;width:24%;height:11%;margin:0!important;padding:0!important;
+  border:0;background:none;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
 
-#ovResult{padding:18px;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
-.result-console{position:relative;width:min(330px,84vw);height:min(500px,76vh);background:url('/games/build-cari-result-win-v9.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
+/* --- 결과 --- ⚠️ 승리/실패 아트는 판 위치가 다르다(실패가 더 아래·짧고 버튼이 1개). 좌표를 공유하지 말 것. */
+#ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
+.result-console{--rh:min(calc(var(--sh)*.78),calc(var(--sw)*1.12));
+  position:relative;width:calc(var(--rh)*.75);height:var(--rh);
+  background:url('/games/build-cari-result-win-v9.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
 #ovResult.fail .result-console{background-image:url('/games/build-cari-result-fail-v9.png')}
 #ovResult .floaty{display:none;}
-#ovResult .badge{position:absolute;left:10%;top:53%;width:80%;margin:0;font-size:23px;text-shadow:0 2px 4px #00102f;}
-#ovResult .scorebox{position:absolute;left:13%;top:61%;width:74%;margin:0;padding:4px;background:transparent;border:0;box-shadow:none;backdrop-filter:none;}
-#ovResult .scorebox .big{color:#fff;font-size:16px;text-shadow:0 2px 4px #00102f;}#ovResult .scorebox .take{color:#dff3ff;font-size:11.5px;line-height:1.35;margin-top:5px;}#ovResult .scorebox .foot{display:none;}
-#ovResult .ovbtns{position:absolute;left:8%;right:8%;bottom:5%;height:67px;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-#ovResult .ovbtns .btn{width:100%!important;height:100%!important;margin:0!important;padding:0 0 0 30px!important;border:0;background:none!important;filter:none;color:#fff;font-size:15px;text-shadow:0 2px 3px #111;}
-#ovResult.fail .ovbtns{left:11%;right:11%;grid-template-columns:1fr}#ovResult.fail #btnNext{display:none;}
+#ovResult .badge{position:absolute;left:12%;top:55.2%;width:76%;height:6.2%;margin:0;
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--rh)*.046);text-shadow:0 2px 4px #00102f;}
+#ovResult .scorebox{position:absolute;left:14%;top:62.2%;width:72%;height:12.5%;margin:0;padding:0;background:transparent;border:0;box-shadow:none;backdrop-filter:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--rh)*.012);}
+#ovResult .scorebox .big{color:#fff;font-size:calc(var(--rh)*.033);text-shadow:0 2px 4px #00102f;}
+#ovResult .scorebox .take{color:#dff3ff;font-size:calc(var(--rh)*.026);line-height:1.35;margin:0;text-align:center;}
+#ovResult .scorebox .foot{display:none;}
+#ovResult .ovbtns{position:absolute;left:11.7%;top:78.2%;width:76.3%;height:15.2%;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:5.1%;}
+#ovResult .ovbtns .btn{width:100%!important;height:100%!important;margin:0!important;padding:0!important;border:0;background:none!important;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
+#ovResult.fail .badge{top:61.6%;height:6%}
+#ovResult.fail .scorebox{top:67.6%;height:8.6%}
+#ovResult.fail .ovbtns{left:10.3%;top:78.9%;width:76.3%;height:14.6%;grid-template-columns:1fr}
+#ovResult.fail #btnNext{display:none;}
+#ovResult.fail #btnRetry{overflow:visible;text-indent:0;padding:0 0 0 27%!important;display:grid;place-items:center;color:#fff;font-size:calc(var(--rh)*.032);text-shadow:0 2px 3px #111;}
 
 .mg-rank{top:11px!important;right:11px!important;width:126px!important;height:38px!important;padding:0!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.png') center/100% 100% no-repeat!important;color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;font-size:12px!important;display:none;grid-template-columns:42px 1fr;align-items:center;}
 .mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{display:block;grid-column:2;text-align:center;width:100%;padding-right:7px;}
-@media (max-width:380px){.control-console{margin-inline:5px}.control-console .tool{flex-basis:54px;width:54px;height:54px}}
-@media (max-height:740px){.hud{flex-basis:72px}.grid{transform:scale(.82);transform-origin:top center;margin-bottom:-76px}.control-console{flex-basis:122px}.control-console .palette{height:61px}.control-console .tool{width:52px;height:52px;flex-basis:52px}.control-console .controls,.control-console .controls .btn{height:49px}#ovStart .floaty{width:128px;height:158px}#ovStart .rules{padding:7px 14px}#ovStart #btnStart{margin-top:7px!important}.result-console{height:min(430px,70vh)}}
+/* 화면이 낮아지면 보드만 줄인다(HUD·콘솔은 그림 비율이 있어 함부로 못 줄인다). */
+@media (max-height:760px){.gridwrap{--gs:.92}.control-console .controls .btn{height:58px}}
+@media (max-height:700px){.gridwrap{--gs:.86}.control-console .tool{width:min(54px,14.5%)}}
+@media (max-height:640px){.gridwrap{--gs:.76}.control-console .controls .btn{height:52px}.hint{font-size:11.5px;padding:6px 9px}}
+@media (max-height:580px){.gridwrap{--gs:.66}}
 </style>
 </head>
 <body>
