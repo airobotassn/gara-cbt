@@ -153,7 +153,8 @@ body{
      intro-v10       955×1413: 남색판 x9~90.6 y49.5~61.6 · 규칙 3줄 중심 y67.6/74.7/81.8(뱃지 오른쪽 끝 x21.2) · 시작=초록원 cx49.8 cy92
      result-win-v9  1086×1448: 남색판 x11.9~87.8 y52.9~75.7 · 버튼 y78.2~93.4(x11.7~47.9 / x51.8~88)
      result-fail-v9           : 남색판 x12.7~87.2 y59.8~76.6 · 버튼 1개 x10.3~86.6 y78.9~93.5
-     run/reset-v9    810×352 : 아이콘 x13.6~26.4 → 글자 자리는 x26.4~93 의 중앙 = 버튼 폭의 59.7%
+     run/reset-v9    810×352 : 아이콘 x13.6~26.4(왼쪽) · 안쪽 판 x6.8~93 → 글자는 버튼 정중앙(아이콘과 안 겹친다)
+     rank-button     1701×494: 트로피 x2.5~20.2 · 남색판 x22.3~96.5 → 글자는 판 중앙 = 버튼 폭의 59.4%
    ⚠️ 배경은 contain 이 아니라 `100% 100%` + 박스를 그림 비율로 고정한다. contain 은 박스가 그림보다
       넓으면 그림만 가운데로 줄어드는데 %좌표는 박스 기준이라 글자가 통째로 어긋난다(v3 의 실제 버그 —
       점수판이 HUD 그림 밖 허공에 떠 있었다).
@@ -170,9 +171,10 @@ body{
   background:url('/games/build-cari-hud-v10.png') center/100% 100% no-repeat;backdrop-filter:none;}
 .hud .cari-mini{display:none;}
 .hud .lvlbox{position:absolute;left:23.2%;top:8.7%;width:51.4%;height:82.6%;transform:none;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--hh)*.02);text-align:center;line-height:1.06;}
-.hud .lvlbox b{font-size:calc(var(--hh)*.175);color:#fff;text-shadow:0 2px 4px #00133a;}
-.hud .lvlbox span{font-size:calc(var(--hh)*.115);color:#a8ddff;font-weight:800;}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--hh)*.075);text-align:center;line-height:1;}
+.hud .lvlbox b{font-size:calc(var(--hh)*.19);color:#fff;letter-spacing:-.02em;text-shadow:0 2px 5px #00133a;}
+/* 부제는 레벨명과 붙으면 한 덩어리로 읽힌다 — 자간을 벌리고 캡션 톤으로 한 급 낮춘다. */
+.hud .lvlbox span{font-size:calc(var(--hh)*.105);color:#8fc9ee;font-weight:800;letter-spacing:.14em;text-indent:.14em;}
 .hud .scorepill{position:absolute;left:76.7%;top:8.7%;width:20.8%;height:82.6%;transform:none;margin:0;padding:0;
   background:none;border:0;box-shadow:none;display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;
   text-align:center;white-space:nowrap;text-shadow:0 2px 4px #00133a;}
@@ -181,12 +183,18 @@ body{
 .scorepill b{font-size:calc(var(--hh)*.165);line-height:1;font-variant-numeric:tabular-nums}
 .scorepill .ok b{color:#7de8ff}.scorepill .err b{color:#ff9b87}
 
-.hint{margin:5px 14px;padding:7px 10px;border:0;border-radius:9px;background:rgba(29,40,43,.88)!important;color:#fff;font-size:12px;font-weight:800;line-height:1.35;backdrop-filter:none;text-shadow:none;}
-.hint b{color:#ffe477;}
+/* 목표 줄 — 전용 아트가 없다. 회색 반투명 띠로 두면 게임 위에 얹힌 웹 요소로 보이므로
+   HUD 남색판과 같은 색·테두리·두께 그림자를 줘서 같은 기구의 아랫단으로 읽히게 한다. */
+.hint{margin:7px auto 0;padding:8px 14px;width:fit-content;max-width:calc(100% - 28px);
+  border:1.5px solid rgba(238,233,220,.5);border-radius:11px;
+  background:linear-gradient(#143563,#0d2145)!important;color:#eaf4ff;font-size:12.5px;font-weight:800;line-height:1.3;
+  letter-spacing:-.01em;box-shadow:0 3px 0 rgba(4,14,32,.4),inset 0 1px 0 rgba(255,255,255,.16);
+  backdrop-filter:none;text-shadow:0 1px 2px rgba(0,10,30,.5);}
+.hint b{color:#ffd253;}
 
 /* --- 보드 --- ⚠️ 칸 좌표(CELL=52)는 JS 가 쓰므로 크기는 transform 으로만 줄인다.
        래퍼 높이를 같이 줄이지 않으면 아래가 빈 칸으로 남는다(옛 코드의 음수 margin 우회를 대체). */
-.gridwrap{--gs:1;flex:0 0 auto;margin:auto;padding:4px 7px;border-radius:20px;
+.gridwrap{flex:0 0 auto;margin:auto;padding:4px 7px;border-radius:20px;   /* 배율 --gs 는 아래 미디어쿼리 사다리가 단일 출처 */
   width:calc(312px*var(--gs) + 14px);height:calc(416px*var(--gs) + 8px);
   background:rgba(8,28,58,.32);backdrop-filter:blur(5px);}
 /* ⚠️ flex:0 0 auto 필수 — 래퍼가 flex 라 줄어든 폭에 맞춰 .grid 가 한 번 더 눌린다(52px 칸이 밖으로 밀림). */
@@ -206,7 +214,7 @@ body{
 /* ⚠️ background-color 를 반드시 죽일 것 — .btn.ghost(리셋)가 배경색 #eef1f8 을 들고 있어서
       투명 PNG 뒤로 흰 상자가 비친다(실제로 리셋 버튼만 흰 테두리가 보였다). */
 .control-console .controls .btn{flex:0 0 auto;width:auto!important;height:64px;aspect-ratio:810/352;
-  padding:0 0 0 19.4%!important;border:0;border-radius:0;background-color:transparent!important;
+  padding:0!important;border:0;border-radius:0;background-color:transparent!important;
   background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;
   box-shadow:none;color:#fff;text-shadow:0 2px 3px #111;font-size:16px;display:grid;place-items:center;}
 .control-console #btnRun{background-image:url('/games/build-cari-run-v9.png')!important}
@@ -238,28 +246,51 @@ body{
   background:url('/games/build-cari-result-win-v9.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
 #ovResult.fail .result-console{background-image:url('/games/build-cari-result-fail-v9.png')}
 #ovResult .floaty{display:none;}
-#ovResult .badge{position:absolute;left:12%;top:55.2%;width:76%;height:6.2%;margin:0;
-  display:flex;align-items:center;justify-content:center;font-size:calc(var(--rh)*.046);text-shadow:0 2px 4px #00102f;}
-#ovResult .scorebox{position:absolute;left:14%;top:62.2%;width:72%;height:12.5%;margin:0;padding:0;background:transparent;border:0;box-shadow:none;backdrop-filter:none;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--rh)*.012);}
-#ovResult .scorebox .big{color:#fff;font-size:calc(var(--rh)*.033);text-shadow:0 2px 4px #00102f;}
-#ovResult .scorebox .take{color:#dff3ff;font-size:calc(var(--rh)*.026);line-height:1.35;margin:0;text-align:center;}
+#ovResult .badge{position:absolute;left:12%;top:54.6%;width:76%;height:6%;margin:0;
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--rh)*.047);letter-spacing:-.02em;text-shadow:0 2px 5px #00102f;}
+/* 남색판 위에서 기본 --good/--bad 는 탁하다 — 판 위 전용 밝은 값으로 올린다. */
+#ovResult .badge.win{color:#3fe3b4}#ovResult .badge.lose{color:#ff9077}
+#ovResult .scorebox{position:absolute;left:14%;top:62.4%;width:72%;height:12.3%;margin:0;padding:0;background:transparent;border:0;box-shadow:none;backdrop-filter:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--rh)*.021);}
+#ovResult .scorebox .big{color:#fff;font-size:calc(var(--rh)*.034);letter-spacing:-.01em;text-shadow:0 2px 4px #00102f;}
+#ovResult .scorebox .take{color:#bcd7ee;font-size:calc(var(--rh)*.026);font-weight:600;line-height:1.35;margin:0;text-align:center;}
 #ovResult .scorebox .foot{display:none;}
 #ovResult .ovbtns{position:absolute;left:11.7%;top:78.2%;width:76.3%;height:15.2%;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:5.1%;}
 #ovResult .ovbtns .btn{width:100%!important;height:100%!important;margin:0!important;padding:0!important;border:0;background:none!important;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
-#ovResult.fail .badge{top:61.6%;height:6%}
-#ovResult.fail .scorebox{top:67.6%;height:8.6%}
+#ovResult.fail .badge{top:60.9%;height:5.5%}
+#ovResult.fail .scorebox{top:67.4%;height:8.8%;gap:calc(var(--rh)*.014)}
 #ovResult.fail .ovbtns{left:10.3%;top:78.9%;width:76.3%;height:14.6%;grid-template-columns:1fr}
 #ovResult.fail #btnNext{display:none;}
 #ovResult.fail #btnRetry{overflow:visible;text-indent:0;padding:0 0 0 27%!important;display:grid;place-items:center;color:#fff;font-size:calc(var(--rh)*.032);text-shadow:0 2px 3px #111;}
 
-.mg-rank{top:11px!important;right:11px!important;width:126px!important;height:38px!important;padding:0!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.png') center/100% 100% no-repeat!important;color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;font-size:12px!important;display:none;grid-template-columns:42px 1fr;align-items:center;}
-.mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{display:block;grid-column:2;text-align:center;width:100%;padding-right:7px;}
-/* 화면이 낮아지면 보드만 줄인다(HUD·콘솔은 그림 비율이 있어 함부로 못 줄인다). */
-@media (max-height:760px){.gridwrap{--gs:.92}.control-console .controls .btn{height:58px}}
-@media (max-height:700px){.gridwrap{--gs:.86}.control-console .tool{width:min(54px,14.5%)}}
-@media (max-height:640px){.gridwrap{--gs:.76}.control-console .controls .btn{height:52px}.hint{font-size:11.5px;padding:6px 9px}}
-@media (max-height:580px){.gridwrap{--gs:.66}}
+/* 랭킹 버튼 — 트로피가 왼쪽에 박힌 그림이라 글자는 남색판 중앙(=버튼 폭의 59.4%)에 온다. */
+.mg-rank{top:11px!important;right:11px!important;width:auto!important;height:38px!important;aspect-ratio:1701/494;
+  /* ⚠️ 여기 padding 은 %가 아니라 px 이다 — 이 버튼은 absolute 라 %패딩이 자기 폭이 아니라
+        무대 폭(460)을 기준으로 잡혀 글자가 오른쪽 끝으로 밀린다. 25px = 폭 130.8 기준 중앙 59.4%. */
+  padding:0 0 0 25px!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.png') center/100% 100% no-repeat!important;
+  color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;
+  font-size:12.5px!important;display:none;place-items:center;}
+.mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{display:block;text-align:center;}
+
+/* 보드 크기 — 6×8 고정판이라 레벨이 올라가도 안 커진다(그래서 화면에 맞춰 키워도 안전).
+   ⚠️ 배율은 폭·높이 둘 다 만족할 때만 올린다. 한쪽만 보면 세로 긴 화면에서 보드가 폭을 넘거나,
+      넓고 낮은 화면에서 조작 콘솔이 화면 밖으로 밀린다. 조건 = 폭 312×배율+30, 높이 = 나머지 UI + 416×배율. */
+.gridwrap{--gs:.54}
+@media (min-width:320px) and (min-height:575px){.gridwrap{--gs:.64}}
+@media (min-width:320px) and (min-height:610px){.gridwrap{--gs:.72}}
+@media (min-width:320px) and (min-height:650px){.gridwrap{--gs:.80}}
+/* 좁은 화면은 HUD·팔레트도 같이 작아져 여유가 더 난다 — 그만큼 먼저 키운다(넓은 쪽 기준으로만 짜면 폰에서 손해). */
+@media (max-width:400px) and (min-height:558px){.gridwrap{--gs:.72}}
+@media (max-width:400px) and (min-height:600px){.gridwrap{--gs:.80}}
+@media (max-width:400px) and (min-height:660px){.gridwrap{--gs:.90}}
+@media (min-width:320px) and (min-height:692px){.gridwrap{--gs:.90}}
+@media (min-width:345px) and (min-height:738px){.gridwrap{--gs:1}}
+@media (min-width:375px) and (min-height:780px){.gridwrap{--gs:1.1}}
+/* ⚠️ 여기서 끝 — 무대(.stage) 높이가 860px 에서 멈추므로 화면이 더 커져도 자리가 안 늘어난다.
+      미디어쿼리는 뷰포트를 보기 때문에 이걸 잊고 한 칸 더 올리면 900px 화면에서 보드가 위아래에 딱 붙는다. */
+@media (min-width:405px) and (min-height:822px){.gridwrap{--gs:1.2}}
+@media (max-height:700px){.control-console .controls .btn{height:58px}.control-console .tool{width:min(54px,14.5%)}}
+@media (max-height:620px){.control-console .controls .btn{height:52px}.hint{font-size:11.5px;padding:6px 10px}}
 </style>
 </head>
 <body>
