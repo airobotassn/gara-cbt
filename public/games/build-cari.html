@@ -62,10 +62,10 @@ body{
 .ci.bin .bany{font-size:15px;font-weight:900;color:#b9c2d6;}
 
 .ilayer{position:absolute;inset:0;pointer-events:none;z-index:3;}
-.item{position:absolute;left:0;top:0;width:26px;height:26px;border-radius:8px;
-  box-shadow:inset 0 2px 3px rgba(255,255,255,.55), 0 2px 5px rgba(40,50,76,.3);
+.item{position:absolute;left:0;top:0;width:26px;height:26px;
+  background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;
   transition:transform var(--tk) linear, opacity .28s ease;}
-.item::after{content:"";position:absolute;top:4px;left:5px;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.55);}
+.item::after{display:none;}
 .item.xgood{box-shadow:0 0 0 3px var(--good), 0 0 14px var(--good);}
 .item.xbad{opacity:.12;}
 .item.xmiss{opacity:.08;}
@@ -199,6 +199,14 @@ body{
   background:rgba(8,28,58,.32);backdrop-filter:blur(5px);}
 /* ⚠️ flex:0 0 auto 필수 — 래퍼가 flex 라 줄어든 폭에 맞춰 .grid 가 한 번 더 눌린다(52px 칸이 밖으로 밀림). */
 .grid{flex:0 0 auto;transform:scale(var(--gs));transform-origin:top center;}
+/* 센서 출구 화살표 — 어느 색이 어디로 나가는지를 타일 위에서 바로 읽게 한다.
+   ⚠️ 그림 회전(--rot)에 얹지 말 것. 방향 클래스로 따로 놓아야 그림을 갈아도 안 어긋난다. */
+.ci .sar{position:absolute;width:0;height:0;z-index:2;
+  filter:drop-shadow(0 0 1.6px rgba(255,255,255,.95)) drop-shadow(0 1px 2px rgba(0,10,35,.85));}
+.ci .sar.d0{top:0;left:50%;margin-left:-9px;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:11px solid var(--c);}
+.ci .sar.d1{right:0;top:50%;margin-top:-9px;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:11px solid var(--c);}
+.ci .sar.d2{bottom:0;left:50%;margin-left:-9px;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid var(--c);}
+.ci .sar.d3{left:0;top:50%;margin-top:-9px;border-top:9px solid transparent;border-bottom:9px solid transparent;border-right:11px solid var(--c);}
 .ci.src .cmini{width:44px;height:40px}.ci.src .cmini img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45));}
 .ci.conv,.ci.sensor{background:transparent!important;box-shadow:none!important;overflow:visible}.ci .tile-asset{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,8,30,.5));}.ci.sensor .tile-asset{transform:rotate(var(--rot));}
 
@@ -225,7 +233,7 @@ body{
 #ovStart .intro-console{--ch:min(calc(var(--sh)*.92),calc(var(--sw)*1.3316));
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:calc(var(--ch)*.67587);height:var(--ch);
-  background:url('/games/build-cari-intro-v10.png') center/100% 100% no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));}
+  background:url('/games/build-cari-intro-v11.png') center/100% 100% no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));}
 #ovStart .floaty{display:none}
 #ovStart .title{position:absolute;z-index:1;left:9%;top:50.25%;width:81.6%;height:7%;margin:0;
   display:flex;align-items:center;justify-content:center;gap:.26em;line-height:1;}
@@ -412,6 +420,7 @@ const TOOL_DEFS=[
 const DIRS=[[-1,0],[0,1],[1,0],[0,-1]];      // 0=up 1=right 2=down 3=left
 const ARROW=['▲','▶','▼','◀'];
 const FEAT={ R:{c:'#f2664f',n:'빨강'}, B:{c:'#1b55d0',n:'파랑'}, G:{c:'#12b58c',n:'초록'} };
+const CARGO_ASSET={R:'/games/build-cari-cargo-red-v1.png',B:'/games/build-cari-cargo-blue-v1.png',G:'/games/build-cari-cargo-green-v1.png'};
 const branchOf=dir=>(dir+3)%4;              // matched item turns this way
 
 const FOOT="기계를 <b>배치·연결</b>해 사람 손 없이 라인이 스스로 도는 게 <b>자동화·시스템 설계</b>예요. 한 번 잘 만들면 계속 재현돼요.";
@@ -474,8 +483,17 @@ function cellInner(r,c){
     return `<div class="ci bin"><div class="binbox" style="border-color:${col||'#b9c2d6'}">`+
       (col?`<span class="bsw" style="background:${col}"></span>`:`<span class="bany">?</span>`)+`</div></div>`; }
   if(g.type==='conv'){ const dn=['up','right','down','left'][g.dir]; return `<div class="ci conv"><img class="tile-asset" src="/games/build-cari-tool-${dn}-v9.png" alt=""></div>`; }
-  if(g.type==='sensor'){ const col=FEAT[L.sense].c;
-    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="/games/build-cari-tool-sensor-v9.png" alt=""><span class="sdot" style="background:${col}"></span></div>`; }
+  if(g.type==='sensor'){
+    // 센서는 "지정색만 왼쪽으로 꺾고 나머지는 직진"(branchOf) 이다. 그림만으로는 그게 안 읽히므로
+    // 두 출구에 색 화살표를 얹는다 — 직진 쪽엔 안 걸리는 색, 꺾이는 쪽엔 지정색.
+    // ⚠️ L.sense 가 없는 레벨(Lv.1)도 있다 — 여기서 FEAT[null] 을 읽어 렌더가 통째로 죽었었다
+    //    (칸은 빈 칸으로 남는데 내부 상태는 센서라 보이지 않는 센서가 생겼다).
+    const sc=L.sense?FEAT[L.sense].c:null;
+    const others=[...new Set(L.pattern)].filter(f=>f!==L.sense);
+    const oc=others.length===1?FEAT[others[0]].c:'#dbe6f7';
+    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="/games/build-cari-tool-sensor-v9.png" alt="">`+
+      `<span class="sar d${g.dir}" style="--c:${oc}"></span>`+
+      (sc?`<span class="sar d${branchOf(g.dir)}" style="--c:${sc}"></span>`:'')+`</div>`; }
   return `<div class="ci empty"></div>`;
 }
 function renderCell(r,c){ cellEls[r][c].innerHTML=cellInner(r,c); }
@@ -500,7 +518,7 @@ function startLevel(i){
 function tokenXY(r,c){ return [c*CELL+(CELL-ITEM)/2, r*CELL+(CELL-ITEM)/2]; }
 function makeToken(it){
   const el=document.createElement('div'); el.className='item';
-  el.style.background=FEAT[it.feat].c;
+  el.style.backgroundImage=`url('${CARGO_ASSET[it.feat]}')`;
   const [x,y]=tokenXY(it.r,it.c); el.style.transform=`translate(${x}px,${y}px)`;
   $('ilayer').appendChild(el); it.el=el;
 }
