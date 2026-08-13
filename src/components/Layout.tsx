@@ -11,6 +11,7 @@ import { useT, LANGS } from '../lib/i18n'
 import { makePracticeExam } from '../lib/practice'
 import {
   HomeIcon,
+  BellIcon,
   BookIcon,
   InfoIcon,
   UserIcon,
@@ -223,9 +224,8 @@ export default function Layout({ children }: { children: ReactNode }) {
                       {/* 아이콘 크기는 옆 글자 크기(fab.css 의 .pf-mypage-btn)와 맞춘다 */}
                       <UserIcon size={15} />
                       {t('nav.mypage')}
-                      {/* 새 답변이 있으면 여기까지 점을 끌고 온다 — FAB 만 찍어두면 패널을 연 사람이
-                          "무슨 일인지" 알 길이 없다. 실제 목적지는 마이페이지 1:1 문의 탭이다. */}
-                      {inquiryAlert > 0 ? <span className="pf-dot" aria-hidden="true" /> : null}
+                      {/* ⛔ 여기에는 알림 표시를 두지 않는다(2026-08-12 요청으로 제거).
+                          알림이 뜨는 자리는 FAB(종) → 마이페이지 1:1 문의 탭(종) 둘뿐이다. */}
                     </button>
                     <button
                       className="pf-acct-btn pf-logout-btn"
@@ -455,7 +455,8 @@ export default function Layout({ children }: { children: ReactNode }) {
               alt="CARIS"
               style={{ width: 40, height: 40, borderRadius: '50%' }}
             />
-            {inquiryAlert > 0 ? <span className="fab-dot" aria-hidden="true" /> : null}
+            {/* 새 답변 알림 — 빨간 점이 아니라 노란 종(2026-08-12 요청). 점은 "뭔가 있다"까지만 말한다. */}
+            {inquiryAlert > 0 ? <BellIcon className="alert-bell fab-bell" size={22} /> : null}
           </button>
         </>
       )}

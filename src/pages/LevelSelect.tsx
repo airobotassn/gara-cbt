@@ -1,9 +1,9 @@
 ﻿// /test/select — 레벨 선택(D안: 결정 중심).
-//   화면 구성: 헤더 → '지금 도전' 응시 카드 1장 → 7단 사다리 스트립(위치만) → 지난 레벨 접이식 → SiteFooter.
+//   화면 구성: 헤더 → '지금 도전' 응시 카드 1장 → 7단 사다리 스트립(위치만) → 지난 레벨 접이식.
 //   왜 목록이 아닌가: 내 등급보다 높은 레벨은 서버(start-test)가 403 으로 막고, 낮은 레벨은 잘 봐도
 //   승급이 안 된다(승급 조건 = 응시레벨 ≥ 내 등급). 즉 실질 선택지가 사실상 1개라 7장을 늘어놓을 이유가 없다.
 //   톤은 **레벨테스트 인증서(pages/LevelCert.tsx)와 같은 밤하늘** — 루트 .lvnight 가 Material 토큰을
-//   그 자리에서 갈아끼워 하위(공용 SiteFooter 포함)를 통째로 어둡게 만든다(수법 설명은 levelselect.css).
+//   그 자리에서 갈아끼워 하위를 통째로 어둡게 만든다(수법 설명은 levelselect.css).
 //   금 = 획득/강조, 은 = 미획득. 레벨 고유색(LEVEL_COLORS)은 별 빛무리에만 남는다.
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
@@ -19,7 +19,6 @@ import {
 } from '../lib/testConfigLevel'
 import { PROMOTE_RATE_LOW, PROMOTE_RATE_HIGH, promoteCut } from '../lib/scoring'
 import { useT } from '../lib/i18n'
-import SiteFooter from '../components/SiteFooter'
 import type { StartTestResponse, ListAttemptsResponse } from '../lib/testTypes'
 
 // 레벨 색(LEVEL_COLORS)은 응시 전 경고 화면과 공유 → lib/testConfigLevel.ts 가 단일 출처.
@@ -492,7 +491,6 @@ export default function LevelSelect() {
         ) : null}
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

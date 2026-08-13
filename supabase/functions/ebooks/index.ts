@@ -36,7 +36,8 @@ function shape(b: Row, owned: boolean, lang: string) {
     author: t.author || ((b.author as string | null) ?? null),
     description: t.description || ((b.description as string | null) ?? null),
     coverUrl: t.coverUrl || ((b.cover_url as string | null) ?? null),
-    price: (b.price as number) ?? 0,
+    // 정가는 달러 센트(100 = $1.00).
+    price_usd_cents: (b.price_usd_cents as number) ?? 0,
     // 카탈로그 = 화면 맨 위 전환 버튼(LEVELTEST / CARIS). 분류값은 카탈로그마다 한 쪽만 채워진다
     // (DB CHECK ebooks_catalog_target_chk). 서재(library)처럼 컬럼을 안 뽑는 곳에선 옛 동작으로 읽힌다.
     catalog: ((b.catalog as string | null) ?? 'leveltest') as 'leveltest' | 'caris',
@@ -87,7 +88,7 @@ Deno.serve(async (req) => {
       // 탭을 눌렀을 때 다시 기다리지 않는다.
       const { data, error } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price, catalog, target_level, target_tier, published, sort_order, created_at, translations')
+        .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations')
         .eq('published', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
@@ -124,7 +125,7 @@ Deno.serve(async (req) => {
       //    필요한 건 대상 레벨 몇 권 + 모자랄 때 채울 '레벨 무관' 몇 권뿐이라 **DB 에서 좁혀서 필요한 만큼만** 받는다.
       //    한 방 OR 쿼리로 합치지 않는 이유: 정렬이 sort_order 라, 노출순이 앞선 '레벨 무관' 책이 많으면
       //    limit 안에서 정작 대상 레벨 책을 밀어내 잘못된 폴백이 나온다. 그래서 두 쿼리로 나눈다.
-      const SELECT = 'id, title, author, description, cover_url, price, catalog, target_level, target_tier, published, sort_order, created_at, translations'
+      const SELECT = 'id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations'
       // ⚠️ 추천은 **레벨테스트 카탈로그만** 본다. CARIS 교재는 급수(자격검정)에 묶인 물건이라
       //    레벨테스트 결과창에 섞이면 "Lv.3 탈락자에게 Elite 교재" 같은 추천이 나간다.
       //    특히 '레벨 무관' 폴백(②)이 위험하다 — CARIS 책은 target_level 이 항상 null 이라 전부 걸린다.
@@ -202,7 +203,7 @@ Deno.serve(async (req) => {
       //    아래 진열 순서가 통째로 무너진다(옛 select 가 그랬다).
       const { data: books } = await admin
         .from('ebooks')
-        .select('id, title, author, description, cover_url, price, translations, catalog, target_level, target_tier')
+        .select('id, title, author, description, cover_url, price_usd_cents, translations, catalog, target_level, target_tier')
         .in('id', ids)
       const byId = new Map((books ?? []).map((b: Row) => [b.id as string, b]))
       // 관리자가 삭제한 책은 건너뛴다.
@@ -223,14 +224,14 @@ Deno.serve(async (req) => {
 
       const { data: book } = await admin
         .from('ebooks')
-        .select('id, price, published')
+        .select('id, price_usd_cents, published')
         .eq('id', id)
         .maybeSingle()
       if (!book || !book.published) return json({ error: '판매 중인 이북이 아닙니다.' }, 404)
 
       // ⚠️ **무료책 전용 경로다.** 결제가 붙은 뒤로 유료책을 여기서 지급하면 결제를 통째로 우회할 수 있다
       //    (프론트를 안 거치고 이 함수를 직접 부르면 그만이다). 유료책은 payments 함수만 지급한다.
-      if ((book.price as number) > 0) {
+      if ((book.price_usd_cents as number) > 0) {
         return json({ error: '결제가 필요한 이북입니다.', needsPayment: true }, 402)
       }
 

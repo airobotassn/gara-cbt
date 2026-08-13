@@ -11,11 +11,19 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것. verify_jwt 는 켜둔 채로 배포한다(관례).
 //   붙이기 전 필독: docs/토스페이먼츠-연동-가드레일.md
 import { corsHeaders, json } from '../_shared/cors.ts'
+import { convertFromUsdCents, refreshRates } from '../_shared/fx.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { getProvider, DEFAULT_PROVIDER, SELECTABLE_PROVIDERS } from '../_shared/payment-provider.ts'
-import { eximbayReady, eximbaySdkUrl, type EximbayReadyPayload } from '../_shared/eximbay.ts'
+import {
+  eximbayAmount,
+  eximbayLang,
+  eximbayReady,
+  eximbaySdkUrl,
+  type EximbayReadyPayload,
+} from '../_shared/eximbay.ts'
 import {
   PAYMENT_COLS,
+  chargeOf,
   ensureCustomerKey,
   newOrderId,
   reconcile,
@@ -186,6 +194,26 @@ Deno.serve(async (req) => {
         ? pgAsked
         : DEFAULT_PROVIDER
 
+      // ⛔ **정가는 달러(센트)이고, 청구 통화는 사용자 국가가 정한다.**
+      //    한국 → 원화. 국내 카드가 달러로 결제되면 해외결제로 잡혀 카드사 수수료가 붙고,
+      //           해외결제를 꺼둔 카드는 아예 실패한다.
+      //    그 외 → 달러 그대로.
+      //    토스는 원화 전용 PG 라 국가와 무관하게 원화다.
+      // ⚠️ **국가를 모르면 해외(달러)로 둔다.** 해외 MID 는 국내 카드도 (수수료가 붙을 뿐) 통과하지만,
+      //    국내 MID 로 해외 카드를 보내면 승인 자체가 안 된다 — 모를 때는 되는 쪽으로 떨어뜨린다.
+      const { data: prof } = await admin.from('profiles').select('country_code').eq('id', uid).maybeSingle()
+      const domestic = String(prof?.country_code ?? '').toUpperCase() === 'KR'
+      const chargeKrw = providerName === 'toss' || domestic
+
+      // ⚠️ 환율은 **여기서 한 번만** 읽고 주문 행에 박는다. 승인은 결제창을 다녀온 뒤라 그 사이 값이
+      //    갱신될 수 있는데, 그때 다시 계산하면 화면에 뜬 금액과 청구액이 달라져 대조가 통째로 깨진다.
+      // 갱신은 여기서 겸사겸사 돌린다 — 별도 크론을 두면 그게 죽었을 때 아무도 모르고 환율만 낡아간다.
+      // 주기(7일)가 안 됐으면 select 한 번으로 끝나므로 주문마다 불러도 부담이 없다.
+      const fxRate = chargeKrw ? (await refreshRates(admin)).rate : null
+      const charge = chargeKrw
+        ? { currency: 'KRW', amount: convertFromUsdCents(product.amount, fxRate as number, 'KRW') }
+        : { currency: 'USD', amount: product.amount / 100 }
+
       const customerKey = await ensureCustomerKey(admin, uid)
       const orderId = newOrderId(productType)
       const { error: insErr } = await admin.from('payments').insert({
@@ -197,8 +225,14 @@ Deno.serve(async (req) => {
         // ⚠️ 클라가 보낸 문자열이 아니라 **서버가 DB 에서 읽어 정규화한 값**을 저장한다.
         //    payments_paid_product_uniq 는 text 원문 비교라, 대소문자·공백 하나만 달라도 중복결제가 뚫린다.
         product_ref: product.ref,
+        // 정가 — **달러 센트**(100 = $1.00). currency 가 'USD' 라는 게 그 단위를 말해준다.
         amount: product.amount,
-        currency: 'KRW',
+        currency: 'USD',
+        // 실제로 청구하는 값(주요 단위). 정가와 단위·통화가 다르므로 **항상** 적는다.
+        charge_amount: charge.amount,
+        charge_currency: charge.currency,
+        // 원화 청구건에만 들어간다 — 그때 쓴 환율을 남겨야 나중에 금액을 설명할 수 있다.
+        fx_rate: fxRate,
         status: 'pending',
         customer_key: customerKey,
       })
@@ -225,8 +259,10 @@ Deno.serve(async (req) => {
 
         const ready = await eximbayReady({
           orderId,
-          amount: String(product.amount),
-          currency: 'KRW',
+          // 자릿수는 통화가 정한다(달러 2자리·원 0자리). 조회 때와 **같은 함수**로 만들어야
+          // 준비/조회가 같은 글자를 써서 같은 결제를 가리킨다.
+          amount: eximbayAmount(charge.currency, charge.amount),
+          currency: charge.currency,
           // 엑심베이에 넘어가는 구매자 표기. 한글 닉네임이 그대로 나가면 PG·카드사 구간에서 깨질 수 있어 ASCII 로만 만든다.
           buyerName: asciiBuyerName((user as { email?: string }).email ?? ''),
           buyerEmail: (user as { email?: string }).email ?? 'noreply@example.com',
@@ -236,7 +272,8 @@ Deno.serve(async (req) => {
           returnUrl: `${fnBase}/functions/v1/payments-return?to=${encodeURIComponent(origin)}`,
           // 서버-서버 통지. 브라우저가 닫혀 return_url 이 안 돌아온 경우를 덮는 유일한 경로다.
           statusUrl: `${fnBase}/functions/v1/payments-webhook?k=${encodeURIComponent(hookKey)}`,
-          lang: lang === 'ko' ? 'KO' : 'EN',
+          // 코드표는 eximbayLang 이 단일 출처다(ISO 639-1 이 아니다 — 일본어가 ja 가 아니라 JP).
+          lang: eximbayLang(lang),
         })
         if (!ready.ok) {
           // 준비가 실패하면 결제창 자체를 못 띄운다. 방금 만든 주문은 접어둔다 —
@@ -259,10 +296,13 @@ Deno.serve(async (req) => {
       return json({
         orderId,
         orderName: product.orderName,
-        amount: product.amount,
-        currency: 'KRW',
+        amount: product.amount, // 정가(달러 센트)
+        currency: 'USD',
         customerKey,
         provider: providerName,
+        // 실제로 청구되는 값. 화면 고지문이 "얼마가 빠지는지"를 정확히 말하려면 정가만으론 부족하다
+        // (엑심베이는 달러로 빠진다). 정가와 같으면 프론트가 원화 문구를 그대로 쓴다.
+        charge,
         eximbay, // 토스면 undefined — 프론트는 이 값 유무로 결제창 종류를 고르지 않는다(provider 를 본다)
         env: getProvider(providerName).env(), // 테스트키/실키 혼용을 화면에서도 알아챌 수 있게 같이 내려준다
       })
@@ -294,10 +334,15 @@ Deno.serve(async (req) => {
       }
 
       // ② successUrl 의 amount 를 그대로 승인에 넘기지 않는다 — 저장된 주문 금액과 대조부터 한다.
-      if (!Number.isFinite(clientAmount) || clientAmount !== row.amount) {
+      //    ⚠️ 대조 기준은 정가(원화)가 아니라 **PG 에 실제로 청구한 값**이다. 엑심베이는 달러로 청구하므로
+      //       원화로 대조하면 정상 결제가 전부 금액불일치로 막힌다.
+      //    ⚠️ 소수를 그대로 !== 로 비교하지 않는다 — 달러는 센트 단위라 부동소수 표현 차이로 어긋날 수 있다.
+      const chg = chargeOf(row)
+      const cents = (v: number) => Math.round(v * 100)
+      if (!Number.isFinite(clientAmount) || cents(clientAmount) !== cents(chg.amount)) {
         await admin
           .from('payments')
-          .update({ status: 'failed', fail_code: 'AMOUNT_MISMATCH', fail_message: `요청 ${clientAmount} ≠ 주문 ${row.amount}`, updated_at: new Date().toISOString() })
+          .update({ status: 'failed', fail_code: 'AMOUNT_MISMATCH', fail_message: `요청 ${clientAmount} ≠ 주문 ${chg.amount} ${chg.currency}`, updated_at: new Date().toISOString() })
           .eq('id', row.id)
           .eq('status', 'pending')  // 금액 검사는 선점 전이라 여기선 pending 만 본다
         return json({ error: '결제 금액이 주문과 일치하지 않습니다.' }, 400)
@@ -402,8 +447,9 @@ Deno.serve(async (req) => {
       const res = await provider.confirm({
         providerKey: paymentKey,
         orderId,
-        amount: row.amount,
-        currency: row.currency,
+        // **저장된 청구값**(클라 값 금지). 토스는 정가와 같고, 엑심베이는 달러다.
+        amount: chg.amount,
+        currency: chg.currency,
         idempotencyKey: row.id,
         // 엑심베이 전용 — 결제창이 브라우저로 돌려준 쿼리스트링 원문. 어댑터가 /verify 로 위변조를 검증하고
         // 상태는 PG 에 다시 물어 확인한다(이 문자열 자체를 결제 성공 근거로 쓰지 않는다). 토스는 무시한다.
@@ -413,7 +459,7 @@ Deno.serve(async (req) => {
       if (!res.ok) {
         // 승인 실패를 곧바로 '결제 실패'로 단정하지 않는다 — 이미 승인된 건인데 응답만 못 받았을 수 있다.
         // 조회 API 로 실제 상태를 확인하고 분기한다.
-        const check = await provider.queryByOrderId(orderId, { currency: row.currency, amount: row.amount })
+        const check = await provider.queryByOrderId(orderId, chg)
         if (check.ok) {
           const out = await settleFromProvider(admin, row, check.data)
           if (out.status === 'paid') {

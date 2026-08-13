@@ -1,5 +1,4 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl } from '../lib/seb'
@@ -137,7 +136,6 @@ export default function ExamCheck() {
         </div>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

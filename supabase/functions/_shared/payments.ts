@@ -26,8 +26,14 @@ export interface PaymentRow {
   order_name: string
   product_type: ProductType
   product_ref: string
+  /** 정가 — currency 의 **최소단위 정수**. 지금은 USD 라 센트다(100 = $1.00). 옛 행은 KRW 원 단위. */
   amount: number
   currency: string
+  /** PG 에 실제로 청구한 금액·통화(주요 단위). 정가와 통화가 다를 수 있다(달러 정가 → 원화 청구). */
+  charge_amount: number | null
+  charge_currency: string | null
+  /** 원화로 청구한 건의 주문 생성 시점 환율. 승인 때 다시 계산하지 않는다. */
+  fx_rate: number | null
   status: string
   payment_key: string | null
   customer_key: string
@@ -38,7 +44,18 @@ export interface PaymentRow {
 
 /** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다. */
 export const PAYMENT_COLS =
-  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at'
+  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at'
+
+/**
+ * **PG 에 말할 때 쓰는 금액·통화.** 승인 대조·조회·환불이 전부 이 값을 기준으로 해야 한다.
+ * 정가(amount·KRW)와 다를 수 있다 — 엑심베이는 달러로 청구하기 때문이다.
+ * ⚠️ 사용자에게 보여줄 가격이나 통계에는 쓰지 말 것. 그건 정가(amount) 소관이다.
+ */
+export function chargeOf(row: PaymentRow): { currency: string; amount: number } {
+  return row.charge_amount != null && row.charge_currency
+    ? { currency: row.charge_currency, amount: Number(row.charge_amount) }
+    : { currency: row.currency, amount: row.amount }
+}
 
 /** 토스가 모르는 주문을 만료로 접기까지 기다리는 시간(분).
  *  결제 승인은 요청 후 10분 안에 해야 하므로, 그보다 넉넉히 지나야 "결제창까지 못 갔다"고 단정할 수 있다. */
@@ -74,7 +91,7 @@ export async function resolveProduct(
   if (productType === 'ebook') {
     const { data: book } = await admin
       .from('ebooks')
-      .select('id, title, price, published, translations')
+      .select('id, title, price_usd_cents, published, translations')
       .eq('id', productRef)
       .maybeSingle()
     if (!book || !book.published) return { ok: false, error: '판매 중인 이북이 아닙니다.', status: 404 }
@@ -83,7 +100,8 @@ export async function resolveProduct(
     const title = tr[lang]?.title || (book.title as string)
     return {
       ok: true,
-      amount: (book.price as number) ?? 0,
+      // 정가는 **달러 센트**다(2026-08-13 전환). 옛 price(원화 정수)는 읽지 않는다.
+      amount: (book.price_usd_cents as number) ?? 0,
       // orderName 은 결제창·카드 명세서에 뜬다. 토스 상한 100자.
       orderName: title.slice(0, 100),
       ref: book.id as string,
@@ -421,8 +439,9 @@ export async function resettle(
 ): Promise<{ orderId: string; status: string; fulfilled: boolean; note?: string }> {
   const provider = getProvider(row.provider)
   // 조회에 주문의 금액·통화를 같이 넘긴다 — 엑심베이 retrieve 는 이 둘이 **필수**라 없으면 조회 자체가 실패한다.
-  // 출처는 반드시 저장된 행이다(콜백·요청 값 금지). 토스 어댑터는 이 인자를 무시한다.
-  const q = { currency: row.currency, amount: row.amount }
+  // ⚠️ 정가(amount)가 아니라 **실제 청구값**이다. 엑심베이엔 달러로 보냈으므로 원화로 물으면 못 찾는다.
+  //    출처는 반드시 저장된 행이다(콜백·요청 값 금지).
+  const q = chargeOf(row)
   const res = row.payment_key
     ? await provider.queryByKey(row.payment_key, q)
     : await provider.queryByOrderId(row.order_id, q)

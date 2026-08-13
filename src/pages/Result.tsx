@@ -11,7 +11,7 @@ import {
 } from '../lib/scoring'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { useT, type TFunc } from '../lib/i18n'
-import { krw } from '../lib/money'
+import { usdc } from '../lib/money'
 import { useCountUp } from '../hooks/useCountUp'
 import RadarChartBox from '../components/RadarChartBox'
 import EbookCover from '../components/EbookCover'
@@ -480,8 +480,8 @@ function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; leve
             <span className={`rb-price${b.owned ? ' is-owned' : ''}`}>
               {b.owned
                 ? t('ebook.owned')
-                : b.price > 0
-                  ? krw(b.price, lang) /* 값은 원(KRW) — `$` 로 찍으면 안 된다 */
+                : b.price_usd_cents > 0
+                  ? usdc(b.price_usd_cents, lang) /* 정가는 달러 센트 — 원화는 결제 시점에 서버가 계산한다 */
                   : t('ebook.free')}
             </span>
           </Link>

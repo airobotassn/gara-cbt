@@ -34,6 +34,11 @@ export interface CreateOrderResp {
   customerKey?: string
   /** 이 주문이 열린 PG. 프론트는 이 값으로 결제창 종류를 고른다. */
   provider?: Pg
+  /**
+   * **실제로 청구되는** 금액·통화. 정가(`amount`, 원화)와 다를 수 있다 — 해외 결제는 달러로 빠진다.
+   * ⚠️ 상품 가격 표시에는 쓰지 말 것(그건 `amount`). 이건 "얼마가 빠지는지" 고지문 전용이다.
+   */
+  charge?: { currency: string; amount: number }
   /** provider==='eximbay' 일 때만 온다. */
   eximbay?: EximbayLaunch
   /** 'test' | 'live' — 실키/테스트키 혼용을 화면에서 알아채기 위한 표시용. */

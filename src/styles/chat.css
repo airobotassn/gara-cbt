@@ -149,31 +149,36 @@
   cursor: default;
 }
 
-.chat-edit-box {
+/* ── 번역 토글 ──
+   목록 위 얇은 한 줄. ⚠️ 버튼을 부모(.aa-chatroom, 방 이름 줄)로 올리지 말 것 —
+   토글 상태가 ChatBoard 안에 있어야 방을 옮길 때 key={room} 재마운트로 **꺼진 채 시작**한다.
+   부모로 올리면 켠 채로 방을 도는 순간 들어간 방마다 과거 글이 통째로 번역된다. */
+.chat-trbar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  justify-content: flex-end;
+  padding: 8px 14px 0;
 }
-.chat-edit-box textarea {
-  width: 100%;
-  border-radius: 10px;
-  border: 1px solid var(--color-outline-variant, #c3c6d6);
-  padding: 8px 10px;
-  font-size: 14px;
-  color: var(--color-on-surface, #191b23);
-  resize: vertical;
-}
-.chat-edit-actions {
-  display: flex;
-  gap: 8px;
-}
-.chat-edit-actions button {
+.chat-tr-btn {
   font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
   border: 1px solid var(--color-outline-variant, #c3c6d6);
   background: var(--color-surface-container-lowest, #fff);
   color: var(--color-on-surface, #191b23);
+  cursor: pointer;
+}
+.chat-tr-btn.on {
+  background: var(--color-primary, #004ac6);
+  border-color: var(--color-primary, #004ac6);
+  color: var(--color-on-primary, #fff);
+}
+.chat-tr-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* 번역본임을 밝히는 꼬리표 — 원문과 구분이 안 되면 오역을 원작자 탓으로 읽게 된다. */
+.chat-tr-mark {
+  font-style: italic;
 }
 
 .chat-toast {

@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import SiteFooter from '../components/SiteFooter'
 import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
 import LearningDashboard from '../components/LearningDashboard'
 import EbookCover from '../components/EbookCover'
@@ -13,7 +12,7 @@ import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../li
 import { countryName, countryOptions } from '../lib/regions'
 import { loadRegionIndex, loadRegions, type RegionOption } from '../lib/regionCatalog'
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
-import { usd } from '../lib/money'
+import { usdc } from '../lib/money'
 import {
   examDateText,
   ticketReasonText,
@@ -400,7 +399,7 @@ function TicketCard({ tk, t, lang, onGo, onCheck }: {
             {t('ticket.issued_at')} {fmtDate(tk.issuedAt)}
             {/* 관리자·무료 발급분은 0원이라 금액 자리를 통째로 비운다 — `$0` 은 '무료로 팔았다'로 읽힌다.
                 ⚠️ pricePaid 는 원화 스냅샷이다. 표시만 달러로 환산한다(실제 청구액 고지는 결제 화면 소관). */}
-            {tk.pricePaid > 0 ? ` | ${t('ticket.price_paid')} ${usd(tk.pricePaid, lang)}` : ''}
+            {tk.pricePaid > 0 ? ` | ${t('ticket.price_paid')} ${usdc(tk.pricePaid, lang)}` : ''}
           </p>
           {reason && (
             tk.usable ? (
@@ -878,7 +877,6 @@ export default function MyPage() {
         </div>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

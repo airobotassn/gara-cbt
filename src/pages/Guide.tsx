@@ -1,6 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
 import { getTracks, TIER_COLORS } from '../lib/caris'
 
@@ -344,7 +343,6 @@ export default function Guide() {
         </section>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

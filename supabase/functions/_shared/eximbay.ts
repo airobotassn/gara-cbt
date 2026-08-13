@@ -32,9 +32,22 @@ function apiBase(): string {
   return HOSTS[env()]
 }
 
-function mid(): string {
-  const v = (Deno.env.get('EXIMBAY_MID') ?? '').trim()
-  if (!v) throw new Error('EXIMBAY_MID 가 설정되지 않았습니다.')
+/**
+ * 가맹점ID(MID). **국내결제와 해외결제가 서로 다른 MID 다** — 같은 API 인데 국내용은 국내 결제망
+ * (원화·카카오페이·국내 카드 매입), 해외용은 국제 카드망을 탄다. 한 MID 로 둘 다는 안 된다.
+ *
+ * ⚠️ **통화가 MID 를 정한다.** 원화면 국내, 그 외는 해외다. 이렇게 묶어두면 승인·조회 때
+ *    "이 주문이 어느 MID 였더라"를 따로 들고 다닐 필요가 없다 — 저장된 청구통화가 곧 답이다.
+ *    반대로 통화와 MID 를 따로 고르게 두면, 원화를 해외 MID 로 보내는 조합이 만들어져
+ *    결제창이 제멋대로 환산한 금액을 띄운다(실제로 겪은 `$1.05` 가 그것이다).
+ * ⚠️ 실계약에서 MID 마다 API 키가 갈릴 수 있다. 그때는 여기서 키도 같이 골라야 한다.
+ */
+function mid(currency: string): string {
+  const local = (Deno.env.get('EXIMBAY_MID_LOCAL') ?? '').trim()
+  const global_ = (Deno.env.get('EXIMBAY_MID_GLOBAL') ?? '').trim()
+  const legacy = (Deno.env.get('EXIMBAY_MID') ?? '').trim()
+  const v = currency.toUpperCase() === 'KRW' ? local || legacy : global_ || legacy
+  if (!v) throw new Error(`엑심베이 MID 가 설정되지 않았습니다 (${currency}).`)
   return v
 }
 function secretKey(): string {
@@ -135,6 +148,20 @@ const METHOD_NAMES: Record<string, string> = {
   P350: 'GrabPay(MYR)', P351: 'GrabPay(SGD)', P352: 'ShopeePay(THB)', P353: 'JKOPAY(TWD)', P354: 'PayPay',
 }
 
+/**
+ * 통화별 소수 자릿수(minor unit) — 엑심베이 통화표 Appendix A. **원·엔은 0자리**, 나머지는 2자리다.
+ * 여기 없는 통화는 2자리로 본다(국제 통화 대부분이 2자리라 그쪽이 덜 틀린다).
+ */
+const MINOR_UNITS: Record<string, number> = { KRW: 0, JPY: 0 }
+
+/**
+ * 금액을 엑심베이 규격 문자열로. **준비(/ready)와 조회(/retrieve)가 같은 글자를 써야 한다** —
+ * 준비에 `1.00` 을 보내고 조회에 `1` 을 보내면 같은 결제를 못 찾는다(포맷을 각자 만들다 실제로 어긋났다).
+ */
+export function eximbayAmount(currency: string, amount: number): string {
+  return Math.max(0, amount).toFixed(MINOR_UNITS[currency.toUpperCase()] ?? 2)
+}
+
 /** 코드표에 없으면 받은 값을 그대로 돌려준다(정보를 지우지 않는다). */
 export function eximbayMethodName(code: string | null | undefined): string | null {
   const c = (code ?? '').trim()
@@ -199,13 +226,31 @@ export async function eximbayReady(input: {
       amount: input.amount,
       lang: input.lang ?? 'EN',
     },
-    merchant: { mid: mid() },
+    merchant: { mid: mid(input.currency) },
     buyer: { name: input.buyerName, email: input.buyerEmail },
     url: { return_url: input.returnUrl, status_url: input.statusUrl },
   }
   const { data } = await call('/v1/payments/ready', payload)
   if (data?.rescode === '0000' && data.fgkey) return { ok: true, fgkey: data.fgkey, payload }
   return { ok: false, code: data?.rescode ?? 'UNKNOWN', message: data?.resmsg ?? '결제 준비 실패' }
+}
+
+/**
+ * 앱 화면 언어 → 엑심베이 결제창 언어 코드.
+ *
+ * 출처: **해외결제 가이드 Appendix B**(Supported Languages). 지원 코드는 8개다 —
+ *   `KR`(한국어) · `EN`(영어) · `JP`(일본어) · `CN`(중국어 간체) · `TW`(중국어 번체) ·
+ *   `RU`(러시아어) · `TH`(태국어) · `VN`(베트남어)
+ *
+ * ⚠️ **ISO 639-1 이 아니다.** 일본어는 `ja` 가 아니라 `JP`, 중국어는 `zh` 가 아니라 `CN` 이다.
+ *    ISO 코드를 넣으면 오류 없이 **조용히 영어로 떨어진다** — `/ready` 가 `XX` 같은 값도 rescode 0000
+ *    으로 받아주기 때문에 서버 응답으로는 절대 못 알아챈다. 결제창을 띄워봐야만 드러난다.
+ * ⚠️ 우리 6개국어 중 **힌디(hi)만 지원 목록에 없다** → 영어로 둔다.
+ */
+const LANGS: Record<string, string> = { ko: 'KR', en: 'EN', ja: 'JP', zh: 'CN', vi: 'VN' }
+
+export function eximbayLang(appLang: string): string {
+  return LANGS[(appLang ?? '').toLowerCase()] ?? 'EN'
 }
 
 /** 프론트가 로드할 SDK 스크립트. 호스트가 test/live 로 갈리는 건 API 와 같다. */
@@ -270,15 +315,26 @@ export const eximbayProvider: PaymentProvider = {
 
     // ② 실제 상태 조회. 우리 주문 기준값(저장된 금액·통화)으로 묻는다 — 콜백이 준 금액으로 물으면
     //    검증을 통과한 값이라도 우리 원장과 어긋난 건을 그대로 승인해버린다.
-    return retrieve('order_id', a.orderId, { currency: a.currency, amount: String(a.amount) })
+    return retrieve('order_id', a.orderId, {
+      currency: a.currency,
+      amount: eximbayAmount(a.currency, a.amount),
+    })
   },
 
   // 엑심베이 retrieve 는 currency·amount 가 **필수**다(실검증 확인). opts 없이 부르면 그 둘이 빠져 실패하므로,
   // 호출부(resettle·reconcile)는 저장된 주문 행의 값을 반드시 같이 넘긴다.
   queryByKey: (transactionId, opts) =>
-    retrieve('transaction_id', transactionId, opts && { currency: opts.currency, amount: String(opts.amount) }),
+    retrieve(
+      'transaction_id',
+      transactionId,
+      opts && { currency: opts.currency, amount: eximbayAmount(opts.currency, opts.amount) },
+    ),
   queryByOrderId: (orderId, opts) =>
-    retrieve('order_id', orderId, opts && { currency: opts.currency, amount: String(opts.amount) }),
+    retrieve(
+      'order_id',
+      orderId,
+      opts && { currency: opts.currency, amount: eximbayAmount(opts.currency, opts.amount) },
+    ),
 }
 
 /** 조회 — order_id 또는 transaction_id 로. status=NONE/Q004 이면 **주문 부재(absent)** 로 접어 resettle 규격에 맞춘다. */
@@ -288,7 +344,8 @@ async function retrieve(
   extra?: { currency: string; amount: string },
 ): Promise<ProviderResult> {
   const { http, data } = await call('/v1/payments/retrieve', {
-    mid: mid(),
+    // 조회도 **그 결제를 만든 MID** 로 물어야 한다. 저장된 청구통화가 그 MID 를 가리킨다.
+    mid: mid(extra?.currency ?? 'USD'),
     key_field: keyField,
     payment: { [keyField]: value, currency: extra?.currency, amount: extra?.amount, lang: 'EN' },
   })

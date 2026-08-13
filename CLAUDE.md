@@ -168,7 +168,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
 | `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
-| `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-edit`·`chat-delete`·`chat-report` |
+| `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-report`·`chat-translate` |
 | `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
 | `/test/:attemptId` (응시) | `pages/TestRunner.tsx` | `test.css` | `start-test` · `submit-test` |
 | `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` |
@@ -190,12 +190,14 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - 히어로 이미지 = `public/hero-robot.png`(배경 투명). **손 위 CARIS 행성은 이미지에 없다** — `logo.png` 를 CSS 로 겹친 별도 레이어(`.guide-hero-orb`, %좌표 + 글로우 + 부유 애니메이션). 로봇 이미지를 갈면 손바닥 비율에 맞춰 `.guide-hero-orb`/`.guide-hero-art::after` 의 `left`·`top` 을 다시 맞출 것.
   - ⚠️ 클래스명에 `.hl` 쓰지 말 것 — `result.css` 가 전역으로 `.hl { display:flex }` 를 잡고 있다(`.gh-hl` 로 우회).
 - `/mypage` 탭(URL `/mypage/:section`) 순서 = `learning`(학습 대시보드, **기본 = `/mypage`**) · `ebooks`(이북 서재) · `attempts`(시험 응시 현황) · `earned` · `issuance` · `inquiry`(1:1 문의). ⚠️ 응시 현황은 예전 기본 탭이라 `/mypage` 였는데 지금은 `/mypage/attempts`.
-  - **1:1 문의 '새 답변' 빨간 점(2026-08-12)**: 점이 뜨는 곳 셋(FAB · FAB 패널의 마이페이지 버튼 · 마이페이지 문의 탭)은 전부 `src/lib/inquiryAlert.ts` 하나를 구독한다 — 화면마다 따로 세면 점이 서로 다른 말을 한다. 세는 질의는 `inquiries` 직접 조회(RLS 가 본인 행만 준다), 끄는 건 RPC `inquiry_mark_seen` 하나뿐.
+  - **1:1 문의 '새 답변' 종(2026-08-12)**: 알림이 뜨는 곳 **둘**(FAB · 마이페이지 문의 탭)은 전부 `src/lib/inquiryAlert.ts` 하나를 구독한다 — 화면마다 따로 세면 알림이 서로 다른 말을 한다. 세는 질의는 `inquiries` 직접 조회(RLS 가 본인 행만 준다), 끄는 건 RPC `inquiry_mark_seen` 하나뿐.
+    - 표시는 **빨간 점이 아니라 노란 종**이다(`FabIcons.tsx` 의 `BellIcon` + `fab.css` 의 `.alert-bell` — 두 자리가 같은 그림·같은 색을 쓴다). 옛 세 번째 자리(FAB 패널의 마이페이지 버튼 옆 `.pf-dot`)는 삭제됐다.
     - ⚠️ **사용자에게 `inquiries` UPDATE 를 열지 말 것.** RLS 는 컬럼 단위로 못 막아서 본인 행 update 를 허용하면 자기 문의의 `answer`·`status` 까지 직접 쓴다. 그래서 읽음 처리만 SECURITY DEFINER 함수로 뚫어 놨다.
     - ⚠️ **읽음 시점 = 문의를 펼친 순간**이지 탭에 들어온 순간이 아니다. 탭 진입으로 끄면 목록만 스쳐본 사람의 답변이 조용히 사라진다.
     - ⚠️ 관리자가 답변을 **고쳐 쓰면** `answer_seen_at` 을 null 로 되돌린다(`admin` 의 `inquiryAnswer`) — 안 그러면 한 번 읽은 문의는 답이 바뀌어도 영영 조용하다.
     - 폴링하지 않는다. 로그인 직후 + **창 포커스 복귀** 때만 다시 센다(30초 스로틀) — 관리자 답변은 하루 몇 건이라 상시 폴링이 아깝다.
-    - ⚠️ FAB 점(`.fab-dot`)은 **테마 무관 고정색**(`--fab-dot`)이다. 그 두 버튼의 면이 항상 흰색이라 `--danger-fg`(다크에선 연분홍)를 쓰면 흰 면에서 힘을 잃는다. 패널 안 점(`.pf-dot`)은 테마를 따르므로 거기선 `--danger-fg` 를 쓴다.
+    - ⚠️ 종은 **채움 노랑(`--fab-bell`) + 어두운 윤곽선(`--fab-bell-line`)이고 둘 다 테마 무관 고정**이다. FAB 면은 항상 흰색이라 노랑만 얹으면 대비 1.5:1 도 안 나와 형체가 녹는다 — 어두운 테가 밝은 면에서 윤곽을 잡고, 어두운 배경 쪽에서는 노란 채움이 스스로 읽힌다(그쪽에선 테가 묻혀도 된다). 테 색을 테마따라 뒤집으면 흰 FAB 면에서 테가 사라진다. 테는 shape 를 따라가야 하므로 box-shadow 링이 아니라 `stroke` + `paint-order: stroke fill`(빼면 테가 안쪽을 파먹어 종이 뭉개진다).
+    - ⚠️ 크기를 **20px 아래로 내리지 말 것** — 작으면 "알림이 왔다"가 아니라 그냥 작은 그림으로 읽힌다(2026-08-12 "벨이 너무 작아"로 15px 에서 올렸다).
 - **`/ebooks` = 러닝 라이브러리(2026-08-06 개편)**: 옛 '이북 스토어'(카드 그리드)를 **가로 3열 — `레벨(급수) | 교재(E-BOOK) | 강의`** 로 바꿨다. 왼쪽에서 레벨을 고르면 가운데·오른쪽이 그 레벨 것으로 갈리고, 각 열은 카페 게시판처럼 자기 안에서 세로 스크롤한다(페이지를 내려서 레벨이 바뀌는 구조가 **아니다**). 좁은 화면은 레벨을 상단 가로 칩으로 빼고 교재↔강의를 탭으로 접는다.
   - **카탈로그가 둘이다(2026-08-11)** — 제목 아래 전환 버튼 `LEVELTEST`(왼쪽 열 = 레벨 1~7 + 레벨 무관) / `CARIS`(왼쪽 열 = 급수 Beginner~Zenith + 급수 무관). 기본은 LEVELTEST. 이름 두 개는 급수 이름처럼 **브랜드 영문 고정**이라 i18n 사전이 아니라 `Ebooks.tsx` 의 `CATALOG_LABEL` 이 단일 출처다.
     - 갈리는 기준은 **`ebooks.catalog` 한 컬럼**이고 분류값은 카탈로그마다 한 쪽만 채운다(`target_level` ↔ `target_tier`, DB CHECK `ebooks_catalog_target_chk`). 관리자 이북 폼은 그래서 셀렉트가 **한 칸**(`LEVELTEST · Lv.3` / `CARIS · Pro`) — 칸을 둘로 쪼개면 화면에서 CHECK 에 걸리는 조합을 만들 수 있다.
@@ -277,11 +279,28 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - 저장 = 테이블 `minigame_scores`(통산 최고, 시즌 스코프 아님) + RPC `minigame_top`. `activity_ledger` 는 정규화 delta 라 줄 세우기에 못 쓴다.
   - ⚠️ 제출은 **티켓 필수**(`submit-minigame` 의 `action:'start'` → HMAC 서명 티켓). 티켓은 **세션당 1개로 재사용** — 제출마다 새로 받으면 "플레이시간 대비 상한"이 리셋돼 레벨형 2번째 이후 정상 기록이 깎인다.
 - **`/arena` 는 더 이상 iframe 이 아니다**: 옛 `public/world-arena.html`(자립형 d3 HTML)을 React 로 포팅하고 삭제했다. 지도 경계는 `public/geo/*.json`(world·kr-prov 즉시, kr-muni 는 시도 진입 시 지연 로드), d3 는 npm 서브모듈(`d3-geo`·`d3-zoom` 등). 문구는 `i18n.tsx` 의 `arena.*`.
-- **`/arena` 채팅(유사채팅 · `components/ChatBoard.tsx`)**: 웹소켓이 아니라 **3.5~4.5초 폴링**이다(신규분 `after` + 수정/삭제 reconcile `ids+since` 두 번). 함수 `chat-list`·`chat-post`·`chat-edit`(10분 내 본인)·`chat-delete`(소프트)·`chat-report`, 공용 헬퍼 `_shared/chat.ts`, 테이블 `chat_messages`·`chat_reports`·`chat_incidents`(RLS 정책 없음 = 함수 전용). 삽입 경로는 RPC `chat_post_atomic` 하나뿐. 검수는 `/admin?top=level&tab=chatmod`(`Admin.tsx` 의 `ChatModAdmin`).
+- **`/arena` 채팅(유사채팅 · `components/ChatBoard.tsx`)**: 웹소켓이 아니라 **3.5~4.5초 폴링**이다(신규분 `after` + 가림/삭제 reconcile `ids+since` 두 번). 함수 `chat-list`·`chat-post`·`chat-report`·`chat-translate`, 공용 헬퍼 `_shared/chat.ts`, 테이블 `chat_messages`·`chat_reports`·`chat_incidents`(RLS 정책 없음 = 함수 전용). 삽입 경로는 RPC `chat_post_atomic` 하나뿐. 검수는 `/admin?top=level&tab=chatmod`(`Admin.tsx` 의 `ChatModAdmin`).
+  - ⛔ **사용자 수정·삭제는 없다(2026-08-13 제거 — `chat-edit`·`chat-delete` 함수 삭제).** `chat-edit` 이 `body` 를 덮어써서 **욕설을 쓰고 신고당한 뒤 10분 안에 고치면 증거가 사라졌다**(관리자가 신고를 열면 멀쩡한 글만 남는다). 삭제는 `deleted_at` 만 찍고 본문을 남겨 원래 안전했지만, 수정을 없애는 김에 같이 걷어냈다. 덤으로 **번역 무효화 로직이 통째로 불필요**해졌다(원문이 안 변하니 번역본을 버릴 일이 없다). 다시 넣으려면 원본 보관이 선행이다. 관리자 가림(`chatHide`)은 그대로라 `chat.deleted` 문구·`deleted_at` 경로는 살아 있다.
   - **방(room) = 전세계 1개 + 나라별 1개** (`chat_messages.room` = `'global'` 또는 ISO2 대문자, 방 도입 전 글은 전부 global). 방 목록을 만들지 않는 이유 = **방은 지도 선택이 정한다** — 지구본에서 아무 나라도 안 고르면 전세계, 나라를 고르면 그 나라 방. 나라 안에서 시도를 골라도 방은 나라 단위로 유지. 전세계로 돌아가는 길은 채팅 머리말의 `전세계로` 버튼 하나(= `goto(0)`, 지도도 같이 나간다).
   - **쓰기는 어느 방이든 로그인만 하면 된다** — 옛 "내 나라 + 전세계만"(`profiles.country_code` 기준 · 서버 `not_my_country` 403 · 프론트 읽기전용 안내) 제한은 2026-08-04 제거했다. 남은 게이트는 로그인 · 배드워드/링크 · OpenAI 모더레이션 · 레이트리밋뿐.
   - ⚠️ **레이트리밋·중복·IP 바닥선 가드는 방을 안 본다(계정 단위 전역)** — 방마다 상한이 리셋되면 방을 옮겨다니며 도배할 수 있다. `chat_post_atomic` 안의 주석과 `tests/db/t-chat-rooms.mjs` 가 이걸 지킨다.
   - ⚠️ 방이 바뀌면 `<ChatBoard key={room}>` 로 **다시 마운트**한다. 목록·커서·폴링 타이머가 한 방을 가리키는 상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청 결과가 새 방 목록에 섞인다.
+- **`/arena` 채팅 번역(2026-08-13)**: 원문이 기본이고, **번역 토글을 켠 사람에게만** 번역본을 보여준다. 한 번 만든 번역본은 `chat_translations` 에 남아 같은 언어 사용자 전원이 나눠 쓴다 → **비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례**한다(중국 방에 한국인이 1명이든 500명이든 번역은 1회). 함수 `chat-translate`(사용자 요청 + 워커의 `pending`/`store`), 어댑터 `_shared/translate.ts`(구글 Cloud Translation v2)·`_shared/country-lang.ts`, 워커 `tools/translate-worker/`, 검증 `tests/db/t-chat-translation.mjs`(30건)·`tests/chat-translate-filters.mjs`(33건).
+  - **엔진 둘 — 엣지가 주력, 구글이 폴백.** 엣지(Edge 브라우저 온디바이스 번역)는 **공짜·무제한·145개 언어**라 우리 기계에서 워커가 미리 창고를 채운다. 구글(월 50만자 무료, 이후 $20/100만자)은 **창고에 없을 때만** — 새 조합의 첫 요청, 워커가 죽었을 때, 엣지가 지원 안 하는 쌍. ⚠️ **구글을 지우면 안 된다** — 기계 하나가 꺼지면 번역이 통째로 죽고, MS·구글이 자동화를 막으면(회색지대다) 대안이 없다. 평소 거의 안 불려서 무료분 안에서 논다.
+    - **Azure(무료 200만자)가 아니라 구글인 이유는 계정이다** — Azure 는 MS 계정·구독을 새로 만들어야 했고(2026-08-13 테넌트 오류로 막힘), 구글은 이미 쓰는 GCP 프로젝트(`GEMINI_API_KEY`)에서 API 하나 켜고 키만 받으면 된다. 무료분이 1/4 이지만 **엣지가 주력이라 여긴 폴백**이다. 갈아탈 일이 생기면 `_shared/translate.ts` 의 어댑터만 고치면 된다 — 호출부는 엔진을 모른다.
+    - ⚠️ **v2(Basic)를 쓴다** — API 키 한 줄이면 되고, v3 는 서비스 계정 JWT 서명이 필요해 Edge Function 에서 번거롭다.
+    - ⚠️ **`source`(원문 언어)를 아는 건 반드시 명시한다** — 구글은 미지정 시 **감지를 별도 과금**해서 문자 수가 두 배가 된다(그래서 `src_lang` 저장이 비용 장치이기도 하다). `format:'text'` 도 필수 — 기본이 `html` 이라 안 주면 `<`·`&` 가 엔티티로 돌아온다.
+    - ⚠️ **언어 코드 표기가 갈린다** — 우리(=브라우저 Translator API) 표기 `zh-Hans`/`zh-Hant`/`he`/`fil` ↔ 구글 `zh-CN`/`zh-TW`/`iw`/`tl`. `translate.ts` 의 `toGoogleLang`/`fromGoogleLang` 이 양방향으로 변환하고, **저장은 우리 표기로 통일**한다(엔진마다 다르게 저장하면 "원문 == 독자 언어" 판정이 흔들린다).
+  - ⛔ **미리 전 언어로 번역해두지 않는다.** 190개 선번역은 하루 채팅 3,000건 기준 **하루 51만 행 · 언어팩 1,700개**라 시간보다 **DB 가 먼저 터진다**(구글 무료분으로는 하루 4~8건이 천장). 커버리지(전 언어)는 "요청이 오면 그때 번역한다"로 달성한다.
+  - **어떤 언어로 미리 채울지는 `chat_translation_demand`(= 번역 요청 기록, 5일)가 정한다.** 접속자 언어를 추적하지 않는다 — **눈팅은 보이지도 않고 볼 필요도 없다**(번역을 안 켜는 사람은 번역본을 안 쓴다). 첫 요청이 곧 등록이라 별도 등록 UI 도 없다. ⚠️ **수요 갱신은 사용자 요청일 때만** — 워커가 갱신하면 자기가 채운 조합이 자기 때문에 영원히 살아남는다.
+  - ⚠️ **대상 언어는 `profiles.country_code` 에서 파생한다(`country-lang.ts`). 요청 파라미터로 받지 않는다.** 언어를 바꿔가며 (방 × 언어) 조합을 무한히 만드는 게 이 기능에서 **비용이 폭발하는 유일한 경로**인데, 국가는 이미 1회만 변경 가능하게 잠겨 있어(`region_changed_at`) 그 잠금을 그대로 물려받는다. 그래서 일일 상한 같은 별도 방어가 없다. 화면 언어(i18n 6개국어)와는 **다른 축**이다.
+  - ⚠️ **토글 상태는 `ChatBoard` 안에 둔다 — 부모(`.aa-chatroom`)로 올리지 말 것.** 방이 바뀌면 `key={room}` 재마운트로 **꺼진 채 시작**해야 한다. 켠 채로 유지하면 방에 들어가기만 해도 그 방이 수요로 등록되어 과거 글까지 전부 번역된다(방 100개를 돌면 100개 방이 통째로 번역되는 그 함정). 안 누르면 0원이다.
+  - ⚠️ **`chat_messages.lang` 은 작성자의 화면 언어지 본문 언어가 아니다** — 한국어 화면으로 영어를 치는 사람이 있다. 그래서 `src_lang` 이 따로 있고, 한 번 판정하면 다시 안 묻는다(감지 요금·감지 오류를 둘 다 없앤다). ⚠️ **비어 있을 때만 채운다** — 덮어쓰면 같은 글의 원문 언어가 요청마다 흔들려 창고가 어긋난다.
+  - ⛔ **사용자 브라우저가 만든 번역을 서버 창고에 올리면 안 된다.** 클라이언트가 조작 가능한 값이라 배드워드·링크·OpenAI 모더레이션을 통째로 우회하는 **새 입력 경로**가 된다(원문은 깨끗한데 번역본만 욕설이면 관리자가 신고를 열어도 멀쩡해 보인다). 워커가 괜찮은 이유는 **우리 기계**라서다.
+  - **워커는 판단하지 않는다** — '무엇을 번역할지'(`chat_translation_pending` RPC)도 '무엇을 저장할지'도 `chat-translate` 가 정하고, 워커는 브라우저를 굴리는 손이다. 백엔드를 Spring 으로 옮겨도 `tools/translate-worker/` 는 손대지 않는다. ⚠️ 판정을 워커에도 복사하면 "워커는 번역했는데 서버는 안 한" 어긋남이 난다(동기화 페어를 새로 만들지 말 것).
+  - ⚠️ **워커는 프로필 폴더 고정이 전제다**(`--user-data-dir`). 언어팩은 **쌍(pair)마다** 받는데 안 고정하면 매번 다시 받는다 → **일회성 CI 러너(GitHub Actions)에서는 못 돌린다.** 언어팩 첫 다운로드에 사용자 제스처가 필요해(`NotAllowedError`) Playwright 가 페이지 버튼을 실제로 클릭한다 — 이미 받은 쌍이면 그 클릭이 그냥 지나가므로 **조건 분기 없이 매 배치마다 누른다**.
+  - 브라우저 지원(2026-08 실측): Translator API 는 **전세계 21.66%** — Chrome 138+(39개 언어)·**Edge 148+(145개 이상)**·Opera 122+ **데스크톱만**. **모바일 전부 ❌**, 파이어폭스(모질라 공식 반대)·사파리·브레이브·웨일·삼성인터넷 ❌. 크로미움 포크가 안 되는 건 내장 AI 가 **Chromium 에 공개되지 않은 구글 내부 코드**에 의존해서다(엣지가 되는 건 MS 가 자체 모델을 붙였기 때문). → 그래서 이 API 를 **사용자 브라우저에 쓰지 않고 우리 워커에만** 쓴다.
+  - 시크릿: `GOOGLE_TRANSLATE_KEY`(GCP 콘솔에서 Cloud Translation API 사용 설정 → API 키)·`TRANSLATE_WORKER_KEY`(아무 랜덤 문자열, 워커와 같은 값). 둘 다 **Supabase 함수 시크릿**이다. ⚠️ `TRANSLATE_WORKER_KEY` 를 안 걸면 워커 경로가 **아예 닫힌다**(빈 값으로 열리지 않게 막아뒀다). ⚠️ 프론트(`VITE_`)에 넣지 말 것 — 브라우저에 노출되면 남이 우리 무료분을 쓴다.
 - 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
 
 ## 구조 맵
@@ -298,10 +317,12 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   36개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+  functions/   48개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
-               · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
+               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · toss.ts(토스 API 래퍼) · payments.ts(주문·금액검증·지급·대사)
+                      · chat.ts(모더레이션·방) · translate.ts(구글 번역 어댑터·번역 판정) · country-lang.ts(국가→번역 대상 언어)
+tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 미리 채운다 — 없어도 기능은 돈다(구글 폴백).
 ```
 
 **DB 테이블**(요약): `profiles`, `questions`(다국어 JSONB·정답 클라 비노출), `test_attempts`(응시 언어·등급변동 스냅샷), `attempt_answers`, `user_level_skill`(레벨별 누적 6축 레이팅), `user_progress`(현재 등급=레벨).
@@ -362,7 +383,13 @@ supabase/
     - ⚠️ **본문을 파싱해서 다시 조립하지 말 것.** 폼 POST 본문은 이미 쿼리스트링 모양이라 글자 그대로 붙이면 되고, 재조립하면 인코딩·순서가 달라져 `/verify` 의 fgkey 검증이 깨진다 — 그러면 정상 결제가 통째로 거절된다.
     - ⚠️ 돌아갈 주소(`?to=`)는 **화이트리스트로만** 연다(로컬 + 배포). 주소에 실려 오는 값을 그대로 믿으면 우리 도메인을 발판 삼는 오픈 리다이렉트가 된다. 목록에 없으면 배포 주소로 떨어뜨린다 — 결제가 이미 끝난 사람을 빈손으로 두지 않기 위해서다.
     - 이 함수에 URL 시크릿을 안 건 이유 = **아무것도 하지 않기 때문**이다. DB 도 안 보고 승인도 안 한다. 실제 판정(위변조 검증·승인·지급)은 결과 화면이 부르는 `payments/confirm` 이 한다.
-  - **KRW 로 `/ready` 가 통과한다** — 달러 환산은 넣지 않았다. 나중에 해외 카드로 달러를 받게 되면 환산은 어댑터가 아니라 결제 레이어(`resolveProduct`/`create`) 소관이다.
+  - ⛔ **엑심베이는 달러로 청구한다(2026-08-13).** 원화로 보내면 PG 가 자기 환율로 다시 환산해 결제창에 `$1.05` 를 띄우는데, 우리 화면은 고정환율로 `$1` 이라고 말해서 한 상품에 달러 값이 두 개가 된다. 그래서 `create` 가 원화 정가를 달러로 바꿔 보낸다.
+    - 환산은 화면의 `usd()` 와 **같은 올림 규칙**(`_shared/payments.ts` 의 `krwToUsd`)을 써야 한다 — 반올림을 쓰면 2,000원짜리가 화면엔 `$1.34`, 결제창엔 `$1.33` 으로 갈린다.
+    - **원장은 정가(원화)를 그대로 두고 실제 청구값을 `charge_amount`/`charge_currency` 에 따로 적는다.** `amount` 를 달러로 갈면 integer 컬럼이고 모든 상품 가격이 원 기준이라 정가 체계가 통째로 흔들린다. 읽을 땐 `chargeOf(row)` 하나만 쓴다 — 승인 대조·조회·환불이 전부 청구값 기준이어야 한다(정가로 대조하면 정상 결제가 전부 금액불일치로 막힌다).
+    - ⚠️ 금액 문자열은 통화가 자릿수를 정한다(달러 2자리·원 0자리 — 엑심베이 통화표 minor unit). `/ready` 에 `1.00` 을 보내고 조회에 `1` 을 보내면 **같은 결제를 못 찾는다** → `eximbayAmount()` 한 곳에서 만든다.
+  - ⚠️ **결제창 언어 코드는 ISO 639-1 이 아니다** — 일본어가 `ja` 가 아니라 **`JP`**, 중국어가 `zh` 가 아니라 **`CN`**, 한국어가 `ko` 가 아니라 **`KR`** 이다. 지원 8개(`KR`·`EN`·`JP`·`CN`·`TW`·`RU`·`TH`·`VN`, 해외결제 가이드 Appendix B)이고 우리 6개국어 중 **힌디만 없다**. 단일 출처는 `eximbayLang()`.
+    - ⛔ **틀린 코드를 보내도 오류가 안 난다 — 조용히 영어로 떨어진다.** `/ready` 는 `XX` 같은 값도 `rescode 0000` 으로 받아준다(실측). 서버 응답으로는 절대 못 알아채고 **결제창을 띄워봐야** 드러난다. 국내결제 가이드 Appendix B 에는 `KR` 한 줄뿐이라 그것만 보고 "한국어·영어뿐"이라고 단정하면 틀린다 — 언어표는 **해외결제 가이드** 쪽을 봐야 한다.
+  - **KRW 로도 `/ready` 는 통과한다** — 통과한다고 맞는 건 아니다(위 환산 문제). 나중에 해외 카드로 달러를 받게 되면 환산은 어댑터가 아니라 결제 레이어(`resolveProduct`/`create`) 소관이다.
   - ⚠️ 시크릿은 `EXIMBAY_MID`·`EXIMBAY_SECRET_KEY`·`EXIMBAY_ENV`(기본 test). 인증은 **`base64(apikey:)`** 다 — 문서 본문의 `base64(mid:apikey)` 는 **틀렸다**(그 형태는 `EC1000`). 호스트가 test/live 로 갈리는 건 API·SDK 둘 다 같다.
   - ⚠️ **지금 붙은 건 공개 샌드박스 키**(`mid=1849705C64`)라 토스 문서키와 같은 성격이다. **실제 카드로 완주해야** 금액 단위(KRW `"1000"` 이 1,000원인지)와 `status_url` 본문 형식이 확정된다. `payments-webhook` 은 그 형식을 몰라 JSON·폼 양쪽을 견디게 해뒀다(식별자도 `order_id`·`transaction_id` 를 같이 본다).
 - **환불 자동 회수** — 사람이 토스 대시보드에서 환불하면 웹훅→`settleFromProvider` 가 `refunded` 로 바꾸는 순간, **그 결제로 지급된 것만 자동 회수**한다(`revokeForRefund`). ⛔ 대상은 사용자·상품이 아니라 **`payment_id` 로만** 특정 — 다른 구매·남의 것은 절대 안 건드린다. 안 쓴 것만 자동: 이북=열람권 삭제, **미사용(issued)** 응시권=void. **이미 소비(consumed)된 응시권은 자동 회수 안 함**(응시 후 건이라 성적·자격증 판단 필요) → 대사 목록에 남긴다. 환불을 **일으키는** 코드(토스 취소 API)는 일부러 없다 — 돈 되돌리는 건 수동. 앱 안에 고객용 '환불 요청' UI 도 아직 없다(요청은 앱 밖).
@@ -477,6 +504,7 @@ SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 �
 - `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
 - **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 토스 개발자센터 웹훅 URL 은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<TOSS_WEBHOOK_SECRET>`.
 - **SEB 인계 함수 배포**: `npx.cmd supabase functions deploy seb-handoff` (플래그 없이 — `verify_jwt` 켠 채로 맞다). SEB 안에서도 anon 키가 실려 오므로 공개 예외가 필요 없다. `--no-verify-jwt` 로 올리지 말 것.
+- **채팅 번역 배포**: `npx.cmd supabase functions deploy chat-translate` (플래그 없이). **워커도 anon 키를 실어 보내므로 공개 예외가 필요 없다** — 워커 권한은 함수 안의 `x-translate-worker-key` 가 판정한다(서비스 롤 키를 워커에 두지 않는다). 시크릿 둘: `GOOGLE_TRANSLATE_KEY`·`TRANSLATE_WORKER_KEY`. ⚠️ 옛 `chat-edit`·`chat-delete` 는 삭제됐으니 대시보드에 남아 있으면 지울 것(코드가 없어도 옛 배포본은 계속 뜬다).
 - **`GEMINI_API_KEY` 는 Supabase 함수 시크릿**(프론트 금지). 키 무효면 추천이 500.
 - **OAuth localhost 튕김** = Supabase Site URL 설정 문제. **모바일 인앱 브라우저 차단** = 구글 정책(기본 브라우저로 열어야 함).
 - **쿨다운(3일 1회)** 토글 = `start-test` 의 `COOLDOWN_ENABLED`. 게스트는 원래 쿨다운 없음.

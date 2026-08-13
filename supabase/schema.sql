@@ -347,6 +347,63 @@ alter table chat_reports   enable row level security;
 alter table chat_incidents enable row level security;
 -- chat_messages / chat_reports / chat_incidents: 클라 정책 없음 → service role(Edge Function)만 접근.
 
+-- ── 채팅 번역(2026-08-13) — 자세한 설계 주석은 20260813120000_chat_translation.sql ──
+--   원문이 기본. 사용자가 번역 토글을 켠 순간에만 번역이 일어나고, 만든 번역본은 창고에 남아
+--   같은 언어 사용자 전원이 나눠 쓴다 → 비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례.
+--   미리 채울 언어는 chat_translation_demand(= 번역 요청 기록)가 정한다. 접속자 언어를 추적하지 않는다.
+create table if not exists chat_translations (
+  message_id bigint      not null references chat_messages(id) on delete cascade,
+  lang       text        not null,
+  body       text        not null,
+  engine     text        not null check (engine in ('edge', 'google')),
+  created_at timestamptz not null default now(),
+  primary key (message_id, lang)
+);
+create index if not exists chat_translations_lang_idx
+  on chat_translations (lang, message_id);
+
+-- ⚠️ 갱신은 사용자 요청일 때만. 워커가 갱신하면 자기가 채운 조합이 자기 때문에 영원히 살아남는다.
+create table if not exists chat_translation_demand (
+  room              text        not null,
+  lang              text        not null,
+  last_requested_at timestamptz not null default now(),
+  primary key (room, lang)
+);
+create index if not exists chat_translation_demand_fresh_idx
+  on chat_translation_demand (last_requested_at desc);
+
+-- ⚠️ chat_messages.lang 은 작성자의 화면 언어지 본문 언어가 아니다 → src_lang 이 따로 필요하다.
+alter table chat_messages add column if not exists src_lang text;
+create index if not exists chat_messages_srclang_todo_idx
+  on chat_messages (id desc) where src_lang is null and deleted_at is null;
+
+alter table chat_translations       enable row level security;
+alter table chat_translation_demand enable row level security;
+-- 정책 없음 → service role 전용. 클라가 번역본을 직접 쓰면 원문 모더레이션을 우회하는 입력 경로가 된다.
+
+-- 워커 할 일 목록 — "수요가 살아있는 방(5일) × 그 언어로 아직 번역 안 된 글", 최신 글부터.
+create or replace function public.chat_translation_pending(p_limit int default 500)
+returns table(message_id bigint, room text, body text, src_lang text, dst_lang text)
+language sql security definer set search_path = public as $$
+  select m.id, m.room, m.body, m.src_lang, d.lang
+  from chat_translation_demand d
+  join chat_messages m
+    on  m.room       = d.room
+    and m.deleted_at is null
+    and m.mod_status = 'ok'
+    and m.body       is not null
+    and char_length(btrim(m.body)) > 2
+    and (m.src_lang is null or m.src_lang <> d.lang)
+  left join chat_translations t
+    on t.message_id = m.id and t.lang = d.lang
+  where d.last_requested_at > now() - interval '5 days'
+    and t.message_id is null
+  order by m.id desc
+  limit greatest(1, least(p_limit, 2000));
+$$;
+revoke execute on function public.chat_translation_pending(int) from public, anon, authenticated;
+grant  execute on function public.chat_translation_pending(int) to service_role;
+
 -- chat_post_atomic — 원자적 채팅 삽입: 최소 간격 / 60초 창 상한 / 중복 / IP 바닥선 가드.
 --   advisory xact lock(user, ip) 으로 동시 요청 직렬화 후 가드 평가 → insert.
 --   raise exception '<code>' (기본 errcode) 로 supabase-js 가 error.message 로 코드를 그대로 받는다.

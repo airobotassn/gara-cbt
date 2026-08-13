@@ -64,7 +64,7 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'block-cari',
     accent: 'CARI',
-    art: '/games/block-cari-cover.png',
+    art: '/games/block-cari-cover-v2.png',
     src: '/games/block-cari.html',
     frame: '#14161d', // 게임 body 그라디언트의 가장 어두운 끝
   },

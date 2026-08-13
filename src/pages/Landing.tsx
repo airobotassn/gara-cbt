@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RankGlobe from '../components/RankGlobe'
+import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
@@ -63,6 +64,17 @@ export default function Landing() {
   const [routing, setRouting] = useState(false)
   const [notFound, setNotFound] = useState(false)
 
+  // 메인에서만 오른쪽 스크롤바를 감춘다(스크롤은 그대로 된다 — 막대만 안 그린다).
+  //   푸터를 히어로 아래에 붙이면서 생긴 막대가 검은 우주 배경 옆에 흰 띠로 남아서다.
+  //   ⚠️ 문서 스크롤바를 그리는 건 <html> 이다 — .lp 나 body 에 걸면 아무 일도 안 일어난다.
+  //      그래서 페이지 스코프 CSS 로 못 쓰고 이 화면이 붙어있는 동안만 루트에 클래스를 건다.
+  //   ⚠️ 떠날 때 반드시 벗길 것. 남기면 긴 문서 화면(/guide·/terms)까지 막대가 사라져
+  //      아래에 내용이 더 있다는 걸 알 방법이 없어진다.
+  useEffect(() => {
+    document.documentElement.classList.add('lp-noscrollbar')
+    return () => document.documentElement.classList.remove('lp-noscrollbar')
+  }, [])
+
   // 로그인이 홈으로 떨어져도 복귀 표식이 있으면 자동 이동.
   // postLoginRedirect: 지정 경로로(예: SEB 진입 /exam/seb) · examIntent: 응시 준비(/exam/prepare)
   useEffect(() => {
@@ -110,46 +122,57 @@ export default function Landing() {
     // force-dark: 배경이 항상 검은 우주라 테마 토글과 무관하게 다크 팔레트로 고정한다.
     //   색을 새로 정하는 게 아니라 기존 다크 모드 토큰을 그대로 쓴다(stitch.css 의 .force-dark).
     //   글자색·버튼색·크기는 손대지 않았다 — 지금 다크 모드에서 보이는 그대로다.
-    <div className="lp force-dark">
-      {/* 우주 + 밤지구 순위 지구본 히어로 (옛 NASA 영상 21.6MB → 경계 데이터 + 렌더러 약 40KB) */}
-      <RankGlobe />
-      <h1>
-        {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>
-        <br />
-        {/* 뒷줄의 'CARIS' 만 강조색으로. 브랜드명이라 6개국어 모두 같은 토큰이므로 문자열 분할로 처리한다. */}
-        {t('landing.hero_post')
-          .split('CARIS')
-          .flatMap((part, i) => (i === 0 ? [part] : [<span key={i} className="em">CARIS</span>, part]))}
-      </h1>
+    //   ⚠️ force-dark 를 .lp 가 아니라 바깥 겹에 두는 이유 = 아래 <SiteFooter> 까지 같이 덮기 위해서다.
+    //      토큰만 갈아끼우는 클래스라(레이아웃 없음) 위치를 올려도 .lp 안 모양은 그대로다.
+    <div className="force-dark">
+      {/* 히어로는 딱 한 화면(min-height:100vh). 푸터는 그 **바깥 형제**라 처음 뜨는 화면은
+          예전과 픽셀이 같고, 스크롤을 내려야 나온다.
+          ⚠️ .lp 안에 넣으면 안 된다 — .lp 의 overflow:hidden(지구본 클리핑용)에 잘려 영영 안 보인다. */}
+      <div className="lp">
+        {/* 우주 + 밤지구 순위 지구본 히어로 (옛 NASA 영상 21.6MB → 경계 데이터 + 렌더러 약 40KB) */}
+        <RankGlobe />
+        <h1>
+          {t('landing.hero_pre')} <span className="em">{t('landing.hero_em')}</span>
+          <br />
+          {/* 뒷줄의 'CARIS' 만 강조색으로. 브랜드명이라 6개국어 모두 같은 토큰이므로 문자열 분할로 처리한다. */}
+          {t('landing.hero_post')
+            .split('CARIS')
+            .flatMap((part, i) => (i === 0 ? [part] : [<span key={i} className="em">CARIS</span>, part]))}
+        </h1>
 
-      {/* 의미 기반 검색 라우터 — 입력 의도에 맞는 페이지로 이동 */}
-      <form className="lp-search" onSubmit={goSearch}>
-        <input
-          className="lp-search-input"
-          type="text"
-          value={query}
-          maxLength={200}
-          placeholder={t('route.placeholder')}
-          onChange={(e) => { setQuery(e.target.value); if (notFound) setNotFound(false) }}
-          disabled={routing}
-        />
-        <button className="lp-search-btn" type="submit" aria-label={t('landing.cta_diagnose')} disabled={routing}>
-          {routing ? '…' : '→'}
-        </button>
-      </form>
-      {notFound ? <div className="lp-notfound" role="alert">{t('route.notfound')}</div> : null}
+        {/* 의미 기반 검색 라우터 — 입력 의도에 맞는 페이지로 이동 */}
+        <form className="lp-search" onSubmit={goSearch}>
+          <input
+            className="lp-search-input"
+            type="text"
+            value={query}
+            maxLength={200}
+            placeholder={t('route.placeholder')}
+            onChange={(e) => { setQuery(e.target.value); if (notFound) setNotFound(false) }}
+            disabled={routing}
+          />
+          <button className="lp-search-btn" type="submit" aria-label={t('landing.cta_diagnose')} disabled={routing}>
+            {routing ? '…' : '→'}
+          </button>
+        </form>
+        {notFound ? <div className="lp-notfound" role="alert">{t('route.notfound')}</div> : null}
 
-      <div className="lp-ctas">
-        <button className="cta" onClick={() => navigate('/arena')}>
-          {t('landing.cta_diagnose')} <span className="arr">→</span>
-        </button>
-        <button className="cta-ghost" onClick={() => navigate('/guide')}>
-          {t('landing.cta_exam')} <span className="arr">→</span>
-        </button>
-        <button className="cta-ghost" onClick={() => navigate('/ebooks')}>
-          {t('landing.cta_learn')} <span className="arr">→</span>
-        </button>
+        <div className="lp-ctas">
+          <button className="cta" onClick={() => navigate('/arena')}>
+            {t('landing.cta_diagnose')} <span className="arr">→</span>
+          </button>
+          <button className="cta-ghost" onClick={() => navigate('/guide')}>
+            {t('landing.cta_exam')} <span className="arr">→</span>
+          </button>
+          <button className="cta-ghost" onClick={() => navigate('/ebooks')}>
+            {t('landing.cta_learn')} <span className="arr">→</span>
+          </button>
+        </div>
       </div>
+
+      {/* 전자상거래법 제10조 — 사업자 정보는 '초기화면'(= 메인 페이지)에 표시해야 한다.
+          스크롤 맨 아래는 그 요건을 만족한다(조문이 말하는 건 페이지지 첫 뷰포트가 아니다). */}
+      <SiteFooter />
     </div>
   )
 }

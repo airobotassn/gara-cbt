@@ -23,10 +23,12 @@
   --fab-face: #ffffff;
   --fab-face-line: rgba(25, 27, 35, 0.2);
   --fab-face-ink: rgba(25, 27, 35, 0.98);
-  /* FAB 위 알림 점(.fab-dot) 색 — 흰 면에 얹히므로 **테마와 무관하게 고정**이다.
-     ⚠️ --danger-fg 를 쓰면 안 된다: 다크에서 #ff9090(연분홍)으로 뒤집혀 흰 면에서 힘을 잃는다.
-     패널 안 점(.pf-dot)은 테마를 따르는 자리라 거기서는 --danger-fg 를 그대로 쓴다. */
-  --fab-dot: #d92d20;
+  /* 1:1 문의 새 답변 알림 종(.alert-bell) 색 — **테마와 무관하게 고정**이다.
+     노란 종은 밝은 면(항상 흰 FAB 면·라이트 배경) 위에서 대비가 1.5:1 도 안 나와 형체가 녹는다
+     → 어두운 테(--fab-bell-line)로 윤곽을 잡는다. 어두운 배경 쪽에서는 노란 채움이 스스로 읽히고
+     테는 배경에 묻혀도 상관없다. 테 색을 테마따라 뒤집으면 흰 FAB 면에서 테가 사라진다. */
+  --fab-bell: #fbbf24;
+  --fab-bell-line: #1c1f27;
 }
 html.dark {
   --theme-toggle: #fbbf24;        /* 다크: 달 아이콘 — 어두운 패널에서 빛나는 앰버 */
@@ -115,27 +117,27 @@ html.dark {
   border-color: rgba(var(--fab-accent), 0.5);
   box-shadow: 0 0 24px -6px rgba(var(--fab-accent), 0.5);
 }
-/* 1:1 문의 새 답변 알림 점 — 로그인한 모든 화면의 FAB 오른쪽 위에 붙는다.
-   원 밖으로 살짝 나가게 두고 흰 테를 둘러야 어두운 배경에서도, 흰 면 위에서도 같은 모양으로 읽힌다
-   (테가 없으면 흰 면에 걸치는 쪽 경계가 사라져 점이 반달로 보인다). */
-.fab-dot {
-  position: absolute;
-  top: -1px;
-  right: -1px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--fab-dot);
-  box-shadow: 0 0 0 2.5px var(--fab-face), var(--fab-badge-shadow);
+/* 1:1 문의 새 답변 알림 종 — 옛 빨간 점을 대신한다(2026-08-12 교체, 색은 노랑).
+   자리는 둘이고 **그림·색이 같아야** 한다: FAB 오른쪽 위(.fab-bell) · 마이페이지 문의 탭 옆.
+   그래서 모양·색은 .alert-bell 이 잡고 위치만 .fab-bell 이 얹는다.
+   ⚠️ 테는 shape 를 따라가야 하므로 box-shadow 링이 아니라 stroke 다. `paint-order: stroke fill` 이
+      없으면 테가 안쪽을 파먹어 종이 뭉개진다.
+   ⚠️ 작게 만들지 말 것 — 20px 아래로 내리면 "알림이 왔다"가 아니라 그냥 작은 그림으로 읽힌다
+      (2026-08-12 "벨이 너무 작아"로 15px 에서 올린 값이다).
+   패널 안(FAB 패널 마이페이지 버튼 옆) 표시는 없앴다 — 알림이 뜨는 자리는 위 둘뿐이다. */
+.alert-bell {
+  color: var(--fab-bell);
+  stroke: var(--fab-bell-line);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
 }
-/* 패널 안(마이페이지 버튼 옆) 점 — 글자 옆에 서는 자리라 더 작고, 여기는 테마를 따른다. */
-.pf-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--danger-fg);
-  flex: none;
-  margin-left: 1px;
+/* FAB 배지 자리 — 원 밖으로 살짝 나가게 걸친다(안쪽에만 두면 로고와 겹쳐 둘 다 안 읽힌다). */
+.fab-bell {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: block;
 }
 
 /* ===== 평상시 맥동 =====

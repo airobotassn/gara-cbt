@@ -1401,7 +1401,6 @@ export const D: Record<string, Record<Lang, string>> = {
   "ll.any_level_desc": { ko: "레벨과 상관없이 볼 수 있는 자료예요.", en: "Material you can use at any level.", ja: "レベルに関係なく使える資料です。", zh: "不限等级都可以看的资料。", hi: "किसी भी लेवल पर काम आने वाली सामग्री।", vi: "Tài liệu dùng được ở mọi cấp." },
   "ll.any_tier": { ko: "급수 무관", en: "Any tier", ja: "級問わず", zh: "不限级别", hi: "किसी भी श्रेणी", vi: "Mọi hạng" },
   "ll.any_tier_desc": { ko: "급수와 상관없이 볼 수 있는 자료예요.", en: "Material you can use for any tier.", ja: "級に関係なく使える資料です。", zh: "不限级别都可以看的资料。", hi: "किसी भी श्रेणी पर काम आने वाली सामग्री।", vi: "Tài liệu dùng được ở mọi hạng." },
-  "ll.count": { ko: "교재 {b} · 강의 {v}", en: "{b} books · {v} lectures", ja: "教材{b} · 講義{v}", zh: "教材 {b} · 课程 {v}", hi: "{b} किताबें · {v} लेक्चर", vi: "{b} giáo trình · {v} bài giảng" },
   "ll.play": { ko: "재생", en: "Play", ja: "再生", zh: "播放", hi: "चलाएँ", vi: "Phát" },
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": { ko: "이전", en: "Previous", ja: "前へ", zh: "上一个", hi: "पिछला", vi: "Trước" },
@@ -1546,22 +1545,31 @@ export const D: Record<string, Record<Lang, string>> = {
   "caris.t2.eligibility": { ko: "하위 티어 순차 취득 원칙", en: "Sequential lower-tier acquisition", ja: "下位ティアの順次取得が原則", zh: "须逐级取得下位等级", hi: "निचले स्तर क्रमिक रूप से प्राप्त करना", vi: "Nguyên tắc đạt tuần tự từ bậc dưới" },
   "caris.t2.caption": { ko: "CARIS-Ⅰ Elite 취득 후, Master부터 상위 티어로 순차 응시하는 전문가 과정입니다.", en: "An expert track: after earning CARIS-Ⅰ Elite, advance from Master upward in sequence.", ja: "CARIS-Ⅰ Elite取得後、Masterから上位ティアへ順次受験する専門家課程です。", zh: "取得CARIS-Ⅰ Elite后，从Master起按等级由低到高顺序应试的专家课程。", hi: "एक विशेषज्ञ ट्रैक: CARIS-Ⅰ Elite प्राप्त करने के बाद, Master से क्रमवार ऊपर बढ़ें।", vi: "Lộ trình chuyên gia: sau khi đạt CARIS-Ⅰ Elite, tiến tuần tự từ Master trở lên." },
   "caris.t2.master.prereq": { ko: "Elite 취득자", en: "Elite holders", ja: "Elite取得者", zh: "Elite取得者", hi: "Elite धारक", vi: "Người đã đạt Elite" },
-  "caris.t2.master.method": { ko: "필기 객관식 50 + 주관식 10 / 60분 · 실기 PC작업형 / 120분", en: "Written: 50 MC + 10 essay / 60 min · Practical: PC task / 120 min", ja: "筆記 選択50+記述10 / 60分 · 実技 PC作業型 / 120分", zh: "笔试 客观50+主观10 / 60分钟 · 实操 PC作业型 / 120分钟", hi: "लिखित: 50 वस्तुनिष्ठ + 10 वर्णनात्मक / 60 मिनट · प्रायोगिक: PC कार्य / 120 मिनट", vi: "Lý thuyết: 50 trắc nghiệm + 10 tự luận / 60 phút · Thực hành: thao tác PC / 120 phút" },
+  // ⚠️ method·pass 는 ' · ' 로 잘라 줄바꿈한다(ExamApply). 구분자를 다른 문자로 바꾸면 한 줄로 뭉친다.
+  //    문항 수·시간은 caris.ts 의 TIER_EXAM_SPEC 과 한 쌍이다 — 한쪽만 고치면 문항 관리 화면과 어긋난다.
+  "caris.t2.master.method": { ko: "필기 객관식 50 + 주관식 10(총 60문항) / 60분 · 실기 PC작업형 / 120분", en: "Written: 50 MC + 10 essay (60 items) / 60 min · Practical: PC task / 120 min", ja: "筆記 選択50+記述10（計60問）/ 60分 · 実技 PC作業型 / 120分", zh: "笔试 客观50+主观10（共60题）/ 60分钟 · 实操 PC作业型 / 120分钟", hi: "लिखित: 50 वस्तुनिष्ठ + 10 वर्णनात्मक (कुल 60) / 60 मिनट · प्रायोगिक: PC कार्य / 120 मिनट", vi: "Lý thuyết: 50 trắc nghiệm + 10 tự luận (tổng 60 câu) / 60 phút · Thực hành: thao tác PC / 120 phút" },
   "caris.t2.master.subj.0": { ko: "AI·로봇 하드웨어 및 모델 최적화", en: "AI · robot hardware and model optimization", ja: "AI・ロボットのハードウェアとモデル最適化", zh: "AI · 机器人硬件与模型优化", hi: "AI · रोबोट हार्डवेयर और मॉडल ऑप्टिमाइज़ेशन", vi: "Tối ưu phần cứng và mô hình AI · robot" },
   "caris.t2.master.subj.1": { ko: "ROS 2 로봇 소프트웨어 개발", en: "ROS 2 robot software development", ja: "ROS 2 ロボットソフトウェア開発", zh: "ROS 2 机器人软件开发", hi: "ROS 2 रोबोट सॉफ़्टवेयर डेवलपमेंट", vi: "Phát triển phần mềm robot ROS 2" },
-  "caris.t2.master.practical": { ko: "기초 AI API + 단일 로봇 제어 코딩", en: "Basic AI API + single-robot control coding", ja: "基礎AI API + 単一ロボット制御コーディング", zh: "基础AI API + 单机器人控制编程", hi: "बुनियादी AI API + एकल रोबोट नियंत्रण कोडिंग", vi: "API AI cơ bản + lập trình điều khiển robot đơn" },
-  "caris.t2.master.pass": { ko: "필기 60점↑ (과목별 40↑) · 실기 70점↑", en: "Written ≥60 (≥40 per subject) · Practical ≥70", ja: "筆記60点↑（科目別40↑）· 実技70点↑", zh: "笔试≥60（各科≥40）· 实操≥70", hi: "लिखित ≥60 (प्रति विषय ≥40) · प्रायोगिक ≥70", vi: "Lý thuyết ≥60 (mỗi môn ≥40) · Thực hành ≥70" },
+  "caris.t2.master.practical": { ko: "기초 AI API 연동, Python/C++ 기반 단일 로봇 제어 및 LLM 연동", en: "Basic AI API integration, Python/C++ single-robot control and LLM integration", ja: "基礎AI API連携、Python/C++による単一ロボット制御とLLM連携", zh: "基础AI API对接、基于Python/C++的单机器人控制与LLM集成", hi: "बुनियादी AI API एकीकरण, Python/C++ आधारित एकल रोबोट नियंत्रण और LLM एकीकरण", vi: "Tích hợp API AI cơ bản, điều khiển robot đơn bằng Python/C++ và tích hợp LLM" },
+  "caris.t2.master.pass": { ko: "필기 과목별 40점↑, 평균 60점↑ · 실기 70점↑", en: "Written ≥40 per subject and ≥60 average · Practical ≥70", ja: "筆記 科目別40点↑・平均60点↑ · 実技70点↑", zh: "笔试 各科≥40且平均≥60 · 实操≥70", hi: "लिखित: प्रति विषय ≥40, औसत ≥60 · प्रायोगिक ≥70", vi: "Lý thuyết: mỗi môn ≥40, trung bình ≥60 · Thực hành ≥70" },
   "caris.t2.grandmaster.prereq": { ko: "Master 취득자", en: "Master holders", ja: "Master取得者", zh: "Master取得者", hi: "Master धारक", vi: "Người đã đạt Master" },
-  "caris.t2.grandmaster.method": { ko: "필기 객관식 50 + 주관식 10 / 60분 · 실기 PC작업형 / 120분", en: "Written: 50 MC + 10 essay / 60 min · Practical: PC task / 120 min", ja: "筆記 選択50+記述10 / 60分 · 実技 PC作業型 / 120分", zh: "笔试 客观50+主观10 / 60分钟 · 实操 PC作业型 / 120分钟", hi: "लिखित: 50 वस्तुनिष्ठ + 10 वर्णनात्मक / 60 मिनट · प्रायोगिक: PC कार्य / 120 मिनट", vi: "Lý thuyết: 50 trắc nghiệm + 10 tự luận / 60 phút · Thực hành: thao tác PC / 120 phút" },
+  "caris.t2.grandmaster.method": { ko: "필기 객관식 50 + 주관식 10(총 60문항) / 60분 · 실기 복합작업형 / 120분", en: "Written: 50 MC + 10 essay (60 items) / 60 min · Practical: composite task / 120 min", ja: "筆記 選択50+記述10（計60問）/ 60分 · 実技 複合作業型 / 120分", zh: "笔试 客观50+主观10（共60题）/ 60分钟 · 实操 复合作业型 / 120分钟", hi: "लिखित: 50 वस्तुनिष्ठ + 10 वर्णनात्मक (कुल 60) / 60 मिनट · प्रायोगिक: संयुक्त कार्य / 120 मिनट", vi: "Lý thuyết: 50 trắc nghiệm + 10 tự luận (tổng 60 câu) / 60 phút · Thực hành: thao tác tổng hợp / 120 phút" },
   "caris.t2.grandmaster.subj.0": { ko: "디지털 트윈 설계 및 AI 기반 시뮬레이션 검증", en: "Digital twin design and AI-based simulation validation", ja: "デジタルツイン設計と AI によるシミュレーション検証", zh: "数字孪生设计与基于 AI 的仿真验证", hi: "डिजिटल ट्विन डिज़ाइन और AI-आधारित सिमुलेशन सत्यापन", vi: "Thiết kế digital twin và kiểm chứng mô phỏng bằng AI" },
   "caris.t2.grandmaster.subj.1": { ko: "AI·로봇 융합 시스템 아키텍처 설계 및 지능형 제어 적용", en: "AI · robot converged system architecture design and intelligent control", ja: "AI・ロボット融合システムのアーキテクチャ設計と知能制御の適用", zh: "AI · 机器人融合系统架构设计与智能控制应用", hi: "AI · रोबोट एकीकृत सिस्टम आर्किटेक्चर डिज़ाइन और बुद्धिमान नियंत्रण", vi: "Thiết kế kiến trúc hệ thống hội tụ AI · robot và áp dụng điều khiển thông minh" },
-  "caris.t2.grandmaster.practical": { ko: "Python/C++ 코드 및 LLM 연동", en: "Python/C++ coding & LLM integration", ja: "Python/C++コードとLLM連携", zh: "Python/C++代码与LLM集成", hi: "Python/C++ कोड व LLM एकीकरण", vi: "Mã Python/C++ & tích hợp LLM" },
-  "caris.t2.grandmaster.pass": { ko: "필기 60점↑ (과목별 40↑) · 실기 70점↑", en: "Written ≥60 (≥40 per subject) · Practical ≥70", ja: "筆記60点↑（科目別40↑）· 実技70点↑", zh: "笔试≥60（各科≥40）· 实操≥70", hi: "लिखित ≥60 (प्रति विषय ≥40) · प्रायोगिक ≥70", vi: "Lý thuyết ≥60 (mỗi môn ≥40) · Thực hành ≥70" },
+  "caris.t2.grandmaster.practical": { ko: "Isaac Sim·Gazebo 기반 자율주행·비전 파이프라인 구축 및 가상-물리 최적화", en: "Autonomous-driving and vision pipelines on Isaac Sim/Gazebo, plus sim-to-real optimization", ja: "Isaac Sim・Gazebo による自動運転・ビジョンパイプライン構築と仮想-物理最適化", zh: "基于 Isaac Sim·Gazebo 的自动驾驶·视觉流水线搭建与虚实优化", hi: "Isaac Sim·Gazebo पर स्वायत्त-ड्राइविंग व विज़न पाइपलाइन निर्माण और सिम-टू-रियल ऑप्टिमाइज़ेशन", vi: "Xây dựng pipeline lái tự hành·thị giác trên Isaac Sim·Gazebo và tối ưu ảo-thực" },
+  "caris.t2.grandmaster.pass": { ko: "필기 과목별 40점↑, 평균 60점↑ · 실기 70점↑", en: "Written ≥40 per subject and ≥60 average · Practical ≥70", ja: "筆記 科目別40点↑・平均60点↑ · 実技70点↑", zh: "笔试 各科≥40且平均≥60 · 实操≥70", hi: "लिखित: प्रति विषय ≥40, औसत ≥60 · प्रायोगिक ≥70", vi: "Lý thuyết: mỗi môn ≥40, trung bình ≥60 · Thực hành ≥70" },
   "caris.t2.zenith.prereq": { ko: "Grand Master 취득자", en: "Grand Master holders", ja: "Grand Master取得者", zh: "Grand Master取得者", hi: "Grand Master धारक", vi: "Người đã đạt Grand Master" },
-  "caris.t2.zenith.method": { ko: "실기 포트폴리오 제출 + 심층 면접 / 30분", en: "Practical: portfolio submission + in-depth interview / 30 min", ja: "実技 ポートフォリオ提出 + 詳細面接 / 30分", zh: "实操 提交作品集 + 深度面试 / 30分钟", hi: "प्रायोगिक: पोर्टफोलियो जमा + गहन साक्षात्कार / 30 मिनट", vi: "Thực hành: nộp portfolio + phỏng vấn chuyên sâu / 30 phút" },
+  // ⚠️ Zenith 는 **필기 서술·논술형 하나**다(2026-08-13). 옛 값은 '포트폴리오 제출 + 심층 면접 30분'
+  //    이었는데 성격이 통째로 바뀌었다. 실기가 없으므로 caris.t2.zenith.practical 키는 계속 안 쓴다.
+  "caris.t2.zenith.method": { ko: "필기 서술·논술형 / 120분", en: "Written: descriptive and essay / 120 min", ja: "筆記 記述・論述型 / 120分", zh: "笔试 简答·论述型 / 120分钟", hi: "लिखित: वर्णनात्मक व निबंध / 120 मिनट", vi: "Lý thuyết: tự luận và luận văn / 120 phút" },
   "caris.t2.zenith.subj.0": { ko: "대규모 AI·로봇 시스템 통합(SI) 및 End-to-End 프로젝트 관리", en: "Large-scale AI · robot system integration (SI) and end-to-end project management", ja: "大規模 AI・ロボットシステム統合(SI)とエンドツーエンドのプロジェクト管理", zh: "大规模 AI · 机器人系统集成(SI)与端到端项目管理", hi: "बड़े पैमाने पर AI · रोबोट सिस्टम इंटीग्रेशन (SI) और एंड-टू-एंड प्रोजेक्ट प्रबंधन", vi: "Tích hợp hệ thống AI · robot quy mô lớn (SI) và quản lý dự án đầu-cuối" },
-  "caris.t2.zenith.subj.1": { ko: "국제 표준(ISO 10218, IEC 62443, ISO/IEC 42001) 기반의 기능안전, AI 거버넌스 및 윤리 적용", en: "Functional safety, AI governance and ethics based on ISO 10218, IEC 62443, ISO/IEC 42001", ja: "国際標準(ISO 10218・IEC 62443・ISO/IEC 42001)に基づく機能安全・AI ガバナンス・倫理の適用", zh: "基于国际标准(ISO 10218、IEC 62443、ISO/IEC 42001)的功能安全、AI 治理与伦理应用", hi: "अंतरराष्ट्रीय मानकों (ISO 10218, IEC 62443, ISO/IEC 42001) पर आधारित कार्यात्मक सुरक्षा, AI गवर्नेंस और नैतिकता", vi: "An toàn chức năng, quản trị và đạo đức AI theo ISO 10218, IEC 62443, ISO/IEC 42001" },
-  "caris.t2.zenith.pass": { ko: "루브릭 심사 · 심사위원 평균 80점 이상", en: "Rubric review · panel average ≥80", ja: "ルーブリック審査 · 審査委員平均80点以上", zh: "评分量表审查 · 评委平均≥80", hi: "रूब्रिक समीक्षा · जूरी औसत ≥80", vi: "Đánh giá theo rubric · trung bình hội đồng ≥80" },
+  // ⚠️ Zenith 는 **3과목**이다(2026-08-13). 예전엔 기능안전과 거버넌스·윤리가 subj.1 한 과목에 묶여 2과목이었는데,
+  //    둘을 갈라 각각 과목으로 세우고 '보안'·'DX 전략'을 넣었다. 표준 3종은 각자 해당 과목을 따라갔다
+  //    (ISO 10218=기능안전 · IEC 62443=보안 → subj.1 / ISO/IEC 42001=AI 거버넌스 → subj.2).
+  //    과목 수는 caris.ts 의 T2_TIERS(subj)가 정한다 — 키만 늘리면 화면에 안 나온다.
+  "caris.t2.zenith.subj.1": { ko: "국제 표준(ISO 10218, IEC 62443) 기반의 기능안전 및 보안 적용", en: "Functional safety and security based on ISO 10218 and IEC 62443", ja: "国際標準(ISO 10218・IEC 62443)に基づく機能安全とセキュリティの適用", zh: "基于国际标准(ISO 10218、IEC 62443)的功能安全与安全防护应用", hi: "अंतरराष्ट्रीय मानकों (ISO 10218, IEC 62443) पर आधारित कार्यात्मक सुरक्षा और साइबर सुरक्षा", vi: "An toàn chức năng và bảo mật theo ISO 10218, IEC 62443" },
+  "caris.t2.zenith.subj.2": { ko: "AI 거버넌스(ISO/IEC 42001), 윤리 및 DX 전략", en: "AI governance (ISO/IEC 42001), ethics and DX strategy", ja: "AI ガバナンス(ISO/IEC 42001)・倫理・DX 戦略", zh: "AI 治理(ISO/IEC 42001)、伦理与数字化转型(DX)战略", hi: "AI गवर्नेंस (ISO/IEC 42001), नैतिकता और DX रणनीति", vi: "Quản trị AI (ISO/IEC 42001), đạo đức và chiến lược DX" },
+  "caris.t2.zenith.pass": { ko: "루브릭 심사 · 심사위원 3인 평균 80점 이상", en: "Rubric review · average ≥80 from three judges", ja: "ルーブリック審査 · 審査委員3名の平均80点以上", zh: "评分量表审查 · 3名评委平均≥80", hi: "रूब्रिक समीक्षा · तीन जूरी सदस्यों का औसत ≥80", vi: "Đánh giá theo rubric · trung bình 3 giám khảo ≥80" },
   // 상시(Rolling) 항목
   "caris.rolling.pro_cbt.name": { ko: "CARIS 상시 검정 (CBT)", en: "CARIS Rolling Exam (CBT)", ja: "CARIS 常時検定 (CBT)", zh: "CARIS 常规检定 (CBT)", hi: "CARIS रोलिंग परीक्षा (CBT)", vi: "Kỳ thi thường trực CARIS (CBT)" },
   "caris.rolling.pro_cbt.badge": { ko: "상시 접수", en: "Rolling", ja: "常時受付", zh: "常年报名", hi: "सतत पंजीकरण", vi: "Nhận thường trực" },
@@ -1757,11 +1765,17 @@ export const D: Record<string, Record<Lang, string>> = {
   'chat.cardOf': { ko: "{name} 카드", en: "{name}'s card", ja: "{name} のカード", zh: "{name} 的卡片", hi: "{name} का कार्ड", vi: "Thẻ của {name}" },
   'chat.noCard': { ko: "아직 랭킹 기록이 없는 사용자예요", en: "This user has no ranking record yet", ja: "まだランキング記録のないユーザーです", zh: "该用户暂无排名记录", hi: "इस उपयोगकर्ता का अभी कोई रैंकिंग रिकॉर्ड नहीं है", vi: "Người dùng này chưa có thứ hạng" },
   'chat.reported': { ko: "신고했습니다", en: "Reported", ja: "通報しました", zh: "已举报", hi: "रिपोर्ट कर दी गई", vi: "Đã báo cáo" },
-  'chat.edit': { ko: "수정", en: "Edit", ja: "編集", zh: "编辑", hi: "संपादित करें", vi: "Sửa" },
-  'chat.editedMark': { ko: "수정됨", en: "edited", ja: "編集済み", zh: "已编辑", hi: "संपादित", vi: "đã sửa" },
-  'chat.delete': { ko: "삭제", en: "Delete", ja: "削除", zh: "删除", hi: "हटाएं", vi: "Xóa" },
+  // 삭제 안내문은 남긴다 — 관리자 가림(chatHide)으로 여전히 이 상태가 나온다.
+  //  ⚠️ 사용자 수정·삭제는 2026-08-13 제거됐다(chat.edit/delete/editedMark/editWindow/confirmDelete 키도 같이 삭제).
+  //     수정이 있으면 욕설을 쓰고 신고당한 뒤 10분 안에 본문을 고쳐 증거를 지울 수 있었다.
   'chat.deleted': { ko: "삭제된 메시지입니다", en: "Message deleted", ja: "削除されたメッセージです", zh: "消息已删除", hi: "संदेश हटा दिया गया", vi: "Tin nhắn đã bị xóa" },
-  'chat.editWindow': { ko: "작성 후 10분이 지나 수정할 수 없어요", en: "Editing window (10 min) has expired", ja: "投稿から10分が過ぎ編集できません", zh: "发布超过10分钟，无法编辑", hi: "पोस्ट के 10 मिनट बाद संपादन संभव नहीं", vi: "Đã quá 10 phút, không thể sửa" },
+  // 번역 토글(2026-08-13). 대상 언어는 국가에서 정해지므로 문구에 언어 이름을 넣지 않는다
+  //  — 넣으려면 전 세계 언어 이름을 6개국어로 들고 있어야 하고, 그건 사전이 아니라 Intl.DisplayNames 의 일이다.
+  'chat.trOff': { ko: "번역", en: "Translate", ja: "翻訳", zh: "翻译", hi: "अनुवाद", vi: "Dịch" },
+  'chat.trOn': { ko: "원문 보기", en: "Show original", ja: "原文を表示", zh: "查看原文", hi: "मूल दिखाएं", vi: "Xem bản gốc" },
+  'chat.trLoading': { ko: "번역 중…", en: "Translating…", ja: "翻訳中…", zh: "翻译中…", hi: "अनुवाद हो रहा है…", vi: "Đang dịch…" },
+  'chat.trMark': { ko: "번역됨", en: "translated", ja: "翻訳済み", zh: "已翻译", hi: "अनूदित", vi: "đã dịch" },
+  'chat.trFailed': { ko: "번역에 실패했어요. 잠시 후 다시 시도해주세요", en: "Translation failed. Please try again shortly", ja: "翻訳に失敗しました。しばらくして再度お試しください", zh: "翻译失败，请稍后重试", hi: "अनुवाद विफल रहा, कृपया बाद में पुनः प्रयास करें", vi: "Dịch thất bại, vui lòng thử lại sau" },
   'chat.blockedLocal': { ko: "부적절한 표현이 포함되어 있어요", en: "Message contains inappropriate content", ja: "不適切な表現が含まれています", zh: "包含不当内容", hi: "संदेश में अनुचित सामग्री है", vi: "Tin nhắn chứa nội dung không phù hợp" },
   'chat.blockedLink': { ko: "링크는 보낼 수 없어요", en: "Links aren't allowed", ja: "リンクは送信できません", zh: "不能发送链接", hi: "लिंक भेजने की अनुमति नहीं है", vi: "Không thể gửi liên kết" },
   'chat.justNow': { ko: "방금 전", en: "just now", ja: "たった今", zh: "刚刚", hi: "अभी-अभी", vi: "vừa xong" },
@@ -1778,7 +1792,6 @@ export const D: Record<string, Record<Lang, string>> = {
   'chat.roomGlobal': { ko: "World", en: "World", ja: "World", zh: "World", hi: "World", vi: "World" },
   'chat.roomBack': { ko: "World", en: "World", ja: "World", zh: "World", hi: "World", vi: "World" },
   'chat.anonBadge': { ko: "익명", en: "Anon", ja: "匿名", zh: "匿名", hi: "गुमनाम", vi: "Ẩn danh" },
-  'chat.confirmDelete': { ko: "이 메시지를 삭제할까요?", en: "Delete this message?", ja: "このメッセージを削除しますか？", zh: "确定要删除这条消息吗？", hi: "क्या इस संदेश को हटाना है?", vi: "Xóa tin nhắn này?" },
   'chat.reportTitle': { ko: "신고 사유를 선택해주세요", en: "Why are you reporting this?", ja: "通報理由を選んでください", zh: "请选择举报原因", hi: "रिपोर्ट का कारण चुनें", vi: "Chọn lý do báo cáo" },
   'chat.reportSpam': { ko: "스팸·광고", en: "Spam or advertising", ja: "スパム・広告", zh: "垃圾信息或广告", hi: "स्पैम या विज्ञापन", vi: "Spam hoặc quảng cáo" },
   'chat.reportAbuse': { ko: "욕설·혐오 표현", en: "Abuse or hate speech", ja: "暴言・ヘイト表現", zh: "辱骂或仇恨言论", hi: "गाली-गलौज या घृणास्पद भाषा", vi: "Lăng mạ hoặc thù ghét" },
@@ -1873,7 +1886,10 @@ export const D: Record<string, Record<Lang, string>> = {
   //   {krw} = lib/money.ts 의 krw() 로 찍은 실제 청구액 문자열.
   // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.
   // ⚠️ '○월○일 기준 환율' 이라고 쓰지 마라. 시장 환율이 아니라 우리가 정한 고정 환산값이다.
-  "pay.currency_note": { ko: "실제 청구 금액 {krw} · 표시 가격은 $1 = 1,500원 고정 환산가입니다.", en: "You will be charged {krw}. Prices are shown at a fixed rate of $1 = 1,500 KRW.", ja: "実際の請求額は {krw} です。表示価格は $1 = 1,500ウォンの固定換算です。", zh: "实际扣款金额为 {krw}。显示价格按 $1 = 1,500韩元 的固定汇率换算。", hi: "वास्तविक शुल्क {krw} लिया जाएगा। दिखाई गई कीमतें $1 = 1,500 KRW की निश्चित दर पर हैं।", vi: "Số tiền thực tế bị trừ là {krw}. Giá hiển thị quy đổi theo tỷ giá cố định $1 = 1.500 KRW." },
+  "pay.currency_note": { ko: "실제 청구 금액 {krw} · 오늘 환율로 계산된 금액입니다.", en: "You will be charged {krw}, converted at today's rate.", ja: "実際の請求額は {krw} です（本日のレートで換算）。", zh: "实际扣款金额为 {krw}（按今日汇率换算）。", hi: "आपसे {krw} लिया जाएगा (आज की दर पर)।", vi: "Bạn sẽ bị trừ {krw} (theo tỷ giá hôm nay)." },
+  // 해외 결제(엑심베이)는 **달러로 청구**된다 — 원화 고지문을 그대로 쓰면 화면과 결제창이 다른 돈을 말한다.
+  //   {usd} = 실제 청구되는 달러 금액(서버가 정한 값 그대로).
+  "pay.currency_note_usd": { ko: "해외 결제는 미국 달러로 청구됩니다 · 실제 청구 금액 {usd}", en: "International payments are charged in US dollars. You will be charged {usd}.", ja: "海外決済は米ドルで請求されます。実際の請求額は {usd} です。", zh: "海外支付以美元扣款，实际扣款金额为 {usd}。", hi: "अंतरराष्ट्रीय भुगतान अमेरिकी डॉलर में लिया जाता है। आपसे {usd} लिया जाएगा।", vi: "Thanh toán quốc tế được tính bằng đô la Mỹ. Bạn sẽ bị trừ {usd}." },
   // 결제대행사 선택 — **개발 단계 비교용**으로 열어둔 것이다(2026-08-11). 실제 서비스에서는 통화·카드 국적이
   //   결정할 자리라, 정식 오픈 때는 문구를 '국내/해외'로만 남기고 회사명을 빼거나 자동 선택으로 바꿀 것.
   // ⚠️ 회사명(TossPayments·Eximbay)은 브랜드라 번역하지 않는다.
@@ -1883,7 +1899,7 @@ export const D: Record<string, Record<Lang, string>> = {
   // 엑심베이는 토스와 달리 화면 안에 결제수단 위젯을 그리지 않는다 — 안내가 없으면 빈 화면으로 읽힌다.
   "pay.pg_eximbay_note": { ko: "결제하기를 누르면 Eximbay 결제창이 열리고, 결제수단은 그 창에서 고릅니다.", en: "Pressing Pay opens the Eximbay payment window, where you choose how to pay.", ja: "「決済する」を押すと Eximbay の決済画面が開き、そこで支払い方法を選びます。", zh: "点击“支付”后将打开 Eximbay 支付窗口，在该窗口中选择支付方式。", hi: "भुगतान करें दबाने पर Eximbay विंडो खुलेगी, जहाँ आप भुगतान का तरीका चुनेंगे।", vi: "Nhấn Thanh toán để mở cửa sổ Eximbay, bạn chọn phương thức tại đó." },
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
-  "pay.currency_hint": { ko: "표시 가격은 $1 = 1,500원 고정 환산가입니다.", en: "Prices are shown at a fixed rate of $1 = 1,500 KRW.", ja: "表示価格は $1 = 1,500ウォンの固定換算です。", zh: "显示价格按 $1 = 1,500韩元 的固定汇率换算。", hi: "कीमतें $1 = 1,500 KRW की निश्चित दर पर दिखाई गई हैं।", vi: "Giá hiển thị theo tỷ giá cố định $1 = 1.500 KRW." },
+  "pay.currency_hint": { ko: "국내 결제는 결제 시점 환율로 원화 청구됩니다.", en: "Domestic payments are charged in KRW at the rate on the day of payment.", ja: "国内決済は決済時点のレートでウォン請求されます。", zh: "国内支付按付款当日汇率以韩元扣款。", hi: "घरेलू भुगतान भुगतान के दिन की दर पर KRW में लिया जाता है।", vi: "Thanh toán trong nước được tính bằng KRW theo tỷ giá ngày thanh toán." },
 
   // ── 응시 게이트(/exam) 거절 안내 ──
   // 여기서 막는 건 보안이 아니라 UX 다(준비 7단계를 다 밟고 마지막에 403 을 받지 않게 하는 것).

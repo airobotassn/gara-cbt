@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { getTracks } from '../lib/caris'
 import { useExamFees, feeKey } from '../lib/fees'
-import { usd } from '../lib/money'
+import { usdc } from '../lib/money'
 import { useExamRounds } from '../lib/rounds'
 import { callFunction } from '../lib/supabase'
 
@@ -18,7 +17,7 @@ import { callFunction } from '../lib/supabase'
 //      진짜 방어선은 서버 — 접수기간/개설 여부는 resolveExamOffer, 중복 결제는 payments 의 부분 유니크와
 //      exam_tickets_live_uniq 가 막는다. 여기 판정이 뚫려도 돈이 두 번 빠지지 않는다.
 //   로그인 게이트는 이 화면에 두지 않는다 — Checkout 이 미로그인 시 postLoginRedirect 를 심고 /login 으로 보낸다.
-// 응시료 금액은 DB(exam_fees) 원화가 단일 소스이고 **표시만 달러**다(usd(), $1 = 1,500원 고정 환산).
+// 응시료 금액은 DB(exam_fees) 원화가 단일 소스이고 **표시만 달러**다(usdc(), $1 = 1,500원 고정 환산).
 export default function ExamApply() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -118,7 +117,7 @@ export default function ExamApply() {
     : !tierOpen
       ? t('apply.tier_not_open')
       : feeReady
-        ? usd(feeAmount, lang)
+        ? usdc(feeAmount, lang)
         : t('apply.fee_tbd')
 
   // 접수기간 가드: 특정 회차(?round=<id>)로 들어왔는데 그 회차가 판매 가능(정기 + 접수중)이 아니면
@@ -145,7 +144,6 @@ export default function ExamApply() {
             </button>
           </div>
         </main>
-        <SiteFooter />
       </div>
     )
   }
@@ -342,7 +340,6 @@ export default function ExamApply() {
         </div>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

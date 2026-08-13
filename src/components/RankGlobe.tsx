@@ -32,7 +32,7 @@ const CFG = {
   hue: 211, // 불빛 색조
   markSize: 54, // 1st·2nd·3rd 표시 크기
   stars: 50, // 별 밝기
-  spin: 75, // 자전 속도
+  spin: 90, // 자전 속도
   size: 150, // 지구 크기
   posx: 50, // 가로 위치
   posy: 53, // 세로 위치

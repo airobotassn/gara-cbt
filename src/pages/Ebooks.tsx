@@ -11,7 +11,7 @@
 //   결제(2026-08-06 연동): 유료책 '구매하기' → /checkout?type=ebook&ref=<id> (토스 결제위젯) → 승인 후 지급.
 //      0원 책만 이 화면에서 ebooks/buy 로 즉시 지급한다(0원은 결제창을 탈 수 없다). 서버도 무료책만 허용.
 //      ⚠️ DB·결제는 원(KRW)이고 **구매자 화면 표시만 달러**다($1 = 1,500원 고정 환산 · 2026-08-07 결정).
-//         금액은 반드시 lib/money.ts 의 usd() 로 찍는다 — 문자열에 `$`·`₩` 를 직접 박지 말 것.
+//         금액은 반드시 lib/money.ts 의 usdc() 로 찍는다 — 문자열에 `$`·`₩` 를 직접 박지 말 것.
 //         실제 청구액(원화) 고지는 결제 화면(/checkout)의 주문요약 아래에서 한다.
 //   ⚠️ 강의는 아직 DB 가 없다 — `lib/lectures.ts` 하드코딩(데모). 관리자 등록으로 옮길 때 그 파일 주석 참고.
 //   구매한 책을 읽는 곳은 여기가 아니라 마이페이지 › E-BOOK 서재(/mypage/ebooks).
@@ -21,8 +21,7 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import type { TFunc, Lang } from '../lib/i18n'
-import { usd } from '../lib/money'
-import SiteFooter from '../components/SiteFooter'
+import { usdc } from '../lib/money'
 import EbookCover from '../components/EbookCover'
 import { MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
 import { getTracks, TIER_COLORS } from '../lib/caris'
@@ -64,8 +63,6 @@ type Group = {
   short: string // 좁은 화면 가로 칩(폭이 좁아 짧게)
   desc: string
   color: string
-  books: number
-  lectures: number
 }
 
 export default function Ebooks() {
@@ -130,12 +127,10 @@ export default function Ebooks() {
           short: `Lv.${lv}`,
           desc: t(`lv.${lv}.desc`),
           color: COVER_COLORS[lv] ?? ANY_COLOR,
-          books: catRows.filter((b) => b.targetLevel === lv).length,
-          lectures: lecturesForLevel(lv).length,
         })
       }
-      const free = catRows.filter((b) => b.targetLevel == null).length
-      if (free) out.push({ key: 'any', label: t('ll.any_level'), short: t('ll.any_level'), desc: t('ll.any_level_desc'), color: ANY_COLOR, books: free, lectures: 0 })
+      const free = catRows.some((b) => b.targetLevel == null)
+      if (free) out.push({ key: 'any', label: t('ll.any_level'), short: t('ll.any_level'), desc: t('ll.any_level_desc'), color: ANY_COLOR })
       return out
     }
     // 급수 목록·설명은 /guide 와 같은 출처(getTracks)를 쓴다 — 여기서 새로 쓰면 문구가 두 벌이 된다.
@@ -146,12 +141,10 @@ export default function Ebooks() {
         short: tier.name,
         desc: tier.target ?? tier.prereq ?? track.name,
         color: TIER_COLORS[tier.key] ?? ANY_COLOR,
-        books: catRows.filter((b) => b.targetTier === tier.key).length,
-        lectures: 0, // 급수별 강의는 아직 데이터가 없다(lectures.ts 는 레벨만 안다)
       })),
     )
-    const free = catRows.filter((b) => b.targetTier == null).length
-    if (free) out.push({ key: 'any', label: t('ll.any_tier'), short: t('ll.any_tier'), desc: t('ll.any_tier_desc'), color: ANY_COLOR, books: free, lectures: 0 })
+    const free = catRows.some((b) => b.targetTier == null)
+    if (free) out.push({ key: 'any', label: t('ll.any_tier'), short: t('ll.any_tier'), desc: t('ll.any_tier_desc'), color: ANY_COLOR })
     return out
   }, [cat, catRows, lang, t])
 
@@ -208,7 +201,7 @@ export default function Ebooks() {
       return
     }
     // 유료책은 결제 화면으로 넘긴다. 금액은 URL 로 넘기지 않는다 — 서버가 상품ID로 다시 계산한다.
-    if (b.price > 0) {
+    if (b.price_usd_cents > 0) {
       navigate(`/checkout?type=ebook&ref=${encodeURIComponent(b.id)}`)
       return
     }
@@ -283,11 +276,12 @@ export default function Ebooks() {
             <h1 className="font-display-lg text-3xl md:text-display-lg font-bold text-on-surface mb-2 tracking-tight break-keep">{t('ebook.store_title')}</h1>
             {/* 화면을 보면 아는 걸 글로 또 쓰지 않는다 — "레벨을 고르면 …" 설명문은 2026-08-06 삭제됐다.
                 ⚠️ 11~13px 짜리 잔글씨 금지(같은 날 반려) — 보조 문구도 15px 아래로 내리지 말 것. */}
-            {/* 가격을 달러로 찍는 목록이라 고정 환산이라는 사실을 여기서 한 번 밝힌다 —
-                실제 청구액(원화) 고지는 결제 화면(/checkout)이 결제 버튼 직전에 다시 한다. */}
-            <p className="font-body-md text-[15px] text-on-surface-variant break-keep">
-              {!isFullUser ? t('ebook.login_to_buy') : t('ebook.store_sub')} {t('pay.currency_hint')}
-            </p>
+            {/* 서재 안내·달러 고정환산 고지는 2026-08-13 삭제(요청). 환산 고지는 결제 화면(/checkout)이
+                결제 버튼 직전에 하므로 여기서 빠져도 고지 자체는 남는다.
+                비로그인 안내만 남긴다 — 살 수 있는지 없는지는 화면만 봐선 모른다. */}
+            {!isFullUser && (
+              <p className="font-body-md text-[15px] text-on-surface-variant break-keep">{t('ebook.login_to_buy')}</p>
+            )}
           </header>
 
           {/* 카탈로그 전환 — 자격검정(CARIS) 교재와 레벨테스트 교재는 겨냥하는 시험이 다르다.
@@ -341,10 +335,7 @@ export default function Ebooks() {
                             className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${on ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}
                           >
                             <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
-                            <span className="min-w-0 flex-1">
-                              <span className={`block truncate font-title-md text-[17px] ${on ? 'font-bold' : 'font-semibold'}`}>{g.label}</span>
-                              <span className="mt-0.5 block font-body-md text-[14px] text-outline">{t('ll.count', { b: g.books, v: g.lectures })}</span>
-                            </span>
+                            <span className={`min-w-0 flex-1 truncate font-title-md text-[17px] ${on ? 'font-bold' : 'font-semibold'}`}>{g.label}</span>
                           </button>
                         </li>
                       )
@@ -356,7 +347,6 @@ export default function Ebooks() {
                 <div className="flex min-w-0 flex-1 gap-4">
                   <Pane
                     title={t('ll.books')}
-                    count={books.length}
                     className="flex-1 min-w-0"
                     pager={bookPager}
                   >
@@ -367,7 +357,6 @@ export default function Ebooks() {
                       없는 영상을 두고 "샘플입니다" 라고 말하는 꼴이 된다. */}
                   <Pane
                     title={t('ll.lectures')}
-                    count={lectures.length}
                     className="flex-1 min-w-0"
                     foot={lectures.length ? t('ll.demo_note') : undefined}
                     pager={lecPager}
@@ -413,7 +402,6 @@ export default function Ebooks() {
                         className={`flex-1 px-4 py-3.5 font-title-md text-[17px] transition-colors ${pane === k ? 'text-on-surface font-bold border-b-2 border-primary' : 'text-on-surface-variant'}`}
                       >
                         {t(k === 'books' ? 'll.books' : 'll.lectures')}
-                        <span className="ml-2 font-body-md text-[15px] text-outline">{k === 'books' ? books.length : lectures.length}</span>
                       </button>
                     ))}
                   </div>
@@ -476,7 +464,6 @@ export default function Ebooks() {
         </div>
       )}
 
-      <SiteFooter />
     </div>
   )
 }
@@ -484,10 +471,9 @@ export default function Ebooks() {
 /** 열 한 칸 — 머리말(고정) + 본문 + 꼬리말(안내문 왼쪽 · 페이지 넘김 오른쪽).
  *  본문은 한 번에 한 항목이라 보통 안 넘치지만, 항목 자체가 화면보다 길면 그때는 여기서 스크롤한다. */
 function Pane({
-  title, count, foot, pager, className = '', children,
+  title, foot, pager, className = '', children,
 }: {
   title: string
-  count?: number
   foot?: string
   pager?: React.ReactNode
   className?: string
@@ -498,9 +484,8 @@ function Pane({
     //    열 경계가 안 보인다(2026-08-06 반려). 한 단 밝은 surface-container-low + 진한 테두리로 띄운다.
     <section className={`flex flex-col min-h-0 rounded-2xl border border-outline-variant bg-surface-container-low ambient-shadow overflow-hidden ${className}`}>
       {/* ⚠️ 열 제목을 11px 대문자 캡션으로 두지 말 것(2026-08-06 반려) — 이 화면의 뼈대라 제목처럼 보여야 한다. */}
-      <div className="shrink-0 flex items-baseline gap-2 border-b border-outline-variant/70 px-4 py-3.5">
+      <div className="shrink-0 border-b border-outline-variant/70 px-4 py-3.5">
         <h2 className="font-title-md text-[18px] font-bold text-on-surface">{title}</h2>
-        {count !== undefined && <span className="font-body-md text-[15px] text-outline">{count}</span>}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</div>
       {(foot || pager) && (
@@ -565,9 +550,9 @@ function BookRow({
             </span>
           ) : (
             <span className="font-title-md text-[19px] font-bold text-on-surface">
-              {/* ⚠️ b.price 는 **원(KRW) 정수**다. 표시가만 달러로 환산한다 — 직접 나누지 말고 usd() 를 쓸 것
+              {/* ⚠️ b.price_usd_cents 는 **달러 센트**다. 문자열에 `$` 를 직접 박지 말고 usdc() 를 쓸 것
                   (환산율 1,500 은 lib/money.ts 한 곳에만 있다). */}
-              {b.price > 0 ? usd(b.price, lang) : t('ebook.free')}
+              {b.price_usd_cents > 0 ? usdc(b.price_usd_cents, lang) : t('ebook.free')}
             </span>
           )}
           {b.owned ? (
@@ -576,7 +561,7 @@ function BookRow({
             </button>
           ) : (
             <button onClick={onBuy} disabled={busy} className="shrink-0 px-4 py-2.5 bg-primary-container text-on-primary font-label-md text-[16px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow disabled:opacity-60">
-              {busy ? t('ebook.processing') : b.price > 0 ? t('ebook.buy') : t('ebook.get_free')}
+              {busy ? t('ebook.processing') : b.price_usd_cents > 0 ? t('ebook.buy') : t('ebook.get_free')}
             </button>
           )}
         </div>

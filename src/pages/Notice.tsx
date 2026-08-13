@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import SiteFooter from '../components/SiteFooter'
 
 // gara_2 (공지사항) — 게시판 목록. 항목 클릭 → 상세 페이지(/notice/:id)로 이동(구 인라인 아코디언 폐지).
 // 데이터는 DB(notices)에서 로드 — 관리자(admin 함수)에서 등록/수정(리치 HTML 본문).
@@ -224,7 +223,6 @@ export default function Notice() {
         )}
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

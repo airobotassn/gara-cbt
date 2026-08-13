@@ -177,3 +177,19 @@ export function CameraIcon(p: IcoProps) {
     </Ico>
   )
 }
+
+/**
+ * 1:1 문의 '새 답변' 알림 종 — 옛 빨간 점을 대신한다(2026-08-12 요청).
+ * FAB 배지와 마이페이지 문의 탭 옆 **두 곳이 같은 그림·같은 색**을 쓴다.
+ * ⚠️ 여기만 채움(fill) 아이콘이다 — 이 세트의 선(stroke) 아이콘 규격으로 그리면
+ *    배지 크기에서 속이 비어 보여 '알림'이 아니라 작은 그림으로 읽힌다.
+ * 색(노랑)과 윤곽선은 CSS 의 `.alert-bell`(fab.css)이 잡는다 — 여기서 색을 박지 말 것.
+ */
+export function BellIcon({ size = 20, ...rest }: IcoProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...rest}>
+      <path d="M12 2.2a1.5 1.5 0 0 1 1.5 1.5v.6a6.2 6.2 0 0 1 4.6 6v3l1.3 2.2a1 1 0 0 1-.86 1.5H5.46a1 1 0 0 1-.86-1.5L5.9 13.3v-3a6.2 6.2 0 0 1 4.6-6v-.6A1.5 1.5 0 0 1 12 2.2Z" />
+      <path d="M9.5 19.3h5a2.5 2.5 0 0 1-5 0Z" />
+    </svg>
+  )
+}

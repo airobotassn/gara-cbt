@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useT } from '../lib/i18n'
-import { usd } from '../lib/money'
+import { usdc } from '../lib/money'
 import { confirmOrder, orderStatus, type PaymentStatusResp, type ProductType } from '../lib/payments'
 import SiteFooter from '../components/SiteFooter'
 
@@ -211,7 +211,7 @@ export default function PayResult() {
               <Title>{isCert ? t('pay.cert_success_title') : isExam ? t('pay.exam_success_title') : t('pay.success_title')}</Title>
               <Body>
                 {view.res.orderName}
-                {typeof view.res.amount === 'number' ? ` · ${usd(view.res.amount, lang)}` : ''}
+                {typeof view.res.amount === 'number' ? ` · ${usdc(view.res.amount, lang)}` : ''}
                 {/* 응시료는 '결제 완료'로 끝나면 안 된다 — 응시권이 어디 있고 언제 쓰는지까지 말해줘야 한다.
                     자격증도 마찬가지로 아직 한 걸음 남았다(발급). 결제로 끝났다고 읽히면 안 된다. */}
                 {isExam && <span className="block mt-2">{t('pay.exam_success_body')}</span>}

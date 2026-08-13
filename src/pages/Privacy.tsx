@@ -1,4 +1,3 @@
-import SiteFooter from '../components/SiteFooter'
 import { usePolicyDoc } from '../lib/policyDocs'
 
 /**
@@ -131,7 +130,6 @@ export default function Privacy() {
       </div>
       </div>
       </main>
-      <SiteFooter />
     </div>
   )
 }

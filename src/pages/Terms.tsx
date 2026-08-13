@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { usePolicyDoc } from '../lib/policyDocs'
 import { useT, type TFunc } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
@@ -203,7 +202,6 @@ export default function Terms() {
       </div>
       </div>
       </main>
-      <SiteFooter />
     </div>
   )
 }

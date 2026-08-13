@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import SiteFooter from '../components/SiteFooter'
 
 // gara_1 (고객센터) 목업 디자인 + 실제 동작(검색·카테고리 필터·아코디언) 연결.
 // 데이터는 DB(faqs, 6개국어)에서 로드 — 관리자(admin 함수)에서 등록/수정.
@@ -221,7 +220,6 @@ export default function Faq() {
         </div>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

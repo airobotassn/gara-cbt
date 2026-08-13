@@ -1,0 +1,104 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>translate worker</title>
+<!--
+  엣지 번역 워커의 작업 페이지. 사람이 볼 화면이 아니다 — 버튼 하나뿐이고 그 버튼을 누르는 건 Playwright 다.
+
+  ⚠️ 버튼이 있는 이유: 브라우저는 **언어팩을 처음 내려받을 때만** 사용자 동작이 있었는지 확인한다
+     (없으면 NotAllowedError: Requires a user gesture). 사이트가 몰래 수십 MB 를 받는 걸 막는 장치다.
+     한 번 받아둔 쌍은 제스처 없이도 되지만, 새 쌍이 나오면 또 필요하므로 **매 배치마다 그냥 누른다**
+     — 이미 받아둔 쌍이면 그 클릭은 아무 의미 없이 지나간다. 조건 분기할 이유가 없다.
+
+  ⚠️ Playwright 의 click 은 CDP 를 통한 진짜 입력 이벤트라 제스처 판정을 통과한다.
+     page.evaluate 로 직접 부르면 사용자 동작이 없는 것으로 취급돼 첫 다운로드가 막힌다.
+-->
+<button id="warm">warm</button>
+<pre id="log"></pre>
+<script>
+  // 워커가 여기에 일감을 넣고 버튼을 누른다. 끝나면 __out 에 결과가 담긴다(null = 아직 진행 중).
+  window.__jobs = null
+  window.__out = null
+
+  // Translator 인스턴스는 쌍(원문→대상)마다 하나를 만들어 **재사용**한다.
+  //  ⚠️ 건마다 create() 하면 인스턴스 생성 비용이 번역 자체보다 크다.
+  const translators = new Map()
+  let detector = null
+
+  async function getTranslator(src, dst) {
+    const key = src + '>' + dst
+    let t = translators.get(key)
+    if (!t) {
+      t = await Translator.create({ sourceLanguage: src, targetLanguage: dst })
+      translators.set(key, t)
+    }
+    return t
+  }
+
+  async function getDetector() {
+    if (!detector) detector = await LanguageDetector.create()
+    return detector
+  }
+
+  /**
+   * 일감을 처리한다. 한 건이 실패해도 나머지는 계속 간다 —
+   * 지원 안 되는 언어쌍 하나 때문에 배치 전체가 죽으면 그 방은 영영 안 채워진다.
+   */
+  async function run(jobs) {
+    const out = []
+    const failedPairs = []
+
+    // ① 원문 언어가 아직 없는 글은 먼저 판정한다. 감지도 온디바이스라 공짜다.
+    //    ⚠️ 신뢰도가 낮으면(짧은 글·이모지 섞임) 판정하지 않는다 — 틀린 원문 언어로 번역하면
+    //       결과가 엉뚱해지고, 그 값이 저장돼서 이후 모든 번역이 같이 틀어진다.
+    const srcOf = new Map()
+    for (const j of jobs) {
+      if (j.src_lang) { srcOf.set(j.message_id, j.src_lang); continue }
+      if (srcOf.has(j.message_id)) continue
+      try {
+        const det = await getDetector()
+        const r = (await det.detect(j.body))?.[0]
+        if (r && r.detectedLanguage && r.detectedLanguage !== 'und' && r.confidence >= 0.5) {
+          srcOf.set(j.message_id, r.detectedLanguage)
+        }
+      } catch (e) {
+        log('detect fail: ' + e)
+      }
+    }
+
+    // ② 번역. 쌍으로 묶어 인스턴스를 재사용한다.
+    for (const j of jobs) {
+      const src = srcOf.get(j.message_id)
+      if (!src) continue                    // 원문 언어를 못 정했으면 건너뛴다(다음 사이클에 다시 온다)
+      if (src === j.dst_lang) continue      // 같은 언어면 번역할 게 없다
+      const pair = src + '>' + j.dst_lang
+      if (failedPairs.includes(pair)) continue
+      try {
+        const t = await getTranslator(src, j.dst_lang)
+        const body = await t.translate(j.body)
+        if (body) out.push({ message_id: j.message_id, lang: j.dst_lang, body, src_lang: src })
+      } catch (e) {
+        // 지원 안 되는 쌍은 이 배치 안에서 다시 시도하지 않는다. 서버(구글 API)가 받아준다.
+        failedPairs.push(pair)
+        log('pair fail ' + pair + ': ' + e)
+      }
+    }
+    return { items: out, failedPairs }
+  }
+
+  function log(s) {
+    const el = document.getElementById('log')
+    el.textContent = (s + '\n' + el.textContent).slice(0, 4000)
+  }
+
+  document.getElementById('warm').onclick = async () => {
+    const jobs = window.__jobs
+    window.__out = null
+    if (!Array.isArray(jobs)) { window.__out = { items: [], failedPairs: [] }; return }
+    try {
+      window.__out = await run(jobs)
+    } catch (e) {
+      log('run fail: ' + e)
+      window.__out = { items: [], failedPairs: [], error: String(e) }
+    }
+  }
+</script>

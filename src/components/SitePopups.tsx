@@ -28,9 +28,13 @@ function placementOf(pathname: string): string | null {
   //    "환경이 이상한가?" 로 읽혀 점검 자체를 방해한다.
   if (/^\/exam\/(run|prepare|seb|check)/.test(pathname)) return null
   if (pathname === '/' ) return 'main'
-  if (pathname.startsWith('/exam') || pathname.startsWith('/certificate') || pathname.startsWith('/plan') || pathname.startsWith('/guide')) return 'caris'
+  // CARIS = **안내 페이지 하나뿐**이다(2026-08-13 결정). 예전엔 /plan·/exam·/exam/apply·/certificate 까지
+  //   묶여 있었는데, 그 화면들은 일정을 고르거나 결제·발급을 진행하는 자리라 팝업이 가로막는다.
+  if (pathname.startsWith('/guide')) return 'caris'
   if (pathname.startsWith('/arena') || pathname.startsWith('/test') || pathname.startsWith('/hub') || pathname.startsWith('/games') || pathname.startsWith('/ranking') || pathname.startsWith('/daily')) return 'arena'
-  if (pathname.startsWith('/ebooks')) return 'library'
+  // 러닝 라이브러리 = 목록 화면만. ⚠️ 이북 뷰어(/ebooks/read/:id)는 제외한다(2026-08-13 결정) —
+  //   전체화면 iframe 으로 책을 읽는 중이라 팝업이 본문 위를 덮는다(FAB 을 숨기는 이유와 같다).
+  if (/^\/ebooks\/?$/.test(pathname)) return 'library'
   return null
 }
 

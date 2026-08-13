@@ -767,7 +767,7 @@ async function examRoundDelete(admin: any, body: any) {
 
 // ---------- 응시료(exam_fees) — 금액만 편집 ----------
 async function examFeeList(admin: any) {
-  const { data, error } = await admin.from('exam_fees').select('key, amount').order('key', { ascending: true })
+  const { data, error } = await admin.from('exam_fees').select('key, amount_usd_cents').order('key', { ascending: true })
   if (error) return json({ error: error.message }, 400)
   return json({ fees: data ?? [] })
 }
@@ -781,7 +781,7 @@ async function examFeeSave(admin: any, body: any) {
     const n = Number(it?.amount)
     if (!key || !Number.isFinite(n)) continue
     const amount = Math.max(0, Math.floor(n))
-    const { error } = await admin.from('exam_fees').upsert({ key, amount, updated_at: now }, { onConflict: 'key' })
+    const { error } = await admin.from('exam_fees').upsert({ key, amount_usd_cents: amount, updated_at: now }, { onConflict: 'key' })
     if (error) return json({ error: error.message }, 400)
   }
   return json({ ok: true })
@@ -2182,7 +2182,7 @@ async function setRegion(admin: any, body: any) {
 async function ebookList(admin: any) {
   const { data, error } = await admin
     .from('ebooks')
-    .select('id, title, author, description, cover_url, price, catalog, target_level, target_tier, storage_path, published, sort_order, created_at, updated_at, translations')
+    .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, storage_path, published, sort_order, created_at, updated_at, translations')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) return json({ error: error.message }, 400)
@@ -2198,7 +2198,8 @@ async function ebookList(admin: any) {
     author: b.author ?? null,
     description: b.description ?? null,
     coverUrl: b.cover_url ?? null,
-    price: b.price ?? 0,
+    // 정가는 달러 센트(100 = $1.00). 옛 price(원화)는 읽지 않는다.
+    price_usd_cents: b.price_usd_cents ?? 0,
     catalog: b.catalog ?? 'leveltest',
     targetLevel: b.target_level ?? null,
     targetTier: b.target_tier ?? null,
@@ -2236,7 +2237,7 @@ async function ebookUpsert(admin: any, body: any) {
     author: e.author ? String(e.author).trim() : null,
     description: e.description ? String(e.description).trim() : null,
     cover_url: e.coverUrl ? String(e.coverUrl).trim() : null,
-    price: Math.max(0, Math.floor(Number(e.price ?? 0)) || 0),
+    price_usd_cents: Math.max(0, Math.floor(Number(e.price_usd_cents ?? 0)) || 0),
     // 카탈로그 = 러닝 라이브러리의 어느 탭에 서는가(LEVELTEST / CARIS).
     //   반대쪽 분류값은 **여기서 비운다** — 레벨을 골라뒀다 CARIS 로 바꾼 책이 두 값을 다 들고 있으면
     //   DB CHECK(ebooks_catalog_target_chk)에 걸려 저장이 통째로 실패한다.

@@ -19,7 +19,7 @@ import {
 } from '@tosspayments/tosspayments-sdk'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
-import { krw, usd } from '../lib/money'
+import { krw, usdc } from '../lib/money'
 import {
   TOSS_CLIENT_KEY,
   createOrder,
@@ -218,7 +218,9 @@ function PayBox({
           widgetsRef.current = widgets
 
           // 금액을 먼저 설정해야 결제 UI 를 그릴 수 있다. (V2 는 setAmount — updateAmount 는 없어졌다)
-          await widgets.setAmount({ currency: 'KRW', value: res.amount as number })
+          // ⚠️ **정가(res.amount, 달러 센트)가 아니라 실제 청구액(res.charge)을 넣는다.** 토스는 원화 전용이라
+          //    서버가 환율로 계산해 내려준 원화 값이 정본이다. 센트를 그대로 넣으면 100원짜리가 된다.
+          await widgets.setAmount({ currency: 'KRW', value: res.charge?.amount as number })
           await widgets.renderPaymentMethods({ selector: '#payment-method' })
           const agreement = await widgets.renderAgreement({ selector: '#agreement' })
           // 필수 약관을 해제하면 결제 버튼을 잠근다(위 termsBlocked 주석 참고 — 초기 상태는 안 온다).
@@ -304,7 +306,7 @@ function PayBox({
           <div className="flex items-baseline justify-between gap-4">
             <span className="font-body-md text-[16px] text-on-surface break-keep">{order.orderName}</span>
             <strong className="font-headline-lg text-[24px] font-black text-primary whitespace-nowrap">
-              {usd(order.amount ?? 0, lang)}
+              {usdc(order.amount ?? 0, lang)}
             </strong>
           </div>
         ) : (
@@ -317,7 +319,11 @@ function PayBox({
           ⚠️ 잔글씨 금지 — 결제 전에 반드시 읽혀야 하는 문장이라 15px 아래로 내리지 말 것. */}
       {order && (
         <p className="mb-8 rounded-xl border border-outline-variant/30 bg-surface-container px-5 py-3 font-body-md text-[15px] leading-[23px] text-on-surface-variant break-keep">
-          {t('pay.currency_note', { krw: krw(order.amount ?? 0, lang) })}
+          {/* 정가는 달러 하나인데 청구 통화는 국가가 정한다 — 화면은 **실제로 빠지는 돈**을 말해야 한다.
+              환율은 서버가 주문에 박아 내려준 값이라, 프론트가 따로 환산하지 않는다. */}
+          {order.charge?.currency === 'KRW'
+            ? t('pay.currency_note', { krw: krw(order.charge.amount, lang) })
+            : t('pay.currency_note_usd', { usd: `$${(order.charge?.amount ?? 0).toFixed(2)}` })}
         </p>
       )}
 
@@ -347,7 +353,7 @@ function PayBox({
           ? t('pay.moving')
           : phase !== 'ready'
             ? t('pay.preparing')
-            : `${usd(order?.amount ?? 0, lang)} ${t('pay.pay_button')}`}
+            : `${usdc(order?.amount ?? 0, lang)} ${t('pay.pay_button')}`}
       </button>
     </>
   )

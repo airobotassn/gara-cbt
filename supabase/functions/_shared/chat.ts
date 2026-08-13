@@ -1,4 +1,5 @@
-// 유사채팅(pseudo-chat) 보드 공용 헬퍼 — chat-post/chat-list/chat-edit/chat-delete/chat-report 5개 함수가 공유.
+// 유사채팅(pseudo-chat) 보드 공용 헬퍼 — chat-post/chat-list/chat-report/chat-translate 가 공유.
+//  ⚠️ chat-edit·chat-delete 는 2026-08-13 제거됐다(수정이 신고 증거를 지울 수 있었다).
 //  · resolveIpHash: IP 레이트리밋용 해시(일자별 salt) — 헤더 없으면 랜덤 sentinel(바닥선 사실상 제외).
 //  · moderateOpenAI: OpenAI Moderations API 호출 + 모듈 단위 circuit breaker(연속 실패 5회 → 60초 단락).
 import { sha256Hex } from './seb.ts'
@@ -82,7 +83,7 @@ let consecutiveFailures = 0
 let breakerOpenUntil = 0
 
 export async function moderateOpenAI(text: string): Promise<ModResult> {
-  // 토글이 꺼져 있으면 검사 없이 통과(ok). 호출부(chat-post·chat-edit)는 손댈 게 없다.
+  // 토글이 꺼져 있으면 검사 없이 통과(ok). 호출부(chat-post)는 손댈 게 없다.
   if (!CHAT_MOD_ENABLED) return { status: 'ok' }
   if (Date.now() < breakerOpenUntil) return { status: 'unavailable' }
 

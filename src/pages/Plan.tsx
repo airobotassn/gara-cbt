@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { useT } from '../lib/i18n'
 import { useExamRounds, type RoundStatus } from '../lib/rounds'
 
@@ -120,7 +119,6 @@ export default function Plan() {
         </div>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

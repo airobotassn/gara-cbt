@@ -1,4 +1,17 @@
 /* landing: Landing.tsx — APEX 다크 미니멀 히어로 (구글/클로드/GPT 메인 톤) */
+
+/* 메인 전용 — 오른쪽 스크롤바를 감춘다(스크롤 동작은 그대로).
+   히어로 아래에 푸터가 붙으면서 문서가 한 화면보다 살짝 길어졌는데, 그 막대가
+   검은 우주 옆에 흰 띠로 남아 눈에 띄었다. 클래스는 Landing.tsx 가 붙였다 뗀다
+   (⚠️ 이 화면에서만 — 긴 문서 화면에서 막대를 지우면 아래 내용이 있는 걸 알 수 없다).
+   덤: 막대가 사라지면서 본문 폭도 푸터 붙이기 전과 같아진다. */
+html.lp-noscrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+html.lp-noscrollbar::-webkit-scrollbar {
+  display: none; /* Chrome · Safari · Edge */
+}
+
 /* ===== Landing ===== */
 .lp {
   position: relative;

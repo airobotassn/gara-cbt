@@ -2,8 +2,10 @@
 //
 // 2026-07 개편: 트랙/급수 체계 전면 교체.
 //   · CARIS-Ⅰ(전국민 AI·로봇 리터러시): Beginner / Pro / Elite — 각 독립 개별 시험, 고정 60% 합격.
-//   · CARIS-Ⅱ(피지컬 AI 전문가): Master / Grand Master / Zenith — 내용 미확정이라
-//     기존 Master 트랙 내용을 그대로 유지하고 티어 이름만 교체(4급~1급 → Master/Grand Master/Zenith).
+//   · CARIS-Ⅱ(피지컬 AI 전문가): Master / Grand Master / Zenith — 2026-08-13 내용 확정.
+//     Master·Grand Master = 필기(객50+주10/60분) + 실기(120분), Zenith = 필기 서술·논술형 120분(실기 없음).
+//     ⚠️ 표시 문구는 확정됐지만 **채점은 아직 총점 60% 단일 기준**이다 — 과목별 40점 과락·실기 70점·
+//        Zenith 루브릭(심사위원 3인)은 판정 코드가 없다(서버 my-attempts/admin 의 PASS_RATIO 0.6).
 // 구 모델("Pro 단일시험 → 취득 점수로 4급~1급 차등")은 폐기. 각 티어가 독립 시험(합격 = 60%↑)이다.
 // 결과판정은 ExamResult 가 총점 60% 합/불로 직접 처리 — 구 점수→급수 판정 코드는 제거됨.
 //
@@ -16,7 +18,7 @@ export type Tier = {
   name: string // 표시 이름(브랜드 영문 고정)
   target?: string // CARIS-Ⅰ: 대상
   prereq?: string // CARIS-Ⅱ: 응시 자격(선행 티어)
-  subjects: string[] // CARIS-Ⅰ=3, CARIS-Ⅱ=2(기존 유지)
+  subjects: string[] // CARIS-Ⅰ=3, CARIS-Ⅱ=2(Zenith 만 3)
   format?: string // CARIS-Ⅰ: 시험 구성(티어별로 다름)
   method?: string // CARIS-Ⅱ: 검정 방법(필기/실기)
   practical?: string // CARIS-Ⅱ: 실기 내용
@@ -42,10 +44,13 @@ const T1_TIERS = [
   { key: 'pro', name: 'Pro' },
   { key: 'elite', name: 'Elite' },
 ] as const
+// subj = 검정 과목 수. ⚠️ **티어마다 다르다** — Zenith 만 3과목이다(2026-08-13, 기능안전·보안과
+//   AI 거버넌스·윤리·DX 를 갈랐다). 예전엔 T2 전체를 2과목으로 박아둬서 세 번째 과목이 화면에 안 나왔다.
+//   사전(caris.t2.<key>.subj.N)에 키를 더하는 것만으로는 안 보인다 — 이 숫자를 같이 올릴 것.
 const T2_TIERS = [
-  { key: 'master', name: 'Master' },
-  { key: 'grandmaster', name: 'Grand Master' },
-  { key: 'zenith', name: 'Zenith' },
+  { key: 'master', name: 'Master', subj: 2 },
+  { key: 'grandmaster', name: 'Grand Master', subj: 2 },
+  { key: 'zenith', name: 'Zenith', subj: 3 },
 ] as const
 
 /** 티어 key → 표시 이름. 칭호(user_titles)가 **key 만** 돌려주므로 화면은 여기서 이름을 얻는다.
@@ -65,17 +70,21 @@ export const TIER_COLORS: Record<string, string> = {
   master: '#10b3ac', grandmaster: '#18bd6a', zenith: '#62c045',
 }
 
-// 급수별 시험 구성(뽑기 blueprint) — /guide 의 caris.t1.*.format 표시문자열과 수치 일치.
-//  Beginner=객40, Pro=객50, Elite=객50+주10. T2(Master~Zenith)는 필기+실기 미확정 → 잠정 0(추후 확정).
-//  ⚠️ format 문자열 바꾸면 여기 수치도 같이 갱신할 것.
+// 급수별 시험 구성(뽑기 blueprint) — caris.t1.*.format · caris.t2.*.method 표시문자열과 수치 일치.
+//  Beginner=객40, Pro=객50, Elite=객50+주10, Master·Grand Master=객50+주10, Zenith=서술·논술 120분.
+//  ⚠️ format·method 문자열 바꾸면 여기 수치도 같이 갱신할 것(원서접수 화면과 문항 관리가 서로 다른 말을 한다).
 export type TierExamSpec = { mc: number; short: number; durationMin: number; passPct: number }
 export const TIER_EXAM_SPEC: Record<string, TierExamSpec> = {
   beginner: { mc: 40, short: 0, durationMin: 40, passPct: 60 },
   pro: { mc: 50, short: 0, durationMin: 50, passPct: 60 },
   elite: { mc: 50, short: 10, durationMin: 60, passPct: 60 },
-  master: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
-  grandmaster: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
-  zenith: { mc: 0, short: 0, durationMin: 0, passPct: 60 },
+  // CARIS-Ⅱ 필기 확정(2026-08-13). Master·Grand Master = 객관식 50 + 주관식 10 / 60분.
+  //   ⚠️ **실기는 여기 없다** — 이 표는 CBT 필기 출제용 수치다(실기는 PC작업형·복합작업형 별도 운영).
+  //   ⚠️ Zenith 는 서술·논술형 120분이라 **문항 수 개념이 없다** → mc/short 는 0으로 둔다.
+  //      0 이라고 미확정이 아니다. 여기에 임의 문항 수를 채우면 문제은행 목표 수량이 거짓으로 잡힌다.
+  master: { mc: 50, short: 10, durationMin: 60, passPct: 60 },
+  grandmaster: { mc: 50, short: 10, durationMin: 60, passPct: 60 },
+  zenith: { mc: 0, short: 0, durationMin: 120, passPct: 60 },
 }
 export const tierTotal = (k: string) => (TIER_EXAM_SPEC[k]?.mc ?? 0) + (TIER_EXAM_SPEC[k]?.short ?? 0)
 
@@ -131,7 +140,7 @@ export function getTracks(lang: Lang): Track[] {
       name: tier.name,
       prereq: tr(lang, `caris.t2.${tier.key}.prereq`),
       method: tr(lang, `caris.t2.${tier.key}.method`),
-      subjects: [0, 1].map((i) => tr(lang, `caris.t2.${tier.key}.subj.${i}`)),
+      subjects: Array.from({ length: tier.subj }, (_, i) => tr(lang, `caris.t2.${tier.key}.subj.${i}`)),
       practical: tier.key === 'zenith' ? undefined : tr(lang, `caris.t2.${tier.key}.practical`),
       pass: tr(lang, `caris.t2.${tier.key}.pass`),
     })),

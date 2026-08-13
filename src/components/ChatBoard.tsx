@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useT, localeOf, type Lang } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -10,12 +10,19 @@ import ShareCardModal from './ShareCardModal'
 import type { ShareCardData } from '../lib/shareCard'
 
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
-// 초기 페이지 → 폴링(신규분 append) + reconcile(수정/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
+// 초기 페이지 → 폴링(신규분 append) + reconcile(가림/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
 // 본문은 항상 React 텍스트 child 로만 렌더(자동 이스케이프) — URL 만 NoticeDetail.linkify 방식으로 링크화.
 //
 // 방(room): 전세계('global') 하나 + 나라별 하나(ISO2). 어느 방인지는 부모가 정해서 내려준다.
 //  ⚠️ 방이 바뀌면 부모가 key={room} 으로 **다시 마운트**시킨다 — 목록·커서·폴링 타이머가 한 방을 가리키는
 //     상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청이 새 방 목록에 섞여 들어온다.
+//
+// 번역(2026-08-13): 원문이 기본이고, 토글을 켠 사람에게만 번역본을 보여준다.
+//  ⚠️ 토글 상태를 이 컴포넌트 안에 두는 게 설계의 일부다. 방이 바뀌면 재마운트되면서 **꺼진 채로 시작**한다
+//     — 켠 채로 유지하면 방에 들어가기만 해도 그 방이 수요로 등록되어 과거 글까지 전부 번역된다
+//     (방을 100개 돌면 100개 방이 통째로 번역되는 그 함정). 안 누르면 아무 비용도 안 난다.
+//  ⚠️ 번역 대상 언어는 서버가 국가(profiles.country_code)에서 정한다. 프론트가 언어를 보내지 않는다.
+//  ⚠️ 수정·삭제는 없다(2026-08-13 제거) — 원문이 안 변하므로 번역본을 무효화할 일도 없다.
 
 interface Row {
   id: number
@@ -76,7 +83,7 @@ function kstFmt(lang: Lang) {
   return f
 }
 
-// chat-post/chat-edit 에러 코드 → i18n 키 매핑(없으면 e.message 그대로 노출)
+// chat-post/chat-translate 에러 코드 → i18n 키 매핑(없으면 e.message 그대로 노출)
 const ERR_KEYS: Record<string, string> = {
   empty: 'chat.empty',
   too_long: 'chat.blockedLocal',
@@ -88,7 +95,7 @@ const ERR_KEYS: Record<string, string> = {
   rate_limited: 'chat.rateLimited',
   ip_floor: 'chat.rateLimited',
   duplicate: 'chat.duplicate',
-  edit_window: 'chat.editWindow',
+  translate_failed: 'chat.trFailed',
 }
 
 interface Props {
@@ -98,6 +105,7 @@ interface Props {
 
 export default function ChatBoard({ room = 'global' }: Props) {
   const { t, lang } = useT()
+  const navigate = useNavigate()
   // ⚠️ 쓰기 가능 판정은 user 가 아니라 isFullUser 다.
   //    익명 세션도 user 는 truthy 라 !user 로 검사하면 입력창이 열리고, 서버(chat-post 의
   //    CHAT_REQUIRE_LOGIN)가 login_required 로 되돌려서 다 치고 나서야 실패한다.
@@ -109,8 +117,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [editText, setEditText] = useState('')
+  // 번역: 토글 상태 + (글번호 → 번역문). 방이 바뀌면 재마운트되며 둘 다 초기화된다.
+  const [trOn, setTrOn] = useState(false)
+  const [tr, setTr] = useState<Map<number, string>>(new Map())
+  const [trBusy, setTrBusy] = useState(false)
   const [reportedIds, setReportedIds] = useState<Set<number>>(new Set())
   // 신고 팝업: 대상 메시지 id · 선택한 사유 코드 · 자유 서술
   const [reportFor, setReportFor] = useState<number | null>(null)
@@ -126,6 +136,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const rowsRef = useRef<Row[]>([])
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tempIdRef = useRef(-1)
+  // 폴링 tick 은 [room] 으로 한 번만 묶여서 최신 state 를 못 본다 — 토글 상태를 ref 로 들고 간다.
+  const trOnRef = useRef(false)
 
   rowsRef.current = rows
 
@@ -139,6 +151,64 @@ export default function ChatBoard({ room = 'global' }: Props) {
     if (!key) return code
     const s = t(key)
     return s === key ? code : s
+  }
+
+  /**
+   * 주어진 글들의 번역본을 받아 Map 에 합친다.
+   *  · 대상 언어는 보내지 않는다 — 서버가 국가에서 정한다.
+   *  · 서버는 창고에 있는 것부터 채우고 없는 것만 번역하므로, 두 번째 사람부터는 호출이 즉시 끝난다.
+   *  · 번역이 안 온 글(엔진 실패·번역 불필요)은 Map 에 안 들어가고 화면에 원문 그대로 남는다.
+   *  ⚠️ 국가 미설정이면 서버가 country_required 를 준다 → 온보딩으로 보낸다. 여기서 언어를
+   *     임의로 정해주면 온보딩을 건너뛴 사람이 엉뚱한 언어로 고정된다.
+   */
+  const fetchTranslations = useCallback(
+    async (ids: number[]): Promise<boolean> => {
+      if (ids.length === 0) return true
+      try {
+        const res = await callFunction<{ lang: string; items: { id: number; body: string }[] }>(
+          'chat-translate',
+          { room, ids },
+        )
+        if (res.items.length > 0) {
+          setTr((prev) => {
+            const next = new Map(prev)
+            for (const it of res.items) next.set(it.id, it.body)
+            return next
+          })
+        }
+        return true
+      } catch (e) {
+        const code = e instanceof Error ? e.message : 'error'
+        if (code === 'country_required') {
+          navigate('/onboarding')
+          return false
+        }
+        showToast(errMsg(code === 'error' ? 'translate_failed' : code))
+        return false
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [room, navigate],
+  )
+
+  // ⚠️ trOnRef 는 여기서만 바꾼다(trOn 을 바꾸는 유일한 곳이라 렌더 중 대입이 필요 없다).
+  //    폴링 tick 은 [room] 으로 한 번만 묶여 최신 state 를 못 보므로 ref 로 건네야 한다.
+  async function toggleTranslate() {
+    if (trBusy) return
+    if (trOn) {
+      trOnRef.current = false
+      setTrOn(false)
+      return
+    }
+    setTrBusy(true)
+    // 목록은 그대로 둔 채 기다린다 — 비우면 읽던 글이 사라진다.
+    const ids = rowsRef.current.filter((r) => !r.sending && r.body != null).map((r) => r.id)
+    const ok = await fetchTranslations(ids)
+    if (ok) {
+      trOnRef.current = true
+      setTrOn(true)
+    }
+    setTrBusy(false)
   }
 
   // 상대 시간이 흐르도록 30초마다 갱신(방금 전 → N분 전).
@@ -206,6 +276,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
             requestAnimationFrame(() => {
               if (atBottom && el) el.scrollTop = el.scrollHeight
             })
+            // 번역을 켜둔 상태면 새 글도 이어서 번역한다. 워커가 이미 채워놨으면 창고 히트라 즉시 온다.
+            if (trOnRef.current) void fetchTranslations(res.messages.map((m) => m.id))
           }
         }
         const visible = rowsRef.current.filter((r) => !r.sending).slice(-200)
@@ -236,7 +308,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
     return () => {
       if (pollRef.current) clearTimeout(pollRef.current)
     }
-  }, [room])
+  }, [room, fetchTranslations])
 
   // 위로 스크롤 시 이전 페이지 prepend(스크롤 위치 보존)
   const loadOlder = useCallback(async () => {
@@ -256,6 +328,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
         requestAnimationFrame(() => {
           if (el) el.scrollTop = el.scrollHeight - prevHeight
         })
+        // 위로 불러온 옛 글도 켜져 있으면 같이 번역한다.
+        if (trOnRef.current) void fetchTranslations(res.messages.map((m) => m.id))
       } else {
         setHasMore(false)
       }
@@ -263,7 +337,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
       /* noop */
     }
     setLoadingOlder(false)
-  }, [loadingOlder, loading, hasMore, rows, room])
+  }, [loadingOlder, loading, hasMore, rows, room, fetchTranslations])
 
   function onScroll() {
     const el = listRef.current
@@ -399,45 +473,36 @@ export default function ChatBoard({ room = 'global' }: Props) {
     setReporting(false)
   }
 
-  function startEdit(row: Row) {
-    setEditingId(row.id)
-    setEditText(row.body ?? '')
-  }
-
-  async function submitEdit(id: number) {
-    const text = editText.trim()
-    if (!text) return
-    try {
-      const res = await callFunction<{ ok: true; id: number; edited_at: string; updated_at: string; mod_status: 'ok' | 'pending' }>('chat-edit', { message_id: id, body: text })
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, body: text, edited_at: res.edited_at, updated_at: res.updated_at, mod_status: res.mod_status } : r)))
-      setEditingId(null)
-    } catch (e) {
-      showToast(errMsg(e instanceof Error ? e.message : 'error'))
-    }
-  }
-
-  async function onDelete(id: number) {
-    if (!window.confirm(t('chat.confirmDelete'))) return
-    try {
-      await callFunction('chat-delete', { message_id: id })
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, body: null, mod_status: 'ok' as const } : r)))
-    } catch (e) {
-      showToast(errMsg(e instanceof Error ? e.message : 'error'))
-    }
-  }
+  // ⚠️ 수정·삭제는 없다(2026-08-13 제거). 수정이 있으면 욕설을 쓰고 신고당한 뒤 10분 안에
+  //    본문을 고쳐 증거를 지울 수 있었다(chat-edit 이 body 를 덮어썼다). 삭제는 소프트라
+  //    본문이 남아 안전했지만, 수정을 없애는 김에 같이 걷어냈다.
 
   return (
     <div className="chat-panel">
+      {/* 번역 토글 — 로그인한 사람에게만. 방을 옮기면 재마운트되어 꺼진 채로 다시 시작한다. */}
+      {isFullUser && (
+        <div className="chat-trbar">
+          <button
+            type="button"
+            className={`chat-tr-btn${trOn ? ' on' : ''}`}
+            onClick={toggleTranslate}
+            disabled={trBusy}
+            aria-pressed={trOn}
+          >
+            {trBusy ? t('chat.trLoading') : trOn ? t('chat.trOn') : t('chat.trOff')}
+          </button>
+        </div>
+      )}
       <div ref={listRef} onScroll={onScroll} className="chat-list">
         {loading && <div className="chat-hint">{t('common.loading')}</div>}
         {!loading && loadingOlder && <div className="chat-hint">{t('common.loading')}</div>}
         {!loading && rows.length === 0 && <div className="chat-hint">{t('chat.empty')}</div>}
         {!loading &&
           rows.map((r) => {
-            // isFullUser 까지 보는 이유는 위 composer 와 같다 — 익명 세션으로 쓴 옛 글에
-            // 수정·삭제 버튼이 뜨는데 서버(chat-edit/chat-delete)는 login_required 로 막는다.
             const own = !!user && isFullUser && r.user_id === user.id
             const deleted = r.body === null
+            // 번역이 없는 글(내 언어로 쓴 글·엔진 실패·너무 짧은 글)은 원문 그대로 둔다.
+            const shown = trOn ? tr.get(r.id) : undefined
             return (
               <div key={r.id} className={`chat-bubble-row ${own ? 'own' : 'other'}`}>
                 <div className="chat-bubble">
@@ -469,29 +534,13 @@ export default function ChatBoard({ room = 'global' }: Props) {
                       {r.is_anon && <span className="chat-anon-badge">{t('chat.anonBadge')}</span>}
                     </div>
                   )}
-                  {editingId === r.id ? (
-                    <div className="chat-edit-box">
-                      <textarea value={editText} onChange={(e) => setEditText(e.target.value)} maxLength={MAX_LEN} rows={2} />
-                      <div className="chat-edit-actions">
-                        <button type="button" onClick={() => submitEdit(r.id)}>{t('chat.send')}</button>
-                        <button type="button" onClick={() => setEditingId(null)}>{t('common.close')}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="chat-body">
-                      {deleted ? t('chat.deleted') : linkify(r.body ?? '')}
-                      {r.sending && <span className="chat-sending-tag"> · {t('chat.sending')}</span>}
-                    </div>
-                  )}
+                  <div className="chat-body">
+                    {deleted ? t('chat.deleted') : linkify(shown ?? r.body ?? '')}
+                    {r.sending && <span className="chat-sending-tag"> · {t('chat.sending')}</span>}
+                  </div>
                   <div className="chat-footer">
                     <span className="chat-time">{formatTime(r.created_at)}</span>
-                    {r.edited_at && !deleted && <span className="chat-edited">· {t('chat.editedMark')}</span>}
-                    {!r.sending && !deleted && own && editingId !== r.id && (
-                      <>
-                        <button type="button" className="chat-action" onClick={() => startEdit(r)}>{t('chat.edit')}</button>
-                        <button type="button" className="chat-action" onClick={() => onDelete(r.id)}>{t('chat.delete')}</button>
-                      </>
-                    )}
+                    {shown && !deleted && <span className="chat-tr-mark">· {t('chat.trMark')}</span>}
                     {!r.sending && !deleted && !own && (
                       <button type="button" className="chat-action" disabled={reportedIds.has(r.id)} onClick={() => openReport(r.id)}>
                         {reportedIds.has(r.id) ? t('chat.reported') : t('chat.report')}

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import SiteFooter from '../components/SiteFooter'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
@@ -37,7 +36,6 @@ function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

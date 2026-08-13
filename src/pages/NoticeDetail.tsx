@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import SiteFooter from '../components/SiteFooter'
 
 // 공지 상세 페이지 (/notice/:id) — 게시판 글 상세. 본문은 리치 HTML(관리자 WYSIWYG 작성)을
 // DOMPurify 로 sanitize 후 렌더. 구 평문 공지(태그 없음)는 줄바꿈 유지(pre-line) + URL 링크.
@@ -128,7 +127,6 @@ export default function NoticeDetail() {
         )}
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

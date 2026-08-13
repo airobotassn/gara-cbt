@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { renderEbookCover } from '../lib/ebookCover'
-import { krw, usd, usdToKrw, krwToUsdInput, KRW_PER_USD } from '../lib/money'
+import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
 import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
 import type {
@@ -3164,7 +3164,8 @@ interface EbookDraft {
   author: string
   description: string
   coverUrl: string
-  price: number
+  /** 정가 — **달러 센트**(100 = $1.00). DB 컬럼명과 같게 둔다. */
+  price_usd_cents: number
   catalog: 'leveltest' | 'caris' // 러닝 라이브러리(/ebooks)의 어느 탭에 서는가
   targetLevel: number | null // 추천 대상 레벨(1~7) — 결과창 추천 정렬에 쓴다. null = 미지정
   targetTier: string | null // 대상 급수(beginner..zenith). null = 미지정
@@ -3174,7 +3175,7 @@ interface EbookDraft {
   translations: Record<string, EbookTranslation>
 }
 function emptyEbookDraft(catalog: EbookCatalog): EbookDraft {
-  return { title: '', author: '', description: '', coverUrl: '', price: 0, catalog, targetLevel: null, targetTier: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
+  return { title: '', author: '', description: '', coverUrl: '', price_usd_cents: 0, catalog, targetLevel: null, targetTier: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
 }
 
 // ── 이북 관리는 카탈로그마다 **화면이 따로**다(2026-08-11) ──────────────
@@ -3517,13 +3518,10 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {ebookSlotLabel(b) || <span style={{ color: 'var(--muted)' }}>{catalog === 'caris' ? '급수 무관' : '레벨 무관'}</span>}
                 </td>
-                {/* 구매자가 보는 값($)과 통장에 찍히는 값(원)을 같이 — 어느 한쪽만 두면 단위를 오해한다. */}
+                {/* 정가는 달러 하나다(2026-08-13). 원화는 결제 시점 환율로 계산되는 파생값이라 여기 안 적는다. */}
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {b.price > 0 ? (
-                    <>
-                      <div style={{ fontWeight: 700 }}>{usd(b.price, 'ko')}</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{krw(b.price, 'ko')}</div>
-                    </>
+                  {b.price_usd_cents > 0 ? (
+                    <div style={{ fontWeight: 700 }}>{usdc(b.price_usd_cents, 'ko')}</div>
                   ) : '무료'}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
@@ -3554,7 +3552,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                         author: b.author ?? '',
                         description: b.description ?? '',
                         coverUrl: b.coverUrl ?? '',
-                        price: b.price,
+                        price_usd_cents: b.price_usd_cents,
                         catalog: b.catalog ?? 'leveltest',
                         targetLevel: b.targetLevel ?? null,
                         targetTier: b.targetTier ?? null,
@@ -3615,11 +3613,11 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                   type="number"
                   min={0}
                   step={0.5}
-                  value={krwToUsdInput(draft.price)}
-                  onChange={(e) => patch({ price: usdToKrw(Number(e.target.value) || 0) })}
+                  value={centsToUsdInput(draft.price_usd_cents)}
+                  onChange={(e) => patch({ price_usd_cents: usdInputToCents(Number(e.target.value) || 0) })}
                 />
                 <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  실제 청구액 {draft.price > 0 ? krw(draft.price, 'ko') : '무료'} ($1 = {KRW_PER_USD.toLocaleString('ko')}원 고정)
+                  {draft.price_usd_cents > 0 ? '국내 결제는 결제 시점 환율로 원화 청구됩니다.' : '무료'}
                 </span>
               </label>
               {/* 분류 — 러닝 라이브러리(/ebooks)에서 어느 칸에 서는가. **카탈로그는 이 화면이 이미 정했다.**

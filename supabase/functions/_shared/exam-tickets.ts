@@ -190,8 +190,13 @@ export function ticketExpired(ticket: ExamTicketRow, round: ExamRoundRow | null,
  * ⚠️ 폴백 금액을 지어내는 코드를 여기든 호출부든 넣지 말 것. 돈 받는 값이라 폴백이 곧 사고다.
  */
 export async function lookupExamFee(admin: SupabaseClient, track: string, tier: string): Promise<number> {
-  const { data } = await admin.from('exam_fees').select('amount').eq('key', `${track}_${tier}`).maybeSingle()
-  const amount = Math.floor(Number(data?.amount ?? 0))
+  // 정가는 **달러 센트**다(2026-08-13 전환). 옛 amount(원화 정수)는 읽지 않는다.
+  const { data } = await admin
+    .from('exam_fees')
+    .select('amount_usd_cents')
+    .eq('key', `${track}_${tier}`)
+    .maybeSingle()
+  const amount = Math.floor(Number(data?.amount_usd_cents ?? 0))
   return Number.isFinite(amount) ? amount : 0
 }
 

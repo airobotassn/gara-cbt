@@ -465,7 +465,8 @@ export interface EbookRow {
   author: string | null
   description: string | null
   coverUrl: string | null // 그 언어의 표지(본문 1페이지를 구운 것)
-  price: number // 달러(USD). 0 = 무료
+  /** 정가 — **달러 센트**(100 = $1.00). 0 = 무료. DB 컬럼명(ebooks.price_usd_cents)과 같게 둔다. */
+  price_usd_cents: number
   /** 러닝 라이브러리의 탭 — 'leveltest' = LEVELTEST E-BOOK(레벨 1~7) · 'caris' = CARIS E-BOOK(급수) */
   catalog: 'leveltest' | 'caris'
   targetLevel: number | null // 추천 대상 레벨(1~7). null = 레벨 무관. catalog='caris' 면 항상 null
@@ -525,7 +526,8 @@ export interface AdminEbookRow {
   author: string | null
   description: string | null
   coverUrl: string | null
-  price: number
+  /** 정가 — **달러 센트**(100 = $1.00). DB 컬럼명(ebooks.price_usd_cents)과 같게 둔다. */
+  price_usd_cents: number
   catalog: 'leveltest' | 'caris' // 러닝 라이브러리 탭. 기존 책은 전부 'leveltest'
   targetLevel: number | null // 추천 대상 레벨(1~7). null = 미지정
   targetTier: string | null // 대상 급수(beginner..zenith). null = 미지정

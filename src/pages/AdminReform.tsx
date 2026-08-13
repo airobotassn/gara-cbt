@@ -1,7 +1,7 @@
 // 관리자페이지 재편(PPT `관리자 페이지 수정사항`)으로 **새로 만든** 화면들 — 2026-08-11.
 //   Admin.tsx 가 이미 6천 줄이라 신규 화면은 여기 모은다. 라우팅(어느 메뉴에 서는가)은 Admin.tsx 가 정한다.
 //   서버는 전부 `admin` 함수의 reform.ts 액션이고, 관리자 게이트는 최상위 <Admin/> 이 이미 통과시킨 뒤다.
-import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode } from 'react'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, productLabel } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
@@ -1799,7 +1799,16 @@ interface PopupRow {
   starts_at: string; ends_at: string; active: boolean; sort_order: number
 }
 type PopupDraft = Partial<PopupRow> & { _new?: boolean }
-const PLACEMENTS: [string, string][] = [['main', '메인'], ['caris', 'CARIS'], ['arena', 'WORLD ARENA'], ['library', '러닝 라이브러리']]
+/** 노출 위치 = [값, 이름, **운영자에게 보여줄 설명**].
+ *  ⚠️ 설명은 `components/SitePopups.tsx` 의 placementOf 가 실제로 매칭하는 주소와 **한 쌍**이다 —
+ *     그쪽 조건을 고치면 이 문장도 같이 고칠 것. 운영자가 볼 화면이므로 주소(`/exam` 같은 것)를 쓰지 않는다.
+ *     여기 적힌 곳 말고는 어디에도 안 뜬다(아래 안내문). */
+const PLACEMENTS: [string, string, string][] = [
+  ['main', '메인', '사이트에 들어오면 가장 먼저 보이는 홈 화면 한 곳'],
+  ['caris', 'CARIS', 'CARIS 자격검정을 소개하는 안내 페이지. 시험 일정·원서접수·자격증 발급 화면에는 뜨지 않습니다'],
+  ['arena', 'WORLD ARENA', '무료 레벨테스트 쪽 전부 — 세계지도, 레벨 선택과 응시, 결과, 캐릭터 허브, 미니게임, 랭킹, 오늘의 학습'],
+  ['library', '러닝 라이브러리', '교재·강의를 고르는 목록 화면. 이북을 펼쳐 읽는 중에는 뜨지 않습니다'],
+]
 const DEVICES: [string, string][] = [['both', 'PC + 모바일'], ['pc', 'PC'], ['mobile', '모바일']]
 // ⚠️ `datetime-local` 은 **그 사람 컴퓨터의 시간대**로 읽고 쓴다.
 //    `new Date(iso).toISOString()` 으로 값을 만들면 UTC 문자열이 칸에 들어가 한국 시간과 9시간 어긋난다
@@ -1820,6 +1829,33 @@ export function PopupAdmin() {
   const draft = useDraft({ kind: 'popup', refId: edit?.id, value: edit, title: edit?.title?.trim() || '새 팝업', enabled: !!edit })
   const [busy, setBusy] = useState(false)
   const rows = data?.popups ?? []
+
+  // 팝업 그림 — 예전엔 '이미지 주소'를 손으로 적는 칸이었다. 운영자에게 없는 값을 요구하는 칸이라
+  //   파일 업로드로 바꿨다(2026-08-13). 공지 에디터와 같은 방식: 스토리지에 올리고 공개 주소만 들고 있는다.
+  //   ⚠️ DB 컬럼(image_url)은 그대로다 — 예전에 주소를 적어 저장한 팝업도 계속 그대로 뜬다.
+  //   ⚠️ '클릭 시 이동할 주소'(link_url)와 헷갈리지 말 것. 그건 누르면 가는 곳이라 손으로 적는 게 맞다.
+  const imgInputRef = useRef<HTMLInputElement>(null)
+  const [imgBusy, setImgBusy] = useState(false)
+  const [imgErr, setImgErr] = useState('')
+  async function pickImage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // 같은 파일을 다시 골라도 change 가 다시 오게
+    if (!file || !edit) return
+    setImgErr('')
+    if (!file.type.startsWith('image/')) { setImgErr('이미지 파일만 올릴 수 있습니다.'); return }
+    if (file.size > 5 * 1024 * 1024) { setImgErr('이미지는 5MB 이하만 올릴 수 있습니다.'); return }
+    setImgBusy(true)
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const path = `${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage.from('popup-images').upload(path, file, { contentType: file.type, upsert: false })
+      if (error) throw error
+      const { data: pub } = supabase.storage.from('popup-images').getPublicUrl(path)
+      setEdit((p) => (p ? { ...p, image_url: pub.publicUrl } : p))
+    } catch (e2) {
+      setImgErr(e2 instanceof Error ? e2.message : '업로드에 실패했습니다.')
+    } finally { setImgBusy(false) }
+  }
 
   async function save() {
     if (!edit) return
@@ -1914,9 +1950,33 @@ export function PopupAdmin() {
               <label style={fld}>내용
                 <textarea style={{ ...inp, minHeight: 100 }} value={edit.body ?? ''} onChange={(e) => setEdit({ ...edit, body: e.target.value })} />
               </label>
-              <label style={fld}>이미지 주소 (선택)
-                <input style={inp} value={edit.image_url ?? ''} onChange={(e) => setEdit({ ...edit, image_url: e.target.value })} />
-              </label>
+              {/* 이미지 — 파일을 고르면 바로 올라가고 미리보기가 뜬다. 주소를 적는 칸은 없앴다. */}
+              <div style={fld}>
+                이미지 (선택)
+                {edit.image_url ? (
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', fontWeight: 400 }}>
+                    <img src={edit.image_url} alt=""
+                      style={{ width: 132, borderRadius: 10, border: '1px solid var(--line2)', display: 'block' }} />
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      <button className="admin-mini" type="button" disabled={imgBusy} onClick={() => imgInputRef.current?.click()}>
+                        {imgBusy ? '올리는 중…' : '다른 이미지로 바꾸기'}
+                      </button>
+                      <button className="admin-mini" type="button" onClick={() => setEdit({ ...edit, image_url: '' })}>
+                        이미지 빼기
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontWeight: 400 }}>
+                    <button className="admin-mini" type="button" disabled={imgBusy} onClick={() => imgInputRef.current?.click()}>
+                      {imgBusy ? '올리는 중…' : '이미지 선택'}
+                    </button>
+                    <span style={{ marginLeft: 10 }}>PNG·JPG 등, 5MB 이하. 넣지 않으면 글자만 있는 팝업이 됩니다.</span>
+                  </div>
+                )}
+                {imgErr && <span style={{ color: 'var(--danger-fg)', fontWeight: 400 }}>{imgErr}</span>}
+                <input ref={imgInputRef} type="file" accept="image/*" hidden onChange={pickImage} />
+              </div>
               <label style={fld}>클릭 시 이동할 주소 (선택)
                 <input style={inp} value={edit.link_url ?? ''} onChange={(e) => setEdit({ ...edit, link_url: e.target.value })} />
               </label>
@@ -1935,21 +1995,30 @@ export function PopupAdmin() {
                   {DEVICES.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </label>
+              {/* 노출 위치 — 이름만 보면 어디까지 포함인지 알 수 없어서(예: 'CARIS' 가 원서접수까지인지)
+                  항목마다 설명을 함께 보여준다. 한 줄에 나란히 두면 설명이 들어갈 자리가 없어 세로로 세운다. */}
               <div style={fld}>
                 노출 위치
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontWeight: 400 }}>
-                  {PLACEMENTS.map(([k, v]) => (
-                    <label key={k} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <input type="checkbox" checked={(edit.placements ?? []).includes(k)}
+                <div style={{ display: 'grid', gap: 10, fontWeight: 400 }}>
+                  {PLACEMENTS.map(([k, v, desc]) => (
+                    <label key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
+                      <input type="checkbox" style={{ marginTop: 3, flex: 'none' }} checked={(edit.placements ?? []).includes(k)}
                         onChange={(e) => {
                           const set = new Set(edit.placements ?? [])
                           if (e.target.checked) set.add(k); else set.delete(k)
                           setEdit({ ...edit, placements: [...set] })
                         }} />
-                      {v}
+                      <span>
+                        <b style={{ color: 'var(--ink)' }}>{v}</b>
+                        <span style={{ display: 'block', marginTop: 2, lineHeight: 1.6, wordBreak: 'keep-all' }}>{desc}</span>
+                      </span>
                     </label>
                   ))}
                 </div>
+                <p className="admin-hint" style={{ margin: '4px 0 0', lineHeight: 1.7, fontWeight: 400 }}>
+                  위에 적힌 곳에만 뜹니다. <b>마이페이지 · 공지사항 · 고객센터 · 협회 소개 · 약관 · 결제 · 로그인</b> 화면에는
+                  어느 것을 골라도 뜨지 않습니다.
+                </p>
               </div>
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
                 <input type="checkbox" checked={edit.active !== false} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} />
