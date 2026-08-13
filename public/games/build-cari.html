@@ -499,15 +499,24 @@ const LEVELS=[
    "이 게임이 뭔지 모르겠다" 는 글로 안 풀린다 — 한 번 굴려보게 한다.
    ⚠️ 자동 실행하지 않는다. 눌러야 시작한다 — 아는 사람에게 두 번 시키면 그게 더 나쁘다.
    ⚠️ 대신 언제든 다시 할 수 있어야 한다(한 번 해도 이해 못 할 수 있다) → 진입점이 인트로·게임화면 둘.
-   길은 일부러 꺾는다 — 도구를 바꿔야 방향이 바뀐다는 걸(칸을 다시 눌러서가 아니라) 여기서 배운다. */
+   도구 셋(컨베이어·지우개·센서)을 다 거치게 짠다 — 게임에서 쓰는 조작이 그 셋뿐이라
+   하나라도 빼면 결국 "이건 뭐지" 가 다시 생긴다.
+   ⚠️ `pre` = 미리 깔아두는 타일. 지우개는 "지울 게 있어야" 가르칠 수 있어서, 일부러 위쪽으로 놓인
+      컨베이어를 길목에 심어둔다(상자를 되돌려 보내는, 눈에 띄게 틀린 배치). */
 const TUT_LEVEL={ name:'튜토리얼', sub:'따 라 해 보 기', tick:520,
-  goal:'', source:{r:2,c:1,dir:2}, pattern:['B','B'], need:2, win:2, sense:null,
-  bins:[{r:4,c:2,want:null}], sol:[[3,1,'conv',2],[4,1,'conv',1]], take:'' };
+  goal:'', source:{r:1,c:1,dir:2}, pattern:['R','B','R','B'], need:4, win:4, sense:'R',
+  bins:[{r:3,c:3,want:'R'},{r:4,c:1,want:'B'}],
+  pre:[[3,1,'conv',0]],
+  sol:[[2,1,'conv',2],[3,1,'sensor',2],[3,2,'conv',1]], take:'' };
 const TUT_STEPS=[
-  { msg:'CARI 가 상자를 <b>아래로</b> 내보내요. 빛나는 칸을 눌러 <b>컨베이어</b>를 놓아요', cell:[3,1] },
-  { msg:'여기서 <b>오른쪽</b>으로 꺾어야 해요. 아래에서 <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
-  { msg:'이제 빛나는 칸을 눌러요', cell:[4,1] },
-  { msg:'라인이 이어졌어요. <b>가동</b>을 눌러요', run:true }
+  { msg:'CARI 가 상자를 <b>아래로</b> 내보내요. 빛나는 칸을 눌러 <b>컨베이어</b>를 놓아요', cell:[2,1] },
+  { msg:'다음 칸은 <b>위로</b> 놓여 있어요 — 상자가 되돌아가요. <b>지우개</b>를 골라요', tool:'erase' },
+  { msg:'빛나는 칸을 눌러 <b>지워요</b>', cell:[3,1] },
+  { msg:'여기엔 <b>분기 센서</b>가 필요해요. 센서를 골라요', tool:'sensor' },
+  { msg:'지운 칸에 놓아요. 센서는 <b>빨강만</b> 옆으로 빼줘요', cell:[3,1] },
+  { msg:'빨간 화살표 쪽으로 길을 이어야 해요. <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
+  { msg:'빛나는 칸을 눌러요', cell:[3,2] },
+  { msg:'라인 완성! <b>가동</b>을 눌러요', run:true }
 ];
 let tutOn=false, tutIdx=0;
 
@@ -568,6 +577,7 @@ function startLevel(i, def){
   grid=[]; for(let r=0;r<ROWS;r++){ grid.push([]); for(let c=0;c<COLS;c++) grid[r].push({type:'empty'}); }
   grid[L.source.r][L.source.c]={type:'source',dir:L.source.dir};
   L.bins.forEach(b=>grid[b.r][b.c]={type:'bin',want:b.want});
+  (L.pre||[]).forEach(([r,c,t,d])=>{ grid[r][c]={type:t,dir:d}; });   // 미리 깔아두는 타일(튜토리얼용)
   resetSim();
   renderBoard();
   $('lvlName').textContent=L.name; $('lvlSub').textContent=L.sub;
