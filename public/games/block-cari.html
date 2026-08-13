@@ -184,9 +184,12 @@
   #startOv #sArt{display:none}
   #startOv .ttl{font-size:30px;margin:0 0 3px;text-shadow:0 3px 12px #000}
   #startOv .lead{margin-bottom:9px;color:#c8d8ed}
-  #startOv .rules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
-  #startOv .rules li{font-size:12.5px;line-height:1.4;padding:7px 9px;border:1px solid rgba(96,204,255,.13);background:rgba(255,255,255,.055)}
-  #startOv .rules li:last-child{grid-column:1/-1}
+  /* 한 줄에 하나씩. 두 칸으로 나누면 문장이 3~4줄로 접혀 오히려 글이 많아 보인다.
+     ⚠️ 문장은 한 줄에 떨어져야 한다 — 끝 단어 하나만 다음 줄로 넘어가면 그것만으로 글이 배로 보인다.
+        좁은 폭에서 글자를 한 급 줄이는 것도 그래서다. */
+  #startOv .rules{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:11px}
+  #startOv .rules li{font-size:13.5px;line-height:1.45;padding:9px 11px;border:1px solid rgba(96,204,255,.13);background:rgba(255,255,255,.055)}
+  @media (max-width:410px){ #startOv .rules li{font-size:12.5px;padding:8px 10px} #startOv .lead{font-size:13.5px} }
   #startOv .btn{padding:15px;background:linear-gradient(#f2c35d,#c58a20);box-shadow:0 4px 0 #744b0b,0 0 18px rgba(255,193,72,.24)}
 
   #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-fail-v2.png') center top/cover no-repeat;backdrop-filter:none}
@@ -242,13 +245,13 @@
   <div class="sheet">
     <div id="sArt"></div>
     <p class="ttl">막아라 <i>CARI</i></p>
-    <p class="lead">동료들이 서류를 들고 온다.<br/>“이거 AI로 정리해 주세요.”</p>
+    <p class="lead">“이거 AI로 정리해 주세요.”</p>
+    <!-- ⚠️ 인트로에 다 적지 않는다. 화면에 보이는 것(밑줄·도장 두 개)과 게임이 알아서 알려주는 것
+         (규정이 날마다 는다 → 2일차 공지 화면)은 뺀다. 남길 것은 "안 하면 손해 보는 것" 셋뿐이다. -->
     <ul class="rules">
-      <li><span>①</span><div>위 <b>규정집</b>에 오늘 지킬 규칙이 있다. <b>날마다 한 줄씩 는다.</b></div></li>
-      <li><span>②</span><div>서류에서 규정에 걸리는 곳을 <b>눌러서 가린다.</b> 밑줄 친 것만 누를 수 있다.</div></li>
-      <li><span>③</span><div>다 됐으면 <b>AI 전송</b>. 가려도 넘기면 안 되는 서류는 <b>반려</b>다.</div></li>
-      <li><span>④</span><div>놓치면 새어 나가고, <b>과하게 가리면</b> CARI 가 헛소리를 한다. 둘 다 경고장이다.</div></li>
-      <li><span>⑤</span><div>경고장 <b>세 장이면 끝.</b></div></li>
+      <li><span>①</span><div><b>규정집</b>을 보고 <b>걸리는 곳을 눌러 가린다</b></div></li>
+      <li><span>②</span><div>다 됐으면 <b>AI 전송</b> · 안 될 건 <b>반려</b></div></li>
+      <li><span>③</span><div>놓쳐도 과하게 가려도 <b>경고장</b> · 3장이면 끝</div></li>
     </ul>
     <button class="btn" id="startBtn">출근하기</button>
   </div>
