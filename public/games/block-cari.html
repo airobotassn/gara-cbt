@@ -32,11 +32,16 @@
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%}
-  body{background:radial-gradient(115% 85% at 50% 0%, #2b2f3c 0%, #1d2029 55%, #14161d 100%);
-    color:#e9ecf3;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  body{background:#050e1c;color:#e9ecf3;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
   /* 앱 안에서는 세로 화면 iframe 이지만, 파일을 그냥 열면 데스크톱 전체 폭이 된다.
-     폭을 안 묶으면 요소가 화면 양 끝으로 흩어져 한눈에 안 들어온다. */
-  #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 80px -20px rgba(0,0,0,.45)}
+     폭을 안 묶으면 요소가 화면 양 끝으로 흩어져 한눈에 안 들어온다.
+     ⚠️ 배경 그림은 body 가 아니라 이 기둥에 붙인다 — body 에 두면 데스크톱 폭(1440)에서 책상이
+        화면 전체로 퍼져, 그림 속 서류함·돋보기가 기둥 밖으로 나가고 UI 만 가운데 떠 있게 된다.
+        아래 도장 두 개가 그림의 빨강·파랑 서류함 위에 오는 구도도 그때 깨진다. */
+  #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;
+    background:linear-gradient(180deg,rgba(4,13,29,.34),rgba(4,13,29,.08) 38%,rgba(4,13,29,.4)),
+      #071426 url('/games/block-cari-game-bg-v2.png') center/cover no-repeat;
+    box-shadow:0 0 80px -20px rgba(0,0,0,.45)}
   .hidden{display:none}
 
   #flash{position:absolute;inset:0;z-index:40;pointer-events:none;background:#ff3b2a;opacity:0}
@@ -44,7 +49,7 @@
   @keyframes fl{0%{opacity:.34}100%{opacity:0}}
 
   /* ── 상단 ─────────────────────────────────── */
-  .top{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:10px 13px 7px}
+  .top{flex:0 0 auto;display:flex;align-items:center;gap:9px;margin:10px 12px 7px;padding:8px 11px;border:1px solid rgba(88,210,255,.28);border-radius:13px;background:linear-gradient(180deg,rgba(8,35,66,.94),rgba(5,19,40,.94));box-shadow:0 8px 20px rgba(0,0,0,.35),inset 0 0 18px rgba(20,151,220,.08)}
   .day{padding:6px 13px;border-radius:9px;background:#b9903f;color:#221a08;font-weight:900;font-size:14.5px}
   .prog{font-size:14px;font-weight:800;color:#9aa2b6}
   .strikes{margin-left:auto;display:flex;gap:4px;align-items:center}
@@ -53,7 +58,7 @@
   .sc{font-size:16px;font-weight:900;color:#e9ecf3;margin-left:7px}
 
   /* ── 규정집 ───────────────────────────────── */
-  .book{flex:0 0 auto;margin:0 13px 8px;background:#20242f;border:1px solid rgba(255,255,255,.10);
+  .book{flex:0 0 auto;margin:0 13px 8px;background:linear-gradient(145deg,rgba(10,30,55,.96),rgba(6,18,38,.96));border:1px solid rgba(70,200,255,.25);
     border-radius:13px;padding:8px 10px}
   .brow{display:flex;align-items:flex-start;gap:7px;margin-bottom:5px}
   .brow:last-child{margin-bottom:0}
@@ -69,9 +74,11 @@
   .bnone{font-size:13.5px;font-weight:700;color:#6b7387;padding:5px 0}
 
   /* ── 서류 ─────────────────────────────────── */
-  .desk{flex:1 1 auto;min-height:0;padding:0 13px 8px;display:flex;align-items:flex-start}
+  /* ⚠️ 서류는 남는 공간 가운데에 둔다. flex-start 로 두면 짧은 서류일 때 아래가 통째로 비어
+     (860px 화면에서 500px 가까이) 도장만 화면 바닥에 따로 떨어져 보인다. */
+  .desk{flex:1 1 auto;min-height:0;padding:0 13px 8px;display:flex;align-items:center}
   /* 내용만큼만 서되 한 장의 서류로 보일 만큼은 확보한다 — 짧은 문서가 쪽지처럼 보이면 안 된다. */
-  .paper{flex:0 1 auto;width:100%;max-height:100%;min-height:min(100%,330px);background:#f6f2e8;color:#2a2620;border-radius:6px;
+  .paper{flex:0 1 auto;width:100%;max-height:100%;min-height:min(100%,330px);background:linear-gradient(135deg,#fffdf4,#eee5d2);color:#2a2620;border-radius:7px;border:1px solid #d5c8ac;
     padding:15px 16px 18px;overflow-y:auto;box-shadow:0 14px 30px -12px rgba(0,0,0,.75);
     transform-origin:50% 50%}
   .paper.in{animation:pin .32s ease-out}
@@ -102,10 +109,10 @@
 
   /* ── 도장 ─────────────────────────────────── */
   .stamps{flex:0 0 auto;display:flex;gap:9px;padding:0 13px calc(12px + env(safe-area-inset-bottom))}
-  .st{flex:1 1 0;padding:17px 8px;border:0;border-radius:14px;cursor:pointer;
+  .st{flex:1 1 0;padding:17px 8px;border:1px solid rgba(255,255,255,.22);border-radius:14px;cursor:pointer;
     font:900 17px/1 system-ui,sans-serif;letter-spacing:-.01em}
-  .st.send{background:linear-gradient(#3f86e8,#245fc0);color:#fff;box-shadow:0 4px 0 #16407f}
-  .st.rej{background:linear-gradient(#d9534a,#b23a31);color:#fff;box-shadow:0 4px 0 #7d251e}
+  .st.send{background:linear-gradient(#2faff3,#1452bd);color:#fff;box-shadow:0 4px 0 #092e72,0 0 18px rgba(44,172,246,.28)}
+  .st.rej{background:linear-gradient(#f05d55,#a91f28);color:#fff;box-shadow:0 4px 0 #68131a,0 0 18px rgba(234,52,61,.22)}
   .st:active{transform:translateY(2px)}
   .st:disabled{opacity:.4;cursor:default;transform:none}
 
@@ -128,7 +135,10 @@
     background:#3f86e8;color:#fff;font:900 16px/1 system-ui,sans-serif}
 
   /* ── 오버레이 ─────────────────────────────── */
-  .ov{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:18px;
+  /* ⚠️ 오버레이도 게임 기둥(520px) 안에 묶는다. 화면 전체로 두면 데스크톱 폭에서 인트로·결과 그림이
+     가로로 확대돼 CARI 얼굴이 시트 뒤로 숨고 귀와 손만 남는다(실제로 그랬다). */
+  .ov{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;
+    z-index:50;display:grid;place-items:center;padding:18px;
     background:rgba(8,10,16,.76);backdrop-filter:blur(4px)}
   /* ⚠️ .hidden 은 위에 있어 .ov 와 특정도가 같다 → 순서상 .ov 가 이긴다.
      이 줄이 없으면 오버레이 셋이 처음부터 전부 떠서 맨 뒤의 '해고' 화면이 게임을 덮는다. */
@@ -166,6 +176,32 @@
     padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
     border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.12);color:#e9ecf3}
   .mg-rank.on{display:inline-flex}
+
+  /* 인트로는 팝업이 아니라 하나의 게임 시작 화면이다. */
+  #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-intro-v2.png') center top/cover no-repeat;backdrop-filter:none}
+  #startOv.hidden{display:none}
+  #startOv .sheet{max-width:460px;max-height:55%;padding:16px 17px 14px;border-color:rgba(82,207,255,.32);border-radius:22px;background:linear-gradient(180deg,rgba(8,30,57,.92),rgba(5,18,38,.97));box-shadow:0 20px 55px rgba(0,0,0,.55),inset 0 0 28px rgba(22,142,208,.08)}
+  #startOv #sArt{display:none}
+  #startOv .ttl{font-size:30px;margin:0 0 3px;text-shadow:0 3px 12px #000}
+  #startOv .lead{margin-bottom:9px;color:#c8d8ed}
+  #startOv .rules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+  #startOv .rules li{font-size:12.5px;line-height:1.4;padding:7px 9px;border:1px solid rgba(96,204,255,.13);background:rgba(255,255,255,.055)}
+  #startOv .rules li:last-child{grid-column:1/-1}
+  #startOv .btn{padding:15px;background:linear-gradient(#f2c35d,#c58a20);box-shadow:0 4px 0 #744b0b,0 0 18px rgba(255,193,72,.24)}
+
+  #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-fail-v2.png') center top/cover no-repeat;backdrop-filter:none}
+  #overOv.cleared{background-image:url('/games/block-cari-success-v2.png')}
+  #overOv .sheet{max-width:460px;max-height:51%;padding:16px 17px;background:linear-gradient(180deg,rgba(7,29,57,.93),rgba(4,17,37,.98));border-color:rgba(82,207,255,.27);box-shadow:0 20px 55px rgba(0,0,0,.6)}
+  #overOv #oArt{display:none}
+  #overOv .ttl{margin:0 0 4px}
+  #overOv .bigscore{font-size:43px}
+  #overOv .note{margin-bottom:10px;padding:9px 12px}
+  #overOv .btn{background:linear-gradient(#2faff3,#1452bd);color:#fff}
+
+  @media (max-height:720px){
+    #startOv .sheet{max-height:59%} #startOv .lead{display:none} #startOv .rules li{font-size:11.5px;padding:5px 7px}
+    #overOv .sheet{max-height:55%}.stats{margin-bottom:8px}.note{font-size:12.5px}
+  }
 </style>
 </head>
 <body>
@@ -526,6 +562,7 @@ function gameOver(cleared){
   locked=true;
   $('fb').classList.remove('on');
   if(window.MGBridge) MGBridge.submit(score); // 랭킹: 점수형
+  $('overOv').classList.toggle('cleared',cleared);
   $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true,shock:!cleared});
   $('oTtl').textContent=cleared?'무사히 한 주를 넘겼다':'해고';
   $('oScore').textContent=score.toLocaleString();
