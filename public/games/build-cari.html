@@ -261,9 +261,14 @@ body{
 /* 튜토리얼 — 아래 바 왼쪽 빈 판. 판의 어두운 면 x9.8~34.8% · y87.9~95.5%(중심 22.3%/91.7%,
    초록 시작 버튼의 세로 중심 92% 와 같은 줄). 판 색이 가장자리로 갈수록 옅어져서 임계값 스캔만으로는
    오른쪽으로 밀린다 — 실제 렌더를 잘라 눈으로 맞춘 값이다. */
-#ovStart #btnTutIntro{position:absolute;z-index:1;left:9.8%;top:87.9%;width:25%;height:7.6%;margin:0!important;padding:0!important;
-  border:0;background:none;box-shadow:none;filter:none;display:grid;place-items:center;
-  color:#e8dcc2;font-size:calc(var(--ch)*.027);font-weight:900;letter-spacing:-.01em;text-shadow:0 2px 3px #000;}
+#ovStart #btnTutIntro{position:absolute;z-index:1;left:11.1%;top:88.04%;width:22.3%;height:7.15%;margin:0!important;padding:0!important;
+  border:0;background:transparent url('/games/build-cari-tut-btn-v1.png') center/100% 100% no-repeat;box-shadow:none;
+  filter:none;display:grid;place-items:center;
+  /* ⚠️ 글자는 어두운 잉크다 — 버튼 그림의 가운데 면이 밝은 크림색이라 흰 글자를 얹으면 대비가 안 난다.
+        (그림자도 어두운 색이면 글자가 뭉갠다 → 위쪽만 옅게 넣어 새김글처럼 보이게 한다) */
+  color:#33281c;font-size:calc(var(--ch)*.0205);font-weight:900;letter-spacing:-.02em;
+  text-shadow:0 1px 0 rgba(255,250,236,.45);}
+#ovStart #btnTutIntro:active{transform:translateY(calc(var(--ch)*.002));filter:brightness(.94)}
 
 /* --- 결과 --- ⚠️ 승리/실패 아트는 판 위치가 다르다(실패가 더 아래·짧고 버튼이 1개). 좌표를 공유하지 말 것. */
 #ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
