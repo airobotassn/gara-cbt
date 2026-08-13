@@ -249,14 +249,16 @@
   /* ⚠️ 라벨이 값 위에 온다 — 종이 위에서는 '점수 / 150' 순서가 자연스럽고, 값 밑에 붙으면 각주로 읽힌다.
         (통계 3장도 같은 이유로 column-reverse. DOM 순서는 그대로 두고 보이는 순서만 뒤집는다.) */
   #overOv:not(.cleared) .ttl{left:20%;top:11.2%;width:60%;height:8.3%;font-size:min(34px,3.9vh);color:#a3271c;text-shadow:none}
-  #overOv:not(.cleared) .biglab{left:10%;top:28%;width:80%;height:5.5%;font-size:min(17px,2vh);font-weight:800;color:#7a6a52;letter-spacing:.08em}
-  #overOv:not(.cleared) .bigscore{left:10%;top:33.5%;width:80%;height:18%;font-size:min(74px,8.4vh);line-height:1;color:#3d3427}
-  #overOv:not(.cleared) .newbest{left:10%;top:52%;width:80%;height:4.5%;font-size:min(14px,1.7vh);color:#a3271c}
-  #overOv:not(.cleared) .stats{left:8.7%;top:62%;width:82%;height:10%;display:flex;justify-content:space-between;gap:0}
+  #overOv:not(.cleared) .biglab{left:10%;top:26.5%;width:80%;height:6%;font-size:min(20px,2.3vh);font-weight:800;color:#7a6a52;letter-spacing:.08em}
+  #overOv:not(.cleared) .bigscore{left:10%;top:32.5%;width:80%;height:17%;font-size:min(88px,10vh);line-height:1;color:#3d3427}
+  #overOv:not(.cleared) .newbest{left:10%;top:50%;width:80%;height:5.5%;font-size:min(20px,2.3vh);font-weight:900;color:#a3271c}
+  /* ⚠️ 메모 3장은 위쪽에 집게가 그려져 있다 — 종이(y60.4~71) 전체를 쓰면 글자가 집게에 물린다.
+        집게 아래(y63~71)만 쓴다. */
+  #overOv:not(.cleared) .stats{left:8.7%;top:63%;width:82%;height:8%;display:flex;justify-content:space-between;gap:0}
   #overOv:not(.cleared) .stats .stat{width:29.3%;height:100%;display:flex;flex-direction:column-reverse;
     align-items:center;justify-content:center;gap:3px;background:none;border:0;padding:0}
-  #overOv:not(.cleared) .stats .stat b{font-size:min(26px,3vh);line-height:1;color:#3d3427}
-  #overOv:not(.cleared) .stats .stat span{font-size:min(13px,1.55vh);font-weight:800;color:#7a6a52}
+  #overOv:not(.cleared) .stats .stat b{font-size:min(31px,3.5vh);line-height:1;color:#3d3427}
+  #overOv:not(.cleared) .stats .stat span{font-size:min(15px,1.75vh);font-weight:800;color:#7a6a52}
   #overOv:not(.cleared) .note{left:10%;top:75.5%;width:79%;height:8.5%;padding:0 10px;background:none;border:0;
     font-size:min(15px,1.8vh);line-height:1.4;color:#4a3c28;overflow:hidden}
   /* 폴더탭은 그림에 이미 파랗게 그려져 있다 — 위에 또 칠하지 않는다. */
