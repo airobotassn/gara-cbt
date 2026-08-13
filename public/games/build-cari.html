@@ -258,19 +258,25 @@ body{
 #ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
 #ovStart #btnStart{position:absolute;z-index:1;left:38%;top:86.5%;width:24%;height:11%;margin:0!important;padding:0!important;
   border:0;background:none;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
-/* 튜토리얼 — 아래 바 왼쪽 홈. 중심은 홈과 같고(22.3% / 91.7%, 초록 시작 버튼의 세로 중심 92% 와 같은 줄)
-   크기는 홈 바닥(22.3%×7.15%)이 아니라 홈 바깥 테두리까지 덮는다.
-   ⚠️ 홈 바닥에 딱 맞추면 안 된다 — 버튼 그림에 이미 자기 테두리가 있어서 바 → 홈 테두리 → 버튼 테두리
-      3중 액자가 되고, 90px 짜리 버튼 안에서 전부 뭉개진다(실기기에서 그렇게 보였다).
-      홈을 덮으면 테두리가 하나로 읽힌다. 비율(2.108)은 그대로 — 폭을 바꾸면 높이도 같이 계산할 것. */
-#ovStart #btnTutIntro{position:absolute;z-index:1;left:8.75%;top:87.35%;width:27.1%;height:8.69%;margin:0!important;padding:0!important;
-  border:0;background:transparent url('/games/build-cari-tut-btn-v1.png') center/100% 100% no-repeat;box-shadow:none;
-  filter:none;display:grid;place-items:center;
-  /* ⚠️ 글자는 어두운 잉크다 — 버튼 그림의 가운데 면이 밝은 크림색이라 흰 글자를 얹으면 대비가 안 난다.
-        (그림자도 어두운 색이면 글자가 뭉갠다 → 위쪽만 옅게 넣어 새김글처럼 보이게 한다) */
-  color:#33281c;font-size:calc(var(--ch)*.0205);font-weight:900;letter-spacing:-.02em;
-  text-shadow:0 1px 0 rgba(255,250,236,.45);}
-#ovStart #btnTutIntro:active{transform:translateY(calc(var(--ch)*.002));filter:brightness(.94)}
+/* 튜토리얼 — 아래 바 왼쪽 홈에 앉는 판. 그림이 아니라 CSS 로 그린다.
+   ⚠️ 홈은 사각형이 아니다 — 좌하·우상이 길게 사선으로 깎인 육각형이라 어떤 사각 버튼도 안 맞는다
+      (그림으로 시도했다가 홈을 통째로 덮어버리는 판이 됐다). clip-path 로 홈 실루엣을 그대로 딴다.
+   ⚠️ 좌표 출처 = 인트로 원본(955×1413) 홈 바닥을 플러드필로 훑은 값 x89~333 / y1245~1344.
+      그림을 갈면 이 다각형과 박스를 다시 떠야 한다.
+   ⚠️ 박스는 홈 바닥과 정확히 같다. 안쪽으로 물리면 사선 끝(좌하·우상 꼭짓점)에서 틈이 벌어져 보인다 —
+      깊이는 틈이 아니라 inset 베벨이 만든다. */
+#ovStart #btnTutIntro{position:absolute;z-index:1;left:9.32%;top:88.11%;width:25.55%;height:7.006%;margin:0!important;padding:0!important;
+  border:0;filter:none;display:grid;place-items:center;
+  clip-path:polygon(2.5% 0,75.8% 0,100% 72.7%,100% 97%,97.1% 100%,25.8% 100%,.8% 33.3%,.8% 3%);
+  background:linear-gradient(180deg,#f4ecd8 0%,#e4d8bb 38%,#c9b894 72%,#9d8a67 100%);
+  /* clip-path 안쪽은 inset 그림자만 살아남는다(바깥 그림자는 잘린다) → 베벨을 inset 으로 만든다. */
+  box-shadow:inset 0 2px 0 rgba(255,253,244,.6),inset 0 -3px 0 rgba(88,70,44,.45);
+  /* 글자는 어두운 잉크 — 판 면이 밝은 크림색이라 흰 글자는 대비가 안 난다. */
+  color:#33281c;font-size:calc(var(--ch)*.0225);font-weight:900;letter-spacing:-.02em;
+  text-shadow:0 1px 0 rgba(255,250,236,.5);}
+#ovStart #btnTutIntro:active{background:linear-gradient(180deg,#e4d8bb 0%,#cdbe9c 60%,#8f7d5c 100%);
+  box-shadow:inset 0 2px 0 rgba(255,253,244,.3),inset 0 -2px 0 rgba(88,70,44,.4);
+  transform:translateY(calc(var(--ch)*.0016));}
 
 /* --- 결과 --- ⚠️ 승리/실패 아트는 판 위치가 다르다(실패가 더 아래·짧고 버튼이 1개). 좌표를 공유하지 말 것. */
 #ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
