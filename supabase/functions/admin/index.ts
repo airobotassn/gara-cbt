@@ -6,6 +6,7 @@
 //  - ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
+import { refreshRates } from '../_shared/fx.ts'
 import { EXAM_ROUND_COLS, examWindowState, grantExamTicket, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
@@ -763,6 +764,38 @@ async function examRoundDelete(admin: any, body: any) {
     return json({ error: msg }, 400)
   }
   return json({ ok: true })
+}
+
+// ---------- 환율(exchange_rates) — 달러 정가를 원화로 청구할 때 쓰는 값 ----------
+// 자동 수집이 기본이고, 관리자가 손으로 고정할 수 있다. 고정하면 자동 수집이 덮어쓰지 않는다
+// (사람이 일부러 잡아둔 값이 조용히 되돌아가면 아무도 이유를 설명하지 못한다 — _shared/fx.ts 참고).
+async function fxGet(admin: any) {
+  const { data } = await admin.from('exchange_rates').select('currency, rate, source, fetched_at, updated_at').order('currency')
+  return json({ rates: data ?? [] })
+}
+
+async function fxSave(admin: any, body: any) {
+  const currency = String(body?.currency ?? 'KRW').toUpperCase()
+
+  // '자동으로 되돌리기' — 지금 값을 즉시 다시 받아온다. 주기를 기다리게 하면 관리자가
+  // 되돌려졌는지 화면으로 확인할 방법이 없다.
+  if (String(body?.mode ?? '') === 'auto') {
+    const out = await refreshRates(admin, { force: true })
+    if (!out.updated) return json({ error: '환율을 받아오지 못했습니다. 잠시 후 다시 시도해주세요.' }, 502)
+    return json({ ok: true, rate: out.rate, source: 'auto' })
+  }
+
+  const rate = Number(body?.rate)
+  // 자릿수를 잘못 넣으면(1.4 / 141700) 정가가 통째로 무너진다. 상식 범위 밖은 저장 자체를 막는다.
+  if (!Number.isFinite(rate) || rate <= 100 || rate >= 100000) {
+    return json({ error: '환율 값이 올바르지 않습니다. (100 ~ 100,000)' }, 400)
+  }
+  const now = new Date().toISOString()
+  const { error } = await admin
+    .from('exchange_rates')
+    .upsert({ currency, rate, source: 'manual', fetched_at: now, updated_at: now }, { onConflict: 'currency' })
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true, rate, source: 'manual' })
 }
 
 // ---------- 응시료(exam_fees) — 금액만 편집 ----------
@@ -2600,6 +2633,8 @@ Deno.serve(async (req) => {
       case 'examRoundUpsert': return await examRoundUpsert(admin, body)
       case 'examRoundReorder': return await examRoundReorder(admin, body)
       case 'examRoundDelete': return await examRoundDelete(admin, body)
+      case 'fxGet': return await fxGet(admin)
+      case 'fxSave': return await fxSave(admin, body)
       case 'examFeeList': return await examFeeList(admin)
       case 'examFeeSave': return await examFeeSave(admin, body)
       case 'examTicketList': return await examTicketList(admin, body)

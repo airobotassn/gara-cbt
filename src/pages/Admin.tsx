@@ -121,6 +121,7 @@ const SUBS: Record<TopMenu, SubItem[]> = {
   site: [
     { key: 'info', label: '사이트 정보' },
     { key: 'popup', label: '팝업 관리' },
+    { key: 'fx', label: '환율 관리' },
     { key: 'admins', label: '관리자 관리', root: true },
   ],
 }
@@ -297,6 +298,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     // ── 홈페이지 관리 ──
     case 'site/info': return <SiteInfoAdmin />
     case 'site/popup': return <PopupAdmin />
+    case 'site/fx': return <FxAdmin />
     case 'site/admins': return isRoot ? <AdminAccountsAdmin /> : <HomeDashboard go={go} />
     default: return <HomeDashboard go={go} />
   }
@@ -6228,5 +6230,104 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
         </div>
       )}
     </>
+  )
+}
+
+
+// ---------- 홈페이지 관리 > 환율 관리 ----------
+// 정가는 달러 하나이고(2026-08-13), 국내 결제만 이 환율로 원화 환산해 청구한다.
+// ⚠️ 여기서 바꾼 값은 **다음 주문부터** 적용된다. 이미 만들어진 주문은 생성 시점 환율이 박혀 있고
+//    그걸 나중에 바꾸면 화면에 뜬 금액과 청구액이 갈려 결제가 통째로 막힌다(payments.fx_rate).
+interface FxRow { currency: string; rate: number; source: string; fetched_at: string; updated_at: string }
+
+function FxAdmin() {
+  const [rows, setRows] = useState<FxRow[]>([])
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const load = async () => {
+    const r = await callFunction<{ rates: FxRow[] }>('admin', { action: 'fxGet' })
+    setRows(r.rates ?? [])
+    setDraft(String(r.rates?.[0]?.rate ?? ''))
+  }
+  // 첫 로딩 — 화면을 떠난 뒤 응답이 와서 없는 컴포넌트에 쓰지 않도록 alive 로 막는다.
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const r = await callFunction<{ rates: FxRow[] }>('admin', { action: 'fxGet' })
+      if (!alive) return
+      setRows(r.rates ?? [])
+      setDraft(String(r.rates?.[0]?.rate ?? ''))
+    })()
+    return () => { alive = false }
+  }, [])
+
+  const krwRow = rows.find((r) => r.currency === 'KRW')
+  const manual = krwRow?.source === 'manual'
+
+  async function save(mode: 'manual' | 'auto') {
+    if (busy) return
+    setBusy(true); setMsg('')
+    try {
+      await callFunction('admin', mode === 'auto'
+        ? { action: 'fxSave', currency: 'KRW', mode: 'auto' }
+        : { action: 'fxSave', currency: 'KRW', rate: Number(draft) })
+      await load()
+      setMsg(mode === 'auto' ? '자동 수집값으로 되돌렸습니다.' : '저장했습니다. 다음 주문부터 적용됩니다.')
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '실패했습니다.')
+    } finally { setBusy(false) }
+  }
+
+  // 지금 환율이면 정가가 원화로 얼마가 되는지 — 관리자가 체감할 수 있어야 값이 낡은 걸 알아챈다.
+  const preview = (cents: number) => krwRow ? Math.ceil((cents / 100) * Number(krwRow.rate)) : 0
+
+  return (
+    <section className="ad-card">
+      <h2 className="ad-h2">환율 관리</h2>
+      <p style={{ color: 'var(--muted)', marginBottom: 16 }}>
+        정가는 달러 하나입니다. <b>국내(한국) 결제만</b> 이 환율로 원화 환산해 청구합니다 — 해외 결제는 달러 그대로입니다.
+      </p>
+
+      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>$1 당 원화</span>
+          <input
+            style={{ ...inpStyle, width: 160, fontSize: 18, fontWeight: 700 }}
+            type="number" min={100} max={100000} step={1}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+        </label>
+        <button className="ad-btn ad-btn-primary" disabled={busy} onClick={() => void save('manual')}>
+          이 값으로 고정
+        </button>
+        <button className="ad-btn" disabled={busy} onClick={() => void save('auto')}>
+          지금 환율 다시 받기
+        </button>
+      </div>
+
+      <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.7 }}>
+        <div>
+          현재 적용값 <b style={{ color: 'var(--fg)' }}>{krwRow ? Number(krwRow.rate).toLocaleString('ko') : '-'}원</b>
+          {' · '}{manual ? '수동 고정' : '자동 수집'}
+          {krwRow?.fetched_at ? ` · ${fmtDT(krwRow.fetched_at)} 기준` : ''}
+        </div>
+        <div>
+          {manual
+            ? '수동으로 고정돼 있어 자동 수집이 덮어쓰지 않습니다. 자동으로 돌리려면 “지금 환율 다시 받기”를 누르세요.'
+            : '주 1회 자동으로 갱신됩니다. 수집이 실패하면 마지막 값을 계속 씁니다 — 환율 때문에 결제가 멈추지는 않습니다.'}
+        </div>
+        <div style={{ marginTop: 10 }}>
+          지금 값 기준 청구액 — $1 = {preview(100).toLocaleString('ko')}원 · $2 = {preview(200).toLocaleString('ko')}원 · $3 = {preview(300).toLocaleString('ko')}원
+        </div>
+        <div style={{ marginTop: 10, color: 'var(--warn, #c77)' }}>
+          ⚠️ 바꾼 값은 <b>다음 주문부터</b> 적용됩니다. 이미 결제 중인 주문은 만들 때의 환율로 청구됩니다.
+        </div>
+      </div>
+
+      {msg && <p style={{ marginTop: 14 }}>{msg}</p>}
+    </section>
   )
 }
