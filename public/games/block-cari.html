@@ -49,21 +49,35 @@
   @keyframes fl{0%{opacity:.34}100%{opacity:0}}
 
   /* ── 상단 ─────────────────────────────────── */
-  .top{flex:0 0 auto;display:flex;align-items:center;gap:9px;margin:10px 12px 7px;padding:8px 11px;border:1px solid rgba(88,210,255,.28);border-radius:13px;background:linear-gradient(180deg,rgba(8,35,66,.94),rgba(5,19,40,.94));box-shadow:0 8px 20px rgba(0,0,0,.35),inset 0 0 18px rgba(20,151,220,.08)}
-  .day{padding:6px 13px;border-radius:9px;background:#b9903f;color:#221a08;font-weight:900;font-size:14.5px}
-  .prog{font-size:14px;font-weight:800;color:#9aa2b6}
-  .strikes{margin-left:auto;display:flex;gap:4px;align-items:center}
-  .strikes span{width:16px;height:16px;border-radius:4px;border:2px solid rgba(255,255,255,.28)}
-  .strikes span.on{background:#e3453a;border-color:#e3453a;box-shadow:0 0 10px rgba(227,69,58,.6)}
-  .sc{font-size:16px;font-weight:900;color:#e9ecf3;margin-left:7px}
+  /* ⚠️ 아트를 깐 상자는 그림 비율로 고정한다 — 내용 높이에 맡기면 100% 100% 배경이 눌려서
+     테두리 두께와 슬롯 위치가 통째로 어긋난다(HUD 는 4.618:1, 규정집은 2.988:1).
+     아래 %좌표는 전부 원본 PNG 를 스캔해 얻은 슬롯 안쪽 값이다. 그림을 갈면 다시 재야 한다.
+       hud-v3 1727×374 : 일차칸 x4.9~19.5 y16.3~78.9 · 가운데판 x23.8~71.9 y20.9~78.9
+                         경고장 3칸 x75.3/82.9/90.3 (각 5.7) y19~58.3 · 점수바 x75.2~95.8 y73~86.9 */
+  .top{position:relative;flex:0 0 auto;width:calc(100% - 18px);aspect-ratio:1727/374;margin:7px auto 3px;padding:0;border:0;
+    background:url('/games/block-cari-hud-v3.png') center/100% 100% no-repeat;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35))}
+  .day{position:absolute;left:4.9%;top:16.3%;width:14.6%;height:62.6%;padding:0;background:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;
+    color:#ffd980;font-weight:950;font-size:min(22px,4.9vw);text-shadow:0 2px 3px #06121f}
+  .day i{font-style:normal;font-size:.52em;font-weight:800;color:#8fd4ff;letter-spacing:.06em;margin-top:.24em}
+  .prog{position:absolute;left:23.8%;top:20.9%;width:48.1%;height:58%;display:grid;place-items:center;
+    font-size:min(24px,5.4vw);font-weight:900;color:#dbeaff;font-variant-numeric:tabular-nums;text-shadow:0 2px 4px #04101d}
+  .strikes{position:absolute;left:75.3%;top:19%;width:20.6%;height:39.3%;margin:0;display:flex;justify-content:space-between;align-items:stretch}
+  /* 빈 칸은 그림이 이미 그려져 있다 — 켜졌을 때만 채운다. */
+  .strikes span{width:27.6%;height:100%;border:0;border-radius:2px;background:none}
+  .strikes span.on{background:linear-gradient(#ff6a5a,#c92b20);box-shadow:0 0 10px rgba(227,69,58,.75),inset 0 1px 0 rgba(255,255,255,.35)}
+  .sc{position:absolute;left:75.2%;top:73%;width:20.6%;height:13.9%;margin:0;display:grid;place-items:center;
+    font-size:min(12px,2.7vw);font-weight:900;color:#bfe6ff;font-variant-numeric:tabular-nums}
 
   /* ── 규정집 ───────────────────────────────── */
-  .book{flex:0 0 auto;margin:0 13px 8px;background:linear-gradient(145deg,rgba(10,30,55,.96),rgba(6,18,38,.96));border:1px solid rgba(70,200,255,.25);
-    border-radius:13px;padding:8px 10px}
-  .brow{display:flex;align-items:flex-start;gap:7px;margin-bottom:5px}
-  .brow:last-child{margin-bottom:0}
+  /* rules-v3 1763×590 : 위 줄 y11.4~46 · 아래 줄 y54.6~89.2 (둘 다 x4.6~95.4) */
+  .book{position:relative;flex:0 0 auto;width:calc(100% - 18px);aspect-ratio:1763/590;margin:0 auto 5px;padding:0;border:0;
+    background:url('/games/block-cari-rules-v3.png') center/100% 100% no-repeat;filter:drop-shadow(0 7px 12px rgba(0,0,0,.28))}
+  .brow{position:absolute;left:5.6%;width:88.8%;height:34.6%;margin:0;display:flex;align-items:center;gap:8px;overflow:hidden}
+  .brow:nth-of-type(1){top:11.4%}
+  .brow:nth-of-type(2){top:54.6%}
   .blab{flex:0 0 auto;font-size:12.5px;font-weight:900;letter-spacing:.02em;color:#8b93a8;
-    padding:5px 0;width:62px}
+    padding:0;width:60px}
   .blab.red{color:#f08a80}
   .chips{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:4px}
   .chip{padding:6px 12px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;
@@ -108,11 +122,14 @@
   .paper.done .tk{cursor:default}
 
   /* ── 도장 ─────────────────────────────────── */
-  .stamps{flex:0 0 auto;display:flex;gap:9px;padding:0 13px calc(12px + env(safe-area-inset-bottom))}
-  .st{flex:1 1 0;padding:17px 8px;border:1px solid rgba(255,255,255,.22);border-radius:14px;cursor:pointer;
-    font:900 17px/1 system-ui,sans-serif;letter-spacing:-.01em}
-  .st.send{background:linear-gradient(#2faff3,#1452bd);color:#fff;box-shadow:0 4px 0 #092e72,0 0 18px rgba(44,172,246,.28)}
-  .st.rej{background:linear-gradient(#f05d55,#a91f28);color:#fff;box-shadow:0 4px 0 #68131a,0 0 18px rgba(234,52,61,.22)}
+  /* ⚠️ 두 도장은 그림 비율이 서로 다르다(전송 2.688 · 반려 2.534) — flex:1 로 같은 폭을 주면
+     둘 다, 그것도 서로 다르게 찌그러진다. 높이를 맞추고 폭은 각자 비율에 맡긴다. */
+  .stamps{flex:0 0 auto;display:flex;justify-content:center;align-items:flex-end;gap:10px;padding:0 13px calc(12px + env(safe-area-inset-bottom))}
+  .st{flex:0 0 auto;height:76px;width:auto;padding:0 0 6px;border:0;cursor:pointer;color:#fff;
+    display:grid;place-items:center;font:950 17px/1 system-ui,sans-serif;letter-spacing:-.01em;
+    text-shadow:0 2px 4px rgba(0,0,0,.7);filter:drop-shadow(0 7px 9px rgba(0,0,0,.35))}
+  .st.send{aspect-ratio:1892/704;background:url('/games/block-cari-send-v3.png') center/100% 100% no-repeat}
+  .st.rej{aspect-ratio:1916/756;background:url('/games/block-cari-reject-v3.png') center/100% 100% no-repeat}
   .st:active{transform:translateY(2px)}
   .st:disabled{opacity:.4;cursor:default;transform:none}
 
@@ -180,7 +197,7 @@
   /* 인트로는 팝업이 아니라 하나의 게임 시작 화면이다. */
   #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-intro-v2.png') center top/cover no-repeat;backdrop-filter:none}
   #startOv.hidden{display:none}
-  #startOv .sheet{max-width:460px;max-height:55%;padding:16px 17px 14px;border-color:rgba(82,207,255,.32);border-radius:22px;background:linear-gradient(180deg,rgba(8,30,57,.92),rgba(5,18,38,.97));box-shadow:0 20px 55px rgba(0,0,0,.55),inset 0 0 28px rgba(22,142,208,.08)}
+  #startOv .sheet{max-width:460px;max-height:56%;padding:29px 33px 25px;border:0;border-radius:0;background:url('/games/block-cari-intro-panel-v3.png') center/100% 100% no-repeat;box-shadow:none;filter:drop-shadow(0 20px 24px rgba(0,0,0,.55))}
   #startOv #sArt{display:none}
   #startOv .ttl{font-size:30px;margin:0 0 3px;text-shadow:0 3px 12px #000}
   #startOv .lead{margin-bottom:9px;color:#c8d8ed}
@@ -190,7 +207,7 @@
   #startOv .rules{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:11px}
   #startOv .rules li{font-size:13.5px;line-height:1.45;padding:9px 11px;border:1px solid rgba(96,204,255,.13);background:rgba(255,255,255,.055)}
   @media (max-width:410px){ #startOv .rules li{font-size:12.5px;padding:8px 10px} #startOv .lead{font-size:13.5px} }
-  #startOv .btn{padding:15px;background:linear-gradient(#f2c35d,#c58a20);box-shadow:0 4px 0 #744b0b,0 0 18px rgba(255,193,72,.24)}
+  #startOv .btn{height:62px;padding:4px 18px 10px;border-radius:0;background:url('/games/block-cari-start-v3.png') center/100% 100% no-repeat;box-shadow:none;font-size:18px;text-shadow:0 1px rgba(255,232,160,.7)}
 
   #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-fail-v2.png') center top/cover no-repeat;backdrop-filter:none}
   #overOv.cleared{background-image:url('/games/block-cari-success-v2.png')}
@@ -200,9 +217,31 @@
   #overOv .bigscore{font-size:43px}
   #overOv .note{margin-bottom:10px;padding:9px 12px}
   #overOv .btn{background:linear-gradient(#2faff3,#1452bd);color:#fff}
+  /* 해고 판은 '틀'이 아니라 '배치도'다 — 붉은 제목칸 · 큰 점수칸 · 작은 칸 셋 · 넓은 한 줄 · 파란 버튼칸.
+     그래서 그림 비율로 고정하고 각 요소를 그 칸에 직접 앉힌다(패딩으로 밀어 맞추면 화면 크기마다 어긋난다).
+     fail-panel-v3 820×1806 : 점수칸 y13.7~47.9(x12~88) · 통계 3칸 x12/38.7/65.4(각 22.7) y50.4~61.4
+                              한 줄 x14.6~85.1 y65.1~81.2 · 버튼칸 x14~85.8 y86.4~93.5 */
+  #overOv:not(.cleared) .sheet{position:relative;width:auto;max-width:100%;height:min(88%,820px);max-height:88%;aspect-ratio:820/1806;
+    padding:0;border:0;border-radius:0;overflow:visible;background:url('/games/block-cari-fail-panel-v3.png') center/100% 100% no-repeat;
+    box-shadow:none;filter:drop-shadow(0 20px 28px rgba(0,0,0,.65))}
+  #overOv:not(.cleared) .sheet>*{position:absolute;margin:0;display:grid;place-items:center;text-align:center}
+  #overOv:not(.cleared) .ttl{left:12%;top:3.4%;width:76%;height:8%;font-size:min(30px,3.4vh)}
+  #overOv:not(.cleared) .bigscore{left:12%;top:16%;width:76%;height:22%;font-size:min(64px,7.2vh);line-height:1}
+  #overOv:not(.cleared) .biglab{left:12%;top:38.5%;width:76%;height:6%;font-size:min(14px,1.7vh)}
+  #overOv:not(.cleared) .newbest{left:12%;top:44%;width:76%;height:5%;font-size:min(13px,1.6vh)}
+  #overOv:not(.cleared) .stats{left:12%;top:50.4%;width:76%;height:11%;display:flex;justify-content:space-between;gap:0}
+  #overOv:not(.cleared) .stats .stat{width:29.9%;height:100%;display:grid;place-items:center;align-content:center;gap:2px;background:none;border:0;padding:0}
+  #overOv:not(.cleared) .stats .stat b{font-size:min(22px,2.6vh)}
+  #overOv:not(.cleared) .stats .stat span{font-size:min(11px,1.35vh)}
+  #overOv:not(.cleared) .note{left:14.6%;top:65.1%;width:70.5%;height:16.1%;padding:0 8px;background:none;border:0;
+    font-size:min(13px,1.6vh);line-height:1.45;overflow:hidden}
+  /* 버튼칸은 그림에 이미 파란 판으로 그려져 있다 — 위에 또 칠하지 않는다. */
+  #overOv:not(.cleared) .btn{left:14%;top:86.4%;width:71.8%;height:7.1%;background:none!important;box-shadow:none;border:0;border-radius:0;
+    font-size:min(18px,2.1vh);text-shadow:0 2px 4px rgba(0,10,30,.8)}
+  #overOv:not(.cleared) .ttl{color:#ff6f67;text-shadow:0 0 16px rgba(255,45,45,.55)}
 
   @media (max-height:720px){
-    #startOv .sheet{max-height:59%} #startOv .lead{display:none} #startOv .rules li{font-size:11.5px;padding:5px 7px}
+    #startOv .sheet{max-height:59%;padding:23px 28px 20px} #startOv .lead{display:none} #startOv .rules li{font-size:11.5px;padding:5px 7px}
     #overOv .sheet{max-height:55%}.stats{margin-bottom:8px}.note{font-size:12.5px}
   }
 </style>
@@ -213,8 +252,8 @@
   <div id="flash"></div>
 
   <div class="top">
-    <span class="day" id="dayEl">1일차</span>
-    <span class="prog" id="progEl">0 / 4</span>
+    <span class="day" id="dayEl">1<i>일차</i></span>
+    <span class="prog" id="progEl">1 / 4</span>
     <span class="strikes" id="strEl"></span>
     <span class="sc" id="scEl">0</span>
   </div>
@@ -438,8 +477,8 @@ function renderBook(newOnes){
 }
 
 function renderHud(){
-  $('dayEl').textContent=DAYS[di].n+'일차';
-  $('progEl').textContent=qi+' / '+DAYS[di].docs.length;
+  $('dayEl').innerHTML=DAYS[di].n+'<i>일차</i>';   // 정사각 슬롯이라 숫자 크게 + '일차' 작게 두 줄
+  $('progEl').textContent=(qi+1)+' / '+DAYS[di].docs.length;
   $('scEl').textContent=score.toLocaleString();
   $('strEl').innerHTML=Array.from({length:MAX_STRIKE},(_,i)=>`<span class="${i<strikes?'on':''}"></span>`).join('');
 }
