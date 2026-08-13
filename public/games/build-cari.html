@@ -258,8 +258,10 @@ body{
 #ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
 #ovStart #btnStart{position:absolute;z-index:1;left:38%;top:86.5%;width:24%;height:11%;margin:0!important;padding:0!important;
   border:0;background:none;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
-/* 튜토리얼 — 아래 바 왼쪽 빈 판(x11~41.8%, y86~97.1%). 시작(초록 원)과 나란히 선다. */
-#ovStart #btnTutIntro{position:absolute;z-index:1;left:11%;top:86%;width:30.8%;height:11.1%;margin:0!important;padding:0!important;
+/* 튜토리얼 — 아래 바 왼쪽 빈 판. 판의 어두운 면 x9.8~34.8% · y87.9~95.5%(중심 22.3%/91.7%,
+   초록 시작 버튼의 세로 중심 92% 와 같은 줄). 판 색이 가장자리로 갈수록 옅어져서 임계값 스캔만으로는
+   오른쪽으로 밀린다 — 실제 렌더를 잘라 눈으로 맞춘 값이다. */
+#ovStart #btnTutIntro{position:absolute;z-index:1;left:9.8%;top:87.9%;width:25%;height:7.6%;margin:0!important;padding:0!important;
   border:0;background:none;box-shadow:none;filter:none;display:grid;place-items:center;
   color:#e8dcc2;font-size:calc(var(--ch)*.027);font-weight:900;letter-spacing:-.01em;text-shadow:0 2px 3px #000;}
 
