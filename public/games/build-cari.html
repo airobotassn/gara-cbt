@@ -258,10 +258,12 @@ body{
 #ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
 #ovStart #btnStart{position:absolute;z-index:1;left:38%;top:86.5%;width:24%;height:11%;margin:0!important;padding:0!important;
   border:0;background:none;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
-/* 튜토리얼 — 아래 바 왼쪽 빈 판. 판의 어두운 면 x9.8~34.8% · y87.9~95.5%(중심 22.3%/91.7%,
-   초록 시작 버튼의 세로 중심 92% 와 같은 줄). 판 색이 가장자리로 갈수록 옅어져서 임계값 스캔만으로는
-   오른쪽으로 밀린다 — 실제 렌더를 잘라 눈으로 맞춘 값이다. */
-#ovStart #btnTutIntro{position:absolute;z-index:1;left:11.1%;top:88.04%;width:22.3%;height:7.15%;margin:0!important;padding:0!important;
+/* 튜토리얼 — 아래 바 왼쪽 홈. 중심은 홈과 같고(22.3% / 91.7%, 초록 시작 버튼의 세로 중심 92% 와 같은 줄)
+   크기는 홈 바닥(22.3%×7.15%)이 아니라 홈 바깥 테두리까지 덮는다.
+   ⚠️ 홈 바닥에 딱 맞추면 안 된다 — 버튼 그림에 이미 자기 테두리가 있어서 바 → 홈 테두리 → 버튼 테두리
+      3중 액자가 되고, 90px 짜리 버튼 안에서 전부 뭉개진다(실기기에서 그렇게 보였다).
+      홈을 덮으면 테두리가 하나로 읽힌다. 비율(2.108)은 그대로 — 폭을 바꾸면 높이도 같이 계산할 것. */
+#ovStart #btnTutIntro{position:absolute;z-index:1;left:8.75%;top:87.35%;width:27.1%;height:8.69%;margin:0!important;padding:0!important;
   border:0;background:transparent url('/games/build-cari-tut-btn-v1.png') center/100% 100% no-repeat;box-shadow:none;
   filter:none;display:grid;place-items:center;
   /* ⚠️ 글자는 어두운 잉크다 — 버튼 그림의 가운데 면이 밝은 크림색이라 흰 글자를 얹으면 대비가 안 난다.
