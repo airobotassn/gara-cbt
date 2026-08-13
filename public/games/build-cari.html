@@ -66,9 +66,7 @@ body{
   background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;
   transition:transform var(--tk) linear, opacity .28s ease;}
 .item::after{display:none;}
-.item.xgood{box-shadow:0 0 0 3px var(--good), 0 0 14px var(--good);}
-.item.xbad{opacity:.12;}
-.item.xmiss{opacity:.08;}
+/* 상자 결말 표시는 v4 블록에서 다시 정의한다(초록 테두리 → 흡수/거부 연출). */
 
 /* palette */
 .palette{display:flex;gap:8px;justify-content:center;padding:3px 12px 2px;}
@@ -205,6 +203,35 @@ body{
   background:rgba(8,28,58,.32);backdrop-filter:blur(5px);}
 /* ⚠️ flex:0 0 auto 필수 — 래퍼가 flex 라 줄어든 폭에 맞춰 .grid 가 한 번 더 눌린다(52px 칸이 밖으로 밀림). */
 .grid{flex:0 0 auto;transform:scale(var(--gs));transform-origin:top center;}
+/* 상자가 함에 닿았을 때 — 성공은 초록 테두리, 실패·놓침은 그냥 흐려지기였다. 실패와 놓침이
+   구분이 안 되고 성공도 "테두리 한 줄" 이라 안 읽혔다.
+   ⚠️ .item 의 transform 은 칸 좌표라 애니메이션에 쓰면 상자가 순간이동한다 — 연출은 box-shadow ·
+      filter · opacity 로만 만든다. 흔들기 같은 transform 연출은 함(.ci) 쪽에 건다. */
+.item.xgood{animation:itGood .42s ease-out forwards;}
+@keyframes itGood{
+  0%{box-shadow:0 0 0 0 rgba(255,255,255,.95);filter:brightness(1.7)}
+  45%{box-shadow:0 0 0 11px rgba(255,255,255,0);filter:brightness(1.2)}
+  100%{opacity:0;filter:brightness(1)}
+}
+.item.xbad{animation:itBad .45s ease-out forwards;}
+@keyframes itBad{
+  0%{box-shadow:0 0 0 3px #ff3b30,0 0 14px 3px rgba(255,59,48,.85);filter:saturate(.25) brightness(.75)}
+  60%{box-shadow:0 0 0 3px rgba(255,59,48,.55),0 0 10px 2px rgba(255,59,48,.3);filter:saturate(.25) brightness(.7)}
+  100%{opacity:0}
+}
+.item.xmiss{animation:itMiss .4s ease-in forwards;}
+@keyframes itMiss{ 0%{filter:grayscale(1) brightness(.85)} 100%{opacity:0;filter:grayscale(1) brightness(.6)} }
+/* 함 반응 — 상자보다 크고 자리가 고정이라 제일 잘 읽히는 신호다. 받으면 삼키듯 커졌다 돌아오고,
+   틀린 색이 오면 고개를 젓는다. */
+.cell.binOk .ci.bin{animation:binOk .5s cubic-bezier(.3,1.5,.5,1);}
+@keyframes binOk{0%{transform:scale(1)}30%{transform:scale(1.16)}100%{transform:scale(1)}}
+.cell.binNo .ci.bin{animation:binNo .45s ease-out;}
+@keyframes binNo{0%,100%{transform:translateX(0)}18%{transform:translateX(-3px)}38%{transform:translateX(3px)}58%{transform:translateX(-2px)}78%{transform:translateX(2px)}}
+/* ⚠️ 테두리 색만 바꾸면 안 된다 — 빨강 함은 원래 테두리가 빨강이라 오류인지 아닌지 구분이 안 된다.
+      면 색까지 같이 바꿔서 어느 함에서든 성공/실패가 같은 신호로 읽히게 한다. */
+.cell.binOk .ci.bin .binbox{background:#e4fbf2!important;}
+.cell.binNo .ci.bin .binbox{border-color:#ff3b30!important;background:#ffe4e0!important;}
+
 /* 센서 출구 화살표 — 어느 색이 어디로 나가는지를 타일 위에서 바로 읽게 한다.
    ⚠️ 그림 회전(--rot)에 얹지 말 것. 방향 클래스로 따로 놓아야 그림을 갈아도 안 어긋난다. */
 /* 튜토리얼 지목 — 지금 눌러야 하는 것 하나만 빛난다(칸·도구·가동 버튼 공용). */
@@ -629,6 +656,12 @@ function killItem(it,fate,offgrid){
   if(fate==='good'||fate==='bad'){ const b=grid[it.r]&&grid[it.r][it.c]; routeLog.push({feat:it.feat,want:b?b.want:null,ok:fate==='good'}); }
   if(it.el){ updateToken(it); const el=it.el; el.classList.add('x'+fate);
     setTimeout(()=>el.remove(), Math.max(240, L.tick*0.9)); }
+  // 함도 같이 반응시킨다 — 상자는 26px 이라 그것만으로는 성공/실패가 안 읽힌다.
+  if((fate==='good'||fate==='bad') && cellEls[it.r] && cellEls[it.r][it.c]){
+    const cd=cellEls[it.r][it.c], cls=fate==='good'?'binOk':'binNo';
+    cd.classList.remove('binOk','binNo'); void cd.offsetWidth;   // 연속 도착에도 다시 재생되게
+    cd.classList.add(cls); setTimeout(()=>cd.classList.remove(cls), 520);
+  }
   updateScore();
 }
 function tick(){
