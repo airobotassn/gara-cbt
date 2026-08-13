@@ -499,26 +499,46 @@ const LEVELS=[
    "이 게임이 뭔지 모르겠다" 는 글로 안 풀린다 — 한 번 굴려보게 한다.
    ⚠️ 자동 실행하지 않는다. 눌러야 시작한다 — 아는 사람에게 두 번 시키면 그게 더 나쁘다.
    ⚠️ 대신 언제든 다시 할 수 있어야 한다(한 번 해도 이해 못 할 수 있다) → 진입점이 인트로·게임화면 둘.
-   도구 셋(컨베이어·지우개·센서)을 다 거치게 짠다 — 게임에서 쓰는 조작이 그 셋뿐이라
-   하나라도 빼면 결국 "이건 뭐지" 가 다시 생긴다.
+   ⚠️ 한 라운드에 다 넣지 않는다 — 도구마다 짧은 라운드 하나씩이고, 각자 자기 가동으로 끝난다.
+      길게 이으면 중간에 뭘 배웠는지 흐려지고, 다시 보고 싶은 부분만 볼 수도 없다.
+   ⚠️ 끝나면 그냥 끝난다 — 메인 게임으로 밀어넣지 않는다. 시작한 자리(인트로 / 하던 레벨)로 돌아간다.
    ⚠️ `pre` = 미리 깔아두는 타일. 지우개는 "지울 게 있어야" 가르칠 수 있어서, 일부러 위쪽으로 놓인
       컨베이어를 길목에 심어둔다(상자를 되돌려 보내는, 눈에 띄게 틀린 배치). */
-const TUT_LEVEL={ name:'튜토리얼', sub:'따 라 해 보 기', tick:520,
-  goal:'', source:{r:1,c:1,dir:2}, pattern:['R','B','R','B'], need:4, win:4, sense:'R',
-  bins:[{r:3,c:3,want:'R'},{r:4,c:1,want:'B'}],
-  pre:[[3,1,'conv',0]],
-  sol:[[2,1,'conv',2],[3,1,'sensor',2],[3,2,'conv',1]], take:'' };
-const TUT_STEPS=[
-  { msg:'CARI 가 상자를 <b>아래로</b> 내보내요. 빛나는 칸을 눌러 <b>컨베이어</b>를 놓아요', cell:[2,1] },
-  { msg:'다음 칸은 <b>위로</b> 놓여 있어요 — 상자가 되돌아가요. <b>지우개</b>를 골라요', tool:'erase' },
-  { msg:'빛나는 칸을 눌러 <b>지워요</b>', cell:[3,1] },
-  { msg:'여기엔 <b>분기 센서</b>가 필요해요. 센서를 골라요', tool:'sensor' },
-  { msg:'지운 칸에 놓아요. 센서는 <b>빨강만</b> 옆으로 빼줘요', cell:[3,1] },
-  { msg:'빨간 화살표 쪽으로 길을 이어야 해요. <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
-  { msg:'빛나는 칸을 눌러요', cell:[3,2] },
-  { msg:'라인 완성! <b>가동</b>을 눌러요', run:true }
+const TUT_ROUNDS=[
+  { title:'컨베이어',
+    level:{ name:'튜토리얼 ①', sub:'컨 베 이 어', tick:520,
+      goal:'', source:{r:2,c:1,dir:2}, pattern:['B','B'], need:2, win:2, sense:null,
+      bins:[{r:4,c:2,want:null}], sol:[[3,1,'conv',2],[4,1,'conv',1]] },
+    steps:[
+      { msg:'CARI 가 상자를 <b>아래로</b> 내보내요. 빛나는 칸을 눌러 <b>컨베이어</b>를 놓아요', cell:[3,1] },
+      { msg:'여기서 <b>오른쪽</b>으로 꺾어야 해요. 아래에서 <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
+      { msg:'빛나는 칸을 눌러요', cell:[4,1] },
+      { msg:'라인이 이어졌어요. <b>가동</b>을 눌러요', run:true } ] },
+
+  { title:'지우개',
+    level:{ name:'튜토리얼 ②', sub:'지 우 개', tick:520,
+      goal:'', source:{r:2,c:2,dir:2}, pattern:['B','B'], need:2, win:2, sense:null,
+      bins:[{r:4,c:2,want:null}], pre:[[3,2,'conv',0]], sol:[[3,2,'conv',2]] },
+    steps:[
+      { msg:'이 칸이 <b>위로</b> 놓였어요 — 상자가 되돌아가요. <b>지우개</b>를 골라요', tool:'erase' },
+      { msg:'빛나는 칸을 눌러 <b>지워요</b>', cell:[3,2] },
+      { msg:'다시 <b>아래쪽 컨베이어</b>를 골라요', tool:'conv-2' },
+      { msg:'같은 칸에 놓아요', cell:[3,2] },
+      { msg:'<b>가동</b>을 눌러요', run:true } ] },
+
+  { title:'분기 센서',
+    level:{ name:'튜토리얼 ③', sub:'분 기 센 서', tick:520,
+      goal:'', source:{r:1,c:1,dir:2}, pattern:['R','B','R','B'], need:4, win:4, sense:'R',
+      bins:[{r:3,c:3,want:'R'},{r:4,c:1,want:'B'}], pre:[[2,1,'conv',2]],
+      sol:[[3,1,'sensor',2],[3,2,'conv',1]] },
+    steps:[
+      { msg:'빨강·파랑이 섞여 나와요. 갈라줄 <b>분기 센서</b>를 골라요', tool:'sensor' },
+      { msg:'빛나는 칸에 놓아요. 센서는 <b>빨강만</b> 옆으로 빼줘요', cell:[3,1] },
+      { msg:'빨간 화살표 쪽으로 길을 이어요. <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
+      { msg:'빛나는 칸을 눌러요', cell:[3,2] },
+      { msg:'<b>가동</b>을 눌러요', run:true } ] },
 ];
-let tutOn=false, tutIdx=0;
+let tutOn=false, tutIdx=0, tutRound=0, tutFrom='intro', tutReturnLI=0, tutTimer=null;
 
 /* ================= State ================= */
 let LI=0, L=null, grid=[], items=[], nextId=0, cellEls=[];
@@ -657,7 +677,7 @@ function setEditable(on){ $('cells').style.opacity=on?'1':'.92'; }
 function setTool(t){ tool=t; document.querySelectorAll('.tool').forEach(el=>el.classList.toggle('on', el.dataset.tool===t)); }
 
 /* --- 튜토리얼 진행 --- 지금 눌러야 하는 것 하나만 빛나고, 그것만 반응한다. */
-function tutStep(){ return tutOn ? TUT_STEPS[tutIdx] : null; }
+function tutStep(){ return tutOn ? TUT_ROUNDS[tutRound].steps[tutIdx] : null; }
 function tutClear(){ document.querySelectorAll('.tut-on').forEach(el=>el.classList.remove('tut-on')); }
 function tutSetHelp(){
   const b=$('btnTut'); if(!b) return;
@@ -672,12 +692,21 @@ function tutMark(){
   if(s.run) $('btnRun').classList.add('tut-on');
   $('hintLine').innerHTML=s.msg;
 }
-function tutNext(){ tutIdx++; if(tutIdx>=TUT_STEPS.length){ tutClear(); return; } tutMark(); }
-function startTutorial(){
+function tutNext(){ tutIdx++; if(tutIdx>=TUT_ROUNDS[tutRound].steps.length){ tutClear(); return; } tutMark(); }
+function loadTutRound(){ tutIdx=0; startLevel(-1, TUT_ROUNDS[tutRound].level); tutMark(); }
+/** from='intro' | 'game' — 끝나거나 그만두면 시작한 자리로 돌려보낸다(메인 게임으로 밀지 않는다). */
+function startTutorial(from){
+  if(from){ tutFrom=from; if(from==='game') tutReturnLI=LI; }
+  clearTimeout(tutTimer);
   $('ovStart').classList.add('hide'); $('ovResult').classList.add('hide');
-  tutOn=true; tutIdx=0; startLevel(-1, TUT_LEVEL); tutSetHelp(); tutMark();
+  tutOn=true; tutRound=0; loadTutRound(); tutSetHelp();
 }
-function quitTutorial(){ tutOn=false; tutClear(); startLevel(0); }   // startLevel 이 ? 표시를 되돌린다
+function exitTutorial(){
+  clearTimeout(tutTimer); tutOn=false; tutClear();
+  $('ovResult').classList.add('hide');
+  startLevel(tutFrom==='game' ? tutReturnLI : 0);          // startLevel 이 ? 표시를 되돌린다
+  if(tutFrom==='intro') $('ovStart').classList.remove('hide');
+}
 
 $('cells').addEventListener('click',e=>{
   if(running) return;
@@ -704,7 +733,7 @@ $('btnRun').onclick=()=>{
   running?stopSim():startSim();
 };
 $('btnReset').onclick=()=>{ tutOn?startTutorial():startLevel(LI); };
-$('btnTut').onclick=()=>{ tutOn?quitTutorial():startTutorial(); };
+$('btnTut').onclick=()=>{ tutOn?exitTutorial():startTutorial('game'); };
 
 /* ================= Result ================= */
 function finish(){
@@ -712,13 +741,19 @@ function finish(){
   const win=good>=L.win;
   // ⚠️ 튜토리얼은 점수를 보내지 않는다 — 랭킹은 실제 도달 레벨만 센다.
   if(tutOn){
-    $('resBadge').textContent='다 됐어요!'; $('resBadge').className='badge win';
-    $('resTitle').textContent='라인만 깔면 상자가 알아서 흘러가요';
-    $('resTake').textContent='이제 진짜 레벨을 해볼까요?';
+    // 중간 라운드는 결과창을 띄우지 않는다 — 짧은 레슨 사이에 창이 끼면 흐름이 끊긴다.
+    if(tutRound < TUT_ROUNDS.length-1){
+      $('hintLine').innerHTML=`좋아요! 다음 — <b>${TUT_ROUNDS[tutRound+1].title}</b>`;
+      tutTimer=setTimeout(()=>{ if(!tutOn) return; tutRound++; loadTutRound(); }, 1500);
+      return;
+    }
+    $('resBadge').textContent='튜토리얼 끝!'; $('resBadge').className='badge win';
+    $('resTitle').textContent='컨베이어 · 지우개 · 분기 센서';
+    $('resTake').textContent='이제 마음껏 지어봐요.';
     $('resFoot').textContent='';
     $('ovResult').classList.remove('fail');
     $('btnRetry').textContent='다시';
-    const nt=$('btnNext'); nt.hidden=false; nt.textContent='시작'; nt.dataset.win='tut';
+    const nt=$('btnNext'); nt.hidden=false; nt.textContent='닫기'; nt.dataset.win='tut';
     $('ovResult').classList.remove('hide');
     return;
   }
@@ -741,7 +776,7 @@ $('btnRetry').onclick=()=>{ $('ovResult').classList.add('hide'); tutOn?startTuto
 $('btnNext').onclick=()=>{
   const d=$('btnNext').dataset.win;
   $('ovResult').classList.add('hide');
-  if(d==='tut'){ quitTutorial(); return; }               // 튜토리얼 끝 → 레벨 1
+  if(d==='tut'){ exitTutorial(); return; }               // 튜토리얼 끝 → 시작한 자리로(메인 게임으로 안 넘김)
   startLevel(d==='1' ? (LI+1)%LEVELS.length : LI);
 };
 
@@ -750,7 +785,7 @@ buildPalette();
 buildCells();
 startLevel(0);
 $('btnStart').onclick=()=>{ $('ovStart').classList.add('hide'); started=true; startLevel(0); };
-$('btnTutIntro').onclick=()=>{ started=true; startTutorial(); };
+$('btnTutIntro').onclick=()=>{ started=true; startTutorial('intro'); };
 
 /* ================= test hooks ================= */
 window.LEVELS=LEVELS;
