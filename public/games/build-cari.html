@@ -526,17 +526,19 @@ const TUT_ROUNDS=[
       { msg:'같은 칸에 놓아요', cell:[3,2] },
       { msg:'<b>가동</b>을 눌러요', run:true } ] },
 
+  /* ⚠️ 센서는 놓는 것보다 '다시 눌러 돌리는' 게 핵심이다(컨베이어는 도구로 방향을 고르지만
+        센서만 재클릭으로 회전한다) → 상자가 오는 방향과 어긋나게 놓이도록 판을 짜서, 한 번 돌려야
+        풀리게 만든다. 센서는 항상 아래(dir 2)로 놓이므로 여기선 왼쪽(dir 3)이 정답 = 클릭 한 번. */
   { title:'분기 센서',
     level:{ name:'튜토리얼 ③', sub:'분 기 센 서', tick:520,
-      goal:'', source:{r:1,c:1,dir:2}, pattern:['R','B','R','B'], need:4, win:4, sense:'R',
-      bins:[{r:3,c:3,want:'R'},{r:4,c:1,want:'B'}], pre:[[2,1,'conv',2]],
-      sol:[[3,1,'sensor',2],[3,2,'conv',1]] },
+      goal:'', source:{r:3,c:4,dir:3}, pattern:['R','B','R','B'], need:4, win:4, sense:'R',
+      bins:[{r:3,c:1,want:'B'},{r:4,c:2,want:'R'}], pre:[[3,3,'conv',3]],
+      sol:[[3,2,'sensor',3]] },
     steps:[
       { msg:'빨강·파랑이 섞여 나와요. 갈라줄 <b>분기 센서</b>를 골라요', tool:'sensor' },
-      { msg:'빛나는 칸에 놓아요. 센서는 <b>빨강만</b> 옆으로 빼줘요', cell:[3,1] },
-      { msg:'빨간 화살표 쪽으로 길을 이어요. <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
-      { msg:'빛나는 칸을 눌러요', cell:[3,2] },
-      { msg:'<b>가동</b>을 눌러요', run:true } ] },
+      { msg:'빛나는 칸에 놓아요', cell:[3,2] },
+      { msg:'화살표가 상자 오는 방향과 안 맞아요. <b>같은 칸을 다시 눌러</b> 돌려요', cell:[3,2] },
+      { msg:'빨강은 아래, 파랑은 왼쪽으로 갈라져요. <b>가동</b>을 눌러요', run:true } ] },
 ];
 let tutOn=false, tutIdx=0, tutRound=0, tutFrom='intro', tutReturnLI=0, tutTimer=null;
 
