@@ -59,7 +59,10 @@ body{
 .ci.bin .binbox{width:34px;height:26px;border:2.5px solid;border-radius:5px;border-top:0;
   display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;background:#fff;}
 .ci.bin .bsw{width:16px;height:10px;border-radius:3px;}
-.ci.bin .bany{font-size:15px;font-weight:900;color:#b9c2d6;}
+/* '아무 색이나 받는 함' 표시. ⚠️ 물음표를 쓰지 말 것 — "아무거나" 가 아니라 "뭔지 모름" 으로 읽힌다.
+   색 세 개를 나란히 두면 설명 없이 통한다. */
+.ci.bin .bany{display:flex;gap:2px;align-items:center;justify-content:center;font-size:0;}
+.ci.bin .bany i{display:block;width:6px;height:10px;border-radius:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
 
 .ilayer{position:absolute;inset:0;pointer-events:none;z-index:3;}
 .item{position:absolute;left:0;top:0;width:26px;height:26px;
@@ -207,17 +210,19 @@ body{
    구분이 안 되고 성공도 "테두리 한 줄" 이라 안 읽혔다.
    ⚠️ .item 의 transform 은 칸 좌표라 애니메이션에 쓰면 상자가 순간이동한다 — 연출은 box-shadow ·
       filter · opacity 로만 만든다. 흔들기 같은 transform 연출은 함(.ci) 쪽에 건다. */
+/* ⚠️ box-shadow 로 테를 두르지 말 것 — 상자는 그림(PNG)인데 box-shadow 는 26px 네모 박스를 따라
+      그려져서, 화물 모양과 무관한 네모 테가 뜬다. 빛은 drop-shadow 로 준다(그림 실루엣을 따라간다). */
 .item.xgood{animation:itGood .42s ease-out forwards;}
 @keyframes itGood{
-  0%{box-shadow:0 0 0 0 rgba(255,255,255,.95);filter:brightness(1.7)}
-  45%{box-shadow:0 0 0 11px rgba(255,255,255,0);filter:brightness(1.2)}
-  100%{opacity:0;filter:brightness(1)}
+  0%{filter:brightness(2.1) drop-shadow(0 0 2px rgba(255,255,255,.95))}
+  40%{filter:brightness(1.5) drop-shadow(0 0 11px rgba(255,255,255,.9))}
+  100%{opacity:0;filter:brightness(1.2) drop-shadow(0 0 16px rgba(255,255,255,0))}
 }
 .item.xbad{animation:itBad .45s ease-out forwards;}
 @keyframes itBad{
-  0%{box-shadow:0 0 0 3px #ff3b30,0 0 14px 3px rgba(255,59,48,.85);filter:saturate(.25) brightness(.75)}
-  60%{box-shadow:0 0 0 3px rgba(255,59,48,.55),0 0 10px 2px rgba(255,59,48,.3);filter:saturate(.25) brightness(.7)}
-  100%{opacity:0}
+  0%{filter:brightness(1.35) saturate(1.5) drop-shadow(0 0 5px rgba(255,59,48,.95))}
+  40%{filter:brightness(.6) saturate(.2) drop-shadow(0 0 10px rgba(255,59,48,.6))}
+  100%{opacity:0;filter:brightness(.45) saturate(0)}
 }
 .item.xmiss{animation:itMiss .4s ease-in forwards;}
 @keyframes itMiss{ 0%{filter:grayscale(1) brightness(.85)} 100%{opacity:0;filter:grayscale(1) brightness(.6)} }
@@ -597,7 +602,8 @@ function cellInner(r,c){
   if(g.type==='source') return `<div class="ci src"><div class="cmini"><img src="/games/build-cari-play-v5.png" alt="" draggable="false"></div><span class="ar">${ARROW[g.dir]}</span></div>`;
   if(g.type==='bin'){ const col=g.want?FEAT[g.want].c:null;
     return `<div class="ci bin"><div class="binbox" style="border-color:${col||'#b9c2d6'}">`+
-      (col?`<span class="bsw" style="background:${col}"></span>`:`<span class="bany">?</span>`)+`</div></div>`; }
+      (col?`<span class="bsw" style="background:${col}"></span>`
+          :`<span class="bany">${['R','G','B'].map(f=>`<i style="background:${FEAT[f].c}"></i>`).join('')}</span>`)+`</div></div>`; }
   if(g.type==='conv'){ const dn=['up','right','down','left'][g.dir]; return `<div class="ci conv"><img class="tile-asset" src="/games/build-cari-tool-${dn}-v9.png" alt=""></div>`; }
   if(g.type==='sensor'){
     // 센서는 "지정색만 왼쪽으로 꺾고 나머지는 직진"(branchOf) 이다. 그림만으로는 그게 안 읽히므로
