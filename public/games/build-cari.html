@@ -185,7 +185,13 @@ body{
 
 /* 목표 줄 — 전용 아트가 없다. 회색 반투명 띠로 두면 게임 위에 얹힌 웹 요소로 보이므로
    HUD 남색판과 같은 색·테두리·두께 그림자를 줘서 같은 기구의 아랫단으로 읽히게 한다. */
-.hint{margin:7px auto 0;padding:8px 14px;width:fit-content;max-width:calc(100% - 28px);
+.hintrow{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:7px;margin:7px 12px 0;}
+.tut-help{flex:0 0 auto;width:30px;height:30px;padding:0;border-radius:50%;cursor:pointer;
+  border:1.5px solid rgba(238,233,220,.5);background:linear-gradient(#143563,#0d2145);
+  color:#ffd253;font:900 15px/1 system-ui,-apple-system,sans-serif;
+  box-shadow:0 3px 0 rgba(4,14,32,.4),inset 0 1px 0 rgba(255,255,255,.16);}
+.tut-help.quit{color:#ffb0a0;font-size:14px;}
+.hint{margin:0;padding:8px 14px;min-width:0;max-width:100%;
   border:1.5px solid rgba(238,233,220,.5);border-radius:11px;
   background:linear-gradient(#143563,#0d2145)!important;color:#eaf4ff;font-size:12.5px;font-weight:800;line-height:1.3;
   letter-spacing:-.01em;box-shadow:0 3px 0 rgba(4,14,32,.4),inset 0 1px 0 rgba(255,255,255,.16);
@@ -201,6 +207,12 @@ body{
 .grid{flex:0 0 auto;transform:scale(var(--gs));transform-origin:top center;}
 /* 센서 출구 화살표 — 어느 색이 어디로 나가는지를 타일 위에서 바로 읽게 한다.
    ⚠️ 그림 회전(--rot)에 얹지 말 것. 방향 클래스로 따로 놓아야 그림을 갈아도 안 어긋난다. */
+/* 튜토리얼 지목 — 지금 눌러야 하는 것 하나만 빛난다(칸·도구·가동 버튼 공용). */
+@keyframes tutring{
+  0%,100%{box-shadow:0 0 0 3px #ffd253,0 0 10px 2px rgba(255,210,83,.5),inset 0 0 0 2px rgba(8,28,58,.68)}
+  50%    {box-shadow:0 0 0 3px #ffd253,0 0 18px 6px rgba(255,210,83,.95),inset 0 0 0 2px rgba(8,28,58,.68)}
+}
+.tut-on{position:relative;z-index:7;border-radius:12px;animation:tutring 1.15s ease-in-out infinite;}
 .ci .sar{position:absolute;width:0;height:0;z-index:2;
   filter:drop-shadow(0 0 1.6px rgba(255,255,255,.95)) drop-shadow(0 1px 2px rgba(0,10,35,.85));}
 .ci .sar.d0{top:0;left:50%;margin-left:-9px;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:11px solid var(--c);}
@@ -221,7 +233,7 @@ body{
 .control-console .controls{height:auto;padding:0;margin:0;display:flex;justify-content:center;gap:10px;background:none;backdrop-filter:none;}
 /* ⚠️ background-color 를 반드시 죽일 것 — .btn.ghost(리셋)가 배경색 #eef1f8 을 들고 있어서
       투명 PNG 뒤로 흰 상자가 비친다(실제로 리셋 버튼만 흰 테두리가 보였다). */
-.control-console .controls .btn{flex:0 0 auto;width:auto!important;height:64px;aspect-ratio:810/352;
+.control-console .controls .btn{position:relative;flex:0 0 auto;width:auto!important;height:64px;aspect-ratio:810/352;
   padding:0!important;border:0;border-radius:0;background-color:transparent!important;
   background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;
   box-shadow:none;color:#fff;text-shadow:0 2px 3px #111;font-size:16px;display:grid;place-items:center;}
@@ -246,6 +258,10 @@ body{
 #ovStart .rules>div>b{display:none}#ovStart .rules span b{color:#b77800;}
 #ovStart #btnStart{position:absolute;z-index:1;left:38%;top:86.5%;width:24%;height:11%;margin:0!important;padding:0!important;
   border:0;background:none;box-shadow:none;filter:none;overflow:hidden;text-indent:-999px;}
+/* 튜토리얼 — 아래 바 왼쪽 빈 판(x11~41.8%, y86~97.1%). 시작(초록 원)과 나란히 선다. */
+#ovStart #btnTutIntro{position:absolute;z-index:1;left:11%;top:86%;width:30.8%;height:11.1%;margin:0!important;padding:0!important;
+  border:0;background:none;box-shadow:none;filter:none;display:grid;place-items:center;
+  color:#e8dcc2;font-size:calc(var(--ch)*.027);font-weight:900;letter-spacing:-.01em;text-shadow:0 2px 3px #000;}
 
 /* --- 결과 --- ⚠️ 승리/실패 아트는 판 위치가 다르다(실패가 더 아래·짧고 버튼이 1개). 좌표를 공유하지 말 것. */
 #ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
@@ -312,7 +328,12 @@ body{
     <div class="scorepill" id="scorePill"></div>
   </div>
 
-  <div class="hint" id="hintLine"></div>
+  <div class="hintrow">
+    <div class="hint" id="hintLine"></div>
+    <!-- 튜토리얼 두 번째 진입점. 인트로는 페이지당 한 번만 뜨고 '다시 시작' 도 인트로로 안 돌아가서,
+         여기가 없으면 게임에 들어간 뒤엔 튜토리얼을 영영 다시 못 본다. -->
+    <button class="tut-help" id="btnTut" type="button" aria-label="튜토리얼">?</button>
+  </div>
 
   <div class="gridwrap">
     <div class="grid">
@@ -339,10 +360,12 @@ body{
       <div class="tag">라인을 깔면 공장이 알아서 돌아가요!</div>
       <div class="rules">
         <div><b>1</b><span>칸을 눌러 <b>컨베이어</b>를 놓아요</span></div>
-        <div><b>2</b><span>다시 누르면 <b>방향이 회전</b>해요</span></div>
+        <div><b>2</b><span><b>화살표 도구</b>를 골라 방향을 정해요</span></div>
         <div><b>3</b><span><b>분기센서</b>로 색상별 출고함에 보내요</span></div>
       </div>
       <button class="btn" id="btnStart">시작하기</button>
+      <!-- 아래 바의 빈 판(왼쪽)에 얹는다 — 그림에 이미 자리가 있어 아트를 다시 뽑지 않아도 된다. -->
+      <button class="btn" id="btnTutIntro" type="button">튜토리얼</button>
     </div>
   </div>
 
@@ -453,6 +476,22 @@ const LEVELS=[
     take:'센서와 길만 설계했더니 공장이 <b>스스로</b> 두 갈래로 분류해요 — 시스템 설계!' },
 ];
 
+/* ================= 튜토리얼 =================
+   "이 게임이 뭔지 모르겠다" 는 글로 안 풀린다 — 한 번 굴려보게 한다.
+   ⚠️ 자동 실행하지 않는다. 눌러야 시작한다 — 아는 사람에게 두 번 시키면 그게 더 나쁘다.
+   ⚠️ 대신 언제든 다시 할 수 있어야 한다(한 번 해도 이해 못 할 수 있다) → 진입점이 인트로·게임화면 둘.
+   길은 일부러 꺾는다 — 도구를 바꿔야 방향이 바뀐다는 걸(칸을 다시 눌러서가 아니라) 여기서 배운다. */
+const TUT_LEVEL={ name:'튜토리얼', sub:'따 라 해 보 기', tick:520,
+  goal:'', source:{r:2,c:1,dir:2}, pattern:['B','B'], need:2, win:2, sense:null,
+  bins:[{r:4,c:2,want:null}], sol:[[3,1,'conv',2],[4,1,'conv',1]], take:'' };
+const TUT_STEPS=[
+  { msg:'CARI 가 상자를 <b>아래로</b> 내보내요. 빛나는 칸을 눌러 <b>컨베이어</b>를 놓아요', cell:[3,1] },
+  { msg:'여기서 <b>오른쪽</b>으로 꺾어야 해요. 아래에서 <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
+  { msg:'이제 빛나는 칸을 눌러요', cell:[4,1] },
+  { msg:'라인이 이어졌어요. <b>가동</b>을 눌러요', run:true }
+];
+let tutOn=false, tutIdx=0;
+
 /* ================= State ================= */
 let LI=0, L=null, grid=[], items=[], nextId=0, cellEls=[];
 let running=false, timer=null, tickN=0, spawnedCount=0;
@@ -500,8 +539,11 @@ function renderCell(r,c){ cellEls[r][c].innerHTML=cellInner(r,c); }
 function renderBoard(){ for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)renderCell(r,c); }
 
 /* ================= Level load ================= */
-function startLevel(i){
-  stopSim(); LI=i; L=LEVELS[i];
+/** def 를 주면 그 판(=튜토리얼)을 띄운다. 안 주면 평소대로 LEVELS[i] — 이때 튜토리얼 모드는 자동 해제. */
+function startLevel(i, def){
+  stopSim();
+  if(!def){ LI=i; tutOn=false; tutSetHelp(); }
+  L=def||LEVELS[i];
   $('ovResult').classList.add('hide');
   document.documentElement.style.setProperty('--tk', L.tick+'ms');
   grid=[]; for(let r=0;r<ROWS;r++){ grid.push([]); for(let c=0;c<COLS;c++) grid[r].push({type:'empty'}); }
@@ -585,27 +627,72 @@ function updateRunBtn(){ const b=$('btnRun'); b.textContent=running?'멈춤':'�
 function setEditable(on){ $('cells').style.opacity=on?'1':'.92'; }
 function setTool(t){ tool=t; document.querySelectorAll('.tool').forEach(el=>el.classList.toggle('on', el.dataset.tool===t)); }
 
+/* --- 튜토리얼 진행 --- 지금 눌러야 하는 것 하나만 빛나고, 그것만 반응한다. */
+function tutStep(){ return tutOn ? TUT_STEPS[tutIdx] : null; }
+function tutClear(){ document.querySelectorAll('.tut-on').forEach(el=>el.classList.remove('tut-on')); }
+function tutSetHelp(){
+  const b=$('btnTut'); if(!b) return;
+  b.textContent=tutOn?'✕':'?'; b.classList.toggle('quit',tutOn);
+  b.setAttribute('aria-label', tutOn?'튜토리얼 그만두기':'튜토리얼');
+}
+function tutMark(){
+  tutClear();
+  const s=tutStep(); if(!s) return;
+  if(s.cell) cellEls[s.cell[0]][s.cell[1]].classList.add('tut-on');
+  if(s.tool) document.querySelector(`.tool[data-tool="${s.tool}"]`).classList.add('tut-on');
+  if(s.run) $('btnRun').classList.add('tut-on');
+  $('hintLine').innerHTML=s.msg;
+}
+function tutNext(){ tutIdx++; if(tutIdx>=TUT_STEPS.length){ tutClear(); return; } tutMark(); }
+function startTutorial(){
+  $('ovStart').classList.add('hide'); $('ovResult').classList.add('hide');
+  tutOn=true; tutIdx=0; startLevel(-1, TUT_LEVEL); tutSetHelp(); tutMark();
+}
+function quitTutorial(){ tutOn=false; tutClear(); startLevel(0); }   // startLevel 이 ? 표시를 되돌린다
+
 $('cells').addEventListener('click',e=>{
   if(running) return;
   const cd=e.target.closest('.cell'); if(!cd) return;
   const r=+cd.dataset.r, c=+cd.dataset.c, g=grid[r][c];
+  const s=tutStep(); if(s && !(s.cell && s.cell[0]===r && s.cell[1]===c)) return;  // 튜토리얼: 지목한 칸만
   if(g.type==='source'||g.type==='bin') return;
   if(tool==='erase'){ grid[r][c]={type:'empty'}; }
   else if(tool.startsWith('conv-')){ grid[r][c]={type:'conv',dir:+tool.slice(5)}; }
   else if(tool==='sensor' && g.type==='sensor'){ g.dir=(g.dir+1)%4; }
   else { grid[r][c]={type:'sensor',dir:2}; }
   renderCell(r,c);
+  if(s) tutNext();
 });
 document.querySelector('.palette').addEventListener('click',e=>{
-  const t=e.target.closest('.tool'); if(t) setTool(t.dataset.tool);
+  const t=e.target.closest('.tool'); if(!t) return;
+  const s=tutStep(); if(s && s.tool!==t.dataset.tool) return;
+  setTool(t.dataset.tool);
+  if(s) tutNext();
 });
-$('btnRun').onclick=()=>{ running?stopSim():startSim(); };
-$('btnReset').onclick=()=>{ startLevel(LI); };
+$('btnRun').onclick=()=>{
+  const s=tutStep(); if(s && !s.run) return;
+  if(s) tutNext();
+  running?stopSim():startSim();
+};
+$('btnReset').onclick=()=>{ tutOn?startTutorial():startLevel(LI); };
+$('btnTut').onclick=()=>{ tutOn?quitTutorial():startTutorial(); };
 
 /* ================= Result ================= */
 function finish(){
   stopSim();
   const win=good>=L.win;
+  // ⚠️ 튜토리얼은 점수를 보내지 않는다 — 랭킹은 실제 도달 레벨만 센다.
+  if(tutOn){
+    $('resBadge').textContent='다 됐어요!'; $('resBadge').className='badge win';
+    $('resTitle').textContent='라인만 깔면 상자가 알아서 흘러가요';
+    $('resTake').textContent='이제 진짜 레벨을 해볼까요?';
+    $('resFoot').textContent='';
+    $('ovResult').classList.remove('fail');
+    $('btnRetry').textContent='다시';
+    const nt=$('btnNext'); nt.hidden=false; nt.textContent='시작'; nt.dataset.win='tut';
+    $('ovResult').classList.remove('hide');
+    return;
+  }
   $('resCari').src=win?'/games/build-cari-intro-hero-v5.png':'/games/build-cari-fail-v5.png';
   $('resBadge').textContent=win?'출고 완료!':'출고 실패';
   $('resBadge').className='badge '+(win?'win':'lose');
@@ -621,11 +708,12 @@ function finish(){
   nx.dataset.win=win?'1':'0';
   $('ovResult').classList.remove('hide');
 }
-$('btnRetry').onclick=()=>{ $('ovResult').classList.add('hide'); startLevel(LI); };
+$('btnRetry').onclick=()=>{ $('ovResult').classList.add('hide'); tutOn?startTutorial():startLevel(LI); };
 $('btnNext').onclick=()=>{
-  const win=$('btnNext').dataset.win==='1';
+  const d=$('btnNext').dataset.win;
   $('ovResult').classList.add('hide');
-  startLevel(win ? (LI+1)%LEVELS.length : LI);
+  if(d==='tut'){ quitTutorial(); return; }               // 튜토리얼 끝 → 레벨 1
+  startLevel(d==='1' ? (LI+1)%LEVELS.length : LI);
 };
 
 /* ================= Boot ================= */
@@ -633,6 +721,7 @@ buildPalette();
 buildCells();
 startLevel(0);
 $('btnStart').onclick=()=>{ $('ovStart').classList.add('hide'); started=true; startLevel(0); };
+$('btnTutIntro').onclick=()=>{ started=true; startTutorial(); };
 
 /* ================= test hooks ================= */
 window.LEVELS=LEVELS;
