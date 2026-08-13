@@ -267,6 +267,10 @@ body{
       깊이는 틈이 아니라 inset 베벨이 만든다. */
 #ovStart #btnTutIntro{position:absolute;z-index:1;left:9.32%;top:88.11%;width:25.55%;height:7.006%;margin:0!important;padding:0!important;
   border:0;filter:none;display:grid;place-items:center;
+  /* ⚠️ border-radius 를 반드시 0 으로 죽일 것 — 기본 .btn 이 24px 을 들고 있는데 버튼 높이가 43px 이라
+        clip-path 로 딴 모서리를 둥글게 다시 깎아버린다(둘은 교집합으로 적용된다).
+        실제로 우하단이 30px 잘려 홈이 비어 보였다. */
+  border-radius:0;
   clip-path:polygon(2.5% 0,75.8% 0,100% 72.7%,100% 97%,97.1% 100%,25.8% 100%,.8% 33.3%,.8% 3%);
   background:linear-gradient(180deg,#f4ecd8 0%,#e4d8bb 38%,#c9b894 72%,#9d8a67 100%);
   /* clip-path 안쪽은 inset 그림자만 살아남는다(바깥 그림자는 잘린다) → 베벨을 inset 으로 만든다. */
