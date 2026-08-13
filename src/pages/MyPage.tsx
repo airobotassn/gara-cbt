@@ -12,7 +12,7 @@ import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../li
 import { countryName, countryOptions } from '../lib/regions'
 import { loadRegionIndex, loadRegions, type RegionOption } from '../lib/regionCatalog'
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
-import { usdc } from '../lib/money'
+import { krw } from '../lib/money'
 import {
   examDateText,
   ticketReasonText,
@@ -397,9 +397,10 @@ function TicketCard({ tk, t, lang, onGo, onCheck }: {
           </p>
           <p className="font-body-md text-body-md text-on-surface-variant mb-3">
             {t('ticket.issued_at')} {fmtDate(tk.issuedAt)}
-            {/* 관리자·무료 발급분은 0원이라 금액 자리를 통째로 비운다 — `$0` 은 '무료로 팔았다'로 읽힌다.
-                ⚠️ pricePaid 는 원화 스냅샷이다. 표시만 달러로 환산한다(실제 청구액 고지는 결제 화면 소관). */}
-            {tk.pricePaid > 0 ? ` | ${t('ticket.price_paid')} ${usdc(tk.pricePaid, lang)}` : ''}
+            {/* 관리자·무료 발급분은 0원이라 금액 자리를 통째로 비운다 — `0원` 은 '무료로 팔았다'로 읽힌다.
+                ⚠️ pricePaid 는 **그때 실제로 낸 원화 스냅샷**이다(정가가 달러로 바뀐 뒤에도 그렇다).
+                   달러로 환산해 보여주면 안 된다 — 지금 환율로 되돌린 값은 그 사람이 낸 돈이 아니다. */}
+            {tk.pricePaid > 0 ? ` | ${t('ticket.price_paid')} ${krw(tk.pricePaid, lang)}` : ''}
           </p>
           {reason && (
             tk.usable ? (

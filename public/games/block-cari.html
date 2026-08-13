@@ -82,8 +82,9 @@
   .brow{position:absolute;left:6%;width:87%;height:35.8%;margin:0;display:flex;align-items:center;gap:8px;overflow:hidden}
   .brow:nth-of-type(1){top:15.4%}
   .brow:nth-of-type(2){top:55%}
-  .blab{flex:0 0 auto;font-size:12.5px;font-weight:900;letter-spacing:.02em;color:#355f82;
-    padding:0;width:60px}
+  /* ⚠️ 규정집은 매 판 눈으로 훑는 곳이다 — 12px 대로 두면 안 읽힌다(종이 칸은 넉넉하다). */
+  .blab{flex:0 0 auto;font-size:15px;font-weight:900;letter-spacing:.01em;color:#355f82;
+    padding:0;width:70px}
   .blab.red{color:#a3271c}
   .chips{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:4px}
   /* ⚠️ v4 규정집은 크림색 종이다 — 흰 글자·흰 반투명 칩은 그대로 사라진다. 잉크색으로 뒤집을 것. */
@@ -196,10 +197,16 @@
     background:linear-gradient(#e0b158,#c1913a);color:#241b06;font:900 16.5px/1 system-ui,sans-serif}
   .newbest{text-align:center;font-size:14px;font-weight:900;color:#e3b45a;margin:-6px 0 13px}
 
-  .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
-    padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
-    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.12);color:#e9ecf3}
-  .mg-rank.on{display:inline-flex}
+  /* 랭킹 버튼은 게임마다 같은 그림을 쓴다(지어라 CARI 와 동일). ⚠️ padding 은 %가 아니라 px —
+     absolute 요소라 %패딩이 자기 폭이 아니라 부모 폭 기준으로 잡혀 글자가 오른쪽 끝으로 밀린다. */
+  .mg-rank{position:absolute;top:11px;right:11px;z-index:60;display:none;width:auto;height:38px;aspect-ratio:1701/494;
+    padding:0 0 0 25px;border:0;border-radius:0;cursor:pointer;place-items:center;
+    background:url('/games/rank-button.png') center/100% 100% no-repeat;color:#fff;
+    font:800 12.5px/1 system-ui,sans-serif;text-shadow:0 1px 3px #001c55;
+    filter:drop-shadow(0 5px 8px rgba(0,10,42,.38))}
+  .mg-rank.on{display:grid}
+  .mg-rank>span[aria-hidden="true"]{display:none}
+  .mg-rank .rank-label{display:block;text-align:center}
 
   /* 인트로는 팝업이 아니라 하나의 게임 시작 화면이다. */
   #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-intro-v2.png') center top/cover no-repeat;backdrop-filter:none}
@@ -217,8 +224,10 @@
   @media (max-width:410px){ #startOv .rules li{font-size:12.5px;padding:8px 10px} #startOv .lead{font-size:13.5px} }
   #startOv .btn{height:62px;padding:4px 18px 10px;border-radius:0;background:url('/games/block-cari-start-v4.png') center/100% 100% no-repeat;box-shadow:none;font-size:18px;text-shadow:0 1px rgba(255,232,160,.7)}
 
-  #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-fail-v2.png') center top/cover no-repeat;backdrop-filter:none}
-  #overOv.cleared{background-image:url('/games/block-cari-success-v2.png')}
+  /* 아웃트로도 같은 책상이다 — 결과 클립보드가 그 책상 위에 놓인 것으로 읽힌다. */
+  #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(4,13,29,.34),rgba(4,13,29,.12) 40%,rgba(4,13,29,.55)),
+      #071426 url('/games/block-cari-game-bg-v2.png') center/cover no-repeat;backdrop-filter:none}
   #overOv .sheet{max-width:460px;max-height:51%;padding:16px 17px;background:linear-gradient(180deg,rgba(7,29,57,.93),rgba(4,17,37,.98));border-color:rgba(82,207,255,.27);box-shadow:0 20px 55px rgba(0,0,0,.6)}
   #overOv #oArt{display:none}
   #overOv .ttl{margin:0 0 4px}
@@ -237,19 +246,22 @@
     background:url('/games/block-cari-fail-panel-v4.png') 49.3% 38.5%/125.5% 101.3% no-repeat;
     box-shadow:none;filter:drop-shadow(0 20px 28px rgba(0,0,0,.65))}
   #overOv:not(.cleared) .sheet>*{position:absolute;margin:0;display:grid;place-items:center;text-align:center}
-  #overOv:not(.cleared) .ttl{left:20%;top:11.2%;width:60%;height:8.3%;font-size:min(30px,3.4vh);color:#a3271c;text-shadow:none}
-  #overOv:not(.cleared) .bigscore{left:10%;top:28%;width:80%;height:19%;font-size:min(64px,7.2vh);line-height:1;color:#3d3427}
-  #overOv:not(.cleared) .biglab{left:10%;top:47.5%;width:80%;height:5%;font-size:min(14px,1.7vh);color:#7a6a52}
-  #overOv:not(.cleared) .newbest{left:10%;top:52.5%;width:80%;height:4.5%;font-size:min(13px,1.6vh);color:#a3271c}
+  /* ⚠️ 라벨이 값 위에 온다 — 종이 위에서는 '점수 / 150' 순서가 자연스럽고, 값 밑에 붙으면 각주로 읽힌다.
+        (통계 3장도 같은 이유로 column-reverse. DOM 순서는 그대로 두고 보이는 순서만 뒤집는다.) */
+  #overOv:not(.cleared) .ttl{left:20%;top:11.2%;width:60%;height:8.3%;font-size:min(34px,3.9vh);color:#a3271c;text-shadow:none}
+  #overOv:not(.cleared) .biglab{left:10%;top:28%;width:80%;height:5.5%;font-size:min(17px,2vh);font-weight:800;color:#7a6a52;letter-spacing:.08em}
+  #overOv:not(.cleared) .bigscore{left:10%;top:33.5%;width:80%;height:18%;font-size:min(74px,8.4vh);line-height:1;color:#3d3427}
+  #overOv:not(.cleared) .newbest{left:10%;top:52%;width:80%;height:4.5%;font-size:min(14px,1.7vh);color:#a3271c}
   #overOv:not(.cleared) .stats{left:8.7%;top:62%;width:82%;height:10%;display:flex;justify-content:space-between;gap:0}
-  #overOv:not(.cleared) .stats .stat{width:29.3%;height:100%;display:grid;place-items:center;align-content:center;gap:2px;background:none;border:0;padding:0}
-  #overOv:not(.cleared) .stats .stat b{font-size:min(22px,2.6vh);color:#3d3427}
-  #overOv:not(.cleared) .stats .stat span{font-size:min(11px,1.35vh);color:#7a6a52}
+  #overOv:not(.cleared) .stats .stat{width:29.3%;height:100%;display:flex;flex-direction:column-reverse;
+    align-items:center;justify-content:center;gap:3px;background:none;border:0;padding:0}
+  #overOv:not(.cleared) .stats .stat b{font-size:min(26px,3vh);line-height:1;color:#3d3427}
+  #overOv:not(.cleared) .stats .stat span{font-size:min(13px,1.55vh);font-weight:800;color:#7a6a52}
   #overOv:not(.cleared) .note{left:10%;top:75.5%;width:79%;height:8.5%;padding:0 10px;background:none;border:0;
-    font-size:min(13px,1.6vh);line-height:1.4;color:#4a3c28;overflow:hidden}
+    font-size:min(15px,1.8vh);line-height:1.4;color:#4a3c28;overflow:hidden}
   /* 폴더탭은 그림에 이미 파랗게 그려져 있다 — 위에 또 칠하지 않는다. */
   #overOv:not(.cleared) .btn{left:16%;top:87%;width:68%;height:8%;background:none!important;box-shadow:none;border:0;border-radius:0;
-    color:#e9f2ff;font-size:min(18px,2.1vh);text-shadow:0 2px 4px rgba(0,10,30,.7)}
+    color:#e9f2ff;font-size:min(20px,2.3vh);text-shadow:0 2px 4px rgba(0,10,30,.7)}
 
   @media (max-height:720px){
     #startOv .sheet{max-height:59%;padding:36px 26px 24px} #startOv .lead{display:none} #startOv .rules li{font-size:11.5px;padding:5px 7px}
