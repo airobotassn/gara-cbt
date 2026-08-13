@@ -224,6 +224,21 @@
   @media (max-width:410px){ #startOv .rules li{font-size:12.5px;padding:8px 10px} #startOv .lead{font-size:13.5px} }
   #startOv .btn{height:62px;padding:4px 18px 10px;border-radius:0;background:url('/games/block-cari-start-v4.png') center/100% 100% no-repeat;box-shadow:none;font-size:18px;text-shadow:0 1px rgba(255,232,160,.7)}
 
+  /* 일차 브리핑은 사내 공지 클립보드다. 1일차부터 같은 화면을 써서 규정 추가 흐름을 먼저 익힌다. */
+  #dayOv{background:rgba(4,12,25,.74);backdrop-filter:blur(3px)}
+  /* 일차 공지 팝업(day-popup-v4)도 배치도다 — 집게 아래 이름표(제목) · 큰 종이(공지) · 나무 명패(버튼).
+     ⚠️ 비율이 1024/1536 으로 적혀 있었는데 실제 그림은 다르다. 캔버스에 여백도 있어서
+        상자는 실물 비율(924×1329 = 0.695)로 잡고 배경을 확대·이동해 실물이 상자를 채우게 한다.
+     day-popup-v4 실물 좌표 : 이름표 x9.8~90 y11~20.5 · 종이 x8~91.7 y23.3~83.6 · 나무 명패 x9.1~90.8 y85.5~95 */
+  #dayOv .sheet{position:relative;width:min(88%,380px);height:auto;aspect-ratio:924/1329;max-height:none;padding:0;border:0;border-radius:0;overflow:visible;
+    background:url('/games/block-cari-day-popup-v4.png') 49.4% 28.1%/119.9% 106.8% no-repeat;box-shadow:none;filter:drop-shadow(0 20px 30px rgba(0,0,0,.65));color:#3d3428}
+  #dayOv .ttl{position:absolute;left:9.8%;top:11%;width:80.2%;height:9.5%;margin:0;display:grid;place-items:center;font-size:min(31px,3.6vh);color:#443727}
+  #dayOv .lead{position:absolute;left:10%;top:25.5%;width:80%;height:5.5%;margin:0;display:grid;place-items:center;font-size:min(15px,1.8vh);color:#796b57}
+  #dayOv .memo{position:absolute;left:11%;top:32%;width:78%;height:49%;margin:0;padding:0 4%;overflow:auto;background:none;border:0;border-radius:0;color:#3d3428}
+  #dayOv .memo h4{font-size:min(18px,2.1vh);color:#5a4630;margin:0 0 8px}
+  #dayOv .memo li{font-size:min(16px,1.9vh);line-height:1.5}
+  #dayOv .btn{position:absolute;left:9.1%;top:85.5%;width:81.7%;height:9.5%;padding:0;background:none;border:0;box-shadow:none;color:#f3e3be;font-size:min(19px,2.2vh);text-shadow:0 2px 3px rgba(0,0,0,.65)}
+
   /* 아웃트로도 같은 책상이다 — 결과 클립보드가 그 책상 위에 놓인 것으로 읽힌다. */
   #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(4,13,29,.34),rgba(4,13,29,.12) 40%,rgba(4,13,29,.55)),
@@ -610,7 +625,6 @@ function openDay(){
   D.newBlock.forEach(k=>activeBlock.add(k));
   renderBook(news);
   renderHud();
-  if(!news.length){ loadDoc(); return; }
   $('dTtl').textContent=D.n+'일차';
   $('dMemo').innerHTML=
     D.newMask.map(k=>`<li><b>${esc(MASK[k].label)}</b> 은(는) 가리고 보낼 것<i>${esc(MASK[k].desc)}</i></li>`).join('')+
