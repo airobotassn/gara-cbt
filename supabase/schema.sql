@@ -355,7 +355,7 @@ create table if not exists chat_translations (
   message_id bigint      not null references chat_messages(id) on delete cascade,
   lang       text        not null,
   body       text        not null,
-  engine     text        not null check (engine in ('edge', 'google')),
+  engine     text        not null check (engine in ('edge', 'azure', 'google')),
   created_at timestamptz not null default now(),
   primary key (message_id, lang)
 );

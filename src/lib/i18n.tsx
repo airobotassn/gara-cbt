@@ -1890,13 +1890,7 @@ export const D: Record<string, Record<Lang, string>> = {
   // 해외 결제(엑심베이)는 **달러로 청구**된다 — 원화 고지문을 그대로 쓰면 화면과 결제창이 다른 돈을 말한다.
   //   {usd} = 실제 청구되는 달러 금액(서버가 정한 값 그대로).
   "pay.currency_note_usd": { ko: "해외 결제는 미국 달러로 청구됩니다 · 실제 청구 금액 {usd}", en: "International payments are charged in US dollars. You will be charged {usd}.", ja: "海外決済は米ドルで請求されます。実際の請求額は {usd} です。", zh: "海外支付以美元扣款，实际扣款金额为 {usd}。", hi: "अंतरराष्ट्रीय भुगतान अमेरिकी डॉलर में लिया जाता है। आपसे {usd} लिया जाएगा।", vi: "Thanh toán quốc tế được tính bằng đô la Mỹ. Bạn sẽ bị trừ {usd}." },
-  // 결제대행사 선택 — **개발 단계 비교용**으로 열어둔 것이다(2026-08-11). 실제 서비스에서는 통화·카드 국적이
-  //   결정할 자리라, 정식 오픈 때는 문구를 '국내/해외'로만 남기고 회사명을 빼거나 자동 선택으로 바꿀 것.
-  // ⚠️ 회사명(TossPayments·Eximbay)은 브랜드라 번역하지 않는다.
-  "pay.pg_label": { ko: "결제수단", en: "Payment gateway", ja: "決済手段", zh: "支付方式", hi: "भुगतान गेटवे", vi: "Cổng thanh toán" },
-  "pay.pg_toss": { ko: "국내 결제 (TossPayments)", en: "Domestic (TossPayments)", ja: "国内決済 (TossPayments)", zh: "国内支付 (TossPayments)", hi: "घरेलू (TossPayments)", vi: "Trong nước (TossPayments)" },
-  "pay.pg_eximbay": { ko: "해외 결제 (Eximbay)", en: "International (Eximbay)", ja: "海外決済 (Eximbay)", zh: "海外支付 (Eximbay)", hi: "अंतरराष्ट्रीय (Eximbay)", vi: "Quốc tế (Eximbay)" },
-  // 엑심베이는 토스와 달리 화면 안에 결제수단 위젯을 그리지 않는다 — 안내가 없으면 빈 화면으로 읽힌다.
+  // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.pg_eximbay_note": { ko: "결제하기를 누르면 Eximbay 결제창이 열리고, 결제수단은 그 창에서 고릅니다.", en: "Pressing Pay opens the Eximbay payment window, where you choose how to pay.", ja: "「決済する」を押すと Eximbay の決済画面が開き、そこで支払い方法を選びます。", zh: "点击“支付”后将打开 Eximbay 支付窗口，在该窗口中选择支付方式。", hi: "भुगतान करें दबाने पर Eximbay विंडो खुलेगी, जहाँ आप भुगतान का तरीका चुनेंगे।", vi: "Nhấn Thanh toán để mở cửa sổ Eximbay, bạn chọn phương thức tại đó." },
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": { ko: "국내 결제는 결제 시점 환율로 원화 청구됩니다.", en: "Domestic payments are charged in KRW at the rate on the day of payment.", ja: "国内決済は決済時点のレートでウォン請求されます。", zh: "国内支付按付款当日汇率以韩元扣款。", hi: "घरेलू भुगतान भुगतान के दिन की दर पर KRW में लिया जाता है।", vi: "Thanh toán trong nước được tính bằng KRW theo tỷ giá ngày thanh toán." },

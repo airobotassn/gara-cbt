@@ -13,7 +13,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { convertFromUsdCents, refreshRates } from '../_shared/fx.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { getProvider, DEFAULT_PROVIDER, SELECTABLE_PROVIDERS } from '../_shared/payment-provider.ts'
+import { getProvider, DEFAULT_PROVIDER } from '../_shared/payment-provider.ts'
 import {
   eximbayAmount,
   eximbayLang,
@@ -186,24 +186,18 @@ Deno.serve(async (req) => {
         return json({ free: true, granted: true })
       }
 
-      // 새 주문을 어느 PG 로 열지. **개발 단계 비교용**으로 프론트가 고를 수 있게 열어뒀다(2026-08-11).
-      // ⚠️ 받은 문자열을 그대로 저장하면 안 된다 — getProvider 가 모르는 값이 박히면 그 주문은 승인도 대사도
-      //    못 하고 영영 pending 으로 남는다. 목록에 없으면 조용히 기본값(토스)으로 떨어뜨린다.
-      const pgAsked = String(body?.pg ?? '').trim()
-      const providerName: string = (SELECTABLE_PROVIDERS as readonly string[]).includes(pgAsked)
-        ? pgAsked
-        : DEFAULT_PROVIDER
+      // PG 는 엑심베이 하나다(2026-08-13, 토스 제거). 프론트가 고르지 않는다 —
+      // 국내/해외는 PG 가 아니라 **MID·통화**로 갈리고, 그건 아래에서 사용자 국가가 정한다.
+      const providerName: string = DEFAULT_PROVIDER
 
       // ⛔ **정가는 달러(센트)이고, 청구 통화는 사용자 국가가 정한다.**
       //    한국 → 원화. 국내 카드가 달러로 결제되면 해외결제로 잡혀 카드사 수수료가 붙고,
       //           해외결제를 꺼둔 카드는 아예 실패한다.
       //    그 외 → 달러 그대로.
-      //    토스는 원화 전용 PG 라 국가와 무관하게 원화다.
       // ⚠️ **국가를 모르면 해외(달러)로 둔다.** 해외 MID 는 국내 카드도 (수수료가 붙을 뿐) 통과하지만,
       //    국내 MID 로 해외 카드를 보내면 승인 자체가 안 된다 — 모를 때는 되는 쪽으로 떨어뜨린다.
       const { data: prof } = await admin.from('profiles').select('country_code').eq('id', uid).maybeSingle()
-      const domestic = String(prof?.country_code ?? '').toUpperCase() === 'KR'
-      const chargeKrw = providerName === 'toss' || domestic
+      const chargeKrw = String(prof?.country_code ?? '').toUpperCase() === 'KR'
 
       // ⚠️ 환율은 **여기서 한 번만** 읽고 주문 행에 박는다. 승인은 결제창을 다녀온 뒤라 그 사이 값이
       //    갱신될 수 있는데, 그때 다시 계산하면 화면에 뜬 금액과 청구액이 달라져 대조가 통째로 깨진다.
@@ -255,7 +249,7 @@ Deno.serve(async (req) => {
         const origin = (req.headers.get('origin') ?? '').trim()
         if (!origin) return json({ error: '결제 준비에 필요한 주소를 확인할 수 없습니다.' }, 400)
         const fnBase = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '')
-        const hookKey = (Deno.env.get('TOSS_WEBHOOK_SECRET') ?? '').trim()
+        const hookKey = ((Deno.env.get('PAYMENTS_WEBHOOK_SECRET') || Deno.env.get('TOSS_WEBHOOK_SECRET')) ?? '').trim()
 
         const ready = await eximbayReady({
           orderId,
@@ -439,7 +433,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 이 주문이 어느 PG 로 열렸는지에 따라 어댑터를 고른다(지금은 전부 'toss'). 아래는 PG 를 모른다.
+      // 이 주문이 어느 PG 로 열렸는지에 따라 어댑터를 고른다. 아래는 PG 를 모른다.
       const provider = getProvider(row.provider)
 
       // 승인에 넘기는 금액은 **저장된 주문 금액**(row.amount). 멱등키는 주문마다 고정(row.id)이라

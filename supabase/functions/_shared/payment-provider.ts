@@ -18,7 +18,7 @@ export type CanonicalStatus =
   | 'failed'
   | 'expired'
 
-/** PG 응답을 정규화한 중립 결제 객체. settleFromProvider 는 이것만 읽는다(TossPayment 를 모른다). */
+/** PG 응답을 정규화한 중립 결제 객체. settleFromProvider 는 이것만 읽는다(PG 원문 타입을 모른다). */
 export interface ProviderPayment {
   /** PG 의 결제 식별자(토스 paymentKey / 엑심베이 거래ID 등). 조회·취소에 쓴다. */
   providerKey: string | null
@@ -87,23 +87,23 @@ export interface PaymentProvider {
 }
 
 // 어댑터 등록. 새 PG 는 여기 한 줄 + 어댑터 파일 하나면 끝이다.
-import { tossProvider } from './toss.ts'
 import { eximbayProvider } from './eximbay.ts'
 
+// 엑심베이 하나로 간다(2026-08-13). 국내(원화)·해외(달러)를 MID 로 가르기 때문에 PG 를 둘 둘 이유가 없어졌다.
+//   ⚠️ **토스 어댑터는 삭제됐다.** 옛 `provider='toss'` 주문 행은 원장에 남아 있으므로, 그 행을 PG 에
+//      물어보려는 경로(대사·웹훅)는 아래 `hasProvider` 로 먼저 걸러야 한다 — getProvider 를 그냥 부르면 던진다.
 const PROVIDERS: Record<string, PaymentProvider> = {
-  toss: tossProvider,
-  // ⚠️ 엑심베이는 **개발 단계 비교용**으로 열어둔 것이다(2026-08-11). 준비·결제창·검증·조회·승인까지
-  //    한 바퀴가 돌지만 아직 공개 샌드박스 키이고, status_url(서버-서버 통지) 경로는 실기기 확인 전이다.
   eximbay: eximbayProvider,
 }
 
-/** 프론트가 고를 수 있는 PG. 여기 없는 값은 create 가 거절한다(임의 문자열이 payments.provider 에 박히면
- *  나중에 getProvider 가 던져서 그 주문은 승인도 대사도 안 된다). */
-export const SELECTABLE_PROVIDERS = ['toss', 'eximbay'] as const
+/** 그 PG 를 아직 다룰 수 있나. 옛 주문(삭제된 PG)을 조용히 건너뛰기 위한 것 — 판정에 쓰지 말 것. */
+export function hasProvider(name: string): boolean {
+  return Boolean(PROVIDERS[name])
+}
 
 /**
- * payments.provider 값 → 어댑터. 없는 값이면 **크게 실패**한다(조용히 토스로 폴백하지 않는다).
- * 잘못 저장된 provider 를 토스로 처리하면 남의 PG 주문을 토스에 물어보는 조용한 사고가 된다.
+ * payments.provider 값 → 어댑터. 없는 값이면 **크게 실패**한다(조용히 다른 PG 로 폴백하지 않는다).
+ * 잘못 저장된 provider 를 남의 PG 로 처리하면 엉뚱한 상점에 물어보는 조용한 사고가 된다.
  */
 export function getProvider(name: string): PaymentProvider {
   const p = PROVIDERS[name]
@@ -111,8 +111,8 @@ export function getProvider(name: string): PaymentProvider {
   return p
 }
 
-/** 새 주문을 어느 PG 로 열지. 지금은 토스 하나뿐이라 고정 — 통화·지역 라우팅이 필요해지면 여기서 분기한다. */
-export const DEFAULT_PROVIDER = 'toss'
+/** 새 주문을 어느 PG 로 열지. 엑심베이 하나뿐이다 — 국내/해외는 PG 가 아니라 **MID·통화**로 갈린다. */
+export const DEFAULT_PROVIDER = 'eximbay'
 
 // SupabaseClient 재노출(어댑터가 타입만 필요할 때 import 경로를 한 곳으로).
 export type { SupabaseClient }

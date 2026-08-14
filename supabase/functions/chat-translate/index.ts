@@ -1,7 +1,7 @@
 // chat-translate: 채팅 번역 — 창고 조회 → 없는 것만 번역 → 창고에 저장.
 //
 //  액션 셋.
-//   · (기본)   사용자가 번역 토글을 켰을 때. 창고 우선, 미스분만 구글.
+//   · (기본)   사용자가 번역 토글을 켰을 때. 창고 우선, 미스분만 서버 엔진(Azure 또는 구글).
 //   · pending  엣지 워커가 "번역할 것" 목록을 받아간다.
 //   · store    엣지 워커가 번역 결과를 되돌려준다.
 //
@@ -99,11 +99,12 @@ async function handleTranslate(req: Request, payload: Record<string, unknown>): 
 
     if (todo.length > 0) {
       const items: TranslateItem[] = todo.map((r) => ({ text: r.body as string, from: r.src_lang }))
-      const res = await translateBatch(items, lang)
+      // 엔진은 어느 키가 꽂혀 있느냐로 정해진다(_shared/translate.ts). 여기선 이름만 받아 기록한다.
+      const { engine, results } = await translateBatch(items, lang)
 
       const inserts: { message_id: number; lang: string; body: string; engine: string }[] = []
       const detected = new Map<string, number[]>()
-      res.forEach((r, i) => {
+      results.forEach((r, i) => {
         if (!r) return // 실패한 건은 그냥 뺀다 — 프론트가 원문 그대로 둔다
         const row = todo[i]
         const id = row.id as number
@@ -116,7 +117,7 @@ async function handleTranslate(req: Request, payload: Record<string, unknown>): 
         // src_lang 만 남기면 다음부터 아예 후보에서 빠진다.
         if (sameLang(r.detected, lang)) return
         hit.set(id, r.text)
-        inserts.push({ message_id: id, lang, body: r.text, engine: 'google' })
+        inserts.push({ message_id: id, lang, body: r.text, engine: engine ?? 'google' })
       })
 
       // 저장이 반환보다 앞이다 — 반대로 하면 실패 시 사용자는 받았는데 창고는 비어

@@ -218,7 +218,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - 화면 보면 아는 사용법 설명문("레벨을 고르면 …")은 넣지 않는다 — 넣었다가 삭제됨.
   - 현재 데이터는 **레벨당 교재 1권 · 강의 1편**(`lectures.ts` 가 레벨당 1개). 늘려도 화면은 손댈 게 없다 — 열이 알아서 스크롤한다.
 - **이북(전자책)**: 관리자가 HTML 1개 파일을 업로드(비공개 버킷 `ebooks`, 표지는 공개 버킷 `ebook-covers`) → 회원이 `/ebooks` 에서 구매 → 마이페이지 '이북 서재' 탭에서 열람(`/ebooks/read/:id` 뷰어가 서명 URL iframe). 테이블 `ebooks`·`ebook_purchases`, 함수 `ebooks`(store·picks·library·buy·read) + `admin`(ebookList/Upsert/Delete/Buyers).
-  - **결제 연동됨(2026-08-06, 토스페이먼츠)**: 유료책은 `/checkout?type=ebook&ref=<id>` → 결제위젯 → `/pay/success` → 서버 승인 → 지급. `ebooks` 함수의 `buy` 는 이제 **0원 책 전용**이고 유료책엔 402 를 준다(안 막으면 함수를 직접 불러 결제를 통째로 우회할 수 있다). 아래 "결제" 절 참고.
+  - **결제 연동됨(엑심베이)**: 유료책은 `/checkout?type=ebook&ref=<id>` → 엑심베이 결제창 → `/pay/success` → 서버 승인 → 지급. `ebooks` 함수의 `buy` 는 이제 **0원 책 전용**이고 유료책엔 402 를 준다(안 막으면 함수를 직접 불러 결제를 통째로 우회할 수 있다). 아래 "결제" 절 참고.
   - **추천**: 레벨테스트 결과창(`Result.tsx` 의 `EbookPicks`)이 `picks` 액션으로 응시 레벨에 맞는 책을 받는다. 기준은 `ebooks.target_level`(1~7, null=무관) 하나 — 관리자 이북 탭에서 고른다. 정렬 = 목표 레벨(승급 시 +1)과 가까운 순 → 동률이면 위 레벨 → 스토어 노출순, 이미 산 책은 서버가 제외. 레벨당 1권 체계라 6축 태그는 일부러 안 넣었다(고를 대상이 없어 결과가 안 바뀜) — 한 레벨에 여러 권이 생기면 그때 축 태그 추가.
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `tickets`(접수·응시권) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
   - ⚠️ **이북 탭은 양쪽 관리자에 하나씩 있다(2026-08-11)** — `?top=caris&tab=ebooks` = CARIS E-BOOK, `?top=level&tab=ebooks` = LEVELTEST E-BOOK. 같은 `EbooksAdmin` 에 `catalog` 만 다르게 넘긴 것이고, 각 화면은 자기 카탈로그 책만 보여주고 등록도 그 카탈로그로 고정한다(등록할 때 카탈로그를 잘못 고를 길이 없다). 순서(↑↓)는 자기 카탈로그 안에서만 바뀌지만 서버로는 **두 카탈로그 합친 전체 ids** 를 보내야 한다(`ebookReorder` 가 받은 순서대로 sort_order 를 다시 매긴다).
@@ -285,12 +285,13 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - **쓰기는 어느 방이든 로그인만 하면 된다** — 옛 "내 나라 + 전세계만"(`profiles.country_code` 기준 · 서버 `not_my_country` 403 · 프론트 읽기전용 안내) 제한은 2026-08-04 제거했다. 남은 게이트는 로그인 · 배드워드/링크 · OpenAI 모더레이션 · 레이트리밋뿐.
   - ⚠️ **레이트리밋·중복·IP 바닥선 가드는 방을 안 본다(계정 단위 전역)** — 방마다 상한이 리셋되면 방을 옮겨다니며 도배할 수 있다. `chat_post_atomic` 안의 주석과 `tests/db/t-chat-rooms.mjs` 가 이걸 지킨다.
   - ⚠️ 방이 바뀌면 `<ChatBoard key={room}>` 로 **다시 마운트**한다. 목록·커서·폴링 타이머가 한 방을 가리키는 상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청 결과가 새 방 목록에 섞인다.
-- **`/arena` 채팅 번역(2026-08-13)**: 원문이 기본이고, **번역 토글을 켠 사람에게만** 번역본을 보여준다. 한 번 만든 번역본은 `chat_translations` 에 남아 같은 언어 사용자 전원이 나눠 쓴다 → **비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례**한다(중국 방에 한국인이 1명이든 500명이든 번역은 1회). 함수 `chat-translate`(사용자 요청 + 워커의 `pending`/`store`), 어댑터 `_shared/translate.ts`(구글 Cloud Translation v2)·`_shared/country-lang.ts`, 워커 `tools/translate-worker/`, 검증 `tests/db/t-chat-translation.mjs`(30건)·`tests/chat-translate-filters.mjs`(33건).
-  - **엔진 둘 — 엣지가 주력, 구글이 폴백.** 엣지(Edge 브라우저 온디바이스 번역)는 **공짜·무제한·145개 언어**라 우리 기계에서 워커가 미리 창고를 채운다. 구글(월 50만자 무료, 이후 $20/100만자)은 **창고에 없을 때만** — 새 조합의 첫 요청, 워커가 죽었을 때, 엣지가 지원 안 하는 쌍. ⚠️ **구글을 지우면 안 된다** — 기계 하나가 꺼지면 번역이 통째로 죽고, MS·구글이 자동화를 막으면(회색지대다) 대안이 없다. 평소 거의 안 불려서 무료분 안에서 논다.
-    - **Azure(무료 200만자)가 아니라 구글인 이유는 계정이다** — Azure 는 MS 계정·구독을 새로 만들어야 했고(2026-08-13 테넌트 오류로 막힘), 구글은 이미 쓰는 GCP 프로젝트(`GEMINI_API_KEY`)에서 API 하나 켜고 키만 받으면 된다. 무료분이 1/4 이지만 **엣지가 주력이라 여긴 폴백**이다. 갈아탈 일이 생기면 `_shared/translate.ts` 의 어댑터만 고치면 된다 — 호출부는 엔진을 모른다.
-    - ⚠️ **v2(Basic)를 쓴다** — API 키 한 줄이면 되고, v3 는 서비스 계정 JWT 서명이 필요해 Edge Function 에서 번거롭다.
-    - ⚠️ **`source`(원문 언어)를 아는 건 반드시 명시한다** — 구글은 미지정 시 **감지를 별도 과금**해서 문자 수가 두 배가 된다(그래서 `src_lang` 저장이 비용 장치이기도 하다). `format:'text'` 도 필수 — 기본이 `html` 이라 안 주면 `<`·`&` 가 엔티티로 돌아온다.
-    - ⚠️ **언어 코드 표기가 갈린다** — 우리(=브라우저 Translator API) 표기 `zh-Hans`/`zh-Hant`/`he`/`fil` ↔ 구글 `zh-CN`/`zh-TW`/`iw`/`tl`. `translate.ts` 의 `toGoogleLang`/`fromGoogleLang` 이 양방향으로 변환하고, **저장은 우리 표기로 통일**한다(엔진마다 다르게 저장하면 "원문 == 독자 언어" 판정이 흔들린다).
+- **`/arena` 채팅 번역(2026-08-13)**: 원문이 기본이고, **번역 토글을 켠 사람에게만** 번역본을 보여준다. 한 번 만든 번역본은 `chat_translations` 에 남아 같은 언어 사용자 전원이 나눠 쓴다 → **비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례**한다(중국 방에 한국인이 1명이든 500명이든 번역은 1회). 함수 `chat-translate`(사용자 요청 + 워커의 `pending`/`store`), 어댑터 `_shared/translate.ts`(Azure·구글 두 벌)·`_shared/country-lang.ts`, 워커 `tools/translate-worker/`, 검증 `tests/db/t-chat-translation.mjs`(30건)·`tests/chat-translate-filters.mjs`(33건).
+  - **엔진 셋 — 엣지가 주력, Azure·구글이 폴백.** 엣지(Edge 브라우저 온디바이스 번역)는 **공짜·무제한·145개 언어**라 우리 기계에서 워커가 미리 창고를 채운다. 서버 엔진은 **창고에 없을 때만** — 새 조합의 첫 요청, 워커가 죽었을 때, 엣지가 지원 안 하는 쌍. ⚠️ **서버 엔진을 지우면 안 된다** — 기계 하나가 꺼지면 번역이 통째로 죽고, MS·구글이 자동화를 막으면(회색지대다) 대안이 없다. 평소 거의 안 불려서 무료분 안에서 논다.
+    - **엔진은 코드가 아니라 꽂힌 키가 정한다** — `AZURE_TRANSLATOR_KEY` 가 있으면 Azure, `GOOGLE_TRANSLATE_KEY` 만 있으면 구글, 둘 다 있으면 Azure. `TRANSLATE_ENGINE` 으로 강제할 수 있다. 2026-08-13 에 계정 문제로 Azure↔구글을 한 번 왕복해서 **갈아탈 때 코드를 안 고치도록** 두 어댑터를 같이 뒀다.
+    - ⚠️ **초과했을 때가 다르다.** Azure F0(월 200만자)는 **거절**이라 모르는 새 돈이 안 나가고, 구글(월 50만자)은 **자동 과금**($20/100만자)이다. 구글로 쓸 거면 GCP 콘솔에서 **할당량 상한을 같이 걸어야** Azure 와 같은 안전성이 된다(예산 알림은 알려주기만 하고 안 막는다).
+    - ⚠️ **Azure 는 지역 헤더가 필수다**(`Ocp-Apim-Subscription-Region`) — 번역 주소가 전 세계 공용이라 키만으로는 어느 리소스인지 알 수 없어 401 이 난다. 구글은 **v2(Basic)** 를 쓴다(API 키 한 줄. v3 는 서비스 계정 JWT 서명이 필요해 Edge Function 에서 번거롭다).
+    - ⚠️ **원문 언어를 아는 건 반드시 명시한다** — 구글은 미지정 시 **감지를 별도 과금**해서 문자 수가 두 배가 된다(그래서 `src_lang` 저장이 비용 장치이기도 하다). 구글은 `format:'text'` 도 필수 — 기본이 `html` 이라 안 주면 `<`·`&` 가 엔티티로 돌아온다.
+    - ⚠️ **언어 코드 표기가 엔진마다 갈린다** — 우리(=브라우저 Translator API) 표기 `zh-Hans`/`zh-Hant`/`he`/`fil` 을 Azure 는 그대로 받고 구글은 `zh-CN`/`zh-TW`/`iw`/`tl` 로 받는다. `translate.ts` 의 `toEngineLang`/`fromEngineLang` 이 변환하고, **저장은 언제나 우리 표기로 통일**한다(엔진마다 다르게 저장하면 "원문 == 독자 언어" 판정이 흔들려 같은 글을 계속 다시 번역한다).
   - ⛔ **미리 전 언어로 번역해두지 않는다.** 190개 선번역은 하루 채팅 3,000건 기준 **하루 51만 행 · 언어팩 1,700개**라 시간보다 **DB 가 먼저 터진다**(구글 무료분으로는 하루 4~8건이 천장). 커버리지(전 언어)는 "요청이 오면 그때 번역한다"로 달성한다.
   - **어떤 언어로 미리 채울지는 `chat_translation_demand`(= 번역 요청 기록, 5일)가 정한다.** 접속자 언어를 추적하지 않는다 — **눈팅은 보이지도 않고 볼 필요도 없다**(번역을 안 켜는 사람은 번역본을 안 쓴다). 첫 요청이 곧 등록이라 별도 등록 UI 도 없다. ⚠️ **수요 갱신은 사용자 요청일 때만** — 워커가 갱신하면 자기가 채운 조합이 자기 때문에 영원히 살아남는다.
   - ⚠️ **대상 언어는 `profiles.country_code` 에서 파생한다(`country-lang.ts`). 요청 파라미터로 받지 않는다.** 언어를 바꿔가며 (방 × 언어) 조합을 무한히 만드는 게 이 기능에서 **비용이 폭발하는 유일한 경로**인데, 국가는 이미 1회만 변경 가능하게 잠겨 있어(`region_changed_at`) 그 잠금을 그대로 물려받는다. 그래서 일일 상한 같은 별도 방어가 없다. 화면 언어(i18n 6개국어)와는 **다른 축**이다.
@@ -300,7 +301,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - **워커는 판단하지 않는다** — '무엇을 번역할지'(`chat_translation_pending` RPC)도 '무엇을 저장할지'도 `chat-translate` 가 정하고, 워커는 브라우저를 굴리는 손이다. 백엔드를 Spring 으로 옮겨도 `tools/translate-worker/` 는 손대지 않는다. ⚠️ 판정을 워커에도 복사하면 "워커는 번역했는데 서버는 안 한" 어긋남이 난다(동기화 페어를 새로 만들지 말 것).
   - ⚠️ **워커는 프로필 폴더 고정이 전제다**(`--user-data-dir`). 언어팩은 **쌍(pair)마다** 받는데 안 고정하면 매번 다시 받는다 → **일회성 CI 러너(GitHub Actions)에서는 못 돌린다.** 언어팩 첫 다운로드에 사용자 제스처가 필요해(`NotAllowedError`) Playwright 가 페이지 버튼을 실제로 클릭한다 — 이미 받은 쌍이면 그 클릭이 그냥 지나가므로 **조건 분기 없이 매 배치마다 누른다**.
   - 브라우저 지원(2026-08 실측): Translator API 는 **전세계 21.66%** — Chrome 138+(39개 언어)·**Edge 148+(145개 이상)**·Opera 122+ **데스크톱만**. **모바일 전부 ❌**, 파이어폭스(모질라 공식 반대)·사파리·브레이브·웨일·삼성인터넷 ❌. 크로미움 포크가 안 되는 건 내장 AI 가 **Chromium 에 공개되지 않은 구글 내부 코드**에 의존해서다(엣지가 되는 건 MS 가 자체 모델을 붙였기 때문). → 그래서 이 API 를 **사용자 브라우저에 쓰지 않고 우리 워커에만** 쓴다.
-  - 시크릿: `GOOGLE_TRANSLATE_KEY`(GCP 콘솔에서 Cloud Translation API 사용 설정 → API 키)·`TRANSLATE_WORKER_KEY`(아무 랜덤 문자열, 워커와 같은 값). 둘 다 **Supabase 함수 시크릿**이다. ⚠️ `TRANSLATE_WORKER_KEY` 를 안 걸면 워커 경로가 **아예 닫힌다**(빈 값으로 열리지 않게 막아뒀다). ⚠️ 프론트(`VITE_`)에 넣지 말 것 — 브라우저에 노출되면 남이 우리 무료분을 쓴다.
+  - 시크릿(전부 **Supabase 함수 시크릿**): Azure 면 `AZURE_TRANSLATOR_KEY`+`AZURE_TRANSLATOR_REGION`, 구글이면 `GOOGLE_TRANSLATE_KEY`. 공통으로 `TRANSLATE_WORKER_KEY`(아무 랜덤 문자열, 워커와 같은 값). ⚠️ `TRANSLATE_WORKER_KEY` 를 안 걸면 워커 경로가 **아예 닫힌다**(빈 값으로 열리지 않게 막아뒀다). ⚠️ 프론트(`VITE_`)에 넣지 말 것 — 브라우저에 노출되면 남이 우리 무료분을 쓴다.
 - 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
 
 ## 구조 맵
@@ -320,9 +321,9 @@ supabase/
   functions/   48개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
-  functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · toss.ts(토스 API 래퍼) · payments.ts(주문·금액검증·지급·대사)
-                      · chat.ts(모더레이션·방) · translate.ts(구글 번역 어댑터·번역 판정) · country-lang.ts(국가→번역 대상 언어)
-tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 미리 채운다 — 없어도 기능은 돈다(구글 폴백).
+  functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
+                      · chat.ts(모더레이션·방) · translate.ts(Azure·구글 어댑터·번역 판정) · country-lang.ts(국가→번역 대상 언어)
+tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 미리 채운다 — 없어도 기능은 돈다(서버 엔진 폴백).
 ```
 
 **DB 테이블**(요약): `profiles`, `questions`(다국어 JSONB·정답 클라 비노출), `test_attempts`(응시 언어·등급변동 스냅샷), `attempt_answers`, `user_level_skill`(레벨별 누적 6축 레이팅), `user_progress`(현재 등급=레벨).
@@ -363,22 +364,22 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 - **공유 카드도 화면 언어를 따른다 (2026-08-07)**: 캔버스에 그리는 글자까지 `share.card.*`. 훅을 못 쓰는 계층이라 `ShareCardData.lang` 을 받아 `tr()` 로 뽑는다 — 호출부(`Hub`·`Ranking`·`ChatBoard`) 셋 다 `lang` 을 넘겨야 한다.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.
 
-## 결제 (토스페이먼츠 · 2026-08-06 연동)
+## 결제 (엑심베이 단일 PG · 2026-08-13)
 
-**코드 쓰기 전에 [`docs/토스페이먼츠-연동-가드레일.md`](./docs/토스페이먼츠-연동-가드레일.md) §8(LLM이 자주 틀리는 패턴 20개)을 먼저 볼 것.** 더 깊은 내용은 `.mcp.json` 의 토스 MCP 서버로 문서를 직접 조회한다.
+> **토스는 제거됐다(2026-08-13).** `docs/토스페이먼츠-연동-가드레일.md` 는 히스토리로만 남겨둔다 — 결제 일반론(멱등·웹훅·대사)은 여전히 맞지만 토스 SDK 부분은 이제 이 저장소와 무관하다.
 
-- **범위**: 1차는 **국내 원화(KRW)만**. 토스 V2 표준 SDK 가 `amount.currency: "KRW"` 만 받기 때문이다(해외카드·페이팔은 MID 1개당 통화 1개라 상점·위젯을 따로 만들어야 하고 카드사 심사가 붙는다). 해외 PG는 나중에 얹되 `payments.provider` 컬럼을 처음부터 둬서 테이블을 안 갈아엎게 했다.
-- **흐름**: `/checkout?type=&ref=` → `payments/create`(서버가 금액 계산) → 결제위젯 → `/pay/success` → `payments/confirm`(승인) → 지급.
+- **범위**: PG 는 **엑심베이 하나**. 정가는 **달러 한 벌**이고(달러 센트 정수), 청구 통화는 **사용자 국가**가 정한다 — 한국이면 원화(국내 MID), 그 외는 달러(해외 MID). 국내/해외를 가르는 건 PG 가 아니라 MID·통화다.
+- **흐름**: `/checkout?type=&ref=` → `payments/create`(서버가 금액·통화·MID 결정 + `/ready` 로 FGKey) → 엑심베이 결제창 → `payments-return`(POST 를 303 으로 넘김) → `/pay/success` → `payments/confirm`(위변조 검증 + 상태 조회) → 지급.
 - **금액을 요청으로 받지 않는다.** `create` 는 상품ID만 받고 `_shared/payments.ts` 의 `resolveProduct` 가 DB에서 다시 뽑는다. `confirm` 은 successUrl 의 `amount` 를 **저장된 주문 금액과 대조한 뒤**, 승인 API 에는 **저장된 값**을 넘긴다. 소유자(`user_id`) 확인도 필수 — 안 하면 남의 주문에 결제를 붙일 수 있다.
 - **중복 지급은 코드가 아니라 DB가 막는다** — `payments` 의 부분 유니크 인덱스 `(user_id, product_type, product_ref) where status='paid'` + `ebook_purchases.unique(user_id, ebook_id)`. Idempotency-Key 는 토스 쪽 중복 승인만 막지 우리 DB 이중지급은 못 막는다.
 - **지급 순서 = 지급 먼저, `fulfilled_at` 나중.** 반대로 하면 지급이 실패했을 때 "이미 줬다"는 기록만 남아 미지급을 영영 못 찾는다. `status='paid' AND fulfilled_at IS NULL` 이 "돈은 받았는데 안 준 것" 신호이고 대사가 이걸 본다.
-- **PG 어댑터(포트) 구조** — 승인·조회·상태정규화는 `_shared/payment-provider.ts`(포트) 뒤에 있고, 토스 구현은 `_shared/toss.ts` 의 `tossProvider` 다. `payments.ts`·`payments` 함수는 PG 를 모르고 `getProvider(row.provider)` 로만 부른다. **엑심베이 등 새 PG = `_shared/eximbay.ts` 새 파일 + `PROVIDERS` 에 한 줄. 토스 코드는 열지 않는다**(그래서 검증된 토스 동작이 안 틀어진다). ⚠️ 프론트 결제창은 PG 마다 달라 포트로 못 숨긴다 — 그건 그때 컴포넌트 추가. `settleFromToss`→`settleFromProvider`, `TossPayment`→`ProviderPayment`(중립). status 정규화 중 `canceled→refunded` 업그레이드만 settle 이 한다(어댑터는 취소를 늘 canceled 로 준다 — 우리 DB 의 fulfilled 를 모르니까).
-- **엑심베이가 실제로 돈다(2026-08-11) — 지금은 사용자가 고른다.** `/checkout` 맨 위 `국내 결제(TossPayments) / 해외 결제(Eximbay)` 선택이 곧 `payments.provider` 다. **개발 단계 비교용**이고, 정식 오픈 때는 통화·카드 국적으로 자동 결정할 자리다. 고를 수 있는 값의 단일 출처 = `payment-provider.ts` 의 `SELECTABLE_PROVIDERS`(목록에 없는 값은 create 가 조용히 토스로 떨어뜨린다 — 모르는 문자열이 박히면 그 주문은 승인도 대사도 못 하고 영영 pending 이다).
-  - **두 PG 는 결제창 방식이 다르다.** 토스는 우리 페이지 안에 위젯을 그리고, 엑심베이는 아무것도 안 그린 채 버튼을 누르면 PG 창을 연다. 그래서 `Checkout.tsx` 는 `<PayBox key={pg}>` 로 **통째로 갈아끼운다** — PG 를 바꾸면 주문도 새로 만들어야 해서(주문행·FGKey 가 PG 에 묶인다) 상태를 손으로 되돌리면 반드시 샌다.
-  - ⚠️ **엑심베이엔 `/ready` 단계가 하나 더 있다(토스엔 없다).** 서버가 `/ready` 로 받은 **FGKey 는 그때 보낸 값들의 서명**이라, 프론트가 `request_pay` 페이로드를 다시 조립하면 금액 형식·언어·URL 끝 슬래시 하나 차이로 결제가 그냥 실패한다. 그래서 **서버가 `/ready` 에 보낸 객체를 그대로 내려주고 프론트는 `fgkey` 만 얹는다.**
+- **PG 어댑터(포트) 구조** — 승인·조회·상태정규화는 `_shared/payment-provider.ts`(포트) 뒤에 있고, 구현은 `_shared/eximbay.ts` 의 `eximbayProvider` 하나다. `payments.ts`·`payments` 함수는 PG 를 모르고 `getProvider(row.provider)` 로만 부른다. **새 PG = 어댑터 파일 하나 + `PROVIDERS` 에 한 줄.** ⚠️ 어댑터를 지울 때는 그 PG 로 만든 옛 주문 행이 원장에 남는다 — 대사·웹훅이 그 행을 물어보려다 던지므로 `hasProvider()` 로 먼저 걸러야 한다(토스 제거 때 실제로 걸린 자리다). ⚠️ 프론트 결제창은 PG 마다 달라 포트로 못 숨긴다 — 그건 그때 컴포넌트 추가. `settleFromToss`→`settleFromProvider`, `TossPayment`→`ProviderPayment`(중립). status 정규화 중 `canceled→refunded` 업그레이드만 settle 이 한다(어댑터는 취소를 늘 canceled 로 준다 — 우리 DB 의 fulfilled 를 모르니까).
+- **국내/해외는 사용자가 고르지 않는다 — 프로필 국가가 정한다(2026-08-13).** 한국이면 국내 MID + 원화, 그 외는 해외 MID + 달러. ⚠️ **국가를 모르면 해외로 떨어뜨린다** — 해외 MID 는 국내 카드도 (수수료가 붙을 뿐) 통과하지만, 국내 MID 로 해외 카드를 보내면 승인 자체가 안 된다. 모를 때는 되는 쪽으로 보낸다.
+  - **엑심베이 결제창은 우리 페이지에 아무것도 안 그린다.** 버튼을 누르면 PG 창이 열리고 결제수단은 거기서 고른다 — 그래서 `/checkout` 에 안내 문구(`pay.pg_eximbay_note`)가 반드시 필요하다. 없으면 화면이 비어 보인다.
+  - ⚠️ **엑심베이엔 `/ready` 단계가 있다.** 서버가 `/ready` 로 받은 **FGKey 는 그때 보낸 값들의 서명**이라, 프론트가 `request_pay` 페이로드를 다시 조립하면 금액 형식·언어·URL 끝 슬래시 하나 차이로 결제가 그냥 실패한다. 그래서 **서버가 `/ready` 에 보낸 객체를 그대로 내려주고 프론트는 `fgkey` 만 얹는다.**
   - ⚠️ **엑심베이 confirm 은 '승인시키기'가 아니다.** 결제창이 이미 승인·매입까지 끝내고 결과를 `return_url` 쿼리스트링으로 브라우저에 돌려준다. 그래서 어댑터가 하는 일은 ① `/verify` 로 **위변조 검증**(원문을 그대로 넘긴다 — 파싱 후 재조립하면 fgkey 가 어긋난다. 위조 데이터엔 실제로 `INVALID_FGKEY` 가 온다) ② `/retrieve` 로 **실제 상태 확인** 두 단계다. ②를 빼면 안 된다 — **`return_url` 엔 `status` 가 없어서** 매출확정(SALE)인지 승인만(AUTH)인지 구분이 안 되고, AUTH 를 paid 로 읽으면 매입 전 건에 물건을 준다.
   - ⚠️ **엑심베이 `retrieve` 는 `currency`·`amount` 가 필수다** — 그래서 포트 `queryBy*` 가 `{currency, amount}` 를 같이 받는다. 값의 출처는 **언제나 저장된 주문 행**이다(콜백이 준 금액으로 물으면 검증을 통과한 값이라도 우리 원장과 어긋난 건을 그대로 승인한다).
-  - ⚠️ **실패도 `/pay/success` 로 돌아온다**(토스처럼 failUrl 이 따로 없다). `rescode !== '0000'` 이면 **승인을 부르지 않고** 실패 화면만 띄운다 — 결제가 안 된 건을 우리가 failed 로 단정하지 않고 대사가 만료로 접게 둔다.
+  - ⚠️ **실패도 `/pay/success` 로 돌아온다**(failUrl 이 따로 없다). `rescode !== '0000'` 이면 **승인을 부르지 않고** 실패 화면만 띄운다 — 결제가 안 된 건을 우리가 failed 로 단정하지 않고 대사가 만료로 접게 둔다.
   - ⛔ **엑심베이는 결과를 `return_url` 로 POST 한다 — 결과 화면 주소를 직접 주면 404 다.** 문서가 말한 '쿼리스트링 형식'은 전송 방식이 아니라 **본문 모양**이었다(그래서 `/verify` 가 본문을 그대로 받는다). 우리 프론트는 정적 SPA 라 GET 만 페이지를 돌려주므로, 결제는 정상 완료됐는데 화면은 "페이지를 찾을 수 없음"이 뜬다(2026-08-11 실기기에서 겪음 — 로컬·배포 둘 다 난다). 그래서 `payments-return` 함수가 POST 를 받아 **303 으로 `/pay/success?<본문 그대로>`** 에 넘긴다.
     - ⚠️ **본문을 파싱해서 다시 조립하지 말 것.** 폼 POST 본문은 이미 쿼리스트링 모양이라 글자 그대로 붙이면 되고, 재조립하면 인코딩·순서가 달라져 `/verify` 의 fgkey 검증이 깨진다 — 그러면 정상 결제가 통째로 거절된다.
     - ⚠️ 돌아갈 주소(`?to=`)는 **화이트리스트로만** 연다(로컬 + 배포). 주소에 실려 오는 값을 그대로 믿으면 우리 도메인을 발판 삼는 오픈 리다이렉트가 된다. 목록에 없으면 배포 주소로 떨어뜨린다 — 결제가 이미 끝난 사람을 빈손으로 두지 않기 위해서다.
@@ -391,19 +392,14 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
     - ⛔ **틀린 코드를 보내도 오류가 안 난다 — 조용히 영어로 떨어진다.** `/ready` 는 `XX` 같은 값도 `rescode 0000` 으로 받아준다(실측). 서버 응답으로는 절대 못 알아채고 **결제창을 띄워봐야** 드러난다. 국내결제 가이드 Appendix B 에는 `KR` 한 줄뿐이라 그것만 보고 "한국어·영어뿐"이라고 단정하면 틀린다 — 언어표는 **해외결제 가이드** 쪽을 봐야 한다.
   - **KRW 로도 `/ready` 는 통과한다** — 통과한다고 맞는 건 아니다(위 환산 문제). 나중에 해외 카드로 달러를 받게 되면 환산은 어댑터가 아니라 결제 레이어(`resolveProduct`/`create`) 소관이다.
   - ⚠️ 시크릿은 `EXIMBAY_MID`·`EXIMBAY_SECRET_KEY`·`EXIMBAY_ENV`(기본 test). 인증은 **`base64(apikey:)`** 다 — 문서 본문의 `base64(mid:apikey)` 는 **틀렸다**(그 형태는 `EC1000`). 호스트가 test/live 로 갈리는 건 API·SDK 둘 다 같다.
-  - ⚠️ **지금 붙은 건 공개 샌드박스 키**(`mid=1849705C64`)라 토스 문서키와 같은 성격이다. **실제 카드로 완주해야** 금액 단위(KRW `"1000"` 이 1,000원인지)와 `status_url` 본문 형식이 확정된다. `payments-webhook` 은 그 형식을 몰라 JSON·폼 양쪽을 견디게 해뒀다(식별자도 `order_id`·`transaction_id` 를 같이 본다).
-- **환불 자동 회수** — 사람이 토스 대시보드에서 환불하면 웹훅→`settleFromProvider` 가 `refunded` 로 바꾸는 순간, **그 결제로 지급된 것만 자동 회수**한다(`revokeForRefund`). ⛔ 대상은 사용자·상품이 아니라 **`payment_id` 로만** 특정 — 다른 구매·남의 것은 절대 안 건드린다. 안 쓴 것만 자동: 이북=열람권 삭제, **미사용(issued)** 응시권=void. **이미 소비(consumed)된 응시권은 자동 회수 안 함**(응시 후 건이라 성적·자격증 판단 필요) → 대사 목록에 남긴다. 환불을 **일으키는** 코드(토스 취소 API)는 일부러 없다 — 돈 되돌리는 건 수동. 앱 안에 고객용 '환불 요청' UI 도 아직 없다(요청은 앱 밖).
+  - ⚠️ **지금 붙은 건 포트원이 공개한 샌드박스 MID** — 국내 `35D49A8CAA` / 해외 `1849705C64`, API 키는 하나로 둘 다 통한다. 카드는 승인까지 되지만 **간편결제(토스·카카오페이)는 그 상점에 계약이 없어 `X048`·`X042` 로 거절**된다(우리 코드 문제가 아니다). **실제 카드로 완주해야** 금액 단위(KRW `"1000"` 이 1,000원인지)와 `status_url` 본문 형식이 확정된다. `payments-webhook` 은 그 형식을 몰라 JSON·폼 양쪽을 견디게 해뒀다(식별자도 `order_id`·`transaction_id` 를 같이 본다).
+- **환불 자동 회수** — 사람이 PG 대시보드에서 환불하면 웹훅→`settleFromProvider` 가 `refunded` 로 바꾸는 순간, **그 결제로 지급된 것만 자동 회수**한다(`revokeForRefund`). ⛔ 대상은 사용자·상품이 아니라 **`payment_id` 로만** 특정 — 다른 구매·남의 것은 절대 안 건드린다. 안 쓴 것만 자동: 이북=열람권 삭제, **미사용(issued)** 응시권=void. **이미 소비(consumed)된 응시권은 자동 회수 안 함**(응시 후 건이라 성적·자격증 판단 필요) → 대사 목록에 남긴다. 환불을 **일으키는** 코드(PG 취소 API)는 일부러 없다 — 돈 되돌리는 건 수동. 앱 안에 고객용 '환불 요청' UI 도 아직 없다(요청은 앱 밖).
 - ⚠️ **가상계좌**: 승인 응답이 와도 `WAITING_FOR_DEPOSIT` 이면 계좌가 **발급**된 것이지 결제된 게 아니다. 여기서 지급하면 돈 안 받고 물건을 준다 → `waiting_deposit` 로 두고 입금 웹훅에서 지급한다.
-- ⚠️ **`verify_jwt=false` 로 배포하는 결제 함수는 둘**이다 — `payments-webhook`(토스는 Supabase JWT 를 못 싣는다. URL 시크릿 `?k=` 필수) · `payments-return`(결제창에서 오는 **브라우저 POST** 라 JWT 가 없다. 시크릿을 안 건 이유는 아래 참고). `route-seed` 까지 합쳐 예외는 셋뿐이고, 나머지 함수엔 `--no-verify-jwt` 금지.
-- **일반 결제 웹훅에는 서명 헤더가 없다**(그건 지급대행/셀러 웹훅 전용). 본문을 믿지 말고 식별자만 꺼내 **토스에 다시 조회**해 판정한다(`resettle`). 웹훅은 중복·역순·미도착이 다 가능하므로 웹훅만으론 부족 — `payments/reconcile`(헤더 `x-reconcile-key`)을 주기적으로 돌려야 한다.
-- **시크릿**: `TOSS_SECRET_KEY`·`TOSS_WEBHOOK_SECRET`·`PAYMENTS_RECONCILE_KEY` 는 **Supabase 함수 시크릿**. 프론트엔 클라이언트 키(`VITE_TOSS_CLIENT_KEY`)만 — 브라우저 노출값이라 상관없다. ⚠️ **결제위젯 연동 키**를 쓸 것('API 개별 연동 키'와 다른 값이다).
-- ⚠️ **현재 붙어 있는 건 토스 '문서용 공개 테스트 키'**(`test_gck_docs_…` / `test_gsk_docs_…`)다. 내 상점 테스트 키는 개발자센터에서 **전자결제 신청(실계약)** 을 해야 값이 보이기 때문이다(가입만으로는 안 나온다 — 2026-08-06 확인). 문서 키의 한계가 하나 있다:
-  - **승인(confirm) API 는 정상 동작**한다(가짜 paymentKey 에 `NOT_FOUND_PAYMENT_SESSION` 이 온다 = 인증 통과).
-  - **조회(query) API 는 안 된다** — 모든 조회가 `NOT_FOUND_MERCHANT` 404 다. 즉 **웹훅 재조회·대사가 문서 키로는 무의미**하다(내 상점 키로 바꾸면 정상화된다).
-  - 그래서 `resettle` 은 HTTP 404 가 아니라 **`ORDER_ABSENT_CODES`(NOT_FOUND_PAYMENT·NOT_FOUND_PAYMENT_SESSION)일 때만** 주문을 만료로 접는다. 404 만 보고 접으면 문서 키 환경에서 **결제된 주문까지 전부 만료로 접힌다.**
-- ⚠️ **약관 위젯의 초기 상태는 이벤트로 오지 않는다.** `agreementStatusChange` 는 이름 그대로 '변경'에만 오고 SDK 에 초기 상태 getter 가 없다. "동의했을 때만 결제 버튼 열기" 로 만들면 위젯이 처음부터 동의된 상태로 그려질 때 **버튼이 영영 잠긴다**(실제로 겪음). `Checkout.tsx` 는 미동의로 **확인된** 경우에만 잠근다.
-- **금액 표시는 `src/lib/money.ts` 의 `krw()` 로만.** 이북 가격은 원(KRW)인데 화면이 `$` 로 찍고 있었다(2026-08-06 수정). 화면 언어가 영어여도 통화는 원이다.
-- **정가(2026-08-06 정리)**: 환산 기준 **$1 = 1,500원**. 이북 = `ebooks.price`(관리자 이북 탭), 응시료 = **`exam_fees`**(관리자 → 시험등록 탭 상단 `ExamFeeBox`). 둘 다 **원 정수**이고 코드에 하드코딩된 금액·폴백은 없다. `caris.ts` 의 `fee`(달러 상수)는 제거됐고 `src/lib/fees.ts`(`useExamFees`/`feeKey`)가 살아났다. 요금 키 = `${트랙키}_${티어키}`(`t1_beginner`·`t1_pro`·`t1_elite`) — 구 급수 키(`pro`·`master_g4`~`g1`)는 삭제됐다.
+- ⚠️ **`verify_jwt=false` 로 배포하는 결제 함수는 둘**이다 — `payments-webhook`(PG 는 Supabase JWT 를 못 싣는다. URL 시크릿 `?k=` 필수) · `payments-return`(결제창에서 오는 **브라우저 POST** 라 JWT 가 없다. 시크릿을 안 건 이유는 아래 참고). `route-seed` 까지 합쳐 예외는 셋뿐이고, 나머지 함수엔 `--no-verify-jwt` 금지.
+- **일반 결제 웹훅에는 서명 헤더가 없다**(그건 지급대행/셀러 웹훅 전용). 본문을 믿지 말고 식별자만 꺼내 **PG 에 다시 조회**해 판정한다(`resettle`). 웹훅은 중복·역순·미도착이 다 가능하므로 웹훅만으론 부족 — `payments/reconcile`(헤더 `x-reconcile-key`)을 주기적으로 돌려야 한다.
+- **시크릿**(전부 Supabase 함수 시크릿): `EXIMBAY_MID_LOCAL`·`EXIMBAY_MID_GLOBAL`·`EXIMBAY_SECRET_KEY`·`EXIMBAY_ENV` · `PAYMENTS_WEBHOOK_SECRET`(웹훅 URL 의 `?k=`, 옛 이름 `TOSS_WEBHOOK_SECRET` 도 폴백으로 읽는다) · `PAYMENTS_RECONCILE_KEY`. **프론트에는 PG 키가 하나도 없다** — 결제창을 여는 건 서버가 주는 FGKey 뿐이다.
+- **금액 표시는 `src/lib/money.ts` 로만** — 정가는 `usdc()`(달러 센트), 실제 청구 원화는 `krw()`. ⚠️ 옛 `usd()`(원화를 받아 달러 문자열을 만들던 것)는 삭제됐다. 이름을 바꾼 이유가 단위 변경을 컴파일러가 잡게 하려는 것이다.
+- **정가(2026-08-13 전환)**: 기준이 **달러**다. 이북 = `ebooks.price_usd_cents`, 응시료 = `exam_fees.amount_usd_cents` — 둘 다 **센트 정수**(100 = $1.00)이고 관리자도 달러로 입력한다. 원화는 결제 시점에 환율로 계산되는 파생값이라 어디에도 저장하지 않는다(`payments.charge_amount` 에 그 건의 청구액만 남는다). ⚠️ 옛 컬럼 `price`·`amount`(원화)는 아직 테이블에 남아 있지만 **아무도 읽지 않는다** — 소비처를 다 옮긴 뒤 지울 것.
   - ⚠️ **`exam_fees` 에 행이 없는 티어는 결제가 막힌다**(원서접수가 '준비 중' 표시 + 결제 버튼 비활성). 버그가 아니라 의도다 — 금액 미설정을 임시값으로 때우면 엉뚱한 돈이 청구된다. 현재 CARIS-Ⅱ(Master·Grand Master·Zenith) 3개가 여기 해당하며, 열려면 관리자 화면에서 금액만 채우면 된다.
 ### 응시권 (exam_tickets) — 응시료 결제의 본체 (2026-08-07)
 
@@ -424,7 +420,7 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 - ⚠️ **`exam_attempts_ticket_live_uniq` 의 조건은 `where ticket_id is not null` — 상태를 넣지 마라.** `status in ('in_progress','submitted')` 로 두면 제출 안 하고 나갔다가 TTL 뒤 재진입할 때 옛 응시를 expired 로 눕히고 **같은 응시권으로 새 응시를 또 만들 수 있다.** 문항 세트가 고정이라 시험창(10일) 내내 반복하면 제한시간·1인1회가 통째로 무의미해진다(2026-08-06 검증에서 실제로 잡힘). 재진입 = '새로 만들기'가 아니라 '그 응시로 돌아가기'다.
 - ⚠️ **지급 실패를 결제 실패로 만들지 마라.** 승인이 끝났으면 돈은 이미 빠졌다. 접수 마감 직후 승인·급수 해제 등으로 지급이 막히면 `paid + fulfilled_at=null` 로 남겨 대사에 걸고, 화면은 **'결제 완료 · 발급 보류'**(`pay.hold_*`)를 보여준다. 실패로 표시하면 사용자가 재결제를 시도하다 '이미 결제 완료'를 보게 돼 두 화면이 정반대로 말한다.
 - ⚠️ **살아있는 결제 = `paid` + `waiting_deposit`.** 중복 검사에서 `paid` 만 보면 가상계좌 주문이 안 잡혀 "VA 로 주문해두고 카드로 또 결제" → 나중에 입금 시 **두 번 청구**가 된다.
-- ⚠️ **웹훅은 영구 오류에 500 을 주면 안 된다** — 토스가 무한 재시도한다. 중복키 같은 건 200 + 사유로 닫는다.
+- ⚠️ **웹훅은 영구 오류에 500 을 주면 안 된다** — PG 가 무한 재시도한다. 중복키 같은 건 200 + 사유로 닫는다.
 - **정기시험 = 월 3구간**(1–10 접수 / 11–20 시험 / 21–말일 채점). 응시창은 `exam_rounds.exam_start_at`·`exam_end_at`(KST). ⚠️ 기존 회차 중 시험일이 11~20 밖인 것(제4·5회)은 백필이 **시험일 당일만** 열었다 — 11~20 을 그대로 밀면 시험창이 시험일을 안 포함해 아무도 응시 못 한다.
 - **상시(rolling)는 판매하지 않는다**(2026-08 폐지). 행·표시 코드는 두고 결제 진입만 막는다.
 - **응시료는 카드·간편결제만**(D3). 가상계좌는 입금이 끝나도 응시권을 발급하지 않고 대사로 넘긴다 — VA 는 접수 마감 뒤 입금이 정상이라 마감이 무의미해진다.
@@ -502,9 +498,9 @@ SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 �
 
 - **프론트는 `master` push → Cloudflare 자동배포**(빌드 수 분 소요). 함수는 **별도 CLI 배포** 필요. git push 로 함수 안 올라감. SPA 라우팅은 `wrangler.jsonc`(`not_found_handling`)로 처리 — `_redirects` 금지(무한루프).
 - `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
-- **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 토스 개발자센터 웹훅 URL 은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<TOSS_WEBHOOK_SECRET>`.
+- **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 엑심베이 `status_url` 은 서버가 `/ready` 에 실어 보내므로 대시보드 설정이 필요 없다 — 값은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<PAYMENTS_WEBHOOK_SECRET>`.
 - **SEB 인계 함수 배포**: `npx.cmd supabase functions deploy seb-handoff` (플래그 없이 — `verify_jwt` 켠 채로 맞다). SEB 안에서도 anon 키가 실려 오므로 공개 예외가 필요 없다. `--no-verify-jwt` 로 올리지 말 것.
-- **채팅 번역 배포**: `npx.cmd supabase functions deploy chat-translate` (플래그 없이). **워커도 anon 키를 실어 보내므로 공개 예외가 필요 없다** — 워커 권한은 함수 안의 `x-translate-worker-key` 가 판정한다(서비스 롤 키를 워커에 두지 않는다). 시크릿 둘: `GOOGLE_TRANSLATE_KEY`·`TRANSLATE_WORKER_KEY`. ⚠️ 옛 `chat-edit`·`chat-delete` 는 삭제됐으니 대시보드에 남아 있으면 지울 것(코드가 없어도 옛 배포본은 계속 뜬다).
+- **채팅 번역 배포**: `npx.cmd supabase functions deploy chat-translate` (플래그 없이). **워커도 anon 키를 실어 보내므로 공개 예외가 필요 없다** — 워커 권한은 함수 안의 `x-translate-worker-key` 가 판정한다(서비스 롤 키를 워커에 두지 않는다). 시크릿: `AZURE_TRANSLATOR_KEY`+`AZURE_TRANSLATOR_REGION`(또는 `GOOGLE_TRANSLATE_KEY`)·`TRANSLATE_WORKER_KEY`. ⚠️ 옛 `chat-edit`·`chat-delete` 는 삭제됐으니 대시보드에 남아 있으면 지울 것(코드가 없어도 옛 배포본은 계속 뜬다).
 - **`GEMINI_API_KEY` 는 Supabase 함수 시크릿**(프론트 금지). 키 무효면 추천이 500.
 - **OAuth localhost 튕김** = Supabase Site URL 설정 문제. **모바일 인앱 브라우저 차단** = 구글 정책(기본 브라우저로 열어야 함).
 - **쿨다운(3일 1회)** 토글 = `start-test` 의 `COOLDOWN_ENABLED`. 게스트는 원래 쿨다운 없음.
@@ -535,7 +531,7 @@ SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 �
 | [`docs/제품구상.md`](./docs/제품구상.md) | **제품 구상**(캐릭터 허브: 자격증·Lecture·CARIS ARENA) — excalidraw 캔버스 전사 + 확정 설계 결정(`[확정]`/`[제안]` 태그). 원본=`docs/design/제품구상.excalidraw` |
 | [`docs/구현계획.md`](./docs/구현계획.md) | **구현 계획** — Phase 1(국가·지역·학교 온보딩 + 지역 경쟁) 상세 + 이후 로드맵. `제품구상.md`의 "어떻게" 짝 문서 |
 | [`docs/구글_계정_워크스페이스_가이드.html`](./docs/구글_계정_워크스페이스_가이드.html) | 구글 로그인(OAuth) 계정 소유권·2FA·Workspace (생성물, 브라우저로 열 것) |
-| [`docs/토스페이먼츠-연동-가드레일.md`](./docs/토스페이먼츠-연동-가드레일.md) | **결제 코드 짜기 전 필독**(토스 공식 LLM Quick Reference 사본) — 흐름 모델·SDK 버전/상품 선택 규칙·시나리오 진입점 + **LLM이 자주 틀리는 패턴 20개**(§8). 더 깊은 내용은 저장소 루트 `.mcp.json` 의 토스 MCP 서버로 문서를 직접 조회할 것 |
+| [`docs/토스페이먼츠-연동-가드레일.md`](./docs/토스페이먼츠-연동-가드레일.md) | **히스토리**(토스 공식 LLM Quick Reference 사본) — 토스는 2026-08-13 제거됐다. 결제 일반론(멱등·웹훅·대사·§8 자주 틀리는 패턴)은 여전히 읽을 값이 있지만 토스 SDK 부분은 이 저장소와 무관하다 |
 | [`docs/review-report.html`](./docs/review-report.html) | 코드 리뷰 리포트(생성물) |
 
 > 새 기능/운영 사항을 추가하면 해당 문서를 갱신하고, 큰 변화는 이 표에 매핑한다.

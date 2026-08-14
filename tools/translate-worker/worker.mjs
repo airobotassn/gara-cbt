@@ -2,13 +2,13 @@
 //
 //   왜 있나: Edge 브라우저의 온디바이스 번역은 **공짜에 무제한**이다(온디바이스라 MS 로 요청이
 //   나가지 않는다 — 호출 횟수 제한도 과금도 없다). 이게 미리 채워두면 사용자가 번역을 눌렀을 때
-//   창고 히트라 구글 API 가 안 불린다.
+//   창고 히트라 서버 엔진(Azure/구글)이 안 불린다.
 //
 //   ⛔ 이 워커는 **판단하지 않는다.** '무엇을 번역할지'도 '무엇을 저장할지'도 전부 서버
 //      (chat-translate 의 pending/store)가 정한다. 워커는 브라우저를 굴리는 손이다.
 //      → 백엔드를 Spring 으로 옮겨도 이 파일은 손대지 않는다.
 //
-//   ⚠️ 죽어도 기능은 안 멈춘다. 창고가 덜 찰 뿐이고 사용자 요청은 서버가 구글 API 로 받는다.
+//   ⚠️ 죽어도 기능은 안 멈춘다. 창고가 덜 찰 뿐이고 사용자 요청은 서버 엔진이 받는다.
 //      그래서 24시간 켜둘 필요도 없다 — 꺼져 있는 동안 돈이 조금 나갈 뿐이다.
 //
 //   실행:
@@ -28,7 +28,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL
 const ANON_KEY = process.env.SUPABASE_ANON_KEY
 const WORKER_KEY = process.env.TRANSLATE_WORKER_KEY
 // 2초 — 채팅 폴링이 4초라 그 안에 끝나면 사용자가 새 글을 받아볼 때 이미 번역이 있다.
-// 늘리면 새 글마다 사용자 요청이 먼저 닿아 구글 API 가 받는다(= 돈).
+// 늘리면 새 글마다 사용자 요청이 먼저 닿아 서버 엔진이 받는다(= 돈).
 const TICK_MS = Number(process.env.TRANSLATE_TICK_MS ?? 2000)
 const BATCH = Number(process.env.TRANSLATE_BATCH ?? 500)
 

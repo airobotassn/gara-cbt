@@ -77,7 +77,7 @@
         const body = await t.translate(j.body)
         if (body) out.push({ message_id: j.message_id, lang: j.dst_lang, body, src_lang: src })
       } catch (e) {
-        // 지원 안 되는 쌍은 이 배치 안에서 다시 시도하지 않는다. 서버(구글 API)가 받아준다.
+        // 지원 안 되는 쌍은 이 배치 안에서 다시 시도하지 않는다. 서버 엔진이 받아준다.
         failedPairs.push(pair)
         log('pair fail ' + pair + ': ' + e)
       }

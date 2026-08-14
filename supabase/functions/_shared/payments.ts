@@ -357,7 +357,7 @@ export async function settleFromProvider(
   }
   const fulfilled = Boolean(row.fulfilled_at)
   // ⚠️ 어댑터는 취소를 늘 'canceled' 로 준다(우리 DB 를 모르니까). **지급까지 갔다가 취소된 건 환불**이므로
-  //    여기서만 canceled→refunded 로 업그레이드한다. 예전 mapTossStatus(status,{fulfilled}) 와 결과가 동일하다
+  //    여기서만 canceled→refunded 로 업그레이드한다(어댑터는 우리 DB 의 fulfilled 를 모르니 늘 canceled 로 준다)
   //    — 취소가 아닌 상태는 fulfilled 를 안 봤고, 취소일 때만 fulfilled 로 갈렸다.
   const next = pp.status === 'canceled' && fulfilled ? 'refunded' : pp.status
 
