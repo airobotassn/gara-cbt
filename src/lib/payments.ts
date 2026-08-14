@@ -23,7 +23,10 @@ export interface CreateOrderResp {
   granted?: boolean
   orderId?: string
   orderName?: string
+  /** 총 정가(달러 센트). 응시료에 교재를 함께 담았으면 **합계**다. */
   amount?: number
+  /** 주문 내역(줄 단위). 응시료+교재처럼 두 건일 때 화면이 각각을 보여주기 위한 값. */
+  items?: { name: string; amount: number }[]
   currency?: string
   customerKey?: string
   /** 이 주문이 열린 PG. 지금은 항상 'eximbay'. */
@@ -49,8 +52,18 @@ export interface PaymentStatusResp {
   currency?: string
 }
 
-export function createOrder(productType: ProductType, productRef: string, lang: string) {
-  return callFunction<CreateOrderResp>('payments', { action: 'create', productType, productRef, lang })
+/**
+ * 주문 생성. `addonEbookId` 는 원서접수 화면에서 **함께 담은 교재**(응시료 결제 전용)다.
+ * ⚠️ 금액은 넘기지 않는다 — 책값도 서버가 그 id 로 DB 에서 다시 뽑는다.
+ */
+export function createOrder(productType: ProductType, productRef: string, lang: string, addonEbookId?: string | null) {
+  return callFunction<CreateOrderResp>('payments', {
+    action: 'create',
+    productType,
+    productRef,
+    lang,
+    ...(addonEbookId ? { addonEbookId } : {}),
+  })
 }
 
 /**

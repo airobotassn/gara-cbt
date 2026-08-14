@@ -40,11 +40,15 @@ export interface PaymentRow {
   fulfilled_at: string | null
   confirmed_at: string | null
   created_at: string
+  /** 응시료와 **함께 산 교재**(이북). 원서접수 화면의 '추천 교재 구매'. 없으면 null. */
+  addon_ebook_id: string | null
+  /** 그 교재의 정가(달러 센트). amount 에 이미 포함돼 있다 — 내역 표시·대사용이지 청구액이 아니다. */
+  addon_amount: number | null
 }
 
 /** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다. */
 export const PAYMENT_COLS =
-  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at'
+  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount'
 
 /**
  * **PG 에 말할 때 쓰는 금액·통화.** 승인 대조·조회·환불이 전부 이 값을 기준으로 해야 한다.
@@ -65,12 +69,17 @@ const STALE_ORDER_MIN = 30
 
 export interface ResolvedProduct {
   ok: true
+  /** 총 정가(달러 센트). **곁다리 교재가 있으면 그 값까지 더한 합계**다 — 결제창에 뜨는 금액이 이것이다. */
   amount: number
   orderName: string
   /** payments.product_ref 에 저장할 **정규화된** 값(DB 에서 읽은 원본). insert 는 반드시 이 값만 쓴다. */
   ref: string
   /** exam 전용 — create 사전검사(보유 응시권·응시 이력)가 exams.id 를 필요로 한다. ebook 에선 undefined. */
   exam?: { id: string; roundId: string; tier: string }
+  /** 함께 담은 교재(응시료 전용). id 는 DB 에서 읽은 값이라 그대로 저장해도 된다. */
+  addon?: { id: string; title: string; amount: number }
+  /** 화면 주문요약에 줄 단위로 그릴 내역. 곁다리가 없으면 한 줄뿐이다. */
+  items: { name: string; amount: number }[]
 }
 
 /**
@@ -87,7 +96,14 @@ export async function resolveProduct(
   productType: ProductType,
   productRef: string,
   lang: string,
+  /** 응시료와 함께 담은 교재(이북) id. 응시료 결제에만 붙는다 — 다른 상품에 오면 400 으로 거절한다. */
+  addonEbookId?: string | null,
 ): Promise<ResolvedProduct | { ok: false; error: string; status: number }> {
+  if (addonEbookId && productType !== 'exam') {
+    // 조용히 무시하면 안 된다 — 사용자는 교재를 담았다고 믿는데 결제·지급에서만 사라진다.
+    return { ok: false, error: '교재를 함께 담을 수 없는 상품입니다.', status: 400 }
+  }
+
   if (productType === 'ebook') {
     const { data: book } = await admin
       .from('ebooks')
@@ -98,13 +114,15 @@ export async function resolveProduct(
 
     const tr = (book.translations as Record<string, { title?: string }> | null) ?? {}
     const title = tr[lang]?.title || (book.title as string)
+    // 정가는 **달러 센트**다(2026-08-13 전환). 옛 price(원화 정수)는 읽지 않는다.
+    const amount = (book.price_usd_cents as number) ?? 0
     return {
       ok: true,
-      // 정가는 **달러 센트**다(2026-08-13 전환). 옛 price(원화 정수)는 읽지 않는다.
-      amount: (book.price_usd_cents as number) ?? 0,
+      amount,
       // orderName 은 결제창·카드 명세서에 뜬다. 토스 상한 100자.
       orderName: title.slice(0, 100),
       ref: book.id as string,
+      items: [{ name: title, amount }],
     }
   }
 
@@ -137,13 +155,15 @@ export async function resolveProduct(
       const error = fee.code === 'no_fee' ? '자격증 발급비가 아직 책정되지 않았습니다.' : fee.error
       return { ok: false, error, status: fee.status }
     }
+    // 결제창·카드 명세서에 뜨는 문구. exams.title 은 관리자가 넣은 한국어 고정값이라 그대로 쓴다
+    // (회차명 다국어 투영은 응시료 쪽 규칙이고, 여기선 급수명이 곧 자격명이라 브랜드 표기가 맞다).
+    const certName = `자격증 발급 · ${(ex.title as string) ?? ''}`.slice(0, 100)
     return {
       ok: true,
       amount: fee.amount,
-      // 결제창·카드 명세서에 뜨는 문구. exams.title 은 관리자가 넣은 한국어 고정값이라 그대로 쓴다
-      // (회차명 다국어 투영은 응시료 쪽 규칙이고, 여기선 급수명이 곧 자격명이라 브랜드 표기가 맞다).
-      orderName: `자격증 발급 · ${(ex.title as string) ?? ''}`.slice(0, 100),
+      orderName: certName,
       ref: productRef, // attemptId(UUID) — 정규화 대상 아님
+      items: [{ name: certName, amount: fee.amount }],
     }
   }
 
@@ -154,12 +174,46 @@ export async function resolveProduct(
   if (!parsed) return { ok: false, error: '상품 정보가 올바르지 않습니다.', status: 400 }
   const offer = await resolveExamOffer(admin, parsed.roundId, parsed.tier, lang)
   if (!offer.ok) return { ok: false, error: offer.error, status: offer.status }
+
+  // 함께 담은 교재 — 금액도 제목도 **여기서 DB 를 다시 읽어** 뽑는다(클라가 보내는 건 책 id 하나뿐이다).
+  const addon = addonEbookId ? await resolveEbookAddon(admin, addonEbookId, lang) : null
+  if (addon && !addon.ok) return addon
+
+  const items = [{ name: offer.orderName, amount: offer.amount }]
+  if (addon?.ok) items.push({ name: addon.title, amount: addon.amount })
+
   return {
     ok: true,
-    amount: offer.amount,
-    orderName: offer.orderName,
+    // 결제창에 뜨는 금액 = 합계. 응시권만 살 때와 같은 경로라 화면·서버가 다른 수를 말할 일이 없다.
+    amount: offer.amount + (addon?.ok ? addon.amount : 0),
+    // 카드 명세서엔 한 줄만 뜬다 — 두 개를 팔았다는 사실이 여기서 지워지면 안 되므로 제목을 이어 붙인다.
+    orderName: (addon?.ok ? `${offer.orderName} + ${addon.title}` : offer.orderName).slice(0, 100),
     ref: offer.ref,
     exam: { id: offer.examId, roundId: offer.round.id, tier: offer.tier },
+    addon: addon?.ok ? { id: addon.id, title: addon.title, amount: addon.amount } : undefined,
+    items,
+  }
+}
+
+/** 곁다리 교재의 제목·정가를 DB 에서 뽑는다. 판매 중이 아니면 결제 자체를 막는다. */
+async function resolveEbookAddon(
+  admin: SupabaseClient,
+  ebookId: string,
+  lang: string,
+): Promise<{ ok: true; id: string; title: string; amount: number } | { ok: false; error: string; status: number }> {
+  const { data: book } = await admin
+    .from('ebooks')
+    .select('id, title, price_usd_cents, published, translations')
+    .eq('id', ebookId)
+    .maybeSingle()
+  if (!book || !book.published) return { ok: false, error: '판매 중인 교재가 아닙니다.', status: 404 }
+  const tr = (book.translations as Record<string, { title?: string }> | null) ?? {}
+  return {
+    ok: true,
+    // ⚠️ 저장은 **DB 에서 읽은 id** 로만 한다(클라 문자열 금지) — product_ref 정규화와 같은 이유다.
+    id: book.id as string,
+    title: tr[lang]?.title || (book.title as string),
+    amount: (book.price_usd_cents as number) ?? 0,
   }
 }
 
@@ -268,10 +322,44 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
     // live_conflict = 다른 출처가 이미 그 슬롯을 차지 → **이 결제분 응시권은 0장**이다.
     // '이미 지급'으로 접으면 fulfilled_at 이 찍혀 어느 대사 목록에도 안 걸린다(돈만 받은 건이 정상으로 보인다).
     if (!res.ok) throw new Error(res.error)
+
+    // 함께 산 교재. 응시권 **뒤에** 준다 — 여기서 던지면 fulfilled_at 이 안 찍혀 대사가 다시 부르는데,
+    // 그때 응시권 재발급은 exam_tickets_payment_uniq 가 흡수하므로 두 장이 나가지 않는다.
+    await grantAddonEbook(admin, row)
     return
   }
 
   throw new Error(`지급 경로가 없는 상품 유형: ${row.product_type}`)
+}
+
+/** 응시료에 곁들여 산 교재의 열람권. 이북 단독 결제와 **같은 모양의 행**을 넣는다
+ *  (source='pg' + payment_id) — 그래야 환불 회수·대사가 경로를 하나만 알면 된다. */
+async function grantAddonEbook(admin: SupabaseClient, row: PaymentRow): Promise<void> {
+  if (!row.addon_ebook_id) return
+  const { error } = await admin.from('ebook_purchases').insert({
+    user_id: row.user_id,
+    ebook_id: row.addon_ebook_id,
+    price_paid: row.addon_amount ?? 0,
+    source: 'pg',
+    payment_id: row.id,
+    payment_ref: row.payment_key,
+  })
+  if (!error) return
+  if ((error as { code?: string }).code !== '23505') throw new Error(error.message)
+
+  // 23505 = 이미 그 책을 갖고 있다. 두 가지가 섞여 있어서 그냥 흡수하면 안 된다:
+  //   · 이 결제의 재시도(웹훅·대사가 다시 부름) → 흡수가 맞다. 이미 이 결제분이 나갔다.
+  //   · **그 사이 /ebooks 에서 따로 산 책** → 같은 책을 두 번 낸 것이다. 여기서 조용히 '지급 완료'로
+  //     접으면 fulfilled_at 이 찍혀 어느 목록에도 안 걸리고, 아무도 이중 청구를 모른다.
+  //     던져서 대사(미지급 목록)에 남긴다 — 응시권은 이미 나갔고, 사람이 책값만 환불하면 된다.
+  const { data: mine } = await admin
+    .from('ebook_purchases')
+    .select('payment_id')
+    .eq('user_id', row.user_id)
+    .eq('ebook_id', row.addon_ebook_id)
+    .maybeSingle()
+  if ((mine as { payment_id: string | null } | null)?.payment_id === row.id) return
+  throw new Error('함께 산 교재를 이미 다른 경로로 보유 중입니다 — 교재 값 환불이 필요합니다(응시권은 발급됨).')
 }
 
 // ---------- ②-b 환불 시 자동 회수 ----------
@@ -309,6 +397,13 @@ async function revokeForRefund(
   }
 
   if (row.product_type === 'exam') {
+    // 함께 산 교재부터 회수한다 — 열람은 소모가 아니라 접근권이라 응시권 상태와 무관하게 되돌릴 수 있다.
+    // (응시를 이미 시작한 건이라 아래에서 fulfilled 를 유지하더라도, 책은 회수한 채로 사람 판단을 기다린다.)
+    const addonNote = row.addon_ebook_id ? ' + 교재 열람권 회수' : ''
+    if (row.addon_ebook_id) {
+      await admin.from('ebook_purchases').delete().eq('payment_id', row.id).eq('user_id', row.user_id)
+    }
+
     // 이 결제로 발급된 응시권 하나(payment_id 로 특정).
     const { data: t } = await admin
       .from('exam_tickets')
@@ -318,20 +413,20 @@ async function revokeForRefund(
     const ticket = t as { id: string; status: string } | null
     if (!ticket) {
       await clearFulfilled()
-      return { fulfilled: false, note: '환불 — 회수할 응시권 없음' }
+      return { fulfilled: false, note: `환불 — 회수할 응시권 없음${addonNote}` }
     }
     if (ticket.status === 'consumed') {
       // 시험을 이미 시작함 — 자동 회수 금지. 사람이 성적·자격증까지 보고 판단한다(fulfilled 유지).
-      return { fulfilled: true, note: '환불 — 응시 후 건이라 자동 회수 안 함(성적·자격증 판단 필요)' }
+      return { fulfilled: true, note: `환불 — 응시 후 건이라 자동 회수 안 함(성적·자격증 판단 필요)${addonNote}` }
     }
     if (ticket.status === 'issued') {
       await voidTicket(admin, ticket.id, '결제 환불로 자동 회수')
       await clearFulfilled()
-      return { fulfilled: false, note: '환불 — 미사용 응시권 자동 회수(void)' }
+      return { fulfilled: false, note: `환불 — 미사용 응시권 자동 회수(void)${addonNote}` }
     }
     // 이미 void/expired — 회수할 게 없다.
     await clearFulfilled()
-    return { fulfilled: false, note: `환불 — 응시권이 이미 ${ticket.status}` }
+    return { fulfilled: false, note: `환불 — 응시권이 이미 ${ticket.status}${addonNote}` }
   }
 
   return { fulfilled: Boolean(row.fulfilled_at), note: '환불 — 회수 경로 없는 상품' }

@@ -62,6 +62,8 @@ export default function Checkout() {
 
   const productType = (params.get('type') ?? '') as ProductType
   const productRef = params.get('ref') ?? ''
+  // 원서접수 화면에서 함께 담은 교재. 여기선 **id 를 서버로 전달만** 한다(가격은 서버가 뽑는다).
+  const addonEbookId = params.get('book') ?? ''
 
   // URL 만 보면 바로 알 수 있는 실패는 effect 가 아니라 렌더 단계에서 판정한다
   // (effect 안에서 동기 setState 를 하면 렌더가 한 번 더 돈다 — react-hooks/set-state-in-effect).
@@ -79,7 +81,9 @@ export default function Checkout() {
     if (authLoading) return
     if (!isFullUser) {
       try {
-        sessionStorage.setItem('postLoginRedirect', `/checkout?type=${productType}&ref=${productRef}`)
+        // ⚠️ 담은 교재도 같이 실어야 한다 — 빠뜨리면 로그인하고 돌아온 사람의 장바구니가 조용히 비워진다.
+        const back = `/checkout?type=${productType}&ref=${productRef}${addonEbookId ? `&book=${addonEbookId}` : ''}`
+        sessionStorage.setItem('postLoginRedirect', back)
       } catch { /* 무시 */ }
       navigate('/login', { replace: true })
       return
@@ -90,7 +94,7 @@ export default function Checkout() {
 
     ;(async () => {
       try {
-        const res = await createOrder(productType, productRef, lang)
+        const res = await createOrder(productType, productRef, lang, addonEbookId || null)
         // 0원 상품은 결제창을 타지 않는다 — 서버가 이미 지급했으니 결과 화면으로 바로 보낸다.
         if (res.free) {
           navigate('/pay/success?free=1', { replace: true })
@@ -107,7 +111,7 @@ export default function Checkout() {
         setPhase('error')
       }
     })()
-  }, [authLoading, isFullUser, productType, productRef, lang, navigate, t, preflightErr])
+  }, [authLoading, isFullUser, productType, productRef, addonEbookId, lang, navigate, t, preflightErr])
 
   async function pay() {
     if (!order?.orderId || paying) return
@@ -166,12 +170,33 @@ export default function Checkout() {
             <section className="mb-4 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-6">
               <h2 className="font-title-md text-title-md font-bold mb-4">{t('pay.order')}</h2>
               {order ? (
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="font-body-md text-[16px] text-on-surface break-keep">{order.orderName}</span>
-                  <strong className="font-headline-lg text-[24px] font-black text-primary whitespace-nowrap">
-                    {usdc(order.amount ?? 0, lang)}
-                  </strong>
-                </div>
+                /* 두 건 이상(응시료 + 교재)이면 줄로 나눠 보여주고 합계를 아래에 둔다.
+                   한 건이면 예전과 같은 한 줄 — 없는 소계 줄을 만들지 않는다. */
+                (order.items?.length ?? 0) > 1 ? (
+                  <div className="flex flex-col gap-3">
+                    {order.items!.map((it, i) => (
+                      <div key={i} className="flex items-baseline justify-between gap-4">
+                        <span className="font-body-md text-[16px] text-on-surface-variant break-keep">{it.name}</span>
+                        <span className="font-body-md text-[16px] text-on-surface font-semibold whitespace-nowrap">
+                          {usdc(it.amount, lang)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-baseline justify-between gap-4 border-t border-outline-variant/30 pt-3">
+                      <span className="font-title-md text-title-md font-bold text-on-surface">{t('apply.total')}</span>
+                      <strong className="font-headline-lg text-[24px] font-black text-primary whitespace-nowrap">
+                        {usdc(order.amount ?? 0, lang)}
+                      </strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="font-body-md text-[16px] text-on-surface break-keep">{order.orderName}</span>
+                    <strong className="font-headline-lg text-[24px] font-black text-primary whitespace-nowrap">
+                      {usdc(order.amount ?? 0, lang)}
+                    </strong>
+                  </div>
+                )
               ) : (
                 <p className="font-body-md text-[15px] text-on-surface-variant">{t('pay.preparing')}</p>
               )}

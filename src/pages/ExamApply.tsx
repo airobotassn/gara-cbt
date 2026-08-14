@@ -18,6 +18,26 @@ import { callFunction } from '../lib/supabase'
 //      exam_tickets_live_uniq 가 막는다. 여기 판정이 뚫려도 돈이 두 번 빠지지 않는다.
 //   로그인 게이트는 이 화면에 두지 않는다 — Checkout 이 미로그인 시 postLoginRedirect 를 심고 /login 으로 보낸다.
 // 응시료 금액은 DB(exam_fees) 원화가 단일 소스이고 **표시만 달러**다(usdc(), $1 = 1,500원 고정 환산).
+//
+// 추천 교재(2026-08-14): 고른 급수의 CARIS 교재 한 권을 가운데 열에 세우고, '구매하기'를 누르면
+//   **결제 요약에 줄이 추가되고 총액이 늘어난다**(별도 결제가 아니라 한 번에 같이 산다).
+//   ⚠️ 결제는 계속 `type=exam` 이다 — 교재는 `&book=<id>` 곁다리로 붙는다. 번들을 별도 상품 유형으로 만들면
+//      payments_paid_product_uniq 가 (사람×타입×상품) 단위라 같은 급수를 'exam' 으로 한 번, 번들로 또 한 번
+//      결제할 수 있게 된다(응시권 이중결제 방어의 본체가 그 인덱스다).
+//   ⚠️ 여기 가격은 **표시용**이다. 결제 금액은 서버가 책 id 로 DB 를 다시 읽어 계산한다.
+
+/** /ebooks 스토어 응답 중 이 화면이 쓰는 부분(ebooks 함수 store 액션의 shape()). */
+type StoreBook = {
+  id: string
+  title: string
+  description: string | null
+  coverUrl: string | null
+  price_usd_cents: number
+  catalog: 'leveltest' | 'caris'
+  targetTier: string | null
+  owned: boolean
+}
+
 export default function ExamApply() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -102,6 +122,26 @@ export default function ExamApply() {
     }
   }, [isFullUser])
 
+  // 추천 교재 — 고른 급수(CARIS 카탈로그)의 교재 한 권. 스토어 목록을 그대로 받아 화면에서 고른다
+  //   (급수별 조회 액션을 새로 파지 않는다 — 권수가 적고, 스토어가 이미 보유 여부까지 내려준다).
+  //   조회 실패는 삼킨다. 이건 곁다리라 없으면 열만 안 세우면 되고, 응시권 결제를 막을 이유가 없다.
+  const [storeBooks, setStoreBooks] = useState<StoreBook[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    callFunction<{ ebooks?: StoreBook[] }>('ebooks', { action: 'store', lang })
+      .then((r) => { if (alive) setStoreBooks(r.ebooks ?? []) })
+      .catch(() => { /* 무시 */ })
+    return () => { alive = false }
+  }, [lang, isFullUser])
+
+  // 스토어는 sort_order 순이라 첫 번째가 그 급수의 대표 교재다.
+  //   (목록이 몇 권뿐이라 memo 하지 않는다 — lv 가 렌더마다 새로 만들어지는 값이라 의존성으로도 못 쓴다.)
+  const book = (storeBooks ?? []).find((b) => b.catalog === 'caris' && b.targetTier === lv.key) ?? null
+  // '함께 구매' 담김 여부. ⚠️ 이미 가진 책은 담기지 않는다 — 담아도 서버가 409 로 막고,
+  //   그 전에 총액이 늘어 사용자가 낼 이유 없는 돈을 보게 된다.
+  const [bookPicked, setBookPicked] = useState(false)
+  const bookAdded = bookPicked && !!book && !book.owned
+
   // product_ref 계약: "<round_id>:<tier>" (서버 parseExamRef 와 같은 형식).
   // UUID·티어 어디에도 ':' 가 없어 분해가 항상 성립한다.
   const productRef = active ? `${active.id}:${lv.key}` : ''
@@ -119,6 +159,13 @@ export default function ExamApply() {
       : feeReady
         ? usdc(feeAmount, lang)
         : t('apply.fee_tbd')
+  // 총액 = 응시료 + (담았다면) 교재. 응시료를 아직 모르면 합계도 말하지 않는다 —
+  // 교재값만 총액으로 띄우면 "응시료가 공짜"로 읽힌다.
+  const totalText = feeReady && book && bookAdded
+    ? usdc(feeAmount + book.price_usd_cents, lang)
+    : feeText
+  // 결제 화면으로 넘길 주소. 교재는 **id 만** 붙인다(금액은 서버가 다시 뽑는다).
+  const checkoutHref = `/checkout?type=exam&ref=${productRef}${bookAdded && book ? `&book=${book.id}` : ''}`
 
   // 접수기간 가드: 특정 회차(?round=<id>)로 들어왔는데 그 회차가 판매 가능(정기 + 접수중)이 아니면
   // (마감·예정·상시·없음·지난 시험) 접수화면을 막고 일정으로 유도. 회차 미지정은 판매 가능 회차로
@@ -165,28 +212,41 @@ export default function ExamApply() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* 좌: 자격 선택 */}
-          <div className="lg:col-span-2">
-            <section className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant/30 ambient-shadow">
+        {/* 3:1 이 아니라 9:3 인 이유 — 결제 요약은 줄이 서너 개뿐이라 1/3 을 주면 아래가 통째로 비고,
+            그만큼 왼쪽이 좁아져 급수 칩 6개가 한 줄에 못 선다(가로 스크롤바가 생겼었다). */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_250px] gap-8">
+          {/* 좌: 자격 선택 + 추천 교재.
+              한 카드 안에서 세로선으로 나눈다 — 교재를 별도 카드로 떼면 '다른 화면의 광고'처럼 읽히고,
+              결제 요약(오른쪽)과의 관계도 흐려진다. 좁은 화면에선 그냥 아래로 쌓인다. */}
+          <div className="min-w-0">
+            <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col lg:flex-row gap-4">
+            <div className="min-w-0 flex-1">
               <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-6">{t('apply.select_cert')}</h2>
 
               {/* 티어 선택 — 트랙 구분 없이 6개 티어를 한 줄에(Beginner … Zenith).
                   회차가 안 연 급수는 **숨기지 않고** 자물쇠 + 비활성으로 둔다 — 어떤 급수가 있는지 자체가
                   알려야 할 정보라서다. 잠긴 뜻은 아래 한 줄로 설명한다(칩마다 배지를 달면 6개가 다 늘어난다). */}
               <span className="font-label-md text-label-md text-on-surface-variant font-semibold">{t('apply.tier')}</span>
-              <div className="flex flex-nowrap gap-1.5 p-1.5 rounded-full bg-surface-container-high w-fit max-w-full mt-2 overflow-x-auto">
+              {/* ⚠️ 넘치면 **접힌다**(가로 스크롤 금지). 옆에 교재 열이 생기면서 6개가 한 줄에 아슬아슬해졌는데,
+                  스크롤로 두면 화면에 스크롤바가 뜨고 뒤쪽 급수가 있는지조차 안 보인다. */}
+              <div className="flex flex-wrap gap-1.5 p-1.5 rounded-3xl bg-surface-container-high w-fit max-w-full mt-2">
                 {TIERS.map(({ tier: l }, i) => {
                   const closed = !isTierOpen(l.key)
                   const bought = active ? ownedRefs.has(`${active.id}:${l.key}`) : false
-                  const base = 'px-5 py-2 rounded-full font-label-md text-label-md transition-all inline-flex items-center gap-1.5'
+                  // 칩 크기는 **읽히는 쪽을 우선**한다(2026-08-14 "좀더 키워도 될 것 같다"). 그 대가로
+                  // 잠긴 급수가 많은 회차에서는 줄이 접힌다 — 접히는 건 괜찮고 가로 스크롤만 안 나면 된다.
+                  const base = 'px-4 py-2.5 rounded-full font-label-md text-[15px] transition-all inline-flex items-center gap-1.5'
                   const cls = i === level
                     ? `${base} bg-primary text-on-primary font-bold`
                     : closed
                       ? `${base} text-outline font-semibold cursor-not-allowed`
                       : `${base} text-on-surface-variant hover:text-on-surface font-semibold`
                   return (
-                    <button key={l.key} onClick={() => setPicked(i)} disabled={closed} title={closed ? t('apply.tier_not_open') : bought ? t('apply.owned') : undefined} className={cls}>
+                    /* ⚠️ 급수를 바꾸면 담아둔 교재를 푼다 — 교재는 급수마다 다른 책이라
+                       그대로 두면 Beginner 교재를 담아놓고 Pro 를 결제하는 모양이 된다. */
+                    <button key={l.key} onClick={() => { setPicked(i); setBookPicked(false) }} disabled={closed} title={closed ? t('apply.tier_not_open') : bought ? t('apply.owned') : undefined} className={cls}>
+                      {/* 'Grand Master' 는 **두 줄로 쌓는다**(시안에도 그렇게 그려져 있다) — 이 칩 하나 때문에
+                          6개가 한 줄을 못 채우는 걸 막는 장치다. 펴면 줄이 통째로 접힌다. */}
                       <span className="flex flex-col items-center leading-[1.05]">{l.name.split(' ').map((w, k) => <span key={k}>{w}</span>)}</span>
                       {closed && <span className="material-symbols-outlined text-[18px]">lock</span>}
                       {!closed && bought && <span className="material-symbols-outlined text-[18px]">check_circle</span>}
@@ -263,11 +323,85 @@ export default function ExamApply() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* 추천 교재 — 그 급수의 교재가 실제로 있을 때만 세운다.
+                ⚠️ 표지를 작게 줄이지 말 것. 한 권뿐이라 열 폭을 그대로 쓰는 게 맞다(러닝 라이브러리와 같은 규칙). */}
+            {book && (
+              <div className="lg:w-[236px] shrink-0 lg:border-l lg:border-outline-variant/30 lg:pl-4">
+                <h2 className="font-title-md text-title-md font-bold text-on-surface border-l-4 border-primary pl-3 mb-6">{t('apply.book_col')}</h2>
+
+                {/* ⚠️ 표지를 테두리 카드 안에 넣지 말 것 — 그 패딩만큼 표지가 줄어든다(시안 235px → 176px 이 됐었다).
+                    표지가 이 열의 주인공이라 **열 폭을 그대로** 쓰고, 글·가격은 그 아래에 그냥 놓는다. */}
+                <div className="flex flex-col gap-3">
+                  {book.coverUrl && (
+                    <img
+                      src={book.coverUrl}
+                      alt=""
+                      className="w-full rounded-xl object-cover aspect-[1/1.414] bg-surface-container-high"
+                    />
+                  )}
+                  <div>
+                    <p className="font-title-md text-[17px] font-bold text-on-surface break-keep">{book.title}</p>
+                    {book.description && (
+                      <p className="mt-1 font-body-md text-[15px] leading-[22px] text-on-surface-variant break-keep line-clamp-3">
+                        {book.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {book.owned ? (
+                    /* 이미 산 책 — 여기서 또 팔지 않는다. 살 것을 권하는 자리가 아니라
+                       "그 책으로 같이 준비하라"고 말하는 자리다. */
+                    /* ⚠️ 아이콘을 문장 옆에 flex 로 붙이지 말 것 — 열이 좁아 남는 폭이 150px 남짓이라
+                       문장이 서너 줄로 쪼개져 가운데 정렬처럼 보인다. 아이콘은 윗줄에 따로 세운다. */
+                    <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 flex flex-col gap-1.5">
+                      <span className="material-symbols-outlined text-[20px] text-primary">menu_book</span>
+                      <p className="font-body-md text-[15px] leading-[22px] text-on-surface break-keep">
+                        {t('apply.book_owned')}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/mypage/ebooks')}
+                        className="self-start inline-flex items-center gap-1 font-label-md text-[15px] font-bold text-primary"
+                      >
+                        {t('apply.book_owned_cta')}
+                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3">
+                      <strong className="font-title-md text-[20px] font-black text-primary whitespace-nowrap">
+                        {usdc(book.price_usd_cents, lang)}
+                      </strong>
+                      {/* 누르면 오른쪽 결제 요약에 줄이 붙고 총액이 늘어난다(별도 결제로 새 화면이 열리지 않는다). */}
+                      <button
+                        type="button"
+                        onClick={() => setBookPicked((v) => !v)}
+                        aria-pressed={bookAdded}
+                        className={
+                          bookAdded
+                            ? 'inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-4 py-2.5 font-label-md text-[16px] font-bold text-primary'
+                            : 'inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 font-label-md text-[16px] font-bold text-on-primary ambient-shadow'
+                        }
+                      >
+                        {bookAdded && <span className="material-symbols-outlined text-[20px]">check</span>}
+                        {bookAdded ? t('apply.book_added') : t('apply.book_add')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {!book.owned && (
+                  <p className="mt-3 font-label-md text-label-md text-on-surface-variant break-keep">{t('apply.book_note')}</p>
+                )}
+              </div>
+            )}
             </section>
           </div>
 
           {/* 우: 결제 요약 */}
-          <aside className="lg:col-span-1">
+          <aside>
             <div className="sticky top-12 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col gap-5">
               <h2 className="font-title-md text-title-md font-bold text-on-surface">{t('apply.pay_summary')}</h2>
 
@@ -286,12 +420,23 @@ export default function ExamApply() {
                     {feeText || t('common.loading')}
                   </span>
                 </div>
+                {/* 교재를 담았을 때만 뜨는 줄. 이 줄이 곧 "왜 총액이 늘었나"의 답이라 제목을 같이 적는다. */}
+                {bookAdded && book && (
+                  <div className="flex justify-between items-start gap-3">
+                    <span className="font-body-md text-body-md text-on-surface-variant break-keep">
+                      {t('apply.book_row', { name: book.title })}
+                    </span>
+                    <span className="font-body-md text-body-md text-on-surface font-semibold whitespace-nowrap">
+                      {usdc(book.price_usd_cents, lang)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-outline-variant/30 pt-4 flex justify-between items-baseline">
                 <span className="font-title-md text-title-md text-on-surface font-bold">{t('apply.total')}</span>
                 <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-black">
-                  {feeText || '—'}
+                  {totalText || '—'}
                 </span>
               </div>
 
@@ -313,7 +458,7 @@ export default function ExamApply() {
                 </div>
               ) : (
                 <button
-                  onClick={() => navigate(`/checkout?type=exam&ref=${productRef}`)}
+                  onClick={() => navigate(checkoutHref)}
                   disabled={!canPay}
                   className="w-full bg-primary text-on-primary font-title-md text-title-md font-bold px-6 py-4 rounded-xl enabled:hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2 disabled:opacity-50"
                 >

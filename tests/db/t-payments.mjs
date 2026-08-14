@@ -16,6 +16,8 @@ const raw = readFileSync('supabase/migrations/20260806170000_payments.sql', 'utf
 const rawCert = readFileSync('supabase/migrations/20260807130000_payments_cert.sql', 'utf8');
 // 승인 선점(confirming) — 같은 상품의 동시 승인이 둘 다 PG 로 나가는 걸 막는 후속 마이그레이션.
 const rawClaim = readFileSync('supabase/migrations/20260810180000_payments_confirming.sql', 'utf8');
+// 응시료에 교재를 함께 담는 곁다리(addon) — 응시료 결제에만 붙고, 금액 없이는 못 붙는다.
+const rawAddon = readFileSync('supabase/migrations/20260814110000_payment_addon_ebook.sql', 'utf8');
 
 // pglite 엔 auth 스키마가 없다 — FK 만 떼고 나머지 DDL 은 원본 그대로 적용한다.
 const strip = (sql) => sql.replace(/\s+references auth\.users\(id\)(\s+on delete cascade)?/g, '');
@@ -40,6 +42,7 @@ await db.exec(`
 await db.exec(strip(raw));
 await db.exec(strip(rawCert));
 await db.exec(strip(rawClaim));
+await db.exec(strip(rawAddon));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -227,6 +230,62 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   await db.query(`delete from ebook_purchases where payment_id=$1 and user_id=$2`, [idX, U1]);
   rec('환불건 이북만 회수됨(payX 삭제)', (await db.query(`select count(*)::int c from ebook_purchases where payment_id=$1`, [idX])).rows[0].c, 0);
   rec('⭐ 다른 결제의 이북은 무사(payY 유지)', (await db.query(`select count(*)::int c from ebook_purchases where payment_id=$1`, [idY])).rows[0].c, 1);
+}
+
+// --- (12) 응시료에 함께 담는 교재(addon) ---
+//     한 결제로 응시권 + 교재가 같이 나간다. 여기서 보는 건 "원장이 무엇을 팔았는지 잊지 않는가"다.
+//     ⭐ 제일 중요한 건 **곁다리를 달아도 응시권 중복결제 방어가 그대로**라는 것 —
+//        그래서 product_type/product_ref 를 건드리지 않는 설계를 골랐다(번들 상품 유형 X).
+{
+  const ADDON_BOOK = '00000000-0000-0000-0000-0000000b0033';
+  await db.query(`insert into ebooks (id) values ($1)`, [ADDON_BOOK]);
+  const EXAM_REF = '00000000-0000-0000-0000-0000000e0001:beginner';
+
+  const cols = (await db.query(
+    `select column_name from information_schema.columns where table_name='payments'
+      and column_name in ('addon_ebook_id','addon_amount')`)).rows.map((r) => r.column_name).sort();
+  rec('addon 컬럼 둘 다 추가됨', cols.join(','), 'addon_amount,addon_ebook_id');
+
+  // 정상: 응시료 결제에 교재 한 권.
+  await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key, addon_ebook_id, addon_amount)
+     values ($1,'addon-ok','시험+교재','exam',$2,200,'paid','k',$3,100)`, [U1, EXAM_REF, ADDON_BOOK]);
+  const okRow = (await db.query(`select amount, addon_amount from payments where order_id='addon-ok'`)).rows[0];
+  rec('합계는 amount, 책값은 addon_amount 에 따로 남는다', `${okRow.amount}/${okRow.addon_amount}`, '200/100');
+
+  // ⭐ 곁다리를 달아도 같은 (사람×회차×급수)를 또 결제할 수 없다 — 응시권 이중결제 방어가 그대로다.
+  let dupBlocked = false;
+  try {
+    await db.query(
+      `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+       values ($1,'addon-dup','시험만','exam',$2,100,'paid','k')`, [U1, EXAM_REF]);
+  } catch (e) { dupBlocked = /unique|duplicate/i.test(String(e?.message ?? '')); }
+  rec('⭐ 교재를 담아 산 급수는 응시료만으로도 다시 못 산다(중복결제 방어 유지)', dupBlocked, true);
+
+  // 이북 결제에 또 이북을 다는 모양은 없다 — 그건 그냥 두 건이다.
+  let wrongType = false;
+  try {
+    await db.query(
+      `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key, addon_ebook_id, addon_amount)
+       values ($1,'addon-ebook','책+책','ebook',$2,200,'pending','k',$3,100)`, [U2, BOOK, ADDON_BOOK]);
+  } catch (e) { wrongType = /payments_addon_exam_only|check/i.test(String(e?.message ?? '')); }
+  rec('이북 결제에는 교재를 곁들일 수 없음', wrongType, true);
+
+  // 금액 없이 책만 달면 원장이 "얼마짜리였는지"를 영영 모른다 → 막는다.
+  let noAmount = false;
+  try {
+    await db.query(
+      `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key, addon_ebook_id)
+       values ($1,'addon-noamt','시험+교재','exam',$2,200,'pending','k',$3)`,
+      [U2, '00000000-0000-0000-0000-0000000e0002:pro', ADDON_BOOK]);
+  } catch (e) { noAmount = /payments_addon_exam_only|check/i.test(String(e?.message ?? '')); }
+  rec('금액 없이 교재만 다는 행은 거부', noAmount, true);
+
+  // 관리자가 책을 지워도 **결제 원장은 남는다**(on delete set null). 무엇을 팔았는지는 order_name 이 증언한다.
+  await db.query(`delete from ebooks where id=$1`, [ADDON_BOOK]);
+  const after = (await db.query(`select addon_ebook_id, order_name from payments where order_id='addon-ok'`)).rows[0];
+  rec('⭐ 책을 지워도 결제 행은 살아있다', after?.order_name, '시험+교재');
+  rec('지워진 책 참조는 null 로 끊긴다', after?.addon_ebook_id, null);
 }
 
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);

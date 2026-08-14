@@ -76,12 +76,14 @@ Deno.serve(async (req) => {
       const productType = String(body?.productType ?? '') as ProductType
       const productRef = String(body?.productRef ?? '').trim()
       const lang = String(body?.lang ?? 'ko')
+      // 원서접수 화면에서 함께 담은 교재. **책 id 하나만** 받는다 — 금액은 아래에서 서버가 다시 뽑는다.
+      const addonEbookId = String(body?.addonEbookId ?? '').trim() || null
       if (!PRODUCT_TYPES.includes(productType) || !productRef) {
         return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
       }
 
       // ① 금액은 상품ID로 서버가 다시 뽑는다. 클라가 보낸 금액은 받지도 않는다(파라미터에 없다).
-      const product = await resolveProduct(admin, productType, productRef, lang)
+      const product = await resolveProduct(admin, productType, productRef, lang, addonEbookId)
       if (!product.ok) return json({ error: product.error }, product.status)
 
       // ⛔ 살아있는 가상계좌 주문이 있으면 새 결제를 막는다.
@@ -140,6 +142,18 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle()
         if (done) return json({ error: '이미 응시를 완료한 시험입니다.', owned: true }, 409)
+
+        // 함께 담은 교재를 이미 갖고 있으면 결제를 막는다. ebook_purchases 의 unique 가 최종 방어선이지만
+        // 그건 **지급 단계**라 여기서 안 보면 돈이 빠진 뒤에 "이미 보유"가 되어 그 몫이 그대로 환불거리다.
+        if (product.addon) {
+          const { data: hasBook } = await admin
+            .from('ebook_purchases')
+            .select('id')
+            .eq('user_id', uid)
+            .eq('ebook_id', product.addon.id)
+            .maybeSingle()
+          if (hasBook) return json({ error: '이미 보유한 교재입니다.', ownedAddon: true }, 409)
+        }
       }
 
       // 자격증 발급비 — 본인의 '합격한·아직 미발급' 응시에만 결제창을 연다.
@@ -227,6 +241,9 @@ Deno.serve(async (req) => {
         charge_currency: charge.currency,
         // 원화 청구건에만 들어간다 — 그때 쓴 환율을 남겨야 나중에 금액을 설명할 수 있다.
         fx_rate: fxRate,
+        // 함께 산 교재. amount 에 이미 더해져 있고, 여기 적힌 몫이 "그중 얼마가 책값이었나"다.
+        addon_ebook_id: product.addon?.id ?? null,
+        addon_amount: product.addon?.amount ?? null,
         status: 'pending',
         customer_key: customerKey,
       })
@@ -290,7 +307,9 @@ Deno.serve(async (req) => {
       return json({
         orderId,
         orderName: product.orderName,
-        amount: product.amount, // 정가(달러 센트)
+        amount: product.amount, // 정가(달러 센트) — 곁다리 교재까지 더한 합계다
+        // 주문요약을 줄 단위로 그리기 위한 내역. 응시료만 살 땐 한 줄이라 화면이 예전과 같아 보인다.
+        items: product.items,
         currency: 'USD',
         customerKey,
         provider: providerName,
