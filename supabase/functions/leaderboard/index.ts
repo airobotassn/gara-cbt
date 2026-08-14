@@ -18,6 +18,8 @@ const TOP_N = 10
 
 interface RpcUser {
   rank: number
+  /** top 행에만 있다(scoped_top, 20260814100000). 방(/room/:handle) 진입용 — me 행에는 없다. */
+  uid?: string
   name: string
   level: number
   rating: number
@@ -33,6 +35,9 @@ function mapUser(u: RpcUser, me = false) {
   const av = u.avatar ?? ''
   return {
     rank: u.rank,
+    // 방 진입용. 방은 공개(room 함수 view)고, uid 로 열 수 있는 건 그 방뿐이다 —
+    // 잠금 테이블은 전부 RLS 미부여라 uid 를 안다고 읽히지 않는다.
+    uid: u.uid ?? null,
     name: u.name,
     level: u.level,
     rating: u.rating,
@@ -62,7 +67,8 @@ Deno.serve(async (req) => {
     //   · scoped_top 은 p_uid 를 **인자로** 받으므로 호출자 본인이 아니어도 된다. p_limit=0 이면 top 은 빈 배열,
     //     me 칸만 채워져 내려온다 → 목록을 통째로 받지 않고 한 사람만 집어 온다.
     //   · 노출값은 /ranking TOP10 이 이미 공개하는 것과 동일(이름·아바타·순위·백분위·시즌점수)이고
-    //     user_id 는 응답에 담지 않는다(mapUser 가 애초에 안 넣는다).
+    //     me 행에는 uid 가 없다(scoped_top 이 top 행에만 넣는다) → 이 경로의 응답에도 uid 는 안 실린다.
+    //     애초에 호출자가 uid 를 인자로 준 것이라 새로 새는 정보가 없다.
     //   ⚠️ 익명·탈퇴 계정은 scoped_top 의 base 가 이미 걸러서(is_anonymous=false, deactivated_at is null)
     //      me=null 로 나온다 → { user: null }. 익명 채팅글의 신원이 카드로 새지 않는다.
     if (scope === 'user') {

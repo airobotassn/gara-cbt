@@ -12,6 +12,8 @@ import type { ShareCardData } from '../lib/shareCard'
 
 interface HofUser {
   rank: number
+  // 방(/room/:uid) 진입용. scoped_top 의 top 행에만 있고 me 행에는 없다 → '내 순위' 바에서는 null.
+  uid: string | null
   name: string
   level: number
   rating: number // 시즌 총점(season_total) — 서버 leaderboard 응답 필드명은 하위호환상 rating 유지
@@ -217,7 +219,14 @@ export default function Ranking() {
       </div>
 
       {cardData ? (
-        <ShareCardModal data={cardData} title={`${cardOf?.name} 카드`} readOnly onClose={() => setCardOf(null)} />
+        <ShareCardModal
+          data={cardData}
+          title={`${cardOf?.name} 카드`}
+          readOnly
+          // 카드 아래 '방 보기' — 상위 랭커 방으로 들어가는 길이다.
+          roomHandle={cardOf?.uid ?? null}
+          onClose={() => setCardOf(null)}
+        />
       ) : null}
     </div>
   )

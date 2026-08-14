@@ -1727,6 +1727,9 @@ select jsonb_build_object(
   'top', coalesce((
     select jsonb_agg(jsonb_build_object(
       'rank', r.grank,
+      -- uid: 랭킹에서 그 사람 방(/room/:handle)으로 들어가는 열쇠(20260814100000).
+      --   me 행에는 안 넣는다 — 호출자 본인이라 이미 안다.
+      'uid', r.user_id,
       'name', coalesce(nullif(pr.display_name, ''), '익명'),
       'level', r.lvl,
       'rating', r.season_total,

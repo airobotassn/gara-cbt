@@ -25,6 +25,9 @@
   --glow: rgba(0, 74, 198, .16);
   --ink2: #6b5a48;         /* 보조 텍스트 */
   --ink3: #55463a;         /* 로그·토스트 텍스트 */
+  /* 방(미니룸) 면 — 벽 2단 + 바닥 2단. 나중에 벽지를 상품으로 팔면 여기가 갈아끼우는 자리다. */
+  --room-wall: #f6efe1; --room-wall2: #e9dcc4;
+  --room-floor: #e2c8a2; --room-floor2: #cdae83;
   --shc: 43, 32, 21;       /* 스티커 드롭섀도 rgb */
   --shc2: 26, 28, 36;
   position: relative; max-width: 480px; margin: 0 auto; min-height: 100vh;
@@ -137,6 +140,64 @@
 .hub .nameplate::before { content: "✦"; font-size: 11px; color: var(--gold); margin-right: -2px; }
 .hub .nameplate::after { content: "✦"; font-size: 11px; color: var(--gold); margin-left: -2px; }
 .hub .nameplate b { font-size: 17px; font-weight: 900; background: var(--nameplate-txt, linear-gradient(180deg, #4a3c1e, #2b2015)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ── 방(미니룸): 벽 + 바닥 두 면, 그 위에 가구 슬롯 ─────────────────────────
+   ⚠️ **슬롯 좌표는 여기 없다.** 서버(_shared/room.ts 의 ROOM_LAYOUT)가 %로 내려주고
+      RoomView 가 인라인 style 로 얹는다. 여기서 정하는 건 크기·모양·색뿐이다
+      — CSS 에 좌표를 박으면 "서버엔 있는데 화면엔 안 그려지는 슬롯" 이 생긴다.
+   ⚠️ 오른쪽 ~15% 는 레일(.rail-r)이 absolute 로 덮는다. 가운데 38~62% 는 CARI 가 서 있다.
+      슬롯 좌표가 그 둘을 비켜 가는 이유이고, 좌표를 옮길 땐 그 두 영역을 다시 확인할 것.
+   ⚠️ 벽/바닥은 아직 그림이 아니라 CSS 두 면이다(2026-08-14: 구조부터, 그림은 나중).  */
+.hub .room { position: absolute; inset: 0; container-type: inline-size; }
+.hub .room-wall { position: absolute; left: 0; right: 0; top: 0; height: 58%;
+  background: linear-gradient(180deg, var(--room-wall) 0%, var(--room-wall2) 100%);
+  border: 3.5px solid var(--line); border-bottom: none; border-radius: 20px 20px 0 0; }
+.hub .room-floor { position: absolute; left: 0; right: 0; top: 58%; bottom: 0;
+  background: linear-gradient(180deg, var(--room-floor) 0%, var(--room-floor2) 100%);
+  border: 3.5px solid var(--line); border-radius: 0 0 20px 20px; }
+/* 캐릭터는 가구보다 앞 — .stage 가 슬롯 뒤 DOM 이지만 z-index 를 명시해 순서를 못박는다.
+   ⚠️ **pointer-events:none 이 빠지면 안 된다.** .stage 는 inset:0 이라 캐릭터 그림은 가운데뿐인데
+      히트박스는 방 전체다 → 꾸미기 모드에서 빈 슬롯이 하나도 안 눌린다(실제로 그렇게 만들었다가 잡음).
+      .stage 안에는 누를 게 없다(그림·받침대·이름표뿐). */
+.hub .room .stage { z-index: 2; pointer-events: none; }
+
+/* ⚠️ 남의 방(/room/:handle)은 이름표에 **닉네임**이 들어간다 — 허브의 'CARI' 와 달리 길어서
+   그대로 두면 두 줄로 접히고 이름표가 세로로 부푼다(실제로 그랬다). 한 줄 고정 + 넘치면 줄임표. */
+.hub .room .nameplate b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40cqw; }
+
+.hub .rm-slot { position: absolute; width: 17%; aspect-ratio: 1; z-index: 1; padding: 0;
+  display: grid; place-items: center; background: none; border: 3px dashed transparent; border-radius: 14px;
+  transition: transform .07s; }
+/* 이모지 크기는 cqw — 방 폭에 따라 같이 줄고 는다(모바일/PC 에 값을 두 벌 두지 않는다).
+   벽 물건은 바닥 물건보다 작게: 실제로 벽에 거는 것들이 더 작고, 같은 크기면 벽이 무거워 보인다. */
+.hub .rm-art { font-size: 13cqw; line-height: 1; filter: drop-shadow(0 3px 2px rgba(var(--shc), .28)); }
+.hub .rm-slot[data-surface="wall"] .rm-art { font-size: 9.5cqw; }
+.hub .rm-plus { font-size: 7cqw; font-weight: 900; color: var(--ink2); opacity: .65; }
+/* 빈 자리는 **꾸미기 모드에서만** 보인다 — 남의 방·평소 화면에 점선 상자가 뜨면 사고처럼 읽힌다. */
+.hub .room.is-editing .rm-slot { cursor: pointer; border-color: rgba(var(--shc), .38); background: rgba(255,255,255,.3); }
+.hub .room.is-editing .rm-slot.has { border-style: solid; }
+.hub .room.is-editing .rm-slot.on { border-style: solid; border-color: var(--brand); background: rgba(95,142,208,.24); }
+.hub .room.is-editing .rm-slot:active { transform: translateY(2px); }
+
+/* 방 조작 버튼 — 무대 **왼쪽 위**, 오른쪽 레일의 반대편에 세로로 쌓는다.
+   ⚠️ .rail-r 과 같은 top(14px)·같은 z(3) 라 좌우가 한 쌍으로 읽힌다. 버튼을 늘리면
+      오른쪽 레일과 마찬가지로 무대 높이를 못 늘리니 개수를 여기서 관리할 것. */
+.hub .room-acts { position: absolute; left: 0; top: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.hub .room-btn { display: flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  background: var(--card); color: var(--ink); border: 3.5px solid var(--line); font-size: 13px; font-weight: 900;
+  box-shadow: 0 4px 0 rgba(var(--shc), .24); transition: transform .07s, box-shadow .1s; white-space: nowrap; }
+.hub .room-btn.on { background: var(--brand); color: #fff; }
+.hub .room-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc), .24); }
+
+/* 가구 고르기 모달 — 한 슬롯에 놓을 것을 고른다. 면(바닥/벽)이 맞는 것만 나온다. */
+.hub .rmpick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hub .rmpick-item { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 6px 8px; cursor: pointer;
+  background: var(--card); border: 3px solid var(--line); border-radius: 14px; box-shadow: 0 4px 0 rgba(var(--shc), .18);
+  font-size: 13px; font-weight: 900; color: var(--ink); text-align: center; line-height: 1.25; }
+.hub .rmpick-item.on { border-color: var(--brand); background: var(--card-alt); }
+.hub .rmpick-item:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(var(--shc), .18); }
+.hub .rmpick-art { font-size: 34px; line-height: 1; }
+.hub .rmpick-empty { margin: 6px 0 0; font-size: 14px; font-weight: 800; color: var(--ink2); line-height: 1.6; text-align: center; }
 
 /* ── 하단 도크: 출석 캘린더 + 메인 CTA ── */
 .hub .dock { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
@@ -589,6 +650,9 @@ html.dark .hub {
   --ink3: #c2c9da;
   --shc: 0, 0, 0;
   --shc2: 0, 0, 0;
+  /* 방 — 밤의 방. 벽이 바닥보다 밝아야 위/아래가 구분된다(둘 다 어두우면 한 판으로 뭉개진다). */
+  --room-wall: #333a4d; --room-wall2: #2a3040;
+  --room-floor: #3b3346; --room-floor2: #2e2836;
   /* 파스텔 액센트: 어두운 배경에서 과채도로 튀지 않게 살짝 눌러준다 */
   --brand: #5680bd;
   --purple: #7f87c8; --green: #5aa9a3; --orange: #d3a94a; --blue: #6f97c6; --red: #d46a6a;
@@ -616,6 +680,8 @@ html.dark .hub .day.on { color: #1b1f28; }
 html.dark .hub .ms-chip.on { color: #1b1f28; }
 html.dark .hub .ms-chip { box-shadow: 0 3px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.07); }
 html.dark .hub .nameplate { box-shadow: 0 4px 0 rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.08); }
+/* 빈 슬롯 표시: 라이트는 흰 반투명이 밝은 벽 위에서 눌린 자리로 읽히는데, 다크에선 그 값이 그대로면 흰 얼룩이 된다. */
+html.dark .hub .room.is-editing .rm-slot { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.24); }
 html.dark .hub .title-badge { box-shadow: 0 4px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
 html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 html.dark .hub .ticket-ghost, html.dark .hub .title-slot { border-color: #4a5264; color: #7f8899; }

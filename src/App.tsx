@@ -38,6 +38,7 @@ import Ranking from './pages/Ranking'
 import Onboarding from './pages/Onboarding'
 import NicknameSetup from './pages/NicknameSetup'
 import Hub from './pages/Hub'
+import Room from './pages/Room'
 import WorldArena from './pages/WorldArena'
 import MiniGame from './pages/MiniGame'
 import MiniGames from './pages/MiniGames'
@@ -158,6 +159,8 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/arena" element={<WorldArena />} />
               <Route path="/hub" element={<Hub />} />
+              {/* 남의 방(공개) — 로그인·온보딩 게이트 없음. SNS 에서 눌러 들어온 사람이 방을 봐야 한다. */}
+              <Route path="/room/:handle" element={<Room />} />
               <Route path="/games" element={<MiniGames />} />
               <Route path="/games/:gameId" element={<MiniGame />} />
               <Route path="/daily" element={<Daily />} />

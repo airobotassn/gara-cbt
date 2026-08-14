@@ -129,7 +129,9 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const [reporting, setReporting] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   // 아바타를 누르면 뜨는 그 사람 카드(/ranking TOP10 클릭과 같은 카드·같은 모달).
-  const [card, setCard] = useState<ShareCardData | null>(null)
+  // 카드와 **방 손잡이는 한 상태**로 들고 다닌다 — 따로 두면 카드를 닫을 때 한쪽만 남아
+  // 다음에 연 사람의 카드에 전 사람 방 링크가 붙는다.
+  const [card, setCard] = useState<{ data: ShareCardData; handle: string } | null>(null)
   const cardBusy = useRef(false)
 
   const listRef = useRef<HTMLDivElement>(null)
@@ -419,7 +421,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
         return
       }
       const u = res.user
-      setCard({
+      setCard({ handle: r.user_id, data: {
         lang,
         name: u.name,
         // 카드 아바타는 서버가 준 원본 문자열을 다시 조립해 쓴다(채팅 행의 avatar_url 과 같은 형식).
@@ -433,7 +435,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
         seasonTotal: u.rating,
         joinedAt: null, country: null, region: null, referralCode: null,
         publicOnly: true,
-      })
+      } })
     } catch {
       showToast(t('chat.noCard'))
     } finally {
@@ -557,7 +559,13 @@ export default function ChatBoard({ room = 'global' }: Props) {
 
       {/* 남의 카드라 보기 전용(저장·공유 버튼 없음) — /ranking TOP10 클릭과 같은 취급. */}
       {card && (
-        <ShareCardModal data={card} title={t('chat.cardOf', { name: card.name })} readOnly onClose={() => setCard(null)} />
+        <ShareCardModal
+          data={card.data}
+          title={t('chat.cardOf', { name: card.data.name })}
+          readOnly
+          roomHandle={card.handle}
+          onClose={() => setCard(null)}
+        />
       )}
 
       {!isFullUser ? (

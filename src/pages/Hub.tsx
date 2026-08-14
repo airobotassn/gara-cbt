@@ -6,6 +6,8 @@ import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
+import RoomView from '../components/RoomView'
+import { furnitureArt, roomUrl, type RoomSlot, type RoomSlots } from '../lib/room'
 import { Link } from 'react-router-dom'
 import { useT, type TFunc } from '../lib/i18n'
 import {
@@ -50,20 +52,17 @@ const PITY_CEILING = 15
 const DAILY_POINTS = 10
 
 // 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
-type Part = { key: string; rare: boolean; weight: number; price: number }
-const POOL: Part[] = [
-  { key: 'hat_common_01', rare: false, weight: 40, price: 200 },
-  { key: 'hat_common_02', rare: false, weight: 40, price: 200 },
-  { key: 'shoe_common_01', rare: false, weight: 30, price: 200 },
-  { key: 'glasses_common_01', rare: false, weight: 30, price: 200 },
-  { key: 'wing_rare_01', rare: true, weight: 5, price: 800 },
-  { key: 'crown_rare_01', rare: true, weight: 5, price: 800 },
-]
+//
+// ⚠️ 뽑기 풀 사본(옛 POOL 상수)은 **삭제했다.** 뽑기 결과를 그 사본에서 찾아 이름을 붙이고 있었는데,
+//    풀이 가구로 바뀌자(20260814090000) 사본에 없는 키가 와서 결과창이 "가루만 받음" 으로 표시됐다.
+//    서버가 준 part_key 를 그대로 쓰면 풀을 바꿔도 화면이 안 깨진다.
 // 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
 function partName(key: string, t: TFunc) {
   return t(`hub.part.${key}`)
 }
 function partEmoji(key: string) {
+  // 가구는 방 렌더러와 **같은 그림**을 쓴다 — 상점 썸네일과 방에 놓인 물건이 다르면 뭘 산 건지 알 수 없다.
+  if (key.startsWith('fur_')) return furnitureArt(key)
   if (key.startsWith('hat')) return '🧢'
   if (key.startsWith('shoe')) return '👟'
   if (key.startsWith('glasses')) return '👓'
@@ -73,15 +72,24 @@ function partEmoji(key: string) {
 }
 
 // ── 서버 계약(입출력) ──
-interface CatalogItem { partKey: string; price: number; rare: boolean }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number }
+// kind·surface 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
+interface CatalogItem { partKey: string; price: number; rare: boolean; kind?: string; surface?: string | null }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
+  // 방(미니룸) — layout(슬롯 목록 + %좌표)은 서버가 통째로 준다. 프론트에 슬롯표를 두지 않는다.
+  room?: { slots: RoomSlots; layout: RoomSlot[] }
+  // 가구 전체(면 포함). catalog 와 달리 상점에서 내린 한정템도 들어 있다 — 이미 가진 사람은 계속 놓을 수 있어야 하므로.
+  furniture?: { partKey: string; surface: string }[] }
 interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
 // stamps = 적립 뒤 7일 사이클 위치(1..7), bonus = 7일 완주 보너스 코인(0 이면 없음).
 interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
 
-const FRIENDLY_ERR = new Set(['insufficient_points', 'insufficient_dust', 'already_owned', 'unauthorized'])
+// 방 저장 거절 사유(room 함수)도 사람 말로 옮긴다 — 'wrong_surface' 가 그대로 뜨면 원인 불명의 오류로 보인다.
+const FRIENDLY_ERR = new Set([
+  'insufficient_points', 'insufficient_dust', 'already_owned', 'unauthorized',
+  'not_owned', 'not_furniture', 'wrong_surface',
+])
 function friendlyError(e: unknown, t: TFunc): string {
   const msg = e instanceof Error ? e.message : ''
   return FRIENDLY_ERR.has(msg) ? t(`hub.err.${msg}`) : t('hub.err.generic')
@@ -90,6 +98,9 @@ function friendlyError(e: unknown, t: TFunc): string {
 type TitleItem = { tier: string; exam_title?: string }
 
 type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
+
+// 면 라벨 사전 키 — 'floor'/'wall' 이 곧 키라서 표를 두 벌 두지 않는다(hub.earn.row.<kind> 와 같은 관례).
+const surfaceLabel = (surface: string, t: TFunc) => t(`hub.room.surface_${surface}`)
 
 // 코인 선물 — 받은 것(오늘, 사람별 합산) / 이력 한 줄.
 type GiftToday = { name: string; amount: number; count: number }
@@ -148,6 +159,13 @@ export default function Hub() {
   const [giftHistory, setGiftHistory] = useState<GiftRow[] | null>(null)
   const [giftHistoryOpen, setGiftHistoryOpen] = useState(false)
   const [owned, setOwned] = useState<Set<string>>(new Set())
+  // 방(미니룸). layout 은 서버가 준 것만 쓴다 — 슬롯표를 프론트에 복제하지 않는다(_shared/room.ts 가 단일 출처).
+  const [roomSlots, setRoomSlots] = useState<RoomSlots>({})
+  const [roomLayout, setRoomLayout] = useState<RoomSlot[]>([])
+  const [furniture, setFurniture] = useState<{ partKey: string; surface: string }[]>([])
+  const [editing, setEditing] = useState(false)
+  const [pickSlot, setPickSlot] = useState<string | null>(null) // 가구 고르기 모달이 열린 슬롯
+  const [roomCopied, setRoomCopied] = useState(false)
   const [pity, setPity] = useState(0)
   // 시험 사다리 등급(user_progress.rank). HUD 의 Lv 는 이제 ARENA 레벨(점수 밴드)이라 화면에는 안 쓴다
   // — 서버는 계속 내려주므로 받아만 둔다(기존 skillScore/activityScore 와 같은 패턴).
@@ -159,7 +177,7 @@ export default function Hub() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [dust, setDust] = useState(0)
   const [exclusives, setExclusives] = useState<{ partKey: string; dustPrice: number }[]>([])
-  const [lastDraw, setLastDraw] = useState<{ dust: number; part: Part | null } | null>(null)
+  const [lastDraw, setLastDraw] = useState<{ dust: number; partKey: string | null } | null>(null)
   const [drawing, setDrawing] = useState(false)
   const [purchased, setPurchased] = useState<{ partKey: string; kind: 'coin' | 'dust' } | null>(null)
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null)
@@ -318,6 +336,13 @@ export default function Hub() {
     setGiftsToday(h.giftsToday ?? [])
     setGiftsOlder(h.giftsOlder ?? 0)
     setGiftsUnseen(h.giftsUnseen ?? 0)
+    setFurniture(h.furniture ?? [])
+    // ⚠️ 배치는 서버 응답으로 **덮어쓴다**(낙관적 반영을 되돌리는 게 아니라 권위값 동기화).
+    //    layout 은 비어 있으면 갱신하지 않는다 — 옛 배포본 응답에 room 이 없으면 방이 통째로 사라진다.
+    if (h.room) {
+      setRoomSlots(h.room.slots ?? {})
+      if (h.room.layout?.length) setRoomLayout(h.room.layout)
+    }
   }
   async function hydrate() {
     try {
@@ -364,9 +389,8 @@ export default function Hub() {
       setDrawing(true)
       setLastDraw(null)
       const r = await callFunction<GachaResp>('gacha-draw', { pool_key: 'default', client_nonce: crypto.randomUUID() })
-      const part = r.part_key ? (POOL.find((p) => p.key === r.part_key) ?? null) : null
       window.setTimeout(() => {
-        setLastDraw({ dust: r.dust_gained, part })
+        setLastDraw({ dust: r.dust_gained, partKey: r.part_key })
         setDrawing(false)
       }, 900)
       await hydrate()
@@ -387,6 +411,52 @@ export default function Hub() {
     } catch (e) {
       pushErr(friendlyError(e, t))
     }
+  }
+
+  // ── 방 꾸미기 ──
+  // 배치 저장은 **낙관적 반영 + 실패 시 되돌리기**다. 가구를 놓는 건 눌렀을 때 바로 보여야 하는 동작이라
+  // 서버 응답을 기다리면 한 박자 늦게 나타난다. 대신 서버가 거절하면 반드시 원래대로 돌려놓는다
+  // — 안 돌리면 화면엔 놓여 있는데 새로고침하면 사라지는(= 원인 모를) 상태가 된다.
+  async function saveRoom(next: RoomSlots) {
+    const prev = roomSlots
+    setRoomSlots(next)
+    try {
+      await callFunction('room', { action: 'save', slots: next })
+    } catch (e) {
+      setRoomSlots(prev)
+      pushErr(friendlyError(e, t))
+    }
+  }
+  // 슬롯에 가구를 놓거나(partKey) 치운다(null).
+  function placeInSlot(slotKey: string, partKey: string | null) {
+    const next: RoomSlots = { ...roomSlots }
+    if (partKey) {
+      // 같은 가구를 두 자리에 둘 수 없다 — 하나뿐인 물건이라 복제로 보인다. 옮기는 것으로 처리한다.
+      for (const k of Object.keys(next)) if (next[k] === partKey) delete next[k]
+      next[slotKey] = partKey
+    } else {
+      delete next[slotKey]
+    }
+    setPickSlot(null)
+    void saveRoom(next)
+  }
+  async function copyRoomLink() {
+    if (!user?.id) return
+    const url = roomUrl(user.id)
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = url
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    setRoomCopied(true)
+    window.setTimeout(() => setRoomCopied(false), 1600)
   }
 
   // 가루 교환 → gacha-exchange (뽑기 전용 한정템 지정 확정). 성공 시 리워드 팝업.
@@ -500,6 +570,10 @@ export default function Hub() {
   // const unusedCoupons = coupons.filter((c) => !c.used).length
   // RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {tierName(titles[0].tier)}</span> : null
+  // 가구 고르기 모달 파생값 — 고른 슬롯의 면과 맞고 **내가 가진** 가구만 후보다.
+  //   면을 안 거르면 벽시계가 바닥 후보로 뜨고, 눌러도 서버가 wrong_surface 로 거절해 헛클릭이 된다.
+  const pickSlotDef = pickSlot ? roomLayout.find((s) => s.key === pickSlot) ?? null : null
+  const pickable = pickSlotDef ? furniture.filter((f) => f.surface === pickSlotDef.surface && owned.has(f.partKey)) : []
   // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
   //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
   const arenaLv = arenaLevelForScore(seasonTotal)
@@ -654,10 +728,25 @@ export default function Hub() {
               <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>{t('hub.rail.title')}</button>
               <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><Ic n="share" s={42} /></span>{t('hub.rail.invite')}</button>
             </div>
-            <div className="stage">
-              <div className="pedestal" />
-              <img className="hero-char" src="/hub-char.png" alt="CARI" />
-              <div className="nameplate"><b>CARI</b> {titleBadge}</div>
+            {/* 방(미니룸) — /room/:handle(남의 방)과 **같은 컴포넌트**를 쓴다.
+                내 방과 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나서 제일 늦게 발견된다. */}
+            <RoomView
+              layout={roomLayout}
+              slots={roomSlots}
+              name="CARI"
+              badge={titleBadge}
+              editing={editing}
+              activeSlot={pickSlot}
+              onSlotClick={(k) => setPickSlot(k)}
+            />
+            {/* 왼쪽 조작 버튼 — 오른쪽 레일의 반대편. 방 링크는 여기 둔다(위 backrow 는 이미 버튼 둘이라 셋이면 밀린다). */}
+            <div className="room-acts">
+              <button className={`room-btn${editing ? ' on' : ''}`} onClick={() => { setEditing((v) => !v); setPickSlot(null) }}>
+                {t(editing ? 'hub.room.done' : 'hub.room.edit')}
+              </button>
+              <button className="room-btn" onClick={copyRoomLink}>
+                {t(roomCopied ? 'hub.room.copied' : 'hub.room.link')}
+              </button>
             </div>
         </div>
 
@@ -704,6 +793,34 @@ export default function Hub() {
         </div>
       )}
 
+      {/* 가구 고르기 — 슬롯 하나에 놓을 것을 고른다. 면이 맞고 내가 가진 것만 나온다. */}
+      {pickSlot && pickSlotDef && (
+        <Modal title={t('hub.room.pick_title', { where: surfaceLabel(pickSlotDef.surface, t) })} onClose={() => setPickSlot(null)}>
+          {pickable.length === 0 ? (
+            <p className="rmpick-empty">{t('hub.room.none_owned', { where: surfaceLabel(pickSlotDef.surface, t) })}</p>
+          ) : (
+            <div className="rmpick-grid">
+              {pickable.map((f) => (
+                <button
+                  key={f.partKey}
+                  className={`rmpick-item${roomSlots[pickSlot] === f.partKey ? ' on' : ''}`}
+                  onClick={() => placeInSlot(pickSlot, f.partKey)}
+                >
+                  <span className="rmpick-art">{furnitureArt(f.partKey)}</span>
+                  <span>{partName(f.partKey, t)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {roomSlots[pickSlot] && (
+            <button className="pbtn" style={{ ...btn('#c3cbe0'), width: '100%', marginTop: 12 }} onClick={() => placeInSlot(pickSlot, null)}>
+              {t('hub.room.remove')}
+            </button>
+          )}
+          <p className="hub-modal-help">{t('hub.room.help')}</p>
+        </Modal>
+      )}
+
       {modal === 'gacha' && (
         <Modal title={t('hub.gacha.title')} onClose={() => setModal(null)}>
           <div className="gacha-head">
@@ -721,12 +838,12 @@ export default function Hub() {
               </div>
             )}
             {!drawing && lastDraw && (
-              lastDraw.part ? (
+              lastDraw.partKey ? (
                 <div className="gacha-result is-rare">
                   <span className="gacha-ribbon">{t('hub.gacha.limited')}</span>
                   <span className="gacha-spark s1">✨</span><span className="gacha-spark s2">✨</span><span className="gacha-spark s3">✨</span>
-                  <div className="gacha-result-icon">{partEmoji(lastDraw.part.key)}</div>
-                  <b>{partName(lastDraw.part.key, t)}</b>
+                  <div className="gacha-result-icon">{partEmoji(lastDraw.partKey)}</div>
+                  <b>{partName(lastDraw.partKey, t)}</b>
                   <span className="gacha-dustgain">{t('hub.gacha.dust_gain', { n: lastDraw.dust })}</span>
                 </div>
               ) : (
@@ -775,7 +892,12 @@ export default function Hub() {
                   {owned.has(c.partKey) && <span className="hub-shop-owned">{t('hub.shop.owned')}</span>}
 
                   <div className="hub-shop-thumb">{partEmoji(c.partKey)}</div>
-                  <div className="hub-shop-name">{partName(c.partKey, t)}</div>
+                  {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
+                      안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
+                  <div className="hub-shop-name">
+                    {partName(c.partKey, t)}
+                    {c.surface ? <small style={{ display: 'block', fontWeight: 800, opacity: .7 }}>{surfaceLabel(c.surface, t)}</small> : null}
+                  </div>
                   <div className="hub-shop-price">🪙 {c.price}</div>
                   <button className="pbtn hub-shop-buy" style={btn(owned.has(c.partKey) ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={owned.has(c.partKey)}>
                     {t(owned.has(c.partKey) ? 'hub.shop.owned' : 'hub.shop.buy')}

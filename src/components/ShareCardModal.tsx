@@ -2,6 +2,8 @@
 // 미리보기 = 실제 출력 캔버스를 CSS 로 축소한 것(별도 DOM 미리보기를 두지 않아 보이는 대로 나간다).
 // 마크업은 hub.css 의 .hub-modal-* 를 그대로 쓴다 → 반드시 .hub 하위에서 렌더할 것.
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { roomPath } from '../lib/room'
 import {
   renderShareCard, canvasToBlob, cardFileName, downloadBlob, shareBlob, copyBlob,
   CARD_W, CARD_H, type ShareCardData,
@@ -15,11 +17,16 @@ export default function ShareCardModal({
   // 남의 카드(랭킹 TOP10 클릭)는 보기 전용 — 저장·공유·복사 버튼을 감춘다.
   // 남의 이미지를 내가 받아서 뿌리는 건 자연스럽지 않고, 게임들도 남의 프로필은 보기만 한다.
   readOnly = false,
+  // 그 사람의 방(/room/:handle) 손잡이. 있으면 카드 아래에 '방 보기' 가 붙는다.
+  //   ⚠️ 랭킹과 채팅이 **같은 이 컴포넌트**를 쓰기 때문에 여기 한 번 붙이면 두 화면에 다 생긴다
+  //     — 화면마다 따로 붙이면 둘이 어긋난다.
+  roomHandle = null,
 }: {
   data: ShareCardData
   onClose: () => void
   title?: string
   readOnly?: boolean
+  roomHandle?: string | null
 }) {
   const { t } = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -93,6 +100,13 @@ export default function ShareCardModal({
               {canCopy && (
                 <button className="pbtn share-btn" onClick={doCopy} disabled={state !== 'ready' || busy}>{t('share.do_copy')}</button>
               )}
+            </div>
+          )}
+          {roomHandle && (
+            <div className="share-actions">
+              <Link className="pbtn share-btn share-btn-primary" to={roomPath(roomHandle)} onClick={onClose}>
+                {t('room.visit')}
+              </Link>
             </div>
           )}
           {note && <p className="share-note">{note}</p>}

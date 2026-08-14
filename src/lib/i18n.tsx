@@ -1659,6 +1659,14 @@ export const D: Record<string, Record<Lang, string>> = {
   // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
   "apply.fee_tbd": { ko: "준비 중", en: "Coming soon", ja: "準備中", zh: "准备中", hi: "जल्द आ रहा है", vi: "Sắp có" },
   "apply.total": { ko: "총 결제금액", en: "Total", ja: "合計金額", zh: "应付总额", hi: "कुल राशि", vi: "Tổng thanh toán" },
+  // 추천 교재(원서접수 가운데 열) — 응시료와 **함께** 결제되는 곁다리다.
+  "apply.book_col": { ko: "추천 교재 구매", en: "Recommended book", ja: "おすすめ教材", zh: "推荐教材", hi: "अनुशंसित पुस्तक", vi: "Giáo trình đề xuất" },
+  "apply.book_add": { ko: "구매하기", en: "Add", ja: "購入する", zh: "购买", hi: "जोड़ें", vi: "Mua" },
+  "apply.book_added": { ko: "담김", en: "Added", ja: "追加済み", zh: "已加入", hi: "जोड़ा गया", vi: "Đã thêm" },
+  "apply.book_row": { ko: "교재 ({name})", en: "Book ({name})", ja: "教材（{name}）", zh: "教材（{name}）", hi: "पुस्तक ({name})", vi: "Giáo trình ({name})" },
+  "apply.book_note": { ko: "원서 접수 시 교재를 함께 구매하면 더욱 편리합니다.", en: "Adding the book to your application makes preparing easier.", ja: "申込と一緒に教材も購入すると便利です。", zh: "报名时一并购买教材更方便。", hi: "आवेदन के साथ पुस्तक लेने पर तैयारी आसान रहती है।", vi: "Mua kèm giáo trình khi đăng ký sẽ tiện hơn." },
+  "apply.book_owned": { ko: "이미 구매하신 교재예요. 이 책으로 함께 준비해 보세요.", en: "You already own this book. Prepare with it alongside the exam.", ja: "すでに購入済みの教材です。この本で一緒に準備しましょう。", zh: "您已购买该教材。用这本书一起备考吧。", hi: "यह पुस्तक आपके पास पहले से है। इसी से तैयारी करें।", vi: "Bạn đã có giáo trình này. Hãy ôn luyện cùng nó." },
+  "apply.book_owned_cta": { ko: "내 서재에서 보기", en: "Open in my library", ja: "マイ書斎で見る", zh: "在我的书架中查看", hi: "मेरी लाइब्रेरी में खोलें", vi: "Mở trong thư viện của tôi" },
   "apply.pay_btn": { ko: "결제하기", en: "Pay", ja: "決済する", zh: "去支付", hi: "भुगतान करें", vi: "Thanh toán" },
   "apply.pay_note": { ko: "결제 시 본인인증이 필요합니다. 응시료·본인인증·결제는 추후 연결(미리보기).", en: "Identity verification is required for payment. Fees, verification, and payment will be connected later (preview).", ja: "決済には本人認証が必要です。受験料・本人認証・決済は後日連携予定（プレビュー）。", zh: "支付需实名认证。应试费·实名认证·支付将于稍后接入（预览）。", hi: "भुगतान के लिए पहचान सत्यापन आवश्यक है। शुल्क·सत्यापन·भुगतान बाद में जोड़े जाएंगे (पूर्वावलोकन)।", vi: "Cần xác minh danh tính để thanh toán. Lệ phí·xác minh·thanh toán sẽ kết nối sau (bản xem trước)." },
   "apply.modal_title": { ko: "결제 기능 준비 중", en: "Payment coming soon", ja: "決済機能は準備中", zh: "支付功能准备中", hi: "भुगतान सुविधा जल्द", vi: "Tính năng thanh toán sắp ra mắt" },
@@ -2031,8 +2039,51 @@ export const D: Record<string, Record<Lang, string>> = {
   'hub.err.already_owned': { ko: '이미 보유한 한정템이에요', en: 'You already own this limited item', ja: 'すでに持っている限定アイテムです', zh: '您已拥有该限定道具', hi: 'यह लिमिटेड आइटम आपके पास पहले से है', vi: 'Bạn đã có vật phẩm giới hạn này' },
   'hub.err.unauthorized': { ko: '로그인이 필요해요', en: 'Sign in required', ja: 'ログインが必要です', zh: '需要登录', hi: 'साइन इन आवश्यक है', vi: 'Cần đăng nhập' },
   'hub.err.generic': { ko: '오류가 발생했어요. 잠시 후 다시 시도해주세요', en: 'Something went wrong. Please try again in a moment.', ja: 'エラーが発生しました。しばらくしてからもう一度お試しください', zh: '发生错误，请稍后再试', hi: 'कुछ गड़बड़ हुई। थोड़ी देर बाद फिर कोशिश करें', vi: 'Đã xảy ra lỗi. Vui lòng thử lại sau giây lát' },
+  // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
+  'hub.err.not_owned': { ko: '가지고 있지 않은 가구예요', en: "You don't own that piece", ja: '持っていない家具です', zh: '您还没有这件家具', hi: 'यह फ़र्नीचर आपके पास नहीं है', vi: 'Bạn chưa sở hữu món này' },
+  'hub.err.not_furniture': { ko: '방에 놓을 수 없는 물건이에요', en: "That can't be placed in a room", ja: '部屋に置けないアイテムです', zh: '该物品不能放进房间', hi: 'इसे कमरे में नहीं रखा जा सकता', vi: 'Vật phẩm này không đặt được trong phòng' },
+  'hub.err.wrong_surface': { ko: '그 자리에는 놓을 수 없는 가구예요', en: "That piece doesn't go there", ja: 'その場所には置けない家具です', zh: '这件家具不能放在那个位置', hi: 'यह फ़र्नीचर वहाँ नहीं रखा जा सकता', vi: 'Không thể đặt món này ở vị trí đó' },
+
+  // ── 방 꾸미기(미니룸) ──
+  'hub.room.edit': { ko: '꾸미기', en: 'Decorate', ja: '模様がえ', zh: '布置', hi: 'सजाएँ', vi: 'Trang trí' },
+  'hub.room.done': { ko: '완료', en: 'Done', ja: '完了', zh: '完成', hi: 'हो गया', vi: 'Xong' },
+  'hub.room.link': { ko: '방 링크', en: 'Room link', ja: '部屋リンク', zh: '房间链接', hi: 'रूम लिंक', vi: 'Liên kết phòng' },
+  'hub.room.copied': { ko: '복사했어요', en: 'Copied', ja: 'コピーしました', zh: '已复制', hi: 'कॉपी हो गया', vi: 'Đã sao chép' },
+  'hub.room.surface_floor': { ko: '바닥', en: 'Floor', ja: '床', zh: '地板', hi: 'फ़र्श', vi: 'Sàn' },
+  'hub.room.surface_wall': { ko: '벽', en: 'Wall', ja: '壁', zh: '墙面', hi: 'दीवार', vi: 'Tường' },
+  'hub.room.pick_title': { ko: '{where}에 놓을 가구', en: 'Furniture for the {where}', ja: '{where}に置く家具', zh: '放在{where}的家具', hi: '{where} के लिए फ़र्नीचर', vi: 'Đồ đặt ở {where}' },
+  'hub.room.none_owned': { ko: '{where}에 놓을 가구가 아직 없어요. 상점이나 뽑기에서 구해보세요.', en: 'You have no furniture for the {where} yet. Try the shop or a draw.', ja: '{where}に置ける家具がまだありません。ショップかガチャで手に入れましょう。', zh: '还没有可以放在{where}的家具，去商店或抽奖看看吧。', hi: '{where} के लिए अभी कोई फ़र्नीचर नहीं है। शॉप या ड्रॉ आज़माएँ।', vi: 'Bạn chưa có đồ nào đặt được ở {where}. Thử cửa hàng hoặc quay thưởng nhé.' },
+  'hub.room.remove': { ko: '이 자리 비우기', en: 'Clear this spot', ja: 'この場所を空ける', zh: '清空这个位置', hi: 'यह जगह खाली करें', vi: 'Bỏ trống chỗ này' },
+  'hub.room.help': { ko: '가구는 한 자리에만 놓을 수 있어요. 다른 자리에 놓으면 옮겨집니다.', en: 'Each piece sits in one spot. Placing it elsewhere moves it.', ja: '家具は一か所にだけ置けます。別の場所に置くと移動します。', zh: '每件家具只能放在一个位置，放到别处即为移动。', hi: 'हर फ़र्नीचर एक ही जगह रह सकता है। कहीं और रखने पर वह वहाँ चला जाता है।', vi: 'Mỗi món chỉ đặt được ở một chỗ. Đặt sang chỗ khác là chuyển đi.' },
+
+  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  'hub.part.fur_plant_01': { ko: '작은 화분', en: 'Little Plant', ja: '小さな鉢植え', zh: '小盆栽', hi: 'छोटा गमला', vi: 'Chậu Cây Nhỏ' },
+  'hub.part.fur_lamp_01': { ko: '스탠드 조명', en: 'Floor Lamp', ja: 'スタンドライト', zh: '落地灯', hi: 'फ़्लोर लैंप', vi: 'Đèn Sàn' },
+  'hub.part.fur_chair_01': { ko: '나무 의자', en: 'Wooden Chair', ja: '木の椅子', zh: '木椅', hi: 'लकड़ी की कुर्सी', vi: 'Ghế Gỗ' },
+  'hub.part.fur_sofa_01': { ko: '포근 소파', en: 'Cozy Sofa', ja: 'ふかふかソファ', zh: '舒适沙发', hi: 'कोज़ी सोफ़ा', vi: 'Ghế Sofa Êm' },
+  'hub.part.fur_wardrobe_01': { ko: '옷장', en: 'Wardrobe', ja: 'クローゼット', zh: '衣柜', hi: 'अलमारी', vi: 'Tủ Quần Áo' },
+  'hub.part.fur_bed_01': { ko: '침대', en: 'Bed', ja: 'ベッド', zh: '床', hi: 'बिस्तर', vi: 'Giường' },
+  'hub.part.fur_frame_01': { ko: '액자', en: 'Picture Frame', ja: '額縁', zh: '相框', hi: 'तस्वीर का फ़्रेम', vi: 'Khung Ảnh' },
+  'hub.part.fur_clock_01': { ko: '벽시계', en: 'Wall Clock', ja: '壁掛け時計', zh: '挂钟', hi: 'दीवार घड़ी', vi: 'Đồng Hồ Treo' },
+  'hub.part.fur_shelf_01': { ko: '책 선반', en: 'Bookshelf', ja: '本棚', zh: '书架', hi: 'किताबों की शेल्फ़', vi: 'Kệ Sách' },
+  'hub.part.fur_window_01': { ko: '창문', en: 'Window', ja: '窓', zh: '窗户', hi: 'खिड़की', vi: 'Cửa Sổ' },
+  'hub.part.fur_aquarium_01': { ko: '작은 수조', en: 'Little Aquarium', ja: '小さな水槽', zh: '小鱼缸', hi: 'छोटा एक्वेरियम', vi: 'Bể Cá Nhỏ' },
+  'hub.part.fur_neon_01': { ko: '네온 사인', en: 'Neon Sign', ja: 'ネオンサイン', zh: '霓虹灯牌', hi: 'नियॉन साइन', vi: 'Bảng Đèn Neon' },
+
+  // ── 남의 방(/room/:handle) ──
+  'room.visit': { ko: '방 보기', en: 'Visit room', ja: '部屋を見る', zh: '参观房间', hi: 'रूम देखें', vi: 'Xem phòng' },
+  'room.copy': { ko: '링크 복사', en: 'Copy link', ja: 'リンクをコピー', zh: '复制链接', hi: 'लिंक कॉपी करें', vi: 'Sao chép liên kết' },
+  'room.copied': { ko: '복사했어요', en: 'Copied', ja: 'コピーしました', zh: '已复制', hi: 'कॉपी हो गया', vi: 'Đã sao chép' },
+  'room.someone': { ko: '이름 없음', en: 'Unnamed', ja: '名前なし', zh: '未命名', hi: 'बिना नाम', vi: 'Chưa đặt tên' },
+  'room.season_pt': { ko: '시즌 {n}점', en: '{n} season pts', ja: 'シーズン{n}点', zh: '赛季 {n} 分', hi: 'सीज़न {n} अंक', vi: '{n} điểm mùa giải' },
+  'room.not_found': { ko: '방을 찾을 수 없어요.', en: "That room doesn't exist.", ja: '部屋が見つかりません。', zh: '找不到这个房间。', hi: 'यह रूम नहीं मिला।', vi: 'Không tìm thấy phòng này.' },
+  'room.empty': { ko: '아직 아무것도 놓지 않은 방이에요.', en: 'Nothing has been placed in this room yet.', ja: 'まだ何も置かれていない部屋です。', zh: '这个房间还什么都没放。', hi: 'इस रूम में अभी कुछ नहीं रखा गया।', vi: 'Phòng này chưa đặt gì cả.' },
+  'room.my_room': { ko: '내 방으로', en: 'Go to my room', ja: '自分の部屋へ', zh: '前往我的房间', hi: 'मेरे रूम पर जाएँ', vi: 'Đến phòng của tôi' },
+  'room.my_room_edit': { ko: '내 방 꾸미기', en: 'Decorate my room', ja: '自分の部屋を模様がえ', zh: '布置我的房间', hi: 'मेरा रूम सजाएँ', vi: 'Trang trí phòng của tôi' },
 
   // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   'hub.part.hat_common_01': { ko: '새싹 모자', en: 'Sprout Cap', ja: 'ふたばキャップ', zh: '嫩芽帽', hi: 'स्प्राउट कैप', vi: 'Mũ Mầm Cây' },
   'hub.part.hat_common_02': { ko: '비니', en: 'Beanie', ja: 'ニット帽', zh: '毛线帽', hi: 'बीनी', vi: 'Mũ Len' },
   'hub.part.shoe_common_01': { ko: '포근 양말', en: 'Cozy Socks', ja: 'ぬくぬく靴下', zh: '暖暖袜子', hi: 'कोज़ी सॉक्स', vi: 'Tất Ấm' },
