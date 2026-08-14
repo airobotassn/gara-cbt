@@ -31,7 +31,7 @@
        ⚠️ cover 금지: 이미지(941x1672) 맨 위가 거의 검정(#23162a)인데 cover 는 세로 전체를 쓰므로
           그 암흑부가 헤더 뒤에 깔려 검은 띠가 된다(.pit 은 자기 높이로 cover 해 위쪽이 잘려나감).
           auto 200% + bottom 으로 위쪽 암흑부를 잘라낸다. */
-    background:url("beat-cari-bg.png") center bottom/auto 200% no-repeat;
+    background:url("beat-cari-bg.webp") center bottom/auto 200% no-repeat;
     /* 어두운 레터박스 위에선 파란 글로우가 안 보인다 → 얇은 광택 테두리로 스테이지 경계를 세운다. */
     box-shadow:0 0 0 1px rgba(255,255,255,.07), 0 18px 60px rgba(10,4,16,.6); overflow:hidden;
   }
@@ -42,7 +42,7 @@
      스테이지 배경이 비쳐 검은 띠·모서리가 생긴다. 스테이지 밖으로 넘겨서 overflow:hidden 으로 잘라낸다. */
   .hud::before{ content:""; position:absolute; inset:-8px -14px -2px;   /* 9-slice: 왼쪽(별)·오른쪽(pill) 고정, 가운데만 늘림 */
     border-style:solid; border-width:0 129px 0 107px;
-    border-image:url("beat-cari-header.png") 0 360 0 300 fill; border-image-repeat:stretch;
+    border-image:url("beat-cari-header.webp") 0 360 0 300 fill; border-image-repeat:stretch;
   }
   .hud-score, .hud-right, .hud-chip{ display:block; }
   .hs-ic, .hud-chip svg, .hc-lab{ display:none; }   /* 별·왕관·번개·라벨 = 이미지에 포함 */
@@ -61,7 +61,7 @@
 
   /* PIT */
   .pit{position:relative; flex:1; overflow:hidden;
-      background:url("beat-cari-bg.png") center bottom/cover no-repeat, #ece9e0;}
+      background:url("beat-cari-bg.webp") center bottom/cover no-repeat, #ece9e0;}
   .pit::after{ /* soft vignette */
     content:""; position:absolute; inset:0; pointer-events:none;
     box-shadow:inset 0 0 70px rgba(150,170,210,.25);
@@ -69,10 +69,10 @@
   .ceiling{position:absolute; left:0; right:0; top:0; will-change:transform;}
   .ceiling-body{
     height:100%;
-    background:url("beat-cari-rock.png") center bottom / 100% 100% no-repeat;
+    background:url("beat-cari-rock.webp") center bottom / 100% 100% no-repeat;
     filter:drop-shadow(0 6px 10px rgba(90,55,80,.4));
   }
-  .teeth{ display:none; } /* 돌 이미지(beat-cari-rock.png) 자체에 종유석 끝이 있어 미사용 */
+  .teeth{ display:none; } /* 돌 이미지(beat-cari-rock.webp) 자체에 종유석 끝이 있어 미사용 */
   .dust{position:absolute; width:5px;height:5px;border-radius:50%;background:#b9c9e6;opacity:.55;}
 
   /* 정답/오답 = 천장 밑면 흙먼지. 화면 흔들림은 쓰지 않는다(문제를 읽는 중이라 가독성이 먼저).
@@ -158,7 +158,7 @@
   .qcard{
     background:transparent; z-index:6;
     border-style:solid; border-width:16px 24px 28px 24px;   /* 문제 영역 전체를 문제창 패널로 9-slice 채움 (좌우 줄여 버튼 폭 확보) */
-    border-image:url("beat-cari-panel.png") 175 200 180 200 fill; border-image-repeat:stretch;
+    border-image:url("beat-cari-panel.webp") 175 200 180 200 fill; border-image-repeat:stretch;
     padding:0 6px 6px;
     margin:-3px;   /* 헤더와 같은 이유 — 패널 PNG 바깥 1~2px 이 반투명이라 스테이지 배경이 어두운 실선으로 비친다 */
   }
@@ -175,7 +175,7 @@
   .choices{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
   .choice{
     position:relative; text-align:left; padding:12px 8px 12px 54px; border:0;
-    background:url("beat-cari-choice.png") center/100% 100% no-repeat;
+    background:url("beat-cari-choice.webp") center/100% 100% no-repeat;
     color:#3e2b52; font-size:15.5px; font-weight:800; line-height:1.25;
     /* 긴 보기(예: "시뮬레이션 투 리얼(Sim-to-Real)")는 줄바꿈.
        keep-all = 한국어를 어절 단위로 끊고, break-word 는 한 어절이 칸보다 길 때만 강제로 끊는다. */
@@ -225,7 +225,7 @@
   /* 배경 = 인트로/아웃트로 동굴 아트로 교체 (기존 반투명 흰 배경/블러 제거). 세로 941x1672 → cover */
   .overlay.intro, .overlay.over{
     backdrop-filter:none;
-    background:url("beat-cari-intro-bg.png") center/cover no-repeat;
+    background:url("beat-cari-intro-bg.webp") center/cover no-repeat;
   }
   /* 마스코트 크기를 화면 높이에 연동 — 세로가 짧은 폰(예: 375x667)에서 앱 헤더까지 빠지면
      '버티기 시작' 버튼이 화면 밖으로 밀려 잘렸다. 높은 화면에서는 min() 이 284px 로 잡혀 원래 그대로. */
@@ -269,7 +269,7 @@
     --pw:min(330px, 100%);
     width:var(--pw); aspect-ratio:1759/843; margin-bottom:20px;
     padding:calc(var(--pw)*.0287) calc(var(--pw)*.06) calc(var(--pw)*.0479) calc(var(--pw)*.205);
-    background:url("beat-cari-intro-panel.png") center/100% 100% no-repeat; }
+    background:url("beat-cari-intro-panel.webp") center/100% 100% no-repeat; }
   /* 텍스트창이 크림색 → 보라로 바뀌면서 기존 #5c4463 은 대비가 3.6:1 까지 떨어져 잘 안 보였다.
      글자를 더 진하게 하고 흰 헤일로(5px)는 줄인다 — 헤일로가 클수록 글자 가장자리가 배경에 녹는다. */
   .ir{ display:flex; align-items:center; text-align:left; font-size:13.5px; color:#3a2440;
@@ -292,7 +292,7 @@
   #startBtn, #againBtn{
     margin-top:16px; padding:0; border:0; border-radius:0; box-shadow:none;
     width:min(224px, 64%); aspect-ratio:932/227;   /* 가로로 너무 길어 축소 — 글자(100px)와 양끝 크리스탈 사이 여백 57px */
-    background:url("beat-cari-startbtn.png") center/100% 100% no-repeat;
+    background:url("beat-cari-startbtn.webp") center/100% 100% no-repeat;
     color:#5c3a6b; font-size:19px; font-weight:900; letter-spacing:-.01em;
     text-shadow:0 1px 0 rgba(255,255,255,.85), 0 0 8px rgba(255,255,255,.65);
     filter:drop-shadow(0 7px 13px rgba(95,60,110,.28));
@@ -325,7 +325,7 @@
     background:linear-gradient(180deg, rgba(252,246,255,.88), rgba(228,207,245,.82)); }
 
   .over-scorebox{ width:min(320px, 86%, 44vh); aspect-ratio:931/529; margin-bottom:14px;
-    background:url("beat-cari-outro-score.png") center/100% 100% no-repeat; }
+    background:url("beat-cari-outro-score.webp") center/100% 100% no-repeat; }
   .over-scorebox::before{ inset:9% 6% 6% 6%; border-radius:18px; }
   .os-lab{ font-size:15px; color:#7a5a86; font-weight:800; letter-spacing:.1em;
     text-shadow:0 1px 0 rgba(255,255,255,.7); }
@@ -337,7 +337,7 @@
   .over-stats{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;
     width:min(320px, 86%, 44vh); margin-bottom:18px; }
   .ost{ aspect-ratio:784/762; min-width:0;
-    background:url("beat-cari-outro-stat.png") center/100% 100% no-repeat; }
+    background:url("beat-cari-outro-stat.webp") center/100% 100% no-repeat; }
   .ost::before{ inset:9% 3% 6% 3%; border-radius:12px; }
   .ost-k{ font-size:13px; color:#7a5a86; letter-spacing:0; font-weight:800; margin-bottom:2px;
     text-transform:none; white-space:nowrap; text-shadow:0 1px 0 rgba(255,255,255,.7); }
@@ -391,7 +391,7 @@
   <!-- START -->
   <div class="overlay intro" id="startOv">
 
-    <img class="intro-mascot" id="introMascot" src="beat-cari-main.png" alt="CARI" />
+    <img class="intro-mascot" id="introMascot" src="beat-cari-main.webp" alt="CARI" />
     <div class="intro-title"><span class="t1" data-i18n="beat.title">버텨라</span> <span class="t2" data-t="CARI">CARI</span></div>
     <div class="intro-tag" data-i18n="beat.tagline">쏟아지는 돌, 문제로 버텨라!</div>
     <div class="intro-rules">
@@ -404,7 +404,7 @@
 
   <!-- GAME OVER -->
   <div class="overlay over hidden" id="overOv">
-    <img class="over-img" src="beat-cari-over.png" alt="" />
+    <img class="over-img" src="beat-cari-over.webp" alt="" />
     <div class="over-title" data-i18n="beat.over">여기까지 버텼어요!</div>
     <div class="over-scorebox">
       <div class="os-lab" data-i18n="mg.score">점수</div>
@@ -914,7 +914,7 @@
 .mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; justify-content:center;
   box-sizing:border-box; width:112px; height:34px; padding:0; border:0; cursor:pointer;
   font:850 11.5px/1 system-ui,-apple-system,sans-serif; letter-spacing:.025em; color:#fff;
-  background:url("rank-button.png") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
+  background:url("rank-button.webp") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
   filter:drop-shadow(0 3px 4px rgba(8,20,60,.24)); -webkit-tap-highlight-color:transparent;}
 .mg-rank.on{display:inline-flex;}
 .mg-rank span{display:block; transform:translateX(7px);}

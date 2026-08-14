@@ -60,6 +60,17 @@ const VAL_ROWS = [694, 733, 770] // Certificate ID / Issue Date / Valid Until �
 const QRB = { size: 130, x: 1180, y: 655 } // 값 블록 오른쪽 빈 공간(푸터 y965 위)
 const CAP_CX = 1245, CAP_Y = 823 // '진위여부 확인' 캡션
 
+// 푸터 GARA 마크 교체 — 배경 시안에 **옛 워드마크가 구워져 있다**(협회 로고가 2026-08 에 바뀌었다).
+// 템플릿 PNG 를 다시 받을 수 없어서, 옛 마크 자리만 패널 바탕색으로 덮고 신규 로고를 그 위에 얹는다.
+// 실측: 옛 마크 x840~951·y966~1000 / 구분선 "|" x975~977 / 영문 기관명 x997~1391(캡높이 y969~991).
+// ⚠️ 신규 마크는 종횡비 6.16:1 로 옛 마크(3.2:1)보다 훨씬 납작하다. 같은 높이로 두면 폭이 216 이 되어
+//    구분선을 침범한다 → 높이를 30 으로 낮추고 **오른쪽 끝(x951)을 고정**해 왼쪽으로 자라게 한다.
+//    구분선·영문은 배경 그대로라 그 사이 간격이 흔들리지 않는다.
+// ⚠️ 협회가 새 템플릿(신규 로고가 박힌 판)을 주면 이 블록을 통째로 지우면 된다.
+const FOOT_BG = '#f3f2f2' // 우측 패널 바탕 실측색 — 이 근방은 편차가 ±2 라 평면 사각형으로 덮여도 이음매가 없다
+const FOOT_PATCH = { x: 826, y: 954, w: 134, h: 54 } // 옛 마크를 덮는 판
+const FOOT_MARK = { h: 30, w: Math.round((30 * 388) / 63), right: 951, cy: 981 } // 신규 마크(388×63)
+
 function todayStr() {
   return fmtCertDate(new Date())
 }
@@ -405,6 +416,16 @@ export default function Certificate() {
 
           {/* 배경 = 신규 시안(값 없는 clean 판) */}
           <image href="/cert-template-v2.png" x="0" y="0" width={VB.w} height={VB.h} />
+
+          {/* 푸터 GARA 마크 = 신규 협회 로고. 배경에 구워진 옛 마크를 덮고 새로 얹는다(위 FOOT_* 주석) */}
+          <rect x={FOOT_PATCH.x} y={FOOT_PATCH.y} width={FOOT_PATCH.w} height={FOOT_PATCH.h} fill={FOOT_BG} />
+          <image
+            href="/cert/mark-gara.png"
+            x={FOOT_MARK.right - FOOT_MARK.w}
+            y={FOOT_MARK.cy - FOOT_MARK.h / 2}
+            width={FOOT_MARK.w}
+            height={FOOT_MARK.h}
+          />
 
           {/* ① 영문 성명 — "This is to certify that" 아래 빈 구간 */}
           <text x={CX} y={NAME_Y} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={nm.size} letterSpacing="1" fill={INK}>{nm.text}</text>

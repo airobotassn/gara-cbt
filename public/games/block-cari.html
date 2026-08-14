@@ -40,7 +40,7 @@
         아래 도장 두 개가 그림의 빨강·파랑 서류함 위에 오는 구도도 그때 깨진다. */
   #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;
     background:linear-gradient(180deg,rgba(4,13,29,.34),rgba(4,13,29,.08) 38%,rgba(4,13,29,.4)),
-      #071426 url('/games/block-cari-game-bg-v2.png') center/cover no-repeat;
+      #071426 url('/games/block-cari-game-bg-v2.webp') center/cover no-repeat;
     box-shadow:0 0 80px -20px rgba(0,0,0,.45)}
   .hidden{display:none}
 
@@ -58,7 +58,7 @@
        hud-v4 실물 1747×617(2.831) : 큰 클립보드 x4.6~32.2 y18.8~85.3 · 좁은 클립보드 x42.6~55.5 y16.7~89.5
                                      빨간 경고카드 3장 x61/72.4/83.9(각 10) y17.8~55.6 · 금색 명패 x61.4~93.7 y62.7~89.9 */
   .top{position:relative;flex:0 0 auto;width:calc(100% - 18px);aspect-ratio:1747/617;margin:7px auto 3px;padding:0;border:0;
-    background:url('/games/block-cari-hud-v4.png') 48.1% 53.6%/105.7% 138.1% no-repeat;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35))}
+    background:url('/games/block-cari-hud-v4.webp') 48.1% 53.6%/105.7% 138.1% no-repeat;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35))}
   /* 좁은 클립보드 — 세로로 길어서 숫자 위 / '일차' 아래가 딱 맞는다. */
   .day{position:absolute;left:42.6%;top:16.7%;width:12.9%;height:72.8%;padding:0;background:none;
     display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;
@@ -78,7 +78,7 @@
   /* ── 규정집 ───────────────────────────────── */
   /* rules-v4 실물 1453×774(1.877, 캔버스의 l11.1 t1.8 w77.2 h92.6) : 위 줄 y15.4~51.2 · 아래 줄 y55~92 */
   .book{position:relative;flex:0 0 auto;width:calc(100% - 18px);aspect-ratio:1453/774;margin:0 auto 5px;padding:0;border:0;
-    background:url('/games/block-cari-rules-v4.png') 48.7% 24.3%/129.5% 108% no-repeat;filter:drop-shadow(0 7px 12px rgba(0,0,0,.28))}
+    background:url('/games/block-cari-rules-v4.webp') 48.7% 24.3%/129.5% 108% no-repeat;filter:drop-shadow(0 7px 12px rgba(0,0,0,.28))}
   .brow{position:absolute;left:6%;width:87%;height:35.8%;margin:0;display:flex;align-items:center;gap:8px;overflow:hidden}
   .brow:nth-of-type(1){top:15.4%}
   .brow:nth-of-type(2){top:55%}
@@ -136,8 +136,8 @@
   .st{flex:0 0 auto;height:76px;width:auto;padding:0 0 6px;border:0;cursor:pointer;color:#fff;
     display:grid;place-items:center;font:950 17px/1 system-ui,sans-serif;letter-spacing:-.01em;
     text-shadow:0 2px 4px rgba(0,0,0,.7);filter:drop-shadow(0 7px 9px rgba(0,0,0,.35))}
-  .st.send{aspect-ratio:1942/809;background:url('/games/block-cari-send-v4.png') center/100% 100% no-repeat}
-  .st.rej{aspect-ratio:1942/809;background:url('/games/block-cari-reject-v4.png') center/100% 100% no-repeat}
+  .st.send{aspect-ratio:1942/809;background:url('/games/block-cari-send-v4.webp') center/100% 100% no-repeat}
+  .st.rej{aspect-ratio:1942/809;background:url('/games/block-cari-reject-v4.webp') center/100% 100% no-repeat}
   .st:active{transform:translateY(2px)}
   .st:disabled{opacity:.4;cursor:default;transform:none}
 
@@ -201,7 +201,7 @@
      absolute 요소라 %패딩이 자기 폭이 아니라 부모 폭 기준으로 잡혀 글자가 오른쪽 끝으로 밀린다. */
   .mg-rank{position:absolute;top:11px;right:11px;z-index:60;display:none;width:auto;height:38px;aspect-ratio:1701/494;
     padding:0 0 0 25px;border:0;border-radius:0;cursor:pointer;place-items:center;
-    background:url('/games/rank-button.png') center/100% 100% no-repeat;color:#fff;
+    background:url('/games/rank-button.webp') center/100% 100% no-repeat;color:#fff;
     font:800 12.5px/1 system-ui,sans-serif;text-shadow:0 1px 3px #001c55;
     filter:drop-shadow(0 5px 8px rgba(0,10,42,.38))}
   .mg-rank.on{display:grid}
@@ -209,10 +209,10 @@
   .mg-rank .rank-label{display:block;text-align:center}
 
   /* 인트로는 팝업이 아니라 하나의 게임 시작 화면이다. */
-  #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-intro-v2.png') center top/cover no-repeat;backdrop-filter:none}
+  #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-intro-v3.png') center top/cover no-repeat;backdrop-filter:none}
   #startOv.hidden{display:none}
   /* ⚠️ 위 여백은 그림의 집게 두 개를 피하는 값이다 — 줄이면 제목이 집게에 물린다. 아래 여백은 종이 말린 끝. */
-  #startOv .sheet{max-width:460px;max-height:56%;padding:46px 32px 32px;border:0;border-radius:0;background:url('/games/block-cari-intro-panel-v4.png') center/100% 100% no-repeat;box-shadow:none;filter:drop-shadow(0 20px 24px rgba(0,0,0,.55));color:#332b22}
+  #startOv .sheet{max-width:460px;max-height:56%;padding:46px 32px 32px;border:0;border-radius:0;background:url('/games/block-cari-intro-panel-v4.webp') center/100% 100% no-repeat;box-shadow:none;filter:drop-shadow(0 20px 24px rgba(0,0,0,.55));color:#332b22}
   #startOv #sArt{display:none}
   #startOv .ttl{font-size:30px;margin:0 0 3px;text-shadow:0 3px 12px #000}
   #startOv .lead{margin-bottom:9px;color:#625747}
@@ -222,7 +222,7 @@
   #startOv .rules{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:11px}
   #startOv .rules li{font-size:13.5px;line-height:1.45;padding:9px 11px;border:1px solid rgba(102,77,44,.17);background:rgba(91,65,34,.06);color:#4d4234}
   @media (max-width:410px){ #startOv .rules li{font-size:12.5px;padding:8px 10px} #startOv .lead{font-size:13.5px} }
-  #startOv .btn{height:62px;padding:4px 18px 10px;border-radius:0;background:url('/games/block-cari-start-v4.png') center/100% 100% no-repeat;box-shadow:none;font-size:18px;text-shadow:0 1px rgba(255,232,160,.7)}
+  #startOv .btn{height:62px;padding:4px 18px 10px;border-radius:0;background:url('/games/block-cari-start-v4.webp') center/100% 100% no-repeat;box-shadow:none;font-size:18px;text-shadow:0 1px rgba(255,232,160,.7)}
 
   /* 일차 브리핑은 사내 공지 클립보드다. 1일차부터 같은 화면을 써서 규정 추가 흐름을 먼저 익힌다. */
   #dayOv{background:rgba(4,12,25,.74);backdrop-filter:blur(3px)}
@@ -231,7 +231,7 @@
         상자는 실물 비율(924×1329 = 0.695)로 잡고 배경을 확대·이동해 실물이 상자를 채우게 한다.
      day-popup-v4 실물 좌표 : 이름표 x9.8~90 y11~20.5 · 종이 x8~91.7 y23.3~83.6 · 나무 명패 x9.1~90.8 y85.5~95 */
   #dayOv .sheet{position:relative;width:min(88%,380px);height:auto;aspect-ratio:924/1329;max-height:none;padding:0;border:0;border-radius:0;overflow:visible;
-    background:url('/games/block-cari-day-popup-v4.png') 49.4% 28.1%/119.9% 106.8% no-repeat;box-shadow:none;filter:drop-shadow(0 20px 30px rgba(0,0,0,.65));color:#3d3428}
+    background:url('/games/block-cari-day-popup-v4.webp') 49.4% 28.1%/119.9% 106.8% no-repeat;box-shadow:none;filter:drop-shadow(0 20px 30px rgba(0,0,0,.65));color:#3d3428}
   #dayOv .ttl{position:absolute;left:9.8%;top:11%;width:80.2%;height:9.5%;margin:0;display:grid;place-items:center;font-size:min(31px,3.6vh);color:#443727}
   #dayOv .lead{position:absolute;left:10%;top:25.5%;width:80%;height:5.5%;margin:0;display:grid;place-items:center;font-size:min(15px,1.8vh);color:#796b57}
   #dayOv .memo{position:absolute;left:11%;top:32%;width:78%;height:49%;margin:0;padding:0 4%;overflow:auto;background:none;border:0;border-radius:0;color:#3d3428}
@@ -242,7 +242,7 @@
   /* 아웃트로도 같은 책상이다 — 결과 클립보드가 그 책상 위에 놓인 것으로 읽힌다. */
   #overOv{align-items:flex-end;padding:0 16px calc(18px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(4,13,29,.34),rgba(4,13,29,.12) 40%,rgba(4,13,29,.55)),
-      #071426 url('/games/block-cari-game-bg-v2.png') center/cover no-repeat;backdrop-filter:none}
+      #071426 url('/games/block-cari-game-bg-v2.webp') center/cover no-repeat;backdrop-filter:none}
   #overOv .sheet{max-width:460px;max-height:51%;padding:16px 17px;background:linear-gradient(180deg,rgba(7,29,57,.93),rgba(4,17,37,.98));border-color:rgba(82,207,255,.27);box-shadow:0 20px 55px rgba(0,0,0,.6)}
   #overOv #oArt{display:none}
   #overOv .ttl{margin:0 0 4px}
@@ -258,7 +258,7 @@
      ⚠️ 종이·포스트잇 위 글자는 잉크색이어야 한다. 흰 글자는 그대로 사라진다. */
   #overOv:not(.cleared) .sheet{position:relative;width:min(92%,53vh);max-width:100%;height:auto;max-height:none;aspect-ratio:865/1429;
     padding:0;border:0;border-radius:0;overflow:visible;
-    background:url('/games/block-cari-fail-panel-v4.png') 49.3% 38.5%/125.5% 101.3% no-repeat;
+    background:url('/games/block-cari-fail-panel-v4.webp') 49.3% 38.5%/125.5% 101.3% no-repeat;
     box-shadow:none;filter:drop-shadow(0 20px 28px rgba(0,0,0,.65))}
   #overOv:not(.cleared) .sheet>*{position:absolute;margin:0;display:grid;place-items:center;text-align:center}
   /* ⚠️ 라벨이 값 위에 온다 — 종이 위에서는 '점수 / 150' 순서가 자연스럽고, 값 밑에 붙으면 각주로 읽힌다.

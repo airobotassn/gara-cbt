@@ -280,15 +280,17 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   const hx = wx + 40
   text(ctx, '✦', hx, BODY_T + 78, { size: T.title, weight: 900, color: C })
   text(ctx, 'CARIS WORLD ARENA', hx + 38, BODY_T + 78, { size: T.label, weight: 800, color: SUB, spacing: 0.5 })
-  // 헤더 우측 = 발급기관 GARA 워드마크(블랙 버전). 원본 png(1536×1024, 배경 투명)는 여백이 커서
-  // 그대로 그리면 작아 보인다 → 잉크 bounding box 로 크롭해 그린다.
-  // ⚠️ 로고 파일을 갈면 아래 SX/SY/SW/SH 를 알파로 다시 실측할 것(파일마다 여백이 다르다).
+  // 헤더 우측 = 발급기관 GARA 로고(마크 + 영문 기관명, 블랙). 파일은 이미 투명 여백을 잘라낸
+  // 판(388×95)이라 여기서 크롭하지 않는다 — 통째로 그린다.
+  // ⚠️ 높이는 **마크만** 44px 이던 옛 워드마크와 같은 크기로 맞춘 값이다(마크가 전체의 64/95).
+  //    영문 기관명이 그 아래 13px 로 붙는데, 이 카드가 폰에서 4.4배 축소되는 걸 감안하면
+  //    읽으라고 있는 글자가 아니라 로고의 일부다. 정보는 카드 본문이 이미 다 말한다.
+  // ⚠️ 로고 파일을 갈면 아래 종횡비(388/95)를 알파로 다시 실측할 것(파일마다 여백이 다르다).
   try {
-    const gara = await loadImage('/gara-logo.png')
-    const [SX, SY, SW, SH] = [58, 298, 1421, 367]
-    const LH = 44
-    const LW = (SW / SH) * LH
-    ctx.drawImage(gara, SX, SY, SW, SH, wx + ww - 40 - LW, BODY_T + 70 - LH / 2, LW, LH)
+    const gara = await loadImage('/gara-mark-en.png')
+    const LH = 65
+    const LW = (388 / 95) * LH
+    ctx.drawImage(gara, wx + ww - 40 - LW, BODY_T + 70 - LH / 2, LW, LH)
   } catch { /* 로고 실패해도 카드는 완성된다 */ }
   const nmSize = fitSize(ctx, d.name, T.display, 700, ww - 80, SERIF)
   text(ctx, d.name, hx, BODY_T + 172, { size: nmSize, weight: 700, color: INK, font: SERIF })

@@ -171,37 +171,432 @@
   .hidden{display:none}
 </style>
 <style>
-  /* v4 asset pass: full-scene presentation shared with the newer CARI games */
-  body{background:#071426 url('/games/order-cari-game-bg-v2.png') center/cover no-repeat}
-  #app{background:linear-gradient(rgba(226,236,250,.92),rgba(213,221,237,.94));box-shadow:0 0 70px rgba(0,0,0,.42)}
+  /* v4 asset pass: full-scene presentation shared with the newer CARI games.
+     다른 CARI 게임(닿아라·골라라·지어라·막아라…)의 플레이 화면은 전부 **배경 아트가 보이고 그 위에
+     패널이 뜬다**. 이 블록이 이 게임을 그 모양으로 바꾼다 — 위쪽 기본 스타일은 흰 카드 테마라
+     여기서 덮지 않으면 화면에 아트가 한 장도 안 보인다. */
+  body{background:#071426 url('/games/order-cari-game-bg-v2.webp') center/cover no-repeat}
+  /* ⚠️ #app 에 불투명 판을 깔지 말 것 — 92% 불투명 밝은 판을 깔아놔서 공방 배경이 **한 픽셀도**
+     안 보였다(다른 게임과 나란히 놓으면 이 게임만 흰 상자 뭉치로 보인다).
+     여기 두는 건 그 위의 글이 읽히게 하는 **얇은 스크림**뿐이다. */
+  #app{background:linear-gradient(rgba(4,14,32,.3),rgba(4,14,32,.55));box-shadow:0 0 70px rgba(0,0,0,.42)}
   .top{margin:8px 10px 5px;padding:9px 12px;border-radius:13px;background:rgba(7,25,53,.91);color:#fff;border:1px solid rgba(91,191,255,.34);box-shadow:0 7px 18px rgba(0,0,0,.25)}
   .ordno{background:#1264bd}.stars b{color:#64748c}
+  /* 손님 말풍선 — 밝은 화면에서 넘어온 흰 풍선은 어두운 공방 위에서 혼자 튄다. 꼬리까지 같이 바꾼다. */
+  .cust .who{background:rgba(7,25,53,.92);border:1px solid rgba(126,205,255,.3)}
+  .cust .say{background:rgba(7,25,53,.88);border-color:rgba(126,205,255,.3);color:#dbeaff;box-shadow:0 8px 20px -12px rgba(0,0,0,.8)}
+  .cust .say::before{background:rgba(7,25,53,.88);border-left-color:rgba(126,205,255,.3);border-bottom-color:rgba(126,205,255,.3)}
   .stage{margin:0 10px 8px;padding:8px;border-radius:18px;background:rgba(7,25,53,.18);backdrop-filter:blur(4px)}
+  /* ⚠️ 완성품 칸은 밝게 둔다 — 도면(청사진 = 어두움) ↔ 완성품(실물 = 밝음) 대조가 이 게임의 본체다. */
+  .slot.plan{border-color:rgba(126,205,255,.28)}
+  .slot.made{border-color:rgba(126,205,255,.28)}
+  .empty{color:#93a1bd}
+  .sayhead h2{color:#eaf5ff;text-shadow:0 1px 3px rgba(0,16,44,.7)}
+  .sayhead h2 small{color:#a8bdda}
+  .cnt.zero{background:rgba(7,25,53,.72);color:#a8bdda;border:1px solid rgba(126,205,255,.24)}
+  /* 시킬 말 카드 — 어두운 유리판. 태그 칩·색막대는 그대로 두어 종류 구분이 유지된다. */
+  .pc{background:rgba(7,25,53,.82);border-color:rgba(126,205,255,.22);color:#eaf5ff;box-shadow:0 8px 18px -14px rgba(0,0,0,.9)}
+  .pc .chk{border-color:rgba(126,205,255,.45)}
+  .pc.on{border-color:#5ed2ff;box-shadow:0 0 0 3px rgba(94,210,255,.2)}
+  .pc.on .chk{background:#1677d2;border-color:#5ed2ff}
+  .pc.on .in{background:rgba(22,119,210,.22)}
   .sendwrap{background:linear-gradient(transparent,rgba(7,20,43,.34))}
   .send{background:linear-gradient(#2faff3,#1452bd);box-shadow:0 4px 0 #0b397d,0 12px 24px -12px #03142e}
-  .pc.on{border-color:#1677d2;box-shadow:0 0 0 3px rgba(22,119,210,.16)}
-  .pc.on .chk{background:#1677d2;border-color:#1677d2}
+  .send:disabled{background:rgba(90,108,140,.85);box-shadow:0 4px 0 rgba(46,58,80,.9)}
+  /* 판정 시트도 같은 유리판 — 흰 시트가 올라오면 그 순간만 화면이 딴 게임이 된다. */
+  .fb{background:linear-gradient(180deg,rgba(9,32,68,.96),rgba(4,16,38,.98));border-color:rgba(126,223,255,.3);color:#eaf5ff}
+  .fb.yes .fbhead b{color:#5ff0ab} .fb.no .fbhead b{color:#ff8b7f}
+  .fbwhy{color:#b9cbe6}
+  .fbwhy em{color:#ff8b7f}
+  .fbwhy q{color:#fff}
+  .diff span{background:rgba(216,68,58,.16);border-color:rgba(255,139,127,.4);color:#ffb3a8}
+  .fbbtn{background:linear-gradient(#2faff3,#1452bd)}
+  .fbbtn.ghost{background:rgba(126,205,255,.14);color:#c5d8f2}
 
-  #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(20px + env(safe-area-inset-bottom));background:#071426 url('/games/order-cari-intro-bg-v2.png') center/cover no-repeat;backdrop-filter:none}
+  /* 인트로 = 배경 위 세로 스택(닿아라·골라라·버텨라·프로그램해라와 같은 틀). 판으로 감싸지 않는다. */
+  #startOv{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px 20px calc(22px + env(safe-area-inset-bottom));background:#071426 url('/games/order-cari-intro-bg-v2.webp') center/cover no-repeat;backdrop-filter:none}
   #startOv.hidden{display:none}
-  #startOv .sheet{position:relative;width:min(94%,460px);height:47%;min-height:360px;padding:76px 24px 22px;overflow:hidden;border:1px solid rgba(108,205,255,.34);border-radius:26px;background:linear-gradient(180deg,rgba(7,25,53,.78),rgba(3,13,31,.96));box-shadow:0 20px 50px rgba(0,0,0,.58);color:#fff;text-align:center}
-  #startOv #sArt{position:absolute;left:50%;top:-190px;width:330px;height:310px;transform:translateX(-50%);background:url('/games/order-cari-intro-hero-v2.png') center 16%/112% auto no-repeat;filter:drop-shadow(0 14px 18px rgba(0,0,0,.42));-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent),linear-gradient(0deg,transparent,#000 22%,#000 100%);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent),linear-gradient(0deg,transparent,#000 22%,#000 100%);mask-composite:intersect;pointer-events:none}
+  /* CARI — 전신 그대로 띄운다. 마스크·크롭 없음(히어로 png 는 배경이 투명하다).
+     ⚠️ 크기는 **다른 게임과 같은 급**이어야 한다 — 이 계열은 CARI 가 화면 폭의 1/3쯤이고 배경이 넉넉히
+        보인다. 키워서 폭을 반 넘게 먹였더니 공방 배경이 가려지고 이 게임만 혼자 커 보였다.
+     ⚠️ 높이를 vh 로 묶어야 낮은 화면에서 아트가 먼저 줄고 규칙·버튼이 안 밀린다. */
+  #startOv #sArt{flex:0 0 auto;width:min(260px,72%);height:min(230px,29vh);background:url('/games/order-cari-intro-hero-v3.png') center/contain no-repeat;filter:drop-shadow(0 16px 20px rgba(0,0,0,.45));animation:introBob 2.8s ease-in-out infinite;pointer-events:none}
+  @keyframes introBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
   #startOv #sArt svg{display:none}
-  #startOv .ttl{margin:0 0 5px;font-size:29px;color:#fff;text-shadow:0 3px 10px #001a3d}
-  #startOv .ttl i{color:#58c7ff}
-  #startOv .lead{margin:0 auto 13px;color:#d8eaff;font-size:12.5px;line-height:1.5}
-  #startOv .rules{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;text-align:left}
-  #startOv .rules li{min-height:58px;padding:8px 9px;background:rgba(255,255,255,.09);border:1px solid rgba(144,208,255,.16);color:#eaf5ff;font-size:11.2px;line-height:1.38}
-  #startOv .rules li span{color:#5ed2ff}
-  #startOv .btn{height:56px;border-radius:15px;background:linear-gradient(#2faff3,#1452bd);box-shadow:0 5px 0 #0b397d;color:#fff;font-size:16px}
+  /* 제목 — 이 계열의 장식 제목(흰 글씨 + 진한 획, 캐릭터 이름만 다른 색).
+     ⚠️ `paint-order:stroke fill` 을 빼면 획이 **글자 안쪽을 파먹어** 획이 가늘어진다(FAB 종과 같은 함정).
+        배경이 밝은 공방이라 획 없이는 흰 제목이 그대로 묻힌다. */
+  /* ⚠️ CARI 와 제목 사이 여백을 죽이지 말 것 — 붙이면 제목이 발치를 파고든다(다른 게임은 다 떨어져 있다). */
+  /* ⚠️ 흰 글자 + 획 하나로는 밝은 공장 사진 위에서 밋밋하다(2026-08-14 반려).
+     금속처럼 위아래로 밝기가 도는 그라디언트 + 두꺼운 획 + 바닥 그림자 세 겹으로 세운다.
+     ⚠️ background-clip:text 가 안 먹는 곳에서는 글자가 통째로 사라지므로 색을 먼저 주고
+        @supports 안에서만 투명으로 바꾼다 — 순서를 뒤집지 말 것. */
+  /* 제목 테두리 — 두 가지 흔한 방법이 **둘 다 여기선 못 쓴다**(2026-08-14 실측):
+     ⛔ `-webkit-text-stroke` : HTML 텍스트엔 `paint-order:stroke fill` 이 안 먹어 획이 글자 안쪽을
+        파먹는다. 한글은 획이 얇아 4px 이면 노란 속이 실오라기만 남고 제목이 남색 덩어리가 된다
+        (라틴인 CARI 만 멀쩡해 보여서 늦게 발견했다).
+     ⛔ `text-shadow` 8방향 : 배경-클립 글자는 **배경 레이어**라 그림자보다 뒤에 깔린다 → 그림자가
+        그라디언트를 통째로 덮어 역시 남색 덩어리가 된다.
+     ✅ `filter: drop-shadow` 연쇄 : 필터는 다 그려진 결과에 걸리므로 테가 글자 뒤에 남는다.
+        연쇄라 각 그림자가 앞 결과를 다시 번지게 해서 2px 넷이면 충분히 두껍다. */
+  #startOv .ttl{margin:24px 0 0;font-size:clamp(34px,10.6vw,46px);font-weight:900;letter-spacing:-.03em;line-height:1.04;color:#fff;
+    filter:drop-shadow(2px 0 0 #0a2950) drop-shadow(-2px 0 0 #0a2950) drop-shadow(0 2px 0 #0a2950) drop-shadow(0 -2px 0 #0a2950)
+      drop-shadow(0 5px 0 rgba(4,18,44,.9)) drop-shadow(0 11px 20px rgba(0,12,40,.75))}
+  #startOv .ttl i{color:#5ed2ff}
+  /* 배경이 파랑·회색 공장이라 흰 제목은 그 안에 섞인다 — 공장의 다른 축인 **노랑**을 쓰면
+     한 글자도 안 키우고 대비가 산다(경고 줄무늬·집게와 같은 색이라 세트 밖으로도 안 나간다).
+     CARI 만 청록으로 남겨 캐릭터 이름이 제목에서 분리돼 읽힌다. */
+  @supports (-webkit-background-clip:text) or (background-clip:text){
+    #startOv .ttl{background:linear-gradient(#fff4cf 22%,#ffd05f 52%,#e0921a 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    #startOv .ttl i{background:linear-gradient(#f2fbff 26%,#6ed8ff 56%,#1786c9 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  }
+  #startOv .lead{margin:9px 0 17px;color:#fff;font-size:14px;font-weight:900;line-height:1.4;text-shadow:0 2px 4px #062248,0 0 2px #062248}
+  /* 규칙 박스 — 한 덩어리 안에 3줄. 각 줄은 원형 번호 뱃지 + 한 줄 글.
+     ⚠️ 다른 게임은 이 판이 그린 PNG 다(rule-panel·intro-panel). 여기는 그 아트가 없어 CSS 로 같은 톤을 낸다
+        — 아트가 나오면 background 만 갈아끼우면 된다. */
+  /* 규칙 판 = 공장에 볼트로 박힌 안내 스크린. 아트가 없어 CSS 로 만든다 —
+     바깥은 금속 베젤(모서리 리벳 4개), 안쪽 ::before 가 파인 검은 화면. 글은 그 위에 얹힌다. */
+  #startOv .rules{position:relative;display:flex;flex-direction:column;justify-content:center;gap:0;width:min(95%,376px);margin:0;padding:17px 19px;text-align:left;border:0;border-radius:13px;
+    background:
+      radial-gradient(circle at 15px 15px,#d3dce7 0 2.6px,transparent 3.2px),
+      radial-gradient(circle at calc(100% - 15px) 15px,#d3dce7 0 2.6px,transparent 3.2px),
+      radial-gradient(circle at 15px calc(100% - 15px),#d3dce7 0 2.6px,transparent 3.2px),
+      radial-gradient(circle at calc(100% - 15px) calc(100% - 15px),#d3dce7 0 2.6px,transparent 3.2px),
+      linear-gradient(180deg,#31465f,#17293e);
+    box-shadow:inset 0 1px 0 rgba(196,220,244,.38),inset 0 0 0 1px rgba(8,18,32,.92),0 16px 34px rgba(2,12,34,.62)}
+  #startOv .rules::before{content:'';position:absolute;inset:9px;border-radius:8px;
+    background:linear-gradient(180deg,rgba(6,21,42,.94),rgba(3,11,24,.97));
+    box-shadow:inset 0 0 0 1px rgba(126,205,255,.24),inset 0 5px 16px rgba(0,0,0,.65)}
+  #startOv .rules li+li{border-top:1px solid rgba(126,205,255,.13)}
+  /* ⚠️ 12.5px · 한 줄이 이 계열의 규격이다. 키우거나 판을 좁히면 바로 두 줄로 넘어간다. */
+  #startOv .rules li{position:relative;z-index:1;display:flex;align-items:center;gap:10px;min-height:42px;padding:5px 6px;background:none;border:0;color:#eaf5ff;font-size:13px;font-weight:800;line-height:1.3;text-shadow:0 1px 3px rgba(0,18,58,.8)}
+  #startOv .rules li span{flex:none;width:27px;height:27px;display:grid;place-items:center;border-radius:50%;color:#dff8ff;background:linear-gradient(160deg,#17548f,#07203f);border:1px solid #7edfff;box-shadow:inset 0 0 0 2px rgba(126,223,255,.12),0 0 8px rgba(56,190,255,.24);font-size:13px;font-weight:900;text-shadow:none}
+  /* ⚠️ 버튼은 규칙판보다 **확실히 좁다**(이 계열 공통). 판과 같은 폭으로 두면 판이 두 칸으로 보인다. */
+  #startOv .btn{width:min(192px,54%);height:56px;margin-top:18px;border-radius:30px;border:2px solid rgba(150,226,255,.55);background:linear-gradient(#2faff3,#1452bd);box-shadow:inset 0 0 0 2px rgba(4,20,50,.55),0 5px 0 #0b397d,0 12px 24px -10px #03142e;color:#fff;font-size:17px;text-shadow:0 2px 4px rgba(0,25,80,.5)}
   #startOv .mg-rank{background:rgba(4,20,43,.78);border-color:rgba(126,205,255,.3);color:#fff}
 
-  #overOv{padding:0;background:#071426 url('/games/order-cari-result-win-v2.png') center/cover no-repeat;backdrop-filter:none;align-items:flex-end}
+  #overOv{padding:0;background:#071426 url('/games/order-cari-result-win-v2.webp') center/cover no-repeat;backdrop-filter:none;align-items:flex-end}
   #overOv .sheet{width:min(92%,440px);margin-bottom:calc(20px + env(safe-area-inset-bottom));padding:18px;border:1px solid rgba(255,210,92,.32);background:linear-gradient(rgba(7,25,53,.82),rgba(3,13,31,.97));color:#fff;text-align:center}
   #overOv #oArt{display:none}#overOv .ttl{margin:0 0 8px;color:#fff}#overOv .biglab{color:#cbdcf3}#overOv .note{background:rgba(37,105,177,.22);border-color:rgba(109,193,255,.28);color:#e7f4ff}
   #overOv .btn{background:linear-gradient(#2faff3,#1452bd);box-shadow:0 5px 0 #0b397d}
-  #overOv.result-fail{background-image:url('/games/order-cari-result-fail-v2.png')}
-  @media(max-height:690px){#startOv .sheet{height:54%;min-height:340px;padding-top:58px}#startOv #sArt{top:-220px}.rules li:nth-child(4){display:none}}
+  #overOv.result-fail{background-image:url('/games/order-cari-result-fail-v2.webp')}
+  /* 낮은 화면 — CARI 와 제목을 줄여 규칙·버튼 자리를 낸다. 옛 판은 여기서 규칙 ④를 숨겼는데,
+     규칙이 셋이 되어 숨길 것이 없어졌다(화면마다 읽는 규칙 수가 달라지는 것 자체가 문제였다). */
+  @media(max-height:690px){#startOv .ttl{font-size:33px}#startOv .lead{margin:8px 0 10px}#startOv .btn{height:52px;margin-top:12px}}
+  @media(max-width:410px){#startOv .rules li{font-size:12.5px;padding:8px 10px}#startOv .lead{font-size:12.5px}}
+</style>
+<style>
+/* ═══ v7 아트 스킨 — 좌표는 전부 원본 PNG 를 스캔해 얻은 슬롯 안쪽 값이다 ═══
+   ⚠️ 그림을 갈면 이 %들을 **다시 재야 한다**(.tmp 스캔이 아니라, 캔버스로 색 경계를 훑어 얻은 값).
+   ⚠️ background-size:100% 100% 이므로 **원본 % = 상자 % 로 1:1 매핑**된다 — 상자를 눌러도
+      슬롯의 가로/세로 % 위치는 변하지 않는다. 그래서 아래 값은 상자 높이와 무관하다.
+      (예외는 .top 뿐 — 아래 참고.)
+
+   실측 슬롯(원본 기준):
+     hud-v4      1774×887  왼쪽 화면 x6.3~28 y9.4~28 · 가운데 청판 x31.3~68.8 y9.4~28 · 금별 3개 x68.8~90.6 y12.5~25
+                           ⚠️ y30% 아래는 통째로 빈 검은 판이다 → 위 32% 만 잘라 쓴다(::before + overflow).
+     dialog-v4   1536×1024 종이 x21.9~87.5 y18.8~78 · 왼쪽 명패 x7~18 y51~62
+     stage-v4    1536×1024 도면(청) x9.4~45 · 완성품(백) x56.3~90.6 · 둘 다 y15.6~75
+                           ⚠️ 집게가 x21.9~28 / x71.9~78 의 y13~27 을 덮는다 → 캡션을 창 **아래**로 내린다.
+     command-v4  1731×909  태그(청) x9.4~21.9 · 글판(백) x25~75 · 체크칸 x81.3~87.5 y34.4~53 (태그·글판 y21.9~62.5)
+     send-v4     1536×1024 램프 x6~15 · 노란 화살표 x18.8~28 · 청판 x28~91 y21.9~75
+     feedback-v4 1402×1122 화면 x14.8~85.2 y12.5~65.6 · 아래 트레이(장식) y79~84
+     result-v4   1024×1536 메달 y7.6~12 · 화면 x18.4~80.8 y21~64 · 청판 y66~83 · 손잡이(장식) y84~97
+
+   ⛔ 아직 아트가 없어 CSS 로 두는 것: 시킬 말 머리띠 · 인트로 버튼 · 결과 버튼.
+      (command/start/replay 는 그림 비율이 이 자리에 안 맞는다 — 재생성 대기. 아래 주석 참고) */
+
+body{background-image:url('/games/order-cari-game-bg-v4.webp')}
+
+/* ── 상단 HUD ─────────────────────────────────────────────
+   ⚠️ 이 하나만 잘라 쓴다. 원본은 2:1 인데 쓸 수 있는 소켓이 위 28% 에만 있어서,
+      통째로 깔면 상자의 4분의 3 이 빈 검은 판이 되고 글자는 위 17px 에 짓눌린다.
+      → ::before 에 원본 비율로 깔고 부모가 잘라, 보이는 띠(원본 y2~32%)만 상자가 되게 한다.
+      그래서 **.top 안의 세로 %는 원본이 아니라 '띠' 기준**이다: 띠y = (원본y - 2) / 30 × 100. */
+.top{position:relative;overflow:hidden;display:block;height:auto;aspect-ratio:1774/266;
+  margin:5px 8px 3px;padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+.top::before{content:'';position:absolute;left:0;top:0;width:100%;aspect-ratio:1774/887;
+  background:url('/games/order-cari-hud-v4.webp') center/100% 100% no-repeat;transform:translateY(-2%)}
+/* ⚠️ grid 로 두지 말 것 — '주문 <b>1</b>/5' 처럼 자식이 여럿이면 grid 가 **한 칸씩 세로로 쌓아**
+   소켓 안에서 세 줄이 된다(실제로 '주문/1//5' 로 찍혔다). 한 줄로 흐르게 flex 를 쓴다. */
+.top>*{position:absolute;z-index:1;margin:0;padding:0;background:none;border:0;box-shadow:none;
+  display:flex;align-items:center;justify-content:center;gap:.22em;
+  line-height:1.05;white-space:nowrap;overflow:hidden}
+.top .ordno{left:6.3%;top:24.7%;width:21.7%;height:62%;color:#cfe6ff;font-size:min(12px,2.9vw);font-weight:900}
+.top .ordno b{color:#fff}
+.top .ordname{left:31.3%;top:24.7%;width:37.5%;height:62%;color:#eaf5ff;font-size:min(15px,3.6vw);font-weight:900;
+  text-shadow:0 1px 2px rgba(0,14,40,.9)}
+/* 별 — 그림에 금별 3개가 **이미 칠해져 있다**. 켤 때 그리는 게 아니라 못 딴 칸을 덮는다(막아라 CARI 와 같은 방향). */
+.top .stars{left:68.8%;top:35%;width:21.8%;height:41.7%;display:flex;justify-content:space-between;align-items:stretch}
+.top .stars i{flex:0 0 30.4%;border-radius:50%;background:rgba(4,10,22,.72);box-shadow:inset 0 0 6px rgba(0,0,0,.8)}
+.top .stars i.on{background:none;box-shadow:0 0 9px rgba(255,196,64,.55)}
+
+/* ── 손님 대사 ────────────────────────────────────────────
+   ⚠️ 글자를 종이(y18.8~78) 밖으로 내보내지 말 것 — 옛 값(위아래 10px 고정)은 78px 상자에서
+      y12.8~87.2 라 위아래가 종이를 넘어 프레임 위에 얹혔다. */
+.cust{position:relative;height:86px;margin:0 8px 3px;padding:0;gap:0;border:0;border-radius:0;box-shadow:none;
+  background:transparent url('/games/order-cari-dialog-v4.webp') center/100% 100% no-repeat}
+/* ⚠️ 그림의 명패는 아주 작다(원본 x8~17 y53~62 ≈ 37×9px). 이름이 최대 7자('오 안전관리자')라
+   명패에 맞추면 글자가 4px 이 된다 → 명패 자리를 기준으로 살짝 키우고, 뒤에 어두운 판을 깔아
+   파이프 위에서도 읽히게 한다. 이 값을 줄이면 긴 이름이 잘린다. */
+.cust .who{position:absolute;left:2.5%;top:48%;width:18%;height:15%;padding:0 2px;border:0;border-radius:4px;
+  background:rgba(3,12,28,.78);box-shadow:inset 0 0 0 1px rgba(126,205,255,.22);
+  display:grid;place-items:center;color:#e6eefa;font-size:min(8.5px,2.1vw);font-weight:900;letter-spacing:-.03em;
+  text-shadow:0 1px 2px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden}
+.cust .say{position:absolute;left:23%;top:21%;width:63%;height:55%;margin:0;padding:0;border:0;border-radius:0;
+  background:none;box-shadow:none;display:flex;align-items:center;color:#3a2f1d;font-size:min(12.5px,3vw);
+  font-weight:800;line-height:1.42;overflow:hidden}
+.cust .say::before{display:none}
+
+/* ── 도면 vs 완성품 ───────────────────────────────────────
+   ⚠️ 캡션은 창 **아래**다. 위에 두면 그림의 로봇 집게(x21.9~28 / x71.9~78, y13~27)가
+      글자를 정확히 덮는다 — 실제로 'CARI 가 만든 것' 이 'CARI ㄱ…든 것' 으로 보였다. */
+/* ⚠️ flex:1 1 auto(기본값) 로 두면 카드가 많은 판(레벨 5 = 7장)에서 무대가 **먼저 찌그러진다** —
+   실측 160px → 115px 로 줄면서 도면 칸의 로봇이 통째로 사라졌다. 무대는 도면↔완성품을 대조하는
+   이 게임의 본체라 마지막에 줄어야 한다: 늘어나지 않고(0), 화면이 정말 낮을 때만 줄인다(1). */
+.stage{flex:0 0 auto;min-height:0;max-height:min(280px,32vh);height:auto;aspect-ratio:1536/1024;
+  margin:0 8px 4px;padding:0;gap:0;border-radius:0;backdrop-filter:none;position:relative;
+  background:transparent url('/games/order-cari-stage-v4.webp') center/100% 100% no-repeat}
+.stage .slot{position:absolute;top:15.6%;height:59.4%;border:0!important;border-radius:0;background:none!important;
+  display:flex;flex-direction:column;padding:0}
+.stage .slot.plan{left:9.4%;width:35.6%}
+.stage .slot.made{left:56.3%;width:34.3%}
+.stage .slot{position:absolute}
+.stage .slot .cap{order:2;flex:0 0 auto;padding:0 2px 2px;font-size:min(10px,2.4vw);letter-spacing:.02em}
+.stage .slot.plan .cap{color:#8fd3ff}
+.stage .slot.made .cap{color:#4d607b}
+/* ⚠️ min-height 없이 두면 도장색 칩이 붙는 판(레벨 4·5)에서 캡션·칩에 밀려 0 이 되고 로봇이 안 보인다. */
+.stage .bot{order:1;flex:1 1 auto;min-height:40px;padding:4px 4px 0}
+.stage .paint{order:3;flex:0 0 auto;padding:0 0 2px}
+.stage .paint span{text-shadow:0 1px 3px rgba(0,12,32,.95)}
+
+/* ── 시킬 말 머리띠 ───────────────────────────────────────
+   아트가 없어 CSS 다. 배경 위에 맨글자로 두면 이 줄만 게임 밖 물건처럼 뜬다. */
+.sayhead{margin:0 8px 4px;padding:6px 10px;border-radius:9px;
+  background:linear-gradient(rgba(7,25,53,.86),rgba(4,16,38,.9));border:1px solid rgba(126,205,255,.22)}
+
+/* ── 시킬 말 카드 ─────────────────────────────────────────
+   ⚠️ 글자를 25% 보다 왼쪽에서 시작하지 말 것 — 파란 태그 슬롯(x9.4~21.9) 위에 올라탄다
+      (실제로 '바퀴를' 세 글자가 파란 판 위에서 안 읽혔다). */
+.scroll{padding:0 8px 6px}
+.pc{position:relative;min-height:92px;border:0;border-radius:0;box-shadow:none;
+  background:transparent url('/games/order-cari-command-v4.webp') center/100% 100% no-repeat}
+.pc .bar{width:0}
+.pc .in{position:static;padding:0;background:none!important}
+.pc .tag{position:absolute;left:9.4%;top:21.9%;width:12.5%;height:40.6%;margin:0;padding:0;border-radius:0;
+  background:none!important;display:grid;place-items:center;color:#bfe4ff;font-size:min(10px,2.4vw);overflow:hidden}
+.pc .txt{position:absolute;left:25%;top:21.9%;width:50%;height:40.6%;display:flex;align-items:center;
+  color:#2b2723;font-size:min(12.5px,3vw);font-weight:800;line-height:1.34;overflow:hidden}
+.pc .chk{position:absolute;left:81.3%;top:34.4%;width:6.2%;height:18.6%;margin:0;border:0;border-radius:0;
+  background:none!important;display:grid;place-items:center;font-size:min(13px,3.1vw);color:transparent}
+.pc.on{filter:drop-shadow(0 0 4px #36c8ff) drop-shadow(0 0 14px rgba(54,200,255,.7));box-shadow:none}
+.pc.on .in{background:none!important}
+.pc.on .chk{color:#062a44;background:radial-gradient(circle at 50% 38%,#c6f2ff,#2ba7ec 62%,#1064a8)!important;
+  border-radius:3px;text-shadow:0 1px 0 rgba(220,248,255,.6)}
+
+/* ── 시키기 버튼 ──────────────────────────────────────────
+   ⚠️ 왼쪽 여백 31% 는 취향이 아니다 — 그림에 램프(x6~15)와 노란 화살표(x18.8~28)가 이미 그려져 있어서
+      그보다 왼쪽에서 글자를 시작하면 화살표를 덮는다. */
+.sendwrap{padding:2px 8px calc(6px + env(safe-area-inset-bottom));background:none}
+.send,.send:disabled{height:64px;padding:0 10% 2px 31%;border:0;border-radius:0;box-shadow:none;
+  font-size:min(16px,3.8vw);text-shadow:0 2px 4px rgba(0,22,60,.6);
+  background:transparent url('/games/order-cari-send-v4.webp') center/100% 100% no-repeat}
+.send:disabled{filter:grayscale(.72);opacity:.62}
+.send:active{transform:translateY(2px);box-shadow:none}
+
+/* ── 판정 시트 ────────────────────────────────────────────
+   글은 전부 화면(x14.8~85.2 y12.5~65.6) 안에. 아래 노란 트레이는 **장식**이고 누를 수 없다 —
+   진짜 버튼은 화면 안 아래쪽에 둔다(트레이 위에 겹치면 못 누르는 버튼 넷이 같이 보인다). */
+/* ⚠️ 높이를 안 묶으면 넓은 화면에서 판이 화면의 53% 를 먹어 **CARI 가 만든 것**(방금 판정의 근거)을
+   덮는다. 도면↔완성품을 보면서 이유를 읽어야 말이 되므로 위쪽을 남긴다.
+   ⛔ aspect-ratio + max-height 조합을 쓰지 말 것 — 좌우를 고정해도 높이가 잘리는 순간 **폭이 비율대로
+      같이 줄어** 판이 왼쪽에 치우쳐 붙는다(2026-08-14 실측). 높이를 직접 준다(살짝 눌리는 건 감수). */
+.fb{left:7px;right:7px;bottom:7px;min-height:0;height:min(370px,47vh);
+  padding:0;border:0;border-radius:0;box-shadow:none;color:#eaf7ff;
+  background:transparent url('/games/order-cari-feedback-v4.webp') center/100% 100% no-repeat}
+/* 실측(캔버스 기준): 검은 화면 x15~85 y12.5~67.5 · 아래 노란 네모 4칸 x44~88 y77.5~87.5 ·
+   왼쪽 파란 램프 x5~15 y10~20 · 왼쪽 아래 부품통 x5~30 y76~90(장식). */
+.fbhead{position:absolute;left:17.5%;top:15%;width:65%;height:9%;margin:0;align-items:center}
+.fbhead b{font-size:min(17px,4vw)}
+.fbhead .st{font-size:min(15px,3.5vw)}
+.diff{position:absolute;left:17.5%;top:26%;width:65%;height:10%;margin:0;overflow:hidden}
+/* ⚠️ 이유 문구가 이 판에서 제일 긴 글이다 — 높이를 줄이면 마지막 줄이 잘린다(실측 4줄까지 난다). */
+/* ⚠️ 13px 이 상한이다 — 14px 로 올리면 제일 긴 이유 문구가 다섯 줄이 되어 마지막 줄이 잘린다. */
+.fbwhy{position:absolute;left:17.5%;top:38%;width:65%;height:28%;margin:0;overflow:hidden;
+  font-size:min(13px,3.1vw);line-height:1.48;color:#cfe5ff}
+/* ⚠️ 버튼은 화면 안이 아니라 **아래 노란 네모 4칸 자리**다. 화면 한가운데 알약으로 띄우면
+   글 밑에 빈 검은 판이 남고 버튼만 붕 떠서 붙여넣은 것처럼 보인다(2026-08-14 반려).
+   네 칸을 덮되 같은 금색이라 원래 그 자리의 스위치가 하나로 합쳐진 것처럼 읽힌다. */
+.fbbtn,.fbbtn.ghost{position:absolute;left:44%;top:77.5%;width:44%;height:10.5%;padding:0;border-radius:5px;
+  font-size:min(14px,3.3vw);color:#2b1c03;border:1px solid rgba(255,232,160,.75);
+  background:linear-gradient(#f6c04a,#b87d15);box-shadow:inset 0 1px 0 rgba(255,246,214,.6),0 3px 0 rgba(74,50,8,.9);
+  text-shadow:0 1px 0 rgba(255,240,200,.5)}
+/* 실패 쪽은 회색 알약이 아니라 **같은 소켓에 낀 강철 부품**으로 보이게 — 밝은 회색 판을 얹으면
+   금색 소켓 위에 스티커를 붙인 것처럼 뜬다(패널 프레임과 같은 강철·금테). */
+.fbbtn.ghost{background:linear-gradient(#8d9caf,#3d4a5e);border-color:rgba(226,178,84,.75);
+  color:#f2f7ff;text-shadow:0 1px 2px rgba(0,10,26,.85);
+  box-shadow:inset 0 1px 0 rgba(226,240,255,.5),0 3px 0 rgba(28,36,48,.95)}
+.fbbtn:active,.fbbtn.ghost:active{transform:translateY(2px);box-shadow:none}
+
+/* ── 인트로 ───────────────────────────────────────────────
+   ⛔ 판(sheet)으로 감싸지 않는다 — 이 계열 공통이고, 마크업에도 .sheet 가 없다.
+      옛 v5/v6 블록이 `#startOv .sheet` 에 intro-panel PNG 를 물려놨었는데 그런 엘리먼트가 없어
+      **그 그림은 한 번도 안 그려졌다**(죽은 CSS 였다). 되살리지 말 것.
+   버튼도 CSS 다 — start-v4 는 1.5:1 이라 알약 버튼에 넣으면 3.4배 눌린다(재생성 대기). */
+/* ⚠️ v4 인트로 배경은 창으로 햇빛이 드는 **밝은** 공장이다 — v2(어두운 공방) 때 쓰던 흰 제목·흰 태그가
+   그대로 묻힌다. 그림을 가리지 않는 선에서 글이 앉는 아래쪽만 눌러 준다(위는 거의 투명). */
+#startOv{background:linear-gradient(rgba(3,12,28,.06) 0%,rgba(3,12,28,.34) 42%,rgba(3,12,28,.72) 100%),
+  #071426 url('/games/order-cari-intro-bg-v4.webp') center/cover no-repeat}
+#startOv .lead{text-shadow:0 2px 5px rgba(0,10,30,.95),0 0 3px rgba(0,10,30,.9)}
+
+/* ── 랭킹 버튼 ────────────────────────────────────────────
+   미니게임 9종이 **같은 그림 한 장**(rank-button.webp)을 쓴다. 여기만 맨 알약이라 혼자 딴 게임처럼 보였다.
+   ⚠️ padding 은 %가 아니라 px — absolute 요소라 %패딩이 자기 폭이 아니라 부모 폭 기준으로 잡혀
+      글자가 오른쪽 끝으로 밀린다(막아라 CARI 에서 겪은 그 함정). */
+.mg-rank{width:auto;height:38px;aspect-ratio:1701/494;padding:0 0 0 25px;border:0;border-radius:0;
+  background:url('/games/rank-button.webp') center/100% 100% no-repeat;color:#fff;place-items:center;
+  font:800 12.5px/1 system-ui,sans-serif;text-shadow:0 1px 3px #001c55;
+  filter:drop-shadow(0 5px 8px rgba(0,10,42,.38))}
+.mg-rank.on{display:grid}
+.mg-rank>span[aria-hidden="true"]{display:none}
+.mg-rank .rank-label{display:block;text-align:center}
+#startOv .mg-rank,#overOv .mg-rank{background:url('/games/rank-button.webp') center/100% 100% no-repeat;border:0;color:#fff}
+
+/* ── 결과 ─────────────────────────────────────────────────
+   result-panel-v4 는 세로 0.667:1 이라 이 자리에 그대로 맞는다(유일하게 비율이 맞는 판).
+   글은 화면(y21~64) 안, 버튼은 아래 청판(y66~83) 위. 맨 아래 손잡이는 장식이다. */
+#overOv{padding:0;align-items:center;justify-content:center;background:rgba(4,12,26,.82);backdrop-filter:blur(3px)}
+#overOv .sheet{position:relative;width:auto;max-width:100%;height:min(92%,660px);aspect-ratio:1024/1536;
+  margin:0;padding:0;border:0;border-radius:0;overflow:visible;box-shadow:none;background:transparent
+  url('/games/order-cari-result-panel-v4.webp') center/100% 100% no-repeat;
+  filter:drop-shadow(0 18px 30px rgba(0,0,0,.6))}
+#overOv .sheet>*{position:absolute;left:18.4%;width:62.4%;margin:0}
+#overOv #oArt{display:none}
+#overOv .ttl{top:23%;height:8%;display:grid;place-items:center;color:#fff;font-size:min(19px,4.4vw)}
+#overOv .big{top:32%;height:13%;display:grid;place-items:center;font-size:min(38px,8.6vw)}
+#overOv .biglab{top:45.5%;height:6%;display:grid;place-items:center;color:#cbdcf3;font-size:min(11.5px,2.8vw)}
+/* ⛔ display:flex 로 두지 말 것 — 이 문단은 안에 <b> 가 있어서 flex 가 [글]·[b]·[글] 을
+   **가로 세 칸으로 쪼갠다**(실제로 문장이 3열로 흩어져 읽을 수 없었다). 블록으로 흘려야 한다. */
+#overOv .note{top:51%;height:13%;display:block;padding:0;border:0;border-radius:0;
+  background:transparent;color:#dbe9ff;font-size:min(11.5px,2.8vw);line-height:1.45;overflow:hidden}
+#overOv .btn{top:68%;height:13%;padding:0;border-radius:0;background:none;box-shadow:none;
+  color:#eaf5ff;font-size:min(15px,3.5vw);text-shadow:0 2px 4px rgba(0,20,60,.7)}
+/* 아쉬운 결과 — 판 자체를 hue-rotate 로 물들이면 금메달이 초록이 된다. 판은 그대로 두고 뒤만 붉힌다. */
+#overOv.result-fail{background:rgba(34,10,12,.84)}
+
+@media(max-height:690px){
+  .cust{height:74px}
+  .pc{min-height:82px}
+  .send,.send:disabled{height:56px}
+}
+</style>
+<style>
+/* ═══ v8 — v5 알파 에셋(실물 기준) ═══
+   ⚠️ v5 여섯 장은 **캔버스에 투명 여백이 크다**(가로형은 위아래 각 13.5%, 말풍선은 좌우 각 13.7%).
+      캔버스 비율로 상자를 잡으면 그만큼 빈 띠가 생겨 자리만 먹고, 그림이 상자 안에서 축소돼
+      아래 %좌표가 통째로 어긋난다. → 상자는 **알파 bbox(실물) 비율**로 잡고, 배경을 그만큼
+      확대해 실물이 상자를 정확히 채우게 한다(막아라 CARI 와 같은 방식).
+      그래서 아래 세로 %는 캔버스가 아니라 **실물 기준**이다: 실물y = (캔버스y − t) / (b − t) × 100.
+
+   실측(캔버스 기준 · 알파 bbox → 실물비율 · 확대율):
+     hud-v5     1731×289 y13.8~86.5 → 8.22:1 ·100% 137.6%  왼쪽판 x8.6~24.6 · 가운데판 x29.3~71.3 · 금별 x77.4~89.5 (판 y28.4~69.2 · 별 y38~57)
+     dialog-v5  2534×724 x13.7~86.3 → 2.54:1 ·137.7% 100%  왼쪽 종이 x16.7~30.7 · 큰 종이 x32.2~84.5 (둘 다 y≈25~89)
+                                                            ⚠️ 위 손잡이가 x40~60 의 y0~31.5 를 덮는다 → 글은 y26 아래에서 시작해야 한다.
+     command-v5 2005×365 y12.9~87.1 → 7.40:1 ·100% 134.8%  경고줄무늬 태그 x4.4~14.5 · 크림 글판 x19.5~82.5 · 체크 소켓 x86.5~92.5 (y≈30~72)
+     send-v5    1750×389 y13.4~86.6 → 6.14:1 ·100% 136.6%  청판 x28~92 (왼쪽은 유압 실린더, 오른쪽은 경고줄무늬)
+     start-v5   1780×445 y13.9~85.8 → 5.56:1 ·100% 139.1%  청판 x9.4~87.5
+     replay-v5  1792×448 y13.4~86.4 → 5.48:1 ·100% 137.0%  청판 x15.6~84.4
+   ⚠️ 그림을 갈면 이 표를 다시 재야 한다. */
+
+/* ── 상단 HUD ── 이제 크롭이 필요없다(v5 는 처음부터 가로로 길다) → ::before 를 끈다. */
+.top{aspect-ratio:1731/210;overflow:visible}
+.top::before{content:none}
+.top{background:url('/games/order-cari-hud-v5.webp') center/100% 137.6% no-repeat}
+.top .ordno{left:8.6%;top:20%;width:16%;height:56%;font-size:min(12px,2.9vw);color:#dbe9f7}
+.top .ordname{left:29.3%;top:20%;width:42%;height:56%;font-size:min(15px,3.6vw);color:#eaf5ff}
+/* 별 — v5 도 금별 3개가 이미 칠해져 있다. 못 딴 칸을 덮는다. */
+.top .stars{left:77%;top:29%;width:13%;height:35%}
+
+/* ── 손님 대사 ── 실물이 좌우로 잘려 있어 가로 확대가 필요하다. */
+.cust{height:auto;aspect-ratio:1840/724;
+  background:url('/games/order-cari-dialog-v5.webp') center/137.7% 100% no-repeat}
+/* ⚠️ 이름 칸은 그림에서 큰 종이 한 장이다 — 10px 로 두면 종이 한가운데 개미만 한 글자가 앉는다. */
+.cust .who{left:5%;top:26%;width:17%;height:62%;padding:0 2px;border:0;border-radius:0;background:none;
+  box-shadow:none;color:#4a3c26;font-size:min(13.5px,3.2vw);letter-spacing:-.03em;text-shadow:none;
+  white-space:normal;word-break:keep-all;line-height:1.25;text-align:center}
+/* ⚠️ top 을 26% 위로 올리지 말 것 — 위쪽 손잡이가 가운데를 덮어 첫 줄이 그 밑으로 들어간다. */
+/* 큰 종이는 x25.6~97.5 — 왼쪽에 여백을 두어 글이 종이 테를 물지 않게 한다. */
+.cust .say{left:28.5%;top:26%;width:66%;height:62%;color:#3f3320;font-size:min(14px,3.35vw);line-height:1.44}
+
+/* ── 시킬 말 카드 ── */
+/* ⚠️ min-height 는 글자 크기와 한 쌍이다 — 태그·문장을 키우면 글판(상자 높이의 56%)이 두 줄을
+   못 담아 아래가 잘린다. 제일 긴 카드가 두 줄이라 66px 아래로 내리면 아랫줄이 잘린다. */
+.pc{min-height:66px;height:auto;aspect-ratio:2005/271;position:relative;
+  background:url('/games/order-cari-command-v5.webp') center/100% 134.8% no-repeat}
+/* ⚠️ 고른 티가 나야 한다 — 옛 값(옅은 글로우 하나)은 낮에 보면 아무 차이가 없었다(2026-08-14 반려).
+   카드 전체를 두르는 청록 테 + 체크 소켓 점등 두 가지를 같이 준다. */
+.pc::after{content:'';position:absolute;inset:0;border-radius:8px;pointer-events:none;opacity:0;
+  transition:opacity .12s;box-shadow:inset 0 0 0 3px rgba(96,222,255,.95),0 0 16px rgba(54,200,255,.8)}
+.pc.on::after{opacity:1}
+/* ⚠️ 태그 자리는 **노란 경고 줄무늬** 판이다 — 어두운 글자는 검은 줄에 먹히고 밝은 글자는 노란 줄에 먹힌다.
+   흰 글자 + 어두운 테두리(획)로만 읽힌다. 색만 바꾸지 말 것. */
+.pc .tag{left:4.4%;top:25%;width:10.1%;height:52%;color:#fff;font-size:min(12.5px,3vw);letter-spacing:-.03em;
+  -webkit-text-stroke:2.8px rgba(20,14,4,.94);paint-order:stroke fill;text-shadow:none}
+.pc .txt{left:21%;top:24%;width:60%;height:56%;color:#2b2723;font-size:min(13.5px,3.2vw);line-height:1.32}
+.pc .chk{left:86.5%;top:26%;width:6%;height:49%;font-size:min(13px,3.1vw)}
+
+/* ── 시키기 버튼 ── 왼쪽 28% 는 유압 실린더 자리라 글이 못 들어간다. */
+.send,.send:disabled{height:auto;aspect-ratio:1750/285;padding:0 9% 0 30%;
+  background:url('/games/order-cari-send-v5.webp') center/100% 136.6% no-repeat}
+.send:disabled{filter:grayscale(.78) brightness(.72);opacity:.75}
+
+/* ── 인트로 · 결과 버튼 ── */
+#startOv .btn{width:min(278px,76%);height:auto;aspect-ratio:1780/320;margin-top:18px;padding:0 13%;
+  border:0;border-radius:0;box-shadow:none;font-size:min(16px,3.8vw);
+  background:url('/games/order-cari-start-v5.webp') center/100% 139.1% no-repeat}
+#overOv .btn{top:69%;height:auto;aspect-ratio:1792/327;padding:0 18%;border-radius:0;box-shadow:none;
+  background:url('/games/order-cari-replay-v5.webp') center/100% 137% no-repeat}
+
+/* ⚠️ v5 는 실물 비율이 커서(말풍선 2.54:1, 버튼 6.1:1) 폭에 맡기면 넓은 화면에서 상단 세 덩이가
+   화면을 다 먹고 카드가 1.5장만 남는다. 위쪽은 상한을 두고 남는 세로는 카드 목록이 먹게 한다
+   — 고를 말이 최대 8장이라 목록이 이 화면의 주인공이다. 상한에 걸리면 그림이 살짝 눌리지만
+   1.4배 안쪽이라 눈에 안 띈다(옛 v4 는 4배였다). */
+/* ⛔ 'CARI 에게 시킬 말' 머리띠는 없앴다(2026-08-14) — 바로 밑에 카드가 줄줄이 있어서
+   무엇을 하는 자리인지 화면만 봐도 안다. 인트로 규칙 ①이 이미 같은 말을 한 번 했다. */
+.sayhead{display:none}
+.cust{max-height:min(118px,15vh)}
+.stage{max-height:min(268px,31vh)}
+.send,.send:disabled{max-height:66px}
+
+/* ── 고르는 동안 = 도면만(pick) ─────────────────────────────
+   두 칸짜리 비교판을 계속 띄우면 오른쪽 칸이 '아직 아무 말도 안 했다' 한 줄로 비어 있는 채
+   세로를 260px 먹어서, 카드가 3장밖에 안 들어가고 나머지는 스크롤로 밀렸다(2026-08-14 반려).
+   ⚠️ 한 칸이 되면 도면이 **작아지는 게 아니라 커진다** — 로봇은 세로로 긴 그림이라 크기를 정하는 건
+      폭이 아니라 높이인데, 비교판의 도면 창(전체 높이의 59%)보다 이 띠가 더 높다.
+   ⚠️ 아트를 쓰지 않고 CSS 로 그린다 — 무대 아트는 창이 둘인 한 장이라 한 칸만 떼어낼 수 없다.
+      대신 인트로 규칙판과 같은 베젤 문법(모서리 리벳 + 파인 화면)이라 세트 밖으로 나가지 않는다. */
+.stage.pick{max-height:none;aspect-ratio:auto;height:min(186px,24vh);padding:9px;background:
+    radial-gradient(circle at 13px 13px,#cfdae8 0 2.4px,transparent 3px),
+    radial-gradient(circle at calc(100% - 13px) 13px,#cfdae8 0 2.4px,transparent 3px),
+    radial-gradient(circle at 13px calc(100% - 13px),#cfdae8 0 2.4px,transparent 3px),
+    radial-gradient(circle at calc(100% - 13px) calc(100% - 13px),#cfdae8 0 2.4px,transparent 3px),
+    linear-gradient(180deg,#31465f,#17293e);
+  border-radius:13px;box-shadow:inset 0 1px 0 rgba(196,220,244,.36),inset 0 0 0 1px rgba(8,18,32,.92),0 10px 22px rgba(2,12,34,.45)}
+.stage.pick .slot.made{display:none}
+.stage.pick .slot.plan{position:absolute;left:9px;right:9px;top:9px;bottom:9px;width:auto;height:auto;
+  border-radius:8px;background:
+    linear-gradient(rgba(126,205,255,.07) 1px,transparent 1px) 0 0/100% 14px,
+    linear-gradient(90deg,rgba(126,205,255,.07) 1px,transparent 1px) 0 0/14px 100%,
+    linear-gradient(180deg,rgba(6,26,52,.96),rgba(3,14,30,.98))!important;
+  box-shadow:inset 0 0 0 1px rgba(126,205,255,.26),inset 0 5px 16px rgba(0,0,0,.6)}
+.stage.pick .slot.plan .cap{color:#8fd3ff}
+/* 카드가 최대 7장이라 간격 2px 이 한 장을 더 넣고 뺀다. */
+.tray{gap:5px}
+.scroll{padding:0 8px 4px}
+/* 목록이 버튼 밑으로 잘려 들어가는 게 보이게 — 안 그러면 카드가 싹둑 잘린 것처럼 읽힌다. */
+.sendwrap{background:linear-gradient(rgba(7,20,43,0),rgba(7,20,43,.55) 60%)}
+
+@media(max-height:690px){.cust{height:auto}.pc{min-height:0}.send,.send:disabled{height:auto}}
 </style>
 </head>
 <body>
@@ -245,22 +640,29 @@
     <p class="fbwhy" id="fbWhy">—</p>
     <button class="fbbtn" id="fbBtn">다음</button>
   </div>
-</div>
 
 <!-- 인트로 -->
+<!-- 인트로 = 다른 게임(닿아라·골라라·버텨라·프로그램해라)과 같은 틀:
+     배경 아트 위에 [CARI 전신] → [제목] → [한 줄 태그] → [규칙 3줄 박스] → [알약 버튼] 세로 스택.
+     ⚠️ 판(sheet) 으로 감싸지 않는다. 옛 판은 화면 아래에 붙은 상자였고, 그 안에 CARI 를 절대배치해서
+        머리가 overflow 에 잘리고 제목이 목도리 위에 얹혔다. 이 계열 게임엔 인트로 판 자체가 없다.
+     ⚠️ 두 오버레이는 반드시 #app **안**에 있어야 한다 — `.ov{position:absolute;inset:0}` 의 기준이
+        #app(520px 상한)이 아니라 뷰포트가 되면, 데스크톱에서 인트로가 화면 전체로 퍼지고 그 안의
+        % 값(버튼 좌우 패딩 등)이 1280px 기준으로 계산돼 버튼이 460px 로 부풀며 글자가 세로로 쪼개진다.
+        (2026-08-14 실제로 그 상태였다. 밖으로 빼지 말 것.) -->
 <div class="ov" id="startOv">
-  <div class="sheet">
-    <div id="sArt"></div>
-    <p class="ttl">시켜라 <i>CARI</i></p>
-    <p class="lead">여기는 CARI 공방.<br/>손님이 도면을 들고 온다. 만드는 건 CARI 다.<br/>당신이 할 일은 <b>말로 시키는 것</b> 하나다.</p>
-    <ul class="rules">
-      <li><span>①</span><div>왼쪽 <b>도면</b>을 봐라. 답은 거기 다 그려져 있다. 손님 말도 흘리지 마라.</div></li>
-      <li><span>②</span><div>시킬 말을 골라 CARI 에게 넘긴다. <b>안 시킨 건 안 만들어진다.</b></div></li>
-      <li><span>③</span><div>말이 많다고 좋아지지 않는다. <b>결과를 망치는 말</b>이 섞여 있다.</div></li>
-      <li><span>④</span><div>한 번에 맞히면 <b>★★★</b>. 다시 시킬 때마다 별이 하나씩 준다.</div></li>
-    </ul>
-    <button class="btn" id="startBtn">공방 열기</button>
-  </div>
+  <div id="sArt"></div>
+  <p class="ttl">시켜라 <i>CARI</i></p>
+  <p class="lead">“도면대로 하나 만들어 주세요.”</p>
+  <!-- ⚠️ 인트로에 다 적지 않는다 — 태그 1줄 + 규칙 3개, 각 한 줄(다른 게임 전부 이 분량이다).
+       화면에 보이는 것(도면 · 손님 대사)과 게임이 알아서 알려주는 것(고른 개수 · 판정 사유)은 뺀다.
+       남길 것은 "안 하면 별을 잃는 것" 셋뿐이다. -->
+  <ul class="rules">
+    <li><span>1</span><div><b>도면</b>대로 나오게 시킬 말을 고른다</div></li>
+    <li><span>2</span><div><b>안 시킨 건 안 나오고</b> 군말은 <b>망친다</b></div></li>
+    <li><span>3</span><div>한 번에 맞혀야 <b>★★★</b></div></li>
+  </ul>
+  <button class="btn" id="startBtn">공방 열기</button>
 </div>
 
 <!-- 종료 -->
@@ -274,6 +676,8 @@
     <button class="btn" id="oAgain">처음부터 다시</button>
   </div>
 </div>
+
+</div><!-- /#app -->
 
 <script>
 /* ================= CARI mascot (기존 게임과 동일 자산) ================= */
@@ -493,6 +897,9 @@ const KEYS=['base','arms','head','size','color'];
 let LI=0,picked=new Set(),busy=false,tries=0,starTotal=0,starsPer=[];
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function starStr(n){return '★'.repeat(n)+'<b>'+'☆'.repeat(3-n)+'</b>';}
+/** HUD 전용 — 그림(hud-v4)에 금별 3개가 이미 칠해져 있다. 그래서 별을 그리는 게 아니라
+ *  **못 딴 칸을 덮는다**(막아라 CARI 의 경고카드와 같은 방향). 여기서 ★ 문자를 쓰면 별이 두 벌이 된다. */
+function starSockets(n){let s='';for(let i=0;i<3;i++)s+='<i'+(i<n?' class="on"':'')+'></i>';return s;}
 
 /** 고른 말로 만들어질 스펙 — 정상 카드 먼저, 함정이 그 위를 덮는다(이 순서가 교훈이다). */
 function buildSpec(){
@@ -516,13 +923,16 @@ function loadLevel(){
   $('ordName').textContent=L.name;
   $('custWho').textContent=L.who;
   $('custSay').textContent=L.say;
-  $('starEl').innerHTML='이번 주문 '+starStr(3);
+  $('starEl').innerHTML=starSockets(3);
   $('goalBot').innerHTML=robotSVG(L.goal,{plan:true});
   if(L.paint){ $('paintChip').classList.remove('hidden');
     $('paintDot').style.background=L.goal.color; $('paintTxt').textContent=L.paint; }
   else $('paintChip').classList.add('hidden');
   $('madeBot').className='bot';
   $('madeBot').innerHTML='<p class="empty">아직 아무 말도<br/>안 했다</p>';
+  // 고르는 동안은 도면만 띄운다(pick) — 완성품 칸은 어차피 비어 있고, 그 자리를 카드 목록이 쓴다.
+  // 시키는 순간 두 칸짜리 비교판으로 바뀐다(send 참고).
+  document.querySelector('.stage').classList.add('pick');
   $('tray').innerHTML=L.cards.map((c,i)=>{
     const P=PART[c.p];
     return `<button class="pc" data-i="${i}"><span class="bar" style="background:${P.c}"></span>`+
@@ -547,8 +957,10 @@ function loadLevel(){
 function send(){
   if(busy) return;
   busy=true; tries++; $('sendBtn').disabled=true;
+  // 여기서부터 볼 것은 '도면 vs 완성품' 이다 — 비교판으로 되돌린다(loadLevel 이 다시 pick 을 건다).
+  document.querySelector('.stage').classList.remove('pick');
   // 딸 수 있는 별이 시도마다 준다 — 상단에서 바로 보여야 "일단 다 눌러보기" 를 망설인다.
-  $('starEl').innerHTML='이번 주문 '+starStr(Math.max(1,4-tries));
+  $('starEl').innerHTML=starSockets(Math.max(1,4-tries));
   const L=LEVELS[LI], spec=buildSpec();
   const bads=[...picked].map(i=>L.cards[i]).filter(c=>c.bad);
   const wrong=KEYS.filter(k=>spec[k]!==L.goal[k]);
@@ -569,14 +981,14 @@ function send(){
         const st=Math.max(1,4-tries);
         starsPer[LI]=st; starTotal=starsPer.reduce((a,b)=>a+(b||0),0);
         $('fbStar').innerHTML=starStr(st);
-        $('starEl').innerHTML='이번 주문 '+starStr(st);
+        $('starEl').innerHTML=starSockets(st);
         $('fbDiff').classList.add('hidden');
         $('fbWhy').innerHTML = bads.length?'':'도면대로 나왔다. 필요한 말만 정확히 시켰다.';
         if(!bads.length&&tries===1) $('fbWhy').innerHTML='한 번에 도면대로 나왔다. 필요한 말만 정확히 시켰다.';
         if(window.MGBridge) MGBridge.submit(LI+1,{timed:true}); // 랭킹: 도달 레벨(동률=시간)
       } else {
         // 다음 시도에 딸 수 있는 별로 바로 낮춘다 — 시키기 직전이 아니라 실패한 순간 보여야 체감된다.
-        $('starEl').innerHTML='이번 주문 '+starStr(Math.max(1,3-tries));
+        $('starEl').innerHTML=starSockets(Math.max(1,3-tries));
         $('fbStar').innerHTML='';
         $('fbDiff').classList.remove('hidden');
         $('fbDiff').innerHTML=wrong.map(k=>`<span>${PARTNAME[k]}</span>`).join('');
@@ -630,7 +1042,9 @@ loadLevel();
     var b=document.createElement('button');
     b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
     b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">🏆</span> 랭킹';
+    // ⚠️ 라벨을 맨 텍스트 노드로 두지 말 것 — 랭킹 버튼은 그림(rank-button.webp)이라 CSS 가
+    //   글자만 따로 가운데로 밀어야 한다(막아라·지어라 CARI 와 같은 마크업).
+    b.innerHTML='<span aria-hidden="true">🏆</span><span class="rank-label">랭킹</span>';
     b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
     ov.appendChild(b);
   }

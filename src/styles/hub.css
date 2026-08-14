@@ -39,8 +39,26 @@
 }
 .hub * { box-sizing: border-box; }
 .hub::before, .hub::after { display: none; }
-.hub > *:not(.sky):not(.hub-modal-backdrop):not(.hub-toast) { position: relative; z-index: 1; }
+/* ⚠️ 예외 목록에서 `.hub-scene` 을 빼지 말 것 — 배경 레이어가 relative/z-index 1 로 끌려 내려오면
+      viewport 고정이 풀려 가운데 열(480px) 안으로 접힌다. 랜딩에서 `.rg` 를 그렇게 잃은 적이 있다. */
+.hub > *:not(.sky):not(.hub-scene):not(.hub-modal-backdrop):not(.hub-toast) { position: relative; z-index: 1; }
 .hub .sky { display: none; }
+
+/* ── 무대(배경 사진 + 캐릭터) — 스킨이 켜졌을 때만 그린다 ────────────────────
+   ⚠️ 여기 **숫자를 직접 쓰지 마라.** 배경 그림·캐릭터 그림·크기·발끝 위치는 전부 스킨 값이다
+      (아래 '스킨 계약' 블록 참고). 규칙은 변수만 읽는다.
+   ⚠️ pointer-events:none 이 빠지면 화면 전체를 덮는 레이어라 아래 UI 가 하나도 안 눌린다.
+   ⚠️ 배경·캐릭터 둘 다 background-image 다 — <img> 로 두면 스킨을 바꿀 때 HTML 을 고쳐야 한다.  */
+.hub-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.hub[data-skin] .hub-scene-bg { position: absolute; inset: 0;
+  background-image: var(--skin-bg); background-size: cover;
+  background-position: var(--skin-bg-pos, 50% 50%); background-repeat: no-repeat; }
+.hub[data-skin] .hub-scene-char { position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: var(--skin-char-bottom); height: var(--skin-char-h); aspect-ratio: var(--skin-char-ar);
+  background-image: var(--skin-char); background-size: contain;
+  background-position: 50% 100%; background-repeat: no-repeat;
+  /* 땅에 붙어 보이게 하는 건 그림자 하나다 — 레퍼런스도 젖은 노면 반사로 캐릭터를 지면에 붙였다. */
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, .35)); }
 
 /* 아레나로 돌아가기 — 공용 .topbar 대신 허브의 카툰 스티커 톤에 맞춘 칩.
    칩 자체는 inline 이라 넓은 화면에서 형제들처럼 가운데 정렬이 안 된다 →
@@ -317,7 +335,8 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .exp-txt { padding: 0 16px; gap: 12px; }
   .hub .exp-pct { display: none; }
   .hub .exp-frac { display: inline; }
-  .hub .gchip { width: 128px; height: 40px; font-size: 18px; }  .hub .exp-lv { font-size: 15px; }
+  .hub .gchip { width: 128px; height: 40px; font-size: 18px; }
+  .hub .exp-lv { font-size: 15px; }
   .hub .stage-zone { height: 470px; margin-top: 8px; }
   .hub .ricon { width: 62px; height: 62px; }
   .hub .fcard { width: 84px; font-size: 17px; }
@@ -684,6 +703,253 @@ html.dark .hub .nameplate { box-shadow: 0 4px 0 rgba(0,0,0,.5), inset 0 2px 0 rg
 html.dark .hub .room.is-editing .rm-slot { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.24); }
 html.dark .hub .title-badge { box-shadow: 0 4px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
 html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
+
+/* ══ 스킨 계약 ═════════════════════════════════════════════════════════════════
+   허브는 **HTML 한 벌**이다. 테마가 바뀌어도 마크업은 그대로고, 아래 두 가지만 갈린다:
+     ① 값   — `.hub[data-skin='<이름>']` 한 블록에 그 테마의 숫자·그림 URL 만 적는다
+     ② 에셋 — public/hub/ 아래 그 테마 그림들
+   새 테마 = 값 블록 한 벌 + 에셋 한 벌. 규칙(아래 `.hub[data-skin] …`)은 손대지 않는다.
+
+   ⛔ **규칙 쪽에 숫자나 URL 을 직접 쓰지 마라.** 그 순간 그 테마 전용 코드가 되고,
+      다음 테마에서 "왜 여기만 안 맞지"가 시작된다. 규칙은 변수만 읽는다.
+
+   ⚠️ "에셋만 갈면 끝"은 **불가능하다.** 장식이 두꺼운 그림은 글자 들어갈 안쪽이 실제로 좁아진다.
+      그래서 판 높이·글자 크기·글자색까지 스킨 값에 포함했다. 목표는 '값이 없는 것'이 아니라
+      **'값이 전부 한 블록에 모여 있는 것'** 이다.
+
+   ⚠️ slice 는 눈대중 금지 — 그림에서 실측한다. 판·버튼·게이지는 "양끝 장식 + 늘어나는 가운데"
+      구조라, 이웃한 픽셀 줄끼리 비교해 '변화 없는 최장 구간'(늘려도 되는 가운데)을 찾고
+      그 바깥이 slice 다. 어림값을 넣으면 장식이 한가운데서 잘려 늘어난다.
+
+   ⚠️ border-image-width 는 쓰지 않는다. border-width 하나가 곧 '그려지는 장식 크기'이자
+      '글자가 들어갈 안쪽 여백'이다. 둘을 따로 쓰면 장식은 큰데 글자가 그 밑으로 파고든다.
+
+   ⚠️ 넓은 화면 값은 **규칙이 아니라 값 블록 안에서** 미디어쿼리로 덮는다. 그래야 규칙에
+      브레이크포인트가 안 생기고, 테마가 자기 값만 책임진다.                                    */
+
+/* ── 값: 궁궐(palace) ─────────────────────────────────────────────────────────
+   에셋 public/hub/ui/*.png · 원본 시트 public/hub/ui-sheet.png
+   ※ button-vertical.png 는 미사용 — 아이콘 자체가 이미 장식판이라 틀을 덧씌우면 두 겹이 된다. */
+.hub[data-skin='palace'] {
+  /* 무대 */
+  --skin-bg: url('/hub/bg.png');
+  --skin-char: url('/hub/char.png');
+  --skin-char-ar: 772 / 1241;   /* 그림 실측 비율. 틀리면 좌우가 잘리거나 여백이 생긴다 */
+  --skin-char-h: 34vh;          /* 캐릭터 키 */
+  --skin-char-bottom: 22vh;     /* 발끝이 화면 아래에서 뜬 높이 = 배경 그림의 지평선에 맞춘다 */
+
+  /* 글자색 — 판이 밝은 베이지라 어둡게. 어두운 판 테마면 여기만 뒤집으면 된다 */
+  --skin-panel-ink: #4a2f16;
+  --skin-panel-title: 17px;   /* 판 머리글(출석 보상 / 오늘의 미션 / 3·7) 크기 */
+  --skin-panel-ink-shadow: 0 1px 0 rgba(255, 245, 220, .7);
+  --skin-rail-ink: #fdf3d8;     /* 레일 라벨은 판이 없어 사진 위에 맨글자로 선다 */
+  --skin-rail-ink-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.7);
+
+  /* 미션 바 — 1155×102, 양끝 꽃 캡 101, 위 36 / 아래 29 */
+  --skin-mission-img: url('/hub/ui/panel-mission.png');
+  --skin-mission-slice: 36 101 29 101 fill;
+  /* ⚠️ 테두리를 얇게 잡는 이유 = 바깥 높이를 옛 크기로 유지하려고. 테두리를 두껍게 그리면
+        같은 바깥 높이에서 글자 자리가 그만큼 줄고, 자리를 지키려 바깥을 키우면 바가 커 보인다.
+        둘 중 하나만 고를 수 있다 — 여기서는 '옛 크기 유지'를 택했다(2026-08-14 "왤케 크게했"). */
+  --skin-mission-edge: 12px 34px 10px;
+  --skin-mission-h: 56px;
+
+  /* 출석 보상 판 — 1155×282, 모서리 장식 148, 위 58 / 아래 51 */
+  --skin-reward-img: url('/hub/ui/panel-reward.png');
+  --skin-reward-slice: 58 147 51 149 fill;
+  --skin-reward-edge: 15px 38px 13px;   /* 미션 바와 같은 이유로 얇게 — 판이 커 보이지 않게 */
+
+  /* 랭킹 버튼 — 지금 그림은 **이 자리에 안 맞아서 빼놨다**(값을 비우면 규칙이 자동으로 안 그린다).
+     넓은 화면에서 랭킹은 출석 판 옆에 서므로 슬롯이 237×169(세로로 긴 쪽)인데,
+     받은 그림은 660×150 = 가로로 4.4배 긴 띠다. 그래서 어떻게 넣어도 장식이 한 축으로만 눌린다
+     (실측: 가로 0.36배 / 세로 0.93배 → "해상도가 개판"으로 보인 원인).
+     ⚠️ 폭·높이를 억지로 맞추지 마라 — 그건 그림을 코드에 맞추는 짓이고 실제로 더 나빠졌다.
+        슬롯 모양에 맞는 그림을 다시 뽑거나, 슬롯을 그림 모양(가로 띠)으로 바꾸는 게 답이다.
+  --skin-cta-img: url('/hub/ui/button-ranking.png');
+  --skin-cta-slice: 38 109 32 104 fill;
+  --skin-cta-edge: 14px 40px 12px;  */
+
+  /* 경험치 게이지 — 홈 958×66(캡 ~66), 채움 958×65 */
+  --skin-gauge-img: url('/hub/ui/gauge-track.png');
+  --skin-gauge-slice: 16 69 22 63 fill;
+  --skin-gauge-edge: 6px 12px 8px;
+  --skin-fill-img: url('/hub/ui/gauge-fill.png');
+  --skin-fill-slice: 29 69 23 70 fill;
+  --skin-fill-edge: 6px 10px;   /* 홈보다 작게 — 진행률이 낮을 때 캡이 뭉쳐 덩어리로 보인다 */
+  --skin-hud-h: 38px;           /* 게이지·? ·코인칩 공통 높이. 셋이 한 줄이라 따로 놀면 티 난다 */
+  --skin-gauge-font: 12.5px;
+
+  /* 출석 도장 */
+  --skin-stamp-img: url('/hub/ui/stamp-empty.png');
+  --skin-stamp-on-img: url('/hub/ui/stamp-filled.png');
+  --skin-stamp-h: 52px;
+  --skin-stamp-font: 13px;
+  --skin-stamp-ink: #4b3020;
+  --skin-stamp-on-ink: #5a3208;
+  --skin-stamp-on-ink-shadow: 0 1px 0 rgba(255,240,200,.85), 0 0 3px rgba(255,235,190,.8);
+  --skin-profile-img: url('/hub/ui/profile-frame.png');
+  --skin-currency-img: url('/hub/ui/currency-chip.png');
+  --skin-currency-slice: 58 160 fill;
+}
+@media (min-width: 768px) {
+  .hub[data-skin='palace'] {
+    --skin-panel-title: 20px;
+    --skin-mission-edge: 14px 40px 12px;
+    --skin-mission-h: 62px;
+    --skin-reward-edge: 18px 46px 16px;
+    --skin-gauge-edge: 7px 28px 9px 27px;
+    --skin-hud-h: 50px;
+    --skin-stamp-h: 58px;
+    --skin-stamp-font: 16px;
+  }
+}
+
+/* ── 규칙: 스킨이 켜졌을 때의 허브. 여기서는 변수만 읽는다 ───────────────────── */
+
+.hub[data-skin] .mission-bar {
+  background: transparent; box-shadow: none;
+  border-style: solid; border-color: transparent; border-width: var(--skin-mission-edge);
+  border-image-source: var(--skin-mission-img);
+  border-image-slice: var(--skin-mission-slice);
+  border-image-repeat: stretch;
+  padding: 0 4px; min-height: var(--skin-mission-h);
+}
+.hub[data-skin] .reward {
+  background: transparent; box-shadow: none;
+  border-style: solid; border-color: transparent; border-width: var(--skin-reward-edge);
+  border-image-source: var(--skin-reward-img);
+  border-image-slice: var(--skin-reward-slice);
+  border-image-repeat: stretch;
+  padding: 0 2px 2px;
+  /* 판을 키웠으면 내용도 그 안에서 가운데로 — 안 그러면 위로 몰리고 아래가 텅 빈다 */
+  display: flex; flex-direction: column; justify-content: center; gap: 10px;
+}
+.hub[data-skin] .streak { margin-top: 0; }
+/* 랭킹 버튼은 스킨이 안 건드린다 — 슬롯 모양에 맞는 그림이 아직 없어서 옛 버튼 그대로 둔다.
+   그림이 오면 위 스킨 값 블록의 주석을 풀고 여기에 판·버튼과 같은 규칙을 다시 넣으면 된다. */
+
+/* 판 위 글자는 전부 판 색을 따른다 — 옛 톤은 어두운 배경 전제라 밝은 글자였다 */
+.hub[data-skin] .rw-top, .hub[data-skin] .rw-n,
+.hub[data-skin] .ms-title, .hub[data-skin] .ms-n {
+  color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
+  font-size: var(--skin-panel-title);
+}
+
+/* 레일 5칸 — 틀을 씌우지 않는다. 아이콘 자체가 장식판이라 덧씌우면 틀이 두 겹이 된다.
+   ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
+      라벨 자리까지 먹어 글자가 통째로 사라진다. 라벨은 태그 없는 맨 텍스트라 grid 가 2행에 앉힌다. */
+.hub[data-skin] .fcard,
+.hub[data-skin] .f-daily, .hub[data-skin] .f-gacha, .hub[data-skin] .f-shop,
+.hub[data-skin] .f-title, .hub[data-skin] .f-invite {
+  background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
+  display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; gap: 1px;
+  font-size: 12px; line-height: 1.15;
+  color: var(--skin-rail-ink); text-shadow: var(--skin-rail-ink-shadow);
+}
+/* ⚠️ overflow:hidden 을 쓰면 그림자까지 네모로 잘려 아이콘마다 사각 경계선이 생긴다.
+      그림을 absolute 로 깔면 부모 높이가 1fr 이어도 퍼센트가 확실히 풀린다. */
+.hub[data-skin] .fcard .fico { position: relative; min-height: 0; width: 100%; height: 100%; }
+.hub[data-skin] .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
+  object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.hub[data-skin] .fcard:active { transform: translateY(2px); box-shadow: none; }
+
+/* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
+   ⚠️ 글자는 padding 으로 밀지 말고 가운데 정렬. padding 으로 앉히면 칸 높이가 바뀔 때 잘린다. */
+.hub[data-skin] .day {
+  border: 0; border-radius: 0; box-shadow: none; padding: 0;
+  min-height: var(--skin-stamp-h); font-size: var(--skin-stamp-font);
+  background: var(--skin-stamp-img) center / contain no-repeat;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  color: var(--skin-stamp-ink);
+}
+/* ⚠️ **반드시 background 단축으로 쓴다.** 옛 톤의 `.day.on { background: 노랑 }` 이 살아 있어서
+      image 만 얹으면 노란 면이 도장을 덮고, 색만 눕히면 size 가 auto·repeat 로 남아 잘려 보인다. */
+.hub[data-skin] .day.on {
+  background: var(--skin-stamp-on-img) center / contain no-repeat;
+  color: var(--skin-stamp-on-ink); text-shadow: var(--skin-stamp-on-ink-shadow);
+}
+.hub[data-skin] .day.on .chk { display: none; }  /* 도장 자체가 '찍혔다'를 말한다 */
+.hub[data-skin] .day .gift { top: -4px; right: -2px; }
+
+/* 경험치 게이지 */
+.hub[data-skin] .exp {
+  background: none; border-radius: 0; overflow: hidden;
+  border-style: solid; border-color: transparent; border-width: var(--skin-gauge-edge);
+  border-image-source: var(--skin-gauge-img);
+  border-image-slice: var(--skin-gauge-slice);
+  border-image-repeat: stretch;
+  padding: 0;
+}
+.hub[data-skin] .exp-fill {
+  background: none; border-radius: 0;
+  border-style: solid; border-color: transparent; border-width: var(--skin-fill-edge);
+  border-image-source: var(--skin-fill-img);
+  border-image-slice: var(--skin-fill-slice);
+  border-image-repeat: stretch;
+}
+/* ⚠️ 글자가 **두 바닥** 위에 걸친다 — 왼쪽은 채움, 오른쪽은 빈 홈. 밝은 글자 하나로는 한쪽에서 묻히므로
+      검은 외곽선을 사방으로 둘러 바닥이 뭐든 형태가 서게 한다.
+   ⚠️ 좌우 여백 0 — 안쪽 여백은 이미 캡(border)이 만든다. 옛 padding 을 두면 글자 자리가 또 깎인다. */
+.hub[data-skin] .exp-txt { color: #fff6dd; padding: 0 2px;
+  font-size: var(--skin-gauge-font); font-weight: 900; letter-spacing: .01em;
+  text-shadow: 0 1px 0 rgba(0,0,0,.9), 0 -1px 0 rgba(0,0,0,.75), 1px 0 0 rgba(0,0,0,.75),
+    -1px 0 0 rgba(0,0,0,.75), 0 2px 4px rgba(0,0,0,.85); }
+/* ⚠️ 셋은 한 줄에 서므로 높이를 같이 간다(하나만 바꾸면 바로 티 난다).
+   ⚠️ `?` 는 **폭도 같이 줘야 한다** — 높이만 올리면 28×38 타원이 된다(2026-08-14 "왜 찌그러진거야").
+      hub.css 위쪽 '아바타 달걀 방지'와 같은 종류의 사고다: 원형인데 한 축만 건드리면 달걀이 된다. */
+.hub[data-skin] .exp, .hub[data-skin] .hub-help, .hub[data-skin] .gchip { height: var(--skin-hud-h); }
+.hub[data-skin] .hub-help { width: var(--skin-hud-h); }
+
+/* 프로필과 보유 재화도 같은 궁정 물성으로 묶는다. */
+.hub[data-skin] .hud-av { isolation: isolate; }
+.hub[data-skin] .hud-av::after {
+  content: ""; position: absolute; z-index: 3; inset: -11px; pointer-events: none;
+  background: var(--skin-profile-img) center / contain no-repeat;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.42));
+}
+.hub[data-skin] .hud-av .av { position: relative; z-index: 1; border: 0; }
+.hub[data-skin] .gchip:not(.gchip-dust) {
+  background: transparent; border-style: solid; border-color: transparent;
+  border-width: 8px 15px;
+  border-image-source: var(--skin-currency-img);
+  border-image-slice: var(--skin-currency-slice);
+  border-image-repeat: stretch;
+  border-radius: 0; box-shadow: none; padding: 0 2px;
+  color: #4a2f16; text-shadow: 0 1px rgba(255,255,255,.65);
+}
+.hub[data-skin] .currency-coin { width: 29px; height: 29px; flex: 0 0 auto; object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(76,37,4,.35)); }
+@media (min-width: 768px) {
+  .hub[data-skin] .hud-av::after { inset: -15px; }
+  .hub[data-skin] .currency-coin { width: 38px; height: 38px; }
+}
+
+
+
+/* ── 한 화면에 고정 — 스크롤 없음 ────────────────────────────────────────────
+   ⚠️ 세로로 흐르는 것을 하나 없앤 게 아니라 **아래로 흐르지 못하게 통을 잠갔다.**
+      .hub 가 화면 높이만큼만 쓰고(100dvh), 남는 자리를 무대(.stage-zone)가 가져간다.
+   ⚠️ 100vh 가 아니라 100dvh 다 — 모바일은 주소창이 접혔다 펴지면서 100vh 가 화면보다
+      커서, vh 로 잠그면 잠근 그 순간에도 스크롤이 남는다.
+   ⚠️ **레일 5칸을 flex 로 나눠 갖게 한 게 핵심이다.** 예전처럼 카드 높이를 고정해 두면
+      무대가 줄어드는 순간 레일이 무대를 넘쳐 아래 출석 스탬프를 덮는다(hub.css 위쪽 경고와 같은 사고).
+      이제 무대가 얼마가 되든 다섯 칸이 그 높이를 나눠 갖는다.                      */
+.hub { height: 100dvh; display: flex; flex-direction: column; }
+/* ⚠️ `width: 100%` 를 빼면 안 된다. 넓은 화면에서 .home 은 `margin-left/right: auto` 로 가운데 정렬되는데,
+      flex 아이템은 **가로 마진이 auto 면 늘어나기(stretch)를 포기하고 내용만큼만 줄어든다**.
+      그래서 .hub 를 flex 로 바꾼 순간 본문 폭이 1080 → 700 언저리로 쪼그라들었다
+      (2026-08-14 "사이즈를 왜 줄이냐니까" — 판·스탬프·랭킹이 한꺼번에 작아 보인 원인이 이 한 줄이다). */
+.hub .home { flex: 1 1 auto; min-height: 0; width: 100%; }
+.hub .stage-zone { flex: 1 1 auto; min-height: 96px; height: auto; }
+.hub .rail-r { top: 0; bottom: 0; justify-content: space-between; }
+/* ⚠️ 아이콘 크기의 천장은 '무대 높이 ÷ 5' 다 — 아이콘은 세로에 갇혀 있어서 폭을 넓혀도 안 커진다.
+      그래서 칸 사이 간격을 줄여 세로를 벌었다. 더 키우려면 무대를 키우거나 칸을 줄이는 수밖에 없다. */
+.hub .rail-r { gap: 6px; }
+.hub .rail-r .fcard { flex: 1 1 0; min-height: 0; width: 64px; }
+@media (min-width: 768px) {
+  .hub .rail-r { gap: 8px; }
+  .hub .rail-r .fcard { width: 96px; }
+}
 html.dark .hub .ticket-ghost, html.dark .hub .title-slot { border-color: #4a5264; color: #7f8899; }
 html.dark .hub .ticket.is-used .ticket-stamp { color: #7f8899; border-color: #4a5264; }
 html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }

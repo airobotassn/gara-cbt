@@ -30,7 +30,7 @@
   /* ===== HUD — 가운데에 큰 타이머 ===== */
   .hud{position:relative; display:flex; align-items:center; justify-content:space-between;
     gap:8px; padding:9px 25px; z-index:6; min-height:88px;
-    background:#071a43 url("pick-cari-hud-v2.png") center/100% 100% no-repeat; border:0; box-shadow:none;}
+    background:#071a43 url("pick-cari-hud-v2.webp") center/100% 100% no-repeat; border:0; box-shadow:none;}
   .hud::before{display:none;}
   .hud>*{position:relative; z-index:1;}
   .hud-score{position:absolute; left:3.5%; top:50%; width:27.5%; transform:translateY(-50%);
@@ -58,7 +58,7 @@
 
   /* ===== 문제판 (위) — 용어를 먼저 크게, 설명을 아래. 'A — 이것은 B 이다' 문장은 폐기. ===== */
   .qboard{position:relative; margin:0; padding:23px 28px 22px;
-    background:#071a43 url("pick-cari-qpanel-v2.png") center/100% 100% no-repeat;
+    background:#071a43 url("pick-cari-qpanel-v2.webp") center/100% 100% no-repeat;
     border:0; box-shadow:none; z-index:6; min-height:156px;}
   .qrule{width:34px; height:3px; border-radius:2px; margin-bottom:8px;
     background:linear-gradient(90deg,#5edfff,#d9f8ff); box-shadow:0 0 8px rgba(94,223,255,.55);}
@@ -69,7 +69,7 @@
 
   /* ===== 필드 = 우주 ===== */
   .field{position:relative; flex:1; overflow:hidden; z-index:1;
-    background:url("pick-cari-game-bg-v2.png") center/cover no-repeat;}
+    background:url("pick-cari-game-bg-v2.webp") center/cover no-repeat;}
 
   /* --- 우주 배경 --- */
   .void{display:none; position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
@@ -113,20 +113,20 @@
   /* 우주에 떠 있는 정거장 발판 — 밝은 상판(어두운 우주에서 튐) + 색 림 글로우 + 패널 라인 */
   .plate{position:absolute; inset:0; display:grid; place-items:center; overflow:visible;
     border-radius:15px; transition:filter .25s;
-    background:url("pick-cari-platform-o-v2.png") center/100% 100% no-repeat;
+    background:url("pick-cari-platform-o-v2.webp") center/100% 100% no-repeat;
     filter:drop-shadow(0 18px 18px rgba(1,8,28,.58));}
   .zoneX .plate{
-    background-image:url("pick-cari-platform-x-v2.png");}
+    background-image:url("pick-cari-platform-x-v2.webp");}
   .zone-mark{position:absolute; left:50%; top:30%; transform:translate(-50%,-50%);
     font-size:82px; font-weight:900; line-height:1; letter-spacing:0; opacity:.18;}
   .zoneO .zone-mark{color:var(--brand);} .zoneX .zone-mark{color:#c2452c;}
   /* 발판·대기 공통 명패 */
   .zone-tag{position:absolute; top:-17px; left:50%; transform:translateX(-50%); z-index:4;
     width:72px; height:34px; display:flex; align-items:center; justify-content:center; gap:2px; padding:0 8px;
-    color:#fff; font-size:11.5px; font-weight:900; white-space:nowrap; background:url("pick-cari-tag-v2.png") center/100% 100% no-repeat;
+    color:#fff; font-size:11.5px; font-weight:900; white-space:nowrap; background:url("pick-cari-tag-v2.webp") center/100% 100% no-repeat;
     font-variant-numeric:tabular-nums; text-shadow:0 1px 3px #00183f; box-shadow:none;}
   .zone-tag b{font-size:18px; font-weight:900; line-height:1;}
-  .zoneO .zone-tag,.zoneX .zone-tag{background-image:url("pick-cari-tag-v2.png");}
+  .zoneO .zone-tag,.zoneX .zone-tag{background-image:url("pick-cari-tag-v2.webp");}
   .zone.safe .plate{filter:saturate(1.18) brightness(1.12) drop-shadow(0 0 18px rgba(73,255,198,.85));}
   .zone.collapse .zone-tag{opacity:0; transition:opacity .2s;}
   /* 발판이 나선을 그리며 사건의 지평선으로 빨려든다 */
@@ -141,7 +141,7 @@
     width:0; height:0;}
   .bh-portal{position:absolute; left:50%; top:50%; width:310px; height:310px;
     transform:translate(-50%,-50%) scale(0) rotate(-25deg);
-    background:url("pick-cari-blackhole-v3.png") center/contain no-repeat;
+    background:url("pick-cari-blackhole-v3.webp") center/contain no-repeat;
     filter:drop-shadow(0 0 22px rgba(69,170,255,.9)) drop-shadow(0 0 38px rgba(114,72,255,.55));
     animation:bhPortal 1.55s cubic-bezier(.2,.8,.3,1) forwards;}
   @keyframes bhPortal{
@@ -162,7 +162,7 @@
   /* --- 대기 발판 — 표면은 홀로그램(우주), 형태는 O/X 와 같은 두께 있는 슬랩 --- */
   .waitzone{position:absolute; left:0; right:0; top:var(--wait-top); height:var(--wait-h);
     z-index:1; border-radius:15px;
-    background:url("pick-cari-platform-o-v2.png") center/100% 100% no-repeat;
+    background:url("pick-cari-platform-o-v2.webp") center/100% 100% no-repeat;
     filter:saturate(.42) brightness(.68) drop-shadow(0 17px 16px rgba(1,8,28,.58)); box-shadow:none;}
   /* 그리드·스캔라인만 잘라내는 내부 레이어 — waitzone 에 overflow:hidden 을 걸면 명패가 잘린다 */
   .wz-fx{position:absolute; inset:0; border-radius:15px; overflow:hidden; pointer-events:none;}
@@ -176,7 +176,7 @@
   /* 명패는 발판 명패와 같은 규격 */
   .waitzone .wl{position:absolute; top:-17px; left:50%; transform:translateX(-50%); z-index:4;
     width:72px; height:34px; display:grid; place-items:center; padding:0 8px; color:#fff; font-size:12px; font-weight:900;
-    white-space:nowrap; background:url("pick-cari-tag-v2.png") center/100% 100% no-repeat;
+    white-space:nowrap; background:url("pick-cari-tag-v2.webp") center/100% 100% no-repeat;
     text-shadow:0 1px 3px #00183f; box-shadow:none;}
 
   /* ===== 캐릭터 — 나 = CARI, 나머지 = 같은 우주복의 응시생(슈트 색으로 구분) ===== */
@@ -255,7 +255,7 @@
     background:#071a42; border-top:1px solid #447fc1;
     box-shadow:0 -8px 18px rgba(2,12,38,.3); z-index:6;}
   .choice{position:relative; display:block; padding:0;
-    border:0; border-radius:0; background:url("pick-cari-choice-o-v2.png") center/100% 100% no-repeat; color:#fff;
+    border:0; border-radius:0; background:url("pick-cari-choice-o-v2.webp") center/100% 100% no-repeat; color:#fff;
     font-size:17px; font-weight:900; cursor:pointer; min-height:66px;
     transition:transform .05s, background .12s, border-color .12s, box-shadow .12s;}
   .choice:active{transform:scale(.97);}
@@ -264,15 +264,15 @@
   .choice-label{position:absolute; left:28%; right:4%; top:50%; transform:translateY(-50%); text-align:center;}
   .choice.o svg{stroke:var(--brand);} .choice.x svg{stroke:var(--bad);}
   .answerbar:has(.choice.sel) .choice:not(.sel){filter:saturate(.48) brightness(.66); opacity:.72;}
-  .choice.sel{z-index:2; background-image:url("pick-cari-choice-o-v2.png");
+  .choice.sel{z-index:2; background-image:url("pick-cari-choice-o-v2.webp");
     transform:translateY(-3px) scale(1.035); filter:brightness(1.2) saturate(1.2)
       drop-shadow(0 0 9px rgba(42,190,255,.92)); box-shadow:none;}
   .choice.sel svg{filter:drop-shadow(0 0 9px #42caff);}
   .choice.sel .choice-label{text-shadow:0 0 12px #62d8ff,0 2px 3px #001c58;}
   .choice.sel::after{content:"✓"; position:absolute; right:8px; top:4px; color:#c9f7ff;
     font-size:28px; font-weight:1000; line-height:1; text-shadow:0 0 10px #009dff,0 2px 2px #001944;}
-  .choice.x{background-image:url("pick-cari-choice-x-v2.png");}
-  .choice.x.sel{background-image:url("pick-cari-choice-x-v2.png");
+  .choice.x{background-image:url("pick-cari-choice-x-v2.webp");}
+  .choice.x.sel{background-image:url("pick-cari-choice-x-v2.webp");
     filter:brightness(1.2) saturate(1.2) drop-shadow(0 0 8px rgba(255,86,65,.92));
     box-shadow:none;}
   .choice.x.sel svg{filter:drop-shadow(0 0 7px #ff806b);}
@@ -290,12 +290,12 @@
     align-items:center; justify-content:center; text-align:center; padding:28px;
     background:rgba(245,247,252,.9); backdrop-filter:blur(4px);}
   #startOv{justify-content:center; padding:74px 24px 28px;
-    background:url("pick-cari-intro-bg-v2.png") center/cover no-repeat; backdrop-filter:none;}
+    background:url("pick-cari-intro-bg-v2.webp") center/cover no-repeat; backdrop-filter:none;}
   .btn{margin-top:18px; padding:15px 48px; border-radius:30px; border:0; cursor:pointer;
     background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:17px; font-weight:800;
     box-shadow:0 10px 24px rgba(0,74,198,.32);}
   #startBtn{width:190px; height:59px; margin-top:13px; padding:0 20px; border-radius:0;
-    background:url("pick-cari-start-v2.png") center/100% 100% no-repeat;
+    background:url("pick-cari-start-v2.webp") center/100% 100% no-repeat;
     color:#fff; font-family:"Malgun Gothic",system-ui,sans-serif; font-size:18px; font-weight:900; letter-spacing:-.04em;
     text-shadow:0 2px 4px rgba(0,28,88,.75); box-shadow:none;
     filter:drop-shadow(0 8px 12px rgba(5,35,95,.3));}
@@ -316,7 +316,7 @@
     text-shadow:0 2px 4px #082755,0 0 2px #082755;}
   .intro-rules{display:flex; flex-direction:column; justify-content:center; gap:3px;
     width:min(100%,330px); min-height:172px; margin:0; padding:22px 25px 20px;
-    background:url("pick-cari-intro-panel-v2.png") center/100% 100% no-repeat;
+    background:url("pick-cari-intro-panel-v2.webp") center/100% 100% no-repeat;
     filter:drop-shadow(0 10px 16px rgba(4,24,72,.25));}
   .ir{display:flex; align-items:center; gap:9px; text-align:left; font-size:12.5px; line-height:1.25; color:var(--ink);
     min-height:39px; background:transparent; border:0; border-radius:10px; padding:5px 7px;
@@ -347,10 +347,10 @@
   .ost-v{font-size:19px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums;}
   #overOv{justify-content:flex-start; padding:36px 24px 22px;
     background:linear-gradient(rgba(5,20,54,.24),rgba(3,10,28,.58)),
-      url("pick-cari-intro-bg-v2.png") center/cover no-repeat; backdrop-filter:none;}
+      url("pick-cari-intro-bg-v2.webp") center/cover no-repeat; backdrop-filter:none;}
   .over-console{position:relative; width:min(340px,86vw); height:min(650px,76vh); min-height:520px;
     display:block; padding:0;
-    background:url("pick-cari-outro-console-v2.png") center/100% 100% no-repeat;
+    background:url("pick-cari-outro-console-v2.webp") center/100% 100% no-repeat;
     filter:drop-shadow(0 16px 24px rgba(0,10,42,.5));}
   #overOv .over-badge{display:none;}
   #overOv .over-img{position:absolute; top:3.8%; left:50%; transform:translateX(-50%);
@@ -367,7 +367,7 @@
   #overOv .ost-k{color:#c4dcf2; font-size:12.5px; font-weight:900; margin-bottom:6px; letter-spacing:-.04em;}
   #overOv .ost-v{color:#fff; font-size:22px;}
   #againBtn{width:190px; height:59px; margin-top:8px; padding:0 20px; border-radius:0;
-    background:url("pick-cari-start-v2.png") center/100% 100% no-repeat; box-shadow:none;
+    background:url("pick-cari-start-v2.webp") center/100% 100% no-repeat; box-shadow:none;
     text-shadow:0 2px 4px rgba(0,28,88,.75); filter:drop-shadow(0 8px 12px rgba(0,14,55,.4));}
   .hidden{display:none!important;}
 </style>
@@ -420,7 +420,7 @@
 
   <!-- START -->
   <div class="overlay" id="startOv">
-    <img class="intro-mascot" id="introMascot" src="pick-cari-intro-cari-v3.png" alt="O와 X를 든 CARI" />
+    <img class="intro-mascot" id="introMascot" src="pick-cari-intro-cari-v3.webp" alt="O와 X를 든 CARI" />
     <div class="intro-title"><span class="t1" data-i18n="pick.title">골라라</span> <span class="t2">CARI</span></div>
     <div class="intro-tag" data-i18n="pick.tagline">발판이 무너지기 전에 O·X 를 골라라!</div>
     <div class="intro-rules">
@@ -435,7 +435,7 @@
   <div class="overlay hidden" id="overOv">
     <div class="over-console">
       <div class="over-badge" id="overBadge">GAME OVER</div>
-      <img class="over-img" id="overImg" src="pick-cari-outro-cari-v3.png" alt="균형을 잃은 CARI" />
+      <img class="over-img" id="overImg" src="pick-cari-outro-cari-v3.webp" alt="균형을 잃은 CARI" />
       <div class="over-title" id="overTitle" data-i18n="pick.over">여기서 발판이 무너졌어요!</div>
       <div class="over-scorebox">
         <div class="os-lab" data-i18n="pick.stage_reached">생존 스테이지</div>
@@ -542,8 +542,8 @@ const SUITS=[                     // [슈트, 슈트그림자, 귀]
   ['#f7d5f0','#d3a3ca','#c977b8'], ['#dbe2ec','#a9b4c6','#7b8aa3'],
 ];
 const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
-const PLAYER_ASSET='pick-cari-player-v4.png';
-const NPC_ASSETS=Array.from({length:8},(_,i)=>`pick-cari-npc-${i+1}-v4.png`);
+const PLAYER_ASSET='pick-cari-player-v4.webp';
+const NPC_ASSETS=Array.from({length:8},(_,i)=>`pick-cari-npc-${i+1}-v4.webp`);
 
 function charSVG(suit,o={}){
   const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
@@ -856,7 +856,7 @@ function gameOver(win,aliveCount){
   else $("newbest").classList.add('hidden');
   $("overBadge").className='over-badge'+(win?' win':'');
   $("overBadge").textContent=win?'CLEAR':'GAME OVER';
-  $("overImg").src=win?'pick-cari-intro-cari-v3.png':'pick-cari-outro-cari-v3.png';
+  $("overImg").src=win?'pick-cari-intro-cari-v3.webp':'pick-cari-outro-cari-v3.webp';
   $("overTitle").textContent=MGI18N.t(win?(round>=TOTAL_STAGES?'pick.cleared':'pick.last'):'pick.over');
   $("finalRound").textContent=round;
   $("finalRank").textContent=MGI18N.t('pick.rank_n',{n:win?1:(aliveCount+1)});
@@ -884,7 +884,7 @@ $("startBtn").onclick=start; $("againBtn").onclick=start;
 .mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; justify-content:center;
   box-sizing:border-box; width:112px; height:34px; padding:0; border:0; cursor:pointer;
   font:850 11.5px/1 system-ui,-apple-system,sans-serif; letter-spacing:.025em; color:#fff;
-  background:url("rank-button.png") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
+  background:url("rank-button.webp") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
   filter:drop-shadow(0 3px 4px rgba(8,20,60,.24)); -webkit-tap-highlight-color:transparent;}
 .mg-rank.on{display:inline-flex;}
 .mg-rank span{display:block; transform:translateX(7px);}

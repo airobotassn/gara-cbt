@@ -52,24 +52,27 @@
   background-image: radial-gradient(circle at top center, rgba(112, 166, 255, 0.08) 0%, transparent 50%);
 }
 
-/* 협회 소개 히어로 워터마크 — GARA 워드마크를 배경에 흐릿하게 깐다.
-   public/gara-wordmark-black.png = 협회 공식 블랙 로고(원본 로고_GARA_블랙.png)의 투명 여백을
-   잘라낸 판(1423×370). 원본은 1536×1024 라 위아래 여백이 30%씩 있어 그대로 쓰면 워터마크가 작게 앉는다.
+/* 협회 소개 히어로 워터마크 — GARA 로고를 배경에 흐릿하게 깐다.
+   public/gara-mark-en.png = 협회 공식 로고(마크 + 영문 기관명)의 투명 여백을 잘라낸 판(388×95).
+   원본(글로벌AI로봇협회-로고_영문추가버전.png)은 510×167 이라 위아래·좌우 여백이 커서
+   그대로 쓰면 워터마크가 작게 앉는다.
+   ⚠️ 원본 해상도가 388px 뿐이라 아래 background-size 로 3배 가까이 늘어난다 — 불투명도가 3% 안팎인
+      워터마크라 뭉개짐이 안 보이지만, 이 그림을 다른 데서 크게 쓰지는 말 것.
    본문은 z-20 이라 이 레이어(z-0)는 항상 뒤에 깔린다. */
 .hero-watermark {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image: url('/gara-wordmark-black.png');
+  background-image: url('/gara-mark-en.png');
   background-repeat: no-repeat;
   background-position: center;
   background-size: min(1100px, 118%) auto;
-  opacity: 0.06;
+  opacity: 0.028;
 }
 html.dark .hero-watermark {
   /* 블랙 로고라 딥다크에선 밝기를 올려도 검정 그대로다 → 반전해서 흰 워드마크로 깐다. */
-  opacity: 0.09;
+  opacity: 0.035;
   filter: invert(1);
 }
 

@@ -9,7 +9,7 @@
 //    topojson 라이브러리가 필요 없고, 온보딩 화면이 지도 코드를 끌고 오지 않는다.
 // ⚠️ 코드 모양은 나라마다 다르다: 'KR-11'(ISO) · 'AE-X01~'(ISO 없는 구역의 임시코드) · 'ES.CE' · 'Est'.
 //    앞 두 글자로 나라를 파싱하면 스페인·부르키나파소에서 깨진다. 나라는 **파일 이름이 곧 나라**다.
-import { D, tr, type Lang } from './i18n';
+import { hasKey, tr, type Lang } from './i18n';
 
 export interface RegionOption {
   code: string;
@@ -45,7 +45,7 @@ function localName(p: Adm1Props, lang: Lang): string {
   // 공식 명칭('강원특별자치도')이라, 사전 쪽이 앱의 다른 화면(관리자 시도 필터 등)과도 맞는다.
   // 사전에 키가 없는 나라는 그냥 파일 이름을 쓴다.
   const key = p.code ? `region.${p.code}` : '';
-  if (key && D[key]) return tr(lang, key);
+  if (key && hasKey(key)) return tr(lang, key);
   const byLang: Record<Lang, string | undefined> = {
     ko: p.name,
     en: p.name_en,

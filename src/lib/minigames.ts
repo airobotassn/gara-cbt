@@ -19,21 +19,21 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'beat-cari',
     accent: 'CARI',
-    art: '/games/beat-cari-cover.png',
+    art: '/games/beat-cari-cover.webp',
     src: '/games/beat-cari.html',
     frame: '#241830', // 동굴 아트 암부색
   },
   {
     id: 'shoot-cari',
     accent: 'CARI',
-    art: '/games/shoot-cari-cover.png',
+    art: '/games/shoot-cari-cover.webp',
     src: '/games/shoot-cari.html',
     frame: '#05021c', // 게임 body 와 동일한 우주 남색
   },
   {
     id: 'pick-cari',
     accent: 'CARI',
-    art: '/games/pick-cari-cover.png',
+    art: '/games/pick-cari-cover.webp',
     src: '/games/pick-cari.html',
     frame: '#e3ebf7', // 스테이지가 크림/밝은 톤이라 밝은 프레임 유지(게임 body 와 동일)
   },
@@ -41,21 +41,21 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'reach-cari',
     accent: 'CARI',
-    art: '/games/reach-cari-cover.png',
+    art: '/games/reach-cari-cover.webp',
     src: '/games/reach-cari.html',
     frame: '#09172c', // 게임 body 의 연구실 외곽 남색과 동일
   },
   {
     id: 'program-cari',
     accent: 'CARI',
-    art: '/games/program-cari-cover-v2.png',
+    art: '/games/program-cari-cover-v2.webp',
     src: '/games/program-cari.html',
     frame: '#e3ebf7', // 위와 동일 팔레트(같은 시안에서 나온 자매 게임)
   },
   {
     id: 'build-cari',
     accent: 'CARI',
-    art: '/games/build-cari-cover-v7.png',
+    art: '/games/build-cari-cover-v9.png',
     src: '/games/build-cari.html',
     frame: '#d8d4ca', // 지상형 스마트팩토리 작업실 가장자리 색
   },
@@ -64,16 +64,18 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'block-cari',
     accent: 'CARI',
-    art: '/games/block-cari-cover-v2.png',
+    art: '/games/block-cari-cover-v3.png',
     src: '/games/block-cari.html',
     frame: '#14161d', // 게임 body 그라디언트의 가장 어두운 끝
   },
   {
     id: 'order-cari',
     accent: 'CARI',
-    art: '/games/order-cari-cover-v2.png',
+    art: '/games/order-cari-cover-v3.png',
     src: '/games/order-cari.html',
-    frame: '#d5dded', // 게임 body 그라디언트의 가장 진한 끝(밝은 공방 톤)
+    // ⚠️ 옛 값 #d5dded(밝은 공방 톤)은 v4 아트로 갈면서 죽었다 — body 가 어두운 공장(#071426)이 되며
+    //   isDark 가 '밝다'로 판정해 흰 상단 바가 검은 게임 위에 이색 띠로 얹혔다(2026-08-14).
+    frame: '#071426', // 게임 body 바탕색과 동일
   },
   {
     id: 'feel-cari',

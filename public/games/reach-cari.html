@@ -27,7 +27,7 @@ body{
 
 /* HUD */
 .hud{position:relative;display:flex;align-items:center;gap:9px;height:65px;margin:6px 10px 2px;padding:12px 31px 11px;z-index:5;
-  background:url('/games/reach-cari-hud-v4.png') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 6px 8px rgba(0,20,60,.3));}
+  background:url('/games/reach-cari-hud-v4.webp') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 6px 8px rgba(0,20,60,.3));}
 .hud .cari-mini{display:none;}
 .hud .lvlbox{display:flex;flex-direction:column;line-height:1.05;}
 .hud .lvlbox b{font-size:17px;color:#fff;text-shadow:0 1px 3px #001b51;}
@@ -40,12 +40,12 @@ body{
 
 /* play area */
 .field{position:relative; flex:1; margin:2px 12px 6px; border-radius:18px; overflow:hidden;
-  background:#eaf2fb url('/games/reach-cari-lab-v2.png') center/cover no-repeat; border:1px solid #cddced;
+  background:#eaf2fb url('/games/reach-cari-lab-v2.webp') center/cover no-repeat; border:1px solid #cddced;
   box-shadow:inset 0 0 30px rgba(14,65,125,.12),0 8px 24px rgba(30,60,110,.12);}
 .field svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
 
 /* controls */
-.controls{position:relative;flex:0 0 230px;padding:0;z-index:5;background:url('/games/reach-cari-controls-v5.png') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 -5px 10px rgba(0,20,60,.28));}
+.controls{position:relative;flex:0 0 230px;padding:0;z-index:5;background:url('/games/reach-cari-controls-v5.webp') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 -5px 10px rgba(0,20,60,.28));}
 .modeseg{position:absolute;left:38px;right:38px;top:12px;height:35px;display:flex;background:transparent;border-radius:10px;padding:1px;margin:0;}
 .modeseg button{flex:1;border:0;background:transparent;color:#8ec9ed;font-weight:900;font-size:11.5px;
   padding:5px 4px;border-radius:9px;cursor:pointer;}
@@ -65,13 +65,13 @@ body{
   background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:15px; font-weight:800;
   box-shadow:0 8px 20px rgba(0,74,198,.28);}
 .btn.ghost{background:#eef1f8;color:var(--brand);box-shadow:none;}
-.btnrow .btn{height:49px;margin:0;padding:0 8px;border-radius:0;background:url('/games/reach-cari-start-btn-v3.png') center/100% 100% no-repeat;color:#fff;font-size:14px;text-shadow:0 2px 4px #001b55;box-shadow:none;filter:drop-shadow(0 5px 7px rgba(0,12,45,.35));}
+.btnrow .btn{height:49px;margin:0;padding:0 8px;border-radius:0;background:url('/games/reach-cari-start-btn-v3.webp') center/100% 100% no-repeat;color:#fff;font-size:14px;text-shadow:0 2px 4px #001b55;box-shadow:none;filter:drop-shadow(0 5px 7px rgba(0,12,45,.35));}
 .btn:active{transform:scale(.97);}
 
 /* overlays */
 .overlay{position:absolute; inset:0; z-index:20; display:flex; flex-direction:column;
   align-items:center; justify-content:center; text-align:center; padding:26px;
-  background:url('/games/reach-cari-intro-bg-v3.png') center/cover no-repeat;color:#fff;}
+  background:url('/games/reach-cari-intro-bg-v3.webp') center/cover no-repeat;color:#fff;}
 .overlay.hide{display:none;}
 .floaty{width:190px;height:205px;object-fit:contain;animation:float 3s ease-in-out infinite;filter:drop-shadow(0 16px 18px rgba(0,0,0,.35));}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
@@ -81,14 +81,14 @@ body{
 .title{margin:8px 0 3px;line-height:1.12;}
 .tag{color:#25456f;font-size:14.5px;margin:2px 0 15px;font-weight:900;text-shadow:0 1px 0 rgba(255,255,255,.9);}
 .rules{display:grid;grid-template-rows:repeat(3,1fr);align-items:center;gap:0;width:min(342px,88vw);height:150px;
-  background:url('/games/reach-cari-rule-panel-v3.png') center/100% 100% no-repeat;padding:19px 31px 18px;text-align:left;
+  background:url('/games/reach-cari-rule-panel-v3.webp') center/100% 100% no-repeat;padding:19px 31px 18px;text-align:left;
   filter:drop-shadow(0 11px 16px rgba(0,20,60,.3));}
 .rules div{font-size:12.5px;font-weight:800;color:#e9f7ff;margin:0;display:flex;gap:10px;align-items:center;line-height:1.25;text-shadow:0 1px 3px #00173c;}
 .rules>div>b{flex:none;width:25px;height:25px;display:grid;place-items:center;border-radius:50%;color:#fff;background:#0874d8;
   border:1px solid #84e6ff;box-shadow:inset 0 0 0 2px rgba(132,230,255,.12),0 0 8px rgba(38,181,255,.35);text-shadow:none;}
 .rules div span b{color:#ffe477;}
-.overlay #btnStart{width:190px;height:60px;margin-top:12px;padding:0;border-radius:0;background:url('/games/reach-cari-start-btn-v3.png') center/100% 100% no-repeat;box-shadow:none;text-shadow:0 2px 4px #001b55;filter:drop-shadow(0 9px 11px rgba(0,15,55,.45));}
-.result-console{position:relative;width:min(330px,78vw);height:min(430px,55vh);background:url('/games/reach-cari-result-console-v3.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(0,10,42,.55));}
+.overlay #btnStart{width:190px;height:60px;margin-top:12px;padding:0;border-radius:0;background:url('/games/reach-cari-start-btn-v3.webp') center/100% 100% no-repeat;box-shadow:none;text-shadow:0 2px 4px #001b55;filter:drop-shadow(0 9px 11px rgba(0,15,55,.45));}
+.result-console{position:relative;width:min(330px,78vw);height:min(430px,55vh);background:url('/games/reach-cari-result-console-v3.webp') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(0,10,42,.55));}
 #ovResult .floaty{position:absolute;top:6%;left:50%;transform:translateX(-50%);width:145px;height:155px;animation:none;}
 #ovResult .badge{position:absolute;top:40%;left:0;width:100%;font-size:29px;color:#6fffd2;text-shadow:0 0 12px #00b97e;}
 #ovResult .scorebox{position:absolute;top:51%;left:12%;width:76%;margin:0;padding:11px 10px;background:transparent;border:0;box-shadow:none;color:#fff;}
@@ -116,7 +116,7 @@ body{
 
   <!-- HUD -->
   <div class="hud">
-    <img class="cari-mini" id="hudCari" src="/games/reach-cari-hero-v2.png" alt=""/>
+    <img class="cari-mini" id="hudCari" src="/games/reach-cari-hero-v2.webp" alt=""/>
     <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">관절 2개 · 쉬움</span></div>
     <div class="goalpill" id="goalPill">별에 닿아라</div>
   </div>
@@ -144,7 +144,7 @@ body{
 
   <!-- START OVERLAY -->
   <div class="overlay" id="ovStart">
-    <img class="floaty" id="startCari" src="/games/reach-cari-hero-v2.png" alt="CARI와 로봇팔"/>
+    <img class="floaty" id="startCari" src="/games/reach-cari-hero-v2.webp" alt="CARI와 로봇팔"/>
     <div class="title"><span class="t1">닿아라 </span><span class="t2">CARI</span></div>
     <div class="tag">로봇팔을 움직여 별에 닿아라!</div>
     <div class="rules">
@@ -158,7 +158,7 @@ body{
   <!-- RESULT OVERLAY -->
   <div class="overlay hide" id="ovResult">
     <div class="result-console">
-      <img class="floaty" id="resCari" src="/games/reach-cari-win-v3.png" alt="기뻐하는 CARI"/>
+      <img class="floaty" id="resCari" src="/games/reach-cari-win-v3.webp" alt="기뻐하는 CARI"/>
       <div class="badge win" id="resBadge">목표 포착!</div>
       <div class="scorebox">
         <div class="big" id="resTitle">레벨 클리어</div>
@@ -389,10 +389,10 @@ function draw(){
   // target
   if(tg.kind==='star'){
     const sz=tg.r*3.2;
-    s+=`<image href="/games/reach-cari-target-star-v3.png" x="${tg.x-sz/2}" y="${tg.y-sz/2}" width="${sz}" height="${sz}" filter="url(#goalGlow)"/>`;
+    s+=`<image href="/games/reach-cari-target-star-v3.webp" x="${tg.x-sz/2}" y="${tg.y-sz/2}" width="${sz}" height="${sz}" filter="url(#goalGlow)"/>`;
   }else{
     const bw=tg.r*2, bh=tg.r*3.1;
-    s+=`<image href="/games/reach-cari-target-battery-v3.png" x="${tg.x-bw/2}" y="${tg.y-bh/2}" width="${bw}" height="${bh}"/>`;
+    s+=`<image href="/games/reach-cari-target-battery-v3.webp" x="${tg.x-bw/2}" y="${tg.y-bh/2}" width="${bw}" height="${bh}"/>`;
   }
 
   // arm segments
@@ -402,24 +402,24 @@ function draw(){
   for(let i=0;i<pts.length-1;i++){
     const p1=pts[i],p2=pts[i+1];
     const len=Math.hypot(p2.x-p1.x,p2.y-p1.y), rot=Math.atan2(p2.y-p1.y,p2.x-p1.x)*R2D;
-    s+=`<image href="/games/reach-cari-arm-link-v4.png" x="0" y="-11" width="${len}" height="22"
+    s+=`<image href="/games/reach-cari-arm-link-v4.webp" x="0" y="-11" width="${len}" height="22"
       preserveAspectRatio="none" transform="translate(${p1.x} ${p1.y}) rotate(${rot})"/>`;
     if(hit) s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#ff1727" stroke-width="24" stroke-linecap="round" opacity=".82"/>`;
   }
   s+='</g>';
   // base mount: draw it before the base joint so both pieces overlap as one mechanism
-  s+=`<image href="/games/reach-cari-arm-base-v3.png" x="${L.base.x-38}" y="${L.base.y-10}" width="76" height="59" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
+  s+=`<image href="/games/reach-cari-arm-base-v3.webp" x="${L.base.x-38}" y="${L.base.y-10}" width="76" height="59" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
 
   // joints: cover both segment ends with one larger bearing
   for(let i=0;i<pts.length-1;i++){
-    s+=`<image href="/games/reach-cari-arm-joint-v3.png" x="${pts[i].x-18}" y="${pts[i].y-18}" width="36" height="36" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
+    s+=`<image href="/games/reach-cari-arm-joint-v3.webp" x="${pts[i].x-18}" y="${pts[i].y-18}" width="36" height="36" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
     // joint drag handles (FK drag on non-base joints)
     if(mode==='FK') s+=`<circle class="jhandle" data-j="${i}" cx="${pts[i].x}" cy="${pts[i].y}" r="20" fill="transparent" style="cursor:grab"/>`;
   }
   // gripper / CARI tip
   const tipAngle=Math.atan2(pts[pts.length-1].y-pts[pts.length-2].y, pts[pts.length-1].x-pts[pts.length-2].x)*R2D;
   s+=gripper(tip.x,tip.y,tipAngle,reached,hit);
-  if(reached) s+=`<image href="/games/reach-cari-contact-vfx-v3.png" x="${tip.x-34}" y="${tip.y-34}" width="68" height="68"/>`;
+  if(reached) s+=`<image href="/games/reach-cari-contact-vfx-v3.webp" x="${tip.x-34}" y="${tip.y-34}" width="68" height="68"/>`;
 
   // tip drag handle in IK mode
   if(mode==='IK'){
@@ -466,7 +466,7 @@ function starPath(cx,cy,r,fill){
 }
 
 function gripper(x,y,angDeg,reached,hit){
-  return `<image href="/games/reach-cari-arm-gripper-v3.png" x="-8" y="-18" width="48" height="36"
+  return `<image href="/games/reach-cari-arm-gripper-v3.webp" x="-8" y="-18" width="48" height="36"
     preserveAspectRatio="xMidYMid meet" transform="translate(${x} ${y}) rotate(${angDeg})" filter="${hit?'url(#hitRed)':''}"/>`;
 }
 
@@ -708,7 +708,7 @@ rafId=requestAnimationFrame(tickNoise);
 .mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; justify-content:center;
   box-sizing:border-box; width:112px; height:34px; padding:0; border:0; cursor:pointer;
   font:850 11.5px/1 system-ui,-apple-system,sans-serif; letter-spacing:.025em; color:#fff;
-  background:url("rank-button.png") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
+  background:url("rank-button.webp") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
   filter:drop-shadow(0 3px 4px rgba(8,20,60,.24)); -webkit-tap-highlight-color:transparent;}
 .mg-rank.on{display:inline-flex;}
 .mg-rank span{display:block; transform:translateX(7px);}

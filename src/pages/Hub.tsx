@@ -25,6 +25,11 @@ import ShareCardModal from '../components/ShareCardModal'
 import { countryName } from '../lib/regions'
 import { tierName } from '../lib/caris'
 
+/** 방(미니룸) 표시 스위치. 2026-08-14: 허브 배경이 사진 한 장이 되면서 CSS 벽·바닥이 설 자리가 없어 껐다.
+ *  ⚠️ 코드를 지우지 않은 이유 — 서버(`room` 함수)·DB(가구 소유)·공개 방 `/room/:handle` 은 그대로 살아 있다.
+ *     가구를 사진 위 %좌표에 다시 얹기로 하면 이 값을 true 로 되돌리는 것만으로 돌아온다. */
+const ROOM_ENABLED = false
+
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
 const ICONS: Record<string, ReactNode> = {
@@ -45,6 +50,28 @@ const ICONS: Record<string, ReactNode> = {
 }
 function Ic({ n, s = 24 }: { n: string; s?: number }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: 'block' }} aria-hidden="true">{ICONS[n]}</svg>
+}
+
+/** 허브 스킨. 화면(마크업)은 한 벌이고 테마는 **값과 그림만** 갈아끼운다 —
+ *  값 = `hub.css` 의 `.hub[data-skin='<이름>']` 한 블록, 그림 = 아래 아이콘 경로 + 그 블록의 URL.
+ *  ⚠️ 지금은 고정값이다. 상점에서 스킨을 팔게 되면 `get-hub` 의 보유·장착 정보에서 받아오면 되고,
+ *     그때 고칠 곳은 이 상수 하나다(화면 코드에는 스킨 이름이 흩어져 있지 않다). */
+const SKIN = 'palace'
+
+/** 스킨별 아이콘 폴더. CSS 변수로 못 넘기는 유일한 자리 — <img src> 라 코드가 알아야 한다. */
+const SKIN_ICON_DIR: Record<string, string> = { palace: '/hub/ui' }
+const HUB_UI_ICON_NAMES = ['calendar', 'gift', 'shop', 'medal', 'invite'] as const
+type HubUiIconName = (typeof HUB_UI_ICON_NAMES)[number]
+
+/** 레일 아이콘. 스킨이 없으면 원래 쓰던 SVG 로 돌아간다 — 스킨은 '덧입히는 것'이지 전제가 아니다. */
+function HubUiIcon({ n, skin }: { n: HubUiIconName; skin: string | null }) {
+  const dir = skin ? SKIN_ICON_DIR[skin] : null
+  if (!dir) return <Ic n={n === 'invite' ? 'share' : n} s={42} />
+  return <img className="hub-ui-icon" src={`${dir}/icon-${n}.png`} alt="" aria-hidden="true" />
+}
+
+function CurrencyCoin() {
+  return <img className="currency-coin" src="/hub/ui/currency-coin.png" alt="" aria-hidden="true" />
 }
 
 const DRAW_COST = 20
@@ -623,7 +650,22 @@ export default function Hub() {
   }
 
   return (
-    <div className="hub">
+    <div className="hub" data-skin={SKIN}>
+      {/* 무대 = 배경 사진 + 캐릭터, 화면에 붙은 한 쌍(2026-08-14 레퍼런스: 전체화면 사진 위 정중앙 캐릭터).
+          ⚠️ 그림 URL·크기·발끝 위치는 **여기 없다** — 전부 hub.css 의 스킨 값 블록이다.
+             그래서 스킨을 바꿔도 이 마크업은 그대로다(그게 스킨 구조의 목적이다).
+          ⚠️ `.hub` 는 max-width 480px 가운데 열이라 배경을 그 안에 두면 화면을 못 채운다 → viewport 고정 레이어로 뺐다.
+          ⚠️ 그래서 hub.css 의 `.hub > *:not(...)` 예외 목록에 `.hub-scene` 이 들어가 있다.
+             빼면 flex/relative 아이템으로 접혀 0×0 이 된다(랜딩 `.rg` 에서 실제로 겪은 사고).
+          ⚠️ pointer-events:none 필수 — 화면 전체를 덮으므로 없으면 아래 UI 가 하나도 안 눌린다.
+          ⚠️ 캐릭터 그림을 갈면 **투명 여백을 트림하고 `--skin-char-ar` 을 다시 잴 것** — 아래에 빈 알파가
+             남으면 발끝이 그만큼 떠서 `--skin-char-bottom` 이 거짓말이 된다(받은 원본은 아래 14%가 여백이었다).
+          ⚠️ 방(RoomView)·공개 방이 쓰는 `/hub-char.png` 와는 다른 파일이라 서로 안 건드린다. */}
+      <div className="hub-scene" aria-hidden="true">
+        <div className="hub-scene-bg" />
+        <div className="hub-scene-char" />
+      </div>
+
       <div className="sky" aria-hidden="true">
         <div className="sun" />
         <div className="cloud c1" /><div className="cloud c2" /><div className="cloud c3" />
@@ -688,7 +730,7 @@ export default function Hub() {
               {/* '?' 는 점수(경험치 바) 쪽 도움말이다 — 코인 옆에 두면 코인 설명으로 읽혀서 바 바로 뒤에 붙였다. */}
               <button className="hub-help" onClick={() => setModal('earn')} aria-label={t('hub.help_aria')}>?</button>
               {/* data-tip = 호버 툴팁("보유한 CARI 코인") — hub.css 의 .gchip[data-tip]::after */}
-              <span className="gchip" data-tip={t('hub.coin_tip')}><Ic n="coin" s={26} /><span className="num">{points.toLocaleString()}</span></span>
+              <span className="gchip" data-tip={t('hub.coin_tip')}><CurrencyCoin /><span className="num">{points.toLocaleString()}</span></span>
             </div>
           </div>
         </div>
@@ -722,32 +764,39 @@ export default function Hub() {
             {/* 왼쪽 레일 제거 — 출석을 오른쪽 뽑기 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
             {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
             <div className="rail rail-r">
-              <button className="fcard f-daily" onClick={doDaily}><span className="fico"><Ic n="calendar" s={42} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
-              <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><Ic n="gift" s={42} /></span>{t('hub.rail.gacha')}</button>
-              <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><Ic n="shop" s={42} /></span>{t('hub.rail.shop')}</button>
-              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><Ic n="medal" s={42} /></span>{t('hub.rail.title')}</button>
-              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><Ic n="share" s={42} /></span>{t('hub.rail.invite')}</button>
+              <button className="fcard f-daily" onClick={doDaily}><span className="fico"><HubUiIcon n="calendar" skin={SKIN} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
+              <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><HubUiIcon n="gift" skin={SKIN} /></span>{t('hub.rail.gacha')}</button>
+              <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><HubUiIcon n="shop" skin={SKIN} /></span>{t('hub.rail.shop')}</button>
+              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" skin={SKIN} /></span>{t('hub.rail.title')}</button>
+              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><HubUiIcon n="invite" skin={SKIN} /></span>{t('hub.rail.invite')}</button>
             </div>
             {/* 방(미니룸) — /room/:handle(남의 방)과 **같은 컴포넌트**를 쓴다.
-                내 방과 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나서 제일 늦게 발견된다. */}
-            <RoomView
-              layout={roomLayout}
-              slots={roomSlots}
-              name="CARI"
-              badge={titleBadge}
-              editing={editing}
-              activeSlot={pickSlot}
-              onSlotClick={(k) => setPickSlot(k)}
-            />
-            {/* 왼쪽 조작 버튼 — 오른쪽 레일의 반대편. 방 링크는 여기 둔다(위 backrow 는 이미 버튼 둘이라 셋이면 밀린다). */}
-            <div className="room-acts">
-              <button className={`room-btn${editing ? ' on' : ''}`} onClick={() => { setEditing((v) => !v); setPickSlot(null) }}>
-                {t(editing ? 'hub.room.done' : 'hub.room.edit')}
-              </button>
-              <button className="room-btn" onClick={copyRoomLink}>
-                {t(roomCopied ? 'hub.room.copied' : 'hub.room.link')}
-              </button>
-            </div>
+                내 방과 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나서 제일 늦게 발견된다.
+                ⚠️ 지금은 꺼져 있다(ROOM_ENABLED=false) — 배경이 사진 한 장이 되면서 CSS 벽·바닥이 설 자리가 없다.
+                   지우지 않은 이유: 서버(room 함수)·DB(가구 소유)·/room/:handle 은 그대로 살아 있고,
+                   가구를 사진 위 %좌표에 다시 얹기로 하면 이 블록을 켜는 것만으로 돌아온다. */}
+            {ROOM_ENABLED && (
+              <>
+                <RoomView
+                  layout={roomLayout}
+                  slots={roomSlots}
+                  name="CARI"
+                  badge={titleBadge}
+                  editing={editing}
+                  activeSlot={pickSlot}
+                  onSlotClick={(k) => setPickSlot(k)}
+                />
+                {/* 왼쪽 조작 버튼 — 오른쪽 레일의 반대편. 방 링크는 여기 둔다(위 backrow 는 이미 버튼 둘이라 셋이면 밀린다). */}
+                <div className="room-acts">
+                  <button className={`room-btn${editing ? ' on' : ''}`} onClick={() => { setEditing((v) => !v); setPickSlot(null) }}>
+                    {t(editing ? 'hub.room.done' : 'hub.room.edit')}
+                  </button>
+                  <button className="room-btn" onClick={copyRoomLink}>
+                    {t(roomCopied ? 'hub.room.copied' : 'hub.room.link')}
+                  </button>
+                </div>
+              </>
+            )}
         </div>
 
         {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
@@ -882,7 +931,7 @@ export default function Hub() {
         <Modal title={t('hub.shop.title')} onClose={() => setModal(null)}>
           <div className="hub-shop-head">
             <span className="hub-shop-head-lab">{t('hub.shop.balance')}</span>
-            <span className="gchip" style={{ margin: 0 }}><Ic n="coin" s={22} /><span className="num">{points.toLocaleString()}</span></span>
+            <span className="gchip" style={{ margin: 0 }}><CurrencyCoin /><span className="num">{points.toLocaleString()}</span></span>
           </div>
           {catalog.length > 0 ? (
             <div className="hub-modal-grid">

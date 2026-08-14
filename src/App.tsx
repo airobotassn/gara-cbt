@@ -8,45 +8,77 @@ import Layout from './components/Layout'
 import SebEscapeHatch from './components/SebEscapeHatch'
 import SitePopups from './components/SitePopups'
 import Landing from './pages/Landing'
-import ExamGate from './pages/ExamGate'
-import ExamApply from './pages/ExamApply'
-import ExamCheck from './pages/ExamCheck'
-import ExamPrepare from './pages/ExamPrepare'
-import SebStart from './pages/SebStart'
-import CbtRunner from './pages/CbtRunner'
-import ExamResult from './pages/ExamResult'
-import ExamDone from './pages/ExamDone'
-import ExamComplete from './pages/ExamComplete'
-import Certificate from './pages/Certificate'
-import VerifyCert from './pages/VerifyCert'
-import MyPage from './pages/MyPage'
-import AuthCallback from './pages/AuthCallback'
-import Login from './pages/Login'
-import About from './pages/About'
-import Privacy from './pages/Privacy'
-import Terms from './pages/Terms'
-import Guide from './pages/Guide'
-import Plan from './pages/Plan'
-import Notice from './pages/Notice'
-import NoticeDetail from './pages/NoticeDetail'
-import Faq from './pages/Faq'
-import LevelSelect from './pages/LevelSelect'
-import LevelCert from './pages/LevelCert'
-import TestRunner from './pages/TestRunner'
-import Result from './pages/Result'
-import Ranking from './pages/Ranking'
-import Onboarding from './pages/Onboarding'
-import NicknameSetup from './pages/NicknameSetup'
-import Hub from './pages/Hub'
-import Room from './pages/Room'
-import WorldArena from './pages/WorldArena'
-import MiniGame from './pages/MiniGame'
-import MiniGames from './pages/MiniGames'
-import Daily from './pages/Daily'
-import Ebooks from './pages/Ebooks'
-import EbookReader from './pages/EbookReader'
-import Checkout from './pages/Checkout'
-import PayResult from './pages/PayResult'
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 화면은 **들어갈 때 받는다** (2026-08-14)
+ *
+ * 예전엔 이 파일이 40개 화면을 전부 정적 import 해서, 누가 `/notice` 하나만 열어도
+ * 브라우저가 관리자·아레나 지도·자격증·결제 코드까지 통째로 받아 해석했다.
+ * 그 결과 첫 진입 JS 가 **1.33MB(gzip 423KB)** 였고 화면마다 "열리기 전에 한 박자
+ * 멈추는" 체감의 가장 큰 원인이었다.
+ *
+ * ⚠️ 랜딩(`Landing`)만 정적으로 남긴다 — 대부분의 사용자가 처음 닿는 화면이라
+ *    여기서 청크를 한 번 더 왕복시키면 첫 화면이 오히려 늦어진다.
+ * ⚠️ 새 라우트를 추가할 때도 `lazy()` 로 넣을 것. 정적 import 를 하나 섞으면
+ *    그 화면이 의존하는 라이브러리까지 첫 진입 번들로 다시 딸려 들어온다
+ *    (특히 xlsx·react-quill = 관리자, d3 = 아레나).
+ * ⚠️ react-router v7 은 이동을 startTransition 으로 감싸므로, 청크를 받는 동안
+ *    이전 화면이 그대로 남아 있다가 교체된다(깜빡임 없음). 아래 Suspense fallback 은
+ *    첫 진입처럼 보여줄 이전 화면이 없을 때만 실제로 보인다.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+// CARIS 자격검정 (CBT)
+const ExamGate = lazy(() => import('./pages/ExamGate'))
+const ExamApply = lazy(() => import('./pages/ExamApply'))
+const ExamCheck = lazy(() => import('./pages/ExamCheck'))
+const ExamPrepare = lazy(() => import('./pages/ExamPrepare'))
+const SebStart = lazy(() => import('./pages/SebStart'))
+const CbtRunner = lazy(() => import('./pages/CbtRunner'))
+const ExamResult = lazy(() => import('./pages/ExamResult'))
+const ExamDone = lazy(() => import('./pages/ExamDone'))
+const ExamComplete = lazy(() => import('./pages/ExamComplete'))
+const Certificate = lazy(() => import('./pages/Certificate'))
+const VerifyCert = lazy(() => import('./pages/VerifyCert'))
+
+// 계정 · 마이페이지
+const MyPage = lazy(() => import('./pages/MyPage'))
+const AuthCallback = lazy(() => import('./pages/AuthCallback'))
+const Login = lazy(() => import('./pages/Login'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const NicknameSetup = lazy(() => import('./pages/NicknameSetup'))
+
+// 정적 안내 페이지
+const About = lazy(() => import('./pages/About'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const Terms = lazy(() => import('./pages/Terms'))
+const Guide = lazy(() => import('./pages/Guide'))
+const Plan = lazy(() => import('./pages/Plan'))
+const Notice = lazy(() => import('./pages/Notice'))
+const NoticeDetail = lazy(() => import('./pages/NoticeDetail'))
+const Faq = lazy(() => import('./pages/Faq'))
+
+// WORLD ARENA (무료 레벨테스트) — d3 지도가 여기 딸려 있다
+const LevelSelect = lazy(() => import('./pages/LevelSelect'))
+const LevelCert = lazy(() => import('./pages/LevelCert'))
+const TestRunner = lazy(() => import('./pages/TestRunner'))
+const Result = lazy(() => import('./pages/Result'))
+const Ranking = lazy(() => import('./pages/Ranking'))
+const WorldArena = lazy(() => import('./pages/WorldArena'))
+
+// 캐릭터 허브 · 미니게임
+const Hub = lazy(() => import('./pages/Hub'))
+const Room = lazy(() => import('./pages/Room'))
+const MiniGame = lazy(() => import('./pages/MiniGame'))
+const MiniGames = lazy(() => import('./pages/MiniGames'))
+const Daily = lazy(() => import('./pages/Daily'))
+
+// 러닝 라이브러리 · 결제
+const Ebooks = lazy(() => import('./pages/Ebooks'))
+const EbookReader = lazy(() => import('./pages/EbookReader'))
+const Checkout = lazy(() => import('./pages/Checkout'))
+const PayResult = lazy(() => import('./pages/PayResult'))
+
+// 관리자 (xlsx · react-quill 를 끌고 온다 — 절대 정적 import 로 되돌리지 말 것)
 const Admin = lazy(() => import('./pages/Admin'))
 
 // 페이지 이동 시 항상 맨 위로 스크롤 (FAB로 이동해도 스크롤 위치 유지되던 문제 해결)
@@ -155,6 +187,9 @@ export default function App() {
             {/* 닉네임(전 경로) → 지역(아레나 계열) 순서. 아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
             <NicknameGate>
             <OnboardingGate>
+            {/* 화면 청크를 받는 동안의 자리. 라우터가 이동을 transition 으로 감싸므로
+                평소 이동에는 이전 화면이 남아 있고, 이 fallback 은 첫 진입에만 스친다. */}
+            <Suspense fallback={<GateSpinner />}>
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/arena" element={<WorldArena />} />
@@ -205,19 +240,13 @@ export default function App() {
               <Route path="/notice" element={<Notice />} />
               <Route path="/notice/:id" element={<NoticeDetail />} />
               <Route path="/faq" element={<Faq />} />
-              <Route
-                path="/admin"
-                element={
-                  <Suspense fallback={<div className="wrap">불러오는 중…</div>}>
-                    <Admin />
-                  </Suspense>
-                }
-              />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/onboarding/nickname" element={<NicknameSetup />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense>
             </OnboardingGate>
             </NicknameGate>
           </Layout>

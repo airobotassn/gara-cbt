@@ -129,7 +129,7 @@ body{
 .stage{
   background:
     linear-gradient(rgba(6,20,42,.12),rgba(6,20,42,.3)),
-    url('/games/build-cari-game-bg-v7.png') center/cover no-repeat;
+    url('/games/build-cari-game-bg-v7.webp') center/cover no-repeat;
 }
 .hud,.hint,.palette,.controls{background:none;backdrop-filter:none;}
 .hud{padding-top:10px;}
@@ -169,7 +169,7 @@ body{
 .stage{--sw:min(460px,100vw);--sh:min(860px,100vh);}
 .hud{--hw:calc(var(--sw) - 16px);--hh:calc(var(--hw) / 3.668);
   position:relative;flex:0 0 auto;width:var(--hw);height:var(--hh);margin:6px auto 0;padding:0;
-  background:url('/games/build-cari-hud-v10.png') center/100% 100% no-repeat;backdrop-filter:none;}
+  background:url('/games/build-cari-hud-v10.webp') center/100% 100% no-repeat;backdrop-filter:none;}
 .hud .cari-mini{display:none;}
 .hud .lvlbox{position:absolute;left:23.2%;top:8.7%;width:51.4%;height:82.6%;transform:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--hh)*.075);text-align:center;line-height:1;}
@@ -269,16 +269,31 @@ body{
   padding:0!important;border:0;border-radius:0;background-color:transparent!important;
   background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;
   box-shadow:none;color:#fff;text-shadow:0 2px 3px #111;font-size:16px;display:grid;place-items:center;}
-.control-console #btnRun{background-image:url('/games/build-cari-run-v9.png')!important}
-.control-console #btnReset{background-image:url('/games/build-cari-reset-v9.png')!important}
+.control-console #btnRun{background-image:url('/games/build-cari-run-v9.webp')!important}
+.control-console #btnReset{background-image:url('/games/build-cari-reset-v9.webp')!important}
 
 /* --- 인트로 --- */
-#ovStart{justify-content:flex-start;padding:0;background-image:linear-gradient(rgba(18,28,36,.08),rgba(18,28,36,.18)),url('/games/build-cari-intro-bg-v7.png');}
+#ovStart{justify-content:flex-start;padding:0;background-image:linear-gradient(rgba(18,28,36,.08),rgba(18,28,36,.18)),url('/games/build-cari-intro-bg-v7.webp');}
 #ovStart .intro-console{--ch:min(calc(var(--sh)*.92),calc(var(--sw)*1.3316));
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:calc(var(--ch)*.67587);height:var(--ch);
-  background:url('/games/build-cari-intro-v11.png') center/100% 100% no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));}
-#ovStart .floaty{display:none}
+  background:url('/games/build-cari-intro-v11.webp') center/100% 100% no-repeat;filter:drop-shadow(0 16px 22px rgba(25,28,24,.35));
+  /* ⛔ 위쪽을 마스크로 자르지 말 것 — 액자의 두꺼운 윗 테두리가 같이 잘려 **판 머리가 싹둑 잘린 것처럼**
+     보인다(2026-08-14 반려). 콘솔 아트에 원래 있는 CARI 의 안테나(행성)가 액자 위로 나와 있는데,
+     그건 자르는 게 아니라 **창 안 새 CARI 의 행성을 잘라** 해결한다(아래 .floaty img 참고). */}
+/* 창 실측(눈금 대조) = x6.7~93.3% · y4.2~47.0% · 모서리 곡률 = 높이의 3.3%.
+   ⚠️ **곡률이 이 판의 핵심이다.** 창은 모서리가 크게 둥근데 사각으로 덮으면 네 귀퉁이가 크림색 액자를
+      파고들어 "안 맞는" 게 바로 보인다(2026-08-14 반려). 사각형을 창에 맞추는 게 아니라 곡률까지 맞춘다. */
+#ovStart .floaty{display:block;position:absolute;z-index:1;left:8%;top:4.6%;width:84%;height:44.7%;
+  overflow:hidden;border-radius:6%/4.06%;animation:none;
+  background:url('/games/build-cari-intro-bg-v7.webp') center/cover no-repeat;}
+/* ⚠️ 인트로·결과 캐릭터 PNG(-v7)는 **알파 여백을 잘라낸 상태**로 저장돼 있다(2026-08-14).
+   받았을 때는 정사각 캔버스 한가운데 그림이 있어서, contain 으로 넣으면 캔버스의 빈 테두리까지
+   슬롯을 먹어 그림이 작아졌다(실패 그림은 슬롯 높이의 65%밖에 못 썼다 — 정사각 캔버스에 가로로
+   넓은 그림이라 위아래가 통째로 비어 있었다).
+   ⛔ 그림을 다시 뽑으면 **여백부터 다시 잘라야 한다.** 안 자르면 이 자리가 도로 작아진다.
+   패딩 2%는 그림이 슬롯 모서리에 딱 붙지 않게 하는 여유다. */
+#ovStart .floaty img{width:100%;height:100%;padding:2%;box-sizing:border-box;object-fit:contain;display:block;}
 #ovStart .title{position:absolute;z-index:1;left:9%;top:50.25%;width:81.6%;height:7%;margin:0;
   display:flex;align-items:center;justify-content:center;gap:.26em;line-height:1;}
 #ovStart .t1,#ovStart .t2{font-size:calc(var(--ch)*.046);font-weight:950;}
@@ -315,12 +330,24 @@ body{
   transform:translateY(calc(var(--ch)*.0016));}
 
 /* --- 결과 --- ⚠️ 승리/실패 아트는 판 위치가 다르다(실패가 더 아래·짧고 버튼이 1개). 좌표를 공유하지 말 것. */
-#ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.png');}
+#ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.webp');}
 .result-console{--rh:min(calc(var(--sh)*.78),calc(var(--sw)*1.12));
   position:relative;width:calc(var(--rh)*.75);height:var(--rh);
-  background:url('/games/build-cari-result-win-v9.png') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
-#ovResult.fail .result-console{background-image:url('/games/build-cari-result-fail-v9.png')}
-#ovResult .floaty{display:none;}
+  background:url('/games/build-cari-result-win-v9.webp') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
+#ovResult.fail .result-console{background-image:url('/games/build-cari-result-fail-v9.webp')}
+/* ⚠️ 이 판은 콘솔 그림의 **창 안**을 통째로 갈아끼우는 자리다(콘솔 아트엔 원래 다른 로봇이 그려져 있다).
+   그래서 창 테두리와 **정확히** 겹쳐야 한다 — 옛 값(left 6.5% / w 87%)은 창(11%~88.9%)보다 넓어서
+   사진 판이 크림색 프레임 위로 넘쳐 나왔다(2026-08-14 반려. 화면에서 네모가 액자 밖으로 튀어나온 그것).
+   ⚠️ 승리/실패는 창 위치가 다르다 — 아래 .fail 이 따로 잡는다. 한 벌로 합치지 말 것.
+   ⚠️ 모서리 곡률까지 맞춰야 한다 — 사각으로 덮으면 네 귀퉁이가 액자를 파고든다.
+   창 실측(눈금 대조) = 승리 x11.6~88.4% y8.8~51.3% · 실패 x11.8~88.2% y7.3~56.8%. */
+#ovResult .floaty{display:block;position:absolute;z-index:1;left:11.4%;top:8.4%;width:77.2%;height:44%;
+  overflow:hidden;border-radius:6%/4.5%;animation:none;
+  background:url('/games/build-cari-game-bg-v7.webp') center/cover no-repeat;}
+#ovResult.fail .floaty{left:11.8%;top:7%;width:76.4%;height:50.6%;border-radius:5%/3.75%;}
+/* ⚠️ 성공·실패 그림은 **모양이 서로 다르다**(성공 1.12:1 세로형 / 실패 1.50:1 가로형).
+   같은 슬롯을 쓰지만 contain 이라 각자 알아서 앉는다 — 한쪽에 맞춰 슬롯 비율을 바꾸지 말 것. */
+#ovResult .floaty img{width:100%;height:100%;padding:2%;box-sizing:border-box;object-fit:contain;display:block;}
 #ovResult .badge{position:absolute;left:12%;top:54.6%;width:76%;height:6%;margin:0;
   display:flex;align-items:center;justify-content:center;font-size:calc(var(--rh)*.047);letter-spacing:-.02em;text-shadow:0 2px 5px #00102f;}
 /* 남색판 위에서 기본 --good/--bad 는 탁하다 — 판 위 전용 밝은 값으로 올린다. */
@@ -344,7 +371,7 @@ body{
 .mg-rank{top:11px!important;right:11px!important;width:auto!important;height:38px!important;aspect-ratio:1701/494;
   /* ⚠️ 여기 padding 은 %가 아니라 px 이다 — 이 버튼은 absolute 라 %패딩이 자기 폭이 아니라
         무대 폭(460)을 기준으로 잡혀 글자가 오른쪽 끝으로 밀린다. 25px = 폭 130.8 기준 중앙 59.4%. */
-  padding:0 0 0 25px!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.png') center/100% 100% no-repeat!important;
+  padding:0 0 0 25px!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.webp') center/100% 100% no-repeat!important;
   color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;
   font-size:12.5px!important;display:none;place-items:center;}
 .mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{display:block;text-align:center;}
@@ -374,7 +401,7 @@ body{
 <div class="stage" id="stage">
 
   <div class="hud">
-    <img class="cari-mini" id="hudCari" src="/games/build-cari-play-v5.png" alt="CARI"/>
+    <img class="cari-mini" id="hudCari" src="/games/build-cari-play-v5.webp" alt="CARI"/>
     <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">직선 라인</span></div>
     <div class="scorepill" id="scorePill"></div>
   </div>
@@ -406,7 +433,7 @@ body{
   <!-- START -->
   <div class="overlay" id="ovStart">
     <div class="intro-console">
-      <div class="floaty" id="startCari"><img src="/games/build-cari-intro-hero-v5.png" alt="컨베이어를 든 CARI"/></div>
+      <div class="floaty" id="startCari"><img src="/games/build-cari-intro-hero-v7.png" alt="컨베이어 라인을 조립하는 CARI"/></div>
       <div class="title"><span class="t1">지어라 </span><span class="t2">CARI</span></div>
       <div class="tag">라인을 깔면 공장이 알아서 돌아가요!</div>
       <div class="rules">
@@ -423,7 +450,7 @@ body{
   <!-- RESULT -->
   <div class="overlay hide" id="ovResult">
     <div class="result-console">
-      <img class="floaty" id="resCari" src="/games/build-cari-intro-hero-v5.png" alt="CARI"/>
+      <div class="floaty"><img id="resCari" src="/games/build-cari-success-v7.png" alt="컨베이어 출고에 성공한 CARI"/></div>
       <div class="badge win" id="resBadge">가동 성공!</div>
       <div class="scorebox">
         <div class="big" id="resTitle"></div>
@@ -484,17 +511,17 @@ const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
 /* ================= Constants ================= */
 const COLS=6, ROWS=8, CELL=52, ITEM=26, SPAWN_EVERY=2;
 const TOOL_DEFS=[
-  ['conv-0','/games/build-cari-tool-up-v9.png','위쪽 컨베이어'],
-  ['conv-1','/games/build-cari-tool-right-v9.png','오른쪽 컨베이어'],
-  ['conv-2','/games/build-cari-tool-down-v9.png','아래쪽 컨베이어'],
-  ['conv-3','/games/build-cari-tool-left-v9.png','왼쪽 컨베이어'],
-  ['sensor','/games/build-cari-tool-sensor-v9.png','분기 센서'],
-  ['erase','/games/build-cari-tool-erase-v9.png','지우기']
+  ['conv-0','/games/build-cari-tool-up-v9.webp','위쪽 컨베이어'],
+  ['conv-1','/games/build-cari-tool-right-v9.webp','오른쪽 컨베이어'],
+  ['conv-2','/games/build-cari-tool-down-v9.webp','아래쪽 컨베이어'],
+  ['conv-3','/games/build-cari-tool-left-v9.webp','왼쪽 컨베이어'],
+  ['sensor','/games/build-cari-tool-sensor-v9.webp','분기 센서'],
+  ['erase','/games/build-cari-tool-erase-v9.webp','지우기']
 ];
 const DIRS=[[-1,0],[0,1],[1,0],[0,-1]];      // 0=up 1=right 2=down 3=left
 const ARROW=['▲','▶','▼','◀'];
 const FEAT={ R:{c:'#f2664f',n:'빨강'}, B:{c:'#1b55d0',n:'파랑'}, G:{c:'#12b58c',n:'초록'} };
-const CARGO_ASSET={R:'/games/build-cari-cargo-red-v1.png',B:'/games/build-cari-cargo-blue-v1.png',G:'/games/build-cari-cargo-green-v1.png'};
+const CARGO_ASSET={R:'/games/build-cari-cargo-red-v1.webp',B:'/games/build-cari-cargo-blue-v1.webp',G:'/games/build-cari-cargo-green-v1.webp'};
 const branchOf=dir=>(dir+3)%4;              // matched item turns this way
 
 const FOOT="기계를 <b>배치·연결</b>해 사람 손 없이 라인이 스스로 도는 게 <b>자동화·시스템 설계</b>예요. 한 번 잘 만들면 계속 재현돼요.";
@@ -599,12 +626,12 @@ function buildPalette(){
 }
 function cellInner(r,c){
   const g=grid[r][c];
-  if(g.type==='source') return `<div class="ci src"><div class="cmini"><img src="/games/build-cari-play-v5.png" alt="" draggable="false"></div><span class="ar">${ARROW[g.dir]}</span></div>`;
+  if(g.type==='source') return `<div class="ci src"><div class="cmini"><img src="/games/build-cari-play-v5.webp" alt="" draggable="false"></div><span class="ar">${ARROW[g.dir]}</span></div>`;
   if(g.type==='bin'){ const col=g.want?FEAT[g.want].c:null;
     return `<div class="ci bin"><div class="binbox" style="border-color:${col||'#b9c2d6'}">`+
       (col?`<span class="bsw" style="background:${col}"></span>`
           :`<span class="bany">${['R','G','B'].map(f=>`<i style="background:${FEAT[f].c}"></i>`).join('')}</span>`)+`</div></div>`; }
-  if(g.type==='conv'){ const dn=['up','right','down','left'][g.dir]; return `<div class="ci conv"><img class="tile-asset" src="/games/build-cari-tool-${dn}-v9.png" alt=""></div>`; }
+  if(g.type==='conv'){ const dn=['up','right','down','left'][g.dir]; return `<div class="ci conv"><img class="tile-asset" src="/games/build-cari-tool-${dn}-v9.webp" alt=""></div>`; }
   if(g.type==='sensor'){
     // 센서는 "지정색만 왼쪽으로 꺾고 나머지는 직진"(branchOf) 이다. 그림만으로는 그게 안 읽히므로
     // 두 출구에 색 화살표를 얹는다 — 직진 쪽엔 안 걸리는 색, 꺾이는 쪽엔 지정색.
@@ -613,7 +640,7 @@ function cellInner(r,c){
     const sc=L.sense?FEAT[L.sense].c:null;
     const others=[...new Set(L.pattern)].filter(f=>f!==L.sense);
     const oc=others.length===1?FEAT[others[0]].c:'#dbe6f7';
-    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="/games/build-cari-tool-sensor-v9.png" alt="">`+
+    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="/games/build-cari-tool-sensor-v9.webp" alt="">`+
       `<span class="sar d${g.dir}" style="--c:${oc}"></span>`+
       (sc?`<span class="sar d${branchOf(g.dir)}" style="--c:${sc}"></span>`:'')+`</div>`; }
   return `<div class="ci empty"></div>`;
@@ -798,7 +825,8 @@ function finish(){
     $('ovResult').classList.remove('hide');
     return;
   }
-  $('resCari').src=win?'/games/build-cari-intro-hero-v5.png':'/games/build-cari-fail-v5.png';
+  $('resCari').src=win?'/games/build-cari-success-v7.png':'/games/build-cari-fail-v7.png';
+  $('resCari').alt=win?'컨베이어 출고에 성공한 CARI':'컨베이어 연결에 실패한 CARI';
   $('resBadge').textContent=win?'출고 완료!':'출고 실패';
   $('resBadge').className='badge '+(win?'win':'lose');
   $('resTitle').textContent=win ? `${L.name} · ${good}/${L.need} 출고` : `${good}/${L.need} 출고`;
