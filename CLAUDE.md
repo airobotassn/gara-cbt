@@ -512,6 +512,7 @@ SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 �
 ## 운영에서 자주 막히는 것 (반드시 숙지)
 
 - **프론트는 `master` push → Cloudflare 자동배포**(빌드 수 분 소요). 함수는 **별도 CLI 배포** 필요. git push 로 함수 안 올라감. SPA 라우팅은 `wrangler.jsonc`(`not_found_handling`)로 처리 — `_redirects` 금지(무한루프).
+- ⛔ **`package.json` 의 의존성을 건드리면 `bun install` 로 `bun.lock` 을 같이 커밋할 것.** Cloudflare 는 `bun install --frozen-lockfile` 로 설치해서 둘이 어긋나면 **빌드가 시작도 못 하고 죽는다**(`error: lockfile had changes, but lockfile is frozen`). 우리 로컬은 `npm` 을 쓰므로 `package-lock.json` 만 갱신되고 `bun.lock` 은 그대로 남는 게 기본값이다 — 그래서 **두 번 겪었다**(playwright 추가 `1530743`, 토스 SDK 제거 `48bfe88`). 화면이 안 바뀌는 이유를 코드에서 찾기 전에 Cloudflare 빌드 로그부터 볼 것.
 - `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
 - **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 엑심베이 `status_url` 은 서버가 `/ready` 에 실어 보내므로 대시보드 설정이 필요 없다 — 값은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<PAYMENTS_WEBHOOK_SECRET>`.
 - **SEB 인계 함수 배포**: `npx.cmd supabase functions deploy seb-handoff` (플래그 없이 — `verify_jwt` 켠 채로 맞다). SEB 안에서도 anon 키가 실려 오므로 공개 예외가 필요 없다. `--no-verify-jwt` 로 올리지 말 것.
