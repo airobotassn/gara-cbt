@@ -3,17 +3,19 @@
 //  엔진이 셋이고 역할이 다르다.
 //   · **엣지**(주력)   — 우리 기계의 Edge 브라우저 온디바이스 번역. 공짜·무제한.
 //                        여기서 호출하지 않는다(브라우저가 필요하므로 워커가 한다).
-//   · **Azure**(폴백)  — 월 200만자 무료(F0). ⚠️ **초과하면 거절**이라 모르는 새 돈이 나가지 않는다.
-//   · **구글**(폴백)   — 월 50만자 무료. ⚠️ **초과하면 자동 과금**($20/100만자)이므로
-//                        쓸 거면 GCP 콘솔에서 할당량 상한을 같이 걸어야 Azure 와 같은 안전성이 된다.
+//   · **Azure**(1차)   — 월 200만자 무료(F0). ⚠️ **초과하면 거절**이라 모르는 새 돈이 나가지 않는다.
+//   · **구글**(2차)    — Azure 가 무료분을 다 썼거나 죽었을 때만. 월 50만자 무료, 이후 자동 과금이므로
+//                        GCP 콘솔에서 할당량 상한을 같이 걸어둘 것.
 //
-//  결제의 payment-provider 포트와 같은 구조다 — 호출부(chat-translate)는 엔진을 모르고
-//  **어느 키가 꽂혀 있느냐로 엔진이 정해진다**. 갈아탈 때 코드를 안 고치려고 이렇게 뒀다
-//  (2026-08-13 에 Azure↔구글을 계정 문제로 한 번 왕복했다).
+//  ⛔ **둘 다 실패하면 그냥 번역하지 않는다.** 예외를 던지지 않고 그 건만 null 로 돌려주고,
+//     화면은 원문 그대로 남는다. 번역은 부가 기능이라 실패가 채팅을 막으면 안 된다.
+//
+//  결제의 payment-provider 포트와 같은 구조다 — 호출부(chat-translate)는 엔진을 모른다.
+//  ⚠️ 엔진은 **꽂힌 키가 정한다**. 키가 없는 엔진은 체인에서 조용히 빠진다.
 
-export type TranslateItem = { text: string; from?: string | null }
-export type TranslateResult = { text: string; detected: string | null }
 export type EngineName = 'azure' | 'google'
+export type TranslateItem = { text: string; from?: string | null }
+export type TranslateResult = { text: string; detected: string | null; engine: EngineName }
 
 // 두 엔진의 상한 중 **작은 쪽**으로 맞춘다(Azure 100건/50k자 · 구글 128건/30k 코드포인트).
 // 여유를 둔다 — 상한에 정확히 붙이면 계산 오차로 400 이 난다.
@@ -32,37 +34,58 @@ export function isTranslatable(text: string | null | undefined): boolean {
   return /\p{L}/u.test(s)
 }
 
-// ── 엔진 선택 ──────────────────────────────────────────────
-// 키가 꽂힌 쪽을 쓴다. 둘 다 있으면 Azure(무료분이 4배고 초과 시 과금이 아니라 거절이다).
-// TRANSLATE_ENGINE 으로 강제할 수 있다.
+// ── 엔진 체인 ──────────────────────────────────────────────
 type Cfg =
   | { name: 'azure'; key: string; region: string; url: string }
   | { name: 'google'; key: string }
 
-function activeEngine(): Cfg | null {
-  const forced = (Deno.env.get('TRANSLATE_ENGINE') ?? '').trim().toLowerCase()
-  const azureKey = Deno.env.get('AZURE_TRANSLATOR_KEY')
-  const googleKey = Deno.env.get('GOOGLE_TRANSLATE_KEY')
-
-  const azure = (): Cfg | null =>
-    azureKey
-      ? {
-          name: 'azure',
-          key: azureKey,
-          region: Deno.env.get('AZURE_TRANSLATOR_REGION') ?? 'koreacentral',
-          url: (Deno.env.get('AZURE_TRANSLATOR_ENDPOINT') ?? 'https://api.cognitive.microsofttranslator.com').replace(/\/+$/, ''),
-        }
-      : null
-  const google = (): Cfg | null => (googleKey ? { name: 'google', key: googleKey } : null)
-
-  if (forced === 'azure') return azure()
-  if (forced === 'google') return google()
-  return azure() ?? google()
+function azureCfg(): Cfg | null {
+  const key = Deno.env.get('AZURE_TRANSLATOR_KEY')
+  if (!key) return null
+  return {
+    name: 'azure',
+    key,
+    region: Deno.env.get('AZURE_TRANSLATOR_REGION') ?? 'koreacentral',
+    url: (Deno.env.get('AZURE_TRANSLATOR_ENDPOINT') ?? 'https://api.cognitive.microsofttranslator.com').replace(/\/+$/, ''),
+  }
 }
 
-/** 지금 어느 엔진이 붙어 있나(없으면 null). 창고에 engine 을 기록할 때 쓴다. */
-export function engineName(): EngineName | null {
-  return activeEngine()?.name ?? null
+function googleCfg(): Cfg | null {
+  const key = Deno.env.get('GOOGLE_TRANSLATE_KEY')
+  return key ? { name: 'google', key } : null
+}
+
+/** Azure 먼저, 그다음 구글. 키가 없는 엔진은 빠진다. */
+function engineChain(): Cfg[] {
+  return [azureCfg(), googleCfg()].filter((c): c is Cfg => c != null)
+}
+
+// 엔진별 차단기(circuit breaker) — 연속 3회 실패하면 60초간 건너뛴다.
+//  ⚠️ 없으면 Azure 무료분이 소진된 뒤 **모든 요청이 Azure 를 먼저 때리고 실패한 다음** 구글로 간다.
+//     사용자는 매번 그 왕복시간을 기다리게 된다. 무료분 소진은 한 달 내내 지속되는 상태라
+//     "실패하면 잠시 건너뛴다"가 있어야 한다.
+const FAIL_LIMIT = 3
+const OPEN_MS = 60_000
+const breaker: Record<EngineName, { fails: number; openUntil: number }> = {
+  azure: { fails: 0, openUntil: 0 },
+  google: { fails: 0, openUntil: 0 },
+}
+
+function isOpen(name: EngineName): boolean {
+  return Date.now() < breaker[name].openUntil
+}
+
+function noteFailure(name: EngineName): void {
+  const b = breaker[name]
+  b.fails += 1
+  if (b.fails >= FAIL_LIMIT) {
+    b.openUntil = Date.now() + OPEN_MS
+    b.fails = 0
+  }
+}
+
+function noteSuccess(name: EngineName): void {
+  breaker[name].fails = 0
 }
 
 // ── 언어 코드 표기 ────────────────────────────────────────
@@ -82,9 +105,9 @@ const GOOGLE_LANG: Record<string, string> = {
 }
 
 function toEngineLang(code: string, engine: EngineName): string {
-  const k = code.trim().toLowerCase()
   // Azure 는 우리 표기(zh-Hans·pt-pt·sr-Cyrl)를 그대로 받는다.
   if (engine === 'azure') return code.trim()
+  const k = code.trim().toLowerCase()
   return GOOGLE_LANG[k] ?? k.split('-')[0]
 }
 
@@ -126,47 +149,57 @@ function chunkIdx(idxs: number[], items: TranslateItem[]): number[][] {
 /**
  * 여러 글을 한 대상 언어로 번역한다. 입력 순서 그대로 돌려준다.
  *
+ *  **Azure → 구글 → 포기.** 앞 엔진이 못 채운 건만 다음 엔진에 넘긴다
+ *  (무료분 소진·장애·지원 안 하는 언어쌍이 다 여기로 걸린다).
+ *
  *  ⚠️ 배열로 한 번에 보내는 게 핵심이다 — 방을 열 때 30건이면 호출 30번이 아니라 1번이다.
  *  ⚠️ 원문 언어가 섞여 있을 수 있는데 `from` 은 요청 단위라, 원문 언어별로 묶어서 보낸다.
  *     모르는 것(from=null)은 한 덩어리로 묶어 자동 감지에 맡기고 detected 를 받아 저장한다.
  *  ⚠️ **원문 언어를 아는 건 반드시 명시한다** — 구글은 미지정 시 감지를 별도 과금해서
  *     같은 번역에 문자 수가 두 배로 청구된다(Azure 는 응답에 딸려 온다).
- *
- *  실패하면 예외를 던지지 않고 **그 건만 null** 로 돌려준다 — 번역은 부가 기능이라
- *  실패했다고 목록이 비면 안 된다. 호출부는 null 인 건을 원문 그대로 둔다.
  */
 export async function translateBatch(
   items: TranslateItem[],
   to: string,
-): Promise<{ engine: EngineName | null; results: (TranslateResult | null)[] }> {
-  const results: (TranslateResult | null)[] = new Array(items.length).fill(null)
-  const cfg = activeEngine()
-  if (!cfg || items.length === 0) return { engine: cfg?.name ?? null, results }
+): Promise<(TranslateResult | null)[]> {
+  const out: (TranslateResult | null)[] = new Array(items.length).fill(null)
+  if (items.length === 0) return out
 
-  // 원문 언어별로 묶는다. ' auto' = 자동 감지 그룹(공백 접두라 실제 언어코드와 겹치지 않는다).
-  const groups = new Map<string, number[]>()
-  items.forEach((it, i) => {
-    const k = (it.from ?? '').trim() || ' auto'
-    const g = groups.get(k)
-    if (g) g.push(i)
-    else groups.set(k, [i])
-  })
+  for (const cfg of engineChain()) {
+    const remaining = out.map((r, i) => (r == null ? i : -1)).filter((i) => i >= 0)
+    if (remaining.length === 0) break
+    if (isOpen(cfg.name)) continue
 
-  for (const [groupKey, idxs] of groups) {
-    const from = groupKey === ' auto' ? null : groupKey
-    for (const partIdxs of chunkIdx(idxs, items)) {
-      const part = partIdxs.map((i) => items[i])
-      const res = cfg.name === 'azure'
-        ? await callAzure(cfg, part, to, from)
-        : await callGoogle(cfg.key, part, to, from)
-      if (!res) continue
-      partIdxs.forEach((origIdx, j) => {
-        const r = res[j]
-        if (r) results[origIdx] = r
-      })
+    // 원문 언어별로 묶는다. ' auto' = 자동 감지 그룹(공백 접두라 실제 언어코드와 겹치지 않는다).
+    const groups = new Map<string, number[]>()
+    for (const i of remaining) {
+      const k = (items[i].from ?? '').trim() || ' auto'
+      const g = groups.get(k)
+      if (g) g.push(i)
+      else groups.set(k, [i])
+    }
+
+    for (const [groupKey, idxs] of groups) {
+      const from = groupKey === ' auto' ? null : groupKey
+      for (const partIdxs of chunkIdx(idxs, items)) {
+        const part = partIdxs.map((i) => items[i])
+        const res = cfg.name === 'azure'
+          ? await callAzure(cfg, part, to, from)
+          : await callGoogle(cfg.key, part, to, from)
+        if (!res) {
+          noteFailure(cfg.name)
+          continue
+        }
+        noteSuccess(cfg.name)
+        partIdxs.forEach((origIdx, j) => {
+          const r = res[j]
+          if (r) out[origIdx] = r
+        })
+      }
     }
   }
-  return { engine: cfg.name, results }
+  // 여기까지 와서 null 인 건은 어느 엔진도 못 한 것 — 호출부가 원문 그대로 둔다.
+  return out
 }
 
 async function callAzure(
@@ -193,6 +226,7 @@ async function callAzure(
       body: JSON.stringify(part.map((p) => ({ Text: p.text }))),
       signal: controller.signal,
     })
+    // 무료분 소진(403 Out of call volume quota)도 여기로 떨어져 구글로 넘어간다.
     if (!res.ok) return null
     const data = await res.json()
     if (!Array.isArray(data)) return null
@@ -200,7 +234,11 @@ async function callAzure(
       const row = data[i]
       const text = row?.translations?.[0]?.text
       if (typeof text !== 'string') return null
-      return { text, detected: fromEngineLang(row?.detectedLanguage?.language, 'azure') ?? from ?? null }
+      return {
+        text,
+        detected: fromEngineLang(row?.detectedLanguage?.language, 'azure') ?? from ?? null,
+        engine: 'azure' as const,
+      }
     })
   } catch {
     return null
@@ -240,7 +278,11 @@ async function callGoogle(
       const row = list[i]
       const text = row?.translatedText
       if (typeof text !== 'string') return null
-      return { text, detected: fromEngineLang(row?.detectedSourceLanguage, 'google') ?? from ?? null }
+      return {
+        text,
+        detected: fromEngineLang(row?.detectedSourceLanguage, 'google') ?? from ?? null,
+        engine: 'google' as const,
+      }
     })
   } catch {
     return null

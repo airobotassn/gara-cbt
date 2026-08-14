@@ -71,7 +71,7 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'order-cari',
     accent: 'CARI',
-    art: '/games/order-cari-cover.png',
+    art: '/games/order-cari-cover-v2.png',
     src: '/games/order-cari.html',
     frame: '#d5dded', // 게임 body 그라디언트의 가장 진한 끝(밝은 공방 톤)
   },

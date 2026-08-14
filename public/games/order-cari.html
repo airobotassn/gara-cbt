@@ -170,6 +170,39 @@
      뒤에 있어야 이긴다 — 위에 두면 숨겨야 할 것이 안 숨는다(실제로 '지정 도장색' 칩이 그랬다). */
   .hidden{display:none}
 </style>
+<style>
+  /* v4 asset pass: full-scene presentation shared with the newer CARI games */
+  body{background:#071426 url('/games/order-cari-game-bg-v2.png') center/cover no-repeat}
+  #app{background:linear-gradient(rgba(226,236,250,.92),rgba(213,221,237,.94));box-shadow:0 0 70px rgba(0,0,0,.42)}
+  .top{margin:8px 10px 5px;padding:9px 12px;border-radius:13px;background:rgba(7,25,53,.91);color:#fff;border:1px solid rgba(91,191,255,.34);box-shadow:0 7px 18px rgba(0,0,0,.25)}
+  .ordno{background:#1264bd}.stars b{color:#64748c}
+  .stage{margin:0 10px 8px;padding:8px;border-radius:18px;background:rgba(7,25,53,.18);backdrop-filter:blur(4px)}
+  .sendwrap{background:linear-gradient(transparent,rgba(7,20,43,.34))}
+  .send{background:linear-gradient(#2faff3,#1452bd);box-shadow:0 4px 0 #0b397d,0 12px 24px -12px #03142e}
+  .pc.on{border-color:#1677d2;box-shadow:0 0 0 3px rgba(22,119,210,.16)}
+  .pc.on .chk{background:#1677d2;border-color:#1677d2}
+
+  #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(20px + env(safe-area-inset-bottom));background:#071426 url('/games/order-cari-intro-bg-v2.png') center/cover no-repeat;backdrop-filter:none}
+  #startOv.hidden{display:none}
+  #startOv .sheet{position:relative;width:min(94%,460px);height:47%;min-height:360px;padding:76px 24px 22px;overflow:hidden;border:1px solid rgba(108,205,255,.34);border-radius:26px;background:linear-gradient(180deg,rgba(7,25,53,.78),rgba(3,13,31,.96));box-shadow:0 20px 50px rgba(0,0,0,.58);color:#fff;text-align:center}
+  #startOv #sArt{position:absolute;left:50%;top:-190px;width:330px;height:310px;transform:translateX(-50%);background:url('/games/order-cari-intro-hero-v2.png') center 16%/112% auto no-repeat;filter:drop-shadow(0 14px 18px rgba(0,0,0,.42));-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent),linear-gradient(0deg,transparent,#000 22%,#000 100%);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent),linear-gradient(0deg,transparent,#000 22%,#000 100%);mask-composite:intersect;pointer-events:none}
+  #startOv #sArt svg{display:none}
+  #startOv .ttl{margin:0 0 5px;font-size:29px;color:#fff;text-shadow:0 3px 10px #001a3d}
+  #startOv .ttl i{color:#58c7ff}
+  #startOv .lead{margin:0 auto 13px;color:#d8eaff;font-size:12.5px;line-height:1.5}
+  #startOv .rules{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;text-align:left}
+  #startOv .rules li{min-height:58px;padding:8px 9px;background:rgba(255,255,255,.09);border:1px solid rgba(144,208,255,.16);color:#eaf5ff;font-size:11.2px;line-height:1.38}
+  #startOv .rules li span{color:#5ed2ff}
+  #startOv .btn{height:56px;border-radius:15px;background:linear-gradient(#2faff3,#1452bd);box-shadow:0 5px 0 #0b397d;color:#fff;font-size:16px}
+  #startOv .mg-rank{background:rgba(4,20,43,.78);border-color:rgba(126,205,255,.3);color:#fff}
+
+  #overOv{padding:0;background:#071426 url('/games/order-cari-result-win-v2.png') center/cover no-repeat;backdrop-filter:none;align-items:flex-end}
+  #overOv .sheet{width:min(92%,440px);margin-bottom:calc(20px + env(safe-area-inset-bottom));padding:18px;border:1px solid rgba(255,210,92,.32);background:linear-gradient(rgba(7,25,53,.82),rgba(3,13,31,.97));color:#fff;text-align:center}
+  #overOv #oArt{display:none}#overOv .ttl{margin:0 0 8px;color:#fff}#overOv .biglab{color:#cbdcf3}#overOv .note{background:rgba(37,105,177,.22);border-color:rgba(109,193,255,.28);color:#e7f4ff}
+  #overOv .btn{background:linear-gradient(#2faff3,#1452bd);box-shadow:0 5px 0 #0b397d}
+  #overOv.result-fail{background-image:url('/games/order-cari-result-fail-v2.png')}
+  @media(max-height:690px){#startOv .sheet{height:54%;min-height:340px;padding-top:58px}#startOv #sArt{top:-220px}.rules li:nth-child(4){display:none}}
+</style>
 </head>
 <body>
 
@@ -572,10 +605,11 @@ $('fbBtn').onclick=()=>{
     const full=LEVELS.length*3;
     $('oStarLab').textContent = starTotal>=full ? '별 '+starTotal+' / '+full+' — 전부 한 번에 맞혔다'
                                                 : '별 '+starTotal+' / '+full;
+    $('overOv').classList.toggle('result-fail',starTotal<LEVELS.length*2);
     $('overOv').classList.remove('hidden');
   } else { LI++; loadLevel(); }
 };
-$('oAgain').onclick=()=>{ LI=0; starsPer=[]; starTotal=0; $('overOv').classList.add('hidden'); loadLevel(); };
+$('oAgain').onclick=()=>{ LI=0; starsPer=[]; starTotal=0; $('overOv').classList.add('hidden'); $('overOv').classList.remove('result-fail'); loadLevel(); };
 $('startBtn').onclick=()=>$('startOv').classList.add('hidden');
 
 $('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});

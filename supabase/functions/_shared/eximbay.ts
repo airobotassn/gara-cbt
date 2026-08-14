@@ -1,8 +1,8 @@
-// 엑심베이(Eximbay) 코어 API 래퍼 + PaymentProvider 포트의 엑심베이 어댑터 — **해외(외화) 결제용**.
+// 엑심베이(Eximbay) 코어 API 래퍼 + PaymentProvider 포트의 유일한 어댑터.
 //   공식 문서: https://developer.eximbay.com/eng/eximbay/api_list/reference.html
 //
-// 왜 있나: 국내는 토스(원화), 해외는 엑심베이(달러). payments.ts·payments 함수는 포트만 알고 PG 를 모른다.
-//   이 파일을 추가하고 payment-provider 의 PROVIDERS 에 등록하면 토스 코드를 한 줄도 안 열고 해외 결제가 붙는다.
+// 국내·해외를 **MID 로** 가른다 — 원화면 국내 MID(국내 결제망), 그 외는 해외 MID(국제 카드망).
+//   payments.ts·payments 함수는 포트만 알고 PG 를 모른다.
 //
 // **실검증 상태(2026-08-11, 문서용 공개 테스트키 mid=1849705C64 / api-test.eximbay.com):**
 //    ✅ 인증 형태 = `base64(apikey:)` (문서 본문 'mid:apikey' 는 틀림 — 실측으로 확정)
@@ -12,13 +12,14 @@
 //    아직 **미확정** — 실제 카드로 완주해야 확인되는 것:
 //      · 금액 단위(KRW "1000" 이 1,000원인지 — /ready 는 통과했지만 매출 확정 전엔 모른다)
 //      · status_url(서버-서버 통지)의 본문 형식 — payments-webhook 이 JSON·폼 양쪽을 견디게는 해뒀다
-//    ⚠️ 위 공개 테스트키는 **여러 사람이 공유하는 샌드박스**다(토스 문서키와 같은 성격). 계약 후 전용 키로 재확인할 것.
+//    ⚠️ 위 키·MID 는 포트원이 공개한 **공유 샌드박스**다. 계약 후 전용 값으로 재확인할 것.
+//       간편결제(토스·카카오페이)는 그 상점에 계약이 없어 X048·X042 로 거절된다 — 카드는 승인된다.
 //
-// ⚠️ 통화: 이 어댑터는 넘겨받은 amount·currency 를 그대로 PG 규격으로 보낼 뿐이다. 나중에 해외 카드용으로
-//    달러를 받게 되면 "원화 정가 → 달러 환산" 은 여기가 아니라 **결제 레이어(resolveProduct/create)** 소관이다.
+// ⚠️ 통화: 이 어댑터는 넘겨받은 amount·currency 를 그대로 PG 규격으로 보낼 뿐이다.
+//    "달러 정가 → 원화 환산" 은 여기가 아니라 **결제 레이어(create)** 소관이다.
 import type { PaymentProvider, ProviderPayment, ProviderResult } from './payment-provider.ts'
 
-// 환경별 호스트. 테스트/실서버가 **URL 로** 갈린다(토스처럼 키 접두사가 아니다).
+// 환경별 호스트. 테스트/실서버가 **URL 로** 갈린다(키 접두사가 아니다).
 const HOSTS = {
   test: 'https://api-test.eximbay.com',
   live: 'https://api.eximbay.com',
@@ -45,8 +46,7 @@ function apiBase(): string {
 function mid(currency: string): string {
   const local = (Deno.env.get('EXIMBAY_MID_LOCAL') ?? '').trim()
   const global_ = (Deno.env.get('EXIMBAY_MID_GLOBAL') ?? '').trim()
-  const legacy = (Deno.env.get('EXIMBAY_MID') ?? '').trim()
-  const v = currency.toUpperCase() === 'KRW' ? local || legacy : global_ || legacy
+  const v = currency.toUpperCase() === 'KRW' ? local : global_
   if (!v) throw new Error(`엑심베이 MID 가 설정되지 않았습니다 (${currency}).`)
   return v
 }
@@ -56,7 +56,7 @@ function secretKey(): string {
   return v
 }
 
-/** ✅ 실검증 완료(2026-08-07, api-test.eximbay.com) — 인증은 **`base64(apikey:)`** 다(apikey + 콜론, 토스와 동일).
+/** ✅ 실검증 완료(2026-08-07, api-test.eximbay.com) — 인증은 **`base64(apikey:)`** 다(apikey + 콜론).
  *   문서 본문엔 `base64(mid:apikey)` 라고 써 있지만 **그건 틀렸다** — 그 형태로 보내면 `EC1000 Authorization is invalid`.
  *   문서의 Basic 예시 값을 디코드하면 `apikey:` 가 나오고, 그 형태만 200 을 받는다. mid 는 인증이 아니라 **본문**에 넣는다. */
 function authHeader(): string {
@@ -95,7 +95,7 @@ async function call(path: string, body: unknown): Promise<{ http: number; data: 
 
 // 엑심베이 status → 우리 CanonicalStatus.
 //   SALE       = 매출 확정(결제 완료)                → paid
-//   REGISTERED = 주문만 등록, 입금 후 확정(무통장/이체) → waiting_deposit (토스 가상계좌와 같은 취급)
+//   REGISTERED = 주문만 등록, 입금 후 확정(무통장/이체) → waiting_deposit (가상계좌와 같은 취급)
 //   AUTH       = 승인만 됨, 매입 전(수동 capture 필요) → pending (아직 돈이 확정 안 됨 → 지급하면 안 된다)
 //   NONE       = 주문 없음                            → 조회 경로에서 '부재(absent)'로 처리(아래 retrieve 참고)
 function mapStatus(s: string | undefined): ProviderPayment['status'] {
@@ -114,9 +114,8 @@ function mapStatus(s: string | undefined): ProviderPayment['status'] {
 /**
  * 결제수단 코드 → 사람이 읽는 이름. 엑심베이는 `payment_method` 를 **`P101` 같은 코드**로 준다.
  *
- * 왜 여기서 이름으로 바꾸나 — `payments.method` 는 대사·분쟁 때 **사람이 읽는 칸**이고, 토스 어댑터는
- * 이미 `카드`·`가상계좌` 처럼 읽히는 값을 넣는다. 한쪽만 코드로 두면 같은 컬럼을 볼 때마다 코드표를
- * 찾아야 하고, 화면에 그대로 내보내면 사용자에게 `P101` 이 보인다.
+ * 왜 여기서 이름으로 바꾸나 — `payments.method` 는 대사·분쟁 때 **사람이 읽는 칸**이다. 코드로 두면
+ * 볼 때마다 코드표를 찾아야 하고, 화면에 그대로 내보내면 사용자에게 `P101` 이 보인다.
  * ⚠️ 원문이 사라지는 건 아니다 — PG 응답 전체는 `payments.raw` 에 그대로 저장된다.
  * ⚠️ 모르는 코드는 **코드 그대로 남긴다**(빈칸·'기타'로 만들면 새 수단이 붙었을 때 알아챌 방법이 없다).
  *
@@ -175,7 +174,7 @@ function normalize(p: EximbayPayment): ProviderPayment {
     orderId: p.order_id ?? '',
     status: mapStatus(p.status),
     method: eximbayMethodName(p.payment_method as string | undefined),
-    // REGISTERED(입금 후 확정)는 토스 가상계좌와 같은 성격 — 발급됐을 뿐 아직 돈이 안 들어온 상태.
+    // REGISTERED(입금 후 확정) — 계좌가 발급됐을 뿐 아직 돈이 안 들어온 상태.
     isVirtualAccount: p.status === 'REGISTERED',
     // YYYYMMDDHHMMSS → ISO 로 대충 변환(정확한 tz 는 실검증 때). 없으면 null.
     approvedAt: p.transaction_date ? isoFromEximbayDate(p.transaction_date) : null,

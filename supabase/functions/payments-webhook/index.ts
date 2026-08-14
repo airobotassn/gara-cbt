@@ -56,8 +56,7 @@ async function readBody(req: Request): Promise<unknown> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    // 옛 이름(TOSS_WEBHOOK_SECRET)도 받는다 — 새 이름만 보게 하면 시크릿을 갈아끼우는 사이 통지가 전부 막힌다.
-    const secret = ((Deno.env.get('PAYMENTS_WEBHOOK_SECRET') || Deno.env.get('TOSS_WEBHOOK_SECRET')) ?? '').trim()
+    const secret = (Deno.env.get('PAYMENTS_WEBHOOK_SECRET') ?? '').trim()
     const given = new URL(req.url).searchParams.get('k') ?? ''
     if (!secret || given !== secret) return json({ error: 'forbidden' }, 403)
 

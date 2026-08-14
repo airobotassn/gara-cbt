@@ -286,9 +286,10 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - ⚠️ **레이트리밋·중복·IP 바닥선 가드는 방을 안 본다(계정 단위 전역)** — 방마다 상한이 리셋되면 방을 옮겨다니며 도배할 수 있다. `chat_post_atomic` 안의 주석과 `tests/db/t-chat-rooms.mjs` 가 이걸 지킨다.
   - ⚠️ 방이 바뀌면 `<ChatBoard key={room}>` 로 **다시 마운트**한다. 목록·커서·폴링 타이머가 한 방을 가리키는 상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청 결과가 새 방 목록에 섞인다.
 - **`/arena` 채팅 번역(2026-08-13)**: 원문이 기본이고, **번역 토글을 켠 사람에게만** 번역본을 보여준다. 한 번 만든 번역본은 `chat_translations` 에 남아 같은 언어 사용자 전원이 나눠 쓴다 → **비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례**한다(중국 방에 한국인이 1명이든 500명이든 번역은 1회). 함수 `chat-translate`(사용자 요청 + 워커의 `pending`/`store`), 어댑터 `_shared/translate.ts`(Azure·구글 두 벌)·`_shared/country-lang.ts`, 워커 `tools/translate-worker/`, 검증 `tests/db/t-chat-translation.mjs`(30건)·`tests/chat-translate-filters.mjs`(33건).
-  - **엔진 셋 — 엣지가 주력, Azure·구글이 폴백.** 엣지(Edge 브라우저 온디바이스 번역)는 **공짜·무제한·145개 언어**라 우리 기계에서 워커가 미리 창고를 채운다. 서버 엔진은 **창고에 없을 때만** — 새 조합의 첫 요청, 워커가 죽었을 때, 엣지가 지원 안 하는 쌍. ⚠️ **서버 엔진을 지우면 안 된다** — 기계 하나가 꺼지면 번역이 통째로 죽고, MS·구글이 자동화를 막으면(회색지대다) 대안이 없다. 평소 거의 안 불려서 무료분 안에서 논다.
-    - **엔진은 코드가 아니라 꽂힌 키가 정한다** — `AZURE_TRANSLATOR_KEY` 가 있으면 Azure, `GOOGLE_TRANSLATE_KEY` 만 있으면 구글, 둘 다 있으면 Azure. `TRANSLATE_ENGINE` 으로 강제할 수 있다. 2026-08-13 에 계정 문제로 Azure↔구글을 한 번 왕복해서 **갈아탈 때 코드를 안 고치도록** 두 어댑터를 같이 뒀다.
-    - ⚠️ **초과했을 때가 다르다.** Azure F0(월 200만자)는 **거절**이라 모르는 새 돈이 안 나가고, 구글(월 50만자)은 **자동 과금**($20/100만자)이다. 구글로 쓸 거면 GCP 콘솔에서 **할당량 상한을 같이 걸어야** Azure 와 같은 안전성이 된다(예산 알림은 알려주기만 하고 안 막는다).
+  - **엔진 셋 — 엣지가 주력, Azure 가 1차 폴백, 구글이 2차.** 엣지(Edge 브라우저 온디바이스 번역)는 **공짜·무제한·145개 언어**라 우리 기계에서 워커가 미리 창고를 채운다. 서버 엔진은 **창고에 없을 때만** — 새 조합의 첫 요청, 워커가 죽었을 때, 엣지가 지원 안 하는 쌍. ⚠️ **서버 엔진을 지우면 안 된다** — 기계 하나가 꺼지면 번역이 통째로 죽고, MS·구글이 자동화를 막으면(회색지대다) 대안이 없다. 평소 거의 안 불려서 무료분 안에서 논다.
+    - **서버 엔진은 체인이다 — `Azure → 구글 → 포기`.** 앞 엔진이 못 채운 건만 다음으로 넘긴다(무료분 소진·장애·지원 안 하는 언어쌍이 전부 여기로 걸린다). **둘 다 실패하면 그냥 번역하지 않는다** — 예외를 던지지 않고 화면에 원문이 남는다. 키가 없는 엔진은 체인에서 조용히 빠지므로 Azure 키만 꽂아도 되고 구글 키만 꽂아도 된다.
+    - ⚠️ **엔진별 차단기가 있다**(연속 3회 실패 → 60초 건너뜀). 없으면 Azure 무료분이 소진된 뒤 **한 달 내내 모든 요청이 Azure 를 먼저 때리고 실패한 다음** 구글로 가서, 사용자가 매번 그 왕복시간을 기다린다.
+    - ⚠️ **초과했을 때가 다르다.** Azure F0(월 200만자)는 **거절**이라 모르는 새 돈이 안 나가고, 구글(월 50만자)은 **자동 과금**($20/100만자)이다. 그래서 Azure 가 1차다. 구글 키를 꽂을 거면 GCP 콘솔에서 **할당량 상한을 같이 걸어야** 안전성이 같아진다(예산 알림은 알려주기만 하고 안 막는다).
     - ⚠️ **Azure 는 지역 헤더가 필수다**(`Ocp-Apim-Subscription-Region`) — 번역 주소가 전 세계 공용이라 키만으로는 어느 리소스인지 알 수 없어 401 이 난다. 구글은 **v2(Basic)** 를 쓴다(API 키 한 줄. v3 는 서비스 계정 JWT 서명이 필요해 Edge Function 에서 번거롭다).
     - ⚠️ **원문 언어를 아는 건 반드시 명시한다** — 구글은 미지정 시 **감지를 별도 과금**해서 문자 수가 두 배가 된다(그래서 `src_lang` 저장이 비용 장치이기도 하다). 구글은 `format:'text'` 도 필수 — 기본이 `html` 이라 안 주면 `<`·`&` 가 엔티티로 돌아온다.
     - ⚠️ **언어 코드 표기가 엔진마다 갈린다** — 우리(=브라우저 Translator API) 표기 `zh-Hans`/`zh-Hant`/`he`/`fil` 을 Azure 는 그대로 받고 구글은 `zh-CN`/`zh-TW`/`iw`/`tl` 로 받는다. `translate.ts` 의 `toEngineLang`/`fromEngineLang` 이 변환하고, **저장은 언제나 우리 표기로 통일**한다(엔진마다 다르게 저장하면 "원문 == 독자 언어" 판정이 흔들려 같은 글을 계속 다시 번역한다).
@@ -366,14 +367,13 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 
 ## 결제 (엑심베이 단일 PG · 2026-08-13)
 
-> **토스는 제거됐다(2026-08-13).** `docs/토스페이먼츠-연동-가드레일.md` 는 히스토리로만 남겨둔다 — 결제 일반론(멱등·웹훅·대사)은 여전히 맞지만 토스 SDK 부분은 이제 이 저장소와 무관하다.
 
 - **범위**: PG 는 **엑심베이 하나**. 정가는 **달러 한 벌**이고(달러 센트 정수), 청구 통화는 **사용자 국가**가 정한다 — 한국이면 원화(국내 MID), 그 외는 달러(해외 MID). 국내/해외를 가르는 건 PG 가 아니라 MID·통화다.
 - **흐름**: `/checkout?type=&ref=` → `payments/create`(서버가 금액·통화·MID 결정 + `/ready` 로 FGKey) → 엑심베이 결제창 → `payments-return`(POST 를 303 으로 넘김) → `/pay/success` → `payments/confirm`(위변조 검증 + 상태 조회) → 지급.
 - **금액을 요청으로 받지 않는다.** `create` 는 상품ID만 받고 `_shared/payments.ts` 의 `resolveProduct` 가 DB에서 다시 뽑는다. `confirm` 은 successUrl 의 `amount` 를 **저장된 주문 금액과 대조한 뒤**, 승인 API 에는 **저장된 값**을 넘긴다. 소유자(`user_id`) 확인도 필수 — 안 하면 남의 주문에 결제를 붙일 수 있다.
-- **중복 지급은 코드가 아니라 DB가 막는다** — `payments` 의 부분 유니크 인덱스 `(user_id, product_type, product_ref) where status='paid'` + `ebook_purchases.unique(user_id, ebook_id)`. Idempotency-Key 는 토스 쪽 중복 승인만 막지 우리 DB 이중지급은 못 막는다.
+- **중복 지급은 코드가 아니라 DB가 막는다** — `payments` 의 부분 유니크 인덱스 `(user_id, product_type, product_ref) where status='paid'` + `ebook_purchases.unique(user_id, ebook_id)`. Idempotency-Key 는 PG 쪽 중복 승인만 막지 우리 DB 이중지급은 못 막는다.
 - **지급 순서 = 지급 먼저, `fulfilled_at` 나중.** 반대로 하면 지급이 실패했을 때 "이미 줬다"는 기록만 남아 미지급을 영영 못 찾는다. `status='paid' AND fulfilled_at IS NULL` 이 "돈은 받았는데 안 준 것" 신호이고 대사가 이걸 본다.
-- **PG 어댑터(포트) 구조** — 승인·조회·상태정규화는 `_shared/payment-provider.ts`(포트) 뒤에 있고, 구현은 `_shared/eximbay.ts` 의 `eximbayProvider` 하나다. `payments.ts`·`payments` 함수는 PG 를 모르고 `getProvider(row.provider)` 로만 부른다. **새 PG = 어댑터 파일 하나 + `PROVIDERS` 에 한 줄.** ⚠️ 어댑터를 지울 때는 그 PG 로 만든 옛 주문 행이 원장에 남는다 — 대사·웹훅이 그 행을 물어보려다 던지므로 `hasProvider()` 로 먼저 걸러야 한다(토스 제거 때 실제로 걸린 자리다). ⚠️ 프론트 결제창은 PG 마다 달라 포트로 못 숨긴다 — 그건 그때 컴포넌트 추가. `settleFromToss`→`settleFromProvider`, `TossPayment`→`ProviderPayment`(중립). status 정규화 중 `canceled→refunded` 업그레이드만 settle 이 한다(어댑터는 취소를 늘 canceled 로 준다 — 우리 DB 의 fulfilled 를 모르니까).
+- **PG 어댑터(포트) 구조** — 승인·조회·상태정규화는 `_shared/payment-provider.ts`(포트) 뒤에 있고, 구현은 `_shared/eximbay.ts` 의 `eximbayProvider` 하나다. `payments.ts`·`payments` 함수는 PG 를 모르고 `getProvider(row.provider)` 로만 부른다. **새 PG = 어댑터 파일 하나 + `PROVIDERS` 에 한 줄.** ⚠️ 어댑터를 지울 때는 그 PG 로 만든 옛 주문 행이 원장에 남는다 — 대사·웹훅이 그 행을 물어보려다 던지므로 `hasProvider()` 로 먼저 걸러야 한다(토스를 걷어낼 때 실제로 걸린 자리다 — 2026-08-13). ⚠️ 프론트 결제창은 PG 마다 달라 포트로 못 숨긴다 — 그건 그때 컴포넌트 추가. `settleFromToss`→`settleFromProvider`, `TossPayment`→`ProviderPayment`(중립). status 정규화 중 `canceled→refunded` 업그레이드만 settle 이 한다(어댑터는 취소를 늘 canceled 로 준다 — 우리 DB 의 fulfilled 를 모르니까).
 - **국내/해외는 사용자가 고르지 않는다 — 프로필 국가가 정한다(2026-08-13).** 한국이면 국내 MID + 원화, 그 외는 해외 MID + 달러. ⚠️ **국가를 모르면 해외로 떨어뜨린다** — 해외 MID 는 국내 카드도 (수수료가 붙을 뿐) 통과하지만, 국내 MID 로 해외 카드를 보내면 승인 자체가 안 된다. 모를 때는 되는 쪽으로 보낸다.
   - **엑심베이 결제창은 우리 페이지에 아무것도 안 그린다.** 버튼을 누르면 PG 창이 열리고 결제수단은 거기서 고른다 — 그래서 `/checkout` 에 안내 문구(`pay.pg_eximbay_note`)가 반드시 필요하다. 없으면 화면이 비어 보인다.
   - ⚠️ **엑심베이엔 `/ready` 단계가 있다.** 서버가 `/ready` 로 받은 **FGKey 는 그때 보낸 값들의 서명**이라, 프론트가 `request_pay` 페이로드를 다시 조립하면 금액 형식·언어·URL 끝 슬래시 하나 차이로 결제가 그냥 실패한다. 그래서 **서버가 `/ready` 에 보낸 객체를 그대로 내려주고 프론트는 `fgkey` 만 얹는다.**
@@ -531,7 +531,6 @@ SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 �
 | [`docs/제품구상.md`](./docs/제품구상.md) | **제품 구상**(캐릭터 허브: 자격증·Lecture·CARIS ARENA) — excalidraw 캔버스 전사 + 확정 설계 결정(`[확정]`/`[제안]` 태그). 원본=`docs/design/제품구상.excalidraw` |
 | [`docs/구현계획.md`](./docs/구현계획.md) | **구현 계획** — Phase 1(국가·지역·학교 온보딩 + 지역 경쟁) 상세 + 이후 로드맵. `제품구상.md`의 "어떻게" 짝 문서 |
 | [`docs/구글_계정_워크스페이스_가이드.html`](./docs/구글_계정_워크스페이스_가이드.html) | 구글 로그인(OAuth) 계정 소유권·2FA·Workspace (생성물, 브라우저로 열 것) |
-| [`docs/토스페이먼츠-연동-가드레일.md`](./docs/토스페이먼츠-연동-가드레일.md) | **히스토리**(토스 공식 LLM Quick Reference 사본) — 토스는 2026-08-13 제거됐다. 결제 일반론(멱등·웹훅·대사·§8 자주 틀리는 패턴)은 여전히 읽을 값이 있지만 토스 SDK 부분은 이 저장소와 무관하다 |
 | [`docs/review-report.html`](./docs/review-report.html) | 코드 리뷰 리포트(생성물) |
 
 > 새 기능/운영 사항을 추가하면 해당 문서를 갱신하고, 큰 변화는 이 표에 매핑한다.

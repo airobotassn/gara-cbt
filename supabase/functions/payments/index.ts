@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
         const origin = (req.headers.get('origin') ?? '').trim()
         if (!origin) return json({ error: '결제 준비에 필요한 주소를 확인할 수 없습니다.' }, 400)
         const fnBase = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '')
-        const hookKey = ((Deno.env.get('PAYMENTS_WEBHOOK_SECRET') || Deno.env.get('TOSS_WEBHOOK_SECRET')) ?? '').trim()
+        const hookKey = (Deno.env.get('PAYMENTS_WEBHOOK_SECRET') ?? '').trim()
 
         const ready = await eximbayReady({
           orderId,
