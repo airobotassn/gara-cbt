@@ -278,7 +278,15 @@ const LANG_NAMES: Record<string, string> = {
   vi: 'Vietnamese',
 }
 
+// ⚠️ 재시도 방지용 상한(경고용이 아니다). 이만큼 큰 요청은 어차피 거절되는데, 아래 루프가
+//    3번을 던져서 같은 페이로드를 세 번 실어 보낸다(7.4MB 짜리 공지에서 22MB 를 허공에 날렸다).
+//    정상 본문은 여기 근처도 안 온다 — 기존 공지들이 162~286자다.
+const GEMINI_MAX_CHARS = 200_000
+
 async function geminiJson(sys: string, user: string, maxTokens: number): Promise<string> {
+  if (user.length > GEMINI_MAX_CHARS) {
+    throw new Error(`본문이 너무 커서(${user.length.toLocaleString()}자) 번역을 건너뛰었습니다.`)
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
@@ -349,6 +357,42 @@ async function translateKoFields(
   return out
 }
 
+// ---------- 본문에 박힌 base64 이미지 → Storage 로 옮기고 URL 로 치환 ----------
+// ⚠️ 에디터(RichEditor)가 붙여넣기·드롭을 막아도 여기가 또 필요하다 — 옛 글, 다른 클라이언트,
+//    API 직접 호출은 그 방어를 안 탄다. 안 펴고 저장하면 두 가지가 같이 깨진다:
+//      (a) 번역 요청이 통째로 거절된다(7.4MB 본문 → Gemini 429. 실제로 겪음)
+//      (b) 공지 목록이 select('*') 라 목록을 여는 사람마다 그 용량을 내려받는다.
+// ⚠️ 업로드가 실패해도 저장은 막지 않는다 — 그림이 본문에 남을 뿐이고, 번역은 위 크기 가드가 접는다.
+//    저장을 막으면 관리자는 자기가 뭘 잘못했는지 모른 채 공지를 못 올린다.
+const DATA_URI_RE = /data:image\/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)/g
+
+async function inlineImagesToStorage(admin: any, html: string): Promise<{ html: string; moved: number }> {
+  if (!html.includes('data:image/')) return { html, moved: 0 }
+  let out = html
+  let moved = 0
+  for (const m of html.matchAll(DATA_URI_RE)) {
+    const [whole, subtype, b64] = m
+    try {
+      const bin = atob(b64.replace(/\s/g, ''))
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const lower = subtype.toLowerCase()
+      const ext = lower === 'jpeg' ? 'jpg' : lower.replace('+xml', '')
+      const path = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`
+      const { error } = await admin.storage
+        .from('notice-images')
+        .upload(path, bytes, { contentType: `image/${lower}`, upsert: false })
+      if (error) throw error
+      const { data } = admin.storage.from('notice-images').getPublicUrl(path)
+      out = out.replace(whole, data.publicUrl)
+      moved++
+    } catch (e) {
+      console.error('[notice] 본문 이미지 업로드 실패:', e instanceof Error ? e.message : e)
+    }
+  }
+  return { html: out, moved }
+}
+
 // ---------- 공지사항(notices) CRUD ----------
 function shapeNotice(n: any) {
   return {
@@ -380,8 +424,11 @@ async function noticeList(admin: any) {
 async function noticeUpsert(admin: any, body: any) {
   const n = body?.notice ?? {}
   const koTitle = String(n.titleI18n?.ko ?? '').trim()
-  const koBody = String(n.bodyI18n?.ko ?? '').trim()
+  let koBody = String(n.bodyI18n?.ko ?? '').trim()
   if (!koTitle) return json({ error: '한국어 제목은 필수입니다.' }, 400)
+
+  // ⚠️ 번역보다 **먼저** 편다. 순서가 바뀌면 번역이 거대 본문을 그대로 받아 거절당한다.
+  koBody = (await inlineImagesToStorage(admin, koBody)).html
 
   // 한국어 → 나머지 5개국어 자동 번역. 실패해도 한국어로 저장은 진행(발행 막지 않음).
   let title_i18n: Record<string, string> = { ko: koTitle }

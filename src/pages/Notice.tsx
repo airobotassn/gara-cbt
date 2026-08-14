@@ -62,6 +62,9 @@ function fmtDate(iso: string): string {
 function excerpt(body: string | null, n = 140): string {
   if (!body) return ''
   return body
+    // ⚠️ 태그만 걷어내면 <style>·<script> 의 **속 내용은 글자로 남는다** — 만들어 올린 HTML 공지의
+    //    목록 미리보기가 `:root{ --navy:#1f3a63; …}` 로 시작한다(실제로 그렇게 보였다).
+    .replace(/<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&[a-z]+;/gi, ' ')

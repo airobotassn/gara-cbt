@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import DOMPurify from 'dompurify'
+import HtmlBody from '../components/HtmlBody'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 // 공지 상세 페이지 (/notice/:id) — 게시판 글 상세. 본문은 리치 HTML(관리자 WYSIWYG 작성)을
-// DOMPurify 로 sanitize 후 렌더. 구 평문 공지(태그 없음)는 줄바꿈 유지(pre-line) + URL 링크.
+// sanitize 후 렌더(<HtmlBody> — CSS 를 들고 온 본문은 Shadow DOM 으로 격리).
+// 구 평문 공지(태그 없음)는 줄바꿈 유지(pre-line) + URL 링크.
 const CAT_CLASS: Record<string, string> = {
   guide: 'bg-surface-container-high text-on-surface',
   schedule: 'bg-primary/10 text-primary',
@@ -119,7 +120,7 @@ export default function NoticeDetail() {
             </div>
             <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-7 break-keep border-b border-outline-variant/30 pb-6">{title}</h1>
             {looksHtml(body) ? (
-              <div className="notice-content text-body-lg" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body) }} />
+              <HtmlBody html={body} className="notice-content text-body-lg" />
             ) : (
               <div className="notice-content text-body-lg whitespace-pre-line break-keep">{linkify(body)}</div>
             )}

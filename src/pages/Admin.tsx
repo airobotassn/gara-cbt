@@ -7,6 +7,7 @@ import { renderEbookCover } from '../lib/ebookCover'
 import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
 import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
+import { importNoticeHtml } from '../lib/noticeHtml'
 import type {
   AdminListResponse,
   AdminAttemptRow,
@@ -981,10 +982,47 @@ function NoticesAdmin() {
     enabled: !!draft,
   })
 
+  // 본문 입력 방식 — 편집기(WYSIWYG) ↔ HTML 소스. 만들어온 HTML 은 소스 쪽으로 들어온다.
+  //   ⚠️ 이 상태는 draft 와 같이 초기화해야 한다 — HTML 모드로 켜둔 채 다른 공지를 열면
+  //      평범한 글을 소스 편집기로 마주하게 된다.
+  const [htmlMode, setHtmlMode] = useState(false)
+  const [htmlNotes, setHtmlNotes] = useState<string[]>([])
+
+  // .html 파일을 골라 본문으로. 붙여넣기와 **같은 정리 경로**를 탄다(둘이 다르면 결과가 갈린다).
+  async function pickHtmlFile() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.html,.htm,text/html'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const { html, notes } = importNoticeHtml(await file.text())
+      patchBody(html)
+      setHtmlNotes(notes)
+      setHtmlMode(true)
+    }
+    input.click()
+  }
+
+  // 소스칸에 통짜 문서를 붙여넣은 경우도 같이 편다(파일로 넣은 것과 결과가 같아야 한다).
+  function patchBodySource(v: string) {
+    if (/<html[\s>]|<body[\s>]/i.test(v)) {
+      const { html, notes } = importNoticeHtml(v)
+      patchBody(html)
+      setHtmlNotes(notes)
+      return
+    }
+    patchBody(v)
+  }
+
   function openNew() {
+    setHtmlMode(false)
+    setHtmlNotes([])
     setDraft(emptyDraft())
   }
   function openEdit(n: NoticeRow) {
+    setHtmlMode(false)
+    setHtmlNotes([])
     setDraft({
       id: n.id,
       category: n.category,
@@ -1201,10 +1239,60 @@ function NoticesAdmin() {
                 />
               </label>
               <div style={fieldStyle}>
-                <span>본문 <em style={{ color: 'var(--muted)' }}>(한국어 · 서식·이미지 가능)</em></span>
-                <Suspense fallback={<div style={{ padding: 12, color: 'var(--muted)', fontSize: 13 }}>에디터 불러오는 중…</div>}>
-                  <RichEditor value={draft.bodyI18n.ko ?? ''} onChange={patchBody} />
-                </Suspense>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>본문 <em style={{ color: 'var(--muted)' }}>(한국어 · 서식·이미지 가능)</em></span>
+                  <span style={{ flex: 1 }} />
+                  <button
+                    type="button"
+                    className="admin-mini"
+                    aria-pressed={!htmlMode}
+                    style={!htmlMode ? { fontWeight: 700 } : undefined}
+                    onClick={() => setHtmlMode(false)}
+                  >
+                    편집기
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-mini"
+                    aria-pressed={htmlMode}
+                    style={htmlMode ? { fontWeight: 700 } : undefined}
+                    onClick={() => setHtmlMode(true)}
+                  >
+                    HTML
+                  </button>
+                  <button type="button" className="admin-mini" onClick={pickHtmlFile}>
+                    HTML 파일 불러오기
+                  </button>
+                </div>
+                {htmlMode ? (
+                  <textarea
+                    style={{
+                      ...inpStyle,
+                      minHeight: 380,
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      whiteSpace: 'pre',
+                      overflowWrap: 'normal',
+                      overflowX: 'auto',
+                    }}
+                    value={draft.bodyI18n.ko ?? ''}
+                    onChange={(e) => patchBodySource(e.target.value)}
+                    placeholder="<style> 와 태그를 그대로 붙여넣으세요. 통짜 문서(<html>…)를 넣으면 본문만 알아서 추려냅니다."
+                    spellCheck={false}
+                  />
+                ) : (
+                  <Suspense fallback={<div style={{ padding: 12, color: 'var(--muted)', fontSize: 13 }}>에디터 불러오는 중…</div>}>
+                    <RichEditor value={draft.bodyI18n.ko ?? ''} onChange={patchBody} />
+                  </Suspense>
+                )}
+                {htmlNotes.length > 0 && (
+                  <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--error, #d43a3a)', lineHeight: 1.6 }}>
+                    {htmlNotes.map((n) => (
+                      <li key={n}>{n}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
                 🌐 저장하면 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역되어 올라갑니다.
