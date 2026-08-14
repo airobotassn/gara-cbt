@@ -313,6 +313,92 @@ async function geminiJson(sys: string, user: string, maxTokens: number): Promise
   throw new Error('unreachable')
 }
 
+// ---------- 번역 대상 = 눈에 보이는 글자만 ----------
+// ⚠️ 옛 방식은 본문을 통째로 넘기고 "태그는 그대로 두고 5개국어로 돌려달라" 였다. 그러면 모델이
+//    **같은 HTML 을 5벌 다시 써야** 해서, 6.9KB 짜리 HTML 공지 하나에 출력이 35KB 가 되고
+//    출력 한도(maxOutputTokens)를 넘겨 잘린다 → 잘리면 실패로 접혀 **한국어로만 저장**됐다.
+//    글자가 많아서가 아니라 태그·CSS 까지 베껴 쓰게 시켜서 생긴 문제다(그 파일의 실제 글자는 1KB 미만).
+//    지금은 텍스트 조각만 뽑아 보낸다 — 분량이 줄고, 태그·CSS 가 모델을 아예 안 거치므로
+//    **디자인이 망가질 수가 없다.**
+// ⚠️ `<style>`·`<script>`·주석 속 내용은 통째로 고정 조각이다. 텍스트로 새어 나가면 CSS 가 번역된다.
+const HTML_SPLIT = /<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<!--[\s\S]*?-->|<[^>]+>/gi
+const HAS_LETTER = /\p{L}/u
+
+type Piece = { raw: string } | { text: string; lead: string; tail: string }
+
+// 조각 앞뒤 공백은 번역에서 떼어 둔다 — 모델이 공백을 흘리면 단어가 붙어버린다.
+function pushText(pieces: Piece[], s: string) {
+  if (!HAS_LETTER.test(s)) {
+    pieces.push({ raw: s }) // 숫자·기호·공백뿐 → 보낼 이유가 없다
+    return
+  }
+  const lead = /^\s*/.exec(s)![0]
+  const tail = /\s*$/.exec(s)![0]
+  pieces.push({ text: s.slice(lead.length, s.length - tail.length), lead, tail })
+}
+
+function splitPieces(src: string): Piece[] {
+  const pieces: Piece[] = []
+  let last = 0
+  HTML_SPLIT.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = HTML_SPLIT.exec(src)) !== null) {
+    if (m.index > last) pushText(pieces, src.slice(last, m.index))
+    pieces.push({ raw: m[0] })
+    last = m.index + m[0].length
+  }
+  if (last < src.length) pushText(pieces, src.slice(last))
+  return pieces
+}
+
+function joinPieces(pieces: Piece[], translated: string[], from: number): string {
+  let i = from
+  return pieces
+    .map((p) => ('raw' in p ? p.raw : `${p.lead}${translated[i++] ?? p.text}${p.tail}`))
+    .join('')
+}
+
+// 한 번에 보낼 조각 묶음 크기. 출력이 5개국어 × 이 분량이라 여기서 출력 한도가 정해진다.
+const BATCH_CHARS = 2500
+
+async function translateSegments(segs: string[]): Promise<Record<string, string[]>> {
+  const langList = TARGET_LANGS.map((c) => `"${c}" = ${LANG_NAMES[c]}`).join(', ')
+  const sys =
+    'You are a professional translator for a Korean AI-literacy certification website (CARIS). ' +
+    'You receive a JSON array of Korean text fragments taken from a web page. ' +
+    'RULES: (1) translate each item independently into each requested language; ' +
+    '(2) return arrays with EXACTLY the same number of items, in the same order — never merge, split, drop or reorder items; ' +
+    '(3) natural, idiomatic wording, preserving meaning and tone; ' +
+    '(4) do NOT translate product names, acronyms (SEB, PC, AI, CARIS, OMR, PDF) or numbers; ' +
+    '(5) keep HTML entities (e.g. &nbsp;) exactly as they appear; ' +
+    '(6) output ONLY valid JSON, no markdown.'
+
+  const outByLang: Record<string, string[]> = {}
+  for (const c of TARGET_LANGS) outByLang[c] = []
+
+  for (let i = 0; i < segs.length; ) {
+    const batch: string[] = []
+    let size = 0
+    while (i < segs.length && (batch.length === 0 || size + segs[i].length <= BATCH_CHARS)) {
+      size += segs[i].length
+      batch.push(segs[i++])
+    }
+    const user =
+      `Translate into: ${langList}.\n` +
+      `Return JSON shaped exactly as { ${TARGET_LANGS.map((c) => `"${c}": [ ... ]`).join(', ')} }, ` +
+      `each array containing exactly ${batch.length} strings.\n\n` +
+      `SOURCE (Korean):\n${JSON.stringify(batch)}`
+    const parsed = JSON.parse(await geminiJson(sys, user, 8192))
+    for (const c of TARGET_LANGS) {
+      const arr = parsed?.[c]
+      // ⚠️ 개수가 어긋나면 그 언어는 통째로 버린다 — 하나만 밀려도 글이 엉뚱한 자리에 박힌다.
+      const ok = Array.isArray(arr) && arr.length === batch.length && arr.every((v) => typeof v === 'string')
+      outByLang[c].push(...(ok ? (arr as string[]) : batch))
+    }
+  }
+  return outByLang
+}
+
 // 여러 한국어 필드 → 나머지 5개국어. 반환: { <field>: { ko, en, ja, zh, hi, vi } }.
 //   키 없거나 내용 없으면 ko만 반환(throw X). API/파싱 실패 시 throw(호출측 best-effort). 공지·FAQ·일정 공용.
 async function translateKoFields(
@@ -325,34 +411,20 @@ async function translateKoFields(
   const hasContent = fields.some((f) => (koFields[f] ?? '').trim())
   if (!GEMINI_API_KEY || !hasContent) return out
 
-  const langList = TARGET_LANGS.map((c) => `"${c}" = ${LANG_NAMES[c]}`).join(', ')
-  const shape = `{ ${TARGET_LANGS.map(
-    (c) => `"${c}": { ${fields.map((f) => `"${f}":"..."`).join(', ')} }`,
-  ).join(', ')} }`
-  const sys =
-    'You are a professional translator for a Korean AI-literacy certification website (CARIS). ' +
-    'Translate the given Korean fields into the requested languages. ' +
-    'RULES: (1) natural, idiomatic wording as a native speaker would write, preserving meaning and tone; ' +
-    '(2) do NOT translate product names, acronyms (SEB, PC, AI, CARIS, OMR, PDF) or numbers; ' +
-    '(3) preserve line breaks; ' +
-    '(4) if a field contains HTML, translate ONLY the human-visible text and keep every HTML tag, attribute, and URL (href/src) exactly unchanged; ' +
-    '(5) output ONLY valid JSON, no markdown.'
-  const user =
-    `Translate these Korean fields into: ${langList}.\n` +
-    `Return JSON shaped exactly as ${shape}.\n` +
-    `If a source field is empty, return "" for it in every language.\n\n` +
-    `SOURCE (Korean):\n${JSON.stringify(koFields)}`
+  // 필드를 조각으로 쪼개고, 번역할 텍스트만 한 줄로 모은다(필드 경계는 개수로 기억).
+  const pieces: Record<string, Piece[]> = {}
+  const starts: Record<string, number> = {}
+  const segs: string[] = []
+  for (const f of fields) {
+    pieces[f] = splitPieces(koFields[f] ?? '')
+    starts[f] = segs.length
+    for (const p of pieces[f]) if ('text' in p) segs.push(p.text)
+  }
+  if (segs.length === 0) return out
 
-  const raw = await geminiJson(sys, user, 8192)
-  const parsed = JSON.parse(raw)
+  const byLang = await translateSegments(segs)
   for (const c of TARGET_LANGS) {
-    const langObj = parsed?.[c]
-    if (langObj && typeof langObj === 'object') {
-      for (const f of fields) {
-        const v = (langObj as Record<string, unknown>)[f]
-        if (typeof v === 'string' && v.trim()) out[f][c] = v
-      }
-    }
+    for (const f of fields) out[f][c] = joinPieces(pieces[f], byLang[c], starts[f])
   }
   return out
 }

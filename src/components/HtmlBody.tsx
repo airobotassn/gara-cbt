@@ -55,6 +55,10 @@ function rehostRules(group: CSSStyleSheet | CSSGroupingRule) {
   }
 }
 
+// 격리 대상 판정의 단일 출처 — 렌더러와 페이지 폭이 **같은 기준**을 봐야 한다.
+// (한쪽만 바뀌면 원본 폭으로 만든 문서가 좁은 칸에 갇히거나, 평범한 공지가 넓게 퍼진다.)
+export const isIsolatedHtml = (html: string) => /<style[\s>]/i.test(html)
+
 export function mountIsolated(host: HTMLElement, cleanHtml: string) {
   // 같은 호스트에 두 번 attach 하면 예외가 난다 — 이미 있으면 그걸 다시 쓴다.
   const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
@@ -67,7 +71,7 @@ export function mountIsolated(host: HTMLElement, cleanHtml: string) {
 
 export default function HtmlBody({ html, className }: { html: string; className?: string }) {
   // ⚠️ 판정은 원본으로(위 ①). sanitize 결과에는 <style> 이 남지 않는다.
-  const isolated = useMemo(() => /<style[\s>]/i.test(html), [html])
+  const isolated = useMemo(() => isIsolatedHtml(html), [html])
   const clean = useMemo(
     () => (isolated ? DOMPurify.sanitize(html, { WHOLE_DOCUMENT: true }) : DOMPurify.sanitize(html)),
     [html, isolated],

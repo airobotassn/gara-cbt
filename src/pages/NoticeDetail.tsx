@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import HtmlBody from '../components/HtmlBody'
+import HtmlBody, { isIsolatedHtml } from '../components/HtmlBody'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
@@ -88,6 +88,12 @@ export default function NoticeDetail() {
   const title = row ? row.title || row.title_ko || '' : ''
   const body = row ? row.body || row.body_ko || '' : ''
 
+  // 만들어 올린 HTML 공지는 자기 폭(보통 1000px 안팎)을 전제로 그려져 있다. 기본 글 폭(max-w-3xl=768px)
+  // 안에 넣으면 표 칸마다 글자가 줄바꿈돼 **디자인이 아니라 자리가 없어서** 찌그러진다.
+  // 그래서 그 공지에서만 폭 제한을 풀고 카드 여백도 줄인다(1000 + 본문 여백 40 + 카드 여백 48 ≒ 1090).
+  // ⚠️ 평범한 공지는 넓히지 않는다 — 글줄이 길어지면 읽기 나빠진다.
+  const wide = isIsolatedHtml(body)
+
   return (
     <div className="bg-background text-on-surface min-h-screen relative overflow-x-hidden flex flex-col">
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-[-1]">
@@ -95,7 +101,11 @@ export default function NoticeDetail() {
         <div className="ambient-mesh bg-surface-mesh-cyan bottom-[-20%] right-[-10%]"></div>
       </div>
 
-      <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop max-w-3xl mx-auto w-full">
+      <main
+        className={`flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop mx-auto w-full ${
+          wide ? 'max-w-[1120px]' : 'max-w-3xl'
+        }`}
+      >
         <Link to="/notice" className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           {t('notice.back_list')}
@@ -110,7 +120,11 @@ export default function NoticeDetail() {
         )}
 
         {!loading && row && (
-          <article className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-8 md:p-10 ambient-shadow">
+          <article
+            className={`bg-surface-container-lowest rounded-2xl border border-outline-variant/20 ambient-shadow ${
+              wide ? 'p-4 md:p-6' : 'p-8 md:p-10'
+            }`}
+          >
             <div className="flex items-center gap-3 mb-5 flex-wrap">
               {row.required && (
                 <span className={`${REQUIRED_CLASS} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t('notice.tag_required')}</span>
