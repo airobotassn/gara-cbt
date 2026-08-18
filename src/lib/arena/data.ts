@@ -1,6 +1,11 @@
-// 월드 아레나 지도 데이터 계층 — TopoJSON 로딩 · 지역 모델 · 색 스케일 · 목값.
+// 월드 아레나 지도 데이터 계층 — TopoJSON 로딩 · 지역 모델 · 색 스케일.
 //   지도 경계는 public/geo/*.json (Natural Earth 세계 · 통계청 2018 시도/시군구) 를 런타임에 fetch 한다.
 //   시군구(kr-muni, 177KB)는 시도까지 파고든 사람만 필요하므로 **드릴다운 시점에 지연 로드**한다.
+//
+// ⚠️ **점수는 여기서 안 만든다(2026-08-18).** 예전엔 이 파일에 데모 순위표(MOCK_TOP_COUNTRY 41개국
+//    \+ 해시 꼬리 · KR_PROV_ORDER)가 박혀 있어서, 서버 실집계가 없는 구역을 브라우저가 지어냈다.
+//    지금은 **더미도 DB(arena_seed_buckets)에 있고** 서버가 실집계와 가중평균으로 섞어 내려준다.
+//    → 여기 목값을 되살리지 말 것. 되살리면 "서버가 말하는 순위"와 "화면이 말하는 순위"가 갈린다.
 import { feature } from 'topojson-client'
 import { scaleLinear } from 'd3-scale'
 import type { Feature, Geometry, FeatureCollection } from 'geojson'
@@ -30,7 +35,11 @@ export interface GeoProps {
 }
 export type GeoFeature = Feature<Geometry, GeoProps> & { id?: string | number }
 
-/** 지도에 칠할 한 구역(국가/시도/시군구). score·takers 는 실데이터 없으면 목값. */
+/**
+ * 지도에 칠할 한 구역(국가/시도/시군구).
+ * score·takers 는 서버 버킷 값이고, 버킷이 없으면 0 이다(브라우저가 지어내지 않는다).
+ * `real` = 그 버킷에 **실회원이 1명이라도 있나**(시드 더미만 있으면 false) — 툴팁의 '실집계' 배지용.
+ */
 export interface Region {
   f: GeoFeature
   key: string
@@ -43,17 +52,21 @@ export interface Region {
 }
 
 /**
- * 백엔드 집계 주입분: alpha2(국가) 또는 region_code(시도) → 값.
+ * 백엔드 집계 주입분: alpha2(국가) 또는 region_code(시도·주) → 값.
  *
  * `score` = leaderboard RPC 의 `score` 필드 = **베이지안 보정된 season_total 평균**
  * (season_total = 개인의 skill_score + activity_score, 즉 개인 랭킹과 같은 재료).
  * 예전엔 같은 응답의 `avg_level`(보정 전 날것)을 썼는데, 그건 이름만 level 이지 실제로는
  * 0~10000 스케일의 랭킹점수라 "Lv.2290" 같은 표시가 나왔고 소수 인원 버킷이 그대로 1위를 먹었다.
  * RPC 쪽 보정(K=25 shrinkage + 일간창 참여율 가중)을 살리려면 반드시 `score` 를 써야 한다.
+ *
+ * ⚠️ 이 값은 **시드 더미 + 실집계가 이미 합쳐진 것**이다(서버 `refresh_arena_buckets`).
+ *    `hasReal` 만이 진짜 사람이 있는 버킷인지 말해 준다 — `members` 는 가상 회원을 포함한다.
  */
 export interface RealBucket {
   score: number
   members: number
+  hasReal: boolean
 }
 export interface RealData {
   country: Record<string, RealBucket>
@@ -107,96 +120,6 @@ export function loadAdm1Index(): Promise<Record<string, number>> {
       .catch(() => ({}))
   }
   return adm1IndexCache
-}
-
-// ── 실데이터 없을 때 쓰는 목값(지역 코드 해시 기반 — 새로고침해도 같은 값) ──
-function h32(s: string): number {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return h >>> 0
-}
-/** 목 점수 — season_total 스케일(0~10000)에 맞춘다. 실집계와 같은 축이어야 한 목록에서 섞인다. */
-const mockScore = (k: string, max: number) => Math.round((h32('s' + k) % (max * 100)) / 100)
-const mockTakers = (k: string) => 30 + (h32('n' + k) % 9970)
-
-/**
- * 데모용 국가 점수 고정표 — 해시 난수만 쓰면 지구본 1위가 말라위·소말리아로, 10위가 뉴칼레도니아로
- * 잡혀 랭킹이 설득력을 잃는다. 그래서 주요국 ~40개를 그럴듯한 순서로 박아 두고, 나머지 소국은
- * 아래 해시(MOCK_REST_MAX 이하)로 꼬리만 채운다. 키는 M49 코드(= world.json 의 feature id, 100 미만은 0 패딩).
- *
- * ⚠️ 전부 **데모용 임시값**이다. AI 활용능력 실측이 아니라 화면이 자연스러워 보이라고 손으로 매긴 순서다.
- * ⚠️ 싱가포르(702)·홍콩(344)은 world.json(Natural Earth 110m, 177개국)에 없어서 못 넣는다(더 상세한 지도 필요).
- * ⚠️ 실집계(leaderboard)가 있는 국가는 그쪽이 이 값을 덮는다. 대한민국(410)도 여기 값이 있지만, 백엔드가
- *    실데이터를 주면 그걸 쓴다 — 백엔드 없이도 데모가 안 무너지게 목값을 같이 둔 것뿐이다.
- */
-const MOCK_TOP_COUNTRY: Record<string, number> = {
-  '840': 3200, // 미국
-  '156': 2900, // 중국
-  '356': 2600, // 인도
-  '410': 2292, // 대한민국(실데이터 있으면 덮임)
-  '826': 2100, // 영국
-  '724': 1980, // 스페인
-  '784': 1880, // 아랍에미리트
-  '392': 1780, // 일본
-  '124': 1680, // 캐나다
-  '376': 1600, // 이스라엘
-  '276': 1560, // 독일
-  '250': 1500, // 프랑스
-  '380': 1440, // 이탈리아
-  '528': 1390, // 네덜란드
-  '752': 1340, // 스웨덴
-  '756': 1300, // 스위스
-  '246': 1250, // 핀란드
-  '036': 1200, // 호주
-  '076': 1150, // 브라질
-  '643': 1100, // 러시아
-  '616': 1050, // 폴란드
-  '792': 1000, // 터키
-  '682': 960, // 사우디아라비아
-  '372': 920, // 아일랜드
-  '578': 880, // 노르웨이
-  '208': 840, // 덴마크
-  '040': 800, // 오스트리아
-  '056': 760, // 벨기에
-  '620': 720, // 포르투갈
-  '484': 680, // 멕시코
-  '360': 640, // 인도네시아
-  '704': 600, // 베트남
-  '764': 560, // 태국
-  '818': 520, // 이집트
-  '566': 480, // 나이지리아
-  '032': 440, // 아르헨티나
-  '710': 400, // 남아프리카공화국
-  '804': 360, // 우크라이나
-  '458': 320, // 말레이시아
-  '608': 290, // 필리핀
-  '554': 270, // 뉴질랜드
-}
-/** 고정표에 없는 소국이 받을 상한 — 위 최저(뉴질랜드 270) 아래로 눌러 주요국 순위를 안 깨뜨린다. */
-const MOCK_REST_MAX = 255
-const mockCountryScore = (id: string, key: string) => MOCK_TOP_COUNTRY[id] ?? mockScore(key, MOCK_REST_MAX)
-
-/**
- * 대한민국 시도의 데모 순위 — 1위부터 나열(코드는 kr-prov.json 기준).
- * 경기·서울·부산은 지정값이고 그 아래는 인구순이다. 해외는 빌드 때 박아 둔 `ord`
- * (수도 1위 → 도시 인구 합 순)를 쓰므로 여기 표가 필요 없다.
- */
-const KR_PROV_ORDER = ['31', '11', '21', '38', '23', '37', '22', '34', '36', '35', '33', '32', '25', '24', '26', '39', '29']
-
-/**
- * 지역 데모 점수 — **순위가 그대로 보이도록** 등수에서 역산한다.
- * 예전엔 지역 코드 해시라 순서가 무작위였다("아무렇게나 되어 있다"는 지적).
- * 실집계가 붙으면 이 값은 안 쓰인다.
- */
-function mockRegionScore(r: Omit<Region, 'score' | 'takers' | 'real'>, total: number): number {
-  const kr = r.code ? KR_PROV_ORDER.indexOf(r.code) : -1
-  const ord = kr >= 0 ? kr + 1 : (r.f.properties.ord ?? total)
-  // 1위가 가장 높고 아래로 고르게 내려간다. 같은 등수가 없으니 동점도 없다.
-  const span = Math.max(1, total)
-  return Math.round(MOCK_REST_MAX * (1 - (ord - 1) / span) * 100) / 100
 }
 
 /**
@@ -388,18 +311,24 @@ export function buildRegions({
   }
 
   return base.map((r) => {
-    // 실데이터 우선(국가=alpha2, 시도=ISO 3166-2).
+    // 서버 버킷 매칭(국가=alpha2, 지역=region_code).
     let bucket: RealBucket | undefined
     if (level === 0) {
       const iso = M49_TO_ISO2[String(r.f.id)]
       if (iso) bucket = real.country[iso]
     } else if (level === 1 && r.code) {
-      // 실집계는 아직 대한민국 시도만 있다. adm1(해외)은 코드 체계가 달라 매칭 대상이 없어 목값이 된다.
-      const iso = PROV_TO_ISO[r.code]
-      if (iso) bucket = real.region[iso]
+      // ⚠️ 대한민국 시도만 숫자 코드(`11`·`37`)라 ISO 3166-2 로 옮겨야 하고, 해외 adm1 은
+      //    지도 파일의 code 가 이미 ISO 3166-2(`US-CA`)라 그대로가 키다. 폴백을 빼면 해외
+      //    주(州)가 통째로 0점이 된다.
+      bucket = real.region[PROV_TO_ISO[r.code] ?? r.code]
     }
-    if (bucket) return { ...r, score: bucket.score, takers: bucket.members, real: true }
-    const score = level === 0 ? mockCountryScore(String(r.f.id), r.key) : mockRegionScore(r, base.length)
-    return { ...r, score, takers: mockTakers(r.key), real: false }
+    // 버킷이 없으면 0 이다 — 브라우저가 점수를 지어내지 않는다(파일 머리 주석 참고).
+    // 시드가 DB 에 깔려 있으므로 정상 상태에서 0 이 나오는 구역은 지도에만 있고 시드에 없는 곳이다.
+    return {
+      ...r,
+      score: bucket?.score ?? 0,
+      takers: bucket?.members ?? 0,
+      real: bucket?.hasReal ?? false,
+    }
   })
 }

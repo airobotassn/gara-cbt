@@ -1,11 +1,11 @@
 // T-Room — 방 꾸미기(미니룸) 검증.
-//   (A) 마이그레이션(20260814090000): 파츠 내림 · 가구 시드 · 면 CHECK · 뽑기 풀 교체 · user_rooms
+//   (A) 마이그레이션(20260814090000): 파츠 내림 · 가구 시드 · 면 CHECK · user_rooms
 //   (B) 배치 검증 로직(_shared/room.ts): 소유·면·모르는 슬롯 처리
 //
 // 왜 이 둘을 한 파일에 두나: 이 기능의 정확성은 "DB 가 무엇을 허용하나" 와 "함수가 무엇을 거절하나"
 // 두 쪽이 맞물려야 성립한다. 한쪽만 보면 "카탈로그엔 벽 가구인데 코드가 바닥에 놓아준다" 를 못 잡는다.
 //
-// pglite 하네스 관례는 t-gacha-shop.mjs 와 동일(auth.users FK strip, Supabase 롤 선생성).
+// pglite 하네스 관례는 t-shop.mjs 와 동일(auth.users FK strip, Supabase 롤 선생성).
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { ROOM_LAYOUT, sanitizeSlots, validateSlots } from '../../supabase/functions/_shared/room.ts';
@@ -33,6 +33,8 @@ await raw(load('supabase/migrations/20260716130000_gacha_tuning.sql'));
 const partsBefore = Number((await q(`select count(*) c from shop_catalog where active`)).rows[0].c);
 
 await raw(load('supabase/migrations/20260814090000_room_furniture.sql'));
+// 뽑기 제거 — 한정 가구 2종이 여기서 카탈로그에서 사라진다(그 마이그레이션 자체 검증은 t-drop-gacha.mjs).
+await raw(readFileSync('supabase/migrations/20260818120000_drop_gacha.sql', 'utf8'));
 
 // ============================================================
 // A1) 파츠는 내려가고 가구만 남는다 — 소유 기록은 건드리지 않는다
@@ -47,9 +49,9 @@ ok('A1c 파츠 행 자체는 지우지 않았다(이미 산 사람의 이름 표
 // A2) 가구 시드 — 면이 반드시 있고, 상점 진열은 active 만
 // ============================================================
 const fur = (await q(`select part_key, surface, active, price from shop_catalog where kind='furniture' order by sort_order`)).rows;
-eq('A2a 가구 12종', fur.length, 12);
+eq('A2a 가구 10종', fur.length, 10);
 ok('A2b 모든 가구에 면이 있다', fur.every((f) => f.surface === 'floor' || f.surface === 'wall'), fur.map((f) => f.surface));
-eq('A2c 상점 진열 가구 10종(한정 2종 제외)', fur.filter((f) => f.active).length, 10);
+eq('A2c 전부 상점에 진열된다(뽑기 전용 한정 2종은 삭제됨)', fur.filter((f) => f.active).length, 10);
 ok('A2d 진열 가구는 값이 0원이 아니다', fur.filter((f) => f.active).every((f) => f.price > 0), fur.filter((f) => f.active).map((f) => f.price));
 
 // ============================================================
@@ -67,21 +69,11 @@ catch (e) { partWithSurface = e.message || String(e); }
 ok('A3b 면 붙은 파츠 거절', partWithSurface != null && /shop_catalog_kind_surface_chk/.test(partWithSurface), partWithSurface);
 
 // ============================================================
-// A4) 뽑기 풀 교체 — 안 바꾸면 뽑기가 계속 '안 보이는 파츠' 를 준다
-// ============================================================
-const pool = (await q(`select part_key, is_rare from gacha_pool where pool_key='default' order by part_key`)).rows;
-ok('A4a 풀이 전부 가구다', pool.length > 0 && pool.every((p) => p.part_key.startsWith('fur_')), pool.map((p) => p.part_key));
-eq('A4b 흔함 4 + 희귀 2 구조 유지', [pool.filter((p) => !p.is_rare).length, pool.filter((p) => p.is_rare).length], [4, 2]);
-const exclusive = (await q(`select part_key, dust_price from gacha_exclusive where active order by part_key`)).rows;
-ok('A4c 가루 교환도 가구로 이동', exclusive.length === 2 && exclusive.every((e) => e.part_key.startsWith('fur_')), exclusive.map((e) => e.part_key));
-eq('A4d 교환가 150 유지(천장 설계 전제값)', [...new Set(exclusive.map((e) => Number(e.dust_price)))], [150]);
-
-// ============================================================
 // A5) shop_buy RPC 는 한 줄도 안 고쳤는데 가구를 팔아야 한다
 //     (소유를 user_cosmetics 로 통일한 설계가 실제로 성립하는지)
 // ============================================================
 const uid = '00000000-0000-0000-0000-0000000000a1';
-await q(`insert into user_currency(user_id, points, dust) values ($1, 1000, 0)`, [uid]);
+await q(`insert into user_currency(user_id, points) values ($1, 1000)`, [uid]);
 await q(`select shop_buy($1,'fur_sofa_01','n1')`, [uid]);
 const boughtPts = Number((await q(`select points from user_currency where user_id=$1`, [uid])).rows[0].points);
 eq('A5a 가구 구매로 코인 차감(1000-400)', boughtPts, 600);
@@ -89,9 +81,9 @@ const ownsSofa = Number((await q(`select count(*) c from user_cosmetics where us
 eq('A5b 소유는 user_cosmetics 에 그대로 쌓인다', ownsSofa, 1);
 
 let buyInactive = null;
-try { await q(`select shop_buy($1,'fur_aquarium_01','n2')`, [uid]); }
+try { await q(`select shop_buy($1,'hat_common_01','n2')`, [uid]); }
 catch (e) { buyInactive = e.message || String(e); }
-ok('A5c 상점에서 내린 한정템은 코인으로 못 산다', buyInactive != null, buyInactive);
+ok('A5c 상점에서 내린 파츠는 코인으로 못 산다(행은 남아 있어도 active=false)', buyInactive != null, buyInactive);
 
 // ============================================================
 // A6) user_rooms — service role 전용(정책 미부여)

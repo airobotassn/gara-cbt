@@ -63,6 +63,17 @@ export function tierName(key: string): string {
   return TIER_NAME[key] ?? key
 }
 
+/** 아직 열지 않은 급수 = CARIS-Ⅱ 전부. 출제 배분표(TIER_DRAW_CELLS)도 문제은행도 없어서 "팔 수 있는 시험"이
+ *  아니다. 그런데 지금까지 이걸 막는 장치가 **응시료 미설정 하나뿐**이라, 관리자가 금액칸에 숫자를 한 번
+ *  넣으면 문항 0개짜리 시험이 그대로 결제된다(2026-08-18). 그래서 관리자 화면에서 두 입구를 잠근다 —
+ *  회차의 '열리는 급수' 체크와 응시료 입력.
+ *  ⚠️ **이미 열려 있는 회차는 건드리지 않는다**(제5회 CARIS 의 Master 가 그렇다). 잠금은 '새로 여는 것'만
+ *     막는다 — 운영 중인 회차의 급수를 코드 배포가 조용히 닫으면 그 회차 화면이 하루아침에 달라진다.
+ *  ⚠️ 서버 짝 = supabase/functions/_shared/exam-tickets.ts 의 LOCKED_TIERS. 급수를 열 땐 **둘 다** 지울 것
+ *     (한쪽만 지우면 화면은 열리는데 서버가 거절해서 원인을 못 찾는다). */
+export const LOCKED_TIERS: readonly string[] = ['master', 'grandmaster', 'zenith']
+export const isTierLocked = (key: string) => LOCKED_TIERS.includes(key)
+
 /** 급수 대표색(딥블루 → 그린 사다리). /guide 피라미드와 러닝 라이브러리(/ebooks) 급수 열이 같이 쓴다.
  *  ⚠️ src/styles/guide.css · Guide.tsx 의 SPECTRUM(그라데이션 두 끝점)과 동기화 — 바꾸면 셋 다. */
 export const TIER_COLORS: Record<string, string> = {

@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthProvider'
 import { useT, localeOf } from '../lib/i18n'
 import { dailyTerm, dailyChoices, termTheory, TERMS } from '../lib/terms'
 import DailyVisual from '../components/DailyVisual'
+import StarField from '../components/StarField'
 
 // ⚠️ 서버(complete-daily)의 DAILY_POINTS 와 같은 값이어야 한다. 적립 권위는 서버, 여기는 예고 표시용.
 const DAILY_POINTS = 10
@@ -122,6 +123,8 @@ export default function Daily() {
 
   return (
     <div className="dy-page">
+      {/* 밤하늘 — /arena 와 같은 별(다크에서만). 내용은 .dy-wrap 이 z-index:1 로 그 위에 선다. */}
+      <StarField />
       <div className="dy-wrap">
       <div className="dy-top">
         {/* 뒤로 = 아레나. 아레나 하단 런처가 허브·레벨테스트·데일리·미니게임의 관문이라 그게 이 화면의 부모다. */}

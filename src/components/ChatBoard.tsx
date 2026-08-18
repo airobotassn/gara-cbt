@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { linkify } from '../lib/linkify'
 import { Avatar } from './GemAvatar'
-import { countryName, flagEmoji } from '../lib/regions'
+import { countryName, flagUrl } from '../lib/regions'
 import ShareCardModal from './ShareCardModal'
 import type { ShareCardData } from '../lib/shareCard'
 
@@ -528,10 +528,15 @@ export default function ChatBoard({ room = 'global' }: Props) {
                         </button>
                       )}
                       <span className="chat-name">{r.display_name}</span>
-                      {flagEmoji(r.country_code) && (
-                        <span className="chat-flag" title={countryName(r.country_code as string, lang)}>
-                          {flagEmoji(r.country_code)}
-                        </span>
+                      {flagUrl(r.country_code) && (
+                        <img
+                          className="chat-flag"
+                          src={flagUrl(r.country_code)}
+                          alt={countryName(r.country_code as string, lang)}
+                          title={countryName(r.country_code as string, lang)}
+                          loading="lazy"
+                          decoding="async"
+                        />
                       )}
                       {r.is_anon && <span className="chat-anon-badge">{t('chat.anonBadge')}</span>}
                     </div>

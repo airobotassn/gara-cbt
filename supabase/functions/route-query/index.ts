@@ -38,7 +38,7 @@ const DEST: Record<string, string> = {
   arena: '/arena',              // 아레나 허브: 세계지도·세계리그·지역랭킹·채팅
   level_test: '/test/select',   // 지금 레벨 진단을 응시(레벨 선택 화면)
   ranking: '/ranking',          // 전체 랭킹·리더보드
-  hub: '/hub',                  // 캐릭터 허브: 캐릭터·코인·가챠·상점·출석
+  hub: '/hub',                  // 캐릭터 허브: 캐릭터·코인·상점·출석
   minigame: '/games',           // 미니게임 목록
   daily: '/daily',              // 오늘의 학습·오늘의 문제
   // --- CARIS 자격검정 ---
@@ -101,7 +101,7 @@ const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색�
 - arena      : WORLD ARENA 자체(세계지도·세계리그·지역/국가 랭킹·아레나 채팅)를 보러 왔다. ("월드 아레나", "WORLD ARENA", "카리스 아레나", "아레나", "세계 리그", "지도 보고싶어", "우리 지역 순위", "아레나 채팅")
 - level_test : 지금 무료 AI 실력 진단(레벨테스트)을 응시하고 싶다. ("레벨테스트 하고싶어", "내 실력 몇점", "무료 진단", "몇 레벨인지", "실력 측정")
 - ranking    : 전체 순위/랭킹/리더보드/명예의전당. ("랭킹", "순위", "1등이 누구")
-- hub        : 캐릭터 허브 — 내 캐릭터/아바타, 코인, 가챠(뽑기), 상점, 출석체크. ("캐릭터", "아바타 바꾸기", "가챠", "뽑기", "코인", "상점", "출석체크", "허브")
+- hub        : 캐릭터 허브 — 내 캐릭터/아바타, 코인, 상점, 출석체크. ("캐릭터", "아바타 바꾸기", "코인", "상점", "출석체크", "허브")
 - minigame   : 미니게임을 하고 싶다. ("미니게임", "게임", "버텨라 카리", "쏴라 카리", "골라라 카리", "닿아라 카리", "프로그램해라 카리", "지어라 카리", "게임하고싶어")
 - daily      : 오늘의 학습/오늘의 문제/데일리 콘텐츠. ("오늘의 학습", "오늘의 문제", "데일리", "오늘 뭐 배워")
 
@@ -165,7 +165,7 @@ function keywordRoute(q: string): string | null {
   if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재)|산\s?책|my\s?e-?book|e-?book\s?library|本棚|購入した本|我的电子书|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
   if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
   // --- 캐릭터 허브 ---
-  if (h(/허브|캐릭터|아바타|가챠|뽑기|코인|상점|출석|hub|character|avatar|gacha|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|ガチャ|コイン|ショップ|出席|角色|抽卡|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
+  if (h(/허브|캐릭터|아바타|코인|상점|출석|hub|character|avatar|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|コイン|ショップ|出席|角色|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
   // --- 이하 기존 순서 유지 ---
   if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
   if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage'

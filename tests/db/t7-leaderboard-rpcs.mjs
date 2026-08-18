@@ -1,3 +1,8 @@
+// ⚠️ **이 스위트는 옛 정의(매 요청 재계산)를 검증한다.** 2026-08-18 에 region_/country_/school_leaderboard
+//    는 스냅샷 테이블(arena_bucket_scores)을 읽는 판으로 바뀌었다 — 지금 프로덕션에서 도는 정의의
+//    검증은 `tests/db/t-arena-buckets.mjs` 다. 여기 남겨 두는 건 베이지안(K=25)·프라이버시 floor·
+//    탈퇴/익명 제외 같은 **집계 의미론**이 그대로 유지되는지를 값으로 못박아 두기 때문이다.
+//
 // T7 집계 리더보드 RPC 검증 — pglite(WASM Postgres 18)에 Supabase 롤 모형을 세우고
 // 실제 마이그레이션 DDL(supabase/migrations/20260714000200_leaderboard_rpcs.sql · 20260721060000_ranking_stage2_rpcs.sql)을 적용해
 //   · STAGE2-B 베이지안 집계: score = (n*group_avg + K*global_avg)/(n+K), K=25 —

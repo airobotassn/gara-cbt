@@ -1646,7 +1646,6 @@ const JA: Record<string, string> = {
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
   "hub.err.insufficient_points": "ポイントが足りません",
-  "hub.err.insufficient_dust": "かけらが足りません",
   "hub.err.already_owned": "すでに持っている限定アイテムです",
   "hub.err.unauthorized": "ログインが必要です",
   "hub.err.generic": "エラーが発生しました。しばらくしてからもう一度お試しください",
@@ -1663,11 +1662,11 @@ const JA: Record<string, string> = {
   "hub.room.surface_floor": "床",
   "hub.room.surface_wall": "壁",
   "hub.room.pick_title": "{where}に置く家具",
-  "hub.room.none_owned": "{where}に置ける家具がまだありません。ショップかガチャで手に入れましょう。",
+  "hub.room.none_owned": "{where}に置ける家具がまだありません。ショップで手に入れましょう。",
   "hub.room.remove": "この場所を空ける",
   "hub.room.help": "家具は一か所にだけ置けます。別の場所に置くと移動します。",
 
-  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  // 가구 이름 — 상점·방 고르기가 같이 쓴다.
   "hub.part.fur_plant_01": "小さな鉢植え",
   "hub.part.fur_lamp_01": "スタンドライト",
   "hub.part.fur_chair_01": "木の椅子",
@@ -1678,8 +1677,6 @@ const JA: Record<string, string> = {
   "hub.part.fur_clock_01": "壁掛け時計",
   "hub.part.fur_shelf_01": "本棚",
   "hub.part.fur_window_01": "窓",
-  "hub.part.fur_aquarium_01": "小さな水槽",
-  "hub.part.fur_neon_01": "ネオンサイン",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "部屋を見る",
@@ -1692,8 +1689,8 @@ const JA: Record<string, string> = {
   "room.my_room": "自分の部屋へ",
   "room.my_room_edit": "自分の部屋を模様がえ",
 
-  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
-  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   "hub.part.hat_common_01": "ふたばキャップ",
   "hub.part.hat_common_02": "ニット帽",
@@ -1703,8 +1700,8 @@ const JA: Record<string, string> = {
   "hub.part.crown_rare_01": "小さな王冠",
 
   // 상단·공통
-  "hub.gate_sub": "ログインして出席・ガチャ・ショップを使いましょう",
-  "hub.banner_login": "出席・ガチャ・ショップはログインが必要です",
+  "hub.gate_sub": "ログインして出席・ショップを使いましょう",
+  "hub.banner_login": "出席・ショップはログインが必要です",
   "hub.share": "シェア",
   "hub.gift_btn": "ギフト",
   "hub.help_aria": "ポイントの獲得方法",
@@ -1714,7 +1711,6 @@ const JA: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "出席",
-  "hub.rail.gacha": "ガチャ",
   "hub.rail.shop": "ショップ",
   "hub.rail.title": "称号",
   "hub.rail.invite": "招待する",
@@ -1734,34 +1730,15 @@ const JA: Record<string, string> = {
   "hub.toast.checkin_done": "出席完了 · +{n}P · スタンプ+1",
   "hub.toast.checkin_bonus": "出席完了 · +{n}P · 7日達成ボーナス +{b}P",
   "hub.toast.checkin_already": "出席完了 · 本日の報酬は受け取り済みです",
-  "hub.toast.no_coin": "コインが足りません",
   "hub.toast.no_points_item": "ポイントが足りません：{name}（{price}P）",
-  "hub.toast.no_dust": "かけらが足りません",
 
   // 구매/교환 완료 팝업
-  "hub.buy.exchanged": "交換完了！",
   "hub.buy.purchased": "購入完了！",
 
-  // 뽑기 모달
-  "hub.gacha.title": "ガチャ",
-  "hub.gacha.dust": "かけら",
-  "hub.gacha.owned_n": "{n}種 保有",
-  "hub.gacha.pity": "天井まで{n}回",
-  "hub.gacha.limited": "限定！",
-  "hub.gacha.dust_gain": "かけら +{n}",
-  "hub.gacha.dust_hint": "集めて限定アイテムと交換！",
-  "hub.gacha.drawing": "抽選中…",
-  "hub.gacha.draw": "ガチャ（{n} 🪙）",
-  "hub.gacha.ex_head": "かけら交換所",
-  "hub.gacha.ex_sub": "ガチャ限定アイテム",
-  "hub.gacha.have": "保有中",
-  "hub.gacha.exchange": "交換",
-  "hub.gacha.help": "ガチャを引くと必ずかけらが貯まります。天井（{n}回）で限定アイテム確定！かけらで好きな限定アイテムと直接交換もできます。",
 
   // 상점 모달
   "hub.shop.title": "ショップ",
   "hub.shop.balance": "保有CARIコイン",
-  "hub.shop.rare": "レア",
   "hub.shop.owned": "保有中",
   "hub.shop.buy": "購入",
   "hub.shop.empty": "ショップに商品がありません。",

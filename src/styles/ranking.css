@@ -861,25 +861,47 @@ html.dark body:has(.hof-wrap) {
   position: absolute; top: 0; transform: translateX(-50%);
   width: 26%; text-align: center; line-height: 1.15;
 }
+/* 이름 줄 = 이름 + 국기 한 줄(flex). 예전엔 block 이었고 말줄임도 여기 걸려 있었는데,
+   국기가 붙으면서 그 역할을 .hof-pn-name 으로 내렸다 — 이름만 줄어야 하기 때문이다. */
 .hof-pn b {
-  display: block; font-weight: 900;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; justify-content: center; gap: 0.3em;
+  font-weight: 900; min-width: 0;
 }
 /* ⚠️ nowrap 필수. 점수 단위가 언어마다 길다(ko '점' 1자 · vi 'điểm' · hi 'अंक') → 칸을 넘기면
    두 줄로 접혀 아래 목록과 붙는다. 넘치면 접지 말고 말줄임표. */
-.hof-pn span {
+/* ⚠️ 직접 자식(`>`)으로 좁혀야 한다 — 그냥 `.hof-pn span` 으로 두면 이름 span(.hof-pn-name)까지
+   잡아서 이름이 점수 색·크기로 그려진다. */
+.hof-pn > span {
   display: block; font-weight: 700; margin-top: 0.4cqw;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
+}
+/* 이름 — 칸을 넘치면 이쪽만 줄어든다. ⚠️ flex 아이템이라 min-width:0 이 없으면
+   축소 자체가 안 돼 말줄임이 안 먹고 국기를 칸 밖으로 밀어낸다. */
+.hof-pn-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 국기 — public/flags/<iso>.webp (flagcdn w160, 4:3).
+   크기를 em 으로 잡는 게 핵심이다: 부모 b 의 font-size 를 따라가므로
+   1등(4.2cqw)은 크고 2·3등(3.3cqw)은 작게 — 글자 위계가 국기에도 그대로 따라붙는다.
+   ⚠️ flex:none 이 없으면 이름이 길 때 국기가 같이 눌려 찌그러진다.
+   ⚠️ 밝은 테(1px)는 장식이 아니다 — 시상대 배경이 어두워서 어두운 국기는 테 없이는
+   바탕에 녹는다(밝은 국기는 제 힘으로 읽히므로 테가 묻혀도 된다).
+   ⚠️ **높이 1em 은 하한이다(2026-08-18에 0.72em 에서 올렸다).** 그 아래로 내리면 폭이 20px 밑으로
+   떨어져 태극기 4괘·성조기 별·인도 차크라가 뭉개진다. 그때 원본 해상도를 올려도 소용없다 —
+   w40/w80/w160 을 같은 크기로 나란히 렌더해 봤는데 w80 과 w160 은 차이가 없었다(w40 만 뭉갠다).
+   원본은 이미 160px 이고 화면에선 20~30px 이라 **부족한 건 해상도가 아니라 크기다.** */
+.hof-pn-flag {
+  flex: none; height: 1em; width: auto; aspect-ratio: 4 / 3;
+  object-fit: cover; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
 .hof-pn.p1 { left: 50.67%; }
 .hof-pn.p2 { left: 22.4%; }
 .hof-pn.p3 { left: 78.5%; }
 /* ⚠️ 2·3등 글자는 아래 4~10위 행 이름보다 커야 한다. 작으면 2등이 4등보다 덜 보이는 순위 역전이 난다. */
 .hof-pn.p1 b { font-size: 4.2cqw; color: #ffcc7a; }
-.hof-pn.p1 span { font-size: 3.2cqw; color: #d9b892; }
+.hof-pn.p1 > span { font-size: 3.2cqw; color: #d9b892; }
 .hof-pn.p2 b, .hof-pn.p3 b { font-size: 3.3cqw; }
-.hof-pn.p2 span, .hof-pn.p3 span { font-size: 2.7cqw; color: var(--muted); }
+.hof-pn.p2 > span, .hof-pn.p3 > span { font-size: 2.7cqw; color: var(--muted); }
 .hof-pn.p2 b { color: #dbe7ff; }
 .hof-pn.p3 b { color: #ffb894; }
 
@@ -932,6 +954,18 @@ html.dark body:has(.hof-wrap) {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .bar-nm small { font-weight: 700; font-size: 2.5cqw; color: #8ea4cc; }
+/* 이름 — 국기·'나' 배지와 한 줄이고, 칸이 넘치면 이쪽만 줄어든다.
+   ⚠️ min-width:0 이 없으면 flex 아이템이 안 줄어들어 말줄임이 안 먹고 국기를 칸 밖으로 민다. */
+.bar-nm-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 국기 — 시상대(.hof-pn-flag)와 같은 물건이고 크기만 이 판 글자에 맞췄다.
+   ⚠️ 1.15em 인 이유는 .hof-pn-flag 의 크기 주석 참고(이 판 글자가 3.2cqw 라 1em 이면 20px 을 밑돈다).
+   ⚠️ 흰 테인 이유 = 이 판은 양 테마에서 늘 어두운 남색이라(위 .bar-nm 주석 참고)
+   어두운 국기가 테 없이는 판에 녹는다. 테마따라 뒤집으면 안 된다. */
+.bar-flag {
+  flex: none; height: 1.15em; width: auto; aspect-ratio: 4 / 3;
+  object-fit: cover; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
 .bar-pt {
   position: absolute; right: 3.5%; top: 50.17%; transform: translateY(-50%);
   font-weight: 850; font-size: 3.2cqw; color: #9ac4ff; font-variant-numeric: tabular-nums;

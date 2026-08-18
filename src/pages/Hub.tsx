@@ -1,5 +1,5 @@
 // 캐릭터 허브(실동작) — /demo 첫 시안 기반 단일 로비 화면.
-//   출석·뽑기·상점·쿠폰·칭호는 전부 실제 백엔드 호출로 동작하며, 상세 동작은 팝업(모달)에서 처리한다.
+//   출석·상점·쿠폰·칭호는 전부 실제 백엔드 호출로 동작하며, 상세 동작은 팝업(모달)에서 처리한다.
 //   초기 재화·보유파츠·스탬프·천장·출석여부·카탈로그·쿠폰·칭호는 get-hub 로 하이드레이트(RLS 잠금 테이블이라 이 함수만 읽음).
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import '../styles/hub.css'
@@ -60,7 +60,7 @@ const SKIN = 'palace'
 
 /** 스킨별 아이콘 폴더. CSS 변수로 못 넘기는 유일한 자리 — <img src> 라 코드가 알아야 한다. */
 const SKIN_ICON_DIR: Record<string, string> = { palace: '/hub/ui' }
-const HUB_UI_ICON_NAMES = ['calendar', 'gift', 'shop', 'medal', 'invite'] as const
+const HUB_UI_ICON_NAMES = ['calendar', 'shop', 'medal', 'invite'] as const
 type HubUiIconName = (typeof HUB_UI_ICON_NAMES)[number]
 
 /** 레일 아이콘. 스킨이 없으면 원래 쓰던 SVG 로 돌아간다 — 스킨은 '덧입히는 것'이지 전제가 아니다. */
@@ -70,19 +70,9 @@ function HubUiIcon({ n, skin }: { n: HubUiIconName; skin: string | null }) {
   return <img className="hub-ui-icon" src={`${dir}/icon-${n}.png`} alt="" aria-hidden="true" />
 }
 
-function CurrencyCoin() {
-  return <img className="currency-coin" src="/hub/ui/currency-coin.png" alt="" aria-hidden="true" />
-}
-
-const DRAW_COST = 20
-const PITY_CEILING = 15
 const DAILY_POINTS = 10
 
 // 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
-//
-// ⚠️ 뽑기 풀 사본(옛 POOL 상수)은 **삭제했다.** 뽑기 결과를 그 사본에서 찾아 이름을 붙이고 있었는데,
-//    풀이 가구로 바뀌자(20260814090000) 사본에 없는 키가 와서 결과창이 "가루만 받음" 으로 표시됐다.
-//    서버가 준 part_key 를 그대로 쓰면 풀을 바꿔도 화면이 안 깨진다.
 // 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
 function partName(key: string, t: TFunc) {
   return t(`hub.part.${key}`)
@@ -100,21 +90,19 @@ function partEmoji(key: string) {
 
 // ── 서버 계약(입출력) ──
 // kind·surface 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
-interface CatalogItem { partKey: string; price: number; rare: boolean; kind?: string; surface?: string | null }
-interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; dust?: number; cosmetics?: string[]; stamps?: number; pity?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; exclusives?: { partKey: string; dustPrice: number }[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
+interface CatalogItem { partKey: string; price: number; kind?: string; surface?: string | null }
+interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; cosmetics?: string[]; stamps?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
   // 방(미니룸) — layout(슬롯 목록 + %좌표)은 서버가 통째로 준다. 프론트에 슬롯표를 두지 않는다.
   room?: { slots: RoomSlots; layout: RoomSlot[] }
   // 가구 전체(면 포함). catalog 와 달리 상점에서 내린 한정템도 들어 있다 — 이미 가진 사람은 계속 놓을 수 있어야 하므로.
   furniture?: { partKey: string; surface: string }[] }
-interface GachaResp { part_key: string | null; dust_gained: number; pity_before: number; pity_after: number; points_after: number; dust_after: number; duplicate: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
-interface ExchangeResp { part_key: string; spent_dust: number; dust_after: number }
 // stamps = 적립 뒤 7일 사이클 위치(1..7), bonus = 7일 완주 보너스 코인(0 이면 없음).
 interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
 
 // 방 저장 거절 사유(room 함수)도 사람 말로 옮긴다 — 'wrong_surface' 가 그대로 뜨면 원인 불명의 오류로 보인다.
 const FRIENDLY_ERR = new Set([
-  'insufficient_points', 'insufficient_dust', 'already_owned', 'unauthorized',
+  'insufficient_points', 'already_owned', 'unauthorized',
   'not_owned', 'not_furniture', 'wrong_surface',
 ])
 function friendlyError(e: unknown, t: TFunc): string {
@@ -124,7 +112,7 @@ function friendlyError(e: unknown, t: TFunc): string {
 
 type TitleItem = { tier: string; exam_title?: string }
 
-type ModalKind = 'gacha' | 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
+type ModalKind = 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
 
 // 면 라벨 사전 키 — 'floor'/'wall' 이 곧 키라서 표를 두 벌 두지 않는다(hub.earn.row.<kind> 와 같은 관례).
 const surfaceLabel = (surface: string, t: TFunc) => t(`hub.room.surface_${surface}`)
@@ -137,7 +125,7 @@ type GiftSendResp = { duplicate: boolean; amount: number; recipient_name: string
 type GiftHistoryResp = { rows: GiftRow[]; next: string | null }
 
 // 점수 획득 방법 모달의 활동 표 — 값은 전부 scoring.ts(원안 반영본) 파생이라 상수를 다시 적지 않는다.
-//   ⚠️ 여기 '점수'는 랭킹 점수(user_progress.activity_score)다. HUD 의 코인(뽑기·상점 재화)과는 별개 지갑이다.
+//   ⚠️ 여기 '점수'는 랭킹 점수(user_progress.activity_score)다. HUD 의 코인(상점 재화)과는 별개 지갑이다.
 // 라벨은 사전 키(hub.earn.row.<kind>)로 조립한다 — kind 가 곧 키라서 표를 두 벌 관리하지 않는다.
 const EARN_ROWS: { kind: ActivityKind; icon: string }[] = [
   { kind: 'attendance', icon: 'calendar' },
@@ -163,7 +151,7 @@ export default function Hub() {
   const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [redeeming, setRedeeming] = useState(false)
   // 코인 선물. giftNonce 는 **모달을 열 때 한 번** 만들고 전송이 성공할 때까지 고정한다 —
-  // 뽑기·상점처럼 호출마다 randomUUID() 를 만들면 타임아웃 후 재시도가 두 번 보내기가 되고,
+  // 상점처럼 호출마다 randomUUID() 를 만들면 타임아웃 후 재시도가 두 번 보내기가 되고,
   // 즉시 이체라 회수할 방법이 없다. 서버 멱등(unique(sender_id, client_nonce))은 같은 값이 와야 걸린다.
   const [giftNonce, setGiftNonce] = useState<string | null>(null)
   const [giftCode, setGiftCode] = useState('')
@@ -193,7 +181,6 @@ export default function Hub() {
   const [editing, setEditing] = useState(false)
   const [pickSlot, setPickSlot] = useState<string | null>(null) // 가구 고르기 모달이 열린 슬롯
   const [roomCopied, setRoomCopied] = useState(false)
-  const [pity, setPity] = useState(0)
   // 시험 사다리 등급(user_progress.rank). HUD 의 Lv 는 이제 ARENA 레벨(점수 밴드)이라 화면에는 안 쓴다
   // — 서버는 계속 내려주므로 받아만 둔다(기존 skillScore/activityScore 와 같은 패턴).
   const [, setLevel] = useState<number | null>(null)
@@ -202,11 +189,7 @@ export default function Hub() {
   const [titles, setTitles] = useState<TitleItem[]>([])
   const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
-  const [dust, setDust] = useState(0)
-  const [exclusives, setExclusives] = useState<{ partKey: string; dustPrice: number }[]>([])
-  const [lastDraw, setLastDraw] = useState<{ dust: number; partKey: string | null } | null>(null)
-  const [drawing, setDrawing] = useState(false)
-  const [purchased, setPurchased] = useState<{ partKey: string; kind: 'coin' | 'dust' } | null>(null)
+  const [purchased, setPurchased] = useState<string | null>(null)
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
@@ -338,7 +321,6 @@ export default function Hub() {
   function applyHub(h: HubState) {
     setPoints(h.points ?? 0)
     setStamps(h.stamps ?? 0)
-    setPity(h.pity ?? 0)
     setCheckedIn(!!h.dailyDone)
     setLearnDone(!!h.learnDone)
     setMinigameDone(!!h.minigameDone)
@@ -351,8 +333,6 @@ export default function Hub() {
     setTitles(h.titles ?? [])
     setCoupons(h.coupons ?? [])
     setCatalog(h.catalog ?? [])
-    setDust(h.dust ?? 0)
-    setExclusives(h.exclusives ?? [])
     setSkillScore(h.skillScore ?? 0)
     setActivityScore(h.activityScore ?? 0)
     setSeasonTotal(h.seasonTotal ?? 0)
@@ -408,24 +388,6 @@ export default function Hub() {
       pushErr(friendlyError(e, t))
     }
   }
-  // 뽑기 → gacha-draw (서버권위/멱등 nonce/천장/환급). 서버 결과로 토스트, get-hub 로 재동기화.
-  async function doGacha() {
-    if (!isFullUser) { void loginWithGoogle(); return }
-    if (points < DRAW_COST) { pushErr(t('hub.toast.no_coin')); return }
-    try {
-      setDrawing(true)
-      setLastDraw(null)
-      const r = await callFunction<GachaResp>('gacha-draw', { pool_key: 'default', client_nonce: crypto.randomUUID() })
-      window.setTimeout(() => {
-        setLastDraw({ dust: r.dust_gained, partKey: r.part_key })
-        setDrawing(false)
-      }, 900)
-      await hydrate()
-    } catch (e) {
-      setDrawing(false)
-      pushErr(friendlyError(e, t))
-    }
-  }
   // 상점 → shop-buy (가격은 서버 카탈로그 권위).
   async function doBuy(partKey: string, price: number) {
     if (!isFullUser) { void loginWithGoogle(); return }
@@ -433,7 +395,7 @@ export default function Hub() {
     if (points < price) { pushErr(t('hub.toast.no_points_item', { name: partName(partKey, t), price })); return }
     try {
       await callFunction<ShopResp>('shop-buy', { part_key: partKey, client_nonce: crypto.randomUUID() })
-      setPurchased({ partKey, kind: 'coin' })
+      setPurchased(partKey)
       await hydrate()
     } catch (e) {
       pushErr(friendlyError(e, t))
@@ -484,20 +446,6 @@ export default function Hub() {
     }
     setRoomCopied(true)
     window.setTimeout(() => setRoomCopied(false), 1600)
-  }
-
-  // 가루 교환 → gacha-exchange (뽑기 전용 한정템 지정 확정). 성공 시 리워드 팝업.
-  async function doExchange(partKey: string, price: number) {
-    if (!isFullUser) { void loginWithGoogle(); return }
-    if (owned.has(partKey)) return
-    if (dust < price) { pushErr(t('hub.toast.no_dust')); return }
-    try {
-      await callFunction<ExchangeResp>('gacha-exchange', { part_key: partKey, client_nonce: crypto.randomUUID() })
-      setPurchased({ partKey, kind: 'dust' })
-      await hydrate()
-    } catch (e) {
-      pushErr(friendlyError(e, t))
-    }
   }
 
   // ---------- 코인 선물 ----------
@@ -597,6 +545,10 @@ export default function Hub() {
   // const unusedCoupons = coupons.filter((c) => !c.used).length
   // RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
   const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {tierName(titles[0].tier)}</span> : null
+  // HUD·내 방에 뜨는 이름 = 내 닉네임. (예전엔 'CARI' 가 박혀 있어서 누구 화면이든 같은 이름이었다.)
+  // ⚠️ 구글 계정 이름(user_metadata.name)으로 폴백하지 말 것 — 실명이다. 닉네임 게이트가 막고 있는 걸
+  //    프로필을 받아오는 짧은 사이에 그대로 흘린다. 아직 못 받았으면 마스코트 이름으로 둔다.
+  const heroName = displayName?.trim() || 'CARI'
   // 가구 고르기 모달 파생값 — 고른 슬롯의 면과 맞고 **내가 가진** 가구만 후보다.
   //   면을 안 거르면 벽시계가 바닥 후보로 뜨고, 눌러도 서버가 wrong_surface 로 거절해 헛클릭이 된다.
   const pickSlotDef = pickSlot ? roomLayout.find((s) => s.key === pickSlot) ?? null : null
@@ -617,7 +569,7 @@ export default function Hub() {
     return nm === `region.${code}` ? code : nm
   }
 
-  // 허브는 로그인 전용(게스트는 출석·뽑기·상점이 전부 잠긴 빈 화면이라 진입 자체를 막는다).
+  // 허브는 로그인 전용(게스트는 출석·상점이 전부 잠긴 빈 화면이라 진입 자체를 막는다).
   //   로그인 후 /hub 로 복귀 — /auth/callback?next=/hub 로 왕복해도 next 가 URL 에 실려 안 날아간다.
   //   loading 중엔 판정 보류(허브가 한 프레임 번쩍였다 게이트로 바뀌는 것 방지).
   if (loading) {
@@ -710,7 +662,8 @@ export default function Hub() {
           </div>
           <div className="hud-mid">
             <div className="hud-name">
-              CARI {titleBadge}
+              {/* 닉네임은 12자까지 들어오므로 좁은 화면에서 자격 배지를 밀어낸다 → 이름만 말줄임(.hud-nick). */}
+              <span className="hud-nick">{heroName}</span> {titleBadge}
             </div>
             <div className="hud-xp">
               {/* ARENA 레벨 경험치 바. 라벨은 바 안 오른쪽(exp-lab) — 바깥에 맨텍스트로 두면 덜렁거린다. */}
@@ -730,7 +683,7 @@ export default function Hub() {
               {/* '?' 는 점수(경험치 바) 쪽 도움말이다 — 코인 옆에 두면 코인 설명으로 읽혀서 바 바로 뒤에 붙였다. */}
               <button className="hub-help" onClick={() => setModal('earn')} aria-label={t('hub.help_aria')}>?</button>
               {/* data-tip = 호버 툴팁("보유한 CARI 코인") — hub.css 의 .gchip[data-tip]::after */}
-              <span className="gchip" data-tip={t('hub.coin_tip')}><CurrencyCoin /><span className="num">{points.toLocaleString()}</span></span>
+              <span className="gchip" data-tip={t('hub.coin_tip')}><span className="num">{points.toLocaleString()}</span></span>
             </div>
           </div>
         </div>
@@ -761,11 +714,10 @@ export default function Hub() {
 
         {/* 친구 초대는 화면에 카드로 꺼내지 않는다 — 도크 '초대하기' 버튼 모달 하나로 모았다(진입점 중복 제거). */}
         <div className="stage-zone">
-            {/* 왼쪽 레일 제거 — 출석을 오른쪽 뽑기 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
+            {/* 왼쪽 레일 제거 — 출석을 오른쪽 맨 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
             {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
             <div className="rail rail-r">
               <button className="fcard f-daily" onClick={doDaily}><span className="fico"><HubUiIcon n="calendar" skin={SKIN} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
-              <button className="fcard f-gacha" onClick={() => setModal('gacha')}><span className="fico"><HubUiIcon n="gift" skin={SKIN} /></span>{t('hub.rail.gacha')}</button>
               <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><HubUiIcon n="shop" skin={SKIN} /></span>{t('hub.rail.shop')}</button>
               <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" skin={SKIN} /></span>{t('hub.rail.title')}</button>
               <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><HubUiIcon n="invite" skin={SKIN} /></span>{t('hub.rail.invite')}</button>
@@ -780,7 +732,7 @@ export default function Hub() {
                 <RoomView
                   layout={roomLayout}
                   slots={roomSlots}
-                  name="CARI"
+                  name={heroName}
                   badge={titleBadge}
                   editing={editing}
                   activeSlot={pickSlot}
@@ -814,7 +766,9 @@ export default function Hub() {
           </div>
           {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
           <Link className="cta-main" to="/ranking">
-            <span className="cta-star"><Ic n="trophy" s={24} /></span>
+            <span className="cta-star" aria-hidden="true">
+              <img src="/hub/ui/icon-ranking.png" alt="" />
+            </span>
             {t('common.ranking')}
           </Link>
         </div>
@@ -833,9 +787,9 @@ export default function Hub() {
         <div className="hub-modal-backdrop buy-pop-backdrop" onClick={() => setPurchased(null)}>
           <div className="buy-pop" onClick={(e) => e.stopPropagation()}>
             <div className="buy-pop-spark"><span>✨</span><span>🎉</span><span>✨</span></div>
-            <div className="buy-pop-title">{t(purchased.kind === 'dust' ? 'hub.buy.exchanged' : 'hub.buy.purchased')}</div>
-            <div className="buy-pop-thumb">{partEmoji(purchased.partKey)}</div>
-            <div className="buy-pop-name">{partName(purchased.partKey, t)}</div>
+            <div className="buy-pop-title">{t('hub.buy.purchased')}</div>
+            <div className="buy-pop-thumb">{partEmoji(purchased)}</div>
+            <div className="buy-pop-name">{partName(purchased, t)}</div>
 
             <button className="pbtn buy-pop-ok" style={btn('#6bbf9a')} onClick={() => setPurchased(null)}>{t('hub.confirm')}</button>
           </div>
@@ -870,76 +824,17 @@ export default function Hub() {
         </Modal>
       )}
 
-      {modal === 'gacha' && (
-        <Modal title={t('hub.gacha.title')} onClose={() => setModal(null)}>
-          <div className="gacha-head">
-            <span className="gchip gchip-dust"><span className="dust-ic">✨</span><span className="num">{dust.toLocaleString()}</span><span className="dust-lab">{t('hub.gacha.dust')}</span></span>
-            <span className="chip" style={{ margin: 0 }}>{t('hub.gacha.owned_n', { n: owned.size })}</span>
-          </div>
-          <div className="gacha-gauge">
-            <div className="gacha-gauge-bar"><div className="gacha-gauge-fill" style={{ width: `${Math.min(100, (pity / PITY_CEILING) * 100)}%` }} /></div>
-            <span className="gacha-gauge-lab">{t('hub.gacha.pity', { n: Math.max(0, PITY_CEILING - pity) })}</span>
-          </div>
-          <div className="gacha-stage">
-            {drawing && (
-              <div className="gacha-capsule">
-                <span className="gacha-capsule-box">🎁</span>
-              </div>
-            )}
-            {!drawing && lastDraw && (
-              lastDraw.partKey ? (
-                <div className="gacha-result is-rare">
-                  <span className="gacha-ribbon">{t('hub.gacha.limited')}</span>
-                  <span className="gacha-spark s1">✨</span><span className="gacha-spark s2">✨</span><span className="gacha-spark s3">✨</span>
-                  <div className="gacha-result-icon">{partEmoji(lastDraw.partKey)}</div>
-                  <b>{partName(lastDraw.partKey, t)}</b>
-                  <span className="gacha-dustgain">{t('hub.gacha.dust_gain', { n: lastDraw.dust })}</span>
-                </div>
-              ) : (
-                <div className="gacha-result is-dust">
-                  <div className="gacha-result-icon">✨</div>
-                  <b>{t('hub.gacha.dust_gain', { n: lastDraw.dust })}</b>
-                  <span className="gacha-dust-hint">{t('hub.gacha.dust_hint')}</span>
-                </div>
-              )
-            )}
-          </div>
-          <button className="pbtn gacha-draw-btn gacha-draw-full" onClick={doGacha} disabled={drawing}>{drawing ? t('hub.gacha.drawing') : t('hub.gacha.draw', { n: DRAW_COST })}</button>
-          <div className="gacha-exchange">
-            <div className="gacha-ex-head">✨ {t('hub.gacha.ex_head')} <span className="gacha-ex-sub">{t('hub.gacha.ex_sub')}</span></div>
-            <div className="gacha-ex-list">
-              {exclusives.map((e) => {
-                const has = owned.has(e.partKey)
-                const canAfford = dust >= e.dustPrice
-                return (
-                  <div key={e.partKey} className={`gacha-ex-item ${has ? 'is-owned' : ''}`}>
-                    {has && <span className="gacha-ex-owned">{t('hub.gacha.have')}</span>}
-                    <div className="gacha-ex-thumb">{partEmoji(e.partKey)}</div>
-                    <div className="gacha-ex-name">{partName(e.partKey, t)}</div>
-                    <div className="gacha-ex-price">✨ {e.dustPrice}</div>
-                    <button className="pbtn gacha-ex-buy" style={btn(has || !canAfford ? '#c3cbe0' : '#7b6bd6')} onClick={() => doExchange(e.partKey, e.dustPrice)} disabled={has}>{t(has ? 'hub.gacha.have' : 'hub.gacha.exchange')}</button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          <p className="hub-modal-help">{t('hub.gacha.help', { n: PITY_CEILING })}</p>
-        </Modal>
-      )}
-
       {modal === 'shop' && (
         <Modal title={t('hub.shop.title')} onClose={() => setModal(null)}>
           <div className="hub-shop-head">
             <span className="hub-shop-head-lab">{t('hub.shop.balance')}</span>
-            <span className="gchip" style={{ margin: 0 }}><CurrencyCoin /><span className="num">{points.toLocaleString()}</span></span>
+            <span className="gchip" style={{ margin: 0 }}><span className="num">{points.toLocaleString()}</span></span>
           </div>
           {catalog.length > 0 ? (
             <div className="hub-modal-grid">
               {catalog.map((c) => (
-                <div key={c.partKey} className={`hub-shop-item ${c.rare ? 'is-rare' : ''}`}>
-                  {c.rare && <span className="hub-shop-ribbon">{t('hub.shop.rare')}</span>}
+                <div key={c.partKey} className="hub-shop-item">
                   {owned.has(c.partKey) && <span className="hub-shop-owned">{t('hub.shop.owned')}</span>}
-
                   <div className="hub-shop-thumb">{partEmoji(c.partKey)}</div>
                   {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
                       안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}

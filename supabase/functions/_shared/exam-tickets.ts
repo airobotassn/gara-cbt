@@ -76,6 +76,13 @@ export const TIER_LABEL: Record<string, string> = {
   zenith: 'Zenith',
 }
 
+/** 아직 열지 않은 급수(CARIS-Ⅱ 전부). 관리자가 **새로 여는 것**만 막는다 — 회차의 '열리는 급수' 체크와
+ *  응시료 입력. 화면 짝은 src/lib/caris.ts 의 LOCKED_TIERS 이고, 여기가 그 최종 게이트다
+ *  (화면 disabled 만으로는 요청을 직접 쏘면 그대로 통과한다).
+ *  ⚠️ 이미 열려 있는 (회차×급수)는 여기서 손대지 않는다 — 판정 기준은 "그 회차의 exams 행이 살아 있나"다. */
+export const LOCKED_TIERS: readonly string[] = ['master', 'grandmaster', 'zenith']
+export const isTierLocked = (key: string) => LOCKED_TIERS.includes(key)
+
 // ---------- product_ref 규약 ----------
 //   product_ref = "<round_id>:<tier>"   예) "3f2a91c8-5d10-4e77-9b03-0c1e8a4f6d22:pro"
 // 구분자가 ':' 하나인 이유 = UUID 에도 티어 key 에도 ':' 가 없어 indexOf 2조각 분해가 항상 성립한다.

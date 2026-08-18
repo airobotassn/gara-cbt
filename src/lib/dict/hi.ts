@@ -1646,7 +1646,6 @@ const HI: Record<string, string> = {
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
   "hub.err.insufficient_points": "पर्याप्त पॉइंट नहीं",
-  "hub.err.insufficient_dust": "पर्याप्त डस्ट नहीं",
   "hub.err.already_owned": "यह लिमिटेड आइटम आपके पास पहले से है",
   "hub.err.unauthorized": "साइन इन आवश्यक है",
   "hub.err.generic": "कुछ गड़बड़ हुई। थोड़ी देर बाद फिर कोशिश करें",
@@ -1663,11 +1662,11 @@ const HI: Record<string, string> = {
   "hub.room.surface_floor": "फ़र्श",
   "hub.room.surface_wall": "दीवार",
   "hub.room.pick_title": "{where} के लिए फ़र्नीचर",
-  "hub.room.none_owned": "{where} के लिए अभी कोई फ़र्नीचर नहीं है। शॉप या ड्रॉ आज़माएँ।",
+  "hub.room.none_owned": "{where} के लिए अभी कोई फ़र्नीचर नहीं है। शॉप आज़माएँ।",
   "hub.room.remove": "यह जगह खाली करें",
   "hub.room.help": "हर फ़र्नीचर एक ही जगह रह सकता है। कहीं और रखने पर वह वहाँ चला जाता है।",
 
-  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  // 가구 이름 — 상점·방 고르기가 같이 쓴다.
   "hub.part.fur_plant_01": "छोटा गमला",
   "hub.part.fur_lamp_01": "फ़्लोर लैंप",
   "hub.part.fur_chair_01": "लकड़ी की कुर्सी",
@@ -1678,8 +1677,6 @@ const HI: Record<string, string> = {
   "hub.part.fur_clock_01": "दीवार घड़ी",
   "hub.part.fur_shelf_01": "किताबों की शेल्फ़",
   "hub.part.fur_window_01": "खिड़की",
-  "hub.part.fur_aquarium_01": "छोटा एक्वेरियम",
-  "hub.part.fur_neon_01": "नियॉन साइन",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "रूम देखें",
@@ -1692,8 +1689,8 @@ const HI: Record<string, string> = {
   "room.my_room": "मेरे रूम पर जाएँ",
   "room.my_room_edit": "मेरा रूम सजाएँ",
 
-  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
-  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   "hub.part.hat_common_01": "स्प्राउट कैप",
   "hub.part.hat_common_02": "बीनी",
@@ -1703,8 +1700,8 @@ const HI: Record<string, string> = {
   "hub.part.crown_rare_01": "छोटा मुकुट",
 
   // 상단·공통
-  "hub.gate_sub": "चेक-इन, ड्रॉ और शॉप के लिए साइन इन करें",
-  "hub.banner_login": "चेक-इन, ड्रॉ और शॉप के लिए साइन इन ज़रूरी है",
+  "hub.gate_sub": "चेक-इन और शॉप के लिए साइन इन करें",
+  "hub.banner_login": "चेक-इन और शॉप के लिए साइन इन ज़रूरी है",
   "hub.share": "शेयर",
   "hub.gift_btn": "गिफ्ट",
   "hub.help_aria": "पॉइंट कैसे कमाएं",
@@ -1714,7 +1711,6 @@ const HI: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "चेक-इन",
-  "hub.rail.gacha": "ड्रॉ",
   "hub.rail.shop": "शॉप",
   "hub.rail.title": "उपाधियाँ",
   "hub.rail.invite": "आमंत्रित करें",
@@ -1734,34 +1730,15 @@ const HI: Record<string, string> = {
   "hub.toast.checkin_done": "चेक-इन हुआ · +{n}P · +1 स्टैम्प",
   "hub.toast.checkin_bonus": "चेक-इन हुआ · +{n}P · 7-दिन बोनस +{b}P",
   "hub.toast.checkin_already": "चेक-इन हुआ · आज का इनाम पहले ही मिल चुका है",
-  "hub.toast.no_coin": "पर्याप्त कॉइन नहीं",
   "hub.toast.no_points_item": "पर्याप्त पॉइंट नहीं: {name} ({price}P)",
-  "hub.toast.no_dust": "पर्याप्त डस्ट नहीं",
 
   // 구매/교환 완료 팝업
-  "hub.buy.exchanged": "बदल लिया!",
   "hub.buy.purchased": "खरीद लिया!",
 
-  // 뽑기 모달
-  "hub.gacha.title": "ड्रॉ",
-  "hub.gacha.dust": "डस्ट",
-  "hub.gacha.owned_n": "{n} प्रकार",
-  "hub.gacha.pity": "गारंटी तक {n}",
-  "hub.gacha.limited": "लिमिटेड!",
-  "hub.gacha.dust_gain": "डस्ट +{n}",
-  "hub.gacha.dust_hint": "जमा करके लिमिटेड आइटम लें!",
-  "hub.gacha.drawing": "ड्रॉ हो रहा है…",
-  "hub.gacha.draw": "ड्रॉ ({n} 🪙)",
-  "hub.gacha.ex_head": "डस्ट एक्सचेंज",
-  "hub.gacha.ex_sub": "केवल ड्रॉ के लिमिटेड आइटम",
-  "hub.gacha.have": "आपके पास है",
-  "hub.gacha.exchange": "बदलें",
-  "hub.gacha.help": "हर ड्रॉ पर डस्ट मिलती है। गारंटी ({n} ड्रॉ) पर लिमिटेड आइटम पक्का! या डस्ट से मनचाहा आइटम तुरंत लें।",
 
   // 상점 모달
   "hub.shop.title": "शॉप",
   "hub.shop.balance": "आपके CARI कॉइन",
-  "hub.shop.rare": "रेयर",
   "hub.shop.owned": "आपके पास है",
   "hub.shop.buy": "खरीदें",
   "hub.shop.empty": "शॉप में कुछ नहीं है।",

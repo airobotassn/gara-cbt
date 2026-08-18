@@ -85,7 +85,12 @@
 /* (.hud-lv 아바타 Lv 배지는 제거 — 경험치 바가 'ARENA Lv.N' 을 말하므로 중복이었다.) */
 .hub .hud-mid { flex: 1; min-width: 0; }
 .hub .hud-name { display: flex; align-items: center; gap: 6px; font-size: 18px; font-weight: 900; }
+/* 이름은 이제 닉네임(최대 12자)이라 길어질 수 있다 — 좁은 화면에서 옆 자격 배지를 밀어내지 않도록
+   ⚠️ 줄어드는 건 이름 쪽만이다. 배지(.tt)는 flex-shrink 를 막아 원래 폭을 지킨다 —
+      배지가 같이 줄면 '🏆 CARIS Pro' 가 글자 단위로 잘려서 무슨 자격인지 못 읽는다. */
+.hub .hud-nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hub .tt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; color: #fff; white-space: nowrap;
+  flex: 0 0 auto;
   background: var(--orange); border: 3px solid var(--line); border-radius: 999px; padding: 2px 10px; }
 /* ⚠️ 바 높이는 옆 코인 칩(.gchip)과 같아야 한다 — 한 줄에 나란히 서는 두 요소라 높이가 어긋나면 바로 보인다.
    .gchip 높이(모바일 28 / PC 40)를 바꾸면 여기도 같이 바꿀 것. */
@@ -144,7 +149,7 @@
   box-shadow: 0 5px 0 rgba(var(--shc), .28); transition: transform .07s, box-shadow .1s; }
 .hub .fcard:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc), .28); }
 .hub .fcard .fico { font-size: 22px; }
-.hub .f-daily { background: var(--blue); } .hub .f-gacha { background: var(--purple); } .hub .f-shop { background: var(--green); } .hub .f-title { background: var(--orange); } .hub .f-ai { background: var(--blue); }
+.hub .f-daily { background: var(--blue); } .hub .f-shop { background: var(--green); } .hub .f-title { background: var(--orange); } .hub .f-ai { background: var(--blue); }
 .hub .bd { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px;
   background: var(--red); color: #fff; border: 2.5px solid var(--line); font-size: 12.5px; font-weight: 900; display: grid; place-items: center; }
 
@@ -269,7 +274,7 @@
 .hub .todo-cta { flex: 0 0 auto; border: 2px solid var(--line); border-radius: 10px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 900; padding: 4px 12px; cursor: pointer; text-decoration: none; }
 .hub .todo-cta:active { transform: translateY(1px); }
 
-/* ── 모달(뽑기/상점/쿠폰/칭호 팝업) ──
+/* ── 모달(상점/쿠폰/칭호 팝업) ──
    ⚠️ 공유 카드 모달은 허브 밖(/ranking 의 TOP10 카드)에서도 쓴다. 규칙이 전부 `.hub` 하위로 묶여 있어
       그대로는 무스타일로 나온다 → 백드롭에 `.sc-host` 를 같이 걸면 어디서든 뜨도록 선택자를 넓혔다.
       `.sc-host` 는 허브가 주던 스티커 토큰(--card/--line/--ink/--shc…)을 대신 공급하는 역할만 한다.
@@ -378,54 +383,6 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 .hub .hub-toast-ic { flex: 0 0 auto; font-size: 20px; line-height: 1; }
 .hub .hub-toast-x { flex: 0 0 auto; width: 24px; height: 24px; border: none; background: transparent; color: var(--ink2); font-size: 18px; font-weight: 900; line-height: 1; cursor: pointer; }
 
-/* ── 뽑기: 천장 게이지 + 캡슐 흔들림 → 결과 리빌 ── */
-.hub .gacha-gauge { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.hub .gacha-gauge-bar { flex: 1; height: 14px; border-radius: 999px; background: var(--card); border: 2.5px solid var(--line); overflow: hidden; }
-.hub .gacha-gauge-fill { height: 100%; background: linear-gradient(90deg, var(--purple), #d4a6f9); transition: width .3s; }
-.hub .gacha-gauge-lab { font-size: 11.5px; font-weight: 900; color: var(--ink2); white-space: nowrap; }
-.hub .gacha-draw-btn { font-size: 16px; padding: 12px 22px; border-radius: 16px; background: var(--purple); box-shadow: 0 5px 0 rgba(var(--shc), .28); transition: transform .07s, box-shadow .1s; }
-.hub .gacha-draw-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc), .28); }
-.hub .gacha-stage { min-height: 120px; display: flex; align-items: center; justify-content: center; margin-top: 14px; }
-@keyframes capsuleShake { 0%, 100% { transform: rotate(0deg) translateY(0); } 20% { transform: rotate(-9deg) translateY(-2px); } 40% { transform: rotate(8deg) translateY(0); } 60% { transform: rotate(-7deg) translateY(-3px); } 80% { transform: rotate(6deg) translateY(0); } }
-.hub .gacha-capsule { display: grid; place-items: center; }
-.hub .gacha-capsule-box { display: inline-block; font-size: 56px; animation: capsuleShake .5s ease-in-out infinite; filter: drop-shadow(0 4px 0 rgba(var(--shc), .2)); }
-@keyframes resultPop { 0% { transform: scale(.5) rotate(-8deg); opacity: 0; } 60% { transform: scale(1.08) rotate(3deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
-.hub .gacha-result { position: relative; width: 100%; text-align: center; padding: 18px 14px 16px; border-radius: 16px; border: 3px solid var(--line);
-  animation: resultPop .38s cubic-bezier(.34,1.56,.64,1); }
-
-.hub .gacha-result.is-rare { background: var(--rare-grad, linear-gradient(180deg, #fff3cf, #fff9e6)); box-shadow: 0 0 0 3px rgba(242,198,94,.35), 0 0 22px rgba(242,198,94,.55); }
-.hub .gacha-result-icon { font-size: 40px; line-height: 1; margin-bottom: 4px; }
-.hub .gacha-result b { font-size: 16px; font-weight: 900; }
-.hub .gacha-ribbon { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--red); color: #fff; font-size: 12px; font-weight: 900;
-  padding: 3px 12px; border-radius: 999px; border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(var(--shc), .22); }
-@keyframes sparkleFloat { 0% { transform: translateY(0) scale(.6); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(-22px) scale(1); opacity: 0; } }
-.hub .gacha-spark { position: absolute; font-size: 16px; animation: sparkleFloat 1.1s ease-out infinite; }
-.hub .gacha-spark.s1 { top: 10px; left: 18%; animation-delay: 0s; }
-.hub .gacha-spark.s2 { top: 4px; right: 20%; animation-delay: .3s; }
-.hub .gacha-spark.s3 { bottom: 14px; left: 46%; animation-delay: .6s; }
-
-/* ── 뽑기 v2: 가루 재화 칩 · 가루 리빌 · 가루 교환소 ── */
-.hub .gacha-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.hub .gchip-dust { width: auto; gap: 6px; padding: 4px 12px 4px 8px; background: var(--dust-grad, linear-gradient(180deg, #f3efff, #fff)); }
-.hub .gchip-dust .dust-ic { font-size: 15px; line-height: 1; }
-.hub .gchip-dust .num { flex: 0 0 auto; text-align: right; color: var(--dust-ink, #6a5bd0); }
-.hub .gchip-dust .dust-lab { font-size: 11.5px; font-weight: 900; color: var(--dust-ink2, #8a7fd0); }
-.hub .gacha-draw-full { width: 100%; margin-top: 14px; }
-.hub .gacha-dustgain { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 900; color: var(--dust-ink, #6a5bd0); }
-.hub .gacha-result.is-dust { background: var(--dust-grad2, linear-gradient(180deg, #f3efff, #fdfcff)); }
-.hub .gacha-dust-hint { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 800; color: var(--dust-ink2, #8a7fd0); }
-.hub .gacha-exchange { margin-top: 16px; padding-top: 14px; border-top: 2.5px dashed var(--line); }
-.hub .gacha-ex-head { font-size: 14px; font-weight: 900; color: var(--dust-ink, #6a5bd0); margin-bottom: 10px; }
-.hub .gacha-ex-sub { font-size: 11px; font-weight: 800; color: var(--dust-ink3, #a99fe0); margin-left: 4px; }
-.hub .gacha-ex-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.hub .gacha-ex-item { position: relative; text-align: center; padding: 12px 8px 10px; border-radius: 16px; background: var(--card); border: 2.5px solid var(--line); box-shadow: 0 4px 0 rgba(var(--shc), .16); }
-.hub .gacha-ex-item.is-owned { filter: grayscale(.25) opacity(.7); }
-.hub .gacha-ex-owned { position: absolute; top: -8px; right: -8px; background: #6bbf9a; color: #fff; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 999px; border: 2px solid var(--line); }
-.hub .gacha-ex-thumb { font-size: 34px; line-height: 1; }
-.hub .gacha-ex-name { font-size: 13px; font-weight: 900; margin-top: 4px; }
-.hub .gacha-ex-price { font-size: 13px; font-weight: 900; color: var(--dust-ink, #6a5bd0); margin: 3px 0 8px; }
-.hub .gacha-ex-buy { width: 100%; padding: 8px 0; font-size: 13px; }
-
 /* ── 상점: 코인 헤더 + 상품 타일 ── */
 .hub .hub-shop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 8px 12px;
   background: var(--card-alt); border: 2.5px solid var(--line); border-radius: 12px; }
@@ -433,14 +390,11 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 .hub .hub-shop-item { position: relative; text-align: center; padding: 14px 8px 12px; border-radius: 16px; background: var(--card); border: 2.5px solid var(--line);
   box-shadow: 0 4px 0 rgba(var(--shc), .16); transition: transform .1s, box-shadow .1s; }
 .hub .hub-shop-item:hover { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(var(--shc), .18); }
-.hub .hub-shop-item.is-rare { background: var(--rare-grad2, linear-gradient(180deg, #fff3cf, #fff)); }
 .hub .hub-shop-thumb { font-size: 32px; line-height: 1; margin-bottom: 4px; }
 .hub .hub-shop-name { font-weight: 900; font-size: 12.5px; }
 .hub .hub-shop-price { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 900; color: var(--gold-ink, #8a6d2f); margin: 4px 0 8px;
   background: var(--card-alt); border: 1.5px solid var(--gold-line, #e8cf8f); border-radius: 999px; padding: 2px 9px; }
 .hub .hub-shop-buy { width: 100%; padding: 7px 0; font-size: 12px; border-radius: 10px; }
-.hub .hub-shop-ribbon { position: absolute; top: -8px; left: -8px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 900;
-  padding: 3px 8px; border-radius: 999px; border: 2px solid var(--line); box-shadow: 0 2px 0 rgba(var(--shc), .22); transform: rotate(-8deg); }
 .hub .hub-shop-owned { position: absolute; top: -8px; right: -8px; background: #6bbf9a; color: #fff; font-size: 10px; font-weight: 900;
   padding: 3px 7px; border-radius: 999px; border: 2px solid var(--line); }
 
@@ -682,13 +636,6 @@ html.dark .hub {
   --warn-ink2: #eaa64f;
   --gold-ink: #dcb96a;
   --gold-line: #6a5a35;
-  --dust-ink: #a99bf0;
-  --dust-ink2: #9186d6;
-  --dust-ink3: #7d75ab;
-  --dust-grad: linear-gradient(180deg, #2b2740, #242a36);
-  --dust-grad2: linear-gradient(180deg, #2b2740, #23262f);
-  --rare-grad: linear-gradient(180deg, #3d3520, #2c2a1e);
-  --rare-grad2: linear-gradient(180deg, #38321f, #242a36);
   --badge-grad: linear-gradient(180deg, #3a3320, #2c2718);
   --nameplate-txt: linear-gradient(180deg, #f0e6c8, #d8c99a);
 }
@@ -733,10 +680,10 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='palace'] {
   /* 무대 */
   --skin-bg: url('/hub/bg.png');
-  --skin-char: url('/hub/char.png');
-  --skin-char-ar: 772 / 1241;   /* 그림 실측 비율. 틀리면 좌우가 잘리거나 여백이 생긴다 */
+  --skin-char: url('/hub/char-korea-lv2-hanbok-final.webp');
+  --skin-char-ar: 512 / 640;    /* 한국 Lv2 A안 2등신 한국한복 최종 모션 실측 비율 */
   --skin-char-h: 34vh;          /* 캐릭터 키 */
-  --skin-char-bottom: 22vh;     /* 발끝이 화면 아래에서 뜬 높이 = 배경 그림의 지평선에 맞춘다 */
+  --skin-char-bottom: 20vh;     /* 발끝을 기존보다 2vh 내려 배경 지평선에 맞춘다 */
 
   /* 글자색 — 판이 밝은 베이지라 어둡게. 어두운 판 테마면 여기만 뒤집으면 된다 */
   --skin-panel-ink: #4a2f16;
@@ -747,7 +694,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 
   /* 미션 바 — 1155×102, 양끝 꽃 캡 101, 위 36 / 아래 29 */
   --skin-mission-img: url('/hub/ui/panel-mission.png');
-  --skin-mission-slice: 36 101 29 101 fill;
+  --skin-mission-slice: 45 145 40 145 fill;
   /* ⚠️ 테두리를 얇게 잡는 이유 = 바깥 높이를 옛 크기로 유지하려고. 테두리를 두껍게 그리면
         같은 바깥 높이에서 글자 자리가 그만큼 줄고, 자리를 지키려 바깥을 키우면 바가 커 보인다.
         둘 중 하나만 고를 수 있다 — 여기서는 '옛 크기 유지'를 택했다(2026-08-14 "왤케 크게했"). */
@@ -789,7 +736,12 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-stamp-on-ink-shadow: 0 1px 0 rgba(255,240,200,.85), 0 0 3px rgba(255,235,190,.8);
   --skin-profile-img: url('/hub/ui/profile-frame.png');
   --skin-currency-img: url('/hub/ui/currency-chip.png');
-  --skin-currency-slice: 58 160 fill;
+  --skin-currency-slice: 60 75 55 350 fill;
+  --skin-currency-edge: 7px 10px 7px 42px;
+  --skin-cta-img: url('/hub/ui/button-ranking.png');
+  /* 실측값(이웃 픽셀 줄 비교로 찾은 '늘려도 되는 가운데'의 바깥). 원본 760×225 */
+  --skin-cta-slice: 58 138 48 140 fill;
+  --skin-cta-edge: 26px 62px 22px;
 }
 @media (min-width: 768px) {
   .hub[data-skin='palace'] {
@@ -829,6 +781,10 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    그림이 오면 위 스킨 값 블록의 주석을 풀고 여기에 판·버튼과 같은 규칙을 다시 넣으면 된다. */
 
 /* 판 위 글자는 전부 판 색을 따른다 — 옛 톤은 어두운 배경 전제라 밝은 글자였다 */
+/* 옆 불꺽 아이콘은 옛 카툰 SVG 라 궁정 판 위에서 혼자 논다 — 글자만으로 충분하다. */
+/* ⚠️ `!important` 가 필요하다 — 아이콘 컴포넌트(Ic)가 svg 에 인라인 style 로
+      `display:block` 을 박아서 일반 규칙으로는 못 감는다(2026-08-18 안 지워져서 찾은 자리). */
+.hub[data-skin] .rw-top svg { display: none !important; }
 .hub[data-skin] .rw-top, .hub[data-skin] .rw-n,
 .hub[data-skin] .ms-title, .hub[data-skin] .ms-n {
   color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
@@ -839,7 +795,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
       라벨 자리까지 먹어 글자가 통째로 사라진다. 라벨은 태그 없는 맨 텍스트라 grid 가 2행에 앉힌다. */
 .hub[data-skin] .fcard,
-.hub[data-skin] .f-daily, .hub[data-skin] .f-gacha, .hub[data-skin] .f-shop,
+.hub[data-skin] .f-daily, .hub[data-skin] .f-shop,
 .hub[data-skin] .f-title, .hub[data-skin] .f-invite {
   background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
   display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; gap: 1px;
@@ -852,6 +808,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin] .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
   object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
 .hub[data-skin] .fcard:active { transform: translateY(2px); box-shadow: none; }
+/* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
+      가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
+.hub[data-skin] .fcard .bd { top: 0; right: 8px; }
 
 /* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
    ⚠️ 글자는 padding 으로 밀지 말고 가운데 정렬. padding 으로 앉히면 칸 높이가 바뀔 때 잘린다. */
@@ -868,8 +827,16 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   background: var(--skin-stamp-on-img) center / contain no-repeat;
   color: var(--skin-stamp-on-ink); text-shadow: var(--skin-stamp-on-ink-shadow);
 }
-.hub[data-skin] .day.on .chk { display: none; }  /* 도장 자체가 '찍혔다'를 말한다 */
-.hub[data-skin] .day .gift { top: -4px; right: -2px; }
+/* 찍힌 날은 **도장만** 남긴다 — 금색 원판 위에 '1일' 이 얹히면 꽃과 숫자가 섞인다
+   (2026-08-18 결정). 날짜는 왜쪽부터 순서대로라 숫자가 없어도 몇 일차인지 읽힌다. */
+.hub[data-skin] .day.on { font-size: 0; }          /* 날짜 글자(태그 없는 맨 텍스트)를 숨긴다 */
+.hub[data-skin] .day.on .chk { display: none; }
+/* 선물 표시도 도장 **그림** 모서리에 붙인다 — 칸(99px)보다 그림(58px)이 작아
+   칸 모서리에 두면 허공에 뜨게 된다(2026-08-18 "7일에 상자 위치도 좀 애매"). */
+/* 칸(가로로 넓다)이 아니라 **도장 그림** 오른쪽 위에 붙인다 — 도장은 칸 높이에 맞춰 정사각으로
+   들어가므로 좌우에 남는 여백이 생기고, 칸 모서리에 두면 그림에서 떨어져 허공에 뜬다.
+   17% = (칸폭 - 도장폭)/2 를 칸폭으로 나눈 값(현재 배치 실측). */
+.hub[data-skin] .day .gift { top: -2px; right: 17%; }
 
 /* 경험치 게이지 */
 .hub[data-skin] .exp {
@@ -908,20 +875,47 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.42));
 }
 .hub[data-skin] .hud-av .av { position: relative; z-index: 1; border: 0; }
-.hub[data-skin] .gchip:not(.gchip-dust) {
-  background: transparent; border-style: solid; border-color: transparent;
-  border-width: 8px 15px;
-  border-image-source: var(--skin-currency-img);
-  border-image-slice: var(--skin-currency-slice);
-  border-image-repeat: stretch;
-  border-radius: 0; box-shadow: none; padding: 0 2px;
+.hub[data-skin] .gchip {
+  background: var(--skin-currency-img) center / 100% 100% no-repeat;
+  border: 0; border-radius: 0; box-shadow: none; position: relative;
+  /* ⚠️ 위쪽 여백이 더 크다 — 그림의 베이지 면이 위아래 대칭이 아니기 때문이다(위 27.5% / 아래 13.9%).
+     칸 기준으로 가운데 맞추면 숫자가 면보다 위로 뜼다(2026-08-18 "살짝 위로 치우침").
+     0.136 = 그 차이(27.5-13.9%)를 높이에 곱한 값 — 높이가 바뀌어도 같이 따라간다. */
+  padding: calc(var(--skin-hud-h) * 0.136) 20px 0 43px;
   color: #4a2f16; text-shadow: 0 1px rgba(255,255,255,.65);
+  /* ⚠️ 폭을 고정하면 안 된다 — 틀(border) 이 좌우 30px 를 먹어서 128px 에 '99,620' 이 안 들어가
+     끝자리 0 이 잘렸다(2026-08-18 "돈이 좀 짤려"). 금액은 자릿수가 변하므로 내용만큼 늘게 둔다. */
+  width: calc(var(--skin-hud-h) * 3.9464); min-width: calc(var(--skin-hud-h) * 3.9464);
+  flex: 0 0 calc(var(--skin-hud-h) * 3.9464);
 }
-.hub[data-skin] .currency-coin { width: 29px; height: 29px; flex: 0 0 auto; object-fit: contain;
-  filter: drop-shadow(0 1px 2px rgba(76,37,4,.35)); }
+.hub[data-skin] .gchip .num { flex: 1 1 auto; padding-left: 4px; text-align: center; }
+.hub[data-skin] .cta-main {
+  /* 그림 한 장을 통째로 늘리지 않는다 — **모서리 장식은 원본 크기로 두고 가운데 면만 늘린다**.
+     그래서 판을 어떤 크기로 잡아도 네 모서리 장식은 안 찌그러진다(2026-08-18 '3번' 선택).
+     ⚠️ 다만 좌우 가운데의 꽃 장식은 세로로 같이 늘어난다 — 그건 이 방식의 대가고, 없애려면
+        그 자리 모양(세로로 긴 판)으로 그림을 다시 뽑아야 한다. */
+  min-width: 250px; background: transparent; box-shadow: none;
+  border-style: solid; border-color: transparent; border-width: var(--skin-cta-edge);
+  border-image-source: var(--skin-cta-img);
+  border-image-slice: var(--skin-cta-slice);
+  border-image-repeat: stretch;
+  border-radius: 0; padding: 0 6px;
+  color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
+}
+.hub[data-skin] .cta-main .cta-star { display: grid; place-items: center; flex: 0 0 auto; }
+.hub[data-skin] .cta-main .cta-star svg { display: none; }
+.hub[data-skin] .cta-main .cta-star img { display: block; width: 50px; height: 50px; object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+.hub[data-skin] .cta-main:active { transform: translateY(2px); box-shadow: none; }
 @media (min-width: 768px) {
   .hub[data-skin] .hud-av::after { inset: -15px; }
-  .hub[data-skin] .currency-coin { width: 38px; height: 38px; }
+  /* ⚠️ 좌·우 여백은 그림의 베이지 면과 맞춰야 한다 — 왼쪽은 코인 메달이 덮고 있어 더 넓다.
+     한쪽만 주면 숫자가 면의 가운데가 아니라 오른쪽으로 밀린다(2026-08-18 "코인 갯수 위치"). */
+  .hub[data-skin] .gchip { padding: calc(var(--skin-hud-h) * 0.136) 27px 0 58px; }
+  /* 옆 출석 판과 위아래 선을 맞춘다(stretch) — 가운데만 늘어나므로 높이가 얼마든 장식은 그대로다 */
+  .hub[data-skin] .cta-main { min-width: 300px; align-self: stretch; height: auto;
+    flex-direction: row; gap: 12px; font-size: 30px; }
+  .hub[data-skin] .cta-main .cta-star img { width: 64px; height: 64px; }
 }
 
 

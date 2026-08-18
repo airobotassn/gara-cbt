@@ -1646,7 +1646,6 @@ const ZH: Record<string, string> = {
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
   "hub.err.insufficient_points": "积分不足",
-  "hub.err.insufficient_dust": "碎片不足",
   "hub.err.already_owned": "您已拥有该限定道具",
   "hub.err.unauthorized": "需要登录",
   "hub.err.generic": "发生错误，请稍后再试",
@@ -1663,11 +1662,11 @@ const ZH: Record<string, string> = {
   "hub.room.surface_floor": "地板",
   "hub.room.surface_wall": "墙面",
   "hub.room.pick_title": "放在{where}的家具",
-  "hub.room.none_owned": "还没有可以放在{where}的家具，去商店或抽奖看看吧。",
+  "hub.room.none_owned": "还没有可以放在{where}的家具，去商店看看吧。",
   "hub.room.remove": "清空这个位置",
   "hub.room.help": "每件家具只能放在一个位置，放到别处即为移动。",
 
-  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  // 가구 이름 — 상점·방 고르기가 같이 쓴다.
   "hub.part.fur_plant_01": "小盆栽",
   "hub.part.fur_lamp_01": "落地灯",
   "hub.part.fur_chair_01": "木椅",
@@ -1678,8 +1677,6 @@ const ZH: Record<string, string> = {
   "hub.part.fur_clock_01": "挂钟",
   "hub.part.fur_shelf_01": "书架",
   "hub.part.fur_window_01": "窗户",
-  "hub.part.fur_aquarium_01": "小鱼缸",
-  "hub.part.fur_neon_01": "霓虹灯牌",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "参观房间",
@@ -1692,8 +1689,8 @@ const ZH: Record<string, string> = {
   "room.my_room": "前往我的房间",
   "room.my_room_edit": "布置我的房间",
 
-  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
-  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   "hub.part.hat_common_01": "嫩芽帽",
   "hub.part.hat_common_02": "毛线帽",
@@ -1703,8 +1700,8 @@ const ZH: Record<string, string> = {
   "hub.part.crown_rare_01": "小王冠",
 
   // 상단·공통
-  "hub.gate_sub": "登录后即可使用签到、抽奖和商店",
-  "hub.banner_login": "签到、抽奖和商店需要登录后使用",
+  "hub.gate_sub": "登录后即可使用签到和商店",
+  "hub.banner_login": "签到和商店需要登录后使用",
   "hub.share": "分享",
   "hub.gift_btn": "赠送",
   "hub.help_aria": "如何获得积分",
@@ -1714,7 +1711,6 @@ const ZH: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "签到",
-  "hub.rail.gacha": "抽奖",
   "hub.rail.shop": "商店",
   "hub.rail.title": "称号",
   "hub.rail.invite": "邀请好友",
@@ -1734,34 +1730,15 @@ const ZH: Record<string, string> = {
   "hub.toast.checkin_done": "签到完成 · +{n}P · 印章 +1",
   "hub.toast.checkin_bonus": "签到完成 · +{n}P · 满 7 天奖励 +{b}P",
   "hub.toast.checkin_already": "签到完成 · 今日奖励已领取",
-  "hub.toast.no_coin": "硬币不足",
   "hub.toast.no_points_item": "积分不足：{name}（{price}P）",
-  "hub.toast.no_dust": "碎片不足",
 
   // 구매/교환 완료 팝업
-  "hub.buy.exchanged": "兑换成功！",
   "hub.buy.purchased": "购买成功！",
 
-  // 뽑기 모달
-  "hub.gacha.title": "抽奖",
-  "hub.gacha.dust": "碎片",
-  "hub.gacha.owned_n": "已拥有 {n} 种",
-  "hub.gacha.pity": "距保底 {n} 次",
-  "hub.gacha.limited": "限定！",
-  "hub.gacha.dust_gain": "碎片 +{n}",
-  "hub.gacha.dust_hint": "收集后可兑换限定道具！",
-  "hub.gacha.drawing": "抽奖中…",
-  "hub.gacha.draw": "抽奖（{n} 🪙）",
-  "hub.gacha.ex_head": "碎片兑换所",
-  "hub.gacha.ex_sub": "抽奖专属限定道具",
-  "hub.gacha.have": "已拥有",
-  "hub.gacha.exchange": "兑换",
-  "hub.gacha.help": "每次抽奖都会累积碎片。达到保底（{n} 次）必得限定道具！也可用碎片直接兑换想要的限定道具。",
 
   // 상점 모달
   "hub.shop.title": "商店",
   "hub.shop.balance": "持有的 CARI 币",
-  "hub.shop.rare": "稀有",
   "hub.shop.owned": "已拥有",
   "hub.shop.buy": "购买",
   "hub.shop.empty": "商店暂无商品。",

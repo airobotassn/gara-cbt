@@ -10,6 +10,7 @@
 // 상태는 이 컴포넌트가 소유하고, 그리기만 ArenaMap 에 맡긴다(제어 컴포넌트).
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ChatBoard from '../components/ChatBoard'
+import StarField from '../components/StarField'
 import { Link } from 'react-router-dom'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
@@ -34,7 +35,7 @@ import {
 } from '../lib/arena/data'
 import { M49_TO_ISO2 } from '../lib/arena/tables'
 // 채팅 방 머리말의 국기 — 지도 쪽 countryName(피처+언어)과 다른 계열이라 lib/regions 에서 가져온다.
-import { flagEmoji } from '../lib/regions'
+import { flagUrl } from '../lib/regions'
 import '../styles/arena.css'
 // ⚠️ 소스 일원화: 아래 leaderboard 호출은 src/pages/Ranking.tsx 의 AggregateBoard(집계 탭)와
 //    완전히 동일한 RPC(region_/country_leaderboard, scope='region'|'country')를 쓴다 — 이중 fetch/별도 엔드포인트 없음.
@@ -43,7 +44,16 @@ import '../styles/arena.css'
 // 개인 랭킹과 같은 재료(skill_score+activity_score)를 국가/지역 단위로 올린 값이라 이게 이 지도의 지표다.
 // ⚠️ 같은 응답의 `avg_level` 은 쓰지 않는다 — 이름과 달리 레벨이 아니라 보정 전 원시 평균이고
 //    (레벨테스트 시절 필드명이 하위호환으로 남은 것), 그걸 쓰면 5명짜리 버킷이 그대로 1위를 먹는다.
-type ServerBucket = { code: string; score: number; member_count: number }
+type ServerBucket = { code: string; score: number; member_count: number; has_real?: boolean }
+
+/** 서버 버킷 배열 → 코드별 맵. 국가·지역이 같은 모양이라 한 함수를 쓴다. */
+function toBucketMap(bs: ServerBucket[] | undefined): RealData['country'] {
+  const out: RealData['country'] = {}
+  for (const b of bs ?? []) {
+    if (b?.code) out[b.code] = { score: Number(b.score), members: Number(b.member_count), hasReal: !!b.has_real }
+  }
+  return out
+}
 
 /** 랭킹 목록 한 줄 — hover 마다 60줄을 통째로 다시 그리지 않도록 memo */
 const RankRow = memo(function RankRow({
@@ -142,42 +152,46 @@ export default function WorldArena() {
     return () => { alive = false }
   }, [drillCountry])
 
-  // 리더보드 집계 + 로그인 계정 국가. 실패해도 목값으로 화면은 살아 있어야 한다.
+  // 로그인 계정 국가 — 지구본의 '우리 순위'·국기가 이걸 본다.
   useEffect(() => {
     let cancelled = false
-    const fetchHome = async (): Promise<string> => {
-      if (!userId) return 'KR'
-      try {
-        const { data } = await supabase.from('profiles').select('country_code').eq('id', userId).maybeSingle()
-        return (data?.country_code || 'KR').toUpperCase()
-      } catch {
-        return 'KR'
-      }
-    }
     const load = async () => {
-      const homeCode = await fetchHome().catch(() => 'KR')
-      if (cancelled) return
-      setHome(homeCode)
-      setHomeReady(true)
-      try {
-        const [country, region] = await Promise.all([
-          callFunction<{ buckets: ServerBucket[] }>('leaderboard', { scope: 'country', window: 'season' }),
-          callFunction<{ buckets: ServerBucket[] }>('leaderboard', { scope: 'region', country: 'KR', window: 'season' }),
-        ])
-        if (cancelled) return
-        const toMap = (bs: ServerBucket[] | undefined) => {
-          const out: RealData['country'] = {}
-          for (const b of bs ?? []) if (b?.code) out[b.code] = { score: Number(b.score), members: Number(b.member_count) }
-          return out
-        }
-        setReal({ country: toMap(country.buckets), region: toMap(region.buckets) })
-      } catch {
-        /* 목값 유지 */
+      let code = 'KR'
+      if (userId) {
+        try {
+          const { data } = await supabase.from('profiles').select('country_code').eq('id', userId).maybeSingle()
+          code = (data?.country_code || 'KR').toUpperCase()
+        } catch { /* 기본값 유지 */ }
       }
+      if (cancelled) return
+      setHome(code)
+      setHomeReady(true)
     }
     void load()
     return () => { cancelled = true }
   }, [userId])
+
+  // 국가 버킷 — 지구본은 항상 전 세계를 그리므로 한 번만 받는다.
+  useEffect(() => {
+    let cancelled = false
+    callFunction<{ buckets: ServerBucket[] }>('leaderboard', { scope: 'country', window: 'season' })
+      .then((res) => { if (!cancelled) setReal((p) => ({ ...p, country: toBucketMap(res.buckets) })) })
+      .catch(() => { /* 못 받으면 지구본이 무채색으로 뜬다 — 예전처럼 브라우저가 목값을 지어내지 않는다 */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // 지역 버킷 — **파고든 그 나라 것만** 받는다.
+  // ⚠️ 예전엔 `country: 'KR'` 로 못박혀 있어서 해외로 파고들면 주(州)가 전부 점수 없이 떴고, 그 빈자리를
+  //    프론트 목값이 메우고 있었다. 목값을 걷어낸 지금은 여기서 받아오지 않으면 그냥 0점 지도가 된다.
+  useEffect(() => {
+    const iso = drillCountry?.iso
+    if (!iso) return
+    let cancelled = false
+    callFunction<{ buckets: ServerBucket[] }>('leaderboard', { scope: 'region', country: iso, window: 'season' })
+      .then((res) => { if (!cancelled) setReal((p) => ({ ...p, region: toBucketMap(res.buckets) })) })
+      .catch(() => { if (!cancelled) setReal((p) => ({ ...p, region: {} })) })
+    return () => { cancelled = true }
+  }, [drillCountry])
 
   const regions = useMemo(
     () =>
@@ -399,6 +413,8 @@ export default function WorldArena() {
 
   return (
     <div className="arena">
+      {/* 밤하늘 — 랜딩 지구본과 같은 별(다크에서만). 내용은 .aa-wrap 이 z-index:1 로 그 위에 선다. */}
+      <StarField />
       <div className="aa-wrap">
         {/* 홈으로 — 위치·모양은 앱 공용 TopBar(원형 화살표 칩 + 라벨, 제목 위 왼쪽)와 같게 두고
             색만 아레나 토큰으로 짠다(공용 .topbar 는 전역 토큰이라 이 페이지 톤과 따로 논다). */}
@@ -633,7 +649,19 @@ export default function WorldArena() {
               {/* 지금 어느 방인지 + 전세계로 돌아가는 길. 방 선택 UI 를 따로 두지 않는 대신,
                   「전세계」를 누르면 지도도 같이 세계로 나간다(goto(0)) — 지도와 방이 늘 한 몸이다. */}
               <div className="aa-chatroom">
-                <span className="rm">{chatRoom === 'global' ? '🌍' : flagEmoji(chatRoom) || '📍'} {chatRoomName}</span>
+                {/* 방 표시. 국가 방은 국기 **그림**이다 — 이모지로 두면 윈도우에서 국기 대신
+                    `KR` 두 글자가 나와, 아래 메시지들엔 국기가 뜨는데 머리말만 글자인 어긋남이 생긴다.
+                    🌍·📍 는 그대로 이모지다(둘 다 윈도우 폰트에 있다). */}
+                <span className="rm">
+                  {chatRoom === 'global' ? (
+                    '🌍'
+                  ) : flagUrl(chatRoom) ? (
+                    <img className="rm-flag" src={flagUrl(chatRoom)} alt="" decoding="async" />
+                  ) : (
+                    '📍'
+                  )}{' '}
+                  {chatRoomName}
+                </span>
                 {chatRoom !== 'global' && (
                   <button type="button" onClick={() => goto(0)}>{t('chat.roomBack')}</button>
                 )}

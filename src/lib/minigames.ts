@@ -80,8 +80,8 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'feel-cari',
     accent: 'CARI',
-    // ⚠️ 임시 커버(SVG). 게임 자체가 도형뿐이라 급한 대로 그린 것 — 다른 6종처럼 생성 PNG 로 갈아끼울 것.
-    art: '/games/feel-cari-cover.svg',
+    // 센서 탐사 콘셉트와 CARI 캐릭터 시트를 반영한 전용 커버.
+    art: '/games/feel-cari-cover-v3.png',
     src: '/games/feel-cari.html',
     frame: '#070a14', // 게임 body 그라디언트의 가장 어두운 끝
   },

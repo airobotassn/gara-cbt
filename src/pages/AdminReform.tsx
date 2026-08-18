@@ -750,8 +750,8 @@ export function CoinPolicyAdmin() {
         <button className="btn-ink" onClick={save} disabled={busy || !rows}>{busy ? '저장 중…' : '저장'}</button>
       </AdminHead>
       <ErrBox msg={err} />
-      {/* ⚠️ 지갑이 둘이다. 코인은 뽑기·상점에서 쓰는 재화, 시즌 점수는 랭킹을 매기는 값이다. 섞으면 안 된다. */}
-      {table('coin', '코인 (뽑기·상점 재화)', '캐릭터 허브에서 뽑기·상점에 쓰는 재화입니다. 랭킹과는 관계가 없습니다.')}
+      {/* ⚠️ 지갑이 둘이다. 코인은 상점에서 쓰는 재화, 시즌 점수는 랭킹을 매기는 값이다. 섞으면 안 된다. */}
+      {table('coin', '코인 (상점 재화)', '캐릭터 허브 상점에서 쓰는 재화입니다. 랭킹과는 관계가 없습니다.')}
       {table('score', '시즌 점수 (랭킹)', '리더보드 순위를 매기는 값입니다. 레벨테스트 클리어 점수(레벨당 1,000)는 여기서 바꾸지 않습니다.')}
       <p className="admin-hint" style={{ lineHeight: 1.7 }}>
         ⚠️ 이미 쌓인 점수는 그대로입니다 — 값을 바꾸면 <b>바꾼 시점 이후</b>부터 달라집니다. 시즌 도중에 올리면

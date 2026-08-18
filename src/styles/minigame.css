@@ -53,7 +53,8 @@ html.dark .mgm-backdrop {
   background-image: radial-gradient(circle 480px at 50% 120px, var(--glow), rgba(0,74,198,0) 62%);
   background-repeat: no-repeat;
 }
-.mgp-in { max-width: 900px; margin: 0 auto; padding: 20px clamp(14px, 3vw, 22px) 44px; }
+/* ⚠️ z-index:1 = 별하늘(<StarField />, z-index:0) 위에 내용을 세우는 값. 빼면 목록이 별 뒤로 내려간다. */
+.mgp-in { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 20px clamp(14px, 3vw, 22px) 44px; }
 html.dark .mgp {
   --bg: #12151c; --card: #1c212c; --line: #5c6578; --ink: #e6ebf7; --muted: #a7b0c4;
   --brand: #7fa9f5; --glow: rgba(79,141,245,.14); --shc: 0, 0, 0;

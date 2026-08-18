@@ -19,6 +19,7 @@ import { geoArea, geoCentroid, geoDistance, geoOrthographic, geoPath } from 'd3-
 import { buildRegions, EMPTY_REAL, loadCountries, type GeoFeature, type RealData } from '../lib/arena/data'
 import { M49_TO_ISO2 } from '../lib/arena/tables'
 import { callFunction } from '../lib/supabase'
+import { paintStars } from '../lib/starfield'
 import '../styles/rankglobe.css'
 
 /** 시안에서 고른 값(2026-08-06). 이름은 시안 컨트롤의 항목명과 그대로 맞춰 뒀다. */
@@ -41,19 +42,32 @@ const CFG = {
 } as const
 
 /**
- * 1·2·3위 표시 크기(지구 반지름 대비, markSize 가 곱해진다).
- * ⚠️ **그 나라 땅 크기에 맞춰 줄이지 않는다.** 옛 버전은 글자를 그려서 좁은 땅(한국·영국)에 맞췄는데,
- *    지금 표시는 궤도와 RANK 라벨까지 품은 에셋이라 땅에 맞추면 숫자가 점처럼 뭉개진다.
- *    (그래서 땅 크기를 재던 ORD_FIT 은 제거됐다 — 아래 draw 의 주석 참고.)
+ * 1·2·3위 표시 크기 상한(지구 반지름 대비, markSize 가 곱해진다).
+ * 땅이 넉넉하면 이 크기까지 쓰고, 좁은 나라(한국·영국)에서는 땅에 맞춰 줄인다 — 아래 `roomOf` 참고.
+ * ⚠️ 다만 **바닥(`ORD_FLOOR_R`)은 지킨다.** 이 표시는 궤도와 RANK 라벨까지 품은 에셋이라
+ *    끝까지 땅에 맞추면 숫자가 점처럼 뭉개진다(그래서 한때 땅 크기 측정을 통째로 걷어냈었다).
  */
 const ORD_SZ: Record<number, number> = { 1: 0.18, 2: 0.155, 3: 0.14 }
+/** 1~3위 에셋이 이보다 작아지지는 않는다(지구 반지름 대비). */
+const ORD_FLOOR_R = 0.055
+
+/**
+ * 순위 숫자 크기 규칙 — **`/arena` 지도(ArenaMap 의 sizeLabels)와 같은 식**이다.
+ * 두 화면이 같은 순위를 말하므로 글자가 커지고 작아지는 감각도 같아야 한다.
+ *   RATIO  = 땅 짧은 변의 몇 %까지 쓸지
+ *   CAP_R  = 큰 땅에서 글자만 비대해지는 걸 막는 상한(지구 반지름 대비)
+ *   FLOOR  = 좁은 나라도 여기까지는 유지(폭 상한에 걸리면 더 줄어든다)
+ *   HIDE   = 그래도 이보다 작으면 못 읽으므로 안 그린다
+ */
+const LBL_RATIO = 0.3
+const LBL_CAP_R = 0.04
+const LBL_FLOOR = 9
+const LBL_HIDE = 6
 const RANK_ASSET = [
   '/landing/rank-node-1.svg',
   '/landing/rank-node-2.svg',
   '/landing/rank-node-3.svg',
 ] as const
-/** 이보다 작아지지는 않는다. 몇 px 짜리 표시는 읽히지 않고 지저분하기만 하다. */
-const ORD_MIN = 11
 
 /** 첫 화면에 보이는 경도(정면 경도 = -이 값). -180 = **날짜변경선(180°)이 정면**.
  *  옛 값 -80(동경 80°)은 유럽·인도·중국·한국을 한 화면에 넣으려던 값이고,
@@ -163,27 +177,8 @@ export default function RankGlobe() {
       buildStars()
     }
 
-    const buildStars = () => {
-      starCv.width = cv.width
-      starCv.height = cv.height
-      const s = starCv.getContext('2d')
-      if (!s) return
-      s.scale(DPR, DPR)
-      let seed = 20260806
-      const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296
-      const N = Math.round((W * H) / 5200)
-      for (let i = 0; i < N; i++) {
-        const x = rnd() * W
-        const y = rnd() * H
-        const p = rnd()
-        const r = p > 0.985 ? 1.5 : p > 0.9 ? 1 : 0.65
-        const a = 0.18 + rnd() * 0.72
-        s.beginPath()
-        s.arc(x, y, r, 0, 6.283)
-        s.fillStyle = `rgba(${200 + Math.round(rnd() * 55)},${215 + Math.round(rnd() * 40)},255,${a.toFixed(3)})`
-        s.fill()
-      }
-    }
+    // 별은 `lib/starfield.ts` 가 그린다 — /arena 배경(StarField)과 **같은 하늘**이어야 한다.
+    const buildStars = () => paintStars(starCv, W, H, DPR)
 
     /** 지구 중심·반지름 — 구도의 단일 출처(CSS 에는 기하가 없다).
      *  ⚠️ 좁은 화면에서 폭 계수를 그대로 쓰면 지구가 손톱만 해진다(390px 에서 반지름 101px 였다). */
@@ -323,40 +318,79 @@ export default function RankGlobe() {
       ctx.fill()
       ctx.restore()
 
-      // ── 1st · 2nd · 3rd — 그 나라 땅 위에.
+      // ── 등수 표시 — 그 나라 땅 위에. 1·2·3위는 메달 에셋, 4~10위는 숫자.
+      //
+      // ⚠️ 4~10위를 메달과 같은 에셋으로 만들지 않았다. 그 에셋은 궤도와 RANK 라벨을 품은 그림이라
+      //    열 개가 뜨면 지구가 배지밭이 된다 — 시상대 셋만 그림이고 나머지는 숫자여야 위계가 산다.
+      // ⚠️ 숫자는 **어두운 테를 먼저 긋고 밝은 면을 얹는다**(`strokeText` → `fillText`).
+      //    빛나는 국토 위에도 얹히므로 면만 칠하면 밝은 땅에서 글자가 통째로 증발한다.
       const mk = CFG.markSize / 100
-      type Mark = { x: number; y: number; ty: number; w: number; h: number; rank: number; fade: number }
+      type Mark = {
+        x: number; y: number; ty: number; w: number; h: number; rank: number; fade: number
+        /** 숫자 표시일 때의 글자 크기(px). 메달(1~3위)이면 0. */
+        fontPx: number
+      }
       const marks: Mark[] = []
-      for (const c of W < 720 ? [] : lit) {
-        if (c.rank > 3) continue
+      /**
+       * 그 나라가 화면에서 차지하는 "짧은 변" 근사치 — `/arena` 의 `roomOf` 와 같은 식이다.
+       *   (1) 구면 면적의 제곱근 × 배율. 지구본이라 가장자리 단축(cos θ)을 곱해 보정한다.
+       *   (2) 실제 바운딩박스의 짧은 변 — 칠레·노르웨이처럼 가늘고 긴 땅에서 (1)의 과대평가를 자른다.
+       * 둘 중 작은 쪽을 쓴다.
+       */
+      const roomOf = (c: Land) => {
+        const a = c.area * Math.max(0.12, facing(c.c))
+        const bb = pathMain.bounds(c.g as never)
+        const shortSide = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
+        return Math.min(Math.sqrt(a) * g.R, shortSide)
+      }
+
+      // ⚠️ **상위 10개국만이 아니라 전 국가에 등수를 찍는다**(`/arena` 와 같다). 불빛은 여전히 10개국뿐이고
+      //    숫자만 전부 뜬다 — 두 화면이 같은 순위를 말하는데 한쪽만 셋을 보여주면 다른 그림이 된다.
+      for (const c of W < 720 ? [] : lands) {
+        if (c.rank <= 0) continue
         const fz = facing(c.c)
-        // 지구 가장자리에서는 에셋이 반쯤 잘려 보이므로 정면에 충분히 들어온 뒤 표시한다.
+        // 지구 가장자리에서는 표시가 반쯤 잘려 보이므로 정면에 충분히 들어온 뒤 표시한다.
         if (fz <= 0.2) continue
         const p = projection(c.c)
         if (!p) continue
-        // 표시 크기는 **지구 반지름 기준 하나**로 정한다.
-        //   ⚠️ 옛 코드는 여기서 그 나라 땅의 짧은 변(pathMain.bounds)을 재서 작은 쪽을 골랐다.
-        //      에셋이 궤도와 RANK 라벨을 품은 지금은 그렇게 줄이면 숫자가 점처럼 뭉개진다 →
-        //      땅 크기 측정을 통째로 걷어냈다. 되살리려면 글자로 돌아가는 얘기부터 해야 한다.
-        const cap = g.R * ORD_SZ[c.rank] * mk
-        const h = Math.max(ORD_MIN * 3.2, cap)
-        const img = rankImgs[c.rank - 1]
+        const room = roomOf(c)
+        const medal = c.rank <= 3
+        let fontPx = 0
+        let h: number
+        if (medal) {
+          // 1~3위 에셋 — 땅에 맞춰 줄이되 바닥은 지킨다(끝까지 맞추면 궤도·라벨이 뭉개진다).
+          h = Math.min(Math.max(room * 0.6, g.R * ORD_FLOOR_R), g.R * ORD_SZ[c.rank] * mk)
+        } else {
+          const digits = String(c.rank).length
+          // 절대 안 넘치게 하는 폭 상한. font-size 가 아니라 **그려지는 글자 폭**으로 재야 한다 —
+          // 두 자릿수는 폭이 font-size 의 1.4배쯤이라 크기만 잘라 두면 그대로 삐져나온다.
+          const widthCap = (room * 0.92) / (0.62 * digits + 0.24)
+          fontPx = Math.min(Math.max(room * LBL_RATIO, LBL_FLOOR), g.R * LBL_CAP_R, widthCap)
+          if (fontPx < LBL_HIDE) continue // 읽을 수 없는 크기면 아예 안 그린다
+          h = fontPx
+        }
+        const img = medal ? rankImgs[c.rank - 1] : null
         const aspect = img?.naturalWidth && img?.naturalHeight ? img.naturalWidth / img.naturalHeight : 0.74
         marks.push({
           x: p[0],
           y: p[1],
-          // 중앙 카피와 겹치는 국가는 제목 바로 위까지만 피한다.
-          ty: p[1] > H * 0.285 && p[1] < H * 0.49 ? Math.max(H * 0.265, p[1] - H * 0.085) : p[1],
-          w: h * aspect,
+          // 시상대(1~3위)만 중앙 카피와 겹칠 때 제목 바로 위까지 비켜 세운다.
+          // ⚠️ 숫자(4위~)는 비켜 세우지 않는다 — 전 국가에 찍히므로 다 피하려 들면 위쪽에 무더기로 쌓인다.
+          // ⚠️ 카피 밖으로 **완전히** 빼지는 않는다. 그렇게 하면 인도의 메달이 중앙아시아 상공에 뜬
+          //    미아가 되어 어느 나라 것인지 못 읽는다(실제로 해보고 되돌렸다). 카피에 가리는 건
+          //    자전으로 곧 풀리지만, 엉뚱한 땅 위에 선 등수는 계속 틀린 말을 한다.
+          ty: medal && p[1] > H * 0.285 && p[1] < H * 0.49 ? Math.max(H * 0.265, p[1] - H * 0.085) : p[1],
+          w: medal ? h * aspect : fontPx * 0.72,
           h,
           rank: c.rank,
           fade: Math.min(1, Math.max(0, (fz - 0.2) * 3.2)),
+          fontPx,
         })
       }
-      // 겹침 해소 — 한국·일본처럼 이웃한 상위권은 글자가 통째로 포개진다.
-      // ⚠️ 판정은 **실제 글자 폭**으로. 글자 크기로 어림하면 가로로 긴 글자가 서로 파고든다.
+      // 겹침 해소는 시상대 셋만. `/arena` 는 겹침을 안 풀고 작은 땅의 숫자를 숨기는 쪽인데,
+      // 여기선 1~3위가 이웃하면(한국·일본) 에셋이 통째로 포개져 등수를 못 읽는다.
       const placed: Mark[] = []
-      for (const m of marks.slice().sort((a, b) => a.rank - b.rank)) {
+      for (const m of marks.filter((x) => !x.fontPx).sort((a, b) => a.rank - b.rank)) {
         let moved = true
         while (moved) {
           moved = false
@@ -371,17 +405,31 @@ export default function RankGlobe() {
       }
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
+      // 등수가 낮은 것부터 그려 1위가 맨 위에 온다(겹치면 시상대가 이긴다).
       for (const m of marks.slice().sort((a, b) => b.rank - a.rank)) {
         const col = litColor(m.rank)
-        const img = rankImgs[m.rank - 1]
-        if (!img?.complete || !img.naturalWidth) continue
-        // 밀린 글자가 어느 땅의 것인지 잃지 않게 짧은 선으로 잇는다.
-        // 어두운 테두리를 먼저 깔아야 밝은 불빛 위에 얹혀도 글자가 안 묻힌다.
         ctx.save()
         ctx.globalAlpha = 0.98 * m.fade
-        ctx.shadowColor = hsl(col.h, 94, 66, 0.22 * m.fade)
-        ctx.shadowBlur = m.h * 0.035
-        ctx.drawImage(img, m.x - m.w / 2, m.ty - m.h * 0.9, m.w, m.h)
+        if (m.fontPx) {
+          // 4위~ 숫자 — `/arena` 의 `.ranklab` 과 같은 칠: **흰 글자 + 어두운 테**.
+          // ⚠️ 등수 색으로 칠하지 말 것. 상위권은 국토가 밝게 빛나는데 글자까지 같은 밝은 색이면
+          //    그 위에서 형체가 녹는다(한국 4위에서 실제로 그랬다). 등수는 이미 땅 색이 말한다.
+          // ⚠️ 테를 먼저 긋고 면을 얹는 순서라야 한다(= arena 의 `paint-order: stroke`).
+          ctx.font = `800 ${m.fontPx.toFixed(1)}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`
+          ctx.lineJoin = 'round'
+          ctx.lineWidth = Math.max(1.5, m.fontPx * 0.22)
+          ctx.strokeStyle = 'rgba(5,16,34,0.8)'
+          ctx.strokeText(String(m.rank), m.x, m.ty)
+          ctx.fillStyle = '#f2f7ff'
+          ctx.fillText(String(m.rank), m.x, m.ty)
+        } else {
+          const img = rankImgs[m.rank - 1]
+          if (img?.complete && img.naturalWidth) {
+            ctx.shadowColor = hsl(col.h, 94, 66, 0.22 * m.fade)
+            ctx.shadowBlur = m.h * 0.035
+            ctx.drawImage(img, m.x - m.w / 2, m.ty - m.h * 0.9, m.w, m.h)
+          }
+        }
         ctx.restore()
       }
     }
@@ -433,10 +481,10 @@ export default function RankGlobe() {
 
     // ── 데이터: 경계(모듈 캐시라 /arena 와 공유) + 나라별 시즌 점수
     //
-    // ⚠️ 순위는 `/arena` 와 **완전히 같은 소스**(`buildRegions`)를 쓴다. 실집계가 있는 나라는 실값,
-    //    없는 나라는 `data.ts` 의 데모 목값이 채운다. 실집계만 쓰면 지금은 대한민국 한 곳뿐이라
-    //    메인에서는 불빛이 하나만 켜지는데 /arena 지도는 전 세계가 순위를 갖고 있어, 같은 순위를
-    //    말하는 두 화면이 서로 다른 그림이 된다. 실데이터가 쌓이면 목값은 자동으로 덮인다.
+    // ⚠️ 순위는 `/arena` 와 **완전히 같은 소스**(`leaderboard` scope:'country' → `buildRegions`)를 쓴다.
+    //    서버가 시드 더미와 실집계를 이미 가중평균으로 섞어 내려주므로 여기서 보정할 게 없다.
+    //    ⛔ 못 받았을 때 쓸 목값을 프론트에 두지 말 것 — 그러면 같은 순위를 말하는 두 화면이
+    //       서로 다른 그림이 된다(2026-08-18 에 그 목값을 DB `arena_seed_buckets` 로 옮겼다).
     void (async () => {
       try {
         const feats = await loadCountries()
@@ -444,17 +492,18 @@ export default function RankGlobe() {
 
         let real: RealData = EMPTY_REAL
         try {
-          const res = await callFunction<{ buckets?: { code: string; score: number; member_count: number }[] }>(
-            'leaderboard',
-            { scope: 'country', window: 'season' },
-          )
+          const res = await callFunction<{
+            buckets?: { code: string; score: number; member_count: number; has_real?: boolean }[]
+          }>('leaderboard', { scope: 'country', window: 'season' })
           const country: RealData['country'] = {}
           for (const b of res?.buckets ?? []) {
-            if (b?.code) country[b.code] = { score: Number(b.score), members: Number(b.member_count) }
+            if (b?.code) {
+              country[b.code] = { score: Number(b.score), members: Number(b.member_count), hasReal: !!b.has_real }
+            }
           }
           real = { country, region: {} }
         } catch {
-          /* 실집계를 못 받으면 목값만으로 그린다 — /arena 도 같은 방식이라 그림이 어긋나지 않는다 */
+          /* 못 받으면 순위 없이 균일한 어두운 판으로 뜬다 — /arena 도 같은 방식이라 그림이 어긋나지 않는다 */
         }
         if (dead) return
 

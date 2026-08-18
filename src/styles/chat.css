@@ -84,11 +84,19 @@
 }
 .chat-avatar-btn:hover { background: rgba(255, 255, 255, .1); }
 .chat-avatar-btn:focus-visible { outline: 2px solid var(--ch-accent, #5b93e2); outline-offset: 0; }
+/* 국기 — public/flags/<iso>.webp (4:3).
+   ⚠️ 예전엔 국기 **이모지**였다. 윈도우에 국기 글리프가 없어서 크롬·엣지가 🇰🇷 대신
+   `KR` 두 글자를 그렸다(사용자 대다수가 윈도우라 사실상 국기가 없는 것과 같았다).
+   높이는 1.35em — 이름 글자(12px)를 그대로 따르면 폭이 16px 이라 4괘·별 같은 디테일이 뭉갠다.
+   지금은 22px 폭이고 옆 아바타(20px)와도 균형이 맞는다(근거는 ranking.css 의 .hof-pn-flag 주석).
+   ⚠️ 테는 회색 반투명이어야 한다 — 말풍선은 테마를 따라 밝기가 뒤집히는데,
+   흰 국기(일본)는 밝은 말풍선에서, 어두운 국기는 다크에서 각각 바탕에 녹는다.
+   한쪽 색으로 고정하면 반대 테마에서 테가 사라진다. */
 .chat-flag {
-  font-size: 13px;
-  line-height: 1;
-  /* 컬러 이모지 폰트가 없는 환경(일부 리눅스)에서도 최소한 흑백 글리프로 보이게 */
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  flex: none;
+  height: 1.35em; width: auto; aspect-ratio: 4 / 3;
+  object-fit: cover; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.45);
 }
 
 .chat-anon-badge {

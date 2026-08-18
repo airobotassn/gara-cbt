@@ -164,7 +164,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/checkout?type=&ref=` (결제) | `pages/Checkout.tsx` | (Tailwind 유틸) | `payments` |
 | `/pay/success` · `/pay/fail` (결제 결과) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
 | **캐릭터 허브 / 미니게임** ||||
-| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `gacha-draw` · `gacha-exchange` · `shop-buy` · `redeem-referral` · `coin-gift` |
+| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `shop-buy` · `redeem-referral` · `coin-gift` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
 | `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
@@ -182,7 +182,13 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - ⚠️ **면 발광은 면적 편향이 있다** — 보정(`AREA_REF` 기준 `^0.42`)을 끄면 6위 중국이 1위 한국보다 압도적으로 밝고 16위 호주가 화면에서 제일 크게 빛난다(시안에서 실제로 그랬다). 순위를 면적과 무관하게 읽히게 하려면 광점 모드가 맞고, 지금은 "땅이 빛나는" 그림을 택한 대신 면적 보정으로 누르고 있다.
   - ⚠️ **구면 클리핑(`clipAngle(90)`)은 필수다.** 뒷면 점을 테두리로 밀어붙이는 근사를 쓰면 러시아·남극처럼 경도로 긴 땅이 넘어갈 때 폴리곤이 넓적하게 늘어나 **바다를 덮었다 벗겨졌다** 한다(자전하니 얼룩이 표면을 훑는 것처럼 보인다 — 실제로 겪고 d3-geo 로 교체했다).
   - 초기 경도 `ROT_LON0 = -80`(동경 80° 정면)은 유럽·인도·중국·한국을 한 화면에 넣으려는 값이다. 태평양(-150)으로 두면 상위권이 전부 뒤편이라 **불빛이 하나도 안 보인다.**
-  - 순위 소스는 `/arena` 와 **동일**(`buildRegions` — 실집계 `leaderboard` `scope:'country'` 우선, 없는 나라는 `data.ts` 의 데모 목값). ⚠️ 실집계는 현재 **대한민국 한 곳뿐**이라 화면에 보이는 순위는 대부분 목값이다.
+  - 순위 소스는 `/arena` 와 **동일**(`leaderboard` `scope:'country'` → `buildRegions`). ⚠️ **더미는 이제 브라우저가 아니라 DB 에 있다** — 아래 "아레나 집계 버킷" 절 참고.
+  - **등수 표시도 `/arena` 지도와 같은 규칙이다(2026-08-18)** — 1·2·3위는 에셋(`public/landing/rank-node-*.svg`), **4위부터 끝까지 전 국가에 숫자**를 찍고, 크기는 그 나라가 화면에서 차지하는 짧은 변에 비례한다(`roomOf` = 구면면적√×배율에 가장자리 단축 cos 보정 + 바운딩박스 짧은 변 중 작은 쪽. `ArenaMap` 의 같은 이름 함수와 한 쌍). 불빛은 여전히 상위 10개국뿐이고 숫자만 전부 뜬다.
+    - ⚠️ **숫자는 흰색 고정(`#f2f7ff`) + 어두운 테**다. 등수 색으로 칠하면 상위권은 국토가 밝게 빛나는 위에 같은 밝은 색이 얹혀 형체가 녹는다(한국 4위에서 실제로 그랬다). 등수 색은 이미 땅이 말한다. 테를 먼저 긋고 면을 얹는 순서(= arena 의 `paint-order: stroke`)도 같이 지킬 것.
+    - ⚠️ **두 자릿수는 폭 상한을 따로 봐야 한다** — 글자 크기만 땅에 맞추면 `173` 같은 값이 그대로 삐져나온다(`widthCap`).
+    - ⚠️ **1~3위 에셋에는 크기 바닥(`ORD_FLOOR_R`)이 필요하다.** 궤도와 RANK 라벨을 품은 그림이라 끝까지 땅에 맞추면 뭉개진다(그래서 한때 땅 크기 측정을 통째로 걷어냈었다).
+    - ⚠️ **중앙 카피 회피는 1~3위만, 그것도 조금만.** 카피 밖으로 완전히 빼면 인도의 메달이 중앙아시아 상공에 뜬 미아가 되어 어느 나라 것인지 못 읽는다(해보고 되돌렸다). 가리는 건 자전으로 곧 풀리지만 엉뚱한 땅 위의 등수는 계속 틀린 말을 한다. 숫자(4위~)는 전 국가에 찍히므로 회피 자체를 안 한다 — 다 피하려 들면 위쪽에 무더기로 쌓인다.
+    - ⚠️ 겹침 해소는 **시상대 셋만** 한다(한국·일본처럼 이웃하면 에셋이 통째로 포개진다). 숫자는 arena 와 같이 안 풀고, 너무 작으면(`LBL_HIDE`) 그냥 안 그린다.
   - ⚠️ `landing.css` 의 `.lp > *:not(.eh):not(.rg)` — 배경 레이어를 예외에서 빠뜨리면 flex 아이템으로 접혀 **0×0** 이 된다(실제로 `.rg` 를 그렇게 잃었다). 같은 파일의 `padding-bottom: 34vh`(옛 영상 구도에서 문구를 위로 밀던 우회)도 제거해 스택이 화면 한가운데 선다.
   - **조작 = 끌어서 돌리기**(`/arena` 와 같은 감각). 누르면 페이지 이동하는 동작은 없다 — `/arena` 로 가는 길은 `WORLD ARENA` 버튼이다. 드래그 중에는 자동 회전이 멈추고, 손을 뗀 각도를 새 기준(`spinBase`/`spinFrom`)으로 삼아 `RESUME_MS`(2.2초) 뒤 이어서 돈다. ⚠️ 기준을 안 잡으면 손 떼는 순간 원래 궤도로 순간이동한다. ⚠️ 캔버스에 `touch-action:none` 이 없으면 모바일에서 브라우저가 스크롤로 가로채 회전이 끊긴다.
   - 절약은 **화면 밖이면 렌더 정지** 하나만 넣었다(대가 없는 유일한 것). 30fps 제한은 자전이 끊겨 보이고, WebGL 은 폴백을 두 벌 유지해야 해서 안 했다.
@@ -239,20 +245,29 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
     - ⚠️ **1회 판정을 `UPDATE ... where region_changed_at is null` 한 문장에 넣는다.** select 로 먼저 확인하고 update 하면 두 번 눌린 요청이 나란히 통과해 2회 변경이 된다. `region_locked_at`(최초 확정 시각)은 건드리지 않는다.
     - ⚠️ 나라를 바꾸면 화면이 지역을 **반드시 비운다** — 안 비우면 옛 나라의 지역이 남아 서버가 거절하고 사용자는 이유 없는 오류만 본다.
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
-- **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 5칸 `출석·뽑기·상점·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
+- **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 4칸 `출석·상점·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
   - ⚠️ **오른쪽 레일은 `position:absolute` 라 무대 높이를 늘리지 못한다** — 버튼을 추가·삭제하면 `hub.css` 의 `.hub-main .stage-zone` 높이(모바일 420 / PC 520)와 `.rail-r` gap 을 다시 실측할 것. 넘치면 아래 출석 스탬프를 덮는다(실제로 5칸이 되며 터졌던 버그).
+  - ⛔ **뽑기(가챠)는 제거됐다(2026-08-18).** 확률·천장·가루(dust)·가루 교환소·한정 가구 2종(어항·네온)이 화면·함수·DB 에서 통째로 사라졌다(`20260818120000_drop_gacha.sql` — `gacha-draw`·`gacha-exchange` 함수 삭제, `gacha_*`·`user_gacha_pity`·`dust_exchange` 표와 `user_currency.dust` 드롭). **재화는 코인 하나뿐**이고 쓸 곳은 상점이다.
+    - 가루를 반만 남기지 않은 이유 = 뽑기가 없으면 **벌 수도 쓸 수도 없는 지갑**이 되어 "왜 안 늘지" 를 아무도 못 푼다.
+    - 한정 가구 2종은 상점에 없던 물건이라 뽑기가 사라지면 얻을 길이 통째로 없어진다 → 카탈로그·소유·방 배치에서 같이 지웠다(**방 슬롯은 값을 보고 지운다** — `slots ?| array[...]` 는 키를 보므로 한 행도 안 걸린다).
+    - 검증: `tests/db/t-drop-gacha.mjs`(17건). 상점 RPC 검증은 `t-shop.mjs`(옛 `t-gacha-shop.mjs` 에서 뽑기 절반을 걷어낸 것).
+    - ⚠️ 옛 마이그레이션 두 개(`20260714000400`·`20260714000500`)는 이제 schema.sql 과 byte-parity 가 안 맞는다 — `_parity-check.mjs` 의 `SUPERSEDED` 에 사유와 함께 적혀 있다.
   - 미션 3종 완료 판정은 `get-hub` 의 `dailyDone`·`learnDone`·`minigameDone`(daily_activity 종류별 플래그), 점수 표기는 `scoring.ts` 의 `ACTIVITY_DELTA` 파생이라 하드코딩이 없다.
+  - **HUD 이름 = 내 닉네임**(`profiles.display_name` · 2026-08-18). 예전엔 `CARI` 가 박혀 있어서 누구 화면이든 같은 이름이었다. 값은 `Hub.tsx` 의 `heroName` 하나이고 내 방(`RoomView`)도 그걸 쓴다.
+    - ⚠️ **구글 계정 이름(`user_metadata.name`)으로 폴백하지 말 것 — 실명이다.** 프로필을 받아오기 전 잠깐이라도 그리면 닉네임 게이트가 막고 있는 걸 그대로 흘린다. 아직 못 받았으면 마스코트 이름(`CARI`)으로 둔다.
+    - ⚠️ `display_name` 에는 **가입 트리거가 넣은 구글 실명이 들어 있을 수 있다** — 닉네임 확정 여부는 `nickname_set_at` 이 답한다(`set-nickname` 이 둘을 같이 쓴다). 허브는 닉네임 게이트를 지난 뒤라 안전하지만, 게이트 앞 화면에서 `display_name` 을 그냥 쓰면 실명이 뜬다.
+    - ⚠️ 닉네임은 최대 12자다. 이름만 말줄임(`.hud-nick`)하고 자격 배지(`.tt`)는 안 줄인다 — 배지가 같이 줄면 무슨 자격인지 못 읽는다.
   - **HUD 경험치 바 = ARENA 레벨 진행도**(`arenaLevelForScore`/`arenaBand`, 시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체했고 `pointsToPass`·`level`(시험 등급)은 화면에서 빠졌다(서버는 계속 내려줌).
     - ⚠️ **`Lv.` 이름이 레벨테스트 등급과 겹친다** — 그래서 바 안 왼쪽에 `ARENA Lv.N` 을 박아 어느 축인지 밝힌다(원안 표의 표기와 동일). 바 안 글자는 `.exp-txt` 한 flex 줄에 넣어야 한다(각각 absolute 로 두면 좁은 화면에서 겹친다). 모바일은 `.exp-next`(분모)를 감춰 `ARENA Lv.N` 이 안 잘리게 한다.
     - ⚠️ **한 줄에 서는 세 요소(`.exp` · `.hub-help` · `.gchip`)는 높이가 같아야 한다**(모바일 28 / PC 40). 하나만 바꾸면 바로 티 난다.
     - ⚠️ **채움(`.exp-fill`)은 원색 블록이 아니라 옅은 틴트 + 원색 3px 진행선**이다. 글자가 바 위에 얹히므로 원색으로 꽉 채우면 채움 경계에서 글자가 묻힌다.
-    - `?` 는 **바 뒤·코인 앞**이다. 코인 옆에 두면 코인 설명으로 읽힌다 — 코인(뽑기·상점 재화)과 점수(랭킹)는 별개 지갑이다.
+    - `?` 는 **바 뒤·코인 앞**이다. 코인 옆에 두면 코인 설명으로 읽힌다 — 코인(상점 재화)과 점수(랭킹)는 별개 지갑이다.
     - 티어는 텍스트가 아니라 **엠블렘 이미지 단독**(`<TierBadge>`, 백분위 '상위 N%' 는 제거 — 순위 맥락은 랭킹 화면 소관). ⚠️ `TierBadge` 가 인라인 style 로 크기를 박으므로 `.tier-chip img` 는 `!important` 없이는 못 키운다.
     - 아바타 밑 `Lv.` 배지(`.hud-lv`)는 제거했다 — 바가 이미 `ARENA Lv.N` 을 말한다.
   - ⚠️ **미션은 한 줄 얇은 바(`.mission-bar`)다 — 카드로 키우지 말 것.** 좌측 세로 카드는 캐릭터를 옆으로 밀어서, 큰 가로 타일은 무대를 눌러서 각각 반려됐다(2026-08-04). 지금은 칩 3개 한 줄이고 chrome 은 하단 `.reward`(출석 보상)와 같은 값이라 위아래가 한 쌍으로 읽힌다. 모바일은 `.ms-chips` 를 `order:3 / flex-basis:100%` 로 통째로 둘째 줄에 내린다. 시안의 CTA 배너("미션 완료하고…")와 코인/점수 구분 안내문은 중복이라 삭제.
   - **코인 선물(2026-08-07)**: 뒤로가기 줄 오른쪽 `선물` 버튼(공유 옆) → 모달. **친구 초대 모달에 넣지 않는다**(같은 친구코드를 쓰지만 별개 진입점으로 두기로 결정). 두 버튼은 `.hub-backrow-act` 로 묶는다 — `.hub-backrow` 가 `space-between` 이라 낱개로 넣으면 셋이 흩어진다.
     - **즉시 이체다. 취소·회수 경로가 없다.** 방어선은 ① 코드 8자 완성 시 상대 **닉네임 자동 표시** ② 확인 단계 ③ nonce 재사용 셋뿐이다.
-    - ⚠️ **`client_nonce` 를 호출마다 새로 만들면 안 된다.** 뽑기·상점은 `crypto.randomUUID()` 를 호출 시점에 만들지만(재시도해도 손해가 작다), 선물은 그러면 타임아웃 후 재시도가 **두 번 보내기**가 되고 되돌릴 수 없다. `Hub.tsx` 는 **모달을 열 때 1회** 만들어 전송 성공까지 고정한다(`giftNonce`).
+    - ⚠️ **`client_nonce` 를 호출마다 새로 만들면 안 된다.** 상점은 `crypto.randomUUID()` 를 호출 시점에 만들지만(재시도해도 손해가 작다), 선물은 그러면 타임아웃 후 재시도가 **두 번 보내기**가 되고 되돌릴 수 없다. `Hub.tsx` 는 **모달을 열 때 1회** 만들어 전송 성공까지 고정한다(`giftNonce`).
     - ⚠️ **잠금 순서가 이 기능의 핵심 한 줄이다.** 이체는 처음으로 두 사람의 `user_currency` 행을 잠근다 — `least/greatest` 로 **uuid 오름차순 고정**이 아니면 A→B / B→A 동시 실행이 데드락이다(동시성 테스트의 음성 대조군이 실제로 데드락을 낸다).
     - ⚠️ **`coin_gift` 안의 순서가 곧 정확성이다 — 잠금 → 멱등 재확인 → 쿨다운 → 잔액.** 셋 다 잠금 앞에 두면 동시 요청에서 조용히 깨진다(2026-08-07 실측):
       · **쿨다운이 잠금 앞**이면 같은 발신자의 동시 2발이 나란히 "직전 없음"을 보고 **둘 다 통과**한다.
@@ -260,7 +275,6 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
     - ⚠️ **원장(`coin_transfers`)은 `on delete set null` + 닉네임 스냅샷**이다. 다른 테이블의 `cascade` 관례를 여기 적용하면 발신자가 탈퇴하는 순간 받은 사람의 이력이 사라져 "이 코인 왜 늘었지"에 영영 못 답한다. self CHECK 도 `sender_id <> recipient_id` 로 쓰면 양쪽 null 일 때 CHECK 이 깨져 SET NULL 자체가 실패한다.
     - **저장은 건별, 표시는 사람별 합산.** 허브는 **오늘 받은 것**만 상세로 보여주고 그 이전 미확인은 건수만(`giftsToday`/`giftsOlder`/`giftsUnseen` — `get-hub`). 서버는 미확인 전부를 내려준다(오늘로 자르면 하루 안 들어온 사람의 알림이 통째로 사라진다). 전체 이력은 모달 안 `선물 내역 ›`(`coin-gift` 의 `history`).
     - **금액 한도는 없다**(잔액이 곧 한도 — 코인은 시즌 점수·랭킹과 별개 지갑이라 파밍해도 순위가 안 흔들린다). 대신 **같은 사람에게 10초 쿨다운**만 건다 — 돈이 아니라 받는 사람의 알림을 지키는 장치다. 한도를 나중에 얹고 싶으면 원장이 이미 있으니 쿼리만 추가하면 된다.
-    - **가루(dust)는 선물 대상이 아니다** — 뽑기 천장·한정템 교환가(150)가 설계 전제라 이체되면 천장이 무의미해진다.
     - 익명 계정은 송·수신 둘 다 불가. 수신은 따로 막지 않아도 된다 — `get-hub` 가 익명을 먼저 컷해서 `ensure_referral_code` 가 안 불리고, **코드가 없으면 지정 자체가 성립하지 않는다.**
     - 검증 두 벌. **pglite 로는 부족하다** — 단일 커넥션이라 트랜잭션을 두 개 못 열어서 이 기능에서 제일 위험한 것들을 구조적으로 재현할 수 없다.
       · `tests/db/t-coin-gift.mjs` (48건, pglite · `test:db` 에 포함) — 제약·에러코드·원장 보존 등 단일 실행 규칙.
@@ -279,6 +293,18 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - 저장 = 테이블 `minigame_scores`(통산 최고, 시즌 스코프 아님) + RPC `minigame_top`. `activity_ledger` 는 정규화 delta 라 줄 세우기에 못 쓴다.
   - ⚠️ 제출은 **티켓 필수**(`submit-minigame` 의 `action:'start'` → HMAC 서명 티켓). 티켓은 **세션당 1개로 재사용** — 제출마다 새로 받으면 "플레이시간 대비 상한"이 리셋돼 레벨형 2번째 이후 정상 기록이 깎인다.
 - **`/arena` 는 더 이상 iframe 이 아니다**: 옛 `public/world-arena.html`(자립형 d3 HTML)을 React 로 포팅하고 삭제했다. 지도 경계는 `public/geo/*.json`(world·kr-prov 즉시, kr-muni 는 시도 진입 시 지연 로드), d3 는 npm 서브모듈(`d3-geo`·`d3-zoom` 등). 문구는 `i18n.tsx` 의 `arena.*`.
+- **아레나 집계 버킷 — 더미도 DB, 계산은 5분에 한 번(2026-08-18)**: `/arena` 지도와 랜딩 지구본이 쓰는 국가·지역 순위. 예전엔 ① 실집계가 **호출마다 재계산**(`profiles ⨝ user_progress` 풀스캔 ×2)이고 ② 없는 구역은 **브라우저가 목값을 지어냈다**(`data.ts` 의 `MOCK_TOP_COUNTRY` 41개국 + 해시 꼬리). 지금은 시드 테이블 `arena_seed_buckets`(더미) + 스냅샷 `arena_bucket_scores`(pg_cron 5분마다 `refresh_arena_buckets()`)이고, 읽기 RPC 3종(`country_/region_/school_leaderboard`)은 스냅샷을 **select 만** 한다.
+  - ⚠️ **합치는 방식이 핵심이다 — 덮어쓰기가 아니라 가중평균**(`(Ns·avg_s + Nr·avg_r)/(Ns+Nr)`). 점수가 `avg(season_total)` 이라 시드를 실집계로 갈아치우면 신규 몇 명이 들어온 순간 국가 평균이 그쪽으로 끌려가 더미 순위가 무너진다(그래서 실제로 한국이 목표 4위가 아니라 15위에 있었다). 시드를 "이미 있던 가상 회원"으로 두면 사람이 붙을수록 저절로 희석돼 더미를 걷어내는 날을 따로 잡을 필요가 없다.
+  - ⚠️ **시드 `member_count` 는 장식이 아니라 안정성 손잡이다.** 베이지안 K=25 shrinkage 때문에 인원이 작은 버킷일수록 전체 평균 쪽으로 끌려 올라간다 — 인원을 제각각 주면 하위권 소국이 중위권을 앞지른다. 그래서 **모든 시드에 5,000 이상**을 주고 점수에 비례해 키운다(그러면 보정이 0.5% 아래라 순위 = 점수 순서 그대로). 대한민국은 2,550점 / 25,408명 — 3위 인도(2600) 바로 아래에 붙여 5위 영국(2100)과 450점 벌린 값이고, 실회원 5,000명이 **전원 0점으로** 들어와도 4위를 지킨다.
+  - ⚠️ **지역 시드 인원은 나라 안에서 균등하다 — 점수 비율로 쪼개지 말 것.** 보정이 `(N·s + K·G)/(N + K)` 라 인원이 작을수록 전체 평균 G 쪽으로 세게 끌린다. 지역은 인원이 수백 명이라 국가(수만 명)보다 보정이 15배쯤 강한데, 꼬리 국가는 점수가 20~40 이고 지역 평균 G 는 600 이라 **점수가 낮아 인원까지 적은 지역이 더 크게 끌려 올라가 1등을 먹는다**(체코·에스토니아 등 17개국에서 실제로 뒤집혔다). 인원을 고르게 두면 분모가 상수라 순서가 절대 안 흔들린다. ±8% 만 기울여도 15개국이 다시 뒤집히므로 "조금만 다르게" 도 안 된다. 대가로 한 나라 안 지역들의 `👥 N명` 이 전부 같은 숫자다.
+  - ⚠️ **지역 인원 합 = 그 나라 인원.** 점수로 따로 환산하면 주(州) 하나가 나라 전체보다 사람이 많아진다(미국 34,440명 vs 미국 30,600명 — 실제로 그렇게 나왔다).
+  - ⚠️ **`has_real` 만이 진짜 사람이 있는 버킷인지 말한다** — `member_count` 에는 가상 회원이 섞여 있어서 이걸로는 구분이 안 된다. `/arena` 툴팁의 '실집계' 배지가 이 값을 본다.
+  - ⚠️ **프론트에 목값을 되살리지 말 것.** 되살리면 "서버가 말하는 순위"와 "화면이 말하는 순위"가 갈린다. 서버를 못 받으면 지구본은 무채색으로 뜬다(그게 맞다).
+  - ⚠️ `/arena` 지역 버킷은 **파고든 그 나라 것**을 받는다(옛 코드는 `country:'KR'` 로 못박혀 해외 주(州)가 전부 목값이었다). 지역 코드는 대한민국만 숫자(`11`)라 `PROV_TO_ISO` 로 옮기고, 해외 adm1 은 지도 파일 `code` 가 이미 ISO 3166-2(`US-CA`)라 그대로 키다.
+  - 시드 데이터 = 생성물 `supabase/migrations/20260818140100_arena_seed_data.sql`. 손으로 고치지 말고 **`node tools/gen-arena-seed.mjs`** 를 다시 돌릴 것(값의 근거가 `public/geo/*.json` 안에 있다 — 국가 목록·행정구역 목록·`ord` 데모 순위). ⚠️ Natural Earth 는 한 행정구역을 여러 피처로 쪼개기도 해서 같은 `code` 가 두 번 나온다(25건) — 생성기가 접는다. 안 접으면 `(scope, code)` PK 에 걸려 insert 가 통째로 죽는다.
+  - 걷어낼 땐 `delete from arena_seed_buckets;` + `select refresh_arena_buckets();` 두 줄.
+  - **개인 랭킹(`scoped_top`)은 그대로 실시간이다** — 내 순위는 즉시 반영돼야 하고, 국가 평균은 5분 늦어도 아무도 모른다.
+  - 검증: `tests/db/t-arena-buckets.mjs`(36건 — 가중평균·floor·has_real·걷어내기·나라 안 순서 불변·상위 10개국 회귀). ⚠️ `t7-leaderboard-rpcs.mjs` 는 **옛 재계산판**을 검증한다(집계 의미론 고정용으로 남겨둠).
 - **`/arena` 채팅(유사채팅 · `components/ChatBoard.tsx`)**: 웹소켓이 아니라 **3.5~4.5초 폴링**이다(신규분 `after` + 가림/삭제 reconcile `ids+since` 두 번). 함수 `chat-list`·`chat-post`·`chat-report`·`chat-translate`, 공용 헬퍼 `_shared/chat.ts`, 테이블 `chat_messages`·`chat_reports`·`chat_incidents`(RLS 정책 없음 = 함수 전용). 삽입 경로는 RPC `chat_post_atomic` 하나뿐. 검수는 `/admin?top=level&tab=chatmod`(`Admin.tsx` 의 `ChatModAdmin`).
   - ⛔ **사용자 수정·삭제는 없다(2026-08-13 제거 — `chat-edit`·`chat-delete` 함수 삭제).** `chat-edit` 이 `body` 를 덮어써서 **욕설을 쓰고 신고당한 뒤 10분 안에 고치면 증거가 사라졌다**(관리자가 신고를 열면 멀쩡한 글만 남는다). 삭제는 `deleted_at` 만 찍고 본문을 남겨 원래 안전했지만, 수정을 없애는 김에 같이 걷어냈다. 덤으로 **번역 무효화 로직이 통째로 불필요**해졌다(원문이 안 변하니 번역본을 버릴 일이 없다). 다시 넣으려면 원본 보관이 선행이다. 관리자 가림(`chatHide`)은 그대로라 `chat.deleted` 문구·`deleted_at` 경로는 살아 있다.
   - **방(room) = 전세계 1개 + 나라별 1개** (`chat_messages.room` = `'global'` 또는 ISO2 대문자, 방 도입 전 글은 전부 global). 방 목록을 만들지 않는 이유 = **방은 지도 선택이 정한다** — 지구본에서 아무 나라도 안 고르면 전세계, 나라를 고르면 그 나라 방. 나라 안에서 시도를 골라도 방은 나라 단위로 유지. 전세계로 돌아가는 길은 채팅 머리말의 `전세계로` 버튼 하나(= `goto(0)`, 지도도 같이 나간다).
@@ -321,7 +347,7 @@ supabase/
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
   functions/   48개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
-               · 허브(get-hub·complete-daily·gacha-draw·gacha-exchange·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
+               · 허브(get-hub·complete-daily·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(Azure·구글 어댑터·번역 판정) · country-lang.ts(국가→번역 대상 언어)
@@ -336,6 +362,9 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - **화면은 `lazy()` 로 받는다**(`App.tsx`). 랜딩만 정적이다(대부분이 처음 닿는 화면이라 청크를 한 번 더 왕복시키면 손해). **새 라우트를 정적 import 로 넣지 말 것** — 그 화면이 쓰는 라이브러리까지 첫 진입 번들로 딸려 온다(xlsx·react-quill = 관리자, d3 = 아레나). 첫 진입 JS 1.33MB → 621KB(gzip 423 → 194KB).
   - **사전은 언어별로 받는다** — 위 i18n 절 참고. 490KB 중 한국어 112KB 만 정적.
   - **게임 이미지는 WebP 다**(`public/games/*.webp`, 229MB → 20MB). 새 에셋도 PNG 로 넣지 말 것. 변환은 `ffmpeg -c:v libwebp`(작은 건 `-lossless 1`, 큰 건 `-quality 90`) — 알파는 그대로 보존된다.
+  - **국기는 파일이다 — 이모지로 쓰지 말 것**(`public/flags/<iso>.webp`, flagcdn w160 · 249개국 · 총 694KB · 2026-08-18). **윈도우에 국기 글리프가 없어서** 크롬·엣지가 🇰🇷 대신 `KR` 두 글자를 그린다(파이어폭스만 Twemoji 내장). 경로는 `regions.ts` 의 `flagUrl()` 하나가 만들고, 목록에 없는 코드는 빈 문자열을 돌려줘 호출부가 렌더를 생략한다.
+    - ⚠️ **번들에 넣지 말 것.** 파일당 하나라 화면에 뜬 나라만 받는다 — 시상대면 3장, 실전송 5KB 미만. 249개를 통으로 싣는 순간 첫 진입 비용이 된다.
+    - ⚠️ 옛 `flagEmoji()` 도 남아 있다(`/arena` 채팅·방 이름). **그 두 자리는 아직 이모지라 윈도우에서 안 보인다** — 옮길 때 `flagUrl()` 로 바꿀 것.
   - ⛔ **이미지를 HTML 안에 base64 로 박지 말 것.** `shoot-cari.html` 이 그래서 4.8MB 였다(그중 4.75MB 가 그림 3장). 박아 두면 ① HTML 을 다 받기 전엔 파싱이 안 끝나고 ② 브라우저가 캐시를 못 해 들어올 때마다 다시 받는다. 파일로 빼면 58KB.
   - 아직 안 한 것: 페이지별 CSS 분리(전역 `index.css` 273KB). 파일끼리 클래스가 얽혀 있어 옮기면 조용히 깨지는 화면이 나온다 — 손대려면 화면을 눈으로 대조하면서 한 파일씩 할 것. `public/` 에 남은 1~2MB 짜리 PNG(자격증 템플릿·로고·마스코트·룸)도 그대로다.
 - **보안 모델**: `questions.correct_index`·`test_attempts`·`attempt_answers`·`user_level_skill`·`user_progress` 는 **클라 직접 SELECT 금지**(RLS 미부여 = service role 전용). 출제·채점·결과 서빙은 **Edge Function 에서만**. 익명 유저 응답에선 총점 외 데이터를 서버가 제외. 정답은 언어 무관 단일 컬럼(`correct_index`)이라 번역과 무관.

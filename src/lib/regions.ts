@@ -82,6 +82,29 @@ export function flagEmoji(code?: string | null): string {
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 }
 
+/** 국기 파일이 실제로 있는 코드인지 O(1) 로 보기 위한 색인. 없는 코드에 <img> 를 걸면 404 + 깨진 그림이 뜬다. */
+const FLAG_SET: ReadonlySet<string> = new Set(COUNTRY_CODES as readonly string[]);
+
+/**
+ * ISO 3166-1 alpha-2 → 국기 이미지 경로. 'KR' → '/flags/kr.webp'
+ *
+ * ⚠️ 왜 이모지(`flagEmoji`)를 안 쓰고 파일을 두나 (2026-08-18)
+ *   **윈도우에 국기 글리프가 없다.** Segoe UI Emoji 에 지역표시기호 합성이 빠져 있어서
+ *   크롬·엣지는 🇰🇷 대신 `KR` 두 글자를 그린다(파이어폭스만 Twemoji 를 내장해 제대로 보인다).
+ *   사용자 대다수가 윈도우라 이모지로는 국기가 아예 안 보이는 것과 같다.
+ *
+ *   그림은 `public/flags/*.webp`(flagcdn w160, 249개국 · 총 694KB)다. 파일당 하나라
+ *   **화면에 뜬 나라만 받는다** — 시상대면 3장, 실전송 5KB 미만이고 그 뒤론 캐시.
+ *   ⚠️ 번들에 넣지 말 것. 249개를 통으로 싣는 순간 첫 진입 비용이 된다(그 규칙은 CLAUDE.md 참고).
+ *
+ * 코드가 없거나 파일이 없는 나라면 빈 문자열 → 호출부에서 렌더 생략(빈 자리를 남기지 않는다).
+ */
+export function flagUrl(code?: string | null): string {
+  const c = (code ?? '').trim().toUpperCase();
+  if (!FLAG_SET.has(c)) return '';
+  return `/flags/${c.toLowerCase()}.webp`;
+}
+
 /**
  * 국가 셀렉트가 그리는 목록 — 화면 언어로 이름을 매겨 **그 언어 기준으로 정렬**한다
  * (코드 순으로 두면 한국어 화면에서 AD·AE·AF… 로 나와 자기 나라를 찾을 수가 없다).

@@ -2,7 +2,7 @@
 // cosmetic-only 경제 테이블의 멱등/1-per-key 제약을 검증한다.
 //  · auth 스키마가 pglite 에 없으므로 `references auth.users(id) [on delete cascade]` 만 제거하고
 //    나머지 DDL(컬럼/타입/pk/unique/rls)은 그대로 사용한다. (rls enable 는 pglite 도 지원)
-// 검증: gacha_log/shop_purchase 의 unique(user_id, client_nonce) 멱등 가드,
+// 검증: shop_purchase 의 unique(user_id, client_nonce) 멱등 가드,
 //       daily_activity pk(user_id, day) 1/day 가드, user_currency.points bigint default 0,
 //       user_cosmetics pk(user_id, part_key) 중복 파츠 차단.
 import { PGlite } from '@electric-sql/pglite';
@@ -22,28 +22,8 @@ const uid = '00000000-0000-0000-0000-000000000001';
 // 마이그레이션이 auth.users FK 를 실제로 제거했는지(하네스가 참조하는 컬럼은 plain uuid) — 정상 실행됐으면 OK
 rec('migration applied (no auth schema)', true, true);
 
-// --- gacha_log unique(user_id, client_nonce) 멱등 가드 ---
-await db.query(
-  `insert into gacha_log (user_id, pool_key, client_nonce, result_part_key) values ($1,'poolA','nonce-1','hat_01')`,
-  [uid],
-);
-let gachaDup = null;
-try {
-  await db.query(
-    `insert into gacha_log (user_id, pool_key, client_nonce, result_part_key) values ($1,'poolA','nonce-1','hat_02')`,
-    [uid],
-  );
-  gachaDup = 'inserted';
-} catch (e) { gachaDup = e.code || 'error'; }
-rec('gacha_log unique(user_id,client_nonce) rejects dup nonce', gachaDup, '23505');
-
-// 다른 nonce 는 허용
-await db.query(
-  `insert into gacha_log (user_id, pool_key, client_nonce) values ($1,'poolA','nonce-2')`,
-  [uid],
-);
-const gachaN = (await db.query(`select count(*)::int n from gacha_log`)).rows[0].n;
-rec('gacha_log distinct nonce allowed (2 rows)', gachaN, 2);
+// ⚠️ 옛 gacha_log 멱등 가드 검증은 뽑기 제거(20260818120000)로 지웠다.
+//    이 파일이 적용하는 20260714000400 은 아직 그 표를 만들지만, 지금 DB 에는 없다.
 
 // --- shop_purchase unique(user_id, client_nonce) 멱등 가드 ---
 await db.query(
@@ -87,7 +67,7 @@ const bigPts = (await db.query(`select points from user_currency where user_id=$
 rec('user_currency.points holds > int4 (bigint)', Number(bigPts), 9000000000);
 
 // --- user_cosmetics pk(user_id, part_key) 중복 파츠 차단 ---
-await db.query(`insert into user_cosmetics (user_id, part_key, source) values ($1,'hat_01','gacha')`, [uid]);
+await db.query(`insert into user_cosmetics (user_id, part_key, source) values ($1,'hat_01','grant')`, [uid]);
 let cosDup = null;
 try {
   await db.query(`insert into user_cosmetics (user_id, part_key, source) values ($1,'hat_01','shop')`, [uid]);

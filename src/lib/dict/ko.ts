@@ -1110,10 +1110,14 @@ const KO: Record<string, string> = {
   "landing.hero_em": "당신의 능력을",
   "landing.hero_post": "CARIS로 확인하세요",
   "landing.hero_cta": "CARIS 응시하기",
-  "landing.cta_diagnose": "WORLD ARENA",
-  "landing.cta_exam": "CARIS",
-  // WORLD ARENA·CARIS 와 나란한 3번째 버튼이라 브랜드 라벨처럼 6개국어 동일 표기. 목적지 = /ebooks.
-  "landing.cta_learn": "Learning Library",
+  // 메인 버튼 3개는 영문 브랜드명 + 괄호 안 한글 이름이다(2026-08-18).
+  // 시니어 응시자가 영문 브랜드명만으로는 어디로 가는 버튼인지 못 읽는다는 지적에서 나왔다.
+  // ⚠️ 한국어 사전에만 붙인다 — 나머지 5개 언어는 브랜드명 그대로다(임의 번역어를 화면에 올리지 않기로 했다).
+  "landing.cta_diagnose": "WORLD ARENA (글로벌 랭킹)",
+  "landing.cta_exam": "CARIS (자격검정)",
+  // WORLD ARENA·CARIS 와 나란한 3번째 버튼. 목적지 = /ebooks.
+  // ⚠️ 이 키는 좌측 FAB 메뉴의 '러닝 라이브러리' 항목도 같이 쓴다 — 여기를 고치면 그쪽 라벨도 바뀐다.
+  "landing.cta_learn": "Learning Library (학습센터)",
   "landing.card.guide.d": "시험 구성·평가 영역·응시 방법을 한눈에 확인하세요.",
   "landing.card.check.d": "응시 전 보안 프로그램과 환경을 미리 점검하세요.",
   "landing.card.notice.d": "오픈 소식과 응시 전 꼭 확인할 공지를 모았습니다.",
@@ -1646,7 +1650,6 @@ const KO: Record<string, string> = {
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
   "hub.err.insufficient_points": "포인트가 부족해요",
-  "hub.err.insufficient_dust": "가루가 부족해요",
   "hub.err.already_owned": "이미 보유한 한정템이에요",
   "hub.err.unauthorized": "로그인이 필요해요",
   "hub.err.generic": "오류가 발생했어요. 잠시 후 다시 시도해주세요",
@@ -1663,11 +1666,11 @@ const KO: Record<string, string> = {
   "hub.room.surface_floor": "바닥",
   "hub.room.surface_wall": "벽",
   "hub.room.pick_title": "{where}에 놓을 가구",
-  "hub.room.none_owned": "{where}에 놓을 가구가 아직 없어요. 상점이나 뽑기에서 구해보세요.",
+  "hub.room.none_owned": "{where}에 놓을 가구가 아직 없어요. 상점에서 구해보세요.",
   "hub.room.remove": "이 자리 비우기",
   "hub.room.help": "가구는 한 자리에만 놓을 수 있어요. 다른 자리에 놓으면 옮겨집니다.",
 
-  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  // 가구 이름 — 상점·방 고르기가 같이 쓴다.
   "hub.part.fur_plant_01": "작은 화분",
   "hub.part.fur_lamp_01": "스탠드 조명",
   "hub.part.fur_chair_01": "나무 의자",
@@ -1678,8 +1681,6 @@ const KO: Record<string, string> = {
   "hub.part.fur_clock_01": "벽시계",
   "hub.part.fur_shelf_01": "책 선반",
   "hub.part.fur_window_01": "창문",
-  "hub.part.fur_aquarium_01": "작은 수조",
-  "hub.part.fur_neon_01": "네온 사인",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "방 보기",
@@ -1692,8 +1693,8 @@ const KO: Record<string, string> = {
   "room.my_room": "내 방으로",
   "room.my_room_edit": "내 방 꾸미기",
 
-  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
-  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   "hub.part.hat_common_01": "새싹 모자",
   "hub.part.hat_common_02": "비니",
@@ -1703,8 +1704,8 @@ const KO: Record<string, string> = {
   "hub.part.crown_rare_01": "작은 왕관",
 
   // 상단·공통
-  "hub.gate_sub": "로그인하고 출석·뽑기·상점을 이용해보세요",
-  "hub.banner_login": "로그인해야 출석·뽑기·상점이 작동해요",
+  "hub.gate_sub": "로그인하고 출석·상점을 이용해보세요",
+  "hub.banner_login": "로그인해야 출석·상점이 작동해요",
   "hub.share": "공유",
   "hub.gift_btn": "선물",
   "hub.help_aria": "점수 획득 방법",
@@ -1714,7 +1715,6 @@ const KO: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "출석",
-  "hub.rail.gacha": "뽑기",
   "hub.rail.shop": "상점",
   "hub.rail.title": "칭호",
   "hub.rail.invite": "초대하기",
@@ -1734,34 +1734,15 @@ const KO: Record<string, string> = {
   "hub.toast.checkin_done": "출석 완료 · +{n}P · 스탬프 +1",
   "hub.toast.checkin_bonus": "출석 완료 · +{n}P · 7일 완주 보너스 +{b}P",
   "hub.toast.checkin_already": "출석 완료 · 오늘 보상은 이미 받았어요",
-  "hub.toast.no_coin": "코인이 부족해요",
   "hub.toast.no_points_item": "포인트가 부족해요: {name} ({price}P)",
-  "hub.toast.no_dust": "가루가 부족해요",
 
   // 구매/교환 완료 팝업
-  "hub.buy.exchanged": "교환 완료!",
   "hub.buy.purchased": "구매 완료!",
 
-  // 뽑기 모달
-  "hub.gacha.title": "뽑기",
-  "hub.gacha.dust": "가루",
-  "hub.gacha.owned_n": "보유 {n}종",
-  "hub.gacha.pity": "천장까지 {n}회",
-  "hub.gacha.limited": "한정템!",
-  "hub.gacha.dust_gain": "가루 +{n}",
-  "hub.gacha.dust_hint": "모아서 한정템 교환!",
-  "hub.gacha.drawing": "뽑는 중…",
-  "hub.gacha.draw": "뽑기 ({n} 🪙)",
-  "hub.gacha.ex_head": "가루 교환소",
-  "hub.gacha.ex_sub": "뽑기 전용 한정템",
-  "hub.gacha.have": "보유중",
-  "hub.gacha.exchange": "교환",
-  "hub.gacha.help": "뽑기하면 항상 가루가 쌓여요. 천장({n}회)엔 한정템이 확정! 가루로 원하는 한정템을 바로 교환할 수도 있어요.",
 
   // 상점 모달
   "hub.shop.title": "상점",
   "hub.shop.balance": "보유 CARI 코인",
-  "hub.shop.rare": "레어",
   "hub.shop.owned": "보유중",
   "hub.shop.buy": "구매",
   "hub.shop.empty": "상점에 물건이 없어요.",

@@ -22,6 +22,16 @@ const DDL_MIGRATIONS = [
   'supabase/migrations/20260804160000_referred_by.sql',
 ];
 
+// 나중 마이그레이션이 이 파일들의 DDL 일부를 **드롭**해서 byte-parity 가 더는 성립하지 않는다.
+// schema.sql 은 '지금의 스키마'라 드롭된 물건이 없고, 옛 파일은 이력으로 남는다.
+//   ⚠️ 목록에서 조용히 빼지 말고 여기 사유와 함께 남긴다 — 그냥 지우면 "원래 검사 안 하던 파일" 로 보인다.
+const SUPERSEDED = {
+  'supabase/migrations/20260714000400_phase2_character.sql':
+    '뽑기 제거(20260818120000) — user_gacha_pity·gacha_log 드롭',
+  'supabase/migrations/20260714000500_gacha_shop.sql':
+    '뽑기 제거(20260818120000) — gacha_pool·gacha_draw 드롭(상점 절반만 schema.sql 에 남음)',
+};
+
 const stripped = (text) => text.split('\n').map((l) => l.replace(/\s+$/, ''))
   .filter((l) => { const t = l.trim(); return t && !t.startsWith('--'); });
 
@@ -41,6 +51,10 @@ function isContiguousSubsequence(hay, needle) {
 
 let allOk = true;
 for (const mig of DDL_MIGRATIONS) {
+  if (SUPERSEDED[mig]) {
+    console.log(`PARITY-SKIP: ${mig.split('/').pop()} — ${SUPERSEDED[mig]}`);
+    continue;
+  }
   const mLines = stripped(readFileSync(mig, 'utf8'));
   const at = isContiguousSubsequence(schema, mLines);
   if (at >= 0) {

@@ -58,9 +58,10 @@ import {
 import { useAdminData, payStatusLabel, productLabel } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
-import { getTracks, tierName, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
+import { getTracks, tierName, isTierLocked, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 import { REGIONS, countryName, flagEmoji } from '../lib/regions'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
+import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
 
 // 관리자 최상위 = **대메뉴 6개 + 홈 대시보드** (2026-08-11 재편 · PPT `관리자 페이지 수정사항` 1페이지).
 //   옛 구조는 상단 2탭(`CARIS 시험` / `WORLD ARENA`) + 각자의 서브탭이었다. 화면 자체는 그대로 두고
@@ -2100,28 +2101,38 @@ function ExamFeeBox() {
       </div>
       <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 12px' }}>
         원(KRW) 단위 정수로 입력하세요. <b>비워두면 그 급수는 원서접수에서 ‘준비 중’으로 표시되고 결제가 막힙니다.</b>
+        <br />
+        ⓘ <b>Master 이후(CARIS-Ⅱ)는 아직 열지 않은 급수</b>라 금액을 넣을 수 없습니다 — 문제은행·출제 배분표가 없어
+        금액만 들어가면 문항 0개짜리 시험이 팔립니다.
       </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
-            <tr><th>트랙</th><th>급수</th><th>요금 키</th><th style={{ width: 160 }}>응시료(원)</th></tr>
+            {/* 요금 키(t1_beginner …)는 화면에서 뺐다 — DB PK 이자 코드가 feeKey() 로 조립하는 값이라
+                관리자가 보고 할 일이 없고, 트랙·급수가 같은 줄에 이미 적혀 있다. */}
+            <tr><th>트랙</th><th>급수</th><th style={{ width: 160 }}>응시료(원)</th></tr>
           </thead>
           <tbody>
             {TIERS.map(({ track, tier }) => {
               const k = feeKey(track.key, tier.key)
+              // 아직 안 연 급수는 금액칸 자체를 잠근다 — 여기 숫자가 들어가는 순간 원서접수에서 결제가 열리는데
+              // 그 시험은 문항이 0개다. 서버(examFeeSave)도 같은 값을 거절하지만, 사용자는 저장 버튼을 누르기
+              // **전에** 왜 못 넣는지 알아야 한다.
+              const locked = isTierLocked(tier.key)
               return (
                 <tr key={k}>
                   <td style={{ whiteSpace: 'nowrap' }}>{track.name}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{tier.name}</td>
-                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{k}</td>
                   <td>
                     <input
-                      style={inpStyle}
+                      style={{ ...inpStyle, ...(locked ? { opacity: .55, cursor: 'not-allowed' } : null) }}
                       type="number"
                       min={0}
                       step={100}
-                      placeholder="미설정"
-                      value={amounts[k] ?? ''}
+                      disabled={locked}
+                      title={locked ? '아직 열지 않은 급수입니다.' : undefined}
+                      placeholder={locked ? '준비 중 (잠김)' : '미설정'}
+                      value={locked ? '' : amounts[k] ?? ''}
                       onChange={(e) => setAmounts((m) => ({ ...m, [k]: e.target.value }))}
                     />
                   </td>
@@ -2289,6 +2300,9 @@ function RoundsAdmin() {
       return kindFilter === 'past' ? bv.localeCompare(av) : av.localeCompare(bv) // 지난 시험은 최근순
     })
   const isReg = draft?.kind === 'regular'
+  // 편집 중인 회차가 **서버 기준으로** 이미 열어둔 급수. 잠긴 급수(CARIS-Ⅱ) 체크박스를 풀지 말지의 기준이다
+  // — 새 회차(id 없음)면 빈 배열이라 잠긴 급수는 전부 못 켠다.
+  const serverTiers = (draft?.id ? rows.find((r) => r.id === draft.id)?.tiers : null) ?? []
 
   return (
     <>
@@ -2473,18 +2487,26 @@ function RoundsAdmin() {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                         {tr.tiers.map((ti) => {
                           const on = draft.tiers.includes(ti.key)
+                          // 잠긴 급수(CARIS-Ⅱ)는 **새로 열지 못한다**. 다만 이미 열려 있는 회차는 그대로 둔다 —
+                          // 기준은 화면 상태(draft)가 아니라 **서버가 준 그 회차의 열린 급수**(serverTiers)다.
+                          // draft 로 판정하면 체크를 한 번 풀었을 때 다시 못 켜는 함정이 되고, 임시저장 복원본
+                          // 에서는 열려 있는 급수가 잠긴 것처럼 보인다.
+                          const locked = isTierLocked(ti.key) && !serverTiers.includes(ti.key)
                           return (
                             <label
                               key={ti.key}
+                              title={locked ? '아직 열지 않은 급수입니다(문제은행 미구축).' : undefined}
                               style={{
-                                display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
+                                cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? .5 : 1,
                                 padding: '6px 11px', borderRadius: 8,
                                 border: `1px solid ${on ? 'var(--blue)' : 'rgba(128,128,128,.35)'}`,
                                 color: on ? 'var(--blue)' : 'inherit', fontWeight: on ? 700 : 400,
                               }}
                             >
-                              <input type="checkbox" checked={on} onChange={(e) => toggleTier(ti.key, e.target.checked)} />
+                              <input type="checkbox" checked={on} disabled={locked} onChange={(e) => toggleTier(ti.key, e.target.checked)} />
                               {ti.name}
+                              {locked && <span style={{ fontSize: 12, color: 'var(--muted)' }}>준비 중</span>}
                             </label>
                           )
                         })}
@@ -2492,6 +2514,10 @@ function RoundsAdmin() {
                     </div>
                   ))}
                 </div>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
+                  ⓘ <b>Master 이후(CARIS-Ⅱ)는 아직 열 수 없습니다</b> — 문제은행과 출제 배분표가 없어 응시권을 팔면
+                  문항 0개짜리 시험이 됩니다. 이미 열려 있는 회차는 그대로 두고, 해제는 할 수 있습니다.
+                </p>
               </div>
 
               {isReg ? (
@@ -3308,8 +3334,8 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
   const ebookDraft = useDraft({ kind: 'ebook', refId: draft?.id, value: draft, title: draft?.title?.trim() || '새 이북', enabled: !!draft })
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false) // 순서 변경 중(↑↓)
-  const [uploading, setUploading] = useState<'html' | 'cover' | 'translate' | null>(null)
-  const [trStatus, setTrStatus] = useState('') // 번역 진행 문구
+  const [uploading, setUploading] = useState<'html' | 'optimize' | 'cover' | 'translate' | null>(null)
+  const [trStatus, setTrStatus] = useState('') // 최적화·번역 진행 문구
   const [buyersOf, setBuyersOf] = useState<{ book: AdminEbookRow; rows: AdminEbookBuyer[] } | null>(null)
   const [preview, setPreview] = useState<AdminEbookRow | null>(null)
 
@@ -3421,11 +3447,22 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
       return
     }
     if (!draft) return
-    setUploading('html')
+    setUploading('optimize')
+    setTrStatus('파일 최적화 중…')
     try {
-      const html = await file.text()
+      // 다이어트 먼저 — 폰트를 밖으로 빼고 이미지를 WebP 로 바꾼다(→ lib/ebookOptimize.ts 머리말).
+      //   ⚠️ 저장·표지·번역 전부 **최적화된 본문**으로 이어져야 한다. 원본 File 을 그대로 올리면
+      //      번역본 5벌에도 폰트가 도로 실린다(한 권에 3MB × 6 = 18MB).
+      const opt = await optimizeEbookHtml(await file.text(), (p) => {
+        setTrStatus(p.phase === 'font' ? '폰트 정리 중…' : `이미지 변환 ${p.done}/${p.total}`)
+      })
+      const html = opt.html
+      setTrStatus(optimizeSummary(opt))
+      setUploading('html')
       const path = `${crypto.randomUUID()}/${file.name.replace(/[^\w.-]/g, '_')}`
-      const { error } = await supabase.storage.from('ebooks').upload(path, file, { contentType: 'text/html', upsert: false })
+      const { error } = await supabase.storage
+        .from('ebooks')
+        .upload(path, new Blob([html], { type: 'text/html' }), { contentType: 'text/html', upsert: false })
       if (error) throw error
       // ⚠️ setState 는 비동기라 이 함수 안에서 draft 를 다시 읽으면 옛 값이다. 갱신본을 직접 들고 간다.
       const next: EbookDraft = { ...draft, storagePath: path }
@@ -3802,7 +3839,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                     {uploading === 'translate' ? '번역 중…' : '다시 번역'}
                   </button>
                 </div>
-                {uploading === 'translate' && trStatus && (
+                {(uploading === 'translate' || uploading === 'optimize' || uploading === 'html') && trStatus && (
                   <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{trStatus}</span>
                 )}
                 {!uploading && EBOOK_LANGS.some((lg) => (draft.translations[lg]?.overflowPages?.length ?? 0) > 0) && (

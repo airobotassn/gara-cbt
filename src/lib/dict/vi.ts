@@ -1646,7 +1646,6 @@ const VI: Record<string, string> = {
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
   "hub.err.insufficient_points": "Không đủ điểm",
-  "hub.err.insufficient_dust": "Không đủ bụi",
   "hub.err.already_owned": "Bạn đã có vật phẩm giới hạn này",
   "hub.err.unauthorized": "Cần đăng nhập",
   "hub.err.generic": "Đã xảy ra lỗi. Vui lòng thử lại sau giây lát",
@@ -1663,11 +1662,11 @@ const VI: Record<string, string> = {
   "hub.room.surface_floor": "Sàn",
   "hub.room.surface_wall": "Tường",
   "hub.room.pick_title": "Đồ đặt ở {where}",
-  "hub.room.none_owned": "Bạn chưa có đồ nào đặt được ở {where}. Thử cửa hàng hoặc quay thưởng nhé.",
+  "hub.room.none_owned": "Bạn chưa có đồ nào đặt được ở {where}. Thử cửa hàng nhé.",
   "hub.room.remove": "Bỏ trống chỗ này",
   "hub.room.help": "Mỗi món chỉ đặt được ở một chỗ. Đặt sang chỗ khác là chuyển đi.",
 
-  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  // 가구 이름 — 상점·방 고르기가 같이 쓴다.
   "hub.part.fur_plant_01": "Chậu Cây Nhỏ",
   "hub.part.fur_lamp_01": "Đèn Sàn",
   "hub.part.fur_chair_01": "Ghế Gỗ",
@@ -1678,8 +1677,6 @@ const VI: Record<string, string> = {
   "hub.part.fur_clock_01": "Đồng Hồ Treo",
   "hub.part.fur_shelf_01": "Kệ Sách",
   "hub.part.fur_window_01": "Cửa Sổ",
-  "hub.part.fur_aquarium_01": "Bể Cá Nhỏ",
-  "hub.part.fur_neon_01": "Bảng Đèn Neon",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "Xem phòng",
@@ -1692,8 +1689,8 @@ const VI: Record<string, string> = {
   "room.my_room": "Đến phòng của tôi",
   "room.my_room_edit": "Trang trí phòng của tôi",
 
-  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
-  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   "hub.part.hat_common_01": "Mũ Mầm Cây",
   "hub.part.hat_common_02": "Mũ Len",
@@ -1703,8 +1700,8 @@ const VI: Record<string, string> = {
   "hub.part.crown_rare_01": "Vương Miện Nhỏ",
 
   // 상단·공통
-  "hub.gate_sub": "Đăng nhập để dùng điểm danh, quay thưởng và cửa hàng",
-  "hub.banner_login": "Điểm danh, quay thưởng và cửa hàng cần đăng nhập",
+  "hub.gate_sub": "Đăng nhập để dùng điểm danh và cửa hàng",
+  "hub.banner_login": "Điểm danh và cửa hàng cần đăng nhập",
   "hub.share": "Chia sẻ",
   "hub.gift_btn": "Tặng",
   "hub.help_aria": "Cách kiếm điểm",
@@ -1714,7 +1711,6 @@ const VI: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "Điểm danh",
-  "hub.rail.gacha": "Quay thưởng",
   "hub.rail.shop": "Cửa hàng",
   "hub.rail.title": "Danh hiệu",
   "hub.rail.invite": "Mời bạn",
@@ -1734,34 +1730,15 @@ const VI: Record<string, string> = {
   "hub.toast.checkin_done": "Đã điểm danh · +{n}P · +1 tem",
   "hub.toast.checkin_bonus": "Đã điểm danh · +{n}P · thưởng đủ 7 ngày +{b}P",
   "hub.toast.checkin_already": "Đã điểm danh · phần thưởng hôm nay đã nhận",
-  "hub.toast.no_coin": "Không đủ coin",
   "hub.toast.no_points_item": "Không đủ điểm: {name} ({price}P)",
-  "hub.toast.no_dust": "Không đủ bụi",
 
   // 구매/교환 완료 팝업
-  "hub.buy.exchanged": "Đã đổi!",
   "hub.buy.purchased": "Đã mua!",
 
-  // 뽑기 모달
-  "hub.gacha.title": "Quay thưởng",
-  "hub.gacha.dust": "Bụi",
-  "hub.gacha.owned_n": "Sở hữu {n} loại",
-  "hub.gacha.pity": "Còn {n} lần đến bảo đảm",
-  "hub.gacha.limited": "Giới hạn!",
-  "hub.gacha.dust_gain": "Bụi +{n}",
-  "hub.gacha.dust_hint": "Tích lũy để đổi vật phẩm giới hạn!",
-  "hub.gacha.drawing": "Đang quay…",
-  "hub.gacha.draw": "Quay ({n} 🪙)",
-  "hub.gacha.ex_head": "Đổi bụi",
-  "hub.gacha.ex_sub": "Vật phẩm giới hạn chỉ có khi quay",
-  "hub.gacha.have": "Đã có",
-  "hub.gacha.exchange": "Đổi",
-  "hub.gacha.help": "Mỗi lần quay đều tích bụi. Đến mốc bảo đảm ({n} lần) chắc chắn nhận vật phẩm giới hạn! Hoặc dùng bụi đổi ngay món bạn muốn.",
 
   // 상점 모달
   "hub.shop.title": "Cửa hàng",
   "hub.shop.balance": "CARI coin của bạn",
-  "hub.shop.rare": "Hiếm",
   "hub.shop.owned": "Đã có",
   "hub.shop.buy": "Mua",
   "hub.shop.empty": "Cửa hàng chưa có sản phẩm.",

@@ -1,13 +1,12 @@
-// cosmetic-only-gate — 경제 edge fn(complete-daily / gacha-draw / shop-buy)이
+// cosmetic-only-gate — 경제 edge fn(complete-daily / shop-buy)이
 // cosmetic-only 하드 불변식(LOCKED)을 소스 수준에서 지키는지 정적 검사한다.
 //  · 각 파일은 _shared/scoring.ts 를 import 하지 않는다(applyAttempt/computeRankChange 금지).
 //  · 소스 텍스트에 'user_progress' / 'user_level_skill' 이 등장하지 않는다(실력/진화 데이터 무접촉).
-// 파일이 아직 없을 수 있으므로(peer 슬라이스가 gacha/shop 생성) try/catch 로 존재하는 파일만 검사.
+// 파일이 아직 없을 수 있으므로 try/catch 로 존재하는 파일만 검사.
 import { readFileSync } from 'node:fs';
 
 const targets = [
   'supabase/functions/complete-daily/index.ts',
-  'supabase/functions/gacha-draw/index.ts',
   'supabase/functions/shop-buy/index.ts',
   // 코인 선물도 같은 범주다 — 재화를 옮기지만 실력/랭킹 데이터는 건드리지 않아야 한다.
   // (코인이 시즌 점수와 별개 지갑이라는 게 "한도 없이 선물해도 순위는 안 흔들린다"의 근거다.)

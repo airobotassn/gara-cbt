@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
-import { countryName } from '../lib/regions'
+import { countryName, flagUrl } from '../lib/regions'
 import { showPercentile } from '../lib/scoring'
 import { useT, type TFunc } from '../lib/i18n'
 import TopBar from '../components/TopBar'
@@ -20,6 +20,9 @@ interface HofUser {
   color: string | null
   image: string | null
   mascot: string | null
+  // 시상대 이름 뒤 국기. top 행에만 있고(scoped_top 20260818130000) me 행에는 없다.
+  // 온보딩 전(국가 미설정)이면 null → 국기를 아예 안 그린다.
+  country: string | null
   me: boolean
   // ⚠️ 서버는 아직 tier 를 내려주지만(DB ranking_tier) 티어 표시는 2026-08-04 제거돼 읽지 않는다.
   percentile: number | null // 0~1, 낮을수록 상위 (해당 보드 범위 안 기준)
@@ -210,7 +213,7 @@ export default function Ranking() {
           </div>
         </>
       ) : (
-        <PersonalBoard t={t} data={data} err={err} listRef={listRef} onPick={setCardOf} />
+        <PersonalBoard t={t} lang={lang} data={data} err={err} listRef={listRef} onPick={setCardOf} />
       )}
 
       {data && !gated ? (
@@ -313,12 +316,14 @@ function MeBar({
 //       제목도 여기 없다 — 탭바 위 페이지 헤더로 올라갔다(Ranking 본체). =====
 function PersonalBoard({
   t,
+  lang,
   data,
   err,
   listRef,
   onPick,
 }: {
   t: TFunc
+  lang: string
   data: HofResponse | null
   err: boolean
   listRef: React.RefObject<HTMLDivElement | null>
@@ -380,7 +385,22 @@ function PersonalBoard({
               {podium.map((u, i) =>
                 u ? (
                   <div key={`pl${u.rank}`} className={`hof-pn ${podClass[i]}`}>
-                    <b>{u.name}</b>
+                    {/* 이름과 국기는 한 줄에 나란히. 국기를 이름 텍스트 **안**에 넣으면 안 된다 —
+                        칸이 26% 폭 + 말줄임이라 이름이 길어지는 순간 국기부터 잘려 나간다.
+                        형제로 두고 국기에 flex:none 을 주면 이름만 줄어든다(css 참고). */}
+                    <b>
+                      <span className="hof-pn-name">{u.name}</span>
+                      {flagUrl(u.country) ? (
+                        <img
+                          className="hof-pn-flag"
+                          src={flagUrl(u.country)}
+                          alt={countryName(u.country as string, lang)}
+                          title={countryName(u.country as string, lang)}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : null}
+                    </b>
                     <span>{t('rank.pt', { n: u.rating })}</span>
                   </div>
                 ) : null,
@@ -395,7 +415,7 @@ function PersonalBoard({
             <div className="hof-listwin" ref={listRef}>
               <div className="hof-list">
                 {rest.map((u) => (
-                  <HofRow key={u.rank} u={u} t={t} onPick={onPick} />
+                  <HofRow key={u.rank} u={u} t={t} lang={lang} onPick={onPick} />
                 ))}
               </div>
             </div>
@@ -408,7 +428,7 @@ function PersonalBoard({
 
 // 4~10위 한 행 = 티어리스트 바 프레임 하나.
 // 그림의 소켓 배치대로: 큰 원=순위 · 작은 원=아바타 · 가운데 빈칸=이름·점수 · 방패=티어 엠블렘.
-function HofRow({ u, t, onPick }: { u: HofUser; t: TFunc; onPick: (u: HofUser) => void }) {
+function HofRow({ u, t, lang, onPick }: { u: HofUser; t: TFunc; lang: string; onPick: (u: HofUser) => void }) {
   return (
     <div className={`hof-row ${u.me ? 'me' : ''}`} {...(u.me ? { 'data-me-anchor': '1' } : {})}>
       <div
@@ -423,7 +443,19 @@ function HofRow({ u, t, onPick }: { u: HofUser; t: TFunc; onPick: (u: HofUser) =
         <span className="bar-rk">{u.rank}</span>
         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(u)} seed={u.name} size={48} /></span>
         <span className="bar-nm">
-          {u.name}
+          {/* 이름 텍스트를 span 으로 감싸는 이유 = 국기·'나' 배지와 같은 flex 줄에서
+              **이름만** 줄어야 하기 때문이다(이름판 소켓 폭이 48% 로 고정이다). */}
+          <span className="bar-nm-txt">{u.name}</span>
+          {flagUrl(u.country) ? (
+            <img
+              className="bar-flag"
+              src={flagUrl(u.country)}
+              alt={countryName(u.country as string, lang)}
+              title={countryName(u.country as string, lang)}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : null}
           {u.me ? <span className="meflag">{t('rank.you')}</span> : null}
         </span>
         <span className="bar-pt">{t('rank.pt', { n: u.rating })}</span>

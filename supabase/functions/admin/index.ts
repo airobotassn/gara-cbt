@@ -7,7 +7,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { refreshRates } from '../_shared/fx.ts'
-import { EXAM_ROUND_COLS, examWindowState, grantExamTicket, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
+import { EXAM_ROUND_COLS, TIER_LABEL, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
 
@@ -790,9 +790,19 @@ async function syncRoundExams(
   if (error) throw new Error(error.message)
   const cur = (existing ?? []) as any[]
   const curByTier = new Map<string, any>(cur.map((e) => [e.tier, e]))
-  const wantKeys = new Set(tiers.map((t) => t.key))
 
-  for (const t of tiers) {
+  // 잠긴 급수(CARIS-Ⅱ)는 **새로 열지 못한다**. 이미 그 회차에 살아 있는(active) 시험이면 그대로 통과시킨다 —
+  // 운영 중인 회차의 급수를 코드 배포가 조용히 닫으면 안 되고, 관리자가 체크를 풀어 닫는 길도 남아야 한다.
+  // 화면(Admin.tsx)도 같은 규칙으로 체크박스를 잠그지만, 요청을 직접 쏘면 그건 통과하므로 여기가 최종 게이트다.
+  const locked: string[] = []
+  const want = tiers.filter((t) => {
+    if (!isTierLocked(t.key) || curByTier.get(t.key)?.active) return true
+    locked.push(TIER_LABEL[t.key] ?? t.key)
+    return false
+  })
+  const wantKeys = new Set(want.map((t) => t.key))
+
+  for (const t of want) {
     const total = Number.isFinite(t.total) ? Math.floor(t.total as number) : 0
     const dur = Number.isFinite(t.durationMin) ? Math.floor(t.durationMin as number) : 120
     const ex = curByTier.get(t.key)
@@ -828,7 +838,7 @@ async function syncRoundExams(
   }
 
   // 해제하지 못한 급수는 계속 열려 있는 상태라 '연 급수' 목록에 남아야 한다.
-  const keys = [...tiers.map((t) => t.key), ...blocked]
+  const keys = [...want.map((t) => t.key), ...blocked]
 
   // exams 는 RLS 정책 0개라 프론트가 못 읽는다 → 공개화면(원서접수)이 볼 수 있게 회차에 비정규화해 둔다.
   // 판매 가능 판정의 정본은 계속 서버(resolveExamOffer)이고 이건 화면 표시용이라, 실패해도
@@ -837,6 +847,12 @@ async function syncRoundExams(
 
   const parts: string[] = []
   if (oe) parts.push(`열린 급수 목록(open_tiers) 갱신 실패: ${oe.message}`)
+  if (locked.length) {
+    parts.push(
+      `${locked.join(', ')} 급수는 아직 열지 않은 급수(CARIS-Ⅱ)라 회차에 추가하지 않았습니다. ` +
+      `문제은행·출제 배분표가 준비되면 코드의 LOCKED_TIERS 에서 빼야 열립니다.`,
+    )
+  }
   if (blocked.length) {
     parts.push(
       `${blocked.join(', ')} 급수는 이미 접수(응시권 또는 진행 중인 결제)가 있어 해제하지 못했습니다. ` +
@@ -927,6 +943,15 @@ async function examFeeList(admin: any) {
 async function examFeeSave(admin: any, body: any) {
   const items = Array.isArray(body?.fees) ? body.fees : []
   if (!items.length) return json({ error: 'fees 필요' }, 400)
+  // 잠긴 급수(CARIS-Ⅱ)는 금액을 받지 않는다 — 금액이 들어오는 순간 원서접수에서 결제 버튼이 열리는데
+  // 그 시험은 문항이 0개다. 조용히 건너뛰면 관리자는 저장된 줄 알고 넘어가므로 **거절해서 알린다**.
+  // 한 건이라도 걸리면 전부 저장하지 않는다 — 절반만 반영되면 화면과 DB 가 어긋난다.
+  for (const it of items) {
+    const tierKey = String(it?.key ?? '').trim().split('_').slice(1).join('_')
+    if (tierKey && isTierLocked(tierKey)) {
+      return json({ error: `${TIER_LABEL[tierKey] ?? tierKey}는 아직 열지 않은 급수라 응시료를 설정할 수 없습니다.` }, 400)
+    }
+  }
   const now = new Date().toISOString()
   for (const it of items) {
     const key = String(it?.key ?? '').trim()
@@ -2376,6 +2401,42 @@ function tierOrNull(v: any): string | null {
   return String(v ?? '').trim() || null
 }
 
+// 표지 공개 URL → ebook-covers 버킷 안 경로. 모르는 형식이면 null 을 준다(모르는 건 지우지 않는다).
+function coverPath(url: any): string | null {
+  const m = String(url ?? '').match(/\/storage\/v1\/object\/public\/ebook-covers\/(.+)$/)
+  return m ? decodeURIComponent(m[1]) : null
+}
+
+/** 이북 한 권이 실제로 붙들고 있는 파일 경로 — 본문(원문+번역본)과 표지(원문+번역본)를 버킷별로 나눠 준다. */
+function ebookFiles(row: any): { html: string[]; covers: string[] } {
+  const tr = Object.values((row?.translations ?? {}) as Record<string, any>)
+  return {
+    html: [row?.storage_path, ...tr.map((t: any) => t?.path)].filter(Boolean) as string[],
+    covers: [coverPath(row?.cover_url), ...tr.map((t: any) => coverPath(t?.coverUrl))].filter(Boolean) as string[],
+  }
+}
+
+/**
+ * 수정으로 **버려진** 파일을 지운다(새 값에 없는 옛 경로만).
+ *
+ * ⚠️ 반드시 DB 갱신 **뒤에** 부를 것 — 먼저 지웠다가 갱신이 실패하면 멀쩡한 책의 본문이 사라진다.
+ * ⚠️ 실패는 삼킨다 — 파일이 남는 건 용량만 먹지 책은 정상이다. 여기서 던지면 저장이 실패한 것처럼 보인다.
+ *
+ * 이게 없어서 재업로드마다 옛 폴더가 그대로 쌓였다(2026-08-18: 이북 10권인데 폴더 55개, 고아 1.8GB).
+ */
+async function removeStaleEbookFiles(admin: any, oldRow: any, newRow: any) {
+  const before = ebookFiles(oldRow)
+  const after = ebookFiles(newRow)
+  const html = before.html.filter((p) => !after.html.includes(p))
+  const covers = before.covers.filter((p) => !after.covers.includes(p))
+  if (html.length) {
+    try { await admin.storage.from('ebooks').remove(html) } catch { /* 파일만 남아도 무해 */ }
+  }
+  if (covers.length) {
+    try { await admin.storage.from('ebook-covers').remove(covers) } catch { /* 파일만 남아도 무해 */ }
+  }
+}
+
 async function ebookUpsert(admin: any, body: any) {
   const e = body?.ebook ?? {}
   const title = String(e.title ?? '').trim()
@@ -2407,8 +2468,14 @@ async function ebookUpsert(admin: any, body: any) {
   }
 
   if (e.id) {
+    const { data: old } = await admin
+      .from('ebooks')
+      .select('storage_path, cover_url, translations')
+      .eq('id', e.id)
+      .maybeSingle()
     const { error } = await admin.from('ebooks').update(row).eq('id', e.id)
     if (error) return json({ error: error.message }, 400)
+    if (old) await removeStaleEbookFiles(admin, old, row)
     return json({ ok: true, id: e.id })
   }
   const { data, error } = await admin.from('ebooks').insert(row).select('id').maybeSingle()
@@ -2428,21 +2495,20 @@ async function ebookReorder(admin: any, body: any) {
   return json({ ok: true })
 }
 
-// 삭제 = 메타데이터 + 본문 파일(번역본 포함). 구매 기록은 FK cascade 로 함께 사라진다(환불/회수와 동일 취급).
+// 삭제 = 메타데이터 + 본문 파일 + 표지(둘 다 번역본 포함). 구매 기록은 FK cascade 로 함께 사라진다(환불/회수와 동일 취급).
+//   ⚠️ 표지를 빼먹으면 안 된다 — 번역할 때마다 언어별 표지를 새로 굽기 때문에 책 한 권이 표지를 6장씩 남긴다.
 async function ebookDelete(admin: any, body: any) {
   const id = String(body?.id ?? '').trim()
   if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
-  const { data: b } = await admin.from('ebooks').select('storage_path, translations').eq('id', id).maybeSingle()
+  const { data: b } = await admin
+    .from('ebooks')
+    .select('storage_path, cover_url, translations')
+    .eq('id', id)
+    .maybeSingle()
   const { error } = await admin.from('ebooks').delete().eq('id', id)
   if (error) return json({ error: error.message }, 400)
   // 원문 + 언어별 번역본을 함께 지운다(같은 uuid 폴더에 모여 있지만 경로를 직접 모아 지우는 게 확실하다).
-  const paths = [
-    b?.storage_path,
-    ...Object.values((b?.translations ?? {}) as Record<string, { path?: string }>).map((t) => t?.path),
-  ].filter(Boolean) as string[]
-  if (paths.length) {
-    try { await admin.storage.from('ebooks').remove(paths) } catch { /* 파일만 남아도 무해 */ }
-  }
+  if (b) await removeStaleEbookFiles(admin, b, {})
   return json({ ok: true })
 }
 

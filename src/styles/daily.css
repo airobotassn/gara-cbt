@@ -36,7 +36,8 @@
   background-repeat: no-repeat;
 }
 .dy-page * { box-sizing: border-box; }
-.dy-wrap { max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 48px; }
+/* ⚠️ z-index:1 = 별하늘(<StarField />, z-index:0) 위에 내용을 세우는 값. 빼면 화면이 별 뒤로 내려간다. */
+.dy-wrap { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 48px; }
 
 /* ── 상단 바 ── */
 .dy-page .dy-top { display: flex; align-items: center; gap: 14px; }

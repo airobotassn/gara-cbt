@@ -39,72 +39,155 @@
   #app{position:relative;height:100%;width:100%;max-width:520px;margin:0 auto;
     display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 80px -20px rgba(0,0,0,.7)}
 
-  .top{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 13px 4px}
-  .lv{padding:5px 11px;border-radius:8px;background:#1f6dff;color:#fff;font-weight:900;font-size:13.5px}
-  .lvname{font-weight:900;font-size:15px;letter-spacing:-.02em}
-  .envt{padding:4px 9px;border-radius:7px;font-size:12px;font-weight:900;background:#3a2a12;color:#f0c078}
-  .hits{margin-left:auto;font-size:13.5px;font-weight:900;color:#ff9a8a}
+  /* HUD 그림(hud-v1)은 '틀'이 아니라 **배치도**다 — 계기판 세 칸이 이미 그려져 있다.
+     ⚠️ 아래 %는 실측값이다(알파 트림 후 2147×427 기준 · 왼 4.3~17.9 · 가운데 20.2~78 · 오른 82.2~95.8,
+        칸 세로 21.4~80.4). 그림을 갈면 이 값들을 다시 재야 한다.
+     ⚠️ 칸을 flex 로 흘리지 말 것 — 그림은 100% 100% 로 늘어나는데 글자는 안 늘어나서
+        폭이 바뀔 때마다 칸 밖으로 새어나간다(2026-08-18 실제로 그 상태였다). 절대배치가 맞다. */
+  .top{position:relative;flex:0 0 auto;margin:5px 13px 3px;height:64px;
+    border:0;background:url('/games/feel-cari-hud-v1.webp') center/100% 100% no-repeat;
+    filter:drop-shadow(0 4px 7px rgba(0,0,0,.5))}
+  .top .slot{position:absolute;top:21.4%;height:59%;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:1px;line-height:1;min-width:0}
+  .top .slot b{font-size:19px;font-weight:900;letter-spacing:-.02em;color:#eaf4ff}
+  .top .slot i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.02em;color:#7fa8cf}
+  .sl-l{left:4.3%;width:13.6%}
+  .sl-c{left:20.2%;width:57.8%;flex-direction:row;gap:7px}
+  .sl-r{left:82.2%;width:13.6%}
+  .sl-r b{color:#ff9a8a}
+  .lvname{font-weight:900;font-size:16px;letter-spacing:-.02em;color:#eaf4ff;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .envt{flex:0 0 auto;padding:3px 8px;border-radius:6px;font-size:11.5px;font-weight:900;
+    background:rgba(240,192,120,.16);border:1px solid rgba(240,192,120,.4);color:#f0c078}
 
   /* ── 배터리 ───────────────────────────────── */
-  .batt{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 13px 7px}
-  .batt .cap{font-size:12px;font-weight:900;color:#7f93bd}
-  .batt .bar{flex:1 1 auto;height:9px;border-radius:5px;background:rgba(255,255,255,.09);overflow:hidden}
+  /* HUD 와 같은 계기 톤(남색 판 + 청록 테)으로 맞춘다 — 여기만 회색 박스면 바로 티가 난다. */
+  .batt{flex:0 0 auto;display:flex;align-items:center;gap:9px;margin:0 13px 7px;padding:7px 11px;
+    background:linear-gradient(180deg,#0b2038,#061321);border:1px solid rgba(90,200,255,.26);border-radius:9px;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.75),0 2px 6px rgba(0,0,0,.35)}
+  .batt .cap{font-size:12px;font-weight:900;color:#7fa8cf;letter-spacing:.02em}
+  .batt .bar{flex:1 1 auto;height:11px;border-radius:3px;background:#02070d;border:1px solid rgba(90,200,255,.3);overflow:hidden;padding:1px}
   .batt .bar i{display:block;height:100%;background:linear-gradient(90deg,#3ddc84,#8fe0a8);
     transition:width .15s linear}
   .batt.low .bar i{background:linear-gradient(90deg,#ff5a48,#ffb020)}
   .batt .pct{font-size:13px;font-weight:900;width:44px;text-align:right}
   .batt.low .pct{color:#ff8a7a}
-  .batt .rate{font-size:11.5px;font-weight:800;color:#7f93bd;width:52px;text-align:right}
+  .batt .rate{font-size:11.5px;font-weight:800;color:#7fa8cf;width:52px;text-align:right}
 
   /* ── 시야 ─────────────────────────────────── */
-  .view{flex:1 1 auto;min-height:0;margin:0 13px;border-radius:14px;overflow:hidden;
-    background:#05070e;border:1px solid rgba(255,255,255,.08);display:grid;place-items:center;position:relative}
+  .view{flex:1 1 auto;min-height:0;margin:0 13px;border-radius:12px;overflow:hidden;
+    background:#010409 url('/games/feel-cari-game-bg-v3.webp') center/cover no-repeat;
+    border:2px solid rgba(90,200,255,.3);display:grid;place-items:center;position:relative;
+    box-shadow:inset 0 0 25px rgba(0,0,0,.55),0 5px 18px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.5)}
   .view svg{width:100%;height:100%;display:block}
   .view.bump{animation:bmp .45s}
+  /* 부딪힌 칸 한 개만 잠깐. (예전엔 구역 벽 전체를 켰다 — 아래 flashHitCell 주석 참고) */
+  .wflash{fill:#ff8a7a;animation:wf .7s ease-out forwards}
+  @keyframes wf{0%{opacity:.9}70%{opacity:.5}100%{opacity:0}}
+  /* 도착지 = 착륙 비컨. 맥박 링 두 겹(시차) + 천천히 도는 점선 링 + 코어.
+     ⚠️ transform-origin 은 사용자 좌표로 직접 박는다(구역마다 도착지 위치가 다르다).
+        fill-box 에 기대면 브라우저마다 기준이 달라져 링이 엉뚱한 데서 커진다. */
+  .goal-pulse{animation:gpulse 2.2s ease-out infinite}
+  .goal-pulse.b{animation-delay:1.1s}
+  @keyframes gpulse{0%{transform:scale(.5);opacity:.9}100%{transform:scale(2.4);opacity:0}}
+  .goal-scan{animation:gspin 7s linear infinite}
+  @keyframes gspin{to{transform:rotate(360deg)}}
+  .goal-core{animation:gcore 2.2s ease-in-out infinite}
+  @keyframes gcore{0%,100%{opacity:.75}50%{opacity:1}}
+  /* 로봇 — 검은 바닥에 묻히지 않게 바닥 발광 + 진행 방향 표시.
+     ⚠️ 그림을 키우지 말 것. 스프라이트 반지름(28)이 이미 충돌 반지름(6)의 네 배라
+        더 키우면 벽에 파묻혀 보이는데 안 부딪힌 판정이 나는 게 심해진다. */
+  .botglow{animation:bglow 2.6s ease-in-out infinite}
+  @keyframes bglow{0%,100%{opacity:.85}50%{opacity:1}}
   @keyframes bmp{0%,100%{transform:translate(0,0)}20%{transform:translate(-5px,3px)}45%{transform:translate(4px,-2px)}70%{transform:translate(-2px,1px)}}
   .compass{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:6px;
-    background:rgba(10,16,32,.8);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 11px}
+    background:rgba(7,22,40,.86);border:1px solid rgba(90,200,255,.34);border-radius:999px;padding:5px 11px;
+    box-shadow:inset 0 1px 0 rgba(140,220,255,.16)}
   .compass svg{width:17px;height:17px}
   .compass span{font-size:13px;font-weight:900;color:#cfe0ff}
   .drift{position:absolute;top:8px;left:8px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:900;
     background:rgba(255,120,60,.16);border:1px solid rgba(255,140,80,.4);color:#ffb98a}
-  .blind{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:6px 13px;border-radius:999px;
+  /* ⚠️ 조이스틱(왼쪽 아래, 98px) 위로 띄운다 — 바닥에 두면 손잡이에 깔린다. */
+  .blind{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);padding:6px 13px;border-radius:999px;
     font-size:13px;font-weight:900;background:rgba(255,90,72,.18);border:1px solid rgba(255,120,90,.45);color:#ffb1a4}
 
   /* ── 센서 (토글 = 판독기) ──────────────────── */
-  .sens{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 13px 6px}
-  .s{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:11px;cursor:pointer;
-    background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);
+  /* 센서 카드 = 판독기 그림 한 장. 글자는 그림의 **액정 안**에만 들어간다.
+     ⚠️ 좌우 여백은 취향이 아니라 실측값이다(트림 후 749×198 기준) — 커넥터(7~15%)와 상태등(86~96%)을
+        피하고 남은 자리가 액정(25.9~91.7%)이다. 여백을 줄이면 글자가 커넥터 위로 올라탄다.
+     ⚠️ aspect-ratio 를 빼면 안 된다. 안 그러면 카드가 글자 높이만큼만 서고 그림은 100% 100% 로
+        늘어나서 액정이 납작해지고 위 %좌표가 통째로 어긋난다(2026-08-18 실제로 그 상태였다). */
+  .sens{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:5px;
+    padding:7px 13px calc(7px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(8,20,35,.1),rgba(8,20,35,.88))}
+  .s{position:relative;display:flex;align-items:center;gap:6px;cursor:pointer;aspect-ratio:749/198;
+    padding:0 8% 0 28%;border:0;border-radius:0;box-shadow:none;
+    background:url('/games/feel-cari-sensor-card-v1.webp') center/100% 100% no-repeat;
     text-align:left;font:inherit;color:inherit;min-width:0}
-  .s .si{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px}
+  /* 켜짐 표시 = **그림에 이미 파여 있는 커넥터 소켓에 불이 들어온다.**
+     아이콘을 새로 얹지 않는 이유: 그림에 자리가 있는데 그 위에 이모지를 또 놓으면 표식이 두 벌이 된다
+     (시켜라 CARI 의 별 소켓과 같은 이유). 색은 센서 색(--c) 하나에서 나온다.
+     ⚠️ 아래 %는 실측값이다(트림 후 749×198 · 소켓 핀면 중심 11.4% / 45%). 그림을 갈면 다시 재야 한다. */
+  .s .si{position:absolute;left:11.4%;top:45%;transform:translate(-50%,-50%);
+    width:8.2%;aspect-ratio:1;border-radius:50%;background:var(--c);opacity:.13;
+    transition:opacity .12s linear,box-shadow .12s linear}
+  .s.on .si{opacity:1;box-shadow:0 0 6px var(--c),0 0 13px var(--c),inset 0 0 3px rgba(255,255,255,.65)}
+  .s .sn{color:var(--c)}
   .s .bd{flex:1 1 auto;min-width:0}
-  .s .sn{display:block;font-size:12.5px;font-weight:900;letter-spacing:-.01em;
+  .s .sn{display:block;font-size:11.5px;font-weight:900;letter-spacing:-.01em;line-height:1.15;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .s .sv{display:block;font-size:17px;font-weight:900;line-height:1.15;color:#5c6b8c}
-  .s .sv small{font-size:10.5px;font-weight:800;margin-left:1px}
-  .s .sp{flex:0 0 auto;font-size:9px;letter-spacing:1px;color:#57648a}
-  .s.on{background:rgba(255,255,255,.09)}
+  .s .sv{display:block;font-size:16px;font-weight:900;line-height:1.2;color:#4d5c7d;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .s .sv small{font-size:10px;font-weight:800;margin-left:1px}
+  .s .sp{flex:0 0 auto;font-size:8.5px;letter-spacing:.5px;color:#4a5878;line-height:1}
+  .s.on{filter:brightness(1.12)}
   .s.on .sv{color:#eaf1ff}
+  .s.on .sp{color:#8fd0ff}
   .s.on.near .sv{color:#ff8a7a}
-  .s.on.dead .sv{font-size:13px;color:#ff8a7a;line-height:1.5}
-  .s.on.touch .sv{font-size:13px;line-height:1.5}
-  /* 펄스/셔터가 실제로 "찰칵" 하는 순간 — 값이 그때만 갱신된다는 걸 눈으로 알려준다 */
-  .s.ping{background:rgba(255,255,255,.20)}
+  .s.on.dead .sv{font-size:12px;color:#ff8a7a;line-height:1.4}
+  .s.on.touch .sv{font-size:12px;line-height:1.4}
+  /* 갱신 순간의 '찰칵' 점멸은 뺐다(2026-08-18 요청) — 초음파·라이다·카메라가 각자 박자로 계속
+     깜빡여서 센서판 전체가 정신없었다. 켜짐은 소켓 불빛 하나로만 말한다.
+     JS 는 계속 .ping 을 붙였다 뗀다 — 되살릴 거면 카드 전체 말고 소켓(.si)만 건드릴 것.
+     ⚠️ background 단축 속성으로 칠하지 말 것: 카드 그림까지 지워져 회색 네모가 된다(실측). */
 
   /* ── 조종 ─────────────────────────────────── */
-  .pad{flex:0 0 auto;display:flex;gap:8px;padding:0 13px calc(11px + env(safe-area-inset-bottom))}
-  .ctl{flex:1 1 0;padding:15px 8px;border:0;border-radius:13px;cursor:pointer;font:900 19px/1 system-ui,sans-serif;
-    background:#1c2740;color:#cfe0ff;border:1px solid rgba(255,255,255,.10);touch-action:none}
+  /* 조이스틱은 **지도 위에 떠 있다.** 자기 줄(104px)을 쓰던 걸 걷어내 그만큼 시야에 줬다 —
+     지도가 세로에 걸려 있어서 이 105px 이 곧 지도 크기다(349×457 → 400×523, 면적 +31%).
+     ⚠️ **왼쪽 아래**여야 한다. 여섯 구역 전부 출발이 왼쪽 위, 도착이 **오른쪽 아래**라
+        오른쪽에 두면 도착지를 정확히 덮는다. 왼쪽 아래는 경로에서 가장 안 밟는 구석이다.
+     ⚠️ .pad 는 클릭을 통과시키고(pointer-events:none) 손잡이만 받는다 — 안 그러면 조이스틱
+        주변의 빈 사각형이 지도 위 터치를 통째로 먹는다. */
+  .pad{position:absolute;left:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:20;
+    pointer-events:none}
+  .joystick{position:relative;width:98px;height:98px;touch-action:none;user-select:none;cursor:grab;outline:none;
+    pointer-events:auto;opacity:.82;transition:opacity .15s linear}
+  .joystick:active{opacity:1}
+  .joystick:active{cursor:grabbing}
+  .joybase{position:absolute;inset:-7px;border-radius:50%;background:url('/games/feel-cari-joystick-base-v1.webp') center/contain no-repeat;
+    filter:drop-shadow(0 7px 8px rgba(0,0,0,.6))}
+  .joyknob{position:absolute;left:50%;top:50%;width:42px;height:42px;margin:-21px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#62aee3,#1e5f96 48%,#0a2945 72%);border:2px solid #8ed8ff;
+    box-shadow:inset 0 2px 5px rgba(255,255,255,.28),0 5px 9px rgba(0,0,0,.6);will-change:transform}
+  .ctl{flex:1 1 0;padding:15px 8px;border-radius:10px;cursor:pointer;font:900 19px/1 system-ui,sans-serif;
+    background:linear-gradient(#263e55,#101d2c);color:#cfe0ff;border:1px solid #45637b;box-shadow:inset 0 1px #668299,0 4px 0 #07101a;touch-action:none}
   .ctl.go{flex:1.5 1 0;background:linear-gradient(#2f7de1,#1c56b8);color:#fff;border-color:transparent;
     box-shadow:0 4px 0 #123a80}
   .ctl.on{filter:brightness(1.25)}
   .ctl.go.on{transform:translateY(2px);box-shadow:0 2px 0 #123a80}
 
   /* ── 판정 ─────────────────────────────────── */
-  .fb{position:absolute;left:13px;right:13px;bottom:13px;z-index:30;background:#141d33;
-    border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px 16px;
-    box-shadow:0 22px 46px -18px rgba(0,0,0,.9);transform:translateY(170%);
+  /* 판정 패널 — 전용 판 그림이 아직 없어서, 그림 대신 **계기판과 같은 색·테**로 맞춘다
+     (남색 판 + 청록 테 + 안쪽 그림자). 회색 카드로 두면 이 화면만 다른 게임처럼 보인다. */
+  .fb{position:absolute;left:13px;right:13px;bottom:13px;z-index:30;
+    background:linear-gradient(180deg,#0d2740,#071628);
+    border:1px solid rgba(90,200,255,.3);border-radius:14px;padding:14px 16px;
+    box-shadow:0 22px 46px -18px rgba(0,0,0,.9),inset 0 1px 0 rgba(140,220,255,.18);
+    transform:translateY(170%);
     pointer-events:none;transition:transform .24s cubic-bezier(.2,.9,.3,1)}
+  .fbart{display:none;position:absolute;right:8px;bottom:88%;width:112px;height:112px;object-fit:contain;
+    filter:drop-shadow(0 12px 12px rgba(0,0,0,.55));pointer-events:none}
+  .fb.no .fbart{display:block}
   .fb.on{transform:translateY(0);pointer-events:auto}
   .fbhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   .fbhead b{font-size:17px;font-weight:900;letter-spacing:-.02em;color:#8fe0a8}
@@ -113,40 +196,117 @@
   .fbhead .st i{font-style:normal;color:#4a5570}
   .fbwhy{margin:0 0 13px;font-size:14.5px;font-weight:700;line-height:1.6;color:#aebbd6;word-break:keep-all}
   .fbwhy em{font-style:normal;color:#ffd08a;font-weight:900}
-  .fbbtn{width:100%;padding:14px;border:0;border-radius:13px;cursor:pointer;background:#2f7de1;color:#fff;
-    font:900 16px/1 system-ui,sans-serif}
+  .fbbtn{width:100%;padding:14px;border:1px solid rgba(140,220,255,.45);border-radius:11px;cursor:pointer;
+    background:linear-gradient(#2f7de1,#1c56b8);color:#fff;font:900 16px/1 system-ui,sans-serif;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 3px 0 #0d2f6b}
+  .fbbtn:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 0 #0d2f6b}
 
   /* ── 오버레이 ─────────────────────────────── */
-  .ov{position:absolute;inset:0;z-index:50;display:grid;place-items:center;padding:16px;
+  .ov{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;
     background:rgba(5,8,18,.82);backdrop-filter:blur(4px)}
   .sheet{width:100%;max-width:430px;max-height:100%;overflow-y:auto;
     background:linear-gradient(#18213a,#111829);border:1px solid rgba(255,255,255,.12);
     border-radius:20px;padding:18px 16px;box-shadow:0 26px 60px -20px rgba(0,0,0,.95)}
   .art{width:74px;height:74px;display:block;margin:0 auto}
-  .ttl{text-align:center;font-size:25px;font-weight:900;letter-spacing:-.03em;margin:11px 0 5px}
+  #sArt{flex:0 1 auto;width:100%;height:min(245px,30vh);margin:-5px auto 4px;background:url('/games/feel-cari-intro-hero-v2.webp') center/contain no-repeat;
+    filter:drop-shadow(0 15px 18px rgba(0,0,0,.5))}
+  #oArt{flex:0 1 auto;height:min(165px,20vh);margin:-4px auto 2px;width:100%;
+    background:url('/games/feel-cari-success-v1.webp') center/contain no-repeat;
+    filter:drop-shadow(0 15px 18px rgba(0,0,0,.48))}
+  #sArt svg,#oArt svg{display:none}
+  .ttl{flex:0 0 auto;text-align:center;font-size:min(25px,3vh);font-weight:900;letter-spacing:-.03em;
+    margin:8px 0 5px;color:#eaf4ff}
   .ttl i{font-style:normal;color:#5aa3ff}
-  .lead{text-align:center;font-size:15px;font-weight:700;line-height:1.6;color:#9fb0d8;margin:0 0 15px}
-  .rules{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .lead{flex:0 0 auto;text-align:center;font-size:min(15px,1.8vh);font-weight:700;line-height:1.6;
+    color:#9fb0d8;margin:0 0 14px}
+  .rules{flex:0 0 auto;list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
   .rules li{display:flex;gap:10px;align-items:flex-start;font-size:15px;font-weight:700;line-height:1.55;
     background:rgba(255,255,255,.05);border-radius:12px;padding:11px 13px;color:#cbd6f0}
   .rules li span{flex:0 0 auto;color:#5aa3ff;font-weight:900}
   .btn{width:100%;padding:15px;border:0;border-radius:13px;cursor:pointer;
     background:linear-gradient(#3a8bff,#1f63e0);color:#fff;font:900 16.5px/1 system-ui,sans-serif}
 
-  .zhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-  .zhead b{font-size:20px;font-weight:900;letter-spacing:-.02em}
-  .zhead span{padding:4px 9px;border-radius:7px;font-size:12px;font-weight:900;background:#3a2a12;color:#f0c078}
-  .zdesc{font-size:14.5px;font-weight:700;line-height:1.6;color:#a9b8d6;margin:0 0 13px;word-break:keep-all}
-  .known{background:rgba(255,150,80,.09);border:1px solid rgba(255,160,90,.26);border-radius:13px;
-    padding:11px 13px;margin-bottom:14px}
-  .known h4{margin:0 0 7px;font-size:13px;font-weight:900;color:#ffb98a;letter-spacing:.02em}
-  .known div{font-size:13.5px;font-weight:700;line-height:1.55;color:#e6d2c2;margin-bottom:3px}
+  /* ── 판 그림 위에 올리기 ───────────────────────────────────────────
+     세 화면(인트로 · 구역 브리핑 · 결과)이 **같은 계기판 한 장**을 쓴다. 다른 게임(막아라=클립보드,
+     시켜라=금속 훈장판)이 화면마다 판 그림을 두는 것과 같은 자리를 채우는 것이다.
+     ⚠️ intro-panel 은 위 가운데에 **손잡이**가 그려져 있어 border-image(9슬라이스)를 쓰면 안 된다 —
+        가운데 조각이 가로로 늘어나 손잡이가 판 전체 폭의 막대가 된다. 통짜로 늘리고 비율을 고정한다.
+     ⚠️ 그래서 판은 **높이로 크기를 정한다**(width:auto + aspect-ratio). 폭으로 정하면 낮은 화면에서
+        판이 세로로 넘쳐 잘린다.
+     ⚠️ 아래 %는 실측값이다(트림 후 652×994 · 안쪽 판 x10.3~89.4 · y13.9~92.6).
+        padding 의 % 는 **폭 기준**이라 세로값은 높이비(1/0.6559)를 곱해 환산했다 — 그림을 갈면 다시 잰다. */
+  .ov .sheet{height:min(92%,660px);width:auto;aspect-ratio:652/994;max-width:96%;
+    padding:21.2% 10.5% 11.3%;border:0;border-radius:0;box-shadow:none;
+    background:url('/games/feel-cari-intro-panel-v1.webp') center/100% 100% no-repeat;
+    filter:drop-shadow(0 18px 24px rgba(0,0,0,.7));
+    display:flex;flex-direction:column;scrollbar-width:none}
+  .ov .sheet::-webkit-scrollbar{display:none}
+  /* 버튼은 판 바닥에 붙인다 — 내용이 짧아도 버튼이 가운데에 떠 있으면 판이 비어 보인다. */
+  .ov .btn{margin-top:auto;width:min(100%,300px);align-self:center;height:auto;aspect-ratio:2022/593;
+    padding:0 12% 2%;border:0;border-radius:0;box-shadow:none;
+    background:url('/games/feel-cari-start-v1.webp') center/100% 100% no-repeat;
+    color:#fff;font-size:min(18px,2.2vh);text-shadow:0 2px 3px #05203c;
+    filter:drop-shadow(0 7px 7px rgba(0,0,0,.48))}
+  .ov .btn:active{transform:translateY(2px)}
+
+  #startOv{padding:10px;background:#040810 url('/games/feel-cari-intro-bg-v1.webp') center/cover no-repeat;backdrop-filter:none}
+  #startOv:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,3,8,.05),rgba(0,3,8,.42));pointer-events:none}
+  #startOv .sheet{position:relative;z-index:1}
+  #startOv #sArt{height:min(235px,28vh);margin:-8px auto 0}
+  #startOv .ttl{font-size:min(25px,3vh);margin:4px 0 3px;color:#f4f8ff;text-shadow:0 2px 2px #02070d}
+  #startOv .lead{font-size:min(14px,1.7vh);line-height:1.45;margin:0 0 10px;color:#bcd0e7}
+  #startOv .rules{gap:6px;margin:0 0 10px}
+  #startOv .rules li{gap:8px;padding:8px 10px;border-radius:7px;background:rgba(2,9,17,.34);
+    font-size:min(13.5px,1.65vh);line-height:1.4;color:#d6e2ef;white-space:nowrap}
+  @media (max-width:430px){ #startOv .rules li{font-size:min(12.5px,1.6vh);padding:7px 8px} }
+  #startOv .rules li span{color:#68d4ff}
+
+  /* 브리핑 — 판 안쪽에서 글이 넘치면 판이 아니라 글이 커진 것처럼 보인다. 넘치는 건 본문만 스크롤한다. */
+  #brOv .sheet{justify-content:flex-start}
+  /* margin:auto 0 = 판 안쪽 남는 높이를 위아래로 나눠 본문을 가운데 세운다.
+     ⚠️ 위로 붙이면 '아는 것' 이 없는 1구역에서 판 아래 절반이 통째로 빈다. */
+  .zbody{margin:auto 0;min-height:0;display:flex;flex-direction:column}
+  .zhead{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex:0 0 auto}
+  .zhead b{font-size:min(20px,2.4vh);font-weight:900;letter-spacing:-.02em;color:#eaf4ff}
+  .zhead span{padding:4px 9px;border-radius:7px;font-size:min(12px,1.5vh);font-weight:900;
+    background:rgba(240,192,120,.16);border:1px solid rgba(240,192,120,.4);color:#f0c078}
+  .zdesc{font-size:min(14.5px,1.75vh);font-weight:700;line-height:1.6;color:#a9b8d6;margin:0 0 12px;
+    word-break:keep-all;flex:0 1 auto;overflow-y:auto;scrollbar-width:none}
+  .zdesc::-webkit-scrollbar{display:none}
+  /* 구역 브리핑의 핵심 = "여기서 뭐가 안 되나". 글로 풀면 네 줄이라 안 읽히므로 칩으로 보여준다.
+     칩 색은 센서 카드 소켓과 같은 색(--c)이라 브리핑에서 본 색을 게임 화면에서 그대로 찾는다.
+     ⚠️ 먹통 칩의 점은 회색이다 — 색이 살아 있으면 "쓸 수 있다"로 읽힌다. */
+  .zhints{flex:0 0 auto;display:flex;flex-direction:column;gap:9px;margin:0 0 12px}
+  .zrow h5{margin:0 0 6px;font-size:min(12px,1.5vh);font-weight:900;letter-spacing:.02em}
+  .zrow.bad h5{color:#ff9a8a}
+  .zrow.good h5{color:#8fe0a8}
+  .zrow>div{display:flex;flex-wrap:wrap;gap:5px}
+  .zrow.all{font-size:min(14px,1.7vh);font-weight:700;color:#a9b8d6}
+  .zrow.all b{color:#8fe0a8}
+  .zc{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:8px;
+    font-size:min(13px,1.6vh);font-weight:900;color:#dbe6f7;
+    background:rgba(2,9,17,.42);border:1px solid rgba(255,255,255,.1)}
+  .zc i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 5px var(--c)}
+  .zc.b{color:#9fadc6}
+  .zc.b i{background:#57627e;box-shadow:none}
+  .zc em{font-style:normal;font-weight:800;font-size:min(11.5px,1.45vh);color:#8b9ab9}
+
+  .known{background:rgba(255,150,80,.09);border:1px solid rgba(255,160,90,.26);border-radius:12px;
+    padding:10px 12px;margin-bottom:12px;flex:0 1 auto;overflow-y:auto;scrollbar-width:none}
+  .known::-webkit-scrollbar{display:none}
+  .known h4{margin:0 0 7px;font-size:min(13px,1.6vh);font-weight:900;color:#ffb98a;letter-spacing:.02em}
+  .known div{font-size:min(13.5px,1.6vh);font-weight:700;line-height:1.55;color:#e6d2c2;margin-bottom:3px}
   .known div b{font-weight:900}
 
-  .big{text-align:center;font-size:34px;font-weight:900;color:#e0a92a;line-height:1.1;letter-spacing:2px}
-  .biglab{text-align:center;font-size:13px;font-weight:800;color:#7d8dba;margin:6px 0 14px}
-  .note{background:rgba(90,163,255,.10);border:1px solid rgba(90,163,255,.28);border-radius:13px;
-    padding:12px 14px;font-size:14.5px;line-height:1.6;font-weight:700;color:#bcd6ff;margin-bottom:15px}
+  /* 결과 — 판 안이 위에서부터 [캐릭터][제목][별][별 수][한 줄 교훈] 이고 버튼은 바닥(.ov .btn). */
+  #overOv .sheet{justify-content:flex-start}
+  .big{flex:0 0 auto;margin:2px 0 0;text-align:center;font-size:min(38px,4.4vh);font-weight:900;color:#e0a92a;line-height:1.1;letter-spacing:2px}
+  .big i{font-style:normal;color:#3d4a6b}
+  .biglab{flex:0 0 auto;text-align:center;font-size:min(13px,1.6vh);font-weight:800;color:#7d8dba;margin:6px 0 12px}
+  .note{background:rgba(90,163,255,.10);border:1px solid rgba(90,163,255,.28);border-radius:12px;
+    padding:11px 13px;font-size:min(14px,1.7vh);line-height:1.55;font-weight:700;color:#bcd6ff;
+    margin-bottom:12px;flex:0 1 auto;overflow-y:auto;scrollbar-width:none}
+  .note::-webkit-scrollbar{display:none}
   .note b{color:#fff}
 
   .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
@@ -162,10 +322,9 @@
 
 <div id="app">
   <div class="top">
-    <span class="lv">구역 <b id="lvNum">1</b>/6</span>
-    <span class="lvname" id="lvName">—</span>
-    <span class="envt hidden" id="envTag">—</span>
-    <span class="hits">부딪힘 <b id="hitEl">0</b>/3</span>
+    <span class="slot sl-l"><b id="lvNum">1</b><i>구역</i></span>
+    <span class="slot sl-c"><b class="lvname" id="lvName">—</b><span class="envt hidden" id="envTag">—</span></span>
+    <span class="slot sl-r"><b id="hitEl">0</b><i>부딪힘</i></span>
   </div>
 
   <div class="batt" id="battBox">
@@ -177,7 +336,19 @@
 
   <div class="view" id="view">
     <svg id="svg" viewBox="0 0 338 442" xmlns="http://www.w3.org/2000/svg">
-      <g id="gWall"></g><g id="gMark"></g><polyline id="gTrail" fill="none"
+      <defs>
+        <radialGradient id="botAura">
+          <stop offset="0" stop-color="#7cc0ff" stop-opacity=".6"/>
+          <stop offset="45%" stop-color="#4a8fe8" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="#4a8fe8" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="goalAura">
+          <stop offset="0" stop-color="#3ddc84" stop-opacity=".42"/>
+          <stop offset="55%" stop-color="#3ddc84" stop-opacity=".13"/>
+          <stop offset="100%" stop-color="#3ddc84" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <g id="gWall"></g><g id="gHit"></g><g id="gMark"></g><polyline id="gTrail" fill="none"
         stroke="rgba(90,163,255,.26)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       <g id="gBeam"></g><g id="gGoal"></g><g id="gBot"></g>
     </svg>
@@ -187,36 +358,41 @@
     </div>
     <div class="drift hidden" id="driftTag">위치 추정 흔들림</div>
     <div class="blind hidden" id="blindTag">센서를 하나도 안 켰다</div>
+    <!-- 조이스틱은 시야 **안**에 떠 있다(자기 줄을 안 쓴다) — 아래 .pad 주석 참고. -->
+    <div class="pad">
+      <div class="joystick" id="joystick" role="application" tabindex="0" aria-label="주행 조이스틱">
+        <div class="joybase"></div><div class="joyknob" id="joyKnob"></div>
+      </div>
+    </div>
   </div>
 
   <div class="sens" id="sens"></div>
 
-  <div class="pad">
-    <button class="ctl" id="bL">↰</button>
-    <button class="ctl go" id="bF">▲ 전진</button>
-    <button class="ctl" id="bR">↱</button>
-  </div>
-
   <div class="fb" id="fb">
+    <img class="fbart" src="/games/feel-cari-fail-v1.webp" alt="" aria-hidden="true" />
     <div class="fbhead"><b id="fbTtl">도착</b><span class="st" id="fbStar"></span></div>
     <p class="fbwhy" id="fbWhy">—</p>
     <button class="fbbtn" id="fbBtn">다음</button>
   </div>
-</div>
+
+<!-- ⚠️ 오버레이 셋은 반드시 #app **안**에 있어야 한다 — `.ov{position:absolute;inset:0}` 의 기준이
+     #app(520px 상한)이 아니라 뷰포트가 되면 데스크톱에서 인트로가 화면 전체(1280px+)로 퍼지고
+     랭킹 버튼도 게임이 아니라 브라우저 오른쪽 끝에 붙는다. (2026-08-18 실제로 그 상태였다.
+     시켜라 CARI 가 같은 이유로 먼저 고쳐졌다 — 밖으로 빼지 말 것.) -->
 
 <!-- 인트로 -->
 <div class="ov" id="startOv">
   <div class="sheet">
     <div id="sArt"></div>
     <p class="ttl">더듬어라 <i>CARI</i></p>
-    <p class="lead">CARI 는 앞을 못 본다.<br/>센서는 전부 달려 있지만 <b>배터리가 하나</b>다.</p>
+    <p class="lead">“앞이 안 보인다. 센서만 믿고 가라.”</p>
+    <!-- ⚠️ 인트로에 다 적지 않는다 — 태그 1줄 + 규칙 3개, 각 한 줄(다른 게임 전부 이 분량이다).
+         센서별 갱신 속도·감지 점 같은 건 구역 브리핑과 판정이 알아서 알려준다.
+         남길 것은 "안 하면 손해 보는 것" 셋뿐이다. -->
     <ul class="rules">
-      <li><span>①</span><div>화면은 까맣다. <b>센서를 켜야</b> 거리가 보인다. 아무거나 눌러서 켜고 끈다.</div></li>
-      <li><span>②</span><div>켜둔 만큼 <b>배터리가 닳는다.</b> 라이다·카메라는 많이 먹고 초음파는 거의 안 먹는다.</div></li>
-      <li><span>③</span><div>구역마다 환경이 다르다. 깜깜하거나, 유리거나, 연기가 낀다. <b>켜봤는데 먹통이면 전기만 버린 것.</b></div></li>
-      <li><span>④</span><div>센서마다 <b>갱신 속도가 다르다.</b> 초음파·카메라는 한 박자 늦고, 라이다는 한 바퀴 돌아야, 적외선·레이더는 즉시. <b>빨리 달리면 느린 센서는 옛 값을 보여준다.</b></div></li>
-      <li><span>⑤</span><div>센서가 닿은 자리는 <b>점으로 남는다.</b> 뭘 켰느냐에 따라 지도가 달라진다.</div></li>
-      <li><span>⑥</span><div>배터리가 떨어지거나 <b>3번</b> 부딪히면 되돌아온다. 한 번도 안 부딪히면 <b>★★★</b>.</div></li>
+      <li><span>①</span><div><b>센서를 켜야</b> 보인다 · 켤수록 <b>빨리 닳는다</b></div></li>
+      <li><span>②</span><div>구역마다 <b>먹통인 센서</b>가 있다</div></li>
+      <li><span>③</span><div><b>3번</b> 부딪히면 끝 · 무사통과 <b>★★★</b></div></li>
     </ul>
     <button class="btn" id="startBtn">시작하기</button>
   </div>
@@ -225,9 +401,12 @@
 <!-- 구역 브리핑 -->
 <div class="ov hidden" id="brOv">
   <div class="sheet">
-    <div class="zhead"><b id="zName">—</b><span class="hidden" id="zEnv">—</span></div>
-    <p class="zdesc" id="zDesc">—</p>
-    <div class="known hidden" id="zKnown"><h4>지금까지 겪어서 아는 것</h4><div id="zKnownBody"></div></div>
+    <div class="zbody">
+      <div class="zhead"><b id="zName">—</b><span class="hidden" id="zEnv">—</span></div>
+      <p class="zdesc" id="zDesc">—</p>
+      <div class="zhints" id="zHints"></div>
+      <div class="known hidden" id="zKnown"><h4>지금까지 겪어서 아는 것</h4><div id="zKnownBody"></div></div>
+    </div>
     <button class="btn" id="zGo">들어가기</button>
   </div>
 </div>
@@ -236,13 +415,15 @@
 <div class="ov hidden" id="overOv">
   <div class="sheet">
     <div id="oArt"></div>
-    <p class="ttl">다섯 구역 통과</p>
+    <p class="ttl" id="oTtl">전 구역 통과</p>
     <p class="big" id="oStars">★</p>
-    <p class="biglab" id="oLab">별 0 / 15</p>
+    <p class="biglab" id="oLab">별 0 / 0</p>
     <div class="note">센서는 세상을 알려주지 않는다. <b>자기가 잴 수 있는 것만</b>, 그것도 <b>전기를 쓰면서</b> 알려준다. 무엇을 언제 켤지 정하는 게 일이다.</div>
     <button class="btn" id="oAgain">처음부터 다시</button>
   </div>
 </div>
+
+</div><!-- /#app -->
 
 <script>
 /* ================= CARI mascot (기존 게임과 동일 자산) ================= */
@@ -314,6 +495,28 @@ const SENSORS={
          contact:true, sees:{'#':1,'G':1,'B':1,'M':1,'C':1}, envFail:[]}
 };
 const ENVLBL={dark:'깜깜함',bright:'햇빛',smoke:'연기',slip:'미끄러움'};
+const MATLBL={G:'유리',B:'검정',M:'금속',C:'천'};   // 격자 재질 코드 → 사람 말
+const ENVWHY={dark:'어둠',bright:'햇빛',smoke:'연기'};
+
+/** 이 구역에서 어떤 센서가 먹통이고 어떤 센서가 유리한가 — **전부 데이터에서 뽑는다.**
+ *  브리핑을 글로 쓰면 규칙과 설명이 따로 놀기 시작한다(초음파 사거리를 고치면 문장도 같이 고쳐야 한다).
+ *  ⚠️ 여기에 "이 구역은 라이다가 안 된다" 같은 특례를 적지 말 것 — 설계 규칙 ④(강약은 SENSORS 한 곳).
+ *  ⚠️ 환경 먹통이 재질보다 먼저다. 둘 다 걸리면 이유를 하나만 보여줘야 칩이 안 길어진다. */
+function zoneHints(l){
+  const mats=new Set();
+  l.grid.forEach(r=>{ for(const c of r) if(MATLBL[c]) mats.add(c); });
+  const bad=[], good=[];
+  Object.keys(SENSORS).forEach(k=>{
+    const S=SENSORS[k];
+    const e=S.envFail.find(x=>l.envs.indexOf(x)>=0);
+    if(e){ bad.push({k,why:ENVWHY[e]||ENVLBL[e]}); return; }
+    const m=[...mats].find(x=>S.sees[x]===0);
+    if(m){ bad.push({k,why:MATLBL[m]}); return; }
+    const b=S.boost&&Object.keys(S.boost).find(x=>mats.has(x));
+    if(b) good.push({k,why:MATLBL[b]+' '+S.boost[b]+'배'});
+  });
+  return {bad,good};
+}
 
 /* ===================== 구역 =====================
    reveals — 그 센서를 달고 들어갔을 때 카드에 남는 메모(실패가 자산이 되게 하는 장치)
@@ -321,7 +524,7 @@ const ENVLBL={dark:'깜깜함',bright:'햇빛',smoke:'연기',slip:'미끄러움
 const LEVELS=[
 {
   name:'물류창고', envs:[], slots:3,
-  desc:'방이 벽으로 나뉘어 있고 <b>벽마다 문이 하나씩</b> 뚫려 있다. 나침반은 방향만 알려줄 뿐 <b>문이 어디인지는 안 알려준다</b> — 벽을 훑어서 찾아라. 여기선 어떤 센서든 다 통한다.',
+  desc:'방마다 문이 <b>하나씩</b>. 나침반은 방향만 알려준다 — <b>문은 직접 찾아라.</b>',
   reveals:{ultra:'사거리가 매우 짧다',lidar:'멀리·정밀하게 본다',cam:'제일 멀리 본다',
            ir:'가까이만 본다',radar:'멀리 보지만 값이 뭉뚱그려진다',bump:'닿기 전엔 아무것도 모른다'},
   after:'같은 벽인데 센서마다 <em>보이는 거리가 다르다.</em> 여기까진 아무거나 골라도 된다 — 다음부터가 진짜다.',
@@ -346,7 +549,7 @@ const LEVELS=[
 },
 {
   name:'정전된 지하', envs:['dark'], slots:2,
-  desc:'<b>빛이 하나도 없다.</b> 벽은 평범한 콘크리트고 문은 <b>한 칸뿐</b>이다.',
+  desc:'<b>빛이 하나도 없다.</b> 문은 <b>한 칸뿐</b>이라 놓치기 쉽다.',
   reveals:{cam:'<b>깜깜하면 먹통</b>'},
   after:'카메라는 <em>빛을 받는</em> 물건이다. 빛이 없으면 아무것도 못 한다. 스스로 쏘는 센서라야 어둠에서 산다.',
   grid:[
@@ -370,7 +573,7 @@ const LEVELS=[
 },
 {
   name:'유리 전시장', envs:[], slots:2,
-  desc:'칸막이가 전부 <b>유리</b>다. 조명은 밝은데, <b>벽이 안 보이면 거기 뚫린 문도 안 보인다.</b>',
+  desc:'칸막이가 전부 <b>유리</b>다. 벽이 안 보이면 <b>문도 안 보인다.</b>',
   reveals:{lidar:'<b>유리를 통과해 못 봄</b>',cam:'<b>유리를 통과해 못 봄</b>',ir:'<b>유리를 통과해 못 봄</b>',
            radar:'<b>유리를 통과해 못 봄</b>',ultra:'<b>유리도 잡는다</b>'},
   after:'빛도 전파도 유리를 <em>그냥 통과한다.</em> “앞이 비었다”는 말은 “아무것도 못 봤다”는 뜻일 수도 있다 — 소리는 유리에 튕긴다.',
@@ -395,7 +598,7 @@ const LEVELS=[
 },
 {
   name:'천 덮인 창고', envs:['bright'], slots:2,
-  desc:'짐이 전부 <b>두꺼운 천</b>으로 덮여 있다. 천창으로 <b>햇빛</b>이 쏟아진다. <b>천은 소리를 삼킨다</b> — 초음파가 "앞이 비었다"고 해도 믿지 마라.',
+  desc:'짐이 <b>두꺼운 천</b>으로 덮여 있다. <b>천은 소리를 삼킨다.</b>',
   reveals:{ultra:'<b>천에 먹힌다 — 벽인데 안 보임</b>',ir:'<b>천에 먹히고 햇빛에도 먹통</b>',
            lidar:'천은 잘 본다',cam:'천은 잘 본다',radar:'천은 잘 본다'},
   after:'소리는 딱딱한 것에 튕기고 <em>푹신한 것에 먹힌다.</em> 여태 만능이던 초음파가 여기서 처음으로 아무것도 못 봤다 — 만능인 센서는 없다.',
@@ -420,7 +623,7 @@ const LEVELS=[
 },
 {
   name:'검은 고무 창고', envs:[], slots:2,
-  desc:'벽이 전부 <b>검은 고무</b>다. 검정은 <b>빛을 삼킨다</b> — 레이저를 쏴봐야 아무것도 안 돌아온다.',
+  desc:'벽이 전부 <b>검은 고무</b>다. 검정은 <b>빛을 삼킨다.</b>',
   reveals:{lidar:'<b>검은 물체를 못 봄</b>',ir:'<b>검은 물체를 못 봄</b>',cam:'검은 물체도 본다',
            radar:'검은 물체도 본다',ultra:'색과 상관없다'},
   after:'라이다는 <em>빛이 되돌아와야</em> 잰다. 검은 것은 빛을 삼켜서 아무것도 안 돌아온다. 소리와 전파는 색을 안 가린다.',
@@ -445,7 +648,7 @@ const LEVELS=[
 },
 {
   name:'연기 낀 공장', envs:['smoke','slip'], slots:3,
-  desc:'용접 <b>연기</b>가 자욱하고 바닥엔 기름이 흘러 <b>미끄럽다</b>. 벽은 <b>금속</b>이라 <b>레이더가 두 배 멀리</b> 본다. 문이 멀리 있어서 코앞만 보는 센서로는 한참 걸리고, 미끄러지면 <b>자기 위치를 잘못 알게 된다.</b>',
+  desc:'연기가 자욱하고 바닥이 <b>미끄럽다</b>. 문이 <b>멀리</b> 있다.',
   reveals:{cam:'<b>연기에 먹통</b>',lidar:'<b>연기에 먹통</b>',radar:'<b>연기를 뚫는다</b>',
            bump:'닿으면 <b>위치를 다시 잡는다</b>'},
   after:'연기는 빛을 흩어버리지만 전파는 뚫는다. 그리고 미끄러진 만큼 <em>내가 아는 내 위치가 틀어진다</em> — 벽에 닿아 다시 잡는 것 말고 방법이 없다. 로봇이 SLAM 을 하는 이유다.',
@@ -478,14 +681,17 @@ const $=id=>document.getElementById(id);
 const CELL=26, D2R=Math.PI/180, BOT_R=6, SPEED=80, TURN=165, MAX_HIT=3, BATT_MAX=100;
 let LI=0, L=null, grid=[], W=0, H=0;
 let bot={x:0,y:0,a:0}, err={x:0,y:0}, driftDir=0, goal={x:0,y:0};
-let on={}, batt=BATT_MAX, hits=0, marks=new Set(), trail=[], held={l:0,f:0,r:0}, touching=false;
-let markDom=0, trailStr='', botG=null;
+let on={}, batt=BATT_MAX, hits=0, marks=new Set(), trail=[], held={l:0,f:0,r:0}, joyTurn=0, joyDrive=0, touching=false;
+let markDom=0, trailStr='', botG=null, botDir=null;
 const MARK_MAX=1400;
 const markFrag=document.createDocumentFragment();
 let meas={}, scanA=0;   // meas=센서별 마지막 측정 캐시 · scanA=라이다 회전각(누적)
 let raf=null, running=false, bumpUntil=0, lastT=0, starsPer=[], learned={};
 
-function starStr(n){return '★'.repeat(n)+'<i>'+'☆'.repeat(3-n)+'</i>';}
+/** ⚠️ 반드시 0~3 으로 접는다 — 예전엔 총점을 5로 나눈 값을 그대로 넘겨서 전 구역 무사통과(별 18)면
+ *  `'☆'.repeat(-1)` 로 결과창이 통째로 터졌다(RangeError). 만점을 받은 사람만 못 보는 화면이었다. */
+function starStr(n){ n=Math.max(0,Math.min(3,Math.round(n)||0));
+  return '★'.repeat(n)+'<i>'+'☆'.repeat(3-n)+'</i>'; }
 function envOn(k){ return L && L.envs.indexOf(k)>=0; }
 function estX(){ return bot.x+err.x; }
 function estY(){ return bot.y+err.y; }
@@ -515,12 +721,30 @@ function ray(sk,ang,ox,oy){
   }
   return {d:S.range,x:bx+dx*S.range,y:by+dy*S.range,hit:false};
 }
+let lastHit=null;   // 마지막으로 부딪힌 칸 [cx,cy] — 충돌 번쩍임이 쓴다
 function hitsWall(x,y){
   for(let i=0;i<8;i++){
     const a=i*45*D2R;
-    if(solid(cellAt(x+Math.cos(a)*BOT_R,y+Math.sin(a)*BOT_R))) return true;
+    const px=x+Math.cos(a)*BOT_R, py=y+Math.sin(a)*BOT_R;
+    if(solid(cellAt(px,py))){ lastHit=[Math.floor(px/CELL),Math.floor(py/CELL)]; return true; }
   }
-  return solid(cellAt(x,y));
+  if(solid(cellAt(x,y))){ lastHit=[Math.floor(x/CELL),Math.floor(y/CELL)]; return true; }
+  return false;
+}
+/** 부딪힌 **그 칸 하나만** 잠깐 보여준다.
+ *  ⛔ 예전엔 gWall(구역 벽 **전체**)을 0.7초 켰다. 충돌 피드백이었는데 게임 전제를 통째로 깼다 —
+ *     일부러 두 번 박으면 목숨 두 개로 지도를 다 사서, 센서를 하나도 안 켜고 완주할 수 있었다
+ *     (배터리도 안 쓴다). 2026-08-18 제거. 완주·실패 뒤의 전체 공개(opacity .35)는 답 공개라 그대로 둔다.
+ *  ⚠️ 좌표는 **로봇이 믿는 위치 기준**으로 옮겨 그린다 — 감지 점·자취와 같은 프레임이어야 한다.
+ *     참값에 그리면 미끄러진 뒤 번쩍임만 엉뚱한 자리에서 난다. */
+function flashHitCell(){
+  if(!lastHit) return;
+  const n=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  n.setAttribute('x',lastHit[0]*CELL+err.x); n.setAttribute('y',lastHit[1]*CELL+err.y);
+  n.setAttribute('width',CELL); n.setAttribute('height',CELL);
+  n.setAttribute('class','wflash');
+  $('gHit').appendChild(n);
+  setTimeout(()=>{ n.remove(); },700);
 }
 function drainRate(){
   // ⚠️ 먹통인 센서도 켜두면 전기를 먹는다. 그게 "잘못 켰다"의 대가다.
@@ -544,9 +768,9 @@ function rayAngles(k){
 function buildSensors(){
   $('sens').innerHTML=Object.keys(SENSORS).map(k=>{
     const S=SENSORS[k];
-    return `<button class="s" data-k="${k}" id="s_${k}">
-      <span class="si" style="background:${S.c}22;color:${S.c}">${S.ic}</span>
-      <span class="bd"><span class="sn" style="color:${S.c}">${S.nm}</span>
+    return `<button class="s" data-k="${k}" id="s_${k}" style="--c:${S.c}">
+      <span class="si" aria-hidden="true"></span>
+      <span class="bd"><span class="sn">${S.nm}</span>
       <span class="sv" id="v_${k}">꺼짐</span></span>
       <span class="sp">${pwDots(k)}</span></button>`;
   }).join('');
@@ -563,7 +787,7 @@ function loadLevel(){
   const envTxt=L.envs.map(e=>ENVLBL[e]).join(' · ');
   $('envTag').textContent=envTxt; $('envTag').classList.toggle('hidden',!envTxt);
   $('driftTag').classList.toggle('hidden',!envOn('slip'));
-  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={l:0,f:0,r:0}; touching=false;
+  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={l:0,f:0,r:0}; joyTurn=0; joyDrive=0; touching=false;
   batt=BATT_MAX; on={}; meas={}; scanA=0;
   driftDir=Math.random()*Math.PI*2;   // 드리프트는 한 방향으로 쏠린다 — 랜덤워크면 상쇄돼 아무 일도 안 난다
   $('hitEl').textContent='0';
@@ -581,11 +805,40 @@ function loadLevel(){
     if(FILL[c]) w+=`<rect x="${x*CELL}" y="${y*CELL}" width="${CELL}" height="${CELL}" fill="${FILL[c]}"/>`;
   }
   $('gWall').innerHTML=w; $('gWall').setAttribute('opacity','0');
-  $('gGoal').innerHTML=`<circle cx="${goal.x}" cy="${goal.y}" r="10" fill="none" stroke="#3ddc84" stroke-width="2.5"/>
-    <circle cx="${goal.x}" cy="${goal.y}" r="4" fill="#3ddc84"/>`;
-  $('gMark').innerHTML=''; $('gBeam').innerHTML=''; $('gTrail').setAttribute('points','');
-  $('gBot').innerHTML='<g id="botG"><circle r="'+BOT_R+'" fill="#eaf1ff"/><path d="M0 -3 L9 0 L0 3 Z" fill="#1f6dff"/></g>';
-  botG=$('botG');
+  // 도착지 — 초록 동그라미 두 개였던 것을 착륙 비컨으로. 어두운 화면에서 멀리서도 눈에 걸려야 한다.
+  const go=`${goal.x}px ${goal.y}px`;
+  $('gGoal').innerHTML=`
+    <circle cx="${goal.x}" cy="${goal.y}" r="30" fill="url(#goalAura)"/>
+    <g class="goal-pulse"   style="transform-origin:${go}"><circle cx="${goal.x}" cy="${goal.y}" r="9" fill="none" stroke="#3ddc84" stroke-width="2.2"/></g>
+    <g class="goal-pulse b" style="transform-origin:${go}"><circle cx="${goal.x}" cy="${goal.y}" r="9" fill="none" stroke="#3ddc84" stroke-width="2.2"/></g>
+    <circle class="goal-scan" style="transform-origin:${go}" cx="${goal.x}" cy="${goal.y}" r="14"
+      fill="none" stroke="#8bf0b4" stroke-width="1.5" stroke-dasharray="5 7" opacity=".8"/>
+    <circle cx="${goal.x}" cy="${goal.y}" r="7.5" fill="rgba(10,40,26,.85)" stroke="#3ddc84" stroke-width="1.6"/>
+    <circle class="goal-core" cx="${goal.x}" cy="${goal.y}" r="3.4" fill="#c9ffe2"/>`;
+  $('gMark').innerHTML=''; $('gBeam').innerHTML=''; $('gHit').innerHTML=''; lastHit=null;
+  $('gTrail').setAttribute('points','');
+  /* 로봇 = 톱다운 차체 + 같은 시점으로 다시 만든 방향성 CARI.
+     CARI와 차체 모두 로컬 기준 오른쪽(초음파 출력 방향)을 바라보고 함께 회전한다.
+     ⛔ 방향 표시를 따로 그리지 말 것 — **차체 그림 앞쪽에 청록 부채꼴이 이미 그려져 있다.**
+        세모를 덧붙였다가 방향 표시가 두 벌이 됐다(판독기 소켓과 같은 실수).
+     ⚠️ 어두운 후광이 발광보다 먼저다. 파란 발광만 깔면 남색 바닥 위 파란 로봇이라 실루엣이 안 산다 —
+        어두운 원반이 배경을 죽여야 차체 윤곽이 뜬다. */
+  $('gBot').innerHTML=
+    '<g id="botG">'
+    + '<circle r="24" fill="rgba(2,6,14,.72)"/>'
+    + '<circle class="botglow" r="26" fill="url(#botAura)"/>'
+    + '<circle r="'+BOT_R+'" fill="#cfe8ff" opacity=".75"/>'
+    + '<g id="botDir">'
+    +   '<image href="/games/feel-cari-rover-base-v1.webp" x="-27" y="-27" width="54" height="54" preserveAspectRatio="xMidYMid meet"/>'
+    /* 머리는 정가운데가 아니라 **링 구멍 중심**에 앉힌다.
+       ⚠️ 로버 그림의 구멍은 캔버스 한가운데가 아니다 — 실측 (43.81%, 48.88%) 이라
+          54px 로 놓았을 때 로컬 좌표로 (-3.34, -0.61) 이다. 머리를 (0,0) 에 두면 그 차이만큼
+          **앞으로 나가 보인다**(앞이 +x 라서). 그래서 x·y 를 그만큼 뺀 값이다.
+          대칭으로 보인다고 -13/-13 으로 되돌리지 말 것. 로버 그림을 갈면 다시 재야 한다. */
+    +   '<image href="/games/feel-cari-head-topdown-v2.png" x="-16.34" y="-13.61" width="26" height="26" preserveAspectRatio="xMidYMid meet"/>'
+    + '</g>'
+    + '</g>';
+  botG=$('botG'); botDir=$('botDir');
 
   $('fb').classList.remove('on');
   running=true; lastT=performance.now();
@@ -598,11 +851,12 @@ function loop(){
   const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   const nowS=now/1000;
 
-  if(held.l) bot.a-=TURN*dt*D2R;
-  if(held.r) bot.a+=TURN*dt*D2R;
+  const turnInput=Math.max(-1,Math.min(1,(held.r?1:0)-(held.l?1:0)+joyTurn));
+  if(turnInput) bot.a+=turnInput*TURN*dt*D2R;
   touching=false;
-  if(held.f){
-    const step=SPEED*dt;
+  const driveInput=Math.max(held.f?1:0,joyDrive);
+  if(driveInput>.04){
+    const step=SPEED*driveInput*dt;
     const nx=bot.x+Math.cos(bot.a)*step, ny=bot.y+Math.sin(bot.a)*step;
     if(hitsWall(nx,ny)){
       touching=true;
@@ -614,9 +868,9 @@ function loop(){
       if(now>bumpUntil){
         hits++; $('hitEl').textContent=hits;
         bumpUntil=now+900;
-        $('gWall').setAttribute('opacity','.55');
+        flashHitCell();
         $('view').classList.add('bump');
-        setTimeout(()=>{ $('gWall').setAttribute('opacity','0'); $('view').classList.remove('bump'); },700);
+        setTimeout(()=>{ $('view').classList.remove('bump'); },700);
         if(hits>=MAX_HIT) return fail('부딪힘 3번');
       }
       bot.x-=Math.cos(bot.a)*1.6; bot.y-=Math.sin(bot.a)*1.6;
@@ -733,7 +987,9 @@ function loop(){
   flushMarks();
   $('gBeam').innerHTML=beams.join('');
   // ⚠️ 로봇은 transform 만 갱신한다. innerHTML 로 다시 그리면 매 프레임 SVG 를 새로 파싱한다.
-  if(botG) botG.setAttribute('transform',`translate(${estX()},${estY()}) rotate(${bot.a/D2R})`);
+  // CARI는 화면에 똑바로 유지하고, 주행 방향 표시만 회전시킨다.
+  if(botG) botG.setAttribute('transform',`translate(${estX()},${estY()})`);
+  if(botDir) botDir.setAttribute('transform',`rotate(${bot.a/D2R})`);
 
   // 나침반도 로봇이 **믿는 위치** 기준이다 — 그래서 미끄러지면 방향까지 틀어진다.
   const ga=Math.atan2(goal.y-estY(),goal.x-estX())-bot.a;
@@ -777,7 +1033,7 @@ function noteLearned(){
   });
 }
 let usedOnce={};
-function stop(){ running=false; cancelAnimationFrame(raf); held={l:0,f:0,r:0};
+function stop(){ running=false; cancelAnimationFrame(raf); held={l:0,f:0,r:0}; joyTurn=0; joyDrive=0;
   document.querySelectorAll('.ctl').forEach(b=>b.classList.remove('on')); }
 
 function clear(){
@@ -812,14 +1068,23 @@ function fail(why){
 }
 
 /* ===================== 조종 ===================== */
-function bind(btn,key){
-  const el=$(btn);
-  const on2=e=>{ e.preventDefault(); held[key]=1; el.classList.add('on'); };
-  const off=()=>{ held[key]=0; el.classList.remove('on'); };
-  el.addEventListener('pointerdown',on2);
-  ['pointerup','pointerleave','pointercancel'].forEach(t=>el.addEventListener(t,off));
+/* 하나의 아날로그 조이스틱: 위로 밀면 전진, 좌우로 밀면 차체 회전.
+   Pointer Events라 터치·펜·PC 마우스가 같은 코드로 동작한다. */
+const joy=$('joystick'), joyKnob=$('joyKnob');
+let joyPointer=null;
+function resetJoy(){ joyTurn=0; joyDrive=0; joyPointer=null; joyKnob.style.transform='translate(0,0)'; }
+function moveJoy(e){
+  if(joyPointer!==e.pointerId) return;
+  const r=joy.getBoundingClientRect(), radius=r.width*.34;
+  let dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2);
+  const d=Math.hypot(dx,dy); if(d>radius){dx*=radius/d;dy*=radius/d;}
+  joyTurn=Math.max(-1,Math.min(1,dx/radius));
+  joyDrive=Math.max(0,Math.min(1,-dy/radius));
+  joyKnob.style.transform=`translate(${dx}px,${dy}px)`;
 }
-bind('bL','l'); bind('bF','f'); bind('bR','r');
+joy.addEventListener('pointerdown',e=>{e.preventDefault();joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);moveJoy(e);});
+joy.addEventListener('pointermove',moveJoy);
+['pointerup','pointercancel','lostpointercapture'].forEach(t=>joy.addEventListener(t,resetJoy));
 document.addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft')held.l=1; if(e.key==='ArrowRight')held.r=1;
   if(e.key==='ArrowUp'){held.f=1;e.preventDefault();}
@@ -828,7 +1093,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{
   if(e.key==='ArrowLeft')held.l=0; if(e.key==='ArrowRight')held.r=0; if(e.key==='ArrowUp')held.f=0;
 });
-document.addEventListener('visibilitychange',()=>{ if(document.hidden) held={l:0,f:0,r:0}; });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){held={l:0,f:0,r:0};resetJoy();} });
 
 /* ===================== 흐름 ===================== */
 function openBrief(){
@@ -837,6 +1102,12 @@ function openBrief(){
   const envTxt=l.envs.map(e=>ENVLBL[e]).join(' · ');
   $('zEnv').textContent=envTxt; $('zEnv').classList.toggle('hidden',!envTxt);
   $('zDesc').innerHTML=l.desc;
+  const hint=zoneHints(l);
+  const chip=(o,cls)=>`<span class="zc ${cls}" style="--c:${SENSORS[o.k].c}"><i></i>${SENSORS[o.k].nm}<em>${o.why}</em></span>`;
+  $('zHints').innerHTML =
+      (hint.bad.length ? `<div class="zrow bad"><h5>여기선 먹통</h5><div>${hint.bad.map(o=>chip(o,'b')).join('')}</div></div>` : '')
+    + (hint.good.length? `<div class="zrow good"><h5>여기선 유리</h5><div>${hint.good.map(o=>chip(o,'g')).join('')}</div></div>` : '')
+    + (!hint.bad.length && !hint.good.length ? `<div class="zrow all">여기선 <b>어떤 센서든 다 통한다</b></div>` : '');
   const ks=Object.keys(learned).filter(k=>learned[k].length);
   $('zKnown').classList.toggle('hidden',!ks.length);
   $('zKnownBody').innerHTML=ks.map(k=>
@@ -850,16 +1121,18 @@ $('fbBtn').onclick=()=>{
   $('fb').classList.remove('on');
   if(!ok) return loadLevel();           // 실패 — 같은 구역 다시
   if(LI+1>=LEVELS.length){
-    const tot=starsPer.reduce((a,b)=>a+(b||0),0);
-    $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
-    $('oStars').innerHTML=starStr(Math.max(1,Math.round(tot/5)));
-    $('oLab').textContent='별 '+tot+' / '+(LEVELS.length*3);
+    const tot=starsPer.reduce((a,b)=>a+(b||0),0), full=LEVELS.length*3;
+    $('oArt').innerHTML='';
+    // ⚠️ 구역 수를 문구에 박지 말 것 — LEVELS 를 늘리면 '다섯 구역 통과'가 그대로 남는다(실제로 그랬다).
+    $('oTtl').textContent=LEVELS.length+'개 구역 통과';
+    $('oStars').innerHTML=starStr(tot/full*3);
+    $('oLab').textContent='별 '+tot+' / '+full;
     $('overOv').classList.remove('hidden');
   } else { LI++; openBrief(); }
 };
 $('oAgain').onclick=()=>{ $('overOv').classList.add('hidden'); LI=0; starsPer=[]; learned={}; usedOnce={}; openBrief(); };
 
-$('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
+$('sArt').innerHTML='';
 buildSensors();
 </script>
 

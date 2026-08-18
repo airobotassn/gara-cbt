@@ -4,6 +4,7 @@
 //   커버 셀 스타일(.mg-shelf/.mg-cover…)은 모달 시절부터 이어진 공용, 페이지 껍데기는 .mgp 스코프.
 import { Link, useNavigate } from 'react-router-dom'
 import { MINIGAMES } from '../lib/minigames'
+import StarField from '../components/StarField'
 import { useT } from '../lib/i18n'
 import '../styles/minigame.css'
 
@@ -12,6 +13,8 @@ export default function MiniGames() {
   const { t } = useT()
   return (
     <div className="mgp">
+      {/* 밤하늘 — /arena 와 같은 별(다크에서만). 내용은 .mgp-in 이 z-index:1 로 그 위에 선다. */}
+      <StarField />
       <div className="mgp-in">
         <Link className="mgp-back" to="/arena" aria-label={t('arena.title')}>
           <span>‹</span> {t('arena.title')}

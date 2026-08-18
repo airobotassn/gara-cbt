@@ -35,7 +35,7 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재)|산\s?책|my\s?e-?book|e-?book\s?library|本棚|購入した本|我的电子书|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
   if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
   // --- 캐릭터 허브 ---
-  if (h(/허브|캐릭터|아바타|가챠|뽑기|코인|상점|출석|hub|character|avatar|gacha|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|ガチャ|コイン|ショップ|出席|角色|抽卡|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
+  if (h(/허브|캐릭터|아바타|코인|상점|출석|hub|character|avatar|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|コイン|ショップ|出席|角色|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
   // --- 이하 기존 순서 유지 ---
   if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
   if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage'

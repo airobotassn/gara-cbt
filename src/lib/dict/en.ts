@@ -1646,7 +1646,6 @@ const EN: Record<string, string> = {
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
   "hub.err.insufficient_points": "Not enough points",
-  "hub.err.insufficient_dust": "Not enough dust",
   "hub.err.already_owned": "You already own this limited item",
   "hub.err.unauthorized": "Sign in required",
   "hub.err.generic": "Something went wrong. Please try again in a moment.",
@@ -1663,11 +1662,11 @@ const EN: Record<string, string> = {
   "hub.room.surface_floor": "Floor",
   "hub.room.surface_wall": "Wall",
   "hub.room.pick_title": "Furniture for the {where}",
-  "hub.room.none_owned": "You have no furniture for the {where} yet. Try the shop or a draw.",
+  "hub.room.none_owned": "You have no furniture for the {where} yet. Try the shop.",
   "hub.room.remove": "Clear this spot",
   "hub.room.help": "Each piece sits in one spot. Placing it elsewhere moves it.",
 
-  // 가구 이름 — 상점·뽑기·방 고르기가 같이 쓴다.
+  // 가구 이름 — 상점·방 고르기가 같이 쓴다.
   "hub.part.fur_plant_01": "Little Plant",
   "hub.part.fur_lamp_01": "Floor Lamp",
   "hub.part.fur_chair_01": "Wooden Chair",
@@ -1678,8 +1677,6 @@ const EN: Record<string, string> = {
   "hub.part.fur_clock_01": "Wall Clock",
   "hub.part.fur_shelf_01": "Bookshelf",
   "hub.part.fur_window_01": "Window",
-  "hub.part.fur_aquarium_01": "Little Aquarium",
-  "hub.part.fur_neon_01": "Neon Sign",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "Visit room",
@@ -1692,8 +1689,8 @@ const EN: Record<string, string> = {
   "room.my_room": "Go to my room",
   "room.my_room_edit": "Decorate my room",
 
-  // 꾸미기 파츠 이름 — 상점·뽑기·토스트가 같이 쓴다.
-  // ⚠️ 파츠 6종은 2026-08-14 에 상점·뽑기에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
+  // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
+  // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
   "hub.part.hat_common_01": "Sprout Cap",
   "hub.part.hat_common_02": "Beanie",
@@ -1703,8 +1700,8 @@ const EN: Record<string, string> = {
   "hub.part.crown_rare_01": "Little Crown",
 
   // 상단·공통
-  "hub.gate_sub": "Sign in to use check-in, draws and the shop",
-  "hub.banner_login": "Check-in, draws and the shop need you signed in",
+  "hub.gate_sub": "Sign in to use check-in and the shop",
+  "hub.banner_login": "Check-in and the shop need you signed in",
   "hub.share": "Share",
   "hub.gift_btn": "Gift",
   "hub.help_aria": "How to earn points",
@@ -1714,7 +1711,6 @@ const EN: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "Check in",
-  "hub.rail.gacha": "Draw",
   "hub.rail.shop": "Shop",
   "hub.rail.title": "Titles",
   "hub.rail.invite": "Invite",
@@ -1734,34 +1730,15 @@ const EN: Record<string, string> = {
   "hub.toast.checkin_done": "Checked in · +{n}P · +1 stamp",
   "hub.toast.checkin_bonus": "Checked in · +{n}P · 7-day bonus +{b}P",
   "hub.toast.checkin_already": "Checked in · you've already claimed today's reward",
-  "hub.toast.no_coin": "Not enough coins",
   "hub.toast.no_points_item": "Not enough points: {name} ({price}P)",
-  "hub.toast.no_dust": "Not enough dust",
 
   // 구매/교환 완료 팝업
-  "hub.buy.exchanged": "Exchanged!",
   "hub.buy.purchased": "Purchased!",
 
-  // 뽑기 모달
-  "hub.gacha.title": "Draw",
-  "hub.gacha.dust": "Dust",
-  "hub.gacha.owned_n": "{n} owned",
-  "hub.gacha.pity": "{n} to guarantee",
-  "hub.gacha.limited": "Limited!",
-  "hub.gacha.dust_gain": "Dust +{n}",
-  "hub.gacha.dust_hint": "Collect it to claim limited items!",
-  "hub.gacha.drawing": "Drawing…",
-  "hub.gacha.draw": "Draw ({n} 🪙)",
-  "hub.gacha.ex_head": "Dust exchange",
-  "hub.gacha.ex_sub": "Draw-only limited items",
-  "hub.gacha.have": "Owned",
-  "hub.gacha.exchange": "Exchange",
-  "hub.gacha.help": "Every draw earns dust. At the guarantee ({n} draws) a limited item is certain — or spend dust to claim the one you want right away.",
 
   // 상점 모달
   "hub.shop.title": "Shop",
   "hub.shop.balance": "Your CARI coins",
-  "hub.shop.rare": "Rare",
   "hub.shop.owned": "Owned",
   "hub.shop.buy": "Buy",
   "hub.shop.empty": "The shop is empty.",

@@ -4,9 +4,14 @@
 //      → { top, total, me, scope, code }. code = 적용된 국가/지역 코드(전세계는 null).
 //      'my-*' 는 호출자 프로필(country_code·region_code)로 범위를 정한다 — 클라가 임의 범위를 지정할 수 없다.
 //      비로그인 → { needsAuth: true }, 지역/국가 미설정 → { needsRegion: true }(빈 보드).
-//  - scope 'region'|'country'|'school': 집계 버킷 리더보드(/arena 지도용). RPC region_/country_/school_leaderboard.
-//      개인 식별 필드 없이 집계값만(code·member_count·avg_level·active_today·participation·score, 학교는 label 추가).
-//      응답 { buckets, scope, window }. member_count<5 프라이버시 floor 버킷은 RPC 가 이미 제외.
+//  - scope 'region'|'country'|'school': 집계 버킷 리더보드(/arena 지도 · 랜딩 지구본용).
+//      RPC region_/country_/school_leaderboard — **스냅샷 테이블 arena_bucket_scores 를 select 만** 한다
+//      (2026-08-18. 예전엔 호출마다 profiles ⨝ user_progress 를 두 번 훑었는데, 이걸 부르는 자리가
+//       랜딩이라 첫 화면 방문자 전원이 전 회원 집계를 돌리고 있었다. 갱신은 pg_cron 5분).
+//      개인 식별 필드 없이 집계값만(code·member_count·avg_level·active_today·participation·score·has_real,
+//      학교는 label 추가). 응답 { buckets, scope, window }. member_count<5 프라이버시 floor 는 갱신 때 이미 적용.
+//      ⚠️ 값은 **시드 더미(arena_seed_buckets) + 실집계가 가중평균으로 합쳐진 것**이다. 진짜 사람이
+//         있는 버킷인지는 `has_real` 만 말해 준다 — member_count 에는 가상 회원이 섞여 있다.
 //  - 정렬(개인): season_total(실력+활동 통합 랭킹점수) desc → 동점 먼저 도달. rating 필드에 season_total.
 //  - 닉네임·레벨·점수·아바타만 공개(이메일 비공개).
 import { corsHeaders, json } from '../_shared/cors.ts'
@@ -24,6 +29,8 @@ interface RpcUser {
   level: number
   rating: number
   avatar: string | null
+  /** top 행에만 있다(scoped_top, 20260818130000). 시상대 이름 뒤 국기용 — me 행에는 없다. */
+  country?: string | null
   tier?: string
   percentile?: number
   me?: boolean
@@ -45,6 +52,8 @@ function mapUser(u: RpcUser, me = false) {
     image: av.startsWith('img:') ? av.slice(4) : null,
     mascot: av.startsWith('mascot:') ? av.slice(7) : null,
     character: av.startsWith('char:') ? av.slice(5) : null,
+    // 시상대 이름 뒤 국기. 온보딩 전이면 null 이고, 그때는 프론트가 국기를 아예 안 그린다.
+    country: u.country ?? null,
     tier: u.tier ?? null,
     percentile: u.percentile ?? null,
     me: me || !!u.me,

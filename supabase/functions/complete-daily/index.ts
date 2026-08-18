@@ -6,7 +6,7 @@
 //    는 동시 호출 시 적립을 유실할 수 있어, 증분(points = points + p_points)을 하나의 트랜잭션으로 처리한다.
 //  · cosmetic-only 하드 불변식: 실력 진척/스킬 레벨 테이블을 절대 읽거나 쓰지 않고,
 //    _shared/scoring.ts(applyAttempt/computeRankChange) 도 import 하지 않는다. 수치는 config-driven 상수.
-//  · body.kind = 'attendance'(기본, 출석) | 'daily_learn'(오늘의 학습 완료) — 가챠 재화(위 RPC)와 별개로
+//  · body.kind = 'attendance'(기본, 출석) | 'daily_learn'(오늘의 학습 완료) — 코인 재화(위 RPC)와 별개로
 //    activity_ledger(kind, delta) 를 적립한다(트리거 activity_ledger_apply, STAGE1b 가 user_progress.activity_score
 //    를 원자 증분 — 이 함수는 user_progress 를 직접 쓰지 않는다, cosmetic-gate 유지).
 //    ⚠️ ACTIVITY_ATTENDANCE_DELTA/ACTIVITY_DAILY_LEARN_DELTA 는 _shared/scoring.ts 의 ACTIVITY_DELTA 와 값이
@@ -46,13 +46,13 @@ Deno.serve(async (req) => {
     })
     if (error) return json({ error: error.message }, 500)
 
-    // (3) 활동점수 적립 — 가챠 재화(위)와 별개 원장. 하루-cap 은 activity_ledger 부분 unique(user_id,kind,day)
+    // (3) 활동점수 적립 — 코인 재화(위)와 별개 원장. 하루-cap 은 activity_ledger 부분 unique(user_id,kind,day)
     //     가 보장한다. ⚠️ 그 인덱스는 partial(where kind in ('attendance','daily_learn')) 이라 PostgREST
     //     의 upsert(onConflict)는 조건절을 실을 수 없어 42P10(no unique/exclusion constraint matching)로 죽는다
     //     (minigame 쪽 daycap 은 non-partial 이라 upsert 가 가능하나, daycap 을 non-partial 로 바꾸면 minigame
     //     이 1/일로 잘못 제한되므로 인덱스는 partial 유지가 필수 — 대신 여기를 insert 로 바꾼다).
     //     insert 로 시도하고 23505(unique_violation = 오늘 이미 적립됨)는 무시(멱등), 그 외 에러는 로깅 후 표면화.
-    //     활성 시즌이 없으면(운영 사고) 스킵 — 가챠 적립은 이미 끝났으므로 응답은 그대로 성공 반환.
+    //     활성 시즌이 없으면(운영 사고) 스킵 — 코인 적립은 이미 끝났으므로 응답은 그대로 성공 반환.
     const seasonId = await getActiveSeasonId(admin)
     if (seasonId != null) {
       const today = kstDay()
