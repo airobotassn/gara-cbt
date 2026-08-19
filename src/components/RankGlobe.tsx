@@ -330,7 +330,6 @@ export default function RankGlobe() {
       //    열 개가 뜨면 지구가 배지밭이 된다 — 시상대 셋만 그림이고 나머지는 숫자여야 위계가 산다.
       // ⚠️ 숫자는 **어두운 테를 먼저 긋고 밝은 면을 얹는다**(`strokeText` → `fillText`).
       //    빛나는 국토 위에도 얹히므로 면만 칠하면 밝은 땅에서 글자가 통째로 증발한다.
-      const mk = CFG.markSize / 100
       type Mark = {
         x: number; y: number; ty: number; w: number; h: number; rank: number; fade: number
         /** 숫자 표시일 때의 글자 크기(px). 메달(1~3위)이면 0. */
@@ -365,7 +364,9 @@ export default function RankGlobe() {
         let h: number
         if (medal) {
           // 1~3위 에셋 — 땅에 맞춰 줄이되 바닥은 지킨다(끝까지 맞추면 궤도·라벨이 뭉개진다).
-          h = Math.min(Math.max(room * 0.6, g.R * ORD_FLOOR_R), g.R * ORD_SZ[c.rank] * mk)
+          // TOP3도 4위 이하 숫자와 같은 방식으로 국가 영역(room)에 비례시킨다.
+          // 전역 markSize 배율로 고정 축소하면 작은 나라와 큰 나라의 마커 비율이 어긋난다.
+          h = Math.min(Math.max(room * 0.6, g.R * ORD_FLOOR_R), g.R * ORD_SZ[c.rank])
         } else {
           const digits = String(c.rank).length
           // 절대 안 넘치게 하는 폭 상한. font-size 가 아니라 **그려지는 글자 폭**으로 재야 한다 —
@@ -420,7 +421,8 @@ export default function RankGlobe() {
           if (img?.complete && img.naturalWidth) {
             ctx.shadowColor = hsl(col.h, 94, 66, 0.22 * m.fade)
             ctx.shadowBlur = m.h * 0.035
-            ctx.drawImage(img, m.x - m.w / 2, m.ty - m.h * 0.9, m.w, m.h)
+            // 숫자 라벨과 동일하게 국가 좌표(m.ty)를 마커의 세로 중앙에 둔다.
+            ctx.drawImage(img, m.x - m.w / 2, m.ty - m.h * 0.5, m.w, m.h)
           }
         }
         ctx.restore()
