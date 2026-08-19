@@ -15,9 +15,11 @@
 // ⚠️ 아래 수치는 전부 시안(`docs/globe-mock.html`)에서 값을 직접 만져 고른 결과다.
 //    바꾸고 싶으면 시안을 열어 슬라이더로 맞춘 뒤 그 값을 여기 옮기는 게 빠르다.
 import { useEffect, useMemo, useRef } from 'react'
-import { geoArea, geoCentroid, geoDistance, geoOrthographic, geoPath } from 'd3-geo'
+import { geoArea, geoDistance, geoOrthographic, geoPath } from 'd3-geo'
 import { buildRegions, EMPTY_REAL, loadCountries, type GeoFeature, type RealData } from '../lib/arena/data'
 import { M49_TO_ISO2 } from '../lib/arena/tables'
+// 라벨 기준점 — `/arena` 지도(ArenaMap)와 **같은 헬퍼**를 쓴다. 구면 중심은 섬이 딸린 나라에서 바다로 나간다.
+import { labelAnchor } from '../lib/arena/labelPoint'
 import { callFunction } from '../lib/supabase'
 import { paintStars } from '../lib/starfield'
 import '../styles/rankglobe.css'
@@ -88,8 +90,12 @@ type Land = {
   g: GeoFeature['geometry']
   /** 대표점 [lon, lat] — 불빛·순위 표시를 세울 자리 */
   c: [number, number]
-  /** 면적(steradian) — 면 발광을 면적으로 보정할 때 쓴다 */
+  /** 면적(steradian) — 면 발광을 면적으로 보정할 때 쓴다(나라 전체) */
   area: number
+  /** 라벨이 얹힌 덩어리(본체) — 글자 크기를 이 땅에 맞춘다 */
+  part: GeoFeature
+  /** 그 덩어리의 면적 */
+  partArea: number
   iso: string
   name: string
   rank: number
@@ -338,8 +344,8 @@ export default function RankGlobe() {
        * 둘 중 작은 쪽을 쓴다.
        */
       const roomOf = (c: Land) => {
-        const a = c.area * Math.max(0.12, facing(c.c))
-        const bb = pathMain.bounds(c.g as never)
+        const a = c.partArea * Math.max(0.12, facing(c.c))
+        const bb = pathMain.bounds(c.part as never)
         const shortSide = Math.min(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1])
         return Math.min(Math.sqrt(a) * g.R, shortSide)
       }
@@ -529,13 +535,23 @@ export default function RankGlobe() {
         const lands: Land[] = []
         for (const f of feats) {
           if (!f.geometry) continue
-          const c = geoCentroid(f as never) as [number, number]
+          // ⚠️ **구면 중심(geoCentroid)을 그대로 쓰면 안 된다.** 멀리 떨어진 섬이 딸린 나라는
+          //    중심이 바다로 끌려간다 — 프랑스(해외령)는 (-6.8, 43.1) 비스케이만 한복판이라
+          //    12위 숫자가 땅이 아니라 물 위에 떴다. `/arena` 지도가 쓰는 `labelAnchor` 와 같은 것을
+          //    쓴다(가장 큰 덩어리를 골라 그 안쪽 점에 찍는다).
+          const anchor = labelAnchor(f)
+          const c = anchor.point
           if (!Number.isFinite(c[0]) || !Number.isFinite(c[1])) continue
           const iso = M49_TO_ISO2[String(f.id)] ?? ''
           lands.push({
             g: f.geometry,
             c,
+            // 발광은 나라 전체 면이 빛나므로 **전체 면적**으로 보정한다.
             area: Math.max(1e-6, geoArea(f as never)),
+            // 글자 크기는 라벨이 얹힌 **그 덩어리**에 맞춘다 — 전체로 재면 해외령까지 더해져
+            // 본토보다 큰 글자가 나온다.
+            part: anchor.part,
+            partArea: Math.max(1e-6, geoArea(anchor.part as never)),
             iso,
             name: f.properties?.name ?? '',
             rank: rankOf.get(iso) ?? 0,
