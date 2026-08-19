@@ -887,7 +887,10 @@ $("startBtn").onclick=start; $("againBtn").onclick=start;
   background:url("rank-button.webp") center/100% 100% no-repeat; text-shadow:0 1px 3px #001c55;
   filter:drop-shadow(0 3px 4px rgba(8,20,60,.24)); -webkit-tap-highlight-color:transparent;}
 .mg-rank.on{display:inline-flex;}
-.mg-rank span{display:block; transform:translateX(7px);}
+/* ⚠️ 랭킹 글자는 판 정중앙(58.5%)이 아니라 **54%** 다 — 왼쪽 트로피가 시각적으로 무거워서
+     기하학적 중앙에 두면 오른쪽으로 밀려 보인다. 모든 게임이 같은 값이다(2026-08-18 일괄 정렬).
+     px 오프셋으로 밀지 말 것 — 버튼 폭이 게임마다 달라(112 vs 131) 같은 px 이 다른 위치가 된다. */
+.mg-rank span{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 .mg-rank:hover{filter:brightness(1.06) drop-shadow(0 3px 5px rgba(8,20,60,.28));}
 .mg-rank:active{transform:translateY(1px) scale(.98);}
 </style>

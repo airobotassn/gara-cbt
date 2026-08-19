@@ -200,13 +200,13 @@
   /* 랭킹 버튼은 게임마다 같은 그림을 쓴다(지어라 CARI 와 동일). ⚠️ padding 은 %가 아니라 px —
      absolute 요소라 %패딩이 자기 폭이 아니라 부모 폭 기준으로 잡혀 글자가 오른쪽 끝으로 밀린다. */
   .mg-rank{position:absolute;top:11px;right:11px;z-index:60;display:none;width:auto;height:38px;aspect-ratio:1701/494;
-    padding:0 0 0 25px;border:0;border-radius:0;cursor:pointer;place-items:center;
+    padding:0;border:0;border-radius:0;cursor:pointer;place-items:center;
     background:url('/games/rank-button.webp') center/100% 100% no-repeat;color:#fff;
     font:800 12.5px/1 system-ui,sans-serif;text-shadow:0 1px 3px #001c55;
     filter:drop-shadow(0 5px 8px rgba(0,10,42,.38))}
   .mg-rank.on{display:grid}
   .mg-rank>span[aria-hidden="true"]{display:none}
-  .mg-rank .rank-label{display:block;text-align:center}
+  .mg-rank .rank-label{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 
   /* 인트로는 팝업이 아니라 하나의 게임 시작 화면이다. */
   #startOv{display:flex;align-items:flex-end;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom));background:#071426 url('/games/block-cari-intro-v3.png') center top/cover no-repeat;backdrop-filter:none}

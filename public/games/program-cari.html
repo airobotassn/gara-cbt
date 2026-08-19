@@ -606,7 +606,10 @@ loadLevel();
   box-sizing:border-box;width:112px;height:34px;padding:0;border:0;cursor:pointer;font:850 11.5px/1 system-ui,-apple-system,sans-serif;letter-spacing:.025em;
   background:url('rank-button.webp') center/100% 100% no-repeat;color:#fff;text-shadow:0 1px 3px #001c55;
   filter:drop-shadow(0 5px 7px rgba(0,8,32,.42));-webkit-tap-highlight-color:transparent;}
-.mg-rank span{display:block;transform:translateX(7px);}
+/* ⚠️ 랭킹 글자는 판 정중앙(58.5%)이 아니라 **54%** 다 — 왼쪽 트로피가 시각적으로 무거워서
+     기하학적 중앙에 두면 오른쪽으로 밀려 보인다. 모든 게임이 같은 값이다(2026-08-18 일괄 정렬).
+     px 오프셋으로 밀지 말 것 — 버튼 폭이 게임마다 달라(112 vs 131) 같은 px 이 다른 위치가 된다. */
+.mg-rank span{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 .mg-rank.on{display:inline-flex;}
 .mg-rank:active{transform:translateY(1px);}
 </style>

@@ -460,15 +460,16 @@
 
 /* ── 랭킹 버튼 ────────────────────────────────────────────
    미니게임 9종이 **같은 그림 한 장**(rank-button.webp)을 쓴다. 여기만 맨 알약이라 혼자 딴 게임처럼 보였다.
-   ⚠️ padding 은 %가 아니라 px — absolute 요소라 %패딩이 자기 폭이 아니라 부모 폭 기준으로 잡혀
-      글자가 오른쪽 끝으로 밀린다(막아라 CARI 에서 겪은 그 함정). */
-.mg-rank{width:auto;height:38px;aspect-ratio:1701/494;padding:0 0 0 25px;border:0;border-radius:0;
+   ⚠️ 글자는 판 정중앙(58.5%)이 아니라 **54%** 다 — 왼쪽 트로피가 시각적으로 무거워서 기하학적
+      중앙에 두면 오른쪽으로 밀려 보인다. 9종이 전부 같은 값이다(2026-08-18 일괄 정렬).
+      px 오프셋으로 밀지 말 것 — 버튼 폭이 게임마다 달라 같은 px 이 다른 위치가 된다. */
+.mg-rank{width:auto;height:38px;aspect-ratio:1701/494;padding:0;border:0;border-radius:0;
   background:url('/games/rank-button.webp') center/100% 100% no-repeat;color:#fff;place-items:center;
   font:800 12.5px/1 system-ui,sans-serif;text-shadow:0 1px 3px #001c55;
   filter:drop-shadow(0 5px 8px rgba(0,10,42,.38))}
 .mg-rank.on{display:grid}
 .mg-rank>span[aria-hidden="true"]{display:none}
-.mg-rank .rank-label{display:block;text-align:center}
+.mg-rank .rank-label{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 #startOv .mg-rank,#overOv .mg-rank{background:url('/games/rank-button.webp') center/100% 100% no-repeat;border:0;color:#fff}
 
 /* ── 결과 ─────────────────────────────────────────────────

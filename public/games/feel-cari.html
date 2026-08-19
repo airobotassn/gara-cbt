@@ -309,10 +309,17 @@
   .note::-webkit-scrollbar{display:none}
   .note b{color:#fff}
 
-  .mg-rank{position:absolute;top:12px;right:12px;z-index:60;display:none;align-items:center;gap:6px;
-    padding:8px 13px;border-radius:999px;cursor:pointer;font:800 12.5px/1 system-ui,sans-serif;
-    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.12);color:#dfe7f5}
-  .mg-rank.on{display:inline-flex}
+  /* 랭킹 버튼 = 게임 공용 에셋(/games/rank-button.webp) — 막아라·지어라·닿아라 등과 같은 값이다.
+     ⚠️ 그림에 트로피가 이미 그려져 있어서 이모지 span 은 숨기고 글자만 오른쪽으로 민다(padding-left).
+        안 숨기면 트로피가 두 개가 된다. aspect-ratio 는 에셋 실물(1701×494)이다. */
+  .mg-rank{position:absolute;top:11px;right:11px;z-index:60;display:none;width:auto;height:38px;aspect-ratio:1701/494;
+    padding:0;border:0;border-radius:0;cursor:pointer;place-items:center;
+    background:url('/games/rank-button.webp') center/100% 100% no-repeat;color:#fff;
+    font:800 12.5px/1 system-ui,sans-serif;text-shadow:0 1px 3px #001c55;
+    filter:drop-shadow(0 5px 8px rgba(0,10,42,.38))}
+  .mg-rank.on{display:grid}
+  .mg-rank>span[aria-hidden="true"]{display:none}
+  .mg-rank .rank-label{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 
   /* ⚠️ .hidden 은 스타일시트 맨 끝 — 특정도가 같은 .ov / .drift 보다 뒤에 있어야 이긴다. */
   .hidden{display:none}
@@ -678,10 +685,11 @@ const LEVELS=[
 const $=id=>document.getElementById(id);
 // ⚠️ SPEED·TURN 은 **초당** 값이다(px/s, 도/s). 프레임당으로 두면 화면 주사율이 높은 PC 에서
 //   그만큼 빨라진다 — 144Hz 면 2.4배로 달린다. 배터리·라이다 회전은 이미 dt 기반이라 더 어긋났다.
-const CELL=26, D2R=Math.PI/180, BOT_R=6, SPEED=80, TURN=165, MAX_HIT=3, BATT_MAX=100;
+const CELL=26, D2R=Math.PI/180, BOT_R=6, SPEED=80, TURN=520, MAX_HIT=3, BATT_MAX=100;
+const DEADZONE=0.18;   // 이보다 살짝 민 건 무시 — 손가락이 스치기만 해도 로봇이 홱 도는 걸 막는다
 let LI=0, L=null, grid=[], W=0, H=0;
 let bot={x:0,y:0,a:0}, err={x:0,y:0}, driftDir=0, goal={x:0,y:0};
-let on={}, batt=BATT_MAX, hits=0, marks=new Set(), trail=[], held={l:0,f:0,r:0}, joyTurn=0, joyDrive=0, touching=false;
+let on={}, batt=BATT_MAX, hits=0, marks=new Set(), trail=[], held={u:0,d:0,l:0,r:0}, joyX=0, joyY=0, touching=false;
 let markDom=0, trailStr='', botG=null, botDir=null;
 const MARK_MAX=1400;
 const markFrag=document.createDocumentFragment();
@@ -787,7 +795,7 @@ function loadLevel(){
   const envTxt=L.envs.map(e=>ENVLBL[e]).join(' · ');
   $('envTag').textContent=envTxt; $('envTag').classList.toggle('hidden',!envTxt);
   $('driftTag').classList.toggle('hidden',!envOn('slip'));
-  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={l:0,f:0,r:0}; joyTurn=0; joyDrive=0; touching=false;
+  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={u:0,d:0,l:0,r:0}; joyX=0; joyY=0; touching=false;
   batt=BATT_MAX; on={}; meas={}; scanA=0;
   driftDir=Math.random()*Math.PI*2;   // 드리프트는 한 방향으로 쏠린다 — 랜덤워크면 상쇄돼 아무 일도 안 난다
   $('hitEl').textContent='0';
@@ -851,11 +859,26 @@ function loop(){
   const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   const nowS=now/1000;
 
-  const turnInput=Math.max(-1,Math.min(1,(held.r?1:0)-(held.l?1:0)+joyTurn));
-  if(turnInput) bot.a+=turnInput*TURN*dt*D2R;
+  /* 조작 = **민 방향으로 간다.** 차체는 가는 쪽으로 빠르게 돌아선다(TURN=520도/s ≈ 0.35초에 반바퀴).
+     ⛔ 옛 탱크식(좌우=제자리 회전, 위=전진, 아래=무반응)으로 되돌리지 말 것 — 모바일에서
+        "오른쪽으로 당겼는데 오른쪽으로 안 간다"·"아래로 당기면 아무 일도 없다"로 읽혀
+        조작을 이해하지 못한다(2026-08-19 실기기에서 확인).
+     ⚠️ 각도 차는 반드시 atan2(sin,cos) 로 접는다. 그냥 빼면 179°→-179° 같은 경계에서
+        먼 쪽으로 한 바퀴 돌아간다.
+     ⚠️ 즉시 스냅이 아니라 최대 회전량으로 제한한다 — 스냅하면 센서 부채꼴이 순간이동해서
+        어디를 훑었는지 눈으로 못 따라간다(이 게임은 그 궤적이 곧 지도다). */
   touching=false;
-  const driveInput=Math.max(held.f?1:0,joyDrive);
-  if(driveInput>.04){
+  let ix=joyX+((held.r?1:0)-(held.l?1:0));
+  let iy=joyY+((held.d?1:0)-(held.u?1:0));
+  let driveInput=Math.hypot(ix,iy);
+  if(driveInput>1){ ix/=driveInput; iy/=driveInput; driveInput=1; }
+  if(driveInput>DEADZONE){
+    let diff=Math.atan2(iy,ix)-bot.a;
+    diff=Math.atan2(Math.sin(diff),Math.cos(diff));
+    const maxTurn=TURN*dt*D2R;
+    bot.a += Math.abs(diff)<=maxTurn ? diff : Math.sign(diff)*maxTurn;
+  }
+  if(driveInput>DEADZONE){
     const step=SPEED*driveInput*dt;
     const nx=bot.x+Math.cos(bot.a)*step, ny=bot.y+Math.sin(bot.a)*step;
     if(hitsWall(nx,ny)){
@@ -1033,7 +1056,7 @@ function noteLearned(){
   });
 }
 let usedOnce={};
-function stop(){ running=false; cancelAnimationFrame(raf); held={l:0,f:0,r:0}; joyTurn=0; joyDrive=0;
+function stop(){ running=false; cancelAnimationFrame(raf); held={u:0,d:0,l:0,r:0}; joyX=0; joyY=0;
   document.querySelectorAll('.ctl').forEach(b=>b.classList.remove('on')); }
 
 function clear(){
@@ -1072,28 +1095,31 @@ function fail(why){
    Pointer Events라 터치·펜·PC 마우스가 같은 코드로 동작한다. */
 const joy=$('joystick'), joyKnob=$('joyKnob');
 let joyPointer=null;
-function resetJoy(){ joyTurn=0; joyDrive=0; joyPointer=null; joyKnob.style.transform='translate(0,0)'; }
+function resetJoy(){ joyX=0; joyY=0; joyPointer=null; joyKnob.style.transform='translate(0,0)'; }
 function moveJoy(e){
   if(joyPointer!==e.pointerId) return;
   const r=joy.getBoundingClientRect(), radius=r.width*.34;
   let dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2);
   const d=Math.hypot(dx,dy); if(d>radius){dx*=radius/d;dy*=radius/d;}
-  joyTurn=Math.max(-1,Math.min(1,dx/radius));
-  joyDrive=Math.max(0,Math.min(1,-dy/radius));
+  // 민 방향 그대로 넘긴다(위가 -y). 회전·전진으로 쪼개지 않는다 — 쪼개면 옛 탱크 조작이 된다.
+  joyX=dx/radius; joyY=dy/radius;
   joyKnob.style.transform=`translate(${dx}px,${dy}px)`;
 }
 joy.addEventListener('pointerdown',e=>{e.preventDefault();joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);moveJoy(e);});
 joy.addEventListener('pointermove',moveJoy);
 ['pointerup','pointercancel','lostpointercapture'].forEach(t=>joy.addEventListener(t,resetJoy));
+/* 화살표도 조이스틱과 같은 뜻이다 — 누른 방향으로 간다(두 개 같이 누르면 대각선).
+   ⚠️ 좌우를 회전으로 두면 키보드와 스틱이 서로 다른 조작이 되어, PC 로 익힌 감각이 모바일에서 안 통한다. */
 document.addEventListener('keydown',e=>{
-  if(e.key==='ArrowLeft')held.l=1; if(e.key==='ArrowRight')held.r=1;
-  if(e.key==='ArrowUp'){held.f=1;e.preventDefault();}
+  if(e.key==='ArrowLeft'){held.l=1;e.preventDefault();} if(e.key==='ArrowRight'){held.r=1;e.preventDefault();}
+  if(e.key==='ArrowUp'){held.u=1;e.preventDefault();} if(e.key==='ArrowDown'){held.d=1;e.preventDefault();}
   const n=parseInt(e.key,10); if(n>=1&&n<=6){ const k=Object.keys(SENSORS)[n-1]; $('s_'+k)&&$('s_'+k).click(); }
 });
 document.addEventListener('keyup',e=>{
-  if(e.key==='ArrowLeft')held.l=0; if(e.key==='ArrowRight')held.r=0; if(e.key==='ArrowUp')held.f=0;
+  if(e.key==='ArrowLeft')held.l=0; if(e.key==='ArrowRight')held.r=0;
+  if(e.key==='ArrowUp')held.u=0; if(e.key==='ArrowDown')held.d=0;
 });
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){held={l:0,f:0,r:0};resetJoy();} });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){held={u:0,d:0,l:0,r:0};resetJoy();} });
 
 /* ===================== 흐름 ===================== */
 function openBrief(){
@@ -1150,7 +1176,7 @@ buildSensors();
     var b=document.createElement('button');
     b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
     b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">🏆</span> 랭킹';
+    b.innerHTML='<span aria-hidden="true">🏆</span><span class="rank-label">랭킹</span>';
     b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
     ov.appendChild(b);
   }

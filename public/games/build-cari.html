@@ -371,10 +371,10 @@ body{
 .mg-rank{top:11px!important;right:11px!important;width:auto!important;height:38px!important;aspect-ratio:1701/494;
   /* ⚠️ 여기 padding 은 %가 아니라 px 이다 — 이 버튼은 absolute 라 %패딩이 자기 폭이 아니라
         무대 폭(460)을 기준으로 잡혀 글자가 오른쪽 끝으로 밀린다. 25px = 폭 130.8 기준 중앙 59.4%. */
-  padding:0 0 0 25px!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.webp') center/100% 100% no-repeat!important;
+  padding:0!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.webp') center/100% 100% no-repeat!important;
   color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;
   font-size:12.5px!important;display:none;place-items:center;}
-.mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{display:block;text-align:center;}
+.mg-rank.on{display:grid!important}.mg-rank>span[aria-hidden="true"]{display:none}.mg-rank .rank-label{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 
 /* 보드 크기 — 6×8 고정판이라 레벨이 올라가도 안 커진다(그래서 화면에 맞춰 키워도 안전).
    ⚠️ 배율은 폭·높이 둘 다 만족할 때만 올린다. 한쪽만 보면 세로 긴 화면에서 보드가 폭을 넘거나,
