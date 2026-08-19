@@ -1124,6 +1124,7 @@ const KO: Record<string, string> = {
   // WORLD ARENA·CARIS 와 나란한 3번째 버튼. 목적지 = /ebooks.
   // ⚠️ 이 키는 좌측 FAB 메뉴의 '러닝 라이브러리' 항목도 같이 쓴다 — 여기를 고치면 그쪽 라벨도 바뀐다.
   "landing.cta_learn": "Learning Library",
+  "landing.cta_learn_main": "Learning Library(학습센터)",
   "landing.card.guide.d": "시험 구성·평가 영역·응시 방법을 한눈에 확인하세요.",
   "landing.card.check.d": "응시 전 보안 프로그램과 환경을 미리 점검하세요.",
   "landing.card.notice.d": "오픈 소식과 응시 전 꼭 확인할 공지를 모았습니다.",

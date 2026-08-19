@@ -1120,6 +1120,7 @@ const JA: Record<string, string> = {
   "landing.cta_exam": "CARIS",
   // WORLD ARENA·CARIS 와 나란한 3번째 버튼이라 브랜드 라벨처럼 6개국어 동일 표기. 목적지 = /ebooks.
   "landing.cta_learn": "Learning Library",
+  "landing.cta_learn_main": "Learning Library",
   "landing.card.guide.d": "試験構成・評価領域・受験方法をひと目で確認。",
   "landing.card.check.d": "受験前にセキュリティプログラムと環境を事前点検。",
   "landing.card.notice.d": "オープン情報と受験前に必読のお知らせをまとめました。",

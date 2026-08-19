@@ -165,7 +165,7 @@ export default function Landing() {
             {t('landing.cta_exam')} <span className="arr">→</span>
           </button>
           <button className="cta-ghost" onClick={() => navigate('/ebooks')}>
-            {t('landing.cta_learn')} <span className="arr">→</span>
+            {t('landing.cta_learn_main')} <span className="arr">→</span>
           </button>
         </div>
       </div>

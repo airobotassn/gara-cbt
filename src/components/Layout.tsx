@@ -328,7 +328,8 @@ export default function Layout({ children }: { children: ReactNode }) {
                 <span className="ic"><InfoIcon /></span> {t('nav.caris')}
               </button>
               {/* 랜딩 CTA 3종(WORLD ARENA · CARIS · Learning Library)과 같은 목록·같은 순서로 맞춘다.
-                  라벨은 새 키를 만들지 않고 랜딩이 쓰는 landing.cta_learn 을 그대로 재사용(6개국어 동일 문구). */}
+                  ⚠️ 라벨은 `landing.cta_learn`(브랜드명 단독)이다. 메인 버튼은 `landing.cta_learn_main` 으로
+                  갈라져 있다 — 거기만 한국어 설명 '(학습센터)' 가 붙는다(2026-08-19 지시). 한 키로 다시 합치지 말 것. */}
               <button className="pf-item" onClick={() => go('/ebooks')}>
                 <span className="ic"><BookIcon /></span> {t('landing.cta_learn')}
               </button>
