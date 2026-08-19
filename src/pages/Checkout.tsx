@@ -64,6 +64,9 @@ export default function Checkout() {
   const productRef = params.get('ref') ?? ''
   // 원서접수 화면에서 함께 담은 교재. 여기선 **id 를 서버로 전달만** 한다(가격은 서버가 뽑는다).
   const addonEbookId = params.get('book') ?? ''
+  // 묶음 결제로 담은 이북 id 들(쉼표 구분). 여기서도 **전달만** 한다 — 금액·할인은 서버가 다시 뽑는다.
+  const bundleIdsRaw = params.get('ids') ?? ''
+  const bundleIds = bundleIdsRaw ? bundleIdsRaw.split(',').filter(Boolean) : []
 
   // URL 만 보면 바로 알 수 있는 실패는 effect 가 아니라 렌더 단계에서 판정한다
   // (effect 안에서 동기 setState 를 하면 렌더가 한 번 더 돈다 — react-hooks/set-state-in-effect).
@@ -82,7 +85,7 @@ export default function Checkout() {
     if (!isFullUser) {
       try {
         // ⚠️ 담은 교재도 같이 실어야 한다 — 빠뜨리면 로그인하고 돌아온 사람의 장바구니가 조용히 비워진다.
-        const back = `/checkout?type=${productType}&ref=${productRef}${addonEbookId ? `&book=${addonEbookId}` : ''}`
+        const back = `/checkout?type=${productType}&ref=${productRef}${addonEbookId ? `&book=${addonEbookId}` : ''}${bundleIdsRaw ? `&ids=${bundleIdsRaw}` : ''}`
         sessionStorage.setItem('postLoginRedirect', back)
       } catch { /* 무시 */ }
       navigate('/login', { replace: true })
@@ -94,7 +97,7 @@ export default function Checkout() {
 
     ;(async () => {
       try {
-        const res = await createOrder(productType, productRef, lang, addonEbookId || null)
+        const res = await createOrder(productType, productRef, lang, addonEbookId || null, bundleIds)
         // 0원 상품은 결제창을 타지 않는다 — 서버가 이미 지급했으니 결과 화면으로 바로 보낸다.
         if (res.free) {
           navigate('/pay/success?free=1', { replace: true })
@@ -111,7 +114,10 @@ export default function Checkout() {
         setPhase('error')
       }
     })()
-  }, [authLoading, isFullUser, productType, productRef, addonEbookId, lang, navigate, t, preflightErr])
+    // ⚠️ bundleIds 는 매 렌더 새 배열이라 deps 에 넣으면 이펙트가 계속 돈다(주문이 그때마다 하나씩 생긴다).
+    //    원문 문자열(bundleIdsRaw)만 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isFullUser, productType, productRef, addonEbookId, bundleIdsRaw, lang, navigate, t, preflightErr])
 
   async function pay() {
     if (!order?.orderId || paying) return

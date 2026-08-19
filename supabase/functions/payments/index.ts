@@ -4,8 +4,9 @@
 //   - status    : 결과 화면 새로고침·재진입용(승인은 하지 않는다)
 //   - reconcile : 미완결/어긋난 결제를 토스에 다시 물어 수렴(운영·크론 전용, 시크릿 헤더 필요)
 //
-//   상품은 세 종류다: ebook(이북 열람권) · exam(자격검정 응시권, product_ref="<round_id>:<tier>")
-//                    · cert(자격증 발급비, product_ref=attemptId — 지급물이 없고 결제 행 자체가 발급 게이트다).
+//   상품은 네 종류다: ebook(이북 열람권) · exam(자격검정 응시권, product_ref="<round_id>:<tier>")
+//                    · cert(자격증 발급비, product_ref=attemptId — 지급물이 없고 결제 행 자체가 발급 게이트다)
+//                    · bundle(이북 묶음, product_ref=카탈로그 + 담은 id 목록 — 줄은 payment_items 에).
 //   응시료 갈래의 판매 가능 판정·금액·응시권 발급은 전부 _shared/exam-tickets.ts 가 단일 출처다.
 //
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것. verify_jwt 는 켜둔 채로 배포한다(관례).
@@ -34,7 +35,7 @@ import {
 } from '../_shared/payments.ts'
 import { findLiveTickets, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
-const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert']
+const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert', 'bundle']
 
 /** 구매자 표기를 ASCII 로만 만든다 — 한글이 PG·카드사 구간에서 깨져 돌아오면 대사할 때 사람이 못 읽는다.
  *  이름 자체가 결제 판정에 쓰이지 않으므로 이메일 아이디로 충분하다(비면 상수). */
@@ -78,12 +79,18 @@ Deno.serve(async (req) => {
       const lang = String(body?.lang ?? 'ko')
       // 원서접수 화면에서 함께 담은 교재. **책 id 하나만** 받는다 — 금액은 아래에서 서버가 다시 뽑는다.
       const addonEbookId = String(body?.addonEbookId ?? '').trim() || null
+      // 묶음(전체구매)으로 담은 이북 id 들. **id 만** 받는다 — 금액도 할인도 서버가 다시 뽑는다.
+      //   상한을 두는 이유: 목록이 곧 product_ref 문자열이라 무한정 길어지면 인덱스가 감당 못 한다.
+      const bundleIds = Array.isArray(body?.ids) ? (body.ids as unknown[]).map((v) => String(v ?? '').trim()) : null
+      if (bundleIds && bundleIds.length > 50) {
+        return json({ error: '한 번에 담을 수 있는 개수를 넘었습니다.' }, 400)
+      }
       if (!PRODUCT_TYPES.includes(productType) || !productRef) {
         return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
       }
 
       // ① 금액은 상품ID로 서버가 다시 뽑는다. 클라가 보낸 금액은 받지도 않는다(파라미터에 없다).
-      const product = await resolveProduct(admin, productType, productRef, lang, addonEbookId)
+      const product = await resolveProduct(admin, productType, productRef, lang, addonEbookId, bundleIds)
       if (!product.ok) return json({ error: product.error }, product.status)
 
       // ⛔ 살아있는 가상계좌 주문이 있으면 새 결제를 막는다.
@@ -117,6 +124,25 @@ Deno.serve(async (req) => {
           .eq('ebook_id', product.ref)
           .maybeSingle()
         if (owned) return json({ error: '이미 보유한 이북입니다.', owned: true }, 409)
+      }
+
+      // 묶음 사전검사 — 담은 것 중 **하나라도** 이미 가진 게 있으면 결제창을 안 띄운다.
+      //   최종 방어선은 ebook_purchases 의 unique 지만 그건 지급 단계라, 여기서 안 보면 돈이 빠진 뒤에
+      //   "이미 보유"가 되어 그 몫이 그대로 환불거리가 된다(곁다리 교재와 같은 이유).
+      if (productType === 'bundle') {
+        if (!product.bundle) return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
+        const ids = product.bundle.lines.map((l) => l.ebookId)
+        const { data: mine } = await admin
+          .from('ebook_purchases')
+          .select('ebook_id')
+          .eq('user_id', uid)
+          .in('ebook_id', ids)
+        if ((mine ?? []).length > 0) {
+          return json(
+            { error: '이미 보유한 교재가 담겨 있습니다. 목록을 새로고침한 뒤 다시 시도해주세요.', owned: true },
+            409,
+          )
+        }
       }
 
       // 응시료 사전검사 — 결제창을 띄우기 전에 막는다. 실제 차단은 DB 유니크(exam_tickets_live_uniq)와
@@ -189,6 +215,18 @@ Deno.serve(async (req) => {
       //    무제한 무료 응시권이 된다. 응시료는 resolveExamOffer 가 금액 0/미설정을 **판매 불가(400)** 로 접어서
       //    애초에 여기까지 오지 않는다 — 아래 가드는 그 규칙이 깨졌을 때의 2차 방어선이다.
       if (product.amount <= 0) {
+        // 묶음인데 담은 게 전부 0원인 경우 — 결제창을 탈 수 없으니 그 자리에서 다 준다(단품 무료와 같은 취급).
+        if (productType === 'bundle' && product.bundle) {
+          const rows = product.bundle.lines.map((l) => ({
+            user_id: uid,
+            ebook_id: l.ebookId,
+            price_paid: 0,
+            source: 'free',
+          }))
+          const { error } = await admin.from('ebook_purchases').insert(rows)
+          if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)
+          return json({ free: true, granted: true })
+        }
         if (productType !== 'ebook') return json({ error: '무료 처리할 수 없는 상품입니다.' }, 400)
         const { error } = await admin.from('ebook_purchases').insert({
           user_id: uid,
@@ -224,7 +262,7 @@ Deno.serve(async (req) => {
 
       const customerKey = await ensureCustomerKey(admin, uid)
       const orderId = newOrderId(productType)
-      const { error: insErr } = await admin.from('payments').insert({
+      const { data: inserted, error: insErr } = await admin.from('payments').insert({
         user_id: uid,
         provider: providerName,
         order_id: orderId,
@@ -246,7 +284,7 @@ Deno.serve(async (req) => {
         addon_amount: product.addon?.amount ?? null,
         status: 'pending',
         customer_key: customerKey,
-      })
+      }).select('id').single()
       // 23505 = 이 사람이 이 상품을 이미 결제 완료했다(부분 유니크 인덱스). 위 보유 검사와 겹치지만
       // 동시 요청이 둘 다 통과한 경우를 여기서 잡는다.
       if (insErr) {
@@ -254,6 +292,26 @@ Deno.serve(async (req) => {
           return json({ error: '이미 결제가 완료된 상품입니다.', owned: true }, 409)
         }
         return json({ error: insErr.message }, 400)
+      }
+
+      // 묶음의 줄 목록. ⛔ **줄 없이 결제창을 열면 안 된다** — 승인이 나도 지급이 무엇인지 알 수 없어
+      //    grant 가 던지고(=대사 미지급), 사용자는 돈만 낸 상태가 된다. 그래서 실패하면 주문을 지우고 접는다
+      //    (아직 pending 이라 돈이 오간 게 없다).
+      if (productType === 'bundle' && product.bundle) {
+        const paymentId = (inserted as { id: string }).id
+        const { error: itemErr } = await admin.from('payment_items').insert(
+          product.bundle.lines.map((l) => ({
+            payment_id: paymentId,
+            product_type: 'ebook',
+            product_ref: l.ebookId,
+            list_amount: l.list,
+            amount: l.amount,
+          })),
+        )
+        if (itemErr) {
+          await admin.from('payments').delete().eq('id', paymentId)
+          return json({ error: itemErr.message }, 400)
+        }
       }
 
       // 엑심베이는 결제창을 띄우기 전에 **서버가 준비(/ready)** 를 한 단계 더 밟는다(토스엔 없는 단계).

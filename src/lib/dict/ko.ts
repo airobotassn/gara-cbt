@@ -1032,6 +1032,21 @@ const KO: Record<string, string> = {
   "ll.next": "다음",
   "ll.watch_yt": "유튜브에서 보기",
   "ll.demo_note": "강의는 데모용 샘플 영상입니다.",
+  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
+  "ll.bundle": "전체구매",
+  "ll.bundle_desc": "교재와 강의를 골라 한 번에 담을 수 있어요.",
+  "ll.bundle_hint": "{c}개 전부 담으면 {n}% 할인",
+  "ll.bundle_on": "{c}개 전부 · {n}% 할인 적용",
+  "ll.pick": "선택",
+  "ll.picked": "선택됨",
+  "ll.pick_all": "전체 선택",
+  "ll.pick_none": "선택 해제",
+  "ll.pick_count": "{n}개 선택",
+  "ll.pick_of": "{a} / {b}개 선택",
+  "ll.total": "합계",
+  "ll.bundle_buy": "선택 항목 구매",
+  "ll.bundle_nofee": "강의는 무료라 결제할 게 없어요. 바로 보시면 됩니다.",
+  "ll.bundle_empty": "담을 수 있는 항목이 아직 없어요.",
   "mypage.reissue": "재발급",
   "mypage.issue": "발급 신청",
   "mypage.view_sample": "견본 보기",
@@ -1117,7 +1132,7 @@ const KO: Record<string, string> = {
   "landing.cta_exam": "CARIS (자격검정)",
   // WORLD ARENA·CARIS 와 나란한 3번째 버튼. 목적지 = /ebooks.
   // ⚠️ 이 키는 좌측 FAB 메뉴의 '러닝 라이브러리' 항목도 같이 쓴다 — 여기를 고치면 그쪽 라벨도 바뀐다.
-  "landing.cta_learn": "Learning Library (학습센터)",
+  "landing.cta_learn": "Learning Library",
   "landing.card.guide.d": "시험 구성·평가 영역·응시 방법을 한눈에 확인하세요.",
   "landing.card.check.d": "응시 전 보안 프로그램과 환경을 미리 점검하세요.",
   "landing.card.notice.d": "오픈 소식과 응시 전 꼭 확인할 공지를 모았습니다.",
@@ -1358,7 +1373,8 @@ const KO: Record<string, string> = {
   "arena.our2": "· 우리 동네",
   "arena.bLevel": "레벨 테스트",
   "arena.bLevelS": "내 실력 측정 · 진화",
-  "arena.bHubS": "홈 · 캐릭터 허브",
+  "arena.bHub": "마이 홈",
+  "arena.bHubS": "캐릭터 허브",
   "arena.bDaily": "오늘의 학습",
   "arena.bDailyS": "데일리 콘텐츠",
   "arena.foot": "지역/국가 실데이터가 있으면 자동 반영(참여 5명 이상 지역), 아직 데이터가 없는 지역·시군구는 예시 값입니다.",
@@ -1514,6 +1530,7 @@ const KO: Record<string, string> = {
   //   {usd} = 실제 청구되는 달러 금액(서버가 정한 값 그대로).
   "pay.currency_note_usd": "해외 결제는 미국 달러로 청구됩니다 · 실제 청구 금액 {usd}",
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
+  "pay.cert_fee_note": "합격 후 자격증을 발급할 때 별도 비용이 청구돼요.",
   "pay.pg_eximbay_note": "결제하기를 누르면 Eximbay 결제창이 열리고, 결제수단은 그 창에서 고릅니다.",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "국내 결제는 결제 시점 환율로 원화 청구됩니다.",

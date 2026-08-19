@@ -16,7 +16,12 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0
 import { getProvider, type ProviderPayment } from './payment-provider.ts'
 import { grantExamTicket, parseExamRef, resolveExamFee, resolveExamOffer, voidTicket } from './exam-tickets.ts'
 
-export type ProductType = 'ebook' | 'exam' | 'cert'
+export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle'
+
+/** 묶음 결제 할인율(%) — **한 카탈로그의 이북을 통으로 담았을 때만** 붙는다.
+ *  ⚠️ 화면(src/pages/Ebooks.tsx 의 BUNDLE_OFF_PCT)과 **같은 값**이어야 한다. 어긋나면 화면에 뜬 금액과
+ *     실제 청구액이 갈린다 — 결제에서 제일 나쁜 종류의 버그다. 값을 바꾸면 양쪽을 같이 고칠 것. */
+export const BUNDLE_OFF_PCT = 10
 
 export interface PaymentRow {
   id: string
@@ -78,6 +83,8 @@ export interface ResolvedProduct {
   exam?: { id: string; roundId: string; tier: string }
   /** 함께 담은 교재(응시료 전용). id 는 DB 에서 읽은 값이라 그대로 저장해도 된다. */
   addon?: { id: string; title: string; amount: number }
+  /** 묶음(bundle) 전용 — payment_items 에 그대로 넣을 줄 목록. list=정가, amount=할인 반영 배분액. */
+  bundle?: { catalog: string; discounted: boolean; lines: { ebookId: string; list: number; amount: number }[] }
   /** 화면 주문요약에 줄 단위로 그릴 내역. 곁다리가 없으면 한 줄뿐이다. */
   items: { name: string; amount: number }[]
 }
@@ -98,11 +105,19 @@ export async function resolveProduct(
   lang: string,
   /** 응시료와 함께 담은 교재(이북) id. 응시료 결제에만 붙는다 — 다른 상품에 오면 400 으로 거절한다. */
   addonEbookId?: string | null,
+  /** 묶음 결제로 담은 이북 id 들. bundle 에만 쓰인다(다른 유형에 오면 무시하지 않고 아래에서 거절). */
+  bundleIds?: string[] | null,
 ): Promise<ResolvedProduct | { ok: false; error: string; status: number }> {
   if (addonEbookId && productType !== 'exam') {
     // 조용히 무시하면 안 된다 — 사용자는 교재를 담았다고 믿는데 결제·지급에서만 사라진다.
     return { ok: false, error: '교재를 함께 담을 수 없는 상품입니다.', status: 400 }
   }
+  if (bundleIds?.length && productType !== 'bundle') {
+    return { ok: false, error: '묶음으로 담을 수 없는 상품입니다.', status: 400 }
+  }
+
+  // 묶음 결제 — productRef 는 카탈로그('leveltest' | 'caris'), 담은 목록은 bundleIds 로 온다.
+  if (productType === 'bundle') return resolveBundle(admin, productRef, bundleIds ?? [], lang)
 
   if (productType === 'ebook') {
     const { data: book } = await admin
@@ -192,6 +207,77 @@ export async function resolveProduct(
     exam: { id: offer.examId, roundId: offer.round.id, tier: offer.tier },
     addon: addon?.ok ? { id: addon.id, title: addon.title, amount: addon.amount } : undefined,
     items,
+  }
+}
+
+/**
+ * 묶음 결제 — 한 카탈로그의 이북 여러 권. **담은 목록·정가·할인을 전부 서버가 다시 뽑는다.**
+ * 클라이언트가 보내는 건 카탈로그와 이북 id 목록뿐이다(금액도 할인 여부도 요청에 없다).
+ *
+ * ⚠️ **할인 판정 때문에 그 카탈로그의 전권을 읽어야 한다.** 담은 것만 읽으면 "전부 담았나" 를 알 수 없다.
+ * ⛔ 할인 조건은 **판매 중인 전권을 다 담았을 때**다 — 이미 가진 책은 담을 수 없으므로, 한 권이라도
+ *    보유한 사람은 이 할인을 못 받는다("7개를 통으로 사야만" — 2026-08-19 지시). 완화하려면 보유분을
+ *    세트의 일부로 쳐야 하는데, 그건 화면(Ebooks.tsx)의 판정과 **한 벌로** 바꿔야 한다.
+ */
+async function resolveBundle(
+  admin: SupabaseClient,
+  catalog: string,
+  ids: string[],
+  lang: string,
+): Promise<ResolvedProduct | { ok: false; error: string; status: number }> {
+  if (catalog !== 'leveltest' && catalog !== 'caris') {
+    return { ok: false, error: '상품 정보가 올바르지 않습니다.', status: 400 }
+  }
+  const want = [...new Set(ids.map((v) => String(v ?? '').trim()).filter(Boolean))]
+  // 한 권이면 묶음이 아니다 — 단품 경로(productType='ebook')로 가야 정가·중복방어가 원래대로 동작한다.
+  if (want.length < 2) return { ok: false, error: '묶음 결제는 두 권부터 담을 수 있습니다.', status: 400 }
+
+  const { data } = await admin
+    .from('ebooks')
+    .select('id, title, price_usd_cents, translations')
+    .eq('catalog', catalog)
+    .eq('published', true)
+  const all = (data ?? []) as { id: string; title: string; price_usd_cents: number | null; translations: unknown }[]
+  const byId = new Map(all.map((b) => [b.id, b]))
+
+  const picked = want.map((id) => byId.get(id))
+  // 하나라도 그 카탈로그의 판매 중 목록에 없으면 통째로 거절한다 — 일부만 조용히 빼면 사용자가 담은 것과
+  // 결제되는 것이 달라진다.
+  if (picked.some((b) => !b)) return { ok: false, error: '판매 중인 이북이 아닙니다.', status: 404 }
+  const books = picked as { id: string; title: string; price_usd_cents: number | null; translations: unknown }[]
+
+  const titleOf = (b: { title: string; translations: unknown }) => {
+    const tr = (b.translations as Record<string, { title?: string }> | null) ?? {}
+    return tr[lang]?.title || b.title
+  }
+  const priceOf = (b: { price_usd_cents: number | null }) => b.price_usd_cents ?? 0
+
+  const listSum = books.reduce((sum, b) => sum + priceOf(b), 0)
+  const discounted = books.length === all.length && listSum > 0
+  const total = discounted ? Math.round((listSum * (100 - BUNDLE_OFF_PCT)) / 100) : listSum
+
+  // 줄마다 얼마씩인지 배분한다(정가 비례). ⚠️ 마지막 줄에 잔액을 몰아줘야 **합이 정확히 total** 이 된다 —
+  // 줄마다 반올림하면 1센트가 남거나 모자라 원장이 안 맞는다.
+  let acc = 0
+  const lines = books.map((b, i) => {
+    const list = priceOf(b)
+    const amount = i === books.length - 1 ? total - acc : Math.round((list * total) / (listSum || 1))
+    acc += amount
+    return { ebookId: b.id, list, amount }
+  })
+
+  const first = titleOf(books[0])
+  const orderName = (books.length > 1 ? `${first} 외 ${books.length - 1}권` : first).slice(0, 100)
+
+  return {
+    ok: true,
+    amount: total,
+    orderName,
+    // ⚠️ 저장은 **DB 에서 읽은 id** 를 정렬해 만든다(클라 문자열·순서 금지) — product_ref 는 text 원문 비교라
+    //    순서만 달라도 같은 조합이 다른 상품으로 보여 '같은 묶음 재구매' 방어가 뚫린다.
+    ref: `ebook:${catalog}:${books.map((b) => b.id).sort().join('+')}`,
+    bundle: { catalog, discounted, lines },
+    items: books.map((b, i) => ({ name: titleOf(b), amount: lines[i].amount })),
   }
 }
 
@@ -295,6 +381,23 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
     return
   }
 
+  // 묶음 — 줄 목록을 읽어 한 권씩 준다. 줄 하나가 막히면 던져서 대사(미지급)에 남긴다.
+  if (row.product_type === 'bundle') {
+    const { data, error } = await admin
+      .from('payment_items')
+      .select('product_type, product_ref, amount')
+      .eq('payment_id', row.id)
+    if (error) throw new Error(error.message)
+    const lines = (data ?? []) as { product_type: string; product_ref: string; amount: number }[]
+    // ⛔ 줄이 하나도 없으면 '지급 완료'로 접지 말 것 — 돈만 받은 건이 정상으로 보인다.
+    if (lines.length === 0) throw new Error('묶음 주문의 줄 목록이 비어 있습니다 — 지급할 대상을 알 수 없습니다.')
+    for (const line of lines) {
+      if (line.product_type !== 'ebook') throw new Error(`묶음에 담을 수 없는 상품입니다: ${line.product_type}`)
+      await grantEbookLine(admin, row, line.product_ref, line.amount, '묶음으로 산 교재')
+    }
+    return
+  }
+
   if (row.product_type === 'exam') {
     const parsed = parseExamRef(row.product_ref)
     if (!parsed) throw new Error(`응시권 상품 정보를 읽을 수 없습니다: ${row.product_ref}`)
@@ -336,10 +439,22 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
  *  (source='pg' + payment_id) — 그래야 환불 회수·대사가 경로를 하나만 알면 된다. */
 async function grantAddonEbook(admin: SupabaseClient, row: PaymentRow): Promise<void> {
   if (!row.addon_ebook_id) return
+  await grantEbookLine(admin, row, row.addon_ebook_id, row.addon_amount ?? 0, '함께 산 교재')
+}
+
+/** 결제 한 건에 딸린 이북 열람권 한 줄. 곁다리(응시료)와 묶음이 **같은 함수**를 쓴다 —
+ *  23505 를 어떻게 다루느냐가 이 기능의 핵심이라 두 벌로 두면 한쪽만 조용히 틀린다. */
+async function grantEbookLine(
+  admin: SupabaseClient,
+  row: PaymentRow,
+  ebookId: string,
+  pricePaid: number,
+  what: string,
+): Promise<void> {
   const { error } = await admin.from('ebook_purchases').insert({
     user_id: row.user_id,
-    ebook_id: row.addon_ebook_id,
-    price_paid: row.addon_amount ?? 0,
+    ebook_id: ebookId,
+    price_paid: pricePaid,
     source: 'pg',
     payment_id: row.id,
     payment_ref: row.payment_key,
@@ -356,10 +471,10 @@ async function grantAddonEbook(admin: SupabaseClient, row: PaymentRow): Promise<
     .from('ebook_purchases')
     .select('payment_id')
     .eq('user_id', row.user_id)
-    .eq('ebook_id', row.addon_ebook_id)
+    .eq('ebook_id', ebookId)
     .maybeSingle()
   if ((mine as { payment_id: string | null } | null)?.payment_id === row.id) return
-  throw new Error('함께 산 교재를 이미 다른 경로로 보유 중입니다 — 교재 값 환불이 필요합니다(응시권은 발급됨).')
+  throw new Error(`${what}를 이미 다른 경로로 보유 중입니다 — 그 몫의 환불이 필요합니다.`)
 }
 
 // ---------- ②-b 환불 시 자동 회수 ----------
@@ -389,8 +504,9 @@ async function revokeForRefund(
     await admin.from('payments').update({ fulfilled_at: null, updated_at: new Date().toISOString() }).eq('id', row.id)
   }
 
-  if (row.product_type === 'ebook') {
-    // payment_id + user_id 로 **이 결제분 한 행만** 삭제. 같은 책을 다른 경로로 또 샀어도 그건 안 건드린다.
+  // 묶음도 이북과 같은 경로다 — 이 결제로 나간 열람권은 전부 payment_id 가 박혀 있어 한 번에 짚인다.
+  if (row.product_type === 'ebook' || row.product_type === 'bundle') {
+    // payment_id + user_id 로 **이 결제분만** 삭제. 같은 책을 다른 경로로 또 샀어도 그건 안 건드린다.
     await admin.from('ebook_purchases').delete().eq('payment_id', row.id).eq('user_id', row.user_id)
     await clearFulfilled()
     return { fulfilled: false, note: '환불 — 이북 열람권 자동 회수' }

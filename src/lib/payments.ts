@@ -7,7 +7,7 @@
 //   ⚠️ 그래서 이 파일엔 PG 클라이언트 키가 없다. 결제창을 여는 데 필요한 건 서버가 주는 FGKey 뿐이다.
 import { callFunction } from './supabase'
 
-export type ProductType = 'ebook' | 'exam' | 'cert'
+export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle'
 
 /** 엑심베이 결제창에 그대로 넘길 값. **서버가 /ready 에 보낸 것과 글자 하나까지 같아야 한다** —
  *  FGKey 가 그 값들의 서명이라 프론트가 하나라도 고치면 결제창이 실패한다. 그래서 여기서 조립하지 않는다. */
@@ -56,13 +56,22 @@ export interface PaymentStatusResp {
  * 주문 생성. `addonEbookId` 는 원서접수 화면에서 **함께 담은 교재**(응시료 결제 전용)다.
  * ⚠️ 금액은 넘기지 않는다 — 책값도 서버가 그 id 로 DB 에서 다시 뽑는다.
  */
-export function createOrder(productType: ProductType, productRef: string, lang: string, addonEbookId?: string | null) {
+export function createOrder(
+  productType: ProductType,
+  productRef: string,
+  lang: string,
+  addonEbookId?: string | null,
+  /** 묶음 결제(type='bundle')로 담은 이북 id 들. productRef 는 그때 카탈로그('leveltest'|'caris')다.
+   *  ⚠️ 금액도 할인 여부도 안 보낸다 — 서버가 이 id 들로 DB 에서 다시 뽑고 '전부 담았나'도 서버가 판정한다. */
+  ids?: string[] | null,
+) {
   return callFunction<CreateOrderResp>('payments', {
     action: 'create',
     productType,
     productRef,
     lang,
     ...(addonEbookId ? { addonEbookId } : {}),
+    ...(ids?.length ? { ids } : {}),
   })
 }
 

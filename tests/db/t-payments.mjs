@@ -18,6 +18,8 @@ const rawCert = readFileSync('supabase/migrations/20260807130000_payments_cert.s
 const rawClaim = readFileSync('supabase/migrations/20260810180000_payments_confirming.sql', 'utf8');
 // 응시료에 교재를 함께 담는 곁다리(addon) — 응시료 결제에만 붙고, 금액 없이는 못 붙는다.
 const rawAddon = readFileSync('supabase/migrations/20260814110000_payment_addon_ebook.sql', 'utf8');
+// 묶음 결제(bundle) — 이북 여러 권을 한 번에. 줄 목록은 payment_items 에 남는다.
+const rawBundle = readFileSync('supabase/migrations/20260819120000_payments_bundle.sql', 'utf8');
 
 // pglite 엔 auth 스키마가 없다 — FK 만 떼고 나머지 DDL 은 원본 그대로 적용한다.
 const strip = (sql) => sql.replace(/\s+references auth\.users\(id\)(\s+on delete cascade)?/g, '');
@@ -43,6 +45,7 @@ await db.exec(strip(raw));
 await db.exec(strip(rawCert));
 await db.exec(strip(rawClaim));
 await db.exec(strip(rawAddon));
+await db.exec(strip(rawBundle));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -286,6 +289,85 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   const after = (await db.query(`select addon_ebook_id, order_name from payments where order_id='addon-ok'`)).rows[0];
   rec('⭐ 책을 지워도 결제 행은 살아있다', after?.order_name, '시험+교재');
   rec('지워진 책 참조는 null 로 끊긴다', after?.addon_ebook_id, null);
+}
+
+// --- (13) 묶음 결제(bundle) — 줄 목록 payment_items ---
+//     보는 것: 새 상품 유형이 열렸나 · 줄이 결제에 매달려 있나(cascade) · 한 주문에 같은 책 두 줄이 안 되나
+//              · **응시권은 줄로 못 들어가나**(이게 제일 중요하다 — 들어가면 응시권 이중결제 방어가 새 나간다)
+{
+  const B1 = '00000000-0000-0000-0000-0000000b0001';
+  const B2 = '00000000-0000-0000-0000-0000000b0002';
+  await db.query(`insert into ebooks (id) values ($1),($2)`, [B1, B2]);
+
+  const BUNDLE_REF = `ebook:leveltest:${[B1, B2].sort().join('+')}`;
+  const pid = (await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1,'bundle-ok','교재 외 1권','bundle',$2,180,'paid','k') returning id`, [U1, BUNDLE_REF])).rows[0].id;
+  rec('product_type 에 bundle 이 허용됨', typeof pid, 'string');
+
+  // 정가 합 200, 실제 청구 180 → 할인 20 이 원장에서 되짚인다.
+  await db.query(
+    `insert into payment_items (payment_id, product_type, product_ref, list_amount, amount)
+     values ($1,'ebook',$2,100,90),($1,'ebook',$3,100,90)`, [pid, B1, B2]);
+  const sums = (await db.query(
+    `select sum(list_amount)::int as list, sum(amount)::int as amt from payment_items where payment_id=$1`, [pid])).rows[0];
+  rec('줄 합계 = 정가 200 / 청구 180', `${sums.list}/${sums.amt}`, '200/180');
+  const head = (await db.query(`select amount from payments where id=$1`, [pid])).rows[0];
+  rec('⭐ 줄 배분액의 합 = payments.amount', sums.amt, head.amount);
+
+  // 같은 주문에 같은 책이 두 줄로 들어오지 않는다(프론트가 중복을 보내도 여기서 걸린다).
+  let dupLine = false;
+  try {
+    await db.query(
+      `insert into payment_items (payment_id, product_type, product_ref, list_amount, amount)
+       values ($1,'ebook',$2,100,90)`, [pid, B1]);
+  } catch (e) { dupLine = /duplicate key|payment_items_pkey/i.test(String(e?.message ?? '')); }
+  rec('한 주문에 같은 책 두 줄은 거부', dupLine, true);
+
+  // ⭐ 응시권을 줄로 담을 수 없다 — 담기면 같은 (회차×급수)를 exam 으로 한 번 + bundle 로 한 번 결제할 수 있다.
+  let examLine = false;
+  try {
+    await db.query(
+      `insert into payment_items (payment_id, product_type, product_ref, list_amount, amount)
+       values ($1,'exam','round:pro',100,100)`, [pid]);
+  } catch (e) { examLine = /check|payment_items_product_type_check/i.test(String(e?.message ?? '')); }
+  rec('⭐ 묶음 줄에 응시권은 못 들어감', examLine, true);
+
+  // 음수 금액 줄은 원장에 못 들어온다(합계가 조용히 줄어드는 길을 막는다).
+  let neg = false;
+  try {
+    await db.query(
+      `insert into payment_items (payment_id, product_type, product_ref, list_amount, amount)
+       values ($1,'ebook',$2,100,-10)`, [pid, '00000000-0000-0000-0000-0000000b0003']);
+  } catch (e) { neg = /check/i.test(String(e?.message ?? '')); }
+  rec('음수 배분액은 거부', neg, true);
+
+  // 같은 조합을 또 결제할 수 없다(paid 부분 유니크). 다른 조합은 열려 있어야 한다.
+  let sameSet = false;
+  try {
+    await db.query(
+      `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+       values ($1,'bundle-dup','같은 묶음','bundle',$2,180,'paid','k')`, [U1, BUNDLE_REF]);
+  } catch (e) { sameSet = /duplicate key|payments_paid_product_uniq/i.test(String(e?.message ?? '')); }
+  rec('같은 묶음 조합 재결제는 거부', sameSet, true);
+  await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1,'bundle-other','다른 묶음','bundle',$2,90,'paid','k')`, [U1, `ebook:leveltest:${B1}+zzz`]);
+  const other = (await db.query(`select count(*)::int as n from payments where order_id='bundle-other'`)).rows[0];
+  rec('⭐ 다른 조합은 그대로 살 수 있다', other.n, 1);
+
+  // 결제를 지우면 줄도 같이 사라진다 — 줄만 남으면 어느 주문 것인지 모르는 고아가 된다.
+  await db.query(`delete from payments where id=$1`, [pid]);
+  const left = (await db.query(`select count(*)::int as n from payment_items where payment_id=$1`, [pid])).rows[0];
+  rec('결제를 지우면 줄도 따라 지워진다(cascade)', left.n, 0);
+
+  // payment_items 도 payments 와 같은 취급 — RLS 켜고 정책 0개(= service role 전용).
+  const rls = (await db.query(
+    `select relrowsecurity from pg_class where relname='payment_items'`)).rows[0];
+  rec('payment_items RLS 켜짐', rls?.relrowsecurity, true);
+  const pol = (await db.query(
+    `select count(*)::int as n from pg_policies where tablename='payment_items'`)).rows[0];
+  rec('payment_items 정책 0개(서비스롤 전용)', pol.n, 0);
 }
 
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);

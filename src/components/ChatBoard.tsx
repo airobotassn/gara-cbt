@@ -12,6 +12,7 @@ import type { ShareCardData } from '../lib/shareCard'
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
 // 초기 페이지 → 폴링(신규분 append) + reconcile(가림/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
 // 본문은 항상 React 텍스트 child 로만 렌더(자동 이스케이프) — URL 만 NoticeDetail.linkify 방식으로 링크화.
+// 표시 상한: 한 방당 최신 100개(MAX_ROWS) — 그 위로는 스크롤해도 안 불러온다.
 //
 // 방(room): 전세계('global') 하나 + 나라별 하나(ISO2). 어느 방인지는 부모가 정해서 내려준다.
 //  ⚠️ 방이 바뀌면 부모가 key={room} 으로 **다시 마운트**시킨다 — 목록·커서·폴링 타이머가 한 방을 가리키는
@@ -63,6 +64,12 @@ interface Tomb {
 const MAX_LEN = 500
 const POLL_MIN_MS = 3500
 const POLL_MAX_MS = 4500
+// 한 방에서 볼 수 있는 글 수 상한 — 위로 스크롤해도 **최신 100개까지만** 불러온다(2026-08-19).
+//  ⚠️ 상한은 '불러오기'에 건다. 폴링으로 들어온 새 글까지 항상 자르려면 위에서 옛 글을 걷어내야 하는데,
+//     위로 올라가 읽는 중이면 그 순간 화면이 통째로 밀린다. 그래서 **맨 아래를 보고 있을 때만** 창을 접는다
+//     (그 직후 스크롤을 바닥에 다시 붙이므로 튀지 않는다).
+const PAGE = 30
+const MAX_ROWS = 100
 
 // 본문 렌더(URL 링크화 + 자동 이스케이프)는 ../lib/linkify 로 분리(단위 테스트 가능).
 
@@ -229,15 +236,15 @@ export default function ChatBoard({ room = 'global' }: Props) {
     return kstDay.format(d) === kstDay.format(new Date(now)) ? kstTime.format(d) : `${kstDay.format(d)} ${kstTime.format(d)}`
   }
 
-  // 초기 30건
+  // 초기 PAGE 건
   useEffect(() => {
     let alive = true
     setLoading(true)
-    callFunction<{ messages: Row[] }>('chat-list', { room, limit: 30 })
+    callFunction<{ messages: Row[] }>('chat-list', { room, limit: PAGE })
       .then((res) => {
         if (!alive) return
         setRows(res.messages)
-        setHasMore(res.messages.length >= 30)
+        setHasMore(res.messages.length >= PAGE)
         setLoading(false)
         requestAnimationFrame(() => {
           const el = listRef.current
@@ -273,7 +280,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
           if (res.messages.length) {
             setRows((prev) => {
               const seen = new Set(prev.map((r) => r.id))
-              return [...prev, ...res.messages.filter((r) => !seen.has(r.id))]
+              const next = [...prev, ...res.messages.filter((r) => !seen.has(r.id))]
+              return atBottom && next.length > MAX_ROWS ? next.slice(-MAX_ROWS) : next
             })
             requestAnimationFrame(() => {
               if (atBottom && el) el.scrollTop = el.scrollHeight
@@ -315,18 +323,24 @@ export default function ChatBoard({ room = 'global' }: Props) {
   // 위로 스크롤 시 이전 페이지 prepend(스크롤 위치 보존)
   const loadOlder = useCallback(async () => {
     if (loadingOlder || loading || !hasMore || rows.length === 0) return
+    // 최신 MAX_ROWS 개가 이 방에서 볼 수 있는 전부다 — 그 위로는 더 안 불러온다.
+    if (rows.length >= MAX_ROWS) {
+      setHasMore(false)
+      return
+    }
+    const take = Math.min(PAGE, MAX_ROWS - rows.length)
     const oldestId = rows[0].id
     const el = listRef.current
     const prevHeight = el?.scrollHeight ?? 0
     setLoadingOlder(true)
     try {
-      const res = await callFunction<{ messages: Row[] }>('chat-list', { room, before: oldestId, limit: 30 })
+      const res = await callFunction<{ messages: Row[] }>('chat-list', { room, before: oldestId, limit: take })
       if (res.messages.length) {
         setRows((prev) => {
           const seen = new Set(prev.map((r) => r.id))
           return [...res.messages.filter((r) => !seen.has(r.id)), ...prev]
         })
-        setHasMore(res.messages.length >= 30)
+        setHasMore(res.messages.length >= take && rows.length + res.messages.length < MAX_ROWS)
         requestAnimationFrame(() => {
           if (el) el.scrollTop = el.scrollHeight - prevHeight
         })
