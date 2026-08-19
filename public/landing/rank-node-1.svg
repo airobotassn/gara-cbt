@@ -1,16 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 92">
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#ffffff"/><stop offset=".42" stop-color="#eaf7ff"/><stop offset="1" stop-color="#91bad0"/>
+    <linearGradient id="num" x1="0" y1="12" x2="0" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/><stop offset=".46" stop-color="#fff5bd"/><stop offset="1" stop-color="#e4b73f"/>
     </linearGradient>
-    <filter id="glow" x="-30%" y="-40%" width="170%" height="190%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="2.2" result="b"/>
-      <feFlood flood-color="#5ed8ff" flood-opacity=".48"/><feComposite in2="b" operator="in"/>
+    <filter id="glow" x="-45%" y="-55%" width="190%" height="220%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.4" result="blur"/>
+      <feFlood flood-color="#ffd75c" flood-opacity=".58"/>
+      <feComposite in2="blur" operator="in"/>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <g font-family="Arial,Helvetica,sans-serif" font-style="italic" filter="url(#glow)">
-    <text x="20" y="76" font-size="76" font-weight="800" fill="url(#face)" stroke="#e2b557" stroke-width="1.5" paint-order="stroke">1</text>
-    <text x="66" y="36" font-size="31" font-weight="700" fill="#fffdf5" stroke="#b7832d" stroke-width=".75" paint-order="stroke">st</text>
+  <g filter="url(#glow)">
+    <path d="M21 67C8 48 20 19 50 11" fill="none" stroke="#55d9ff" stroke-opacity=".6" stroke-width="1.5"/>
+    <path d="M97 18c18 8 28 24 27 42" fill="none" stroke="#ffd75c" stroke-opacity=".72" stroke-width="1.5"/>
+    <circle cx="50" cy="11" r="2.5" fill="#6ee5ff"/><circle cx="124" cy="60" r="2.5" fill="#ffd75c"/>
+    <text x="57" y="76" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="900" font-style="italic" fill="url(#num)" stroke="#14283b" stroke-width="1.4" paint-order="stroke">1</text>
+    <text x="93" y="33" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="800" font-style="italic" letter-spacing=".5" fill="#fff4b0">ST</text>
+    <path d="M87 40h30" stroke="#ffd75c" stroke-width="2"/><path d="M91 44h18" stroke="#55d9ff" stroke-opacity=".7"/>
   </g>
 </svg>

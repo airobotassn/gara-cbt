@@ -63,20 +63,17 @@
 .lc-orn.bl { left: 26px; bottom: 26px; transform: scaleY(-1); }
 .lc-orn.br { right: 26px; bottom: 26px; transform: scale(-1); }
 
-/* 텍스트 기둥 — 폭 560px, 세로 정중앙. **오른쪽**(별자리가 왼쪽으로 갔다) */
+/* 텍스트 기둥 — 폭 560px, **오른쪽**(별자리가 왼쪽으로 갔다).
+   ⚠️ 세로 정중앙(top:50% + translateY)이 아니라 **제목 위치로 고정**한다(2026-08-19).
+      발행처가 아래로 빠지면서 기둥 높이가 줄었는데, 가운데 정렬로 두면 그 차이만큼 제목이
+      통째로 내려앉는다 — 제목은 시안에서 안 움직이는 요소다. 아래 세 값(top·margin-top 2개)은
+      시안(바탕화면 '레벨테스트 인증서 양식.pptx')의 슬라이드 좌표를 1448×900 으로 환산한 실측값이다. */
 .lc-col {
   position: absolute;
   right: 82px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 261px;
   width: 560px;
   text-align: center;
-}
-.lc-brand {
-  display: block;
-  height: 52px;
-  margin: 0 auto 30px;
-  filter: drop-shadow(0 0 16px rgba(224, 192, 124, 0.3));
 }
 /* 제목·LEVEL·숫자는 확정 시안 에셋(PNG) — 여기서 서체·자간을 만들지 않는다.
    ⚠️ 아래 크기 4종(.lc-title 폭 · .lc-mark 간격 · cap/num 높이)은 정적 시안
@@ -87,8 +84,9 @@
   margin: 0 auto;
   filter: drop-shadow(0 0 26px rgba(230, 180, 80, 0.28));
 }
+/* 이름 — **레벨 아래**. margin 은 시안 좌표(글리프 중심 y≈621)에서 역산한 값이다. */
 .lc-name {
-  margin-top: 48px;
+  margin-top: 83px;
   font: 700 58px CertSerifKR, 'Noto Serif KR', serif;
   letter-spacing: 9px;
   text-indent: 9px;
@@ -98,36 +96,51 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 레벨 — **이름 위**(시안 좌표: 글리프 중심 y≈470). */
 .lc-mark {
-  margin-top: 44px;
+  margin-top: 49px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  /* 시안에서 이 덩어리가 원본의 80% 로 줄어 있다(가로 0.83 · 세로 0.77 의 기하평균).
+     ⚠️ gap 도 같이 줄여야 한다 — 높이만 줄이면 글자 사이만 벌어져 'LEVEL' 과 숫자가 남남이 된다. */
+  gap: 19px;
 }
 /* cap 과 num 은 반드시 같은 높이. 예전 숫자가 가는 세리프라 58px 로 키워뒀던 값이 남아 있었는데,
    지금은 둘 다 같은 굵은 산세리프라 크기가 다르면 한 줄 안에서 따로 논다. */
-.lc-mark-cap { height: 58px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
-.lc-mark-num { height: 58px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+.lc-mark-cap { height: 46px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+.lc-mark-num { height: 46px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+
+/* 발행처 서명단 — 카드 하단 **정중앙**(2026-08-19 시안). 오른쪽 기둥이 아니라 카드 폭 기준이다.
+   ⚠️ 아래 top·height·margin 은 시안 슬라이드 좌표의 실측 환산값이라 눈대중으로 고치지 말 것. */
+.lc-sign {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 798px;
+  text-align: center;
+}
+/* GARA — 제목 위에 있던 시절(52px)의 **절반**이다. 자리가 바뀌면서 주인공이 아니라
+   문서 아래 찍는 발행처 표시가 됐다. 크게 두면 하단이 로고 배너처럼 읽힌다. */
+.lc-brand {
+  display: block;
+  height: 26px;
+  margin: 0 auto;
+  filter: drop-shadow(0 0 16px rgba(224, 192, 124, 0.3));
+}
 
 /* 발행기관 — 잔글씨. ⚠️ 금색으로 쓰지 말 것.
    이 인증서의 금색은 전부 금박 각인 질감 + 광택 림을 가진 이미지 자산이라, CSS 금색 텍스트를 얹으면
-   혼자 납작해서 따로 논다(하이라이트 0%). 재질 경쟁을 피하려고 일부러 무채에 가까운 웜톤으로 뺐다. */
+   혼자 납작해서 따로 논다(하이라이트 0%). 재질 경쟁을 피하려고 일부러 무채에 가까운 웜톤으로 뺐다.
+   ⚠️ 옛 금색 구분선(::before)은 뺐다 — 로고와 기관명 사이가 15px 뿐이라 들어갈 자리가 없고,
+      시안에도 없다. 그 둘은 이제 구분해야 할 남남이 아니라 한 덩어리(서명단)다. */
 .lc-issuer {
-  margin-top: 38px;
+  margin-top: 15px;
   font: 400 20px CertSerifKR, 'Noto Serif KR', serif;
   letter-spacing: 3.5px;
   text-indent: 3.5px;
   color: rgba(228, 216, 194, 0.58);
   white-space: nowrap;
-}
-.lc-issuer::before {
-  content: '';
-  display: block;
-  width: 120px;
-  height: 1px;
-  margin: 0 auto 20px;
-  background: linear-gradient(90deg, transparent, rgba(224, 192, 124, 0.45), transparent);
 }
 
 /* 북두칠성 — 왼쪽. (텍스트 기둥은 위 .lc-col 에서 오른쪽으로 보냈다.)

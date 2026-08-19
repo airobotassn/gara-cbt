@@ -43,18 +43,19 @@ html.dark .arena {
   --aa-sh-solid: rgba(0, 0, 0, .5);
 }
 
-/* ── 지도 표면(지구본·바다·대륙) ── **라이트/다크 공통으로 어둡다.**
-   페이지(카드·패널·글자)는 테마를 따르지만 지도만은 항상 딥블루다. 1~3위 테두리를 **흰빛으로
-   발광**시키려면 주변이 어두워야 하기 때문 — 밝은 바다 위에 흰 광채를 얹으면 아예 안 보인다.
-   바다는 램프에서 가장 어두운 색(#2b64b6 = 1위 쪽)보다 어두워야 대륙이 떠 보인다. */
+/* ── 지도 표면(지구본·바다·대륙) ── **라이트/다크 공통으로 같은 색이다.**
+   페이지(카드·패널·글자)는 테마를 따르지만 지도는 항상 이 값이다.
+   **바다 = 연한 회색(2026-08-19 요청).** 그전엔 딥블루였고, 그래서 아래 두 가지가
+   ‘어두운 바다’를 전제로 잡혀 있다 — 1~3위 테두리의 **흰 발광**(.medalline·top10)과
+   흰 해안선(--aa-geo-stroke). 둘 다 육지(파랑) 쪽에서는 그대로 읽히고 바다 쪽에서만 약해졌다.
+   램프(CSCALE_RAMP)는 그대로 둔다 — 파란 육지가 회색 바다 위에 그대로 떠 보인다. */
 .arena {
-  --aa-ocean-hi: #1d59a5; --aa-ocean-mid: #174c90; --aa-ocean-lo: #0f386e;
+  --aa-ocean-hi: #eaedf2; --aa-ocean-mid: #dee2e9; --aa-ocean-lo: #c7cdd7;
   --aa-land-none: #21538e;
-  --aa-sphere-line: rgba(200, 222, 255, .14);
   --aa-geo-stroke: rgba(238, 247, 255, .55);
   --aa-spec-op: .16;               /* 어두운 구체에 흰 하이라이트를 세게 주면 뿌옇게 뜬다 */
   --aa-atmo: #5b9ae8; --aa-atmo-op: .5;
-  --aa-inset-grad: linear-gradient(160deg, #245ea6, #10386c);
+  --aa-inset-grad: linear-gradient(160deg, #e7ebf1, #ccd2dc);
 }
 
 /* ⚠️ z-index:1 은 별하늘(<StarField />, z-index:0) 위에 내용을 세우는 값이다 — 빼면 지도·카드가
@@ -162,8 +163,9 @@ html.dark .arena {
    오른쪽 리그 패널을 닫아도 1~3위가 어디인지는 남아야 한다.
    ⚠️ 흰 카드로 두면 딥블루 지구본 위에 종잇조각처럼 뜬다 → **어두운 유리 HUD**로 지도에 얹는다.
       지도는 라이트/다크 공통으로 어두우므로(위 --aa-ocean-*) 이 판도 테마와 무관하게 고정색이다.
-   ⚠️ pointer-events: none — 지구본 위라서 여기서 드래그가 먹히면 지도가 안 돌아간다. */
-.aa-top3 { position: absolute; left: 14px; bottom: 54px; z-index: 8; width: 196px;
+   ⚠️ pointer-events: none — 지구본 위라서 여기서 드래그가 먹히면 지도가 안 돌아간다.
+      줄(.row)만 auto 로 되살려 클릭을 받는다 — 판 전체를 열면 시상대 위에서 지구본을 못 돌린다. */
+.aa-top3 { position: absolute; left: 14px; bottom: 54px; z-index: 8; width: 214px;
   display: flex; flex-direction: column; gap: 2px; padding: 11px 12px 12px;
   border: 1.5px solid rgba(150, 195, 255, .26); border-radius: 15px;
   background: linear-gradient(158deg, rgba(18, 46, 92, .93), rgba(8, 22, 48, .93));
@@ -172,7 +174,16 @@ html.dark .arena {
   pointer-events: none; overflow: hidden; }
 .aa-top3 .cap { display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
   font-size: 9.5px; font-weight: 900; letter-spacing: .19em; color: rgba(206, 224, 255, .72); }
-.aa-top3 .row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
+/* 줄 = 버튼. 누르면 지도가 그 나라로 이동(activate)하므로 <button> 기본 꾸밈만 벗긴다. */
+.aa-top3 .row { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; padding: 3px 6px; margin: 0 -6px;
+  pointer-events: auto; cursor: pointer; border: 0; border-radius: 9px; background: none; color: inherit;
+  font: inherit; text-align: left; -webkit-appearance: none; appearance: none; transition: background-color .12s ease; }
+.aa-top3 .row:hover { background-color: rgba(160, 200, 255, .16); }
+.aa-top3 .row:active { transform: translateY(1px); }
+.aa-top3 .row:focus-visible { outline: 2px solid rgba(190, 220, 255, .9); outline-offset: 1px; }
+/* 국기 — 4:3 원본 그대로(잘라내면 태극기 4괘·성조기 별이 먼저 날아간다). */
+.aa-top3 .fl { flex: 0 0 auto; width: 21px; aspect-ratio: 4 / 3; border-radius: 3px; object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .28); }
 .aa-top3 .md { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
   display: grid; place-items: center; font-size: 10.5px; font-weight: 900; color: #1b2436;
   text-shadow: 0 1px 0 rgba(255, 255, 255, .45); }
@@ -180,7 +191,7 @@ html.dark .arena {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aa-top3 .sc { flex: 0 0 auto; font-size: 12px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
 /* 1위 줄만 한 칸 높이고 옅은 금빛 바닥을 깐다 — 셋을 나란히 두면 시상대가 아니라 그냥 목록이 된다. */
-.aa-top3 .r1 { padding: 5px 0 4px; border-radius: 9px;
+.aa-top3 .r1 { padding: 5px 6px 4px; border-radius: 9px;
   background: linear-gradient(90deg, rgba(240, 204, 116, .17), rgba(240, 204, 116, 0) 78%); }
 .aa-top3 .r1 .nm { font-size: 13.5px; font-weight: 900; }
 .aa-top3 .r1 .sc { font-size: 12.5px; }
@@ -354,9 +365,11 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
 #arena-map #oceanGrad .g-hi  { stop-color: var(--aa-ocean-hi); }
 #arena-map #oceanGrad .g-mid { stop-color: var(--aa-ocean-mid); }
 #arena-map #oceanGrad .g-lo  { stop-color: var(--aa-ocean-lo); }
+/* 액자(알래스카·하와이) 바탕도 같은 바다 — 색은 여기 한 곳에서만 정한다. */
+#arena-map #insetGrad .i-hi  { stop-color: var(--aa-ocean-hi); }
+#arena-map #insetGrad .i-lo  { stop-color: var(--aa-ocean-lo); }
 #arena-map #atmoGrad .a-in   { stop-color: var(--aa-atmo); stop-opacity: 0; }
 #arena-map #atmoGrad .a-out  { stop-color: var(--aa-atmo); stop-opacity: var(--aa-atmo-op); }
-#arena-map .grat { fill: none; stroke: var(--aa-sphere-line); stroke-width: .5; opacity: .5; }
 #arena-map .krmark { fill: none; stroke: var(--aa-gold); stroke-width: 2; }
 /* 1~3위 입체 트로피(public/rank-1..3.png). 크기·위치는 ArenaMap 이 지도 배율에 맞춰 인라인으로 준다.
    이미지 자체가 입체라 그림자만 살짝 깔아 지도 위에 떠 보이게 한다. */

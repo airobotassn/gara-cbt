@@ -12,7 +12,6 @@ import {
   geoArea,
   geoCentroid,
   geoDistance,
-  geoGraticule10,
   geoAzimuthalEqualArea,
   geoMercator,
   geoOrthographic,
@@ -28,8 +27,12 @@ import { DOKDO_GEO, M49_TO_ISO2 } from '../lib/arena/tables'
 import { labelAnchor } from '../lib/arena/labelPoint'
 
 export interface ArenaMapHandle {
-  /** 사이드 랭킹 목록 클릭도 지도 클릭과 같은 경로를 타도록 노출 */
-  activate(r: Region): void
+  /**
+   * 사이드 랭킹 목록 클릭도 지도 클릭과 같은 경로를 타도록 노출.
+   * `enter:false` 면 그 나라를 정면으로 돌려 고르기만 하고 **안으로 들어가지 않는다**
+   * (시상대 TOP 3 가 이걸 쓴다 — 거기선 진입이 아니라 '어디인지 보여주기'가 목적이다).
+   */
+  activate(r: Region, opts?: { enter?: boolean }): void
   zoomIn(): void
   zoomOut(): void
 }
@@ -279,7 +282,6 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     atmo: Selection<SVGGElement, unknown, null, undefined>
     sphere: Selection<SVGGElement, unknown, null, undefined>
     spec: Selection<SVGGElement, unknown, null, undefined>
-    grat: Selection<SVGGElement, unknown, null, undefined>
     geo: Selection<SVGGElement, unknown, null, undefined>
     glow: Selection<SVGGElement, unknown, null, undefined>
     mark: Selection<SVGGElement, unknown, null, undefined>
@@ -288,13 +290,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     zoom: ZoomBehavior<SVGSVGElement, unknown>
   } | null>(null)
 
-  const graticule = useMemo(() => geoGraticule10(), [])
-
   // d3 이벤트 핸들러가 호출할 최신 함수들(핸들러는 마운트 때 한 번만 등록되므로 ref 로 우회).
   const fn = useRef<{
     paint: () => void
     draw: () => void
-    activate: (r: Region) => void
+    activate: (r: Region, opts?: { enter?: boolean }) => void
     resizeLabels: () => void
   }>({
     paint: () => {},
@@ -544,17 +544,10 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
         .attr('rx', rr * 0.46)
         .attr('ry', rr * 0.32)
         .attr('transform', `rotate(-24 ${ctr[0] - rr * 0.26} ${ctr[1] - rr * 0.34})`)
-      groups.grat
-        .selectAll('path')
-        .data([graticule])
-        .join('path')
-        .attr('class', 'grat')
-        .attr('d', (d) => path(d))
     } else {
       groups.atmo.selectAll('*').remove()
       groups.sphere.selectAll('*').remove()
       groups.spec.selectAll('*').remove()
-      groups.grat.selectAll('*').remove()
     }
 
     // 평면 레벨(1·2)의 어두운 바탕 — 지구본과 같은 바다 그라디언트를 화면 전체에 깐다.
@@ -656,7 +649,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       .attr('href', (d) => `/rank-${d.rank}.png`) // 1=골드 2=블루 3=청록
     sizeLabels(path)
     paintInsets()
-  }, [graticule, sizeLabels, paintInsets])
+  }, [sizeLabels, paintInsets])
 
   const startSpin = useCallback(() => {
     stopSpin()
@@ -784,14 +777,15 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
 
   // ── 클릭 처리: 지도/사이드 목록 공통 경로 ──
   const activate = useCallback(
-    (d: Region) => {
+    (d: Region, opts?: { enter?: boolean }) => {
       const { level, onSelect, onDrill } = p.current
       if (level === 0) {
         // ⚠️ 진입 연출(회전 820ms → 페이드 420ms)이 도는 동안 다른 나라를 누르면 두 연출이
         //    엉켜 지도가 멈췄다. 한 번 시작하면 끝날 때까지 클릭을 무시한다.
         if (st.current.entering) return
         onSelect(d.key)
-        if (!d.drill) {
+        // enter:false 는 '들어가지 말고 보여주기만' — 파고들 수 없는 나라와 같은 취급.
+        if (!d.drill || opts?.enter === false) {
           rotateTo(d.f)
           return
         }
@@ -910,9 +904,11 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
     atmoGrad.append('stop').attr('class', 'a-out').attr('offset', '100%')
     // 코너 액자 — 바탕 그라디언트 + 액자 밖으로 지오메트리가 새지 않게 자를 클립.
     // 클립은 하나면 된다: 각 액자 그룹이 자기 transform 을 갖고, 클립은 그 좌표계에서 잘린다.
+    // ⚠️ 액자 바탕도 '바다'다 — 색을 여기 박으면 바다색을 바꿀 때 액자만 옛 색으로 남는다.
+    //    oceanGrad 와 같이 클래스만 주고 색은 arena.css 의 --aa-ocean-* 이 정하게 한다.
     const insetGrad = defs.append('linearGradient').attr('id', 'insetGrad').attr('x1', '0').attr('y1', '0').attr('x2', '0.6').attr('y2', '1')
-    insetGrad.append('stop').attr('offset', '0%').attr('stop-color', '#245ea6')
-    insetGrad.append('stop').attr('offset', '100%').attr('stop-color', '#10386c')
+    insetGrad.append('stop').attr('class', 'i-hi').attr('offset', '0%')
+    insetGrad.append('stop').attr('class', 'i-lo').attr('offset', '100%')
     defs
       .append('clipPath')
       .attr('id', 'rinClip')
@@ -997,7 +993,6 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
       atmo: viewport.append('g'),
       sphere: viewport.append('g'),
       spec: viewport.append('g'),
-      grat: viewport.append('g'),
       geo: viewport.append('g'),
       glow: viewport.append('g').attr('class', 'medalglow'),
       mark: viewport.append('g'),
@@ -1125,7 +1120,7 @@ function ArenaMapInner(props: Props, ref: React.Ref<ArenaMapHandle>) {
   useImperativeHandle(
     ref,
     () => ({
-      activate: (r: Region) => fn.current.activate(r),
+      activate: (r: Region, opts?: { enter?: boolean }) => fn.current.activate(r, opts),
       zoomIn: () => {
         const node = svgRef.current
         if (node && g.current) g.current.zoom.scaleBy(select(node).transition().duration(180), 1.6)

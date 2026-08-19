@@ -66,9 +66,9 @@ const LBL_CAP_R = 0.04
 const LBL_FLOOR = 9
 const LBL_HIDE = 6
 const RANK_ASSET = [
-  '/landing/rank-node-1.svg',
-  '/landing/rank-node-2.svg',
-  '/landing/rank-node-3.svg',
+  '/landing/rank-medal-1.png',
+  '/landing/rank-medal-2.png',
+  '/landing/rank-medal-3.png',
 ] as const
 
 /** 첫 화면에 보이는 경도(정면 경도 = -이 값). -180 = **날짜변경선(180°)이 정면**.
@@ -385,7 +385,8 @@ export default function RankGlobe() {
           // ⚠️ 카피 밖으로 **완전히** 빼지는 않는다. 그렇게 하면 인도의 메달이 중앙아시아 상공에 뜬
           //    미아가 되어 어느 나라 것인지 못 읽는다(실제로 해보고 되돌렸다). 카피에 가리는 건
           //    자전으로 곧 풀리지만, 엉뚱한 땅 위에 선 등수는 계속 틀린 말을 한다.
-          ty: medal && p[1] > H * 0.285 && p[1] < H * 0.49 ? Math.max(H * 0.265, p[1] - H * 0.085) : p[1],
+          // 순위 마커는 문구 영역을 피하지 않고 해당 국가 좌표에 그대로 붙인다.
+          ty: p[1],
           w: medal ? h * aspect : fontPx * 0.72,
           h,
           rank: c.rank,
@@ -395,20 +396,6 @@ export default function RankGlobe() {
       }
       // 겹침 해소는 시상대 셋만. `/arena` 는 겹침을 안 풀고 작은 땅의 숫자를 숨기는 쪽인데,
       // 여기선 1~3위가 이웃하면(한국·일본) 에셋이 통째로 포개져 등수를 못 읽는다.
-      const placed: Mark[] = []
-      for (const m of marks.filter((x) => !x.fontPx).sort((a, b) => a.rank - b.rank)) {
-        let moved = true
-        while (moved) {
-          moved = false
-          for (const q of placed) {
-            if (Math.abs(m.x - q.x) < (m.w + q.w) * 0.58 && Math.abs(m.ty - q.ty) < (m.h + q.h) * 0.48) {
-              m.ty = q.ty + (m.h + q.h) * 0.5
-              moved = true
-            }
-          }
-        }
-        placed.push(m)
-      }
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       // 등수가 낮은 것부터 그려 1위가 맨 위에 온다(겹치면 시상대가 이긴다).

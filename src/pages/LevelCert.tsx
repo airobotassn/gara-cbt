@@ -249,15 +249,21 @@ export default function LevelCert() {
           <img className="lc-orn bl" src="/cert/corner.png" alt="" />
           <img className="lc-orn br" src="/cert/corner.png" alt="" />
 
+          {/* 오른쪽 글자 기둥 — 제목 → 레벨 → 이름 순. **레벨이 이름 위**다(2026-08-19 시안).
+              발행처(GARA·기관명)는 이 기둥에서 빠져 아래 .lc-sign 으로 내려갔다. */}
           <div className="lc-col">
-            <img className="lc-brand" src="/cert/logo-gara.png" alt="GARA" />
             <img className="lc-title" src="/cert/title-word.png" alt="LEVEL TEST CERTIFICATE" />
-            <div className="lc-name">{name}</div>
             <div className="lc-mark">
               <img className="lc-mark-cap" src="/cert/level-word.png" alt="LEVEL" />
               <img className="lc-mark-num" src={`/cert/num-${level}.png`} alt={String(level)} />
             </div>
-            {/* 발행기관 — 기관 정식명은 번역하지 않고 영문 고정(증서 관행) */}
+            <div className="lc-name">{name}</div>
+          </div>
+
+          {/* 발행처 서명단 — 카드 하단 **중앙**. 로고와 기관명이 한 덩어리라 같이 묶는다.
+              기관 정식명은 번역하지 않고 영문 고정(증서 관행). */}
+          <div className="lc-sign">
+            <img className="lc-brand" src="/cert/logo-gara.png" alt="GARA" />
             <div className="lc-issuer">Global AI &amp; Robotics Association</div>
           </div>
 

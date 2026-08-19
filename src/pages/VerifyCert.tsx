@@ -117,7 +117,12 @@ export default function VerifyCert() {
       <div className="vrf-doc">
         <div className="vrf-inner">
           <header className="vrf-mast">
-            <img className="vrf-logo" src="/logo.png" alt="CARIS" />
+            {/* 로고 락업 — CARIS(자격) | GARA(발급기관). 진위확인은 "누가 발급했나"가 핵심이라 둘 다 세운다. */}
+            <div className="vrf-brand">
+              <img className="vrf-logo" src="/logo.png" alt="CARIS" />
+              <span className="vrf-brand-sep" aria-hidden="true" />
+              <img className="vrf-logo-gara" src="/gara-wordmark-2026.png" alt="GARA" />
+            </div>
             <div className="vrf-authority">Global AI &amp; Robotics Association</div>
             <div className="vrf-rule"><span>◆</span></div>
             <h1 className="vrf-sys">{t('verify.system_sub')}</h1>

@@ -134,8 +134,14 @@
   .s.on .si{opacity:1;box-shadow:0 0 6px var(--c),0 0 13px var(--c),inset 0 0 3px rgba(255,255,255,.65)}
   .s .sn{color:var(--c)}
   .s .bd{flex:1 1 auto;min-width:0}
-  .s .sn{display:block;font-size:11.5px;font-weight:900;letter-spacing:-.01em;line-height:1.15;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .s .sn{display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:900;letter-spacing:-.01em;
+    line-height:1.15;min-width:0}
+  .s .sn .nt{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 숫자키 힌트 — 1~6 으로도 켜지는데 화면에 번호가 없어서 알 길이 없었다(2026-08-19).
+     ⚠️ 이름과 같은 줄이라 이름 쪽에만 말줄임을 걸어야 한다 — .sn 에 걸면 번호가 먼저 잘린다. */
+  .s .sk{flex:0 0 auto;font-size:9px;line-height:1;padding:2px 3.5px;border-radius:3px;
+    color:#4a5878;border:1px solid rgba(120,150,200,.32)}
+  .s.on .sk{color:var(--c);border-color:currentColor}
   .s .sv{display:block;font-size:16px;font-weight:900;line-height:1.2;color:#4d5c7d;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .s .sv small{font-size:10px;font-weight:800;margin-left:1px}
@@ -774,11 +780,12 @@ function rayAngles(k){
 
 /* ===================== 센서 판 ===================== */
 function buildSensors(){
-  $('sens').innerHTML=Object.keys(SENSORS).map(k=>{
+  $('sens').innerHTML=Object.keys(SENSORS).map((k,i)=>{
     const S=SENSORS[k];
+    // 번호는 여기서 세지 않는다 — 키 순서가 곧 숫자키(아래 keydown 의 Object.keys(SENSORS)[n-1]).
     return `<button class="s" data-k="${k}" id="s_${k}" style="--c:${S.c}">
       <span class="si" aria-hidden="true"></span>
-      <span class="bd"><span class="sn">${S.nm}</span>
+      <span class="bd"><span class="sn"><span class="nt">${S.nm}</span><b class="sk">${i+1}</b></span>
       <span class="sv" id="v_${k}">꺼짐</span></span>
       <span class="sp">${pwDots(k)}</span></button>`;
   }).join('');

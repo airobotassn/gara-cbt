@@ -401,8 +401,11 @@ export default function ExamApply() {
           </div>
 
           {/* 우: 결제 요약 */}
+          {/* sticky 를 카드가 아니라 **바깥 겹**에 건다 — 아래 발급비 경고까지 같이 따라와야 한다.
+              카드에 걸어두면 경고만 제자리에 남아 스크롤하면 요약과 따로 논다. */}
           <aside>
-            <div className="sticky top-12 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col gap-5">
+            <div className="sticky top-12 flex flex-col gap-4">
+            <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col gap-5">
               <h2 className="font-title-md text-title-md font-bold text-on-surface">{t('apply.pay_summary')}</h2>
 
               <div className="flex flex-col gap-3">
@@ -480,6 +483,21 @@ export default function ExamApply() {
                 <span className="material-symbols-outlined text-[18px] mt-px shrink-0">{isFullUser ? 'lock' : 'login'}</span>
                 {isFullUser ? t('apply.pay_note_live') : t('apply.login_required')}
               </p>
+            </div>
+
+            {/* 자격증 발급비 경고 — 결제 요약 **밖·아래**에 둔다. 요약 안에 넣으면 지금 낼 돈처럼 읽혀
+                총액과 싸운다(이건 합격 뒤에 따로 내는 돈이다).
+                ⚠️ **금액을 말하지 않는다.** 이 자리가 할 일은 "합격해도 돈이 한 번 더 든다" 까지고,
+                   실제 금액은 발급 화면이 결제할 때 보여준다. 여기에 숫자를 박으면 값이 바뀔 때마다
+                   6개국어 문구를 같이 고쳐야 하고, 한 번 어긋나면 그대로 거짓말이 된다
+                   (2026-08-19 "응시료와 같은 금액" 이라고 썼다가 사실과 달라 걷어냈다 —
+                    서버 cert 분기는 아직 exam_fees 를 그대로 쓴다. 금액 산정이 확정되면 그쪽을 먼저 고칠 것).
+                네온(=secondary · 다크 시안 / 라이트 딥틸)은 테두리·아이콘·제목에만 쓰고 본문은 on-surface 로 둔다 —
+                문장까지 형광으로 칠하면 대비가 떨어져 정작 경고가 안 읽힌다. */}
+            <div className="flex items-start gap-2.5 rounded-2xl border border-secondary/55 bg-secondary/10 px-5 py-4 shadow-[0_0_22px_-8px_var(--color-secondary)]">
+              <span className="material-symbols-outlined shrink-0 text-[20px] leading-[1.45] text-secondary">error</span>
+              <p className="font-body-md text-body-md leading-[1.45] text-on-surface break-keep">{t('pay.cert_fee_note')}</p>
+            </div>
             </div>
           </aside>
         </div>

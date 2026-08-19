@@ -356,7 +356,10 @@ export default function WorldArena() {
     scrollAnim.current = requestAnimationFrame(step)
   }, [selKey, rightPanel, shown])
 
-  const activate = useCallback((r: Region) => mapRef.current?.activate(r), [])
+  const activate = useCallback(
+    (r: Region, opts?: { enter?: boolean }) => mapRef.current?.activate(r, opts),
+    [],
+  )
   const onRowEnter = useCallback((key: string) => setHotKey(key), [])
   const onRowLeave = useCallback(() => setHotKey(null), [])
 
@@ -433,7 +436,7 @@ export default function WorldArena() {
             {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
             <span className="ic ic-img"><img src="/cari-diagonal.png" alt="" /></span>
             <span className="lt">
-              <b>CARI</b>
+              <b>{t('arena.bHub')}</b>
               <i>{t('arena.bHubS')}</i>
             </span>
             <span className="go">›</span>
@@ -551,8 +554,19 @@ export default function WorldArena() {
                 <span className="cap">🏆 TOP 3</span>
                 {sorted.slice(0, 3).map((r, i) => {
                   const [lit, shade] = MEDAL_TONE[i]
+                  // 국기는 지구본(레벨0)에서만 — 파고든 뒤의 1~3위는 전부 같은 나라라 세 줄에
+                  // 같은 국기가 반복될 뿐이다.
+                  const flag = level === 0 ? flagUrl(M49_TO_ISO2[String(r.f.id)]) : ''
                   return (
-                    <div className={`row r${i + 1}`} key={r.key}>
+                    // 줄 전체가 버튼 — 지도가 그 나라로 돌아가고 선택까지만 한다.
+                    // ⚠️ enter:false 를 빼면 목록 줄(RankRow)처럼 그 나라 안(주·시도 랭킹)까지
+                    //    파고든다. 시상대는 '1~3위가 어디인지' 를 보여주는 자리라 진입은 안 한다.
+                    <button
+                      type="button"
+                      className={`row r${i + 1}`}
+                      key={r.key}
+                      onClick={() => activate(r, { enter: false })}
+                    >
                       <span
                         className="md"
                         style={{
@@ -562,9 +576,10 @@ export default function WorldArena() {
                       >
                         {i + 1}
                       </span>
+                      {flag && <img className="fl" src={flag} alt="" decoding="async" />}
                       <span className="nm" style={i === 0 ? { color: lit } : undefined}>{r.name}</span>
                       <span className="sc" style={{ textShadow: `0 0 10px ${lit}59` }}>{fmtScore(r.score)}</span>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
