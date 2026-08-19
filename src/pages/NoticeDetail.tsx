@@ -3,16 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import HtmlBody, { isIsolatedHtml } from '../components/HtmlBody'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { loadBoardCats, catName, type BoardCat } from '../lib/boardCats'
 
 // 공지 상세 페이지 (/notice/:id) — 게시판 글 상세. 본문은 리치 HTML(관리자 WYSIWYG 작성)을
 // sanitize 후 렌더(<HtmlBody> — CSS 를 들고 온 본문은 Shadow DOM 으로 격리).
 // 구 평문 공지(태그 없음)는 줄바꿈 유지(pre-line) + URL 링크.
-const CAT_CLASS: Record<string, string> = {
-  guide: 'bg-surface-container-high text-on-surface',
-  schedule: 'bg-primary/10 text-primary',
-  maintenance: 'bg-surface-container-high text-on-surface-variant',
-  event: 'bg-secondary/10 text-secondary',
-}
+// 분류 배지는 색을 나누지 않는다 — 목록(/notice)과 같은 규칙(2026-08-19 결정). 색은 '필독'만.
+const CAT_CLASS = 'bg-surface-container-high text-on-surface-variant'
 const REQUIRED_CLASS = 'bg-error/10 text-error'
 
 interface Row {
@@ -61,6 +58,18 @@ export default function NoticeDetail() {
   const { t, lang } = useT()
   const [row, setRow] = useState<Row | null>(null)
   const [loading, setLoading] = useState(true)
+  // 분류 이름은 DB(board_categories)에서 온다. 지워진 분류면 이름이 없어 배지를 그리지 않는다
+  // (목록에서 이미 빠진 글이라, 링크로 직접 들어온 경우다).
+  const [cats, setCats] = useState<BoardCat[]>([])
+  useEffect(() => {
+    let alive = true
+    loadBoardCats('notice').then((c) => {
+      if (alive) setCats(c)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !id) {
@@ -129,7 +138,9 @@ export default function NoticeDetail() {
               {row.required && (
                 <span className={`${REQUIRED_CLASS} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t('notice.tag_required')}</span>
               )}
-              <span className={`${CAT_CLASS[row.category] ?? CAT_CLASS.guide} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.filter_${row.category}`)}</span>
+              {catName(cats.find((c) => c.key === row.category), lang) && (
+                <span className={`${CAT_CLASS} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{catName(cats.find((c) => c.key === row.category), lang)}</span>
+              )}
               <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{fmtDate(row.published_at)}</span>
             </div>
             <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-7 break-keep border-b border-outline-variant/30 pb-6">{title}</h1>

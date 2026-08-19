@@ -2,20 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { loadBoardCats, catName, type BoardCat } from '../lib/boardCats'
 
 // gara_2 (공지사항) — 게시판 목록. 항목 클릭 → 상세 페이지(/notice/:id)로 이동(구 인라인 아코디언 폐지).
 // 데이터는 DB(notices)에서 로드 — 관리자(admin 함수)에서 등록/수정(리치 HTML 본문).
 // 페이로드 절약: 현재 언어(+ko 폴백) + 짧은 발췌만 받고, 10건 단위 페이지네이션(더보기).
 // 구 딥링크 /notice?id=<uuid> 는 /notice/<uuid> 로 리다이렉트(공유 링크 호환).
 
-const FILTERS = ['all', 'guide', 'schedule', 'maintenance', 'event']
-
-const CAT_CLASS: Record<string, string> = {
-  guide: 'bg-surface-container-high text-on-surface',
-  schedule: 'bg-primary/10 text-primary',
-  maintenance: 'bg-surface-container-high text-on-surface-variant',
-  event: 'bg-secondary/10 text-secondary',
-}
+// 분류는 DB(board_categories)에서 온다 — 관리자가 만들고 지운다(2026-08-19). 여기 목록을 박지 말 것.
+//
+// ⚠️ **분류 배지는 색을 나누지 않는다.** 예전엔 분류마다 색이 달랐는데, 분류가 4개일 때도 무슨 색이
+//    무슨 분류인지 아무도 못 외웠고, 관리자가 분류를 늘릴 수 있게 되면서 새 분류의 색을 정하는 문제만
+//    남았다. 눈에 띄어야 하는 건 빨간 '필독' 하나다(2026-08-19 결정).
+const CAT_CLASS = 'bg-surface-container-high text-on-surface-variant'
 const REQUIRED_CLASS = 'bg-error/10 text-error'
 
 const PAGE_SIZE = 10
@@ -38,12 +37,14 @@ function projFor(lang: string): string {
     : `title:title_i18n->>${lang}, title_ko:title_i18n->>ko, body:body_i18n->>${lang}, body_ko:body_i18n->>ko`
 }
 
-async function fetchPage(filter: string, lang: string, offset: number): Promise<Row[]> {
+// ⚠️ catKeys = 지금 있는 분류 전부. '전체' 에서도 이걸로 걸러야 **지워진 분류의 글이 안 보인다**
+//    (그 글들은 삭제되지 않고 관리자 쪽 '미분류' 에 남아 있다 — lib/boardCats.ts 주석 참고).
+async function fetchPage(filter: string, lang: string, offset: number, catKeys: string[]): Promise<Row[]> {
   let q = supabase
     .from('notices')
     .select(`id, category, required, ${projFor(lang)}, pinned, published_at`)
     .eq('published', true)
-  if (filter !== 'all') q = q.eq('category', filter)
+  q = filter !== 'all' ? q.eq('category', filter) : q.in('category', catKeys)
   const { data } = await q
     .order('pinned', { ascending: false })
     .order('published_at', { ascending: false })
@@ -78,6 +79,9 @@ export default function Notice() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [filter, setFilter] = useState('all')
+  // null = 아직 못 받음. 빈 배열(=분류가 하나도 없음)과 구분해야 한다 — 못 받은 동안 목록을 조회하면
+  // 걸러낼 키가 없어서 빈 게시판이 한 번 스친다.
+  const [cats, setCats] = useState<BoardCat[] | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -90,27 +94,42 @@ export default function Notice() {
     if (id) navigate(`/notice/${id}`, { replace: true })
   }, [])
 
+  // 분류 먼저(한 번만). 언어가 바뀌어도 다시 안 받는다 — 6개국어 이름이 한 행에 다 들어 있다.
+  useEffect(() => {
+    let alive = true
+    loadBoardCats('notice').then((c) => {
+      if (alive) setCats(c)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const catKeys = (cats ?? []).map((c) => c.key)
+  const catKeysSig = catKeys.join(',') // 배열은 렌더마다 새 참조라 deps 에 그대로 못 넣는다
+
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false)
       return
     }
+    if (cats === null) return // 분류를 받기 전엔 조회하지 않는다(위 주석)
     const req = ++reqRef.current
     setLoading(true)
     ;(async () => {
-      const page = await fetchPage(filter, lang, 0)
+      const page = await fetchPage(filter, lang, 0, catKeysSig ? catKeysSig.split(',') : [])
       if (reqRef.current !== req) return
       setRows(page)
       setHasMore(page.length === PAGE_SIZE)
       setLoading(false)
     })()
-  }, [filter, lang])
+  }, [filter, lang, cats, catKeysSig])
 
   async function loadMore() {
     if (loadingMore || loading) return
     const req = reqRef.current
     setLoadingMore(true)
-    const page = await fetchPage(filter, lang, rows.length)
+    const page = await fetchPage(filter, lang, rows.length, catKeys)
     if (reqRef.current === req) {
       setRows((prev) => {
         const seen = new Set(prev.map((r) => r.id))
@@ -120,6 +139,10 @@ export default function Notice() {
     }
     setLoadingMore(false)
   }
+
+  /** 분류 이름 — 'all' 만 사전(전체)이고 나머지는 DB 에서 온 이름이다. */
+  const filterLabel = (key: string) =>
+    key === 'all' ? t('notice.filter_all') : catName((cats ?? []).find((c) => c.key === key), lang)
 
   const title = (n: Row) => n.title || n.title_ko || ''
   const preview = (n: Row) => excerpt(n.body || n.body_ko || '')
@@ -149,11 +172,11 @@ export default function Notice() {
 
         {/* Filters */}
         <div className="flex gap-3 overflow-x-auto pb-6 mb-8 scrollbar-hide border-b border-outline-variant/30">
-          {FILTERS.map((f) =>
+          {['all', ...catKeys].map((f) =>
             f === filter ? (
-              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-primary text-on-primary font-label-md text-label-md whitespace-nowrap shadow-sm hover:opacity-90 transition-colors">{t(`notice.filter_${f}`)}</button>
+              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-primary text-on-primary font-label-md text-label-md whitespace-nowrap shadow-sm hover:opacity-90 transition-colors">{filterLabel(f)}</button>
             ) : (
-              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface-variant hover:border-primary hover:text-primary transition-colors font-label-md text-label-md whitespace-nowrap shadow-sm">{t(`notice.filter_${f}`)}</button>
+              <button key={f} onClick={() => setFilter(f)} className="px-6 py-2.5 rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface-variant hover:border-primary hover:text-primary transition-colors font-label-md text-label-md whitespace-nowrap shadow-sm">{filterLabel(f)}</button>
             ),
           )}
         </div>
@@ -163,7 +186,7 @@ export default function Notice() {
         )}
 
         {!loading && rows.length === 0 && (
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">{t('notice.empty', { filter: t(`notice.filter_${filter}`) })}</div>
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-12 text-center text-on-surface-variant">{t('notice.empty', { filter: filterLabel(filter) })}</div>
         )}
 
         {/* Featured — 최신/고정 1건 큰 카드 */}
@@ -175,7 +198,7 @@ export default function Notice() {
                 {featured.required && (
                   <span className={`${REQUIRED_CLASS} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t('notice.tag_required')}</span>
                 )}
-                <span className={`${CAT_CLASS[featured.category] ?? CAT_CLASS.guide} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{t(`notice.filter_${featured.category}`)}</span>
+                <span className={`${CAT_CLASS} px-3 py-1 rounded-full font-label-sm text-label-sm tracking-wide`}>{filterLabel(featured.category)}</span>
                 <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{fmtDate(featured.published_at)}</span>
               </div>
               <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-3 break-keep group-hover:text-primary transition-colors">{title(featured)}</h2>
@@ -196,7 +219,7 @@ export default function Notice() {
                       {n.required && (
                         <span className={`${REQUIRED_CLASS} px-2.5 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap`}>{t('notice.tag_required')}</span>
                       )}
-                      <span className={`${CAT_CLASS[n.category] ?? CAT_CLASS.guide} px-2.5 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap`}>{t(`notice.filter_${n.category}`)}</span>
+                      <span className={`${CAT_CLASS} px-2.5 py-1 rounded-md font-label-sm text-label-sm whitespace-nowrap`}>{filterLabel(n.category)}</span>
                     </div>
                     <span className="text-outline font-label-md text-label-md whitespace-nowrap">{fmtDate(n.published_at)}</span>
                   </div>

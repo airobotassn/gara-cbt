@@ -634,6 +634,158 @@ async function faqDelete(admin: any, body: any) {
   return json({ ok: true })
 }
 
+// ---------- 게시판 분류(board_categories) CRUD ----------
+// 공지·FAQ 의 분류를 관리자가 직접 만든다(2026-08-19). kind 로 둘을 가른다.
+//
+// ⛔ **분류를 지워도 글은 안 건드린다.** 글의 category 값(고아 키)은 그대로 남고, 공개 화면이 "지금 있는
+//    분류"만 보여주며 관리자 목록에서는 '미분류' 로 모인다 — 같은 key 로 다시 만들면 그대로 돌아온다.
+//    그래서 삭제 전에 **몇 건이 딸려 내려가는지**를 먼저 알려준다(목록이 count 를 같이 준다).
+
+const BOARD_KINDS = ['notice', 'faq'] as const
+type BoardKind = (typeof BOARD_KINDS)[number]
+
+function boardKindOf(body: any): BoardKind | null {
+  const k = String(body?.kind ?? '')
+  return (BOARD_KINDS as readonly string[]).includes(k) ? (k as BoardKind) : null
+}
+const boardTableOf = (kind: BoardKind) => (kind === 'notice' ? 'notices' : 'faqs')
+
+function shapeBoardCat(c: any, count: number) {
+  return {
+    id: c.id,
+    kind: c.kind,
+    key: c.key,
+    labelI18n: c.label_i18n ?? {},
+    icon: c.icon ?? '',
+    sort: c.sort,
+    count, // 이 분류를 쓰는 글 수(미공개 포함)
+  }
+}
+
+// 목록 + 글 수. 고아(orphans) = 분류가 지워졌거나 예전 값이 남아 있는 글들 → 관리자 화면의 '미분류'.
+async function boardCatList(admin: any, body: any) {
+  const kind = boardKindOf(body)
+  if (!kind) return json({ error: 'kind 는 notice|faq' }, 400)
+
+  const { data: cats, error } = await admin
+    .from('board_categories')
+    .select('*')
+    .eq('kind', kind)
+    .order('sort', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) return json({ error: error.message }, 400)
+
+  // 글 수는 category 컬럼만 받아 여기서 센다 — 공지·FAQ 는 많아야 수백 건이라 group by RPC 를 팔 이유가 없다.
+  const { data: rows, error: e2 } = await admin.from(boardTableOf(kind)).select('category')
+  if (e2) return json({ error: e2.message }, 400)
+  const counts = new Map<string, number>()
+  for (const r of rows ?? []) counts.set(r.category, (counts.get(r.category) ?? 0) + 1)
+
+  const known = new Set((cats ?? []).map((c: any) => c.key))
+  const orphans = [...counts.entries()]
+    .filter(([k]) => !known.has(k))
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count)
+
+  return json({
+    categories: (cats ?? []).map((c: any) => shapeBoardCat(c, counts.get(c.key) ?? 0)),
+    orphans,
+  })
+}
+
+// 생성/수정. 한국어 이름만 받아 나머지 5개국어를 자동 번역한다(공지·FAQ 본문과 같은 경로).
+//   ⚠️ key 는 만들 때만 정한다 — 나중에 바꾸면 그 분류를 쓰던 글이 통째로 고아가 된다.
+async function boardCatUpsert(admin: any, body: any) {
+  const kind = boardKindOf(body)
+  if (!kind) return json({ error: 'kind 는 notice|faq' }, 400)
+  const c = body?.category ?? {}
+  const koLabel = String(c.labelI18n?.ko ?? '').trim()
+  if (!koLabel) return json({ error: '한국어 분류 이름은 필수입니다.' }, 400)
+
+  let label_i18n: Record<string, string> = { ko: koLabel }
+  let translateWarning: string | null = null
+  try {
+    const tr = await translateKoFields({ label: koLabel })
+    label_i18n = tr.label
+  } catch (e) {
+    translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
+  }
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+
+  const patch: Record<string, unknown> = {
+    label_i18n,
+    icon: String(c.icon ?? '').trim(),
+    updated_at: new Date().toISOString(),
+  }
+  if (typeof c.sort === 'number') patch.sort = c.sort
+
+  if (c.id) {
+    // key 는 손대지 않는다(위 주석). 이름·아이콘·순서만 고친다.
+    const { error } = await admin.from('board_categories').update(patch).eq('id', c.id)
+    if (error) return json({ error: error.message }, 400)
+    return json({ ok: true, translateWarning })
+  }
+
+  const key = String(c.key ?? '').trim().toLowerCase()
+  if (!/^[a-z][a-z0-9_]{0,31}$/.test(key)) {
+    return json({ error: '분류 키는 영문 소문자로 시작하고 영문·숫자·밑줄만 쓸 수 있습니다.' }, 400)
+  }
+  const { error } = await admin
+    .from('board_categories')
+    .insert({ kind, key, sort: typeof c.sort === 'number' ? c.sort : 999, ...patch })
+  if (error) {
+    // 23505 = 같은 kind 에 같은 key. 조용히 덮으면 남의 분류 이름을 갈아치우게 된다.
+    if ((error as { code?: string }).code === '23505') return json({ error: '이미 있는 분류 키입니다.' }, 409)
+    return json({ error: error.message }, 400)
+  }
+  return json({ ok: true, translateWarning })
+}
+
+// 삭제 — 글은 그대로 두고 분류 행만 지운다(위 ⛔ 주석). 몇 건이 미분류로 내려가는지는 화면이 미리 보여준다.
+async function boardCatDelete(admin: any, body: any) {
+  const id = body?.id
+  if (!id) return json({ error: 'id 필요' }, 400)
+  const { error } = await admin.from('board_categories').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true })
+}
+
+// 순서 재배치 — faqReorder 와 같은 방식(받은 순서대로 10,20,30…).
+async function boardCatReorder(admin: any, body: any) {
+  const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
+  if (!ids.length) return json({ error: 'ids 필요' }, 400)
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await admin.from('board_categories').update({ sort: (i + 1) * 10 }).eq('id', ids[i])
+    if (error) return json({ error: error.message }, 400)
+  }
+  return json({ ok: true })
+}
+
+// 글의 분류를 옮긴다 — 미분류(고아)로 내려온 글을 다시 지정할 때 쓴다.
+//   ⚠️ 옮길 대상 분류가 **실재하는지** 확인한다. 안 보면 오타 한 번에 글이 또 미분류가 된다.
+async function boardCatMove(admin: any, body: any) {
+  const kind = boardKindOf(body)
+  if (!kind) return json({ error: 'kind 는 notice|faq' }, 400)
+  const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
+  const to = String(body?.to ?? '').trim()
+  if (!ids.length || !to) return json({ error: 'ids·to 필요' }, 400)
+
+  const { data: cat } = await admin
+    .from('board_categories')
+    .select('key')
+    .eq('kind', kind)
+    .eq('key', to)
+    .maybeSingle()
+  if (!cat) return json({ error: '없는 분류입니다.' }, 400)
+
+  const { error } = await admin
+    .from(boardTableOf(kind))
+    .update({ category: to, updated_at: new Date().toISOString() })
+    .in('id', ids)
+  if (error) return json({ error: error.message }, 400)
+  return json({ ok: true, moved: ids.length })
+}
+
 // ---------- 시험 일정/회차(exam_rounds) CRUD ----------
 // tiers = 이 회차가 연 급수(활성 exams.tier) 키 배열. 회차 등록 기능(exams=회차×급수)에서 채움.
 function shapeExamRound(r: any, tiers: string[] = []) {
@@ -2814,6 +2966,11 @@ Deno.serve(async (req) => {
       case 'faqUpsert': return await faqUpsert(admin, body)
       case 'faqDelete': return await faqDelete(admin, body)
       case 'faqReorder': return await faqReorder(admin, body)
+      case 'boardCatList': return await boardCatList(admin, body)
+      case 'boardCatUpsert': return await boardCatUpsert(admin, body)
+      case 'boardCatDelete': return await boardCatDelete(admin, body)
+      case 'boardCatReorder': return await boardCatReorder(admin, body)
+      case 'boardCatMove': return await boardCatMove(admin, body)
       case 'examRoundList': return await examRoundList(admin)
       case 'examRoundUpsert': return await examRoundUpsert(admin, body)
       case 'examRoundReorder': return await examRoundReorder(admin, body)

@@ -2,18 +2,15 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { loadBoardCats, catName, type BoardCat } from '../lib/boardCats'
 
 // gara_1 (고객센터) 목업 디자인 + 실제 동작(검색·카테고리 필터·아코디언) 연결.
 // 데이터는 DB(faqs, 6개국어)에서 로드 — 관리자(admin 함수)에서 등록/수정.
-
-// 사이드바 카테고리(고정) — key = faqs.category, labelKey = i18n
-const CATS = [
-  { key: 'schedule', icon: 'calendar_month', labelKey: 'faq.cat_schedule' },
-  { key: 'system', icon: 'computer', labelKey: 'faq.cat_system' },
-  { key: 'payment', icon: 'credit_card', labelKey: 'faq.cat_payment' },
-  { key: 'grading', icon: 'workspace_premium', labelKey: 'faq.cat_grading' },
-  { key: 'corporate', icon: 'domain', labelKey: 'faq.cat_corporate' },
-] as const
+//
+// 사이드바 분류도 DB 다(board_categories, kind='faq' — 2026-08-19). 관리자가 만들고 지운다.
+//   ⛔ 분류가 지워진 FAQ 는 여기서 안 보인다(글은 남아 있고 관리자 '미분류' 에서 다시 지정하면 돌아온다).
+//      아이콘이 비어 있으면 기본 아이콘을 쓴다 — 새 분류를 만들 때 아이콘은 선택이다.
+const FALLBACK_ICON = 'help'
 
 interface Row {
   id: string
@@ -26,11 +23,26 @@ interface Row {
 
 export default function Faq() {
   const { t, lang } = useT()
-  const [cat, setCat] = useState<string>('schedule')
+  // null = 아직 못 받음. 첫 분류를 기본 선택으로 삼는다(예전엔 'schedule' 하드코딩이었다).
+  const [cats, setCats] = useState<BoardCat[] | null>(null)
+  const [cat, setCat] = useState<string>('')
   const [open, setOpen] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    loadBoardCats('faq').then((c) => {
+      if (!alive) return
+      setCats(c)
+      // 아직 아무것도 안 고른 상태면 첫 분류로. 사용자가 이미 골랐으면 건드리지 않는다.
+      setCat((cur) => cur || c[0]?.key || '')
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -59,15 +71,19 @@ export default function Faq() {
 
   const q = query.trim().toLowerCase()
   const searching = q.length > 0
-  const list = rows.filter((f) =>
+  const catList = cats ?? []
+  // ⚠️ 지워진 분류의 글은 목록에서 뺀다 — 검색 결과에서도 마찬가지다(안 빼면 사이드바엔 없는 글이 검색으로 나온다).
+  const known = new Set(catList.map((c) => c.key))
+  const live = rows.filter((f) => known.has(f.category))
+  const list = live.filter((f) =>
     searching
       ? pick(f.question_i18n).toLowerCase().includes(q) || pick(f.answer_i18n).toLowerCase().includes(q)
       : f.category === cat,
   )
-  const catLabel = (key: string) => t(CATS.find((c) => c.key === key)?.labelKey ?? 'faq.title')
+  const catLabel = (key: string) => catName(catList.find((c) => c.key === key), lang) || t('faq.title')
   // 항목이 있는 카테고리만 사이드바에 노출(빈 탭 숨김). 로딩 중엔 전체 유지(깜빡임 방지),
   // 현재 선택된 탭은 비어도 유지(선택 탭이 사라지는 혼란 방지).
-  const visibleCats = loading ? CATS : CATS.filter((c) => c.key === cat || rows.some((f) => f.category === c.key))
+  const visibleCats = loading ? catList : catList.filter((c) => c.key === cat || live.some((f) => f.category === c.key))
 
   const helpBox = (
     <div className="p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
@@ -134,17 +150,17 @@ export default function Faq() {
               <nav className="flex flex-col gap-2">
                 {visibleCats.map((c) => {
                   const active = c.key === cat && !searching
-                  const count = rows.filter((f) => f.category === c.key).length
+                  const count = live.filter((f) => f.category === c.key).length
                   return active ? (
                     <button key={c.key} onClick={() => { setCat(c.key); setQuery('') }} className="flex items-center gap-4 p-4 rounded-xl transition-all text-left shadow-md bg-primary-container text-on-primary">
-                      <span className="material-symbols-outlined text-white/80">{c.icon}</span>
-                      <div><span className="block font-title-md text-base font-semibold">{t(c.labelKey)}</span></div>
+                      <span className="material-symbols-outlined text-white/80">{c.icon || FALLBACK_ICON}</span>
+                      <div><span className="block font-title-md text-base font-semibold">{catName(c, lang)}</span></div>
                     </button>
                   ) : (
                     <button key={c.key} onClick={() => { setCat(c.key); setQuery('') }} className="flex items-center justify-between gap-4 p-4 rounded-xl hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-all text-left group">
                       <span className="flex items-center gap-4">
-                        <span className="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">{c.icon}</span>
-                        <span className="block font-title-md text-base font-semibold group-hover:text-primary transition-colors">{t(c.labelKey)}</span>
+                        <span className="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">{c.icon || FALLBACK_ICON}</span>
+                        <span className="block font-title-md text-base font-semibold group-hover:text-primary transition-colors">{catName(c, lang)}</span>
                       </span>
                       {count > 0 && <span className="font-label-sm text-label-sm text-outline">{count}</span>}
                     </button>

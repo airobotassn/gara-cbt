@@ -887,14 +887,239 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
   )
 }
 
-// ── 공지사항 관리 (admin 함수의 noticeList/noticeUpsert/noticeDelete) ──
-const NOTICE_CATS = ['guide', 'schedule', 'maintenance', 'event'] as const
-const NOTICE_CAT_LABEL: Record<string, string> = {
-  guide: '안내',
-  schedule: 'CARIS 일정',
-  maintenance: '점검',
-  event: '이벤트',
+// ── 게시판 분류(board_categories) — 공지·FAQ 가 같은 표를 쓰고 kind 로 갈린다 (2026-08-19) ──
+//   예전엔 분류가 여기 상수(NOTICE_CATS/FAQ_CATS)와 i18n 사전 두 곳에 박혀 있어서, 하나 늘리려면
+//   개발자가 고치고 배포해야 했다. 지금은 관리자가 '분류 관리' 모달에서 만들고 고치고 지운다.
+//   ⛔ 분류를 지워도 글은 안 지운다 — 그 글들은 '미분류' 로 내려오고(공개 화면에선 안 보인다)
+//      여기서 다시 분류를 지정하면 살아난다. 서버 주석(admin/index.ts 의 boardCat*)과 한 쌍이다.
+interface BoardCat {
+  id: string
+  key: string
+  labelI18n: I18nText
+  icon: string
+  sort: number
+  count: number // 이 분류를 쓰는 글 수(미공개 포함)
 }
+type BoardKind = 'notice' | 'faq'
+interface BoardCatResp {
+  categories: BoardCat[]
+  orphans: { key: string; count: number }[]
+}
+const KIND_WORD: Record<BoardKind, string> = { notice: '공지', faq: 'FAQ' }
+
+/** FAQ 사이드바 아이콘 후보. 관리자가 Material Symbols 이름을 외울 필요가 없게 골라 담았다. */
+const CAT_ICONS = ['help', 'calendar_month', 'computer', 'credit_card', 'workspace_premium', 'domain', 'school', 'description', 'support_agent', 'settings']
+
+function useBoardCats(kind: BoardKind) {
+  const [cats, setCats] = useState<BoardCat[]>([])
+  const [orphans, setOrphans] = useState<{ key: string; count: number }[]>([])
+  const reloadCats = useCallback(async () => {
+    try {
+      const r = await callFunction<BoardCatResp>('admin', { action: 'boardCatList', kind })
+      setCats(r.categories ?? [])
+      setOrphans(r.orphans ?? [])
+    } catch {
+      /* 분류를 못 불러와도 글 목록은 보여야 한다 — 이름 대신 키가 그대로 뜬다. */
+    }
+  }, [kind])
+  useEffect(() => {
+    reloadCats()
+  }, [reloadCats])
+  return { cats, orphans, reloadCats }
+}
+
+/** 분류 이름. 지워진 분류(고아)면 키를 그대로 보여준다 — 무슨 값이었는지 알아야 다시 지정할 수 있다. */
+function catLabelOf(cats: BoardCat[], key: string): string {
+  return cats.find((c) => c.key === key)?.labelI18n?.ko || key
+}
+const isOrphanCat = (cats: BoardCat[], key: string) => !!key && !cats.some((c) => c.key === key)
+
+/** 분류 관리 모달 — 추가·이름 수정·순서·삭제. 공지·FAQ 화면이 같은 것을 띄운다. */
+function BoardCatModal({ kind, onClose, onChanged }: { kind: BoardKind; onClose: () => void; onChanged: () => void }) {
+  const [cats, setCats] = useState<BoardCat[]>([])
+  const [orphans, setOrphans] = useState<{ key: string; count: number }[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  // 편집 중인 한 건. id 가 없으면 새로 만드는 중.
+  const [draft, setDraft] = useState<{ id?: string; key: string; labelKo: string; icon: string } | null>(null)
+
+  const load = useCallback(async () => {
+    setErr('')
+    try {
+      const r = await callFunction<BoardCatResp>('admin', { action: 'boardCatList', kind })
+      setCats(r.categories ?? [])
+      setOrphans(r.orphans ?? [])
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '분류를 불러올 수 없습니다.')
+    }
+  }, [kind])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function call(body: Record<string, unknown>) {
+    setBusy(true)
+    try {
+      const res = await callFunction<{ translateWarning?: string | null }>('admin', body)
+      await load()
+      onChanged()
+      if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:' + String.fromCharCode(10) + res.translateWarning)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function save() {
+    if (!draft) return
+    if (!draft.labelKo.trim()) {
+      alert('한국어 분류 이름은 필수입니다.')
+      return
+    }
+    await call({
+      action: 'boardCatUpsert',
+      kind,
+      category: { id: draft.id, key: draft.key, icon: draft.icon, labelI18n: { ko: draft.labelKo.trim() } },
+    })
+    setDraft(null)
+  }
+
+  async function remove(c: BoardCat) {
+    // ⚠️ 몇 건이 딸려 내려가는지 **먼저** 알려준다. 지워도 글은 남지만, 공개 화면에서 사라지는 건 사실이다.
+    const name = c.labelI18n.ko || c.key
+    const msg = c.count > 0
+      ? [
+          `"${name}" 분류를 지울까요?`,
+          '',
+          `이 분류를 쓰는 ${KIND_WORD[kind]} ${c.count}건은 삭제되지 않지만,`,
+          '· 사용자 화면에서는 내려갑니다',
+          `· 관리자 목록에서 '미분류' 로 모입니다 (분류를 다시 지정하면 다시 보입니다)`,
+        ].join(String.fromCharCode(10))
+      : `"${name}" 분류를 지울까요?`
+    if (!confirm(msg)) return
+    await call({ action: 'boardCatDelete', id: c.id })
+  }
+
+  async function move(i: number, dir: -1 | 1) {
+    const j = i + dir
+    if (j < 0 || j >= cats.length) return
+    const next = [...cats]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setCats(next) // 낙관적 반영 — 눌렀는데 안 움직이는 것처럼 보이지 않게
+    await call({ action: 'boardCatReorder', ids: next.map((c) => c.id) })
+  }
+
+  return (
+    <div className="admin-modal-bg">
+      {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 다른 모달과 같은 규칙(입력하던 값이 날아간다). */}
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2 style={{ margin: 0 }}>{KIND_WORD[kind]} 분류 관리</h2>
+        <p style={{ margin: '8px 0 14px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+          한국어 이름만 쓰면 저장할 때 나머지 5개국어로 자동 번역됩니다.
+          분류를 지워도 글은 지워지지 않고 ‘미분류’로 내려갑니다.
+        </p>
+
+        {err && <div className="admin-section admin-empty">{err}</div>}
+
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'center' }}>순서</th>
+                <th>이름 (한국어)</th>
+                <th>키</th>
+                <th style={{ textAlign: 'right' }}>글</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {cats.map((c, i) => (
+                <tr key={c.id}>
+                  <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                    <button className="admin-mini" disabled={busy || i === 0} onClick={() => move(i, -1)} title="위로">↑</button>
+                    <button className="admin-mini" style={{ marginLeft: 4 }} disabled={busy || i === cats.length - 1} onClick={() => move(i, 1)} title="아래로">↓</button>
+                  </td>
+                  <td>
+                    {kind === 'faq' && c.icon && (
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: -4, marginRight: 6, opacity: 0.7 }}>{c.icon}</span>
+                    )}
+                    {c.labelI18n.ko || <span style={{ color: 'var(--muted)' }}>(이름 없음)</span>}
+                  </td>
+                  <td style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 13 }}>{c.key}</td>
+                  <td style={{ textAlign: 'right' }}>{c.count}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="admin-mini" disabled={busy} onClick={() => setDraft({ id: c.id, key: c.key, labelKo: c.labelI18n.ko ?? '', icon: c.icon })}>편집</button>
+                    <button className="admin-mini" style={{ marginLeft: 6 }} disabled={busy} onClick={() => remove(c)}>삭제</button>
+                  </td>
+                </tr>
+              ))}
+              {!cats.length && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>분류가 없습니다.</td></tr>
+              )}
+              {/* 고아 = 지워진(또는 옛) 분류를 달고 있는 글들. 같은 키로 다시 만들면 그대로 돌아온다. */}
+              {orphans.map((o) => (
+                <tr key={`orphan-${o.key}`}>
+                  <td />
+                  <td style={{ color: 'var(--muted)' }}>미분류</td>
+                  <td style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 13 }}>{o.key}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{o.count}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="admin-mini" disabled={busy} onClick={() => setDraft({ key: o.key, labelKo: '', icon: '' })}>이 키로 되살리기</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {draft ? (
+          <div className="admin-section" style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 15 }}>{draft.id ? '분류 편집' : '새 분류'}</h3>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <label style={{ ...fieldStyle, flex: 2, minWidth: 160 }}>
+                이름 <em style={{ color: 'var(--error, #d43a3a)' }}>(한국어 · 필수)</em>
+                <input type="text" style={inpStyle} value={draft.labelKo} onChange={(e) => setDraft({ ...draft, labelKo: e.target.value })} placeholder="예: 채용 공고" />
+              </label>
+              <label style={{ ...fieldStyle, flex: 1, minWidth: 150 }}>
+                {/* ⚠️ 키는 만들 때만 정한다 — 나중에 바꾸면 그 분류를 쓰던 글이 통째로 미분류가 된다(서버도 무시한다). */}
+                키 {draft.id ? <em style={{ color: 'var(--muted)' }}>(변경 불가)</em> : <em style={{ color: 'var(--muted)' }}>(영문 소문자)</em>}
+                <input
+                  type="text"
+                  style={{ ...inpStyle, fontFamily: 'monospace', opacity: draft.id ? 0.6 : 1 }}
+                  value={draft.key}
+                  disabled={!!draft.id}
+                  onChange={(e) => setDraft({ ...draft, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                  placeholder="recruit"
+                />
+              </label>
+              {kind === 'faq' && (
+                <label style={{ ...fieldStyle, flex: 1, minWidth: 150 }}>
+                  아이콘
+                  <select style={inpStyle} value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })}>
+                    <option value="">(없음)</option>
+                    {CAT_ICONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                  </select>
+                </label>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="admin-mini" onClick={() => setDraft(null)}>취소</button>
+              <button className="admin-mini" disabled={busy} onClick={save}>{busy ? '저장 중…' : '저장'}</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="admin-mini" onClick={() => setDraft({ key: '', labelKo: '', icon: '' })}>+ 새 분류</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── 공지사항 관리 (admin 함수의 noticeList/noticeUpsert/noticeDelete) ──
 interface NoticeDraft {
   id?: string
   category: string
@@ -954,6 +1179,9 @@ function NoticesAdmin() {
   const [err, setErr] = useState('')
   const [draft, setDraft] = useState<NoticeDraft | null>(null)
   const [saving, setSaving] = useState(false)
+  // 분류는 DB(board_categories)에서 온다 — 관리자가 '분류 관리' 에서 만든 그대로.
+  const { cats, reloadCats } = useBoardCats('notice')
+  const [catOpen, setCatOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1019,7 +1247,8 @@ function NoticesAdmin() {
   function openNew() {
     setHtmlMode(false)
     setHtmlNotes([])
-    setDraft(emptyDraft())
+    // 첫 분류를 기본값으로 — 분류를 다 지운 상태면 옛 기본값('guide')이 남지만, 저장 즉시 미분류로 보인다.
+    setDraft({ ...emptyDraft(), category: cats[0]?.key ?? 'guide' })
   }
   function openEdit(n: NoticeRow) {
     setHtmlMode(false)
@@ -1091,6 +1320,9 @@ function NoticesAdmin() {
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
+          <button className="admin-mini" onClick={() => setCatOpen(true)}>
+            분류 관리
+          </button>
           <button className="admin-mini" onClick={openNew}>
             + 새 공지
           </button>
@@ -1124,7 +1356,14 @@ function NoticesAdmin() {
                   )}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {NOTICE_CAT_LABEL[n.category] ?? n.category}
+                  {/* 지워진 분류를 달고 있는 글 — 공개 화면에선 이미 안 보인다. 편집에서 다시 지정하면 살아난다. */}
+                  {isOrphanCat(cats, n.category) ? (
+                    <span style={{ color: 'var(--muted)' }} title={`분류 '${n.category}' 가 삭제됨 — 편집에서 다시 지정하세요`}>
+                      미분류 ({n.category})
+                    </span>
+                  ) : (
+                    catLabelOf(cats, n.category)
+                  )}
                   {n.required && (
                     <span className="admin-badge st-voided" style={{ marginLeft: 6 }}>
                       필독
@@ -1158,6 +1397,17 @@ function NoticesAdmin() {
         </table>
       </div>
 
+      {catOpen && (
+        <BoardCatModal
+          kind="notice"
+          onClose={() => setCatOpen(false)}
+          onChanged={() => {
+            reloadCats()
+            load() // 분류가 바뀌면 목록의 '미분류' 표시도 같이 바뀐다
+          }}
+        />
+      )}
+
       {draft && (
         <div className="admin-modal-bg">
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
@@ -1184,9 +1434,14 @@ function NoticesAdmin() {
                     value={draft.category}
                     onChange={(e) => patch({ category: e.target.value })}
                   >
-                    {NOTICE_CATS.map((c) => (
-                      <option key={c} value={c}>
-                        {NOTICE_CAT_LABEL[c]}
+                    {/* 지워진 분류를 달고 있는 글도 열 수 있어야 한다 — 없는 값이면 select 가 첫 항목으로
+                        튀어서, 저장만 눌러도 조용히 다른 분류가 된다. 그래서 현재 값을 임시 항목으로 넣는다. */}
+                    {isOrphanCat(cats, draft.category) && (
+                      <option value={draft.category}>미분류 ({draft.category})</option>
+                    )}
+                    {cats.map((c) => (
+                      <option key={c.id} value={c.key}>
+                        {c.labelI18n.ko || c.key}
                       </option>
                     ))}
                   </select>
@@ -1317,14 +1572,9 @@ function NoticesAdmin() {
 }
 
 // ── FAQ 관리 (admin 함수의 faqList/faqUpsert/faqDelete) ──
-const FAQ_CATS = ['schedule', 'system', 'payment', 'grading', 'corporate'] as const
-const FAQ_CAT_LABEL: Record<string, string> = {
-  schedule: '시험 접수·일정',
-  system: '시스템·환경',
-  payment: '결제·환불',
-  grading: '채점·인증서',
-  corporate: '기업·단체',
-}
+//   분류는 공지와 같은 표(board_categories, kind='faq')에서 온다 — 위 BoardCatModal 참고.
+/** 미분류(지워진 분류를 달고 있는 글) 묶음을 가리키는 화면 전용 키. DB 에 저장되는 값이 아니다. */
+const FAQ_NONE = '__none__'
 
 interface FaqDraft {
   id?: string
@@ -1337,13 +1587,15 @@ interface FaqDraft {
 }
 
 function emptyFaqDraft(): FaqDraft {
-  return { category: 'schedule', sort: 9999, published: true, questionI18n: {}, answerI18n: {}, tagI18n: {} }
+  return { category: '', sort: 9999, published: true, questionI18n: {}, answerI18n: {}, tagI18n: {} }
 }
 
 function FaqAdmin() {
   const [rows, setRows] = useState<FaqRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  const { cats, reloadCats } = useBoardCats('faq')
+  const [catOpen, setCatOpen] = useState(false)
   const [draft, setDraft] = useState<FaqDraft | null>(null)
   const faqDraft = useDraft({ kind: 'faq', refId: draft?.id, value: draft, title: draft?.questionI18n?.ko?.trim() || '새 FAQ', enabled: !!draft })
   const [saving, setSaving] = useState(false)
@@ -1367,7 +1619,9 @@ function FaqAdmin() {
   }, [load])
 
   function openNew() {
-    setDraft({ ...emptyFaqDraft(), category: catFilter })
+    // 보고 있던 분류로 시작한다. '미분류' 를 보던 중이면 첫 분류로(미분류는 저장할 수 있는 값이 아니다).
+    const base = catFilter === FAQ_NONE ? (cats[0]?.key ?? '') : catFilter
+    setDraft({ ...emptyFaqDraft(), category: base })
   }
   function openEdit(f: FaqRow) {
     setDraft({
@@ -1427,9 +1681,10 @@ function FaqAdmin() {
     if (swap < 0 || swap >= group.length) return
     const g = [...group]
     ;[g[idx], g[swap]] = [g[swap], g[idx]]
-    const known = new Set<string>(FAQ_CATS)
+    const catKeys = cats.map((c) => c.key)
+    const known = new Set<string>(catKeys)
     const ids: string[] = []
-    for (const key of FAQ_CATS) {
+    for (const key of catKeys) {
       if (key === f.category) g.forEach((r) => ids.push(r.id))
       else rows.filter((r) => r.category === key).sort((a, b) => a.sort - b.sort).forEach((r) => ids.push(r.id))
     }
@@ -1445,7 +1700,13 @@ function FaqAdmin() {
     }
   }
 
-  const group = rows.filter((r) => r.category === catFilter).sort((a, b) => a.sort - b.sort)
+  // 고른 분류가 사라졌으면(그 분류를 방금 지웠다면) 첫 분류로 접는다 — 빈 화면을 보여주지 않는다.
+  const activeCat =
+    catFilter === FAQ_NONE || cats.some((c) => c.key === catFilter) ? catFilter : (cats[0]?.key ?? catFilter)
+  const orphanRows = rows.filter((r) => isOrphanCat(cats, r.category))
+  const group = (activeCat === FAQ_NONE ? orphanRows : rows.filter((r) => r.category === activeCat)).sort(
+    (a, b) => a.sort - b.sort,
+  )
 
   return (
     <>
@@ -1455,6 +1716,9 @@ function FaqAdmin() {
           <span className="admin-count">총 {rows.length}건</span>
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
+          </button>
+          <button className="admin-mini" onClick={() => setCatOpen(true)}>
+            분류 관리
           </button>
           <button className="admin-mini" onClick={openNew}>
             + 새 FAQ
@@ -1466,19 +1730,26 @@ function FaqAdmin() {
 
       {/* 분류 버튼 — 눌러서 해당 분류만 보기(공개 FAQ 사이드바처럼) */}
       <div className="admin-tabs" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
-        {FAQ_CATS.map((key) => {
-          const count = rows.filter((r) => r.category === key).length
+        {cats.map((c) => {
+          const count = rows.filter((r) => r.category === c.key).length
           return (
             <button
-              key={key}
-              className={catFilter === key ? 'on' : ''}
-              onClick={() => setCatFilter(key)}
+              key={c.id}
+              className={activeCat === c.key ? 'on' : ''}
+              onClick={() => setCatFilter(c.key)}
             >
-              {FAQ_CAT_LABEL[key]}
+              {c.labelI18n.ko || c.key}
               {count > 0 && <span style={{ opacity: 0.55, marginLeft: 5 }}>{count}</span>}
             </button>
           )
         })}
+        {/* 분류가 지워져 갈 곳을 잃은 글들. 있을 때만 칸이 생긴다 — 평소엔 없는 게 정상이다. */}
+        {orphanRows.length > 0 && (
+          <button className={activeCat === FAQ_NONE ? 'on' : ''} onClick={() => setCatFilter(FAQ_NONE)}>
+            미분류
+            <span style={{ opacity: 0.55, marginLeft: 5 }}>{orphanRows.length}</span>
+          </button>
+        )}
       </div>
 
       <div className="admin-table-wrap">
@@ -1534,13 +1805,24 @@ function FaqAdmin() {
             {!group.length && !loading && (
               <tr>
                 <td colSpan={4} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  이 분류에 FAQ가 없습니다. “+ 새 FAQ”로 추가하세요.
+                  {activeCat === FAQ_NONE ? '미분류 FAQ가 없습니다.' : '이 분류에 FAQ가 없습니다. “+ 새 FAQ”로 추가하세요.'}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {catOpen && (
+        <BoardCatModal
+          kind="faq"
+          onClose={() => setCatOpen(false)}
+          onChanged={() => {
+            reloadCats()
+            load() // 분류가 바뀌면 칸·'미분류' 묶음도 같이 바뀐다
+          }}
+        />
+      )}
 
       {draft && (
         <div className="admin-modal-bg">
@@ -1560,9 +1842,13 @@ function FaqAdmin() {
                     value={draft.category}
                     onChange={(e) => patch({ category: e.target.value })}
                   >
-                    {FAQ_CATS.map((c) => (
-                      <option key={c} value={c}>
-                        {FAQ_CAT_LABEL[c]}
+                    {/* 공지와 같은 이유 — 없는 값이면 select 가 첫 항목으로 튀어 조용히 분류가 바뀐다. */}
+                    {isOrphanCat(cats, draft.category) && (
+                      <option value={draft.category}>미분류 ({draft.category})</option>
+                    )}
+                    {cats.map((c) => (
+                      <option key={c.id} value={c.key}>
+                        {c.labelI18n.ko || c.key}
                       </option>
                     ))}
                   </select>
