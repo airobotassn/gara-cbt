@@ -70,5 +70,7 @@ export default function HtmlBody({ html, className }: { html: string; className?
       </div>
     )
   }
-  return <div className={className} dangerouslySetInnerHTML={{ __html: clean }} />
+  // 조각(편집기로 쓴 글)도 넘칠 수 있다 — 폭 선언 없는 표를 붙여 넣으면 칸 수만큼 옆으로 자란다.
+  // ⚠️ 페이지 바깥이 overflow-x:hidden 이라 여기서 안 받으면 스크롤 없이 **그냥 잘린다**.
+  return <div className={className} style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: clean }} />
 }

@@ -119,7 +119,37 @@ function mediaToContainer(group: CSSStyleSheet | CSSGroupingRule) {
 
 // 격리 대상 판정의 단일 출처 — 렌더러와 페이지 폭이 **같은 기준**을 봐야 한다.
 // (한쪽만 바뀌면 원본 폭으로 만든 문서가 좁은 칸에 갇히거나, 평범한 공지가 넓게 퍼진다.)
-export const isIsolatedHtml = (html: string) => /<style[\s>]/i.test(html)
+const DOC_WIDTH_RE = /(?:max-)?width\s*:\s*(\d{3,5})(?:\.\d+)?\s*px/gi
+/** 문서급 폭으로 볼 최소값(px). 배지·아이콘 같은 작은 px 폭에 걸리지 않게 잡은 선. */
+const DOC_WIDTH_MIN = 600
+
+/**
+ * 본문이 **스스로 정한 폭**(px). 없으면 0.
+ * `<style>` 안이든 인라인 `style="…"` 이든 글자만 보고 찾는다 — 어느 쪽으로 만들어 오든 같게 다루려고.
+ * `width:100%` · `width:15%` 같은 비율과 200px 짜리 배지는 걸리지 않는다.
+ */
+export function declaredDocWidth(html: string): number {
+  let max = 0
+  for (const m of html.matchAll(DOC_WIDTH_RE)) max = Math.max(max, Number(m[1]))
+  return max >= DOC_WIDTH_MIN ? max : 0
+}
+
+/**
+ * 문서형 판정 — "이 본문이 **자기 스타일·자기 폭을 들고 온 문서**인가".
+ *
+ * ⚠️ 예전엔 `<style>` 유무 **하나로만** 봤다. 그런데 만들어 오는 HTML 은 인라인 `style="…"` 만으로
+ *    짜여 오는 경우가 흔하다(생성 AI 로 뽑으면 대개 그렇다). 그런 문서는 '조각' 으로 취급돼
+ *    **읽기 칸(768px)** 에 들어갔고, 900px 로 만든 표가 그 안에서 눌려 칸마다 글자가 줄줄이 접혔다
+ *    (2026-08-20 실제 사례). 관리자에게 "이런 모양으로 만들어 오세요" 를 요구하지 않는 게 원칙이라
+ *    — 어떤 모양으로 올지 우리는 모른다 — 판정을 넓힌다.
+ * ⚠️ 그렇다고 "태그가 있으면 문서" 로 하면 안 된다. 편집기(Quill)로 쓴 평범한 글까지 그림자 안으로
+ *    들어가 **앱 서체·간격을 잃고** 브라우저 기본 스타일(명조·줄간격 없음)로 뜬다. 그건 조각으로 남아야 한다.
+ *
+ * 그래서 둘 중 하나면 문서다:
+ *   · `<style>` 이 있다 — 스스로 꾸미는 문서
+ *   · 문서급 폭을 선언했다 — 스스로 폭을 정한 문서
+ */
+export const isIsolatedHtml = (html: string) => /<style[\s>]/i.test(html) || declaredDocWidth(html) > 0
 
 /**
  * 만들어 올린 공지 본문의 **표준 폭(px)**. 화면·미리보기·업로드 정규화가 전부 이 값을 본다.
