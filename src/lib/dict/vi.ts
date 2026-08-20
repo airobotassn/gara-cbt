@@ -1534,6 +1534,26 @@ const VI: Record<string, string> = {
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.cert_fee_note": "Sau khi đạt, việc cấp chứng chỉ sẽ được tính phí riêng.",
   "pay.pg_eximbay_note": "Nhấn Thanh toán để mở cửa sổ Eximbay, bạn chọn phương thức tại đó.",
+  // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
+  //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
+  //    ⚠️ 법적 고지라 임의로 줄이거나 의역하지 말 것 — 문구를 바꾸려면 규정 자체를 먼저 고쳐야 한다.
+  "pay.terms_title": "Quy định hủy và hoàn tiền",
+  "pay.terms_col_when": "Thời điểm hủy (tính đến 24:00 ngày đó)",
+  "pay.terms_col_rate": "Mức hoàn",
+  "pay.terms_col_note": "Ghi chú",
+  "pay.terms_none": "Không được",
+  "pay.terms_r1_when": "Đến trước ngày thi 7 ngày",
+  "pay.terms_r1_note": "Hoàn toàn bộ",
+  "pay.terms_r2_when": "Từ 6 ngày đến 3 ngày trước ngày thi",
+  "pay.terms_r2_note": "Hoàn một nửa",
+  "pay.terms_r3_when": "Từ 2 ngày trước đến khi bắt đầu thi",
+  "pay.terms_r3_note": "Về nguyên tắc không được",
+  "pay.terms_r3_note2": "Hoàn toàn bộ theo ngoại lệ — người thân trực hệ qua đời hoặc nhập viện, cách ly do bệnh truyền nhiễm và các lý do bất khả kháng khác, có chứng từ",
+  "pay.terms_r4_when": "Sau khi đã bắt đầu thi",
+  "pay.terms_r4_note": "Tuyệt đối không hủy và không hoàn tiền (kể cả không dự thi)",
+  "pay.terms_ebook": "Sách điện tử và bài giảng là nội dung số. Sau khi thanh toán, nếu bạn đã bắt đầu xem thì quyền rút lại bị hạn chế; chỉ những mục chưa từng mở mới được hoàn tiền trong vòng 7 ngày kể từ ngày thanh toán.",
+  "pay.terms_agree": "Tôi đã đọc và đồng ý với quy định hủy, hoàn tiền ở trên. (bắt buộc)",
+  "pay.terms_required": "Bạn phải đồng ý với quy định hoàn tiền trước khi thanh toán.",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "Thanh toán trong nước được tính bằng KRW theo tỷ giá ngày thanh toán.",
 
@@ -1674,32 +1694,10 @@ const VI: Record<string, string> = {
   "hub.err.generic": "Đã xảy ra lỗi. Vui lòng thử lại sau giây lát",
   // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
   "hub.err.not_owned": "Bạn chưa sở hữu món này",
-  "hub.err.not_furniture": "Vật phẩm này không đặt được trong phòng",
-  "hub.err.wrong_surface": "Không thể đặt món này ở vị trí đó",
 
   // ── 방 꾸미기(미니룸) ──
-  "hub.room.edit": "Trang trí",
-  "hub.room.done": "Xong",
-  "hub.room.link": "Liên kết phòng",
-  "hub.room.copied": "Đã sao chép",
-  "hub.room.surface_floor": "Sàn",
-  "hub.room.surface_wall": "Tường",
-  "hub.room.pick_title": "Đồ đặt ở {where}",
-  "hub.room.none_owned": "Bạn chưa có đồ nào đặt được ở {where}. Thử cửa hàng nhé.",
-  "hub.room.remove": "Bỏ trống chỗ này",
-  "hub.room.help": "Mỗi món chỉ đặt được ở một chỗ. Đặt sang chỗ khác là chuyển đi.",
 
   // 가구 이름 — 상점·방 고르기가 같이 쓴다.
-  "hub.part.fur_plant_01": "Chậu Cây Nhỏ",
-  "hub.part.fur_lamp_01": "Đèn Sàn",
-  "hub.part.fur_chair_01": "Ghế Gỗ",
-  "hub.part.fur_sofa_01": "Ghế Sofa Êm",
-  "hub.part.fur_wardrobe_01": "Tủ Quần Áo",
-  "hub.part.fur_bed_01": "Giường",
-  "hub.part.fur_frame_01": "Khung Ảnh",
-  "hub.part.fur_clock_01": "Đồng Hồ Treo",
-  "hub.part.fur_shelf_01": "Kệ Sách",
-  "hub.part.fur_window_01": "Cửa Sổ",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "Xem phòng",
@@ -1708,7 +1706,6 @@ const VI: Record<string, string> = {
   "room.someone": "Chưa đặt tên",
   "room.season_pt": "{n} điểm mùa giải",
   "room.not_found": "Không tìm thấy phòng này.",
-  "room.empty": "Phòng này chưa đặt gì cả.",
   "room.my_room": "Đến phòng của tôi",
   "room.my_room_edit": "Trang trí phòng của tôi",
 
@@ -1778,7 +1775,6 @@ const VI: Record<string, string> = {
   "hub.closet.tab_items": "Túi đồ",
   "hub.closet.g_character": "Nhân vật",
   "hub.closet.g_skin": "Skin nền & giao diện",
-  "hub.closet.g_furniture": "Nội thất",
   "hub.closet.g_part": "Vật phẩm",
   "hub.closet.worn": "Đang dùng",
   "hub.closet.wear": "Dùng",

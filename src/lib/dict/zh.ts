@@ -1534,6 +1534,26 @@ const ZH: Record<string, string> = {
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.cert_fee_note": "通过考试后申请发放证书时，将另行收费。",
   "pay.pg_eximbay_note": "点击“支付”后将打开 Eximbay 支付窗口，在该窗口中选择支付方式。",
+  // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
+  //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
+  //    ⚠️ 법적 고지라 임의로 줄이거나 의역하지 말 것 — 문구를 바꾸려면 규정 자체를 먼저 고쳐야 한다.
+  "pay.terms_title": "取消及退款规定",
+  "pay.terms_col_when": "取消时点（以当日24:00为准）",
+  "pay.terms_col_rate": "退款比例",
+  "pay.terms_col_note": "备注",
+  "pay.terms_none": "不可",
+  "pay.terms_r1_when": "应试日7天前为止",
+  "pay.terms_r1_note": "全额退款",
+  "pay.terms_r2_when": "应试日6天前 ~ 3天前",
+  "pay.terms_r2_note": "半额退款",
+  "pay.terms_r3_when": "应试日2天前 ~ 当日应试开始前",
+  "pay.terms_r3_note": "原则上不可",
+  "pay.terms_r3_note2": "例外全额退款 — 直系亲属死亡、住院，传染病隔离等不可抗力事由并提供证明时",
+  "pay.terms_r4_when": "应试开始之后",
+  "pay.terms_r4_note": "绝对不可取消及退款（含未应试）",
+  "pay.terms_ebook": "电子书与课程为数字内容。付款后一旦开始阅览即限制解除合同，仅未曾阅览的商品可在付款之日起7日内退款。",
+  "pay.terms_agree": "本人已确认并同意上述取消及退款规定。（必填）",
+  "pay.terms_required": "需同意退款规定后才能付款。",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "国内支付按付款当日汇率以韩元扣款。",
 
@@ -1674,32 +1694,10 @@ const ZH: Record<string, string> = {
   "hub.err.generic": "发生错误，请稍后再试",
   // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
   "hub.err.not_owned": "您还没有这件家具",
-  "hub.err.not_furniture": "该物品不能放进房间",
-  "hub.err.wrong_surface": "这件家具不能放在那个位置",
 
   // ── 방 꾸미기(미니룸) ──
-  "hub.room.edit": "布置",
-  "hub.room.done": "完成",
-  "hub.room.link": "房间链接",
-  "hub.room.copied": "已复制",
-  "hub.room.surface_floor": "地板",
-  "hub.room.surface_wall": "墙面",
-  "hub.room.pick_title": "放在{where}的家具",
-  "hub.room.none_owned": "还没有可以放在{where}的家具，去商店看看吧。",
-  "hub.room.remove": "清空这个位置",
-  "hub.room.help": "每件家具只能放在一个位置，放到别处即为移动。",
 
   // 가구 이름 — 상점·방 고르기가 같이 쓴다.
-  "hub.part.fur_plant_01": "小盆栽",
-  "hub.part.fur_lamp_01": "落地灯",
-  "hub.part.fur_chair_01": "木椅",
-  "hub.part.fur_sofa_01": "舒适沙发",
-  "hub.part.fur_wardrobe_01": "衣柜",
-  "hub.part.fur_bed_01": "床",
-  "hub.part.fur_frame_01": "相框",
-  "hub.part.fur_clock_01": "挂钟",
-  "hub.part.fur_shelf_01": "书架",
-  "hub.part.fur_window_01": "窗户",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "参观房间",
@@ -1708,7 +1706,6 @@ const ZH: Record<string, string> = {
   "room.someone": "未命名",
   "room.season_pt": "赛季 {n} 分",
   "room.not_found": "找不到这个房间。",
-  "room.empty": "这个房间还什么都没放。",
   "room.my_room": "前往我的房间",
   "room.my_room_edit": "布置我的房间",
 
@@ -1778,7 +1775,6 @@ const ZH: Record<string, string> = {
   "hub.closet.tab_items": "背包",
   "hub.closet.g_character": "角色",
   "hub.closet.g_skin": "背景 · UI 皮肤",
-  "hub.closet.g_furniture": "家具",
   "hub.closet.g_part": "道具",
   "hub.closet.worn": "使用中",
   "hub.closet.wear": "使用",

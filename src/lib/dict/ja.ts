@@ -1534,6 +1534,26 @@ const JA: Record<string, string> = {
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.cert_fee_note": "合格後に資格証を発行する際、別途費用が請求されます。",
   "pay.pg_eximbay_note": "「決済する」を押すと Eximbay の決済画面が開き、そこで支払い方法を選びます。",
+  // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
+  //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
+  //    ⚠️ 법적 고지라 임의로 줄이거나 의역하지 말 것 — 문구를 바꾸려면 규정 자체를 먼저 고쳐야 한다.
+  "pay.terms_title": "キャンセル・返金規定",
+  "pay.terms_col_when": "キャンセル時点（当日24:00基準）",
+  "pay.terms_col_rate": "返金率",
+  "pay.terms_col_note": "備考",
+  "pay.terms_none": "不可",
+  "pay.terms_r1_when": "受験日の7日前まで",
+  "pay.terms_r1_note": "全額返金",
+  "pay.terms_r2_when": "受験日の6日前～3日前まで",
+  "pay.terms_r2_note": "半額返金",
+  "pay.terms_r3_when": "受験日の2日前～当日の受験開始前",
+  "pay.terms_r3_note": "原則不可",
+  "pay.terms_r3_note2": "例外的に全額返金 — 直系家族の死亡・入院、感染症による隔離など、やむを得ない事由を証明した場合",
+  "pay.terms_r4_when": "受験開始以降",
+  "pay.terms_r4_note": "キャンセル・返金は一切不可（未受験を含む）",
+  "pay.terms_ebook": "電子書籍・講義はデジタルコンテンツです。決済後に閲覧を開始するとクーリングオフが制限され、一度も閲覧していない商品のみ決済日から7日以内に返金できます。",
+  "pay.terms_agree": "上記のキャンセル・返金規定を確認し、同意します。（必須）",
+  "pay.terms_required": "返金規定に同意しないと決済できません。",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "国内決済は決済時点のレートでウォン請求されます。",
 
@@ -1674,32 +1694,10 @@ const JA: Record<string, string> = {
   "hub.err.generic": "エラーが発生しました。しばらくしてからもう一度お試しください",
   // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
   "hub.err.not_owned": "持っていない家具です",
-  "hub.err.not_furniture": "部屋に置けないアイテムです",
-  "hub.err.wrong_surface": "その場所には置けない家具です",
 
   // ── 방 꾸미기(미니룸) ──
-  "hub.room.edit": "模様がえ",
-  "hub.room.done": "完了",
-  "hub.room.link": "部屋リンク",
-  "hub.room.copied": "コピーしました",
-  "hub.room.surface_floor": "床",
-  "hub.room.surface_wall": "壁",
-  "hub.room.pick_title": "{where}に置く家具",
-  "hub.room.none_owned": "{where}に置ける家具がまだありません。ショップで手に入れましょう。",
-  "hub.room.remove": "この場所を空ける",
-  "hub.room.help": "家具は一か所にだけ置けます。別の場所に置くと移動します。",
 
   // 가구 이름 — 상점·방 고르기가 같이 쓴다.
-  "hub.part.fur_plant_01": "小さな鉢植え",
-  "hub.part.fur_lamp_01": "スタンドライト",
-  "hub.part.fur_chair_01": "木の椅子",
-  "hub.part.fur_sofa_01": "ふかふかソファ",
-  "hub.part.fur_wardrobe_01": "クローゼット",
-  "hub.part.fur_bed_01": "ベッド",
-  "hub.part.fur_frame_01": "額縁",
-  "hub.part.fur_clock_01": "壁掛け時計",
-  "hub.part.fur_shelf_01": "本棚",
-  "hub.part.fur_window_01": "窓",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "部屋を見る",
@@ -1708,7 +1706,6 @@ const JA: Record<string, string> = {
   "room.someone": "名前なし",
   "room.season_pt": "シーズン{n}点",
   "room.not_found": "部屋が見つかりません。",
-  "room.empty": "まだ何も置かれていない部屋です。",
   "room.my_room": "自分の部屋へ",
   "room.my_room_edit": "自分の部屋を模様がえ",
 
@@ -1778,7 +1775,6 @@ const JA: Record<string, string> = {
   "hub.closet.tab_items": "持ち物",
   "hub.closet.g_character": "キャラクター",
   "hub.closet.g_skin": "背景・UIスキン",
-  "hub.closet.g_furniture": "家具",
   "hub.closet.g_part": "アイテム",
   "hub.closet.worn": "着用中",
   "hub.closet.wear": "着用する",

@@ -13,7 +13,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { krw, usdc } from '../lib/money'
-import { createOrder, type CreateOrderResp, type ProductType } from '../lib/payments'
+import { agreeTerms, createOrder, type CreateOrderResp, type ProductType } from '../lib/payments'
 import SiteFooter from '../components/SiteFooter'
 
 type Phase = 'loading' | 'ready' | 'error'
@@ -22,6 +22,15 @@ type Phase = 'loading' | 'ready' | 'error'
 // 고를 수 있도록 결제창으로 나가기 직전에 적어둔다.
 // ⚠️ PayResult.tsx 가 같은 키로 읽는다. 표시용 힌트일 뿐이라 권한 판정에 쓰면 안 된다.
 const PRODUCT_HINT_KEY = 'payProductType'
+
+// 환불 규정 표 4줄. 문구는 전부 사전에 있고 여기엔 순서와 '환불율' 만 둔다
+// (rate 가 없는 줄은 '불가' — 언어마다 다른 말이라 사전에서 뽑는다).
+const REFUND_ROWS: { key: string; when: string; rate: string | null; note: string; note2?: string }[] = [
+  { key: 'r1', when: 'pay.terms_r1_when', rate: '100%', note: 'pay.terms_r1_note' },
+  { key: 'r2', when: 'pay.terms_r2_when', rate: '50%', note: 'pay.terms_r2_note' },
+  { key: 'r3', when: 'pay.terms_r3_when', rate: null, note: 'pay.terms_r3_note', note2: 'pay.terms_r3_note2' },
+  { key: 'r4', when: 'pay.terms_r4_when', rate: null, note: 'pay.terms_r4_note' },
+]
 
 /** 엑심베이 JS SDK 가 심는 전역. 스크립트를 로드해야 생긴다. */
 declare global {
@@ -61,6 +70,8 @@ export default function Checkout() {
   const { isFullUser, loading: authLoading } = useAuth()
 
   const productType = (params.get('type') ?? '') as ProductType
+  // 응시료·자격증 발급비는 '응시일' 기준 표, 이북·묶음은 디지털 콘텐츠 문구.
+  const isExamLike = productType === 'exam' || productType === 'cert' 
   const productRef = params.get('ref') ?? ''
   // 원서접수 화면에서 함께 담은 교재. 여기선 **id 를 서버로 전달만** 한다(가격은 서버가 뽑는다).
   const addonEbookId = params.get('book') ?? ''
@@ -76,6 +87,9 @@ export default function Checkout() {
   const [err, setErr] = useState('')
   const [order, setOrder] = useState<CreateOrderResp | null>(null)
   const [paying, setPaying] = useState(false)
+  // 취소·환불 규정 동의. 체크 전에는 결제 버튼이 안 눌린다(2026-08-20).
+  //   ⚠️ 기본값을 true 로 두거나 '동의로 간주' 문구로 대체하지 말 것 — 그건 동의를 받은 게 아니다.
+  const [agreed, setAgreed] = useState(false)
 
   // StrictMode 는 개발에서 effect 를 두 번 돌린다 — 막지 않으면 주문이 두 개 생긴다.
   const startedRef = useRef(false)
@@ -120,11 +134,14 @@ export default function Checkout() {
   }, [authLoading, isFullUser, productType, productRef, addonEbookId, bundleIdsRaw, lang, navigate, t, preflightErr])
 
   async function pay() {
-    if (!order?.orderId || paying) return
+    if (!order?.orderId || paying || !agreed) return
     setPaying(true)
     setErr('')
     try {
       try { sessionStorage.setItem(PRODUCT_HINT_KEY, productType) } catch { /* 없으면 결과 화면이 이북 기준으로 떨어질 뿐이다 */ }
+      // 동의를 **결제창을 열기 전에** 결제 건에 남긴다. 실패하면 결제창을 열지 않는다 —
+      // 동의 기록 없이 돈만 빠지면 그 건은 나중에 증거가 없다.
+      await agreeTerms(order.orderId)
       const ex = order.eximbay
       if (!ex || !window.EXIMBAY) throw new Error(t('pay.error_generic'))
       // ⚠️ 페이로드를 여기서 만들지 않는다 — FGKey 는 서버가 /ready 에 보낸 값들의 서명이라
@@ -224,13 +241,61 @@ export default function Checkout() {
               {t('pay.pg_eximbay_note')}
             </p>
 
+            {/* 취소·환불 규정 — 결제 버튼 **바로 위**다. 동의하지 않으면 결제가 시작되지 않는다.
+                상품 종류로 내용이 갈린다: 응시료·자격증 발급비는 응시일 기준 표, 이북·묶음은 디지털
+                콘텐츠 청약철회 문구. ⚠️ 잔글씨 금지 — 동의를 받는 문장이라 읽혀야 한다. */}
+            <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container px-5 py-4">
+              <h2 className="mb-3 font-title-md text-[17px] font-bold text-on-surface">{t('pay.terms_title')}</h2>
+              {isExamLike ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] border-collapse font-body-md text-[15px] leading-[23px]">
+                    <thead>
+                      <tr className="border-b border-outline-variant/40 text-left text-on-surface-variant">
+                        <th className="py-2 pr-4 font-normal break-keep">{t('pay.terms_col_when')}</th>
+                        <th className="py-2 pr-4 font-normal whitespace-nowrap">{t('pay.terms_col_rate')}</th>
+                        <th className="py-2 font-normal break-keep">{t('pay.terms_col_note')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {REFUND_ROWS.map((r) => (
+                        <tr key={r.key} className="border-b border-outline-variant/20 last:border-0 align-top">
+                          <td className="py-3 pr-4 font-semibold text-on-surface break-keep">{t(r.when)}</td>
+                          <td className="py-3 pr-4 font-semibold text-on-surface whitespace-nowrap">
+                            {r.rate ?? t('pay.terms_none')}
+                          </td>
+                          <td className="py-3 text-on-surface-variant break-keep">
+                            {t(r.note)}
+                            {r.note2 && <span className="mt-1 block">{t(r.note2)}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="font-body-md text-[15px] leading-[23px] text-on-surface-variant break-keep">
+                  {t('pay.terms_ebook')}
+                </p>
+              )}
+            </div>
+
+            <label className="mb-6 flex cursor-pointer items-start gap-3 font-body-md text-[15px] leading-[23px] text-on-surface break-keep">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-primary)]"
+              />
+              {t('pay.terms_agree')}
+            </label>
+
             {err && phase === 'ready' && (
               <p className="mb-4 font-body-md text-[15px] text-error break-keep">{err}</p>
             )}
 
             <button
               onClick={pay}
-              disabled={phase !== 'ready' || paying}
+              disabled={phase !== 'ready' || paying || !agreed}
               className="w-full py-4 bg-primary text-on-primary font-label-md text-[17px] font-bold rounded-2xl ambient-shadow disabled:opacity-50 transition-opacity"
             >
               {paying
@@ -239,6 +304,12 @@ export default function Checkout() {
                   ? t('pay.preparing')
                   : `${usdc(order?.amount ?? 0, lang)} ${t('pay.pay_button')}`}
             </button>
+            {/* 버튼이 왜 안 눌리는지 말해준다 — 비활성 버튼만 두면 고장으로 읽힌다. */}
+            {phase === 'ready' && !agreed && (
+              <p className="mt-3 text-center font-body-md text-[15px] text-on-surface-variant break-keep">
+                {t('pay.terms_required')}
+              </p>
+            )}
           </>
         )}
       </main>

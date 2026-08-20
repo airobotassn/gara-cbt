@@ -6,8 +6,6 @@ import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
-import RoomView from '../components/RoomView'
-import { furnitureArt, roomUrl, type RoomSlot, type RoomSlots } from '../lib/room'
 import { Link } from 'react-router-dom'
 import { useT, type TFunc } from '../lib/i18n'
 import {
@@ -30,11 +28,6 @@ import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, charSeriesOf,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
 } from '../lib/hubCosmetics'
-
-/** 방(미니룸) 표시 스위치. 2026-08-14: 허브 배경이 사진 한 장이 되면서 CSS 벽·바닥이 설 자리가 없어 껐다.
- *  ⚠️ 코드를 지우지 않은 이유 — 서버(`room` 함수)·DB(가구 소유)·공개 방 `/room/:handle` 은 그대로 살아 있다.
- *     가구를 사진 위 %좌표에 다시 얹기로 하면 이 값을 true 로 되돌리는 것만으로 돌아온다. */
-const ROOM_ENABLED = false
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -84,8 +77,6 @@ function partName(key: string, t: TFunc) {
   return t(`hub.part.${key}`)
 }
 function partEmoji(key: string) {
-  // 가구는 방 렌더러와 **같은 그림**을 쓴다 — 상점 썸네일과 방에 놓인 물건이 다르면 뭘 산 건지 알 수 없다.
-  if (key.startsWith('fur_')) return furnitureArt(key)
   if (key.startsWith('hat')) return '🧢'
   if (key.startsWith('shoe')) return '👟'
   if (key.startsWith('glasses')) return '👓'
@@ -98,7 +89,6 @@ function partEmoji(key: string) {
 const CLOSET_GROUPS: { kind: string; labelKey: string }[] = [
   { kind: 'character', labelKey: 'hub.closet.g_character' },
   { kind: 'skin', labelKey: 'hub.closet.g_skin' },
-  { kind: 'furniture', labelKey: 'hub.closet.g_furniture' },
   { kind: 'part', labelKey: 'hub.closet.g_part' },
 ]
 
@@ -114,10 +104,6 @@ function CosmeticThumb({ partKey }: { partKey: string }) {
 // kind·surface 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
 interface CatalogItem { partKey: string; price: number; kind?: string; surface?: string | null }
 interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; cosmetics?: string[]; stamps?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
-  // 방(미니룸) — layout(슬롯 목록 + %좌표)은 서버가 통째로 준다. 프론트에 슬롯표를 두지 않는다.
-  room?: { slots: RoomSlots; layout: RoomSlot[] }
-  // 가구 전체(면 포함). catalog 와 달리 상점에서 내린 한정템도 들어 있다 — 이미 가진 사람은 계속 놓을 수 있어야 하므로.
-  furniture?: { partKey: string; surface: string }[]
   // 꾸미기 — 장착한 캐릭터(baseKey) · 그 외 장착(equipped.skin) · 첫 진입 흐름 진행 상태.
   //   ⚠️ charChosen·tutorialDone 은 **서버만이 안다**. 화면이 localStorage 로 기억하면
   //      브라우저를 바꾸거나 지운 사람에게 첫 진입 흐름이 다시 강제된다.
@@ -129,10 +115,8 @@ interface ShopResp { part_key: string; spent_points: number; points_after: numbe
 // stamps = 적립 뒤 7일 사이클 위치(1..7), bonus = 7일 완주 보너스 코인(0 이면 없음).
 interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
 
-// 방 저장 거절 사유(room 함수)도 사람 말로 옮긴다 — 'wrong_surface' 가 그대로 뜨면 원인 불명의 오류로 보인다.
 const FRIENDLY_ERR = new Set([
-  'insufficient_points', 'already_owned', 'unauthorized',
-  'not_owned', 'not_furniture', 'wrong_surface',
+  'insufficient_points', 'already_owned', 'unauthorized', 'not_owned',
   // 꾸미기(character 함수) — 장착·선택 거절 사유.
   'invalid_character', 'invalid_kind', 'invalid_part',
 ])
@@ -148,9 +132,6 @@ type TitleItem = { tier: string; exam_title?: string }
 type ModalKind = 'closet' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
 /** 꾸미기 모달의 두 탭. */
 type ClosetTab = 'shop' | 'items'
-
-// 면 라벨 사전 키 — 'floor'/'wall' 이 곧 키라서 표를 두 벌 두지 않는다(hub.earn.row.<kind> 와 같은 관례).
-const surfaceLabel = (surface: string, t: TFunc) => t(`hub.room.surface_${surface}`)
 
 // 코인 선물 — 받은 것(오늘, 사람별 합산) / 이력 한 줄.
 type GiftToday = { name: string; amount: number; count: number }
@@ -219,13 +200,6 @@ export default function Hub() {
   const [giftHistory, setGiftHistory] = useState<GiftRow[] | null>(null)
   const [giftHistoryOpen, setGiftHistoryOpen] = useState(false)
   const [owned, setOwned] = useState<Set<string>>(new Set())
-  // 방(미니룸). layout 은 서버가 준 것만 쓴다 — 슬롯표를 프론트에 복제하지 않는다(_shared/room.ts 가 단일 출처).
-  const [roomSlots, setRoomSlots] = useState<RoomSlots>({})
-  const [roomLayout, setRoomLayout] = useState<RoomSlot[]>([])
-  const [furniture, setFurniture] = useState<{ partKey: string; surface: string }[]>([])
-  const [editing, setEditing] = useState(false)
-  const [pickSlot, setPickSlot] = useState<string | null>(null) // 가구 고르기 모달이 열린 슬롯
-  const [roomCopied, setRoomCopied] = useState(false)
   // 시험 사다리 등급(user_progress.rank). HUD 의 Lv 는 이제 ARENA 레벨(점수 밴드)이라 화면에는 안 쓴다
   // — 서버는 계속 내려주므로 받아만 둔다(기존 skillScore/activityScore 와 같은 패턴).
   const [, setLevel] = useState<number | null>(null)
@@ -413,7 +387,6 @@ export default function Hub() {
     setGiftsToday(h.giftsToday ?? [])
     setGiftsOlder(h.giftsOlder ?? 0)
     setGiftsUnseen(h.giftsUnseen ?? 0)
-    setFurniture(h.furniture ?? [])
     // 꾸미기 장착값 — 서버가 권위다. 'default'(아직 안 고름)는 null 로 눕혀 폴백 그림 하나로 처리한다.
     setCharKey(h.baseKey && h.baseKey !== 'default' ? h.baseKey : null)
     setSkinPart(h.equipped?.skin ?? DEFAULT_SKIN_PART)
@@ -422,12 +395,6 @@ export default function Hub() {
     if (h.authed) {
       setCharChosen(!!h.charChosen)
       setTutorialDone(!!h.tutorialDone)
-    }
-    // ⚠️ 배치는 서버 응답으로 **덮어쓴다**(낙관적 반영을 되돌리는 게 아니라 권위값 동기화).
-    //    layout 은 비어 있으면 갱신하지 않는다 — 옛 배포본 응답에 room 이 없으면 방이 통째로 사라진다.
-    if (h.room) {
-      setRoomSlots(h.room.slots ?? {})
-      if (h.room.layout?.length) setRoomLayout(h.room.layout)
     }
   }
   async function hydrate() {
@@ -550,52 +517,6 @@ export default function Hub() {
     }
   }
 
-  // ── 방 꾸미기 ──
-  // 배치 저장은 **낙관적 반영 + 실패 시 되돌리기**다. 가구를 놓는 건 눌렀을 때 바로 보여야 하는 동작이라
-  // 서버 응답을 기다리면 한 박자 늦게 나타난다. 대신 서버가 거절하면 반드시 원래대로 돌려놓는다
-  // — 안 돌리면 화면엔 놓여 있는데 새로고침하면 사라지는(= 원인 모를) 상태가 된다.
-  async function saveRoom(next: RoomSlots) {
-    const prev = roomSlots
-    setRoomSlots(next)
-    try {
-      await callFunction('room', { action: 'save', slots: next })
-    } catch (e) {
-      setRoomSlots(prev)
-      pushErr(friendlyError(e, t))
-    }
-  }
-  // 슬롯에 가구를 놓거나(partKey) 치운다(null).
-  function placeInSlot(slotKey: string, partKey: string | null) {
-    const next: RoomSlots = { ...roomSlots }
-    if (partKey) {
-      // 같은 가구를 두 자리에 둘 수 없다 — 하나뿐인 물건이라 복제로 보인다. 옮기는 것으로 처리한다.
-      for (const k of Object.keys(next)) if (next[k] === partKey) delete next[k]
-      next[slotKey] = partKey
-    } else {
-      delete next[slotKey]
-    }
-    setPickSlot(null)
-    void saveRoom(next)
-  }
-  async function copyRoomLink() {
-    if (!user?.id) return
-    const url = roomUrl(user.id)
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = url
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-    }
-    setRoomCopied(true)
-    window.setTimeout(() => setRoomCopied(false), 1600)
-  }
-
   // ---------- 코인 선물 ----------
   // 즉시 이체다. 취소·회수 경로가 없어서 방어선은 (a) 코드 8자 완성 시 닉네임 노출 (b) 확인 단계
   // (c) nonce 재사용 셋뿐이다. 서버는 잠금 순서·잔액·멱등·원장을 전부 RPC 한 트랜잭션에서 처리한다.
@@ -697,10 +618,6 @@ export default function Hub() {
   // ⚠️ 구글 계정 이름(user_metadata.name)으로 폴백하지 말 것 — 실명이다. 닉네임 게이트가 막고 있는 걸
   //    프로필을 받아오는 짧은 사이에 그대로 흘린다. 아직 못 받았으면 마스코트 이름으로 둔다.
   const heroName = displayName?.trim() || 'CARI'
-  // 가구 고르기 모달 파생값 — 고른 슬롯의 면과 맞고 **내가 가진** 가구만 후보다.
-  //   면을 안 거르면 벽시계가 바닥 후보로 뜨고, 눌러도 서버가 wrong_surface 로 거절해 헛클릭이 된다.
-  const pickSlotDef = pickSlot ? roomLayout.find((s) => s.key === pickSlot) ?? null : null
-  const pickable = pickSlotDef ? furniture.filter((f) => f.surface === pickSlotDef.surface && owned.has(f.partKey)) : []
 
   // 지금 **그릴** 스킨 = 입어보는 중이면 그것, 아니면 실제 장착값.
   //   ⚠️ 저장값(skinPart)과 화면값(skin)을 갈라놓는 게 입어보기의 전부다. 저장 경로는 이 값을 안 본다.
@@ -920,33 +837,6 @@ export default function Hub() {
               <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" dir={skin.iconDir} /></span>{t('hub.rail.title')}</button>
               <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><HubUiIcon n="invite" dir={skin.iconDir} /></span>{t('hub.rail.invite')}</button>
             </div>
-            {/* 방(미니룸) — /room/:handle(남의 방)과 **같은 컴포넌트**를 쓴다.
-                내 방과 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나서 제일 늦게 발견된다.
-                ⚠️ 지금은 꺼져 있다(ROOM_ENABLED=false) — 배경이 사진 한 장이 되면서 CSS 벽·바닥이 설 자리가 없다.
-                   지우지 않은 이유: 서버(room 함수)·DB(가구 소유)·/room/:handle 은 그대로 살아 있고,
-                   가구를 사진 위 %좌표에 다시 얹기로 하면 이 블록을 켜는 것만으로 돌아온다. */}
-            {ROOM_ENABLED && (
-              <>
-                <RoomView
-                  layout={roomLayout}
-                  slots={roomSlots}
-                  name={heroName}
-                  badge={titleBadge}
-                  editing={editing}
-                  activeSlot={pickSlot}
-                  onSlotClick={(k) => setPickSlot(k)}
-                />
-                {/* 왼쪽 조작 버튼 — 오른쪽 레일의 반대편. 방 링크는 여기 둔다(위 backrow 는 이미 버튼 둘이라 셋이면 밀린다). */}
-                <div className="room-acts">
-                  <button className={`room-btn${editing ? ' on' : ''}`} onClick={() => { setEditing((v) => !v); setPickSlot(null) }}>
-                    {t(editing ? 'hub.room.done' : 'hub.room.edit')}
-                  </button>
-                  <button className="room-btn" onClick={copyRoomLink}>
-                    {t(roomCopied ? 'hub.room.copied' : 'hub.room.link')}
-                  </button>
-                </div>
-              </>
-            )}
         </div>
 
         {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
@@ -992,34 +882,6 @@ export default function Hub() {
             <button className="pbtn buy-pop-ok" style={btn('#6bbf9a')} onClick={() => setPurchased(null)}>{t('hub.confirm')}</button>
           </div>
         </div>
-      )}
-
-      {/* 가구 고르기 — 슬롯 하나에 놓을 것을 고른다. 면이 맞고 내가 가진 것만 나온다. */}
-      {pickSlot && pickSlotDef && (
-        <Modal title={t('hub.room.pick_title', { where: surfaceLabel(pickSlotDef.surface, t) })} onClose={() => setPickSlot(null)}>
-          {pickable.length === 0 ? (
-            <p className="rmpick-empty">{t('hub.room.none_owned', { where: surfaceLabel(pickSlotDef.surface, t) })}</p>
-          ) : (
-            <div className="rmpick-grid">
-              {pickable.map((f) => (
-                <button
-                  key={f.partKey}
-                  className={`rmpick-item${roomSlots[pickSlot] === f.partKey ? ' on' : ''}`}
-                  onClick={() => placeInSlot(pickSlot, f.partKey)}
-                >
-                  <span className="rmpick-art">{furnitureArt(f.partKey)}</span>
-                  <span>{partName(f.partKey, t)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          {roomSlots[pickSlot] && (
-            <button className="pbtn" style={{ ...btn('#c3cbe0'), width: '100%', marginTop: 12 }} onClick={() => placeInSlot(pickSlot, null)}>
-              {t('hub.room.remove')}
-            </button>
-          )}
-          <p className="hub-modal-help">{t('hub.room.help')}</p>
-        </Modal>
       )}
 
       {/* 꾸미기 = 상점 + 인벤토리 한 모달의 두 탭(2026-08-20).
@@ -1071,10 +933,7 @@ export default function Hub() {
                               </button>
                               {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
                                   안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
-                              <div className="hub-shop-name">
-                                {partName(c.partKey, t)}
-                                {c.surface ? <small style={{ display: 'block', fontWeight: 800, opacity: .7 }}>{surfaceLabel(c.surface, t)}</small> : null}
-                              </div>
+                              <div className="hub-shop-name">{partName(c.partKey, t)}</div>
                               <div className="hub-shop-price">{c.price > 0 ? `🪙 ${c.price}` : t('hub.shop.free')}</div>
                               <button className="pbtn hub-shop-buy" style={btn(has ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={has}>
                                 {t(has ? 'hub.shop.owned' : 'hub.shop.buy')}

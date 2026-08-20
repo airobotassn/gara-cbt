@@ -1,10 +1,10 @@
-// room: 미니룸 저장(본인) · 열람(공개).
+// room: 남의 방 열람(공개).
 //
-//  · action:'save' — 본인 방 배치 저장. 소유·면 검증은 _shared/room.ts 가 한다.
-//  · action:'view' — **아무나** 볼 수 있는 남의 방. 로그인 없이도 열린다(SNS 링크가 목적이라 그래야 한다).
+//  · action:'view' — **아무나** 볼 수 있다. 로그인 없이도 열린다(SNS 링크가 목적이라 그래야 한다).
 //
-// ⚠️ user_rooms 는 RLS 정책 미부여(service role 전용)라 클라가 직접 읽고 쓸 수 없다.
-//   특히 쓰기를 열면 소유하지 않은 가구를 꽂을 수 있고, 방은 공개라 남들이 그걸 본다.
+// ⚠️ 2026-08-20: **가구·미니룸은 제거됐다.** 배치 저장(action:'save')·슬롯·좌표가 통째로 사라지고,
+//   이 화면은 그 사람이 꾸민 **배경 + 캐릭터**를 보여주는 자리가 됐다.
+//   걷어낼 때 산 사람이 한 명도 없었다(보유 0 · 구매 0 · 쓴 코인 0) → 몰수 문제가 없었다.
 //
 // ⚠️ view 가 내주는 건 **랭킹 화면에 이미 공개된 것 + 방 배치**뿐이다.
 //   국가·지역·가입일·코인·미션 같은 건 넣지 않는다(공유 카드가 publicOnly 로 거르는 것과 같은 기준).
@@ -13,22 +13,15 @@
 // ⚠️ _shared 를 import 하므로 대시보드 편집 불가 → CLI 배포 전용: `supabase functions deploy room`.
 //   verify_jwt 는 **켠 채로** 배포한다 — 비로그인도 anon 키는 실려 오므로 공개 예외가 필요 없다.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser } from '../_shared/lib.ts'
-import { ROOM_LAYOUT, sanitizeSlots, validateSlots, type Surface } from '../_shared/room.ts'
+import { adminClient } from '../_shared/lib.ts'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** 가구 카탈로그(part_key → 면). 상점에서 내린 한정템도 포함해야 한다 — 이미 가진 사람은 계속 놓을 수 있어야 하므로. */
-async function furnitureMap(admin: ReturnType<typeof adminClient>): Promise<Map<string, Surface>> {
-  const { data } = await admin.from('shop_catalog').select('part_key, surface').eq('kind', 'furniture')
-  return new Map((data ?? []).map((r) => [r.part_key as string, r.surface as Surface]))
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const admin = adminClient()
-    const body = await req.json().catch(() => ({})) as { action?: string; slots?: unknown; handle?: string }
+    const body = await req.json().catch(() => ({})) as { action?: string; handle?: string }
     const action = body.action ?? 'view'
 
     // ── 남의 방 보기 — 공개. 로그인도, 온보딩도 요구하지 않는다. ──
@@ -38,9 +31,8 @@ Deno.serve(async (req) => {
       // (프론트는 handle 을 문자열로만 다루고 라우트도 그대로다).
       if (!UUID_RE.test(handle)) return json({ error: 'bad_handle' }, 400)
 
-      const [{ data: profile }, { data: room }, { data: progress }, { data: titles }, { data: character }] = await Promise.all([
+      const [{ data: profile }, { data: progress }, { data: titles }, { data: character }] = await Promise.all([
         admin.from('profiles').select('display_name, avatar_url, is_anonymous').eq('id', handle).maybeSingle(),
-        admin.from('user_rooms').select('slots').eq('user_id', handle).maybeSingle(),
         admin.from('user_progress').select('season_total').eq('user_id', handle).maybeSingle(),
         admin.rpc('user_titles', { p_uid: handle }),
         // 장착한 캐릭터·스킨 — 방에 그 사람 캐릭터가 서고 배경이 그 사람 스킨으로 깔린다.
@@ -62,32 +54,7 @@ Deno.serve(async (req) => {
         // 'default'(아직 안 고름)는 null 로 눕힌다 — 프론트가 폴백 그림 하나로 처리한다.
         character: (() => { const b = (character?.base_key as string) ?? 'default'; return b && b !== 'default' ? b : null })(),
         skin: ((character?.equipped as Record<string, string> | null) ?? {}).skin ?? null,
-        slots: sanitizeSlots(room?.slots),
-        layout: ROOM_LAYOUT,
       })
-    }
-
-    // ── 여기부터는 본인만 ──
-    const user = await getUser(req)
-    if (!user || user.is_anonymous) return json({ error: 'unauthorized' }, 401)
-    const uid = user.id
-
-    if (action === 'save') {
-      const [{ data: owned }, furniture] = await Promise.all([
-        admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
-        furnitureMap(admin),
-      ])
-      const ownedSet = new Set((owned ?? []).map((r) => r.part_key as string))
-
-      const check = validateSlots(body.slots, ownedSet, furniture)
-      if (!check.ok) return json({ error: check.error }, 400)
-
-      const { error } = await admin
-        .from('user_rooms')
-        .upsert({ user_id: uid, slots: check.slots, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-      if (error) return json({ error: error.message }, 500)
-
-      return json({ ok: true, slots: check.slots })
     }
 
     return json({ error: 'bad_action' }, 400)

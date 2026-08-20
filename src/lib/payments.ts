@@ -89,6 +89,14 @@ export function confirmOrder(args: {
   return callFunction<PaymentStatusResp>('payments', { action: 'confirm', ...args })
 }
 
+/**
+ * 취소·환불 규정 동의를 결제 건에 기록한다. **결제창을 열기 직전에** 부른다.
+ * ⚠️ 실패하면 결제창을 열지 말 것 — 동의 기록 없이 돈만 빠지면 그 건은 증거가 없다.
+ */
+export function agreeTerms(orderId: string) {
+  return callFunction<{ ok: true; agreedAt: string }>('payments', { action: 'agree', orderId })
+}
+
 export function orderStatus(orderId: string) {
   return callFunction<PaymentStatusResp>('payments', { action: 'status', orderId })
 }

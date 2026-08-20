@@ -560,6 +560,32 @@ Deno.serve(async (req) => {
       })
     }
 
+    // ---------- 환불규정 동의 ----------
+    // 결제창을 열기 **직전에** 프론트가 부른다. 주문 생성 때 받지 않는 이유는 순서 때문이다 —
+    // 주문은 화면에 금액을 띄우려고 진입하자마자 만들어지고, 동의는 그 금액을 본 다음에 한다.
+    // ⚠️ 한 번 찍힌 시각은 덮어쓰지 않는다(재시도해도 최초 동의 시각이 증거다).
+    if (action === 'agree') {
+      const orderId = String(body?.orderId ?? '').trim()
+      if (!orderId) return json({ error: '주문번호가 필요합니다.' }, 400)
+      const { data } = await admin
+        .from('payments')
+        .select('order_id, user_id, status, terms_agreed_at')
+        .eq('order_id', orderId)
+        .maybeSingle()
+      const row = data as { user_id: string; status: string; terms_agreed_at: string | null } | null
+      if (!row) return json({ error: '주문을 찾을 수 없습니다.' }, 404)
+      if (row.user_id !== uid) return json({ error: '권한이 없습니다.' }, 403)
+      if (row.terms_agreed_at) return json({ ok: true, agreedAt: row.terms_agreed_at })
+      const agreedAt = new Date().toISOString()
+      const { error } = await admin
+        .from('payments')
+        .update({ terms_agreed_at: agreedAt })
+        .eq('order_id', orderId)
+        .is('terms_agreed_at', null)
+      if (error) return json({ error: error.message }, 400)
+      return json({ ok: true, agreedAt })
+    }
+
     // ---------- 상태 조회 ----------
     if (action === 'status') {
       const orderId = String(body?.orderId ?? '').trim()

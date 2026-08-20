@@ -1,46 +1,11 @@
-// 방(미니룸) 프론트 공용 — 타입 + 가구 그림 매핑.
+// 방(남의 방) 주소 헬퍼.
 //
-// ⚠️ 슬롯 목록과 좌표는 **여기 없다.** 서버(_shared/room.ts)가 layout 으로 통째로 내려주고
-//    화면은 그걸 인라인 style 로 얹는다. 여기에 좌표표를 복제하면 동기화 페어가 하나 더 생긴다.
-
-export type Surface = 'floor' | 'wall'
-
-export interface RoomSlot {
-  key: string
-  surface: Surface
-  x: number // % — 무대(.stage-zone) 기준, 슬롯 박스 왼쪽
-  y: number // % — 슬롯 박스 위쪽
-}
-
-/** {슬롯키: part_key}. 빈 슬롯은 키 자체가 없다. */
-export type RoomSlots = Record<string, string>
-
-export interface RoomData {
-  slots: RoomSlots
-  layout: RoomSlot[]
-}
-
-// 가구 그림 — **아직 그림이 없어서 이모지다**(2026-08-14: CSS 방으로 구조부터).
-//   그림이 생기면 여기 값을 <img src> 로 바꾸면 되고, DB(shop_catalog)·서버·슬롯 좌표는 안 바뀐다.
-//   ⚠️ 새 가구를 DB 에 넣으면 여기에도 한 줄 추가할 것 — 없으면 아래 기본 상자로 그려진다(깨지진 않는다).
-const FURNITURE_ART: Record<string, string> = {
-  fur_plant_01: '🪴',
-  fur_lamp_01: '💡',
-  fur_chair_01: '🪑',
-  fur_sofa_01: '🛋️',
-  fur_wardrobe_01: '🗄️',
-  fur_bed_01: '🛏️',
-  fur_frame_01: '🖼️',
-  fur_clock_01: '🕰️',
-  fur_shelf_01: '📚',
-  fur_window_01: '🪟',
-  fur_aquarium_01: '🐠',
-  fur_neon_01: '🌈',
-}
-
-export function furnitureArt(partKey: string): string {
-  return FURNITURE_ART[partKey] ?? '📦'
-}
+// ⚠️ 2026-08-20: **가구·미니룸은 제거됐다.** 방 안에 물건을 놓는 기능(슬롯·좌표·가구 그림)이
+//    통째로 사라졌고, `/room/:handle` 은 이제 "그 사람이 꾸민 배경 + 캐릭터"를 보여주는 화면이다.
+//    걷어낸 이유: 허브 배경이 사진 한 장이 되면서 CSS 벽·바닥이 설 자리를 잃었고(2026-08-14 허브에서
+//    먼저 껐다), 그 뒤로 남의 방에만 옛 상자가 남아 새 배경 위에 겹쳐 떠 있었다.
+//    걷어낼 때 **산 사람이 한 명도 없었다**(보유 0 · 구매 0 · 쓴 코인 0) — 그래서 몰수 문제가 없었다.
+//    되살리려면 이 커밋을 되짚되, 배경 사진 위 %좌표로 다시 잡아야 한다(CSS 벽·바닥은 못 쓴다).
 
 /** 방 주소. 지금 handle = uid — 서버 room 함수의 handle 해석과 짝이다(짧은 코드로 바꾸면 양쪽 한 줄씩). */
 export function roomPath(handle: string): string {

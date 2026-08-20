@@ -1534,6 +1534,26 @@ const EN: Record<string, string> = {
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.cert_fee_note": "Issuing your certificate after you pass is charged separately.",
   "pay.pg_eximbay_note": "Pressing Pay opens the Eximbay payment window, where you choose how to pay.",
+  // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
+  //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
+  //    ⚠️ 법적 고지라 임의로 줄이거나 의역하지 말 것 — 문구를 바꾸려면 규정 자체를 먼저 고쳐야 한다.
+  "pay.terms_title": "Cancellation & refund policy",
+  "pay.terms_col_when": "When you cancel (as of 24:00 that day)",
+  "pay.terms_col_rate": "Refund",
+  "pay.terms_col_note": "Notes",
+  "pay.terms_none": "Not allowed",
+  "pay.terms_r1_when": "Up to 7 days before the exam",
+  "pay.terms_r1_note": "Full refund",
+  "pay.terms_r2_when": "6 to 3 days before the exam",
+  "pay.terms_r2_note": "Half refund",
+  "pay.terms_r3_when": "From 2 days before until the exam starts",
+  "pay.terms_r3_note": "Not allowed as a rule",
+  "pay.terms_r3_note2": "Full refund by exception — death or hospitalization of an immediate family member, quarantine for an infectious disease, or a similar unavoidable cause, with documentation",
+  "pay.terms_r4_when": "After the exam has started",
+  "pay.terms_r4_note": "No cancellation or refund at all (including no-shows)",
+  "pay.terms_ebook": "E-books and lectures are digital content. Once you start reading or watching, the right of withdrawal is limited; only items you have never opened can be refunded within 7 days of payment.",
+  "pay.terms_agree": "I have read and agree to the cancellation and refund policy above. (required)",
+  "pay.terms_required": "You must agree to the refund policy before paying.",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "Domestic payments are charged in KRW at the rate on the day of payment.",
 
@@ -1674,32 +1694,10 @@ const EN: Record<string, string> = {
   "hub.err.generic": "Something went wrong. Please try again in a moment.",
   // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
   "hub.err.not_owned": "You don't own that piece",
-  "hub.err.not_furniture": "That can't be placed in a room",
-  "hub.err.wrong_surface": "That piece doesn't go there",
 
   // ── 방 꾸미기(미니룸) ──
-  "hub.room.edit": "Decorate",
-  "hub.room.done": "Done",
-  "hub.room.link": "Room link",
-  "hub.room.copied": "Copied",
-  "hub.room.surface_floor": "Floor",
-  "hub.room.surface_wall": "Wall",
-  "hub.room.pick_title": "Furniture for the {where}",
-  "hub.room.none_owned": "You have no furniture for the {where} yet. Try the shop.",
-  "hub.room.remove": "Clear this spot",
-  "hub.room.help": "Each piece sits in one spot. Placing it elsewhere moves it.",
 
   // 가구 이름 — 상점·방 고르기가 같이 쓴다.
-  "hub.part.fur_plant_01": "Little Plant",
-  "hub.part.fur_lamp_01": "Floor Lamp",
-  "hub.part.fur_chair_01": "Wooden Chair",
-  "hub.part.fur_sofa_01": "Cozy Sofa",
-  "hub.part.fur_wardrobe_01": "Wardrobe",
-  "hub.part.fur_bed_01": "Bed",
-  "hub.part.fur_frame_01": "Picture Frame",
-  "hub.part.fur_clock_01": "Wall Clock",
-  "hub.part.fur_shelf_01": "Bookshelf",
-  "hub.part.fur_window_01": "Window",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "Visit room",
@@ -1708,7 +1706,6 @@ const EN: Record<string, string> = {
   "room.someone": "Unnamed",
   "room.season_pt": "{n} season pts",
   "room.not_found": "That room doesn't exist.",
-  "room.empty": "Nothing has been placed in this room yet.",
   "room.my_room": "Go to my room",
   "room.my_room_edit": "Decorate my room",
 
@@ -1778,7 +1775,6 @@ const EN: Record<string, string> = {
   "hub.closet.tab_items": "Closet",
   "hub.closet.g_character": "Characters",
   "hub.closet.g_skin": "Background & UI skins",
-  "hub.closet.g_furniture": "Furniture",
   "hub.closet.g_part": "Items",
   "hub.closet.worn": "Equipped",
   "hub.closet.wear": "Equip",

@@ -15,8 +15,7 @@ import { useT } from '../lib/i18n'
 import { tierName } from '../lib/caris'
 import { Avatar } from '../components/GemAvatar'
 import CharArt from '../components/CharArt'
-import RoomView from '../components/RoomView'
-import { roomUrl, type RoomSlot, type RoomSlots } from '../lib/room'
+import { roomUrl } from '../lib/room'
 import { skinByPart } from '../lib/hubCosmetics'
 import { arenaLevelForScore } from '../lib/scoring'
 
@@ -30,8 +29,6 @@ interface RoomResp {
   // 여기만 기본 그림으로 두면 공유 카드와 방이 다른 사람처럼 보인다.
   character: string | null
   skin: string | null
-  slots: RoomSlots
-  layout: RoomSlot[]
   error?: string
 }
 
@@ -79,7 +76,6 @@ export default function Room() {
   const skin = skinByPart(data?.skin ?? null)
   const name = data?.name || t('room.someone')
   const badge = data?.title ? <span className="tt">🏆 CARIS {tierName(data.title)}</span> : null
-  const empty = !!data && Object.keys(data.slots ?? {}).length === 0
 
   return (
     <div className="hub" data-skin={skin.key}>
@@ -120,18 +116,16 @@ export default function Room() {
           </div>
         </div>
 
+        {/* 무대는 배경 레이어(.hub-scene)가 화면 전체에 이미 그리고 있다 — 여기는 그 위 빈 자리다.
+            ⚠️ 옛 미니룸 상자(RoomView: CSS 벽·바닥 + 가구 + 옛 로봇)는 2026-08-20 제거됐다.
+               배경이 사진 한 장이 된 뒤로 그 상자가 새 배경 위에 회색 사각형으로 겹쳐 떠 있었다. */}
         <div className="stage-zone">
-          {data ? (
-            <RoomView layout={data.layout} slots={data.slots} name={name} badge={badge} />
-          ) : (
+          {!data && (
             <p className="rmpick-empty" style={{ paddingTop: 40 }}>
               {failed ? t('room.not_found') : t('common.loading')}
             </p>
           )}
         </div>
-
-        {/* 빈 방 안내는 방 **아래**에 둔다 — 방 위에 겹치면 남의 방을 가린다. */}
-        {empty && <p className="rmpick-empty">{t('room.empty')}</p>}
 
         <div className="dock">
           <Link className="cta-main" to="/hub">{t(isMine ? 'room.my_room_edit' : 'room.my_room')}</Link>

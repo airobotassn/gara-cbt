@@ -1534,6 +1534,26 @@ const HI: Record<string, string> = {
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.cert_fee_note": "पास होने के बाद प्रमाणपत्र जारी कराने पर अलग से शुल्क लिया जाता है।",
   "pay.pg_eximbay_note": "भुगतान करें दबाने पर Eximbay विंडो खुलेगी, जहाँ आप भुगतान का तरीका चुनेंगे।",
+  // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
+  //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
+  //    ⚠️ 법적 고지라 임의로 줄이거나 의역하지 말 것 — 문구를 바꾸려면 규정 자체를 먼저 고쳐야 한다.
+  "pay.terms_title": "रद्दीकरण एवं धनवापसी नियम",
+  "pay.terms_col_when": "रद्द करने का समय (उस दिन 24:00 के अनुसार)",
+  "pay.terms_col_rate": "धनवापसी",
+  "pay.terms_col_note": "टिप्पणी",
+  "pay.terms_none": "संभव नहीं",
+  "pay.terms_r1_when": "परीक्षा से 7 दिन पहले तक",
+  "pay.terms_r1_note": "पूरी धनवापसी",
+  "pay.terms_r2_when": "परीक्षा से 6 दिन से 3 दिन पहले तक",
+  "pay.terms_r2_note": "आधी धनवापसी",
+  "pay.terms_r3_when": "परीक्षा से 2 दिन पहले से परीक्षा शुरू होने तक",
+  "pay.terms_r3_note": "सामान्यतः संभव नहीं",
+  "pay.terms_r3_note2": "अपवाद में पूरी धनवापसी — निकट परिवार की मृत्यु या भर्ती, संक्रामक रोग के कारण क्वारंटीन जैसे अपरिहार्य कारण, प्रमाण सहित",
+  "pay.terms_r4_when": "परीक्षा शुरू होने के बाद",
+  "pay.terms_r4_note": "रद्दीकरण और धनवापसी बिलकुल नहीं (अनुपस्थिति सहित)",
+  "pay.terms_ebook": "ई-बुक और लेक्चर डिजिटल सामग्री हैं। भुगतान के बाद पढ़ना या देखना शुरू करने पर वापसी का अधिकार सीमित हो जाता है; केवल कभी न खोली गई सामग्री की भुगतान से 7 दिन के भीतर धनवापसी संभव है।",
+  "pay.terms_agree": "मैंने ऊपर दिए रद्दीकरण एवं धनवापसी नियम पढ़ लिए हैं और उनसे सहमत हूँ। (आवश्यक)",
+  "pay.terms_required": "भुगतान से पहले धनवापसी नियमों से सहमत होना आवश्यक है।",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "घरेलू भुगतान भुगतान के दिन की दर पर KRW में लिया जाता है।",
 
@@ -1674,32 +1694,10 @@ const HI: Record<string, string> = {
   "hub.err.generic": "कुछ गड़बड़ हुई। थोड़ी देर बाद फिर कोशिश करें",
   // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
   "hub.err.not_owned": "यह फ़र्नीचर आपके पास नहीं है",
-  "hub.err.not_furniture": "इसे कमरे में नहीं रखा जा सकता",
-  "hub.err.wrong_surface": "यह फ़र्नीचर वहाँ नहीं रखा जा सकता",
 
   // ── 방 꾸미기(미니룸) ──
-  "hub.room.edit": "सजाएँ",
-  "hub.room.done": "हो गया",
-  "hub.room.link": "रूम लिंक",
-  "hub.room.copied": "कॉपी हो गया",
-  "hub.room.surface_floor": "फ़र्श",
-  "hub.room.surface_wall": "दीवार",
-  "hub.room.pick_title": "{where} के लिए फ़र्नीचर",
-  "hub.room.none_owned": "{where} के लिए अभी कोई फ़र्नीचर नहीं है। शॉप आज़माएँ।",
-  "hub.room.remove": "यह जगह खाली करें",
-  "hub.room.help": "हर फ़र्नीचर एक ही जगह रह सकता है। कहीं और रखने पर वह वहाँ चला जाता है।",
 
   // 가구 이름 — 상점·방 고르기가 같이 쓴다.
-  "hub.part.fur_plant_01": "छोटा गमला",
-  "hub.part.fur_lamp_01": "फ़्लोर लैंप",
-  "hub.part.fur_chair_01": "लकड़ी की कुर्सी",
-  "hub.part.fur_sofa_01": "कोज़ी सोफ़ा",
-  "hub.part.fur_wardrobe_01": "अलमारी",
-  "hub.part.fur_bed_01": "बिस्तर",
-  "hub.part.fur_frame_01": "तस्वीर का फ़्रेम",
-  "hub.part.fur_clock_01": "दीवार घड़ी",
-  "hub.part.fur_shelf_01": "किताबों की शेल्फ़",
-  "hub.part.fur_window_01": "खिड़की",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "रूम देखें",
@@ -1708,7 +1706,6 @@ const HI: Record<string, string> = {
   "room.someone": "बिना नाम",
   "room.season_pt": "सीज़न {n} अंक",
   "room.not_found": "यह रूम नहीं मिला।",
-  "room.empty": "इस रूम में अभी कुछ नहीं रखा गया।",
   "room.my_room": "मेरे रूम पर जाएँ",
   "room.my_room_edit": "मेरा रूम सजाएँ",
 
@@ -1778,7 +1775,6 @@ const HI: Record<string, string> = {
   "hub.closet.tab_items": "बैग",
   "hub.closet.g_character": "कैरेक्टर",
   "hub.closet.g_skin": "बैकग्राउंड और UI स्किन",
-  "hub.closet.g_furniture": "फ़र्नीचर",
   "hub.closet.g_part": "आइटम",
   "hub.closet.worn": "लगा हुआ",
   "hub.closet.wear": "लगाएँ",

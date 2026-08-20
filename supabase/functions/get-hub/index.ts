@@ -11,7 +11,6 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { kstDay } from '../_shared/kst.ts'
-import { ROOM_LAYOUT, sanitizeSlots } from '../_shared/room.ts'
 
 // DB 하드코딩 상수(complete_daily: 10)와 동일하게 유지 — 표시 전용.
 const ECON = { dailyPoints: 10 }
@@ -22,12 +21,8 @@ Deno.serve(async (req) => {
     const admin = adminClient()
 
     // 상점 카탈로그(코인 기본템) — 비로그인도 열람 가능.
-    const [{ data: catRows }, { data: furRows }] = await Promise.all([
-      // kind·surface 는 방 꾸미기(20260814090000)에서 붙었다 — 화면이 가구를 면별로 묶어 보여준다.
+    const [{ data: catRows }] = await Promise.all([
       admin.from('shop_catalog').select('part_key, price, kind, surface, sort_order').eq('active', true),
-      // 가구 전체(면 포함) — **active 로 거르지 않는다.** 상점에서 내린 품목도 이미 가진 사람은
-      // 계속 방에 놓을 수 있어야 하고, 화면은 "이 가구가 벽 것인지 바닥 것인지" 를 알아야 한다.
-      admin.from('shop_catalog').select('part_key, surface').eq('kind', 'furniture'),
     ])
     const catalog = (catRows ?? [])
       .map((c) => ({
@@ -39,12 +34,11 @@ Deno.serve(async (req) => {
       }))
       // 진열 순서는 관리표(sort_order)가 정한다 — 가격순으로 두면 면(바닥/벽)이 뒤섞여 진열이 흐트러진다.
       .sort((a, b) => a.sort - b.sort || a.price - b.price || a.partKey.localeCompare(b.partKey))
-    const furniture = (furRows ?? []).map((f) => ({ partKey: f.part_key as string, surface: f.surface as string }))
 
     // 인증: 비로그인/익명은 공개 정보만.
     const user = await getUser(req)
     if (!user || user.is_anonymous) {
-      return json({ authed: false, econ: ECON, catalog, furniture })
+      return json({ authed: false, econ: ECON, catalog })
     }
 
     const uid = user.id
@@ -68,7 +62,6 @@ Deno.serve(async (req) => {
       { data: referralCode },
       { data: referredRow },
       { data: giftRows },
-      { data: room },
     ] = await Promise.all([
       admin.from('user_currency').select('points').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
@@ -118,8 +111,6 @@ Deno.serve(async (req) => {
         .is('seen_at', null)
         .order('created_at', { ascending: false })
         .limit(200),
-      // 방(미니룸) 배치. 행이 없으면 빈 방 — 여기서 만들지 않는다(읽기만 하는 함수라 쓰기를 섞지 않는다).
-      admin.from('user_rooms').select('slots').eq('user_id', uid).maybeSingle(),
     ])
 
     const couponList = (coupons ?? []).map((c) => ({
@@ -192,12 +183,9 @@ Deno.serve(async (req) => {
       minigameDone: !!daily?.did_minigame,
       leveltestDone: !!daily?.did_leveltest,
       catalog,
-      furniture,
       coupons: couponList,
       titles: titleList,
       econ: ECON,
-      // 방 — 슬롯 배치와 **레이아웃(좌표 포함)** 을 같이 준다. 프론트에 슬롯표를 두지 않는다(_shared/room.ts 가 단일 출처).
-      room: { slots: sanitizeSlots(room?.slots), layout: ROOM_LAYOUT },
     })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)

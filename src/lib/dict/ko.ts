@@ -1540,6 +1540,26 @@ const KO: Record<string, string> = {
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
   "pay.cert_fee_note": "합격 후 자격증을 발급할 때 별도 비용이 청구돼요.",
   "pay.pg_eximbay_note": "결제하기를 누르면 Eximbay 결제창이 열리고, 결제수단은 그 창에서 고릅니다.",
+  // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
+  //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
+  //    ⚠️ 법적 고지라 임의로 줄이거나 의역하지 말 것 — 문구를 바꾸려면 규정 자체를 먼저 고쳐야 한다.
+  "pay.terms_title": "취소 및 환불 규정",
+  "pay.terms_col_when": "취소 시점 (해당일 24:00 기준)",
+  "pay.terms_col_rate": "환불율",
+  "pay.terms_col_note": "비고",
+  "pay.terms_none": "불가",
+  "pay.terms_r1_when": "응시일 7일 전까지",
+  "pay.terms_r1_note": "전액 환불",
+  "pay.terms_r2_when": "응시일 6일 전 ~ 3일 전까지",
+  "pay.terms_r2_note": "반액 환불",
+  "pay.terms_r3_when": "응시일 2일 전 ~ 당일 응시 시작 전",
+  "pay.terms_r3_note": "원칙적 불가",
+  "pay.terms_r3_note2": "예외 전액 환불 — 직계가족 사망·입원, 감염병 격리 등 불가피한 사유 증빙 시",
+  "pay.terms_r4_when": "응시 시작 이후",
+  "pay.terms_r4_note": "취소 및 환불 절대 불가 (미응시 포함)",
+  "pay.terms_ebook": "전자책·강의는 디지털 콘텐츠입니다. 결제 후 열람을 시작하면 청약철회가 제한되며, 한 번도 열람하지 않은 상품만 결제일로부터 7일 이내 환불할 수 있습니다.",
+  "pay.terms_agree": "위 취소 및 환불 규정을 확인했으며 이에 동의합니다. (필수)",
+  "pay.terms_required": "환불 규정에 동의해야 결제할 수 있습니다.",
   // 위 고지문의 짧은 버전 — 가격만 달러로 보여주는 목록(/ebooks · /exam/apply)용. 청구액 보간이 없다.
   "pay.currency_hint": "국내 결제는 결제 시점 환율로 원화 청구됩니다.",
 
@@ -1680,32 +1700,10 @@ const KO: Record<string, string> = {
   "hub.err.generic": "오류가 발생했어요. 잠시 후 다시 시도해주세요",
   // 방 저장 거절 사유(room 함수). 정상적으로 쓰면 안 뜬다 — 화면이 면 안 맞는 가구를 후보에서 이미 거른다.
   "hub.err.not_owned": "가지고 있지 않은 가구예요",
-  "hub.err.not_furniture": "방에 놓을 수 없는 물건이에요",
-  "hub.err.wrong_surface": "그 자리에는 놓을 수 없는 가구예요",
 
   // ── 방 꾸미기(미니룸) ──
-  "hub.room.edit": "꾸미기",
-  "hub.room.done": "완료",
-  "hub.room.link": "방 링크",
-  "hub.room.copied": "복사했어요",
-  "hub.room.surface_floor": "바닥",
-  "hub.room.surface_wall": "벽",
-  "hub.room.pick_title": "{where}에 놓을 가구",
-  "hub.room.none_owned": "{where}에 놓을 가구가 아직 없어요. 상점에서 구해보세요.",
-  "hub.room.remove": "이 자리 비우기",
-  "hub.room.help": "가구는 한 자리에만 놓을 수 있어요. 다른 자리에 놓으면 옮겨집니다.",
 
   // 가구 이름 — 상점·방 고르기가 같이 쓴다.
-  "hub.part.fur_plant_01": "작은 화분",
-  "hub.part.fur_lamp_01": "스탠드 조명",
-  "hub.part.fur_chair_01": "나무 의자",
-  "hub.part.fur_sofa_01": "포근 소파",
-  "hub.part.fur_wardrobe_01": "옷장",
-  "hub.part.fur_bed_01": "침대",
-  "hub.part.fur_frame_01": "액자",
-  "hub.part.fur_clock_01": "벽시계",
-  "hub.part.fur_shelf_01": "책 선반",
-  "hub.part.fur_window_01": "창문",
 
   // ── 남의 방(/room/:handle) ──
   "room.visit": "방 보기",
@@ -1714,7 +1712,6 @@ const KO: Record<string, string> = {
   "room.someone": "이름 없음",
   "room.season_pt": "시즌 {n}점",
   "room.not_found": "방을 찾을 수 없어요.",
-  "room.empty": "아직 아무것도 놓지 않은 방이에요.",
   "room.my_room": "내 방으로",
   "room.my_room_edit": "내 방 꾸미기",
 
@@ -1784,7 +1781,6 @@ const KO: Record<string, string> = {
   "hub.closet.tab_items": "보관함",
   "hub.closet.g_character": "캐릭터",
   "hub.closet.g_skin": "배경 · UI 스킨",
-  "hub.closet.g_furniture": "가구",
   "hub.closet.g_part": "아이템",
   "hub.closet.worn": "착용 중",
   "hub.closet.wear": "적용하기",
