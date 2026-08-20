@@ -60,6 +60,39 @@ function mapUser(u: RpcUser, me = false) {
   }
 }
 
+/**
+ * 장착한 캐릭터·스킨을 행에 붙인다 — 공유 카드가 그 사람의 캐릭터와 배경으로 그려지게 하려는 것.
+ *
+ * ⚠️ **`scoped_top` 이 아니라 여기서 조인한다.** RPC 를 고치면 그 RPC 를 쓰는 다른 화면
+ *    (/arena 지도·랭킹 세 탭·아레나 채팅)이 전부 같이 흔들린다. 여기서 붙이면 한 함수만 바뀐다.
+ * ⚠️ 노출값 기준은 기존과 같다 — 캐릭터·스킨은 **랭킹 시상대와 남의 방에 이미 보이는 그림**이라
+ *    새로 새는 정보가 없다(국가·지역·가입일 같은 건 여전히 안 붙인다).
+ * ⚠️ 소유하지 않은 것을 장착할 길이 없으므로(hub_equip 이 막는다) 여기서 소유를 다시 보지 않는다.
+ */
+async function attachCosmetics(
+  admin: ReturnType<typeof adminClient>,
+  rows: { uid?: string | null; [k: string]: unknown }[],
+) {
+  const ids = [...new Set(rows.map((r) => r.uid).filter((v): v is string => !!v))]
+  if (!ids.length) return
+  const { data } = await admin.from('user_characters').select('user_id, base_key, equipped').in('user_id', ids)
+  const byUid = new Map<string, { character: string | null; skin: string | null }>()
+  for (const c of data ?? []) {
+    const eq = (c.equipped as Record<string, string> | null) ?? {}
+    const base = (c.base_key as string) ?? 'default'
+    byUid.set(c.user_id as string, {
+      // 'default' 는 아직 안 고른 상태 = 폴백 그림을 쓰라는 뜻이라 null 로 눕힌다(프론트 분기가 하나로 준다).
+      character: base && base !== 'default' ? base : null,
+      skin: eq.skin ?? null,
+    })
+  }
+  for (const r of rows) {
+    const c = r.uid ? byUid.get(r.uid) : null
+    r.character = c?.character ?? null
+    r.skin = c?.skin ?? null
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -86,7 +119,15 @@ Deno.serve(async (req) => {
       const { data, error } = await admin.rpc('scoped_top', { p_uid: uid, p_limit: 0, p_country: null, p_region: null })
       if (error) return json({ error: error.message }, 500)
       const d = (data ?? {}) as { total?: number; me?: RpcUser | null }
-      return json({ user: d.me ? mapUser(d.me) : null, total: d.total ?? 0 })
+      if (!d.me) return json({ user: null, total: d.total ?? 0 })
+      // me 행에는 uid 가 없다(scoped_top 이 top 행에만 넣는다) → **호출자가 인자로 준 uid** 로 붙인다.
+      // 그 uid 는 애초에 요청에 실려 온 값이라 새로 새는 정보가 없다.
+      const one: Record<string, unknown> = { ...mapUser(d.me), uid }
+      await attachCosmetics(admin, [one])
+      // uid 는 도로 null 로 되돌린다 — 이 경로의 응답에 uid 가 실린 적이 없다(mapUser 가 늘 null 로 준다).
+      // 잠깐 넣은 건 위 조회 때문이다.
+      one.uid = null
+      return json({ user: one, total: d.total ?? 0 })
     }
 
     // 개인 리더보드 — 전세계 / 내 국가 / 내 지역. 세 탭 모두 같은 RPC(scoped_top), 모수만 다르다.
@@ -123,6 +164,16 @@ Deno.serve(async (req) => {
       const d = (data ?? {}) as { top?: RpcUser[]; total?: number; me?: (RpcUser & { points_to_pass?: number | null }) | null }
       const top = (d.top ?? []).map((u) => mapUser(u))
       const me: Record<string, unknown> | null = d.me ? mapUser(d.me, true) : null
+      // 시상대·목록에서 사람을 누르면 그 사람 카드가 뜬다 → 캐릭터·스킨이 필요하다.
+      // me 행에는 uid 가 없으므로 로그인한 본인 id 로 따로 붙인다.
+      await attachCosmetics(admin, top)
+      if (me && user?.id) {
+        me.uid = user.id
+        await attachCosmetics(admin, [me])
+        // ⚠️ 도로 null 로 되돌린다 — me 행에 uid 가 없는 건 기존 계약이다(랭킹 '내 순위' 바가
+        //    그 null 을 보고 방 링크를 안 그린다). 조회하려고 잠깐 넣었을 뿐이다.
+        me.uid = null
+      }
       // 칭호(인증서 트랙·급수): 개인 응답 me 에만 부착. exam_attempts 합격에서 ON READ 파생(user_titles).
       //   · 로그인 사용자만 조회(비로그인 me=null). 실패 시 무시(back-compat: title 미포함).
       //   · top 행은 user_id 를 노출하지 않으므로(프라이버시) 칭호 미부착. me(본인)만 노출.

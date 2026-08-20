@@ -14,8 +14,11 @@ import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { tierName } from '../lib/caris'
 import { Avatar } from '../components/GemAvatar'
+import CharArt from '../components/CharArt'
 import RoomView from '../components/RoomView'
 import { roomUrl, type RoomSlot, type RoomSlots } from '../lib/room'
+import { skinByPart } from '../lib/hubCosmetics'
+import { arenaLevelForScore } from '../lib/scoring'
 
 interface RoomResp {
   handle: string
@@ -23,6 +26,10 @@ interface RoomResp {
   avatarUrl: string | null
   seasonTotal: number | null
   title: string | null
+  // 그 사람이 장착한 캐릭터·스킨(2026-08-20). 남의 방도 **그 사람이 꾸민 대로** 보여야 한다 —
+  // 여기만 기본 그림으로 두면 공유 카드와 방이 다른 사람처럼 보인다.
+  character: string | null
+  skin: string | null
   slots: RoomSlots
   layout: RoomSlot[]
   error?: string
@@ -68,12 +75,26 @@ export default function Room() {
   }
 
   const isMine = !!user?.id && user.id === handle
+  // 아직 응답을 못 받았으면 기본 스킨으로 그린다(skinByPart 가 모르는 값·null 을 기본으로 떨어뜨린다).
+  const skin = skinByPart(data?.skin ?? null)
   const name = data?.name || t('room.someone')
   const badge = data?.title ? <span className="tt">🏆 CARIS {tierName(data.title)}</span> : null
   const empty = !!data && Object.keys(data.slots ?? {}).length === 0
 
   return (
-    <div className="hub">
+    <div className="hub" data-skin={skin.key}>
+      {/* 무대 = 그 사람의 배경 + 그 사람의 캐릭터. /hub 와 **같은 마크업·같은 CSS** 다 —
+          내 허브와 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나 제일 늦게 발견된다.
+          ⚠️ `.hub-scene` 은 `.hub > *:not(...)` 예외 목록에 있어야 viewport 고정이 풀리지 않는다. */}
+      <div className="hub-scene" aria-hidden="true">
+        <div className="hub-scene-bg" />
+        <div className="hub-scene-char">
+          {/* 레벨은 시즌 총점에서 파생한다 — 허브가 자기 화면에 쓰는 것과 같은 함수라
+              내 허브와 남이 보는 내 방의 캐릭터가 어긋나지 않는다. */}
+          <CharArt charKey={data?.character ?? null} level={arenaLevelForScore(data?.seasonTotal ?? 0)} className="hub-scene-char-img" />
+        </div>
+      </div>
+
       <div className="hub-backrow">
         {/* 들어온 길이 랭킹일 수도 채팅일 수도 SNS 일 수도 있다 — 어디서 왔든 말이 되는 곳(아레나)으로 보낸다. */}
         <Link className="hub-back" to="/arena"><span className="ic">←</span>WORLD ARENA</Link>

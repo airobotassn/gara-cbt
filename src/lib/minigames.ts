@@ -19,7 +19,7 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'beat-cari',
     accent: 'CARI',
-    art: '/games/beat-cari-cover.webp',
+    art: '/games/beat-cari-cover-gameplay-v1.webp',
     src: '/games/beat-cari.html',
     frame: '#241830', // 동굴 아트 암부색
   },
@@ -33,7 +33,7 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'pick-cari',
     accent: 'CARI',
-    art: '/games/pick-cari-cover.webp',
+    art: '/games/pick-cari-cover-gameplay-v1.webp',
     src: '/games/pick-cari.html',
     frame: '#e3ebf7', // 스테이지가 크림/밝은 톤이라 밝은 프레임 유지(게임 body 와 동일)
   },
@@ -55,7 +55,7 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'build-cari',
     accent: 'CARI',
-    art: '/games/build-cari-cover-v9.png',
+    art: '/games/build-cari-cover-gameplay-v1.webp',
     src: '/games/build-cari.html',
     frame: '#d8d4ca', // 지상형 스마트팩토리 작업실 가장자리 색
   },
@@ -64,14 +64,14 @@ export const MINIGAMES: MiniGame[] = [
   {
     id: 'block-cari',
     accent: 'CARI',
-    art: '/games/block-cari-cover-v3.png',
+    art: '/games/block-cari-cover-gameplay-v1.webp',
     src: '/games/block-cari.html',
     frame: '#14161d', // 게임 body 그라디언트의 가장 어두운 끝
   },
   {
     id: 'order-cari',
     accent: 'CARI',
-    art: '/games/order-cari-cover-v3.png',
+    art: '/games/order-cari-cover-gameplay-v1.webp',
     src: '/games/order-cari.html',
     // ⚠️ 옛 값 #d5dded(밝은 공방 톤)은 v4 아트로 갈면서 죽었다 — body 가 어두운 공장(#071426)이 되며
     //   isDark 가 '밝다'로 판정해 흰 상단 바가 검은 게임 위에 이색 띠로 얹혔다(2026-08-14).
@@ -81,7 +81,7 @@ export const MINIGAMES: MiniGame[] = [
     id: 'feel-cari',
     accent: 'CARI',
     // 센서 탐사 콘셉트와 CARI 캐릭터 시트를 반영한 전용 커버.
-    art: '/games/feel-cari-cover-v3.png',
+    art: '/games/feel-cari-cover-gameplay-v2.webp',
     src: '/games/feel-cari.html',
     frame: '#070a14', // 게임 body 그라디언트의 가장 어두운 끝
   },

@@ -2035,3 +2035,130 @@ export function PopupAdmin() {
     </>
   )
 }
+
+// ══════════════════════════════════════════════════════════════
+// WORLD ARENA > 꾸미기 관리 (캐릭터 · 스킨 · 가구 가격표)
+//
+// ⚠️ **여기서 만지는 건 가격·판매여부·진열순서 셋뿐이다**(2026-08-20 결정).
+//    그림과 9패치 자르는 값(`--skin-mission-slice: 45 145 40 145 fill` 같은 줄 15개)은
+//    코드/에셋에 있다 — 그림을 보면서 맞추는 값이라 폼에 칠 수가 없고, 한 칸만 틀려도 판이 찌그러진다.
+//    캐릭터·스킨을 **새로 추가**하는 것도 여기가 아니라 배포다(에셋 + hub.css 값 블록 + shop_catalog 한 행).
+// ⚠️ 가격 0 = **첫 선택 무료 대상**이다. 값을 매기면 그 캐릭터는 신규 회원 선택 화면에서 빠지고
+//    상점에만 뜬다. 무료 캐릭터를 전부 없애면 신규 회원이 첫 화면에서 갇히므로 서버가 저장을 거절한다.
+// ══════════════════════════════════════════════════════════════
+interface CosmeticRow {
+  part_key: string; price: number; kind: string; surface: string | null
+  active: boolean; sort_order: number; owners: number; worn: number
+}
+const COSMETIC_KIND_LABEL: Record<string, string> = {
+  character: '캐릭터', skin: '배경·UI 스킨', furniture: '가구', part: '아이템',
+}
+// 진열 순서와 같은 순서로 묶어 보여준다.
+const COSMETIC_KIND_ORDER = ['character', 'skin', 'furniture', 'part']
+
+export function HubCosmeticAdmin() {
+  const { data, loading, err, reload } = useAdminData<{ items: CosmeticRow[] }>('hubCosmetics')
+  const [rows, setRows] = useState<CosmeticRow[] | null>(null)
+  const draft = useDraft({ kind: 'hub-cosmetics', value: rows, title: '허브 꾸미기 가격표', enabled: !!rows })
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { if (data) setRows(data.items) }, [data])
+
+  const patch = (key: string, p: Partial<CosmeticRow>) =>
+    setRows((prev) => (prev ? prev.map((r) => (r.part_key === key ? { ...r, ...p } : r)) : prev))
+
+  // 첫 선택 후보 수 — 0이 되면 저장이 막힌다. 저장을 누르기 전에 화면에서 먼저 보이게 한다.
+  const starters = (rows ?? []).filter((r) => r.kind === 'character' && r.price === 0 && r.active)
+
+  async function save() {
+    if (!rows) return
+    setBusy(true); setMsg('')
+    try {
+      await callFunction('admin', {
+        action: 'hubCosmeticsSave',
+        rows: rows.map((r) => ({ partKey: r.part_key, price: r.price, active: r.active, sortOrder: r.sort_order })),
+      })
+      setMsg('✅ 저장했습니다')
+      draft.clear()
+      await reload()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '저장 실패')
+    } finally { setBusy(false) }
+  }
+
+  const table = (kind: string) => {
+    const list = (rows ?? []).filter((r) => r.kind === kind)
+    if (!list.length) return null
+    const isChar = kind === 'character'
+    return (
+      <div className="admin-section" key={kind}>
+        <h3>{COSMETIC_KIND_LABEL[kind] ?? kind}</h3>
+        {isChar && (
+          <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12 }}>
+            가격을 <b>0</b> 으로 두면 신규 회원의 <b>첫 캐릭터 선택 화면</b>에 나옵니다(무료). 값을 매기면
+            그 화면에서 빠지고 상점에서 코인으로 파는 캐릭터가 됩니다.
+            {' '}현재 첫 선택 후보 <b>{starters.length}종</b>
+            {starters.length === 0 && <b style={{ color: 'var(--danger, #d33)' }}> — 최소 1종은 있어야 저장됩니다</b>}
+          </p>
+        )}
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>키</th>
+              <th style={{ width: 130 }}>가격(코인)</th>
+              <th style={{ width: 110 }}>진열순서</th>
+              <th style={{ width: 120 }}>진열</th>
+              <th style={{ width: 150 }}>보유 / 착용</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((r) => (
+              <tr key={r.part_key}>
+                <td>
+                  <b>{r.part_key}</b>
+                  {r.surface && <span className="admin-hint"> · {r.surface}</span>}
+                </td>
+                <td>
+                  <input style={inp} type="number" min={0} step={1} value={r.price}
+                    onChange={(e) => patch(r.part_key, { price: Math.max(0, Math.floor(+e.target.value || 0)) })} />
+                </td>
+                <td>
+                  <input style={inp} type="number" step={1} value={r.sort_order}
+                    onChange={(e) => patch(r.part_key, { sort_order: Math.floor(+e.target.value || 0) })} />
+                </td>
+                <td>
+                  <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="checkbox" checked={r.active}
+                      onChange={(e) => patch(r.part_key, { active: e.target.checked })} />
+                    {r.active ? '진열' : '내림'}
+                  </label>
+                </td>
+                {/* 보유자는 값을 올리기 전에, 착용자는 진열을 내리기 전에 봐야 하는 숫자다. */}
+                <td className="admin-hint">{r.owners}명 / {r.worn}명</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <AdminHead title="꾸미기 관리" onReload={reload} loading={loading}>
+        {msg && <span className="admin-msg">{msg}</span>}
+        <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
+          onRestore={(p: CosmeticRow[]) => setRows(p)} />
+        <button className="btn-ink" onClick={save} disabled={busy || !rows}>{busy ? '저장 중…' : '저장'}</button>
+      </AdminHead>
+      <ErrBox msg={err} />
+      {COSMETIC_KIND_ORDER.map(table)}
+      <p className="admin-hint" style={{ lineHeight: 1.7 }}>
+        ⚠️ <b>진열을 내려도(“내림”) 이미 산 사람은 계속 씁니다.</b> 상점 목록에서만 사라지고 보관함에는 남습니다 —
+        돈을 낸 물건을 뺏지 않기 위해서입니다.<br />
+        ⚠️ 캐릭터 그림과 스킨 이미지는 이 화면에서 올리지 않습니다. 새 캐릭터·스킨을 추가하려면 개발자에게 요청하세요
+        (에셋 파일 + 화면 배포가 함께 필요합니다).
+      </p>
+    </>
+  )
+}

@@ -414,7 +414,7 @@ export default function ExamApply() {
                   <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{roundLabel}</span>
                 </div>
                 <div className="flex justify-between items-start gap-3">
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t('sched.exam_date')}</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">{t('sched.exam_period')}</span>
                   <span className="font-body-md text-body-md text-on-surface font-semibold text-right break-keep">{dateLabel}</span>
                 </div>
                 <div className="flex justify-between items-start gap-3">

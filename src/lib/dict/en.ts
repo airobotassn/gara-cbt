@@ -1234,8 +1234,13 @@ const EN: Record<string, string> = {
 
   // ── Plan(/plan · 시험 일정) ──
   "plan.title": "CARIS PLAN",
-  "plan.sub": "CARIS sessions you can register for right now.",
+  "plan.sub": "Monthly operating schedule for CARIS certification.",
   "plan.back": "CARIS",
+  // ── /plan 접수중 회차 일정표(2026-08-20) — 줄 이름 4개. 날짜는 그 회차 값에서 온다. ──
+  "plan.step_apply": "Application",
+  "plan.step_exam": "Exam period",
+  "plan.step_grade": "Grading",
+  "plan.step_result": "Results",
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": "AI·Robotics Convergence Competency Exam",
@@ -1764,6 +1769,12 @@ const EN: Record<string, string> = {
   "hub.shop.free": "Free",
   "hub.closet.title": "Customize",
   "hub.closet.tab_shop": "Shop",
+  "hub.closet.tryon_on": "Previewing",
+  "hub.closet.tryon_back": "Undo",
+  "hub.closet.tryon_buy": "Buy for {n} coins",
+  "hub.score_line": "Season {n} pts",
+  "hub.score_top": "Top {n}%",
+  "hub.closet.preview": "Preview",
   "hub.closet.tab_items": "Closet",
   "hub.closet.g_character": "Characters",
   "hub.closet.g_skin": "Background & UI skins",

@@ -21,7 +21,7 @@
 //      → payments 가 담은 id 로 금액·할인을 **다시 뽑아** 주문을 만들고, 줄은 payment_items 에 남는다.
 //      강의는 값이 0원이고 소유 개념이 없어 결제 대상이 아니다(강의만 담으면 안내만 뜬다).
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -494,6 +494,13 @@ export default function Ebooks() {
         <div className="max-w-[1240px] mx-auto w-full relative z-10">
           {/* 안내문은 여기 머리말에 둔다 — 화면 맨 아래에 깔면 떠 있는 FAB(왼쪽 아래)·맨위로 버튼(오른쪽 아래)에
               그대로 덮여 글자가 잘린다. 실제로 그렇게 만들었다가 반려됐다(2026-08-06). */}
+          {/* 메인으로 — /notice·/exam/apply 등 다른 화면 상단에 있는 그 뒤로가기와 같은 모양이다.
+              이 화면엔 헤더가 없어서 여기 말고는 홈으로 돌아갈 길이 FAB 뿐이다. */}
+          <Link to="/" className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            {t('common.home')}
+          </Link>
+
           <header className="mb-5">
             <h1 className="font-display-lg text-3xl md:text-display-lg font-bold text-on-surface mb-2 tracking-tight break-keep">{t('ebook.store_title')}</h1>
             {/* 화면을 보면 아는 걸 글로 또 쓰지 않는다 — "레벨을 고르면 …" 설명문은 2026-08-06 삭제됐다.

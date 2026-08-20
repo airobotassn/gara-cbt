@@ -6,7 +6,8 @@ import { loadBoardCats, catName, type BoardCat } from '../lib/boardCats'
 
 // gara_2 (공지사항) — 게시판 목록. 항목 클릭 → 상세 페이지(/notice/:id)로 이동(구 인라인 아코디언 폐지).
 // 데이터는 DB(notices)에서 로드 — 관리자(admin 함수)에서 등록/수정(리치 HTML 본문).
-// 페이로드 절약: 현재 언어(+ko 폴백) + 짧은 발췌만 받고, 10건 단위 페이지네이션(더보기).
+// 페이로드 절약: 목록은 제목만(현재 언어 +ko 폴백) 받고, 10건 단위 페이지네이션(더보기).
+// 제목 밑 본문 미리보기는 없앴다(2026-08-20) — 그래서 목록 조회에 body 를 아예 안 싣는다.
 // 구 딥링크 /notice?id=<uuid> 는 /notice/<uuid> 로 리다이렉트(공유 링크 호환).
 
 // 분류는 DB(board_categories)에서 온다 — 관리자가 만들고 지운다(2026-08-19). 여기 목록을 박지 말 것.
@@ -25,16 +26,14 @@ interface Row {
   required: boolean
   title: string | null
   title_ko?: string | null
-  body: string | null
-  body_ko?: string | null
   pinned: boolean
   published_at: string
 }
 
 function projFor(lang: string): string {
   return lang === 'ko'
-    ? 'title:title_i18n->>ko, body:body_i18n->>ko'
-    : `title:title_i18n->>${lang}, title_ko:title_i18n->>ko, body:body_i18n->>${lang}, body_ko:body_i18n->>ko`
+    ? 'title:title_i18n->>ko'
+    : `title:title_i18n->>${lang}, title_ko:title_i18n->>ko`
 }
 
 // ⚠️ catKeys = 지금 있는 분류 전부. '전체' 에서도 이걸로 걸러야 **지워진 분류의 글이 안 보인다**
@@ -57,21 +56,6 @@ function fmtDate(iso: string): string {
   if (isNaN(d.getTime())) return ''
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}. ${p(d.getMonth() + 1)}. ${p(d.getDate())}`
-}
-
-// 리치 HTML/평문 → 목록 발췌(태그·엔티티 제거 후 잘라내기)
-function excerpt(body: string | null, n = 140): string {
-  if (!body) return ''
-  return body
-    // ⚠️ 태그만 걷어내면 <style>·<script> 의 **속 내용은 글자로 남는다** — 만들어 올린 HTML 공지의
-    //    목록 미리보기가 `:root{ --navy:#1f3a63; …}` 로 시작한다(실제로 그렇게 보였다).
-    .replace(/<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&[a-z]+;/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, n)
 }
 
 export default function Notice() {
@@ -145,7 +129,6 @@ export default function Notice() {
     key === 'all' ? t('notice.filter_all') : catName((cats ?? []).find((c) => c.key === key), lang)
 
   const title = (n: Row) => n.title || n.title_ko || ''
-  const preview = (n: Row) => excerpt(n.body || n.body_ko || '')
 
   const featured = rows[0]
   const rest = rows.slice(1)
@@ -202,7 +185,6 @@ export default function Notice() {
                 <span className="text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px]">calendar_today</span>{fmtDate(featured.published_at)}</span>
               </div>
               <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-3 break-keep group-hover:text-primary transition-colors">{title(featured)}</h2>
-              <p className="font-body-lg text-body-lg text-on-surface-variant leading-relaxed break-keep line-clamp-2">{preview(featured)}</p>
               <span className="inline-flex items-center gap-1 mt-5 text-primary font-label-md text-label-md">{t('notice.read_more')}<span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span></span>
             </div>
           </Link>
@@ -226,7 +208,6 @@ export default function Notice() {
                   <div className="flex-grow min-w-0 flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <h3 className="font-title-md text-title-md text-on-surface group-hover:text-primary transition-colors line-clamp-1">{title(n)}</h3>
-                      <p className="font-body-md text-body-md text-on-surface-variant line-clamp-1 mt-0.5">{preview(n)}</p>
                     </div>
                     <span className="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all hidden md:block shrink-0">arrow_forward</span>
                   </div>

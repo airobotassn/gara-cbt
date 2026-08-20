@@ -1238,8 +1238,13 @@ const KO: Record<string, string> = {
 
   // ── Plan(/plan · 시험 일정) ──
   "plan.title": "CARIS PLAN",
-  "plan.sub": "지금 접수할 수 있는 CARIS 일정입니다.",
+  "plan.sub": "CARIS 자격 검정 매월 정기 운영 일정 안내",
   "plan.back": "CARIS",
+  // ── /plan 접수중 회차 일정표(2026-08-20) — 줄 이름 4개. 날짜는 그 회차 값에서 온다. ──
+  "plan.step_apply": "원서 접수",
+  "plan.step_exam": "응시 기간",
+  "plan.step_grade": "채점 기간",
+  "plan.step_result": "합격자 조회",
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": "AI·Robot 융합역량 자격시험",
@@ -1770,6 +1775,12 @@ const KO: Record<string, string> = {
   "hub.shop.free": "무료",
   "hub.closet.title": "꾸미기",
   "hub.closet.tab_shop": "상점",
+  "hub.closet.tryon_on": "미리보기 중",
+  "hub.closet.tryon_back": "되돌리기",
+  "hub.closet.tryon_buy": "{n}코인으로 구매",
+  "hub.score_line": "시즌 {n}점",
+  "hub.score_top": "상위 {n}%",
+  "hub.closet.preview": "미리보기",
   "hub.closet.tab_items": "보관함",
   "hub.closet.g_character": "캐릭터",
   "hub.closet.g_skin": "배경 · UI 스킨",

@@ -55,13 +55,14 @@ import type {
 import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaUserPanel, type ArenaUserRow } from './AdminLevelTest'
 // 재편으로 새로 만든 화면들(Admin.tsx 가 이미 6천 줄이라 분리) — 라우팅만 여기서 한다.
 import {
-  PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, TermPoolAdmin, CoinPolicyAdmin,
+  PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, TermPoolAdmin, CoinPolicyAdmin, HubCosmeticAdmin,
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
 } from './AdminReform'
 import { useAdminData, payStatusLabel, productLabel } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { getTracks, tierName, isTierLocked, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
+import { autoRoundTitle, isExamMonth, monthOfExamDate, schedulePreview } from '../lib/examSchedule'
 import { REGIONS, countryName, flagEmoji } from '../lib/regions'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
@@ -102,6 +103,8 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     { key: 'daily', label: '오늘의 학습', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
     { key: 'chat', label: '채팅 관리' },
     { key: 'coin', label: '코인 관리' },
+    // 캐릭터·스킨의 **가격·판매여부**만 만지는 화면. 그림은 코드/에셋이라 여기서 안 올린다(2026-08-20).
+    { key: 'cosmetic', label: '꾸미기 관리' },
   ],
   caris: [
     { key: 'dash', label: '대시보드' },
@@ -277,6 +280,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     case 'arena/daily/quiz': return <TermPoolAdmin scope="daily" />
     case 'arena/chat': return <ChatModAdmin />
     case 'arena/coin': return <CoinPolicyAdmin />
+    case 'arena/cosmetic': return <HubCosmeticAdmin />
     // ── CARIS ──
     case 'caris/dash': return <DashboardAdmin go={go} />
     case 'caris/plan': return <RoundsAdmin />
@@ -2374,20 +2378,17 @@ interface RoundDraft {
   published: boolean
   titleI18n: I18nText
   noteI18n: I18nText
-  examDate: string // YYYY-MM-DD
-  applyStart: string // YYYY-MM-DD
-  applyEnd: string // YYYY-MM-DD
-  examStart: string // YYYY-MM-DD — 응시 창 시작(KST)
-  examEnd: string // YYYY-MM-DD — 응시 창 종료(KST)
+  // 정기시험은 **월 하나**만 고른다(2026-08-20 정책) — 접수·응시·채점·발표 날짜는 서버가 계산한다.
+  //   화면이 날짜를 만들어 보내지 않으므로 옛 examDate/applyStart/... 칸은 통째로 없앴다.
+  month: string // YYYY-MM (상시는 '')
   tiers: string[] // 이 회차가 여는 급수(getTracks 티어 key)
 }
 
 // 서버가 회차에 얹어 내려주는 응시 창. types.ts 의 ExamRoundRow 는 다른 작업이 만지고 있어 여기서 로컬로 넓힌다.
-type ExamRoundRowX = ExamRoundRow & { examStartAt?: string | null; examEndAt?: string | null }
+type ExamRoundRowX = ExamRoundRow & { examStartAt?: string | null; examEndAt?: string | null; month?: string; resultReleaseAt?: string | null }
 
-// 정기시험 일정은 전부 KST 기준이다. 오프셋 없이 저장하면 timestamptz 가 UTC 로 읽어 9시간 어긋난다
-// (예전엔 `${날짜}T23:59:59` 를 그대로 보내서 마감이 다음날 08:59 KST 로 저장됐다).
-const KST_OFFSET = '+09:00'
+// 정기시험 일정은 전부 KST 기준이다. 오프셋(+09:00)을 붙이는 일은 이제 서버(_shared/exam-schedule.ts)가
+// 하고 화면은 월만 보낸다 — 예전엔 여기서 `${날짜}T23:59:59` 를 만들다가 마감이 다음날 08:59 KST 로 저장됐다.
 /** ISO(timestamptz) → KST 날짜 'YYYY-MM-DD'. slice(0,10) 은 UTC 날짜라 밤 시각에서 하루 어긋난다. */
 function dayKST(iso?: string | null): string {
   if (!iso) return ''
@@ -2399,16 +2400,15 @@ function kstToday(): { y: number; m: number } {
   const k = new Date(Date.now() + 9 * 3600e3)
   return { y: k.getUTCFullYear(), m: k.getUTCMonth() + 1 }
 }
-const ymd = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-
 function emptyRoundDraft(kind: 'regular' | 'rolling'): RoundDraft {
-  // 정기시험은 월 3구간(1~10 접수 / 11~20 응시 / 21~말일 채점)으로 돈다 → 응시 창을 그 달 11~20일로 미리 채운다.
-  // 상수로 박는 게 아니라 기본값일 뿐이다 — 회차마다 다를 수 있어 관리자가 그대로 고칠 수 있어야 한다.
+  // 기본 월 = 이번 달(KST). 회차명도 그 달 이름으로 미리 채워 둔다 — 관리자가 고쳐 쓸 수 있다.
   const t = kstToday()
+  const month = kind === 'regular' ? `${t.y}-${String(t.m).padStart(2, '0')}` : ''
   return {
-    kind, sort: 9999, published: true, titleI18n: {}, noteI18n: {},
-    examDate: '', applyStart: '', applyEnd: '',
-    examStart: ymd(t.y, t.m, 11), examEnd: ymd(t.y, t.m, 20),
+    kind, sort: 9999, published: true,
+    titleI18n: month ? { ko: autoRoundTitle(month) } : {},
+    noteI18n: {},
+    month,
     tiers: [],
   }
 }
@@ -2569,11 +2569,9 @@ function RoundsAdmin() {
       published: r.published,
       titleI18n: { ...r.titleI18n },
       noteI18n: { ...r.noteI18n },
-      examDate: r.examDate ?? '',
-      applyStart: dayKST(r.applyStartAt),
-      applyEnd: dayKST(r.applyEndAt),
-      examStart: dayKST(rx.examStartAt),
-      examEnd: dayKST(rx.examEndAt),
+      // 월은 서버가 내려준 값(대표일에서 되짚은 것)을 쓰고, 옛 회차(월 규칙 밖)면 대표일의 달로 폴백한다.
+      // ⚠️ 옛 회차를 열어서 저장하면 그 달의 규칙 날짜로 **옮겨간다** — 그래서 아래 미리보기가 필수다.
+      month: rx.month || monthOfExamDate(r.examDate),
       tiers: r.tiers ?? [],
     })
   }
@@ -2600,6 +2598,10 @@ function RoundsAdmin() {
       return
     }
     const isReg = draft.kind === 'regular'
+    if (isReg && !isExamMonth(draft.month)) {
+      alert('시험 월을 선택하세요.')
+      return
+    }
     // 선택된 급수 → [{key, title}]. title = "회차명 · 급수명"(다운스트림 examTitle 로 노출)
     const roundKo = draft.titleI18n.ko?.trim() || '시험'
     const tiers = getTracks('ko')
@@ -2617,13 +2619,9 @@ function RoundsAdmin() {
           published: draft.published,
           titleI18n: draft.titleI18n,
           noteI18n: isReg ? {} : draft.noteI18n,
-          examDate: isReg ? draft.examDate || null : null,
-          // ⚠️ 오프셋(+09:00)을 반드시 붙인다 — 이 값들이 이제 결제·응시 게이트의 판정 기준이라,
-          //    UTC 로 저장되면 접수·응시가 9시간씩 어긋나서 열리고 닫힌다.
-          applyStartAt: isReg && draft.applyStart ? `${draft.applyStart}T00:00:00${KST_OFFSET}` : null,
-          applyEndAt: isReg && draft.applyEnd ? `${draft.applyEnd}T23:59:59${KST_OFFSET}` : null,
-          examStartAt: isReg && draft.examStart ? `${draft.examStart}T00:00:00${KST_OFFSET}` : null,
-          examEndAt: isReg && draft.examEnd ? `${draft.examEnd}T23:59:59${KST_OFFSET}` : null,
+          // ⚠️ 날짜를 보내지 않는다 — 접수·응시·채점·발표는 서버가 이 월에서 계산한다
+          //    (supabase/functions/_shared/exam-schedule.ts). 화면이 날짜를 만들면 규칙 밖 회차가 생긴다.
+          month: isReg ? draft.month : null,
           tiers,
         },
       })
@@ -2726,7 +2724,8 @@ function RoundsAdmin() {
             <tr>
               <th>상태</th>
               <th>회차명 (한국어)</th>
-              <th>시험일</th>
+              {/* 대표일 = 응시 마지막 날. '지난 시험' 판정이 이 값을 본다(월 규칙이면 그 달 20일). */}
+              <th>응시 마감</th>
               <th>접수기간</th>
               <th>응시기간</th>
               <th>열린 급수</th>
@@ -2860,7 +2859,7 @@ function RoundsAdmin() {
 
               {/* 열리는 급수 — 체크한 급수마다 이 회차용 시험(exams)이 생성된다. 회차마다 문항 별도. */}
               <div style={fieldStyle}>
-                <span>열리는 급수 <em style={{ color: 'var(--muted)' }}>(이 회차에 응시 가능한 시험 · 급수마다 문항 따로)</em></span>
+                <span>열리는 급수</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 2 }}>
                   {getTracks('ko').map((tr) => (
                     <div key={tr.key}>
@@ -2898,41 +2897,49 @@ function RoundsAdmin() {
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
-                  ⓘ <b>Master 이후(CARIS-Ⅱ)는 아직 열 수 없습니다</b> — 문제은행과 출제 배분표가 없어 응시권을 팔면
-                  문항 0개짜리 시험이 됩니다. 이미 열려 있는 회차는 그대로 두고, 해제는 할 수 있습니다.
-                </p>
               </div>
 
               {isReg ? (
                 <>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                      시험일
-                      <input type="date" style={inpStyle} value={draft.examDate} onChange={(e) => patch({ examDate: e.target.value })} />
+                  {/* 월 하나만 고른다 — 나머지 날짜는 규칙에서 나온다(2026-08-20 정책).
+                      ⚠️ 날짜칸을 되살리지 말 것. 관리자가 하루라도 손대면 /plan 의 "매월 1~10일 접수"
+                         안내가 그 회차에서만 거짓이 되고, 그걸 화면에서 알아챌 방법이 없다. */}
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <label style={{ ...fieldStyle, flex: '0 0 190px' }}>
+                      시험 월 <em style={{ color: 'var(--error, #d43a3a)' }}>(필수)</em>
+                      <input
+                        type="month"
+                        style={inpStyle}
+                        value={draft.month}
+                        onChange={(e) => {
+                          const month = e.target.value
+                          // 회차명이 비었거나 '앞 월의 자동 이름' 그대로면 같이 따라간다.
+                          // 관리자가 손으로 고쳐 쓴 이름은 건드리지 않는다.
+                          const cur = draft.titleI18n.ko?.trim() ?? ''
+                          const auto = !cur || cur === autoRoundTitle(draft.month)
+                          setDraft((d) => (d ? {
+                            ...d,
+                            month,
+                            titleI18n: auto && isExamMonth(month) ? { ...d.titleI18n, ko: autoRoundTitle(month) } : d.titleI18n,
+                          } : d))
+                        }}
+                      />
                     </label>
-                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                      접수 시작
-                      <input type="date" style={inpStyle} value={draft.applyStart} onChange={(e) => patch({ applyStart: e.target.value })} />
-                    </label>
-                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                      접수 마감
-                      <input type="date" style={inpStyle} value={draft.applyEnd} onChange={(e) => patch({ applyEnd: e.target.value })} />
-                    </label>
-                  </div>
-                  {/* 응시 창 — '시험일'은 안내용 대표일이고, 실제로 응시가 열리고 닫히는 건 이 두 날짜다. */}
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                      응시 시작
-                      <input type="date" style={inpStyle} value={draft.examStart} onChange={(e) => patch({ examStart: e.target.value })} />
-                    </label>
-                    <label style={{ ...fieldStyle, flex: 1, minWidth: 130 }}>
-                      응시 종료
-                      <input type="date" style={inpStyle} value={draft.examEnd} onChange={(e) => patch({ examEnd: e.target.value })} />
-                    </label>
-                    <div style={{ flex: 2, minWidth: 220, alignSelf: 'flex-end', paddingBottom: 6, fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
-                      정기시험은 <b>1~10일 접수 · 11~20일 응시 · 21~말일 채점</b>으로 돕니다.<br />
-                      비워두면 <b>시험일 하루</b>만 응시할 수 있습니다.
+                    <div style={{ flex: 1, minWidth: 260 }}>
+                      {isExamMonth(draft.month) ? (
+                        <table style={{ width: '100%', fontSize: 14, borderCollapse: 'collapse' }}>
+                          <tbody>
+                            {schedulePreview(draft.month).map((r) => (
+                              <tr key={r.key}>
+                                <td style={{ padding: '3px 10px 3px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{r.label}</td>
+                                <td style={{ padding: '3px 0', fontWeight: 700, whiteSpace: 'nowrap' }}>{r.range}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <div style={{ fontSize: 14, color: 'var(--muted)' }}>월을 고르면 날짜가 여기 표시됩니다.</div>
+                      )}
                     </div>
                   </div>
                 </>
@@ -2961,10 +2968,6 @@ function RoundsAdmin() {
               </p>
               {isReg && (
                 <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
-                  ⓘ 접수 시작~마감 기간이면 “접수중”, 시작 전이면 “예정”, 마감 후면 “마감”으로 표시됩니다.
-                  <br />
-                  ⓘ 이 날짜들은 표시용이 아니라 <b>실제 게이트</b>입니다 — 접수기간 밖이면 결제가 막히고, 응시기간 밖이면 응시가 막힙니다(모두 KST 기준).
-                  <br />
                   ⓘ 이미 접수(응시권·진행 중 결제)가 있는 급수는 체크를 해제해도 <b>닫히지 않습니다</b>. 접수분을 먼저 회수·환불하세요.
                 </p>
               )}

@@ -11,6 +11,8 @@
 import { qrMatrix } from './qr'
 // 캔버스에 그리는 글자도 화면 언어를 따른다. 훅을 못 쓰는 계층이라 lang 을 받아 비-훅 번역기(tr)를 쓴다.
 import { tr, type Lang } from './i18n'
+// 캔버스는 CSS 변수(`--skin-bg`)를 못 읽는다 → 배경·캐릭터 경로를 코드에서 받아온다.
+import { cosmeticArt, CHAR_FALLBACK_SRC, CHAR_MIN_LEVEL } from './hubCosmetics'
 
 export const CARD_W = 1600
 export const CARD_H = 900
@@ -66,6 +68,13 @@ export interface ShareCardData {
   /** 남의 카드(랭킹 TOP10 클릭)면 true — 랭킹 화면에 없던 정보(국가·지역 순위, 가입일, 지역)는 아예 안 그린다.
    *  '—' 로 비워 두면 빈 줄만 남아 카드가 헐거워지고, 채우려면 그 사람의 프로필을 새로 노출해야 한다. */
   publicOnly?: boolean
+  /** 장착한 캐릭터 키(`char_a_m` …). null 이면 아직 안 고른 것 → 폴백 캐릭터로 그린다. */
+  character?: string | null
+  /** 장착한 스킨의 상점 키(`skin_palace` …). 좌 패널 배경이 이 스킨의 배경 그림이 된다. */
+  skin?: string | null
+  /** 캐릭터 레벨(1~7 = ARENA 레벨). 레벨마다 그림이 달라 카드에도 지금 모습이 나가야 한다.
+   *  ⚠️ 안 주면 Lv.1 로 그린다 — 남의 카드에서 이걸 빠뜨리면 상위 랭커가 갓 시작한 모습으로 나간다. */
+  charLevel?: number | null
 }
 
 // ── 색 헬퍼 ──
@@ -231,24 +240,47 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   ctx.save()
   rr(ctx, lx, BODY_T, LEFT_W, lh, 28); ctx.clip()
   // 좌패널도 브랜드 코발트 계열 — 티어색은 아래 광원에만 아주 옅게 섞는다.
+  //   ⚠️ 스킨 배경이 위에 깔리더라도 이 칠은 지우지 말 것. 배경 그림을 못 받으면(오프라인·파일 없음)
+  //      이게 그대로 남아 카드가 완성된다. 그림이 유일한 바탕이면 실패했을 때 흰 구멍이 뚫린다.
   const pg = ctx.createLinearGradient(lx, BODY_T, lx + LEFT_W, BODY_B)
   pg.addColorStop(0, mix(BRAND_DEEP, BRAND, 0.4))
   pg.addColorStop(1, dk(BRAND_DEEP, 0.25))
   ctx.fillStyle = pg; ctx.fillRect(lx, BODY_T, LEFT_W, lh)
-  // 반짝이(레퍼의 별가루)
-  for (let i = 0; i < 46; i++) {
-    const a = (i * 2654435761) % 1000 / 1000
-    const b = (i * 40503) % 997 / 997
-    const r = 1 + ((i * 7) % 3)
-    ctx.beginPath(); ctx.arc(lx + a * LEFT_W, BODY_T + b * lh, r, 0, Math.PI * 2)
-    ctx.fillStyle = rgba('#ffffff', 0.1 + ((i * 13) % 5) * 0.07); ctx.fill()
+
+  // 장착한 스킨의 배경 + 캐릭터. 허브 화면에서 보던 그 두 장이 그대로 카드에 들어간다(2026-08-20).
+  const art = cosmeticArt(d.character ?? null, d.skin ?? null, d.charLevel ?? CHAR_MIN_LEVEL)
+
+  // 배경 — 패널이 세로로 길어서(372×약 660) 가로로 긴 배경 그림을 그대로 늘리면 뭉개진다.
+  //   ⚠️ `cover` 로 **잘라 넣는다**(비율 유지 + 넘치는 쪽을 자름). 늘려 넣으면 지평선이 휘어 보인다.
+  try {
+    const bg = await loadImage(art.bg)
+    const s = Math.max(LEFT_W / bg.width, lh / bg.height)
+    const bw = bg.width * s
+    const bh = bg.height * s
+    // 가로는 가운데, 세로는 **위쪽을 남긴다**(하늘이 보이고 지면이 아래에 오도록 — 캐릭터가 설 자리다).
+    ctx.drawImage(bg, lx + (LEFT_W - bw) / 2, BODY_T + (lh - bh) * 0.35, bw, bh)
+    // 배경을 조금 눌러 캐릭터와 이름 플레이트가 읽히게 한다. 안 누르면 밝은 배경에서 흰 이름이 증발한다.
+    ctx.fillStyle = rgba(BRAND_DEEP, 0.34); ctx.fillRect(lx, BODY_T, LEFT_W, lh)
+  } catch {
+    // 배경 그림 실패 → 위 그라디언트 위에 예전처럼 별가루를 뿌린다(빈 판으로 두지 않는다).
+    for (let i = 0; i < 46; i++) {
+      const a = (i * 2654435761) % 1000 / 1000
+      const b = (i * 40503) % 997 / 997
+      const r = 1 + ((i * 7) % 3)
+      ctx.beginPath(); ctx.arc(lx + a * LEFT_W, BODY_T + b * lh, r, 0, Math.PI * 2)
+      ctx.fillStyle = rgba('#ffffff', 0.1 + ((i * 13) % 5) * 0.07); ctx.fill()
+    }
   }
-  // 캐릭터 뒤 광원
+
+  // 캐릭터 뒤 광원 — 배경이 어떤 그림이든 캐릭터 실루엣이 떠 보이게 한다.
   const cgl = ctx.createRadialGradient(lx + LEFT_W / 2, BODY_T + lh * 0.5, 20, lx + LEFT_W / 2, BODY_T + lh * 0.5, 240)
   cgl.addColorStop(0, rgba(lt(mix(BRAND, C, 0.45), 0.35), 0.42)); cgl.addColorStop(1, rgba(BRAND, 0))
   ctx.fillStyle = cgl; ctx.fillRect(lx, BODY_T, LEFT_W, lh)
+
+  // 캐릭터 — 장착한 것. 그림이 아직 없는 키면 폴백 한 장으로 떨어진다(화면의 <CharArt> 와 같은 규칙).
   try {
-    const char = await loadImage('/hub-char.png')
+    let char: HTMLImageElement
+    try { char = await loadImage(art.char) } catch { char = await loadImage(CHAR_FALLBACK_SRC) }
     const H = lh * 0.78
     const w = (char.width / char.height) * H
     ctx.drawImage(char, lx + LEFT_W / 2 - w / 2, BODY_T + lh * 0.9 - H, w, H)

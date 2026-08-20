@@ -4,19 +4,35 @@
 
 .pl-wrap { padding-block: 34px 88px; } /* ⚠️ padding 축약형은 px-margin-* 유틸의 좌우 패딩을 덮는다 */
 
-.pl-back {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px 8px 11px;
-  border: 1px solid color-mix(in srgb, var(--g-line) 70%, transparent); border-radius: 999px;
-  background: var(--g-card); color: var(--g-muted); font-size: 13.5px; font-weight: 700;
-  box-shadow: 0 2px 6px rgba(15, 60, 140, .06); transition: border-color .16s ease, color .16s ease;
-}
-.pl-back .material-symbols-outlined { font-size: 18px; }
-.pl-back:hover { border-color: color-mix(in srgb, var(--g-blue) 45%, transparent); color: var(--g-blue-deep); }
+/* 뒤로가기 칩(.pl-back)의 모양은 guide.css 의 `.gd-back, .pl-back` 한 규칙이 갖고 있다 —
+   /guide 홈 버튼과 같은 물건이라 두 벌로 두지 않는다(2026-08-20). */
 
 .pl-head { margin: 26px 0 34px; }
 .pl-head h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); font-weight: 900; letter-spacing: -.02em; color: var(--g-navy); }
 .pl-head h1 em { font-style: normal; color: var(--g-blue); }
 .pl-head p { margin: 12px 0 0; font-size: 15.5px; line-height: 1.7; color: var(--g-muted); word-break: keep-all; }
+
+/* ── 접수중 회차 일정표 (2026-08-20) ─────────────────────────────
+   왼쪽 색 칩(원서접수·응시기간·채점기간·합격자조회) + 오른쪽 날짜 한 줄. */
+.pl-crit-title {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 14px; font-size: 19px; font-weight: 800; color: var(--g-navy);
+}
+.pl-crit {
+  border: 1px solid color-mix(in srgb, var(--g-line) 70%, transparent); border-radius: 14px;
+  background: var(--g-card); overflow: hidden;
+}
+.pl-crit-row { display: flex; align-items: flex-start; gap: 18px; padding: 14px 18px; }
+.pl-crit-row + .pl-crit-row { border-top: 1px solid color-mix(in srgb, var(--g-line) 55%, transparent); }
+/* 칩 색은 행마다 --c 로 들어온다. 면·글자 다 --c 를 카드색/잉크와 섞어서 만들기 때문에
+   라이트에서는 옅은 파스텔, 다크에서는 어두운 틴트로 알아서 뒤집힌다. */
+.pl-crit-chip {
+  flex: 0 0 108px; text-align: center; padding: 7px 10px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 700; word-break: keep-all;
+  background: color-mix(in srgb, var(--c) 16%, var(--g-card));
+  color: color-mix(in srgb, var(--c) 72%, var(--g-ink));
+}
+.pl-crit-when { font-size: 15px; font-weight: 800; color: var(--g-ink); word-break: keep-all; }
 
 .pl-empty { margin: 40px 0; text-align: center; font-size: 15px; color: var(--g-muted); }
 
@@ -46,6 +62,8 @@ html.dark .pl-rd { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 20px 44
 .pl-rd-title { font-size: 13px; font-weight: 800; color: var(--g-blue); }
 .pl-rd.is-off .pl-rd-title { color: var(--g-muted); }
 .pl-rd-date { font-size: 17px; font-weight: 800; color: var(--g-navy); }
+/* 응시 기간 라벨 — 날짜 위 한 줄. 접수기간(.pl-rd-apply)과 같은 자리·같은 크기라 두 줄이 한 쌍으로 읽힌다. */
+.pl-rd-datelbl { display: block; margin-bottom: 2px; font-size: 13px; font-weight: 600; color: var(--g-muted); }
 .pl-rd-apply { margin-top: 9px; font-size: 13px; color: var(--g-muted); }
 .pl-rd-apply b { display: block; margin-top: 2px; color: var(--g-ink); font-weight: 700; }
 
@@ -95,6 +113,8 @@ html.dark .pl-rolling-ic { background: rgba(18, 165, 140, .18); color: #4fd6bd; 
 }
 @media (max-width: 620px) {
   .pl-rounds { grid-template-columns: 1fr; }
+  .pl-crit-row { flex-direction: column; gap: 8px; }
+  .pl-crit-chip { flex: none; align-self: flex-start; }
   .pl-rolling { flex-direction: column; align-items: flex-start; }
   .pl-rolling-r { align-self: stretch; justify-content: space-between; }
 }

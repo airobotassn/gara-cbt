@@ -8,6 +8,7 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { refreshRates } from '../_shared/fx.ts'
 import { EXAM_ROUND_COLS, TIER_LABEL, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
+import { isExamMonth, monthOfExamDate, scheduleForMonth } from '../_shared/exam-schedule.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
 
@@ -810,6 +811,8 @@ function shapeExamRound(r: any, tiers: string[] = []) {
     examEndAt: r.exam_end_at ?? null, // ISO | null
     applyStartAt: r.apply_start_at, // ISO | null
     applyEndAt: r.apply_end_at, // ISO | null
+    // 관리자 화면의 월 선택기를 되채우는 값. 대표일이 곧 그 달이라 따로 저장하지 않는다.
+    month: monthOfExamDate(r.exam_date),
     noteI18n: r.note_i18n ?? {},
     published: !!r.published,
     sort: r.sort,
@@ -861,17 +864,24 @@ async function examRoundUpsert(admin: any, body: any) {
   const kind = r.kind === 'rolling' ? 'rolling' : 'regular'
   const sortNum = Number(r.sort)
   const hasSort = Number.isFinite(sortNum)
+
+  // 정기시험 날짜는 **월 하나에서 전부 계산한다**(2026-08-20 정책). 화면이 보낸 날짜는 쓰지 않는다 —
+  // 받으면 규칙 밖 회차(접수 3일짜리 등)를 만들 수 있고, 그때부터 /plan 의 안내문이 거짓말이 된다.
+  if (kind === 'regular' && !isExamMonth(r.month)) {
+    return json({ error: '시험 월(YYYY-MM)을 선택하세요.' }, 400)
+  }
+  const sch = kind === 'regular' ? scheduleForMonth(String(r.month)) : null
+
   const row: Record<string, unknown> = {
     kind,
     title_i18n,
     note_i18n,
-    exam_date: r.examDate || null,
-    // 응시 창(정기시험 전용). 화면이 KST 오프셋(+09:00)을 붙여 보낸다 —
-    // 오프셋 없는 문자열을 timestamptz 에 넣으면 UTC 로 해석돼 9시간 어긋난다.
-    exam_start_at: r.examStartAt || null,
-    exam_end_at: r.examEndAt || null,
-    apply_start_at: r.applyStartAt || null,
-    apply_end_at: r.applyEndAt || null,
+    // 대표일 = 응시 마지막 날(20일). '지난 시험' 판정이 이 값을 본다.
+    exam_date: sch?.examDate ?? null,
+    exam_start_at: sch?.examStartAt ?? null,
+    exam_end_at: sch?.examEndAt ?? null,
+    apply_start_at: sch?.applyStartAt ?? null,
+    apply_end_at: sch?.applyEndAt ?? null,
     published: r.published !== false,
     updated_at: new Date().toISOString(),
   }

@@ -1,11 +1,13 @@
 // submit-exam: 소유/상태/TTL 검증 → (voided 면 무효 기록) → 서버 채점 → 제출 확정
-//   결과 공개 시각 = 제출 +7일. ⚠️ 점수는 반환하지 않는다(공개일 이후 get-exam-result 로만).
+//   결과 공개 시각 = 회차의 합격자 조회 시작일(그 달 25일 10시 KST). 옛 회차·상시는 제출 +7일 폴백.
+//   ⚠️ 점수는 반환하지 않는다(공개일 이후 get-exam-result 로만).
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient } from '../_shared/lib.ts'
 import { getExamActor } from '../_shared/exam-token.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
 import { matchShort, parseAcceptedAnswers } from '../_shared/normalize.ts'
+import { monthOfWindow, scheduleForMonth } from '../_shared/exam-schedule.ts'
 
 // 응시 TTL(분) — 전역 상한/안전망. 실제 제한시간은 시험별 exams.duration_minutes 로 강제한다.
 const ATTEMPT_TTL_MINUTES = 240
@@ -138,9 +140,27 @@ Deno.serve(async (req) => {
         .eq('id', row.id)
     }
 
-    // 결과 공개 = 제출 +N일 되는 날의 오전 10시(KST) 정각. N<=0 이면 즉시(테스트 스위치 유지).
+    // 결과 공개 시각.
+    //   정기시험(월 규칙)은 **회차가 정한다** — 그 달 25일 10:00 KST(exam_rounds.result_release_at).
+    //   ⚠️ 응시자별 '제출 +7일' 로 두면 11일에 본 사람이 18일에 점수를 보는데, 그건 채점 기간(21~24)이
+    //      시작도 안 한 때다. 같은 회차인데 사람마다 공개일이 다른 것도 안 맞는다.
+    //   회차가 없거나(상시·미배정) 월 규칙 밖인 옛 회차면 예전대로 +N일 폴백 — 이미 팔린 응시권의
+    //   규칙을 바꾸지 않기 위해서다. RESULT_RELEASE_DAYS<=0 (테스트 즉시공개)은 언제나 이긴다.
+    // ⚠️ 회차에 공개 시각을 저장해두지 않는다 — 달이 정해지면 언제나 그 달 25일 10시라 **계산으로 나온다**.
+    //    월 규칙 회차인지는 응시 창이 그 달 11~20일인지로 가른다(monthOfWindow).
+    const roundReleaseAt = await (async () => {
+      if (!attempt.round_id) return null
+      const { data: rd } = await admin
+        .from('exam_rounds')
+        .select('exam_start_at, exam_end_at')
+        .eq('id', attempt.round_id)
+        .maybeSingle()
+      const month = monthOfWindow(rd?.exam_start_at, rd?.exam_end_at)
+      return month ? scheduleForMonth(month).resultReleaseAt : null
+    })()
     const resultReleaseAt = (() => {
       if (RESULT_RELEASE_DAYS <= 0) return new Date().toISOString()
+      if (roundReleaseAt) return roundReleaseAt
       const kst = new Date(Date.now() + RESULT_RELEASE_DAYS * 864e5 + 9 * 3600e3)
       // 01:00 UTC = 10:00 KST
       return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate(), 1, 0, 0)).toISOString()

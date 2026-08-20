@@ -229,6 +229,84 @@ async function rewardPolicySave(admin: any, body: any, ctx: Ctx) {
   return json({ ok: true })
 }
 
+// ── 허브 꾸미기(캐릭터·스킨·가구) 가격표 ─────────────────────
+//
+// ⚠️ 여기서 다루는 건 **가격·판매여부·진열순서 셋뿐**이다(2026-08-20 결정).
+//    그림과 9패치 자르는 값은 코드/에셋에 있다(`src/lib/hubCosmetics.ts` · `hub.css`) —
+//    스킨 한 벌이 `--skin-*-slice` 같은 숫자 15줄을 달고 다녀서, 그걸 관리자 폼으로 만들면
+//    입력칸 수십 개짜리 화면이 되고 한 칸만 틀려도 판이 찌그러진다.
+//    새 캐릭터·스킨을 **추가**하는 것도 여기가 아니라 배포다.
+async function hubCosmetics(admin: any) {
+  const { data, error } = await admin
+    .from('shop_catalog')
+    .select('part_key, price, kind, surface, active, sort_order')
+    .order('kind')
+    .order('sort_order')
+  if (error) return json({ error: error.message }, 500)
+
+  // 보유자 수 — "이 물건을 몇 명이 갖고 있나". 값을 올리기 전에 알아야 하는 숫자다.
+  const owners: Record<string, number> = {}
+  const { data: owned } = await admin.from('user_cosmetics').select('part_key')
+  for (const o of owned ?? []) owners[(o as any).part_key] = (owners[(o as any).part_key] ?? 0) + 1
+
+  // 장착 수 — 지금 실제로 입고 있는 사람. 보유자와 다르다(사놓고 안 입을 수 있다).
+  const worn: Record<string, number> = {}
+  const { data: chars } = await admin.from('user_characters').select('base_key, equipped')
+  for (const c of chars ?? []) {
+    const base = (c as any).base_key as string
+    if (base && base !== 'default') worn[base] = (worn[base] ?? 0) + 1
+    const eq = ((c as any).equipped ?? {}) as Record<string, string>
+    for (const v of Object.values(eq)) if (v) worn[v] = (worn[v] ?? 0) + 1
+  }
+
+  const items = (data ?? []).map((r: any) => ({
+    part_key: r.part_key, price: r.price, kind: r.kind ?? 'part',
+    surface: r.surface ?? null, active: r.active !== false, sort_order: r.sort_order ?? 0,
+    owners: owners[r.part_key] ?? 0, worn: worn[r.part_key] ?? 0,
+  }))
+  return json({ items })
+}
+
+async function hubCosmeticsSave(admin: any, body: any, ctx: Ctx) {
+  const rows = (body?.rows ?? []) as any[]
+  if (!Array.isArray(rows) || !rows.length) return json({ error: '저장할 값이 없습니다.' }, 400)
+
+  const { data: current, error: readErr } = await admin.from('shop_catalog').select('part_key, price, kind, active')
+  if (readErr) return json({ error: readErr.message }, 500)
+  const byKey = new Map<string, any>((current ?? []).map((r: any) => [r.part_key, r]))
+
+  // 저장 뒤의 모습을 미리 만들어 검사한다 — 한 줄씩 쓰면서 검사하면 절반만 반영된 상태로 막힌다.
+  const after = new Map<string, { price: number; kind: string; active: boolean }>()
+  for (const [k, r] of byKey) after.set(k, { price: r.price, kind: r.kind ?? 'part', active: r.active !== false })
+  for (const r of rows) {
+    const key = String(r.partKey ?? '')
+    const cur = byKey.get(key)
+    if (!cur) return json({ error: `없는 품목입니다: ${key}` }, 400)
+    const price = Number(r.price)
+    if (!Number.isInteger(price) || price < 0) return json({ error: '가격은 0 이상의 정수여야 합니다.' }, 400)
+    after.set(key, { price, kind: cur.kind ?? 'part', active: r.active !== false })
+  }
+
+  // ⛔ **첫 선택 후보를 0개로 만들 수 없다.** 신규 가입자는 캐릭터를 고르기 전에는 허브를 못 쓰는데,
+  //    무료(price 0) + 판매 중인 캐릭터가 하나도 없으면 고를 게 없어서 **첫 화면에서 갇힌다.**
+  //    값을 잘못 매긴 걸 사용자가 갇혀서야 알게 되면 늦다 → 저장 자체를 막는다.
+  const starters = [...after.values()].filter((v) => v.kind === 'character' && v.price === 0 && v.active)
+  if (!starters.length) {
+    return json({ error: '무료로 고를 수 있는 캐릭터가 최소 1종은 있어야 합니다. 신규 회원이 첫 화면에서 캐릭터를 고를 수 없게 됩니다.' }, 400)
+  }
+
+  for (const r of rows) {
+    const { error } = await admin.from('shop_catalog').update({
+      price: Number(r.price),
+      active: r.active !== false,
+      sort_order: Number.isFinite(Number(r.sortOrder)) ? Number(r.sortOrder) : 0,
+    }).eq('part_key', String(r.partKey))
+    if (error) return json({ error: error.message }, 500)
+  }
+  await audit(admin, ctx, 'hubCosmeticsSave', null, { n: rows.length })
+  return json({ ok: true })
+}
+
 // ── 미니게임·오늘의 학습 현황 ────────────────────────────────
 // 데이터는 이미 쌓여 있다(minigame_scores 통산 최고 · daily_activity 일별 플래그 + 첫 접속 시각). 집계만 한다.
 // ⚠️ 컬럼명은 `game_id`·`best_score`·`plays` 다(`game`·`score` 아님 — 실제로 그렇게 틀려서 500 이 났다).
@@ -767,6 +845,8 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx): P
     case 'lectureDelete': return await lectureDelete(admin, body, ctx)
     case 'rewardPolicy': return await rewardPolicy(admin)
     case 'rewardPolicySave': return await rewardPolicySave(admin, body, ctx)
+    case 'hubCosmetics': return await hubCosmetics(admin)
+    case 'hubCosmeticsSave': return await hubCosmeticsSave(admin, body, ctx)
     case 'minigameStats': return await minigameStats(admin, body)
     case 'dailyStats': return await dailyStats(admin, body)
     case 'homeStats': return await homeStats(admin)

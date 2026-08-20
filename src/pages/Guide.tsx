@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { getTracks, TIER_COLORS } from '../lib/caris'
 
@@ -140,6 +140,14 @@ export default function Guide() {
       <main>
         {/* Hero — 좌: 로고 락업 + 카피 + CARIS PLAN / 우: 로봇 */}
         <section className="guide-hero px-margin-mobile md:px-margin-desktop">
+          {/* 메인으로 — /plan 상단 칩과 같은 물건(guide.css 의 .gd-back). 이 화면엔 헤더가 없어서
+              여기 말고는 홈으로 돌아갈 길이 FAB 뿐이다. */}
+          <div className="max-w-container-max mx-auto guide-backrow">
+            <Link to="/" className="gd-back">
+              <span className="material-symbols-outlined">arrow_back</span>
+              {t('common.home')}
+            </Link>
+          </div>
           <div className="max-w-container-max mx-auto guide-hero-grid">
             <div className="guide-hero-copy">
               <div className="guide-lockup">

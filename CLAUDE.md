@@ -164,7 +164,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/checkout?type=&ref=` (결제) | `pages/Checkout.tsx` | (Tailwind 유틸) | `payments` |
 | `/pay/success` · `/pay/fail` (결제 결과) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
 | **캐릭터 허브 / 미니게임** ||||
-| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `shop-buy` · `redeem-referral` · `coin-gift` |
+| `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `shop-buy` · `character` · `redeem-referral` · `coin-gift` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
 | `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
@@ -287,7 +287,32 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - ⚠️ **루트 전용**이다 — 이 조작은 '국가·지역 1회 변경' 잠금까지 풀어준다. 되돌릴 수 없어 `admin_audit` 에 이전 값을 남긴다.
   - 검증: `tests/db/t9-admin-set-region.mjs`(19건 — 뒤쪽 절반이 초기화. ⭐다른 값 보존·재확정 후 락 재발효 포함).
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
-- **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 4칸 `출석·상점·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
+- **첫 진입 흐름 · 캐릭터 · 스킨(2026-08-20)** — 신규 가입자가 `/hub` 에 처음 들어오면 **캐릭터를 고르고 → 튜토리얼을 본다.** 그 뒤로는 **꾸미기**(옛 '상점')에서 캐릭터·배경 스킨을 코인으로 사서 보관함에서 갈아입는다. 갈아입은 모습은 허브·공유 카드·랭킹/채팅 카드·남의 방에 **전부 같이 반영**된다.
+  - **판정의 단일 출처는 서버다** — `user_characters.chosen_at`(캐릭터를 골랐나) · `tutorial_done_at`(튜토리얼을 끝냈나). `get-hub` 가 `charChosen`·`tutorialDone` 두 boolean 으로 내려준다. ⚠️ **localStorage 로 판정하지 말 것** — 브라우저를 바꾸거나 지우는 순간 이미 끝낸 사람에게 첫 화면이 다시 강제된다(웹이라 강제가 안 된다는 말이 여기서 갈린다).
+  - ⚠️ 두 플래그는 **null(=아직 서버에 안 물어봄)** 상태를 구분해야 한다. false 로 시작하면 하이드레이트 전 한 프레임 동안 이미 끝낸 사람 화면에도 선택창이 번쩍인다.
+  - **캐릭터 = 계열 3 × 성별 2 × 레벨 7 = 그림 42장**(`public/hub/char/<key>/lv1.webp` ~ `lv7.webp`). 키 규칙 `char_<계열>_<성별>` 은 곧 `shop_catalog.part_key` 다 — ⚠️ **키는 만들 때만 정한다**(바꾸면 산 사람의 `user_cosmetics` 행과 장착값이 통째로 고아가 된다). 표시 이름은 사전 `hub.part.<key>` 라 이름은 나중에 얼마든지 바꿀 수 있다.
+    - **캐릭터 레벨 = ARENA 레벨(1~7)** = 시즌 총점 밴드(`arenaLevelForScore`). ⚠️ 시험 사다리 등급(`user_progress.rank`)이 **아니다** — 둘 다 1~7 이라 제일 헷갈리는 자리다. 남의 카드·남의 방도 이 함수로 파생해야 두 화면의 캐릭터가 어긋나지 않는다.
+    - **선택 화면 = 가로로 긴 줄 3단**(계열마다 한 줄, 줄 안에 Lv.1~7 을 늘어놓아 '이렇게 자란다'를 보여준다). ⚠️ **줄 안에 가로 스크롤·3단에 세로 스크롤을 만들지 말 것** — 일곱 단계를 한눈에 보고 셋을 나란히 비교하는 게 이 화면의 전부다. 좁으면 그림이 작아지는 쪽을 택한다.
+    - ⚠️ `.charpick` 은 `align-items:center` 가 아니라 **`overflow-y:auto` + 자식 `margin:auto`** 다. 가운데 정렬만 쓰면 내용이 화면보다 길어졌을 때 **위쪽이 잘리고 스크롤로도 못 닿는다**(768px 에서 제목이 통째로 사라졌다).
+    - ⚠️ 캐릭터만 CSS 배경이 아니라 **`<img>`**(`<CharArt>`)다. 이유는 **onError 폴백** — `background-image` 는 실패를 알 수 없어 그림이 아직 없는 키를 고르면 무대가 텅 빈다. 그림 42장이 도착하기 전에도 화면이 서야 해서 폴백(`CHAR_FALLBACK_SRC`)이 필수다.
+  - **첫 선택 무료 대상 = `price = 0` 인 캐릭터뿐이다.** 값이 곧 자격이라 후보 목록을 따로 관리하지 않는다. ⚠️ 화면도 **카탈로그에서** 후보를 뽑아야 한다 — 코드의 `CHAR_KEYS` 를 그대로 쓰면 관리자가 값을 매긴 캐릭터가 선택지에 남아 고르는 순간 서버가 `not_owned` 로 거절한다.
+    - ⚠️ `chosen_at` 은 **처음 값을 지킨다**(coalesce). 갈아입을 때마다 밀면 첫 선택 무료가 매번 다시 열려 유료 캐릭터를 공짜로 가져간다. `t-hub-character.mjs` 2e 가 그걸 본다.
+    - ⛔ 관리자 화면은 **무료 캐릭터를 0종으로 만들 수 없다**(서버가 저장을 거절). 0종이면 신규 회원이 첫 화면에서 고를 게 없어 갇힌다.
+  - **스킨 미리보기는 창이 아니라 '입어보기'다(2026-08-20).** 썸네일을 누르면 꾸미기 모달이 닫히고 **실제 허브 화면에 그 스킨이 얹히며**, 맨 위에 `미리보기 중 · 되돌리기 / 구매` 띠가 뜬다. 저장은 안 되고 화면값(`skin`)만 갈린다.
+    - ⚠️ **모달 안 그림으로는 미리볼 수 없다.** 스킨이 바꾸는 건 배경뿐 아니라 HUD·미션바·판·게이지·도장·아이콘 전부인데, 그 자산은 CSS 변수 안에만 있어 코드가 경로를 모른다. 배경 + 아이콘 4개만 얹은 창을 만들어봤더니 실제 화면의 5분의 1도 안 보여서 반려됐다. 진짜 화면에 얹으면 위치가 어긋날 수가 없고 구현도 더 간단하다.
+    - ⚠️ 띠는 **맨 위 고정 + `.hub.is-tryon` 이 위를 비운다**(안 비우면 뒤로가기 줄을 덮는다). 아래에 두면 떠 있는 FAB·맨위로 버튼이 덮는다. `.hub > *:not(...)` 예외 목록에 `.tryon` 이 있어야 fixed 가 유지된다.
+    - ⚠️ 적용에 성공하면 띠를 **반드시 내린다** — 남겨두면 저장된 스킨이 임시값처럼 보인다. '되돌리기'는 보던 자리(꾸미기 모달 보관함 탭)로 되돌려준다.
+    - 캐릭터는 그대로 **창**이다(큰 그림 하나 + 아래에서 Lv.1~7 전환). 캐릭터는 그림 한 장이라 창으로 충분하고, 일곱을 나열하면 한 칸이 썸네일만 해져 미리보기 구실을 못 한다.
+  - **스킨 = 배경 + UI 한 벌(통짜 한 상품)**. `data-skin` 한 속성만 갈면 배경·판·게이지·스탬프·아이콘이 통째로 바뀐다(CSS 가 전부 그 속성에서 파생). 목록·경로의 단일 출처 = `src/lib/hubCosmetics.ts` 의 `SKINS`, 값은 `hub.css` 의 `.hub[data-skin='<키>']` 블록.
+    - ⚠️ 기본 스킨(`skin_palace`)은 **비판매**(`active=false`)지만 보관함에는 늘 뜬다 — 살 수 없는 물건이라 소유 검사를 그대로 적용하면 아무도 기본으로 못 돌아온다(`hub_equip` 이 `price=0` 을 예외로 둔다).
+    - ⚠️ `hub_equip` 은 `equipped` jsonb 를 **`||` 로 한 키만** 갱신한다. 통째로 덮으면 나중에 종류(테두리·이펙트…)가 늘었을 때 한 종류를 바꾸는 요청이 나머지를 전부 지운다.
+  - **소유는 `user_cosmetics` 하나로 통일**(가구·캐릭터·스킨이 전부 `part_key`). 표를 종류마다 파면 상점·보관함·환불이 두 벌이 된다. 구매는 기존 `shop-buy`(`shop_buy` RPC) 그대로다.
+  - **그림·수치는 코드/에셋, 가격·판매여부·진열순서는 DB**(2026-08-20 결정). ⚠️ 관리자 화면(`WORLD ARENA > 꾸미기 관리`)에서 **에셋을 올리지 않는다** — 스킨 한 벌은 `--skin-mission-slice: 45 145 40 145 fill` 같은 9패치 자르는 값 15줄을 달고 다니는데, 그건 그림을 보면서 맞추는 값이지 폼에 칠 값이 아니고 한 칸만 틀려도 판이 찌그러진다. 가구(`fur_*`)가 이미 같은 구조다.
+  - **튜토리얼은 강제 + 건너뛰기**(2026-08-20 결정). 검은 화면에 가리킬 자리만 구멍(`data-tut` → `getBoundingClientRect`). ⚠️ **누르게 시키지 않고 가리키기만 한다** — "출석을 눌러보세요" 로 진행을 묶으면 오늘 이미 출석한 사람은 눌러도 아무 일이 없어 거기서 갇힌다. ⚠️ 구멍은 보여주기 전용(`pointer-events:none`)이다. 뚫린 자리를 실제로 누를 수 있으면 튜토리얼 도중에 모달이 열려 안내 카드와 겹친다. 건너뛰기도 '끝'으로 기록되어 다시 안 뜬다.
+  - **함수는 `character` 하나**(`choose`·`equip`·`tutorial`) — 전부 원자 RPC(`hub_choose_character`·`hub_equip`·`hub_tutorial_done`)의 얇은 래퍼다. 검증 `tests/db/t-hub-character.mjs`(35건).
+  - **관리자 '첫 진입 상태로 초기화'가 캐릭터·튜토리얼도 비운다**(`admin_reset_onboarding`). ⚠️ **소유(`user_cosmetics`)는 안 지운다** — 산 물건을 뺏는 건 초기화가 아니라 몰수다. 첫 선택 무료만 되살아난다.
+  - ⚠️ **공유 카드 좌 패널의 캐릭터 폴백이 `/hub-char.png` → `/hub/char-korea-lv2-hanbok-final.webp` 로 바뀌었다**(무대와 같은 그림). 두 자리에 다른 폴백을 두면 "내 허브 캐릭터 ≠ 내 카드 캐릭터" 가 되어, 이 기능이 없애려던 어긋남이 그대로 남는다.
+- **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 4칸 `출석·꾸미기·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
   - ⚠️ **오른쪽 레일은 `position:absolute` 라 무대 높이를 늘리지 못한다** — 버튼을 추가·삭제하면 `hub.css` 의 `.hub-main .stage-zone` 높이(모바일 420 / PC 520)와 `.rail-r` gap 을 다시 실측할 것. 넘치면 아래 출석 스탬프를 덮는다(실제로 5칸이 되며 터졌던 버그).
   - ⛔ **뽑기(가챠)는 제거됐다(2026-08-18).** 확률·천장·가루(dust)·가루 교환소·한정 가구 2종(어항·네온)이 화면·함수·DB 에서 통째로 사라졌다(`20260818120000_drop_gacha.sql` — `gacha-draw`·`gacha-exchange` 함수 삭제, `gacha_*`·`user_gacha_pity`·`dust_exchange` 표와 `user_currency.dust` 드롭). **재화는 코인 하나뿐**이고 쓸 곳은 상점이다.
     - 가루를 반만 남기지 않은 이유 = 뽑기가 없으면 **벌 수도 쓸 수도 없는 지갑**이 되어 "왜 안 늘지" 를 아무도 못 푼다.
@@ -299,6 +324,11 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
     - ⚠️ **구글 계정 이름(`user_metadata.name`)으로 폴백하지 말 것 — 실명이다.** 프로필을 받아오기 전 잠깐이라도 그리면 닉네임 게이트가 막고 있는 걸 그대로 흘린다. 아직 못 받았으면 마스코트 이름(`CARI`)으로 둔다.
     - ⚠️ `display_name` 에는 **가입 트리거가 넣은 구글 실명이 들어 있을 수 있다** — 닉네임 확정 여부는 `nickname_set_at` 이 답한다(`set-nickname` 이 둘을 같이 쓴다). 허브는 닉네임 게이트를 지난 뒤라 안전하지만, 게이트 앞 화면에서 `display_name` 을 그냥 쓰면 실명이 뜬다.
     - ⚠️ 닉네임은 최대 12자다. 이름만 말줄임(`.hud-nick`)하고 자격 배지(`.tt`)는 안 줄인다 — 배지가 같이 줄면 무슨 자격인지 못 읽는다.
+    - **이름 바로 뒤 = 랭킹 점수(시즌 총점)**(`.hud-score` · 2026-08-20). 서버가 늘 내려주던 값인데 화면에 쓰는 곳이 없었다. 형태는 `시즌 3,700점 · 상위 12%`.
+      - ⚠️ **`margin-left:auto` 로 오른쪽 끝에 밀지 말 것**(반려). 바로 아래 코인 칩과 세로로 겹쳐 서서 같은 종류로 읽힌다 — 랭킹 점수와 상점 재화는 지갑이 다르다. 이름에 붙어 있으면 그 줄이 통째로 '누구' 가 된다.
+      - ⚠️ **자기 줄로 빼지도 말 것**(반려). HUD 가 3단이 되어 왼쪽이 무거워진다.
+      - ⚠️ **경험치 바의 분수(`16 / 1,000`)로 대신하면 안 된다** — 그건 밴드 안 진행분이지 총점이 아니다. 반대로 바의 분수를 총점으로 바꾸면 바(2%)와 글자가 어긋나 보인다.
+      - ⚠️ 순위·백분위는 **`showPercentile` 게이트를 지날 때만** 붙이고 **좁은 화면에서는 감춘다**. 사람이 적으면 `12명 중 3위` 가 되어 1등도 초라해 보이고, 390px 에서는 `닉네임 12자 + 자격배지 + 점수` 가 겹쳐 이름이 한 글자로 죽는다(이 줄에서 줄어드는 건 닉네임뿐이다).
   - **HUD 경험치 바 = ARENA 레벨 진행도**(`arenaLevelForScore`/`arenaBand`, 시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체했고 `pointsToPass`·`level`(시험 등급)은 화면에서 빠졌다(서버는 계속 내려줌).
     - ⚠️ **`Lv.` 이름이 레벨테스트 등급과 겹친다** — 그래서 바 안 왼쪽에 `ARENA Lv.N` 을 박아 어느 축인지 밝힌다(원안 표의 표기와 동일). 바 안 글자는 `.exp-txt` 한 flex 줄에 넣어야 한다(각각 absolute 로 두면 좁은 화면에서 겹친다). 모바일은 `.exp-next`(분모)를 감춰 `ARENA Lv.N` 이 안 잘리게 한다.
     - ⚠️ **한 줄에 서는 세 요소(`.exp` · `.hub-help` · `.gchip`)는 높이가 같아야 한다**(모바일 28 / PC 40). 하나만 바꾸면 바로 티 난다.
@@ -387,8 +417,8 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   48개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
-               · 허브(get-hub·complete-daily·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
+  functions/   49개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+               · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
@@ -536,7 +566,8 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 - **정기시험은 월 단위다 — 관리자는 '월'만 고른다(2026-08-20 정책).** 1~10 원서접수 · 11~20 응시 · 21~24 채점(응시 불가) · **25일 10:00~말일 합격자 조회**. 날짜의 단일 출처 = `supabase/functions/_shared/exam-schedule.ts` 의 `scheduleForMonth()` 이고, `admin` 함수가 그걸로 계산해 `exam_rounds` 에 넣는다.
   - ⛔ **화면이 보낸 날짜는 받지 않는다.** 관리자 폼(`Admin.tsx` 의 `RoundsAdmin`)은 `month` 하나만 보내고 날짜칸이 아예 없다 — 하루라도 손댈 수 있으면 /plan 의 "매월 1~10일 접수" 안내가 그 회차에서만 거짓이 되고, 그걸 화면에서 알아챌 방법이 없다. 화면의 `src/lib/examSchedule.ts` 는 **저장 전 미리보기 전용**(같은 날짜표를 들고 있으니 바꾸면 양쪽 다).
   - ⚠️ **`exam_date` 의 뜻이 바뀌었다 — '시험 보는 하루' 가 아니라 '응시 마지막 날'(그 달 20일)이다.** '지난 시험' 판정(관리자 필터·`lib/rounds.ts`)이 이 값을 보므로 첫날(11일)을 넣으면 **응시 기간 도중에 회차가 목록에서 사라진다.** 같은 이유로 응시자에게 "언제부터 응시" 를 말할 땐 `exam_start_at` 을 쓴다(대표일로 말하면 "20일부터 응시할 수 있어요" 가 된다 — `tickets.ts`).
-  - ⚠️ **성적 공개가 회차 소유로 바뀌었다** — `exam_rounds.result_release_at`(그 달 25일 10:00 KST)을 `submit-exam` 이 읽는다. 예전엔 **응시자별 제출 +7일**이라 11일에 본 사람이 18일에 점수를 봤는데, 그건 채점 기간(21~24)이 시작도 안 한 때였다. **null 이면 옛 규칙(+7일)로 폴백**한다 — 월 규칙 이전에 팔린 응시권의 약속을 마이그레이션이 몰래 바꾸지 않기 위해서다.
+  - ⚠️ **성적 공개가 회차 단위로 바뀌었다** — 그 달 **25일 10:00 KST** 에 그 회차 응시자 전원이 동시에 본다. 예전엔 **응시자별 제출 +7일**이라 11일에 본 사람이 18일에 점수를 봤는데, 그건 채점 기간(21~24)이 시작도 안 한 때였다.
+  - ⛔ **공개 시각을 컬럼으로 저장하지 않는다.** 달이 정해지면 언제나 그 달 25일 10시라 **계산으로 나온다** — 저장하면 같은 사실이 두 곳에 생긴다. 월 규칙 회차인지는 **응시 창이 그 달 11~20일인지**로 가른다(`monthOfWindow`, 양쪽 exam-schedule 에 한 쌍). 규칙 밖인 옛 회차는 예전대로 **제출 +7일** 폴백이고, `/plan` 에선 채점·조회 두 줄이 빠진다.
   - ⚠️ 옛 회차(9/19·12/19 등 월 패턴 밖)는 **그대로 둔다.** 다만 관리자가 그 회차를 열어 저장하면 그 달의 규칙 날짜로 **옮겨간다** — 그래서 폼에 저장 전 미리보기 표가 있다.
 - **상시(rolling)는 판매하지 않는다**(2026-08 폐지). 행·표시 코드는 두고 결제 진입만 막는다.
 - **응시료는 카드·간편결제만**(D3). 가상계좌는 입금이 끝나도 응시권을 발급하지 않고 대사로 넘긴다 — VA 는 접수 마감 뒤 입금이 정상이라 마감이 무의미해진다.

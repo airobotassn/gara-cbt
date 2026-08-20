@@ -38,11 +38,14 @@ Deno.serve(async (req) => {
       // (프론트는 handle 을 문자열로만 다루고 라우트도 그대로다).
       if (!UUID_RE.test(handle)) return json({ error: 'bad_handle' }, 400)
 
-      const [{ data: profile }, { data: room }, { data: progress }, { data: titles }] = await Promise.all([
+      const [{ data: profile }, { data: room }, { data: progress }, { data: titles }, { data: character }] = await Promise.all([
         admin.from('profiles').select('display_name, avatar_url, is_anonymous').eq('id', handle).maybeSingle(),
         admin.from('user_rooms').select('slots').eq('user_id', handle).maybeSingle(),
         admin.from('user_progress').select('season_total').eq('user_id', handle).maybeSingle(),
         admin.rpc('user_titles', { p_uid: handle }),
+        // 장착한 캐릭터·스킨 — 방에 그 사람 캐릭터가 서고 배경이 그 사람 스킨으로 깔린다.
+        //   ⚠️ 새로 새는 정보가 아니다: 같은 그림이 랭킹 시상대와 공유 카드에 이미 나온다.
+        admin.from('user_characters').select('base_key, equipped').eq('user_id', handle).maybeSingle(),
       ])
 
       // 익명(게스트) 계정은 방이 없다 — 이름도 없고 남에게 보여줄 것도 없다.
@@ -56,6 +59,9 @@ Deno.serve(async (req) => {
         seasonTotal: (progress?.season_total as number) ?? null,
         // 칭호는 랭킹·허브에 이미 노출되는 값이라 방에도 띄운다(합격한 티어 그 자체).
         title: (titleList[0] as { tier?: string } | undefined)?.tier ?? null,
+        // 'default'(아직 안 고름)는 null 로 눕힌다 — 프론트가 폴백 그림 하나로 처리한다.
+        character: (() => { const b = (character?.base_key as string) ?? 'default'; return b && b !== 'default' ? b : null })(),
+        skin: ((character?.equipped as Record<string, string> | null) ?? {}).skin ?? null,
         slots: sanitizeSlots(room?.slots),
         layout: ROOM_LAYOUT,
       })

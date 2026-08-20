@@ -1234,8 +1234,13 @@ const ZH: Record<string, string> = {
 
   // ── Plan(/plan · 시험 일정) ──
   "plan.title": "CARIS PLAN",
-  "plan.sub": "当前可报名的 CARIS 日程。",
+  "plan.sub": "CARIS 资格检定每月定期运营日程说明。",
   "plan.back": "CARIS",
+  // ── /plan 접수중 회차 일정표(2026-08-20) — 줄 이름 4개. 날짜는 그 회차 값에서 온다. ──
+  "plan.step_apply": "报名",
+  "plan.step_exam": "应试期间",
+  "plan.step_grade": "评分期间",
+  "plan.step_result": "合格查询",
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": "AI·机器人融合能力资格考试",
@@ -1764,6 +1769,12 @@ const ZH: Record<string, string> = {
   "hub.shop.free": "免费",
   "hub.closet.title": "装扮",
   "hub.closet.tab_shop": "商店",
+  "hub.closet.tryon_on": "预览中",
+  "hub.closet.tryon_back": "还原",
+  "hub.closet.tryon_buy": "用{n}金币购买",
+  "hub.score_line": "赛季 {n} 分",
+  "hub.score_top": "前{n}%",
+  "hub.closet.preview": "预览",
   "hub.closet.tab_items": "背包",
   "hub.closet.g_character": "角色",
   "hub.closet.g_skin": "背景 · UI 皮肤",

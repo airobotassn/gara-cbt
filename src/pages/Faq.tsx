@@ -126,7 +126,7 @@ export default function Faq() {
               </div>
               <div className="w-full md:w-5/12 hidden md:block">
                 <div className="grid grid-cols-2 gap-4">
-                  <Link to="/guide" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
+                  <Link to="/plan" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><span className="material-symbols-outlined">event_available</span></div>
                     <h3 className="font-title-md text-base font-bold text-on-surface">{t('faq.card_schedule_title')}</h3>
                     <p className="text-sm text-on-surface-variant leading-relaxed">{t('faq.card_schedule_desc')}</p>
@@ -174,8 +174,9 @@ export default function Faq() {
           {/* Main FAQ Content */}
           <div className="w-full lg:w-3/4">
             <div className="mb-8 pb-6 border-b border-outline-variant/40">
-              <h2 className="font-headline-lg text-2xl md:text-headline-lg font-bold text-on-surface mb-2 break-keep">{searching ? t('faq.search_results') : catLabel(cat)}</h2>
-              <p className="text-on-surface-variant font-body-md">{searching ? t('faq.searching_sub', { query }) : t('faq.cat_sub')}</p>
+              {/* 분류 이름 밑 설명문은 없앴다(2026-08-20) — 검색 결과일 때 '‘…’ 관련 문항입니다' 만 남는다. */}
+              <h2 className={`font-headline-lg text-2xl md:text-headline-lg font-bold text-on-surface break-keep ${searching ? 'mb-2' : ''}`}>{searching ? t('faq.search_results') : catLabel(cat)}</h2>
+              {searching && <p className="text-on-surface-variant font-body-md">{t('faq.searching_sub', { query })}</p>}
             </div>
             <div className="flex flex-col gap-6">
               {list.map((f) => {

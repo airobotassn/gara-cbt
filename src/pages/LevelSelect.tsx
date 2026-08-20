@@ -399,6 +399,7 @@ export default function LevelSelect() {
             >
               {DIPPER_EDGES.map(([a, b]) => {
                 const p = sky.at[a], q = sky.at[b]
+                const dotted = (a === 1 && b === 4) || (a === 4 && b === 1)
                 // 두 끝이 다 해금된 구간만 금빛 — 1‑2‑3‑4‑5‑6‑7 이 곧 승급 순서라 이게 진행선이 된다.
                 const on = a <= unlocked && b <= unlocked
                 const dx = q.x - p.x, dy = q.y - p.y
@@ -418,7 +419,7 @@ export default function LevelSelect() {
                 const len = Math.max(raw * 0.25, raw - cut * 2)
                 // 1↔4 를 잇는 한 구간만 옅게. 이 선은 국자를 닫는 변이라 1→2→3→4→5… 로 읽는
                 // 진행 순서에 없다(다른 선들과 같은 농도면 4 에서 1 로 되돌아가는 길처럼 보인다).
-                const faint = (a === 1 && b === 4) || (a === 4 && b === 1)
+                const faint = dotted
                 // 나머지 진행선은 한 단계 밝게 — 은하수 사진 위에서 각인 막대가 하늘에 묻힌다.
                 // 금색 구간은 이미 opacity 1 이라 더 올릴 데가 없어 brightness + 번짐으로 올린다.
                 const op = faint ? (on ? 0.55 : 0.3) : on ? 1 : 0.72
@@ -432,7 +433,9 @@ export default function LevelSelect() {
                 return (
                   <image
                     key={`e${a}-${b}`}
-                    href={on ? '/cert/edge-sm.webp' : '/cert/edge-silver-sm.webp'}
+                    href={dotted
+                      ? (on ? '/cert/edge-dotted-sm.webp' : '/cert/edge-dotted-silver-sm.webp')
+                      : (on ? '/cert/edge-sm.webp' : '/cert/edge-silver-sm.webp')}
                     x={-len / 2} y={-th / 2} width={len} height={th}
                     preserveAspectRatio="none"
                     opacity={op}

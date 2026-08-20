@@ -41,7 +41,9 @@
 .hub::before, .hub::after { display: none; }
 /* ⚠️ 예외 목록에서 `.hub-scene` 을 빼지 말 것 — 배경 레이어가 relative/z-index 1 로 끌려 내려오면
       viewport 고정이 풀려 가운데 열(480px) 안으로 접힌다. 랜딩에서 `.rg` 를 그렇게 잃은 적이 있다. */
-.hub > *:not(.sky):not(.hub-scene):not(.hub-modal-backdrop):not(.hub-toast) { position: relative; z-index: 1; }
+/* ⚠️ 첫 진입 오버레이(.charpick·.tut)도 예외다 — 화면 전체를 덮는 fixed 레이어라
+      가운데 열(480px) 안으로 접히면 캐릭터 셋이 한 줄에 안 들어간다. */
+.hub > *:not(.sky):not(.hub-scene):not(.hub-modal-backdrop):not(.hub-toast):not(.charpick):not(.tut):not(.tryon) { position: relative; z-index: 1; }
 .hub .sky { display: none; }
 
 /* ── 무대(배경 사진 + 캐릭터) — 스킨이 켜졌을 때만 그린다 ────────────────────
@@ -53,12 +55,17 @@
 .hub[data-skin] .hub-scene-bg { position: absolute; inset: 0;
   background-image: var(--skin-bg); background-size: cover;
   background-position: var(--skin-bg-pos, 50% 50%); background-repeat: no-repeat; }
+/* 캐릭터 칸 — **키와 발끝 위치는 스킨이 정한다**(배경마다 지평선이 다르다).
+   ⚠️ 폭을 aspect-ratio 로 잡지 않는다(2026-08-20). 캐릭터가 6종이 되면서 그림마다 비율이 달라졌고,
+      칸에 비율을 박으면 그 비율이 아닌 그림은 옆으로 늘어난다. 칸은 넉넉히 두고 그림이
+      object-fit:contain 으로 자기 비율을 지킨다 → 그림을 갈아도 CSS 를 다시 잴 일이 없다. */
 .hub[data-skin] .hub-scene-char { position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: var(--skin-char-bottom); height: var(--skin-char-h); aspect-ratio: var(--skin-char-ar);
-  background-image: var(--skin-char); background-size: contain;
-  background-position: 50% 100%; background-repeat: no-repeat;
+  bottom: var(--skin-char-bottom); height: var(--skin-char-h); width: min(92vw, 640px);
   /* 땅에 붙어 보이게 하는 건 그림자 하나다 — 레퍼런스도 젖은 노면 반사로 캐릭터를 지면에 붙였다. */
   filter: drop-shadow(0 10px 10px rgba(0, 0, 0, .35)); }
+/* ⚠️ object-position 이 bottom 이어야 발끝이 칸 바닥에 붙는다 — 가운데면 키 작은 그림이 공중에 뜬다. */
+.hub .hub-scene-char-img { display: block; width: 100%; height: 100%;
+  object-fit: contain; object-position: 50% 100%; }
 
 /* 아레나로 돌아가기 — 공용 .topbar 대신 허브의 카툰 스티커 톤에 맞춘 칩.
    칩 자체는 inline 이라 넓은 화면에서 형제들처럼 가운데 정렬이 안 된다 →
@@ -89,6 +96,24 @@
    ⚠️ 줄어드는 건 이름 쪽만이다. 배지(.tt)는 flex-shrink 를 막아 원래 폭을 지킨다 —
       배지가 같이 줄면 '🏆 CARIS Pro' 가 글자 단위로 잘려서 무슨 자격인지 못 읽는다. */
 .hub .hud-nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 랭킹 점수(시즌 총점) — 이름 줄 안, **이름 바로 뒤**(2026-08-20).
+   ⚠️ `margin-left:auto` 로 오른쪽 끝에 밀지 말 것 — 바로 아래 코인 칩과 세로로 겹쳐 서서 같은 종류로
+      읽힌다(랭킹 점수 ↔ 상점 재화는 지갑이 다르다). 이름에 붙어 있으면 그 줄이 통째로 '누구' 가 된다.
+   ⚠️ 자기 줄로 빼는 안도 만들어봤다가 반려됐다 — HUD 가 3단이 되어 왼쪽이 무거워진다.
+   ⚠️ `flex: 0 0 auto` 라야 한다. 줄어들게 두면 숫자가 말줄임돼 1,016 이 1,0… 이 된다
+      (이 줄에서 줄어도 되는 건 닉네임뿐이다). */
+.hub .hud-score { flex: 0 0 auto; width: fit-content; min-width: 104px; min-height: 30px; padding: 7px 18px 6px;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  background: url('/hub/ui/rank-score-frame.png') center / 100% 100% no-repeat;
+  font-size: 11.5px; font-weight: 900; line-height: 1.3; color: #fff;
+  /* ⚠️ 그림자를 빼지 말 것 — 프레임 그림이 밝은 부분을 갖고 있어서 흰 글자가 거기서 녹는다. */
+  text-shadow: 0 1px 1px rgba(0,0,0,.85); font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 백분위는 덤이라 한 단 낮춘다 — 같은 흰색이면 점수와 무게가 같아져 둘 다 안 읽힌다.
+   ⚠️ 좁은 화면에서는 **감춘다.** 이 줄에서 줄어드는 건 닉네임뿐이라, 켜두면 390px 에서
+      `닉네임 12자 + 자격배지 + 점수` 가 겹치며 이름이 `열…` 한 글자로 죽는다(실측).
+      점수가 본체고 백분위는 덤이다. */
+.hub .hud-score-pct { display: none; font-weight: 800; color: rgba(255, 255, 255, .72); }
 .hub .tt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; color: #fff; white-space: nowrap;
   flex: 0 0 auto;
   background: var(--orange); border: 3px solid var(--line); border-radius: 999px; padding: 2px 10px; }
@@ -335,6 +360,8 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .hud-av { width: 68px; height: 68px; }
   .hub .hud-name { font-size: 26px; }
   .hub .tt { font-size: 16px; }
+  .hub .hud-score { min-width: 142px; min-height: 38px; padding: 9px 24px 8px; font-size: 15px; }
+  .hub .hud-score-pct { display: inline; }
   .hub .exp { height: 40px; } /* = .gchip 높이 (위 주석 참고) */
   .hub .exp-lab { font-size: 16px; }
   .hub .exp-txt { padding: 0 16px; gap: 12px; }
@@ -376,7 +403,10 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 
 /* 액션 결과 토스트(닫기 가능·자동 사라짐) — 화면 중앙 팝업 카드, 모달보다 위 */
 @keyframes toastPop { 0% { transform: translate(-50%, -50%) scale(.8); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-.hub .hub-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 90; max-width: min(88vw, 360px);
+/* ⚠️ z-index 는 **화면에서 제일 위**여야 한다(첫 진입 오버레이 90·튜토리얼 95 보다 위).
+   같은 90 으로 두면 뒤에 오는 `.charpick` 이 덮어서 **실패 안내가 통째로 안 보인다** —
+   캐릭터를 고르고 '시작하기' 를 눌렀는데 아무 반응도 없는 것처럼 보였다(2026-08-20). */
+.hub .hub-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 120; max-width: min(88vw, 360px);
   display: flex; align-items: center; gap: 10px; background: var(--card); border: 3px solid var(--line); border-radius: 18px;
   padding: 14px 14px 14px 18px; font-size: 14px; font-weight: 800; color: var(--ink3); box-shadow: 0 6px 0 rgba(var(--shc), .28); cursor: pointer;
   animation: toastPop .28s cubic-bezier(.34,1.56,.64,1); }
@@ -964,3 +994,220 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   background: var(--brand); color: #fff; border: 3.5px solid var(--line); font-size: 15px; font-weight: 900;
   box-shadow: 0 5px 0 rgba(var(--shc), .3); transition: transform .07s, box-shadow .1s; }
 .hub .hub-gate-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc), .3); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   꾸미기(상점 + 인벤토리) · 캐릭터 고르기 · 튜토리얼 — 2026-08-20
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 꾸미기 모달의 두 탭 ── */
+/* 꾸미기 창은 **넓게** 연다(2026-08-20). 기본 모달 폭(420 / PC 480)은 목록이 짧은 창 기준이라,
+   진열이 종류별로 여러 묶음인 여기서는 한 줄에 두 개밖에 안 들어가 한없이 아래로 길어진다.
+   ⚠️ 칸 수는 **breakpoint 로 못박는다.** `auto-fill + minmax` 를 썼더니 390px 에서 1열로 떨어졌다 —
+      창 안 세로 스크롤바가 19px 을 먹어서 두 칸 기준(310px)에 4px 이 모자랐기 때문이다(실측 299px).
+      폭이 조금만 흔들려도 열 수가 통째로 바뀌는 방식은 이 창에 안 맞는다. 최소 2열은 보장한다. */
+.hub .closet-modal { max-width: min(96vw, 880px); }
+.hub .closet-modal .hub-modal-grid { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 560px) { .hub .closet-modal .hub-modal-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 768px) { .hub .closet-modal .hub-modal-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 980px) { .hub .closet-modal .hub-modal-grid { grid-template-columns: repeat(5, 1fr); } }
+/* 창이 넓어지면 카드도 넓어진다 — 썸네일만 그대로 두면 카드 안이 허전해진다. */
+.hub .closet-modal .hub-shop-thumb.pv-open { min-height: 92px; }
+.hub .closet-modal .hub-shop-thumb .closet-char-img,
+.hub .closet-modal .hub-shop-thumb .closet-skin-img { max-height: 92px; height: 92px; }
+
+.hub .closet-tabs { display: flex; gap: 6px; margin: 0 0 14px; }
+.hub .closet-tab { flex: 1 1 0; padding: 9px 10px; border-radius: 12px; cursor: pointer;
+  background: var(--card); border: 3px solid var(--line); color: var(--ink2);
+  font-family: inherit; font-size: 13.5px; font-weight: 900; }
+.hub .closet-tab.on { background: var(--brand); color: #fff; }
+
+.hub .closet-group + .closet-group { margin-top: 20px; }
+.hub .closet-group-h { margin: 0 0 9px; font-size: 14.5px; font-weight: 900; color: var(--ink); }
+
+/* 인벤토리 칸 — 눌러서 갈아입는다. 지금 입은 것은 눌리지 않고 테두리로 표시된다. */
+.hub .closet-item { display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 8px; border-radius: 14px; cursor: pointer; text-align: center;
+  background: var(--card); border: 3px solid var(--line); color: var(--ink);
+  font-family: inherit; font-weight: 800; }
+.hub .closet-item.on { border-color: var(--brand); box-shadow: 0 0 0 3px var(--glow); }
+.hub .closet-item:disabled { cursor: default; }
+.hub .closet-item-thumb { display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 92px; overflow: hidden; }
+.hub .closet-item-name { font-size: 13px; font-weight: 900; }
+.hub .closet-item-state { font-size: 11.5px; font-weight: 800; color: var(--ink2); }
+.hub .closet-item.on .closet-item-state { color: var(--brand); }
+
+/* 썸네일 — 캐릭터는 전신이 다 보여야 하고(contain), 배경은 칸을 채워야 뭔지 읽힌다(cover). */
+.hub .closet-char-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.hub .closet-skin-img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.hub .hub-shop-thumb .closet-char-img,
+.hub .hub-shop-thumb .closet-skin-img { max-height: 74px; height: 74px; }
+
+/* ── 캐릭터 고르기 (첫 진입, 닫는 길 없음) ──────────────────────────────────
+   계열 하나 = **가로로 긴 줄 한 개**(Lv.1~7 이 그 안에 늘어선다). 그런 줄이 위에서부터 3단.
+   ⚠️ 줄 안에 가로 스크롤을 만들지 말 것 — 일곱 단계를 **한눈에** 보여주는 게 이 줄의 전부라,
+      밀어야 보이면 자라는 모습을 비교할 수 없다. 좁은 화면에서는 그림이 작아지는 쪽을 택한다.
+   ⚠️ 3단을 세로 스크롤로 넘기지도 말 것 — 셋을 나란히 비교하는 게 이 화면의 목적이다.
+      그래서 줄 높이는 vh 로 잡아 화면 안에 셋이 다 들어간다. */
+.hub .charpick { position: fixed; inset: 0; z-index: 90; display: flex; padding: 16px 10px;
+  background: rgba(10, 8, 20, .93); backdrop-filter: blur(3px);
+  /* ⚠️ overflow 와 `margin:auto` 가 한 쌍이다. `align-items:center` 로 가운데를 맞추면 내용이
+     화면보다 길어졌을 때 **위쪽이 잘리고 스크롤로도 닿을 수 없다**(768px 에서 제목이 통째로 사라졌다).
+     `margin:auto` 는 남는 공간이 있을 때만 가운데로 밀고, 모자라면 위에서부터 흐른다. */
+  overflow-y: auto; }
+.hub .charpick-inner { width: 100%; max-width: 900px; margin: auto; text-align: center; }
+.hub .charpick-title { margin: 0; font-size: 20px; font-weight: 900; color: #fff; }
+.hub .charpick-sub { margin: 6px 0 14px; font-size: 12.5px; font-weight: 700; line-height: 1.5;
+  color: rgba(255, 255, 255, .74); }
+
+.hub .cp-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* 한 줄 = 한 계열. 고른 줄만 테두리가 산다. */
+.hub .cp-row { padding: 7px 8px 8px; border-radius: 16px; text-align: left;
+  background: rgba(255, 255, 255, .06); border: 3px solid rgba(255, 255, 255, .16); }
+.hub .cp-row.on { border-color: var(--brand); background: rgba(0, 74, 198, .22); }
+
+.hub .cp-head { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 0 2px; }
+.hub .cp-name { font-size: 12.5px; font-weight: 900; color: #fff; }
+.hub .cp-dots { display: flex; gap: 5px; margin-left: auto; }
+.hub .cp-dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 255, 255, .3); border: none; }
+.hub .cp-dot.on { background: #fff; }
+
+/* ⚠️ align-items 를 stretch 로 두지 말 것 — 화살표가 줄 높이만큼 늘어나 **흰 판**처럼 보인다.
+      가운데 정렬 + 고정 크기라야 '버튼'으로 읽힌다. */
+.hub .cp-body { display: flex; align-items: center; gap: 4px; }
+.hub .cp-arrow { flex: 0 0 auto; width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .9); border: 2px solid rgba(0, 0, 0, .35); color: #201a12;
+  font-family: inherit; font-size: 17px; font-weight: 900; line-height: 1; }
+
+/* Lv.1~7 일곱 칸. flex:1 + min-width:0 이라 폭이 좁아지면 **스크롤 대신 그림이 작아진다**. */
+.hub .cp-strip { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-end; gap: 2px;
+  padding: 0; background: none; border: none; cursor: pointer; }
+.hub .cp-cell { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hub .cp-img { width: 100%; height: 15vh; max-height: 130px; min-height: 62px;
+  object-fit: contain; object-position: 50% 100%;
+  filter: drop-shadow(0 5px 6px rgba(0, 0, 0, .5)); }
+.hub .cp-lv { font-size: 10px; font-weight: 900; font-style: normal; color: rgba(255, 255, 255, .55); }
+/* 시작 지점(Lv.1)만 밝힌다 — "여기서 시작해서 오른쪽으로 자란다" 가 이 줄이 하는 말이다. */
+.hub .cp-cell.is-start .cp-lv { color: #fff; }
+.hub .cp-row.on .cp-lv { color: rgba(255, 255, 255, .72); }
+.hub .cp-row.on .cp-cell.is-start .cp-lv { color: #fff; }
+
+.hub .charpick-go { width: 100%; max-width: 380px; margin: 14px auto 0; display: block;
+  padding: 13px 18px; border-radius: 14px; cursor: pointer;
+  background: var(--brand); color: #fff; border: 3.5px solid var(--line);
+  font-family: inherit; font-size: 15px; font-weight: 900;
+  box-shadow: 0 5px 0 rgba(var(--shc2), .5); transition: transform .07s, box-shadow .1s; }
+.hub .charpick-go:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc2), .5); }
+.hub .charpick-go:disabled { background: #6a6f7e; cursor: default; box-shadow: none; }
+.hub .charpick-note { margin: 9px 0 0; font-size: 11.5px; font-weight: 700; line-height: 1.5;
+  color: rgba(255, 255, 255, .58); }
+
+@media (min-width: 560px) {
+  .hub .charpick-title { font-size: 25px; }
+  .hub .charpick-sub { font-size: 13.5px; margin-bottom: 18px; }
+  .hub .cp-list { gap: 12px; }
+  .hub .cp-row { padding: 10px 12px 12px; }
+  .hub .cp-name { font-size: 15px; }
+  .hub .cp-body { gap: 8px; }
+  .hub .cp-arrow { width: 34px; height: 34px; font-size: 21px; }
+  .hub .cp-strip { gap: 6px; }
+  .hub .cp-img { height: 16vh; max-height: 150px; }
+  .hub .cp-lv { font-size: 12px; }
+}
+
+/* ── 튜토리얼 ───────────────────────────────────────────────────────────────
+   구멍은 **투명 상자 + 아주 큰 그림자**로 뚫는다(SVG 마스크보다 가볍고, 상자만 옮기면 구멍이 따라온다).
+   ⚠️ 구멍은 보여주기 전용이다(pointer-events:none) — 실제로 누를 수 있게 하면 튜토리얼 도중에
+      모달이 열려 안내 카드와 겹친다. */
+.hub .tut { position: fixed; inset: 0; z-index: 95; }
+.hub .tut-veil { position: absolute; inset: 0; background: rgba(8, 7, 16, .86); }
+.hub .tut-hole { position: fixed; border-radius: 16px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(8, 7, 16, .86), 0 0 0 3px rgba(255, 255, 255, .85) inset;
+  transition: left .18s, top .18s, width .18s, height .18s; }
+
+.hub .tut-card { position: fixed; left: 50%; transform: translateX(-50%); z-index: 2;
+  width: min(92vw, 360px); padding: 16px 18px 14px; border-radius: 18px; text-align: left;
+  background: var(--card); border: 3.5px solid var(--line); color: var(--ink);
+  box-shadow: 0 6px 0 rgba(var(--shc2), .45); }
+.hub .tut-card.is-center { top: 50%; transform: translate(-50%, -50%); }
+.hub .tut-step { font-size: 11.5px; font-weight: 900; color: var(--brand); letter-spacing: .06em; }
+.hub .tut-title { margin: 4px 0 6px; font-size: 17px; font-weight: 900; }
+.hub .tut-body { margin: 0 0 14px; font-size: 13.5px; font-weight: 700; line-height: 1.6; color: var(--ink2); }
+.hub .tut-act { display: flex; gap: 8px; justify-content: flex-end; }
+.hub .tut-btn { padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  background: var(--brand); color: #fff; border: 3px solid var(--line);
+  font-family: inherit; font-size: 13.5px; font-weight: 900; }
+.hub .tut-btn-ghost { background: var(--card); color: var(--ink2); }
+
+.hub .tut-skip { position: fixed; right: 14px; top: 14px; z-index: 3;
+  padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, .16); border: 2px solid rgba(255, 255, 255, .34); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 800; }
+
+/* ── 미리보기(상점·보관함 공통) — 2026-08-20 ──────────────────────────────
+   썸네일(74px)로는 캐릭터 생김새도, 스킨이 화면을 어떻게 바꾸는지도 알 수 없다. */
+/* 썸네일 = 미리보기 버튼. 원래 그냥 div 였으므로 버튼 기본 모양을 지운다. */
+/* ⚠️ 원래 `div` 이던 자리를 버튼으로 바꿨다 — 버튼 기본 모양(테두리·배경·inline-block)을 지우고
+      **폭을 되돌려야** 한다. 안 그러면 상점 카드에서 썸네일이 내용만큼 줄어 가운데로 몰린다. */
+.hub .pv-open { position: relative; display: flex; align-items: center; justify-content: center; width: 100%;
+  padding: 0; background: none; border: none; color: inherit; font: inherit; cursor: zoom-in; }
+.hub .hub-shop-thumb.pv-open { font-size: 32px; min-height: 74px; }
+.hub .pv-mag { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 16, 30, .72); color: #fff; font-size: 12px; font-weight: 900; line-height: 1; }
+
+/* 캐릭터 — **큰 그림 하나** + 아래에서 레벨을 갈아 본다.
+   ⚠️ 일곱을 나열하면 한 칸이 썸네일만 해져서 미리보기가 미리보기 구실을 못 한다
+      (고르는 화면은 '비교'가 목적이라 나열이 맞고, 여기는 '크게 보기'가 목적이다). */
+.hub .pv-big { display: flex; align-items: flex-end; justify-content: center;
+  height: 34vh; max-height: 320px; min-height: 170px; margin-bottom: 10px; }
+.hub .pv-big-img { max-width: 100%; max-height: 100%; object-fit: contain; object-position: 50% 100%;
+  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, .28)); }
+
+.hub .pv-levels { display: flex; align-items: flex-end; gap: 3px; margin-bottom: 12px; }
+.hub .pv-cell { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 2px; border-radius: 10px; cursor: pointer;
+  background: none; border: 2px solid transparent; font-family: inherit; }
+.hub .pv-cell.on { border-color: var(--brand); background: var(--card-alt); }
+.hub .pv-img { width: 100%; height: 46px; object-fit: contain; object-position: 50% 100%; }
+.hub .pv-lv { font-size: 10.5px; font-weight: 900; font-style: normal; color: var(--ink2); }
+.hub .pv-cell.on .pv-lv { color: var(--brand); }
+
+/* ⚠️ 스킨은 여기서 그리지 않는다 — **화면에 입혀 본다**(`.tryon` 참고).
+   모달 안 그림으로는 미리볼 수가 없다: 스킨이 바꾸는 건 배경뿐 아니라 HUD·미션바·판·게이지·도장·
+   아이콘 전부인데, 그 자산은 CSS 변수 안에만 있어 코드가 경로를 모른다. 배경 + 아이콘 몇 개만
+   얹어봤더니 실제 화면의 5분의 1도 안 보였다(2026-08-20 반려). */
+.hub .pv-plain { font-size: 64px; text-align: center; padding: 18px 0; }
+
+.hub .pv-act { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.hub .pv-price { font-size: 15px; font-weight: 900; color: var(--ink); }
+.hub .pv-btn { min-width: 120px; }
+
+/* 보관함 칸 — 카드 전체가 버튼이던 것을 [썸네일=미리보기] + [버튼=적용] 으로 쪼갰다. */
+.hub .closet-item-act { width: 100%; padding: 7px 8px; border-radius: 10px; cursor: pointer;
+  background: var(--brand); color: #fff; border: 2px solid var(--line);
+  font-family: inherit; font-size: 12px; font-weight: 900; }
+.hub .closet-item-act:disabled { background: #c3cbe0; cursor: default; }
+
+/* ── 스킨 입어보기 띠 — 2026-08-20 ────────────────────────────────────────
+   화면에는 이미 그 스킨이 얹혀 있고, 이 띠는 **임시라는 사실**만 말한다.
+   ⚠️ 맨 위 고정. 아래에 두면 떠 있는 FAB(왼쪽 아래)·맨위로 버튼(오른쪽 아래)이 덮는다.
+   ⚠️ `.hub > *:not(...)` 예외 목록에 `.tryon` 이 있어야 fixed 가 유지된다(빼면 열 안으로 접힌다). */
+.hub .tryon { position: fixed; left: 0; right: 0; top: 0; z-index: 70;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; background: rgba(16, 13, 28, .93); backdrop-filter: blur(4px);
+  border-bottom: 2px solid rgba(255, 255, 255, .18); }
+.hub .tryon-lab { display: flex; align-items: baseline; gap: 7px; min-width: 0;
+  font-size: 12px; font-weight: 800; color: rgba(255, 255, 255, .68); }
+.hub .tryon-lab b { font-size: 13.5px; font-weight: 900; color: #fff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub .tryon-act { display: flex; gap: 6px; flex: 0 0 auto; }
+.hub .tryon-btn { padding: 8px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  background: var(--brand); color: #fff; border: 2px solid rgba(0, 0, 0, .3);
+  font-family: inherit; font-size: 12.5px; font-weight: 900; }
+.hub .tryon-btn-ghost { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .3); }
+/* 띠가 뒤로가기 줄을 덮지 않도록 그때만 위를 비운다. */
+.hub.is-tryon { padding-top: 62px; }

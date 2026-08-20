@@ -6,7 +6,7 @@ import MobileBlock from '../components/MobileBlock'
 import { RESULT_RELEASE_DAYS } from '../lib/testConfig'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
-import { tierDisplay, type ExamTicketView } from '../lib/tickets'
+import { ticketExamPeriodText, tierDisplay, type ExamTicketView } from '../lib/tickets'
 import type { MyAttemptsResponse } from '../lib/types'
 
 // gara_4 (CARIS 자격검정 응시 안내/원서접수) 목업 디자인 + 응시 게이트 로직 보존. 헤더 없음(FAB이 네비).
@@ -142,7 +142,7 @@ export default function ExamGate() {
                             {tierDisplay(tk.tier, lang)}
                           </h4>
                           <p className="font-body-md text-body-md text-on-surface-variant break-keep">
-                            {tk.roundTitle}{tk.examDate ? ` · ${t('sched.exam_date')} ${tk.examDate}` : ''}
+                            {tk.roundTitle}{tk.examDate ? ` · ${t('sched.exam_period')} ${ticketExamPeriodText(tk, lang)}` : ''}
                           </p>
                         </div>
                         {ready ? (

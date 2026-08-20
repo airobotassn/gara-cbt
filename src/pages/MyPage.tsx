@@ -14,7 +14,7 @@ import { loadRegionIndex, loadRegions, type RegionOption } from '../lib/regionCa
 import { NICK_MAX, NICK_MIN, nicknameError } from '../lib/nickname'
 import { krw } from '../lib/money'
 import {
-  examDateText,
+  ticketExamPeriodText,
   ticketReasonText,
   ticketSourceKey,
   ticketStatusKey,
@@ -391,9 +391,9 @@ function TicketCard({ tk, t, lang, onGo, onCheck }: {
             )}
           </div>
           {/* 회차명은 그 자체가 '무슨 회차'라 라벨(ticket.round)을 앞에 또 붙이지 않는다.
-              시험일 라벨은 일정 화면과 같은 말이어야 해서 기존 sched.exam_date 를 그대로 쓴다. */}
+              응시 기간 라벨은 일정 화면(/plan)과 같은 말이어야 해서 sched.exam_period 를 그대로 쓴다. */}
           <p className="font-body-md text-body-md text-on-surface-variant mb-1">
-            {tk.roundTitle} | {t('sched.exam_date')} {examDateText(tk.examDate, lang)}
+            {tk.roundTitle} | {t('sched.exam_period')} {ticketExamPeriodText(tk, lang)}
           </p>
           <p className="font-body-md text-body-md text-on-surface-variant mb-3">
             {t('ticket.issued_at')} {fmtDate(tk.issuedAt)}

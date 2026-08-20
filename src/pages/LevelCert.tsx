@@ -110,13 +110,14 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
       {/* ① 연결선 — 각인 선 조각을 구간마다 회전·신축. 링 앞에서 끊어 여백을 준다 */}
       {EDGES.map(([a, b]) => {
         const p = at(a), q = at(b), on = lit(a) && lit(b)
+        const dotted = (a === 1 && b === 4) || (a === 4 && b === 1)
         const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy)
         const seg = len - GAP * 2, th = 9
         const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2
         const deg = (Math.atan2(dy, dx) * 180) / Math.PI
         return (
           <image
-            key={`e${a}-${b}`} href="/cert/edge.png" x={-seg / 2} y={-th / 2} width={seg} height={th}
+            key={`e${a}-${b}`} href={dotted ? '/cert/edge-dotted.png' : '/cert/edge.png'} x={-seg / 2} y={-th / 2} width={seg} height={th}
             preserveAspectRatio="none" opacity={on ? 1 : 0.62} filter={on ? undefined : 'url(#lc-ash)'}
             transform={`translate(${mx},${my}) rotate(${deg})`}
           />

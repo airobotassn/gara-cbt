@@ -1234,8 +1234,13 @@ const HI: Record<string, string> = {
 
   // ── Plan(/plan · 시험 일정) ──
   "plan.title": "CARIS PLAN",
-  "plan.sub": "अभी जिन CARIS सत्रों के लिए पंजीकरण खुला है।",
+  "plan.sub": "CARIS प्रमाणन का मासिक नियमित संचालन कार्यक्रम।",
   "plan.back": "CARIS",
+  // ── /plan 접수중 회차 일정표(2026-08-20) — 줄 이름 4개. 날짜는 그 회차 값에서 온다. ──
+  "plan.step_apply": "आवेदन",
+  "plan.step_exam": "परीक्षा अवधि",
+  "plan.step_grade": "मूल्यांकन अवधि",
+  "plan.step_result": "परिणाम",
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": "AI·रोबोट संगम दक्षता परीक्षा",
@@ -1764,6 +1769,12 @@ const HI: Record<string, string> = {
   "hub.shop.free": "मुफ़्त",
   "hub.closet.title": "सजाएँ",
   "hub.closet.tab_shop": "शॉप",
+  "hub.closet.tryon_on": "प्रीव्यू में",
+  "hub.closet.tryon_back": "वापस लें",
+  "hub.closet.tryon_buy": "{n} कॉइन में खरीदें",
+  "hub.score_line": "सीज़न {n} अंक",
+  "hub.score_top": "शीर्ष {n}%",
+  "hub.closet.preview": "प्रीव्यू",
   "hub.closet.tab_items": "बैग",
   "hub.closet.g_character": "कैरेक्टर",
   "hub.closet.g_skin": "बैकग्राउंड और UI स्किन",

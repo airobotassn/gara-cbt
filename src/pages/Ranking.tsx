@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { countryName, flagUrl } from '../lib/regions'
-import { showPercentile } from '../lib/scoring'
+import { showPercentile, arenaLevelForScore } from '../lib/scoring'
 import { useT, type TFunc } from '../lib/i18n'
 import TopBar from '../components/TopBar'
 import { Avatar } from '../components/GemAvatar'
@@ -26,6 +26,10 @@ interface HofUser {
   me: boolean
   // ⚠️ 서버는 아직 tier 를 내려주지만(DB ranking_tier) 티어 표시는 2026-08-04 제거돼 읽지 않는다.
   percentile: number | null // 0~1, 낮을수록 상위 (해당 보드 범위 안 기준)
+  // 장착한 캐릭터·스킨(2026-08-20). 카드 좌 패널이 그 사람의 배경 + 캐릭터로 그려진다.
+  //   ⚠️ top 행에만 온다 — me 행에는 uid 가 없어 서버가 조인할 대상을 못 찾는다('내 순위' 바는 카드를 안 연다).
+  character: string | null
+  skin: string | null
 }
 interface HofResponse {
   top: HofUser[]
@@ -151,6 +155,12 @@ export default function Ranking() {
         joinedAt: null, country: null, region: null,
         referralCode: null, // 남의 카드에 내 초대 코드를 박지 않는다
         publicOnly: true,
+        // 그 사람이 입고 있는 캐릭터·배경. 랭킹 시상대에 이미 보이는 그림이라 새로 노출되는 건 없다.
+        character: cardOf.character,
+        skin: cardOf.skin,
+        // 캐릭터 레벨은 서버가 따로 안 준다 — 시즌 총점에서 파생하는 값이라 여기서 계산한다
+        // (허브가 자기 화면에 쓰는 것과 **같은 함수**라 두 화면의 캐릭터 모습이 어긋나지 않는다).
+        charLevel: arenaLevelForScore(cardOf.rating),
       }
     : null
 

@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     ] = await Promise.all([
       admin.from('user_currency').select('points').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
-      admin.from('user_characters').select('base_key, equipped').eq('user_id', uid).maybeSingle(),
+      admin.from('user_characters').select('base_key, equipped, chosen_at, tutorial_done_at').eq('user_id', uid).maybeSingle(),
       admin.from('user_stamps').select('count').eq('user_id', uid).eq('stamp_kind', 'daily').maybeSingle(),
       // ⚠️ 행 존재 여부로 '완료'를 판정하면 안 된다 — 이 행은 레벨테스트(did_leveltest)·미니게임(did_minigame)도
       //    만든다. 출석/오늘의 학습 완료는 반드시 각 종류 플래그로 판정할 것(2026-07-27 버그 수정).
@@ -170,6 +170,12 @@ Deno.serve(async (req) => {
       cosmetics: (cosmetics ?? []).map((c) => c.part_key as string),
       baseKey: (character?.base_key as string) ?? 'default',
       equipped: (character?.equipped as Record<string, string>) ?? {},
+      // 첫 진입 흐름(캐릭터 선택 → 튜토리얼)의 판정 근거. **서버가 유일한 출처**다 —
+      // localStorage 로 판정하면 브라우저를 바꾸거나 지우는 순간 이미 끝낸 사람에게 다시 강제된다.
+      //   ⚠️ 시각이 아니라 boolean 으로 내린다. 화면은 "끝냈나"만 알면 되고, 시각을 내리면
+      //      화면이 그걸로 뭔가 계산하려 든다(그 값의 의미는 서버에만 있다).
+      charChosen: !!character?.chosen_at,
+      tutorialDone: !!character?.tutorial_done_at,
       stamps: (stamp?.count as number) ?? 0,
       // dailyDone = 허브 '출석' 완료(did_attendance). learnDone = /daily 오늘의 학습 완료(did_learn).
       // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).

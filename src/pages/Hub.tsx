@@ -20,10 +20,16 @@ import {
   LEVELTEST_CLEAR_POINTS,
   LEVELTEST_MAX,
   SEASON_MAX_POINTS,
+  showPercentile,
 } from '../lib/scoring'
 import ShareCardModal from '../components/ShareCardModal'
+import CharArt from '../components/CharArt'
 import { countryName } from '../lib/regions'
 import { tierName } from '../lib/caris'
+import {
+  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, charSeriesOf,
+  DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
+} from '../lib/hubCosmetics'
 
 /** 방(미니룸) 표시 스위치. 2026-08-14: 허브 배경이 사진 한 장이 되면서 CSS 벽·바닥이 설 자리가 없어 껐다.
  *  ⚠️ 코드를 지우지 않은 이유 — 서버(`room` 함수)·DB(가구 소유)·공개 방 `/room/:handle` 은 그대로 살아 있다.
@@ -53,19 +59,15 @@ function Ic({ n, s = 24 }: { n: string; s?: number }) {
 }
 
 /** 허브 스킨. 화면(마크업)은 한 벌이고 테마는 **값과 그림만** 갈아끼운다 —
- *  값 = `hub.css` 의 `.hub[data-skin='<이름>']` 한 블록, 그림 = 아래 아이콘 경로 + 그 블록의 URL.
- *  ⚠️ 지금은 고정값이다. 상점에서 스킨을 팔게 되면 `get-hub` 의 보유·장착 정보에서 받아오면 되고,
- *     그때 고칠 곳은 이 상수 하나다(화면 코드에는 스킨 이름이 흩어져 있지 않다). */
-const SKIN = 'palace'
+ *  값 = `hub.css` 의 `.hub[data-skin='<이름>']` 한 블록, 그림 = 아이콘 폴더 + 그 블록의 URL.
+ *  2026-08-20: 고정 상수였던 것을 **장착값**으로 바꿨다(상점에서 스킨을 판다).
+ *  ⚠️ 스킨 이름은 화면 코드에 흩어져 있지 않다 — 루트의 `data-skin` 하나와 아이콘 폴더뿐이고,
+ *     나머지는 전부 CSS 가 그 속성에서 파생한다. 그래서 갈아입으면 화면이 통째로 바뀐다.
+ *  목록·경로의 단일 출처 = `src/lib/hubCosmetics.ts` 의 `SKINS`. */
+type HubUiIconName = 'calendar' | 'shop' | 'medal' | 'invite'
 
-/** 스킨별 아이콘 폴더. CSS 변수로 못 넘기는 유일한 자리 — <img src> 라 코드가 알아야 한다. */
-const SKIN_ICON_DIR: Record<string, string> = { palace: '/hub/ui' }
-const HUB_UI_ICON_NAMES = ['calendar', 'shop', 'medal', 'invite'] as const
-type HubUiIconName = (typeof HUB_UI_ICON_NAMES)[number]
-
-/** 레일 아이콘. 스킨이 없으면 원래 쓰던 SVG 로 돌아간다 — 스킨은 '덧입히는 것'이지 전제가 아니다. */
-function HubUiIcon({ n, skin }: { n: HubUiIconName; skin: string | null }) {
-  const dir = skin ? SKIN_ICON_DIR[skin] : null
+/** 레일 아이콘. 폴더가 없으면 원래 쓰던 SVG 로 돌아간다 — 스킨은 '덧입히는 것'이지 전제가 아니다. */
+function HubUiIcon({ n, dir }: { n: HubUiIconName; dir: string | null }) {
   if (!dir) return <Ic n={n === 'invite' ? 'share' : n} s={42} />
   return <img className="hub-ui-icon" src={`${dir}/icon-${n}.png`} alt="" aria-hidden="true" />
 }
@@ -92,6 +94,22 @@ function partEmoji(key: string) {
   return '🎁'
 }
 
+/** 상점 진열 순서 = 이 표의 순서. 종류별로 묶어야 캐릭터·배경·가구가 한 격자에 섞이지 않는다. */
+const CLOSET_GROUPS: { kind: string; labelKey: string }[] = [
+  { kind: 'character', labelKey: 'hub.closet.g_character' },
+  { kind: 'skin', labelKey: 'hub.closet.g_skin' },
+  { kind: 'furniture', labelKey: 'hub.closet.g_furniture' },
+  { kind: 'part', labelKey: 'hub.closet.g_part' },
+]
+
+/** 상점 썸네일 — 종류마다 그림이 다르다(캐릭터=그림 / 스킨=배경 / 그 외=이모지·가구 그림). */
+function CosmeticThumb({ partKey }: { partKey: string }) {
+  // 상점 썸네일은 **Lv.1** 이다 — 사면 처음 만나는 모습이라야 산 것과 보이는 게 같다.
+  if (isCharKey(partKey)) return <CharArt charKey={partKey} level={CHAR_MIN_LEVEL} className="closet-char-img" />
+  if (isSkinKey(partKey)) return <img className="closet-skin-img" src={skinThumb(skinByPart(partKey))} alt="" />
+  return <>{partEmoji(partKey)}</>
+}
+
 // ── 서버 계약(입출력) ──
 // kind·surface 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
 interface CatalogItem { partKey: string; price: number; kind?: string; surface?: string | null }
@@ -99,7 +117,14 @@ interface HubState { authed: boolean; level?: number | null; rankPoints?: number
   // 방(미니룸) — layout(슬롯 목록 + %좌표)은 서버가 통째로 준다. 프론트에 슬롯표를 두지 않는다.
   room?: { slots: RoomSlots; layout: RoomSlot[] }
   // 가구 전체(면 포함). catalog 와 달리 상점에서 내린 한정템도 들어 있다 — 이미 가진 사람은 계속 놓을 수 있어야 하므로.
-  furniture?: { partKey: string; surface: string }[] }
+  furniture?: { partKey: string; surface: string }[]
+  // 꾸미기 — 장착한 캐릭터(baseKey) · 그 외 장착(equipped.skin) · 첫 진입 흐름 진행 상태.
+  //   ⚠️ charChosen·tutorialDone 은 **서버만이 안다**. 화면이 localStorage 로 기억하면
+  //      브라우저를 바꾸거나 지운 사람에게 첫 진입 흐름이 다시 강제된다.
+  baseKey?: string
+  equipped?: Record<string, string>
+  charChosen?: boolean
+  tutorialDone?: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 // stamps = 적립 뒤 7일 사이클 위치(1..7), bonus = 7일 완주 보너스 코인(0 이면 없음).
 interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
@@ -108,6 +133,8 @@ interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number 
 const FRIENDLY_ERR = new Set([
   'insufficient_points', 'already_owned', 'unauthorized',
   'not_owned', 'not_furniture', 'wrong_surface',
+  // 꾸미기(character 함수) — 장착·선택 거절 사유.
+  'invalid_character', 'invalid_kind', 'invalid_part',
 ])
 function friendlyError(e: unknown, t: TFunc): string {
   const msg = e instanceof Error ? e.message : ''
@@ -116,7 +143,11 @@ function friendlyError(e: unknown, t: TFunc): string {
 
 type TitleItem = { tier: string; exam_title?: string }
 
-type ModalKind = 'shop' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
+// 'closet' = 옛 'shop'. 상점과 인벤토리가 한 모달의 두 탭이 되면서 이름을 바꿨다(2026-08-20)
+// — 사는 곳과 갈아입는 곳이 같은 자리라 버튼 이름이 '상점' 이면 절반을 숨기는 말이 된다.
+type ModalKind = 'closet' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
+/** 꾸미기 모달의 두 탭. */
+type ClosetTab = 'shop' | 'items'
 
 // 면 라벨 사전 키 — 'floor'/'wall' 이 곧 키라서 표를 두 벌 두지 않는다(hub.earn.row.<kind> 와 같은 관례).
 const surfaceLabel = (surface: string, t: TFunc) => t(`hub.room.surface_${surface}`)
@@ -217,6 +248,31 @@ export default function Hub() {
     region: { rank: number | null; total: number | null }
   } | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
+  const [closetTab, setClosetTab] = useState<ClosetTab>('shop')
+  // ── 꾸미기(캐릭터·스킨) ──
+  // 장착값. 서버(get-hub)가 권위고 화면은 낙관적으로 먼저 반영한 뒤 hydrate 로 맞춘다.
+  const [charKey, setCharKey] = useState<string | null>(null)
+  const [skinPart, setSkinPart] = useState<string>(DEFAULT_SKIN_PART)
+  // 첫 진입 흐름 — null = 아직 서버에 안 물어봄(모름). 모르는 동안은 아무 오버레이도 띄우지 않는다.
+  //   ⚠️ false 로 시작하면 하이드레이트 전 한 프레임 동안 이미 끝낸 사람에게도 선택 화면이 번쩍인다.
+  const [charChosen, setCharChosen] = useState<boolean | null>(null)
+  const [tutorialDone, setTutorialDone] = useState<boolean | null>(null)
+  // 선택 화면에서 계열마다 지금 보고 있는 칸(좌우 버튼). 계열들이 각자 기억한다.
+  //   ⚠️ 'm'|'f' 가 아니라 **인덱스**다 — 한 계열에 변형이 셋 이상 생겨도 화면이 그대로 돌아간다.
+  const [charLook, setCharLook] = useState<Record<string, number>>({})
+  // 미리보기로 열어둔 품목(part_key). 상점·보관함 어디서 눌렀든 같은 창이 뜬다 —
+  // 사기 전과 산 뒤에 보는 그림이 다르면 "산 게 그거 맞나" 를 다시 확인하러 가야 한다.
+  const [preview, setPreview] = useState<string | null>(null)
+  // 미리보기에서 지금 보고 있는 레벨. ⚠️ 열 때마다 정해준다 — 안 그러면 앞에 보던 레벨이 남는다.
+  const [pvLevel, setPvLevel] = useState(CHAR_MIN_LEVEL)
+  /** 잠깐 입어본 스킨(part_key). **저장되지 않는다** — 화면에만 얹힌다.
+   *  ⚠️ 스킨은 모달 안 그림으로는 미리볼 수 없다. 배경뿐 아니라 HUD·미션바·판·게이지·도장·아이콘이
+   *     전부 바뀌는데, 그 자산들은 CSS 변수 안에만 있어서 코드가 경로를 알지 못한다.
+   *     그래서 **진짜 화면에 얹는다** — 그러면 위치가 어긋날 수가 없고 구현도 이쪽이 더 간단하다. */
+  const [previewSkin, setPreviewSkin] = useState<string | null>(null)
+  const [charPick, setCharPick] = useState<string | null>(null) // 고른 칸(확정 전)
+  const [charSaving, setCharSaving] = useState(false)
+  const [tutorialStep, setTutorialStep] = useState(0)
   const [, setSkillScore] = useState(0)
   const [, setActivityScore] = useState(0)
   const [seasonTotal, setSeasonTotal] = useState(0) // 공유 카드의 시즌 점수 / 전투력
@@ -358,6 +414,15 @@ export default function Hub() {
     setGiftsOlder(h.giftsOlder ?? 0)
     setGiftsUnseen(h.giftsUnseen ?? 0)
     setFurniture(h.furniture ?? [])
+    // 꾸미기 장착값 — 서버가 권위다. 'default'(아직 안 고름)는 null 로 눕혀 폴백 그림 하나로 처리한다.
+    setCharKey(h.baseKey && h.baseKey !== 'default' ? h.baseKey : null)
+    setSkinPart(h.equipped?.skin ?? DEFAULT_SKIN_PART)
+    // 첫 진입 흐름. **비로그인 응답(authed=false)에는 이 값이 없다** — 그때는 모름(null)으로 두어야
+    // 게스트 화면에 캐릭터 선택이 뜨는 일이 없다(허브는 로그인 전용이라 실제로 도달하진 않는다).
+    if (h.authed) {
+      setCharChosen(!!h.charChosen)
+      setTutorialDone(!!h.tutorialDone)
+    }
     // ⚠️ 배치는 서버 응답으로 **덮어쓴다**(낙관적 반영을 되돌리는 게 아니라 권위값 동기화).
     //    layout 은 비어 있으면 갱신하지 않는다 — 옛 배포본 응답에 room 이 없으면 방이 통째로 사라진다.
     if (h.room) {
@@ -410,9 +475,78 @@ export default function Hub() {
     try {
       await callFunction<ShopResp>('shop-buy', { part_key: partKey, client_nonce: crypto.randomUUID() })
       setPurchased(partKey)
+      // 산 물건은 입으라고 산 것이다 — 축하 팝업을 닫으면 인벤토리 탭이 열려 있게 둔다.
+      //   ⚠️ 여기서 바로 장착하지는 않는다. 산 순간 화면이 통째로 바뀌면(스킨) 뭘 산 건지 못 보고 지나간다.
+      setClosetTab('items')
       await hydrate()
     } catch (e) {
       pushErr(friendlyError(e, t))
+    }
+  }
+
+  // 미리보기 열기. **이미 가진 캐릭터는 지금 내 레벨**로, 아직 안 산 것은 Lv.1 로 연다 —
+  // 보관함에서는 "지금 이렇게 보인다"가, 상점에서는 "사면 이 모습부터 시작한다"가 궁금한 것이라서다.
+  function openPreview(key: string) {
+    // 스킨은 창에 그리지 않고 **화면에 입혀 본다**(위 previewSkin 주석 참고).
+    //   모달을 닫는 게 핵심이다 — 안 닫으면 정작 바뀐 화면이 모달에 가려 안 보인다.
+    if (isSkinKey(key)) {
+      setPreviewSkin(key)
+      setModal(null)
+      return
+    }
+    setPvLevel(isCharKey(key) && owned.has(key) ? arenaLevelForScore(seasonTotal) : CHAR_MIN_LEVEL)
+    setPreview(key)
+  }
+  /** 입어보기 끝 — 원래 스킨으로 돌아가고 **보던 자리(꾸미기 모달)로 되돌린다.** */
+  function endTryOn(reopen = true) {
+    setPreviewSkin(null)
+    if (reopen) { setClosetTab('items'); setModal('closet') }
+  }
+
+  // ── 캐릭터 · 스킨 ──────────────────────────────────────────────────────────
+  // 캐릭터 선택. 첫 선택이면 서버가 무료로 지급하고 장착까지 한 트랜잭션에서 끝낸다.
+  //   ⚠️ 낙관적 반영을 하지 않는다 — 첫 선택은 되돌릴 수 없는 지급이라 "화면엔 골라졌는데 서버는
+  //      거절한" 상태가 남으면 사용자가 그걸 자기 캐릭터로 알고 지나간다. 응답을 받고 나서 닫는다.
+  async function chooseCharacter(key: string) {
+    if (charSaving) return
+    setCharSaving(true)
+    try {
+      await callFunction<{ base_key: string; first: boolean }>('character', { action: 'choose', key })
+      setCharKey(key)
+      setCharChosen(true)
+      setCharPick(null)
+      await hydrate()
+    } catch (e) {
+      pushErr(friendlyError(e, t))
+    } finally {
+      setCharSaving(false)
+    }
+  }
+
+  // 스킨 등 갈아입기. 캐릭터는 위 전용 경로로 간다(첫 선택 무료 규칙이 걸려 있다).
+  //   여기는 낙관적 반영이 맞다 — 실패해도 잃는 게 없고, 갈아입기는 눌렀을 때 바로 보여야 한다.
+  async function equip(kind: string, key: string) {
+    if (kind === 'character') { void chooseCharacter(key); return }
+    const prev = skinPart
+    // 적용했으면 더는 '입어보는 중'이 아니다 — 띠를 남겨두면 저장된 스킨을 임시값처럼 보이게 한다.
+    if (kind === 'skin') { setSkinPart(key); setPreviewSkin(null) }
+    try {
+      await callFunction('character', { action: 'equip', kind, key })
+    } catch (e) {
+      if (kind === 'skin') setSkinPart(prev)
+      pushErr(friendlyError(e, t))
+    }
+  }
+
+  // 튜토리얼 종료(끝까지 봤든 건너뛰었든 같다).
+  //   ⚠️ 화면을 먼저 닫고 서버에 알린다 — 저장이 늦어도 사용자를 검은 화면에 잡아두지 않는다.
+  //      실패하면 다음 진입에 한 번 더 뜨는데, 그게 "닫혔는데 서버는 모르는" 상태보다 낫다.
+  async function finishTutorial() {
+    setTutorialDone(true)
+    try {
+      await callFunction('character', { action: 'tutorial' })
+    } catch {
+      /* 다음 진입에 다시 뜬다 — 조용히 넘긴다 */
     }
   }
 
@@ -567,6 +701,32 @@ export default function Hub() {
   //   면을 안 거르면 벽시계가 바닥 후보로 뜨고, 눌러도 서버가 wrong_surface 로 거절해 헛클릭이 된다.
   const pickSlotDef = pickSlot ? roomLayout.find((s) => s.key === pickSlot) ?? null : null
   const pickable = pickSlotDef ? furniture.filter((f) => f.surface === pickSlotDef.surface && owned.has(f.partKey)) : []
+
+  // 지금 **그릴** 스킨 = 입어보는 중이면 그것, 아니면 실제 장착값.
+  //   ⚠️ 저장값(skinPart)과 화면값(skin)을 갈라놓는 게 입어보기의 전부다. 저장 경로는 이 값을 안 본다.
+  const skin = skinByPart(previewSkin ?? skinPart)
+  // 인벤토리 = **가진 것**. 기본 스킨은 산 적이 없어도 늘 있는 것으로 친다(되돌아갈 길이 필요하다).
+  const ownedChars = CHAR_KEYS.filter((k) => owned.has(k))
+  const ownedSkins = SKINS.filter((s) => s.partKey === DEFAULT_SKIN_PART || owned.has(s.partKey))
+  // 첫 진입 흐름 — 순서가 곧 규칙이다: 캐릭터를 고른 다음에 튜토리얼.
+  //   ⚠️ null(아직 모름)일 때는 **아무것도 띄우지 않는다.** false 로 판정하면 하이드레이트 전 한 프레임에
+  //      이미 끝낸 사람 화면에도 선택창이 번쩍인다.
+  // 첫 선택 후보 = **판매 중인 무료 캐릭터**(shop_catalog 의 price 0). 값이 곧 자격이라 목록을 또 두지 않는다.
+  //   ⚠️ 코드의 CHAR_KEYS 를 그대로 쓰면 안 된다 — 관리자가 값을 매긴 캐릭터까지 후보에 섞여서,
+  //      고르는 순간 서버가 not_owned 로 거절한다(화면과 서버가 다른 말을 한다).
+  //   ⚠️ 카탈로그가 아직 안 왔거나 비어 있으면 코드 목록으로 떨어진다 — 빈 화면에 가두는 것보단 낫다.
+  const starterKeys = catalog.filter((c) => (c.kind ?? '') === 'character' && c.price === 0).map((c) => c.partKey)
+  const pickKeys = starterKeys.length ? starterKeys : CHAR_KEYS
+  // 계열별로 묶는다 — 한 계열이 카드 한 장이고, 좌우 버튼이 그 안에서 모습을 바꾼다.
+  const pickSeries: { series: string; keys: string[] }[] = []
+  for (const k of pickKeys) {
+    const series = charSeriesOf(k)
+    const found = pickSeries.find((g) => g.series === series)
+    if (found) found.keys.push(k)
+    else pickSeries.push({ series, keys: [k] })
+  }
+  const needCharPick = authed && charChosen === false
+  const needTutorial = authed && charChosen === true && tutorialDone === false
   // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
   //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
   const arenaLv = arenaLevelForScore(seasonTotal)
@@ -616,7 +776,8 @@ export default function Hub() {
   }
 
   return (
-    <div className="hub" data-skin={SKIN}>
+    // ⚠️ 입어보기 띠는 화면 맨 위 고정이라 그대로 두면 뒤로가기 줄을 덮는다 → 그때만 위를 비운다.
+    <div className={`hub${previewSkin ? ' is-tryon' : ''}`} data-skin={skin.key}>
       {/* 무대 = 배경 사진 + 캐릭터, 화면에 붙은 한 쌍(2026-08-14 레퍼런스: 전체화면 사진 위 정중앙 캐릭터).
           ⚠️ 그림 URL·크기·발끝 위치는 **여기 없다** — 전부 hub.css 의 스킨 값 블록이다.
              그래서 스킨을 바꿔도 이 마크업은 그대로다(그게 스킨 구조의 목적이다).
@@ -624,12 +785,18 @@ export default function Hub() {
           ⚠️ 그래서 hub.css 의 `.hub > *:not(...)` 예외 목록에 `.hub-scene` 이 들어가 있다.
              빼면 flex/relative 아이템으로 접혀 0×0 이 된다(랜딩 `.rg` 에서 실제로 겪은 사고).
           ⚠️ pointer-events:none 필수 — 화면 전체를 덮으므로 없으면 아래 UI 가 하나도 안 눌린다.
-          ⚠️ 캐릭터 그림을 갈면 **투명 여백을 트림하고 `--skin-char-ar` 을 다시 잴 것** — 아래에 빈 알파가
-             남으면 발끝이 그만큼 떠서 `--skin-char-bottom` 이 거짓말이 된다(받은 원본은 아래 14%가 여백이었다).
-          ⚠️ 방(RoomView)·공개 방이 쓰는 `/hub-char.png` 와는 다른 파일이라 서로 안 건드린다. */}
+          ⚠️ 캐릭터 그림을 갈면 **투명 여백을 트림할 것** — 아래에 빈 알파가 남으면 발끝이 그만큼 떠서
+             `--skin-char-bottom` 이 거짓말이 된다(받은 원본은 아래 14%가 여백이었다).
+          ⚠️ 캐릭터만 CSS 배경이 아니라 <img> 다(2026-08-20). 이유 = **그림이 없을 때 폴백**이 필요해서다
+             — background-image 는 실패를 알 수 없어, 아직 안 그려진 캐릭터를 고르면 무대가 텅 빈다.
+             칸(위치·키)은 그대로 `.hub-scene-char` 가 잡고 그림만 그 안을 채운다. */}
       <div className="hub-scene" aria-hidden="true">
         <div className="hub-scene-bg" />
-        <div className="hub-scene-char" />
+        <div className="hub-scene-char">
+          {/* 캐릭터 레벨 = ARENA 레벨(시즌 총점 밴드, 1~7). 점수가 오르면 무대 위 캐릭터가 그대로 자란다.
+              ⚠️ 시험 사다리 등급(user_progress.rank)이 아니다 — 둘 다 1~7 이라 헷갈리기 쉽다. */}
+          <CharArt charKey={charKey} level={arenaLv} className="hub-scene-char-img" />
+        </div>
       </div>
 
       <div className="sky" aria-hidden="true">
@@ -678,6 +845,22 @@ export default function Hub() {
             <div className="hud-name">
               {/* 닉네임은 12자까지 들어오므로 좁은 화면에서 자격 배지를 밀어낸다 → 이름만 말줄임(.hud-nick). */}
               <span className="hud-nick">{heroName}</span> {titleBadge}
+              {/* 랭킹 점수 = 시즌 총점. 서버가 늘 내려주던 값인데 화면에 쓰는 곳이 없었다(2026-08-20).
+                  ⚠️ **이름에 바로 붙인다 — 오른쪽 끝으로 밀지 말 것.** 끝에 붙였더니 바로 아래 코인 칩과
+                     세로로 겹쳐 서서 같은 종류로 읽혔다(랭킹 점수 ↔ 상점 재화는 지갑이 다르다).
+                     자기 줄로 빼는 안도 만들어봤는데 HUD 가 3단이 되어 반려됐다.
+                  ⚠️ 경험치 바의 분수(16/1,000)는 **밴드 안 진행분**이라 총점이 아니다 — 그래서 총점을
+                     따로 보여줘야 한다. 반대로 바의 분수를 총점으로 바꾸면 바와 글자가 어긋나 보인다.
+                  ⚠️ 순위·백분위는 **모수가 충분할 때만** 붙인다(showPercentile). 사람이 적으면
+                     '12명 중 3위' 가 되어 1등도 초라해 보인다. 점수는 몇 명이든 안전하다. */}
+              {authed && (
+                <span className="hud-score">
+                  {t('hub.score_line', { n: seasonTotal.toLocaleString() })}
+                  {percentile != null && showPercentile(rankTotal) && (
+                    <span className="hud-score-pct"> · {t('hub.score_top', { n: Math.max(1, Math.round(percentile * 100)) })}</span>
+                  )}
+                </span>
+              )}
             </div>
             <div className="hud-xp">
               {/* ARENA 레벨 경험치 바. 라벨은 바 안 오른쪽(exp-lab) — 바깥에 맨텍스트로 두면 덜렁거린다. */}
@@ -705,7 +888,7 @@ export default function Hub() {
         {/* 오늘의 미션 — 무대 **위 가로 한 줄**(하단 '출석 보상' 스트립과 같은 형태).
             좌측 열로 두면 카드 하나 때문에 캐릭터가 옆으로 밀려서 전체 폭 한 줄로 옮겼다 → 캐릭터는 정중앙 유지.
             완료 판정은 서버 플래그(daily_activity 종류별), 점수는 scoring.ts 의 ACTIVITY_DELTA 파생. */}
-        <div className="mission-bar">
+        <div className="mission-bar" data-tut="mission">
           <span className="ms-title"><Ic n="star" s={16} /> {t('hub.mission_title')}</span>
           <div className="ms-chips">
           {missions.map((m) => {
@@ -731,10 +914,11 @@ export default function Hub() {
             {/* 왼쪽 레일 제거 — 출석을 오른쪽 맨 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
             {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
             <div className="rail rail-r">
-              <button className="fcard f-daily" onClick={doDaily}><span className="fico"><HubUiIcon n="calendar" skin={SKIN} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
-              <button className="fcard f-shop" onClick={() => setModal('shop')}><span className="fico"><HubUiIcon n="shop" skin={SKIN} /></span>{t('hub.rail.shop')}</button>
-              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" skin={SKIN} /></span>{t('hub.rail.title')}</button>
-              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><HubUiIcon n="invite" skin={SKIN} /></span>{t('hub.rail.invite')}</button>
+              <button className="fcard f-daily" data-tut="daily" onClick={doDaily}><span className="fico"><HubUiIcon n="calendar" dir={skin.iconDir} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
+              {/* '상점' → '꾸미기'. 사는 곳과 갈아입는 곳이 한 모달의 두 탭이라 상점만 말하면 절반을 숨긴다. */}
+              <button className="fcard f-shop" data-tut="closet" onClick={() => { setClosetTab('shop'); setModal('closet') }}><span className="fico"><HubUiIcon n="shop" dir={skin.iconDir} /></span>{t('hub.rail.closet')}</button>
+              <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" dir={skin.iconDir} /></span>{t('hub.rail.title')}</button>
+              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><HubUiIcon n="invite" dir={skin.iconDir} /></span>{t('hub.rail.invite')}</button>
             </div>
             {/* 방(미니룸) — /room/:handle(남의 방)과 **같은 컴포넌트**를 쓴다.
                 내 방과 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나서 제일 늦게 발견된다.
@@ -767,7 +951,7 @@ export default function Hub() {
 
         {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
         <div className="dock">
-          <div className="reward">
+          <div className="reward" data-tut="stamp">
             <div className="rw-top"><Ic n="fire" s={20} /> {t('hub.reward_head')}<span className="rw-n">{stamps} / 7</span></div>
             <div className="streak">
               {[1, 2, 3, 4, 5, 6, 7].map((d) => (
@@ -838,33 +1022,121 @@ export default function Hub() {
         </Modal>
       )}
 
-      {modal === 'shop' && (
-        <Modal title={t('hub.shop.title')} onClose={() => setModal(null)}>
+      {/* 꾸미기 = 상점 + 인벤토리 한 모달의 두 탭(2026-08-20).
+          ⚠️ 둘을 나누지 않은 이유 — 사고 나서 입는 게 한 동작이라, 화면을 나누면 산 뒤에 "그래서 어디서
+             입지" 를 찾아야 한다. 구매 직후 인벤토리 탭으로 자동으로 넘어가는 것도 그래서다. */}
+      {modal === 'closet' && (
+        <Modal title={t('hub.closet.title')} className="closet-modal" onClose={() => setModal(null)}>
           <div className="hub-shop-head">
             <span className="hub-shop-head-lab">{t('hub.shop.balance')}</span>
             <span className="gchip" style={{ margin: 0 }}><span className="num">{points.toLocaleString()}</span></span>
           </div>
-          {catalog.length > 0 ? (
-            <div className="hub-modal-grid">
-              {catalog.map((c) => (
-                <div key={c.partKey} className="hub-shop-item">
-                  {owned.has(c.partKey) && <span className="hub-shop-owned">{t('hub.shop.owned')}</span>}
-                  <div className="hub-shop-thumb">{partEmoji(c.partKey)}</div>
-                  {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
-                      안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
-                  <div className="hub-shop-name">
-                    {partName(c.partKey, t)}
-                    {c.surface ? <small style={{ display: 'block', fontWeight: 800, opacity: .7 }}>{surfaceLabel(c.surface, t)}</small> : null}
-                  </div>
-                  <div className="hub-shop-price">🪙 {c.price}</div>
-                  <button className="pbtn hub-shop-buy" style={btn(owned.has(c.partKey) ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={owned.has(c.partKey)}>
-                    {t(owned.has(c.partKey) ? 'hub.shop.owned' : 'hub.shop.buy')}
-                  </button>
-                </div>
-              ))}
-            </div>
+
+          <div className="closet-tabs" role="tablist">
+            {(['shop', 'items'] as ClosetTab[]).map((k) => (
+              <button
+                key={k}
+                role="tab"
+                aria-selected={closetTab === k}
+                className={`closet-tab${closetTab === k ? ' on' : ''}`}
+                onClick={() => setClosetTab(k)}
+              >
+                {t(k === 'shop' ? 'hub.closet.tab_shop' : 'hub.closet.tab_items')}
+              </button>
+            ))}
+          </div>
+
+          {closetTab === 'shop' ? (
+            catalog.length > 0 ? (
+              // 종류별로 묶어서 진열한다 — 캐릭터·배경·가구가 한 격자에 섞이면 뭘 사는 건지 안 갈린다.
+              // 진열 순서는 서버(sort_order)가 정하므로 여기서 다시 정렬하지 않는다.
+              <>
+                {CLOSET_GROUPS.map(({ kind, labelKey }) => {
+                  const items = catalog.filter((c) => (c.kind ?? 'part') === kind)
+                  if (!items.length) return null
+                  return (
+                    <div key={kind} className="closet-group">
+                      <h4 className="closet-group-h">{t(labelKey)}</h4>
+                      <div className="hub-modal-grid">
+                        {items.map((c) => {
+                          const has = owned.has(c.partKey)
+                          return (
+                            <div key={c.partKey} className="hub-shop-item">
+                              {has && <span className="hub-shop-owned">{t('hub.shop.owned')}</span>}
+                              {/* 썸네일 = 미리보기 버튼. 74px 로는 캐릭터가 어떻게 생겼는지도,
+                                  스킨이 화면을 어떻게 바꾸는지도 알 수 없다 — 사기 전에 크게 볼 길이 필요하다. */}
+                              <button className="hub-shop-thumb pv-open" onClick={() => openPreview(c.partKey)} aria-label={t('hub.closet.preview')}>
+                                <CosmeticThumb partKey={c.partKey} />
+                                <span className="pv-mag" aria-hidden="true">⌕</span>
+                              </button>
+                              {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
+                                  안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
+                              <div className="hub-shop-name">
+                                {partName(c.partKey, t)}
+                                {c.surface ? <small style={{ display: 'block', fontWeight: 800, opacity: .7 }}>{surfaceLabel(c.surface, t)}</small> : null}
+                              </div>
+                              <div className="hub-shop-price">{c.price > 0 ? `🪙 ${c.price}` : t('hub.shop.free')}</div>
+                              <button className="pbtn hub-shop-buy" style={btn(has ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={has}>
+                                {t(has ? 'hub.shop.owned' : 'hub.shop.buy')}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            ) : (
+              <p className="hub-modal-help">{t(isFullUser ? 'hub.shop.empty' : 'hub.shop.login')}</p>
+            )
           ) : (
-            <p className="hub-modal-help">{t(isFullUser ? 'hub.shop.empty' : 'hub.shop.login')}</p>
+            // ── 인벤토리 — 가진 것을 눌러 갈아입는다. 지금 입은 것에 표시가 붙는다. ──
+            <>
+              <div className="closet-group">
+                <h4 className="closet-group-h">{t('hub.closet.g_character')}</h4>
+                {ownedChars.length ? (
+                  <div className="hub-modal-grid">
+                    {ownedChars.map((k) => (
+                      // ⚠️ 카드 전체를 버튼으로 두지 않는다 — 누르는 곳이 둘(미리보기 · 적용)이라
+                      //    카드가 통째로 버튼이면 미리보기를 누를 자리가 없다.
+                      <div key={k} className={`closet-item${charKey === k ? ' on' : ''}`}>
+                        <button className="closet-item-thumb pv-open" onClick={() => openPreview(k)} aria-label={t('hub.closet.preview')}>
+                          <CharArt charKey={k} level={arenaLv} className="closet-char-img" />
+                          <span className="pv-mag" aria-hidden="true">⌕</span>
+                        </button>
+                        <span className="closet-item-name">{partName(k, t)}</span>
+                        <button className="closet-item-act" onClick={() => equip('character', k)} disabled={charSaving || charKey === k}>
+                          {t(charKey === k ? 'hub.closet.worn' : 'hub.closet.wear')}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="hub-modal-help">{t('hub.closet.empty_character')}</p>
+                )}
+              </div>
+
+              <div className="closet-group">
+                <h4 className="closet-group-h">{t('hub.closet.g_skin')}</h4>
+                <div className="hub-modal-grid">
+                  {ownedSkins.map((sk) => (
+                    <div key={sk.partKey} className={`closet-item${skinPart === sk.partKey ? ' on' : ''}`}>
+                      <button className="closet-item-thumb pv-open" onClick={() => openPreview(sk.partKey)} aria-label={t('hub.closet.preview')}>
+                        <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
+                        <span className="pv-mag" aria-hidden="true">⌕</span>
+                      </button>
+                      <span className="closet-item-name">{partName(sk.partKey, t)}</span>
+                      <button className="closet-item-act" onClick={() => equip('skin', sk.partKey)} disabled={skinPart === sk.partKey}>
+                        {t(skinPart === sk.partKey ? 'hub.closet.worn' : 'hub.closet.wear')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {/* 스킨은 배경만 바꾸는 게 아니라 판·게이지·스탬프까지 통째로 바뀐다 — 미리 말해둔다. */}
+                <p className="hub-modal-help">{t('hub.closet.skin_help')}</p>
+              </div>
+            </>
           )}
         </Modal>
       )}
@@ -913,6 +1185,10 @@ export default function Hub() {
             country: countryCode ? countryName(countryCode, lang) : null,
             region: regionName(regionCode),
             referralCode,
+            // 카드 좌 패널 = 지금 입고 있는 배경 + 캐릭터. 허브에서 보던 그 그림이 그대로 나간다.
+            character: charKey,
+            skin: skinPart,
+            charLevel: arenaLv,
           }}
         />
       )}
@@ -1129,6 +1405,276 @@ export default function Hub() {
         </Modal>
       )}
 
+      {/* ── 스킨 입어보기 띠 ────────────────────────────────────────────────────
+          화면에는 이미 그 스킨이 얹혀 있고(위 `skin` 파생), 이 띠는 **임시라는 사실**만 말한다.
+          ⚠️ 없으면 안 된다 — 띠가 없으면 사용자는 자기가 이미 산·적용한 줄 알고 나간다.
+          ⚠️ 화면 맨 위 고정. 아래에 두면 떠 있는 FAB(왼쪽 아래)·맨위로 버튼(오른쪽 아래)이 덮는다. */}
+      {previewSkin && (() => {
+        const item = catalog.find((c) => c.partKey === previewSkin)
+        const has = owned.has(previewSkin) || previewSkin === DEFAULT_SKIN_PART
+        return (
+          <div className="tryon" role="status">
+            <span className="tryon-lab">
+              {t('hub.closet.tryon_on')}
+              <b>{partName(previewSkin, t)}</b>
+            </span>
+            <div className="tryon-act">
+              {/* 되돌리기가 먼저다 — 되돌릴 수 있다는 걸 먼저 보여줘야 마음 놓고 눌러본다. */}
+              <button className="tryon-btn tryon-btn-ghost" onClick={() => endTryOn()}>
+                {t('hub.closet.tryon_back')}
+              </button>
+              {!has && item ? (
+                <button className="tryon-btn" onClick={() => doBuy(item.partKey, item.price)}>
+                  {item.price > 0 ? t('hub.closet.tryon_buy', { n: item.price.toLocaleString() }) : t('hub.shop.buy')}
+                </button>
+              ) : (
+                <button className="tryon-btn" onClick={() => equip('skin', previewSkin)}>
+                  {t('hub.closet.wear')}
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── 미리보기 — 상점·보관함 어디서 눌렀든 같은 창 ───────────────────────
+          ⚠️ 스킨은 **배경만 보여주면 안 된다.** 스킨이 바꾸는 건 배경뿐 아니라 판·게이지·도장·아이콘
+             전부라, 배경 사진만 크게 띄우면 정작 화면이 어떻게 달라지는지를 못 본다.
+             그래서 그 스킨의 레일 아이콘을 배경 위에 얹어 같이 보여준다(경로는 SkinDef.iconDir 가 안다). */}
+      {preview && (() => {
+        const item = catalog.find((c) => c.partKey === preview)
+        const isChar = isCharKey(preview)
+        const has = owned.has(preview) || (isSkinKey(preview) && preview === DEFAULT_SKIN_PART)
+        const wearing = isChar ? charKey === preview : skinPart === preview
+        return (
+          <Modal title={partName(preview, t)} onClose={() => setPreview(null)}>
+            {isChar ? (
+              // ⚠️ 일곱을 나열하면 한 칸이 썸네일만 해져서 **미리보기가 미리보기 구실을 못 한다**
+              //    (고르는 화면은 '비교'가 목적이라 나열이 맞지만, 여기는 '크게 보기'가 목적이다).
+              //    그래서 큰 그림 하나 + 아래에서 레벨을 갈아 보는 방식이다.
+              <>
+                <div className="pv-big"><CharArt charKey={preview} level={pvLevel} className="pv-big-img" /></div>
+                <div className="pv-levels" role="tablist">
+                  {CHAR_LEVELS.map((lv) => (
+                    <button
+                      key={lv}
+                      role="tab"
+                      aria-selected={lv === pvLevel}
+                      className={`pv-cell${lv === pvLevel ? ' on' : ''}`}
+                      onClick={() => setPvLevel(lv)}
+                    >
+                      <CharArt charKey={preview} level={lv} className="pv-img" />
+                      <em className="pv-lv">Lv.{lv}</em>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              // 스킨은 여기 오지 않는다(입어보기로 빠진다) — 남은 건 가구·기타 아이템이다.
+              <div className="pv-plain">{partEmoji(preview)}</div>
+            )}
+
+            <div className="pv-act">
+              {!has && item ? (
+                <>
+                  <span className="pv-price">{item.price > 0 ? `🪙 ${item.price}` : t('hub.shop.free')}</span>
+                  <button
+                    className="pbtn pv-btn"
+                    style={btn('#6bbf9a')}
+                    onClick={() => { doBuy(item.partKey, item.price); setPreview(null) }}
+                  >
+                    {t('hub.shop.buy')}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="pbtn pv-btn"
+                  style={btn(wearing ? '#c3cbe0' : '#6bbf9a')}
+                  disabled={wearing || charSaving}
+                  onClick={() => { equip(isChar ? 'character' : 'skin', preview); setPreview(null) }}
+                >
+                  {t(wearing ? 'hub.closet.worn' : 'hub.closet.wear')}
+                </button>
+              )}
+            </div>
+          </Modal>
+        )
+      })()}
+
+      {/* ── 첫 진입 ①: 캐릭터 고르기 ────────────────────────────────────────────
+          닫는 길이 없다. 고르지 않으면 허브를 쓸 수 없고, 서버에도 그렇게 기록되어 있어
+          창을 껐다 켜도·다른 브라우저로 와도 같은 화면이 뜬다(localStorage 가 아니다).
+          ⚠️ 계열 셋을 **한 줄로** 놓는다(요청). 좁은 화면에서도 세로로 쌓지 않는다 —
+             셋을 한눈에 비교하는 게 이 화면의 전부라, 스크롤이 생기면 비교가 안 된다. */}
+      {needCharPick && (
+        <div className="charpick" role="dialog" aria-modal="true" aria-label={t('hub.charpick.title')}>
+          <div className="charpick-inner">
+            <h2 className="charpick-title">{t('hub.charpick.title')}</h2>
+            <p className="charpick-sub">{t('hub.charpick.sub')}</p>
+
+            {/* 계열 하나 = **가로로 긴 줄 한 개**, 그 줄 안에 Lv.1~7 이 늘어선다.
+                그런 줄이 위에서부터 3단으로 쌓인다(2026-08-20 요구).
+                ⚠️ 줄 안에서 가로 스크롤을 만들지 말 것 — 일곱 단계를 **한눈에** 보여주는 게 이 줄의 전부라,
+                   스크롤이 생기면 자라는 모습을 보려고 밀어야 해서 비교가 안 된다. 좁으면 그림이 작아진다. */}
+            <div className="cp-list">
+              {pickSeries.map(({ series, keys }) => {
+                const i = (charLook[series] ?? 0) % keys.length
+                const key = keys[i]
+                const picked = charPick === key
+                // 좌우 버튼은 **이 계열 안에서만** 돈다 — 다른 계열은 각자 보고 있던 모습을 유지한다.
+                const cycle = (d: number) =>
+                  setCharLook((p) => ({ ...p, [series]: (i + d + keys.length) % keys.length }))
+                return (
+                  <div key={series} className={`cp-row${picked ? ' on' : ''}`}>
+                    <div className="cp-head">
+                      <span className="cp-name">{partName(key, t)}</span>
+                      {/* 변형이 하나뿐인 계열엔 전환 UI 를 안 그린다 — 눌러도 안 바뀌는 버튼은 고장으로 읽힌다. */}
+                      {keys.length > 1 && (
+                        <span className="cp-dots">
+                          {keys.map((k, ki) => (
+                            <button
+                              key={k}
+                              className={`cp-dot${ki === i ? ' on' : ''}`}
+                              aria-label={partName(k, t)}
+                              onClick={() => setCharLook((p) => ({ ...p, [series]: ki }))}
+                            />
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                    <div className="cp-body">
+                      {keys.length > 1 && (
+                        <button className="cp-arrow" aria-label={t('hub.charpick.prev')} onClick={() => cycle(-1)}>‹</button>
+                      )}
+                      {/* 줄 전체가 고르는 자리다 — 어느 칸을 눌러도 이 캐릭터를 고른 것이다
+                          (칸마다 고르게 하면 "Lv.5 를 골랐다" 로 읽혀 시작 레벨을 고르는 화면처럼 보인다). */}
+                      <button className="cp-strip" onClick={() => setCharPick(key)} aria-pressed={picked}>
+                        {CHAR_LEVELS.map((lv) => (
+                          <span className={`cp-cell${lv === CHAR_MIN_LEVEL ? ' is-start' : ''}`} key={lv}>
+                            <CharArt charKey={key} level={lv} className="cp-img" />
+                            <em className="cp-lv">Lv.{lv}</em>
+                          </span>
+                        ))}
+                      </button>
+                      {keys.length > 1 && (
+                        <button className="cp-arrow" aria-label={t('hub.charpick.next')} onClick={() => cycle(1)}>›</button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              className="charpick-go"
+              disabled={!charPick || charSaving}
+              onClick={() => charPick && chooseCharacter(charPick)}
+            >
+              {charSaving ? t('common.loading') : charPick ? t('hub.charpick.go', { name: partName(charPick, t) }) : t('hub.charpick.pick_first')}
+            </button>
+            {/* 되돌릴 수 있는지 없는지를 미리 말한다 — 안 말하면 고르는 손이 멈춘다. */}
+            <p className="charpick-note">{t('hub.charpick.note')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── 첫 진입 ②: 튜토리얼 ─────────────────────────────────────────────── */}
+      {needTutorial && (
+        <TutorialOverlay
+          step={tutorialStep}
+          onPrev={() => setTutorialStep((v) => Math.max(0, v - 1))}
+          onNext={() => setTutorialStep((v) => v + 1)}
+          onDone={finishTutorial}
+        />
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 튜토리얼 — 검은 화면 + 가리키는 자리에 구멍.
+//
+// ⚠️ **누르게 시키지 않고 가리키기만 한다(2026-08-20 결정).** "출석을 눌러보세요" 로 진행을 묶으면
+//    오늘 이미 출석한 사람은 눌러도 아무 일이 없어 **거기서 갇힌다.** 튜토리얼은 어디에 뭐가 있는지
+//    알려주는 게 목적이고, 실제로 누르는 건 끝난 뒤에 하면 된다.
+// ⚠️ 그래서 구멍은 **보여주기 전용**이다(pointer-events: none). 뚫린 자리를 실제로 누를 수 있게 하면
+//    튜토리얼 도중에 모달이 열려 안내 카드와 겹친다.
+// ⚠️ 구멍 좌표는 매번 실측한다 — 화면 폭·스킨에 따라 자리가 달라져서 값을 박아두면 곧 어긋난다.
+// ══════════════════════════════════════════════════════════════════════════
+/** 단계표. target = `data-tut` 값(없으면 화면 가운데 카드만). 순서가 곧 진행 순서다. */
+const TUTORIAL_STEPS: { target: string | null; key: string }[] = [
+  { target: null, key: 'welcome' },
+  { target: 'mission', key: 'mission' },
+  { target: 'daily', key: 'daily' },
+  { target: 'closet', key: 'closet' },
+  { target: 'stamp', key: 'stamp' },
+]
+
+function TutorialOverlay({ step, onPrev, onNext, onDone }: {
+  step: number
+  onPrev: () => void
+  onNext: () => void
+  onDone: () => void
+}) {
+  const { t } = useT()
+  const cur = TUTORIAL_STEPS[Math.min(step, TUTORIAL_STEPS.length - 1)]
+  const last = step >= TUTORIAL_STEPS.length - 1
+  const [measured, setMeasured] = useState<DOMRect | null>(null)
+  // 가리킬 자리가 없는 단계는 **재는 게 아니라 안 쓰는 것**이다 — 이펙트에서 null 을 다시 써넣지 않고
+  // 여기서 걸러낸다(그래야 단계가 넘어갈 때 렌더가 한 번 더 돌지 않는다).
+  const rect = cur.target ? measured : null
+
+  // 가리킬 자리를 실측한다. 창 크기가 바뀌거나 단계가 넘어가면 다시 잰다.
+  //   ⚠️ 못 찾으면 null 로 둔다 — 그 단계는 구멍 없이 가운데 카드로 뜬다(화면이 깨지지 않는다).
+  useEffect(() => {
+    if (!cur.target) return
+    const measure = () => {
+      const el = document.querySelector(`[data-tut="${cur.target}"]`)
+      setMeasured(el ? el.getBoundingClientRect() : null)
+    }
+    // ⚠️ 첫 실측은 **다음 프레임**에 한다. 오버레이가 붙는 순간에는 아래 화면의 배치가 아직 확정되지
+    //    않을 수 있어(그림·글꼴이 늦게 오면 자리가 밀린다) 곧바로 재면 구멍이 엉뚱한 데 뚫린다.
+    const raf = requestAnimationFrame(measure)
+    window.addEventListener('resize', measure)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', measure) }
+  }, [cur.target])
+
+  // 안내 카드는 구멍을 가리면 안 된다 — 구멍이 화면 위쪽이면 아래에, 아래쪽이면 위에 붙인다.
+  const below = rect ? rect.bottom < window.innerHeight * 0.55 : true
+  const PAD = 10
+
+  return (
+    <div className="tut" role="dialog" aria-modal="true">
+      {rect ? (
+        // 구멍 = 검은 판을 그리는 게 아니라 **투명 상자에 아주 큰 그림자**를 둘러 바깥을 덮는 방식.
+        // SVG 마스크보다 가볍고, 상자 하나만 옮기면 구멍이 따라 움직인다.
+        <div
+          className="tut-hole"
+          style={{
+            left: rect.left - PAD, top: rect.top - PAD,
+            width: rect.width + PAD * 2, height: rect.height + PAD * 2,
+          }}
+        />
+      ) : (
+        <div className="tut-veil" />
+      )}
+
+      <div
+        className={`tut-card${rect ? '' : ' is-center'}`}
+        style={rect ? (below ? { top: rect.bottom + 18 } : { bottom: window.innerHeight - rect.top + 18 }) : undefined}
+      >
+        <div className="tut-step">{step + 1} / {TUTORIAL_STEPS.length}</div>
+        <h3 className="tut-title">{t(`hub.tut.${cur.key}_t`)}</h3>
+        <p className="tut-body">{t(`hub.tut.${cur.key}_b`)}</p>
+        <div className="tut-act">
+          {step > 0 && <button className="tut-btn tut-btn-ghost" onClick={onPrev}>{t('hub.tut.prev')}</button>}
+          <button className="tut-btn" onClick={last ? onDone : onNext}>{t(last ? 'hub.tut.done' : 'hub.tut.next')}</button>
+        </div>
+      </div>
+
+      {/* 건너뛰기 — 강제하되 빠져나갈 문은 남긴다(2026-08-20 결정). 이미 아는 사람을 5단계 붙잡아두면
+          그건 안내가 아니라 통행세다. 건너뛰어도 '끝냈다'로 기록되어 다시 뜨지 않는다. */}
+      <button className="tut-skip" onClick={onDone}>{t('hub.tut.skip')}</button>
     </div>
   )
 }

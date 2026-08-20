@@ -8,6 +8,7 @@ import { Avatar } from './GemAvatar'
 import { countryName, flagUrl } from '../lib/regions'
 import ShareCardModal from './ShareCardModal'
 import type { ShareCardData } from '../lib/shareCard'
+import { arenaLevelForScore } from '../lib/scoring'
 
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
 // 초기 페이지 → 폴링(신규분 append) + reconcile(가림/삭제 tombstone) + 위로 스크롤 시 이전 페이지(prepend).
@@ -488,7 +489,11 @@ export default function ChatBoard({ room = 'global' }: Props) {
     cardBusy.current = true
     try {
       const res = await callFunction<{
-        user: { rank: number; name: string; rating: number; color: string | null; image: string | null; percentile: number | null } | null
+        user: {
+          rank: number; name: string; rating: number; color: string | null; image: string | null; percentile: number | null
+          // 장착한 캐릭터·스킨(2026-08-20) — 카드 좌 패널이 그 사람의 배경 + 캐릭터가 된다.
+          character: string | null; skin: string | null
+        } | null
         total: number
       }>('leaderboard', { scope: 'user', uid: r.user_id })
       if (!res.user) {
@@ -510,6 +515,9 @@ export default function ChatBoard({ room = 'global' }: Props) {
         seasonTotal: u.rating,
         joinedAt: null, country: null, region: null, referralCode: null,
         publicOnly: true,
+        character: u.character, skin: u.skin,
+        // 레벨은 시즌 총점에서 파생한다(허브·랭킹과 같은 함수) — 서버가 따로 내려주지 않는다.
+        charLevel: arenaLevelForScore(u.rating),
       } })
     } catch {
       showToast(t('chat.noCard'))

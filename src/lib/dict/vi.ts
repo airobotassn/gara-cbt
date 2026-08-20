@@ -1234,8 +1234,13 @@ const VI: Record<string, string> = {
 
   // ── Plan(/plan · 시험 일정) ──
   "plan.title": "CARIS PLAN",
-  "plan.sub": "Các đợt CARIS bạn có thể đăng ký ngay.",
+  "plan.sub": "Lịch vận hành định kỳ hằng tháng của kỳ thi CARIS.",
   "plan.back": "CARIS",
+  // ── /plan 접수중 회차 일정표(2026-08-20) — 줄 이름 4개. 날짜는 그 회차 값에서 온다. ──
+  "plan.step_apply": "Đăng ký",
+  "plan.step_exam": "Thời gian thi",
+  "plan.step_grade": "Chấm thi",
+  "plan.step_result": "Tra cứu kết quả",
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": "Kỳ thi năng lực hội tụ AI·robot",
@@ -1764,6 +1769,12 @@ const VI: Record<string, string> = {
   "hub.shop.free": "Miễn phí",
   "hub.closet.title": "Trang trí",
   "hub.closet.tab_shop": "Cửa hàng",
+  "hub.closet.tryon_on": "Đang xem thử",
+  "hub.closet.tryon_back": "Hoàn tác",
+  "hub.closet.tryon_buy": "Mua với {n} xu",
+  "hub.score_line": "Mùa giải {n} điểm",
+  "hub.score_top": "Top {n}%",
+  "hub.closet.preview": "Xem trước",
   "hub.closet.tab_items": "Túi đồ",
   "hub.closet.g_character": "Nhân vật",
   "hub.closet.g_skin": "Skin nền & giao diện",

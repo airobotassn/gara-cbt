@@ -11,6 +11,9 @@ interface RawRound {
   exam_date: string | null
   apply_start_at: string | null
   apply_end_at: string | null
+  // 응시 창(정기시험). 월 규칙이면 그 달 11~20일. 없으면 exam_date 하루짜리 회차(월 규칙 이전 회차).
+  exam_start_at: string | null
+  exam_end_at: string | null
   note_i18n: Record<string, string> | null
   open_tiers: string[] | null
   sort: number
@@ -23,8 +26,15 @@ export interface RoundView {
   kind: 'regular' | 'rolling'
   title: string
   note: string
-  dateText: string // 정기: 시험일(언어별 포맷) / 상시: ''
+  // 정기: 응시 기간 "MM. DD ~ MM. DD"(창이 없는 옛 회차는 그 하루) / 상시: ''
+  // ⚠️ '시험일 하루'가 아니다 — 월 규칙에서 응시는 11~20일 열흘이라 하루를 뽑으면 거짓말이 된다.
+  dateText: string
   applyText: string // 접수기간 "YYYY. MM. DD ~ YYYY. MM. DD" / 상시·미설정: ''
+  // 원본 날짜(ISO). /plan 이 접수중 회차의 채점·발표 구간을 계산해 쓴다 — 포맷된 문자열을 되파싱하지 않도록.
+  applyStartAt: string | null
+  applyEndAt: string | null
+  examStartAt: string | null
+  examEndAt: string | null
   status: RoundStatus
   clickable: boolean // 접수중일 때만 원서접수로 이동
   // 이 회차가 연 급수(exam_tiers.tier 키). 빈 배열 = 아직 아무 급수도 안 열린 회차.
@@ -62,8 +72,8 @@ function fmtDate(ymd: string, lang: Lang): string {
   }
 }
 
-// 접수기간(timestamptz) → 요일 없는 짧은 날짜 (범위 표기용)
-function fmtShort(iso: string, lang: Lang): string {
+// 접수기간(timestamptz) → 요일 없는 짧은 날짜 (범위 표기용). /plan 의 일정 표도 같은 표기를 쓴다.
+export function fmtShort(iso: string, lang: Lang): string {
   try {
     return new Intl.DateTimeFormat(LOCALE[lang] ?? 'en-US', {
       year: 'numeric',
@@ -83,6 +93,15 @@ function fmtApply(r: RawRound, lang: Lang): string {
   if (e) return `~ ${e}`
   if (s) return `${s} ~`
   return ''
+}
+
+// 응시 기간 표기. 창(11~20일)이 있으면 범위로, 없으면(옛 회차) 시험일 하루로.
+function examText(r: RawRound, lang: Lang): string {
+  if (r.kind === 'rolling') return ''
+  if (r.exam_start_at && r.exam_end_at) {
+    return `${fmtShort(r.exam_start_at, lang)} ~ ${fmtShort(r.exam_end_at, lang)}`
+  }
+  return r.exam_date ? fmtDate(r.exam_date, lang) : ''
 }
 
 // 접수 상태: 상시는 항상 open, 정기는 접수기간(now) 기준.
@@ -112,7 +131,7 @@ export function useExamRounds(lang: Lang) {
       }
       const { data } = await supabase
         .from('exam_rounds')
-        .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, note_i18n, open_tiers, sort')
+        .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, exam_start_at, exam_end_at, note_i18n, open_tiers, sort')
         .eq('published', true)
         // 정기시험은 시험일 오름차순(가까운 순). 상시(exam_date=null)는 뒤로 밀고 sort로 정렬.
         .order('exam_date', { ascending: true, nullsFirst: false })
@@ -133,10 +152,15 @@ export function useExamRounds(lang: Lang) {
     // 자정 경계 흔들림 방지: 오늘 00:00 을 지난 것만 과거로 판정.
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
+    // ⚠️ 끝을 정하는 건 **응시 창의 끝**이다. exam_date(대표일)로만 보면 월 규칙 회차가 20일 다음날
+    //    사라지는 건 같지만, 대표일을 첫날로 바꾸는 순간 응시 기간 도중에 목록에서 없어진다.
     const isPastExam = (r: RawRound) => {
-      if (!r.exam_date) return false
-      const d = Date.parse(`${r.exam_date}T23:59:59`)
-      return !Number.isNaN(d) && d < todayStart.getTime()
+      const end = r.exam_end_at
+        ? Date.parse(r.exam_end_at)
+        : r.exam_date
+          ? Date.parse(`${r.exam_date}T23:59:59`)
+          : NaN
+      return !Number.isNaN(end) && end < todayStart.getTime()
     }
     return raw
       .filter((r) => !isPastExam(r))
@@ -147,8 +171,12 @@ export function useExamRounds(lang: Lang) {
           kind: r.kind,
           title: pick(r.title_i18n),
           note: pick(r.note_i18n),
-          dateText: r.exam_date ? fmtDate(r.exam_date, lang) : '',
+          dateText: examText(r, lang),
           applyText: fmtApply(r, lang),
+          applyStartAt: r.apply_start_at,
+          applyEndAt: r.apply_end_at,
+          examStartAt: r.exam_start_at,
+          examEndAt: r.exam_end_at,
           status,
           clickable: status === 'open',
           openTiers: r.open_tiers ?? [],

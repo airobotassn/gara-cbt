@@ -27,7 +27,11 @@ export interface ExamTicketView {
   roundId: string
   roundTitle: string
   roundKind: 'regular' | 'rolling'
-  examDate: string | null // 'YYYY-MM-DD'(대표일). 실제 응시 가능 판정은 서버의 usable 이 한다
+  examDate: string | null // 'YYYY-MM-DD' 대표일 = **응시 마지막 날**(월 규칙이면 그 달 20일)
+  // 응시 창. 월 규칙(11~20일)에서 "언제부터/언제까지"를 말하려면 대표일 하나로는 안 된다.
+  // ⚠️ examDate 로 '언제부터'를 말하면 마지막 날을 시작일로 안내한다(실제로 그럴 뻔했다).
+  examStartAt: string | null // ISO | null(옛 회차)
+  examEndAt: string | null // ISO | null
   tier: string // exam_tiers.tier — beginner|pro|elite|master|grandmaster|zenith
   status: ExamTicketStatus
   source: ExamTicketSource
@@ -88,15 +92,24 @@ export function examDateText(iso: string | null | undefined, lang: string): stri
   }
 }
 
+/** 이 응시권의 응시 기간 표기. 창이 있으면 "5월 11일 ~ 5월 20일", 없으면(옛 회차) 그 하루. */
+export function ticketExamPeriodText(tk: ExamTicketView, lang: string): string {
+  if (tk.examStartAt && tk.examEndAt) {
+    return `${examDateText(tk.examStartAt, lang)} ~ ${examDateText(tk.examEndAt, lang)}`
+  }
+  return examDateText(tk.examDate, lang)
+}
+
 /**
  * 응시권 한 줄에 붙일 안내 문구 — 쓸 수 있으면 '지금 응시 가능', 아니면 그 이유.
- * `before_exam_day` 만 시험일을 끼워 넣는다(언제부터 되는지가 그 문장의 전부라서).
+ * `before_exam_day` 만 날짜를 끼워 넣는다(언제부터 되는지가 그 문장의 전부라서).
+ * ⚠️ 그 날짜는 **응시 첫날**이다. 대표일(examDate = 마지막 날)을 쓰면 "20일부터 응시할 수 있어요"가 된다.
  */
 export function ticketReasonText(tk: ExamTicketView, t: TFunc, lang: string): string {
   if (tk.usable) return t('ticket.usable')
   const key = tk.usableReason ? REASON_KEY[tk.usableReason] : ''
   if (!key) return ''
-  return t(key, { date: examDateText(tk.examDate, lang) })
+  return t(key, { date: examDateText(tk.examStartAt ?? tk.examDate, lang) })
 }
 
 /**

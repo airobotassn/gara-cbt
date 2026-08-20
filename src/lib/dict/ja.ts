@@ -1234,8 +1234,13 @@ const JA: Record<string, string> = {
 
   // ── Plan(/plan · 시험 일정) ──
   "plan.title": "CARIS PLAN",
-  "plan.sub": "今お申し込みいただけるCARISの日程です。",
+  "plan.sub": "CARIS資格検定の毎月の定期運営スケジュールです。",
   "plan.back": "CARIS",
+  // ── /plan 접수중 회차 일정표(2026-08-20) — 줄 이름 4개. 날짜는 그 회차 값에서 온다. ──
+  "plan.step_apply": "出願受付",
+  "plan.step_exam": "受験期間",
+  "plan.step_grade": "採点期間",
+  "plan.step_result": "合格者照会",
 
   // ── Guide(자격검정 안내) 하드코딩 라벨 ──
   "guide.cert_intro_title": "AI・ロボット融合力 資格試験",
@@ -1764,6 +1769,12 @@ const JA: Record<string, string> = {
   "hub.shop.free": "無料",
   "hub.closet.title": "きせかえ",
   "hub.closet.tab_shop": "ショップ",
+  "hub.closet.tryon_on": "プレビュー中",
+  "hub.closet.tryon_back": "元に戻す",
+  "hub.closet.tryon_buy": "{n}コインで購入",
+  "hub.score_line": "シーズン {n}pt",
+  "hub.score_top": "上位{n}%",
+  "hub.closet.preview": "プレビュー",
   "hub.closet.tab_items": "持ち物",
   "hub.closet.g_character": "キャラクター",
   "hub.closet.g_skin": "背景・UIスキン",
