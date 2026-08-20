@@ -43,6 +43,17 @@ const GROUP_SIZE = 25
 const POOL = 2
 /** 분당 Gemini 호출 상한. 로그상 분당 18건에서 429 가 났다(2026-07-28) → 여유를 둔 값. */
 const RPM = 12
+/**
+ * 분당 한도(429)에 걸렸을 때 쉬는 시간(ms).
+ * ⚠️ **429 는 사다리로 풀 수 있는 실패가 아니다.** 묶음을 잘게 쪼개 다시 물으면 호출 수가 오히려 늘어
+ *    한도를 더 세게 때린다. 분당 한도는 시간이 지나야 풀리므로 **기다렸다가 같은 묶음을 다시** 보낸다.
+ *    60초 + 5초 = 분당 창이 확실히 넘어가도록.
+ */
+const RATE_WAIT_MS = 65_000
+/** 한 묶음이 분당 한도로 기다려 볼 횟수. 이걸 넘기면 그 묶음은 포기하고 사다리에 맡긴다. */
+const RATE_RETRY = 2
+/** 함수가 돌려주는 실패 사유 중 '분당 한도' 를 가리키는 것(서버 shortReason 과 한 쌍). */
+const RATE_REASON = /분당한도|429/
 
 /**
  * 분당 호출 스로틀(토큰 버킷).
@@ -66,6 +77,20 @@ const takeSlots = (() => {
   }
 })()
 
+/**
+ * 분당 한도에 걸린 시각 + 언제까지 쉬는지(모듈 전역).
+ * ⚠️ 워커(POOL) 하나가 429 를 맞았는데 다른 워커가 계속 쏘면 한도가 안 풀린다 — **다 같이** 쉰다.
+ */
+let cooldownUntil = 0
+
+/** 쿨다운이 끝날 때까지 1초마다 남은 시간을 알리며 기다린다(관리자 화면에 카운트다운이 뜬다). */
+async function waitCooldown(report?: (leftSec: number) => void): Promise<void> {
+  while (Date.now() < cooldownUntil) {
+    report?.(Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000)))
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+}
+
 /** 일일 한도(RPD) 소진 — 오늘은 더 돌려도 소용없으므로 사다리를 즉시 중단시킨다. */
 class DailyQuotaError extends Error {}
 
@@ -82,6 +107,8 @@ export interface LangResult {
   meta: EbookMeta
   /** 번역이 실패해 원문(한국어)이 그대로 남은 조각 수 */
   failed: number
+  /** 실패 사유별 횟수(예: {'분당한도(429)': 40}). 관리자에게 원인을 보여주는 유일한 근거다. */
+  failReasons: Record<string, number>
   /** 글이 넘쳐 자동으로 축소해 맞춘 페이지 번호(1부터) */
   fittedPages: number[]
   /** 축소 하한까지 줄여도 안 들어간 페이지 번호 — 사람이 손봐야 하는 것만 남는다 */
@@ -95,6 +122,8 @@ export interface TranslateProgress {
   lang?: EbookLang
   /** 재시도 단계 표시(예: '재시도 12개씩'). 1차 통과 중에는 빈 문자열. */
   note?: string
+  /** 분당 한도에 걸려 **쉬는 중**. 화면이 이걸 보고 눈에 띄게 표시한다(문구로 판정하지 말 것). */
+  waiting?: boolean
 }
 
 const SKIP_TAGS = new Set(['STYLE', 'SCRIPT', 'NOSCRIPT', 'TEMPLATE', 'TITLE'])
@@ -273,29 +302,47 @@ async function fitToPages(html: string): Promise<{ html: string; fitted: number[
  * 함수는 조각 단위로 성공/실패를 돌려준다({tr} 또는 {error}) — 성공분만 채우고,
  * 아직 빈 자리를 다음 단계에서 다시 묻는다. 마지막 단계까지 못 채운 자리는 null(원문 유지).
  *
- * @returns 길이 = texts.length. 각 칸 = { en:'…', ja:'…' } 또는 null(실패)
+ * ⚠️ 실패 **사유**도 같이 모은다 — 예전엔 함수가 조각마다 사유를 주는데도 버렸다. 그래서 관리자는
+ *    "번역이 덜 됐다" 만 보고 왜인지 몰라 문의를 넣었다(2026-08-19). 사유는 호출부가 사람 말로 옮긴다.
+ *
+ * @returns out = 길이 texts.length(각 칸 { en:'…' } 또는 null) · reasons = 사유별 조각 수
  */
 async function translateTexts(
   texts: string[],
   langs: readonly EbookLang[],
   context: string,
-  onProgress?: (done: number, total: number, note: string) => void,
-): Promise<(Record<string, string> | null)[]> {
+  onProgress?: (done: number, total: number, note: string, waiting?: boolean) => void,
+): Promise<{ out: (Record<string, string> | null)[]; reasons: Record<string, number> }> {
   const out: (Record<string, string> | null)[] = new Array(texts.length).fill(null)
+  const reasons: Record<string, number> = {}
   const filled = () => out.reduce((n, t) => (t ? n + 1 : n), 0)
+  const note429 = (sec: number) =>
+    onProgress?.(filled(), texts.length, `분당 한도에 걸렸습니다 — ${sec}초 후 자동으로 이어서 합니다`, true)
 
   // 배치 하나(인덱스 묶음) 처리. 실패해도 던지지 않는다 — 빈 자리는 다음 단계가 가져간다.
   //   (예외: 일일 한도는 더 돌려도 소용없으니 위로 던져 사다리를 끝낸다)
   async function handle(idxs: number[]): Promise<void> {
+    let waited = 0
     for (let attempt = 0; ; attempt++) {
+      await waitCooldown(note429) // 다른 워커가 429 를 맞았으면 같이 쉰다
       await takeSlots(Math.ceil(idxs.length / GROUP_SIZE)) // 이 요청이 쓸 Gemini 호출 수만큼 슬롯 확보
       try {
         const res = await callFunction<{
           results: ({ tr: Record<string, string> } | { error: string })[]
         }>('translate-ebook', { texts: idxs.map((i) => texts[i]), langs, context })
+        let rate = 0
         res.results?.forEach((r, k) => {
-          if ('tr' in r) out[idxs[k]] = r.tr
+          if ('tr' in r) { out[idxs[k]] = r.tr; return }
+          const why = r.error || '미상'
+          if (RATE_REASON.test(why)) rate++
+          reasons[why] = (reasons[why] ?? 0) + 1
         })
+        // 분당 한도로 빈 자리가 남았다면 **기다렸다 같은 묶음을 다시** 보낸다(위 RATE_WAIT_MS 주석).
+        if (rate > 0 && waited < RATE_RETRY) {
+          waited++
+          cooldownUntil = Math.max(cooldownUntil, Date.now() + RATE_WAIT_MS)
+          continue
+        }
         return
       } catch (e) {
         // ⚠️ 일일 한도는 함수가 429 + {error:'quota_daily'} 로 준다 → callFunction 이 그 문자열을
@@ -304,7 +351,17 @@ async function translateTexts(
         if (/quota_daily|일일한도/.test(msg)) {
           throw new DailyQuotaError('Gemini 일일 한도를 다 썼습니다. 내일 다시 시도해 주세요.')
         }
-        if (attempt >= 1) return // 네트워크·서버 오류는 1회만 재시도, 나머지는 다음 단계로 넘긴다
+        // 요청 자체가 429 로 튕긴 경우(함수가 조각별 사유를 못 줄 때) — 위와 같은 대기 경로를 탄다.
+        if (RATE_REASON.test(msg) && waited < RATE_RETRY) {
+          waited++
+          reasons['분당한도(429)'] = (reasons['분당한도(429)'] ?? 0) + idxs.length
+          cooldownUntil = Math.max(cooldownUntil, Date.now() + RATE_WAIT_MS)
+          continue
+        }
+        if (attempt >= 1) {
+          reasons[msg.slice(0, 60)] = (reasons[msg.slice(0, 60)] ?? 0) + idxs.length
+          return // 네트워크·서버 오류는 1회만 재시도, 나머지는 다음 단계로 넘긴다
+        }
         await new Promise((r) => setTimeout(r, 1500))
       }
     }
@@ -326,7 +383,7 @@ async function translateTexts(
     }
     await Promise.all(Array.from({ length: Math.min(POOL, batches.length) }, worker))
   }
-  return out
+  return { out, reasons }
 }
 
 /**
@@ -353,8 +410,8 @@ export async function translateEbook(
   onProgress?.({ phase: 'extract', done: texts.length, total: texts.length })
 
   // ── 번역: 사다리(120 → 12 → 4)로 실패분만 다시 돈다. 끝까지 못 채운 조각은 원문 유지 ──
-  const translated = await translateTexts(texts, langs, meta.title, (done, total, note) =>
-    onProgress?.({ phase: 'translate', done, total, note }),
+  const { out: translated, reasons } = await translateTexts(texts, langs, meta.title, (done, total, note, waiting) =>
+    onProgress?.({ phase: 'translate', done, total, note, waiting }),
   )
 
   // ── 언어별 문서 생성 ──
@@ -400,7 +457,8 @@ export async function translateEbook(
     } catch {
       // 맞춤 실패는 번역 자체를 막지 않는다(원문 조판 그대로 저장된다).
     }
-    out.push({ lang, html: langHtml, meta: langMeta, failed, fittedPages, overflowPages })
+    // 사유는 조각 단위라 언어와 무관하다(한 조각이 실패하면 5개 언어가 다 비었다) — 같은 표를 싣는다.
+    out.push({ lang, html: langHtml, meta: langMeta, failed, failReasons: reasons, fittedPages, overflowPages })
   }
   return out
 }

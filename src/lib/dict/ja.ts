@@ -959,6 +959,7 @@ const JA: Record<string, string> = {
   "ebook.free": "無料",
   "ebook.owned": "所有中",
   "ebook.read": "読む",
+  "ebook.view": "見る",
   "ebook.cover_zoom": "表紙を大きく見る",
   "ebook.processing": "処理中…",
   "ebook.bought": "購入完了 — E-BOOKライブラリに追加しました。",
@@ -1768,7 +1769,7 @@ const JA: Record<string, string> = {
   "hub.title.login": "ログインすると称号コレクションが表示されます。",
 
   // 점수 획득 방법
-  "hub.earn.title": "ポイントの獲得方法",
+  "hub.earn.title": "ポイント・コインの獲得方法",
   "hub.earn.lead": "いろいろな活動に参加してポイントを貯め、ランキングに挑戦しよう！",
   "hub.earn.col_act": "活動項目",
   "hub.earn.col_pt": "獲得ポイント",
@@ -1781,6 +1782,18 @@ const JA: Record<string, string> = {
   "hub.earn.row.daily_learn": "今日の学習を完了",
   "hub.earn.row.minigame": "ミニゲームをプレイ",
   "hub.earn.row.referral": "友達を招待",
+  "hub.earn.sec_score": "シーズンポイント",
+  "hub.earn.sec_coin": "CARI コイン",
+  "hub.earn.coin_lead": "ショップでキャラクターと部屋を飾るのに使う通貨です。ランキングのポイントとは別の財布です。",
+  "hub.earn.col_coin": "獲得コイン",
+  "hub.earn.coin_pt": "+{n}コイン",
+  "hub.earn.coin_any": "もらった分",
+  "hub.earn.coin.daily": "出席または今日の学習",
+  "hub.earn.coin.stamp": "7日スタンプの完成",
+  "hub.earn.coin.gift": "友だちからのプレゼント",
+  "hub.earn.coin_note.daily": "1日1回 · 先に行った方",
+  "hub.earn.coin_note.stamp": "7マスを埋めた日",
+  "hub.earn.coin_note.gift": "送った人が決めた額",
 
   // 친구 초대 모달
   "hub.invite.title": "友達招待",

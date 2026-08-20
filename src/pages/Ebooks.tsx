@@ -416,7 +416,15 @@ export default function Ebooks() {
         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 150px), 1fr))' }}
       >
         {st.items.map((i) => (
-          <BundleCard key={i.key} item={i} on={picked.has(i.key)} t={t} lang={lang} onToggle={() => togglePick(i.key)} />
+          <BundleCard
+            key={i.key}
+            item={i}
+            on={picked.has(i.key)}
+            t={t}
+            lang={lang}
+            onToggle={() => togglePick(i.key)}
+            onOpen={() => navigate('/mypage/ebooks')}
+          />
         ))}
       </ul>
     )
@@ -873,13 +881,15 @@ function LectureRow({
  *  교재는 세로 표지, 강의는 16:9 썸네일이라 그림 자리만 다르고 나머지 줄은 같은 모양으로 맞춘다.
  *  ⚠️ 강의 썸네일은 여기서 재생하지 않는다 — 고르는 화면이라 소리가 나면 방해가 된다(재생은 강의 열에서). */
 function BundleCard({
-  item, on, t, lang, onToggle,
+  item, on, t, lang, onToggle, onOpen,
 }: {
   item: BundleItem
   on: boolean
   t: TFunc
   lang: Lang
   onToggle: () => void
+  /** 이미 가진 책 — 담기 대신 서재로 보낸다(강의는 owned 가 없어 안 불린다). */
+  onOpen: () => void
 }) {
   return (
     <li
@@ -916,15 +926,27 @@ function BundleCard({
           <p className="mt-1 truncate font-body-md text-[15px] text-outline">{item.sub}</p>
         )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-          {/* ⚠️ 금액은 usdc() 로만 찍는다(달러 센트) — 문자열에 $ 를 직접 박지 말 것. */}
-          <span className="font-title-md text-[17px] font-bold text-on-surface">
-            {item.price > 0 ? usdc(item.price, lang) : t('ebook.free')}
-          </span>
+          {/* 이미 산 책에 값을 계속 띄우면 아직 안 산 것처럼 읽힌다 — 값 자리에 '보유 중'을 대신 둔다
+              (교재 열의 BookRow 와 같은 규칙). 오른쪽 버튼은 담기 대신 서재로 보낸다. */}
           {item.owned ? (
-            <span className="inline-flex shrink-0 items-center gap-1 font-label-md text-[15px] font-bold text-secondary">
+            <span className="inline-flex items-center gap-1 font-title-md text-[17px] font-bold text-secondary">
               <span className="material-symbols-outlined text-[19px]">check_circle</span>
               {t('ebook.owned')}
             </span>
+          ) : (
+            // ⚠️ 금액은 usdc() 로만 찍는다(달러 센트) — 문자열에 $ 를 직접 박지 말 것.
+            <span className="font-title-md text-[17px] font-bold text-on-surface">
+              {item.price > 0 ? usdc(item.price, lang) : t('ebook.free')}
+            </span>
+          )}
+          {item.owned ? (
+            <button
+              type="button"
+              onClick={onOpen}
+              className="shrink-0 rounded-lg border border-secondary/25 bg-secondary/10 px-3.5 py-2 font-label-md text-[15px] font-bold text-secondary transition-colors hover:bg-secondary/15"
+            >
+              {t('ebook.view')}
+            </button>
           ) : (
             <button
               type="button"

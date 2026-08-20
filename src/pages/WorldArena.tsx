@@ -430,7 +430,8 @@ export default function WorldArena() {
           <h1>{t('arena.title')}</h1>
         </header>
 
-        {/* 런처 — 아레나가 허브·미니게임·레벨테스트·데일리의 관문이라 지도보다 위에 둔다. */}
+        {/* 런처 — 아레나가 허브·레벨테스트·미니게임·데일리의 관문이라 지도보다 위에 둔다.
+            순서는 레벨 → 미니게임 → 오늘의 학습(2026-08-19 지시). 마이 홈만 맨 앞에 그대로 둔다. */}
         <nav className="aa-launch">
           <Link className="aa-lbtn cari" to="/hub">
             {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
@@ -441,19 +442,19 @@ export default function WorldArena() {
             </span>
             <span className="go">›</span>
           </Link>
-          <Link className="aa-lbtn game" to="/games">
-            <span className="ic">🕹️</span>
-            <span className="lt">
-              <b>{t('arena.bGame')}</b>
-              <i>{t('arena.bGameS')}</i>
-            </span>
-            <span className="go">›</span>
-          </Link>
           <Link className="aa-lbtn lvl" to="/test/select">
             <span className="ic">🎯</span>
             <span className="lt">
               <b>{t('arena.bLevel')}</b>
               <i>{t('arena.bLevelS')}</i>
+            </span>
+            <span className="go">›</span>
+          </Link>
+          <Link className="aa-lbtn game" to="/games">
+            <span className="ic">🕹️</span>
+            <span className="lt">
+              <b>{t('arena.bGame')}</b>
+              <i>{t('arena.bGameS')}</i>
             </span>
             <span className="go">›</span>
           </Link>

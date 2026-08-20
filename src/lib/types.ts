@@ -506,14 +506,18 @@ export interface EbookReadResp {
   langs: string[] // 이 책이 가진 언어
 }
 
-/** 이북 번역본 1건 — `ebooks.translations` jsonb 의 값. 원문(ko)은 여기 없다. */
+/** 이북 번역본 1건 — `ebooks.translations` jsonb 의 값. 원문(ko)은 여기 없다.
+ *  ⚠️ `failReasons` 는 관리자 화면이 "왜 덜 됐는지" 를 말하는 유일한 근거다(2026-08-19 추가).
+ *     예전엔 실패 조각 수만 남겨서, 분당 한도에 걸린 건지 조판이 깨진 건지 관리자가 알 길이 없었다. */
 export interface EbookTranslation {
   path: string
   coverUrl?: string
   title?: string
   author?: string
   description?: string
-  failed?: number // 번역 실패해 한국어로 남은 조각 수
+  failed?: number
+  /** 실패 사유별 조각 수(예: {'분당한도(429)': 40}) */
+  failReasons?: Record<string, number> // 번역 실패해 한국어로 남은 조각 수
   fittedPages?: number[] // 글이 넘쳐 자동 축소해 맞춘 페이지 번호(1부터)
   overflowPages?: number[] // 축소 하한까지 줄여도 안 들어간 페이지 — 사람이 손봐야 함
   at?: string

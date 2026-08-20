@@ -959,6 +959,7 @@ const EN: Record<string, string> = {
   "ebook.free": "Free",
   "ebook.owned": "Owned",
   "ebook.read": "Read",
+  "ebook.view": "Open",
   "ebook.cover_zoom": "View cover larger",
   "ebook.processing": "Processing…",
   "ebook.bought": "Purchased — added to your E-BOOK Library.",
@@ -1768,7 +1769,7 @@ const EN: Record<string, string> = {
   "hub.title.login": "Sign in to see your title collection.",
 
   // 점수 획득 방법
-  "hub.earn.title": "How to earn points",
+  "hub.earn.title": "How to earn points & coins",
   "hub.earn.lead": "Join the activities, stack up points and climb the ranking!",
   "hub.earn.col_act": "Activity",
   "hub.earn.col_pt": "Points",
@@ -1781,6 +1782,18 @@ const EN: Record<string, string> = {
   "hub.earn.row.daily_learn": "Finish today's lesson",
   "hub.earn.row.minigame": "Play a mini game",
   "hub.earn.row.referral": "Invite a friend",
+  "hub.earn.sec_score": "Season points",
+  "hub.earn.sec_coin": "CARI coins",
+  "hub.earn.coin_lead": "Coins are spent in the shop on your character and room — a different wallet from ranking points.",
+  "hub.earn.col_coin": "Coins",
+  "hub.earn.coin_pt": "+{n} coins",
+  "hub.earn.coin_any": "Whatever is sent",
+  "hub.earn.coin.daily": "Check-in or Today's Study",
+  "hub.earn.coin.stamp": "Fill the 7-day stamp card",
+  "hub.earn.coin.gift": "A friend gifts you coins",
+  "hub.earn.coin_note.daily": "Once a day · whichever you do first",
+  "hub.earn.coin_note.stamp": "On the day all 7 are filled",
+  "hub.earn.coin_note.gift": "The sender decides",
 
   // 친구 초대 모달
   "hub.invite.title": "Invite friends",

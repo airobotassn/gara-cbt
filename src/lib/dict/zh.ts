@@ -959,6 +959,7 @@ const ZH: Record<string, string> = {
   "ebook.free": "免费",
   "ebook.owned": "已拥有",
   "ebook.read": "阅读",
+  "ebook.view": "查看",
   "ebook.cover_zoom": "查看大图封面",
   "ebook.processing": "处理中…",
   "ebook.bought": "购买完成 — 已加入 E-BOOK 书架。",
@@ -1768,7 +1769,7 @@ const ZH: Record<string, string> = {
   "hub.title.login": "登录后即可查看称号收藏。",
 
   // 점수 획득 방법
-  "hub.earn.title": "如何获得积分",
+  "hub.earn.title": "积分与金币获取方式",
   "hub.earn.lead": "参与各种活动累积积分，冲击排行榜！",
   "hub.earn.col_act": "活动项目",
   "hub.earn.col_pt": "获得积分",
@@ -1781,6 +1782,18 @@ const ZH: Record<string, string> = {
   "hub.earn.row.daily_learn": "完成今日学习",
   "hub.earn.row.minigame": "玩小游戏",
   "hub.earn.row.referral": "邀请好友",
+  "hub.earn.sec_score": "赛季积分",
+  "hub.earn.sec_coin": "CARI 金币",
+  "hub.earn.coin_lead": "金币用于在商店装扮角色和房间，与排行榜积分是不同的钱包。",
+  "hub.earn.col_coin": "获得金币",
+  "hub.earn.coin_pt": "+{n}金币",
+  "hub.earn.coin_any": "对方赠送的数额",
+  "hub.earn.coin.daily": "签到或今日学习",
+  "hub.earn.coin.stamp": "集满 7 天印章",
+  "hub.earn.coin.gift": "收到好友赠送",
+  "hub.earn.coin_note.daily": "每天 1 次 · 以先完成的为准",
+  "hub.earn.coin_note.stamp": "集满 7 格的当天",
+  "hub.earn.coin_note.gift": "由赠送者决定",
 
   // 친구 초대 모달
   "hub.invite.title": "邀请好友",

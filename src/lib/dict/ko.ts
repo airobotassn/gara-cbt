@@ -959,6 +959,7 @@ const KO: Record<string, string> = {
   "ebook.free": "무료",
   "ebook.owned": "보유 중",
   "ebook.read": "읽기",
+  "ebook.view": "보러가기",
   "ebook.cover_zoom": "표지 크게 보기",
   "ebook.processing": "처리 중…",
   "ebook.bought": "구매 완료 — E-BOOK 서재에 담겼어요.",
@@ -1772,7 +1773,7 @@ const KO: Record<string, string> = {
   "hub.title.login": "로그인하면 칭호 보관소가 보여요.",
 
   // 점수 획득 방법
-  "hub.earn.title": "점수 획득 방법",
+  "hub.earn.title": "점수 · 코인 획득 방법",
   "hub.earn.lead": "다양한 활동에 참여하고 점수를 모아 랭킹에 도전하세요!",
   "hub.earn.col_act": "활동 항목",
   "hub.earn.col_pt": "획득 점수",
@@ -1785,6 +1786,18 @@ const KO: Record<string, string> = {
   "hub.earn.row.daily_learn": "오늘의 학습 완료",
   "hub.earn.row.minigame": "미니게임 플레이",
   "hub.earn.row.referral": "친구 초대",
+  "hub.earn.sec_score": "시즌 점수",
+  "hub.earn.sec_coin": "CARI 코인",
+  "hub.earn.coin_lead": "상점에서 캐릭터와 방을 꾸미는 데 쓰는 재화예요. 랭킹 점수와는 다른 지갑입니다.",
+  "hub.earn.col_coin": "획득 코인",
+  "hub.earn.coin_pt": "+{n}코인",
+  "hub.earn.coin_any": "받은 만큼",
+  "hub.earn.coin.daily": "출석 또는 오늘의 학습",
+  "hub.earn.coin.stamp": "7일 출석 도장 완성",
+  "hub.earn.coin.gift": "친구에게 선물 받기",
+  "hub.earn.coin_note.daily": "하루 1회 · 둘 중 먼저 한 쪽",
+  "hub.earn.coin_note.stamp": "도장 7칸을 채운 날",
+  "hub.earn.coin_note.gift": "보낸 사람이 정한 금액",
 
   // 친구 초대 모달
   "hub.invite.title": "친구 초대",

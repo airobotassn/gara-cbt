@@ -959,6 +959,7 @@ const HI: Record<string, string> = {
   "ebook.free": "मुफ़्त",
   "ebook.owned": "आपके पास है",
   "ebook.read": "पढ़ें",
+  "ebook.view": "देखें",
   "ebook.cover_zoom": "कवर बड़ा देखें",
   "ebook.processing": "प्रोसेस हो रहा है…",
   "ebook.bought": "खरीद पूरी — आपकी E-BOOK लाइब्रेरी में जोड़ी गई।",
@@ -1768,7 +1769,7 @@ const HI: Record<string, string> = {
   "hub.title.login": "उपाधि संग्रह देखने के लिए साइन इन करें।",
 
   // 점수 획득 방법
-  "hub.earn.title": "पॉइंट कैसे कमाएं",
+  "hub.earn.title": "पॉइंट और सिक्के कैसे कमाएँ",
   "hub.earn.lead": "गतिविधियों में भाग लें, पॉइंट जमा करें और रैंकिंग में चढ़ें!",
   "hub.earn.col_act": "गतिविधि",
   "hub.earn.col_pt": "पॉइंट",
@@ -1781,6 +1782,18 @@ const HI: Record<string, string> = {
   "hub.earn.row.daily_learn": "आज की पढ़ाई पूरी करें",
   "hub.earn.row.minigame": "मिनी गेम खेलें",
   "hub.earn.row.referral": "दोस्त को बुलाएं",
+  "hub.earn.sec_score": "सीज़न पॉइंट",
+  "hub.earn.sec_coin": "CARI सिक्के",
+  "hub.earn.coin_lead": "सिक्के दुकान में किरदार और कमरा सजाने के लिए हैं — यह रैंकिंग पॉइंट से अलग बटुआ है।",
+  "hub.earn.col_coin": "मिले सिक्के",
+  "hub.earn.coin_pt": "+{n} सिक्के",
+  "hub.earn.coin_any": "जितने भेजे जाएँ",
+  "hub.earn.coin.daily": "हाज़िरी या आज की पढ़ाई",
+  "hub.earn.coin.stamp": "7 दिन का स्टैम्प पूरा",
+  "hub.earn.coin.gift": "दोस्त से उपहार",
+  "hub.earn.coin_note.daily": "दिन में 1 बार · जो पहले हो",
+  "hub.earn.coin_note.stamp": "जिस दिन सातों भर जाएँ",
+  "hub.earn.coin_note.gift": "भेजने वाला तय करता है",
 
   // 친구 초대 모달
   "hub.invite.title": "दोस्तों को बुलाएं",

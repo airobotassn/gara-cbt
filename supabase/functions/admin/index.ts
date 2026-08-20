@@ -2506,6 +2506,39 @@ async function setRegion(admin: any, body: any) {
   return json({ ok: true })
 }
 
+// ---------- 어드민: 첫 진입 상태로 되돌리기 ----------
+// 신규 가입 흐름(닉네임 → 국가·지역·연령대)을 실제 경로 그대로 다시 태운다. 온보딩 값만 비운다
+// (코인·아바타·응시 이력·자격증은 그대로) — 마이그레이션 20260819170000 주석 참고.
+//
+// ⚠️ **루트 전용이다.** 이 조작은 '국가·지역 1회 변경' 잠금까지 풀어준다 — 등록 이메일 아무나 누를 수 있으면
+//    잠금이 사실상 없는 것과 같다(examTicketGrant 를 루트로 막은 것과 같은 이유).
+// ⚠️ 되돌릴 수 없으므로 admin_audit 에 남긴다 — 누가 남의 계정을 초기화했는지 답할 수 있어야 한다.
+async function resetOnboarding(admin: any, body: any, email: string, isRoot: boolean) {
+  if (!isRoot) return json({ error: '루트 관리자만 초기화할 수 있습니다.' }, 403)
+  const uid = String(body?.uid ?? '').trim()
+  if (!uid) return json({ error: 'uid 가 필요합니다.' }, 400)
+
+  // 되돌리기 전 값을 로그에 남긴다 — 실수로 눌렀을 때 사람이 복구할 근거가 이것뿐이다.
+  const { data: before } = await admin
+    .from('profiles')
+    .select('nickname_set_at, region_locked_at, region_changed_at, country_code, region_code, age_band')
+    .eq('id', uid)
+    .maybeSingle()
+  if (!before) return json({ error: '회원을 찾을 수 없습니다.' }, 404)
+
+  const { error } = await admin.rpc('admin_reset_onboarding', { p_uid: uid })
+  if (error) return json({ error: error.message }, 400)
+
+  // 로그 실패로 초기화를 되돌리지는 않는다(이미 끝난 조작이다). 조용히 삼킨다.
+  await admin.from('admin_audit').insert({
+    actor_email: email,
+    action: 'resetOnboarding',
+    target: uid,
+    detail: { before },
+  })
+  return json({ ok: true, before })
+}
+
 // ---------- 어드민: 이북(전자책) ----------
 // 본문 HTML·표지 파일은 클라가 스토리지에 직접 올리고(관리자 전용 정책), 여기선 메타데이터만 다룬다.
 async function ebookList(admin: any) {
@@ -3004,6 +3037,8 @@ Deno.serve(async (req) => {
       case 'cbtUsers': return await cbtUsers(admin)
       case 'cbtUserDetail': return await cbtUserDetail(admin, body)
       case 'setRegion': return await setRegion(admin, body)
+      // ⚠️ isRoot 를 넘겨 루트 전용으로 막는다(위 주석 — 지역 1회 변경 잠금을 푸는 조작이다).
+      case 'resetOnboarding': return await resetOnboarding(admin, body, email, isRoot)
       case 'ebookList': return await ebookList(admin)
       case 'ebookUpsert': return await ebookUpsert(admin, body)
       case 'ebookReorder': return await ebookReorder(admin, body)

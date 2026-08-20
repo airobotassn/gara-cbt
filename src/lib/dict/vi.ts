@@ -959,6 +959,7 @@ const VI: Record<string, string> = {
   "ebook.free": "Miễn phí",
   "ebook.owned": "Đã sở hữu",
   "ebook.read": "Đọc",
+  "ebook.view": "Xem",
   "ebook.cover_zoom": "Xem bìa lớn hơn",
   "ebook.processing": "Đang xử lý…",
   "ebook.bought": "Đã mua — đã thêm vào Thư viện E-BOOK.",
@@ -1768,7 +1769,7 @@ const VI: Record<string, string> = {
   "hub.title.login": "Đăng nhập để xem bộ sưu tập danh hiệu.",
 
   // 점수 획득 방법
-  "hub.earn.title": "Cách kiếm điểm",
+  "hub.earn.title": "Cách nhận điểm và xu",
   "hub.earn.lead": "Tham gia hoạt động, tích điểm và leo bảng xếp hạng!",
   "hub.earn.col_act": "Hoạt động",
   "hub.earn.col_pt": "Điểm nhận",
@@ -1781,6 +1782,18 @@ const VI: Record<string, string> = {
   "hub.earn.row.daily_learn": "Hoàn thành bài học hôm nay",
   "hub.earn.row.minigame": "Chơi mini game",
   "hub.earn.row.referral": "Mời bạn bè",
+  "hub.earn.sec_score": "Điểm mùa giải",
+  "hub.earn.sec_coin": "Xu CARI",
+  "hub.earn.coin_lead": "Xu dùng ở cửa hàng để trang trí nhân vật và phòng — ví riêng, khác điểm xếp hạng.",
+  "hub.earn.col_coin": "Xu nhận được",
+  "hub.earn.coin_pt": "+{n} xu",
+  "hub.earn.coin_any": "Tùy người gửi",
+  "hub.earn.coin.daily": "Điểm danh hoặc Học hôm nay",
+  "hub.earn.coin.stamp": "Hoàn thành 7 ngày điểm danh",
+  "hub.earn.coin.gift": "Bạn bè tặng xu",
+  "hub.earn.coin_note.daily": "1 lần/ngày · cái nào trước",
+  "hub.earn.coin_note.stamp": "Vào ngày lấp đủ 7 ô",
+  "hub.earn.coin_note.gift": "Người gửi quyết định",
 
   // 친구 초대 모달
   "hub.invite.title": "Mời bạn bè",

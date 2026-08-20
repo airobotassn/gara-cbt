@@ -276,6 +276,13 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
     - ⚠️ **국가·지역은 `enforce_region_lock` 트리거가 막아서 service role 로도 직접 못 고친다.** `admin_set_region` 과 같은 방식(트랜잭션 로컬 GUC `app.allow_region_change`)으로만 쓴다.
     - ⚠️ **1회 판정을 `UPDATE ... where region_changed_at is null` 한 문장에 넣는다.** select 로 먼저 확인하고 update 하면 두 번 눌린 요청이 나란히 통과해 2회 변경이 된다. `region_locked_at`(최초 확정 시각)은 건드리지 않는다.
     - ⚠️ 나라를 바꾸면 화면이 지역을 **반드시 비운다** — 안 비우면 옛 나라의 지역이 남아 서버가 거절하고 사용자는 이유 없는 오류만 본다.
+- **첫 진입 상태로 되돌리기(2026-08-19)** — 관리자 › 유저 관리 › 회원 상세의 `첫 진입 상태로 초기화`. 신규 가입 흐름(닉네임 → 국가·지역·연령대)을 **실제 경로 그대로** 다시 태운다. 경로는 `admin` 함수의 `resetOnboarding` → RPC `admin_reset_onboarding` 하나뿐이다.
+  - ⚠️ **게스트(익명) 로그인은 이 용도로 못 쓴다.** 닉네임 게이트·온보딩 게이트가 둘 다 `isFullUser` 일 때만 돌아서, 게스트를 아무리 많이 만들어도 그 화면들을 한 번도 안 만난다. 그래서 "정식 계정을 가입 직후로 되돌리는" 쪽으로 만들었다.
+  - 비우는 값 = AuthProvider 가 게이트 판정에 쓰는 것 그대로(`nickname_set_at`·`region_locked_at`·`country_code`·`region_code`·`age_band`) + `region_changed_at`(안 지우면 초기화 후 국가를 못 바꾼다).
+  - ⛔ **`display_name` 은 안 건드린다** — 가입 트리거가 넣은 구글 실명이 들어 있는 게 가입 직후의 진짜 상태다. 코인·아바타·응시 이력·자격증도 그대로.
+  - ⚠️ `enforce_region_lock` 이 service role 로도 막으므로 `admin_set_region` 과 **같은 방식**(트랜잭션 로컬 GUC)으로만 쓴다.
+  - ⚠️ **루트 전용**이다 — 이 조작은 '국가·지역 1회 변경' 잠금까지 풀어준다. 되돌릴 수 없어 `admin_audit` 에 이전 값을 남긴다.
+  - 검증: `tests/db/t9-admin-set-region.mjs`(19건 — 뒤쪽 절반이 초기화. ⭐다른 값 보존·재확정 후 락 재발효 포함).
 - **진입점 배치(2026-07 정리)**: 미니게임은 `/arena` 하단 런처 4번째 버튼(`components/MiniGamePicker.tsx` 팝업) → `/games/:id`. 랭킹은 `/hub` 도크 CTA → `/ranking`. 레벨선택·허브에는 각각 미니게임·랭킹 진입점이 없다(중복 제거).
 - **`/hub` 화면 구성(2026-08-04 시안 반영)**: 상단 HUD(아바타 · 이름 + 티어 **엠블렘** · **ARENA 레벨 경험치 바** + `?` + 코인) → **오늘의 미션 바**(한 줄) → 캐릭터 무대(+ 오른쪽 레일 4칸 `출석·상점·칭호·초대하기`) → 도크(7일 출석 스탬프 + 랭킹 CTA). 전부 전체 폭 세로 스택이라 캐릭터가 화면 정중앙에 온다.
   - ⚠️ **오른쪽 레일은 `position:absolute` 라 무대 높이를 늘리지 못한다** — 버튼을 추가·삭제하면 `hub.css` 의 `.hub-main .stage-zone` 높이(모바일 420 / PC 520)와 `.rail-r` gap 을 다시 실측할 것. 넘치면 아래 출석 스탬프를 덮는다(실제로 5칸이 되며 터졌던 버그).
