@@ -1263,6 +1263,7 @@ const KO: Record<string, string> = {
   "sched.regular": "정기시험 일정",
   "sched.rolling": "상시시험",
   "sched.exam_date": "시험일",
+  "sched.exam_period": "응시 기간",
   "sched.apply_period": "접수기간",
   "sched.apply": "접수하기",
   "sched.empty": "등록된 시험 일정이 없습니다.",
@@ -1326,6 +1327,16 @@ const KO: Record<string, string> = {
   "seb.entry_loading": "시험을 준비하고 있어요…",
   "seb.entry_retry": "다시 시도",
   // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
+  // SEB 환경 점검 도착 화면(/exam/envcheck) — **모의 문제를 풀리지 않는다.**
+  // 확인하려는 건 "이 PC 에서 SEB 가 실제로 떴는가" 하나뿐이고, 이 화면이 보이면 그게 증명된다.
+  "envcheck.ok_title": "환경 점검 완료",
+  "envcheck.ok_desc": "이 컴퓨터에서 시험을 볼 수 있습니다. 아래 버튼으로 보안 브라우저를 닫아주세요.",
+  "envcheck.warn_title": "확인이 필요한 항목이 있어요",
+  "envcheck.warn_desc": "아래에서 ✕ 표시된 항목을 해결한 뒤 다시 점검해 주세요.",
+  "envcheck.row_seb": "보안 브라우저로 열림",
+  "envcheck.row_fs": "전체화면 전환",
+  "envcheck.row_net": "인터넷 연결",
+  "envcheck.row_screen": "화면 크기",
   "seb.exit": "보안 브라우저 종료",
   // SEB 로 로그인을 넘기는 인계표가 주소에 없을 때. 옛 .seb 파일로 들어왔거나 설정에서
   // startURLAppendQueryParameter 가 빠진 경우다 — SEB 안에서는 로그인할 방법이 없으므로 나가서 다시 시작해야 한다.
@@ -1724,7 +1735,7 @@ const KO: Record<string, string> = {
 
   // 오른쪽 레일
   "hub.rail.daily": "출석",
-  "hub.rail.shop": "상점",
+  "hub.rail.closet": "꾸미기",
   "hub.rail.title": "칭호",
   "hub.rail.invite": "초대하기",
 
@@ -1750,12 +1761,59 @@ const KO: Record<string, string> = {
 
 
   // 상점 모달
-  "hub.shop.title": "상점",
   "hub.shop.balance": "보유 CARI 코인",
   "hub.shop.owned": "보유중",
   "hub.shop.buy": "구매",
   "hub.shop.empty": "상점에 물건이 없어요.",
   "hub.shop.login": "로그인하면 상점을 이용할 수 있어요.",
+  // ── 꾸미기(상점 + 보관함) · 캐릭터 고르기 · 튜토리얼 (2026-08-20) ──────────
+  "hub.shop.free": "무료",
+  "hub.closet.title": "꾸미기",
+  "hub.closet.tab_shop": "상점",
+  "hub.closet.tab_items": "보관함",
+  "hub.closet.g_character": "캐릭터",
+  "hub.closet.g_skin": "배경 · UI 스킨",
+  "hub.closet.g_furniture": "가구",
+  "hub.closet.g_part": "아이템",
+  "hub.closet.worn": "착용 중",
+  "hub.closet.wear": "적용하기",
+  "hub.closet.empty_character": "아직 가진 캐릭터가 없어요. 상점 탭에서 만나볼 수 있어요.",
+  "hub.closet.skin_help": "스킨을 바꾸면 배경뿐 아니라 출석판·게이지·도장까지 함께 바뀌어요.",
+  "hub.charpick.title": "함께할 캐릭터를 골라주세요",
+  "hub.charpick.sub": "화살표로 다른 모습을 볼 수 있어요. 고른 캐릭터는 Lv.1부터 함께 자라요.",
+  "hub.charpick.prev": "이전 모습",
+  "hub.charpick.next": "다음 모습",
+  "hub.charpick.g_m": "남성",
+  "hub.charpick.g_f": "여성",
+  "hub.charpick.go": "{name}(으)로 시작하기",
+  "hub.charpick.pick_first": "캐릭터를 먼저 골라주세요",
+  "hub.charpick.note": "나중에 상점에서 다른 캐릭터를 얻으면 보관함에서 언제든 바꿀 수 있어요.",
+  "hub.tut.welcome_t": "CARI 허브에 오신 걸 환영해요",
+  "hub.tut.welcome_b": "여기는 캐릭터와 함께 지내는 공간이에요. 어디에 뭐가 있는지 잠깐만 살펴볼게요.",
+  "hub.tut.mission_t": "오늘의 미션",
+  "hub.tut.mission_b": "하루에 세 가지를 하면 시즌 점수가 쌓여요. 점수는 랭킹을 매기는 값이에요.",
+  "hub.tut.daily_t": "출석하기",
+  "hub.tut.daily_b": "하루 한 번 눌러 CARI 코인을 받아요. 코인은 꾸미기에 쓰는 재화예요.",
+  "hub.tut.closet_t": "꾸미기",
+  "hub.tut.closet_b": "모은 코인으로 캐릭터와 배경 스킨을 사고, 보관함에서 갈아입을 수 있어요.",
+  "hub.tut.stamp_t": "출석 도장",
+  "hub.tut.stamp_b": "며칠째 왔는지 여기서 볼 수 있어요. 7일을 채우면 보너스 코인을 받아요.",
+  "hub.tut.prev": "이전",
+  "hub.tut.next": "다음",
+  "hub.tut.done": "시작하기",
+  "hub.tut.skip": "건너뛰기",
+  "hub.err.invalid_character": "선택할 수 없는 캐릭터예요",
+  "hub.err.invalid_kind": "적용할 수 없는 종류예요",
+  "hub.err.invalid_part": "적용할 수 없는 아이템이에요",
+  // ⚠️ 캐릭터 이름은 **임시값**이다 — 그림이 아직 없어서 계열을 A·B·C 로만 부른다.
+  //    그림이 도착하면 여기 이름만 갈면 된다(키는 절대 바꾸지 말 것 — 소유·장착이 키로 돌아간다).
+  "hub.part.char_a_m": "캐릭터 A · 남",
+  "hub.part.char_a_f": "캐릭터 A · 여",
+  "hub.part.char_b_m": "캐릭터 B · 남",
+  "hub.part.char_b_f": "캐릭터 B · 여",
+  "hub.part.char_c_m": "캐릭터 C · 남",
+  "hub.part.char_c_f": "캐릭터 C · 여",
+  "hub.part.skin_palace": "고궁",
 
   // 쿠폰함
   "hub.coupon.title": "쿠폰함",

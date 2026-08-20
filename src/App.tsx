@@ -31,6 +31,7 @@ import Landing from './pages/Landing'
 const ExamGate = lazy(() => import('./pages/ExamGate'))
 const ExamApply = lazy(() => import('./pages/ExamApply'))
 const ExamCheck = lazy(() => import('./pages/ExamCheck'))
+const ExamEnvCheck = lazy(() => import('./pages/ExamEnvCheck'))
 const ExamPrepare = lazy(() => import('./pages/ExamPrepare'))
 const SebStart = lazy(() => import('./pages/SebStart'))
 const CbtRunner = lazy(() => import('./pages/CbtRunner'))
@@ -203,6 +204,8 @@ export default function App() {
               <Route path="/exam" element={<ExamGate />} />
               <Route path="/exam/apply" element={<ExamApply />} />
               <Route path="/exam/check" element={<ExamCheck />} />
+              {/* SEB 환경 점검 도착 화면 — 모의 .seb 의 startURL. 모의 문제를 풀지 않고 "떴다" 만 확인하고 나간다. */}
+              <Route path="/exam/envcheck" element={<ExamEnvCheck />} />
               <Route path="/exam/prepare" element={<ExamPrepare />} />
               <Route path="/exam/seb" element={<SebStart />} />
               <Route path="/exam/run/:attemptId" element={<CbtRunner />} />

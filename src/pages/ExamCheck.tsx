@@ -1,9 +1,9 @@
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
 import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl } from '../lib/seb'
 import SebInstall from '../components/SebInstall'
-import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
@@ -20,6 +20,8 @@ export default function ExamCheck() {
   const [params] = useSearchParams()
   const ticketId = params.get('ticket')
   const { isFullUser } = useAuth()
+  // 점검 기록 전송 중 — 중복 클릭과 '보냈는데 아직 안 끝남' 을 둘 다 막는다.
+  const [busy, setBusy] = useState(false)
   if (isMobileDevice()) return <MobileBlock />
 
   const inSeb = isSEB()
@@ -30,24 +32,30 @@ export default function ExamCheck() {
     { ok: navigator.onLine, label: t('check.chk_net'), note: navigator.onLine ? t('check.chk_net_ok') : t('check.chk_net_no') },
   ]
 
-  function startPractice() {
-    // ⚠️ 점검 완료는 **모의 응시를 시작한 시점**에 남긴다.
-    //    끝까지 풀었는지는 서버가 알 수 없고(모의는 채점도 제출도 없다), 여기까지 왔다는 건
-    //    이 PC 에서 응시 화면이 실제로 떴다는 뜻이라 그게 우리가 확인하려던 것이다.
-    //    ⚠️ 기록 실패가 모의 응시를 막지 않는다 — 점검이 목적이지 기록이 목적이 아니다.
+  async function startPractice() {
+    if (busy) return
+    setBusy(true)
+    // ⚠️ 점검 완료는 **점검을 시작한 시점**에 남긴다. 끝까지 뭘 했는지는 서버가 알 수 없고
+    //    (모의는 채점도 제출도 없다), 여기까지 왔다는 건 이 PC 가 조건을 만족한다는 뜻이라 그게 확인하려던 것이다.
+    // ⛔ **반드시 await 한다.** 예전엔 요청을 띄우자마자 아래에서 SEB 링크로 페이지를 넘겨버려서
+    //    브라우저가 그 요청을 취소했다 — 점검을 해도 기록이 안 남아 마이페이지의 '응시하러 가기' 가
+    //    영영 안 열렸다(2026-08-13). 기록 실패는 여전히 삼킨다(점검이 목적이지 기록이 목적이 아니다).
     if (isFullUser) {
-      callFunction('exam-env-check', {
-        ticketId,
-        ua: navigator.userAgent,
-        screen: `${window.screen.width}x${window.screen.height}`,
-        detail: { inSeb: isSEB(), fullscreen: !!document.fullscreenEnabled, online: navigator.onLine },
-      }).catch(() => { /* 기록 실패는 무시 */ })
+      try {
+        await callFunction('exam-env-check', {
+          ticketId,
+          ua: navigator.userAgent,
+          screen: `${window.screen.width}x${window.screen.height}`,
+          detail: { inSeb: isSEB(), fullscreen: !!document.fullscreenEnabled, online: navigator.onLine },
+        })
+      } catch { /* 기록 실패는 무시 */ }
     }
+    setBusy(false)
     if (SEB_REQUIRED && !isSEB()) {
       window.location.href = sebPracticeLaunchUrl(lang)
       return
     }
-    navigate('/exam/run/practice', { state: makePracticeExam() })
+    navigate('/exam/envcheck')
   }
 
   return (
@@ -119,7 +127,7 @@ export default function ExamCheck() {
               <div className="flex-grow">
                 <h2 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('check.sec3_title')}</h2>
                 <p className="font-body-md text-body-md text-on-surface-variant mb-6 leading-relaxed break-keep max-w-prose">{t('check.sec3_desc')}</p>
-                <button onClick={startPractice} className="bg-primary-container text-on-primary font-title-md text-title-md px-8 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2 w-full md:w-auto font-bold">
+                <button onClick={() => { void startPractice() }} disabled={busy} className="bg-primary-container text-on-primary font-title-md text-title-md px-8 py-3 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow inline-flex items-center justify-center gap-2 w-full md:w-auto font-bold">
                   <span className="material-symbols-outlined text-[20px]">play_arrow</span>
                   {t('check.practice_btn')}
                 </button>

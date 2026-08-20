@@ -9,7 +9,7 @@
 //
 // 생성물(언어 6종 × 실제/연습):
 //   public/gara-<lang>.seb          startURL = <origin>/exam/seb?lang=<lang>
-//   public/gara-practice-<lang>.seb startURL = <origin>/exam/run/practice?lang=<lang>
+//   public/gara-practice-<lang>.seb startURL = <origin>/exam/envcheck?lang=<lang>
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -122,9 +122,9 @@ mkdirSync(outDir, { recursive: true })
 console.log(`origin=${origin}  maxDisplays=${maxDisplays}`)
 for (const lang of LANGS) {
   emit(join(outDir, `gara-${lang}.seb`), `${origin}/exam/seb?lang=${lang}`)
-  emit(join(outDir, `gara-practice-${lang}.seb`), `${origin}/exam/run/practice?lang=${lang}`)
+  emit(join(outDir, `gara-practice-${lang}.seb`), `${origin}/exam/envcheck?lang=${lang}`)
 }
 // 언어 미지정 fallback(=ko) — 옛 /gara.seb 참조 호환
 emit(join(outDir, 'gara.seb'), `${origin}/exam/seb?lang=ko`)
-emit(join(outDir, 'gara-practice.seb'), `${origin}/exam/run/practice?lang=ko`)
+emit(join(outDir, 'gara-practice.seb'), `${origin}/exam/envcheck?lang=ko`)
 console.log('done.')
