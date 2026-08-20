@@ -574,7 +574,11 @@ body:has(.hub) .fab-top { display: none; }
   font-size: 13px; font-weight: 900; display: grid; place-items: center; }
 
 /* 점수 획득 방법 모달 */
-.hub .earn-lead { margin-top: 0; }
+/* 지갑 구분 머리 — 점수 표와 코인 표를 눈으로 갈라준다. 둘은 버는 길도 쓰는 곳도 다르다. */
+.hub .earn-sec { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 900; color: var(--ink); }
+.hub .earn-sec svg { flex: 0 0 auto; }
+.hub .earn-sec-2 { margin-top: 18px; padding-top: 14px; border-top: 2.5px dashed var(--line); }
+.hub .earn-lead { margin-top: 4px; }
 .hub .earn-tb { width: 100%; border-collapse: collapse; margin-top: 4px; }
 .hub .earn-tb th { background: var(--card-alt); border: 2.5px solid var(--line); padding: 6px 10px; font-size: 12.5px; font-weight: 900; color: var(--ink); }
 .hub .earn-tb td { border: 2.5px solid var(--line); padding: 7px 10px; font-size: 13px; font-weight: 800; color: var(--ink); vertical-align: middle; }

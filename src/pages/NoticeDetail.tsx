@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import HtmlBody, { isIsolatedHtml } from '../components/HtmlBody'
+import HtmlBody from '../components/HtmlBody'
+import { isIsolatedHtml } from '../lib/noticeRender'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { loadBoardCats, catName, type BoardCat } from '../lib/boardCats'
@@ -97,10 +98,13 @@ export default function NoticeDetail() {
   const title = row ? row.title || row.title_ko || '' : ''
   const body = row ? row.body || row.body_ko || '' : ''
 
-  // 만들어 올린 HTML 공지는 자기 폭(보통 1000px 안팎)을 전제로 그려져 있다. 기본 글 폭(max-w-3xl=768px)
-  // 안에 넣으면 표 칸마다 글자가 줄바꿈돼 **디자인이 아니라 자리가 없어서** 찌그러진다.
-  // 그래서 그 공지에서만 폭 제한을 풀고 카드 여백도 줄인다(1000 + 본문 여백 40 + 카드 여백 48 ≒ 1090).
-  // ⚠️ 평범한 공지는 넓히지 않는다 — 글줄이 길어지면 읽기 나빠진다.
+  // 만들어 올린 HTML 공지는 표준 폭(NOTICE_WIDTH=1000px)으로 선다 — 업로드할 때 그 폭에 맞춰
+  // 넣어 두고(lib/noticeHtml 의 fitNoticeHtml), 화면이 좁으면 HtmlBody 안에서 옆으로 민다.
+  // 그래서 글칸은 딱 그만큼만 준다:
+  //   1000(본문) + 카드 여백 24×2(md:p-6) + 카드 테두리 1×2 + 페이지 여백 40×2(margin-desktop) = 1130
+  // ⚠️ 넷 중 하나라도 바꾸면 이 숫자를 다시 계산할 것. **2px만 모자라도 PC 에 가로 스크롤바가 뜬다** —
+  //    카드 테두리를 빼먹어 실제로 그랬다. 반대로 넓으면 문서 오른쪽에 빈 자리가 남는다.
+  // ⚠️ 평범한 공지(<style> 없는 글)는 넓히지 않는다 — 글줄이 길어지면 읽기 나빠진다.
   const wide = isIsolatedHtml(body)
 
   return (
@@ -112,7 +116,7 @@ export default function NoticeDetail() {
 
       <main
         className={`flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop mx-auto w-full ${
-          wide ? 'max-w-[1120px]' : 'max-w-3xl'
+          wide ? 'max-w-[1130px]' : 'max-w-3xl'
         }`}
       >
         <Link to="/notice" className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">

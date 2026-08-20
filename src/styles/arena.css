@@ -45,17 +45,26 @@ html.dark .arena {
 
 /* ── 지도 표면(지구본·바다·대륙) ── **라이트/다크 공통으로 같은 색이다.**
    페이지(카드·패널·글자)는 테마를 따르지만 지도는 항상 이 값이다.
-   **바다 = 연한 회색(2026-08-19 요청).** 그전엔 딥블루였고, 그래서 아래 두 가지가
-   ‘어두운 바다’를 전제로 잡혀 있다 — 1~3위 테두리의 **흰 발광**(.medalline·top10)과
-   흰 해안선(--aa-geo-stroke). 둘 다 육지(파랑) 쪽에서는 그대로 읽히고 바다 쪽에서만 약해졌다.
-   램프(CSCALE_RAMP)는 그대로 둔다 — 파란 육지가 회색 바다 위에 그대로 떠 보인다. */
+   **바다 = 다크그레이(2026-08-19 요청).** 딥블루 → 연한 회색 → 여기까지 왔다.
+   흰 것들(1~3위 테두리 발광 .medalline·top10, 흰 해안선 --aa-geo-stroke, 흰 등수 글자)은
+   전부 **어두운 바다를 전제로** 잡힌 값이라 연회색에서 약해졌던 게 여기서 되살아난다 — 같이 손대지 말 것.
+   램프(CSCALE_RAMP)도 그대로. 파란 육지가 회색 바다 위에 떠 보이는 건 밝기 차라 색조와 무관하다.
+   ⚠️ 채도를 넣지 말 것 — 육지가 파랑이라 바다까지 푸르면 둘이 같은 색군으로 뭉쳐 경계가 흐려진다.
+      그래서 아주 옅은 한기만 남긴 거의 무채색이다. */
 .arena {
-  --aa-ocean-hi: #eaedf2; --aa-ocean-mid: #dee2e9; --aa-ocean-lo: #c7cdd7;
+  --aa-ocean-hi: #4a4e56; --aa-ocean-mid: #3a3e46; --aa-ocean-lo: #24272d;
   --aa-land-none: #21538e;
   --aa-geo-stroke: rgba(238, 247, 255, .55);
   --aa-spec-op: .16;               /* 어두운 구체에 흰 하이라이트를 세게 주면 뿌옇게 뜬다 */
-  --aa-atmo: #5b9ae8; --aa-atmo-op: .5;
-  --aa-inset-grad: linear-gradient(160deg, #e7ebf1, #ccd2dc);
+  /* 구체 가장자리 대기광 — **끈다(2026-08-19 요청).** 바다가 다크그레이가 되면서 파란 초승달만
+     혼자 남아 테두리처럼 떠 보였다(딥블루 시절엔 바다와 이어져 대기로 읽혔다).
+     되살리려면 --aa-atmo-op 만 .5 로 돌리면 된다 — 색·기하는 그대로 남겨뒀다. */
+  --aa-atmo: #5b9ae8; --aa-atmo-op: 0;
+  --aa-inset-grad: linear-gradient(160deg, #474b53, #23262b);
+  /* 구체 윤곽선만 따로 뺀 무채색(2026-08-19 요청). 페이지 공용 외곽선 --aa-line 은 푸른 회색이라
+     다크그레이 바다 위에서 파란 테두리로 읽혔다. ⚠️ --aa-line 자체를 바꾸면 카드·버튼 외곽선이
+     전부 따라 바뀐다 — 지구에만 필요한 색이라 여기서 끊는다. */
+  --aa-sphere-line: #6b6e74;
 }
 
 /* ⚠️ z-index:1 은 별하늘(<StarField />, z-index:0) 위에 내용을 세우는 값이다 — 빼면 지도·카드가
@@ -354,7 +363,7 @@ html.dark .arena .aa-tip .real { color: #8fb9f5; }
    테두리 세기로 급을 나눈다: 1~3위(흰 심지 + 후광) > 4~10위(약한 흰 선) > 나머지(기본 선). */
 #arena-map .geo[data-tier='top10'] { stroke: rgba(255, 255, 255, .92); stroke-width: 1.7; }
 #arena-map .geo.sel { fill: #e5484d !important; stroke: #ffffff; stroke-width: 2.2; filter: drop-shadow(0 0 7px rgba(229, 72, 77, .75)); }
-#arena-map .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--aa-line); stroke-width: 3; }
+#arena-map .sphere { fill: url(#oceanGrad); filter: url(#globeShadow); stroke: var(--aa-sphere-line); stroke-width: 3; }
 /* 평면 레벨(1·2)의 바탕 — 지구본 바다와 같은 그라디언트라 세 레벨의 인상이 일치한다.
    viewport 밖에 있어 팬·줌에 안 따라 움직인다(ArenaMap 의 backdrop 그룹). */
 #arena-map .mapbgfill { fill: url(#oceanGrad); }

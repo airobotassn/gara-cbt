@@ -7,7 +7,10 @@ import { renderEbookCover } from '../lib/ebookCover'
 import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
 import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
-import { importNoticeHtml } from '../lib/noticeHtml'
+import { fitNoticeHtml, importNoticeHtml } from '../lib/noticeHtml'
+import { isIsolatedHtml } from '../lib/noticeRender'
+import HtmlBody from '../components/HtmlBody'
+import { NOTICE_WIDTH } from '../lib/noticeRender'
 import type {
   AdminListResponse,
   AdminAttemptRow,
@@ -1216,6 +1219,17 @@ function NoticesAdmin() {
   //      평범한 글을 소스 편집기로 마주하게 된다.
   const [htmlMode, setHtmlMode] = useState(false)
   const [htmlNotes, setHtmlNotes] = useState<string[]>([])
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  // 들여오기 = 정리(importNoticeHtml) → **표준 폭 맞추기**(fitNoticeHtml) 한 벌.
+  //   ⚠️ 파일과 붙여넣기가 같은 경로를 타야 한다 — 한쪽만 폭을 맞추면 어떻게 넣었는지에 따라
+  //      같은 파일이 다른 크기로 올라간다.
+  function takeHtml(source: string) {
+    const { html, notes } = importNoticeHtml(source)
+    const fit = fitNoticeHtml(html)
+    patchBody(fit.html)
+    setHtmlNotes(fit.note ? [...notes, fit.note] : notes)
+  }
 
   // .html 파일을 골라 본문으로. 붙여넣기와 **같은 정리 경로**를 탄다(둘이 다르면 결과가 갈린다).
   async function pickHtmlFile() {
@@ -1225,10 +1239,9 @@ function NoticesAdmin() {
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
-      const { html, notes } = importNoticeHtml(await file.text())
-      patchBody(html)
-      setHtmlNotes(notes)
+      // ⚠️ 모드를 **먼저** 바꾼다 — 편집기가 붙어 있는 채로 본문을 넣으면 그 순간 CSS 가 지워진다.
       setHtmlMode(true)
+      takeHtml(await file.text())
     }
     input.click()
   }
@@ -1236,9 +1249,7 @@ function NoticesAdmin() {
   // 소스칸에 통짜 문서를 붙여넣은 경우도 같이 편다(파일로 넣은 것과 결과가 같아야 한다).
   function patchBodySource(v: string) {
     if (/<html[\s>]|<body[\s>]/i.test(v)) {
-      const { html, notes } = importNoticeHtml(v)
-      patchBody(html)
-      setHtmlNotes(notes)
+      takeHtml(v)
       return
     }
     patchBody(v)
@@ -1251,7 +1262,10 @@ function NoticesAdmin() {
     setDraft({ ...emptyDraft(), category: cats[0]?.key ?? 'guide' })
   }
   function openEdit(n: NoticeRow) {
-    setHtmlMode(false)
+    // ⚠️ 만들어 온 HTML(=<style> 이 든 본문)은 **편집기로 열면 안 된다.** Quill 은 자기가 아는
+    //    서식만 남기고 나머지를 버리는데, 여는 즉시 onChange 가 한 번 돌아 `<style>` 이 통째로
+    //    사라진다 — 오타 하나 고치러 들어갔다가 디자인이 날아가고 그대로 저장된다(실측).
+    setHtmlMode(isIsolatedHtml(n.bodyI18n.ko ?? ''))
     setHtmlNotes([])
     setDraft({
       id: n.id,
@@ -1503,7 +1517,18 @@ function NoticesAdmin() {
                     className="admin-mini"
                     aria-pressed={!htmlMode}
                     style={!htmlMode ? { fontWeight: 700 } : undefined}
-                    onClick={() => setHtmlMode(false)}
+                    onClick={() => {
+                      // 되돌릴 수 없다 — 편집기가 열리는 순간 CSS 가 사라지고 취소해도 안 돌아온다.
+                      if (
+                        isIsolatedHtml(draft.bodyI18n.ko ?? '') &&
+                        !confirm(
+                          '편집기로 열면 이 공지의 디자인(CSS)이 사라지고 글자만 남습니다. 되돌릴 수 없습니다.' +
+                            String.fromCharCode(10, 10) +
+                            '계속할까요?',
+                        )
+                      ) return
+                      setHtmlMode(false)
+                    }}
                   >
                     편집기
                   </button>
@@ -1518,6 +1543,16 @@ function NoticesAdmin() {
                   </button>
                   <button type="button" className="admin-mini" onClick={pickHtmlFile}>
                     HTML 파일 불러오기
+                  </button>
+                  {/* 저장 **전에** 확인할 수 있어야 한다 — 예전엔 저장하고 실제 공지를 열어봐야
+                      어떻게 나오는지 알 수 있었다. */}
+                  <button
+                    type="button"
+                    className="admin-mini"
+                    onClick={() => setPreviewOpen(true)}
+                    disabled={!(draft.bodyI18n.ko ?? '').trim()}
+                  >
+                    미리보기
                   </button>
                 </div>
                 {htmlMode ? (
@@ -1567,7 +1602,70 @@ function NoticesAdmin() {
           </div>
         </div>
       )}
+
+      {previewOpen && draft && (
+        <NoticePreviewModal
+          title={draft.titleI18n.ko ?? ''}
+          body={draft.bodyI18n.ko ?? ''}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </>
+  )
+}
+
+/**
+ * 공지 미리보기 — 저장 전에 PC·폰 양쪽을 확인한다.
+ *
+ * ⚠️ 실제 공지 화면과 **같은 렌더러(<HtmlBody>)** 를 쓴다. 여기서 따로 그리면 미리보기는
+ *    멀쩡한데 올려놓고 보니 다른, 제일 나쁜 상태가 된다.
+ * ⚠️ 폰 칸은 `width:390px` 로 **자리만** 좁힌다 — 축소는 HtmlBody 가 알아서 한다(같은 규칙이
+ *    실제 폰에서도 돌아야 하므로 여기서 배율을 흉내내면 안 된다).
+ */
+function NoticePreviewModal({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
+  const [device, setDevice] = useState<'pc' | 'phone'>('pc')
+  const phone = device === 'phone'
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div
+        className="admin-modal admin-modal-wide"
+        style={{ maxWidth: 'min(1180px, 96vw)', height: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2 style={{ marginBottom: 4 }}>{title || '(제목 없음)'}</h2>
+        <p className="admin-modal-meta" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          미리보기 — 실제 공지 화면과 같은 방식으로 그립니다
+          <span style={{ flex: 1 }} />
+          <button type="button" className="admin-mini" aria-pressed={!phone}
+            style={!phone ? { fontWeight: 700 } : undefined} onClick={() => setDevice('pc')}>
+            PC
+          </button>
+          <button type="button" className="admin-mini" aria-pressed={phone}
+            style={phone ? { fontWeight: 700 } : undefined} onClick={() => setDevice('phone')}>
+            폰
+          </button>
+        </p>
+        <div style={{ flex: 1, overflow: 'auto', background: '#f1f3f7', borderRadius: 10, padding: 16 }}>
+          <div
+            style={{
+              // PC = 표준 폭 + 카드 여백 24×2 + 테두리 1×2(공지 화면의 카드와 같은 값), 폰 = 흔한 화면 폭.
+              // ⚠️ 2px만 모자라도 미리보기에만 가로 스크롤바가 떠서 실제 화면과 달라 보인다.
+              width: phone ? 390 : NOTICE_WIDTH + 50,
+              maxWidth: '100%',
+              margin: '0 auto',
+              background: '#fff',
+              border: '1px solid #d7dbe3',
+              borderRadius: 12,
+              padding: phone ? 16 : 24,
+              color: '#20293c',
+            }}
+          >
+            <HtmlBody html={body} className="notice-content" />
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -3555,6 +3653,33 @@ function AdminAccountsAdmin() {
   )
 }
 
+/**
+ * 번역 실패 사유(기계 문구) → 관리자가 읽고 **뭘 하면 되는지 아는** 한 문장.
+ *
+ * 왜 필요한가(2026-08-19): 분당 한도(429)에 걸리면 번역이 조용히 덜 채워진 채 끝났다. 화면엔
+ * '실패 조각 N개' 만 떠서, 개발자가 아닌 관리자는 원인을 알 수 없어 매번 문의가 왔다.
+ * ⚠️ 사유 문자열의 출처는 서버(`translate-ebook` 의 shortReason) 하나다 — 여기서 새로 만들지 말 것.
+ */
+function explainTranslateFail(reasons?: Record<string, number>): string {
+  const total = Object.values(reasons ?? {}).reduce((a, b) => a + b, 0)
+  if (!reasons || !total) return ''
+  // 제일 많이 난 사유 하나로 설명한다 — 여러 줄로 늘어놓으면 아무도 안 읽는다.
+  const [why] = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0]
+  if (/일일한도/.test(why)) {
+    return '오늘 쓸 수 있는 번역량(일일 한도)을 다 썼습니다. 내일 다시 “다시 번역”을 눌러주세요.'
+  }
+  if (/분당한도|429/.test(why)) {
+    return '번역 서비스의 분당 요청 한도에 걸렸습니다. 잠깐(1~2분) 두었다가 “다시 번역”을 누르면 남은 조각만 이어서 채웁니다. 책이 크면 몇 번 나눠 눌러야 할 수 있어요.'
+  }
+  if (/출력잘림|모델항목누락|JSON|빈번역|빈응답/.test(why)) {
+    return '번역 모델이 일부 조각을 제대로 돌려주지 못했습니다. “다시 번역”을 누르면 그 조각만 다시 시도합니다.'
+  }
+  if (/서버오류/.test(why)) {
+    return '번역 서버가 일시적으로 응답하지 못했습니다. 잠시 후 “다시 번역”을 눌러주세요.'
+  }
+  return `일부 조각을 번역하지 못했습니다(${why}). “다시 번역”을 누르면 그 조각만 다시 시도합니다.`
+}
+
 // ── 이북(전자책) 관리 ──
 //   본문 HTML 1개 파일 = 비공개 버킷 'ebooks', 표지 이미지 = 공개 버킷 'ebook-covers'.
 //   파일은 클라에서 스토리지로 직접 올리고(관리자 전용 정책), 메타데이터만 admin 함수로 저장한다.
@@ -3622,6 +3747,8 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
   const [busy, setBusy] = useState(false) // 순서 변경 중(↑↓)
   const [uploading, setUploading] = useState<'html' | 'optimize' | 'cover' | 'translate' | null>(null)
   const [trStatus, setTrStatus] = useState('') // 최적화·번역 진행 문구
+  // 분당 한도로 **쉬는 중**인지. 진행 문구를 눈에 띄게 바꾼다 — 안 그러면 멈춘 줄 알고 창을 닫는다.
+  const [trWaiting, setTrWaiting] = useState(false)
   const [buyersOf, setBuyersOf] = useState<{ book: AdminEbookRow; rows: AdminEbookBuyer[] } | null>(null)
   const [preview, setPreview] = useState<AdminEbookRow | null>(null)
 
@@ -3669,7 +3796,10 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
       { title: d.title, author: d.author, description: d.description },
       EBOOK_LANGS,
       (p) => {
-        if (p.phase === 'translate') setTrStatus(`번역 ${p.done}/${p.total} 조각${p.note ? ` · ${p.note}` : ''}`)
+        if (p.phase === 'translate') {
+          setTrWaiting(!!p.waiting)
+          setTrStatus(`번역 ${p.done}/${p.total} 조각${p.note ? ` · ${p.note}` : ''}`)
+        }
         else if (p.phase === 'build') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 본문 생성 중…`)
         else if (p.phase === 'fit') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 페이지 맞추는 중…`)
       },
@@ -3696,6 +3826,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
         author: r.meta.author,
         description: r.meta.description,
         failed: r.failed,
+        failReasons: r.failReasons,
         fittedPages: r.fittedPages,
         overflowPages: r.overflowPages,
         at: new Date().toISOString(),
@@ -4106,6 +4237,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                       ? '번역 없음'
                       : [
                           (t.failed ?? 0) > 0 ? `번역 실패 조각 ${t.failed}개(한국어로 남음)` : '',
+                          explainTranslateFail(t.failReasons),
                           (t.fittedPages?.length ?? 0) > 0 ? `자동 축소로 맞춘 페이지: ${t.fittedPages!.join(', ')}` : '',
                           (t.overflowPages?.length ?? 0) > 0 ? `축소해도 안 들어간 페이지: ${t.overflowPages!.join(', ')} — 원문 조판을 손봐야 함` : '',
                         ].filter(Boolean).join(' · ') || '이상 없음'
@@ -4126,8 +4258,28 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                   </button>
                 </div>
                 {(uploading === 'translate' || uploading === 'optimize' || uploading === 'html') && trStatus && (
-                  <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{trStatus}</span>
+                  <span
+                    style={{
+                      fontSize: trWaiting ? 13 : 12.5,
+                      fontWeight: trWaiting ? 700 : 400,
+                      color: trWaiting ? 'var(--error, #d43a3a)' : 'var(--muted)',
+                    }}
+                  >
+                    {trWaiting ? '⏳ ' : ''}{trStatus}
+                  </span>
                 )}
+                {/* ⚠️ 원인을 안 보여주면 관리자는 "번역이 안 된다" 로만 알고 문의를 넣는다(2026-08-19).
+                    실패 조각이 하나라도 있으면 **무엇 때문인지와 무엇을 하면 되는지**를 같이 적는다. */}
+                {!uploading && (() => {
+                  const hit = EBOOK_LANGS.map((lg) => draft.translations[lg]).find((x) => (x?.failed ?? 0) > 0)
+                  const why = explainTranslateFail(hit?.failReasons)
+                  if (!hit || !why) return null
+                  return (
+                    <span style={{ fontSize: 12.5, color: 'var(--error, #d43a3a)', lineHeight: 1.6 }}>
+                      ⚠ 번역이 덜 채워졌습니다(원문 그대로 남은 조각 {hit.failed}개) — {why}
+                    </span>
+                  )
+                })()}
                 {!uploading && EBOOK_LANGS.some((lg) => (draft.translations[lg]?.overflowPages?.length ?? 0) > 0) && (
                   <span style={{ fontSize: 12.5, color: 'var(--error, #d43a3a)' }}>
                     ⚠ 축소 하한(82%)까지 줄여도 안 들어간 페이지가 있습니다 — 뱃지에 마우스를 올리면 페이지 번호가 보입니다.
@@ -5270,6 +5422,34 @@ function EarnedCerts({ attempts }: { attempts: CbtUserAttempt[] }) {
 //      아레나·결제까지 기다린다.
 function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => void }) {
   const [tab, setTab] = useState<'caris' | 'arena' | 'pay'>('caris')
+  const [resetting, setResetting] = useState(false)
+  const [resetDone, setResetDone] = useState(false)
+
+  // 첫 진입 상태로 되돌리기 — 신규 가입 흐름(닉네임 → 국가·지역·연령대)을 실제 경로 그대로 다시 태운다.
+  //   ⚠️ 게스트(익명)에게는 안 쓴다 — 게이트가 정식 회원에게만 도는 구조라 눌러도 아무 화면도 안 뜬다.
+  //   ⚠️ 서버가 루트 전용으로 막는다(지역 1회 변경 잠금을 푸는 조작이라). 여기선 버튼을 숨기지 않고
+  //      눌렀을 때 서버 문구를 그대로 보여준다 — 숨기면 왜 없는지 아무도 모른다.
+  async function resetOnboarding() {
+    if (!confirm(
+      [
+        `${user.name || user.email || '이 회원'} 을 첫 진입 상태로 되돌릴까요?`,
+        '',
+        '· 닉네임·국가·지역·연령대를 비웁니다 → 다음 접속에서 그 화면들을 다시 만납니다',
+        '· 국가·지역 1회 변경권도 되돌아갑니다',
+        '· 코인·아바타·응시 이력·자격증은 그대로입니다',
+      ].join(String.fromCharCode(10)),
+    )) return
+    setResetting(true)
+    try {
+      await callFunction('admin', { action: 'resetOnboarding', uid: user.id })
+      setResetDone(true)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '초기화에 실패했습니다.')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
     <div className="admin-modal-bg" onClick={onClose}>
       {/* 안에 표가 셋(응시 이력·레벨테스트 이력·결제 내역) 들어가므로 넓게 쓴다 — 기본 폭이면 가로 스크롤이 생긴다. */}
@@ -5282,6 +5462,18 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
           가입 {fmtDT(user.created)} · {user.anon ? '게스트' : '가입 유저'}
           {user.arenaRank != null ? ` · ARENA Lv.${user.arenaRank}` : ''}
         </p>
+        {!user.anon && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 12px' }}>
+            <button className="admin-mini" onClick={resetOnboarding} disabled={resetting || resetDone}>
+              {resetting ? '초기화 중…' : resetDone ? '초기화됨' : '첫 진입 상태로 초기화'}
+            </button>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+              {resetDone
+                ? '이 회원이 다음에 접속하면 닉네임 → 국가·지역 화면을 다시 만납니다.'
+                : '신규 가입 흐름(닉네임·국가·지역·연령대)을 다시 태웁니다. 이력·자격증은 그대로.'}
+            </span>
+          </div>
+        )}
         <div className="admin-tabs" style={{ marginBottom: 14 }}>
           <button className={tab === 'caris' ? 'on' : ''} onClick={() => setTab('caris')}>CARIS</button>
           <button className={tab === 'arena' ? 'on' : ''} onClick={() => setTab('arena')}>WORLD ARENA</button>

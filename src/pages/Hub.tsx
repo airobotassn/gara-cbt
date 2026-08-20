@@ -71,6 +71,10 @@ function HubUiIcon({ n, skin }: { n: HubUiIconName; skin: string | null }) {
 }
 
 const DAILY_POINTS = 10
+/** 7일 출석 도장을 채운 날 얹어주는 보너스 코인.
+ *  ⚠️ 권위는 DB 다 — `20260812120000_stamp_7day_cycle.sql` 의 `c_cycle_bonus`. 여기는 표시용 사본이라
+ *     그 값을 고치면 같이 고칠 것(DAILY_POINTS ↔ complete-daily 의 관계와 같다). */
+const STAMP_BONUS = 20
 
 // 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
 // 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
@@ -132,6 +136,16 @@ const EARN_ROWS: { kind: ActivityKind; icon: string }[] = [
   { kind: 'daily_learn', icon: 'book' },
   { kind: 'minigame', icon: 'star' },
   { kind: 'referral', icon: 'gift' },
+]
+
+/** 코인이 들어오는 길 — **이게 전부다.** 미니게임·레벨테스트는 시즌 점수만 주고 코인은 안 준다.
+ *  n=null 은 정해진 값이 없다는 뜻(선물은 보낸 사람이 금액을 정한다).
+ *  ⚠️ 새 코인 지급처를 만들면 여기에도 줄을 추가할 것 — 화면이 '전부'라고 말하는 표라
+ *     빠지면 사용자는 그 경로가 없는 줄 안다. */
+const COIN_ROWS: { key: string; icon: string; n: number | null }[] = [
+  { key: 'daily', icon: 'calendar', n: DAILY_POINTS },
+  { key: 'stamp', icon: 'gift', n: STAMP_BONUS },
+  { key: 'gift', icon: 'coin', n: null },
 ]
 
 export default function Hub() {
@@ -922,9 +936,12 @@ export default function Hub() {
         </Modal>
       )}
 
-      {/* 점수 획득 방법 — 표의 모든 수치는 scoring.ts(원안 반영본) 파생이라 여기서 하드코딩하지 않는다. */}
+      {/* 점수·코인 획득 방법 — 점수 수치는 scoring.ts(원안 반영본) 파생이라 여기서 하드코딩하지 않는다.
+          ⚠️ **두 지갑을 한 표에 섞지 말 것.** 시즌 점수는 랭킹, 코인은 상점이라 쓰는 곳도 버는 길도 다르다.
+             섞으면 "미니게임 하면 코인이 늘겠지" 같은 오해가 그대로 생긴다(미니게임은 점수만 준다). */}
       {modal === 'earn' && (
         <Modal title={t('hub.earn.title')} onClose={() => setModal(null)}>
+          <div className="earn-sec"><Ic n="trophy" s={17} />{t('hub.earn.sec_score')}</div>
           <p className="hub-modal-help earn-lead">{t('hub.earn.lead')}</p>
           <table className="earn-tb">
             <thead><tr><th>{t('hub.earn.col_act')}</th><th>{t('hub.earn.col_pt')}</th></tr></thead>
@@ -951,6 +968,22 @@ export default function Hub() {
             <p className="hub-modal-help">{t('hub.earn.foot', { a: LEVELTEST_MAX.toLocaleString(), b: SEASON_MAX_POINTS.toLocaleString() })}</p>
           </div>
 
+          <div className="earn-sec earn-sec-2"><Ic n="coin" s={17} />{t('hub.earn.sec_coin')}</div>
+          <p className="hub-modal-help earn-lead">{t('hub.earn.coin_lead')}</p>
+          <table className="earn-tb">
+            <thead><tr><th>{t('hub.earn.col_act')}</th><th>{t('hub.earn.col_coin')}</th></tr></thead>
+            <tbody>
+              {COIN_ROWS.map((r) => (
+                <tr key={r.key}>
+                  <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{t(`hub.earn.coin.${r.key}`)}</td>
+                  <td className="earn-v">
+                    {r.n === null ? t('hub.earn.coin_any') : t('hub.earn.coin_pt', { n: r.n })}
+                    <em>{t(`hub.earn.coin_note.${r.key}`)}</em>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Modal>
       )}
 
