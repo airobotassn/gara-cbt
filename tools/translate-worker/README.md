@@ -57,6 +57,12 @@ Start-ScheduledTask -TaskName GaraTranslateWorker
 
 **리눅스(Spring 서버)** — systemd. 절차는 `gara-translate-worker.service` 파일 머리 주석에 있다.
 
+**창은 안 뜬다**(headless). 돌고 있는지 보려면 로그를 본다:
+
+```powershell
+Get-Content $env:LOCALAPPDATAgara-translate-workerworker.log -Tail 20 -Wait
+```
+
 ### ⚠️ 죽었을 때가 설계의 절반이다
 
 워커는 **브라우저가 죽으면 스스로 종료한다.** 살아있는 척 헛도는 게 죽는 것보다 나쁘기 때문이다

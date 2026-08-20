@@ -55,9 +55,12 @@ set SUPABASE_URL=$SupabaseUrl
 set SUPABASE_ANON_KEY=$AnonKey
 set TRANSLATE_WORKER_KEY=$WorkerKey
 cd /d "$repo"
+set LOG=%~dp0worker.log
 :loop
-"$node" "$script"
+echo [%date% %time%] --- start --- >> "%LOG%"
+"$node" "$script" >> "%LOG%" 2>&1
 rem 워커가 끝났다(브라우저 사망·크래시). 5초 쉬고 다시 띄운다.
+echo [%date% %time%] --- exited, restarting in 5s --- >> "%LOG%"
 timeout /t 5 /nobreak >nul
 goto loop
 "@ | Set-Content -Path $wrapper -Encoding ascii
@@ -92,4 +95,5 @@ if (-not $registered) {
 }
 
 Write-Host "  래퍼: $wrapper"
+Write-Host "  로그: $(Join-Path $wrapperDir 'worker.log')"
 Write-Host "  해제: .\install-windows.ps1 -Uninstall"
