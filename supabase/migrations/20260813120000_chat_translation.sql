@@ -8,6 +8,9 @@
 --    · 어떤 언어로 미리 채울지는 **번역 요청 기록**이 정한다(chat_translation_demand).
 --      접속자 언어를 추적하지 않는다 — 눈팅은 번역본을 쓰지 않으므로 셀 이유가 없다.
 --
+--    · 번역은 **우리 기계의 Edge 브라우저**(tools/translate-worker)만 한다. 서버 번역 엔진은 없다
+--      — 외부 계정·카드·API 키가 하나도 필요 없고, 대신 워커가 꺼져 있으면 번역이 안 된다.
+--
 --   ⚠️ 두 테이블 모두 RLS 정책 없음 = service role(Edge Function·워커) 전용.
 --      chat_messages 와 같은 관례다. 클라가 번역본을 직접 쓸 수 있으면
 --      원문 모더레이션을 우회하는 입력 경로가 열린다.
@@ -17,12 +20,13 @@
 
 -- ── 번역 창고 ──────────────────────────────────────────────
 -- (글, 대상언어) → 번역문. 원문이 지워지면 같이 사라진다(cascade).
--- engine 은 기록용이고 조회는 엔진을 구분하지 않는다 — 어느 쪽이 만들었든 같은 값으로 쓴다.
+-- engine 은 지금 'edge' 하나뿐이다(서버 번역 엔진 없음). 컬럼을 남겨둔 건 나중에 다른 엔진을
+-- 붙일 때 어느 쪽이 만든 번역인지 구분하기 위해서다 — 그때 CHECK 만 늘리면 된다.
 create table if not exists chat_translations (
   message_id bigint      not null references chat_messages(id) on delete cascade,
   lang       text        not null,
   body       text        not null,
-  engine     text        not null check (engine in ('edge', 'azure', 'google')),
+  engine     text        not null check (engine = 'edge'),
   created_at timestamptz not null default now(),
   primary key (message_id, lang)
 );
@@ -48,7 +52,7 @@ create index if not exists chat_translation_demand_fresh_idx
 -- ── 원문 언어 ──────────────────────────────────────────────
 -- 한 번 판정하고 저장한다. 두 군데서 쓴다:
 --   ① 독자 언어와 같으면 번역 대상에서 제외(번역할 이유가 없다)
---   ② 번역 호출에 원문 언어를 명시 → 감지 요금·감지 오류를 둘 다 없앤다
+--   ② 워커가 매번 다시 판정하지 않게 한다(같은 글의 원문 언어가 흔들리면 창고가 어긋난다)
 --  ⚠️ chat_messages.lang 은 **작성자의 화면 언어**지 본문 언어가 아니다.
 --     한국어 화면으로 영어를 치는 사람이 있으므로 그 값으로 대신할 수 없다.
 alter table chat_messages add column if not exists src_lang text;

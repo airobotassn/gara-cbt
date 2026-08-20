@@ -251,7 +251,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - `/admin` 서브탭(URL `?tab=`): `dash`(기본, 파라미터 없음) · `subs`(제출답안) · `grading`(채점) · `users` · `questions`(문항) · `notices` · `faq` · `rounds`(회차) · `tickets`(접수·응시권) · `ebooks`(이북) · `admins`. **`Admin.tsx` 3.7k줄 / `AdminLevelTest.tsx` 2.3k줄** — 전체 읽지 말고 서브탭 컴포넌트만 찾아 들어갈 것.
   - ⚠️ **이북 탭은 양쪽 관리자에 하나씩 있다(2026-08-11)** — `?top=caris&tab=ebooks` = CARIS E-BOOK, `?top=level&tab=ebooks` = LEVELTEST E-BOOK. 같은 `EbooksAdmin` 에 `catalog` 만 다르게 넘긴 것이고, 각 화면은 자기 카탈로그 책만 보여주고 등록도 그 카탈로그로 고정한다(등록할 때 카탈로그를 잘못 고를 길이 없다). 순서(↑↓)는 자기 카탈로그 안에서만 바뀌지만 서버로는 **두 카탈로그 합친 전체 ids** 를 보내야 한다(`ebookReorder` 가 받은 순서대로 sort_order 를 다시 매긴다).
 - **게시판 분류는 DB 다 — 관리자가 추가·수정·삭제한다(2026-08-19).** 표 하나(`board_categories`)를 `kind`(`notice`|`faq`)로 가른다. 화면 = 공지·FAQ 관리 머리말의 `분류 관리` 버튼(`Admin.tsx` 의 `BoardCatModal`), 서버 = `admin` 함수의 `boardCatList/Upsert/Delete/Reorder/Move`, 공개 화면은 `src/lib/boardCats.ts` 로 읽는다.
-  - 예전엔 분류가 **코드 상수 + i18n 사전** 두 곳에 박혀 있었다(`NOTICE_CATS`·`FAQ_CATS`, `notice.filter_*`·`faq.cat_*`). 그 사전 키는 **삭제됐다** — 이름의 단일 출처는 이제 `board_categories.label_i18n` 하나다(`notice.filter_all`·`faq.cat_sub`·`faq.cat_empty` 만 남았다).
+  - 예전엔 분류가 **코드 상수 + i18n 사전** 두 곳에 박혀 있었다(`NOTICE_CATS`·`FAQ_CATS`, `notice.filter_*`·`faq.cat_*`). 그 사전 키는 **삭제됐다** — 이름의 단일 출처는 이제 `board_categories.label_i18n` 하나다(`notice.filter_all`·`faq.cat_empty` 만 남았다 — `faq.cat_sub` 는 분류 설명문을 없애면서 2026-08-20 삭제).
   - 이름은 **한국어만 입력**하면 저장할 때 서버가 나머지 5개국어를 자동 번역한다(공지·FAQ 본문과 같은 `translateKoFields`).
     - ⚠️ **Gemini 무료 한도는 API 키가 아니라 구글 프로젝트 단위다** — 키만 여러 개 만들면 지갑이 안 나뉜다. 그래서 용도마다 **프로젝트를 따로** 파고 거기서 키를 하나씩 발급해 시크릿에 꽂는다: 공지·FAQ·분류·회차 = `GEMINI_API_KEY_NOTICE`(`content-translate`) · 시험 문항 = `GEMINI_API_KEY_TRANSLATE`(`translate-agent`) · 이북 = `GEMINI_API_KEY_EBOOK`(`ebook-translate`) · 검색·추천·마이페이지 AI·강의 Q&A·지식베이스 = `GEMINI_API_KEY`(`gara-home-search`).
     - ⚠️ 공지를 문항과 **같은 지갑에 두지 말 것**(2026-08-20 분리). 문항 번역은 한 번에 수백 건이라 그 프로젝트의 **하루 한도를 태우는데**, 그러면 호출 두 번짜리 공지 저장까지 그날 내내 같이 막힌다 — 공지는 남에게 피해를 안 주면서 피해만 보는 쪽이다.
@@ -353,14 +353,9 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - **쓰기는 어느 방이든 로그인만 하면 된다** — 옛 "내 나라 + 전세계만"(`profiles.country_code` 기준 · 서버 `not_my_country` 403 · 프론트 읽기전용 안내) 제한은 2026-08-04 제거했다. 남은 게이트는 로그인 · 배드워드/링크 · OpenAI 모더레이션 · 레이트리밋뿐.
   - ⚠️ **레이트리밋·중복·IP 바닥선 가드는 방을 안 본다(계정 단위 전역)** — 방마다 상한이 리셋되면 방을 옮겨다니며 도배할 수 있다. `chat_post_atomic` 안의 주석과 `tests/db/t-chat-rooms.mjs` 가 이걸 지킨다.
   - ⚠️ 방이 바뀌면 `<ChatBoard key={room}>` 로 **다시 마운트**한다. 목록·커서·폴링 타이머가 한 방을 가리키는 상태 뭉치라, 방만 갈아끼우면 전 방으로 날아간 요청 결과가 새 방 목록에 섞인다.
-- **`/arena` 채팅 번역(2026-08-13)**: 원문이 기본이고, **번역 토글을 켠 사람에게만** 번역본을 보여준다. 한 번 만든 번역본은 `chat_translations` 에 남아 같은 언어 사용자 전원이 나눠 쓴다 → **비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례**한다(중국 방에 한국인이 1명이든 500명이든 번역은 1회). 함수 `chat-translate`(사용자 요청 + 워커의 `pending`/`store`), 어댑터 `_shared/translate.ts`(Azure·구글 두 벌)·`_shared/country-lang.ts`, 워커 `tools/translate-worker/`, 검증 `tests/db/t-chat-translation.mjs`(30건)·`tests/chat-translate-filters.mjs`(33건).
-  - **엔진 셋 — 엣지가 주력, Azure 가 1차 폴백, 구글이 2차.** 엣지(Edge 브라우저 온디바이스 번역)는 **공짜·무제한·145개 언어**라 우리 기계에서 워커가 미리 창고를 채운다. 서버 엔진은 **창고에 없을 때만** — 새 조합의 첫 요청, 워커가 죽었을 때, 엣지가 지원 안 하는 쌍. ⚠️ **서버 엔진을 지우면 안 된다** — 기계 하나가 꺼지면 번역이 통째로 죽고, MS·구글이 자동화를 막으면(회색지대다) 대안이 없다. 평소 거의 안 불려서 무료분 안에서 논다.
-    - **서버 엔진은 체인이다 — `Azure → 구글 → 포기`.** 앞 엔진이 못 채운 건만 다음으로 넘긴다(무료분 소진·장애·지원 안 하는 언어쌍이 전부 여기로 걸린다). **둘 다 실패하면 그냥 번역하지 않는다** — 예외를 던지지 않고 화면에 원문이 남는다. 키가 없는 엔진은 체인에서 조용히 빠지므로 Azure 키만 꽂아도 되고 구글 키만 꽂아도 된다.
-    - ⚠️ **엔진별 차단기가 있다**(연속 3회 실패 → 60초 건너뜀). 없으면 Azure 무료분이 소진된 뒤 **한 달 내내 모든 요청이 Azure 를 먼저 때리고 실패한 다음** 구글로 가서, 사용자가 매번 그 왕복시간을 기다린다.
-    - ⚠️ **초과했을 때가 다르다.** Azure F0(월 200만자)는 **거절**이라 모르는 새 돈이 안 나가고, 구글(월 50만자)은 **자동 과금**($20/100만자)이다. 그래서 Azure 가 1차다. 구글 키를 꽂을 거면 GCP 콘솔에서 **할당량 상한을 같이 걸어야** 안전성이 같아진다(예산 알림은 알려주기만 하고 안 막는다).
-    - ⚠️ **Azure 는 지역 헤더가 필수다**(`Ocp-Apim-Subscription-Region`) — 번역 주소가 전 세계 공용이라 키만으로는 어느 리소스인지 알 수 없어 401 이 난다. 구글은 **v2(Basic)** 를 쓴다(API 키 한 줄. v3 는 서비스 계정 JWT 서명이 필요해 Edge Function 에서 번거롭다).
-    - ⚠️ **원문 언어를 아는 건 반드시 명시한다** — 구글은 미지정 시 **감지를 별도 과금**해서 문자 수가 두 배가 된다(그래서 `src_lang` 저장이 비용 장치이기도 하다). 구글은 `format:'text'` 도 필수 — 기본이 `html` 이라 안 주면 `<`·`&` 가 엔티티로 돌아온다.
-    - ⚠️ **언어 코드 표기가 엔진마다 갈린다** — 우리(=브라우저 Translator API) 표기 `zh-Hans`/`zh-Hant`/`he`/`fil` 을 Azure 는 그대로 받고 구글은 `zh-CN`/`zh-TW`/`iw`/`tl` 로 받는다. `translate.ts` 의 `toEngineLang`/`fromEngineLang` 이 변환하고, **저장은 언제나 우리 표기로 통일**한다(엔진마다 다르게 저장하면 "원문 == 독자 언어" 판정이 흔들려 같은 글을 계속 다시 번역한다).
+- **`/arena` 채팅 번역(2026-08-13)**: 원문이 기본이고, **번역 토글을 켠 사람에게만** 번역본을 보여준다. 한 번 만든 번역본은 `chat_translations` 에 남아 같은 언어 사용자 전원이 나눠 쓴다 → **비용이 사용자 수가 아니라 (방 × 언어) 조합 수에만 비례**한다(중국 방에 한국인이 1명이든 500명이든 번역은 1회). 함수 `chat-translate`(사용자 요청 + 워커의 `pending`/`store`), 판정 `_shared/translate.ts`·`_shared/country-lang.ts`, 워커 `tools/translate-worker/`, 검증 `tests/db/t-chat-translation.mjs`(30건)·`tests/chat-translate-filters.mjs`(33건).
+  - ⛔ **번역 엔진은 엣지 하나뿐이다(2026-08-13 결정).** Azure·구글 어댑터를 만들었다가 걷어냈다 — 둘 다 계정·카드가 필요한데(Azure 는 테넌트 오류로 막히기까지 했다) **엣지는 공짜·무제한·145개 언어**라 우리 기계에서 워커가 다 한다. 외부 API 키가 하나도 없다.
+    - **대가는 둘**: ① 워커가 꺼져 있으면 번역이 안 되고 원문이 남는다 ② 엣지가 지원 안 하는 언어쌍은 영영 못 한다(145개 밖). 나중에 이게 실제로 문제가 되면 어댑터를 다시 붙이면 된다 — `_shared/translate.ts` 에 판정만 남겨두고 호출부는 창고만 보게 해뒀다.
   - ⛔ **미리 전 언어로 번역해두지 않는다.** 190개 선번역은 하루 채팅 3,000건 기준 **하루 51만 행 · 언어팩 1,700개**라 시간보다 **DB 가 먼저 터진다**(구글 무료분으로는 하루 4~8건이 천장). 커버리지(전 언어)는 "요청이 오면 그때 번역한다"로 달성한다.
   - **어떤 언어로 미리 채울지는 `chat_translation_demand`(= 번역 요청 기록, 5일)가 정한다.** 접속자 언어를 추적하지 않는다 — **눈팅은 보이지도 않고 볼 필요도 없다**(번역을 안 켜는 사람은 번역본을 안 쓴다). 첫 요청이 곧 등록이라 별도 등록 UI 도 없다. ⚠️ **수요 갱신은 사용자 요청일 때만** — 워커가 갱신하면 자기가 채운 조합이 자기 때문에 영원히 살아남는다.
   - ⚠️ **대상 언어는 `profiles.country_code` 에서 파생한다(`country-lang.ts`). 요청 파라미터로 받지 않는다.** 언어를 바꿔가며 (방 × 언어) 조합을 무한히 만드는 게 이 기능에서 **비용이 폭발하는 유일한 경로**인데, 국가는 이미 1회만 변경 가능하게 잠겨 있어(`region_changed_at`) 그 잠금을 그대로 물려받는다. 그래서 일일 상한 같은 별도 방어가 없다. 화면 언어(i18n 6개국어)와는 **다른 축**이다.
@@ -368,9 +363,11 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
   - ⚠️ **`chat_messages.lang` 은 작성자의 화면 언어지 본문 언어가 아니다** — 한국어 화면으로 영어를 치는 사람이 있다. 그래서 `src_lang` 이 따로 있고, 한 번 판정하면 다시 안 묻는다(감지 요금·감지 오류를 둘 다 없앤다). ⚠️ **비어 있을 때만 채운다** — 덮어쓰면 같은 글의 원문 언어가 요청마다 흔들려 창고가 어긋난다.
   - ⛔ **사용자 브라우저가 만든 번역을 서버 창고에 올리면 안 된다.** 클라이언트가 조작 가능한 값이라 배드워드·링크·OpenAI 모더레이션을 통째로 우회하는 **새 입력 경로**가 된다(원문은 깨끗한데 번역본만 욕설이면 관리자가 신고를 열어도 멀쩡해 보인다). 워커가 괜찮은 이유는 **우리 기계**라서다.
   - **워커는 판단하지 않는다** — '무엇을 번역할지'(`chat_translation_pending` RPC)도 '무엇을 저장할지'도 `chat-translate` 가 정하고, 워커는 브라우저를 굴리는 손이다. 백엔드를 Spring 으로 옮겨도 `tools/translate-worker/` 는 손대지 않는다. ⚠️ 판정을 워커에도 복사하면 "워커는 번역했는데 서버는 안 한" 어긋남이 난다(동기화 페어를 새로 만들지 말 것).
+  - ⛔ **Playwright 기본 실행 인자가 온디바이스 AI 를 죽인다 — 이걸 모르면 워커가 조용히 헛돈다(2026-08-13 실측).** `--disable-component-update` 가 진짜 범인이다(모델을 배달하는 게 컴포넌트 업데이터다). 이걸 안 빼면 `Translator` 객체는 있는데 **모든 언어쌍이 `unavailable`** 이고 워커는 "저장할 것 없음" 만 반복한다 — 오류가 안 나서 원인을 찾기 어렵다. `--disable-features=…,Translate,OptimizationHints,…` 도 같이 빼야 감지기가 산다. 둘 다 `ignoreDefaultArgs` 로 제거하고, **부팅 때 가용성을 찍어** 다음에 Playwright 가 인자를 바꿔도 바로 드러나게 해뒀다.
+  - ⚠️ **판정 결과는 번역이 필요 없어도 올려보낸다** — 원문 언어 == 독자 언어라 번역을 안 하는 글도 `src_lang` 을 기록해야 한다. 안 그러면 그 글이 **매 사이클 후보로 영원히 다시 올라온다**(서버는 body 없는 항목을 번역본 없이 src_lang 만 기록한다).
   - ⚠️ **워커는 프로필 폴더 고정이 전제다**(`--user-data-dir`). 언어팩은 **쌍(pair)마다** 받는데 안 고정하면 매번 다시 받는다 → **일회성 CI 러너(GitHub Actions)에서는 못 돌린다.** 언어팩 첫 다운로드에 사용자 제스처가 필요해(`NotAllowedError`) Playwright 가 페이지 버튼을 실제로 클릭한다 — 이미 받은 쌍이면 그 클릭이 그냥 지나가므로 **조건 분기 없이 매 배치마다 누른다**.
   - 브라우저 지원(2026-08 실측): Translator API 는 **전세계 21.66%** — Chrome 138+(39개 언어)·**Edge 148+(145개 이상)**·Opera 122+ **데스크톱만**. **모바일 전부 ❌**, 파이어폭스(모질라 공식 반대)·사파리·브레이브·웨일·삼성인터넷 ❌. 크로미움 포크가 안 되는 건 내장 AI 가 **Chromium 에 공개되지 않은 구글 내부 코드**에 의존해서다(엣지가 되는 건 MS 가 자체 모델을 붙였기 때문). → 그래서 이 API 를 **사용자 브라우저에 쓰지 않고 우리 워커에만** 쓴다.
-  - 시크릿(전부 **Supabase 함수 시크릿**): Azure 면 `AZURE_TRANSLATOR_KEY`+`AZURE_TRANSLATOR_REGION`, 구글이면 `GOOGLE_TRANSLATE_KEY`. 공통으로 `TRANSLATE_WORKER_KEY`(아무 랜덤 문자열, 워커와 같은 값). ⚠️ `TRANSLATE_WORKER_KEY` 를 안 걸면 워커 경로가 **아예 닫힌다**(빈 값으로 열리지 않게 막아뒀다). ⚠️ 프론트(`VITE_`)에 넣지 말 것 — 브라우저에 노출되면 남이 우리 무료분을 쓴다.
+  - 시크릿은 `TRANSLATE_WORKER_KEY` **하나뿐**이다(아무 랜덤 문자열, 워커와 같은 값 · Supabase 함수 시크릿). 번역 API 키가 없다. ⚠️ `TRANSLATE_WORKER_KEY` 를 안 걸면 워커 경로가 **아예 닫힌다**(빈 값으로 열리지 않게 막아뒀다). ⚠️ 프론트(`VITE_`)에 넣지 말 것 — 브라우저에 노출되면 남이 우리 무료분을 쓴다.
 - 매칭 없는 경로는 전부 `/` 로 리다이렉트(404 페이지 없음).
 
 ## 구조 맵
@@ -392,8 +389,8 @@ supabase/
                · 허브(get-hub·complete-daily·shop-buy·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
-                      · chat.ts(모더레이션·방) · translate.ts(Azure·구글 어댑터·번역 판정) · country-lang.ts(국가→번역 대상 언어)
-tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 미리 채운다 — 없어도 기능은 돈다(서버 엔진 폴백).
+                      · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
+tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 채운다 — **번역하는 건 이것뿐이라 꺼지면 번역이 안 된다.**
 ```
 
 **DB 테이블**(요약): `profiles`, `questions`(다국어 JSONB·정답 클라 비노출), `test_attempts`(응시 언어·등급변동 스냅샷), `attempt_answers`, `user_level_skill`(레벨별 누적 6축 레이팅), `user_progress`(현재 등급=레벨).
@@ -614,7 +611,7 @@ SEB 는 뒤로가기·새로고침·주소창·앱전환이 다 막혀 있고 �
 - `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
 - **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 엑심베이 `status_url` 은 서버가 `/ready` 에 실어 보내므로 대시보드 설정이 필요 없다 — 값은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<PAYMENTS_WEBHOOK_SECRET>`.
 - **SEB 인계 함수 배포**: `npx.cmd supabase functions deploy seb-handoff` (플래그 없이 — `verify_jwt` 켠 채로 맞다). SEB 안에서도 anon 키가 실려 오므로 공개 예외가 필요 없다. `--no-verify-jwt` 로 올리지 말 것.
-- **채팅 번역 배포**: `npx.cmd supabase functions deploy chat-translate` (플래그 없이). **워커도 anon 키를 실어 보내므로 공개 예외가 필요 없다** — 워커 권한은 함수 안의 `x-translate-worker-key` 가 판정한다(서비스 롤 키를 워커에 두지 않는다). 시크릿: `AZURE_TRANSLATOR_KEY`+`AZURE_TRANSLATOR_REGION`(또는 `GOOGLE_TRANSLATE_KEY`)·`TRANSLATE_WORKER_KEY`. ⚠️ 옛 `chat-edit`·`chat-delete` 는 삭제됐으니 대시보드에 남아 있으면 지울 것(코드가 없어도 옛 배포본은 계속 뜬다).
+- **채팅 번역 배포**: `npx.cmd supabase functions deploy chat-translate` (플래그 없이). **워커도 anon 키를 실어 보내므로 공개 예외가 필요 없다** — 워커 권한은 함수 안의 `x-translate-worker-key` 가 판정한다(서비스 롤 키를 워커에 두지 않는다). 시크릿은 `TRANSLATE_WORKER_KEY` 하나. ⚠️ 옛 `chat-edit`·`chat-delete` 는 삭제됐으니 대시보드에 남아 있으면 지울 것(코드가 없어도 옛 배포본은 계속 뜬다).
 - **`GEMINI_API_KEY` 는 Supabase 함수 시크릿**(프론트 금지). 키 무효면 추천이 500.
 - **OAuth localhost 튕김** = Supabase Site URL 설정 문제. **모바일 인앱 브라우저 차단** = 구글 정책(기본 브라우저로 열어야 함).
 - **쿨다운(3일 1회)** 토글 = `start-test` 의 `COOLDOWN_ENABLED`. 게스트는 원래 쿨다운 없음.

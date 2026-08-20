@@ -61,6 +61,10 @@ interface Tomb {
   body: string | null
 }
 
+// 번역이 아직 없을 때 다시 물어보는 간격. 워커가 1초마다 도니 두 번이면 대부분 잡힌다.
+//  ⚠️ 무한히 묻지 않는다 — 워커가 꺼져 있으면 영영 안 오므로 여기서 끊고 원문을 남긴다.
+const RETRY_MS = [1500, 3000]
+
 const MAX_LEN = 500
 const POLL_MIN_MS = 3500
 const POLL_MAX_MS = 4500
@@ -147,6 +151,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const tempIdRef = useRef(-1)
   // 폴링 tick 은 [room] 으로 한 번만 묶여서 최신 state 를 못 본다 — 토글 상태를 ref 로 들고 간다.
   const trOnRef = useRef(false)
+  // 재시도가 언마운트 뒤에도 계속 도는 걸 막는다(방을 옮기면 이 컴포넌트가 통째로 새로 뜬다).
+  const aliveRef = useRef(true)
+  // 폴링 tick 이 부를 최신 fetchWithRetry — 함수가 매 렌더 새로 만들어지므로 ref 로 건넨다.
+  const fetchWithRetryRef = useRef<(ids: number[]) => Promise<number[] | null>>(async () => [])
 
   rowsRef.current = rows
 
@@ -171,8 +179,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
    *     임의로 정해주면 온보딩을 건너뛴 사람이 엉뚱한 언어로 고정된다.
    */
   const fetchTranslations = useCallback(
-    async (ids: number[]): Promise<boolean> => {
-      if (ids.length === 0) return true
+    async (ids: number[]): Promise<number[] | null> => {
+      if (ids.length === 0) return []
       try {
         const res = await callFunction<{ lang: string; items: { id: number; body: string }[] }>(
           'chat-translate',
@@ -185,20 +193,49 @@ export default function ChatBoard({ room = 'global' }: Props) {
             return next
           })
         }
-        return true
+        // 안 온 id 를 돌려준다 — 재시도가 그것만 다시 묻는다.
+        const got = new Set(res.items.map((it) => it.id))
+        return ids.filter((id) => !got.has(id))
       } catch (e) {
         const code = e instanceof Error ? e.message : 'error'
         if (code === 'country_required') {
           navigate('/onboarding')
-          return false
+          return null
         }
         showToast(errMsg(code === 'error' ? 'translate_failed' : code))
-        return false
+        return null
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [room, navigate],
   )
+
+  /**
+   * 안 온 것만 몇 번 더 물어본다.
+   *
+   *  ⚠️ 왜 다시 묻나 — **서버가 브라우저에게 먼저 말을 걸 수 없어서**다. 어떤 (방 × 언어) 조합을
+   *     처음 켜면 창고가 비어 있고, 그 요청 자체가 워커에게 "이거 채워라"는 수요 등록이 된다.
+   *     워커는 우리 기계에서 1초마다 돌지만 그 결과를 브라우저로 밀어줄 길이 없다.
+   *  ⚠️ 이 지연을 겪는 사람은 **(방 × 언어) 조합당 한 명**뿐이다. 그 뒤 모두는 창고 히트라 즉시다.
+   *  ⚠️ Supabase Realtime 을 쓰면 밀어줄 수 있지만 **그쪽에 묶인 부품이 하나 생긴다**(Spring 이관 예정).
+   *     다시 묻는 방식은 HTTP 요청일 뿐이라 백엔드를 갈아도 주소만 바뀐다.
+   */
+  const fetchWithRetry = useCallback(
+    async (ids: number[]): Promise<number[] | null> => {
+      let missing = await fetchTranslations(ids)
+      for (const wait of RETRY_MS) {
+        if (missing == null || missing.length === 0) break
+        await new Promise((r) => window.setTimeout(r, wait))
+        // 방을 옮겼거나 번역을 껐으면 그만둔다 — 전 방 결과가 새 화면에 섞이면 안 된다.
+        if (!aliveRef.current || !trOnRef.current) break
+        missing = await fetchTranslations(missing)
+      }
+      return missing
+    },
+    [fetchTranslations],
+  )
+  // 폴링 tick 이 항상 최신 함수를 부르도록 이펙트에서 갈아끼운다(렌더 중 ref 대입 금지).
+  useEffect(() => { fetchWithRetryRef.current = fetchWithRetry }, [fetchWithRetry])
 
   // ⚠️ trOnRef 는 여기서만 바꾼다(trOn 을 바꾸는 유일한 곳이라 렌더 중 대입이 필요 없다).
   //    폴링 tick 은 [room] 으로 한 번만 묶여 최신 state 를 못 보므로 ref 로 건네야 한다.
@@ -212,13 +249,21 @@ export default function ChatBoard({ room = 'global' }: Props) {
     setTrBusy(true)
     // 목록은 그대로 둔 채 기다린다 — 비우면 읽던 글이 사라진다.
     const ids = rowsRef.current.filter((r) => !r.sending && r.body != null).map((r) => r.id)
-    const ok = await fetchTranslations(ids)
-    if (ok) {
-      trOnRef.current = true
+    // ⚠️ 첫 조회 결과를 보기 전에 켠 것으로 표시한다 — fetchWithRetry 안의 재시도가 trOnRef 를 보고
+    //    이어갈지 정하기 때문이다. 여기서 안 켜면 재시도가 첫 대기에서 바로 멈춘다.
+    trOnRef.current = true
+    const missing = await fetchWithRetry(ids)
+    if (missing == null) {
+      // 로그인·국가 문제 등 재시도해도 소용없는 실패 — 토글을 켜지 않는다.
+      trOnRef.current = false
+    } else {
       setTrOn(true)
     }
     setTrBusy(false)
   }
+
+  // 언마운트되면 재시도 루프를 멈춘다.
+  useEffect(() => () => { aliveRef.current = false }, [])
 
   // 상대 시간이 흐르도록 30초마다 갱신(방금 전 → N분 전).
   useEffect(() => {
@@ -287,7 +332,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
               if (atBottom && el) el.scrollTop = el.scrollHeight
             })
             // 번역을 켜둔 상태면 새 글도 이어서 번역한다. 워커가 이미 채워놨으면 창고 히트라 즉시 온다.
-            if (trOnRef.current) void fetchTranslations(res.messages.map((m) => m.id))
+            if (trOnRef.current) void fetchWithRetryRef.current(res.messages.map((m) => m.id))
           }
         }
         const visible = rowsRef.current.filter((r) => !r.sending).slice(-200)
@@ -345,7 +390,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
           if (el) el.scrollTop = el.scrollHeight - prevHeight
         })
         // 위로 불러온 옛 글도 켜져 있으면 같이 번역한다.
-        if (trOnRef.current) void fetchTranslations(res.messages.map((m) => m.id))
+        if (trOnRef.current) void fetchWithRetryRef.current(res.messages.map((m) => m.id))
       } else {
         setHasMore(false)
       }
@@ -353,7 +398,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
       /* noop */
     }
     setLoadingOlder(false)
-  }, [loadingOlder, loading, hasMore, rows, room, fetchTranslations])
+  }, [loadingOlder, loading, hasMore, rows, room])
 
   function onScroll() {
     const el = listRef.current

@@ -5,8 +5,8 @@
 //  · sameLang        — 원문 == 독자 언어면 번역 안 함. 잘못 판정하면 헛돈 or 안 읽히는 글
 //  · langForCountry  — 대상 언어의 유일한 출처. 계정에 언어 컬럼을 안 두는 이유가 여기 있다
 //
-// ⚠️ Deno 함수 파일을 bun 이 직접 import 한다. translate.ts 의 Deno.env 는 함수 안에만 있어서
-//    모듈 로드에는 걸리지 않는다(activeEngine 을 부르지 않는 한).
+// ⚠️ Deno 함수 파일을 bun 이 직접 import 한다. 두 파일 다 Deno 전역을 안 쓰므로 그냥 로드된다
+//    (서버 번역 엔진을 걷어낸 뒤로 translate.ts 에는 판정 함수 하나만 남았다).
 import { isTranslatable } from '../supabase/functions/_shared/translate.ts';
 import { langForCountry, sameLang } from '../supabase/functions/_shared/country-lang.ts';
 

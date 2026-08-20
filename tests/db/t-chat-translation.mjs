@@ -72,7 +72,7 @@ rec('chat_messages.src_lang 존재', srcCol?.data_type, 'text');
 
 // --- (2) 같은 (글, 언어) 두 번 저장 불가 ---
 const m1 = await put('CN', '你好朋友们');
-await db.query(`insert into chat_translations(message_id, lang, body, engine) values ($1,'ko','안녕','google')`, [m1]);
+await db.query(`insert into chat_translations(message_id, lang, body, engine) values ($1,'ko','안녕','edge')`, [m1]);
 let dupErr = null;
 try {
   await db.query(`insert into chat_translations(message_id, lang, body, engine) values ($1,'ko','안녕2','edge')`, [m1]);
@@ -91,7 +91,7 @@ let engErr = null;
 try {
   await db.query(`insert into chat_translations(message_id, lang, body, engine) values ($1,'ja','こんにちは','gpt')`, [m1]);
 } catch (e) { engErr = e.message || ''; }
-rec('engine 은 edge|google 만 허용', engErr != null, true);
+rec('engine 은 edge 만 허용', engErr != null, true);
 
 // --- (3) 원문이 지워지면 번역본도 사라진다 ---
 const m2 = await put('CN', '这是要删除的消息');
