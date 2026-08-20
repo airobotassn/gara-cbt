@@ -64,6 +64,9 @@ interface Tomb {
 // 번역이 아직 없을 때 다시 물어보는 간격. 워커가 1초마다 도니 두 번이면 대부분 잡힌다.
 //  ⚠️ 무한히 묻지 않는다 — 워커가 꺼져 있으면 영영 안 오므로 여기서 끊고 원문을 남긴다.
 const RETRY_MS = [1500, 3000]
+// 폴링(4초)에서 한 글을 최대 몇 번까지 다시 물어보나. 5번 ≈ 20초.
+//  ⚠️ 무제한이면 워커가 못 하는 글을 영원히 다시 묻는다.
+const TR_MAX_TRIES = 5
 
 const MAX_LEN = 500
 const POLL_MIN_MS = 3500
@@ -153,8 +156,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const trOnRef = useRef(false)
   // 재시도가 언마운트 뒤에도 계속 도는 걸 막는다(방을 옮기면 이 컴포넌트가 통째로 새로 뜬다).
   const aliveRef = useRef(true)
-  // 폴링 tick 이 부를 최신 fetchWithRetry — 함수가 매 렌더 새로 만들어지므로 ref 로 건넨다.
-  const fetchWithRetryRef = useRef<(ids: number[]) => Promise<number[] | null>>(async () => [])
+  // 폴링 tick 이 "아직 번역 안 온 글"을 추려내려면 지금까지 받은 번역 Map 을 봐야 한다.
+  const trRef = useRef<Map<number, string>>(new Map())
+  // 글마다 몇 번이나 물어봤나 — 워커가 못 하는 글(감지 실패 등)을 영원히 다시 묻지 않기 위해서다.
+  const trTriesRef = useRef<Map<number, number>>(new Map())
 
   rowsRef.current = rows
 
@@ -190,6 +195,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
           setTr((prev) => {
             const next = new Map(prev)
             for (const it of res.items) next.set(it.id, it.body)
+            trRef.current = next
             return next
           })
         }
@@ -234,9 +240,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
     },
     [fetchTranslations],
   )
-  // 폴링 tick 이 항상 최신 함수를 부르도록 이펙트에서 갈아끼운다(렌더 중 ref 대입 금지).
-  useEffect(() => { fetchWithRetryRef.current = fetchWithRetry }, [fetchWithRetry])
-
   // ⚠️ trOnRef 는 여기서만 바꾼다(trOn 을 바꾸는 유일한 곳이라 렌더 중 대입이 필요 없다).
   //    폴링 tick 은 [room] 으로 한 번만 묶여 최신 state 를 못 보므로 ref 로 건네야 한다.
   async function toggleTranslate() {
@@ -331,8 +334,21 @@ export default function ChatBoard({ room = 'global' }: Props) {
             requestAnimationFrame(() => {
               if (atBottom && el) el.scrollTop = el.scrollHeight
             })
-            // 번역을 켜둔 상태면 새 글도 이어서 번역한다. 워커가 이미 채워놨으면 창고 히트라 즉시 온다.
-            if (trOnRef.current) void fetchWithRetryRef.current(res.messages.map((m) => m.id))
+          }
+        }
+        // 번역을 켜둔 동안은 **아직 못 받은 글을 계속 채운다**(새 글 + 워커가 늦게 채운 옛 글).
+        //  ⚠️ 이게 없으면 첫 재시도(1.5·3초) 안에 워커가 못 끝낸 글이 영영 원문으로 남는다 —
+        //     사용자가 토글을 껐다 켜야 나오던 버그(2026-08-13). 30건이면 워커가 몇 초 더 걸린다.
+        //  ⚠️ 시도 횟수를 세서 끊는다. 워커가 못 하는 글(원문 언어 판정 실패 등)은 영영 안 오는데
+        //     안 끊으면 4초마다 그 목록을 계속 다시 묻는다.
+        if (trOnRef.current) {
+          const want = rowsRef.current
+            .filter((r) => !r.sending && r.body != null && !trRef.current.has(r.id))
+            .filter((r) => (trTriesRef.current.get(r.id) ?? 0) < TR_MAX_TRIES)
+            .map((r) => r.id)
+          if (want.length) {
+            for (const id of want) trTriesRef.current.set(id, (trTriesRef.current.get(id) ?? 0) + 1)
+            void fetchTranslations(want)
           }
         }
         const visible = rowsRef.current.filter((r) => !r.sending).slice(-200)
@@ -390,7 +406,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
           if (el) el.scrollTop = el.scrollHeight - prevHeight
         })
         // 위로 불러온 옛 글도 켜져 있으면 같이 번역한다.
-        if (trOnRef.current) void fetchWithRetryRef.current(res.messages.map((m) => m.id))
+        // 위로 불러온 옛 글은 따로 안 부른다 — 위 폴링이 "못 받은 것 전부"를 채우므로 곧 따라온다.
       } else {
         setHasMore(false)
       }
