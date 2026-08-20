@@ -19,9 +19,14 @@
 import { chromium } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { homedir } from 'node:os'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PROFILE_DIR = process.env.TRANSLATE_PROFILE_DIR ?? join(HERE, '.edge-profile')
+// ⛔ **프로필은 저장소 밖에 둔다.** 안에 두면 Vite 개발서버의 파일 감시자가 이 폴더를 지켜보다가
+//    브라우저가 잠근 파일(Network/Cookies 등)에서 EBUSY 로 죽는다 — 개발서버가 통째로 못 뜬다.
+//    수 GB 짜리 언어팩이 소스 트리에 쌓이는 것도 곤란하다(.gitignore 로 가리는 건 그다음 문제다).
+const PROFILE_DIR =
+  process.env.TRANSLATE_PROFILE_DIR ?? join(homedir(), 'AppData', 'Local', 'gara-translate-profile')
 const WARM_PAGE = 'file://' + join(HERE, 'warm.html').replace(/\\/g, '/')
 
 const SUPABASE_URL = process.env.SUPABASE_URL

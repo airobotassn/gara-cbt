@@ -21,7 +21,7 @@ node tools/translate-worker/worker.mjs
 
 | 환경변수 | 기본값 | |
 |---|---|---|
-| `TRANSLATE_PROFILE_DIR` | `tools/translate-worker/.edge-profile` | ⚠️ **고정 필수** — 바뀌면 언어팩을 매번 다시 받는다 |
+| `TRANSLATE_PROFILE_DIR` | `%LOCALAPPDATA%\gara-translate-profile` | ⚠️ **고정 필수** — 바뀌면 언어팩을 매번 다시 받는다. **저장소 안에 두지 말 것**(Vite 감시자가 EBUSY 로 죽는다) |
 | `TRANSLATE_TICK_MS` | `1000` | 프론트 재시도가 1.5초부터라 그 안에 채워야 첫 요청자가 바로 본다 |
 | `TRANSLATE_BATCH` | `500` | 한 사이클 상한. 밀린 백로그가 클 때를 위한 안전장치 |
 
