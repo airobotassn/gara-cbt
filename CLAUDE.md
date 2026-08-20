@@ -253,6 +253,9 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 - **게시판 분류는 DB 다 — 관리자가 추가·수정·삭제한다(2026-08-19).** 표 하나(`board_categories`)를 `kind`(`notice`|`faq`)로 가른다. 화면 = 공지·FAQ 관리 머리말의 `분류 관리` 버튼(`Admin.tsx` 의 `BoardCatModal`), 서버 = `admin` 함수의 `boardCatList/Upsert/Delete/Reorder/Move`, 공개 화면은 `src/lib/boardCats.ts` 로 읽는다.
   - 예전엔 분류가 **코드 상수 + i18n 사전** 두 곳에 박혀 있었다(`NOTICE_CATS`·`FAQ_CATS`, `notice.filter_*`·`faq.cat_*`). 그 사전 키는 **삭제됐다** — 이름의 단일 출처는 이제 `board_categories.label_i18n` 하나다(`notice.filter_all`·`faq.cat_sub`·`faq.cat_empty` 만 남았다).
   - 이름은 **한국어만 입력**하면 저장할 때 서버가 나머지 5개국어를 자동 번역한다(공지·FAQ 본문과 같은 `translateKoFields`).
+    - ⚠️ **Gemini 무료 한도는 API 키가 아니라 구글 프로젝트 단위다** — 키만 여러 개 만들면 지갑이 안 나뉜다. 그래서 용도마다 **프로젝트를 따로** 파고 거기서 키를 하나씩 발급해 시크릿에 꽂는다: 공지·FAQ·분류·회차 = `GEMINI_API_KEY_NOTICE`(`content-translate`) · 시험 문항 = `GEMINI_API_KEY_TRANSLATE`(`translate-agent`) · 이북 = `GEMINI_API_KEY_EBOOK`(`ebook-translate`) · 검색·추천·마이페이지 AI·강의 Q&A·지식베이스 = `GEMINI_API_KEY`(`gara-home-search`).
+    - ⚠️ 공지를 문항과 **같은 지갑에 두지 말 것**(2026-08-20 분리). 문항 번역은 한 번에 수백 건이라 그 프로젝트의 **하루 한도를 태우는데**, 그러면 호출 두 번짜리 공지 저장까지 그날 내내 같이 막힌다 — 공지는 남에게 피해를 안 주면서 피해만 보는 쪽이다.
+    - ⚠️ 한도가 모자라서 **같은 용도로 프로젝트를 또 파는 건 하지 말 것.** 용도별 분리는 정당하지만 그건 무료 한도 우회로 보이고 계정 단위 제재 대상이다. 모자라면 그 프로젝트만 유료 등급으로 올린다.
   - ⛔ **분류를 지워도 글은 안 지운다.** 글의 `category` 값(고아 키)이 그대로 남고, 공개 화면은 `.in('category', 지금 있는 키)` 로 걸러 **안 보이게만** 하며, 관리자 목록에는 '미분류' 로 모여 다시 지정할 수 있다. 그래서 `notices.category`·`faqs.category` 에 **FK 를 걸지 않는다**(걸면 삭제가 막히거나 글이 딸려 지워진다). 같은 키로 다시 만들면 그 글들이 그대로 돌아온다 — 그게 이 설계의 되돌리기다.
   - ⚠️ 삭제 전에 **몇 건이 딸려 내려가는지** 먼저 보여준다(`boardCatList` 가 분류마다 글 수를 같이 준다). 안 보여주면 관리자가 공지 12건을 화면에서 지운 줄 모른다.
   - ⚠️ **키는 만들 때만 정한다.** 나중에 바꾸면 그 분류를 쓰던 글이 통째로 고아가 된다 — 화면도 서버도 수정 시 key 를 무시한다.

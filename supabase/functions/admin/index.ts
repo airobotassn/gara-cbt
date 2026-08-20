@@ -264,9 +264,19 @@ async function gradeAnswer(admin: any, body: any, actor: string) {
   return json({ ok: true })
 }
 
-// ---------- Gemini 텍스트 번역 (공지/콘텐츠용 — 기존 GEMINI_API_KEY 재사용) ----------
-// 번역은 전용 키(GEMINI_API_KEY_TRANSLATE) 우선 — 라이브 검색(route-query)/추천이 쓰는 공용 키 quota 를 안 먹도록.
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY_TRANSLATE') ?? Deno.env.get('GEMINI_API_KEY')
+// ---------- Gemini 텍스트 번역 (공지·FAQ·게시판 분류·시험 회차) ----------
+// 여기서 번역하는 것들은 한 건에 호출 1~2회뿐이지만, **지갑은 따로 써야 한다**(2026-08-20).
+//
+// ⚠️ 구글 무료 한도는 **API 키가 아니라 구글 프로젝트 단위**다. 그래서 키를 나누는 게 아니라
+//    프로젝트를 나눠야 실제로 갈린다(우리는 프로젝트별로 키를 하나씩 발급해 시크릿에 꽂는다).
+// ⚠️ 예전엔 문항 번역(translate-questions)과 `GEMINI_API_KEY_TRANSLATE` 를 같이 썼다. 문항은 한 번에
+//    수백 건이라 그 프로젝트의 **하루치를 태울 수 있는데**, 그러면 호출 두 번짜리 공지 저장까지
+//    그날 내내 같이 막혔다. 공지는 남에게 피해를 안 주면서 피해만 보는 쪽이라 떼어냈다.
+// 폴백은 키를 아직 안 꽂았을 때 동작만 유지하기 위한 것이다 — 운영에서는 NOTICE 키를 둘 것.
+const GEMINI_API_KEY =
+  Deno.env.get('GEMINI_API_KEY_NOTICE') ??
+  Deno.env.get('GEMINI_API_KEY_TRANSLATE') ??
+  Deno.env.get('GEMINI_API_KEY')
 const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-3.1-flash-lite'
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const TARGET_LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
@@ -513,7 +523,7 @@ async function noticeUpsert(admin: any, body: any) {
   } catch (e) {
     translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
   }
-  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_NOTICE) 미설정 — 한국어로만 저장됨'
 
   const row: Record<string, unknown> = {
     category: n.category ?? 'guide',
@@ -590,7 +600,7 @@ async function faqUpsert(admin: any, body: any) {
   } catch (e) {
     translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
   }
-  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_NOTICE) 미설정 — 한국어로만 저장됨'
 
   const sortNum = Number(f.sort)
   const hasSort = Number.isFinite(sortNum)
@@ -710,7 +720,7 @@ async function boardCatUpsert(admin: any, body: any) {
   } catch (e) {
     translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
   }
-  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_NOTICE) 미설정 — 한국어로만 저장됨'
 
   const patch: Record<string, unknown> = {
     label_i18n,
@@ -846,7 +856,7 @@ async function examRoundUpsert(admin: any, body: any) {
   } catch (e) {
     translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
   }
-  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_TRANSLATE) 미설정 — 한국어로만 저장됨'
+  if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_NOTICE) 미설정 — 한국어로만 저장됨'
 
   const kind = r.kind === 'rolling' ? 'rolling' : 'regular'
   const sortNum = Number(r.sort)
