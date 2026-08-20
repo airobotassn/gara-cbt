@@ -24,6 +24,7 @@ node tools/translate-worker/worker.mjs
 | `TRANSLATE_PROFILE_DIR` | `%LOCALAPPDATA%\gara-translate-profile` | ⚠️ **고정 필수** — 바뀌면 언어팩을 매번 다시 받는다. **저장소 안에 두지 말 것**(Vite 감시자가 EBUSY 로 죽는다) |
 | `TRANSLATE_TICK_MS` | `1000` | 프론트 재시도가 1.5초부터라 그 안에 채워야 첫 요청자가 바로 본다 |
 | `TRANSLATE_BATCH` | `500` | 한 사이클 상한. 밀린 백로그가 클 때를 위한 안전장치 |
+| `TRANSLATE_HEADED` | (없음) | `1` 이면 브라우저 창을 띄운다. 기본은 headless — 서버에서 화면 없이 돌아야 하기 때문 |
 
 `TRANSLATE_WORKER_KEY` 는 Supabase 함수 시크릿에도 같은 값으로 넣어야 한다.
 **안 넣으면 워커 경로가 아예 닫힌다**(빈 값으로 열리지 않게 막아뒀다).
@@ -35,12 +36,32 @@ npx.cmd supabase secrets set TRANSLATE_WORKER_KEY=<값>
 ## 돌아가는 방식
 
 ```
-2초마다 → 서버에 "번역할 것 있나?"(pending)
+1초마다 → 서버에 "번역할 것 있나?"(pending)
         → 없으면 그냥 잠   ← 대부분의 사이클이 여기서 끝난다
         → 있으면 브라우저에서 번역 → 서버에 저장(store)
 ```
 
 **판단은 전부 서버가 한다.** 무엇을 번역할지(`chat_translation_pending` RPC)도, 무엇을 저장할지도 `chat-translate` 함수가 정한다. 워커는 브라우저를 굴리는 손이라 **백엔드를 Spring 으로 옮겨도 이 폴더는 손대지 않는다.**
+
+## 서버에서 자동으로 띄우기
+
+**사람이 브라우저를 켜지 않는다.** 부팅 시 이 프로세스만 뜨면 되고, Edge 는 코드가 띄운다.
+headless 로 도니 로그인 세션도 화면도 필요 없다(실측 확인).
+
+**윈도우** — 작업 스케줄러에 등록
+```powershell
+cd tools	ranslate-worker
+.install-windows.ps1 -SupabaseUrl https://xxx.supabase.co -AnonKey eyJ... -WorkerKey gara-worker-...
+Start-ScheduledTask -TaskName GaraTranslateWorker
+```
+
+**리눅스(Spring 서버)** — systemd. 절차는 `gara-translate-worker.service` 파일 머리 주석에 있다.
+
+### ⚠️ 죽었을 때가 설계의 절반이다
+
+워커는 **브라우저가 죽으면 스스로 종료한다.** 살아있는 척 헛도는 게 죽는 것보다 나쁘기 때문이다
+— 감시자가 "돌고 있네" 하고 안 건드린다. 종료하면 감시자(작업 스케줄러 / `Restart=always`)가
+새로 띄운다. 이 둘이 한 쌍이라 **감시자 없이 워커만 돌리면 복구가 없다.**
 
 ## ⚠️ 조용히 헛도는 함정 (2026-08-13 실측)
 
@@ -64,7 +85,7 @@ Playwright 버전이 올라가면 저 인자 문자열이 바뀔 수 있고, 그
 
 ## 알아둘 것
 
-- **첫 실행은 창이 뜬다**(`headless: false`). 언어팩 다운로드가 사용자 동작을 요구해서, Playwright 가 페이지 버튼을 실제로 클릭한다. 이미 받아둔 쌍이면 그 클릭은 그냥 지나간다
+- **기본이 headless 다.** 언어팩 다운로드가 사용자 동작을 요구하지만 Playwright 의 클릭이 그 조건을 채운다(headless 에서도 통과). 눈으로 보려면 `TRANSLATE_HEADED=1`
 - **워커가 꺼져 있으면 새 번역이 안 생긴다.** 이미 창고에 있는 건 계속 보이고, 없는 건 원문으로 남는다(오류는 안 난다)
 - **일회성 CI 러너(GitHub Actions 등)에서는 못 돌린다** — 매 실행마다 언어팩을 다시 받는다
 - **MS 로 요청이 나가지 않는다**(온디바이스). 언어팩 다운로드만 쌍당 1회. 호출 횟수 제한·과금 없음

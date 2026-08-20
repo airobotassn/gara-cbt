@@ -11,8 +11,14 @@
 //   ⚠️ 꺼져 있으면 새 번역이 안 생긴다. 이미 창고에 있는 건 계속 보이고, 없는 건 원문으로 남는다
 //      (오류는 안 난다 — 채팅 자체는 정상이다).
 //
-//   실행:
-//     SUPABASE_URL=... SUPABASE_ANON_KEY=... TRANSLATE_WORKER_KEY=... node tools/translate-worker/worker.mjs
+//   실행: SUPABASE_URL=… SUPABASE_ANON_KEY=… TRANSLATE_WORKER_KEY=… node tools/translate-worker/worker.mjs
+//
+//   ⚠️ **사람이 브라우저를 켜지 않는다.** Playwright 가 Edge 를 직접 띄운다. 서버가 부팅되면
+//      이 프로세스만 뜨면 되고(작업 스케줄러·systemd), 브라우저는 코드가 알아서 켠다.
+//   ⚠️ 기본이 headless 다 — 로그인 세션이 없는 서버에서도 떠야 하기 때문이다(실측: headless 에서도
+//      번역된다). 눈으로 보고 싶으면 TRANSLATE_HEADED=1.
+//   ⚠️ **브라우저가 죽으면 프로세스를 끝낸다.** 살아있는 척 헛도는 게 죽는 것보다 나쁘다 —
+//      감시자가 "돌고 있네" 하고 안 건드리기 때문이다. 종료하면 감시자가 새로 띄운다.
 //
 //   ⚠️ 프로필 폴더(--user-data-dir)를 고정하는 게 전제다. 안 하면 실행할 때마다 언어팩을
 //      처음부터 다시 받는다. 그래서 일회성 CI 러너(GitHub Actions 등)에서는 못 돌린다.
@@ -34,6 +40,7 @@ const ANON_KEY = process.env.SUPABASE_ANON_KEY
 const WORKER_KEY = process.env.TRANSLATE_WORKER_KEY
 // 1초 — 채팅 폴링이 4초고 프론트 재시도가 1.5초부터라 그 안에 잡히게 한다.
 // 늘리면 첫 요청자가 재시도(1.5초·3초)를 다 쓰고도 못 받아 원문으로 남는다. 공짜라 아낄 이유가 없다.
+const HEADED = process.env.TRANSLATE_HEADED === '1'
 const TICK_MS = Number(process.env.TRANSLATE_TICK_MS ?? 1000)
 const BATCH = Number(process.env.TRANSLATE_BATCH ?? 500)
 
@@ -77,10 +84,14 @@ async function main() {
 
   const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
     channel: 'msedge', // ⚠️ 크롬(39개 언어) 말고 엣지(145개 이상)
-    headless: false,   // 첫 언어팩 다운로드가 확실히 돌도록 창을 띄운 채 시작한다
+    headless: !HEADED, // 서버(세션 없음)에서도 떠야 한다. 눈으로 보려면 TRANSLATE_HEADED=1
     ignoreDefaultArgs: [PW_DISABLE_FEATURES, '--disable-component-update'],
     args: ['--no-first-run', '--no-default-browser-check'],
   })
+  // 브라우저가 죽으면(크래시·강제 종료) 여기서 잡아 프로세스를 끝낸다.
+  let browserDead = false
+  ctx.on('close', () => { browserDead = true })
+
   const page = ctx.pages()[0] ?? (await ctx.newPage())
   await page.goto(WARM_PAGE)
 
@@ -107,6 +118,10 @@ async function main() {
   process.on('SIGTERM', () => { stopping = true })
 
   while (!stopping) {
+    if (browserDead || page.isClosed()) {
+      console.error('[worker] 브라우저가 죽었습니다. 프로세스를 종료합니다 — 감시자가 다시 띄웁니다.')
+      process.exit(1)
+    }
     try {
       const { items: jobs } = await callFn({ action: 'pending', limit: BATCH })
       if (!jobs || jobs.length === 0) {
@@ -130,8 +145,14 @@ async function main() {
       }
       if (out.failedPairs?.length) console.log(`[worker] 미지원 쌍: ${out.failedPairs.join(', ')}`)
     } catch (e) {
-      // 한 번 실패했다고 죽지 않는다 — 다음 tick 에 다시 시도한다.
-      console.error('[worker]', e instanceof Error ? e.message : e)
+      const msg = e instanceof Error ? e.message : String(e)
+      // ⚠️ 브라우저가 닫힌 뒤의 오류는 재시도해도 영원히 같은 오류다 — 그때는 끝내야 한다.
+      //    네트워크 오류처럼 회복 가능한 것만 다음 tick 에 다시 시도한다.
+      if (browserDead || page.isClosed() || /Target (page|closed)|browser has been closed|Target closed/i.test(msg)) {
+        console.error('[worker] 브라우저 연결이 끊겼습니다:', msg)
+        process.exit(1)
+      }
+      console.error('[worker]', msg)
       await sleep(TICK_MS * 5)
     }
   }
