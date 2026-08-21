@@ -1,7 +1,14 @@
-// 공유 카드 모달 — 허브 HUD 의 "공유" 버튼이 연다.
+// 공유 카드 모달 — 허브 HUD 의 "공유" 버튼, 랭킹 TOP10, 채팅 이름 클릭이 연다.
 // 미리보기 = 실제 출력 캔버스를 CSS 로 축소한 것(별도 DOM 미리보기를 두지 않아 보이는 대로 나간다).
-// 마크업은 hub.css 의 .hub-modal-* 를 그대로 쓴다 → 반드시 .hub 하위에서 렌더할 것.
+//
+// ⚠️ **스타일시트를 이 파일이 직접 가져온다.** 마크업이 hub.css 의 `.hub-modal-*`·`.share-*` 를 쓰는데
+//    그 파일은 오래 `Hub.tsx` 만 import 했다 → `/arena`·`/ranking` 에서 카드를 열면 스타일이 **하나도**
+//    안 먹어 1600px 캔버스가 원본 크기로 튀어나왔다(모달이 채팅 칸을 뚫고 나온다).
+//    "가끔" 이었던 이유: 그 세션에 /hub 를 한 번이라도 거쳤으면 CSS 가 이미 문서에 남아 정상으로 보인다.
+//    ⚠️ 규칙을 작은 파일로 떼어내지 말 것 — hub.css 안에서 토큰(`--card`·`--line`·`--shc`)과 얽혀 있어
+//       옮기면 조용히 어긋난다. 컴포넌트가 자기 CSS 를 들고 다니는 쪽이 안전하다.
 import { useEffect, useRef, useState } from 'react'
+import '../styles/hub.css'
 import { Link } from 'react-router-dom'
 import { roomPath } from '../lib/room'
 import {

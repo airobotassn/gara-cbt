@@ -8,7 +8,7 @@ import { useT, type TFunc } from '../lib/i18n'
 import TopBar from '../components/TopBar'
 import { Avatar } from '../components/GemAvatar'
 import ShareCardModal from '../components/ShareCardModal'
-import type { ShareCardData } from '../lib/shareCard'
+import { scopedForCard, type CardScoped, type ShareCardData } from '../lib/shareCard'
 
 interface HofUser {
   rank: number
@@ -138,9 +138,18 @@ export default function Ranking() {
 
   // 보드에서 사람을 누르면 그 사람 카드(PNG)를 **그때그때** 만들어 보여준다.
   //   · 저장하지 않는다 — TOP10 은 계속 바뀌어서 저장하는 순간 낡는다.
-  //   · 추가 조회도 없다 — 카드에 쓰는 값이 전부 leaderboard 응답의 그 행에 이미 들어 있다.
-  //   · publicOnly=true → 랭킹 화면에 없던 정보(국가·지역 순위·가입일·지역)는 아예 안 그린다.
+  //   · 국가·지역 순위만 따로 받는다(아래 pickCard) — 목록 행에는 그 보드의 순위 하나뿐이다.
+  //   · publicOnly=true → 가입일·초대코드처럼 랭킹 화면에 없던 개인 정보는 안 그린다.
   const [cardOf, setCardOf] = useState<HofUser | null>(null)
+  // 국가·지역 순위는 목록 행에 없다(전세계 보드는 전세계 순위만 안다) → 카드를 열 때 그 사람 것만 따로 받는다.
+  //   ⚠️ 목록을 그릴 때 미리 받지 않는다 — TOP10 이면 사람마다 두 번씩, 스크롤할 때마다 다시 조회하게 된다.
+  const [cardRanks, setCardRanks] = useState<CardScoped | null>(null)
+  async function pickCard(u: HofUser) {
+    setCardOf(u)
+    setCardRanks(null)
+    if (!u.uid) return
+    try { setCardRanks(await scopedForCard(u.uid, lang)) } catch { /* 못 받으면 '—' 로 나간다 — 카드는 이미 떠 있다 */ }
+  }
   const cardData: ShareCardData | null = cardOf
     ? {
         lang,
@@ -150,9 +159,12 @@ export default function Ranking() {
         percentile: cardOf.percentile,
         rank: cardOf.rank,
         rankTotal: data?.total ?? null,
-        countryRank: null, countryTotal: null, regionRank: null, regionTotal: null,
+        countryRank: cardRanks?.countryRank ?? null, countryTotal: cardRanks?.countryTotal ?? null,
+        regionRank: cardRanks?.regionRank ?? null, regionTotal: cardRanks?.regionTotal ?? null,
+        country: cardRanks?.country ?? null,
+        region: cardRanks?.region ?? null,
         seasonTotal: cardOf.rating,
-        joinedAt: null, country: null, region: null,
+        joinedAt: null,
         referralCode: null, // 남의 카드에 내 초대 코드를 박지 않는다
         publicOnly: true,
         // 그 사람이 입고 있는 캐릭터·배경. 랭킹 시상대에 이미 보이는 그림이라 새로 노출되는 건 없다.
@@ -223,7 +235,7 @@ export default function Ranking() {
           </div>
         </>
       ) : (
-        <PersonalBoard t={t} lang={lang} data={data} err={err} listRef={listRef} onPick={setCardOf} />
+        <PersonalBoard t={t} lang={lang} data={data} err={err} listRef={listRef} onPick={pickCard} />
       )}
 
       {data && !gated ? (
@@ -238,7 +250,7 @@ export default function Ranking() {
           readOnly
           // 카드 아래 '방 보기' — 상위 랭커 방으로 들어가는 길이다.
           roomHandle={cardOf?.uid ?? null}
-          onClose={() => setCardOf(null)}
+          onClose={() => { setCardOf(null); setCardRanks(null) }}
         />
       ) : null}
     </div>

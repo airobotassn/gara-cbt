@@ -7,7 +7,7 @@ import { linkify } from '../lib/linkify'
 import { Avatar } from './GemAvatar'
 import { countryName, flagUrl } from '../lib/regions'
 import ShareCardModal from './ShareCardModal'
-import type { ShareCardData } from '../lib/shareCard'
+import { scopedForCard, type CardScoped, type ShareCardData } from '../lib/shareCard'
 import { arenaLevelForScore } from '../lib/scoring'
 
 // 유사채팅(pseudo-chat) 보드 — 로그인 필요(작성), 조회는 공개. /arena 페이지 안의 섹션으로 렌더된다.
@@ -501,6 +501,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
         return
       }
       const u = res.user
+      // 국가·지역 순위·이름 — 랭킹 화면과 **같은 헬퍼**를 쓴다(각자 조립하면 두 화면의 카드가 갈린다).
+      //   못 받으면 그 칸만 '—' 로 나간다. 카드 자체는 뜬다.
+      let scoped: CardScoped | null = null
+      try { scoped = await scopedForCard(r.user_id, lang) } catch { scoped = null }
       setCard({ handle: r.user_id, data: {
         lang,
         name: u.name,
@@ -510,10 +514,12 @@ export default function ChatBoard({ room = 'global' }: Props) {
         percentile: u.percentile,
         rank: u.rank,
         rankTotal: res.total,
-        // 남의 카드라 국가·지역 순위, 가입일, 초대코드는 안 그린다(publicOnly).
-        countryRank: null, countryTotal: null, regionRank: null, regionTotal: null,
+        // 국가·지역 순위·이름은 남의 카드에도 그린다(2026-08-21). 가입일·초대코드는 계속 안 그린다(publicOnly).
+        countryRank: scoped?.countryRank ?? null, countryTotal: scoped?.countryTotal ?? null,
+        regionRank: scoped?.regionRank ?? null, regionTotal: scoped?.regionTotal ?? null,
+        country: scoped?.country ?? null, region: scoped?.region ?? null,
         seasonTotal: u.rating,
-        joinedAt: null, country: null, region: null, referralCode: null,
+        joinedAt: null, referralCode: null,
         publicOnly: true,
         character: u.character, skin: u.skin,
         // 레벨은 시즌 총점에서 파생한다(허브·랭킹과 같은 함수) — 서버가 따로 내려주지 않는다.

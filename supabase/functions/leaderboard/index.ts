@@ -127,7 +127,38 @@ Deno.serve(async (req) => {
       // uid 는 도로 null 로 되돌린다 — 이 경로의 응답에 uid 가 실린 적이 없다(mapUser 가 늘 null 로 준다).
       // 잠깐 넣은 건 위 조회 때문이다.
       one.uid = null
-      return json({ user: one, total: d.total ?? 0 })
+
+      // 국가·지역 순위 — 남의 카드에도 넣는다(2026-08-20 요청).
+      // ⚠️ 범위는 **그 사람 프로필에서** 읽는다. 요청 파라미터로 받으면 남의 카드에 아무 국가·지역이나
+      //    지정해 "그 사람이 그 지역에서 몇 위인지" 를 캐낼 수 있다.
+      // ⚠️ **코드**를 같이 준다(이름이 아니라 'KR'·'KR-11'). 카드가 '대한민국 6위'·'서울특별시 2위' 로
+      //    쓰기 때문이다(2026-08-21 요청). 이름표는 클라가 이미 갖고 있으므로(249개국 × 6개국어 +
+      //    지도 파일의 지역명) 서버가 6개국어 이름을 만들어 내려보내지 않는다.
+      const { data: pr } = await admin
+        .from('profiles')
+        .select('country_code,region_code')
+        .eq('id', uid)
+        .maybeSingle()
+      const cc = (pr?.country_code as string | null) ?? null
+      const rc = (pr?.region_code as string | null) ?? null
+      const scoped = async (country: string | null, region: string | null) => {
+        if (!country) return { rank: null as number | null, total: null as number | null }
+        const { data: sd } = await admin.rpc('scoped_top', { p_uid: uid, p_limit: 0, p_country: country, p_region: region })
+        const r = (sd ?? {}) as { total?: number; me?: RpcUser | null }
+        return { rank: (r.me?.rank as number | undefined) ?? null, total: r.total ?? null }
+      }
+      const [inCountry, inRegion] = await Promise.all([scoped(cc, null), scoped(cc && rc ? cc : null, rc)])
+
+      return json({
+        user: one,
+        total: d.total ?? 0,
+        countryRank: inCountry.rank,
+        countryTotal: inCountry.total,
+        regionRank: inRegion.rank,
+        regionTotal: inRegion.total,
+        countryCode: cc,
+        regionCode: rc,
+      })
     }
 
     // 개인 리더보드 — 전세계 / 내 국가 / 내 지역. 세 탭 모두 같은 RPC(scoped_top), 모수만 다르다.
