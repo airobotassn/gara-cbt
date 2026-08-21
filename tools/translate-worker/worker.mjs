@@ -137,13 +137,20 @@ async function main() {
       await page.waitForFunction(() => window.__out !== null, null, { timeout: 180_000 })
       const out = await page.evaluate(() => window.__out)
 
+      let res = null
       if (out.items.length > 0) {
-        const res = await callFn({ action: 'store', items: out.items })
+        res = await callFn({ action: 'store', items: out.items })
         console.log(`[worker] ${res.stored}/${jobs.length} 저장`)
       } else {
         console.log(`[worker] ${jobs.length}건 중 저장할 것 없음`)
       }
       if (out.failedPairs?.length) console.log(`[worker] 미지원 쌍: ${out.failedPairs.join(', ')}`)
+      // ⚠️ 브라우저 안에서 난 오류는 페이지 밖으로 안 나온다 — 여기서 꺼내 찍는다.
+      //    안 그러면 "저장할 것 없음" 만 보이고 왜 안 됐는지 영영 모른다.
+      if (out.log && (!res || res.stored < jobs.length)) {
+        console.log(`[worker] 브라우저 로그:
+${out.log.trim()}`)
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       // ⚠️ 브라우저가 닫힌 뒤의 오류는 재시도해도 영원히 같은 오류다 — 그때는 끝내야 한다.

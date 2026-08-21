@@ -34,6 +34,16 @@
     return t
   }
 
+  // 인스턴스가 상해서 UnknownError 를 내는 일이 있다 — 그때는 캐시에서 버리고 새로 만든다.
+  function dropTranslator(src, dst) {
+    const key = src + '>' + dst
+    const t = translators.get(key)
+    translators.delete(key)
+    try { t?.destroy?.() } catch { /* 이미 죽은 인스턴스면 그만 */ }
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
   async function getDetector() {
     if (!detector) detector = await LanguageDetector.create()
     return detector
@@ -66,6 +76,11 @@
     }
 
     // ② 번역. 쌍으로 묶어 인스턴스를 재사용한다.
+    //
+    //  ⚠️ **실패를 두 종류로 가른다** — 안 그러면 글 하나가 실패했을 때 그 언어쌍 전체가
+    //     막혀서 멀쩡한 나머지 글이 통째로 안 번역된다(2026-08-13 실측: US 방 5건 중 2건만 됨).
+    //      · NotSupportedError = 그 쌍을 엣지가 정말 못 한다 → 이 배치에서 그 쌍은 포기
+    //      · 그 외(UnknownError 등) = **일시적**이다 → 인스턴스를 버리고 새로 만들어 한 번 더
     for (const j of jobs) {
       const src = srcOf.get(j.message_id)
       if (!src) continue                    // 원문 언어를 못 정했으면 건너뛴다(다음 사이클에 다시 온다)
@@ -78,17 +93,27 @@
       }
       const pair = src + '>' + j.dst_lang
       if (failedPairs.includes(pair)) continue
-      try {
-        const t = await getTranslator(src, j.dst_lang)
-        const body = await t.translate(j.body)
-        if (body) out.push({ message_id: j.message_id, lang: j.dst_lang, body, src_lang: src })
-      } catch (e) {
-        // 지원 안 되는 쌍은 이 배치 안에서 다시 시도하지 않는다(엣지가 못 하면 아무도 못 한다).
-        failedPairs.push(pair)
-        log('pair fail ' + pair + ': ' + e)
+
+      let body = null
+      for (let attempt = 0; attempt < 2 && body == null; attempt++) {
+        try {
+          const t = await getTranslator(src, j.dst_lang)
+          body = await t.translate(j.body)
+        } catch (e) {
+          log('fail #' + j.message_id + ' ' + pair + ' (try ' + (attempt + 1) + '): ' + e)
+          if (e && e.name === 'NotSupportedError') { failedPairs.push(pair); break }
+          // 상한 인스턴스일 수 있다 — 버리고 잠깐 쉬었다 새로 만든다.
+          dropTranslator(src, j.dst_lang)
+          await sleep(300)
+        }
       }
+      // ⚠️ 두 번 다 실패하면 **실패했다고 올려보낸다**(failed:true). 안 올리면 서버가 아무 흔적을
+      //    못 남겨서 이 글이 매 초 영원히 다시 후보로 올라온다 — 엣지는 특정 문장에서 그냥 터지고
+      //    그건 다시 시도해도 계속 터진다(2026-08-13: `lol` 이 문장 중간에 있으면 재현).
+      if (body) out.push({ message_id: j.message_id, lang: j.dst_lang, body, src_lang: src })
+      else out.push({ message_id: j.message_id, lang: j.dst_lang, src_lang: src, failed: true })
     }
-    return { items: out, failedPairs }
+    return { items: out, failedPairs, log: document.getElementById('log').textContent.slice(0, 1500) }
   }
 
   function log(s) {

@@ -82,6 +82,9 @@ async function handleTranslate(req: Request, payload: Record<string, unknown>): 
     .select('message_id, body')
     .eq('lang', lang)
     .in('message_id', ids)
+    // ⚠️ body 가 null 인 행은 **엔진이 못 한 글** 표식이다(재시도 중단용). 화면엔 원문이 남아야 하므로
+    //    돌려주지 않는다 — 여기서 안 거르면 프론트가 null 을 번역문으로 그린다.
+    .not('body', 'is', null)
 
   // 창고에 있는 것만 돌려준다. 없는 건 위(수요 갱신)에서 이미 워커에게 넘겼으므로
   // 여기서 더 할 일이 없다 — 프론트가 잠시 뒤 다시 물어본다(ChatBoard 의 fetchWithRetry).
@@ -106,7 +109,7 @@ async function handlePending(admin: Admin, payload: Record<string, unknown>): Pr
 async function handleStore(admin: Admin, payload: Record<string, unknown>): Promise<Response> {
   const itemsIn = Array.isArray(payload?.items) ? (payload.items as Record<string, unknown>[]) : []
 
-  const inserts: { message_id: number; lang: string; body: string; engine: string }[] = []
+  const inserts: { message_id: number; lang: string; body: string | null; engine: string }[] = []
   const detected = new Map<string, number[]>()
   for (const it of itemsIn) {
     const id = Number(it?.message_id)
@@ -120,7 +123,14 @@ async function handleStore(admin: Admin, payload: Record<string, unknown>): Prom
       if (g) g.push(id)
       else detected.set(src, [id])
     }
-    if (!lang || !body || sameLang(src, lang)) continue
+    if (!lang || sameLang(src, lang)) continue
+    // ⚠️ failed = 엔진이 이 글을 번역하지 못했다. **body 를 null 로 기록해 재시도를 끊는다** —
+    //    안 남기면 pending 이 매 초 같은 글을 다시 내주고 워커가 영원히 헛돈다.
+    if (it?.failed === true) {
+      inserts.push({ message_id: id, lang, body: null, engine: 'edge' })
+      continue
+    }
+    if (!body) continue
     inserts.push({ message_id: id, lang, body, engine: 'edge' })
   }
 

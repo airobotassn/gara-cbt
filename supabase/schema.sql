@@ -354,7 +354,9 @@ alter table chat_incidents enable row level security;
 create table if not exists chat_translations (
   message_id bigint      not null references chat_messages(id) on delete cascade,
   lang       text        not null,
-  body       text        not null,
+  -- ⚠️ body 가 null 이면 **시도했지만 엔진이 못 한 글**이다(재시도 중단 표식).
+  --    엣지 번역기가 특정 문장에서 그냥 터지는데, 안 남기면 워커가 매 초 영원히 다시 시도한다.
+  body       text,
   engine     text        not null check (engine = 'edge'),
   created_at timestamptz not null default now(),
   primary key (message_id, lang)
