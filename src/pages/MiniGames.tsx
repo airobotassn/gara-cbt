@@ -3,13 +3,15 @@
 //   게임 목록은 src/lib/minigames.ts 한 곳에서만 관리(새 게임 = 그 배열에 한 줄).
 //   커버 셀 스타일(.mg-shelf/.mg-cover…)은 모달 시절부터 이어진 공용, 페이지 껍데기는 .mgp 스코프.
 import { Link, useNavigate } from 'react-router-dom'
-import { MINIGAMES } from '../lib/minigames'
+import { MINIGAMES, guestPlayable } from '../lib/minigames'
 import StarField from '../components/StarField'
+import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import '../styles/minigame.css'
 
 export default function MiniGames() {
   const navigate = useNavigate()
+  const { isFullUser } = useAuth()
   const { t } = useT()
   return (
     <div className="mgp">
@@ -17,7 +19,7 @@ export default function MiniGames() {
       <StarField />
       <div className="mgp-in">
         <Link className="mgp-back" to="/arena" aria-label={t('arena.title')}>
-          <span>‹</span> {t('arena.title')}
+          <span className="material-symbols-outlined">arrow_back</span> {t('arena.title')}
         </Link>
 
         <header className="mgp-head">
@@ -36,12 +38,17 @@ export default function MiniGames() {
             g.accent && gTitle.includes(g.accent)
               ? [gTitle.slice(0, gTitle.indexOf(g.accent)), g.accent]
               : [gTitle, '']
+          // 비로그인은 GUEST_GAME_ID 한 판만 열린다. 커버는 그대로 두고 PLAY 만 죽인다 —
+          //   무슨 게임이 있는지는 보여주는 게 로그인할 이유가 된다(가려버리면 아무 이유가 안 남는다).
+          const locked = !isFullUser && !guestPlayable(g.id)
           return (
             <button
               key={g.id}
-              className="mg-cover"
-              onClick={() => navigate(`/games/${g.id}`)}
-              aria-label={gTitle}
+              className={`mg-cover${locked ? ' is-locked' : ''}`}
+              onClick={() => { if (!locked) navigate(`/games/${g.id}`) }}
+              disabled={locked}
+              title={locked ? t('mg.locked_hint') : undefined}
+              aria-label={locked ? `${gTitle} — ${t('mg.locked_hint')}` : gTitle}
             >
               <img className="mg-art" src={g.art} alt="" />
               <span className="mg-caption">
@@ -52,7 +59,9 @@ export default function MiniGames() {
                 </b>
                 <span className="mg-tag">{t(`mg.${g.id}.tagline`)}</span>
                 <span className="mg-play">
-                  <b className="mg-play-tri" />
+                  {locked
+                    ? <span className="material-symbols-outlined mg-play-lock">lock</span>
+                    : <b className="mg-play-tri" />}
                   PLAY
                 </span>
               </span>

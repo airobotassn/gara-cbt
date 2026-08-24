@@ -7,7 +7,7 @@ export default function TopBar({ to = '/', label }: { to?: string; label?: strin
   const { t } = useT()
   return (
     <Link to={to} className="topbar">
-      <span className="ic">←</span>
+      <span className="material-symbols-outlined">arrow_back</span>
       {label ?? t('common.home')}
     </Link>
   )

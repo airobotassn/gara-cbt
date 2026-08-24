@@ -7,11 +7,13 @@
 //     없다 → 점수 제출과 랭킹 조회는 전부 이 부모가 대신한다. 게임은 "점수 났다 / 랭킹 열어달라"만 알린다.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { findMiniGame } from '../lib/minigames'
+import { findMiniGame, guestPlayable, GUEST_GAME_ID } from '../lib/minigames'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
 import MiniGameRankModal from '../components/MiniGameRankModal'
+import StarField from '../components/StarField'
+import { rememberPostLogin } from '../lib/postLogin'
 import '../styles/minigame.css'
 
 /** #rrggbb 의 밝기로 글자색을 정한다 — 프레임 색을 게임마다 바꿔도 상단 바가 알아서 반전된다. */
@@ -123,9 +125,38 @@ export default function MiniGame() {
     )
   }
 
-  // 옛 로그인 게이트(게스트 플레이 불가)는 2026-08-06 제거했다 — 게스트도 바로 플레이한다.
+  // 게스트에게 열린 건 GUEST_GAME_ID 한 판뿐이다(2026-08-24). 나머지는 여기서 막는다 —
+  //   ⚠️ 목록의 회색 PLAY 만으로는 아무것도 못 막는다. 주소를 직접 치면 그대로 들어온다.
+  //   ⚠️ 판정은 `guestPlayable` 하나를 목록과 같이 쓴다. 여기서 따로 쓰면 두 화면이 다른 말을 한다.
+  if (!isFullUser && !guestPlayable(game.id)) {
+    return (
+      <div className="mgp">
+        <StarField />
+        <div className="mgp-in">
+          <button className="mgp-back" onClick={() => navigate('/games')} aria-label={t('mg.title')}>
+            <span className="material-symbols-outlined">arrow_back</span> {t('mg.title')}
+          </button>
+          <div className="mg-gate">
+            <img className="mg-gate-art" src={game.art} alt="" />
+            <h1 className="mg-gate-title">{t('mg.locked_title')}</h1>
+            <p className="mg-gate-sub">{t('mg.locked_body', { game: t(`mg.${GUEST_GAME_ID}.title`) })}</p>
+            <button
+              className="mg-gate-btn"
+              onClick={() => {
+                rememberPostLogin(`/games/${game.id}`)
+                void loginWithGoogle(`${window.location.origin}/auth/callback`)
+              }}
+            >
+              {t('common.login_google')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 게스트에게 열린 게임은 그대로 플레이한다 — 기록만 안 남는다.
   // 대신 상단 바에 '기록이 안 남는다'는 한 줄을 달아, 로그인하면 뭐가 달라지는지 플레이 전에 알린다.
-  // ⚠️ 플레이를 막지 말 것. 미니게임은 서비스를 처음 만난 사람이 제일 먼저 눌러보는 곳이다.
 
   // 상단 바는 게임 프레임 색(= 게임 body 배경)을 그대로 입는다 — 흰 바가 남으면 게임 위에 이색 띠로 뜬다.
   const dark = isDark(game.frame)
@@ -169,8 +200,7 @@ export default function MiniGame() {
         {!isFullUser && (
           <button
             onClick={() => {
-              // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(AuthCallback 참고).
-              try { sessionStorage.setItem('postLoginRedirect', `/games/${game.id}`) } catch { /* 무시 */ }
+              rememberPostLogin(`/games/${game.id}`)
               void loginWithGoogle(`${window.location.origin}/auth/callback`)
             }}
             style={{
@@ -225,8 +255,7 @@ export default function MiniGame() {
             </p>
             <button
               onClick={() => {
-                // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(AuthCallback 참고).
-                try { sessionStorage.setItem('postLoginRedirect', `/games/${game.id}`) } catch { /* 무시 */ }
+                rememberPostLogin(`/games/${game.id}`)
                 void loginWithGoogle(`${window.location.origin}/auth/callback`)
               }}
               style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: 0, background: '#004ac6', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}

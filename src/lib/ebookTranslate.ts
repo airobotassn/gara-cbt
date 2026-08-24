@@ -8,7 +8,7 @@
 //
 // 전제(표지 생성과 동일): 이북은 외부 리소스가 없는 단일 HTML.
 
-import { callFunction } from './supabase'
+import { FunctionError, callFunction } from './supabase'
 
 /** 번역 대상 언어. 원문은 한국어(ko)라 목록에 없다. */
 export const EBOOK_LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
@@ -91,9 +91,6 @@ async function waitCooldown(report?: (leftSec: number) => void): Promise<void> {
   }
 }
 
-/** 일일 한도(RPD) 소진 — 오늘은 더 돌려도 소용없으므로 사다리를 즉시 중단시킨다. */
-class DailyQuotaError extends Error {}
-
 /** 스토어 카드에 쓰는 메타(제목·지은이·소개) — 본문과 같이 번역해 언어별로 저장한다. */
 export interface EbookMeta {
   title: string
@@ -109,10 +106,28 @@ export interface LangResult {
   failed: number
   /** 실패 사유별 횟수(예: {'분당한도(429)': 40}). 관리자에게 원인을 보여주는 유일한 근거다. */
   failReasons: Record<string, number>
+  /** 번역 못 한 **본문 조각 번호**(0부터, 메타 제외). 다음에 '다시 번역' 할 때 이 자리만 다시 묻는다.
+   *  ⚠️ 없던 시절 책도 있어서 이어받기는 이 목록이 없을 때 글자 비교로 폴백한다(resumeSeed 주석). */
+  failedIdx: number[]
   /** 글이 넘쳐 자동으로 축소해 맞춘 페이지 번호(1부터) */
   fittedPages: number[]
   /** 축소 하한까지 줄여도 안 들어간 페이지 번호 — 사람이 손봐야 하는 것만 남는다 */
   overflowPages: number[]
+}
+
+/**
+ * 이어받기 재료 — **이전에 저장해 둔 번역본**. 있으면 이미 번역된 조각은 다시 묻지 않는다.
+ *
+ * ⚠️ 조각은 번호로 맞춘다(문서 순서대로 센 n번째). 그래서 **원본이 바뀌면 못 쓴다** — 문단이 하나만
+ *    앞에 끼어도 그 뒤 번호가 전부 밀려서, 5번 자리에 4번 문장이 조용히 박힌다. 안 깨지고 틀리는
+ *    종류라 제일 나쁘다. 그래서 ① 본문을 새로 올리면 호출부가 번역을 통째로 비우고
+ *    ② 여기서도 조각 개수가 다르면 이어받기를 통째로 포기한다.
+ */
+export interface ResumeSource {
+  /** 언어별 이전 번역본 HTML. */
+  html: Partial<Record<EbookLang, string>>
+  /** 이전에 실패했던 본문 조각 번호. 있으면 글자 비교보다 이걸 믿는다(정확). */
+  failedIdx?: number[]
 }
 
 export interface TranslateProgress {
@@ -312,9 +327,14 @@ async function translateTexts(
   langs: readonly EbookLang[],
   context: string,
   onProgress?: (done: number, total: number, note: string, waiting?: boolean) => void,
-): Promise<{ out: (Record<string, string> | null)[]; reasons: Record<string, number> }> {
+  /** 이미 번역돼 있는 자리(이어받기). 채워진 칸은 아예 묻지 않는다. */
+  seed?: (Record<string, string> | null)[],
+): Promise<{ out: (Record<string, string> | null)[]; reasons: Record<string, number>; dailyHit: boolean }> {
   const out: (Record<string, string> | null)[] = new Array(texts.length).fill(null)
+  if (seed) for (let i = 0; i < out.length; i++) out[i] = seed[i] ?? null
   const reasons: Record<string, number> = {}
+  /** 하루 한도를 만났나. 만나면 사다리를 즉시 접는다(던지지 않는다 — 위 주석). */
+  let dailyHit = false
   const filled = () => out.reduce((n, t) => (t ? n + 1 : n), 0)
   const note429 = (sec: number) =>
     onProgress?.(filled(), texts.length, `분당 한도에 걸렸습니다 — ${sec}초 후 자동으로 이어서 합니다`, true)
@@ -349,7 +369,20 @@ async function translateTexts(
         //    그대로 메시지로 삼아 던진다(부분 결과는 이때 버려진다).
         const msg = e instanceof Error ? e.message : String(e)
         if (/quota_daily|일일한도/.test(msg)) {
-          throw new DailyQuotaError('Gemini 일일 한도를 다 썼습니다. 내일 다시 시도해 주세요.')
+          // ⛔ 던지지 않는다. 예전엔 여기서 throw 해서 **그 실행에서 이미 번역한 것까지 통째로 버렸다**
+          //    (600조각 중 550조각을 채운 뒤 걸리면 550개가 사라졌다). 하루 한도는 더 두드려야
+          //    소용없으니 사다리는 멈추되, 채운 것은 남겨서 저장·이어받기가 되게 한다.
+          // ⚠️ 서버는 429 와 함께 **그때까지 번역된 조각도 같이** 돌려준다 — 오류 본문에서 건져 넣는다.
+          const partial = (e instanceof FunctionError ? e.body : null) as
+            | { results?: ({ tr: Record<string, string> } | { error: string })[] }
+            | null
+          partial?.results?.forEach((r, k) => {
+            if ('tr' in r && out[idxs[k]] == null) out[idxs[k]] = r.tr
+          })
+          const left = idxs.filter((i) => out[i] == null).length
+          if (left) reasons['일일한도'] = (reasons['일일한도'] ?? 0) + left
+          dailyHit = true
+          return
         }
         // 요청 자체가 429 로 튕긴 경우(함수가 조각별 사유를 못 줄 때) — 위와 같은 대기 경로를 탄다.
         if (RATE_REASON.test(msg) && waited < RATE_RETRY) {
@@ -368,6 +401,7 @@ async function translateTexts(
   }
 
   for (const size of SPLIT_STEPS) {
+    if (dailyHit) break // 오늘은 더 물어봐야 소용없다 — 채운 것만 들고 나간다
     const todo: number[] = []
     for (let i = 0; i < texts.length; i++) if (!out[i]) todo.push(i)
     if (!todo.length) break
@@ -376,14 +410,67 @@ async function translateTexts(
     for (let j = 0; j < todo.length; j += size) batches.push(todo.slice(j, j + size))
     let bi = 0
     const worker = async () => {
-      while (bi < batches.length) {
+      while (bi < batches.length && !dailyHit) {
         await handle(batches[bi++])
         onProgress?.(filled(), texts.length, note)
       }
     }
     await Promise.all(Array.from({ length: Math.min(POOL, batches.length) }, worker))
   }
-  return { out, reasons }
+  return { out, reasons, dailyHit }
+}
+
+/**
+ * 이전 번역본에서 **이미 번역된 조각**을 뽑아 seed 로 만든다. 못 쓰겠으면 null(=전체 재번역).
+ *
+ * 판정: 그 자리의 번역문이 **한국어 원문과 글자가 다르면** 번역된 것으로 본다. 실패한 조각은
+ * 원문을 그대로 남기도록 만들어져 있어서 이 비교가 성립한다.
+ *   ⚠️ 번역 결과가 원문과 우연히 같으면 "안 된 것"으로 보고 다시 묻는다 — 조각을 뽑을 때 한글이 든
+ *      노드만 대상으로 해서 확률이 사실상 없고, 틀려도 손해는 그 조각 한 번 더 묻는 것뿐이다.
+ *   ⚠️ **5개 언어가 전부 채워진 조각만** 완료로 친다. 한 언어라도 비면 어차피 한 번의 호출로 전 언어를
+ *      다시 받으므로, 부분만 채워 두면 그 자리는 덮어써진다.
+ *   ⚠️ 조각 개수가 원본과 하나라도 다르면 **통째로 포기**한다 — 번호가 밀린 채 재활용하면 엉뚱한 자리에
+ *      엉뚱한 문장이 조용히 박힌다(ResumeSource 주석).
+ */
+function buildResumeSeed(
+  nodes: Text[],
+  metaOffset: number,
+  langs: readonly EbookLang[],
+  resume: ResumeSource,
+): (Record<string, string> | null)[] | null {
+  const parser = new DOMParser()
+  const failed = new Set(resume.failedIdx ?? [])
+  const perLang: Partial<Record<EbookLang, Text[]>> = {}
+  for (const lang of langs) {
+    const html = resume.html[lang]
+    if (!html) return null // 한 언어라도 이전 번역이 없으면 이어받을 게 못 된다
+    const doc = parser.parseFromString(html, 'text/html')
+    const got = collectNodes(doc)
+    if (got.length !== nodes.length) return null // 원본이 바뀌었다 — 번호가 안 맞는다
+    perLang[lang] = got
+  }
+
+  const seed: (Record<string, string> | null)[] = new Array(metaOffset + nodes.length).fill(null)
+
+  // ⛔ **메타(제목·지은이·소개)는 이어받지 않는다 — 늘 다시 번역한다.**
+  //    본문은 파일을 새로 올려야 바뀌고 그때 옛 번역이 통째로 비워지지만, 메타는 **폼에서 그냥 고칠 수 있다.**
+  //    이어받으면 "제목 오타를 고치고 다시 번역" 했을 때 번역 제목만 옛것으로 남는다(조용히 틀린다).
+  //    조각 3개라 다시 묻는 비용도 사실상 없다.
+
+  // 본문 조각
+  for (let i = 0; i < nodes.length; i++) {
+    if (failed.has(i)) continue // 저장된 실패 목록이 있으면 그걸 믿는다
+    const orig = (nodes[i].nodeValue ?? '').trim()
+    const got: Record<string, string> = {}
+    let ok = true
+    for (const lang of langs) {
+      const v = (perLang[lang]![i].nodeValue ?? '').trim()
+      if (!v || v === orig) { ok = false; break }
+      got[lang] = v
+    }
+    if (ok) seed[metaOffset + i] = got
+  }
+  return seed
 }
 
 /**
@@ -398,6 +485,8 @@ export async function translateEbook(
   meta: EbookMeta,
   langs: readonly EbookLang[] = EBOOK_LANGS,
   onProgress?: (p: TranslateProgress) => void,
+  /** 있으면 **이미 번역된 조각은 다시 묻지 않는다**(이어받기). 못 쓰는 재료면 조용히 전체 재번역. */
+  resume?: ResumeSource,
 ): Promise<LangResult[]> {
   const parser = new DOMParser()
   const source = parser.parseFromString(html, 'text/html')
@@ -410,9 +499,23 @@ export async function translateEbook(
   onProgress?.({ phase: 'extract', done: texts.length, total: texts.length })
 
   // ── 번역: 사다리(120 → 12 → 4)로 실패분만 다시 돈다. 끝까지 못 채운 조각은 원문 유지 ──
-  const { out: translated, reasons } = await translateTexts(texts, langs, meta.title, (done, total, note, waiting) =>
-    onProgress?.({ phase: 'translate', done, total, note, waiting }),
+  // 이어받기 — 쓸 수 있으면 이미 번역된 자리를 미리 채워 그만큼 안 묻는다.
+  const seed = resume ? buildResumeSeed(nodes, bodyOffset, langs, resume) : null
+  const { out: translated, reasons } = await translateTexts(
+    texts,
+    langs,
+    meta.title,
+    (done, total, note, waiting) => onProgress?.({ phase: 'translate', done, total, note, waiting }),
+    seed ?? undefined,
   )
+
+  // 번역 못 한 본문 조각 번호 — 어느 언어든 하나라도 비면 미완으로 친다.
+  //   다음 '다시 번역' 때 이 목록이 이어받기의 근거가 된다(글자 비교보다 정확하다).
+  const failedIdx: number[] = []
+  for (let i = 0; i < nodes.length; i++) {
+    const tr = translated[bodyOffset + i]
+    if (!tr || langs.some((l) => !tr[l])) failedIdx.push(i)
+  }
 
   // ── 언어별 문서 생성 ──
   const out: LangResult[] = []
@@ -458,7 +561,8 @@ export async function translateEbook(
       // 맞춤 실패는 번역 자체를 막지 않는다(원문 조판 그대로 저장된다).
     }
     // 사유는 조각 단위라 언어와 무관하다(한 조각이 실패하면 5개 언어가 다 비었다) — 같은 표를 싣는다.
-    out.push({ lang, html: langHtml, meta: langMeta, failed, failReasons: reasons, fittedPages, overflowPages })
+    // 사유·실패 번호는 조각 단위라 언어와 무관하다(한 조각이 실패하면 5개 언어가 다 비었다) — 같은 값을 싣는다.
+    out.push({ lang, html: langHtml, meta: langMeta, failed, failReasons: reasons, failedIdx, fittedPages, overflowPages })
   }
   return out
 }

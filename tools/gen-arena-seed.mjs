@@ -65,10 +65,26 @@ const h32 = (s) => {
 const hashScore = (k, max) => Math.round((h32('s' + k) % (max * 100)) / 100)
 
 /**
+ * 가상 회원 수 축소 배수(2026-08-21). 예전엔 국가 138만 + 지역 164만 = 302만 명이었는데,
+ * 화면에 "👥 25,408명" 이 뜨는 게 신생 서비스로는 뻥이라 20으로 나눴다(한국 1,270명 · 미국 1,530명).
+ *
+ * ⚠️ **줄일 땐 반드시 전부 같은 비율로 줄인다.** 상위국만 남기고 하위국을 더 깎으면 순위가 무너진다 —
+ *    베이지안 보정 `(N·s + K·G)/(N + K)` 이 인원이 적은 버킷을 전체 평균 쪽으로 **끌어올리기** 때문이다
+ *    (직관과 반대다). 실제로 계산해보면 상위 유지·하위 축소는 173개국 중 157개국 순위를 뒤집고
+ *    최하위 우즈베키스탄(3점)이 31위로 올라온다. 균등 축소는 순위 변동 0이다.
+ *
+ * ⚠️ **24를 넘겨 줄이지 말 것.** 지역 최소 인원이 120명이라 1/24 가 한계다 —
+ *    그보다 줄이면 refresh_arena_buckets() 의 프라이버시 floor(합쳐진 인원 5명)에 걸려
+ *    지역 버킷이 통째로 사라진다(1/100 이면 3,504개 중 63%가 증발한다).
+ *    더 줄여야 하면 K=25 도 같은 비율로 낮춰야 순위가 보존된다.
+ */
+const MEMBER_SCALE = 24
+
+/**
  * 점수 → 가상 회원 수. 5,000 바닥 + 점수 비례(위 주석의 이유).
  * 상위권일수록 사람이 많은 그림이라 화면에 뜨는 "참가자 N명"도 자연스럽다.
  */
-const membersFor = (score) => 5000 + Math.round(score * 8)
+const membersFor = (score) => Math.round((5000 + score * 8) / MEMBER_SCALE)
 /** 오늘 활동 — 참여율 8% 언저리. 일간창(daily) 점수가 0으로 죽지 않게 하는 값이다. */
 const activeFor = (members, key) => Math.round(members * (0.06 + (h32('a' + key) % 40) / 1000))
 
@@ -85,11 +101,11 @@ const activeFor = (members, key) => Math.round(members * (0.06 + (h32('a' + key)
  *    1등을 먹는다(체코·에스토니아 등 17개국에서 실제로 뒤집혔다).
  *    인원을 고르게 두면 분모가 상수가 되어 보정이 점수 순서를 절대 못 흔든다 — 그게 이 함수다.
  *
- * ⚠️ 바닥 120명은 지역이 아주 많은 나라(우간다 111, 북마케도니아 84 …)에서 "👥 55명" 같은 값이
+ * ⚠️ 바닥 120명(축소 후 6명)은 지역이 아주 많은 나라(우간다 111, 북마케도니아 84 …)에서 "👥 55명" 같은 값이
  *    안 나오게 하는 값이다. 이때만 지역 합이 나라 인원을 넘는데, 순서에는 영향이 없다.
  */
 const splitMembers = (total, scores) => {
-  const each = Math.max(120, Math.round(total / Math.max(1, scores.length)))
+  const each = Math.max(Math.round(120 / MEMBER_SCALE), Math.round(total / Math.max(1, scores.length)))
   return scores.map(() => each)
 }
 

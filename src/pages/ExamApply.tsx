@@ -16,7 +16,8 @@ import { callFunction } from '../lib/supabase'
 //   ⚠️ 여기서 하는 판정(회차가 연 급수 · 이미 산 급수 · 접수기간)은 전부 **화면 편의**다.
 //      진짜 방어선은 서버 — 접수기간/개설 여부는 resolveExamOffer, 중복 결제는 payments 의 부분 유니크와
 //      exam_tickets_live_uniq 가 막는다. 여기 판정이 뚫려도 돈이 두 번 빠지지 않는다.
-//   로그인 게이트는 이 화면에 두지 않는다 — Checkout 이 미로그인 시 postLoginRedirect 를 심고 /login 으로 보낸다.
+//   로그인 게이트는 이 화면에 두지 않는다 — Checkout 이 미로그인일 때 **로그인 안내 카드**를 띄우고,
+//   그 버튼이 복귀 주소(담은 교재까지)를 심어 /login 으로 보낸다(2026-08-24. 예전엔 말없이 튕겼다).
 // 응시료 금액은 DB(exam_fees) 원화가 단일 소스이고 **표시만 달러**다(usdc(), $1 = 1,500원 고정 환산).
 //
 // 추천 교재(2026-08-14): 고른 급수의 CARIS 교재 한 권을 가운데 열에 세우고, '구매하기'를 누르면
@@ -199,8 +200,9 @@ export default function ExamApply() {
     <div className="bg-background text-on-surface min-h-screen flex flex-col">
       {/* 결제 안내(목업) 모달은 삭제됐다 — 결제하기가 실제로 /checkout 으로 간다(2026-08). */}
       <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto">
-        {/* 상단 */}
-        <button onClick={() => navigate('/guide')} className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">
+        {/* 돌아갈 곳은 /plan 이다 — 여기로 오는 길이 /guide → /plan → 회차 카드 → /exam/apply 라
+            /guide 로 보내면 한 단계를 건너뛰어 방금 고른 회차 목록으로 못 돌아간다(2026-08-20). */}
+        <button onClick={() => navigate('/plan')} className="gd-back mb-6">
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           {t('apply.back')}
         </button>
@@ -477,8 +479,8 @@ export default function ExamApply() {
               )}
               {/* 안내문. 옛 apply.pay_note('결제는 추후 연결') 는 결제가 실동작하는 지금 거짓말이라 쓰지 않는다
                   — i18n 에 apply.pay_note_live 로 갈아끼울 문구가 이미 들어와 있다(옛 키는 남겨둠).
-                  비로그인이라고 여기서 막지는 않는다 — Checkout 이 postLoginRedirect 를 심고 /login 으로 보낸 뒤
-                  로그인하면 결제화면으로 정확히 되돌아온다. 여기서 한 번 더 게이트를 만들면 그 경로가 끊긴다. */}
+                  비로그인이라고 여기서 막지는 않는다 — Checkout 이 로그인 안내 카드를 띄우고, 그 버튼이
+                  복귀 주소를 심어 결제화면으로 정확히 되돌려준다. 여기서 한 번 더 게이트를 만들면 그 경로가 끊긴다. */}
               <p className="flex items-start gap-1.5 font-label-md text-label-md text-on-surface-variant break-keep">
                 <span className="material-symbols-outlined text-[18px] mt-px shrink-0">{isFullUser ? 'lock' : 'login'}</span>
                 {isFullUser ? t('apply.pay_note_live') : t('apply.login_required')}

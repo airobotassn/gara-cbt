@@ -55,7 +55,10 @@ export async function callFunction<T>(
 
   const json = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new FunctionError(json?.error ?? `${name} 호출 실패 (${res.status})`, res.status, json?.code)
+    // ⚠️ 본문을 같이 싣는다 — 오류 응답에도 **쓸 수 있는 결과가 섞여 있는 경우**가 있다.
+    //    (이북 번역은 하루 한도로 429 를 주면서 그때까지 번역된 조각을 함께 돌려준다. 예전엔 사유만
+    //     챙기고 본문을 버려서 그 성공분이 통째로 사라졌다.)
+    throw new FunctionError(json?.error ?? `${name} 호출 실패 (${res.status})`, res.status, json?.code, json)
   }
   return json as T
 }
@@ -72,12 +75,15 @@ export class FunctionError extends Error {
   //    이 저장소는 tsconfig 의 erasableSyntaxOnly 가 켜져 있어 컴파일이 막힌다. 필드로 따로 선언한다.
   status: number
   code?: string
+  /** 오류 응답의 본문(파싱된 JSON). 오류인데도 쓸 수 있는 결과가 섞여 오는 경우가 있다 — 위 주석 참고. */
+  body?: unknown
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, body?: unknown) {
     super(message)
     this.name = 'FunctionError'
     this.status = status
     this.code = code
+    this.body = body
   }
 }
 

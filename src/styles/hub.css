@@ -53,7 +53,12 @@
    ⚠️ 배경·캐릭터 둘 다 background-image 다 — <img> 로 두면 스킨을 바꿀 때 HTML 을 고쳐야 한다.  */
 .hub-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .hub[data-skin] .hub-scene-bg { position: absolute; inset: 0;
-  background-image: var(--skin-bg); background-size: cover;
+  background-image: var(--skin-bg);
+  /* ⚠️ 기본값 cover 는 **세로 위치를 못 움직인다.** 폰처럼 세로로 긴 화면에서는 cover 가 그림 높이를
+     화면에 꼭 맞춰서 세로로 넘치는 부분이 0이 되고, --skin-bg-pos 의 Y 를 뭘 넣든 그림이 그대로다.
+     땅 높이를 캐릭터 발에 맞추려면 --skin-bg-size 로 **세로를 조금 키워** 넘칠 여지를 만든 뒤
+     --skin-bg-pos 로 밀어야 한다(예: auto 115%). 두 값은 한 쌍이다. */
+  background-size: var(--skin-bg-size, cover);
   background-position: var(--skin-bg-pos, 50% 50%); background-repeat: no-repeat; }
 /* 캐릭터 칸 — **키와 발끝 위치는 스킨이 정한다**(배경마다 지평선이 다르다).
    ⚠️ 폭을 aspect-ratio 로 잡지 않는다(2026-08-20). 캐릭터가 6종이 되면서 그림마다 비율이 달라졌고,
@@ -71,12 +76,6 @@
    칩 자체는 inline 이라 넓은 화면에서 형제들처럼 가운데 정렬이 안 된다 →
    같은 폭을 갖는 .hub-backrow 로 감싸 배너·HUD 와 왼쪽 끝을 맞춘다. */
 .hub .hub-backrow { margin: 0 0 10px; }
-.hub .hub-back { display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px 7px 11px; border-radius: 999px; text-decoration: none;
-  background: var(--card); border: 3px solid var(--line); color: var(--ink);
-  font-size: 12.5px; font-weight: 900; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
-.hub .hub-back .ic { font-size: 14px; line-height: 1; }
-.hub .hub-back:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc), .18); }
 
 .hub .slim-banner { margin: 0 0 10px; padding: 7px 12px; border-radius: 13px; font-size: 11.5px; font-weight: 800; color: var(--brand-ink, #2f4a86);
   background: var(--card); border: 3px solid var(--line); box-shadow: 0 3px 0 rgba(var(--shc2), .14); }
@@ -174,7 +173,7 @@
   box-shadow: 0 5px 0 rgba(var(--shc), .28); transition: transform .07s, box-shadow .1s; }
 .hub .fcard:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc), .28); }
 .hub .fcard .fico { font-size: 22px; }
-.hub .f-daily { background: var(--blue); } .hub .f-shop { background: var(--green); } .hub .f-title { background: var(--orange); } .hub .f-ai { background: var(--blue); }
+.hub .f-shop { background: var(--green); } .hub .f-title { background: var(--orange); } .hub .f-ai { background: var(--blue); }
 .hub .bd { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px;
   background: var(--red); color: #fff; border: 2.5px solid var(--line); font-size: 12.5px; font-weight: 900; display: grid; place-items: center; }
 
@@ -451,6 +450,10 @@ body:has(.hub) .fab-top { display: none; }
   box-shadow: 0 3px 0 rgba(var(--shc), .18), inset 0 1px 0 rgba(255,255,255,.85);
   transition: transform .07s, box-shadow .1s; }
 .hub .ms-chip:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc), .18); }
+/* 출석 칩은 **누를 것이 없다**(사이트에 들어오면 자동으로 찍힌다 · 2026-08-24) — 손가락 커서도,
+   눌리는 애니메이션도 주지 않는다. 남겨두면 눌러도 아무 일이 없어 '고장' 으로 읽힌다. */
+.hub .ms-chip.is-static { cursor: default; }
+.hub .ms-chip.is-static:active { transform: none; box-shadow: 0 3px 0 rgba(var(--shc), .18), inset 0 1px 0 rgba(255,255,255,.85); }
 .hub .ms-chip.on { background: var(--yellow); }
 .hub .ms-chip svg { width: 16px; height: 16px; }
 .hub .ms-chip-pt { color: var(--plus); }
@@ -479,7 +482,7 @@ body:has(.hub) .fab-top { display: none; }
 
 /* ---------- 코인 선물 모달 ----------
    즉시 이체라 되돌릴 수 없다 → 화면이 지는 책임은 "누구에게 얼마" 를 착각할 수 없게 만드는 것 하나다.
-   그래서 코드 밑 이름(.gf-to)과 확인 단계(.gf-confirm)는 크게, 나머지는 조용하게 둔다. */
+   그래서 상대 카드(.gf-card)와 확인 단계(.gf-confirm)는 크게, 나머지는 조용하게 둔다. */
 .hub .gf-bal { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 13px;
   background: var(--card); border: 3px solid var(--line); }
 .hub .gf-bal-n { font-size: 20px; font-weight: 900; color: var(--ink); }
@@ -501,11 +504,29 @@ body:has(.hub) .fab-top { display: none; }
 .hub .gf-lab { display: block; font-size: 13px; font-weight: 800; color: var(--ink2); margin: 10px 0 5px; }
 .hub .gf-in { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 11px;
   background: var(--card); border: 3px solid var(--line); outline: none;
-  font-size: 16px; font-weight: 900; color: var(--ink); letter-spacing: .04em; }
+  font-size: 16px; font-weight: 900; color: var(--ink); }
 .hub .gf-in::placeholder { color: var(--ink2); font-weight: 700; }
-/* 코드 8자를 다 치면 뜨는 상대 이름. 오타를 잡는 유일한 지점이라 본문 크기로 키운다. */
+/* ⚠️ 닉네임 칸에는 letter-spacing 을 걸지 않는다 — 옛 코드 칸(CARIXXXX)에는 자간이 있었지만
+      한글·가나·데바나가리는 자간을 벌리면 글자가 흩어져 읽기 나빠진다. */
+/* 조회 실패 사유(없는 닉네임·내 닉네임·쿼터). 성공은 아래 카드가 대신한다. */
 .hub .gf-to { margin: 7px 0 0; font-size: 14px; font-weight: 800; color: var(--red); }
-.hub .gf-to.is-ok { color: var(--plus); }
+
+/* 상대 카드 — **오타 방어선의 본체**다.
+   ⚠️ 이름 한 줄로 되돌리지 말 것. 사용자가 방금 친 값이 그대로 되돌아오는 것이라 확인 기능이 0이다
+      (옛 친구코드 방식에서는 '내가 모르는 닉네임이 뜬다' 자체가 확인이었다). 아바타·ARENA 레벨·
+      국기·지역처럼 **사용자가 안 친 정보**가 있어야 "이 사람 맞네" 를 판단할 수 있다. */
+.hub .gf-card { margin-top: 9px; display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+  border-radius: 13px; background: var(--card); border: 3px solid var(--plus); }
+.hub .gf-card-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hub .gf-card-nm { font-size: 16.5px; font-weight: 900; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub .gf-card-sub { display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  font-size: 13.5px; font-weight: 800; color: var(--ink2); }
+/* 국기는 파일(SVG)이다 — 이모지로 두면 윈도우 크롬·엣지가 'KR' 두 글자를 그린다.
+   ⚠️ 폭 20px 아래로 내리지 말 것(태극기 4괘·성조기 별을 담을 자리가 없다). */
+.hub .gf-card-flag { width: 20px; height: 15px; border-radius: 2px; flex: 0 0 auto; }
+/* ⚠️ 아바타 달걀 방지 — <Avatar> 가 인라인 style 로 px 크기를 박으므로 소켓에서 %로 덮지 않는다.
+      여기는 px(46) 그대로 넘기므로 별도 규칙이 필요 없다(ranking.css 의 소켓 사례와 다른 경우). */
 
 .hub .gf-btn { cursor: pointer; padding: 10px 16px; border-radius: 11px;
   background: var(--brand); color: #fff; border: 3px solid var(--line);
@@ -656,16 +677,34 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ 넓은 화면 값은 **규칙이 아니라 값 블록 안에서** 미디어쿼리로 덮는다. 그래야 규칙에
       브레이크포인트가 안 생기고, 테마가 자기 값만 책임진다.                                    */
 
-/* ── 값: 궁궐(palace) ─────────────────────────────────────────────────────────
+/* 배경 두 장 — 같은 고궁의 낮과 밤(2026-08-20). 옛 단일 배경(bg.png)은 제거됐다.
+   ⚠️ 여기 경로를 바꾸면 `src/lib/hubCosmetics.ts` 의 SkinDef.bg 도 같이 바꿀 것 —
+      공유 카드는 캔버스라 CSS 변수를 못 읽어서 그쪽 경로를 따로 본다. 어긋나면 화면과 카드 배경이 갈린다. */
+/* ⚠️ **확대(--skin-bg-size)와 위치(--skin-bg-pos)는 한 쌍이다.** 기본값 cover 만 두면 세로가 화면에
+   꼭 맞아 넘칠 여지가 0 이라 위치를 뭐를 주든 배경이 안 움직인다(실측). 세로를 130% 로 키워 여지를
+   만들고 아래끝(100%)에 붙여, 그림 아래쪽 마당이 올라와 캐릭터 발밑에 오게 한다.
+   ⚠️ 130 은 눈으로 맞춘 값이다 — 캐릭터가 계단 턱이 아니라 **평평한 마당(밤은 원형 문양)** 위에
+      서는 지점. 폰·PC 양쪽에서 확인했다. 그림을 갈면 docs/hub-skin-mock.html 에서 다시 맞출 것. */
+.hub[data-skin='palace_day']   { --skin-bg: url('/hub/bg-v2.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='palace_night'] { --skin-bg: url('/hub/bg-v5.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
+
+/* ── 값: 궁궐(palace) — 낮·밤 **공용** ────────────────────────────────────────
+   ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 **이 둘만 같은 UI 를 쓰기로 한 예외**다.
+      스킨의 원칙은 여전히 "배경 + UI 한 벌 통짜" — 새 스킨은 **자기 블록을 통째로** 갖고
+      판·게이지·도장·아이콘까지 자기 그림으로 바꾼다(SkinDef.iconDir 도 스킨마다 따로다).
+      새 스킨을 여기 선택자에 끼워 넣지 말 것. 그러면 배경만 바뀌는 반쪽 상품이 된다.
    에셋 public/hub/ui/*.png · 원본 시트 public/hub/ui-sheet.png
    ※ button-vertical.png 는 미사용 — 아이콘 자체가 이미 장식판이라 틀을 덧씌우면 두 겹이 된다. */
-.hub[data-skin='palace'] {
+.hub[data-skin='palace_day'], .hub[data-skin='palace_night'] {
   /* 무대 */
-  --skin-bg: url('/hub/bg.png');
-  --skin-char: url('/hub/char-korea-lv2-hanbok-final.webp');
-  --skin-char-ar: 512 / 640;    /* 한국 Lv2 A안 2등신 한국한복 최종 모션 실측 비율 */
+  /* 배경만 낮·밤이 다르다 — 나머지 값(판·게이지·도장·아이콘)은 두 스킨이 통째로 공유한다.
+     ⚠️ 그래서 --skin-bg 를 여기 두지 않고 아래에서 스킨별로 덮는다. 여기 두면 한쪽이 늘 이긴다. */
+  /* ⚠️ 캐릭터 그림 경로·비율은 여기 없다 — 캐릭터를 고를 수 있게 되면서(2026-08-20) 코드가 알아야
+     하는 값이 됐다(src/lib/hubCosmetics.ts). 여기 남기면 두 곳이 서로 다른 그림을 가리킨다. */
   --skin-char-h: 34vh;          /* 캐릭터 키 */
-  --skin-char-bottom: 20vh;     /* 발끝을 기존보다 2vh 내려 배경 지평선에 맞춘다 */
+  --skin-char-bottom: 20vh;     /* 발끝이 놓이는 자리. 배경 지평선과 맞춘다 */
+                                /* ⚠️ 이 값이 뜻대로 동작하려면 그림 아래에 투명 여백이 없어야 한다.
+                                   여백이 있으면 발끝이 그만큼 떠서 이 값이 거짓말을 한다. */
 
   /* 글자색 — 판이 밝은 베이지라 어둡게. 어두운 판 테마면 여기만 뒤집으면 된다 */
   --skin-panel-ink: #4a2f16;
@@ -726,7 +765,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-cta-edge: 26px 62px 22px;
 }
 @media (min-width: 768px) {
-  .hub[data-skin='palace'] {
+  .hub[data-skin='palace_day'], .hub[data-skin='palace_night'] {
     --skin-panel-title: 20px;
     --skin-mission-edge: 14px 40px 12px;
     --skin-mission-h: 62px;
@@ -773,22 +812,33 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   font-size: var(--skin-panel-title);
 }
 
-/* 레일 5칸 — 틀을 씌우지 않는다. 아이콘 자체가 장식판이라 덧씌우면 틀이 두 겹이 된다.
+/* 레일 칸 — 틀을 씌우지 않는다. 아이콘 자체가 장식판이라 덧씌우면 틀이 두 겹이 된다.
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
       라벨 자리까지 먹어 글자가 통째로 사라진다. 라벨은 태그 없는 맨 텍스트라 grid 가 2행에 앉힌다. */
 .hub[data-skin] .fcard,
-.hub[data-skin] .f-daily, .hub[data-skin] .f-shop,
+.hub[data-skin] .f-shop,
 .hub[data-skin] .f-title, .hub[data-skin] .f-invite {
   background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
   display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; gap: 1px;
-  font-size: 12px; line-height: 1.15;
+  font-size: 15px; line-height: 1.15;
   color: var(--skin-rail-ink); text-shadow: var(--skin-rail-ink-shadow);
+}
+/* ⚠️ 레일 글자 크기는 **이 규칙에서만** 정해진다 — 위쪽 `.hub .fcard`(13px · PC 17px)를
+      특정도로 이기고 스킨은 항상 켜져 있다. PC 에서도 12px 로 남아 있던 게 그래서였다.
+   ⚠️ 칸 폭이 곧 상한이다(모바일 64px · PC 96px). 제일 긴 라벨이 '초대하기'(4자)라
+      모바일에서 16px 을 넘기면 줄바꿈되고, 두 줄이 되면 위 칸(1fr)의 아이콘이 그만큼 눌린다. */
+@media (min-width: 768px) {
+  .hub[data-skin] .fcard,
+  .hub[data-skin] .f-shop,
+  .hub[data-skin] .f-title, .hub[data-skin] .f-invite { font-size: 19px; }
 }
 /* ⚠️ overflow:hidden 을 쓰면 그림자까지 네모로 잘려 아이콘마다 사각 경계선이 생긴다.
       그림을 absolute 로 깔면 부모 높이가 1fr 이어도 퍼센트가 확실히 풀린다. */
 .hub[data-skin] .fcard .fico { position: relative; min-height: 0; width: 100%; height: 100%; }
 .hub[data-skin] .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
-  object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+  /* 첫 행이 남는 높이를 모두 차지하므로 가운데 정렬하면 아이콘과 아래 라벨 사이가 벌어진다.
+     아이콘을 행의 아래쪽에 붙여 세 버튼의 그림과 텍스트가 한 덩어리로 읽히게 한다. */
+  object-fit: contain; object-position: center bottom; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
 .hub[data-skin] .fcard:active { transform: translateY(2px); box-shadow: none; }
 /* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
       가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
@@ -907,9 +957,10 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       .hub 가 화면 높이만큼만 쓰고(100dvh), 남는 자리를 무대(.stage-zone)가 가져간다.
    ⚠️ 100vh 가 아니라 100dvh 다 — 모바일은 주소창이 접혔다 펴지면서 100vh 가 화면보다
       커서, vh 로 잠그면 잠근 그 순간에도 스크롤이 남는다.
-   ⚠️ **레일 5칸을 flex 로 나눠 갖게 한 게 핵심이다.** 예전처럼 카드 높이를 고정해 두면
+   ⚠️ **레일 칸을 flex 로 나눠 갖게 한 게 핵심이다.** 예전처럼 카드 높이를 고정해 두면
       무대가 줄어드는 순간 레일이 무대를 넘쳐 아래 출석 스탬프를 덮는다(hub.css 위쪽 경고와 같은 사고).
-      이제 무대가 얼마가 되든 다섯 칸이 그 높이를 나눠 갖는다.                      */
+      이제 무대가 얼마가 되든 칸들이 그 높이를 나눠 갖는다 — 그래서 칸을 더하거나 빼도(2026-08-24
+      '출석' 제거로 4 → 3) 높이를 다시 실측할 일이 없다.                          */
 .hub { height: 100dvh; display: flex; flex-direction: column; }
 /* ⚠️ `width: 100%` 를 빼면 안 된다. 넓은 화면에서 .home 은 `margin-left/right: auto` 로 가운데 정렬되는데,
       flex 아이템은 **가로 마진이 auto 면 늘어나기(stretch)를 포기하고 내용만큼만 줄어든다**.
@@ -918,7 +969,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub .home { flex: 1 1 auto; min-height: 0; width: 100%; }
 .hub .stage-zone { flex: 1 1 auto; min-height: 96px; height: auto; }
 .hub .rail-r { top: 0; bottom: 0; justify-content: space-between; }
-/* ⚠️ 아이콘 크기의 천장은 '무대 높이 ÷ 5' 다 — 아이콘은 세로에 갇혀 있어서 폭을 넓혀도 안 커진다.
+/* ⚠️ 아이콘 크기의 천장은 '무대 높이 ÷ 칸 수' 다 — 아이콘은 세로에 갇혀 있어서 폭을 넓혀도 안 커진다.
       그래서 칸 사이 간격을 줄여 세로를 벌었다. 더 키우려면 무대를 키우거나 칸을 줄이는 수밖에 없다. */
 .hub .rail-r { gap: 6px; }
 .hub .rail-r .fcard { flex: 1 1 0; min-height: 0; width: 64px; }
@@ -930,18 +981,11 @@ html.dark .hub .ticket-ghost, html.dark .hub .title-slot { border-color: #4a5264
 html.dark .hub .ticket.is-used .ticket-stamp { color: #7f8899; border-color: #4a5264; }
 html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 
-/* ── 로그인 게이트 (비로그인으로 /hub 진입 시) ── */
-.hub.hub-gate { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-.hub .hub-gate-card { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; text-align: center;
-  background: var(--card); border: 3.5px solid var(--line); border-radius: 24px; padding: 28px 30px 30px;
-  box-shadow: 0 6px 0 rgba(var(--shc), .2); max-width: 340px; width: 100%; }
-.hub .hub-gate-char { width: 150px; height: auto; margin: -6px 0 6px; filter: drop-shadow(0 8px 4px rgba(60,45,10,.16)); }
-.hub .hub-gate-title { margin: 0; font-size: 26px; font-weight: 900; color: var(--ink); letter-spacing: .01em; }
-.hub .hub-gate-sub { margin: 8px 0 20px; font-size: 13.5px; font-weight: 700; color: var(--ink2); line-height: 1.5; }
-.hub .hub-gate-btn { width: 100%; padding: 13px 18px; border-radius: 14px; cursor: pointer;
-  background: var(--brand); color: #fff; border: 3.5px solid var(--line); font-size: 15px; font-weight: 900;
-  box-shadow: 0 5px 0 rgba(var(--shc), .3); transition: transform .07s, box-shadow .1s; }
-.hub .hub-gate-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc), .3); }
+/* ── 로그인 게이트는 여기 없다(2026-08-24) ──
+   비로그인 /hub 게이트를 **결제 화면(/checkout)의 로그인 안내 카드와 같은 것**으로 갈았다.
+   그래서 카툰 카드 값(.hub-gate-*)과 옛 CARI 로봇 그림(/hub-char.png)이 통째로 빠졌다 —
+   그림은 이미 지금 캐릭터가 아니었고, 같은 상황을 두 화면이 다른 얼굴로 말하고 있었다.
+   지금 마크업은 Hub.tsx 안에 Tailwind 토큰으로 있다(ExamApply 의 막힘 카드와 같은 값). */
 
 /* ══════════════════════════════════════════════════════════════════════════
    꾸미기(상점 + 인벤토리) · 캐릭터 고르기 · 튜토리얼 — 2026-08-20

@@ -208,11 +208,21 @@ const overflow = (await q(`
 `)).rows[0].n;
 eq('지역 인원 합이 나라 인원을 2.5배 넘는 나라는 없다', Number(overflow), 0);
 
-// 실회원 300명이 0점으로 들어와도 대한민국은 4위를 지킨다(시드 인원이 2.5만이라 희석된다).
-for (let i = 100; i < 400; i++) await addUser(i, 'KR', null, 0);
+// 실회원이 0점으로 들어오면 시드가 희석된다.
+//   ⚠️ **시드 인원을 1/24 로 줄인 뒤(2026-08-21) 이 방어력도 24배 줄었다** — 대한민국이 4위를 지키는
+//      한계는 이제 약 230명이다(옛 2.5만 시드에서는 5,000명이었다). 그게 인원을 줄인 대가고,
+//      사람이 모이면 더미가 밀려나는 건 의도한 동작이다.
+//   ⚠️ 다만 **언제 밀리는지를 모르면** 어느 날 순위가 바뀐 걸 버그로 오해한다. 그래서 경계를
+//      양쪽에서 박아 둔다 — 아래 두 검사가 같이 움직여야 시드를 다시 손댈 때 값이 드러난다.
+for (let i = 100; i < 250; i++) await addUser(i, 'KR', null, 0);   // 150명 — 경계 아래
 await refresh();
 const top2 = (await q(`select public.country_leaderboard('season') as j`)).rows[0].j.map((b) => b.code);
-eq('실회원 300명(0점) 유입 후에도 대한민국 4위', top2.indexOf('KR'), 3);
+eq('실회원 150명(0점) 유입 후에도 대한민국 4위', top2.indexOf('KR'), 3);
+
+for (let i = 250; i < 400; i++) await addUser(i, 'KR', null, 0);   // 누적 300명 — 경계 위
+await refresh();
+const top2b = (await q(`select public.country_leaderboard('season') as j`)).rows[0].j.map((b) => b.code);
+eq('실회원 300명(0점)이면 대한민국이 5위로 밀린다(축소의 대가)', top2b.indexOf('KR'), 4);
 const krNow = await bucket('country', 'KR');
 eq('그때도 has_real = true', krNow.has_real, true);
 

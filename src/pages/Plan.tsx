@@ -38,6 +38,23 @@ function scheduleRows(r: RoundView, lang: Lang) {
   return out
 }
 
+/** "A ~ B" 를 양끝이 각각 안 쪼개지게 그린다. 범위가 아니면(옛 회차의 시험일 하루) 그대로. */
+function rangeText(text: string) {
+  const [a, b] = text.split('~')
+  if (b === undefined) return text
+  return (
+    <>
+      <span className="whitespace-nowrap">{a.trim()}</span>
+      {' ~ '}
+      <span className="whitespace-nowrap">{b.trim()}</span>
+    </>
+  )
+}
+
+// 카드로 보여줄 정기 회차 수. 이번 달 + 다음 두 달(2026-08-21 지시) — 목록은 이미 가까운 순이고
+// 지난 회차는 useExamRounds 가 걸러내므로 앞에서 3개를 자르면 그대로 '현재·+1·+2' 다.
+const ROUNDS_SHOWN = 3
+
 const STATUS_KEY: Record<RoundStatus, string> = {
   open: 'guide.status_open',
   upcoming: 'guide.status_upcoming',
@@ -51,6 +68,8 @@ export default function Plan() {
 
   const apply = (id: string, label: string, dateLabel: string) =>
     navigate(`/exam/apply?round=${id}`, { state: { roundId: id, roundLabel: label, dateLabel } })
+
+  const shown = regular.slice(0, ROUNDS_SHOWN)
 
   return (
     <div className="guide-page text-on-background min-h-screen">
@@ -97,11 +116,11 @@ export default function Plan() {
             <p className="pl-empty">{t('sched.empty')}</p>
           )}
 
-          {regular.length > 0 && (
+          {shown.length > 0 && (
             <section className="pl-sec">
               {/* 정기시험은 섹션 헤더 없이 카드만 — 상시시험이 있을 때만 아래에 구분 헤더가 붙는다. */}
               <div className="pl-rounds">
-                {regular.map((s) => (
+                {shown.map((s) => (
                   <article
                     key={s.id}
                     className={`pl-rd${s.clickable ? ' is-open' : ' is-off'}`}
@@ -114,25 +133,20 @@ export default function Plan() {
                       <span className="pl-rd-title">{s.title}</span>
                       <span className="pl-pill">{t(STATUS_KEY[s.status])}</span>
                     </div>
-                    {/* 큰 줄 = 응시 기간(11~20일). 예전엔 '시험일 하루' 였는데 월 규칙에서는 열흘이라
-                        라벨 없이 날짜만 두면 접수기간과 구분이 안 된다. */}
-                    <div className="pl-rd-date">
-                      <span className="pl-rd-datelbl">{t('sched.exam_period')}</span>
-                      {s.dateText}
-                    </div>
+                    {/* 접수기간 → 응시기간 순서로 같은 크기 두 줄. 접수가 위인 이유 = 지금 눌러서 할 일이
+                        접수고, 응시는 그 다음이다. 한쪽만 키우면 다른 쪽이 부속 설명처럼 읽힌다. */}
                     {s.applyText && (
-                      <div className="pl-rd-apply">
-                        {t('sched.apply_period')}
-                        <b>
-                          {(() => {
-                            const [a1, a2] = s.applyText.split('~')
-                            return a2 !== undefined
-                              ? <><span className="whitespace-nowrap">{a1.trim()}</span>{' ~ '}<span className="whitespace-nowrap">{a2.trim()}</span></>
-                              : s.applyText
-                          })()}
-                        </b>
+                      <div className="pl-rd-row">
+                        <span className="pl-rd-rowlbl">{t('sched.apply_period')}</span>
+                        <b className="pl-rd-rowval">{rangeText(s.applyText)}</b>
                       </div>
                     )}
+                    {/* 응시 기간(11~20일). 예전엔 '시험일 하루' 였는데 월 규칙에서는 열흘이라
+                        라벨 없이 날짜만 두면 접수기간과 구분이 안 된다. */}
+                    <div className="pl-rd-row">
+                      <span className="pl-rd-rowlbl">{t('sched.exam_period')}</span>
+                      <b className="pl-rd-rowval">{rangeText(s.dateText)}</b>
+                    </div>
                     {s.clickable && (
                       <span className="pl-go">
                         {t('sched.apply')}

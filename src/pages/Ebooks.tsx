@@ -32,6 +32,7 @@ import { MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
 import { getTracks, TIER_COLORS } from '../lib/caris'
 import { LECTURES, lecturesForLevel, ytEmbed, ytThumb, ytWatch, type Lecture } from '../lib/lectures'
 import type { EbookListResp, EbookRow, ServerLecture } from '../lib/types'
+import { rememberPostLogin } from '../lib/postLogin'
 
 type Catalog = 'leveltest' | 'caris'
 /** 카탈로그 이름은 급수 이름(Beginner…)과 같은 브랜드 고유명이라 **언어 무관 영문 고정**이다(i18n 사전 아님). */
@@ -286,7 +287,7 @@ export default function Ebooks() {
 
   // 로그인 수단이 구글만이 아니라서(카카오도 있음) 특정 provider 를 호출하지 않고 로그인 페이지로 보낸다.
   function goLogin() {
-    try { sessionStorage.setItem('postLoginRedirect', '/ebooks') } catch { /* 무시 */ }
+    rememberPostLogin('/ebooks')
     navigate('/login')
   }
 
@@ -322,14 +323,22 @@ export default function Ebooks() {
       return next
     })
   }
-  /** 전체 선택 ↔ 해제 — **그 종류 안에서만** 움직인다(교재 버튼이 강의를 건드리면 안 된다). */
+  /**
+   * 전체 선택 ↔ 해제 — **그 종류 안에서만** 움직인다(교재 버튼이 강의를 건드리면 안 된다).
+   * ⚠️ 기준은 **담은 게 하나라도 있나**(`done > 0`)다. 예전엔 할인 조건(`all` = 전권을 담았나)을 썼는데,
+   *    `all` 은 이미 산 책까지 분모에 넣기 때문에 **한 권이라도 보유한 사람은 영영 true 가 안 됐다**
+   *    → 버튼이 계속 '전체 선택' 인 채로 담기만 하고 **푸는 길이 없었다**(2026-08-21 신고).
+   *    할인 판정과 버튼 동작은 다른 문제다 — `all` 은 서버(resolveBundle)와 한 벌이라 그대로 둔다.
+   */
   function pickAllOf(kind: BundleItem['kind']) {
     const st = kind === 'book' ? bundleKinds.book : bundleKinds.lecture
+    const clear = st.done > 0
     setPicked((prev) => {
       const next = new Set(prev)
-      for (const i of st.sellable) {
-        if (st.all) next.delete(i.key)
-        else next.add(i.key)
+      for (const i of st.items) {
+        // 해제는 items 전체를 훑는다 — 담아둔 뒤 그 책을 사버린 경우처럼 sellable 에서 빠진 키도 털어낸다.
+        if (clear) next.delete(i.key)
+        else if (!i.owned) next.add(i.key)
       }
       return next
     })
@@ -463,10 +472,10 @@ export default function Ebooks() {
             <button
               type="button"
               onClick={() => pickAllOf(kind)}
-              disabled={st.sellable.length === 0}
+              disabled={st.sellable.length === 0 && st.done === 0}
               className="rounded-xl border border-outline-variant px-4 py-2.5 font-label-md text-[16px] font-bold text-on-surface-variant transition-colors hover:text-on-surface disabled:opacity-40"
             >
-              {st.all ? t('ll.pick_none') : t('ll.pick_all')}
+              {st.done > 0 ? t('ll.pick_none') : t('ll.pick_all')}
             </button>
             <button
               type="button"
@@ -496,7 +505,7 @@ export default function Ebooks() {
               그대로 덮여 글자가 잘린다. 실제로 그렇게 만들었다가 반려됐다(2026-08-06). */}
           {/* 메인으로 — /notice·/exam/apply 등 다른 화면 상단에 있는 그 뒤로가기와 같은 모양이다.
               이 화면엔 헤더가 없어서 여기 말고는 홈으로 돌아갈 길이 FAB 뿐이다. */}
-          <Link to="/" className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">
+          <Link to="/" className="gd-back mb-6">
             <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             {t('common.home')}
           </Link>
@@ -550,7 +559,12 @@ export default function Ebooks() {
                      페이지 나누기)이 푸는 문제다. 크기를 다시 줄이지 말 것. */}
               {/* ⚠️ max-h 는 카탈로그 전환 버튼 줄(52px + 여백 16)까지 뺀 값이다 — 위에 뭘 더 얹으면 여기도 다시 잴 것.
                   두 열을 묶은 겹에도 같이 걸린다(&>*) — 안 걸면 그 겹만 화면 밖으로 자란다. */}
-              <div className="hidden lg:flex gap-4 items-start [&>*]:max-h-[calc(100dvh-276px)]">
+              {/* ⚠️ 세 열의 **높이를 맞춘다**(2026-08-21 요청) — `items-stretch`(flex 기본)라 셋 다 제일 긴 열만큼 선다.
+                  ⚠️ 여전히 **화면 높이로 못박는 게 아니다**(그게 2026-08-06 반려된 것). 기준은 제일 긴 열의 내용이고,
+                     그게 max-h 를 넘을 때만 각 열이 자기 안에서 스크롤한다.
+                  ⚠️ 짧은 열은 아래가 빈다 — 지금은 레벨 열(전체구매+7레벨)이 제일 길어서 교재·강의 아래가 남는다.
+                     그게 싫으면 `items-start` 로 되돌리면 되고, 그러면 레벨 열만 따로 논다. */}
+              <div className="hidden lg:flex gap-4 [&>*]:max-h-[calc(100dvh-276px)]">
                 <Pane title={t(cat === 'caris' ? 'll.tier_col' : 'll.level_col')} className="w-[276px] shrink-0">
                   <ul className="p-2.5">
                     {groups.map((g) => {

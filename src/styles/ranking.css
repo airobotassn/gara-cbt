@@ -706,7 +706,7 @@ html.dark body:has(.hof-wrap) {
     width: min(1280px, 100%); max-width: 1280px;
     height: auto; min-height: 100dvh;
     overflow: visible;
-    padding-bottom: 40px;
+    padding-bottom: 10px;
   }
   /* 뒤로가기 칩 하나가 한 행을 통째로 먹고 있었다 — 흐름에서 빼서 왼쪽 위에 얹고 그만큼 본문을 올린다 */
   .hof-wrap > .topbar { position: absolute; top: 10px; left: 0; margin: 0; z-index: 2; }
@@ -721,12 +721,13 @@ html.dark body:has(.hof-wrap) {
     grid-template-areas:
       'pod   list'
       'mebar list';
-    grid-template-rows: auto 1fr;
+    /* 왼쪽의 시상대+내 순위 바를 한 묶음처럼 화면 하단에 붙인다. */
+    grid-template-rows: 1fr auto;
     column-gap: 32px;
     align-content: start;
   }
-  .hof-body > .hof-podium { grid-area: pod; }
-  .hof-body > .hof-mebar { grid-area: mebar; align-self: start; margin-top: 14px; }
+  .hof-body > .hof-podium { grid-area: pod; align-self: end; transform: translateY(-20px); }
+  .hof-body > .hof-mebar { grid-area: mebar; align-self: start; margin-top: 0; transform: translateY(-20px); }
   /* 그리드에선 flex 속성이 무시된다 → 창은 내용만큼 자란다(stretch 면 빈 보드에서 거대한 빈 상자가 된다).
      center = 왼쪽 칸(시상대+내 순위)과 세로 중심을 맞춘다. start 로 두면 목록만 위에 붙어 아래가 빈다. */
   .hof-body > .hof-listwin { grid-area: list; align-self: center; max-height: none; }
@@ -747,8 +748,9 @@ html.dark body:has(.hof-wrap) {
 .hof-head { position: relative; text-align: center; width: 100%; margin: 2px auto 10px; }
 .hof-head .hof-title { font-size: clamp(26px, 5.2vw, 38px); margin-bottom: 0; }
 @media (min-width: 900px) {
-  .hof-head { margin: 0 auto 16px; }
+  .hof-head { margin: 0 auto; }
   .hof-head .hof-title { font-size: clamp(34px, 3.4vw, 46px); }
+  .hof-tabs { margin-top: 0; transform: translateY(-8px); }
 }
 /* (옛 .hof-head-in — 시상대 그림의 '날개 사이'에 제목을 얹던 것 — 은 제거됐다.
     2026-08-03 새 시상대(밤하늘·금 건축물)엔 날개도 빈 띠도 없어서 얹을 자리가 없다.) */
@@ -798,11 +800,53 @@ html.dark body:has(.hof-wrap) {
       또 시상대 글자 크기가 cqw(=그림 폭) 라 폭을 줄이면 2·3등 이름이 4~10위 행보다 작아진다
       → 폭을 줄인 만큼 아래 .hof-plate 의 글자 비율을 올려서 위계를 지킨다. 둘은 같이 움직인다.
    (이 규칙은 반드시 위 기본 규칙 **뒤**에 있어야 한다 — 앞에 두면 같은 특정도라 500px 에 덮인다) */
-@media (min-width: 900px) { .hof-podium { max-width: 600px; } }
+/* 국기와 깃대가 숨 쉴 세로 공간을 확보하도록 데스크톱 시상대를 한 단계 줄인다. */
+@media (min-width: 900px) { .hof-podium { max-width: 540px; } }
 /* 컨테이너 = 그림 자체. 명판 글자 크기를 cqw 로 잡아 그림과 정확히 같은 비율로 줄어들게 한다
    (vw 로 잡으면 데스크톱 2단처럼 그림 폭과 화면 폭이 따로 노는 곳에서 어긋난다). */
 .hof-podium-art { position: relative; container-type: inline-size; }
 .hof-podium-img { display: block; width: 100%; height: auto; }
+.hof-podium-flag {
+  position: absolute;
+  z-index: 1;
+  width: 17%;
+  aspect-ratio: 4 / 3;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+/* 경기장 천장에서 큰 국기 원단만 내려온 인상. 중앙 국기가 더 크고 높다. */
+.hof-podium-flag.p1 { left: 50.67%; top: -22.8%; }
+.hof-podium-flag.p2 { left: 22.4%; top: 2.4%; width: 17%; }
+.hof-podium-flag.p3 { left: 78.5%; top: 11%; width: 17%; }
+/* 세로가 넉넉한 화면에서는 하단 고정으로 생긴 빈 공간을 국기가 채운다.
+   링 외곽 기준 간격은 세 국기 모두 같은 3%를 유지한다. */
+@media (min-width: 900px) and (min-height: 760px) {
+  .hof-podium-flag { width: 23%; }
+  .hof-podium-flag.p1 { top: -30.2%; }
+  .hof-podium-flag.p2 { left: 18%; top: -5%; width: 23%; }
+  .hof-podium-flag.p3 { left: 82%; top: 3.6%; width: 23%; }
+}
+.hof-flag-pole { display: none; }
+.hof-flag-cloth {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 1px 1px 4px 4px;
+  background: #fff;
+  transform: perspective(240px) rotateX(-2deg);
+  transform-origin: top center;
+  box-shadow: inset -12px 0 18px rgba(0, 0, 0, .12);
+}
+.hof-flag-cloth::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.15), transparent 25%, rgba(0,0,0,.09) 52%, rgba(255,255,255,.1) 74%, rgba(0,0,0,.14)),
+    linear-gradient(180deg, rgba(255,255,255,.08), transparent 30%, rgba(0,0,0,.1));
+  pointer-events: none;
+}
+.hof-flag-cloth img { display: block; width: 100%; height: 100%; object-fit: fill; }
 /* 링 = 그 사람 카드를 여는 버튼(button 리셋 포함).
    ⚠️ overflow 는 visible 이어야 한다 — 아래 ::after(프로필 링 테두리)가 슬롯 밖으로 삐져나오게
       그려지는데, hidden 이면 통째로 잘려서 링이 안 보인다. 아바타 자체는 각자 원형이라(이미지는
@@ -983,6 +1027,13 @@ html.dark body:has(.hof-wrap) {
      이름판     x 581~2102(27.19% ~ 98.41%) — .bar-nm/.bar-pt 의 좌우 여백이 여기서 나온다.
      세로는 셋 다 중심 50.17%. */
 .bar-rk { left: 7.23%; top: 50.17%; width: 9.45%; aspect-ratio: 1; font-weight: 900; font-size: 4.4cqw; color: #ffbe63; }
+/* 순위 소켓은 에셋 안에서 폭이 고정되어 있으므로 네 자리부터 숫자만 단계적으로 줄인다.
+   한두 자리 순위는 기존 크기를 그대로 유지해 빈 소켓 안에서 작아 보이지 않게 한다. */
+.bar-rk[data-digits="4"] { font-size: 3.7cqw; letter-spacing: -0.12cqw; }
+.bar-rk[data-digits="5"] { font-size: 3.05cqw; letter-spacing: -0.15cqw; }
+.bar-rk[data-digits="6"] { font-size: 2.55cqw; letter-spacing: -0.17cqw; }
+.bar-rk[data-digits="7"] { font-size: 2.15cqw; letter-spacing: -0.18cqw; }
+.bar-rk[data-digits="8"] { font-size: 1.9cqw; letter-spacing: -0.19cqw; }
 .bar-ava { left: 18.86%; top: 50.17%; width: 8.94%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; }
 /* 내 행 — 배경을 못 깔므로(프레임이 이미지) 광채로 표시.
    ⚠️ filter 를 바에 걸면 프레임 이미지가 한 번 더 래스터화돼 선이 지글거린다 → 뒤에 깔린 글로우로 처리. */
@@ -1008,6 +1059,13 @@ html.dark body:has(.hof-wrap) {
   margin: 12px auto 0;
   padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
+/* 내 순위 바 — 목록과 같은 프레임을 쓰되 보랏빛 코발트로 살짝 구분한다. */
+.hof-mebar .bar-frame {
+  filter: hue-rotate(48deg) saturate(1.28) brightness(1.09)
+    drop-shadow(0 0 10px rgba(139, 104, 255, .42));
+}
+.hof-mebar .bar-rk,
+.hof-mebar .bar-pt { color: #d6c8ff; text-shadow: 0 0 7px rgba(139, 104, 255, .55); }
 /* 눌러서 내 행으로 이동 (보드 안에 내가 있을 때만) */
 .hof-bar.jump { cursor: pointer; transition: transform .15s ease; }
 .hof-bar.jump:hover { transform: translateY(-2px); }
@@ -1076,3 +1134,12 @@ html.dark body:has(.hof-wrap) {
 .hof-bkt-meta { margin-top: 3px; display: flex; align-items: center; gap: 7px; font-size: var(--fs-sm); color: var(--muted); font-weight: 700; }
 .hof-bkt-meta .dot { color: var(--line2); }
 .hof-bkt-agg { font-style: italic; color: var(--dim); }
+
+/* 이어보기(무한 스크롤) 로딩 줄 — 목록 창 안 맨 아래.
+   ⚠️ '끝' 같은 문구는 넣지 않는다. 3만5천 명 목록에서 그 줄만 계속 눈에 걸린다. */
+.hof-more {
+  padding: 14px 0 18px;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}

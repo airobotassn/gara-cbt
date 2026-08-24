@@ -281,7 +281,7 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   })
 
   // GARA 로고(우상단) — 원본이 **검정 글씨**라 사진 위에서는 안 보인다 → 반전해 흰 로고로 그린다
-  // (앱도 다크 테마에서 같은 방법을 쓴다 — stitch.css 의 .hero-watermark).
+  // (앱도 다크 테마에서 같은 방법을 쓴다 — shared.css 의 .gara-wordmark).
   // ⚠️ 로고 파일을 갈면 종횡비(388/95)를 알파로 다시 실측할 것.
   try {
     const gara = await loadImage('/gara-mark-en.png')

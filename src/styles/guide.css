@@ -42,19 +42,6 @@ html.dark .guide-page {
 }
 
 /* ── 히어로 ── */
-/* ── 상단 홈/뒤로가기 칩 ──
-   /guide(홈으로)와 /plan(CARIS 안내로)이 **같은 물건**이라 규칙도 하나다.
-   ⚠️ 두 화면 다 .guide-page 의 --g-* 토큰 위에서 그려진다(그래서 토큰 주인인 이 파일에 둔다).
-      새 화면에 또 그리지 말고 이 클래스를 쓸 것 — 모양이 갈리면 같은 버튼이 페이지마다 달라 보인다. */
-.gd-back, .pl-back {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px 8px 11px;
-  border: 1px solid color-mix(in srgb, var(--g-line) 70%, transparent); border-radius: 999px;
-  background: var(--g-card); color: var(--g-muted); font-size: 13.5px; font-weight: 700;
-  box-shadow: 0 2px 6px rgba(15, 60, 140, .06); transition: border-color .16s ease, color .16s ease;
-}
-.gd-back .material-symbols-outlined, .pl-back .material-symbols-outlined { font-size: 18px; }
-.gd-back:hover, .pl-back:hover { border-color: color-mix(in srgb, var(--g-blue) 45%, transparent); color: var(--g-blue-deep); }
-
 /* 히어로 위 한 줄 — 칩만 있는 줄이라 아래 여백만 준다. */
 .guide-backrow { margin-bottom: 16px; }
 

@@ -15,6 +15,7 @@ import { useT } from '../lib/i18n'
 import { krw, usdc } from '../lib/money'
 import { agreeTerms, createOrder, type CreateOrderResp, type ProductType } from '../lib/payments'
 import SiteFooter from '../components/SiteFooter'
+import { rememberPostLogin } from '../lib/postLogin'
 
 type Phase = 'loading' | 'ready' | 'error'
 
@@ -96,15 +97,10 @@ export default function Checkout() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!isFullUser) {
-      try {
-        // ⚠️ 담은 교재도 같이 실어야 한다 — 빠뜨리면 로그인하고 돌아온 사람의 장바구니가 조용히 비워진다.
-        const back = `/checkout?type=${productType}&ref=${productRef}${addonEbookId ? `&book=${addonEbookId}` : ''}${bundleIdsRaw ? `&ids=${bundleIdsRaw}` : ''}`
-        sessionStorage.setItem('postLoginRedirect', back)
-      } catch { /* 무시 */ }
-      navigate('/login', { replace: true })
-      return
-    }
+    // 비로그인은 여기서 멈춘다 — **조용히 /login 으로 튕기지 않는다**(2026-08-24 지시).
+    // 아래 렌더가 로그인 안내 카드를 띄우고, 그 버튼이 복귀 주소를 심은 뒤 /login 으로 보낸다.
+    // (버튼을 누를 때 심는 이유 = 들어오기만 하고 나간 사람의 다음 로그인이 엉뚱하게 결제로 튀지 않게)
+    if (!isFullUser) return
     if (preflightErr) return // 위에서 이미 판정났다 — 주문을 만들지 않는다
     if (startedRef.current) return
     startedRef.current = true
@@ -153,6 +149,18 @@ export default function Checkout() {
     }
   }
 
+  // 로그인 안내 카드 — authLoading 중엔 판정 보류(로그인한 사람 화면에 카드가 한 프레임 번쩍이는 것 방지).
+  const needLogin = !authLoading && !isFullUser
+
+  // 로그인 수단이 구글만이 아니라서(카카오도 있다) 특정 provider 를 부르지 않고 로그인 화면으로 보낸다.
+  // ⚠️ 복귀 주소에 담은 교재·묶음 목록을 같이 실어야 한다 — 빠뜨리면 로그인하고 돌아온 사람의
+  //    장바구니가 조용히 비워진다.
+  function goLogin() {
+    const back = `/checkout?type=${productType}&ref=${productRef}${addonEbookId ? `&book=${addonEbookId}` : ''}${bundleIdsRaw ? `&ids=${bundleIdsRaw}` : ''}`
+    rememberPostLogin(back)
+    navigate('/login')
+  }
+
   const showError = preflightErr || phase === 'error'
   const chargeKrw = order?.charge?.currency === 'KRW'
 
@@ -161,7 +169,7 @@ export default function Checkout() {
       <main className="flex-grow w-full max-w-3xl mx-auto px-margin-mobile md:px-margin-desktop pt-12 pb-24">
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors"
+          className="gd-back mb-6"
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           {t('pay.back')}
@@ -176,7 +184,24 @@ export default function Checkout() {
           </div>
         )}
 
-        {showError ? (
+        {/* 로그인 안내 — /hub 게이트와 같은 취급이다. 예전엔 이 자리에서 말없이 /login 으로 튕겨서,
+            누른 사람은 결제하기를 눌렀는데 왜 로그인 화면이 떴는지 모른 채 넘어갔다. */}
+        {needLogin ? (
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-10 text-center ambient-shadow">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
+              <span className="material-symbols-outlined text-[32px]">login</span>
+            </div>
+            <h2 className="mb-2 font-title-md text-title-md font-bold text-on-surface">{t('pay.login_title')}</h2>
+            <p className="mb-6 font-body-md text-body-md text-on-surface-variant break-keep">{t('pay.login_sub')}</p>
+            <button
+              onClick={goLogin}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-label-md text-label-md font-bold text-on-primary ambient-shadow"
+            >
+              {t('common.login')}
+              <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+            </button>
+          </div>
+        ) : showError ? (
           <div className="rounded-2xl border border-error/30 bg-error/5 p-6">
             <p className="font-body-md text-[16px] text-on-surface break-keep">{preflightErr || err}</p>
             {/* 되돌아갈 곳은 상품 종류가 정한다 — 응시료를 결제하다 막힌 사람을 이북 스토어로 보내면 길을 잃는다. */}

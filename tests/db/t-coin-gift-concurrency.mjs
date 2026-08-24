@@ -18,6 +18,8 @@ import { readFileSync } from 'node:fs';
 
 const URL = process.env.CARI_TEST_PG ?? 'postgres://postgres:test@127.0.0.1:55432/caritest';
 const raw = readFileSync('supabase/migrations/20260807120000_coin_gift.sql', 'utf8');
+// 지목 수단이 친구코드 → 닉네임으로 바뀐 뒤의 함수를 검증한다(둘을 순서대로 적용).
+const rawNick = readFileSync('supabase/migrations/20260824140000_coin_gift_by_nickname.sql', 'utf8');
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -40,7 +42,13 @@ for (const r of ['anon', 'authenticated', 'service_role']) {
 await admin.unsafe(`
   create table profiles (
     id uuid primary key references auth.users(id) on delete cascade,
-    display_name text, referral_code text, deactivated_at timestamptz
+    display_name text, referral_code text, deactivated_at timestamptz,
+    -- 닉네임 지목의 전제. 확정 안 된 계정은 조회·이체 양쪽에서 안 잡힌다.
+    nickname_set_at timestamptz, avatar_url text, country_code text, region_code text
+  );
+  create table user_progress (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    season_total bigint not null default 0
   );
   create table user_currency (
     user_id uuid primary key references auth.users(id) on delete cascade,
@@ -48,6 +56,7 @@ await admin.unsafe(`
   );
 `);
 await admin.unsafe(raw);
+await admin.unsafe(rawNick);
 
 // 음성 대조군 — **일부러 틀린 잠금 순서**(보내는 사람 먼저 → 받는 사람). 실제 함수와 로직은 같고 순서만 다르다.
 // 이게 없으면 "데드락 0건"이 '순서가 옳아서'인지 '테스트가 애초에 경쟁을 못 만들어서'인지 구분할 수 없다.
@@ -79,14 +88,15 @@ await admin.unsafe(`
 
 // ---------- 사용자 ----------
 const uid = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
-const code = (n) => `CARI${String(n).padStart(4, '0').replace(/(\d)/g, (d) => 'ABCDEFGHIJ'[Number(d)])}`;
+// 닉네임으로 지목한다(2026-08-24 부터 친구코드 경로가 없다). display_name 과 같은 값이어야 한다.
+const nick = (n) => `유저${n}`;
 // 사용자 수는 부하 단계의 쿨다운 충돌률이 정한다 — 적으면 같은 (보낸이×받는이) 쌍이 계속 겹쳐
 // too_fast 만 잔뜩 나오고 정작 이체가 안 일어나 테스트가 조용히 무의미해진다.
 const N_USERS = 24;
 const START = 100000;
 for (let i = 0; i < N_USERS; i++) {
   await admin`insert into auth.users(id) values (${uid(i)}::uuid)`;
-  await admin`insert into profiles(id, display_name, referral_code) values (${uid(i)}::uuid, ${'유저' + i}, ${code(i)})`;
+  await admin`insert into profiles(id, display_name, nickname_set_at) values (${uid(i)}::uuid, ${nick(i)}, now())`;
   await admin`insert into user_currency(user_id, points) values (${uid(i)}::uuid, ${START})`;
 }
 const totalStart = N_USERS * START;
@@ -133,7 +143,7 @@ const totalStart = N_USERS * START;
   const cs = conn(8);
   const before = Number((await admin`select points from user_currency where user_id=${uid(2)}::uuid`)[0].points);
   const out = await Promise.allSettled(
-    cs.map((c) => c`select coin_gift(${uid(2)}::uuid, ${code(3)}::text, 500::int, ${'same-nonce'}::text) r`),
+    cs.map((c) => c`select coin_gift(${uid(2)}::uuid, ${nick(3)}::text, 500::int, ${'same-nonce'}::text) r`),
   );
   await Promise.all(cs.map((c) => c.end()));
   const ok = out.filter((r) => r.status === 'fulfilled');
@@ -155,7 +165,7 @@ const totalStart = N_USERS * START;
   await admin`update user_currency set points = 500 where user_id=${uid(4)}::uuid`;
   const cs = conn(6);
   const out = await Promise.allSettled(
-    cs.map((c, i) => c`select coin_gift(${uid(4)}::uuid, ${code(6 + i)}::text, 500::int, ${'race-' + i}::text) r`),
+    cs.map((c, i) => c`select coin_gift(${uid(4)}::uuid, ${nick(6 + i)}::text, 500::int, ${'race-' + i}::text) r`),
   );
   await Promise.all(cs.map((c) => c.end()));
   const ok = out.filter((r) => r.status === 'fulfilled').length;
@@ -175,8 +185,8 @@ const totalStart = N_USERS * START;
 {
   const [c1, c2] = conn(2);
   const out = await Promise.allSettled([
-    c1`select coin_gift(${uid(8)}::uuid, ${code(9)}::text, 10::int, ${'cd-1'}::text) r`,
-    c2`select coin_gift(${uid(8)}::uuid, ${code(9)}::text, 10::int, ${'cd-2'}::text) r`,
+    c1`select coin_gift(${uid(8)}::uuid, ${nick(9)}::text, 10::int, ${'cd-1'}::text) r`,
+    c2`select coin_gift(${uid(8)}::uuid, ${nick(9)}::text, 10::int, ${'cd-2'}::text) r`,
   ]);
   await Promise.all([c1.end(), c2.end()]);
   const ok = out.filter((r) => r.status === 'fulfilled').length;
@@ -217,7 +227,7 @@ const totalStart = N_USERS * START;
       const from = rnd(N_USERS);
       let to = rnd(N_USERS);
       if (to === from) to = (to + 1) % N_USERS;
-      return c`select coin_gift(${uid(from)}::uuid, ${code(to)}::text, ${1 + rnd(50)}::int, ${`load-${r}-${i}`}::text) r`;
+      return c`select coin_gift(${uid(from)}::uuid, ${nick(to)}::text, ${1 + rnd(50)}::int, ${`load-${r}-${i}`}::text) r`;
     });
     const out = await Promise.allSettled(jobs);
     deadlocks += out.filter((x) => x.status === 'rejected' && isDeadlock(x.reason)).length;

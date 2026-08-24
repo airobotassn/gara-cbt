@@ -57,37 +57,79 @@ svg .medot {
   fill: var(--blue);
 }
 
-/* 공통 상단: 홈으로 (원형 화살표 칩 + 라벨) */
-.topbar {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 22px;
-  text-decoration: none;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: var(--fs-sm);
-  transition: color 0.14s;
+/* ── 뒤로/홈 칩 — 앱 전체에서 **이 규칙 하나**다(2026-08-20 통일) ──────────────
+   기준은 /guide 의 칩: 얇은 1px 테두리 + 한 단 밝은 면 + 보조색 글자 + 부드러운 그림자.
+   예전엔 화면마다 따로 그려서 여섯 가지가 돌아다녔다 — 원형 화살표 칩(.topbar), 두꺼운 카툰
+   테두리(.hub-back·.dy-back·.mgp-back), 인라인 스타일(.ebr-back), Tailwind 인라인 몇 벌.
+   같은 자리에 있는 같은 버튼이 페이지마다 달라 보였다.
+
+   ⚠️ **색은 전용 토큰(--backchip-*)으로 박는다.** 전역 --line/--ink/--blue 를 쓰면 안 된다 —
+      .hub 는 --line 을 검정(#33323f)으로, --ink 를 진회색으로 덮어써서 그 화면에서만 칩이
+      두꺼운 검정 테두리로 뒤집힌다. /guide 가 --g-* 를 따로 둔 이유와 같다.
+   ⚠️ 새 화면에 또 그리지 말 것 — <TopBar/> 를 쓰거나 아래 선택자에 이름만 추가한다. */
+:root {
+  --backchip-face: #ffffff;
+  --backchip-line: #dbe7f7;
+  --backchip-ink: #63758f;
+  --backchip-accent: #1f74e8;
+  --backchip-accent-deep: #0f56c4;
 }
-.topbar .ic {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--soft);
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-  font-size: var(--fs-md);
-  line-height: 1;
-  color: var(--ink);
-  transition: 0.16s;
+html.dark {
+  --backchip-face: #131a29;
+  --backchip-line: #23304a;
+  --backchip-ink: #93a8c6;
+  --backchip-accent: #7aa9ff;
+  --backchip-accent-deep: #5b8ff0;
 }
-.topbar:hover {
-  color: var(--ink);
+
+.topbar,
+.gd-back, .pl-back,
+.hub .hub-back,
+.mgp-back,
+.dy-page .dy-back,
+.ebr-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 15px 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--backchip-line) 70%, transparent);
+  border-radius: 999px;
+  background: var(--backchip-face); color: var(--backchip-ink);
+  font-family: inherit; font-size: 13.5px; font-weight: 700; line-height: 1.2;
+  letter-spacing: normal; white-space: nowrap; text-decoration: none; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 60, 140, .06);
+  transition: border-color .16s ease, color .16s ease;
 }
-.topbar:hover .ic {
-  background: var(--blue);
-  color: var(--on-accent);
-  border-color: var(--blue);
-  transform: translateX(-3px);
+/* 화살표도 하나로 — 전부 Material 아이콘(arrow_back)이다(2026-08-20).
+   예전엔 화면마다 ← · ‹ · arrow_back 셋이 섞여서, 칩 모양을 맞춰도 화살표가 서로 달라 보였다.
+   ⚠️ 옛 .topbar 의 32px 원형 칩은 여기서 사라진다(그게 다른 화면과 제일 달라 보이던 부분이다).
+   ⚠️ .ic 선택자는 남겨둔다 — 아직 글자 화살표를 쓰는 자리가 나중에 생겨도 크기가 튀지 않게. */
+.topbar .ic, .hub .hub-back .ic,
+.dy-page .dy-back > span, .mgp-back span, .ebr-back > span,
+.topbar .material-symbols-outlined,
+.gd-back .material-symbols-outlined, .pl-back .material-symbols-outlined,
+.hub .hub-back .material-symbols-outlined, .mgp-back .material-symbols-outlined,
+.dy-page .dy-back .material-symbols-outlined, .ebr-back .material-symbols-outlined {
+  width: auto; height: auto; border: 0; background: none; border-radius: 0;
+  font-size: 18px; line-height: 1; color: inherit;
 }
+/* ⚠️ 이북 뷰어 머리말은 **테마와 무관하게 항상 흰 띠**다(책장처럼 보이라고 하드코딩돼 있다).
+   그래서 이 칩만 밝은 값을 자기 안에 고정한다 — 안 그러면 다크에서 흰 띠 위에 검은 칩이 얹힌다. */
+.ebr-back { --backchip-face: #ffffff; --backchip-line: #dbe7f7; --backchip-ink: #63758f; }
+
+.topbar:hover, .gd-back:hover, .pl-back:hover,
+.hub .hub-back:hover, .mgp-back:hover,
+.dy-page .dy-back:hover, .ebr-back:hover {
+  border-color: color-mix(in srgb, var(--backchip-accent) 45%, transparent);
+  color: var(--backchip-accent-deep);
+}
+/* 눌림 효과도 하나로 — 옛 카툰 칩들은 단색 그림자를 아래로 밀어 눌렀다(화면마다 깊이가 달랐다). */
+.topbar:active, .gd-back:active, .pl-back:active,
+.hub .hub-back:active, .mgp-back:active,
+.dy-page .dy-back:active, .ebr-back:active { transform: translateY(1px); }
+
+/* ── GARA 워드마크 ────────────────────────────────────────────────────
+   `public/gara-wordmark-2026.png` 은 **검정 단색 래스터**라 다크 배경에서 통째로 묻힌다.
+   색 토큰으로 못 바꾸는 그림이므로 반전으로 흰색을 만든다(알파는 그대로 남는다).
+   ⚠️ `.force-light` 안에서는 반전하면 안 된다 — 그 서브트리는 다크 모드에서도 흰 면이라
+      거기서 뒤집으면 흰 배경 위 흰 글자가 된다. */
+html.dark .gara-wordmark { filter: invert(1); }
+html.dark .force-light .gara-wordmark { filter: none; }

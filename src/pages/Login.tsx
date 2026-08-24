@@ -5,7 +5,7 @@ import { useT } from '../lib/i18n'
 // gara_10 (로그인) 목업 디자인 그대로 + 실제 구글/카카오 OAuth 연결. 헤더 없음(FAB이 네비).
 // 원본: stitch_design_critique_assistant/gara_10/code.html
 export default function Login() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const navigate = useNavigate()
   const { isFullUser, loginWithGoogle, loginWithKakao } = useAuth()
 
@@ -28,15 +28,18 @@ export default function Login() {
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl opacity-80 pointer-events-none"></div>
         {/* Header / Logo */}
         <div className="relative z-10">
+          {/* 브랜드 마크 = GARA 워드마크(2026). 옛 CARIS 행성(`/logo.png`)은 동그란 그림이라
+              원형 크롭으로 썼는데, 워드마크는 가로로 긴 글자라 원에 넣으면 양옆이 잘린다 —
+              그래서 원형 크롭(`rounded-full` + `object-cover`)을 걷어내고 높이만 잡는다. */}
           <button
             onClick={() => navigate('/')}
-            className="w-16 h-16 flex items-center justify-center group mb-16 lg:mb-32 rounded-full overflow-hidden"
-            aria-label="CARIS"
+            className="inline-flex items-center group mb-16 lg:mb-32"
+            aria-label="GARA"
           >
             <img
-              alt="CARIS Logo"
-              className="w-full h-full object-cover rounded-full transition-transform duration-700 ease-out group-hover:scale-110"
-              src="/logo.png"
+              alt="GARA"
+              className="gara-wordmark h-6 sm:h-7 w-auto transition-transform duration-700 ease-out group-hover:scale-105"
+              src="/gara-wordmark-2026.png"
             />
           </button>
           <div className="max-w-xl">
@@ -51,8 +54,9 @@ export default function Login() {
         {/* Footer Links (Desktop) */}
         <footer className="hidden lg:flex flex-col gap-4 relative z-10 mt-32">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="CARIS" className="h-7 w-7 object-cover rounded-full" />
-            <span className="font-title-md text-title-md font-bold text-on-surface">CARIS</span>
+            {/* 푸터는 협회 공식 로고(마크 + 영문 기관명)를 쓴다 — 발급기관을 밝히는 자리라
+                이름이 그림 안에 들어 있다. 옆에 글자를 또 붙이지 않는다. */}
+            <img src="/gara-mark-en.png" alt="GARA · Global AI & Robotics Association" className="gara-wordmark h-8 w-auto" />
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>
@@ -85,32 +89,42 @@ export default function Login() {
             </div>
           </button>
 
-          {/* Kakao Block */}
-          <button
-            onClick={() => loginWithKakao()}
-            className="group w-full bg-[#FEE500] rounded-[32px] p-8 sm:p-10 flex flex-col items-start gap-12 border-2 border-[#FEE500] ambient-shadow hover:border-[#3C1E1E] hover:shadow-[0_8px_30px_rgba(254,229,0,0.3)] transition-all duration-500 hover:-translate-y-1 relative overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-[#FEE500]/50"
-          >
-            <div className="w-14 h-14 bg-black/5 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
-              <svg className="w-8 h-8 text-black" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3C6.48 3 2 6.47 2 10.75c0 2.76 1.83 5.17 4.63 6.47-.14.48-.52 1.76-.55 1.88-.06.2.04.22.18.12.1-.06 1.76-1.18 2.47-1.67a11.23 11.23 0 0 0 3.27.49c5.52 0 10-3.47 10-7.75S17.52 3 12 3z" fill="currentColor" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-black/90 tracking-tight">{t('login.kakao_title')}</h2>
-            </div>
-            <div className="absolute top-10 right-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-x-4 group-hover:translate-x-0">
-              <svg className="w-8 h-8 text-black/20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-              </svg>
-            </div>
-          </button>
+          {/* 카카오는 **한국어 화면에서만** 보여준다(2026-08-24 결정) — 국내 사용자용 로그인이다.
+              ⚠️ 계정의 국적(`profiles.country_code`)으로는 가릴 수 없다 — 이 화면은 **로그인 전**이라
+                 계정이 아직 없다. 로그인 전에 알 수 있는 건 화면 언어 · 브라우저 언어 · IP 셋뿐이고,
+                 IP(`lib/geo.ts` 의 `fetchGeoPrefill`)는 외부 API 왕복이라 버튼이 뒤늦게 튀어나온다.
+                 화면 언어는 즉시 알고 실패할 일이 없으며, 저장값이 없는 첫 방문자는 `i18n` 의
+                 `detect()` 가 브라우저 언어까지 보므로 한국 사용자는 대개 여기서 걸린다.
+              ⚠️ 화면에서만 감추는 것이다 — Supabase 의 kakao provider 와 `loginWithKakao()` 는
+                 계속 살아 있다(이미 카카오로 가입한 사람은 언어를 바꿔도 로그인·세션이 유지된다). */}
+          {lang === 'ko' && (
+            <button
+              onClick={() => loginWithKakao()}
+              className="group w-full bg-[#FEE500] rounded-[32px] p-8 sm:p-10 flex flex-col items-start gap-12 border-2 border-[#FEE500] ambient-shadow hover:border-[#3C1E1E] hover:shadow-[0_8px_30px_rgba(254,229,0,0.3)] transition-all duration-500 hover:-translate-y-1 relative overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-[#FEE500]/50"
+            >
+              <div className="w-14 h-14 bg-black/5 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
+                <svg className="w-8 h-8 text-black" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 3C6.48 3 2 6.47 2 10.75c0 2.76 1.83 5.17 4.63 6.47-.14.48-.52 1.76-.55 1.88-.06.2.04.22.18.12.1-.06 1.76-1.18 2.47-1.67a11.23 11.23 0 0 0 3.27.49c5.52 0 10-3.47 10-7.75S17.52 3 12 3z" fill="currentColor" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-black/90 tracking-tight">{t('login.kakao_title')}</h2>
+              </div>
+              <div className="absolute top-10 right-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform translate-x-4 group-hover:translate-x-0">
+                <svg className="w-8 h-8 text-black/20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                </svg>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* Footer Links (Mobile) */}
         <footer className="lg:hidden flex flex-col items-center gap-4 mt-24 text-center w-full">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="CARIS" className="h-7 w-7 object-cover rounded-full" />
-            <span className="font-title-md text-title-md font-bold text-on-surface">CARIS</span>
+            {/* 푸터는 협회 공식 로고(마크 + 영문 기관명)를 쓴다 — 발급기관을 밝히는 자리라
+                이름이 그림 안에 들어 있다. 옆에 글자를 또 붙이지 않는다. */}
+            <img src="/gara-mark-en.png" alt="GARA · Global AI & Robotics Association" className="gara-wordmark h-8 w-auto" />
           </div>
           <div className="flex flex-wrap justify-center gap-4 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>

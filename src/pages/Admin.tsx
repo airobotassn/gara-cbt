@@ -6,7 +6,7 @@ import { callFunction, supabase } from '../lib/supabase'
 import { renderEbookCover } from '../lib/ebookCover'
 import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
-import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
+import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL, type ResumeSource } from '../lib/ebookTranslate'
 import { fitNoticeHtml, importNoticeHtml } from '../lib/noticeHtml'
 import { isIsolatedHtml } from '../lib/noticeRender'
 import HtmlBody from '../components/HtmlBody'
@@ -57,8 +57,9 @@ import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaUserPanel, type Are
 import {
   PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, TermPoolAdmin, CoinPolicyAdmin, HubCosmeticAdmin,
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
+  ReadCell,
 } from './AdminReform'
-import { useAdminData, payStatusLabel, productLabel } from '../lib/adminData'
+import { useAdminData, payStatusLabel, productLabel, type EbookReadRow } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { getTracks, tierName, isTierLocked, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
@@ -3790,9 +3791,33 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
     return supabase.storage.from('ebook-covers').getPublicUrl(path).data.publicUrl
   }
 
+  /**
+   * 이어받기 재료 — 저장된 언어별 번역본을 내려받아 "이미 번역된 조각"을 알아낼 수 있게 넘긴다.
+   * ⚠️ 5개 언어가 **전부** 있어야 한다. 하나라도 없으면 그 언어는 처음부터 받아야 하고, 그러면 어차피
+   *    한 번의 호출로 전 언어를 다시 받으므로 이어받을 것이 없다.
+   */
+  async function loadResume(d: EbookDraft): Promise<ResumeSource | undefined> {
+    const html: ResumeSource['html'] = {}
+    for (const lg of EBOOK_LANGS) {
+      const prev = d.translations[lg]
+      if (!prev?.path) return undefined
+      const { data, error } = await supabase.storage.from('ebooks').download(prev.path)
+      if (error || !data) return undefined
+      html[lg] = await data.text()
+    }
+    // 실패 번호는 언어와 무관하게 같은 값이라 아무 언어에서 꺼내도 된다(없던 시절 책은 undefined).
+    const failedIdx = EBOOK_LANGS.map((lg) => d.translations[lg]?.failedIdx).find((v) => Array.isArray(v))
+    return { html, failedIdx }
+  }
+
   // 본문을 5개 언어로 번역 → 언어별 HTML·표지·스토어 메타를 만들어 저장한다.
   //   원문 폴더(<uuid>/) 안에 <lang>.html 로 넣어 삭제 시 함께 정리되게 한다.
-  async function runTranslation(html: string, d: EbookDraft): Promise<Record<string, EbookTranslation>> {
+  //   resume 을 넘기면 **아직 한국어로 남아 있는 조각만** 다시 묻는다(호출 수가 그만큼 준다).
+  async function runTranslation(
+    html: string,
+    d: EbookDraft,
+    resume?: ResumeSource,
+  ): Promise<Record<string, EbookTranslation>> {
     const folder = d.storagePath.split('/')[0]
     const results = await translateEbook(
       html,
@@ -3806,6 +3831,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
         else if (p.phase === 'build') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 본문 생성 중…`)
         else if (p.phase === 'fit') setTrStatus(`${EBOOK_LANG_LABEL[p.lang!] ?? p.lang} 페이지 맞추는 중…`)
       },
+      resume,
     )
     const out: Record<string, EbookTranslation> = {}
     for (const r of results) {
@@ -3830,6 +3856,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
         description: r.meta.description,
         failed: r.failed,
         failReasons: r.failReasons,
+        failedIdx: r.failedIdx,
         fittedPages: r.fittedPages,
         overflowPages: r.overflowPages,
         at: new Date().toISOString(),
@@ -3838,16 +3865,28 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
     return out
   }
 
-  // 이미 등록된 책 다시 번역 — 본문을 비공개 버킷에서 내려받아 파이프라인을 다시 돌린다.
-  async function regenTranslations() {
+  /**
+   * 이미 등록된 책 다시 번역. 본문을 비공개 버킷에서 내려받아 파이프라인을 다시 돌린다.
+   *   · 'resume' — 아직 한국어로 남은 조각만 다시 묻는다(기본). 한도 때문에 누르는 버튼이라 이게 기본이다.
+   *   · 'all'    — 이미 번역된 것까지 전부 다시. 번역 품질이 맘에 안 들거나 모델·제목을 바꿨을 때.
+   * ⚠️ 'resume' 이 기본이 되면서 "싹 다시" 로 갈 길이 없어지므로 'all' 을 따로 남겨둔다.
+   */
+  async function regenTranslations(mode: 'resume' | 'all' = 'resume') {
     if (!draft?.storagePath) return
-    if (!confirm('5개 언어(영어·일본어·중국어·힌디·베트남어)로 번역합니다. 몇 분 걸릴 수 있습니다. 진행할까요?')) return
+    const ask =
+      mode === 'all'
+        ? '이미 번역된 것까지 5개 언어를 전부 다시 번역합니다.\n시간과 번역 한도를 그만큼 더 씁니다. 진행할까요?'
+        : '아직 번역되지 않은 조각만 다시 시도합니다.\n(처음이면 5개 언어 전체를 번역합니다 · 몇 분 걸릴 수 있습니다)'
+    if (!confirm(ask)) return
     setUploading('translate')
     setTrStatus('본문 내려받는 중…')
     try {
       const { data, error } = await supabase.storage.from('ebooks').download(draft.storagePath)
       if (error) throw error
-      patch({ translations: await runTranslation(await data.text(), draft) })
+      // 이어받기 재료는 실패해도 조용히 넘어간다 — 그때는 전체 재번역이 되지 틀린 번역이 되진 않는다.
+      const resume = mode === 'resume' ? await loadResume(draft).catch(() => undefined) : undefined
+      if (mode === 'resume' && resume) setTrStatus('이미 번역된 조각 확인 중…')
+      patch({ translations: await runTranslation(await data.text(), draft, resume) })
       setTrStatus('')
     } catch (e) {
       alert(e instanceof Error ? e.message : '번역에 실패했습니다.')
@@ -3885,8 +3924,12 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
         .upload(path, new Blob([html], { type: 'text/html' }), { contentType: 'text/html', upsert: false })
       if (error) throw error
       // ⚠️ setState 는 비동기라 이 함수 안에서 draft 를 다시 읽으면 옛 값이다. 갱신본을 직접 들고 간다.
-      const next: EbookDraft = { ...draft, storagePath: path }
-      patch({ storagePath: path })
+      // ⛔ **옛 번역을 여기서 비운다.** 번역본은 원본의 조각 **번호**에 붙어 있어서, 본문이 바뀌면
+      //    번호가 밀린다(문단 하나만 앞에 끼어도 그 뒤가 전부). 그 상태로 이어받기를 하면 5번 자리에
+      //    4번 문장이 조용히 박힌다 — 안 깨지고 틀리는 종류라 제일 나쁘다. 아래 번역이 실패해도
+      //    "새 본문 + 헌 번역" 이 남지 않게, 성공 여부와 무관하게 지금 비운다.
+      const next: EbookDraft = { ...draft, storagePath: path, translations: {} }
+      patch({ storagePath: path, translations: {} })
 
       setUploading('cover')
       try {
@@ -4256,9 +4299,21 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                       </span>
                     )
                   })}
-                  <button type="button" className="admin-mini" disabled={!draft.storagePath || !!uploading} onClick={regenTranslations}>
+                  <button type="button" className="admin-mini" disabled={!draft.storagePath || !!uploading} onClick={() => regenTranslations('resume')}>
                     {uploading === 'translate' ? '번역 중…' : '다시 번역'}
                   </button>
+                  {/* 번역본이 하나도 없으면 둘이 같은 동작이라 숨긴다 — 버튼이 둘이면 뭐가 다른지 묻게 된다. */}
+                  {EBOOK_LANGS.some((lg) => draft.translations[lg]) && (
+                    <button
+                      type="button"
+                      className="admin-mini"
+                      disabled={!draft.storagePath || !!uploading}
+                      onClick={() => regenTranslations('all')}
+                      title="이미 번역된 것까지 전부 다시 번역합니다"
+                    >
+                      전체 다시
+                    </button>
+                  )}
                 </div>
                 {(uploading === 'translate' || uploading === 'optimize' || uploading === 'html') && trStatus && (
                   <span
@@ -4325,6 +4380,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                     <th>이메일</th>
                     <th>결제</th>
                     <th>구매일</th>
+                    <th>열람</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4336,11 +4392,13 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                         {b.pricePaid > 0 ? krw(b.pricePaid, 'ko') : '무료'} · {b.source}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(b.createdAt)}</td>
+                      {/* 산 사람이 실제로 열어봤나. 환불 판단에 쓰는 값이라 구매자 목록에서 바로 보인다. */}
+                      <ReadCell reads={b.read ? [{ ebookId: buyersOf.book.id, title: buyersOf.book.title, ...b.read }] : []} />
                     </tr>
                   ))}
                   {buyersOf.rows.length === 0 && (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
                         아직 구매자가 없습니다.
                       </td>
                     </tr>
@@ -4785,6 +4843,8 @@ interface PaymentAdminRow {
   failCode: string | null
   failMessage: string | null
   createdAt: string
+  // 이 결제로 나간 이북들의 열람 여부(환불 판단용). 이북이 안 붙은 결제는 빈 배열이다.
+  reads?: EbookReadRow[]
 }
 interface PaymentListResp {
   payments: PaymentAdminRow[]
@@ -5578,7 +5638,7 @@ function MemberPayPanel({ userId }: { userId: string }) {
     <div className="admin-table-wrap">
       <table className="admin-table">
         <thead>
-          <tr><th>일시</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>상태</th></tr>
+          <tr><th>일시</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>상태</th><th>열람</th></tr>
         </thead>
         <tbody>
           {rows.map((p) => (
@@ -5595,6 +5655,8 @@ function MemberPayPanel({ userId }: { userId: string }) {
                 {/* 돈은 받았는데 물건이 안 나간 건 — 대사에서 잡히는 그 신호다. */}
                 {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
               </td>
+              {/* 이북을 샀다면 실제로 열어봤는지 — 환불 문의를 받았을 때 여기부터 본다. */}
+              <ReadCell reads={p.reads} />
             </tr>
           ))}
         </tbody>

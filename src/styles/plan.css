@@ -4,7 +4,7 @@
 
 .pl-wrap { padding-block: 34px 88px; } /* ⚠️ padding 축약형은 px-margin-* 유틸의 좌우 패딩을 덮는다 */
 
-/* 뒤로가기 칩(.pl-back)의 모양은 guide.css 의 `.gd-back, .pl-back` 한 규칙이 갖고 있다 —
+/* 뒤로가기 칩(.pl-back)의 모양은 **shared.css 의 앱 공용 뒤로 칩 규칙** 하나가 갖고 있다 —
    /guide 홈 버튼과 같은 물건이라 두 벌로 두지 않는다(2026-08-20). */
 
 .pl-head { margin: 26px 0 34px; }
@@ -61,11 +61,12 @@ html.dark .pl-rd { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 20px 44
 .pl-rd-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 11px; }
 .pl-rd-title { font-size: 13px; font-weight: 800; color: var(--g-blue); }
 .pl-rd.is-off .pl-rd-title { color: var(--g-muted); }
-.pl-rd-date { font-size: 17px; font-weight: 800; color: var(--g-navy); }
-/* 응시 기간 라벨 — 날짜 위 한 줄. 접수기간(.pl-rd-apply)과 같은 자리·같은 크기라 두 줄이 한 쌍으로 읽힌다. */
-.pl-rd-datelbl { display: block; margin-bottom: 2px; font-size: 13px; font-weight: 600; color: var(--g-muted); }
-.pl-rd-apply { margin-top: 9px; font-size: 13px; color: var(--g-muted); }
-.pl-rd-apply b { display: block; margin-top: 2px; color: var(--g-ink); font-weight: 700; }
+/* 접수기간·응시기간 두 줄. 라벨(작게) 위, 날짜(크게) 아래로 완전히 같은 규격이다 —
+   한쪽만 크면 다른 쪽이 부속 설명처럼 읽혀서 "언제 접수하고 언제 보는지"가 한눈에 안 들어온다.
+   ⚠️ 두 줄에 서로 다른 크기를 주지 말 것(2026-08-21 지시). */
+.pl-rd-row + .pl-rd-row { margin-top: 9px; }
+.pl-rd-rowlbl { display: block; margin-bottom: 2px; font-size: 13px; font-weight: 600; color: var(--g-muted); }
+.pl-rd-rowval { display: block; font-size: 17px; font-weight: 800; color: var(--g-navy); }
 
 .pl-pill {
   font-size: 12px; font-weight: 800; padding: 4px 11px; border-radius: 999px; white-space: nowrap;

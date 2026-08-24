@@ -419,10 +419,11 @@ export default function WorldArena() {
       {/* 밤하늘 — 랜딩 지구본과 같은 별(다크에서만). 내용은 .aa-wrap 이 z-index:1 로 그 위에 선다. */}
       <StarField />
       <div className="aa-wrap">
-        {/* 홈으로 — 위치·모양은 앱 공용 TopBar(원형 화살표 칩 + 라벨, 제목 위 왼쪽)와 같게 두고
-            색만 아레나 토큰으로 짠다(공용 .topbar 는 전역 토큰이라 이 페이지 톤과 따로 논다). */}
-        <Link className="aa-home" to="/">
-          <span className="ic" aria-hidden="true">←</span>
+        {/* 홈으로 — 앱 공용 뒤로 칩(shared.css)을 그대로 쓴다.
+            ⚠️ 예전엔 아레나 톤에 맞춘다고 .aa-home 으로 따로 그렸는데, 그렇게 화면마다 하나씩
+               따로 그린 결과가 같은 버튼 일곱 가지였다(2026-08-20 통일). */}
+        <Link className="topbar" to="/">
+          <span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>
           {t('common.home')}
         </Link>
 

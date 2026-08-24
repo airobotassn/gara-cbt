@@ -179,14 +179,16 @@ eq(FE.LEVELTEST_MAX, 7000, 'LEVELTEST_MAX === 7,000 (원안 "레벨테스트 시
 eq(FE.computeSkillScore(0), 0, '미클리어 = 0 (컷 미달은 부분점수 없음)');
 
 // 활동 트랙: seasonMax = delta × perDay × SEASON_DAYS 가 원안 표와 정확히 떨어져야 한다.
-const EXPECTED_SEASON_MAX = { minigame: 2190, daily_learn: 730, referral: 1825, attendance: 1825 };
+// ⚠️ referral 은 2026-08-24 에 이 표에서 빠졌다 — 친구 초대 보상이 시즌 점수 +5 에서 코인 50(양쪽)으로
+//    옮겨갔다(RPC redeem_referral). 되살리면 화면이 주지도 않는 점수를 약속하게 된다.
+const EXPECTED_SEASON_MAX = { minigame: 2190, daily_learn: 730, attendance: 1825 };
 for (const [kind, expected] of Object.entries(EXPECTED_SEASON_MAX)) {
   const derived = FE.activityDelta(kind) * FE.activityPerDay(kind) * FE.SEASON_DAYS;
   eq(derived, expected, `활동 시즌상한 ${kind} = ${FE.activityDelta(kind)}점 × ${FE.activityPerDay(kind)}회 × ${FE.SEASON_DAYS}일`);
   eq(FE.ACTIVITY_SEASON_MAX[kind], expected, `ACTIVITY_SEASON_MAX.${kind} === ${expected}`);
 }
-eq(FE.ACTIVITY_MAX, 6570, 'ACTIVITY_MAX(활동 4종 합) === 6,570');
-eq(FE.SEASON_MAX_POINTS, 13570, 'SEASON_MAX_POINTS === 13,570 (= 원안 Lv.7 최고점)');
+eq(FE.ACTIVITY_MAX, 4745, 'ACTIVITY_MAX(활동 3종 합) === 4,745');
+eq(FE.SEASON_MAX_POINTS, 11745, 'SEASON_MAX_POINTS === 11,745 (= Lv.7 최고점)');
 
 // ARENA 밴드 경계 — 원안 표 그대로 1,000점 균등.
 eq(FE.arenaLevelForScore(0), 1, 'band 0 -> Lv.1');
@@ -197,14 +199,16 @@ eq(FE.arenaLevelForScore(6000), 7, 'band 6,000 -> Lv.7');
 eq(FE.arenaLevelForScore(FE.SEASON_MAX_POINTS), 7, 'band 상한 -> Lv.7');
 eq(FE.arenaBand(1), [0, 999], 'arenaBand(1) === [0, 999]');
 eq(FE.arenaBand(6), [5000, 5999], 'arenaBand(6) === [5,000, 5,999]');
-eq(FE.arenaBand(7), [6000, 13570], 'arenaBand(7) === [6,000, 13,570]');
+eq(FE.arenaBand(7), [6000, 11745], 'arenaBand(7) === [6,000, 11,745]');
 
-// ⚠️ 옛 부등호 검사("실력 최고치 > 활동 최대 기여")는 삭제했다 — 원안은 그 부등호를 **깨는 안**이라
-//    그대로 두면 원안 반영이 실패로 뜬다. 대신 그 성질을 명시적으로 고정해 회귀만 감시한다:
-//    활동만 채워도(6,570) 최상위 밴드(6,000 이상)에 들어간다. 이건 보류중인 수정안의 핵심 쟁점이다
-//    (바탕화면 WORLD_ARENA_점수체계_수정제안.html — 레벨테스트 총합을 활동 상한 위로 올리는 안).
-eq(FE.ACTIVITY_MAX > FE.LEVELTEST_MAX - 1000, true, '활동 상한(6,570)이 레벨테스트 트랙(7,000)과 맞먹는다 — 원안의 성질');
-eq(FE.arenaLevelForScore(FE.ACTIVITY_MAX), 7, '활동만으로 ARENA Lv.7 도달 가능 — 원안이 의도한 성질(수정안의 쟁점)');
+// 두 트랙의 힘 관계 — 여기가 2026-08-24 에 뒤집혔다.
+//   원안(2026-08-04)은 활동 상한 6,570 이 레벨테스트 7,000 과 맞먹어서 **활동만 채워도 Lv.7** 이었다.
+//   친구 초대(+5 · 시즌 1,825)가 코인으로 옮겨가면서 활동 상한이 4,745 로 내려갔고, 그 성질이 깨졌다 —
+//   이제 활동만으로는 Lv.5 까지다. 의도한 결과가 아니라 **보상 지갑을 옮긴 것의 부수효과**이므로
+//   되돌리려면 남은 3종의 적립값을 올려야 한다(초대를 점수 표로 되돌리는 건 답이 아니다).
+//   보류중인 수정안(바탕화면 WORLD_ARENA_점수체계_수정제안.html)이 노리던 방향과 우연히 같다.
+eq(FE.ACTIVITY_MAX < FE.LEVELTEST_MAX, true, '활동 상한(4,745) < 레벨테스트 트랙(7,000)');
+eq(FE.arenaLevelForScore(FE.ACTIVITY_MAX), 5, '활동만으로는 ARENA Lv.5 까지 — 초대 보상이 코인으로 빠진 결과');
 
 if (failed > 0) {
   console.error(`\n${failed} scoring-parity test(s) FAILED`);

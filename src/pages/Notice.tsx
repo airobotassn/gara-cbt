@@ -141,6 +141,12 @@ export default function Notice() {
       </div>
 
       <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
+        {/* 홈으로 — 헤더가 없는 화면이라 여기 말고는 홈으로 갈 길이 FAB 뿐이었다. */}
+        <Link to="/" className="gd-back mb-6">
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            {t('common.home')}
+          </Link>
+
         {/* Hero */}
         <div className="relative py-10 md:py-16 mb-12 rounded-3xl overflow-hidden glass-panel border border-white/40 shadow-sm flex flex-col items-center justify-center text-center">
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none"></div>

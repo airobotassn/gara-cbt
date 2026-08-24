@@ -129,7 +129,7 @@ export default function Daily() {
       <div className="dy-top">
         {/* 뒤로 = 아레나. 아레나 하단 런처가 허브·레벨테스트·데일리·미니게임의 관문이라 그게 이 화면의 부모다. */}
         <button className="dy-back" onClick={() => navigate('/arena')} aria-label="WORLD ARENA">
-          <span>‹</span> WORLD ARENA
+          <span className="material-symbols-outlined">arrow_back</span> WORLD ARENA
         </button>
         <div className="dy-head">
           <b>{t('daily.title')}</b>

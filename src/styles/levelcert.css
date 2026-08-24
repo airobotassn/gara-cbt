@@ -121,12 +121,24 @@
   text-align: center;
 }
 /* GARA — 제목 위에 있던 시절(52px)의 **절반**이다. 자리가 바뀌면서 주인공이 아니라
-   문서 아래 찍는 발행처 표시가 됐다. 크게 두면 하단이 로고 배너처럼 읽힌다. */
+   문서 아래 찍는 발행처 표시가 됐다. 크게 두면 하단이 로고 배너처럼 읽힌다.
+   LEVEL TEST 제목과 같은 금박 물성으로 묶는다. 원래 logo-gara.png 는 매끈한 노란 그라디언트라
+   제목의 따뜻한 금박 각인과 따로 놀았다 → 로고 알파를 마스크로 쓰고 금박 결·림을 입힌다. */
 .lc-brand {
   display: block;
+  width: 160px;
   height: 26px;
   margin: 0 auto;
-  filter: drop-shadow(0 0 16px rgba(224, 192, 124, 0.3));
+  background:
+    linear-gradient(180deg, rgba(255, 249, 218, 0.78) 0%, transparent 24%, rgba(119, 66, 8, 0.18) 78%, rgba(255, 222, 126, 0.45) 100%),
+    url('/cert/gold-foil.webp') center 44% / 210px auto;
+  -webkit-mask: url('/cert/logo-gara.png') center / contain no-repeat;
+  mask: url('/cert/logo-gara.png') center / contain no-repeat;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 244, 199, 0.8))
+    drop-shadow(0 0 1px rgba(255, 211, 104, 0.95))
+    drop-shadow(0 2px 1px rgba(103, 57, 5, 0.62))
+    drop-shadow(0 0 16px rgba(224, 192, 124, 0.3));
 }
 
 /* 발행기관 — 잔글씨. ⚠️ 금색으로 쓰지 말 것.

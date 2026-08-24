@@ -56,7 +56,7 @@ export function charSeriesOf(key: string): string {
  * ⚠️ 지우지 말 것. 6종 그림이 아직 없어서 지금은 **모든 슬롯이 이 그림으로 그려진다.**
  */
 export const CHAR_FALLBACK_SRC = '/hub/char-korea-lv2-hanbok-final.webp'
-/** 폴백 그림의 실측 비율(가로/세로). hub.css palace 블록의 `--skin-char-ar` 과 같은 값이다. */
+/** 폴백 그림의 실측 비율(가로/세로). */
 export const CHAR_FALLBACK_AR = 512 / 640
 
 /**
@@ -116,19 +116,29 @@ export interface SkinDef {
 }
 
 /**
- * 스킨 목록. **첫 항목이 기본**(아무도 안 산 상태에서 쓰는 바탕)이다.
- * ⚠️ palace 는 상점에 없다(`active=false`) — 전원이 처음부터 쓰는 바탕이라 살 물건이 아니다.
- *    그래도 인벤토리에는 늘 떠야 한다(다른 스킨을 샀다가 되돌아올 길이 필요하다).
+ * 스킨 목록 — 같은 고궁의 **낮과 밤** 두 장(2026-08-20). 옛 단일 배경(`bg.png`)은 제거됐다.
+ * ⚠️ **첫 항목이 기본**이다. 아무것도 장착 안 한 사람과 모르는 값이 저장된 사람이 전부 여기로
+ *    떨어진다(`skinByPart`) — 그래서 첫 항목은 반드시 **값이 0**이어서 전원이 쓸 수 있어야 한다.
+ *    값을 매기면 신규 회원 화면에 배경이 없다.
+ * ⚠️ 값 0인 스킨은 사지 않아도 장착된다(`hub_equip` 이 price=0 을 예외로 둔다) — 되돌아올 길이다.
  */
 export const SKINS: SkinDef[] = [
+  // 같은 고궁의 **낮**. 값이 0이라 전원이 쓰는 기본 배경이자 첫 화면이다.
   {
-    key: 'palace',
-    partKey: 'skin_palace',
+    key: 'palace_day',
+    partKey: 'skin_palace_day',
     iconDir: '/hub/ui',
-    bg: '/hub/bg.png',
+    bg: '/hub/bg-v2.png',
   },
-  // 새 스킨 예시 — 그림 한 벌 + hub.css 값 블록이 준비되면 주석을 풀면 된다.
-  // { key: 'neon', partKey: 'skin_neon', iconDir: '/hub/skin/neon/ui', bg: '/hub/skin/neon/bg.webp' },
+  // 같은 고궁의 **밤**. 코인으로 사는 쪽.
+  //   ⚠️ 두 스킨은 UI 한 벌(판·게이지·도장·아이콘)을 통째로 공유하고 배경만 다르다 —
+  //      hub.css 도 값 블록 하나를 둘이 같이 쓰고 --skin-bg 만 각자 덮는다.
+  {
+    key: 'palace_night',
+    partKey: 'skin_palace_night',
+    iconDir: '/hub/ui',
+    bg: '/hub/bg-v5.png',
+  },
 ]
 
 export const DEFAULT_SKIN = SKINS[0].key

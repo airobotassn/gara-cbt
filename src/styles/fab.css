@@ -601,29 +601,6 @@ body:has(.panel.open) .fab::after {
   background: var(--line);
   color: var(--ink);
 }
-/* 디자인/개발 확인용 임시 미리보기 링크 — 런칭 시 제거 대상이라 앰버 톤으로 구분 */
-.pf-more-link.pf-preview {
-  color: #b45309;
-  background: rgba(245, 158, 11, 0.09);
-}
-.pf-more-link.pf-preview:hover {
-  color: #92400e;
-  background: rgba(245, 158, 11, 0.18);
-}
-.pf-more-link.pf-preview .pf-more-ext {
-  color: #d97706;
-}
-html.dark .pf-more-link.pf-preview {
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.12);
-}
-html.dark .pf-more-link.pf-preview:hover {
-  color: #fcd34d;
-  background: rgba(245, 158, 11, 0.22);
-}
-html.dark .pf-more-link.pf-preview .pf-more-ext {
-  color: #fbbf24;
-}
 .pf-more-ext {
   color: var(--dim);
   font-size: var(--fs-sm);

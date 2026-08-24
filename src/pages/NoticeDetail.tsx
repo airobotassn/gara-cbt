@@ -119,7 +119,7 @@ export default function NoticeDetail() {
           wide ? 'max-w-[1130px]' : 'max-w-3xl'
         }`}
       >
-        <Link to="/notice" className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md mb-6 transition-colors">
+        <Link to="/notice" className="gd-back mb-6">
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           {t('notice.back_list')}
         </Link>

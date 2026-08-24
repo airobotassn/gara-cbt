@@ -44,12 +44,14 @@ const T1_TIERS = [
   { key: 'pro', name: 'Pro' },
   { key: 'elite', name: 'Elite' },
 ] as const
-// subj = 검정 과목 수. ⚠️ **티어마다 다르다** — Zenith 만 3과목이다(2026-08-13, 기능안전·보안과
-//   AI 거버넌스·윤리·DX 를 갈랐다). 예전엔 T2 전체를 2과목으로 박아둬서 세 번째 과목이 화면에 안 나왔다.
-//   사전(caris.t2.<key>.subj.N)에 키를 더하는 것만으로는 안 보인다 — 이 숫자를 같이 올릴 것.
+// subj = 검정 과목 수. ⚠️ 사전(caris.t2.<key>.subj.N)에 키를 더하는 것만으로는 화면에 안 나온다 —
+//   이 숫자를 같이 올릴 것(그래서 세 번째 과목이 한동안 안 보였다).
+// ⚠️ Master·Grand Master 의 3과목은 **실기 내용과 같은 문장**이다(2026-08-21, 공식 검정과목표 기준).
+//   공식 표가 그걸 검정과목 3으로 세기 때문이고, `practical` 키는 그대로 남아 있어 원서접수·응시준비
+//   화면에서는 '실기' 로도 한 번 더 나온다.
 const T2_TIERS = [
-  { key: 'master', name: 'Master', subj: 2 },
-  { key: 'grandmaster', name: 'Grand Master', subj: 2 },
+  { key: 'master', name: 'Master', subj: 3 },
+  { key: 'grandmaster', name: 'Grand Master', subj: 3 },
   { key: 'zenith', name: 'Zenith', subj: 3 },
 ] as const
 

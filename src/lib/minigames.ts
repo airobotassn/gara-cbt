@@ -87,6 +87,17 @@ export const MINIGAMES: MiniGame[] = [
   },
 ]
 
+/** 비로그인(게스트)에게 열어두는 게임 — **이 하나뿐**이다(2026-08-24 결정).
+ *  나머지는 목록에서 PLAY 가 회색으로 죽고, 주소를 직접 쳐도 로그인 안내로 막힌다.
+ *  ⚠️ 두 화면(`/games` 목록 · `/games/:id` 실행)이 **같은 판정**을 써야 한다 — 목록만 막으면
+ *     회색 버튼은 장식이 되고 주소창으로 그대로 들어간다.
+ *  ⚠️ 이건 '무한 공짜'를 끊는 장치지 보안 장치가 아니다. 게스트 식별 수단이 없어서 판수로는 못 세고
+ *     (지우면 리셋된다), 대신 **열어주는 게임을 하나로 좁히는** 쪽을 택했다. */
+export const GUEST_GAME_ID = 'beat-cari'
+export function guestPlayable(id: string | undefined): boolean {
+  return id === GUEST_GAME_ID
+}
+
 export function findMiniGame(id: string | undefined): MiniGame | undefined {
   return MINIGAMES.find((g) => g.id === id)
 }

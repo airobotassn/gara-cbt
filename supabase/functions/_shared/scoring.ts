@@ -128,9 +128,12 @@ export function computeRankChange(
 // ── 시즌 점수 체계 (2026-08-04 원안 반영) ──
 // 시즌 총점(user_progress.season_total) = 레벨테스트 트랙(skill_score) + 활동 트랙(activity_score).
 //   레벨테스트 : 레벨 클리어 1회당 +1,000 · 7단계 전부 = 7,000
-//   활동      : 미니게임 +2(일 3회) · 오늘의 학습 +2(일 1회) · 친구 초대 +5(일 1회) · 출석 +5(일 1회)
-//               → 시즌(365일) 상한 2,190 + 730 + 1,825 + 1,825 = 6,570
-//   전체 상한  = 7,000 + 6,570 = 13,570  (= ARENA Lv.7 최고점. 아래 밴드표와 맞물린다)
+//   활동      : 미니게임 +2(일 3회) · 오늘의 학습 +2(일 1회) · 출석 +5(일 1회)
+//               → 시즌(365일) 상한 2,190 + 730 + 1,825 = 4,745
+//   전체 상한  = 7,000 + 4,745 = 11,745  (= ARENA Lv.7 최고점. 아래 밴드표와 맞물린다)
+// ⚠️ 친구 초대는 **이 표에 없다**(2026-08-24). 보상이 시즌 점수 +5 에서 **코인 50(양쪽)** 으로 옮겨갔다 —
+//    코인은 상점 지갑이라 랭킹에 안 섞인다. 지급은 RPC `redeem_referral`(20260824120000) 하나가 한다.
+//    ⛔ 여기에 referral 을 되살리면 화면이 "친구 초대 +5점" 이라고 말하면서 실제로는 코인만 나간다.
 // ⚠️ 시즌 길이가 365일이 아니면 ACTIVITY_SEASON_MAX 가 실제 도달 가능 상한과 어긋난다 —
 //    reset_season() 주기를 바꾸면 이 표를 다시 계산할 것.
 export const SEASON_DAYS = 365
@@ -149,25 +152,24 @@ export function computePoints(level: number, correct: number): number {
 // 원안 표 그대로. 적립값·일일 횟수·시즌 상한 세 표가 한 벌이고, seasonMax = delta × perDay × SEASON_DAYS 로 떨어진다.
 // ⚠️ 미니게임은 **참여 횟수당 고정 적립**이다(성적 무관) — 예전의 "게임별 정규화 점수 비례"는 원안 채택으로 제거됐다.
 //    성적 반영안(게임당 0~2점 · 서로 다른 3종)은 보류 상태다.
-// ⚠️ referral(친구 초대)은 점수 규칙만 선반영된 상태다 — 초대코드 발급·가입 귀속 플로우가 아직 없어 적립 호출부가 없다.
-export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame' | 'referral'
+// ⚠️ 옛 'referral'(친구 초대 +5) 은 2026-08-24 에 빠졌다 — 보상이 코인으로 옮겨갔다(위 주석 참고).
+//    activity_ledger 의 kind CHECK 에는 아직 남아 있고 **이미 적립된 옛 행도 그대로 둔다**(받은 점수를
+//    빼앗지 않는다). 새로 쌓는 곳만 없어졌다.
+export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame'
 export const ACTIVITY_DELTA: Record<ActivityKind, number> = {
   attendance: 5,
   daily_learn: 2,
   minigame: 2,
-  referral: 5,
 }
 export const ACTIVITY_PER_DAY: Record<ActivityKind, number> = {
   attendance: 1,
   daily_learn: 1,
   minigame: 3,
-  referral: 1,
 }
 export const ACTIVITY_SEASON_MAX: Record<ActivityKind, number> = {
   attendance: 1825,
   daily_learn: 730,
   minigame: 2190,
-  referral: 1825,
 }
 export function activityDelta(kind: ActivityKind): number {
   return ACTIVITY_DELTA[kind]
@@ -175,7 +177,7 @@ export function activityDelta(kind: ActivityKind): number {
 export function activityPerDay(kind: ActivityKind): number {
   return ACTIVITY_PER_DAY[kind]
 }
-/** 활동 트랙 시즌 상한 합 = 6,570 */
+/** 활동 트랙 시즌 상한 합 = 4,745 */
 export const ACTIVITY_MAX = Object.values(ACTIVITY_SEASON_MAX).reduce((a, b) => a + b, 0)
 
 // ── 레벨테스트 트랙 ──
@@ -189,11 +191,11 @@ export function computeSkillScore(clearedLevels: number): number {
 }
 
 // ── ARENA 레벨 밴드 — 시즌 총점 → 표시 레벨 ──
-// 원안 표 그대로 1,000점 균등 밴드: Lv.1 0~999 · Lv.2 1,000~1,999 · … · Lv.6 5,000~5,999 · Lv.7 6,000~13,570.
+// 원안 표 그대로 1,000점 균등 밴드: Lv.1 0~999 · Lv.2 1,000~1,999 · … · Lv.6 5,000~5,999 · Lv.7 6,000~11,745.
 // ⚠️ 이건 **표시용 레벨**이고, 시험 사다리 등급(user_progress.rank — 승급으로만 오름)과는 별개 축이다.
 //    결과창의 승급 연출은 계속 rank 기준이다.
 export const ARENA_BAND_STEP = 1000
-/** 시즌 총점 상한 = 레벨테스트 7,000 + 활동 6,570 = 13,570 (= Lv.7 최고점) */
+/** 시즌 총점 상한 = 레벨테스트 7,000 + 활동 4,745 = 11,745 (= Lv.7 최고점) */
 export const SEASON_MAX_POINTS = LEVELTEST_MAX + ACTIVITY_MAX
 export function arenaLevelForScore(total: number): number {
   const t = Math.max(0, Math.floor(total))

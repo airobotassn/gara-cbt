@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { usePolicyDoc } from '../lib/policyDocs'
 import { useT, type TFunc } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
@@ -175,6 +175,14 @@ export default function Terms() {
     <div className="ax-page">
       <main className="ax-band">
       <div className="ax-wrap">
+      {/* 홈으로 — 헤더가 없는 문서 화면이라 여기 말고는 홈으로 갈 길이 FAB 뿐이었다.
+          카드와 왼쪽을 맞추려고 같은 maxWidth 안에 둔다. */}
+      <div style={{ maxWidth: 860, margin: '0 auto 16px' }}>
+        <Link to="/" className="gd-back">
+          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          {t('common.home')}
+        </Link>
+      </div>
       <div className="card pad doc" style={{ maxWidth: 860, margin: '0 auto' }}>
         <h1 className="doc-title">글로벌 AI 로봇협회 서비스 이용약관</h1>
         {/* 관리자가 저장한 개정판이 있으면 그것을, 없으면 아래 코드 본문을 보여준다.

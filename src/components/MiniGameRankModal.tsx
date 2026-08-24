@@ -169,7 +169,7 @@ export default function MiniGameRankModal({
                     <div key={r.rank} className={`hof-row ${r.me ? 'me' : ''}`}>
                       <div className="hof-bar">
                         <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
-                        <span className="bar-rk">{r.rank}</span>
+                        <span className="bar-rk" data-digits={String(r.rank).length}>{r.rank}</span>
                         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(r)} seed={r.name} size={48} /></span>
                         <span className="bar-nm">
                           {r.name}
@@ -196,7 +196,7 @@ export default function MiniGameRankModal({
             <div className="hof-mebar">
               <div className="hof-bar">
                 <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
-                <span className="bar-rk">{data.me.rank}</span>
+                <span className="bar-rk" data-digits={String(data.me.rank).length}>{data.me.rank}</span>
                 <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(data.me)} seed={data.me.name} size={48} /></span>
                 <span className="bar-nm">
                   {data.me.name}

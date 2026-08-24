@@ -642,6 +642,12 @@ export default function MyPage() {
         ></div>
 
         <div className="max-w-5xl mx-auto w-full relative z-10">
+          {/* 홈으로 — 이 화면엔 헤더가 없어서(FAB 이 네비) 여기 말고는 홈으로 갈 길이 FAB 뿐이었다. */}
+          <Link to="/" className="gd-back mb-6">
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            {t('common.home')}
+          </Link>
+
           {/* Page Header */}
           <header className="mb-8 md:mb-12">
             <h1 className="font-display-lg text-4xl md:text-display-lg font-bold text-on-surface mb-3 tracking-tight break-keep">{t('mypage.title')}</h1>

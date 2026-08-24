@@ -517,7 +517,9 @@ export interface EbookTranslation {
   description?: string
   failed?: number
   /** 실패 사유별 조각 수(예: {'분당한도(429)': 40}) */
-  failReasons?: Record<string, number> // 번역 실패해 한국어로 남은 조각 수
+  failReasons?: Record<string, number>
+  /** 번역 못 한 본문 조각 번호(0부터). '다시 번역' 이 이 자리만 다시 묻는다 — 없으면 글자 비교로 폴백. */
+  failedIdx?: number[] // 번역 실패해 한국어로 남은 조각 수
   fittedPages?: number[] // 글이 넘쳐 자동 축소해 맞춘 페이지 번호(1부터)
   overflowPages?: number[] // 축소 하한까지 줄여도 안 들어간 페이지 — 사람이 손봐야 함
   at?: string
@@ -552,6 +554,9 @@ export interface AdminEbookBuyer {
   pricePaid: number
   source: string
   createdAt: string
+  /** 이 사람이 이 책을 열어본 기록. 한 번도 안 열었으면 null.
+   *  ⚠️ 구매(ebook_purchases)와 **수명이 다른 표**(ebook_reads)라 환불된 뒤에도 남는다 — 환불 판단용. */
+  read: { firstAt: string; lastAt: string; count: number } | null
 }
 export interface AdminEbookBuyersResp {
   buyers: AdminEbookBuyer[]

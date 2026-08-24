@@ -4,9 +4,10 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
+import { ensureCheckedIn } from '../lib/autoCheckin'
 import { useAuth } from '../context/AuthProvider'
 import { Avatar } from '../components/GemAvatar'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useT, type TFunc } from '../lib/i18n'
 import {
   type ActivityKind,
@@ -22,8 +23,9 @@ import {
 } from '../lib/scoring'
 import ShareCardModal from '../components/ShareCardModal'
 import CharArt from '../components/CharArt'
-import { countryName } from '../lib/regions'
+import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
+import { rememberPostLogin } from '../lib/postLogin'
 import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, charSeriesOf,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
@@ -66,10 +68,17 @@ function HubUiIcon({ n, dir }: { n: HubUiIconName; dir: string | null }) {
 }
 
 const DAILY_POINTS = 10
+/** 닉네임 최대 길이 — set-nickname 의 MAX 와 같은 값이어야 한다(서버가 그 길이로 거절한다).
+ *  선물 입력칸의 maxLength 와 조회 발동 조건이 이 값을 쓴다. */
+const NICK_MAX = 12
 /** 7일 출석 도장을 채운 날 얹어주는 보너스 코인.
  *  ⚠️ 권위는 DB 다 — `20260812120000_stamp_7day_cycle.sql` 의 `c_cycle_bonus`. 여기는 표시용 사본이라
  *     그 값을 고치면 같이 고칠 것(DAILY_POINTS ↔ complete-daily 의 관계와 같다). */
 const STAMP_BONUS = 20
+/** 친구 초대 보상 코인 — 초대한 쪽·코드를 쓴 쪽 **양쪽 다** 같은 금액을 받는다.
+ *  ⚠️ 권위는 DB 다 — `20260824130000_referral_coin.sql` 의 `c_coin`. 여기는 표시용 사본이다.
+ *  ⚠️ 초대자 쪽에는 상한이 없다(2026-08-24 지시) — 초대할수록 계속 받는다. 코드를 쓰는 쪽만 계정당 1회. */
+const REFERRAL_COIN = 50
 
 // 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
 // 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
@@ -112,8 +121,6 @@ interface HubState { authed: boolean; level?: number | null; rankPoints?: number
   charChosen?: boolean
   tutorialDone?: boolean }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
-// stamps = 적립 뒤 7일 사이클 위치(1..7), bonus = 7일 완주 보너스 코인(0 이면 없음).
-interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
 
 const FRIENDLY_ERR = new Set([
   'insufficient_points', 'already_owned', 'unauthorized', 'not_owned',
@@ -136,7 +143,10 @@ type ClosetTab = 'shop' | 'items'
 // 코인 선물 — 받은 것(오늘, 사람별 합산) / 이력 한 줄.
 type GiftToday = { name: string; amount: number; count: number }
 type GiftRow = { id: string; dir: 'in' | 'out'; name: string; amount: number; at: string }
-type GiftLookupResp = { name?: string; error?: string }
+/** 선물 상대 카드 — **이름만 돌려주면 확인이 안 된다**(사용자가 친 값이 그대로 되돌아온다).
+ *  아바타·시즌점수·국가·지역은 사용자가 안 친 정보라 "이 사람 맞네" 를 판단할 수 있다. */
+type GiftCard = { name: string; avatar: string | null; countryCode: string | null; regionCode: string | null; seasonTotal: number }
+type GiftLookupResp = { name?: string; avatar?: string | null; country_code?: string | null; region_code?: string | null; season_total?: number; error?: string }
 type GiftSendResp = { duplicate: boolean; amount: number; recipient_name: string; points_after: number }
 type GiftHistoryResp = { rows: GiftRow[]; next: string | null }
 
@@ -147,7 +157,6 @@ const EARN_ROWS: { kind: ActivityKind; icon: string }[] = [
   { kind: 'attendance', icon: 'calendar' },
   { kind: 'daily_learn', icon: 'book' },
   { kind: 'minigame', icon: 'star' },
-  { kind: 'referral', icon: 'gift' },
 ]
 
 /** 코인이 들어오는 길 — **이게 전부다.** 미니게임·레벨테스트는 시즌 점수만 주고 코인은 안 준다.
@@ -157,11 +166,13 @@ const EARN_ROWS: { kind: ActivityKind; icon: string }[] = [
 const COIN_ROWS: { key: string; icon: string; n: number | null }[] = [
   { key: 'daily', icon: 'calendar', n: DAILY_POINTS },
   { key: 'stamp', icon: 'gift', n: STAMP_BONUS },
+  { key: 'referral', icon: 'share', n: REFERRAL_COIN },  // ICONS 에 'invite' 는 없다 — 초대 아이콘은 'share' 다
   { key: 'gift', icon: 'coin', n: null },
 ]
 
 export default function Hub() {
   const { isFullUser, loginWithGoogle, user, loading } = useAuth()
+  const navigate = useNavigate()
   const { t, lang } = useT()
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
@@ -180,11 +191,11 @@ export default function Hub() {
   // 상점처럼 호출마다 randomUUID() 를 만들면 타임아웃 후 재시도가 두 번 보내기가 되고,
   // 즉시 이체라 회수할 방법이 없다. 서버 멱등(unique(sender_id, client_nonce))은 같은 값이 와야 걸린다.
   const [giftNonce, setGiftNonce] = useState<string | null>(null)
-  const [giftCode, setGiftCode] = useState('')
-  // 코드 8자 완성 시 자동 조회 결과. 실패는 **문구가 아니라 사전 키**로 들고 있는다 —
+  const [giftNick, setGiftNick] = useState('')
+  // 닉네임을 2자 이상 치면 자동 조회한 결과. 실패는 **문구가 아니라 사전 키**로 들고 있는다 —
   // 그래야 조회 이펙트가 t 에 의존하지 않는다(t 는 렌더마다 새로 만들어져서 deps 에 넣으면 이펙트가 매 렌더 돈다).
   // 덤으로 조회 후 언어를 바꿔도 메시지가 같이 바뀐다.
-  const [giftTo, setGiftTo] = useState<{ ok: true; name: string } | { ok: false; errKey: string } | null>(null)
+  const [giftTo, setGiftTo] = useState<{ ok: true; card: GiftCard } | { ok: false; errKey: string } | null>(null)
   const [giftAmount, setGiftAmount] = useState('')
   const [giftConfirm, setGiftConfirm] = useState(false) // 되돌릴 수 없어서 확인 단계를 반드시 거친다
   const [giftSending, setGiftSending] = useState(false)
@@ -298,11 +309,13 @@ export default function Hub() {
     setRedeeming(true)
     setRedeemMsg(null)
     try {
-      const r = await callFunction<{ ok?: boolean; error?: string; credited?: boolean }>('redeem-referral', { code })
+      const r = await callFunction<{ ok?: boolean; error?: string; coin?: number }>('redeem-referral', { code })
       if (r.ok) {
         setReferralUsed(true)
         setRedeemInput('')
-        setRedeemMsg({ ok: true, text: t('hub.invite.ok') })
+        // 금액은 서버가 준 값을 쓴다 — 화면 상수(REFERRAL_COIN)는 안내표용 사본이라
+        // DB 값을 고쳤을 때 성공 문구까지 같이 틀리면 안 된다.
+        setRedeemMsg({ ok: true, text: t('hub.invite.ok', { n: r.coin ?? REFERRAL_COIN }) })
         void hydrate()
       } else {
         setRedeemMsg({ ok: false, text: REDEEM_ERR[r.error ?? ''] ?? t('hub.invite.fail') })
@@ -313,7 +326,8 @@ export default function Hub() {
     setRedeeming(false)
   }
 
-  // 오늘의 미션 3종(시안 좌상단 카드). to=null 인 출석은 이 화면에서 바로 처리(doDaily), 나머지는 해당 화면으로 보낸다.
+  // 오늘의 미션 3종(시안 좌상단 카드). to=null 인 출석은 **누를 것이 없다** — 사이트에 들어오면
+  // 자동으로 찍히므로(lib/autoCheckin.ts) 이 칩은 현황 표시 전용이다. 나머지는 해당 화면으로 보낸다.
   //   ⚠️ 미니게임은 **목록 페이지(/games)로 바로** 보낸다. 예전엔 /arena 로 보냈는데, 그때는
   //      아레나 하단 런처가 유일한 진입점이었기 때문이다. 지금은 /games 가 목록 페이지라
   //      /arena 로 보내면 지도만 뜨고 미션은 한 단계 더 찾아 들어가야 끝난다.
@@ -414,26 +428,21 @@ export default function Hub() {
     return () => { alive = false }
   }, [])
 
-  // 출석 → complete-daily (하루 1회 서버 강제). 성공 후 get-hub 로 재화/스탬프 재동기화.
-  async function doDaily() {
-    if (!isFullUser) { void loginWithGoogle(); return }
-    if (checkedIn) return
-    try {
-      // kind 명시 — 서버 기본값에 기대지 않는다(오늘의 학습과 종류가 갈린다).
-      const r = await callFunction<DailyResp>('complete-daily', { kind: 'attendance' })
-      // first=false 면 오늘 '오늘의 학습'으로 이미 재화를 받은 것 — 없는 적립을 있다고 쓰지 않는다.
-      // 보너스 금액은 서버가 준 값을 그대로 쓴다(화면에 상수를 또 두면 서버와 어긋난다).
-      const bonus = r.bonus ?? 0
-      pushLog(
-        !r.first ? t('hub.toast.checkin_already')
-          : bonus > 0 ? t('hub.toast.checkin_bonus', { n: DAILY_POINTS, b: bonus })
-            : t('hub.toast.checkin_done', { n: DAILY_POINTS }),
-      )
-      await hydrate()
-    } catch (e) {
-      pushErr(friendlyError(e, t))
-    }
-  }
+  // 자동 출석이 오늘 치를 찍고 나면 미션바·스탬프를 한 번 더 받는다.
+  //   ⚠️ **출석을 기다렸다 그리지 않는다** — 그 왕복이 허브 첫 그림을 늦춘다. 위 효과가 먼저 그리고,
+  //      출석이 실제로 찍힌 경우(=화면이 달라진 경우)에만 여기서 다시 받는다.
+  //   ⚠️ 부르는 자리가 App.tsx 에도 있지만 세션당 1회로 접히므로(ensureCheckedIn) 요청은 하나다.
+  //      여기서 또 부르는 이유는 **언제 끝났는지 알아야** 다시 받을 수 있기 때문이다.
+  useEffect(() => {
+    const uid = user?.id
+    if (!uid) return
+    let alive = true
+    void ensureCheckedIn(uid).then((changed) => {
+      if (!changed || !alive) return
+      callFunction<HubState>('get-hub', {}).then((h) => { if (alive) applyHub(h) }).catch(() => {})
+    })
+    return () => { alive = false }
+  }, [user?.id])
   // 상점 → shop-buy (가격은 서버 카탈로그 권위).
   async function doBuy(partKey: string, price: number) {
     if (!isFullUser) { void loginWithGoogle(); return }
@@ -518,13 +527,15 @@ export default function Hub() {
   }
 
   // ---------- 코인 선물 ----------
-  // 즉시 이체다. 취소·회수 경로가 없어서 방어선은 (a) 코드 8자 완성 시 닉네임 노출 (b) 확인 단계
-  // (c) nonce 재사용 셋뿐이다. 서버는 잠금 순서·잔액·멱등·원장을 전부 RPC 한 트랜잭션에서 처리한다.
+  // 즉시 이체다. 취소·회수 경로가 없어서 방어선은 (a) 닉네임을 치면 뜨는 **상대 카드**(아바타·ARENA
+  // 레벨·국가·지역) (b) 확인 단계 (c) nonce 재사용 셋뿐이다. (a) 가 이름만이면 사용자가 방금 친 값이
+  // 되돌아오는 것이라 확인이 성립하지 않는다 — 카드에 안 친 정보가 있어야 방어선이 된다.
+  // 서버는 잠금 순서·잔액·멱등·원장을 전부 RPC 한 트랜잭션에서 처리한다.
   function openGift() {
     if (!isFullUser) { void loginWithGoogle(); return }
     setGiftNonce(crypto.randomUUID()) // ⚠️ 여기서 한 번만. 전송 성공 전까지 이 값을 재사용한다.
     setGiftGot(giftsToday); setGiftGotOlder(giftsOlder) // 연 시점으로 고정 — 아래 seen 처리에 지워지지 않게
-    setGiftCode(''); setGiftTo(null); setGiftAmount('')
+    setGiftNick(''); setGiftTo(null); setGiftAmount('')
     setGiftConfirm(false); setGiftMsg(null)
     setGiftHistory(null); setGiftHistoryOpen(false)
     setModal('gift')
@@ -536,20 +547,32 @@ export default function Hub() {
     }
   }
 
-  // 코드 8자가 채워지면 자동 조회 — 조회 버튼을 따로 두지 않는다(동선 하나 줄이고, 이름이 곧 확인 절차다).
-  // 서버 쿼터는 10분 30회라 사람이 타이핑하는 속도로는 닿지 않는다.
+  // 닉네임을 2자 이상 치면 자동 조회 — 조회 버튼을 따로 두지 않는다(동선 하나 줄인다).
+  //   ⚠️ 옛 코드 입력은 길이가 8 로 고정이라 **정확히 한 번** 조회했지만, 닉네임은 길이가 제각각이라
+  //      타이핑 중에 여러 번 나간다. 그래서 디바운스를 250 → 450ms 로 늘리고 서버 쿼터도 60회로 올렸다.
+  //   ⚠️ 대소문자를 바꾸지 않는다 — 닉네임은 사용자가 정한 표기이고, 대소문자 무시 비교는 DB 가 한다
+  //      (정규화 키가 lower + 공백제거). 여기서 upper() 를 걸면 다국어 닉네임이 화면에서 망가진다.
   useEffect(() => {
     if (modal !== 'gift') return
-    const code = giftCode.trim().toUpperCase()
-    // 8자 미만이면 아무것도 하지 않는다 — 이전 이름을 지우는 건 onChange 가 맡는다.
+    const nickname = giftNick.trim()
+    // 2자 미만·12자 초과면 아무것도 하지 않는다 — 이전 카드를 지우는 건 onChange 가 맡는다.
     // (이 파일 규칙: 이펙트 본문에서 동기 setState 금지. setState 는 프라미스 콜백에서만.)
-    if (code.length !== 8) return
+    if (nickname.length < 2 || nickname.length > NICK_MAX) return
     let alive = true
     const timer = window.setTimeout(() => {
-      callFunction<GiftLookupResp>('coin-gift', { action: 'lookup', code })
+      callFunction<GiftLookupResp>('coin-gift', { action: 'lookup', nickname })
         .then((r) => {
           if (!alive) return
-          if (r.name) { setGiftTo({ ok: true, name: r.name }); return }
+          if (r.name) {
+            setGiftTo({ ok: true, card: {
+              name: r.name,
+              avatar: r.avatar ?? null,
+              countryCode: r.country_code ?? null,
+              regionCode: r.region_code ?? null,
+              seasonTotal: r.season_total ?? 0,
+            } })
+            return
+          }
           const map: Record<string, string> = {
             not_found: 'hub.gift.err_not_found',
             self: 'hub.gift.err_self_code',
@@ -558,9 +581,9 @@ export default function Hub() {
           setGiftTo({ ok: false, errKey: map[r.error ?? ''] ?? 'hub.gift.err_lookup' })
         })
         .catch(() => { if (alive) setGiftTo({ ok: false, errKey: 'hub.gift.err_lookup' }) })
-    }, 250)
+    }, 450)
     return () => { alive = false; window.clearTimeout(timer) }
-  }, [giftCode, modal])
+  }, [giftNick, modal])
 
   async function doGift() {
     if (!giftNonce || giftSending) return
@@ -571,14 +594,14 @@ export default function Hub() {
       setGiftMsg(null)
       const r = await callFunction<GiftSendResp>('coin-gift', {
         action: 'send',
-        code: giftCode.trim().toUpperCase(),
+        nickname: giftNick.trim(),
         amount,
         client_nonce: giftNonce, // ⚠️ 재시도에도 같은 값 — 새로 만들면 두 번 보내진다.
       })
       setGiftMsg({ ok: true, text: t('hub.gift.sent_ok', { name: r.recipient_name, n: r.amount.toLocaleString() }) })
       // 성공했으니 이 nonce 는 소진됐다. 이어서 또 보내려면 새 값이 필요하다.
       setGiftNonce(crypto.randomUUID())
-      setGiftCode(''); setGiftTo(null); setGiftAmount(''); setGiftConfirm(false)
+      setGiftNick(''); setGiftTo(null); setGiftAmount(''); setGiftConfirm(false)
       setGiftHistory(null) // 이력을 펼쳐놨다면 다음에 열 때 새로 받는다
       await hydrate()
     } catch (e) {
@@ -628,11 +651,14 @@ export default function Hub() {
   // 첫 진입 흐름 — 순서가 곧 규칙이다: 캐릭터를 고른 다음에 튜토리얼.
   //   ⚠️ null(아직 모름)일 때는 **아무것도 띄우지 않는다.** false 로 판정하면 하이드레이트 전 한 프레임에
   //      이미 끝낸 사람 화면에도 선택창이 번쩍인다.
-  // 첫 선택 후보 = **판매 중인 무료 캐릭터**(shop_catalog 의 price 0). 값이 곧 자격이라 목록을 또 두지 않는다.
-  //   ⚠️ 코드의 CHAR_KEYS 를 그대로 쓰면 안 된다 — 관리자가 값을 매긴 캐릭터까지 후보에 섞여서,
+  // 첫 선택 후보 = **판매 중인 캐릭터 전부**. 값은 안 본다 — 첫 선택은 값과 무관하게 공짜고
+  //   (20260824120000), 두 번째부터 상점에서 값을 내고 산 것만 갈아입는다.
+  //   ⚠️ 값으로 거르면 안 된다 — 캐릭터가 전부 유료(500)라 후보가 0종이 되어 첫 화면이 빈다.
+  //   ⚠️ 코드의 CHAR_KEYS 를 그대로 쓰면 안 된다 — 진열에서 내린 캐릭터까지 후보에 섞여서,
   //      고르는 순간 서버가 not_owned 로 거절한다(화면과 서버가 다른 말을 한다).
+  //      카탈로그는 get-hub 가 active 만 내려주므로 그게 곧 후보다.
   //   ⚠️ 카탈로그가 아직 안 왔거나 비어 있으면 코드 목록으로 떨어진다 — 빈 화면에 가두는 것보단 낫다.
-  const starterKeys = catalog.filter((c) => (c.kind ?? '') === 'character' && c.price === 0).map((c) => c.partKey)
+  const starterKeys = catalog.filter((c) => (c.kind ?? '') === 'character').map((c) => c.partKey)
   const pickKeys = starterKeys.length ? starterKeys : CHAR_KEYS
   // 계열별로 묶는다 — 한 계열이 카드 한 장이고, 좌우 버튼이 그 안에서 모습을 바꾼다.
   const pickSeries: { series: string; keys: string[] }[] = []
@@ -664,30 +690,35 @@ export default function Hub() {
   //   로그인 후 /hub 로 복귀 — /auth/callback?next=/hub 로 왕복해도 next 가 URL 에 실려 안 날아간다.
   //   loading 중엔 판정 보류(허브가 한 프레임 번쩍였다 게이트로 바뀌는 것 방지).
   if (loading) {
-    return <div className="hub hub-gate"><div className="hub-gate-card">{t('common.loading')}</div></div>
+    return (
+      <div className="bg-background text-on-surface min-h-screen flex items-center justify-center">
+        <p className="font-body-md text-body-md text-on-surface-variant">{t('common.loading')}</p>
+      </div>
+    )
   }
   if (!isFullUser) {
     return (
-      <div className="hub hub-gate">
-        <div className="sky" aria-hidden="true">
-          <div className="sun" />
-          <div className="cloud c1" /><div className="cloud c2" /><div className="cloud c3" />
-        </div>
-        <div className="hub-gate-card">
-          <img className="hub-gate-char" src="/hub-char.png" alt="CARI" />
-          <h2 className="hub-gate-title">CARI</h2>
-          <p className="hub-gate-sub">{t('hub.gate_sub')}</p>
-          <button
-            className="hub-gate-btn"
-            onClick={() => {
-              // 복귀 경로는 sessionStorage 로 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시키므로(AuthCallback 참고).
-              try { sessionStorage.setItem('postLoginRedirect', '/hub') } catch { /* 무시 */ }
-              loginWithGoogle(`${window.location.origin}/auth/callback`)
-            }}
-          >
-            {t('common.login_google')}
-          </button>
-        </div>
+      <div className="bg-background text-on-surface min-h-screen flex flex-col">
+        <main className="flex-grow flex items-center justify-center px-margin-mobile py-24">
+          <div className="max-w-md w-full text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 ambient-shadow">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
+              <span className="material-symbols-outlined text-[32px]">login</span>
+            </div>
+            <h1 className="mb-2 font-title-md text-title-md font-bold text-on-surface">{t('hub.gate_title')}</h1>
+            <p className="mb-6 font-body-md text-body-md text-on-surface-variant break-keep">{t('hub.gate_sub')}</p>
+            <button
+              onClick={() => {
+                // 복귀 경로는 저장소에 심어 넘긴다 — Supabase 가 redirect_to 의 query 를 유실시킨다(lib/postLogin 참고).
+                rememberPostLogin('/hub')
+                navigate('/login')
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-label-md text-label-md font-bold text-on-primary ambient-shadow"
+            >
+              {t('common.login')}
+              <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
@@ -726,7 +757,7 @@ export default function Hub() {
       {/* 허브는 아레나 런처(CARI 버튼)로 들어오는 화면 — 뒤로가기도 아레나로 */}
       <div className="hub-backrow">
         <Link className="hub-back" to="/arena">
-          <span className="ic">←</span>WORLD ARENA
+          <span className="material-symbols-outlined">arrow_back</span>WORLD ARENA
         </Link>
         {/* 오른쪽 두 버튼은 묶어둔다 — .hub-backrow 가 space-between 이라 낱개로 넣으면 셋이 흩어진다.
             선물은 초대하기 모달에 넣지 않고 여기 독립 진입점으로 둔다(2026-08-07 결정). */}
@@ -818,9 +849,11 @@ export default function Hub() {
               </>
             )
             const cls = `ms-chip${m.done ? ' on' : ''}`
+            // to=null(출석) 은 **버튼이 아니다** — 자동으로 찍히는 것을 누르게 두면
+            // 눌러도 아무 일이 없는 칸이 되어 "고장났나" 로 읽힌다.
             return m.to
               ? <Link key={m.kind} className={cls} to={m.to}>{body}</Link>
-              : <button key={m.kind} className={cls} onClick={doDaily}>{body}</button>
+              : <span key={m.kind} className={`${cls} is-static`}>{body}</span>
           })}
           </div>
           <span className="ms-n">{missionDone}/{missions.length}</span>
@@ -831,7 +864,8 @@ export default function Hub() {
             {/* 왼쪽 레일 제거 — 출석을 오른쪽 맨 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
             {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
             <div className="rail rail-r">
-              <button className="fcard f-daily" data-tut="daily" onClick={doDaily}><span className="fico"><HubUiIcon n="calendar" dir={skin.iconDir} /></span>{t('hub.rail.daily')}{authed && !checkedIn && <span className="bd">1</span>}</button>
+              {/* 옛 '출석' 칸은 제거됐다(2026-08-24) — 출석은 사이트에 들어오면 자동으로 찍힌다(lib/autoCheckin.ts).
+                  ⚠️ 칸을 되살릴 일이 있어도 누르는 버튼으로 두지 말 것. 이미 찍힌 걸 또 누르는 자리가 된다. */}
               {/* '상점' → '꾸미기'. 사는 곳과 갈아입는 곳이 한 모달의 두 탭이라 상점만 말하면 절반을 숨긴다. */}
               <button className="fcard f-shop" data-tut="closet" onClick={() => { setClosetTab('shop'); setModal('closet') }}><span className="fico"><HubUiIcon n="shop" dir={skin.iconDir} /></span>{t('hub.rail.closet')}</button>
               <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" dir={skin.iconDir} /></span>{t('hub.rail.title')}</button>
@@ -1149,7 +1183,10 @@ export default function Hub() {
                     placeholder="CARIXXXX"
                     maxLength={8}
                     disabled={redeeming}
-                    aria-label={t('hub.gift.code_label')}
+                    /* ⚠️ 옛날엔 선물 모달의 라벨 키(hub.gift.code_label)를 빌려 쓰고 있었다. 선물이 닉네임으로
+                       바뀌면서 그 키가 사라졌으므로 여기는 **초대 쪽 자기 키**를 쓴다 — 남의 화면 키를
+                       빌려 쓰면 그 화면이 바뀔 때 이렇게 조용히 깨진다. */
+                    aria-label={t('hub.invite.redeem_head')}
                   />
                   <button className="iv-copy" onClick={redeemReferral} disabled={redeeming || !redeemInput.trim()}>
                     {t(redeeming ? 'hub.invite.checking' : 'hub.invite.register')}
@@ -1188,24 +1225,45 @@ export default function Hub() {
             </div>
           )}
 
-          {/* 보내기 — 되돌릴 수 없으니 코드 → 이름 확인 → 금액 → 확인 순서를 강제한다. */}
+          {/* 보내기 — 되돌릴 수 없으니 닉네임 → 상대 카드 확인 → 금액 → 확인 순서를 강제한다. */}
           <div className="gf-send">
             <div className="gf-send-head">{t('hub.gift.send_head')}</div>
-            <label className="gf-lab" htmlFor="gf-code">{t('hub.gift.code_label')}</label>
+            <label className="gf-lab" htmlFor="gf-nick">{t('hub.gift.nick_label')}</label>
             <input
-              id="gf-code"
+              id="gf-nick"
               className="gf-in"
-              value={giftCode}
-              /* 코드가 바뀌면 앞서 띄운 이름은 그 자리에서 무효다 — 여기서 지운다(이펙트가 아니라).
-                 남겨두면 코드를 고치는 도중에도 옛 이름이 붙어 있어 엉뚱한 사람 이름을 보고 보내게 된다. */
-              onChange={(e) => { setGiftCode(e.target.value.toUpperCase()); setGiftTo(null); setGiftConfirm(false); setGiftMsg(null) }}
-              placeholder="CARIXXXX"
-              maxLength={8}
+              value={giftNick}
+              /* 닉네임이 바뀌면 앞서 띄운 카드는 그 자리에서 무효다 — 여기서 지운다(이펙트가 아니라).
+                 남겨두면 고치는 도중에도 옛 카드가 붙어 있어 엉뚱한 사람을 보고 보내게 된다. */
+              onChange={(e) => { setGiftNick(e.target.value); setGiftTo(null); setGiftConfirm(false); setGiftMsg(null) }}
+              placeholder={t('hub.gift.nick_ph')}
+              maxLength={NICK_MAX}
               disabled={giftSending}
               autoComplete="off"
             />
-            {/* 8자를 다 치면 여기 이름이 뜬다. 이게 오타를 막는 유일한 장치라 반드시 실명(닉네임)을 보여준다. */}
-            {giftTo && <p className={`gf-to${giftTo.ok ? ' is-ok' : ''}`}>{giftTo.ok ? t('hub.gift.to_ok', { name: giftTo.name }) : t(giftTo.errKey)}</p>}
+            {/* ⛔ **이름만 보여주면 안 된다.** 사용자가 방금 친 값이 그대로 되돌아오는 것이라 확인 기능이 0이다.
+                아바타·ARENA 레벨·국기·지역은 사용자가 안 친 정보라, 이 카드가 오타 방어선을 대신한다.
+                (옛 친구코드 방식에서는 '내가 모르는 닉네임이 뜬다' 자체가 확인이었다.) */}
+            {giftTo?.ok && (
+              <div className="gf-card">
+                <Avatar avatarUrl={giftTo.card.avatar} seed={giftTo.card.name} size={46} />
+                <div className="gf-card-txt">
+                  <b className="gf-card-nm">{giftTo.card.name}</b>
+                  <span className="gf-card-sub">
+                    ARENA Lv.{arenaLevelForScore(giftTo.card.seasonTotal)}
+                    {giftTo.card.countryCode && (
+                      <>
+                        {' · '}
+                        {flagUrl(giftTo.card.countryCode) && <img className="gf-card-flag" src={flagUrl(giftTo.card.countryCode)} alt="" />}
+                        {countryName(giftTo.card.countryCode, lang)}
+                      </>
+                    )}
+                    {regionName(giftTo.card.regionCode) && ` · ${regionName(giftTo.card.regionCode)}`}
+                  </span>
+                </div>
+              </div>
+            )}
+            {giftTo && !giftTo.ok && <p className="gf-to">{t(giftTo.errKey)}</p>}
 
             <label className="gf-lab" htmlFor="gf-amt">{t('hub.gift.amount_label')}</label>
             <input
@@ -1231,7 +1289,7 @@ export default function Hub() {
               <div className="gf-confirm">
                 {/* 강조를 위한 인라인 <b> 는 뺐다 — 어순이 언어마다 달라서 문장을 쪼개면 번역이 불가능해진다. */}
                 <p className="gf-confirm-q">
-                  {t('hub.gift.confirm_q', { name: giftTo?.ok ? giftTo.name : '', n: Number(giftAmount).toLocaleString() })}
+                  {t('hub.gift.confirm_q', { name: giftTo?.ok ? giftTo.card.name : '', n: Number(giftAmount).toLocaleString() })}
                 </p>
                 <p className="gf-confirm-warn">{t('hub.gift.confirm_warn')}</p>
                 <div className="gf-confirm-act">
@@ -1460,11 +1518,12 @@ export default function Hub() {
 //    튜토리얼 도중에 모달이 열려 안내 카드와 겹친다.
 // ⚠️ 구멍 좌표는 매번 실측한다 — 화면 폭·스킨에 따라 자리가 달라져서 값을 박아두면 곧 어긋난다.
 // ══════════════════════════════════════════════════════════════════════════
-/** 단계표. target = `data-tut` 값(없으면 화면 가운데 카드만). 순서가 곧 진행 순서다. */
+/** 단계표. target = `data-tut` 값(없으면 화면 가운데 카드만). 순서가 곧 진행 순서다.
+ *  ⚠️ 옛 'daily'(출석 버튼) 단계는 빠졌다(2026-08-24) — 가리킬 버튼이 없어졌고, 자동으로 찍히는 것에
+ *     "하루 한 번 눌러요" 라고 가르치면 그 자리에서 거짓말이 된다. 그 내용은 'stamp' 단계가 흡수했다. */
 const TUTORIAL_STEPS: { target: string | null; key: string }[] = [
   { target: null, key: 'welcome' },
   { target: 'mission', key: 'mission' },
-  { target: 'daily', key: 'daily' },
   { target: 'closet', key: 'closet' },
   { target: 'stamp', key: 'stamp' },
 ]

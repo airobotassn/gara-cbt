@@ -72,19 +72,6 @@ html.dark .arena {
 .aa-wrap { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 40px; }
 
 /* ── 헤더 ── */
-/* 홈으로(제목 위 왼쪽) — 앱 공용 .topbar 와 같은 모양이지만 그 클래스를 그대로 못 쓴다:
-   .topbar 는 전역 토큰(--soft/--line/--ink)을 써서 이 페이지의 두꺼운 외곽선 + 단색 그림자
-   톤과 따로 논다. 모양만 맞추고 색·그림자는 --aa-* 로 다시 짠다(런처 버튼과 같은 값). */
-.aa-home { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 14px;
-  text-decoration: none; color: var(--aa-muted); font-weight: 800; font-size: 13.5px; transition: color .14s; }
-.aa-home .ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 16px; line-height: 1; color: var(--aa-ink);
-  background: var(--aa-panel); border: 2.5px solid var(--aa-line); box-shadow: 0 3px 0 var(--aa-sh-solid);
-  transition: transform .1s ease, box-shadow .1s ease; }
-.aa-home:hover { color: var(--aa-ink); }
-.aa-home:hover .ic { transform: translateY(-2px); box-shadow: 0 5px 0 var(--aa-sh-solid); }
-.aa-home:active .ic { transform: translateY(2px); box-shadow: 0 1px 0 var(--aa-sh-solid); }
-
 .aa-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
 .aa-head h1 { margin: 0; font-size: clamp(26px, 3.6vw, 36px); font-weight: 900; letter-spacing: -.02em; }
 

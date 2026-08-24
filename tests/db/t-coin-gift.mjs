@@ -1,5 +1,7 @@
-// T-Coin-Gift — 마이그레이션 20260807120000_coin_gift.sql 을 pglite 에 적용해
+// T-Coin-Gift — 코인 선물 마이그레이션 두 개를 순서대로 pglite 에 적용해
 // **코인 선물의 방어선이 DB 에서 실제로 서는지** 검증한다.
+//   ① 20260807120000_coin_gift.sql        — 원장·제약·이체 로직
+//   ② 20260824140000_coin_gift_by_nickname.sql — 지목 수단을 친구코드 → **닉네임**으로 교체
 //
 // 코인 선물은 즉시 이체다 — 취소·회수 경로가 없다. 그래서 여기서 깨지는 것들은 전부 되돌릴 수 없다:
 //   · 멱등이 안 걸리면 재시도 한 번이 두 번 보내기가 된다
@@ -13,6 +15,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
 const raw = readFileSync('supabase/migrations/20260807120000_coin_gift.sql', 'utf8');
+const rawNick = readFileSync('supabase/migrations/20260824140000_coin_gift_by_nickname.sql', 'utf8');
 
 const db = await PGlite.create();
 await db.exec(`set timezone = 'UTC';`);
@@ -32,8 +35,23 @@ await db.exec(`
     id uuid primary key references auth.users(id) on delete cascade,
     display_name text,
     referral_code text,
+    -- 닉네임 지목의 전제: 확정된 닉네임만 찾을 수 있어야 한다(미확정은 구글 실명이 들어 있다).
+    nickname_set_at timestamptz,
+    avatar_url text,
+    country_code text,
+    region_code text,
     deactivated_at timestamptz
   );
+  -- 상대 카드의 ARENA 레벨용 시즌 총점. **읽기 전용**이다 — 선물은 이 표에 한 줄도 쓰지 않는다.
+  create table user_progress (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    season_total bigint not null default 0
+  );
+  -- 닉네임 유니크(실제 스키마의 profiles_nickname_key_uniq 와 같은 표현식) —
+  -- 이게 없으면 '닉네임으로 한 명을 특정할 수 있다'는 이 기능의 전제가 테스트에서 검증되지 않는다.
+  create unique index profiles_nickname_key_uniq
+    on profiles (lower(regexp_replace(display_name, '\\s+', '', 'g')))
+    where nickname_set_at is not null and deactivated_at is null;
   create table user_currency (
     user_id uuid primary key references auth.users(id) on delete cascade,
     points bigint not null default 0,
@@ -46,29 +64,39 @@ const U_A = '11111111-1111-1111-1111-111111111111'; // 보내는 사람
 const U_B = '22222222-2222-2222-2222-222222222222'; // 받는 사람
 const U_C = '33333333-3333-3333-3333-333333333333'; // 탈퇴 계정
 const U_D = '44444444-4444-4444-4444-444444444444'; // 두 번째 수신자(쿨다운 회피용)
+const U_E = '55555555-5555-5555-5555-555555555555'; // 영문 닉네임(대소문자 흡수 검증)
+const U_F = '66666666-6666-6666-6666-666666666666'; // 닉네임 미확정(= 구글 실명이 들어 있는 상태)
 
 for (const [id, name, code] of [
-  [U_A, '보낸이', 'CARIAAAA'],
-  [U_B, '받는이', 'CARIBBBB'],
-  [U_C, '탈퇴자', 'CARICCCC'],
-  [U_D, '다른이', 'CARIDDDD'],
+  [U_A, '보낸이', '보낸이'],
+  [U_B, '받는이', '받는이'],
+  [U_C, '탈퇴자', '탈퇴자'],
+  [U_D, '다른이', '다른이'],
+  [U_E, 'GiftMe', 'CARIEEEE'],
+  [U_F, '홍길동', 'CARIFFFF'],
 ]) {
   await db.query(`insert into auth.users(id) values ($1)`, [id]);
   await db.query(`insert into profiles(id, display_name, referral_code) values ($1,$2,$3)`, [id, name, code]);
 }
+// U_F 만 미확정으로 남긴다 — 나머지는 닉네임을 확정한 상태.
+await db.query(`update profiles set nickname_set_at = now() where id <> $1`, [U_F]);
 await db.query(`update profiles set deactivated_at = now() where id = $1`, [U_C]);
+// 카드에 실릴 값(아바타·국가·지역·시즌점수).
+await db.query(`update profiles set avatar_url='gem:#a566e0', country_code='KR', region_code='KR-11' where id=$1`, [U_B]);
+await db.query(`insert into user_progress(user_id, season_total) values ($1, 3700)`, [U_B]);
 await db.query(`insert into user_currency(user_id, points) values ($1, 1000), ($2, 0)`, [U_A, U_B]);
 
 await db.exec(raw);
+await db.exec(rawNick);
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
 const failsWith = async (fn) => { try { await fn(); return null } catch (e) { return e.message || String(e) } };
 
-const gift = (from, code, amount, nonce) =>
-  db.query(`select coin_gift($1,$2,$3,$4) r`, [from, code, amount, nonce]).then((x) => x.rows[0].r);
-const lookup = (from, code) =>
-  db.query(`select coin_gift_lookup($1,$2) r`, [from, code]).then((x) => x.rows[0].r);
+const gift = (from, nick, amount, nonce) =>
+  db.query(`select coin_gift($1,$2,$3,$4) r`, [from, nick, amount, nonce]).then((x) => x.rows[0].r);
+const lookup = (from, nick) =>
+  db.query(`select coin_gift_lookup($1,$2) r`, [from, nick]).then((x) => x.rows[0].r);
 const balance = async (uid) =>
   Number((await db.query(`select points from user_currency where user_id=$1`, [uid])).rows[0].points);
 const ledgerCount = async () =>
@@ -80,7 +108,7 @@ rec('user_currency 음수 잔액 거부',
   (await failsWith(() => db.query(`update user_currency set points = -1 where user_id=$1`, [U_A]))) !== null, true);
 
 // --- (2) 정상 이체 ---
-const g1 = await gift(U_A, 'CARIBBBB', 300, 'nonce-1');
+const g1 = await gift(U_A, '받는이', 300, 'nonce-1');
 rec('이체 성공 — duplicate=false', g1.duplicate, false);
 rec('이체 성공 — 수신자 이름 반환', g1.recipient_name, '받는이');
 rec('보낸 사람 잔액 차감', await balance(U_A), 700);
@@ -93,7 +121,7 @@ rec('원장 — 아직 미확인(seen_at null)', led.seen_at, null);
 
 // --- (3) 멱등 — 같은 nonce 는 두 번 이체하지 않는다 ---
 // 즉시 이체라 이게 뚫리면 타임아웃 후 재시도 한 번이 그대로 두 번 보내기다.
-const g2 = await gift(U_A, 'CARIBBBB', 300, 'nonce-1');
+const g2 = await gift(U_A, '받는이', 300, 'nonce-1');
 rec('같은 nonce 재요청 — duplicate=true', g2.duplicate, true);
 rec('같은 nonce 재요청 — 잔액 불변', await balance(U_A), 700);
 rec('같은 nonce 재요청 — 원장도 그대로', await ledgerCount(), 1);
@@ -102,25 +130,25 @@ rec('같은 nonce 재요청 — 원래 결과를 그대로 반환', Number(g2.am
 // --- (4) 스팸 가드 ---
 // 금액 한도는 없다(잔액이 곧 한도). 이건 돈이 아니라 **받는 사람의 알림**을 지키는 장치다.
 rec('같은 사람에게 연속 전송 거부(too_fast)',
-  (await failsWith(() => gift(U_A, 'CARIBBBB', 10, 'nonce-2')))?.includes('too_fast'), true);
+  (await failsWith(() => gift(U_A, '받는이', 10, 'nonce-2')))?.includes('too_fast'), true);
 rec('too_fast 는 잔액을 건드리지 않는다', await balance(U_A), 700);
 // 다른 사람에게는 제한이 없다.
-const g3 = await gift(U_A, 'CARIDDDD', 100, 'nonce-3');
+const g3 = await gift(U_A, '다른이', 100, 'nonce-3');
 rec('다른 사람에게는 즉시 전송 가능', g3.duplicate, false);
 rec('두 번째 이체 후 잔액', await balance(U_A), 600);
 
 // 쿨다운이 지나면 같은 사람에게 다시 보낼 수 있다.
 await db.query(`update coin_transfers set created_at = now() - interval '1 minute'`);
-const g4 = await gift(U_A, 'CARIBBBB', 100, 'nonce-4');
+const g4 = await gift(U_A, '받는이', 100, 'nonce-4');
 rec('쿨다운 경과 후 같은 사람에게 재전송 가능', g4.duplicate, false);
 rec('재전송 후 수신자 잔액 누적', await balance(U_B), 400);
 
 // --- (5) 금액 ---
 // 음수를 통과시키면 `points - (-100)` 이 되어 선물하기가 남의 코인 뺏기가 된다.
 rec('음수 금액 거부',
-  (await failsWith(() => gift(U_A, 'CARIDDDD', -100, 'nonce-neg')))?.includes('invalid_amount'), true);
+  (await failsWith(() => gift(U_A, '다른이', -100, 'nonce-neg')))?.includes('invalid_amount'), true);
 rec('0원 거부',
-  (await failsWith(() => gift(U_A, 'CARIDDDD', 0, 'nonce-zero')))?.includes('invalid_amount'), true);
+  (await failsWith(() => gift(U_A, '다른이', 0, 'nonce-zero')))?.includes('invalid_amount'), true);
 rec('음수 시도 후 상대 잔액 불변', await balance(U_D), 100);
 rec('원장에 amount<=0 은 아예 못 들어간다',
   (await failsWith(() => db.query(
@@ -132,42 +160,61 @@ await db.query(`update coin_transfers set created_at = now() - interval '1 minut
 const beforeA = await balance(U_A);
 const beforeB = await balance(U_B);
 rec('잔액 초과 전송 거부',
-  (await failsWith(() => gift(U_A, 'CARIBBBB', 999999, 'nonce-over')))?.includes('insufficient_points'), true);
+  (await failsWith(() => gift(U_A, '받는이', 999999, 'nonce-over')))?.includes('insufficient_points'), true);
 rec('실패해도 보낸 사람 잔액 불변', await balance(U_A), beforeA);
 rec('실패해도 받는 사람 잔액 불변', await balance(U_B), beforeB);
 rec('실패는 원장에 남지 않는다', await ledgerCount(), 3);
 
 // --- (7) 수신자 판정 ---
 rec('나에게는 못 보낸다',
-  (await failsWith(() => gift(U_A, 'CARIAAAA', 10, 'nonce-self')))?.includes('self_transfer'), true);
+  (await failsWith(() => gift(U_A, '보낸이', 10, 'nonce-self')))?.includes('self_transfer'), true);
 rec('없는 코드 거부',
-  (await failsWith(() => gift(U_A, 'CARIZZZZ', 10, 'nonce-404')))?.includes('recipient_not_found'), true);
+  (await failsWith(() => gift(U_A, '없는사람', 10, 'nonce-404')))?.includes('recipient_not_found'), true);
 rec('형식이 틀린 코드 거부',
   (await failsWith(() => gift(U_A, 'nope', 10, 'nonce-bad')))?.includes('recipient_not_found'), true);
 rec('탈퇴 계정에는 못 보낸다',
-  (await failsWith(() => gift(U_A, 'CARICCCC', 10, 'nonce-dead')))?.includes('recipient_not_found'), true);
+  (await failsWith(() => gift(U_A, '탈퇴자', 10, 'nonce-dead')))?.includes('recipient_not_found'), true);
 // 소문자·공백을 흡수해야 한다 — 사용자가 그대로 붙여넣는 값이다.
 await db.query(`update coin_transfers set created_at = now() - interval '1 minute'`);
-const g5 = await gift(U_A, '  caribbbb ', 10, 'nonce-lower');
-rec('코드 대소문자·공백 흡수', g5.duplicate, false);
+const g5 = await gift(U_A, '  받는이 ', 10, 'nonce-lower');
+rec('닉네임 앞뒤 공백 흡수', g5.duplicate, false);
 
-// --- (8) 조회(코드 → 닉네임) ---
-// 오타 방지에 필요하지만 동시에 "이 코드가 실존하냐" 오라클이라 쿼터가 걸려 있다.
-rec('조회 — 정상 코드는 닉네임 반환', (await lookup(U_A, 'CARIBBBB')).name, '받는이');
-rec('조회 — 없는 코드', (await lookup(U_A, 'CARIZZZZ')).error, 'not_found');
-rec('조회 — 내 코드', (await lookup(U_A, 'CARIAAAA')).error, 'self');
-rec('조회 — 탈퇴 계정', (await lookup(U_A, 'CARICCCC')).error, 'not_found');
-// 형식 오류는 쿼터를 소모하지 않는다(오타로 한도가 닳으면 안 된다).
+// --- (7b) 닉네임 지목 규칙 ---
+// ⛔ 조회와 이체가 **같은 규칙**으로 사람을 찾아야 한다. 한쪽만 다르면 화면에 뜬 사람과
+//    실제로 받는 사람이 갈리는데, 되돌릴 수 없는 이체에서 그건 사고다.
+rec('이체 — 닉네임 미확정 계정은 지목 불가(구글 실명 노출 방지)',
+  (await failsWith(() => gift(U_A, '홍길동', 10, 'nonce-unset')))?.includes('recipient_not_found'), true);
+rec('조회 — 닉네임 미확정 계정은 안 나온다', (await lookup(U_A, '홍길동')).error, 'not_found');
+rec('조회 — 대소문자 무시(GIFTME → GiftMe)', (await lookup(U_A, ' GIFTME ')).name, 'GiftMe');
+rec('이체 — 1자는 거절(길이 규칙 2~12)',
+  (await failsWith(() => gift(U_A, 'z', 10, 'nonce-short')))?.includes('recipient_not_found'), true);
+rec('이체 — 13자는 거절',
+  (await failsWith(() => gift(U_A, 'z'.repeat(13), 10, 'nonce-long')))?.includes('recipient_not_found'), true);
+
+// --- (8) 조회(닉네임 → 상대 카드) ---
+// ⛔ **이름만 돌려주면 안 된다.** 사용자가 방금 친 값이 그대로 되돌아오는 것이라 확인 기능이 0이다.
+//    아바타·시즌점수·국가·지역은 사용자가 안 친 정보라야 오타 방어선 구실을 한다.
+const card = await lookup(U_A, '받는이');
+rec('조회 — 닉네임 반환', card.name, '받는이');
+rec('조회 — 카드에 아바타', card.avatar, 'gem:#a566e0');
+rec('조회 — 카드에 국가', card.country_code, 'KR');
+rec('조회 — 카드에 지역', card.region_code, 'KR-11');
+rec('조회 — 카드에 시즌 총점(화면이 ARENA 레벨로 환산)', Number(card.season_total), 3700);
+rec('조회 — 시즌 기록이 없으면 0', Number((await lookup(U_A, '다른이')).season_total), 0);
+rec('조회 — 없는 닉네임', (await lookup(U_A, '없는사람')).error, 'not_found');
+rec('조회 — 내 닉네임', (await lookup(U_A, '보낸이')).error, 'self');
+rec('조회 — 탈퇴 계정', (await lookup(U_A, '탈퇴자')).error, 'not_found');
+// 길이 규칙 밖은 쿼터를 소모하지 않는다(치는 도중에 한도가 닳으면 안 된다).
 const qBefore = (await db.query(`select n from coin_gift_lookup_quota where user_id=$1`, [U_A])).rows[0].n;
-await lookup(U_A, 'zz');
-rec('조회 — 형식 오류는 쿼터를 안 쓴다',
+await lookup(U_A, 'z');
+rec('조회 — 길이 규칙 밖은 쿼터를 안 쓴다',
   (await db.query(`select n from coin_gift_lookup_quota where user_id=$1`, [U_A])).rows[0].n, qBefore);
-// 30회를 넘기면 막힌다.
-for (let i = 0; i < 30; i++) await lookup(U_A, 'CARIBBBB');
-rec('조회 — 쿼터 초과 시 too_many', (await lookup(U_A, 'CARIBBBB')).error, 'too_many');
+// 60회를 넘기면 막힌다(옛 30회 → 닉네임은 타이핑 중 여러 번 조회되므로 올렸다).
+for (let i = 0; i < 60; i++) await lookup(U_A, '받는이');
+rec('조회 — 쿼터 초과 시 too_many', (await lookup(U_A, '받는이')).error, 'too_many');
 // 창이 지나면 리셋된다.
 await db.query(`update coin_gift_lookup_quota set window_start = now() - interval '11 minutes' where user_id=$1`, [U_A]);
-rec('조회 — 창이 지나면 리셋', (await lookup(U_A, 'CARIBBBB')).name, '받는이');
+rec('조회 — 창이 지나면 리셋', (await lookup(U_A, '받는이')).name, '받는이');
 
 // --- (9) 원장은 지워지지 않는다 ---
 // ⚠️ 여기가 다른 테이블과 다른 유일한 지점이다. cascade 였다면 보낸 사람이 탈퇴하는 순간
@@ -195,7 +242,12 @@ rec('coin_gift 는 service_role 이 부른다',
   (await db.query(`select has_function_privilege('service_role','coin_gift(uuid,text,int,text)','execute') p`)).rows[0].p, true);
 
 // --- (11) 재실행 안전 ---
-rec('마이그레이션 재실행 안전', await failsWith(() => db.exec(raw)), null);
+// ⚠️ **최신 마이그레이션**만 다시 돌린다. 옛 파일(raw)을 이 위에 다시 얹으면
+//    `create or replace coin_gift(p_uid, p_code, ...)` 가 "cannot change name of input parameter" 로 죽는다 —
+//    지금 함수의 인자 이름이 p_nick 이기 때문이다. 마이그레이션은 순서대로 한 번씩만 적용되므로
+//    실제로는 일어나지 않는 조합이고(새 DB 는 옛 파일 → 새 파일 순서로 정상 통과), 인자 이름을
+//    p_code 로 남겨두는 것보다 '이름이 뜻과 맞는' 쪽이 낫다고 판단했다.
+rec('마이그레이션 재실행 안전(최신 파일)', await failsWith(() => db.exec(rawNick)), null);
 
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);
 const failed = results.filter((x) => !x.pass).length;

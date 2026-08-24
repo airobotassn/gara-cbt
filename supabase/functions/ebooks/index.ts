@@ -3,7 +3,7 @@
 //   - picks   : 레벨테스트 결과창용 추천 목록 (응시 레벨 기준 정렬) — 비로그인도 조회 가능
 //   - library : 내가 구매한 이북 목록 (로그인 필수)
 //   - buy     : **무료(0원) 이북 전용** 즉시 지급. 유료책은 402 로 막고 payments 함수(토스 결제)만 지급한다.
-//   - read    : 소유 확인 후 비공개 버킷 HTML 의 서명 URL 발급(뷰어 iframe 이 이걸 연다)
+//   - read    : 소유 확인 후 비공개 버킷 HTML 의 서명 URL 발급(뷰어 iframe 이 이걸 연다) + 열람 기록(ebook_reads)
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
@@ -278,6 +278,14 @@ Deno.serve(async (req) => {
       if (signErr || !signed?.signedUrl) {
         return json({ error: signErr?.message ?? '본문을 불러올 수 없습니다.' }, 400)
       }
+
+      // 열람 기록(사람×책). 관리자 화면이 환불 판단에 쓴다 — 여기가 **클라가 못 건너뛰는 유일한 길목**이라
+      // 서명 URL 발급에 성공한 뒤에 찍는다(발급이 실패하면 못 읽으므로 열람이 아니다).
+      //   ⚠️ 실패는 삼킨다. 기록이 안 됐다고 산 책을 못 열게 만들면 본말이 전도된다.
+      //   ⚠️ 횟수는 10분 창으로 접힌다(ebook_mark_read) — 새로고침·언어 전환이 열람 횟수를 부풀리지 않게.
+      try {
+        await admin.rpc('ebook_mark_read', { p_user: uid, p_ebook: book.id })
+      } catch { /* 기록 실패가 열람을 막지 않는다 */ }
 
       return json({
         id: book.id,

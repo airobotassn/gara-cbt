@@ -26,7 +26,7 @@ const NODES = [
   { n: 4, x: 547, y: 218 }, { n: 5, x: 754, y: 99 }, { n: 6, x: 1019, y: 79 },
   { n: 7, x: 1269, y: 70 },
 ]
-const EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 1], [4, 5], [5, 6], [6, 7]] // 국자 + 손잡이
+const EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7]]
 const R = 28
 const ROTC = { x: 670, y: 269 }
 // 기울기 = 대각선. 배치(어느 별이 어디)는 레벨 선택을 따르고 회전만 여기서 준다.
@@ -53,7 +53,7 @@ const LABEL: Record<number, { dx: number; dy: number; anchor: 'start' | 'middle'
   1: { dx: -44, dy: 12, anchor: 'end' },    // 국자 왼쪽 끝 — 왼쪽으로(1→2 선이 아래로 지나간다)
   2: { dx: 0, dy: 68, anchor: 'middle' },   // 국자 바닥 — 아래로
   3: { dx: 46, dy: 12, anchor: 'start' },   // 국자 오른쪽 — 오른쪽으로
-  4: { dx: -46, dy: -24, anchor: 'end' },   // 이음매 — 왼쪽 위(4→1 선 위로 띄운다)
+  4: { dx: -46, dy: -24, anchor: 'end' },   // 이음매 — 왼쪽 위
   5: { dx: -46, dy: -8, anchor: 'end' },    // 손잡이 — 왼쪽 위. 오른쪽에 두면 글자 기둥을 침범한다
   6: { dx: -46, dy: -8, anchor: 'end' },    // 손잡이 — 5 와 같은 쪽
   7: { dx: 0, dy: -46, anchor: 'middle' },  // 끝 별 — 위로(옆으로 빼면 GARA 로고에 붙는다)
@@ -110,14 +110,13 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
       {/* ① 연결선 — 각인 선 조각을 구간마다 회전·신축. 링 앞에서 끊어 여백을 준다 */}
       {EDGES.map(([a, b]) => {
         const p = at(a), q = at(b), on = lit(a) && lit(b)
-        const dotted = (a === 1 && b === 4) || (a === 4 && b === 1)
         const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy)
         const seg = len - GAP * 2, th = 9
         const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2
         const deg = (Math.atan2(dy, dx) * 180) / Math.PI
         return (
           <image
-            key={`e${a}-${b}`} href={dotted ? '/cert/edge-dotted.png' : '/cert/edge.png'} x={-seg / 2} y={-th / 2} width={seg} height={th}
+            key={`e${a}-${b}`} href="/cert/edge.png" x={-seg / 2} y={-th / 2} width={seg} height={th}
             preserveAspectRatio="none" opacity={on ? 1 : 0.62} filter={on ? undefined : 'url(#lc-ash)'}
             transform={`translate(${mx},${my}) rotate(${deg})`}
           />
@@ -264,7 +263,7 @@ export default function LevelCert() {
           {/* 발행처 서명단 — 카드 하단 **중앙**. 로고와 기관명이 한 덩어리라 같이 묶는다.
               기관 정식명은 번역하지 않고 영문 고정(증서 관행). */}
           <div className="lc-sign">
-            <img className="lc-brand" src="/cert/logo-gara.png" alt="GARA" />
+            <span className="lc-brand" role="img" aria-label="GARA" />
             <div className="lc-issuer">Global AI &amp; Robotics Association</div>
           </div>
 

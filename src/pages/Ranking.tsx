@@ -31,9 +31,14 @@ interface HofUser {
   character: string | null
   skin: string | null
 }
+/** 이어보기 커서 — 점수·시각·id 세 값이 한 벌이다.
+ *  ⚠️ 점수만 보내면 동점자가 통째로 건너뛰어진다(실측 3만5천 명 중 7,419명 누락).
+ *     서버가 준 것을 **그대로** 되돌려주기만 하면 된다. */
+interface HofCursor { score: number; at: string; id: string; rank: number }
 interface HofResponse {
   top: HofUser[]
   total: number
+  cursor?: HofCursor | null
   me: (HofUser & { pointsToPass?: number | null }) | null
   code?: string | null // 적용된 국가/지역 코드(전세계는 null)
   needsAuth?: boolean // 비로그인이라 국가·지역 보드를 만들 수 없음
@@ -110,6 +115,38 @@ export default function Ranking() {
       alive = false
     }
   }, [scope, cacheKey, loading, boards, errs])
+
+  // ── 이어보기(무한 스크롤) ────────────────────────────────────────────────
+  // 첫 화면은 위 effect 가 TOP 10 을 받고, 그 뒤는 커서로 50명씩 이어 붙인다.
+  //   ⚠️ 탭마다 따로 쌓는다(cacheKey) — 탭을 옮겼다 돌아오면 봤던 만큼 그대로 남는다.
+  //   ⚠️ 총원·내 순위·백분위는 다시 받지 않는다. 그 계산이 랭킹 조회를 285ms 로 만드는 부분이고
+  //      첫 화면이 이미 받은 값이다.
+  const [more, setMore] = useState<Record<string, HofUser[]>>({})
+  const [cursors, setCursors] = useState<Record<string, HofCursor | null>>({})
+  const [paging, setPaging] = useState(false)
+  const pagingRef = useRef(false)
+
+  const loadMore = async (key: string, board: Scope) => {
+    if (pagingRef.current) return
+    // 커서가 아직 없으면 첫 화면 응답의 것을 쓴다. null 이 **명시적으로** 들어와 있으면 끝까지 본 것이다.
+    const cur = key in cursors ? cursors[key] : (boards[key]?.cursor ?? null)
+    if (!cur) return
+    pagingRef.current = true
+    setPaging(true)
+    try {
+      const r = await callFunction<{ rows: HofUser[]; cursor: HofCursor | null }>('leaderboard', {
+        scope: 'page', board, cursor: { score: cur.score, at: cur.at, id: cur.id }, startRank: cur.rank + 1, limit: 50,
+      })
+      setMore((prev) => ({ ...prev, [key]: [...(prev[key] ?? []), ...(r.rows ?? [])] }))
+      // 받은 게 없으면 커서를 null 로 박아 더 이상 요청하지 않는다.
+      setCursors((prev) => ({ ...prev, [key]: (r.rows?.length ?? 0) > 0 ? r.cursor : null }))
+    } catch {
+      // 실패는 조용히 둔다 — 다음 스크롤에서 다시 시도된다(이미 보고 있는 목록은 그대로다).
+    } finally {
+      pagingRef.current = false
+      setPaging(false)
+    }
+  }
 
   // 탭 라벨: 전세계는 고정, 국가·지역은 **실제 이름**(대한민국 · 서울). 코드가 없으면 일반 라벨로 폴백.
   const labelOf = (s: Scope): string => {
@@ -235,7 +272,13 @@ export default function Ranking() {
           </div>
         </>
       ) : (
-        <PersonalBoard t={t} lang={lang} data={data} err={err} listRef={listRef} onPick={pickCard} />
+        <PersonalBoard
+          t={t} lang={lang} data={data} err={err} listRef={listRef} onPick={pickCard}
+          more={more[cacheKey] ?? []}
+          hasMore={(cacheKey in cursors ? cursors[cacheKey] : (data?.cursor ?? null)) != null}
+          paging={paging}
+          onNeedMore={() => loadMore(cacheKey, scope)}
+        />
       )}
 
       {data && !gated ? (
@@ -319,7 +362,7 @@ function MeBar({
           : {})}
       >
         <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
-        <span className="bar-rk">{me.rank}</span>
+        <span className="bar-rk" data-digits={String(me.rank).length}>{me.rank}</span>
         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(me)} seed={me.name} size={48} /></span>
         <span className="bar-nm">
           {me.name}
@@ -342,6 +385,10 @@ function PersonalBoard({
   data,
   err,
   listRef,
+  more,
+  hasMore,
+  paging,
+  onNeedMore,
   onPick,
 }: {
   t: TFunc
@@ -349,6 +396,10 @@ function PersonalBoard({
   data: HofResponse | null
   err: boolean
   listRef: React.RefObject<HTMLDivElement | null>
+  more: HofUser[]
+  hasMore: boolean
+  paging: boolean
+  onNeedMore: () => void
   onPick: (u: HofUser) => void
 }) {
   const top = data?.top ?? []
@@ -386,7 +437,17 @@ function PersonalBoard({
               글자 크기는 cqw 라 그림과 같이 줄어든다. */}
           <div className="hof-podium">
             <div className="hof-podium-art">
-              <img src="/ranking/podium.png" alt="" className="hof-podium-img" />
+              <img src="/ranking/podium-gara-2026.png" alt="" className="hof-podium-img" />
+              {podium.map((u, i) =>
+                u && flagUrl(u.country) ? (
+                  <span key={`flag-${u.rank}`} className={`hof-podium-flag ${podClass[i]}`} aria-hidden="true">
+                    <span className="hof-flag-cloth">
+                      <img src={flagUrl(u.country) as string} alt="" loading="lazy" decoding="async" />
+                    </span>
+                    <span className="hof-flag-pole" />
+                  </span>
+                ) : null,
+              )}
               {podium.map((u, i) =>
                 u ? (
                   <button
@@ -434,12 +495,26 @@ function PersonalBoard({
               4위 이하가 아예 없으면(지역 보드처럼 인원이 3명 이하) 창을 아예 그리지 않는다.
               빈 창은 큰 빈 상자(세로 고정 시절) 아니면 얇은 선(2단 이후)이라 둘 다 사고처럼 보인다. */}
           {rest.length > 0 ? (
-            <div className="hof-listwin" ref={listRef}>
+            <div
+              className="hof-listwin"
+              ref={listRef}
+              // ⚠️ **바닥에 닿기 전에 미리 당겨온다.** 한 페이지 왕복이 780ms 라(DB 는 16~36ms,
+              //    나머지는 함수 왕복) 바닥에서 요청하면 사용자가 그 시간을 그대로 기다린다.
+              //    남은 스크롤이 한 화면 반 이하일 때 미리 부르면 지연이 안 느껴진다.
+              onScroll={(e) => {
+                if (!hasMore || paging) return
+                const el = e.currentTarget
+                if (el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 1.5) onNeedMore()
+              }}
+            >
               <div className="hof-list">
-                {rest.map((u) => (
+                {rest.concat(more).map((u) => (
                   <HofRow key={u.rank} u={u} t={t} lang={lang} onPick={onPick} />
                 ))}
               </div>
+              {/* 더 있는데 아직 안 받았을 때만 알린다. 끝까지 봤으면 아무것도 안 그린다 —
+                  '끝' 같은 문구를 넣으면 3만5천 명 목록에서 그 줄만 계속 눈에 걸린다. */}
+              {paging ? <div className="hof-more">{t('rank.loading_more')}</div> : null}
             </div>
           ) : null}
         </>
@@ -462,7 +537,7 @@ function HofRow({ u, t, lang, onPick }: { u: HofUser; t: TFunc; lang: string; on
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(u) } }}
       >
         <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
-        <span className="bar-rk">{u.rank}</span>
+        <span className="bar-rk" data-digits={String(u.rank).length}>{u.rank}</span>
         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(u)} seed={u.name} size={48} /></span>
         <span className="bar-nm">
           {/* 이름 텍스트를 span 으로 감싸는 이유 = 국기·'나' 배지와 같은 flex 줄에서

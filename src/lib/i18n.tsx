@@ -9,13 +9,15 @@ import {
 import KO from './dict/ko'
 
 export type Lang = 'ko' | 'en' | 'ja' | 'zh' | 'hi' | 'vi'
+// ⚠️ 배열 순서 = **FAB 언어 목록에 보이는 순서**다(2026-08-21 지정: 영·중·인·일·베·한).
+//    폴백 언어나 기본값과는 무관하다 — 그건 ko 로 코드에 박혀 있고, 여기서는 유효한 코드인지만 본다(.some).
 export const LANGS: { code: Lang; label: string }[] = [
-  { code: 'ko', label: '한국어' },
   { code: 'en', label: 'English' },
-  { code: 'ja', label: '日本語' },
   { code: 'zh', label: '中文' },
   { code: 'hi', label: 'हिन्दी' },
+  { code: 'ja', label: '日本語' },
   { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'ko', label: '한국어' },
 ]
 
 /* ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>허브 배경 · 캐릭터 자리 맞추기</title>
+<!--
+  허브 무대(배경 + 캐릭터)의 네 값을 눈으로 맞추는 시안. 지구본 시안(docs/globe-mock.html)과 같은 쓰임새다.
+
+  왜 시안에서 맞추나
+    배경은 `background-size: cover` 라 **화면 비율이 바뀌면 보이는 부분이 달라진다.** 390 폰에서 맞춘
+    값이 PC 에서 어긋나고, 낮 그림과 밤 그림은 지평선 높이도 다르다. 숫자로 계산할 수 있는 값이 아니라
+    "발이 땅에 붙어 보이나"를 보고 정하는 값이다.
+
+  쓰는 법
+    1) 이 파일을 브라우저로 연다(더블클릭).
+    2) 낮/밤 · 화면 크기를 바꿔가며 슬라이더로 맞춘다. 빨간 선이 발끝 기준선이다.
+    3) 아래 '설정값 복사' 를 눌러 나온 CSS 를 `src/styles/hub.css` 의 해당 스킨 블록에 붙인다.
+
+  ⚠️ 무대(vh)는 여기서 **무대 상자 높이의 %** 로 흉내 낸다 — 상자 높이를 기기 화면 높이로 두었으므로
+     1% = 1vh 로 그대로 대응한다. 상자 크기를 임의로 바꾸면 그 대응이 깨진다.
+  ⚠️ 여기 값은 배경·캐릭터 **자리**만이다. 판·게이지·도장 같은 UI 9패치 값은 이 시안이 다루지 않는다.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0d0f15; color: #cfd6e4;
+         font: 13px/1.5 system-ui, -apple-system, 'Malgun Gothic', sans-serif; }
+  header { padding: 14px 18px 10px; }
+  h1 { margin: 0 0 4px; font-size: 17px; font-weight: 800; color: #fff; }
+  .hint { color: #8b93a6; font-size: 12px; }
+  main { display: flex; gap: 18px; padding: 8px 18px 24px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* 무대 — 상자 높이 = 흉내 낼 기기 화면 높이. 그래서 아래 %가 곧 vh 다. */
+  .stage { position: relative; overflow: hidden; border: 1px solid #2a3040; border-radius: 8px; flex: 0 0 auto; }
+  .bg { position: absolute; inset: 0; background-repeat: no-repeat; background-size: cover; }
+  .char { position: absolute; left: 50%; transform: translateX(-50%); }
+  .char img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%;
+              filter: drop-shadow(0 10px 10px rgba(0,0,0,.35)); }
+  .footline { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,60,60,.9); }
+  .footline::after { content: '발끝 기준선'; position: absolute; right: 4px; top: -15px;
+                     font-size: 10px; color: rgba(255,120,120,.95); }
+
+  .panel { flex: 1 1 320px; min-width: 300px; max-width: 460px;
+           background: #141824; border: 1px solid #232a3a; border-radius: 10px; padding: 14px 16px; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+  .row label { flex: 0 0 108px; font-size: 12px; color: #9aa3b6; }
+  .row input[type=range] { flex: 1; }
+  .row .val { flex: 0 0 62px; text-align: right; font-variant-numeric: tabular-nums;
+              font-weight: 700; color: #fff; }
+  .seg { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .seg button { padding: 6px 12px; border-radius: 999px; cursor: pointer;
+                background: #1b2130; border: 1px solid #2c3446; color: #aeb7c8;
+                font: inherit; font-size: 12px; font-weight: 700; }
+  .seg button.on { background: #3b6fd4; border-color: #3b6fd4; color: #fff; }
+  .out { margin-top: 12px; }
+  .out textarea { width: 100%; height: 108px; resize: vertical; background: #0b0e16; color: #cfe0ff;
+                  border: 1px solid #232a3a; border-radius: 8px; padding: 10px;
+                  font: 12px/1.5 ui-monospace, Consolas, monospace; }
+  .out button { margin-top: 8px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+                background: #3b6fd4; border: 0; color: #fff; font: inherit; font-weight: 800; }
+  .note { margin-top: 12px; font-size: 11.5px; color: #7d879b; line-height: 1.65; }
+</style>
+</head>
+<body>
+<header>
+  <h1>허브 배경 · 캐릭터 자리 맞추기</h1>
+  <div class="hint">빨간 선이 발끝이 놓이는 자리입니다. 배경을 위아래로 밀어 <b>땅이 그 선에 오도록</b> 맞춰주세요.</div>
+</header>
+
+<main>
+  <div id="stageWrap"></div>
+
+  <div class="panel">
+    <div class="seg" id="skinSeg"></div>
+    <div class="seg" id="sizeSeg"></div>
+
+    <div class="row">
+      <label>배경 세로 위치</label>
+      <input type="range" id="bgY" min="0" max="100" step="1">
+      <span class="val" id="bgYv"></span>
+    </div>
+    <div class="row">
+      <label>배경 확대</label>
+      <input type="range" id="bgZ" min="100" max="160" step="1">
+      <span class="val" id="bgZv"></span>
+    </div>
+    <div class="row">
+      <label>캐릭터 키</label>
+      <input type="range" id="charH" min="14" max="60" step="0.5">
+      <span class="val" id="charHv"></span>
+    </div>
+    <div class="row">
+      <label>발끝 위치</label>
+      <input type="range" id="charB" min="0" max="45" step="0.5">
+      <span class="val" id="charBv"></span>
+    </div>
+
+    <div class="out">
+      <textarea id="css" readonly></textarea>
+      <button id="copy">설정값 복사</button>
+    </div>
+
+    <p class="note">
+      ⚠️ <b>낮과 밤은 따로 맞춰야 합니다</b> — 두 그림의 지평선 높이가 다릅니다.<br>
+      ⚠️ <b>폭을 바꿔가며 확인하세요.</b> 배경이 <code>cover</code> 라 화면 비율이 바뀌면 보이는 부분이 달라져,
+      폰에서 맞춘 값이 PC 에서 어긋날 수 있습니다.<br>
+      ⚠️ 캐릭터 키·발끝 위치는 <b>낮·밤이 지금 값을 공유</b>합니다. 한쪽만 바꾸려면 hub.css 에서 스킨별로
+      나눠 적어야 합니다.
+    </p>
+  </div>
+</main>
+
+<script>
+// 기기 프리셋 — 상자 높이가 곧 '화면 높이'라 슬라이더의 % 가 그대로 vh 가 된다.
+const SIZES = [
+  { key: 'phone',  label: '390 × 760 (폰)',    w: 390,  h: 760 },
+  { key: 'tablet', label: '768 × 900 (태블릿)', w: 768,  h: 900 },
+  { key: 'pc',     label: '1280 × 800 (PC)',   w: 1280, h: 800 },
+];
+const SKINS = [
+  { key: 'palace_day',   label: '고궁 · 낮',  bg: '../public/hub/bg-v2.png' },
+  { key: 'palace_night', label: '고궁 · 밤',  bg: '../public/hub/bg-v5.png' },
+];
+const CHAR = '../public/hub/char-korea-lv2-hanbok-final.webp';
+// 그림 아래 투명 여백 비율(실측 512×640 중 아래 119px). 발끝 선을 여기만큼 올려 긋는다.
+const CHAR_PAD_BOTTOM = 119 / 640;
+
+// 시작값 = 지금 hub.css 에 들어 있는 값(배경 위치는 기본값 50%).
+const state = {
+  size: 'phone',
+  skin: 'palace_day',
+  bg: { palace_day: 100, palace_night: 100 },   // 세로 위치 %
+  zoom: { palace_day: 130, palace_night: 130 }, // 세로 확대 % (100 = cover, 넘침 0 → 위치가 안 먹는다)
+  charH: 34,
+  charB: 20,
+};
+
+const $ = (id) => document.getElementById(id);
+
+function seg(host, items, get, set) {
+  host.innerHTML = '';
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.textContent = it.label;
+    b.className = get() === it.key ? 'on' : '';
+    b.onclick = () => { set(it.key); render(); };
+    host.appendChild(b);
+  }
+}
+
+function render() {
+  const size = SIZES.find((s) => s.key === state.size);
+  const skin = SKINS.find((s) => s.key === state.skin);
+
+  seg($('skinSeg'), SKINS, () => state.skin, (v) => (state.skin = v));
+  seg($('sizeSeg'), SIZES, () => state.size, (v) => (state.size = v));
+
+  $('stageWrap').innerHTML =
+    '<div class="stage" style="width:' + size.w + 'px;height:' + size.h + 'px">' +
+      '<div class="bg" style="background-image:url(' + skin.bg + ');' +
+        'background-size:' + (state.zoom[state.skin] === 100 ? 'cover' : 'auto ' + state.zoom[state.skin] + '%') + ';' +
+        'background-position:50% ' + state.bg[state.skin] + '%"></div>' +
+      '<div class="char" style="bottom:' + state.charB + '%;height:' + state.charH + '%;width:min(92%,640px)">' +
+        '<img src="' + CHAR + '" alt="">' +
+      '</div>' +
+      // ⚠️ 선은 **실제로 발이 그려지는 높이**에 긋는다 — 그림 아래 투명 여백(18.6%)만큼
+      //    상자 바닥보다 위다. 상자 바닥에 그으면 있지도 않은 자리를 기준으로 맞추게 된다.
+      '<div class="footline" style="bottom:' + (state.charB + state.charH * CHAR_PAD_BOTTOM) + '%"></div>' +
+    '</div>';
+
+  $('bgY').value = state.bg[state.skin];  $('bgYv').textContent = state.bg[state.skin] + '%';
+  $('bgZ').value = state.zoom[state.skin]; $('bgZv').textContent = state.zoom[state.skin] + '%';
+  $('bgY').disabled = state.zoom[state.skin] === 100;
+  $('charH').value = state.charH;         $('charHv').textContent = state.charH + 'vh';
+  $('charB').value = state.charB;         $('charBv').textContent = state.charB + 'vh';
+
+  $('css').value =
+    '/* 배경 세로 위치 — 스킨마다 지평선이 달라 따로 잡는다 */\n' +
+    ".hub[data-skin='palace_day']   { --skin-bg: url('/hub/bg-v2.png'); --skin-bg-size: auto " + state.zoom.palace_day + '%; --skin-bg-pos: 50% ' + state.bg.palace_day + '%; }\n' +
+    ".hub[data-skin='palace_night'] { --skin-bg: url('/hub/bg-v5.png'); --skin-bg-size: auto " + state.zoom.palace_night + '%; --skin-bg-pos: 50% ' + state.bg.palace_night + '%; }\n' +
+    '\n/* 값 블록 안(낮·밤 공용) */\n' +
+    '  --skin-char-h: ' + state.charH + 'vh;\n' +
+    '  --skin-char-bottom: ' + state.charB + 'vh;\n';
+}
+
+$('bgY').oninput   = (e) => { state.bg[state.skin] = +e.target.value; render(); };
+$('bgZ').oninput   = (e) => { state.zoom[state.skin] = +e.target.value; render(); };
+$('charH').oninput = (e) => { state.charH = +e.target.value; render(); };
+$('charB').oninput = (e) => { state.charB = +e.target.value; render(); };
+$('copy').onclick  = () => {
+  $('css').select();
+  navigator.clipboard.writeText($('css').value).then(
+    () => { $('copy').textContent = '복사했습니다'; setTimeout(() => ($('copy').textContent = '설정값 복사'), 1400); },
+    () => { $('copy').textContent = '복사 실패 — 직접 선택하세요'; },
+  );
+};
+
+render();
+</script>
+</body>
+</html>

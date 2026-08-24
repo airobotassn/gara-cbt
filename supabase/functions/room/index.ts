@@ -40,8 +40,28 @@ Deno.serve(async (req) => {
         admin.from('user_characters').select('base_key, equipped').eq('user_id', handle).maybeSingle(),
       ])
 
-      // 익명(게스트) 계정은 방이 없다 — 이름도 없고 남에게 보여줄 것도 없다.
-      if (!profile || profile.is_anonymous) return json({ error: 'not_found' }, 404)
+      // 실회원이 아니면 **랭킹 더미**인지 본다 — /ranking 시상대의 '방 보기' 는 진짜와 더미를
+      // 구분하지 않고 같은 주소로 들어오기 때문이다. 여기서 안 받으면 더미만 404 가 뜨고,
+      // "지도엔 사람이 있다는데 방은 없네" 라는 어긋남이 이 자리에서 다시 생긴다.
+      //   ⚠️ 실회원 경로를 먼저 태우고 못 찾았을 때만 더미를 조회한다(대부분은 실회원이다).
+      //   ⚠️ 칭호는 비운다 — 자격증은 실제 응시 기록에서 나오는 것이라 더미가 가질 수 없다.
+      if (!profile || profile.is_anonymous) {
+        const { data: dummy } = await admin
+          .from('ranking_dummies')
+          .select('display_name, avatar_url, season_total, character_key, skin')
+          .eq('id', handle)
+          .maybeSingle()
+        if (!dummy) return json({ error: 'not_found' }, 404)
+        return json({
+          handle,
+          name: (dummy.display_name as string | null) ?? null,
+          avatarUrl: (dummy.avatar_url as string | null) ?? null,
+          seasonTotal: (dummy.season_total as number) ?? null,
+          title: null,
+          character: (dummy.character_key as string | null) ?? null,
+          skin: (dummy.skin as string | null) ?? null,
+        })
+      }
 
       const titleList = Array.isArray(titles) ? titles : []
       return json({

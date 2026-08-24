@@ -67,11 +67,6 @@ html.dark .mgp {
 }
 
 /* ── 뒤로 (스티커 pill) ── */
-.mgp-back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px;
-  padding: 7px 15px 7px 12px; border-radius: 999px; border: 2px solid var(--line);
-  background: var(--card); color: var(--ink); font-size: 12.5px; font-weight: 800;
-  text-decoration: none; box-shadow: 0 3px 0 rgba(var(--shc), .16); }
-.mgp-back:active { transform: translateY(2px); box-shadow: none; }
 .mgp-back span { font-size: 15px; line-height: 1; }
 
 /* ── 헤더 — 아레나 헤더와 동일(배경 위 굵은 제목) ── */
@@ -123,6 +118,28 @@ html.dark .mg-cover { background: #1b2130; }
 .mg-play-tri { width: 0; height: 0; border-style: solid; border-width: 8px 0 8px 13px;
   border-color: transparent transparent transparent #fff; filter: drop-shadow(0 1px 1px rgba(0,40,120,.35)); }
 @keyframes mg-play-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+
+/* ── 게스트 잠금 — 비로그인은 GUEST_GAME_ID(버텨라 CARI) 하나만 열린다(lib/minigames.ts) ──
+   ⚠️ **썸네일은 원색 그대로 둔다.** 흑백으로 죽이면 '해볼까' 하는 마음이 안 생겨서 로그인할 이유가
+      같이 사라진다(그렇게 만들었다가 반려 — 2026-08-24). 죽이는 건 PLAY 버튼 하나뿐이다.
+   ⚠️ 애니메이션(mg-play-bob)을 반드시 끈다 — 회색인데 계속 통통 튀면 눌러도 되는 것처럼 읽힌다. */
+.mg-cover.is-locked { cursor: default; }
+.mg-cover.is-locked:hover { transform: none; box-shadow: 0 6px 0 rgba(var(--shc), .2); }
+.mg-cover.is-locked .mg-play {
+  animation: none;
+  color: #8b93a7;
+  background: linear-gradient(160deg, #e4e7ee 0%, #d2d7e2 55%, #c3c9d6 100%);
+  border-color: rgba(255,255,255,.7);
+  box-shadow: 0 5px 0 #a9b0bf, inset 0 2px 3px rgba(255,255,255,.5);
+}
+.mg-cover.is-locked:hover .mg-play { filter: none; }
+.mg-play-lock { font-size: clamp(13px, 5.6cqw, 18px); line-height: 1; }
+html.dark .mg-cover.is-locked .mg-play {
+  color: #7e8698;
+  background: linear-gradient(160deg, #3a4152 0%, #2c3243 55%, #232838 100%);
+  border-color: rgba(255,255,255,.14);
+  box-shadow: 0 5px 0 #1a1f2c, inset 0 2px 3px rgba(255,255,255,.08);
+}
 
 /* ── 로그인 게이트(/games/:id 를 비로그인으로 열었을 때) — 목록 커버와 같은 스티커 톤의 단일 카드 ── */
 .mg-gate { max-width: 420px; margin: 6vh auto 0; padding: 22px 20px 24px; text-align: center;

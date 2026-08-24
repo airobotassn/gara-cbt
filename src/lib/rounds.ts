@@ -133,7 +133,12 @@ export function useExamRounds(lang: Lang) {
         .from('exam_rounds')
         .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, exam_start_at, exam_end_at, note_i18n, open_tiers, sort')
         .eq('published', true)
-        // 정기시험은 시험일 오름차순(가까운 순). 상시(exam_date=null)는 뒤로 밀고 sort로 정렬.
+        // 접수 시작일 오름차순(= 지금 신청할 수 있는 것부터). /plan 은 접수하러 오는 페이지라
+        // '언제부터 신청하나' 가 줄 세우는 기준이다.
+        // ⚠️ 시험일(exam_date) 순이 아니다 — 정기시험끼리는 두 기준이 같은 순서지만, 접수를 길게 여는
+        //    회차(구성원 테스트처럼 몇 년짜리)는 시험일 순으로 두면 지금 접수중인데도 맨 뒤에 선다.
+        // 접수일이 없는 회차(상시 · 미설정)는 뒤로 밀고 시험일 → sort 로 정렬.
+        .order('apply_start_at', { ascending: true, nullsFirst: false })
         .order('exam_date', { ascending: true, nullsFirst: false })
         .order('sort', { ascending: true })
       if (!alive) return

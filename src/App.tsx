@@ -4,6 +4,7 @@ import { I18nProvider, useT } from './lib/i18n'
 import { AuthProvider, useAuth } from './context/AuthProvider'
 import { loadSiteSettings, applySiteHead } from './lib/siteSettings'
 import { callFunction } from './lib/supabase'
+import { ensureCheckedIn } from './lib/autoCheckin'
 import Layout from './components/Layout'
 import SebEscapeHatch from './components/SebEscapeHatch'
 import SitePopups from './components/SitePopups'
@@ -153,12 +154,13 @@ function GateSpinner() {
 }
 
 /**
- * 사이트 정보 적용 + 접속 기록.
+ * 사이트 정보 적용 + 접속 기록 + 자동 출석.
  * ⚠️ 접속 기록은 **로그인 사용자만**, **하루 한 번만** 남긴다 — 매 이동마다 쓰면 접속자 수만큼 쓰기가 생긴다.
  *    이 값이 관리자 대시보드의 "오늘 접속자 · 휴면 회원"의 유일한 출처다(없으면 항상 0명).
  */
 function SiteBoot() {
-  const { isFullUser } = useAuth()
+  const { isFullUser, user } = useAuth()
+  const uid = isFullUser ? user?.id : undefined
   useEffect(() => { loadSiteSettings().then(applySiteHead) }, [])
   useEffect(() => {
     if (!isFullUser) return
@@ -169,6 +171,13 @@ function SiteBoot() {
       .then(() => localStorage.setItem('gara_seen_day', todayKst))
       .catch(() => { /* 접속 기록 실패는 무시 */ })
   }, [isFullUser])
+  // 자동 출석 — 옛 '출석' 버튼(허브 레일)을 대신한다. 여기 두는 이유는 **어느 페이지로 들어와도**
+  // 찍혀야 해서다(랜딩만 걸면 북마크로 직행한 날은 출석이 빠진다). 화면에는 아무것도 띄우지 않는다.
+  //   ⚠️ 판정·중복방지는 서버와 lib/autoCheckin.ts 가 한다 — 여기서 조건을 더 얹지 말 것.
+  useEffect(() => {
+    if (!uid) return
+    void ensureCheckedIn(uid)
+  }, [uid])
   return null
 }
 

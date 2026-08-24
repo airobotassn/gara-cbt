@@ -3,7 +3,7 @@
 //   서버는 전부 `admin` 함수의 reform.ts 액션이고, 관리자 게이트는 최상위 <Admin/> 이 이미 통과시킨 뒤다.
 import { Fragment, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode } from 'react'
 import { callFunction, supabase } from '../lib/supabase'
-import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, productLabel } from '../lib/adminData'
+import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, productLabel, readSummary, type EbookReadRow } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { krw } from '../lib/money'
@@ -67,12 +67,38 @@ interface PaymentRow {
   id: string; userId: string; name: string | null; email: string | null
   orderId: string; orderName: string; productType: string; amount: number
   status: string; method: string | null; fulfilledAt: string | null; createdAt: string
+  // 이 결제로 나간 이북들의 열람 여부. 이북이 안 붙은 결제(응시료 단독 등)는 빈 배열이다.
+  reads?: EbookReadRow[]
 }
 interface PaymentListResp {
   payments: PaymentRow[]; total: number
   stats30d: { paidN: number; paidAmount: number; refundN: number; refundAmount: number }
   queues: { unfulfilled: number; revoked: number }
 }
+/** 열람 칸 — 결제 목록(여기)과 회원 상세 '결제·구매' 탭이 같이 쓴다.
+ *  ⚠️ 여러 권이면 제목·시각을 칸에 펼치지 않고 마우스 올림(title)으로 넘긴다 — 표 줄이 무너진다.
+ *  ⚠️ **읽음을 경고색(amber)으로 칠하지 않는다.** 이 화면에서 amber 는 '미지급'(우리가 잘못한 것) 한 뜻이다.
+ *     열람은 잘못이 아니라 사실이라 굵기로만 세운다. */
+export function ReadCell({ reads }: { reads?: EbookReadRow[] }) {
+  const s = readSummary(reads)
+  const detail = (reads ?? [])
+    .map((r) => `${r.title ?? r.ebookId} — ${r.firstAt ? `${fmtDT(r.firstAt)} 첫 열람 · ${r.count}회` : '열람 없음'}`)
+    .join('\n')
+  return (
+    <td style={{ whiteSpace: 'nowrap' }} title={detail || undefined}>
+      {s.none
+        ? <span style={{ color: 'var(--muted)' }}>-</span>
+        : s.opened
+          ? <b>{s.text}</b>
+          : <span style={{ color: 'var(--muted)' }}>{s.text}</span>}
+      {/* 한 권짜리 결제는 마지막 열람 시각까지 — 환불 문의가 들어온 시점과 대조하는 값이다. */}
+      {s.opened && reads?.length === 1 && reads[0].lastAt && (
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDT(reads[0].lastAt)}</div>
+      )}
+    </td>
+  )
+}
+
 export function PaymentsAdmin() {
   const [status, setStatus] = useState('')
   const [productType, setProductType] = useState('')
@@ -128,7 +154,7 @@ export function PaymentsAdmin() {
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
-            <tr><th>일시</th><th>구매자</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>수단</th><th>상태</th></tr>
+            <tr><th>일시</th><th>구매자</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>수단</th><th>상태</th><th>열람</th></tr>
           </thead>
           <tbody>
             {rows.map((p) => (
@@ -142,10 +168,12 @@ export function PaymentsAdmin() {
                   <span className="badge">{payStatusLabel(p.status)}</span>
                   {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
                 </td>
+                {/* 열람 여부 — 환불 문의가 왔을 때 제일 먼저 보는 칸이다. 읽은 건은 눈에 띄어야 한다. */}
+                <ReadCell reads={p.reads} />
               </tr>
             ))}
             {!rows.length && !loading && (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>결제 내역이 없습니다.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>결제 내역이 없습니다.</td></tr>
             )}
           </tbody>
         </table>
@@ -2068,7 +2096,10 @@ export function HubCosmeticAdmin() {
     setRows((prev) => (prev ? prev.map((r) => (r.part_key === key ? { ...r, ...p } : r)) : prev))
 
   // 첫 선택 후보 수 — 0이 되면 저장이 막힌다. 저장을 누르기 전에 화면에서 먼저 보이게 한다.
-  const starters = (rows ?? []).filter((r) => r.kind === 'character' && r.price === 0 && r.active)
+  //   ⚠️ 값(price)은 보지 않는다 — 첫 선택은 값과 무관하게 공짜다(20260824120000).
+  //      서버 가드(hubCosmeticsSave)와 같은 조건이어야 한다. 어긋나면 화면은 되는 줄 알고
+  //      저장을 눌렀는데 서버가 거절하거나, 반대로 갇히는 값을 통과시킨다.
+  const starters = (rows ?? []).filter((r) => r.kind === 'character' && r.active)
 
   async function save() {
     if (!rows) return
@@ -2095,8 +2126,8 @@ export function HubCosmeticAdmin() {
         <h3>{COSMETIC_KIND_LABEL[kind] ?? kind}</h3>
         {isChar && (
           <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12 }}>
-            가격을 <b>0</b> 으로 두면 신규 회원의 <b>첫 캐릭터 선택 화면</b>에 나옵니다(무료). 값을 매기면
-            그 화면에서 빠지고 상점에서 코인으로 파는 캐릭터가 됩니다.
+            신규 회원은 <b>첫 캐릭터 선택 화면</b>에서 <b>진열 중인 캐릭터 아무거나 한 종을 공짜로</b> 받습니다 —
+            가격은 <b>두 번째 캐릭터부터</b> 붙습니다. 진열을 내리면 그 화면에서도 빠집니다.
             {' '}현재 첫 선택 후보 <b>{starters.length}종</b>
             {starters.length === 0 && <b style={{ color: 'var(--danger, #d33)' }}> — 최소 1종은 있어야 저장됩니다</b>}
           </p>

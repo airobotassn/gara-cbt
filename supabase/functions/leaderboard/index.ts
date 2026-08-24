@@ -86,6 +86,20 @@ async function attachCosmetics(
       skin: eq.skin ?? null,
     })
   }
+  // 실회원 쪽에서 못 찾은 uid 는 **랭킹 더미**다(ranking_dummies — profiles 에 행이 없다).
+  //   ⚠️ 안 붙여도 화면은 안 깨진다(폴백 그림). 붙이는 건 시상대에 선 사람들이 전부 같은 그림이면
+  //      보드가 밋밋해서다 — 더미 행에도 캐릭터·스킨이 실려 있다.
+  const missing = ids.filter((id) => !byUid.has(id))
+  if (missing.length) {
+    const { data: dm } = await admin.from('ranking_dummies').select('id, character_key, skin').in('id', missing)
+    for (const d of dm ?? []) {
+      byUid.set(d.id as string, {
+        character: ((d.character_key as string | null) ?? null),
+        skin: ((d.skin as string | null) ?? null),
+      })
+    }
+  }
+
   for (const r of rows) {
     const c = r.uid ? byUid.get(r.uid) : null
     r.character = c?.character ?? null
@@ -97,10 +111,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const body = (await req.json().catch(() => ({}))) as {
-      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school' | 'user'
+      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school' | 'user' | 'page'
       window?: 'daily' | 'season'
       country?: string
       uid?: string
+      // scope 'page'(무한 스크롤) 전용 — 어느 보드를 이어볼지 + 앞 응답에서 받은 커서.
+      board?: 'global' | 'my-country' | 'my-region'
+      cursor?: { score?: number; at?: string; id?: string } | null
+      startRank?: number
+      limit?: number
     }
     const scope = body.scope ?? 'global'
     const admin = adminClient()
@@ -134,13 +153,19 @@ Deno.serve(async (req) => {
       // ⚠️ **코드**를 같이 준다(이름이 아니라 'KR'·'KR-11'). 카드가 '대한민국 6위'·'서울특별시 2위' 로
       //    쓰기 때문이다(2026-08-21 요청). 이름표는 클라가 이미 갖고 있으므로(249개국 × 6개국어 +
       //    지도 파일의 지역명) 서버가 6개국어 이름을 만들어 내려보내지 않는다.
+      //   ⚠️ 랭킹 더미는 profiles 에 행이 없다 → 여기서 못 찾으면 더미 표를 본다.
+      //      안 보면 더미 카드에서만 '대한민국 —위' 처럼 그 칸이 비어 진짜와 티가 난다.
       const { data: pr } = await admin
         .from('profiles')
         .select('country_code,region_code')
         .eq('id', uid)
         .maybeSingle()
-      const cc = (pr?.country_code as string | null) ?? null
-      const rc = (pr?.region_code as string | null) ?? null
+      const { data: dpr } = pr
+        ? { data: null }
+        : await admin.from('ranking_dummies').select('country_code,region_code').eq('id', uid).maybeSingle()
+      const src = (pr ?? dpr) as { country_code?: string | null; region_code?: string | null } | null
+      const cc = (src?.country_code as string | null) ?? null
+      const rc = (src?.region_code as string | null) ?? null
       const scoped = async (country: string | null, region: string | null) => {
         if (!country) return { rank: null as number | null, total: null as number | null }
         const { data: sd } = await admin.rpc('scoped_top', { p_uid: uid, p_limit: 0, p_country: country, p_region: region })
@@ -159,6 +184,45 @@ Deno.serve(async (req) => {
         countryCode: cc,
         regionCode: rc,
       })
+    }
+
+    // 이어보기(무한 스크롤) — 첫 화면 다음 구간을 커서로 떠온다.
+    //   ⚠️ **총원·내 순위·백분위를 다시 계산하지 않는다.** 그게 랭킹 조회가 285ms 인 이유고,
+    //      스크롤할 때마다 되풀이하면 페이지마다 그 시간이 붙는다. 첫 화면이 이미 받은 값이다.
+    //   ⚠️ 커서는 클라가 앞 응답에서 받은 것을 **그대로** 돌려준다(점수·시각·id 세 값이 한 벌).
+    //      점수만 보내면 동점자가 통째로 건너뛰어진다 — 실측 3만5천 명 중 7,419명이 빠졌다.
+    //   ⚠️ 범위(국가·지역)는 여기서도 **서버가 호출자 프로필에서** 읽는다. 클라가 지정하게 하면
+    //      남의 국가·지역 보드를 훑을 수 있다(위 첫 화면 경로와 같은 이유).
+    if (scope === 'page') {
+      const user = await getUser(req)
+      const board = body.board === 'my-country' || body.board === 'my-region' ? body.board : 'global'
+      let pCountry: string | null = null
+      let pRegion: string | null = null
+      if (board !== 'global') {
+        if (!user?.id) return json({ rows: [], cursor: null, needsAuth: true })
+        const { data: pr } = await admin
+          .from('profiles').select('country_code,region_code').eq('id', user.id).maybeSingle()
+        pCountry = (pr?.country_code as string | null) ?? null
+        if (board === 'my-region') pRegion = (pr?.region_code as string | null) ?? null
+        if (board === 'my-region' ? !pRegion : !pCountry) return json({ rows: [], cursor: null, needsRegion: true })
+      }
+      const cur = (body.cursor ?? null) as { score?: number; at?: string; id?: string } | null
+      const { data, error } = await admin.rpc('scoped_page', {
+        p_uid: user?.id ?? null,
+        p_after_score: cur?.score ?? null,
+        p_after_at: cur?.at ?? null,
+        p_after_id: cur?.id ?? null,
+        p_start_rank: Math.max(1, Math.floor(Number(body.startRank ?? 1))),
+        // 한 번에 50명 — 쿼리 비용은 20명과 같은데 함수 왕복이 실제 지연의 절반이라 왕복을 줄인다.
+        p_limit: Math.min(100, Math.max(10, Math.floor(Number(body.limit ?? 50)))),
+        p_country: pCountry,
+        p_region: pRegion,
+      })
+      if (error) return json({ error: error.message }, 500)
+      const d = (data ?? {}) as { rows?: RpcUser[]; cursor?: unknown }
+      const rows = (d.rows ?? []).map((u) => mapUser(u))
+      await attachCosmetics(admin, rows)
+      return json({ rows, cursor: d.cursor ?? null })
     }
 
     // 개인 리더보드 — 전세계 / 내 국가 / 내 지역. 세 탭 모두 같은 RPC(scoped_top), 모수만 다르다.
@@ -192,7 +256,7 @@ Deno.serve(async (req) => {
       })
       if (error) return json({ error: error.message }, 500)
 
-      const d = (data ?? {}) as { top?: RpcUser[]; total?: number; me?: (RpcUser & { points_to_pass?: number | null }) | null }
+      const d = (data ?? {}) as { top?: RpcUser[]; total?: number; cursor?: unknown; me?: (RpcUser & { points_to_pass?: number | null }) | null }
       const top = (d.top ?? []).map((u) => mapUser(u))
       const me: Record<string, unknown> | null = d.me ? mapUser(d.me, true) : null
       // 시상대·목록에서 사람을 누르면 그 사람 카드가 뜬다 → 캐릭터·스킨이 필요하다.
@@ -221,7 +285,8 @@ Deno.serve(async (req) => {
         // 다음 순위 게이지: 그 **보드 안에서** 바로 윗사람과의 점수차(scoped_top 이 같이 내려준다).
         me.pointsToPass = d.me?.points_to_pass ?? null
       }
-      return json({ top, total: d.total ?? 0, me, scope, code: pRegion ?? pCountry })
+      // 이어보기 시작점 — 프론트가 이 커서를 그대로 되돌려주면 11위부터 온다(scope 'page').
+      return json({ top, total: d.total ?? 0, me, scope, code: pRegion ?? pCountry, cursor: d.cursor ?? null })
     }
 
     // 집계 버킷 리더보드 — 개인정보 없이 집계값만. RPC 가 프라이버시 floor(member_count<5) 를 이미 제외.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
@@ -30,6 +30,16 @@ export default function Faq() {
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
+  const resultsRef = useRef<HTMLDivElement>(null)
+
+  // 검색은 타이핑하는 대로 걸러진다(그건 그대로 둔다). 엔터·버튼이 하는 일은
+  //   ① 모바일 키보드를 접고 ② 히어로 아래에 있는 결과로 스크롤해 주는 것뿐이다.
+  //   ⚠️ 여기서 필터를 '확정' 방식으로 바꾸지 말 것 — 지금 화면은 한 글자마다 반응하는 게 기본 동작이다.
+  function onSearch(e: React.FormEvent) {
+    e.preventDefault()
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   useEffect(() => {
     let alive = true
@@ -89,7 +99,10 @@ export default function Faq() {
     <div className="p-6 rounded-xl bg-surface-container-low border border-outline-variant/20 shadow-sm">
       <h3 className="font-title-md font-bold mb-2">{t('faq.help_title')}</h3>
       <p className="text-sm text-on-surface-variant mb-4">{t('faq.help_body')}</p>
-      <Link className="group inline-flex items-center gap-1.5 text-primary font-label-md hover:text-primary-container transition-colors" to="/notice">
+      {/* FAQ 를 다 읽고도 안 풀렸으면 갈 곳은 공지사항이 아니라 **1:1 문의**다(2026-08-20).
+          ⚠️ /mypage 는 로그인 전용이라 비로그인은 로그인 화면으로 간다 — 문의는 답변을 받을 계정이
+             있어야 성립하므로 그게 맞는 흐름이다. */}
+      <Link className="group inline-flex items-center gap-1.5 text-primary font-label-md hover:text-primary-container transition-colors" to="/mypage/inquiry">
         <span className="group-hover:underline">{t('faq.help_link')}</span>
         <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-0.5">arrow_forward</span>
       </Link>
@@ -100,12 +113,23 @@ export default function Faq() {
     <div className="bg-background text-on-background font-body-md min-h-screen flex flex-col relative overflow-x-hidden">
       {/* Main Content Canvas (헤더 없음 — FAB이 네비) */}
       <main className="flex-grow w-full pb-24 pt-12">
+        {/* 홈으로 — 헤더가 없는 화면이라(FAB 이 네비) 여기 말고는 홈으로 갈 길이 FAB 뿐이었다.
+            ⚠️ main 에 폭 제한이 없어서 아래 히어로와 같은 컨테이너로 감싼다(안 그러면 칩만 화면 끝에 붙는다). */}
+        <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+          <Link to="/" className="gd-back mb-6">
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            {t('common.home')}
+          </Link>
+        </div>
+
         {/* Hero Section */}
         <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto mb-10 mt-8">
           <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 md:p-10 relative overflow-hidden shadow-sm mesh-gradient">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 pointer-events-none"></div>
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-              <div className="w-full md:w-1/2">
+              {/* 오른쪽 카드 2장(CARIS PLAN·자격 검증)은 2026-08-20 제거 — 폭을 절반으로
+                  두면 데스크톱에서 히어로 오른쪽이 통째로 텅 빈다. */}
+              <div className="w-full">
                 <span className="inline-flex items-center gap-2 pl-2.5 pr-4 py-1.5 rounded-full bg-surface-container-lowest/70 text-primary font-title-md text-label-md font-semibold mb-6 shadow-sm border border-primary/15 backdrop-blur-md">
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary"><span className="material-symbols-outlined text-[16px]">support_agent</span></span>
                   {t('faq.eyebrow2')}
@@ -113,30 +137,27 @@ export default function Faq() {
                 <h1 className="font-display-lg text-4xl md:text-[56px] leading-[1.1] font-bold mb-6 tracking-tight text-on-surface break-keep">
                   {t('faq.hero_title')} <br /><span className="text-primary">{t('faq.hero_title_em')}</span>
                 </h1>
-                <div className="relative group max-w-xl">
-                  <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors text-xl">search</span>
+                {/* 엔터 버튼은 메인(랜딩) 검색창과 같은 물건이다 — 같은 클래스(`.lp-search-btn`)를 쓴다.
+                    ⚠️ 색·크기를 여기서 다시 쓰지 말 것: 두 벌이 되면 메인만 고쳤을 때 조용히 갈린다. */}
+                <form className="relative group max-w-xl" onSubmit={onSearch}>
+                  {/* ⚠️ z-10 필수 — input 의 `backdrop-blur-sm` 이 스태킹 컨텍스트를 만들어서
+                      앞에 있는 절대배치 아이콘을 덮어버린다(그동안 돋보기가 안 보이던 이유). */}
+                  <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 z-10 text-primary/60 group-focus-within:text-primary transition-colors text-xl">search</span>
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="w-full bg-surface-container-lowest/80 backdrop-blur-sm border border-outline-variant/50 rounded-2xl py-4 pl-14 pr-6 text-body-lg focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm outline-none placeholder:text-on-surface-variant/50"
+                    className="w-full bg-surface-container-lowest/80 backdrop-blur-sm border border-outline-variant/50 rounded-2xl py-4 pl-14 pr-[68px] text-body-lg focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm outline-none placeholder:text-on-surface-variant/50"
                     placeholder={t('faq.search_ph')}
                     type="text"
                   />
-                </div>
-              </div>
-              <div className="w-full md:w-5/12 hidden md:block">
-                <div className="grid grid-cols-2 gap-4">
-                  <Link to="/plan" className="glass-card p-6 rounded-2xl flex flex-col gap-3 translate-y-8 hover:shadow-md transition-shadow">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><span className="material-symbols-outlined">event_available</span></div>
-                    <h3 className="font-title-md text-base font-bold text-on-surface">{t('faq.card_schedule_title')}</h3>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">{t('faq.card_schedule_desc')}</p>
-                  </Link>
-                  <Link to="/mypage" className="glass-card p-6 rounded-2xl flex flex-col gap-3 hover:shadow-md transition-shadow">
-                    <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary"><span className="material-symbols-outlined">verified_user</span></div>
-                    <h3 className="font-title-md text-base font-bold text-on-surface">{t('faq.card_verify_title')}</h3>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">{t('faq.card_verify_desc')}</p>
-                  </Link>
-                </div>
+                  <button
+                    className="lp-search-btn absolute right-2 top-1/2 -translate-y-1/2"
+                    type="submit"
+                    aria-label={t('faq.search_go')}
+                  >
+                    →
+                  </button>
+                </form>
               </div>
             </div>
           </div>
@@ -172,7 +193,7 @@ export default function Faq() {
           </aside>
 
           {/* Main FAQ Content */}
-          <div className="w-full lg:w-3/4">
+          <div className="w-full lg:w-3/4" ref={resultsRef}>
             <div className="mb-8 pb-6 border-b border-outline-variant/40">
               {/* 분류 이름 밑 설명문은 없앴다(2026-08-20) — 검색 결과일 때 '‘…’ 관련 문항입니다' 만 남는다. */}
               <h2 className={`font-headline-lg text-2xl md:text-headline-lg font-bold text-on-surface break-keep ${searching ? 'mb-2' : ''}`}>{searching ? t('faq.search_results') : catLabel(cat)}</h2>

@@ -93,7 +93,7 @@ export default function Room() {
 
       <div className="hub-backrow">
         {/* 들어온 길이 랭킹일 수도 채팅일 수도 SNS 일 수도 있다 — 어디서 왔든 말이 되는 곳(아레나)으로 보낸다. */}
-        <Link className="hub-back" to="/arena"><span className="ic">←</span>WORLD ARENA</Link>
+        <Link className="hub-back" to="/arena"><span className="material-symbols-outlined">arrow_back</span>WORLD ARENA</Link>
         <div className="hub-backrow-act">
           <button className="hub-share" onClick={copyLink}>{t(copied ? 'room.copied' : 'room.copy')}</button>
         </div>

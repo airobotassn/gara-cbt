@@ -8,7 +8,6 @@ import { GEM_COLORS, ADMIN_MASCOT_COUNT, parseAvatar, uploadAvatar } from '../li
 import { isSEB } from '../lib/seb'
 import { clearInquiryAlert, refreshInquiryAlert, useInquiryAlert } from '../lib/inquiryAlert'
 import { useT, LANGS } from '../lib/i18n'
-import { makePracticeExam } from '../lib/practice'
 import {
   HomeIcon,
   BellIcon,
@@ -173,13 +172,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     setOpen(false)
     setMoreOpen(false)
     navigate(path)
-  }
-
-  // 응시 화면(연습 데이터) 바로 진입 — 디자인 확인용. SEB·로그인 없이 열림.
-  function goExamPreview() {
-    setOpen(false)
-    setMoreOpen(false)
-    navigate('/exam/run/practice', { state: makePracticeExam() })
   }
 
   // WORLD ARENA(글로벌 응시 현황) 지도로 이동
@@ -387,39 +379,6 @@ export default function Layout({ children }: { children: ReactNode }) {
               </button>
               <button className="pf-more-link" onClick={() => go('/about')}>
                 {t('nav.assoc')} <span className="pf-more-ext">↗</span>
-              </button>
-              {/* 개발/디자인 확인용 미리보기 — 런칭 시 제거 예정(앰버색으로 구분) */}
-              {/* 레벨테스트 인증서 시안 — React 라우트가 아니라 정적 HTML(public/cert-preview.html).
-                  레벨 1~7 을 버튼으로 넘겨보는 용도라 실데이터 라우트(/test/certificate)와 별도로 유지한다. */}
-              <button
-                className="pf-more-link pf-preview"
-                onClick={() => {
-                  setOpen(false); setMoreOpen(false)
-                  window.open(`/cert-preview.html?name=${encodeURIComponent(name)}`, '_blank', 'noopener')
-                }}
-              >
-                레벨테스트 인증서 미리보기 <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={() => go('/certificate')}>
-                {t('nav.certpreview')} <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={() => go('/certificate/preview')}>
-                {t('nav.certgatepreview')} <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={() => go('/verify/preview-sample')}>
-                진위확인(유효) 미리보기 <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={() => go('/verify/preview-invalid')}>
-                진위확인(무효) 미리보기 <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={goExamPreview}>
-                {t('nav.exampreview')} <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={() => go('/exam/result/preview')}>
-                {t('nav.resultpasspreview')} <span className="pf-more-ext">↗</span>
-              </button>
-              <button className="pf-more-link pf-preview" onClick={() => go('/exam/result/preview?demo=fail')}>
-                {t('nav.resultfailpreview')} <span className="pf-more-ext">↗</span>
               </button>
               {/* 개인정보처리방침·이용약관은 한국어 법무 문서 — 한국어에서만 노출 */}
               {lang === 'ko' ? (

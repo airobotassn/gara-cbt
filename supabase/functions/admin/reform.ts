@@ -288,11 +288,13 @@ async function hubCosmeticsSave(admin: any, body: any, ctx: Ctx) {
   }
 
   // ⛔ **첫 선택 후보를 0개로 만들 수 없다.** 신규 가입자는 캐릭터를 고르기 전에는 허브를 못 쓰는데,
-  //    무료(price 0) + 판매 중인 캐릭터가 하나도 없으면 고를 게 없어서 **첫 화면에서 갇힌다.**
-  //    값을 잘못 매긴 걸 사용자가 갇혀서야 알게 되면 늦다 → 저장 자체를 막는다.
-  const starters = [...after.values()].filter((v) => v.kind === 'character' && v.price === 0 && v.active)
+  //    판매 중인 캐릭터가 하나도 없으면 고를 게 없어서 **첫 화면에서 갇힌다.**
+  //    진열을 잘못 내린 걸 사용자가 갇혀서야 알게 되면 늦다 → 저장 자체를 막는다.
+  //    ⚠️ 값(price)은 보지 않는다 — 첫 선택은 값과 무관하게 공짜다(20260824120000).
+  //       여기서 '무료 1종 이상'을 요구하면 캐릭터에 값을 매기는 것 자체가 막힌다.
+  const starters = [...after.values()].filter((v) => v.kind === 'character' && v.active)
   if (!starters.length) {
-    return json({ error: '무료로 고를 수 있는 캐릭터가 최소 1종은 있어야 합니다. 신규 회원이 첫 화면에서 캐릭터를 고를 수 없게 됩니다.' }, 400)
+    return json({ error: '판매 중인 캐릭터가 최소 1종은 있어야 합니다. 신규 회원이 첫 화면에서 캐릭터를 고를 수 없게 됩니다.' }, 400)
   }
 
   for (const r of rows) {

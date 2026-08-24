@@ -11,6 +11,7 @@ import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { EBOOK_LANG_LABEL } from '../lib/ebookTranslate'
 import type { EbookReadResp } from '../lib/types'
+import { rememberPostLogin } from '../lib/postLogin'
 
 // ── 반출 억제 레이어 ────────────────────────────────────────────────────────────
 // ⚠️ 완전 차단은 불가능하다(본문 HTML 이 이미 브라우저에 내려와 있어 devtools 로는 언제든 볼 수 있다).
@@ -161,7 +162,7 @@ export default function EbookReader() {
         <p style={{ fontWeight: 800, color: 'var(--ink, #28324c)' }}>{t('ebook.login_to_buy')}</p>
         <button
           onClick={() => {
-            try { sessionStorage.setItem('postLoginRedirect', `/ebooks/read/${id ?? ''}`) } catch { /* 무시 */ }
+            rememberPostLogin(`/ebooks/read/${id ?? ''}`)
             void loginWithGoogle(`${window.location.origin}/auth/callback`)
           }}
           style={{ padding: '10px 20px', borderRadius: 999, border: 0, cursor: 'pointer', background: '#004ac6', color: '#fff', fontWeight: 800 }}
@@ -233,21 +234,9 @@ export default function EbookReader() {
           className="ebr-back"
           onClick={goLibrary}
           aria-label={t('ebook.reader_back')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '7px 13px 7px 10px',
-            borderRadius: 999,
-            border: '1px solid #d9e0f0',
-            background: '#fff',
-            color: '#28324c',
-            fontWeight: 800,
-            fontSize: 13.5,
-            cursor: 'pointer',
-          }}
         >
-          <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> {t('ebook.reader_back')}
+          {/* 모양은 앱 공용 뒤로 칩(shared.css)이 준다 — 인라인 스타일로 다시 그리면 여기만 또 갈린다. */}
+          <span className="material-symbols-outlined">arrow_back</span> {t('ebook.reader_back')}
         </button>
         <strong className="ebr-title" style={{ fontSize: 15, color: '#28324c', letterSpacing: '-.01em' }} title={book?.title ?? ''}>
           {book?.title ?? ''}

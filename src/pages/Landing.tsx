@@ -5,6 +5,7 @@ import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
+import { takePostLogin } from '../lib/postLogin'
 
 // CBT 메인(랜딩) — 의미 기반 검색 라우터 + 자격검정 CTA
 //   검색창 입력 → route-query(임베딩 유사도 + LLM 폴백) → 알맞은 페이지로 이동.
@@ -76,12 +77,15 @@ export default function Landing() {
   }, [])
 
   // 로그인이 홈으로 떨어져도 복귀 표식이 있으면 자동 이동.
+  //   ⚠️ 실제로 여기로 떨어진다 — Supabase 는 redirectTo 가 허용목록에 없으면 Site URL(=홈)로 보낸다
+  //      (개발 서버를 5173 이 아닌 포트로 띄우면 바로 이 경우고, 그때는 오리진까지 배포 주소로 바뀐다).
+  //   ⚠️ 예전엔 이 줄이 localStorage 를 봤는데 심는 쪽은 전부 sessionStorage 였다 — 안전망이 죽어 있었다.
+  //      지금은 AuthCallback 과 같은 함수(lib/postLogin)를 쓴다.
   // postLoginRedirect: 지정 경로로(예: SEB 진입 /exam/seb) · examIntent: 응시 준비(/exam/prepare)
   useEffect(() => {
     if (!isFullUser) return
-    const dest = localStorage.getItem('postLoginRedirect')
+    const dest = takePostLogin()
     if (dest) {
-      localStorage.removeItem('postLoginRedirect')
       navigate(dest, { replace: true })
       return
     }

@@ -49,3 +49,25 @@ export function fmtAdminDT(iso?: string | null): string {
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
 }
+
+/** 이북 열람 기록 한 줄(결제에 딸린 책 하나). 안 읽었으면 firstAt 이 null 이다. */
+export interface EbookReadRow {
+  ebookId: string
+  title: string | null
+  firstAt: string | null
+  lastAt: string | null
+  count: number
+}
+
+/** 결제 한 건의 열람 상태를 한 마디로 — 환불을 받아줄지 가르는 값이라 한눈에 읽혀야 한다.
+ *  ⚠️ 이북이 안 붙은 결제(응시료 단독·자격증 발급비)는 '-' 다. 그걸 '안 읽음' 으로 쓰면
+ *     **읽을 것이 없는 건**과 **사놓고 안 읽은 건**이 화면에서 같은 말이 된다. */
+export function readSummary(reads?: EbookReadRow[] | null): { text: string; opened: boolean; none: boolean } {
+  const rows = reads ?? []
+  if (!rows.length) return { text: '-', opened: false, none: true }
+  const opened = rows.filter((r) => r.firstAt)
+  if (!opened.length) return { text: '안 읽음', opened: false, none: false }
+  // 한 권이면 횟수까지 보여준다 — 한 번 열어본 것과 여러 번 나눠 읽은 건 판단이 다르다.
+  if (rows.length === 1) return { text: `읽음 · ${opened[0].count}회`, opened: true, none: false }
+  return { text: `읽음 ${opened.length}/${rows.length}권`, opened: true, none: false }
+}

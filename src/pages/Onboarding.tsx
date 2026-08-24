@@ -60,6 +60,9 @@ export default function Onboarding() {
   // 마운트 시 IP 기반 프리필(실패해도 무시). 1단계를 읽는 동안 조용히 채워둔다.
   //   ⚠️ 국가를 못 알아내면 **비워 둔다**. 예전처럼 'KR' 로 떨어뜨리면 외국 사용자가 화면에 뜬
   //      '대한민국'을 그대로 확정해 버리고, 그건 1회 변경권을 쓰지 않으면 못 되돌린다.
+  //   ⛔ **지역은 프리필하지 않는다(2026-08-24).** 시도를 미리 채우면 사용자가 그냥 확정하는 것만으로
+  //      IP 유래 위치가 계정에 저장된다 — 이유와 함께 지운 것들은 `lib/geo.ts` 머리 주석에 있다.
+  //      지역은 아래 셀렉트에서 **직접** 고른다.
   useEffect(() => {
     let alive = true
     fetchGeoPrefill().then((geo) => {
@@ -68,8 +71,6 @@ export default function Onboarding() {
         setGeoCountry(geo.country_code)
         setCountry((c) => c || geo.country_code!)
       }
-      // 지역 프리필은 한국만 이름→코드 표가 있다. 다른 나라는 나라만 맞춰주고 지역은 직접 고르게 둔다.
-      if (geo.region_code) setRegion(geo.region_code)
     })
     return () => {
       alive = false

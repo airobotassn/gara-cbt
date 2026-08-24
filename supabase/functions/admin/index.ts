@@ -1628,7 +1628,7 @@ async function paymentList(admin: any, body: any) {
   const userId = String(body?.userId ?? '').trim()
 
   let sel = admin.from('payments').select(
-    'id, user_id, order_id, order_name, product_type, product_ref, amount, status, method, confirmed_at, fulfilled_at, fail_code, fail_message, created_at',
+    'id, user_id, order_id, order_name, product_type, product_ref, amount, status, method, confirmed_at, fulfilled_at, fail_code, fail_message, addon_ebook_id, created_at',
     { count: 'exact' },
   )
   if (userId) sel = sel.eq('user_id', userId)
@@ -1651,6 +1651,69 @@ async function paymentList(admin: any, body: any) {
       const { data: au } = await admin.rpc('admin_user_emails')
       for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* 이메일만 빈칸 */ }
+  }
+
+  // ── 이북 열람 여부(환불 판단용) ─────────────────────────────────
+  // "샀는데 읽었나" 는 환불을 받아줄지 가르는 사실이라 결제 목록에서 바로 보여야 한다.
+  // 이북이 결제에 붙는 경로가 셋이라 셋 다 훑는다:
+  //   ebook  = product_ref 가 곧 이북 id
+  //   bundle = 줄 목록(payment_items)
+  //   exam   = 곁다리 교재(addon_ebook_id)
+  // ⚠️ ebook_reads 는 환불로 열람권이 지워져도 남는다 — **환불된 건에서도 값이 보이는 게 이 표를 따로 둔 이유**다.
+  const readsOf: Record<string, { ebookId: string; title: string | null; firstAt: string | null; lastAt: string | null; count: number }[]> = {}
+  {
+    const bookOf: Record<string, string[]> = {} // payment_id → ebook ids
+    const bundleIds: string[] = []
+    for (const p of rows) {
+      if (p.product_type === 'ebook' && p.product_ref) bookOf[p.id] = [String(p.product_ref)]
+      else if (p.product_type === 'bundle') bundleIds.push(p.id)
+      else if (p.product_type === 'exam' && p.addon_ebook_id) bookOf[p.id] = [String(p.addon_ebook_id)]
+    }
+    if (bundleIds.length) {
+      const { data: items } = await admin
+        .from('payment_items')
+        .select('payment_id, product_ref')
+        .in('payment_id', bundleIds)
+        .eq('product_type', 'ebook')
+      for (const it of items ?? []) {
+        const pid = (it as any).payment_id as string
+        ;(bookOf[pid] ??= []).push(String((it as any).product_ref))
+      }
+    }
+    const allBooks = [...new Set(Object.values(bookOf).flat())]
+    if (allBooks.length && userIds.length) {
+      const titleMap: Record<string, string> = {}
+      const { data: bs } = await admin.from('ebooks').select('id, title').in('id', allBooks)
+      for (const b of bs ?? []) titleMap[(b as any).id] = (b as any).title
+      // ⚠️ (사람 × 책) 쌍으로 다시 짚는다 — in × in 은 교차곱이라 **남의 열람이 섞여 들어온다**.
+      const rmap: Record<string, { firstAt: string; lastAt: string; count: number }> = {}
+      const { data: reads } = await admin
+        .from('ebook_reads')
+        .select('user_id, ebook_id, first_read_at, last_read_at, read_count')
+        .in('ebook_id', allBooks)
+        .in('user_id', userIds)
+      for (const r of reads ?? []) {
+        rmap[`${(r as any).user_id}|${(r as any).ebook_id}`] = {
+          firstAt: (r as any).first_read_at,
+          lastAt: (r as any).last_read_at,
+          count: (r as any).read_count ?? 0,
+        }
+      }
+      for (const p of rows) {
+        const ids = bookOf[p.id]
+        if (!ids?.length) continue
+        readsOf[p.id] = ids.map((bid) => {
+          const hit = rmap[`${p.user_id}|${bid}`]
+          return {
+            ebookId: bid,
+            title: titleMap[bid] ?? null,
+            firstAt: hit?.firstAt ?? null,
+            lastAt: hit?.lastAt ?? null,
+            count: hit?.count ?? 0,
+          }
+        })
+      }
+    }
   }
 
   // 30일 집계. 환불은 매출에서 빼지 않고 옆에 세운다 — 정산 기준일이 달라 단순 상계하면 값이 어긋난다.
@@ -1696,6 +1759,7 @@ async function paymentList(admin: any, body: any) {
       failCode: p.fail_code ?? null,
       failMessage: p.fail_message ?? null,
       createdAt: p.created_at,
+      reads: readsOf[p.id] ?? [],
     })),
     total: count ?? rows.length,
     stats30d: stats,
@@ -2739,6 +2803,23 @@ async function ebookBuyers(admin: any, body: any) {
       for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
     } catch { /* 이메일만 빈칸 */ }
   }
+  // 열람 여부(환불 판단용). ebook_reads 는 **구매와 수명이 분리된 표**라 환불된 사람 것도 남아 있다 —
+  // 그래서 여기 뜨는 행이 구매자 목록보다 많을 수 있다(사서 읽고 환불한 사람). 그게 이 표를 따로 둔 이유다.
+  const readMap: Record<string, { firstAt: string; lastAt: string; count: number }> = {}
+  {
+    const { data: reads } = await admin
+      .from('ebook_reads')
+      .select('user_id, first_read_at, last_read_at, read_count')
+      .eq('ebook_id', id)
+    for (const r of reads ?? []) {
+      readMap[(r as any).user_id] = {
+        firstAt: (r as any).first_read_at,
+        lastAt: (r as any).last_read_at,
+        count: (r as any).read_count ?? 0,
+      }
+    }
+  }
+
   return json({
     buyers: rows.map((r: any) => ({
       userId: r.user_id,
@@ -2747,6 +2828,7 @@ async function ebookBuyers(admin: any, body: any) {
       pricePaid: r.price_paid ?? 0,
       source: r.source ?? 'demo',
       createdAt: r.created_at,
+      read: readMap[r.user_id] ?? null,
     })),
   })
 }

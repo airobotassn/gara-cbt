@@ -5,7 +5,8 @@
 // 이 스위트가 지키는 것 — 전부 "틀렸을 때 조용히 손해가 나는" 자리다:
 //   1) 첫 선택은 **한 번뿐**이고 무료다. chosen_at 이 그 표시고, 갈아입어도 밀리지 않는다.
 //      (밀리면 갈아입을 때마다 첫 선택 무료가 다시 열려 유료 캐릭터를 공짜로 가져간다)
-//   2) 첫 선택 무료는 **price = 0 인 캐릭터만**. 값이 곧 자격이다.
+//   2) 첫 선택은 **판매 중인 캐릭터 아무거나** 한 종을 공짜로 준다(값은 안 본다 — 20260824120000).
+//      진열에서 내린 것만 거절한다. 그 뒤로는 상점에서 산 것만 갈아입는다.
 //   3) 갈아입기는 **소유한 것만**. 상점을 거치지 않고 장착하는 경로를 막는다.
 //   4) equip 은 equipped jsonb 의 **한 키만** 갱신한다(통째로 덮으면 다른 종류가 지워진다).
 //   5) 종류가 맞아야 한다 — 스킨 자리에 가구를 꽂을 수 없다.
@@ -65,6 +66,9 @@ await raw(`
 // "반환형을 안 바꿨다"까지 같이 검증된다(바꿨으면 여기서 터진다).
 await raw(readFileSync('supabase/migrations/20260819170000_admin_reset_onboarding.sql', 'utf8'));
 await raw(readFileSync('supabase/migrations/20260820120000_hub_character_skin.sql', 'utf8'));
+// 캐릭터 값 매기기(500) + 첫 선택 자격을 값에서 '판매 중'으로 옮긴 판. 원본을 먼저 깔아야
+// `create or replace` 가 실제로 갈아끼우는지까지 같이 검증된다.
+await raw(readFileSync('supabase/migrations/20260824120000_hub_character_price.sql', 'utf8'));
 
 const U = '00000000-0000-0000-0000-0000000000a1';
 const V = '00000000-0000-0000-0000-0000000000a2';
@@ -84,8 +88,13 @@ await raw(`
 // ============================================================
 // 0) 마이그레이션이 심은 것
 // ============================================================
-const seeded = (await q(`select count(*)::int n from shop_catalog where kind='character' and price=0 and active`)).rows[0].n;
-eq('0a 무료 캐릭터 6종이 시드됐다', seeded, 6);
+const priced = (await q(`select count(*)::int n from shop_catalog
+                          where part_key in ('char_a_m','char_a_f','char_b_m','char_b_f','char_c_m','char_c_f')
+                            and kind='character' and price=500 and active`)).rows[0].n;
+eq('0a 캐릭터 6종이 500 으로 매겨졌다(판매 중)', priced, 6);
+// ⛔ 값 0인 캐릭터가 남아 있으면 상점에 공짜 캐릭터가 서 있게 된다.
+const freeChars = (await q(`select count(*)::int n from shop_catalog where kind='character' and price=0`)).rows[0].n;
+eq('0d 값 0인 캐릭터는 남아 있지 않다', freeChars, 0);
 const cols = (await q(`select column_name from information_schema.columns
                         where table_name='user_characters' and column_name in ('chosen_at','tutorial_done_at')
                         order by column_name`)).rows.map((r) => r.column_name);
@@ -132,21 +141,40 @@ const chosenAt2 = (await q(`select chosen_at from user_characters where user_id=
 ok('2e ⭐ 갈아입어도 chosen_at 은 처음 값 그대로', String(chosenAt1) === String(chosenAt2), { chosenAt1, chosenAt2 });
 
 // ============================================================
-// 3) 첫 선택 무료는 **price = 0 인 캐릭터만**
+// 3) 첫 선택은 **판매 중이면 값과 무관하게** 공짜 — 진열에서 내린 것만 거절
 // ============================================================
-const paidFirst = await raises(`select hub_choose_character($1,'char_paid_m') as r`, [V]);
-ok('3a ⭐ 유료 캐릭터는 첫 선택으로 못 가져간다', paidFirst != null && /not_owned/.test(paidFirst), paidFirst);
-const vRow = (await q(`select count(*)::int n from user_cosmetics where user_id=$1`, [V])).rows[0].n;
-eq('3b 거절이 소유를 만들지 않았다', vRow, 0);
-const vChosen = (await q(`select chosen_at from user_characters where user_id=$1`, [V])).rows;
-ok('3c 거절이 첫 선택을 소진시키지 않았다', vChosen.length === 0 || vChosen[0].chosen_at === null, vChosen);
-// 그리고 무료 캐릭터로는 여전히 첫 선택이 가능하다.
-const vFree = (await q(`select hub_choose_character($1,'char_c_f') as r`, [V])).rows[0].r;
-eqObj('3d 거절 뒤에도 무료 캐릭터 첫 선택은 된다', vFree, { base_key: 'char_c_f', first: true });
+const paidFirst = (await q(`select hub_choose_character($1,'char_paid_m') as r`, [V])).rows[0].r;
+eqObj('3a ⭐ 유료 캐릭터도 첫 선택이면 공짜로 준다', paidFirst, { base_key: 'char_paid_m', first: true });
+const vSrc = (await q(`select source from user_cosmetics where user_id=$1 and part_key='char_paid_m'`, [V])).rows[0];
+eq('3b 그 지급도 starter 로 남는다', vSrc.source, 'starter');
+const vSpent = (await q(`select count(*)::int n from shop_purchase where user_id=$1`, [V])).rows[0].n;
+eq('3c 값이 있어도 첫 선택은 코인을 안 쓴다', vSpent, 0);
+// 첫 선택을 쓴 뒤에는 500 이 실제로 값으로 작동한다 — 안 산 것은 거절.
+const vSecond = await raises(`select hub_choose_character($1,'char_a_m') as r`, [V]);
+ok('3d ⭐ 첫 선택을 쓴 뒤에는 안 산 캐릭터 거절', vSecond != null && /not_owned/.test(vSecond), vSecond);
+
+// 진열에서 내린 캐릭터(active=false)는 준다고 말한 적이 없다 — 선택 화면에도 안 뜬다(get-hub 가 active 만 내려준다).
+await raw(`
+  insert into shop_catalog (part_key, price, kind, sort_order, active) values
+    ('char_hidden_m', 500, 'character', 95, false)
+  on conflict (part_key) do nothing;
+`);
+const X = '00000000-0000-0000-0000-0000000000a4';
+const hiddenFirst = await raises(`select hub_choose_character($1,'char_hidden_m') as r`, [X]);
+ok('3e ⭐ 진열에서 내린 캐릭터는 첫 선택으로도 못 가져간다', hiddenFirst != null && /not_owned/.test(hiddenFirst), hiddenFirst);
+const xChosen = (await q(`select chosen_at from user_characters where user_id=$1`, [X])).rows;
+ok('3f 거절이 첫 선택을 소진시키지 않았다', xChosen.length === 0 || xChosen[0].chosen_at === null, xChosen);
+// 반대로 **이미 가진 사람**은 진열에서 내려가도 계속 입어야 한다(그래서 (2b) 는 active 를 안 본다).
+await q(`insert into user_cosmetics (user_id, part_key, source) values ($1,'char_hidden_m','shop')`, [V]);
+const hiddenWear = (await q(`select hub_choose_character($1,'char_hidden_m') as r`, [V])).rows[0].r;
+eqObj('3g ⭐ 진열에서 내려도 가진 사람은 계속 입는다', hiddenWear, { base_key: 'char_hidden_m', first: false });
+// 그리고 판매 중 캐릭터로는 여전히 첫 선택이 된다.
+const xFree = (await q(`select hub_choose_character($1,'char_c_f') as r`, [X])).rows[0].r;
+eqObj('3h 판매 중 캐릭터로는 첫 선택이 된다', xFree, { base_key: 'char_c_f', first: true });
 
 // 캐릭터가 아닌 키는 애초에 거절
 const notChar = await raises(`select hub_choose_character($1,'skin_neon') as r`, [U]);
-ok('3e 캐릭터가 아닌 키는 invalid_character', notChar != null && /invalid_character/.test(notChar), notChar);
+ok('3i 캐릭터가 아닌 키는 invalid_character', notChar != null && /invalid_character/.test(notChar), notChar);
 
 // ============================================================
 // 4) hub_equip — 소유·종류 검사, 한 키만 갱신
