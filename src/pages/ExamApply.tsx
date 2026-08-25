@@ -85,13 +85,17 @@ export default function ExamApply() {
   const fmtParts = lv.format ? lv.format.split(' · ') : []
   const fmtDuration = fmtParts.length > 1 ? fmtParts[fmtParts.length - 1] : ''
   const fmtComposition = fmtParts.length > 1 ? fmtParts.slice(0, -1).join(' · ') : lv.format ?? ''
-  // 응시료: **DB(exam_fees) 가 단일 소스**다(2026-08-06). 관리자 화면에서 원 단위로 편집한다.
+  // 응시료: **DB(exam_fees) 가 단일 소스**다(2026-08-06). 관리자 화면에서 달러로 편집한다(저장은 센트 정수).
   //   키 = `${트랙키}_${티어키}`(feeKey). 행이 없는 티어 = 아직 결제를 열지 않은 급수(CARIS-Ⅱ 전부)
   //   → 금액 대신 '준비 중'을 보여주고 결제 버튼을 막는다.
   //   ⚠️ 여기에 하드코딩 폴백을 두면 안 된다. 돈 받는 값이라 "설정 누락"이 조용히 임시금액으로 결제되면 사고다.
+  // ⛔ **판정이 `> 0` 이 아니라 `>= 0` 인 이유**(2026-08-25): 0 은 관리자가 정한 **무료 급수**고 팔 수 있는
+  //    상품이다. 미설정은 키 자체가 없어(undefined) 여기서 갈린다 — `> 0` 으로 되돌리면 무료 급수가
+  //    화면에서만 '준비 중'으로 잠기는데 서버는 팔고 있어서, 사용자는 살 수 있는 걸 못 사게 된다.
   const { fees, loading: feesLoading } = useExamFees()
   const feeAmount = fees[feeKey(cur.key, lv.key)]
-  const feeReady = typeof feeAmount === 'number' && feeAmount > 0
+  const feeReady = typeof feeAmount === 'number' && feeAmount >= 0
+  const feeFree = feeReady && feeAmount === 0
 
   // 보유 응시권 — 이미 산 (회차×급수)는 다시 팔지 않고 '구매 완료'로 보여준다.
   //   타입을 lib/tickets.ts(ExamTicketView)에서 끌어오지 않는 이유: 여기서 쓰는 필드가 셋뿐이고,
@@ -153,17 +157,24 @@ export default function ExamApply() {
   // 금액 표기 = 달러 고정 환산($1 = 1,500원). DB·실제 청구는 원화이고, 그 고지문은 결제 직전
   // (/checkout 주문요약 아래)에 붙는다 — 여기서 두 번 말하지 않는다.
   // 빈 문자열 = '아직 모른다'(로딩) → 호출부가 자리에 맞는 플레이스홀더를 고른다.
+  // 무료 급수는 `$0` 대신 '무료'라고 쓴다 — 금액칸의 `$0` 은 "아직 안 정했다"로도 읽혀서
+  // 바로 옆 '준비 중'과 뜻이 헷갈린다(둘은 정반대다).
   const feeText = !roundReady || feesLoading
     ? ''
     : !tierOpen
       ? t('apply.tier_not_open')
-      : feeReady
-        ? usdc(feeAmount, lang)
-        : t('apply.fee_tbd')
+      : feeFree
+        ? t('apply.fee_free')
+        : feeReady
+          ? usdc(feeAmount, lang)
+          : t('apply.fee_tbd')
   // 총액 = 응시료 + (담았다면) 교재. 응시료를 아직 모르면 합계도 말하지 않는다 —
   // 교재값만 총액으로 띄우면 "응시료가 공짜"로 읽힌다.
+  // (무료 급수 + 유료 교재면 합계는 교재값 그대로다 — 그건 '무료'가 아니라 금액으로 적는다.)
   const totalText = feeReady && book && bookAdded
-    ? usdc(feeAmount + book.price_usd_cents, lang)
+    ? feeAmount + book.price_usd_cents === 0
+      ? t('apply.fee_free')
+      : usdc(feeAmount + book.price_usd_cents, lang)
     : feeText
   // 결제 화면으로 넘길 주소. 교재는 **id 만** 붙인다(금액은 서버가 다시 뽑는다).
   const checkoutHref = `/checkout?type=exam&ref=${productRef}${bookAdded && book ? `&book=${book.id}` : ''}`
@@ -461,10 +472,14 @@ export default function ExamApply() {
                   disabled={!canPay}
                   className="w-full bg-primary text-on-primary font-title-md text-title-md font-bold px-6 py-4 rounded-xl enabled:hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2 disabled:opacity-50"
                 >
+                  {/* 낼 돈이 0이면 '결제하기'가 거짓말이 된다 — 누르면 결제창 없이 바로 발급된다.
+                      담은 교재가 유료면 실제로 결제하므로 그때는 원래 문구 그대로다. */}
                   {!roundReady || feesLoading
                     ? t('common.loading')
                     : canPay
-                      ? t('apply.pay_btn')
+                      ? feeFree && !(bookAdded && book && book.price_usd_cents > 0)
+                        ? t('apply.free_btn')
+                        : t('apply.pay_btn')
                       : !tierOpen
                         ? t('apply.tier_not_open')
                         : t('apply.fee_tbd')}
@@ -490,10 +505,14 @@ export default function ExamApply() {
                     서버 cert 분기는 아직 exam_fees 를 그대로 쓴다. 금액 산정이 확정되면 그쪽을 먼저 고칠 것).
                 네온(=secondary · 다크 시안 / 라이트 딥틸)은 테두리·아이콘·제목에만 쓰고 본문은 on-surface 로 둔다 —
                 문장까지 형광으로 칠하면 대비가 떨어져 정작 경고가 안 읽힌다. */}
+            {/* ⚠️ 무료 급수(응시료 $0)에서는 감춘다 — 발급비 = 그 급수의 응시료라 발급도 무료다.
+                "합격하면 돈이 한 번 더 든다"를 그대로 띄우면 사실이 아닌 말을 하게 된다. */}
+            {!feeFree && (
             <div className="flex items-start gap-2.5 rounded-2xl border border-secondary/55 bg-secondary/10 px-5 py-4 shadow-[0_0_22px_-8px_var(--color-secondary)]">
               <span className="material-symbols-outlined shrink-0 text-[20px] leading-[1.45] text-secondary">error</span>
               <p className="font-body-md text-body-md leading-[1.45] text-on-surface break-keep">{t('pay.cert_fee_note')}</p>
             </div>
+            )}
             </div>
           </aside>
         </div>

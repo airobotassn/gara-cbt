@@ -123,11 +123,19 @@ const KO: Record<string, string> = {
   "terms.title": "이용약관",
   "terms.todo": "내용 준비 중입니다.",
   "withdraw.title": "탈퇴",
-  "withdraw.desc": "탈퇴 시 계정이 비활성화되고 {d}일 보관 후 영구 삭제됩니다. 그 전에 다시 로그인하면 복구돼요.",
+  "withdraw.desc": "탈퇴 시 계정이 비활성화되고 {d}일 보관 후 회원정보가 파기됩니다. 그 전에 다시 로그인해 복구할 수 있어요.",
   "withdraw.button": "탈퇴",
-  "withdraw.confirm": "정말 탈퇴하시겠어요? 계정이 비활성화되고 {d}일 후 영구 삭제됩니다. 그 전에 다시 로그인하면 복구돼요.",
+  "withdraw.confirm": "정말 탈퇴하시겠어요? 계정이 비활성화되고 {d}일 후 회원정보가 파기됩니다. 그 전에 다시 로그인해 복구할 수 있어요.",
   "withdraw.done": "탈퇴 처리됐어요. 그동안 이용해 주셔서 감사합니다.",
   "withdraw.failed": "탈퇴 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.",
+  "withdraw.gate_title": "탈퇴 신청된 계정이에요",
+  "withdraw.gate_body": "탈퇴하신 계정입니다. 보관기간 {d}일 안에 복구하면 등급·기록·구매하신 교재가 그대로 돌아와요. 복구하지 않으면 회원정보가 파기되고 이 계정으로는 다시 들어올 수 없어요.",
+  "withdraw.gate_left": "복구할 수 있는 기간이 {n}일 남았어요",
+  "withdraw.gate_purge_on": "{date}에 파기됩니다",
+  "withdraw.gate_restore": "계정 복구하기",
+  "withdraw.gate_logout": "복구하지 않고 로그아웃",
+  "withdraw.restoring": "복구하는 중…",
+  "withdraw.restore_failed": "복구하지 못했어요. 잠시 후 다시 시도해 주세요.",
   "lecture.title": "강의 화면입니다",
   "lecture.sub": "강의 콘텐츠는 준비 중입니다.",
 
@@ -995,6 +1003,8 @@ const KO: Record<string, string> = {
   "pay.success_title": "결제가 완료됐어요",
   "pay.free_title": "담았어요",
   "pay.free_body": "무료 자료라 바로 서재에 담겼어요.",
+  "pay.free_title_exam": "응시권이 발급됐어요",
+  "pay.free_body_exam": "무료 급수라 결제 없이 바로 발급됐어요.",
   // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
   "pay.waiting_title": "입금을 기다리고 있어요",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
@@ -1316,6 +1326,8 @@ const KO: Record<string, string> = {
   // exam_fees 에 그 티어의 행이 없을 때 — 금액 자리에 숫자를 지어내지 않고 이걸 띄우고 결제를 막는다.
   // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
   "apply.fee_tbd": "준비 중",
+  "apply.fee_free": "무료",
+  "apply.free_btn": "무료로 신청하기",
   "apply.total": "총 결제금액",
   // 추천 교재(원서접수 가운데 열) — 응시료와 **함께** 결제되는 곁다리다.
   "apply.book_col": "추천 교재 구매",

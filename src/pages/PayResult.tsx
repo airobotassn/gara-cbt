@@ -129,12 +129,14 @@ export default function PayResult() {
       })
   }, [handoff, view.kind, paymentKey, orderId, amount, isEximbay, rawQuery, t])
 
-  // 상품 종류 — 승인 응답이 정본이고, 실패 화면에서만 세션 힌트로 대신한다.
-  //   'free'(0원 즉시지급)는 이북 전용이라 힌트를 보지 않는다 — 응시료는 0원 분기를 타지 않게 서버가 막는다.
+  // 상품 종류 — 승인 응답이 정본이고, 승인이 없는 화면(실패·무료)에서만 세션 힌트로 대신한다.
+  //   ⚠️ 'free'(0원 즉시지급)도 힌트를 본다(2026-08-25). 예전엔 이북 전용이라 안 봤는데,
+  //      **무료 급수(응시료 $0)** 가 생기면서 이 갈래로 응시권도 나간다 — 안 보면 응시권을 받은
+  //      사람에게 'E-BOOK 서재로'가 뜬다. 무료 결제엔 승인 응답이 없어(결제 행 자체가 없다) 힌트뿐이다.
   const productType: ProductType | '' =
     view.kind === 'done'
       ? view.res.productType
-      : view.kind === 'failed'
+      : view.kind === 'failed' || view.kind === 'free'
         ? productHint()
         : ''
   const isExam = productType === 'exam'
@@ -181,12 +183,13 @@ export default function PayResult() {
             </>
           )}
 
+          {/* 무료 지급 — 이북이면 서재로, 무료 급수 응시권이면 응시 현황으로. CTA 는 위에서 이미 골라뒀다. */}
           {view.kind === 'free' && (
             <>
               <Icon name="check_circle" tone="ok" />
-              <Title>{t('pay.free_title')}</Title>
-              <Body>{t('pay.free_body')}</Body>
-              <Cta onClick={goLibrary}>{t('ebook.go_library')}</Cta>
+              <Title>{isExam ? t('pay.free_title_exam') : t('pay.free_title')}</Title>
+              <Body>{isExam ? t('pay.free_body_exam') : t('pay.free_body')}</Body>
+              <Cta onClick={okGo}>{okLabel}</Cta>
             </>
           )}
 

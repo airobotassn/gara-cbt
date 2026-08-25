@@ -117,7 +117,10 @@ export default function Checkout() {
       try {
         const res = await createOrder(productType, productRef, lang, addonEbookId || null, bundleIds)
         // 0원 상품은 결제창을 타지 않는다 — 서버가 이미 지급했으니 결과 화면으로 바로 보낸다.
+        // ⚠️ 상품 힌트는 **여기서도** 심는다. 아래 pay() 는 결제창을 열 때만 부르는데 이 갈래는 그걸
+        //    건너뛰므로, 안 심으면 무료 응시권을 받고도 결과 화면이 'E-BOOK 서재로'를 띄운다.
         if (res.free) {
+          try { sessionStorage.setItem(PRODUCT_HINT_KEY, productType) } catch { /* 없으면 이북 기준 CTA 로 떨어질 뿐이다 */ }
           navigate('/pay/success?free=1', { replace: true })
           return
         }

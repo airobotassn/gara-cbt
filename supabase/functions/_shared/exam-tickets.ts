@@ -4,8 +4,11 @@
 //
 // 이 파일이 지키는 5가지(전부 검증에서 실제로 뚫렸던 자리다):
 //   ① 판매 가능 판정과 금액은 **DB 값으로만** 정한다 — 클라가 보낸 문자열은 조회 키로만 쓰고 저장하지 않는다
-//   ② 폴백 금액을 절대 지어내지 않는다 — exam_fees 행이 없거나 0원이면 **판매 자체를 막는다**
-//      (0원을 '무료 즉시지급'으로 열면 관리자 오타 한 번이 무제한 무료 응시권이 된다)
+//   ② 폴백 금액을 절대 지어내지 않는다 — exam_fees 에 **행이 없으면** 판매 자체를 막는다
+//      ⚠️ **'행이 없다(미설정)'와 '0으로 저장했다(무료)'는 다른 말이다**(2026-08-25). 예전엔 둘 다 0으로
+//         뭉뚱그려 판매 불가였는데, 그러면 무료 시험을 열 방법이 아예 없다. 지금은 lookupExamFee 가
+//         미설정을 **null** 로 돌려주고 0 은 "관리자가 무료로 정했다"는 뜻이다(관리자 화면이 확인을 한 번 받는다).
+//         이 구분이 무너지면(미설정이 다시 0이 되면) **오타 한 번이 무제한 무료 응시권**이 된다 — 그게 원래 이유였다.
 //   ③ 상시(rolling) 회차는 팔지 않는다 — 회차 행이 안 바뀌어 product_ref 가 영구 고정이라
 //      계정당 평생 1회만 결제되고, exam_date 가 없어 응시창·만료 판정 근거도 없다
 //   ④ 시간 판정은 전부 KST — exam_date 는 bare date 라 new Date() 와 그냥 비교하면 9시간 어긋난다
@@ -191,20 +194,33 @@ export function ticketExpired(ticket: ExamTicketRow, round: ExamRoundRow | null,
 // ---------- 판매 가능 판정 ----------
 
 /**
- * (트랙 × 급수) → 정가(원). **정가 단일 소스 = exam_fees** 이고 키 규칙 `${track}_${tier}` 는
- * src/lib/fees.ts 의 feeKey() 와 같은 규칙이다. 행이 없으면 0 을 돌려준다 —
- * "0/미설정이면 판매 불가" 판정은 호출부가 한다(응시료·발급비가 같은 문구를 쓰지 않기 때문).
- * ⚠️ 폴백 금액을 지어내는 코드를 여기든 호출부든 넣지 말 것. 돈 받는 값이라 폴백이 곧 사고다.
+ * (트랙 × 급수) → 정가(달러 센트). **정가 단일 소스 = exam_fees** 이고 키 규칙 `${track}_${tier}` 는
+ * src/lib/fees.ts 의 feeKey() 와 같은 규칙이다.
+ *
+ * ⛔ **null 과 0 은 다른 말이다.**
+ *    · `null` = 행이 없거나 값이 비었다 = **아직 금액을 안 정했다** → 호출부가 판매 불가(`no_fee`)로 접는다.
+ *    · `0`    = 관리자가 **무료로 정했다** → 결제창을 타지 않고 응시권을 그 자리에서 준다.
+ *    예전엔 미설정도 0으로 돌려줘서 둘을 구분할 수 없었고, 그래서 "0이면 무조건 판매 불가"가 유일한
+ *    안전판이었다(오타 한 번 = 무제한 무료 응시권). 이 함수가 null 을 잃는 순간 그 위험이 그대로 돌아온다 —
+ *    `?? 0` 같은 걸 여기든 호출부든 넣지 말 것.
+ * ⚠️ 폴백 금액을 지어내는 코드도 마찬가지다. 돈 받는 값이라 폴백이 곧 사고다.
  */
-export async function lookupExamFee(admin: SupabaseClient, track: string, tier: string): Promise<number> {
+export async function lookupExamFee(
+  admin: SupabaseClient,
+  track: string,
+  tier: string,
+): Promise<number | null> {
   // 정가는 **달러 센트**다(2026-08-13 전환). 옛 amount(원화 정수)는 읽지 않는다.
   const { data } = await admin
     .from('exam_fees')
     .select('amount_usd_cents')
     .eq('key', `${track}_${tier}`)
     .maybeSingle()
-  const amount = Math.floor(Number(data?.amount_usd_cents ?? 0))
-  return Number.isFinite(amount) ? amount : 0
+  const raw = data?.amount_usd_cents
+  if (raw === null || raw === undefined) return null // 행 없음 / 컬럼 null = 미설정
+  const amount = Math.floor(Number(raw))
+  // 숫자가 아닌 값이 들어있다 = 정가를 못 읽었다. 0(무료)으로 접으면 조용히 공짜가 되므로 미설정으로 본다.
+  return Number.isFinite(amount) && amount >= 0 ? amount : null
 }
 
 export type ExamFeeErrorCode = 'tier_unknown' | 'no_fee'
@@ -227,8 +243,9 @@ export async function resolveExamFee(admin: SupabaseClient, tier: string): Promi
   if (!tierRow) return { ok: false, code: 'tier_unknown', error: '알 수 없는 급수입니다.', status: 404 }
   const tierKey = tierRow.tier as string
   const track = tierRow.track as string
+  // ⚠️ `<= 0` 이 아니라 `== null` 이다 — 0 은 관리자가 정한 무료값이고 미설정만 막는다.
   const amount = await lookupExamFee(admin, track, tierKey)
-  if (amount <= 0) {
+  if (amount === null) {
     return { ok: false, code: 'no_fee', error: '아직 금액이 책정되지 않은 급수입니다.', status: 400 }
   }
   return { ok: true, tier: tierKey, track, amount }
@@ -323,10 +340,12 @@ export async function resolveExamOffer(
   }
 
   // 정가 단일 소스 = exam_fees(위 lookupExamFee 가 키 규칙의 유일한 정의처).
-  // ⚠️ 행이 없거나 0원이면 **판매 불가**다. CARIS-Ⅱ(t2_*)는 일부러 행이 없고(결제 미개방),
-  //    0원은 exam_fees 의 default·관리자 빈 입력으로 자연스럽게 생긴다 — 둘 다 무료 응시권이 되면 안 된다.
+  // ⚠️ **행이 없으면(null)** 판매 불가다 — CARIS-Ⅱ(t2_*)는 일부러 행이 없다(결제 미개방).
+  //    **0 은 판매한다** — 관리자가 확인을 한 번 받고 무료로 정한 값이다(2026-08-25).
+  //    그 경우 payments/create 가 결제창을 타지 않고 응시권을 바로 준다(payments.amount 는 >0 제약이라
+  //    0원 주문 행 자체가 만들어지지 않는다 — 이북 무료와 같은 경로다).
   const amount = await lookupExamFee(admin, track, tierKey)
-  if (amount <= 0) {
+  if (amount === null) {
     return { ok: false, code: 'no_fee', error: '아직 응시료가 책정되지 않은 급수입니다.', status: 400 }
   }
 

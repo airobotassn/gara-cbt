@@ -2426,12 +2426,16 @@ const TIER_LABEL: Record<string, string> = Object.fromEntries(
 const TIER_ORDER: string[] = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ti.key))
 const tierRank = (t?: string | null) => { const i = TIER_ORDER.indexOf(t ?? ''); return i < 0 ? 999 : i }
 
-/** 응시료 편집 — 티어별 금액(원)만 다룬다. **정가 단일 소스가 DB `exam_fees` 라 여기가 유일한 입력구**다.
+/** 응시료 편집 — 티어별 금액(달러)만 다룬다. **정가 단일 소스가 DB `exam_fees` 라 여기가 유일한 입력구**다.
  *
- *  ⚠️ 통화는 원(KRW) 하나다. 달러로 적어두고 환율을 곱하는 방식은 쓰지 않는다 — 주문 시점과 승인 시점의
- *     환율이 다르면 금액 불일치로 결제 승인이 튕기고, 여기 적은 값과 실제 청구액이 달라진다.
- *  ⚠️ **비운 티어는 결제가 막힌다**(원서접수 화면이 '준비 중'을 띄우고 결제 버튼을 잠근다). 이건 버그가 아니라
- *     의도다 — 금액 미설정을 임시값으로 때우면 엉뚱한 돈이 청구된다. 지금 CARIS-Ⅱ 3개가 여기 해당한다.
+ *  ⚠️ **입력은 달러, 저장은 센트 정수**다(`amount_usd_cents`, 100 = $1.00). `1` 을 적으면 $1 이다.
+ *     2026-08-13 에 정가 기준이 원화→달러로 바뀌었는데 이 화면만 '원' 라벨을 달고 있었다 — 서버는 그때부터
+ *     이미 입력값을 센트로 저장하고 있어서, 관리자가 "1500원"으로 적은 값이 **$15.00** 로 팔리고 있었다.
+ *  ⚠️ **빈칸과 0 은 다른 말이다.**
+ *     · 빈칸 = 아직 금액을 안 정했다 → 아예 저장하지 않는다(행이 없다) → 원서접수는 '준비 중', 결제 잠김.
+ *     · 0     = **무료 급수**다 → 결제창 없이 응시권이 바로 나간다. 되돌리기 어려운 값이라 저장 전에 확인을 받는다.
+ *     이 구분이 서버 판매 판정의 전부다(_shared/exam-tickets.ts 의 lookupExamFee 가 미설정을 null 로 준다).
+ *     ⛔ 빈칸을 0 으로 밀어 저장하면 그 순간 **미설정 급수가 전부 무료 시험**이 된다.
  *  키 규칙은 src/lib/fees.ts 의 feeKey() = `${트랙키}_${티어키}` 와 반드시 같아야 한다.
  */
 function ExamFeeBox() {
@@ -2446,9 +2450,16 @@ function ExamFeeBox() {
     setLoading(true)
     setMsg('')
     try {
-      const res = await callFunction<{ fees: { key: string; amount: number }[] }>('admin', { action: 'examFeeList' })
+      const res = await callFunction<{ fees: { key: string; amount_usd_cents: number | null }[] }>('admin', {
+        action: 'examFeeList',
+      })
       const m: Record<string, string> = {}
-      for (const f of res.fees ?? []) m[f.key] = String(f.amount)
+      // 저장은 센트, 입력칸은 달러다. 값이 null 인 행(있어도 금액 미정)은 빈칸으로 둔다 — 0 으로 채우면
+      // 화면이 '무료'라고 말하게 되는데 서버는 미설정으로 보고 판매를 막는다(두 화면이 다른 말을 한다).
+      for (const f of res.fees ?? []) {
+        if (f.amount_usd_cents === null || f.amount_usd_cents === undefined) continue
+        m[f.key] = String(centsToUsdInput(f.amount_usd_cents))
+      }
       setAmounts(m)
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '응시료를 불러올 수 없습니다.')
@@ -2459,15 +2470,37 @@ function ExamFeeBox() {
   useEffect(() => { load() }, [load])
 
   async function save() {
-    // 빈칸은 "저장 안 함"이 아니라 **그 티어를 아직 안 연다**는 뜻이라 0 으로 밀지 않고 그냥 빼고 보낸다.
+    // ⛔ **빈칸은 0 이 아니다.** "그 티어를 아직 안 연다"는 뜻이라 0 으로 밀지 않고 목록에서 통째로 뺀다
+    //    — 밀어 보내는 순간 미설정 급수가 전부 무료 시험이 된다.
+    //    입력은 달러, 전송은 센트 정수(usdInputToCents). 음수는 여기서 걸러 서버까지 보내지 않는다.
     const fees = Object.entries(amounts)
-      .map(([key, v]) => ({ key, amount: Number(v) }))
-      .filter((f) => String(amounts[f.key] ?? '').trim() !== '' && Number.isFinite(f.amount) && f.amount > 0)
+      .filter(([, v]) => String(v ?? '').trim() !== '')
+      .map(([key, v]) => ({ key, usd: Number(v) }))
+      .filter((f) => Number.isFinite(f.usd) && f.usd >= 0)
+      .map((f) => ({ key: f.key, amount: usdInputToCents(f.usd), usd: f.usd }))
     if (!fees.length) { setMsg('저장할 금액이 없습니다.'); return }
+
+    // 0 = 무료 급수. 결제창 없이 응시권이 바로 나가는 값이라 저장 전에 한 번 확인받는다
+    // (오타 한 번이 곧 무료 시험 개방이다 — 그래서 조용히 저장하지 않는다).
+    const free = fees.filter((f) => f.amount === 0)
+    if (free.length) {
+      const names = free
+        .map((f) => TIERS.find(({ track, tier }) => feeKey(track.key, tier.key) === f.key))
+        .map((x) => (x ? `${x.track.name} · ${x.tier.name}` : ''))
+        .filter(Boolean)
+        .join('\n')
+      const ok = window.confirm(
+        `다음 급수를 $0(무료)로 저장합니다.\n\n${names}\n\n` +
+          '무료 급수는 결제 없이 응시권이 바로 발급되고, 그 급수의 자격증 발급비도 무료가 됩니다.\n' +
+          '금액을 아직 안 정한 거라면 저장하지 말고 칸을 비워 두세요 (그러면 ‘준비 중’으로 잠깁니다).\n\n' +
+          '무료로 열까요?',
+      )
+      if (!ok) return
+    }
     setSaving(true)
     setMsg('')
     try {
-      await callFunction('admin', { action: 'examFeeSave', fees })
+      await callFunction('admin', { action: 'examFeeSave', fees: fees.map((f) => ({ key: f.key, amount: f.amount })) })
       await load()
       setMsg('저장했습니다.')
     } catch (e) {
@@ -2480,7 +2513,7 @@ function ExamFeeBox() {
   return (
     <div className="admin-section" style={{ marginBottom: 20 }}>
       <div className="admin-head" style={{ marginBottom: 12 }}>
-        <h1 style={{ fontSize: 18 }}>응시료 (원)</h1>
+        <h1 style={{ fontSize: 18 }}>응시료 ($)</h1>
         <div className="admin-head-actions">
           <button className="admin-mini" onClick={load} disabled={loading || saving}>새로고침</button>
           <button className="admin-mini" onClick={save} disabled={loading || saving}>
@@ -2489,7 +2522,12 @@ function ExamFeeBox() {
         </div>
       </div>
       <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 12px' }}>
-        원(KRW) 단위 정수로 입력하세요. <b>비워두면 그 급수는 원서접수에서 ‘준비 중’으로 표시되고 결제가 막힙니다.</b>
+        <b>달러($)로 입력하세요 — 1 을 적으면 $1 입니다.</b> 소수점 두 자리까지 됩니다($1.50).
+        국내 결제는 결제 시점 환율로 원화 청구됩니다.
+        <br />
+        · <b>비워두면</b> 그 급수는 원서접수에서 ‘준비 중’으로 표시되고 결제가 막힙니다(= 금액 미정).
+        <br />
+        · <b>0 을 넣으면 무료 급수</b>가 되어 결제 없이 응시권이 바로 발급됩니다(그 급수 자격증 발급비도 무료). 저장 전에 한 번 더 확인합니다.
         <br />
         ⓘ <b>Master 이후(CARIS-Ⅱ)는 아직 열지 않은 급수</b>라 금액을 넣을 수 없습니다 — 문제은행·출제 배분표가 없어
         금액만 들어가면 문항 0개짜리 시험이 팔립니다.
@@ -2499,7 +2537,7 @@ function ExamFeeBox() {
           <thead>
             {/* 요금 키(t1_beginner …)는 화면에서 뺐다 — DB PK 이자 코드가 feeKey() 로 조립하는 값이라
                 관리자가 보고 할 일이 없고, 트랙·급수가 같은 줄에 이미 적혀 있다. */}
-            <tr><th>트랙</th><th>급수</th><th style={{ width: 160 }}>응시료(원)</th></tr>
+            <tr><th>트랙</th><th>급수</th><th style={{ width: 160 }}>응시료($)</th></tr>
           </thead>
           <tbody>
             {TIERS.map(({ track, tier }) => {
@@ -2513,17 +2551,22 @@ function ExamFeeBox() {
                   <td style={{ whiteSpace: 'nowrap' }}>{track.name}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{tier.name}</td>
                   <td>
+                    {/* step=0.01 — 달러 입력이라 100 단위(원화 시절 값)로 두면 화살표가 $100 씩 뛴다. */}
                     <input
                       style={{ ...inpStyle, ...(locked ? { opacity: .55, cursor: 'not-allowed' } : null) }}
                       type="number"
                       min={0}
-                      step={100}
+                      step={0.01}
                       disabled={locked}
                       title={locked ? '아직 열지 않은 급수입니다.' : undefined}
                       placeholder={locked ? '준비 중 (잠김)' : '미설정'}
                       value={locked ? '' : amounts[k] ?? ''}
                       onChange={(e) => setAmounts((m) => ({ ...m, [k]: e.target.value }))}
                     />
+                    {/* 0 은 빈칸과 눈으로 구분이 안 되는데 뜻은 정반대라(무료 개방 ↔ 판매 잠금) 칸 옆에 못박는다. */}
+                    {!locked && String(amounts[k] ?? '').trim() !== '' && Number(amounts[k]) === 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--warn, #d97706)', marginTop: 4 }}>무료 급수 (결제 없이 발급)</div>
+                    )}
                   </td>
                 </tr>
               )
@@ -5240,6 +5283,9 @@ interface MemberRow {
   arenaRank: number | null
   arenaAttempts: number
   lastActive: string | null
+  // 탈퇴 신청 시각 / 파기 완료 시각. 둘 다 cbtUsers 만 준다(아레나 목록엔 없다).
+  deactivated: string | null
+  purged: string | null
 }
 
 function MembersAdmin() {
@@ -5270,6 +5316,7 @@ function MembersAdmin() {
         id: u.id, name: u.name, email: u.email, anon: u.anon, created: u.created,
         carisAttempts: u.attempts, passedTitles: u.passedTitles ?? [],
         arenaRank: null, arenaAttempts: 0, lastActive: u.lastActive,
+        deactivated: u.deactivated ?? null, purged: u.purged ?? null,
       })
     }
     for (const a of arena?.users ?? []) {
@@ -5287,6 +5334,7 @@ function MembersAdmin() {
           id: a.id, name: a.name, email: a.email, anon: a.anon, created: a.created,
           carisAttempts: 0, passedTitles: [],
           arenaRank: a.rank, arenaAttempts: a.attempts, lastActive: a.lastActive,
+          deactivated: null, purged: null,
         })
       }
     }
@@ -5362,7 +5410,14 @@ function MembersAdmin() {
           <tbody>
             {shown.map((u) => (
               <tr key={u.id}>
-                <td>{u.name || '-'}</td>
+                <td>
+                  {u.name || '-'}
+                  {/* 탈퇴는 이름 옆에 붙인다 — 칸을 새로 만들면 대부분 빈칸인 열이 하나 늘고,
+                      정작 급한 정보(이 사람은 지금 탈퇴 상태다)는 표 끝으로 밀린다. */}
+                  {/* 파기됨은 회색(끝난 상태), 탈퇴는 빨강(아직 되돌릴 수 있어 눈에 띄어야 한다). */}
+                  {u.purged ? <span className="badge low" style={{ marginLeft: 6 }}>파기됨</span>
+                    : u.deactivated ? <span className="badge none" style={{ marginLeft: 6 }}>탈퇴</span> : null}
+                </td>
                 <td style={{ color: 'var(--muted)' }}>{u.email || '-'}</td>
                 <td>{u.anon ? '게스트' : '가입'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(u.created)}</td>
@@ -5491,6 +5546,34 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
   const [tab, setTab] = useState<'caris' | 'arena' | 'pay'>('caris')
   const [resetting, setResetting] = useState(false)
   const [resetDone, setResetDone] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreDone, setRestoreDone] = useState(false)
+
+  // 탈퇴 계정 복구. 판정은 전부 서버(admin_restore_account)가 하고 여기선 결과만 받는다.
+  //   ⚠️ 파기된 계정에는 버튼을 아예 안 그린다 — 눌러도 서버가 409 를 줄 뿐이고,
+  //     되돌릴 수 있다는 기대만 준다(파기는 구글 연결까지 끊어서 본인도 못 들어온다).
+  async function restoreAccount() {
+    if (!confirm(
+      [
+        `${user.name || user.email || '이 회원'} 의 탈퇴를 취소하고 계정을 복구할까요?`,
+        '',
+        '· 랭킹·채팅에 다시 나타나고 서비스를 그대로 이용합니다',
+        '· 본인이 다시 탈퇴하면 되돌아갑니다',
+      ].join(String.fromCharCode(10)),
+    )) return
+    setRestoring(true)
+    try {
+      const r = await callFunction<{ nicknameReset?: boolean }>('admin', { action: 'restoreAccount', uid: user.id })
+      setRestoreDone(true)
+      // 탈퇴한 사이 남이 그 닉네임을 가져가면 서버가 닉네임만 놓아주고 계정을 살린다.
+      // 조용히 넘기면 관리자는 왜 그 회원이 닉네임 화면을 다시 만나는지 모른다.
+      if (r?.nicknameReset) alert('복구했습니다. 다만 탈퇴한 사이 닉네임을 다른 회원이 사용해서, 이 회원은 다음 접속에서 닉네임을 새로 정하게 됩니다.')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '복구에 실패했습니다.')
+    } finally {
+      setRestoring(false)
+    }
+  }
 
   // 첫 진입 상태로 되돌리기 — 신규 가입 흐름(닉네임 → 국가·지역·연령대)을 실제 경로 그대로 다시 태운다.
   //   ⚠️ 게스트(익명)에게는 안 쓴다 — 게이트가 정식 회원에게만 도는 구조라 눌러도 아무 화면도 안 뜬다.
@@ -5529,6 +5612,34 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
           가입 {fmtDT(user.created)} · {user.anon ? '게스트' : '가입 유저'}
           {user.arenaRank != null ? ` · ARENA Lv.${user.arenaRank}` : ''}
         </p>
+        {/* 탈퇴 상태는 다른 무엇보다 먼저 눈에 들어와야 한다 — 이 줄이 없어서 탈퇴한 계정이
+            멀쩡한 회원처럼 보였고, 그 사실을 알려면 DB 를 직접 봐야 했다(2026-08-24). */}
+        {user.deactivated && (
+          <div style={{
+            margin: '4px 0 12px', padding: '10px 12px', borderRadius: 10,
+            background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          }}>
+            <span style={{ fontWeight: 800, color: 'var(--danger-fg)' }}>
+              {user.purged ? '파기됨' : '탈퇴 신청됨'} · {fmtDT(user.deactivated)}
+            </span>
+            {user.purged ? (
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                {fmtDT(user.purged)} 에 개인정보를 파기했습니다. 복구할 수 없습니다.
+              </span>
+            ) : restoreDone ? (
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>복구했습니다. 목록은 새로고침하면 반영됩니다.</span>
+            ) : (
+              <>
+                <button className="admin-mini" onClick={restoreAccount} disabled={restoring}>
+                  {restoring ? '복구 중…' : '계정 복구'}
+                </button>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                  보관기간이 지나면 개인정보가 파기되고 그 뒤로는 복구할 수 없습니다.
+                </span>
+              </>
+            )}
+          </div>
+        )}
         {!user.anon && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 12px' }}>
             <button className="admin-mini" onClick={resetOnboarding} disabled={resetting || resetDone}>

@@ -1,7 +1,9 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react'
@@ -36,6 +38,14 @@ interface AuthState {
   needsNickname: boolean
   // 닉네임 설정 성공 직후 호출(markOnboardingDone 과 같은 이유 — 안 하면 목적지에서 다시 튕긴다).
   markNicknameDone: () => void
+  // 탈퇴(soft delete) 게이트: 탈퇴 신청 시각. null 이면 정상 계정.
+  //   ⛔ 재로그인만으로 자동 복구하지 않는다 — 복구 화면에서 사람이 눌러야 풀린다.
+  //     (옛 코드는 SIGNED_IN 에서 조용히 UPDATE 했는데, 구글 복귀는 새 페이지 로드라 리스너가
+  //      INITIAL_SESSION 을 먼저 받아 그 UPDATE 가 아예 안 나갔다 — 탈퇴 상태로 서비스를 계속 쓴
+  //      계정이 실제로 나왔다. 조용한 복구는 성공해도 "탈퇴한 적 없는 것" 이라 어차피 틀렸다.)
+  deactivatedAt: string | null
+  // 복구 성공 직후 호출. 안 하면 게이트가 목적지에서 다시 복구 화면으로 튕긴다.
+  markRestored: (nicknameReset?: boolean) => void
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -53,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [onboardingLoading, setOnboardingLoading] = useState(false)
   const [needsNickname, setNeedsNickname] = useState(false)
+  const [deactivatedAt, setDeactivatedAt] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -64,22 +75,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!u || !computeIsFullUser(u)) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
+        setDeactivatedAt(null)
         setOnboardingLoading(false)
         return
       }
       setOnboardingLoading(true)
       const { data, error } = await supabase
         .from('profiles')
-        .select('region_locked_at,country_code,region_code,nickname_set_at,age_band')
+        .select('region_locked_at,country_code,region_code,nickname_set_at,age_band,deactivated_at')
         .eq('id', u.id)
         .maybeSingle()
       // 조회 실패 → FAIL-OPEN: 유저를 가두지 않는다.
       if (error) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
+        setDeactivatedAt(null)
         setOnboardingLoading(false)
         return
       }
+      setDeactivatedAt(data?.deactivated_at ?? null)
       // 프로필 행이 없으면(최초) 지역 미확정 → 온보딩 필요.
       // 연령대도 같은 화면에서 받으므로 둘 중 하나라도 비면 보낸다 — 지역만 확정한 기존 회원이
       // 아레나에 들어오면 그 화면이 연령대만 물어본다. '공개 안 함'(=age_band 'private')도
@@ -106,15 +120,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastUserId = uid
       // 토큰만 새로 발급된 경우엔 세션 객체를 갈아끼우지 않는다 — 값이 같으면 리렌더도 필요 없다.
       if (changed || event === 'SIGNED_OUT') setSession(s)
-      // 탈퇴(soft delete) 복구: 보관기간 내 재로그인하면 비활성 플래그 해제.
-      //   ⚠️ `changed` 를 안 보면 탭 전환마다 UPDATE 가 나간다.
-      if (changed && event === 'SIGNED_IN' && s?.user && !s.user.is_anonymous) {
-        supabase.from('profiles').update({ deactivated_at: null }).eq('id', s.user.id).then(() => {})
-        loadOnboarding(s.user)
-      }
+      // ⛔ 여기서 탈퇴 플래그를 조용히 풀지 않는다 — 복구는 `/account/restore` 에서 사람이 누른다.
+      //    (옛 코드가 이 자리에서 UPDATE 를 쐈는데, 이 조건 자체가 구글 로그인 복귀에선 거짓이라
+      //     한 번도 안 나갔다. 나갔더라도 "실수로 로그인했더니 되살아남" 이라 어차피 틀린 동작이다.)
+      if (changed && event === 'SIGNED_IN' && s?.user && !s.user.is_anonymous) loadOnboarding(s.user)
       if (event === 'SIGNED_OUT') {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
+        setDeactivatedAt(null)
         setOnboardingLoading(false)
       }
     })
@@ -123,17 +136,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const user = session?.user ?? null
 
+  // ⚠️ **아래 함수 7개와 value 는 반드시 useCallback/useMemo 로 고정한다.**
+  //    이 프로바이더는 최상위라 부팅 중에만 3번 넘게 리렌더하는데(getSession 반환 · profiles 조회 반환),
+  //    함수를 렌더마다 새로 만들면 이 값들을 **이펙트 의존성에 넣은 화면이 그때마다 이펙트를 다시 돌린다.**
+  //    실제 사고: /games/:id 가 `ensureAnonymous` 를 deps 에 두고 있어서 제출 티켓을 두 번 받았고,
+  //    티켓이 새로 발급되면 서버의 '플레이시간 대비 점수 상한' 기준 시각이 리셋돼
+  //    **레벨형 게임(닿아라·지어라·프로그램해라)의 정상 기록이 깎였다**(2026-08-25).
+  //    deps 를 [] 로 둘 수 있는 이유 = 전부 모듈 스코프(supabase)와 setState 만 쓴다(setState 는 불변).
+
   // 세션이 전혀 없을 때만 익명 세션 생성. 이미 세션 있으면 no-op.
-  async function ensureAnonymous() {
+  const ensureAnonymous = useCallback(async () => {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { data } = await supabase.auth.getSession()
     if (data.session) return
     const { error } = await supabase.auth.signInAnonymously()
     if (error) throw error
-  }
+  }, [])
 
   // 항상 일반 구글 로그인으로 통일(익명 응시 없음).
-  async function loginWithGoogle(redirectTo?: string) {
+  const loginWithGoogle = useCallback(async (redirectTo?: string) => {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -145,9 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     })
     if (error) throw error
-  }
+  }, [])
 
-  async function loginWithKakao(redirectTo?: string) {
+  const loginWithKakao = useCallback(async (redirectTo?: string) => {
     if (!isSupabaseConfigured) throw new Error('Supabase 미설정')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
@@ -160,38 +181,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     })
     if (error) throw error
-  }
+  }, [])
 
-  async function logout() {
+  const logout = useCallback(async () => {
     await supabase.auth.signOut()
-  }
+  }, [])
 
   // set-region 이 200/409(already_locked) 로 끝났다 = 서버 기준 확정. 재조회 없이 낙관적으로 해제.
-  function markOnboardingDone() {
+  const markOnboardingDone = useCallback(() => {
     setNeedsOnboarding(false)
     setOnboardingLoading(false)
-  }
+  }, [])
 
   // set-nickname 이 성공했다 = 서버 기준 확정. 재조회 없이 낙관적으로 해제.
-  function markNicknameDone() {
+  const markNicknameDone = useCallback(() => {
     setNeedsNickname(false)
-  }
+  }, [])
 
-  const value: AuthState = {
-    session,
-    user,
-    loading,
-    isFullUser: computeIsFullUser(user),
-    needsOnboarding,
-    onboardingLoading,
-    markOnboardingDone,
-    needsNickname,
-    markNicknameDone,
-    ensureAnonymous,
-    loginWithGoogle,
-    loginWithKakao,
-    logout,
-  }
+  // restore_account RPC 가 성공했다 = 서버 기준 복구 완료.
+  //   ⚠️ nicknameReset 이면 닉네임 게이트가 이어서 떠야 한다 — 탈퇴한 사이 남이 그 닉네임을
+  //     가져가면 RPC 가 nickname_set_at 을 비우고 계정을 살리기 때문이다.
+  const markRestored = useCallback((nicknameReset = false) => {
+    setDeactivatedAt(null)
+    if (nicknameReset) setNeedsNickname(true)
+  }, [])
+
+  // ⚠️ value 도 같이 고정해야 의미가 있다 — 함수만 고정하고 객체를 매 렌더 새로 만들면
+  //    컨텍스트를 구독하는 화면 전체가 그대로 다시 렌더된다(고친 이유의 절반이 이쪽이다).
+  const value: AuthState = useMemo(
+    () => ({
+      session,
+      user,
+      loading,
+      isFullUser: computeIsFullUser(user),
+      needsOnboarding,
+      onboardingLoading,
+      markOnboardingDone,
+      needsNickname,
+      markNicknameDone,
+      deactivatedAt,
+      markRestored,
+      ensureAnonymous,
+      loginWithGoogle,
+      loginWithKakao,
+      logout,
+    }),
+    [
+      session,
+      user,
+      loading,
+      needsOnboarding,
+      onboardingLoading,
+      needsNickname,
+      deactivatedAt,
+      markOnboardingDone,
+      markNicknameDone,
+      markRestored,
+      ensureAnonymous,
+      loginWithGoogle,
+      loginWithKakao,
+      logout,
+    ],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

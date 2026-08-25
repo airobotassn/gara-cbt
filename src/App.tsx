@@ -48,6 +48,7 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 const Login = lazy(() => import('./pages/Login'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
 const NicknameSetup = lazy(() => import('./pages/NicknameSetup'))
+const AccountRestore = lazy(() => import('./pages/AccountRestore'))
 
 // 정적 안내 페이지
 const About = lazy(() => import('./pages/About'))
@@ -114,6 +115,25 @@ const ONBOARDING_ENFORCED = [
 // 실명이 그대로 노출된다. 미루면 그사이 실명이 새어나가므로 로그인 직후 받는다.
 // 예외는 무한 루프를 막기 위한 최소한만(설정 화면 자신 · 로그인/콜백).
 const NICKNAME_EXEMPT = ['/onboarding/nickname', '/login', '/auth/callback']
+
+// 탈퇴 게이트 — 닉네임보다 **먼저** 온다. 탈퇴 신청된 계정은 복구를 누르기 전엔 아무것도 못 한다.
+// 여태는 플래그가 랭킹에서만 걸러져서, 탈퇴한 계정이 로그인·미니게임·결제까지 그대로 됐다
+// (2026-08-24 실제로 그 상태의 계정이 나왔다). 전 경로에서 막는 이유가 그것이다.
+// 예외는 무한 루프를 막을 최소한만 — 복구 화면 자신, 로그인/콜백, 그리고 정책 문서
+// (탈퇴·파기 규정을 읽을 길은 열어둔다).
+const WITHDRAWN_EXEMPT = ['/account/restore', '/login', '/auth/callback', '/terms', '/privacy']
+
+function WithdrawnGate({ children }: { children: ReactNode }) {
+  const { deactivatedAt, onboardingLoading, isFullUser, loading } = useAuth()
+  const { pathname, search } = useLocation()
+  if (WITHDRAWN_EXEMPT.some((p) => pathname === p || pathname.startsWith(p + '/'))) return <>{children}</>
+  if (loading || (isFullUser && onboardingLoading)) return <GateSpinner />
+  if (isFullUser && deactivatedAt) {
+    const next = encodeURIComponent(pathname + search)
+    return <Navigate to={`/account/restore?next=${next}`} replace />
+  }
+  return <>{children}</>
+}
 
 function NicknameGate({ children }: { children: ReactNode }) {
   const { needsNickname, onboardingLoading, isFullUser, loading } = useAuth()
@@ -195,7 +215,9 @@ export default function App() {
               응시 중(/exam/run/*)에는 뜨지 않는다 — 그 화면의 종료는 '포기'라 응시 무효 기록이 따로 남아야 한다. */}
           <SebEscapeHatch />
           <Layout>
-            {/* 닉네임(전 경로) → 지역(아레나 계열) 순서. 아레나로 바로 온 사람은 두 화면이 이어서 뜬다. */}
+            {/* 탈퇴(전 경로) → 닉네임(전 경로) → 지역(아레나 계열) 순서.
+                탈퇴가 맨 앞인 이유: 복구하기 전에는 닉네임·지역을 물어볼 이유가 없다. */}
+            <WithdrawnGate>
             <NicknameGate>
             <OnboardingGate>
             {/* 화면 청크를 받는 동안의 자리. 라우터가 이동을 transition 으로 감싸므로
@@ -259,11 +281,14 @@ export default function App() {
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/onboarding/nickname" element={<NicknameSetup />} />
+              {/* 탈퇴 신청된 계정으로 로그인했을 때 — WithdrawnGate 가 여기로 보낸다. */}
+              <Route path="/account/restore" element={<AccountRestore />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             </Suspense>
             </OnboardingGate>
             </NicknameGate>
+            </WithdrawnGate>
           </Layout>
         </BrowserRouter>
       </AuthProvider>

@@ -873,6 +873,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
       가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
 .hub[data-ui='palace'] .fcard .bd { top: 0; right: 8px; }
+/* EVENT 배지 — 궁궐 벌에서는 칸 위로 띄우지 않는다.
+   ⚠️ 기본값(-11px)은 칸 간격 16px 을 전제로 한 값이라, 간격이 6~8px 뿐인 여기서는 배지가
+      간격을 통째로 넘어 **위 칸('칭호') 라벨 위에 얹힌다** — 어느 버튼 것인지 못 읽는다.
+      칸에 면이 없어(투명) 배지를 아이콘 머리에 겹쳐도 가릴 판이 없으므로 안으로 들인다. */
+.hub[data-ui='palace'] .f-invite .ev { top: -2px; padding: 2px 8px; border-width: 2px; font-size: 12px; }
+@media (min-width: 768px) {
+  .hub[data-ui='palace'] .f-invite .ev { top: -3px; padding: 3px 11px; font-size: 14.5px; }
+}
 
 /* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
    ⚠️ 글자는 padding 으로 밀지 말고 가운데 정렬. padding 으로 앉히면 칸 높이가 바뀔 때 잘린다. */

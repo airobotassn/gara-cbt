@@ -324,6 +324,48 @@ async function geminiJson(sys: string, user: string, maxTokens: number): Promise
   throw new Error('unreachable')
 }
 
+// ---------- 모델 응답 읽기 — 값 하나만 떼어낸다 ----------
+// ⚠️ 응답 전체를 통째로 JSON.parse 하면 **뒤에 붙은 군더더기 하나가 멀쩡한 번역을 통째로 버린다.**
+//    2026-08-25 실제로 겪었다: 31조각 × 5개국어가 온전히 다 온 167줄짜리 객체였는데, 닫는 `}` 다음
+//    줄에 뭔가가 더 있어서 `position 5541 (line 168 column 1)` 로 거절됐다 → 공지가 한국어로만 저장.
+//    모델이 뭘 덧붙일지는 우리 손 밖이라 프롬프트로 부탁해봐야 소용없다. 안 보면 그만이다.
+// ⚠️ 정상 응답은 첫 줄 그대로 통과시킨다(fast path). 멀쩡히 돌던 게 이 변경으로 달라질 여지를 두지 않는다.
+function firstJsonValue(src: string): string {
+  const start = src.indexOf('{')
+  if (start < 0) throw new Error('JSON 객체가 없다')
+  let depth = 0
+  let inStr = false
+  for (let i = start; i < src.length; i++) {
+    const c = src[i]
+    if (inStr) {
+      if (c === '\\') i++ // 이스케이프된 따옴표에 속지 않는다
+      else if (c === '"') inStr = false
+      continue
+    }
+    if (c === '"') inStr = true
+    else if (c === '{' || c === '[') depth++
+    else if (c === '}' || c === ']') {
+      if (--depth === 0) return src.slice(start, i + 1) // 여기까지가 우리가 원한 값. 뒤는 안 본다.
+    }
+  }
+  throw new Error('JSON 이 닫히지 않았다')
+}
+
+function parseJsonLoose(txt: string): Record<string, unknown> {
+  try {
+    return JSON.parse(txt)
+  } catch {
+    // 코드펜스(```json)가 붙어도 여기서 같이 걷힌다 — firstJsonValue 가 첫 `{` 부터 읽으므로.
+    try {
+      return JSON.parse(firstJsonValue(txt))
+    } catch (e) {
+      // ⚠️ 원문을 남긴다. 안 남기면 원인을 줄 수로 역산해야 한다(조각이 많으면 그것도 못 한다).
+      console.error('[translate] 응답 파싱 실패:', txt.slice(0, 300))
+      throw e
+    }
+  }
+}
+
 // ---------- 번역 대상 = 눈에 보이는 글자만 ----------
 // ⚠️ 옛 방식은 본문을 통째로 넘기고 "태그는 그대로 두고 5개국어로 돌려달라" 였다. 그러면 모델이
 //    **같은 HTML 을 5벌 다시 써야** 해서, 6.9KB 짜리 HTML 공지 하나에 출력이 35KB 가 되고
@@ -399,7 +441,7 @@ async function translateSegments(segs: string[]): Promise<Record<string, string[
       `Return JSON shaped exactly as { ${TARGET_LANGS.map((c) => `"${c}": [ ... ]`).join(', ')} }, ` +
       `each array containing exactly ${batch.length} strings.\n\n` +
       `SOURCE (Korean):\n${JSON.stringify(batch)}`
-    const parsed = JSON.parse(await geminiJson(sys, user, 8192))
+    const parsed = parseJsonLoose(await geminiJson(sys, user, 8192))
     for (const c of TARGET_LANGS) {
       const arr = parsed?.[c]
       // ⚠️ 개수가 어긋나면 그 언어는 통째로 버린다 — 하나만 밀려도 글이 엉뚱한 자리에 박힌다.
@@ -1129,6 +1171,10 @@ async function examFeeSave(admin: any, body: any) {
     const key = String(it?.key ?? '').trim()
     const n = Number(it?.amount)
     if (!key || !Number.isFinite(n)) continue
+    // 단위는 **달러 센트**다(100 = $1.00). 관리자 화면이 달러 입력을 센트로 바꿔 보낸다.
+    // ⚠️ **0 은 정상 값이다** — "무료 급수"라는 뜻이고, 화면이 저장 전에 확인을 한 번 받는다(2026-08-25).
+    //    '아직 안 정했다'는 0 이 아니라 **행을 안 만드는 것**으로 표현한다(화면이 빈칸을 아예 안 보낸다).
+    //    그 구분이 판매 판정의 전부다 — resolveExamOffer 는 행 없음(null)만 막고 0 은 무료로 판다.
     const amount = Math.max(0, Math.floor(n))
     const { error } = await admin.from('exam_fees').upsert({ key, amount_usd_cents: amount, updated_at: now }, { onConflict: 'key' })
     if (error) return json({ error: error.message }, 400)
@@ -2485,7 +2531,9 @@ async function cbtUsers(admin: any) {
   // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → CARIS ARENA 게스트(is_anonymous)는 회원목록에서 제외.
   const { data: profiles } = await admin
     .from('profiles')
-    .select('id, display_name, is_anonymous, created_at')
+    // ⚠️ 탈퇴 계정도 **목록에 남긴다** — 여기서 빼면 관리자가 "탈퇴했다" 는 사실 자체를 볼 길이 없다.
+    //    2026-08-24 에 탈퇴 상태로 서비스를 계속 쓴 계정이 나왔는데 화면으로는 알아낼 방법이 없었다.
+    .select('id, display_name, is_anonymous, created_at, deactivated_at, purged_at')
     .eq('is_anonymous', false)
     .order('created_at', { ascending: false })
     .limit(5000)
@@ -2537,6 +2585,10 @@ async function cbtUsers(admin: any) {
     passed: pass[p.id] ?? 0,
     passedTitles: passTitles[p.id] ?? [],
     lastActive: last[p.id] ?? null,
+    // 탈퇴 신청 시각 · 파기 완료 시각. 화면은 이 둘로 '탈퇴' / '파기됨' 을 가른다
+    // (파기된 계정은 복구할 것이 없다 — 구글 연결이 끊겨 본인도 못 들어온다).
+    deactivated: p.deactivated_at ?? null,
+    purged: p.purged_at ?? null,
   }))
   return json({ users })
 }
@@ -2621,6 +2673,33 @@ async function resetOnboarding(admin: any, body: any, email: string, isRoot: boo
     detail: { before },
   })
   return json({ ok: true, before })
+}
+
+// 탈퇴 계정 복구(회원 상세의 '복구' 버튼).
+// ⚠️ 루트 전용으로 두지 않는다 — 되돌릴 수 있는 조작이고(다시 탈퇴하면 그만), 실수로 탈퇴한
+//    사용자의 문의는 아무 관리자나 받는다. resetOnboarding 을 루트로 막은 이유(되돌릴 수 없음)와 다르다.
+// ⚠️ 판정·닉네임 충돌 처리는 전부 RPC 안에 있다(admin_restore_account) — 본인 복구와 같은 규칙을 쓰려고
+//    한 벌로 뒀다. 여기서 조건을 더 얹으면 두 경로가 다른 말을 한다.
+async function restoreAccount(admin: any, body: any, email: string) {
+  const uid = String(body?.uid ?? '').trim()
+  if (!uid) return json({ error: 'uid 가 필요합니다.' }, 400)
+
+  const { data, error } = await admin.rpc('admin_restore_account', { p_uid: uid })
+  if (error) {
+    const msg = String(error.message ?? '')
+    if (/purged/.test(msg)) return json({ error: '이미 파기된 계정이라 복구할 수 없습니다.' }, 409)
+    if (/not_found/.test(msg)) return json({ error: '회원을 찾을 수 없습니다.' }, 404)
+    return json({ error: msg || '복구에 실패했습니다.' }, 400)
+  }
+
+  // 로그 실패로 복구를 되돌리지는 않는다(이미 끝난 조작이다).
+  await admin.from('admin_audit').insert({
+    actor_email: email,
+    action: 'restoreAccount',
+    target: uid,
+    detail: data ?? {},
+  })
+  return json({ ok: true, ...(data ?? {}) })
 }
 
 // ---------- 어드민: 이북(전자책) ----------
@@ -3141,6 +3220,7 @@ Deno.serve(async (req) => {
       case 'setRegion': return await setRegion(admin, body)
       // ⚠️ isRoot 를 넘겨 루트 전용으로 막는다(위 주석 — 지역 1회 변경 잠금을 푸는 조작이다).
       case 'resetOnboarding': return await resetOnboarding(admin, body, email, isRoot)
+      case 'restoreAccount': return await restoreAccount(admin, body, email)
       case 'ebookList': return await ebookList(admin)
       case 'ebookUpsert': return await ebookUpsert(admin, body)
       case 'ebookReorder': return await ebookReorder(admin, body)

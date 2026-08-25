@@ -123,11 +123,19 @@ const EN: Record<string, string> = {
   "terms.title": "Terms of Service",
   "terms.todo": "Coming soon.",
   "withdraw.title": "Delete account",
-  "withdraw.desc": "On withdrawal your account is deactivated and permanently deleted after {d} days. Log in again before then to restore it.",
+  "withdraw.desc": "On withdrawal your account is deactivated, and your personal information is erased after {d} days. You can log back in before then to restore it.",
   "withdraw.button": "Delete my account",
-  "withdraw.confirm": "Delete your account? It will be deactivated and permanently deleted after {d} days. Log in again before then to restore it.",
+  "withdraw.confirm": "Delete your account? It will be deactivated, and your personal information is erased after {d} days. You can log back in before then to restore it.",
   "withdraw.done": "Your account has been deactivated. Thank you for using our service.",
   "withdraw.failed": "Something went wrong. Please try again later.",
+  "withdraw.gate_title": "This account is scheduled for deletion",
+  "withdraw.gate_body": "You asked to delete this account. Restore it within the {d}-day retention period and your rank, records and purchased books all come back. If you don't, your personal information is erased and you can never sign in to this account again.",
+  "withdraw.gate_left": "{n} days left to restore",
+  "withdraw.gate_purge_on": "Will be erased on {date}",
+  "withdraw.gate_restore": "Restore my account",
+  "withdraw.gate_logout": "Log out without restoring",
+  "withdraw.restoring": "Restoring…",
+  "withdraw.restore_failed": "Could not restore. Please try again later.",
   "lecture.title": "Lectures page",
   "lecture.sub": "Lecture content is coming soon.",
 
@@ -993,6 +1001,8 @@ const EN: Record<string, string> = {
   "pay.success_title": "Payment complete",
   "pay.free_title": "Added to your library",
   "pay.free_body": "It's free, so it went straight to your library.",
+  "pay.free_title_exam": "Your exam pass is ready",
+  "pay.free_body_exam": "This level is free, so your pass was issued without payment.",
   // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
   "pay.waiting_title": "Waiting for your deposit",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
@@ -1310,6 +1320,8 @@ const EN: Record<string, string> = {
   // exam_fees 에 그 티어의 행이 없을 때 — 금액 자리에 숫자를 지어내지 않고 이걸 띄우고 결제를 막는다.
   // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
   "apply.fee_tbd": "Coming soon",
+  "apply.fee_free": "Free",
+  "apply.free_btn": "Get it free",
   "apply.total": "Total",
   // 추천 교재(원서접수 가운데 열) — 응시료와 **함께** 결제되는 곁다리다.
   "apply.book_col": "Recommended book",

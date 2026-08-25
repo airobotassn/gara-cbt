@@ -4,15 +4,20 @@ import { usePolicyDoc } from '../lib/policyDocs'
 import { useT, type TFunc } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
 import { supabase } from '../lib/supabase'
+import { RETENTION_DAYS } from '../lib/withdrawal'
 
-const RETENTION_DAYS = 90 // 탈퇴 후 보관기간(이후 purge_deactivated_accounts 로 영구 삭제)
-
-// 회원탈퇴(soft delete): 비활성화 → 보관 → 재로그인 시 복구. 로그인(영구) 유저에게만 노출.
+// 회원탈퇴(soft delete): 비활성화 → 보관 → **복구 화면에서 눌러야** 복구. 로그인(영구) 유저에게만 노출.
+//   ⚠️ 보관기간은 여기 두지 않는다 — lib/withdrawal.ts 가 단일 출처고 서버 함수와 한 벌이다.
+//   ⛔ 탈퇴해도 결제 원장·발급된 자격증은 남는다(법정 보존 + 진위확인). 파기되는 건 프로필·계정 연결이다.
 function WithdrawButton({ t }: { t: TFunc }) {
-  const { user, isFullUser, logout } = useAuth()
+  const { user, isFullUser, logout, deactivatedAt } = useAuth()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   if (!isFullUser || !user) return null
+  // ⚠️ 이미 탈퇴 신청한 사람에게는 안 보여준다 — 또 누르면 deactivated_at 이 새로 찍혀
+  //   **보관기간이 처음부터 다시 간다**(파기가 그만큼 미뤄진다). 그 사람이 여기 닿는 경로는
+  //   실재한다: WithdrawnGate 가 /terms 를 예외로 열어두기 때문이다(탈퇴·파기 규정을 읽을 길).
+  if (deactivatedAt) return null
 
   async function withdraw() {
     if (busy || !user) return

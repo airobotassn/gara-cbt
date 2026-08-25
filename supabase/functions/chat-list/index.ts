@@ -5,6 +5,8 @@
 //  reconcile 만 방 조건이 없다(PK 조회이고, 클라는 자기가 띄운 방의 id 만 보낸다).
 //  본문 게이트: mod_status='ok' 이거나 본인 글이면 노출, 아니면(pending/hidden 이며 타인) body=null.
 //  reporter_id/ip_hash/content_hash 는 응답에 절대 포함하지 않는다.
+//  익명 글은 user_id 도 안 내보낸다(shapeRow) — 아바타·국기를 가려놓고 uuid 를 주면,
+//    같은 uuid 를 가진 실명 글과 대조해 익명 배지를 통째로 무력화할 수 있다.
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
@@ -12,23 +14,39 @@ import { normalizeRoom } from '../_shared/chat.ts'
 
 const MSG_COLUMNS = 'id, user_id, display_name, is_anon, body, mod_status, edited_at, created_at, updated_at, deleted_at'
 
-// 작성자 프로필(아바타·국가)을 한 번의 조회로 붙인다 — 이름 왼쪽 프로필, 오른쪽 국기용.
+type ShapedRow = ReturnType<typeof shapeRow>
+
+// 작성자 프로필(이름·아바타·국가)을 한 번의 조회로 붙인다 — 이름 왼쪽 프로필, 오른쪽 국기용.
 //  · 익명 글에는 붙이지 않는다. 익명 배지를 달아놓고 아바타·국기를 노출하면 익명성이 무너진다.
 //  · 국가 미등록(country_code=null)이면 null 그대로 — 화면이 국기를 렌더하지 않는다.
 //  · profiles 는 메시지 수와 무관하게 작성자 수만큼만 조회한다(N+1 방지).
-async function attachProfiles<T extends { user_id: string | null; is_anon: boolean }>(
+//  ⚠️ 이름은 저장된 스냅샷이 아니라 **지금 닉네임**으로 덮는다. `chat_messages.display_name` 은 글 쓸 때
+//     찍힌 텍스트라, 닉네임을 바꾸면(1회 변경 가능 — `profiles.nickname_changed_at`) 옛 글이 옛 이름으로
+//     남는다. 닉네임은 유니크라 놓은 이름을 남이 가져갈 수 있고, 코인 선물이 **닉네임 지목**이라
+//     채팅에서 본 이름으로 보내면 엉뚱한 사람에게 간다(되돌릴 수 없는 이체).
+//     그래도 스냅샷은 지우지 않는다 — 관리자 신고 검수가 보는 '그때 이름' 이고, 여기 폴백이기도 하다.
+async function attachProfiles(
   admin: ReturnType<typeof adminClient>,
-  rows: T[],
-): Promise<(T & { avatar_url: string | null; country_code: string | null })[]> {
+  rows: ShapedRow[],
+): Promise<(ShapedRow & { avatar_url: string | null; country_code: string | null })[]> {
   const ids = [...new Set(rows.filter((r) => !r.is_anon && r.user_id).map((r) => r.user_id as string))]
-  const byId = new Map<string, { avatar_url: string | null; country_code: string | null }>()
+  const byId = new Map<string, { display_name: string | null; avatar_url: string | null; country_code: string | null }>()
   if (ids.length > 0) {
-    const { data } = await admin.from('profiles').select('id, avatar_url, country_code').in('id', ids)
-    for (const p of data ?? []) byId.set(p.id, { avatar_url: p.avatar_url, country_code: p.country_code })
+    const { data } = await admin.from('profiles').select('id, display_name, avatar_url, country_code').in('id', ids)
+    for (const p of data ?? []) {
+      byId.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url, country_code: p.country_code })
+    }
   }
   return rows.map((r) => {
     const p = r.is_anon || !r.user_id ? undefined : byId.get(r.user_id)
-    return { ...r, avatar_url: p?.avatar_url ?? null, country_code: p?.country_code ?? null }
+    // 프로필이 없거나(탈퇴) 이름이 비면 스냅샷 그대로 — 이름 없는 줄을 만들지 않는다.
+    const now = (p?.display_name ?? '').trim()
+    return {
+      ...r,
+      display_name: now || r.display_name,
+      avatar_url: p?.avatar_url ?? null,
+      country_code: p?.country_code ?? null,
+    }
   })
 }
 
@@ -117,7 +135,10 @@ type MsgRow = {
 function shapeRow(r: MsgRow) {
   return {
     id: r.id,
-    user_id: r.user_id,
+    // ⚠️ 익명 글은 uuid 를 내보내지 않는다. 아바타 시드를 'anon' 으로 고정하고 국기를 뺀 이유와 같다 —
+    //    uuid 가 있으면 같은 사람의 실명 글과 대조해 익명 글을 전부 이어붙일 수 있다.
+    //    본문 노출 판정(본인 pending 글)은 서버 쿼리가 하므로 화면은 이 값이 없어도 된다.
+    user_id: r.is_anon ? null : r.user_id,
     display_name: r.display_name,
     is_anon: r.is_anon,
     body: r.body,

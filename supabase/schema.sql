@@ -534,22 +534,11 @@ alter table profiles add column if not exists deactivated_at timestamptz;
 create index if not exists profiles_deactivated_idx
   on profiles (deactivated_at) where deactivated_at is not null;
 
--- 보관기간(기본 90일) 지난 탈퇴 계정 완전 삭제(auth.users → cascade).
-create or replace function public.purge_deactivated_accounts(retention_days int default 90)
-returns int language plpgsql security definer set search_path = public, auth as $$
-declare n int;
-begin
-  with del as (
-    delete from auth.users u using profiles p
-    where p.id = u.id and p.deactivated_at is not null
-      and p.deactivated_at < now() - make_interval(days => retention_days)
-    returning u.id
-  )
-  select count(*) into n from del;
-  return n;
-end;
-$$;
-revoke all on function public.purge_deactivated_accounts(int) from public, anon, authenticated;
+-- 보관기간(기본 90일) 지난 탈퇴 계정 처리 → **삭제가 아니라 익명화**다.
+--   ⛔ 옛 판(auth.users DELETE)은 2026-08-25 에 제거했다. payments·exam_attempts 가 auth.users 에
+--      CASCADE 로 물려 있어서, 켜는 순간 결제 원장(전자상거래법 5년)과 발급된 자격증이 같이 날아간다.
+--   실제 정의·복구 함수·크론은 마이그레이션 `20260825140000_withdrawal.sql` 참고
+--   (profiles.purged_at · restore_account() · admin_restore_account() · anonymize_deactivated_accounts()).
 
 -- ============================================================
 -- 온보딩: 국가·지역·학교 + 지역 락 (Phase 1 · T1)

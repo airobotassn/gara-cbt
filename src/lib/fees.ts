@@ -4,6 +4,12 @@
 // ⚠️ **폴백 없음.** 예전엔 미설정 시 caris.ts 의 `fee`(달러 임시값)로 떨어졌는데, 그 상수는 제거됐다.
 //    돈 받는 값이라 폴백이 있으면 "설정 누락"이 조용히 임시금액 결제로 이어진다. 키가 없으면
 //    호출부가 금액을 못 받고(undefined) 화면이 '준비 중'으로 막는 게 맞다.
+// ⛔ **키 없음(undefined)과 0 은 다른 말이다**(2026-08-25).
+//    · 없음 = 금액 미정 → '준비 중', 결제 잠김.
+//    · 0     = 관리자가 정한 **무료 급수** → 결제창 없이 응시권이 나간다.
+//    그래서 호출부의 판정은 `amount > 0` 이 아니라 `typeof amount === 'number'` 여야 한다.
+//    서버도 같은 규칙이다(_shared/exam-tickets.ts 의 lookupExamFee 가 미설정을 null 로 준다) — 한쪽만
+//    고치면 화면은 '무료'인데 결제가 '준비 중'으로 막히거나 그 반대가 된다.
 // 통화는 달러 하나 — amount 는 **센트 정수**다(100 = $1.00, 2026-08-13 전환). 표시는 lib/money.ts 의 usdc().
 // 국내 결제는 서버가 결제 시점 환율로 원화를 계산한다 — 프론트가 환산하지 않는다.
 import { useEffect, useState } from 'react'
@@ -33,7 +39,11 @@ export function useExamFees() {
       const { data } = await supabase.from('exam_fees').select('key, amount_usd_cents')
       if (!alive) return
       const map: FeeMap = {}
-      for (const r of (data as { key: string; amount_usd_cents: number }[] | null) ?? []) map[r.key] = r.amount_usd_cents
+      // 값이 null 인 행은 **키를 아예 안 넣는다** — 0 으로 접으면 미설정 급수가 화면에서 '무료'가 된다.
+      for (const r of (data as { key: string; amount_usd_cents: number | null }[] | null) ?? []) {
+        if (r.amount_usd_cents === null || r.amount_usd_cents === undefined) continue
+        map[r.key] = r.amount_usd_cents
+      }
       setFees(map)
       setLoading(false)
     })()

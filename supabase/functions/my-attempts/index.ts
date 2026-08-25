@@ -7,7 +7,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang, projText } from '../_shared/lib.ts'
 import { makeCertNo, subjectOf, gradeOfTitle } from '../_shared/cert.ts'
-import { examWindowOpen, ticketSourceAlive } from '../_shared/exam-tickets.ts'
+import { examWindowOpen, resolveExamFee, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
 const PASS_RATIO = 0.6
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
@@ -119,18 +119,35 @@ Deno.serve(async (req) => {
 
       // 자격증 발급비 — 최초 발급은 발급비 결제(cert paid)가 있어야 한다. 재발급(이미 cert_no·토큰 있음)은 무료.
       //   결제 우회로 발급하지 못하게, 채번 전에 이 응시(product_ref = attempt id)의 paid cert 주문을 확인한다.
+      //
+      // ⚠️ **발급비가 $0 인 급수는 결제 확인 자체를 건너뛴다(2026-08-25).** 발급비 = 그 급수의 응시료라
+      //    응시료를 0으로 연 급수는 발급비도 0인데, payments.amount 에 >0 제약이 있어 **0원 결제 행을
+      //    만들 수 없다.** 그대로 두면 402 → 체크아웃 → 0원이라 결제창을 못 탐 → 다시 402 로 영원히 튕긴다.
+      //    ⛔ 판정은 반드시 resolveExamFee(정가표)로 한다 — 응시권의 price_paid(실제 낸 돈)로 보면
+      //       관리자 수기 발급분(0원)이 전부 무료 발급이 된다.
       if (!(a.verify_token && a.cert_no)) {
-        const { data: certPaid } = await admin
-          .from('payments')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('product_type', 'cert')
-          .eq('product_ref', a.id)
-          .eq('status', 'paid')
-          .maybeSingle()
-        // ⚠️ 프론트(Certificate.tsx)가 이 문자열로 결제 화면 전환을 판단한다 — 같은 핸들러의
-        //    invalid_name_roman·name_roman_required 와 같은 기계 코드 관례다. 문구로 바꾸지 말 것.
-        if (!certPaid) return json({ error: 'cert_fee_required', needsPayment: true }, 402)
+        let feeFree = false
+        if (a.exam_id) {
+          const { data: ex } = await admin.from('exams').select('tier').eq('id', a.exam_id as string).maybeSingle()
+          if (ex?.tier) {
+            const fee = await resolveExamFee(admin, ex.tier as string)
+            // 미설정(no_fee)은 무료가 아니다 — 그건 아래 402 로 떨어져 결제 화면이 '준비 중'을 말한다.
+            feeFree = fee.ok && fee.amount === 0
+          }
+        }
+        if (!feeFree) {
+          const { data: certPaid } = await admin
+            .from('payments')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('product_type', 'cert')
+            .eq('product_ref', a.id)
+            .eq('status', 'paid')
+            .maybeSingle()
+          // ⚠️ 프론트(Certificate.tsx)가 이 문자열로 결제 화면 전환을 판단한다 — 같은 핸들러의
+          //    invalid_name_roman·name_roman_required 와 같은 기계 코드 관례다. 문구로 바꾸지 말 것.
+          if (!certPaid) return json({ error: 'cert_fee_required', needsPayment: true }, 402)
+        }
       }
 
       // 영문 성명 검증 — 채번보다 먼저 통과시킨다. 검증 실패(400)가 자격번호 시퀀스를 소각하면 안 된다.

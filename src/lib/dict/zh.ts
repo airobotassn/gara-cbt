@@ -123,11 +123,19 @@ const ZH: Record<string, string> = {
   "terms.title": "服务条款",
   "terms.todo": "内容准备中。",
   "withdraw.title": "注销账户",
-  "withdraw.desc": "注销后账户将被停用，保留 {d} 天后永久删除。在此之前重新登录可恢复。",
+  "withdraw.desc": "注销后账户将被停用，保留 {d} 天后销毁会员信息。在此之前可重新登录并恢复。",
   "withdraw.button": "注销账户",
-  "withdraw.confirm": "确定要注销吗？账户将被停用，{d} 天后永久删除。在此之前重新登录可恢复。",
+  "withdraw.confirm": "确定要注销吗？账户将被停用，{d} 天后销毁会员信息。在此之前可重新登录并恢复。",
   "withdraw.done": "已完成注销。感谢您的使用。",
   "withdraw.failed": "处理出错，请稍后重试。",
+  "withdraw.gate_title": "该账户已申请注销",
+  "withdraw.gate_body": "该账户已申请注销。在 {d} 天保留期内恢复，等级、记录和已购教材都会原样回来。若不恢复，会员信息将被销毁，此账户将无法再次登录。",
+  "withdraw.gate_left": "还剩 {n} 天可以恢复",
+  "withdraw.gate_purge_on": "将于 {date} 销毁",
+  "withdraw.gate_restore": "恢复我的账户",
+  "withdraw.gate_logout": "不恢复，直接退出登录",
+  "withdraw.restoring": "正在恢复…",
+  "withdraw.restore_failed": "恢复失败，请稍后重试。",
   "lecture.title": "课程页面",
   "lecture.sub": "课程内容正在准备中。",
 
@@ -993,6 +1001,8 @@ const ZH: Record<string, string> = {
   "pay.success_title": "支付完成",
   "pay.free_title": "已加入书架",
   "pay.free_body": "免费资料，已直接加入书架。",
+  "pay.free_title_exam": "考试券已发放",
+  "pay.free_body_exam": "该级别免费，无需支付即已发放。",
   // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
   "pay.waiting_title": "等待入款",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
@@ -1310,6 +1320,8 @@ const ZH: Record<string, string> = {
   // exam_fees 에 그 티어의 행이 없을 때 — 금액 자리에 숫자를 지어내지 않고 이걸 띄우고 결제를 막는다.
   // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
   "apply.fee_tbd": "准备中",
+  "apply.fee_free": "免费",
+  "apply.free_btn": "免费报名",
   "apply.total": "应付总额",
   // 추천 교재(원서접수 가운데 열) — 응시료와 **함께** 결제되는 곁다리다.
   "apply.book_col": "推荐教材",

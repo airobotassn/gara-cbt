@@ -33,7 +33,7 @@ import {
   type PaymentRow,
   type ProductType,
 } from '../_shared/payments.ts'
-import { findLiveTickets, ticketSourceAlive } from '../_shared/exam-tickets.ts'
+import { findLiveTickets, grantExamTicket, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
 const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert', 'bundle']
 
@@ -209,11 +209,13 @@ Deno.serve(async (req) => {
         if (!alive.ok) return json({ error: alive.error }, 409)
       }
 
-      // 무료 상품은 결제창을 타지 않는다(0원 결제는 애초에 불가). 바로 지급하고 끝낸다.
-      // ⛔ **이 분기는 이북 전용이다. 응시료를 여기로 들이지 말 것.** exam_fees.amount 는 default 0 이고
-      //    관리자 화면의 빈 입력도 0 으로 저장되므로, 0원을 '무료 즉시지급'으로 열면 오타 한 번이
-      //    무제한 무료 응시권이 된다. 응시료는 resolveExamOffer 가 금액 0/미설정을 **판매 불가(400)** 로 접어서
-      //    애초에 여기까지 오지 않는다 — 아래 가드는 그 규칙이 깨졌을 때의 2차 방어선이다.
+      // 무료 상품은 결제창을 타지 않는다(0원 결제는 애초에 불가 + payments.amount 에 >0 제약이 있다).
+      // 바로 지급하고 끝낸다.
+      //
+      // ⚠️ **응시료도 여기로 들어온다(2026-08-25).** 예전엔 이북 전용이었고 "0원 = 무제한 무료 응시권"을
+      //    막으려고 응시료를 통째로 배제했는데, 그 방어는 이제 **미설정(null) ↔ 무료(0) 구분**이 대신한다
+      //    (_shared/exam-tickets.ts 의 lookupExamFee). 즉 여기 도달한 0원 응시료는 관리자가 화면에서
+      //    확인까지 받고 정한 값이다. ⛔ 그 구분이 무너지면 이 분기가 곧바로 무료 응시권 발급기가 된다.
       if (product.amount <= 0) {
         // 묶음인데 담은 게 전부 0원인 경우 — 결제창을 탈 수 없으니 그 자리에서 다 준다(단품 무료와 같은 취급).
         if (productType === 'bundle' && product.bundle) {
@@ -227,6 +229,38 @@ Deno.serve(async (req) => {
           if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)
           return json({ free: true, granted: true })
         }
+
+        // 무료 응시권. **결제 행이 없다** — payments.amount 는 >0 제약이라 0원 주문을 남길 수 없다.
+        // 그래서 중복 방어는 payments_paid_product_uniq 가 아니라 exam_tickets_live_uniq 가 한다
+        // (위 findLiveTickets 사전검사 + 그 유니크가 최종 방어선이다. 유료 경로와 같은 두 겹이다).
+        // ⚠️ source='free' 다 — 대사(reconcile)는 source='pg' 행만 결제와 대조하므로, 'pg' 로 넣으면
+        //    결제 행이 없는 응시권이 영원히 '미지급 의심'으로 대사 목록에 뜬다.
+        if (productType === 'exam') {
+          if (!product.exam) return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
+          const res = await grantExamTicket(admin, {
+            userId: uid,
+            roundId: product.exam.roundId,
+            tier: product.exam.tier,
+            source: 'free',
+            pricePaid: 0,
+            note: '무료 급수(응시료 $0)',
+          })
+          if (!res.ok) return json({ error: res.error, owned: res.code === 'live_conflict' }, res.code === 'live_conflict' ? 409 : 400)
+          // 응시료가 0인데 교재를 함께 담았다면 그 교재도 0원이라 총액이 0이다(유료 교재였다면 여기 안 온다).
+          if (product.addon) {
+            const { error } = await admin.from('ebook_purchases').insert({
+              user_id: uid,
+              ebook_id: product.addon.id,
+              price_paid: 0,
+              source: 'free',
+            })
+            if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)
+          }
+          return json({ free: true, granted: true })
+        }
+
+        // 자격증 발급비가 0인 경우는 여기까지 오지 않는다 — Certificate 화면이 402(cert_fee_required)를
+        // 받지 않고 곧바로 발급되기 때문이다(my-attempts 가 발급비 0을 결제 없이 통과시킨다).
         if (productType !== 'ebook') return json({ error: '무료 처리할 수 없는 상품입니다.' }, 400)
         const { error } = await admin.from('ebook_purchases').insert({
           user_id: uid,

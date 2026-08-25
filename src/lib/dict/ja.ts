@@ -123,11 +123,19 @@ const JA: Record<string, string> = {
   "terms.title": "利用規約",
   "terms.todo": "準備中です。",
   "withdraw.title": "退会",
-  "withdraw.desc": "退会するとアカウントは無効化され、{d}日間の保管後に完全削除されます。それまでに再ログインすれば復元できます。",
+  "withdraw.desc": "退会するとアカウントは無効化され、{d}日間の保管後に会員情報が破棄されます。それまでに再ログインして復元できます。",
   "withdraw.button": "退会する",
-  "withdraw.confirm": "本当に退会しますか？ アカウントは無効化され、{d}日後に完全削除されます。それまでに再ログインすれば復元できます。",
+  "withdraw.confirm": "本当に退会しますか？ アカウントは無効化され、{d}日後に会員情報が破棄されます。それまでに再ログインして復元できます。",
   "withdraw.done": "退会処理が完了しました。ご利用ありがとうございました。",
   "withdraw.failed": "エラーが発生しました。後ほど再度お試しください。",
+  "withdraw.gate_title": "退会申請済みのアカウントです",
+  "withdraw.gate_body": "このアカウントは退会申請されています。保管期間{d}日以内に復元すれば、ランク・記録・購入した教材がそのまま戻ります。復元しない場合は会員情報が破棄され、このアカウントには二度とログインできません。",
+  "withdraw.gate_left": "復元できる期間はあと{n}日です",
+  "withdraw.gate_purge_on": "{date}に破棄されます",
+  "withdraw.gate_restore": "アカウントを復元する",
+  "withdraw.gate_logout": "復元せずログアウト",
+  "withdraw.restoring": "復元中…",
+  "withdraw.restore_failed": "復元できませんでした。後ほど再度お試しください。",
   "lecture.title": "講義ページです",
   "lecture.sub": "講義コンテンツは準備中です。",
 
@@ -993,6 +1001,8 @@ const JA: Record<string, string> = {
   "pay.success_title": "決済が完了しました",
   "pay.free_title": "追加しました",
   "pay.free_body": "無料資料のため、そのままライブラリに追加されました。",
+  "pay.free_title_exam": "受験券が発行されました",
+  "pay.free_body_exam": "無料の級のため、決済なしで発行されました。",
   // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
   "pay.waiting_title": "入金をお待ちしています",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
@@ -1310,6 +1320,8 @@ const JA: Record<string, string> = {
   // exam_fees 에 그 티어의 행이 없을 때 — 금액 자리에 숫자를 지어내지 않고 이걸 띄우고 결제를 막는다.
   // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
   "apply.fee_tbd": "準備中",
+  "apply.fee_free": "無料",
+  "apply.free_btn": "無料で申し込む",
   "apply.total": "合計金額",
   // 추천 교재(원서접수 가운데 열) — 응시료와 **함께** 결제되는 곁다리다.
   "apply.book_col": "おすすめ教材",

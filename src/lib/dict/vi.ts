@@ -123,11 +123,19 @@ const VI: Record<string, string> = {
   "terms.title": "Điều khoản dịch vụ",
   "terms.todo": "Đang chuẩn bị.",
   "withdraw.title": "Xóa tài khoản",
-  "withdraw.desc": "Khi xóa, tài khoản bị vô hiệu hóa và xóa vĩnh viễn sau {d} ngày. Đăng nhập lại trước đó để khôi phục.",
+  "withdraw.desc": "Khi xóa, tài khoản bị vô hiệu hóa và thông tin thành viên bị hủy sau {d} ngày. Bạn có thể đăng nhập lại trước đó để khôi phục.",
   "withdraw.button": "Xóa tài khoản của tôi",
-  "withdraw.confirm": "Xóa tài khoản? Tài khoản sẽ bị vô hiệu hóa và xóa vĩnh viễn sau {d} ngày. Đăng nhập lại trước đó để khôi phục.",
+  "withdraw.confirm": "Xóa tài khoản? Tài khoản sẽ bị vô hiệu hóa và thông tin thành viên bị hủy sau {d} ngày. Bạn có thể đăng nhập lại trước đó để khôi phục.",
   "withdraw.done": "Đã xử lý xóa tài khoản. Cảm ơn bạn đã sử dụng dịch vụ.",
   "withdraw.failed": "Đã xảy ra lỗi. Vui lòng thử lại sau.",
+  "withdraw.gate_title": "Tài khoản này đã yêu cầu xóa",
+  "withdraw.gate_body": "Tài khoản này đã được yêu cầu xóa. Khôi phục trong thời hạn lưu giữ {d} ngày thì hạng, thành tích và sách đã mua đều trở lại nguyên vẹn. Nếu không, thông tin thành viên sẽ bị hủy và bạn không thể đăng nhập lại tài khoản này.",
+  "withdraw.gate_left": "Còn {n} ngày để khôi phục",
+  "withdraw.gate_purge_on": "Sẽ bị hủy vào {date}",
+  "withdraw.gate_restore": "Khôi phục tài khoản",
+  "withdraw.gate_logout": "Đăng xuất mà không khôi phục",
+  "withdraw.restoring": "Đang khôi phục…",
+  "withdraw.restore_failed": "Không thể khôi phục. Vui lòng thử lại sau.",
   "lecture.title": "Trang bài giảng",
   "lecture.sub": "Nội dung bài giảng sắp ra mắt.",
 
@@ -993,6 +1001,8 @@ const VI: Record<string, string> = {
   "pay.success_title": "Thanh toán hoàn tất",
   "pay.free_title": "Đã thêm vào thư viện",
   "pay.free_body": "Tài liệu miễn phí nên đã vào thẳng thư viện của bạn.",
+  "pay.free_title_exam": "Đã cấp vé dự thi",
+  "pay.free_body_exam": "Cấp độ này miễn phí nên vé đã được cấp mà không cần thanh toán.",
   // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
   "pay.waiting_title": "Đang chờ bạn chuyển khoản",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
@@ -1310,6 +1320,8 @@ const VI: Record<string, string> = {
   // exam_fees 에 그 티어의 행이 없을 때 — 금액 자리에 숫자를 지어내지 않고 이걸 띄우고 결제를 막는다.
   // (현재 CARIS-Ⅱ Master·Grand Master·Zenith 가 여기 해당)
   "apply.fee_tbd": "Sắp có",
+  "apply.fee_free": "Miễn phí",
+  "apply.free_btn": "Đăng ký miễn phí",
   "apply.total": "Tổng thanh toán",
   // 추천 교재(원서접수 가운데 열) — 응시료와 **함께** 결제되는 곁다리다.
   "apply.book_col": "Giáo trình đề xuất",

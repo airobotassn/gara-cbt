@@ -28,7 +28,9 @@ import { arenaLevelForScore } from '../lib/scoring'
 
 interface Row {
   id: number
-  user_id: string
+  /** ⚠️ 익명 글은 null 이다 — 서버가 익명성 보호로 uuid 를 안 내려준다(chat-list 의 shapeRow). */
+  user_id: string | null
+  /** 작성자의 **지금** 닉네임 — 서버가 profiles 에서 덮어 내려준다(글에 박힌 옛 이름이 아니다). */
   display_name: string
   is_anon: boolean
   body: string | null
@@ -484,8 +486,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
   //      모달이 열린다(작은 원이라 거기 정확히 떨어질 일이 드물다).
   //   ⚠️ 익명 글은 아예 대상이 아니다 — 익명으로 쓴 글에서 실명 카드가 나오면 익명성이 깨진다.
   //      (서버도 같은 판단: scoped_top 이 익명 계정을 제외해서 user:null 로 되돌린다. 이중 방어)
+  //      익명 글엔 user_id 자체가 안 내려오므로 그것도 같이 막는다(삼중).
   async function openCard(r: Row) {
-    if (r.is_anon || r.sending || cardBusy.current) return
+    if (r.is_anon || !r.user_id || r.sending || cardBusy.current) return
+    const uid = r.user_id
     cardBusy.current = true
     try {
       const res = await callFunction<{
@@ -495,7 +499,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
           character: string | null; skin: string | null
         } | null
         total: number
-      }>('leaderboard', { scope: 'user', uid: r.user_id })
+      }>('leaderboard', { scope: 'user', uid })
       if (!res.user) {
         showToast(t('chat.noCard'))
         return
@@ -504,13 +508,13 @@ export default function ChatBoard({ room = 'global' }: Props) {
       // 국가·지역 순위·이름 — 랭킹 화면과 **같은 헬퍼**를 쓴다(각자 조립하면 두 화면의 카드가 갈린다).
       //   못 받으면 그 칸만 '—' 로 나간다. 카드 자체는 뜬다.
       let scoped: CardScoped | null = null
-      try { scoped = await scopedForCard(r.user_id, lang) } catch { scoped = null }
-      setCard({ handle: r.user_id, data: {
+      try { scoped = await scopedForCard(uid, lang) } catch { scoped = null }
+      setCard({ handle: uid, data: {
         lang,
         name: u.name,
         // 카드 아바타는 서버가 준 원본 문자열을 다시 조립해 쓴다(채팅 행의 avatar_url 과 같은 형식).
         avatarUrl: u.image ? `img:${u.image}` : u.color ? `gem:${u.color}` : (r.avatar_url ?? null),
-        seed: r.user_id,
+        seed: uid,
         percentile: u.percentile,
         rank: u.rank,
         rankTotal: res.total,
@@ -613,7 +617,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
                           onClick={() => openCard(r)}
                           aria-label={t('chat.cardOf', { name: r.display_name })}
                         >
-                          <Avatar avatarUrl={r.avatar_url} seed={r.user_id} size={20} />
+                          <Avatar avatarUrl={r.avatar_url} seed={r.user_id ?? undefined} size={20} />
                         </button>
                       )}
                       <span className="chat-name">{r.display_name}</span>

@@ -436,6 +436,10 @@ export interface CbtUserRow {
   passedTitles: string[]
   /** 마지막으로 시험을 **제출**한 시각. 로그인·접속은 안 본다. */
   lastActive: string | null
+  /** 탈퇴(soft delete) 신청 시각. null 이면 정상 계정. */
+  deactivated: string | null
+  /** 보관기간이 지나 개인정보를 파기한 시각. 찍혀 있으면 복구할 수 없다. */
+  purged: string | null
 }
 export interface CbtUsersResp {
   users: CbtUserRow[]
