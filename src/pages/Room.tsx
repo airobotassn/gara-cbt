@@ -78,7 +78,7 @@ export default function Room() {
   const badge = data?.title ? <span className="tt">🏆 CARIS {tierName(data.title)}</span> : null
 
   return (
-    <div className="hub" data-skin={skin.key}>
+    <div className="hub" data-skin={skin.key} data-ui={skin.ui}>
       {/* 무대 = 그 사람의 배경 + 그 사람의 캐릭터. /hub 와 **같은 마크업·같은 CSS** 다 —
           내 허브와 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나 제일 늦게 발견된다.
           ⚠️ `.hub-scene` 은 `.hub > *:not(...)` 예외 목록에 있어야 viewport 고정이 풀리지 않는다. */}

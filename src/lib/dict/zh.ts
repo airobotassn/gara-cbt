@@ -14,7 +14,7 @@ const ZH: Record<string, string> = {
   "common.cancel": "取消",
   "common.ranking": "排行榜",
   "common.hub": "角色中心",
-  "common.cari": "CARI",
+  "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
   "common.login_google": "使用 Google 登录",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
@@ -981,6 +981,8 @@ const ZH: Record<string, string> = {
   "pay.preparing": "正在准备结算…",
   "pay.pay_button": "支付",
   "pay.moving": "正在打开支付窗口…",
+  "pay.reopen": "重新打开支付窗口",
+  "pay.reopen_hint": "关闭了支付窗口吗？尚未完成支付 — 可用上方按钮重新打开。",
   // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
   "pay.test_mode": "测试环境 — 不会产生真实扣款。",
   "pay.not_configured": "支付尚未开通，请稍后再试。",
@@ -1453,6 +1455,7 @@ const ZH: Record<string, string> = {
   "chat.duplicate": "你刚发送过相同内容",
   "chat.rateLimited": "请求过于频繁，请稍后重试",
   "chat.loginToJoin": "登录后即可参与聊天",
+  "chat.scamNotice": "CARIS 运营人员绝不会索要账号信息、验证码或财物。对于冒充行为及用户之间私下交易造成的损失，本站概不负责。",
   // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
   // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
@@ -1521,7 +1524,6 @@ const ZH: Record<string, string> = {
   // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
   // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
   "apply.tier_not_open": "本场次未开设",
-  "apply.tier_not_open_hint": "该等级本场次不接受报名，请查看其他场次。",
   "apply.owned": "已购买",
   "apply.owned_cta": "查看我的应试券",
   "apply.already_applied": "您已报名该等级",
@@ -1717,7 +1719,7 @@ const ZH: Record<string, string> = {
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
-  "hub.err.insufficient_points": "积分不足",
+  "hub.err.insufficient_points": "金币不足",
   "hub.err.already_owned": "您已拥有该限定道具",
   "hub.err.unauthorized": "需要登录",
   "hub.err.generic": "发生错误，请稍后再试",
@@ -1776,7 +1778,7 @@ const ZH: Record<string, string> = {
   "hub.day_n": "第 {n} 天",
 
   // 토스트
-  "hub.toast.no_points_item": "积分不足：{name}（{price}P）",
+  "hub.toast.no_points_item": "金币不足：{name}（{price}金币）",
 
   // 구매/교환 완료 팝업
   "hub.buy.purchased": "购买成功！",
@@ -1836,6 +1838,7 @@ const ZH: Record<string, string> = {
   "hub.part.char_b_f": "角色 B · 女",
   "hub.part.char_c_m": "角色 C · 男",
   "hub.part.char_c_f": "角色 C · 女",
+  "hub.part.skin_meadow": "草原",
   "hub.part.skin_palace_day": "古宫 · 白天",
   "hub.part.skin_palace_night": "古宫 · 夜晚",
 
@@ -1930,6 +1933,29 @@ const ZH: Record<string, string> = {
   "hub.gift.err_invalid_amount": "赠送数量不正确",
   "hub.gift.err_too_fast": "向同一位好友赠送过于频繁，请稍后再试",
   "hub.gift.err_send_fail": "赠送失败",
+
+  // 1:1 inquiry (My Page > Support). Category labels are keyed as `inq.cat.<code>`.
+  "inq.intro": "提交咨询后，我们会确认并回复。",
+  "inq.private": "仅本人与运营人员可见。",
+  "inq.write": "提交咨询",
+  "inq.cat.exam": "考试",
+  "inq.cat.payment": "支付·退款",
+  "inq.cat.account": "账号",
+  "inq.cat.arena": "WORLD ARENA",
+  "inq.cat.etc": "其他",
+  "inq.ph_title": "标题",
+  "inq.ph_body": "请填写咨询内容。考试或支付相关咨询请一并写明场次与等级，回复会更快。",
+  "inq.submit": "提交",
+  "inq.sending": "发送中…",
+  "inq.err_fields": "请填写标题和内容。",
+  "inq.err_login": "需要登录。",
+  "inq.login_required": "登录后即可使用。",
+  "inq.empty": "还没有咨询。",
+  "inq.status_open": "等待回复",
+  "inq.status_answered": "已回复",
+  "inq.new_answer": "新回复",
+  "inq.answer_at": "回复 · {d}",
+  "inq.no_answer": "尚未登记回复。",
 }
 
 export default ZH

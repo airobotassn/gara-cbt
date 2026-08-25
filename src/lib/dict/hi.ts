@@ -14,7 +14,7 @@ const HI: Record<string, string> = {
   "common.cancel": "रद्द करें",
   "common.ranking": "रैंकिंग",
   "common.hub": "हब",
-  "common.cari": "CARI",
+  "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
   "common.login_google": "Google से साइन इन करें",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
@@ -981,6 +981,8 @@ const HI: Record<string, string> = {
   "pay.preparing": "भुगतान तैयार हो रहा है…",
   "pay.pay_button": "भुगतान करें",
   "pay.moving": "भुगतान विंडो खुल रही है…",
+  "pay.reopen": "भुगतान विंडो फिर से खोलें",
+  "pay.reopen_hint": "क्या आपने भुगतान विंडो बंद कर दी? अभी तक कोई भुगतान नहीं हुआ है — ऊपर दिए बटन से इसे दोबारा खोलें।",
   // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
   "pay.test_mode": "टेस्ट मोड — वास्तविक भुगतान नहीं होगा।",
   "pay.not_configured": "भुगतान अभी उपलब्ध नहीं है। कृपया बाद में प्रयास करें।",
@@ -1453,6 +1455,7 @@ const HI: Record<string, string> = {
   "chat.duplicate": "आपने अभी वही संदेश भेजा है",
   "chat.rateLimited": "बहुत अधिक अनुरोध, कृपया बाद में पुनः प्रयास करें",
   "chat.loginToJoin": "चैट में शामिल होने के लिए साइन इन करें",
+  "chat.scamNotice": "CARIS संचालक कभी भी खाता जानकारी, सत्यापन कोड या पैसे नहीं मांगते। प्रतिरूपण या उपयोगकर्ताओं के बीच निजी लेनदेन से हुए नुकसान के लिए हम ज़िम्मेदार नहीं हैं।",
   // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
   // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
@@ -1521,7 +1524,6 @@ const HI: Record<string, string> = {
   // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
   // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
   "apply.tier_not_open": "इस सत्र में उपलब्ध नहीं",
-  "apply.tier_not_open_hint": "यह स्तर इस सत्र में उपलब्ध नहीं है। कृपया कोई अन्य सत्र देखें।",
   "apply.owned": "खरीदा गया",
   "apply.owned_cta": "मेरे टिकट देखें",
   "apply.already_applied": "आप इस स्तर के लिए पहले ही पंजीकरण कर चुके हैं",
@@ -1717,7 +1719,7 @@ const HI: Record<string, string> = {
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
-  "hub.err.insufficient_points": "पर्याप्त पॉइंट नहीं",
+  "hub.err.insufficient_points": "पर्याप्त सिक्के नहीं",
   "hub.err.already_owned": "यह लिमिटेड आइटम आपके पास पहले से है",
   "hub.err.unauthorized": "साइन इन आवश्यक है",
   "hub.err.generic": "कुछ गड़बड़ हुई। थोड़ी देर बाद फिर कोशिश करें",
@@ -1776,7 +1778,7 @@ const HI: Record<string, string> = {
   "hub.day_n": "दिन {n}",
 
   // 토스트
-  "hub.toast.no_points_item": "पर्याप्त पॉइंट नहीं: {name} ({price}P)",
+  "hub.toast.no_points_item": "पर्याप्त सिक्के नहीं: {name} ({price} सिक्के)",
 
   // 구매/교환 완료 팝업
   "hub.buy.purchased": "खरीद लिया!",
@@ -1836,6 +1838,7 @@ const HI: Record<string, string> = {
   "hub.part.char_b_f": "कैरेक्टर B · महिला",
   "hub.part.char_c_m": "कैरेक्टर C · पुरुष",
   "hub.part.char_c_f": "कैरेक्टर C · महिला",
+  "hub.part.skin_meadow": "घास का मैदान",
   "hub.part.skin_palace_day": "महल · दिन",
   "hub.part.skin_palace_night": "महल · रात",
 
@@ -1930,6 +1933,29 @@ const HI: Record<string, string> = {
   "hub.gift.err_invalid_amount": "यह राशि सही नहीं है",
   "hub.gift.err_too_fast": "एक ही दोस्त को बहुत बार भेज रहे हैं। थोड़ी देर बाद कोशिश करें",
   "hub.gift.err_send_fail": "भेजा नहीं जा सका",
+
+  // 1:1 inquiry (My Page > Support). Category labels are keyed as `inq.cat.<code>`.
+  "inq.intro": "पूछताछ भेजने पर हम जाँच कर जवाब देंगे।",
+  "inq.private": "इसे सिर्फ़ आप और संचालन टीम देख सकते हैं।",
+  "inq.write": "पूछताछ करें",
+  "inq.cat.exam": "परीक्षा",
+  "inq.cat.payment": "भुगतान · रिफ़ंड",
+  "inq.cat.account": "खाता",
+  "inq.cat.arena": "WORLD ARENA",
+  "inq.cat.etc": "अन्य",
+  "inq.ph_title": "शीर्षक",
+  "inq.ph_body": "अपनी बात लिखें। परीक्षा या भुगतान से जुड़ी बात हो तो सत्र और स्तर भी लिखें — जवाब जल्दी मिलेगा।",
+  "inq.submit": "भेजें",
+  "inq.sending": "भेजा जा रहा है…",
+  "inq.err_fields": "शीर्षक और विवरण दोनों भरें।",
+  "inq.err_login": "लॉगिन ज़रूरी है।",
+  "inq.login_required": "लॉगिन के बाद उपलब्ध है।",
+  "inq.empty": "अभी कोई पूछताछ नहीं है।",
+  "inq.status_open": "जवाब का इंतज़ार",
+  "inq.status_answered": "जवाब मिला",
+  "inq.new_answer": "नया जवाब",
+  "inq.answer_at": "जवाब · {d}",
+  "inq.no_answer": "अभी जवाब दर्ज नहीं हुआ है।",
 }
 
 export default HI

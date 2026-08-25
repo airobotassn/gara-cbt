@@ -14,7 +14,7 @@ const KO: Record<string, string> = {
   "common.cancel": "취소",
   "common.ranking": "랭킹",
   "common.hub": "허브",
-  "common.cari": "CARI",
+  "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
   "common.login_google": "구글로 로그인",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
@@ -983,6 +983,8 @@ const KO: Record<string, string> = {
   "pay.preparing": "결제창을 준비하고 있어요…",
   "pay.pay_button": "결제하기",
   "pay.moving": "결제창으로 이동 중…",
+  "pay.reopen": "결제창 다시 열기",
+  "pay.reopen_hint": "결제창을 닫으셨나요? 아직 결제되지 않았어요 — 위 버튼으로 다시 열 수 있습니다.",
   // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
   "pay.test_mode": "테스트 결제 환경입니다 — 실제로 결제되지 않습니다.",
   "pay.not_configured": "결제가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
@@ -1461,6 +1463,7 @@ const KO: Record<string, string> = {
   "chat.duplicate": "방금 같은 내용을 보냈어요",
   "chat.rateLimited": "요청이 너무 많아요. 잠시 후 다시 시도해주세요",
   "chat.loginToJoin": "채팅에 참여하려면 로그인해주세요",
+  "chat.scamNotice": "CARIS 운영자는 계정정보·인증번호·금품을 요구하지 않으며, 사칭 및 개인 간 거래로 인한 피해에 대해서는 책임지지 않습니다.",
   // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
   // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
@@ -1529,7 +1532,6 @@ const KO: Record<string, string> = {
   // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
   // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
   "apply.tier_not_open": "이 회차 미개설",
-  "apply.tier_not_open_hint": "이 회차에서는 접수할 수 없는 급수예요. 다른 회차를 확인해 주세요.",
   "apply.owned": "구매 완료",
   "apply.owned_cta": "내 응시권 보기",
   "apply.already_applied": "이미 접수한 급수입니다",
@@ -1566,7 +1568,7 @@ const KO: Record<string, string> = {
   //   {usd} = 실제 청구되는 달러 금액(서버가 정한 값 그대로).
   "pay.currency_note_usd": "해외 결제는 미국 달러로 청구됩니다 · 실제 청구 금액 {usd}",
   // 엑심베이 결제창은 우리 페이지에 아무것도 그리지 않는다 — 안내가 없으면 화면이 빈 것으로 읽힌다.
-  "pay.cert_fee_note": "합격 후 자격증을 발급할 때 별도 비용이 청구돼요.",
+  "pay.cert_fee_note": "합격 후 자격증을 발급할 때 별도 비용이 청구됩니다.",
   "pay.pg_eximbay_note": "결제하기를 누르면 Eximbay 결제창이 열리고, 결제수단은 그 창에서 고릅니다.",
   // ── 결제 전 취소·환불 규정 동의(2026-08-20) ──
   //    표 4줄은 응시료·자격증 발급비용, terms_ebook 은 이북·묶음용(디지털 콘텐츠라 기준이 다르다).
@@ -1725,7 +1727,7 @@ const KO: Record<string, string> = {
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
-  "hub.err.insufficient_points": "포인트가 부족해요",
+  "hub.err.insufficient_points": "코인이 부족해요",
   "hub.err.already_owned": "이미 보유한 한정템이에요",
   "hub.err.unauthorized": "로그인이 필요해요",
   "hub.err.generic": "오류가 발생했어요. 잠시 후 다시 시도해주세요",
@@ -1784,7 +1786,7 @@ const KO: Record<string, string> = {
   "hub.day_n": "{n}일",
 
   // 토스트
-  "hub.toast.no_points_item": "포인트가 부족해요: {name} ({price}P)",
+  "hub.toast.no_points_item": "코인이 부족해요: {name} ({price}코인)",
 
   // 구매/교환 완료 팝업
   "hub.buy.purchased": "구매 완료!",
@@ -1846,6 +1848,7 @@ const KO: Record<string, string> = {
   "hub.part.char_b_f": "캐릭터 B · 여",
   "hub.part.char_c_m": "캐릭터 C · 남",
   "hub.part.char_c_f": "캐릭터 C · 여",
+  "hub.part.skin_meadow": "초원",
   "hub.part.skin_palace_day": "고궁 · 낮",
   "hub.part.skin_palace_night": "고궁 · 밤",
 
@@ -1940,6 +1943,29 @@ const KO: Record<string, string> = {
   "hub.gift.err_invalid_amount": "보낼 금액이 올바르지 않아요",
   "hub.gift.err_too_fast": "같은 친구에게 너무 자주 보내고 있어요. 잠시 후 다시 시도해주세요",
   "hub.gift.err_send_fail": "보내지 못했어요",
+
+  // 1:1 문의(마이페이지 › 문의 탭). 분류 라벨은 `inq.cat.<코드>` 로 키를 조립한다 — DB 에 든 건 코드뿐이다.
+  "inq.intro": "문의하시면 확인 후 답변드립니다.",
+  "inq.private": "작성자 본인과 운영자만 볼 수 있습니다.",
+  "inq.write": "문의하기",
+  "inq.cat.exam": "응시·시험",
+  "inq.cat.payment": "결제·환불",
+  "inq.cat.account": "계정",
+  "inq.cat.arena": "WORLD ARENA",
+  "inq.cat.etc": "기타",
+  "inq.ph_title": "제목",
+  "inq.ph_body": "문의 내용을 적어주세요. 응시·결제 문의는 회차와 급수를 같이 적어주시면 빠릅니다.",
+  "inq.submit": "문의 등록",
+  "inq.sending": "보내는 중…",
+  "inq.err_fields": "제목과 내용을 모두 입력해 주세요.",
+  "inq.err_login": "로그인이 필요합니다.",
+  "inq.login_required": "로그인 후 이용할 수 있습니다.",
+  "inq.empty": "아직 문의가 없습니다.",
+  "inq.status_open": "답변 대기",
+  "inq.status_answered": "답변 완료",
+  "inq.new_answer": "새 답변",
+  "inq.answer_at": "답변 · {d}",
+  "inq.no_answer": "아직 답변이 등록되지 않았습니다.",
 }
 
 export default KO

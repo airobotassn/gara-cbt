@@ -14,7 +14,7 @@ const EN: Record<string, string> = {
   "common.cancel": "Cancel",
   "common.ranking": "Ranking",
   "common.hub": "Hub",
-  "common.cari": "CARI",
+  "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
   "common.login_google": "Sign in with Google",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
@@ -981,6 +981,8 @@ const EN: Record<string, string> = {
   "pay.preparing": "Preparing checkout…",
   "pay.pay_button": "Pay",
   "pay.moving": "Opening payment window…",
+  "pay.reopen": "Reopen payment window",
+  "pay.reopen_hint": "Closed the payment window? Nothing has been charged yet — use the button above to open it again.",
   // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
   "pay.test_mode": "Test mode — no real payment will be made.",
   "pay.not_configured": "Payments aren't set up yet. Please try again later.",
@@ -1453,6 +1455,7 @@ const EN: Record<string, string> = {
   "chat.duplicate": "You just sent the same message",
   "chat.rateLimited": "Too many requests. Please try again shortly",
   "chat.loginToJoin": "Sign in to join the chat",
+  "chat.scamNotice": "CARIS staff never ask for account details, verification codes, or money. We are not responsible for losses from impersonation or private transactions between users.",
   // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
   // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
@@ -1521,7 +1524,6 @@ const EN: Record<string, string> = {
   // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
   // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
   "apply.tier_not_open": "Not offered this session",
-  "apply.tier_not_open_hint": "This level isn't open for this session. Please check another session.",
   "apply.owned": "Purchased",
   "apply.owned_cta": "View my tickets",
   "apply.already_applied": "You've already registered for this level",
@@ -1717,7 +1719,7 @@ const EN: Record<string, string> = {
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
-  "hub.err.insufficient_points": "Not enough points",
+  "hub.err.insufficient_points": "Not enough coins",
   "hub.err.already_owned": "You already own this limited item",
   "hub.err.unauthorized": "Sign in required",
   "hub.err.generic": "Something went wrong. Please try again in a moment.",
@@ -1776,7 +1778,7 @@ const EN: Record<string, string> = {
   "hub.day_n": "Day {n}",
 
   // 토스트
-  "hub.toast.no_points_item": "Not enough points: {name} ({price}P)",
+  "hub.toast.no_points_item": "Not enough coins: {name} ({price} coins)",
 
   // 구매/교환 완료 팝업
   "hub.buy.purchased": "Purchased!",
@@ -1836,6 +1838,7 @@ const EN: Record<string, string> = {
   "hub.part.char_b_f": "Character B · F",
   "hub.part.char_c_m": "Character C · M",
   "hub.part.char_c_f": "Character C · F",
+  "hub.part.skin_meadow": "Meadow",
   "hub.part.skin_palace_day": "Palace · Day",
   "hub.part.skin_palace_night": "Palace · Night",
 
@@ -1930,6 +1933,29 @@ const EN: Record<string, string> = {
   "hub.gift.err_invalid_amount": "That amount is not valid",
   "hub.gift.err_too_fast": "You're sending to the same friend too often. Please try again in a moment",
   "hub.gift.err_send_fail": "Couldn't send",
+
+  // 1:1 inquiry (My Page > Support). Category labels are keyed as `inq.cat.<code>`.
+  "inq.intro": "We'll review your inquiry and reply.",
+  "inq.private": "Only you and our staff can see it.",
+  "inq.write": "New inquiry",
+  "inq.cat.exam": "Exam",
+  "inq.cat.payment": "Payment & refund",
+  "inq.cat.account": "Account",
+  "inq.cat.arena": "WORLD ARENA",
+  "inq.cat.etc": "Other",
+  "inq.ph_title": "Title",
+  "inq.ph_body": "Tell us what you need. For exam or payment questions, include the round and tier to get a faster answer.",
+  "inq.submit": "Submit",
+  "inq.sending": "Sending…",
+  "inq.err_fields": "Please fill in both the title and the message.",
+  "inq.err_login": "Please sign in.",
+  "inq.login_required": "Sign in to use this.",
+  "inq.empty": "No inquiries yet.",
+  "inq.status_open": "Awaiting reply",
+  "inq.status_answered": "Answered",
+  "inq.new_answer": "New reply",
+  "inq.answer_at": "Reply · {d}",
+  "inq.no_answer": "No reply has been posted yet.",
 }
 
 export default EN

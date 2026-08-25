@@ -2,6 +2,7 @@
 //   전용 페이지로 승격. 껍데기는 부모 페이지 /arena 와 동일한 규칙(연보라 배경 + 굵은 제목).
 //   게임 목록은 src/lib/minigames.ts 한 곳에서만 관리(새 게임 = 그 배열에 한 줄).
 //   커버 셀 스타일(.mg-shelf/.mg-cover…)은 모달 시절부터 이어진 공용, 페이지 껍데기는 .mgp 스코프.
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MINIGAMES, guestPlayable } from '../lib/minigames'
 import StarField from '../components/StarField'
@@ -13,6 +14,18 @@ export default function MiniGames() {
   const navigate = useNavigate()
   const { isFullUser } = useAuth()
   const { t } = useT()
+  // 잠긴 커버를 눌렀을 때 잠깐 떴다 사라지는 안내. 누를 것이 없는 순수 알림이라
+  //   pointer-events 를 끊어 다음 클릭을 가로막지 않는다(닫기 버튼도 두지 않는다).
+  //   ⚠️ 커버는 disabled 가 아니라 aria-disabled 다 — disabled 버튼은 click 이 아예 안 떠서
+  //     "눌러도 아무 반응 없음"(지금 상태)이 그대로 남는다.
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef<number | null>(null)
+  useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current) }, [])
+  const showToast = (text: string) => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current)
+    setToast(text)
+    toastTimer.current = window.setTimeout(() => setToast(null), 2400)
+  }
   return (
     <div className="mgp">
       {/* 밤하늘 — /arena 와 같은 별(다크에서만). 내용은 .mgp-in 이 z-index:1 로 그 위에 선다. */}
@@ -23,10 +36,7 @@ export default function MiniGames() {
         </Link>
 
         <header className="mgp-head">
-          <h1>
-            {t('arena.bGame')}
-            <b className="mgp-count">{MINIGAMES.length}</b>
-          </h1>
+          <h1>{t('arena.bGame')}</h1>
           <p>{t('arena.bGameS')}</p>
         </header>
 
@@ -45,8 +55,8 @@ export default function MiniGames() {
             <button
               key={g.id}
               className={`mg-cover${locked ? ' is-locked' : ''}`}
-              onClick={() => { if (!locked) navigate(`/games/${g.id}`) }}
-              disabled={locked}
+              onClick={() => { if (locked) showToast(t('mg.locked_hint')); else navigate(`/games/${g.id}`) }}
+              aria-disabled={locked || undefined}
               title={locked ? t('mg.locked_hint') : undefined}
               aria-label={locked ? `${gTitle} — ${t('mg.locked_hint')}` : gTitle}
             >
@@ -70,6 +80,13 @@ export default function MiniGames() {
           })}
         </div>
       </div>
+
+      {toast && (
+        <div className="mgp-toast" role="status">
+          <span className="material-symbols-outlined">lock</span>
+          <span>{toast}</span>
+        </div>
+      )}
     </div>
   )
 }

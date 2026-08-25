@@ -14,7 +14,7 @@ const VI: Record<string, string> = {
   "common.cancel": "Hủy",
   "common.ranking": "Xếp hạng",
   "common.hub": "Hub",
-  "common.cari": "CARI",
+  "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
   "common.login_google": "Đăng nhập bằng Google",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
@@ -981,6 +981,8 @@ const VI: Record<string, string> = {
   "pay.preparing": "Đang chuẩn bị thanh toán…",
   "pay.pay_button": "Thanh toán",
   "pay.moving": "Đang mở cửa sổ thanh toán…",
+  "pay.reopen": "Mở lại cửa sổ thanh toán",
+  "pay.reopen_hint": "Bạn đã đóng cửa sổ thanh toán? Chưa có khoản thanh toán nào — dùng nút phía trên để mở lại.",
   // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
   "pay.test_mode": "Chế độ thử nghiệm — không có thanh toán thật.",
   "pay.not_configured": "Thanh toán chưa sẵn sàng. Vui lòng thử lại sau.",
@@ -1453,6 +1455,7 @@ const VI: Record<string, string> = {
   "chat.duplicate": "Bạn vừa gửi nội dung giống hệt",
   "chat.rateLimited": "Quá nhiều yêu cầu, vui lòng thử lại sau",
   "chat.loginToJoin": "Đăng nhập để tham gia trò chuyện",
+  "chat.scamNotice": "Quản trị viên CARIS không bao giờ yêu cầu thông tin tài khoản, mã xác minh hay tiền bạc. Chúng tôi không chịu trách nhiệm về thiệt hại do mạo danh hoặc giao dịch riêng giữa người dùng.",
   // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
   // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
@@ -1521,7 +1524,6 @@ const VI: Record<string, string> = {
   // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
   // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
   "apply.tier_not_open": "Không mở đợt này",
-  "apply.tier_not_open_hint": "Bậc này không mở trong đợt thi này. Vui lòng xem đợt khác.",
   "apply.owned": "Đã mua",
   "apply.owned_cta": "Xem vé của tôi",
   "apply.already_applied": "Bạn đã đăng ký bậc này rồi",
@@ -1717,7 +1719,7 @@ const VI: Record<string, string> = {
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
-  "hub.err.insufficient_points": "Không đủ điểm",
+  "hub.err.insufficient_points": "Không đủ xu",
   "hub.err.already_owned": "Bạn đã có vật phẩm giới hạn này",
   "hub.err.unauthorized": "Cần đăng nhập",
   "hub.err.generic": "Đã xảy ra lỗi. Vui lòng thử lại sau giây lát",
@@ -1776,7 +1778,7 @@ const VI: Record<string, string> = {
   "hub.day_n": "Ngày {n}",
 
   // 토스트
-  "hub.toast.no_points_item": "Không đủ điểm: {name} ({price}P)",
+  "hub.toast.no_points_item": "Không đủ xu: {name} ({price} xu)",
 
   // 구매/교환 완료 팝업
   "hub.buy.purchased": "Đã mua!",
@@ -1836,6 +1838,7 @@ const VI: Record<string, string> = {
   "hub.part.char_b_f": "Nhân vật B · Nữ",
   "hub.part.char_c_m": "Nhân vật C · Nam",
   "hub.part.char_c_f": "Nhân vật C · Nữ",
+  "hub.part.skin_meadow": "Đồng cỏ",
   "hub.part.skin_palace_day": "Cố cung · Ngày",
   "hub.part.skin_palace_night": "Cố cung · Đêm",
 
@@ -1930,6 +1933,29 @@ const VI: Record<string, string> = {
   "hub.gift.err_invalid_amount": "Số coin không hợp lệ",
   "hub.gift.err_too_fast": "Bạn gửi cho cùng một người quá thường xuyên. Vui lòng thử lại sau",
   "hub.gift.err_send_fail": "Không gửi được",
+
+  // 1:1 inquiry (My Page > Support). Category labels are keyed as `inq.cat.<code>`.
+  "inq.intro": "Gửi câu hỏi, chúng tôi sẽ kiểm tra và trả lời.",
+  "inq.private": "Chỉ người viết và ban quản trị xem được.",
+  "inq.write": "Gửi câu hỏi",
+  "inq.cat.exam": "Thi cử",
+  "inq.cat.payment": "Thanh toán · hoàn tiền",
+  "inq.cat.account": "Tài khoản",
+  "inq.cat.arena": "WORLD ARENA",
+  "inq.cat.etc": "Khác",
+  "inq.ph_title": "Tiêu đề",
+  "inq.ph_body": "Hãy viết nội dung cần hỏi. Với câu hỏi về kỳ thi hoặc thanh toán, ghi kèm đợt thi và cấp độ sẽ được trả lời nhanh hơn.",
+  "inq.submit": "Gửi",
+  "inq.sending": "Đang gửi…",
+  "inq.err_fields": "Vui lòng nhập cả tiêu đề và nội dung.",
+  "inq.err_login": "Cần đăng nhập.",
+  "inq.login_required": "Đăng nhập để sử dụng.",
+  "inq.empty": "Chưa có câu hỏi nào.",
+  "inq.status_open": "Chờ trả lời",
+  "inq.status_answered": "Đã trả lời",
+  "inq.new_answer": "Trả lời mới",
+  "inq.answer_at": "Trả lời · {d}",
+  "inq.no_answer": "Chưa có trả lời.",
 }
 
 export default VI

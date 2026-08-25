@@ -256,12 +256,6 @@ export default function ExamApply() {
                   )
                 })}
               </div>
-              {roundReady && TIERS.some(({ tier: l }) => !openTiers.includes(l.key)) && (
-                <p className="mt-2 flex items-start gap-1.5 font-label-md text-label-md text-on-surface-variant break-keep">
-                  <span className="material-symbols-outlined text-[18px] shrink-0">lock</span>
-                  {t('apply.tier_not_open_hint')}
-                </p>
-              )}
 
               <div className="mt-6 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

@@ -14,7 +14,7 @@ const JA: Record<string, string> = {
   "common.cancel": "キャンセル",
   "common.ranking": "ランキング",
   "common.hub": "ハブ",
-  "common.cari": "CARI",
+  "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
   "common.login_google": "Googleでログイン",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
@@ -981,6 +981,8 @@ const JA: Record<string, string> = {
   "pay.preparing": "決済画面を準備しています…",
   "pay.pay_button": "支払う",
   "pay.moving": "決済画面へ移動中…",
+  "pay.reopen": "決済画面をもう一度開く",
+  "pay.reopen_hint": "決済画面を閉じましたか？まだ決済は行われていません — 上のボタンでもう一度開けます。",
   // 테스트 키로 붙어 있을 때만 뜬다 — 실키와 헷갈리면 안 되므로 문구를 부드럽게 쓰지 않는다.
   "pay.test_mode": "テスト環境です — 実際には決済されません。",
   "pay.not_configured": "決済はまだ準備中です。しばらくしてからお試しください。",
@@ -1453,6 +1455,7 @@ const JA: Record<string, string> = {
   "chat.duplicate": "同じ内容を送信済みです",
   "chat.rateLimited": "リクエストが多すぎます。しばらくして再度お試しください",
   "chat.loginToJoin": "チャットに参加するにはログインしてください",
+  "chat.scamNotice": "CARIS 運営がアカウント情報・認証番号・金品を要求することはありません。なりすましや利用者間の個人取引による被害について、当社は責任を負いません。",
   // 방(room) — World 1개 + 나라별 1개. 어느 방인지는 지도 선택이 정한다(/arena).
   // ⚠️ 'World' 는 브랜드 영문 고정(2026-08-11) — 6개국어 모두 같은 글자. 돌아가기 버튼도 같은 글자다
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
@@ -1521,7 +1524,6 @@ const JA: Record<string, string> = {
   // 회차가 연 급수(exam_rounds.open_tiers)에 없는 티어는 숨기지 않고 비활성 + 이 배지로 보여준다
   // — 어떤 급수가 존재하는지 알리는 값이 있어서다.
   "apply.tier_not_open": "この回次は未開設",
-  "apply.tier_not_open_hint": "この回次では申し込めない等級です。他の回次をご確認ください。",
   "apply.owned": "購入済み",
   "apply.owned_cta": "受験チケットを見る",
   "apply.already_applied": "すでに申し込み済みの等級です",
@@ -1717,7 +1719,7 @@ const JA: Record<string, string> = {
   // Hub.tsx 는 오래 한국어 하드코딩이었다(2026-08-07 일괄 이관). 문구를 새로 넣을 때 6개국어를 다 채울 것.
   // ⚠️ 토스트 아이콘은 예전에 문구를 정규식(/부족|필요|오류/)으로 검사해 골랐다 — 번역하면 그대로 깨져서
   //    Hub.tsx 가 종류(kind)를 들고 다니도록 바꿨다. 여기 문구를 고쳐도 아이콘은 영향받지 않는다.
-  "hub.err.insufficient_points": "ポイントが足りません",
+  "hub.err.insufficient_points": "コインが足りません",
   "hub.err.already_owned": "すでに持っている限定アイテムです",
   "hub.err.unauthorized": "ログインが必要です",
   "hub.err.generic": "エラーが発生しました。しばらくしてからもう一度お試しください",
@@ -1776,7 +1778,7 @@ const JA: Record<string, string> = {
   "hub.day_n": "{n}日",
 
   // 토스트
-  "hub.toast.no_points_item": "ポイントが足りません：{name}（{price}P）",
+  "hub.toast.no_points_item": "コインが足りません：{name}（{price}コイン）",
 
   // 구매/교환 완료 팝업
   "hub.buy.purchased": "購入完了！",
@@ -1836,6 +1838,7 @@ const JA: Record<string, string> = {
   "hub.part.char_b_f": "キャラB・女",
   "hub.part.char_c_m": "キャラC・男",
   "hub.part.char_c_f": "キャラC・女",
+  "hub.part.skin_meadow": "草原",
   "hub.part.skin_palace_day": "古宮・昼",
   "hub.part.skin_palace_night": "古宮・夜",
 
@@ -1930,6 +1933,29 @@ const JA: Record<string, string> = {
   "hub.gift.err_invalid_amount": "送る金額が正しくありません",
   "hub.gift.err_too_fast": "同じ友達に送りすぎです。しばらくしてからお試しください",
   "hub.gift.err_send_fail": "送れませんでした",
+
+  // 1:1 inquiry (My Page > Support). Category labels are keyed as `inq.cat.<code>`.
+  "inq.intro": "お問い合わせいただければ、確認のうえご返信します。",
+  "inq.private": "投稿者ご本人と運営のみが閲覧できます。",
+  "inq.write": "問い合わせる",
+  "inq.cat.exam": "受験・試験",
+  "inq.cat.payment": "決済・返金",
+  "inq.cat.account": "アカウント",
+  "inq.cat.arena": "WORLD ARENA",
+  "inq.cat.etc": "その他",
+  "inq.ph_title": "タイトル",
+  "inq.ph_body": "お問い合わせ内容をご記入ください。受験・決済のお問い合わせは、回次と級を一緒にご記入いただくと早く対応できます。",
+  "inq.submit": "問い合わせを送信",
+  "inq.sending": "送信中…",
+  "inq.err_fields": "タイトルと内容をすべて入力してください。",
+  "inq.err_login": "ログインが必要です。",
+  "inq.login_required": "ログイン後にご利用いただけます。",
+  "inq.empty": "まだお問い合わせがありません。",
+  "inq.status_open": "返信待ち",
+  "inq.status_answered": "回答済み",
+  "inq.new_answer": "新しい回答",
+  "inq.answer_at": "回答 · {d}",
+  "inq.no_answer": "まだ回答が登録されていません。",
 }
 
 export default JA

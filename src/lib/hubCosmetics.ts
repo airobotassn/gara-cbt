@@ -16,9 +16,12 @@
 //
 // 새 스킨을 넣을 때
 //   1) `public/hub/skin/<key>/` 에 그림 한 벌.
-//   2) `hub.css` 에 `.hub[data-skin='<key>']` 값 블록 한 벌(기존 palace 블록을 복사해 값만 갈면 된다).
-//   3) 이 파일 `SKINS` 에 한 줄.
-//   4) `shop_catalog` 에 한 행 + 사전 `hub.skin.<key>`.
+//   2) `hub.css` 에 `.hub[data-skin='<key>']` 배경 블록(그림·확대·캐릭터 키/발끝) 한 벌.
+//   3) UI 를 새로 입힐 거면 `SkinUi` 에 이름을 하나 더 만들고 `hub.css` 에 `[data-ui='<이름>']`
+//      값 블록 + 규칙 한 벌(기존 palace 블록을 복사해 값만 갈면 된다).
+//      기존 벌을 그대로 쓸 거면 `ui` 에 그 이름만 적는다.
+//   4) 이 파일 `SKINS` 에 한 줄.
+//   5) `shop_catalog` 에 한 행 + 사전 `hub.part.skin_<key>`.
 
 // ── 캐릭터 ──────────────────────────────────────────────────────────────────
 /** 계열(생김새) — 화면에 한 줄로 이 순서대로 선다. 좌우 버튼이 계열 안에서 성별을 바꾼다. */
@@ -102,13 +105,28 @@ export const charAspect = (key: string) => CHAR_AR[key] ?? CHAR_FALLBACK_AR
  * ⚠️ `key` 는 `hub.css` 의 `.hub[data-skin='<key>']` 블록 이름과 **글자까지 같아야** 한다.
  *    다르면 화면이 값 블록을 못 찾아 판·게이지·스탬프가 통째로 맨몸으로 뜬다.
  */
+/**
+ * 이 스킨이 입는 **UI 한 벌**의 이름 = `.hub` 의 `data-ui` 값.
+ * `base`   = 아무 그림도 안 얹는 원래 카툰 CSS(흰 면 + 두꺼운 외곽선 + SVG 아이콘).
+ * `palace` = 궁궐 9패치 판·게이지·도장·아이콘 한 벌(`public/hub/ui/*`).
+ *
+ * ⚠️ **스킨 이름(`data-skin`)으로 UI 를 고르지 말 것.** 예전엔 CSS 가 `.hub[data-skin]` 이면
+ *    무조건 궁궐 UI 를 얹었는데, 기본 배경(초원)이 생기자 초원 위에 궁궐 판이 그대로 얹혔다.
+ *    급한 대로 선택자를 `palace_night` 하나로 좁혔더니 이번엔 **고궁 낮이 UI 를 잃었다**
+ *    (2026-08-25). 배경과 UI 는 각자 이름을 갖는다 — 그래야 "배경만 다른 두 스킨"이 성립한다.
+ */
+export type SkinUi = 'base' | 'palace'
+
 export interface SkinDef {
-  /** `data-skin` 값 = CSS 값 블록 이름 */
+  /** `data-skin` 값 = 배경 값 블록 이름(`hub.css` 의 `.hub[data-skin='<키>']`) */
   key: string
   /** 상점 카탈로그의 part_key(`shop_catalog`). 소유·구매가 이 값으로 돌아간다. */
   partKey: string
-  /** 레일 아이콘 폴더 — CSS 변수로 못 넘기는 유일한 자리(`<img src>` 라 코드가 알아야 한다). */
-  iconDir: string
+  /** 입는 UI 한 벌 = `data-ui` 값. 같은 벌을 쓰는 스킨끼리 CSS 를 통째로 공유한다. */
+  ui: SkinUi
+  /** 레일 아이콘 폴더 — CSS 변수로 못 넘기는 유일한 자리(`<img src>` 라 코드가 알아야 한다).
+   *  null 이면 원래 쓰던 SVG 아이콘으로 돌아간다(= `ui: 'base'` 와 한 쌍). */
+  iconDir: string | null
   /** 배경 그림. 공유 카드가 이 그림을 캔버스에 깐다(CSS 변수는 캔버스에서 못 읽는다). */
   bg: string
   /** 상점·인벤토리 썸네일. 없으면 배경 그림을 줄여 쓴다. */
@@ -116,26 +134,38 @@ export interface SkinDef {
 }
 
 /**
- * 스킨 목록 — 같은 고궁의 **낮과 밤** 두 장(2026-08-20). 옛 단일 배경(`bg.png`)은 제거됐다.
+ * 스킨 목록 — 기본 초원 + 판매용 고궁 두 장(낮·밤).
  * ⚠️ **첫 항목이 기본**이다. 아무것도 장착 안 한 사람과 모르는 값이 저장된 사람이 전부 여기로
  *    떨어진다(`skinByPart`) — 그래서 첫 항목은 반드시 **값이 0**이어서 전원이 쓸 수 있어야 한다.
  *    값을 매기면 신규 회원 화면에 배경이 없다.
  * ⚠️ 값 0인 스킨은 사지 않아도 장착된다(`hub_equip` 이 price=0 을 예외로 둔다) — 되돌아올 길이다.
  */
 export const SKINS: SkinDef[] = [
-  // 같은 고궁의 **낮**. 값이 0이라 전원이 쓰는 기본 배경이자 첫 화면이다.
+  // 초원 — 값이 0이라 전원이 쓰는 **기본**이자 첫 화면. 비판매(상점에 안 뜨고 보관함에만 있다).
+  //   ⚠️ 이 자리를 고궁 낮에 얹어 쓰지 말 것(2026-08-25 에 실제로 그랬다). 기본은 자기 키를 갖는다 —
+  //      그래야 고궁 낮이 자기 배경·자기 UI 를 그대로 들고 판매용 스킨으로 설 수 있다.
+  {
+    key: 'meadow',
+    partKey: 'skin_meadow',
+    // 기본 초원은 옛 CSS 카드·게이지와 SVG 아이콘을 한 세트로 쓴다 — 그래서 아이콘 폴더가 없다.
+    ui: 'base',
+    iconDir: null,
+    bg: '/hub/bg-meadow-default.png',
+  },
+  // 같은 고궁의 **낮**과 **밤**. 둘 다 코인으로 산다.
+  //   ⚠️ 이 둘은 UI 한 벌(판·게이지·도장·아이콘)을 통째로 공유하고 배경만 다르다 —
+  //      hub.css 도 값 블록 하나(`[data-ui='palace']`)를 둘이 같이 쓰고 --skin-bg 만 각자 덮는다.
   {
     key: 'palace_day',
     partKey: 'skin_palace_day',
+    ui: 'palace',
     iconDir: '/hub/ui',
     bg: '/hub/bg-v2.png',
   },
-  // 같은 고궁의 **밤**. 코인으로 사는 쪽.
-  //   ⚠️ 두 스킨은 UI 한 벌(판·게이지·도장·아이콘)을 통째로 공유하고 배경만 다르다 —
-  //      hub.css 도 값 블록 하나를 둘이 같이 쓰고 --skin-bg 만 각자 덮는다.
   {
     key: 'palace_night',
     partKey: 'skin_palace_night',
+    ui: 'palace',
     iconDir: '/hub/ui',
     bg: '/hub/bg-v5.png',
   },

@@ -662,6 +662,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
         />
       )}
 
+      {/* 사기 경고 — 입력창 바로 위 고정. 목록 안에 두면 대화가 쌓이는 순간 위로 밀려
+          사라지는데, 이 문구가 필요한 시점이 정확히 "누가 뭘 요구해서 답을 치려는 때"다. */}
+      <p className="chat-scam-note">{t('chat.scamNotice')}</p>
+
       {!isFullUser ? (
         <div className="chat-login-cta">
           <span>{t('chat.loginToJoin')}</span>

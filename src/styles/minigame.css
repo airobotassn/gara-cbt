@@ -74,11 +74,6 @@ html.dark .mgp {
 .mgp-head h1 { margin: 0; display: flex; align-items: center; gap: 10px;
   font-size: clamp(26px, 6.5vw, 34px); font-weight: 900; letter-spacing: -.02em; color: var(--ink); }
 .mgp-head p { margin: 5px 0 0; font-size: 14px; font-weight: 700; color: var(--muted); }
-.mgp-count { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px;
-  border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--brand) 42%, transparent);
-  color: var(--brand); font-size: 13px; font-weight: 900; }
-
 /* ── 표지 커버(일러스트 포스터, 가로 나란히) ── */
 .mg-shelf { display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 14px; }
 /* 페이지에선 폭에 맞춰 열 수가 줄어든다(모달은 한 줄 유지).
@@ -140,6 +135,21 @@ html.dark .mg-cover.is-locked .mg-play {
   border-color: rgba(255,255,255,.14);
   box-shadow: 0 5px 0 #1a1f2c, inset 0 2px 3px rgba(255,255,255,.08);
 }
+
+/* ── 잠긴 커버를 눌렀을 때의 안내 토스트 ──
+   ⚠️ 화면 가운데다(하단 아님). /games 목록에선 FAB(왼쪽 아래)·맨위로(오른쪽 아래)가 살아 있어서,
+      390px 폭에선 아래쪽 가운데 띠가 그 둘에 덮인다. 허브 토스트도 같은 이유로 가운데에 선다.
+   ⚠️ pointer-events:none — 누를 것이 없는 알림이라 떠 있는 동안 다른 커버 클릭을 먹으면 안 된다. */
+.mgp-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60;
+  pointer-events: none; max-width: min(88vw, 320px);
+  display: flex; align-items: center; gap: 9px;
+  padding: 13px 18px; border-radius: 14px;
+  background: var(--card); border: 2.5px solid var(--line); color: var(--ink);
+  font-size: 14px; font-weight: 800; text-align: left;
+  box-shadow: 0 6px 0 rgba(var(--shc), .22), 0 10px 30px rgba(0,0,0,.22);
+  animation: mgpToastPop .22s cubic-bezier(.34,1.56,.64,1); }
+.mgp-toast .material-symbols-outlined { flex: 0 0 auto; font-size: 19px; line-height: 1; color: var(--brand); }
+@keyframes mgpToastPop { 0% { transform: translate(-50%, -50%) scale(.85); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
 /* ── 로그인 게이트(/games/:id 를 비로그인으로 열었을 때) — 목록 커버와 같은 스티커 톤의 단일 카드 ── */
 .mg-gate { max-width: 420px; margin: 6vh auto 0; padding: 22px 20px 24px; text-align: center;

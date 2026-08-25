@@ -92,6 +92,14 @@ export default function Checkout() {
   //   ⚠️ 기본값을 true 로 두거나 '동의로 간주' 문구로 대체하지 말 것 — 그건 동의를 받은 게 아니다.
   const [agreed, setAgreed] = useState(false)
 
+  // 결제창을 한 번이라도 띄운 뒤 = 버튼이 '다시 열기' 가 되는 상태.
+  //   엑심베이 SDK 는 창이 닫혔다는 신호를 주지 않는다(스크립트를 열어 확인함 — 콜백 자리가 없다).
+  //   그래서 닫힘을 알아내려 하지 않고, 띄운 직후 그냥 버튼을 되살린다(대부분의 사이트가 이렇게 한다).
+  //   ⚠️ 그래도 결제창이 두 개가 되지 않는 이유 = SDK 가 팝업을 **`popOpen` 이라는 고정된 이름**으로
+  //      열기 때문이다. 같은 이름으로 다시 열면 브라우저가 새 창을 만들지 않고 그 창을 재사용한다.
+  //      주문·FGKey 도 같은 것을 다시 쓰므로(새로 만들지 않는다) 결제 건이 늘어나지도 않는다.
+  const [reopen, setReopen] = useState(false)
+
   // StrictMode 는 개발에서 effect 를 두 번 돌린다 — 막지 않으면 주문이 두 개 생긴다.
   const startedRef = useRef(false)
 
@@ -137,12 +145,17 @@ export default function Checkout() {
       try { sessionStorage.setItem(PRODUCT_HINT_KEY, productType) } catch { /* 없으면 결과 화면이 이북 기준으로 떨어질 뿐이다 */ }
       // 동의를 **결제창을 열기 전에** 결제 건에 남긴다. 실패하면 결제창을 열지 않는다 —
       // 동의 기록 없이 돈만 빠지면 그 건은 나중에 증거가 없다.
-      await agreeTerms(order.orderId)
+      if (!reopen) await agreeTerms(order.orderId) // 동의는 이 주문에 이미 기록됐다 — 다시 열 땐 안 부른다
       const ex = order.eximbay
       if (!ex || !window.EXIMBAY) throw new Error(t('pay.error_generic'))
       // ⚠️ 페이로드를 여기서 만들지 않는다 — FGKey 는 서버가 /ready 에 보낸 값들의 서명이라
       //    금액 형식·언어·URL 이 한 글자만 달라도 불일치로 결제가 실패한다. 서버가 준 것을 그대로 넘긴다.
       window.EXIMBAY.request_pay({ fgkey: ex.fgkey, ...ex.payload })
+      // 결제창을 띄웠으면 버튼을 곧바로 되살린다. 창을 X 로 닫아도 우리에겐 아무 신호가 안 오므로,
+      // 잠가두면 닫고 나온 사람이 **안 눌리는 버튼만 남은 화면에 갇힌다**(그게 원래 증상이었다).
+      // 결제를 마치면 팝업이 결과 주소를 이 창에 넘기고 스스로 닫으므로 이 화면은 어차피 사라진다.
+      setPaying(false)
+      setReopen(true)
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('pay.error_generic'))
       setPaying(false)
@@ -327,14 +340,22 @@ export default function Checkout() {
                 ? t('pay.moving')
                 : phase !== 'ready'
                   ? t('pay.preparing')
-                  : `${usdc(order?.amount ?? 0, lang)} ${t('pay.pay_button')}`}
+                  : reopen
+                    ? t('pay.reopen')
+                    : `${usdc(order?.amount ?? 0, lang)} ${t('pay.pay_button')}`}
             </button>
             {/* 버튼이 왜 안 눌리는지 말해준다 — 비활성 버튼만 두면 고장으로 읽힌다. */}
-            {phase === 'ready' && !agreed && (
+            {phase === 'ready' && !agreed ? (
               <p className="mt-3 text-center font-body-md text-[15px] text-on-surface-variant break-keep">
                 {t('pay.terms_required')}
               </p>
-            )}
+            ) : phase === 'ready' && reopen && !paying ? (
+              /* 창을 닫았는지 우리는 모른다 — 그래서 "닫혔다"가 아니라 "닫으셨다면"으로 말한다.
+                 아직 결제되지 않았다는 한 줄이 핵심이다(닫고 나간 사람이 결제된 줄 알면 안 된다). */
+              <p className="mt-3 text-center font-body-md text-[15px] text-on-surface-variant break-keep">
+                {t('pay.reopen_hint')}
+              </p>
+            ) : null}
           </>
         )}
       </main>

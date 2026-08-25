@@ -220,7 +220,7 @@ export default function Ranking() {
   return (
     <div className="wrap hof-wrap">
       {/* 랭킹 진입점이 허브(CARI) 도크 CTA 라 뒤로가기도 허브로 */}
-      <TopBar to="/hub" label={t('common.cari')} />
+      <TopBar to="/hub" label={t('common.my_home')} />
 
       {/* 제목은 페이지 전체의 제목이라 탭바 **위**, 전체 폭 가운데다.
           (한때 본문 안에 있었는데, 2단이 되면서 왼쪽 칸 안에 갇혀 화면 기준으로 왼쪽에 치우쳐 보였다.
@@ -406,6 +406,19 @@ function PersonalBoard({
   const podium = [top[1], top[0], top[2]] // 2 · 1 · 3
   const podClass = ['p2', 'p1', 'p3']
   const rest = top.slice(3)
+
+  // ⚠️ **창이 아직 안 넘치면 스크롤 이벤트가 영영 안 온다** → 넘칠 때까지 미리 채운다.
+  //    첫 화면은 4~10위 7줄뿐이라 창을 못 채우는 경우가 흔하고(데스크톱 2단이 늘 그렇다),
+  //    그러면 onScroll 이 한 번도 안 불려 무한 스크롤이 **시작조차 못 한다**(2026-08-25 실측:
+  //    1920×911 에서 창 662px / 내용 662px → 스크롤 0).
+  //    ⚠️ 멈추는 건 위 CSS 상한이다 — 한 페이지(50명)만 붙으면 어느 화면에서든 창을 넘어
+  //       이 효과가 손을 떼고 그 뒤는 onScroll 이 이어받는다. 상한을 풀면 영영 안 넘쳐서 계속 받는다.
+  useEffect(() => {
+    if (!hasMore || paging) return
+    const el = listRef.current
+    if (!el) return
+    if (el.scrollHeight - el.clientHeight < 40) onNeedMore()
+  }, [hasMore, paging, more.length, listRef, onNeedMore])
 
   return (
     <>

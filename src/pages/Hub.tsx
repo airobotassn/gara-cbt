@@ -1,7 +1,7 @@
 // 캐릭터 허브(실동작) — /demo 첫 시안 기반 단일 로비 화면.
 //   출석·상점·쿠폰·칭호는 전부 실제 백엔드 호출로 동작하며, 상세 동작은 팝업(모달)에서 처리한다.
 //   초기 재화·보유파츠·스탬프·천장·출석여부·카탈로그·쿠폰·칭호는 get-hub 로 하이드레이트(RLS 잠금 테이블이라 이 함수만 읽음).
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { ensureCheckedIn } from '../lib/autoCheckin'
@@ -54,16 +54,24 @@ function Ic({ n, s = 24 }: { n: string; s?: number }) {
 }
 
 /** 허브 스킨. 화면(마크업)은 한 벌이고 테마는 **값과 그림만** 갈아끼운다 —
- *  값 = `hub.css` 의 `.hub[data-skin='<이름>']` 한 블록, 그림 = 아이콘 폴더 + 그 블록의 URL.
+ *  배경 = `hub.css` 의 `.hub[data-skin='<이름>']`, UI 한 벌 = `.hub[data-ui='<이름>']`,
+ *  그림 = 아이콘 폴더(`SkinDef.iconDir`) + 그 블록들의 URL.
  *  2026-08-20: 고정 상수였던 것을 **장착값**으로 바꿨다(상점에서 스킨을 판다).
- *  ⚠️ 스킨 이름은 화면 코드에 흩어져 있지 않다 — 루트의 `data-skin` 하나와 아이콘 폴더뿐이고,
+ *  ⚠️ 스킨 이름은 화면 코드에 흩어져 있지 않다 — 루트의 `data-skin`·`data-ui` 와 아이콘 폴더뿐이고,
  *     나머지는 전부 CSS 가 그 속성에서 파생한다. 그래서 갈아입으면 화면이 통째로 바뀐다.
+ *  ⚠️ **배경과 UI 는 축이 둘이다**(2026-08-25). 고궁 낮·밤은 배경만 다르고 UI 는 한 벌을 같이 쓰며,
+ *     기본 초원은 아무 그림도 안 얹는 옛 카툰 CSS(`data-ui='base'`)를 그대로 쓴다.
  *  목록·경로의 단일 출처 = `src/lib/hubCosmetics.ts` 의 `SKINS`. */
-type HubUiIconName = 'calendar' | 'shop' | 'medal' | 'invite'
+type HubUiIconName = 'calendar' | 'shop' | 'medal' | 'invite' | 'ranking'
+/** 스킨 그림이 없을 때 대신 그릴 기본 SVG(`ICONS` 의 키). 이름이 다른 것만 적는다. */
+const HUB_ICON_FALLBACK: Partial<Record<HubUiIconName, string>> = { invite: 'share', ranking: 'star' }
 
-/** 레일 아이콘. 폴더가 없으면 원래 쓰던 SVG 로 돌아간다 — 스킨은 '덧입히는 것'이지 전제가 아니다. */
-function HubUiIcon({ n, dir }: { n: HubUiIconName; dir: string | null }) {
-  if (!dir) return <Ic n={n === 'invite' ? 'share' : n} s={42} />
+/** 허브 아이콘. 폴더가 없으면 원래 쓰던 SVG 로 돌아간다 — 스킨은 '덧입히는 것'이지 전제가 아니다.
+ *  ⚠️ **스킨 PNG 를 마크업에 직접 박지 말 것.** 랭킹 CTA 가 `<img src="/hub/ui/icon-ranking.png">` 를
+ *     그대로 들고 있었는데, 그 그림에 크기를 주는 건 궁궐 스킨 CSS 뿐이라 기본 배경에서는
+ *     512px 원본이 통째로 튀어나와 도크와 캐릭터를 덮었다(2026-08-25). 아이콘은 전부 여기를 지난다. */
+function HubUiIcon({ n, dir, s = 42 }: { n: HubUiIconName; dir: string | null; s?: number }) {
+  if (!dir) return <Ic n={HUB_ICON_FALLBACK[n] ?? n} s={s} />
   return <img className="hub-ui-icon" src={`${dir}/icon-${n}.png`} alt="" aria-hidden="true" />
 }
 
@@ -255,6 +263,10 @@ export default function Hub() {
    *     전부 바뀌는데, 그 자산들은 CSS 변수 안에만 있어서 코드가 경로를 알지 못한다.
    *     그래서 **진짜 화면에 얹는다** — 그러면 위치가 어긋날 수가 없고 구현도 이쪽이 더 간단하다. */
   const [previewSkin, setPreviewSkin] = useState<string | null>(null)
+  /** 입어보기를 시작한 탭 — '되돌리기'가 여기로 돌려보낸다.
+   *  ⚠️ state 가 아니라 ref 다. 이 값이 바뀌어도 다시 그릴 게 없고(모달은 닫혀 있다),
+   *     state 로 두면 입어보기를 시작할 때 화면이 한 번 더 도는 값이 하나 늘 뿐이다. */
+  const tryOnFrom = useRef<ClosetTab>('shop')
   const [charPick, setCharPick] = useState<string | null>(null) // 고른 칸(확정 전)
   const [charSaving, setCharSaving] = useState(false)
   const [tutorialStep, setTutorialStep] = useState(0)
@@ -466,6 +478,9 @@ export default function Hub() {
     // 스킨은 창에 그리지 않고 **화면에 입혀 본다**(위 previewSkin 주석 참고).
     //   모달을 닫는 게 핵심이다 — 안 닫으면 정작 바뀐 화면이 모달에 가려 안 보인다.
     if (isSkinKey(key)) {
+      // ⚠️ **떠나온 탭을 적어 둔다.** '되돌리기'는 보던 자리로 돌려보내는 버튼인데, 돌아갈 곳을
+      //    보관함으로 못박아 두면 상점에서 입어본 사람이 엉뚱한 탭에 떨어져 자기가 보던 진열을 잃는다.
+      tryOnFrom.current = closetTab
       setPreviewSkin(key)
       setModal(null)
       return
@@ -473,10 +488,10 @@ export default function Hub() {
     setPvLevel(isCharKey(key) && owned.has(key) ? arenaLevelForScore(seasonTotal) : CHAR_MIN_LEVEL)
     setPreview(key)
   }
-  /** 입어보기 끝 — 원래 스킨으로 돌아가고 **보던 자리(꾸미기 모달)로 되돌린다.** */
+  /** 입어보기 끝 — 원래 스킨으로 돌아가고 **떠나온 그 탭으로** 되돌린다(상점에서 왔으면 상점으로). */
   function endTryOn(reopen = true) {
     setPreviewSkin(null)
-    if (reopen) { setClosetTab('items'); setModal('closet') }
+    if (reopen) { setClosetTab(tryOnFrom.current); setModal('closet') }
   }
 
   // ── 캐릭터 · 스킨 ──────────────────────────────────────────────────────────
@@ -725,7 +740,7 @@ export default function Hub() {
 
   return (
     // ⚠️ 입어보기 띠는 화면 맨 위 고정이라 그대로 두면 뒤로가기 줄을 덮는다 → 그때만 위를 비운다.
-    <div className={`hub${previewSkin ? ' is-tryon' : ''}`} data-skin={skin.key}>
+    <div className={`hub${previewSkin ? ' is-tryon' : ''}`} data-skin={skin.key} data-ui={skin.ui}>
       {/* 무대 = 배경 사진 + 캐릭터, 화면에 붙은 한 쌍(2026-08-14 레퍼런스: 전체화면 사진 위 정중앙 캐릭터).
           ⚠️ 그림 URL·크기·발끝 위치는 **여기 없다** — 전부 hub.css 의 스킨 값 블록이다.
              그래서 스킨을 바꿔도 이 마크업은 그대로다(그게 스킨 구조의 목적이다).
@@ -889,7 +904,7 @@ export default function Hub() {
           {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
           <Link className="cta-main" to="/ranking">
             <span className="cta-star" aria-hidden="true">
-              <img src="/hub/ui/icon-ranking.png" alt="" />
+              <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
             </span>
             {t('common.ranking')}
           </Link>
@@ -963,7 +978,7 @@ export default function Hub() {
                                   스킨이 화면을 어떻게 바꾸는지도 알 수 없다 — 사기 전에 크게 볼 길이 필요하다. */}
                               <button className="hub-shop-thumb pv-open" onClick={() => openPreview(c.partKey)} aria-label={t('hub.closet.preview')}>
                                 <CosmeticThumb partKey={c.partKey} />
-                                <span className="pv-mag" aria-hidden="true">⌕</span>
+                                <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                               </button>
                               {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
                                   안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
@@ -996,7 +1011,7 @@ export default function Hub() {
                       <div key={k} className={`closet-item${charKey === k ? ' on' : ''}`}>
                         <button className="closet-item-thumb pv-open" onClick={() => openPreview(k)} aria-label={t('hub.closet.preview')}>
                           <CharArt charKey={k} level={arenaLv} className="closet-char-img" />
-                          <span className="pv-mag" aria-hidden="true">⌕</span>
+                          <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                         </button>
                         <span className="closet-item-name">{partName(k, t)}</span>
                         <button className="closet-item-act" onClick={() => equip('character', k)} disabled={charSaving || charKey === k}>
@@ -1017,7 +1032,7 @@ export default function Hub() {
                     <div key={sk.partKey} className={`closet-item${skinPart === sk.partKey ? ' on' : ''}`}>
                       <button className="closet-item-thumb pv-open" onClick={() => openPreview(sk.partKey)} aria-label={t('hub.closet.preview')}>
                         <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
-                        <span className="pv-mag" aria-hidden="true">⌕</span>
+                        <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                       </button>
                       <span className="closet-item-name">{partName(sk.partKey, t)}</span>
                       <button className="closet-item-act" onClick={() => equip('skin', sk.partKey)} disabled={skinPart === sk.partKey}>
@@ -1332,8 +1347,13 @@ export default function Hub() {
         return (
           <div className="tryon" role="status">
             <span className="tryon-lab">
-              {t('hub.closet.tryon_on')}
-              <b>{partName(previewSkin, t)}</b>
+              {/* '미리보기 중' 은 이 띠의 전부다 — 회색 잔글씨로 두면 사람이 산 줄 알고 나간다.
+                  그래서 눈 아이콘 + 노란 배지로 띄우고, 옆에 무엇을 보고 있는지(스킨 이름)를 붙인다. */}
+              <span className="tryon-tag">
+                <span className="material-symbols-outlined">visibility</span>
+                {t('hub.closet.tryon_on')}
+              </span>
+              <b className="tryon-name">{partName(previewSkin, t)}</b>
             </span>
             <div className="tryon-act">
               {/* 되돌리기가 먼저다 — 되돌릴 수 있다는 걸 먼저 보여줘야 마음 놓고 눌러본다. */}

@@ -726,11 +726,11 @@ html.dark body:has(.hof-wrap) {
     column-gap: 32px;
     align-content: start;
   }
-  .hof-body > .hof-podium { grid-area: pod; align-self: end; transform: translateY(-20px); }
-  .hof-body > .hof-mebar { grid-area: mebar; align-self: start; margin-top: 0; transform: translateY(-20px); }
+  .hof-body > .hof-podium { grid-area: pod; align-self: end; transform: translateY(-56px); }
+  .hof-body > .hof-mebar { grid-area: mebar; align-self: start; margin-top: 0; transform: translateY(-56px); }
   /* 그리드에선 flex 속성이 무시된다 → 창은 내용만큼 자란다(stretch 면 빈 보드에서 거대한 빈 상자가 된다).
      center = 왼쪽 칸(시상대+내 순위)과 세로 중심을 맞춘다. start 로 두면 목록만 위에 붙어 아래가 빈다. */
-  .hof-body > .hof-listwin { grid-area: list; align-self: center; max-height: none; }
+  .hof-body > .hof-listwin { grid-area: list; align-self: center; max-height: calc(100dvh - 210px); }
   /* 비로그인·지역 미설정 안내 카드는 단을 나눌 게 없으니 통으로 */
   .hof-body > .panel-card { grid-column: 1 / -1; }
 }
