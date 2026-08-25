@@ -34,6 +34,8 @@ export interface StartExamResponse {
   tier?: string | null
   /** 이 응시를 열어준 응시권. 소진(consumed)된 그 행이다. */
   ticket?: { id: string; roundId: string; tier: string } | null
+  /** 중간 저장된 답안 — 끊겼다 돌아온 사람이 풀던 자리에서 이어가게 한다(하트비트가 저장한 값). */
+  saved?: { number: number; selectedIndex: number | null; answerText: string | null }[]
 }
 
 // 제출 시 보내는 답안

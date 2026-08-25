@@ -13,15 +13,15 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0
 
 export interface ReentryBlock {
   error: string
-  /** already_done = 제출 완료(1인 1회) · attempt_voided = 이미 무효 · reentry_voided = 이번에 무효 처리됨 */
-  code: 'reentry_voided' | 'already_done' | 'attempt_voided'
+  /** already_done = 제출 완료(1인 1회) · attempt_voided = 이미 무효 · reentry_blocked = 진행중인 응시가 있어 거절 */
+  code: 'reentry_blocked' | 'already_done' | 'attempt_voided'
   attemptId: string
   alreadyDone?: boolean
 }
 
 /** 응시자에게 그대로 보여지는 문구. 사유와 다음 행동(문의)까지 말해야 한다 — 옆에서 설명해 줄 사람이 없다. */
 const MESSAGE =
-  '응시 중 시험 화면을 벗어나 응시가 무효 처리되었습니다. 기기·네트워크 문제로 중단된 경우 문의해 주시면 확인 후 재응시를 도와드립니다.'
+  '이미 시작한 응시가 있어 새로 시작할 수 없습니다. 기기·네트워크 문제로 중단되셨다면 문의해 주시면 확인 후 다시 응시하실 수 있게 도와드립니다.'
 
 /**
  * 이 응시권으로 이미 시작해놓고 안 끝낸 응시가 있으면 **무효로 만들고** 막을 내용을 돌려준다.
@@ -66,21 +66,21 @@ export async function blockOnReentry(
     return { error: MESSAGE, code: 'attempt_voided', attemptId: live.id as string }
   }
 
+  // ⛔ **여기서 응시를 죽이지 않는다(2026-08-13 결정).** 예전엔 새 진입이 오면 진행중이던 응시를
+  //    voided 로 박았는데, 그러면 A 가 시험 보는 중에 다른 기기에서 시작을 한 번 누르기만 해도
+  //    **A 의 응시가 죽는다.** A 는 화면에서 계속 풀다가 제출할 때야 알게 된다.
+  //    막아야 할 건 "새로 들어오는 쪽" 하나뿐이라, 거절만 하고 원래 응시는 그대로 둔다.
+  //    (못 들어간 사람이 진짜 사고였다면 문의 → 관리자 복구로 푼다. 결과는 죽이는 것과 같고
+  //     남이 보던 시험을 건드리지 않는다는 것만 다르다.)
   const lastSeen = live.last_seen_at ? new Date(live.last_seen_at as string).getTime() : null
   const entries = (live.entry_count as number) ?? 1
 
+  // 진입 시도 자체는 남긴다 — 복구 판단의 자료이자, 상습적인 재진입을 알아보는 유일한 흔적이다.
   await admin
     .from('exam_attempts')
-    .update({
-      status: 'voided',
-      void_reason: 'reentry',
-      submitted_at: new Date(now).toISOString(),
-      entry_count: entries + 1,
-    })
+    .update({ entry_count: entries + 1 })
     .eq('id', live.id)
-    .eq('status', live.status) // 동시 요청이 이미 상태를 바꿨으면 덮어쓰지 않는다
 
-  // 복구 판단에 필요한 정황을 남긴다. 사람이 이걸 보고 풀어줄지 정한다.
   await admin.from('exam_session_events').insert({
     attempt_id: live.id,
     kind: 'reentry',
@@ -95,5 +95,5 @@ export async function blockOnReentry(
     },
   })
 
-  return { error: MESSAGE, code: 'reentry_voided', attemptId: live.id as string }
+  return { error: MESSAGE, code: 'reentry_blocked', attemptId: live.id as string }
 }

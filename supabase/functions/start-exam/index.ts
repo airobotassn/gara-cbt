@@ -98,17 +98,45 @@ Deno.serve(async (req) => {
     const admin = adminClient()
     const now = Date.now()
 
+    // ── 읽기 한 파 ────────────────────────────────────────────────────────
+    // 아래 ⓪·①·④ 와 '다 쓴 응시권'·'복구 유예' 는 **상수 키 또는 user 만** 쓰고 서로의 결과를
+    // 인자·조건으로 쓰지 않는다. 예전엔 줄 세워서, 시험 시작 버튼을 누른 사람이 문항을 보기까지
+    // 이 다섯 왕복을 차례로 기다렸다.
+    //   ⚠️ **판정 순서는 아래 그대로다** — 잠금이면 여전히 제일 먼저 503 이 나간다.
+    //      잠금 중에도 나머지 조회가 같이 나가지만 전부 읽기라 아무것도 바꾸지 않는다.
+    //   ⚠️ 여기서 묶는 건 **읽기뿐**이다. 아래 ⑥부터의 쓰기(다른 응시 만료 → 응시 생성 → 답안 깔기 →
+    //      응시권 소진)는 순서가 곧 정확성이라(⑥ 주석 참고) 손대지 않는다.
+    //   ⚠️ admin_users 는 user.email 이 있을 때만 던진다 — 빈 값으로 조회하면 조건이 무의미해진다.
+    const [lockRes, ticketRes, adminRowRes, spentRes] = await Promise.all([
+      admin.from('site_settings').select('key, value').in('key', ['exam_start_locked', 'exam_start_lock_note']),
+      // ⚠️ ticketId 로 먼저 좁히지 않는다. 남의 ticketId 를 넣어도 이 user_id 스코프 밖으로 나가지 못해야 한다 —
+      //    ticketId 는 마이페이지 응답·응시 준비 화면 등 클라 표면에 상시 노출되는 값이라
+      //    "알면 곧 소진 권한" 이 되는 순간 남의 응시권을 태워버릴 수 있다.
+      admin
+        .from('exam_tickets')
+        .select(EXAM_TICKET_COLS)
+        .eq('user_id', user.id)
+        .in('status', ['issued', 'consumed'])
+        .order('issued_at', { ascending: true }),
+      user.email
+        ? admin.from('admin_users').select('email').eq('email', user.email).maybeSingle()
+        : Promise.resolve({ data: null }),
+      // 이미 다 쓴(제출·무효) 응시권 — 후보에서 빼야 자동선택이 남은 응시권을 정확히 고른다.
+      admin
+        .from('exam_attempts')
+        .select('ticket_id')
+        .eq('user_id', user.id)
+        .in('status', ['submitted', 'voided'])
+        .not('ticket_id', 'is', null),
+    ])
+
     // ---------- ⓪ 응시 시작 잠금 ----------
     // 배포·DB 작업 중에 새 응시가 시작되면 그 사람 시험이 날아간다. 관리자가 켜면 **새 응시만** 막는다.
     // ⚠️ 이미 보고 있는 사람은 막지 않는다 — 아래 재진입 경로(같은 응시로 돌아가기)는 이 검사보다 뒤에 있고,
     //    여기서 걸리는 건 '새로 시작'뿐이다. 잠금 때문에 시험 중인 사람이 제출을 못 하면 더 큰 사고다.
     {
-      const { data: lock } = await admin
-        .from('site_settings')
-        .select('key, value')
-        .in('key', ['exam_start_locked', 'exam_start_lock_note'])
       const map: Record<string, string> = {}
-      for (const r of (lock ?? []) as { key: string; value: string }[]) map[r.key] = r.value
+      for (const r of (lockRes.data ?? []) as { key: string; value: string }[]) map[r.key] = r.value
       if (map.exam_start_locked === '1') {
         return json(
           {
@@ -124,14 +152,8 @@ Deno.serve(async (req) => {
     // ⚠️ ticketId 로 먼저 좁히지 않는다. 남의 ticketId 를 넣어도 이 user_id 스코프 밖으로 나가지 못해야 한다 —
     //    ticketId 는 마이페이지 응답·응시 준비 화면 등 클라 표면에 상시 노출되는 값이라
     //    "알면 곧 소진 권한" 이 되는 순간 남의 응시권을 태워버릴 수 있다.
-    const { data: tRows, error: tErr } = await admin
-      .from('exam_tickets')
-      .select(EXAM_TICKET_COLS)
-      .eq('user_id', user.id)
-      .in('status', ['issued', 'consumed'])
-      .order('issued_at', { ascending: true })
-    if (tErr) return json({ error: tErr.message }, 500)
-    const owned = (tRows ?? []) as unknown as TicketRow[]
+    if (ticketRes.error) return json({ error: ticketRes.error.message }, 500)
+    const owned = (ticketRes.data ?? []) as unknown as TicketRow[]
     if (owned.length === 0) {
       return json(
         { error: '응시권이 없습니다. 원서접수(결제) 후 응시할 수 있습니다.', code: 'no_ticket' },
@@ -142,32 +164,29 @@ Deno.serve(async (req) => {
     // ---------- ② 회차 ----------
     const roundIds = [...new Set(owned.map((t) => t.round_id))]
     const roundMap = new Map<string, RoundRow>()
-    {
-      const { data: rRows } = await admin
-        .from('exam_rounds')
-        .select('id, kind, published, exam_date, exam_start_at, exam_end_at, title_i18n')
-        .in('id', roundIds)
-      for (const r of (rRows ?? []) as unknown as RoundRow[]) roundMap.set(r.id, r)
-    }
-
-    // ---------- ③ 결제가 살아있는지 ----------
-    // 환불은 응시권을 자동으로 죽이지 않는다(회수는 사람이 하는 목록으로만 남는 방침).
-    // 여기서 안 보면 "돈은 돌려받고 시험은 치른" 상태가 그대로 통과하고, 합격하면 자격번호까지 채번된다
-    // (자격번호는 한번 나가면 회수가 안 된다). 조회 한 번으로 막는다.
     const payIds = [
       ...new Set(
         owned.filter((t) => t.source === 'pg' && t.payment_id).map((t) => t.payment_id as string),
       ),
     ]
     const paidSet = new Set<string>()
-    if (payIds.length > 0) {
-      const { data: pRows } = await admin
-        .from('payments')
-        .select('id, status')
-        .in('id', payIds)
-        .eq('status', 'paid')
-      for (const p of (pRows ?? []) as { id: string }[]) paidSet.add(p.id)
-    }
+    // ⚠️ 둘 다 위 응시권 목록에서 뽑은 id 배열만 쓰고 서로를 참조하지 않는다 → 한 파로 던진다.
+    const [roundsRes, paysRes] = await Promise.all([
+      admin
+        .from('exam_rounds')
+        .select('id, kind, published, exam_date, exam_start_at, exam_end_at, title_i18n')
+        .in('id', roundIds),
+      payIds.length > 0
+        ? admin.from('payments').select('id, status').in('id', payIds).eq('status', 'paid')
+        : Promise.resolve({ data: null }),
+    ])
+    for (const r of (roundsRes.data ?? []) as unknown as RoundRow[]) roundMap.set(r.id, r)
+    for (const p of (paysRes.data ?? []) as { id: string }[]) paidSet.add(p.id)
+
+    // ---------- ③ 결제가 살아있는지 ----------
+    // 환불은 응시권을 자동으로 죽이지 않는다(회수는 사람이 하는 목록으로만 남는 방침).
+    // 여기서 안 보면 "돈은 돌려받고 시험은 치른" 상태가 그대로 통과하고, 합격하면 자격번호까지 채번된다
+    // (자격번호는 한번 나가면 회수가 안 된다). 조회 한 번으로 막는다.
 
     // ---------- ④ 재응시 예외 계정 ----------
     // 관리자(루트/admin_users) 또는 RETAKE_ALLOW_EMAILS — 테스트/감독용.
@@ -176,8 +195,7 @@ Deno.serve(async (req) => {
     const email = (user.email ?? '').toLowerCase()
     const isAdmin =
       (!!email && email === ROOT_ADMIN.toLowerCase()) ||
-      (!!user.email &&
-        (await admin.from('admin_users').select('email').eq('email', user.email).maybeSingle()).data != null)
+      (!!user.email && adminRowRes.data != null)
     const allowList = (Deno.env.get('RETAKE_ALLOW_EMAILS') ?? '')
       .toLowerCase()
       .split(',')
@@ -188,36 +206,16 @@ Deno.serve(async (req) => {
     // 이미 다 쓴(제출·무효) 응시권 — 후보에서 빼야 자동선택이 남은 응시권을 정확히 고른다.
     // 안 빼면 응시권 2장 중 1장을 쓴 사람이 pick_ticket 으로 튕기고, 골라도 409 를 받는다.
     const spent = new Set<string>()
-    {
-      const { data: usedRows } = await admin
-        .from('exam_attempts')
-        .select('ticket_id')
-        .eq('user_id', user.id)
-        .in('status', ['submitted', 'voided'])
-        .not('ticket_id', 'is', null)
-      for (const r of (usedRows ?? []) as { ticket_id: string | null }[]) {
-        if (r.ticket_id) spent.add(r.ticket_id)
-      }
+    for (const r of (spentRes.data ?? []) as { ticket_id: string | null }[]) {
+      if (r.ticket_id) spent.add(r.ticket_id)
     }
 
-    // ---------- ④-b 복구 유예 ----------
-    // 관리자가 복구해 준 응시는 **회차의 응시 기간이 닫혔어도** 들어갈 수 있어야 한다.
-    // 안 그러면 "마지막 날 저녁에 PC 가 뻗음 → 다음 날 처리 → 응시창이 이미 닫힘" 에서
-    // 복구가 아무 의미가 없다(관리자가 24시간 상주하지 않는 한 그게 흔한 경우다).
-    // 유예 기한은 복구할 때 관리자가 정한다(exam_attempts.resume_deadline).
-    const resumeGrace = new Map<string, string>() // ticket_id → 유예 기한
-    {
-      const { data: gRows } = await admin
-        .from('exam_attempts')
-        .select('ticket_id, resume_deadline')
-        .eq('user_id', user.id)
-        .not('reinstated_at', 'is', null)
-        .not('ticket_id', 'is', null)
-        .gt('resume_deadline', new Date(now).toISOString())
-      for (const r of (gRows ?? []) as { ticket_id: string | null; resume_deadline: string }[]) {
-        if (r.ticket_id) resumeGrace.set(r.ticket_id, r.resume_deadline)
-      }
-    }
+    // ⛔ **복구해도 응시 기간(10일) 밖에서는 못 들어간다(2026-08-13 결정).**
+    //    예전엔 복구할 때 관리자가 별도 기한을 줘서 회차가 닫혀도 들어갈 수 있었는데, 규칙을
+    //    "10일 안에만" 으로 정리하면서 걷어냈다. 마지막 날 저녁에 끊겨 다음 날 처리되는 사람은
+    //    응시를 못 한다 — 열흘을 줬는데 마지막 날 밤에 시작한 쪽의 몫이라는 판단이다.
+    //    ⚠️ 그래서 관리자 화면은 **기간이 이미 끝났으면 그렇게 보여줘야 한다**. 안 그러면
+    //       복구를 눌러놓고 왜 안 되냐가 된다(Admin.tsx 의 InterruptionPanel).
 
     // ---------- ⑤ 지금 쓸 수 있는 응시권만 남기기 ----------
     const usable: { ticket: TicketRow; round: RoundRow }[] = []
@@ -235,10 +233,7 @@ Deno.serve(async (req) => {
         blocked ??= '결제가 취소·환불된 응시권입니다. 운영팀에 문의해 주세요.'
         continue
       }
-      // 관리자가 복구해 준 응시권 — 아래 기간 검사들을 건너뛴다(그게 복구의 의미다).
-      // 유효기간·응시창은 둘 다 회차 일정에서 나오는 값이라, 복구 유예가 있으면 둘 다 넘긴다.
-      const grace = resumeGrace.get(t.id)
-      if (!grace && t.expires_at && Date.parse(t.expires_at) < now) {
+      if (t.expires_at && Date.parse(t.expires_at) < now) {
         blocked ??= '응시권 유효기간이 지났습니다.'
         continue
       }
@@ -247,7 +242,7 @@ Deno.serve(async (req) => {
         continue
       }
       // 응시 창(KST) 판정의 정본. 여기서 직접 날짜를 비교하지 않는다.
-      const open: boolean = examWindowOpen(round) || Boolean(grace)
+      const open: boolean = examWindowOpen(round)
       if (!open) {
         const b = windowBounds(round)
         // 경계가 아예 없는 회차(일정 미정·상시)는 '아직/지남' 어느 쪽도 아니다 — 뭉뚱그리지 말고 따로 말한다.
@@ -406,14 +401,18 @@ Deno.serve(async (req) => {
       const blocked = await blockOnReentry(admin, user.id, ticket.id, now)
       if (blocked) return json(blocked, 409)
 
-      // 복구된 응시 — 그 응시로 돌아간다(문항 세트는 그대로).
+      // 복구된 응시 — 그 응시로 돌아간다. 문항도 답안도 그대로고, **남은 시간도 그대로**다.
       //
-      // ⛔ **제한시간은 처음부터 다시 준다**(started_at = 지금).
-      //    "남은 시간만 복원" 을 하려면 중단 시점의 답안·경과가 실시간으로 저장돼 있어야 하는데,
-      //    답안은 **제출할 때 한 번에** 올라간다(attempt_answers 는 시작 시 빈 행으로만 깔린다).
-      //    그래서 시간만 깎아 돌려주면 **백지에서 짧은 시간**으로 다시 하는 셈이라 처음부터 다시보다 나쁘다.
-      //    그걸 맞추자고 매 클릭을 DB 에 밀어넣는 건 이 한 경우를 위해 치를 비용이 아니다.
-      const resumedStart = new Date(now).toISOString()
+      // ⛔ **시계를 끊긴 지점에서 다시 켠다.** 끊긴 시각(last_seen_at)까지 쓴 시간만 소비된 것으로 치고,
+      //    started_at 을 `지금 − 그 시간` 으로 옮긴다. 그러면 나가 있던 시간은 안 깎이고 남은 시간이 보존된다.
+      //    ⚠️ **재진입 시점에 계산해야 한다.** 복구를 눌러준 시점에 맞추면, 관리자가 승인해놓고
+      //       응시자가 몇 시간 뒤에 들어올 때 그 사이가 전부 흘러가 복구가 무의미해진다.
+      //    ⚠️ 이게 성립하는 건 답안이 하트비트로 저장되기 때문이다(exam-session). 답이 안 남으면
+      //       시간만 깎인 백지가 되어 처음부터 다시보다 나쁘다 — 둘은 한 쌍이다.
+      const startedMs = live.started_at ? Date.parse(live.started_at as string) : now
+      const deadMs = live.last_seen_at ? Date.parse(live.last_seen_at as string) : startedMs
+      const usedMs = Math.max(0, Math.min(now - startedMs, deadMs - startedMs))
+      const resumedStart = new Date(now - usedMs).toISOString()
       await admin
         .from('exam_attempts')
         .update({
@@ -422,7 +421,6 @@ Deno.serve(async (req) => {
           // 관리자가 승인한 **그 한 번의 복귀**만 통과시킨다. 또 끊기면 다시 문의 → 다시 복구다
           // (코드가 횟수를 세는 게 아니라, 매번 사람이 정한다).
           reinstated_at: null,
-          resume_deadline: null,
           entry_count: entries + 1,
         })
         .eq('id', live.id)
@@ -491,9 +489,23 @@ Deno.serve(async (req) => {
     // 0행이어도 실패로 보지 않는다 — 다른 요청이 먼저 소진한 것이고 응시는 이미 만들어져 있다.
     if (ticket.status === 'issued') await consumeTicket(admin, ticket.id, user.id)
 
+    // 중간 저장된 답안 — 끊겼다 돌아온 사람이 **풀던 자리에서 이어가게** 하는 값이다.
+    // 하트비트가 저장해 둔 것이고(exam-session), 처음 시작한 응시면 전부 비어 있다.
+    // ⚠️ 정답은 절대 싣지 않는다 — 여기에 is_correct·correct_index 를 얹으면 응시 중에 답이 새어나간다.
+    const { data: draftRows } = await admin
+      .from('attempt_answers')
+      .select('number, selected_index, answer_text')
+      .eq('attempt_id', attemptId)
+      .order('number', { ascending: true })
+
     // 정답(correct_index) 제외하고 반환
     return json({
       attemptId,
+      saved: (draftRows ?? []).map((r) => ({
+        number: r.number as number,
+        selectedIndex: (r.selected_index as number | null) ?? null,
+        answerText: (r.answer_text as string | null) ?? null,
+      })),
       exam: {
         slug: exam.slug,
         title: exam.title,

@@ -8,7 +8,7 @@ import SebRequired from '../components/SebRequired'
 import SebExitButton from '../components/SebExitButton'
 import { SEB_REQUIRED, isSEB } from '../lib/seb'
 import { examAuthHeaders } from '../lib/examToken'
-import { HEARTBEAT_MS, primeExamSession, sendClosed, sendPing } from '../lib/examSession'
+import { HEARTBEAT_MS, primeExamSession, sendClosed, sendPing, type DraftAnswer } from '../lib/examSession'
 import { makePracticeExam } from '../lib/practice'
 import { useT } from '../lib/i18n'
 import type { StartExamResponse, SubmittedAnswer, SubmitExamResponse } from '../lib/types'
@@ -114,8 +114,24 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   const preview = start.attemptId === 'preview' // 관리자 검수 미리보기 — 서버 제출·부정행위 가드 없음
 
   const [index, setIndex] = useState(0)
-  const [selected, setSelected] = useState<(number | null)[]>(() => Array(total).fill(null))
-  const [texts, setTexts] = useState<string[]>(() => Array(total).fill('')) // 주관식 답안
+  // 끊겼다 돌아온 응시는 **중간 저장된 답으로 시작**한다(서버가 start-exam 응답에 실어준다).
+  // 처음 시작한 응시면 전부 비어 있어 기존과 똑같다.
+  const [selected, setSelected] = useState<(number | null)[]>(() => {
+    const base: (number | null)[] = Array(total).fill(null)
+    for (const a of start.saved ?? []) {
+      const i = questions.findIndex((q) => q.number === a.number)
+      if (i >= 0) base[i] = a.selectedIndex
+    }
+    return base
+  })
+  const [texts, setTexts] = useState<string[]>(() => {
+    const base: string[] = Array(total).fill('')
+    for (const a of start.saved ?? []) {
+      const i = questions.findIndex((q) => q.number === a.number)
+      if (i >= 0) base[i] = a.answerText ?? ''
+    }
+    return base
+  }) // 주관식 답안
   const [submitting, setSubmitting] = useState(false)
   const [askQuit, setAskQuit] = useState(false) // 종료(포기) 확인 모달 — 네이티브 confirm은 전체화면 해제+포커스 이탈로 부정행위 오탐 유발 → 금지
   const submittedRef = useRef(false)
@@ -134,9 +150,16 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
   // 최신 값을 ref 로 복사해 둔다 — 아래 하트비트/언로드 핸들러가 답안이 바뀔 때마다
   // 재등록되지 않게 하려는 것이다(30초 타이머가 매 클릭마다 리셋되면 하트비트가 안 나간다).
   const answeredRef = useRef(0)
+  // 하트비트가 실어 보낼 답안 스냅샷 — 값이 바뀔 때마다 타이머를 다시 걸지 않으려고 ref 에 둔다.
+  const draftRef = useRef<DraftAnswer[]>([])
   useEffect(() => {
     answeredRef.current = answeredNow()
-  }, [answeredNow])
+    draftRef.current = questions.map((q, i) => ({
+      number: q.number,
+      selectedIndex: q.kind === 'short' ? null : selected[i],
+      answerText: q.kind === 'short' ? texts[i] : null,
+    }))
+  }, [answeredNow, questions, selected, texts])
 
   // 생존 신호 — 실제 응시에서만. 미리보기·모의는 서버에 기록할 게 없다.
   const traced = !preview && start.attemptId !== 'practice'
@@ -144,8 +167,8 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
     if (!traced) return
     // 떠나는 순간 쓸 인증 헤더를 미리 만들어 둔다(그때 만들면 늦는다 — examSession.ts 주석 참고).
     void primeExamSession()
-    sendPing(start.attemptId, answeredRef.current)
-    const id = window.setInterval(() => sendPing(start.attemptId, answeredRef.current), HEARTBEAT_MS)
+    sendPing(start.attemptId, answeredRef.current, draftRef.current)
+    const id = window.setInterval(() => sendPing(start.attemptId, answeredRef.current, draftRef.current), HEARTBEAT_MS)
     // ⚠️ `pagehide` 를 쓴다. `beforeunload` 는 SEB·모바일에서 안 오는 경우가 있고,
     //    `unload` 는 keepalive 요청이 씹히는 브라우저가 있다.
     const onHide = () => {

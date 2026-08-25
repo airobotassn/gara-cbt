@@ -40,9 +40,21 @@ function examHeaders(): Record<string, string> | undefined {
   return t ? { 'x-exam-token': t } : undefined
 }
 
-/** 살아있다는 신호. 실패해도 조용히 넘긴다 — 하트비트가 응시를 방해하면 안 된다(다음 주기에 다시 보낸다). */
-export function sendPing(attemptId: string, answered: number): void {
-  void callFunction('exam-session', { action: 'ping', attemptId, answered }, examHeaders()).catch(() => {})
+/** 중간 저장에 실어 보내는 답안 한 줄. 정답은 클라가 모르므로 고른 값만 담는다. */
+export interface DraftAnswer {
+  number: number
+  selectedIndex: number | null
+  answerText: string | null
+}
+
+/**
+ * 살아있다는 신호 + **답안 중간 저장**. 실패해도 조용히 넘긴다 — 하트비트가 응시를 방해하면 안 되고,
+ * 다음 주기에 어차피 다시 보낸다.
+ *
+ * ⚠️ 저장은 제출이 아니다. 채점은 제출할 때만 하고, 여기 저장된 값은 **끊겼을 때 복구용 사본**이다.
+ */
+export function sendPing(attemptId: string, answered: number, answers?: DraftAnswer[]): void {
+  void callFunction('exam-session', { action: 'ping', attemptId, answered, answers }, examHeaders()).catch(() => {})
 }
 
 /**

@@ -669,13 +669,34 @@ async function faqUpsert(admin: any, body: any) {
 }
 
 // 순서 재배치 — ids 를 받은 순서대로 sort = 10,20,30… 재부여(관리자 ↑↓ 이동용).
+/**
+ * 순서 재배치 공용 — ids 를 받은 순서대로 sort = 10,20,30… 재부여.
+ *
+ * ⚠️ 예전엔 항목마다 UPDATE 를 **줄 세워** 보냈다(FAQ 30개면 30왕복). 같은 코드가 네 군데에
+ *    복사돼 있었고 reform.ts 에도 둘 더 있었다. 각 UPDATE 는 서로 다른 행 하나씩만 건드려
+ *    의존이 없으므로 한 번에 내보낸다 — 왕복이 개수만큼이 아니라 한 파로 끝난다.
+ * ⚠️ upsert 한 방으로 더 줄일 수도 있지만 그러면 NOT NULL 컬럼을 전부 실어야 한다.
+ *    정렬값만 바꾸려다 다른 값을 덮어쓸 위험을 여기서 질 이유가 없다.
+ * ⚠️ 실패는 **하나라도 있으면** 오류로 준다. 부분 성공이면 화면의 순서와 DB 가 어긋나는데,
+ *    관리자가 그걸 알아챌 방법이 없다(다시 눌러 맞추면 되므로 되돌리기는 값싸다).
+ */
+async function reorderRows(
+  admin: any,
+  table: string,
+  column: 'sort' | 'sort_order',
+  ids: string[],
+): Promise<{ message: string } | null> {
+  const results = await Promise.all(
+    ids.map((id, i) => admin.from(table).update({ [column]: (i + 1) * 10 }).eq('id', id)),
+  )
+  return (results as any[]).find((r) => r?.error)?.error ?? null
+}
+
 async function faqReorder(admin: any, body: any) {
   const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
   if (!ids.length) return json({ error: 'ids 필요' }, 400)
-  for (let i = 0; i < ids.length; i++) {
-    const { error } = await admin.from('faqs').update({ sort: (i + 1) * 10 }).eq('id', ids[i])
-    if (error) return json({ error: error.message }, 400)
-  }
+  const err = await reorderRows(admin, 'faqs', 'sort', ids)
+  if (err) return json({ error: err.message }, 400)
   return json({ ok: true })
 }
 
@@ -807,10 +828,8 @@ async function boardCatDelete(admin: any, body: any) {
 async function boardCatReorder(admin: any, body: any) {
   const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
   if (!ids.length) return json({ error: 'ids 필요' }, 400)
-  for (let i = 0; i < ids.length; i++) {
-    const { error } = await admin.from('board_categories').update({ sort: (i + 1) * 10 }).eq('id', ids[i])
-    if (error) return json({ error: error.message }, 400)
-  }
+  const err = await reorderRows(admin, 'board_categories', 'sort', ids)
+  if (err) return json({ error: err.message }, 400)
   return json({ ok: true })
 }
 
@@ -1079,10 +1098,8 @@ async function syncRoundExams(
 async function examRoundReorder(admin: any, body: any) {
   const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
   if (!ids.length) return json({ error: 'ids 필요' }, 400)
-  for (let i = 0; i < ids.length; i++) {
-    const { error } = await admin.from('exam_rounds').update({ sort: (i + 1) * 10 }).eq('id', ids[i])
-    if (error) return json({ error: error.message }, 400)
-  }
+  const err = await reorderRows(admin, 'exam_rounds', 'sort', ids)
+  if (err) return json({ error: err.message }, 400)
   return json({ ok: true })
 }
 
@@ -1167,6 +1184,9 @@ async function examFeeSave(admin: any, body: any) {
     }
   }
   const now = new Date().toISOString()
+  // ⚠️ 급수마다 upsert 를 따로 쏘던 것을 한 번에 모아 보낸다(급수 6개면 6왕복 → 1왕복).
+  //    행끼리 의존이 없고 충돌 키(key)도 같아서 배열 하나로 그대로 들어간다.
+  const rows: { key: string; amount_usd_cents: number; updated_at: string }[] = []
   for (const it of items) {
     const key = String(it?.key ?? '').trim()
     const n = Number(it?.amount)
@@ -1175,8 +1195,10 @@ async function examFeeSave(admin: any, body: any) {
     // ⚠️ **0 은 정상 값이다** — "무료 급수"라는 뜻이고, 화면이 저장 전에 확인을 한 번 받는다(2026-08-25).
     //    '아직 안 정했다'는 0 이 아니라 **행을 안 만드는 것**으로 표현한다(화면이 빈칸을 아예 안 보낸다).
     //    그 구분이 판매 판정의 전부다 — resolveExamOffer 는 행 없음(null)만 막고 0 은 무료로 판다.
-    const amount = Math.max(0, Math.floor(n))
-    const { error } = await admin.from('exam_fees').upsert({ key, amount_usd_cents: amount, updated_at: now }, { onConflict: 'key' })
+    rows.push({ key, amount_usd_cents: Math.max(0, Math.floor(n)), updated_at: now })
+  }
+  if (rows.length) {
+    const { error } = await admin.from('exam_fees').upsert(rows, { onConflict: 'key' })
     if (error) return json({ error: error.message }, 400)
   }
   return json({ ok: true })
@@ -1393,13 +1415,23 @@ async function examTicketSummary(admin: any, body: any) {
     if (rows.length < CHUNK) break
   }
 
-  // 문항 준비 상태는 회차를 특정했을 때만 센다(전체 회차면 exams 수만큼 쿼리가 늘어난다).
+  // 문항 준비 상태는 회차를 특정했을 때만 센다(전체 회차면 받아올 문항 행이 통째로 커진다).
+  //   ⚠️ 예전엔 급수마다 count 를 따로 물어(급수 6개면 6왕복) 여기가 회차 요약에서 제일 느렸다.
+  //      지금은 한 번에 받아 메모리에서 센다 — 급수가 늘어도 2왕복 그대로다.
   const sets: Record<string, { total: number; loaded: number; active: boolean }> = {}
   if (roundId) {
     const { data: exs } = await admin.from('exams').select('id, tier, total_questions, active').eq('round_id', roundId)
-    for (const e of (exs ?? []) as any[]) {
-      const { count } = await admin.from('exam_questions').select('id', { count: 'exact', head: true }).eq('exam_id', e.id)
-      sets[e.tier] = { total: e.total_questions ?? 0, loaded: count ?? 0, active: !!e.active }
+    const rows = (exs ?? []) as any[]
+    const loaded: Record<string, number> = {}
+    if (rows.length) {
+      const { data: qs } = await admin
+        .from('exam_questions')
+        .select('exam_id')
+        .in('exam_id', rows.map((e) => e.id))
+      for (const q of (qs ?? []) as { exam_id: string }[]) loaded[q.exam_id] = (loaded[q.exam_id] ?? 0) + 1
+    }
+    for (const e of rows) {
+      sets[e.tier] = { total: e.total_questions ?? 0, loaded: loaded[e.id] ?? 0, active: !!e.active }
     }
   }
 
@@ -1543,7 +1575,7 @@ async function examInterruption(admin: any, body: any) {
   const { data: a } = await admin
     .from('exam_attempts')
     .select(
-      'id, user_id, exam_id, status, void_reason, started_at, submitted_at, last_seen_at, answered_count, total_questions, entry_count, reinstated_at, reinstated_by, reinstate_note, resume_deadline',
+      'id, user_id, exam_id, status, void_reason, started_at, submitted_at, last_seen_at, answered_count, total_questions, entry_count, reinstated_at, reinstated_by, reinstate_note',
     )
     .eq('id', attemptId)
     .maybeSingle()
@@ -1578,21 +1610,22 @@ async function examInterruption(admin: any, body: any) {
   })
 }
 
-/** 복구 유예 기본값(일). 문의를 처리하고 응시자가 다시 앉기까지의 현실적인 여유. */
-const REINSTATE_GRACE_DAYS = 7
-
 /**
- * 무효된 응시를 풀어 다시 들어갈 수 있게 한다.
+ * 중단된 응시를 다시 볼 수 있게 풀어준다.
  *
- * ⛔ **제한시간은 처음부터 다시 준다.** 시계는 응시자가 실제로 다시 들어오는 순간부터 간다
- *    (start-exam 이 그때 started_at 을 지금으로 옮긴다). 복구 시점에 맞추면 관리자가 눌러놓고
- *    응시자가 몇 시간 뒤에 들어올 때 그 사이가 다 흘러가 **복구해도 이미 만료**다.
- *    ⚠️ '남은 시간만 복원' 은 하지 않는다 — 답안은 제출할 때 한 번에 올라가므로(실시간 저장 없음)
- *       시간만 깎아 돌려주면 백지에서 짧은 시간으로 하는 셈이라 처음부터 다시보다 나쁘다.
- * ⛔ **응시 기간이 닫혔어도 들어갈 수 있게** resume_deadline 을 준다. 마지막 날 사고는 처리 시점에
- *    이미 회차가 끝나 있어서, 이게 없으면 복구가 성립하지 않는다.
+ * ⛔ **응시 기간(10일) 안에서만 의미가 있다(2026-08-13 결정).** 예전엔 별도 기한을 줘서 회차가
+ *    닫혀도 들어갈 수 있게 했는데, 규칙을 "10일 안에만" 으로 정리하면서 걷어냈다. 마지막 날 저녁에
+ *    끊겨 다음 날 처리되는 사람은 응시하지 못한다 — 열흘을 줬는데 마지막 날 밤에 시작한 쪽의 몫이다.
+ *    ⚠️ 그래서 관리자 화면이 **기간이 이미 끝났는지 보여줘야 한다**. 안 그러면 복구를 눌러놓고
+ *       "왜 안 들어가지냐" 가 된다(Admin.tsx 의 InterruptionPanel).
  *
- * ⚠️ 응시권을 새로 쓰지는 않는다 — 같은 응시권·같은 문항 세트로 다시 볼 뿐이다.
+ * ⛔ **남은 시간은 보존된다.** 끊긴 시각까지 쓴 만큼만 소비된 것으로 치고 나머지를 돌려준다.
+ *    계산은 **응시자가 실제로 다시 들어오는 순간** start-exam 이 한다 — 복구를 눌러준 시점에 맞추면
+ *    관리자가 승인해놓고 응시자가 몇 시간 뒤 들어올 때 그 사이가 다 흘러간다.
+ *    ⚠️ 이게 성립하는 건 답안이 하트비트로 저장되기 때문이다(exam-session). 답이 안 남으면
+ *       시간만 깎인 백지가 된다 — 둘은 한 쌍이다.
+ *
+ * ⚠️ 응시권을 새로 쓰지는 않는다 — 같은 응시권·같은 문항으로 이어서 볼 뿐이다.
  *    다른 문항으로 처음부터 보게 하려면 응시권을 새로 발급하는 게 맞다(examTicketGrant).
  * ⚠️ 사유를 반드시 받는다. "특정인만 살려줬다" 는 말이 나올 수 있는 자리라,
  *    누가·언제·왜가 남지 않으면 나중에 아무것도 해명할 수 없다.
@@ -1600,7 +1633,6 @@ const REINSTATE_GRACE_DAYS = 7
 async function examReinstate(admin: any, body: any, actorEmail: string) {
   const attemptId = String(body?.attemptId ?? '').trim()
   const note = String(body?.note ?? '').trim()
-  const days = Math.min(Math.max(1, Math.floor(Number(body?.graceDays ?? REINSTATE_GRACE_DAYS))), 30)
   if (!attemptId) return json({ error: 'attemptId 필요' }, 400)
   if (!note) return json({ error: '복구 사유를 적어주세요(나중에 근거가 될 것이 이것뿐입니다).' }, 400)
 
@@ -1610,23 +1642,19 @@ async function examReinstate(admin: any, body: any, actorEmail: string) {
     .eq('id', attemptId)
     .maybeSingle()
   if (!a) return json({ error: '응시를 찾을 수 없습니다.' }, 404)
-  // ⚠️ voided 만 받으면 안 된다. **응시 기간이 닫힌 뒤 사고가 처리되는 경우**, 응시자는 재진입 자체가
-  //    티켓 필터에서 막혀(start-exam 의 resume_blocked) 무효 판정에 닿지도 못한 채 in_progress 로 남는다.
-  //    그게 정확히 "마지막 날 저녁 사고" 의 모양이라, 여기서 거절하면 도와줄 방법이 사라진다.
-  //    복구는 '무효를 푸는 것' 이 아니라 **다시 볼 수 있게 시계와 기한을 주는 것**이다.
+  // ⚠️ voided 만 받으면 안 된다. 응시 기간이 닫힌 뒤에는 재진입이 티켓 필터에서 먼저 막혀
+  //    (start-exam 의 resume_blocked) 무효 판정에 닿지도 못한 채 in_progress 로 남는다.
   if (a.status === 'submitted') {
     return json({ error: '이미 제출된 응시입니다. 복구 대상이 아닙니다.' }, 409)
   }
 
   const now = new Date().toISOString()
-  const deadline = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
   const { data: won } = await admin
     .from('exam_attempts')
     .update({
       status: 'in_progress',
       // 무효로 찍혔던 제출시각을 되돌린다 — 남겨두면 '제출한 응시'로 보여 목록·집계가 어긋난다.
       submitted_at: null,
-      resume_deadline: deadline,
       reinstated_at: now,
       reinstated_by: actorEmail,
       reinstate_note: note.slice(0, 500),
@@ -1640,20 +1668,11 @@ async function examReinstate(admin: any, body: any, actorEmail: string) {
   await admin.from('exam_session_events').insert({
     attempt_id: attemptId,
     kind: 'reinstate',
-    detail: {
-      by: actorEmail,
-      note: note.slice(0, 500),
-      prevVoidReason: a.void_reason ?? null,
-      resumeDeadline: deadline,
-    },
+    detail: { by: actorEmail, note: note.slice(0, 500), prevVoidReason: a.void_reason ?? null },
   })
   return json({
     ok: true,
-    resumeDeadline: deadline,
-    // 응시자에게 뭐라고 안내할지가 갈리는 지점이라 서버가 문장으로 명시한다.
-    note:
-      `복구했습니다. 제한시간은 처음부터 다시 주어지고, 시계는 응시자가 실제로 다시 들어오는 ` +
-      `순간부터 갑니다. 응시 기간이 이미 끝났더라도 ${days}일 안에는 들어갈 수 있습니다.`,
+    note: '복구했습니다. 끊긴 시점의 답안과 남은 시간 그대로 이어서 응시할 수 있습니다. 다만 **응시 기간 안에서만** 들어갈 수 있습니다.',
   })
 }
 
@@ -1890,15 +1909,24 @@ async function bankListForAdmin(admin: any) {
   const { data, error } = await admin.from('question_banks').select('id, tier, title, active').order('tier', { ascending: true })
   if (error) return json({ error: error.message }, 400)
   const banks = data ?? []
-  const out: any[] = []
-  for (const b of banks) {
-    const [t, a] = await Promise.all([
-      admin.from('questions').select('id', { count: 'exact', head: true }).eq('bank_id', b.id).is('deleted_at', null),
-      admin.from('questions').select('id', { count: 'exact', head: true }).eq('bank_id', b.id).eq('active', true).is('deleted_at', null),
-    ])
-    out.push({ ...b, questionCount: t.count ?? 0, activeCount: a.count ?? 0 })
+  // ⚠️ 예전엔 은행마다 count 2개를 물었다(급수 6개면 6파 = 12왕복). 은행끼리 의존이 없으므로
+  //    한 번에 받아 메모리에서 센다 — 총 2왕복이고 은행 수가 늘어도 안 변한다.
+  const total: Record<string, number> = {}
+  const active: Record<string, number> = {}
+  if (banks.length) {
+    const { data: qs } = await admin
+      .from('questions')
+      .select('bank_id, active')
+      .in('bank_id', banks.map((b: any) => b.id))
+      .is('deleted_at', null)
+    for (const q of (qs ?? []) as { bank_id: string; active: boolean }[]) {
+      total[q.bank_id] = (total[q.bank_id] ?? 0) + 1
+      if (q.active) active[q.bank_id] = (active[q.bank_id] ?? 0) + 1
+    }
   }
-  return json({ banks: out })
+  return json({
+    banks: banks.map((b: any) => ({ ...b, questionCount: total[b.id] ?? 0, activeCount: active[b.id] ?? 0 })),
+  })
 }
 
 // 등록시험 목록(회차×급수, round_id NOT NULL) + 각 시험의 뽑힌 세트 수. 시험문항 셀렉터용.
@@ -1910,12 +1938,19 @@ async function examListForAdmin(admin: any) {
     .order('created_at', { ascending: true })
   if (error) return json({ error: error.message }, 400)
   const exams = data ?? []
+  // ⚠️ 예전엔 시험마다 count 를 따로 물었다 — 회차가 쌓일수록 왕복이 그대로 늘어나(12회차 × 6급수 = 73회)
+  //    시간이 갈수록 느려지는 구조였다. 지금은 한 번에 받아 메모리에서 센다(총 2왕복, 개수와 무관).
+  //    ⚠️ 세는 걸 DB 로 내리면(group by) 오가는 행도 같이 줄지만, 이 프로젝트는 PostgREST 집계가
+  //       꺼져 있어(PGRST123) RPC 를 새로 파야 한다. 관리자 화면이라 그 값어치가 아직 없다.
   const counts: Record<string, number> = {}
-  for (const ex of exams) {
-    const { count } = await admin.from('exam_questions').select('id', { count: 'exact', head: true }).eq('exam_id', ex.id)
-    counts[ex.id] = count ?? 0
+  if (exams.length) {
+    const { data: qs } = await admin
+      .from('exam_questions')
+      .select('exam_id')
+      .in('exam_id', exams.map((ex: any) => ex.id))
+    for (const q of (qs ?? []) as { exam_id: string }[]) counts[q.exam_id] = (counts[q.exam_id] ?? 0) + 1
   }
-  return json({ exams: exams.map((ex: any) => ({ ...ex, questionCount: counts[ex.id], activeCount: counts[ex.id] })) })
+  return json({ exams: exams.map((ex: any) => ({ ...ex, questionCount: counts[ex.id] ?? 0, activeCount: counts[ex.id] ?? 0 })) })
 }
 
 // 한 은행의 문항 목록(비삭제, 번호순). 관리자에겐 correct_index·해설 포함.
@@ -2836,10 +2871,8 @@ async function ebookUpsert(admin: any, body: any) {
 async function ebookReorder(admin: any, body: any) {
   const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
   if (!ids.length) return json({ error: 'ids 필요' }, 400)
-  for (let i = 0; i < ids.length; i++) {
-    const { error } = await admin.from('ebooks').update({ sort_order: (i + 1) * 10 }).eq('id', ids[i])
-    if (error) return json({ error: error.message }, 400)
-  }
+  const err = await reorderRows(admin, 'ebooks', 'sort_order', ids)
+  if (err) return json({ error: err.message }, 400)
   return json({ ok: true })
 }
 

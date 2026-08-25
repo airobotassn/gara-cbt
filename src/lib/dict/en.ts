@@ -1385,7 +1385,7 @@ const EN: Record<string, string> = {
   // ⚠️ "도와드립니다" 로 끝내면 안 된다 — 응시자는 (1) 남은 시간이 사라졌는지 (2) 응시 기간이 끝나면
   //    끝인지 (3) 언제 처리되는지를 모른 채 기다리게 된다. 세 가지를 다 말해준다.
   //    24시간 상주 운영이 아니므로 "바로 처리"를 약속하지 않는다.
-  "seb.voided_how": "If a device failure, power loss, or network drop interrupted you, please contact us. We'll review the interruption record, and once restored you get the full time limit again (the clock starts only when you re-enter). Even if the exam period has ended, we'll grant a separate deadline. Please allow some time on business days for the review.",
+  "seb.voided_how": "If a device failure, power loss, or network drop interrupted you, contact us. We will review the interruption record, and once restored you continue with the answers and remaining time you had. You can only resume within the exam period, and the review may take some business days.",
   "seb.err_no_handoff": "We couldn't verify your exam session.",
   "seb.err_no_handoff_how": "Close the secure browser and start again from the exam preparation page in your normal browser.",
 

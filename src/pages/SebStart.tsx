@@ -32,7 +32,7 @@ export default function SebStart() {
   const navigate = useNavigate()
   const { t } = useT()
   const [err, setErr] = useState('')
-  // 재진입 무효(서버 code='reentry_voided') — 재시도가 의미 없는 상태라 화면 구성이 달라진다.
+  // 진입 거절(서버 code='reentry_blocked'·'attempt_voided') — 재시도가 의미 없어 문의 안내로 바꾼다.
   const [voided, setVoided] = useState(false)
   const [starting, setStarting] = useState(false)
   const started = useRef(false)
@@ -82,7 +82,7 @@ export default function SebStart() {
       started.current = false
       setStarting(false)
       // 무효는 재시도로 풀리지 않는다 — 버튼을 감추고 문의 안내로 바꾼다.
-      if (isFunctionCode(e, 'reentry_voided') || isFunctionCode(e, 'attempt_voided')) setVoided(true)
+      if (isFunctionCode(e, 'reentry_blocked') || isFunctionCode(e, 'attempt_voided')) setVoided(true)
       setErr(e instanceof Error ? e.message : t('prep.err_start'))
     }
   }

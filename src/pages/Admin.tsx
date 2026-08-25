@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
+import { loadAdminMe } from '../lib/adminMe'
 import { renderEbookCover } from '../lib/ebookCover'
 import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
@@ -143,7 +144,7 @@ const isTopMenu = (v: string): v is TopMenu => MENUS.some((m) => m.key === v)
 export type AdminGo = (top: TopMenu | '', tab?: string, sub?: string, extra?: Record<string, string>) => void
 
 export default function Admin() {
-  const { isFullUser, loginWithGoogle } = useAuth()
+  const { isFullUser, loginWithGoogle, user } = useAuth()
   // 대메뉴·하위메뉴 상태를 URL 쿼리(?top·?tab)로 → 브라우저 뒤로/앞으로가 메뉴 사이를 오간다.
   const [params, setParams] = useSearchParams()
   // 권한 확인은 여기 한 번뿐이다. 옛 구조는 두 화면이 각자 `me` 를 불러 로그인 게이트가 두 벌이었다.
@@ -155,13 +156,14 @@ export default function Admin() {
       setState('checking')
       return
     }
-    callFunction<{ ok: boolean; isRoot?: boolean }>('admin', { action: 'me' })
-      .then((r) => {
-        setIsRoot(!!r.isRoot)
-        setState('ok')
-      })
-      .catch(() => setState('denied'))
-  }, [isFullUser])
+    let alive = true
+    loadAdminMe(user?.id ?? null).then((me) => {
+      if (!alive) return
+      setIsRoot(me.isRoot)
+      setState(me.isAdmin ? 'ok' : 'denied')
+    })
+    return () => { alive = false }
+  }, [isFullUser, user])
 
   const rawTop = params.get('top') ?? ''
   const top: TopMenu | '' = isTopMenu(rawTop) ? rawTop : ''
@@ -736,7 +738,6 @@ interface InterruptionResp {
     reinstated_at: string | null
     reinstated_by: string | null
     reinstate_note: string | null
-    resume_deadline: string | null
   }
   events: { kind: string; at: string; detail: Record<string, unknown> }[]
   summary: {
@@ -752,7 +753,7 @@ interface InterruptionResp {
 const EVENT_LABEL: Record<string, string> = {
   start: '응시 시작',
   closed: '화면 닫힘(사용자가 닫음)',
-  reentry: '재진입 → 무효 처리',
+  reentry: '다시 들어오려 함 → 거절됨',
   reinstate: '관리자 복구',
 }
 
@@ -767,9 +768,6 @@ function fmtGap(sec: number | null): string {
 function InterruptionPanel({ attemptId }: { attemptId: string }) {
   const [data, setData] = useState<InterruptionResp | null>(null)
   const [note, setNote] = useState('')
-  // 복구 후 응시 가능 기한(일). **회차 응시 기간과 무관하게** 이 기간은 열린다 —
-  // 마지막 날 사고를 다음 날 처리하면 회차가 이미 끝나 있어서, 이게 없으면 복구가 성립하지 않는다.
-  const [graceDays, setGraceDays] = useState(7)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -796,7 +794,7 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
     setBusy(true)
     setMsg('')
     try {
-      const r = await callFunction<{ note?: string }>('admin', { action: 'examReinstate', attemptId, note, graceDays })
+      const r = await callFunction<{ note?: string }>('admin', { action: 'examReinstate', attemptId, note })
       setMsg(r.note ?? '복구했습니다.')
       setNote('')
       await load()
@@ -812,13 +810,15 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
       <b style={{ display: 'block', marginBottom: 8 }}>응시 중단 기록</b>
 
       <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', margin: 0, fontSize: 14 }}>
-        <dt>무효 사유</dt>
+        <dt>상태</dt>
         <dd style={{ margin: 0 }}>
-          {attempt.void_reason === 'reentry'
-            ? '응시 화면을 벗어났다 다시 들어옴'
+          {attempt.status === 'in_progress'
+            ? '진행중 — 끊긴 뒤 다시 못 들어가고 있는 상태일 수 있습니다'
             : attempt.void_reason === 'quit'
-              ? '응시자가 스스로 종료(포기)'
-              : (attempt.void_reason ?? '-')}
+              ? '무효 — 응시자가 스스로 종료(포기)'
+              : attempt.status === 'voided'
+                ? `무효 — ${attempt.void_reason ?? '사유 없음'}`
+                : attempt.status}
         </dd>
 
         {/* ⭐ 판단의 핵심 — 이 한 줄이 '사고'와 '일부러 나감'을 가른다 */}
@@ -853,22 +853,21 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
       {attempt.reinstated_at ? (
         <p style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
           <b>복구됨</b> — {fmtDT(attempt.reinstated_at)} · {attempt.reinstated_by} · 사유: {attempt.reinstate_note}
-          {/* 아직 안 들어온 상태 = 시계가 멈춰 있다. 언제까지 들어와야 하는지가 문의 응대의 핵심이다. */}
-          {attempt.resume_deadline && (
-            <>
-              <br />
-              응시 기한 <b>{fmtDT(attempt.resume_deadline)}</b> 까지 · 제한시간은 처음부터 다시 ·
-              시계는 응시자가 다시 들어오는 순간부터 갑니다.
-            </>
-          )}
+          <>
+            <br />
+            끊긴 시점의 답안과 남은 시간 그대로 이어집니다. <b>응시 기간 안에서만</b> 들어갈 수 있습니다.
+          </>
         </p>
       ) : attempt.status !== 'submitted' ? (
         <div style={{ marginTop: 12 }}>
           {/* ⚠️ 새 응시가 아니다 — 문항 세트는 그대로고 이미 쓴 시간도 돌려주지 않는다(남은 시간만 복원).
               "처음부터 다시" 가 필요하면 응시권을 새로 발급하는 게 맞다. */}
           <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.6 }}>
-            복구하면 <b>제한시간을 처음부터 다시</b> 받고, 시계는 <b>응시자가 실제로 다시 들어오는 순간부터</b> 갑니다.
-            아래 기한 안에는 <b>응시 기간이 끝났어도</b> 들어갈 수 있습니다. 문항 세트는 그대로입니다.
+            복구하면 <b>끊긴 시점의 답안과 남은 시간 그대로</b> 이어서 응시합니다. 문항도 그대로입니다.
+            {/* ⚠️ 기간이 끝났으면 복구해도 못 들어간다 — 그걸 안 보여주면 눌러놓고 왜 안 되냐가 된다. */}
+            <br />
+            <b>응시 기간 안에서만</b> 들어갈 수 있습니다. 기간이 지났다면 복구해도 응시할 수 없으니,
+            필요하면 응시권을 새로 발급해 주세요.
           </p>
           <input
             value={note}
@@ -876,18 +875,6 @@ function InterruptionPanel({ attemptId }: { attemptId: string }) {
             placeholder="복구 사유 (예: 정전 문의 접수, 닫힘 신호 없음 확인)"
             style={{ width: '100%', padding: '8px 10px', marginBottom: 6 }}
           />
-          <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>
-            응시 기한{' '}
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={graceDays}
-              onChange={(e) => setGraceDays(Number(e.target.value))}
-              style={{ width: 64, padding: '4px 6px' }}
-            />{' '}
-            일 이내
-          </label>
           <button className="admin-mini" onClick={reinstate} disabled={busy}>
             {busy ? '복구 중…' : '이 응시 복구'}
           </button>

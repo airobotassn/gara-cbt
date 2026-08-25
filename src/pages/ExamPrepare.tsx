@@ -97,7 +97,7 @@ export default function ExamPrepare() {
       // ⛔ 들어갈 수 없는 사유는 **SEB 를 켜기 전에** 여기서 끝난다. 시험 시작에서만 잡으면 SEB 가 켜지고,
       //    잠긴 화면 안에서 안내를 본 뒤 다시 SEB 를 빠져나와야 한다 — 헛걸음이다.
       //    무효 계열만 문의 안내를 붙인다. 정상 제출로 끝난 건(already_done)은 안내할 게 없다.
-      if (isFunctionCode(e, 'reentry_voided') || isFunctionCode(e, 'attempt_voided')) setVoided(true)
+      if (isFunctionCode(e, 'reentry_blocked') || isFunctionCode(e, 'attempt_voided')) setVoided(true)
       setErr(e instanceof Error ? e.message : t('prep.err_start'))
     }
   }

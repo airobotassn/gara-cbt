@@ -11,6 +11,7 @@
 //
 // ⚠️ _shared 사용 → CLI 로만 배포할 것. verify_jwt 는 켠 채로.
 import { corsHeaders, json } from '../_shared/cors.ts'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { adminClient } from '../_shared/lib.ts'
 import { getExamActor } from '../_shared/exam-token.ts'
 
@@ -19,6 +20,29 @@ function clampCount(v: unknown, max: number): number {
   const n = Math.floor(Number(v ?? 0))
   if (!Number.isFinite(n) || n < 0) return 0
   return Math.min(n, max > 0 ? max : n)
+}
+
+/** 하트비트가 실어 보낸 답안을 그 응시의 답안 행에 덮어쓴다. 채점하지 않는다(제출 때만 한다). */
+async function saveDraft(admin: SupabaseClient, attemptId: string, answers: unknown): Promise<void> {
+  if (!Array.isArray(answers) || answers.length === 0) return
+  // 한 번에 최대 200문항 — 그 이상은 클라가 이상한 값을 보낸 것이라 자른다.
+  for (const a of answers.slice(0, 200)) {
+    const num = Math.floor(Number((a as { number?: unknown })?.number ?? NaN))
+    if (!Number.isFinite(num) || num < 1) continue
+    const rawSel = (a as { selectedIndex?: unknown })?.selectedIndex
+    const selected = rawSel === null || rawSel === undefined ? null : Math.floor(Number(rawSel))
+    const text = typeof (a as { answerText?: unknown })?.answerText === 'string'
+      ? ((a as { answerText: string }).answerText).slice(0, 2000)
+      : null
+    await admin
+      .from('attempt_answers')
+      .update({
+        selected_index: Number.isFinite(selected as number) ? selected : null,
+        answer_text: text,
+      })
+      .eq('attempt_id', attemptId)
+      .eq('number', num)
+  }
 }
 
 Deno.serve(async (req) => {
@@ -55,6 +79,14 @@ Deno.serve(async (req) => {
         .update({ last_seen_at: now, answered_count: answered })
         .eq('id', attemptId)
         .eq('status', 'in_progress')
+
+      // ⛔ **답안 중간 저장.** 이게 있어야 끊겼다 복구했을 때 풀던 자리에서 이어갈 수 있다
+      //    (그리고 그래야 '남은 시간만 복원' 이 말이 된다 — start-exam 의 재개 주석과 한 쌍이다).
+      //    행은 응시를 만들 때 문항 수만큼 이미 깔려 있으므로 값만 덮어쓴다.
+      // ⚠️ **채점은 하지 않는다.** is_correct 는 건드리지 않고 제출 때만 매긴다 —
+      //    중간 저장은 복구용 사본이지 제출이 아니다.
+      // ⚠️ 클라가 보낸 값이라 문항 번호는 **이 응시에 실제로 있는 번호만** 반영된다(number 로 매칭).
+      await saveDraft(admin, attemptId, body?.answers)
       return json({ ok: true })
     }
 

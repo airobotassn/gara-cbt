@@ -1385,7 +1385,7 @@ const VI: Record<string, string> = {
   // ⚠️ "도와드립니다" 로 끝내면 안 된다 — 응시자는 (1) 남은 시간이 사라졌는지 (2) 응시 기간이 끝나면
   //    끝인지 (3) 언제 처리되는지를 모른 채 기다리게 된다. 세 가지를 다 말해준다.
   //    24시간 상주 운영이 아니므로 "바로 처리"를 약속하지 않는다.
-  "seb.voided_how": "Nếu bài thi bị gián đoạn do hỏng thiết bị, mất điện hoặc mất mạng, hãy liên hệ với chúng tôi. Chúng tôi sẽ kiểm tra bản ghi gián đoạn; sau khi khôi phục, bạn được cấp lại toàn bộ thời gian làm bài (đồng hồ chỉ chạy khi bạn vào lại). Ngay cả khi kỳ thi đã kết thúc, chúng tôi vẫn cấp thời hạn riêng. Việc kiểm tra có thể mất một số ngày làm việc.",
+  "seb.voided_how": "Nếu bài thi bị gián đoạn do hỏng thiết bị, mất điện hoặc mất mạng, hãy liên hệ với chúng tôi. Chúng tôi sẽ kiểm tra bản ghi; sau khi khôi phục, bạn tiếp tục với bài làm và thời gian còn lại. Bạn chỉ có thể thi tiếp trong thời gian kỳ thi, và việc kiểm tra có thể mất một số ngày làm việc.",
   "seb.err_no_handoff": "Không xác minh được phiên thi của bạn.",
   "seb.err_no_handoff_how": "Hãy đóng trình duyệt bảo mật và bắt đầu lại từ trang chuẩn bị thi trên trình duyệt thường.",
 
