@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { isSEB } from '../lib/seb'
 import SebExitButton from '../components/SebExitButton'
 import { useT } from '../lib/i18n'
@@ -12,18 +11,14 @@ import { useT } from '../lib/i18n'
 //    여기서는 서버에 기록을 남길 수 없다 — 시험 전용 토큰은 응시 계열 두 함수만 받는다.
 export default function ExamEnvCheck() {
   const { t } = useT()
-  const [full, setFull] = useState(false)
-
-  // 전체화면이 실제로 되는지까지 여기서 확인한다 — 실제 응시가 요구하는 조건이라 미리 걸러야 한다.
-  useEffect(() => {
-    document.documentElement.requestFullscreen?.()
-      .then(() => setFull(true))
-      .catch(() => setFull(false))
-  }, [])
+  // ⛔ 여기서 requestFullscreen() 을 부르면 안 된다. 브라우저는 **사용자 클릭 없이는 전체화면을 거부**해서,
+  //    페이지가 열리자마자 시도하면 무조건 실패한다 — SEB 가 이미 전체화면으로 돌고 있는데도 ✕ 로 떴다
+  //    (2026-08-13). 확인할 것은 "지금 되나" 가 아니라 **"이 브라우저가 전체화면을 허용하나"** 다.
+  const fullOk = !!document.fullscreenEnabled || !!document.fullscreenElement
 
   const rows = [
     { ok: isSEB(), label: t('envcheck.row_seb') },
-    { ok: full || !!document.fullscreenElement, label: t('envcheck.row_fs') },
+    { ok: fullOk, label: t('envcheck.row_fs') },
     { ok: navigator.onLine, label: t('envcheck.row_net') },
     { ok: window.innerWidth >= 1024, label: t('envcheck.row_screen') },
   ]
