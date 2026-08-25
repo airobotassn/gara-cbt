@@ -5653,6 +5653,8 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
 }
 
 function MemberCarisPanel({ userId }: { userId: string }) {
+  // 중단 기록을 펼쳐 볼 응시. 표에서 고른 한 건만 아래에 보여준다.
+  const [resumeId, setResumeId] = useState('')
   const [detail, setDetail] = useState<CbtUserDetailResp | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -5683,6 +5685,9 @@ function MemberCarisPanel({ userId }: { userId: string }) {
                 <th>결과</th>
                 <th>자격증</th>
                 <th>제출</th>
+                {/* 중단된 응시를 여기서 바로 처리한다 — 문의를 받고 회원을 찾아 들어오는 흐름이라
+                    이 표가 그 자리다(예전엔 제출답안 탭의 상세 모달 안에만 있어 찾기 어려웠다). */}
+                <th>중단·복구</th>
               </tr>
             </thead>
             <tbody>
@@ -5700,17 +5705,29 @@ function MemberCarisPanel({ userId }: { userId: string }) {
                   <td>{at.passed !== true ? <span style={{ color: 'var(--dim)' }}>–</span>
                     : at.released ? <span className="badge ok">발급 가능</span> : <span className="badge low">공개 대기</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(at.submittedAt)}</td>
+                  <td>
+                    {at.status === 'submitted'
+                      ? <span style={{ color: 'var(--dim)' }}>–</span>
+                      : <button className="admin-mini" onClick={() => setResumeId(at.id)}>기록·복구</button>}
+                  </td>
                 </tr>
               ))}
               {!(detail?.attempts ?? []).length && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
                     응시 이력이 없습니다.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+          {/* 고른 응시의 중단 기록 + 복구. 표 바로 아래에 펼쳐 보여준다(모달을 또 띄우지 않는다 —
+              이미 회원 상세 모달 안이라 모달이 두 겹이 된다). */}
+          {resumeId && (
+            <div style={{ marginTop: 12 }}>
+              <InterruptionPanel attemptId={resumeId} />
+            </div>
+          )}
         </div>
       )}
     </>

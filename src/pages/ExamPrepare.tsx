@@ -41,10 +41,10 @@ export default function ExamPrepare() {
   const [voided, setVoided] = useState(false)
   const [sebNotice, setSebNotice] = useState(false)
 
-  // 준비 화면에 오래(15분) 아무 조작 없이 방치되면(예: SEB 로 나가고 남은 탭) 자동으로 메인으로.
+  // 준비 화면에 오래(10분) 아무 조작 없이 방치되면(예: SEB 로 나가고 남은 탭) 자동으로 메인으로.
   // 폴링이 아니라 타이머 1개 + 클릭/키 리스너뿐이라 리소스 부담 없음. 조작하면 타이머 리셋 → 진행 중인 사람은 안 쫓겨남.
   useEffect(() => {
-    const IDLE_MS = 15 * 60 * 1000
+    const IDLE_MS = 10 * 60 * 1000
     let id = window.setTimeout(() => navigate('/'), IDLE_MS)
     const reset = () => {
       window.clearTimeout(id)
@@ -58,6 +58,25 @@ export default function ExamPrepare() {
       window.removeEventListener('keydown', reset)
     }
   }, [navigate])
+
+  // SEB 를 띄운 뒤부터 30초마다 "시험이 시작됐나" 를 묻고, 시작이 확인되면 이 탭을 메인으로 보낸다.
+  //
+  // ⚠️ **묻는 것 말고 방법이 없다.** SEB 안 페이지는 서버에 "시작했다" 를 보내지만, 바깥 브라우저 탭에는
+  //    직접 신호를 못 보낸다(완전히 다른 프로그램이라 저장소도 공유되지 않는다). 서버가 유일한 연결점이고,
+  //    서버는 먼저 말을 걸 수 없으니 이쪽에서 물어야 한다.
+  // ⚠️ SEB 를 띄우기 전에는 묻지 않는다(sebNotice) — 시작될 리가 없는 동안 부를 이유가 없다.
+  // ⚠️ 가벼운 전용 조회(startedCheck)를 쓴다. 목록 조회는 응시권·회차·점검기록까지 훑어 폴링에 못 쓴다.
+  useEffect(() => {
+    if (!sebNotice || !ticketId) return
+    let alive = true
+    const ask = () => {
+      callFunction<{ started?: boolean }>('my-attempts', { action: 'startedCheck', ticketId })
+        .then((r) => { if (alive && r.started) navigate('/') })
+        .catch(() => { /* 실패는 무시 — 다음 주기에 다시 묻는다 */ })
+    }
+    const id = window.setInterval(ask, 30_000)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [sebNotice, ticketId, navigate])
 
   if (isMobileDevice()) return <MobileBlock />
 

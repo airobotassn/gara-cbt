@@ -82,6 +82,24 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
+    // ── 시험이 시작됐나(가벼운 조회) ──
+    // 응시 준비 화면이 SEB 를 띄운 뒤 30초마다 묻는다. 시작이 확인되면 그 탭은 할 일이 끝났으니
+    // 메인으로 나간다 — SEB 안 페이지가 바깥 탭에 직접 신호를 보낼 방법이 없어서(별도 브라우저),
+    // 서버를 통해 아는 것이 유일한 길이다.
+    // ⚠️ 아래 목록 조회는 응시권·회차·점검기록까지 훑는 무거운 경로다. 폴링이 그걸 타면 안 되므로
+    //    여기서 먼저 끊는다.
+    if (body?.action === 'startedCheck') {
+      const tid = String(body?.ticketId ?? '').trim()
+      if (!tid) return json({ started: false })
+      const { data: at } = await admin
+        .from('exam_attempts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('ticket_id', tid)
+        .maybeSingle()
+      return json({ started: Boolean(at) })
+    }
+
     // 방치된 진행중 응시 만료 — 제한시간을 훌쩍 넘긴 것(TTL)만
     const cutoff = new Date(now - ATTEMPT_TTL_MINUTES * 60000).toISOString()
     await admin
@@ -219,20 +237,84 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data } = await admin
-      .from('exam_attempts')
-      .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, cert_issued_at, verify_token, cert_no, cert_name_roman')
-      .eq('user_id', user.id)
-      .order('submitted_at', { ascending: false, nullsFirst: false })
-      .order('started_at', { ascending: false })
-      .limit(50)
+    // ── 1파: 전부 user.id 하나만 쓰고 서로를 참조하지 않는다 ──────────────
+    //   ⚠️ 위 87행의 TTL 만료 UPDATE 는 **이 목록 조회보다 앞**이어야 한다(순서 고정) —
+    //      목록이 그 상태를 그대로 내려주므로, 뒤로 밀면 방금 만료된 응시가 '진행 중'으로 나간다.
+    //      여기서 묶는 건 그 UPDATE 뒤의 읽기 셋뿐이다.
+    const lang = pickLang(body?.lang)
+    const [{ data }, { data: tRows }, { data: checks }] = await Promise.all([
+      admin
+        .from('exam_attempts')
+        .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, cert_issued_at, verify_token, cert_no, cert_name_roman')
+        .eq('user_id', user.id)
+        .order('submitted_at', { ascending: false, nullsFirst: false })
+        .order('started_at', { ascending: false })
+        .limit(50),
+      // 보유 응시권 — 마이페이지 응시 탭이 이 함수 하나만 부르므로 여기에 얹는다.
+      // void 는 내려주지 않는다 — 회수된 응시권을 사용자 화면에 남길 이유가 없고, 회수 사유는 관리자 소관이다.
+      // 컬럼을 _shared/exam-tickets.ts 의 공용 COLS 로 받지 않는 이유: 이 응답이 어느 컬럼에 기대는지가
+      // 여기서 바로 보여야 한다. 반대로 '응시 가능한가' 판정은 examWindowOpen 하나로 묶는다 —
+      // start-exam 이 같은 함수로 거르므로, 여기서 따로 계산하면 화면은 '응시 가능'인데 서버는 403 을
+      // 주는 조합이 생긴다.
+      admin
+        .from('exam_tickets')
+        .select('id, round_id, tier, status, source, price_paid, expires_at, issued_at, consumed_at')
+        .eq('user_id', user.id)
+        .in('status', ['issued', 'consumed', 'expired'])
+        .order('issued_at', { ascending: false })
+        .limit(TICKET_LIMIT),
+      // 시험환경 점검 여부 — 응시권 카드가 "점검 먼저" 게이트를 그리는 데 쓴다.
+      //   ⚠️ 응시권에 묶인 기록이 우선이고, 없으면 그 사람이 어떤 식으로든 점검을 마친 적이 있는지 본다
+      //      (응시권 없이 체험만 한 경우도 점검은 점검이다 — 두 번 시키지 않는다).
+      admin.from('exam_env_checks').select('ticket_id').eq('user_id', user.id).limit(500),
+    ])
 
     const rows = data ?? []
+    const ticketRows = (tRows ?? []) as TicketRow[]
     const examIds = [...new Set(rows.map((r) => r.exam_id).filter(Boolean))]
+    const roundIds = [...new Set(ticketRows.map((t) => t.round_id).filter(Boolean))]
+
+    // ── 2파: 1파가 준 id 배열만 쓰고 셋이 서로 독립이다 ──────────────────
+    const [examsRes, roundsRes, usedRes] = await Promise.all([
+      examIds.length
+        ? admin.from('exams').select('id, title').in('id', examIds)
+        : Promise.resolve({ data: null }),
+      roundIds.length
+        ? admin
+            .from('exam_rounds')
+            .select('id, kind, title_i18n, exam_date, exam_start_at, exam_end_at, apply_start_at, apply_end_at, published')
+            .in('id', roundIds)
+        : Promise.resolve({ data: null }),
+      // 응시권 → 응시 역조회. 살아있는 응시(제출·무효·진행중)만 담는다 —
+      // 만료된 응시는 결과도 없고 이어할 수도 없어서 화면이 가리킬 대상이 아니다.
+      ticketRows.length
+        ? admin
+            .from('exam_attempts')
+            .select('id, ticket_id, status, started_at')
+            .in('ticket_id', ticketRows.map((t) => t.id))
+            .order('started_at', { ascending: false })
+        : Promise.resolve({ data: null }),
+    ])
+
     const titleMap: Record<string, string> = {}
-    if (examIds.length) {
-      const { data: exams } = await admin.from('exams').select('id, title').in('id', examIds)
-      for (const e of exams ?? []) titleMap[(e as { id: string }).id] = (e as { title: string }).title
+    for (const e of examsRes.data ?? []) titleMap[(e as { id: string }).id] = (e as { title: string }).title
+
+    const envDone = new Set<string>()
+    let envAny = false
+    for (const c of (checks ?? []) as { ticket_id: string | null }[]) {
+      envAny = true
+      if (c.ticket_id) envDone.add(c.ticket_id)
+    }
+
+    const roundMap: Record<string, RoundRow> = {}
+    for (const r of (roundsRes.data ?? []) as RoundRow[]) roundMap[r.id] = r
+
+    const attemptByTicket: Record<string, TicketAttemptRow> = {}
+    for (const a of (usedRes.data ?? []) as TicketAttemptRow[]) {
+      const rank = ATTEMPT_RANK[a.status] ?? 0
+      if (!a.ticket_id || rank === 0) continue
+      const prev = attemptByTicket[a.ticket_id]
+      if (!prev || rank > (ATTEMPT_RANK[prev.status] ?? 0)) attemptByTicket[a.ticket_id] = a
     }
 
     const attempts = rows.map((r) => {
@@ -260,68 +342,6 @@ Deno.serve(async (req) => {
         certNameRoman: passed ? r.cert_name_roman ?? null : null,
       }
     })
-
-    // ---------- 보유 응시권 ----------
-    // 마이페이지 응시 탭이 이 함수 하나만 부르므로 여기에 얹는다(왕복이 안 늘고, '이 응시권은 이미
-    // 소진됐다'는 판정을 서버가 한 번에 확정할 수 있다).
-    // void 는 내려주지 않는다 — 회수된 응시권을 사용자 화면에 남길 이유가 없고, 회수 사유는 관리자 소관이다.
-    // 컬럼을 _shared/exam-tickets.ts 의 공용 COLS 로 받지 않는 이유: 이 응답이 어느 컬럼에 기대는지가
-    // 여기서 바로 보여야 한다. 반대로 '응시 가능한가' 판정은 examWindowOpen 하나로 묶는다 —
-    // start-exam 이 같은 함수로 거르므로, 여기서 따로 계산하면 화면은 '응시 가능'인데 서버는 403 을
-    // 주는 조합이 생긴다.
-    const lang = pickLang(body?.lang)
-    const { data: tRows } = await admin
-      .from('exam_tickets')
-      .select('id, round_id, tier, status, source, price_paid, expires_at, issued_at, consumed_at')
-      .eq('user_id', user.id)
-      .in('status', ['issued', 'consumed', 'expired'])
-      .order('issued_at', { ascending: false })
-      .limit(TICKET_LIMIT)
-    const ticketRows = (tRows ?? []) as TicketRow[]
-
-    // 시험환경 점검 여부 — 응시권 카드가 "점검 먼저" 게이트를 그리는 데 쓴다.
-    //   ⚠️ 응시권에 묶인 기록이 우선이고, 없으면 그 사람이 어떤 식으로든 점검을 마친 적이 있는지 본다
-    //      (응시권 없이 체험만 한 경우도 점검은 점검이다 — 두 번 시키지 않는다).
-    const envDone = new Set<string>()
-    let envAny = false
-    {
-      const { data: checks } = await admin
-        .from('exam_env_checks')
-        .select('ticket_id')
-        .eq('user_id', user.id)
-        .limit(500)
-      for (const c of (checks ?? []) as { ticket_id: string | null }[]) {
-        envAny = true
-        if (c.ticket_id) envDone.add(c.ticket_id)
-      }
-    }
-
-    const roundMap: Record<string, RoundRow> = {}
-    const roundIds = [...new Set(ticketRows.map((t) => t.round_id).filter(Boolean))]
-    if (roundIds.length) {
-      const { data: rounds } = await admin
-        .from('exam_rounds')
-        .select('id, kind, title_i18n, exam_date, exam_start_at, exam_end_at, apply_start_at, apply_end_at, published')
-        .in('id', roundIds)
-      for (const r of (rounds ?? []) as RoundRow[]) roundMap[r.id] = r
-    }
-
-    // 응시권 → 응시 역조회. 살아있는 응시(제출·무효·진행중)만 담는다 —
-    // 만료된 응시는 결과도 없고 이어할 수도 없어서 화면이 가리킬 대상이 아니다.
-    const attemptByTicket: Record<string, TicketAttemptRow> = {}
-    if (ticketRows.length) {
-      const { data: used } = await admin
-        .from('exam_attempts')
-        .select('id, ticket_id, status, started_at')
-        .in('ticket_id', ticketRows.map((t) => t.id))
-        .order('started_at', { ascending: false })
-      for (const a of (used ?? []) as TicketAttemptRow[]) {
-        const rank = ATTEMPT_RANK[a.status] ?? 0
-        if (!a.ticket_id || rank === 0) continue
-        const prev = attemptByTicket[a.ticket_id]
-        if (!prev || rank > (ATTEMPT_RANK[prev.status] ?? 0)) attemptByTicket[a.ticket_id] = a
-      }
-    }
 
     const tickets = ticketRows.map((t) => {
       const round = roundMap[t.round_id] ?? null
