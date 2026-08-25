@@ -1368,6 +1368,8 @@ const ZH: Record<string, string> = {
   "seb.entry_loading": "正在准备考试…",
   "seb.entry_retry": "重试",
   // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
+  "envcheck.saving": "正在保存检测结果…",
+  "envcheck.save_failed": "未能保存检测记录。请关闭安全浏览器后重试。",
   "envcheck.ok_title": "环境检测完成",
   "envcheck.ok_desc": "本机可以应试。请用下方按钮关闭安全浏览器。",
   "envcheck.warn_title": "有需要确认的项目",
@@ -1766,7 +1768,7 @@ const ZH: Record<string, string> = {
   "hub.gate_title": "需要登录",
   "hub.gate_sub": "登录后即可使用签到和商店",
   "hub.banner_login": "签到和商店需要登录后使用",
-  "hub.share": "分享",
+  "hub.share": "炫耀我的排名",
   "hub.gift_btn": "赠送",
   "hub.help_aria": "如何获得积分",
   "hub.coin_tip": "持有的 CARI 币",

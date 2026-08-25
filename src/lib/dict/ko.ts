@@ -1376,6 +1376,8 @@ const KO: Record<string, string> = {
   // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
   // SEB 환경 점검 도착 화면(/exam/envcheck) — **모의 문제를 풀리지 않는다.**
   // 확인하려는 건 "이 PC 에서 SEB 가 실제로 떴는가" 하나뿐이고, 이 화면이 보이면 그게 증명된다.
+  "envcheck.saving": "점검 결과를 저장하는 중…",
+  "envcheck.save_failed": "점검 기록을 저장하지 못했습니다. 보안 브라우저를 닫고 다시 시도해 주세요.",
   "envcheck.ok_title": "환경 점검 완료",
   "envcheck.ok_desc": "이 컴퓨터에서 시험을 볼 수 있습니다. 아래 버튼으로 보안 브라우저를 닫아주세요.",
   "envcheck.warn_title": "확인이 필요한 항목이 있어요",
@@ -1774,7 +1776,7 @@ const KO: Record<string, string> = {
   "hub.gate_title": "로그인이 필요해요",
   "hub.gate_sub": "로그인하고 출석·상점을 이용해보세요",
   "hub.banner_login": "로그인해야 출석·상점이 작동해요",
-  "hub.share": "공유",
+  "hub.share": "내 랭킹 자랑",
   "hub.gift_btn": "선물",
   "hub.help_aria": "점수 획득 방법",
   "hub.coin_tip": "보유한 CARI 코인",

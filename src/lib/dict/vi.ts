@@ -1368,6 +1368,8 @@ const VI: Record<string, string> = {
   "seb.entry_loading": "Đang chuẩn bị bài thi…",
   "seb.entry_retry": "Thử lại",
   // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
+  "envcheck.saving": "Đang lưu kết quả kiểm tra…",
+  "envcheck.save_failed": "Không lưu được bản ghi kiểm tra. Hãy đóng trình duyệt bảo mật và thử lại.",
   "envcheck.ok_title": "Kiểm tra môi trường hoàn tất",
   "envcheck.ok_desc": "Máy này đã sẵn sàng để thi. Hãy dùng nút bên dưới để đóng trình duyệt bảo mật.",
   "envcheck.warn_title": "Có mục cần kiểm tra",
@@ -1766,7 +1768,7 @@ const VI: Record<string, string> = {
   "hub.gate_title": "Cần đăng nhập",
   "hub.gate_sub": "Đăng nhập để dùng điểm danh và cửa hàng",
   "hub.banner_login": "Điểm danh và cửa hàng cần đăng nhập",
-  "hub.share": "Chia sẻ",
+  "hub.share": "Khoe hạng của tôi",
   "hub.gift_btn": "Tặng",
   "hub.help_aria": "Cách kiếm điểm",
   "hub.coin_tip": "CARI coin của bạn",

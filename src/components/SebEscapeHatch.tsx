@@ -13,7 +13,8 @@ import { useT } from '../lib/i18n'
 //    잠금이 무의미해진다. 그 화면에는 이미 '종료(포기)' 가 있고 그건 응시를 무효로 기록한다.
 // ⚠️ 종료 화면(/exam/complete·/exam/done)에도 안 띄운다 — 거기엔 이미 종료 버튼이 있고,
 //    /exam/done 은 SEB 가 스스로 닫는 주소라 버튼이 뜰 새도 없다.
-const HIDDEN_PREFIXES = ['/exam/run', '/exam/complete', '/exam/done']
+// ⚠️ /exam/envcheck 는 그 화면이 자기 종료 버튼을 이미 갖고 있다 — 여기까지 뜨면 같은 버튼이 둘이 된다.
+const HIDDEN_PREFIXES = ['/exam/run', '/exam/complete', '/exam/done', '/exam/envcheck']
 
 export default function SebEscapeHatch() {
   const { pathname } = useLocation()

@@ -2,11 +2,10 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { isMobileDevice } from '../lib/device'
 import MobileBlock from '../components/MobileBlock'
-import { isSEB, SEB_REQUIRED, sebPracticeLaunchUrl } from '../lib/seb'
+import { isSEB, sebPracticeLaunchUrl } from '../lib/seb'
 import SebInstall from '../components/SebInstall'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
-import { useAuth } from '../context/AuthProvider'
 
 // gara_3 (시험환경 테스트) 목업 디자인 그대로 + 실제 점검 로직(SEB 감지·환경체크·모의응시) 보존.
 // 원본: stitch_design_critique_assistant/gara_3/code.html
@@ -19,9 +18,9 @@ export default function ExamCheck() {
   // 없어도 된다(그냥 체험). 그때도 "이 PC 는 된다"는 사실은 남긴다.
   const [params] = useSearchParams()
   const ticketId = params.get('ticket')
-  const { isFullUser } = useAuth()
   // 점검 기록 전송 중 — 중복 클릭과 '보냈는데 아직 안 끝남' 을 둘 다 막는다.
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   if (isMobileDevice()) return <MobileBlock />
 
   const inSeb = isSEB()
@@ -35,27 +34,23 @@ export default function ExamCheck() {
   async function startPractice() {
     if (busy) return
     setBusy(true)
-    // ⚠️ 점검 완료는 **점검을 시작한 시점**에 남긴다. 끝까지 뭘 했는지는 서버가 알 수 없고
-    //    (모의는 채점도 제출도 없다), 여기까지 왔다는 건 이 PC 가 조건을 만족한다는 뜻이라 그게 확인하려던 것이다.
-    // ⛔ **반드시 await 한다.** 예전엔 요청을 띄우자마자 아래에서 SEB 링크로 페이지를 넘겨버려서
-    //    브라우저가 그 요청을 취소했다 — 점검을 해도 기록이 안 남아 마이페이지의 '응시하러 가기' 가
-    //    영영 안 열렸다(2026-08-13). 기록 실패는 여전히 삼킨다(점검이 목적이지 기록이 목적이 아니다).
-    if (isFullUser) {
-      try {
-        await callFunction('exam-env-check', {
-          ticketId,
-          ua: navigator.userAgent,
-          screen: `${window.screen.width}x${window.screen.height}`,
-          detail: { inSeb: isSEB(), fullscreen: !!document.fullscreenEnabled, online: navigator.onLine },
-        })
-      } catch { /* 기록 실패는 무시 */ }
+    setErr('')
+    try {
+      // ⛔ 점검 기록을 **여기서 남기지 않는다.** 예전엔 버튼을 누른 순간 기록해서, SEB 가 안 떠도
+      //    "점검 완료" 가 됐다 — 정작 확인하려던 "이 PC 에서 SEB 가 뜨는가" 를 증명하지 못했다.
+      //    대신 일회용 표를 받아 실행 링크에 실어 보내고, **SEB 안에서 그 표를 쓸 때** 서버가 기록한다.
+      //    그러면 기록이 남았다는 것 자체가 SEB 가 떴다는 증거가 된다.
+      const h = await callFunction<{ nonce: string }>('seb-handoff', {
+        action: 'issue',
+        purpose: 'envcheck',
+        ...(ticketId ? { ticketId } : {}),
+      })
+      window.location.href = sebPracticeLaunchUrl(lang, h.nonce)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('prep.err_start'))
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
-    if (SEB_REQUIRED && !isSEB()) {
-      window.location.href = sebPracticeLaunchUrl(lang)
-      return
-    }
-    navigate('/exam/envcheck')
   }
 
   return (
@@ -131,6 +126,7 @@ export default function ExamCheck() {
                   <span className="material-symbols-outlined text-[20px]">play_arrow</span>
                   {t('check.practice_btn')}
                 </button>
+                {err && <p className="prep-warn" style={{ marginTop: 10 }}>{err}</p>}
               </div>
             </div>
           </div>

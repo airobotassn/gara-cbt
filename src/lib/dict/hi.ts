@@ -1368,6 +1368,8 @@ const HI: Record<string, string> = {
   "seb.entry_loading": "आपकी परीक्षा तैयार की जा रही है…",
   "seb.entry_retry": "पुनः प्रयास करें",
   // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
+  "envcheck.saving": "जाँच परिणाम सहेजा जा रहा है…",
+  "envcheck.save_failed": "जाँच रिकॉर्ड सहेजा नहीं जा सका। सुरक्षित ब्राउज़र बंद करके पुनः प्रयास करें।",
   "envcheck.ok_title": "पर्यावरण जाँच पूर्ण",
   "envcheck.ok_desc": "यह कंप्यूटर परीक्षा के लिए तैयार है। नीचे के बटन से सुरक्षित ब्राउज़र बंद करें।",
   "envcheck.warn_title": "कुछ आइटम पर ध्यान देने की आवश्यकता है",
@@ -1766,7 +1768,7 @@ const HI: Record<string, string> = {
   "hub.gate_title": "लॉगिन आवश्यक है",
   "hub.gate_sub": "चेक-इन और शॉप के लिए साइन इन करें",
   "hub.banner_login": "चेक-इन और शॉप के लिए साइन इन ज़रूरी है",
-  "hub.share": "शेयर",
+  "hub.share": "मेरी रैंक दिखाएँ",
   "hub.gift_btn": "गिफ्ट",
   "hub.help_aria": "पॉइंट कैसे कमाएं",
   "hub.coin_tip": "आपके CARI कॉइन",

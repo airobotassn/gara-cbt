@@ -1368,6 +1368,8 @@ const JA: Record<string, string> = {
   "seb.entry_loading": "試験を準備しています…",
   "seb.entry_retry": "再試行",
   // SEB 탈출 버튼. '취소'·'닫기' 처럼 모호하게 쓰지 말 것 — 갇힌 사람이 한눈에 알아봐야 하는 문구다.
+  "envcheck.saving": "点検結果を保存しています…",
+  "envcheck.save_failed": "点検記録を保存できませんでした。セキュアブラウザを閉じてもう一度お試しください。",
   "envcheck.ok_title": "環境チェック完了",
   "envcheck.ok_desc": "このコンピュータで受験できます。下のボタンでセキュアブラウザを閉じてください。",
   "envcheck.warn_title": "確認が必要な項目があります",
@@ -1766,7 +1768,7 @@ const JA: Record<string, string> = {
   "hub.gate_title": "ログインが必要です",
   "hub.gate_sub": "ログインして出席・ショップを使いましょう",
   "hub.banner_login": "出席・ショップはログインが必要です",
-  "hub.share": "シェア",
+  "hub.share": "ランキング自慢",
   "hub.gift_btn": "ギフト",
   "hub.help_aria": "ポイントの獲得方法",
   "hub.coin_tip": "保有CARIコイン",

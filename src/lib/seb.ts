@@ -85,8 +85,11 @@ export function sebQuitUrl(): string {
 }
 
 // 모의 응시용 .seb (gara-practice[-<lang>].seb) — 실제와 같은 SEB 잠금 환경에서 연습 문제를 연다.
-export function sebPracticeLaunchUrl(lang?: string): string {
+export function sebPracticeLaunchUrl(lang?: string, nonce?: string): string {
   if (typeof window === 'undefined') return ''
   const file = lang ? `gara-practice-${lang}.seb` : 'gara-practice.seb'
-  return toScheme(`${window.location.origin}/${file}`)
+  const base = `${window.location.origin}/${file}`
+  // ⚠️ 물음표 두 개(`??h=`) — 하나면 SEB 가 startURL 로 안 옮긴다(sebLaunchUrl 주석 참고).
+  //    점검 표는 SEB 안에서 교환될 때 **점검 기록만** 남긴다(시험 자격은 안 나온다).
+  return toScheme(nonce ? `${base}??h=${encodeURIComponent(nonce)}` : base)
 }
