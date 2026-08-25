@@ -56,7 +56,7 @@ import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaUserPanel, type Are
 // 재편으로 새로 만든 화면들(Admin.tsx 가 이미 6천 줄이라 분리) — 라우팅만 여기서 한다.
 import {
   PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, TermPoolAdmin, CoinPolicyAdmin, HubCosmeticAdmin,
-  CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
+  CertAdmin, LecturesAdmin, QnaAdmin, FeedbackAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
   ReadCell,
 } from './AdminReform'
 import { useAdminData, payStatusLabel, productLabel, type EbookReadRow } from '../lib/adminData'
@@ -123,6 +123,9 @@ const SUBS: Record<TopMenu, SubItem[]> = {
   board: [
     { key: 'notice', label: '공지사항' },
     { key: 'support', label: '고객센터', children: [{ key: 'faq', label: 'FAQ' }, { key: 'qna', label: 'Q&A' }] },
+    // 의견함 — FAB 의 빨간 '의견 보내기'. ⚠️ Q&A 아래 children 으로 넣지 말 것: 고객센터는 **답변하는**
+    //   물건이고 의견함은 답변이 없다. 같은 묶음에 두면 답변 안 한 의견이 밀린 것처럼 보인다.
+    { key: 'feedback', label: '의견함' },
     { key: 'about', label: '협회소개' },
     { key: 'privacy', label: '개인정보처리방침' },
     { key: 'terms', label: '이용약관' },
@@ -300,6 +303,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     case 'board/notice': return <NoticesAdmin />
     case 'board/support/faq': return <FaqAdmin />
     case 'board/support/qna': return <QnaAdmin />
+    case 'board/feedback': return <FeedbackAdmin />
     // ⚠️ key 가 없으면 세 문서가 **같은 컴포넌트 인스턴스**를 재사용해 본문(state)이 그대로 남는다 —
     //    협회소개를 보다 이용약관으로 넘어가면 협회소개 글이 그대로 보인다(실제로 그랬다).
     case 'board/about': return <PolicyAdmin key="about" doc="about" />

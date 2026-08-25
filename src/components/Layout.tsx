@@ -23,6 +23,7 @@ import {
   PencilIcon,
   CameraIcon,
   ChevronUpIcon,
+  MegaphoneIcon,
 } from './FabIcons'
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -324,6 +325,13 @@ export default function Layout({ children }: { children: ReactNode }) {
                   갈라져 있다 — 거기만 한국어 설명 '(학습센터)' 가 붙는다(2026-08-19 지시). 한 키로 다시 합치지 말 것. */}
               <button className="pf-item" onClick={() => go('/ebooks')}>
                 <span className="ic"><BookIcon /></span> {t('landing.cta_learn')}
+              </button>
+              {/* 의견 보내기 — 목록에서 **유일하게 빨간** 항목이다(2026-08-25 지시: 한눈에 보이게).
+                  ⚠️ 색은 전용 토큰 `--pf-alert-*` 로 박는다. 전역 --error 를 쓰면 테마마다 값이 달라
+                     라이트에서 글자가 면에 묻는다(FAB 패널 면은 테마를 따라간다).
+                  ⚠️ 목록 맨 아래에 둔다 — 위로 올리면 HOME·CARIS 같은 실제 이동 메뉴를 밀어낸다. */}
+              <button className="pf-item is-alert" onClick={() => go('/feedback')}>
+                <span className="ic"><MegaphoneIcon /></span> {t('fab.feedback')}
               </button>
             </div>
 

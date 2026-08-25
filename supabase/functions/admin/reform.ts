@@ -138,6 +138,54 @@ async function inquiryAnswer(admin: any, body: any, ctx: Ctx) {
   return json({ ok: true })
 }
 
+// ── 의견함 ──────────────────────────────────────────────────
+// ⛔ 1:1 문의(inquiryList)와 다른 표다 — 여기엔 답변 경로가 없다. 관리자는 읽고, 엑셀로 뽑고, 지운다.
+// ⚠️ limit 을 문의(200)보다 크게 잡는다: 엑셀 추출이 이 응답을 그대로 쓰기 때문에 잘리면 **말없이
+//    일부만 담긴 파일**이 나간다. 넘칠 때를 대비해 total 을 같이 주고 화면이 잘림을 알린다.
+const FEEDBACK_LIMIT = 1000
+
+async function feedbackList(admin: any, body: any) {
+  const q = String(body?.q ?? '').trim()
+  let sel = admin.from('feedbacks').select('*', { count: 'exact' })
+  // 소속·이름·경로·내용 아무 데나 걸리면 된다(관리자가 기억하는 조각으로 찾는다).
+  if (q) {
+    const esc = q.replace(/[%_,()]/g, ' ').trim()
+    if (esc) sel = sel.or(`org.ilike.%${esc}%,name.ilike.%${esc}%,path.ilike.%${esc}%,body.ilike.%${esc}%`)
+  }
+  const { data, count, error } = await sel.order('created_at', { ascending: false }).limit(FEEDBACK_LIMIT)
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+  // 로그인 상태로 쓴 건 계정 이름을 곁들인다 — 본인이 적은 이름과 다를 수 있어 **덮어쓰지 않고 따로** 준다.
+  const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
+  const accountMap: Record<string, string> = {}
+  if (ids.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids)
+    for (const p of profs ?? []) accountMap[(p as any).id] = (p as any).display_name ?? ''
+  }
+  return json({
+    feedbacks: rows.map((r) => ({
+      id: r.id,
+      org: r.org,
+      name: r.name,
+      path: r.path,
+      body: r.body,
+      account: r.user_id ? (accountMap[r.user_id] || '(이름 없음)') : null,
+      createdAt: r.created_at,
+    })),
+    total: count ?? rows.length,
+    limit: FEEDBACK_LIMIT,
+  })
+}
+
+async function feedbackDelete(admin: any, body: any, ctx: Ctx) {
+  const id = String(body?.id ?? '')
+  if (!id) return json({ error: 'id 가 없습니다.' }, 400)
+  const { error } = await admin.from('feedbacks').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 500)
+  await audit(admin, ctx, 'feedbackDelete', id)
+  return json({ ok: true })
+}
+
 // ── 이북 미리보기 ────────────────────────────────────────────
 /**
  * 관리자가 **구매 없이** 이북 본문을 연다.
@@ -841,6 +889,8 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx): P
     case 'policyUpsert': return await policyUpsert(admin, body, ctx)
     case 'inquiryList': return await inquiryList(admin, body)
     case 'inquiryAnswer': return await inquiryAnswer(admin, body, ctx)
+    case 'feedbackList': return await feedbackList(admin, body)
+    case 'feedbackDelete': return await feedbackDelete(admin, body, ctx)
     case 'ebookPreview': return await ebookPreview(admin, body)
     case 'lectureList': return await lectureList(admin, body)
     case 'lectureUpsert': return await lectureUpsert(admin, body)

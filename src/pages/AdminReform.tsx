@@ -9,6 +9,7 @@ import DraftBar from '../components/DraftBar'
 import { krw } from '../lib/money'
 import { getTracks } from '../lib/caris'
 import { MAX_LEVEL } from '../lib/categories'
+import * as XLSX from 'xlsx'
 
 // ── 공용 ──────────────────────────────────────────────────────
 const inp: CSSProperties = {
@@ -1194,6 +1195,146 @@ export function QnaAdmin() {
           </div>
         </div>
       )}
+    </>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// 게시판 관리 > 의견함
+// ══════════════════════════════════════════════════════════════
+// FAB 패널의 빨간 '의견 보내기'(/feedback)로 들어온 것들.
+// ⛔ Q&A(1:1 문의)와 **다른 표**다 — 여기엔 답변 경로가 없다. 관리자가 하는 일은 읽기·엑셀·삭제 셋뿐이다.
+//    답변 칸을 붙이고 싶어지면 그건 Q&A 로 옮길 일이다(의견을 쓴 사람은 계정이 없을 수도 있어 보낼 곳이 없다).
+interface FeedbackRow {
+  id: string
+  org: string
+  name: string
+  path: string
+  body: string
+  /** 로그인 상태로 썼을 때의 계정 이름. 본인이 적은 name 과 다를 수 있어 **덮어쓰지 않고 따로** 보여준다. */
+  account: string | null
+  createdAt: string
+}
+
+/** 엑셀 파일명에 못 쓰는 글자를 턴다(문항 내보내기와 같은 규칙). */
+function fbFileName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_')
+}
+
+function exportFeedbackXlsx(rows: FeedbackRow[]) {
+  const header = ['등록일시', '소속', '이름', '경로', '내용', '계정']
+  const body = rows.map((r) => [fmtDT(r.createdAt), r.org, r.name, r.path, r.body, r.account ?? ''])
+  const ws = XLSX.utils.aoa_to_sheet([header, ...body])
+  // 기본 폭이면 '내용' 칸이 한 글자 폭으로 서서 파일을 열자마자 손으로 늘려야 한다.
+  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 26 }, { wch: 70 }, { wch: 14 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '의견')
+  const day = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(/-/g, '')
+  XLSX.writeFile(wb, fbFileName(`의견함_${day}.xlsx`))
+}
+
+export function FeedbackAdmin() {
+  // 검색어는 입력할 때마다 서버를 부르지 않는다 — 엔터/버튼으로 확정한 값(q)만 조회에 쓴다.
+  const [draftQ, setDraftQ] = useState('')
+  const [q, setQ] = useState('')
+  const { data, loading, err, reload } = useAdminData<{ feedbacks: FeedbackRow[]; total: number; limit: number }>('feedbackList', { q })
+  const [open, setOpen] = useState<FeedbackRow | null>(null)
+  const rows = data?.feedbacks ?? []
+  const total = data?.total ?? rows.length
+  // ⚠️ 잘림을 반드시 말한다 — 엑셀이 이 목록을 그대로 쓰기 때문에, 조용히 자르면
+  //    "전부 받았다" 고 믿고 일부만 든 파일이 나간다.
+  const truncated = !!data && total > rows.length
+
+  async function remove(r: FeedbackRow) {
+    if (!confirm(`${r.name}(${r.org}) 님의 의견을 지웁니다. 되돌릴 수 없습니다.`)) return
+    try {
+      await callFunction('admin', { action: 'feedbackDelete', id: r.id })
+      setOpen(null)
+      await reload()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제 실패')
+    }
+  }
+
+  return (
+    <>
+      <AdminHead title="게시판 관리 · 의견함" count={`전체 ${total}건`} onReload={reload} loading={loading}>
+        <button className="admin-mini" onClick={() => exportFeedbackXlsx(rows)} disabled={!rows.length}>
+          엑셀 내려받기
+        </button>
+      </AdminHead>
+      <ErrBox msg={err} />
+      <p className="admin-hint" style={{ marginBottom: 12, lineHeight: 1.7 }}>
+        화면 왼쪽 아래 <b>CARIS 버튼 → 의견 보내기</b> 로 들어온 의견입니다. <b>답변 기능이 없습니다</b> —
+        회신이 필요한 문의는 <b>고객센터 · Q&amp;A</b> 로 옵니다. 로그인하지 않은 사람도 쓸 수 있어
+        소속·이름은 <b>본인이 적은 값</b>입니다.
+      </p>
+      <div className="admin-toolbar">
+        <input
+          style={{ ...inp, maxWidth: 260 }}
+          placeholder="소속·이름·경로·내용 검색"
+          value={draftQ}
+          onChange={(e) => setDraftQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') setQ(draftQ.trim()) }}
+        />
+        <button className="admin-mini" onClick={() => setQ(draftQ.trim())}>검색</button>
+        {q ? <button className="admin-mini" onClick={() => { setDraftQ(''); setQ('') }}>초기화</button> : null}
+        <span className="admin-hint">{rows.length}건 표시</span>
+      </div>
+      {truncated ? (
+        <div className="admin-section admin-empty">
+          최근 {rows.length}건만 불러왔습니다(전체 {total}건). 엑셀도 이 {rows.length}건만 담깁니다 — 검색으로 좁혀 주세요.
+        </div>
+      ) : null}
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead><tr><th>등록</th><th>소속</th><th>이름</th><th>경로</th><th>내용</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.createdAt)}</td>
+                <td>{r.org}</td>
+                <td>
+                  {r.name}
+                  {/* 계정 이름이 적어낸 이름과 다를 때만 덧붙인다 — 같으면 같은 말을 두 번 쓰는 것이다. */}
+                  {r.account && r.account !== r.name
+                    ? <span className="admin-hint" style={{ marginLeft: 6 }}>({r.account})</span>
+                    : null}
+                </td>
+                <td>{r.path}</td>
+                {/* 목록에서는 한 줄만 — 내용이 길어 그대로 두면 표가 아니라 문서가 된다. 전문은 모달. */}
+                <td style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.body}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="admin-mini" onClick={() => setOpen(r)}>보기</button>
+                </td>
+              </tr>
+            ))}
+            {!loading && !rows.length ? (
+              <tr><td colSpan={6} className="admin-empty">{q ? '검색 결과가 없습니다.' : '아직 들어온 의견이 없습니다.'}</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      {open ? (
+        <div className="admin-modal-bg">
+          {/* 읽기 전용 모달이라 바깥 클릭으로 닫아도 잃을 게 없다(Q&A 는 답변을 쓰던 중이라 안 닫는다). */}
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setOpen(null)}>✕</button>
+            <h2 style={{ margin: 0 }}>{open.org} · {open.name}</h2>
+            <p className="admin-modal-meta">
+              {fmtDT(open.createdAt)} · 경로 <b>{open.path}</b>
+              {open.account ? <> · 계정 <b>{open.account}</b></> : <> · 비로그인</>}
+            </p>
+            {/* 줄바꿈을 살린다 — 의견은 문단으로 적는 글이라 한 줄로 접으면 읽는 순서가 무너진다. */}
+            <div className="admin-section" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.75 }}>{open.body}</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+              <button className="admin-mini danger" onClick={() => remove(open)}>삭제</button>
+              <button className="admin-mini" onClick={() => setOpen(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
