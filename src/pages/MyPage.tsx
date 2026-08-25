@@ -3,9 +3,18 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse } from '../lib/types'
-import LearningDashboard from '../components/LearningDashboard'
+import type { EbookListResp, EbookRow, MyAttempt, MyAttemptsResponse, ServerLecture } from '../lib/types'
 import EbookCover from '../components/EbookCover'
+import {
+  BookRow,
+  LectureRow,
+  LibraryFrame,
+  PaneEmpty,
+  Pager,
+  type LibGroup,
+} from '../components/LearningLibrary'
+import { ANY_COLOR, COVER_COLORS } from '../lib/coverColors'
+import { getTracks, TIER_COLORS } from '../lib/caris'
 import InquiryBoard from '../components/InquiryBoard'
 import { useInquiryAlert } from '../lib/inquiryAlert'
 import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate } from '../lib/certNo'
@@ -27,11 +36,14 @@ import type { Lang, TFunc } from '../lib/i18n'
 // 원본: stitch_design_critique_assistant/gara_5/code.html
 // primary 는 전역 토큰 사용(라이트 #004ac6 / 다크 #7aa9ff) — 페이지별 오버라이드 제거.
 
-// 탭 순서 = 화면에 보이는 순서. 첫 탭(학습 대시보드)이 /mypage 기본 화면이다.
-//   ⚠️ '시험 응시 현황'은 예전 기본 탭이라 /mypage 였는데, 기본이 대시보드로 바뀌며 /mypage/attempts 로 이동했다.
+// 탭 순서 = 화면에 보이는 순서. 첫 탭(이북 서재)이 /mypage 기본 화면이다.
+//   ⚠️ 옛 첫 탭 '학습 대시보드'는 2026-08-25 에 통째로 찢겨나갔다 — 레벨테스트 몫(최고레벨·누적응시·
+//      평균정답률·영역 밸런스·승급 기록)은 `/test/record`, 활동 기록 달력은 `/hub`(스탬프판 → 출석 기록),
+//      랭킹 추이는 `/ranking` 으로 갔다. 여기(CARIS 자격검정 마이페이지)에 레벨테스트 화면이 얹혀 있던
+//      것이 애초에 어긋난 자리였다. 되살릴 거면 그 세 자리부터 확인할 것 — 되돌리면 같은 말이 두 곳에 선다.
+//   ⚠️ '시험 응시 현황'은 그보다 더 예전의 기본 탭이라 /mypage 였다(지금은 /mypage/attempts).
 const TABS = [
-  { key: 'learning', labelKey: 'mypage.tab_learning', to: '/mypage' },
-  { key: 'ebooks', labelKey: 'mypage.tab_ebooks', to: '/mypage/ebooks' },
+  { key: 'ebooks', labelKey: 'mypage.tab_ebooks', to: '/mypage' },
   { key: 'attempts', labelKey: 'mypage.tab_attempts', to: '/mypage/attempts' },
   { key: 'earned', labelKey: 'mypage.tab_earned', to: '/mypage/earned' },
   { key: 'issuance', labelKey: 'mypage.tab_issuance', to: '/mypage/issuance' },
@@ -79,7 +91,7 @@ function statusInfo(a: MyAttempt) {
 //   ⚠️ 학교(school_id) 입력 UI 는 제거됨(2026-07-28). DB 컬럼·schools 테이블·school_leaderboard RPC 는 남아있고,
 //      랭킹의 학교 탭도 숨김 상태(Ranking.tsx) — 되살리려면 이 섹션에 자동완성 입력을 다시 붙이면 된다.
 function ProfileSection() {
-  const { user } = useAuth()
+  const { user, applyRegion } = useAuth()
   const { t, lang } = useT()
   const [profile, setProfile] = useState<{
     country_code: string | null
@@ -173,6 +185,9 @@ function ProfileSection() {
         region_code: geoNeedRegion ? geoRegion : null,
         region_changed_at: new Date().toISOString(),
       } : p))
+      // ⚠️ 컨텍스트도 같이 갱신한다 — 랭킹 탭 라벨과 아레나 '우리 순위'가 이 값을 본다.
+      //    빼먹으면 이 화면만 새 나라로 바뀌고 다른 화면은 새로고침 전까지 옛 나라를 가리킨다.
+      applyRegion(geoCountry, geoNeedRegion ? geoRegion : null)
       setGeoEditing(false)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -450,24 +465,102 @@ function TicketCard({ tk, t, lang, onGo, onCheck }: {
   )
 }
 
-// 이북 서재 — 구매한 이북만 보인다(구매는 /ebooks 스토어에서). 읽기는 뷰어(/ebooks/read/:id).
+// 내 서재 — **러닝 라이브러리(/ebooks)와 같은 3열**이다(2026-08-25 요청): 레벨(급수) | E-Book | 강의.
+//   차이는 데이터와 버튼뿐이다 — 여기 뜨는 건 **산 것만**이고, 버튼은 구매가 아니라 열기/재생이다.
+//   ⚠️ 뼈대·항목 줄은 components/LearningLibrary.tsx 가 단일 출처다. 여기서 다시 그리지 말 것 —
+//      두 벌이 되는 순간 한쪽만 고쳐진다(표지 폭·열 배경·좁은 화면 탭에는 전부 반려 이력이 붙어 있다).
+//   ⛔ 전체구매 칸은 **없다** — 서재는 파는 곳이 아니다.
+//   이북 읽기는 뷰어(/ebooks/read/:id), 강의는 그 자리에서 재생한다(2026-08-25 결정 — 시청 전용 화면을
+//   따로 만들면 서재 ↔ 시청 왕복이 생기고, 서재를 벗어날 이유가 없다).
 function EbookLibrary() {
   const { t, lang } = useT()
   const navigate = useNavigate()
   const [rows, setRows] = useState<EbookRow[] | null>(null)
+  const [lectures, setLectures] = useState<ServerLecture[]>([])
   const [err, setErr] = useState('')
+  const [zoom, setZoom] = useState<EbookRow | null>(null)
+  // 재생 중인 강의 — 한 번에 하나만(iframe 을 여러 개 띄우면 소리가 겹치고 페이지가 무거워진다).
+  const [playing, setPlaying] = useState<string | null>(null)
+  const [cat, setCat] = useState<'leveltest' | 'caris'>('leveltest')
+  const [levelSel, setLevelSel] = useState('1')
+  const [tierSel, setTierSel] = useState('beginner')
+  const [bookPageRaw, setBookPage] = useState(0)
+  const [lecPageRaw, setLecPage] = useState(0)
+  const [pane, setPane] = useState<string>('books')
 
   useEffect(() => {
     // 화면 언어의 번역본이 있으면 그 제목·표지로 보여준다(없으면 서버가 한국어로 폴백).
     callFunction<EbookListResp>('ebooks', { action: 'library', lang })
-      .then((r) => setRows(r.ebooks))
+      .then((r) => {
+        setRows(r.ebooks)
+        setLectures(r.lectures ?? [])
+        // 산 것이 한쪽 카탈로그에만 있으면 그쪽을 먼저 연다 — 빈 탭으로 시작하지 않는다.
+        const hasLevel = r.ebooks.some((b) => b.catalog !== 'caris') || (r.lectures ?? []).some((l) => l.catalog !== 'caris')
+        if (!hasLevel) setCat('caris')
+      })
       .catch((e) => setErr(e instanceof Error ? e.message : '이북을 불러올 수 없습니다.'))
   }, [lang])
+
+  const catRows = (rows ?? []).filter((b) => b.catalog === cat)
+  const catLectures = lectures.filter((l) => l.catalog === cat)
+
+  // 왼쪽 열 — 스토어와 같은 사다리다(산 게 없는 칸도 남긴다. 사다리가 중간에 비면 몇 칸짜리인지부터 헷갈린다).
+  const groups: LibGroup[] = cat === 'leveltest'
+    ? Array.from({ length: 7 }, (_, i) => i + 1).map((lv) => ({
+        key: String(lv),
+        label: `Lv.${lv} ${t(`lv.${lv}.name`)}`,
+        short: `Lv.${lv}`,
+        desc: t(`lv.${lv}.desc`),
+        color: COVER_COLORS[lv] ?? ANY_COLOR,
+      }))
+    : getTracks(lang).flatMap((track) =>
+        track.tiers.map((tier) => ({
+          key: tier.key,
+          label: tier.name,
+          short: tier.name,
+          desc: tier.target ?? tier.prereq ?? track.name,
+          color: TIER_COLORS[tier.key] ?? ANY_COLOR,
+        })),
+      )
+  // '무관'(레벨/급수 없이 산 것)은 있을 때만 세운다 — 항상 있으면 빈 칸이 하나 더 있는 것으로 읽힌다.
+  const hasAny = cat === 'leveltest'
+    ? catRows.some((b) => b.targetLevel == null) || catLectures.some((l) => l.targetLevel == null)
+    : catRows.some((b) => b.targetTier == null) || catLectures.some((l) => l.targetTier == null)
+  if (hasAny) {
+    groups.push({
+      key: 'any',
+      label: t(cat === 'caris' ? 'll.any_tier' : 'll.any_level'),
+      short: t(cat === 'caris' ? 'll.any_tier' : 'll.any_level'),
+      desc: t(cat === 'caris' ? 'll.any_tier_desc' : 'll.any_level_desc'),
+      color: ANY_COLOR,
+    })
+  }
+
+  const sel = cat === 'leveltest' ? levelSel : tierSel
+  const setSel = cat === 'leveltest' ? setLevelSel : setTierSel
+  const active = groups.find((g) => g.key === sel) ?? groups[0]
+  const inGroup = (targetLevel: number | null, targetTier: string | null) =>
+    cat === 'leveltest'
+      ? (active?.key === 'any' ? targetLevel == null : targetLevel === Number(active?.key))
+      : (active?.key === 'any' ? targetTier == null : targetTier === active?.key)
+
+  const books = catRows.filter((b) => inGroup(b.targetLevel, b.targetTier))
+  const lecs = catLectures.filter((l) => inGroup(l.targetLevel, l.targetTier))
+
+  // 한 화면에 한 개씩, 나머지는 페이지로 넘긴다(스토어와 같은 규칙).
+  //   ⚠️ 페이지 번호는 **clamp 로 접는다** — useEffect 로 0 을 다시 밀면 렌더가 한 번 더 돌고 빈 화면이 스친다.
+  const bookPage = Math.min(bookPageRaw, Math.max(0, books.length - 1))
+  const lecPage = Math.min(lecPageRaw, Math.max(0, lecs.length - 1))
+  const bookPager = books.length > 1 ? <Pager page={bookPage} total={books.length} onGo={setBookPage} t={t} /> : undefined
+  const lecPager = lecs.length > 1
+    ? <Pager page={lecPage} total={lecs.length} onGo={(p) => { setLecPage(p); setPlaying(null) }} t={t} />
+    : undefined
 
   if (err) return <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>
   if (rows === null) return <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>
 
-  if (rows.length === 0) {
+  // 아무것도 안 샀으면 3열을 세우지 않는다 — 일곱 칸이 전부 '없어요'인 화면은 안내가 아니라 미로다.
+  if (rows.length === 0 && lectures.length === 0) {
     return (
       <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center">
         <p className="font-body-md text-on-surface-variant mb-5">{t('mypage.empty_ebooks')}</p>
@@ -476,32 +569,103 @@ function EbookLibrary() {
     )
   }
 
+  const storeLink = (
+    <button onClick={() => navigate('/ebooks')} className="px-5 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:border-primary/30 hover:text-primary transition-all duration-200">
+      {t('ebook.go_store')}
+    </button>
+  )
+
   return (
     <>
-      {/* 표지 글자가 읽히도록 타일을 키운다(4열 → 3열, 모바일 2열 유지). */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-6">
-        {rows.map((b) => (
+      {/* 카탈로그 전환 — 스토어와 같은 버튼이다. 산 것이 없는 쪽도 남긴다(구조가 같아야 헷갈리지 않는다). */}
+      <div className="mb-4 inline-flex flex-wrap gap-1 rounded-full border border-outline-variant bg-surface-container-low p-1" role="group">
+        {(['leveltest', 'caris'] as const).map((k) => (
           <button
-            key={b.id}
-            onClick={() => navigate(`/ebooks/read/${b.id}`)}
-            className="group text-left flex flex-col gap-2.5"
-            aria-label={b.title}
+            key={k}
+            type="button"
+            onClick={() => { setCat(k); setPlaying(null); setBookPage(0); setLecPage(0) }}
+            aria-pressed={cat === k}
+            className={`rounded-full px-5 py-2.5 font-label-md text-[16px] font-bold tracking-tight transition-colors ${cat === k ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
-            <EbookCover title={b.title} coverUrl={b.coverUrl} width={320} className="w-full transition-transform duration-300 group-hover:-translate-y-1 ambient-shadow" />
-            <div>
-              <h3 className="font-title-md text-[15px] leading-snug font-bold text-on-surface break-keep line-clamp-2">{b.title}</h3>
-              {b.author && <p className="font-body-sm text-[12.5px] text-outline mt-0.5">{b.author}</p>}
-            </div>
-            <span className="font-label-md text-[13px] font-bold text-primary flex items-center gap-1">
-              {t('ebook.read')}
-              <span className="material-symbols-outlined text-[16px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
-            </span>
+            {k === 'leveltest' ? 'LEVELTEST' : 'CARIS'}
           </button>
         ))}
       </div>
-      <div className="mt-8 text-center">
-        <button onClick={() => navigate('/ebooks')} className="px-6 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-[15px] font-bold rounded-xl hover:border-primary/30 hover:text-primary transition-all duration-200">{t('ebook.go_store')}</button>
-      </div>
+
+      <LibraryFrame
+        groups={groups}
+        activeKey={active?.key}
+        onPick={(g) => { setSel(g.key); setPlaying(null); setBookPage(0); setLecPage(0) }}
+        colTitle={t(cat === 'caris' ? 'll.tier_col' : 'll.level_col')}
+        pane={pane}
+        onPane={setPane}
+        /* ⚠️ 마이페이지는 위에 헤더·탭줄이 더 있어 스토어보다 많이 뺀다 — 위에 뭘 더 얹으면 다시 잴 것. */
+        wideMaxH="calc(100dvh - 360px)"
+        narrowMaxH="calc(100dvh - 420px)"
+        panes={[
+          {
+            key: 'books',
+            title: t('ll.books'),
+            body: books.length === 0
+              ? <PaneEmpty text={t('ll.empty_owned')} action={storeLink} />
+              : (
+                <ul className="divide-y divide-outline-variant/70">
+                  {books.slice(bookPage, bookPage + 1).map((b) => (
+                    <BookRow
+                      key={b.id}
+                      b={b}
+                      t={t}
+                      lang={lang}
+                      onZoom={() => setZoom(b)}
+                      onOpen={() => navigate(`/ebooks/read/${b.id}`)}
+                    />
+                  ))}
+                </ul>
+              ),
+            pager: bookPager,
+          },
+          {
+            key: 'lectures',
+            title: t('ll.lectures'),
+            body: lecs.length === 0
+              ? <PaneEmpty text={t('ll.empty_owned')} action={storeLink} />
+              : (
+                <ul className="divide-y divide-outline-variant/70">
+                  {lecs.slice(lecPage, lecPage + 1).map((lec) => (
+                    <LectureRow
+                      key={lec.id}
+                      lec={lec}
+                      t={t}
+                      lang={lang}
+                      playing={playing === lec.id}
+                      onPlay={() => setPlaying((p) => (p === lec.id ? null : lec.id))}
+                    />
+                  ))}
+                </ul>
+              ),
+            pager: lecPager,
+          },
+        ]}
+      />
+
+      <div className="mt-6 text-center">{storeLink}</div>
+
+      {/* 표지 확대 — 목록 썸네일은 작아서 표지 글자가 안 읽힌다(스토어와 같은 동작). */}
+      {zoom && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm cursor-zoom-out"
+          role="dialog"
+          aria-modal="true"
+          aria-label={zoom.title}
+          onClick={() => setZoom(null)}
+        >
+          {zoom.coverUrl ? (
+            <img src={zoom.coverUrl} alt={zoom.title} className="max-h-[92dvh] max-w-[min(100%,620px)] w-auto h-auto rounded-xl shadow-2xl" />
+          ) : (
+            <div className="w-[min(90vw,360px)]"><EbookCover title={zoom.title} coverUrl={null} className="w-full" /></div>
+          )}
+        </div>
+      )}
     </>
   )
 }
@@ -510,7 +674,7 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { section } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab = section && TABS.some((t) => t.key === section) ? section : 'learning'
+  const tab = section && TABS.some((t) => t.key === section) ? section : 'ebooks'
   const { isFullUser, user, loading: authLoading } = useAuth()
   const { t, lang } = useT()
   // 1:1 문의 새 답변 개수 — 세는 곳은 Layout(FAB) 한 곳이고 여기는 같은 값을 구독만 한다.
@@ -630,7 +794,7 @@ export default function MyPage() {
   const attempts = list ?? []
   const earned = attempts.filter((a) => a.passed === true)
   const loading = !err && list === null
-  const selfLoaded = tab === 'learning' || tab === 'ebooks' // 자체 로딩 탭
+  const selfLoaded = tab === 'ebooks' // 자체 로딩 탭
 
   return (
     <div className="bg-background text-on-background min-h-screen relative overflow-x-hidden">
@@ -641,7 +805,11 @@ export default function MyPage() {
           style={{ maskImage: 'linear-gradient(to bottom, white 0%, white 300px, transparent 600px)', WebkitMaskImage: 'linear-gradient(to bottom, white 0%, white 300px, transparent 600px)', opacity: 0.15 }}
         ></div>
 
-        <div className="max-w-5xl mx-auto w-full relative z-10">
+        {/* ⚠️ 서재 탭만 러닝 라이브러리와 **같은 폭(1240)** 이다(2026-08-25 요청). 3열이 서는 화면이라
+            기본 폭(1024)에서는 가운데·오른쪽 열이 눈에 띄게 좁아 두 화면이 다른 물건처럼 보인다.
+            ⚠️ 마이페이지 **전체**를 넓히지 않는다 — 응시 현황·자격증·문의는 가로로 긴 카드라 넓히면 헐렁해진다.
+            대가: 탭을 옮길 때 폭이 한 번 바뀐다. */}
+        <div className={`${tab === 'ebooks' ? 'max-w-[1240px]' : 'max-w-5xl'} mx-auto w-full relative z-10`}>
           {/* 홈으로 — 이 화면엔 헤더가 없어서(FAB 이 네비) 여기 말고는 홈으로 갈 길이 FAB 뿐이었다. */}
           <Link to="/" className="gd-back mb-6">
             <span className="material-symbols-outlined text-[20px]">arrow_back</span>
@@ -705,12 +873,9 @@ export default function MyPage() {
             ))}
           </div>
 
-          {/* 학습 대시보드·이북 서재는 각자 데이터를 불러오므로 응시내역(my-attempts) 로딩/에러 배너 대상이 아니다. */}
+          {/* 이북 서재는 자기 데이터를 따로 불러오므로 응시내역(my-attempts) 로딩/에러 배너 대상이 아니다. */}
           {err && !selfLoaded && <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/30 text-center text-on-surface-variant">{err}</div>}
           {loading && !selfLoaded && <div className="bg-surface-container-lowest rounded-2xl p-12 border border-outline-variant/30 text-center text-on-surface-variant">{t('common.loading')}</div>}
-
-          {/* 학습 대시보드 (CARIS ARENA) — 자체적으로 list-attempts 로딩 */}
-          {tab === 'learning' && <LearningDashboard />}
 
           {/* 1:1 문의 — 쓴 사람과 운영자만 본다. */}
           {tab === 'inquiry' && <InquiryBoard />}

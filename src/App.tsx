@@ -64,6 +64,7 @@ const Faq = lazy(() => import('./pages/Faq'))
 // WORLD ARENA (무료 레벨테스트) — d3 지도가 여기 딸려 있다
 const LevelSelect = lazy(() => import('./pages/LevelSelect'))
 const LevelCert = lazy(() => import('./pages/LevelCert'))
+const LevelRecord = lazy(() => import('./pages/LevelRecord'))
 const TestRunner = lazy(() => import('./pages/TestRunner'))
 const Result = lazy(() => import('./pages/Result'))
 const Ranking = lazy(() => import('./pages/Ranking'))
@@ -264,6 +265,8 @@ export default function App() {
               <Route path="/test/select" element={<LevelSelect />} />
               {/* 레벨테스트 인증서 — /test/:attemptId 보다 먼저 둔다(안 그러면 attemptId 로 잡힌다) */}
               <Route path="/test/certificate" element={<LevelCert />} />
+              {/* 내 기록(옛 마이페이지 '학습 대시보드'의 레벨테스트 몫) — 같은 이유로 :attemptId 보다 먼저 */}
+              <Route path="/test/record" element={<LevelRecord />} />
               <Route path="/test/:attemptId" element={<TestRunner />} />
               <Route path="/test/result/:attemptId" element={<Result />} />
               <Route path="/ranking" element={<Ranking />} />

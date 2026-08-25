@@ -1,9 +1,14 @@
-// ebooks: 이북 스토어·서재·열람 API.
-//   - store   : 공개된 이북 목록 (로그인 시 owned 플래그 포함) — 비로그인도 조회 가능
+// ebooks: 러닝 라이브러리(이북 + 강의) 스토어·서재·열람 API.
+//   - store   : 공개된 이북·강의 목록 (로그인 시 owned 플래그 포함) — 비로그인도 조회 가능
 //   - picks   : 레벨테스트 결과창용 추천 목록 (응시 레벨 기준 정렬) — 비로그인도 조회 가능
-//   - library : 내가 구매한 이북 목록 (로그인 필수)
-//   - buy     : **무료(0원) 이북 전용** 즉시 지급. 유료책은 402 로 막고 payments 함수(토스 결제)만 지급한다.
+//   - library : 내가 구매한 이북·강의 목록 (로그인 필수)
+//   - buy     : **무료(0원) 전용** 즉시 지급(이북·강의). 유료는 402 로 막고 payments 함수(결제)만 지급한다.
 //   - read    : 소유 확인 후 비공개 버킷 HTML 의 서명 URL 발급(뷰어 iframe 이 이걸 연다) + 열람 기록(ebook_reads)
+//
+// ⛔ **강의는 사기 전에 youtube_id 를 안 내려준다**(2026-08-25 유료화). 유튜브 영상은 id 만 알면 누구나
+//    보므로 그 값이 곧 상품이다 — 미소유자에게 주면 결제가 장식이 된다. 대신 썸네일 주소만 준다.
+//    ⚠️ 폴백 썸네일(img.youtube.com/vi/<id>/…)에는 그 id 가 박혀 있다. 완전히 막으려면 관리자가
+//       lectures.thumb_url 에 자체 썸네일을 넣어야 하고, 파는 영상은 **미등록(unlisted)** 이어야 한다.
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
@@ -71,6 +76,35 @@ async function ownedIds(admin: ReturnType<typeof adminClient>, uid: string): Pro
   return new Set((data ?? []).map((r: Row) => r.ebook_id as string))
 }
 
+async function ownedLectureIds(admin: ReturnType<typeof adminClient>, uid: string): Promise<Set<string>> {
+  const { data } = await admin.from('lecture_purchases').select('lecture_id').eq('user_id', uid)
+  return new Set((data ?? []).map((r: Row) => r.lecture_id as string))
+}
+
+/** 유튜브가 무료로 주는 정적 썸네일. 관리자가 thumb_url 을 넣었으면 그게 이긴다. */
+const ytThumb = (id: string) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`
+
+/** 강의 한 줄. ⛔ **youtubeId 는 소유자에게만** 내려간다 — 위 파일 머리 주석 참고.
+ *  ⚠️ 강의엔 번역본이 없다(제목·채널이 관리자가 넣은 값 그대로) → 이북의 shape() 와 달리 lang 을 안 본다. */
+function shapeLecture(l: Row, owned: boolean) {
+  return {
+    id: l.id as string,
+    catalog: ((l.catalog as string | null) ?? 'leveltest') as 'leveltest' | 'caris',
+    targetLevel: (l.target_level as number | null) ?? null,
+    targetTier: (l.target_tier as string | null) ?? null,
+    title: l.title as string,
+    channel: (l.channel as string | null) ?? '',
+    description: (l.description as string | null) ?? '',
+    price_usd_cents: (l.price_usd_cents as number) ?? 0,
+    thumbUrl: (l.thumb_url as string | null) || ytThumb(l.youtube_id as string),
+    youtubeId: owned ? (l.youtube_id as string) : null,
+    owned,
+  }
+}
+
+/** 강의 목록 select — 소유 판정 전이라 youtube_id 도 뽑는다(내려줄지는 shapeLecture 가 정한다). */
+const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, title, channel, description, price_usd_cents, thumb_url, sort_order, created_at'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -86,28 +120,28 @@ Deno.serve(async (req) => {
     if (action === 'store') {
       // 두 카탈로그를 한 번에 내려주고 화면이 전환 버튼으로 가른다 — 권수가 적어 나눠 부를 이유가 없고,
       // 탭을 눌렀을 때 다시 기다리지 않는다.
-      const { data, error } = await admin
-        .from('ebooks')
-        .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations')
-        .eq('published', true)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false })
-      if (error) return json({ error: error.message }, 400)
-      const mine = uid ? await ownedIds(admin, uid) : new Set<string>()
       // 강의도 같이 내려준다 — 화면이 교재·강의를 나란히 그리므로 한 번에 받는 게 맞다.
-      //   ⚠️ 관리자 등록(lectures 테이블)이 생기기 전엔 프론트가 코드에 박힌 목록(lib/lectures.ts)을 썼다.
-      //      DB 에 공개된 강의가 하나라도 있으면 **DB 가 이긴다**(관리자가 등록했는데 안 보이면 안 된다).
-      const { data: lec } = await admin
-        .from('lectures')
-        .select('id, catalog, target_level, target_tier, youtube_id, title, channel, description, sort_order')
-        .eq('published', true)
-        .order('sort_order', { ascending: true })
+      //   ⚠️ 넷은 서로의 결과를 안 쓴다(보유 목록은 uid 만, 목록은 인자가 없다) → 한 파로 내보낸다.
+      const [{ data, error }, mine, { data: lec }, mineLec] = await Promise.all([
+        admin
+          .from('ebooks')
+          .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations')
+          .eq('published', true)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false }),
+        uid ? ownedIds(admin, uid) : Promise.resolve(new Set<string>()),
+        admin
+          .from('lectures')
+          .select(LECTURE_COLS)
+          .eq('published', true)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false }),
+        uid ? ownedLectureIds(admin, uid) : Promise.resolve(new Set<string>()),
+      ])
+      if (error) return json({ error: error.message }, 400)
       return json({
         ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string), lang)),
-        lectures: (lec ?? []).map((l: Record<string, unknown>) => ({
-          id: l.id, catalog: l.catalog, targetLevel: l.target_level, targetTier: l.target_tier,
-          youtubeId: l.youtube_id, title: l.title, channel: l.channel, description: l.description,
-        })),
+        lectures: (lec ?? []).map((l: Row) => shapeLecture(l, mineLec.has(l.id as string))),
       })
     }
 
@@ -192,53 +226,86 @@ Deno.serve(async (req) => {
 
     if (action === 'library') {
       if (!uid) return json({ error: '로그인이 필요합니다.' }, 401)
-      const { data: purchases } = await admin
-        .from('ebook_purchases')
-        .select('ebook_id, created_at')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false })
+      // 서재 화면(마이페이지)이 러닝 라이브러리와 같은 3열이라 **강의도 같이** 내려준다.
+      //   ⚠️ 둘은 서로의 결과를 안 쓴다 → 한 파로 내보낸다.
+      const [{ data: purchases }, { data: lecBuys }] = await Promise.all([
+        admin
+          .from('ebook_purchases')
+          .select('ebook_id, created_at')
+          .eq('user_id', uid)
+          .order('created_at', { ascending: false }),
+        admin
+          .from('lecture_purchases')
+          .select('lecture_id, created_at')
+          .eq('user_id', uid)
+          .order('created_at', { ascending: false }),
+      ])
       const ids = (purchases ?? []).map((p: Row) => p.ebook_id as string)
-      if (!ids.length) return json({ ebooks: [] })
+      const lecIds = (lecBuys ?? []).map((p: Row) => p.lecture_id as string)
+
       // ⚠️ catalog·target_* 를 같이 뽑아야 한다 — 안 뽑으면 shape() 가 전부 '레벨 무관 leveltest'로 읽어
       //    아래 진열 순서가 통째로 무너진다(옛 select 가 그랬다).
-      const { data: books } = await admin
-        .from('ebooks')
-        .select('id, title, author, description, cover_url, price_usd_cents, translations, catalog, target_level, target_tier')
-        .in('id', ids)
+      const [{ data: books }, { data: lecs }] = await Promise.all([
+        ids.length
+          ? admin
+              .from('ebooks')
+              .select('id, title, author, description, cover_url, price_usd_cents, translations, catalog, target_level, target_tier')
+              .in('id', ids)
+          : Promise.resolve({ data: [] as Row[] }),
+        lecIds.length
+          ? admin.from('lectures').select(LECTURE_COLS).in('id', lecIds)
+          : Promise.resolve({ data: [] as Row[] }),
+      ])
+
       const byId = new Map((books ?? []).map((b: Row) => [b.id as string, b]))
       // 관리자가 삭제한 책은 건너뛴다.
       const ebooks = (purchases ?? []).flatMap((p: Row) => {
         const b = byId.get(p.ebook_id as string)
         return b ? [{ ...shape(b, true, lang), purchasedAt: p.created_at as string }] : []
       })
+      const lecById = new Map((lecs ?? []).map((l: Row) => [l.id as string, l]))
+      // ⚠️ 여기 오는 강의는 **전부 소유**다 → youtubeId 가 내려간다(그래야 서재에서 재생된다).
+      //    비공개로 내린 강의도 그대로 보여준다 — 산 사람의 시청권까지 회수하는 건 다른 얘기다.
+      const lectures = (lecBuys ?? []).flatMap((p: Row) => {
+        const l = lecById.get(p.lecture_id as string)
+        return l ? [{ ...shapeLecture(l, true), purchasedAt: p.created_at as string }] : []
+      })
+
       // 레벨 사다리 순으로 진열(shelfKey 주석 참고). sort 가 안정 정렬이라 같은 레벨끼리는
       // 위 쿼리가 준 구매순(최신 먼저)이 그대로 남는다.
       ebooks.sort((a, b) => shelfKey(a) - shelfKey(b))
-      return json({ ebooks })
+      lectures.sort((a, b) => shelfKey(a) - shelfKey(b))
+      return json({ ebooks, lectures })
     }
 
     if (action === 'buy') {
       if (!uid) return json({ error: '로그인이 필요합니다.' }, 401)
       const id = String(body?.id ?? '').trim()
       if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
+      // 강의도 같은 경로로 산다(무료 전용). 표만 다르고 규칙은 한 벌이다.
+      const isLec = body?.kind === 'lecture'
+      const table = isLec ? 'lectures' : 'ebooks'
+      const buyTable = isLec ? 'lecture_purchases' : 'ebook_purchases'
+      const fkCol = isLec ? 'lecture_id' : 'ebook_id'
+      const notSelling = isLec ? '판매 중인 강의가 아닙니다.' : '판매 중인 이북이 아닙니다.'
 
-      const { data: book } = await admin
-        .from('ebooks')
+      const { data: item } = await admin
+        .from(table)
         .select('id, price_usd_cents, published')
         .eq('id', id)
         .maybeSingle()
-      if (!book || !book.published) return json({ error: '판매 중인 이북이 아닙니다.' }, 404)
+      if (!item || !item.published) return json({ error: notSelling }, 404)
 
-      // ⚠️ **무료책 전용 경로다.** 결제가 붙은 뒤로 유료책을 여기서 지급하면 결제를 통째로 우회할 수 있다
-      //    (프론트를 안 거치고 이 함수를 직접 부르면 그만이다). 유료책은 payments 함수만 지급한다.
-      if ((book.price_usd_cents as number) > 0) {
-        return json({ error: '결제가 필요한 이북입니다.', needsPayment: true }, 402)
+      // ⚠️ **무료 전용 경로다.** 결제가 붙은 뒤로 유료를 여기서 지급하면 결제를 통째로 우회할 수 있다
+      //    (프론트를 안 거치고 이 함수를 직접 부르면 그만이다). 유료는 payments 함수만 지급한다.
+      if ((item.price_usd_cents as number) > 0) {
+        return json({ error: isLec ? '결제가 필요한 강의입니다.' : '결제가 필요한 이북입니다.', needsPayment: true }, 402)
       }
 
-      // 0원 책은 결제창을 탈 수 없으므로 여기서 바로 지급한다. 이미 산 책이면 그대로 성공(멱등).
-      const { error } = await admin.from('ebook_purchases').insert({
+      // 0원은 결제창을 탈 수 없으므로 여기서 바로 지급한다. 이미 산 것이면 그대로 성공(멱등).
+      const { error } = await admin.from(buyTable).insert({
         user_id: uid,
-        ebook_id: id,
+        [fkCol]: id,
         price_paid: 0,
         source: 'free',
       })

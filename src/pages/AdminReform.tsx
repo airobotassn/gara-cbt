@@ -969,7 +969,12 @@ function CertConditions() {
 interface LectureRow {
   id: string; catalog: 'leveltest' | 'caris'
   target_level: number | null; target_tier: string | null
+  /** ⚠️ channel 은 관리자 화면에서 뺐다(2026-08-25) — DB 컬럼은 남아 있고 옛 값도 그대로다. */
   youtube_id: string; title: string; channel: string; description: string
+  /** 정가 — **달러 센트**(100 = $1.00). 이북과 같은 단위다. 0 = 무료. */
+  price_usd_cents: number
+  /** 목록 썸네일 주소. 비우면 유튜브 썸네일로 폴백한다(그 주소엔 영상 id 가 박혀 있다 — 아래 경고 참고). */
+  thumb_url: string | null
   published: boolean; sort_order: number
 }
 type LectureDraft = Partial<LectureRow> & { _new?: boolean }
@@ -995,7 +1000,12 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
           targetLevel: catalog === 'leveltest' ? (edit.target_level ?? null) : null,
           targetTier: catalog === 'caris' ? (edit.target_tier ?? null) : null,
           youtubeId: edit.youtube_id ?? '',
-          title: edit.title ?? '', channel: edit.channel ?? '', description: edit.description ?? '',
+          // ⚠️ 채널은 2026-08-25 에 관리자 화면에서 뺐다 — 우리가 만든 강의를 파는 것이라 '어느 채널 영상인가'
+          //    가 쓸 정보가 아니다. 넘기지 않으면 서버가 빈 값으로 덮고, 사용자 화면은 비면 그 줄을 안 그린다.
+          title: edit.title ?? '', description: edit.description ?? '',
+          // ⚠️ 화면 입력은 **달러**, 저장은 센트다(이북과 같은 규칙). 소수 둘째 자리까지 받는다.
+          priceUsdCents: Math.max(0, Math.round(Number(edit.price_usd_cents ?? 0)) || 0),
+          thumbUrl: edit.thumb_url ?? '',
           published: edit.published !== false, sortOrder: edit.sort_order ?? rows.length,
         },
       })
@@ -1012,7 +1022,7 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
     catch (e) { alert(e instanceof Error ? e.message : '삭제 실패') }
   }
 
-  const blank: LectureDraft = { _new: true, published: true, sort_order: rows.length, target_level: catalog === 'leveltest' ? 1 : null }
+  const blank: LectureDraft = { _new: true, published: true, sort_order: rows.length, target_level: catalog === 'leveltest' ? 1 : null, price_usd_cents: 0 }
   return (
     <>
       <AdminHead title={`콘텐츠 관리 · ${catalog === 'caris' ? 'CARIS' : 'LEVEL TEST'}`} count={`총 ${rows.length}편`} onReload={reload} loading={loading}>
@@ -1020,21 +1030,26 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
       </AdminHead>
       <ErrBox msg={err} />
       <p className="admin-hint" style={{ marginBottom: 12, lineHeight: 1.7 }}>
-        ⚠️ <b>유튜브 링크만</b> 받습니다. 영상 파일을 우리 서버에 올리면 그때부터 영상 트래픽 비용이 전부 우리 몫이 됩니다.
+        ⚠️ <b>유튜브 링크만</b> 받습니다. 영상 파일을 우리 서버에 올리면 그때부터 영상 트래픽 비용이 전부 우리 몫이 됩니다.<br />
+        ⛔ <b>돈을 받는 강의는 반드시 &lsquo;미등록(unlisted)&rsquo; 으로 올리세요.</b> 유튜브 <b>공개</b> 영상은 주소만 알면 누구나 무료로 보기 때문에,
+        값을 매겨도 결제가 아무 의미가 없습니다. (미소유자에게 영상 ID 는 내려보내지 않습니다.)<br />
+        ⚠️ <b>썸네일을 안 올리면</b> 유튜브 썸네일을 대신 쓰는데, 그 주소에는 <b>영상 ID 가 들어 있어</b> 아직 안 산 사람에게도 노출됩니다.
+        유료 강의라면 썸네일을 직접 올려주세요.
       </p>
 
       <div className="admin-table-wrap">
         <table className="admin-table">
-          <thead><tr><th>썸네일</th><th>제목</th><th>채널</th><th>{catalog === 'caris' ? '대상 급수' : '대상 레벨'}</th><th>상태</th><th></th></tr></thead>
+          <thead><tr><th>썸네일</th><th>제목</th><th>{catalog === 'caris' ? '대상 급수' : '대상 레벨'}</th><th>가격</th><th>상태</th><th></th></tr></thead>
           <tbody>
             {rows.map((l) => (
               <tr key={l.id}>
-                <td><img src={ytThumbUrl(l.youtube_id)} alt="" style={{ width: 96, borderRadius: 6, display: 'block' }} /></td>
+                <td><img src={l.thumb_url || ytThumbUrl(l.youtube_id)} alt="" style={{ width: 96, borderRadius: 6, display: 'block' }} /></td>
                 <td><b>{l.title}</b></td>
-                <td style={{ color: 'var(--muted)' }}>{l.channel || '-'}</td>
                 <td>{catalog === 'caris'
                   ? (l.target_tier ? <span className="badge">{tiers.find((t) => t.key === l.target_tier)?.name ?? l.target_tier}</span> : <span style={{ color: 'var(--dim)' }}>급수 무관</span>)
                   : (l.target_level ? `Lv.${l.target_level}` : <span style={{ color: 'var(--dim)' }}>레벨 무관</span>)}</td>
+                {/* 정가는 달러 센트다 — 100 = $1.00. */}
+                <td style={{ whiteSpace: 'nowrap' }}>{(l.price_usd_cents ?? 0) > 0 ? `$${((l.price_usd_cents ?? 0) / 100).toFixed(2)}` : <span style={{ color: 'var(--dim)' }}>무료</span>}</td>
                 <td>{l.published ? <span className="badge ok">공개</span> : <span className="badge low">비공개</span>}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => setEdit({ ...l })}>수정</button>{' '}
@@ -1066,8 +1081,30 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
               <label style={fld}>제목
                 <input style={inp} value={edit.title ?? ''} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
               </label>
-              <label style={fld}>채널
-                <input style={inp} value={edit.channel ?? ''} onChange={(e) => setEdit({ ...edit, channel: e.target.value })} />
+              {/* 정가 — 화면은 **달러**, 저장은 센트(이북 폼과 같은 규칙). 0 = 무료(결제창을 안 타고 바로 지급). */}
+              <label style={fld}>가격 (달러 · 0 이면 무료)
+                <input
+                  style={inp}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={((edit.price_usd_cents ?? 0) / 100).toString()}
+                  onChange={(e) => {
+                    const dollars = Number(e.target.value)
+                    setEdit({ ...edit, price_usd_cents: Number.isFinite(dollars) ? Math.max(0, Math.round(dollars * 100)) : 0 })
+                  }}
+                />
+              </label>
+              {/* ⚠️ 비우면 유튜브 썸네일 폴백 — 그 주소엔 영상 id 가 박혀 있어 미소유자에게 노출된다(위 안내 참고).
+                  ⛔ 주소를 손으로 적게 하지 말 것(ImageField 주석과 같은 이유) — 남의 서버 링크가 걸리면
+                     그쪽이 내려가는 순간 우리 목록이 깨지고, 원인을 찾기도 어렵다. */}
+              <label style={fld}>썸네일 (안 올리면 유튜브 썸네일을 씁니다)
+                <ImageField
+                  dir="lecture"
+                  value={edit.thumb_url ?? ''}
+                  onChange={(url) => setEdit({ ...edit, thumb_url: url })}
+                  hint="가로 16:9 그림을 권장합니다. 유료 강의는 반드시 올려주세요 — 안 올리면 영상 ID가 노출됩니다."
+                />
               </label>
               <label style={fld}>{catalog === 'caris' ? '대상 급수' : '대상 레벨'}
                 {catalog === 'caris' ? (
@@ -1719,7 +1756,7 @@ const SITE_GROUPS: { title: string; note?: string; preview: 'browser' | 'footer'
  *    걸게 되고(내려가면 우리 화면이 깨짐), 둘 다 나중에 원인을 찾기 어렵다.
  * 저장 위치는 이북 표지와 같은 **공개 버킷**이다(로고·파비콘은 로그인 없이 보여야 한다).
  */
-function ImageField({ value, onChange, hint }: { value: string; onChange: (url: string) => void; hint?: string }) {
+function ImageField({ value, onChange, hint, dir = 'site' }: { value: string; onChange: (url: string) => void; hint?: string; dir?: string }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   async function pick(file: File | null) {
@@ -1729,7 +1766,9 @@ function ImageField({ value, onChange, hint }: { value: string; onChange: (url: 
     setBusy(true); setErr('')
     try {
       const ext = (file.name.split('.').pop() || 'png').toLowerCase()
-      const path = `site/${Date.now()}.${ext}`
+      // dir 로 용도를 가른다(site=로고·파비콘 / lecture=강의 썸네일) — 한 폴더에 섞으면 나중에
+      // 어느 그림이 어디 쓰이는지 못 가려서 지우지도 못한다.
+      const path = `${dir}/${Date.now()}.${ext}`
       const { error } = await supabase.storage.from('ebook-covers').upload(path, file, { upsert: true, contentType: file.type })
       if (error) throw error
       const { data } = supabase.storage.from('ebook-covers').getPublicUrl(path)

@@ -30,7 +30,7 @@ import { useT } from '../lib/i18n'
 //    여기 안내 문구가 그 자리를 잡아두고 있다.
 export default function SebStart() {
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, lang } = useT()
   const [err, setErr] = useState('')
   // 진입 거절(서버 code='reentry_blocked'·'attempt_voided') — 재시도가 의미 없어 문의 안내로 바꾼다.
   const [voided, setVoided] = useState(false)
@@ -74,7 +74,8 @@ export default function SebStart() {
       await document.documentElement.requestFullscreen?.().catch(() => {})
       const res = await callFunction<StartExamResponse>(
         'start-exam',
-        { examSlug: DEFAULT_EXAM_SLUG },
+        // SEB 안에서는 화면 언어가 startURL 의 ?lang= 에서 온다(i18n detect) — 그 값이 곧 응시 언어다.
+        { examSlug: DEFAULT_EXAM_SLUG, lang },
         examAuthHeaders(),
       )
       navigate(`/exam/run/${res.attemptId}`, { state: res, replace: true })

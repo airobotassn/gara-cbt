@@ -11,7 +11,6 @@
 //
 // ⚠️ _shared 사용 → CLI 로만 배포할 것. verify_jwt 는 켠 채로.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { adminClient } from '../_shared/lib.ts'
 import { getExamActor } from '../_shared/exam-token.ts'
 
@@ -22,10 +21,21 @@ function clampCount(v: unknown, max: number): number {
   return Math.min(n, max > 0 ? max : n)
 }
 
-/** 하트비트가 실어 보낸 답안을 그 응시의 답안 행에 덮어쓴다. 채점하지 않는다(제출 때만 한다). */
-async function saveDraft(admin: SupabaseClient, attemptId: string, answers: unknown): Promise<void> {
-  if (!Array.isArray(answers) || answers.length === 0) return
-  // 한 번에 최대 200문항 — 그 이상은 클라가 이상한 값을 보낸 것이라 자른다.
+/** 하트비트가 실어 보낸 답안을 **응시 행의 jsonb 한 칸**에 통째로 덮어쓴다. 채점하지 않는다(제출 때만 한다).
+ *
+ * ⛔ **문항 행(attempt_answers)에 쓰지 않는다.** 예전엔 거기에 문항마다 UPDATE 를 쐈는데,
+ *    클라가 매번 전 문항을 보내므로 40문항이면 30초마다 40왕복 = 50분에 4,000왕복이었다(2026-08-25).
+ *    임시보관은 **제출 전 복구용 사본**이고 채점 결과와 성격이 다르다 — 그 둘이 같은 행에 얹혀 있던
+ *    것이 비용의 원인이었다. 채점 결과는 제출 때 그대로 attempt_answers 에 남는다.
+ * ⚠️ 클라가 보낸 값을 그대로 담지 않는다 — 번호·선택지는 정수로 자르고 주관식은 2000자로 끊는다
+ *    (옛 검증을 그대로 옮겼다). 한 번에 최대 200문항 — 그 이상은 클라가 이상한 값을 보낸 것이다.
+ * ⚠️ 실패는 삼킨다(예전과 같다). 다음 하트비트가 어차피 전 문항을 다시 보낸다.
+ */
+function buildDraft(
+  answers: unknown,
+): { number: number; selectedIndex: number | null; answerText: string | null }[] | null {
+  if (!Array.isArray(answers) || answers.length === 0) return null
+  const draft: { number: number; selectedIndex: number | null; answerText: string | null }[] = []
   for (const a of answers.slice(0, 200)) {
     const num = Math.floor(Number((a as { number?: unknown })?.number ?? NaN))
     if (!Number.isFinite(num) || num < 1) continue
@@ -34,15 +44,13 @@ async function saveDraft(admin: SupabaseClient, attemptId: string, answers: unkn
     const text = typeof (a as { answerText?: unknown })?.answerText === 'string'
       ? ((a as { answerText: string }).answerText).slice(0, 2000)
       : null
-    await admin
-      .from('attempt_answers')
-      .update({
-        selected_index: Number.isFinite(selected as number) ? selected : null,
-        answer_text: text,
-      })
-      .eq('attempt_id', attemptId)
-      .eq('number', num)
+    draft.push({
+      number: num,
+      selectedIndex: Number.isFinite(selected as number) ? (selected as number) : null,
+      answerText: text,
+    })
   }
+  return draft.length ? draft : null
 }
 
 Deno.serve(async (req) => {
@@ -74,19 +82,24 @@ Deno.serve(async (req) => {
 
     if (action === 'ping') {
       // 갱신만 한다(이력 없음). 50분 응시에 하트비트를 행으로 쌓으면 응시당 100행이 된다.
+      //
+      // ⛔ **답안 중간 저장이 여기 같이 들어간다.** 이게 있어야 끊겼다 복구했을 때 풀던 자리에서
+      //    이어갈 수 있다(start-exam 의 재개 주석과 한 쌍).
+      // ⚠️ 생존 신호와 **한 번의 UPDATE 로** 쓴다 — 같은 행이라 나눠 쏠 이유가 없다. 30초마다
+      //    오는 신호라 왕복 하나가 곧 응시자 수 × 시험 시간만큼 곱해진다.
+      // ⚠️ **채점은 하지 않는다.** is_correct 는 제출 때만 매긴다 — 중간 저장은 복구용 사본이지
+      //    제출이 아니다(채점 결과는 attempt_answers 에 남는다).
+      const draft = buildDraft(body?.answers)
       await admin
         .from('exam_attempts')
-        .update({ last_seen_at: now, answered_count: answered })
+        .update({
+          last_seen_at: now,
+          answered_count: answered,
+          // 보낸 게 없으면 기존 보관분을 지우지 않는다 — 빈 배열로 덮으면 복구할 것이 사라진다.
+          ...(draft ? { draft_answers: draft } : {}),
+        })
         .eq('id', attemptId)
         .eq('status', 'in_progress')
-
-      // ⛔ **답안 중간 저장.** 이게 있어야 끊겼다 복구했을 때 풀던 자리에서 이어갈 수 있다
-      //    (그리고 그래야 '남은 시간만 복원' 이 말이 된다 — start-exam 의 재개 주석과 한 쌍이다).
-      //    행은 응시를 만들 때 문항 수만큼 이미 깔려 있으므로 값만 덮어쓴다.
-      // ⚠️ **채점은 하지 않는다.** is_correct 는 건드리지 않고 제출 때만 매긴다 —
-      //    중간 저장은 복구용 사본이지 제출이 아니다.
-      // ⚠️ 클라가 보낸 값이라 문항 번호는 **이 응시에 실제로 있는 번호만** 반영된다(number 로 매칭).
-      await saveDraft(admin, attemptId, body?.answers)
       return json({ ok: true })
     }
 

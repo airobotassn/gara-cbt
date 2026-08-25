@@ -12,7 +12,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ChatBoard from '../components/ChatBoard'
 import StarField from '../components/StarField'
 import { Link } from 'react-router-dom'
-import { callFunction, supabase } from '../lib/supabase'
+import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { ArenaMap, DokdoInset, type ArenaMapHandle, type HoverInfo } from '../components/ArenaMap'
@@ -103,8 +103,7 @@ const RankRow = memo(function RankRow({
 
 export default function WorldArena() {
   const { t, lang } = useT()
-  const { user } = useAuth()
-  const userId = user?.id ?? null
+  const { profile, loading, onboardingLoading } = useAuth()
   const mapRef = useRef<ArenaMapHandle>(null)
 
   // ── 지도 경계 데이터 ──
@@ -127,8 +126,13 @@ export default function WorldArena() {
 
   // ── 백엔드 실데이터 ──
   const [real, setReal] = useState<RealData>(EMPTY_REAL)
-  const [home, setHome] = useState('KR')
-  const [homeReady, setHomeReady] = useState(false) // 확정되면 지구본 자동회전 정지
+  // 로그인 계정 국가 — 지구본의 '우리 순위'·국기가 이걸 본다.
+  //   **AuthProvider 가 게이트 판정으로 이미 읽어 둔 값**을 쓴다(예전엔 이 화면이 같은 행을 한 번 더 조회했다).
+  //   국가를 모르면 'KR' 로 둔다 — 비로그인·익명·조회실패가 모두 여기로 떨어진다(옛 동작 그대로).
+  const home = (profile?.countryCode || 'KR').toUpperCase()
+  // 확정되면 지구본 자동회전 정지. ⚠️ `loading` 을 같이 봐야 한다 — 세션을 받기 전에는
+  //   onboardingLoading 이 아직 false 라, 이것만 보면 부팅 첫 프레임에 'KR' 로 확정돼 버린다.
+  const homeReady = !loading && !onboardingLoading
 
   const fmt = useCallback((n: number) => Number(n).toLocaleString(lang === 'ko' ? 'ko-KR' : lang), [lang])
   const ppl = useCallback((n: number) => fmt(n) + t('arena.ppl'), [fmt, t])
@@ -151,25 +155,6 @@ export default function WorldArena() {
     load.then((f) => alive && setProvinces(f)).catch(() => alive && setProvinces([]))
     return () => { alive = false }
   }, [drillCountry])
-
-  // 로그인 계정 국가 — 지구본의 '우리 순위'·국기가 이걸 본다.
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      let code = 'KR'
-      if (userId) {
-        try {
-          const { data } = await supabase.from('profiles').select('country_code').eq('id', userId).maybeSingle()
-          code = (data?.country_code || 'KR').toUpperCase()
-        } catch { /* 기본값 유지 */ }
-      }
-      if (cancelled) return
-      setHome(code)
-      setHomeReady(true)
-    }
-    void load()
-    return () => { cancelled = true }
-  }, [userId])
 
   // 국가 버킷 — 지구본은 항상 전 세계를 그리므로 한 번만 받는다.
   useEffect(() => {
@@ -720,7 +705,9 @@ export default function WorldArena() {
       {hover && (
         <div className="aa-tip" style={{ left: hover.x, top: hover.y }}>
           <b>{hover.region.name}</b>
-          {hover.region.real && <span className="real"> · {t('arena.real')}</span>}
+          {/* ⛔ 옛 '실데이터' 배지는 뗐다(2026-08-25). 실회원이 있는 버킷에만 붙던 것이라 **한국에만** 떴는데,
+              사용자에게 쓸모가 없는 데다 "여기만 실데이터" 라고 붙이는 순간 나머지 나라는 아니라고 우리가
+              먼저 광고하는 꼴이 된다. 판정값(region.real ← has_real)은 그대로 내려온다 — 운영 판단용이다. */}
           <div className="row">
             <span>{t('arena.regionScore')}</span>
             <span>{fmtScore(hover.region.score)}</span>

@@ -12,6 +12,9 @@
 @import './styles/result.css';
 @import './styles/ranking.css';
 @import './styles/dashboard.css';
+/* ⚠️ dashboard.css 뒤여야 한다 — `.lvrec .stats` 가 `.db-wrap .stats` 와 특정도가 같아서(0,2,0)
+   앞에 두면 3열 규칙이 4열에 밀린다. */
+@import './styles/levelrecord.css';
 @import './styles/fab.css';
 @import './styles/calendar.css';
 @import './styles/policy.css';

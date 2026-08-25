@@ -137,8 +137,9 @@
 .hub .exp-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 0 11px; font-weight: 900; color: var(--ink); }
 .hub .exp-lv { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; letter-spacing: .01em; }
+/* 바 안 오른쪽 값 = 진행 %. 폭과 무관하게 이것 하나다(2026-08-25) — 옛 PC 전용 분수 표기(.exp-frac)는
+   분모가 밴드 폭이라 총점으로 오해를 샀고, 좁은 화면에선 어차피 왼쪽 'ARENA Lv.N' 을 잘라먹었다. */
 .hub .exp-lab { flex: 0 0 auto; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
-.hub .exp-frac { display: none; } /* 모바일은 %만 — 분수를 넣으면 왼쪽 'ARENA Lv.N' 이 잘린다 */
 .hub .rank-gauge { flex: 1; min-width: 0; }
 .hub .rank-gauge-lab { font-size: 11px; font-weight: 900; color: var(--ink2); margin-bottom: 3px; }
 .hub .rank-gauge-track { display: flex; align-items: center; gap: 6px; }
@@ -206,8 +207,23 @@
 /* ── 하단 도크: 출석 캘린더 + 메인 CTA ── */
 .hub .dock { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .hub .reward { flex: 1; min-width: 0; background: var(--card); border: 4px solid var(--line); border-radius: 16px; padding: 9px 12px 11px; box-shadow: 0 4px 0 rgba(var(--shc2), .16); }
+/* 스탬프판은 <button> 이다(눌러서 출석 기록 달력을 연다 — 2026-08-25).
+   ⚠️ 버튼은 font·색을 상속하지 않고 UA 기본값(작은 시스템 글꼴 + 가운데 정렬)을 쓴다.
+      되돌리지 않으면 판 안의 글자만 이 화면에서 혼자 다른 서체로 뜬다. */
+.hub button.reward {
+  font: inherit; color: inherit; text-align: left; -webkit-appearance: none; appearance: none;
+  cursor: pointer; transition: transform .07s, box-shadow .1s;
+}
+/* 눌림은 도크의 다른 버튼(.cta-main)과 같은 어휘 — 그림자를 눕히면서 판이 내려앉는다 */
+.hub button.reward:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc2), .16); }
 .hub .rw-top { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 900; }
 .hub .rw-n { margin-left: auto; font-weight: 900; }
+/* '눌리는 판' 이라는 유일한 표시 — 숫자 뒤 홑화살괄호. margin-left 를 주지 않는다(숫자에 붙어야
+   '3 / 7 ›' 한 덩어리로 읽힌다). 궁궐 벌에서도 살아야 해서 svg 가 아니라 글자다.
+   ⚠️ 판 글자(14px)를 그대로 따라가면 너무 작아 장식으로 읽힌다 — 눌러도 되는 곳이라는 유일한 신호라
+      한 단 키워서 따로 세운다(2026-08-25 "화살표 좀더 키우고"). */
+.hub .rw-more { font-size: 22px; font-weight: 900; opacity: .7; line-height: 1; margin-left: 4px; }
+@media (min-width: 768px) { .hub .rw-more { font-size: 28px; } }
 .hub .streak { display: flex; gap: 5px; margin-top: 8px; }
 .hub .day { position: relative; flex: 1; text-align: center; border: 3px solid var(--line); border-radius: 11px; padding: 7px 0 5px; font-size: 13px; font-weight: 900; background: var(--card); line-height: 1.15; }
 .hub .day.on { background: var(--yellow); color: #33323f; }
@@ -294,16 +310,19 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 
 /* HUD 우측 공유 칩 — 뒤로가기 칩과 같은 스티커 톤(같은 줄 오른쪽 끝) */
 .hub .hub-backrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.hub .hub-share { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
-  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+/* 가로로 긴 알약. '내 랭킹 자랑' 처럼 문구가 길어져도 좁아 보이지 않게 좌우 여백을 넉넉히 주고
+   짧은 언어(zh·ja)에서도 같은 길이로 서도록 min-width 로 바닥을 깐다. */
+.hub .hub-share { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: 0 0 auto;
+  min-width: 156px; padding: 8px 22px; border-radius: 999px; cursor: pointer;
   background: var(--card); border: 3px solid var(--line); color: var(--ink);
-  font-size: 12.5px; font-weight: 900; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
+  font-size: 13.5px; font-weight: 900; box-shadow: 0 3px 0 rgba(var(--shc), .18); }
 .hub .hub-share:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(var(--shc), .18); }
 .hub .hub-share .ic { line-height: 0; }
 /* 뒤로가기 줄 오른쪽 버튼 묶음(선물·공유). .hub-backrow 가 space-between 이라 낱개로 두면 셋이 흩어진다. */
 .hub .hub-backrow-act { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-/* 선물 버튼 — .bd(미확인 건수 뱃지)가 absolute 라 기준 박스가 필요하다. */
-.hub .hub-gift { position: relative; }
+/* 선물 버튼 — .bd(미확인 건수 뱃지)가 absolute 라 기준 박스가 필요하다.
+   ⚠️ 긴 알약은 '내 랭킹 자랑' 하나뿐이다 — 선물까지 같이 길어지면 뒤로가기 줄이 버튼 두 개로 꽉 찬다. */
+.hub .hub-gift { position: relative; min-width: 0; padding: 8px 16px; }
 
 /* ============================================================
    데스크톱(PC): 화면 꽉 채우는 와이드 (레퍼 01 처럼 가로)
@@ -313,6 +332,8 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .slim-banner, .hub .home, .hub .log, .hub .demo-banner, .hub .panel, .hub .hub-backrow { max-width: 1080px; margin-left: auto; margin-right: auto; }
   .hub .slim-banner, .hub .hub-backrow { width: calc(100% - 48px); }
   .hub .home { padding: 0 clamp(24px, 5vw, 80px); }
+  .hub .hub-share { font-size: 15px; min-width: 176px; padding: 9px 26px; }
+  .hub .hub-gift { font-size: 13.5px; min-width: 0; padding: 9px 17px; }
   .hub .hud-av { width: 68px; height: 68px; }
   .hub .hud-name { font-size: 26px; }
   .hub .tt { font-size: 16px; }
@@ -321,8 +342,6 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .exp { height: 40px; } /* = .gchip 높이 (위 주석 참고) */
   .hub .exp-lab { font-size: 16px; }
   .hub .exp-txt { padding: 0 16px; gap: 12px; }
-  .hub .exp-pct { display: none; }
-  .hub .exp-frac { display: inline; }
   .hub .gchip { width: 128px; height: 40px; font-size: 18px; }
   .hub .exp-lv { font-size: 15px; }
   .hub .stage-zone { height: 470px; margin-top: 8px; }
@@ -836,11 +855,15 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* ⚠️ `!important` 가 필요하다 — 아이콘 컴포넌트(Ic)가 svg 에 인라인 style 로
       `display:block` 을 박아서 일반 규칙으로는 못 감는다(2026-08-18 안 지워져서 찾은 자리). */
 .hub[data-ui='palace'] .rw-top svg { display: none !important; }
-.hub[data-ui='palace'] .rw-top, .hub[data-ui='palace'] .rw-n,
+.hub[data-ui='palace'] .rw-top, .hub[data-ui='palace'] .rw-n, .hub[data-ui='palace'] .rw-more,
 .hub[data-ui='palace'] .ms-title, .hub[data-ui='palace'] .ms-n {
   color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
   font-size: var(--skin-panel-title);
 }
+/* ⚠️ 위 규칙이 판 글자 크기를 통째로 잡아서 화살표까지 같이 눌러버린다 — 색·그림자만 물려받고
+      크기는 되돌린다(기본 벌과 같은 이유: 작으면 누를 수 있는 곳으로 안 읽힌다). */
+.hub[data-ui='palace'] .rw-more { font-size: 26px; }
+@media (min-width: 768px) { .hub[data-ui='palace'] .rw-more { font-size: 32px; } }
 
 /* 레일 칸 — 틀을 씌우지 않는다. 아이콘 자체가 장식판이라 덧씌우면 틀이 두 겹이 된다.
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
@@ -1319,4 +1342,61 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 @media (max-width: 560px) {
   .hub .tryon-lab { flex-basis: 100%; justify-content: center; }
   .hub.is-tryon { padding-top: 96px; }
+}
+
+/* ============================================================
+   출석 기록 달력 (도크 스탬프판 → '출석 기록' 모달, 2026-08-25)
+   components/ContributionGraph.tsx 를 그대로 쓴다. 그 컴포넌트는 원래 마이페이지 학습 대시보드에
+   살았던 것이라 **레거시 토큰**(--txt/--muted/--line2/--blue)과 초록 잔디 색을 전제로 그려진다.
+   ⚠️ 그 색을 그대로 두면 허브에서만 어긋난다 — 이 화면의 '출석'은 도크의 **노란 도장**이고,
+      초록이 하나 더 들어오면 같은 사실을 말하는 색이 두 개가 된다.
+   ⚠️ 스킨(data-ui)은 모달을 안 건드리므로 기본·고궁 두 벌이 이 한 벌을 같이 쓴다.
+   ============================================================ */
+.hub .attend-modal .calm {
+  max-width: 100%;
+  /* 출석 색 = 도크 스탬프의 노랑(.day.on). 잔디 초록(#22c55e)을 여기로 끌고 오지 말 것. */
+  --attend: var(--yellow);
+}
+/* 이번 달 출석 일수 — calendar.css 는 이 숫자를 --attend 색으로 칠한다.
+   노란 글자는 흰 면에서 대비가 2:1 도 안 나오므로 색이 아니라 크기로 세운다. */
+.hub .attend-modal .calm-summary {
+  color: var(--ink); font-size: 22px; font-weight: 900; letter-spacing: -.02em; margin: 0 0 14px;
+}
+.hub .attend-modal .calm-head { margin-bottom: 10px; }
+.hub .attend-modal .calm-title { font-size: 16px; font-weight: 900; color: var(--ink); }
+.hub .attend-modal .calm-wd { font-size: 12px; font-weight: 800; color: var(--ink2); padding-bottom: 4px; }
+/* 칸 = 도크 스탬프(.day)와 같은 어휘: 두꺼운 외곽선 + 흰 면. 두 곳이 한 물건의 앞뒤로 읽힌다.
+   ⚠️ 테두리를 3px(도크와 동일)로 두면 7열 격자에서 선이 화면의 절반을 먹는다 → 2px. */
+.hub .attend-modal .calm-cell {
+  border: 2px solid var(--line); border-radius: 10px; background: var(--card);
+  color: var(--ink); font-size: 14px; font-weight: 800;
+}
+/* 찍힌 날 = 노란 도장(.day.on 과 같은 값). calendar.css 가 흰 글자를 박아두므로 같이 되돌린다 —
+   노란 면에 흰 글자는 안 읽힌다. */
+.hub .attend-modal .calm-cell.active { background: var(--yellow); color: #33323f; font-weight: 900; }
+/* 빈 칸·미래는 판이 아니다 — 테두리까지 지워야 '아직 오지 않은 날'로 읽힌다
+   (테두리만 남기면 안 찍힌 과거와 구분이 안 된다). */
+.hub .attend-modal .calm-cell.empty { border-color: transparent; background: transparent; }
+.hub .attend-modal .calm-cell.future { border-style: dashed; border-color: var(--line); background: transparent; color: var(--ink2); opacity: .45; }
+/* 오늘 — calendar.css 의 inset 링은 2px 테두리 안쪽에 그려져 거의 안 보인다.
+   바깥으로 한 겹 두른다(카툰 톤의 '선택됨' 표시와 같은 수법). */
+.hub .attend-modal .calm-cell.today { box-shadow: 0 0 0 3px var(--brand); }
+.hub .attend-modal .calm-cell.today.active { box-shadow: 0 0 0 3px var(--brand); }
+/* 달 이동 화살표 — .hl-arrow 는 result.css 것이라 코발트/흰 면 전제다. 허브 버튼으로 다시 입힌다.
+   ⚠️ 크기는 `!important` 가 필요하다 — ContributionGraph 가 인라인 style 로 28×28 을 박아서
+      일반 규칙으로는 못 이긴다(TierBadge 와 같은 상황). 28px 은 달력 칸(48px)보다 작아
+      머리말에서 눌릴 것으로 안 읽혔다(2026-08-25 "화살표 좀더 키우고"). */
+.hub .attend-modal .hl-arrow {
+  border: 2.5px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 12px; box-shadow: 0 3px 0 rgba(var(--shc), .18); font-weight: 900;
+  width: 42px !important; height: 42px !important; font-size: 24px;
+}
+.hub .attend-modal .hl-arrow:hover:not(:disabled) { background: var(--card); border-color: var(--line); color: var(--ink); transform: none; }
+.hub .attend-modal .hl-arrow:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.hub .attend-modal .hub-modal-help { text-align: center; margin-top: 14px; }
+@media (min-width: 768px) {
+  .hub .attend-modal .calm-cell { font-size: 16px; }
+  .hub .attend-modal .calm-title { font-size: 18px; }
+  .hub .attend-modal .calm-summary { font-size: 25px; }
+  .hub .attend-modal .hl-arrow { width: 48px !important; height: 48px !important; font-size: 28px; }
 }

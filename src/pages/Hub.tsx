@@ -22,6 +22,7 @@ import {
   showPercentile,
 } from '../lib/scoring'
 import ShareCardModal from '../components/ShareCardModal'
+import ContributionGraph from '../components/ContributionGraph'
 import CharArt from '../components/CharArt'
 import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
@@ -84,9 +85,9 @@ const NICK_MAX = 12
  *     그 값을 고치면 같이 고칠 것(DAILY_POINTS ↔ complete-daily 의 관계와 같다). */
 const STAMP_BONUS = 20
 /** 친구 초대 보상 코인 — 초대한 쪽·코드를 쓴 쪽 **양쪽 다** 같은 금액을 받는다.
- *  ⚠️ 권위는 DB 다 — `20260824130000_referral_coin.sql` 의 `c_coin`. 여기는 표시용 사본이다.
+ *  ⚠️ 권위는 DB 다 — `20260825200000_referral_coin_500.sql` 의 `c_coin`. 여기는 표시용 사본이다.
  *  ⚠️ 초대자 쪽에는 상한이 없다(2026-08-24 지시) — 초대할수록 계속 받는다. 코드를 쓰는 쪽만 계정당 1회. */
-const REFERRAL_COIN = 50
+const REFERRAL_COIN = 500
 
 // 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
 // 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
@@ -121,6 +122,10 @@ function CosmeticThumb({ partKey }: { partKey: string }) {
 // kind·surface 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
 interface CatalogItem { partKey: string; price: number; kind?: string; surface?: string | null }
 interface HubState { authed: boolean; level?: number | null; rankPoints?: number | null; points?: number; cosmetics?: string[]; stamps?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
+  // 출석한 날짜('YYYY-MM-DD', 최근 1년) — 도크 스탬프판을 눌러 여는 '출석 기록' 달력의 유일한 출처.
+  //   서버는 예전부터 내려주고 있었고(옛 마이페이지 학습 대시보드가 쓰던 값), 2026-08-25 에 그 화면을
+  //   찢으면서 이 자리로 왔다. 새로 부르는 요청이 없다 — 허브가 이미 받고 있던 응답이다.
+  attendanceDays?: string[] | null;
   // 꾸미기 — 장착한 캐릭터(baseKey) · 그 외 장착(equipped.skin) · 첫 진입 흐름 진행 상태.
   //   ⚠️ charChosen·tutorialDone 은 **서버만이 안다**. 화면이 localStorage 로 기억하면
   //      브라우저를 바꾸거나 지운 사람에게 첫 진입 흐름이 다시 강제된다.
@@ -144,7 +149,7 @@ type TitleItem = { tier: string; exam_title?: string }
 
 // 'closet' = 옛 'shop'. 상점과 인벤토리가 한 모달의 두 탭이 되면서 이름을 바꿨다(2026-08-20)
 // — 사는 곳과 갈아입는 곳이 같은 자리라 버튼 이름이 '상점' 이면 절반을 숨기는 말이 된다.
-type ModalKind = 'closet' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift'
+type ModalKind = 'closet' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift' | 'attend'
 /** 꾸미기 모달의 두 탭. */
 type ClosetTab = 'shop' | 'items'
 
@@ -167,6 +172,12 @@ const EARN_ROWS: { kind: ActivityKind; icon: string }[] = [
   { kind: 'minigame', icon: 'star' },
 ]
 
+/** 코인 선물 노출 스위치 — 화면에서만 감춘다(2026-08-25).
+ *  서버(coin-gift 함수·RPC)와 이 파일의 선물 코드는 그대로 살아 있고, 진입점만 안 그린다.
+ *  ⚠️ 켤 때는 이 값 하나만 true 로. 아래 코인 표의 '선물' 줄도 같은 값을 본다 —
+ *     표만 남으면 화면이 "선물로 코인을 받을 수 있다"고 말하는데 보낼 길이 없다. */
+const GIFT_ENABLED: boolean = false
+
 /** 코인이 들어오는 길 — **이게 전부다.** 미니게임·레벨테스트는 시즌 점수만 주고 코인은 안 준다.
  *  n=null 은 정해진 값이 없다는 뜻(선물은 보낸 사람이 금액을 정한다).
  *  ⚠️ 새 코인 지급처를 만들면 여기에도 줄을 추가할 것 — 화면이 '전부'라고 말하는 표라
@@ -185,6 +196,8 @@ export default function Hub() {
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
+  // 출석 기록 달력(스탬프판을 눌러 여는 모달) — 최근 1년치 출석일.
+  const [attendanceDays, setAttendanceDays] = useState<string[]>([])
   // 오늘의 미션 3종 완료 플래그(daily_activity 의 종류별 플래그 — 행 존재로 판정하면 안 된다).
   const [learnDone, setLearnDone] = useState(false)
   const [minigameDone, setMinigameDone] = useState(false)
@@ -392,6 +405,7 @@ export default function Hub() {
     setPoints(h.points ?? 0)
     setStamps(h.stamps ?? 0)
     setCheckedIn(!!h.dailyDone)
+    setAttendanceDays(h.attendanceDays ?? [])
     setLearnDone(!!h.learnDone)
     setMinigameDone(!!h.minigameDone)
     setReferralCode(h.referralCode ?? null)
@@ -777,14 +791,17 @@ export default function Hub() {
         {/* 오른쪽 두 버튼은 묶어둔다 — .hub-backrow 가 space-between 이라 낱개로 넣으면 셋이 흩어진다.
             선물은 초대하기 모달에 넣지 않고 여기 독립 진입점으로 둔다(2026-08-07 결정). */}
         <div className="hub-backrow-act">
-          {/* 코인 선물 = 친구코드로 CARI 코인을 즉시 이체. 뱃지 = 아직 확인 안 한 받은 선물 건수. */}
-          <button className="hub-share hub-gift" onClick={openGift}>
-            <span className="ic"><Ic n="coin" s={16} /></span>{t('hub.gift_btn')}
-            {giftsUnseen > 0 && <span className="bd">{giftsUnseen}</span>}
-          </button>
+          {/* 코인 선물 = 닉네임으로 CARI 코인을 즉시 이체. 뱃지 = 아직 확인 안 한 받은 선물 건수.
+              GIFT_ENABLED=false 인 동안은 이 버튼이 유일한 진입점이라 안 그리면 모달도 못 연다. */}
+          {GIFT_ENABLED && (
+            <button className="hub-share hub-gift" onClick={openGift}>
+              <span className="ic"><Ic n="coin" s={16} /></span>{t('hub.gift_btn')}
+              {giftsUnseen > 0 && <span className="bd">{giftsUnseen}</span>}
+            </button>
+          )}
           {/* 공유 = 지금 순위·티어·칭호로 카드(PNG) 를 만들어 내보낸다(ShareCardModal) */}
           <button className="hub-share" onClick={() => setModal('share')}>
-            <span className="ic"><Ic n="share" s={16} /></span>{t('hub.share')}
+            <span className="ic"><Ic n="share" s={17} /></span>{t('hub.share')}
           </button>
         </div>
       </div>
@@ -833,11 +850,10 @@ export default function Hub() {
                 <div className="exp-fill" style={{ width: `${gaugeFillPct}%` }} />
                 <span className="exp-txt">
                   <span className="exp-lv">ARENA Lv.{arenaLv}</span>
-                  {/* 좁은 화면은 분수를 넣으면 'ARENA Lv.N' 이 잘려서 %로 줄인다(둘 다 같은 값이라 어긋나지 않는다). */}
-                  <span className="exp-lab">
-                    <span className="exp-pct">{Math.round(gaugeFillPct)}%</span>
-                    <span className="exp-frac">{bandCur.toLocaleString()} / {bandSpan.toLocaleString()}</span>
-                  </span>
+                  {/* 화면 폭과 무관하게 **%만** 쓴다(2026-08-25 지시). 옛날엔 PC 에서 '159 / 1,000' 분수를
+                      보여줬는데, 분모가 밴드 폭(1,000)이라 시즌 총점으로 오해하기 쉬웠고 좁은 화면에서는
+                      어차피 'ARENA Lv.N' 이 잘려 %로 바꿔야 했다 — 두 표기를 유지할 이유가 없다. */}
+                  <span className="exp-lab">{Math.round(gaugeFillPct)}%</span>
                 </span>
               </div>
               {/* '?' 는 점수(경험치 바) 쪽 도움말이다 — 코인 옆에 두면 코인 설명으로 읽혀서 바 바로 뒤에 붙였다. */}
@@ -888,10 +904,20 @@ export default function Hub() {
             </div>
         </div>
 
-        {/* 도크: 7일 출석 캘린더 + 메인 CTA(출석) */}
+        {/* 도크: 7일 출석 스탬프 + 메인 CTA(랭킹) */}
         <div className="dock">
-          <div className="reward" data-tut="stamp">
-            <div className="rw-top"><Ic n="fire" s={20} /> {t('hub.reward_head')}<span className="rw-n">{stamps} / 7</span></div>
+          {/* 스탬프판을 누르면 '출석 기록' 달력이 열린다(2026-08-25 — 옛 마이페이지 학습 대시보드의
+              활동 기록 달력이 여기로 왔다). 이 판이 곧 출석이라 진입점을 따로 만들지 않았다:
+              레일에 칸을 하나 더 넣으면 정사각 칸이 4개가 되면서 그만큼 작아진다.
+              ⚠️ <div> 가 아니라 <button> 이라 hub.css 에서 font/색을 상속으로 되돌려야 한다. */}
+          <button type="button" className="reward" data-tut="stamp" onClick={() => setModal('attend')}>
+            <div className="rw-top">
+              <Ic n="fire" s={20} /> {t('hub.reward_head')}
+              <span className="rw-n">{stamps} / 7</span>
+              {/* ⚠️ svg 가 아니라 글자다 — 궁궐 벌이 `.rw-top svg { display:none }` 라
+                  아이콘으로 넣으면 그 스킨에서만 조용히 사라져 '눌리는 판' 이라는 표시가 없어진다. */}
+              <span className="rw-more" aria-hidden="true">›</span>
+            </div>
             <div className="streak">
               {[1, 2, 3, 4, 5, 6, 7].map((d) => (
                 <div key={d} className={`day ${d <= stamps ? 'on' : ''}`}>
@@ -900,7 +926,7 @@ export default function Hub() {
                 </div>
               ))}
             </div>
-          </div>
+          </button>
           {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
           <Link className="cta-main" to="/ranking">
             <span className="cta-star" aria-hidden="true">
@@ -1120,6 +1146,16 @@ export default function Hub() {
         </Modal>
       )}
 
+      {/* 출석 기록 — 도크 스탬프판을 눌러서 연다. 7일 판이 '이번 사이클', 이 달력이 '지금까지 전부'다.
+          ⚠️ 안내문(hub.attend.help)을 빼지 말 것 — 출석은 2026-08-24 부터 **사이트에 들어오면 자동으로**
+             찍힌다. 누르는 버튼이 없어졌으니 어떻게 찍히는지 말해주는 자리가 여기밖에 없다. */}
+      {modal === 'attend' && (
+        <Modal title={t('hub.attend.title')} className="attend-modal" onClose={() => setModal(null)}>
+          <ContributionGraph days={new Set(attendanceDays)} />
+          <p className="hub-modal-help">{t('hub.attend.help')}</p>
+        </Modal>
+      )}
+
       {/* 점수·코인 획득 방법 — 점수 수치는 scoring.ts(원안 반영본) 파생이라 여기서 하드코딩하지 않는다.
           ⚠️ **두 지갑을 한 표에 섞지 말 것.** 시즌 점수는 랭킹, 코인은 상점이라 쓰는 곳도 버는 길도 다르다.
              섞으면 "미니게임 하면 코인이 늘겠지" 같은 오해가 그대로 생긴다(미니게임은 점수만 준다). */}
@@ -1157,7 +1193,7 @@ export default function Hub() {
           <table className="earn-tb">
             <thead><tr><th>{t('hub.earn.col_act')}</th><th>{t('hub.earn.col_coin')}</th></tr></thead>
             <tbody>
-              {COIN_ROWS.map((r) => (
+              {COIN_ROWS.filter((r) => GIFT_ENABLED || r.key !== 'gift').map((r) => (
                 <tr key={r.key}>
                   <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{t(`hub.earn.coin.${r.key}`)}</td>
                   <td className="earn-v">
@@ -1174,7 +1210,9 @@ export default function Hub() {
       {modal === 'invite' && (
         <Modal title={t('hub.invite.title')} onClose={() => setModal(null)}>
           <div className="iv-title">{t('hub.invite.lead')}</div>
-          <p className="hub-modal-help">{t('hub.invite.help')}</p>
+          {/* 두 안내문(help·hint)은 각각 "내 코드를 남이 쓰면" / "남의 코드를 내가 쓰면" 을 말한다.
+              금액은 상수에서 넣는다 — 문장에 박으면 보상을 고칠 때 6개국어 12줄이 조용히 거짓말을 한다. */}
+          <p className="hub-modal-help">{t('hub.invite.help', { n: REFERRAL_COIN })}</p>
           <div className="iv-code iv-code-lg">
             <span className="iv-code-lab">{t('hub.invite.my_code')}</span>
             <b className="iv-code-v">{referralCode ?? '––––'}</b>
@@ -1207,7 +1245,7 @@ export default function Hub() {
                     {t(redeeming ? 'hub.invite.checking' : 'hub.invite.register')}
                   </button>
                 </div>
-                <p className="hub-modal-help iv-redeem-hint">{t('hub.invite.hint')}</p>
+                <p className="hub-modal-help iv-redeem-hint">{t('hub.invite.hint', { n: REFERRAL_COIN })}</p>
               </>
             )}
             {redeemMsg && <p className={`iv-redeem-msg${redeemMsg.ok ? ' is-ok' : ''}`}>{redeemMsg.text}</p>}

@@ -30,12 +30,31 @@ Deno.serve(async (req) => {
 
     const admin = adminClient()
 
-    const { data, error } = await admin
-      .from('test_attempts')
-      .select('id, level, total_correct, total_questions, rank_after, rank_dir, deltas, submitted_at')
-      .eq('user_id', user.id)
-      .eq('status', 'submitted')
-      .order('submitted_at', { ascending: false })
+    // ⚠️ 아래 다섯은 **전부 user.id 하나만** 인자로 쓰고 서로의 결과를 참조하지 않는다
+    //    (현재 등급 계산 같은 조합은 다섯 개를 다 받은 뒤 아래에서 한다).
+    //    예전엔 이걸 줄 세워서 응시 이력 화면 하나에 왕복 6회가 들었다 — 한 파로 내보낸다.
+    const [
+      { data, error },
+      { data: prog },
+      { data: skills },
+      { left: dailyLeft },
+      { data: prof },
+    ] = await Promise.all([
+      admin
+        .from('test_attempts')
+        .select('id, level, total_correct, total_questions, rank_after, rank_dir, deltas, submitted_at')
+        .eq('user_id', user.id)
+        .eq('status', 'submitted')
+        .order('submitted_at', { ascending: false }),
+      admin.from('user_progress').select('rank, points').eq('user_id', user.id).maybeSingle(),
+      admin
+        .from('user_level_skill')
+        .select('level, ratings, attempts_count, placed')
+        .eq('user_id', user.id)
+        .order('level', { ascending: true }),
+      dailyAttemptsLeft(admin, user.id),
+      admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
+    ])
     if (error) return json({ error: error.message }, 500)
 
     const attempts = (data ?? []).map((a) => ({
@@ -51,20 +70,10 @@ Deno.serve(async (req) => {
     }))
 
     // 현재 등급/점수 (user_progress 한 줄). 응시 기록 없으면 등급 null.
-    const { data: prog } = await admin
-      .from('user_progress')
-      .select('rank, points')
-      .eq('user_id', user.id)
-      .maybeSingle()
     const currentRank = attempts.length > 0 ? ((prog?.rank as number) ?? 1) : null
     const currentPoints = (prog?.points as number) ?? 0
 
     // 레벨별 누적 레이더
-    const { data: skills } = await admin
-      .from('user_level_skill')
-      .select('level, ratings, attempts_count, placed')
-      .eq('user_id', user.id)
-      .order('level', { ascending: true })
     const levelSkills = (skills ?? [])
       .filter((s) => s.placed)
       .map((s) => ({
@@ -73,8 +82,7 @@ Deno.serve(async (req) => {
         attemptsCount: s.attempts_count as number,
       }))
 
-    // 레벨 선택 화면의 '오늘 N회 남음' 표시용. 강제는 start-test 가 같은 헬퍼로 한다.
-    const { left: dailyLeft } = await dailyAttemptsLeft(admin, user.id)
+    // (dailyLeft = 레벨 선택 화면의 '오늘 N회 남음'. 강제는 start-test 가 같은 헬퍼로 한다.)
 
     // ── 인증서 발자취 ──────────────────────────────────────────────
     // data 는 submitted_at 내림차순이라 덮어쓰며 훑으면 각 레벨의 '가장 이른' 날짜가 남는다.
@@ -101,12 +109,6 @@ Deno.serve(async (req) => {
     // 켜지는 별의 개수는 user_progress.rank 에서 뽑는다(승급 기록이 없는 옛 응시가 섞여도 안 흔들리게).
     // 날짜가 비는 레벨은 별만 켜지고 날짜가 안 찍힌다 — 화면이 null 을 이미 처리한다.
     const clearedTop = Math.max((currentRank ?? 1) - 1, clearedTop7 ? MAX_LEVEL : 0)
-
-    const { data: prof } = await admin
-      .from('profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .maybeSingle()
 
     // 한 레벨도 못 깼으면 인증서 자체가 없다(응시만 했다고 발급하지 않는다).
     const certificate = clearedTop >= 1

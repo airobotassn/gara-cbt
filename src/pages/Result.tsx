@@ -147,10 +147,11 @@ export default function Result() {
         <EbookPicks t={t} lang={lang} level={data.level} promoted={data.rankDir === 'up'} />
 
         <div className="result-actions">
-          {/* 학습 대시보드 = /mypage 기본 탭. 옛 /dashboard 는 라우트가 없어 catch-all 로 메인에 떨어졌다. */}
+          {/* 내 기록 = /test/record. 2026-08-25 까지는 마이페이지 '학습 대시보드' 탭(/mypage)이었는데,
+              그 화면을 찢어 레벨테스트 몫만 여기로 모았다 — 레벨테스트 결과창에서 가는 곳이니 이쪽이 맞다. */}
           {isFullUser ? (
-            <Link className="btn-ghost" to="/mypage" style={{ textDecoration: 'none' }}>
-              {t('common.dashboard')}
+            <Link className="btn-ghost" to="/test/record" style={{ textDecoration: 'none' }}>
+              {t('db.title')}
             </Link>
           ) : null}
           {/* 승급했으면 '다음 레벨 도전'이 주 버튼 — 다시 테스트는 보조로 내린다. */}

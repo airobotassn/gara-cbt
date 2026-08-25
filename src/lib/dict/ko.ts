@@ -9,7 +9,6 @@
 // ⚠️ 이 파일을 다른 데서 직접 import 하지 말 것 — 조회는 i18n.tsx 의 tr()/useT() 하나로만.
 const KO: Record<string, string> = {
   "common.home": "홈",
-  "common.dashboard": "학습 대시보드",
   "common.close": "닫기",
   "common.cancel": "취소",
   "common.ranking": "랭킹",
@@ -100,7 +99,6 @@ const KO: Record<string, string> = {
   // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
   "route.placeholder": "무엇을 찾으세요?",
   "route.notfound": "올바르지 않은 검색어예요. 다시 입력해 주세요.",
-  "mypage.tab_learning": "학습 대시보드",
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
   "rank.title": "랭킹",
   "report.btn": "🚩 오류 제보",
@@ -284,7 +282,6 @@ const KO: Record<string, string> = {
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   "result.next_level": "Lv.{n} 도전하기 →",
   "rank.cur_level": "현재 등급 · 레벨 {n}",
-  "db.cur_rank": "현재 등급 · 응시 {n}회",
   "db.points": "랭킹 점수 {p}",
   "db.skill_score": "실력 점수",
   "db.activity_score": "활동 점수",
@@ -361,6 +358,10 @@ const KO: Record<string, string> = {
   "rank.promotion_zone": "승급 구간",
   "rank.top_tier": "최고 티어",
   "rank.pt": "{n}점",
+  "rank.nth": "{n}위",
+  "rank.trend_title": "순위 추이",
+  "rank.trend_empty": "이 기간엔 기록이 없어요.",
+  "rank.trend_help": "선이 올라가면 순위가 오른 거예요. 그래프를 짚으면 그날 점수가 보여요.",
   "rank.you": "나",
   "rank.cta_test": "테스트로 랭킹에 배치받기",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -389,7 +390,7 @@ const KO: Record<string, string> = {
   "rank.active_today": "오늘 참여율",
   "country.KR": "대한민국",
 
-  "db.title": "학습 대시보드",
+  "db.title": "내 기록",
   "db.empty": "아직 제출한 시험이 없어요.",
   "db.start": "테스트 시작하기",
   "db.stat_maxlevel": "최고 레벨",
@@ -409,7 +410,6 @@ const KO: Record<string, string> = {
   "db.trend_season": "시즌",
   "db.trend_season_hint": "시즌 = 6개월",
   "db.trend_empty": "이 기간엔 응시 기록이 없어요.",
-  "db.activity_title": "활동 기록",
   "db.radar_title": "영역 밸런스",
   "db.radar_me": "내 점수",
   "db.radar_avg": "레벨 평균",
@@ -560,32 +560,24 @@ const KO: Record<string, string> = {
   "prep.start_login": "로그인 후 시작",
   "check.title": "시험환경 테스트 (사전 점검)",
   "check.eyebrow": "사전 점검",
-  "check.sub": "실제 시험 전에 보안 프로그램 설치와 응시 환경을 미리 확인하고, 모의 문제를 풀어보세요.",
+  "check.sub": "실제 시험 전에 이 PC에서 보안 브라우저가 제대로 열리는지, 응시 환경이 준비됐는지 미리 확인하세요.",
   "check.sec1_title": "보안 프로그램(Safe Exam Browser) 설치",
   "check.sec1_desc": "시험은 화면 캡처·복사·프로그램 전환을 차단하는 보안 프로그램(Safe Exam Browser) 안에서 진행됩니다.",
+  "check.sec1_hint": "위 확인에서 보안 브라우저가 열리지 않았다면 여기서 설치하세요.",
   "check.install_btn": "보안 프로그램(SEB) 설치하기",
   "check.install_note1": "· 설치 시 Windows가 “게시자: ETH Zürich” 로 표시되면 정상입니다.",
   "check.install_note2": "· “Windows가 PC를 보호했습니다” 창이 뜨면 추가 정보 → 실행 을 누르세요. (정상 설치 과정)",
-  "check.sec2_title": "응시 환경 자동 점검",
+  "check.sec2_title": "응시 환경 점검",
+  "check.sec2_desc": "보안 브라우저를 실행하면 아래 항목을 점검합니다.",
   "check.chk_pc": "PC(데스크톱) 환경",
-  "check.chk_pc_ok": "PC에서 접속되었습니다.",
   "check.chk_screen": "화면 크기",
-  "check.chk_screen_ok": "응시에 충분합니다.",
-  "check.chk_screen_no": "가로 1024px 이상 화면을 권장합니다.",
   "check.chk_fs": "전체화면 지원",
-  "check.chk_fs_ok": "전체화면 응시가 가능합니다.",
-  "check.chk_fs_no": "브라우저가 전체화면을 막고 있습니다.",
   "check.chk_net": "인터넷 연결",
-  "check.chk_net_ok": "정상 연결됨.",
-  "check.chk_net_no": "인터넷 연결을 확인하세요.",
-  "check.chk_seb": "보안 브라우저(SEB)",
-  "check.chk_seb_ok": "보안 브라우저로 열렸습니다.",
-  "check.chk_seb_no": "실제 시험은 보안 브라우저로 열어야 합니다.",
+  "check.chk_seb": "보안 브라우저(SEB) 실행",
   "check.monitor_note": "· 모니터 수는 보안 브라우저 실행 시 자동 점검됩니다. 외부 모니터는 1대만 연결하세요.",
-  "check.sec3_title": "모의 문제 풀어보기",
-  "check.sec3_desc": "실제 시험과 똑같은 화면으로 모의 문제를 풀어보며 조작에 익숙해지세요. (채점되지 않습니다)",
-  "check.practice_btn": "모의 문제 시작",
-  "check.back": "CARIS로 돌아가기",
+  "check.sebtest_btn": "보안 브라우저로 열어서 확인",
+  "check.sebtest_desc": "실제 시험과 같은 방식으로 보안 브라우저를 실행해, 이 PC에서 제대로 열리는지 확인합니다.\n시험 문제는 나오지 않습니다.",
+  "check.back": "내 응시권으로 돌아가기",
   "done.title": "제출이 완료되었습니다",
   "done.sub1": "응시가 정상적으로 접수되었습니다. 보안 브라우저는 자동으로 종료됩니다.",
   "done.sub2": "채점 결과는 발표일 이후 마이페이지에서 확인할 수 있습니다.",
@@ -956,12 +948,14 @@ const KO: Record<string, string> = {
   // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
   "mypage.cert_no": "인증번호",
   "mypage.empty_issuance": "발급 가능한 인증서가 없습니다.",
-  "mypage.tab_ebooks": "E-BOOK 서재",
-  "mypage.empty_ebooks": "아직 구매한 이북이 없습니다.",
+  // ⚠️ 이 탭에는 이제 **강의도 들어간다**(2026-08-25) — 'E-BOOK 서재' 라고 부르면 강의가 없는 것처럼 읽힌다.
+  //    URL(/mypage/ebooks)은 그대로다(북마크·링크가 이미 나가 있다).
+  "mypage.tab_ebooks": "내 서재",
+  "mypage.empty_ebooks": "아직 구매한 E-Book·강의가 없습니다.",
   // 메인 3번째 CTA(landing.cta_learn)와 같은 이름. 브랜드 라벨이라 6개국어 동일 표기.
   "ebook.store_title": "Learning Library",
-  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = E-BOOK 서재)과 같아야 한다.
-  "ebook.store_sub": "구매한 책은 마이페이지 › E-BOOK 서재에서 읽을 수 있어요.",
+  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = 내 서재)과 같아야 한다.
+  "ebook.store_sub": "구매한 책은 마이페이지 › 내 서재에서 읽을 수 있어요.",
   "ebook.empty_store": "등록된 이북이 없습니다.",
   "ebook.buy": "구매하기",
   "ebook.get_free": "무료로 담기",
@@ -971,12 +965,12 @@ const KO: Record<string, string> = {
   "ebook.view": "보러가기",
   "ebook.cover_zoom": "표지 크게 보기",
   "ebook.processing": "처리 중…",
-  "ebook.bought": "구매 완료 — E-BOOK 서재에 담겼어요.",
+  "ebook.bought": "구매 완료 — 내 서재에 담겼어요.",
   "ebook.login_to_buy": "로그인 후 구매할 수 있어요.",
   // 비로그인이 구매 버튼을 눌렀을 때 뜨는 로그인 모달(제목 한 줄 + 버튼만 — 책 정보·설명은 넣지 않는다)
   "ebook.login_modal_title": "로그인이 필요해요",
   "ebook.go_store": "Learning Library 가기",
-  "ebook.go_library": "E-BOOK 서재에서 보기",
+  "ebook.go_library": "내 서재에서 보기",
   "ebook.load_failed": "이북을 불러올 수 없습니다.",
 
   // ---- 결제(/checkout · /pay/success · /pay/fail) ----
@@ -1015,7 +1009,7 @@ const KO: Record<string, string> = {
   "pay.fail_title": "결제하지 못했어요",
   "pay.fail_body": "결제가 취소되었거나 승인되지 않았습니다.",
   "pay.retry": "다시 시도",
-  "ebook.reader_back": "E-BOOK 서재",
+  "ebook.reader_back": "내 서재",
   "ebook.reader_lang": "읽을 언어",
   "ebook.reader_fs": "전체화면",
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
@@ -1025,11 +1019,13 @@ const KO: Record<string, string> = {
   "ll.catalog": "교재 종류",
   "ll.level_col": "레벨",
   "ll.tier_col": "급수",
-  "ll.books": "교재",
+  // ⚠️ 'E-Book' 은 카탈로그 이름(LEVELTEST·CARIS)과 같은 **브랜드 표기라 6개국어 모두 같은 글자**다
+  //    (2026-08-25 지시로 '교재' 에서 바뀌었다). 언어별로 번역하면 화면마다 다른 이름이 된다.
+  "ll.books": "E-Book",
   "ll.lectures": "강의",
-  "ll.no_books": "이 레벨의 교재는 준비 중이에요.",
+  "ll.no_books": "이 레벨의 E-Book 은 준비 중이에요.",
   "ll.no_lectures": "이 레벨의 강의는 준비 중이에요.",
-  "ll.no_books_tier": "이 급수의 교재는 준비 중이에요.",
+  "ll.no_books_tier": "이 급수의 E-Book 은 준비 중이에요.",
   "ll.no_lectures_tier": "이 급수의 강의는 준비 중이에요.",
   "ll.any_level": "레벨 무관",
   "ll.any_level_desc": "레벨과 상관없이 볼 수 있는 자료예요.",
@@ -1039,11 +1035,14 @@ const KO: Record<string, string> = {
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": "이전",
   "ll.next": "다음",
-  "ll.watch_yt": "유튜브에서 보기",
-  "ll.demo_note": "강의는 데모용 샘플 영상입니다.",
+  // 강의 시청(2026-08-25 유료화) — 산 사람에게만 보인다. 옛 'll.watch_yt'(유튜브에서 보기)와
+  //   'll.demo_note'(데모 안내)는 삭제됐다: 돈 받고 파는 물건 옆에 무료로 가는 길을 둘 수 없다.
+  "ll.watch": "시청하기",
+  "ll.playing": "재생 중",
+  "ll.empty_owned": "이 칸에는 구매한 자료가 없어요.",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "전체구매",
-  "ll.bundle_desc": "교재와 강의를 골라 한 번에 담을 수 있어요.",
+  "ll.bundle_desc": "E-Book 과 강의를 골라 한 번에 담을 수 있어요.",
   "ll.bundle_hint": "{c}개 전부 담으면 {n}% 할인",
   "ll.bundle_on": "{c}개 전부 · {n}% 할인 적용",
   "ll.pick": "선택",
@@ -1054,7 +1053,6 @@ const KO: Record<string, string> = {
   "ll.pick_of": "{a} / {b}개 선택",
   "ll.total": "합계",
   "ll.bundle_buy": "선택 항목 구매",
-  "ll.bundle_nofee": "강의는 무료라 결제할 게 없어요. 바로 보시면 됩니다.",
   "ll.bundle_empty": "담을 수 있는 항목이 아직 없어요.",
   "mypage.reissue": "재발급",
   "mypage.issue": "발급 신청",
@@ -1399,7 +1397,6 @@ const KO: Record<string, string> = {
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
-  "arena.tag": "실데이터 연동 · 지역 미수집 구간은 예시",
   "arena.low": "낮음",
   "arena.high": "높음",
   // ⚠️ arena.avgLevel 은 레벨테스트 시절 문구다. 지도 지표가 레벨 → 랭킹점수(season_total 평균, 베이지안 보정)로
@@ -1415,7 +1412,6 @@ const KO: Record<string, string> = {
   "arena.world": "세계",
   "arena.worldLeague": "World League",
   "arena.league": " 리그",
-  "arena.real": "실데이터",
   "arena.ppl": "명",
   "arena.unit": "위",
   "arena.avg": "평균",
@@ -1429,7 +1425,6 @@ const KO: Record<string, string> = {
   "arena.bHubS": "캐릭터 허브",
   "arena.bDaily": "오늘의 학습",
   "arena.bDailyS": "데일리 콘텐츠",
-  "arena.foot": "지역/국가 실데이터가 있으면 자동 반영(참여 5명 이상 지역), 아직 데이터가 없는 지역·시군구는 예시 값입니다.",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "미니게임",
@@ -1786,7 +1781,7 @@ const KO: Record<string, string> = {
   // 오른쪽 레일
   "hub.rail.closet": "꾸미기",
   "hub.rail.title": "칭호",
-  "hub.rail.invite": "초대하기",
+  "hub.rail.invite": "초대보상",
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "출석",
@@ -1795,6 +1790,8 @@ const KO: Record<string, string> = {
 
   // 도크(출석 보상)
   "hub.reward_head": "출석 보상",
+  "hub.attend.title": "출석 기록",
+  "hub.attend.help": "사이트에 들어오면 그날 출석이 자동으로 찍혀요.",
   "hub.daily.claim": "오늘 출석하기",
   "hub.daily.done": "오늘 출석 완료",
   "hub.day_n": "{n}일",
@@ -1911,7 +1908,7 @@ const KO: Record<string, string> = {
   // 친구 초대 모달
   "hub.invite.title": "친구 초대",
   "hub.invite.lead": "친구와 함께 CARIS 하세요!",
-  "hub.invite.help": "내 초대코드를 알려주면 친구가 바로 시작할 수 있어요.",
+  "hub.invite.help": "내 초대코드를 친구가 입력하면 둘 다 {n} CARI 코인 증정",
   "hub.invite.my_code": "내 초대코드",
   "hub.invite.copied": "복사됨",
   "hub.invite.copy": "복사",
@@ -1921,7 +1918,7 @@ const KO: Record<string, string> = {
   "hub.invite.redeem_done": "✓ 초대코드를 등록했어요 (한 번만 가능해요)",
   "hub.invite.checking": "확인 중",
   "hub.invite.register": "등록",
-  "hub.invite.hint": "한 번 등록하면 바꿀 수 없어요.",
+  "hub.invite.hint": "친구가 알려준 초대코드를 입력하면 둘 다 {n} CARI 코인 증정",
   "hub.invite.err_not_found": "없는 초대코드예요. 다시 확인해주세요",
   "hub.invite.err_self": "내 초대코드는 쓸 수 없어요",
   "hub.invite.err_already": "이미 초대코드를 등록했어요",

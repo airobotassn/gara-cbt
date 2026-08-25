@@ -324,20 +324,36 @@ export default function ChatBoard({ room = 'global' }: Props) {
       try {
         const current = rowsRef.current.filter((r) => !r.sending)
         const lastId = current.length ? current[current.length - 1].id : undefined
-        if (typeof lastId === 'number') {
-          const el = listRef.current
-          const atBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : true
-          const res = await callFunction<{ messages: Row[] }>('chat-list', { room, after: lastId })
-          if (res.messages.length) {
-            setRows((prev) => {
-              const seen = new Set(prev.map((r) => r.id))
-              const next = [...prev, ...res.messages.filter((r) => !seen.has(r.id))]
-              return atBottom && next.length > MAX_ROWS ? next.slice(-MAX_ROWS) : next
-            })
-            requestAnimationFrame(() => {
-              if (atBottom && el) el.scrollTop = el.scrollHeight
-            })
-          }
+        // 신규분(after)과 가림·삭제 반영(ids+since)을 **한 번에** 묻는다.
+        //  ⚠️ 예전엔 함수를 두 번 따로 불렀고, 그것도 첫 답을 받고서야 두 번째를 물었다 —
+        //     4초 폴링이라 접속자 1명당 분당 30왕복이었다. 서버가 한 응답에 둘 다 담아준다.
+        //  ⚠️ 반영 대상 id 는 **묻기 전에** 고른다. 지금 막 도착한 글은 방금 받은 최신 상태라
+        //     반영할 것이 없으므로 빠져도 맞다(옛 코드도 결과적으로 그랬다).
+        const visible = current.slice(-200)
+        const el = listRef.current
+        const atBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : true
+        const req: Record<string, unknown> = { room }
+        if (typeof lastId === 'number') req.after = lastId
+        if (visible.length) {
+          req.ids = visible.map((r) => r.id)
+          req.since = visible.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), '1970-01-01T00:00:00Z')
+        }
+        // 아직 아무것도 안 띄운 상태(첫 로드 전)면 물어볼 것이 없다.
+        if (req.after === undefined && req.ids === undefined) {
+          schedule()
+          return
+        }
+        const res = await callFunction<{ messages?: Row[]; tombstones?: Tomb[] }>('chat-list', req)
+        const incoming = res.messages ?? []
+        if (incoming.length) {
+          setRows((prev) => {
+            const seen = new Set(prev.map((r) => r.id))
+            const next = [...prev, ...incoming.filter((r) => !seen.has(r.id))]
+            return atBottom && next.length > MAX_ROWS ? next.slice(-MAX_ROWS) : next
+          })
+          requestAnimationFrame(() => {
+            if (atBottom && el) el.scrollTop = el.scrollHeight
+          })
         }
         // 번역을 켜둔 동안은 **아직 못 받은 글을 계속 채운다**(새 글 + 워커가 늦게 채운 옛 글).
         //  ⚠️ 이게 없으면 첫 재시도(1.5·3초) 안에 워커가 못 끝낸 글이 영영 원문으로 남는다 —
@@ -354,24 +370,19 @@ export default function ChatBoard({ room = 'global' }: Props) {
             void fetchTranslations(want)
           }
         }
-        const visible = rowsRef.current.filter((r) => !r.sending).slice(-200)
-        if (visible.length) {
-          const ids = visible.map((r) => r.id)
-          const since = visible.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), '1970-01-01T00:00:00Z')
-          const rec = await callFunction<{ tombstones?: Tomb[] }>('chat-list', { room, ids, since })
-          if (rec.tombstones?.length) {
-            const byId = new Map(rec.tombstones.map((tm) => [tm.id, tm]))
-            setRows((prev) =>
-              prev.map((r) => {
-                const tm = byId.get(r.id)
-                if (!tm) return r
-                if (tm.deleted_at != null) {
-                  return { ...r, body: null, deleted_at: tm.deleted_at, edited_at: tm.edited_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
-                }
-                return { ...r, body: tm.body, edited_at: tm.edited_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
-              }),
-            )
-          }
+        // 가림·삭제 반영 — 위 한 번의 응답에 같이 실려 온 것이다(따로 묻지 않는다).
+        if (res.tombstones?.length) {
+          const byId = new Map(res.tombstones.map((tm) => [tm.id, tm]))
+          setRows((prev) =>
+            prev.map((r) => {
+              const tm = byId.get(r.id)
+              if (!tm) return r
+              if (tm.deleted_at != null) {
+                return { ...r, body: null, deleted_at: tm.deleted_at, edited_at: tm.edited_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
+              }
+              return { ...r, body: tm.body, edited_at: tm.edited_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
+            }),
+          )
         }
       } catch {
         /* noop — 다음 tick 에 재시도 */

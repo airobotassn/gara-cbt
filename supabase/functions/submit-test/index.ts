@@ -109,6 +109,12 @@ Deno.serve(async (req) => {
     const totalByCat: Record<string, number> = {}
     let totalCorrect = 0
 
+    // ⚠️ 채점 결과 쓰기는 **모아서 한 파로** 내보낸다(자격검정 submit-exam 과 같은 이유).
+    //    예전엔 문항마다 UPDATE 를 줄 세워서 30문항이면 응시자가 30왕복을 그대로 기다렸다.
+    //    각 UPDATE 는 `.eq('id', row.id)` 로 서로 다른 행 하나씩만 건드려 의존이 없다.
+    // ⛔ **한 건이라도 실패하면 제출을 확정하지 않는다.** 아래 제출 확정·등급 반영이 이어서 도는데,
+    //    답안이 반만 써진 채로 그게 돌면 점수와 답안이 어긋난 기록이 남는다.
+    const writes: Promise<{ error: { message: string } | null }>[] = []
     for (const row of assigned as any[]) {
       const cat = row.category as string
       totalByCat[cat] = (totalByCat[cat] ?? 0) + 1
@@ -121,14 +127,20 @@ Deno.serve(async (req) => {
         totalCorrect += 1
         correctByCat[cat] += 1
       }
-      await admin
-        .from('test_answers')
-        .update({
-          selected_index: selected,
-          is_correct: isCorrect,
-          time_spent: Math.max(0, Math.floor(sub?.timeSpent ?? 0)),
-        })
-        .eq('id', row.id)
+      writes.push(
+        admin
+          .from('test_answers')
+          .update({
+            selected_index: selected,
+            is_correct: isCorrect,
+            time_spent: Math.max(0, Math.floor(sub?.timeSpent ?? 0)),
+          })
+          .eq('id', row.id),
+      )
+    }
+    const failed = (await Promise.all(writes)).find((r) => r?.error)
+    if (failed?.error) {
+      return json({ error: '채점 결과를 저장하지 못했습니다. 잠시 후 다시 제출해주세요.' }, 500)
     }
 
     // 이 시험의 축별 perf (출제된 축만, 0~100)

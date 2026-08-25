@@ -1,26 +1,29 @@
-// 러닝 라이브러리 (/ebooks) — **가로 3열**: 레벨(급수) | 교재(E-BOOK) | 강의.
+// 러닝 라이브러리 (/ebooks) — **가로 3열**: 레벨(급수) | E-Book | 강의.
 //   맨 위 전환 버튼으로 카탈로그가 둘이다(2026-08-11):
 //     · LEVELTEST E-BOOK — 무료 레벨테스트용. 왼쪽 열 = 레벨 1~7 (+레벨 무관)
 //     · CARIS E-BOOK     — 자격검정용.       왼쪽 열 = 급수 Beginner~Zenith (+급수 무관)
-//   책이 어느 쪽에 서는지는 `ebooks.catalog` 한 컬럼이 정한다(관리자 이북 탭에서 고른다).
-//   ⚠️ 급수별 강의는 아직 없다 — lectures.ts 는 레벨만 안다. CARIS 탭의 강의 열은 비어 있는 게 맞다.
+//   책·강의가 어느 쪽에 서는지는 `catalog` 한 컬럼이 정한다(관리자 탭에서 고른다).
 //   왼쪽에서 레벨을 고르면 가운데·오른쪽이 그 레벨 것으로 갈리고, 각 열은 카페 게시판처럼
 //   **자기 안에서 세로로 스크롤**한다(페이지를 내려서 레벨이 바뀌는 구조가 아니다).
-//   좁은 화면은 3열이 안 들어가므로 레벨을 상단 가로 칩으로 빼고 교재↔강의를 탭으로 접는다.
+//   좁은 화면은 3열이 안 들어가므로 레벨을 상단 가로 칩으로 빼고 E-Book↔강의를 탭으로 접는다.
+//   ⚠️ 3열 뼈대·항목 줄은 **components/LearningLibrary.tsx** 가 단일 출처다 — 마이페이지 서재가 같은 걸 쓴다.
 //
-//   결제(2026-08-06 연동): 유료책 '구매하기' → /checkout?type=ebook&ref=<id> (토스 결제위젯) → 승인 후 지급.
-//      0원 책만 이 화면에서 ebooks/buy 로 즉시 지급한다(0원은 결제창을 탈 수 없다). 서버도 무료책만 허용.
-//      ⚠️ DB·결제는 원(KRW)이고 **구매자 화면 표시만 달러**다($1 = 1,500원 고정 환산 · 2026-08-07 결정).
-//         금액은 반드시 lib/money.ts 의 usdc() 로 찍는다 — 문자열에 `$`·`₩` 를 직접 박지 말 것.
-//         실제 청구액(원화) 고지는 결제 화면(/checkout)의 주문요약 아래에서 한다.
-//   ⚠️ 강의는 아직 DB 가 없다 — `lib/lectures.ts` 하드코딩(데모). 관리자 등록으로 옮길 때 그 파일 주석 참고.
+//   결제(2026-08-06 연동): 유료 '구매하기' → /checkout?type=ebook|lecture&ref=<id> → 승인 후 지급.
+//      0원짜리만 이 화면에서 ebooks/buy 로 즉시 지급한다(0원은 결제창을 탈 수 없다). 서버도 무료만 허용.
+//      금액은 반드시 lib/money.ts 의 usdc() 로 찍는다 — 문자열에 `$`·`₩` 를 직접 박지 말 것.
+//      실제 청구액(원화) 고지는 결제 화면(/checkout)의 주문요약 아래에서 한다.
+//
+//   ⛔ **강의도 유료 상품이다(2026-08-25).** 사기 전엔 썸네일·제목·소개만 보이고 재생은 산 뒤에 열린다
+//      (서버가 미소유에게 youtube_id 를 안 내려준다). 산 강의는 마이페이지 서재에서 본다.
+//      ⚠️ 파는 강의는 **미등록(unlisted) 업로드**여야 한다 — 공개 영상은 링크만 알면 누구나 본다.
+//      ⚠️ 옛 '유튜브에서 보기' 링크는 제거됐다(2026-08-25 지시) — 돈 받고 파는 물건 옆에 무료로 가는
+//         길을 두면 그 자체로 앞뒤가 안 맞는다.
 //   전체구매(2026-08-19): 왼쪽 열 **맨 위** 칸. 레벨 하나가 아니라 카탈로그 전체의 교재·강의를 썸네일로 깔고
 //      항목마다 붙은 버튼으로 고른 것만 담는다. **교재와 강의는 각자 따로** 세고 할인도 각자 붙는다 —
 //      한 종류를 통으로(7개 전부) 담아야 그 종류값에서 10%. 문구는 고르기 전에도 계속 떠 있다.
-//      결제까지 붙어 있다(2026-08-19) — '선택 항목 구매' → /checkout?type=bundle&ref=<카탈로그>&ids=…
+//      결제까지 붙어 있다 — '선택 항목 구매' → /checkout?type=bundle&kind=ebook|lecture&ref=<카탈로그>&ids=…
 //      → payments 가 담은 id 로 금액·할인을 **다시 뽑아** 주문을 만들고, 줄은 payment_items 에 남는다.
-//      강의는 값이 0원이고 소유 개념이 없어 결제 대상이 아니다(강의만 담으면 안내만 뜬다).
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
@@ -28,9 +31,17 @@ import { useT } from '../lib/i18n'
 import type { TFunc, Lang } from '../lib/i18n'
 import { usdc } from '../lib/money'
 import EbookCover from '../components/EbookCover'
+import {
+  BookRow,
+  LectureRow,
+  LibraryFrame,
+  PaneEmpty,
+  Pager,
+  type LibGroup,
+} from '../components/LearningLibrary'
+import { ANY_COLOR, COVER_COLORS } from '../lib/coverColors'
 import { MIN_LEVEL, MAX_LEVEL } from '../lib/testConfigLevel'
 import { getTracks, TIER_COLORS } from '../lib/caris'
-import { LECTURES, lecturesForLevel, ytEmbed, ytThumb, ytWatch, type Lecture } from '../lib/lectures'
 import type { EbookListResp, EbookRow, ServerLecture } from '../lib/types'
 import { rememberPostLogin } from '../lib/postLogin'
 
@@ -40,14 +51,8 @@ const CATALOG_LABEL: Record<Catalog, string> = {
   leveltest: 'LEVELTEST',
   caris: 'CARIS',
 }
-const ANY_COLOR = 'rgb(148 163 184)' // slate-400 — 레벨/급수 색 사다리 밖이라는 뜻으로 무채색
-
 /** 전체구매 칸의 key — 왼쪽 열 **맨 위**(레벨 1 위)에 서는 특별 칸이라 레벨/급수 key 와 안 겹치게 둔다.
- *  ⛔ **구색이다(2026-08-19 지시)** — 고르기·합계·할인 표시까지가 전부고 묶음 결제는 아직 없다. 두 가지가 없어서다:
- *     · 다건 결제 — payments 는 한 결제에 상품 1건(+이북 곁다리 1건)까지만 안다. 줄 단위 주문을 새로 만들어야 하고,
- *       할인율도 **서버가 다시 계산**해야 한다(금액은 요청으로 받지 않는다 — CLAUDE.md 결제 절).
- *     · 강의 상품 — lectures 테이블에 가격 컬럼도 구매·소유 테이블도 없다(유튜브 임베드라 지금은 그냥 무료 시청).
- *       그래서 여기 강의는 0원으로 잡힌다. 가격이 생기면 BundleItem.price 만 채우면 합계에 그대로 들어간다. */
+ *  교재 묶음·강의 묶음이 **각자 따로** 결제된다(한 묶음에 한 종류 — 서버 resolveBundle 과 한 벌). */
 const BUNDLE_KEY = '__bundle__'
 const BUNDLE_COLOR = '#f6c453' // 금색 — 레벨 색 사다리(표지색) 밖이라는 뜻. 전체를 묶는 자리라 따로 논다.
 /** 한 종류를 통으로 담았을 때의 할인율(%). 화면 문구(ll.bundle_hint/ll.bundle_on)의 {n} 도 이 값을 받는다
@@ -57,48 +62,19 @@ const BUNDLE_COLOR = '#f6c453' // 금색 — 레벨 색 사다리(표지색) 밖
 const BUNDLE_OFF_PCT = 10
 
 /** 전체구매 격자의 한 칸 — 교재와 강의를 **같은 모양**으로 다룬다(둘을 한 목록에서 고르므로).
- *  key 는 접두사로 가른다 — 교재 id(uuid)와 강의 id(유튜브)가 한 Set 에 섞인다. */
+ *  key 는 접두사로 가른다 — 교재 id 와 강의 id 가 한 Set 에 섞인다(둘 다 uuid 라 접두사 없이는 못 가른다). */
 type BundleItem = {
   key: string
-  /** 원본 id — 교재는 ebooks.id(결제로 넘어가는 값), 강의는 유튜브 id. key 에서 접두사를 벗기지 않으려고 따로 둔다. */
+  /** 원본 id — **결제로 넘어가는 값**이다. 교재는 ebooks.id, 강의는 lectures.id(유튜브 id 가 아니다). */
   id: string
   kind: 'book' | 'lecture'
   title: string
   sub: string // 저자(교재) 또는 채널(강의)
-  price: number // 달러 센트. 강의는 0 — 위 BUNDLE_KEY 주석 참고
+  price: number // 달러 센트
   owned: boolean
-  cover: string | null
-  ytId: string | null
+  cover: string | null // 교재 표지(세로)
+  thumb: string | null // 강의 썸네일(가로 16:9)
   level: number | null
-}
-
-/** 레벨 칸의 색 점 — **그 레벨 교재 표지의 네온색**에서 뽑은 값이다(표지 그림에서 실측).
- *  ⚠️ testConfigLevel 의 LEVEL_COLORS(연두→빨강)를 쓰지 않는다. 이 화면은 바로 옆에 표지가 서 있어서
- *     사다리색을 쓰면 점과 표지가 서로 다른 색을 말한다. 표지를 새로 뽑으면 이 값도 다시 재야 한다. */
-const COVER_COLORS: Record<number, string> = {
-  1: '#2edef9', // 시안
-  2: '#0632f1', // 파랑
-  3: '#755ef4', // 보라
-  4: '#8d49f7', // 자주
-  5: '#f52c8f', // 핑크
-  6: '#f35907', // 주황
-  7: '#da1919', // 빨강
-}
-
-/** 교재 표지 폭(열 본문 폭 대비). 강의 썸네일은 이 값을 쓰지 않는다 — 영상은 가로가 긴 물건이라
- *  열 폭을 꽉 채우고 제목을 그 밑에 둔다(2026-08-11 지시).
- *  ⚠️ 51% 는 **줄 높이를 강의 줄과 맞추려고 역산한 값**이다(표지 A4 → 폭×1.414 + 패딩 32 ≒ 썸네일 16:9 + 제목·채널).
- *     줄여 놓으면 교재 줄이 짧아 박스 아래가 100px 씩 텅 빈다(실제로 그렇게 만들었다가 지적받음).
- *     ⚠️ max-w 를 걸지 말 것 — 열이 넓어질 때 표지만 안 커져 다시 어긋난다. 상한은 페이지 폭(1240)이 이미 준다. */
-const MEDIA_W = 'w-[51%] shrink-0 self-start'
-
-/** 왼쪽 열 한 칸 — 레벨(1~7·무관) 또는 급수(Beginner~Zenith·무관). 두 카탈로그가 같은 모양을 쓴다. */
-type Group = {
-  key: string // 레벨은 '1'~'7', 급수는 티어 key. 'any' = 그 카탈로그의 '무관' 자리
-  label: string // 왼쪽 열 · 좁은 화면 설명줄에 쓰는 이름
-  short: string // 좁은 화면 가로 칩(폭이 좁아 짧게)
-  desc: string
-  color: string
 }
 
 export default function Ebooks() {
@@ -122,8 +98,9 @@ export default function Ebooks() {
   const [bookPageRaw, setBookPage] = useState(0)
   const [lecPageRaw, setLecPage] = useState(0)
   // 좁은 화면 전용 — 3열을 못 세우니 가운데·오른쪽 열을 탭으로 번갈아 보여준다.
-  const [pane, setPane] = useState<'books' | 'lectures'>('books')
-  // 관리자가 등록한 강의(lectures 테이블). ⚠️ 하나라도 있으면 코드에 박힌 목록(lib/lectures.ts)보다 이게 우선이다.
+  const [pane, setPane] = useState<string>('books')
+  // 관리자가 등록한 강의(lectures 테이블). ⛔ 여기가 유일한 출처다 — 코드에 박힌 폴백은 제거됐다
+  //   (파는 물건이 된 뒤로, DB 에 없는 강의는 사지도 갖지도 못하므로 화면에 두면 유령 항목이 된다).
   const [dbLectures, setDbLectures] = useState<ServerLecture[] | null>(null)
   // 전체구매에서 고른 항목(BundleItem.key). 카탈로그를 바꾸면 목록이 통째로 갈리므로 같이 비운다.
   const [picked, setPicked] = useState<Set<string>>(new Set())
@@ -155,16 +132,23 @@ export default function Ebooks() {
 
   // 왼쪽 열 목록. 교재가 없는 레벨·급수도 남긴다 — 사다리가 중간에 비면 몇 칸짜리인지부터 헷갈린다.
   //   '무관' 칸만은 해당 교재가 있을 때만 세운다(항상 있으면 빈 칸이 하나 더 있는 것으로 읽힌다).
-  const groups = useMemo<Group[]>(() => {
+  const groups = useMemo<LibGroup[]>(() => {
+    // 할인은 목록에서도 보인다 — 들어가 봐야 아는 혜택이면 아무도 안 누른다.
+    const bundleBadge = (
+      <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 font-label-md text-[14px] font-bold text-secondary">-{BUNDLE_OFF_PCT}%</span>
+    )
     if (cat === 'leveltest') {
       // ⚠️ 전체구매는 **맨 앞**이다(레벨 1 위 — 2026-08-19 지시). CARIS 탭에는 아직 안 세운다:
       //    급수별 강의가 하나도 없어서 '교재만 있는 전체구매' 가 된다. 열려면 여기서 같이 push 하면 된다.
-      const out: Group[] = [{
+      const out: LibGroup[] = [{
         key: BUNDLE_KEY,
         label: t('ll.bundle'),
         short: t('ll.bundle'),
         desc: t('ll.bundle_desc'),
         color: BUNDLE_COLOR,
+        badge: bundleBadge,
+        // 전체구매는 레벨 사다리의 한 칸이 아니다 — 선을 그어 사다리와 떼어 놓는다.
+        divider: true,
       }]
       for (let lv = MIN_LEVEL; lv <= MAX_LEVEL; lv++) {
         out.push({
@@ -180,7 +164,7 @@ export default function Ebooks() {
       return out
     }
     // 급수 목록·설명은 /guide 와 같은 출처(getTracks)를 쓴다 — 여기서 새로 쓰면 문구가 두 벌이 된다.
-    const out: Group[] = getTracks(lang).flatMap((track) =>
+    const out: LibGroup[] = getTracks(lang).flatMap((track) =>
       track.tiers.map((tier) => ({
         key: tier.key,
         label: tier.name, // 급수 이름은 브랜드 고유명(언어 무관 영문)
@@ -206,20 +190,14 @@ export default function Ebooks() {
     }
     return catRows.filter((b) => (active.key === 'any' ? b.targetTier == null : b.targetTier === active.key))
   }, [catRows, cat, active])
-  // 강의 = 관리자 등록(DB)이 우선, 하나도 없으면 코드에 박힌 기본 목록.
-  //   ⚠️ 급수(CARIS)별 강의는 코드 목록엔 아예 없다 — 그건 DB 로만 채워진다.
+  // 강의 = 관리자 등록(DB) **하나뿐**이다. DB 가 비면 강의 열도 비는 게 맞다(위 dbLectures 주석 참고).
+  const catLectures = useMemo(() => (dbLectures ?? []).filter((l) => l.catalog === cat), [dbLectures, cat])
   const lectures = useMemo(() => {
     if (!active) return []
-    const db = (dbLectures ?? []).filter((l) => l.catalog === cat)
-    if (db.length) {
-      return db
-        .filter((l) => (cat === 'leveltest'
-          ? (active.key === 'any' ? l.targetLevel == null : l.targetLevel === Number(active.key))
-          : (active.key === 'any' ? l.targetTier == null : l.targetTier === active.key)))
-        .map((l) => ({ id: l.youtubeId, title: l.title, channel: l.channel, level: l.targetLevel ?? 0 }))
-    }
-    return cat === 'leveltest' && active.key !== 'any' ? lecturesForLevel(Number(active.key)) : []
-  }, [cat, active, dbLectures])
+    return catLectures.filter((l) => (cat === 'leveltest'
+      ? (active.key === 'any' ? l.targetLevel == null : l.targetLevel === Number(active.key))
+      : (active.key === 'any' ? l.targetTier == null : l.targetTier === active.key)))
+  }, [cat, active, catLectures])
 
   // ── 전체구매 ─────────────────────────────────────────────
   // 레벨을 가리지 않고 이 카탈로그의 교재 전부 + 강의 전부. 레벨 오름차순(무관은 뒤)으로 세운다.
@@ -229,22 +207,18 @@ export default function Ebooks() {
       .sort((a, b) => (a.targetLevel ?? 99) - (b.targetLevel ?? 99))
       .map((b) => ({
         key: `b:${b.id}`, id: b.id, kind: 'book', title: b.title, sub: b.author ?? '',
-        price: b.price_usd_cents, owned: b.owned, cover: b.coverUrl, ytId: null, level: b.targetLevel,
+        price: b.price_usd_cents, owned: b.owned, cover: b.coverUrl, thumb: null, level: b.targetLevel,
       }))
-    // 강의는 목록 화면과 같은 규칙 — DB 에 하나라도 있으면 그게 우선, 없으면 코드에 박힌 기본 목록.
-    const db = (dbLectures ?? []).filter((l) => l.catalog === cat)
-    const src = db.length
-      ? db.map((l) => ({ id: l.youtubeId, title: l.title, channel: l.channel, level: l.targetLevel ?? 0 }))
-      : (cat === 'leveltest' ? LECTURES : [])
-    const lecs: BundleItem[] = src
+    const lecs: BundleItem[] = catLectures
       .slice()
-      .sort((a, b) => (a.level || 99) - (b.level || 99))
+      .sort((a, b) => (a.targetLevel ?? 99) - (b.targetLevel ?? 99))
       .map((l) => ({
+        // ⚠️ id 는 **lectures.id(uuid)** 다 — 결제로 넘어가는 값이라 유튜브 id 를 넣으면 서버가 못 찾는다.
         key: `l:${l.id}`, id: l.id, kind: 'lecture', title: l.title, sub: l.channel,
-        price: 0, owned: false, cover: null, ytId: l.id, level: l.level || null,
+        price: l.price_usd_cents, owned: l.owned, cover: null, thumb: l.thumbUrl, level: l.targetLevel,
       }))
     return [...books, ...lecs]
-  }, [catRows, dbLectures, cat])
+  }, [catRows, catLectures])
 
   // 집계는 **교재·강의 따로**다(2026-08-19 지시). 할인도 각자 붙는다 — 교재 7권을 통으로 담으면 교재값에서
   //   10%, 강의 7편을 통으로 담으면 강의값에서 10%. 한쪽만 채워도 그쪽은 할인이 붙고, 섞어서 7개를 담는 건
@@ -291,22 +265,29 @@ export default function Ebooks() {
     navigate('/login')
   }
 
-  async function buy(b: EbookRow) {
+  /** 이북·강의 구매 — **한 함수**다. 유료는 결제 화면으로, 0원은 그 자리에서 지급(서버도 무료만 허용).
+   *  ⚠️ 금액은 URL 로 넘기지 않는다 — 서버가 상품ID로 다시 계산한다. */
+  async function buy(kind: 'ebook' | 'lecture', id: string, price: number) {
     if (!isFullUser) {
       setLoginOpen(true) // 바로 OAuth 로 튕기지 않고 모달로 한 번 받아준다
       return
     }
-    // 유료책은 결제 화면으로 넘긴다. 금액은 URL 로 넘기지 않는다 — 서버가 상품ID로 다시 계산한다.
-    if (b.price_usd_cents > 0) {
-      navigate(`/checkout?type=ebook&ref=${encodeURIComponent(b.id)}`)
+    if (price > 0) {
+      navigate(`/checkout?type=${kind}&ref=${encodeURIComponent(id)}`)
       return
     }
-    // 0원 책만 이 자리에서 즉시 지급(결제창을 탈 수 없으므로). 서버도 무료책만 허용한다.
-    setBusy(b.id)
+    setBusy(id)
     setMsg('')
     try {
-      await callFunction('ebooks', { action: 'buy', id: b.id })
-      setRows((prev) => prev?.map((x) => (x.id === b.id ? { ...x, owned: true } : x)) ?? prev)
+      await callFunction('ebooks', { action: 'buy', id, kind })
+      if (kind === 'ebook') {
+        setRows((prev) => prev?.map((x) => (x.id === id ? { ...x, owned: true } : x)) ?? prev)
+      } else {
+        // ⚠️ 강의는 owned 만 켜면 재생이 안 된다 — youtubeId 가 미소유일 때 null 로 내려오기 때문이다.
+        //    목록을 다시 받아 그 값을 채운다(서버가 소유자에게만 준다).
+        const r = await callFunction<EbookListResp>('ebooks', { action: 'store', lang })
+        setDbLectures(r.lectures ?? [])
+      }
       setMsg(t('ebook.bought'))
     } catch (e) {
       setMsg(e instanceof Error ? e.message : t('ebook.load_failed'))
@@ -343,27 +324,26 @@ export default function Ebooks() {
       return next
     })
   }
-  /** 담은 것 결제 — 교재만 결제 대상이다(강의는 파는 물건이 아니다).
-   *  ⚠️ 금액도 할인도 URL 에 싣지 않는다. 넘기는 건 카탈로그와 이북 id 목록뿐이고, 서버가 다시 뽑는다.
-   *  한 권이면 단품 경로로 보낸다 — 서버가 묶음을 2권부터 받고(단품 중복방어가 그쪽에 있다), 한 권에
-   *  묶음 할인이 붙으면 같은 책이 화면 두 곳에서 다른 값이 된다. */
+  /** 담은 것 결제 — **그 종류만** 넘긴다(교재 묶음 / 강의 묶음. 한 묶음에 두 종류를 섞지 않는다).
+   *  ⚠️ 금액도 할인도 URL 에 싣지 않는다. 넘기는 건 종류·카탈로그·id 목록뿐이고, 서버가 다시 뽑는다.
+   *  하나면 단품 경로로 보낸다 — 서버가 묶음을 2개부터 받고(단품 중복방어가 그쪽에 있다), 하나에
+   *  묶음 할인이 붙으면 같은 것이 화면 두 곳에서 다른 값이 된다. */
   function buyBundle(kind: BundleItem['kind']) {
     if (!isFullUser) {
       setLoginOpen(true)
       return
     }
     const st = kind === 'book' ? bundleKinds.book : bundleKinds.lecture
-    const books = st.chosen.filter((i) => i.kind === 'book')
-    if (books.length === 0) {
-      setMsg(t('ll.bundle_nofee'))
+    const type = kind === 'book' ? 'ebook' : 'lecture'
+    const chosen = st.chosen
+    if (chosen.length === 0) return
+    // 전부 0원이면 결제창을 못 탄다 — 서버가 그 자리에서 지급하므로 그대로 보내도 된다(단품도 같은 취급).
+    if (chosen.length === 1) {
+      navigate(`/checkout?type=${type}&ref=${encodeURIComponent(chosen[0].id)}`)
       return
     }
-    if (books.length === 1) {
-      navigate(`/checkout?type=ebook&ref=${encodeURIComponent(books[0].id)}`)
-      return
-    }
-    const ids = books.map((i) => i.id).join(',')
-    navigate(`/checkout?type=bundle&ref=${encodeURIComponent(cat)}&ids=${encodeURIComponent(ids)}`)
+    const ids = chosen.map((i) => i.id).join(',')
+    navigate(`/checkout?type=bundle&kind=${type}&ref=${encodeURIComponent(cat)}&ids=${encodeURIComponent(ids)}`)
   }
 
   const loading = !err && rows === null
@@ -371,7 +351,7 @@ export default function Ebooks() {
   const noLectures = t(cat === 'caris' ? 'll.no_lectures_tier' : 'll.no_lectures')
 
   // 레벨·급수를 바꾸면 목록이 통째로 갈리므로 페이지도 1쪽으로 돌린다(3쪽을 보다 옮겼는데 3쪽이 없는 칸이면 헷갈린다).
-  function pick(g: Group) {
+  function pick(g: LibGroup) {
     setSel(g.key)
     setPlaying(null)
     setBookPage(0)
@@ -388,8 +368,8 @@ export default function Ebooks() {
           lang={lang}
           busy={busy === b.id}
           onZoom={() => setZoom(b)}
-          onBuy={() => buy(b)}
-          onLibrary={() => navigate('/mypage/ebooks')}
+          onBuy={() => buy('ebook', b.id, b.price_usd_cents)}
+          onOpen={() => navigate('/mypage/ebooks')}
         />
       ))}
     </ul>
@@ -401,8 +381,11 @@ export default function Ebooks() {
           key={lec.id}
           lec={lec}
           t={t}
+          lang={lang}
+          busy={busy === lec.id}
           playing={playing === lec.id}
           onPlay={() => setPlaying((p) => (p === lec.id ? null : lec.id))}
+          onBuy={() => buy('lecture', lec.id, lec.price_usd_cents)}
         />
       ))}
     </ul>
@@ -564,128 +547,39 @@ export default function Ebooks() {
                      그게 max-h 를 넘을 때만 각 열이 자기 안에서 스크롤한다.
                   ⚠️ 짧은 열은 아래가 빈다 — 지금은 레벨 열(전체구매+7레벨)이 제일 길어서 교재·강의 아래가 남는다.
                      그게 싫으면 `items-start` 로 되돌리면 되고, 그러면 레벨 열만 따로 논다. */}
-              <div className="hidden lg:flex gap-4 [&>*]:max-h-[calc(100dvh-276px)]">
-                <Pane title={t(cat === 'caris' ? 'll.tier_col' : 'll.level_col')} className="w-[276px] shrink-0">
-                  <ul className="p-2.5">
-                    {groups.map((g) => {
-                      const on = g.key === active?.key
-                      return (
-                        <Fragment key={g.key}>
-                          <li>
-                            <button
-                              type="button"
-                              onClick={() => pick(g)}
-                              aria-current={on ? 'true' : undefined}
-                              className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${on ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}
-                            >
-                              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
-                              <span className={`min-w-0 flex-1 truncate font-title-md text-[17px] ${on ? 'font-bold' : 'font-semibold'}`}>{g.label}</span>
-                              {/* 할인은 목록에서도 보인다 — 들어가 봐야 아는 혜택이면 아무도 안 누른다. */}
-                              {g.key === BUNDLE_KEY && (
-                                <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 font-label-md text-[14px] font-bold text-secondary">-{BUNDLE_OFF_PCT}%</span>
-                              )}
-                            </button>
-                          </li>
-                          {/* 전체구매는 레벨 사다리의 한 칸이 아니다 — 선을 그어 사다리와 떼어 놓는다. */}
-                          {g.key === BUNDLE_KEY && <li aria-hidden className="mx-3 my-2 h-px bg-outline-variant/60" />}
-                        </Fragment>
-                      )
-                    })}
-                  </ul>
-                </Pane>
-
-                {/* 교재·강의를 묶는 겹. 이 겹의 높이 = 둘 중 긴 쪽이고, 두 열이 그 높이로 함께 선다.
-                    전체구매 칸에서는 두 열을 접고 한 열(격자)로 편다 — 교재·강의를 한 목록에서 고르는 화면이라 나눌 이유가 없다. */}
-                <div className="flex min-w-0 flex-1 gap-4">
-                  {isBundle ? (
-                  <>
-                    <Pane title={t('ll.books')} className="flex-1 min-w-0" bar={bundleBar('book', 'bottom')}>{bundleGridOf('book')}</Pane>
-                    <Pane title={t('ll.lectures')} className="flex-1 min-w-0" bar={bundleBar('lecture', 'bottom')}>{bundleGridOf('lecture')}</Pane>
-                  </>
-                  ) : (
-                  <>
-                  <Pane
-                    title={t('ll.books')}
-                    className="flex-1 min-w-0"
-                    pager={bookPager}
-                  >
-                    {books.length === 0 ? <PaneEmpty text={noBooks} /> : bookList}
-                  </Pane>
-
-                  {/* 데모 안내 꼬리말은 강의가 실제로 있을 때만 — 한 편도 없는 칸(CARIS 급수·레벨 무관)에서는
-                      없는 영상을 두고 "샘플입니다" 라고 말하는 꼴이 된다. */}
-                  <Pane
-                    title={t('ll.lectures')}
-                    className="flex-1 min-w-0"
-                    foot={lectures.length ? t('ll.demo_note') : undefined}
-                    pager={lecPager}
-                  >
-                    {lectures.length === 0 ? <PaneEmpty text={noLectures} /> : lectureList}
-                  </Pane>
-                  </>
-                  )}
-                </div>
-              </div>
-
-              {/* ── 좁은 화면: 레벨은 가로 칩, 교재/강의는 탭 하나로 접는다. */}
-              <div className="lg:hidden">
-                <div className="mb-3 flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {groups.map((g) => {
-                    const on = g.key === active?.key
-                    return (
-                      <button
-                        key={g.key}
-                        type="button"
-                        onClick={() => pick(g)}
-                        className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 font-label-md text-[16px] transition-colors ${on ? 'bg-surface-container-high text-on-surface font-bold' : 'text-on-surface-variant'}`}
-                      >
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
-                        {g.short}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {active && (
-                  <p className="mb-3 px-1 font-body-md text-[16px] leading-[24px] text-on-surface-variant break-keep">
-                    <b className="text-on-surface">{active.label}</b> — {active.desc}
-                  </p>
-                )}
-
-                {/* 여기도 h-[...] 고정 금지 — 위 3열과 같은 이유(항목 1개일 때 빈 검은 상자가 된다). */}
-                <div className="flex flex-col max-h-[calc(100dvh-336px)] rounded-2xl border border-outline-variant bg-surface-container-low ambient-shadow overflow-hidden">
-                  <div className="flex shrink-0 border-b border-outline-variant/70">
-                    {(['books', 'lectures'] as const).map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => setPane(k)}
-                        className={`flex-1 px-4 py-3.5 font-title-md text-[17px] transition-colors ${pane === k ? 'text-on-surface font-bold border-b-2 border-primary' : 'text-on-surface-variant'}`}
-                      >
-                        {t(k === 'books' ? 'll.books' : 'll.lectures')}
-                      </button>
-                    ))}
-                  </div>
-                  {/* 전체구매는 이 탭이 곧 '교재 / 강의 따로' 다 — 보고 있는 탭의 요약 띠만 위에 붙인다. */}
-                  {isBundle && bundleBar(pane === 'books' ? 'book' : 'lecture', 'top')}
-                  <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                    {isBundle
-                      ? bundleGridOf(pane === 'books' ? 'book' : 'lecture')
-                      : pane === 'books'
-                        ? (books.length === 0 ? <PaneEmpty text={noBooks} /> : bookList)
-                        : (lectures.length === 0 ? <PaneEmpty text={noLectures} /> : lectureList)}
-                  </div>
-                  {/* 꼬리말 = 안내문(강의 탭에서만) + 지금 보고 있는 탭의 페이지 넘김. 둘 다 없으면 띠 자체를 안 그린다. */}
-                  {!isBundle && ((pane === 'lectures' && lectures.length > 0) || (pane === 'books' ? bookPager : lecPager)) && (
-                    <div className="shrink-0 flex items-center justify-between gap-3 border-t border-outline-variant/70 px-4 py-2">
-                      <p className="min-w-0 font-body-md text-[14px] text-outline">
-                        {pane === 'lectures' && lectures.length > 0 ? t('ll.demo_note') : ''}
-                      </p>
-                      {pane === 'books' ? bookPager : lecPager}
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* 3열 뼈대는 components/LearningLibrary.tsx 가 그린다 — 마이페이지 서재가 같은 걸 쓴다.
+                  전체구매 칸에서는 두 열이 '교재 격자 / 강의 격자'가 되고 요약 띠가 각자 붙는다. */}
+              <LibraryFrame
+                groups={groups}
+                activeKey={active?.key}
+                onPick={pick}
+                colTitle={t(cat === 'caris' ? 'll.tier_col' : 'll.level_col')}
+                pane={pane}
+                onPane={setPane}
+                /* ⚠️ 카탈로그 전환 버튼 줄(52px + 여백 16)까지 뺀 값이다 — 위에 뭘 더 얹으면 여기도 다시 잴 것. */
+                wideMaxH="calc(100dvh - 276px)"
+                narrowMaxH="calc(100dvh - 336px)"
+                panes={[
+                  {
+                    key: 'books',
+                    title: t('ll.books'),
+                    body: isBundle
+                      ? bundleGridOf('book')
+                      : books.length === 0 ? <PaneEmpty text={noBooks} /> : bookList,
+                    pager: isBundle ? undefined : bookPager,
+                    bar: isBundle ? (edge) => bundleBar('book', edge) : undefined,
+                  },
+                  {
+                    key: 'lectures',
+                    title: t('ll.lectures'),
+                    body: isBundle
+                      ? bundleGridOf('lecture')
+                      : lectures.length === 0 ? <PaneEmpty text={noLectures} /> : lectureList,
+                    pager: isBundle ? undefined : lecPager,
+                    bar: isBundle ? (edge) => bundleBar('lecture', edge) : undefined,
+                  },
+                ]}
+              />
             </>
           )}
         </div>
@@ -733,171 +627,6 @@ export default function Ebooks() {
   )
 }
 
-/** 열 한 칸 — 머리말(고정) + 본문 + 꼬리말(안내문 왼쪽 · 페이지 넘김 오른쪽).
- *  본문은 한 번에 한 항목이라 보통 안 넘치지만, 항목 자체가 화면보다 길면 그때는 여기서 스크롤한다. */
-function Pane({
-  title, foot, pager, bar, className = '', children,
-}: {
-  title: string
-  foot?: string
-  pager?: React.ReactNode
-  /** 본문 **밖**에 고정으로 붙는 띠(전체구매 요약). 꼬리말과 달리 폭을 통째로 쓴다. */
-  bar?: React.ReactNode
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    // ⚠️ 다크가 기본이라 bg-surface-container-lowest(#0d0f15)를 쓰면 페이지 배경(#0a0c11)과 거의 같아
-    //    열 경계가 안 보인다(2026-08-06 반려). 한 단 밝은 surface-container-low + 진한 테두리로 띄운다.
-    <section className={`flex flex-col min-h-0 rounded-2xl border border-outline-variant bg-surface-container-low ambient-shadow overflow-hidden ${className}`}>
-      {/* ⚠️ 열 제목을 11px 대문자 캡션으로 두지 말 것(2026-08-06 반려) — 이 화면의 뼈대라 제목처럼 보여야 한다. */}
-      <div className="shrink-0 border-b border-outline-variant/70 px-4 py-3.5">
-        <h2 className="font-title-md text-[18px] font-bold text-on-surface">{title}</h2>
-      </div>
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</div>
-      {bar}
-      {(foot || pager) && (
-        <div className="shrink-0 flex items-center justify-between gap-3 border-t border-outline-variant/70 px-4 py-2">
-          <p className="min-w-0 font-body-md text-[14px] text-outline">{foot ?? ''}</p>
-          {pager}
-        </div>
-      )}
-    </section>
-  )
-}
-
-/** 페이지 넘김 — 한 페이지에 한 개라 페이지 수 = 항목 수다. 한 개뿐이면 아예 그리지 않는다. */
-function Pager({ page, total, onGo, t }: { page: number; total: number; onGo: (p: number) => void; t: TFunc }) {
-  if (total <= 1) return null
-  const btn = 'flex h-9 w-9 items-center justify-center rounded-lg text-[20px] leading-none text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-30 disabled:hover:bg-transparent'
-  return (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <button type="button" onClick={() => onGo(page - 1)} disabled={page <= 0} aria-label={t('ll.prev')} className={btn}>‹</button>
-      {/* tabular-nums — 자릿수가 바뀌어도 버튼이 좌우로 흔들리지 않는다. */}
-      <span className="px-1.5 font-body-md text-[15px] tabular-nums text-on-surface-variant">{page + 1} / {total}</span>
-      <button type="button" onClick={() => onGo(page + 1)} disabled={page >= total - 1} aria-label={t('ll.next')} className={btn}>›</button>
-    </div>
-  )
-}
-
-function PaneEmpty({ text }: { text: string }) {
-  return <div className="px-5 py-10 text-center font-body-md text-body-md text-outline break-keep">{text}</div>
-}
-
-/** 교재 한 줄 — 표지(탭하면 확대) + 제목 + 가격/버튼.
- *    표지 폭은 강의 썸네일과 같은 MEDIA_W 다(2026-08-11 — 두 열의 항목 크기를 맞췄다).
- *    목록이라고 더 줄이지 말 것 — 표지 글자가 아무 데서도 안 읽힌다. */
-function BookRow({
-  b, t, lang, busy, onZoom, onBuy, onLibrary,
-}: {
-  b: EbookRow
-  t: TFunc
-  lang: Lang
-  busy: boolean
-  onZoom: () => void
-  onBuy: () => void
-  onLibrary: () => void
-}) {
-  return (
-    <li className="flex gap-4 px-4 py-4 transition-colors hover:bg-surface-container/60">
-      {/* self-start 필수 — flex 자식 기본값 stretch 라 표지 박스가 줄 높이만큼 늘어나 A4 비율이 깨진다. */}
-      <button type="button" onClick={onZoom} aria-label={t('ebook.cover_zoom')} className={`${MEDIA_W} cursor-zoom-in`}>
-        {/* width = 표시 폭(약 222)의 2배 — 고밀도 화면에서 표지 글자가 뭉개지지 않게 스토리지 변환으로 받는다. */}
-        <EbookCover title={b.title} coverUrl={b.coverUrl} width={444} className="w-full" />
-      </button>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <h3 className="font-title-md text-[19px] font-bold text-on-surface break-keep line-clamp-2">{b.title}</h3>
-        {b.author && <p className="mt-1 font-body-md text-[15px] text-outline truncate">{b.author}</p>}
-        {b.description && <p className="mt-2 font-body-md text-[15px] leading-[23px] text-on-surface-variant line-clamp-4 break-keep">{b.description}</p>}
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3">
-          {/* 이미 산 책에 가격을 계속 띄우면 아직 안 산 것처럼 읽힌다 — 값 자리에 '보유 중'을 대신 둔다. */}
-          {b.owned ? (
-            <span className="inline-flex items-center gap-1.5 font-title-md text-[17px] font-bold text-secondary">
-              <span className="material-symbols-outlined text-[20px]">check_circle</span>
-              {t('ebook.owned')}
-            </span>
-          ) : (
-            <span className="font-title-md text-[19px] font-bold text-on-surface">
-              {/* ⚠️ b.price_usd_cents 는 **달러 센트**다. 문자열에 `$` 를 직접 박지 말고 usdc() 를 쓸 것
-                  (환산율 1,500 은 lib/money.ts 한 곳에만 있다). */}
-              {b.price_usd_cents > 0 ? usdc(b.price_usd_cents, lang) : t('ebook.free')}
-            </span>
-          )}
-          {b.owned ? (
-            <button onClick={onLibrary} className="shrink-0 px-4 py-2.5 bg-secondary/10 text-secondary border border-secondary/20 font-label-md text-[16px] font-bold rounded-xl hover:bg-secondary/15 transition-colors">
-              {t('ebook.read')}
-            </button>
-          ) : (
-            <button onClick={onBuy} disabled={busy} className="shrink-0 px-4 py-2.5 bg-primary-container text-on-primary font-label-md text-[16px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow disabled:opacity-60">
-              {busy ? t('ebook.processing') : b.price_usd_cents > 0 ? t('ebook.buy') : t('ebook.get_free')}
-            </button>
-          )}
-        </div>
-      </div>
-    </li>
-  )
-}
-
-/** 강의 한 줄 — **열 폭을 꽉 채운 가로 16:9 썸네일** + 그 **밑에** 제목·채널(2026-08-11 지시).
- *    누르면 그 자리에서 유튜브 플레이어로 바뀐다. 처음부터 iframe 을 깔지 않는 이유:
- *    줄 수만큼 플레이어가 로드돼 열이 눈에 띄게 무거워진다.
- *    ⚠️ 교재 표지처럼 왼쪽으로 세우지 말 것 — 영상은 가로가 긴 물건이라 옆에 글을 붙이면 그림이 작아진다.
- *       (표지는 계속 왼쪽 + 오른쪽 글. 두 열은 **박스 높이**로 맞추지 항목 배치로 맞추지 않는다.) */
-function LectureRow({
-  lec, t, playing, onPlay,
-}: {
-  lec: Lecture
-  t: TFunc
-  playing: boolean
-  onPlay: () => void
-}) {
-  // 썸네일이 404 면(영상이 내려갔거나 id 오타) 이미지를 지우고 아래 그라데이션 판이 드러나게 둔다.
-  const [thumbDead, setThumbDead] = useState(false)
-
-  return (
-    <li className="px-4 py-4 transition-colors hover:bg-surface-container/60">
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-slate-700 to-slate-900">
-        {playing ? (
-          <iframe
-            src={ytEmbed(lec.id)}
-            title={lec.title}
-            className="absolute inset-0 h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-          />
-        ) : (
-          <button type="button" onClick={onPlay} className="group absolute inset-0 h-full w-full" aria-label={`${t('ll.play')} — ${lec.title}`}>
-            {!thumbDead && (
-              <img
-                src={ytThumb(lec.id)}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                onError={() => setThumbDead(true)}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-              />
-            )}
-            <span className="absolute inset-0 flex items-center justify-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/25 bg-black/55 backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
-                <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[1px] fill-white" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-              </span>
-            </span>
-          </button>
-        )}
-      </div>
-      <h4 className="mt-3.5 font-title-md text-[19px] font-bold text-on-surface break-keep line-clamp-2">{lec.title}</h4>
-      <div className="mt-1.5 flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate font-body-md text-[15px] text-outline">{lec.channel}</span>
-        {/* 임베드를 막아둔 영상은 플레이어가 오류를 뱉는다 — 그때의 탈출구. */}
-        <a href={ytWatch(lec.id)} target="_blank" rel="noreferrer" className="shrink-0 font-label-md text-[15px] font-bold text-on-surface-variant hover:text-primary transition-colors">
-          {t('ll.watch_yt')} ↗
-        </a>
-      </div>
-    </li>
-  )
-}
-
 /** 전체구매 격자의 한 칸 — 썸네일 + 제목 + (가격 · 선택 버튼).
  *  교재는 세로 표지, 강의는 16:9 썸네일이라 그림 자리만 다르고 나머지 줄은 같은 모양으로 맞춘다.
  *  ⚠️ 강의 썸네일은 여기서 재생하지 않는다 — 고르는 화면이라 소리가 나면 방해가 된다(재생은 강의 열에서). */
@@ -909,7 +638,7 @@ function BundleCard({
   t: TFunc
   lang: Lang
   onToggle: () => void
-  /** 이미 가진 책 — 담기 대신 서재로 보낸다(강의는 owned 가 없어 안 불린다). */
+  /** 이미 가진 것 — 담기 대신 서재로 보낸다(교재·강의 둘 다). */
   onOpen: () => void
 }) {
   return (
@@ -927,8 +656,9 @@ function BundleCard({
         // 표지와 같은 여백·모서리로 맞춘다 — 한 격자에 나란히 서지는 않지만 두 상자가 같은 카드로 읽혀야 한다.
         <div className="p-2.5">
           <div className="relative aspect-video overflow-hidden rounded-lg bg-gradient-to-br from-slate-700 to-slate-900">
-            {item.ytId && (
-              <img src={ytThumb(item.ytId)} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+            {/* ⚠️ 서버가 준 thumbUrl 을 그대로 쓴다 — 여기서 유튜브 주소를 만들면 미소유 강의의 영상 id 가 필요해진다. */}
+            {item.thumb && (
+              <img src={item.thumb} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
             )}
           </div>
         </div>

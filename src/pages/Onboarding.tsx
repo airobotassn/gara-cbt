@@ -27,7 +27,7 @@ export default function Onboarding() {
   const { t, lang } = useT()
   const navigate = useNavigate()
   const location = useLocation()
-  const { needsOnboarding, onboardingLoading, isFullUser, markOnboardingDone, user } = useAuth()
+  const { needsOnboarding, onboardingLoading, isFullUser, markOnboardingDone, applyRegion, user } = useAuth()
 
   const [step, setStep] = useState<1 | 2>(1)
   const [country, setCountry] = useState('')
@@ -136,6 +136,8 @@ export default function Onboarding() {
       })
       // ⚠️ navigate 전에 반드시 해제. 안 하면 nextDest 가 아레나 경로일 때 OnboardingGate 가
       // 여기로 다시 튕겨서 새로고침해야만 넘어간다.
+      // 컨텍스트의 국가·지역도 같이 채운다 — 목적지가 /ranking·/arena 면 그 화면이 바로 이 값을 쓴다.
+      applyRegion(country, needRegion ? region : null)
       markOnboardingDone()
       navigate(nextDest, { replace: true })
     } catch (e) {

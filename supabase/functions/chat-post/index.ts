@@ -30,9 +30,10 @@ Deno.serve(async (req) => {
 
     const admin = adminClient()
     const isAnon = !!user.is_anonymous
-    const poster = await resolvePoster(admin, user.id)
-
-    const mod = await moderateOpenAI(text)
+    // ⚠️ 프로필 조회와 모더레이션은 서로 결과를 안 쓴다(poster.name 은 아래 displayName 조립에만,
+    //    moderateOpenAI 는 text 만 쓴다). 그리고 여기서 제일 오래 걸리는 건 **OpenAI 왕복**이라
+    //    DB 조회를 그 뒤에 줄 세울 이유가 없다 — 같이 내보낸다.
+    const [poster, mod] = await Promise.all([resolvePoster(admin, user.id), moderateOpenAI(text)])
     let modStatus: 'ok' | 'pending' = 'ok'
     if (mod.status === 'flagged') return json({ error: 'blocked_mod' }, 422)
     if (mod.status === 'unavailable') {

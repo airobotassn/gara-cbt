@@ -25,18 +25,9 @@ export interface SubmittedAnswer {
   timeSpent: number // 초
 }
 
-// 채점 후 문항별 결과 (로그인 유저만 정답/해설 노출)
-export interface GradedAnswer {
-  questionId: string
-  code?: string | null
-  category: CategoryKey
-  prompt: string
-  options: string[]
-  selectedIndex: number | null
-  correctIndex: number
-  isCorrect: boolean
-  explanation: string
-}
+// ⛔ 옛 GradedAnswer(문항별 정답·해설)는 제거됐다 — 결과창의 오답노트가 없어지면서 쓰는 곳이
+//    사라졌는데 서버는 계속 만들어 보내고 있었다(2026-08-25). 되살릴 땐 화면부터 만들 것.
+//    ⚠️ 같은 이름이 lib/types.ts 에도 있는데 그건 **CBT 자격검정 결과창**용이라 살아 있다.
 
 // submit-test / get-result 응답
 // locked=true(익명)면 서버가 점수 외 상세를 비워서 내려준다.
@@ -57,7 +48,6 @@ export interface ResultResponse {
   rankBefore: number | null // 시험 전 내 등급(레벨)
   rankAfter: number | null // 시험 후 내 등급(레벨)
   rankDir: RankDir | null // 승급/유지 (강등 없음)
-  answers: GradedAnswer[]
 
   // 익명 소유자에게만 발급되는 일회성 이관 토큰
   claimToken?: string | null

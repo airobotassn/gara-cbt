@@ -21,8 +21,11 @@ Deno.serve(async (req) => {
     const admin = adminClient()
 
     // 상점 카탈로그(코인 기본템) — 비로그인도 열람 가능.
-    const [{ data: catRows }] = await Promise.all([
+    //   ⚠️ 인증과 같이 내보낸다. 카탈로그는 user 를 전혀 안 쓰는 공개 목록인데 예전엔 원소가
+    //      하나뿐인 Promise.all 뒤에 getUser 가 따로 await 되어 있어 직렬 2단이었다.
+    const [{ data: catRows }, user] = await Promise.all([
       admin.from('shop_catalog').select('part_key, price, kind, surface, sort_order').eq('active', true),
+      getUser(req),
     ])
     const catalog = (catRows ?? [])
       .map((c) => ({
@@ -36,7 +39,6 @@ Deno.serve(async (req) => {
       .sort((a, b) => a.sort - b.sort || a.price - b.price || a.partKey.localeCompare(b.partKey))
 
     // 인증: 비로그인/익명은 공개 정보만.
-    const user = await getUser(req)
     if (!user || user.is_anonymous) {
       return json({ authed: false, econ: ECON, catalog })
     }

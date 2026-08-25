@@ -9,7 +9,6 @@
 // ⚠️ 이 파일을 다른 데서 직접 import 하지 말 것 — 조회는 i18n.tsx 의 tr()/useT() 하나로만.
 const JA: Record<string, string> = {
   "common.home": "ホーム",
-  "common.dashboard": "学習ダッシュボード",
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
   "common.ranking": "ランキング",
@@ -100,7 +99,6 @@ const JA: Record<string, string> = {
   // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
   "route.placeholder": "何をお探しですか？",
   "route.notfound": "正しくない検索語です。もう一度入力してください。",
-  "mypage.tab_learning": "学習ダッシュボード",
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
   "rank.title": "ランキング",
   "report.btn": "🚩 誤りを報告",
@@ -284,7 +282,6 @@ const JA: Record<string, string> = {
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   "result.next_level": "Lv.{n}に挑戦 →",
   "rank.cur_level": "現在の等級 · レベル{n}",
-  "db.cur_rank": "現在の等級 · {n}回受験",
   "db.points": "ランキングスコア {p}",
   "db.skill_score": "実力スコア",
   "db.activity_score": "活動スコア",
@@ -361,6 +358,10 @@ const JA: Record<string, string> = {
   "rank.promotion_zone": "昇格ゾーン",
   "rank.top_tier": "最高ティア",
   "rank.pt": "{n}点",
+  "rank.nth": "{n}位",
+  "rank.trend_title": "順位の推移",
+  "rank.trend_empty": "この期間の記録はありません。",
+  "rank.trend_help": "線が上がると順位が上がったということです。グラフに触れるとその日のスコアが出ます。",
   "rank.you": "あなた",
   "rank.cta_test": "テストでランク配置",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -389,7 +390,7 @@ const JA: Record<string, string> = {
   "rank.active_today": "今日の参加率",
   "country.KR": "韓国",
 
-  "db.title": "学習ダッシュボード",
+  "db.title": "マイ記録",
   "db.empty": "まだ提出したテストがありません。",
   "db.start": "テストを始める",
   "db.stat_maxlevel": "最高レベル",
@@ -409,7 +410,6 @@ const JA: Record<string, string> = {
   "db.trend_season": "シーズン",
   "db.trend_season_hint": "シーズン = 6ヶ月",
   "db.trend_empty": "この期間の受験記録はありません。",
-  "db.activity_title": "活動記録",
   "db.radar_title": "領域バランス",
   "db.radar_me": "自分",
   "db.radar_avg": "レベル平均",
@@ -560,32 +560,24 @@ const JA: Record<string, string> = {
   "prep.start_login": "ログインして開始",
   "check.title": "試験環境テスト（事前点検）",
   "check.eyebrow": "事前点検",
-  "check.sub": "実際の試験前に、セキュリティソフトの設置と受験環境を事前に確認し、模擬問題を解いてみてください。",
+  "check.sub": "実際の試験前に、このPCでセキュアブラウザが正しく開くか、受験環境が整っているかを事前に確認してください。",
   "check.sec1_title": "セキュリティソフト（Safe Exam Browser）の設置",
   "check.sec1_desc": "試験は、画面キャプチャ・コピー・アプリ切替を遮断するセキュリティプログラム（Safe Exam Browser）内で行われます。",
+  "check.sec1_hint": "上の確認でセキュアブラウザが開かなかった場合は、ここから設置してください。",
   "check.install_btn": "セキュリティソフト（SEB）をインストール",
   "check.install_note1": "· インストール時にWindowsが「発行元: ETH Zürich」と表示すれば正常です。",
   "check.install_note2": "· 「WindowsによってPCが保護されました」と表示されたら、詳細情報 → 実行 を押してください。（正常な設置手順）",
-  "check.sec2_title": "受験環境の自動点検",
+  "check.sec2_title": "受験環境の点検",
+  "check.sec2_desc": "セキュアブラウザを起動すると、以下の項目を点検します。",
   "check.chk_pc": "PC（デスクトップ）環境",
-  "check.chk_pc_ok": "PCから接続されています。",
   "check.chk_screen": "画面サイズ",
-  "check.chk_screen_ok": "受験に十分です。",
-  "check.chk_screen_no": "横1024px以上の画面を推奨します。",
   "check.chk_fs": "全画面対応",
-  "check.chk_fs_ok": "全画面での受験が可能です。",
-  "check.chk_fs_no": "ブラウザが全画面を妨げています。",
   "check.chk_net": "インターネット接続",
-  "check.chk_net_ok": "正常に接続されています。",
-  "check.chk_net_no": "インターネット接続を確認してください。",
-  "check.chk_seb": "セキュアブラウザ（SEB）",
-  "check.chk_seb_ok": "セキュアブラウザで開かれました。",
-  "check.chk_seb_no": "実際の試験はセキュアブラウザで開く必要があります。",
+  "check.chk_seb": "セキュアブラウザ（SEB）の起動",
   "check.monitor_note": "· モニター数はセキュアブラウザ実行時に自動点検されます。外部モニターは1台のみ接続してください。",
-  "check.sec3_title": "模擬問題を解いてみる",
-  "check.sec3_desc": "実際の試験と同じ画面で模擬問題を解いて操作に慣れてください。（採点されません）",
-  "check.practice_btn": "模擬問題を開始",
-  "check.back": "CARISに戻る",
+  "check.sebtest_btn": "セキュアブラウザで開いて確認",
+  "check.sebtest_desc": "実際の試験と同じ方法でセキュアブラウザを起動し、このPCで正しく開くかを確認します。\n試験問題は出ません。",
+  "check.back": "受験券に戻る",
   "done.title": "提出が完了しました",
   "done.sub1": "受験が正常に受け付けられました。セキュアブラウザは自動的に終了します。",
   "done.sub2": "採点結果は発表日以降にマイページで確認できます。",
@@ -956,12 +948,12 @@ const JA: Record<string, string> = {
   // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
   "mypage.cert_no": "認証番号",
   "mypage.empty_issuance": "発行可能な証明書がありません。",
-  "mypage.tab_ebooks": "E-BOOKライブラリ",
-  "mypage.empty_ebooks": "まだ購入したE-Bookがありません。",
+  "mypage.tab_ebooks": "マイライブラリ",
+  "mypage.empty_ebooks": "まだ購入したE-Book・講義がありません。",
   // 메인 3번째 CTA(landing.cta_learn)와 같은 이름. 브랜드 라벨이라 6개국어 동일 표기.
   "ebook.store_title": "Learning Library",
-  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = E-BOOK 서재)과 같아야 한다.
-  "ebook.store_sub": "購入した本はマイページ › E-BOOKライブラリで読めます。",
+  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = 내 서재)과 같아야 한다.
+  "ebook.store_sub": "購入した本はマイページ › マイライブラリで読めます。",
   "ebook.empty_store": "登録されたE-Bookがありません。",
   "ebook.buy": "購入する",
   "ebook.get_free": "無料で入手",
@@ -971,12 +963,12 @@ const JA: Record<string, string> = {
   "ebook.view": "見る",
   "ebook.cover_zoom": "表紙を大きく見る",
   "ebook.processing": "処理中…",
-  "ebook.bought": "購入完了 — E-BOOKライブラリに追加しました。",
+  "ebook.bought": "購入完了 — マイライブラリに追加しました。",
   "ebook.login_to_buy": "ログイン後に購入できます。",
   // 비로그인이 구매 버튼을 눌렀을 때 뜨는 로그인 모달(제목 한 줄 + 버튼만 — 책 정보·설명은 넣지 않는다)
   "ebook.login_modal_title": "ログインが必要です",
   "ebook.go_store": "Learning Library へ",
-  "ebook.go_library": "E-BOOKライブラリで見る",
+  "ebook.go_library": "マイライブラリで見る",
   "ebook.load_failed": "E-Bookを読み込めません。",
 
   // ---- 결제(/checkout · /pay/success · /pay/fail) ----
@@ -1013,7 +1005,7 @@ const JA: Record<string, string> = {
   "pay.fail_title": "決済できませんでした",
   "pay.fail_body": "決済がキャンセルされたか、承認されませんでした。",
   "pay.retry": "もう一度",
-  "ebook.reader_back": "E-BOOKライブラリ",
+  "ebook.reader_back": "マイライブラリ",
   "ebook.reader_lang": "表示言語",
   "ebook.reader_fs": "全画面",
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
@@ -1023,7 +1015,8 @@ const JA: Record<string, string> = {
   "ll.catalog": "教材の種類",
   "ll.level_col": "レベル",
   "ll.tier_col": "級",
-  "ll.books": "教材",
+  // ⚠️ 브랜드 표기라 6개국어 모두 같은 글자다(ko.ts 주석 참고).
+  "ll.books": "E-Book",
   "ll.lectures": "講義",
   "ll.no_books": "このレベルの教材は準備中です。",
   "ll.no_lectures": "このレベルの講義は準備中です。",
@@ -1037,8 +1030,9 @@ const JA: Record<string, string> = {
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": "前へ",
   "ll.next": "次へ",
-  "ll.watch_yt": "YouTubeで見る",
-  "ll.demo_note": "講義はデモ用のサンプル動画です。",
+  "ll.watch": "視聴する",
+  "ll.playing": "再生中",
+  "ll.empty_owned": "この欄に購入した教材はまだありません。",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "まとめ買い",
   "ll.bundle_desc": "教材と講義を選んでまとめて追加できます。",
@@ -1052,7 +1046,6 @@ const JA: Record<string, string> = {
   "ll.pick_of": "{a} / {b}件選択",
   "ll.total": "合計",
   "ll.bundle_buy": "選択した項目を購入",
-  "ll.bundle_nofee": "講義は無料なので支払うものがありません。そのままご覧ください。",
   "ll.bundle_empty": "追加できる項目がまだありません。",
   "mypage.reissue": "再発行",
   "mypage.issue": "発行申請",
@@ -1391,7 +1384,6 @@ const JA: Record<string, string> = {
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
-  "arena.tag": "実データ連携 · 未収集地域はサンプル",
   "arena.low": "低",
   "arena.high": "高",
   // ⚠️ arena.avgLevel 은 레벨테스트 시절 문구다. 지도 지표가 레벨 → 랭킹점수(season_total 평균, 베이지안 보정)로
@@ -1407,7 +1399,6 @@ const JA: Record<string, string> = {
   "arena.world": "世界",
   "arena.worldLeague": "ワールドリーグ",
   "arena.league": " リーグ",
-  "arena.real": "実データ",
   "arena.ppl": "人",
   "arena.unit": "位",
   "arena.avg": "平均",
@@ -1421,7 +1412,6 @@ const JA: Record<string, string> = {
   "arena.bHubS": "キャラハブ",
   "arena.bDaily": "今日の学習",
   "arena.bDailyS": "デイリー",
-  "arena.foot": "実データのある地域/国は自動反映（参加5人以上）。データのない地域・市郡区はサンプル値です。",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "ミニゲーム",
@@ -1778,7 +1768,7 @@ const JA: Record<string, string> = {
   // 오른쪽 레일
   "hub.rail.closet": "きせかえ",
   "hub.rail.title": "称号",
-  "hub.rail.invite": "招待する",
+  "hub.rail.invite": "招待報酬",
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "出席",
@@ -1787,6 +1777,8 @@ const JA: Record<string, string> = {
 
   // 도크(출석 보상)
   "hub.reward_head": "出席報酬",
+  "hub.attend.title": "出席履歴",
+  "hub.attend.help": "サイトを開くと、その日の出席が自動で記録されます。",
   "hub.daily.claim": "今日の出席",
   "hub.daily.done": "本日の出席完了",
   "hub.day_n": "{n}日",
@@ -1901,7 +1893,7 @@ const JA: Record<string, string> = {
   // 친구 초대 모달
   "hub.invite.title": "友達招待",
   "hub.invite.lead": "友達と一緒にCARISを！",
-  "hub.invite.help": "招待コードを教えると友達がすぐ始められます。",
+  "hub.invite.help": "友達が私の招待コードを入力すると、二人とも{n} CARIコインもらえます。",
   "hub.invite.my_code": "私の招待コード",
   "hub.invite.copied": "コピー済み",
   "hub.invite.copy": "コピー",
@@ -1911,7 +1903,7 @@ const JA: Record<string, string> = {
   "hub.invite.redeem_done": "✓ 招待コードを登録しました（1回のみ）",
   "hub.invite.checking": "確認中",
   "hub.invite.register": "登録",
-  "hub.invite.hint": "一度登録すると変更できません。",
+  "hub.invite.hint": "友達に教えてもらった招待コードを入力すると、二人とも{n} CARIコインもらえます。",
   "hub.invite.err_not_found": "存在しない招待コードです。もう一度ご確認ください",
   "hub.invite.err_self": "自分の招待コードは使えません",
   "hub.invite.err_already": "すでに招待コードを登録済みです",

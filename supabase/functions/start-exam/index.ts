@@ -7,7 +7,7 @@
 //    exam_attempts 는 RLS 정책 0개라 이 함수가 유일한 생성 경로다 — 여기만 막으면 우회로가 없다.
 // ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, pickLang, projText } from '../_shared/lib.ts'
+import { adminClient, pickLang, projKoOptions, projKoText, projText } from '../_shared/lib.ts'
 import { getExamActor } from '../_shared/exam-token.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
 import { EXAM_TICKET_COLS, consumeTicket, examWindowOpen } from '../_shared/exam-tickets.ts'
@@ -355,7 +355,7 @@ Deno.serve(async (req) => {
     // ⚠️ 응시자에게 나가는 페이로드 — correct_index·answer_key·explanation(해설)은 절대 select 금지.
     const { data: set, error: qErr } = await admin
       .from('exam_questions')
-      .select('number, questions(id, subject, topic, prompt, kind, choices, active)')
+      .select('number, questions(id, subject, topic, prompt, prompt_i18n, kind, choices, choices_i18n, active)')
       .eq('exam_id', exam.id)
       .order('number', { ascending: true })
     if (qErr) return json({ error: qErr.message }, 500)
@@ -363,9 +363,13 @@ Deno.serve(async (req) => {
     if (setRows.length === 0) {
       return json({ error: '아직 문항이 출제되지 않은 시험입니다.' }, 400)
     }
+    // ⚠️ 여기서는 **원문 그대로** 들고 있는다. 어느 언어로 투영할지는 ⑧ 에서 정해진다 —
+    //    재개는 요청 언어가 아니라 **처음 응시한 언어**로 돌아가야 하기 때문이다(아래 effLang).
     let served = setRows.map((r: any) => ({
       id: r.questions.id, number: r.number, subject: r.questions.subject,
-      topic: r.questions.topic, prompt: r.questions.prompt, kind: r.questions.kind ?? 'mc', choices: r.questions.choices ?? [],
+      topic: r.questions.topic, kind: r.questions.kind ?? 'mc',
+      prompt: r.questions.prompt, promptI18n: r.questions.prompt_i18n ?? {},
+      choices: r.questions.choices ?? [], choicesI18n: r.questions.choices_i18n ?? {},
     }))
 
     // (테스트용) 환경변수 EXAM_QUESTION_LIMIT 가 있으면 앞에서 그만큼만 출제
@@ -384,7 +388,7 @@ Deno.serve(async (req) => {
     //    즉 응시권 1장으로는 **끝까지 같은 응시 하나**만 존재한다 — 재개는 그 응시로 돌아가는 것이다.
     const { data: live } = await admin
       .from('exam_attempts')
-      .select('id, started_at, status, last_seen_at, answered_count, entry_count, reinstated_at')
+      .select('id, started_at, status, last_seen_at, answered_count, entry_count, reinstated_at, lang')
       .eq('ticket_id', ticket.id)
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
@@ -393,6 +397,10 @@ Deno.serve(async (req) => {
 
     let attemptId: string
     let startedAt: string
+    // 실제로 문항을 투영할 언어. 신규 응시는 요청 언어, **재개는 처음 응시한 언어**다.
+    // ⚠️ 재개에서 요청 언어를 쓰면, 중단했다가 화면 언어를 바꿔 돌아온 사람에게 앞서 풀던 문항이
+    //    통째로 다른 언어로 뒤바뀐다(답안은 번호로 남아 있으므로 보기 순서만 같고 글이 달라진다).
+    let effLang = lang
     if (live) {
       // ⛔ 들어갈 수 없는 사유(제출 완료·이미 무효·재진입)는 전부 _shared/exam-reentry.ts 한 곳이 판정한다.
       //    응시 준비 화면(seb-handoff)이 **SEB 를 켜기 전에** 같은 함수로 먼저 잡고, 여기는
@@ -426,6 +434,8 @@ Deno.serve(async (req) => {
         .eq('id', live.id)
       attemptId = live.id as string
       startedAt = resumedStart
+      // 옛 응시(lang 컬럼 생기기 전)는 값이 없다 — 그때는 요청 언어를 그대로 쓴다.
+      if (live.lang) effLang = pickLang(live.lang)
     } else {
       // 이 응시권으로 만든 응시가 아직 없다. 다른 응시권으로 진행중인 응시가 있으면 정리한다(동시 1개 강제).
       await admin
@@ -444,6 +454,8 @@ Deno.serve(async (req) => {
           ticket_id: ticket.id,
           status: 'in_progress',
           total_questions: served.length,
+          // 응시 언어 고정 — 결과창(오답노트)이 이 값으로 투영한다.
+          lang: effLang,
         })
         .select('id, started_at')
         .single()
@@ -490,22 +502,30 @@ Deno.serve(async (req) => {
     if (ticket.status === 'issued') await consumeTicket(admin, ticket.id, user.id)
 
     // 중간 저장된 답안 — 끊겼다 돌아온 사람이 **풀던 자리에서 이어가게** 하는 값이다.
-    // 하트비트가 저장해 둔 것이고(exam-session), 처음 시작한 응시면 전부 비어 있다.
+    // 하트비트가 저장해 둔 것이고(exam-session), 처음 시작한 응시면 비어 있다.
     // ⚠️ 정답은 절대 싣지 않는다 — 여기에 is_correct·correct_index 를 얹으면 응시 중에 답이 새어나간다.
-    const { data: draftRows } = await admin
-      .from('attempt_answers')
-      .select('number, selected_index, answer_text')
-      .eq('attempt_id', attemptId)
-      .order('number', { ascending: true })
+    // ⚠️ 읽는 곳이 **응시 행의 jsonb 한 칸**으로 바뀌었다(20260825170000). 예전엔 문항 행을 훑었는데,
+    //    그 구조 때문에 하트비트가 30초마다 문항 수만큼 UPDATE 를 쐈다. 채점 결과는 그대로 문항 행에 있다.
+    const { data: draftRow } = await admin
+      .from('exam_attempts')
+      .select('draft_answers')
+      .eq('id', attemptId)
+      .maybeSingle()
+    const draft = Array.isArray(draftRow?.draft_answers)
+      ? (draftRow.draft_answers as { number?: unknown; selectedIndex?: unknown; answerText?: unknown }[])
+      : []
 
     // 정답(correct_index) 제외하고 반환
     return json({
       attemptId,
-      saved: (draftRows ?? []).map((r) => ({
-        number: r.number as number,
-        selectedIndex: (r.selected_index as number | null) ?? null,
-        answerText: (r.answer_text as string | null) ?? null,
-      })),
+      saved: draft
+        .map((r) => ({
+          number: Number(r?.number),
+          selectedIndex: typeof r?.selectedIndex === 'number' ? r.selectedIndex : null,
+          answerText: typeof r?.answerText === 'string' ? r.answerText : null,
+        }))
+        .filter((r) => Number.isFinite(r.number))
+        .sort((a, b) => a.number - b.number),
       exam: {
         slug: exam.slug,
         title: exam.title,
@@ -516,14 +536,19 @@ Deno.serve(async (req) => {
       },
       ticket: { id: ticket.id, roundId: ticket.round_id, tier: ticket.tier },
       startedAt,
+      // 이 응시가 고정된 언어. 화면이 나중에 언어를 바꿔도 문항은 이 언어 그대로다 —
+      // 응시 화면이 "지금 보고 있는 문항의 언어" 를 알아야 안내 문구를 맞출 수 있다.
+      lang: effLang,
+      // ⚠️ 투영은 **여기 한 곳**에서만 한다. 위에서 원문을 들고 온 이유가 이것이다(effLang 확정이 ⑧ 이후).
+      //    미번역 문항은 projKo* 가 한국어 원문으로 떨어뜨린다 — 그 문항만 한국어로 보인다.
       questions: served.map((q) => ({
         id: q.id,
         number: q.number,
         subject: q.subject,
         topic: q.topic,
-        prompt: q.prompt,
+        prompt: projKoText(q.prompt, q.promptI18n, effLang),
         kind: q.kind ?? 'mc',
-        choices: q.choices,
+        choices: projKoOptions(q.choices, q.choicesI18n, effLang),
       })),
     })
   } catch (e) {

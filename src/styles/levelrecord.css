@@ -1,0 +1,121 @@
+/* levelrecord: pages/LevelRecord.tsx — /test/record (레벨테스트 내 기록) */
+
+/* ===== 레거시 토큰을 밤하늘로 =====
+   이 화면이 쓰는 카드들(.stat · .panel-card · .hrow · .axis-prog-cmp · .hl-arrow · .btn-ink)은
+   **레거시 토큰**(--bg/--line/--ink/--blue …)으로 그려지는 공용 클래스다. .lvnight 는 Material
+   토큰(--color-*)만 갈아끼우므로 그것만으로는 이 카드들이 하나도 안 어두워진다 → 여기서 같이 갈아낀다.
+   (같은 수법의 선례 = ranking.css 의 .hof-wrap)
+   ⚠️ .lvnight 이 아니라 .lvrec 에 건다. /test/select 도 .lvnight 라서 거기다 걸면 그 화면의
+      레거시 토큰까지 같이 바뀐다 — 이 파일은 이 페이지만 책임진다. */
+.lvrec {
+  --paper: 236, 240, 250;
+  --page: #050a16;
+  /* 카드 표면 = 하늘 위 유리판. 값은 .lvn-card 와 같다(두 화면의 판이 같은 물건으로 읽혀야 한다) */
+  --bg: rgba(10, 16, 31, 0.84);
+  --soft: rgba(26, 37, 60, 0.7);
+  --soft2: rgba(13, 20, 36, 0.6);
+  --line: rgba(178, 196, 226, 0.18);
+  --line2: rgba(178, 196, 226, 0.32);
+  --ink: #f3ecdd; /* 웜 오프화이트 = 인증서 이름 글자 */
+  --txt: rgba(243, 236, 221, 0.9);
+  --muted: #bcc8e0;
+  --dim: rgba(188, 200, 224, 0.6);
+  /* 강조 = 금. 코발트(#004ac6)는 밤하늘에서 그냥 안 보인다 — /test/select·인증서와 같은 판단이다.
+     레거시 컴포넌트들이 액센트를 전부 --blue/--blue-hi 로 부르므로 이름은 그대로 두고 값만 금으로. */
+  --blue: #f0d493;
+  --blue-hi: #f7e3b4;
+  --accent: #f0d493;
+  --accent2: #f7e3b4;
+  --on-accent: #241803;
+  --danger-fg: #ff9a8f;
+  --danger-bg: rgba(255, 154, 143, 0.14);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 40px -24px rgba(0, 0, 0, 0.8);
+  color: var(--txt);
+}
+
+/* --bg 가 반투명이라 판 뒤로 별이 그대로 비친다 → 글자가 읽히게 블러를 건다(.lvn-card 와 같은 값). */
+.lvrec .panel-card,
+.lvrec .stat {
+  backdrop-filter: blur(7px);
+}
+
+/* .db-wrap 은 마이페이지 안에 있던 시절 좌우 패딩을 0으로 눕혀 놨다(부모가 이미 줬으므로).
+   여기서는 그 부모가 없으니 되돌린다 — 안 되돌리면 좁은 화면에서 카드가 화면 끝에 붙는다. */
+.lvrec .db-wrap {
+  padding-left: clamp(14px, 4vw, 20px);
+  padding-right: clamp(14px, 4vw, 20px);
+  padding-top: 4px;
+}
+
+/* 스탯이 4장에서 3장이 됐다(옛 '내 순위' 칸은 /ranking 내 순위 바와 같은 말이라 버렸다). */
+.lvrec .stats {
+  grid-template-columns: repeat(3, 1fr);
+}
+/* ⚠️ 좁은 화면에서 3열을 유지하면 안 된다 — 390px 에서 칸이 120px 이 되어 '평균 정답률'과
+   그 아래 날짜 줄이 통째로 접힌다. 2열로 내리되 홀수(3)라 마지막 칸이 반쪽으로 남으므로
+   그 칸만 한 줄을 다 쓰게 한다(빈 반 칸이 남는 것보다 낫다). */
+@media (max-width: 620px) {
+  .lvrec .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .lvrec .stats .stat:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ===== 영역 밸런스 = 육각형 + 축 막대 =====
+   옛 대시보드에선 이 카드가 반 칸(달력과 나란히)이라 위아래로 쌓았다. 여기선 카드가 폭을 다 써서
+   그대로 쌓으면 육각형 양옆이 통째로 빈다 → 넓은 화면에서만 좌우로 가른다.
+   ⚠️ 하한은 min(320px, 100%) — 그냥 320px 로 두면 뷰포트가 그보다 좁을 때 칸이 안 줄어 오른쪽이 잘린다. */
+.lvrec-radar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 18px;
+  align-items: center;
+}
+.lvrec-radar-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+/* 축 라벨은 무조건 한 줄 — 줄바꿈되면 그 행만 키가 커져 레벨·언어마다 카드 높이가 달라진다
+   (전체 이름은 title 툴팁이 준다). */
+.lvrec .axis-prog-cmp .ap .lab {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 축 수가 적은 레벨(Lv.1=3축)에서 높이를 맞추려고 넣는 빈 행 — 자리만 차지하고 보이지 않는다 */
+.lvrec .ap-ghost {
+  visibility: hidden;
+}
+
+/* ===== 하드코딩된 코발트 되돌리기 =====
+   아래 셋은 값이 rgba(0, 74, 198, …) 로 파일에 박혀 있어서 --blue 를 갈아도 안 따라온다.
+   밤하늘에서 코발트는 배경과 같은 어둠에 묻혀 '내 점수' 도형이 아예 안 보인다. */
+.lvrec svg .me {
+  fill: rgba(240, 212, 147, 0.2);
+  stroke: var(--blue);
+}
+.lvrec svg .medot {
+  fill: var(--blue);
+}
+.lvrec .radar-leg .rl-me {
+  background: rgba(240, 212, 147, 0.22);
+  border-color: var(--blue);
+}
+.lvrec .ap-status.above {
+  color: var(--blue-hi);
+  background: rgba(240, 212, 147, 0.16);
+}
+
+/* 승급 기록 행 — 하늘 위라 구분선이 기본값(--line)만으론 안 보인다 */
+.lvrec .hrow {
+  border-bottom-color: rgba(178, 196, 226, 0.14);
+}
+.lvrec .hrow:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 12px;
+}

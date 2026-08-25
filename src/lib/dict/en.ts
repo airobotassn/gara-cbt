@@ -9,7 +9,6 @@
 // ⚠️ 이 파일을 다른 데서 직접 import 하지 말 것 — 조회는 i18n.tsx 의 tr()/useT() 하나로만.
 const EN: Record<string, string> = {
   "common.home": "Home",
-  "common.dashboard": "Learning dashboard",
   "common.close": "Close",
   "common.cancel": "Cancel",
   "common.ranking": "Ranking",
@@ -100,7 +99,6 @@ const EN: Record<string, string> = {
   // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
   "route.placeholder": "What are you looking for?",
   "route.notfound": "That's not a valid search. Please try again.",
-  "mypage.tab_learning": "Learning",
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
   "rank.title": "Ranking",
   "report.btn": "🚩 Report issue",
@@ -284,7 +282,6 @@ const EN: Record<string, string> = {
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   "result.next_level": "Take Lv.{n} →",
   "rank.cur_level": "Current rank · Level {n}",
-  "db.cur_rank": "Current rank · {n} attempts",
   "db.points": "Ranking score {p}",
   "db.skill_score": "Skill score",
   "db.activity_score": "Activity score",
@@ -361,6 +358,10 @@ const EN: Record<string, string> = {
   "rank.promotion_zone": "Promotion zone",
   "rank.top_tier": "Top tier",
   "rank.pt": "{n} pt",
+  "rank.nth": "#{n}",
+  "rank.trend_title": "Rank trend",
+  "rank.trend_empty": "No records in this period.",
+  "rank.trend_help": "The line goes up when your rank improves. Touch the graph to see that day's score.",
   "rank.you": "You",
   "rank.cta_test": "Take a test to get ranked",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -389,7 +390,7 @@ const EN: Record<string, string> = {
   "rank.active_today": "Today's activity",
   "country.KR": "South Korea",
 
-  "db.title": "Learning dashboard",
+  "db.title": "My record",
   "db.empty": "No submitted tests yet.",
   "db.start": "Start a test",
   "db.stat_maxlevel": "Top level",
@@ -409,7 +410,6 @@ const EN: Record<string, string> = {
   "db.trend_season": "Season",
   "db.trend_season_hint": "Season = 6 months",
   "db.trend_empty": "No tests in this period.",
-  "db.activity_title": "Activity",
   "db.radar_title": "Area balance",
   "db.radar_me": "You",
   "db.radar_avg": "Level average",
@@ -560,32 +560,24 @@ const EN: Record<string, string> = {
   "prep.start_login": "Sign in to start",
   "check.title": "Exam environment test (pre-check)",
   "check.eyebrow": "Pre-check",
-  "check.sub": "Before the real exam, install the secure software, check your environment, and try the sample questions.",
+  "check.sub": "Before the real exam, check that the secure browser opens properly on this PC and that your environment is ready.",
   "check.sec1_title": "Install secure software (Safe Exam Browser)",
   "check.sec1_desc": "The exam runs inside a secure program (Safe Exam Browser) that blocks screen capture, copying, and switching apps.",
+  "check.sec1_hint": "If the secure browser did not open in the check above, install it here.",
   "check.install_btn": "Install secure software (SEB)",
   "check.install_note1": "· It's normal if Windows shows \"Publisher: ETH Zürich\" during installation.",
   "check.install_note2": "· If \"Windows protected your PC\" appears, click More info → Run. (Normal installation step)",
-  "check.sec2_title": "Automatic environment check",
+  "check.sec2_title": "Environment check",
+  "check.sec2_desc": "Launching the secure browser checks the items below.",
   "check.chk_pc": "PC (desktop) environment",
-  "check.chk_pc_ok": "Connected from a PC.",
   "check.chk_screen": "Screen size",
-  "check.chk_screen_ok": "Large enough for the exam.",
-  "check.chk_screen_no": "A screen 1024px wide or more is recommended.",
   "check.chk_fs": "Fullscreen support",
-  "check.chk_fs_ok": "Fullscreen exam is available.",
-  "check.chk_fs_no": "The browser is blocking fullscreen.",
   "check.chk_net": "Internet connection",
-  "check.chk_net_ok": "Connected.",
-  "check.chk_net_no": "Check your internet connection.",
-  "check.chk_seb": "Secure browser (SEB)",
-  "check.chk_seb_ok": "Opened in the secure browser.",
-  "check.chk_seb_no": "The real exam must open in the secure browser.",
+  "check.chk_seb": "Secure browser (SEB) launch",
   "check.monitor_note": "· The number of monitors is checked automatically when the secure browser runs. Connect only one external monitor.",
-  "check.sec3_title": "Try the sample questions",
-  "check.sec3_desc": "Try the sample questions on a screen identical to the real exam to get used to the controls. (Not graded)",
-  "check.practice_btn": "Start sample question",
-  "check.back": "Back to CARIS",
+  "check.sebtest_btn": "Open in the secure browser to check",
+  "check.sebtest_desc": "Launches the secure browser the same way the real exam does, to confirm it opens properly on this PC.\nNo exam questions are shown.",
+  "check.back": "Back to my exam tickets",
   "done.title": "Your exam has been submitted",
   "done.sub1": "Your attempt was received successfully. The secure browser will close automatically.",
   "done.sub2": "Results will be available on My Page after the release date.",
@@ -956,12 +948,12 @@ const EN: Record<string, string> = {
   // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
   "mypage.cert_no": "Cert No.",
   "mypage.empty_issuance": "No certificates available for issuance.",
-  "mypage.tab_ebooks": "E-BOOK Library",
-  "mypage.empty_ebooks": "You haven't purchased any E-Books yet.",
+  "mypage.tab_ebooks": "My Library",
+  "mypage.empty_ebooks": "You haven't purchased any E-Books or lectures yet.",
   // 메인 3번째 CTA(landing.cta_learn)와 같은 이름. 브랜드 라벨이라 6개국어 동일 표기.
   "ebook.store_title": "Learning Library",
-  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = E-BOOK 서재)과 같아야 한다.
-  "ebook.store_sub": "Books you buy can be read in My Page › E-BOOK Library.",
+  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = 내 서재)과 같아야 한다.
+  "ebook.store_sub": "Books you buy can be read in My Page › My Library.",
   "ebook.empty_store": "No E-Books available yet.",
   "ebook.buy": "Buy",
   "ebook.get_free": "Get for free",
@@ -971,12 +963,12 @@ const EN: Record<string, string> = {
   "ebook.view": "Open",
   "ebook.cover_zoom": "View cover larger",
   "ebook.processing": "Processing…",
-  "ebook.bought": "Purchased — added to your E-BOOK Library.",
+  "ebook.bought": "Purchased — added to your library.",
   "ebook.login_to_buy": "Sign in to purchase.",
   // 비로그인이 구매 버튼을 눌렀을 때 뜨는 로그인 모달(제목 한 줄 + 버튼만 — 책 정보·설명은 넣지 않는다)
   "ebook.login_modal_title": "Sign in required",
   "ebook.go_store": "Go to Learning Library",
-  "ebook.go_library": "Open in E-BOOK Library",
+  "ebook.go_library": "Open in My Library",
   "ebook.load_failed": "Could not load the E-Book.",
 
   // ---- 결제(/checkout · /pay/success · /pay/fail) ----
@@ -1013,7 +1005,7 @@ const EN: Record<string, string> = {
   "pay.fail_title": "Payment didn't go through",
   "pay.fail_body": "The payment was cancelled or declined.",
   "pay.retry": "Try again",
-  "ebook.reader_back": "E-BOOK Library",
+  "ebook.reader_back": "My Library",
   "ebook.reader_lang": "Reading language",
   "ebook.reader_fs": "Fullscreen",
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
@@ -1023,7 +1015,8 @@ const EN: Record<string, string> = {
   "ll.catalog": "Catalog",
   "ll.level_col": "Level",
   "ll.tier_col": "Tier",
-  "ll.books": "Books",
+  // ⚠️ 브랜드 표기라 6개국어 모두 같은 글자다(ko.ts 주석 참고).
+  "ll.books": "E-Book",
   "ll.lectures": "Lectures",
   "ll.no_books": "Books for this level are on the way.",
   "ll.no_lectures": "Lectures for this level are on the way.",
@@ -1037,8 +1030,9 @@ const EN: Record<string, string> = {
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": "Previous",
   "ll.next": "Next",
-  "ll.watch_yt": "Watch on YouTube",
-  "ll.demo_note": "Lectures are sample videos for this demo.",
+  "ll.watch": "Watch",
+  "ll.playing": "Now playing",
+  "ll.empty_owned": "Nothing purchased in this section yet.",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "Buy All",
   "ll.bundle_desc": "Pick the books and lectures you want and grab them together.",
@@ -1052,7 +1046,6 @@ const EN: Record<string, string> = {
   "ll.pick_of": "{a} / {b} selected",
   "ll.total": "Total",
   "ll.bundle_buy": "Buy selected",
-  "ll.bundle_nofee": "Lectures are free — nothing to pay for. Just press play.",
   "ll.bundle_empty": "Nothing to add yet.",
   "mypage.reissue": "Reissue",
   "mypage.issue": "Apply",
@@ -1391,7 +1384,6 @@ const EN: Record<string, string> = {
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
-  "arena.tag": "Live data · sample where region data is missing",
   "arena.low": "Low",
   "arena.high": "High",
   // ⚠️ arena.avgLevel 은 레벨테스트 시절 문구다. 지도 지표가 레벨 → 랭킹점수(season_total 평균, 베이지안 보정)로
@@ -1407,7 +1399,6 @@ const EN: Record<string, string> = {
   "arena.world": "World",
   "arena.worldLeague": "World League",
   "arena.league": " League",
-  "arena.real": "live",
   "arena.ppl": "",
   "arena.unit": "",
   "arena.avg": "avg",
@@ -1421,7 +1412,6 @@ const EN: Record<string, string> = {
   "arena.bHubS": "Character hub",
   "arena.bDaily": "Daily Learning",
   "arena.bDailyS": "Daily content",
-  "arena.foot": "Regions/countries with live data appear automatically (5+ participants); areas without data show sample values.",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "Mini Games",
@@ -1778,7 +1768,7 @@ const EN: Record<string, string> = {
   // 오른쪽 레일
   "hub.rail.closet": "Customize",
   "hub.rail.title": "Titles",
-  "hub.rail.invite": "Invite",
+  "hub.rail.invite": "Invite reward",
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "Check in",
@@ -1787,6 +1777,8 @@ const EN: Record<string, string> = {
 
   // 도크(출석 보상)
   "hub.reward_head": "Check-in rewards",
+  "hub.attend.title": "Check-in history",
+  "hub.attend.help": "Your check-in is recorded automatically the moment you open the site each day.",
   "hub.daily.claim": "Check in today",
   "hub.daily.done": "Checked in today",
   "hub.day_n": "Day {n}",
@@ -1901,7 +1893,7 @@ const EN: Record<string, string> = {
   // 친구 초대 모달
   "hub.invite.title": "Invite friends",
   "hub.invite.lead": "Do CARIS together with a friend!",
-  "hub.invite.help": "Share your invite code and your friend can start right away.",
+  "hub.invite.help": "When a friend enters your invite code, you both get {n} CARI coins.",
   "hub.invite.my_code": "My invite code",
   "hub.invite.copied": "Copied",
   "hub.invite.copy": "Copy",
@@ -1911,7 +1903,7 @@ const EN: Record<string, string> = {
   "hub.invite.redeem_done": "✓ Invite code registered (one time only)",
   "hub.invite.checking": "Checking",
   "hub.invite.register": "Register",
-  "hub.invite.hint": "Once registered it can't be changed.",
+  "hub.invite.hint": "Enter a friend's invite code and you both get {n} CARI coins.",
   "hub.invite.err_not_found": "That invite code doesn't exist. Please check it again",
   "hub.invite.err_self": "You can't use your own invite code",
   "hub.invite.err_already": "You've already registered an invite code",

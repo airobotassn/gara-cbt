@@ -136,7 +136,7 @@ export default function MiniGameRankModal({
               {/* === 시상대 TOP 3 — /ranking 과 같은 그림·좌표(ranking.css). 제목만 없다(모달 헤더가 대신한다). === */}
               <div className="hof-podium">
                 <div className="hof-podium-art">
-                  <img src="/ranking/podium.png" alt="" className="hof-podium-img" />
+                  <img src="/ranking/podium-gara-2026.png" alt="" className="hof-podium-img" />
                   {podium.map((r, i) =>
                     r ? (
                       <span key={r.rank} className={`hof-slot ${podClass[i]}`}>

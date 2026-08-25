@@ -4,6 +4,8 @@
 //      → { top, total, me, scope, code }. code = 적용된 국가/지역 코드(전세계는 null).
 //      'my-*' 는 호출자 프로필(country_code·region_code)로 범위를 정한다 — 클라가 임의 범위를 지정할 수 없다.
 //      비로그인 → { needsAuth: true }, 지역/국가 미설정 → { needsRegion: true }(빈 보드).
+//  - scope 'trend': 내 순위 추이(ranking_history). 보고 있는 탭(board)의 순위 + 그날 점수.
+//      → { points: [{day, rank, score}], scope } · 비로그인 { points: [], needsAuth }.
 //  - scope 'region'|'country'|'school': 집계 버킷 리더보드(/arena 지도 · 랜딩 지구본용).
 //      RPC region_/country_/school_leaderboard — **스냅샷 테이블 arena_bucket_scores 를 select 만** 한다
 //      (2026-08-18. 예전엔 호출마다 profiles ⨝ user_progress 를 두 번 훑었는데, 이걸 부르는 자리가
@@ -75,8 +77,24 @@ async function attachCosmetics(
 ) {
   const ids = [...new Set(rows.map((r) => r.uid).filter((v): v is string => !!v))]
   if (!ids.length) return
-  const { data } = await admin.from('user_characters').select('user_id, base_key, equipped').in('user_id', ids)
+  // 실회원(user_characters)과 **랭킹 더미**(ranking_dummies — profiles 에 행이 없다)를 같이 물어본다.
+  //   ⚠️ 예전엔 실회원을 먼저 받고 '못 찾은 uid' 로만 더미를 물어 **두 번 줄 서 있었다**. 더미가
+  //      3만5천 명이라 보드에는 거의 항상 섞여서, 그 두 번째 조회가 사실상 매번 실행된다 —
+  //      즉 순차 2왕복이 기본값이었다. 같은 id 집합으로 동시에 던지고 실회원을 우선 채택하면 결과가 같다.
+  //   ⚠️ 안 붙여도 화면은 안 깨진다(폴백 그림). 붙이는 건 시상대에 선 사람들이 전부 같은 그림이면
+  //      보드가 밋밋해서다.
+  const [{ data }, { data: dm }] = await Promise.all([
+    admin.from('user_characters').select('user_id, base_key, equipped').in('user_id', ids),
+    admin.from('ranking_dummies').select('id, character_key, skin').in('id', ids),
+  ])
   const byUid = new Map<string, { character: string | null; skin: string | null }>()
+  // 더미를 먼저 깔고 실회원으로 덮는다 — 실회원 값이 이긴다(옛 순서와 같은 결과).
+  for (const d of dm ?? []) {
+    byUid.set(d.id as string, {
+      character: ((d.character_key as string | null) ?? null),
+      skin: ((d.skin as string | null) ?? null),
+    })
+  }
   for (const c of data ?? []) {
     const eq = (c.equipped as Record<string, string> | null) ?? {}
     const base = (c.base_key as string) ?? 'default'
@@ -85,19 +103,6 @@ async function attachCosmetics(
       character: base && base !== 'default' ? base : null,
       skin: eq.skin ?? null,
     })
-  }
-  // 실회원 쪽에서 못 찾은 uid 는 **랭킹 더미**다(ranking_dummies — profiles 에 행이 없다).
-  //   ⚠️ 안 붙여도 화면은 안 깨진다(폴백 그림). 붙이는 건 시상대에 선 사람들이 전부 같은 그림이면
-  //      보드가 밋밋해서다 — 더미 행에도 캐릭터·스킨이 실려 있다.
-  const missing = ids.filter((id) => !byUid.has(id))
-  if (missing.length) {
-    const { data: dm } = await admin.from('ranking_dummies').select('id, character_key, skin').in('id', missing)
-    for (const d of dm ?? []) {
-      byUid.set(d.id as string, {
-        character: ((d.character_key as string | null) ?? null),
-        skin: ((d.skin as string | null) ?? null),
-      })
-    }
   }
 
   for (const r of rows) {
@@ -111,12 +116,14 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const body = (await req.json().catch(() => ({}))) as {
-      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school' | 'user' | 'page'
+      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school' | 'user' | 'page' | 'trend'
       window?: 'daily' | 'season'
       country?: string
       uid?: string
-      // scope 'page'(무한 스크롤) 전용 — 어느 보드를 이어볼지 + 앞 응답에서 받은 커서.
+      // scope 'page'(무한 스크롤) · 'trend'(랭킹 추이) 공용 — 어느 보드냐.
       board?: 'global' | 'my-country' | 'my-region'
+      // scope 'trend' 전용 — 며칠치.
+      days?: number
       cursor?: { score?: number; at?: string; id?: string } | null
       startRank?: number
       limit?: number
@@ -225,6 +232,34 @@ Deno.serve(async (req) => {
       return json({ rows, cursor: d.cursor ?? null })
     }
 
+    // 랭킹 추이 — 내 순위가 날짜별로 어떻게 움직였나(ranking_history). 순위 한 줄 + 툴팁용 점수.
+    //   ⚠️ **본인 것만** 준다. 남의 uid 를 인자로 받지 않는다 — /ranking 이 공개하는 건 '지금 순위'
+    //      한 값이지 그 사람이 언제 오르내렸는지가 아니다(활동 패턴은 별개의 정보다).
+    //   ⚠️ 범위는 보고 있는 탭을 따라가되 국가·지역은 **서버가 호출자 프로필에서** 읽는다
+    //      (위 두 경로와 같은 이유 — 클라가 지정하면 남의 보드를 훑는 길이 된다).
+    if (scope === 'trend') {
+      const user = await getUser(req)
+      if (!user?.id) return json({ points: [], needsAuth: true })
+      const board = body.board === 'my-country' || body.board === 'my-region' ? body.board : 'global'
+      let pScope: 'global' | 'country' | 'region' = 'global'
+      if (board !== 'global') {
+        const { data: pr } = await admin
+          .from('profiles').select('country_code,region_code').eq('id', user.id).maybeSingle()
+        const cc = (pr?.country_code as string | null) ?? null
+        const rc = (pr?.region_code as string | null) ?? null
+        if (board === 'my-region' ? !rc : !cc) return json({ points: [], needsRegion: true })
+        pScope = board === 'my-region' ? 'region' : 'country'
+      }
+      const { data, error } = await admin.rpc('ranking_trend', {
+        p_uid: user.id,
+        p_scope: pScope,
+        // 화면 기간 탭(1주/3개월/시즌=180일)의 상한. 그 이상은 표에도 없다(백필 400일).
+        p_days: Math.min(400, Math.max(1, Math.floor(Number(body.days ?? 180)))),
+      })
+      if (error) return json({ error: error.message }, 500)
+      return json({ points: (data ?? []) as unknown[], scope: pScope })
+    }
+
     // 개인 리더보드 — 전세계 / 내 국가 / 내 지역. 세 탭 모두 같은 RPC(scoped_top), 모수만 다르다.
     if (scope === 'global' || scope === 'my-country' || scope === 'my-region') {
       // 랭킹은 공개 — 비로그인도 전세계 보드는 열람 가능. 'me'(내 순위)는 로그인 시에만 채워진다.
@@ -260,23 +295,30 @@ Deno.serve(async (req) => {
       const top = (d.top ?? []).map((u) => mapUser(u))
       const me: Record<string, unknown> | null = d.me ? mapUser(d.me, true) : null
       // 시상대·목록에서 사람을 누르면 그 사람 카드가 뜬다 → 캐릭터·스킨이 필요하다.
-      // me 행에는 uid 가 없으므로 로그인한 본인 id 로 따로 붙인다.
-      await attachCosmetics(admin, top)
+      // me 행에는 uid 가 없으므로 로그인한 본인 id 로 잠깐 채워 **top 과 한 번에** 조회한다.
+      //   ⚠️ 예전엔 attachCosmetics 를 top 용·me 용으로 **두 번** 불러서 user_characters 를
+      //      한 요청에 두 번 쳤다. 같은 표를 두 번 볼 이유가 없다.
+      const withMe: Record<string, unknown>[] = [...top]
       if (me && user?.id) {
         me.uid = user.id
-        await attachCosmetics(admin, [me])
-        // ⚠️ 도로 null 로 되돌린다 — me 행에 uid 가 없는 건 기존 계약이다(랭킹 '내 순위' 바가
-        //    그 null 을 보고 방 링크를 안 그린다). 조회하려고 잠깐 넣었을 뿐이다.
-        me.uid = null
+        withMe.push(me)
       }
       // 칭호(인증서 트랙·급수): 개인 응답 me 에만 부착. exam_attempts 합격에서 ON READ 파생(user_titles).
       //   · 로그인 사용자만 조회(비로그인 me=null). 실패 시 무시(back-compat: title 미포함).
       //   · top 행은 user_id 를 노출하지 않으므로(프라이버시) 칭호 미부착. me(본인)만 노출.
+      //   ⚠️ user_titles 는 p_uid 만 쓴다 — 캐릭터 조회 결과를 안 보므로 같이 내보낸다.
+      const [, titlesRes] = await Promise.all([
+        attachCosmetics(admin, withMe),
+        me && user?.id ? admin.rpc('user_titles', { p_uid: user.id }) : Promise.resolve({ data: null }),
+      ])
       if (me && user?.id) {
+        // ⚠️ 도로 null 로 되돌린다 — me 행에 uid 가 없는 건 기존 계약이다(랭킹 '내 순위' 바가
+        //    그 null 을 보고 방 링크를 안 그린다). 조회하려고 잠깐 넣었을 뿐이다.
+        me.uid = null
         // ⚠️ 급수(1급~4급)는 없다 — 2026-07 체계 개편으로 티어 6개가 각각 독립 자격이 됐고
         //    user_titles 도 그에 맞게 티어 key 만 돌려준다(20260807130000). 표시 이름은 TIER_LABEL 이 단일 출처.
         //    RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
-        const { data: titles } = await admin.rpc('user_titles', { p_uid: user.id })
+        const titles = (titlesRes as { data: unknown }).data
         const arr = Array.isArray(titles) ? (titles as Array<{ tier: string; exam_title?: string }>) : []
         if (arr.length) {
           me.title = `CARIS ${TIER_LABEL[arr[0].tier] ?? arr[0].tier}`

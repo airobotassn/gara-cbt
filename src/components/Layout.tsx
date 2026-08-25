@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { ChangeEvent, ReactNode } from 'react'
 import { useAuth } from '../context/AuthProvider'
-import { supabase, callFunction } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { loadAdminMe } from '../lib/adminMe'
 import GemAvatar, { Avatar } from './GemAvatar'
 import { GEM_COLORS, ADMIN_MASCOT_COUNT, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
@@ -77,9 +78,9 @@ export default function Layout({ children }: { children: ReactNode }) {
       setIsAdmin(false)
       return
     }
-    callFunction('admin', { action: 'me' })
-      .then(() => setIsAdmin(true))
-      .catch(() => setIsAdmin(false))
+    let alive = true
+    loadAdminMe(user?.id ?? null).then((me) => { if (alive) setIsAdmin(me.isAdmin) })
+    return () => { alive = false }
   }, [isFullUser, user])
 
   useEffect(() => {

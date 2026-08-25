@@ -3,7 +3,7 @@
 //   · 의존성 없는 단일 파일 → Supabase 대시보드 웹에디터로도 배포 가능.
 //   · (선택) TRANSLATE_PASSCODE 환경변수를 설정하면 x-passcode 헤더로 간단 보호.
 //
-// 요청(POST): { items: [{prompt, options:[...], explanation}], langs?: ["en","ja",...] }
+// 요청(POST): { items: [{prompt, options:[...], explanation}], langs?: ["en","ja",...], use?: "leveltest"|"caris" }
 // 응답:       { results: [ { tr: {en:{...},ja:{...},...}, issues: {en:[...],...} } | null ] }
 //   - tr     : 언어별 번역
 //   - issues : 언어별 "검토 필요" 사유 목록(빈 배열이면 통과). 룰검사 + AI검수 결과.
@@ -23,11 +23,24 @@ function json(body: unknown, status = 200): Response {
 }
 
 // 이 함수 전용 키만 사용(공용 GEMINI_API_KEY 와 분리).
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY_TRANSLATE')
+//
+// ⛔ **지갑이 둘이다 — 요청의 `use` 가 고른다.**
+//   · use:'leveltest'(기본) → GEMINI_API_KEY_TRANSLATE  — 무료 레벨테스트 문항
+//   · use:'caris'           → GEMINI_API_KEY_TEST_GENERATE — CARIS 자격검정 문항
+//   구글 무료 한도는 API 키가 아니라 **프로젝트 단위**라 키만 더 만들어봐야 지갑이 안 나뉜다
+//   (CLAUDE.md 의 용도별 프로젝트 분리 규칙). CARIS 문항은 588개 × 5개국어라 한 번 돌리면
+//   그 프로젝트의 하루 한도를 크게 먹는데, 같은 지갑에 두면 그날 레벨테스트 번역까지 같이 막힌다.
+//   TEST_GENERATE 는 문항 생성(KB 파이프라인)용인데 지금 생성을 안 돌려서 비어 있다.
+// ⚠️ 키 이름을 **클라가 보내지 않는다.** 보내는 건 용도 문자열뿐이고 매핑은 여기 고정이다 —
+//    아니면 남의 키를 지정해 태울 수 있는 입력이 된다.
+const KEY_BY_USE: Record<string, string | undefined> = {
+  leveltest: Deno.env.get('GEMINI_API_KEY_TRANSLATE'),
+  caris: Deno.env.get('GEMINI_API_KEY_TEST_GENERATE') || Deno.env.get('GEMINI_API_KEY_TRANSLATE'),
+}
 const PASSCODE = Deno.env.get('TRANSLATE_PASSCODE') // 미설정 시 보호 없음
 const MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-3.1-flash-lite'
-const ENDPOINT =
-  `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`
+const endpointFor = (key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`
 
 const LANG_NAMES: Record<string, string> = {
   en: 'English',
@@ -79,10 +92,10 @@ function parseFirstJson<T>(raw: string): T {
   throw new Error('JSON 끝 못 찾음(잘림 가능)')
 }
 
-async function callGemini(sys: string, user: string, maxTokens: number): Promise<string> {
+async function callGemini(sys: string, user: string, maxTokens: number, endpoint: string): Promise<string> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +143,7 @@ async function callGemini(sys: string, user: string, maxTokens: number): Promise
 }
 
 // 여러 문항을 한 번의 호출로 묶어 번역. 결과는 입력 순서대로 배열 반환.
-async function translateGroup(items: Item[], langs: string[]): Promise<Tr[]> {
+async function translateGroup(items: Item[], langs: string[], endpoint: string): Promise<Tr[]> {
   const sys =
     'You are a professional translator for an AI/robotics literacy certification test. ' +
     'Translate each Korean multiple-choice question into the requested languages. ' +
@@ -148,7 +161,7 @@ async function translateGroup(items: Item[], langs: string[]): Promise<Tr[]> {
     `SOURCE (Korean, JSON array):\n` +
     JSON.stringify(items.map((it) => ({ prompt: it.prompt, options: it.options, explanation: it.explanation })))
 
-  const txt = await callGemini(sys, user, 60000) // 모델 한도 65,536 내. 출력 잘림 방지
+  const txt = await callGemini(sys, user, 60000, endpoint) // 모델 한도 65,536 내. 출력 잘림 방지
   let out: Tr[]
   try {
     out = parseFirstJson<Tr[]>(txt) // 뒤 군더더기·마크다운 무시하고 첫 JSON만
@@ -164,9 +177,26 @@ async function translateGroup(items: Item[], langs: string[]): Promise<Tr[]> {
     throw new Error(`문항 수 불일치 (${out?.length}/${items.length})`)
   }
   out.forEach((tr, i) => {
+    const want = items[i].options.length
     for (const c of langs) {
       const o = tr?.[c]
-      if (!o || !Array.isArray(o.options) || o.options.length !== items[i].options.length) {
+      if (!o) throw new Error(`보기 개수 불일치 (#${i + 1} ${c})`)
+      // ⚠️ **보기가 없는 문항(주관식)은 options 키가 없어도 통과시킨다.**
+      //    보내는 원본이 `options: []` 라 모델이 그 키를 아예 빼고 돌려주는 일이 잦은데,
+      //    예전 검사는 그걸 개수 불일치로 보고 **그 묶음 전체를 실패**시켰다. 레벨테스트는
+      //    전 문항이 객관식이라 안 드러났고, 주관식이 있는 CARIS Elite 에서만 터졌다
+      //    (실측: elite 주관식 10문항이 몇 번을 돌려도 계속 실패).
+      //    보기가 1개 이상인 문항의 검사는 그대로다 — 개수가 어긋나면 정답 번호가 다른 보기를
+      //    가리켜 아무도 못 맞히는 문항이 되므로 거기서는 절대 느슨해지면 안 된다.
+      if (want === 0) {
+        // ⚠️ 모델이 **없는 보기를 지어내서** 돌려주는 일이 잦다 — "…프로토콜은?" 같은 주관식에
+        //    정답을 options 에 채워 넣는다(실측: elite 주관식 5문항이 이것 때문에 계속 실패).
+        //    원본에 보기가 없으면 지어낸 값은 쓸 데가 없으므로 **버린다**(실패로 만들지 않는다).
+        //    주관식 채점은 answer_key 로 하지 보기로 하지 않아서 버려도 잃는 것이 없다.
+        o.options = []
+        continue
+      }
+      if (!Array.isArray(o.options) || o.options.length !== want) {
         throw new Error(`보기 개수 불일치 (#${i + 1} ${c})`)
       }
     }
@@ -187,6 +217,7 @@ function ruleIssues(tr: Item): string[] {
 async function reviewGroup(
   pairs: { src: Item; tr: Tr }[],
   langs: string[],
+  endpoint: string,
 ): Promise<Record<string, string[]>[]> {
   const sys =
     'You are a bilingual QA reviewer for a certification test. ' +
@@ -210,7 +241,7 @@ async function reviewGroup(
     `ITEMS (JSON array):\n` +
     JSON.stringify(payload)
 
-  const txt = await callGemini(sys, user, 8192)
+  const txt = await callGemini(sys, user, 8192, endpoint)
   const out = parseFirstJson<Record<string, string[]>[]>(txt) // 군더더기 무시
   if (!Array.isArray(out) || out.length !== pairs.length) {
     throw new Error(`검수 응답 수 불일치 (${out?.length}/${pairs.length})`)
@@ -234,11 +265,20 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    if (!GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY_TRANSLATE 미설정' }, 500)
     if (PASSCODE && req.headers.get('x-passcode') !== PASSCODE) {
       return json({ error: '암호가 올바르지 않습니다.' }, 401)
     }
     const body = await req.json()
+    // 어느 지갑으로 부를지 — 모르는 값은 레벨테스트로 떨어뜨린다(옛 호출자는 use 를 안 보낸다).
+    const use = body?.use === 'caris' ? 'caris' : 'leveltest'
+    const apiKey = KEY_BY_USE[use]
+    if (!apiKey) {
+      return json(
+        { error: use === 'caris' ? 'GEMINI_API_KEY_TEST_GENERATE 미설정' : 'GEMINI_API_KEY_TRANSLATE 미설정' },
+        500,
+      )
+    }
+    const endpoint = endpointFor(apiKey)
     const items: Item[] = Array.isArray(body?.items) ? body.items : []
     const langs: string[] =
       Array.isArray(body?.langs) && body.langs.length ? body.langs : DEFAULT_LANGS
@@ -276,7 +316,7 @@ Deno.serve(async (req) => {
     await mapLimit(tGroups, CONCURRENCY, async (g) => {
       if (dailyHit) return
       try {
-        const out = await translateGroup(g.items, langs)
+        const out = await translateGroup(g.items, langs, endpoint)
         out.forEach((tr, k) => { translations[g.start + k] = tr })
       } catch (e) {
         // 폭주 방지: 묶음이 실패해도 여기서 동시 단건 재시도를 하지 않는다.
@@ -317,6 +357,7 @@ Deno.serve(async (req) => {
           const rv = await reviewGroup(
             idxs.map((i) => ({ src: items[i], tr: translations[i]! })),
             langs,
+            endpoint,
           )
           idxs.forEach((i, k) => {
             const r = rv[k]

@@ -61,6 +61,8 @@ await db.exec(
   readFileSync('supabase/migrations/20260821160000_scoped_page.sql', 'utf8')
     .replace(/select cron\.[\s\S]*?;\n/g, ''),
 );
+// 허브가 쓰는 전세계 순위. 더미를 안 세던 것을 고친 판 — 아래 (8b) 가 scoped_top 과 대조한다.
+await db.exec(readFileSync('supabase/migrations/20260825150000_my_rank_context_dummies.sql', 'utf8'));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -324,6 +326,48 @@ const U = '11111111-1111-1111-1111-111111111111';
   rec('⭐ 첫 화면과 이어보기가 겹치지 않는다', overlap, false);
 
   await db.query(`select seed_ranking_dummies(10)`);
+}
+
+// --- (8b) ⭐ my_rank_context 가 scoped_top 과 같은 답을 낸다 ---
+//     허브(HUD 의 '상위 N%' · 공유 카드의 World 순위)와 /ranking 월드 탭이 서로 다른 순위를 말하면 안 된다.
+//     2026-08-25 에 실제로 갈렸다 — 더미를 넣을 때 이 함수만 안 열어서 허브가 "실회원 8명 중 4위" 를
+//     찍고 있었고, 같은 계정이 랭킹 화면에선 8,591위였다.
+//     ⚠️ 두 구현은 속도 때문에 일부러 따로 산다(하나는 윈도 함수, 하나는 세기) — **이 대조가 그 대가다.**
+{
+  const picks = (await db.query(`
+    select id from (
+      (select id, season_total from ranking_dummies order by season_total desc limit 3)
+      union all
+      (select id, season_total from ranking_dummies order by season_total asc limit 3)
+    ) x
+  `)).rows.map((r) => r.id);
+
+  const keys = ['rank', 'total', 'season_total', 'tier', 'percentile', 'points_to_pass'];
+  let same = 0;
+  for (const id of [U, ...picks]) {
+    const r = await one(`select scoped_top($1, 0, null, null) as j, my_rank_context($1) as f`, [id]);
+    const a = {
+      rank: r.j.me?.rank ?? null, total: r.j.total, season_total: r.j.me?.rating ?? null,
+      tier: r.j.me?.tier ?? null, percentile: r.j.me?.percentile ?? null,
+      points_to_pass: r.j.me?.points_to_pass ?? null,
+    };
+    const b = Object.fromEntries(keys.map((k) => [k, r.f[k] ?? null]));
+    if (JSON.stringify(a) === JSON.stringify(b)) same++;
+  }
+  rec('⭐ 두 구현이 같은 순위·백분위·티어를 낸다(상위·하위·실회원)', same, 1 + picks.length);
+
+  // 회귀 그 자체 — 더미를 안 세면 total 이 실회원 수(1)로 떨어진다.
+  const me = await one(`select my_rank_context($1) as f`, [U]);
+  const n = await one(`select count(*)::int c from ranking_dummies`);
+  rec('⭐ 전세계 모수에 더미가 들어 있다', me.f.total, n.c + 1);
+  rec('레벨 7 클리어한 실사용자는 여전히 1위', me.f.rank, 1);
+  rec('1위는 따라잡을 사람이 없다', me.f.points_to_pass, null);
+
+  // 아직 집계 전인 사람(내 행이 없다) — 옛 판과 같은 모양으로 총원만 나간다.
+  const ghost = '99999999-9999-9999-9999-999999999999';
+  const g = await one(`select my_rank_context($1) as f`, [ghost]);
+  rec('집계 전인 사람은 순위가 null', g.f.rank, null);
+  rec('집계 전이어도 총원은 같다', g.f.total, n.c + 1);
 }
 
 // --- (9) 걷어내기 ---

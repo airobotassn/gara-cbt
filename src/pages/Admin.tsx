@@ -68,6 +68,8 @@ import { autoRoundTitle, isExamMonth, monthOfExamDate, schedulePreview } from '.
 import { REGIONS, countryName, flagEmoji } from '../lib/regions'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
+// ⚠️ 별칭이 필요하다 — 이 파일 안에 이북 본문 번역용 `runTranslation`(다른 시그니처)이 이미 있다.
+import { runTranslation as runQTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 
 // 관리자 최상위 = **대메뉴 6개 + 홈 대시보드** (2026-08-11 재편 · PPT `관리자 페이지 수정사항` 1페이지).
 //   옛 구조는 상단 2탭(`CARIS 시험` / `WORLD ARENA`) + 각자의 서브탭이었다. 화면 자체는 그대로 두고
@@ -5995,6 +5997,8 @@ function DiffTag({ value }: { value: string | null | undefined }) {
 function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: QuestionBankItem[]; tierKey: string; onTierKey: (k: string) => void; refreshKey?: number }) {
   const tiers = getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => ({ track: tr.name, key: ti.key, name: ti.name, subjects: ti.subjects })))
   const [rows, setRows] = useState<AdminQuestionRow[]>([])
+  // 번역 완료율 원본 — 서버(questionList)가 준 값 그대로 담는다(화면에서 다시 세지 않는다).
+  const [cov, setCov] = useState<{ coverage: Record<string, number>; total: number; langs: string[] }>({ coverage: {}, total: 0, langs: [] })
   const [loading, setLoading] = useState(false)
   const [reloadTick, setReloadTick] = useState(0) // 수동 새로고침
   const [poolKind, setPoolKind] = useState<'mc' | 'short'>('mc') // 유형별 풀(주관식 있는 급수는 토글)
@@ -6005,12 +6009,16 @@ function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: Questi
 
   // 급수 변경·부모의 문항 변경(refreshKey)·수동 새로고침 때마다 재조회
   useEffect(() => {
-    if (!bankId) { setRows([]); return }
+    if (!bankId) { setRows([]); setCov({ coverage: {}, total: 0, langs: [] }); return }
     let alive = true
     setLoading(true)
     callFunction<AdminQuestionListResp>('admin', { action: 'questionList', bankId })
-      .then((r) => { if (alive) setRows(r.rows) })
-      .catch(() => { if (alive) setRows([]) })
+      .then((r) => {
+        if (!alive) return
+        setRows(r.rows)
+        setCov({ coverage: r.coverage ?? {}, total: r.total ?? r.rows.length, langs: r.langs ?? [] })
+      })
+      .catch(() => { if (alive) { setRows([]); setCov({ coverage: {}, total: 0, langs: [] }) } })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [bankId, refreshKey, reloadTick])
@@ -6104,6 +6112,58 @@ function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: Questi
           </div>
         </>
       )}
+      <TransCoverage coverage={cov.coverage} total={cov.total} langs={cov.langs} loading={loading} />
+    </div>
+  )
+}
+
+// 언어별 번역 완료율 — 문항 풀 현황표 바로 밑(2026-08-25 요청).
+// 숫자는 전부 서버(questionList 의 coverage)가 준다 — ⚠️ 여기서 다시 세지 말 것.
+// 판정이 두 벌이 되면 목록의 '미번역' 배지와 이 숫자가 서로 다른 말을 한다.
+// 번역 대상 = 한국어를 뺀 5개국어. 한국어는 문항의 원본 컬럼(prompt·choices)이 정본이라 대상이 아니다.
+// ⚠️ 서버 admin 함수의 TRANSLATABLE_LANGS 와 한 쌍이다 — 한쪽만 늘리면 화면은 번역을 보내는데
+//    서버가 그 언어를 버리거나(저장 안 됨), 반대로 완료율이 영영 100%가 안 된다.
+const TRANS_LANGS = ['en', 'ja', 'zh', 'hi', 'vi']
+const TRANS_LANG_LABEL: Record<string, string> = { en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
+function TransCoverage({ coverage, total, langs, loading }: { coverage: Record<string, number>; total: number; langs: string[]; loading?: boolean }) {
+  if (!langs.length) return null
+  const done = langs.filter((l) => (coverage[l] ?? 0) >= total && total > 0).length
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div className="admin-sub" style={{ marginTop: 0 }}>
+        언어별 번역 완료율{' '}
+        <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--dim)' }}>
+          활성 {total}문항 중 · 한국어는 원문이라 대상이 아님(비활성은 출제되지 않아 분모에서 뺌)
+          {total > 0 && done === langs.length ? ' · 전 언어 완료' : ''}
+        </span>
+      </div>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead><tr><th>언어</th><th>번역됨</th><th>미번역</th><th>완료율</th></tr></thead>
+          <tbody>
+            {langs.map((l) => {
+              const n = coverage[l] ?? 0
+              const miss = Math.max(0, total - n)
+              const pct = total > 0 ? Math.round((n / total) * 100) : 0
+              return (
+                <tr key={l} className={miss > 0 ? 'prob' : ''}>
+                  <td>{TRANS_LANG_LABEL[l] ?? l}</td>
+                  <td style={{ fontVariantNumeric: 'tabular-nums' }}>{n}</td>
+                  <td style={{ fontVariantNumeric: 'tabular-nums', color: miss > 0 ? '#c0392b' : 'var(--dim)', fontWeight: miss > 0 ? 700 : 400 }}>{miss || '—'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {miss === 0 && total > 0
+                      ? <span className="badge ok">100%</span>
+                      : <span className="badge low">{pct}%</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="admin-hint" style={{ marginTop: 6 }}>
+        {loading ? '불러오는 중…' : '미번역 문항은 그 문항만 한국어로 출제됩니다. 아래 문항 목록에서 「미번역만」으로 모아 번역하세요.'}
+      </div>
     </div>
   )
 }
@@ -6194,6 +6254,7 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
   const [rows, setRows] = useState<ExamSetRow[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [drawWarn, setDrawWarn] = useState('') // 방금 뽑은 세트의 미번역 경고(막지 않고 알리기만)
   const ex = exams.find((e) => e.id === examId)
   const spec = ex?.tier ? TIER_EXAM_SPEC[ex.tier] : undefined
 
@@ -6222,9 +6283,21 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
     const cells = ex?.tier ? buildDrawCells(ex.tier, tierSubjects) : null
     setBusy(true)
     try {
-      await callFunction('admin', { action: 'examDraw', examId, mc: spec.mc, short: spec.short, cells, replace })
+      const res = await callFunction<{ count: number; untranslated?: Record<string, number> }>(
+        'admin', { action: 'examDraw', examId, mc: spec.mc, short: spec.short, cells, replace },
+      )
       await load()
       onChanged()
+      // 미번역 경고 — **막지 않고 알려만 준다**(막으면 번역이 덜 된 동안 회차를 못 연다).
+      // 그 문항은 응시 화면에서 그 문항만 한국어로 뜬다.
+      const un = Object.entries(res?.untranslated ?? {})
+      setDrawWarn(
+        un.length
+          ? `뽑힌 ${res.count}문항 중 번역이 없는 문항: ` +
+            un.map(([l, n]) => `${TRANS_LANG_LABEL[l] ?? l} ${n}개`).join(' · ') +
+            ' — 그 언어로 응시하면 해당 문항만 한국어로 나옵니다. 「문항 목록」의 “미번역만 보기”에서 번역하세요.'
+          : '',
+      )
     } catch (e) {
       const msg = e instanceof Error ? e.message : '추출 실패'
       if (/응시 기록/.test(msg) && !replace) {
@@ -6266,6 +6339,7 @@ function ExamSetView({ examId, exams, onChanged }: { examId: string; exams: Admi
         이 등록시험의 급수 <b>문제은행</b>에서 구성(객 {spec?.mc ?? 0} + 주 {spec?.short ?? 0})만큼 랜덤 추출해 저장합니다.
         추출 후 <b>시험화면 미리보기</b>로 실제 응시 화면 그대로(정답·해설 비노출·SEB 불필요) 검수할 수 있습니다.
       </p>
+      {drawWarn && <div className="admin-warn" style={{ marginBottom: 10 }}>{drawWarn}</div>}
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead><tr><th>#</th><th>유형</th><th>과목</th><th>난이도</th><th>지문</th><th>은행번호</th></tr></thead>
@@ -6296,8 +6370,10 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [edit, setEdit] = useState<AdminQuestionRow | 'new' | null>(null)
-  const [sel, setSel] = useState<Set<string>>(new Set()) // 체크박스 선택(엑셀 다운로드 대상)
+  const [sel, setSel] = useState<Set<string>>(new Set()) // 체크박스 선택(엑셀 다운로드 대상 · 번역 대상)
   const [page, setPage] = useState(0) // 클라 페이징(아래 PER) — 검색·필터는 전체 기준 그대로다
+  const [onlyMissing, setOnlyMissing] = useState(false) // 미번역만 모아보기
+  const [trMsg, setTrMsg] = useState('') // 번역 진행/결과 문구
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -6337,7 +6413,16 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
   const guideSubjects = tierSubjectsOf(tier)
   const extraSubjects = [...new Set(rows.map((r) => r.subject).filter(Boolean))].filter((s) => !guideSubjects.includes(s)).sort()
   const subjects = [...guideSubjects, ...extraSubjects]
-  const filtered = rows.filter((q) => f.matchTS(q.subject) && f.matchDiff(q.difficulty) && f.matchKind(q.kind) && f.matchQ(`${q.number} ${q.subject} ${q.prompt}`))
+  const missOf = (q: AdminQuestionRow) => q.missing ?? []
+  const filtered = rows.filter(
+    (q) =>
+      f.matchTS(q.subject) && f.matchDiff(q.difficulty) && f.matchKind(q.kind) &&
+      f.matchQ(`${q.number} ${q.subject} ${q.prompt}`) &&
+      // '미번역만' — 활성 문항 중 한 언어라도 빠진 것. 비활성은 출제되지 않아 번역 대상이 아니다
+      // (완료율 분모와 같은 규칙이라 "미번역 0인데 완료율이 100%가 아닌" 어긋남이 안 생긴다).
+      (!onlyMissing || (q.active && missOf(q).length > 0)),
+  )
+  const missingRows = rows.filter((q) => q.active && missOf(q).length > 0)
 
   // ⚠️ 페이징은 **클라이언트 전용**이다 — 검색·필터·전체선택·다운로드는 전부 `filtered`(전체) 기준으로 돌고,
   //    `shown` 은 화면에 그릴 줄만 잘라낸 것이다. 서버 페이징으로 바꾸면 검색이 현재 페이지만 뒤지게 되니 주의.
@@ -6353,6 +6438,72 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
   function toggle(id: string) {
     setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
+  /**
+   * 고른 문항을 5개국어로 번역해 저장한다.
+   *
+   * 파이프라인은 레벨테스트와 **같은 것**(runTranslation → translate-questions)이고, 다른 건 지갑뿐이다
+   * (use:'caris' → GEMINI_API_KEY_TEST_GENERATE). 여기서 새로 쪼개기·재시도를 짜지 않는다 —
+   * 10→5→1 쪼개기·분당 스로틀·일일한도 감지가 이미 그 안에 있다.
+   *
+   * ⚠️ 한국어 원문은 **한 글자도 안 보낸 채로 저장**된다(questionTransSave 가 번역본만 update).
+   *    번역하러 들어갔다가 원문이 바뀌는 일이 없어야 한다.
+   * ⚠️ 해설(explanation)은 번역하지 않는다 — 관리자 전용이라 응시자에게 안 나간다. 다만 번역기가
+   *    문맥으로 쓰도록 같이 **보내기는** 한다(품질이 올라간다). 받은 해설 번역은 그냥 버린다.
+   */
+  async function translateRows(targets: AdminQuestionRow[]) {
+    if (!targets.length) return
+    if (!confirm(`${targets.length}개 문항을 5개국어(영어·일본어·중국어·힌디어·베트남어)로 번역합니다.\n문항 수에 따라 몇 분 걸릴 수 있어요. 진행할까요?`)) return
+    setBusy(true)
+    setTrMsg(`번역 준비 중… (${targets.length}문항)`)
+    try {
+      const items = targets.map((q) => ({
+        prompt: q.prompt,
+        options: q.kind === 'short' ? [] : (q.choices ?? []),
+        explanation: q.explanation ?? '',
+      }))
+      const res: TransResult[] = await runQTranslation(
+        items satisfies TransItem[],
+        TRANS_LANGS,
+        (done, total, note) => setTrMsg(`번역 ${done}/${total}${note ? ` · ${note}` : ''}`),
+        { use: 'caris' },
+      )
+      // 성공한 것만 추려 저장 — 실패분은 원문(한국어) 그대로 남는다.
+      const save: { id: string; promptI18n: Record<string, string>; choicesI18n: Record<string, string[]> }[] = []
+      const failed: string[] = []
+      res.forEach((r, i) => {
+        const q = targets[i]
+        if (!('tr' in r)) { failed.push(`${q.number}번(${'error' in r ? r.error : '실패'})`); return }
+        const promptI18n: Record<string, string> = {}
+        const choicesI18n: Record<string, string[]> = {}
+        for (const l of TRANS_LANGS) {
+          const t = r.tr[l]
+          if (!t?.prompt) continue
+          promptI18n[l] = t.prompt
+          if (q.kind !== 'short') choicesI18n[l] = t.options ?? []
+        }
+        if (Object.keys(promptI18n).length) save.push({ id: q.id, promptI18n, choicesI18n })
+        else failed.push(`${q.number}번(빈 번역)`)
+      })
+      if (save.length) {
+        setTrMsg(`저장 중… (${save.length}문항)`)
+        // 한 번에 다 밀면 요청이 커진다(문항당 5개국어 지문+보기). 60개씩 나눠 보낸다.
+        for (let i = 0; i < save.length; i += 60) {
+          await callFunction('admin', { action: 'questionTransSave', bankId, rows: save.slice(i, i + 60) })
+        }
+      }
+      await load()
+      onChanged()
+      setTrMsg(
+        `✅ ${save.length}문항 번역 저장` +
+          (failed.length ? ` · ⚠️ ${failed.length}문항 실패(${failed.slice(0, 5).join(', ')}${failed.length > 5 ? ' …' : ''}) — 다시 누르면 그 문항만 재시도합니다.` : ''),
+      )
+    } catch (e) {
+      setTrMsg('번역 실패 — ' + (e instanceof Error ? e.message : '알 수 없는 오류'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function toggleAll() {
     setSel((s) => {
       const n = new Set(s)
@@ -6379,10 +6530,33 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
               엑셀 다운로드{selRows.length ? ` (${selRows.length})` : ''}
             </button>
           )}
+          {/* 번역 — 체크한 게 있으면 그것만, 없으면 미번역 문항 전부. 버튼 하나로 두 경우를 덮는다. */}
+          <button
+            className="admin-mini"
+            disabled={busy || loading || (!selRows.length && !missingRows.length)}
+            title={
+              selRows.length
+                ? '체크한 문항을 5개국어로 번역합니다'
+                : missingRows.length
+                  ? '아직 번역이 안 된 활성 문항을 전부 번역합니다'
+                  : '번역할 문항이 없습니다(전 문항 번역 완료)'
+            }
+            onClick={() => translateRows(selRows.length ? selRows : missingRows)}
+          >
+            {busy ? '번역 중…' : selRows.length ? `🌐 선택 번역 (${selRows.length})` : `🌐 미번역 번역 (${missingRows.length})`}
+          </button>
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
           </button>
         </div>
+      </div>
+      {/* 미번역만 모아보기 — 번역하고 나면 목록이 저절로 비므로 '남은 게 있나'가 한눈에 보인다. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <input type="checkbox" checked={onlyMissing} onChange={(e) => { setOnlyMissing(e.target.checked); setPage(0) }} />
+          <span>미번역만 보기{missingRows.length ? ` (${missingRows.length})` : ''}</span>
+        </label>
+        {trMsg && <span className="admin-hint" style={{ margin: 0 }}>{trMsg}</span>}
       </div>
       <TierSubjectBar f={f} count={filtered.length} loading={loading} subjects={subjects} />
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
@@ -6397,6 +6571,7 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
               <th>난이도</th>
               <th>지문</th>
               <th>정답</th>
+              <th>미번역</th>
               <th>상태</th>
               <th></th>
             </tr>
@@ -6415,6 +6590,12 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
                 <td style={{ whiteSpace: 'nowrap' }}><DiffTag value={q.difficulty} /></td>
                 <td style={{ maxWidth: 340, whiteSpace: 'normal', wordBreak: 'break-word' }}>{q.prompt}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{q.kind === 'short' ? <span style={{ color: 'var(--muted)' }}>검수 채점</span> : `${(q.correct_index ?? 0) + 1}번`}</td>
+                {/* 미번역 언어 — 서버(questionList)가 준 목록 그대로. 다 됐으면 조용히 ✓ 만 둔다. */}
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {missOf(q).length === 0
+                    ? <span className="badge ok">✓</span>
+                    : <span className="badge low" title={missOf(q).map((l) => TRANS_LANG_LABEL[l] ?? l).join(', ')}>{missOf(q).length}개 언어</span>}
+                </td>
                 <td>
                   <span className={`admin-badge st-${q.active ? 'submitted' : 'voided'}`}>{q.active ? '활성' : '비활성'}</span>
                 </td>
@@ -6438,8 +6619,14 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
             ))}
             {!filtered.length && !loading && (
               <tr>
-                <td colSpan={isRoot ? 9 : 8} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  {rows.length ? '이 급수·과목에 해당하는 문항이 없습니다.' : '문항이 없습니다. “+ 문항 추가” 또는 “엑셀 업로드”로 추가하세요.'}
+                <td colSpan={isRoot ? 10 : 9} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  {/* '미번역만' 을 켜서 빈 경우를 따로 말한다 — 같은 문구를 쓰면 "문항이 없다" 로 읽혀
+                      번역이 다 끝난 건지 필터에 걸린 건지 구분이 안 된다. */}
+                  {onlyMissing && rows.length
+                    ? '✅ 이 조건에 미번역 문항이 없습니다 — 전부 5개국어로 번역돼 있습니다.'
+                    : rows.length
+                      ? '이 급수·과목에 해당하는 문항이 없습니다.'
+                      : '문항이 없습니다. “+ 문항 추가” 또는 “엑셀 업로드”로 추가하세요.'}
                 </td>
               </tr>
             )}
@@ -6508,6 +6695,13 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
   const [explanation, setExplanation] = useState(row?.explanation ?? '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  // 방금 뽑은 번역 — 저장할 때 같이 실어보낸다. 저장 전에는 DB 에 아무것도 안 들어간다.
+  // ⚠️ **어느 원문으로 뽑았는지(key)를 같이 들고 다닌다.** 옛 원문으로 뽑은 번역을 새 원문에 붙이면
+  //    외국어 응시자만 다른 문제를 풀게 되고 화면에는 아무 표시도 안 남는다.
+  //    이펙트로 지우지 않고 key 비교로 무효화한다 — 이펙트에서 setState 하면 렌더가 한 번 더 돈다.
+  const [trans, setTrans] = useState<{ key: string; promptI18n: Record<string, string>; choicesI18n: Record<string, string[]> } | null>(null)
+  const [trMsg, setTrMsg] = useState('')
+  const [translating, setTranslating] = useState(false)
 
   // 임시저장 — 문제·보기 4개·해설을 다 쓴 뒤 날리면 되돌릴 방법이 없다.
   const draft = useDraft({
@@ -6517,13 +6711,67 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
     title: prompt.trim().slice(0, 40) || (row ? `${row.number}번 문항` : '새 문항'),
   })
 
+  // 원문이 바뀌면 방금 뽑은 번역을 버린다 — 짝이 안 맞는 번역은 저장되면 안 된다.
+  // (이미 저장돼 있던 번역은 서버가 같은 규칙으로 비운다 — questionUpsert 의 koChanged.)
+  const koKey = `${prompt} ${kind} ${choices.join(' ')}`
+  // 이펙트로 지우지 않고 key 비교로 무효화한다 — 이펙트에서 setState 하면 렌더가 한 번 더 돈다.
+  const liveTrans = trans && trans.key === koKey ? trans : null
+  const staleTrans = !!trans && !liveTrans
+
+  const koReady = prompt.trim() && (kind === 'short' || choices.every((c) => c.trim()))
+
+  // 한국어 원문 → 5개국어. 문항 목록의 일괄 번역과 **같은 파이프라인**(runQTranslation · use:'caris').
+  async function translate() {
+    if (!koReady) return
+    setTranslating(true)
+    setTrMsg('번역 중… (영어·일본어·중국어·힌디어·베트남어)')
+    try {
+      const [res] = await runQTranslation(
+        [{ prompt, options: kind === 'short' ? [] : choices, explanation }],
+        TRANS_LANGS,
+        undefined,
+        { use: 'caris' },
+      )
+      if (!res || !('tr' in res)) {
+        setTrMsg('번역 실패 — ' + (res && 'error' in res ? res.error : '빈 응답') + ' · 다시 눌러보세요.')
+        return
+      }
+      const promptI18n: Record<string, string> = {}
+      const choicesI18n: Record<string, string[]> = {}
+      const bad: string[] = []
+      for (const l of TRANS_LANGS) {
+        const t = res.tr[l]
+        // 보기 개수가 어긋난 언어는 버린다 — 정답 번호가 다른 보기를 가리키게 되는 것이 제일 위험하다.
+        if (!t?.prompt || (kind !== 'short' && (t.options ?? []).length !== choices.length)) { bad.push(l); continue }
+        promptI18n[l] = t.prompt
+        if (kind !== 'short') choicesI18n[l] = t.options
+      }
+      setTrans(Object.keys(promptI18n).length ? { key: koKey, promptI18n, choicesI18n } : null)
+      const ok = Object.keys(promptI18n)
+      setTrMsg(
+        (ok.length ? `✅ ${ok.map((l) => TRANS_LANG_LABEL[l] ?? l).join('·')} 준비됨 — 저장해야 반영됩니다. ` : '') +
+          (bad.length ? `⚠️ ${bad.map((l) => TRANS_LANG_LABEL[l] ?? l).join('·')} 실패 — 다시 눌러주세요.` : ''),
+      )
+    } catch (e) {
+      setTrMsg('번역 실패 — ' + (e instanceof Error ? e.message : '알 수 없는 오류'))
+    } finally {
+      setTranslating(false)
+    }
+  }
+
   async function save() {
     setErr('')
     setSaving(true)
     try {
       await callFunction('admin', {
         action: 'questionUpsert',
-        question: { id: row?.id, bankId, number, kind, subject, difficulty, prompt, choices, correctIndex, answerKey, explanation, active: row ? row.active : true },
+        question: {
+          id: row?.id, bankId, number, kind, subject, difficulty, prompt, choices, correctIndex, answerKey, explanation,
+          active: row ? row.active : true,
+          // 번역을 안 뽑았으면(또는 원문이 바뀌어 무효면) 아예 안 보낸다 — 서버가 "안 보냄" 과
+          // "빈 번역" 을 갈라 본다(안 보내면 원문이 바뀌었을 때만 옛 번역을 비운다).
+          ...(liveTrans ? { promptI18n: liveTrans.promptI18n, choicesI18n: liveTrans.choicesI18n } : {}),
+        },
       })
       draft.clear()
       onSaved()
@@ -6639,6 +6887,29 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
           <div style={QE.field}>
             <span style={QE.lab}>해설 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(선택 · 정답 풀이 · 응시자·결과 비노출)</span></span>
             <textarea className="admin-ta" rows={3} value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="정답 풀이·근거·출제 의도 등" />
+          </div>
+        </div>
+
+        {/* 다국어 — 한국어로 쓰고 여기서 5개국어를 뽑는다(문항 목록의 일괄 번역과 같은 파이프라인).
+            ⚠️ 번역은 **저장해야** 반영된다. 여기서 바로 DB 에 쓰면 취소하고 나간 사람의 문항이 바뀐다. */}
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn-ink admin-mini" disabled={translating || saving || !koReady} onClick={translate}>
+              {translating ? '번역 중…' : '🌐 자동 번역 (5개 언어)'}
+            </button>
+            <span className="admin-hint" style={{ margin: 0 }}>
+              {staleTrans
+                ? '원문이 바뀌어 방금 뽑은 번역은 무효입니다 — 다시 번역해 주세요.'
+                : trMsg
+                ? trMsg
+                : koReady
+                  ? row && !(row.missing?.length ?? 0)
+                    ? '이 문항은 이미 5개국어로 번역돼 있습니다 — 원문을 고쳤다면 다시 번역하세요.'
+                    : '영어·일본어·중국어·힌디어·베트남어. 번역 없이 저장해도 되며, 그 문항은 응시 화면에서 한국어로 나옵니다.'
+                  : kind === 'short'
+                    ? '지문(한국어)을 채우면 번역할 수 있어요.'
+                    : '지문과 보기 4개(한국어)를 모두 채우면 번역할 수 있어요.'}
+            </span>
           </div>
         </div>
 
@@ -6873,7 +7144,11 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
     setMsg('')
     try {
       const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', bankId, rows: mappedRows })
-      setMsg(`✅ ${res.count}문항 반영됨`)
+      // ⚠️ 업로드는 한국어만 넣는다 — 번역은 여기서 자동으로 돌리지 않는다.
+      //    수백 문항 업로드 뒤 곧바로 번역이 시작되면 관리자가 그 몇 분을 창을 못 닫은 채 기다리고,
+      //    중간에 닫으면 어디까지 됐는지 화면에 안 남는다. 「문항 목록」에서 "미번역만" 을 보고
+      //    본인이 원할 때 돌리게 한다(이어서 돌리면 남은 것만 다시 시도한다).
+      setMsg(`✅ ${res.count}문항 반영됨 — 한국어로만 올라갔습니다. 「문항 목록」 탭의 “🌐 미번역 번역”으로 5개국어를 채우세요.`)
       setRows([])
       setSubjMap({})
       setFileName('')

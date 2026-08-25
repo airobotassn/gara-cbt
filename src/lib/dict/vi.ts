@@ -9,7 +9,6 @@
 // ⚠️ 이 파일을 다른 데서 직접 import 하지 말 것 — 조회는 i18n.tsx 의 tr()/useT() 하나로만.
 const VI: Record<string, string> = {
   "common.home": "Trang chủ",
-  "common.dashboard": "Bảng điều khiển học tập",
   "common.close": "Đóng",
   "common.cancel": "Hủy",
   "common.ranking": "Xếp hạng",
@@ -100,7 +99,6 @@ const VI: Record<string, string> = {
   // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
   "route.placeholder": "Bạn đang tìm gì?",
   "route.notfound": "Từ khóa không hợp lệ. Vui lòng thử lại.",
-  "mypage.tab_learning": "Bảng học tập",
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
   "rank.title": "Xếp hạng",
   "report.btn": "🚩 Báo lỗi",
@@ -284,7 +282,6 @@ const VI: Record<string, string> = {
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   "result.next_level": "Thử Lv.{n} →",
   "rank.cur_level": "Hạng hiện tại · Cấp {n}",
-  "db.cur_rank": "Hạng hiện tại · {n} lần thi",
   "db.points": "Điểm xếp hạng {p}",
   "db.skill_score": "Điểm kỹ năng",
   "db.activity_score": "Điểm hoạt động",
@@ -361,6 +358,10 @@ const VI: Record<string, string> = {
   "rank.promotion_zone": "Vùng thăng hạng",
   "rank.top_tier": "Hạng cao nhất",
   "rank.pt": "{n} điểm",
+  "rank.nth": "Hạng {n}",
+  "rank.trend_title": "Diễn biến thứ hạng",
+  "rank.trend_empty": "Không có dữ liệu trong khoảng này.",
+  "rank.trend_help": "Đường đi lên nghĩa là thứ hạng của bạn tăng. Chạm vào biểu đồ để xem điểm hôm đó.",
   "rank.you": "Bạn",
   "rank.cta_test": "Làm bài để được xếp hạng",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -389,7 +390,7 @@ const VI: Record<string, string> = {
   "rank.active_today": "Hoạt động hôm nay",
   "country.KR": "Hàn Quốc",
 
-  "db.title": "Bảng điều khiển học tập",
+  "db.title": "Hồ sơ của tôi",
   "db.empty": "Chưa có bài kiểm tra nào được nộp.",
   "db.start": "Bắt đầu một bài",
   "db.stat_maxlevel": "Cấp cao nhất",
@@ -409,7 +410,6 @@ const VI: Record<string, string> = {
   "db.trend_season": "Mùa",
   "db.trend_season_hint": "Mùa = 6 tháng",
   "db.trend_empty": "Không có lần thi nào trong kỳ này.",
-  "db.activity_title": "Hoạt động",
   "db.radar_title": "Cân bằng lĩnh vực",
   "db.radar_me": "Bạn",
   "db.radar_avg": "TB cấp độ",
@@ -560,32 +560,24 @@ const VI: Record<string, string> = {
   "prep.start_login": "Đăng nhập để bắt đầu",
   "check.title": "Kiểm tra môi trường thi (kiểm tra trước)",
   "check.eyebrow": "Kiểm tra trước",
-  "check.sub": "Trước kỳ thi thật, hãy cài phần mềm bảo mật, kiểm tra môi trường và thử các câu hỏi mẫu.",
+  "check.sub": "Trước kỳ thi thật, hãy kiểm tra xem trình duyệt bảo mật có mở đúng trên máy này không và môi trường thi đã sẵn sàng chưa.",
   "check.sec1_title": "Cài phần mềm bảo mật (Safe Exam Browser)",
   "check.sec1_desc": "Bài thi diễn ra trong chương trình bảo mật (Safe Exam Browser) chặn chụp màn hình, sao chép và chuyển ứng dụng.",
+  "check.sec1_hint": "Nếu trình duyệt bảo mật không mở ở phần kiểm tra trên, hãy cài đặt tại đây.",
   "check.install_btn": "Cài phần mềm bảo mật (SEB)",
   "check.install_note1": "· Khi cài, Windows hiển thị \"Nhà phát hành: ETH Zürich\" là bình thường.",
   "check.install_note2": "· Nếu xuất hiện \"Windows đã bảo vệ PC của bạn\", hãy nhấn Thông tin thêm → Chạy. (Bước cài đặt bình thường)",
-  "check.sec2_title": "Tự động kiểm tra môi trường thi",
+  "check.sec2_title": "Kiểm tra môi trường thi",
+  "check.sec2_desc": "Khi chạy trình duyệt bảo mật, các mục dưới đây sẽ được kiểm tra.",
   "check.chk_pc": "Môi trường PC (máy bàn)",
-  "check.chk_pc_ok": "Đã kết nối từ PC.",
   "check.chk_screen": "Kích thước màn hình",
-  "check.chk_screen_ok": "Đủ lớn để thi.",
-  "check.chk_screen_no": "Khuyến nghị màn hình rộng từ 1024px.",
   "check.chk_fs": "Hỗ trợ toàn màn hình",
-  "check.chk_fs_ok": "Có thể thi toàn màn hình.",
-  "check.chk_fs_no": "Trình duyệt đang chặn toàn màn hình.",
   "check.chk_net": "Kết nối internet",
-  "check.chk_net_ok": "Đã kết nối.",
-  "check.chk_net_no": "Hãy kiểm tra kết nối internet.",
-  "check.chk_seb": "Trình duyệt bảo mật (SEB)",
-  "check.chk_seb_ok": "Đã mở trong trình duyệt bảo mật.",
-  "check.chk_seb_no": "Bài thi thật phải mở trong trình duyệt bảo mật.",
+  "check.chk_seb": "Khởi chạy trình duyệt bảo mật (SEB)",
   "check.monitor_note": "· Số màn hình được kiểm tra tự động khi chạy trình duyệt bảo mật. Chỉ kết nối 1 màn hình ngoài.",
-  "check.sec3_title": "Thử các câu hỏi mẫu",
-  "check.sec3_desc": "Thử các câu hỏi mẫu trên màn hình giống hệt bài thi thật để làm quen thao tác. (Không chấm điểm)",
-  "check.practice_btn": "Bắt đầu câu hỏi mẫu",
-  "check.back": "Quay lại CARIS",
+  "check.sebtest_btn": "Mở bằng trình duyệt bảo mật để kiểm tra",
+  "check.sebtest_desc": "Khởi chạy trình duyệt bảo mật giống hệt kỳ thi thật để xác nhận nó mở đúng trên máy này.\nKhông có câu hỏi thi nào xuất hiện.",
+  "check.back": "Quay lại vé thi của tôi",
   "done.title": "Đã nộp bài thi",
   "done.sub1": "Lượt thi của bạn đã được tiếp nhận. Trình duyệt bảo mật sẽ tự động đóng.",
   "done.sub2": "Kết quả sẽ có trên Trang của tôi sau ngày công bố.",
@@ -956,12 +948,12 @@ const VI: Record<string, string> = {
   // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
   "mypage.cert_no": "Số chứng nhận",
   "mypage.empty_issuance": "Không có chứng chỉ nào để cấp.",
-  "mypage.tab_ebooks": "Thư viện E-BOOK",
-  "mypage.empty_ebooks": "Bạn chưa mua E-Book nào.",
+  "mypage.tab_ebooks": "Thư viện của tôi",
+  "mypage.empty_ebooks": "Bạn chưa mua E-Book hay bài giảng nào.",
   // 메인 3번째 CTA(landing.cta_learn)와 같은 이름. 브랜드 라벨이라 6개국어 동일 표기.
   "ebook.store_title": "Learning Library",
-  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = E-BOOK 서재)과 같아야 한다.
-  "ebook.store_sub": "Sách đã mua có thể đọc tại Trang cá nhân › Thư viện E-BOOK.",
+  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = 내 서재)과 같아야 한다.
+  "ebook.store_sub": "Sách đã mua có thể đọc tại Trang cá nhân › Thư viện của tôi.",
   "ebook.empty_store": "Chưa có E-Book nào.",
   "ebook.buy": "Mua",
   "ebook.get_free": "Nhận miễn phí",
@@ -971,12 +963,12 @@ const VI: Record<string, string> = {
   "ebook.view": "Xem",
   "ebook.cover_zoom": "Xem bìa lớn hơn",
   "ebook.processing": "Đang xử lý…",
-  "ebook.bought": "Đã mua — đã thêm vào Thư viện E-BOOK.",
+  "ebook.bought": "Đã mua — đã thêm vào Thư viện của tôi.",
   "ebook.login_to_buy": "Đăng nhập để mua.",
   // 비로그인이 구매 버튼을 눌렀을 때 뜨는 로그인 모달(제목 한 줄 + 버튼만 — 책 정보·설명은 넣지 않는다)
   "ebook.login_modal_title": "Cần đăng nhập",
   "ebook.go_store": "Đến Learning Library",
-  "ebook.go_library": "Xem trong Thư viện E-BOOK",
+  "ebook.go_library": "Xem trong Thư viện của tôi",
   "ebook.load_failed": "Không thể tải eBook.",
 
   // ---- 결제(/checkout · /pay/success · /pay/fail) ----
@@ -1013,7 +1005,7 @@ const VI: Record<string, string> = {
   "pay.fail_title": "Thanh toán chưa thành công",
   "pay.fail_body": "Thanh toán đã bị hủy hoặc không được chấp nhận.",
   "pay.retry": "Thử lại",
-  "ebook.reader_back": "Thư viện E-BOOK",
+  "ebook.reader_back": "Thư viện của tôi",
   "ebook.reader_lang": "Ngôn ngữ đọc",
   "ebook.reader_fs": "Toàn màn hình",
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
@@ -1023,7 +1015,8 @@ const VI: Record<string, string> = {
   "ll.catalog": "Loại giáo trình",
   "ll.level_col": "Cấp",
   "ll.tier_col": "Hạng",
-  "ll.books": "Giáo trình",
+  // ⚠️ 브랜드 표기라 6개국어 모두 같은 글자다(ko.ts 주석 참고).
+  "ll.books": "E-Book",
   "ll.lectures": "Bài giảng",
   "ll.no_books": "Giáo trình cho cấp này đang được chuẩn bị.",
   "ll.no_lectures": "Bài giảng cho cấp này đang được chuẩn bị.",
@@ -1037,8 +1030,9 @@ const VI: Record<string, string> = {
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": "Trước",
   "ll.next": "Tiếp",
-  "ll.watch_yt": "Xem trên YouTube",
-  "ll.demo_note": "Bài giảng là video mẫu cho bản demo.",
+  "ll.watch": "Xem",
+  "ll.playing": "Đang phát",
+  "ll.empty_owned": "Mục này chưa có tài liệu đã mua.",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "Mua tất cả",
   "ll.bundle_desc": "Chọn giáo trình và bài giảng rồi thêm cùng lúc.",
@@ -1052,7 +1046,6 @@ const VI: Record<string, string> = {
   "ll.pick_of": "Đã chọn {a} / {b}",
   "ll.total": "Tổng",
   "ll.bundle_buy": "Mua mục đã chọn",
-  "ll.bundle_nofee": "Bài giảng miễn phí — không có gì để thanh toán. Cứ xem thôi.",
   "ll.bundle_empty": "Chưa có mục nào để thêm.",
   "mypage.reissue": "Cấp lại",
   "mypage.issue": "Đăng ký cấp",
@@ -1391,7 +1384,6 @@ const VI: Record<string, string> = {
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
-  "arena.tag": "Dữ liệu thực · vùng thiếu dữ liệu là ví dụ",
   "arena.low": "Thấp",
   "arena.high": "Cao",
   // ⚠️ arena.avgLevel 은 레벨테스트 시절 문구다. 지도 지표가 레벨 → 랭킹점수(season_total 평균, 베이지안 보정)로
@@ -1407,7 +1399,6 @@ const VI: Record<string, string> = {
   "arena.world": "Thế giới",
   "arena.worldLeague": "Giải Thế giới",
   "arena.league": " Giải",
-  "arena.real": "thực",
   "arena.ppl": "",
   "arena.unit": "",
   "arena.avg": "TB",
@@ -1421,7 +1412,6 @@ const VI: Record<string, string> = {
   "arena.bHubS": "Trung tâm nhân vật",
   "arena.bDaily": "Học hôm nay",
   "arena.bDailyS": "Nội dung ngày",
-  "arena.foot": "Vùng/quốc gia có dữ liệu thực hiển thị tự động (≥5 người); nơi chưa có dữ liệu là giá trị ví dụ.",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "Trò chơi nhỏ",
@@ -1778,7 +1768,7 @@ const VI: Record<string, string> = {
   // 오른쪽 레일
   "hub.rail.closet": "Trang trí",
   "hub.rail.title": "Danh hiệu",
-  "hub.rail.invite": "Mời bạn",
+  "hub.rail.invite": "Thưởng mời bạn",
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "Điểm danh",
@@ -1787,6 +1777,8 @@ const VI: Record<string, string> = {
 
   // 도크(출석 보상)
   "hub.reward_head": "Thưởng điểm danh",
+  "hub.attend.title": "Lịch sử điểm danh",
+  "hub.attend.help": "Chỉ cần mở trang web, điểm danh của ngày đó sẽ được ghi nhận tự động.",
   "hub.daily.claim": "Điểm danh hôm nay",
   "hub.daily.done": "Đã điểm danh hôm nay",
   "hub.day_n": "Ngày {n}",
@@ -1901,7 +1893,7 @@ const VI: Record<string, string> = {
   // 친구 초대 모달
   "hub.invite.title": "Mời bạn bè",
   "hub.invite.lead": "Cùng bạn bè chơi CARIS!",
-  "hub.invite.help": "Chia sẻ mã mời để bạn của bạn bắt đầu ngay.",
+  "hub.invite.help": "Bạn bè nhập mã mời của bạn thì cả hai đều nhận {n} CARI coin.",
   "hub.invite.my_code": "Mã mời của tôi",
   "hub.invite.copied": "Đã sao chép",
   "hub.invite.copy": "Sao chép",
@@ -1911,7 +1903,7 @@ const VI: Record<string, string> = {
   "hub.invite.redeem_done": "✓ Đã đăng ký mã mời (chỉ một lần)",
   "hub.invite.checking": "Đang kiểm tra",
   "hub.invite.register": "Đăng ký",
-  "hub.invite.hint": "Đã đăng ký thì không đổi được.",
+  "hub.invite.hint": "Nhập mã mời bạn bè cho thì cả hai đều nhận {n} CARI coin.",
   "hub.invite.err_not_found": "Mã mời không tồn tại. Vui lòng kiểm tra lại",
   "hub.invite.err_self": "Không thể dùng mã mời của chính mình",
   "hub.invite.err_already": "Bạn đã đăng ký mã mời rồi",

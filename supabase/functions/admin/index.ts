@@ -5,7 +5,7 @@
 //    isRoot 를 인자로 넘겨 루트 전용으로 따로 막는다. 새 액션을 추가할 때 이 구분을 확인할 것.
 //  - ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser } from '../_shared/lib.ts'
+import { adminClient, getUser, questionTranslated, SUPPORTED_LANGS } from '../_shared/lib.ts'
 import { refreshRates } from '../_shared/fx.ts'
 import { EXAM_ROUND_COLS, TIER_LABEL, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { isExamMonth, monthOfExamDate, scheduleForMonth } from '../_shared/exam-schedule.ts'
@@ -1959,14 +1959,33 @@ async function questionList(admin: any, body: any) {
   if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const { data, error } = await admin
     .from('questions')
-    .select('id, bank_id, number, subject, difficulty, topic, prompt, kind, choices, correct_index, answer_key, explanation, active')
+    .select('id, bank_id, number, subject, difficulty, topic, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index, answer_key, explanation, active')
     .eq('bank_id', bankId)
     .is('deleted_at', null)
     .order('number', { ascending: true })
     .limit(2000)
   if (error) return json({ error: error.message }, 400)
-  return json({ rows: data ?? [] })
+  // 문항마다 '아직 번역 안 된 언어' 를 같이 준다 — 관리자 목록의 '미번역' 칸·번역 완료율·
+  // '미번역만 보기' 필터가 전부 이 값 하나를 본다(화면이 따로 세면 두 벌이 된다).
+  // ⚠️ ko 는 원본 컬럼이라 언제나 있음 → 대상은 나머지 5개국어뿐(TRANSLATABLE_LANGS).
+  const rows = (data ?? []).map((r: any) => ({
+    ...r,
+    missing: TRANSLATABLE_LANGS.filter((l) => !questionTranslated(r, l)),
+  }))
+  // 언어별 완료 문항 수 — 화면의 '번역 완료율' 패널이 그대로 그린다(화면이 다시 세지 않는다).
+  // ⚠️ 분모는 **활성 문항**이다. 비활성은 세트에 뽑히지 않아 번역할 이유가 없는데,
+  //    분모에 넣으면 영영 100% 가 안 돼서 "다 됐다" 를 아무도 판단하지 못한다.
+  const live = rows.filter((r: any) => r.active)
+  const coverage: Record<string, number> = {}
+  for (const l of TRANSLATABLE_LANGS) {
+    coverage[l] = live.filter((r: any) => !r.missing.includes(l)).length
+  }
+  return json({ rows, coverage, total: live.length, langs: TRANSLATABLE_LANGS })
 }
+
+// 번역 대상 언어 — 한국어는 원본 컬럼(prompt·choices)에 있으므로 뺀다.
+// 이 배열이 '미번역' 판정·완료율·번역 요청의 langs 를 전부 정한다.
+const TRANSLATABLE_LANGS = SUPPORTED_LANGS.filter((l) => l !== 'ko')
 
 // 난이도(과목 하위분류) — 상/중/하 중 하나만 유효, 그 외/빈값은 null(미지정).
 const DIFFICULTIES = ['상', '중', '하']
@@ -2015,8 +2034,33 @@ async function questionUpsert(admin: any, body: any, actor: string) {
     row.answer_key = null
   }
 
+  // 화면이 방금 뽑은 번역을 같이 보내면 그대로 싣는다(편집 모달의 '자동 번역' → 저장 한 번).
+  // 개수·빈값 검사는 sanitizeQuestionTrans 한 곳에서 한다 — 저장 경로가 둘(여기·questionTransSave)이라
+  // 검사를 각자 쓰면 한쪽만 느슨해져서 정답 번호가 어긋난 보기가 들어온다.
+  const sent = sanitizeQuestionTrans(q.promptI18n, q.choicesI18n, (row.choices as string[]) ?? [])
+  if (sent) {
+    row.prompt_i18n = sent.prompt_i18n
+    row.choices_i18n = sent.choices_i18n
+  }
+
   const isNew = !q.id
   if (q.id) {
+    // ⛔ **한국어 원문이 바뀌면 옛 번역을 그 자리에서 비운다.** 안 비우면 지문만 고쳐도
+    //    번역본은 옛 문장 그대로라 외국어 응시자만 **다른 문제를 푼다**(화면에는 아무 표시도 없다).
+    //    이북 번역이 본문 교체 때 옛 번역을 비우는 것과 같은 이유다.
+    //    ⚠️ 번역을 같이 보냈으면(sent) 그게 새 원문에 맞춰 뽑은 것이므로 비우지 않는다.
+    if (!sent) {
+      const { data: before } = await admin
+        .from('questions').select('prompt, choices').eq('id', q.id).maybeSingle()
+      const koChanged =
+        !!before &&
+        (String(before.prompt ?? '') !== prompt ||
+          JSON.stringify(before.choices ?? []) !== JSON.stringify(row.choices ?? []))
+      if (koChanged) {
+        row.prompt_i18n = {}
+        row.choices_i18n = {}
+      }
+    }
     const { error } = await admin.from('questions').update(row).eq('id', q.id)
     if (error) return json({ error: error.message }, 400)
   } else {
@@ -2025,6 +2069,75 @@ async function questionUpsert(admin: any, body: any, actor: string) {
   }
   await logCbtEvent(admin, { question_id: q.id ?? null, bank_id: bankId, number, action: isNew ? 'import' : 'edit', actor, detail: { kind, single: true } })
   return json({ ok: true })
+}
+
+// 번역본 정리 — 저장 전 마지막 관문. 통과 못 한 언어는 **버린다**(원문으로 뜨는 게 맞다).
+//  · 지문이 비었으면 그 언어 탈락
+//  · 보기 개수가 원문과 다르거나 빈 보기가 있으면 그 언어 탈락
+//    ⚠️ 개수가 어긋난 채로 저장되면 correct_index 가 다른 보기를 가리켜 **아무도 못 맞히는 문항**이 된다.
+//  · ko 는 절대 담지 않는다 — 한국어 단일 출처는 원본 컬럼이다(마이그레이션 20260825190000).
+// 보낸 게 아무것도 없으면 null → 호출부가 "번역을 안 보냈다" 로 다룬다(빈 객체 저장과 구분).
+function sanitizeQuestionTrans(
+  promptI18n: unknown,
+  choicesI18n: unknown,
+  koChoices: string[],
+): { prompt_i18n: Record<string, string>; choices_i18n: Record<string, string[]> } | null {
+  const pIn = (promptI18n ?? null) as Record<string, unknown> | null
+  const cIn = (choicesI18n ?? null) as Record<string, unknown> | null
+  if (!pIn && !cIn) return null
+  const prompt_i18n: Record<string, string> = {}
+  const choices_i18n: Record<string, string[]> = {}
+  for (const lang of TRANSLATABLE_LANGS) {
+    const p = pIn?.[lang]
+    if (typeof p !== 'string' || !p.trim()) continue
+    if (koChoices.length > 0) {
+      const o = cIn?.[lang]
+      if (!Array.isArray(o) || o.length !== koChoices.length) continue
+      const opts = o.map((x) => String(x ?? '').trim())
+      if (opts.some((x) => !x)) continue
+      choices_i18n[lang] = opts
+    }
+    prompt_i18n[lang] = p.trim()
+  }
+  return { prompt_i18n, choices_i18n }
+}
+
+// 번역본만 저장 — 목록에서 여러 문항을 한 번에 번역할 때 쓴다(한국어 원문은 손대지 않는다).
+//  요청: { rows: [{ id, promptI18n, choicesI18n }] }
+// ⚠️ **원문을 DB 에서 다시 읽어** 보기 개수를 대조한다. 화면이 보낸 개수를 믿으면, 번역을 뽑는 사이
+//    다른 창에서 보기를 고친 문항에 옛 개수 기준 번역이 박힌다.
+async function questionTransSave(admin: any, body: any, actor: string) {
+  const rows = Array.isArray(body?.rows) ? body.rows : []
+  if (!rows.length) return json({ error: '저장할 번역이 없습니다.' }, 400)
+  const ids = rows.map((r: any) => r?.id).filter(Boolean)
+  if (!ids.length) return json({ error: 'id 가 없는 행이 있습니다.' }, 400)
+
+  const { data: cur, error: readErr } = await admin
+    .from('questions').select('id, bank_id, number, choices').in('id', ids)
+  if (readErr) return json({ error: readErr.message }, 400)
+  const byId: Record<string, any> = {}
+  for (const c of cur ?? []) byId[c.id] = c
+
+  let saved = 0
+  let skipped = 0
+  for (const r of rows) {
+    const base = byId[r.id]
+    if (!base) { skipped++; continue }
+    const clean = sanitizeQuestionTrans(r.promptI18n, r.choicesI18n, base.choices ?? [])
+    if (!clean || Object.keys(clean.prompt_i18n).length === 0) { skipped++; continue }
+    const { error } = await admin
+      .from('questions')
+      .update({ prompt_i18n: clean.prompt_i18n, choices_i18n: clean.choices_i18n })
+      .eq('id', r.id)
+    if (error) return json({ error: error.message }, 400)
+    saved++
+  }
+  // 문항마다 이벤트를 남기면 588건 번역에 588줄이 쌓여 이력 탭이 그것만 보인다 — 한 줄로 접는다.
+  await logCbtEvent(admin, {
+    question_id: null, bank_id: body?.bankId ?? null, number: null,
+    action: 'edit', actor, detail: { translate: true, saved, skipped },
+  })
+  return json({ ok: true, saved, skipped })
 }
 
 async function questionSetActive(admin: any, body: any, actor: string) {
@@ -2210,7 +2323,20 @@ async function examDraw(admin: any, body: any, actor: string) {
   if (error) return json({ error: error.message }, 400)
   await admin.from('exams').update({ total_questions: rows.length }).eq('id', examId)
   await logCbtEvent(admin, { question_id: null, bank_id: bank.id, number: null, action: 'import', actor, detail: { draw: examId, count: rows.length } })
-  return json({ ok: true, count: rows.length })
+
+  // 뽑힌 세트에 미번역이 몇 개인지 — **막지 않고 알려만 준다.**
+  // 미번역 문항을 후보에서 빼면 번역이 덜 된 동안 '보유 0/필요 N' 로 뽑기가 통째로 실패해
+  // 한국어만 받는 회차까지 못 연다. 그 문항은 응시 화면에서 한국어로 뜬다(빈 화면이 아니다).
+  const { data: drawn } = await admin
+    .from('questions')
+    .select('prompt_i18n, choices_i18n, choices')
+    .in('id', picked)
+  const untranslated: Record<string, number> = {}
+  for (const l of TRANSLATABLE_LANGS) {
+    const n = (drawn ?? []).filter((r: any) => !questionTranslated(r, l)).length
+    if (n > 0) untranslated[l] = n
+  }
+  return json({ ok: true, count: rows.length, untranslated })
 }
 
 // 등록시험의 뽑힌 세트(번호순) + 문항 메타.
@@ -3247,6 +3373,7 @@ Deno.serve(async (req) => {
       case 'questionRestore': return await questionRestore(admin, body, email)
       case 'questionEvents': return await questionEvents(admin, body)
       case 'questionsImport': return await questionsImport(admin, body, email)
+      case 'questionTransSave': return await questionTransSave(admin, body, email)
       case 'cbtAnalytics': return await cbtAnalytics(admin)
       case 'cbtUsers': return await cbtUsers(admin)
       case 'cbtUserDetail': return await cbtUserDetail(admin, body)

@@ -9,16 +9,30 @@
 //   ④ 어긋난 건을 자동으로 집어낸다(reconcile)
 //   ⑤ **지급 직전에 상품을 다시 확인한다** — 승인이 create 보다 한참 뒤에 올 수 있어서다(접수 마감 후 승인 등).
 //      확인에 실패하면 지급하지 않고 던진다 → payments 는 paid, fulfilled_at 은 null → 대사 목록에 걸린다.
-// 상품은 ebook(이북 열람권)과 exam(응시권) 둘이고, 지급 경로만 갈린다(grant()).
+// 상품은 ebook(이북 열람권)·lecture(강의 시청권)·exam(응시권)이고, 지급 경로만 갈린다(grant()).
 // ⚠️ 버전은 _shared/lib.ts 와 **같은 핀**이어야 한다 — 다르면 Deno 가 모듈을 두 벌 받아
 //    adminClient() 가 준 클라이언트와 여기 타입이 서로 안 맞는다.
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { getProvider, type ProviderPayment } from './payment-provider.ts'
 import { grantExamTicket, parseExamRef, resolveExamFee, resolveExamOffer, voidTicket } from './exam-tickets.ts'
 
-export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle'
+export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle' | 'lecture'
 
-/** 묶음 결제 할인율(%) — **한 카탈로그의 이북을 통으로 담았을 때만** 붙는다.
+/** 묶음 한 건에 담기는 종류. **한 묶음에는 한 종류만** 담긴다(교재 묶음 / 강의 묶음) —
+ *  화면이 종류마다 따로 세고 할인도 따로 붙이기 때문이다(Ebooks.tsx 의 bundleKinds).
+ *  ⚠️ 이 값이 product_ref 접두사('ebook:' / 'lecture:')가 된다 — 같은 카탈로그의 교재 묶음과
+ *     강의 묶음이 paid 부분 유니크에서 서로 다른 상품으로 갈리려면 그 접두사가 필요하다. */
+export type BundleKind = 'ebook' | 'lecture'
+
+/** 종류별 표 이름 — 소유·지급·회수가 전부 이 두 표를 **같은 코드**로 다룬다.
+ *  ⚠️ 컬럼 이름도 한 벌이다(user_id / <kind>_id / price_paid / source / payment_id / payment_ref).
+ *     한쪽만 다르게 두면 갈래마다 다른 코드가 생기고, 그 순간 한쪽만 조용히 틀린다. */
+export const PURCHASE_TABLE: Record<BundleKind, { table: string; col: string }> = {
+  ebook: { table: 'ebook_purchases', col: 'ebook_id' },
+  lecture: { table: 'lecture_purchases', col: 'lecture_id' },
+}
+
+/** 묶음 결제 할인율(%) — **한 카탈로그의 그 종류를 통으로 담았을 때만** 붙는다.
  *  ⚠️ 화면(src/pages/Ebooks.tsx 의 BUNDLE_OFF_PCT)과 **같은 값**이어야 한다. 어긋나면 화면에 뜬 금액과
  *     실제 청구액이 갈린다 — 결제에서 제일 나쁜 종류의 버그다. 값을 바꾸면 양쪽을 같이 고칠 것. */
 export const BUNDLE_OFF_PCT = 10
@@ -83,8 +97,9 @@ export interface ResolvedProduct {
   exam?: { id: string; roundId: string; tier: string }
   /** 함께 담은 교재(응시료 전용). id 는 DB 에서 읽은 값이라 그대로 저장해도 된다. */
   addon?: { id: string; title: string; amount: number }
-  /** 묶음(bundle) 전용 — payment_items 에 그대로 넣을 줄 목록. list=정가, amount=할인 반영 배분액. */
-  bundle?: { catalog: string; discounted: boolean; lines: { ebookId: string; list: number; amount: number }[] }
+  /** 묶음(bundle) 전용 — payment_items 에 그대로 넣을 줄 목록. list=정가, amount=할인 반영 배분액.
+   *  ⚠️ `kind` 가 줄의 상품 종류다(교재 묶음 / 강의 묶음). 한 묶음에 두 종류가 섞이지 않는다. */
+  bundle?: { kind: BundleKind; catalog: string; discounted: boolean; lines: { itemId: string; list: number; amount: number }[] }
   /** 화면 주문요약에 줄 단위로 그릴 내역. 곁다리가 없으면 한 줄뿐이다. */
   items: { name: string; amount: number }[]
 }
@@ -105,8 +120,10 @@ export async function resolveProduct(
   lang: string,
   /** 응시료와 함께 담은 교재(이북) id. 응시료 결제에만 붙는다 — 다른 상품에 오면 400 으로 거절한다. */
   addonEbookId?: string | null,
-  /** 묶음 결제로 담은 이북 id 들. bundle 에만 쓰인다(다른 유형에 오면 무시하지 않고 아래에서 거절). */
+  /** 묶음 결제로 담은 항목 id 들. bundle 에만 쓰인다(다른 유형에 오면 무시하지 않고 아래에서 거절). */
   bundleIds?: string[] | null,
+  /** 묶음의 종류(교재/강의). bundle 에만 쓰인다. 안 주면 교재 — 옛 링크(kind 없음)가 그대로 동작해야 한다. */
+  bundleKind?: BundleKind | null,
 ): Promise<ResolvedProduct | { ok: false; error: string; status: number }> {
   if (addonEbookId && productType !== 'exam') {
     // 조용히 무시하면 안 된다 — 사용자는 교재를 담았다고 믿는데 결제·지급에서만 사라진다.
@@ -117,7 +134,32 @@ export async function resolveProduct(
   }
 
   // 묶음 결제 — productRef 는 카탈로그('leveltest' | 'caris'), 담은 목록은 bundleIds 로 온다.
-  if (productType === 'bundle') return resolveBundle(admin, productRef, bundleIds ?? [], lang)
+  if (productType === 'bundle') {
+    return resolveBundle(admin, bundleKind === 'lecture' ? 'lecture' : 'ebook', productRef, bundleIds ?? [], lang)
+  }
+
+  // 강의 시청권 — 이북과 같은 모양이다(단품 하나, 정가는 달러 센트).
+  //   ⚠️ 강의엔 번역본이 없다(제목·채널이 관리자가 넣은 값 그대로). 그래서 lang 을 안 본다.
+  if (productType === 'lecture') {
+    const { data: lec } = await admin
+      .from('lectures')
+      .select('id, title, price_usd_cents, published')
+      .eq('id', productRef)
+      .maybeSingle()
+    if (!lec || !lec.published) return { ok: false, error: '판매 중인 강의가 아닙니다.', status: 404 }
+
+    const title = lec.title as string
+    const amount = (lec.price_usd_cents as number) ?? 0
+    return {
+      ok: true,
+      amount,
+      orderName: title.slice(0, 100),
+      // ⚠️ DB 에서 읽은 id 로만 저장한다 — product_ref 는 text 원문 비교라 표기가 하나만 달라도
+      //    같은 상품에 paid 행이 둘 생겨 중복결제 방어가 무력화된다(이북과 같은 이유).
+      ref: lec.id as string,
+      items: [{ name: title, amount }],
+    }
+  }
 
   if (productType === 'ebook') {
     const { data: book } = await admin
@@ -211,16 +253,19 @@ export async function resolveProduct(
 }
 
 /**
- * 묶음 결제 — 한 카탈로그의 이북 여러 권. **담은 목록·정가·할인을 전부 서버가 다시 뽑는다.**
- * 클라이언트가 보내는 건 카탈로그와 이북 id 목록뿐이다(금액도 할인 여부도 요청에 없다).
+ * 묶음 결제 — 한 카탈로그의 **한 종류**(교재 여러 권 또는 강의 여러 편). **담은 목록·정가·할인을 전부
+ * 서버가 다시 뽑는다.** 클라이언트가 보내는 건 종류·카탈로그·id 목록뿐이다(금액도 할인 여부도 요청에 없다).
  *
- * ⚠️ **할인 판정 때문에 그 카탈로그의 전권을 읽어야 한다.** 담은 것만 읽으면 "전부 담았나" 를 알 수 없다.
- * ⛔ 할인 조건은 **판매 중인 전권을 다 담았을 때**다 — 이미 가진 책은 담을 수 없으므로, 한 권이라도
+ * ⚠️ **할인 판정 때문에 그 카탈로그·그 종류의 전부를 읽어야 한다.** 담은 것만 읽으면 "전부 담았나" 를 알 수 없다.
+ * ⛔ 할인 조건은 **판매 중인 전부를 다 담았을 때**다 — 이미 가진 것은 담을 수 없으므로, 하나라도
  *    보유한 사람은 이 할인을 못 받는다("7개를 통으로 사야만" — 2026-08-19 지시). 완화하려면 보유분을
  *    세트의 일부로 쳐야 하는데, 그건 화면(Ebooks.tsx)의 판정과 **한 벌로** 바꿔야 한다.
+ * ⛔ **교재와 강의를 한 묶음에 섞지 않는다.** 섞으면 "한 종류를 통으로" 라는 할인 조건이 다른 말이 되고,
+ *    화면에서도 어느 값이 어느 조건으로 깎였는지 안 갈린다(2026-08-19 결정).
  */
 async function resolveBundle(
   admin: SupabaseClient,
+  kind: BundleKind,
   catalog: string,
   ids: string[],
   lang: string,
@@ -228,46 +273,51 @@ async function resolveBundle(
   if (catalog !== 'leveltest' && catalog !== 'caris') {
     return { ok: false, error: '상품 정보가 올바르지 않습니다.', status: 400 }
   }
+  const isBook = kind === 'ebook'
+  const notSelling = isBook ? '판매 중인 이북이 아닙니다.' : '판매 중인 강의가 아닙니다.'
   const want = [...new Set(ids.map((v) => String(v ?? '').trim()).filter(Boolean))]
-  // 한 권이면 묶음이 아니다 — 단품 경로(productType='ebook')로 가야 정가·중복방어가 원래대로 동작한다.
-  if (want.length < 2) return { ok: false, error: '묶음 결제는 두 권부터 담을 수 있습니다.', status: 400 }
+  // 하나면 묶음이 아니다 — 단품 경로로 가야 정가·중복방어가 원래대로 동작한다.
+  if (want.length < 2) return { ok: false, error: '묶음 결제는 두 개부터 담을 수 있습니다.', status: 400 }
 
+  // 강의엔 번역본이 없다(제목이 관리자가 넣은 값 그대로) — translations 컬럼 자체가 없으므로 select 를 가른다.
   const { data } = await admin
-    .from('ebooks')
-    .select('id, title, price_usd_cents, translations')
+    .from(isBook ? 'ebooks' : 'lectures')
+    .select(isBook ? 'id, title, price_usd_cents, translations' : 'id, title, price_usd_cents')
     .eq('catalog', catalog)
     .eq('published', true)
-  const all = (data ?? []) as { id: string; title: string; price_usd_cents: number | null; translations: unknown }[]
+  type Item = { id: string; title: string; price_usd_cents: number | null; translations?: unknown }
+  const all = (data ?? []) as Item[]
   const byId = new Map(all.map((b) => [b.id, b]))
 
   const picked = want.map((id) => byId.get(id))
   // 하나라도 그 카탈로그의 판매 중 목록에 없으면 통째로 거절한다 — 일부만 조용히 빼면 사용자가 담은 것과
   // 결제되는 것이 달라진다.
-  if (picked.some((b) => !b)) return { ok: false, error: '판매 중인 이북이 아닙니다.', status: 404 }
-  const books = picked as { id: string; title: string; price_usd_cents: number | null; translations: unknown }[]
+  if (picked.some((b) => !b)) return { ok: false, error: notSelling, status: 404 }
+  const items = picked as Item[]
 
-  const titleOf = (b: { title: string; translations: unknown }) => {
+  const titleOf = (b: Item) => {
     const tr = (b.translations as Record<string, { title?: string }> | null) ?? {}
     return tr[lang]?.title || b.title
   }
-  const priceOf = (b: { price_usd_cents: number | null }) => b.price_usd_cents ?? 0
+  const priceOf = (b: Item) => b.price_usd_cents ?? 0
 
-  const listSum = books.reduce((sum, b) => sum + priceOf(b), 0)
-  const discounted = books.length === all.length && listSum > 0
+  const listSum = items.reduce((sum, b) => sum + priceOf(b), 0)
+  const discounted = items.length === all.length && listSum > 0
   const total = discounted ? Math.round((listSum * (100 - BUNDLE_OFF_PCT)) / 100) : listSum
 
   // 줄마다 얼마씩인지 배분한다(정가 비례). ⚠️ 마지막 줄에 잔액을 몰아줘야 **합이 정확히 total** 이 된다 —
   // 줄마다 반올림하면 1센트가 남거나 모자라 원장이 안 맞는다.
   let acc = 0
-  const lines = books.map((b, i) => {
+  const lines = items.map((b, i) => {
     const list = priceOf(b)
-    const amount = i === books.length - 1 ? total - acc : Math.round((list * total) / (listSum || 1))
+    const amount = i === items.length - 1 ? total - acc : Math.round((list * total) / (listSum || 1))
     acc += amount
-    return { ebookId: b.id, list, amount }
+    return { itemId: b.id, list, amount }
   })
 
-  const first = titleOf(books[0])
-  const orderName = (books.length > 1 ? `${first} 외 ${books.length - 1}권` : first).slice(0, 100)
+  const first = titleOf(items[0])
+  const unit = isBook ? '권' : '편'
+  const orderName = (items.length > 1 ? `${first} 외 ${items.length - 1}${unit}` : first).slice(0, 100)
 
   return {
     ok: true,
@@ -275,9 +325,10 @@ async function resolveBundle(
     orderName,
     // ⚠️ 저장은 **DB 에서 읽은 id** 를 정렬해 만든다(클라 문자열·순서 금지) — product_ref 는 text 원문 비교라
     //    순서만 달라도 같은 조합이 다른 상품으로 보여 '같은 묶음 재구매' 방어가 뚫린다.
-    ref: `ebook:${catalog}:${books.map((b) => b.id).sort().join('+')}`,
-    bundle: { catalog, discounted, lines },
-    items: books.map((b, i) => ({ name: titleOf(b), amount: lines[i].amount })),
+    // ⚠️ 접두사가 종류를 담는다 — 같은 카탈로그의 교재 묶음과 강의 묶음이 서로 다른 상품이어야 한다.
+    ref: `${kind}:${catalog}:${items.map((b) => b.id).sort().join('+')}`,
+    bundle: { kind, catalog, discounted, lines },
+    items: items.map((b, i) => ({ name: titleOf(b), amount: lines[i].amount })),
   }
 }
 
@@ -360,10 +411,12 @@ export async function ensureCustomerKey(admin: SupabaseClient, uid: string): Pro
  * (ebook_purchases.unique(user_id, ebook_id) + payments 의 부분 유니크 인덱스).
  */
 async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
-  if (row.product_type === 'ebook') {
-    const { error } = await admin.from('ebook_purchases').insert({
+  // 이북·강의는 **같은 모양의 지급**이다(표만 다르다) — 갈래를 나누면 한쪽만 조용히 틀어진다.
+  if (row.product_type === 'ebook' || row.product_type === 'lecture') {
+    const { table, col } = PURCHASE_TABLE[row.product_type]
+    const { error } = await admin.from(table).insert({
       user_id: row.user_id,
-      ebook_id: row.product_ref,
+      [col]: row.product_ref,
       price_paid: row.amount,
       source: 'pg',
       payment_id: row.id,

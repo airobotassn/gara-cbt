@@ -46,6 +46,15 @@ interface AuthState {
   deactivatedAt: string | null
   // 복구 성공 직후 호출. 안 하면 게이트가 목적지에서 다시 복구 화면으로 튕긴다.
   markRestored: (nicknameReset?: boolean) => void
+  // 내 국가·지역. 게이트 판정용으로 **이미 읽고 있던 값**을 화면들에 나눠주는 것뿐이다(추가 조회 없음).
+  //   ⚠️ 여기에 자주 바뀌는 값(avatar_url·display_name)을 얹지 말 것 — 갱신 책임이 같이 따라온다.
+  //     국가·지역은 계정당 1회만 바꿀 수 있어(region_changed_at 잠금) 사실상 불변이고,
+  //     바뀌는 자리가 온보딩 확정과 마이페이지 1회 변경 딱 둘뿐이라 아래 applyRegion 으로 덮으면 끝난다.
+  //   · 정식 회원이 아니거나 조회 실패면 null — 호출부는 '모른다'로 다루면 된다.
+  //   · 로딩 여부는 onboardingLoading 을 본다(같은 조회다).
+  profile: { countryCode: string | null; regionCode: string | null } | null
+  // 국가·지역을 바꾼 직후 호출(온보딩 확정 · 마이페이지 1회 변경). 재조회 없이 낙관적으로 덮는다.
+  applyRegion: (countryCode: string | null, regionCode: string | null) => void
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -64,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [onboardingLoading, setOnboardingLoading] = useState(false)
   const [needsNickname, setNeedsNickname] = useState(false)
   const [deactivatedAt, setDeactivatedAt] = useState<string | null>(null)
+  const [profile, setProfile] = useState<{ countryCode: string | null; regionCode: string | null } | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -76,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
         setDeactivatedAt(null)
+        setProfile(null)
         setOnboardingLoading(false)
         return
       }
@@ -90,10 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
         setDeactivatedAt(null)
+        setProfile(null)
         setOnboardingLoading(false)
         return
       }
       setDeactivatedAt(data?.deactivated_at ?? null)
+      // 게이트 판정에 쓰는 김에 국가·지역도 담아 둔다 — 예전엔 랭킹·아레나·마이페이지가
+      // 이 값을 얻으려고 같은 행을 각자 한 번씩 더 읽었다.
+      setProfile({
+        countryCode: (data?.country_code as string | null) ?? null,
+        regionCode: (data?.region_code as string | null) ?? null,
+      })
       // 프로필 행이 없으면(최초) 지역 미확정 → 온보딩 필요.
       // 연령대도 같은 화면에서 받으므로 둘 중 하나라도 비면 보낸다 — 지역만 확정한 기존 회원이
       // 아레나에 들어오면 그 화면이 연령대만 물어본다. '공개 안 함'(=age_band 'private')도
@@ -128,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
         setDeactivatedAt(null)
+        setProfile(null)
         setOnboardingLoading(false)
       }
     })
@@ -206,6 +225,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (nicknameReset) setNeedsNickname(true)
   }, [])
 
+  // set-region 이 성공했다 = 서버 기준 확정. 재조회 없이 낙관적으로 덮는다(markOnboardingDone 과 같은 성격).
+  //   ⚠️ 이걸 빼먹으면 랭킹 탭 라벨·아레나 '우리 순위'가 **옛 나라**를 계속 가리킨다(새로고침해야 풀린다).
+  const applyRegion = useCallback((countryCode: string | null, regionCode: string | null) => {
+    setProfile({ countryCode, regionCode })
+  }, [])
+
   // ⚠️ value 도 같이 고정해야 의미가 있다 — 함수만 고정하고 객체를 매 렌더 새로 만들면
   //    컨텍스트를 구독하는 화면 전체가 그대로 다시 렌더된다(고친 이유의 절반이 이쪽이다).
   const value: AuthState = useMemo(
@@ -221,6 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       markNicknameDone,
       deactivatedAt,
       markRestored,
+      profile,
+      applyRegion,
       ensureAnonymous,
       loginWithGoogle,
       loginWithKakao,
@@ -234,9 +261,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onboardingLoading,
       needsNickname,
       deactivatedAt,
+      profile,
       markOnboardingDone,
       markNicknameDone,
       markRestored,
+      applyRegion,
       ensureAnonymous,
       loginWithGoogle,
       loginWithKakao,

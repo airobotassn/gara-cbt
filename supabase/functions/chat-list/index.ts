@@ -62,17 +62,42 @@ Deno.serve(async (req) => {
     const room = normalizeRoom(roomIn)
     const admin = adminClient()
 
-    if (Array.isArray(ids) && ids.length > 0) {
-      const capped = ids.slice(0, 200)
+    // ── 폴링(after) + reconcile(ids+since) ──────────────────────────────
+    // 둘을 **한 요청으로** 받는다(2026-08-25). 화면은 4초마다 이 두 가지를 묻는데, 예전엔 함수를
+    // 두 번 따로 불렀다 — 그것도 첫 답을 받고서야 두 번째를 물어서, 접속자 1명당 분당 30왕복이었다.
+    // 두 조회는 서로의 결과를 인자로 쓰지 않으므로 여기서 동시에 던지고 한 응답에 담는다.
+    //   ⚠️ 셋 다 지원한다 — after 만(옛 폴링) · ids 만(옛 reconcile) · 둘 다(지금 폴링).
+    //      응답 모양은 예전과 같아서(`messages`·`tombstones`) 옛 화면이 그대로 돌아간다.
+    //   ⚠️ reconcile 은 방 조건이 없다 — PK 조회이고 클라는 자기가 띄운 방의 id 만 보낸다(위 머리말).
+    const wantAfter = typeof after === 'number' && Number.isFinite(after)
+    const wantIds = Array.isArray(ids) && ids.length > 0
+    if (wantAfter || wantIds) {
       const sinceTs = typeof since === 'string' && since ? since : '1970-01-01T00:00:00Z'
-      const { data, error } = await admin
-        .from('chat_messages')
-        .select('id, user_id, body, deleted_at, edited_at, mod_status, updated_at')
-        .in('id', capped)
-        .gt('updated_at', sinceTs)
-      if (error) return json({ error: error.message }, 500)
+      const [msgRes, tombRes] = await Promise.all([
+        wantAfter
+          ? admin
+              .from('chat_messages')
+              .select(MSG_COLUMNS)
+              .eq('room', room)
+              .is('deleted_at', null)
+              .or(visibilityFilter)
+              .gt('id', after)
+              .order('id', { ascending: true })
+              .limit(50)
+          : Promise.resolve(null),
+        wantIds
+          ? admin
+              .from('chat_messages')
+              .select('id, user_id, body, deleted_at, edited_at, mod_status, updated_at')
+              .in('id', ids.slice(0, 200))
+              .gt('updated_at', sinceTs)
+          : Promise.resolve(null),
+      ])
+      if (msgRes?.error) return json({ error: msgRes.error.message }, 500)
+      if (tombRes?.error) return json({ error: tombRes.error.message }, 500)
 
-      const tombstones = (data ?? []).map((r) => ({
+      const messages = msgRes ? await attachProfiles(admin, (msgRes.data ?? []).map(shapeRow)) : []
+      const tombstones = (tombRes?.data ?? []).map((r) => ({
         id: r.id,
         deleted_at: r.deleted_at,
         edited_at: r.edited_at,
@@ -80,22 +105,7 @@ Deno.serve(async (req) => {
         updated_at: r.updated_at,
         body: r.deleted_at == null && (r.mod_status === 'ok' || (caller != null && r.user_id === caller)) ? r.body : null,
       }))
-      return json({ messages: [], tombstones })
-    }
-
-    if (typeof after === 'number' && Number.isFinite(after)) {
-      const { data, error } = await admin
-        .from('chat_messages')
-        .select(MSG_COLUMNS)
-        .eq('room', room)
-        .is('deleted_at', null)
-        .or(visibilityFilter)
-        .gt('id', after)
-        .order('id', { ascending: true })
-        .limit(50)
-      if (error) return json({ error: error.message }, 500)
-
-      return json({ messages: await attachProfiles(admin, (data ?? []).map(shapeRow)) })
+      return json({ messages, tombstones })
     }
 
     let query = admin

@@ -15,8 +15,34 @@ export interface BoardCat {
   icon: string
 }
 
+// 분류 목록을 5분간 재사용한다. 공지 목록 → 글 상세 → FAQ → 다시 공지 를 오갈 때마다
+// 같은 목록을 새로 받던 것을 없앤다(관리자가 몇 달에 한 번 건드리는 데이터다).
+//
+// ⚠️ **영구 캐시로 만들지 말 것.** 공개 목록은 "지금 있는 분류"로 글을 거른다(위 ⛔ 참고) —
+//    관리자가 분류를 새로 만들고 거기에 긴급 공지를 올리면, 옛 목록을 든 브라우저는 그 분류를
+//    몰라서 **그 공지를 필터로 걸러내 아예 못 본다.** 5분은 그 창을 좁히려고 정한 값이다.
+// ⚠️ 진행 중 요청(inflight)을 공유한다 — 한 화면이 목록과 사이드바에서 동시에 부를 수 있다.
+const TTL_MS = 5 * 60 * 1000
+const cache = new Map<string, { at: number; rows: BoardCat[] }>()
+const inflight = new Map<string, Promise<BoardCat[]>>()
+
 export async function loadBoardCats(kind: 'notice' | 'faq'): Promise<BoardCat[]> {
   if (!isSupabaseConfigured) return []
+  const hit = cache.get(kind)
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.rows
+  const pending = inflight.get(kind)
+  if (pending) return pending
+  const p = fetchBoardCats(kind)
+    .then((rows) => {
+      cache.set(kind, { at: Date.now(), rows })
+      return rows
+    })
+    .finally(() => inflight.delete(kind))
+  inflight.set(kind, p)
+  return p
+}
+
+async function fetchBoardCats(kind: 'notice' | 'faq'): Promise<BoardCat[]> {
   const { data } = await supabase
     .from('board_categories')
     .select('key, label_i18n, icon')

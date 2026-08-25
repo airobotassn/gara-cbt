@@ -52,25 +52,27 @@ Deno.serve(async (req) => {
     const admin = adminClient()
 
     // 구조화 데이터 수집(벡터 아님): 현재 등급 + 레벨별 6축 + 최근 응시 이력.
-    const { data: progress } = await admin
-      .from('user_progress')
-      .select('rank, points, updated_at')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    const { data: skills } = await admin
-      .from('user_level_skill')
-      .select('level, ratings, rating, attempts_count, placed')
-      .eq('user_id', user.id)
-      .order('level', { ascending: true })
-
-    const { data: attempts } = await admin
-      .from('test_attempts')
-      .select('level, status, total_correct, total_questions, axis_perf, rank_dir, submitted_at')
-      .eq('user_id', user.id)
-      .eq('status', 'submitted')
-      .order('submitted_at', { ascending: false })
-      .limit(5)
+    //   ⚠️ 셋 다 user.id 만 쓰고 서로를 참조하지 않는다(전부 모아서 프롬프트 한 덩어리로 만든다) →
+    //      한 파로 내보낸다. 예전엔 줄 세워서 Gemini 를 부르기도 전에 왕복 3회를 썼다.
+    const [{ data: progress }, { data: skills }, { data: attempts }] = await Promise.all([
+      admin
+        .from('user_progress')
+        .select('rank, points, updated_at')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      admin
+        .from('user_level_skill')
+        .select('level, ratings, rating, attempts_count, placed')
+        .eq('user_id', user.id)
+        .order('level', { ascending: true }),
+      admin
+        .from('test_attempts')
+        .select('level, status, total_correct, total_questions, axis_perf, rank_dir, submitted_at')
+        .eq('user_id', user.id)
+        .eq('status', 'submitted')
+        .order('submitted_at', { ascending: false })
+        .limit(5),
+    ])
 
     const profile = {
       rank: progress?.rank ?? null,

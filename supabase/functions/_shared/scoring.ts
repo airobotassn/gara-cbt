@@ -2,7 +2,7 @@
 // ⚠️ 프론트 src/lib/scoring.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
 // 인증·클라이언트·다국어(pick/proj) 헬퍼는 ./lib.ts 를 재수출한다(CARIS ARENA 함수는 이 파일만 import).
 import { type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { pickLang, projText, projOptions } from './lib.ts'
+import { projOptions } from './lib.ts'
 export * from './lib.ts'
 
 // ----- 공통 상수 -----
@@ -489,7 +489,6 @@ export async function fullResult(
   },
 ) {
   const keys = axisKeysForLevel(attempt.level)
-  const lang = pickLang(attempt.lang)
 
   let ratings: AxisMap
   let placed: boolean
@@ -531,25 +530,11 @@ export async function fullResult(
     if (prev) prevPerf = toAxisMap(prev, keys)
   }
 
-  // 해설/오답 (응시 언어로 투영)
-  const { data: rows } = await admin
-    .from('test_answers')
-    .select(
-      'question_id, category, selected_index, is_correct, test_questions(code, prompt_i18n, options_i18n, explanation_i18n, correct_index)',
-    )
-    .eq('attempt_id', attempt.id)
-  // 비활성·삭제된 문항도 과거 결과창엔 내용 그대로 보인다(행 보존). 차이는 통계/출제뿐.
-  const answers = (rows ?? []).map((r: any) => ({
-    questionId: r.question_id,
-    code: r.test_questions?.code ?? null,
-    category: r.category,
-    prompt: projText(r.test_questions?.prompt_i18n, lang),
-    options: projOptionsForLevel(r.test_questions?.options_i18n, lang, attempt.level),
-    selectedIndex: r.selected_index,
-    correctIndex: r.test_questions?.correct_index ?? -1,
-    isCorrect: r.is_correct,
-    explanation: projText(r.test_questions?.explanation_i18n, lang),
-  }))
+  // ⛔ 문항별 오답노트(본문·보기·해설)는 **안 만든다**. 결과창에서 그 목록이 제거됐는데
+  //    (Result.tsx 의 '오답노트는 제거됐다' 주석) 서버만 계속 만들어 보내고 있었다 —
+  //    문항마다 prompt_i18n·options_i18n·explanation_i18n 을 6개국어로 조회해 응시 언어로
+  //    투영한 뒤, 화면이 통째로 버렸다. 시험 한 번에 두 번(제출 직후 + 결과 재조회) 돌던 조회다.
+  //    되살릴 땐 화면부터 만들 것 — 쓰는 데가 없으면 다시 같은 상태가 된다.
 
   return {
     attemptId: attempt.id,
@@ -565,6 +550,5 @@ export async function fullResult(
     rankBefore,
     rankAfter,
     rankDir,
-    answers,
   }
 }

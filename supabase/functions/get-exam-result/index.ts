@@ -4,7 +4,7 @@
 //   - 공개일 이후: { released:true, totalCorrect, ..., answers:[...] }
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser } from '../_shared/lib.ts'
+import { adminClient, getUser, pickLang, projKoOptions, projKoText } from '../_shared/lib.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
     const { data: attempt } = await admin
       .from('exam_attempts')
-      .select('id, user_id, status, submitted_at, result_release_at, total_correct, total_questions, exam_id')
+      .select('id, user_id, status, submitted_at, result_release_at, total_correct, total_questions, exam_id, lang')
       .eq('id', attemptId)
       .single()
     if (!attempt) return json({ error: '결과를 찾을 수 없습니다.' }, 404)
@@ -54,17 +54,23 @@ Deno.serve(async (req) => {
     // ⚠️ 해설(explanation)은 결과 화면에도 내리지 않는다 — 관리자 전용(요구사항: 어떤 경우에도 해설 미노출).
     const { data: rows } = await admin
       .from('attempt_answers')
-      .select('number, selected_index, answer_text, is_correct, review_status, questions(subject, topic, prompt, kind, choices, correct_index)')
+      .select('number, selected_index, answer_text, is_correct, review_status, questions(subject, topic, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index)')
       .eq('attempt_id', attemptId)
       .order('number', { ascending: true })
+
+    // ⛔ **화면 언어가 아니라 응시 언어로 투영한다.** 오답노트는 "내가 시험 때 본 그 문제" 여야 한다 —
+    //    화면 언어를 따르면 응시 후 언어를 바꾼 사람에게 본 적 없는 지문이 뜨고, 보기 순서만 같고
+    //    글이 달라서 "내가 고른 2번" 이 무엇이었는지 확인할 수가 없다.
+    //    lang 이 비어 있는 건 컬럼이 생기기 전 응시다 — 그때는 전부 한국어였다.
+    const langOf = pickLang(attempt.lang)
 
     const answers = (rows ?? []).map((r: any) => ({
       number: r.number,
       subject: r.questions?.subject ?? null,
       topic: r.questions?.topic ?? null,
-      prompt: r.questions?.prompt ?? '',
+      prompt: projKoText(r.questions?.prompt, r.questions?.prompt_i18n, langOf),
       kind: r.questions?.kind ?? 'mc',
-      choices: r.questions?.choices ?? [],
+      choices: projKoOptions(r.questions?.choices, r.questions?.choices_i18n, langOf),
       selectedIndex: r.selected_index,
       answerText: r.answer_text ?? null,
       correctIndex: r.questions?.correct_index ?? -1,

@@ -9,7 +9,6 @@
 // ⚠️ 이 파일을 다른 데서 직접 import 하지 말 것 — 조회는 i18n.tsx 의 tr()/useT() 하나로만.
 const HI: Record<string, string> = {
   "common.home": "होम",
-  "common.dashboard": "लर्निंग डैशबोर्ड",
   "common.close": "बंद करें",
   "common.cancel": "रद्द करें",
   "common.ranking": "रैंकिंग",
@@ -100,7 +99,6 @@ const HI: Record<string, string> = {
   // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
   "route.placeholder": "आप क्या ढूंढ रहे हैं?",
   "route.notfound": "अमान्य खोज शब्द। कृपया फिर से लिखें।",
-  "mypage.tab_learning": "लर्निंग",
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
   "rank.title": "रैंकिंग",
   "report.btn": "🚩 गलती की रिपोर्ट करें",
@@ -284,7 +282,6 @@ const HI: Record<string, string> = {
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   "result.next_level": "Lv.{n} लें →",
   "rank.cur_level": "वर्तमान रैंक · स्तर {n}",
-  "db.cur_rank": "वर्तमान रैंक · {n} प्रयास",
   "db.points": "रैंकिंग स्कोर {p}",
   "db.skill_score": "कौशल स्कोर",
   "db.activity_score": "गतिविधि स्कोर",
@@ -361,6 +358,10 @@ const HI: Record<string, string> = {
   "rank.promotion_zone": "पदोन्नति क्षेत्र",
   "rank.top_tier": "सर्वोच्च टियर",
   "rank.pt": "{n} अंक",
+  "rank.nth": "#{n}",
+  "rank.trend_title": "रैंक ट्रेंड",
+  "rank.trend_empty": "इस अवधि में कोई रिकॉर्ड नहीं है।",
+  "rank.trend_help": "रेखा ऊपर जाए तो आपकी रैंक सुधरी है। ग्राफ़ को छूकर उस दिन का स्कोर देखें।",
   "rank.you": "आप",
   "rank.cta_test": "रैंक पाने के लिए टेस्ट दें",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -389,7 +390,7 @@ const HI: Record<string, string> = {
   "rank.active_today": "आज की सक्रियता",
   "country.KR": "दक्षिण कोरिया",
 
-  "db.title": "लर्निंग डैशबोर्ड",
+  "db.title": "मेरा रिकॉर्ड",
   "db.empty": "अभी कोई टेस्ट जमा नहीं किया।",
   "db.start": "टेस्ट शुरू करें",
   "db.stat_maxlevel": "सर्वोच्च लेवल",
@@ -409,7 +410,6 @@ const HI: Record<string, string> = {
   "db.trend_season": "सीज़न",
   "db.trend_season_hint": "सीज़न = 6 माह",
   "db.trend_empty": "इस अवधि में कोई टेस्ट नहीं।",
-  "db.activity_title": "गतिविधि",
   "db.radar_title": "क्षेत्र संतुलन",
   "db.radar_me": "आप",
   "db.radar_avg": "स्तर औसत",
@@ -560,32 +560,24 @@ const HI: Record<string, string> = {
   "prep.start_login": "साइन इन करके शुरू करें",
   "check.title": "परीक्षा वातावरण परीक्षण (पूर्व-जांच)",
   "check.eyebrow": "पूर्व-जांच",
-  "check.sub": "वास्तविक परीक्षा से पहले सुरक्षा सॉफ़्टवेयर इंस्टॉल करें, अपना वातावरण जांचें और नमूना प्रश्न आज़माएं।",
+  "check.sub": "वास्तविक परीक्षा से पहले जांच लें कि इस PC पर सुरक्षित ब्राउज़र ठीक से खुलता है और आपका वातावरण तैयार है।",
   "check.sec1_title": "सुरक्षा सॉफ़्टवेयर (Safe Exam Browser) इंस्टॉल करें",
   "check.sec1_desc": "परीक्षा एक सुरक्षा प्रोग्राम (Safe Exam Browser) के अंदर होती है जो स्क्रीन कैप्चर, कॉपी और ऐप बदलना रोकता है।",
+  "check.sec1_hint": "यदि ऊपर की जांच में सुरक्षित ब्राउज़र नहीं खुला, तो इसे यहां से इंस्टॉल करें।",
   "check.install_btn": "सुरक्षा सॉफ़्टवेयर (SEB) इंस्टॉल करें",
   "check.install_note1": "· इंस्टॉल के दौरान Windows पर \"प्रकाशक: ETH Zürich\" दिखना सामान्य है।",
   "check.install_note2": "· यदि \"Windows ने आपके PC की रक्षा की\" दिखे, तो अधिक जानकारी → चलाएं दबाएं। (सामान्य इंस्टॉल प्रक्रिया)",
-  "check.sec2_title": "परीक्षा वातावरण की स्वतः जांच",
+  "check.sec2_title": "परीक्षा वातावरण की जांच",
+  "check.sec2_desc": "सुरक्षित ब्राउज़र चलाने पर नीचे दिए आइटम जांचे जाते हैं।",
   "check.chk_pc": "PC (डेस्कटॉप) वातावरण",
-  "check.chk_pc_ok": "PC से कनेक्ट हुआ।",
   "check.chk_screen": "स्क्रीन आकार",
-  "check.chk_screen_ok": "परीक्षा के लिए पर्याप्त।",
-  "check.chk_screen_no": "1024px या अधिक चौड़ी स्क्रीन की सलाह है।",
   "check.chk_fs": "फुलस्क्रीन समर्थन",
-  "check.chk_fs_ok": "फुलस्क्रीन परीक्षा संभव है।",
-  "check.chk_fs_no": "ब्राउज़र फुलस्क्रीन को रोक रहा है।",
   "check.chk_net": "इंटरनेट कनेक्शन",
-  "check.chk_net_ok": "कनेक्ट है।",
-  "check.chk_net_no": "अपना इंटरनेट कनेक्शन जांचें।",
-  "check.chk_seb": "सुरक्षित ब्राउज़र (SEB)",
-  "check.chk_seb_ok": "सुरक्षित ब्राउज़र में खुला।",
-  "check.chk_seb_no": "वास्तविक परीक्षा सुरक्षित ब्राउज़र में खोलनी होगी।",
+  "check.chk_seb": "सुरक्षित ब्राउज़र (SEB) का चलना",
   "check.monitor_note": "· मॉनिटर संख्या सुरक्षित ब्राउज़र चलने पर स्वतः जांची जाती है। केवल 1 बाहरी मॉनिटर जोड़ें।",
-  "check.sec3_title": "नमूना प्रश्न आज़माएं",
-  "check.sec3_desc": "वास्तविक परीक्षा जैसी ही स्क्रीन पर नमूना प्रश्न आज़माकर नियंत्रण से परिचित हों। (अंक नहीं मिलते)",
-  "check.practice_btn": "नमूना प्रश्न शुरू करें",
-  "check.back": "CARIS पर वापस जाएं",
+  "check.sebtest_btn": "सुरक्षित ब्राउज़र में खोलकर जांचें",
+  "check.sebtest_desc": "सुरक्षित ब्राउज़र को उसी तरह चलाता है जैसे वास्तविक परीक्षा में, ताकि पुष्टि हो कि यह इस PC पर ठीक से खुलता है।\nकोई परीक्षा प्रश्न नहीं दिखते।",
+  "check.back": "मेरे परीक्षा टिकट पर वापस जाएं",
   "done.title": "आपकी परीक्षा जमा हो गई",
   "done.sub1": "आपका प्रयास सफलतापूर्वक प्राप्त हुआ। सुरक्षित ब्राउज़र स्वतः बंद हो जाएगा।",
   "done.sub2": "परिणाम जारी होने की तिथि के बाद माय पेज पर देखे जा सकते हैं।",
@@ -956,12 +948,12 @@ const HI: Record<string, string> = {
   // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
   "mypage.cert_no": "प्रमाण संख्या",
   "mypage.empty_issuance": "जारी करने योग्य कोई प्रमाणपत्र नहीं है।",
-  "mypage.tab_ebooks": "E-BOOK लाइब्रेरी",
-  "mypage.empty_ebooks": "आपने अभी तक कोई ईबुक नहीं खरीदी है।",
+  "mypage.tab_ebooks": "मेरी लाइब्रेरी",
+  "mypage.empty_ebooks": "आपने अभी तक कोई E-Book या लेक्चर नहीं खरीदा है।",
   // 메인 3번째 CTA(landing.cta_learn)와 같은 이름. 브랜드 라벨이라 6개국어 동일 표기.
   "ebook.store_title": "Learning Library",
-  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = E-BOOK 서재)과 같아야 한다.
-  "ebook.store_sub": "खरीदी गई किताबें माय पेज › E-BOOK लाइब्रेरी में पढ़ी जा सकती हैं।",
+  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = 내 서재)과 같아야 한다.
+  "ebook.store_sub": "खरीदी गई किताबें माय पेज › मेरी लाइब्रेरी में पढ़ी जा सकती हैं।",
   "ebook.empty_store": "अभी कोई ईबुक उपलब्ध नहीं है।",
   "ebook.buy": "खरीदें",
   "ebook.get_free": "मुफ़्त पाएँ",
@@ -971,12 +963,12 @@ const HI: Record<string, string> = {
   "ebook.view": "देखें",
   "ebook.cover_zoom": "कवर बड़ा देखें",
   "ebook.processing": "प्रोसेस हो रहा है…",
-  "ebook.bought": "खरीद पूरी — आपकी E-BOOK लाइब्रेरी में जोड़ी गई।",
+  "ebook.bought": "खरीद पूरी — आपकी मेरी लाइब्रेरी में जोड़ी गई।",
   "ebook.login_to_buy": "खरीदने के लिए साइन इन करें।",
   // 비로그인이 구매 버튼을 눌렀을 때 뜨는 로그인 모달(제목 한 줄 + 버튼만 — 책 정보·설명은 넣지 않는다)
   "ebook.login_modal_title": "साइन इन आवश्यक है",
   "ebook.go_store": "Learning Library पर जाएँ",
-  "ebook.go_library": "E-BOOK लाइब्रेरी में खोलें",
+  "ebook.go_library": "मेरी लाइब्रेरी में खोलें",
   "ebook.load_failed": "ईबुक लोड नहीं हो सकी।",
 
   // ---- 결제(/checkout · /pay/success · /pay/fail) ----
@@ -1013,7 +1005,7 @@ const HI: Record<string, string> = {
   "pay.fail_title": "भुगतान नहीं हो सका",
   "pay.fail_body": "भुगतान रद्द हुआ या स्वीकृत नहीं हुआ।",
   "pay.retry": "फिर से करें",
-  "ebook.reader_back": "E-BOOK लाइब्रेरी",
+  "ebook.reader_back": "मेरी लाइब्रेरी",
   "ebook.reader_lang": "पढ़ने की भाषा",
   "ebook.reader_fs": "फुलस्क्रीन",
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
@@ -1023,7 +1015,8 @@ const HI: Record<string, string> = {
   "ll.catalog": "कैटलॉग",
   "ll.level_col": "लेवल",
   "ll.tier_col": "श्रेणी",
-  "ll.books": "किताबें",
+  // ⚠️ 브랜드 표기라 6개국어 모두 같은 글자다(ko.ts 주석 참고).
+  "ll.books": "E-Book",
   "ll.lectures": "लेक्चर",
   "ll.no_books": "इस लेवल की किताबें तैयार की जा रही हैं।",
   "ll.no_lectures": "इस लेवल के लेक्चर तैयार किए जा रहे हैं।",
@@ -1037,8 +1030,9 @@ const HI: Record<string, string> = {
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": "पिछला",
   "ll.next": "अगला",
-  "ll.watch_yt": "YouTube पर देखें",
-  "ll.demo_note": "लेक्चर इस डेमो के लिए सैंपल वीडियो हैं।",
+  "ll.watch": "देखें",
+  "ll.playing": "चल रहा है",
+  "ll.empty_owned": "इस हिस्से में अभी कोई खरीदी गई सामग्री नहीं है।",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "सभी खरीदें",
   "ll.bundle_desc": "किताबें और लेक्चर चुनकर एक साथ जोड़ें।",
@@ -1052,7 +1046,6 @@ const HI: Record<string, string> = {
   "ll.pick_of": "{a} / {b} चुने गए",
   "ll.total": "कुल",
   "ll.bundle_buy": "चुने हुए खरीदें",
-  "ll.bundle_nofee": "लेक्चर मुफ़्त हैं — भुगतान करने को कुछ नहीं। सीधे देखिए।",
   "ll.bundle_empty": "अभी जोड़ने के लिए कुछ नहीं है।",
   "mypage.reissue": "पुनः जारी करें",
   "mypage.issue": "आवेदन करें",
@@ -1391,7 +1384,6 @@ const HI: Record<string, string> = {
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
-  "arena.tag": "लाइव डेटा · डेटा रहित क्षेत्र नमूना",
   "arena.low": "कम",
   "arena.high": "अधिक",
   // ⚠️ arena.avgLevel 은 레벨테스트 시절 문구다. 지도 지표가 레벨 → 랭킹점수(season_total 평균, 베이지안 보정)로
@@ -1407,7 +1399,6 @@ const HI: Record<string, string> = {
   "arena.world": "विश्व",
   "arena.worldLeague": "वर्ल्ड लीग",
   "arena.league": " लीग",
-  "arena.real": "लाइव",
   "arena.ppl": "",
   "arena.unit": "",
   "arena.avg": "औसत",
@@ -1421,7 +1412,6 @@ const HI: Record<string, string> = {
   "arena.bHubS": "कैरेक्टर हब",
   "arena.bDaily": "आज की सीख",
   "arena.bDailyS": "दैनिक",
-  "arena.foot": "लाइव डेटा वाले क्षेत्र/देश स्वतः दिखते हैं (5+ प्रतिभागी); डेटा रहित क्षेत्र नमूना मान हैं।",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "मिनी गेम्स",
@@ -1778,7 +1768,7 @@ const HI: Record<string, string> = {
   // 오른쪽 레일
   "hub.rail.closet": "सजाएँ",
   "hub.rail.title": "उपाधियाँ",
-  "hub.rail.invite": "आमंत्रित करें",
+  "hub.rail.invite": "आमंत्रण इनाम",
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "चेक-इन",
@@ -1787,6 +1777,8 @@ const HI: Record<string, string> = {
 
   // 도크(출석 보상)
   "hub.reward_head": "चेक-इन इनाम",
+  "hub.attend.title": "चेक-इन इतिहास",
+  "hub.attend.help": "हर दिन साइट खोलते ही आपका चेक-इन अपने आप दर्ज हो जाता है।",
   "hub.daily.claim": "आज चेक इन करें",
   "hub.daily.done": "आज चेक-इन हो गया",
   "hub.day_n": "दिन {n}",
@@ -1901,7 +1893,7 @@ const HI: Record<string, string> = {
   // 친구 초대 모달
   "hub.invite.title": "दोस्तों को बुलाएं",
   "hub.invite.lead": "दोस्त के साथ CARIS करें!",
-  "hub.invite.help": "अपना इनवाइट कोड दें और दोस्त तुरंत शुरू कर सकता है।",
+  "hub.invite.help": "दोस्त आपका इनवाइट कोड डाले तो दोनों को {n} CARI कॉइन मिलेंगे।",
   "hub.invite.my_code": "मेरा इनवाइट कोड",
   "hub.invite.copied": "कॉपी हुआ",
   "hub.invite.copy": "कॉपी",
@@ -1911,7 +1903,7 @@ const HI: Record<string, string> = {
   "hub.invite.redeem_done": "✓ इनवाइट कोड दर्ज हुआ (सिर्फ एक बार)",
   "hub.invite.checking": "जाँच रहे हैं",
   "hub.invite.register": "दर्ज करें",
-  "hub.invite.hint": "एक बार दर्ज करने पर बदला नहीं जा सकता।",
+  "hub.invite.hint": "दोस्त का दिया इनवाइट कोड डालें तो दोनों को {n} CARI कॉइन मिलेंगे।",
   "hub.invite.err_not_found": "यह इनवाइट कोड मौजूद नहीं। दोबारा जाँचें",
   "hub.invite.err_self": "अपना ही कोड इस्तेमाल नहीं कर सकते",
   "hub.invite.err_already": "आप पहले ही इनवाइट कोड दर्ज कर चुके हैं",

@@ -1,10 +1,16 @@
-/* dashboard: Dashboard.tsx */
+/* dashboard: 공용 카드 부품(.panel-card · .stat · .hrow · .axis-prog-cmp · .radar-leg …)
+   ⚠️ 이름이 'dashboard' 인 건 옛 마이페이지 '학습 대시보드'(components/LearningDashboard.tsx)가
+      여기 살았기 때문이다. 그 화면은 2026-08-25 에 찢겨 없어졌고(레벨테스트 몫 → /test/record,
+      활동 달력 → /hub 출석 모달, 랭킹 추이 → /ranking 예정), 파일은 남았다 —
+      여기 클래스들을 **Ranking·Result·AdminLevelTest·WorldArena 가 같이 쓴다.** 통째로 지우지 말 것.
 
-/* ===== 학습 대시보드 스케일(.db-wrap) =====
-   마이페이지 컨테이너(max-w-5xl = 1024px)에 폭을 맞추고 글씨·여백을 한 단계 키운다.
+   ===== 카드 스케일(.db-wrap) =====
+   폭을 1024px 로 맞추고 글씨·여백을 한 단계 키우는 껍데기. 지금 쓰는 곳은 /test/record 하나다.
    토큰만 덮어쓰는 방식은 base.css 의 `.admin` 선례와 같다(하위 요소가 --fs-sm/md 기반이라 함께 커짐).
    ⚠️ .wrap·.panel-card·.stat·.hrow 는 다른 페이지도 쓰는 공용 클래스다 —
-      여기서 키우는 규칙은 반드시 `.db-wrap` 안으로 한정할 것. */
+      여기서 키우는 규칙은 반드시 `.db-wrap` 안으로 한정할 것.
+   ⚠️ 좌우 패딩이 0인 건 마이페이지 안에 있던 시절의 잔재다(부모가 여백을 줬다).
+      독립 페이지에서는 levelrecord.css 의 `.lvrec .db-wrap` 이 되돌린다. */
 .db-wrap {
   --container: 1024px;
   --fs-sm: 14.5px;

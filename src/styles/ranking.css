@@ -778,7 +778,9 @@ html.dark body:has(.hof-wrap) {
 .hof-sub::after { transform: scaleX(-1); }
 
 /* ===== 시상대 =====
-   그림 = public/ranking/podium.png (1424×874 · 높이÷폭 0.614). 남색 메탈 단 3개 + 네온.
+   그림 = public/ranking/podium-gara-2026.png (1424×874 · 높이÷폭 0.614). 남색 메탈 단 3개 + 네온.
+   ⚠️ 1위 단의 GARA 워드마크만 다른 옛 파일(podium.png)이 아직 public 에 남아 있다 — 쓰는 곳은 없다.
+      두 화면(/ranking · 미니게임 랭킹 모달)이 같은 그림을 봐야 로고가 어긋나지 않는다.
    ⚠️ 2026-08-06 교체: 옛 그림(밤하늘 남색 + 앤티크 금 + 크림 명판)은 "너무 게임 같다"로 반려됐다.
    ⚠️ **아바타 링도 크림 명판도 없는 그림이다.** 그래서 얹는 방식이 이전과 다르다:
         · 아바타 = 각 단 **위에 떠서** 윗면에 살짝 걸친다(단 앞면은 큼직한 1·2·3 숫자가 차지).
@@ -1143,3 +1145,51 @@ html.dark body:has(.hof-wrap) {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
+
+/* ===== 순위 추이 (2026-08-25) =====
+   뒤로가기 줄 오른쪽 끝에 진입점을 얹는다. 칩 높이가 뒤로가기와 같아서 **세로를 한 픽셀도 안 쓴다** —
+   이 화면은 '한 화면 고정 틀'이라 아래에 섹션을 붙이면 4~10위 창이 그만큼 깎인다.
+   ⚠️ 내 순위 바에 붙이지 않았다: 그 바는 이미 '눌러서 내 행으로'(.hof-bar.jump)에 눌림을 쓴다. */
+.hof-topline {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+/* ⚠️ 뒤로/홈 칩 규칙(.topbar …)에 이름을 얹지 않는다 — 그 규칙은 '뒤로 가는 칩'이라는 뜻을 갖고
+   있고 이건 여는 버튼이다. 생김새만 같은 언어로 맞추고 강조는 --accent 로 준다. */
+.hof-trend-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 15px 8px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-family: inherit; font-size: 13.5px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+  transition: background .15s, border-color .15s;
+}
+.hof-trend-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
+.hof-trend-btn .material-symbols-outlined { font-size: 18px; line-height: 1; }
+
+/* 추이 모달 — 이 화면에는 모달 틀이 없었다(카드는 ShareCardModal 이 자기 것을 들고 있다). */
+.hof-modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(4, 6, 12, .62);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.hof-modal {
+  width: 100%; max-width: 620px; max-height: 88vh; overflow-y: auto;
+  padding: 18px 18px 16px; border-radius: 18px;
+  background: var(--bg); border: 1px solid var(--line2);
+  box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .9);
+}
+.hof-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.hof-modal-head h3 { margin: 0; font-size: var(--fs-md); font-weight: 800; color: var(--ink); }
+/* 어느 보드의 등수인지 — 없으면 국가 탭에서 연 3위와 전세계 3위가 화면에서 구분이 안 된다. */
+.hof-modal-sub { display: block; margin-top: 3px; font-size: var(--fs-sm); font-weight: 700; color: var(--accent); }
+.hof-modal-close {
+  flex: none; width: 30px; height: 30px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line2); background: var(--soft); color: var(--muted);
+  font-size: 17px; line-height: 1; font-weight: 800;
+}
+.hof-modal-close:hover { color: var(--ink); border-color: var(--ink); }
+.hof-modal-msg { margin: 18px 0; text-align: center; font-size: var(--fs-sm); color: var(--muted); }
+.hof-modal-msg.small { margin: 10px 0 0; font-size: var(--fs-sm); color: var(--dim); }
+/* 기간 세그먼트(.trend-seg)는 dashboard.css 공용을 그대로 쓴다 — 한 벌 더 그리지 않는다. */
+.hof-modal .trend-seg { margin-bottom: 10px; }

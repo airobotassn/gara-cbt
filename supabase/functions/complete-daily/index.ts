@@ -39,11 +39,16 @@ Deno.serve(async (req) => {
     // (2) 원자 적립: 종류별 1/일 가드 + 플래그 세팅 + 재화/스탬프 증분을 하나의 SQL 트랜잭션으로.
     //     ⚠️ 잠금 판정은 daily_activity 행 존재가 아니라 종류 플래그(did_attendance/did_learn) 다 —
     //        행 자체는 레벨테스트·미니게임도 만들기 때문(20260727010000 마이그레이션). RPC 반환 jsonb 를 그대로 전달.
-    const { data, error } = await admin.rpc('complete_daily_kind', {
-      p_uid: user.id,
-      p_points: DAILY_POINTS,
-      p_kind: kind,
-    })
+    //     ⚠️ 활성 시즌 조회(아래 3번에서 쓴다)는 user 도 이 RPC 결과도 안 쓴다 → 같이 내보낸다.
+    //        적립 순서는 그대로다 — 쓰기는 여전히 RPC 가 먼저 끝난 뒤에 일어난다.
+    const [{ data, error }, seasonId] = await Promise.all([
+      admin.rpc('complete_daily_kind', {
+        p_uid: user.id,
+        p_points: DAILY_POINTS,
+        p_kind: kind,
+      }),
+      getActiveSeasonId(admin),
+    ])
     if (error) return json({ error: error.message }, 500)
 
     // (3) 활동점수 적립 — 코인 재화(위)와 별개 원장. 하루-cap 은 activity_ledger 부분 unique(user_id,kind,day)
@@ -53,7 +58,6 @@ Deno.serve(async (req) => {
     //     이 1/일로 잘못 제한되므로 인덱스는 partial 유지가 필수 — 대신 여기를 insert 로 바꾼다).
     //     insert 로 시도하고 23505(unique_violation = 오늘 이미 적립됨)는 무시(멱등), 그 외 에러는 로깅 후 표면화.
     //     활성 시즌이 없으면(운영 사고) 스킵 — 코인 적립은 이미 끝났으므로 응답은 그대로 성공 반환.
-    const seasonId = await getActiveSeasonId(admin)
     if (seasonId != null) {
       const today = kstDay()
       const { error: ledgerError } = await admin.from('activity_ledger').insert({

@@ -9,7 +9,6 @@
 // ⚠️ 이 파일을 다른 데서 직접 import 하지 말 것 — 조회는 i18n.tsx 의 tr()/useT() 하나로만.
 const ZH: Record<string, string> = {
   "common.home": "主页",
-  "common.dashboard": "学习仪表盘",
   "common.close": "关闭",
   "common.cancel": "取消",
   "common.ranking": "排行榜",
@@ -100,7 +99,6 @@ const ZH: Record<string, string> = {
   // 뒤에 붙던 예시(WORLD ARENA·시험안내·문의…)는 뺐다 — 메인 검색창은 질문 한 줄만 둔다.
   "route.placeholder": "您在找什么？",
   "route.notfound": "无效的搜索词，请重新输入。",
-  "mypage.tab_learning": "学习仪表板",
   // CARIS ARENA 이식 잔여 키 (gara-cbt에 없던 7개)
   "rank.title": "排行榜",
   "report.btn": "🚩 报告问题",
@@ -284,7 +282,6 @@ const ZH: Record<string, string> = {
   // 승급했을 때만 뜨는 결과창 CTA — 누르면 다음 레벨 응시를 바로 시작한다(응시 전 경고 화면으로 이동).
   "result.next_level": "挑战 Lv.{n} →",
   "rank.cur_level": "当前等级 · Lv.{n}",
-  "db.cur_rank": "当前等级 · 应试 {n} 次",
   "db.points": "排名分数 {p}",
   "db.skill_score": "实力分数",
   "db.activity_score": "活动分数",
@@ -361,6 +358,10 @@ const ZH: Record<string, string> = {
   "rank.promotion_zone": "升级区间",
   "rank.top_tier": "最高段位",
   "rank.pt": "{n} 分",
+  "rank.nth": "第 {n} 名",
+  "rank.trend_title": "排名走势",
+  "rank.trend_empty": "这段时间没有记录。",
+  "rank.trend_help": "曲线上升代表排名上升。点一下图表就能看到当天的分数。",
   "rank.you": "我",
   "rank.cta_test": "做测试获得排名",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -389,7 +390,7 @@ const ZH: Record<string, string> = {
   "rank.active_today": "今日参与率",
   "country.KR": "韩国",
 
-  "db.title": "学习仪表盘",
+  "db.title": "我的记录",
   "db.empty": "还没有提交过测试。",
   "db.start": "开始测试",
   "db.stat_maxlevel": "最高等级",
@@ -409,7 +410,6 @@ const ZH: Record<string, string> = {
   "db.trend_season": "赛季",
   "db.trend_season_hint": "赛季 = 6 个月",
   "db.trend_empty": "该期间没有应试记录。",
-  "db.activity_title": "活动记录",
   "db.radar_title": "领域均衡",
   "db.radar_me": "我的",
   "db.radar_avg": "等级平均",
@@ -560,32 +560,24 @@ const ZH: Record<string, string> = {
   "prep.start_login": "登录后开始",
   "check.title": "考试环境测试（预检）",
   "check.eyebrow": "预检",
-  "check.sub": "在正式考试前，先安装安全程序、确认应试环境，并试做模拟题。",
+  "check.sub": "在正式考试前，先确认安全浏览器能否在本机正常打开，以及应试环境是否就绪。",
   "check.sec1_title": "安装安全程序（Safe Exam Browser）",
   "check.sec1_desc": "考试在阻止截屏、复制和切换程序的安全程序（Safe Exam Browser）中进行。",
+  "check.sec1_hint": "若上面的确认中安全浏览器未能打开，请在此安装。",
   "check.install_btn": "安装安全程序（SEB）",
   "check.install_note1": "· 安装时 Windows 显示「发布者: ETH Zürich」即为正常。",
   "check.install_note2": "· 若出现「Windows 已保护你的电脑」，请点击 更多信息 → 运行。（正常安装步骤）",
-  "check.sec2_title": "应试环境自动检查",
+  "check.sec2_title": "应试环境检查",
+  "check.sec2_desc": "启动安全浏览器后，将检查以下项目。",
   "check.chk_pc": "PC（台式机）环境",
-  "check.chk_pc_ok": "已从 PC 连接。",
   "check.chk_screen": "屏幕尺寸",
-  "check.chk_screen_ok": "足够应试。",
-  "check.chk_screen_no": "建议使用宽 1024px 以上的屏幕。",
   "check.chk_fs": "支持全屏",
-  "check.chk_fs_ok": "可全屏应试。",
-  "check.chk_fs_no": "浏览器正在阻止全屏。",
   "check.chk_net": "网络连接",
-  "check.chk_net_ok": "连接正常。",
-  "check.chk_net_no": "请检查网络连接。",
-  "check.chk_seb": "安全浏览器（SEB）",
-  "check.chk_seb_ok": "已用安全浏览器打开。",
-  "check.chk_seb_no": "实际考试须用安全浏览器打开。",
+  "check.chk_seb": "安全浏览器（SEB）启动",
   "check.monitor_note": "· 显示器数量在安全浏览器运行时自动检查。外接显示器请仅连接 1 台。",
-  "check.sec3_title": "试做模拟题",
-  "check.sec3_desc": "在与实际考试完全相同的界面试做模拟题，熟悉操作。（不计分）",
-  "check.practice_btn": "开始模拟题",
-  "check.back": "返回 CARIS",
+  "check.sebtest_btn": "用安全浏览器打开确认",
+  "check.sebtest_desc": "以与正式考试相同的方式启动安全浏览器，确认其在本机能否正常打开。\n不会出现考题。",
+  "check.back": "返回我的考试券",
   "done.title": "提交已完成",
   "done.sub1": "您的应试已正常受理。安全浏览器将自动关闭。",
   "done.sub2": "评分结果将在公布日后于「我的页面」查看。",
@@ -956,12 +948,12 @@ const ZH: Record<string, string> = {
   // WORLD ARENA 레벨 인증서 — 레벨테스트에서 승급할 때마다 한 장씩 쌓인다(자격 취득 현황 탭)
   "mypage.cert_no": "认证编号",
   "mypage.empty_issuance": "暂无可发放的证书。",
-  "mypage.tab_ebooks": "E-BOOK 书架",
-  "mypage.empty_ebooks": "尚未购买电子书。",
+  "mypage.tab_ebooks": "我的书架",
+  "mypage.empty_ebooks": "尚未购买电子书或课程。",
   // 메인 3번째 CTA(landing.cta_learn)와 같은 이름. 브랜드 라벨이라 6개국어 동일 표기.
   "ebook.store_title": "Learning Library",
-  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = E-BOOK 서재)과 같아야 한다.
-  "ebook.store_sub": "已购买的书可在个人中心 › E-BOOK 书架阅读。",
+  // 안내에 쓰는 '서재' 이름은 실제 마이페이지 탭 라벨(mypage.tab_ebooks = 내 서재)과 같아야 한다.
+  "ebook.store_sub": "已购买的书可在个人中心 › 我的书架阅读。",
   "ebook.empty_store": "暂无上架的电子书。",
   "ebook.buy": "购买",
   "ebook.get_free": "免费获取",
@@ -971,12 +963,12 @@ const ZH: Record<string, string> = {
   "ebook.view": "查看",
   "ebook.cover_zoom": "查看大图封面",
   "ebook.processing": "处理中…",
-  "ebook.bought": "购买完成 — 已加入 E-BOOK 书架。",
+  "ebook.bought": "购买完成 — 已加入 我的书架。",
   "ebook.login_to_buy": "登录后即可购买。",
   // 비로그인이 구매 버튼을 눌렀을 때 뜨는 로그인 모달(제목 한 줄 + 버튼만 — 책 정보·설명은 넣지 않는다)
   "ebook.login_modal_title": "需要登录",
   "ebook.go_store": "前往 Learning Library",
-  "ebook.go_library": "在 E-BOOK 书架中查看",
+  "ebook.go_library": "在 我的书架中查看",
   "ebook.load_failed": "无法加载电子书。",
 
   // ---- 결제(/checkout · /pay/success · /pay/fail) ----
@@ -1013,7 +1005,7 @@ const ZH: Record<string, string> = {
   "pay.fail_title": "支付未完成",
   "pay.fail_body": "支付已取消或未获批准。",
   "pay.retry": "重试",
-  "ebook.reader_back": "E-BOOK 书架",
+  "ebook.reader_back": "我的书架",
   "ebook.reader_lang": "阅读语言",
   "ebook.reader_fs": "全屏",
   // 러닝 라이브러리(/ebooks) — 레벨 | 교재 | 강의 3열. 레벨 이름·설명은 lv.N.name / lv.N.desc 를 그대로 쓴다.
@@ -1023,7 +1015,8 @@ const ZH: Record<string, string> = {
   "ll.catalog": "教材类别",
   "ll.level_col": "等级",
   "ll.tier_col": "级别",
-  "ll.books": "教材",
+  // ⚠️ 브랜드 표기라 6개국어 모두 같은 글자다(ko.ts 주석 참고).
+  "ll.books": "E-Book",
   "ll.lectures": "课程",
   "ll.no_books": "该等级的教材正在准备中。",
   "ll.no_lectures": "该等级的课程正在准备中。",
@@ -1037,8 +1030,9 @@ const ZH: Record<string, string> = {
   // 페이지 넘김(한 페이지에 한 개). 화면엔 ‹ 1 / 3 › 만 보이고 이 문구는 읽어주는 이름표다.
   "ll.prev": "上一个",
   "ll.next": "下一个",
-  "ll.watch_yt": "在 YouTube 上观看",
-  "ll.demo_note": "课程为演示用示例视频。",
+  "ll.watch": "观看",
+  "ll.playing": "播放中",
+  "ll.empty_owned": "此栏还没有已购买的内容。",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "全部购买",
   "ll.bundle_desc": "可以挑选教材和课程，一次性加入。",
@@ -1052,7 +1046,6 @@ const ZH: Record<string, string> = {
   "ll.pick_of": "已选 {a} / {b}",
   "ll.total": "合计",
   "ll.bundle_buy": "购买所选",
-  "ll.bundle_nofee": "课程免费，无需付款，直接观看即可。",
   "ll.bundle_empty": "暂时没有可添加的项目。",
   "mypage.reissue": "重新发放",
   "mypage.issue": "申请发放",
@@ -1391,7 +1384,6 @@ const ZH: Record<string, string> = {
 
   // ── 월드 아레나(/arena) — 지도·랭킹 패널·하단 런처 ──
   //   arena.b* = 하단 이동 버튼(Hub · 레벨테스트 · 오늘의 문제 · 미니게임)
-  "arena.tag": "实时数据 · 无数据地区为示例",
   "arena.low": "低",
   "arena.high": "高",
   // ⚠️ arena.avgLevel 은 레벨테스트 시절 문구다. 지도 지표가 레벨 → 랭킹점수(season_total 평균, 베이지안 보정)로
@@ -1407,7 +1399,6 @@ const ZH: Record<string, string> = {
   "arena.world": "世界",
   "arena.worldLeague": "世界联赛",
   "arena.league": " 联赛",
-  "arena.real": "实时",
   "arena.ppl": "人",
   "arena.unit": "名",
   "arena.avg": "平均",
@@ -1421,7 +1412,6 @@ const ZH: Record<string, string> = {
   "arena.bHubS": "角色中心",
   "arena.bDaily": "今日学习",
   "arena.bDailyS": "每日内容",
-  "arena.foot": "有实时数据的地区/国家自动显示（参与≥5人）；暂无数据的地区·市郡区为示例值。",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "小游戏",
@@ -1778,7 +1768,7 @@ const ZH: Record<string, string> = {
   // 오른쪽 레일
   "hub.rail.closet": "装扮",
   "hub.rail.title": "称号",
-  "hub.rail.invite": "邀请好友",
+  "hub.rail.invite": "邀请奖励",
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "签到",
@@ -1787,6 +1777,8 @@ const ZH: Record<string, string> = {
 
   // 도크(출석 보상)
   "hub.reward_head": "签到奖励",
+  "hub.attend.title": "签到记录",
+  "hub.attend.help": "只要打开网站，当天的签到就会自动记录。",
   "hub.daily.claim": "今日签到",
   "hub.daily.done": "今日已签到",
   "hub.day_n": "第 {n} 天",
@@ -1901,7 +1893,7 @@ const ZH: Record<string, string> = {
   // 친구 초대 모달
   "hub.invite.title": "邀请好友",
   "hub.invite.lead": "和朋友一起玩 CARIS！",
-  "hub.invite.help": "把邀请码告诉朋友，他就能立刻开始。",
+  "hub.invite.help": "好友输入我的邀请码，双方各得 {n} CARI 币。",
   "hub.invite.my_code": "我的邀请码",
   "hub.invite.copied": "已复制",
   "hub.invite.copy": "复制",
@@ -1911,7 +1903,7 @@ const ZH: Record<string, string> = {
   "hub.invite.redeem_done": "✓ 邀请码已登记（仅限一次）",
   "hub.invite.checking": "确认中",
   "hub.invite.register": "登记",
-  "hub.invite.hint": "登记后无法更改。",
+  "hub.invite.hint": "输入好友给的邀请码，双方各得 {n} CARI 币。",
   "hub.invite.err_not_found": "邀请码不存在，请重新确认",
   "hub.invite.err_self": "不能使用自己的邀请码",
   "hub.invite.err_already": "您已登记过邀请码",

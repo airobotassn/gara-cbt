@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
+import { loadAdminMe } from '../lib/adminMe'
 import {
   MAX_LEVEL,
   COMING_SOON_LEVELS,
@@ -48,7 +49,7 @@ const DIPPER_EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6]
 export default function LevelSelect() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isFullUser, ensureAnonymous } = useAuth()
+  const { isFullUser, ensureAnonymous, user } = useAuth()
   const { t, lang } = useT()
   const [loading, setLoading] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -97,17 +98,21 @@ export default function LevelSelect() {
       return
     }
     // 관리자는 문항 확인용으로 전 레벨 해금(서버 start-test 도 면제).
-    callFunction<{ isAdmin: boolean }>('admin', { action: 'me' })
-      .then(() => setUnlocked(MAX_LEVEL))
-      .catch(() => {
-        callFunction<ListAttemptsResponse>('list-attempts', {})
-          .then((r) => {
-            setUnlocked(r.currentRank ?? 1)
-            setDailyLeft(r.dailyLeft ?? null)
-          })
-          .catch(() => {})
-      })
-  }, [isFullUser])
+    // ⚠️ 둘을 **동시에** 부른다. 예전엔 admin 을 먼저 부르고 그게 403 으로 **실패해야** list-attempts 를
+    //    시작했는데, 일반 회원은 항상 그 경로라 첫 화면이 늘 두 왕복을 줄줄이 기다렸다.
+    //    두 응답은 서로를 인자로 쓰지 않는다 — 받아놓고 고르기만 하면 된다.
+    let alive = true
+    void Promise.all([
+      loadAdminMe(user?.id ?? null),
+      callFunction<ListAttemptsResponse>('list-attempts', {}).catch(() => null),
+    ]).then(([me, r]) => {
+      if (!alive) return
+      setUnlocked(me.isAdmin ? MAX_LEVEL : (r?.currentRank ?? 1))
+      // 관리자는 쿨다운이 면제라 남은 횟수를 띄우지 않는다(옛 동작 그대로).
+      setDailyLeft(me.isAdmin ? null : (r?.dailyLeft ?? null))
+    })
+    return () => { alive = false }
+  }, [isFullUser, user])
 
   // 카드에 띄울 레벨 = 사다리에서 고른 것 > 검색 추천(해금 범위 안) > 내 등급(승급 도전 레벨).
   //   잠긴 레벨도 고를 수 있다 — 내용(이름·설명·문항수·시간·승급컷)은 열어 두고 응시만 막는다.
@@ -208,6 +213,16 @@ export default function LevelSelect() {
             {/* 레벨테스트 인증서 — 응시 여부와 무관하게 항상 있는 자리(기록이 없으면 인증서 화면이 안내한다).
                 ⚠️ 원래 금색(primary)이었는데 중립으로 내렸다 — 이 화면에서 금색은 '응시 시작' 하나여야 한다.
                    금색 물건이 넷(인증서·규칙·배지·CTA)이면 뭐가 결정인지 안 보인다. */}
+            {/* 내 기록 — 옛 마이페이지 '학습 대시보드'의 레벨테스트 몫(스탯·영역 밸런스·승급 기록)이
+                여기로 왔다(2026-08-25). 인증서와 같은 성격(응시 이력을 보는 자리)이라 나란히 둔다.
+                인증서와 같은 이유로 중립 칩이다 — 이 화면에서 금색은 '응시 시작' 하나여야 한다. */}
+            <button
+              onClick={() => navigate('/test/record')}
+              className="lvn-chip inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full font-label-md text-[15px] font-bold transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">timeline</span>
+              {t('db.title')}
+            </button>
             <button
               onClick={() => navigate('/test/certificate')}
               className="lvn-chip inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full font-label-md text-[15px] font-bold transition-colors"

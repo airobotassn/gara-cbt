@@ -257,8 +257,11 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
               {t('exresult.issue_cert')}
             </button>
           )}
+          {/* ⚠️ 버튼이 '내 응시 현황' 이라고 말하므로 그 탭으로 직행해야 한다. 예전엔 /mypage 로 보냈는데
+              그때의 기본 탭은 학습 대시보드였고, 2026-08-25 그 탭이 사라지면서 기본이 이북 서재가 됐다 —
+              둘 다 응시 현황이 아니다. */}
           <button
-            onClick={() => navigate('/mypage')}
+            onClick={() => navigate('/mypage/attempts')}
             className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary font-title-md text-title-md py-3.5 px-6 rounded-xl transition-all"
           >
             {t('exresult.to_attempts')}

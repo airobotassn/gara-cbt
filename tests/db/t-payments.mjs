@@ -20,6 +20,9 @@ const rawClaim = readFileSync('supabase/migrations/20260810180000_payments_confi
 const rawAddon = readFileSync('supabase/migrations/20260814110000_payment_addon_ebook.sql', 'utf8');
 // 묶음 결제(bundle) — 이북 여러 권을 한 번에. 줄 목록은 payment_items 에 남는다.
 const rawBundle = readFileSync('supabase/migrations/20260819120000_payments_bundle.sql', 'utf8');
+// 강의 유료화(2026-08-25) — product_type 에 'lecture' 를 더하고 lecture_purchases 를 만든다.
+//   묶음 줄에도 강의가 담긴다(교재 묶음 / 강의 묶음. 응시권은 여전히 못 담는다).
+const rawLecture = readFileSync('supabase/migrations/20260825180000_lecture_purchases.sql', 'utf8');
 
 // pglite 엔 auth 스키마가 없다 — FK 만 떼고 나머지 DDL 은 원본 그대로 적용한다.
 const strip = (sql) => sql.replace(/\s+references auth\.users\(id\)(\s+on delete cascade)?/g, '');
@@ -30,6 +33,7 @@ const db = await PGlite.create();
 await db.exec(`
   create table profiles (id uuid primary key);
   create table ebooks (id uuid primary key default gen_random_uuid());
+  create table lectures (id uuid primary key default gen_random_uuid());
   create table ebook_purchases (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null,
@@ -46,6 +50,7 @@ await db.exec(strip(rawCert));
 await db.exec(strip(rawClaim));
 await db.exec(strip(rawAddon));
 await db.exec(strip(rawBundle));
+await db.exec(strip(rawLecture));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -91,19 +96,20 @@ for (const s of ['pending', 'waiting_deposit', 'paid', 'canceled', 'refunded', '
   rec(`status '${s}' 허용`, err, null);
 }
 
-// --- (3-b) product_type 은 세 가지만 ---
+// --- (3-b) product_type 은 정해진 다섯 가지만 ---
 // cert(자격증 발급비)는 지급물이 없어 "결제 행 자체가 발급 게이트"다 — 오타 타입이 저장되면
 // my-attempts 의 게이트 조회가 조용히 빗나가 발급비를 낸 사람이 발급을 못 받는다.
+// ⚠️ 'lecture' 는 2026-08-25 에 들어왔다(강의 유료화). 그전엔 이 목록에 없어서 거부 대상이었다.
 const insertTyped = (type, ref) =>
   db.query(
     `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
      values ($1, $2, '테스트', $3, $4, 3000, 'pending', 'cus-test') returning id`,
     [U2, `type-order-${++seq}`, type, ref],
   );
-for (const ty of ['ebook', 'exam', 'cert']) {
+for (const ty of ['ebook', 'exam', 'cert', 'lecture']) {
   rec(`product_type '${ty}' 허용`, await failsWith(() => insertTyped(ty, `tref-${ty}`)), null);
 }
-rec('알 수 없는 product_type 거부', (await failsWith(() => insertTyped('lecture', 'tref-x'))) !== null, true);
+rec('알 수 없는 product_type 거부', (await failsWith(() => insertTyped('course', 'tref-x'))) !== null, true);
 // 같은 응시(product_ref)에 발급비를 두 번 낼 수 없다 — cert 도 기존 부분 유니크가 그대로 막는다.
 const ATT = '00000000-0000-0000-0000-0000000000c1';
 await db.query(
@@ -368,6 +374,92 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   const pol = (await db.query(
     `select count(*)::int as n from pg_policies where tablename='payment_items'`)).rows[0];
   rec('payment_items 정책 0개(서비스롤 전용)', pol.n, 0);
+}
+
+// --- (14) 강의 유료화(2026-08-25) — lecture_purchases · 강의 묶음 ---
+//     보는 것: 강의 시청권이 이북 열람권과 **같은 방어선**을 갖는가.
+//     ⛔ 여기서 제일 중요한 건 '같은 강의를 두 번 못 산다'(unique)와 '응시권은 여전히 묶음에 못 담긴다'다.
+{
+  const L1 = '00000000-0000-0000-0000-0000000c0001';
+  const L2 = '00000000-0000-0000-0000-0000000c0002';
+  await db.query(`insert into lectures (id) values ($1),($2)`, [L1, L2]);
+
+  // 단품 강의 결제 — 이북과 같은 부분 유니크가 그대로 적용된다.
+  await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1,'lec-1','강의','lecture',$2,300,'paid','k')`, [U1, L1]);
+  let dupLec = false;
+  try {
+    await db.query(
+      `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+       values ($1,'lec-1b','강의','lecture',$2,300,'paid','k')`, [U1, L1]);
+  } catch (e) { dupLec = /duplicate key|payments_paid_product_uniq/i.test(String(e?.message ?? '')); }
+  rec('⭐ 같은 강의를 두 번 결제 완료할 수 없다', dupLec, true);
+
+  // ⭐ 같은 카탈로그의 교재 묶음과 강의 묶음은 **서로 다른 상품**이다(접두사가 그 구분을 담는다).
+  //    안 갈리면 교재를 통으로 산 사람이 강의를 통으로 살 때 부분 유니크에 걸려 영영 못 산다.
+  const SET = `${[L1, L2].sort().join('+')}`;
+  await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1,'lec-bundle','강의 외 1편','bundle',$2,540,'paid','k')`, [U2, `lecture:leveltest:${SET}`]);
+  await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1,'book-bundle','교재 외 1권','bundle',$2,180,'paid','k')`, [U2, `ebook:leveltest:${SET}`]);
+  const both = (await db.query(
+    `select count(*)::int as n from payments where user_id=$1 and product_type='bundle' and status='paid'`, [U2])).rows[0];
+  rec('⭐ 같은 목록이어도 교재 묶음 / 강의 묶음은 따로 산다', both.n, 2);
+
+  // 묶음 줄에 강의가 담긴다(교재와 같은 자리).
+  const lpid = (await db.query(`select id from payments where order_id='lec-bundle'`)).rows[0].id;
+  rec('묶음 줄에 강의 허용', await failsWith(() => db.query(
+    `insert into payment_items (payment_id, product_type, product_ref, list_amount, amount)
+     values ($1,'lecture',$2,300,270),($1,'lecture',$3,300,270)`, [lpid, L1, L2])), null);
+  // ⭐ 그래도 응시권은 여전히 못 담는다 — 넓힌 CHECK 이 exam 까지 열어버리면 이중결제 방어가 샌다.
+  let examLine2 = false;
+  try {
+    await db.query(
+      `insert into payment_items (payment_id, product_type, product_ref, list_amount, amount)
+       values ($1,'exam','round:pro',100,100)`, [lpid]);
+  } catch (e) { examLine2 = /check|payment_items_product_type_check/i.test(String(e?.message ?? '')); }
+  rec('⭐ 강의 묶음에도 응시권은 못 들어감', examLine2, true);
+
+  // lecture_purchases — 이북 구매표와 같은 모양(같은 코드가 두 표를 다룬다).
+  const lcols = (await db.query(
+    `select column_name from information_schema.columns where table_schema='public' and table_name='lecture_purchases'`,
+  )).rows.map((r) => r.column_name);
+  for (const c of ['user_id', 'lecture_id', 'price_paid', 'source', 'payment_id', 'payment_ref']) {
+    rec(`lecture_purchases.${c} 존재`, lcols.includes(c), true);
+  }
+  await db.query(`insert into lecture_purchases (user_id, lecture_id, price_paid, source) values ($1,$2,300,'pg')`, [U1, L1]);
+  let dupOwn = false;
+  try {
+    await db.query(`insert into lecture_purchases (user_id, lecture_id) values ($1,$2)`, [U1, L1]);
+  } catch (e) { dupOwn = /duplicate key/i.test(String(e?.message ?? '')); }
+  rec('⭐ 같은 강의를 두 번 보유할 수 없다(최종 방어선)', dupOwn, true);
+
+  // ⭐ 환불 회수는 payment_id 로 이 결제분만 짚는다 → 결제를 지워도 시청권은 남고 참조만 끊긴다.
+  //    (이북과 달리 cascade 로 지우면 "환불했더니 남의 구매까지 사라졌다" 를 만들 수 있다.)
+  const p1 = (await db.query(`select id from payments where order_id='lec-1'`)).rows[0].id;
+  await db.query(`update lecture_purchases set payment_id=$1 where user_id=$2 and lecture_id=$3`, [p1, U1, L1]);
+  await db.query(`delete from payments where id=$1`, [p1]);
+  const kept = (await db.query(
+    `select payment_id from lecture_purchases where user_id=$1 and lecture_id=$2`, [U1, L1])).rows[0];
+  rec('결제를 지워도 시청권은 남는다', kept !== undefined, true);
+  rec('지워진 결제 참조는 null 로 끊긴다', kept?.payment_id, null);
+
+  // RLS — payments 와 같은 취급(정책 0개 = 엣지 함수 전용). 열면 클라가 소유를 직접 만들 수 있다.
+  const lrls = (await db.query(`select relrowsecurity from pg_class where relname='lecture_purchases'`)).rows[0];
+  rec('lecture_purchases RLS 켜짐', lrls?.relrowsecurity, true);
+  const lpol = (await db.query(`select count(*)::int as n from pg_policies where tablename='lecture_purchases'`)).rows[0];
+  rec('lecture_purchases 정책 0개(서비스롤 전용)', lpol.n, 0);
+
+  // 값 — 달러 센트 정수. 음수는 못 들어온다(lectures_price_chk).
+  let negPrice = false;
+  try {
+    await db.query(`alter table lectures add column if not exists price_usd_cents integer not null default 0`);
+    await db.query(`insert into lectures (id, price_usd_cents) values (gen_random_uuid(), -1)`);
+  } catch (e) { negPrice = /check|lectures_price_chk/i.test(String(e?.message ?? '')); }
+  rec('강의 가격 음수 거부', negPrice, true);
 }
 
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);

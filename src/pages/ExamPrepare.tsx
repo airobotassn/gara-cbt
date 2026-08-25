@@ -151,8 +151,11 @@ export default function ExamPrepare() {
       //    응시권이 2장 이상이면 서버가 어느 걸 쓸지 몰라 409 pick_ticket 으로 튕긴다.
       //    그 상태에서 고를 화면이 없으면 **돈은 다 냈는데 어느 시험도 시작 못 하는** 상태가 된다.
       //    값은 마이페이지 응시권 카드 → navigate state, 또는 URL ?ticket= 로 들어온다.
+      // ⚠️ lang 은 **응시 언어**다 — 서버가 이 값으로 문항을 투영하고 exam_attempts.lang 에 못박는다.
+      //    빠뜨리면 서버 기본값(ko)이라 외국어 사용자가 한국어 시험지를 받는다.
       const res = await callFunction<StartExamResponse>('start-exam', {
         examSlug: DEFAULT_EXAM_SLUG,
+        lang,
         ...(ticketId ? { ticketId } : {}),
       })
       navigate(`/exam/run/${res.attemptId}`, { state: res })

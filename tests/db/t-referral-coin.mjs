@@ -1,5 +1,6 @@
-// T-Referral-Coin — 친구 초대 보상(코인 50, 양쪽)을 pglite(WASM Postgres 18)에서 검증.
-//   대상 = 20260824130000_referral_coin.sql 의 redeem_referral RPC.
+// T-Referral-Coin — 친구 초대 보상(코인 500, 양쪽)을 pglite(WASM Postgres 18)에서 검증.
+//   대상 = 20260825200000_referral_coin_500.sql 의 redeem_referral RPC
+//         (본문은 20260824130000 과 같고 금액만 50 → 500. 두 파일을 순서대로 얹어 실제 배포 상태를 만든다).
 //
 // 이 스위트가 지키는 것 — 전부 "틀렸을 때 조용히 손해가 나는" 자리다:
 //   1) 양쪽 다 받는다. 한쪽만 주면 이 기능이 반만 동작하는데 아무도 오류를 안 본다.
@@ -44,6 +45,7 @@ await raw(`
 
 // ---- 검증 대상 ----
 await raw(readFileSync('supabase/migrations/20260824130000_referral_coin.sql', 'utf8'));
+await raw(readFileSync('supabase/migrations/20260825200000_referral_coin_500.sql', 'utf8'));
 
 const A = '00000000-0000-0000-0000-0000000000a1'; // 초대자
 const B = '00000000-0000-0000-0000-0000000000b2'; // 코드를 쓰는 사람 (uuid 가 A 보다 큼)
@@ -56,15 +58,15 @@ const coin = async (uid) =>
   (await q(`select coalesce((select points from user_currency where user_id=$1), 0)::int n`, [uid])).rows[0].n;
 
 // ============================================================
-// 1) 정상 등록 — 양쪽 50
+// 1) 정상 등록 — 양쪽 500
 // ============================================================
 const r1 = (await q(`select redeem_referral($1,'CARIAAAA') as r`, [B])).rows[0].r;
 ok('1a ok=true 로 돌아온다', r1.ok === true, r1);
-eq('1b 금액을 알려준다', r1.coin, 50);
+eq('1b 금액을 알려준다', r1.coin, 500);
 eq('1c 초대자를 알려준다(성공 문구용)', r1.inviterName, '초대자');
-eq('1d ⭐ 코드를 쓴 사람이 50 을 받는다', await coin(B), 50);
-eq('1e ⭐ 코드를 공유한 사람도 50 을 받는다', await coin(A), 50);
-eq('1f 잔액도 같이 준다', r1.balance, 50);
+eq('1d ⭐ 코드를 쓴 사람이 500 을 받는다', await coin(B), 500);
+eq('1e ⭐ 코드를 공유한 사람도 500 을 받는다', await coin(A), 500);
+eq('1f 잔액도 같이 준다', r1.balance, 500);
 const linked = (await q(`select referred_by from profiles where id=$1`, [B])).rows[0].referred_by;
 eq('1g 귀속이 박힌다', linked, A);
 
@@ -73,22 +75,22 @@ eq('1g 귀속이 박힌다', linked, A);
 // ============================================================
 const r2 = (await q(`select redeem_referral($1,'CARIAAAA') as r`, [B])).rows[0].r;
 eq('2a 두 번째 등록은 already', [r2.ok, r2.error], [false, 'already']);
-eq('2b ⭐ 코드를 쓴 사람 잔액이 안 늘어난다', await coin(B), 50);
-eq('2c ⭐ 초대자 잔액도 안 늘어난다', await coin(A), 50);
+eq('2b ⭐ 코드를 쓴 사람 잔액이 안 늘어난다', await coin(B), 500);
+eq('2c ⭐ 초대자 잔액도 안 늘어난다', await coin(A), 500);
 
 // ============================================================
 // 3) 초대자는 상한이 없다 — 다른 사람이 쓰면 또 받는다
 // ============================================================
 const r3 = (await q(`select redeem_referral($1,'CARIAAAA') as r`, [C])).rows[0].r;
 ok('3a 두 번째 사람도 등록된다', r3.ok === true, r3);
-eq('3b ⭐ 초대자가 또 받는다(상한 없음)', await coin(A), 100);
-eq('3c 두 번째 사람도 50', await coin(C), 50);
+eq('3b ⭐ 초대자가 또 받는다(상한 없음)', await coin(A), 1000);
+eq('3c 두 번째 사람도 500', await coin(C), 500);
 
 // uuid 가 초대자보다 **작은** 쪽도 똑같이 동작해야 한다 —
 // 지급이 least/greatest 로 순서를 바꿔 들어가므로, 방향이 바뀌어도 금액이 안 갈리는지 본다.
 const r4 = (await q(`select redeem_referral($1,'CARIAAAA') as r`, [Z])).rows[0].r;
 ok('3d uuid 순서가 반대여도 등록된다', r4.ok === true, r4);
-eq('3e ⭐ 잠금 순서가 뒤집혀도 양쪽 금액은 같다', [await coin(Z), await coin(A)], [50, 150]);
+eq('3e ⭐ 잠금 순서가 뒤집혀도 양쪽 금액은 같다', [await coin(Z), await coin(A)], [500, 1500]);
 
 // ============================================================
 // 4) 거절 사유가 갈린다 — 모달이 이유를 그대로 보여준다
@@ -122,12 +124,12 @@ await raw(`alter table user_currency drop constraint tmp_block;`);
 // 막은 것을 풀면 그대로 다시 받을 수 있어야 한다(5b 가 말이 되는지 끝까지 본다).
 const r5 = (await q(`select redeem_referral($1,'CARIAAAA') as r`, [E])).rows[0].r;
 ok('5c ⭐ 되돌아갔으니 다시 등록된다', r5.ok === true, r5);
-eq('5d 다시 받은 금액도 50', await coin(E), 50);
+eq('5d 다시 받은 금액도 500', await coin(E), 500);
 
 // ============================================================
 // 6) 옛 점수 보상은 이 경로에 없다
 // ============================================================
-const src = readFileSync('supabase/migrations/20260824130000_referral_coin.sql', 'utf8');
+const src = readFileSync('supabase/migrations/20260825200000_referral_coin_500.sql', 'utf8');
 // 주석에는 '옛 보상이 activity_ledger 였다'가 적혀 있다 — 실행문만 보고 판단한다.
 const srcSql = src.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
 ok('6a RPC 가 activity_ledger 를 건드리지 않는다', !srcSql.includes('activity_ledger'), srcSql.includes('activity_ledger'));

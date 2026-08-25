@@ -13,7 +13,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { krw, usdc } from '../lib/money'
-import { agreeTerms, createOrder, type CreateOrderResp, type ProductType } from '../lib/payments'
+import { agreeTerms, createOrder, type BundleKind, type CreateOrderResp, type ProductType } from '../lib/payments'
 import SiteFooter from '../components/SiteFooter'
 import { rememberPostLogin } from '../lib/postLogin'
 
@@ -76,9 +76,11 @@ export default function Checkout() {
   const productRef = params.get('ref') ?? ''
   // 원서접수 화면에서 함께 담은 교재. 여기선 **id 를 서버로 전달만** 한다(가격은 서버가 뽑는다).
   const addonEbookId = params.get('book') ?? ''
-  // 묶음 결제로 담은 이북 id 들(쉼표 구분). 여기서도 **전달만** 한다 — 금액·할인은 서버가 다시 뽑는다.
+  // 묶음 결제로 담은 id 들(쉼표 구분). 여기서도 **전달만** 한다 — 금액·할인은 서버가 다시 뽑는다.
   const bundleIdsRaw = params.get('ids') ?? ''
   const bundleIds = bundleIdsRaw ? bundleIdsRaw.split(',').filter(Boolean) : []
+  // 묶음의 종류(교재/강의). 없으면 교재 — 옛 링크가 그대로 동작해야 한다.
+  const bundleKind: BundleKind = params.get('kind') === 'lecture' ? 'lecture' : 'ebook'
 
   // URL 만 보면 바로 알 수 있는 실패는 effect 가 아니라 렌더 단계에서 판정한다
   // (effect 안에서 동기 setState 를 하면 렌더가 한 번 더 돈다 — react-hooks/set-state-in-effect).
@@ -115,7 +117,7 @@ export default function Checkout() {
 
     ;(async () => {
       try {
-        const res = await createOrder(productType, productRef, lang, addonEbookId || null, bundleIds)
+        const res = await createOrder(productType, productRef, lang, addonEbookId || null, bundleIds, bundleKind)
         // 0원 상품은 결제창을 타지 않는다 — 서버가 이미 지급했으니 결과 화면으로 바로 보낸다.
         // ⚠️ 상품 힌트는 **여기서도** 심는다. 아래 pay() 는 결제창을 열 때만 부르는데 이 갈래는 그걸
         //    건너뛰므로, 안 심으면 무료 응시권을 받고도 결과 화면이 'E-BOOK 서재로'를 띄운다.
@@ -138,7 +140,7 @@ export default function Checkout() {
     // ⚠️ bundleIds 는 매 렌더 새 배열이라 deps 에 넣으면 이펙트가 계속 돈다(주문이 그때마다 하나씩 생긴다).
     //    원문 문자열(bundleIdsRaw)만 본다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isFullUser, productType, productRef, addonEbookId, bundleIdsRaw, lang, navigate, t, preflightErr])
+  }, [authLoading, isFullUser, productType, productRef, addonEbookId, bundleIdsRaw, bundleKind, lang, navigate, t, preflightErr])
 
   async function pay() {
     if (!order?.orderId || paying || !agreed) return

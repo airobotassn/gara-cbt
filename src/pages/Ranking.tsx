@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
-import { callFunction, supabase } from '../lib/supabase'
+import { callFunction } from '../lib/supabase'
 import { countryName, flagUrl } from '../lib/regions'
 import { showPercentile, arenaLevelForScore } from '../lib/scoring'
-import { useT, type TFunc } from '../lib/i18n'
+import { useT, type TFunc, type Lang } from '../lib/i18n'
 import TopBar from '../components/TopBar'
 import { Avatar } from '../components/GemAvatar'
+import LineChart, { type AxisTick } from '../components/LineChart'
 import ShareCardModal from '../components/ShareCardModal'
 import { scopedForCard, type CardScoped, type ShareCardData } from '../lib/shareCard'
 
@@ -61,7 +62,7 @@ function avatarUrlOf(u: { image: string | null; color: string | null; mascot?: s
 // (더미 리더보드 제거 — 실데이터 또는 빈 상태만 표시)
 
 export default function Ranking() {
-  const { user, isFullUser, loading, loginWithGoogle } = useAuth()
+  const { user, isFullUser, loading, loginWithGoogle, profile } = useAuth()
   const { t, lang } = useT()
   // 사용자가 탭을 직접 고르기 전엔 null — 그동안은 아래 defaultScope 가 적용된다.
   const [picked, setPicked] = useState<Scope | null>(null)
@@ -69,34 +70,21 @@ export default function Ranking() {
   // 로그인/로그아웃하면 키가 어긋나 자동으로 다시 받는다(응답의 me 가 달라지므로).
   const [boards, setBoards] = useState<Record<string, HofResponse>>({})
   const [errs, setErrs] = useState<Record<string, boolean>>({})
-  // 탭 라벨용 내 국가·지역 코드(데이터 도착 전에도 '대한민국·서울'로 보여야 하므로 프로필에서 먼저 읽는다).
-  //   uid 를 같이 들고 있다가 렌더에서 대조 — 계정이 바뀌면 이전 사용자 코드가 남지 않는다.
-  const [profile, setProfile] = useState<{ uid: string; country: string | null; region: string | null } | null>(null)
+  // 탭 라벨용 내 국가·지역 코드. **AuthProvider 가 게이트 판정으로 이미 읽어 둔 값**을 그대로 쓴다
+  // — 예전엔 이 화면이 같은 행을 한 번 더 조회했다(계정이 바뀌면 컨텍스트가 통째로 갈리므로
+  //   옛 uid 대조 가드도 필요 없어졌다).
   const uid = user?.id ?? null
-  const myCode = uid && isFullUser && profile?.uid === uid ? profile : { country: null, region: null }
+  const myCode = uid && isFullUser && profile
+    ? { country: profile.countryCode, region: profile.regionCode }
+    : { country: null, region: null }
   // 기본 탭 = **전세계**. 랭킹은 "내가 몇 등이냐"보다 "여기가 얼마나 큰 판이냐"를 먼저 보여주는 화면이다.
   // ⚠️ 예전엔 내 지역(`myCode.region ? 'my-region' : 'global'`)이었다. 그 탓에 첫 화면이 사람 몇 명뿐인
   //    좁은 보드였고, 프로필(국가·지역) 조회가 끝날 때까지 보드 조회 자체를 미뤄야 해서 첫 화면도 늦었다.
   //    상수가 되면서 그 대기(profileReady 게이트)도 같이 없앴다 — 내 지역은 탭으로 한 번 누르면 된다.
   const defaultScope: Scope = 'global'
   const scope = picked ?? defaultScope
-
-  useEffect(() => {
-    if (!uid || !isFullUser) return
-    let alive = true
-    supabase
-      .from('profiles')
-      .select('country_code,region_code')
-      .eq('id', uid)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive) return
-        setProfile({ uid, country: data?.country_code ?? null, region: data?.region_code ?? null })
-      })
-    return () => {
-      alive = false
-    }
-  }, [uid, isFullUser])
+  // 순위 추이 모달 — 열려 있는 동안만 조회한다(닫혀 있으면 요청이 0건).
+  const [trendOpen, setTrendOpen] = useState(false)
 
   // 보드 조회 — 랭킹은 공개라 비로그인도 전세계 탭은 본다(서버가 me 만 비움).
   const cacheKey = `${isFullUser ? 'u' : 'g'}:${scope}`
@@ -219,8 +207,20 @@ export default function Ranking() {
   //   고정: 내 순위 바 (창 밖이라 순위 행과 겹칠 수 없다)
   return (
     <div className="wrap hof-wrap">
-      {/* 랭킹 진입점이 허브(CARI) 도크 CTA 라 뒤로가기도 허브로 */}
-      <TopBar to="/hub" label={t('common.my_home')} />
+      {/* 뒤로가기 줄. 오른쪽 끝에 '순위 추이'를 얹는다 — 칩 높이가 뒤로가기와 같아서
+          한 화면 고정 틀에 **세로를 한 픽셀도 더 쓰지 않는다**(아래에 섹션을 붙이면 그 틀이 깨진다).
+          ⚠️ 내 순위 바에 붙이지 않았다: 그 바는 이미 '눌러서 내 행으로' 에 눌림을 쓰고 있어
+             같은 자리에 두 가지 뜻이 겹친다. */}
+      <div className="hof-topline">
+        {/* 랭킹 진입점이 허브(CARI) 도크 CTA 라 뒤로가기도 허브로 */}
+        <TopBar to="/hub" label={t('common.my_home')} />
+        {isFullUser ? (
+          <button type="button" className="hof-trend-btn" onClick={() => setTrendOpen(true)}>
+            <span className="material-symbols-outlined">timeline</span>
+            {t('rank.trend_title')}
+          </button>
+        ) : null}
+      </div>
 
       {/* 제목은 페이지 전체의 제목이라 탭바 **위**, 전체 폭 가운데다.
           (한때 본문 안에 있었는데, 2단이 되면서 왼쪽 칸 안에 갇혀 화면 기준으로 왼쪽에 치우쳐 보였다.
@@ -296,6 +296,156 @@ export default function Ranking() {
           onClose={() => { setCardOf(null); setCardRanks(null) }}
         />
       ) : null}
+
+      {trendOpen ? (
+        <TrendModal t={t} lang={lang} board={scope} label={labelOf(scope)} onClose={() => setTrendOpen(false)} />
+      ) : null}
+    </div>
+  )
+}
+
+// ===== 순위 추이 =====
+// 내 등수가 날짜별로 어떻게 움직였나. **선은 순위 하나**고 그날 점수는 툴팁으로만 준다
+// (옛 마이페이지 '학습 대시보드'의 같은 이름 그래프는 실제로는 레벨테스트 점수를 그리고 있었다 —
+//  이름과 내용이 달랐던 걸 2026-08-25 에 이쪽으로 옮기면서 바로잡았다).
+//
+// ⚠️ **축을 뒤집는다**(LineChart 의 invert). 등수는 숫자가 작을수록 잘한 것이라, 그대로 그리면
+//    순위가 올랐는데 선이 내려가서 "잘하고 있다"가 거꾸로 읽힌다.
+// ⚠️ 범위는 **보고 있는 탭**을 따라간다. 다만 국가·지역 코드는 서버가 내 프로필에서 읽는다
+//    (클라가 지정하게 하면 남의 보드 이력을 훑는 길이 된다).
+// ⚠️ 지금은 순위선이 점수선과 사실상 같은 그림이다 — 상대인 더미 3만5천이 상수라 내 순위를
+//    움직이는 게 사실상 내 점수뿐이다. 사람이 모이면 그때 갈린다.
+type TrendRange = '1w' | '3m' | 'season'
+const TREND_DAYS: Record<TrendRange, number> = { '1w': 7, '3m': 90, season: 180 }
+const TREND_TABS: { key: TrendRange; label: string }[] = [
+  { key: '1w', label: 'db.trend_1w' },
+  { key: '3m', label: 'db.trend_3m' },
+  { key: 'season', label: 'db.trend_season' },
+]
+const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+interface TrendPoint { day: string; rank: number; score: number }
+
+function TrendModal({
+  t, lang, board, label, onClose,
+}: {
+  t: TFunc
+  lang: Lang
+  board: Scope
+  label: string
+  onClose: () => void
+}) {
+  const [range, setRange] = useState<TrendRange>('season')
+  // 기간 자르기 기준 시각은 열 때 한 번만 고정한다(렌더마다 Date.now() 를 읽으면 순수하지 않다).
+  const [nowTs] = useState(() => Date.now())
+  // 범위(탭)별로 따로 캐시 — 기간 탭을 오갈 때 다시 부르지 않는다.
+  //   ⚠️ 항상 **가장 넓은 기간**(season)으로 한 번만 받고 화면에서 잘라 쓴다. 기간마다 요청하면
+  //      같은 값을 세 번 받는다(서버가 주는 건 어차피 하루 한 점이라 크지도 않다).
+  const [points, setPoints] = useState<TrendPoint[] | null>(null)
+  const [state, setState] = useState<'load' | 'ok' | 'auth' | 'region' | 'err'>('load')
+
+  // 한 번만 돈다 — 모달이 떠 있는 동안 탭바는 백드롭에 가려 못 누르므로 board 가 안 바뀐다
+  // (그래서 여기서 'load' 로 되돌릴 일도 없다 — 초기값이 이미 그것이다).
+  useEffect(() => {
+    let alive = true
+    callFunction<{ points?: TrendPoint[]; needsAuth?: boolean; needsRegion?: boolean }>('leaderboard', {
+      scope: 'trend', board, days: TREND_DAYS.season,
+    })
+      .then((r) => {
+        if (!alive) return
+        if (r.needsAuth) { setState('auth'); return }
+        if (r.needsRegion) { setState('region'); return }
+        setPoints(r.points ?? [])
+        setState('ok')
+      })
+      .catch(() => { if (alive) setState('err') })
+    return () => { alive = false }
+  }, [board])
+
+  const from = nowTs - TREND_DAYS[range] * 86400000
+  const data = useMemo(
+    () => (points ?? [])
+      .map((p) => {
+        const dt = new Date(`${p.day}T00:00:00`)
+        return { v: p.rank, t: dt.getTime(), date: dt.toLocaleDateString(), note: t('rank.pt', { n: p.score }) }
+      })
+      .filter((p) => p.t >= from),
+    [points, from, t],
+  )
+
+  // x축 눈금 — 1주일은 하루 간격(M/D), 3개월·시즌은 월 시작(월 이름).
+  const ticks = useMemo<AxisTick[]>(() => {
+    const monthTick = (m: number) => (lang === 'en' ? EN_MONTHS[m - 1] : lang === 'ja' || lang === 'zh' ? `${m}月` : `${m}월`)
+    const out: AxisTick[] = []
+    const d = new Date(from)
+    d.setHours(0, 0, 0, 0)
+    if (range === '1w') {
+      d.setDate(d.getDate() + 1)
+      for (; d.getTime() <= nowTs; d.setDate(d.getDate() + 1)) {
+        out.push({ t: d.getTime(), label: `${d.getMonth() + 1}/${d.getDate()}` })
+      }
+    } else {
+      d.setDate(1)
+      d.setMonth(d.getMonth() + 1) // 구간 안에 온전히 들어오는 달의 1일부터
+      for (; d.getTime() <= nowTs; d.setMonth(d.getMonth() + 1)) {
+        out.push({ t: d.getTime(), label: monthTick(d.getMonth() + 1) })
+      }
+    }
+    return out
+  }, [range, from, nowTs, lang])
+
+  return (
+    <div className="hof-modal-backdrop" onClick={onClose}>
+      <div className="hof-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="hof-modal-head">
+          <h3>
+            {t('rank.trend_title')}
+            {/* 어느 보드의 등수인지 — 전세계/대한민국/서울처럼 탭 이름을 그대로 단다.
+                안 달면 국가 탭에서 연 3위와 전세계 3위가 화면에서 구분이 안 된다. */}
+            <span className="hof-modal-sub">{label}</span>
+          </h3>
+          <button className="hof-modal-close" onClick={onClose} aria-label={t('common.close')}>×</button>
+        </div>
+
+        <div className="trend-seg" role="tablist" aria-label={t('rank.trend_title')}>
+          {TREND_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={range === tab.key}
+              className={range === tab.key ? 'on' : ''}
+              onClick={() => setRange(tab.key)}
+            >
+              {t(tab.label)}
+            </button>
+          ))}
+        </div>
+
+        {state === 'load' ? (
+          <p className="hof-modal-msg">{t('common.loading')}</p>
+        ) : state === 'region' ? (
+          <p className="hof-modal-msg">{t('rank.scope_no_region')}</p>
+        ) : state === 'err' || state === 'auth' ? (
+          <p className="hof-modal-msg">{t('result.load_failed')}</p>
+        ) : (
+          <>
+            <LineChart
+              data={data}
+              from={from}
+              to={nowTs}
+              ticks={ticks}
+              height={250}
+              // 등수는 작을수록 위 — 선이 올라가면 순위가 오른 것.
+              invert
+              format={(v) => t('rank.nth', { n: Math.round(v).toLocaleString() })}
+              // 순위는 값이 커서(수천) 비율 여유만 두면 하루 20등 움직인 게 안 보인다.
+              padMin={8}
+              emptyText={t('rank.trend_empty')}
+            />
+            <p className="hof-modal-msg small">{t('rank.trend_help')}</p>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -444,7 +594,7 @@ function PersonalBoard({
       ) : (
         <>
           {/* === 시상대 TOP 3 ===
-              그림 = public/ranking/podium.png. 아바타는 각 단 **위에 떠서** 윗면에 살짝 걸치고,
+              그림 = public/ranking/podium-gara-2026.png. 아바타는 각 단 **위에 떠서** 윗면에 살짝 걸치고,
               이름·점수는 그림 **아래** 3칸에 둔다(새 그림엔 글자를 얹을 빈 면이 없다 — 단 앞면은
               큼직한 1·2·3 숫자가 차지한다). 둘 다 그림 기준 %좌표(실측값은 ranking.css 주석).
               글자 크기는 cqw 라 그림과 같이 줄어든다. */}

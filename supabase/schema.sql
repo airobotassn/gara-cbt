@@ -115,6 +115,10 @@ create table if not exists exam_attempts (
   result_release_at timestamptz,         -- 이 시각 이후에만 점수/오답 공개(제출 +7일)
   total_questions int,
   total_correct int,
+  -- 응시 중 답안 임시보관(복구용). [{number, selectedIndex, answerText}, ...]
+  --   ⛔ 채점 결과가 아니다 — 그건 attempt_answers 에 문항별로 남는다(주관식 검수 큐·정답률 집계가 그 행을 쓴다).
+  --      임시보관을 그 행에 얹어 두면 하트비트가 30초마다 문항 수만큼 UPDATE 를 쏜다(20260825170000).
+  draft_answers jsonb,
   created_at timestamptz default now()
 );
 create index if not exists exam_attempts_round_idx on exam_attempts(round_id);

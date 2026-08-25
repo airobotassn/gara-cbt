@@ -239,8 +239,18 @@ async function lectureUpsert(admin: any, body: any) {
     // 한 강의는 한 카탈로그에만 속한다(DB CHECK 과 같은 규칙) — 반대편 분류는 반드시 비운다.
     target_level: catalog === 'leveltest' ? (l.targetLevel ?? null) : null,
     target_tier: catalog === 'caris' ? (l.targetTier ?? null) : null,
-    youtube_id: vid, title: String(l.title), channel: String(l.channel ?? ''),
+    youtube_id: vid, title: String(l.title),
+    // ⚠️ 채널은 관리자 화면에서 뺐다(2026-08-25) — 우리가 만든 강의를 파는 것이라 '어느 채널 영상인가'가
+    //    쓸 정보가 아니다. 화면이 안 보내므로 저장할 때마다 빈 값이 되고, 사용자 화면은 비면 그 줄을 안 그린다.
+    //    ⛔ 컬럼은 남겨둔다 — 지우면 옛 행의 값까지 사라져 되돌릴 수 없다.
+    channel: String(l.channel ?? ''),
     description: String(l.description ?? ''),
+    // 정가 — **달러 센트**(100 = $1.00). 이북과 같은 단위다. 0 = 무료(결제창을 안 타고 바로 지급).
+    //   ⚠️ 음수·소수·NaN 을 그대로 넣지 않는다 — DB CHECK 이 막아주지만 여기서 접어야 오류가 안 뜬다.
+    price_usd_cents: Math.max(0, Math.round(Number(l.priceUsdCents ?? 0)) || 0),
+    // 목록 썸네일. 비우면 유튜브 썸네일 폴백 — 그 주소엔 영상 id 가 박혀 있어 **미소유자에게 노출된다**
+    //   (파는 강의는 미등록 업로드 + 자체 썸네일이 한 쌍이다. ebooks 함수 머리 주석 참고).
+    thumb_url: String(l.thumbUrl ?? '').trim() || null,
     published: l.published !== false, sort_order: Number(l.sortOrder ?? 0),
   }
   const q = l.id ? admin.from('lectures').update(row).eq('id', l.id) : admin.from('lectures').insert(row)

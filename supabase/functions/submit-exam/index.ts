@@ -103,41 +103,63 @@ Deno.serve(async (req) => {
     //  · 객관식: 정답 비교 자동채점(review_status=auto)
     //  · 주관식: 허용답안(answer_key, 줄바꿈 목록) 있으면 정규화 정확일치 자동채점(auto).
     //           허용답안이 없으면(미큐레이션) 기존대로 보류(pending) → 관리자 수동검수 폴백.
+    // ⚠️ 채점 결과 쓰기는 **모아서 한 파로** 내보낸다. 예전엔 문항마다 UPDATE 를 줄 세워서,
+    //    40문항이면 응시자가 제출 버튼을 누른 채 40왕복을 그대로 기다렸다(2026-08-25).
+    //    각 UPDATE 는 `.eq('id', row.id)` 로 서로 다른 행 하나씩만 건드려 의존이 없다.
+    // ⛔ **한 건이라도 실패하면 제출을 확정하지 않는다.** 예전엔 오류를 아예 안 봤다 —
+    //    중간에 끊기면 앞 문항만 채점된 채 아래 status='submitted' 가 찍혀 그대로 굳었다.
+    //    지금은 그 상태로 응시가 남으므로(in_progress) 다시 제출할 수 있다.
     let totalCorrect = 0
+    const writes: Promise<{ error: { message: string } | null }>[] = []
     for (const row of assigned as any[]) {
       const sub = submittedMap.get(row.question_id)
       const kind = row.questions?.kind ?? 'mc'
       const timeSpent = Math.max(0, Math.floor(sub?.timeSpent ?? 0))
       if (kind === 'short') {
         const answerKey: string | null = row.questions?.answer_key ?? null
-        const auto = parseAcceptedAnswers(answerKey).length > 0
+        // ⛔ **한국어로 응시한 사람만 자동채점한다**(2026-08-25 문항 다국어화).
+        //    자동채점은 한국어 모범답안(answer_key)과의 정규화 정확일치인데, 일본어로 출제된 문제에
+        //    일본어로 답한 사람은 절대 일치하지 않는다 → 예전 코드는 그걸 그대로 **오답(auto)** 으로
+        //    확정해 버렸다. 채점자가 다시 볼 기회조차 없이 조용히 틀린 것으로 남는 종류의 사고다.
+        //    ⚠️ 모범답안을 5개국어로 번역해도 이 문제는 안 풀린다 — 서술형 답안은 표현이 제각각이라
+        //       애초에 정확일치로 채점할 수 있는 물건이 아니다. 사람이 봐야 한다(pending).
+        const koAttempt = (attempt.lang ?? 'ko') === 'ko'
+        const auto = koAttempt && parseAcceptedAnswers(answerKey).length > 0
         const ok = auto && matchShort(sub?.answerText, answerKey)
         if (ok) totalCorrect += 1
-        await admin
-          .from('attempt_answers')
-          .update({
-            answer_text: sub?.answerText ?? null,
-            selected_index: null,
-            is_correct: auto ? ok : null,
-            review_status: auto ? 'auto' : 'pending',
-            time_spent: timeSpent,
-          })
-          .eq('id', row.id)
+        writes.push(
+          admin
+            .from('attempt_answers')
+            .update({
+              answer_text: sub?.answerText ?? null,
+              selected_index: null,
+              is_correct: auto ? ok : null,
+              review_status: auto ? 'auto' : 'pending',
+              time_spent: timeSpent,
+            })
+            .eq('id', row.id),
+        )
         continue
       }
       const selected = sub?.selectedIndex ?? null
       const correctIndex = row.questions?.correct_index ?? -1
       const isCorrect = selected !== null && selected === correctIndex
       if (isCorrect) totalCorrect += 1
-      await admin
-        .from('attempt_answers')
-        .update({
-          selected_index: selected,
-          is_correct: isCorrect,
-          review_status: 'auto',
-          time_spent: timeSpent,
-        })
-        .eq('id', row.id)
+      writes.push(
+        admin
+          .from('attempt_answers')
+          .update({
+            selected_index: selected,
+            is_correct: isCorrect,
+            review_status: 'auto',
+            time_spent: timeSpent,
+          })
+          .eq('id', row.id),
+      )
+    }
+    const failed = (await Promise.all(writes)).find((r) => r?.error)
+    if (failed?.error) {
+      return json({ error: '채점 결과를 저장하지 못했습니다. 잠시 후 다시 제출해주세요.' }, 500)
     }
 
     // 결과 공개 시각.

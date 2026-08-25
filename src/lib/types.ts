@@ -322,9 +322,18 @@ export interface AdminQuestionRow {
   answer_key: string | null
   explanation: string | null // 정답 해설/풀이(관리자 전용 · 응시/결과 비노출)
   active: boolean
+  // 다국어 — 한국어는 위 prompt·choices 가 정본이고 여기엔 **번역본만** 있다(ko 키 없음).
+  prompt_i18n?: Record<string, string>
+  choices_i18n?: Record<string, string[]>
+  // 아직 번역이 안 된 언어 코드. 서버(questionList)가 계산해서 내려준다 —
+  // ⚠️ 화면에서 다시 세지 말 것. 판정이 두 벌이 되면 '미번역' 표시와 완료율이 서로 다른 말을 한다.
+  missing?: string[]
 }
 export interface AdminQuestionListResp {
   rows: AdminQuestionRow[]
+  coverage?: Record<string, number> // 언어별 번역 완료 문항 수
+  total?: number
+  langs?: string[] // 번역 대상 언어(ko 제외)
 }
 
 export interface AdminQuestionEvent {
@@ -481,20 +490,28 @@ export interface EbookRow {
   owned: boolean
   purchasedAt?: string // 서재(library) 응답에만
 }
-/** 관리자가 등록한 강의 한 건(lectures 테이블). 코드에 박힌 lib/lectures.ts 를 대체한다. */
+/** 관리자가 등록한 강의 한 건(lectures 테이블). **이북과 같은 유료 상품이다**(2026-08-25).
+ *  ⛔ `id` 는 우리 uuid 지 유튜브 id 가 아니다 — 결제·소유가 그 uuid 로 걸린다. */
 export interface ServerLecture {
   id: string
   catalog: 'leveltest' | 'caris'
   targetLevel: number | null
   targetTier: string | null
-  youtubeId: string
+  /** ⛔ **산 사람에게만 내려온다**(미소유는 null). 유튜브 영상은 id 만 알면 누구나 보므로 그 값이 곧 상품이다. */
+  youtubeId: string | null
+  /** 목록 썸네일. 관리자가 넣은 값이 없으면 서버가 유튜브 썸네일 주소로 채워 준다. */
+  thumbUrl: string
+  /** 정가 — **달러 센트**(100 = $1.00). 0 = 무료. DB 컬럼명(lectures.price_usd_cents)과 같게 둔다. */
+  price_usd_cents: number
+  owned: boolean
+  purchasedAt?: string // 서재(library) 응답에만
   title: string
   channel: string
   description: string
 }
 export interface EbookListResp {
   ebooks: EbookRow[]
-  /** ⚠️ ebooks 함수를 다시 배포해야 내려온다 — 그 전 응답엔 없다(그때는 코드 목록을 쓴다). */
+  /** ⚠️ ebooks 함수를 다시 배포해야 내려온다 — 그 전 응답엔 없다(그때는 강의 열이 빈다). */
   lectures?: ServerLecture[]
 }
 /** 결과창 추천(picks) — 응시 레벨 기준으로 고른 목록. */

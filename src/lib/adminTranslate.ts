@@ -45,6 +45,10 @@ export async function runTranslation(
     seed?: (TransResult | undefined)[]
     // 배치 하나가 끝날 때마다 현재까지의 결과 스냅샷 전달(자동저장용)
     onBatch?: (results: TransResult[]) => void
+    // 어느 지갑(구글 프로젝트)으로 부를지. 기본은 레벨테스트.
+    // ⚠️ CARIS 자격검정 문항은 반드시 'caris' — 588문항이라 한 번 돌리면 그 프로젝트의 하루 한도를
+    //    크게 먹는데, 레벨테스트와 같은 지갑에 두면 그날 레벨테스트 번역까지 같이 막힌다.
+    use?: 'leveltest' | 'caris'
   },
 ): Promise<TransResult[]> {
   const results: (TransResult | undefined)[] =
@@ -63,7 +67,7 @@ export async function runTranslation(
       try {
         const r = await callFunction<{ results: (TransResult | null)[] }>(
           'translate-questions',
-          { items: payload, langs },
+          { items: payload, langs, use: opts?.use ?? 'leveltest' },
         )
         ;(r.results || []).forEach((res, k) => {
           results[idxs[k]] = res ?? { error: '빈응답' }

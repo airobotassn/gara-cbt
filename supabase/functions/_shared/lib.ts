@@ -37,6 +37,46 @@ export function projOptions(i18n: unknown, lang: string): string[] {
   return []
 }
 
+// ----- CARIS 문항 다국어 투영 (레벨테스트와 담는 모양이 다르다) -----
+// 레벨테스트(test_questions)는 prompt_i18n 안에 ko 까지 담지만, CARIS(questions)는
+// **한국어가 원본 컬럼(prompt·choices)에 있고 *_i18n 에는 번역본만** 있다.
+// 이유는 마이그레이션 20260825190000 주석 참고(관리자 화면 열 곳이 원본 컬럼을 읽는다).
+//   · ko 요청        → 원본 그대로
+//   · 번역 있음      → 번역본
+//   · 번역 없음      → 원본(한국어). 미번역 문항은 그 문항만 한국어로 뜬다 — 빈 화면보다 낫다.
+export function projKoText(base: unknown, i18n: unknown, lang: string): string {
+  const src = typeof base === 'string' ? base : ''
+  if (lang === DEFAULT_LANG) return src
+  const v = (i18n as Record<string, unknown> | null)?.[lang]
+  return typeof v === 'string' && v.trim() ? v : src
+}
+export function projKoOptions(base: unknown, i18n: unknown, lang: string): string[] {
+  const src = Array.isArray(base) ? base.map((x) => String(x ?? '')) : []
+  if (lang === DEFAULT_LANG) return src
+  const v = (i18n as Record<string, unknown> | null)?.[lang]
+  // ⚠️ 개수가 어긋난 번역본은 버리고 원본을 쓴다. 보기 순서가 곧 정답 번호(correct_index)라
+  //    개수가 다르면 정답이 다른 보기를 가리켜 **아무도 못 맞히는 문항**이 된다.
+  //    저장 경로에서도 막지만(admin questionTransSave), 서빙에서 한 번 더 본다.
+  if (Array.isArray(v) && v.length === src.length && v.every((x) => String(x ?? '').trim())) {
+    return v.map((x) => String(x))
+  }
+  return src
+}
+// 그 문항이 이 언어로 번역돼 있나 — 관리자 '미번역' 표시·완료율의 단일 판정.
+// ⚠️ 지문만 있고 보기가 없으면 미번역으로 친다(객관식은 둘 다 있어야 응시가 성립한다).
+export function questionTranslated(
+  row: { prompt_i18n?: unknown; choices_i18n?: unknown; choices?: unknown },
+  lang: string,
+): boolean {
+  if (lang === DEFAULT_LANG) return true
+  const p = (row.prompt_i18n as Record<string, unknown> | null)?.[lang]
+  if (typeof p !== 'string' || !p.trim()) return false
+  const srcLen = Array.isArray(row.choices) ? row.choices.length : 0
+  if (srcLen === 0) return true // 주관식 — 보기가 없으므로 지문만 보면 된다
+  const o = (row.choices_i18n as Record<string, unknown> | null)?.[lang]
+  return Array.isArray(o) && o.length === srcLen && o.every((x) => String(x ?? '').trim())
+}
+
 // ----- 클라이언트 -----
 export function adminClient(): SupabaseClient {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
