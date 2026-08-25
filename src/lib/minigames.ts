@@ -13,6 +13,11 @@ export interface MiniGame {
    *  ⚠️ 게임 HTML 의 body 배경과 짝 — 한쪽만 바꾸면 상단에 이색 띠가 생긴다.
    *  밝기는 자동 판정(어두우면 흰 글자) — MiniGame.tsx 의 isDark 참고. */
   frame: string
+  /** 게임 본체(스테이지)의 최대 가로폭 px — 플레이 화면 상단 바를 이 폭으로 좁혀 게임과 왼쪽 끝을 맞춘다.
+   *  ⚠️ 게임 HTML 안의 스테이지 폭과 짝이다(.stage 의 `width:min(Npx,100vw)` 또는 #app 의 `max-width`).
+   *     한쪽만 바꾸면 상단 바가 게임보다 넓거나 좁게 떠서 왼쪽 끝이 어긋난다.
+   *  좁은 화면에선 게임이 100vw 라 바도 자동으로 화면 전체 폭이 된다(min 으로 접힌다). */
+  stage: number
 }
 
 export const MINIGAMES: MiniGame[] = [
@@ -22,6 +27,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/beat-cari-cover-gameplay-v1.webp',
     src: '/games/beat-cari.html',
     frame: '#241830', // 동굴 아트 암부색
+    stage: 460,
   },
   {
     id: 'shoot-cari',
@@ -29,6 +35,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/shoot-cari-cover.webp',
     src: '/games/shoot-cari.html',
     frame: '#05021c', // 게임 body 와 동일한 우주 남색
+    stage: 460,
   },
   {
     id: 'pick-cari',
@@ -36,6 +43,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/pick-cari-cover-gameplay-v1.webp',
     src: '/games/pick-cari.html',
     frame: '#e3ebf7', // 스테이지가 크림/밝은 톤이라 밝은 프레임 유지(게임 body 와 동일)
+    stage: 460,
   },
   // 아래 둘은 용어 퀴즈가 아니라 로봇 조작/코딩 퍼즐이다(문제 은행을 쓰지 않는다) — 뱃지 문구도 그렇게 구분했다.
   {
@@ -44,6 +52,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/reach-cari-cover.webp',
     src: '/games/reach-cari.html',
     frame: '#09172c', // 게임 body 의 연구실 외곽 남색과 동일
+    stage: 460,
   },
   {
     id: 'program-cari',
@@ -51,6 +60,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/program-cari-cover-v2.webp',
     src: '/games/program-cari.html',
     frame: '#e3ebf7', // 위와 동일 팔레트(같은 시안에서 나온 자매 게임)
+    stage: 460,
   },
   {
     id: 'build-cari',
@@ -58,6 +68,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/build-cari-cover-gameplay-v1.webp',
     src: '/games/build-cari.html',
     frame: '#d8d4ca', // 지상형 스마트팩토리 작업실 가장자리 색
+    stage: 460,
   },
   // 아래 둘은 용어 퀴즈도 조작 퍼즐도 아닌 '판단' 계열이다 —
   // 규정을 읽고 서류를 가리거나(막아라), 지시를 골라 결과를 맞춘다(시켜라).
@@ -67,6 +78,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/block-cari-cover-gameplay-v1.webp',
     src: '/games/block-cari.html',
     frame: '#14161d', // 게임 body 그라디언트의 가장 어두운 끝
+    stage: 520,
   },
   {
     id: 'order-cari',
@@ -76,6 +88,7 @@ export const MINIGAMES: MiniGame[] = [
     // ⚠️ 옛 값 #d5dded(밝은 공방 톤)은 v4 아트로 갈면서 죽었다 — body 가 어두운 공장(#071426)이 되며
     //   isDark 가 '밝다'로 판정해 흰 상단 바가 검은 게임 위에 이색 띠로 얹혔다(2026-08-14).
     frame: '#071426', // 게임 body 바탕색과 동일
+    stage: 520,
   },
   {
     id: 'feel-cari',
@@ -84,6 +97,7 @@ export const MINIGAMES: MiniGame[] = [
     art: '/games/feel-cari-cover-gameplay-v2.webp',
     src: '/games/feel-cari.html',
     frame: '#070a14', // 게임 body 그라디언트의 가장 어두운 끝
+    stage: 520,
   },
 ]
 

@@ -162,9 +162,14 @@ export default function MiniGame() {
   const dark = isDark(game.frame)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: game.frame }}>
+      {/* 상단 바는 게임 스테이지와 같은 폭으로 좁혀 가운데 세운다(2026-08-25) — 게임은 iframe 안에서
+          가운데 정렬된 좁은 판(460/520px)이라, 바가 화면 전체 폭이면 넓은 화면에서 '‹미니게임'·제목만
+          저 멀리 왼쪽 끝에 떨어져 게임과 남남으로 보인다. 폭의 출처는 minigames.ts 의 stage 하나. */}
       <header
         style={{
           flex: '0 0 auto',
+          width: `min(${game.stage}px, 100vw)`,
+          margin: '0 auto', // flex column 의 교차축 가운데 정렬 = 게임 스테이지와 같은 선
           display: 'flex',
           alignItems: 'center',
           gap: 10,
@@ -179,8 +184,10 @@ export default function MiniGame() {
           onClick={() => navigate('/games')}
           aria-label={t('mg.title')}
           style={{
+            flex: '0 0 auto',
             display: 'inline-flex',
             alignItems: 'center',
+            whiteSpace: 'nowrap',
             gap: 6,
             padding: '7px 13px 7px 10px',
             borderRadius: 999,
@@ -194,8 +201,10 @@ export default function MiniGame() {
         >
           <span style={{ fontSize: 15, lineHeight: 1 }}>‹</span> {t('mg.title')}
         </button>
-        <strong style={{ fontSize: 15, color: dark ? '#fff' : '#28324c', letterSpacing: '-.01em' }}>{t(`mg.${game.id}.title`)}</strong>
-        <span style={{ fontSize: 11.5, color: dark ? 'rgba(255,255,255,.6)' : '#7c869e', fontWeight: 700 }}>{t(`mg.${game.id}.tagline`)}</span>
+        {/* 게임명은 줄바꿈 금지 — 바가 게임 폭(460px)이라 게스트 칩까지 서면 '버텨라 / CARI' 로 접혀 바가 2단이 된다. */}
+        <strong style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 15, color: dark ? '#fff' : '#28324c', letterSpacing: '-.01em' }}>{t(`mg.${game.id}.title`)}</strong>
+        {/* 바가 게임 폭으로 좁아져서(460px) 게스트 칩까지 서면 빠듯하다 — 밀려나는 건 태그라인 하나뿐이다. */}
+        <span style={{ fontSize: 11.5, color: dark ? 'rgba(255,255,255,.6)' : '#7c869e', fontWeight: 700, flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t(`mg.${game.id}.tagline`)}</span>
         {/* 게스트 안내 — 태그라인 자리를 뺏지 않게 오른쪽 끝으로 민다. 플레이를 막지 않으므로 배너가 아니라 칩이다. */}
         {!isFullUser && (
           <button
