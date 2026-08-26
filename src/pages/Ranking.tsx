@@ -182,8 +182,13 @@ export default function Ranking() {
         avatarUrl: avatarUrlOf(cardOf),
         seed: cardOf.name,
         percentile: cardOf.percentile,
-        rank: cardOf.rank,
-        rankTotal: data?.total ?? null,
+        // ⛔ **목록 행의 순위(cardOf.rank)를 World 칸에 넣지 말 것.** 그건 지금 보고 있는 탭의 순위라
+        //    전세계 탭에서만 전세계 순위다 — 경기도 탭에서 누르면 'World 4위 · 대한민국 9위' 처럼
+        //    **월드가 국가보다 앞서는** 카드가 나온다(2026-08-26에 그렇게 나가 있었다).
+        //    전세계 탭에서만 행의 값을 그대로 쓰고, 다른 탭에선 서버 응답(scopedForCard)을 기다린다
+        //    — 그동안은 '—' 다. 틀린 숫자를 잠깐 보여주느니 빈칸이 낫다.
+        rank: cardRanks?.worldRank ?? (scope === 'global' ? cardOf.rank : null),
+        rankTotal: cardRanks?.worldTotal ?? (scope === 'global' ? data?.total ?? null : null),
         countryRank: cardRanks?.countryRank ?? null, countryTotal: cardRanks?.countryTotal ?? null,
         regionRank: cardRanks?.regionRank ?? null, regionTotal: cardRanks?.regionTotal ?? null,
         country: cardRanks?.country ?? null,

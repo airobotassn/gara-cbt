@@ -15,9 +15,11 @@ const VALID_DESTS = new Set([
   // WORLD ARENA 계열
   '/arena', '/test/select', '/ranking', '/hub', '/games', '/daily',
   // CARIS 자격검정
-  '/guide', '/exam/apply', '/exam', '/exam/check', '/certificate',
+  '/guide', '/plan', '/exam/apply', '/exam', '/exam/check', '/certificate',
   // 내 정보
-  '/mypage', '/mypage/ebooks', '/ebooks', '/login',
+  //   ⚠️ `/mypage` 는 더 이상 어떤 인텐트의 목적지가 아니다 — 2026-08-25 에 그 기본 화면이
+  //      이북 서재가 되면서 "내 점수" 검색이 서재로 떨어졌다. 지금은 응시 현황 탭으로 직행한다.
+  '/mypage/attempts', '/mypage/ebooks', '/ebooks', '/login',
   // 사이트 정보
   '/about', '/notice', '/faq', '/terms', '/privacy',
 ])
@@ -33,20 +35,23 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/미니\s?게임|게임|mini\s?game|ゲーム|游戏|trò chơi|버텨라|쏴라|골라라/)) return '/games'
   if (h(/오늘의?\s?(학습|문제|공부)|데일리|daily|今日の(学習|問題)|デイリー|今日学习|每日|học hôm nay|hằng ngày/)) return '/daily'
   // --- 이북(허브 '상점' 보다 먼저) ---
-  if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재)|산\s?책|my\s?e-?book|e-?book\s?library|本棚|購入した本|我的电子书|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
-  if (h(/이북|e-?book|전자책|전자\s?교재|교재|電子書籍|电子书|sách điện tử/)) return '/ebooks'
+  if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재|강의)|산\s?책|내\s?강의|my\s?e-?book|e-?book\s?library|my\s?lecture|本棚|購入した本|我的电子书|我的课程|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
+  if (h(/이북|e-?book|전자책|전자\s?교재|교재|강의|인강|lecture|online\s?course|電子書籍|講義|电子书|课程|sách điện tử|bài giảng/)) return '/ebooks'
   // --- 캐릭터 허브 ---
   if (h(/허브|캐릭터|아바타|코인|상점|출석|hub|character|avatar|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|コイン|ショップ|出席|角色|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
   // --- 이하 기존 순서 유지 ---
   if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
-  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage'
+  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage/attempts'
   if (h(/자격증|합격증|증명서|인증서|certificate|証明書|合格証|证书|chứng chỉ của/)) return '/certificate'
   if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|gara|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
-  if (h(/문의|고객센터|환불|결제|상담|도와|도움|help|contact|support|refund|payment|問い合わせ|カスタマー|返金|客服|退款|hỏi|liên hệ|hoàn tiền|hỗ trợ/)) return '/faq'
+  if (h(/문의|고객센터|환불|결제|상담|도와|도움|의견|건의|피드백|help|contact|support|refund|payment|feedback|問い合わせ|カスタマー|返金|ご意見|客服|退款|意见|建议|hỏi|liên hệ|hoàn tiền|hỗ trợ|góp ý/)) return '/faq'
   if (h(/모의|환경\s?점검|연습\s?시험|사전\s?점검|seb|mock|practice|system\s?check|模擬|模拟|事前チェック|thi thử/)) return '/exam/check'
-  if (h(/일정|날짜|언제|회차|스케줄|schedule|日程|いつ|时间|khi nào|lịch/)) return '/guide'
+  if (h(/일정|날짜|언제|회차|스케줄|접수\s?기간|schedule|日程|いつ|时间|khi nào|lịch/)) return '/plan'
   if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
+  // ⚠️ '응시 자격' 은 **정보**를 묻는 말이라 안내로 가야 한다 — 아래 '응시' 규칙이 먼저 잡아서
+  //    시험장 입구로 보내고 있었다(2026-08-25 점검에서 발견). 그래서 이 줄이 그보다 위에 있어야 한다.
+  if (h(/응시\s?자격|수험\s?자격|지원\s?자격|eligib|受験資格|报考资格|điều kiện dự thi/)) return '/guide'
   if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
   // '카리스/caris' = 자격검정 브랜드명 → 안내로. ('카리스 아레나' 는 위 arena 규칙이 이미 가져갔다)
   if (h(/자격|급수|과목|자격검정|카리스|caris|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'

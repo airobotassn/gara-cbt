@@ -592,7 +592,9 @@ body:has(.hub) .fab-top { display: none; }
 
 /* 도크 5번째 버튼(초대하기) + 코인 옆 도움말 */
 .hub .f-invite { background: var(--red); }
-.hub .f-invite .ev { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+/* ⚠️ 배지는 칸 위 허공이 아니라 **칸 윗변에 걸쳐야** 한다(2026-08-26 지시). 예전 -11px 은 배지가
+      거의 통째로 칸 밖에 떠서 레일 간격(16px) 한가운데에 서는 바람에 어느 버튼 것인지 안 읽혔다. */
+.hub .f-invite .ev { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); white-space: nowrap;
   padding: 1px 6px; border-radius: 999px; background: var(--gold); color: var(--ink); border: 2.5px solid var(--line);
   font-size: 9.5px; font-weight: 900; }
 /* 높이는 옆 경험치 바(.exp)·코인 칩(.gchip)과 맞춘다 — 한 줄에 나란히 서는 세 요소다. */
@@ -896,13 +898,17 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
       가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
 .hub[data-ui='palace'] .fcard .bd { top: 0; right: 8px; }
-/* EVENT 배지 — 궁궐 벌에서는 칸 위로 띄우지 않는다.
-   ⚠️ 기본값(-11px)은 칸 간격 16px 을 전제로 한 값이라, 간격이 6~8px 뿐인 여기서는 배지가
-      간격을 통째로 넘어 **위 칸('칭호') 라벨 위에 얹힌다** — 어느 버튼 것인지 못 읽는다.
-      칸에 면이 없어(투명) 배지를 아이콘 머리에 겹쳐도 가릴 판이 없으므로 안으로 들인다. */
-.hub[data-ui='palace'] .f-invite .ev { top: -2px; padding: 2px 8px; border-width: 2px; font-size: 12px; }
+/* EVENT 배지 — 궁궐 벌에서는 **칸 위쪽이 아니라 아이콘 바로 위**에 붙인다.
+   ⛔ `top` 으로 잡으면 안 된다(2026-08-26). 여기서 칸은 `flex:1 1 0` 라 무대 높이를 셋이 나눠 갖는
+      156px 짜리 세로 상자인데 그림은 그 안 **맨 아래**(object-position: center bottom)에 앉는다.
+      그래서 칸 위(top:-2px)는 아이콘에서 40px 넘게 떨어진 허공이고, 실제로 배지가 위 칸('칭호')
+      라벨 바로 밑에 떠서 초대보상이 아니라 칭호 것으로 읽혔다.
+   ⚠️ 그래서 바닥에서 되짚는다: 라벨 한 줄(약 1.15em) + 행 간격 1px + 아이콘 높이(≈ 칸 폭).
+      칸 폭이 곧 아이콘 높이라 폭을 바꾸면 이 값도 같이 바꿔야 한다(모바일 64 · PC 96).
+      `em` 을 쓸 수 없다 — 배지 자신의 글자 크기로 풀려서 라벨 높이와 무관해진다. */
+.hub[data-ui='palace'] .f-invite .ev { top: auto; bottom: 84px; padding: 2px 8px; border-width: 2px; font-size: 12px; }
 @media (min-width: 768px) {
-  .hub[data-ui='palace'] .f-invite .ev { top: -3px; padding: 3px 11px; font-size: 14.5px; }
+  .hub[data-ui='palace'] .f-invite .ev { bottom: 118px; padding: 3px 11px; font-size: 14.5px; }
 }
 
 /* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
@@ -1035,7 +1041,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
       라벨 자리까지 먹어 글자가 통째로 사라진다(궁궐 쪽에서 이미 겪은 사고). 라벨은 태그 없는
       맨 텍스트라 grid 가 알아서 2행에 앉힌다. */
-/* ⚠️ 간격은 16px 아래로 내리지 말 것 — '초대하기' 의 EVENT 배지가 칸 위로 11px 튀어나와서(.f-invite .ev)
+/* ⚠️ 간격은 16px 아래로 내리지 말 것 — '초대보상' 의 EVENT 배지가 칸 위로 6px 튀어나와서(.f-invite .ev)
    간격이 그보다 좁으면 배지가 위 칸 바닥에 얹힌다. */
 .hub[data-ui='base'] .rail-r { top: 0; bottom: auto; justify-content: flex-start; gap: 16px; }
 .hub[data-ui='base'] .rail-r .fcard {

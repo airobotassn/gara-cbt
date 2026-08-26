@@ -333,8 +333,14 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
 }
 
 
-/** 카드 한 장에 필요한 '남의 국가·지역' 값. 순위와 **표시명**을 짝으로 들고 다닌다. */
+/**
+ * 카드 한 장에 필요한 '남의 전세계·국가·지역' 값. 순위와 **표시명**을 짝으로 들고 다닌다.
+ * ⚠️ 세 순위를 **한 응답에서 같이** 꺼낸다 — 한 칸만 다른 데서 가져오면 그 칸만 다른 기준이 된다
+ *    (실제로 그랬다: 아래 scopedForCard 주석 참고).
+ */
 export interface CardScoped {
+  worldRank: number | null
+  worldTotal: number | null
   countryRank: number | null
   countryTotal: number | null
   regionRank: number | null
@@ -344,14 +350,20 @@ export interface CardScoped {
 }
 
 /**
- * 남의 카드를 열 때 그 사람의 국가·지역 순위와 이름을 받아온다(랭킹·채팅이 **같은 이 함수**를 쓴다).
+ * 남의 카드를 열 때 그 사람의 전세계·국가·지역 순위와 이름을 받아온다(랭킹·채팅이 **같은 이 함수**를 쓴다).
  * ⚠️ 두 화면이 각자 조립하면 한쪽만 이름이 뜨거나 라벨이 갈린다 — 실제로 그러기 직전이었다.
+ * ⛔ **전세계 순위도 여기서 준다(2026-08-26).** 예전엔 국가·지역만 줘서 랭킹 화면이 World 칸을
+ *    **목록 행의 순위**로 채웠는데, 그 숫자는 보고 있는 탭의 순위지 전세계 순위가 아니다
+ *    (경기도 탭에서 누르면 'World 4위 · 대한민국 9위' 처럼 **월드가 국가보다 앞서는** 카드가 나왔다).
+ *    서버는 원래 이 응답에 전세계 순위를 같이 싣고 있었다 — 안 쓰고 있었을 뿐이라 요청이 늘지 않는다.
  * ⚠️ 서버는 **코드**만 준다(`KR`·`KR-11`). 이름표는 앱이 이미 갖고 있어서(249개국 사전 + 지도 파일)
  *    6개국어 이름을 서버가 만들어 내려보낼 이유가 없다.
  * ⚠️ 지역 이름은 그 나라 지도 파일을 받아야 나온다 → 실패하면 이름 없이 순위만 쓴다(카드는 이미 떠 있다).
  */
 export async function scopedForCard(uid: string, lang: Lang): Promise<CardScoped> {
   const res = await callFunction<{
+    user: { rank: number | null } | null
+    total: number | null
     countryRank: number | null; countryTotal: number | null
     regionRank: number | null; regionTotal: number | null
     countryCode: string | null; regionCode: string | null
@@ -363,6 +375,8 @@ export async function scopedForCard(uid: string, lang: Lang): Promise<CardScoped
     try { region = await regionDisplayName(cc, rc, lang) } catch { region = null }
   }
   return {
+    worldRank: res.user?.rank ?? null,
+    worldTotal: res.total ?? null,
     countryRank: res.countryRank ?? null,
     countryTotal: res.countryTotal ?? null,
     regionRank: res.regionRank ?? null,
