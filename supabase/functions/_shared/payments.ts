@@ -139,16 +139,16 @@ export async function resolveProduct(
   }
 
   // 강의 시청권 — 이북과 같은 모양이다(단품 하나, 정가는 달러 센트).
-  //   ⚠️ 강의엔 번역본이 없다(제목·채널이 관리자가 넣은 값 그대로). 그래서 lang 을 안 본다.
+  //   제목은 요청 언어로 준다(2026-08-26). 결제창·영수증에 뜨는 이름이라 화면에서 본 제목과 같아야 한다.
   if (productType === 'lecture') {
     const { data: lec } = await admin
       .from('lectures')
-      .select('id, title, price_usd_cents, published')
+      .select('id, title, title_i18n, price_usd_cents, published')
       .eq('id', productRef)
       .maybeSingle()
     if (!lec || !lec.published) return { ok: false, error: '판매 중인 강의가 아닙니다.', status: 404 }
 
-    const title = lec.title as string
+    const title = ((lec.title_i18n as Record<string, string> | null) ?? {})[lang] || (lec.title as string)
     const amount = (lec.price_usd_cents as number) ?? 0
     return {
       ok: true,
@@ -279,13 +279,14 @@ async function resolveBundle(
   // 하나면 묶음이 아니다 — 단품 경로로 가야 정가·중복방어가 원래대로 동작한다.
   if (want.length < 2) return { ok: false, error: '묶음 결제는 두 개부터 담을 수 있습니다.', status: 400 }
 
-  // 강의엔 번역본이 없다(제목이 관리자가 넣은 값 그대로) — translations 컬럼 자체가 없으므로 select 를 가른다.
+  // 번역 제목이 담긴 자리가 서로 다르다 — 이북은 `translations[lang].title`(본문 번역과 한 덩어리),
+  // 강의는 `title_i18n[lang]`(제목·소개 두 필드뿐이라 컬럼으로 둔다). 그래서 select 를 가른다.
   const { data } = await admin
     .from(isBook ? 'ebooks' : 'lectures')
-    .select(isBook ? 'id, title, price_usd_cents, translations' : 'id, title, price_usd_cents')
+    .select(isBook ? 'id, title, price_usd_cents, translations' : 'id, title, price_usd_cents, title_i18n')
     .eq('catalog', catalog)
     .eq('published', true)
-  type Item = { id: string; title: string; price_usd_cents: number | null; translations?: unknown }
+  type Item = { id: string; title: string; price_usd_cents: number | null; translations?: unknown; title_i18n?: unknown }
   const all = (data ?? []) as Item[]
   const byId = new Map(all.map((b) => [b.id, b]))
 
@@ -297,7 +298,8 @@ async function resolveBundle(
 
   const titleOf = (b: Item) => {
     const tr = (b.translations as Record<string, { title?: string }> | null) ?? {}
-    return tr[lang]?.title || b.title
+    const i18n = (b.title_i18n as Record<string, string> | null) ?? {}
+    return tr[lang]?.title || i18n[lang] || b.title
   }
   const priceOf = (b: Item) => b.price_usd_cents ?? 0
 

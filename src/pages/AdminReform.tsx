@@ -992,7 +992,9 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
     if (!edit) return
     setBusy(true)
     try {
-      await callFunction('admin', {
+      // ⚠️ 번역 경고는 저장 실패가 아니다 — 한국어로는 등록됐다는 뜻이라 문구도 그렇게 쓴다
+      //    (공지·FAQ 와 같은 규칙. '실패'로 띄우면 관리자가 안 올라간 줄 알고 같은 강의를 또 만든다).
+      const res = await callFunction<{ translateWarning?: string }>('admin', {
         action: 'lectureUpsert',
         lecture: {
           id: edit._new ? undefined : edit.id,
@@ -1009,6 +1011,7 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
           published: edit.published !== false, sortOrder: edit.sort_order ?? rows.length,
         },
       })
+      if (res?.translateWarning) alert('저장됐지만 자동 번역은 건너뛰었습니다:\n' + res.translateWarning)
       draft.clear()
       setEdit(null)
       await reload()
@@ -1126,6 +1129,11 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
                 <input type="checkbox" checked={edit.published !== false} onChange={(e) => setEdit({ ...edit, published: e.target.checked })} />
                 공개
               </label>
+              {/* 공지·FAQ 폼과 같은 안내다 — 관리자가 한국어만 쓰고, 버튼은 없다(저장이 곧 번역). */}
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                🌐 제목·소개는 저장하면 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다.
+                (한국어 원문 기준 · 수정 후 저장하면 다시 번역)
+              </p>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
               <button className="admin-mini" onClick={() => setEdit(null)}>취소</button>

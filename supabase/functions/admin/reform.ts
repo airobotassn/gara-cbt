@@ -5,6 +5,34 @@ import { json } from '../_shared/cors.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
+/**
+ * 한국어 → 5개국어 번역기. **index.ts 가 들고 있는 것을 그대로 받아 쓴다**(2026-08-26).
+ *
+ * ⚠️ import 로 가져올 수 없다 — index.ts 가 이 파일을 import 하므로 반대 방향이 순환이 된다.
+ *    공용 모듈로 빼는 방법도 있지만, 그 블록(Gemini 호출·조각 나누기·이어붙이기 200여 줄)은
+ *    공지·FAQ·회차가 매일 쓰는 살아 있는 코드라 옮기다 어긋나면 그쪽이 조용히 한국어로만 저장된다.
+ *    받아 쓰면 단일 출처는 그대로고 옮길 코드가 0줄이다.
+ * @returns `{ <필드>: { ko, en, ja, zh, hi, vi } }`
+ */
+export interface ReformDeps {
+  translateKoFields: (koFields: Record<string, string>) => Promise<Record<string, Record<string, string>>>
+  /** 번역 키가 꽂혀 있나. 없으면 한국어로만 저장되므로 화면에 그 사실을 알린다. */
+  hasTranslateKey: boolean
+}
+
+/** 번역 대상 언어 — 한국어는 원본 컬럼이 단일 출처라 대상이 아니다(`translateKoFields` 의 ko 는 버린다). */
+const TRANSLATED_LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
+
+/** `translateKoFields` 결과 한 필드 → 저장할 jsonb. **ko 는 담지 않는다**(위 마이그레이션 주석의 규칙). */
+function i18nOf(field: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const lg of TRANSLATED_LANGS) {
+    const v = (field?.[lg] ?? '').trim()
+    if (v) out[lg] = v
+  }
+  return out
+}
+
 /** 되돌릴 수 없는 조작을 남긴다. 실패해도 본 작업을 막지 않는다(로그 때문에 운영이 멈추면 안 된다). */
 async function audit(admin: any, ctx: Ctx, action: string, target: string | null, detail: unknown = {}) {
   try {
@@ -255,13 +283,13 @@ async function lectureList(admin: any, body: any) {
   if (error) return json({ error: error.message }, 500)
   return json({ lectures: data ?? [] })
 }
-async function lectureUpsert(admin: any, body: any) {
+async function lectureUpsert(admin: any, body: any, deps: ReformDeps) {
   const l = body?.lecture ?? {}
   const vid = youtubeId(String(l.youtubeId ?? ''))
   if (!vid) return json({ error: '유튜브 주소(또는 영상 ID)를 확인해 주세요.' }, 400)
   if (!String(l.title ?? '').trim()) return json({ error: '제목을 입력하세요.' }, 400)
   const catalog = l.catalog === 'caris' ? 'caris' : 'leveltest'
-  const row = {
+  const row: Record<string, unknown> = {
     catalog,
     // 한 강의는 한 카탈로그에만 속한다(DB CHECK 과 같은 규칙) — 반대편 분류는 반드시 비운다.
     target_level: catalog === 'leveltest' ? (l.targetLevel ?? null) : null,
@@ -280,10 +308,32 @@ async function lectureUpsert(admin: any, body: any) {
     thumb_url: String(l.thumbUrl ?? '').trim() || null,
     published: l.published !== false, sort_order: Number(l.sortOrder ?? 0),
   }
+
+  // ── 제목·소개 자동 번역 (2026-08-26) ─────────────────────────────
+  // 관리자는 한국어만 쓴다 — 공지·FAQ·게시판 분류·회차와 **같은 방식**이고, 여기서도 버튼이 없다.
+  //   ⚠️ 번역 실패로 저장을 막지 않는다(best-effort). 막으면 관리자가 강의를 아예 못 올린다 —
+  //      번역이 비면 사용자 화면은 한국어 원문으로 폴백하므로 잃는 것이 없다.
+  //   ⚠️ 저장할 때마다 다시 번역한다. 필드가 둘뿐이라 호출 1회고, "바뀌었나" 를 따로 기억하면
+  //      그 판정이 어긋나는 순간 제목만 옛 번역으로 남아 조용히 틀린다(이북에서 실제로 겪은 자리다).
+  let translateWarning = ''
+  if (!deps.hasTranslateKey) translateWarning = '번역 키(GEMINI_API_KEY_NOTICE) 미설정 — 한국어로만 저장됨'
+  else {
+    try {
+      const tr = await deps.translateKoFields({
+        title: String(l.title ?? '').trim(),
+        description: String(l.description ?? '').trim(),
+      })
+      row.title_i18n = i18nOf(tr.title)
+      row.description_i18n = i18nOf(tr.description)
+    } catch (e) {
+      translateWarning = e instanceof Error ? e.message : '번역 실패'
+    }
+  }
+
   const q = l.id ? admin.from('lectures').update(row).eq('id', l.id) : admin.from('lectures').insert(row)
   const { error } = await q
   if (error) return json({ error: error.message }, 500)
-  return json({ ok: true })
+  return json({ ok: true, translateWarning: translateWarning || undefined })
 }
 async function lectureDelete(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
@@ -900,7 +950,7 @@ async function mailLog(admin: any) {
   return json({ rows: data ?? [] })
 }
 
-export async function handleReform(admin: any, action: string, body: any, ctx: Ctx): Promise<Response | null> {
+export async function handleReform(admin: any, action: string, body: any, ctx: Ctx, deps: ReformDeps): Promise<Response | null> {
   switch (action) {
     case 'envCheckList': return await envCheckList(admin, body)
     case 'mailNudge': return await mailNudge(admin, body, ctx)
@@ -912,10 +962,10 @@ export async function handleReform(admin: any, action: string, body: any, ctx: C
     case 'termDelete': return await termDelete(admin, body, ctx)
     case 'termImport': return await termImport(admin, body, ctx)
   }
-  return await handleReform2(admin, action, body, ctx)
+  return await handleReform2(admin, action, body, ctx, deps)
 }
 
-async function handleReform2(admin: any, action: string, body: any, ctx: Ctx): Promise<Response | null> {
+async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, deps: ReformDeps): Promise<Response | null> {
   switch (action) {
     case 'siteSettings': return await siteSettings(admin)
     case 'siteSettingsSave': return await siteSettingsSave(admin, body, ctx)
@@ -931,7 +981,7 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx): P
     case 'feedbackDelete': return await feedbackDelete(admin, body, ctx)
     case 'ebookPreview': return await ebookPreview(admin, body)
     case 'lectureList': return await lectureList(admin, body)
-    case 'lectureUpsert': return await lectureUpsert(admin, body)
+    case 'lectureUpsert': return await lectureUpsert(admin, body, deps)
     case 'lectureDelete': return await lectureDelete(admin, body, ctx)
     case 'rewardPolicy': return await rewardPolicy(admin)
     case 'rewardPolicySave': return await rewardPolicySave(admin, body, ctx)

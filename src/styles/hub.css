@@ -126,6 +126,7 @@
 .hub .tt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; color: #fff; white-space: nowrap;
   flex: 0 0 auto;
   background: var(--orange); border: 3px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.hub .tt > img { width: 24px; height: 24px; margin: -6px 0; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,.28)); }
 /* ⚠️ 바 높이는 옆 코인 칩(.gchip)과 같아야 한다 — 한 줄에 나란히 서는 두 요소라 높이가 어긋나면 바로 보인다.
    .gchip 높이(모바일 28 / PC 40)를 바꾸면 여기도 같이 바꿀 것. */
 .hub .exp { position: relative; margin-top: 6px; height: 28px; border-radius: 999px; overflow: hidden; background: var(--card); border: 3px solid var(--line); }
@@ -426,15 +427,26 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 .hub .ticket-ghost-ic { font-size: 24px; filter: grayscale(1); }
 
 /* ── 칭호 보관소: 뱃지 볼트 ── */
-.hub .title-vault { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.hub .title-badge { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; font-size: 12.5px;
-  background: var(--badge-grad, linear-gradient(180deg, #fff3cf, #ffe9a8)); border: 2.5px solid var(--line); box-shadow: 0 4px 0 rgba(var(--shc), .18), inset 0 1px 0 rgba(255,255,255,.7); }
+.hub .title-modal { width: min(560px, calc(100vw - 28px)); }
+.hub .title-vault { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hub .title-badge { position: relative; min-width: 0; padding: 10px 6px 12px; display: flex; flex-direction: column; align-items: center;
+  border-radius: 16px; font-size: 12.5px; color: var(--ink); text-align: center;
+  background: radial-gradient(circle at 50% 18%, rgba(48,164,236,.22), transparent 48%), var(--card);
+  border: 2.5px solid var(--line); box-shadow: 0 4px 0 rgba(var(--shc), .18), inset 0 1px 0 rgba(255,255,255,.7); }
+.hub .title-badge > img { display: block; width: min(112px, 100%); aspect-ratio: 1; object-fit: contain;
+  filter: drop-shadow(0 5px 4px rgba(3,38,91,.25)); transition: transform .18s ease; }
+.hub .title-badge.is-earned:hover > img { transform: translateY(-2px) scale(1.035); }
+.hub .title-badge > span:not(.title-lock) { min-width: 0; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
 .hub .title-badge b { font-weight: 900; }
-.hub .title-badge-grade { font-weight: 900; color: var(--gold-ink, #8a6d2f); }
-.hub .title-vault-empty { grid-template-columns: repeat(3, 1fr); align-items: center; justify-items: center; }
-.hub .title-vault-empty .hub-modal-help { grid-column: 1 / -1; text-align: center; margin-top: 12px; }
-.hub .title-slot { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; color: #b7bfd4;
-  border: 2.5px dashed #c7c7c7; background: var(--card); }
+.hub .title-badge.is-locked { opacity: .38; filter: grayscale(1); box-shadow: none; }
+.hub .title-lock { position: absolute; top: 8px; right: 8px; width: 25px; height: 25px; display: grid; place-items: center;
+  border: 2px solid var(--line); border-radius: 50%; background: var(--card); font-size: 12px; filter: grayscale(1); }
+.hub .title-vault-help { margin: 14px 2px 0; text-align: center; }
+@media (max-width: 390px) {
+  .hub .title-vault { gap: 7px; }
+  .hub .title-badge { padding-inline: 3px; font-size: 11px; }
+  .hub .title-lock { top: 5px; right: 5px; }
+}
 
 /* 허브는 단일 화면이라 우하단 '맨 위로' 버튼 숨김(.hub 렌더 시에만) */
 body:has(.hub) .fab-top { display: none; }
@@ -592,12 +604,8 @@ body:has(.hub) .fab-top { display: none; }
 .hub .gf-hist-at { flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--ink2); }
 
 /* 도크 5번째 버튼(초대하기) + 코인 옆 도움말 */
+/* 옛 EVENT 배지(`.f-invite .ev`)는 마크업과 함께 제거됐다(2026-08-26 지시). */
 .hub .f-invite { background: var(--red); }
-/* ⚠️ 배지는 칸 위 허공이 아니라 **칸 윗변에 걸쳐야** 한다(2026-08-26 지시). 예전 -11px 은 배지가
-      거의 통째로 칸 밖에 떠서 레일 간격(16px) 한가운데에 서는 바람에 어느 버튼 것인지 안 읽혔다. */
-.hub .f-invite .ev { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-  padding: 1px 6px; border-radius: 999px; background: var(--gold); color: var(--ink); border: 2.5px solid var(--line);
-  font-size: 9.5px; font-weight: 900; }
 /* 높이는 옆 경험치 바(.exp)·코인 칩(.gchip)과 맞춘다 — 한 줄에 나란히 서는 세 요소다. */
 .hub .hub-help { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border-radius: 999px; cursor: pointer;
   background: var(--card); color: var(--ink2); border: 2.5px solid var(--line);
@@ -638,7 +646,6 @@ body:has(.hub) .fab-top { display: none; }
   .hub .iv-code-v { font-size: 19px; }
   .hub .iv-copy { font-size: 14px; padding: 6px 13px; }
   .hub .hub-help { width: 40px; height: 40px; font-size: 18px; }
-  .hub .f-invite .ev { font-size: 11px; }
 }
 
 /* ============================================================
@@ -906,18 +913,11 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
       가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
 .hub[data-ui='palace'] .fcard .bd { top: 0; right: 8px; }
-/* EVENT 배지 — 궁궐 벌에서는 **칸 위쪽이 아니라 아이콘 바로 위**에 붙인다.
-   ⛔ `top` 으로 잡으면 안 된다(2026-08-26). 여기서 칸은 `flex:1 1 0` 라 무대 높이를 셋이 나눠 갖는
-      156px 짜리 세로 상자인데 그림은 그 안 **맨 아래**(object-position: center bottom)에 앉는다.
-      그래서 칸 위(top:-2px)는 아이콘에서 40px 넘게 떨어진 허공이고, 실제로 배지가 위 칸('칭호')
-      라벨 바로 밑에 떠서 초대보상이 아니라 칭호 것으로 읽혔다.
-   ⚠️ 그래서 바닥에서 되짚는다: 라벨 한 줄(약 1.15em) + 행 간격 1px + 아이콘 높이(≈ 칸 폭).
-      칸 폭이 곧 아이콘 높이라 폭을 바꾸면 이 값도 같이 바꿔야 한다(모바일 64 · PC 96).
-      `em` 을 쓸 수 없다 — 배지 자신의 글자 크기로 풀려서 라벨 높이와 무관해진다. */
-.hub[data-ui='palace'] .f-invite .ev { top: auto; bottom: 84px; padding: 2px 8px; border-width: 2px; font-size: 12px; }
-@media (min-width: 768px) {
-  .hub[data-ui='palace'] .f-invite .ev { bottom: 118px; padding: 3px 11px; font-size: 14.5px; }
-}
+/* EVENT 배지는 제거됐다(2026-08-26 지시) — 궁궐 전용 자리잡기 규칙도 같이 걷어냈다.
+   ⚠️ 되살릴 일이 있으면 `top` 으로 잡지 말 것. 여기서 칸은 `flex:1 1 0` 라 무대 높이를 셋이 나눠 갖는
+      156px 짜리 세로 상자인데 그림은 그 안 **맨 아래**(object-position: center bottom)에 앉는다 —
+      칸 위(top:-2px)는 아이콘에서 40px 넘게 떨어진 허공이라, 배지가 위 칸('칭호') 라벨 바로 밑에 떠서
+      초대보상이 아니라 칭호 것으로 읽혔다. 바닥에서 되짚은 값이 모바일 84px · PC 118px 이었다. */
 
 /* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
    ⚠️ 글자는 padding 으로 밀지 말고 가운데 정렬. padding 으로 앉히면 칸 높이가 바뀔 때 잘린다. */
@@ -1017,12 +1017,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   border-radius: 0; padding: 0 6px;
   color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
 }
-.hub[data-ui='palace'] .cta-main .cta-star { display: grid; place-items: center; flex: 0 0 auto; }
-.hub[data-ui='palace'] .cta-main .cta-star svg { display: none; }
-.hub[data-ui='palace'] .cta-main .cta-star img { display: block; width: 50px; height: 50px; object-fit: contain;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
-/* (옛 `.cta-star svg { display:none }` 은 제거 — 아이콘은 HubUiIcon 이 스킨에 따라
-   img 와 svg 중 **하나만** 그린다. 감출 svg 자체가 없다.) */
+/* 랭킹 아이콘은 궁궐 벌에서 아예 안 그린다(2026-08-26 지시) — 판 그림이 이미 장식을 다 하고 있다.
+   ⚠️ 감추는 건 CSS 가 아니라 `Hub.tsx` 다(display:none 이어도 424KB PNG 는 그대로 받아온다).
+      되살릴 때 쓰던 값 = 50px(모바일) · 64px(PC) + drop-shadow(0 2px 2px rgba(0,0,0,.35)). */
 .hub[data-ui='palace'] .cta-main:active { transform: translateY(2px); box-shadow: none; }
 @media (min-width: 768px) {
   .hub[data-ui='palace'] .hud-av::after { inset: -15px; }
@@ -1033,7 +1030,6 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   /* 옆 출석 판과 위아래 선을 맞춘다(stretch) — 가운데만 늘어나므로 높이가 얼마든 장식은 그대로다 */
   .hub[data-ui='palace'] .cta-main { min-width: 300px; align-self: stretch; height: auto;
     flex-direction: row; gap: 12px; font-size: 30px; }
-  .hub[data-ui='palace'] .cta-main .cta-star img { width: 64px; height: 64px; }
 }
 
 
@@ -1050,8 +1046,8 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
       라벨 자리까지 먹어 글자가 통째로 사라진다(궁궐 쪽에서 이미 겪은 사고). 라벨은 태그 없는
       맨 텍스트라 grid 가 알아서 2행에 앉힌다. */
-/* ⚠️ 간격은 16px 아래로 내리지 말 것 — '초대보상' 의 EVENT 배지가 칸 위로 6px 튀어나와서(.f-invite .ev)
-   간격이 그보다 좁으면 배지가 위 칸 바닥에 얹힌다. */
+/* (간격 16px 은 옛 EVENT 배지가 칸 위로 6px 튀어나오던 시절의 값이다. 배지는 2026-08-26 에 없어졌으니
+   이제 순수한 여백이고, 배지를 되살린다면 그때 다시 이 값이 하한이 된다.) */
 .hub[data-ui='base'] .rail-r { top: 0; bottom: auto; justify-content: flex-start; gap: 16px; }
 .hub[data-ui='base'] .rail-r .fcard {
   flex: 0 0 auto; aspect-ratio: 1; height: auto;
@@ -1103,7 +1099,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   .hub .rail-r { gap: 8px; }
   .hub .rail-r .fcard { width: 96px; }
 }
-html.dark .hub .ticket-ghost, html.dark .hub .title-slot { border-color: #4a5264; color: #7f8899; }
+html.dark .hub .ticket-ghost { border-color: #4a5264; color: #7f8899; }
 html.dark .hub .ticket.is-used .ticket-stamp { color: #7f8899; border-color: #4a5264; }
 html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 

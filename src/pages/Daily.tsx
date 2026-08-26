@@ -18,21 +18,23 @@ import StarField from '../components/StarField'
 
 // ⚠️ 서버(complete-daily)의 DAILY_POINTS 와 같은 값이어야 한다. 적립 권위는 서버, 여기는 예고 표시용.
 const DAILY_POINTS = 10
-const STAMP_GOAL = 7 // 허브 도크의 7일 스탬프판과 동일
+
+// ⚠️ 이 화면에는 스탬프 표시가 없다(2026-08-26 제거). 서버는 여전히 스탬프를 적립하지만
+//    자동 출석이 늘 먼저 찍어서 '오늘의 학습'으로는 한 번도 들어오지 않는다 — 화면에 '스탬프 +1'
+//    예고와 7칸 판을 두면 매일 거짓말을 한다. 스탬프를 보는 자리는 허브 도크 하나뿐이다.
 
 // get-hub 응답 중 이 화면이 쓰는 것만. (전체 형태는 Hub.tsx 참고)
 //   ⚠️ 이 화면의 완료 판정은 learnDone(=daily_activity.did_learn) 이다. dailyDone(출석)이나 행 존재로
 //      판정하면 레벨테스트·미니게임만 해도 오늘의 문제가 잠긴다(2026-07-27 버그).
-interface HubState { authed: boolean; points?: number; stamps?: number; learnDone?: boolean }
+interface HubState { authed: boolean; points?: number; learnDone?: boolean }
 // complete-daily 응답. first = 이번 호출로 재화(코인·스탬프)가 실제 지급됐는지(출석·학습 통틀어 하루 1회).
 // bonus = 7일 스탬프를 채운 날 붙는 완주 보너스 코인(0 이면 없음). 금액 권위는 서버다.
-interface DailyResp { ok: boolean; day: string; first: boolean; stamps?: number | null; bonus?: number }
+interface DailyResp { ok: boolean; day: string; first: boolean; bonus?: number }
 
 const IK = '#33323f'
 const ICONS: Record<string, ReactNode> = {
   sun: (<><circle cx="12" cy="12" r="5" fill="#f2c65e" stroke={IK} strokeWidth="2" /><g stroke={IK} strokeWidth="2" strokeLinecap="round"><path d="M12 2.4v2.4M12 19.2v2.4M2.4 12h2.4M19.2 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1l-1.7 1.7" /></g></>),
   coin: (<><circle cx="12" cy="12" r="8.6" fill="#f2c65e" stroke={IK} strokeWidth="2" /><circle cx="12" cy="12" r="5.4" fill="none" stroke={IK} strokeWidth="1.4" opacity=".55" /><path d="M12 8.6v6.8M10.2 10.4h3.2a1.6 1.6 0 0 1 0 3.2h-2.8" stroke={IK} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" fill="none" /></>),
-  stamp: (<><circle cx="12" cy="12" r="8.6" fill="#74c6bf" stroke={IK} strokeWidth="2" /><path d="M8.2 12.3l2.6 2.6 5-5.2" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" /></>),
   lock: (<><rect x="4.6" y="10.4" width="14.8" height="10.2" rx="2.4" fill="#fff" stroke={IK} strokeWidth="2" /><path d="M8.2 10.4V7.8a3.8 3.8 0 0 1 7.6 0v2.6" fill="none" stroke={IK} strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="15.4" r="1.5" fill={IK} /></>),
 }
 function Ic({ n, s = 24 }: { n: string; s?: number }) {
@@ -45,7 +47,6 @@ export default function Daily() {
   const { t, lang } = useT()
   const [authed, setAuthed] = useState(false)
   const [points, setPoints] = useState(0)
-  const [stamps, setStamps] = useState(0)
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -75,7 +76,6 @@ export default function Daily() {
   function applyHub(h: HubState) {
     setAuthed(!!h.authed)
     setPoints(h.points ?? 0)
-    setStamps(h.stamps ?? 0)
     setDone(!!h.learnDone)
   }
 
@@ -88,7 +88,7 @@ export default function Daily() {
     return () => { alive = false }
   }, [])
 
-  // 완료 → complete-daily(1일 1회 서버 강제·멱등). 성공 후 get-hub 로 재화/스탬프 재동기화.
+  // 완료 → complete-daily(1일 1회 서버 강제·멱등). 성공 후 get-hub 로 재화 재동기화.
   // 완료 트리거 = 오늘의 문제 '시도'(onPick). 설계상 맞히는 게 아니라 시도하면 완료다.
   async function complete() {
     if (!isFullUser) { void loginWithGoogle(); return }
@@ -220,12 +220,6 @@ export default function Daily() {
         <div className="dy-rw-top">{t('daily.reward_head')}</div>
         <div className="dy-rw-row">
           <span className="dy-rw-item"><Ic n="coin" s={26} /><b>+{DAILY_POINTS}P</b></span>
-          <span className="dy-rw-item"><Ic n="stamp" s={26} /><b>{t('daily.stamp_plus')}</b></span>
-        </div>
-        <div className="dy-streak" aria-label={t('daily.stamp_aria', { n: stamps, max: STAMP_GOAL })}>
-          {Array.from({ length: STAMP_GOAL }, (_, i) => i + 1).map((d) => (
-            <span key={d} className={`dy-day ${d <= stamps ? 'on' : ''}`}>{d <= stamps ? '✓' : d}</span>
-          ))}
         </div>
       </div>
 
@@ -247,13 +241,16 @@ export default function Daily() {
       {celebrate && (
         <div className="dy-pop-bd" onClick={() => setCelebrate(false)}>
           <div className="dy-pop" onClick={(e) => e.stopPropagation()}>
-            <div className="dy-pop-burst"><Ic n="stamp" s={64} /></div>
+            <div className="dy-pop-burst"><Ic n="sun" s={64} /></div>
             <b className="dy-pop-title">{t('daily.pop_title')}</b>
-            <div className="dy-pop-gain">
-              {rewarded && <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>}
-              {bonus > 0 && <span><Ic n="coin" s={22} />{t('daily.pop_bonus', { b: bonus })}</span>}
-              <span><Ic n="stamp" s={22} />{t('daily.pop_stamp', { n: stamps, max: STAMP_GOAL })}</span>
-            </div>
+            {/* ⚠️ 받은 게 없으면 이 줄을 아예 안 그린다 — 스탬프 칸이 빠지면서 둘 다 거짓인 날
+                (자동 출석이 먼저 받아간 날 = 사실상 매일)은 빈 띠만 남는다. */}
+            {(rewarded || bonus > 0) && (
+              <div className="dy-pop-gain">
+                {rewarded && <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>}
+                {bonus > 0 && <span><Ic n="coin" s={22} />{t('daily.pop_bonus', { b: bonus })}</span>}
+              </div>
+            )}
             <p className="dy-pop-msg">
               {t(rewarded ? 'daily.pop_grew' : 'daily.pop_already')}
             </p>

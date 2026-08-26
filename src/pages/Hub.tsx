@@ -153,6 +153,13 @@ function friendlyError(e: unknown, t: TFunc): string {
 }
 
 type TitleItem = { tier: string; exam_title?: string }
+const SHOWCASE_TITLE_TIERS = ['beginner', 'pro', 'elite'] as const
+type ShowcaseTitleTier = (typeof SHOWCASE_TITLE_TIERS)[number]
+const TITLE_ASSET: Record<ShowcaseTitleTier, string> = {
+  beginner: '/hub/titles/beginner-v2.png',
+  pro: '/hub/titles/pro-v2.png',
+  elite: '/hub/titles/elite-v2.png',
+}
 
 // 'closet' = 옛 'shop'. 상점과 인벤토리가 한 모달의 두 탭이 되면서 이름을 바꿨다(2026-08-20)
 // — 사는 곳과 갈아입는 곳이 같은 자리라 버튼 이름이 '상점' 이면 절반을 숨기는 말이 된다.
@@ -726,7 +733,11 @@ export default function Hub() {
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
   // const unusedCoupons = coupons.filter((c) => !c.used).length
   // RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
-  const titleBadge = titles[0] ? <span className="tt">🏆 CARIS {tierName(titles[0].tier)}</span> : null
+  const activeTitleTier = titles[0]?.tier as ShowcaseTitleTier | undefined
+  const titleBadge = titles[0] ? <span className="tt">
+    {activeTitleTier && TITLE_ASSET[activeTitleTier] ? <img src={TITLE_ASSET[activeTitleTier]} alt="" /> : '🏆'}
+    CARIS {tierName(titles[0].tier)}
+  </span> : null
   // HUD·내 방에 뜨는 이름 = 내 닉네임. (예전엔 'CARI' 가 박혀 있어서 누구 화면이든 같은 이름이었다.)
   // ⚠️ 구글 계정 이름(user_metadata.name)으로 폴백하지 말 것 — 실명이다. 닉네임 게이트가 막고 있는 걸
   //    프로필을 받아오는 짧은 사이에 그대로 흘린다. 아직 못 받았으면 마스코트 이름으로 둔다.
@@ -967,7 +978,8 @@ export default function Hub() {
               {/* '상점' → '꾸미기'. 사는 곳과 갈아입는 곳이 한 모달의 두 탭이라 상점만 말하면 절반을 숨긴다. */}
               <button className="fcard f-shop" data-tut="closet" onClick={() => { setClosetTab('shop'); setModal('closet') }}><span className="fico"><HubUiIcon n="shop" dir={skin.iconDir} /></span>{t('hub.rail.closet')}</button>
               <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" dir={skin.iconDir} /></span>{t('hub.rail.title')}</button>
-              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="ev">EVENT</span><span className="fico"><HubUiIcon n="invite" dir={skin.iconDir} /></span>{t('hub.rail.invite')}</button>
+              {/* 옛 EVENT 배지는 제거됐다(2026-08-26 지시) — 상시 기능인데 한시 이벤트처럼 읽혔다. */}
+              <button className="fcard f-invite" onClick={() => setModal('invite')}><span className="fico"><HubUiIcon n="invite" dir={skin.iconDir} /></span>{t('hub.rail.invite')}</button>
             </div>
         </div>
 
@@ -996,9 +1008,15 @@ export default function Hub() {
           </button>
           {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
           <Link className="cta-main" to="/ranking">
-            <span className="cta-star" aria-hidden="true">
-              <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
-            </span>
+            {/* ⚠️ 궁궐 벌(고궁 낮·밤)에는 아이콘을 아예 그리지 않는다(2026-08-26 지시) — 판 그림이 이미
+                장식을 다 하고 있어서 글자 옆에 그림을 하나 더 얹으면 스티커를 붙인 것처럼 읽힌다.
+                CSS 로 감추지 않은 이유 = display:none 이어도 브라우저는 icon-ranking.png(424KB)를
+                그대로 받아온다. 기본(초원)의 별 SVG 는 그대로다. */}
+            {skin.ui !== 'palace' && (
+              <span className="cta-star" aria-hidden="true">
+                <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
+              </span>
+            )}
             {t('common.ranking')}
           </Link>
         </div>
@@ -1195,21 +1213,20 @@ export default function Hub() {
       )}
 
       {modal === 'title' && (
-        <Modal title={t('hub.title.title')} onClose={() => setModal(null)}>
-          {titles.length > 0 ? (
-            <div className="title-vault">
-              {titles.map((tt, i) => (
-                <span key={i} className="title-badge">🏅<b>CARIS {tierName(tt.tier)}</b></span>
-              ))}
-            </div>
-          ) : (
-            <div className="title-vault title-vault-empty">
-              {[1, 2, 3].map((i) => (
-                <span key={i} className="title-slot">🔒</span>
-              ))}
-              <p className="hub-modal-help">{t(authed ? 'hub.title.empty' : 'hub.title.login')}</p>
-            </div>
-          )}
+        <Modal title={t('hub.title.title')} className="title-modal" onClose={() => setModal(null)}>
+          <div className="title-vault">
+            {SHOWCASE_TITLE_TIERS.map((tier) => {
+              const earned = titles.some((tt) => tt.tier === tier)
+              return (
+                <div key={tier} className={`title-badge ${earned ? 'is-earned' : 'is-locked'}`}>
+                  <img src={TITLE_ASSET[tier]} alt="" />
+                  <span>CARIS <b>{tierName(tier)}</b></span>
+                  {!earned && <span className="title-lock" aria-label="locked">🔒</span>}
+                </div>
+              )
+            })}
+          </div>
+          {titles.length === 0 && <p className="hub-modal-help title-vault-help">{t(authed ? 'hub.title.empty' : 'hub.title.login')}</p>}
         </Modal>
       )}
 

@@ -84,17 +84,23 @@ async function ownedLectureIds(admin: ReturnType<typeof adminClient>, uid: strin
 /** 유튜브가 무료로 주는 정적 썸네일. 관리자가 thumb_url 을 넣었으면 그게 이긴다. */
 const ytThumb = (id: string) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`
 
+/** 제목·소개 번역본 한 칸 꺼내기. 없으면 **한국어 원문**(원본 컬럼이 ko 의 단일 출처다).
+ *  ⚠️ 아직 번역이 안 된 강의는 그 강의만 한국어로 뜬다 — 빈 칸이 되면 안 된다. */
+const trField = (i18n: unknown, lang: string, ko: string): string =>
+  (((i18n as Record<string, string> | null) ?? {})[lang] ?? '').trim() || ko
+
 /** 강의 한 줄. ⛔ **youtubeId 는 소유자에게만** 내려간다 — 위 파일 머리 주석 참고.
- *  ⚠️ 강의엔 번역본이 없다(제목·채널이 관리자가 넣은 값 그대로) → 이북의 shape() 와 달리 lang 을 안 본다. */
-function shapeLecture(l: Row, owned: boolean) {
+ *  제목·소개는 이북의 shape() 와 같이 **요청 언어**로 준다(2026-08-26. 그전엔 번역이 아예 없어서,
+ *  러닝 라이브러리를 영어로 보면 이북 열만 영어고 강의 열은 한국어였다). 채널은 화면에서 뺀 값이라 그대로. */
+function shapeLecture(l: Row, owned: boolean, lang: string) {
   return {
     id: l.id as string,
     catalog: ((l.catalog as string | null) ?? 'leveltest') as 'leveltest' | 'caris',
     targetLevel: (l.target_level as number | null) ?? null,
     targetTier: (l.target_tier as string | null) ?? null,
-    title: l.title as string,
+    title: trField(l.title_i18n, lang, l.title as string),
     channel: (l.channel as string | null) ?? '',
-    description: (l.description as string | null) ?? '',
+    description: trField(l.description_i18n, lang, (l.description as string | null) ?? ''),
     price_usd_cents: (l.price_usd_cents as number) ?? 0,
     thumbUrl: (l.thumb_url as string | null) || ytThumb(l.youtube_id as string),
     youtubeId: owned ? (l.youtube_id as string) : null,
@@ -103,7 +109,7 @@ function shapeLecture(l: Row, owned: boolean) {
 }
 
 /** 강의 목록 select — 소유 판정 전이라 youtube_id 도 뽑는다(내려줄지는 shapeLecture 가 정한다). */
-const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, title, channel, description, price_usd_cents, thumb_url, sort_order, created_at'
+const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, title, title_i18n, channel, description, description_i18n, price_usd_cents, thumb_url, sort_order, created_at'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -141,7 +147,7 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.message }, 400)
       return json({
         ebooks: (data ?? []).map((b: Row) => shape(b, mine.has(b.id as string), lang)),
-        lectures: (lec ?? []).map((l: Row) => shapeLecture(l, mineLec.has(l.id as string))),
+        lectures: (lec ?? []).map((l: Row) => shapeLecture(l, mineLec.has(l.id as string), lang)),
       })
     }
 
@@ -268,7 +274,7 @@ Deno.serve(async (req) => {
       //    비공개로 내린 강의도 그대로 보여준다 — 산 사람의 시청권까지 회수하는 건 다른 얘기다.
       const lectures = (lecBuys ?? []).flatMap((p: Row) => {
         const l = lecById.get(p.lecture_id as string)
-        return l ? [{ ...shapeLecture(l, true), purchasedAt: p.created_at as string }] : []
+        return l ? [{ ...shapeLecture(l, true, lang), purchasedAt: p.created_at as string }] : []
       })
 
       // 레벨 사다리 순으로 진열(shelfKey 주석 참고). sort 가 안정 정렬이라 같은 레벨끼리는

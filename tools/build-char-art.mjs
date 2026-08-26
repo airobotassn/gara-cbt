@@ -41,7 +41,18 @@ const DIL = 3 // 벽 부풀리기(px). 구름 윤곽의 1~2px 틈으로 배경�
 const FEATHER = 14 // 벽 안쪽으로 이만큼 들어가면 완전 불투명. 경계 단차를 없앤다
 const LO = 15 // 배경 밝기 편차(가장자리 255 · 안쪽 246)를 흡수할 여유
 
-const [sheet, key, cutout, lv7sheet] = process.argv.slice(2)
+// ⚠️ 플래그(`--…`)를 먼저 걷어내고 자리 인자를 읽는다 — 안 그러면 플래그가 파일 경로 자리에 들어간다.
+const [sheet, key, cutout, lv7sheet] = process.argv.slice(2).filter((a) => !a.startsWith('--'))
+/**
+ * 발밑에 **그려져 있는** 옅은 회색 그림자를 지운다(`--trim-shadow`).
+ * 흰 종이 위에서는 안 보이지만 사진 배경에 얹으면 회색 얼룩으로 남는다. 배경제거 프로그램은
+ * 그걸 인물의 일부로 보고 남긴다(2026-08-26 여캐에서 실제로 그랬다 · 남캐 시트에는 없다).
+ *   ⚠️ **켤지 말지는 그림마다 사람이 정한다.** 자동으로 걸면 밝은 회색 소품(흰 버선·은장식)이
+ *      같이 지워질 수 있다.
+ *   ⚠️ Lv.7 은 **건드리지 않는다** — 옥좌에 앉아 있어 발밑 그림자가 없고, 아래쪽 후광이
+ *      옅은 크림색이라 같은 규칙에 걸려 빛이 잘려 나간다.
+ */
+const TRIM_SHADOW = process.argv.includes('--trim-shadow')
 if (!sheet || !/^char_[a-z]+_[a-z]+$/.test(key || '')) {
   console.error('사용법: node tools/build-char-art.mjs "<흰배경시트.png>" char_<계열>_<성별> ["<배경뺀시트.png>"]')
   process.exit(1)
@@ -238,6 +249,26 @@ function dropLabel(c) {
   return c
 }
 
+/** 발밑 회색 그림자 지우기 — 아래 SHADOW_BAND 행 안의 '채도 낮고 밝은' 픽셀만 (위 TRIM_SHADOW 주석) */
+const SHADOW_BAND = 50
+function trimShadow(c) {
+  const { P, w, h } = c
+  // ⚠️ 기준은 **그 칸의 인물 아래끝**이지 잘라낸 판의 밑변이 아니다. 판 밑변에는 라벨과의 여백이
+  //    붙어 있어서, 그걸 기준으로 잡으면 빈 곳만 훑고 정작 그림자는 그대로 남는다(실제로 그랬다).
+  let bot = -1
+  for (let y = h - 1; y >= 0 && bot < 0; y--) for (let x = 0; x < w; x++) if (P[(y * w + x) * 4 + 3] > 8) { bot = y; break }
+  if (bot < 0) return c
+  for (let y = Math.max(0, bot - SHADOW_BAND); y <= bot; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4
+    if (P[i + 3] < 8) continue
+    const r = P[i], g = P[i + 1], b = P[i + 2]
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+    const sat = mx ? (mx - mn) / mx : 0
+    if (sat < 0.18 && (r + g + b) / 3 > 130) { P[i] = P[i + 1] = P[i + 2] = P[i + 3] = 0 }
+  }
+  return c
+}
+
 /** 알파로 인물 상자와 '서는 자리'를 잰다 */
 function measure(c) {
   const { P, w, h } = c
@@ -275,14 +306,16 @@ if (lv7sheet) {
 
 // Lv.1~6 은 배경 뺀 시트의 모양을 입히고, 없으면(그리고 Lv.7 은 언제나) 여기서 배경을 뺀다.
 const cells = cut.map(([x0, x1], i) => {
-  if (altA && i < 6) return measure(applyMask(crop(x0, x1)))
+  // 그림자 지우기는 서 있는 Lv.1~6 만 (Lv.7 은 옥좌라 발밑 그림자가 없고 후광이 걸린다)
+  const ground = (c) => (TRIM_SHADOW ? trimShadow(c) : c)
+  if (altA && i < 6) return measure(ground(applyMask(crop(x0, x1))))
   if (i === 6 && lv7) {
     const c = crop(x0, x1, lv7)
     const BG = [lv7[0], lv7[1], lv7[2]]
     // 흰 배경이면 번지는 빛까지 살리는 쪽, 단색 키 배경이면 또렷한 쪽(위 dekey 주석 참고)
     return measure(dropLabel(Math.min(...BG) > 235 ? dewhite(c) : dekey(c, BG)))
   }
-  return measure(dewhite(crop(x0, x1)))
+  return measure(i < 6 ? ground(dewhite(crop(x0, x1))) : dewhite(crop(x0, x1)))
 })
 
 // 늘린 알파가 원본과 같은 자리에 있나 — 어긋나면 실루엣이 한쪽으로 밀린 채 잘린다

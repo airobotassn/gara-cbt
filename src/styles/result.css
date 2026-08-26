@@ -356,51 +356,74 @@
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
+/* 승급 배너 — 이 화면에서 제일 큰 사건이다(2026-08-26 지시로 키웠다).
+   ⚠️ 옛 판은 점수(--fs-lg, 30~52px) 아래 16px 짜리 작은 칩이라, 배지 하나 더 붙은 것처럼 보이고
+      "올랐다"가 안 읽혔다. 지금은 라벨을 점수 바로 아래 단계까지 올리고 판을 넓혔다.
+   ⚠️ 글씨 크기 3단 토큰(sm/md/lg) 사이에 값이 없어 clamp 를 직접 쓴다 — 토큰을 새로 만들면
+      이 배너 하나 때문에 전역 스케일이 4단이 된다. */
 .tier-change {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   width: fit-content;
-  margin: 0 auto 12px;   /* 자기 줄을 차지하고 중앙 정렬 → 엠블렘과 겹침 방지 */
-  padding: 8px 18px;
-  border-radius: 14px;
+  max-width: 100%;
+  margin: 6px auto 20px;   /* 자기 줄을 차지하고 중앙 정렬 → 엠블렘과 겹침 방지 */
+  padding: clamp(14px, 2.6vw, 20px) clamp(24px, 5vw, 40px);
+  border-radius: 20px;
 }
 .tier-change .tc-label {
-  font-size: var(--fs-md);
-  font-weight: 850;
+  font-size: clamp(24px, 5vw, 36px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 .tier-change .tc-flow {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  opacity: 0.85;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(16px, 3.2vw, 21px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.95;
 }
 .tier-change .tc-arrow {
-  opacity: 0.55;
+  opacity: 0.5;
+  font-weight: 600;
+}
+/* 도착 레벨만 한 단 키운다 — 둘이 같은 크기면 어느 쪽이 '지금'인지 눈으로 안 갈린다. */
+.tier-change .tc-to {
+  font-size: 1.24em;
+  font-weight: 900;
 }
 .tier-change.up {
   background: linear-gradient(
     180deg,
-    rgba(0, 74, 198, 0.16),
-    rgba(0, 74, 198, 0.1)
+    rgba(0, 74, 198, 0.3),
+    rgba(0, 74, 198, 0.14)
   );
   color: var(--blue-hi);
-  box-shadow: 0 0 0 1px rgba(0, 74, 198, 0.4) inset;
-  animation: tc-up 0.6s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  box-shadow:
+    0 0 0 2px rgba(0, 74, 198, 0.55) inset,
+    0 14px 34px -14px rgba(0, 74, 198, 0.75);
+  animation: tc-up 0.72s cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
 /* (.tier-change.down / @keyframes tc-down 은 강등 제거로 삭제됐다 — 배너는 승급만 뜬다) */
 @keyframes tc-up {
   0% {
-    transform: translateY(10px) scale(0.8);
+    transform: translateY(16px) scale(0.66);
     opacity: 0;
   }
-  60% {
-    transform: translateY(-3px) scale(1.06);
+  62% {
+    transform: translateY(-5px) scale(1.1);
   }
   100% {
     transform: translateY(0) scale(1);
     opacity: 1;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tier-change.up { animation: none; }
 }
 /* 처방(다음 단계) 카드 */
 .panel-card.rx {

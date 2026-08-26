@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useT, localeOf, type Lang } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
@@ -80,6 +80,8 @@ const POLL_MAX_MS = 4500
 //     (그 직후 스크롤을 바닥에 다시 붙이므로 튀지 않는다).
 const PAGE = 30
 const MAX_ROWS = 100
+// 바닥에서 이 안쪽이면 '맨 아래를 보고 있다'로 친다(줄 하나 높이보다 넉넉히).
+const BOTTOM_GAP = 80
 
 // 본문 렌더(URL 링크화 + 자동 이스케이프)는 ../lib/linkify 로 분리(단위 테스트 가능).
 
@@ -152,6 +154,14 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const cardBusy = useRef(false)
 
   const listRef = useRef<HTMLDivElement>(null)
+  // 스크롤은 기본이 '맨 아래에 붙어 있는 것'이고, 위로 올려 옛 글을 읽는 동안만 놓아준다.
+  //  ⚠️ 이 값을 폴링 tick 안에서 미리 재두면 안 된다 — 네트워크 왕복(수백 ms) 뒤에 쓰는 값이라
+  //     그 사이 사용자가 움직이면 틀린 판정이 되고, 화면이 붙었다 떨어졌다 한다(2026-08-26 수정 전 증상).
+  const pinnedRef = useRef(true)
+  // 옛 글을 위에 붙이는 동안만 값이 있다 = '바닥에서 이만큼 떨어진 자리를 지켜라'.
+  //  ⚠️ 위쪽 높이(예전의 scrollHeight 차이)로 복원하면 안 된다 — 같은 자리에 '불러오는 중' 안내 줄이
+  //     떴다 사라져서, 붙일 때 한 번 지울 때 한 번 화면이 튄다. 바닥 기준은 위에서 뭘 하든 안 흔들린다.
+  const keepBottomRef = useRef<number | null>(null)
   const rowsRef = useRef<Row[]>([])
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tempIdRef = useRef(-1)
@@ -271,6 +281,35 @@ export default function ChatBoard({ room = 'global' }: Props) {
   // 언마운트되면 재시도 루프를 멈춘다.
   useEffect(() => () => { aliveRef.current = false }, [])
 
+  // ── 스크롤 위치는 여기 한 곳이 정한다 ─────────────────────────────────────────
+  // 목록 높이를 바꾸는 것 전부(새 글·보낸 글·번역문 도착·번역 토글·옛 글 붙이기·안내 줄)가
+  // 이 이펙트를 지난다. 맨 아래를 보고 있었으면 다시 바닥에 붙이고, 위로 올라가 읽는 중이면 안 건드린다.
+  //  ⚠️ requestAnimationFrame 으로 붙이면 안 된다 — setState 뒤 rAF 는 React 가 DOM 을 고치기 **전에**
+  //     돌 수 있어서, 옛 높이 기준으로 바닥에 붙인 뒤 새 글이 그 아래에 그려진다(= 한 줄씩 어긋나 보인다).
+  //     useLayoutEffect 는 DOM 이 바뀐 뒤·화면에 그려지기 전이라 어긋날 틈이 없다.
+  useLayoutEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    if (keepBottomRef.current != null) {
+      el.scrollTop = el.scrollHeight - keepBottomRef.current
+      // 붙이기가 끝난 커밋(안내 줄까지 사라진 뒤)에서만 놓아준다.
+      if (!loadingOlder) keepBottomRef.current = null
+      return
+    }
+    if (pinnedRef.current) el.scrollTop = el.scrollHeight
+  }, [rows, tr, trOn, loading, loadingOlder])
+
+  // 목록 상자 자체가 커지거나 작아질 때도 다시 붙인다(창 크기 변경 · 모바일 주소창 숨김으로 60vh 가 변할 때).
+  useEffect(() => {
+    const el = listRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      if (pinnedRef.current && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // 상대 시간이 흐르도록 30초마다 갱신(방금 전 → N분 전).
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30_000)
@@ -294,13 +333,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
     callFunction<{ messages: Row[] }>('chat-list', { room, limit: PAGE })
       .then((res) => {
         if (!alive) return
+        // 첫 화면은 바닥에서 시작한다 — 붙이는 건 위의 레이아웃 이펙트가 한다(pinned 기본값 true).
         setRows(res.messages)
         setHasMore(res.messages.length >= PAGE)
         setLoading(false)
-        requestAnimationFrame(() => {
-          const el = listRef.current
-          if (el) el.scrollTop = el.scrollHeight
-        })
       })
       .catch(() => {
         if (alive) setLoading(false)
@@ -330,8 +366,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
         //  ⚠️ 반영 대상 id 는 **묻기 전에** 고른다. 지금 막 도착한 글은 방금 받은 최신 상태라
         //     반영할 것이 없으므로 빠져도 맞다(옛 코드도 결과적으로 그랬다).
         const visible = current.slice(-200)
-        const el = listRef.current
-        const atBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : true
         const req: Record<string, unknown> = { room }
         if (typeof lastId === 'number') req.after = lastId
         if (visible.length) {
@@ -349,11 +383,11 @@ export default function ChatBoard({ room = 'global' }: Props) {
           setRows((prev) => {
             const seen = new Set(prev.map((r) => r.id))
             const next = [...prev, ...incoming.filter((r) => !seen.has(r.id))]
-            return atBottom && next.length > MAX_ROWS ? next.slice(-MAX_ROWS) : next
+            // 창 접기는 **맨 아래를 보고 있을 때만** — 위로 올라가 읽는 중이면 그 순간 화면이 통째로 밀린다.
+            //  ⚠️ 판정은 응답을 받은 지금 다시 본다(요청 전에 재둔 값은 이미 낡았다).
+            return pinnedRef.current && next.length > MAX_ROWS ? next.slice(-MAX_ROWS) : next
           })
-          requestAnimationFrame(() => {
-            if (atBottom && el) el.scrollTop = el.scrollHeight
-          })
+          // 스크롤은 레이아웃 이펙트가 붙인다(여기서 따로 안 만진다).
         }
         // 번역을 켜둔 동안은 **아직 못 받은 글을 계속 채운다**(새 글 + 워커가 늦게 채운 옛 글).
         //  ⚠️ 이게 없으면 첫 재시도(1.5·3초) 안에 워커가 못 끝낸 글이 영영 원문으로 남는다 —
@@ -406,7 +440,9 @@ export default function ChatBoard({ room = 'global' }: Props) {
     const take = Math.min(PAGE, MAX_ROWS - rows.length)
     const oldestId = rows[0].id
     const el = listRef.current
-    const prevHeight = el?.scrollHeight ?? 0
+    // 보고 있던 자리를 '바닥에서의 거리'로 적어둔다 — 위에 안내 줄이 떴다 사라지고 옛 글이 붙어도
+    // 이 값은 안 흔들린다. 실제 복원은 레이아웃 이펙트가 한다.
+    if (el) keepBottomRef.current = el.scrollHeight - el.scrollTop
     setLoadingOlder(true)
     try {
       const res = await callFunction<{ messages: Row[] }>('chat-list', { room, before: oldestId, limit: take })
@@ -416,9 +452,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
           return [...res.messages.filter((r) => !seen.has(r.id)), ...prev]
         })
         setHasMore(res.messages.length >= take && rows.length + res.messages.length < MAX_ROWS)
-        requestAnimationFrame(() => {
-          if (el) el.scrollTop = el.scrollHeight - prevHeight
-        })
         // 위로 불러온 옛 글도 켜져 있으면 같이 번역한다.
         // 위로 불러온 옛 글은 따로 안 부른다 — 위 폴링이 "못 받은 것 전부"를 채우므로 곧 따라온다.
       } else {
@@ -430,9 +463,13 @@ export default function ChatBoard({ room = 'global' }: Props) {
     setLoadingOlder(false)
   }, [loadingOlder, loading, hasMore, rows, room])
 
+  // 스크롤할 때마다 '지금 맨 아래를 보고 있나'를 다시 잰다 — 새 글을 따라갈지 말지의 유일한 기준이다.
+  //  ⚠️ 우리가 코드로 바닥에 붙일 때도 이 핸들러가 돌아 pinned 가 true 로 유지된다(그게 맞다).
   function onScroll() {
     const el = listRef.current
-    if (el && el.scrollTop < 60) loadOlder()
+    if (!el) return
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_GAP
+    if (el.scrollTop < 60) loadOlder()
   }
 
   async function onSend(e: React.FormEvent) {
@@ -458,12 +495,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
       updated_at: new Date().toISOString(),
       sending: true,
     }
-    const el = listRef.current
-    const atBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 80 : true
+    // 내가 보낸 글은 위로 올라가 읽던 중이었어도 바닥으로 데려간다 — 방금 쓴 글이 안 보이면 실패로 읽힌다.
+    pinnedRef.current = true
+    keepBottomRef.current = null
     setRows((prev) => [...prev, tempRow])
-    requestAnimationFrame(() => {
-      if (atBottom && el) el.scrollTop = el.scrollHeight
-    })
     try {
       const res = await callFunction<{ id: number; created_at: string; updated_at: string; display_name: string; is_anon: boolean; mod_status: 'ok' | 'pending' }>('chat-post', { room, body: text })
       setRows((prev) => {

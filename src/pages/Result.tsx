@@ -8,6 +8,7 @@ import { useT, type TFunc } from '../lib/i18n'
 import { usdc } from '../lib/money'
 import { useCountUp } from '../hooks/useCountUp'
 import RadarChartBox from '../components/RadarChartBox'
+import Confetti from '../components/Confetti'
 import EbookCover from '../components/EbookCover'
 import TopBar from '../components/TopBar'
 import type { ResultResponse, StartTestResponse } from '../lib/testTypes'
@@ -120,6 +121,9 @@ export default function Result() {
 
   return (
     <div className="wrap">
+      {/* 승급 축하 꽃가루. promoted 는 false → true 로 한 번만 바뀌므로(게스트가 로그인해 잠금이 풀리는
+          경우 포함) 여기서 조건부로 그리면 발사도 한 번이고, 다 떨어지면 스스로 사라진다. */}
+      {promoted ? <Confetti /> : null}
       <TopBar />
       <div className="card pad">
         <ScoreHeader
@@ -294,8 +298,11 @@ function RankBanner({ data, t }: { data: ResultResponse; t: TFunc }) {
     <div style={{ textAlign: 'center' }}>
       <div className="tier-change up">
         <span className="tc-label">🎉 {t('result.promoted')}</span>
+        {/* 숫자·기호뿐이라 어순을 타지 않는다 — 도착 레벨만 한 단 키워 '지금'이 어디인지 보이게 한다. */}
         <span className="tc-flow">
-          Lv.{rankBefore} <span className="tc-arrow">→</span> Lv.{rankAfter}
+          <span>Lv.{rankBefore}</span>
+          <span className="tc-arrow">→</span>
+          <span className="tc-to">Lv.{rankAfter}</span>
         </span>
       </div>
     </div>

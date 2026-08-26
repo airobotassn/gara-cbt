@@ -3443,7 +3443,12 @@ Deno.serve(async (req) => {
       case 'chatPurge': return await chatPurge(admin, body)
       default: {
         // 관리자페이지 재편(2026-08-11)으로 생긴 액션들은 reform.ts 로 뺐다 — index.ts 가 이미 2.6k줄이다.
-        const r = await handleReform(admin, action, body, { email, isRoot, uid: user?.id ?? null })
+        //   번역기는 **여기 것을 넘겨준다**(강의 제목·소개 자동 번역). reform.ts 가 import 하면
+        //   index.ts ↔ reform.ts 가 순환한다 — 자세한 이유는 그쪽 `ReformDeps` 주석에 있다.
+        const r = await handleReform(admin, action, body, { email, isRoot, uid: user?.id ?? null }, {
+          translateKoFields,
+          hasTranslateKey: !!GEMINI_API_KEY,
+        })
         if (r) return r
         return json({ error: '알 수 없는 action' }, 400)
       }

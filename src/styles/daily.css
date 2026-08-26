@@ -226,10 +226,6 @@
 .dy-page .dy-rw-row { display: flex; gap: 8px; margin-top: 9px; }
 .dy-page .dy-rw-item { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font-size: 15px; font-weight: 900; background: var(--yellow); border: 3px solid var(--line); border-radius: 12px; padding: 8px 4px; }
-.dy-page .dy-streak { display: flex; gap: 5px; margin-top: 11px; }
-.dy-page .dy-day { flex: 1; text-align: center; border: 3px solid var(--line); border-radius: 11px; padding: 7px 0;
-  font-size: 14px; font-weight: 900; background: var(--card); line-height: 1.15; }
-.dy-page .dy-day.on { background: var(--teal); color: #fff; }
 
 /* ── CTA ── */
 .dy-page .dy-err { margin: 12px 0 0; font-size: 13px; font-weight: 800; color: #d05a5a; text-align: center; }
@@ -307,5 +303,4 @@ html.dark .dy-page {
   --slot-bg: #232833;
   --slot-line: #495064;
 }
-html.dark .dy-page .dy-day.on { color: #eef3f2; }
 html.dark .dy-page .dy-pop-bd { background: rgba(0, 0, 0, .6); }

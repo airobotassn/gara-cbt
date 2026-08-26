@@ -7,7 +7,7 @@ import { loadAdminMe } from '../lib/adminMe'
 import { renderEbookCover } from '../lib/ebookCover'
 import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
-import { translateEbook, EBOOK_LANGS, EBOOK_LANG_LABEL, type ResumeSource } from '../lib/ebookTranslate'
+import { translateEbook, translateEbookMeta, EBOOK_LANGS, EBOOK_LANG_LABEL, type ResumeSource } from '../lib/ebookTranslate'
 import { fitNoticeHtml, importNoticeHtml } from '../lib/noticeHtml'
 import { isIsolatedHtml } from '../lib/noticeRender'
 import HtmlBody from '../components/HtmlBody'
@@ -4006,6 +4006,23 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
     }
   }
 
+  /**
+   * 저장할 때 **메타(제목·지은이·소개)만** 다시 번역해야 하나.
+   *
+   * 판정 기준은 둘이고, 새 상태를 들고 다니지 않으려고 **DB 에 저장된 행**과 비교한다.
+   *   ① 폼의 한국어 메타가 저장된 값과 다르다 = 고친 것 → 번역도 따라가야 한다.
+   *   ② 아직 등록 전(신규)이다 → 업로드 시점엔 제목이 비어 있었을 수 있다(파일부터 올리고 제목을
+   *      나중에 치면 그 제목은 번역 대상에서 빠진 채 지나간다).
+   *   ③ 번역본은 있는데 제목이 비어 있다 = 메타 번역이 생기기 전에 등록된 옛 책.
+   */
+  function metaNeedsTranslate(d: EbookDraft): boolean {
+    if (!d.title.trim()) return false
+    const before = d.id ? rows.find((r) => r.id === d.id) : null
+    if (!before) return true
+    if (before.title !== d.title || (before.author ?? '') !== d.author || (before.description ?? '') !== d.description) return true
+    return EBOOK_LANGS.some((lg) => d.translations[lg] && !d.translations[lg]!.title)
+  }
+
   async function save() {
     if (!draft) return
     if (!draft.title.trim()) {
@@ -4034,6 +4051,34 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
           alert(`번역에 실패해 한국어본만 저장합니다. '다시 번역'으로 재시도할 수 있습니다.\n${e instanceof Error ? e.message : ''}`)
         } finally {
           setUploading(null)
+          setTrStatus('')
+        }
+      } else if (metaNeedsTranslate(d)) {
+        // 본문 번역은 그대로 두고 **제목·지은이·소개만** 다시 번역한다(조각 3개 = 호출 1회).
+        //   ⚠️ 이게 없으면 제목 오타를 고친 뒤 '다시 번역'을 눌러야만 번역 제목이 따라온다 —
+        //      안 누르면 다른 언어 스토어 카드가 옛 제목을 계속 말한다(2026-08-26).
+        setUploading('translate')
+        setTrStatus('제목·소개 번역 중…')
+        try {
+          const meta = await translateEbookMeta(
+            { title: d.title, author: d.author, description: d.description },
+            EBOOK_LANGS,
+            (p) => { setTrWaiting(!!p.waiting); setTrStatus(`제목·소개 번역 중…${p.note ? ` · ${p.note}` : ''}`) },
+          )
+          // 언어 항목을 통째로 갈아끼우지 않는다 — path·coverUrl·failedIdx 같은 본문 쪽 값이 같이 날아간다.
+          const merged: Record<string, EbookTranslation> = { ...d.translations }
+          for (const lg of EBOOK_LANGS) {
+            if (!merged[lg]) continue
+            merged[lg] = { ...merged[lg], title: meta[lg].title, author: meta[lg].author, description: meta[lg].description }
+          }
+          d = { ...d, translations: merged }
+          setDraft(d)
+        } catch (e) {
+          // 메타 번역 실패로 저장을 막지 않는다 — 옛 번역 제목이 남을 뿐이고 '다시 번역'으로 고칠 수 있다.
+          alert(`제목·소개 번역에 실패했습니다. 저장은 그대로 진행합니다 — '다시 번역'으로 재시도할 수 있습니다.\n${e instanceof Error ? e.message : ''}`)
+        } finally {
+          setUploading(null)
+          setTrWaiting(false)
           setTrStatus('')
         }
       }

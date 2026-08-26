@@ -474,6 +474,43 @@ function buildResumeSeed(
 }
 
 /**
+ * **메타(제목·지은이·소개)만** 번역한다 — 본문은 손대지 않는다.
+ *
+ * 왜 따로 필요한가(2026-08-26): 본문은 파일을 새로 올려야 바뀌지만 **메타는 폼에서 그냥 고칠 수 있다.**
+ * 그런데 저장은 "번역본이 하나도 없을 때만" 전체 번역을 돌리므로, 제목을 고쳐도 번역 제목은 옛것으로
+ * 남아 스토어·서재 카드가 다른 언어에서 계속 옛 제목을 말했다. 관리자가 `다시 번역`을 눌러야만
+ * 고쳐지는 상태였고, 그걸 기억해야 하는 것 자체가 버그다.
+ *
+ * ⚠️ 조각이 셋뿐이라 Gemini 호출 1회다 — 본문(수백 조각)과 비용이 비교가 안 된다.
+ * ⚠️ 실패한 필드는 **한국어 원문을 그대로** 돌려준다(스토어 카드가 비지 않게).
+ */
+export async function translateEbookMeta(
+  meta: EbookMeta,
+  langs: readonly EbookLang[] = EBOOK_LANGS,
+  onProgress?: (p: TranslateProgress) => void,
+): Promise<Record<string, EbookMeta>> {
+  const out: Record<string, EbookMeta> = {}
+  for (const lang of langs) out[lang] = { ...meta }
+  // 빈 필드는 보내지 않는다(번역 사다리에 빈 조각이 섞이면 그 자리가 늘 실패로 잡힌다).
+  const keys = (['title', 'author', 'description'] as const).filter((k) => meta[k].trim())
+  if (!keys.length) return out
+
+  const { out: tr } = await translateTexts(
+    keys.map((k) => meta[k].trim()),
+    langs,
+    meta.title,
+    (done, total, note, waiting) => onProgress?.({ phase: 'translate', done, total, note, waiting }),
+  )
+  for (const lang of langs) {
+    keys.forEach((k, i) => {
+      const v = tr[i]?.[lang]
+      if (v) out[lang][k] = v
+    })
+  }
+  return out
+}
+
+/**
  * 본문 HTML → 언어별 HTML.
  * @param html   원문(한국어) 이북 HTML
  * @param title  번역 품질용 문맥(책 제목)
