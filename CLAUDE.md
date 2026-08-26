@@ -650,7 +650,8 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - ⛔ **목적지를 함부로 늘리지 말 것.** 서로 비슷한 말이 목적지 둘로 갈리면 벡터가 못 가른다 — 그래서 레벨테스트 기록/인증서는 목적지로 안 만들었고(“내 점수”와 구분 불가), 의견함(`/feedback`)도 `/faq` 가 흡수한다.
   - ⛔ **재시드는 학습분(`source='llm'`)도 같이 비운다.** 예전엔 `source='seed'` 만 지워서, 문구를 고치고 재시드해도 예전에 학습된 질의가 **옛 페이지로 계속 갔다.** 학습분은 시드에서 다시 자라므로 버려도 잃는 게 없다.
   - ⚠️ `/feedback`(의견함)으로 가는 길은 FAB 하나뿐이다 — 검색은 `/faq` 로 보내는데 **그 화면에 의견함 링크가 없다.** 의견을 쓰러 온 사람은 아직 한 번에 못 닿는다.
-  - 배포: `npx.cmd supabase functions deploy route-query` + `route-seed`(이건 `--no-verify-jwt`) → `x-seed-key` 헤더로 `{reset:true}` 재시드. **재시드를 안 하면 앵커가 옛 목적지 그대로다.**
+  - 배포: `npx.cmd supabase functions deploy route-query` + `route-seed`(이건 `--no-verify-jwt`) → **재시드** `ROUTE_SEED_KEY=... node tools/reseed-routes.mjs`(762문구 × 600ms ≒ 8분) → 확인 `node tools/probe-routes.mjs`.
+    - ⛔ **재시드를 안 하면 배포가 아무 효과가 없다.** 앵커가 먼저 답하고 LLM 을 안 부르기 때문이다 — 2026-08-26 실측: 함수를 올린 직후에도 `시험 언제야` 가 `{"dest":"/guide","hit":true}` 로 옛 답을 그대로 줬다.
 - **`/feedback` 의견함 — 파일 첨부(2026-08-26)**: 캡처만이 아니라 **PPT·PDF 로 정리해 보내는 사람**까지 받는다(지시). 한 건에 **3개 · 파일당 20MB**, 붙이는 순간 올라가고 제출에는 **경로만** 실어보낸다. 관리자는 의견함 모달의 `📎` 버튼으로 연다.
   - ⛔ **브라우저가 Storage 에 직접 올리지 않는다.** 그러려면 `storage.objects` 에 anon insert 정책이 필요한데, 의견함은 **비로그인 누구나** 쓰는 화면이라 그 순간 우리 스토리지가 **가드 없는 무제한 업로드 엔드포인트**가 된다. 대신 `feedback` 함수가 경로 하나짜리 **서명 업로드 URL**(`createSignedUploadUrl`)을 굽고 브라우저는 그 토큰으로만 올린다 — 서명 업로드는 RLS 를 안 보므로 **버킷 정책이 0개**여도 동작하고, 정책이 0개라 토큰 없이는 아무도 못 올린다. 읽기도 관리자 함수가 굽는 서명 URL 뿐이다(`feedbackFileUrl`, 10분).
   - ⛔ **발급도 세야 한다** — 발급 자체는 로그인 없이 부를 수 있다. `feedback_upload_claim` RPC 가 advisory lock 안에서 **10분 15건 · 하루 400MB** 를 본다(엣지 함수에서 세면 동시 요청에 샌다). 그 원장(`feedback_uploads`)이 하는 일 셋: 바닥선 · "그 경로가 정말 이 사람이 방금 올린 것인가" 확인 · **올려놓고 안 보낸 고아 목록**.
