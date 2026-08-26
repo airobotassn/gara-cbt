@@ -594,16 +594,12 @@
 .rb-more:hover {
   text-decoration: underline;
 }
-.rb-sub {
-  margin: 0 0 14px;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
 /* 추천은 2권(응시 레벨 + 다음 레벨) — Result.tsx 의 EBOOK_PICKS 와 짝이다. */
 .rb-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  margin-top: 14px;
 }
 .rb-item {
   display: block;
@@ -618,9 +614,34 @@
 .rb-cover {
   width: 100%;
 }
+/* 표지 아래 한 줄 — 왼쪽에 제목·보유표시, 오른쪽에 '바로 학습하기'. 시안(2026-08-26)의 배치다. */
+.rb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+/* 제목은 길어지면 줄고, 버튼은 안 줄어야 한다 — min-width:0 이 없으면 flex 아이템이 안 줄어 버튼을 민다. */
+.rb-meta {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rb-go {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rb-item:hover .rb-go {
+  filter: brightness(1.08);
+}
 .rb-title {
   display: block;
-  margin-top: 8px;
   font-size: var(--fs-sm);
   font-weight: 700;
   line-height: 1.35;

@@ -111,9 +111,11 @@ const CLOSET_GROUPS: { kind: string; labelKey: string }[] = [
 ]
 
 /** 상점 썸네일 — 종류마다 그림이 다르다(캐릭터=그림 / 스킨=배경 / 그 외=이모지·가구 그림). */
-function CosmeticThumb({ partKey }: { partKey: string }) {
-  // 상점 썸네일은 **Lv.1** 이다 — 사면 처음 만나는 모습이라야 산 것과 보이는 게 같다.
-  if (isCharKey(partKey)) return <CharArt charKey={partKey} level={CHAR_MIN_LEVEL} className="closet-char-img" />
+function CosmeticThumb({ partKey, level }: { partKey: string; level: number }) {
+  // ⚠️ 캐릭터 썸네일은 **보는 사람의 ARENA 레벨**이다(2026-08-26). 한때 Lv.1 로 고정했었는데
+  //    ARENA Lv.2 인 사람이 사면 그 자리에서 Lv.2 로 보이므로 썸네일이 거짓말을 한다.
+  //    상점·보관함·무대가 전부 같은 레벨을 그려야 "산 것 = 보이는 것" 이 된다.
+  if (isCharKey(partKey)) return <CharArt charKey={partKey} level={level} className="closet-char-img" />
   if (isSkinKey(partKey)) return <img className="closet-skin-img" src={skinThumb(skinByPart(partKey))} alt="" />
   return <>{partEmoji(partKey)}</>
 }
@@ -499,7 +501,10 @@ export default function Hub() {
       setModal(null)
       return
     }
-    setPvLevel(isCharKey(key) && owned.has(key) ? arenaLevelForScore(seasonTotal) : CHAR_MIN_LEVEL)
+    // ⚠️ 가진 것이든 아니든 **내 ARENA 레벨**로 연다(2026-08-26). 안 가진 캐릭터만 Lv.1 로 열면
+    //    "사면 이렇게 보인다" 를 못 보여준다 — 사는 순간 바로 내 레벨 모습이 되기 때문이다.
+    //    아래 줄의 Lv.1~7 버튼으로 다른 단계를 볼 수 있으니 성장 과정도 그대로 보인다.
+    setPvLevel(isCharKey(key) ? arenaLevelForScore(seasonTotal) : CHAR_MIN_LEVEL)
     setPreview(key)
   }
   /** 입어보기 끝 — 원래 스킨으로 돌아가고 **떠나온 그 탭으로** 되돌린다(상점에서 왔으면 상점으로). */
@@ -1003,7 +1008,7 @@ export default function Hub() {
                               {/* 썸네일 = 미리보기 버튼. 74px 로는 캐릭터가 어떻게 생겼는지도,
                                   스킨이 화면을 어떻게 바꾸는지도 알 수 없다 — 사기 전에 크게 볼 길이 필요하다. */}
                               <button className="hub-shop-thumb pv-open" onClick={() => openPreview(c.partKey)} aria-label={t('hub.closet.preview')}>
-                                <CosmeticThumb partKey={c.partKey} />
+                                <CosmeticThumb partKey={c.partKey} level={arenaLv} />
                                 <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                               </button>
                               {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,

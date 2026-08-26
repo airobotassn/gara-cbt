@@ -2,13 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction } from '../lib/supabase'
-import {
-  weakestAxis,
-  promoteCut,
-  PROMOTE_RATE_LOW,
-  PROMOTE_RATE_HIGH,
-  type AxisMap,
-} from '../lib/scoring'
+import { weakestAxis, type AxisMap } from '../lib/scoring'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
 import { useT, type TFunc } from '../lib/i18n'
 import { usdc } from '../lib/money'
@@ -397,11 +391,10 @@ function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
   const focus = axisDef(focusKey).short
 
   // 승급했으면 다음 레벨 도전을 권하고, 승급 못 했으면(유지) 교재 학습으로 유도한다.
-  //   승급 컷은 비율이라 '몇 개 모자랐는지'를 실제 출제 수 기준으로 계산해 보여준다.
+  // ⚠️ **정답률 컷·'몇 개 더 맞히면 됐는지'는 문구에서 뺐다(2026-08-26 지시).** 문장을 고정문으로
+  //    바꾸면서 남긴 동적 값은 **약점 영역과 레벨 숫자 둘뿐**이다. 되살리려면 promoteCut·
+  //    PROMOTE_RATE_* 를 다시 import 해야 한다(지금은 이 파일에서 쓰는 곳이 없어 걷어냈다).
   const promoted = data.rankDir === 'up'
-  const total = data.totalQuestions
-  const cutRate = data.level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH
-  const need = Math.max(1, promoteCut(data.level, total) - data.totalCorrect)
 
   return (
     <div className="panel-card rx" style={{ marginTop: 18 }}>
@@ -418,18 +411,25 @@ function Prescription({ data, t }: { data: ResultResponse; t: TFunc }) {
         {promoted ? (
           <li>
             <span className="rx-ic">🎚️</span>
-            <span>{t('rx.next_up', { n: Math.min(data.level + 1, MAX_LEVEL) })}</span>
+            {/* 승급해도 교재로 잇는다(2026-08-26 지시) — 여기서 끊기면 '다음 레벨 도전'만 남고
+                무엇으로 준비하는지가 없다. 미승급 줄과 **같은 CTA** 를 쓴다. */}
+            <span>
+              {t('rx.next_up', { n: Math.min(data.level + 1, MAX_LEVEL) })}
+              {' '}
+              <Link className="rx-cta" to="/ebooks">{t('rx.study_cta')}</Link>
+            </span>
           </li>
         ) : (
           <>
             <li>
               <span className="rx-ic">📕</span>
-              <span>{t('rx.study_weak', { axis: focus })}</span>
+              {/* 고정문 — 약점 영역 이름은 바로 위 줄이 이미 말한다. */}
+              <span>{t('rx.study_weak')}</span>
             </li>
             <li>
               <span className="rx-ic">🎚️</span>
               <span>
-                {t('rx.study_pass', { n: data.level, p: Math.round(cutRate * 100), need })}
+                {t('rx.study_pass', { n: data.level })}
                 {' '}
                 <Link className="rx-cta" to="/ebooks">{t('rx.study_cta')}</Link>
               </span>
@@ -470,21 +470,28 @@ function EbookPicks({ t, lang, level, promoted }: { t: TFunc; lang: string; leve
           {t('result.books_more')} ›
         </Link>
       </div>
-      <p className="rb-sub">{t('result.books_sub')}</p>
       <div className="rb-grid">
         {books.map((b) => (
-          <Link key={b.id} className="rb-item" to="/ebooks">
+          // 가진 책은 뷰어로 바로 열고, 안 산 책은 러닝 라이브러리로 보낸다(거기서 사야 열린다).
+          // ⚠️ 칸 전체가 링크라 안쪽 '바로 학습하기'는 **버튼이 아니라 모양만 버튼인 span** 이다
+          //    — <a> 안에 <button>·<a> 를 넣으면 중첩 인터랙티브라 브라우저가 마크업을 쪼갠다.
+          <Link key={b.id} className="rb-item" to={b.owned ? `/ebooks/read/${b.id}` : '/ebooks'}>
             <EbookCover title={b.title} coverUrl={b.coverUrl} className="rb-cover" />
-            <b className="rb-title">{b.title}</b>
-            {b.author ? <i className="rb-author">{b.author}</i> : null}
-            {/* 보유한 책도 추천에서 빼지 않는다(칸이 비어 보이지 않게) — 대신 가격 자리를 '보유중'으로 바꾼다. */}
-            <span className={`rb-price${b.owned ? ' is-owned' : ''}`}>
-              {b.owned
-                ? t('ebook.owned')
-                : b.price_usd_cents > 0
-                  ? usdc(b.price_usd_cents, lang) /* 정가는 달러 센트 — 원화는 결제 시점에 서버가 계산한다 */
-                  : t('ebook.free')}
-            </span>
+            <div className="rb-row">
+              <span className="rb-meta">
+                <b className="rb-title">{b.title}</b>
+                {b.author ? <i className="rb-author">{b.author}</i> : null}
+                {/* 보유한 책도 추천에서 빼지 않는다(칸이 비어 보이지 않게) — 대신 가격 자리를 '보유중'으로 바꾼다. */}
+                <span className={`rb-price${b.owned ? ' is-owned' : ''}`}>
+                  {b.owned
+                    ? t('ebook.owned')
+                    : b.price_usd_cents > 0
+                      ? usdc(b.price_usd_cents, lang) /* 정가는 달러 센트 — 원화는 결제 시점에 서버가 계산한다 */
+                      : t('ebook.free')}
+                </span>
+              </span>
+              <span className="rb-go">{t('result.books_read')}</span>
+            </div>
           </Link>
         ))}
       </div>

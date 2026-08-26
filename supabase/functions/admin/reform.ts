@@ -143,6 +143,8 @@ async function inquiryAnswer(admin: any, body: any, ctx: Ctx) {
 // ⚠️ limit 을 문의(200)보다 크게 잡는다: 엑셀 추출이 이 응답을 그대로 쓰기 때문에 잘리면 **말없이
 //    일부만 담긴 파일**이 나간다. 넘칠 때를 대비해 total 을 같이 주고 화면이 잘림을 알린다.
 const FEEDBACK_LIMIT = 1000
+// 첨부 버킷 — **비공개**다. 정책이 0개라 서명 URL 말고는 읽을 길이 없다(storage-buckets.sql 참고).
+const FEEDBACK_BUCKET = 'feedback-files'
 
 async function feedbackList(admin: any, body: any) {
   const q = String(body?.q ?? '').trim()
@@ -170,6 +172,10 @@ async function feedbackList(admin: any, body: any) {
       path: r.path,
       body: r.body,
       account: r.user_id ? (accountMap[r.user_id] || '(이름 없음)') : null,
+      // 첨부는 **경로·이름·크기까지만** 준다. 여는 URL 은 누를 때 따로 발급한다 —
+      // 목록 1000건 × 3개에 서명 URL 을 미리 굽는 건 낭비고, 어차피 만료되는 값이라
+      // 화면에 오래 떠 있는 목록에 실어 보내면 눌렀을 때 이미 죽어 있다.
+      files: Array.isArray(r.files) ? r.files : [],
       createdAt: r.created_at,
     })),
     total: count ?? rows.length,
@@ -177,11 +183,32 @@ async function feedbackList(admin: any, body: any) {
   })
 }
 
+/** 첨부 한 개를 여는 서명 URL. 관리자 게이트는 index.ts 가 이미 통과시켰다. */
+async function feedbackFileUrl(admin: any, body: any) {
+  const path = String(body?.path ?? '')
+  if (!path) return json({ error: 'path 가 없습니다.' }, 400)
+  // ⚠️ 아무 경로나 서명해 주지 않는다 — 실제로 접수된 첨부인지 원장에서 먼저 확인한다.
+  const { data: row } = await admin.from('feedback_uploads').select('path').eq('path', path).maybeSingle()
+  if (!row) return json({ error: '없는 첨부입니다.' }, 404)
+  const { data, error } = await admin.storage.from(FEEDBACK_BUCKET).createSignedUrl(path, 60 * 10)
+  if (error || !data) return json({ error: error?.message ?? '링크를 만들지 못했습니다.' }, 500)
+  return json({ url: data.signedUrl })
+}
+
 async function feedbackDelete(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   if (!id) return json({ error: 'id 가 없습니다.' }, 400)
+  // 파일 경로를 **지우기 전에** 읽어둔다 — 행이 사라지면 무엇을 지워야 하는지 알 길이 없다.
+  const { data: row } = await admin.from('feedbacks').select('files').eq('id', id).maybeSingle()
+  const paths: string[] = Array.isArray(row?.files)
+    ? (row.files as any[]).map((f) => String(f?.path ?? '')).filter(Boolean)
+    : []
+
   const { error } = await admin.from('feedbacks').delete().eq('id', id)
   if (error) return json({ error: error.message }, 500)
+  // ⚠️ 스토리지는 **DB 뒤에** 비운다(이북 정리와 같은 순서). 먼저 지웠다가 삭제가 실패하면
+  //    목록에는 남아 있는데 첨부만 사라진 의견이 된다. 실패는 삼킨다 — 파일이 남는 건 용량만 먹는다.
+  if (paths.length) await admin.storage.from(FEEDBACK_BUCKET).remove(paths)
   await audit(admin, ctx, 'feedbackDelete', id)
   return json({ ok: true })
 }
@@ -900,6 +927,7 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx): P
     case 'inquiryList': return await inquiryList(admin, body)
     case 'inquiryAnswer': return await inquiryAnswer(admin, body, ctx)
     case 'feedbackList': return await feedbackList(admin, body)
+    case 'feedbackFileUrl': return await feedbackFileUrl(admin, body)
     case 'feedbackDelete': return await feedbackDelete(admin, body, ctx)
     case 'ebookPreview': return await ebookPreview(admin, body)
     case 'lectureList': return await lectureList(admin, body)

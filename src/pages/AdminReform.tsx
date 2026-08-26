@@ -1250,7 +1250,14 @@ interface FeedbackRow {
   body: string
   /** 로그인 상태로 썼을 때의 계정 이름. 본인이 적은 name 과 다를 수 있어 **덮어쓰지 않고 따로** 보여준다. */
   account: string | null
+  /** 첨부. 여는 URL 은 **누를 때** 따로 받는다(서명 URL 이라 목록에 실어두면 눌렀을 때 이미 만료다). */
+  files: { path: string; name: string; size: number }[]
   createdAt: string
+}
+
+function fbSize(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}MB`
+  return `${Math.max(1, Math.round(n / 1024))}KB`
 }
 
 /** 엑셀 파일명에 못 쓰는 글자를 턴다(문항 내보내기와 같은 규칙). */
@@ -1259,11 +1266,16 @@ function fbFileName(name: string): string {
 }
 
 function exportFeedbackXlsx(rows: FeedbackRow[]) {
-  const header = ['등록일시', '소속', '이름', '경로', '내용', '계정']
-  const body = rows.map((r) => [fmtDT(r.createdAt), r.org, r.name, r.path, r.body, r.account ?? ''])
+  // ⚠️ 첨부는 **이름만** 담는다 — 링크를 적어도 서명 URL 은 10분이면 죽어서 파일 안에서는
+  //    쓸모가 없다. 파일을 봐야 하면 관리자 화면에서 연다.
+  const header = ['등록일시', '소속', '이름', '경로', '내용', '계정', '첨부']
+  const body = rows.map((r) => [
+    fmtDT(r.createdAt), r.org, r.name, r.path, r.body, r.account ?? '',
+    (r.files ?? []).map((f) => f.name).join(', '),
+  ])
   const ws = XLSX.utils.aoa_to_sheet([header, ...body])
   // 기본 폭이면 '내용' 칸이 한 글자 폭으로 서서 파일을 열자마자 손으로 늘려야 한다.
-  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 26 }, { wch: 70 }, { wch: 14 }]
+  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 26 }, { wch: 70 }, { wch: 14 }, { wch: 28 }]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '의견')
   const day = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(/-/g, '')
@@ -1281,6 +1293,21 @@ export function FeedbackAdmin() {
   // ⚠️ 잘림을 반드시 말한다 — 엑셀이 이 목록을 그대로 쓰기 때문에, 조용히 자르면
   //    "전부 받았다" 고 믿고 일부만 든 파일이 나간다.
   const truncated = !!data && total > rows.length
+
+  /** 첨부 열기.
+   *  ⚠️ 빈 탭을 **먼저** 연다 — await 뒤에 window.open 을 부르면 사용자 클릭과 끊겨 팝업 차단에 걸린다. */
+  async function openFile(path: string) {
+    const w = window.open('', '_blank')
+    try {
+      const { url } = await callFunction<{ url: string }>('admin', { action: 'feedbackFileUrl', path })
+      // 팝업이 막혔으면 이 탭에서 연다(빈손으로 두지 않는다).
+      if (w) w.location.href = url
+      else window.location.assign(url)
+    } catch (e) {
+      w?.close()
+      alert(e instanceof Error ? e.message : '첨부를 열지 못했습니다.')
+    }
+  }
 
   async function remove(r: FeedbackRow) {
     if (!confirm(`${r.name}(${r.org}) 님의 의견을 지웁니다. 되돌릴 수 없습니다.`)) return
@@ -1325,7 +1352,7 @@ export function FeedbackAdmin() {
       ) : null}
       <div className="admin-table-wrap">
         <table className="admin-table">
-          <thead><tr><th>등록</th><th>소속</th><th>이름</th><th>경로</th><th>내용</th><th></th></tr></thead>
+          <thead><tr><th>등록</th><th>소속</th><th>이름</th><th>경로</th><th>내용</th><th>첨부</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
@@ -1341,13 +1368,17 @@ export function FeedbackAdmin() {
                 <td>{r.path}</td>
                 {/* 목록에서는 한 줄만 — 내용이 길어 그대로 두면 표가 아니라 문서가 된다. 전문은 모달. */}
                 <td style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.body}</td>
+                {/* 목록에서는 개수만 — 파일은 모달에서 연다. 없으면 빈칸이라 붙은 건만 눈에 띈다. */}
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>
+                  {r.files?.length ? `📎 ${r.files.length}` : ''}
+                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => setOpen(r)}>보기</button>
                 </td>
               </tr>
             ))}
             {!loading && !rows.length ? (
-              <tr><td colSpan={6} className="admin-empty">{q ? '검색 결과가 없습니다.' : '아직 들어온 의견이 없습니다.'}</td></tr>
+              <tr><td colSpan={7} className="admin-empty">{q ? '검색 결과가 없습니다.' : '아직 들어온 의견이 없습니다.'}</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -1365,6 +1396,20 @@ export function FeedbackAdmin() {
             </p>
             {/* 줄바꿈을 살린다 — 의견은 문단으로 적는 글이라 한 줄로 접으면 읽는 순서가 무너진다. */}
             <div className="admin-section" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.75 }}>{open.body}</div>
+            {open.files?.length ? (
+              /* 첨부는 비공개 버킷이라 누를 때마다 10분짜리 서명 URL 을 새로 받는다 —
+                 그래서 <a href> 가 아니라 버튼이다. */
+              <div className="admin-section" style={{ marginTop: 10 }}>
+                <div className="admin-hint" style={{ marginBottom: 6 }}>첨부 {open.files.length}개</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {open.files.map((f) => (
+                    <button key={f.path} className="admin-mini" onClick={() => openFile(f.path)}>
+                      📎 {f.name} <span style={{ color: 'var(--muted)' }}>({fbSize(f.size)})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
               <button className="admin-mini danger" onClick={() => remove(open)}>삭제</button>
               <button className="admin-mini" onClick={() => setOpen(null)}>닫기</button>

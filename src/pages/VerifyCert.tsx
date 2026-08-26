@@ -24,13 +24,15 @@ const DEMO_BAD_TOKEN = 'preview-invalid'
 function demoResult(): VerifyCertResponse {
   const now = new Date()
   const exp = new Date(now)
-  exp.setMonth(exp.getMonth() + 6) // CARIS Pro = 취득일 +6개월
+  exp.setMonth(exp.getMonth() + 6) // CARIS Beginner = 취득일 +6개월(_shared/cert.ts 의 EXPIRY_MONTHS)
   return {
     valid: true,
     status: 'valid',
     name: '홍*동',
-    grade: 'CARIS PRO',
-    certNo: 'CA-PRO-2026-000001',
+    // ⚠️ **미리보기 증서와 같은 급수여야 한다.** 이 토큰을 QR 에 싣는 건 `/certificate` 미리보기 하나뿐이고
+    //    그 증서는 Beginner 다 — 예전엔 여기만 Pro 라 QR 을 찍으면 증서와 급수가 어긋났다(2026-08-26).
+    grade: 'CARIS BEGINNER',
+    certNo: 'CA-BEG-2026-000001',
     issuedAt: now.toISOString(),
     expiresAt: exp.toISOString(),
   }
@@ -154,7 +156,11 @@ export default function VerifyCert() {
                 <p className="vrf-invalid-desc">{t('verify.invalid_desc')}</p>
               )}
 
-              {isDemo && <div className="vrf-demo">{t('verify.demo_note')}</div>}
+              {/* ⛔ **데모 안내문('미리보기 예시입니다')은 뺐다(2026-08-26 지시).** 사용설명서에 싣는 증서의 QR 이
+                  이 토큰을 가리키는데, 안내문이 붙으면 진위확인 기능을 보여주려고 넣은 그림이 "예시라서 안 된다"
+                  로 읽힌다. 실제로 이 토큰을 쓰는 발급 건은 하나도 없다(발급본은 전부 난수 토큰이다).
+                  ⚠️ 대가: `/verify/preview-sample` 을 직접 여는 사람에게도 **실재하지 않는 자격증이 '유효'로**
+                     보인다. 되살리려면 이 자리에 안내문을 다시 넣으면 된다(문구 키는 6개국어에서 같이 지웠다). */}
 
               <footer className="vrf-trust">
                 <p>{t('verify.trust')}</p>

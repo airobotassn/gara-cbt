@@ -19,7 +19,7 @@ const KO: Record<string, string> = {
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "로그인",
   "common.logout": "로그아웃",
-  "common.retry_test": "다시 테스트",
+  "common.retry_test": "테스트 다시 응시하기",
   "common.loading": "불러오는 중…",
 
   "fab.guest": "게스트",
@@ -303,28 +303,30 @@ const KO: Record<string, string> = {
   "result.delta_legend": "▲ 상승 / ▼ 하락",
   "result.answers_title": "문제 해설 · 오답노트",
   // 결과창 하단 이북 추천 칸(eBook Store 로 연결)
-  "result.books_title": "추천 이북",
-  "result.books_sub": "다음 단계 학습에 도움이 될 교재예요.",
-  "result.books_more": "스토어 전체 보기",
+  // ⚠️ 'E-BOOK'·'Learning Library' 는 카탈로그 이름처럼 **6개국어 모두 같은 영문**이다 — 번역하지 말 것.
+  "result.books_title": "추천 E-BOOK",
+  "result.books_more": "Learning Library",
+  "result.books_read": "바로 학습하기",
   "result.correct": "정답",
   "result.wrong": "오답",
   "result.mychoice": "(내 선택)",
 
-  "rx.title": "다음 단계",
+  "rx.title": "테스트 분석 및 다음 단계",
   "rx.promote": "{tier}까지 {p}점 남았어요",
   "rx.master": "최고 티어 달성! 🎉",
-  "rx.focus": "가장 약한 영역은 [{axis}]예요",
+  "rx.focus": "집중 보완 포인트: [{axis}] 영역",
   "rx.focus_peer": " (또래 평균보다 {gap}↓)",
   "rx.weak": "{axis}이(가) {tier} 평균보다 {gap} 낮아요",
-  "rx.next_up": "잘했어요! 다음엔 Lv.{n} 도전",
+  "rx.next_up": "잘했어요! Lv.{n} 도전을 위해 Learning Library로 학습해 보세요.",
   "rx.next_same": "Lv.{n} 한 번 더 다지기",
   "rx.next_down": "Lv.{n}로 기초 다지기",
   // 승급 못 했을 때(유지) 처방 둘째 줄 — 약점 영역을 짚고 교재로 유도한다.
   //   ⚠️ 이북에 레벨·영역 메타데이터가 없어 '이 축을 다루는 책'을 특정하지 못한다. 문구로만 연결하고
   //      실제 목록은 결과창 아래 추천 이북 칸(스토어 노출순)이다. 메타데이터가 생기면 여기서 매칭할 것.
-  "rx.study_weak": "{axis} — 이 영역이 발목을 잡았어요. 여기를 다루는 교재로 메우는 게 가장 빨라요",
-  "rx.study_pass": "Lv.{n} 통과는 정답률 {p}% — {need}개 더 맞히면 됐어요. 아래 교재로 준비하세요",
-  "rx.study_cta": "📚 추천 교재 보기",
+  // ⚠️ 고정문이다 — 남은 동적 값은 약점 영역({axis})과 레벨({n}) 둘뿐이다(2026-08-26 지시).
+  "rx.study_weak": "이 영역을 보완하면 전체 실력 향상에 큰 도움이 됩니다.",
+  "rx.study_pass": "Lv.{n} 통과를 위해 Learning Library로 학습해 보세요.",
+  "rx.study_cta": "👉 추천 E-BOOK 보기",
   "tip.prompt": "원하는 출력 형식·예시를 넣고 작업을 단계로 나눠 지시하는 연습을 해보세요.",
   "tip.model": "작업마다 어떤 AI가 적합한지, 각 모델이 잘 못하는 건 뭔지 학습해 보세요.",
   "tip.verify": "AI 답을 그대로 믿지 말고 출처·사실을 직접 확인하는 습관을 들여보세요.",
@@ -746,7 +748,10 @@ const KO: Record<string, string> = {
   "cert.confirm_ok": "이 이름으로 발급",
   "cert.confirm_edit": "수정하기",
   "cert.roman_invalid": "영문 성명을 로마자로 입력해 주세요(영문·공백·하이픈만).",
-  "cert.qr_caption": "진위여부 확인",
+  // ⚠️ 증서 안에 각인되는 글자는 **6개국어 모두 영문 고정**이다(2026-08-26 지시).
+  //    자격증 서식(cert-template-v2.png)이 영문 한 벌뿐이라 화면 언어를 따라가면 영문 증서에
+  //    한글·중국어 캡션만 섞여 박힌다. 번역하지 말 것.
+  "cert.qr_caption": "Verify authenticity",
   "cert.gate_pay": "결제하고 발급받기",
   "cert.gate_later": "나중에 하기",
   "cert.issuing": "발급 중…",
@@ -767,7 +772,6 @@ const KO: Record<string, string> = {
   "verify.status": "상태",
   "verify.status_valid": "유효",
   "verify.status_expired": "만료",
-  "verify.demo_note": "※ 미리보기 예시입니다 — 실제 발급된 인증서가 아닙니다.",
   "verify.system_sub": "자격 진위확인 시스템",
   "verify.official_body": "공인 AI·로봇 자격 검정기관",
   "verify.headline_valid": "유효한 인증서입니다",
@@ -1136,10 +1140,10 @@ const KO: Record<string, string> = {
   "feedback.f_name": "이름",
   "feedback.f_path": "경로",
   "feedback.f_body": "내용",
-  "feedback.ph_org": "예: 글로벌 AI·로봇 협회",
-  "feedback.ph_name": "예: 홍길동",
-  "feedback.ph_path": "예: 마이페이지 > 이북 서재",
-  "feedback.ph_body": "어떤 점이 불편했는지, 무엇을 기대했는지 적어주세요.",
+  "feedback.ph_org": "예: 전략기획실",
+  "feedback.ph_name": "예: 최원석",
+  "feedback.ph_path": "예: https://gara-cbt.airobotassn.workers.dev/hub",
+  "feedback.ph_body": "예: 배경 색상이 좀더 진했으면 좋겠습니다.",
   "feedback.hint_path": "의견이 해당하는 화면이나 메뉴를 적어주세요.",
   "feedback.f_files": "파일 첨부 (선택)",
   "feedback.files_drop": "여기로 파일을 끌어다 놓거나, 캡처를 붙여넣기(Ctrl+V) 하세요.",
@@ -1864,8 +1868,8 @@ const KO: Record<string, string> = {
   "hub.err.invalid_part": "적용할 수 없는 아이템이에요",
   // ⚠️ 캐릭터 이름은 **임시값**이다 — 그림이 아직 없어서 계열을 A·B·C 로만 부른다.
   //    그림이 도착하면 여기 이름만 갈면 된다(키는 절대 바꾸지 말 것 — 소유·장착이 키로 돌아간다).
-  "hub.part.char_a_m": "캐릭터 A · 남",
-  "hub.part.char_a_f": "캐릭터 A · 여",
+  "hub.part.char_a_m": "한국풍 캐릭터(남)",
+  "hub.part.char_a_f": "한국풍 캐릭터(여)",
   "hub.part.char_b_m": "캐릭터 B · 남",
   "hub.part.char_b_f": "캐릭터 B · 여",
   "hub.part.char_c_m": "캐릭터 C · 남",

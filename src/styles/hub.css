@@ -733,7 +733,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       궁궐 값을 그대로 쓰면 캐릭터가 언덕 중턱에 붕 뜬다. */
 .hub[data-skin='meadow']       {
   --skin-bg: url('/hub/bg-meadow-default.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%;
-  --skin-char-h: 30vh; --skin-char-bottom: 25vh;
+  --skin-char-h: 43vh; --skin-char-bottom: 25vh;
 }
 .hub[data-skin='palace_day']   { --skin-bg: url('/hub/bg-v2.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='palace_night'] { --skin-bg: url('/hub/bg-v5.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
@@ -751,10 +751,17 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
      ⚠️ 그래서 --skin-bg 를 여기 두지 않고 아래에서 스킨별로 덮는다. 여기 두면 한쪽이 늘 이긴다. */
   /* ⚠️ 캐릭터 그림 경로·비율은 여기 없다 — 캐릭터를 고를 수 있게 되면서(2026-08-20) 코드가 알아야
      하는 값이 됐다(src/lib/hubCosmetics.ts). 여기 남기면 두 곳이 서로 다른 그림을 가리킨다. */
-  --skin-char-h: 34vh;          /* 캐릭터 키 */
+  --skin-char-h: 48vh;          /* 캐릭터 칸 높이 — 그림이 실제로 차지하는 키가 아니다(아래 ⚠️) */
+                                /* ⚠️ **캔버스 높이지 인물 키가 아니다.** 캐릭터 그림은 7장이 같은
+                                   캔버스를 쓰고 그 안에서 Lv.1~6 이 세로 70%, Lv.7 만 90%대다
+                                   (마지막 레벨이라 후광·옥좌까지 크게 그렸다). 그래서
+                                   **인물이 화면에서 차지하는 키 = 이 값 × 0.70** 이다.
+                                   ⛔ 이 70% 는 `tools/build-char-art.mjs` 의 HEADROOM(1.42)이 정한다 —
+                                      한쪽만 고치면 캐릭터가 통째로 커지거나 작아진다. 한 쌍이다. */
   --skin-char-bottom: 20vh;     /* 발끝이 놓이는 자리. 배경 지평선과 맞춘다 */
                                 /* ⚠️ 이 값이 뜻대로 동작하려면 그림 아래에 투명 여백이 없어야 한다.
-                                   여백이 있으면 발끝이 그만큼 떠서 이 값이 거짓말을 한다. */
+                                   여백이 있으면 발끝이 그만큼 떠서 이 값이 거짓말을 한다.
+                                   (위 도구가 캔버스 아래끝을 발끝에 맞춰 잘라서 그걸 보장한다.) */
 
   /* 글자색 — 판이 밝은 베이지라 어둡게. 어두운 판 테마면 여기만 뒤집으면 된다 */
   --skin-panel-ink: #4a2f16;
@@ -1146,8 +1153,10 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 .hub .closet-item-state { font-size: 11.5px; font-weight: 800; color: var(--ink2); }
 .hub .closet-item.on .closet-item-state { color: var(--brand); }
 
-/* 썸네일 — 캐릭터는 전신이 다 보여야 하고(contain), 배경은 칸을 채워야 뭔지 읽힌다(cover). */
-.hub .closet-char-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* 썸네일 — 캐릭터는 전신이 다 보여야 하고(contain), 배경은 칸을 채워야 뭔지 읽힌다(cover).
+   ⚠️ 캐릭터는 **아래끝 기준**이다. 그림 한 장이 Lv.7(후광·옥좌까지 큰 것)까지 담는 캔버스라
+      Lv.1 은 위쪽 30% 가 투명인데, 가운데 정렬로 두면 그 여백만큼 칸 안에서 붕 떠 보인다. */
+.hub .closet-char-img { max-width: 100%; max-height: 100%; object-fit: contain; object-position: 50% 100%; }
 .hub .closet-skin-img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
 .hub .hub-shop-thumb .closet-char-img,
 .hub .hub-shop-thumb .closet-skin-img { max-height: 74px; height: 74px; }
