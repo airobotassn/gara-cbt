@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { callFunction, isFunctionCode } from '../lib/supabase'
 import SebExitButton from '../components/SebExitButton'
-import { SEB_REQUIRED, isSEB, sebRunConfigUrl } from '../lib/seb'
+import { SEB_REQUIRED, isSEB } from '../lib/seb'
 import { DEFAULT_EXAM_SLUG } from '../lib/testConfig'
 import {
   examAuthHeaders,
@@ -41,10 +41,6 @@ export default function SebStart() {
   // 표를 state 로 들고 있어야 하는 이유 = 아래에서 주소를 지운 뒤에도 '다시 시도' 를 누를 수 있어야 한다
   // (표는 서버에서 1회용이라 실제로 교환에 성공한 뒤엔 재시도해도 거절된다 — 그건 서버가 판정한다).
   const [nonce] = useState(() => readHandoffNonce(window.location.search))
-  // 지금이 2단계(문제 화면 설정)인가. 2단계 .seb 의 startURL 에만 `go=1` 이 박혀 있다.
-  // ⚠️ URLSearchParams 로 읽지 않는다 — SEB 가 표를 '?' 로 붙이면 `…&go=1?h=<표>` 가 되어
-  //    값이 `1?h=…` 로 잡힌다(표를 원문 정규식으로 긁는 것과 같은 이유).
-  const [stageRun] = useState(() => /[?&]go=1(?:[&?#]|$)/.test(window.location.search))
   useEffect(() => {
     if (nonce) stripHandoffFromUrl()
   }, [nonce])
@@ -53,21 +49,6 @@ export default function SebStart() {
   useEffect(() => {
     if (SEB_REQUIRED && !isSEB()) navigate('/exam', { replace: true })
   }, [navigate])
-
-  /**
-   * 1단계 → 2단계. 표는 **여기서 쓰지 않고 그대로 넘긴다** — 표를 여기서 토큰으로 바꿔봐야
-   * 재구성이 세션을 새로 열면서 그 토큰이 사라진다(sessionStorage 는 세션과 함께 날아간다).
-   * 표는 1회용·수 분짜리라 그대로 실어 보내도 노출이 늘지 않는다(이미 이 주소로 실려 왔다).
-   */
-  function handOffToRunConfig() {
-    if (!nonce) {
-      setErr(t('seb.err_no_handoff'))
-      return
-    }
-    setStarting(true)
-    setErr('')
-    window.location.href = sebRunConfigUrl(lang, nonce)
-  }
 
   async function begin() {
     if (started.current) return
@@ -107,17 +88,6 @@ export default function SebStart() {
     }
   }
 
-  // 2단계로 넘어왔으면 버튼 없이 바로 시작한다 — 확인은 1단계에서 이미 받았다.
-  // ⚠️ 여기서 또 누르게 하면 재구성 뒤 같은 화면이 한 번 더 뜨는 꼴이라 "왜 두 번 누르지" 가 된다.
-  // ⚠️ 이펙트 본문에서 바로 부르지 않고 한 틱 미룬다 — begin() 이 첫 줄에서 setState 를 해서
-  //    렌더 도중 상태를 바꾸는 꼴이 된다(eslint react-hooks/set-state-in-effect).
-  useEffect(() => {
-    if (!stageRun) return
-    const id = window.setTimeout(() => void begin(), 0)
-    return () => window.clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 1회. begin 은 started ref 로 자체 중복 방지.
-  }, [stageRun])
-
   return (
     <div className="exam-center">
       <div style={{ textAlign: 'center', maxWidth: 460, margin: '0 auto', padding: 24 }}>
@@ -134,10 +104,7 @@ export default function SebStart() {
             {/* 표도 토큰도 없으면 재시도해봐야 같은 곳에서 막힌다 — SEB 를 닫고 다시 시작하라고 말해준다.
                 (토큰이 있으면 교환은 이미 끝난 것이라, 실패한 건 응시 시작 쪽이고 재시도가 의미 있다.) */}
             {voided ? null : nonce || getExamToken() ? (
-              // 1단계에서 실패했으면 다시 넘겨받기부터, 2단계면 응시 시작부터 — 각자 자기 단계를 재시도한다.
-              <button className="exam-btn" onClick={() => (stageRun ? void begin() : handOffToRunConfig())}>
-                {t('seb.entry_retry')}
-              </button>
+              <button className="exam-btn" onClick={begin}>{t('seb.entry_retry')}</button>
             ) : (
               <p className="font-body-md text-body-md text-on-surface-variant" style={{ marginBottom: 16 }}>
                 {t('seb.err_no_handoff_how')}
@@ -161,9 +128,7 @@ export default function SebStart() {
               현재 본인인증 수단을 준비 중입니다.<br />
               아래 <b>확인</b>을 누르면 시험을 시작합니다.
             </p>
-            {/* 여기서 응시가 곧바로 시작되지 않는다 — 종료가 막힌 2단계 설정으로 넘겨받고, 시험은 거기서 시작한다.
-                (SEB 는 그 사이 세션을 다시 여는데, 응시자에게는 화면이 한 번 깜빡이는 것으로 보인다.) */}
-            <button className="exam-btn" onClick={() => (stageRun ? void begin() : handOffToRunConfig())}>확인</button>
+            <button className="exam-btn" onClick={begin}>확인</button>
             {/* 시작 전이라 나가도 잃을 게 없다 — 잘못 열었을 때 재부팅하지 않도록 길을 열어둔다. */}
             <div style={{ marginTop: 18 }}>
               <SebExitButton />

@@ -7,10 +7,9 @@
 //   예) 배포:  node tools/make-seb-all.mjs https://gara-cbt.airobotassn.workers.dev public 8
 //       로컬:  node tools/make-seb-all.mjs http://localhost:5174 public 8
 //
-// 생성물(언어 6종 × 3벌):
-//   public/gara-<lang>.seb          1단계 startURL = <origin>/exam/seb?lang=<lang>
-//   public/gara-run-<lang>.seb      2단계 startURL = <origin>/exam/seb?lang=<lang>&go=1
-//   public/gara-practice-<lang>.seb 점검  startURL = <origin>/exam/envcheck?lang=<lang>
+// 생성물(언어 6종 × 실제/연습):
+//   public/gara-<lang>.seb          startURL = <origin>/exam/seb?lang=<lang>
+//   public/gara-practice-<lang>.seb startURL = <origin>/exam/envcheck?lang=<lang>
 import { gzipSync, gunzipSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -21,31 +20,30 @@ const outDir = process.argv[3] || 'public'
 const maxDisplays = Math.max(1, Number(process.argv[4] || 8))
 const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
 
-// ⛔ **설정이 두 벌인 이유 — 응시 화면에서만 SEB 자체 종료를 없애기 위해서다(2026-08-26).**
-//    SEB 설정은 세션 단위라 화면별로 다르게 잠글 수 없다. 그런데 두 구간의 요구가 정반대다:
-//      · 1단계(본인인증·오류 안내) — 여기서 우리 앱이 안 뜨면(사이트 다운·JS 사망) 화면에 아무것도
-//        없다. 종료를 막아두면 **응시자가 남의 PC 를 강제 종료해야 한다.** 그래서 X 를 남긴다.
-//        아직 시험이 시작되지 않았으니 서버가 그 이탈을 알 필요도 없다.
-//      · 2단계(문제 화면) — 여기서 X 로 나가면 우리 페이지를 거치지 않아 **서버는 그 사실을 영영
-//        모른다**(2026-08-26 실측: 문제 화면에서 X 로 나갔더니 기록에 'start' 하나만 남았다).
-//        그래서 X·Ctrl+Q 를 없애고, 나가는 길을 화면의 '종료(포기)' 하나로 만든다.
-//    그래서 1단계에서 '확인' 을 누르면 **2단계 .seb 로 넘겨받는다**(SEB 재구성 = 세션 재시작).
+// ⛔ **설정은 한 벌이다 — 응시 화면에서만 SEB 종료를 없애는 '2단계 설정' 을 만들었다가 되돌렸다(2026-08-26).**
+//    문제: 문제 화면에서 SEB 자체 종료(작업표시줄 X · Ctrl+Q)로 나가면 우리 페이지를 안 거쳐
+//          **서버가 그 이탈을 모른다**(그날 실측: 기록에 'start' 하나만 남았다).
+//    시도: 세션을 둘로 갈라(SEB 재구성) 문제 화면만 `allowQuit=false` 로 열었다. 실기기에서 **동작까지
+//          확인했다** — 표가 새 세션까지 도착했고 '종료(포기)' 가 무효로 기록됐다.
+//    되돌린 이유: 그 구조에서도 **2단계를 여는 그 한 번의 로딩이 실패하면 나갈 수단이 없다**(강제 종료).
+//          그런데 얻는 것은 '고의 이탈' 라벨 하나뿐이고, **정말 고의로 나갈 사람은 전원 버튼을 누르면
+//          그만이라 그 라벨을 그대로 피해 간다.** 결국 이득도 손해도 정직한 응시자에게만 생기는데
+//          손해 쪽(시험을 못 보고 남의 PC 를 강제 종료)이 비교가 안 되게 크다.
+//    그래서 **X 는 모든 화면에 둔다.** 이탈은 라벨이 아니라 기록으로 다룬다 — 하트비트가
+//    `exam_attempts.last_seen_at`·`answered_count`·`draft_answers` 를 계속 갱신하므로 "언제 끊겼고
+//    어디까지 풀었나" 는 이미 서버에 남는다(관리자 응시 상세의 '응시 중단 기록' 패널이 그걸 본다).
 //
-//    SEB 소스에서 확인한 것(3.10 · seb-win-refactoring):
-//      · 작업표시줄 X : `taskbar.ShowQuitButton = Security.AllowTermination`        (ShellOperation)
-//      · Ctrl+Q      : `if (AllowTermination && activator is ITerminationActivator)` (ShellOperation)
-//        → allowQuit=false 면 버튼이 안 그려지고 단축키는 등록조차 안 된다.
-//      · quitURL     : RequestHandler_QuitUrlVisited → TerminationRequested → TryRequestShutdown
-//        → **AllowTermination 을 보지 않는다.** 우리 종료 버튼은 2단계에서도 그대로 동작한다.
-//      · 재구성 허용 : `examSessionReconfigureAllow`(=AllowReconfiguration). 종료 비밀번호가 없으면
-//        `allow = ConfigurationMode == ConfigureClient || AllowReconfiguration` 이라 이 값만 켜면 된다.
-//      · 표(nonce) 전달: HandleStartUrlQuery 가 **재구성일 때는 ReconfigurationUrl 의 쿼리**를 새 startURL
-//        뒤에 붙인다(`uri.Query.LastIndexOf('?') > 0` — 그래서 여기도 물음표 두 개 `??h=` 가 필요하다).
-//
-//    ⚠️ **2단계에서 우리 앱이 안 뜨면 여전히 강제 종료뿐이다.** 그건 어떤 설정으로도 못 없앤다.
-//       대신 그 경우는 사고로 남고(신호 없음 → 재진입 차단 → 관리자 복구) 1단계와 달리 시험이 이미
-//       시작된 뒤라 서버가 응시의 존재는 안다.
-//    ⚠️ 실기기 검증 전이다 — 재구성이 실제로 걸리는지, 표가 새 세션까지 살아오는지 둘 다 눌러봐야 한다.
+//    ⚠️ **되살릴 거면 감독 체계가 생긴 뒤다.** 그때는 갇혀도 옆에서 풀어줄 사람이 있다.
+//       그때 필요한 사실들(SEB 3.10 · seb-win-refactoring 소스에서 확인):
+//         · 작업표시줄 X : `taskbar.ShowQuitButton = Security.AllowTermination`        (ShellOperation)
+//         · Ctrl+Q      : `if (AllowTermination && activator is ITerminationActivator)` (ShellOperation)
+//           → allowQuit=false 면 버튼이 안 그려지고 단축키는 등록조차 안 된다.
+//         · quitURL     : RequestHandler_QuitUrlVisited → TerminationRequested → TryRequestShutdown
+//           → **AllowTermination 을 보지 않는다.** 화면의 종료 버튼은 그 설정과 무관하게 동작한다.
+//         · 재구성 허용 : `examSessionReconfigureAllow` + `downloadAndOpenSebConfig` **둘 다** 켜야 한다.
+//           뒤엣것이 꺼져 있으면 .seb 내려받기 자체를 거절해서 아무 일도 안 일어난다(오류도 안 뜬다).
+//         · 표 전달    : HandleStartUrlQuery 가 재구성일 때 ReconfigurationUrl 의 쿼리를 새 startURL 뒤에
+//           붙인다(`uri.Query.LastIndexOf('?') > 0`) — 그래서 그 링크도 물음표 두 개(`??h=`)가 필요하다.
 //
 // ⛔ 종료 비밀번호(hashedQuitPassword)를 **일부러 넣지 않는다.** 넣으면 SEB 의 종료(X) 버튼이
 //    비밀번호를 묻고, 그 순간 응시자는 나갈 방법이 없어진다 — 우리 시험은 **감독관이 없는 10일 자율응시**라
@@ -67,14 +65,15 @@ const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
 // 시험 종료(quitURL=/exam/done)는 계속 비밀번호 없이 자동 종료(quitURLConfirm=false).
 
 /**
- * XML 이스케이프. ⚠️ **빼면 안 된다** — 2단계 시작 주소에 `&go=1` 이 들어가는데, plist 는 XML 이라
- * 날 `&` 는 엔티티 시작으로 읽혀 **설정 파일 자체가 파싱 오류**가 된다(SEB 가 그냥 안 열린다).
+ * XML 이스케이프. plist 는 XML 이라 시작 주소에 `&`(쿼리 두 개 이상)가 들어가면 엔티티 시작으로 읽혀
+ * **설정 파일 자체가 파싱 오류**가 된다 — SEB 가 그냥 안 열린다. 지금 주소엔 쿼리가 하나뿐이라
+ * 당장 걸릴 일은 없지만, 하나 더 붙이는 순간 조용히 터지는 자리라 남겨둔다(2026-08-26 실제로 겪었다).
  */
 function xmlEsc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function plistFor(rawStartURL, { allowQuit = true, allowReconfigure = false } = {}) {
+function plistFor(rawStartURL) {
   const startURL = xmlEsc(rawStartURL)
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -103,19 +102,17 @@ function plistFor(rawStartURL, { allowQuit = true, allowReconfigure = false } = 
 \t<integer>0</integer>
 \t<key>sendBrowserExamKey</key>
 \t<true/>
-\t<!-- SEB 자체 종료(작업표시줄 X · Ctrl+Q). 1단계는 켜고(갇히면 안 되니까) 2단계(문제 화면)는 끈다
-\t     — 끄면 나가는 길이 아래 quitURL 하나뿐이라 이탈이 반드시 서버에 기록된다. 머리말 참고. -->
+\t<!-- SEB 자체 종료(작업표시줄 X · Ctrl+Q)는 **모든 화면에서 켠다.** 우리 앱이 못 뜨는 순간에도
+\t     응시자가 나갈 수 있어야 한다 — 끄면 그때 남는 길이 PC 강제 종료뿐이다. 머리말 참고. -->
 \t<key>allowQuit</key>
-\t${allowQuit ? '<true/>' : '<false/>'}
-\t<!-- 시험 중 다른 .seb 로 넘어가기(재구성). 1단계만 켠다 — '확인' 을 누르면 2단계 설정으로
-\t     넘겨받아야 하기 때문이다. 2단계는 꺼서 거기서 또 다른 설정으로 새는 길을 만들지 않는다.
-\t     ⚠️ **두 값이 한 쌍이다** — 아래 downloadAndOpenSebConfig 가 꺼져 있으면 브라우저가 .seb
-\t        내려받기 자체를 거절해서, 이 값이 켜져 있어도 **아무 일도 일어나지 않는다**(오류도 안 뜬다).
-\t        판정 순서: DownloadResponsibility(AllowConfigurationDownloads) → IsAllowedToReconfigure. -->
+\t<true/>
+\t<!-- 시험 중 다른 .seb 로 갈아타기(재구성)는 막는다. 우리가 쓰지 않는 길이고, 열어두면
+\t     응시 중에 다른 설정으로 넘어가는 경로가 생긴다. 두 값이 한 쌍이라 같이 끈다
+\t     (판정 순서: DownloadResponsibility → IsAllowedToReconfigure). -->
 \t<key>examSessionReconfigureAllow</key>
-\t${allowReconfigure ? '<true/>' : '<false/>'}
+\t<false/>
 \t<key>downloadAndOpenSebConfig</key>
-\t${allowReconfigure ? '<true/>' : '<false/>'}
+\t<false/>
 \t<key>quitURL</key>
 \t<string>${origin}/exam/done</string>
 \t<key>quitURLConfirm</key>
@@ -147,39 +144,36 @@ function plistFor(rawStartURL, { allowQuit = true, allowReconfigure = false } = 
 `
 }
 
-function buildSeb(startURL, opts) {
-  const inner = gzipSync(Buffer.from(plistFor(startURL, opts), 'utf8'))
+function buildSeb(startURL) {
+  const inner = gzipSync(Buffer.from(plistFor(startURL), 'utf8'))
   const prefixed = Buffer.concat([Buffer.from('plnd', 'ascii'), inner])
   return gzipSync(prefixed)
 }
 
-function emit(outPath, startURL, opts = {}) {
-  const seb = buildSeb(startURL, opts)
+function emit(outPath, startURL) {
+  const seb = buildSeb(startURL)
   writeFileSync(outPath, seb)
-  // 라운드트립 자가검증 — 시작 주소뿐 아니라 **종료 허용 여부까지** 본다. 이 값이 두 벌을 가르는
-  // 전부라, 잘못 뽑히면 응시 화면에 X 가 살아 있거나(감지 못 함) 1단계에서 갇힌다.
+  // 라운드트립 자가검증 — 시작 주소 + **종료가 열려 있는지**. 종료가 닫힌 설정이 잘못 나가면
+  // 응시자가 갇힌다(머리말의 되돌린 이유 참고).
   const d1 = gunzipSync(seb)
   const pfx = d1.subarray(0, 4).toString('ascii')
   const d2 = gunzipSync(d1.subarray(4)).toString('utf8')
-  const quitWanted = opts.allowQuit === false ? '<false/>' : '<true/>'
-  const quitOk = new RegExp(`<key>allowQuit</key>\\s*${quitWanted}`).test(d2)
+  const quitOk = /<key>allowQuit<\/key>\s*<true\/>/.test(d2)
   // ⚠️ 날 `&` 가 남아 있으면 SEB 가 설정을 못 읽는다 — 이스케이프가 빠진 걸 여기서 잡는다.
   //    주석 안의 `&` 는 XML 에서 합법이라(설명문에 '&' 를 쓴 곳이 있다) 빼고 본다.
   const xmlOk = !/&(?!amp;|lt;|gt;|quot;|apos;|#)/.test(d2.replace(/<!--[\s\S]*?-->/g, ''))
   const ok = pfx === 'plnd' && d2.includes(`<string>${xmlEsc(startURL)}</string>`) && quitOk && xmlOk
-  console.log(`  ${outPath}  ←  ${startURL}  [${ok ? 'OK' : 'FAIL'}] quit=${opts.allowQuit === false ? 'off' : 'on'}`)
+  console.log(`  ${outPath}  ←  ${startURL}  [${ok ? 'OK' : 'FAIL'}]`)
   if (!ok) process.exit(1)
 }
 
 mkdirSync(outDir, { recursive: true })
 console.log(`origin=${origin}  maxDisplays=${maxDisplays}`)
-// 1단계 = 본인인증 화면(종료 가능·재구성 허용) · 2단계 = 문제 화면(종료 불가) · 점검 = 환경 점검
 for (const lang of LANGS) {
-  emit(join(outDir, `gara-${lang}.seb`), `${origin}/exam/seb?lang=${lang}`, { allowReconfigure: true })
-  emit(join(outDir, `gara-run-${lang}.seb`), `${origin}/exam/seb?lang=${lang}&go=1`, { allowQuit: false })
+  emit(join(outDir, `gara-${lang}.seb`), `${origin}/exam/seb?lang=${lang}`)
   emit(join(outDir, `gara-practice-${lang}.seb`), `${origin}/exam/envcheck?lang=${lang}`)
 }
 // 언어 미지정 fallback(=ko) — 옛 /gara.seb 참조 호환
-emit(join(outDir, 'gara.seb'), `${origin}/exam/seb?lang=ko`, { allowReconfigure: true })
+emit(join(outDir, 'gara.seb'), `${origin}/exam/seb?lang=ko`)
 emit(join(outDir, 'gara-practice.seb'), `${origin}/exam/envcheck?lang=ko`)
 console.log('done.')
