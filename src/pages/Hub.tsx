@@ -23,6 +23,7 @@ import {
 } from '../lib/scoring'
 import ShareCardModal from '../components/ShareCardModal'
 import ContributionGraph from '../components/ContributionGraph'
+import LevelUpModal from '../components/LevelUpModal'
 import CharArt from '../components/CharArt'
 import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
@@ -135,7 +136,10 @@ interface HubState { authed: boolean; level?: number | null; rankPoints?: number
   baseKey?: string
   equipped?: Record<string, string>
   charChosen?: boolean
-  tutorialDone?: boolean }
+  tutorialDone?: boolean
+  // 레벨업 연출(2026-08-26) — 축하할 게 있으면 {from,to}, 없으면 null·없음.
+  //   서버가 저장된 두 값(user_progress.arena_level ↔ user_characters.arena_level_seen)을 비교해 판정한다.
+  levelUp?: { from: number; to: number } | null }
 interface ShopResp { part_key: string; spent_points: number; points_after: number }
 
 const FRIENDLY_ERR = new Set([
@@ -250,6 +254,11 @@ export default function Hub() {
   //   ⚠️ 초기값 계산은 한 번만 돈다(useState 의 함수형 초기화) — 렌더마다 읽으면 낭비다.
   //   ⚠️ 아래 useState 들보다 **먼저** 있어야 한다(같은 함수 안이라 선언 전에는 못 읽는다).
   const remembered = useState(() => lastLook(user?.id))[0]
+  // 화면을 열어도 되는가. 적어 둔 모습이 있으면 그걸로 바로 그리고, 없으면(첫 진입) `get-hub` 를 기다린다.
+  //   ⚠️ **기다리는 동안 기본값으로 그리지 않는다**(2026-08-26 지시) — 초원 + 기본 UI + 폴백 캐릭터가
+  //      0.4초 떴다가 제 모습으로 덮이는 게 눈에 띄었다. 틀린 걸 보여주느니 잠깐 비워 둔다.
+  //   ⚠️ 응답이 실패해도 열어준다(아래 마운트 효과의 catch) — 안 그러면 영영 갇힌다.
+  const [hubReady, setHubReady] = useState(!!remembered)
   // ⚠️ 아바타·이름도 마지막 값으로 시작한다 — 안 그러면 HUD 가 색 젬 + 'CARI' 로 떴다가 바뀐다.
   const [avatarUrl, setAvatarUrl] = useState<string | null>(remembered?.avatar ?? null)
   const [displayName, setDisplayName] = useState<string | null>(remembered?.name ?? null)
@@ -273,6 +282,8 @@ export default function Hub() {
   //   ⚠️ false 로 시작하면 하이드레이트 전 한 프레임 동안 이미 끝낸 사람에게도 선택 화면이 번쩍인다.
   const [charChosen, setCharChosen] = useState<boolean | null>(null)
   const [tutorialDone, setTutorialDone] = useState<boolean | null>(null)
+  // 밀린 레벨업 축하. 서버가 판정해 내려준 것만 담는다(화면에서 점수로 다시 계산하지 않는다).
+  const [levelUp, setLevelUp] = useState<{ from: number; to: number } | null>(null)
   // 선택 화면에서 계열마다 지금 보고 있는 칸(좌우 버튼). 계열들이 각자 기억한다.
   //   ⚠️ 'm'|'f' 가 아니라 **인덱스**다 — 한 계열에 변형이 셋 이상 생겨도 화면이 그대로 돌아간다.
   const [charLook, setCharLook] = useState<Record<string, number>>({})
@@ -455,7 +466,13 @@ export default function Hub() {
     if (h.authed) {
       setCharChosen(!!h.charChosen)
       setTutorialDone(!!h.tutorialDone)
+      // ⚠️ 이미 띄워둔 축하를 덮지 않는다. 자동 출석이 찍히면 get-hub 를 한 번 더 받는데(아래 효과),
+      //    그 응답에는 levelUp 이 없을 수도 있고(방금 워터마크를 올렸다면) 그때 null 로 덮으면
+      //    사용자가 보고 있던 모달이 눈앞에서 사라진다.
+      const up = h.levelUp
+      if (up && up.to > up.from) setLevelUp((prev) => prev ?? { from: up.from, to: up.to })
     }
+    setHubReady(true)
   }
   async function hydrate() {
     try {
@@ -470,7 +487,9 @@ export default function Hub() {
     let alive = true
     callFunction<HubState>('get-hub', {})
       .then((h) => { if (alive) applyHub(h) })
-      .catch(() => {})
+      // ⚠️ 실패해도 화면은 열어준다 — 아래 `hubReady` 게이트가 이걸 안 풀면 불러오는 중에 영영 갇힌다.
+      //    그때는 예전처럼 기본값으로 그린다(틀린 화면이라도 갇히는 것보단 낫다).
+      .catch(() => { if (alive) setHubReady(true) })
     return () => { alive = false }
   }, [])
 
@@ -573,6 +592,21 @@ export default function Hub() {
     setTutorialDone(true)
     try {
       await callFunction('character', { action: 'tutorial' })
+    } catch {
+      /* 다음 진입에 다시 뜬다 — 조용히 넘긴다 */
+    }
+  }
+
+  // 레벨업 축하 확인 — 워터마크(user_characters.arena_level_seen)를 그 레벨까지 올린다.
+  //   ⚠️ 튜토리얼과 같은 순서다: **화면을 먼저 닫고** 서버에 알린다. 저장이 늦어도 사용자를 붙들지 않는다.
+  //      실패하면 다음 진입에 축하가 한 번 더 뜨는데, 그게 "닫혔는데 서버는 모르는" 상태보다 낫다
+  //      (축하를 두 번 보는 건 성가시고, 못 보는 건 되돌릴 수 없다).
+  //   ⚠️ 서버에는 **화면에 표시 중인 계단 값이 아니라 최종 레벨(to)** 을 보낸다 — 계단을 다 밟기 전에
+  //      Esc 로 닫아도 그 사람의 진짜 레벨은 to 이고, 중간값을 보내면 남은 칸이 다음 진입에 또 뜬다.
+  async function ackLevelUp(to: number) {
+    setLevelUp(null)
+    try {
+      await callFunction('character', { action: 'levelSeen', level: to })
     } catch {
       /* 다음 진입에 다시 뜬다 — 조용히 넘긴다 */
     }
@@ -771,6 +805,18 @@ export default function Hub() {
             </button>
           </div>
         </main>
+      </div>
+    )
+  }
+
+  // 적어 둔 모습이 없는 첫 진입 — `get-hub` 가 올 때까지 **비워 둔다**(2026-08-26 지시).
+  //   ⚠️ 기본값으로 그리면 초원 + 기본 UI + 폴백 캐릭터가 0.4초 떴다가 제 모습으로 덮인다(실측).
+  //      두 번째 진입부터는 적어 둔 값이 있어 이 화면을 아예 안 지나간다.
+  //   ⚠️ 로그인 게이트보다 **뒤에** 있어야 한다 — 앞에 두면 게스트가 응답을 기다렸다 게이트를 본다.
+  if (!hubReady) {
+    return (
+      <div className="bg-background text-on-surface min-h-screen flex items-center justify-center">
+        <p className="font-body-md text-body-md text-on-surface-variant">{t('common.loading')}</p>
       </div>
     )
   }
@@ -1583,6 +1629,20 @@ export default function Hub() {
           onPrev={() => setTutorialStep((v) => Math.max(0, v - 1))}
           onNext={() => setTutorialStep((v) => v + 1)}
           onDone={finishTutorial}
+        />
+      )}
+
+      {/* ── 레벨업 축하 ──────────────────────────────────────────────────────
+          ⚠️ **첫 진입 흐름이 먼저다**(캐릭터 선택 → 튜토리얼 → 축하). 캐릭터를 아직 안 고른 사람에게
+             축하를 띄우면 폴백 그림 두 장을 나란히 놓고 "자랐어요" 라고 말하게 된다. 튜토리얼도
+             전체화면이라 겹치면 둘 다 못 읽는다.
+             (서버도 같은 방향으로 막고 있다 — user_characters 행이 없으면 levelUp 을 아예 안 준다.) */}
+      {levelUp && !needCharPick && !needTutorial && (
+        <LevelUpModal
+          charKey={charKey}
+          from={levelUp.from}
+          to={levelUp.to}
+          onClose={() => void ackLevelUp(levelUp.to)}
         />
       )}
     </div>
