@@ -29,7 +29,7 @@ import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
 import { rememberPostLogin } from '../lib/postLogin'
 import {
-  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, charSeriesOf,
+  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
 } from '../lib/hubCosmetics'
 import { lastLook, saveLook } from '../lib/lastLook'
@@ -283,10 +283,10 @@ export default function Hub() {
   const [charChosen, setCharChosen] = useState<boolean | null>(null)
   const [tutorialDone, setTutorialDone] = useState<boolean | null>(null)
   // 밀린 레벨업 축하. 서버가 판정해 내려준 것만 담는다(화면에서 점수로 다시 계산하지 않는다).
-  const [levelUp, setLevelUp] = useState<{ from: number; to: number } | null>(null)
-  // 선택 화면에서 계열마다 지금 보고 있는 칸(좌우 버튼). 계열들이 각자 기억한다.
-  //   ⚠️ 'm'|'f' 가 아니라 **인덱스**다 — 한 계열에 변형이 셋 이상 생겨도 화면이 그대로 돌아간다.
-  const [charLook, setCharLook] = useState<Record<string, number>>({})
+  //   start = 이번 방문에 축하를 시작한 레벨(고정) · cur = 지금 띄운 모달의 '이전' 레벨 · to = 최종 레벨.
+  //   ⚠️ cur 만으로는 '몇 번 중 몇 번째'를 못 그린다 — 여러 레벨을 뛰면 모달을 그 수만큼 띄우므로
+  //      시작점을 따로 들고 있어야 진행 표시가 선다.
+  const [levelUp, setLevelUp] = useState<{ start: number; cur: number; to: number } | null>(null)
   // 미리보기로 열어둔 품목(part_key). 상점·보관함 어디서 눌렀든 같은 창이 뜬다 —
   // 사기 전과 산 뒤에 보는 그림이 다르면 "산 게 그거 맞나" 를 다시 확인하러 가야 한다.
   const [preview, setPreview] = useState<string | null>(null)
@@ -470,7 +470,7 @@ export default function Hub() {
       //    그 응답에는 levelUp 이 없을 수도 있고(방금 워터마크를 올렸다면) 그때 null 로 덮으면
       //    사용자가 보고 있던 모달이 눈앞에서 사라진다.
       const up = h.levelUp
-      if (up && up.to > up.from) setLevelUp((prev) => prev ?? { from: up.from, to: up.to })
+      if (up && up.to > up.from) setLevelUp((prev) => prev ?? { start: up.from, cur: up.from, to: up.to })
     }
     setHubReady(true)
   }
@@ -597,16 +597,20 @@ export default function Hub() {
     }
   }
 
-  // 레벨업 축하 확인 — 워터마크(user_characters.arena_level_seen)를 그 레벨까지 올린다.
-  //   ⚠️ 튜토리얼과 같은 순서다: **화면을 먼저 닫고** 서버에 알린다. 저장이 늦어도 사용자를 붙들지 않는다.
-  //      실패하면 다음 진입에 축하가 한 번 더 뜨는데, 그게 "닫혔는데 서버는 모르는" 상태보다 낫다
+  // 레벨업 축하 확인 — 한 칸씩이다. 여러 레벨을 뛰었으면 다음 축하를 이어서 띄운다(2026-08-26 지시).
+  //   ⚠️ 튜토리얼과 같은 순서다: **화면을 먼저 넘기고** 서버에 알린다. 저장이 늦어도 사용자를 붙들지 않는다.
+  //      실패하면 다음 진입에 그 칸이 한 번 더 뜨는데, 그게 "닫혔는데 서버는 모르는" 상태보다 낫다
   //      (축하를 두 번 보는 건 성가시고, 못 보는 건 되돌릴 수 없다).
-  //   ⚠️ 서버에는 **화면에 표시 중인 계단 값이 아니라 최종 레벨(to)** 을 보낸다 — 계단을 다 밟기 전에
-  //      Esc 로 닫아도 그 사람의 진짜 레벨은 to 이고, 중간값을 보내면 남은 칸이 다음 진입에 또 뜬다.
-  async function ackLevelUp(to: number) {
-    setLevelUp(null)
+  //   ⚠️ **한 칸 올릴 때마다 서버에 알린다.** 마지막에 몰아서 알리면, 6칸짜리를 3칸만 보고 창을 닫은
+  //      사람이 다음 진입에 **처음부터 여섯 번**을 다시 본다. 워터마크 RPC 가 greatest/least 라
+  //      여러 번 불려도 안전하고, 순서가 뒤집혀 도착해도 되돌아가지 않는다.
+  async function ackLevelUp() {
+    const lu = levelUp
+    if (!lu) return
+    const reached = lu.cur + 1
+    setLevelUp(reached < lu.to ? { ...lu, cur: reached } : null)
     try {
-      await callFunction('character', { action: 'levelSeen', level: to })
+      await callFunction('character', { action: 'levelSeen', level: reached })
     } catch {
       /* 다음 진입에 다시 뜬다 — 조용히 넘긴다 */
     }
@@ -745,15 +749,9 @@ export default function Hub() {
   //      카탈로그는 get-hub 가 active 만 내려주므로 그게 곧 후보다.
   //   ⚠️ 카탈로그가 아직 안 왔거나 비어 있으면 코드 목록으로 떨어진다 — 빈 화면에 가두는 것보단 낫다.
   const starterKeys = catalog.filter((c) => (c.kind ?? '') === 'character').map((c) => c.partKey)
+  //   ⚠️ 후보는 **한 캐릭터가 한 줄**이다(2026-08-26 지시). 남·여를 한 줄에 겹쳐 놓고 화살표로 넘기게
+  //      했더니 처음 뜨는 한쪽만 보여서, 다른 쪽이 있다는 것도 모른 채 고르게 된다.
   const pickKeys = starterKeys.length ? starterKeys : CHAR_KEYS
-  // 계열별로 묶는다 — 한 계열이 카드 한 장이고, 좌우 버튼이 그 안에서 모습을 바꾼다.
-  const pickSeries: { series: string; keys: string[] }[] = []
-  for (const k of pickKeys) {
-    const series = charSeriesOf(k)
-    const found = pickSeries.find((g) => g.series === series)
-    if (found) found.keys.push(k)
-    else pickSeries.push({ series, keys: [k] })
-  }
   const needCharPick = authed && charChosen === false
   const needTutorial = authed && charChosen === true && tutorialDone === false
   // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
@@ -1548,62 +1546,37 @@ export default function Hub() {
       {/* ── 첫 진입 ①: 캐릭터 고르기 ────────────────────────────────────────────
           닫는 길이 없다. 고르지 않으면 허브를 쓸 수 없고, 서버에도 그렇게 기록되어 있어
           창을 껐다 켜도·다른 브라우저로 와도 같은 화면이 뜬다(localStorage 가 아니다).
-          ⚠️ 계열 셋을 **한 줄로** 놓는다(요청). 좁은 화면에서도 세로로 쌓지 않는다 —
-             셋을 한눈에 비교하는 게 이 화면의 전부라, 스크롤이 생기면 비교가 안 된다. */}
+          ⚠️ 고를 수 있는 캐릭터는 **전부 화면에 있어야** 한다. 화살표로 넘겨야 보이는 후보는
+             있는 줄도 모르고 지나친다(남·여를 한 줄에 겹쳐 놨다가 되돌렸다). */}
       {needCharPick && (
         <div className="charpick" role="dialog" aria-modal="true" aria-label={t('hub.charpick.title')}>
           <div className="charpick-inner">
             <h2 className="charpick-title">{t('hub.charpick.title')}</h2>
             <p className="charpick-sub">{t('hub.charpick.sub')}</p>
 
-            {/* 계열 하나 = **가로로 긴 줄 한 개**, 그 줄 안에 Lv.1~7 이 늘어선다.
-                그런 줄이 위에서부터 3단으로 쌓인다(2026-08-20 요구).
+            {/* 캐릭터 하나 = **가로로 긴 줄 한 개**, 그 줄 안에 Lv.1~7 이 늘어선다.
+                그런 줄이 후보 수만큼 위에서부터 쌓인다(지금은 남·여 두 줄).
                 ⚠️ 줄 안에서 가로 스크롤을 만들지 말 것 — 일곱 단계를 **한눈에** 보여주는 게 이 줄의 전부라,
                    스크롤이 생기면 자라는 모습을 보려고 밀어야 해서 비교가 안 된다. 좁으면 그림이 작아진다. */}
             <div className="cp-list">
-              {pickSeries.map(({ series, keys }) => {
-                const i = (charLook[series] ?? 0) % keys.length
-                const key = keys[i]
+              {pickKeys.map((key) => {
                 const picked = charPick === key
-                // 좌우 버튼은 **이 계열 안에서만** 돈다 — 다른 계열은 각자 보고 있던 모습을 유지한다.
-                const cycle = (d: number) =>
-                  setCharLook((p) => ({ ...p, [series]: (i + d + keys.length) % keys.length }))
                 return (
-                  <div key={series} className={`cp-row${picked ? ' on' : ''}`}>
+                  <div key={key} className={`cp-row${picked ? ' on' : ''}`}>
                     <div className="cp-head">
                       <span className="cp-name">{partName(key, t)}</span>
-                      {/* 변형이 하나뿐인 계열엔 전환 UI 를 안 그린다 — 눌러도 안 바뀌는 버튼은 고장으로 읽힌다. */}
-                      {keys.length > 1 && (
-                        <span className="cp-dots">
-                          {keys.map((k, ki) => (
-                            <button
-                              key={k}
-                              className={`cp-dot${ki === i ? ' on' : ''}`}
-                              aria-label={partName(k, t)}
-                              onClick={() => setCharLook((p) => ({ ...p, [series]: ki }))}
-                            />
-                          ))}
+                    </div>
+                    {/* 줄 전체가 고르는 자리다 — 어느 칸을 눌러도 이 캐릭터를 고른 것이다
+                        (칸마다 고르게 하면 "Lv.5 를 골랐다" 로 읽혀 시작 레벨을 고르는 화면처럼 보인다).
+                        ⚠️ 고르는 건 언제나 **한 줄뿐**이다(charPick 한 값) — 여러 줄이 동시에 켜지지 않는다. */}
+                    <button className="cp-strip" onClick={() => setCharPick(key)} aria-pressed={picked}>
+                      {CHAR_LEVELS.map((lv) => (
+                        <span className={`cp-cell${lv === CHAR_MIN_LEVEL ? ' is-start' : ''}`} key={lv}>
+                          <CharArt charKey={key} level={lv} className="cp-img" />
+                          <em className="cp-lv">Lv.{lv}</em>
                         </span>
-                      )}
-                    </div>
-                    <div className="cp-body">
-                      {keys.length > 1 && (
-                        <button className="cp-arrow" aria-label={t('hub.charpick.prev')} onClick={() => cycle(-1)}>‹</button>
-                      )}
-                      {/* 줄 전체가 고르는 자리다 — 어느 칸을 눌러도 이 캐릭터를 고른 것이다
-                          (칸마다 고르게 하면 "Lv.5 를 골랐다" 로 읽혀 시작 레벨을 고르는 화면처럼 보인다). */}
-                      <button className="cp-strip" onClick={() => setCharPick(key)} aria-pressed={picked}>
-                        {CHAR_LEVELS.map((lv) => (
-                          <span className={`cp-cell${lv === CHAR_MIN_LEVEL ? ' is-start' : ''}`} key={lv}>
-                            <CharArt charKey={key} level={lv} className="cp-img" />
-                            <em className="cp-lv">Lv.{lv}</em>
-                          </span>
-                        ))}
-                      </button>
-                      {keys.length > 1 && (
-                        <button className="cp-arrow" aria-label={t('hub.charpick.next')} onClick={() => cycle(1)}>›</button>
-                      )}
-                    </div>
+                      ))}
+                    </button>
                   </div>
                 )
               })}
@@ -1638,11 +1611,15 @@ export default function Hub() {
              전체화면이라 겹치면 둘 다 못 읽는다.
              (서버도 같은 방향으로 막고 있다 — user_characters 행이 없으면 levelUp 을 아예 안 준다.) */}
       {levelUp && !needCharPick && !needTutorial && (
+        // ⚠️ key 에 cur 를 넣어 칸이 넘어갈 때마다 **다시 마운트**시킨다 — 안 그러면 두 번째 축하가
+        //    등장 애니메이션 없이 숫자만 슥 바뀌어, 새 축하가 아니라 같은 창이 갱신된 것처럼 보인다.
         <LevelUpModal
+          key={levelUp.cur}
           charKey={charKey}
-          from={levelUp.from}
-          to={levelUp.to}
-          onClose={() => void ackLevelUp(levelUp.to)}
+          from={levelUp.cur}
+          index={levelUp.cur - levelUp.start}
+          count={levelUp.to - levelUp.start}
+          onConfirm={() => void ackLevelUp()}
         />
       )}
     </div>
