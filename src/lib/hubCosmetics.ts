@@ -29,7 +29,7 @@
  *
  * ⚠️ 지금은 **a 한 줄뿐이다**(2026-08-26). b·c 는 그림이 아직 없어서 고르면 폴백 한 장만 뜨는
  *    빈 껍데기였다 — 시트가 도착하면 여기에 다시 넣고 `shop_catalog` 의 active 를 되살리면 된다
- *    (행은 안 지웠다: `20260826140000_hub_char_bc_off.sql`).
+ *    (행은 안 지웠다: `20260826170000_hub_char_bc_off.sql`).
  */
 export const CHAR_SERIES = ['a'] as const
 export type CharSeries = (typeof CHAR_SERIES)[number]
@@ -84,7 +84,7 @@ export const CHAR_FALLBACK_AR = 512 / 640
  */
 export const CHAR_AR: Record<string, number> = {
   char_a_m: 809 / 1220,
-  char_a_f: 857 / 1102,
+  char_a_f: 852 / 1102,
 }
 
 /**

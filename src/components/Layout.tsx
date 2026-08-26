@@ -7,6 +7,7 @@ import { loadAdminMe } from '../lib/adminMe'
 import GemAvatar, { Avatar } from './GemAvatar'
 import { GEM_COLORS, ADMIN_MASCOT_COUNT, parseAvatar, uploadAvatar } from '../lib/avatar'
 import { isSEB } from '../lib/seb'
+import { lastLook, saveLook } from '../lib/lastLook'
 import { clearInquiryAlert, refreshInquiryAlert, useInquiryAlert } from '../lib/inquiryAlert'
 import { useT, LANGS } from '../lib/i18n'
 import {
@@ -31,10 +32,16 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
   const { user, isFullUser, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  // ⚠️ 프로필이 오기 전 한 박자를 **마지막에 본 값**으로 메운다(`lib/lastLook.ts`) — 안 그러면
+  //    떠 있는 FAB 이 색 젬으로 떴다가 내가 올린 사진으로 바뀌는 게 화면마다 보인다.
+  // ⛔ 표시용 초기값일 뿐이다. 진짜 값이 오면 그대로 덮이고, 게스트면 아래 이펙트가 즉시 null 로 되돌린다.
   const [profile, setProfile] = useState<{
     display_name: string | null
     avatar_url: string | null
-  } | null>(null)
+  } | null>(() => {
+    const l = isFullUser ? lastLook(user?.id) : null
+    return l ? { display_name: l.name ?? null, avatar_url: l.avatar ?? null } : null
+  })
   const [picking, setPicking] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
@@ -93,7 +100,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       .select('display_name, avatar_url')
       .eq('id', user.id)
       .maybeSingle()
-      .then(({ data }) => setProfile(data ?? null))
+      .then(({ data }) => {
+        setProfile(data ?? null)
+        // 다음 진입의 첫 그림용으로 적어 둔다(lib/lastLook.ts). 허브도 같은 값을 쓴다.
+        saveLook(user.id, { avatar: data?.avatar_url ?? null, name: data?.display_name ?? null })
+      })
   }, [isFullUser, user])
 
   // 1:1 문의 '새 답변' 빨간 점 — FAB 은 로그인한 모든 화면에 떠 있으므로 여기가 셈의 자리다.
@@ -138,6 +149,8 @@ export default function Layout({ children }: { children: ReactNode }) {
     if (!user) return
     await supabase.from('profiles').update({ avatar_url: val }).eq('id', user.id)
     setProfile((p) => ({ display_name: p?.display_name ?? null, avatar_url: val }))
+    // 방금 바꾼 아바타를 적어 둬야 다음 진입의 첫 그림이 옛 아바타로 뜨지 않는다.
+    saveLook(user.id, { avatar: val })
   }
 
   async function pickColor(c: string) {

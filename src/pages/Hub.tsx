@@ -31,6 +31,7 @@ import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, charSeriesOf,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
 } from '../lib/hubCosmetics'
+import { lastLook, saveLook } from '../lib/lastLook'
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -244,8 +245,14 @@ export default function Hub() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [purchased, setPurchased] = useState<string | null>(null)
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [displayName, setDisplayName] = useState<string | null>(null)
+  // 마지막에 본 내 모습 — **응답 전에도 화면은 그려지므로** 초기값을 여기서 가져온다(`lib/lastLook.ts`).
+  // 없으면 예전과 똑같이 기본값으로 시작한다. ⛔ 판정에는 쓰지 않는다 — 그림을 미리 까는 용도뿐이다.
+  //   ⚠️ 초기값 계산은 한 번만 돈다(useState 의 함수형 초기화) — 렌더마다 읽으면 낭비다.
+  //   ⚠️ 아래 useState 들보다 **먼저** 있어야 한다(같은 함수 안이라 선언 전에는 못 읽는다).
+  const remembered = useState(() => lastLook(user?.id))[0]
+  // ⚠️ 아바타·이름도 마지막 값으로 시작한다 — 안 그러면 HUD 가 색 젬 + 'CARI' 로 떴다가 바뀐다.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(remembered?.avatar ?? null)
+  const [displayName, setDisplayName] = useState<string | null>(remembered?.name ?? null)
   // 공유 카드 하단 바용 프로필 값(가입일 · 국가 · 지역). 학교는 넣지 않는다.
   const [joinedAt, setJoinedAt] = useState<string | null>(null)
   const [countryCode, setCountryCode] = useState<string | null>(null)
@@ -259,8 +266,9 @@ export default function Hub() {
   const [closetTab, setClosetTab] = useState<ClosetTab>('shop')
   // ── 꾸미기(캐릭터·스킨) ──
   // 장착값. 서버(get-hub)가 권위고 화면은 낙관적으로 먼저 반영한 뒤 hydrate 로 맞춘다.
-  const [charKey, setCharKey] = useState<string | null>(null)
-  const [skinPart, setSkinPart] = useState<string>(DEFAULT_SKIN_PART)
+  // ⚠️ 마지막에 본 모습으로 시작한다 — 안 그러면 기본배경+기본UI+폴백캐릭터 조합이 먼저 떴다가 덮인다.
+  const [charKey, setCharKey] = useState<string | null>(remembered?.char ?? null)
+  const [skinPart, setSkinPart] = useState<string>(remembered?.skin ?? DEFAULT_SKIN_PART)
   // 첫 진입 흐름 — null = 아직 서버에 안 물어봄(모름). 모르는 동안은 아무 오버레이도 띄우지 않는다.
   //   ⚠️ false 로 시작하면 하이드레이트 전 한 프레임 동안 이미 끝낸 사람에게도 선택 화면이 번쩍인다.
   const [charChosen, setCharChosen] = useState<boolean | null>(null)
@@ -287,7 +295,9 @@ export default function Hub() {
   const [tutorialStep, setTutorialStep] = useState(0)
   const [, setSkillScore] = useState(0)
   const [, setActivityScore] = useState(0)
-  const [seasonTotal, setSeasonTotal] = useState(0) // 공유 카드의 시즌 점수 / 전투력
+  // 공유 카드의 시즌 점수 / 전투력. ⚠️ 캐릭터 레벨이 여기서 파생되므로 마지막 값으로 시작해야
+  // 첫 그림에서 Lv.1 그림을 받았다가 곧바로 내 레벨 그림을 다시 받는 일이 없다.
+  const [seasonTotal, setSeasonTotal] = useState(remembered?.score ?? 0)
   const [percentile, setPercentile] = useState<number | null>(null)
   // '다음 순위까지 N점' — 옛 랭킹 게이지 라벨. 경험치 바가 ARENA 레벨 진행도로 바뀌면서 화면에서 빠졌다.
   const [, setPointsToPass] = useState<number | null>(null)
@@ -373,8 +383,12 @@ export default function Hub() {
     supabase.from('profiles').select('avatar_url, display_name, created_at, country_code, region_code').eq('id', uid).maybeSingle()
       .then(({ data }) => {
         if (!alive) return
-        setAvatarUrl((data?.avatar_url as string | null) ?? null)
-        setDisplayName((data?.display_name as string | null) ?? null)
+        const av = (data?.avatar_url as string | null) ?? null
+        const nm = (data?.display_name as string | null) ?? null
+        setAvatarUrl(av)
+        setDisplayName(nm)
+        // 다음 진입의 첫 그림용 — 여기가 이 두 값의 유일한 쓰기 자리다(lib/lastLook.ts).
+        saveLook(uid, { avatar: av, name: nm })
         setJoinedAt((data?.created_at as string | null) ?? null)
         setCountryCode((data?.country_code as string | null) ?? null)
         setRegionCode((data?.region_code as string | null) ?? null)
@@ -430,8 +444,12 @@ export default function Hub() {
     setGiftsOlder(h.giftsOlder ?? 0)
     setGiftsUnseen(h.giftsUnseen ?? 0)
     // 꾸미기 장착값 — 서버가 권위다. 'default'(아직 안 고름)는 null 로 눕혀 폴백 그림 하나로 처리한다.
-    setCharKey(h.baseKey && h.baseKey !== 'default' ? h.baseKey : null)
-    setSkinPart(h.equipped?.skin ?? DEFAULT_SKIN_PART)
+    const nextChar = h.baseKey && h.baseKey !== 'default' ? h.baseKey : null
+    const nextSkin = h.equipped?.skin ?? DEFAULT_SKIN_PART
+    setCharKey(nextChar)
+    setSkinPart(nextSkin)
+    // 다음 진입의 첫 그림용으로 적어 둔다 — **서버 응답이 온 뒤가 유일한 쓰기 자리**다(lib/lastLook.ts).
+    saveLook(user?.id, { skin: nextSkin, char: nextChar, score: h.seasonTotal ?? 0 })
     // 첫 진입 흐름. **비로그인 응답(authed=false)에는 이 값이 없다** — 그때는 모름(null)으로 두어야
     // 게스트 화면에 캐릭터 선택이 뜨는 일이 없다(허브는 로그인 전용이라 실제로 도달하진 않는다).
     if (h.authed) {

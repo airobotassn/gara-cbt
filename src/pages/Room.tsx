@@ -72,24 +72,32 @@ export default function Room() {
   }
 
   const isMine = !!user?.id && user.id === handle
-  // 아직 응답을 못 받았으면 기본 스킨으로 그린다(skinByPart 가 모르는 값·null 을 기본으로 떨어뜨린다).
-  const skin = skinByPart(data?.skin ?? null)
+  // ⚠️ **응답 전에는 무대를 안 그린다**(2026-08-26). 예전엔 기본 스킨으로 먼저 그렸는데, 남의 방은
+  //    열 때마다 주인이 달라서 그 기본값이 맞을 확률이 거의 없다 — 초원 배경 + 폴백 캐릭터가 떴다가
+  //    그 사람 것으로 덮이는 게 매번 보였다. 허브(`lib/lastLook.ts`)처럼 적어 둘 수도 없는 자리다.
+  //    아래 `stage-zone` 이 그동안 '불러오는 중'을 띄우므로 빈 화면이 되지도 않는다.
+  const skin = data ? skinByPart(data.skin ?? null) : null
   const name = data?.name || t('room.someone')
   const badge = data?.title ? <span className="tt">🏆 CARIS {tierName(data.title)}</span> : null
 
   return (
-    <div className="hub" data-skin={skin.key} data-ui={skin.ui}>
+    <div className="hub" data-skin={skin?.key} data-ui={skin?.ui}>
       {/* 무대 = 그 사람의 배경 + 그 사람의 캐릭터. /hub 와 **같은 마크업·같은 CSS** 다 —
           내 허브와 남이 보는 내 방이 갈리면 배치를 바꿔봐야 드러나 제일 늦게 발견된다.
-          ⚠️ `.hub-scene` 은 `.hub > *:not(...)` 예외 목록에 있어야 viewport 고정이 풀리지 않는다. */}
-      <div className="hub-scene" aria-hidden="true">
-        <div className="hub-scene-bg" />
-        <div className="hub-scene-char">
-          {/* 레벨은 시즌 총점에서 파생한다 — 허브가 자기 화면에 쓰는 것과 같은 함수라
-              내 허브와 남이 보는 내 방의 캐릭터가 어긋나지 않는다. */}
-          <CharArt charKey={data?.character ?? null} level={arenaLevelForScore(data?.seasonTotal ?? 0)} className="hub-scene-char-img" />
+          ⚠️ `.hub-scene` 은 `.hub > *:not(...)` 예외 목록에 있어야 viewport 고정이 풀리지 않는다.
+          ⚠️ **응답이 오기 전에는 통째로 안 그린다.** 칸의 위치·크기는 `.hub[data-skin]` 선택자가
+             잡는데 그 값이 없으면 그림만 남아 제 크기로 튀어나온다(스킨 아이콘을 마크업에 박았을 때
+             512px 원본이 화면을 덮었던 것과 같은 사고다). */}
+      {skin && (
+        <div className="hub-scene" aria-hidden="true">
+          <div className="hub-scene-bg" />
+          <div className="hub-scene-char">
+            {/* 레벨은 시즌 총점에서 파생한다 — 허브가 자기 화면에 쓰는 것과 같은 함수라
+                내 허브와 남이 보는 내 방의 캐릭터가 어긋나지 않는다. */}
+            <CharArt charKey={data?.character ?? null} level={arenaLevelForScore(data?.seasonTotal ?? 0)} className="hub-scene-char-img" />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="hub-backrow">
         {/* 들어온 길이 랭킹일 수도 채팅일 수도 SNS 일 수도 있다 — 어디서 왔든 말이 되는 곳(아레나)으로 보낸다. */}

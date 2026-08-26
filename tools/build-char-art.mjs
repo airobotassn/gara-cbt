@@ -41,7 +41,7 @@ const DIL = 3 // 벽 부풀리기(px). 구름 윤곽의 1~2px 틈으로 배경�
 const FEATHER = 14 // 벽 안쪽으로 이만큼 들어가면 완전 불투명. 경계 단차를 없앤다
 const LO = 15 // 배경 밝기 편차(가장자리 255 · 안쪽 246)를 흡수할 여유
 
-const [sheet, key, cutout] = process.argv.slice(2)
+const [sheet, key, cutout, lv7sheet] = process.argv.slice(2)
 if (!sheet || !/^char_[a-z]+_[a-z]+$/.test(key || '')) {
   console.error('사용법: node tools/build-char-art.mjs "<흰배경시트.png>" char_<계열>_<성별> ["<배경뺀시트.png>"]')
   process.exit(1)
@@ -140,12 +140,32 @@ function dist(seed, w, h) {
   return d
 }
 
-/** 원본 시트에서 칸 하나를 오려낸다(색만 — 알파는 아직 전부 불투명) */
-function crop(x0, x1) {
+/** 시트에서 칸 하나를 오려낸다(색만 — 알파는 아직 전부 불투명) */
+function crop(x0, x1, buf = src) {
   const w = x1 - x0 + 1, h = cy1 - cy0 + 1
   const P = Buffer.alloc(w * h * 4)
-  for (let y = 0; y < h; y++) src.copy(P, y * w * 4, ((cy0 + y) * W + x0) * 4, ((cy0 + y) * W + x0 + w) * 4)
+  for (let y = 0; y < h; y++) buf.copy(P, y * w * 4, ((cy0 + y) * W + x0) * 4, ((cy0 + y) * W + x0 + w) * 4)
   return { P, w, h, x0 }
+}
+
+/**
+ * 단색 배경 빼기 — **가장자리가 또렷한** 그림용(Lv.7 교체 시트처럼).
+ * 배경색에서 얼마나 멀어졌는지만 보고 알파를 매기고, 섞여 들어간 배경색은 역산해서 벗긴다.
+ *   ⚠️ 부드럽게 번지는 빛에는 쓰면 안 된다 — 생성 AI 는 그런 빛을 **배경색과 이미 섞어서** 칠하므로
+ *      되돌릴 원래 색이 없다(마젠타 배경이면 후광이 통째로 분홍으로 남는다. 2026-08-26 실측).
+ *      그래서 이 경로는 빛이 또렷한 테두리 안에서 끝나는 그림에만 쓴다.
+ */
+function dekey(c, BG, lo = 25, hi = 90) {
+  const { P, w, h } = c
+  for (let p = 0; p < w * h; p++) {
+    const i = p * 4
+    const d = Math.hypot(P[i] - BG[0], P[i + 1] - BG[1], P[i + 2] - BG[2])
+    const a = Math.min(1, Math.max(0, (d - lo) / (hi - lo)))
+    if (a <= 0) { P[i] = P[i + 1] = P[i + 2] = P[i + 3] = 0; continue }
+    if (a < 1) for (let k = 0; k < 3; k++) P[i + k] = Math.max(0, Math.min(255, Math.round((P[i + k] - (1 - a) * BG[k]) / a)))
+    P[i + 3] = Math.round(a * 255)
+  }
+  return c
 }
 
 /**
@@ -200,6 +220,24 @@ function dewhite(c) {
   return c
 }
 
+/**
+ * 칸 아래쪽에 남은 'LEVEL N' 글자를 지운다 — Lv.7 교체 시트용.
+ * 자르는 높이(cy0~cy1)는 **원본 시트**에서 잰 값이라, 판이 조금이라도 다른 시트를 끼우면
+ * 글자가 그 안으로 딸려 들어온다. 인물과 글자 사이의 빈 줄을 다시 찾아 그 아래를 비운다.
+ */
+function dropLabel(c) {
+  const { P, w, h } = c
+  const on = new Array(h).fill(false)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (P[(y * w + x) * 4 + 3] > 8) { on[y] = true; break }
+  let last = -1, g = -1
+  for (let y = 0; y < h; y++) {
+    if (!on[y]) { if (g < 0) g = y } else if (g >= 0) { if (y - g > 8) last = g; g = -1 }
+  }
+  if (last < 0) return c
+  P.fill(0, last * w * 4)
+  return c
+}
+
 /** 알파로 인물 상자와 '서는 자리'를 잰다 */
 function measure(c) {
   const { P, w, h } = c
@@ -220,9 +258,32 @@ function measure(c) {
   return { ...c, bx0, bx1, by0, by1, footX: sw ? sx / sw : (bx0 + bx1) / 2 }
 }
 
-// Lv.1~6 은 배경 뺀 시트의 모양을 입히고, 없으면(그리고 Lv.7 은 언제나) 여기서 흰 배경을 뺀다.
-const cells = cut.map(([x0, x1], i) =>
-  measure(altA && i < 6 ? applyMask(crop(x0, x1)) : dewhite(crop(x0, x1))))
+/**
+ * Lv.7 만 다른 시트에서 가져올 때(네 번째 인자). 그 시트를 원본과 같은 크기로 맞춰 두면
+ * 칸 자리·바닥선이 그대로 맞으므로 아래 파이프라인이 손댈 것 없이 돈다.
+ *   ⚠️ 원본보다 작은 파일이면 **늘려 쓴다 — 그만큼 흐려진다.** Lv.1~6 은 원본 해상도라
+ *      선택 화면에 나란히 서면 Lv.7 만 뭉개져 보인다. 되도록 같은 크기로 받을 것.
+ */
+let lv7 = null
+if (lv7sheet) {
+  const [sw, sh] = size(lv7sheet)
+  lv7 = sw === W && sh === H ? raw(lv7sheet)
+    : execFileSync('ffmpeg', ['-v', 'error', '-i', lv7sheet, '-vf', `scale=${W}:${H}:flags=lanczos`,
+      '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { maxBuffer: 1 << 30 })
+  if (sw !== W) console.log(`⚠️ Lv.7 시트 ${sw}x${sh} → ${W}x${H} 로 늘려 씀(그만큼 흐려진다)`)
+}
+
+// Lv.1~6 은 배경 뺀 시트의 모양을 입히고, 없으면(그리고 Lv.7 은 언제나) 여기서 배경을 뺀다.
+const cells = cut.map(([x0, x1], i) => {
+  if (altA && i < 6) return measure(applyMask(crop(x0, x1)))
+  if (i === 6 && lv7) {
+    const c = crop(x0, x1, lv7)
+    const BG = [lv7[0], lv7[1], lv7[2]]
+    // 흰 배경이면 번지는 빛까지 살리는 쪽, 단색 키 배경이면 또렷한 쪽(위 dekey 주석 참고)
+    return measure(dropLabel(Math.min(...BG) > 235 ? dewhite(c) : dekey(c, BG)))
+  }
+  return measure(dewhite(crop(x0, x1)))
+})
 
 // 늘린 알파가 원본과 같은 자리에 있나 — 어긋나면 실루엣이 한쪽으로 밀린 채 잘린다
 if (altA) {
