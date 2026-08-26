@@ -63,6 +63,10 @@ await db.exec(
 );
 // 허브가 쓰는 전세계 순위. 더미를 안 세던 것을 고친 판 — 아래 (8b) 가 scoped_top 과 대조한다.
 await db.exec(readFileSync('supabase/migrations/20260825150000_my_rank_context_dummies.sql', 'utf8'));
+// 배경 분포(초원 50 · 고궁 낮 30 · 고궁 밤 20, 위에서부터 고궁). 시드 뒤에 한 번 더 덮어쓰는 짝이다.
+await db.exec(readFileSync('supabase/migrations/20260826180000_ranking_dummy_skins.sql', 'utf8'));
+// 캐릭터를 그림이 있는 계열(a)로. 이것도 시드 뒤에 덮어쓰는 짝이다.
+await db.exec(readFileSync('supabase/migrations/20260826190000_ranking_dummy_chars_a.sql', 'utf8'));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -133,9 +137,42 @@ const one = async (sql, params) => (await db.query(sql, params)).rows[0];
   const badChar = await one(`select count(*)::int n from ranking_dummies
     where character_key not in ('char_a_m','char_a_f','char_b_m','char_b_f','char_c_m','char_c_f')`);
   rec('캐릭터 키가 실제 상품 키와 같다', badChar.n, 0);
-  // 스킨은 코인 상품이라 전원이 가지면 이상하다 — 일부만 갖는다.
-  const skinAll = await one(`select count(*)::int n from ranking_dummies where skin is not null`);
-  rec('밤 배경은 일부만 갖는다', skinAll.n > 0 && skinAll.n < 40, true);
+  // ⭐ 그림이 있는 계열만 쓴다(20260826190000). b·c 는 그림이 없어 폴백 한 장으로 떨어지는데,
+  //    그러면 성별도 레벨도 무시된 같은 얼굴이 랭킹·남의 방을 덮는다.
+  const noArt = await one(`select count(*)::int n from ranking_dummies
+    where character_key not in ('char_a_m','char_a_f')`);
+  rec('⭐ 그림이 있는 캐릭터만 쓴다', noArt.n, 0);
+  // 성별은 지킨다 — 남녀가 한쪽으로 쏠리면 갈아입힌 티가 난다.
+  const gender = await one(`select
+      (count(*) filter (where character_key = 'char_a_m'))::int as m,
+      (count(*) filter (where character_key = 'char_a_f'))::int as f from ranking_dummies`);
+  rec('남녀가 한쪽으로 쏠리지 않는다', gender.m > 0 && gender.f > 0, true);
+  // 배경은 초원 50% · 고궁 낮 30% · 고궁 밤 20%(20260826180000). 스킨은 코인 상품이라
+  // 전원이 가지면 이상하고, 아무도 안 가지면 랭킹 방이 전부 같은 그림이 된다.
+  const sk = await one(`select
+      (count(*) filter (where skin is null))::int                     as meadow,
+      (count(*) filter (where skin = 'skin_palace_day'))::int         as day,
+      (count(*) filter (where skin = 'skin_palace_night'))::int       as night,
+      count(*)::int                                                   as all_n
+    from ranking_dummies`);
+  rec('초원이 절반', sk.meadow, Math.round(sk.all_n * 0.5));
+  rec('고궁 낮이 30%', sk.day, Math.round(sk.all_n * 0.3));
+  rec('고궁 밤이 20%', sk.night, Math.round(sk.all_n * 0.2));
+  // ⭐ 상위권은 고궁 — 지역 안 등수로 자르므로 전세계·국가 보드 윗줄도 자동으로 고궁이 된다.
+  const topPlain = await one(`with p as (
+      select skin, row_number() over (partition by region_code order by season_total desc, id) as r
+        from ranking_dummies)
+    select count(*)::int n from p where r <= 3 and skin is null`);
+  rec('⭐ 지역 상위 3명은 초원이 아니다', topPlain.n, 0);
+  const worldPlain = await one(`select count(*)::int n from (
+      select skin from ranking_dummies order by season_total desc limit 10) t where skin is null`);
+  rec('⭐ 전세계 상위 10명도 고궁', worldPlain.n, 0);
+  // 밤이 어느 자리에 오는지는 지역마다 달라야 한다 — 안 돌리면 모든 보드의 1·2위가 똑같이 밤이다.
+  const nightSpots = await one(`with p as (
+      select region_code, skin, row_number() over (partition by region_code order by season_total desc, id) as r
+        from ranking_dummies)
+    select count(distinct r)::int n from p where skin = 'skin_palace_night'`);
+  rec('밤 자리가 지역마다 다르다', nightSpots.n > 1, true);
 
   // 아바타는 비운다 — 프론트가 id 시드로 젬 색을 만든다(실회원과 같은 규칙).
   const av = await one(`select count(*)::int n from ranking_dummies where avatar_url is not null`);

@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     ] = await Promise.all([
       admin.from('user_currency').select('points').eq('user_id', uid).maybeSingle(),
       admin.from('user_cosmetics').select('part_key').eq('user_id', uid),
-      admin.from('user_characters').select('base_key, equipped, chosen_at, tutorial_done_at').eq('user_id', uid).maybeSingle(),
+      admin.from('user_characters').select('base_key, equipped, chosen_at, tutorial_done_at, arena_level_seen').eq('user_id', uid).maybeSingle(),
       admin.from('user_stamps').select('count').eq('user_id', uid).eq('stamp_kind', 'daily').maybeSingle(),
       // ⚠️ 행 존재 여부로 '완료'를 판정하면 안 된다 — 이 행은 레벨테스트(did_leveltest)·미니게임(did_minigame)도
       //    만든다. 출석/오늘의 학습 완료는 반드시 각 종류 플래그로 판정할 것(2026-07-27 버그 수정).
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
         .eq('user_id', uid)
         .order('issued_for_level', { ascending: false }),
       // HUD 표시(레벨·랭킹점수·실력/활동 분해)용 읽기 전용 — 이 함수는 user_progress 를 절대 쓰지 않는다(cosmetic-only).
-      admin.from('user_progress').select('rank, points, skill_score, activity_score, season_total').eq('user_id', uid).maybeSingle(),
+      admin.from('user_progress').select('rank, points, skill_score, activity_score, season_total, arena_level').eq('user_id', uid).maybeSingle(),
       admin.rpc('user_titles', { p_uid: uid }),
       // 다음 순위 게이지(티어·백분위·points_to_pass) — season_total 기반 read-시점 파생, 실패해도 무시(back-compat).
       admin.rpc('my_rank_context', { p_uid: uid }),
@@ -145,6 +145,17 @@ Deno.serve(async (req) => {
     }
     const giftsToday = [...giftAgg.values()].sort((a, b) => b.amount - a.amount)
 
+    // ARENA 레벨업 감지 — 저장된 두 값의 비교가 전부다(20260826150000).
+    //   ⚠️ 여기서 season_total 로 레벨을 **다시 계산하지 않는다.** 그러면 레벨 공식이 이 파일에도
+    //      한 벌 생겨 동기화 페어가 늘어난다 — 계산은 DB 트리거 한 곳에서만 하고 여기선 읽기만 한다.
+    //   ⚠️ 아직 캐릭터를 안 고른 사람(user_characters 행 없음)은 워터마크가 없다. 그 사람에겐
+    //      캐릭터 선택 화면이 먼저 뜨고 hub_choose_character 가 워터마크를 현재 레벨로 심어주므로,
+    //      여기서는 지금 레벨을 그대로 써서 **축하가 안 뜨게** 한다(1로 두면 첫 선택 직후 가짜 축하가 뜬다).
+    const levelTo = Math.max(1, Number(progress?.arena_level ?? 1))
+    const levelFrom = character
+      ? Math.max(1, Number(character.arena_level_seen ?? 1))
+      : levelTo
+
     return json({
       authed: true,
       level: progress?.rank ?? null,
@@ -169,6 +180,18 @@ Deno.serve(async (req) => {
       //      화면이 그걸로 뭔가 계산하려 든다(그 값의 의미는 서버에만 있다).
       charChosen: !!character?.chosen_at,
       tutorialDone: !!character?.tutorial_done_at,
+      // 레벨업 연출(2026-08-26) — 축하할 게 있으면 {from,to}, 없으면 null.
+      //   from = 마지막으로 축하한 레벨(user_characters.arena_level_seen)
+      //   to   = 지금 레벨(user_progress.arena_level, 트리거가 유지)
+      //
+      // ⚠️ **판정을 서버가 한다.** localStorage 에 직전 레벨을 적어두는 방식이면 브라우저를
+      //    바꾸거나 지우는 순간 축하를 두 번 보거나(워터마크 소실) 통째로 놓친다 —
+      //    캐릭터 선택·튜토리얼 플래그를 서버에 둔 것과 같은 이유다.
+      // ⚠️ 여기서 워터마크를 올리지 않는다. 이 함수는 읽기 전용이고, 응답만 받고 연출을 못 본 채
+      //    창을 닫으면(느린 회선·즉시 이탈) 축하가 조용히 사라진다. 올리는 건 연출을 **다 본 뒤**
+      //    화면이 부르는 character{levelSeen} 하나다.
+      // ⚠️ from < to 일 때만 준다 — 같거나 뒤집힌 경우(시즌 리셋 직후 등)는 축하할 게 없다.
+      levelUp: levelFrom < levelTo ? { from: levelFrom, to: levelTo } : null,
       stamps: (stamp?.count as number) ?? 0,
       // dailyDone = 허브 '출석' 완료(did_attendance). learnDone = /daily 오늘의 학습 완료(did_learn).
       // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).

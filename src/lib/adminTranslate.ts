@@ -7,6 +7,10 @@ export interface TransItem {
   prompt: string
   options: string[]
   explanation: string
+  // 주관식 허용답안(선택). 레벨테스트는 전 문항이 객관식이라 안 보낸다.
+  // ⚠️ options 와 달리 개수를 맞추지 않는다 — 표기 변형 가짓수가 언어마다 다르고, 채점은
+  //    원문+번역 합집합에 들어 있는지만 본다(supabase/functions/_shared/normalize.ts).
+  answers?: string[]
 }
 export type TransResult =
   | { tr: Record<string, TransItem>; issues: Record<string, string[]> }

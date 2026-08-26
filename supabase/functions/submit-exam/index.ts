@@ -6,7 +6,7 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient } from '../_shared/lib.ts'
 import { getExamActor } from '../_shared/exam-token.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
-import { matchShort, parseAcceptedAnswers } from '../_shared/normalize.ts'
+import { acceptedAnswerPool, answerLangReady, matchShortPool } from '../_shared/normalize.ts'
 import { monthOfWindow, scheduleForMonth } from '../_shared/exam-schedule.ts'
 
 // 응시 TTL(분) — 전역 상한/안전망. 실제 제한시간은 시험별 exams.duration_minutes 로 강제한다.
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     // 출제된(고정된) 문항 + 정답/유형
     const { data: assigned } = await admin
       .from('attempt_answers')
-      .select('id, question_id, questions(kind, correct_index, answer_key)')
+      .select('id, question_id, questions(kind, correct_index, answer_key, answer_key_i18n)')
       .eq('attempt_id', attemptId)
     if (!assigned || assigned.length === 0) {
       return json({ error: '채점할 문항이 없습니다.' }, 400)
@@ -117,15 +117,21 @@ Deno.serve(async (req) => {
       const timeSpent = Math.max(0, Math.floor(sub?.timeSpent ?? 0))
       if (kind === 'short') {
         const answerKey: string | null = row.questions?.answer_key ?? null
-        // ⛔ **한국어로 응시한 사람만 자동채점한다**(2026-08-25 문항 다국어화).
-        //    자동채점은 한국어 모범답안(answer_key)과의 정규화 정확일치인데, 일본어로 출제된 문제에
-        //    일본어로 답한 사람은 절대 일치하지 않는다 → 예전 코드는 그걸 그대로 **오답(auto)** 으로
-        //    확정해 버렸다. 채점자가 다시 볼 기회조차 없이 조용히 틀린 것으로 남는 종류의 사고다.
-        //    ⚠️ 모범답안을 5개국어로 번역해도 이 문제는 안 풀린다 — 서술형 답안은 표현이 제각각이라
-        //       애초에 정확일치로 채점할 수 있는 물건이 아니다. 사람이 봐야 한다(pending).
-        const koAttempt = (attempt.lang ?? 'ko') === 'ko'
-        const auto = koAttempt && parseAcceptedAnswers(answerKey).length > 0
-        const ok = auto && matchShort(sub?.answerText, answerKey)
+        const answerKeyI18n = row.questions?.answer_key_i18n ?? null
+        // 주관식 자동채점 — **응시 언어의 허용답안이 준비된 문항만** 한다(2026-08-26).
+        //   · 대조는 원문+전 언어 번역의 **합집합**이다(acceptedAnswerPool). 일본어로 응시해도
+        //     기술 용어는 영어로 쓰는 일이 흔해서, 응시 언어 목록만 보면 맞은 답을 틀렸다고 한다.
+        //   · 그 언어 번역이 아직 없으면 채점하지 않고 pending 으로 넘긴다(answerLangReady).
+        //     그게 없으면 일본어 응시자가 일본어로 쓴 정답이 한국어 목록과 안 맞아 **오답으로 확정**된다.
+        //
+        // 옛 코드는 이 자리에서 **한국어 응시만** 자동채점했다(koAttempt). 그때 근거였던
+        // "모범답안을 번역해도 안 풀린다 — 서술형은 표현이 제각각이라" 는 **데이터를 안 보고 쓴 것이다.**
+        // 실제 주관식 74문항은 전부 용어 단답이고(평균 27자: '엣지 컴퓨팅/Edge Computing', 'NPU'),
+        // 원문 허용답안에 이미 영어 표기가 섞여 있다 — 정확일치로 채점되도록 만들어진 물건이다.
+        const auto =
+          answerLangReady(answerKeyI18n, attempt.lang ?? 'ko') &&
+          acceptedAnswerPool(answerKey, answerKeyI18n).length > 0
+        const ok = auto && matchShortPool(sub?.answerText, answerKey, answerKeyI18n)
         if (ok) totalCorrect += 1
         writes.push(
           admin

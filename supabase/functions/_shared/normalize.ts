@@ -40,3 +40,56 @@ export function matchShort(submitted: string | null | undefined, answerKey: stri
   if (!s) return false
   return accepted.includes(s)
 }
+
+// 한국어 원문(answer_key) + 번역본(answer_key_i18n) 을 **합쳐** 허용답안 목록을 만든다.
+// 주관식 채점의 단일 출처 — 응시 언어와 무관하게 이 하나만 본다.
+//
+// ⛔ **언어별로 가르지 않고 전부 합친다.** 일본어로 응시해도 기술 용어는 영어로 쓰는 일이 흔하고
+//    ('Edge Computing'), 한국어 표기를 그대로 치는 사람도 있다. 어느 쪽이든 맞는 답인데
+//    응시 언어의 목록만 보면 **맞은 답을 틀렸다고 한다.** 합집합이라 느슨해 보이지만, 애초에
+//    다른 문항의 답이 섞이지 않는 한(한 문항의 자기 답들이다) 오답이 통과할 길은 없다.
+// ⚠️ 정규화 후 중복은 자연히 접힌다 — 원문에 이미 영어 표기가 섞여 있는 문항이 많다.
+export function acceptedAnswerPool(
+  answerKey: string | null | undefined,
+  answerKeyI18n: unknown,
+): string[] {
+  const set = new Set<string>(parseAcceptedAnswers(answerKey))
+  const m = answerKeyI18n as Record<string, unknown> | null | undefined
+  if (m && typeof m === 'object') {
+    for (const v of Object.values(m)) {
+      if (!Array.isArray(v)) continue
+      for (const line of v) {
+        const n = normalizeAnswer(String(line ?? ''))
+        if (n) set.add(n)
+      }
+    }
+  }
+  return [...set]
+}
+
+// 이 응시 언어로 자동채점을 해도 되나 — **자동채점의 안전장치다.**
+//
+// ⛔ 합집합만 보고 채점하면 안 된다. 일본어로 출제된 문항인데 일본어 허용답안이 아직 없으면,
+//    응시자는 일본어로 답을 쓰는데 목록엔 한국어·영어뿐이라 **맞은 답이 오답으로 확정된다.**
+//    (자동채점은 되돌릴 기회 없이 그대로 굳는다 — 예전에 koAttempt 로 통째로 막아뒀던 그 사고다.)
+//    번역이 없으면 채점하지 말고 pending 으로 넘겨 사람이 본다.
+// ⚠️ 한국어 응시는 원문 자체가 그 언어라 언제나 준비된 것으로 본다.
+export function answerLangReady(answerKeyI18n: unknown, lang: string): boolean {
+  if (!lang || lang === 'ko') return true
+  const v = (answerKeyI18n as Record<string, unknown> | null | undefined)?.[lang]
+  return Array.isArray(v) && v.some((x) => String(x ?? '').trim())
+}
+
+// 제출 답안이 합집합(원문+번역본) 중 하나와 정규화 정확일치하면 정답.
+// 합집합이 비면 false → 호출측이 수동검수(pending)로 폴백한다(matchShort 와 같은 규칙).
+export function matchShortPool(
+  submitted: string | null | undefined,
+  answerKey: string | null | undefined,
+  answerKeyI18n: unknown,
+): boolean {
+  const accepted = acceptedAnswerPool(answerKey, answerKeyI18n)
+  if (accepted.length === 0) return false
+  const s = normalizeAnswer(submitted)
+  if (!s) return false
+  return accepted.includes(s)
+}

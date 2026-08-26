@@ -1959,7 +1959,7 @@ async function questionList(admin: any, body: any) {
   if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const { data, error } = await admin
     .from('questions')
-    .select('id, bank_id, number, subject, difficulty, topic, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index, answer_key, explanation, active')
+    .select('id, bank_id, number, subject, difficulty, topic, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index, answer_key, answer_key_i18n, explanation, active')
     .eq('bank_id', bankId)
     .is('deleted_at', null)
     .order('number', { ascending: true })
@@ -2037,10 +2037,17 @@ async function questionUpsert(admin: any, body: any, actor: string) {
   // 화면이 방금 뽑은 번역을 같이 보내면 그대로 싣는다(편집 모달의 '자동 번역' → 저장 한 번).
   // 개수·빈값 검사는 sanitizeQuestionTrans 한 곳에서 한다 — 저장 경로가 둘(여기·questionTransSave)이라
   // 검사를 각자 쓰면 한쪽만 느슨해져서 정답 번호가 어긋난 보기가 들어온다.
-  const sent = sanitizeQuestionTrans(q.promptI18n, q.choicesI18n, (row.choices as string[]) ?? [])
+  const sent = sanitizeQuestionTrans(
+    q.promptI18n,
+    q.choicesI18n,
+    (row.choices as string[]) ?? [],
+    q.answerKeyI18n,
+    row.answer_key as string | null,
+  )
   if (sent) {
     row.prompt_i18n = sent.prompt_i18n
     row.choices_i18n = sent.choices_i18n
+    row.answer_key_i18n = sent.answer_key_i18n
   }
 
   const isNew = !q.id
@@ -2051,7 +2058,9 @@ async function questionUpsert(admin: any, body: any, actor: string) {
     //    ⚠️ 번역을 같이 보냈으면(sent) 그게 새 원문에 맞춰 뽑은 것이므로 비우지 않는다.
     if (!sent) {
       const { data: before } = await admin
-        .from('questions').select('prompt, choices').eq('id', q.id).maybeSingle()
+        .from('questions').select('prompt, choices, answer_key').eq('id', q.id).maybeSingle()
+      // ⚠️ **지문·보기와 모범답안을 따로 본다.** 모범답안만 고쳤으면 지문 번역은 그대로 유효한데
+      //    같이 비우면 멀쩡한 5개국어를 버리고 다시 번역하게 된다(반대도 마찬가지).
       const koChanged =
         !!before &&
         (String(before.prompt ?? '') !== prompt ||
@@ -2059,6 +2068,10 @@ async function questionUpsert(admin: any, body: any, actor: string) {
       if (koChanged) {
         row.prompt_i18n = {}
         row.choices_i18n = {}
+      }
+      // 모범답안이 바뀌면 그 번역은 다른 답을 가리킨다 — 그대로 두면 **틀린 답이 정답으로 통과**한다.
+      if (!!before && String(before.answer_key ?? '') !== String(row.answer_key ?? '')) {
+        row.answer_key_i18n = {}
       }
     }
     const { error } = await admin.from('questions').update(row).eq('id', q.id)
@@ -2075,18 +2088,27 @@ async function questionUpsert(admin: any, body: any, actor: string) {
 //  · 지문이 비었으면 그 언어 탈락
 //  · 보기 개수가 원문과 다르거나 빈 보기가 있으면 그 언어 탈락
 //    ⚠️ 개수가 어긋난 채로 저장되면 correct_index 가 다른 보기를 가리켜 **아무도 못 맞히는 문항**이 된다.
+//  · 주관식 허용답안은 **있으면 담고 없어도 탈락시키지 않는다**(아래 참고).
 //  · ko 는 절대 담지 않는다 — 한국어 단일 출처는 원본 컬럼이다(마이그레이션 20260825190000).
 // 보낸 게 아무것도 없으면 null → 호출부가 "번역을 안 보냈다" 로 다룬다(빈 객체 저장과 구분).
 function sanitizeQuestionTrans(
   promptI18n: unknown,
   choicesI18n: unknown,
   koChoices: string[],
-): { prompt_i18n: Record<string, string>; choices_i18n: Record<string, string[]> } | null {
+  answerKeyI18n?: unknown,
+  koAnswerKey?: string | null,
+): {
+  prompt_i18n: Record<string, string>
+  choices_i18n: Record<string, string[]>
+  answer_key_i18n: Record<string, string[]>
+} | null {
   const pIn = (promptI18n ?? null) as Record<string, unknown> | null
   const cIn = (choicesI18n ?? null) as Record<string, unknown> | null
-  if (!pIn && !cIn) return null
+  const aIn = (answerKeyI18n ?? null) as Record<string, unknown> | null
+  if (!pIn && !cIn && !aIn) return null
   const prompt_i18n: Record<string, string> = {}
   const choices_i18n: Record<string, string[]> = {}
+  const answer_key_i18n: Record<string, string[]> = {}
   for (const lang of TRANSLATABLE_LANGS) {
     const p = pIn?.[lang]
     if (typeof p !== 'string' || !p.trim()) continue
@@ -2096,16 +2118,28 @@ function sanitizeQuestionTrans(
       const opts = o.map((x) => String(x ?? '').trim())
       if (opts.some((x) => !x)) continue
       choices_i18n[lang] = opts
+    } else if (koAnswerKey && String(koAnswerKey).trim()) {
+      // 주관식 허용답안 — 개수는 안 본다(원문과 다른 게 정상이다. 표기 변형 가짓수가 언어마다 다르고,
+      // 순서가 정답 번호를 가리키지도 않는다). 채점은 원문+번역 합집합 포함 여부만 본다.
+      // ⚠️ **답 번역이 비어도 그 언어를 탈락시키지 않는다** — 탈락시키면 멀쩡히 번역된 지문까지
+      //    같이 버려진다. 안 담고 넘어가면 questionTranslated 가 그 언어를 '미번역'으로 남겨서
+      //    관리자가 「미번역 번역」을 다시 누를 때 그 문항만 재시도된다.
+      const a = aIn?.[lang]
+      if (Array.isArray(a)) {
+        const list = [...new Set(a.map((x) => String(x ?? '').trim()).filter(Boolean))]
+        if (list.length) answer_key_i18n[lang] = list
+      }
     }
     prompt_i18n[lang] = p.trim()
   }
-  return { prompt_i18n, choices_i18n }
+  return { prompt_i18n, choices_i18n, answer_key_i18n }
 }
 
 // 번역본만 저장 — 목록에서 여러 문항을 한 번에 번역할 때 쓴다(한국어 원문은 손대지 않는다).
-//  요청: { rows: [{ id, promptI18n, choicesI18n }] }
+//  요청: { rows: [{ id, promptI18n, choicesI18n, answerKeyI18n }] }
 // ⚠️ **원문을 DB 에서 다시 읽어** 보기 개수를 대조한다. 화면이 보낸 개수를 믿으면, 번역을 뽑는 사이
-//    다른 창에서 보기를 고친 문항에 옛 개수 기준 번역이 박힌다.
+//    다른 창에서 보기를 고친 문항에 옛 개수 기준 번역이 박힌다. 모범답안도 같은 이유로 다시 읽는다
+//    (그 사이에 답이 바뀌었으면 지금 들고 온 번역은 다른 답의 것이다).
 async function questionTransSave(admin: any, body: any, actor: string) {
   const rows = Array.isArray(body?.rows) ? body.rows : []
   if (!rows.length) return json({ error: '저장할 번역이 없습니다.' }, 400)
@@ -2113,7 +2147,7 @@ async function questionTransSave(admin: any, body: any, actor: string) {
   if (!ids.length) return json({ error: 'id 가 없는 행이 있습니다.' }, 400)
 
   const { data: cur, error: readErr } = await admin
-    .from('questions').select('id, bank_id, number, choices').in('id', ids)
+    .from('questions').select('id, bank_id, number, choices, answer_key').in('id', ids)
   if (readErr) return json({ error: readErr.message }, 400)
   const byId: Record<string, any> = {}
   for (const c of cur ?? []) byId[c.id] = c
@@ -2123,11 +2157,17 @@ async function questionTransSave(admin: any, body: any, actor: string) {
   for (const r of rows) {
     const base = byId[r.id]
     if (!base) { skipped++; continue }
-    const clean = sanitizeQuestionTrans(r.promptI18n, r.choicesI18n, base.choices ?? [])
+    const clean = sanitizeQuestionTrans(
+      r.promptI18n, r.choicesI18n, base.choices ?? [], r.answerKeyI18n, base.answer_key,
+    )
     if (!clean || Object.keys(clean.prompt_i18n).length === 0) { skipped++; continue }
     const { error } = await admin
       .from('questions')
-      .update({ prompt_i18n: clean.prompt_i18n, choices_i18n: clean.choices_i18n })
+      .update({
+        prompt_i18n: clean.prompt_i18n,
+        choices_i18n: clean.choices_i18n,
+        answer_key_i18n: clean.answer_key_i18n,
+      })
       .eq('id', r.id)
     if (error) return json({ error: error.message }, 400)
     saved++
@@ -2239,10 +2279,18 @@ async function questionsImport(admin: any, body: any, actor: string) {
     payload.push({ bank_id: bankId, number: next, subject, difficulty, topic, prompt, kind, choices, correct_index: ci, answer_key: null, explanation, active: true, deleted_at: null })
   }
 
-  const { data, error } = await admin.from('questions').insert(payload).select('id')
+  // ⚠️ **방금 넣은 행의 id·번호를 돌려준다** — 화면이 업로드 직후 이어서 번역을 돌리고
+  //    그 결과를 questionTransSave 로 붙이는 데 쓴다(2026-08-26). 없으면 화면이 "방금 올린 게
+  //    어느 문항인지" 를 알 길이 없어 목록 전체를 다시 읽어 추측해야 한다.
+  //    번호(number)를 같이 주는 이유 = 화면이 보낸 순서와 돌아온 순서가 같은지 대조할 수 있게.
+  const { data, error } = await admin.from('questions').insert(payload).select('id, number')
   if (error) return json({ error: error.message }, 400)
   await logCbtEvent(admin, { question_id: null, bank_id: bankId, number: null, action: 'import', actor, detail: { count: payload.length } })
-  return json({ ok: true, count: data?.length ?? payload.length })
+  return json({
+    ok: true,
+    count: data?.length ?? payload.length,
+    inserted: (data ?? []).map((r: any) => ({ id: r.id, number: r.number })),
+  })
 }
 
 // ---------- 등록시험 뽑기(문제은행 → exam_questions 세트) ----------
@@ -2329,7 +2377,9 @@ async function examDraw(admin: any, body: any, actor: string) {
   // 한국어만 받는 회차까지 못 연다. 그 문항은 응시 화면에서 한국어로 뜬다(빈 화면이 아니다).
   const { data: drawn } = await admin
     .from('questions')
-    .select('prompt_i18n, choices_i18n, choices')
+    // ⚠️ answer_key·answer_key_i18n 도 같이 읽는다 — questionTranslated 가 주관식은 모범답안
+    //    번역까지 봐서, 안 읽으면 답이 다 번역돼 있어도 전부 미번역으로 세어 경고가 거짓말을 한다.
+    .select('prompt_i18n, choices_i18n, choices, answer_key, answer_key_i18n')
     .in('id', picked)
   const untranslated: Record<string, number> = {}
   for (const l of TRANSLATABLE_LANGS) {

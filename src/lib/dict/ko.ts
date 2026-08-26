@@ -1843,9 +1843,7 @@ const KO: Record<string, string> = {
   "hub.closet.empty_character": "아직 가진 캐릭터가 없어요. 상점 탭에서 만나볼 수 있어요.",
   "hub.closet.skin_help": "스킨을 바꾸면 배경뿐 아니라 출석판·게이지·도장까지 함께 바뀌어요.",
   "hub.charpick.title": "함께할 캐릭터를 골라주세요",
-  "hub.charpick.sub": "화살표로 다른 모습을 볼 수 있어요. 고른 캐릭터는 Lv.1부터 함께 자라요.",
-  "hub.charpick.prev": "이전 모습",
-  "hub.charpick.next": "다음 모습",
+  "hub.charpick.sub": "한 명만 고를 수 있어요. 고른 캐릭터는 Lv.1부터 함께 자라요.",
   "hub.charpick.g_m": "남성",
   "hub.charpick.g_f": "여성",
   "hub.charpick.go": "{name}(으)로 시작하기",
@@ -1863,6 +1861,14 @@ const KO: Record<string, string> = {
   "hub.tut.next": "다음",
   "hub.tut.done": "시작하기",
   "hub.tut.skip": "건너뛰기",
+  // 레벨업 축하(2026-08-26). title 은 6개국어 모두 같은 영문이다 — 게임에서 'LEVEL UP' 은
+  // 이름에 가깝고, 언어마다 다르게 옮기면 같은 연출이 화면마다 다른 이름으로 불린다.
+  // ⚠️ next = 여러 레벨을 뛰어 축하가 이어질 때의 버튼. 마지막 한 번만 ok('확인')다.
+  "hub.lvup.title": "LEVEL UP",
+  "hub.lvup.before": "이전",
+  "hub.lvup.now": "지금",
+  "hub.lvup.ok": "확인",
+  "hub.lvup.next": "다음",
   "hub.err.invalid_character": "선택할 수 없는 캐릭터예요",
   "hub.err.invalid_kind": "적용할 수 없는 종류예요",
   "hub.err.invalid_part": "적용할 수 없는 아이템이에요",

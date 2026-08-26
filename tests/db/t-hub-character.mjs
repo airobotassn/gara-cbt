@@ -69,6 +69,22 @@ await raw(readFileSync('supabase/migrations/20260820120000_hub_character_skin.sq
 // 캐릭터 값 매기기(500) + 첫 선택 자격을 값에서 '판매 중'으로 옮긴 판. 원본을 먼저 깔아야
 // `create or replace` 가 실제로 갈아끼우는지까지 같이 검증된다.
 await raw(readFileSync('supabase/migrations/20260824120000_hub_character_price.sql', 'utf8'));
+// ARENA 레벨업(20260826150000)이 hub_choose_character 를 **또 한 번** 갈아끼운다(워터마크 초기값 한 줄).
+//   ⚠️ 이걸 안 얹으면 이 스위트의 검증이 통째로 **옛 함수 몸통**을 향한다 — 갈아끼우면서 첫 선택 무료
+//      규칙을 흘려도 여기서 안 잡힌다. 그래서 최신판까지 깔고 아래 전부를 그 위에서 돌린다.
+//   ⚠️ 그 마이그레이션은 user_progress 를 만지므로 최소 모형이 먼저 필요하다.
+await raw(`
+  create table user_progress (
+    user_id uuid primary key,
+    rank int not null default 1,
+    points int not null default 0,
+    skill_score numeric not null default 0,
+    activity_score numeric not null default 0,
+    season_total numeric generated always as (skill_score + activity_score) stored,
+    updated_at timestamptz default now()
+  );
+`);
+await raw(readFileSync('supabase/migrations/20260826150000_arena_level_up.sql', 'utf8'));
 
 const U = '00000000-0000-0000-0000-0000000000a1';
 const V = '00000000-0000-0000-0000-0000000000a2';

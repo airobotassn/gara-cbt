@@ -43,7 +43,7 @@
       viewport 고정이 풀려 가운데 열(480px) 안으로 접힌다. 랜딩에서 `.rg` 를 그렇게 잃은 적이 있다. */
 /* ⚠️ 첫 진입 오버레이(.charpick·.tut)도 예외다 — 화면 전체를 덮는 fixed 레이어라
       가운데 열(480px) 안으로 접히면 캐릭터 셋이 한 줄에 안 들어간다. */
-.hub > *:not(.sky):not(.hub-scene):not(.hub-modal-backdrop):not(.hub-toast):not(.charpick):not(.tut):not(.tryon) { position: relative; z-index: 1; }
+.hub > *:not(.sky):not(.hub-scene):not(.hub-modal-backdrop):not(.hub-toast):not(.charpick):not(.tut):not(.tryon):not(.lvup) { position: relative; z-index: 1; }
 .hub .sky { display: none; }
 
 /* ── 무대(배경 사진 + 캐릭터) — 스킨이 켜졌을 때만 그린다 ────────────────────
@@ -100,6 +100,7 @@
    레일 라벨이 쓰는 것과 같은 수법으로 **흰 글자 + 어두운 테를 테마 무관 고정**한다 —
    바탕이 하늘이든 기와지붕이든 형태가 선다. 옆의 자격 배지·점수 칩은 자기 면이 있어 해당 없음. */
 .hub[data-skin] .hud-nick { color: #fff;
+  -webkit-text-stroke: .65px rgba(36, 28, 22, .92); paint-order: stroke fill;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .7); }
 /* 랭킹 점수(시즌 총점) — 이름 줄 안, **이름 바로 뒤**(2026-08-20).
    ⚠️ `margin-left:auto` 로 오른쪽 끝에 밀지 말 것 — 바로 아래 코인 칩과 세로로 겹쳐 서서 같은 종류로
@@ -337,7 +338,7 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
   .hub .hud-av { width: 68px; height: 68px; }
   .hub .hud-name { font-size: 26px; }
   .hub .tt { font-size: 16px; }
-  .hub .hud-score { min-width: 142px; min-height: 38px; padding: 9px 24px 8px; font-size: 15px; }
+  .hub .hud-score { min-width: 158px; min-height: 38px; padding: 9px 30px 8px; font-size: 15px; }
   .hub .hud-score-pct { display: inline; }
   .hub .exp { height: 40px; } /* = .gchip 높이 (위 주석 참고) */
   .hub .exp-lab { font-size: 16px; }
@@ -1025,6 +1026,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-ui='palace'] .cta-main:active { transform: translateY(2px); box-shadow: none; }
 @media (min-width: 768px) {
   .hub[data-ui='palace'] .hud-av::after { inset: -15px; }
+  .hub[data-ui='palace'] .hud-score { padding-right: 30px; padding-left: 30px; }
   /* ⚠️ 좌·우 여백은 그림의 베이지 면과 맞춰야 한다 — 왼쪽은 코인 메달이 덮고 있어 더 넓다.
      한쪽만 주면 숫자가 면의 가운데가 아니라 오른쪽으로 밀린다(2026-08-18 "코인 갯수 위치"). */
   .hub[data-ui='palace'] .gchip { padding: calc(var(--skin-hud-h) * 0.136) 27px 0 58px; }
@@ -1180,28 +1182,16 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 
 .hub .cp-list { display: flex; flex-direction: column; gap: 8px; }
 
-/* 한 줄 = 한 계열. 고른 줄만 테두리가 산다. */
+/* 한 줄 = 한 캐릭터. 고른 줄만 테두리가 산다(고르는 건 언제나 한 줄뿐). */
 .hub .cp-row { padding: 7px 8px 8px; border-radius: 16px; text-align: left;
   background: rgba(255, 255, 255, .06); border: 3px solid rgba(255, 255, 255, .16); }
 .hub .cp-row.on { border-color: var(--brand); background: rgba(0, 74, 198, .22); }
 
 .hub .cp-head { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 0 2px; }
 .hub .cp-name { font-size: 12.5px; font-weight: 900; color: #fff; }
-.hub .cp-dots { display: flex; gap: 5px; margin-left: auto; }
-.hub .cp-dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; cursor: pointer;
-  background: rgba(255, 255, 255, .3); border: none; }
-.hub .cp-dot.on { background: #fff; }
-
-/* ⚠️ align-items 를 stretch 로 두지 말 것 — 화살표가 줄 높이만큼 늘어나 **흰 판**처럼 보인다.
-      가운데 정렬 + 고정 크기라야 '버튼'으로 읽힌다. */
-.hub .cp-body { display: flex; align-items: center; gap: 4px; }
-.hub .cp-arrow { flex: 0 0 auto; width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, .9); border: 2px solid rgba(0, 0, 0, .35); color: #201a12;
-  font-family: inherit; font-size: 17px; font-weight: 900; line-height: 1; }
 
 /* Lv.1~7 일곱 칸. flex:1 + min-width:0 이라 폭이 좁아지면 **스크롤 대신 그림이 작아진다**. */
-.hub .cp-strip { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-end; gap: 2px;
+.hub .cp-strip { width: 100%; min-width: 0; display: flex; align-items: flex-end; gap: 2px;
   padding: 0; background: none; border: none; cursor: pointer; }
 .hub .cp-cell { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .hub .cp-img { width: 100%; height: 15vh; max-height: 130px; min-height: 62px;
@@ -1229,8 +1219,6 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   .hub .cp-list { gap: 12px; }
   .hub .cp-row { padding: 10px 12px 12px; }
   .hub .cp-name { font-size: 15px; }
-  .hub .cp-body { gap: 8px; }
-  .hub .cp-arrow { width: 34px; height: 34px; font-size: 21px; }
   .hub .cp-strip { gap: 6px; }
   .hub .cp-img { height: 16vh; max-height: 150px; }
   .hub .cp-lv { font-size: 12px; }
@@ -1414,4 +1402,226 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   .hub .attend-modal .calm-title { font-size: 18px; }
   .hub .attend-modal .calm-summary { font-size: 25px; }
   .hub .attend-modal .hl-arrow { width: 48px !important; height: 48px !important; font-size: 28px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   레벨업 축하 (2026-08-26)
+   ⚠️ `.hub > *:not(...)` 예외 목록에 `.lvup` 이 있어야 fixed 가 유지된다 —
+      빼면 480px 가운데 열의 flex 아이템으로 접혀 화면을 못 덮는다(랜딩 `.rg` 에서 겪은 사고와 같다).
+   ⚠️ 스킨(`data-ui`)이 안 건드린다 — 기본·고궁 두 벌이 이 한 벌을 같이 쓴다(출석 기록 모달과 같은 규칙).
+   ⚠️ charpick 과 같은 이유로 `align-items:center` 가 아니라 `overflow-y:auto` + 자식 `margin:auto` 다.
+      가운데 정렬만 쓰면 내용이 화면보다 길어졌을 때 위쪽이 잘리고 스크롤로도 못 닿는다.
+   ══════════════════════════════════════════════════════════════════════════ */
+.hub .lvup { position: fixed; inset: 0; z-index: 95; display: flex; padding: 16px 12px;
+  background: rgba(10, 8, 20, .93); backdrop-filter: blur(3px);
+  overflow-y: auto; animation: lvup-in .22s ease-out both; }
+@keyframes lvup-in { from { opacity: 0 } to { opacity: 1 } }
+
+.hub .lvup-card { position: relative; width: 100%; max-width: 460px; margin: auto; text-align: center;
+  padding: 22px 18px 18px; border-radius: 20px;
+  background: linear-gradient(180deg, rgba(38, 30, 70, .96), rgba(20, 16, 40, .96));
+  border: 3px solid rgba(255, 207, 92, .5);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 18px 50px rgba(0, 0, 0, .55); }
+
+/* 카드 모서리에 흩뿌린 반짝임. 장식이라 aria-hidden 이고 pointer-events 도 없다. */
+.hub .lvup-spark { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 20px; }
+.hub .lvup-spark > span { position: absolute; color: #ffcf5c; font-size: 15px;
+  animation: lvup-twinkle 1.9s ease-in-out infinite; }
+.hub .lvup-s1 { left: 9%;  top: 12%; animation-delay: 0s }
+.hub .lvup-s2 { right: 11%; top: 18%; animation-delay: .45s }
+.hub .lvup-s3 { left: 15%; bottom: 22%; animation-delay: .9s }
+.hub .lvup-s4 { right: 8%; bottom: 15%; animation-delay: 1.35s }
+@keyframes lvup-twinkle {
+  0%, 100% { opacity: .15; transform: scale(.75) }
+  50%      { opacity: 1;   transform: scale(1.15) }
+}
+
+.hub .lvup-title { margin: 0 0 16px; font-size: 24px; font-weight: 900; letter-spacing: .06em;
+  color: #ffcf5c; text-shadow: 0 2px 10px rgba(255, 190, 60, .45); }
+/* 제목 아래 설명문은 없다(2026-08-26 지시로 삭제) — 진화 연출이 이미 무슨 일이 일어났는지 말한다. */
+
+/* 이전 → 지금. 좁은 화면에서도 가로를 유지한다 — 세로로 쌓으면 '무엇이 무엇으로 바뀌었나'가 안 읽힌다. */
+.hub .lvup-pair { display: flex; align-items: flex-end; justify-content: center; gap: 6px; }
+.hub .lvup-side { flex: 1 1 0; min-width: 0; margin: 0; }
+.hub .lvup-side figcaption { margin-top: 6px; display: flex; flex-direction: column; gap: 1px; }
+.hub .lvup-side figcaption em { font-style: normal; font-size: 11px; font-weight: 800;
+  color: rgba(255, 255, 255, .5); }
+.hub .lvup-side figcaption b { font-size: 16px; font-weight: 900; color: #fff; }
+
+/* ⚠️ 아래끝 정렬 필수 — 캐릭터 캔버스는 위쪽 30%가 여백(HEADROOM)이라 가운데로 두면 칸 안에서 붕 뜬다.
+      무대·썸네일(.cp-img·.pv-img·.closet-char-img)과 같은 규칙이다. */
+.hub .lvup-img { width: 100%; height: 22vh; max-height: 190px;
+  object-fit: contain; object-position: 50% 100%; }
+
+/* 이전 = 물러나 있어야 한다. 흑백까지 가면 '고장난 그림'으로 읽혀서 채도만 낮추고 어둡게 둔다. */
+.hub .lvup-side.is-before { opacity: .45; filter: saturate(.5) brightness(.75); transform: scale(.88); }
+.hub .lvup-side.is-before figcaption b { color: rgba(255, 255, 255, .7); }
+
+/* 지금 = 축하마다 통통 튀며 등장한다(여러 레벨을 뛰면 호출부가 key 를 갈아 다시 마운트시킨다). */
+.hub .lvup-side.is-after .lvup-img { animation: lvup-pop .5s cubic-bezier(.2, 1.4, .4, 1) both;
+  filter: drop-shadow(0 0 14px rgba(255, 207, 92, .55)); }
+@keyframes lvup-pop {
+  0%   { opacity: 0; transform: scale(.82) translateY(8px) }
+  60%  { opacity: 1; transform: scale(1.04) translateY(0) }
+  100% { opacity: 1; transform: scale(1) translateY(0) }
+}
+
+.hub .lvup-arrow { flex: 0 0 auto; padding-bottom: 30px; font-size: 22px; font-weight: 900;
+  color: #ffcf5c; }
+
+/* 진행 표시 — 축하 몇 번 중 몇 번째인지. 1단계 상승이면 아예 안 그린다(점 하나는 정보가 0이다). */
+.hub .lvup-dots { display: flex; justify-content: center; gap: 6px; margin: 12px 0 0; }
+.hub .lvup-dot { width: 7px; height: 7px; border-radius: 999px; background: rgba(255, 255, 255, .22);
+  transition: background .2s, transform .2s; }
+.hub .lvup-dot.on { background: #ffcf5c; transform: scale(1.25); }
+
+.hub .lvup-ok { width: 100%; max-width: 300px; margin: 16px auto 0; display: block;
+  padding: 12px 18px; border-radius: 14px; cursor: pointer;
+  background: var(--brand); color: #fff; border: 3.5px solid var(--line);
+  font-family: inherit; font-size: 15px; font-weight: 900;
+  box-shadow: 0 5px 0 rgba(var(--shc2), .5); transition: transform .07s, box-shadow .1s; }
+.hub .lvup-ok:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shc2), .5); }
+
+@media (min-width: 560px) {
+  .hub .lvup-title { font-size: 30px; }
+  .hub .lvup-sub { font-size: 14px; }
+  .hub .lvup-img { height: 26vh; max-height: 240px; }
+  .hub .lvup-side figcaption em { font-size: 12px; }
+  .hub .lvup-side figcaption b { font-size: 19px; }
+  .hub .lvup-arrow { font-size: 28px; }
+}
+
+/* 움직임을 줄여달라는 설정 — 반짝임·등장 애니메이션을 끈다(축하 자체는 그대로 뜬다). */
+@media (prefers-reduced-motion: reduce) {
+  .hub .lvup,
+  .hub .lvup-spark > span,
+  .hub .lvup-side.is-after .lvup-img { animation: none; }
+}
+
+/* ── 1막: 진화 연출 (2026-08-26) ─────────────────────────────────────────────
+   포켓몬 진화 그대로 — 실루엣 → 맥동 → 섬광 → 새 모습 → 레벨 숫자 → 폭죽.
+   ⚠️ 타임라인 끝(약 2.7초)은 `LevelUpModal.tsx` 의 EVOLVE_MS 와 **한 쌍**이다.
+      여기 delay 를 옮기면 그 상수도 같이 옮길 것 — 짧으면 폭죽이 잘리고, 길면 끝난 화면을 멀뚱히 본다.
+   ⚠️ 카드가 없다. 화면 한가운데 캐릭터 하나만 크게 선다(1막은 '무슨 일이 일어났나'만 말한다).
+   ⚠️ 아무 데나 누르면 건너뛴다 — 여러 레벨을 뛰면 이 연출이 그 수만큼 반복되므로 출구가 필요하다.
+   ────────────────────────────────────────────────────────────────────────── */
+.hub .lvup.is-evolve { align-items: center; justify-content: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 46%, rgba(38, 26, 84, .96), rgba(6, 5, 16, .985) 62%);
+  cursor: pointer; }
+
+.hub .evo { position: relative; width: min(92vw, 440px); height: min(66vh, 440px); }
+
+/* ⚠️ 광원·빛줄기·폭죽의 중심은 **캐릭터의 배꼽쯤(62%)** 이지 칸 한가운데가 아니다.
+   캐릭터 캔버스는 위쪽 30%가 여백(HEADROOM)이고 그림도 바닥 정렬이라, 50% 에 두면
+   빛이 인물 머리 위 허공에서 난다(실제로 그렇게 나왔다). */
+.hub .evo { --evo-cy: 62%; }
+
+/* 뒤에서 부풀어오르는 광원 — 진화가 진행될수록 밝고 커진다. */
+.hub .evo-glow { position: absolute; left: 50%; top: var(--evo-cy); width: 72%; aspect-ratio: 1;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  /* ⚠️ **가운데가 빈 도넛**이어야 한다. 꽉 찬 원으로 두면 흰 실루엣이 밝은 광원 위에 얹혀
+     형체가 통째로 녹는다 — 무슨 모양인지 안 보이면 실루엣 연출이 아니다(2026-08-26 실제로 그랬다). */
+  background: radial-gradient(circle,
+    rgba(255, 235, 175, 0) 26%, rgba(255, 216, 120, .5) 44%,
+    rgba(255, 180, 60, .28) 58%, rgba(255, 170, 50, 0) 74%);
+  animation: evo-glow 1.4s ease-in both; }
+@keyframes evo-glow {
+  0%   { opacity: 0;   transform: translate(-50%, -50%) scale(.35) }
+  55%  { opacity: .75; transform: translate(-50%, -50%) scale(1.05) }
+  100% { opacity: 1;   transform: translate(-50%, -50%) scale(1.65) }
+}
+
+/* 방사형 빛줄기 — 돌면서 점점 빨라진다. conic-gradient 한 장이라 DOM 이 늘지 않는다. */
+.hub .evo-rays { position: absolute; left: 50%; top: var(--evo-cy); width: 210%; aspect-ratio: 1;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; opacity: 0;
+  /* ⛔ **repeating-conic-gradient 여야 한다.** 그냥 conic-gradient 는 한 바퀴를 한 번만 그려서
+     빛줄기가 **딱 하나** 생기고, 화면에 막대 하나가 비스듬히 선 것처럼 보인다(2026-08-26 실제로 그랬다). */
+  /* ⚠️ 너무 진하면 빛줄기가 주인공이 되어 새로 나타난 캐릭터가 안 읽힌다. 뒤에 깔리는 정도로. */
+  background: repeating-conic-gradient(from 0deg, rgba(255, 238, 180, .4) 0 5deg, transparent 5deg 26deg);
+  mask-image: radial-gradient(circle, transparent 12%, #000 30%, #000 46%, transparent 70%);
+  animation: evo-rays 1.5s linear both; }
+@keyframes evo-rays {
+  0%   { opacity: 0;   transform: translate(-50%, -50%) rotate(0deg) }
+  40%  { opacity: .42; }
+  100% { opacity: .62; transform: translate(-50%, -50%) rotate(300deg) }
+}
+
+/* ⛔ **absolute 여야 한다.** relative 로 두면 옛 모습·새 모습 두 장이 `.evo` 의 flex 아이템이 되어
+   좌우로 나란히 서고, 실루엣이 화면 왼쪽에서 혼자 빛난다(2026-08-26 실제로 그렇게 나왔다).
+   둘은 **같은 자리에 겹쳐** 있다가 섬광에서 바뀌는 것이 이 연출의 전부다. */
+.hub .evo-char { position: absolute; inset: 0; }
+/* ⚠️ 두 그림을 **겹쳐** 놓고 투명도로 갈아끼운다. 색 → 흰 실루엣을 filter 전환으로 하면
+      중간 프레임이 지저분한 회색으로 뜬다(brightness/invert 는 곱해지는 값이라 보간이 안 곱게 된다). */
+.hub .evo-img { position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; object-position: 50% 100%; }
+/* 실루엣 = 알파는 그대로 두고 안을 통째로 하얗게 태운 것.
+   ⚠️ drop-shadow 를 키우면 윤곽이 빛에 먹혀 **무슨 모양인지 안 보인다**(18px 에서 뭉갰다).
+      실루엣은 '누구인지 알아볼 수 있는 검은 그림자'가 핵심이라 테두리를 살려야 한다. */
+.hub .evo-sil { filter: brightness(0) invert(1) drop-shadow(0 0 9px rgba(255, 244, 205, .85)); }
+
+/* 옛 모습: 색이 빠지며 실루엣이 되고, 세 번 맥동한 뒤 섬광에 삼켜진다. */
+.hub .evo-char.is-old { animation: evo-pulse 1.25s ease-in-out .25s 3, evo-gone .01s linear 1.3s both; }
+.hub .evo-char.is-old .evo-color { animation: evo-fade-out .25s ease-out both; }
+.hub .evo-char.is-old .evo-sil   { animation: evo-fade-in  .25s ease-out both; }
+@keyframes evo-pulse {
+  0%, 100% { transform: scale(1) }
+  50%      { transform: scale(1.11) }
+}
+@keyframes evo-gone { to { opacity: 0; visibility: hidden } }
+@keyframes evo-fade-in  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes evo-fade-out { from { opacity: 1 } to { opacity: 0 } }
+
+/* 새 모습: 섬광이 터지는 순간(1.3s) 실루엣으로 등장 → 1.4~1.75s 에 색을 되찾는다. */
+.hub .evo-char.is-new { opacity: 0; animation: evo-arrive .45s cubic-bezier(.2, 1.5, .4, 1) 1.3s both; }
+.hub .evo-char.is-new .evo-color { animation: evo-fade-in .35s ease-out 1.4s both; }
+.hub .evo-char.is-new .evo-sil   { animation: evo-fade-out .35s ease-out 1.4s both; }
+@keyframes evo-arrive {
+  0%   { opacity: 0; transform: scale(1.28) }
+  60%  { opacity: 1; transform: scale(.98) }
+  100% { opacity: 1; transform: scale(1) }
+}
+
+/* 화면을 삼키는 흰 섬광 — 이 뒤에서 그림이 바뀐다. */
+.hub .evo-flash { position: fixed; inset: 0; pointer-events: none; background: #fff; opacity: 0;
+  animation: evo-flash .34s ease-out 1.16s both; }
+@keyframes evo-flash {
+  0%   { opacity: 0 }
+  38%  { opacity: 1 }
+  100% { opacity: 0 }
+}
+
+/* 레벨 숫자 — 멀리서 날아와 팍 박힌다. */
+.hub .evo-lv { position: absolute; left: 50%; top: 8%; transform: translateX(-50%);
+  pointer-events: none; animation: evo-lv .5s cubic-bezier(.15, 1.6, .4, 1) 1.55s both; }
+.hub .evo-lv-txt { display: block; font-size: clamp(38px, 11vw, 66px); font-weight: 900;
+  letter-spacing: .02em; color: #fff;
+  text-shadow: 0 0 18px rgba(255, 214, 110, .95), 0 0 46px rgba(255, 175, 40, .7), 0 5px 0 rgba(120, 70, 0, .55); }
+@keyframes evo-lv {
+  0%   { opacity: 0; transform: translateX(-50%) scale(2.6); filter: blur(9px) }
+  65%  { opacity: 1; transform: translateX(-50%) scale(.92); filter: blur(0) }
+  100% { opacity: 1; transform: translateX(-50%) scale(1);   filter: blur(0) }
+}
+
+/* 폭죽 — 조각마다 좌표·크기·지연·색을 인라인 변수로 받는다(cos/sin 은 JS 가 계산한다). */
+.hub .evo-fx { position: absolute; left: 50%; top: var(--evo-cy); width: 0; height: 0; pointer-events: none; }
+/* ⛔ fill 은 `forwards` 다 — `both` 로 두면 **backwards fill** 때문에 1.7초 지연 내내 0% 키프레임이
+   적용되어(opacity:1) 색색의 점들이 화면 한가운데 박혀 있다가 터진다(실제로 그렇게 나왔다).
+   forwards 면 지연 동안은 요소 자신의 opacity:0 이 그대로 살아 안 보인다. */
+.hub .evo-spark { position: absolute; left: 0; top: 0; width: var(--ss); height: var(--ss);
+  border-radius: 999px; opacity: 0;
+  background: hsl(var(--sh) 100% 64%);
+  box-shadow: 0 0 12px hsl(var(--sh) 100% 66% / .95);
+  animation: evo-spark .95s cubic-bezier(.12, .75, .3, 1) calc(1.7s + var(--sd)) forwards; }
+@keyframes evo-spark {
+  0%   { opacity: 1; transform: translate(0, 0) scale(.3) }
+  55%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 34px)) scale(1) }
+}
+
+/* 움직임을 줄여달라는 설정에서는 1막을 아예 안 그린다(컴포넌트가 결과부터 시작한다).
+   여기 규칙은 혹시 그 판정이 빗나갔을 때의 안전망이다. */
+@media (prefers-reduced-motion: reduce) {
+  .hub .evo-glow, .hub .evo-rays, .hub .evo-flash, .hub .evo-spark,
+  .hub .evo-char, .hub .evo-char .evo-img, .hub .evo-lv { animation: none; opacity: 1; }
+  .hub .evo-char.is-old, .hub .evo-sil { display: none; }
 }

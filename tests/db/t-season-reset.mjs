@@ -54,6 +54,15 @@ const raw1e = readFileSync('supabase/migrations/20260721050000_reset_season_fn.s
 const ddl1e = raw1e.split('\n').filter((l) => !/^revoke|^grant/.test(l.trim())).join('\n');
 await db.exec(ddl1e);
 
+// ARENA 레벨업(20260826150000)이 reset_season 을 갈아끼운다(워터마크 재동기화 한 문장이 늘었다).
+//   ⚠️ 이걸 안 얹으면 아래 검증이 통째로 **옛 몸통**을 향한다 — 갈아끼우면서 탈퇴자 제외나 티어
+//      계산을 흘려도 여기서 안 잡힌다. 그래서 최신판까지 깔고 전부를 그 위에서 돌린다.
+//   ⚠️ 그 마이그레이션은 user_characters 를 만지므로 최소 모형이 먼저 필요하다(레벨업 연출 자체의
+//      검증은 t-arena-level.mjs 소관이고, 여기서는 시즌 리셋 본래 일이 안 흐트러졌는지만 본다).
+await db.exec(`create table user_characters (user_id uuid primary key, updated_at timestamptz default now());`);
+const rawLv = readFileSync('supabase/migrations/20260826150000_arena_level_up.sql', 'utf8');
+await db.exec(rawLv.split('\n').filter((l) => !/^revoke|^grant/.test(l.trim())).join('\n'));
+
 // 시드: 활성 20명 + 탈퇴자(total 9999, 제외 확인용).
 for (const u of users) {
   await db.query(`insert into profiles (id) values ($1)`, [u.id]);

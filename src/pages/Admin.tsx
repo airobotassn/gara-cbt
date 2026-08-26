@@ -6125,6 +6125,126 @@ function PoolOverview({ banks, tierKey, onTierKey, refreshKey }: { banks: Questi
 //    서버가 그 언어를 버리거나(저장 안 됨), 반대로 완료율이 영영 100%가 안 된다.
 const TRANS_LANGS = ['en', 'ja', 'zh', 'hi', 'vi']
 const TRANS_LANG_LABEL: Record<string, string> = { en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
+
+// 주관식 허용답안(줄바꿈 목록 문자열) → 줄 배열. 번역기에 보낼 때 쓴다.
+// ⚠️ 채점용 parseAcceptedAnswers 를 쓰면 안 된다 — 그건 정규화(공백·대소문자 제거)까지 해버려서
+//    번역기에 'edgecomputing' 같은 뭉갠 글자가 간다. 여기서는 사람이 쓴 표기 그대로 보내야 한다.
+const answerKeyLines = (answerKey: string | null | undefined): string[] =>
+  String(answerKey ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+
+// 번역에 넣을 문항의 최소 모양 — 목록 행(AdminQuestionRow)과 업로드 행(QuestionImportRow)의 공통분모.
+export interface QTransTarget {
+  id: string
+  label: string // 실패를 사람에게 알릴 때 쓰는 이름(보통 '12번')
+  kind: 'mc' | 'short'
+  prompt: string
+  choices: string[]
+  answerKey: string | null
+  explanation: string | null
+}
+
+/**
+ * 문항을 5개국어로 번역해 저장한다 — **문항 목록의 일괄 번역과 엑셀 업로드 직후 번역이 이걸 같이 쓴다.**
+ *
+ * ⛔ 두 벌로 두지 말 것. 갈라놓으면 "빈 답 번역은 담지 않는다" 같은 규칙이 한쪽에만 남아,
+ *    올린 경로에 따라 같은 문항이 다르게 저장된다(그 차이는 화면에 안 드러난다).
+ *
+ * 파이프라인은 레벨테스트와 **같은 것**(runTranslation → translate-questions)이고 다른 건 지갑뿐이다
+ * (use:'caris'). 여기서 쪼개기·재시도를 새로 짜지 않는다 — 10→5→1 쪼개기·분당 스로틀·일일한도
+ * 감지가 이미 그 안에 있다.
+ *
+ * ⚠️ 한국어 원문은 **한 글자도 안 보낸 채로 저장**된다(questionTransSave 가 번역본만 update).
+ * ⚠️ 해설은 번역기에 문맥으로 **보내기만** 하고 받은 번역은 버린다(관리자 전용이라 응시자에게 안 나간다).
+ *    주관식 허용답안은 반대다 — 받아서 저장한다. 그게 있어야 외국어 응시자의 답이 자동채점된다.
+ */
+type QTransRow = {
+  id: string
+  promptI18n: Record<string, string>
+  choicesI18n: Record<string, string[]>
+  answerKeyI18n: Record<string, string[]>
+}
+
+async function translateQuestionsAndSave(
+  bankId: string,
+  targets: QTransTarget[],
+  onProgress: (msg: string) => void,
+): Promise<{ saved: number; failed: string[] }> {
+  const items = targets.map((q) => ({
+    prompt: q.prompt,
+    options: q.kind === 'short' ? [] : q.choices,
+    explanation: q.explanation ?? '',
+    answers: q.kind === 'short' ? answerKeyLines(q.answerKey) : [],
+  }))
+
+  // 한 문항의 번역 결과 → 저장할 행. 저장할 게 없으면(빈 번역) null.
+  const rowOf = (i: number, r: TransResult): QTransRow | null => {
+    if (!('tr' in r)) return null
+    const q = targets[i]
+    const promptI18n: Record<string, string> = {}
+    const choicesI18n: Record<string, string[]> = {}
+    const answerKeyI18n: Record<string, string[]> = {}
+    for (const l of TRANS_LANGS) {
+      const t = r.tr[l]
+      if (!t?.prompt) continue
+      promptI18n[l] = t.prompt
+      if (q.kind !== 'short') choicesI18n[l] = t.options ?? []
+      // ⚠️ 답 번역이 빈 언어는 **안 담고 넘어간다**(지문 번역까지 버리지 않는다). 서버가 그 언어를
+      //    '미번역'으로 남겨서 다음에 「미번역 번역」을 누를 때 그 문항만 다시 잡힌다.
+      else if (t.answers?.length) answerKeyI18n[l] = t.answers
+    }
+    return Object.keys(promptI18n).length ? { id: q.id, promptI18n, choicesI18n, answerKeyI18n } : null
+  }
+
+  // ⛔ **번역이 끝날 때마다 그만큼 바로 저장한다 — 전부 끝난 뒤 한 번에 저장하지 말 것.**
+  //    300문항 중 280개를 번역한 상태에서 창을 닫거나 네트워크가 끊기면, 모아서 저장하는 판에서는
+  //    280개분 Gemini 호출이 통째로 버려지고 다시 처음부터 돌아야 한다(실제로 그렇게 만들었다가 고침).
+  //    지금은 그때까지 번역된 것이 DB 에 남아, 다시 눌렀을 때 「미번역 번역」이 진짜 남은 것만 잡는다.
+  const savedIdx = new Set<number>()
+  async function flush(snapshot: (TransResult | undefined)[]) {
+    const idxs: number[] = []
+    const rows: QTransRow[] = []
+    snapshot.forEach((r, i) => {
+      if (!r || savedIdx.has(i)) return
+      const row = rowOf(i, r)
+      if (row) { idxs.push(i); rows.push(row) }
+    })
+    if (!rows.length) return
+    // 한 번에 다 밀면 요청이 커진다(문항당 5개국어 지문+보기). 60개씩 나눠 보낸다.
+    for (let i = 0; i < rows.length; i += 60) {
+      await callFunction('admin', { action: 'questionTransSave', bankId, rows: rows.slice(i, i + 60) })
+    }
+    // ⚠️ 저장에 성공한 뒤에 표시한다 — 먼저 표시하면 저장이 실패한 문항이 영영 다시 안 올라간다.
+    //    (같은 문항이 두 번 저장되는 건 무해하다 — 번역본을 덮어쓰는 update 다.)
+    idxs.forEach((i) => savedIdx.add(i))
+  }
+
+  // onBatch 는 동기 콜백이라 await 를 못 한다 → 저장을 한 줄로 이어붙이고 마지막에 기다린다.
+  // 여기서 나는 오류는 삼킨다(다음 flush 가 그 문항을 다시 시도하고, 최종 flush 가 마지막 관문이다).
+  let chain: Promise<void> = Promise.resolve()
+  const res: TransResult[] = await runQTranslation(
+    items satisfies TransItem[],
+    TRANS_LANGS,
+    (done, total, note) =>
+      onProgress(`번역 ${done}/${total}${note ? ` · ${note}` : ''} · 저장 ${savedIdx.size}`),
+    {
+      use: 'caris',
+      onBatch: (snapshot) => { chain = chain.then(() => flush(snapshot)).catch(() => {}) },
+    },
+  )
+  await chain
+  onProgress('저장 중…')
+  await flush(res) // 마지막 관문 — 여기서 나는 오류는 호출부로 던진다.
+
+  // 실패 집계는 최종 결과로 한다(중간 스냅샷에는 아직 안 돈 문항이 섞여 있다).
+  const failed: string[] = []
+  res.forEach((r, i) => {
+    if (savedIdx.has(i)) return
+    const q = targets[i]
+    failed.push(`${q.label}(${'error' in r ? r.error : '빈 번역'})`)
+  })
+  return { saved: savedIdx.size, failed }
+}
+
 function TransCoverage({ coverage, total, langs, loading }: { coverage: Record<string, number>; total: number; langs: string[]; loading?: boolean }) {
   if (!langs.length) return null
   const done = langs.filter((l) => (coverage[l] ?? 0) >= total && total > 0).length
@@ -6438,63 +6558,31 @@ function QuestionListView({ bankId, tier, onChanged, isRoot }: { bankId: string;
   function toggle(id: string) {
     setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
-  /**
-   * 고른 문항을 5개국어로 번역해 저장한다.
-   *
-   * 파이프라인은 레벨테스트와 **같은 것**(runTranslation → translate-questions)이고, 다른 건 지갑뿐이다
-   * (use:'caris' → GEMINI_API_KEY_TEST_GENERATE). 여기서 새로 쪼개기·재시도를 짜지 않는다 —
-   * 10→5→1 쪼개기·분당 스로틀·일일한도 감지가 이미 그 안에 있다.
-   *
-   * ⚠️ 한국어 원문은 **한 글자도 안 보낸 채로 저장**된다(questionTransSave 가 번역본만 update).
-   *    번역하러 들어갔다가 원문이 바뀌는 일이 없어야 한다.
-   * ⚠️ 해설(explanation)은 번역하지 않는다 — 관리자 전용이라 응시자에게 안 나간다. 다만 번역기가
-   *    문맥으로 쓰도록 같이 **보내기는** 한다(품질이 올라간다). 받은 해설 번역은 그냥 버린다.
-   */
+  // 고른 문항을 5개국어로 번역해 저장한다. 실제 일은 translateQuestionsAndSave 가 한다 —
+  // 엑셀 업로드 직후 번역과 **같은 함수**라 두 경로가 같은 규칙으로 저장된다.
   async function translateRows(targets: AdminQuestionRow[]) {
     if (!targets.length) return
     if (!confirm(`${targets.length}개 문항을 5개국어(영어·일본어·중국어·힌디어·베트남어)로 번역합니다.\n문항 수에 따라 몇 분 걸릴 수 있어요. 진행할까요?`)) return
     setBusy(true)
     setTrMsg(`번역 준비 중… (${targets.length}문항)`)
     try {
-      const items = targets.map((q) => ({
-        prompt: q.prompt,
-        options: q.kind === 'short' ? [] : (q.choices ?? []),
-        explanation: q.explanation ?? '',
-      }))
-      const res: TransResult[] = await runQTranslation(
-        items satisfies TransItem[],
-        TRANS_LANGS,
-        (done, total, note) => setTrMsg(`번역 ${done}/${total}${note ? ` · ${note}` : ''}`),
-        { use: 'caris' },
+      const { saved, failed } = await translateQuestionsAndSave(
+        bankId,
+        targets.map((q) => ({
+          id: q.id,
+          label: `${q.number}번`,
+          kind: q.kind,
+          prompt: q.prompt,
+          choices: q.choices ?? [],
+          answerKey: q.answer_key,
+          explanation: q.explanation,
+        })),
+        setTrMsg,
       )
-      // 성공한 것만 추려 저장 — 실패분은 원문(한국어) 그대로 남는다.
-      const save: { id: string; promptI18n: Record<string, string>; choicesI18n: Record<string, string[]> }[] = []
-      const failed: string[] = []
-      res.forEach((r, i) => {
-        const q = targets[i]
-        if (!('tr' in r)) { failed.push(`${q.number}번(${'error' in r ? r.error : '실패'})`); return }
-        const promptI18n: Record<string, string> = {}
-        const choicesI18n: Record<string, string[]> = {}
-        for (const l of TRANS_LANGS) {
-          const t = r.tr[l]
-          if (!t?.prompt) continue
-          promptI18n[l] = t.prompt
-          if (q.kind !== 'short') choicesI18n[l] = t.options ?? []
-        }
-        if (Object.keys(promptI18n).length) save.push({ id: q.id, promptI18n, choicesI18n })
-        else failed.push(`${q.number}번(빈 번역)`)
-      })
-      if (save.length) {
-        setTrMsg(`저장 중… (${save.length}문항)`)
-        // 한 번에 다 밀면 요청이 커진다(문항당 5개국어 지문+보기). 60개씩 나눠 보낸다.
-        for (let i = 0; i < save.length; i += 60) {
-          await callFunction('admin', { action: 'questionTransSave', bankId, rows: save.slice(i, i + 60) })
-        }
-      }
       await load()
       onChanged()
       setTrMsg(
-        `✅ ${save.length}문항 번역 저장` +
+        `✅ ${saved}문항 번역 저장` +
           (failed.length ? ` · ⚠️ ${failed.length}문항 실패(${failed.slice(0, 5).join(', ')}${failed.length > 5 ? ' …' : ''}) — 다시 누르면 그 문항만 재시도합니다.` : ''),
       )
     } catch (e) {
@@ -6699,7 +6787,12 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
   // ⚠️ **어느 원문으로 뽑았는지(key)를 같이 들고 다닌다.** 옛 원문으로 뽑은 번역을 새 원문에 붙이면
   //    외국어 응시자만 다른 문제를 풀게 되고 화면에는 아무 표시도 안 남는다.
   //    이펙트로 지우지 않고 key 비교로 무효화한다 — 이펙트에서 setState 하면 렌더가 한 번 더 돈다.
-  const [trans, setTrans] = useState<{ key: string; promptI18n: Record<string, string>; choicesI18n: Record<string, string[]> } | null>(null)
+  const [trans, setTrans] = useState<{
+    key: string
+    promptI18n: Record<string, string>
+    choicesI18n: Record<string, string[]>
+    answerKeyI18n: Record<string, string[]>
+  } | null>(null)
   const [trMsg, setTrMsg] = useState('')
   const [translating, setTranslating] = useState(false)
 
@@ -6713,7 +6806,10 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
 
   // 원문이 바뀌면 방금 뽑은 번역을 버린다 — 짝이 안 맞는 번역은 저장되면 안 된다.
   // (이미 저장돼 있던 번역은 서버가 같은 규칙으로 비운다 — questionUpsert 의 koChanged.)
-  const koKey = `${prompt} ${kind} ${choices.join(' ')}`
+  // ⚠️ **모범답안도 열쇠에 넣는다.** 답을 고쳤는데 옛 답으로 뽑은 번역이 저장되면 채점 목록에
+  //    다른 답이 섞여 **틀린 답이 정답으로 통과**한다. 대가로 답만 고쳐도 다시 번역해야 하지만,
+  //    잘못 채점하는 것보다 한 번 더 누르는 게 훨씬 싸다.
+  const koKey = `${prompt} ${kind} ${choices.join(' ')} ${answerKey}`
   // 이펙트로 지우지 않고 key 비교로 무효화한다 — 이펙트에서 setState 하면 렌더가 한 번 더 돈다.
   const liveTrans = trans && trans.key === koKey ? trans : null
   const staleTrans = !!trans && !liveTrans
@@ -6727,7 +6823,13 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
     setTrMsg('번역 중… (영어·일본어·중국어·힌디어·베트남어)')
     try {
       const [res] = await runQTranslation(
-        [{ prompt, options: kind === 'short' ? [] : choices, explanation }],
+        [{
+          prompt,
+          options: kind === 'short' ? [] : choices,
+          explanation,
+          // 주관식 허용답안 — 이게 있어야 외국어 응시자의 답이 자동채점된다.
+          answers: kind === 'short' ? answerKeyLines(answerKey) : [],
+        }],
         TRANS_LANGS,
         undefined,
         { use: 'caris' },
@@ -6738,19 +6840,29 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
       }
       const promptI18n: Record<string, string> = {}
       const choicesI18n: Record<string, string[]> = {}
+      const answerKeyI18n: Record<string, string[]> = {}
       const bad: string[] = []
+      const noAns: string[] = []
+      const wantAns = kind === 'short' && answerKeyLines(answerKey).length > 0
       for (const l of TRANS_LANGS) {
         const t = res.tr[l]
         // 보기 개수가 어긋난 언어는 버린다 — 정답 번호가 다른 보기를 가리키게 되는 것이 제일 위험하다.
         if (!t?.prompt || (kind !== 'short' && (t.options ?? []).length !== choices.length)) { bad.push(l); continue }
         promptI18n[l] = t.prompt
         if (kind !== 'short') choicesI18n[l] = t.options
+        // 허용답안은 개수를 안 본다(표기 변형 가짓수가 언어마다 다르다). 빈 언어는 담지 않고
+        // 따로 알려준다 — 그 언어로 응시하면 이 문항만 사람 손 채점으로 넘어가기 때문이다.
+        else if (t.answers?.length) answerKeyI18n[l] = t.answers
+        else if (wantAns) noAns.push(l)
       }
-      setTrans(Object.keys(promptI18n).length ? { key: koKey, promptI18n, choicesI18n } : null)
+      setTrans(Object.keys(promptI18n).length ? { key: koKey, promptI18n, choicesI18n, answerKeyI18n } : null)
       const ok = Object.keys(promptI18n)
       setTrMsg(
         (ok.length ? `✅ ${ok.map((l) => TRANS_LANG_LABEL[l] ?? l).join('·')} 준비됨 — 저장해야 반영됩니다. ` : '') +
-          (bad.length ? `⚠️ ${bad.map((l) => TRANS_LANG_LABEL[l] ?? l).join('·')} 실패 — 다시 눌러주세요.` : ''),
+          (bad.length ? `⚠️ ${bad.map((l) => TRANS_LANG_LABEL[l] ?? l).join('·')} 실패 — 다시 눌러주세요. ` : '') +
+          (noAns.length
+            ? `⚠️ ${noAns.map((l) => TRANS_LANG_LABEL[l] ?? l).join('·')} 는 허용답안 번역이 비었습니다 — 그 언어로 응시하면 이 문항은 자동채점되지 않고 수동검수로 넘어갑니다(다시 눌러보세요).`
+            : ''),
       )
     } catch (e) {
       setTrMsg('번역 실패 — ' + (e instanceof Error ? e.message : '알 수 없는 오류'))
@@ -6770,7 +6882,13 @@ function QuestionEditModal({ bankId, tier, row, defaultNumber, onClose, onSaved 
           active: row ? row.active : true,
           // 번역을 안 뽑았으면(또는 원문이 바뀌어 무효면) 아예 안 보낸다 — 서버가 "안 보냄" 과
           // "빈 번역" 을 갈라 본다(안 보내면 원문이 바뀌었을 때만 옛 번역을 비운다).
-          ...(liveTrans ? { promptI18n: liveTrans.promptI18n, choicesI18n: liveTrans.choicesI18n } : {}),
+          ...(liveTrans
+            ? {
+                promptI18n: liveTrans.promptI18n,
+                choicesI18n: liveTrans.choicesI18n,
+                answerKeyI18n: liveTrans.answerKeyI18n,
+              }
+            : {}),
         },
       })
       draft.clear()
@@ -7033,6 +7151,7 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
   const [parseErr, setParseErr] = useState('')
   const [importing, setImporting] = useState(false)
   const [msg, setMsg] = useState('')
+  const [transMsg, setTransMsg] = useState('') // 업로드 직후 이어서 도는 번역의 진행률
 
   const guideSubjects = tierSubjectsOf(tier) // 이 은행 급수의 정규 검정과목(가이드)
   // 엑셀에 등장한 distinct 과목, 그리고 매핑을 적용한 최종 행(정규 과목명으로 치환). 매핑 없으면 원문 유지.
@@ -7142,28 +7261,73 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
     }
     setImporting(true)
     setMsg('')
+    setTransMsg('')
+    // 문항이 실제로 들어갔는지 — 번역 단계에서 터졌을 때 "업로드는 됐다" 를 말해주기 위해 밖에 둔다.
+    let importedCount = 0
     try {
-      const res = await callFunction<{ count: number }>('admin', { action: 'questionsImport', bankId, rows: mappedRows })
-      // ⚠️ 업로드는 한국어만 넣는다 — 번역은 여기서 자동으로 돌리지 않는다.
-      //    수백 문항 업로드 뒤 곧바로 번역이 시작되면 관리자가 그 몇 분을 창을 못 닫은 채 기다리고,
-      //    중간에 닫으면 어디까지 됐는지 화면에 안 남는다. 「문항 목록」에서 "미번역만" 을 보고
-      //    본인이 원할 때 돌리게 한다(이어서 돌리면 남은 것만 다시 시도한다).
-      setMsg(`✅ ${res.count}문항 반영됨 — 한국어로만 올라갔습니다. 「문항 목록」 탭의 “🌐 미번역 번역”으로 5개국어를 채우세요.`)
-      setRows([])
-      setSubjMap({})
-      setFileName('')
+      const res = await callFunction<{ count: number; inserted?: { id: string; number: number }[] }>(
+        'admin',
+        { action: 'questionsImport', bankId, rows: mappedRows },
+      )
+      importedCount = res.count
+      const inserted = res.inserted ?? []
       onImported()
+
+      // ⛔ **문항을 먼저 저장하고 번역을 이어서 돌린다** — 레벨테스트('문항 추가 & 번역' 탭)는 반대로
+      //    번역이 끝나야 저장하고, 그래서 도중에 창을 닫으면 잃는 것을 localStorage 자동저장으로 막는다.
+      //    여기서는 저장 순서로 같은 문제를 푼다: 번역 중 창을 닫아도 문항은 이미 DB 에 있고, 남은
+      //    번역은 「문항 목록」의 "🌐 미번역 번역" 이 그대로 이어받는다(그 버튼이 미번역만 잡는다).
+      // ⚠️ 서버가 방금 넣은 행을 안 돌려주면(옛 배포본) 번역을 건너뛴다 — 어느 문항인지 알 수 없는데
+      //    추측해서 남의 문항에 번역을 붙이면 화면에 아무 표시 없이 틀린 문제가 된다.
+      if (inserted.length !== mappedRows.length) {
+        setMsg(`✅ ${res.count}문항 반영됨 — 한국어로만 올라갔습니다. 「문항 목록」 탭의 “🌐 미번역 번역”으로 5개국어를 채우세요.`)
+        setRows([]); setSubjMap({}); setFileName('')
+        return
+      }
+
+      setMsg(`✅ ${res.count}문항 반영됨 — 이어서 5개국어로 번역합니다. 이 창을 닫아도 문항은 남습니다.`)
+      const { saved, failed } = await translateQuestionsAndSave(
+        bankId,
+        mappedRows.map((r, i) => ({
+          id: inserted[i].id,
+          label: `${inserted[i].number}번`,
+          kind: r.kind,
+          prompt: r.prompt,
+          choices: r.choices ?? [],
+          answerKey: r.answerKey ?? null,
+          explanation: r.explanation ?? null,
+        })),
+        setTransMsg,
+      )
+      setTransMsg('')
+      onImported()
+      setMsg(
+        `✅ ${res.count}문항 반영 · ${saved}문항 5개국어 번역 완료` +
+          (failed.length
+            ? ` · ⚠️ ${failed.length}문항 번역 실패(${failed.slice(0, 3).join(', ')}${failed.length > 3 ? ' …' : ''}) — 「문항 목록」 탭의 “🌐 미번역 번역”으로 다시 시도하세요.`
+            : ''),
+      )
+      setRows([]); setSubjMap({}); setFileName('')
     } catch (e) {
-      setMsg('실패: ' + (e instanceof Error ? e.message : String(e)))
+      const m = e instanceof Error ? e.message : String(e)
+      // 업로드는 끝났는데 번역에서 터진 경우 — "실패" 로만 띄우면 관리자가 문항까지 안 들어간 줄 알고
+      // 같은 파일을 다시 올려 **중복 문항**을 만든다(업로드는 항상 뒤에 새로 추가된다).
+      setMsg(
+        importedCount
+          ? `✅ ${importedCount}문항은 반영됐습니다 — 번역만 실패했습니다(${m}). 다시 올리지 마시고 「문항 목록」 탭의 “🌐 미번역 번역”으로 채우세요.`
+          : '실패: ' + m,
+      )
+      if (importedCount) { setRows([]); setSubjMap({}); setFileName('') }
     } finally {
       setImporting(false)
+      setTransMsg('')
     }
   }
 
   return (
     <>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안·유사정답1~5(주관식) · 해설</b>. 유형이 비면 객관식. <b>주관식·유사정답 열은 주관식이 있는 급수에서만</b> 쓰이며(이 급수에 주관식이 없으면 주관식 행은 업로드 거부), 주관식은 <b>모범답안+유사정답을 정규화 정확일치로 자동채점</b>합니다(대소문자·띄어쓰기 무시). <b>난이도·해설은 선택</b>이며 <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 엑셀 <b>과목명은 아래 “과목 매핑”에서 이 급수의 정규 검정과목으로 치환</b>됩니다. 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호 자동 부여).
+        <b>머리글의 열 이름을 자동 인식</b>합니다 — 컬럼 순서가 달라도, 위에 안내줄이 있어도 OK. 인식 열: <b>과목 · 난이도(상/중/하) · 지문 · 보기1~4 · 정답(1~4) · 유형(객관식/주관식) · 모범답안·유사정답1~5(주관식) · 해설</b>. 유형이 비면 객관식. <b>주관식·유사정답 열은 주관식이 있는 급수에서만</b> 쓰이며(이 급수에 주관식이 없으면 주관식 행은 업로드 거부), 주관식은 <b>모범답안+유사정답을 정규화 정확일치로 자동채점</b>합니다(대소문자·띄어쓰기 무시). <b>난이도·해설은 선택</b>이며 <b>응시·결과 화면에 노출되지 않습니다</b>(관리자 전용). 엑셀 <b>과목명은 아래 “과목 매핑”에서 이 급수의 정규 검정과목으로 치환</b>됩니다. 업로드하면 <b>항상 이 은행 뒤에 새 문항으로 추가</b>됩니다(번호 자동 부여). 반영 뒤 <b>영어·일본어·중국어·힌디어·베트남어 번역이 이어서 자동 실행</b>됩니다(주관식은 모범답안까지) — 문항 수에 따라 몇 분 걸리며, <b>중간에 창을 닫아도 문항은 남고</b> 남은 번역은 「문항 목록」 탭의 “🌐 미번역 번역”이 이어받습니다.
       </p>
       <div className="admin-section" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <label className="admin-mini" style={{ cursor: 'pointer' }}>
@@ -7189,10 +7353,13 @@ function QuestionImportView({ bankId, tier, onImported }: { bankId: string; tier
         )}
         {rows.length > 0 && (
           <button className="btn-ink" onClick={doImport} disabled={importing || problems.length > 0}>
-            {importing ? '반영 중…' : `${rows.length}문항 반영`}
+            {importing ? (transMsg ? '번역 중…' : '반영 중…') : `${rows.length}문항 반영 & 번역`}
           </button>
         )}
         {msg && <span style={{ fontSize: 13 }}>{msg}</span>}
+        {/* 번역 진행률 — 문항 수에 따라 몇 분 걸리므로 어디까지 갔는지 계속 보여준다.
+            ⚠️ 이 줄이 없으면 관리자가 멈춘 줄 알고 창을 닫거나 같은 파일을 다시 올린다. */}
+        {transMsg && <span className="admin-hint" style={{ margin: 0 }}>{transMsg}</span>}
       </div>
       {/* 과목 매핑 — 엑셀 과목명을 이 급수의 정규 검정과목으로 치환. 비슷한 걸 자동 선택해두고 확인/수정만.
           정규 과목으로 맞춰야 문항 풀 현황 집계·실제 출제 추출(둘 다 과목명 완전일치)에 잡힌다. */}

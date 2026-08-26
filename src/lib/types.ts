@@ -322,9 +322,12 @@ export interface AdminQuestionRow {
   answer_key: string | null
   explanation: string | null // 정답 해설/풀이(관리자 전용 · 응시/결과 비노출)
   active: boolean
-  // 다국어 — 한국어는 위 prompt·choices 가 정본이고 여기엔 **번역본만** 있다(ko 키 없음).
+  // 다국어 — 한국어는 위 prompt·choices·answer_key 가 정본이고 여기엔 **번역본만** 있다(ko 키 없음).
   prompt_i18n?: Record<string, string>
   choices_i18n?: Record<string, string[]>
+  // 주관식 허용답안 번역본. ⚠️ 개수는 원문과 다를 수 있다(표기 변형 가짓수가 언어마다 다르다) —
+  // 채점은 원문+번역 합집합 포함 여부만 본다.
+  answer_key_i18n?: Record<string, string[]>
   // 아직 번역이 안 된 언어 코드. 서버(questionList)가 계산해서 내려준다 —
   // ⚠️ 화면에서 다시 세지 말 것. 판정이 두 벌이 되면 '미번역' 표시와 완료율이 서로 다른 말을 한다.
   missing?: string[]

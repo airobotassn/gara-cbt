@@ -59,6 +59,11 @@ interface Item {
   prompt: string
   options: string[]
   explanation: string
+  // 주관식 허용답안(선택). 객관식·레벨테스트 호출자는 안 보낸다 — 그때는 빈 배열로 다룬다.
+  // ⚠️ options 와 달리 **개수를 맞추지 않는다.** 표기 변형('엣지 컴퓨팅'/'엣지컴퓨팅')은 언어마다
+  //    가짓수가 다르고, 순서가 정답 번호를 가리키지도 않아서(채점은 합집합 포함 여부만 본다)
+  //    개수를 강제하면 멀쩡한 번역을 버리게 된다.
+  answers?: string[]
 }
 type Tr = Record<string, Item> // { en:{...}, ja:{...}, ... }
 
@@ -152,14 +157,29 @@ async function translateGroup(items: Item[], langs: string[], endpoint: string):
     '(3) write it so it reads naturally and idiomatically — as a native speaker would phrase it, NOT word-for-word — ' +
     'while preserving the exact meaning and difficulty; no added or removed content; ' +
     '(4) keep all numbers exactly as in the source; ' +
-    '(5) output ONLY a valid JSON array, no markdown.'
+    // "answers" = 주관식 허용답안. 이것만 규칙이 반대다(개수 자유·변형 장려) — 채점이 이 목록과의
+    // 정규화 정확일치라, 그 언어권에서 실제로 통용되는 표기를 다 받아야 맞는 답이 틀리지 않는다.
+    '(5) "answers" is the accepted-answer list of a short-answer question, used for EXACT-MATCH grading. ' +
+    'Translate each entry into the term practitioners ACTUALLY use in that language, not a literal gloss. ' +
+    'Unlike "options", the count is FREE: add the common spelling variants of that language ' +
+    '(spaced/unspaced, native script and the widely-used English or acronym form) and drop duplicates. ' +
+    'Always keep the English/acronym form when it is what people actually write (e.g. "NPU", "MQTT"). ' +
+    'If the source "answers" is empty or missing, return an empty array; ' +
+    '(6) output ONLY a valid JSON array, no markdown.'
   const langList = langs.map((c) => `"${c}" = ${LANG_NAMES[c] ?? c}`).join(', ')
   const user =
     `Translate the following ${items.length} questions into: ${langList}.\n` +
     `Return a JSON ARRAY of length ${items.length}. Element i = translations of SOURCE[i], ` +
-    `shaped as { ${langs.map((c) => `"${c}": {"prompt":"...","options":[...],"explanation":"..."}`).join(', ')} }.\n\n` +
+    `shaped as { ${langs.map((c) => `"${c}": {"prompt":"...","options":[...],"explanation":"...","answers":[...]}`).join(', ')} }.\n\n` +
     `SOURCE (Korean, JSON array):\n` +
-    JSON.stringify(items.map((it) => ({ prompt: it.prompt, options: it.options, explanation: it.explanation })))
+    JSON.stringify(
+      items.map((it) => ({
+        prompt: it.prompt,
+        options: it.options,
+        explanation: it.explanation,
+        answers: it.answers ?? [],
+      })),
+    )
 
   const txt = await callGemini(sys, user, 60000, endpoint) // 모델 한도 65,536 내. 출력 잘림 방지
   let out: Tr[]
@@ -181,6 +201,13 @@ async function translateGroup(items: Item[], langs: string[], endpoint: string):
     for (const c of langs) {
       const o = tr?.[c]
       if (!o) throw new Error(`보기 개수 불일치 (#${i + 1} ${c})`)
+      // 허용답안 — 개수는 안 보고 모양만 정리한다(빈 항목·중복 제거).
+      // ⚠️ **원본에 답이 있는데 번역이 비어도 실패로 만들지 않는다.** 묶음 하나가 통째로 죽으면
+      //    같이 묶인 멀쩡한 문항까지 다시 돌려야 한다(주관식이 계속 실패하던 옛 증상이 그것이다).
+      //    빈 채로 내보내면 저장 단계가 그 언어를 '미번역'으로 남기고, 다음에 그 문항만 재시도한다.
+      o.answers = Array.isArray(o.answers)
+        ? [...new Set(o.answers.map((x) => String(x ?? '').trim()).filter(Boolean))]
+        : []
       // ⚠️ **보기가 없는 문항(주관식)은 options 키가 없어도 통과시킨다.**
       //    보내는 원본이 `options: []` 라 모델이 그 키를 아예 빼고 돌려주는 일이 잦은데,
       //    예전 검사는 그걸 개수 불일치로 보고 **그 묶음 전체를 실패**시켰다. 레벨테스트는
@@ -205,11 +232,15 @@ async function translateGroup(items: Item[], langs: string[], endpoint: string):
 }
 
 // 룰 검사(로컬, API 불필요): 한글 잔존만. 숫자 보존은 오탐이 많아 AI 검수로 넘김.
-function ruleIssues(tr: Item): string[] {
+function ruleIssues(tr: Item, src: Item): string[] {
   const out: string[] = []
+  // ⚠️ **허용답안(answers)은 한글 검사에서 뺀다** — 한국어 표기가 섞여 있어도 정상이다.
+  //    채점이 원문+번역 합집합이라 한국어 표기는 어차피 들어가고, 그걸 잔존으로 잡으면 오탐만 는다.
   const text = [tr.prompt, ...tr.options, tr.explanation].join(' ')
   // 한글 잔존(번역 누락) — 대상 언어엔 한글이 있을 수 없음
   if (/[가-힣]/.test(text)) out.push('한글 잔존')
+  // 원본에 답이 있는데 번역이 통째로 비면 그 언어는 자동채점에 쓸 것이 없다(→ 그 언어만 재시도).
+  if ((src.answers?.length ?? 0) > 0 && !(tr.answers?.length ?? 0)) out.push('허용답안 번역 없음')
   return out
 }
 
@@ -225,12 +256,20 @@ async function reviewGroup(
     '(a) the meaning matches the source, (b) it reads naturally to a native speaker, ' +
     '(c) the options stay distinct and the correct answer is not made ambiguous, ' +
     '(d) every number, quantity, unit, date and year carries the SAME value/meaning as the source ' +
-    '(numbers may be written as words or local numerals — that is fine; only flag a real value mismatch, e.g. 2024 became 2042). ' +
+    '(numbers may be written as words or local numerals — that is fine; only flag a real value mismatch, e.g. 2024 became 2042), ' +
+    '(e) "answers" (accepted answers, used for exact-match grading) name the SAME concept as the source and use the term ' +
+    'practitioners actually write in that language — flag a wrong or invented term, but NOT a differing entry count ' +
+    'and NOT an English/acronym entry left as-is (both are intended). ' +
     'Return ONLY a JSON array; element i = an object mapping each language code to an array of SHORT issue strings in Korean ' +
     '(empty array [] when the translation is fine). Do not nitpick style; flag only real problems.'
   const langList = langs.join(', ')
   const payload = pairs.map((p) => ({
-    ko: { prompt: p.src.prompt, options: p.src.options, explanation: p.src.explanation },
+    ko: {
+      prompt: p.src.prompt,
+      options: p.src.options,
+      explanation: p.src.explanation,
+      answers: p.src.answers ?? [],
+    },
     translations: Object.fromEntries(langs.map((c) => [c, p.tr[c]])),
   }))
   const user =
@@ -340,7 +379,7 @@ Deno.serve(async (req) => {
       issues[i] = {}
       const tr = translations[i]
       if (!tr) continue
-      for (const c of langs) issues[i][c] = ruleIssues(tr[c])
+      for (const c of langs) issues[i][c] = ruleIssues(tr[c], items[i])
     }
 
     // ── 3) AI 검수 (번역된 문항만, REVIEW_GROUP 묶음) ──

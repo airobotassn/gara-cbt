@@ -546,12 +546,19 @@
   width: 100%;
   max-width: 640px;
   overflow: hidden;
+  /* 창 전체가 화면 안에 선다 — 넘치면 본문만 안에서 스크롤하고 단계바·버튼줄은 늘 보인다.
+     ⚠️ 이걸 빼면 가장 긴 단계 높이로 통일된 창이 화면보다 커져서 '다음' 버튼이 화면 밖으로 밀린다.
+     112px = .exam-center 의 위아래 여백(32 + 80). 그 값을 고치면 여기도 같이. */
+  max-height: calc(100dvh - 112px);
+  display: flex;
+  flex-direction: column;
 }
 .prep-steps {
   display: flex;
   background: var(--soft);
   padding: 14px 10px;
   gap: 4px;
+  flex: none;
 }
 .prep-steps li {
   flex: 1;
@@ -587,7 +594,33 @@
 }
 .prep-body {
   padding: 28px 30px;
-  min-height: 280px;
+  /* 남는 높이를 본문이 갖는다(제목은 제 크기, 나머지 전부 단계 칸).
+     옛 min-height:280px 은 뺐다 — 이제 높이는 '가장 긴 단계' 가 정하고 그건 늘 280 보다 크다. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 7단계 창 높이 통일 — 7개 단계를 같은 그리드 칸에 겹쳐 두고 현재 단계만 보이게 한다.
+   그래서 칸 높이가 늘 '가장 긴 단계' 이고, 짧은 단계는 그만큼 아래가 빈다(단계를 넘겨도 창이 안 흔들린다).
+   ⚠️ 높이를 px 로 박지 말 것 — 6개국어·화면 폭마다 어느 단계가 가장 긴지가 달라진다.
+   ⚠️ display:none 이 아니라 visibility:hidden 이다. none 이면 자리를 안 차지해 높이가 다시 들쭉날쭉해진다
+      (visibility:hidden 은 안 보이는 단계의 버튼·링크 클릭과 탭 이동도 같이 막아 준다).
+   ⚠️ 스크롤은 칸이 아니라 **각 단계**가 한다. 칸에 걸면 화면이 낮을 때 짧은 단계에도 스크롤바가 생겨
+      빈칸만 굴러간다(칸 높이는 어느 단계를 보든 '가장 긴 단계' 라서). */
+.prep-panes {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.prep-pane {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  overflow-y: auto;
+}
+.prep-pane.on {
+  visibility: visible;
 }
 .prep-title {
   font-size: var(--fs-md);
@@ -597,6 +630,8 @@
   padding-bottom: 12px;
   border-bottom: 2px solid var(--blue);
   display: inline-block;
+  /* .prep-body 가 flex 라 이게 없으면 inline-block 이 풀려 파란 밑줄이 창 폭 전체로 늘어난다. */
+  align-self: flex-start;
 }
 .prep-text p {
   color: var(--txt);
@@ -749,6 +784,7 @@
 }
 .prep-foot {
   display: flex;
+  flex: none;
   justify-content: space-between;
   padding: 16px 24px;
   border-top: 1px solid var(--line);

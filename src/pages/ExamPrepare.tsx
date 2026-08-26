@@ -166,6 +166,8 @@ export default function ExamPrepare() {
   }
 
   const last = step === STEP_KEYS.length - 1
+  // 단계 창 클래스 — 7개를 전부 그리고 현재 것만 보인다(높이 통일. cbt.css 의 .prep-panes 주석 참고).
+  const pane = (i: number, base = 'prep-text') => `${base} prep-pane${step === i ? ' on' : ''}`
 
   return (
     <div className="exam-center">
@@ -213,9 +215,11 @@ export default function ExamPrepare() {
         <div className="prep-body">
           <h2 className="prep-title">{t(STEP_KEYS[step])}</h2>
 
-          {/* 0. 검정 안내 — 결제한 시험(디폴트 CARIS-Ⅰ Pro)의 /guide 팩트: 과목·시험 구성·합격 기준 */}
-          {step === 0 && (
-            <div className="prep-text">
+          {/* 7단계를 전부 그려 놓고 현재 단계만 보이게 한다 — 창 높이가 늘 '가장 긴 단계' 로 고정되고
+              짧은 단계는 그만큼 아래가 빈다(cbt.css 의 .prep-panes 주석 참고). */}
+          <div className="prep-panes">
+            {/* 0. 검정 안내 — 결제한 시험(디폴트 CARIS-Ⅰ Pro)의 /guide 팩트: 과목·시험 구성·합격 기준 */}
+            <div className={pane(0)}>
               <p>{t('prep.exam_lead', { exam: `${examTrack.name} ${examTier.name}` })}</p>
               {examTier.target && (
                 <>
@@ -242,11 +246,9 @@ export default function ExamPrepare() {
                 <dd>{examTier.pass}</dd>
               </dl>
             </div>
-          )}
 
-          {/* 1. 안내사항 */}
-          {step === 1 && (
-            <div className="prep-text">
+            {/* 1. 안내사항 */}
+            <div className={pane(1)}>
               <p>{t('prep.guide_lead')}</p>
               <ul>
                 <li>{t('prep.guide_li2')}</li>
@@ -254,11 +256,9 @@ export default function ExamPrepare() {
                 <li>{t('prep.guide_li4')}</li>
               </ul>
             </div>
-          )}
 
-          {/* 2. 유의사항 */}
-          {step === 2 && (
-            <div className="prep-text">
+            {/* 2. 유의사항 */}
+            <div className={pane(2)}>
               <p>{t('prep.notice_lead')}</p>
               <ul>
                 <li>{t('prep.notice_li3')}</li>
@@ -282,11 +282,9 @@ export default function ExamPrepare() {
                 <li>{t('prep.af12')}</li>
               </ul>
             </div>
-          )}
 
-          {/* 3. 보안 프로그램 설치 — /exam/check(SebInstall)와 동일 정보 구조(설명→버튼→라벨:값→경고 문장) */}
-          {step === 3 && (
-            <div className="prep-text">
+            {/* 3. 보안 프로그램 설치 — /exam/check(SebInstall)와 동일 정보 구조(설명→버튼→라벨:값→경고 문장) */}
+            <div className={pane(3)}>
               {inSeb ? (
                 <div className="prep-seb-ok">{t('prep.seb_running')}</div>
               ) : (
@@ -324,11 +322,9 @@ export default function ExamPrepare() {
                 </>
               )}
             </div>
-          )}
 
-          {/* 4. 메뉴 설명 */}
-          {step === 4 && (
-            <div className="prep-text">
+            {/* 4. 메뉴 설명 */}
+            <div className={pane(4)}>
               <p>{t('prep.menu_lead')}</p>
               <ul>
                 <li>{t('prep.menu_li1')}</li>
@@ -337,11 +333,9 @@ export default function ExamPrepare() {
                 <li>{t('prep.menu_li5')}</li>
               </ul>
             </div>
-          )}
 
-          {/* 5. 문제풀이 연습 + 환경 점검 */}
-          {step === 5 && (
-            <div className="prep-practice">
+            {/* 5. 문제풀이 연습 + 환경 점검 */}
+            <div className={pane(5, 'prep-practice')}>
               <h4 className="prep-sub">{t('prep.check_title')}</h4>
               <ul className="check-list" style={{ marginBottom: 18 }}>
                 {checks.map((c) => (
@@ -389,11 +383,9 @@ export default function ExamPrepare() {
                 )}
               </div>
             </div>
-          )}
 
-          {/* 6. 시험 준비 완료 */}
-          {step === 6 && (
-            <div className="prep-text">
+            {/* 6. 시험 준비 완료 */}
+            <div className={pane(6)}>
               <p>{t('prep.ready_lead')}</p>
               <ul>
                 <li>{t('prep.ready_li1')}</li>
@@ -412,7 +404,7 @@ export default function ExamPrepare() {
                 </p>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         <div className="prep-foot">

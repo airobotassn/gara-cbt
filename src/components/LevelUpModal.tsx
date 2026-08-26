@@ -69,11 +69,13 @@ export default function LevelUpModal({
     const rnd = (n: number) => { const x = Math.sin((n + to * 7.13) * 12.9898) * 43758.5453; return x - Math.floor(x) }
     return Array.from({ length: SPARKS }, (_, i) => {
       const a = (i / SPARKS) * Math.PI * 2 + rnd(i) * 0.28
-      const d = 90 + rnd(i + 101) * 130
+      // ⚠️ 가깝게 터지면(90~220px) 조각이 캐릭터 몸에 붙어 '폭죽'이 아니라 얼룩으로 읽힌다.
+      //    인물 바깥으로 확실히 나가야 터지는 맛이 난다.
+      const d = 165 + rnd(i + 101) * 215
       return {
         x: Math.cos(a) * d,
         y: Math.sin(a) * d,
-        size: 5 + rnd(i + 202) * 6,
+        size: 7 + rnd(i + 202) * 9,
         delay: rnd(i + 303) * 180,
         hue: [0, 42, 48, 12, 200][i % 5],
       }

@@ -64,15 +64,33 @@ export function projKoOptions(base: unknown, i18n: unknown, lang: string): strin
 }
 // 그 문항이 이 언어로 번역돼 있나 — 관리자 '미번역' 표시·완료율의 단일 판정.
 // ⚠️ 지문만 있고 보기가 없으면 미번역으로 친다(객관식은 둘 다 있어야 응시가 성립한다).
+// ⚠️ **주관식은 모범답안 번역까지 있어야 완료다.** 지문만 번역하면 외국어 응시자는 문제를 자기
+//    언어로 읽고 답도 자기 언어로 쓰는데, 허용답안이 한국어뿐이라 자동채점이 통째로 안 돈다.
+//    이 한 줄이 곧 백필 스위치이기도 하다 — 이미 지문이 번역된 옛 주관식 문항들이 여기서
+//    '미번역'으로 다시 떠서, 관리자가 기존 「🌐 미번역 번역」 버튼 한 번으로 답까지 채운다.
+//    호출부는 answer_key·answer_key_i18n 을 같이 select 해야 한다(안 하면 늘 미번역으로 보인다).
 export function questionTranslated(
-  row: { prompt_i18n?: unknown; choices_i18n?: unknown; choices?: unknown },
+  row: {
+    prompt_i18n?: unknown
+    choices_i18n?: unknown
+    choices?: unknown
+    answer_key?: unknown
+    answer_key_i18n?: unknown
+  },
   lang: string,
 ): boolean {
   if (lang === DEFAULT_LANG) return true
   const p = (row.prompt_i18n as Record<string, unknown> | null)?.[lang]
   if (typeof p !== 'string' || !p.trim()) return false
   const srcLen = Array.isArray(row.choices) ? row.choices.length : 0
-  if (srcLen === 0) return true // 주관식 — 보기가 없으므로 지문만 보면 된다
+  if (srcLen === 0) {
+    // 주관식 — 보기가 없으므로 지문 + 모범답안을 본다.
+    // 모범답안이 비어 있는 문항은 원래 자동채점 대상이 아니라(수동검수 폴백) 번역할 것도 없다.
+    const ko = String(row.answer_key ?? '').trim()
+    if (!ko) return true
+    const a = (row.answer_key_i18n as Record<string, unknown> | null)?.[lang]
+    return Array.isArray(a) && a.length > 0 && a.some((x) => String(x ?? '').trim())
+  }
   const o = (row.choices_i18n as Record<string, unknown> | null)?.[lang]
   return Array.isArray(o) && o.length === srcLen && o.every((x) => String(x ?? '').trim())
 }
