@@ -87,6 +87,28 @@ export function sebQuitUrl(): string {
   return `${window.location.origin}/exam/done`
 }
 
+/**
+ * 2단계(문제 화면) 설정으로 넘겨받는 주소 — **SEB 안에서만** 쓴다.
+ *
+ * 왜 설정을 갈아타나: SEB 설정은 세션 단위라 화면별로 다르게 잠글 수 없는데, 두 구간의 요구가 정반대다.
+ *   · 1단계(본인인증·오류 안내) — 우리 앱이 안 뜨면 화면에 아무것도 없다. SEB 종료(X)를 막아두면
+ *     응시자가 **PC 를 강제 종료**해야 한다. 그래서 X 를 남긴다(아직 시험 전이라 서버가 알 필요도 없다).
+ *   · 2단계(문제 화면) — X 로 나가면 우리 페이지를 안 거쳐 **서버가 이탈을 영영 모른다.** 그래서 끈다.
+ * 그 경계가 여기다 — '확인' 을 누르면 종료가 막힌 설정으로 세션을 다시 연다(SEB 재구성).
+ *
+ * ⚠️ **물음표 두 개(`??h=`)가 여기서도 필요하다.** 재구성일 때 SEB 는 이 주소의 쿼리를 새 startURL 뒤에
+ *    붙이는데(`HandleStartUrlQuery` → `uri.Query.LastIndexOf('?') > 0`), 하나면 위치가 0 이라 조건이
+ *    거짓이 되어 **표가 조용히 사라진다**(처음 SEB 를 띄울 때와 똑같은 함정이다).
+ * ⚠️ 스킴을 바꾸지 않는다(`sebs://` 아님). 이미 SEB 안이라 **그냥 .seb 파일로 이동**하면 SEB 가 그걸
+ *    설정 내려받기로 알아채 재구성한다. 실기기에서 안 걸리면 그때 스킴 쪽을 시도해 볼 것.
+ * ⚠️ 이 이동은 1단계 설정의 `examSessionReconfigureAllow` 가 켜져 있어야 한다(tools/make-seb-all.mjs).
+ *    꺼져 있으면 SEB 가 내려받기를 거절하고 **아무 일도 일어나지 않는다**(화면엔 오류도 안 뜬다).
+ */
+export function sebRunConfigUrl(lang: string | undefined, nonce: string): string {
+  const file = lang ? `gara-run-${lang}.seb` : 'gara-run-ko.seb'
+  return `${window.location.origin}/${file}??h=${encodeURIComponent(nonce)}`
+}
+
 // 모의 응시용 .seb (gara-practice[-<lang>].seb) — 실제와 같은 SEB 잠금 환경에서 연습 문제를 연다.
 export function sebPracticeLaunchUrl(lang?: string, nonce?: string): string {
   if (typeof window === 'undefined') return ''
