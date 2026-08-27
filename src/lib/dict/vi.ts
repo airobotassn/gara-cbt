@@ -174,7 +174,7 @@ const VI: Record<string, string> = {
   "lcert.load_failed": "Không tải được chứng nhận. Vui lòng thử lại sau.",
   "lcert.go_test": "Đi làm bài kiểm tra",
   // 문항 수는 레벨 구간별(10/20/30)이고 제한시간(분)이 그 수와 같다. 승급은 개수가 아니라 정답률. 강등은 없다.
-  "lv.rule_up": "Lv.1–3: {p1}%+ · Lv.4–7: {p2}%+ để lên hạng",
+  "lv.rule_up": "Lv.1–4: {p1}%+ · Lv.5–7: {p2}%+ để lên hạng",
   "lv.rule_nodown": "Điểm thấp cũng không bị tụt hạng",
   "lv.rule_daily": "Mỗi ngày {n} lượt thi — mỗi lần thăng hạng được cộng thêm 1",
   // 레벨 선택(D안) — '지금 도전' 카드
@@ -206,15 +206,16 @@ const VI: Record<string, string> = {
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "Nhập môn công cụ AI, prompt và giải quyết vấn đề bằng AI",
   "lv.2.name": "Cơ bản",
-  "lv.2.desc": "Hiểu biết & đạo đức AI tạo sinh, nền tảng prompt engineering",
+  // 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 Lv.2 가 비었다 — 새 문항이 들어오면 이 설명을 그 내용으로 바꿀 것.
+  "lv.2.desc": "Câu hỏi mới đang được chuẩn bị",
   "lv.3.name": "Trung cấp",
-  "lv.3.desc": "AI tạo sinh trung cấp; dùng Python kết nối AI với phần cứng",
+  "lv.3.desc": "Hiểu biết & đạo đức AI tạo sinh, nền tảng prompt engineering",
   "lv.4.name": "Nâng cao",
-  "lv.4.desc": "AI tạo sinh nâng cao (LLM·RAG·phát triển app), vision AI cơ bản (nhận diện vật thể), C/C++ cơ bản",
+  "lv.4.desc": "AI tạo sinh trung cấp; dùng Python kết nối AI với phần cứng",
   "lv.5.name": "Chuyên sâu",
-  "lv.5.desc": "Điều khiển chính xác STM32, tích hợp ROS2, lập trình PLC, mô phỏng quy trình",
+  "lv.5.desc": "AI tạo sinh nâng cao (LLM·RAG·phát triển app), vision AI cơ bản (nhận diện vật thể), C/C++ cơ bản",
   "lv.6.name": "Ứng dụng",
-  "lv.6.desc": "Nâng cao hệ thống thông minh",
+  "lv.6.desc": "Điều khiển chính xác STM32, tích hợp ROS2, lập trình PLC, mô phỏng quy trình",
   "lv.7.name": "Bậc thầy",
   "lv.7.desc": "Làm chủ Digital Twin và robot bầy đàn",
 

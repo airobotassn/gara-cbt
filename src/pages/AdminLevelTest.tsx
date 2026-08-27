@@ -996,7 +996,7 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
   const [correct, setCorrect] = useState(row?.correct_index ?? 0)
   const [active, setActive] = useState(row?.active ?? true)
   const [pi, setPi] = useState<Record<string, string>>({ ...(row?.prompt_i18n ?? {}) })
-  // 신규는 그 레벨의 보기 개수만큼 빈칸을 띄운다(Lv.1~3 4개 / Lv.4~7 5개).
+  // 신규는 그 레벨의 보기 개수만큼 빈칸을 띄운다(Lv.1~4 4개 / Lv.5~7 5개).
   const [oi, setOi] = useState<Record<string, string[]>>(
     row ? { ...row.options_i18n } : { ko: Array.from({ length: optionCountForLevel(listLevel) }, () => '') },
   )

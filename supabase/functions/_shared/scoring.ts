@@ -8,11 +8,13 @@ export * from './lib.ts'
 // ----- 공통 상수 -----
 /** @deprecated 문항 수는 레벨 구간별(questionsForLevel). 이 값은 구코드 폴백용으로만 남긴다. */
 export const QUESTIONS_PER_TEST = 20
-// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1 = 10 · Lv.2~3 = 20 · Lv.4~7 = 30.
+// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1 = 10 · Lv.2~4 = 20 · Lv.5~7 = 30.
 //   ⚠️ 프론트 src/lib/scoring.ts 의 동명 함수와 항상 같이 고칠 것.
+//   ⚠️ 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 경계가 Lv.3/4 → Lv.4/5 로 옮겨졌다.
+//      옛 L3 문항(=지금 L4)은 보기가 4개뿐이라 경계를 안 밀면 5지선다 규칙에 걸려 보기가 빈다.
 export function questionsForLevel(level: number): number {
   if (level <= 1) return 10
-  if (level <= 3) return 20
+  if (level <= 4) return 20
   return 30
 }
 export function durationMinutesForLevel(level: number): number {
@@ -60,15 +62,18 @@ export async function dailyAttemptsLeft(
 }
 
 // ----- 레벨별 축 코드 (categories.ts 와 동일하게 유지!) — Lv.1 만 3축, 나머지는 6축 -----
+// 2026-08-27 사다리 밀기: 옛 2~5 → 3~6(축 코드도 같이 밀었다 — 옛 l2_principle = 지금 l3_principle).
+//   L1·L7 은 제자리. 옛 L6 축(l6_reasoning 등)은 폐기.
 export const LEVEL_AXES: Record<number, string[]> = {
   // 2026-07-27 l1_problem(AI를 활용한 문제해결) 추가 — 프론트 categories.ts 와 순서까지 동일하게 유지할 것.
   1: ['l1_prompt', 'l1_tools', 'l1_problem'],
-  2: ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt'],
-  3: ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python'],
-  4: ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv'],
-  5: ['l5_preproc', 'l5_stm32', 'l5_ros2', 'l5_plc', 'l5_sim', 'l5_smartfactory'],
-  6: ['l6_reasoning', 'l6_edge', 'l6_iiot', 'l6_dtwin', 'l6_sysopt', 'l6_ros2'],
-  // L7 = 임시(더미). categories.ts 와 동일하게 유지.
+  // Lv.2 = 빈 레벨(축·문항 미정). 문항을 넣기 전에 categories.ts 와 여기 6축을 먼저 정의할 것.
+  2: [],
+  3: ['l3_principle', 'l3_security', 'l3_ethics', 'l3_responsibility', 'l3_llm_eco', 'l3_prompt'],
+  4: ['l4_genai', 'l4_api', 'l4_algo', 'l4_sensor', 'l4_block', 'l4_python'],
+  5: ['l5_rag', 'l5_llm_ctrl', 'l5_vision_eval', 'l5_vision_data', 'l5_c_basic', 'l5_c_adv'],
+  6: ['l6_preproc', 'l6_stm32', 'l6_ros2', 'l6_plc', 'l6_sim', 'l6_smartfactory'],
+  // L7 = 최종 단계(2026-08-27 용어 정리 + 6개국어). 코드는 그대로 — 문항 95개가 달려 있다.
   7: ['l7_swarm', 'l7_hrc', 'l7_dtwin', 'l7_orchestration', 'l7_process_opt', 'l7_robosec'],
 }
 export function axisKeysForLevel(level: number): string[] {
@@ -98,14 +103,14 @@ export function updateAxis(prev: number, perf: number, placed: boolean): number 
 }
 
 // ----- 등급(레벨) 변동 (scoring.ts 와 동일하게 유지!) -----
-// 승급컷: 레벨1~3 = 70%, 레벨4~7 = 80%. (2026-08-04 완화 — 이전 80/90%)
-//   → Lv.1 7개(10문) / Lv.2·3 14개(20문) / Lv.4~7 24개(30문).
+// 승급컷: 레벨1~4 = 70%, 레벨5~7 = 80%. (2026-08-04 완화 — 이전 80/90% · 2026-08-27 경계 한 칸 밀기)
+//   → Lv.1 7개(10문) / Lv.2~4 14개(20문) / Lv.5~7 24개(30문).
 //   강등은 없다(2026-07 제거) — 등급은 오르거나 유지만 된다.
 //   문항 수가 레벨 구간마다 달라(10/20/30) 절대 개수가 아니라 비율로 판정한다.
 export const PROMOTE_RATE_LOW = 0.7
 export const PROMOTE_RATE_HIGH = 0.8
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
-  return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
+  return Math.ceil(total * (level <= 4 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
 export type RankDir = 'up' | 'stay'
 export interface RankChange {
@@ -231,8 +236,10 @@ export function toAxisMap(obj: unknown, keys: string[]): AxisMap {
   return out
 }
 
-// 레벨별 선택지 수. **문항이 아니라 레벨이 정한다** — 레벨1~3 4지선다, 레벨4~7 5지선다.
-// 2026-08-05 DB 실측에서 예외 0건(Lv.1~3 232문항 전부 4개 / Lv.4~7 281문항 전부 5개).
+// 레벨별 선택지 수. **문항이 아니라 레벨이 정한다** — 레벨1~4 4지선다, 레벨5~7 5지선다.
+// 2026-08-05 DB 실측에서 예외 0건(그때 기준 Lv.1~3 232문항 전부 4개 / Lv.4~7 281문항 전부 5개).
+// 2026-08-27 사다리 밀기로 경계가 Lv.3/4 → Lv.4/5 로 옮겨졌다 — 문항이 가진 보기 개수를 따라간 것이다.
+//   옛 L3(4지선다) 문항이 L4 로 올라갔으므로 경계를 그대로 두면 L4 시험에 보기가 하나 빈 채로 나간다.
 // ⚠️ 프론트 src/lib/scoring.ts 의 OPTIONS_BY_LEVEL 과 항상 같이 고칠 것.
 // 이제 DB 도 실제로 4개다 — 옛 5지선다 시절 5번째 보기는 6개 언어 전부에서 제거했고,
 // 정답이 5번이던 문항은 그 전에 1~4번으로 스왑했다
@@ -240,7 +247,7 @@ export function toAxisMap(obj: unknown, keys: string[]): AxisMap {
 // 그래서 아래 slice 는 이제 사실상 no-op 이고, 옛 데이터·수동 입력에 대한 안전망으로만 남는다.
 // 새로 넣는 것도 admin-test 의 upsert 검증이 보기 4개·정답 1~4번을 강제한다.
 // (이 컷은 채점에 영향 없음: 채점은 correct_index 로만 함)
-export const VISIBLE_OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4, 4: 5, 5: 5, 6: 5, 7: 5 }
+export const VISIBLE_OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4, 4: 4, 5: 5, 6: 5, 7: 5 }
 export function projOptionsForLevel(i18n: unknown, lang: string, level: number): string[] {
   const opts = projOptions(i18n, lang)
   const cap = VISIBLE_OPTIONS_BY_LEVEL[level]

@@ -5,10 +5,13 @@
 const SUPABASE_REF = 'lditytpxuuojfznwfnep'
 const AXES = ['prompt', 'model', 'verify', 'automation', 'data', 'ethics']
 const axisMap = (vals) => Object.fromEntries(AXES.map((k, i) => [k, vals[i]]))
-// 레벨별 실제 6축 코드(레이더가 제대로 그려지도록). 2026-07 사다리 한 칸 밀기 반영 — L1 변수 = 지금의 Lv.2 축.
-const L1 = ['l2_principle', 'l2_security', 'l2_ethics', 'l2_responsibility', 'l2_llm_eco', 'l2_prompt']
-const L2 = ['l3_genai', 'l3_api', 'l3_algo', 'l3_sensor', 'l3_block', 'l3_python']
-const L3 = ['l4_rag', 'l4_llm_ctrl', 'l4_vision_eval', 'l4_vision_data', 'l4_c_basic', 'l4_c_adv']
+// 레벨별 실제 축 코드(레이더가 제대로 그려지도록) — src/lib/categories.ts 와 같이 고칠 것.
+// 2026-08-27 사다리 밀기(옛 2~5 → 3~6) 반영. ⚠️ 이름이 곧 레벨이다(AX4 = Lv.4 축) — 목 데이터의
+// level 값과 축 세트가 어긋나면 레이더가 0으로 그려진다(옛 변수명 L1·L2·L3 이 그 혼동의 원인이었다 —
+// L1 이 Lv.2 축을 담고 있었다). 이름을 레벨에 맞춰 붙여 그 함정을 없앴다.
+const AX1 = ['l1_prompt', 'l1_tools', 'l1_problem'] // Lv.1 만 3축
+const AX3 = ['l3_principle', 'l3_security', 'l3_ethics', 'l3_responsibility', 'l3_llm_eco', 'l3_prompt']
+const AX4 = ['l4_genai', 'l4_api', 'l4_algo', 'l4_sensor', 'l4_block', 'l4_python']
 const mapBy = (keys, vals) => Object.fromEntries(keys.map((k, i) => [k, vals[i]]))
 
 const DEVICES = {
@@ -44,11 +47,11 @@ async function seedAuthAndMocks(context) {
     r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({
         attemptId: 'demo', level: 4, totalCorrect: 3, totalQuestions: 20, locked: false,
-        rating: mapBy(L3, [52, 45, 58, 40, 50, 38]), deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]),
-        perf: mapBy(L3, [48, 40, 55, 35, 47, 33]), prevPerf: mapBy(L3, [60, 52, 50, 44, 41, 39]),
+        rating: mapBy(AX4, [52, 45, 58, 40, 50, 38]), deltas: mapBy(AX4, [-3, -5, -2, -4, -1, -3]),
+        perf: mapBy(AX4, [48, 40, 55, 35, 47, 33]), prevPerf: mapBy(AX4, [60, 52, 50, 44, 41, 39]),
         placed: true, rankBefore: 4, rankAfter: 4, rankDir: 'stay',
         answers: Array.from({ length: 6 }, (_, i) => ({
-          questionId: `q${i}`, category: L3[i % L3.length],
+          questionId: `q${i}`, category: AX4[i % AX4.length],
           prompt: `샘플 문항 ${i + 1}`, options: ['A', 'B', 'C', 'D'],
           selectedIndex: 0, correctIndex: 1, isCorrect: i < 2,
           explanation: '해설',
@@ -60,17 +63,17 @@ async function seedAuthAndMocks(context) {
       body: JSON.stringify({
         // 대시보드 하단이 '승급 기록'(rankDir==='up' 만)이라 승급 행이 섞여 있어야 빈 패널이 안 나온다.
         attempts: [
-          { attemptId: 'a0', level: 4, totalCorrect: 9, totalQuestions: 20, rankAfter: 4, rankDir: 'stay', deltas: mapBy(L3, [-3, -5, -2, -4, -1, -3]), submittedAt: '2026-06-15T10:00:00Z' },
-          { attemptId: 'a1', level: 3, totalCorrect: 17, totalQuestions: 20, rankAfter: 4, rankDir: 'up', deltas: mapBy(L3, [4, 5, 3, 6, 2, 4]), submittedAt: '2026-05-15T10:00:00Z' },
-          { attemptId: 'a2', level: 3, totalCorrect: 3, totalQuestions: 20, rankAfter: 3, rankDir: 'stay', deltas: mapBy(L2, [-3, -5, -2, -4, -1, -3]), submittedAt: '2026-04-15T10:00:00Z' },
-          { attemptId: 'a3', level: 2, totalCorrect: 18, totalQuestions: 20, rankAfter: 3, rankDir: 'up', deltas: mapBy(L2, [5, 4, 6, 3, 5, 4]), submittedAt: '2026-03-15T10:00:00Z' },
-          { attemptId: 'a4', level: 1, totalCorrect: 16, totalQuestions: 20, rankAfter: 2, rankDir: 'up', deltas: mapBy(L2, [3, 3, 4, 2, 3, 3]), submittedAt: '2026-02-15T10:00:00Z' },
+          { attemptId: 'a0', level: 4, totalCorrect: 9, totalQuestions: 20, rankAfter: 4, rankDir: 'stay', deltas: mapBy(AX4, [-3, -5, -2, -4, -1, -3]), submittedAt: '2026-06-15T10:00:00Z' },
+          { attemptId: 'a1', level: 3, totalCorrect: 17, totalQuestions: 20, rankAfter: 4, rankDir: 'up', deltas: mapBy(AX4, [4, 5, 3, 6, 2, 4]), submittedAt: '2026-05-15T10:00:00Z' },
+          { attemptId: 'a2', level: 3, totalCorrect: 3, totalQuestions: 20, rankAfter: 3, rankDir: 'stay', deltas: mapBy(AX3, [-3, -5, -2, -4, -1, -3]), submittedAt: '2026-04-15T10:00:00Z' },
+          { attemptId: 'a3', level: 2, totalCorrect: 18, totalQuestions: 20, rankAfter: 3, rankDir: 'up', deltas: mapBy(AX3, [5, 4, 6, 3, 5, 4]), submittedAt: '2026-03-15T10:00:00Z' },
+          { attemptId: 'a4', level: 1, totalCorrect: 16, totalQuestions: 20, rankAfter: 2, rankDir: 'up', deltas: mapBy(AX3, [3, 3, 4, 2, 3, 3]), submittedAt: '2026-02-15T10:00:00Z' },
         ],
         currentRank: 4,
         currentPoints: 3214, // ← 랭킹 점수(목)
         levelSkills: [
-          { level: 3, ratings: mapBy(L2, [70, 65, 60, 72, 58, 68]), attemptsCount: 3 },
-          { level: 4, ratings: mapBy(L3, [72, 45, 58, 40, 57, 38]), attemptsCount: 5 }, // 잘함/평균/부족 섞이게(데모)
+          { level: 3, ratings: mapBy(AX3, [70, 65, 60, 72, 58, 68]), attemptsCount: 3 },
+          { level: 4, ratings: mapBy(AX4, [72, 45, 58, 40, 57, 38]), attemptsCount: 5 }, // 잘함/평균/부족 섞이게(데모)
         ],
       }) }))
 
@@ -155,7 +158,7 @@ async function seedAuthAndMocks(context) {
       body: JSON.stringify({
         attemptId: 'demo', level: 1, lang: 'ko', startedAt: '2026-06-18T10:00:00Z',
         questions: Array.from({ length: 20 }, (_, i) => ({
-          id: `q${i}`, category: L1[i % L1.length],
+          id: `q${i}`, category: AX1[i % AX1.length],
           prompt: `생성형 AI를 활용할 때 가장 적절한 접근은 무엇인가요? (샘플 문항 ${i + 1})`,
           options: ['첫 번째 선택지', '두 번째 선택지', '세 번째 선택지', '네 번째 선택지'],
         })),

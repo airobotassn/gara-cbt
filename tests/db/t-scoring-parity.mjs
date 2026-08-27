@@ -89,8 +89,10 @@ function normalize(text) {
     .trim();
 }
 
+// questionsForLevel 은 2026-08-27 사다리 밀기에서 경계(Lv.3/4 → Lv.4/5)가 옮겨진 자리다 —
+// promoteCut·보기 개수와 한 몸이라 한쪽만 고치면 시험 규모와 승급컷이 어긋난다. 그래서 여기서 같이 본다.
 const FN_SYMBOLS = [
-  'promoteCut', 'computeRankChange', 'computePoints', 'computeSkillScore',
+  'promoteCut', 'questionsForLevel', 'computeRankChange', 'computePoints', 'computeSkillScore',
   'activityDelta', 'activityPerDay', 'arenaLevelForScore', 'arenaBand',
 ];
 // 강등 관련 상수(DEMOTE_*)는 강등 제거로 사라졌다 — 남은 승급/점수 상수만 비교한다.
@@ -123,13 +125,16 @@ const tmpPath = join(tmpDir, 'shared-scoring.ts');
 writeFileSync(tmpPath, strippedShared, 'utf8');
 const Shared = await import(pathToFileURL(tmpPath).href);
 
+// 2026-08-27 경계 이동(Lv.4/5) 양쪽을 반드시 밟는다 — Lv.4 = 20문항·70% / Lv.5 = 30문항·80%.
 const SAMPLE_LEVEL_CORRECT = [
   [1, 0], [1, 8], [1, 16], [1, 20],
-  [3, 15], [3, 16], [4, 17], [4, 18], [4, 25],
+  [3, 15], [3, 16], [4, 13], [4, 14], [4, 17],
+  [5, 23], [5, 24], [5, 25],
   [7, 0], [7, 9], [7, 18], [7, 30],
 ];
 for (const [level, correct] of SAMPLE_LEVEL_CORRECT) {
   eq(Shared.promoteCut(level), FE.promoteCut(level), `promoteCut(${level})`);
+  eq(Shared.questionsForLevel(level), FE.questionsForLevel(level), `questionsForLevel(${level})`);
   eq(Shared.computePoints(level, correct), FE.computePoints(level, correct), `computePoints(${level},${correct})`);
 }
 

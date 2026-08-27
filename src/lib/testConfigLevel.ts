@@ -2,7 +2,7 @@
 import { MIN_LEVEL, MAX_LEVEL } from './categories'
 
 // 문항 수·제한시간은 레벨 구간별 — 단일 출처는 scoring.ts 의 questionsForLevel/durationMinutesForLevel.
-//   Lv.1 = 10문항/10분 · Lv.2~3 = 20문항/20분 · Lv.4~7 = 30문항/30분 (문항당 1분)
+//   Lv.1 = 10문항/10분 · Lv.2~4 = 20문항/20분 · Lv.5~7 = 30문항/30분 (문항당 1분)
 export { questionsForLevel, durationMinutesForLevel } from './scoring'
 /** @deprecated 레벨 구간별로 갈렸다. 레벨을 모르는 자리의 표시용 폴백으로만 쓸 것. */
 export const QUESTIONS_PER_TEST = 20
@@ -38,7 +38,11 @@ export const LEVEL_COLORS: Record<number, string> = {
 //   2026-07-23 Lv.1 문항 등록(l1_prompt 20 · l1_tools 13) 완료 → 잠금 해제.
 //   2026-07-27 Lv.1 에 l1_problem(AI를 활용한 문제해결) 축 추가 — 이 축은 아직 문항 0개라
 //   출제 시 부족분을 다른 축에서 채운다(start-test 폴백). 문항을 채우기 전엔 레이더 삼각형의 한 꼭짓점이 0 이다.
-export const COMING_SOON_LEVELS: number[] = []
+//   2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 **Lv.2 가 비었다**(축 0개·문항 0개) → 여기서 잠근다.
+//   ⛔ 새 Lv.2 문항을 넣을 때 이 배열을 []로 되돌릴 것. 잠금을 먼저 풀면 start-test 가
+//      '해당 레벨의 문제가 없습니다.' 로 400 을 내고, 사용자는 이유를 모르는 오류만 본다.
+//   ⚠️ 그동안 Lv.1 을 클리어한 사람(등급 2)은 다음에 응시할 시험이 없다 — 승급이 멈춘다.
+export const COMING_SOON_LEVELS: number[] = [2]
 
 // 부정행위 방지 2층: 화면 이탈 N회 누적 시 자동 제출
 export const MAX_VIOLATIONS = 3

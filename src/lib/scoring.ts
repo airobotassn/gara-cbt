@@ -46,12 +46,14 @@ export function weakestAxis(rating: AxisMap, keys: string[]): string {
 
 // <scoring-sync> ⚠️ 등급/점수 공식 — _shared/lib.ts 의 <scoring-sync> 영역과 항상 같이 고칠 것.
 // ── 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). 문항당 1분. ──
-//   Lv.1 = 10문항/10분 · Lv.2~3 = 20문항/20분 · Lv.4~7 = 30문항/30분
+//   Lv.1 = 10문항/10분 · Lv.2~4 = 20문항/20분 · Lv.5~7 = 30문항/30분
 //   ⚠️ 문항 수가 레벨마다 다르므로 승급컷은 절대 개수가 아니라 **비율**이다(아래).
-//   ⚠️ 구간 경계가 승급컷 비율의 경계(Lv.3/Lv.4)와 맞물려 있다 — 한쪽만 옮기면 컷이 어긋난다.
+//   ⚠️ 구간 경계가 승급컷 비율·보기 개수의 경계(Lv.4/Lv.5)와 맞물려 있다 — 한쪽만 옮기면 어긋난다.
+//   ⚠️ 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 경계가 Lv.3/4 → Lv.4/5 로 옮겨졌다.
+//      옛 L3 문항(=지금 L4)은 보기가 4개뿐이라 경계를 안 밀면 5지선다 규칙에 걸려 보기가 빈다.
 export function questionsForLevel(level: number): number {
   if (level <= 1) return 10
-  if (level <= 3) return 20
+  if (level <= 4) return 20
   return 30
 }
 export function durationMinutesForLevel(level: number): number {
@@ -61,13 +63,13 @@ export function durationMinutesForLevel(level: number): number {
 // ── 등급(레벨) 변동 규칙 ──
 // ⚠️ 강등은 없다(2026-07 제거). 등급은 오르거나 유지만 된다 — 강등선/경고(DEMOTE_*)·강등 시드·rank_dir='down' 이
 //    같이 사라졌다. DB 컬럼(user_progress.demotion_strikes · test_attempts.warn_strikes)은 남아있지만 읽지도 쓰지도 않는다.
-// 승급컷 비율: 레벨1~3 = 70%, 레벨4~7 = 80%. (2026-08-04 완화 — 이전 80/90%)
-//   → Lv.1 7개(10문) / Lv.2·3 14개(20문) / Lv.4~7 24개(30문).
+// 승급컷 비율: 레벨1~4 = 70%, 레벨5~7 = 80%. (2026-08-04 완화 — 이전 80/90% · 2026-08-27 경계 한 칸 밀기)
+//   → Lv.1 7개(10문) / Lv.2~4 14개(20문) / Lv.5~7 24개(30문).
 //   total 은 실제 출제 문항 수(문제은행이 모자라 덜 나간 경우 그 수)를 넘기면 그 기준으로 계산한다.
-export const PROMOTE_RATE_LOW = 0.7 // Lv.1~3
-export const PROMOTE_RATE_HIGH = 0.8 // Lv.4~7
+export const PROMOTE_RATE_LOW = 0.7 // Lv.1~4
+export const PROMOTE_RATE_HIGH = 0.8 // Lv.5~7
 export function promoteCut(level: number, total: number = questionsForLevel(level)): number {
-  return Math.ceil(total * (level <= 3 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
+  return Math.ceil(total * (level <= 4 ? PROMOTE_RATE_LOW : PROMOTE_RATE_HIGH))
 }
 
 export type RankDir = 'up' | 'stay'
@@ -215,12 +217,13 @@ export function levelColor(level: number): string {
 
 // ── 레벨별 보기 개수 ──
 // ⚠️ supabase/functions/_shared/scoring.ts 의 VISIBLE_OPTIONS_BY_LEVEL 과 항상 같이 고칠 것.
-// 보기 개수는 **문항이 아니라 레벨이 정한다** — Lv.1~3 4지선다, Lv.4~7 5지선다.
-// 2026-08-05 DB 실측에서 예외가 0건이었다(Lv.1~3 232문항 전부 4개 / Lv.4~7 281문항 전부 5개).
+// 보기 개수는 **문항이 아니라 레벨이 정한다** — Lv.1~4 4지선다, Lv.5~7 5지선다.
+// 2026-08-05 DB 실측에서 예외가 0건이었다(그때 기준 Lv.1~3 232문항 전부 4개 / Lv.4~7 281문항 전부 5개).
+// 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 경계가 Lv.3/4 → Lv.4/5 로 옮겨졌다 — 문항이 가진 보기 개수를 따라간 것이다.
 // 그래서 관리자 문항 편집기는 '보기 추가/삭제'가 아니라 레벨에 맞는 개수를 그냥 띄운다.
 // Lv.1~3 의 옛 5번째 보기는 2026-08-04 마이그레이션으로 DB 에서 제거됐다
 // (migrations/20260804120000_leveltest_l1_l3_drop_fifth_option.sql).
-export const OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4, 4: 5, 5: 5, 6: 5, 7: 5 }
+export const OPTIONS_BY_LEVEL: Record<number, number> = { 1: 4, 2: 4, 3: 4, 4: 4, 5: 5, 6: 5, 7: 5 }
 export function optionCountForLevel(level: number): number {
   return OPTIONS_BY_LEVEL[level] ?? 4
 }

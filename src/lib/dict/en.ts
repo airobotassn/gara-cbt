@@ -174,7 +174,7 @@ const EN: Record<string, string> = {
   "lcert.load_failed": "Could not load the certificate. Please try again shortly.",
   "lcert.go_test": "Take a level test",
   // 문항 수는 레벨 구간별(10/20/30)이고 제한시간(분)이 그 수와 같다. 승급은 개수가 아니라 정답률. 강등은 없다.
-  "lv.rule_up": "Lv.1–3: {p1}%+ · Lv.4–7: {p2}%+ to rank up",
+  "lv.rule_up": "Lv.1–4: {p1}%+ · Lv.5–7: {p2}%+ to rank up",
   "lv.rule_nodown": "Your tier never goes down, even after a low score",
   "lv.rule_daily": "You get {n} attempts a day — each promotion adds one more",
   // 레벨 선택(D안) — '지금 도전' 카드
@@ -206,15 +206,16 @@ const EN: Record<string, string> = {
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "Intro to AI tools, prompts, and problem solving with AI",
   "lv.2.name": "Basic",
-  "lv.2.desc": "Generative-AI literacy & ethics, prompt-engineering basics",
+  // 2026-08-27 ladder shift (old 2~5 → 3~6) emptied Lv.2 — replace this once new questions land.
+  "lv.2.desc": "New questions are on the way",
   "lv.3.name": "Intermediate",
-  "lv.3.desc": "Intermediate generative AI; connecting AI and hardware via Python",
+  "lv.3.desc": "Generative-AI literacy & ethics, prompt-engineering basics",
   "lv.4.name": "Advanced",
-  "lv.4.desc": "Advanced generative AI (LLM·RAG, app dev), basic vision AI (object detection), C/C++ basics",
+  "lv.4.desc": "Intermediate generative AI; connecting AI and hardware via Python",
   "lv.5.name": "In-depth",
-  "lv.5.desc": "STM32 precision control, ROS2 integration, PLC programming, process simulation",
+  "lv.5.desc": "Advanced generative AI (LLM·RAG, app dev), basic vision AI (object detection), C/C++ basics",
   "lv.6.name": "Applied",
-  "lv.6.desc": "Advancing intelligent systems",
+  "lv.6.desc": "STM32 precision control, ROS2 integration, PLC programming, process simulation",
   "lv.7.name": "Master",
   "lv.7.desc": "Mastering Digital Twin and swarm robotics",
 
