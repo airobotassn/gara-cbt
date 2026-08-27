@@ -202,10 +202,10 @@ const ZH: Record<string, string> = {
   // 문제은행이 아직 없는 레벨(COMING_SOON_LEVELS)의 카드 문구
   "lv.coming_soon": "即将开放",
   "lv.start_failed": "启动失败。",
-  "lv.1.name": "入门1",
+  "lv.1.name": "入门 I",
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "AI 工具理解、提示词运用与运用 AI 解决问题入门",
-  "lv.2.name": "入门2",
+  "lv.2.name": "入门 II",
   "lv.2.desc": "商务与日常提示词、提示词技巧、AI 工具运用与生产力协作",
   "lv.3.name": "基础",
   "lv.3.desc": "生成式 AI 素养与伦理，提示工程基础",

@@ -202,10 +202,10 @@ const VI: Record<string, string> = {
   // 문제은행이 아직 없는 레벨(COMING_SOON_LEVELS)의 카드 문구
   "lv.coming_soon": "Sắp mở",
   "lv.start_failed": "Không thể bắt đầu.",
-  "lv.1.name": "Nhập môn 1",
+  "lv.1.name": "Nhập môn I",
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "Nhập môn công cụ AI, prompt và giải quyết vấn đề bằng AI",
-  "lv.2.name": "Nhập môn 2",
+  "lv.2.name": "Nhập môn II",
   "lv.2.desc": "Prompt kinh doanh & đời sống, kỹ thuật prompt, dùng công cụ AI để tăng năng suất",
   "lv.3.name": "Cơ bản",
   "lv.3.desc": "Hiểu biết & đạo đức AI tạo sinh, nền tảng prompt engineering",

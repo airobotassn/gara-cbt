@@ -202,10 +202,10 @@ const JA: Record<string, string> = {
   // 문제은행이 아직 없는 레벨(COMING_SOON_LEVELS)의 카드 문구
   "lv.coming_soon": "公開予定",
   "lv.start_failed": "開始に失敗しました。",
-  "lv.1.name": "入門1",
+  "lv.1.name": "入門 I",
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "AIツールの理解・プロンプト活用とAIを活用した問題解決の入門",
-  "lv.2.name": "入門2",
+  "lv.2.name": "入門 II",
   "lv.2.desc": "ビジネス・日常プロンプト、プロンプト技法、AIツール活用と生産性・協働",
   "lv.3.name": "基礎",
   "lv.3.desc": "生成AIリテラシー・AI倫理、プロンプトエンジニアリング基礎",
