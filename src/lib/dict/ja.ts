@@ -188,7 +188,7 @@ const JA: Record<string, string> = {
   "lv.daily_limit": "本日の受験回数を使い切りました。明日また挑戦するか、昇級すると1回追加されます。",
   "lv.rule_note": "Lv.{max}は最高等級",
   "lv.login_to_save": "テスト結果を保存するにはログインが必要です",
-  "lv.sub_tail": "選んだ難易度で20問 · ログインユーザーは{d}日に1回",
+  "lv.sub_tail": "選んだ難易度に合わせて出題 · ログインユーザーは{d}日に1回",
   "lv.rec_firsttime": "初めてならLv.3から気軽に",
   "lv.rec_for_user": "現在の実力ではLv.{c}がおすすめ",
   "lv.rec_challenge": " · Lv.{n}に挑戦しても",

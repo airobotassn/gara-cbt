@@ -125,9 +125,11 @@ const tmpPath = join(tmpDir, 'shared-scoring.ts');
 writeFileSync(tmpPath, strippedShared, 'utf8');
 const Shared = await import(pathToFileURL(tmpPath).href);
 
-// 2026-08-27 경계 이동(Lv.4/5) 양쪽을 반드시 밟는다 — Lv.4 = 20문항·70% / Lv.5 = 30문항·80%.
+// 문항 수 구간(10/15/20/30)과 승급컷 경계(Lv.4/5)를 양쪽 다 밟는다 —
+//   Lv.1 10문·70% / Lv.2 15문·70% / Lv.3·4 20문·70% / Lv.5~7 30문·80%.
 const SAMPLE_LEVEL_CORRECT = [
   [1, 0], [1, 8], [1, 16], [1, 20],
+  [2, 10], [2, 11], [2, 15],
   [3, 15], [3, 16], [4, 13], [4, 14], [4, 17],
   [5, 23], [5, 24], [5, 25],
   [7, 0], [7, 9], [7, 18], [7, 30],

@@ -188,7 +188,7 @@ const VI: Record<string, string> = {
   "lv.daily_limit": "Bạn đã dùng hết lượt thi hôm nay. Hãy quay lại ngày mai — hoặc thăng hạng để được thêm 1 lượt.",
   "lv.rule_note": "Lv.{max} là hạng cao nhất",
   "lv.login_to_save": "Đăng nhập để lưu kết quả bài thi",
-  "lv.sub_tail": "20 câu ở mức bạn chọn · người dùng đăng nhập {d} ngày 1 lần",
+  "lv.sub_tail": "Câu hỏi theo mức bạn chọn · người dùng đăng nhập {d} ngày 1 lần",
   "lv.rec_firsttime": "Lần đầu? Hãy bắt đầu nhẹ nhàng ở Lv.3",
   "lv.rec_for_user": "Đề xuất Lv.{c} cho trình độ của bạn",
   "lv.rec_challenge": " · hoặc thử Lv.{n}",

@@ -8,12 +8,14 @@ export * from './lib.ts'
 // ----- 공통 상수 -----
 /** @deprecated 문항 수는 레벨 구간별(questionsForLevel). 이 값은 구코드 폴백용으로만 남긴다. */
 export const QUESTIONS_PER_TEST = 20
-// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1 = 10 · Lv.2~4 = 20 · Lv.5~7 = 30.
+// 시험 규모: 레벨 구간별 문항 수 = 제한시간(분). Lv.1 = 10 · Lv.2 = 15 · Lv.3~4 = 20 · Lv.5~7 = 30.
 //   ⚠️ 프론트 src/lib/scoring.ts 의 동명 함수와 항상 같이 고칠 것.
-//   ⚠️ 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 경계가 Lv.3/4 → Lv.4/5 로 옮겨졌다.
+//   ⚠️ 승급컷 비율·보기 개수의 경계는 Lv.4/Lv.5 다 — 문항 수만 Lv.2 에서 한 번 더 나뉜다(2026-08-27 지시).
+//   ⚠️ 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 그 경계가 Lv.3/4 → Lv.4/5 로 옮겨졌다.
 //      옛 L3 문항(=지금 L4)은 보기가 4개뿐이라 경계를 안 밀면 5지선다 규칙에 걸려 보기가 빈다.
 export function questionsForLevel(level: number): number {
   if (level <= 1) return 10
+  if (level <= 2) return 15
   if (level <= 4) return 20
   return 30
 }
@@ -105,7 +107,7 @@ export function updateAxis(prev: number, perf: number, placed: boolean): number 
 
 // ----- 등급(레벨) 변동 (scoring.ts 와 동일하게 유지!) -----
 // 승급컷: 레벨1~4 = 70%, 레벨5~7 = 80%. (2026-08-04 완화 — 이전 80/90% · 2026-08-27 경계 한 칸 밀기)
-//   → Lv.1 7개(10문) / Lv.2~4 14개(20문) / Lv.5~7 24개(30문).
+//   → Lv.1 7개(10문) / Lv.2 11개(15문) / Lv.3·4 14개(20문) / Lv.5~7 24개(30문).
 //   강등은 없다(2026-07 제거) — 등급은 오르거나 유지만 된다.
 //   문항 수가 레벨 구간마다 달라(10/20/30) 절대 개수가 아니라 비율로 판정한다.
 export const PROMOTE_RATE_LOW = 0.7

@@ -188,7 +188,9 @@ const KO: Record<string, string> = {
   "lv.daily_limit": "오늘 응시 횟수를 다 썼어요. 내일 다시 도전하거나, 승급하면 1회가 추가돼요.",
   "lv.rule_note": "Lv.{max}은 최고 등급",
   "lv.login_to_save": "테스트 결과를 저장하려면 로그인이 필요합니다",
-  "lv.sub_tail": "선택한 난이도로 20문항 · 로그인 유저는 {d}일에 1회",
+  // ⚠️ 지금 아무 데서도 안 쓰는 키다. 문항 수는 레벨마다 다르므로(10/15/20/30) 여기에 숫자를 박지 말 것 —
+  //    되살릴 땐 lv.fact_q 처럼 questionsForLevel 로 계산해 넘길 것.
+  "lv.sub_tail": "선택한 난이도에 맞춰 출제 · 로그인 유저는 {d}일에 1회",
   "lv.rec_firsttime": "처음이라면 Lv.3부터 가볍게 시작해보세요",
   "lv.rec_for_user": "현재 실력 기준 Lv.{c} 추천",
   "lv.rec_challenge": " · Lv.{n}로 도전해도 좋아요",

@@ -188,7 +188,7 @@ const EN: Record<string, string> = {
   "lv.daily_limit": "You've used today's attempts. Come back tomorrow — or earn one more by ranking up.",
   "lv.rule_note": "Lv.{max} is the top tier",
   "lv.login_to_save": "Log in to save your test results",
-  "lv.sub_tail": "20 questions at your level · logged-in users once every {d} days",
+  "lv.sub_tail": "Questions matched to the level you pick · logged-in users once every {d} days",
   "lv.rec_firsttime": "New here? Start light at Lv.3",
   "lv.rec_for_user": "Recommended Lv.{c} for your level",
   "lv.rec_challenge": " · or try Lv.{n}",

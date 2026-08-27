@@ -188,7 +188,7 @@ const ZH: Record<string, string> = {
   "lv.daily_limit": "今天的应试次数已用完。明天再来，或升级可再获得 1 次。",
   "lv.rule_note": "Lv.{max} 为最高级",
   "lv.login_to_save": "登录后才能保存测试结果",
-  "lv.sub_tail": "所选难度共 20 题 · 登录用户每 {d} 天 1 次",
+  "lv.sub_tail": "按所选难度出题 · 登录用户每 {d} 天 1 次",
   "lv.rec_firsttime": "第一次的话，从 Lv.3 轻松开始吧",
   "lv.rec_for_user": "按当前实力推荐 Lv.{c}",
   "lv.rec_challenge": " · 也可以挑战 Lv.{n}",

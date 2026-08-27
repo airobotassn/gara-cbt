@@ -2,7 +2,7 @@
 import { MIN_LEVEL, MAX_LEVEL } from './categories'
 
 // 문항 수·제한시간은 레벨 구간별 — 단일 출처는 scoring.ts 의 questionsForLevel/durationMinutesForLevel.
-//   Lv.1 = 10문항/10분 · Lv.2~4 = 20문항/20분 · Lv.5~7 = 30문항/30분 (문항당 1분)
+//   Lv.1 = 10문항/10분 · Lv.2 = 15문항/15분 · Lv.3~4 = 20문항/20분 · Lv.5~7 = 30문항/30분 (문항당 1분)
 export { questionsForLevel, durationMinutesForLevel } from './scoring'
 /** @deprecated 레벨 구간별로 갈렸다. 레벨을 모르는 자리의 표시용 폴백으로만 쓸 것. */
 export const QUESTIONS_PER_TEST = 20
