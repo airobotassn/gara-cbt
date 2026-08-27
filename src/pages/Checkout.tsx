@@ -209,8 +209,7 @@ export default function Checkout() {
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
               <span className="material-symbols-outlined text-[32px]">login</span>
             </div>
-            <h2 className="mb-2 font-title-md text-title-md font-bold text-on-surface">{t('pay.login_title')}</h2>
-            <p className="mb-6 font-body-md text-body-md text-on-surface-variant break-keep">{t('pay.login_sub')}</p>
+            <h2 className="mb-6 font-title-md text-title-md font-bold text-on-surface">{t('pay.login_title')}</h2>
             <button
               onClick={goLogin}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-label-md text-label-md font-bold text-on-primary ambient-shadow"

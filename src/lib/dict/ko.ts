@@ -485,6 +485,7 @@ const KO: Record<string, string> = {
   "gate.login_modal_desc": "로그인이 되어 있지 않습니다. 로그인 후 응시할 수 있어요.",
   "prep.step_exam": "검정 안내",
   "prep.exam_lead": "이 시험은 {exam} 검정입니다. 아래 과목·시험 구성·합격 기준을 확인하세요.",
+  "prep.exam_unknown": "이 응시권의 급수 정보를 찾지 못해 검정 안내를 표시할 수 없습니다. 아래 준비 단계는 그대로 진행하시면 됩니다.",
   "prep.step_guide": "안내사항",
   "prep.step_notice": "유의사항",
   "prep.step_seb": "보안 프로그램",
@@ -517,6 +518,11 @@ const KO: Record<string, string> = {
   "prep.guide_li2": "제한시간이 끝나면 자동으로 제출됩니다",
   "prep.guide_li3": "채점 결과는 제출 {d}일 후 공개됩니다",
   "prep.guide_li4": "본 시험은 PC(데스크톱/노트북) 전용입니다",
+  "prep.resume_title": "시험 중단 시 재접속·자동 제출 규정",
+  "prep.resume_li1": "정전·네트워크 오류 등으로 접속이 끊기면 해당 응시는 일시적으로 잠깁니다. 1:1 문의로 알려주시면 중단 기록을 확인해 복구해 드리며, 확인에는 영업일 기준 시간이 걸릴 수 있습니다",
+  "prep.resume_li2": "복구되면 중단 시점의 답안과 잔여 시간 그대로 이어서 응시합니다",
+  "prep.resume_li3": "재응시는 반드시 전체 시험 운영 기간 내에만 가능합니다",
+  "prep.resume_li4": "시험 운영 기간과 마감 시각은 모두 한국 표준시(UTC+9) 기준입니다",
   "prep.notice_lead": "다음 유의사항을 반드시 지켜주세요. 위반 시 채점에서 불이익을 받을 수 있습니다",
   "prep.notice_li3": "미응답 문항이 있으면 제출되지 않으며, 미응답 문항으로 이동합니다",
   "prep.notice_li4": "모니터는 1대만 권장하며, 보안 브라우저가 추가 화면을 가립니다",
@@ -554,12 +560,10 @@ const KO: Record<string, string> = {
   "prep.ready_li1": "「시험 시작」을 누르면 곧바로 시험이 시작됩니다",
   "prep.ready_li2": "시작 후에는 제한시간이 즉시 시작되며, 처음부터 다시 시작할 수 없습니다",
   "prep.agree": "위 안내와 유의사항을 모두 확인했으며, 시험에 응시합니다",
-  "prep.login_warn": "본인 확인을 위해 구글 로그인 후 시작할 수 있습니다",
   "prep.prev": "이전",
   "prep.next": "다음",
   "prep.starting": "시험 준비 중…",
   "prep.start": "시험 시작",
-  "prep.start_login": "로그인 후 시작",
   "check.title": "시험환경 테스트 (사전 점검)",
   "check.eyebrow": "사전 점검",
   "check.sub": "실제 시험 전에 이 PC에서 보안 브라우저가 제대로 열리는지, 응시 환경이 준비됐는지 미리 확인하세요.",
@@ -749,7 +753,7 @@ const KO: Record<string, string> = {
   "cert.confirm_edit": "수정하기",
   "cert.roman_invalid": "영문 성명을 로마자로 입력해 주세요(영문·공백·하이픈만).",
   // ⚠️ 증서 안에 각인되는 글자는 **6개국어 모두 영문 고정**이다(2026-08-26 지시).
-  //    자격증 서식(cert-template-v2.png)이 영문 한 벌뿐이라 화면 언어를 따라가면 영문 증서에
+  //    자격증 서식(cert-template-v2.webp)이 영문 한 벌뿐이라 화면 언어를 따라가면 영문 증서에
   //    한글·중국어 캡션만 섞여 박힌다. 번역하지 말 것.
   "cert.qr_caption": "Verify authenticity",
   "cert.gate_pay": "결제하고 발급받기",
@@ -981,10 +985,9 @@ const KO: Record<string, string> = {
   // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
   "pay.title": "결제",
   "pay.back": "돌아가기",
-  // 비로그인으로 결제 화면에 들어왔을 때. ⚠️ 조용히 /login 으로 튕기지 말 것 — 왜 로그인해야 하는지,
-  //    로그인하면 어디로 돌아오는지를 말해줘야 한다(2026-08-24 지시).
+  // 비로그인으로 결제 화면에 들어왔을 때. ⚠️ 조용히 /login 으로 튕기지 말 것 — 로그인해야 한다는 걸
+  //    화면에서 말해줘야 한다(2026-08-24 지시). 설명문(`pay.login_sub`)은 2026-08-26 지시로 삭제.
   "pay.login_title": "로그인이 필요해요",
-  "pay.login_sub": "결제는 로그인한 계정에 붙어요. 로그인하면 이 결제 화면으로 다시 돌아옵니다.",
   "pay.order": "주문 내역",
   "pay.preparing": "결제창을 준비하고 있어요…",
   "pay.pay_button": "결제하기",

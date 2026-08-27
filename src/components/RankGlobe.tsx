@@ -66,9 +66,9 @@ const LBL_CAP_R = 0.04
 const LBL_FLOOR = 9
 const LBL_HIDE = 6
 const RANK_ASSET = [
-  '/landing/rank-medal-1.png',
-  '/landing/rank-medal-2.png',
-  '/landing/rank-medal-3.png',
+  '/landing/rank-medal-1.webp',
+  '/landing/rank-medal-2.webp',
+  '/landing/rank-medal-3.webp',
 ] as const
 
 /** 첫 화면에 보이는 경도(정면 경도 = -이 값). -180 = **날짜변경선(180°)이 정면**.

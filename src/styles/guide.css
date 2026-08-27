@@ -50,7 +50,7 @@ html.dark .guide-page {
   display: grid; grid-template-columns: 1fr 480px; gap: 24px; align-items: center; min-height: 470px;
 }
 .guide-lockup { display: flex; align-items: center; gap: 6px; margin: 0 0 26px; }
-/* logo.png 는 상하좌우 여백이 39% 라 그대로 넣으면 작고 붕 뜬다 → 크게 잡고 음수 마진으로 상쇄 */
+/* logo.webp 는 상하좌우 여백이 39% 라 그대로 넣으면 작고 붕 뜬다 → 크게 잡고 음수 마진으로 상쇄 */
 .guide-lockup img { width: 74px; height: 74px; object-fit: contain; margin: -14px -6px -14px -14px; }
 .guide-lockup b { font-size: 34px; font-weight: 800; letter-spacing: .01em; color: var(--g-navy); }
 

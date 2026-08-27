@@ -284,7 +284,7 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   // (앱도 다크 테마에서 같은 방법을 쓴다 — shared.css 의 .gara-wordmark).
   // ⚠️ 로고 파일을 갈면 종횡비(388/95)를 알파로 다시 실측할 것.
   try {
-    const gara = await loadImage('/gara-mark-en.png')
+    const gara = await loadImage('/gara-mark-en.webp')
     const LH = 62
     const LW = (388 / 95) * LH
     ctx.save()

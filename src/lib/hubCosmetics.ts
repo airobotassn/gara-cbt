@@ -161,7 +161,7 @@ export const SKINS: SkinDef[] = [
     // 기본 초원은 옛 CSS 카드·게이지와 SVG 아이콘을 한 세트로 쓴다 — 그래서 아이콘 폴더가 없다.
     ui: 'base',
     iconDir: null,
-    bg: '/hub/bg-meadow-default.png',
+    bg: '/hub/bg-meadow-default.webp',
   },
   // 같은 고궁의 **낮**과 **밤**. 둘 다 코인으로 산다.
   //   ⚠️ 이 둘은 UI 한 벌(판·게이지·도장·아이콘)을 통째로 공유하고 배경만 다르다 —
@@ -171,14 +171,14 @@ export const SKINS: SkinDef[] = [
     partKey: 'skin_palace_day',
     ui: 'palace',
     iconDir: '/hub/ui',
-    bg: '/hub/bg-v2.png',
+    bg: '/hub/bg-v2.webp',
   },
   {
     key: 'palace_night',
     partKey: 'skin_palace_night',
     ui: 'palace',
     iconDir: '/hub/ui',
-    bg: '/hub/bg-v5.png',
+    bg: '/hub/bg-v5.webp',
   },
 ]
 

@@ -28,7 +28,7 @@ export default function Login() {
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl opacity-80 pointer-events-none"></div>
         {/* Header / Logo */}
         <div className="relative z-10">
-          {/* 브랜드 마크 = GARA 워드마크(2026). 옛 CARIS 행성(`/logo.png`)은 동그란 그림이라
+          {/* 브랜드 마크 = GARA 워드마크(2026). 옛 CARIS 행성(`/logo.webp`)은 동그란 그림이라
               원형 크롭으로 썼는데, 워드마크는 가로로 긴 글자라 원에 넣으면 양옆이 잘린다 —
               그래서 원형 크롭(`rounded-full` + `object-cover`)을 걷어내고 높이만 잡는다. */}
           <button
@@ -39,7 +39,7 @@ export default function Login() {
             <img
               alt="GARA"
               className="gara-wordmark h-6 sm:h-7 w-auto transition-transform duration-700 ease-out group-hover:scale-105"
-              src="/gara-wordmark-2026.png"
+              src="/gara-wordmark-2026.webp"
             />
           </button>
           <div className="max-w-xl">
@@ -56,7 +56,7 @@ export default function Login() {
           <div className="flex items-center gap-2">
             {/* 푸터는 협회 공식 로고(마크 + 영문 기관명)를 쓴다 — 발급기관을 밝히는 자리라
                 이름이 그림 안에 들어 있다. 옆에 글자를 또 붙이지 않는다. */}
-            <img src="/gara-mark-en.png" alt="GARA · Global AI & Robotics Association" className="gara-wordmark h-8 w-auto" />
+            <img src="/gara-mark-en.webp" alt="GARA · Global AI & Robotics Association" className="gara-wordmark h-8 w-auto" />
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>
@@ -124,7 +124,7 @@ export default function Login() {
           <div className="flex items-center gap-2">
             {/* 푸터는 협회 공식 로고(마크 + 영문 기관명)를 쓴다 — 발급기관을 밝히는 자리라
                 이름이 그림 안에 들어 있다. 옆에 글자를 또 붙이지 않는다. */}
-            <img src="/gara-mark-en.png" alt="GARA · Global AI & Robotics Association" className="gara-wordmark h-8 w-auto" />
+            <img src="/gara-mark-en.webp" alt="GARA · Global AI & Robotics Association" className="gara-wordmark h-8 w-auto" />
           </div>
           <div className="flex flex-wrap justify-center gap-4 text-sm text-on-surface-variant font-medium">{footerLinks}</div>
           <span className="text-outline-variant text-xs mt-2">{t('footer.rights')}</span>

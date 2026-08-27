@@ -136,7 +136,7 @@ export default function MiniGameRankModal({
               {/* === 시상대 TOP 3 — /ranking 과 같은 그림·좌표(ranking.css). 제목만 없다(모달 헤더가 대신한다). === */}
               <div className="hof-podium">
                 <div className="hof-podium-art">
-                  <img src="/ranking/podium-gara-2026.png" alt="" className="hof-podium-img" />
+                  <img src="/ranking/podium-gara-2026.webp" alt="" className="hof-podium-img" />
                   {podium.map((r, i) =>
                     r ? (
                       <span key={r.rank} className={`hof-slot ${podClass[i]}`}>
@@ -168,7 +168,7 @@ export default function MiniGameRankModal({
                   {rest.map((r) => (
                     <div key={r.rank} className={`hof-row ${r.me ? 'me' : ''}`}>
                       <div className="hof-bar">
-                        <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
+                        <img src="/ranking/tierbar.webp" alt="" className="bar-frame" />
                         <span className="bar-rk" data-digits={String(r.rank).length}>{r.rank}</span>
                         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(r)} seed={r.name} size={48} /></span>
                         <span className="bar-nm">
@@ -195,7 +195,7 @@ export default function MiniGameRankModal({
             // 구조·크기 전부 /ranking 의 내 순위 바와 동일: 이름 옆 small 로 '상위 N%'(meflag 대신).
             <div className="hof-mebar">
               <div className="hof-bar">
-                <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
+                <img src="/ranking/tierbar.webp" alt="" className="bar-frame" />
                 <span className="bar-rk" data-digits={String(data.me.rank).length}>{data.me.rank}</span>
                 <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(data.me)} seed={data.me.name} size={48} /></span>
                 <span className="bar-nm">

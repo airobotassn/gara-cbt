@@ -421,7 +421,7 @@ export default function WorldArena() {
         <nav className="aa-launch">
           <Link className="aa-lbtn cari" to="/hub">
             {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
-            <span className="ic ic-img"><img src="/cari-diagonal.png" alt="" /></span>
+            <span className="ic ic-img"><img src="/cari-diagonal.webp" alt="" /></span>
             <span className="lt">
               <b>{t('arena.bHub')}</b>
               <i>{t('arena.bHubS')}</i>

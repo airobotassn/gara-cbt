@@ -27,7 +27,7 @@ export default function About() {
             {/* 협회 공식 로고 — 옛 영문 배지가 있던 자리이자, 배경에 흐릿하게 깔려 있던 그 로고다.
                 ⚠️ 원본이 388px 뿐이라 이보다 크게 키우지 말 것(stitch.css 옛 워터마크 주석 참고). */}
             <img
-              src="/gara-mark-en.png"
+              src="/gara-mark-en.webp"
               alt="GARA · Global AI & Robotics Association"
               className="gara-wordmark h-9 md:h-10 w-auto mx-auto mb-6"
             />

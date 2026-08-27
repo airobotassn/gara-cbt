@@ -433,7 +433,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             title={inquiryAlert > 0 ? t('fab.newanswer') : undefined}
           >
             <img
-              src="/logo.png"
+              src="/logo.webp"
               alt="CARIS"
               style={{ width: 40, height: 40, borderRadius: '50%' }}
             />

@@ -756,7 +756,7 @@ html.dark body:has(.hof-wrap) {
     2026-08-03 새 시상대(밤하늘·금 건축물)엔 날개도 빈 띠도 없어서 얹을 자리가 없다.) */
 
 /* (방패 엠블럼 .hof-badge 는 제거됨 — 시상대 왕관과 중복이고 고정 틀에서 110px 을 먹었다.
-    에셋 public/ranking/emblem.png 는 남겨둔다.) */
+    에셋 public/ranking/emblem.webp 는 남겨둔다.) */
 
 /* 단색 제목. ⚠️ 2026-08-05 명조(CertMyeongjo) 제거 — 화면 글씨체는 Pretendard 하나로 통일했다.
    명조는 인증서(자격증·레벨 인증서) 안에서만 쓴다. */
@@ -778,8 +778,8 @@ html.dark body:has(.hof-wrap) {
 .hof-sub::after { transform: scaleX(-1); }
 
 /* ===== 시상대 =====
-   그림 = public/ranking/podium-gara-2026.png (1424×874 · 높이÷폭 0.614). 남색 메탈 단 3개 + 네온.
-   ⚠️ 1위 단의 GARA 워드마크만 다른 옛 파일(podium.png)이 아직 public 에 남아 있다 — 쓰는 곳은 없다.
+   그림 = public/ranking/podium-gara-2026.webp (1424×874 · 높이÷폭 0.614). 남색 메탈 단 3개 + 네온.
+   ⚠️ 1위 단의 GARA 워드마크만 다른 옛 파일(podium.webp)이 아직 public 에 남아 있다 — 쓰는 곳은 없다.
       두 화면(/ranking · 미니게임 랭킹 모달)이 같은 그림을 봐야 로고가 어긋나지 않는다.
    ⚠️ 2026-08-06 교체: 옛 그림(밤하늘 남색 + 앤티크 금 + 크림 명판)은 "너무 게임 같다"로 반려됐다.
    ⚠️ **아바타 링도 크림 명판도 없는 그림이다.** 그래서 얹는 방식이 이전과 다르다:
@@ -861,14 +861,14 @@ html.dark body:has(.hof-wrap) {
 }
 .hof-slot:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 /* ===== 프로필 링 테두리 (TOP 3 전용) =====
-   그림 = public/ranking/ring.png (1162×1162 정사각 · 가운데 구멍은 알파로 뚫려 있다).
+   그림 = public/ranking/ring.webp (1162×1162 정사각 · 가운데 구멍은 알파로 뚫려 있다).
    구멍 지름 = 그림 폭의 **71.86%**, 구멍 중심 = 정중앙. 따라서 구멍을 슬롯(=아바타)에 딱 맞추려면
    링 그림은 슬롯의 1/0.7186 = 1.3916배여야 하고, 사방으로 (1.3916−1)/2 = 19.58% 씩 넘쳐야 한다.
    ⚠️ 링 그림을 갈면 구멍 비율을 다시 재서(`_span.mjs`) 이 inset 을 다시 계산할 것.
    ⚠️ 아바타 위가 아니라 **아바타를 감싸는 테두리**다 — 구멍이 뚫려 있어 얼굴을 가리지 않는다. */
 .hof-slot::after {
   content: ''; position: absolute; inset: -19.58%;
-  background: url('/ranking/ring.png') center / 100% 100% no-repeat;
+  background: url('/ranking/ring.webp') center / 100% 100% no-repeat;
   pointer-events: none;
 }
 /* ===== ⚠️ 아바타 달걀 방지 — 아바타 소켓은 **전부 이 규칙 하나**를 쓴다 =====
@@ -953,7 +953,7 @@ html.dark body:has(.hof-wrap) {
 .hof-pn.p3 b { color: #ffb894; }
 
 /* ===== 티어리스트 바 (4~10위 행 · 내 순위 바 공용) =====
-   프레임 = public/ranking/tierbar.png (2137×296 — 원본에서 투명 여백만 잘라낸 것, 축소 금지).
+   프레임 = public/ranking/tierbar.webp (2137×296 — 원본에서 투명 여백만 잘라낸 것, 축소 금지).
    ⚠️ 2026-08-06 교체: 시상대와 같이 갈았다(앤티크 금 → 남색 메탈 + 네온). 소켓 배치는 그대로라
       순위칸·아바타·이름판 세 자리는 옛 바와 같은 역할이고, **오른쪽 끝 빈 방패 소켓은 사라졌다**.
    ⚠️ 판이 크림색에서 **어두운 남색**으로 바뀌었다 → 이 안의 글자색은 전부 밝은 쪽으로 뒤집혔다.
@@ -1022,7 +1022,7 @@ html.dark body:has(.hof-wrap) {
    여기에 따로 쓰면 그 블록과 갈라져서 또 aspect-ratio 를 빠뜨리게 된다. */
 /* 순위 숫자 칸은 둥근 사각이고 어두운 남색이다 → 글자색은 프레임 모서리 브래킷과 같은 호박색.
    토큰(--fs-lg 는 데스크톱에서 52px까지 커진다) 대신 고정값. 폰 크기는 아래 미디어쿼리에서. */
-/* ⚠️ 아래 %는 프레임 그림(public/ranking/tierbar.png)의 소켓을 밝기 스캔으로 실측한 값이다.
+/* ⚠️ 아래 %는 프레임 그림(public/ranking/tierbar.webp)의 소켓을 밝기 스캔으로 실측한 값이다.
    그림을 갈면 반드시 다시 재야 한다 — 2026-08-06 교체본(2137×296) 실측(`_sock2.mjs`):
      순위 소켓 x 54~255(중심 7.23% · 폭 9.45% · 202px 정사각)
      아바타 원  x 308~498(중심 18.86% · 폭 8.94% · 191px)

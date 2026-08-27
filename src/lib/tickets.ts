@@ -7,7 +7,7 @@
 // ⚠️ **판정은 전부 서버가 한다**(`usable` / `usableReason`). 프론트에서 시험일·상태를 다시 계산하지 말 것 —
 //    접수·응시 창 판정이 KST 기준인데 브라우저 타임존으로 다시 재면 최대 9시간 어긋난다.
 // ⚠️ 문구는 i18n `D` 사전(`ticket.*`)에 있다. 여기서는 **키만** 고른다(6개국어를 코드가 들고 있으면 안 된다).
-import { getTracks } from './caris'
+import { getPrepareExam } from './caris'
 import type { Lang, TFunc } from './i18n'
 
 export type ExamTicketStatus = 'issued' | 'consumed' | 'void' | 'expired'
@@ -118,9 +118,6 @@ export function ticketReasonText(tk: ExamTicketView, t: TFunc, lang: string): st
  * 모르는 key(옛 데이터·오타)는 원문을 그대로 돌려준다 — 빈칸보다 낫다.
  */
 export function tierDisplay(tierKey: string, lang: Lang): string {
-  for (const track of getTracks(lang)) {
-    const tier = track.tiers.find((x) => x.key === tierKey)
-    if (tier) return `${track.name} ${tier.name}`
-  }
-  return tierKey
+  const found = getPrepareExam(lang, tierKey)
+  return found ? `${found.track.name} ${found.tier.name}` : tierKey
 }

@@ -156,9 +156,9 @@ type TitleItem = { tier: string; exam_title?: string }
 const SHOWCASE_TITLE_TIERS = ['beginner', 'pro', 'elite'] as const
 type ShowcaseTitleTier = (typeof SHOWCASE_TITLE_TIERS)[number]
 const TITLE_ASSET: Record<ShowcaseTitleTier, string> = {
-  beginner: '/hub/titles/beginner-v2.png',
-  pro: '/hub/titles/pro-v2.png',
-  elite: '/hub/titles/elite-v2.png',
+  beginner: '/hub/titles/beginner-v3.webp',
+  pro: '/hub/titles/pro-v3.webp',
+  elite: '/hub/titles/elite-v3.webp',
 }
 
 // 'closet' = 옛 'shop'. 상점과 인벤토리가 한 모달의 두 탭이 되면서 이름을 바꿨다(2026-08-20)

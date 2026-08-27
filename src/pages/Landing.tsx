@@ -86,7 +86,9 @@ export default function Landing() {
   //      (개발 서버를 5173 이 아닌 포트로 띄우면 바로 이 경우고, 그때는 오리진까지 배포 주소로 바뀐다).
   //   ⚠️ 예전엔 이 줄이 localStorage 를 봤는데 심는 쪽은 전부 sessionStorage 였다 — 안전망이 죽어 있었다.
   //      지금은 AuthCallback 과 같은 함수(lib/postLogin)를 쓴다.
-  // postLoginRedirect: 지정 경로로(예: SEB 진입 /exam/seb) · examIntent: 응시 준비(/exam/prepare)
+  // postLoginRedirect: 지정 경로로(예: SEB 진입 /exam/seb) · examIntent: 응시 안내(/exam)
+  // ⚠️ examIntent 를 준비 화면(/exam/prepare)으로 보내지 말 것 — 그 화면은 응시권이 정해진 뒤에만 열린다.
+  //    로그인하고 돌아온 시점엔 어느 응시권인지 아직 안 골랐으므로 목록이 있는 /exam 이 맞다.
   useEffect(() => {
     if (!isFullUser) return
     const dest = takePostLogin()
@@ -96,7 +98,7 @@ export default function Landing() {
     }
     if (localStorage.getItem('examIntent')) {
       localStorage.removeItem('examIntent')
-      navigate('/exam/prepare', { replace: true })
+      navigate('/exam', { replace: true })
     }
   }, [isFullUser, navigate])
 

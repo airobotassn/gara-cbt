@@ -116,7 +116,7 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
         const deg = (Math.atan2(dy, dx) * 180) / Math.PI
         return (
           <image
-            key={`e${a}-${b}`} href="/cert/edge.png" x={-seg / 2} y={-th / 2} width={seg} height={th}
+            key={`e${a}-${b}`} href="/cert/edge.webp" x={-seg / 2} y={-th / 2} width={seg} height={th}
             preserveAspectRatio="none" opacity={on ? 1 : 0.62} filter={on ? undefined : 'url(#lc-ash)'}
             transform={`translate(${mx},${my}) rotate(${deg})`}
           />
@@ -126,7 +126,7 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
       {/* ② 발광 별 — flare 의 빛 중심이 (0.502, 0.371) 이라 그만큼 보정 */}
       {P.filter((p) => lit(p.n)).map((p) => {
         const s = 430
-        return <image key={`f${p.n}`} href="/cert/flare-gold.png" x={p.x - s * 0.502} y={p.y - s * 0.371} width={s} height={s} />
+        return <image key={`f${p.n}`} href="/cert/flare-gold.webp" x={p.x - s * 0.502} y={p.y - s * 0.371} width={s} height={s} />
       })}
 
       {/* ③ 링 + 숫자 + 취득일 — 좌표가 이미 회전된 값이라 글자를 되돌릴 필요가 없다 */}
@@ -138,7 +138,7 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
         return (
           <g key={`n${p.n}`}>
             <circle cx={p.x} cy={p.y} r={R} fill="rgba(3,11,20,.72)" />
-            <image href="/cert/node.png" x={p.x - rw / 2} y={p.y - rh / 2} width={rw} height={rh}
+            <image href="/cert/node.webp" x={p.x - rw / 2} y={p.y - rh / 2} width={rw} height={rh}
               opacity={on ? 1 : 0.72} filter={on ? undefined : 'url(#lc-ash)'} />
             <text x={p.x} y={p.y + 11} textAnchor="middle" fontFamily="CertSerifKR,serif" fontSize={32}
               fontWeight={on ? 700 : 500} fill={on ? '#fff4dd' : 'rgba(206,216,230,.82)'}>{p.n}</text>
@@ -241,20 +241,20 @@ export default function LevelCert() {
     <div className="lc-page">
       <div className="lc-wrap" ref={wrapRef}>
         <div className={`lc-stage lc-lay-${layout}`} ref={stageRef}>
-          <img className="lc-bg" src="/cert/bg.png" alt="" />
+          <img className="lc-bg" src="/cert/bg.webp" alt="" />
           <div className="lc-vig" />
 
-          <img className="lc-orn tl" src="/cert/corner.png" alt="" />
-          <img className="lc-orn tr" src="/cert/corner.png" alt="" />
-          <img className="lc-orn bl" src="/cert/corner.png" alt="" />
-          <img className="lc-orn br" src="/cert/corner.png" alt="" />
+          <img className="lc-orn tl" src="/cert/corner.webp" alt="" />
+          <img className="lc-orn tr" src="/cert/corner.webp" alt="" />
+          <img className="lc-orn bl" src="/cert/corner.webp" alt="" />
+          <img className="lc-orn br" src="/cert/corner.webp" alt="" />
 
           {/* 오른쪽 글자 기둥 — 제목 → 레벨 → 이름 순. **레벨이 이름 위**다(2026-08-19 시안).
               발행처(GARA·기관명)는 이 기둥에서 빠져 아래 .lc-sign 으로 내려갔다. */}
           <div className="lc-col">
-            <img className="lc-title" src="/cert/title-word.png" alt="LEVEL TEST CERTIFICATE" />
+            <img className="lc-title" src="/cert/title-word.webp" alt="LEVEL TEST CERTIFICATE" />
             <div className="lc-mark">
-              <img className="lc-mark-cap" src="/cert/level-word.png" alt="LEVEL" />
+              <img className="lc-mark-cap" src="/cert/level-word.webp" alt="LEVEL" />
               <img className="lc-mark-num" src={`/cert/num-${level}.png`} alt={String(level)} />
             </div>
             <div className="lc-name">{name}</div>

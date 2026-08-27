@@ -57,8 +57,8 @@ export default function ExamCheck() {
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-6">
             {/* 로고만 — 감싸던 원판(테두리·그림자·방사 그라디언트)과 동심원 2개는 제거(2026-08-05).
-                object-contain: logo.png 는 자체 여백이 39% 라 cover 로 채우면 행성이 잘린다. */}
-            <img alt="CARIS Logo" className="w-44 aspect-square object-contain" src="/logo.png" />
+                object-contain: logo.webp 는 자체 여백이 39% 라 cover 로 채우면 행성이 잘린다. */}
+            <img alt="CARIS Logo" className="w-44 aspect-square object-contain" src="/logo.webp" />
             <div>
               <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-4">{t('check.title')}</h1>
               <p className="font-body-lg text-body-lg text-on-surface-variant break-keep leading-relaxed max-w-2xl mx-auto">{t('check.sub')}</p>

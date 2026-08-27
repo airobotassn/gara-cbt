@@ -516,7 +516,7 @@ function MeBar({
             }
           : {})}
       >
-        <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
+        <img src="/ranking/tierbar.webp" alt="" className="bar-frame" />
         <span className="bar-rk" data-digits={String(me.rank).length}>{me.rank}</span>
         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(me)} seed={me.name} size={48} /></span>
         <span className="bar-nm">
@@ -599,13 +599,13 @@ function PersonalBoard({
       ) : (
         <>
           {/* === 시상대 TOP 3 ===
-              그림 = public/ranking/podium-gara-2026.png. 아바타는 각 단 **위에 떠서** 윗면에 살짝 걸치고,
+              그림 = public/ranking/podium-gara-2026.webp. 아바타는 각 단 **위에 떠서** 윗면에 살짝 걸치고,
               이름·점수는 그림 **아래** 3칸에 둔다(새 그림엔 글자를 얹을 빈 면이 없다 — 단 앞면은
               큼직한 1·2·3 숫자가 차지한다). 둘 다 그림 기준 %좌표(실측값은 ranking.css 주석).
               글자 크기는 cqw 라 그림과 같이 줄어든다. */}
           <div className="hof-podium">
             <div className="hof-podium-art">
-              <img src="/ranking/podium-gara-2026.png" alt="" className="hof-podium-img" />
+              <img src="/ranking/podium-gara-2026.webp" alt="" className="hof-podium-img" />
               {podium.map((u, i) =>
                 u && flagUrl(u.country) ? (
                   <span key={`flag-${u.rank}`} className={`hof-podium-flag ${podClass[i]}`} aria-hidden="true">
@@ -704,7 +704,7 @@ function HofRow({ u, t, lang, onPick }: { u: HofUser; t: TFunc; lang: string; on
         onClick={() => onPick(u)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(u) } }}
       >
-        <img src="/ranking/tierbar.png" alt="" className="bar-frame" />
+        <img src="/ranking/tierbar.webp" alt="" className="bar-frame" />
         <span className="bar-rk" data-digits={String(u.rank).length}>{u.rank}</span>
         <span className="bar-ava"><Avatar avatarUrl={avatarUrlOf(u)} seed={u.name} size={48} /></span>
         <span className="bar-nm">

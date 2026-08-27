@@ -421,7 +421,7 @@ function RunnerInner({ start }: { start: StartExamResponse }) {
       {/* Exam Header */}
       <header className="bg-surface-container-lowest border-b border-outline-variant/30 h-16 shrink-0 flex items-center px-4 md:px-margin-desktop justify-between z-50">
         <div className="flex items-center gap-2">
-          <img alt="CARIS" className="h-8 w-8 object-cover rounded-full" src="/logo.png" />
+          <img alt="CARIS" className="h-8 w-8 object-cover rounded-full" src="/logo.webp" />
           <span className="font-title-md text-title-md font-bold text-on-surface tracking-tight">{t('run.top_title', { title: exam.title })}</span>
           {preview && (
             <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/30 text-[11px] font-bold">검수 미리보기</span>

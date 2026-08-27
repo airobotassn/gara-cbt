@@ -109,7 +109,7 @@
    ⚠️ `flex: 0 0 auto` 라야 한다. 줄어들게 두면 숫자가 말줄임돼 1,016 이 1,0… 이 된다
       (이 줄에서 줄어도 되는 건 닉네임뿐이다). */
 /* ⚠️ 기본값은 **궁궐 액자가 아니라 카툰 칩**이다 — 옆 자격 배지(.tt)·코인 칩(.gchip)과 같은
-      두꺼운 외곽선 + 흰 면. 한때 여기에 `/hub/ui/rank-score-frame.png` 가 박혀 있었는데,
+      두꺼운 외곽선 + 흰 면. 한때 여기에 `/hub/ui/rank-score-frame.webp` 가 박혀 있었는데,
       그건 궁궐 스킨의 그림이라 기본 배경(초원)에서 이 칩 하나만 금테를 두르고 혼자 놀았다
       (2026-08-25). 스킨 그림은 스킨 값 블록에서만 얹는다. */
 .hub .hud-score { flex: 0 0 auto; width: fit-content; min-width: 104px; min-height: 30px; padding: 4px 12px;
@@ -740,11 +740,11 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ 초원은 지평선이 화면 한복판이고 아래가 통째로 평지라 발끝을 궁궐(20vh)보다 낮게 둔다.
       궁궐 값을 그대로 쓰면 캐릭터가 언덕 중턱에 붕 뜬다. */
 .hub[data-skin='meadow']       {
-  --skin-bg: url('/hub/bg-meadow-default.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%;
+  --skin-bg: url('/hub/bg-meadow-default.webp'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%;
   --skin-char-h: 43vh; --skin-char-bottom: 25vh;
 }
-.hub[data-skin='palace_day']   { --skin-bg: url('/hub/bg-v2.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='palace_night'] { --skin-bg: url('/hub/bg-v5.png'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='palace_day']   { --skin-bg: url('/hub/bg-v2.webp'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='palace_night'] { --skin-bg: url('/hub/bg-v5.webp'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
    ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 이름이 아니라 **`data-ui` 가 같기 때문**이다.
@@ -779,7 +779,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-rail-ink-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.7);
 
   /* 미션 바 — 1155×102, 양끝 꽃 캡 101, 위 36 / 아래 29 */
-  --skin-mission-img: url('/hub/ui/panel-mission.png');
+  --skin-mission-img: url('/hub/ui/panel-mission.webp');
   --skin-mission-slice: 45 145 40 145 fill;
   /* ⚠️ 테두리를 얇게 잡는 이유 = 바깥 높이를 옛 크기로 유지하려고. 테두리를 두껍게 그리면
         같은 바깥 높이에서 글자 자리가 그만큼 줄고, 자리를 지키려 바깥을 키우면 바가 커 보인다.
@@ -788,7 +788,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-mission-h: 56px;
 
   /* 출석 보상 판 — 1155×282, 모서리 장식 148, 위 58 / 아래 51 */
-  --skin-reward-img: url('/hub/ui/panel-reward.png');
+  --skin-reward-img: url('/hub/ui/panel-reward.webp');
   --skin-reward-slice: 58 147 51 149 fill;
   --skin-reward-edge: 15px 38px 13px;   /* 미션 바와 같은 이유로 얇게 — 판이 커 보이지 않게 */
 
@@ -798,34 +798,34 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
      (실측: 가로 0.36배 / 세로 0.93배 → "해상도가 개판"으로 보인 원인).
      ⚠️ 폭·높이를 억지로 맞추지 마라 — 그건 그림을 코드에 맞추는 짓이고 실제로 더 나빠졌다.
         슬롯 모양에 맞는 그림을 다시 뽑거나, 슬롯을 그림 모양(가로 띠)으로 바꾸는 게 답이다.
-  --skin-cta-img: url('/hub/ui/button-ranking.png');
+  --skin-cta-img: url('/hub/ui/button-ranking.webp');
   --skin-cta-slice: 38 109 32 104 fill;
   --skin-cta-edge: 14px 40px 12px;  */
 
   /* 경험치 게이지 — 홈 958×66(캡 ~66), 채움 958×65 */
-  --skin-gauge-img: url('/hub/ui/gauge-track.png');
+  --skin-gauge-img: url('/hub/ui/gauge-track.webp');
   --skin-gauge-slice: 16 69 22 63 fill;
   --skin-gauge-edge: 6px 12px 8px;
-  --skin-fill-img: url('/hub/ui/gauge-fill.png');
+  --skin-fill-img: url('/hub/ui/gauge-fill.webp');
   --skin-fill-slice: 29 69 23 70 fill;
   --skin-fill-edge: 6px 10px;   /* 홈보다 작게 — 진행률이 낮을 때 캡이 뭉쳐 덩어리로 보인다 */
   --skin-hud-h: 38px;           /* 게이지·? ·코인칩 공통 높이. 셋이 한 줄이라 따로 놀면 티 난다 */
   --skin-gauge-font: 12.5px;
 
   /* 출석 도장 */
-  --skin-stamp-img: url('/hub/ui/stamp-empty.png');
-  --skin-stamp-on-img: url('/hub/ui/stamp-filled.png');
+  --skin-stamp-img: url('/hub/ui/stamp-empty.webp');
+  --skin-stamp-on-img: url('/hub/ui/stamp-filled.webp');
   --skin-stamp-h: 52px;
   --skin-stamp-font: 13px;
   --skin-stamp-ink: #4b3020;
   --skin-stamp-on-ink: #5a3208;
   --skin-stamp-on-ink-shadow: 0 1px 0 rgba(255,240,200,.85), 0 0 3px rgba(255,235,190,.8);
-  --skin-profile-img: url('/hub/ui/profile-frame.png');
-  --skin-rank-img: url('/hub/ui/rank-score-frame.png');   /* 이름 옆 랭킹 점수 칩의 액자 */
-  --skin-currency-img: url('/hub/ui/currency-chip.png');
+  --skin-profile-img: url('/hub/ui/profile-frame.webp');
+  --skin-rank-img: url('/hub/ui/rank-score-frame.webp');   /* 이름 옆 랭킹 점수 칩의 액자 */
+  --skin-currency-img: url('/hub/ui/currency-chip.webp');
   --skin-currency-slice: 60 75 55 350 fill;
   --skin-currency-edge: 7px 10px 7px 42px;
-  --skin-cta-img: url('/hub/ui/button-ranking.png');
+  --skin-cta-img: url('/hub/ui/button-ranking.webp');
   /* 실측값(이웃 픽셀 줄 비교로 찾은 '늘려도 되는 가운데'의 바깥). 원본 760×225 */
   --skin-cta-slice: 58 138 48 140 fill;
   --skin-cta-edge: 26px 62px 22px;
@@ -1105,7 +1105,7 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 
 /* ── 로그인 게이트는 여기 없다(2026-08-24) ──
    비로그인 /hub 게이트를 **결제 화면(/checkout)의 로그인 안내 카드와 같은 것**으로 갈았다.
-   그래서 카툰 카드 값(.hub-gate-*)과 옛 CARI 로봇 그림(/hub-char.png)이 통째로 빠졌다 —
+   그래서 카툰 카드 값(.hub-gate-*)과 옛 CARI 로봇 그림(/hub-char.webp)이 통째로 빠졌다 —
    그림은 이미 지금 캐릭터가 아니었고, 같은 상황을 두 화면이 다른 얼굴로 말하고 있었다.
    지금 마크업은 Hub.tsx 안에 Tailwind 토큰으로 있다(ExamApply 의 막힘 카드와 같은 값). */
 

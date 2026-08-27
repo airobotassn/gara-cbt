@@ -8,7 +8,7 @@ import { gradeDisplay, fmtCertDate, certExpiryDate, makeCertNo, gradeOfTitle } f
 import type { MyAttemptsResponse } from '../lib/types'
 
 // ===== 인증서 = 확정 시안 PNG(배경·프레임·로고·문구·라벨) + 동적 필드 SVG 오버레이 =====
-// 배경 = public/cert-template-v2.png (2026-08 협회 신규 시안 — 좌측 다크 패널 + 우측 영문 서식, 1448×1086).
+// 배경 = public/cert-template-v2.webp (2026-08 협회 신규 시안 — 좌측 다크 패널 + 우측 영문 서식, 1448×1086).
 // 그 위에 값만 얹는다: ①영문 성명 ②급수 ③Certificate ID ④Issue Date ⑤Valid Until ⑥진위확인 QR.
 // 좌표는 템플릿을 픽셀 계측해 뽑았다(scratchpad/measure-cert-v2.mjs — 잉크 있는 행 구간 = 기존 텍스트 줄).
 // ⚠️ 이름은 **영문만** 각인한다(신규 시안이 영문 서식). 값은 발급 신청 화면에서 입력받아
@@ -415,12 +415,12 @@ export default function Certificate() {
           </defs>
 
           {/* 배경 = 신규 시안(값 없는 clean 판) */}
-          <image href="/cert-template-v2.png" x="0" y="0" width={VB.w} height={VB.h} />
+          <image href="/cert-template-v2.webp" x="0" y="0" width={VB.w} height={VB.h} />
 
           {/* 푸터 GARA 마크 = 신규 협회 로고. 배경에 구워진 옛 마크를 덮고 새로 얹는다(위 FOOT_* 주석) */}
           <rect x={FOOT_PATCH.x} y={FOOT_PATCH.y} width={FOOT_PATCH.w} height={FOOT_PATCH.h} fill={FOOT_BG} />
           <image
-            href="/cert/mark-gara.png"
+            href="/cert/mark-gara.webp"
             x={FOOT_MARK.right - FOOT_MARK.w}
             y={FOOT_MARK.cy - FOOT_MARK.h / 2}
             width={FOOT_MARK.w}

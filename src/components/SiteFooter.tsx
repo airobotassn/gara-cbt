@@ -63,7 +63,7 @@ export default function SiteFooter() {
       <div className="pt-8 pb-6 md:py-7 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-start gap-4 md:gap-5">
         <div className="flex flex-col gap-1.5">
           <Link to="/" aria-label="CARIS 홈으로" className="flex items-center gap-2 w-fit group">
-            <img src="/logo.png" alt="CARIS" className="h-9 w-9 object-cover rounded-full" />
+            <img src="/logo.webp" alt="CARIS" className="h-9 w-9 object-cover rounded-full" />
             <span className="font-title-md text-title-md font-bold text-on-surface group-hover:text-primary transition-colors">CARIS</span>
           </Link>
           {/* 전자상거래법 표기 — 관리자가 채우기 전에는 줄 자체가 안 나온다(빈 라벨만 남는 게 더 나쁘다). */}

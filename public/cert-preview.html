@@ -33,7 +33,7 @@
   .vig{position:absolute;inset:0;
        background:radial-gradient(120% 90% at 50% 45%,rgba(0,0,0,0) 35%,rgba(3,6,12,.55) 78%,rgba(2,4,9,.86) 100%)}
 
-  /* 모서리 장식 — corner.png 한 장을 네 방향으로 뒤집어 쓴다 */
+  /* 모서리 장식 — corner.webp 한 장을 네 방향으로 뒤집어 쓴다 */
   .orn{position:absolute;width:320px;pointer-events:none}
   .orn.tl{left:26px;top:26px}
   .orn.tr{right:26px;top:26px;transform:scaleX(-1)}
@@ -94,18 +94,18 @@
 </div>
 
 <div class="wrap"><div class="stage" id="stage">
-  <img class="bg" src="cert/bg.png" alt="">
+  <img class="bg" src="cert/bg.webp" alt="">
   <div class="vig"></div>
 
-  <img class="orn tl" src="cert/corner.png" alt=""><img class="orn tr" src="cert/corner.png" alt="">
-  <img class="orn bl" src="cert/corner.png" alt=""><img class="orn br" src="cert/corner.png" alt="">
+  <img class="orn tl" src="cert/corner.webp" alt=""><img class="orn tr" src="cert/corner.webp" alt="">
+  <img class="orn bl" src="cert/corner.webp" alt=""><img class="orn br" src="cert/corner.webp" alt="">
 
   <div class="col">
-    <img class="brand" src="cert/logo-gara.png" alt="GARA">
-    <img class="title" src="cert/title-word.png" alt="LEVEL TEST CERTIFICATE">
+    <img class="brand" src="cert/logo-gara.webp" alt="GARA">
+    <img class="title" src="cert/title-word.webp" alt="LEVEL TEST CERTIFICATE">
     <div class="name" id="name">홍길동</div>
     <div class="mark">
-      <img class="mark-cap" src="cert/level-word.png" alt="LEVEL">
+      <img class="mark-cap" src="cert/level-word.webp" alt="LEVEL">
       <img class="mark-num" id="lv-num" src="cert/num-3.png" alt="3">
     </div>
     <div class="issuer">Global AI &amp; Robotics Association</div>
@@ -203,7 +203,7 @@ function draw(level){
   refitViewBox();
   const lit = n => n <= level;   // 좌표가 이미 회전된 값이라 글자를 되돌릴 필요가 없다
 
-  // ① 연결선 — 각인 선 조각(edge.png)을 구간마다 회전·신축해 깐다. 링 앞에서 끊어 여백을 준다.
+  // ① 연결선 — 각인 선 조각(edge.webp)을 구간마다 회전·신축해 깐다. 링 앞에서 끊어 여백을 준다.
   const GAP = R + 12;
   EDGES.forEach(([a,b]) => {
     const p = at(a), q = at(b), on = lit(a) && lit(b);
@@ -211,15 +211,15 @@ function draw(level){
     const seg = len - GAP * 2, th = 9;
     const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
     const deg = Math.atan2(dy, dx) * 180 / Math.PI;
-    g.appendChild(el('image', { href:'cert/edge.png', x:-seg/2, y:-th/2, width:seg, height:th,
+    g.appendChild(el('image', { href:'cert/edge.webp', x:-seg/2, y:-th/2, width:seg, height:th,
       preserveAspectRatio:'none', opacity: on ? 1 : 0.62, ...(on ? {} : { filter:'url(#ash)' }),
       transform:`translate(${mx},${my}) rotate(${deg})` }));
   });
 
-  // ② 발광 별 — flare-gold.png 의 빛 중심이 (0.502, 0.371) 지점이라 그만큼 보정
+  // ② 발광 별 — flare-gold.webp 의 빛 중심이 (0.502, 0.371) 지점이라 그만큼 보정
   P.filter(p => lit(p.n)).forEach(p => {
     const s = 430;
-    g.appendChild(el('image', { href:'cert/flare-gold.png', x:p.x-s*0.502, y:p.y-s*0.371, width:s, height:s }));
+    g.appendChild(el('image', { href:'cert/flare-gold.webp', x:p.x-s*0.502, y:p.y-s*0.371, width:s, height:s }));
   });
 
   // ③ 링 + 숫자 + 취득일 — 레벨과 무관하게 항상 같은 좌표
@@ -227,7 +227,7 @@ function draw(level){
     const on = lit(p.n);
     g.appendChild(el('circle', { cx:p.x, cy:p.y, r:R, fill:'rgba(3,11,20,.72)' }));
     const rw = 637 / 630 * (R * 2.45), rh = R * 2.45;
-    g.appendChild(el('image', { href:'cert/node.png', x:p.x-rw/2, y:p.y-rh/2, width:rw, height:rh,
+    g.appendChild(el('image', { href:'cert/node.webp', x:p.x-rw/2, y:p.y-rh/2, width:rw, height:rh,
       opacity: on ? 1 : 0.72, ...(on ? {} : { filter:'url(#ash)' }) }));
     const num = el('text', { x:p.x, y:p.y+11, 'text-anchor':'middle',
       'font-family':'NotoSerifKR,serif', 'font-size':32, 'font-weight': on ? 700 : 500,

@@ -49,10 +49,12 @@ export default function ExamGate() {
     document.getElementById('my-tickets')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // 로그인 안내 팝업에서 실제 구글 로그인 실행
+  // 로그인 안내 팝업에서 실제 구글 로그인 실행.
+  // ⚠️ 돌아올 곳은 **이 화면**이다 — 준비 화면은 응시권이 정해진 뒤에만 열리는데, 로그인하고 돌아온
+  //    시점엔 아직 안 골랐다. 여기로 돌아와야 아래 응시권 목록에서 고르는 흐름이 이어진다.
   function doLogin() {
     localStorage.setItem('examIntent', '1')
-    loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam/prepare')}`)
+    loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam')}`)
   }
 
   return (
@@ -81,8 +83,8 @@ export default function ExamGate() {
           <section className="flex flex-col lg:flex-row gap-16 items-center">
             <div className="w-full lg:w-5/12 flex justify-center items-center">
               {/* 로고만 — 감싸던 원판(테두리·그림자·방사 그라디언트)과 동심원 2개는 제거(2026-08-05).
-                  object-contain: logo.png 는 자체 여백이 39% 라 cover 로 채우면 행성이 잘린다. */}
-              <img src="/logo.png" alt="CARIS Logo" className="w-full aspect-square max-w-md object-contain" />
+                  object-contain: logo.webp 는 자체 여백이 39% 라 cover 로 채우면 행성이 잘린다. */}
+              <img src="/logo.webp" alt="CARIS Logo" className="w-full aspect-square max-w-md object-contain" />
             </div>
             <div className="w-full lg:w-7/12 flex flex-col gap-8">
               <div>

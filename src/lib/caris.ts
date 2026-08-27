@@ -161,18 +161,19 @@ export function getTracks(lang: Lang): Track[] {
   return [track1, track2]
 }
 
-// 응시 전 안내(ExamPrepare)에서 보여줄 '결제한 시험' → 트랙·티어. 결제/응시권 연동 전까지 CARIS-Ⅰ Pro 고정(표시용).
-// ⚠️ 실제 응시 문제는 단일시험(gara-default)이라 이 티어는 안내 표시일 뿐 문제 내용과 무관.
-// TODO: 결제/응시권(exam registration)에서 사용자가 결제한 트랙·티어를 조회해 인자로 넘기도록 교체.
-export function getPrepareExam(
-  lang: Lang,
-  trackKey: string = 't1',
-  tierKey: string = 'pro',
-): { track: Track; tier: Tier } {
-  const tracks = getTracks(lang)
-  const track = tracks.find((t) => t.key === trackKey) ?? tracks[0]
-  const tier = track.tiers.find((t) => t.key === tierKey) ?? track.tiers[0]
-  return { track, tier }
+/** 급수 key(`exam_tickets.tier`) → 그 급수가 속한 트랙·티어.
+ *  인자가 **급수 하나뿐인 이유**: 응시권에는 트랙 컬럼이 없다(`exam_tickets.tier` 한 컬럼). 티어 key 는
+ *  두 트랙을 통틀어 유일하므로 여기서 트랙까지 찾아 준다.
+ *  ⛔ **못 찾았을 때 아무 급수나 돌려주지 말 것.** 예전엔 인자 기본값이 `t1`·`pro` 였고 응시 준비 화면이
+ *     인자를 아예 안 넘겨서, **어떤 응시권으로 들어와도 CARIS-Ⅰ Pro 의 과목·합격 기준**이 떴다
+ *     (Elite 응시권으로 응시하면서 Pro 안내를 읽는다 — 2026-08-26 발견). 모르면 null 을 줘서
+ *     호출부가 '틀린 안내' 대신 '안내 없음'을 그리게 한다. */
+export function getPrepareExam(lang: Lang, tierKey: string): { track: Track; tier: Tier } | null {
+  for (const track of getTracks(lang)) {
+    const tier = track.tiers.find((t) => t.key === tierKey)
+    if (tier) return { track, tier }
+  }
+  return null
 }
 
 // 시험 일정(정기/상시)은 DB(exam_rounds)가 단일 소스 — src/lib/rounds.ts 의 useExamRounds 로 로드.
