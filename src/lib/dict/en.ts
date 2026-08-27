@@ -206,8 +206,7 @@ const EN: Record<string, string> = {
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "Intro to AI tools, prompts, and problem solving with AI",
   "lv.2.name": "Basic",
-  // 2026-08-27 ladder shift (old 2~5 → 3~6) emptied Lv.2 — replace this once new questions land.
-  "lv.2.desc": "New questions are on the way",
+  "lv.2.desc": "Business & everyday prompts, prompt techniques, AI tools for productivity",
   "lv.3.name": "Intermediate",
   "lv.3.desc": "Generative-AI literacy & ethics, prompt-engineering basics",
   "lv.4.name": "Advanced",

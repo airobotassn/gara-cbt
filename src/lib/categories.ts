@@ -56,10 +56,32 @@ const LEVEL_CATEGORIES_RAW: Record<number, AxisRaw[]> = {
       ['AI를 활용한 문제해결', 'Problem solving with AI', 'AIを活用した問題解決', '运用AI解决问题', 'AI से समस्या समाधान', 'Giải quyết vấn đề bằng AI'],
       ['문제해결', 'Problem solving', '問題解決', '问题解决', 'समस्या समाधान', 'Giải quyết vấn đề']),
   ],
-  // Lv.2 = 빈 레벨(2026-08-27 밀기로 비었다). 새 문항을 넣기 전에 여기 6축을 정의할 것 —
-  //   축이 없으면 관리자 업로드가 category 를 전부 거절하고(admin-test/handlers/questions.ts),
-  //   start-test 는 '해당 레벨의 문제가 없습니다.' 로 400 을 낸다.
-  2: [],
+  // Lv.2 = 2026-08-27 밀기로 비었던 자리에 새로 정의한 6축(지시). 아직 **문항이 0개**라
+  //   testConfigLevel.ts 의 COMING_SOON_LEVELS 가 잠가두고 있다 — 문항이 들어오면 그 배열을 비울 것.
+  //   ⚠️ 키를 옛 l2_*(l2_principle·l2_security·l2_ethics·l2_responsibility·l2_llm_eco·l2_prompt)와
+  //      **겹치지 않게** 새로 잡았다. 그 코드들은 지금 l3_* 로 밀렸지만 옛 응시 기록(test_answers·
+  //      test_attempts 의 축 JSONB)에는 밀기 전 코드가 그대로 남아 있어서, 재사용하면 옛 답안이
+  //      새 영역 이름으로 뜬다.
+  2: [
+    ax('l2_biz_prompt',
+      ['비즈니스 프롬프트', 'Business prompts', 'ビジネスプロンプト', '商务提示词', 'बिज़नेस प्रॉम्प्ट', 'Prompt kinh doanh'],
+      ['비즈니스', 'Business', 'ビジネス', '商务', 'बिज़नेस', 'Kinh doanh']),
+    ax('l2_life_prompt',
+      ['일상 프롬프트', 'Everyday prompts', '日常プロンプト', '日常提示词', 'रोज़मर्रा के प्रॉम्प्ट', 'Prompt đời sống'],
+      ['일상', 'Everyday', '日常', '日常', 'रोज़मर्रा', 'Đời sống']),
+    ax('l2_technique',
+      ['프롬프트 기법', 'Prompt techniques', 'プロンプト技法', '提示词技巧', 'प्रॉम्प्ट तकनीक', 'Kỹ thuật prompt'],
+      ['프롬프트기법', 'Techniques', 'プロンプト技法', '提示技巧', 'तकनीक', 'Kỹ thuật']),
+    ax('l2_tools',
+      ['AI 툴 활용', 'Using AI tools', 'AIツール活用', 'AI 工具运用', 'AI टूल उपयोग', 'Sử dụng công cụ AI'],
+      ['AI툴활용', 'AI tools', 'AIツール', 'AI工具', 'AI टूल', 'Công cụ AI']),
+    ax('l2_productivity',
+      ['생산성·협업 AI', 'Productivity & collaboration AI', '生産性・協働AI', '生产力·协作 AI', 'उत्पादकता·सहयोग AI', 'AI năng suất & cộng tác'],
+      ['생산성·협업', 'Productivity', '生産性・協働', '生产力·协作', 'उत्पादकता', 'Năng suất']),
+    ax('l2_solve_ethics',
+      ['문제해결·윤리', 'Problem solving & ethics', '問題解決・倫理', '问题解决·伦理', 'समस्या समाधान·नैतिकता', 'Giải quyết vấn đề & đạo đức'],
+      ['문제해결·윤리', 'Solving·Ethics', '問題解決・倫理', '问题解决·伦理', 'समाधान·नैतिकता', 'Giải quyết·Đạo đức']),
+  ],
   3: [
     ax('l3_principle',
       ['생성형 AI 기본 원리', 'Generative AI basics', '生成AIの基礎', '生成式AI原理', 'जनरेटिव AI मूल', 'Nguyên lý AI tạo sinh'],

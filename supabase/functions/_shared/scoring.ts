@@ -67,8 +67,9 @@ export async function dailyAttemptsLeft(
 export const LEVEL_AXES: Record<number, string[]> = {
   // 2026-07-27 l1_problem(AI를 활용한 문제해결) 추가 — 프론트 categories.ts 와 순서까지 동일하게 유지할 것.
   1: ['l1_prompt', 'l1_tools', 'l1_problem'],
-  // Lv.2 = 빈 레벨(축·문항 미정). 문항을 넣기 전에 categories.ts 와 여기 6축을 먼저 정의할 것.
-  2: [],
+  // Lv.2 = 2026-08-27 밀기로 비었던 자리에 새로 정의한 6축. 아직 문항이 0개라 COMING_SOON_LEVELS 가 잠가둔다.
+  //   ⚠️ 키를 옛 l2_*(지금 l3_*)와 겹치지 않게 새로 잡았다 — 옛 응시 기록에 밀기 전 코드가 남아 있다.
+  2: ['l2_biz_prompt', 'l2_life_prompt', 'l2_technique', 'l2_tools', 'l2_productivity', 'l2_solve_ethics'],
   3: ['l3_principle', 'l3_security', 'l3_ethics', 'l3_responsibility', 'l3_llm_eco', 'l3_prompt'],
   4: ['l4_genai', 'l4_api', 'l4_algo', 'l4_sensor', 'l4_block', 'l4_python'],
   5: ['l5_rag', 'l5_llm_ctrl', 'l5_vision_eval', 'l5_vision_data', 'l5_c_basic', 'l5_c_adv'],

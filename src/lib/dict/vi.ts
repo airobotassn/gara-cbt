@@ -206,8 +206,7 @@ const VI: Record<string, string> = {
   // Lv.1 = 3축(다른 레벨은 6축) — AI 프롬프트 활용 · AI 도구 이해 · AI를 활용한 문제해결
   "lv.1.desc": "Nhập môn công cụ AI, prompt và giải quyết vấn đề bằng AI",
   "lv.2.name": "Cơ bản",
-  // 2026-08-27 사다리 밀기(옛 2~5 → 3~6)로 Lv.2 가 비었다 — 새 문항이 들어오면 이 설명을 그 내용으로 바꿀 것.
-  "lv.2.desc": "Câu hỏi mới đang được chuẩn bị",
+  "lv.2.desc": "Prompt kinh doanh & đời sống, kỹ thuật prompt, dùng công cụ AI để tăng năng suất",
   "lv.3.name": "Trung cấp",
   "lv.3.desc": "Hiểu biết & đạo đức AI tạo sinh, nền tảng prompt engineering",
   "lv.4.name": "Nâng cao",
