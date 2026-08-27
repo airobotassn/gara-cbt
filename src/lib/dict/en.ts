@@ -382,7 +382,7 @@ const EN: Record<string, string> = {
   "hub.today_todo": "Today's to-do",
   "hub.todo_attendance": "Attendance",
   "hub.todo_problem": "Today's problem",
-  "hub.todo_learn": "Today's lesson",
+  "hub.todo_learn": "DAILY QUIZ",
   "hub.todo_game": "Mini game",
   "rank.win_daily": "Today",
   "rank.win_season": "Season",
@@ -1424,7 +1424,7 @@ const EN: Record<string, string> = {
   "arena.bLevelS": "Measure & evolve",
   "arena.bHub": "My Home",
   "arena.bHubS": "Character hub",
-  "arena.bDaily": "Daily Learning",
+  "arena.bDaily": "DAILY QUIZ",
   "arena.bDailyS": "Daily content",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
@@ -1632,27 +1632,27 @@ const EN: Record<string, string> = {
   "mypage.empty_no_ticket": "You haven't registered for any exam yet.",
   "mypage.go_apply": "Register for an exam",
 
-  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ── DAILY QUIZ(/daily) · 미니게임(/games) ────────────────────────────────
   // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
   //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
   //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
   //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
-  "daily.title": "Today's lesson",
+  "daily.title": "DAILY QUIZ",
   "daily.login_note": "Sign in to have your completion recorded",
   "daily.term_label": "Today's term",
-  "daily.correct": "Correct! 🎉 Today’s lesson is done.",
+  "daily.correct": "Correct! 🎉 Today's DAILY QUIZ is done.",
   "daily.wrong": "Not quite — the answer is {answer}. You tried, so it counts!",
-  "daily.already": "You've already finished today's lesson. The answer is {answer}.",
+  "daily.already": "You've already finished today's DAILY QUIZ. The answer is {answer}.",
   "daily.theory": "Theory",
   "daily.hint_lead": "Not sure?",
   "daily.reward_head": "On completion",
-  "daily.done_note": "Today's lesson is done ✓ A new question opens tomorrow. You can revisit today's (reward is once a day).",
+  "daily.done_note": "Today's DAILY QUIZ is done ✓ A new question opens tomorrow. You can revisit today's (reward is once a day).",
   "daily.saving": "Saving…",
-  "daily.pick_note": "Pick an answer to finish today's lesson — you earn it just for trying.",
-  "daily.pop_title": "Today's lesson complete!",
+  "daily.pick_note": "Pick an answer to finish today's DAILY QUIZ — you earn it just for trying.",
+  "daily.pop_title": "DAILY QUIZ complete!",
   "daily.pop_bonus": "7-day bonus +{b}P",
   "daily.pop_grew": "Your character grew a little more today.",
-  "daily.pop_already": "You already got coins from today's check-in. The lesson is still recorded.",
+  "daily.pop_already": "You already got coins from today's check-in. The DAILY QUIZ is still recorded.",
 
   "mg.title": "Mini games",
   "mg.preparing": "This mini game is not ready yet.",
@@ -1783,7 +1783,7 @@ const EN: Record<string, string> = {
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "Check in",
-  "hub.mission.daily_learn": "Today's lesson",
+  "hub.mission.daily_learn": "DAILY QUIZ",
   "hub.mission.minigame": "Mini game",
 
   // 도크(출석 보상)
@@ -1887,7 +1887,7 @@ const EN: Record<string, string> = {
   "hub.earn.lv_sub": "per level cleared",
   "hub.earn.foot": "Clearing all 7 levels gives {a} pts — with activities the season max is {b} pts.",
   "hub.earn.row.attendance": "Check in",
-  "hub.earn.row.daily_learn": "Finish today's lesson",
+  "hub.earn.row.daily_learn": "Finish DAILY QUIZ",
   "hub.earn.row.minigame": "Play a mini game",
   "hub.earn.sec_score": "Season points",
   "hub.earn.sec_coin": "CARI coins",
@@ -1895,7 +1895,7 @@ const EN: Record<string, string> = {
   "hub.earn.col_coin": "Coins",
   "hub.earn.coin_pt": "+{n} coins",
   "hub.earn.coin_any": "Whatever is sent",
-  "hub.earn.coin.daily": "Check-in or Today's Study",
+  "hub.earn.coin.daily": "Check-in or DAILY QUIZ",
   "hub.earn.coin.stamp": "Fill the 7-day stamp card",
   "hub.earn.coin.referral": "Invite a friend · redeem a code",
   "hub.earn.coin.gift": "A friend gifts you coins",

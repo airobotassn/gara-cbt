@@ -6,7 +6,7 @@
 //    는 동시 호출 시 적립을 유실할 수 있어, 증분(points = points + p_points)을 하나의 트랜잭션으로 처리한다.
 //  · cosmetic-only 하드 불변식: 실력 진척/스킬 레벨 테이블을 절대 읽거나 쓰지 않고,
 //    _shared/scoring.ts(applyAttempt/computeRankChange) 도 import 하지 않는다. 수치는 config-driven 상수.
-//  · body.kind = 'attendance'(기본, 출석) | 'daily_learn'(오늘의 학습 완료) — 코인 재화(위 RPC)와 별개로
+//  · body.kind = 'attendance'(기본, 출석) | 'daily_learn'(DAILY QUIZ 완료) — 코인 재화(위 RPC)와 별개로
 //    activity_ledger(kind, delta) 를 적립한다(트리거 activity_ledger_apply, STAGE1b 가 user_progress.activity_score
 //    를 원자 증분 — 이 함수는 user_progress 를 직접 쓰지 않는다, cosmetic-gate 유지).
 //    ⚠️ ACTIVITY_ATTENDANCE_DELTA/ACTIVITY_DAILY_LEARN_DELTA 는 _shared/scoring.ts 의 ACTIVITY_DELTA 와 값이

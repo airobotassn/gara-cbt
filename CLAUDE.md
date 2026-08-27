@@ -166,7 +166,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | **캐릭터 허브 / 미니게임** ||||
 | `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `shop-buy` · `character` · `redeem-referral` · `coin-gift` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
-| `/daily` (오늘의 학습) | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
+| `/daily` (DAILY QUIZ — 옛 이름 '오늘의 학습') | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
 | `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-report`·`chat-translate` |
 | `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
@@ -649,7 +649,7 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 - **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~4 70%, Lv.5~7 80% → Lv.1 7/10 · Lv.2~4 14/20 · Lv.5~7 24/30. 2026-08-04 완화, 이전 80/90% · 2026-08-27 경계 한 칸 밀기). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
 - **시즌 점수 (2026-08-04 원안 반영)**: 리더보드 정렬 단일 출처 = `user_progress.season_total` = **레벨테스트 트랙**(`skill_score`) + **활동 트랙**(`activity_score`).
   - 레벨테스트 = 레벨 클리어 1회당 **+1,000**(부분점수 없음 — 승급컷 미달은 0) · 7단계 전부 = **7,000**. `applyAttempt` 가 "클리어한 레벨 수 = 도달 등급−1, 단 천장에서 Lv.7 을 통과하면 7" 로 계산해 GREATEST 로 쌓는다.
-  - 활동 = 미니게임 +2(일 3회) · 오늘의 학습 +2(일 1회) · 출석 +5(일 1회) → 시즌(365일) 상한 **4,745**. 적립값·일일횟수·시즌상한 3표가 한 벌이다(`ACTIVITY_DELTA`/`ACTIVITY_PER_DAY`/`ACTIVITY_SEASON_MAX`, `seasonMax = delta × perDay × SEASON_DAYS`).
+  - 활동 = 미니게임 +2(일 3회) · DAILY QUIZ +2(일 1회) · 출석 +5(일 1회) → 시즌(365일) 상한 **4,745**. 적립값·일일횟수·시즌상한 3표가 한 벌이다(`ACTIVITY_DELTA`/`ACTIVITY_PER_DAY`/`ACTIVITY_SEASON_MAX`, `seasonMax = delta × perDay × SEASON_DAYS`).
   - 전체 상한 **11,745**. 표시 레벨 `ARENA Lv.N` = 시즌 총점 1,000점 균등 밴드(`arenaLevelForScore`/`arenaBand`) — **시험 사다리 등급(`user_progress.rank`)과 별개 축**이다(결과창 승급 연출은 계속 rank 기준).
   - ⚠️ 미니게임은 **참여 횟수당 고정 적립**이라 성적이 활동점수에 반영되지 않는다(게임 실력은 `minigame_scores` 랭킹 전용). 하루 캡은 `activity_ledger` 의 `unique(user_id, day, source_ref)` 를 회차 슬롯(`play:1`…`play:3`)으로 써서 건다.
   - ⛔ **친구 초대는 이제 점수를 주지 않는다(2026-08-24)** — 보상이 **코인 500(양쪽 다 · 도입 때는 50)** 으로 옮겨갔다(아래 '친구 초대' 절). 그래서 활동 상한이 6,570 → **4,745**, 전체 상한이 13,570 → **11,745** 로 내려갔다.

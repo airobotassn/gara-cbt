@@ -316,7 +316,7 @@ export function MinigameStatAdmin() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// WORLD ARENA > 오늘의 학습 > 참여 현황
+// WORLD ARENA > DAILY QUIZ > 참여 현황
 // ══════════════════════════════════════════════════════════════
 interface DailySeriesRow { key: string; learn: number; attend: number; minigame: number; leveltest: number }
 interface DailyStatsResp {
@@ -340,8 +340,8 @@ export function DailyStatAdmin() {
   return (
     <>
       <AdminHead
-        title="오늘의 학습 · 참여 현황"
-        count={t ? `학습 ${t.learn.toLocaleString()}건 · ${t.people.toLocaleString()}명 · 출석 ${t.attend.toLocaleString()}건` : ''}
+        title="DAILY QUIZ · 참여 현황"
+        count={t ? `풀이 ${t.learn.toLocaleString()}건 · ${t.people.toLocaleString()}명 · 출석 ${t.attend.toLocaleString()}건` : ''}
         onReload={reload}
         loading={loading}
       />
@@ -364,9 +364,9 @@ export function DailyStatAdmin() {
       </div>
 
       <div className="admin-cards">
-        <div className="admin-card"><div className="k">학습 완료</div><div className="v">{(t?.learn ?? 0).toLocaleString()}건</div><div className="s">기간 합계</div></div>
+        <div className="admin-card"><div className="k">DAILY QUIZ 완료</div><div className="v">{(t?.learn ?? 0).toLocaleString()}건</div><div className="s">기간 합계</div></div>
         <div className="admin-card"><div className="k">참여 인원</div><div className="v">{(t?.people ?? 0).toLocaleString()}명</div><div className="s">중복 제외</div></div>
-        <div className="admin-card"><div className="k">출석</div><div className="v">{(t?.attend ?? 0).toLocaleString()}건</div><div className="s">학습과 별개 집계</div></div>
+        <div className="admin-card"><div className="k">출석</div><div className="v">{(t?.attend ?? 0).toLocaleString()}건</div><div className="s">DAILY QUIZ와 별개 집계</div></div>
         <div className="admin-card">
           <div className="k">하루 평균</div>
           <div className="v">{t ? Math.round((t.learn / Math.max(1, t.days)) * 10) / 10 : 0}건</div>
@@ -374,17 +374,17 @@ export function DailyStatAdmin() {
         </div>
       </div>
 
-      {/* ⚠️ 한 그래프에 학습·출석을 겹쳐 그리면 하루에 막대가 둘이라 해석이 안 된다 → 그래프를 둘로 나눈다. */}
+      {/* ⚠️ 한 그래프에 DAILY QUIZ·출석을 겹쳐 그리면 하루에 막대가 둘이라 해석이 안 된다 → 그래프를 둘로 나눈다. */}
       {(() => {
         const labels = rows.map((r) => (bucket === 'month' ? r.key : r.key.slice(5)))
         return (
           <>
             <div className="admin-section">
-              <h3>학습 완료</h3>
+              <h3>DAILY QUIZ 완료</h3>
               <MiniBars labels={labels} values={rows.map((r) => r.learn)} color="var(--k-blue, #3f7bd6)" />
             </div>
             <div className="admin-section">
-              <h3>출석 <span className="admin-hint">학습과 별개로 집계됩니다</span></h3>
+              <h3>출석 <span className="admin-hint">DAILY QUIZ와 별개로 집계됩니다</span></h3>
               <MiniBars labels={labels} values={rows.map((r) => r.attend)} color="var(--k-violet, #7c6cf0)" />
             </div>
           </>
@@ -400,7 +400,7 @@ export function DailyStatAdmin() {
                 <thead>
                   <tr>
                     <th>{bucket === 'month' ? '월' : bucket === 'week' ? '주(시작일)' : '날짜'}</th>
-                    <th style={{ textAlign: 'right' }}>학습</th>
+                    <th style={{ textAlign: 'right' }}>DAILY QUIZ</th>
                     <th style={{ textAlign: 'right' }}>출석</th>
                     <th style={{ textAlign: 'right' }}>미니게임</th>
                     <th style={{ textAlign: 'right' }}>레벨테스트</th>
@@ -425,7 +425,7 @@ export function DailyStatAdmin() {
 
       {/* 어느 시간에 많이 하는지 — 그날 처음 들어온 시각 기준, 한국 시간. */}
       <div className="admin-section">
-        <h3>시간대 <span className="admin-hint">학습한 사람이 그날 처음 들어온 시각(한국 시간)</span></h3>
+        <h3>시간대 <span className="admin-hint">DAILY QUIZ를 푼 사람이 그날 처음 들어온 시각(한국 시간)</span></h3>
         <HourChart hours={hours} />
       </div>
     </>
@@ -433,7 +433,7 @@ export function DailyStatAdmin() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 용어 문항 풀 — 미니게임 3종 + 오늘의 학습이 **같이 쓰는 한 벌**
+// 용어 문항 풀 — 미니게임 3종 + DAILY QUIZ 가 **같이 쓰는 한 벌**
 // ══════════════════════════════════════════════════════════════
 interface TermRow {
   id: string; field: string; active: boolean; sort_order: number
@@ -445,13 +445,13 @@ interface TermRow {
 type TermDraft = Partial<TermRow> & { _new?: boolean }
 const TERM_FIELDS = ['AI', '로봇', '피지컬AI']
 
-// 용어 문항을 쓰는 곳 — 미니게임 3종 + 오늘의 학습.
+// 용어 문항을 쓰는 곳 — 미니게임 3종 + DAILY QUIZ.
 //   ⚠️ 퍼즐형(닿아라·지어라·프로그램해라)은 용어 문제가 아니라 레벨 설계라 여기 없다.
 const TERM_TARGETS: [string, string][] = [
   ['beat-cari', '버텨라 CARI'],
   ['shoot-cari', '쏴라 CARI'],
   ['pick-cari', '골라라 CARI'],
-  ['daily', '오늘의 학습'],
+  ['daily', 'DAILY QUIZ'],
 ]
 
 export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
@@ -539,7 +539,7 @@ export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
   return (
     <>
       <AdminHead
-        title={scope === 'daily' ? '오늘의 학습 · 문항 관리' : '게임 문항'}
+        title={scope === 'daily' ? 'DAILY QUIZ · 문항 관리' : '게임 문항'}
         count={`총 ${data?.terms.length ?? 0}문항`}
         onReload={reload}
         loading={loading}
@@ -2067,7 +2067,7 @@ type PopupDraft = Partial<PopupRow> & { _new?: boolean }
 const PLACEMENTS: [string, string, string][] = [
   ['main', '메인', '사이트에 들어오면 가장 먼저 보이는 홈 화면 한 곳'],
   ['caris', 'CARIS', 'CARIS 자격검정을 소개하는 안내 페이지. 시험 일정·원서접수·자격증 발급 화면에는 뜨지 않습니다'],
-  ['arena', 'WORLD ARENA', '무료 레벨테스트 쪽 전부 — 세계지도, 레벨 선택과 응시, 결과, 캐릭터 허브, 미니게임, 랭킹, 오늘의 학습'],
+  ['arena', 'WORLD ARENA', '무료 레벨테스트 쪽 전부 — 세계지도, 레벨 선택과 응시, 결과, 캐릭터 허브, 미니게임, 랭킹, DAILY QUIZ'],
   ['library', '러닝 라이브러리', '교재·강의를 고르는 목록 화면. 이북을 펼쳐 읽는 중에는 뜨지 않습니다'],
 ]
 const DEVICES: [string, string][] = [['both', 'PC + 모바일'], ['pc', 'PC'], ['mobile', '모바일']]

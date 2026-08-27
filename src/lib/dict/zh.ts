@@ -382,7 +382,7 @@ const ZH: Record<string, string> = {
   "hub.today_todo": "今日待办",
   "hub.todo_attendance": "签到",
   "hub.todo_problem": "今日一题",
-  "hub.todo_learn": "今日学习",
+  "hub.todo_learn": "DAILY QUIZ",
   "hub.todo_game": "小游戏",
   "rank.win_daily": "今日",
   "rank.win_season": "赛季",
@@ -1424,7 +1424,7 @@ const ZH: Record<string, string> = {
   "arena.bLevelS": "测评 · 进化",
   "arena.bHub": "我的主页",
   "arena.bHubS": "角色中心",
-  "arena.bDaily": "今日学习",
+  "arena.bDaily": "DAILY QUIZ",
   "arena.bDailyS": "每日内容",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
@@ -1632,27 +1632,27 @@ const ZH: Record<string, string> = {
   "mypage.empty_no_ticket": "您还没有报名任何考试。",
   "mypage.go_apply": "报名考试",
 
-  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ── DAILY QUIZ(/daily) · 미니게임(/games) ────────────────────────────────
   // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
   //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
   //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
   //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
-  "daily.title": "今日学习",
-  "daily.login_note": "登录后才会记录学习完成",
+  "daily.title": "DAILY QUIZ",
+  "daily.login_note": "登录后才会记录 DAILY QUIZ 完成",
   "daily.term_label": "今日术语",
-  "daily.correct": "答对了！🎉 今日学习完成。",
+  "daily.correct": "答对了！🎉 今日 DAILY QUIZ 完成。",
   "daily.wrong": "差一点 — 正确答案是 {answer}。尝试过就算完成！",
-  "daily.already": "今日学习已完成。正确答案是 {answer}。",
+  "daily.already": "今日 DAILY QUIZ 已完成。正确答案是 {answer}。",
   "daily.theory": "理论",
   "daily.hint_lead": "拿不准的话",
   "daily.reward_head": "完成后",
-  "daily.done_note": "今日学习完成 ✓ 明天开放新题。今天的可以再看（奖励每日一次）。",
+  "daily.done_note": "今日 DAILY QUIZ 完成 ✓ 明天开放新题。今天的可以再看（奖励每日一次）。",
   "daily.saving": "记录中…",
-  "daily.pick_note": "选择答案即可完成今日学习。即使答错，尝试也会计入。",
-  "daily.pop_title": "今日学习完成！",
+  "daily.pick_note": "选择答案即可完成今日 DAILY QUIZ。即使答错，尝试也会计入。",
+  "daily.pop_title": "DAILY QUIZ 完成！",
   "daily.pop_bonus": "满 7 天 +{b}P",
   "daily.pop_grew": "你的角色今天又长大了一点。",
-  "daily.pop_already": "今天签到已领取硬币。学习记录已保存。",
+  "daily.pop_already": "今天签到已领取硬币。DAILY QUIZ 记录已保存。",
 
   "mg.title": "小游戏",
   "mg.preparing": "这个小游戏还在准备中。",
@@ -1783,7 +1783,7 @@ const ZH: Record<string, string> = {
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "签到",
-  "hub.mission.daily_learn": "今日学习",
+  "hub.mission.daily_learn": "DAILY QUIZ",
   "hub.mission.minigame": "小游戏",
 
   // 도크(출석 보상)
@@ -1887,7 +1887,7 @@ const ZH: Record<string, string> = {
   "hub.earn.lv_sub": "通关每个等级",
   "hub.earn.foot": "通过全部 7 个等级可得 {a} 分 · 加上活动的赛季满分为 {b} 分。",
   "hub.earn.row.attendance": "签到",
-  "hub.earn.row.daily_learn": "完成今日学习",
+  "hub.earn.row.daily_learn": "完成 DAILY QUIZ",
   "hub.earn.row.minigame": "玩小游戏",
   "hub.earn.sec_score": "赛季积分",
   "hub.earn.sec_coin": "CARI 金币",
@@ -1895,7 +1895,7 @@ const ZH: Record<string, string> = {
   "hub.earn.col_coin": "获得金币",
   "hub.earn.coin_pt": "+{n}金币",
   "hub.earn.coin_any": "对方赠送的数额",
-  "hub.earn.coin.daily": "签到或今日学习",
+  "hub.earn.coin.daily": "签到或 DAILY QUIZ",
   "hub.earn.coin.stamp": "集满 7 天印章",
   "hub.earn.coin.referral": "邀请好友 · 填写邀请码",
   "hub.earn.coin.gift": "收到好友赠送",

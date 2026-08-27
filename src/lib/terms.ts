@@ -2,7 +2,7 @@
 //   (AI로봇피지컬AI_용어퀴즈_50문항.xlsx). 게임 본체는 자립형 정적 HTML(iframe)이라
 //   public/games/*.html 의 POOL 을 React 에서 직접 import 할 수 없어 여기 TS 로 복제한다.
 //   ⚠️ 같은 데이터이므로 문항을 고치면 양쪽(이 파일 ↔ public/games/*.html 의 POOL)을 같이 갱신할 것.
-//   오늘의 학습(/daily, pages/Daily.tsx)이 날짜별로 하나씩 순환 출제한다.
+//   DAILY QUIZ(/daily, pages/Daily.tsx)가 날짜별로 하나씩 순환 출제한다.
 
 export type TermField = 'AI' | '로봇' | '피지컬AI'
 

@@ -104,7 +104,7 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     // PPT 2페이지 도형 그대로 — '미니게임' 이 상위고 게임 현황·게임 문항이 그 아래다.
     { key: 'minigame', label: '미니게임', children: [{ key: 'stat', label: '게임 현황' }, { key: 'quiz', label: '게임 문항' }] },
     { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
-    { key: 'daily', label: '오늘의 학습', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
+    { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
     { key: 'chat', label: '채팅 관리' },
     { key: 'coin', label: '코인 관리' },
     // 캐릭터·스킨의 **가격·판매여부**만 만지는 화면. 그림은 코드/에셋이라 여기서 안 올린다(2026-08-20).

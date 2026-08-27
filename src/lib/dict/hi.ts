@@ -382,7 +382,7 @@ const HI: Record<string, string> = {
   "hub.today_todo": "आज का काम",
   "hub.todo_attendance": "उपस्थिति",
   "hub.todo_problem": "आज की समस्या",
-  "hub.todo_learn": "आज की पढ़ाई",
+  "hub.todo_learn": "DAILY QUIZ",
   "hub.todo_game": "मिनी गेम",
   "rank.win_daily": "आज",
   "rank.win_season": "सीज़न",
@@ -1424,7 +1424,7 @@ const HI: Record<string, string> = {
   "arena.bLevelS": "मापें · विकास",
   "arena.bHub": "मेरा होम",
   "arena.bHubS": "कैरेक्टर हब",
-  "arena.bDaily": "आज की सीख",
+  "arena.bDaily": "DAILY QUIZ",
   "arena.bDailyS": "दैनिक",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
@@ -1632,27 +1632,27 @@ const HI: Record<string, string> = {
   "mypage.empty_no_ticket": "आपने अभी तक किसी परीक्षा के लिए पंजीकरण नहीं किया।",
   "mypage.go_apply": "परीक्षा हेतु पंजीकरण करें",
 
-  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ── DAILY QUIZ(/daily) · 미니게임(/games) ────────────────────────────────
   // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
   //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
   //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
   //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
-  "daily.title": "आज की पढ़ाई",
+  "daily.title": "DAILY QUIZ",
   "daily.login_note": "पूरा होना दर्ज करने के लिए साइन इन करें",
   "daily.term_label": "आज का शब्द",
-  "daily.correct": "सही! 🎉 आज की पढ़ाई पूरी।",
+  "daily.correct": "सही! 🎉 आज का DAILY QUIZ पूरा।",
   "daily.wrong": "लगभग — सही उत्तर {answer} है। कोशिश की, तो पूरा!",
-  "daily.already": "आज की पढ़ाई पूरी हो चुकी है। सही उत्तर {answer} है।",
+  "daily.already": "आज का DAILY QUIZ पूरा हो चुका है। सही उत्तर {answer} है।",
   "daily.theory": "सिद्धांत",
   "daily.hint_lead": "उलझन हो तो",
   "daily.reward_head": "पूरा करने पर",
-  "daily.done_note": "आज की पढ़ाई पूरी ✓ कल नया सवाल खुलेगा। आज का दोबारा देख सकते हैं (इनाम दिन में एक बार)।",
+  "daily.done_note": "आज का DAILY QUIZ पूरा ✓ कल नया सवाल खुलेगा। आज का दोबारा देख सकते हैं (इनाम दिन में एक बार)।",
   "daily.saving": "दर्ज हो रहा है…",
-  "daily.pick_note": "उत्तर चुनते ही आज की पढ़ाई पूरी। गलत होने पर भी कोशिश गिनी जाती है।",
-  "daily.pop_title": "आज की पढ़ाई पूरी!",
+  "daily.pick_note": "उत्तर चुनते ही आज का DAILY QUIZ पूरा। गलत होने पर भी कोशिश गिनी जाती है।",
+  "daily.pop_title": "DAILY QUIZ पूरा!",
   "daily.pop_bonus": "7-दिन बोनस +{b}P",
   "daily.pop_grew": "आपका किरदार आज फिर थोड़ा बढ़ा।",
-  "daily.pop_already": "आज के चेक-इन से कॉइन मिल चुके हैं। पढ़ाई दर्ज हो गई।",
+  "daily.pop_already": "आज के चेक-इन से कॉइन मिल चुके हैं। DAILY QUIZ दर्ज हो गया।",
 
   "mg.title": "मिनी गेम",
   "mg.preparing": "यह मिनी गेम अभी तैयार नहीं है।",
@@ -1783,7 +1783,7 @@ const HI: Record<string, string> = {
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "चेक-इन",
-  "hub.mission.daily_learn": "आज की पढ़ाई",
+  "hub.mission.daily_learn": "DAILY QUIZ",
   "hub.mission.minigame": "मिनी गेम",
 
   // 도크(출석 보상)
@@ -1887,7 +1887,7 @@ const HI: Record<string, string> = {
   "hub.earn.lv_sub": "हर लेवल पूरा करने पर",
   "hub.earn.foot": "सभी 7 लेवल पास करने पर {a} अंक · गतिविधियों सहित सीज़न का अधिकतम {b} अंक है।",
   "hub.earn.row.attendance": "चेक-इन करें",
-  "hub.earn.row.daily_learn": "आज की पढ़ाई पूरी करें",
+  "hub.earn.row.daily_learn": "DAILY QUIZ पूरा करें",
   "hub.earn.row.minigame": "मिनी गेम खेलें",
   "hub.earn.sec_score": "सीज़न पॉइंट",
   "hub.earn.sec_coin": "CARI सिक्के",
@@ -1895,7 +1895,7 @@ const HI: Record<string, string> = {
   "hub.earn.col_coin": "मिले सिक्के",
   "hub.earn.coin_pt": "+{n} सिक्के",
   "hub.earn.coin_any": "जितने भेजे जाएँ",
-  "hub.earn.coin.daily": "हाज़िरी या आज की पढ़ाई",
+  "hub.earn.coin.daily": "हाज़िरी या DAILY QUIZ",
   "hub.earn.coin.stamp": "7 दिन का स्टैम्प पूरा",
   "hub.earn.coin.referral": "दोस्त को न्योता · कोड दर्ज करना",
   "hub.earn.coin.gift": "दोस्त से उपहार",

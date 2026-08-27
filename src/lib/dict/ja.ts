@@ -382,7 +382,7 @@ const JA: Record<string, string> = {
   "hub.today_todo": "今日のやること",
   "hub.todo_attendance": "出席",
   "hub.todo_problem": "今日の問題",
-  "hub.todo_learn": "今日の学習",
+  "hub.todo_learn": "DAILY QUIZ",
   "hub.todo_game": "ミニゲーム",
   "rank.win_daily": "今日",
   "rank.win_season": "シーズン",
@@ -1424,7 +1424,7 @@ const JA: Record<string, string> = {
   "arena.bLevelS": "実力測定 · 進化",
   "arena.bHub": "マイホーム",
   "arena.bHubS": "キャラハブ",
-  "arena.bDaily": "今日の学習",
+  "arena.bDaily": "DAILY QUIZ",
   "arena.bDailyS": "デイリー",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
@@ -1632,27 +1632,27 @@ const JA: Record<string, string> = {
   "mypage.empty_no_ticket": "まだ申し込んだ試験がありません。",
   "mypage.go_apply": "試験に申し込む",
 
-  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ── DAILY QUIZ(/daily) · 미니게임(/games) ────────────────────────────────
   // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
   //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
   //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
   //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
-  "daily.title": "今日の学習",
-  "daily.login_note": "ログインすると学習完了が記録されます",
+  "daily.title": "DAILY QUIZ",
+  "daily.login_note": "ログインするとDAILY QUIZ完了が記録されます",
   "daily.term_label": "今日の用語",
-  "daily.correct": "正解です！🎉 今日の学習完了。",
+  "daily.correct": "正解です！🎉 本日のDAILY QUIZ完了。",
   "daily.wrong": "惜しい — 正解は {answer} です。挑戦したので完了！",
-  "daily.already": "今日の学習は完了済みです。正解は {answer} です。",
+  "daily.already": "本日のDAILY QUIZは完了済みです。正解は {answer} です。",
   "daily.theory": "理論",
   "daily.hint_lead": "迷ったら",
   "daily.reward_head": "完了すると",
-  "daily.done_note": "今日の学習完了 ✓ 明日新しい問題が開きます。今日の分は見返せます（報酬は1日1回）。",
+  "daily.done_note": "本日のDAILY QUIZ完了 ✓ 明日新しい問題が開きます。今日の分は見返せます（報酬は1日1回）。",
   "daily.saving": "記録中…",
-  "daily.pick_note": "答えを選ぶと今日の学習が完了します。正解でなくても挑戦すれば加算されます。",
-  "daily.pop_title": "今日の学習完了！",
+  "daily.pick_note": "答えを選ぶと本日のDAILY QUIZが完了します。正解でなくても挑戦すれば加算されます。",
+  "daily.pop_title": "DAILY QUIZ完了！",
   "daily.pop_bonus": "7日達成 +{b}P",
   "daily.pop_grew": "キャラクターが今日もひとまわり成長しました。",
-  "daily.pop_already": "本日の出席でコインは受け取り済みです。学習記録は残りました。",
+  "daily.pop_already": "本日の出席でコインは受け取り済みです。DAILY QUIZの記録は残りました。",
 
   "mg.title": "ミニゲーム",
   "mg.preparing": "準備中のミニゲームです。",
@@ -1783,7 +1783,7 @@ const JA: Record<string, string> = {
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "出席",
-  "hub.mission.daily_learn": "今日の学習",
+  "hub.mission.daily_learn": "DAILY QUIZ",
   "hub.mission.minigame": "ミニゲーム",
 
   // 도크(출석 보상)
@@ -1887,7 +1887,7 @@ const JA: Record<string, string> = {
   "hub.earn.lv_sub": "レベルクリア時",
   "hub.earn.foot": "7段階すべて突破で{a}点 · 活動を合わせたシーズン満点は{b}点です。",
   "hub.earn.row.attendance": "出席する",
-  "hub.earn.row.daily_learn": "今日の学習を完了",
+  "hub.earn.row.daily_learn": "DAILY QUIZを完了",
   "hub.earn.row.minigame": "ミニゲームをプレイ",
   "hub.earn.sec_score": "シーズンポイント",
   "hub.earn.sec_coin": "CARI コイン",
@@ -1895,7 +1895,7 @@ const JA: Record<string, string> = {
   "hub.earn.col_coin": "獲得コイン",
   "hub.earn.coin_pt": "+{n}コイン",
   "hub.earn.coin_any": "もらった分",
-  "hub.earn.coin.daily": "出席または今日の学習",
+  "hub.earn.coin.daily": "出席またはDAILY QUIZ",
   "hub.earn.coin.stamp": "7日スタンプの完成",
   "hub.earn.coin.referral": "友だち招待・招待コード登録",
   "hub.earn.coin.gift": "友だちからのプレゼント",

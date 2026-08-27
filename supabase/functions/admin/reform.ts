@@ -444,7 +444,7 @@ async function hubCosmeticsSave(admin: any, body: any, ctx: Ctx) {
   return json({ ok: true })
 }
 
-// ── 미니게임·오늘의 학습 현황 ────────────────────────────────
+// ── 미니게임·DAILY QUIZ 현황 ────────────────────────────────
 // 데이터는 이미 쌓여 있다(minigame_scores 통산 최고 · daily_activity 일별 플래그 + 첫 접속 시각). 집계만 한다.
 // ⚠️ 컬럼명은 `game_id`·`best_score`·`plays` 다(`game`·`score` 아님 — 실제로 그렇게 틀려서 500 이 났다).
 /**
@@ -522,7 +522,7 @@ async function minigameStats(admin: any, body: any) {
 }
 
 /**
- * 오늘의 학습 참여 현황 — 기간을 지정해 일/주/월로 묶어 본다.
+ * DAILY QUIZ 참여 현황 — 기간을 지정해 일/주/월로 묶어 본다.
  * ⚠️ 막대만 그려놓으면 "몇 명인지 하나도 모르겠다" 가 된다 → 구간별 **숫자**를 같이 내려준다.
  * ⚠️ 시간대는 `daily_activity.first_seen_at`(그날 처음 들어온 시각)에서 뽑는다. KST 기준으로 시프트한다 —
  *    UTC 로 세면 한국 저녁이 다음 날 새벽으로 잡혀 그래프가 통째로 어긋난다.

@@ -44,7 +44,7 @@ async function run(uid: string): Promise<boolean> {
     if (localStorage.getItem(KEY) === stamp) return false
   } catch { /* 사이트 데이터가 막힌 브라우저 — 가드 없이 그냥 부른다 */ }
   try {
-    // kind 를 명시한다 — 서버 기본값에 기대지 않는다('오늘의 학습'과 종류가 갈린다).
+    // kind 를 명시한다 — 서버 기본값에 기대지 않는다(DAILY QUIZ 와 종류가 갈린다).
     await callFunction('complete-daily', { kind: 'attendance' })
     try { localStorage.setItem(KEY, stamp) } catch { /* 못 적어도 다음 진입에서 한 번 더 부를 뿐 */ }
     return true

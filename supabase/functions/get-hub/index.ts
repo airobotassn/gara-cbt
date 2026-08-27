@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       admin.from('user_characters').select('base_key, equipped, chosen_at, tutorial_done_at, arena_level_seen').eq('user_id', uid).maybeSingle(),
       admin.from('user_stamps').select('count').eq('user_id', uid).eq('stamp_kind', 'daily').maybeSingle(),
       // ⚠️ 행 존재 여부로 '완료'를 판정하면 안 된다 — 이 행은 레벨테스트(did_leveltest)·미니게임(did_minigame)도
-      //    만든다. 출석/오늘의 학습 완료는 반드시 각 종류 플래그로 판정할 것(2026-07-27 버그 수정).
+      //    만든다. 출석/DAILY QUIZ 완료는 반드시 각 종류 플래그로 판정할 것(2026-07-27 버그 수정).
       admin
         .from('daily_activity')
         .select('day, did_attendance, did_learn, did_minigame, did_leveltest')
@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
       // ⚠️ from < to 일 때만 준다 — 같거나 뒤집힌 경우(시즌 리셋 직후 등)는 축하할 게 없다.
       levelUp: levelFrom < levelTo ? { from: levelFrom, to: levelTo } : null,
       stamps: (stamp?.count as number) ?? 0,
-      // dailyDone = 허브 '출석' 완료(did_attendance). learnDone = /daily 오늘의 학습 완료(did_learn).
+      // dailyDone = 허브 '출석' 완료(did_attendance). learnDone = /daily DAILY QUIZ 완료(did_learn).
       // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).
       // 활동 기록 달력(마이페이지) — 출석한 날짜('YYYY-MM-DD') 목록, 최근 1년.
       attendanceDays,

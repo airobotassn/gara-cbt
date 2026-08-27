@@ -382,7 +382,7 @@ const VI: Record<string, string> = {
   "hub.today_todo": "Việc hôm nay",
   "hub.todo_attendance": "Điểm danh",
   "hub.todo_problem": "Bài toán hôm nay",
-  "hub.todo_learn": "Bài học hôm nay",
+  "hub.todo_learn": "DAILY QUIZ",
   "hub.todo_game": "Trò chơi nhỏ",
   "rank.win_daily": "Hôm nay",
   "rank.win_season": "Mùa giải",
@@ -1424,7 +1424,7 @@ const VI: Record<string, string> = {
   "arena.bLevelS": "Đo lường · tiến hóa",
   "arena.bHub": "Nhà của tôi",
   "arena.bHubS": "Trung tâm nhân vật",
-  "arena.bDaily": "Học hôm nay",
+  "arena.bDaily": "DAILY QUIZ",
   "arena.bDailyS": "Nội dung ngày",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
@@ -1632,27 +1632,27 @@ const VI: Record<string, string> = {
   "mypage.empty_no_ticket": "Bạn chưa đăng ký kỳ thi nào.",
   "mypage.go_apply": "Đăng ký dự thi",
 
-  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ── DAILY QUIZ(/daily) · 미니게임(/games) ────────────────────────────────
   // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
   //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
   //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
   //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
-  "daily.title": "Bài học hôm nay",
+  "daily.title": "DAILY QUIZ",
   "daily.login_note": "Đăng nhập để ghi nhận hoàn thành",
   "daily.term_label": "Thuật ngữ hôm nay",
-  "daily.correct": "Chính xác! 🎉 Xong bài hôm nay.",
+  "daily.correct": "Chính xác! 🎉 Xong DAILY QUIZ hôm nay.",
   "daily.wrong": "Chưa đúng — đáp án là {answer}. Bạn đã thử nên vẫn tính!",
-  "daily.already": "Bạn đã hoàn thành bài hôm nay. Đáp án là {answer}.",
+  "daily.already": "Bạn đã hoàn thành DAILY QUIZ hôm nay. Đáp án là {answer}.",
   "daily.theory": "Lý thuyết",
   "daily.hint_lead": "Nếu phân vân",
   "daily.reward_head": "Khi hoàn thành",
-  "daily.done_note": "Xong bài hôm nay ✓ Mai có câu mới. Bạn xem lại được (thưởng mỗi ngày một lần).",
+  "daily.done_note": "Xong DAILY QUIZ hôm nay ✓ Mai có câu mới. Bạn xem lại được (thưởng mỗi ngày một lần).",
   "daily.saving": "Đang ghi…",
-  "daily.pick_note": "Chọn đáp án là xong bài hôm nay. Sai vẫn được tính vì đã thử.",
-  "daily.pop_title": "Hoàn thành bài hôm nay!",
+  "daily.pick_note": "Chọn đáp án là xong DAILY QUIZ hôm nay. Sai vẫn được tính vì đã thử.",
+  "daily.pop_title": "Hoàn thành DAILY QUIZ!",
   "daily.pop_bonus": "Đủ 7 ngày +{b}P",
   "daily.pop_grew": "Nhân vật của bạn lại lớn thêm một chút.",
-  "daily.pop_already": "Bạn đã nhận coin từ điểm danh hôm nay. Bài học vẫn được ghi nhận.",
+  "daily.pop_already": "Bạn đã nhận coin từ điểm danh hôm nay. DAILY QUIZ vẫn được ghi nhận.",
 
   "mg.title": "Mini game",
   "mg.preparing": "Mini game này chưa sẵn sàng.",
@@ -1783,7 +1783,7 @@ const VI: Record<string, string> = {
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "Điểm danh",
-  "hub.mission.daily_learn": "Bài học hôm nay",
+  "hub.mission.daily_learn": "DAILY QUIZ",
   "hub.mission.minigame": "Mini game",
 
   // 도크(출석 보상)
@@ -1887,7 +1887,7 @@ const VI: Record<string, string> = {
   "hub.earn.lv_sub": "mỗi cấp vượt qua",
   "hub.earn.foot": "Vượt cả 7 cấp được {a} điểm · cộng hoạt động thì điểm tối đa mùa là {b}.",
   "hub.earn.row.attendance": "Điểm danh",
-  "hub.earn.row.daily_learn": "Hoàn thành bài học hôm nay",
+  "hub.earn.row.daily_learn": "Hoàn thành DAILY QUIZ",
   "hub.earn.row.minigame": "Chơi mini game",
   "hub.earn.sec_score": "Điểm mùa giải",
   "hub.earn.sec_coin": "Xu CARI",
@@ -1895,7 +1895,7 @@ const VI: Record<string, string> = {
   "hub.earn.col_coin": "Xu nhận được",
   "hub.earn.coin_pt": "+{n} xu",
   "hub.earn.coin_any": "Tùy người gửi",
-  "hub.earn.coin.daily": "Điểm danh hoặc Học hôm nay",
+  "hub.earn.coin.daily": "Điểm danh hoặc DAILY QUIZ",
   "hub.earn.coin.stamp": "Hoàn thành 7 ngày điểm danh",
   "hub.earn.coin.referral": "Mời bạn bè · nhập mã mời",
   "hub.earn.coin.gift": "Bạn bè tặng xu",

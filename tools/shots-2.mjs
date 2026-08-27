@@ -47,9 +47,9 @@ await try_('30', async () => {
 await go(page, '/games', { wait: 3000 })
 await shot(page, 31, '미니게임')
 
-// 32 오늘의 학습
+// 32 DAILY QUIZ
 await go(page, '/daily', { wait: 3000 })
-await shot(page, 32, '오늘의-학습')
+await shot(page, 32, 'daily-quiz')
 
 // 34 1:1 문의
 await go(page, '/mypage/inquiry', { wait: 3000 })

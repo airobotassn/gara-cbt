@@ -384,7 +384,7 @@ const KO: Record<string, string> = {
   "hub.today_todo": "오늘 할 일",
   "hub.todo_attendance": "출석",
   "hub.todo_problem": "오늘의 문제",
-  "hub.todo_learn": "오늘의 학습",
+  "hub.todo_learn": "DAILY QUIZ",
   "hub.todo_game": "미니게임",
   "rank.win_daily": "오늘",
   "rank.win_season": "시즌",
@@ -1442,7 +1442,7 @@ const KO: Record<string, string> = {
   "arena.bLevelS": "내 실력 측정 · 진화",
   "arena.bHub": "마이 홈",
   "arena.bHubS": "캐릭터 허브",
-  "arena.bDaily": "오늘의 학습",
+  "arena.bDaily": "DAILY QUIZ",
   "arena.bDailyS": "데일리 콘텐츠",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
@@ -1650,27 +1650,27 @@ const KO: Record<string, string> = {
   "mypage.empty_no_ticket": "아직 접수한 시험이 없습니다.",
   "mypage.go_apply": "시험 접수하기",
 
-  // ── 오늘의 학습(/daily) · 미니게임(/games) ────────────────────────────────
+  // ── DAILY QUIZ(/daily) · 미니게임(/games) ────────────────────────────────
   // ⚠️ 여기 있는 건 **화면 문구뿐**이다. 문제 자체(용어·설명·보기)는 src/lib/terms.ts 와
   //    public/games/*.html 의 POOL 에 한국어로 들어 있고 아직 다국어가 아니다.
   //    레벨테스트(questions 다국어 JSONB + translate-questions)처럼 콘텐츠 파이프라인을 붙이면
   //    그때 문항도 언어를 따라간다 — 그 전까지는 틀만 번역되고 문제는 한국어로 나온다.
-  "daily.title": "오늘의 학습",
-  "daily.login_note": "로그인해야 학습 완료가 기록돼요",
+  "daily.title": "DAILY QUIZ",
+  "daily.login_note": "로그인해야 DAILY QUIZ 완료가 기록돼요",
   "daily.term_label": "오늘의 용어",
-  "daily.correct": "정답이에요! 🎉 오늘 학습 완료.",
+  "daily.correct": "정답이에요! 🎉 오늘 DAILY QUIZ 완료.",
   "daily.wrong": "아쉬워요 — 정답은 {answer} 예요. 시도했으니 완료!",
-  "daily.already": "오늘 학습은 이미 완료했어요. 정답은 {answer} 예요.",
+  "daily.already": "오늘 DAILY QUIZ는 이미 완료했어요. 정답은 {answer} 예요.",
   "daily.theory": "이론",
   "daily.hint_lead": "헷갈리면",
   "daily.reward_head": "완료하면",
-  "daily.done_note": "오늘 학습 완료 ✓ 내일 새 문제가 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).",
+  "daily.done_note": "오늘 DAILY QUIZ 완료 ✓ 내일 새 문제가 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).",
   "daily.saving": "기록하는 중…",
-  "daily.pick_note": "정답을 고르면 오늘 학습이 완료돼요. 맞히지 않아도 시도하면 적립돼요.",
-  "daily.pop_title": "오늘 학습 완료!",
+  "daily.pick_note": "정답을 고르면 오늘 DAILY QUIZ가 완료돼요. 맞히지 않아도 시도하면 적립돼요.",
+  "daily.pop_title": "오늘 DAILY QUIZ 완료!",
   "daily.pop_bonus": "7일 완주 +{b}P",
   "daily.pop_grew": "캐릭터가 오늘도 한 뼘 자랐어요.",
-  "daily.pop_already": "오늘 출석으로 코인은 이미 받았어요. 학습 기록은 남았습니다.",
+  "daily.pop_already": "오늘 출석으로 코인은 이미 받았어요. DAILY QUIZ 기록은 남았습니다.",
 
   "mg.title": "미니게임",
   "mg.preparing": "준비 중인 미니게임이에요.",
@@ -1801,7 +1801,7 @@ const KO: Record<string, string> = {
 
   // 오늘의 미션 칩
   "hub.mission.attendance": "출석",
-  "hub.mission.daily_learn": "오늘의 학습",
+  "hub.mission.daily_learn": "DAILY QUIZ",
   "hub.mission.minigame": "미니게임",
 
   // 도크(출석 보상)
@@ -1910,7 +1910,7 @@ const KO: Record<string, string> = {
   "hub.earn.lv_sub": "레벨 클리어 시",
   "hub.earn.foot": "7단계를 모두 통과하면 {a}점 · 활동까지 더한 시즌 만점은 {b}점이에요.",
   "hub.earn.row.attendance": "출석하기",
-  "hub.earn.row.daily_learn": "오늘의 학습 완료",
+  "hub.earn.row.daily_learn": "DAILY QUIZ 완료",
   "hub.earn.row.minigame": "미니게임 플레이",
   "hub.earn.sec_score": "시즌 점수",
   "hub.earn.sec_coin": "CARI 코인",
@@ -1918,7 +1918,7 @@ const KO: Record<string, string> = {
   "hub.earn.col_coin": "획득 코인",
   "hub.earn.coin_pt": "+{n}코인",
   "hub.earn.coin_any": "받은 만큼",
-  "hub.earn.coin.daily": "출석 또는 오늘의 학습",
+  "hub.earn.coin.daily": "출석 또는 DAILY QUIZ",
   "hub.earn.coin.stamp": "7일 출석 도장 완성",
   "hub.earn.coin.referral": "친구 초대 · 초대코드 등록",
   "hub.earn.coin.gift": "친구에게 선물 받기",

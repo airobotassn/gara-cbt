@@ -105,7 +105,9 @@ const CASES = [
   // 나머지 대표값
   ['시험 보러 왔어', '/exam'], ['모의고사', '/exam/check'], ['자격증 발급', '/certificate'],
   ['랭킹', '/ranking'], ['순위 추이', '/ranking'], ['아레나', '/arena'], ['우리 지역 순위', '/arena'],
-  ['미니게임', '/games'], ['오늘의 학습', '/daily'], ['캐릭터', '/hub'], ['코인', '/hub'], ['출석', '/hub'],
+  // /daily 는 2026-08-27 에 이름이 'DAILY QUIZ' 가 됐다 — 옛 이름도 계속 닿아야 한다.
+  ['미니게임', '/games'], ['DAILY QUIZ', '/daily'], ['데일리 퀴즈', '/daily'], ['오늘의 학습', '/daily'],
+  ['캐릭터', '/hub'], ['코인', '/hub'], ['출석', '/hub'],
   ['레벨테스트', '/test/select'], ['내 실력 몇점', '/test/select'],
   ['로그인', '/login'], ['공지사항', '/notice'], ['이용약관', '/terms'], ['개인정보', '/privacy'], ['협회 소개', '/about'],
 ]

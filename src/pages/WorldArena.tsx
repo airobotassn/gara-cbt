@@ -417,7 +417,7 @@ export default function WorldArena() {
         </header>
 
         {/* 런처 — 아레나가 허브·레벨테스트·미니게임·데일리의 관문이라 지도보다 위에 둔다.
-            순서는 레벨 → 미니게임 → 오늘의 학습(2026-08-19 지시). 마이 홈만 맨 앞에 그대로 둔다. */}
+            순서는 레벨 → 미니게임 → DAILY QUIZ(2026-08-19 지시). 마이 홈만 맨 앞에 그대로 둔다. */}
         <nav className="aa-launch">
           <Link className="aa-lbtn cari" to="/hub">
             {/* 학사모 이모지 대신 CARI 전신(원본 'CARI 대각선.png' — 불투명 배경을 따내고 트리밍) */}
