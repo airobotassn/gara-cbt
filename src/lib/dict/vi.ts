@@ -1427,7 +1427,7 @@ const VI: Record<string, string> = {
   "arena.bHub": "Nhà của tôi",
   "arena.bHubS": "Nhân vật của tôi",
   "arena.bDaily": "DAILY QUIZ",
-  "arena.bDailyS": "Câu hỏi hôm nay",
+  "arena.bDailyS": "Nội dung học mỗi ngày",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "Trò chơi nhỏ",

@@ -1427,7 +1427,7 @@ const EN: Record<string, string> = {
   "arena.bHub": "My Home",
   "arena.bHubS": "My character",
   "arena.bDaily": "DAILY QUIZ",
-  "arena.bDailyS": "Today's question",
+  "arena.bDailyS": "Daily learning content",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "Mini Games",

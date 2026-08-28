@@ -1427,7 +1427,7 @@ const ZH: Record<string, string> = {
   "arena.bHub": "我的主页",
   "arena.bHubS": "我的角色",
   "arena.bDaily": "DAILY QUIZ",
-  "arena.bDailyS": "今日一题",
+  "arena.bDailyS": "每日学习内容",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "小游戏",

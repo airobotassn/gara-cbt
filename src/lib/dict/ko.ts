@@ -1451,7 +1451,7 @@ const KO: Record<string, string> = {
   "arena.bHub": "마이 홈",
   "arena.bHubS": "내 캐릭터",
   "arena.bDaily": "DAILY QUIZ",
-  "arena.bDailyS": "오늘의 한 문제",
+  "arena.bDailyS": "데일리 학습 콘텐츠",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "미니게임",
