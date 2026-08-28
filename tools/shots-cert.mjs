@@ -27,23 +27,22 @@ const ctx = await browser.newContext({
 const page = await ctx.newPage()
 
 // ① 견본 화면에서 앱이 쓰는 예시 인물·번호를 그대로 읽어온다(값을 여기 베껴 적지 않는다).
-// ⚠️ 선택자는 **직계 자식**이어야 한다 — 워터마크 글자가 <defs><pattern> 안에 있어서
-//    `.cert-svg text` 로 잡으면 그게 앞에 끼어들어 자리가 두 칸 밀린다.
+// ⚠️ 칸은 **data-f 로 집는다** — 순서(nth)로 집으면 증서 서식이 바뀌어 칸이 늘거나 줄 때
+//    조용히 엉뚱한 자리에 값이 박힌다(v3 서식에서 '급수 전체명' 칸이 하나 늘었다).
 await page.goto(`${BASE}/certificate/sample`, { waitUntil: 'domcontentloaded' })
 await page.waitForTimeout(2500)
-const sample = await page.locator('.cert-svg > text').allTextContents()
-console.log('견본값:', JSON.stringify(sample.slice(0, 5)))
+const pick = (f) => page.locator(`.cert-svg [data-f="${f}"]`).first().textContent()
+const sample = { name: await pick('name'), certNo: await pick('no') }
+console.log('견본값:', JSON.stringify(sample))
 
 // ② 워터마크 없는 증서를 열고 이름·번호만 견본값으로 교체.
 await page.goto(`${BASE}/certificate`, { waitUntil: 'domcontentloaded' })
 await page.waitForTimeout(2500)
-await page.evaluate(([name, certNo]) => {
-  const t = document.querySelectorAll('.cert-svg > text')
-  if (t[0]) t[0].textContent = name   // ① 영문 성명
-  if (t[2]) t[2].textContent = certNo // ③ Certificate ID
-  // ⑥ QR 캡션 — 라이브가 아직 옛 배포(한글)면 영문으로 맞춘다. 배포되고 나면 같은 값이라 아무 일도 안 한다.
-  if (t[5]) t[5].textContent = 'Verify authenticity'
-}, [sample[0], sample[2]])
+await page.evaluate(({ name, certNo }) => {
+  const set = (f, v) => { const el = document.querySelector(`.cert-svg [data-f="${f}"]`); if (el) el.textContent = v }
+  set('name', name)   // ① 영문 성명
+  set('no', certNo)   // ④ Certificate ID
+}, sample)
 await page.waitForTimeout(400)
 
 await page.locator('.cert-canvas').screenshot({ path: OUT })

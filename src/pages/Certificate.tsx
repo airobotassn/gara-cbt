@@ -8,9 +8,11 @@ import { gradeDisplay, fmtCertDate, certExpiryDate, makeCertNo, gradeOfTitle } f
 import type { MyAttemptsResponse } from '../lib/types'
 
 // ===== 인증서 = 확정 시안 PNG(배경·프레임·로고·문구·라벨) + 동적 필드 SVG 오버레이 =====
-// 배경 = public/cert-template-v2.webp (2026-08 협회 신규 시안 — 좌측 다크 패널 + 우측 영문 서식, 1448×1086).
-// 그 위에 값만 얹는다: ①영문 성명 ②급수 ③Certificate ID ④Issue Date ⑤Valid Until ⑥진위확인 QR.
-// 좌표는 템플릿을 픽셀 계측해 뽑았다(scratchpad/measure-cert-v2.mjs — 잉크 있는 행 구간 = 기존 텍스트 줄).
+// 배경 = public/cert-template-v3.webp (2026-08-28 협회 신규 시안 — 좌측 다크 지구 패널 + 우측 영문 서식
+//        + 월계관 + GAPA 푸터, 1448×1086. 원본 PNG = output/imagegen/caris-certificate-server-template-v16.png).
+// 그 위에 값만 얹는다: ①영문 성명 ②급수 전체명("CARIS BEGINNER" — earned the 빈칸) ③급수 단어(월계관 안)
+//                    ④Certificate ID ⑤Issue Date ⑥Valid Until ⑦진위확인 QR.
+// 좌표는 템플릿을 픽셀 계측해 뽑았다(잉크 있는 행/열 구간 = 서식에 인쇄된 글줄·월계관 실측).
 // ⚠️ 이름은 **영문만** 각인한다(신규 시안이 영문 서식). 값은 발급 신청 화면에서 입력받아
 //    exam_attempts.cert_name_roman 에 저장된 스냅샷 — 자동 로마자 변환은 하지 않는다(성씨 표기가 제각각).
 //
@@ -49,44 +51,56 @@ const SERIF = "CariSerif,'Times New Roman',serif" // 이름·급수(템플릿 �
 const INK = '#0a0a0a', GRADE_C = '#0b2a6b', VAL_C = '#1a1a1a', CAP_C = '#555b66'
 const WM_C = '#8b93a3' // 견본 워터마크 — 밝은 우측·어두운 좌측 어디서나 보이는 중간 회색
 
-// 오버레이 앵커 — 우측 흰 패널 기준(계측값):
-//   "This is to certify that" y284~304 · "has successfully…" y426~449 · 라벨 3줄 y678~770(콜론 끝 x746)
-//   · GARA 푸터 y965~1000. 패널 중심 x = 928.
-const CX = 928 // 우측 패널 가로 중심
-const NAME_Y = 388 // 이름 baseline (빈 구간 304~426 의 시각 중앙)
-const GRADE_Y = 592 // 급수 baseline (빈 구간 449~678)
-const VAL_X = 775 // 값 시작 x (콜론 x746 뒤)
-const VAL_ROWS = [694, 733, 770] // Certificate ID / Issue Date / Valid Until 값 baseline
-const QRB = { size: 130, x: 1180, y: 655 } // 값 블록 오른쪽 빈 공간(푸터 y965 위)
-const CAP_CX = 1245, CAP_Y = 823 // '진위여부 확인' 캡션
-
-// 푸터 GARA 마크 교체 — 배경 시안에 **옛 워드마크가 구워져 있다**(협회 로고가 2026-08 에 바뀌었다).
-// 템플릿 PNG 를 다시 받을 수 없어서, 옛 마크 자리만 패널 바탕색으로 덮고 신규 로고를 그 위에 얹는다.
-// 실측: 옛 마크 x840~951·y966~1000 / 구분선 "|" x975~977 / 영문 기관명 x997~1391(캡높이 y969~991).
-// ⚠️ 신규 마크는 종횡비 6.16:1 로 옛 마크(3.2:1)보다 훨씬 납작하다. 같은 높이로 두면 폭이 216 이 되어
-//    구분선을 침범한다 → 높이를 30 으로 낮추고 **오른쪽 끝(x951)을 고정**해 왼쪽으로 자라게 한다.
-//    구분선·영문은 배경 그대로라 그 사이 간격이 흔들리지 않는다.
-// ⚠️ 협회가 새 템플릿(신규 로고가 박힌 판)을 주면 이 블록을 통째로 지우면 된다.
-const FOOT_BG = '#f3f2f2' // 우측 패널 바탕 실측색 — 이 근방은 편차가 ±2 라 평면 사각형으로 덮여도 이음매가 없다
-const FOOT_PATCH = { x: 826, y: 954, w: 134, h: 54 } // 옛 마크를 덮는 판
-const FOOT_MARK = { h: 30, w: Math.round((30 * 388) / 63), right: 951, cy: 981 } // 신규 마크(388×63)
+// 오버레이 앵커 — 우측 패널을 픽셀 계측한 값(잉크 행/열 프로파일). 서식을 갈면 전부 다시 재야 한다.
+//   "This is to certify that"  캡 y288 · 베이스라인 y311 · x805~1093
+//   "has successfully…"        어센더 y412 · 베이스라인 y432 · x669~1217
+//   "earned the" x693~808  |  빈칸 251px  |  "certification." x1060~1195 · 베이스라인 y479
+//   월계관  x542~1338 · y525~752 (안쪽 여백 x≈588~1292)
+//   라벨 3줄 베이스라인 y813/856/899 · 콜론 끝 x764
+//   'Verify authenticity' 캡션 x1174~1303 · 캡 y883 — **서식에 인쇄돼 있다(코드로 그리지 않는다)**
+//   GAPA 푸터 y940~1030 · 실링 x1264~1420
+const CX = 944 // 우측 패널 본문 가로 중심(세 줄 실측 949·943·944)
+const NAME_MID = 365 // 이름 자리 = 두 문장 사이 빈 띠(y320~410)의 세로 중앙
+const NAME_W = 700 // 이름 최대 폭
+// ⚠️ 빈칸은 251px 이지만 예산은 236 이다 — 꽉 채우면 "earned theCARIS BEGINNERcertification." 처럼
+//    앞뒤 낱말과 붙어버린다(첫 렌더가 그랬다). 남는 15px 가 좌우 낱말 사이 공백 노릇을 한다.
+const EARN = { cx: 934, y: 479, w: 236 } // "earned the [급수] certification." 의 빈칸(x809~1059)
+const WREATH = { cx: 940, cy: 639, w: 644 } // 월계관 안쪽 = 급수 단어 자리
+const VAL_X = 790 // 값 시작 x (콜론 x764 뒤)
+const VAL_ROWS = [813, 856, 899] // Certificate ID / Issue Date / Valid Until 값 baseline
+// QR = 인쇄된 캡션(캡 y883) 바로 위, 캡션과 같은 중심(x1238). 위로는 월계관 아래끝(y752)이 천장이다.
+const QRB = { size: 116, x: 1181, y: 758 }
 
 function todayStr() {
   return fmtCertDate(new Date())
 }
 
-// 영문 성명 — 패널 폭(약 760px)에 맞춰 크기를 줄인다. 세리프 평균 자폭 ≈ 0.5em 기준.
+// 영문 성명 — 빈 띠 폭에 맞춰 크기를 줄인다. 세리프 평균 자폭 ≈ 0.52em 기준.
+// ⚠️ 베이스라인은 크기에 따라 움직인다(romanBase) — 이름이 길어 작아져도 띠 한가운데 앉게.
 function romanFit(raw: string): { text: string; size: number } {
   const s = raw.trim().replace(/\s+/g, ' ')
-  const size = Math.max(38, Math.min(72, Math.round(760 / Math.max(1, s.length * 0.52))))
+  const size = Math.max(34, Math.min(66, Math.round(NAME_W / Math.max(1, s.length * 0.52))))
   return { text: s, size }
 }
-// 급수 표시어 — "CARIS PRO" → "PRO". 좌측 패널에 CARIS 로고가 이미 크게 있어 급수 단어만 각인한다(옛 시안과 동일).
+// ⚠️ 캡 높이가 아니라 **디센더까지 포함해** 띠 안에 앉힌다 — 캡 기준으로 가운데를 맞추면
+//    'g'·'y' 꼬리가 아래 문장("has successfully…" 어센더 y412)에 닿는다.
+const romanBase = (size: number) => Math.round(NAME_MID + size * 0.2)
+
+// 급수 표시어 — "CARIS PRO" → "PRO". 월계관 안에는 급수 단어만 들어간다(브랜드는 좌측 패널 로고가 이미 말한다).
 function gradeWord(full: string) {
   return full.replace(/^CARIS\s+/i, '').trim().toUpperCase()
 }
+// 월계관 안 급수 — 폭 예산에 맞춰 줄인다(대문자 평균 자폭 ≈ 0.667em + 자간 5px).
+// Beginner·Pro·Elite 는 전부 상한(104)에 걸리고, 긴 이름(GRAND MASTER)만 줄어든다.
 function gradeSize(g: string): number {
-  return g.length <= 8 ? 86 : g.length <= 12 ? 74 : 62
+  const n = Math.max(1, g.length)
+  return Math.max(44, Math.min(104, Math.floor((WREATH.w - (n - 1) * 5) / (n * 0.667))))
+}
+const gradeBase = (size: number) => Math.round(WREATH.cy + size * 0.331)
+// "earned the ___ certification." 의 빈칸에 들어가는 급수 전체명("CARIS BEGINNER").
+// 서식 본문이 ≈29px 세리프라 거기 맞추되, 251px 칸을 넘으면 줄인다(긴 급수명 대비).
+function earnSize(g: string): number {
+  return Math.max(17, Math.min(29, Math.floor(EARN.w / Math.max(1, g.length * 0.64))))
 }
 
 // 등록번호 마스킹 — 결제 유도 화면에서 마지막 일련번호 구획만 가린다. 예: CA-PRO-2026-000001 → CA-PRO-2026-••••••
@@ -198,8 +212,10 @@ export default function Certificate() {
   const expiryText = data.expiryDate ?? '무기한'
   // 인증서에 각인되는 이름 = 영문 성명 하나뿐(신규 시안이 영문 서식).
   const nm = romanFit(data.nameRoman ?? '')
-  const gradeText = gradeWord(gradeFull)
+  const earnText = gradeFull.toUpperCase() // "CARIS BEGINNER" — earned the 빈칸
+  const gradeText = gradeWord(gradeFull) // "BEGINNER" — 월계관 안
   const gsize = gradeSize(gradeText)
+  const esize = earnSize(earnText)
   const values = [data.certNo, data.issueDate, expiryText]
 
   // QR 은 발급 후에만(토큰이 발급 시점에 생긴다).
@@ -414,31 +430,25 @@ export default function Certificate() {
             )}
           </defs>
 
-          {/* 배경 = 신규 시안(값 없는 clean 판) */}
-          <image href="/cert-template-v2.webp" x="0" y="0" width={VB.w} height={VB.h} />
+          {/* 배경 = 신규 시안(값 없는 clean 판). 푸터 GAPA 마크·실링·'Verify authenticity' 캡션까지
+              전부 서식에 인쇄돼 있다 — 코드로 덧그리는 것은 아래 값 여섯 개뿐이다. */}
+          <image href="/cert-template-v3.webp" x="0" y="0" width={VB.w} height={VB.h} />
 
-          {/* 푸터 GARA 마크 = 신규 협회 로고. 배경에 구워진 옛 마크를 덮고 새로 얹는다(위 FOOT_* 주석) */}
-          <rect x={FOOT_PATCH.x} y={FOOT_PATCH.y} width={FOOT_PATCH.w} height={FOOT_PATCH.h} fill={FOOT_BG} />
-          <image
-            href="/cert/mark-gara.webp"
-            x={FOOT_MARK.right - FOOT_MARK.w}
-            y={FOOT_MARK.cy - FOOT_MARK.h / 2}
-            width={FOOT_MARK.w}
-            height={FOOT_MARK.h}
-          />
+          {/* ① 영문 성명 — "This is to certify that" 와 "has successfully…" 사이 빈 띠 */}
+          <text data-f="name" x={CX} y={romanBase(nm.size)} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={nm.size} letterSpacing="1" fill={INK}>{nm.text}</text>
 
-          {/* ① 영문 성명 — "This is to certify that" 아래 빈 구간 */}
-          <text x={CX} y={NAME_Y} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={nm.size} letterSpacing="1" fill={INK}>{nm.text}</text>
+          {/* ② 급수 전체명 — "earned the ___ certification." 의 빈칸 */}
+          <text data-f="tier" x={EARN.cx} y={EARN.y} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={esize} letterSpacing="0.4" fill={INK}>{earnText}</text>
 
-          {/* ② 급수 — "…recognized as a" 아래 빈 구간 */}
-          <text x={CX} y={GRADE_Y} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={gsize} letterSpacing="3" fill={GRADE_C}>{gradeText}</text>
+          {/* ③ 급수 단어 — 월계관 안 */}
+          <text data-f="grade" x={WREATH.cx} y={gradeBase(gsize)} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={gsize} letterSpacing="5" fill={GRADE_C}>{gradeText}</text>
 
-          {/* ③④⑤ Certificate ID / Issue Date / Valid Until — 라벨·콜론은 배경에 있고 값만 얹는다 */}
+          {/* ④⑤⑥ Certificate ID / Issue Date / Valid Until — 라벨·콜론은 배경에 있고 값만 얹는다 */}
           {values.map((v, i) => (
-            <text key={i} x={VAL_X} y={VAL_ROWS[i]} fontFamily={SANS} fontWeight="400" fontSize="25" fill={VAL_C}>{v}</text>
+            <text key={i} data-f={['no', 'issue', 'valid'][i]} x={VAL_X} y={VAL_ROWS[i]} fontFamily={SANS} fontWeight="400" fontSize="25" fill={VAL_C}>{v}</text>
           ))}
 
-          {/* ⑥ QR 진위확인 — 값 블록 오른쪽 빈 공간. 견본엔 토큰이 없어 자리만 잠금 표시 */}
+          {/* ⑦ QR 진위확인 — 인쇄된 'Verify authenticity' 캡션 바로 위. 견본엔 토큰이 없어 자리만 잠금 표시 */}
           {sample ? (
             <>
               <rect x={QRB.x} y={QRB.y} width={QRB.size} height={QRB.size} rx="4" fill="#e9ecf3" stroke="#b9c4d8" strokeWidth="1.4" strokeDasharray="7 5" />
@@ -449,7 +459,6 @@ export default function Certificate() {
               <rect key={i} x={QRB.x + c * qm} y={QRB.y + r * qm} width={qm + 0.4} height={qm + 0.4} fill="#141414" />
             ))
           )}
-          <text x={CAP_CX} y={CAP_Y} textAnchor="middle" fontFamily={SANS} fontWeight="400" fontSize="19" fill={CAP_C}>{t('cert.qr_caption')}</text>
 
           {/* 워터마크 오버레이 — 증서 내용 위에 덮는다(맨 마지막 = 최상단) */}
           {sample && (
