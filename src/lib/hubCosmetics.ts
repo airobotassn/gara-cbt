@@ -83,7 +83,7 @@ export const CHAR_FALLBACK_AR = 512 / 640
  * 값이 없으면 폴백 비율을 쓴다 → 그림이 아직 없는 계열(b·c)도 화면이 정상으로 선다.
  */
 export const CHAR_AR: Record<string, number> = {
-  char_a_m: 809 / 1220,
+  char_a_m: 417 / 654,
   char_a_f: 852 / 1102,
 }
 

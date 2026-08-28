@@ -16,7 +16,7 @@
 //   ⚠️ 잘라내거나 비율을 바꾼 파일은 못 쓴다 — **비율이 같아야** 자리가 맞는다(아래에서 검사한다).
 //   ⚠️ 그 파일에 Lv.7 이 같이 들어 있어도 **쓰지 않는다** — 후광이 이미 깨져 있다.
 //
-// ── Lv.7 은 여기서 흰 배경을 뺀다 ───────────────────────────────────────────
+// ── Lv.7 은 여기서 흰 배경을 뺀다 (후광이 없으면 `--lv7-mask`) ──────────────
 // Lv.7 후광은 바깥으로 갈수록 흰색으로 옅어져 배경과 경계가 없다. 그래서 배경제거 프로그램은
 // 후광을 배경으로 보고 같이 지우거나(빛이 통째로 날아간다) 남기면 흰 사각형이 남는다.
 // 여기서는 **흰색 위에 합성된 것을 역산해서**(un-premultiply) 후광을 반투명한 빛으로 되살리고,
@@ -53,6 +53,15 @@ const [sheet, key, cutout, lv7sheet] = process.argv.slice(2).filter((a) => !a.st
  *      옅은 크림색이라 같은 규칙에 걸려 빛이 잘려 나간다.
  */
 const TRIM_SHADOW = process.argv.includes('--trim-shadow')
+/**
+ * Lv.7 도 **배경 뺀 시트의 모양**을 쓴다(`--lv7-mask`).
+ * Lv.7 만 흰 배경에서 직접 빼는 이유는 **후광** 하나뿐이다 — 바깥으로 옅어지는 빛은 배경제거
+ * 프로그램이 배경으로 보고 같이 지운다. 그래서 **Lv.7 에 후광이 없는 시트**(옥좌를 버리고 그냥
+ * 서 있는 그림)에서는 그 예외가 손해만 낸다: 배경이 순백이 아니면 흰 배경 빼기가 옅은 알파를
+ * 남겨 **칸 크기의 네모난 얼룩**이 진다(2026-08-28 새 남캐 시트 · 베이지 배경 · 알파 9~31).
+ *   ⚠️ 후광·글로우가 있는 Lv.7 에는 켜지 말 것 — 빛이 통째로 잘려 나간다.
+ */
+const LV7_MASK = process.argv.includes('--lv7-mask')
 if (!sheet || !/^char_[a-z]+_[a-z]+$/.test(key || '')) {
   console.error('사용법: node tools/build-char-art.mjs "<흰배경시트.png>" char_<계열>_<성별> ["<배경뺀시트.png>"]')
   process.exit(1)
@@ -306,9 +315,10 @@ if (lv7sheet) {
 
 // Lv.1~6 은 배경 뺀 시트의 모양을 입히고, 없으면(그리고 Lv.7 은 언제나) 여기서 배경을 뺀다.
 const cells = cut.map(([x0, x1], i) => {
-  // 그림자 지우기는 서 있는 Lv.1~6 만 (Lv.7 은 옥좌라 발밑 그림자가 없고 후광이 걸린다)
+  // 그림자 지우기는 서 있는 Lv.1~6 만 (옥좌에 앉은 Lv.7 은 발밑 그림자가 없고 후광이 걸린다).
+  // ⚠️ `--lv7-mask` 로 Lv.7 까지 배경 뺀 시트를 쓸 땐 그 그림도 서 있으므로 같이 걸린다.
   const ground = (c) => (TRIM_SHADOW ? trimShadow(c) : c)
-  if (altA && i < 6) return measure(ground(applyMask(crop(x0, x1))))
+  if (altA && (i < 6 || LV7_MASK)) return measure(ground(applyMask(crop(x0, x1))))
   if (i === 6 && lv7) {
     const c = crop(x0, x1, lv7)
     const BG = [lv7[0], lv7[1], lv7[2]]
@@ -337,7 +347,8 @@ const dir = resolve('public/hub/char', key)
 rmSync(dir, { recursive: true, force: true })
 mkdirSync(dir, { recursive: true })
 console.log(`${key} · 캔버스 ${CW}x${CH} (비율 ${(CW / CH).toFixed(4)}) · Lv.1~6 평균 키 ${Math.round(base)}px`)
-console.log(altA ? '  Lv.1~6 = 배경 뺀 시트의 모양 + 원본 색 · Lv.7 = 흰 배경 원본에서 직접'
+console.log(altA
+  ? `  Lv.1~${LV7_MASK ? 7 : 6} = 배경 뺀 시트의 모양 + 원본 색${LV7_MASK ? '' : ' · Lv.7 = 흰 배경 원본에서 직접'}`
   : '  전부 흰 배경 원본에서 직접')
 
 cells.forEach((c, i) => {
