@@ -257,9 +257,6 @@ export default function LevelSelect() {
                 </li>
               ))}
             </ul>
-            <p className="mt-3.5 pt-3.5 border-t border-outline-variant/30 font-body-sm text-[15px] text-outline">
-              {t('lv.rule_note', { max: MAX_LEVEL })}
-            </p>
           </div>
         ) : null}
 

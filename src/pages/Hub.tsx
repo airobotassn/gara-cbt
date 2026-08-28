@@ -1152,8 +1152,6 @@ export default function Hub() {
                     </div>
                   ))}
                 </div>
-                {/* 스킨은 배경만 바꾸는 게 아니라 판·게이지·스탬프까지 통째로 바뀐다 — 미리 말해둔다. */}
-                <p className="hub-modal-help">{t('hub.closet.skin_help')}</p>
               </div>
             </>
           )}
@@ -1226,7 +1224,8 @@ export default function Hub() {
               )
             })}
           </div>
-          {titles.length === 0 && <p className="hub-modal-help title-vault-help">{t(authed ? 'hub.title.empty' : 'hub.title.login')}</p>}
+          {/* 비로그인만 안내한다 — 로그인 상태의 빈 보관소는 자물쇠 배지들이 이미 말하고 있다. */}
+          {titles.length === 0 && !authed && <p className="hub-modal-help title-vault-help">{t('hub.title.login')}</p>}
         </Modal>
       )}
 

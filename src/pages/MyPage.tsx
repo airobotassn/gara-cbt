@@ -887,8 +887,7 @@ export default function MyPage() {
               모바일에서 잘리고, 응시권↔응시기록은 같은 물건의 앞뒤 상태(결제 → 응시 → 결과)다. */}
           {!loading && !err && tab === 'attempts' && tickets.length > 0 && (
             <section className="mb-8 md:mb-10">
-              <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-2">{t('ticket.section_title')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mb-5 break-keep">{t('ticket.section_sub')}</p>
+              <h2 className="font-title-md text-lg md:text-[22px] font-bold text-on-surface mb-5">{t('ticket.section_title')}</h2>
               <div className="flex flex-col gap-6">
                 {tickets.map((tk) => (
                   // ⚠️ 어느 응시권으로 가는지 반드시 넘긴다. 같은 회차에서 여러 급수를 살 수 있어서

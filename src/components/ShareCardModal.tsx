@@ -117,11 +117,8 @@ export default function ShareCardModal({
             </div>
           )}
           {note && <p className="share-note">{note}</p>}
-          <p className="hub-modal-help">
-            {readOnly
-              ? t('share.note')
-              : t('share.note_retry')}
-          </p>
+          {/* 재응시 안내는 뺐다 — 자랑하러 연 창에서 "다시 응시해라"를 읽힐 자리가 아니다. */}
+          {readOnly && <p className="hub-modal-help">{t('share.note')}</p>}
         </div>
       </div>
     </div>

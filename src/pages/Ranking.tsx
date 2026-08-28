@@ -447,7 +447,6 @@ function TrendModal({
               padMin={8}
               emptyText={t('rank.trend_empty')}
             />
-            <p className="hof-modal-msg small">{t('rank.trend_help')}</p>
           </>
         )}
       </div>

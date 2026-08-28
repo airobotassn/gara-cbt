@@ -210,6 +210,10 @@ export default function WorldArena() {
 
   const totalTakers = useMemo(() => regions.reduce((s, r) => s + r.takers, 0), [regions])
 
+  // 세계에선 칸이 '나라', 나라 안으로 들어가면 '지역'이다 — 지표·검색 문구도 같이 갈린다.
+  const isWorld = level === 0
+  const scoreLabel = t(isWorld ? 'arena.countryScore' : 'arena.regionScore')
+
   // 지구본에서 내 나라 찾기 — 국기·"우리 순위"·목록 하단 고정이 모두 이 하나를 쓴다.
   // ⚠️ 예전엔 `drill`(파고들 수 있는 나라)로 찾았다. 자립형 HTML 시절엔 드릴 대상이 대한민국
   //    하나뿐이라 그게 곧 "우리나라"였지만, 전 세계 adm1 을 지원하면서 200여 개국이 참이 됐다.
@@ -495,10 +499,10 @@ export default function WorldArena() {
               <span>{t('arena.low')}</span>
               <div className="bar" />
               <span>{t('arena.high')}</span>
-              <span style={{ marginLeft: 8 }}>{t('arena.regionScore')}</span>
+              <span style={{ marginLeft: 8 }}>{scoreLabel}</span>
             </div>
 
-            <div className="aa-zoomctl" role="group" aria-label={t('arena.regionScore')}>
+            <div className="aa-zoomctl" role="group" aria-label={scoreLabel}>
               {/* 세계로 — 나라 안에 들어와 있을 때만. 빵부스러기가 화면 위쪽에 있어 지도를 보다가
                   돌아가려면 시선을 멀리 옮겨야 했다. 조작 버튼 옆에 같이 둔다. */}
               {level > 0 && (
@@ -601,7 +605,7 @@ export default function WorldArena() {
 
             <div className="aa-stats">
               <div className="aa-stat">
-                <div className="k">{t('arena.topRegion')}</div>
+                <div className="k">{t(isWorld ? 'arena.topCountry' : 'arena.topRegion')}</div>
                 <div className="v">
                   {sorted[0] ? (sorted[0].name.length > 8 ? sorted[0].name.slice(0, 8) + '…' : sorted[0].name) : '—'}
                 </div>
@@ -617,7 +621,7 @@ export default function WorldArena() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('arena.search')}
+              placeholder={t(isWorld ? 'arena.searchCountry' : 'arena.search')}
               autoComplete="off"
               spellCheck={false}
             />
@@ -709,7 +713,7 @@ export default function WorldArena() {
               사용자에게 쓸모가 없는 데다 "여기만 실데이터" 라고 붙이는 순간 나머지 나라는 아니라고 우리가
               먼저 광고하는 꼴이 된다. 판정값(region.real ← has_real)은 그대로 내려온다 — 운영 판단용이다. */}
           <div className="row">
-            <span>{t('arena.regionScore')}</span>
+            <span>{scoreLabel}</span>
             <span>{fmtScore(hover.region.score)}</span>
           </div>
           <div className="row">

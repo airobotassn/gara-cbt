@@ -36,8 +36,8 @@ export default function MiniGames() {
         </Link>
 
         <header className="mgp-head">
+          {/* 부제는 뺐다 — /arena 런처 칩에서 이미 읽고 들어온 문장이라 제목 밑에서 한 번 더 말할 게 없다. */}
           <h1>{t('arena.bGame')}</h1>
-          <p>{t('arena.bGameS')}</p>
         </header>
 
         <div className="mg-shelf">

@@ -368,7 +368,6 @@ const KO: Record<string, string> = {
   "rank.nth": "{n}위",
   "rank.trend_title": "순위 추이",
   "rank.trend_empty": "이 기간엔 기록이 없어요.",
-  "rank.trend_help": "선이 올라가면 순위가 오른 거예요. 그래프를 짚으면 그날 점수가 보여요.",
   "rank.you": "나",
   "rank.cta_test": "테스트로 랭킹에 배치받기",
   // 집계 리더보드(지역·국가·학교) — 협력 서사(하락/꼴찌 없음). /arena 지도 전용(랭킹 탭에서는 제거됨)
@@ -948,7 +947,7 @@ const KO: Record<string, string> = {
   "mypage.title": "마이페이지",
   "mypage.greeting_hello": "안녕하세요, ",
   "mypage.greeting_name": "{name} 님",
-  "mypage.greeting_tail": ". CARIS 현황을 확인하세요.",
+  "mypage.greeting_tail": ".",
   "mypage.empty_attempts": "아직 응시 내역이 없습니다.",
   "mypage.go_exam": "CARIS 응시하기",
   "mypage.cta_sub": "CARIS 공식 응시 페이지로 이동합니다.",
@@ -1051,7 +1050,7 @@ const KO: Record<string, string> = {
   //   'll.demo_note'(데모 안내)는 삭제됐다: 돈 받고 파는 물건 옆에 무료로 가는 길을 둘 수 없다.
   "ll.watch": "시청하기",
   "ll.playing": "재생 중",
-  "ll.empty_owned": "이 칸에는 구매한 자료가 없습니다.",
+  "ll.empty_owned": "구매한 자료가 없습니다.",
   // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
   "ll.bundle": "전체구매",
   "ll.bundle_desc": "E-Book 과 강의를 골라 한 번에 담을 수 있습니다.",
@@ -1070,7 +1069,7 @@ const KO: Record<string, string> = {
   "mypage.issue": "발급 신청",
   "mypage.view_sample": "견본 보기",
   "mypage.sample_title": "인증서 견본",
-  "mypage.sample_desc": "발급되는 인증서가 어떻게 생겼는지 미리 확인하세요.",
+  "mypage.sample_desc": "인증서가 어떻게 생겼는지 확인해 보세요.",
   "gate.btn_check": "시험환경 테스트",
   "gate.login_required": "응시하려면 구글 로그인이 필요합니다. (비로그인 시 자동 안내)",
   "gate.format_value": "지선다형 객관식",
@@ -1426,12 +1425,17 @@ const KO: Record<string, string> = {
   //    바뀌면서 arena.regionScore 로 대체했다. 다른 곳에서 안 쓰면 avgLevel 은 지워도 된다.
   "arena.avgLevel": "평균 레벨",
   "arena.regionScore": "지역 점수",
+  // ⚠️ 세계 지도의 칸은 '나라'고, 나라 안으로 들어가야 '지역'이다 — 그래서 한 쌍으로 둔다(`level === 0` 이 고른다).
+  //    한쪽만 두면 월드리그에서 나라 목록을 놓고 '지역 검색'이라고 말하게 된다.
+  "arena.countryScore": "국가 점수",
   "arena.part": "참여 인원",
   "arena.rankL": "순위",
-  "arena.ourRank": "우리 순위",
+  "arena.ourRank": "순위",
   "arena.topRegion": "최고 지역",
-  "arena.totalPart": "총 참여",
+  "arena.topCountry": "최고 국가",
+  "arena.totalPart": "총 참여 인원",
   "arena.search": "지역 검색…",
+  "arena.searchCountry": "국가 검색…",
   "arena.world": "세계",
   "arena.worldLeague": "World League",
   "arena.league": " 리그",
@@ -1443,16 +1447,16 @@ const KO: Record<string, string> = {
   "arena.our1": "· 우리 지역",
   "arena.our2": "· 우리 동네",
   "arena.bLevel": "레벨 테스트",
-  "arena.bLevelS": "내 실력 측정 · 진화",
+  "arena.bLevelS": "AI & 로봇 실력 테스트",
   "arena.bHub": "마이 홈",
-  "arena.bHubS": "캐릭터 허브",
+  "arena.bHubS": "내 캐릭터",
   "arena.bDaily": "DAILY QUIZ",
-  "arena.bDailyS": "데일리 콘텐츠",
+  "arena.bDailyS": "오늘의 한 문제",
   // 아레나 화면 제목 — 제품명은 6개국어 영문 유지(ko 만 기존 표기 보존)
   "arena.title": "WORLD ARENA",
   "arena.bGame": "미니게임",
   // 용어 퀴즈 게임 3종 + 로봇 조작/코딩 퍼즐 2종이라 '용어'로 못 묶는다 → AI·로봇 전체로 넓힌 문구.
-  "arena.bGameS": "AI · 로봇을 게임으로 한 판",
+  "arena.bGameS": "AI · 로봇 게임",
   "arena.loading": "지도를 불러오는 중…",
   "arena.zoom_in": "확대",
   "arena.zoom_out": "축소",
@@ -1521,7 +1525,6 @@ const KO: Record<string, string> = {
 
   // ── 응시권 상태·라벨 (ticket.*) — 마이페이지 '보유 응시권' 블록이 주 사용처 ──
   "ticket.section_title": "보유 응시권",
-  "ticket.section_sub": "결제한 시험이 여기 쌓여요. 응시 기간이 되면 바로 응시할 수 있어요.",
   "ticket.empty": "아직 보유한 응시권이 없습니다.",
   "ticket.empty_cta": "접수하러 가기",
   "ticket.count": "보유 {n}장",
@@ -1670,7 +1673,6 @@ const KO: Record<string, string> = {
   "daily.reward_head": "완료하면",
   "daily.done_note": "오늘 DAILY QUIZ 완료 ✓ 내일 새 문제가 열려요. 오늘 것은 다시 볼 수 있어요(보상은 하루 1회).",
   "daily.saving": "기록하는 중…",
-  "daily.pick_note": "정답을 고르면 오늘 DAILY QUIZ가 완료돼요. 맞히지 않아도 시도하면 적립돼요.",
   "daily.pop_title": "오늘 DAILY QUIZ 완료!",
   "daily.pop_bonus": "7일 완주 +{b}P",
   "daily.pop_grew": "캐릭터가 오늘도 한 뼘 자랐어요.",
@@ -1699,31 +1701,31 @@ const KO: Record<string, string> = {
 
   // 미니게임 카드(제목·소개·뱃지) — 'CARI' 는 캐릭터 이름이라 번역하지 않는다.
   "mg.beat-cari.title": "버텨라 CARI",
-  "mg.beat-cari.tagline": "쏟아지는 돌, 문제로 버텨라!",
+  "mg.beat-cari.tagline": "내려오는 천장에서 CARI 를 구해봐요",
   "mg.beat-cari.badge": "AI · 로봇 용어 서바이벌",
   "mg.shoot-cari.title": "쏴라 CARI",
-  "mg.shoot-cari.tagline": "쏟아지는 운석을 정답으로 격추!",
+  "mg.shoot-cari.tagline": "몰려오는 적 기체에서 CARI 를 지켜줘요",
   "mg.shoot-cari.badge": "AI · 로봇 용어 슈팅",
   "mg.pick-cari.title": "골라라 CARI",
-  "mg.pick-cari.tagline": "발판이 무너지기 전에 O·X 를 골라라!",
+  "mg.pick-cari.tagline": "발판이 꺼지기 전에 CARI 를 옮겨줘요",
   "mg.pick-cari.badge": "AI · 로봇 용어 OX 서바이벌",
   "mg.reach-cari.title": "닿아라 CARI",
-  "mg.reach-cari.tagline": "관절을 움직여 목표에 닿아라",
+  "mg.reach-cari.tagline": "CARI 의 로봇팔을 움직여 별에 닿아봐요",
   "mg.reach-cari.badge": "로봇팔 · 기구학 퍼즐",
   "mg.program-cari.title": "프로그램해라 CARI",
-  "mg.program-cari.tagline": "명령을 짜서 CARI를 움직여라",
+  "mg.program-cari.tagline": "길을 모르는 CARI 에게 순서를 짜줘요",
   "mg.program-cari.badge": "로봇 · 블록 코딩 퍼즐",
   "mg.build-cari.title": "지어라 CARI",
-  "mg.build-cari.tagline": "라인을 깔면 공장이 알아서 돌아가요!",
+  "mg.build-cari.tagline": "CARI 의 공장에 컨베이어를 깔아줘요",
   "mg.build-cari.badge": "스마트팩토리 · 라인 설계 퍼즐",
   "mg.block-cari.title": "막아라 CARI",
-  "mg.block-cari.tagline": "규정에 걸리는 곳을 가리고 넘겨라!",
+  "mg.block-cari.tagline": "CARI 가 보낼 문서, 위험한 곳을 가려줘요",
   "mg.block-cari.badge": "AI 입력 전 정보 가리기",
   "mg.order-cari.title": "시켜라 CARI",
-  "mg.order-cari.tagline": "도면대로 나오게 지시를 골라라!",
+  "mg.order-cari.tagline": "CARI 에게 도면대로 만들라고 시켜봐요",
   "mg.order-cari.badge": "AI 지시문 설계 퍼즐",
   "mg.feel-cari.title": "더듬어라 CARI",
-  "mg.feel-cari.tagline": "앞이 안 보인다. 센서만 믿고 가라!",
+  "mg.feel-cari.tagline": "앞이 안 보이는 CARI 에게 센서를 켜줘요",
   "mg.feel-cari.badge": "센서 · 에지 AI 탐사",
 
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
@@ -1740,7 +1742,6 @@ const KO: Record<string, string> = {
   "share.do_save": "이미지 저장",
   "share.do_copy": "이미지 복사",
   "share.note": "지금 순위·티어 기준으로 만든 카드예요.",
-  "share.note_retry": "카드는 지금 순위·티어 기준이에요. 응시하면 다시 만들어서 공유할 수 있어요.",
   // 카드 안(캔버스)에 그려지는 글자
   "share.card.title": "시즌 기록",
   "share.card.rank_n": "{n}위",
@@ -1846,7 +1847,6 @@ const KO: Record<string, string> = {
   "hub.closet.worn": "착용 중",
   "hub.closet.wear": "적용하기",
   "hub.closet.empty_character": "아직 가진 캐릭터가 없어요. 상점 탭에서 만나볼 수 있어요.",
-  "hub.closet.skin_help": "스킨을 바꾸면 배경뿐 아니라 출석판·게이지·도장까지 함께 바뀌어요.",
   "hub.charpick.title": "함께할 캐릭터를 골라주세요",
   "hub.charpick.sub": "한 명만 고를 수 있어요. 고른 캐릭터는 Lv.1부터 함께 자라요.",
   "hub.charpick.g_m": "남성",
@@ -1900,7 +1900,6 @@ const KO: Record<string, string> = {
 
   // 칭호
   "hub.title.title": "칭호",
-  "hub.title.empty": "아직 획득한 칭호가 없어요 — 인증서에 합격하면 채워져요",
   "hub.title.login": "로그인하면 칭호 보관소가 보여요.",
 
   // 점수 획득 방법

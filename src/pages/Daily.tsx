@@ -225,14 +225,11 @@ export default function Daily() {
 
       {err && <p className="dy-err">{err}</p>}
 
-      {/* 완료 트리거는 문제 시도(왼쪽 카드)로 옮겨졌다. 여기는 상태 안내만. */}
-      <p className="dy-note">
-        {done
-          ? t('daily.done_note')
-          : busy
-          ? t('daily.saving')
-          : t('daily.pick_note')}
-      </p>
+      {/* 완료 트리거는 문제 시도(왼쪽 카드)로 옮겨졌다. 여기는 상태 안내만.
+          ⚠️ 고르기 전 안내는 뺐다 — 아직 아무것도 안 한 사람에게 적립 규칙부터 읽히지 않는다. */}
+      {(done || busy) && (
+        <p className="dy-note">{done ? t('daily.done_note') : t('daily.saving')}</p>
+      )}
       </aside>
       </div>
       </div>
