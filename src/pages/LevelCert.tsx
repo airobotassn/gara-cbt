@@ -34,6 +34,7 @@ const ROTC = { x: 670, y: 269 }
 // 45° 는 너무 가팔라서 국자가 세로로 서고 아래쪽 별이 하단 테두리까지 내려갔다 → 30° 로 완만하게(2026-08-06).
 const ROT = -30
 const VB = { w: 1448, h: 900 } // 인증서 고정 좌표계
+const QR_QUIET = 4 // QR 둘레 여백(모듈 수) — 규격 최소치다. 줄이면 리더가 코드 경계를 못 잡는다.
 
 // 증서 본문 서체 — 라틴은 Tinos(= Times New Roman 과 자폭까지 같은 폰트, `CariSerif` 로 cert.css 에 이미 등록),
 // 한글 이름만 Noto Serif KR(`CertSerifKR`)로 떨어진다. ⚠️ 순서를 뒤집지 말 것 — CertSerifKR 이 앞에 오면
@@ -243,7 +244,9 @@ export default function LevelCert() {
   // 닉네임 미설정이면 자리를 비우지 않고 기본 표기를 쓴다(인증서에 빈 줄이 남지 않게).
   const name = (data.displayName || t('lcert.no_name')).slice(0, 12)
   const level = Math.min(7, Math.max(1, data.level))
-  const qr = data.verifyToken ? qrMatrix(`${window.location.origin}/verify/${data.verifyToken}`, 'H') : null
+  // ⛔ 오차정정을 H 로 올리지 말 것 — 같은 주소가 41×41 로 불어나 124px 안에서 한 칸이 3px 밑으로
+  //    떨어진다. 이 QR 은 찢어지거나 도장이 찍히는 종이가 아니라 화면·인쇄본이라 M 이면 충분하다.
+  const qr = data.verifyToken ? qrMatrix(`${window.location.origin}/verify/${data.verifyToken}`, 'M') : null
 
   return (
     <div className="lc-page">
@@ -281,15 +284,26 @@ export default function LevelCert() {
               <img className="lc-certification-copy" src="/cert/copy-certification.png" alt="" />
             </div>
 
-            {/* 진위확인 QR — 금색 모듈 / 검은 판 = **흑백이 뒤집힌 QR**(시안 그대로). 스캐너 여유를 벌려고
-                오차정정은 최고 등급(H)으로 굽는다. ⛔ 토큰이 없으면 QR 을 그리지 않는다 —
-                죽은 /verify 주소를 찍어 두면 스캔한 사람이 '위조'라는 답을 받는다. */}
+            {/* 진위확인 QR — **금색 판 위에 어두운 모듈**. ⛔ 뒤집지 말 것(금색 모듈 / 검은 판).
+                시안이 반전 QR 이라 그대로 따라 그렸는데 **폰 카메라가 한 대도 못 읽었다**(2026-08-28
+                실측: OpenCV 디코더도 그림을 반전시켜야만 읽힌다). QR 규격은 '밝은 바탕 + 어두운 모듈'
+                이라 반전본은 읽어주는 리더가 있으면 운이 좋은 것이다. 증서에서 유일하게 밝은 면이라
+                눈에 띄지만, 안 읽히는 QR 은 장식일 뿐이다.
+                ⚠️ 판 둘레의 여백(quiet zone)도 규격이다 — 4칸. 격자에 딱 맞춰 자르면 리더가
+                   시작·끝을 못 잡는다. 그래서 viewBox 가 격자보다 8칸 크다.
+                ⛔ 토큰이 없으면 QR 을 그리지 않는다 — 죽은 /verify 주소를 찍어 두면 스캔한 사람이
+                   '위조'라는 답을 받는다. */}
             <div className="lc-qrbox">
               {qr ? (
-                <svg className="lc-qr" viewBox={`0 0 ${qr.count} ${qr.count}`} role="img" aria-label="Verify authenticity">
-                  <rect x="0" y="0" width={qr.count} height={qr.count} fill="#000409" />
+                <svg
+                  className="lc-qr"
+                  viewBox={`0 0 ${qr.count + QR_QUIET * 2} ${qr.count + QR_QUIET * 2}`}
+                  role="img"
+                  aria-label="Verify authenticity"
+                >
+                  <rect x="0" y="0" width={qr.count + QR_QUIET * 2} height={qr.count + QR_QUIET * 2} fill="#e7c47e" />
                   {qr.dark.map(([r, c], i) => (
-                    <rect key={i} x={c} y={r} width={1.04} height={1.04} fill="#e0ab45" />
+                    <rect key={i} x={c + QR_QUIET} y={r + QR_QUIET} width={1.02} height={1.02} fill="#0a1220" />
                   ))}
                 </svg>
               ) : (
