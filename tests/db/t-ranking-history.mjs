@@ -102,6 +102,8 @@ await db.exec(`
 `);
 
 await db.exec(strip(noCron(readFileSync('supabase/migrations/20260825210000_ranking_history.sql', 'utf8'))));
+// 첫 화면 최적화판. 아래 (2c~2e) 가 이력의 순위를 **화면이 실제로 쓰는 함수**와 대조하려면 이게 있어야 한다.
+await db.exec(readFileSync('supabase/migrations/20260827130000_scoped_top_fast.sql', 'utf8'));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });

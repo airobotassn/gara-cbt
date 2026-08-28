@@ -67,6 +67,8 @@ await db.exec(readFileSync('supabase/migrations/20260825150000_my_rank_context_d
 await db.exec(readFileSync('supabase/migrations/20260826180000_ranking_dummy_skins.sql', 'utf8'));
 // 캐릭터를 그림이 있는 계열(a)로. 이것도 시드 뒤에 덮어쓰는 짝이다.
 await db.exec(readFileSync('supabase/migrations/20260826190000_ranking_dummy_chars_a.sql', 'utf8'));
+// 첫 화면 최적화 — 전체 정렬을 인덱스로 바꾼 판. **이걸 빼면 아래 검사가 옛 함수를 보게 된다.**
+await db.exec(readFileSync('supabase/migrations/20260827130000_scoped_top_fast.sql', 'utf8'));
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -206,7 +208,11 @@ const U = '11111111-1111-1111-1111-111111111111';
   rec('더미 행에도 uid 가 실린다(방 보기용)', typeof g.top[1].uid === 'string', true);
   rec('더미 행에 이름이 있다', typeof g.top[1].name === 'string' && g.top[1].name.length > 0, true);
   rec('더미 행에 국가가 실린다(국기용)', ['US', 'KR'].includes(g.top[1].country), true);
-  rec('티어가 백분위에서 나온다', g.top[0].tier, 'diamond');
+  // ⚠️ 옛 검사는 `tier === 'diamond'` 였다. 20260827130000 부터 첫 화면은 티어를 **안 만든다** —
+  //    화면에서 2026-08-04 에 제거돼 아무도 안 읽는데, 그 값 하나 때문에 풀 전체를 한 번 더
+  //    정렬하고 있었다(실측 325ms 의 큰 몫). 키는 남기고 null 을 넣어 응답 모양만 지킨다.
+  //    ⛔ 되살릴 거면 tier_by_score(점수) 를 쓸 것 — ranking_tier(백분위) 로 돌아가면 정렬이 같이 온다.
+  rec('첫 화면은 티어를 만들지 않는다(키는 남는다)', 'tier' in g.top[0] && g.top[0].tier === null, true);
 
   // 국가·지역 탭
   const kr = (await db.query(`select scoped_top($1, 10, 'KR', null) as j`, [U])).rows[0].j;
@@ -379,19 +385,27 @@ const U = '11111111-1111-1111-1111-111111111111';
     ) x
   `)).rows.map((r) => r.id);
 
-  const keys = ['rank', 'total', 'season_total', 'tier', 'percentile', 'points_to_pass'];
+  // ⚠️ 티어는 비교 대상이 아니다 — scoped_top 은 20260827130000 부터 티어를 **안 만든다**(null).
+  //    화면에서 2026-08-04 에 제거돼 아무도 안 읽는데, 그 값을 내려고 풀 전체를 한 번 더 정렬하고
+  //    있었기 때문이다. my_rank_context 는 백분위를 이미 들고 있어 공짜라 그대로 둔다.
+  //    ⛔ 그래도 **순위·총원·점수·백분위·남은점수**는 두 구현이 반드시 같아야 한다 —
+  //       어긋나면 허브의 내 순위와 랭킹 화면의 내 순위가 같은 순간에 다른 값을 말한다.
+  const keys = ['rank', 'total', 'season_total', 'percentile', 'points_to_pass'];
   let same = 0;
+  let tierGone = 0;
   for (const id of [U, ...picks]) {
     const r = await one(`select scoped_top($1, 0, null, null) as j, my_rank_context($1) as f`, [id]);
     const a = {
       rank: r.j.me?.rank ?? null, total: r.j.total, season_total: r.j.me?.rating ?? null,
-      tier: r.j.me?.tier ?? null, percentile: r.j.me?.percentile ?? null,
+      percentile: r.j.me?.percentile ?? null,
       points_to_pass: r.j.me?.points_to_pass ?? null,
     };
     const b = Object.fromEntries(keys.map((k) => [k, r.f[k] ?? null]));
     if (JSON.stringify(a) === JSON.stringify(b)) same++;
+    if ((r.j.me?.tier ?? null) === null) tierGone++;
   }
-  rec('⭐ 두 구현이 같은 순위·백분위·티어를 낸다(상위·하위·실회원)', same, 1 + picks.length);
+  rec('⭐ 두 구현이 같은 순위·백분위를 낸다(상위·하위·실회원)', same, 1 + picks.length);
+  rec('⭐ 첫 화면은 티어를 만들지 않는다(전체 정렬 제거)', tierGone, 1 + picks.length);
 
   // 회귀 그 자체 — 더미를 안 세면 total 이 실회원 수(1)로 떨어진다.
   const me = await one(`select my_rank_context($1) as f`, [U]);
