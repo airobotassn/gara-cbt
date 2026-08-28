@@ -1052,7 +1052,6 @@ const ZH: Record<string, string> = {
   "mypage.issue": "申请发放",
   "mypage.view_sample": "查看样本",
   "mypage.sample_title": "证书样本",
-  "mypage.sample_desc": "看看证书长什么样。",
   "gate.btn_check": "考试环境测试",
   "gate.login_required": "应试需要 Google 登录。（未登录时将自动引导）",
   "gate.format_value": "多选一客观题",

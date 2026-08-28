@@ -63,62 +63,214 @@
 .lc-orn.bl { left: 26px; bottom: 26px; transform: scaleY(-1); }
 .lc-orn.br { right: 26px; bottom: 26px; transform: scale(-1); }
 
-/* 텍스트 기둥 — 폭 560px, **오른쪽**(별자리가 왼쪽으로 갔다).
-   ⚠️ 세로 정중앙(top:50% + translateY)이 아니라 **제목 위치로 고정**한다(2026-08-19).
-      발행처가 아래로 빠지면서 기둥 높이가 줄었는데, 가운데 정렬로 두면 그 차이만큼 제목이
-      통째로 내려앉는다 — 제목은 시안에서 안 움직이는 요소다. 아래 세 값(top·margin-top 2개)은
-      시안(바탕화면 '레벨테스트 인증서 양식.pptx')의 슬라이드 좌표를 1448×900 으로 환산한 실측값이다. */
-.lc-col {
+/* ========================================================================
+   좌표의 출처 (2026-08-28)
+   아래 모든 px 값은 레퍼런스 이미지(1611×976)에서 요소별 잉크 경계를 실측해
+   1448×900 으로 환산한 값이다(가로 ×0.8988 · 세로 ×0.9221).
+   ⚠️ 눈대중으로 고치지 말 것 — 고칠 일이 생기면 레퍼런스에서 다시 재고, 잰 값을 여기 적는다.
+   ⚠️ 글자 상자의 top 은 잉크 top 이 아니다. line-height:1 인 Tinos 는
+      상자top + 0.1755em 이 대문자 윗선, + 0.1545em 이 어센더 윗선이다(그만큼 빼서 박았다).
+   ======================================================================== */
+
+/* 제목 기둥 — **왼쪽 위**(2026-08-28 시안. 예전엔 오른쪽 기둥 맨 위였다).
+   실측: 제목 x109~567 · y144~290 / LEVEL N x218~458 · y340~388.
+   둘의 가운데가 x338 로 같다 = 제목 폭 안에서 중앙정렬이다. */
+.lc-head {
   position: absolute;
-  right: 82px;
-  top: 261px;
-  width: 560px;
+  left: 109px;
+  top: 144px;
+  width: 458px;
   text-align: center;
 }
-/* 제목·LEVEL·숫자는 확정 시안 에셋(PNG) — 여기서 서체·자간을 만들지 않는다.
-   ⚠️ 아래 크기 4종(.lc-title 폭 · .lc-mark 간격 · cap/num 높이)은 정적 시안
-   public/cert-preview.html 의 .title/.mark/.mark-cap/.mark-num 과 **같은 값이어야 한다**. */
+/* 제목·LEVEL·숫자는 확정 시안 에셋 — 여기서 서체·자간을 만들지 않는다.
+   title-word.webp 는 1123×349(여백 없이 잘려 있음)라 폭 458 → 높이 142 다. */
 .lc-title {
   display: block;
-  width: 440px;
+  width: 458px;
   margin: 0 auto;
   filter: drop-shadow(0 0 26px rgba(230, 180, 80, 0.28));
 }
-/* 이름 — **레벨 아래**. margin 은 시안 좌표(글리프 중심 y≈621)에서 역산한 값이다. */
+/* LEVEL N — 제목 잉크 바닥(144+142=286)에서 54px 아래가 글리프 윗선(340). */
+.lc-mark {
+  margin-top: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ⚠️ gap 도 높이와 같이 움직여야 한다 — 높이만 줄이면 'LEVEL' 과 숫자가 남남이 된다. */
+  gap: 23px;
+}
+/* cap 과 num 은 반드시 같은 높이(둘 다 같은 굵은 산세리프다). */
+.lc-mark-cap { height: 48px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+.lc-mark-num { height: 48px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
+
+/* 증서문 기둥 — **오른쪽**. 실측한 요소 7개(증서문·이름·본문 2줄·QR·캡션·직인)의 가운데가
+   전부 x1062~1077 에 몰려 있어 기둥 가운데를 x1070 으로 잡았다(left 780 + 폭 580 의 절반).
+   자식은 전부 절대배치다 — 이름 길이가 변해도 아래 요소가 밀리지 않게 하려는 것이다. */
+.lc-col {
+  position: absolute;
+  left: 780px;
+  top: 0;
+  width: 580px;
+  height: 900px;
+  text-align: center;
+}
+.lc-col > * {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0;
+}
+/* 잔글씨 금색 — 레퍼런스 실측 #f8d870 계열. 이름보다 밝고 노랗다. */
+.lc-certify,
+.lc-body,
+.lc-vcap {
+  display: block;
+  height: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+/* 크기는 레퍼런스에서 잰 **잉크 폭**으로 역산한다 — 글자를 그림(copy-*.png)으로 박아 뒀으므로
+   CSS 의 width 는 잉크 폭이 아니라 **투명 여백까지 포함한 상자 폭**이다. 둘을 혼동하면 글줄이
+   통째로 한 단 커진다(2026-08-28 에 증서문·본문·캡션 셋이 다 10~12% 크게 박혀 있었다).
+   환산 = 상자폭 = 목표 잉크폭 ÷ (그림의 잉크 비율). 그림별 비율:
+     copy-certify 0.976 · copy-requirements 0.989 · copy-verify 0.962
+     copy-earned 0.926 · copy-certification 0.933 · copy-issuer 1.000
+   세로도 같다 — top 은 잉크 윗선이 아니라 상자 윗선이라 그림 위쪽 여백만큼 빼서 박는다.
+   목표 잉크(레퍼런스 실측): 증서문 x953~1191·y251 / 본문 x808~1322·y397 / 캡션 x989~1140·y632 */
+.lc-certify { top: 248px; width: 244px; }
+.lc-body1 { top: 395px; width: 520px; }
+/* ⚠️ QR·캡션·직인 셋은 **한 덩어리로 움직인다**(2026-08-28 지시로 레퍼런스보다 40px 아래).
+   하나만 옮기면 캡션이 QR 에서 떨어지거나 직인에 붙는다 — 셋의 간격(17 / 21)은 고정이다. */
+.lc-vcap { top: 669px; width: 157px; }
+
+/* earned 줄 — 잉크 실측 y435~461(가운데 448)이라 상자 가운데를 448 에 맞춘다. */
+.lc-earned-row {
+  top: 424px;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 낱말 사이 실측 = 21 / 13 / 15px. 그림마다 좌우 여백이 달라 flex gap 하나로는 셋이 안 맞는다 —
+     기본 11 로 깔고 'LEVEL' 앞에만 6 을 더해 21 을 만든다. */
+  gap: 11px;
+  white-space: nowrap;
+}
+.lc-earned-copy { width: 118px; height: auto; }
+.lc-certification-copy { width: 138px; height: auto; }
+.lc-earned-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  margin-left: 6px;
+  filter: drop-shadow(0 0 12px rgba(224, 192, 124, 0.24));
+}
+/* ⚠️ 26px 은 **숫자(num-N.png)를 레퍼런스에 맞춘 높이**다(실측 17×26 = 그림 비율 그대로).
+   더 키우면 'LEVEL N' 이 옆 세리프 글줄을 눌러 문장이 아니라 배지처럼 읽힌다(31px 이 그랬다). */
+.lc-earned-level-word,
+.lc-earned-level-num {
+  display: block;
+  height: 26px;
+  width: auto;
+}
+
+/* 이름 — 레퍼런스 실측 x839~1312(폭 473) · y306~378. Tinos Bold 로 그 폭이 나오는 크기가 80px 다.
+   ⚠️ 단색 금색으로 칠하지 말 것 — 이 인증서의 금색은 전부 금박 각인 질감이라 납작한 CSS 금색은
+      혼자 따로 논다. 그래서 세로 그라디언트를 글자에 클립해 위아래 명암을 준다(날짜 라벨의
+      SVG lc-gold 그라디언트와 같은 색 단계다).
+   ⚠️ color 를 먼저 깔고 @supports 안에서만 투명으로 덮는다 — background-clip 이 안 먹는 곳에서
+      글자가 통째로 사라지는 사고를 막는다. */
+/* top 은 292(라틴 이름이 실측 y306 에 정확히 떨어지는 값)와 304(한글 이름이 같은 광학 중심에
+   오는 값)의 절충이다. 한글에는 어센더·디센더가 없어 같은 상자 안에서 라틴보다 12px 높이 앉는다 —
+   어느 한쪽에 맞추면 다른 쪽이 6px 이 아니라 12px 어긋난다. */
 .lc-name {
-  margin-top: 83px;
-  font: 700 58px CertSerifKR, 'Noto Serif KR', serif;
-  letter-spacing: 9px;
-  text-indent: 9px;
-  color: #fff;
-  text-shadow: 0 0 26px rgba(255, 235, 190, 0.3);
+  top: 300px;
+  font: 700 80px CariSerif, CertSerifKR, serif;
+  line-height: 1;
+  color: #d0a048;
+  /* 각인 — 위 하이라이트 / 아래 그늘. 이게 없으면 납작한 색면이라 금박 제목 옆에서 싸구려로 읽힌다. */
+  text-shadow: 0 1px 0 rgba(72, 42, 6, 0.42), 0 -1px 0 rgba(255, 240, 200, 0.26);
+  filter: drop-shadow(0 0 20px rgba(208, 160, 72, 0.24));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* 레벨 — **이름 위**(시안 좌표: 글리프 중심 y≈470). */
-.lc-mark {
-  margin-top: 49px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 시안에서 이 덩어리가 원본의 80% 로 줄어 있다(가로 0.83 · 세로 0.77 의 기하평균).
-     ⚠️ gap 도 같이 줄여야 한다 — 높이만 줄이면 글자 사이만 벌어져 'LEVEL' 과 숫자가 남남이 된다. */
-  gap: 19px;
+/* ⚠️ 밝게 만들지 말 것. 레퍼런스 이름 픽셀은 상·중·하가 전부 #d0a048 근처로 **거의 균일한 진한 금**이다.
+   크림(#fff3cf)을 위쪽에 크게 물리면 흰끼가 돌아 형광처럼 뜬다(2026-08-28 에 그렇게 만들었다가 물렸다).
+   하이라이트는 맨 위 8% 에만 얇게 준다. */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .lc-name {
+    background: linear-gradient(180deg, #f0d492 0%, #dcae5c 8%, #d0a048 38%, #c2903a 72%, #b8862f 90%, #d9b264 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
-/* cap 과 num 은 반드시 같은 높이. 예전 숫자가 가는 세리프라 58px 로 키워뒀던 값이 남아 있었는데,
-   지금은 둘 다 같은 굵은 산세리프라 크기가 다르면 한 줄 안에서 따로 논다. */
-.lc-mark-cap { height: 46px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
-.lc-mark-num { height: 46px; filter: drop-shadow(0 0 18px rgba(224, 192, 124, 0.28)); }
 
-/* 발행처 서명단 — 카드 하단 **정중앙**(2026-08-19 시안). 오른쪽 기둥이 아니라 카드 폭 기준이다.
-   ⚠️ 아래 top·height·margin 은 시안 슬라이드 좌표의 실측 환산값이라 눈대중으로 고치지 말 것. */
+/* QR — 실측 x1000~1124 · y488~613(124×124). 판(검정)은 모듈 격자 딱 그만큼이고 그 바깥은
+   증서 배경이 그대로 여백(quiet zone) 노릇을 한다 — 배경이 이미 거의 검정이라 성립한다.
+   ⛔ 흰 판을 깔지 말 것. 반전 QR 의 여백은 어두워야 한다(밝은 테두리가 오히려 인식을 깬다). */
+.lc-qrbox {
+  top: 528px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: 124px;
+  height: 124px;
+}
+.lc-qr { display: block; width: 100%; height: 100%; }
+/* 토큰 발급 전 — 자리만 잡아 둔다(죽은 QR 을 찍는 것보다 낫다). */
+.lc-qr-wait {
+  width: 100%;
+  height: 100%;
+  border: 1.4px dashed rgba(224, 171, 69, 0.5);
+  border-radius: 6px;
+  background: rgba(0, 4, 9, 0.55);
+}
+
+/* 직인 — **증서문 기둥의 맨 아래**다(진위확인 캡션 밑). 실측 잉크 x999~1153 · y677~838(154×161).
+   ⛔ 발행처 서명단(.lc-sign) 안에 넣지 말 것. 한 줄에 끼우면 줄 높이에 맞춰 68px 로 쪼그라들어
+      '봉인'이 아니라 아이콘으로 읽히고, 덤으로 서명단 전체를 왼쪽으로 밀어 GARA 자리가 어긋난다
+      (2026-08-28 에 그렇게 들어가 있었다). 서명단이 왼쪽에 서는 건 이 직인이 오른쪽 아래를
+      차지하기 때문이지, 같은 줄에 있기 때문이 아니다.
+   ⚠️ 크기는 **레퍼런스보다 작다.** 레퍼런스 실측대로 162(잉크 154)로 박으면 QR(124)보다 커서
+      기둥의 주인공이 봉인이 되어 버린다 — 2026-08-28 지시로 QR 보다 한 단 작게 내렸다.
+   seal.png 는 사방에 여백이 있다(잉크 비율 0.954). */
+.lc-seal {
+  display: block;
+  top: 712px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.48));
+}
+
+/* 발행처 서명단 — 로고 · 세로선 · 직함+기관명이 **한 줄**(2026-08-28 시안).
+   실측: 로고 x403~561 · 세로선 x579 · 글자 x600~967, 줄 전체 y801~834.
+   ⚠️ 카드 정중앙(x724)이 아니라 x685 다 — 오른쪽 아래 직인이 자리를 먹어서 그만큼 왼쪽에 선다.
+      right:78 이 그 39px 을 만든다(줄 폭 158+19+1+19+367=564 → 좌우 여백이 403 으로 떨어진다).
+   ⚠️ 여기 폭을 바꾸면 줄 전체가 좌우로 움직인다 — 특히 .lc-issuer 폭. 예전에 420 이라
+      줄이 31px 왼쪽으로 밀려 있었다. */
 .lc-sign {
   position: absolute;
   left: 0;
-  right: 0;
-  top: 798px;
-  text-align: center;
+  right: 78px;
+  top: 801px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 19px;
+}
+.lc-sign-bar {
+  width: 1px;
+  height: 34px;
+  background: rgba(240, 216, 150, 0.55);
 }
 /* GARA — 제목 위에 있던 시절(52px)의 **절반**이다. 자리가 바뀌면서 주인공이 아니라
    문서 아래 찍는 발행처 표시가 됐다. 크게 두면 하단이 로고 배너처럼 읽힌다.
@@ -126,9 +278,9 @@
    제목의 따뜻한 금박 각인과 따로 놀았다 → 로고 알파를 마스크로 쓰고 금박 결·림을 입힌다. */
 .lc-brand {
   display: block;
-  width: 160px;
+  flex: none;
+  width: 158px;
   height: 26px;
-  margin: 0 auto;
   background:
     linear-gradient(180deg, rgba(255, 249, 218, 0.78) 0%, transparent 24%, rgba(119, 66, 8, 0.18) 78%, rgba(255, 222, 126, 0.45) 100%),
     url('/cert/gold-foil.webp') center 44% / 210px auto;
@@ -141,18 +293,16 @@
     drop-shadow(0 0 16px rgba(224, 192, 124, 0.3));
 }
 
-/* 발행기관 — 잔글씨. ⚠️ 금색으로 쓰지 말 것.
-   이 인증서의 금색은 전부 금박 각인 질감 + 광택 림을 가진 이미지 자산이라, CSS 금색 텍스트를 얹으면
-   혼자 납작해서 따로 논다(하이라이트 0%). 재질 경쟁을 피하려고 일부러 무채에 가까운 웜톤으로 뺐다.
-   ⚠️ 옛 금색 구분선(::before)은 뺐다 — 로고와 기관명 사이가 15px 뿐이라 들어갈 자리가 없고,
-      시안에도 없다. 그 둘은 이제 구분해야 할 남남이 아니라 한 덩어리(서명단)다. */
+/* 직함 + 발행기관 — 로고 오른쪽 한 줄.
+   ⚠️ 자간 0 이다. 실측 폭이 369px 인데 Tinos 20px 의 소지 폭이 361px 로 딱 맞는다 —
+      예전처럼 letter-spacing 3.5px 을 주면 504px 이 되어 줄이 직인까지 밀고 들어간다.
+   ⚠️ 예전 주석은 '기관명을 금색으로 쓰지 말 것'이었지만 2026-08-28 시안이 금색이다(레퍼런스가 이긴다).
+      납작해 보이지 않게 이름·잔글씨와 같은 금색 계열로 묶고 은은한 발광만 준다. */
 .lc-issuer {
-  margin-top: 15px;
-  font: 400 20px CertSerifKR, 'Noto Serif KR', serif;
-  letter-spacing: 3.5px;
-  text-indent: 3.5px;
-  color: rgba(228, 216, 194, 0.58);
-  white-space: nowrap;
+  display: block;
+  flex: none;
+  width: 367px;
+  height: auto;
 }
 
 /* 북두칠성 — 왼쪽. (텍스트 기둥은 위 .lc-col 에서 오른쪽으로 보냈다.)

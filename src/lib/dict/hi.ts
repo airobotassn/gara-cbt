@@ -1052,7 +1052,6 @@ const HI: Record<string, string> = {
   "mypage.issue": "आवेदन करें",
   "mypage.view_sample": "नमूना देखें",
   "mypage.sample_title": "प्रमाणपत्र नमूना",
-  "mypage.sample_desc": "देखिए कि प्रमाणपत्र कैसा दिखता है।",
   "gate.btn_check": "परीक्षा वातावरण परीक्षण",
   "gate.login_required": "परीक्षा देने के लिए Google साइन-इन आवश्यक है। (साइन-इन न होने पर स्वतः मार्गदर्शन मिलेगा)",
   "gate.format_value": "बहुविकल्पीय",

@@ -1052,7 +1052,6 @@ const EN: Record<string, string> = {
   "mypage.issue": "Apply",
   "mypage.view_sample": "View sample",
   "mypage.sample_title": "Certificate sample",
-  "mypage.sample_desc": "See what the certificate looks like.",
   "gate.btn_check": "Test exam environment",
   "gate.login_required": "Google sign-in is required to take the exam. (You'll be guided automatically if not signed in.)",
   "gate.format_value": "multiple choice",

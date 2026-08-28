@@ -175,8 +175,8 @@ const KO: Record<string, string> = {
   "lcert.go_test": "레벨테스트 하러 가기",
   // 문항 수는 레벨 구간별(10/20/30)이고 제한시간(분)이 그 수와 같다. 승급은 개수가 아니라 정답률. 강등은 없다.
   "lv.rule_up": "Lv.1~4는 {p1}%, Lv.5~7은 {p2}% 이상 맞히면 승급",
-  "lv.rule_nodown": "점수가 낮아도 등급은 내려가지 않아요",
-  "lv.rule_daily": "하루 {n}회 응시할 수 있고, 승급하면 1회가 추가돼요",
+  "lv.rule_nodown": "점수가 낮아도 등급은 내려가지 않습니다",
+  "lv.rule_daily": "하루 {n}회 응시할 수 있고, 승급하면 1회가 추가됩니다",
   // 레벨 선택(D안) — '지금 도전' 카드
   "lv.prev_level": "이전 레벨",
   "lv.next_level": "다음 레벨",
@@ -1069,7 +1069,6 @@ const KO: Record<string, string> = {
   "mypage.issue": "발급 신청",
   "mypage.view_sample": "견본 보기",
   "mypage.sample_title": "인증서 견본",
-  "mypage.sample_desc": "인증서가 어떻게 생겼는지 확인해 보세요.",
   "gate.btn_check": "시험환경 테스트",
   "gate.login_required": "응시하려면 구글 로그인이 필요합니다. (비로그인 시 자동 안내)",
   "gate.format_value": "지선다형 객관식",
@@ -1520,7 +1519,7 @@ const KO: Record<string, string> = {
   "ticket.env_done": "환경 테스트 완료",
   "ticket.env_required": "시험환경 테스트를 마쳐야 응시할 수 있어요.",
   "ticket.open_now": "지금 응시할 수 있는 시험 {n}개",
-  "ticket.open_now_sub": "보유 응시권에서 시험환경 테스트 후 응시하세요.",
+  "ticket.open_now_sub": "보유 응시권으로 시험환경 테스트 후 응시하세요",
   // 필드 라벨 — 회차·등급은 원서접수 화면(apply.round / apply.tier)과 같은 말을 써야 한다.
   "ticket.round": "회차",
   "ticket.tier": "등급",

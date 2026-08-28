@@ -47,6 +47,48 @@ export function expiryMonths(grade: GradeCode): number | null {
   return EXPIRY_MONTHS[grade]
 }
 
+// ── 레벨테스트(무료) 인증서 진위확인 토큰 ─────────────────────────────────
+// ⚠️ **임시 방식이다(2026-08-28).** CBT 는 발급 시점에 난수를 뽑아 exam_attempts.verify_token 에
+//    저장하지만, 레벨테스트 인증서에는 '발급' 이라는 사건이 없다(레벨을 깨는 순간부터 유효) —
+//    난수를 담아둘 행이 없다. 그래서 지금은 **user_id 를 되돌릴 수 있게 인코딩**해 토큰으로 쓴다.
+//    · 위조해도 얻는 게 없다 — verify-cert 는 토큰이 가리키는 **서버 원본 기록**만 보고 판정한다.
+//    · 대가: QR 을 뜯으면 그 사람의 user_id 가 보인다(uid 만으로는 아무 권한도 없다. RLS 는 JWT 를 본다).
+// ⛔ 제대로 하려면 user_progress 에 verify_token(난수·유니크) 컬럼을 만들고 **이 두 함수만** 갈아끼운다.
+//    부르는 곳은 list-attempts(발급)와 verify-cert(조회) 둘뿐이라 그때 형식이 바뀌어도 옛 QR 만 죽는다.
+const LEVEL_TOKEN_PREFIX = 'lv-'
+
+/** user_id(uuid) → `lv-<base64url 22자>`. uuid 가 아니면 빈 문자열(= QR 을 그리지 않는다). */
+export function levelCertToken(userId: string): string {
+  const hex = (userId ?? '').replace(/-/g, '').toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(hex)) return ''
+  let bin = ''
+  for (let i = 0; i < 32; i += 2) bin += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16))
+  const b64 = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return LEVEL_TOKEN_PREFIX + b64
+}
+
+/** 토큰 → user_id. 레벨테스트 토큰이 아니거나 형식이 깨졌으면 null(= CBT 토큰으로 넘긴다). */
+export function parseLevelCertToken(token: string): string | null {
+  if (typeof token !== 'string' || !token.startsWith(LEVEL_TOKEN_PREFIX)) return null
+  const raw = token.slice(LEVEL_TOKEN_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/')
+  try {
+    const bin = atob(raw + '='.repeat((4 - (raw.length % 4)) % 4))
+    if (bin.length !== 16) return null
+    let hex = ''
+    for (let i = 0; i < 16; i++) hex += bin.charCodeAt(i).toString(16).padStart(2, '0')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  } catch {
+    return null
+  }
+}
+
+/** 레벨 인증서의 표시용 조회번호. ⚠️ 자격번호(makeCertNo)가 **아니다** — 채번 대장이 없다. */
+export function levelCertNo(userId: string, level: number, issuedAt?: string | null): string {
+  const year = issuedAt ? new Date(issuedAt).getFullYear() : new Date().getFullYear()
+  const tail = (userId ?? '').replace(/-/g, '').slice(-6).toUpperCase()
+  return `WA-L${level}-${year}-${tail || '000000'}`
+}
+
 // 이름 마스킹 — 공개 검증 페이지 PII 최소화. 홍길동→홍*동, 홍*(2자), 단어별 적용(영문 이름).
 export function maskName(raw: string): string {
   const one = (s: string): string => {

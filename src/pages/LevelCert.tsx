@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
+import { qrMatrix } from '../lib/qr'
 import type { ListAttemptsResponse, LevelCertData } from '../lib/testTypes'
 
 // ===== 레벨테스트 인증서 =====
@@ -33,6 +34,11 @@ const ROTC = { x: 670, y: 269 }
 // 45° 는 너무 가팔라서 국자가 세로로 서고 아래쪽 별이 하단 테두리까지 내려갔다 → 30° 로 완만하게(2026-08-06).
 const ROT = -30
 const VB = { w: 1448, h: 900 } // 인증서 고정 좌표계
+
+// 증서 본문 서체 — 라틴은 Tinos(= Times New Roman 과 자폭까지 같은 폰트, `CariSerif` 로 cert.css 에 이미 등록),
+// 한글 이름만 Noto Serif KR(`CertSerifKR`)로 떨어진다. ⚠️ 순서를 뒤집지 말 것 — CertSerifKR 이 앞에 오면
+// 라틴 글자까지 그쪽에서 나와 시안(2026-08-28 레퍼런스)의 세리프와 자폭이 어긋난다.
+const SERIF = 'CariSerif, CertSerifKR, serif'
 
 // 회전을 **좌표에 먼저 먹인다**. 예전엔 <g transform=rotate> 로 통째로 돌리고 글자만 반대로 되돌렸는데,
 // 그러면 라벨의 정렬·여백 계산이 회전 전 좌표를 보게 돼서 각도를 바꿀 때마다 날짜가 잘리고 겹쳤다.
@@ -140,10 +146,10 @@ function Dipper({ level, milestones }: { level: number; milestones: Record<strin
             <circle cx={p.x} cy={p.y} r={R} fill="rgba(3,11,20,.72)" />
             <image href="/cert/node.webp" x={p.x - rw / 2} y={p.y - rh / 2} width={rw} height={rh}
               opacity={on ? 1 : 0.72} filter={on ? undefined : 'url(#lc-ash)'} />
-            <text x={p.x} y={p.y + 11} textAnchor="middle" fontFamily="CertSerifKR,serif" fontSize={32}
+            <text x={p.x} y={p.y + 11} textAnchor="middle" fontFamily={SERIF} fontSize={32}
               fontWeight={on ? 700 : 500} fill={on ? '#fff4dd' : 'rgba(206,216,230,.82)'}>{p.n}</text>
             {date && (
-              <text x={p.x + L.dx} y={p.y + L.dy} textAnchor={L.anchor} fontFamily="CertSerifKR,serif" fontSize={26}
+              <text x={p.x + L.dx} y={p.y + L.dy} textAnchor={L.anchor} fontFamily={SERIF} fontSize={26}
                 letterSpacing={1.8} fontWeight={400} fill="url(#lc-gold)">{date}</text>
             )}
           </g>
@@ -177,7 +183,8 @@ export default function LevelCert() {
     if (import.meta.env.DEV) {
       const lv = Number(new URLSearchParams(window.location.search).get('preview'))
       if (Number.isInteger(lv) && lv >= 1 && lv <= 7) {
-        setData({ displayName: '홍길동', level: lv, milestones: DEV_MILESTONES })
+        // 토큰도 가짜로 넣어야 QR 이 그려진다(서버가 아직 안 내려준다 — testTypes 의 verifyToken 주석 참고).
+        setData({ displayName: '홍길동', level: lv, milestones: DEV_MILESTONES, verifyToken: 'preview-sample' })
         setState('ok')
         return
       }
@@ -236,6 +243,7 @@ export default function LevelCert() {
   // 닉네임 미설정이면 자리를 비우지 않고 기본 표기를 쓴다(인증서에 빈 줄이 남지 않게).
   const name = (data.displayName || t('lcert.no_name')).slice(0, 12)
   const level = Math.min(7, Math.max(1, data.level))
+  const qr = data.verifyToken ? qrMatrix(`${window.location.origin}/verify/${data.verifyToken}`, 'H') : null
 
   return (
     <div className="lc-page">
@@ -249,22 +257,57 @@ export default function LevelCert() {
           <img className="lc-orn bl" src="/cert/corner.webp" alt="" />
           <img className="lc-orn br" src="/cert/corner.webp" alt="" />
 
-          {/* 오른쪽 글자 기둥 — 제목 → 레벨 → 이름 순. **레벨이 이름 위**다(2026-08-19 시안).
-              발행처(GARA·기관명)는 이 기둥에서 빠져 아래 .lc-sign 으로 내려갔다. */}
-          <div className="lc-col">
+          {/* 왼쪽 위 제목 기둥 — 제목 → 레벨(2026-08-28 시안). 예전엔 오른쪽 기둥 맨 위였다. */}
+          <div className="lc-head">
             <img className="lc-title" src="/cert/title-word.webp" alt="LEVEL TEST CERTIFICATE" />
             <div className="lc-mark">
               <img className="lc-mark-cap" src="/cert/level-word.webp" alt="LEVEL" />
               <img className="lc-mark-num" src={`/cert/num-${level}.png`} alt={String(level)} />
             </div>
-            <div className="lc-name">{name}</div>
           </div>
 
-          {/* 발행처 서명단 — 카드 하단 **중앙**. 로고와 기관명이 한 덩어리라 같이 묶는다.
+          {/* 오른쪽 증서문 기둥 — 증서 관행대로 **영문 고정**이다(화면 언어를 따르지 않는다).
+              사전에 담지 않은 이유 = 언어마다 줄바꿈 폭이 달라 아래 실측 y좌표가 통째로 어긋난다. */}
+          <div className="lc-col">
+            <img className="lc-certify" src="/cert/copy-certify.png" alt="This is to certify that" />
+            <div className="lc-name">{name}</div>
+            <img className="lc-body lc-body1" src="/cert/copy-requirements.png" alt="has successfully fulfilled the requirements for and" />
+            <div className="lc-earned-row" aria-label={`earned the LEVEL ${level} certification.`}>
+              <img className="lc-earned-copy" src="/cert/copy-earned.png" alt="" />
+              <span className="lc-earned-level" aria-hidden="true">
+                <img className="lc-earned-level-word" src="/cert/level-word.webp" alt="" />
+                <img className="lc-earned-level-num" src={`/cert/num-${level}.png`} alt="" />
+              </span>
+              <img className="lc-certification-copy" src="/cert/copy-certification.png" alt="" />
+            </div>
+
+            {/* 진위확인 QR — 금색 모듈 / 검은 판 = **흑백이 뒤집힌 QR**(시안 그대로). 스캐너 여유를 벌려고
+                오차정정은 최고 등급(H)으로 굽는다. ⛔ 토큰이 없으면 QR 을 그리지 않는다 —
+                죽은 /verify 주소를 찍어 두면 스캔한 사람이 '위조'라는 답을 받는다. */}
+            <div className="lc-qrbox">
+              {qr ? (
+                <svg className="lc-qr" viewBox={`0 0 ${qr.count} ${qr.count}`} role="img" aria-label="Verify authenticity">
+                  <rect x="0" y="0" width={qr.count} height={qr.count} fill="#000409" />
+                  {qr.dark.map(([r, c], i) => (
+                    <rect key={i} x={c} y={r} width={1.04} height={1.04} fill="#e0ab45" />
+                  ))}
+                </svg>
+              ) : (
+                <div className="lc-qr-wait" />
+              )}
+            </div>
+            <img className="lc-vcap" src="/cert/copy-verify.png" alt="Verify authenticity" />
+            {/* 봉인 — 기둥 맨 아래. ⛔ 아래 서명단 안으로 옮기지 말 것(levelcert.css 의 .lc-seal 주석 참고). */}
+            <img className="lc-seal" src="/cert/seal.webp" alt="" />
+          </div>
+
+          {/* 발행처 서명단 — 카드 하단, 로고 · 세로선 · 직함+기관명이 **한 줄**(2026-08-28 시안).
+              오른쪽 아래 직인이 자리를 먹어서 카드 정중앙이 아니라 살짝 왼쪽에 선다.
               기관 정식명은 번역하지 않고 영문 고정(증서 관행). */}
           <div className="lc-sign">
             <span className="lc-brand" role="img" aria-label="GARA" />
-            <div className="lc-issuer">Global AI &amp; Robotics Association</div>
+            <span className="lc-sign-bar" />
+            <img className="lc-issuer" src="/cert/copy-issuer.png" alt="President, Global AI &amp; Robotics Association" />
           </div>
 
           <div className="lc-dipbox">

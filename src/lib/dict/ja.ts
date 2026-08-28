@@ -1052,7 +1052,6 @@ const JA: Record<string, string> = {
   "mypage.issue": "発行申請",
   "mypage.view_sample": "見本を見る",
   "mypage.sample_title": "資格証の見本",
-  "mypage.sample_desc": "資格証のデザインをご確認ください。",
   "gate.btn_check": "試験環境テスト",
   "gate.login_required": "受験にはGoogleログインが必要です。（未ログイン時は自動でご案内します）",
   "gate.format_value": "択一式（客観式）",

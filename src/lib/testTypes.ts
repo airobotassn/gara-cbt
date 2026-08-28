@@ -90,4 +90,9 @@ export interface LevelCertData {
   // Lv.1 을 깨면 2가 된다(취득 = rank − 1, 천장에서 Lv.7 을 통과하면 7). 하나도 못 깼으면 인증서가 null.
   level: number
   milestones: Record<string, string> // 레벨 → 최초 취득일(ISO)
+  // 진위확인 토큰 — /verify/<token>. list-attempts 가 만들어 내려준다(클라가 만들지 않는다).
+  // ⚠️ 지금은 **user_id 를 인코딩한 임시 토큰**이다(`lv-…`) — 레벨테스트에는 난수를 담을
+  //    verify_token 컬럼이 없어서다. 형식·한계·바꿀 자리는 functions/_shared/cert.ts 주석 참고.
+  // 없으면 인증서 QR 이 잠금 슬롯으로 뜬다 — 죽은 링크를 QR 로 찍지 않기 위해서다.
+  verifyToken?: string | null
 }

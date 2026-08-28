@@ -995,13 +995,12 @@ export default function MyPage() {
               {/* 인증서 견본 — 취득 여부와 무관하게 이 탭에 항상 있는 고정 진입점(목록 위).
                   합격 건이 있으면 그 급수 견본으로, 없으면 기본 급수 견본으로 연다. */}
               <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow flex flex-col md:flex-row md:items-center justify-between gap-5">
-                <div className="flex items-start gap-5">
+                <div className="flex items-center gap-5">
                   <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
                   </div>
                   <div>
-                    <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface mb-2 break-keep">{t('mypage.sample_title')}</h3>
-                    <p className="font-body-md text-body-md text-on-surface-variant break-keep">{t('mypage.sample_desc')}</p>
+                    <h3 className="font-title-md text-lg leading-snug md:text-[22px] md:leading-[28px] font-bold text-on-surface break-keep">{t('mypage.sample_title')}</h3>
                   </div>
                 </div>
                 <button

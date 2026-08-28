@@ -18,6 +18,7 @@ import {
   promoteCut,
   MAX_LEVEL,
 } from '../_shared/scoring.ts'
+import { levelCertToken } from '../_shared/cert.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -111,11 +112,14 @@ Deno.serve(async (req) => {
     const clearedTop = Math.max((currentRank ?? 1) - 1, clearedTop7 ? MAX_LEVEL : 0)
 
     // 한 레벨도 못 깼으면 인증서 자체가 없다(응시만 했다고 발급하지 않는다).
+    // 진위확인 토큰 — 인증서 QR 이 /verify/<token> 을 가리킨다. 형식·주의는 _shared/cert.ts 참고.
+    // ⚠️ 클라가 만들지 않는다. 여기서 내려준 값만 QR 에 실린다(빈 값이면 화면이 QR 을 생략한다).
     const certificate = clearedTop >= 1
       ? {
           displayName: ((prof?.display_name as string | null) ?? '').trim(),
           level: clearedTop,
           milestones,
+          verifyToken: levelCertToken(user.id) || null,
         }
       : null
 

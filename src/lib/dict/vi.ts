@@ -1052,7 +1052,6 @@ const VI: Record<string, string> = {
   "mypage.issue": "Đăng ký cấp",
   "mypage.view_sample": "Xem bản mẫu",
   "mypage.sample_title": "Bản mẫu chứng chỉ",
-  "mypage.sample_desc": "Xem chứng chỉ trông như thế nào.",
   "gate.btn_check": "Kiểm tra môi trường thi",
   "gate.login_required": "Cần đăng nhập Google để dự thi. (Sẽ tự động hướng dẫn nếu chưa đăng nhập)",
   "gate.format_value": "trắc nghiệm nhiều lựa chọn",

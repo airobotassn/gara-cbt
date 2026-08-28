@@ -5,7 +5,58 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient } from '../_shared/lib.ts'
-import { gradeOfTitle, expiryMonths, maskName } from '../_shared/cert.ts'
+import { gradeOfTitle, expiryMonths, maskName, parseLevelCertToken, levelCertNo } from '../_shared/cert.ts'
+import { MAX_LEVEL, promoteCut } from '../_shared/scoring.ts'
+
+// ── 레벨테스트(무료) 인증서 판정 ───────────────────────────────────────────
+// CBT 와 달리 발급 기록이 없다 — 토큰이 가리키는 사람의 **현재 등급**이 곧 증서 내용이다.
+// ⚠️ 취득 레벨 = rank − 1(천장 통과만 예외). list-attempts 와 **같은 규칙**이라 한쪽만 고치면
+//    인증서에 찍힌 레벨과 진위확인 결과가 어긋난다. 만료는 없다(expiresAt = null).
+async function verifyLevelCert(admin: ReturnType<typeof adminClient>, userId: string) {
+  const [{ data: prog }, { data: rows }, { data: prof }] = await Promise.all([
+    admin.from('user_progress').select('rank').eq('user_id', userId).maybeSingle(),
+    admin
+      .from('test_attempts')
+      .select('level, total_correct, total_questions, rank_after, rank_dir, submitted_at')
+      .eq('user_id', userId)
+      .eq('status', 'submitted')
+      .order('submitted_at', { ascending: false }),
+    admin.from('profiles').select('display_name').eq('id', userId).maybeSingle(),
+  ])
+
+  const milestones: Record<number, string> = {}
+  let clearedTop7 = false
+  for (const a of rows ?? []) {
+    if (!a.submitted_at) continue
+    if (a.rank_dir === 'up' && a.rank_after) {
+      const got = (a.rank_after as number) - 1
+      if (got >= 1) milestones[got] = a.submitted_at as string
+    } else if (
+      a.level === MAX_LEVEL &&
+      a.rank_after === MAX_LEVEL &&
+      ((a.total_correct as number | null) ?? 0) >=
+        promoteCut(a.level as number, (a.total_questions as number | null) ?? undefined)
+    ) {
+      milestones[MAX_LEVEL] = a.submitted_at as string
+      clearedTop7 = true
+    }
+  }
+  const level = Math.max(((prog?.rank as number | null) ?? 1) - 1, clearedTop7 ? MAX_LEVEL : 0)
+  // 한 레벨도 못 깼으면 인증서가 존재하지 않는다(= 무효). 인증서 발급 조건과 같은 판정.
+  if (level < 1) return { valid: false, reason: 'not_found' }
+
+  const issuedAt = milestones[level] ?? null
+  const holder = ((prof?.display_name as string | null) ?? '').trim()
+  return {
+    valid: true,
+    status: 'valid',
+    name: holder ? maskName(holder) : '',
+    grade: `WORLD ARENA LEVEL ${level}`,
+    certNo: levelCertNo(userId, level, issuedAt),
+    issuedAt,
+    expiresAt: null,
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -14,6 +65,11 @@ Deno.serve(async (req) => {
     if (!token || typeof token !== 'string') return json({ valid: false, reason: 'not_found' })
 
     const admin = adminClient()
+
+    // 레벨테스트 인증서 토큰(lv-…)이면 여기서 끝난다 — exam_attempts 에는 이 토큰이 없다.
+    const levelUser = parseLevelCertToken(token)
+    if (levelUser) return json(await verifyLevelCert(admin, levelUser))
+
     const { data: a } = await admin
       .from('exam_attempts')
       .select('id, user_id, exam_id, cert_issued_at, cert_no')
