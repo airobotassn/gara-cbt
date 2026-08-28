@@ -15,7 +15,6 @@
 --   · ebooks         (비공개) 이북 본문 HTML — 서명 URL 로만 연다
 --   · ebook-covers   (공개)  이북 표지 + 사이트 로고·파비콘(`site/`) + **강의 썸네일(`lecture/`)**
 --   · avatars        (공개)  회원 프로필 이미지 — 경로 첫 칸이 본인 uid
---   · feedback-files (비공개) 의견함 첨부 — 정책 0개, 서명 URL 로만 오르내린다
 
 -- ─────────────────────────────────────────────────────────────
 -- avatars — 회원 프로필 이미지 (2026-08-25 생성)
@@ -55,26 +54,3 @@ create policy avatars_own_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
--- ─────────────────────────────────────────────────────────────
--- feedback-files — 의견함 첨부 (2026-08-26)
---   경로 규칙: `<uuid>/<정리한 원본 파일명>` (supabase/functions/feedback/index.ts 가 정한다)
---
--- ⛔ **정책을 하나도 만들지 않는다.** 의견함은 비로그인이 쓰는 화면이라 anon insert 를 열면
---    그 순간 우리 스토리지가 가드 없는 무제한 업로드 엔드포인트가 된다. 대신 엣지 함수가
---    경로 하나짜리 **서명 업로드 URL** 을 발급하고(createSignedUploadUrl), 브라우저는 그 토큰으로만
---    올린다 — 서명 업로드는 RLS 를 보지 않으므로 정책 없이도 동작하고, 정책이 없으므로
---    토큰 없이는 아무도 못 올린다. 읽기도 관리자 함수가 발급하는 서명 URL 뿐이다.
---
--- ⚠️ 20MB 상한은 서버(functions/feedback/index.ts 의 MAX_FILE_BYTES)·DB CHECK
---    (feedback_uploads_size_chk)·화면(src/pages/Feedback.tsx 의 MAX_FILE_BYTES)과 **같은 값**이어야
---    한다. 버킷이 더 작으면 화면·서버가 통과시킨 파일이 업로드에서만 실패해 사용자는 이유를 못 듣는다.
--- ⚠️ allowed_mime_types 를 비워 둔다 — 브라우저가 보내는 content-type 은 믿을 값이 아니고(파일에
---    따라 빈 문자열로도 온다), 진짜 관문은 서버의 **확장자 화이트리스트**다. 여기서 mime 을 조이면
---    멀쩡한 pptx 가 브라우저에 따라 조용히 거절된다.
--- ─────────────────────────────────────────────────────────────
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('feedback-files', 'feedback-files', false, 20971520, null)
-on conflict (id) do update
-  set public = excluded.public,
-      file_size_limit = excluded.file_size_limit,
-      allowed_mime_types = excluded.allowed_mime_types;

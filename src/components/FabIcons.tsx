@@ -143,18 +143,6 @@ export function GlobeIcon(p: IcoProps) {
   )
 }
 
-// 의견 보내기 — 확성기. FAB 패널에서 유일하게 빨간 항목이라 모양도 다른 것들과 겹치면 안 된다
-// (말풍선은 1:1 문의 쪽 어휘라 일부러 피했다).
-export function MegaphoneIcon(p: IcoProps) {
-  return (
-    <Ico {...p}>
-      <path d="M3 11v2a1 1 0 0 0 1 1h2.5L14 19V5L6.5 10H4a1 1 0 0 0-1 1Z" />
-      <path d="M17.5 9.5a3.5 3.5 0 0 1 0 5" />
-      <path d="M6.5 14v3.5a1.5 1.5 0 0 0 3 0V16" />
-    </Ico>
-  )
-}
-
 export function ToolIcon(p: IcoProps) {
   return (
     <Ico {...p}>

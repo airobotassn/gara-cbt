@@ -57,7 +57,6 @@ const Terms = lazy(() => import('./pages/Terms'))
 const Guide = lazy(() => import('./pages/Guide'))
 const Plan = lazy(() => import('./pages/Plan'))
 const Notice = lazy(() => import('./pages/Notice'))
-const Feedback = lazy(() => import('./pages/Feedback'))
 const NoticeDetail = lazy(() => import('./pages/NoticeDetail'))
 const Faq = lazy(() => import('./pages/Faq'))
 
@@ -275,8 +274,6 @@ export default function App() {
               <Route path="/terms" element={<Terms />} />
               <Route path="/guide" element={<Guide />} />
               <Route path="/plan" element={<Plan />} />
-              {/* 의견함 — FAB 패널의 빨간 항목이 유일한 진입점. 비로그인도 들어온다(게이트 없음). */}
-              <Route path="/feedback" element={<Feedback />} />
               <Route path="/notice" element={<Notice />} />
               <Route path="/notice/:id" element={<NoticeDetail />} />
               <Route path="/faq" element={<Faq />} />
