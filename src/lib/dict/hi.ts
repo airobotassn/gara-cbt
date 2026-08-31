@@ -1725,12 +1725,6 @@ const HI: Record<string, string> = {
   // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
   // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
-  "hub.part.hat_common_01": "स्प्राउट कैप",
-  "hub.part.hat_common_02": "बीनी",
-  "hub.part.shoe_common_01": "कोज़ी सॉक्स",
-  "hub.part.glasses_common_01": "गोल चश्मा",
-  "hub.part.wing_rare_01": "चमकते पंख",
-  "hub.part.crown_rare_01": "छोटा मुकुट",
 
   // 상단·공통
   "hub.gate_title": "लॉगिन आवश्यक है",

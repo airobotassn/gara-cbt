@@ -29,7 +29,7 @@ import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
 import { rememberPostLogin } from '../lib/postLogin'
 import {
-  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL,
+  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
 } from '../lib/hubCosmetics'
 import { lastLook, saveLook } from '../lib/lastLook'
@@ -93,8 +93,10 @@ const REFERRAL_COIN = 500
 
 // 파츠 이름은 사전(hub.part.<key>)에 있다 — 여기 name 은 두지 않는다(두면 화면마다 어느 쪽을 쓰는지 갈린다).
 // 모듈 최상위라 훅을 못 쓴다 → t 를 넘겨받는다. 사전에 없는 키는 tr() 이 키를 그대로 돌려주므로 최소한 깨지진 않는다.
-function partName(key: string, t: TFunc) {
-  return t(`hub.part.${key}`)
+function partName(key: string, t: TFunc, lang?: string) {
+  // 관리자가 올린 캐릭터는 사전에 키가 없다(사전은 배포물이라 못 늘린다) → 그때만 DB 이름이 이긴다.
+  const uploaded = lang ? charArtName(key, lang) : null
+  return uploaded ?? t(`hub.part.${key}`)
 }
 function partEmoji(key: string) {
   if (key.startsWith('hat')) return '🧢'
@@ -519,7 +521,7 @@ export default function Hub() {
   async function doBuy(partKey: string, price: number) {
     if (!isFullUser) { void loginWithGoogle(); return }
     if (owned.has(partKey)) return
-    if (points < price) { pushErr(t('hub.toast.no_points_item', { name: partName(partKey, t), price })); return }
+    if (points < price) { pushErr(t('hub.toast.no_points_item', { name: partName(partKey, t, lang), price })); return }
     try {
       await callFunction<ShopResp>('shop-buy', { part_key: partKey, client_nonce: crypto.randomUUID() })
       setPurchased(partKey)
@@ -747,7 +749,10 @@ export default function Hub() {
   //   ⚠️ 저장값(skinPart)과 화면값(skin)을 갈라놓는 게 입어보기의 전부다. 저장 경로는 이 값을 안 본다.
   const skin = skinByPart(previewSkin ?? skinPart)
   // 인벤토리 = **가진 것**. 기본 스킨은 산 적이 없어도 늘 있는 것으로 친다(되돌아갈 길이 필요하다).
-  const ownedChars = CHAR_KEYS.filter((k) => owned.has(k))
+  // ⚠️ 코드 목록(CHAR_KEYS)만 보면 **관리자가 올린 새 캐릭터가 보관함에서 사라진다** — 산 사람은
+  //    가지고 있는데 갈아입을 자리가 없다. 업로드분을 합치고, 그래도 빠진 건 소유 목록에서 줍는다.
+  const knownChars = [...new Set([...CHAR_KEYS, ...uploadedCharKeys()])]
+  const ownedChars = [...new Set([...knownChars.filter((k) => owned.has(k)), ...[...owned].filter(isCharKey)])]
   const ownedSkins = SKINS.filter((s) => s.partKey === DEFAULT_SKIN_PART || owned.has(s.partKey))
   // 첫 진입 흐름 — 순서가 곧 규칙이다: 캐릭터를 고른 다음에 튜토리얼.
   //   ⚠️ null(아직 모름)일 때는 **아무것도 띄우지 않는다.** false 로 판정하면 하이드레이트 전 한 프레임에
@@ -1037,7 +1042,7 @@ export default function Hub() {
             <div className="buy-pop-spark"><span>✨</span><span>🎉</span><span>✨</span></div>
             <div className="buy-pop-title">{t('hub.buy.purchased')}</div>
             <div className="buy-pop-thumb">{partEmoji(purchased)}</div>
-            <div className="buy-pop-name">{partName(purchased, t)}</div>
+            <div className="buy-pop-name">{partName(purchased, t, lang)}</div>
 
             <button className="pbtn buy-pop-ok" style={btn('#6bbf9a')} onClick={() => setPurchased(null)}>{t('hub.confirm')}</button>
           </div>
@@ -1093,7 +1098,7 @@ export default function Hub() {
                               </button>
                               {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
                                   안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
-                              <div className="hub-shop-name">{partName(c.partKey, t)}</div>
+                              <div className="hub-shop-name">{partName(c.partKey, t, lang)}</div>
                               <div className="hub-shop-price">{c.price > 0 ? `🪙 ${c.price}` : t('hub.shop.free')}</div>
                               <button className="pbtn hub-shop-buy" style={btn(has ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={has}>
                                 {t(has ? 'hub.shop.owned' : 'hub.shop.buy')}
@@ -1124,7 +1129,7 @@ export default function Hub() {
                           <CharArt charKey={k} level={arenaLv} className="closet-char-img" />
                           <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                         </button>
-                        <span className="closet-item-name">{partName(k, t)}</span>
+                        <span className="closet-item-name">{partName(k, t, lang)}</span>
                         <button className="closet-item-act" onClick={() => equip('character', k)} disabled={charSaving || charKey === k}>
                           {t(charKey === k ? 'hub.closet.worn' : 'hub.closet.wear')}
                         </button>
@@ -1145,7 +1150,7 @@ export default function Hub() {
                         <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
                         <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                       </button>
-                      <span className="closet-item-name">{partName(sk.partKey, t)}</span>
+                      <span className="closet-item-name">{partName(sk.partKey, t, lang)}</span>
                       <button className="closet-item-act" onClick={() => equip('skin', sk.partKey)} disabled={skinPart === sk.partKey}>
                         {t(skinPart === sk.partKey ? 'hub.closet.worn' : 'hub.closet.wear')}
                       </button>
@@ -1474,7 +1479,7 @@ export default function Hub() {
                 <span className="material-symbols-outlined">visibility</span>
                 {t('hub.closet.tryon_on')}
               </span>
-              <b className="tryon-name">{partName(previewSkin, t)}</b>
+              <b className="tryon-name">{partName(previewSkin, t, lang)}</b>
             </span>
             <div className="tryon-act">
               {/* 되돌리기가 먼저다 — 되돌릴 수 있다는 걸 먼저 보여줘야 마음 놓고 눌러본다. */}
@@ -1505,7 +1510,7 @@ export default function Hub() {
         const has = owned.has(preview) || (isSkinKey(preview) && preview === DEFAULT_SKIN_PART)
         const wearing = isChar ? charKey === preview : skinPart === preview
         return (
-          <Modal title={partName(preview, t)} onClose={() => setPreview(null)}>
+          <Modal title={partName(preview, t, lang)} onClose={() => setPreview(null)}>
             {isChar ? (
               // ⚠️ 일곱을 나열하면 한 칸이 썸네일만 해져서 **미리보기가 미리보기 구실을 못 한다**
               //    (고르는 화면은 '비교'가 목적이라 나열이 맞지만, 여기는 '크게 보기'가 목적이다).
@@ -1580,7 +1585,7 @@ export default function Hub() {
                 return (
                   <div key={key} className={`cp-row${picked ? ' on' : ''}`}>
                     <div className="cp-head">
-                      <span className="cp-name">{partName(key, t)}</span>
+                      <span className="cp-name">{partName(key, t, lang)}</span>
                     </div>
                     {/* 줄 전체가 고르는 자리다 — 어느 칸을 눌러도 이 캐릭터를 고른 것이다
                         (칸마다 고르게 하면 "Lv.5 를 골랐다" 로 읽혀 시작 레벨을 고르는 화면처럼 보인다).
@@ -1603,7 +1608,7 @@ export default function Hub() {
               disabled={!charPick || charSaving}
               onClick={() => charPick && chooseCharacter(charPick)}
             >
-              {charSaving ? t('common.loading') : charPick ? t('hub.charpick.go', { name: partName(charPick, t) }) : t('hub.charpick.pick_first')}
+              {charSaving ? t('common.loading') : charPick ? t('hub.charpick.go', { name: partName(charPick, t, lang) }) : t('hub.charpick.pick_first')}
             </button>
             {/* 되돌릴 수 있는지 없는지를 미리 말한다 — 안 말하면 고르는 손이 멈춘다. */}
             <p className="charpick-note">{t('hub.charpick.note')}</p>

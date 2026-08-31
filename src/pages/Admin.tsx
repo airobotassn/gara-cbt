@@ -65,7 +65,9 @@ import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { getTracks, tierName, isTierLocked, TIER_EXAM_SPEC, tierTotal, TIER_DRAW_CELLS, POOL_MULTIPLIER, buildDrawCells } from '../lib/caris'
 import { autoRoundTitle, isExamMonth, monthOfExamDate, schedulePreview } from '../lib/examSchedule'
-import { REGIONS, countryName, flagEmoji } from '../lib/regions'
+import { REGIONS, countryName, flagEmoji, flagUrl } from '../lib/regions'
+// 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
+import { loadRegions } from '../lib/regionCatalog'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
 // ⚠️ 별칭이 필요하다 — 이 파일 안에 이북 본문 번역용 `runTranslation`(다른 시그니처)이 이미 있다.
@@ -97,6 +99,9 @@ const MENUS: { key: TopMenu; label: string }[] = [
 const SUBS: Record<TopMenu, SubItem[]> = {
   members: [
     { key: 'users', label: '유저' },
+    // 홈 대시보드에도 같은 내용이 요약으로 서 있다 — 화면(VisitStats)은 한 벌이고 머리말만 다르다.
+    // 두 벌로 베끼지 말 것: 기간·집계 규칙이 갈리면 같은 날 숫자가 두 개 나온다.
+    { key: 'visits', label: '접속통계' },
     { key: 'payments', label: '결제관리' },
   ],
   arena: [
@@ -274,6 +279,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
   switch (`${top}/${tab}${sub ? `/${sub}` : ''}`) {
     // ── 회원관리 ──
     case 'members/users': return <MembersAdmin />
+    case 'members/visits': return <VisitStats standalone />
     case 'members/payments': return <PaymentsAdmin />
     // ── WORLD ARENA ──
     case 'arena/dash': return <ArenaDashboard />
@@ -384,6 +390,8 @@ function HomeDashboard({ go }: { go: AdminGo }) {
         )}
       </div>
 
+      <VisitStats />
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
         <div className="admin-section">
           <div className="admin-section-head">
@@ -424,6 +432,197 @@ function HomeDashboard({ go }: { go: AdminGo }) {
         </div>
       </div>
 
+    </>
+  )
+}
+
+
+/* ── 방문 통계 (홈 대시보드 안) ───────────────────────────────────────────────
+ * 출처는 `visit_events` 한 표뿐이고 집계는 전부 SQL(`visit_stats` RPC)이 한다.
+ *
+ * ⛔ **국가는 브라우저가 알아내 보낸 값이다 — 서버가 IP 로 정하지 않는다**(`src/lib/geo.ts` 의
+ *    2026-08-24 결정). 그래서 광고차단기가 조회를 막은 방문은 '미상' 으로 남는다. 정확도를 올리겠다고
+ *    엣지 함수에서 IP 를 읽는 쪽으로 바꾸지 말 것 — 그 결정이 왜 있는지는 geo.ts 머리 주석에 있다.
+ * ⛔ **국가와 지역은 모수가 다르다.** 국가 = 전체 방문자, 지역 = 지역을 설정한 **로그인 회원**뿐이다
+ *    (지역은 이벤트에 안 담고 `profiles.region_code` 를 조회할 때 조인한다). 두 표의 합계는 안 맞는 게
+ *    정상이라 화면이 그 사실을 글자로 밝힌다 — 그 문장을 지우면 다음 사람이 버그로 신고한다.
+ * ⚠️ 기간을 바꾸면 **다시 불러온다**(클라에서 자르지 않는다). 국가·기기 집계는 서버가 그 기간으로
+ *    묶어놓은 값이라, 막대만 잘라내면 추이는 7일인데 국가표는 90일인 화면이 된다.
+ * ⚠️ '방문자' 는 사람이 아니라 **브라우저**다(localStorage 난수). 폰·PC 로 오면 둘로 센다.
+ * ─────────────────────────────────────────────────────────────────────────── */
+interface VisitBucket { key: string | null; visitors: number; views: number }
+interface VisitRegionRow { country: string | null; key: string; visitors: number }
+interface VisitStatsResp {
+  from: string; to: string
+  visitors: number; views: number; members: number
+  daily: { day: string; visitors: number; views: number }[]
+  countries: VisitBucket[]
+  regions: VisitRegionRow[]
+  devices: VisitBucket[]
+  browsers: VisitBucket[]
+  os: VisitBucket[]
+  paths: VisitBucket[]
+}
+
+const DEVICE_LABEL: Record<string, string> = { mobile: '모바일', tablet: '태블릿', desktop: 'PC' }
+
+/** from~to 사이의 모든 날짜. 방문이 0인 날도 막대 자리를 남겨야 추이가 안 찌그러진다. */
+function dayRangeList(from: string, to: string): string[] {
+  const out: string[] = []
+  const a = Date.parse(`${from}T00:00:00Z`)
+  const b = Date.parse(`${to}T00:00:00Z`)
+  if (isNaN(a) || isNaN(b)) return out
+  for (let t = a; t <= b; t += 86400e3) out.push(new Date(t).toISOString().slice(0, 10))
+  return out
+}
+
+// ⛔ 설명문(안내 문장)을 달지 말 것. 표가 스스로 말하게 두고, 밝혀야 할 조건은 **제목에 괄호로**
+//    붙인다(예: '지역별 (회원)'). 문장으로 늘어놓으면 매번 읽어야 하는 소음이 된다.
+function VisitPanel({ title, rows, unit, empty }: {
+  title: string
+  rows: { label: string; value: number; icon?: ReactNode }[]
+  unit: string
+  empty: string
+}) {
+  const max = Math.max(1, ...rows.map((r) => r.value))
+  return (
+    <div className="admin-section">
+      <div className="admin-section-head"><h3>{title}</h3></div>
+      {rows.length
+        ? rows.map((r, i) => <HBar key={`${r.label}-${i}`} label={r.label} value={r.value} max={max} sub={unit} icon={r.icon} />)
+        : <div className="admin-empty">{empty}</div>}
+    </div>
+  )
+}
+
+// standalone = 유저관리 › 접속통계(자기 화면). 없으면 홈 대시보드 안의 섹션.
+//   ⚠️ 두 자리가 **같은 컴포넌트**를 쓴다. 자기 화면용으로 복제하지 말 것 — 기간 규칙이나 집계가
+//      한쪽만 바뀌면 같은 날 방문자 수가 화면마다 다르게 뜨고, 어느 쪽이 맞는지 아무도 못 가린다.
+function VisitStats({ standalone }: { standalone?: boolean }) {
+  const [days, setDays] = useState(30)
+  const [metric, setMetric] = useState<'visitors' | 'views'>('visitors')
+  const { data, loading, err, reload } = useAdminData<VisitStatsResp>('visitStats', { days })
+  const [regionNames, setRegionNames] = useState<Record<string, string>>({})
+
+  // 지역 이름 — 코드 모양이 나라마다 달라(KR-11 · ES.CE · Est) 나라별 지도 파일에서 찾아야 한다.
+  //   ⚠️ 화면에 뜬 나라만 받는다(파일 하나가 30KB 다). 목록은 서버가 30줄로 잘라 보낸다.
+  const regionRows = data?.regions
+  useEffect(() => {
+    const rows = regionRows ?? []
+    if (!rows.length) return
+    let alive = true
+    const isos = [...new Set(rows.map((r) => r.country).filter(Boolean) as string[])]
+    Promise.all(isos.map((iso) => loadRegions(iso, 'ko').then((list) => [iso, list] as const)))
+      .then((pairs) => {
+        if (!alive) return
+        const m: Record<string, string> = {}
+        for (const [iso, list] of pairs) for (const r of list) m[`${iso}:${r.code}`] = r.name
+        setRegionNames(m)
+      })
+      .catch(() => { /* 이름을 못 받으면 코드가 그대로 뜬다 */ })
+    return () => { alive = false }
+  }, [regionRows])
+
+  const dayList = dayRangeList(data?.from ?? '', data?.to ?? '')
+  const dailyMap: Record<string, number> = {}
+  for (const d of data?.daily ?? []) dailyMap[d.day] = d[metric]
+
+  const flag = (code: string | null) => {
+    const u = flagUrl(code)
+    return u ? <img src={u} alt="" className="hbar-flag" /> : null
+  }
+  const pick = (b: VisitBucket) => (metric === 'views' ? b.views : b.visitors)
+  const unit = metric === 'views' ? '회' : '명'
+
+  return (
+    <>
+      {standalone && <AdminHead title="접속통계" onReload={reload} loading={loading} />}
+      <div className="admin-section">
+        <div className="admin-section-head">
+          <h3>{standalone ? '방문자 추이' : '방문 통계'}</h3>
+          <div className="rng">
+            {[7, 30, 90].map((d) => (
+              <button key={d} className={days === d ? 'on' : ''} onClick={() => setDays(d)}>{d}일</button>
+            ))}
+            <span className="rng-tilde">·</span>
+            <button className={metric === 'visitors' ? 'on' : ''} onClick={() => setMetric('visitors')}>방문자</button>
+            <button className={metric === 'views' ? 'on' : ''} onClick={() => setMetric('views')}>조회수</button>
+          </div>
+        </div>
+        {err
+          ? <div className="admin-empty">{err}</div>
+          : loading && !data
+            ? <div className="admin-empty">불러오는 중…</div>
+            : (
+              <>
+                <div className="admin-cards">
+                  <div className="admin-card k-blue">
+                    <div className="k">방문자</div>
+                    <div className="v">{(data?.visitors ?? 0).toLocaleString()}명</div>
+                    <div className="s">최근 {days}일</div>
+                  </div>
+                  <div className="admin-card k-violet">
+                    <div className="k">조회수</div>
+                    <div className="v">{(data?.views ?? 0).toLocaleString()}회</div>
+                    <div className="s">방문자당 {((data?.views ?? 0) / Math.max(1, data?.visitors ?? 0)).toFixed(1)}회</div>
+                  </div>
+                  <div className="admin-card k-green">
+                    <div className="k">로그인 방문자</div>
+                    <div className="v">{(data?.members ?? 0).toLocaleString()}명</div>
+                    <div className="s">최근 {days}일</div>
+                  </div>
+                </div>
+                <MiniBars days={dayList} map={dailyMap} color="var(--blue)" />
+              </>
+            )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+        <VisitPanel
+          title="국가별"
+          unit={unit}
+          empty="기록이 없습니다."
+          rows={(data?.countries ?? []).map((c) => ({
+            label: c.key ? countryName(c.key, 'ko') : '미상',
+            value: pick(c),
+            icon: flag(c.key),
+          }))}
+        />
+        <VisitPanel
+          title="지역별 (회원)"
+          unit="명"
+          empty="기록이 없습니다."
+          rows={(data?.regions ?? []).map((r) => ({
+            label: regionNames[`${r.country}:${r.key}`] ?? r.key,
+            value: r.visitors,
+            icon: flag(r.country),
+          }))}
+        />
+        <VisitPanel
+          title="기기"
+          unit={unit}
+          empty="기록이 없습니다."
+          rows={(data?.devices ?? []).map((d) => ({ label: DEVICE_LABEL[d.key ?? ''] ?? d.key ?? '기타', value: pick(d) }))}
+        />
+        <VisitPanel
+          title="웹브라우저"
+          unit={unit}
+          empty="기록이 없습니다."
+          rows={(data?.browsers ?? []).map((b) => ({ label: b.key ?? '기타', value: pick(b) }))}
+        />
+        <VisitPanel
+          title="운영체제"
+          unit={unit}
+          empty="기록이 없습니다."
+          rows={(data?.os ?? []).map((o) => ({ label: o.key ?? '기타', value: pick(o) }))}
+        />
+        <VisitPanel
+          title="많이 본 화면"
+          unit="회"
+          empty="기록이 없습니다."
+          rows={(data?.paths ?? []).map((p) => ({ label: p.key ?? '-', value: p.views }))}
+        />
+      </div>
     </>
   )
 }
@@ -3329,6 +3528,18 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
       <div className="admin-head" style={{ marginTop: 4 }}>
         <h1 style={{ fontSize: 18 }}>응시권 목록</h1>
         <div className="admin-head-actions">
+          {/* 회차 — 화면 맨 위 것과 **같은 state** 를 쓴다(어느 쪽을 바꿔도 위 접수 현황까지 같이 따라간다).
+              ⛔ 목록 전용 회차 state 를 따로 두지 말 것 — 위아래가 다른 회차를 가리키는 순간
+                 '접수 12장' 아래에 남의 회차 목록이 깔리고, 어느 쪽이 맞는지 화면으로는 못 가린다. */}
+          <label className="grade-round">
+            <span className="grade-round-lab">회차</span>
+            <select value={roundId} onChange={(e) => setRoundId(e.target.value)}>
+              <option value="">전체 회차</option>
+              {roundOpts.map((r) => (
+                <option key={r.id} value={r.id}>{r.titleI18n.ko || '(회차명 없음)'}</option>
+              ))}
+            </select>
+          </label>
           <label className="grade-round">
             <span className="grade-round-lab">급수</span>
             <select value={tier} onChange={(e) => setTier(e.target.value)}>
@@ -4840,10 +5051,11 @@ function MiniBars({ days, map, color }: { days: string[]; map: Record<string, nu
   )
 }
 
-function HBar({ label, value, max, sub }: { label: string; value: number; max: number; sub?: string }) {
+// icon = 라벨 앞에 서는 것(국기 등). 안 주면 예전 그대로다 — 기존 대시보드 호출부는 손댈 게 없다.
+function HBar({ label, value, max, sub, icon }: { label: string; value: number; max: number; sub?: string; icon?: ReactNode }) {
   return (
     <div className="hbar">
-      <span className="hbar-l" title={label}>{label}</span>
+      <span className="hbar-l" title={label}>{icon}{label}</span>
       <div className="hbar-track"><div className="hbar-fill" style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%` }} /></div>
       <span className="hbar-v">{value}{sub ?? ''}</span>
     </div>

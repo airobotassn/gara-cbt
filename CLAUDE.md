@@ -203,9 +203,9 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   49개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+  functions/   50개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
-               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions)
+               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions·track-visit)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
 tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 채운다 — **번역하는 건 이것뿐이라 꺼지면 번역이 안 된다.**
@@ -313,7 +313,30 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - ⚠️ **고아 청소 크론은 아직 없다.** `feedback_id is null and created_at < now() - interval '1 day'` 가 그 목록이다.
   - **배포 완료(2026-08-26)** — 마이그레이션 `20260826120000` 적용 + `feedback-files` 버킷 생성(정책 0개 확인) + `feedback`·`admin` 배포(둘 다 `verify_jwt=true` 유지). ⛔ 버킷 만들기를 빼먹으면 업로드가 통째로 `Bucket not found` 다(`avatars` 가 그래서 몇 달 죽어 있었다). 되살릴 때 쓸 SQL 은 `supabase/storage-buckets.sql` 의 그 블록.
   - 검증: `tests/db/t-feedback.mjs`(55건 — ⭐남의 경로 차단·⭐이름·크기는 원장 값·⭐더블클릭에도 첨부 보존·⭐파일만 붙여 재전송하면 새 글·발급 바닥선) + **프로덕션 실경로 스모크**(비로그인 anon 으로 발급 → Storage 직접 업로드 200 → 접수 → 첨부 저장 확인 → `.exe` 400 거절 확인, 흔적은 지움).
+- **방문 통계 (2026-08-31 · `20260831130000`)** — 관리자 **홈 대시보드**(좌상단 이름 클릭) 안의 '방문 통계' 섹션. 일별 방문자·조회수 추이 + 국가별·지역별·기기·브라우저·OS·많이 본 화면. 라우트가 바뀔 때마다 `App.tsx` 의 `<VisitTracker/>` 가 `track-visit` 를 부르고, 집계는 `visit_stats` RPC 한 방이 한다(`admin` 의 `visitStats` 액션).
+  - ⛔ **IP 를 저장하지도, IP 로 국가를 정하지도 않는다.** 국가는 **브라우저가 제3자(ipwho.is)에게 직접 물어본** 두 글자를 실어 보낸 것이고, 서버는 그걸 그대로 받는다 — `src/lib/geo.ts` 의 2026-08-24 결정을 그대로 따른 것이다. **엣지 함수에서 `cf-ipcountry`·`x-forwarded-for` 를 읽는 쪽으로 바꾸지 말 것**(그 순간 "우리가 위치정보를 수집한다"로 성격이 바뀐다). 대가는 광고차단기에 막힌 방문이 **'미상'** 으로 남는 것이고, 화면이 그 사실을 밝힌다.
+  - ⛔ **User-Agent 원문을 저장하지 않는다.** `track-visit` 가 기기(모바일/태블릿/PC)·브라우저·OS 세 값으로 접어서 넣는다. ⚠️ 브라우저 판정은 **순서가 곧 규칙**이다 — 엣지·삼성·웨일·오페라는 UA 에 `chrome` 을, 크롬은 `safari` 를 달고 다녀서 넓은 것부터 보면 전부 한쪽으로 뭉친다.
+  - ⛔ **지역(시도)은 이벤트에 안 담는다** — 조회할 때 `user_id → profiles.region_code` 를 조인한다. 담으면 ① 알아낸 적 없는 위치가 이벤트에 박히고 ② 사용자가 지역을 정정해도 옛 기록이 안 따라온다. 그래서 **국가와 지역은 모수가 다르다**(국가=전체 방문자, 지역=지역을 설정한 로그인 회원). 합계가 안 맞는 게 정상이고, 화면은 **제목에 괄호로**(`지역별 (회원)`) 그걸 밝힌다. ⛔ 안내 문장을 다시 달지 말 것(2026-08-31 지시 — 매번 읽어야 하는 소음이 된다). 밝힐 게 생기면 제목에 붙인다.
+  - ⛔ **행이 무한히 늘지 않는 게 설계다.** PK 가 `(day, visitor_id, path)` 라 같은 사람이 같은 날 같은 화면을 100번 봐도 행은 하나고 `views` 만 오른다. 페이지뷰마다 행을 쌓는 쪽으로 되돌리지 말 것 — 이 표는 **비로그인도 쓸 수 있는 쓰기 경로**(anon 키)라 행 수에 바닥이 있어야 한다. 화면 주소의 아이디 자리(`/test/result/<uuid>`)를 `:id` 로 접는 것도 같은 이유다(쿼리스트링은 통째로 버린다 — `?next=`·`?ref=` 에 남의 주소가 섞인다).
+  - ⚠️ `visit_track` 의 `user_id`·`country` 는 **`coalesce(새 값, 기존 값)`** 이다. 그냥 덮으면 방문 도중 로그인한 사람의 uid 를 그 다음 익명 요청이 다시 null 로 지운다.
+  - ⚠️ '방문자'는 사람이 아니라 **브라우저**다(localStorage 난수). 폰·PC 로 오면 둘로 세고, 기록을 지우면 새 사람이 된다.
+  - ⚠️ 기간(7/30/90)을 바꾸면 **다시 불러온다**. 막대만 클라에서 자르면 추이는 7일인데 국가표는 90일인 화면이 된다.
+  - 안 세는 것: 관리자 경로(`/admin*`) · 개발 서버(localhost) · 봇 UA. 보존기간 크론은 없다(정리는 마이그레이션 머리 주석의 `delete … where day < current_date - 400`).
+  - 배포: 마이그레이션 적용 + `npx.cmd supabase functions deploy track-visit admin` (**둘 다 플래그 없이** — anon 키가 실려 오므로 공개 예외가 필요 없다). 프론트는 `master` push. 검증 = `tests/db/t-visit-stats.mjs`(27건).
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
+- **허브 캐릭터 업로드 (2026-08-31 · `20260831140000`)** — 관리자 › WORLD ARENA › 꾸미기 관리 › **캐릭터 업로드**. 캐릭터를 늘리는 데 **배포가 필요 없다**(2026-08-20 의 "그림은 코드, 가격은 DB" 선을 캐릭터에서만 옮긴 것 — 캐릭터가 가진 수치는 비율 하나뿐이라 그림에서 재면 되기 때문이다. 스킨은 9패치 값 15줄이 그림과 같이 와야 해서 여전히 배포다).
+  - ⛔ **시트를 자르는 건 여전히 `tools/build-char-art.mjs` 다.** 올리는 건 **완제품 lv1~7** 이다. 흰 배경 빼기·Lv.7 후광 역산은 판단이 섞인 일이고(배경 뺀 시트를 사람이 따로 넣는다) Deno 엣지에는 그 이미지 처리기가 아예 없다.
+  - ⛔ **코드의 파일 경로(`/hub/char/<키>/lv<n>.webp`)를 지우지 말 것.** 지금 그림이 있는 두 캐릭터(`char_a_m`·`char_a_f`)는 `hub_char_art` 에 행이 없어서 계속 그쪽에서 그려진다. 표를 단일 출처로 만들면 그 둘을 누군가 다시 올리기 전까지 허브가 폴백 한 장으로 뜬다.
+  - ⛔ **저장은 `hub_char_art` + `shop_catalog` 두 행을 같이 쓴다.** 상점 행이 없으면 화면에 **영영 안 나온다** — 허브의 첫 선택 후보도 상점 목록도 `get-hub` 가 `shop_catalog`(active)에서 만든다.
+  - ⛔ **브라우저가 버킷에 직접 올리지 않는다.** `admin` 이 구운 **서명 업로드 URL** 로만 올린다(`hub-char` 버킷 정책 0개 = 토큰 없이는 아무도 못 올린다). 스토리지 정책으로 관리자를 가리려면 정책 안에서 `admin_users` 를 뒤져야 해서 게이트가 두 벌이 된다.
+  - ⚠️ **파일 이름에 타임스탬프를 박는다.** 같은 경로에 덮어쓰면 공개 URL 이 그대로라 CDN·브라우저가 옛 그림을 계속 준다 — "올렸는데 화면이 안 바뀐다". 대가는 안 쓰는 옛 파일이 버킷에 남는 것(청소 크론 없음).
+  - ⚠️ **비율은 브라우저가 잰다**(올린 그림의 가로/세로). 엣지에 디코더가 없다. 7장이 같은 캔버스라 아무 장이나 같은 값이다.
+  - ⛔ **키는 화면에 없다 — 서버가 정한다**(`nextCharKey` → `char_001`…). 관리자에게 `char_003` 은 아무 뜻도 없는 글자다. 이름으로 만들 수도 없다: 키가 그대로 스토리지 경로가 되는데 **Storage 는 ASCII 만 받아서** 한글 이름을 쓰면 서명 URL 은 200 이고 **올릴 때만** InvalidKey 400 이 난다(의견함 첨부에서 겪은 그 함정). 새 캐릭터는 **첫 업로드 때** 서버가 키를 만들어 돌려주고 화면이 그걸 숨겨 들고 있는다 — 안 붙잡으면 7장이 각각 다른 키로 흩어진다.
+  - ⚠️ 이름은 `hub_char_art.name_ko`(원본) + `name_i18n`(번역본만, ko 제외). 사전(`hub.part.<키>`)은 배포물이라 못 늘리므로 **업로드된 캐릭터만** DB 이름이 이긴다(`charArtName`).
+  - ⚠️ **미리보기는 기본 스킨(초원) 하나로 고정**한다. 썸네일만 봐서는 크기를 못 읽는다(레벨마다 캔버스 안 크기가 다르고 Lv.7 이 크다) — 배경 위에 올려야 판단이 된다. 스킨마다 발끝 높이가 달라 여러 개를 보여주면 "어느 게 맞냐"가 된다.
+  - ⚠️ **보유·착용 목록(`cosmeticOwners`)은 착용을 두 자리에서 모은다** — 캐릭터는 `user_characters.base_key`, 파츠는 같은 행의 `equipped` 안. 한쪽만 보면 "보유 12명 / 착용 0명" 같은 거짓말이 나온다. **산 기록 없이 입고 있는 사람**도 세운다(첫 캐릭터는 공짜라 `user_cosmetics` 에 안 남는다) — 빼면 "착용 30명인데 목록엔 2명"이 된다.
+  - ⚠️ 조회는 `charArtSrc` 가 렌더 중에 불리는 **동기 함수**라(공유 카드처럼 훅을 못 쓰는 자리도 부른다) 모듈이 한 번 받아 들고 있고, 도착하면 `<CharArt>` 가 구독으로 다시 그린다. 안 알리면 이미 그려진 화면이 폴백인 채로 남는다.
+  - 배포: 마이그레이션 + **`supabase/storage-buckets.sql` 의 `hub-char` 블록 실행**(⛔ 버킷을 안 만들면 업로드가 통째로 `Bucket not found` — `avatars` 가 그래서 몇 달 죽어 있었다) + `npx.cmd supabase functions deploy admin` + 프론트 push.
 - **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`).
   - ⚠️ **아바타를 %크기 소켓에 넣을 땐 `aspect-ratio: 1 !important` 를 반드시 같이 걸 것 — 안 그러면 달걀이 된다.** `<Avatar>` 는 인라인 style 로 px 크기 + `border-radius:50%` 를 박기 때문에, `width/height:100%` 만 덮어쓰면 퍼센트 높이가 auto 로 떨어지는 순간 박스가 세로로 눌려 **원이 타원**이 된다. 반복해서 재발한 버그다(시상대 → 티어바). `ranking.css` 의 '아바타 달걀 방지' 블록에 소켓 선택자를 **모아서** 관리한다 — 소켓을 새로 만들면 그 블록에 선택자만 추가하고, 소켓마다 규칙을 따로 쓰지 말 것. 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.
     - ⛔ **그 버킷은 2026-08-25 까지 실제로 없었다 — 아바타 업로드가 통째로 실패하고 있었다**(`Bucket not found`). 코드는 처음부터 `avatars` 를 부르는데 만드는 단계만 아무도 안 밟은 것이다. 지금은 만들었고, 버킷·정책 SQL 은 **`supabase/storage-buckets.sql`** 에 모아 뒀다(마이그레이션이 아니다 — `storage` 스키마는 pglite 에 없어서 섞으면 `test:db` 가 죽는다).

@@ -5,8 +5,18 @@
 //
 // ⚠️ CSS 배경이 아니라 <img> 인 이유 = **onError 폴백**이다. background-image 는 실패를 알 수 없어
 //    파일이 없으면 그냥 빈 자리가 된다(그림이 도착하기 전까지 무대에 캐릭터가 아예 안 선다).
-import { useState } from 'react'
-import { CHAR_FALLBACK_SRC, charArtSrc, CHAR_MIN_LEVEL } from '../lib/hubCosmetics'
+import { useState, useSyncExternalStore } from 'react'
+import {
+  CHAR_FALLBACK_SRC, charArtSrc, CHAR_MIN_LEVEL,
+  loadCharArt, subscribeCharArt, charArtVersion,
+} from '../lib/hubCosmetics'
+
+// 구독을 시작할 때 조회도 같이 건다 — 렌더 중에 부르면 '그리는 일'이 네트워크를 타게 된다.
+//   ⚠️ 모듈 최상위에 둬야 한다(참조가 바뀌면 useSyncExternalStore 가 매 렌더 다시 구독한다).
+const subscribeArt = (fn: () => void) => {
+  void loadCharArt()
+  return subscribeCharArt(fn)
+}
 
 export default function CharArt({
   charKey,
@@ -21,6 +31,9 @@ export default function CharArt({
   className?: string
   alt?: string
 }) {
+  // 관리자가 올린 캐릭터 표가 도착하면 다시 그린다. 안 구독하면 표가 와도 이미 그려진 화면은
+  // 코드 경로(=없는 파일 → 폴백)인 채로 남는다. 조회는 모듈이 한 번만 한다.
+  useSyncExternalStore(subscribeArt, charArtVersion, charArtVersion)
   const wanted = charKey && charKey !== 'default' ? charArtSrc(charKey, level) : CHAR_FALLBACK_SRC
   // 실패한 경로를 **집합으로** 기억한다 — boolean 하나면 캐릭터나 레벨을 바꿨을 때
   // 새 그림도 폴백으로 시작한다(멀쩡한 파일이 있는데 안 보인다).

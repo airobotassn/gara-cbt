@@ -739,7 +739,7 @@ create table if not exists shop_catalog (part_key text primary key, price int no
 alter table shop_catalog enable row level security;
 drop policy if exists "shop_catalog_select_all" on shop_catalog;
 create policy "shop_catalog_select_all" on shop_catalog for select using (true);
-insert into shop_catalog(part_key,price) values ('hat_common_01',200),('hat_common_02',200),('shoe_common_01',200),('glasses_common_01',200),('wing_rare_01',800),('crown_rare_01',800) on conflict (part_key) do nothing;
+-- 아이템(kind='part') 6종은 폐기했다(20260831150000) — 되살리지 말 것. 뽑기가 사라지면서 살 길이 없어진 물건이다.
 
 -- ============================================================================
 -- shop_buy: 원자 구매. 멱등(user_id,client_nonce). 차감 → 지급 → 로그.

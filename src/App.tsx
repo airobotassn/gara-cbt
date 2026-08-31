@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthProvider'
 import { loadSiteSettings, applySiteHead } from './lib/siteSettings'
 import { callFunction } from './lib/supabase'
 import { ensureCheckedIn } from './lib/autoCheckin'
+import { trackVisit } from './lib/visitTrack'
 import Layout from './components/Layout'
 import SebEscapeHatch from './components/SebEscapeHatch'
 import SitePopups from './components/SitePopups'
@@ -91,6 +92,18 @@ function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
     window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
+
+// 방문 기록 — 라우트가 바뀔 때마다 한 줄 남긴다. 관리자 홈 대시보드 "방문 통계"(국가·지역·기기·
+// 브라우저)의 **유일한** 입력이다. 화면에는 아무것도 그리지 않는다.
+//   ⚠️ 여기가 아니라 각 페이지에 넣지 말 것 — 47개 화면에 흩어지면 새 라우트를 추가할 때마다 빠진다.
+//   ⚠️ 관리자 경로·개발 서버 제외, 중복 억제, 국가 조회는 전부 lib/visitTrack.ts 안에 있다.
+function VisitTracker() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    trackVisit(pathname)
   }, [pathname])
   return null
 }
@@ -212,6 +225,7 @@ export default function App() {
           {/* 관리자가 등록한 팝업. ⛔ 응시 화면에는 컴포넌트 안에서 라우트로 막는다. */}
           <SitePopups />
           <ScrollToTop />
+          <VisitTracker />
           {/* SEB(잠금 브라우저) 안에서만 뜨는 탈출 버튼. 라우트가 안 맞아 랜딩으로 튕겨도 나갈 길이 남는다.
               응시 중(/exam/run/*)에는 뜨지 않는다 — 그 화면의 종료는 '포기'라 응시 무효 기록이 따로 남아야 한다. */}
           <SebEscapeHatch />

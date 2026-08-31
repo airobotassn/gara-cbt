@@ -1725,12 +1725,6 @@ const JA: Record<string, string> = {
   // 꾸미기 파츠 이름 — 상점·토스트가 같이 쓴다.
   // ⚠️ 파츠 6종은 2026-08-14 에 상점에서 내려갔다(방 가구로 일원화). 이미 산 사람의 목록에는 남아 있어
   //    이름은 계속 필요하다 — 지우면 그 사람 화면에 키가 그대로 뜬다.
-  "hub.part.hat_common_01": "ふたばキャップ",
-  "hub.part.hat_common_02": "ニット帽",
-  "hub.part.shoe_common_01": "ぬくぬく靴下",
-  "hub.part.glasses_common_01": "まる眼鏡",
-  "hub.part.wing_rare_01": "輝く翼",
-  "hub.part.crown_rare_01": "小さな王冠",
 
   // 상단·공통
   "hub.gate_title": "ログインが必要です",

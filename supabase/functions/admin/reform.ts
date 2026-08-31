@@ -557,6 +557,217 @@ async function homeStats(admin: any) {
   })
 }
 
+// ── 허브 캐릭터 업로드 ───────────────────────────────────────
+// 캐릭터 한 종 = **완제품 7장 + 비율 + 이름 + 상점 한 행**. 여태 앞의 셋이 코드/에셋이라 그림이
+// 도착할 때마다 배포였다(2026-08-20 에 "그림은 코드, 가격은 DB" 로 가른 그 선). 여기가 그 선을 옮긴다.
+//
+// ⛔ **시트를 자르지 않는다.** 올리는 건 `tools/build-char-art.mjs` 가 뽑아 놓은 **완제품 7장**이다.
+//    흰 배경 빼기·Lv.7 후광 역산은 판단이 섞인 일이고 Deno 엣지에는 그 이미지 처리기도 없다.
+// ⛔ **브라우저가 버킷에 직접 올리지 않는다.** 서명 업로드 URL 을 여기서 구워 준다 —
+//    버킷 정책이 0개라 토큰 없이는 아무도 못 올리고, 관리자 판정은 이 함수가 이미 통과시킨 뒤다.
+//    (스토리지 정책으로 관리자를 가리려면 정책 안에서 admin_users 를 뒤져야 한다 — 게이트가 두 벌이 된다.)
+const CHAR_BUCKET = 'hub-char'
+const CHAR_PUBLIC_MARK = `/storage/v1/object/public/${CHAR_BUCKET}/`
+const CHAR_KEY_RE = /^char_[a-z0-9_]+$/
+const CHAR_EXT_MIME: Record<string, string> = { webp: 'image/webp', png: 'image/png' }
+
+/**
+ * 새 캐릭터 키 — **사람에게 보여주지 않는다**(2026-08-31 지시: "키는 서버에서 정해").
+ *
+ * ⛔ **이름으로 키를 만들 수 없다.** 키가 그대로 스토리지 경로(`<키>/lv1-….webp`)가 되는데
+ *    Supabase Storage 는 키를 ASCII 로만 받는다 — 한글 이름을 그대로 쓰면 서명 URL 은 200 이고
+ *    **올릴 때만** InvalidKey 400 이 난다(의견함 첨부에서 이미 겪은 그 함정).
+ *    로마자로 옮기려면 romanizer 가 필요하고, 그건 이름이 바뀔 때마다 키가 흔들린다는 뜻이다.
+ * ⚠️ 그래서 순번이다. 표시 이름은 `name_ko` 가 따로 들고 있으므로 키가 무의미해도 아무도 안 아쉽다.
+ */
+async function nextCharKey(admin: any): Promise<string> {
+  const [art, cat] = await Promise.all([
+    admin.from('hub_char_art').select('part_key'),
+    admin.from('shop_catalog').select('part_key').eq('kind', 'character'),
+  ])
+  let max = 0
+  for (const r of [...(art.data ?? []), ...(cat.data ?? [])] as any[]) {
+    const m = /^char_(\d+)$/.exec(String(r.part_key ?? ''))
+    if (m) max = Math.max(max, Number(m[1]))
+  }
+  return `char_${String(max + 1).padStart(3, '0')}`
+}
+
+/**
+ * 이 품목을 **가진 사람 / 입고 있는 사람** 목록. 값을 올리거나 진열을 내리기 전에 보는 화면이다.
+ * ⚠️ 착용은 두 자리에서 나온다 — 캐릭터는 `user_characters.base_key`, 파츠는 같은 행의 `equipped` 안.
+ *    한쪽만 보면 "보유 12명 / 착용 0명" 같은 거짓말이 나온다.
+ */
+async function cosmeticOwners(admin: any, body: any) {
+  const partKey = String(body?.partKey ?? '')
+  if (!partKey) return json({ error: '품목 키가 없습니다.' }, 400)
+
+  const [own, chars] = await Promise.all([
+    admin.from('user_cosmetics').select('user_id, acquired_at, source').eq('part_key', partKey).limit(1000),
+    admin.from('user_characters').select('user_id, base_key, equipped').limit(50000),
+  ])
+  const wearing = new Set<string>()
+  for (const c of (chars.data ?? []) as any[]) {
+    if (c.base_key === partKey) wearing.add(c.user_id)
+    const eq = (c.equipped ?? {}) as Record<string, string>
+    for (const v of Object.values(eq)) if (v === partKey) wearing.add(c.user_id)
+  }
+  const byUser = new Map<string, { userId: string; name: string; acquiredAt: string | null; source: string | null; worn: boolean }>()
+  for (const o of (own.data ?? []) as any[]) {
+    byUser.set(o.user_id, { userId: o.user_id, name: '', acquiredAt: o.acquired_at ?? null, source: o.source ?? null, worn: wearing.has(o.user_id) })
+  }
+  // ⚠️ 산 기록 없이 입고 있는 사람도 세운다 — 첫 선택 무료 캐릭터가 그렇다(user_cosmetics 에 안 남는다).
+  //    빼면 "착용 30명인데 목록엔 2명" 이 된다.
+  for (const uid of wearing) {
+    if (!byUser.has(uid)) byUser.set(uid, { userId: uid, name: '', acquiredAt: null, source: null, worn: true })
+  }
+  const ids = [...byUser.keys()]
+  if (ids.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids)
+    for (const p of (profs ?? []) as any[]) {
+      const row = byUser.get(p.id)
+      if (row) row.name = p.display_name ?? ''
+    }
+  }
+  const users = [...byUser.values()].sort((a, b) => Number(b.worn) - Number(a.worn) || (b.acquiredAt ?? '').localeCompare(a.acquiredAt ?? ''))
+  return json({ partKey, users, owners: (own.data ?? []).length, worn: wearing.size })
+}
+
+/** 캐릭터 목록 — 상점 행(있으면)과 업로드된 그림을 한 줄로 합쳐 돌려준다. */
+async function charArtList(admin: any) {
+  const [cat, art] = await Promise.all([
+    admin.from('shop_catalog').select('part_key, price, kind, active, sort_order').eq('kind', 'character'),
+    admin.from('hub_char_art').select('part_key, ar, urls, name_ko, name_i18n, updated_at'),
+  ])
+  const byKey = new Map<string, any>()
+  for (const r of (cat.data ?? []) as any[]) {
+    byKey.set(r.part_key, {
+      partKey: r.part_key, price: r.price ?? 0, active: r.active !== false,
+      sortOrder: r.sort_order ?? 0, ar: null, urls: {}, nameKo: '', uploaded: 0, updatedAt: null,
+    })
+  }
+  for (const a of (art.data ?? []) as any[]) {
+    // ⚠️ 상점 행이 아직 없는 키도 줄을 세운다 — 그림만 올리고 값을 안 정한 상태가 실제로 생긴다.
+    const row = byKey.get(a.part_key) ?? {
+      partKey: a.part_key, price: 0, active: false, sortOrder: 0, ar: null, urls: {}, nameKo: '', uploaded: 0, updatedAt: null,
+    }
+    row.ar = a.ar === null || a.ar === undefined ? null : Number(a.ar)
+    row.urls = (a.urls ?? {}) as Record<string, string>
+    row.nameKo = a.name_ko ?? ''
+    row.uploaded = Object.keys(row.urls).length
+    row.updatedAt = a.updated_at ?? null
+    byKey.set(a.part_key, row)
+  }
+  const items = [...byKey.values()].sort((x, y) => x.sortOrder - y.sortOrder || x.partKey.localeCompare(y.partKey))
+  return json({ items })
+}
+
+/**
+ * 그림 한 장의 서명 업로드 URL. 브라우저는 이 토큰으로만 올린다.
+ * ⚠️ 파일 이름에 타임스탬프를 박는다 — 같은 경로에 덮어쓰면 공개 URL 이 그대로라 CDN·브라우저가
+ *    옛 그림을 계속 준다("올렸는데 안 바뀐다"). 옛 파일은 남지만 그건 눈에 보이는 사고가 아니다.
+ */
+async function charArtUploadUrl(admin: any, body: any) {
+  const raw = String(body?.partKey ?? '')
+  const level = Number(body?.level)
+  const ext = String(body?.ext ?? 'webp').toLowerCase()
+  // ⚠️ 새 캐릭터는 아직 키가 없다(화면이 안 묻는다) — 여기서 만들어 **돌려준다**.
+  //    화면은 그 값을 숨겨 들고 있다가 저장할 때 같이 보낸다. 안 돌려주면 7장이 각각 다른 키로 흩어진다.
+  const partKey = raw || (await nextCharKey(admin))
+  if (!CHAR_KEY_RE.test(partKey)) return json({ error: '캐릭터 키가 올바르지 않습니다.' }, 400)
+  if (!Number.isInteger(level) || level < 1 || level > 7) return json({ error: '레벨은 1~7 입니다.' }, 400)
+  if (!CHAR_EXT_MIME[ext]) return json({ error: 'webp 또는 png 만 올릴 수 있습니다.' }, 400)
+
+  const path = `${partKey}/lv${level}-${Date.now()}.${ext}`
+  const { data, error } = await admin.storage.from(CHAR_BUCKET).createSignedUploadUrl(path)
+  if (error) return json({ error: error.message }, 500)
+  const pub = admin.storage.from(CHAR_BUCKET).getPublicUrl(path)
+  return json({ partKey, path, token: data?.token ?? null, signedUrl: data?.signedUrl ?? null, publicUrl: pub.data.publicUrl })
+}
+
+/**
+ * 캐릭터 한 종 저장 — 그림 주소·비율·이름 + 상점 행(가격·판매여부)을 같이 쓴다.
+ * ⛔ 상점 행을 같이 만들지 않으면 화면에 **영영 안 나온다** — 허브의 첫 선택 후보도 상점 목록도
+ *    `shop_catalog` 에서 나온다(get-hub 가 active 만 내려준다).
+ * ⚠️ 그림 주소는 **우리 버킷의 공개 주소인지 확인**한다. 안 보면 남의 서버 주소를 그대로 심을 수 있고,
+ *    그러면 그쪽이 그림을 갈아치우는 순간 우리 허브 캐릭터가 바뀐다.
+ */
+async function charArtSave(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
+  // 키는 사람이 안 정한다 — 그림을 먼저 올렸으면 그때 받은 키가 오고, 아니면 여기서 만든다.
+  const partKey = String(body?.partKey ?? '') || (await nextCharKey(admin))
+  if (!CHAR_KEY_RE.test(partKey)) return json({ error: '캐릭터 키가 올바르지 않습니다.' }, 400)
+
+  const nameKo = String(body?.nameKo ?? '').trim()
+  if (!nameKo) return json({ error: '캐릭터 이름(한국어)을 입력하세요.' }, 400)
+
+  const price = Number(body?.price ?? 0)
+  if (!Number.isInteger(price) || price < 0) return json({ error: '가격은 0 이상의 정수여야 합니다.' }, 400)
+  const active = body?.active !== false
+  // 표시 순서는 화면이 안 보낸다(만드는 중엔 몇 번째인지 알 수가 없다) → **맨 뒤**로 붙인다.
+  //   ⚠️ 기존 캐릭터를 다시 저장할 땐 그 값을 유지한다. 0 으로 덮으면 저장할 때마다 맨 앞으로 튄다.
+  let sortOrder = Number.isInteger(Number(body?.sortOrder)) ? Number(body.sortOrder) : null
+  if (sortOrder === null) {
+    const { data: cur } = await admin.from('shop_catalog').select('part_key, sort_order').eq('kind', 'character')
+    const mine = (cur ?? []).find((r: any) => r.part_key === partKey)
+    sortOrder = mine
+      ? (mine.sort_order ?? 0)
+      : Math.max(-1, ...((cur ?? []) as any[]).map((r) => r.sort_order ?? 0)) + 1
+  }
+
+  const arRaw = body?.ar
+  const ar = arRaw === null || arRaw === undefined || arRaw === '' ? null : Number(arRaw)
+  if (ar !== null && (!Number.isFinite(ar) || ar <= 0 || ar > 10)) return json({ error: '비율 값이 이상합니다.' }, 400)
+
+  const urlsIn = (body?.urls ?? {}) as Record<string, unknown>
+  const urls: Record<string, string> = {}
+  for (let lv = 1; lv <= 7; lv++) {
+    const u = urlsIn[String(lv)]
+    if (typeof u !== 'string' || !u) continue
+    if (!u.includes(CHAR_PUBLIC_MARK)) return json({ error: `Lv.${lv} 그림 주소가 우리 저장소의 것이 아닙니다.` }, 400)
+    urls[String(lv)] = u
+  }
+
+  // 이름 번역 — 한국어가 원본이고 i18n 에는 번역본만 담는다(공지·강의와 같은 규칙).
+  //   ⚠️ 번역이 실패해도 저장은 한다. 이름이 한국어로만 뜨는 것과 캐릭터가 아예 안 들어가는 것은 무게가 다르다.
+  let nameI18n: Record<string, string> = {}
+  if (deps.hasTranslateKey) {
+    try {
+      const t = await deps.translateKoFields({ name: nameKo })
+      nameI18n = i18nOf(t.name)
+    } catch { /* 한국어로만 저장 */ }
+  }
+
+  const { error: artErr } = await admin.from('hub_char_art').upsert({
+    part_key: partKey, ar, urls, name_ko: nameKo, name_i18n: nameI18n, updated_at: new Date().toISOString(),
+  }, { onConflict: 'part_key' })
+  if (artErr) return json({ error: artErr.message }, 500)
+
+  const { error: shopErr } = await admin.from('shop_catalog').upsert({
+    part_key: partKey, price, kind: 'character', active, sort_order: sortOrder,
+  }, { onConflict: 'part_key' })
+  if (shopErr) return json({ error: shopErr.message }, 500)
+
+  await audit(admin, ctx, 'charArtSave', partKey, { nameKo, price, active, levels: Object.keys(urls).length })
+  return json({ ok: true, partKey, translated: Object.keys(nameI18n).length })
+}
+
+// ── 방문 통계 ────────────────────────────────────────────────
+// 홈 대시보드의 "방문 통계" 섹션 하나가 쓰는 전부(일별 추이 · 국가 · 지역 · 기기 · 브라우저 · OS · 인기 화면).
+//   ⚠️ 집계는 SQL(`visit_stats` RPC)이 한다 — 행을 다 끌어와 TS 에서 세는 방식(homeStats 가 그렇다)은
+//      방문이 쌓이면 limit 에 먼저 걸려 **조용히 틀린 숫자**를 내놓는다.
+//   ⚠️ 날짜 경계는 KST 다. 표의 `day` 도 KST 기준으로 서버가 찍는다(마이그레이션 기본값).
+async function visitStats(admin: any, body: any) {
+  const days = Math.min(365, Math.max(7, Number(body?.days ?? 90) || 90))
+  const kstNow = new Date(Date.now() + 9 * 3600e3)
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10)
+  const to = dayKey(kstNow)
+  const from = dayKey(new Date(kstNow.getTime() - (days - 1) * 86400e3))
+
+  const { data, error } = await admin.rpc('visit_stats', { p_from: from, p_to: to })
+  if (error) return json({ error: error.message }, 500)
+  return json({ from, to, ...((data ?? {}) as Record<string, unknown>) })
+}
+
 // ── 시스템 알림 ──────────────────────────────────────────────
 async function alertList(admin: any, body: any) {
   const status = String(body?.status ?? 'open')
@@ -909,9 +1120,14 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'rewardPolicySave': return await rewardPolicySave(admin, body, ctx)
     case 'hubCosmetics': return await hubCosmetics(admin)
     case 'hubCosmeticsSave': return await hubCosmeticsSave(admin, body, ctx)
+    case 'charArtList': return await charArtList(admin)
+    case 'charArtUploadUrl': return await charArtUploadUrl(admin, body)
+    case 'charArtSave': return await charArtSave(admin, body, ctx, deps)
+    case 'cosmeticOwners': return await cosmeticOwners(admin, body)
     case 'minigameStats': return await minigameStats(admin, body)
     case 'dailyStats': return await dailyStats(admin, body)
     case 'homeStats': return await homeStats(admin)
+    case 'visitStats': return await visitStats(admin, body)
     case 'alertList': return await alertList(admin, body)
     case 'alertUpdate': return await alertUpdate(admin, body)
     case 'auditList': return await auditList(admin)

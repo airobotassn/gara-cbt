@@ -15,6 +15,7 @@
 --   · ebooks         (비공개) 이북 본문 HTML — 서명 URL 로만 연다
 --   · ebook-covers   (공개)  이북 표지 + 사이트 로고·파비콘(`site/`) + **강의 썸네일(`lecture/`)**
 --   · avatars        (공개)  회원 프로필 이미지 — 경로 첫 칸이 본인 uid
+--   · hub-char       (공개)  허브 캐릭터 그림 — 정책 0개(서명 업로드 전용), 2026-08-31 추가
 
 -- ─────────────────────────────────────────────────────────────
 -- avatars — 회원 프로필 이미지 (2026-08-25 생성)
@@ -54,3 +55,22 @@ create policy avatars_own_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
+
+-- ─────────────────────────────────────────────────────────────
+-- hub-char — 허브 캐릭터 그림 (2026-08-31 생성)
+--   경로 규칙: `<part_key>/lv<n>-<타임스탬프>.webp` (관리자 › 꾸미기 관리 › 캐릭터 업로드)
+--   ⚠️ **정책을 만들지 않는다.** 업로드는 관리자 함수가 구운 **서명 업로드 URL** 로만 한다
+--      (서명 업로드는 RLS 를 안 보므로 정책이 0개여도 되고, 0개라 토큰 없이는 아무도 못 올린다).
+--      의견함 첨부(`feedback-files`)와 같은 방식이다.
+--   ⚠️ 읽기는 공개다 — 허브·남의 방·공유 카드가 로그인 없이 캐릭터를 그린다.
+--      공개 버킷은 정책 없이도 읽히므로 select 정책도 필요 없다.
+--   ⚠️ 5MB 상한은 화면(Admin.tsx 의 CHAR_MAX_UPLOAD)과 **같은 값**이어야 한다. 버킷이 더 작으면
+--      화면은 통과시킨 파일이 업로드에서만 이유 없이 실패한다.
+--   ⚠️ svg 를 넣지 말 것 — 스크립트를 품을 수 있고 공개 버킷이라 그대로 실행 가능한 주소가 된다.
+-- ─────────────────────────────────────────────────────────────
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('hub-char', 'hub-char', true, 5242880, array['image/webp','image/png'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;

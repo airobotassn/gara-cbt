@@ -6,13 +6,17 @@
 //   그래서 **그림·수치 = 코드/에셋, 가격·판매여부·진열순서 = DB(`shop_catalog`)** 로 갈랐다.
 //   가구(`fur_*`)가 이미 같은 구조다(그림은 `lib/room.ts`, 가격만 DB).
 //
-// 새 캐릭터를 넣을 때
+// 새 캐릭터를 넣을 때 (2026-08-31 부터 **배포가 필요 없다**)
 //   1) Lv.1~7 이 **한 줄로 선 시트 한 장**(흰 배경 그대로)을 받아
-//      `node tools/build-char-art.mjs "<시트.png>" <키>` → `public/hub/char/<key>/lv1..7.webp`.
+//      `node tools/build-char-art.mjs "<시트.png>" <키>` → `lv1..7.webp` 7장을 만든다.
 //      ⚠️ 손으로 자르지 말 것 — 흰 배경 빼기와 '7장을 같은 캔버스에' 규칙이 그 도구 안에 있다.
-//   2) 이 파일 `CHAR_AR` 에 한 줄(도구가 마지막에 찍어주는 비율을 그대로).
-//   3) `shop_catalog` 에 한 행(관리자 화면에서 가격만 정하면 된다).
-//   4) 사전에 `hub.char.<key>` 6개국어.
+//      ⚠️ 이 단계는 **여전히 사람이 한다.** 배경 뺀 시트를 따로 넣어야 하고(팔과 몸 사이 틈은
+//         계산이 아니라 판단이다), 엣지 함수에는 그 이미지 처리기가 아예 없다.
+//   2) 관리자 › WORLD ARENA › 꾸미기 관리 › **캐릭터 업로드** 에서 그 7장을 올리고 이름·가격을 정한다.
+//      → `hub_char_art` 한 행 + `shop_catalog` 한 행이 같이 생기고, 이름 5개국어는 자동 번역된다.
+//      비율은 브라우저가 올린 그림에서 재서 같이 보낸다(아래 `charAspect`).
+//   ⛔ 아래 `CHAR_SERIES`·`CHAR_AR`·파일 경로 규칙을 지우지 말 것 — **이미 있는 두 캐릭터**
+//      (`char_a_m`·`char_a_f`)는 표에 행이 없고 계속 `public/hub/char/...` 에서 그려진다.
 //
 // 새 스킨을 넣을 때
 //   1) `public/hub/skin/<key>/` 에 그림 한 벌.
@@ -22,6 +26,8 @@
 //      기존 벌을 그대로 쓸 거면 `ui` 에 그 이름만 적는다.
 //   4) 이 파일 `SKINS` 에 한 줄.
 //   5) `shop_catalog` 에 한 행 + 사전 `hub.part.skin_<key>`.
+
+import { supabase } from './supabase'
 
 // ── 캐릭터 ──────────────────────────────────────────────────────────────────
 /**
@@ -102,13 +108,72 @@ export const CHAR_LEVELS: number[] = Array.from(
 export const clampCharLevel = (lv: number | null | undefined): number =>
   Math.max(CHAR_MIN_LEVEL, Math.min(CHAR_MAX_LEVEL, Math.round(lv ?? CHAR_MIN_LEVEL) || CHAR_MIN_LEVEL))
 
+/* ── 관리자가 올린 그림이 코드 경로를 이긴다 (2026-08-31) ──────────────────────
+ * 캐릭터를 늘리는 데 배포가 필요 없게 하려고 `hub_char_art` 표를 하나 뒀다. 여기 있는 키는
+ * 업로드된 주소로 그리고, 없는 키는 **예전 그대로** `public/hub/char/...` 에서 그린다.
+ *
+ * ⛔ 아래 파일 경로 규칙을 지우지 말 것 — 지금 그림이 있는 두 캐릭터(`char_a_m`·`char_a_f`)는
+ *    표에 행이 없다. 규칙을 없애면 누군가 그 둘을 다시 업로드하기 전까지 허브가 폴백 한 장으로 뜬다.
+ * ⚠️ 조회는 **한 번만** 하고 모듈에 들고 있는다 — `charArtSrc` 는 렌더 중에 불리는 동기 함수라
+ *    (공유 카드처럼 훅을 못 쓰는 자리도 부른다) 여기서 await 할 수가 없다.
+ * ⚠️ 도착하면 구독자에게 알린다. 안 알리면 이미 그려진 화면이 폴백 그림인 채로 남는다.
+ */
+interface CharArtRow { ar: number | null; urls: Record<string, string> ; nameKo: string; nameI18n: Record<string, string> }
+let CHAR_ART: Record<string, CharArtRow> = {}
+const artSubs = new Set<() => void>()
+let artVersion = 0
+let artLoading: Promise<void> | null = null
+
+export function subscribeCharArt(fn: () => void): () => void {
+  artSubs.add(fn)
+  return () => { artSubs.delete(fn) }
+}
+export const charArtVersion = () => artVersion
+
+/** 업로드된 캐릭터 표를 한 번 받아 둔다. 실패하면 조용히 코드 경로로 남는다(화면이 비지 않는다). */
+export function loadCharArt(): Promise<void> {
+  if (!artLoading) {
+    artLoading = (async () => {
+      try {
+        const { data } = await supabase.from('hub_char_art').select('part_key, ar, urls, name_ko, name_i18n')
+        const next: Record<string, CharArtRow> = {}
+        for (const r of (data ?? []) as Record<string, unknown>[]) {
+          next[String(r.part_key)] = {
+            ar: r.ar === null || r.ar === undefined ? null : Number(r.ar),
+            urls: (r.urls ?? {}) as Record<string, string>,
+            nameKo: (r.name_ko as string) ?? '',
+            nameI18n: (r.name_i18n ?? {}) as Record<string, string>,
+          }
+        }
+        CHAR_ART = next
+        artVersion++
+        for (const fn of artSubs) fn()
+      } catch { /* 못 받으면 코드 경로 그대로 — 화면이 비지 않는다 */ }
+    })()
+  }
+  return artLoading
+}
+
+/** 업로드된 캐릭터 키 — 코드 목록(`CHAR_KEYS`)에 없는 새 캐릭터가 보관함에서 사라지지 않게 한다. */
+export const uploadedCharKeys = (): string[] => Object.keys(CHAR_ART)
+
+/**
+ * 캐릭터 이름 — 업로드된 것이면 관리자가 넣은 이름, 아니면 사전(`hub.part.<key>`).
+ * ⚠️ 한국어는 `name_ko` 가 원본이고 `name_i18n` 에는 번역본만 있다(공지·강의와 같은 규칙).
+ */
+export function charArtName(key: string, lang: string): string | null {
+  const row = CHAR_ART[key]
+  if (!row) return null
+  return (lang === 'ko' ? row.nameKo : row.nameI18n[lang] || row.nameKo) || null
+}
+
 /**
  * 캐릭터 그림 경로 — **한 캐릭터가 레벨마다 한 장**이다(`/hub/char/char_a_m/lv3.webp`).
- * 그래서 총 장수 = 계열 3 × 성별 2 × 레벨 7 = **42장**.
  * 파일이 없으면 브라우저 onError 가 폴백으로 바꾼다(`<CharArt>` 참고) — 그림이 도착하기 전에도 화면이 선다.
  */
-export const charArtSrc = (key: string, level: number) => `/hub/char/${key}/lv${clampCharLevel(level)}.webp`
-export const charAspect = (key: string) => CHAR_AR[key] ?? CHAR_FALLBACK_AR
+export const charArtSrc = (key: string, level: number) =>
+  CHAR_ART[key]?.urls[String(clampCharLevel(level))] ?? `/hub/char/${key}/lv${clampCharLevel(level)}.webp`
+export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? CHAR_FALLBACK_AR
 
 // ── 스킨 ────────────────────────────────────────────────────────────────────
 /**

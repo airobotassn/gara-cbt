@@ -9,6 +9,9 @@ import DraftBar from '../components/DraftBar'
 import { krw } from '../lib/money'
 import { getTracks } from '../lib/caris'
 import { MAX_LEVEL } from '../lib/categories'
+import { useT } from '../lib/i18n'
+// 이름·그림은 허브가 쓰는 것을 그대로 쓴다 — 관리자용 표를 따로 두면 같은 물건이 두 이름으로 뜬다.
+import { SKINS, skinThumb } from '../lib/hubCosmetics'
 
 // ── 공용 ──────────────────────────────────────────────────────
 const inp: CSSProperties = {
@@ -2117,7 +2120,9 @@ export function PopupAdmin() {
 // ⚠️ **여기서 만지는 건 가격·판매여부·진열순서 셋뿐이다**(2026-08-20 결정).
 //    그림과 9패치 자르는 값(`--skin-mission-slice: 45 145 40 145 fill` 같은 줄 15개)은
 //    코드/에셋에 있다 — 그림을 보면서 맞추는 값이라 폼에 칠 수가 없고, 한 칸만 틀려도 판이 찌그러진다.
-//    캐릭터·스킨을 **새로 추가**하는 것도 여기가 아니라 배포다(에셋 + hub.css 값 블록 + shop_catalog 한 행).
+//    ⚠️ **캐릭터만 예외다(2026-08-31).** 바로 위 `CharArtAdmin` 이 완제품 7장을 받아 배포 없이 추가한다 —
+//       캐릭터가 가진 수치는 비율 하나뿐이고 그건 그림에서 재면 되기 때문이다. 스킨은 여전히 배포다
+//       (9패치 값 15줄이 그림과 같이 와야 한다).
 // ⚠️ 가격 0 = **첫 선택 무료 대상**이다. 값을 매기면 그 캐릭터는 신규 회원 선택 화면에서 빠지고
 //    상점에만 뜬다. 무료 캐릭터를 전부 없애면 신규 회원이 첫 화면에서 갇히므로 서버가 저장을 거절한다.
 // ══════════════════════════════════════════════════════════════
@@ -2126,21 +2131,498 @@ interface CosmeticRow {
   active: boolean; sort_order: number; owners: number; worn: number
 }
 const COSMETIC_KIND_LABEL: Record<string, string> = {
-  character: '캐릭터', skin: '배경·UI 스킨', furniture: '가구', part: '아이템',
+  character: '캐릭터', skin: '배경·UI 스킨', furniture: '가구',
 }
-// 진열 순서와 같은 순서로 묶어 보여준다.
-const COSMETIC_KIND_ORDER = ['character', 'skin', 'furniture', 'part']
+// ⛔ 'part'(아이템 — 모자·신발·안경·날개·왕관)는 폐기했다(20260831150000). 되살리지 말 것 —
+//    뽑기가 사라지면서 살 길이 없어진 물건이고, 프로덕션에서 6종 전부 진열 내림·착용자 0명이었다.
+const COSMETIC_KIND_ORDER = ['character', 'skin', 'furniture']
+
+// 이 품목을 가진 사람 / 입고 있는 사람.
+// ⚠️ 착용은 두 자리에서 나온다 — 캐릭터는 `user_characters.base_key`, 파츠는 같은 행의 `equipped` 안.
+//    서버(cosmeticOwners)가 둘을 합쳐 내려준다. 화면에서 다시 세지 말 것.
+// ⚠️ **산 기록 없이 입고 있는 사람**이 있다(첫 캐릭터는 공짜라 user_cosmetics 에 안 남는다).
+//    그래서 '보유'가 비어 있는데 '착용'인 줄이 정상으로 나온다.
+interface CosmeticOwnerRow {
+  userId: string; name: string; acquiredAt: string | null; source: string | null; worn: boolean
+}
+
+function CosmeticOwners({ partKey, onClose }: { partKey: string; onClose: () => void }) {
+  const { data, loading, err } = useAdminData<{ users: CosmeticOwnerRow[]; owners: number; worn: number }>(
+    'cosmeticOwners', { partKey },
+  )
+  const users = data?.users ?? []
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h3 style={{ marginTop: 0 }}>보유 · 착용 유저</h3>
+        <p className="admin-hint" style={{ marginTop: -6 }}>
+          보유 <b>{data?.owners ?? 0}명</b> · 착용 <b>{data?.worn ?? 0}명</b>
+        </p>
+        <ErrBox msg={err} />
+        {loading && !data
+          ? <div className="admin-empty">불러오는 중…</div>
+          : users.length
+            ? (
+              <div className="admin-table-wrap" style={{ maxHeight: '52vh', overflowY: 'auto' }}>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>닉네임</th>
+                      <th style={{ width: 90 }}>착용</th>
+                      <th style={{ width: 110 }}>얻은 경로</th>
+                      <th style={{ width: 150 }}>얻은 날</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((u) => (
+                      <tr key={u.userId}>
+                        <td>
+                          <div>{u.name || <span style={{ color: 'var(--muted)' }}>(닉네임 없음)</span>}</div>
+                          <div style={{ color: 'var(--muted)', fontSize: 13 }}>{u.userId.slice(0, 8)}</div>
+                        </td>
+                        <td>{u.worn ? <span className="admin-badge st-submitted">착용중</span> : <span className="admin-hint">—</span>}</td>
+                        <td className="admin-hint">{u.source ?? '첫 선택'}</td>
+                        <td className="admin-hint">{u.acquiredAt ? fmtDT(u.acquiredAt) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : <div className="admin-empty">아직 아무도 갖고 있지 않습니다.</div>}
+      </div>
+    </div>
+  )
+}
+
+// ── 캐릭터 업로드 (2026-08-31) ────────────────────────────────
+// 캐릭터를 늘리는 데 **배포가 필요 없게** 한다. 올리는 건 완제품 7장이다.
+//
+// ⛔ **여기서 시트를 자르지 않는다.** `tools/build-char-art.mjs` 가 만든 lv1~7 을 그대로 올린다 —
+//    흰 배경 빼기·Lv.7 후광 역산은 판단이 섞인 일이고 엣지 함수엔 이미지 처리기도 없다.
+// ⚠️ 비율은 **여기서 잰다**(올린 그림의 가로/세로). 서버에서 재려면 디코더가 필요한데 없다.
+//    한 캐릭터의 7장은 같은 캔버스라 아무 장이나 재도 같은 값이 나온다 — 첫 장을 쓴다.
+// ⚠️ 브라우저가 버킷에 직접 올리지 않는다. 관리자 함수가 구운 **서명 URL** 로만 올린다
+//    (버킷 정책이 0개다 — supabase/storage-buckets.sql 의 hub-char 블록).
+const CHAR_MAX_UPLOAD = 5 * 1024 * 1024 // 버킷 file_size_limit 과 같은 값이어야 한다
+const CHAR_UP_LEVELS = [1, 2, 3, 4, 5, 6, 7]
+
+interface CharArtRow {
+  partKey: string; price: number; active: boolean; sortOrder: number
+  ar: number | null; urls: Record<string, string>; nameKo: string; uploaded: number; updatedAt: string | null
+}
+
+function CharArtAdmin({ items, loading, err, reload, onSaved }: {
+  items: CharArtRow[]; loading: boolean; err: string; reload: () => Promise<void> | void; onSaved: () => void
+}) {
+  // ⛔ **키는 화면에 없다**(2026-08-31 지시). 서버가 정하고(`nextCharKey`) 여기서는 숨겨 들고만 있는다 —
+  //    관리자에게 `char_003` 은 아무 뜻도 없는 글자고, 한글 이름은 스토리지 경로가 못 된다(ASCII 만 받는다).
+  //    새 캐릭터는 첫 업로드 때 서버가 키를 만들어 돌려주고, 그림 없이 저장하면 저장할 때 만든다.
+  const [sel, setSel] = useState('')      // 편집 중인 키('' = 새로 만들기)
+  const [newKey, setNewKey] = useState('') // 새 캐릭터가 첫 업로드에서 받은 키(사람에게 안 보인다)
+  const [nameKo, setNameKo] = useState('')
+  const [price, setPrice] = useState(0)
+  const [active, setActive] = useState(true)
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const [ar, setAr] = useState<number | null>(null)
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState('')
+  const [pvLevel, setPvLevel] = useState(1) // 미리보기에서 보고 있는 레벨
+
+  const partKey = sel || newKey
+
+  // 목록에서 하나를 고르면 그 값으로 폼을 채운다. '새로 만들기'면 비운다.
+  function pick(key: string) {
+    setSel(key); setMsg(''); setNewKey('')
+    const row = items.find((i) => i.partKey === key)
+    setNameKo(row?.nameKo ?? '')
+    setPrice(row?.price ?? 0)
+    setActive(row?.active ?? true)
+    setUrls(row?.urls ?? {})
+    setAr(row?.ar ?? null)
+  }
+
+  /** 그림 한 장 올리기 — 서명 URL 받기 → 그 토큰으로 올리기 → 공개 주소를 폼에 꽂기. */
+  async function upload(level: number, file: File) {
+    if (!/\.(webp|png)$/i.test(file.name)) { setMsg('webp 또는 png 만 올릴 수 있습니다.'); return }
+    if (file.size > CHAR_MAX_UPLOAD) { setMsg('파일이 너무 큽니다(최대 5MB).'); return }
+    const ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'webp'
+    setBusy('lv' + level); setMsg('')
+    try {
+      const sign = await callFunction<{ partKey: string; path: string; token: string | null; publicUrl: string }>('admin', {
+        action: 'charArtUploadUrl', partKey: partKey || undefined, level, ext,
+      })
+      if (!sign.token) throw new Error('업로드 주소를 받지 못했습니다.')
+      // 새 캐릭터의 첫 장 — 서버가 정한 키를 여기서 붙잡는다. 안 잡으면 다음 장이 또 새 키를 받아 흩어진다.
+      if (!partKey) setNewKey(sign.partKey)
+      const { error } = await supabase.storage.from('hub-char').uploadToSignedUrl(sign.path, sign.token, file, {
+        contentType: ext === 'png' ? 'image/png' : 'image/webp',
+      })
+      if (error) throw error
+      setUrls((prev) => ({ ...prev, [String(level)]: sign.publicUrl }))
+      // 비율 — 아직 없을 때만 잰다(7장이 같은 캔버스라 아무 장이나 같은 값이다).
+      if (ar === null) {
+        try {
+          const bmp = await createImageBitmap(file)
+          setAr(Number((bmp.width / bmp.height).toFixed(6)))
+          bmp.close()
+        } catch { /* 못 재면 화면이 폴백 비율을 쓴다 */ }
+      }
+      setMsg('✅ Lv.' + level + ' 올렸습니다')
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Lv.' + level + ' 업로드 실패')
+    } finally { setBusy('') }
+  }
+
+  async function save() {
+    if (!nameKo.trim()) { setMsg('이름(한국어)을 입력하세요.'); return }
+    setBusy('save'); setMsg('')
+    try {
+      const res = await callFunction<{ ok: boolean; partKey: string; translated: number }>('admin', {
+        action: 'charArtSave', partKey: partKey || undefined, nameKo: nameKo.trim(), price, active, ar, urls,
+      })
+      setMsg(res?.translated ? '✅ 저장했습니다 (이름 ' + res.translated + '개국어 번역됨)' : '✅ 저장했습니다')
+      await reload()
+      onSaved()
+      setSel(res.partKey); setNewKey('')
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '저장 실패')
+    } finally { setBusy('') }
+  }
+
+
+  return (
+    <div className="admin-section">
+      <div className="admin-section-head">
+        <h3>캐릭터 업로드</h3>
+        <div className="admin-head-actions">
+          {msg && <span className="admin-msg">{msg}</span>}
+          <button className="admin-mini" onClick={() => void reload()} disabled={loading}>새로고침</button>
+          <button className="btn-ink" onClick={save} disabled={!!busy}>{busy === 'save' ? '저장 중…' : '저장'}</button>
+        </div>
+      </div>
+      <ErrBox msg={err} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 14 }}>
+        <label style={fld}>
+          캐릭터
+          <select style={inp} value={sel} onChange={(e) => pick(e.target.value)}>
+            <option value="">+ 새로 만들기</option>
+            {items.map((i) => (
+              <option key={i.partKey} value={i.partKey}>
+                {i.nameKo || '(이름 없음)'} · 그림 {i.uploaded}/7
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={fld}>
+          이름(한국어)
+          <input style={inp} placeholder="한국풍 캐릭터(남)" value={nameKo} onChange={(e) => setNameKo(e.target.value)} />
+        </label>
+        <label style={fld}>
+          가격(코인)
+          <input style={inp} type="number" min={0} step={1} value={price}
+            onChange={(e) => setPrice(Math.max(0, Math.floor(+e.target.value || 0)))} />
+        </label>
+        {/* ⛔ 표시 순서는 여기서 안 묻는다 — 캐릭터를 만드는 중에 "몇 번째로 세울지"를 알 수가 없다.
+            새 캐릭터는 맨 뒤로 붙고, 순서는 아래 표에서 ↑↓ 로 옮긴다. */}
+        <label style={{ ...fld, alignSelf: 'end' }}>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 600 }}>
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+            {active ? '상점에 표시' : '상점에서 숨김'}
+          </span>
+        </label>
+      </div>
+
+      {/* 미리보기 — **허브에서 어떻게 보이는지**를 그대로 세운다.
+          ⚠️ 칸에 담긴 썸네일만 봐서는 크기를 못 읽는다. 캐릭터 그림은 레벨마다 캔버스 안에서 크기가
+             다르고(Lv.7 이 크다) 그 차이가 무대에서 드러나는 게 전부라, 배경 위에 올려봐야 판단이 된다.
+          ⚠️ 배경은 기본 스킨(초원) 하나로 고정한다 — 스킨마다 발끝 높이가 달라서 다 보여주면
+             "어느 게 맞는 거냐"가 된다. 여기서 볼 것은 캐릭터 자체다. */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--muted)' }}>미리보기</span>
+          <div className="rng">
+            {CHAR_UP_LEVELS.map((lv) => (
+              <button key={lv} className={pvLevel === lv ? 'on' : ''} onClick={() => setPvLevel(lv)}>Lv.{lv}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{
+          position: 'relative', height: 280, borderRadius: 12, overflow: 'hidden',
+          border: '1px solid var(--line2)',
+          background: "url('/hub/bg-meadow-default.webp') center 100% / auto 130% no-repeat",
+        }}>
+          {urls[String(pvLevel)] ? (
+            <img
+              src={urls[String(pvLevel)]}
+              alt={'Lv.' + pvLevel}
+              style={{
+                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                bottom: '18%', height: '62%', objectFit: 'contain', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,.35))',
+              }}
+            />
+          ) : (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+              color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', fontSize: 'var(--fs-sm)', fontWeight: 700,
+            }}>
+              Lv.{pvLevel} 그림 없음 — 아래에서 올리면 여기 바로 보입니다
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 레벨 7칸 — 한 칸이 그림 한 장이다. 빠진 레벨은 화면에서 기본 그림으로 그려진다. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10 }}>
+        {CHAR_UP_LEVELS.map((lv) => {
+          const u = urls[String(lv)]
+          return (
+            <div key={lv} style={{ border: '1px solid var(--line2)', borderRadius: 10, padding: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>Lv.{lv}</div>
+              <div style={{ height: 92, display: 'grid', placeItems: 'center', background: 'var(--soft)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+                {u
+                  ? <img src={u} alt={'Lv.' + lv} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                  : <span style={{ color: 'var(--dim)', fontSize: 12 }}>없음</span>}
+              </div>
+              <input
+                type="file"
+                accept="image/webp,image/png"
+                disabled={!!busy}
+                style={{ fontSize: 11, width: '100%' }}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = '' // 같은 파일을 다시 골라도 이벤트가 오게 한다
+                  if (f) void upload(lv, f)
+                }}
+              />
+              {busy === 'lv' + lv && <div style={{ fontSize: 11, color: 'var(--muted)' }}>올리는 중…</div>}
+            </div>
+          )
+        })}
+      </div>
+
+    </div>
+  )
+}
+
+/* ── 꾸미기 품목의 이름과 그림 ──────────────────────────────────────────────
+ * ⛔ **키를 화면에 내보내지 않는다**(2026-08-31 지시). `char_c_f` 는 보는 사람에게 아무 뜻이 없다.
+ * ⚠️ 이름·그림을 여기서 새로 만들지 않는다 — 허브가 쓰는 것을 그대로 쓴다
+ *    (사전 `hub.part.<키>` · `SKINS` · 업로드된 `hub_char_art`). 관리자용 표를 따로 두면
+ *    같은 물건이 허브와 관리자에서 다른 이름·다른 그림으로 뜬다.
+ * ⚠️ 가구·아이템은 코드에 그림이 없다 — 그 둘은 이름만 선다(빈 네모를 세운다).
+ */
+function cosmeticLabel(r: CosmeticRow, charMap: Map<string, CharArtRow>, t: (k: string) => string): string {
+  // 업로드된 캐릭터는 사전에 키가 없다(사전은 배포물이라 못 늘린다) → 그때만 DB 이름이 이긴다.
+  const uploaded = charMap.get(r.part_key)?.nameKo
+  if (uploaded) return uploaded
+  const dict = t(`hub.part.${r.part_key}`)
+  return dict === `hub.part.${r.part_key}` ? '(이름 없음)' : dict
+}
+
+function cosmeticThumb(r: CosmeticRow, charMap: Map<string, CharArtRow>): string | null {
+  if (r.kind === 'character') {
+    // 올린 그림이 있으면 그것, 없으면 예전 파일 경로(그것도 없으면 <CosmeticThumb> 가 빈 네모로 둔다).
+    return charMap.get(r.part_key)?.urls?.['1'] ?? `/hub/char/${r.part_key}/lv1.webp`
+  }
+  if (r.kind === 'skin') {
+    const skin = SKINS.find((x) => x.partKey === r.part_key)
+    return skin ? skinThumb(skin) : null
+  }
+  return null
+}
+
+/** 작은 미리보기 한 칸. 파일이 없으면 조용히 빈 네모로 남는다(깨진 이미지 아이콘을 안 보여준다). */
+function CosmeticThumb({ kind, src }: { kind: string; src: string | null }) {
+  const [bad, setBad] = useState(false)
+  const box: CSSProperties = {
+    width: kind === 'skin' ? 56 : 34, height: 40, flex: 'none', borderRadius: 8,
+    border: '1px solid var(--line2)', background: 'var(--soft)',
+    display: 'grid', placeItems: 'center', overflow: 'hidden',
+  }
+  if (!src || bad) return <span style={box} />
+  return (
+    <span style={box}>
+      <img
+        src={src}
+        alt=""
+        onError={() => setBad(true)}
+        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: kind === 'skin' ? 'cover' : 'contain' }}
+      />
+    </span>
+  )
+}
+
+/**
+ * 캐릭터 Lv.1~7 을 한 번에. 표의 썸네일은 한 장뿐이라 "레벨이 오르면 어떻게 되는지"를 못 본다.
+ *
+ * ⛔ **그림 위쪽 여백을 잘라내지 말 것.** 7장은 같은 크기 캔버스를 쓰고 아래끝이 발끝이다
+ *    (캔버스 높이 = Lv.1~6 평균 키 × 1.42 — `tools/build-char-art.mjs`). 그 빈 자리가 곧
+ *    **Lv.7 이 커지는 자리**라, 위를 크롭하면 Lv.7 머리가 잘린다. 레벨마다 딱 맞게 채우면
+ *    7장이 전부 같은 키가 되어 '자란다'는 사실 자체가 사라진다.
+ * ⚠️ 그래서 칸마다 네모를 두지 않고 **바닥 하나 위에 나란히 세운다.** 네모 안에 바닥 맞춤으로
+ *    두면 위가 텅 빈 채 아래에 처박힌 것처럼 보인다(2026-08-31 지적) — 서 있을 땅이 없어서다.
+ * ⚠️ 올린 그림이 없는 레벨은 예전 파일 경로로 떨어지고, 그것도 없으면 빈 자리로 남긴다 —
+ *    거기에 폴백 그림을 채우면 "올린 줄 알았는데 안 올라간" 레벨을 못 알아챈다.
+ */
+function CharLevelsModal({ name, urls, partKey, onClose }: {
+  name: string; urls: Record<string, string>; partKey: string; onClose: () => void
+}) {
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      {/* ⚠️ 기본 모달 폭(640px)으로는 7장이 5+2 로 접힌다. 레벨은 **한 줄로 나란히** 봐야
+          자라는 흐름이 읽히므로 폭을 넓히고, 그래도 좁은 화면에서는 **줄바꿈 대신 가로 스크롤**이다
+          (칸을 줄이면 그림이 안 보이고, 접으면 순서가 끊긴다). */}
+      <div className="admin-modal" style={{ maxWidth: 1040 }} onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h3 style={{ marginTop: 0 }}>{name}</h3>
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(120px, 1fr))', gap: 10, minWidth: 900 }}>
+            {[1, 2, 3, 4, 5, 6, 7].map((lv) => (
+              <div key={lv} style={{ textAlign: 'center' }}>
+                <div style={{
+                  height: 190, display: 'grid', placeItems: 'center', overflow: 'hidden',
+                  background: 'var(--soft)', border: '1px solid var(--line2)', borderRadius: 10,
+                }}>
+                  <CharLevelImg src={urls[String(lv)] ?? `/hub/char/${partKey}/lv${lv}.webp`} lv={lv} />
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginTop: 4 }}>Lv.{lv}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 그림 안에서 **사람이 실제로 그려진 자리**를 재서 칸 가운데로 올린다.
+ *
+ * 왜 필요한가: 7장은 같은 크기 캔버스를 쓰고 아래끝이 발끝이라, Lv.1~6 은 위쪽이 통째로 비어 있다
+ * (캔버스 높이 = Lv.1~6 평균 키 × 1.42). 그대로 두면 칸 아래에 처박힌 것처럼 보인다.
+ *   ⛔ **여백을 잘라내면 안 된다** — 그 자리가 Lv.7 이 커지는 자리라 크롭하면 Lv.7 머리가 잘리고,
+ *      레벨마다 딱 맞게 채우면 7장이 전부 같은 키가 되어 '자란다'는 사실이 사라진다.
+ *   그래서 자르지 않고 **위치만** 옮긴다 — 크기 차이는 그대로 남는다.
+ * ⚠️ 값은 그림마다 다르다(레벨마다 키가 다르다). 고정 비율로 밀면 Lv.7 만 어긋난다 → 알파를 잰다.
+ * ⚠️ 못 재면(다른 출처의 그림이라 캔버스가 오염되는 등) 0 = 예전 그대로다. 화면이 깨지진 않는다.
+ */
+function useArtShift(src: string): number {
+  const [shift, setShift] = useState(0)
+  useEffect(() => {
+    let alive = true
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const W = 48
+        const H = Math.max(1, Math.round((img.naturalHeight / img.naturalWidth) * W))
+        const cv = document.createElement('canvas')
+        cv.width = W; cv.height = H
+        const ctx = cv.getContext('2d', { willReadFrequently: true })
+        if (!ctx) return
+        ctx.drawImage(img, 0, 0, W, H)
+        const px = ctx.getImageData(0, 0, W, H).data
+        let top = -1, bot = -1
+        for (let y = 0; y < H; y++) {
+          let on = false
+          for (let x = 0; x < W; x++) if (px[(y * W + x) * 4 + 3] > 12) { on = true; break }
+          if (on) { if (top < 0) top = y; bot = y }
+        }
+        if (!alive || top < 0) return
+        // 보이는 부분의 한가운데를 칸 한가운데로. (양수 = 아래로, 음수 = 위로)
+        setShift(0.5 - ((top + bot + 1) / 2) / H)
+      } catch { /* 캔버스를 못 읽으면 그냥 예전 자리 */ }
+    }
+    img.src = src
+    return () => { alive = false }
+  }, [src])
+  return shift
+}
+
+/**
+ * 배경 스킨 한 장을 크게. 캐릭터의 '보기'와 짝이다 — 표의 56px 썸네일로는 무엇이 그려진 배경인지 모른다.
+ * ⚠️ 그림은 `SKINS`(코드)에서 온다. 스킨은 아직 업로드 대상이 아니라 DB 에 그림이 없다.
+ * ⚠️ 배경은 무대에서 **아래쪽이 보이는** 그림이라(지평선이 아래) `object-position: bottom` 이다 —
+ *    가운데로 맞추면 화면에서 실제로 보이는 부분과 다른 데를 보여주게 된다.
+ */
+function SkinViewModal({ partKey, name, onClose }: { partKey: string; name: string; onClose: () => void }) {
+  const skin = SKINS.find((x) => x.partKey === partKey)
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" style={{ maxWidth: 900 }} onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h3 style={{ marginTop: 0 }}>{name}</h3>
+        {skin ? (
+          <img
+            src={skin.bg}
+            alt={name}
+            style={{ width: '100%', maxHeight: '62vh', objectFit: 'cover', objectPosition: 'bottom', borderRadius: 12, border: '1px solid var(--line2)' }}
+          />
+        ) : (
+          <div className="admin-empty">그림을 찾을 수 없습니다.</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CharLevelImg({ src, lv }: { src: string; lv: number }) {
+  const [bad, setBad] = useState(false)
+  const shift = useArtShift(src)
+  if (bad) return <span style={{ color: 'var(--dim)', fontSize: 12 }}>없음</span>
+  return (
+    <img
+      src={src}
+      alt={`Lv.${lv}`}
+      onError={() => setBad(true)}
+      // height:100% = 캔버스 전체(여백 포함)를 칸에 맞춘다 → 레벨 간 크기 차이가 그대로 남는다.
+      style={{ height: '100%', maxWidth: '100%', objectFit: 'contain', transform: `translateY(${(shift * 100).toFixed(2)}%)` }}
+    />
+  )
+}
 
 export function HubCosmeticAdmin() {
+  const { t } = useT()
   const { data, loading, err, reload } = useAdminData<{ items: CosmeticRow[] }>('hubCosmetics')
+  // 캐릭터 이름·그림의 출처. 업로드 화면과 **같은 조회 하나**를 나눠 쓴다 —
+  //   ⚠️ 두 번 부르면 업로드 직후 한쪽만 갱신돼 가격표에 옛 이름이 남는다.
+  const chars = useAdminData<{ items: CharArtRow[] }>('charArtList')
+  const charMap = new Map((chars.data?.items ?? []).map((c) => [c.partKey, c]))
   const [rows, setRows] = useState<CosmeticRow[] | null>(null)
   const draft = useDraft({ kind: 'hub-cosmetics', value: rows, title: '허브 꾸미기 가격표', enabled: !!rows })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+  const [owners, setOwners] = useState<string | null>(null)   // 보유자 목록을 연 품목 키
+  const [charView, setCharView] = useState<string | null>(null) // 레벨별로 펼쳐 본 캐릭터 키
+  const [skinView, setSkinView] = useState<string | null>(null) // 크게 펼쳐 본 배경 스킨 키
   useEffect(() => { if (data) setRows(data.items) }, [data])
 
   const patch = (key: string, p: Partial<CosmeticRow>) =>
     setRows((prev) => (prev ? prev.map((r) => (r.part_key === key ? { ...r, ...p } : r)) : prev))
+
+  /**
+   * 한 칸 위/아래로. 순서는 **묶음(kind) 안에서만** 뜻이 있다 — 캐릭터와 스킨은 서로 다른 목록이라
+   * 번호가 겹쳐도 상관없다.
+   * ⚠️ 옮긴 뒤 그 묶음을 0부터 다시 매긴다. 자리를 바꾸기만 하고 번호를 그대로 두면 화면 순서와
+   *    저장될 순서가 갈라진다(보이는 것과 저장되는 것이 달라지는 종류의 사고다).
+   */
+  function move(kind: string, key: string, dir: -1 | 1) {
+    setRows((prev) => {
+      if (!prev) return prev
+      const group = prev.filter((r) => r.kind === kind)
+        .sort((a, b) => a.sort_order - b.sort_order || a.part_key.localeCompare(b.part_key))
+      const at = group.findIndex((r) => r.part_key === key)
+      const to = at + dir
+      if (at < 0 || to < 0 || to >= group.length) return prev
+      const [moved] = group.splice(at, 1)
+      group.splice(to, 0, moved)
+      const order = new Map(group.map((r, i) => [r.part_key, i]))
+      return prev.map((r) => (order.has(r.part_key) ? { ...r, sort_order: order.get(r.part_key)! } : r))
+    })
+  }
 
   // 첫 선택 후보 수 — 0이 되면 저장이 막힌다. 저장을 누르기 전에 화면에서 먼저 보이게 한다.
   //   ⚠️ 값(price)은 보지 않는다 — 첫 선택은 값과 무관하게 공짜다(20260824120000).
@@ -2165,54 +2647,86 @@ export function HubCosmeticAdmin() {
   }
 
   const table = (kind: string) => {
+    // ⚠️ 화면 순서 = 저장될 순서(sort_order). 서버가 준 배열 순서를 그대로 그리면 ↑↓ 를 눌렀을 때
+    //    줄이 안 움직이는 것처럼 보인다(값만 바뀌고 자리는 그대로라서).
     const list = (rows ?? []).filter((r) => r.kind === kind)
+      .sort((a, b) => a.sort_order - b.sort_order || a.part_key.localeCompare(b.part_key))
     if (!list.length) return null
     const isChar = kind === 'character'
     return (
       <div className="admin-section" key={kind}>
         <h3>{COSMETIC_KIND_LABEL[kind] ?? kind}</h3>
-        {isChar && (
-          <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12 }}>
-            신규 회원은 <b>첫 캐릭터 선택 화면</b>에서 <b>진열 중인 캐릭터 아무거나 한 종을 공짜로</b> 받습니다 —
-            가격은 <b>두 번째 캐릭터부터</b> 붙습니다. 진열을 내리면 그 화면에서도 빠집니다.
-            {' '}현재 첫 선택 후보 <b>{starters.length}종</b>
-            {starters.length === 0 && <b style={{ color: 'var(--danger, #d33)' }}> — 최소 1종은 있어야 저장됩니다</b>}
+        {/* ⚠️ 설명문은 두지 않는다(2026-08-31 지시). **저장이 막히는 상태일 때만** 한 줄 띄운다 —
+            이건 안내가 아니라 오류 예고다. 없으면 관리자가 이유 모를 저장 실패를 본다. */}
+        {isChar && starters.length === 0 && (
+          <p style={{ marginTop: -6, marginBottom: 12, color: 'var(--danger, #d33)', fontWeight: 700 }}>
+            ⚠️ 상점에 진열된 캐릭터가 없어 저장할 수 없습니다.
           </p>
         )}
         <table className="admin-table">
           <thead>
             <tr>
-              <th>키</th>
+              <th>이름</th>
               <th style={{ width: 130 }}>가격(코인)</th>
-              <th style={{ width: 110 }}>진열순서</th>
-              <th style={{ width: 120 }}>진열</th>
+              <th style={{ width: 96 }}>표시 순서</th>
+              <th style={{ width: 140 }}>상점 진열</th>
               <th style={{ width: 150 }}>보유 / 착용</th>
             </tr>
           </thead>
           <tbody>
-            {list.map((r) => (
+            {list.map((r, i) => (
               <tr key={r.part_key}>
-                <td>
-                  <b>{r.part_key}</b>
-                  {r.surface && <span className="admin-hint"> · {r.surface}</span>}
+                {/* ⛔ 키(`char_c_f`)를 글자로 내보내지 말 것(2026-08-31 지시) — 보는 사람에게 아무 뜻이 없다.
+                    그림과 이름이 그 자리를 대신하고, 키는 title 로만 남긴다(장애 신고 때 쓴다). */}
+                <td title={r.part_key}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CosmeticThumb kind={r.kind} src={cosmeticThumb(r, charMap)} />
+                    <span>
+                      <b>{cosmeticLabel(r, charMap, t)}</b>
+                      {r.surface && <span className="admin-hint"> · {r.surface}</span>}
+                      {/* ⚠️ 여는 자리는 **이름 옆 버튼**이다(2026-08-31 지시). 썸네일을 누르게 하면
+                          누를 수 있다는 걸 아무도 모른다 — 그냥 그림으로 보인다. */}
+                      {(r.kind === 'character' || r.kind === 'skin') && (
+                        <>
+                          {' '}
+                          <button
+                            className="admin-mini"
+                            onClick={() => (r.kind === 'skin' ? setSkinView(r.part_key) : setCharView(r.part_key))}
+                          >
+                            보기
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </div>
                 </td>
                 <td>
                   <input style={inp} type="number" min={0} step={1} value={r.price}
                     onChange={(e) => patch(r.part_key, { price: Math.max(0, Math.floor(+e.target.value || 0)) })} />
                 </td>
-                <td>
-                  <input style={inp} type="number" step={1} value={r.sort_order}
-                    onChange={(e) => patch(r.part_key, { sort_order: Math.floor(+e.target.value || 0) })} />
+                {/* ⛔ 순서를 숫자로 치게 하지 말 것(2026-08-31 지시). 사이에 하나 끼우려면 뒤를 전부 다시
+                    매겨야 하고, 같은 숫자를 두 개 주면 순서가 안 정해진다(그땐 키 순으로 떨어져 무작위로 보인다).
+                    ⚠️ 보이는 순서가 곧 저장될 순서다 — 옮기면 그 묶음을 0부터 다시 번호 매긴다. */}
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="admin-mini" onClick={() => move(kind, r.part_key, -1)} disabled={i === 0} title="위로">↑</button>
+                  {' '}
+                  <button className="admin-mini" onClick={() => move(kind, r.part_key, 1)} disabled={i === list.length - 1} title="아래로">↓</button>
                 </td>
                 <td>
+                  {/* ⚠️ '진열/내림' 은 무엇을 뜻하는지 안 통했다 → **상점에 뜨는가**로 말을 바꿨다. */}
                   <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <input type="checkbox" checked={r.active}
                       onChange={(e) => patch(r.part_key, { active: e.target.checked })} />
-                    {r.active ? '진열' : '내림'}
+                    {r.active ? '상점에 표시' : '상점에서 숨김'}
                   </label>
                 </td>
-                {/* 보유자는 값을 올리기 전에, 착용자는 진열을 내리기 전에 봐야 하는 숫자다. */}
-                <td className="admin-hint">{r.owners}명 / {r.worn}명</td>
+                {/* 보유자는 값을 올리기 전에, 착용자는 진열을 내리기 전에 봐야 하는 숫자다.
+                    ⚠️ 숫자만으로는 판단이 안 서서 **누구인지** 열 수 있게 했다(2026-08-31 지시). */}
+                <td>
+                  <button className="admin-mini" onClick={() => setOwners(r.part_key)} disabled={!r.owners && !r.worn}>
+                    {r.owners}명 / {r.worn}명
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -2230,13 +2744,26 @@ export function HubCosmeticAdmin() {
         <button className="btn-ink" onClick={save} disabled={busy || !rows}>{busy ? '저장 중…' : '저장'}</button>
       </AdminHead>
       <ErrBox msg={err} />
+      {/* 캐릭터를 **만드는** 자리 — 아래 가격표는 이미 있는 것의 값만 만진다.
+          ⚠️ 저장하면 shop_catalog 행이 같이 생기므로 가격표를 다시 불러와야 새 줄이 보인다. */}
+      <CharArtAdmin
+        items={chars.data?.items ?? []}
+        loading={chars.loading}
+        err={chars.err}
+        reload={chars.reload}
+        onSaved={reload}
+      />
       {COSMETIC_KIND_ORDER.map(table)}
-      <p className="admin-hint" style={{ lineHeight: 1.7 }}>
-        ⚠️ <b>진열을 내려도(“내림”) 이미 산 사람은 계속 씁니다.</b> 상점 목록에서만 사라지고 보관함에는 남습니다 —
-        돈을 낸 물건을 뺏지 않기 위해서입니다.<br />
-        ⚠️ 캐릭터 그림과 스킨 이미지는 이 화면에서 올리지 않습니다. 새 캐릭터·스킨을 추가하려면 개발자에게 요청하세요
-        (에셋 파일 + 화면 배포가 함께 필요합니다).
-      </p>
+      {owners && <CosmeticOwners partKey={owners} onClose={() => setOwners(null)} />}
+      {skinView && <SkinViewModal partKey={skinView} name={cosmeticLabel((rows ?? []).find((r) => r.part_key === skinView) ?? { part_key: skinView, kind: 'skin' } as CosmeticRow, charMap, t)} onClose={() => setSkinView(null)} />}
+      {charView && (
+        <CharLevelsModal
+          partKey={charView}
+          name={cosmeticLabel((rows ?? []).find((r) => r.part_key === charView) ?? { part_key: charView, kind: 'character' } as CosmeticRow, charMap, t)}
+          urls={charMap.get(charView)?.urls ?? {}}
+          onClose={() => setCharView(null)}
+        />
+      )}
     </>
   )
 }

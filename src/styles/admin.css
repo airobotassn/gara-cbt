@@ -312,6 +312,9 @@
 .hbar-track { flex: 1; height: 18px; background: var(--soft); border-radius: 999px; overflow: hidden; }
 .hbar-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 999px; transition: width 0.4s; }
 .hbar-v { width: 86px; flex: none; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--txt); }
+/* 국기 — 이모지가 아니라 파일이다(윈도우에 국기 글리프가 없다. CLAUDE.md 의 그 항목).
+   ⚠️ 폭 하한 20px: 그 아래로 내리면 태극기 4괘·성조기 별이 담길 자리가 없다. */
+.hbar-flag { width: 20px; height: 15px; object-fit: cover; border-radius: 2px; margin-right: 7px; vertical-align: -2px; }
 
 /* 등급변동 스택 바 — 상승=블루 / 유지=중립 / 하락=위험 */
 .rank-bar { display: flex; height: 34px; border-radius: 12px; overflow: hidden; font-size: var(--fs-sm); font-weight: 800; color: var(--on-accent); }
