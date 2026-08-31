@@ -846,6 +846,7 @@ const EN: Record<string, string> = {
   "login.subtitle": "Sign in to use GARA.",
   "login.google_title": "Continue with Google",
   "login.kakao_title": "Continue with Kakao",
+  "login.consent": "By signing in you are deemed to consent to the collection of your email address, and you may receive notice emails sent by GARA.",
   "fab.login_cta": "Sign in",
   "about.hero_line1": "Global AI & Robotics Association",
   "about.hero_line2": "An institution that helps humanity adapt to change and grow in the AI & Robot era.",

@@ -846,6 +846,7 @@ const JA: Record<string, string> = {
   "login.subtitle": "GARAをご利用いただくにはログインしてください。",
   "login.google_title": "Googleで続ける",
   "login.kakao_title": "カカオで続ける",
+  "login.consent": "ログインすると、メールアドレスの収集に同意したものとみなされ、GARA が送信する案内メールを受け取る場合があります。",
   "fab.login_cta": "ログイン",
   "about.hero_line1": "グローバルAIロボット協会",
   "about.hero_line2": "AI・ロボット時代、人類が変化に適応し成長できるよう支援する機関です。",

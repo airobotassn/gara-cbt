@@ -856,6 +856,7 @@ const KO: Record<string, string> = {
   "login.subtitle": "GARA 서비스를 이용하려면 로그인하세요.",
   "login.google_title": "구글로 계속하기",
   "login.kakao_title": "카카오로 계속하기",
+  "login.consent": "로그인 시 이메일 주소 수집에 동의한 것으로 간주되며, GARA에서 발송하는 안내 이메일을 수신할 수 있습니다.",
   "fab.login_cta": "로그인",
   "about.hero_line1": "글로벌 AI 로봇협회",
   "about.hero_line2": "AI & Robot 시대 인류가 변화에 적응하고 성장하도록 돕는 기관입니다.",

@@ -49,6 +49,10 @@ export default function Login() {
             <p className="text-xl lg:text-2xl text-on-surface-variant font-medium leading-relaxed tracking-tight break-keep">
               {t('login.subtitle')}
             </p>
+            {/* 이메일 수집 동의 고지 — 로그인 안내문 바로 밑. 버튼을 누르기 전에 읽히는 자리다. */}
+            <p className="mt-5 text-xs sm:text-sm text-outline leading-relaxed break-keep max-w-lg">
+              {t('login.consent')}
+            </p>
           </div>
         </div>
         {/* Footer Links (Desktop) */}

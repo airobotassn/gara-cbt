@@ -846,6 +846,7 @@ const VI: Record<string, string> = {
   "login.subtitle": "Đăng nhập để sử dụng dịch vụ GARA.",
   "login.google_title": "Tiếp tục với Google",
   "login.kakao_title": "Tiếp tục với Kakao",
+  "login.consent": "Khi đăng nhập, bạn được xem là đồng ý cho thu thập địa chỉ email và có thể nhận email thông báo do GARA gửi.",
   "fab.login_cta": "Đăng nhập",
   "about.hero_line1": "Hiệp hội AI & Robot Toàn cầu",
   "about.hero_line2": "Tổ chức giúp nhân loại thích ứng với thay đổi và phát triển trong kỷ nguyên AI & Robot.",

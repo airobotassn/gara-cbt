@@ -846,6 +846,7 @@ const ZH: Record<string, string> = {
   "login.subtitle": "登录后即可使用 GARA 服务。",
   "login.google_title": "使用 Google 继续",
   "login.kakao_title": "使用 Kakao 继续",
+  "login.consent": "登录即视为同意收集您的电子邮箱地址，您可能会收到 GARA 发送的通知邮件。",
   "fab.login_cta": "登录",
   "about.hero_line1": "全球人工智能机器人协会",
   "about.hero_line2": "在 AI 与机器人时代，帮助人类适应变化、持续成长的机构。",
