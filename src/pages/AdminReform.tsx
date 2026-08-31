@@ -11,7 +11,7 @@ import { getTracks } from '../lib/caris'
 import { MAX_LEVEL } from '../lib/categories'
 import { useT } from '../lib/i18n'
 // 이름·그림은 허브가 쓰는 것을 그대로 쓴다 — 관리자용 표를 따로 두면 같은 물건이 두 이름으로 뜬다.
-import { SKINS, skinThumb } from '../lib/hubCosmetics'
+import { SKINS, skinThumb, DEFAULT_SKIN_PART } from '../lib/hubCosmetics'
 
 // ── 공용 ──────────────────────────────────────────────────────
 const inp: CSSProperties = {
@@ -2207,43 +2207,14 @@ function CosmeticOwners({ partKey, onClose }: { partKey: string; onClose: () => 
 //    (버킷 정책이 0개다 — supabase/storage-buckets.sql 의 hub-char 블록).
 const CHAR_MAX_UPLOAD = 5 * 1024 * 1024 // 버킷 file_size_limit 과 같은 값이어야 한다
 const CHAR_UP_LEVELS = [1, 2, 3, 4, 5, 6, 7]
+// 미리보기 축소율 — 허브는 화면 높이(vh) 기준이라 iframe 을 실제 화면 크기로 띄우고 이만큼 줄여서 넣는다.
+const PV_ZOOM = 0.5
 
 interface CharArtRow {
   partKey: string; price: number; active: boolean; sortOrder: number
   ar: number | null; urls: Record<string, string>; nameKo: string; uploaded: number; updatedAt: string | null
   /** 레벨('1'~'7') → 크기 배율. 없는 레벨은 1. */
   scales: Record<string, number>
-}
-
-/**
- * 미리보기 한 장. 파일이 없으면(404) 깨진 아이콘 대신 안내 글로 바뀐다.
- * ⚠️ `scale` 은 허브의 `--char-scale` 과 **같은 뜻**이어야 한다 — 여기만 다르게 그리면 관리자가
- *    맞춰 놓은 크기가 실제 화면에서 다르게 나온다.
- */
-function PreviewArt({ src, lv, scale = 1 }: { src: string | null; lv: number; scale?: number }) {
-  const [bad, setBad] = useState(false)
-  if (!src || bad) {
-    return (
-      <div style={{
-        position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-        color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', fontSize: 'var(--fs-sm)', fontWeight: 700,
-      }}>
-        Lv.{lv} 그림 없음 — 아래에서 올리면 여기 바로 보입니다
-      </div>
-    )
-  }
-  return (
-    <img
-      src={src}
-      alt={'Lv.' + lv}
-      onError={() => setBad(true)}
-      style={{
-        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-        bottom: '18%', height: `${(62 * scale).toFixed(1)}%`, objectFit: 'contain',
-        objectPosition: '50% 100%', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,.35))',
-      }}
-    />
-  )
 }
 
 function CharArtAdmin({ items, loading, err, reload, onSaved }: {
@@ -2279,6 +2250,8 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
   const [pvLevel, setPvLevel] = useState(1) // 미리보기에서 보고 있는 레벨
+  const [pvSkin, setPvSkin] = useState(DEFAULT_SKIN_PART) // 미리보기 배경
+  const pvFrame = useRef<HTMLIFrameElement | null>(null)
 
   const partKey = sel || newKey
 
@@ -2297,6 +2270,17 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
 
   /** 이 레벨의 크기 배율(안 정했으면 1). */
   const scaleOf = (lv: number) => scales[String(lv)] ?? 1
+
+  // 미리보기에 값 전달 — **해시만 갈아끼운다.** src 를 바꾸면 iframe 이 리로드돼 슬라이더가 끊긴다.
+  //   ⚠️ 같은 오리진이라 contentWindow 를 직접 만질 수 있다. 다른 오리진이면 postMessage 여야 한다.
+  const pvHash = partKey ? `${partKey}:${pvSkin}:${pvLevel}:${scaleOf(pvLevel)}` : ''
+  useEffect(() => {
+    if (!pvHash) return
+    try {
+      const w = pvFrame.current?.contentWindow
+      if (w) w.location.hash = `preview=${encodeURIComponent(pvHash)}`
+    } catch { /* 아직 안 떴으면 src 의 초기 해시가 그 값이다 */ }
+  }, [pvHash])
 
   /**
    * 올리기 전에 **투명 여백을 잘라낸다.**
@@ -2475,30 +2459,50 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
         </label>
       </div>
 
-      {/* 미리보기 — **허브에서 어떻게 보이는지**를 그대로 세운다.
-          ⚠️ 칸에 담긴 썸네일만 봐서는 크기를 못 읽는다. 캐릭터 그림은 레벨마다 캔버스 안에서 크기가
-             다르고(Lv.7 이 크다) 그 차이가 무대에서 드러나는 게 전부라, 배경 위에 올려봐야 판단이 된다.
-          ⚠️ 배경은 기본 스킨(초원) 하나로 고정한다 — 스킨마다 발끝 높이가 달라서 다 보여주면
-             "어느 게 맞는 거냐"가 된다. 여기서 볼 것은 캐릭터 자체다. */}
+      {/* 미리보기 = **진짜 /hub 화면**을 그대로 띄운다.
+          ⛔ 허브 화면을 여기 다시 그리지 말 것(2026-08-31 지시: "UI·버튼도 있어야 판단이 된다").
+             배경만 깔고 캐릭터를 얹으면 HUD·버튼과 겹치는지, 발끝이 지평선에 맞는지를 못 본다.
+             그리고 두 벌이 되는 순간 허브 UI 를 고칠 때마다 이쪽이 뒤처져 **맞춰 놓은 크기가 거짓말**이 된다.
+          ⚠️ 값 전달은 **해시**다(`#preview=키:스킨:레벨:배율`). 쿼리스트링을 바꾸면 iframe 이 통째로
+             리로드돼서 슬라이더를 못 쓴다 — 해시는 리로드 없이 hashchange 로만 전달된다.
+          ⚠️ 허브는 화면 높이(vh) 기준으로 그린다 → iframe 을 실제 화면 크기로 띄우고 **축소**해서 넣는다.
+             칸에 맞춰 iframe 을 작게 만들면 캐릭터 키가 실제와 달라져 미리보기의 의미가 없어진다. */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--muted)' }}>미리보기</span>
           <div className="rng">
             {CHAR_UP_LEVELS.map((lv) => (
               <button key={lv} className={pvLevel === lv ? 'on' : ''} onClick={() => setPvLevel(lv)}>Lv.{lv}</button>
             ))}
           </div>
+          {/* 스킨마다 지평선과 캐릭터 기본 키가 다르다 — 한 배경에서만 맞추면 다른 배경에서 어긋난다. */}
+          <div className="rng">
+            {SKINS.map((s) => (
+              <button key={s.partKey} className={pvSkin === s.partKey ? 'on' : ''} onClick={() => setPvSkin(s.partKey)}>
+                {t(`hub.part.${s.partKey}`)}
+              </button>
+            ))}
+          </div>
         </div>
         <div style={{
-          position: 'relative', height: 440, borderRadius: 12, overflow: 'hidden',
-          border: '1px solid var(--line2)',
-          // ⚠️ 허브는 `auto 130%`(높이 기준)를 쓰지만 그건 화면 높이가 큰 무대에서다. 여기는 넓고 낮은
-          //    칸이라 그 값을 그대로 쓰면 배경이 가운데만 덮고 양옆이 빈다 → `cover` 로 채운다.
-          background: "url('/hub/bg-meadow-default.webp') center 100% / cover no-repeat",
+          position: 'relative', height: 460, borderRadius: 12, overflow: 'hidden',
+          border: '1px solid var(--line2)', background: 'var(--soft)',
         }}>
-          {/* ⚠️ 옛 파일 경로로 떨어진 그림은 **없을 수도 있다**(그림이 안 들어온 계열). 그때는 깨진 이미지
-              아이콘 대신 안내로 바뀐다 — onError 가 그 판정의 유일한 근거다. */}
-          <PreviewArt key={`${partKey}-${pvLevel}`} src={artOf(pvLevel)} lv={pvLevel} scale={scaleOf(pvLevel)} />
+          {partKey ? (
+            <iframe
+              ref={pvFrame}
+              title="허브 미리보기"
+              src={`/hub#preview=${encodeURIComponent(`${partKey}:${pvSkin}:${pvLevel}:${scaleOf(pvLevel)}`)}`}
+              style={{
+                width: `${100 / PV_ZOOM}%`, height: `${100 / PV_ZOOM}%`,
+                transform: `scale(${PV_ZOOM})`, transformOrigin: '0 0', border: 0, display: 'block',
+              }}
+            />
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--dim)', fontSize: 'var(--fs-sm)' }}>
+              캐릭터를 고르거나 그림을 한 장 올리면 여기 실제 허브 화면이 뜹니다
+            </div>
+          )}
         </div>
       </div>
 

@@ -28,6 +28,7 @@ import CharArt from '../components/CharArt'
 import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
 import { rememberPostLogin } from '../lib/postLogin'
+import { loadAdminMe } from '../lib/adminMe'
 import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName, charScale,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
@@ -205,10 +206,45 @@ const COIN_ROWS: { key: string; icon: string; n: number | null }[] = [
   { key: 'gift', icon: 'coin', n: null },
 ]
 
+/**
+ * 관리자 미리보기 값 — `#preview=<캐릭터키>:<스킨파츠키>:<레벨>:<배율>`.
+ * 꾸미기 관리가 이 화면을 iframe 으로 띄우고 해시만 갈아끼운다(리로드 없이 바뀐다).
+ */
+interface HubPreview { char: string; skin: string; lv: number; scale: number }
+function readPreviewHash(): HubPreview | null {
+  const m = /(?:^#|&)preview=([^&]+)/.exec(window.location.hash)
+  if (!m) return null
+  const [char, skin, lv, scale] = decodeURIComponent(m[1]).split(':')
+  if (!char || !skin) return null
+  const n = Number(lv), s = Number(scale)
+  return {
+    char,
+    skin,
+    lv: Number.isFinite(n) ? Math.min(7, Math.max(1, Math.round(n))) : 1,
+    scale: Number.isFinite(s) && s > 0 ? Math.min(2, Math.max(0.4, s)) : 1,
+  }
+}
+
 export default function Hub() {
   const { isFullUser, loginWithGoogle, user, loading } = useAuth()
   const navigate = useNavigate()
   const { t, lang } = useT()
+  // 관리자 미리보기(꾸미기 관리가 이 화면을 iframe 으로 띄운다). 자세한 이유는 아래 `pv` 주석에.
+  const [previewHash, setPreviewHash] = useState<HubPreview | null>(() => readPreviewHash())
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => {
+    // 해시만 바뀌면 리로드가 안 일어난다 → 직접 듣는다. 이게 슬라이더가 끊기지 않는 이유다.
+    const on = () => setPreviewHash(readPreviewHash())
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  useEffect(() => {
+    // 해시가 있을 때만 물어본다 — 평소 진입에 관리자 조회를 하나 더 얹지 않는다(캐시돼 있어도 그렇다).
+    if (!previewHash) return
+    let alive = true
+    void loadAdminMe(user?.id ?? null).then((m) => { if (alive) setIsAdmin(m.isAdmin) })
+    return () => { alive = false }
+  }, [previewHash, user?.id])
   const [points, setPoints] = useState(0)
   const [stamps, setStamps] = useState(0)
   const [checkedIn, setCheckedIn] = useState(false)
@@ -747,7 +783,13 @@ export default function Hub() {
 
   // 지금 **그릴** 스킨 = 입어보는 중이면 그것, 아니면 실제 장착값.
   //   ⚠️ 저장값(skinPart)과 화면값(skin)을 갈라놓는 게 입어보기의 전부다. 저장 경로는 이 값을 안 본다.
-  const skin = skinByPart(previewSkin ?? skinPart)
+  // 관리자 미리보기 — 꾸미기 관리가 이 화면을 그대로 띄워서 캐릭터 크기를 맞춘다(`#preview=키:스킨:레벨:배율`).
+  //   ⛔ **허브 화면을 관리자 쪽에 다시 그리지 않기 위한 장치다.** 두 벌이 되면 UI 를 고칠 때마다
+  //      미리보기가 뒤처지고, 관리자가 맞춘 크기가 실제와 달라진다.
+  //   ⛔ 관리자에게만 듣는다 — 아니면 아무나 URL 로 안 산 스킨·캐릭터를 미리 볼 수 있다.
+  //   ⚠️ 쿼리스트링이 아니라 **해시**다. 쿼리를 바꾸면 iframe 이 통째로 리로드돼서 슬라이더를 못 쓴다.
+  const pv = isAdmin ? previewHash : null
+  const skin = skinByPart(pv?.skin ?? previewSkin ?? skinPart)
   // 인벤토리 = **가진 것**. 기본 스킨은 산 적이 없어도 늘 있는 것으로 친다(되돌아갈 길이 필요하다).
   // ⚠️ 코드 목록(CHAR_KEYS)만 보면 **관리자가 올린 새 캐릭터가 보관함에서 사라진다** — 산 사람은
   //    가지고 있는데 갈아입을 자리가 없다. 업로드분을 합치고, 그래도 빠진 건 소유 목록에서 줍는다.
@@ -772,7 +814,7 @@ export default function Hub() {
   const needTutorial = authed && charChosen === true && tutorialDone === false
   // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
   //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
-  const arenaLv = arenaLevelForScore(seasonTotal)
+  const arenaLv = pv?.lv ?? arenaLevelForScore(seasonTotal)
   const [bandLo, bandHi] = arenaBand(arenaLv)
   // ⚠️ 라벨은 **바와 같은 기준**이어야 한다 — 구간 내 진행분/구간 폭. 절대 총점(5,700/6,000)을 쓰면
   //    사용자는 95% 로 읽는데 바는 70%(구간 5,000~6,000 안에서 700) 라 눈에 바로 어긋나 보인다.
@@ -852,10 +894,13 @@ export default function Hub() {
              칸(위치·키)은 그대로 `.hub-scene-char` 가 잡고 그림만 그 안을 채운다. */}
       <div className="hub-scene" aria-hidden="true">
         <div className="hub-scene-bg" />
-        <div className="hub-scene-char" style={{ '--char-scale': charScale(charKey, arenaLv) } as CSSProperties}>
+        <div
+          className="hub-scene-char"
+          style={{ '--char-scale': pv?.scale ?? charScale(pv?.char ?? charKey, arenaLv) } as CSSProperties}
+        >
           {/* 캐릭터 레벨 = ARENA 레벨(시즌 총점 밴드, 1~7). 점수가 오르면 무대 위 캐릭터가 그대로 자란다.
               ⚠️ 시험 사다리 등급(user_progress.rank)이 아니다 — 둘 다 1~7 이라 헷갈리기 쉽다. */}
-          <CharArt charKey={charKey} level={arenaLv} className="hub-scene-char-img" />
+          <CharArt charKey={pv?.char ?? charKey} level={arenaLv} className="hub-scene-char-img" />
         </div>
       </div>
 
