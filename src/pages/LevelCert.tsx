@@ -36,6 +36,18 @@ const ROT = -30
 const VB = { w: 1448, h: 900 } // 인증서 고정 좌표계
 const QR_QUIET = 4 // QR 둘레 여백(모듈 수) — 규격 최소치다. 줄이면 리더가 코드 경계를 못 잡는다.
 
+// 이름 자동 축소 — 닉네임은 12자까지 쓸 수 있는데(lib/nickname.ts 의 NICK_MAX) 한글 12자면
+// 80px 에서 927px 이라 이름 상자(580px)를 훌쩍 넘어 「…」로 잘렸다.
+// ⛔ **증서에 남의 이름을 잘라서 내보내면 안 된다.** 그래서 폭에 맞춰 글자를 줄인다.
+// 하한 46 은 안전장치일 뿐 실제로는 안 닿는다 — 최악(대문자 12자 = 960px)이 48px 다.
+const NAME_MAX_PX = 80
+const NAME_MIN_PX = 44
+// ⚠️ 상자 폭을 꽉 채우게 두면 안 된다 — '들어가긴' 하지만 이름이 기둥 좌우선에 딱 붙어
+//    (한글 8자가 정확히 580px 다) 잘린 것처럼 보인다. 양쪽에 이만큼 숨통을 두고 잰다.
+const NAME_SIDE_GAP = 20
+// 광학 중심 — 80px 일 때의 상자 가운데(top 300 + 80/2). 크기가 줄어도 이 선을 붙잡는다.
+const NAME_CENTER_Y = 340
+
 // 증서 본문 서체 — 라틴은 Tinos(= Times New Roman 과 자폭까지 같은 폰트, `CariSerif` 로 cert.css 에 이미 등록),
 // 한글 이름만 Noto Serif KR(`CertSerifKR`)로 떨어진다. ⚠️ 순서를 뒤집지 말 것 — CertSerifKR 이 앞에 오면
 // 라틴 글자까지 그쪽에서 나와 시안(2026-08-28 레퍼런스)의 세리프와 자폭이 어긋난다.
@@ -170,22 +182,30 @@ const DEV_MILESTONES: Record<string, string> = {
 
 export default function LevelCert() {
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, lang } = useT()
   const { isFullUser, loading: authLoading } = useAuth()
   const [data, setData] = useState<LevelCertData | null>(null)
   const [state, setState] = useState<'load' | 'ok' | 'empty' | 'err'>('load')
   const stageRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const nameRef = useRef<HTMLDivElement>(null)
   // 배치 비교용 — 하나로 확정되면 이 스위치와 나머지 두 배치의 CSS 를 지운다.
   const layout = import.meta.env.DEV ? (new URLSearchParams(window.location.search).get('layout') || 'a') : 'a'
 
   useEffect(() => {
     if (authLoading) return
     if (import.meta.env.DEV) {
-      const lv = Number(new URLSearchParams(window.location.search).get('preview'))
+      const qs = new URLSearchParams(window.location.search)
+      const lv = Number(qs.get('preview'))
       if (Number.isInteger(lv) && lv >= 1 && lv <= 7) {
         // 토큰도 가짜로 넣어야 QR 이 그려진다(서버가 아직 안 내려준다 — testTypes 의 verifyToken 주석 참고).
-        setData({ displayName: '홍길동', level: lv, milestones: DEV_MILESTONES, verifyToken: 'preview-sample' })
+        // `&name=…` 은 긴 닉네임에서 이름이 어떻게 줄어드는지 눈으로 보려고 뚫어 둔 구멍이다(DEV 전용).
+        setData({
+          displayName: qs.get('name') || '홍길동',
+          level: lv,
+          milestones: DEV_MILESTONES,
+          verifyToken: 'preview-sample',
+        })
         setState('ok')
         return
       }
@@ -223,6 +243,44 @@ export default function LevelCert() {
     window.addEventListener('resize', fit)
     return () => window.removeEventListener('resize', fit)
   }, [state])
+
+  // 이름을 상자 폭에 맞춰 줄인다(위 NAME_* 주석 참고).
+  // ⚠️ 글자 수가 아니라 **잰 폭**으로 줄일 것 — 같은 12자라도 'Gildong Hong' 482px,
+  //    'WWWWWWWWWWWW' 960px 이다. 자수 구간표로 하면 후자가 그대로 잘린다.
+  // ⚠️ 줄이면 상자 윗선은 그대로인데 글자만 작아져 위로 뜬다 — top 을 같이 내려 광학 중심을 붙잡는다.
+  useEffect(() => {
+    const el = nameRef.current
+    if (state !== 'ok' || !el) return
+    let alive = true
+    const fitName = () => {
+      if (!alive || !el) return
+      // ⚠️ scrollWidth 로 재면 안 된다 — 글자가 상자보다 짧으면 **상자 폭**을 돌려줘서(580)
+      //    세 글자짜리 이름까지 줄어든다. 실제 글자 폭은 Range 로 잰다.
+      // ⚠️ 재는 동안 overflow 를 열어 둔다 — 안 그러면 긴 이름이 「…」로 잘린 뒤의 폭이 잡혀
+      //    "이미 딱 맞다"고 오판하고 그대로 잘린 채 남는다.
+      el.style.overflow = 'visible'
+      el.style.fontSize = `${NAME_MAX_PX}px`
+      // 인증서는 통째로 scale 되므로 화면 좌표를 배치 좌표(1448×900)로 되돌려야 한다.
+      const scale = el.clientWidth > 0 ? el.getBoundingClientRect().width / el.clientWidth : 1
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const need = range.getBoundingClientRect().width / (scale || 1)
+      el.style.overflow = ''
+      const room = el.clientWidth - NAME_SIDE_GAP * 2
+      const px =
+        room > 0 && need > room
+          ? Math.max(NAME_MIN_PX, Math.floor((NAME_MAX_PX * room) / need))
+          : NAME_MAX_PX
+      el.style.fontSize = `${px}px`
+      el.style.top = `${NAME_CENTER_Y - px / 2}px`
+    }
+    fitName()
+    // ⚠️ 웹폰트(CertSerifKR)가 늦게 오면 자폭이 달라진다 — 도착한 뒤 한 번 더 잰다.
+    document.fonts?.ready.then(fitName)
+    return () => {
+      alive = false
+    }
+  }, [state, data?.displayName, lang])
 
   if (state === 'load') {
     return <div className="lc-page"><p className="lc-msg">{t('common.loading')}</p></div>
@@ -273,7 +331,7 @@ export default function LevelCert() {
               사전에 담지 않은 이유 = 언어마다 줄바꿈 폭이 달라 아래 실측 y좌표가 통째로 어긋난다. */}
           <div className="lc-col">
             <img className="lc-certify" src="/cert/copy-certify.png" alt="This is to certify that" />
-            <div className="lc-name">{name}</div>
+            <div className="lc-name" ref={nameRef}>{name}</div>
             <img className="lc-body lc-body1" src="/cert/copy-requirements.png" alt="has successfully fulfilled the requirements for and" />
             <div className="lc-earned-row" aria-label={`earned the LEVEL ${level} certification.`}>
               <img className="lc-earned-copy" src="/cert/copy-earned.png" alt="" />
@@ -287,30 +345,33 @@ export default function LevelCert() {
             {/* 진위확인 QR — **금색 판 위에 어두운 모듈**. ⛔ 뒤집지 말 것(금색 모듈 / 검은 판).
                 시안이 반전 QR 이라 그대로 따라 그렸는데 **폰 카메라가 한 대도 못 읽었다**(2026-08-28
                 실측: OpenCV 디코더도 그림을 반전시켜야만 읽힌다). QR 규격은 '밝은 바탕 + 어두운 모듈'
-                이라 반전본은 읽어주는 리더가 있으면 운이 좋은 것이다. 증서에서 유일하게 밝은 면이라
-                눈에 띄지만, 안 읽히는 QR 은 장식일 뿐이다.
+                이라 반전본은 읽어주는 리더가 있으면 운이 좋은 것이다.
+                ⚠️ 판 색은 밝은 금(#e7c47e)에서 앤티크 골드(#c9a961)로 한 단 내렸다 — 대비 8:1 이라
+                   스캔은 그대로 되면서 밤하늘에서 덜 튄다. 더 내리면 싸구려 리더가 놓치기 시작한다.
                 ⚠️ 판 둘레의 여백(quiet zone)도 규격이다 — 4칸. 격자에 딱 맞춰 자르면 리더가
                    시작·끝을 못 잡는다. 그래서 viewBox 가 격자보다 8칸 크다.
                 ⛔ 토큰이 없으면 QR 을 그리지 않는다 — 죽은 /verify 주소를 찍어 두면 스캔한 사람이
                    '위조'라는 답을 받는다. */}
-            <div className="lc-qrbox">
-              {qr ? (
-                <svg
-                  className="lc-qr"
-                  viewBox={`0 0 ${qr.count + QR_QUIET * 2} ${qr.count + QR_QUIET * 2}`}
-                  role="img"
-                  aria-label="Verify authenticity"
-                >
-                  <rect x="0" y="0" width={qr.count + QR_QUIET * 2} height={qr.count + QR_QUIET * 2} fill="#e7c47e" />
-                  {qr.dark.map(([r, c], i) => (
-                    <rect key={i} x={c + QR_QUIET} y={r + QR_QUIET} width={1.02} height={1.02} fill="#0a1220" />
-                  ))}
-                </svg>
-              ) : (
-                <div className="lc-qr-wait" />
-              )}
+            <div className="lc-vbox">
+              <div className="lc-qrbox">
+                {qr ? (
+                  <svg
+                    className="lc-qr"
+                    viewBox={`0 0 ${qr.count + QR_QUIET * 2} ${qr.count + QR_QUIET * 2}`}
+                    role="img"
+                    aria-label="Verify authenticity"
+                  >
+                    <rect x="0" y="0" width={qr.count + QR_QUIET * 2} height={qr.count + QR_QUIET * 2} fill="#c9a961" />
+                    {qr.dark.map(([r, c], i) => (
+                      <rect key={i} x={c + QR_QUIET} y={r + QR_QUIET} width={1.02} height={1.02} fill="#0a1220" />
+                    ))}
+                  </svg>
+                ) : (
+                  <div className="lc-qr-wait" />
+                )}
+              </div>
+              <img className="lc-vcap" src="/cert/copy-verify.png" alt="Verify authenticity" />
             </div>
-            <img className="lc-vcap" src="/cert/copy-verify.png" alt="Verify authenticity" />
             {/* 봉인 — 기둥 맨 아래. ⛔ 아래 서명단 안으로 옮기지 말 것(levelcert.css 의 .lc-seal 주석 참고). */}
             <img className="lc-seal" src="/cert/seal.webp" alt="" />
           </div>
