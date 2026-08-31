@@ -203,9 +203,9 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   50개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+  functions/   51개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
-               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions·track-visit)
+               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions·track-visit·agree-terms)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
 tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 채운다 — **번역하는 건 이것뿐이라 꺼지면 번역이 안 된다.**
@@ -323,6 +323,17 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - ⚠️ 기간(7/30/90)을 바꾸면 **다시 불러온다**. 막대만 클라에서 자르면 추이는 7일인데 국가표는 90일인 화면이 된다.
   - 안 세는 것: 관리자 경로(`/admin*`) · 개발 서버(localhost) · 봇 UA. 보존기간 크론은 없다(정리는 마이그레이션 머리 주석의 `delete … where day < current_date - 400`).
   - 배포: 마이그레이션 적용 + `npx.cmd supabase functions deploy track-visit admin` (**둘 다 플래그 없이** — anon 키가 실려 오므로 공개 예외가 필요 없다). 프론트는 `master` push. 검증 = `tests/db/t-visit-stats.mjs`(27건).
+- **약관·연령 동의 게이트 (2026-08-31 · `20260831160000`)** — 만 14세 미만 아동의 개인정보는 법정대리인 동의 없이 처리할 수 없는데(개인정보보호법 §22-2) 우리는 구글 로그인 하나뿐이라 나이를 알 방법이 없었다. **법정대리인 동의 절차를 만드는 대신 가입 연령을 제한**하고, 로그인 직후 게이트에서 체크 한 줄(만 14세 이상 + 약관·방침 동의)로 받는다. 게이트 순서는 **탈퇴 → 동의 → 닉네임 → 지역**.
+  - ⛔ **동의가 닉네임보다 앞이다.** 뒤에 두면 동의를 받기 전에 닉네임(개인정보)을 저장하게 된다.
+  - ⛔ **이 화면을 로그인 전으로 옮기지 말 것.** ① 동의는 "누가 언제"가 계정에 남아야 하는데 로그인 전엔 계정이 없다(브라우저에 저장하면 그 기기에만 남는다) ② 이미 세션이 있는 기존 회원은 로그인 버튼을 안 거친다. 옮기면 이 게이트가 없어지는 게 아니라 **하나 더 얹혀** 신규 회원이 두 번 동의한다. 로그인 화면에는 **고지 한 줄**(`login.age_notice`)만 둔다. ⚠️ "진입점이 흩어져 있어서"는 이유가 아니다 — 버튼은 여럿이어도 전부 `loginWithGoogle()` 하나를 부른다.
+  - ⛔ **나가는 문(로그아웃)이 반드시 있어야 한다.** 전 경로를 막는 게이트라 없으면 동의 안 한 사람이 로그인한 채 갇힌다. 예외 경로도 같은 이유다 — 동의 화면 자신·`/login`·`/auth/callback`(무한 루프) · **`/terms`·`/privacy`**(동의하라면서 그 문서를 못 읽게 할 수 없다) · `/verify`(남이 여는 공개 화면) · **`/exam/run`**(응시 중 새로고침에 끼어들면 시험이 끊긴다 — 동의는 시험 끝나고 받는다).
+  - ⛔ **동의를 안 했다고 계정을 지우지 않는다.** 실수로 나간 사람과, 결제·자격증 이력이 있는 기존 회원이 다친다(결제 원장은 법정 보존). 동의 전에는 서비스를 못 쓰는 것으로 충분하다.
+  - ⛔ **`profiles.terms_agreed_at` 을 `grant update (…)` 목록에 넣지 말 것.** profiles 는 화이트리스트 방식이라 새 컬럼은 자동으로 service role 전용이고, `agree-terms` 함수만 쓴다. 목록에 넣는 순간 브라우저가 체크박스를 안 누르고도 자기 동의를 써넣을 수 있다.
+  - ⚠️ **버전 문자열이 sync 페어다** — `src/lib/consent.ts` 의 `TERMS_VERSION` ↔ `functions/agree-terms` 의 같은 상수. 약관을 고치면 둘 다 올려야 재동의가 걸린다. **한쪽만 올리면 전원이 매번 다시 동의하거나(화면만) 아무도 안 물어본다(서버만)** — 둘 다 화면에 오류가 안 뜬다. 검증 = `tests/consent-version.mjs`(15건, `test:db` 포함).
+  - ⚠️ 동의 여부는 `AuthProvider` 가 **따로 한 번 더 조회**한다. 기존 select 에 끼워 넣으면 컬럼이 없는 배포본에서 쿼리가 통째로 실패해 닉네임·지역 게이트까지 fail-open 된다.
+  - ⚠️ 게스트(익명)에게는 안 뜬다 — 개인정보를 안 남기기 때문이고, 구글로 이관하는 순간 대상이 된다.
+  - 문서: 약관 제4조에 가입 연령 조항, 개인정보처리방침 **제6조(만 14세 미만 아동의 개인정보)** 신설(뒤 조항 번호가 한 칸씩 밀렸다).
+  - 배포: 마이그레이션 + `npx.cmd supabase functions deploy agree-terms`(플래그 없이) + 프론트 push.
 - **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
 - **허브 캐릭터 업로드 (2026-08-31 · `20260831140000`)** — 관리자 › WORLD ARENA › 꾸미기 관리 › **캐릭터 업로드**. 캐릭터를 늘리는 데 **배포가 필요 없다**(2026-08-20 의 "그림은 코드, 가격은 DB" 선을 캐릭터에서만 옮긴 것 — 캐릭터가 가진 수치는 비율 하나뿐이라 그림에서 재면 되기 때문이다. 스킨은 9패치 값 15줄이 그림과 같이 와야 해서 여전히 배포다).
   - ⛔ **시트를 자르는 건 여전히 `tools/build-char-art.mjs` 다.** 올리는 건 **완제품 lv1~7** 이다. 흰 배경 빼기·Lv.7 후광 역산은 판단이 섞인 일이고(배경 뺀 시트를 사람이 따로 넣는다) Deno 엣지에는 그 이미지 처리기가 아예 없다.
@@ -336,6 +347,14 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - ⚠️ **미리보기는 기본 스킨(초원) 하나로 고정**한다. 썸네일만 봐서는 크기를 못 읽는다(레벨마다 캔버스 안 크기가 다르고 Lv.7 이 크다) — 배경 위에 올려야 판단이 된다. 스킨마다 발끝 높이가 달라 여러 개를 보여주면 "어느 게 맞냐"가 된다.
   - ⚠️ **보유·착용 목록(`cosmeticOwners`)은 착용을 두 자리에서 모은다** — 캐릭터는 `user_characters.base_key`, 파츠는 같은 행의 `equipped` 안. 한쪽만 보면 "보유 12명 / 착용 0명" 같은 거짓말이 나온다. **산 기록 없이 입고 있는 사람**도 세운다(첫 캐릭터는 공짜라 `user_cosmetics` 에 안 남는다) — 빼면 "착용 30명인데 목록엔 2명"이 된다.
   - ⚠️ 조회는 `charArtSrc` 가 렌더 중에 불리는 **동기 함수**라(공유 카드처럼 훅을 못 쓰는 자리도 부른다) 모듈이 한 번 받아 들고 있고, 도착하면 `<CharArt>` 가 구독으로 다시 그린다. 안 알리면 이미 그려진 화면이 폴백인 채로 남는다.
+  - **수정·삭제**: 드롭다운에서 기존 캐릭터를 고르면 이름·가격·그림이 폼에 채워진다 — 원하는 레벨만 다시 올려 저장하면 되고, 키가 그대로라 **산 사람·입고 있는 사람 기록이 안 깨진다**. 레벨 한 장은 `비우기`, 캐릭터 전체는 `삭제`.
+    - ⛔ **가진 사람이 하나라도 있으면 삭제를 막는다**(`charArtDelete` 가 409). 키가 사라지면 그 사람의 보유·착용 기록이 이름도 그림도 없는 유령이 된다 — 그 경우는 '상점에서 숨김'이 맞다.
+    - ⛔ **올릴 때 투명 여백을 잘라낸다**(`20260831170000`). 화면은 그림 맨 아래를 지면에 붙이는데(`object-position: 50% 100%`) 그 맨 아래가 발끝이 아니라 빈 공간이면 캐릭터가 **공중에 뜬다** — 실측에서 올라온 그림이 발밑에 12~24%를 달고 있었다. 잘라내는 건 계산이라 사람에게 맡기지 않는다. ⚠️ 알파가 없는 그림(흰 배경)은 자를 경계가 없어 원본 그대로 올린다.
+    - ⛔ **자르면 7장이 전부 같은 키가 된다 → 그래서 `scales`(레벨별 배율)가 한 벌이다.** 업로드가 "원본에서 인물이 캔버스의 몇 %였나"를 재서 **제일 큰 레벨을 1.0 으로** 환산해 초기값을 넣고, 관리자가 슬라이더로 조정한다. 이 환산을 빼면 '레벨이 오르면 커진다'가 통째로 사라진다.
+    - ⛔ **배율은 캐릭터당이 아니라 레벨당이다.** 캐릭터당 하나로는 "Lv.7 만 작다"를 못 고친다(전부 같이 커진다). 처음에 그렇게 만들려다 되돌렸다. 최종 키 = `--skin-char-h × --char-scale` 이고, **발끝 위치는 여전히 스킨 것**이다(배경마다 지평선이 달라 캐릭터 속성이 될 수 없다).
+    - ⚠️ **관리자 미리보기와 허브가 같은 배율을 써야 한다** — 미리보기만 다르게 그리면 맞춰 놓은 크기가 실제 화면에서 달라진다. `/hub` 와 `/room/:handle` 둘 다 `--char-scale` 을 건다(한쪽만 걸면 내 허브와 남이 보는 내 방의 키가 다르다).
+    - ⚠️ **비율은 그림을 올릴 때마다 다시 잰다.** '없을 때만' 재면 기존 캐릭터를 통째로 갈아끼웠을 때 옛 비율이 남아 허브에서 캐릭터가 눌리거나 늘어난다(값이 화면에 안 보여 알아채기도 어렵다).
+    - ⚠️ **이미 열려 있는 사용자 탭은 새로고침해야 바뀐다** — 캐릭터 표를 세션당 한 번만 읽기 때문이다. 새로 들어오는 사람은 즉시 반영된다.
   - 배포: 마이그레이션 + **`supabase/storage-buckets.sql` 의 `hub-char` 블록 실행**(⛔ 버킷을 안 만들면 업로드가 통째로 `Bucket not found` — `avatars` 가 그래서 몇 달 죽어 있었다) + `npx.cmd supabase functions deploy admin` + 프론트 push.
 - **캐릭터(아바타)**: `profiles.avatar_url` 한 컬럼에 `gem:#hex`(젬 색) 또는 `img:<public-url>`(업로드 이미지) 저장. 그 외 값/NULL(구글 가입 URL 등)은 무시하고 시드 젬으로 표시. 해석·팔레트·업로드는 `src/lib/avatar.ts`(`parseAvatar`/`uploadAvatar`), 렌더는 `<Avatar>`(`GemAvatar.tsx`).
   - ⚠️ **아바타를 %크기 소켓에 넣을 땐 `aspect-ratio: 1 !important` 를 반드시 같이 걸 것 — 안 그러면 달걀이 된다.** `<Avatar>` 는 인라인 style 로 px 크기 + `border-radius:50%` 를 박기 때문에, `width/height:100%` 만 덮어쓰면 퍼센트 높이가 auto 로 떨어지는 순간 박스가 세로로 눌려 **원이 타원**이 된다. 반복해서 재발한 버그다(시상대 → 티어바). `ranking.css` 의 '아바타 달걀 방지' 블록에 소켓 선택자를 **모아서** 관리한다 — 소켓을 새로 만들면 그 블록에 선택자만 추가하고, 소켓마다 규칙을 따로 쓰지 말 것. 업로드는 Supabase Storage **공개 버킷 `avatars`**(경로 `<uid>/...`, RLS=본인 폴더만). 리더보드도 이미지/색을 반환하므로 변경 시 `leaderboard` 함수 재배포 필요.

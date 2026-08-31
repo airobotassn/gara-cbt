@@ -29,7 +29,7 @@ import { countryName, flagUrl } from '../lib/regions'
 import { tierName } from '../lib/caris'
 import { rememberPostLogin } from '../lib/postLogin'
 import {
-  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName,
+  CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName, charScale,
   DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
 } from '../lib/hubCosmetics'
 import { lastLook, saveLook } from '../lib/lastLook'
@@ -852,7 +852,7 @@ export default function Hub() {
              칸(위치·키)은 그대로 `.hub-scene-char` 가 잡고 그림만 그 안을 채운다. */}
       <div className="hub-scene" aria-hidden="true">
         <div className="hub-scene-bg" />
-        <div className="hub-scene-char">
+        <div className="hub-scene-char" style={{ '--char-scale': charScale(charKey, arenaLv) } as CSSProperties}>
           {/* 캐릭터 레벨 = ARENA 레벨(시즌 총점 밴드, 1~7). 점수가 오르면 무대 위 캐릭터가 그대로 자란다.
               ⚠️ 시험 사다리 등급(user_progress.rank)이 아니다 — 둘 다 1~7 이라 헷갈리기 쉽다. */}
           <CharArt charKey={charKey} level={arenaLv} className="hub-scene-char-img" />

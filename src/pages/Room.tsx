@@ -6,7 +6,7 @@
 // ⚠️ 방 그림은 /hub 와 **같은 컴포넌트(RoomView)** 다. 여기서 따로 그리면
 //    내 방과 남이 보는 내 방이 갈리고, 그 차이는 배치를 바꿔봐야 드러나 제일 늦게 발견된다.
 // ⚠️ 루트에 `.hub` 클래스가 필요하다 — hub.css 의 모든 선택자가 `.hub` 아래로 스코프돼 있다.
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import '../styles/hub.css'
 import { callFunction } from '../lib/supabase'
@@ -16,7 +16,7 @@ import { tierName } from '../lib/caris'
 import { Avatar } from '../components/GemAvatar'
 import CharArt from '../components/CharArt'
 import { roomUrl } from '../lib/room'
-import { skinByPart } from '../lib/hubCosmetics'
+import { skinByPart, charScale } from '../lib/hubCosmetics'
 import { arenaLevelForScore } from '../lib/scoring'
 
 interface RoomResp {
@@ -91,7 +91,11 @@ export default function Room() {
       {skin && (
         <div className="hub-scene" aria-hidden="true">
           <div className="hub-scene-bg" />
-          <div className="hub-scene-char">
+          {/* ⚠️ 크기 배율도 허브와 **같이** 걸어야 한다 — 빼면 내 허브와 남이 보는 내 방의 캐릭터 키가 달라진다. */}
+          <div
+            className="hub-scene-char"
+            style={{ '--char-scale': charScale(data?.character ?? null, arenaLevelForScore(data?.seasonTotal ?? 0)) } as CSSProperties}
+          >
             {/* 레벨은 시즌 총점에서 파생한다 — 허브가 자기 화면에 쓰는 것과 같은 함수라
                 내 허브와 남이 보는 내 방의 캐릭터가 어긋나지 않는다. */}
             <CharArt charKey={data?.character ?? null} level={arenaLevelForScore(data?.seasonTotal ?? 0)} className="hub-scene-char-img" />

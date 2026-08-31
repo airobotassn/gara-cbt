@@ -9,6 +9,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { needsConsent } from '../lib/consent'
 
 interface AuthState {
   session: Session | null
@@ -38,6 +39,12 @@ interface AuthState {
   needsNickname: boolean
   // 닉네임 설정 성공 직후 호출(markOnboardingDone 과 같은 이유 — 안 하면 목적지에서 다시 튕긴다).
   markNicknameDone: () => void
+  // 약관 동의 게이트: 정식 회원이 아직 동의하지 않았으면 true(전 경로에서 강제).
+  //   만 14세 미만 아동의 개인정보는 법정대리인 동의 없이 처리할 수 없는데(개인정보보호법 §22-2)
+  //   우리는 구글 로그인뿐이라 나이를 알 방법이 없다 → 가입 연령을 본인이 확인하는 체크 한 줄로 받는다.
+  needsTerms: boolean
+  // 동의 성공 직후 호출(markNicknameDone 과 같은 이유).
+  markTermsDone: () => void
   // 탈퇴(soft delete) 게이트: 탈퇴 신청 시각. null 이면 정상 계정.
   //   ⛔ 재로그인만으로 자동 복구하지 않는다 — 복구 화면에서 사람이 눌러야 풀린다.
   //     (옛 코드는 SIGNED_IN 에서 조용히 UPDATE 했는데, 구글 복귀는 새 페이지 로드라 리스너가
@@ -72,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [onboardingLoading, setOnboardingLoading] = useState(false)
   const [needsNickname, setNeedsNickname] = useState(false)
+  const [needsTerms, setNeedsTerms] = useState(false)
   const [deactivatedAt, setDeactivatedAt] = useState<string | null>(null)
   const [profile, setProfile] = useState<{ countryCode: string | null; regionCode: string | null } | null>(null)
 
@@ -85,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!u || !computeIsFullUser(u)) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
+        setNeedsTerms(false)
         setDeactivatedAt(null)
         setProfile(null)
         setOnboardingLoading(false)
@@ -100,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         setNeedsOnboarding(false)
         setNeedsNickname(false)
+        setNeedsTerms(false)
         setDeactivatedAt(null)
         setProfile(null)
         setOnboardingLoading(false)
@@ -119,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNeedsOnboarding(data == null ? true : data.region_locked_at == null || data.age_band == null)
       // 닉네임은 '확정 시각'으로만 판정한다 — display_name 에는 가입 트리거가 넣은 구글 실명이 들어 있다.
       setNeedsNickname(data == null ? true : data.nickname_set_at == null)
+      // ⚠️ **위 select 에 끼워 넣지 말 것.** 컬럼이 아직 없는 배포본에서는 쿼리 하나가 통째로 실패해
+      //    닉네임·지역 게이트까지 같이 fail-open 된다. 따로 읽으면 못 읽어도 이 게이트만 꺼진다.
+      const { data: tData, error: tErr } = await supabase
+        .from('profiles').select('terms_agreed_at, terms_version').eq('id', u.id).maybeSingle()
+      const tRow = tData as { terms_agreed_at: string | null; terms_version: string | null } | null
+      setNeedsTerms(tErr ? false : tRow == null ? true : needsConsent(tRow.terms_agreed_at, tRow.terms_version))
       setOnboardingLoading(false)
     }
     supabase.auth.getSession().then(({ data }) => {
@@ -217,6 +233,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsNickname(false)
   }, [])
 
+  // 동의가 저장됐다 = 서버 기준 확정. 재조회 없이 낙관적으로 해제.
+  const markTermsDone = useCallback(() => {
+    setNeedsTerms(false)
+  }, [])
+
   // restore_account RPC 가 성공했다 = 서버 기준 복구 완료.
   //   ⚠️ nicknameReset 이면 닉네임 게이트가 이어서 떠야 한다 — 탈퇴한 사이 남이 그 닉네임을
   //     가져가면 RPC 가 nickname_set_at 을 비우고 계정을 살리기 때문이다.
@@ -244,6 +265,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       markOnboardingDone,
       needsNickname,
       markNicknameDone,
+      needsTerms,
+      markTermsDone,
       deactivatedAt,
       markRestored,
       profile,
@@ -260,10 +283,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       needsOnboarding,
       onboardingLoading,
       needsNickname,
+      needsTerms,
       deactivatedAt,
       profile,
       markOnboardingDone,
       markNicknameDone,
+      markTermsDone,
       markRestored,
       applyRegion,
       ensureAnonymous,

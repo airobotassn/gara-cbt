@@ -118,7 +118,14 @@ export const clampCharLevel = (lv: number | null | undefined): number =>
  *    (공유 카드처럼 훅을 못 쓰는 자리도 부른다) 여기서 await 할 수가 없다.
  * ⚠️ 도착하면 구독자에게 알린다. 안 알리면 이미 그려진 화면이 폴백 그림인 채로 남는다.
  */
-interface CharArtRow { ar: number | null; urls: Record<string, string> ; nameKo: string; nameI18n: Record<string, string> }
+interface CharArtRow {
+  ar: number | null
+  urls: Record<string, string>
+  nameKo: string
+  nameI18n: Record<string, string>
+  /** 레벨(문자열 '1'~'7') → 크기 배율. 없는 레벨은 1. */
+  scales: Record<string, number>
+}
 let CHAR_ART: Record<string, CharArtRow> = {}
 const artSubs = new Set<() => void>()
 let artVersion = 0
@@ -135,7 +142,7 @@ export function loadCharArt(): Promise<void> {
   if (!artLoading) {
     artLoading = (async () => {
       try {
-        const { data } = await supabase.from('hub_char_art').select('part_key, ar, urls, name_ko, name_i18n')
+        const { data } = await supabase.from('hub_char_art').select('part_key, ar, urls, name_ko, name_i18n, scales')
         const next: Record<string, CharArtRow> = {}
         for (const r of (data ?? []) as Record<string, unknown>[]) {
           next[String(r.part_key)] = {
@@ -143,6 +150,7 @@ export function loadCharArt(): Promise<void> {
             urls: (r.urls ?? {}) as Record<string, string>,
             nameKo: (r.name_ko as string) ?? '',
             nameI18n: (r.name_i18n ?? {}) as Record<string, string>,
+            scales: (r.scales ?? {}) as Record<string, number>,
           }
         }
         CHAR_ART = next
@@ -173,6 +181,18 @@ export function charArtName(key: string, lang: string): string | null {
  */
 export const charArtSrc = (key: string, level: number) =>
   CHAR_ART[key]?.urls[String(clampCharLevel(level))] ?? `/hub/char/${key}/lv${clampCharLevel(level)}.webp`
+
+/**
+ * 무대에서 이 레벨이 기본 키의 몇 배로 설 것인가 (`hub.css` 의 `--char-scale`).
+ *
+ * 왜 필요한가: 업로드된 그림은 **투명 여백까지 잘라서** 올라오므로 그대로 두면 7장이 전부 같은 키가
+ * 된다(레벨이 올라도 안 커진다). 원본에서 인물이 캔버스의 몇 %를 차지했는지를 업로드가 배율로
+ * 옮겨 담고, 관리자가 거기서부터 조정한다.
+ * ⚠️ 값이 없으면 1 — 그래서 표에 행이 없는 옛 캐릭터는 예전 그대로 그려진다.
+ * ⛔ 이 값으로 발끝 위치를 대신하려 들지 말 것. 그건 배경마다 다른 값이라 스킨이 갖는다.
+ */
+export const charScale = (key: string | null | undefined, level: number): number =>
+  (key ? CHAR_ART[key]?.scales?.[String(clampCharLevel(level))] : undefined) ?? 1
 export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? CHAR_FALLBACK_AR
 
 // ── 스킨 ────────────────────────────────────────────────────────────────────

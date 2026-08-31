@@ -53,6 +53,11 @@ export default function Login() {
             <p className="mt-5 text-xs sm:text-sm text-outline leading-relaxed break-keep max-w-lg">
               {t('login.consent')}
             </p>
+            {/* 가입 연령 고지 — 들어오기 전에 알아야 헛걸음이 없다. 실제 판정은 로그인 뒤 동의 게이트가 한다
+                (로그인 버튼이 허브·데일리·시험·이북에도 흩어져 있어 여기서 막으면 구멍이 난다). */}
+            <p className="mt-2 text-xs sm:text-sm text-outline leading-relaxed break-keep max-w-lg">
+              {t('login.age_notice')}
+            </p>
           </div>
         </div>
         {/* Footer Links (Desktop) */}

@@ -637,23 +637,24 @@ async function cosmeticOwners(admin: any, body: any) {
 async function charArtList(admin: any) {
   const [cat, art] = await Promise.all([
     admin.from('shop_catalog').select('part_key, price, kind, active, sort_order').eq('kind', 'character'),
-    admin.from('hub_char_art').select('part_key, ar, urls, name_ko, name_i18n, updated_at'),
+    admin.from('hub_char_art').select('part_key, ar, urls, name_ko, name_i18n, scales, updated_at'),
   ])
   const byKey = new Map<string, any>()
   for (const r of (cat.data ?? []) as any[]) {
     byKey.set(r.part_key, {
       partKey: r.part_key, price: r.price ?? 0, active: r.active !== false,
-      sortOrder: r.sort_order ?? 0, ar: null, urls: {}, nameKo: '', uploaded: 0, updatedAt: null,
+      sortOrder: r.sort_order ?? 0, ar: null, urls: {}, nameKo: '', scales: {}, uploaded: 0, updatedAt: null,
     })
   }
   for (const a of (art.data ?? []) as any[]) {
     // ⚠️ 상점 행이 아직 없는 키도 줄을 세운다 — 그림만 올리고 값을 안 정한 상태가 실제로 생긴다.
     const row = byKey.get(a.part_key) ?? {
-      partKey: a.part_key, price: 0, active: false, sortOrder: 0, ar: null, urls: {}, nameKo: '', uploaded: 0, updatedAt: null,
+      partKey: a.part_key, price: 0, active: false, sortOrder: 0, ar: null, urls: {}, nameKo: '', scales: {}, uploaded: 0, updatedAt: null,
     }
     row.ar = a.ar === null || a.ar === undefined ? null : Number(a.ar)
     row.urls = (a.urls ?? {}) as Record<string, string>
     row.nameKo = a.name_ko ?? ''
+    row.scales = (a.scales ?? {}) as Record<string, number>
     row.uploaded = Object.keys(row.urls).length
     row.updatedAt = a.updated_at ?? null
     byKey.set(a.part_key, row)
@@ -714,6 +715,17 @@ async function charArtSave(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
       : Math.max(-1, ...((cur ?? []) as any[]).map((r) => r.sort_order ?? 0)) + 1
   }
 
+  // 레벨별 크기 배율 — 범위 밖은 거절한다. 0.01 이나 50 이 들어가면 캐릭터가 사라지거나 화면을 덮는다.
+  //   ⚠️ 1 인 레벨은 담지 않는다. 기본값이 1 이라 담아봐야 같은 뜻이고, 담으면 표만 커진다.
+  const scalesIn = (body?.scales ?? {}) as Record<string, unknown>
+  const scales: Record<string, number> = {}
+  for (let lv = 1; lv <= 7; lv++) {
+    const v = Number(scalesIn[String(lv)])
+    if (!Number.isFinite(v)) continue
+    if (v < 0.4 || v > 2) return json({ error: `Lv.${lv} 크기는 0.4 ~ 2.0 사이여야 합니다.` }, 400)
+    if (Math.abs(v - 1) > 0.0001) scales[String(lv)] = Number(v.toFixed(3))
+  }
+
   const arRaw = body?.ar
   const ar = arRaw === null || arRaw === undefined || arRaw === '' ? null : Number(arRaw)
   if (ar !== null && (!Number.isFinite(ar) || ar <= 0 || ar > 10)) return json({ error: '비율 값이 이상합니다.' }, 400)
@@ -738,7 +750,7 @@ async function charArtSave(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
   }
 
   const { error: artErr } = await admin.from('hub_char_art').upsert({
-    part_key: partKey, ar, urls, name_ko: nameKo, name_i18n: nameI18n, updated_at: new Date().toISOString(),
+    part_key: partKey, ar, urls, name_ko: nameKo, name_i18n: nameI18n, scales, updated_at: new Date().toISOString(),
   }, { onConflict: 'part_key' })
   if (artErr) return json({ error: artErr.message }, 500)
 
@@ -749,6 +761,44 @@ async function charArtSave(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
 
   await audit(admin, ctx, 'charArtSave', partKey, { nameKo, price, active, levels: Object.keys(urls).length })
   return json({ ok: true, partKey, translated: Object.keys(nameI18n).length })
+}
+
+/**
+ * 캐릭터 한 종 삭제 — 표 두 행 + 올린 그림 파일까지 지운다.
+ *
+ * ⛔ **가진 사람이 하나라도 있으면 지우지 않는다.** 키가 사라지면 그 사람의 보유·착용 기록이
+ *    이름도 그림도 없는 유령이 된다("돈 낸 물건을 뺏지 않는다"와 같은 자리다).
+ *    그 경우엔 삭제가 아니라 **상점에서 숨김**이 맞고, 화면이 그렇게 안내한다.
+ * ⚠️ 파일은 마지막에 지운다. 먼저 지우면 표가 남았는데 그림만 없는 상태가 생긴다.
+ *    파일 삭제가 실패해도 본 작업은 성공으로 친다 — 남는 건 아무도 안 부르는 파일뿐이다.
+ */
+async function charArtDelete(admin: any, body: any, ctx: Ctx) {
+  const partKey = String(body?.partKey ?? '')
+  if (!CHAR_KEY_RE.test(partKey)) return json({ error: '캐릭터 키가 올바르지 않습니다.' }, 400)
+
+  const [own, chars] = await Promise.all([
+    admin.from('user_cosmetics').select('user_id').eq('part_key', partKey).limit(1),
+    admin.from('user_characters').select('user_id, base_key, equipped').eq('base_key', partKey).limit(1),
+  ])
+  const owners = (own.data ?? []).length
+  const worn = (chars.data ?? []).length
+  if (owners || worn) {
+    return json({ error: '이미 가지고 있는 회원이 있어 지울 수 없습니다. 상점에서 숨김으로 내려 주세요.' }, 409)
+  }
+
+  const { error: aErr } = await admin.from('hub_char_art').delete().eq('part_key', partKey)
+  if (aErr) return json({ error: aErr.message }, 500)
+  const { error: sErr } = await admin.from('shop_catalog').delete().eq('part_key', partKey)
+  if (sErr) return json({ error: sErr.message }, 500)
+
+  try {
+    const { data: files } = await admin.storage.from(CHAR_BUCKET).list(partKey)
+    const paths = (files ?? []).map((f: any) => `${partKey}/${f.name}`)
+    if (paths.length) await admin.storage.from(CHAR_BUCKET).remove(paths)
+  } catch { /* 남은 파일은 아무도 안 부른다 */ }
+
+  await audit(admin, ctx, 'charArtDelete', partKey, {})
+  return json({ ok: true })
 }
 
 // ── 방문 통계 ────────────────────────────────────────────────
@@ -1124,6 +1174,7 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'charArtUploadUrl': return await charArtUploadUrl(admin, body)
     case 'charArtSave': return await charArtSave(admin, body, ctx, deps)
     case 'cosmeticOwners': return await cosmeticOwners(admin, body)
+    case 'charArtDelete': return await charArtDelete(admin, body, ctx)
     case 'minigameStats': return await minigameStats(admin, body)
     case 'dailyStats': return await dailyStats(admin, body)
     case 'homeStats': return await homeStats(admin)

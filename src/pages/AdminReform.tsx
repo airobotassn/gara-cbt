@@ -2211,11 +2211,56 @@ const CHAR_UP_LEVELS = [1, 2, 3, 4, 5, 6, 7]
 interface CharArtRow {
   partKey: string; price: number; active: boolean; sortOrder: number
   ar: number | null; urls: Record<string, string>; nameKo: string; uploaded: number; updatedAt: string | null
+  /** 레벨('1'~'7') → 크기 배율. 없는 레벨은 1. */
+  scales: Record<string, number>
+}
+
+/**
+ * 미리보기 한 장. 파일이 없으면(404) 깨진 아이콘 대신 안내 글로 바뀐다.
+ * ⚠️ `scale` 은 허브의 `--char-scale` 과 **같은 뜻**이어야 한다 — 여기만 다르게 그리면 관리자가
+ *    맞춰 놓은 크기가 실제 화면에서 다르게 나온다.
+ */
+function PreviewArt({ src, lv, scale = 1 }: { src: string | null; lv: number; scale?: number }) {
+  const [bad, setBad] = useState(false)
+  if (!src || bad) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+        color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', fontSize: 'var(--fs-sm)', fontWeight: 700,
+      }}>
+        Lv.{lv} 그림 없음 — 아래에서 올리면 여기 바로 보입니다
+      </div>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt={'Lv.' + lv}
+      onError={() => setBad(true)}
+      style={{
+        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+        bottom: '18%', height: `${(62 * scale).toFixed(1)}%`, objectFit: 'contain',
+        objectPosition: '50% 100%', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,.35))',
+      }}
+    />
+  )
 }
 
 function CharArtAdmin({ items, loading, err, reload, onSaved }: {
   items: CharArtRow[]; loading: boolean; err: string; reload: () => Promise<void> | void; onSaved: () => void
 }) {
+  const { t } = useT()
+  // ⚠️ 이름이 없으면 **사전 이름**으로 떨어진다. 키를 화면에서 뺐기 때문에(2026-08-31 지시)
+  //    이 폴백이 없으면 옛 캐릭터 6종이 전부 '(이름 없음)' 한 줄로 보여 고를 수가 없다.
+  const charLabel = (key: string, nameKo: string) => {
+    if (nameKo) return nameKo
+    const d = t(`hub.part.${key}`)
+    return d === `hub.part.${key}` ? '(이름 없음)' : d
+  }
+  // 올린 그림이 없으면 예전 파일 경로 — 허브가 실제로 그리는 그림과 같은 규칙이다.
+  //   ⚠️ 이게 없으면 옛 캐릭터를 골랐을 때 그림이 있는데도 미리보기가 '없음'으로 떠서, 관리자가
+  //      "그림이 사라졌다"고 오해한다.
+  const artOf = (lv: number) => urls[String(lv)] ?? (partKey ? `/hub/char/${partKey}/lv${lv}.webp` : null)
   // ⛔ **키는 화면에 없다**(2026-08-31 지시). 서버가 정하고(`nextCharKey`) 여기서는 숨겨 들고만 있는다 —
   //    관리자에게 `char_003` 은 아무 뜻도 없는 글자고, 한글 이름은 스토리지 경로가 못 된다(ASCII 만 받는다).
   //    새 캐릭터는 첫 업로드 때 서버가 키를 만들어 돌려주고, 그림 없이 저장하면 저장할 때 만든다.
@@ -2226,6 +2271,11 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
   const [active, setActive] = useState(true)
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [ar, setAr] = useState<number | null>(null)
+  // 레벨별 크기 배율. 없는 레벨은 1 이다(서버도 1 은 안 담는다).
+  const [scales, setScales] = useState<Record<string, number>>({})
+  // 방금 올린 그림에서 잰 '원본에서 인물이 차지하던 높이 비율'. 저장 때 배율 초기값으로 환산한다.
+  //   ⚠️ 이미 손으로 정한 배율은 덮지 않는다 — 사람이 맞춘 값을 기계가 되돌리면 안 된다.
+  const [rawFill, setRawFill] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
   const [pvLevel, setPvLevel] = useState(1) // 미리보기에서 보고 있는 레벨
@@ -2236,42 +2286,113 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
   function pick(key: string) {
     setSel(key); setMsg(''); setNewKey('')
     const row = items.find((i) => i.partKey === key)
-    setNameKo(row?.nameKo ?? '')
+    setNameKo(key ? charLabel(key, row?.nameKo ?? '').replace('(이름 없음)', '') : '')
     setPrice(row?.price ?? 0)
     setActive(row?.active ?? true)
     setUrls(row?.urls ?? {})
     setAr(row?.ar ?? null)
+    setScales(row?.scales ?? {})
+    setRawFill({})
   }
 
-  /** 그림 한 장 올리기 — 서명 URL 받기 → 그 토큰으로 올리기 → 공개 주소를 폼에 꽂기. */
+  /** 이 레벨의 크기 배율(안 정했으면 1). */
+  const scaleOf = (lv: number) => scales[String(lv)] ?? 1
+
+  /**
+   * 올리기 전에 **투명 여백을 잘라낸다.**
+   *
+   * 왜: 화면은 그림 맨 아래를 지면에 붙이는데(`object-position: 50% 100%`), 그 맨 아래가 발끝이 아니라
+   * 빈 공간이면 캐릭터가 그만큼 **공중에 뜬다**. 실측에서 올라온 그림들이 발밑에 12~24%를 달고 있었다.
+   *   ⚠️ 자르면 7장이 전부 칸을 꽉 채워 **같은 키**가 된다 → 그래서 원본에서 인물이 캔버스의 몇 %를
+   *      차지했는지를 같이 돌려주고, 그 값이 레벨별 크기 배율의 초기값이 된다(안 그러면 '자란다'가 사라진다).
+   *   ⚠️ 알파가 없는 그림(흰 배경 JPG 등)은 잘라낼 경계가 없어 **원본 그대로** 올린다.
+   */
+  async function trimTransparent(file: File): Promise<{ blob: Blob; fill: number } | null> {
+    try {
+      const bmp = await createImageBitmap(file)
+      const cv = document.createElement('canvas')
+      cv.width = bmp.width; cv.height = bmp.height
+      const ctx = cv.getContext('2d', { willReadFrequently: true })
+      if (!ctx) { bmp.close(); return null }
+      ctx.drawImage(bmp, 0, 0)
+      const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data
+      let top = -1, bot = -1, left = -1, right = -1
+      for (let y = 0; y < bmp.height; y++) {
+        for (let x = 0; x < bmp.width; x++) {
+          if (px[(y * bmp.width + x) * 4 + 3] <= 12) continue
+          if (top < 0) top = y
+          bot = y
+          if (left < 0 || x < left) left = x
+          if (x > right) right = x
+        }
+      }
+      // 알파 경계가 없다(전부 불투명) → 자를 게 없다. 원본을 그대로 쓴다.
+      if (top < 0 || (top === 0 && left === 0 && bot === bmp.height - 1 && right === bmp.width - 1)) {
+        bmp.close()
+        return null
+      }
+      const w = right - left + 1, h = bot - top + 1
+      const out = document.createElement('canvas')
+      out.width = w; out.height = h
+      out.getContext('2d')!.drawImage(bmp, left, top, w, h, 0, 0, w, h)
+      const fill = h / bmp.height
+      bmp.close()
+      const blob: Blob | null = await new Promise((ok) => out.toBlob((b) => ok(b), 'image/webp', 0.95))
+      return blob ? { blob, fill } : null
+    } catch {
+      return null // 못 자르면 원본 그대로 — 화면이 깨지진 않는다
+    }
+  }
+
+  /** 그림 한 장 올리기 — 여백 잘라내기 → 서명 URL → 올리기 → 공개 주소와 크기 초기값을 폼에 꽂기. */
   async function upload(level: number, file: File) {
     if (!/\.(webp|png)$/i.test(file.name)) { setMsg('webp 또는 png 만 올릴 수 있습니다.'); return }
     if (file.size > CHAR_MAX_UPLOAD) { setMsg('파일이 너무 큽니다(최대 5MB).'); return }
-    const ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'webp'
     setBusy('lv' + level); setMsg('')
     try {
+      const trimmed = await trimTransparent(file)
+      const body = trimmed ? trimmed.blob : file
+      const ext = trimmed ? 'webp' : (file.name.toLowerCase().endsWith('.png') ? 'png' : 'webp')
+
       const sign = await callFunction<{ partKey: string; path: string; token: string | null; publicUrl: string }>('admin', {
         action: 'charArtUploadUrl', partKey: partKey || undefined, level, ext,
       })
       if (!sign.token) throw new Error('업로드 주소를 받지 못했습니다.')
       // 새 캐릭터의 첫 장 — 서버가 정한 키를 여기서 붙잡는다. 안 잡으면 다음 장이 또 새 키를 받아 흩어진다.
       if (!partKey) setNewKey(sign.partKey)
-      const { error } = await supabase.storage.from('hub-char').uploadToSignedUrl(sign.path, sign.token, file, {
+      const { error } = await supabase.storage.from('hub-char').uploadToSignedUrl(sign.path, sign.token, body, {
         contentType: ext === 'png' ? 'image/png' : 'image/webp',
       })
       if (error) throw error
       setUrls((prev) => ({ ...prev, [String(level)]: sign.publicUrl }))
-      // 비율 — 아직 없을 때만 잰다(7장이 같은 캔버스라 아무 장이나 같은 값이다).
-      if (ar === null) {
-        try {
-          const bmp = await createImageBitmap(file)
-          setAr(Number((bmp.width / bmp.height).toFixed(6)))
-          bmp.close()
-        } catch { /* 못 재면 화면이 폴백 비율을 쓴다 */ }
-      }
-      setMsg('✅ Lv.' + level + ' 올렸습니다')
+      // 크기 초기값 = 원본에서 인물이 차지하던 높이 비율. 저장 직전에 제일 큰 레벨이 1.0 이 되게 맞춘다.
+      if (trimmed) setRawFill((prev) => ({ ...prev, [String(level)]: trimmed.fill }))
+      // 비율 — 트림 뒤 값으로 다시 잰다.
+      try {
+        const b2 = await createImageBitmap(body)
+        setAr(Number((b2.width / b2.height).toFixed(6)))
+        b2.close()
+      } catch { /* 못 재면 화면이 폴백 비율을 쓴다 */ }
+      setMsg(trimmed ? `✅ Lv.${level} 올렸습니다 (여백 잘라냄)` : `✅ Lv.${level} 올렸습니다`)
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Lv.' + level + ' 업로드 실패')
+    } finally { setBusy('') }
+  }
+
+  /** 캐릭터 통째로 지우기. 가진 사람이 있으면 서버가 막는다(그땐 '상점에서 숨김'이 맞다). */
+  async function remove() {
+    if (!sel || busy) return
+    const row = items.find((i) => i.partKey === sel)
+    if (!window.confirm(`'${row?.nameKo || '이 캐릭터'}' 을(를) 지웁니다. 올린 그림도 같이 사라지고 되돌릴 수 없습니다.`)) return
+    setBusy('del'); setMsg('')
+    try {
+      await callFunction('admin', { action: 'charArtDelete', partKey: sel })
+      pick('')
+      setMsg('✅ 지웠습니다')
+      await reload()
+      onSaved()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '삭제 실패')
     } finally { setBusy('') }
   }
 
@@ -2279,9 +2400,23 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
     if (!nameKo.trim()) { setMsg('이름(한국어)을 입력하세요.'); return }
     setBusy('save'); setMsg('')
     try {
+      // 방금 올린 그림의 원본 비율을 배율로 환산한다 — **제일 큰 레벨이 1.0** 이 되게 맞춘다.
+      //   ⚠️ 이미 값이 있는 레벨은 건드리지 않는다(사람이 손으로 맞춘 값을 기계가 되돌리면 안 된다).
+      //   ⚠️ 이 환산이 없으면 여백을 잘라낸 7장이 전부 같은 키로 서서 '레벨이 오르면 커진다'가 사라진다.
+      const nextScales = { ...scales }
+      const fills = Object.values(rawFill)
+      if (fills.length) {
+        const top = Math.max(...fills)
+        for (const [lv, f] of Object.entries(rawFill)) {
+          if (nextScales[lv] === undefined) nextScales[lv] = Math.min(2, Math.max(0.4, Number((f / top).toFixed(3))))
+        }
+      }
       const res = await callFunction<{ ok: boolean; partKey: string; translated: number }>('admin', {
         action: 'charArtSave', partKey: partKey || undefined, nameKo: nameKo.trim(), price, active, ar, urls,
+        scales: nextScales,
       })
+      setScales(nextScales)
+      setRawFill({})
       setMsg(res?.translated ? '✅ 저장했습니다 (이름 ' + res.translated + '개국어 번역됨)' : '✅ 저장했습니다')
       await reload()
       onSaved()
@@ -2299,6 +2434,11 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
         <div className="admin-head-actions">
           {msg && <span className="admin-msg">{msg}</span>}
           <button className="admin-mini" onClick={() => void reload()} disabled={loading}>새로고침</button>
+          {sel && (
+            <button className="admin-mini" onClick={remove} disabled={!!busy}>
+              {busy === 'del' ? '지우는 중…' : '삭제'}
+            </button>
+          )}
           <button className="btn-ink" onClick={save} disabled={!!busy}>{busy === 'save' ? '저장 중…' : '저장'}</button>
         </div>
       </div>
@@ -2311,7 +2451,7 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
             <option value="">+ 새로 만들기</option>
             {items.map((i) => (
               <option key={i.partKey} value={i.partKey}>
-                {i.nameKo || '(이름 없음)'} · 그림 {i.uploaded}/7
+                {charLabel(i.partKey, i.nameKo)}{i.uploaded ? ` · 올린 그림 ${i.uploaded}/7` : ''}
               </option>
             ))}
           </select>
@@ -2350,59 +2490,82 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
           </div>
         </div>
         <div style={{
-          position: 'relative', height: 280, borderRadius: 12, overflow: 'hidden',
+          position: 'relative', height: 440, borderRadius: 12, overflow: 'hidden',
           border: '1px solid var(--line2)',
-          background: "url('/hub/bg-meadow-default.webp') center 100% / auto 130% no-repeat",
+          // ⚠️ 허브는 `auto 130%`(높이 기준)를 쓰지만 그건 화면 높이가 큰 무대에서다. 여기는 넓고 낮은
+          //    칸이라 그 값을 그대로 쓰면 배경이 가운데만 덮고 양옆이 빈다 → `cover` 로 채운다.
+          background: "url('/hub/bg-meadow-default.webp') center 100% / cover no-repeat",
         }}>
-          {urls[String(pvLevel)] ? (
-            <img
-              src={urls[String(pvLevel)]}
-              alt={'Lv.' + pvLevel}
-              style={{
-                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                bottom: '18%', height: '62%', objectFit: 'contain', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,.35))',
-              }}
-            />
-          ) : (
-            <div style={{
-              position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-              color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', fontSize: 'var(--fs-sm)', fontWeight: 700,
-            }}>
-              Lv.{pvLevel} 그림 없음 — 아래에서 올리면 여기 바로 보입니다
-            </div>
-          )}
+          {/* ⚠️ 옛 파일 경로로 떨어진 그림은 **없을 수도 있다**(그림이 안 들어온 계열). 그때는 깨진 이미지
+              아이콘 대신 안내로 바뀐다 — onError 가 그 판정의 유일한 근거다. */}
+          <PreviewArt key={`${partKey}-${pvLevel}`} src={artOf(pvLevel)} lv={pvLevel} scale={scaleOf(pvLevel)} />
         </div>
       </div>
 
       {/* 레벨 7칸 — 한 칸이 그림 한 장이다. 빠진 레벨은 화면에서 기본 그림으로 그려진다. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10 }}>
+      {/* ⚠️ 칸을 줄여 7개를 욱여넣지 않는다 — 그림이 안 보이면 올린 걸 확인할 수가 없다.
+          좁은 화면에서는 **가로 스크롤**로 푼다(개수는 스크롤이 푸는 문제다). */}
+      <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(150px, 1fr))', gap: 10, minWidth: 1080 }}>
         {CHAR_UP_LEVELS.map((lv) => {
-          const u = urls[String(lv)]
+          const uploaded = urls[String(lv)]
+          const u = artOf(lv)
           return (
             <div key={lv} style={{ border: '1px solid var(--line2)', borderRadius: 10, padding: 8, textAlign: 'center' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>Lv.{lv}</div>
-              <div style={{ height: 92, display: 'grid', placeItems: 'center', background: 'var(--soft)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+              <div style={{ height: 210, display: 'grid', placeItems: 'center', background: 'var(--soft)', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
                 {u
-                  ? <img src={u} alt={'Lv.' + lv} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                  ? <CharLevelImg src={u} lv={lv} />
                   : <span style={{ color: 'var(--dim)', fontSize: 12 }}>없음</span>}
               </div>
-              <input
-                type="file"
-                accept="image/webp,image/png"
-                disabled={!!busy}
-                style={{ fontSize: 11, width: '100%' }}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const f = e.target.files?.[0]
-                  e.target.value = '' // 같은 파일을 다시 골라도 이벤트가 오게 한다
-                  if (f) void upload(lv, f)
-                }}
-              />
-              {busy === 'lv' + lv && <div style={{ fontSize: 11, color: 'var(--muted)' }}>올리는 중…</div>}
+              {/* ⚠️ 네이티브 파일 입력을 그대로 두면 'Choose File / No file chosen' 이라 **버튼인지 알 수 없다**.
+                  라벨로 감싸 숨기고 우리 버튼 모양을 씌운다(사이트 정보 화면이 쓰는 그 방식). */}
+              <label className="admin-mini" style={{ display: 'block', cursor: busy ? 'default' : 'pointer' }}>
+                {busy === 'lv' + lv ? '올리는 중…' : uploaded ? '다른 그림으로' : '그림 올리기'}
+                <input
+                  type="file"
+                  accept="image/webp,image/png"
+                  disabled={!!busy}
+                  style={{ display: 'none' }}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const f = e.target.files?.[0]
+                    e.target.value = '' // 같은 파일을 다시 골라도 이벤트가 오게 한다
+                    if (f) void upload(lv, f)
+                  }}
+                />
+              </label>
+              {/* 레벨별 크기 — 여백을 잘라내면 7장이 같은 키가 되므로, 그 차이를 여기서 되살린다.
+                  ⚠️ 위 미리보기가 같은 값으로 그려진다. 눈으로 맞추고 저장하면 허브도 그대로 선다. */}
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="range" min={40} max={200} step={5}
+                  value={Math.round(scaleOf(lv) * 100)}
+                  onChange={(e) => {
+                    const v = Number(e.target.value) / 100
+                    setPvLevel(lv)
+                    setScales((prev) => ({ ...prev, [String(lv)]: v }))
+                  }}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--muted)', width: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.round(scaleOf(lv) * 100)}%
+                </span>
+              </div>
+              {/* 잘못 올린 한 장을 되돌리는 유일한 길. 저장해야 실제로 빠진다(그 전엔 화면에서만 사라진다). */}
+              {uploaded && !busy && (
+                <button
+                  className="admin-mini"
+                  style={{ marginTop: 6, fontSize: 12 }}
+                  onClick={() => setUrls((prev) => { const n = { ...prev }; delete n[String(lv)]; return n })}
+                >
+                  비우기
+                </button>
+              )}
             </div>
           )
         })}
       </div>
-
+      </div>
     </div>
   )
 }
