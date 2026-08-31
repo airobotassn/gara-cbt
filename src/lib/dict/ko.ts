@@ -757,7 +757,7 @@ const KO: Record<string, string> = {
   "cert.confirm_edit": "수정하기",
   "cert.roman_invalid": "영문 성명을 로마자로 입력해 주세요(영문·공백·하이픈만).",
   // ⚠️ 증서 안에 각인되는 글자는 **6개국어 모두 영문 고정**이다(2026-08-26 지시).
-  //    자격증 서식(cert-template-v2.webp)이 영문 한 벌뿐이라 화면 언어를 따라가면 영문 증서에
+  //    자격증 서식(cert-template-v4.webp)이 영문 한 벌뿐이라 화면 언어를 따라가면 영문 증서에
   //    한글·중국어 캡션만 섞여 박힌다. 번역하지 말 것.
   "cert.qr_caption": "Verify authenticity",
   "cert.gate_pay": "결제하고 발급받기",

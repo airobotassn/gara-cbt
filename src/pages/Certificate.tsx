@@ -8,8 +8,24 @@ import { gradeDisplay, fmtCertDate, certExpiryDate, makeCertNo, gradeOfTitle } f
 import type { MyAttemptsResponse } from '../lib/types'
 
 // ===== 인증서 = 확정 시안 PNG(배경·프레임·로고·문구·라벨) + 동적 필드 SVG 오버레이 =====
-// 배경 = public/cert-template-v3.webp (2026-08-28 협회 신규 시안 — 좌측 다크 지구 패널 + 우측 영문 서식
-//        + 월계관 + GAPA 푸터, 1448×1086. 원본 PNG = output/imagegen/caris-certificate-server-template-v16.png).
+// 배경 = public/cert-template-v4.webp (2026-08-28 협회 신규 시안 — 좌측 다크 지구 패널 + 우측 영문 서식
+//        + 월계관 + GAPA 푸터, 1448×1086. 원본 PNG = output/imagegen/caris-certificate-server-template-v17.png).
+// ⚠️ v17 = 협회가 준 v16 을 우리가 손본 판이다(2026-08-31 지시). 원판은 축이 셋으로 갈려 있었다
+//    (제목 중심 980 · 본문 중심 944 · 라벨 왼끝 584 vs 푸터 왼끝 598). 두 축으로 모았다:
+//    ① 제목 -36 · 부제 -34 → 둘 다 중심 x944(본문 축). ⚠️ 반대로 본문을 오른쪽으로 미는 건 안 된다
+//       — 월계관이 서식에 x940 으로 박혀 있어 그 안의 급수 단어가 오른쪽 가지를 뚫는다.
+//    ② 라벨 3줄 +22 · GAPA 푸터 +8 → 둘 다 왼끝 x606.
+//    ⛔ **아래 블록 다섯(라벨·푸터·QR·캡션·실링)은 한 덩어리로만 움직인다.** 실링은 푸터 글줄 끝에서
+//       30px(원판 간격) 자리에 매여 있어서, QR 을 왼쪽으로 옮기면 실링도 따라가야 하고 그러려면 푸터가,
+//       푸터가 움직이면 라벨이 따라가야 한다. 하나만 옮기면 그 자리에서 축이 어긋난다.
+//    ③ 'Verify authenticity' 캡션 +34x·+32y → QR 과 한 열(중심 x1272). 밀랍 실링은 161px → 114px 로
+//       줄여 오른쪽 아래에 둔다 — ⛔ **실링은 왼쪽으로 못 간다**(푸터 글줄 끝 x1241 에서 30px 자리).
+//       그래서 QR·캡션 열은 실링보다 왼쪽에 선다(원판 v16 과 같은 관계다).
+//    ④ 월계관 두 가지를 잎 높이 227px → 150px 로 줄여 BEGINNER 를 감싸게 다시 앉혔다.
+//    바탕이 #EAE9E9 평면(편차 ±2)인 아래쪽은 원위치를 평면 사각형으로 덮고 조각을 새 자리에 붙였다.
+//    ⚠️ 제목 띠(y78~226)는 바탕이 한 단 밝아서(#ECECEC) 평면칠하면 단차가 보인다 — 거긴 지우지 않고
+//       **제 자리를 덮는 폭으로 떠서** 옮겼다.
+//    협회가 새 판을 주면 이 가공을 다시 해야 한다 — 위 수치가 그 레시피다.
 // 그 위에 값만 얹는다: ①영문 성명 ②급수 전체명("CARIS BEGINNER" — earned the 빈칸) ③급수 단어(월계관 안)
 //                    ④Certificate ID ⑤Issue Date ⑥Valid Until ⑦진위확인 QR.
 // 좌표는 템플릿을 픽셀 계측해 뽑았다(잉크 있는 행/열 구간 = 서식에 인쇄된 글줄·월계관 실측).
@@ -56,20 +72,24 @@ const WM_C = '#8b93a3' // 견본 워터마크 — 밝은 우측·어두운 좌�
 //   "has successfully…"        어센더 y412 · 베이스라인 y432 · x669~1217
 //   "earned the" x693~808  |  빈칸 251px  |  "certification." x1060~1195 · 베이스라인 y479
 //   월계관  x542~1338 · y525~752 (안쪽 여백 x≈588~1292)
-//   라벨 3줄 베이스라인 y813/856/899 · 콜론 끝 x764
-//   'Verify authenticity' 캡션 x1174~1303 · 캡 y883 — **서식에 인쇄돼 있다(코드로 그리지 않는다)**
-//   GAPA 푸터 y940~1030 · 실링 x1264~1420
+//   라벨 3줄 왼끝 x606 · 베이스라인 y813/856/899 · 콜론 끝 x786 (전부 가공 후 값)
+//   ⚠️ 캡션은 서식에 인쇄돼 있다 — 코드로 그리지 않는다
+//   'Verify authenticity' 캡션 중심 x1272 (QR 과 한 열) · 실링 x1271~1385 · y948~1062
+//   GAPA 푸터 왼끝 x606(라벨과 같은 축) · 월계관 두 가지 x549~624 / x1265~1340 · y564~714
 const CX = 944 // 우측 패널 본문 가로 중심(세 줄 실측 949·943·944)
 const NAME_MID = 365 // 이름 자리 = 두 문장 사이 빈 띠(y320~410)의 세로 중앙
 const NAME_W = 700 // 이름 최대 폭
 // ⚠️ 빈칸은 251px 이지만 예산은 236 이다 — 꽉 채우면 "earned theCARIS BEGINNERcertification." 처럼
 //    앞뒤 낱말과 붙어버린다(첫 렌더가 그랬다). 남는 15px 가 좌우 낱말 사이 공백 노릇을 한다.
 const EARN = { cx: 934, y: 479, w: 236 } // "earned the [급수] certification." 의 빈칸(x809~1059)
-const WREATH = { cx: 940, cy: 639, w: 644 } // 월계관 안쪽 = 급수 단어 자리
-const VAL_X = 790 // 값 시작 x (콜론 x764 뒤)
+// ⚠️ cx 가 946 인데 글자는 944 에 선다 — SVG 는 자간(letterSpacing)을 마지막 글자 뒤에도 넣어서
+//    가운데 정렬이 자간의 절반만큼 왼쪽으로 밀린다. 그 2px 를 미리 얹은 값이다(본문 축 = 944).
+const WREATH = { cx: 946, cy: 639, w: 644 } // 월계관 안쪽 = 급수 단어 자리
+const VAL_X = 812 // 값 시작 x (콜론 x786 뒤)
 const VAL_ROWS = [813, 856, 899] // Certificate ID / Issue Date / Valid Until 값 baseline
-// QR = 인쇄된 캡션(캡 y883) 바로 위, 캡션과 같은 중심(x1238). 위로는 월계관 아래끝(y752)이 천장이다.
-const QRB = { size: 116, x: 1181, y: 758 }
+// QR = 인쇄된 캡션과 한 열(중심 x1272). **세로는 라벨 3줄과 같은 띠**(y794~898) — 크기가 그 띠에 맞춰진다.
+// 아래로는 인쇄된 캡션(y915)이 바닥이다.
+const QRB = { size: 104, x: 1220, y: 794 }
 
 function todayStr() {
   return fmtCertDate(new Date())
@@ -432,7 +452,7 @@ export default function Certificate() {
 
           {/* 배경 = 신규 시안(값 없는 clean 판). 푸터 GAPA 마크·실링·'Verify authenticity' 캡션까지
               전부 서식에 인쇄돼 있다 — 코드로 덧그리는 것은 아래 값 여섯 개뿐이다. */}
-          <image href="/cert-template-v3.webp" x="0" y="0" width={VB.w} height={VB.h} />
+          <image href="/cert-template-v4.webp" x="0" y="0" width={VB.w} height={VB.h} />
 
           {/* ① 영문 성명 — "This is to certify that" 와 "has successfully…" 사이 빈 띠 */}
           <text data-f="name" x={CX} y={romanBase(nm.size)} textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize={nm.size} letterSpacing="1" fill={INK}>{nm.text}</text>
