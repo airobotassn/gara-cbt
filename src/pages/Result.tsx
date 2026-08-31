@@ -11,7 +11,7 @@ import RadarChartBox from '../components/RadarChartBox'
 import Confetti from '../components/Confetti'
 import EbookCover from '../components/EbookCover'
 import TopBar from '../components/TopBar'
-import type { ResultResponse, StartTestResponse } from '../lib/testTypes'
+import type { ResultResponse } from '../lib/testTypes'
 import type { EbookPicksResp, EbookRow } from '../lib/types'
 
 const CLAIM_KEY = 'pendingClaim'
@@ -32,8 +32,6 @@ export default function Result() {
   const [loading, setLoading] = useState(!initial)
   const [error, setError] = useState<string | null>(null)
   // '다음 레벨 도전' 버튼 상태(승급했을 때만 쓴다)
-  const [starting, setStarting] = useState(false)
-  const [startErr, setStartErr] = useState<string | null>(null)
 
   useEffect(() => {
     if (initial?.claimToken && attemptId) {
@@ -93,24 +91,16 @@ export default function Result() {
 
   const locked = data.locked || !isFullUser
   // 승급했을 때만 다음 레벨로 이어 붙인다. 새 등급(rankAfter)이 곧 다음에 도전할 레벨이다
-  // (승급 조건 = 응시레벨 ≥ 내 등급). 버튼을 누르면 여기서 응시를 만들고 /test/:id 의 응시 전
-  // 경고 게이트로 넘어간다 — 레벨 선택 화면을 거치지 않는다.
+  // (승급 조건 = 응시레벨 ≥ 내 등급). 버튼을 누르면 응시 전 안내 게이트(/test/ready)로 넘어간다
+  // — 레벨 선택 화면을 거치지 않는다.
   const promoted = !locked && data.rankDir === 'up'
   const nextLevel = Math.min(data.rankAfter ?? data.level + 1, MAX_LEVEL)
 
-  async function startNext() {
-    setStartErr(null)
-    setStarting(true)
-    try {
-      const res = await callFunction<StartTestResponse>('start-test', { level: nextLevel, lang })
-      navigate(`/test/${res.attemptId}`, { state: res })
-    } catch (e) {
-      // 하루 응시 소진은 서버가 error='daily_limit' 로 429 를 낸다(LevelSelect 와 같은 처리).
-      const raw = e instanceof Error ? e.message : ''
-      setStartErr(raw === 'daily_limit' ? t('lv.daily_limit') : raw || t('lv.start_failed'))
-    } finally {
-      setStarting(false)
-    }
+  // ⛔ 여기서 응시를 만들지 않는다 — 안내 게이트로 보내고, 거기서 시작을 눌러야 만들어진다
+  //    (레벨 선택 화면과 같은 경로). 예전엔 이 버튼이 곧바로 응시를 만들어서, 안내를 보고
+  //    마음을 바꿔도 하루 횟수가 이미 깎였다.
+  function startNext() {
+    navigate(`/test/ready/${nextLevel}`)
   }
 
   const scorePct = Math.round((data.totalCorrect / data.totalQuestions) * 100)
@@ -157,16 +147,11 @@ export default function Result() {
             {t('common.retry_test')}
           </Link>
           {promoted ? (
-            <button className="btn-ink" onClick={startNext} disabled={starting}>
-              {starting ? t('lv.preparing') : t('result.next_level', { n: nextLevel })}
+            <button className="btn-ink" onClick={startNext}>
+              {t('result.next_level', { n: nextLevel })}
             </button>
           ) : null}
         </div>
-        {startErr ? (
-          <div style={{ textAlign: 'center', color: '#dc2626', fontSize: 'var(--fs-sm)', marginTop: 10 }}>
-            {startErr}
-          </div>
-        ) : null}
       </div>
     </div>
   )

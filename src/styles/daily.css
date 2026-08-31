@@ -226,6 +226,11 @@
 .dy-page .dy-rw-row { display: flex; gap: 8px; margin-top: 9px; }
 .dy-page .dy-rw-item { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font-size: 15px; font-weight: 900; background: var(--yellow); border: 3px solid var(--line); border-radius: 12px; padding: 8px 4px; }
+/* 완료 상태 — 예고 두 줄(제목+금색 알약) 자리를 초록 한 덩어리가 통째로 먹는다.
+   색은 --teal 로 맞춘다(이 페이지에서 정답을 칠하는 그 색이라 '됐다' 로 읽힌다 · 다크값도 이미 있다). */
+.dy-page .dy-reward.is-done { background: var(--teal); }
+.dy-page .dy-rw-done { display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 19px; font-weight: 900; color: #fff; padding: 10px 4px; letter-spacing: .01em; }
 
 /* ── CTA ── */
 .dy-page .dy-err { margin: 12px 0 0; font-size: 13px; font-weight: 800; color: #d05a5a; text-align: center; }

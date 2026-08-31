@@ -1,15 +1,17 @@
-// ISO 3166-2:KR — 17 시도. Server-side allowlist for edge functions (Deno).
+// ISO 3166-2:KR — 16 시도. Server-side allowlist for edge functions (Deno).
 // Deno edge fns cannot import from src/, so this mirrors src/lib/regions.ts.
 // The code set MUST stay identical to src/lib/regions.ts and the regions(code)
 // seed in supabase/migrations/20260714000000_region_onboarding.sql
 // (enforced by tests/db/regions-set-equality.mjs).
+//
+// ⛔ 광주(KR-29)는 없다 — 전남광주통합특별시로 통합되면서 KR-46 이 흡수했다(2026-08-31).
+//    여기에 되살리면 서버만 옛 코드를 통과시켜, 화면에 없는 지역이 프로필에 저장된다.
 
 export const REGION_CODES: readonly string[] = [
   'KR-11',
   'KR-26',
   'KR-27',
   'KR-28',
-  'KR-29',
   'KR-30',
   'KR-31',
   'KR-41',

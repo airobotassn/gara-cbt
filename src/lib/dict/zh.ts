@@ -36,12 +36,11 @@ const ZH: Record<string, string> = {
   "fab.upload_image": "上传图片",
   "fab.upload_fail": "上传失败",
 
-  // 온보딩/지역 (ISO 3166-2:KR 17 시도)
+  // 온보딩/지역 (ISO 3166-2:KR 16 시도 — 광주 KR-29 는 전남광주통합특별시로 흡수돼 없다)
   "region.KR-11": "首尔特别市",
   "region.KR-26": "釜山广域市",
   "region.KR-27": "大邱广域市",
   "region.KR-28": "仁川广域市",
-  "region.KR-29": "光州广域市",
   "region.KR-30": "大田广域市",
   "region.KR-31": "蔚山广域市",
   "region.KR-41": "京畿道",
@@ -49,7 +48,7 @@ const ZH: Record<string, string> = {
   "region.KR-43": "忠清北道",
   "region.KR-44": "忠清南道",
   "region.KR-45": "全北特别自治道",
-  "region.KR-46": "全罗南道",
+  "region.KR-46": "全南光州统合特别市",
   "region.KR-47": "庆尚北道",
   "region.KR-48": "庆尚南道",
   "region.KR-49": "济州特别自治道",
@@ -1111,7 +1110,7 @@ const ZH: Record<string, string> = {
   "fab.light": "浅色模式",
   "nav.assoc": "协会简介",
   "fab.login": "使用 Google 登录",
-  "fab.loginhint": "登录后即可应试",
+  "fab.loginhint": "登录后即可使用",
   "fab.morebtn": "更多",
   "fab.changeChar": "更换头像",
   "fab.editName": "修改姓名",
@@ -1615,7 +1614,7 @@ const ZH: Record<string, string> = {
   "daily.theory": "理论",
   "daily.hint_lead": "拿不准的话",
   "daily.reward_head": "完成后",
-  "daily.done_note": "今日 DAILY QUIZ 完成 ✓ 明天开放新题。今天的可以再看（奖励每日一次）。",
+  "daily.reward_done": "已完成 ✓",
   "daily.saving": "记录中…",
   "daily.pop_title": "DAILY QUIZ 完成！",
   "daily.pop_bonus": "满 7 天 +{b}P",
@@ -1639,7 +1638,7 @@ const ZH: Record<string, string> = {
   "mg.rank_players": " · {n} 人参与",
   "mg.rank_empty": "还没有成绩，来当第一个吧！",
   "mg.rank_need_login": "登录后可查看我的排名。",
-  "mg.rank_no_mine": "你还没有成绩 — 玩一局就会出现。",
+  "mg.rank_no_mine": "参与游戏后即可进入排名。",
   "mg.sec": "{n} 秒",
   "mg.min_sec": "{m} 分 {s} 秒",
 
@@ -1675,7 +1674,7 @@ const ZH: Record<string, string> = {
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
   //    카드는 이미지로 밖으로 나가는 물건이라, 만든 사람의 화면 언어를 그대로 따라가는 게 맞다.
-  "share.modal_title": "分享我的卡片",
+  "share.modal_title": "我的排名卡",
   "share.making": "正在生成卡片…",
   "share.make_fail": "卡片生成失败",
   "share.img_fail": "图片生成失败",
@@ -1736,7 +1735,7 @@ const ZH: Record<string, string> = {
   "hub.gate_title": "需要登录",
   "hub.gate_sub": "登录后即可使用签到和商店",
   "hub.banner_login": "签到和商店需要登录后使用",
-  "hub.share": "炫耀我的排名",
+  "hub.share": "我的排名卡",
   "hub.gift_btn": "赠送",
   "hub.help_aria": "如何获得积分",
   "hub.coin_tip": "持有的 CARI 币",

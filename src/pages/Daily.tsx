@@ -215,21 +215,27 @@ export default function Daily() {
       </main>
 
       <aside className="dy-rail">
-      {/* 보상 예고 — 완료하면 뭘 받는지 미리. */}
-      <div className="dy-reward">
-        <div className="dy-rw-top">{t('daily.reward_head')}</div>
-        <div className="dy-rw-row">
-          <span className="dy-rw-item"><Ic n="coin" s={26} /><b>+{DAILY_POINTS}P</b></span>
-        </div>
+      {/* 보상 예고 — 완료하면 뭘 받는지 미리.
+          ⚠️ 다 풀고 나면 상자를 통째로 '완료' 로 바꾼다(제목+금색 알약 둘 다 치운다).
+             '완료하면 +10P' 는 이미 받은 사람에게는 말이 안 되는 문장이다. */}
+      <div className={`dy-reward${done ? ' is-done' : ''}`}>
+        {done ? (
+          <div className="dy-rw-done">{t('daily.reward_done')}</div>
+        ) : (
+          <>
+            <div className="dy-rw-top">{t('daily.reward_head')}</div>
+            <div className="dy-rw-row">
+              <span className="dy-rw-item"><Ic n="coin" s={26} /><b>+{DAILY_POINTS}P</b></span>
+            </div>
+          </>
+        )}
       </div>
 
       {err && <p className="dy-err">{err}</p>}
 
       {/* 완료 트리거는 문제 시도(왼쪽 카드)로 옮겨졌다. 여기는 상태 안내만.
           ⚠️ 고르기 전 안내는 뺐다 — 아직 아무것도 안 한 사람에게 적립 규칙부터 읽히지 않는다. */}
-      {(done || busy) && (
-        <p className="dy-note">{done ? t('daily.done_note') : t('daily.saving')}</p>
-      )}
+      {busy && <p className="dy-note">{t('daily.saving')}</p>}
       </aside>
       </div>
       </div>

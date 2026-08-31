@@ -64,6 +64,7 @@ const Faq = lazy(() => import('./pages/Faq'))
 const LevelSelect = lazy(() => import('./pages/LevelSelect'))
 const LevelCert = lazy(() => import('./pages/LevelCert'))
 const LevelRecord = lazy(() => import('./pages/LevelRecord'))
+const TestReady = lazy(() => import('./pages/TestReady'))
 const TestRunner = lazy(() => import('./pages/TestRunner'))
 const Result = lazy(() => import('./pages/Result'))
 const Ranking = lazy(() => import('./pages/Ranking'))
@@ -264,6 +265,9 @@ export default function App() {
               <Route path="/test/select" element={<LevelSelect />} />
               {/* 레벨테스트 인증서 — /test/:attemptId 보다 먼저 둔다(안 그러면 attemptId 로 잡힌다) */}
               <Route path="/test/certificate" element={<LevelCert />} />
+              {/* 응시 전 안내 게이트 — 여기서 「전체화면으로 시작」을 눌러야 응시가 만들어지고
+                  하루 횟수가 깎인다. 안내만 보고 나가면 아무것도 소모되지 않는다. */}
+              <Route path="/test/ready/:level" element={<TestReady />} />
               {/* 내 기록(옛 마이페이지 '학습 대시보드'의 레벨테스트 몫) — 같은 이유로 :attemptId 보다 먼저 */}
               <Route path="/test/record" element={<LevelRecord />} />
               <Route path="/test/:attemptId" element={<TestRunner />} />

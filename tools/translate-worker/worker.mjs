@@ -31,8 +31,17 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 // ⛔ **프로필은 저장소 밖에 둔다.** 안에 두면 Vite 개발서버의 파일 감시자가 이 폴더를 지켜보다가
 //    브라우저가 잠근 파일(Network/Cookies 등)에서 EBUSY 로 죽는다 — 개발서버가 통째로 못 뜬다.
 //    수 GB 짜리 언어팩이 소스 트리에 쌓이는 것도 곤란하다(.gitignore 로 가리는 건 그다음 문제다).
+// ⚠️ **브라우저는 바꿔 낄 수 있어야 한다(2026-08-27).** 엣지가 번역기를 못 받는 상태에 빠질 수 있고
+//    (실제로 8/24 엣지 업데이트 뒤 그렇게 됐다 — 모델 런타임을 요청조차 안 한다), 그러면 번역이
+//    통째로 멈추는데 **오류가 안 나서 아무도 모른다.** 크롬은 같은 코드로 정상 동작한다.
+//     · 엣지  = 145개 언어. 기본값이고 이게 정상일 때 제일 좋다.
+//     · 크롬  = 39개 언어. 엣지가 못 받을 때의 대피로.
+//    ⚠️ 프로필은 **채널마다 따로** 둔다 — 언어팩이 브라우저별로 다른 자리에 쌓이고, 한 폴더를
+//       두 브라우저가 번갈아 쓰면 프로필이 상한다.
+const CHANNEL = process.env.TRANSLATE_CHANNEL ?? 'msedge'
 const PROFILE_DIR =
-  process.env.TRANSLATE_PROFILE_DIR ?? join(homedir(), 'AppData', 'Local', 'gara-translate-profile')
+  process.env.TRANSLATE_PROFILE_DIR ??
+  join(homedir(), 'AppData', 'Local', `gara-translate-profile${CHANNEL === 'msedge' ? '' : '-' + CHANNEL}`)
 const WARM_PAGE = 'file://' + join(HERE, 'warm.html').replace(/\\/g, '/')
 
 const SUPABASE_URL = process.env.SUPABASE_URL
@@ -83,10 +92,17 @@ async function main() {
     'OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion'
 
   const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
-    channel: 'msedge', // ⚠️ 크롬(39개 언어) 말고 엣지(145개 이상)
+    channel: CHANNEL, // 기본 엣지(145개 언어). 엣지가 번역기를 못 받으면 TRANSLATE_CHANNEL=chrome
     headless: !HEADED, // 서버(세션 없음)에서도 떠야 한다. 눈으로 보려면 TRANSLATE_HEADED=1
     ignoreDefaultArgs: [PW_DISABLE_FEATURES, '--disable-component-update'],
-    args: ['--no-first-run', '--no-default-browser-check'],
+    // TRANSLATE_DEBUG=1 이면 브라우저 내부 로그를 프로필 폴더의 chrome_debug.log 에 남긴다.
+    //  · 번역기가 안 받아질 때 **여기서만** 이유가 보인다(컴포넌트 등록·다운로드·설치 로그).
+    //  · 평소엔 끈다 — 로그가 계속 커지고 워커는 몇 달씩 돈다.
+    args: [
+      '--no-first-run',
+      '--no-default-browser-check',
+      ...(process.env.TRANSLATE_DEBUG === '1' ? ['--enable-logging', '--v=1'] : []),
+    ],
   })
   // 브라우저가 죽으면(크래시·강제 종료) 여기서 잡아 프로세스를 끝낸다.
   let browserDead = false
@@ -107,9 +123,34 @@ async function main() {
     detector: await LanguageDetector.availability().catch(() => 'error'),
     sample: await Translator.availability({ sourceLanguage: 'en', targetLanguage: 'ko' }).catch(() => 'error'),
   }))
-  console.log(`[worker] 모델 가용성 — 감지기 ${avail.detector} / 번역기(en>ko) ${avail.sample}`)
-  if (avail.sample === 'unavailable') {
-    console.error('[worker] ⚠️ 번역 모델이 없습니다. Playwright 기본 인자가 바뀌어 위 ignoreDefaultArgs 가 안 먹었을 수 있습니다.')
+  console.log(`[worker] ${CHANNEL} · 모델 가용성 — 감지기 ${avail.detector} / 번역기(en>ko) ${avail.sample}`)
+
+  // ⛔ **가용성만 믿으면 안 된다(2026-08-27).** 엣지는 모델이 하나도 없는 상태에서도 'downloadable'
+  //    (= 받을 수 있다)이라고 답하는데, 정작 create() 를 부르면 요청을 **아예 안 보내고** 오류도 없이
+  //    영원히 매달린다. 그러면 워커는 3분 타임아웃만 반복하며 살아있는 척 헛돈다 — 8/21~8/27 에
+  //    실제로 그렇게 엿새를 흘렸고, 오류가 안 나니 아무도 몰랐다.
+  //    그래서 **부팅할 때 진짜로 한 줄 번역해 본다.** 여기서 못 하면 이 워커는 앞으로도 못 한다.
+  if (avail.sample !== 'available') {
+    console.log('[worker] 모델이 아직 없습니다. 실제로 받아지는지 확인합니다(최대 90초)…')
+    const probe = await page.evaluate(async () => {
+      try {
+        const t = await Promise.race([
+          Translator.create({ sourceLanguage: 'en', targetLanguage: 'ko' }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('시간 초과')), 90_000)),
+        ])
+        return { ok: true, text: await t.translate('Hello') }
+      } catch (e) {
+        return { ok: false, why: e?.name === 'Error' ? e.message : `${e?.name}: ${e?.message ?? e}` }
+      }
+    })
+    if (probe.ok) {
+      console.log(`[worker] 모델 확보 — 시험 번역 "${probe.text}"`)
+    } else {
+      console.error(`[worker] ⛔ 이 브라우저(${CHANNEL})는 번역기를 받지 못합니다: ${probe.why}`)
+      console.error('[worker] ⛔ 이대로 두면 번역이 한 건도 안 되면서 오류도 안 납니다.')
+      console.error("[worker] ⛔ 대피로: TRANSLATE_CHANNEL=chrome 으로 다시 띄우십시오(언어 39개).")
+      if (process.env.TRANSLATE_STRICT === '1') process.exit(1)
+    }
   }
   console.log(`[worker] 시작. profile=${PROFILE_DIR} tick=${TICK_MS}ms`)
 

@@ -18,6 +18,9 @@ param(
   [string]$SupabaseUrl,
   [string]$AnonKey,
   [string]$WorkerKey,
+  # Which browser translates. Default is Edge Dev, NOT Edge Stable - see README
+  # ("Edge Stable cannot fetch the translation engine", 2026-08-27).
+  [string]$Channel = 'msedge-dev',
   [string]$TaskName = 'GaraTranslateWorker',
   [switch]$Uninstall
 )
@@ -54,6 +57,7 @@ New-Item -ItemType Directory -Force -Path $wrapperDir | Out-Null
 set SUPABASE_URL=$SupabaseUrl
 set SUPABASE_ANON_KEY=$AnonKey
 set TRANSLATE_WORKER_KEY=$WorkerKey
+set TRANSLATE_CHANNEL=$Channel
 cd /d "$repo"
 set LOG=%~dp0worker.log
 :loop

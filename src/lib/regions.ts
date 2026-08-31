@@ -1,14 +1,19 @@
-// ISO 3166-2:KR — 17 시도. 단일 진실(single source of truth) for client-side region codes.
+// ISO 3166-2:KR — 16 시도. 단일 진실(single source of truth) for client-side region codes.
 // Must stay set-equal with supabase/functions/_shared/regions.ts and the regions(code)
 // seed in supabase/migrations/20260714000000_region_onboarding.sql
 // (enforced by tests/db/regions-set-equality.mjs).
+//
+// ⛔ **광주(KR-29)는 없다 — 전남광주통합특별시로 통합되면서 KR-46 이 흡수했다(2026-08-31).**
+//    ISO 3166-2:KR 에는 아직 통합 코드가 없어서 살아남은 쪽 코드(KR-46)를 그대로 쓴다.
+//    되살리지 말 것: 다시 넣으면 통합시가 지도·랭킹·온보딩에서 두 줄로 갈린다.
+//    같이 밀어야 하는 곳 → _shared/regions.ts · 사전 6벌(region.KR-*) ·
+//    arena/tables.ts(PROV_TO_ISO·PROV_I18N) · public/geo/kr-prov.json · public/geo/adm1/KR.json.
 
 export const REGION_CODES = [
   'KR-11', // 서울특별시
   'KR-26', // 부산광역시
   'KR-27', // 대구광역시
   'KR-28', // 인천광역시
-  'KR-29', // 광주광역시
   'KR-30', // 대전광역시
   'KR-31', // 울산광역시
   'KR-41', // 경기도
@@ -16,7 +21,7 @@ export const REGION_CODES = [
   'KR-43', // 충청북도
   'KR-44', // 충청남도
   'KR-45', // 전북특별자치도
-  'KR-46', // 전라남도
+  'KR-46', // 전남광주통합특별시 (옛 전라남도 + 광주광역시)
   'KR-47', // 경상북도
   'KR-48', // 경상남도
   'KR-49', // 제주특별자치도
@@ -37,7 +42,7 @@ export function isValidRegion(code: string): boolean {
   return (REGION_CODES as readonly string[]).includes(code);
 }
 
-// ⚠️ 여기 REGION_CODES 는 **한국 17개**뿐이다 — 관리자 화면의 시도 필터처럼 한국을 전제로 한 자리에서만 쓴다.
+// ⚠️ 여기 REGION_CODES 는 **한국 16개**뿐이다 — 관리자 화면의 시도 필터처럼 한국을 전제로 한 자리에서만 쓴다.
 //    온보딩·마이페이지의 지역 선택은 전 세계를 다루므로 lib/regionCatalog.ts (지도 파일 기반)를 쓸 것.
 //    그쪽이 211개국·3,504개 구역을 6개국어 이름과 함께 알고 있고, 정답지는 DB regions 테이블이다.
 

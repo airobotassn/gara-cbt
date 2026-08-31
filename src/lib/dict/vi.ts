@@ -36,12 +36,11 @@ const VI: Record<string, string> = {
   "fab.upload_image": "Tải ảnh lên",
   "fab.upload_fail": "Tải lên thất bại",
 
-  // 온보딩/지역 (ISO 3166-2:KR 17 시도)
+  // 온보딩/지역 (ISO 3166-2:KR 16 시도 — 광주 KR-29 는 전남광주통합특별시로 흡수돼 없다)
   "region.KR-11": "Seoul",
   "region.KR-26": "Busan",
   "region.KR-27": "Daegu",
   "region.KR-28": "Incheon",
-  "region.KR-29": "Gwangju",
   "region.KR-30": "Daejeon",
   "region.KR-31": "Ulsan",
   "region.KR-41": "Gyeonggi",
@@ -49,7 +48,7 @@ const VI: Record<string, string> = {
   "region.KR-43": "Chungbuk",
   "region.KR-44": "Chungnam",
   "region.KR-45": "Jeonbuk",
-  "region.KR-46": "Jeonnam",
+  "region.KR-46": "Jeonnam-Gwangju",
   "region.KR-47": "Gyeongbuk",
   "region.KR-48": "Gyeongnam",
   "region.KR-49": "Jeju",
@@ -1111,7 +1110,7 @@ const VI: Record<string, string> = {
   "fab.light": "Chế độ sáng",
   "nav.assoc": "Giới thiệu Hiệp hội",
   "fab.login": "Đăng nhập bằng Google",
-  "fab.loginhint": "Đăng nhập để dự thi",
+  "fab.loginhint": "Có sẵn sau khi đăng nhập",
   "fab.morebtn": "Thêm",
   "fab.changeChar": "Đổi ảnh đại diện",
   "fab.editName": "Đổi tên",
@@ -1615,7 +1614,7 @@ const VI: Record<string, string> = {
   "daily.theory": "Lý thuyết",
   "daily.hint_lead": "Nếu phân vân",
   "daily.reward_head": "Khi hoàn thành",
-  "daily.done_note": "Xong DAILY QUIZ hôm nay ✓ Mai có câu mới. Bạn xem lại được (thưởng mỗi ngày một lần).",
+  "daily.reward_done": "Hoàn thành ✓",
   "daily.saving": "Đang ghi…",
   "daily.pop_title": "Hoàn thành DAILY QUIZ!",
   "daily.pop_bonus": "Đủ 7 ngày +{b}P",
@@ -1639,7 +1638,7 @@ const VI: Record<string, string> = {
   "mg.rank_players": " · {n} người chơi",
   "mg.rank_empty": "Chưa có điểm nào — hãy là người đầu tiên!",
   "mg.rank_need_login": "Đăng nhập để xem hạng của bạn.",
-  "mg.rank_no_mine": "Bạn chưa có điểm — chơi một ván là có.",
+  "mg.rank_no_mine": "Chơi một ván để vào bảng xếp hạng.",
   "mg.sec": "{n} giây",
   "mg.min_sec": "{m} phút {s} giây",
 
@@ -1675,7 +1674,7 @@ const VI: Record<string, string> = {
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
   //    카드는 이미지로 밖으로 나가는 물건이라, 만든 사람의 화면 언어를 그대로 따라가는 게 맞다.
-  "share.modal_title": "Chia sẻ thẻ của tôi",
+  "share.modal_title": "Thẻ hạng của tôi",
   "share.making": "Đang tạo thẻ…",
   "share.make_fail": "Không tạo được thẻ",
   "share.img_fail": "Không tạo được ảnh",
@@ -1736,7 +1735,7 @@ const VI: Record<string, string> = {
   "hub.gate_title": "Cần đăng nhập",
   "hub.gate_sub": "Đăng nhập để dùng điểm danh và cửa hàng",
   "hub.banner_login": "Điểm danh và cửa hàng cần đăng nhập",
-  "hub.share": "Khoe hạng của tôi",
+  "hub.share": "Thẻ hạng của tôi",
   "hub.gift_btn": "Tặng",
   "hub.help_aria": "Cách kiếm điểm",
   "hub.coin_tip": "CARI coin của bạn",

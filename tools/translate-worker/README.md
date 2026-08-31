@@ -4,8 +4,18 @@
 
 ## 요구사항
 
-- **Microsoft Edge 148 이상 · 데스크톱** (Windows / macOS / Linux)
+- **Microsoft Edge Dev 채널 · 데스크톱** (Windows / macOS / Linux)
   - Translator API 는 **모바일에 없다**. 크롬도 되지만 언어가 39개뿐이라 엣지(145개+)를 쓴다
+  - ⛔ **Edge Stable 을 쓰지 말 것(2026-08-27).** 151 에서 번역 엔진(`Chrome TranslateKit` 컴포넌트)을
+    **자기 서버가 거절한다** — 내부 로그에 `MakePipeline result.status: error-invalidAppId`. 그 결과
+    `availability()` 는 계속 `downloadable`("받으면 된다")이라고 답하는데 `create()` 는 요청을 보내지도
+    않고 **오류 없이 영원히 매달린다.** 8/21~8/27 엿새 동안 번역이 0건이었는데 오류가 안 나서 아무도 몰랐다.
+    · 배제한 것: 실행 인자·headless·프로필·정책·IPv6·기능 플래그·컴포넌트 서버 교체·엔진 파일 직접 복사 — 전부 무효
+    · **Edge Dev(153)·크롬에서는 같은 코드가 즉시 동작한다.** MS 가 고쳐야 하는 회귀다
+    · 8/21 까지 멀쩡했던 건 **옛 버전에서 이미 받아둔 엔진**이 프로필에 남아 있었기 때문이다.
+      8/24 업데이트가 그걸 무효화하면서 처음으로 다운로드가 필요해졌고, 거기서 드러났다
+  - ⚠️ Stable 이 고쳐지면 `TRANSLATE_CHANNEL=msedge` 로 되돌리면 된다. **되돌리기 전에 반드시
+    부팅 로그의 `모델 확보` 줄을 확인할 것** — 안 되면 워커가 다시 조용히 헛돈다
   - 파이어폭스·사파리·브레이브·웨일·삼성인터넷에는 없다(구글 내부 코드 의존이라 크로미움 포크도 안 된다)
 - Node 18+ (`@playwright/test` 는 이미 devDependency)
 - 메모리 1GB 여유 · 디스크 수 GB(언어팩은 **쌍(pair)마다** 받는다)
@@ -21,7 +31,9 @@ node tools/translate-worker/worker.mjs
 
 | 환경변수 | 기본값 | |
 |---|---|---|
-| `TRANSLATE_PROFILE_DIR` | `%LOCALAPPDATA%\gara-translate-profile` | ⚠️ **고정 필수** — 바뀌면 언어팩을 매번 다시 받는다. **저장소 안에 두지 말 것**(Vite 감시자가 EBUSY 로 죽는다) |
+| `TRANSLATE_CHANNEL` | `msedge` | 번역할 브라우저. **설치 스크립트는 `msedge-dev` 를 박는다**(위 ⛔ 참고). 값은 Playwright 채널 이름 — `msedge` · `msedge-dev` · `msedge-beta` · `chrome` |
+| `TRANSLATE_PROFILE_DIR` | `%LOCALAPPDATA%\gara-translate-profile[-채널]` | ⚠️ **고정 필수** — 바뀌면 언어팩을 매번 다시 받는다. **저장소 안에 두지 말 것**(Vite 감시자가 EBUSY 로 죽는다). 채널마다 따로 쓴다 |
+| `TRANSLATE_DEBUG` | (없음) | `1` 이면 브라우저 내부 로그를 프로필의 `chrome_debug.log` 에 남긴다. 번역기가 안 받아질 때 **여기서만** 이유가 보인다 |
 | `TRANSLATE_TICK_MS` | `1000` | 프론트 재시도가 1.5초부터라 그 안에 채워야 첫 요청자가 바로 본다 |
 | `TRANSLATE_BATCH` | `500` | 한 사이클 상한. 밀린 백로그가 클 때를 위한 안전장치 |
 | `TRANSLATE_HEADED` | (없음) | `1` 이면 브라우저 창을 띄운다. 기본은 headless — 서버에서 화면 없이 돌아야 하기 때문 |
@@ -68,6 +80,26 @@ Get-Content $env:LOCALAPPDATAgara-translate-workerworker.log -Tail 20 -Wait
 워커는 **브라우저가 죽으면 스스로 종료한다.** 살아있는 척 헛도는 게 죽는 것보다 나쁘기 때문이다
 — 감시자가 "돌고 있네" 하고 안 건드린다. 종료하면 감시자(작업 스케줄러 / `Restart=always`)가
 새로 띄운다. 이 둘이 한 쌍이라 **감시자 없이 워커만 돌리면 복구가 없다.**
+
+## 부팅할 때 진짜로 한 줄 번역해 본다 (2026-08-27)
+
+모델이 `available` 이 아니면 워커가 **시작하기 전에 실제로 번역을 시도한다.** 여기서 못 하면 앞으로도 못 한다.
+
+```
+[worker] msedge-dev · 모델 가용성 — 감지기 downloadable / 번역기(en>ko) downloadable
+[worker] 모델이 아직 없습니다. 실제로 받아지는지 확인합니다(최대 90초)…
+[worker] 모델 확보 — 시험 번역 "안녕하세요"          ← 정상
+```
+```
+[worker] ⛔ 이 브라우저(msedge)는 번역기를 받지 못합니다: 시간 초과
+[worker] ⛔ 이대로 두면 번역이 한 건도 안 되면서 오류도 안 납니다.
+```
+
+⛔ **가용성 값만 믿으면 안 된다.** Edge Stable 은 모델이 하나도 없는 상태에서도 `downloadable`
+(= 받을 수 있다)이라고 답하고, 정작 부르면 요청도 안 보내고 매달린다. 그 상태로 두면 워커는
+3분 타임아웃만 반복하며 **살아있는 척** 헛돈다 — 엿새를 그렇게 흘린 적이 있다(위 ⛔ 참고).
+
+`TRANSLATE_STRICT=1` 이면 이때 프로세스를 끝낸다(감시자가 계속 되살리며 로그를 남기게 하려면).
 
 ## ⚠️ 조용히 헛도는 함정 (2026-08-13 실측)
 

@@ -36,12 +36,11 @@ const EN: Record<string, string> = {
   "fab.upload_image": "Upload image",
   "fab.upload_fail": "Upload failed",
 
-  // 온보딩/지역 (ISO 3166-2:KR 17 시도)
+  // 온보딩/지역 (ISO 3166-2:KR 16 시도 — 광주 KR-29 는 전남광주통합특별시로 흡수돼 없다)
   "region.KR-11": "Seoul",
   "region.KR-26": "Busan",
   "region.KR-27": "Daegu",
   "region.KR-28": "Incheon",
-  "region.KR-29": "Gwangju",
   "region.KR-30": "Daejeon",
   "region.KR-31": "Ulsan",
   "region.KR-41": "Gyeonggi",
@@ -49,7 +48,7 @@ const EN: Record<string, string> = {
   "region.KR-43": "Chungbuk",
   "region.KR-44": "Chungnam",
   "region.KR-45": "Jeonbuk",
-  "region.KR-46": "Jeonnam",
+  "region.KR-46": "Jeonnam-Gwangju",
   "region.KR-47": "Gyeongbuk",
   "region.KR-48": "Gyeongnam",
   "region.KR-49": "Jeju",
@@ -1111,7 +1110,7 @@ const EN: Record<string, string> = {
   "fab.light": "Light mode",
   "nav.assoc": "About the Association",
   "fab.login": "Sign in with Google",
-  "fab.loginhint": "Sign in to take the exam",
+  "fab.loginhint": "Available after sign-in",
   "fab.morebtn": "More",
   "fab.changeChar": "Change avatar",
   "fab.editName": "Edit name",
@@ -1615,7 +1614,7 @@ const EN: Record<string, string> = {
   "daily.theory": "Theory",
   "daily.hint_lead": "Not sure?",
   "daily.reward_head": "On completion",
-  "daily.done_note": "Today's DAILY QUIZ is done ✓ A new question opens tomorrow. You can revisit today's (reward is once a day).",
+  "daily.reward_done": "Done ✓",
   "daily.saving": "Saving…",
   "daily.pop_title": "DAILY QUIZ complete!",
   "daily.pop_bonus": "7-day bonus +{b}P",
@@ -1639,7 +1638,7 @@ const EN: Record<string, string> = {
   "mg.rank_players": " · {n} players",
   "mg.rank_empty": "No scores yet — be the first!",
   "mg.rank_need_login": "Sign in to see your rank.",
-  "mg.rank_no_mine": "You don't have a score yet — play a round and it'll show up.",
+  "mg.rank_no_mine": "Play a round to join the ranking.",
   "mg.sec": "{n}s",
   "mg.min_sec": "{m}m {s}s",
 
@@ -1675,7 +1674,7 @@ const EN: Record<string, string> = {
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
   //    카드는 이미지로 밖으로 나가는 물건이라, 만든 사람의 화면 언어를 그대로 따라가는 게 맞다.
-  "share.modal_title": "Share my card",
+  "share.modal_title": "My rank card",
   "share.making": "Creating your card…",
   "share.make_fail": "Couldn't create the card",
   "share.img_fail": "Couldn't create the image",
@@ -1736,7 +1735,7 @@ const EN: Record<string, string> = {
   "hub.gate_title": "Sign-in required",
   "hub.gate_sub": "Sign in to use check-in and the shop",
   "hub.banner_login": "Check-in and the shop need you signed in",
-  "hub.share": "Show off my rank",
+  "hub.share": "My rank card",
   "hub.gift_btn": "Gift",
   "hub.help_aria": "How to earn points",
   "hub.coin_tip": "Your CARI coins",

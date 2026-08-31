@@ -20,7 +20,7 @@ import {
 } from '../lib/testConfigLevel'
 import { PROMOTE_RATE_LOW, PROMOTE_RATE_HIGH, promoteCut } from '../lib/scoring'
 import { useT } from '../lib/i18n'
-import type { StartTestResponse, ListAttemptsResponse } from '../lib/testTypes'
+import type { ListAttemptsResponse } from '../lib/testTypes'
 
 // 레벨 색(LEVEL_COLORS)은 응시 전 경고 화면과 공유 → lib/testConfigLevel.ts 가 단일 출처.
 // 이 화면에선 별 빛무리(--lv-c)에만 쓴다 — 배지·진행바는 금/은(인증서와 같은 규칙)이라 색을 안 받는다.
@@ -49,10 +49,8 @@ const DIPPER_EDGES: [number, number][] = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6]
 export default function LevelSelect() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isFullUser, ensureAnonymous, user } = useAuth()
-  const { t, lang } = useT()
-  const [loading, setLoading] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { isFullUser, user } = useAuth()
+  const { t } = useT()
   const [ruleOpen, setRuleOpen] = useState(false) // 등급 규칙 접기(기본 접힘)
   // 해금된 최고 레벨 = 현재 등급(rank). 게스트/첫 유저 = 1. 승급 시 한 단계씩 해제.
   const [unlocked, setUnlocked] = useState(1)
@@ -124,24 +122,12 @@ export default function LevelSelect() {
         (searchRec.alt ? t('reco.result_alt', { n: searchRec.alt }) : '')
       : null
 
-  async function start(level: number) {
-    setError(null)
-    setLoading(level)
-    try {
-      // 게스트 응시 — 세션이 없으면 익명 세션을 즉석에서 만든다(2026-08-06 부활).
-      //   응시는 되지만 **결과는 총점만** 나오고 누적(등급·6축)에는 반영되지 않는다
-      //   — 잠금 판정은 서버(submit-test·get-result 의 lockedResult)가 하고, 화면은 손댈 것이 없다.
-      //   결과창에서 구글 로그인하면 claim_token 으로 그 응시가 그대로 계정에 이관된다.
-      await ensureAnonymous()
-      const res = await callFunction<StartTestResponse>('start-test', { level, lang })
-      navigate(`/test/${res.attemptId}`, { state: res })
-    } catch (e) {
-      // start-test 는 하루 응시 소진 시 error='daily_limit' 로 429 를 낸다(서버 문구 대신 현지화 문구로).
-      const raw = e instanceof Error ? e.message : ''
-      setError(raw === 'daily_limit' ? t('lv.daily_limit') : raw || t('lv.start_failed'))
-    } finally {
-      setLoading(null)
-    }
+  // ⛔ 여기서 응시를 만들지 않는다 — 안내 게이트(/test/ready)의 「전체화면으로 시작」이 만든다.
+  //    예전엔 이 버튼이 곧바로 start-test 를 불러서, 안내만 보고 「취소」를 눌러도 하루 응시
+  //    횟수가 이미 1회 깎였다(문제를 한 개도 못 본 채로). 익명 세션 생성도 같이 미룬다.
+  //    응시 실패(하루 소진·잠긴 레벨)도 이제 그 화면에서 뜬다 — 여기엔 띄울 것이 없다.
+  function start(level: number) {
+    navigate(`/test/ready/${level}`)
   }
 
   // 규칙 3줄(승급/유지/일일횟수) — 숫자는 scoring 임계값에서 읽어 자동 동기화. 강등은 없다.
@@ -266,12 +252,6 @@ export default function LevelSelect() {
           </div>
         ) : null}
 
-        {error ? (
-          <div className="mb-3 rounded-xl border border-error/20 bg-error/5 px-4 py-2.5 font-body-sm text-[15px] text-error break-keep">
-            {error}
-          </div>
-        ) : null}
-
         {/* 응시 카드 — 이 화면의 유일한 결정.
             모바일은 폭이 좁아 가로 사다리가 성립하지 않는다(원 7개가 붙어버림) → 카드 안에서
             ‹ › 로 레벨을 넘기고, 사다리는 진행바 + 'N / 7' 로 압축한다. PC 는 아래 가로 사다리를 쓴다. */}
@@ -339,7 +319,7 @@ export default function LevelSelect() {
             {/* 잠긴 레벨은 회색 비활성 버튼 — 내용은 다 보이지만 응시만 막힌다(서버 start-test 도 403). */}
             <button
               onClick={() => start(focus)}
-              disabled={loading !== null || focusSoon || focusLocked}
+              disabled={focusSoon || focusLocked}
               className={`w-full px-6 py-3.5 md:py-4 inline-flex items-center justify-center gap-1.5 font-label-md text-[17px] md:text-[18px] font-bold rounded-xl transition-colors ambient-shadow ${
                 focusLocked
                   ? 'bg-outline-variant text-on-surface-variant cursor-not-allowed'
@@ -353,17 +333,12 @@ export default function LevelSelect() {
                 </>
               ) : focusSoon ? (
                 t('lv.coming_soon')
-              ) : loading === focus ? (
-                t('lv.preparing')
               ) : (
                 t('lv.start_now')
               )}
             </button>
-            {focusLocked ? (
-              <span className="font-label-md text-[15px] font-bold text-outline break-keep md:text-center">
-                {t('lv.locked_hint')}
-              </span>
-            ) : dailyLeft != null ? (
+            {/* 잠김 안내 문구는 뺐다 — 자물쇠 버튼이 이미 같은 말을 한다. 별 툴팁에는 남아 있다. */}
+            {!focusLocked && dailyLeft != null ? (
               <span className="font-label-md text-[15px] font-bold text-outline break-keep md:text-center">
                 {t('lv.left_today', { n: Math.max(0, dailyLeft) })}
               </span>

@@ -82,15 +82,21 @@ export function useAntiCheat({ enabled, onLimitReached }: Options): AntiCheatSta
     }
   }, [enabled])
 
-  async function enterFullscreen() {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen()
-      }
-    } catch {
-      // 사용자가 거부하거나 미지원 — 치명적이지 않음(2층 감지는 계속 동작)
-    }
-  }
-
   return { violations, lastWarning, logRef, enterFullscreen }
+}
+
+/**
+ * 전체화면 진입. 훅 밖에서도 쓴다 — 응시 시작 버튼이 응시 화면이 아니라 **그 앞의 안내 게이트**
+ * (TestReady)에 있기 때문이다. 두 벌로 복사하면 거부·미지원 처리가 한쪽에만 남는다.
+ * ⚠️ 실패해도 던지지 않는다. 전체화면은 부정행위 감지의 편의일 뿐이고, 못 걸었다고 응시를
+ *    막으면 전체화면을 거부한 브라우저에서 시험 자체를 못 본다(이탈 감지는 그대로 돈다).
+ */
+export async function enterFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen()
+    }
+  } catch {
+    // 사용자가 거부하거나 미지원 — 치명적이지 않음(2층 감지는 계속 동작)
+  }
 }

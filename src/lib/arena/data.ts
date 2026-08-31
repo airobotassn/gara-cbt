@@ -99,7 +99,7 @@ export const loadCountries = (): Promise<GeoFeature[]> =>
   loadFeatures('/geo/world.json', () => 'countries').then((fs) =>
     fs.filter((f) => f.properties.name !== 'Antarctica'),
   )
-/** 대한민국 시도 17개 — 레벨1 */
+/** 대한민국 시도 16개 — 레벨1 (광주는 전남광주통합특별시로 합쳐져 16개다) */
 export const loadProvinces = (): Promise<GeoFeature[]> => loadFeatures('/geo/kr-prov.json')
 
 /**

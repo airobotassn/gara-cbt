@@ -573,12 +573,14 @@ drop policy if exists "schools_select_all" on schools;
 create policy "schools_select_all" on schools for select using (true);
 create index if not exists schools_name_trgm on schools using gin (name gin_trgm_ops);
 
--- (3) regions (ISO 3166-2:KR 17 시도 — 지역 코드 유효성의 단일출처 = FK 대상)
+-- (3) regions (ISO 3166-2:KR 16 시도 — 지역 코드 유효성의 단일출처 = FK 대상)
+-- ⛔ 광주(KR-29)는 없다 — 전남광주통합특별시로 통합되면서 KR-46 이 흡수했다(2026-08-31,
+--    마이그레이션 20260831120000). ISO 에 통합 코드가 아직 없어 살아남은 쪽 코드를 그대로 쓴다.
 create table if not exists regions (
   code text primary key
 );
 insert into regions (code) values
-  ('KR-11'),('KR-26'),('KR-27'),('KR-28'),('KR-29'),('KR-30'),('KR-31'),
+  ('KR-11'),('KR-26'),('KR-27'),('KR-28'),('KR-30'),('KR-31'),
   ('KR-41'),('KR-42'),('KR-43'),('KR-44'),('KR-45'),('KR-46'),('KR-47'),
   ('KR-48'),('KR-49'),('KR-50')
 on conflict (code) do nothing;

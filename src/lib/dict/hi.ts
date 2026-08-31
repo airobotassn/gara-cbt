@@ -36,12 +36,11 @@ const HI: Record<string, string> = {
   "fab.upload_image": "छवि अपलोड करें",
   "fab.upload_fail": "अपलोड विफल",
 
-  // 온보딩/지역 (ISO 3166-2:KR 17 시도)
+  // 온보딩/지역 (ISO 3166-2:KR 16 시도 — 광주 KR-29 는 전남광주통합특별시로 흡수돼 없다)
   "region.KR-11": "सियोल",
   "region.KR-26": "बुसान",
   "region.KR-27": "देगू",
   "region.KR-28": "इंचियोन",
-  "region.KR-29": "ग्वांगजू",
   "region.KR-30": "देजियन",
   "region.KR-31": "उल्सान",
   "region.KR-41": "ग्योंगगी",
@@ -49,7 +48,7 @@ const HI: Record<string, string> = {
   "region.KR-43": "चुंगबुक",
   "region.KR-44": "चुंगनाम",
   "region.KR-45": "जिओनबुक",
-  "region.KR-46": "जिओलानाम",
+  "region.KR-46": "जिओनम-ग्वांगजू",
   "region.KR-47": "ग्योंगबुक",
   "region.KR-48": "ग्योंगनाम",
   "region.KR-49": "जेजू",
@@ -1111,7 +1110,7 @@ const HI: Record<string, string> = {
   "fab.light": "लाइट मोड",
   "nav.assoc": "एसोसिएशन परिचय",
   "fab.login": "Google से साइन इन करें",
-  "fab.loginhint": "साइन इन करके परीक्षा दें",
+  "fab.loginhint": "साइन इन करने पर उपलब्ध",
   "fab.morebtn": "और देखें",
   "fab.changeChar": "अवतार बदलें",
   "fab.editName": "नाम बदलें",
@@ -1615,7 +1614,7 @@ const HI: Record<string, string> = {
   "daily.theory": "सिद्धांत",
   "daily.hint_lead": "उलझन हो तो",
   "daily.reward_head": "पूरा करने पर",
-  "daily.done_note": "आज का DAILY QUIZ पूरा ✓ कल नया सवाल खुलेगा। आज का दोबारा देख सकते हैं (इनाम दिन में एक बार)।",
+  "daily.reward_done": "पूर्ण ✓",
   "daily.saving": "दर्ज हो रहा है…",
   "daily.pop_title": "DAILY QUIZ पूरा!",
   "daily.pop_bonus": "7-दिन बोनस +{b}P",
@@ -1639,7 +1638,7 @@ const HI: Record<string, string> = {
   "mg.rank_players": " · {n} खिलाड़ी",
   "mg.rank_empty": "अभी कोई स्कोर नहीं — पहले बनिए!",
   "mg.rank_need_login": "अपनी रैंक देखने के लिए साइन इन करें।",
-  "mg.rank_no_mine": "आपका स्कोर नहीं है — एक बार खेलें, दर्ज हो जाएगा।",
+  "mg.rank_no_mine": "खेलने के बाद रैंकिंग में दर्ज हो जाएगा।",
   "mg.sec": "{n}से",
   "mg.min_sec": "{m}मि {s}से",
 
@@ -1675,7 +1674,7 @@ const HI: Record<string, string> = {
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
   //    카드는 이미지로 밖으로 나가는 물건이라, 만든 사람의 화면 언어를 그대로 따라가는 게 맞다.
-  "share.modal_title": "मेरा कार्ड शेयर करें",
+  "share.modal_title": "मेरा रैंक कार्ड",
   "share.making": "कार्ड बन रहा है…",
   "share.make_fail": "कार्ड नहीं बन सका",
   "share.img_fail": "छवि नहीं बन सकी",
@@ -1736,7 +1735,7 @@ const HI: Record<string, string> = {
   "hub.gate_title": "लॉगिन आवश्यक है",
   "hub.gate_sub": "चेक-इन और शॉप के लिए साइन इन करें",
   "hub.banner_login": "चेक-इन और शॉप के लिए साइन इन ज़रूरी है",
-  "hub.share": "मेरी रैंक दिखाएँ",
+  "hub.share": "मेरा रैंक कार्ड",
   "hub.gift_btn": "गिफ्ट",
   "hub.help_aria": "पॉइंट कैसे कमाएं",
   "hub.coin_tip": "आपके CARI कॉइन",

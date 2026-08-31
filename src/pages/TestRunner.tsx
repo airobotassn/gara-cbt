@@ -45,7 +45,9 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
   const total = questions.length
 
   const [index, setIndex] = useState(0)
-  const [started, setStarted] = useState(false) // 경고 게이트 통과 후 시작
+  // ⛔ '시작 전 안내' 게이트는 여기 없다 — 응시를 만들기 **전** 화면(TestReady)으로 옮겼다.
+  //    이 화면에 들어왔다는 건 이미 응시 기록이 만들어졌다는 뜻이라, 마운트가 곧 시작이다.
+  //    게이트를 여기로 되돌리면 안내만 보고 나간 사람의 하루 응시 횟수가 다시 깎인다.
   const [selected, setSelected] = useState<(number | null)[]>(
     () => Array(total).fill(null),
   )
@@ -120,8 +122,8 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     }).catch(() => {})
   }, [start.attemptId])
 
-  const { violations, lastWarning, logRef, enterFullscreen } = useAntiCheat({
-    enabled: started && !submitting && !voided,
+  const { violations, lastWarning, logRef } = useAntiCheat({
+    enabled: !submitting && !voided,
     onLimitReached: voidByCheat,
   })
   vLogRef.current = logRef.current // 훅의 배열은 제자리 변형이라 참조만 물려주면 된다
@@ -135,7 +137,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
   const deadlineRef = useRef<number | null>(null)
   const [remainMs, setRemainMs] = useState(durationMin * 60000)
   useEffect(() => {
-    if (!started || voided) return
+    if (voided) return
     if (deadlineRef.current == null) deadlineRef.current = Date.now() + durationMin * 60000
     const tick = () => {
       const left = Math.max(0, (deadlineRef.current as number) - Date.now())
@@ -145,13 +147,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     tick()
     const id = window.setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [started, voided, submit, durationMin])
-
-  // 경고 게이트의 "시작" 버튼에서 호출 — 사용자 제스처라 전체화면 진입이 허용된다.
-  async function begin() {
-    await enterFullscreen()
-    setStarted(true)
-  }
+  }, [voided, submit, durationMin])
 
   // 다음 = 문항 이동만 한다. 제출은 하단의 전용 버튼이 맡는다(예전엔 마지막 문항의 '다음'이
   // 제출을 겸했는데, 전용 버튼이 생기면서 마지막 화면에 제출이 두 개 보이게 돼 갈랐다).
@@ -178,7 +174,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
   //   · 마우스로 보기를 고른 뒤 →로 넘기면 그 버튼에 포커스가 남아 다음 문항에서 Enter 가
   //     엉뚱한 보기를 누르므로, 문항 이동 시 포커스를 푼다(blur 는 버블링 안 해 이탈감지와 무관).
   useEffect(() => {
-    if (!started || voided || submitting || askSubmit || askQuit) return
+    if (voided || submitting || askSubmit || askQuit) return
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return
       const el = document.activeElement
@@ -199,7 +195,7 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, voided, submitting, askSubmit, askQuit, questions, index, choose, goNext, goPrev])
+  }, [voided, submitting, askSubmit, askQuit, questions, index, choose, goNext, goPrev])
 
   function quit() {
     if (submitting) return
@@ -252,59 +248,6 @@ function RunnerInner({ start }: { start: StartTestResponse }) {
             </button>
             <button className="btn-ghost" onClick={() => navigate('/')}>
               {t('void.home')}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // 시작 전 경고 게이트 — 전체화면/이탈경고/무효 규칙 안내 후 사용자 클릭으로 시작
-  if (!started) {
-    return (
-      <div className="wrap">
-        <div className="card pad intro-gate">
-          <div className="intro-ico">⚠️</div>
-          <h2 className="sc-title">{t('intro.title')}</h2>
-          {/* 응시 레벨 — 흰 숫자 사각 배지는 ⚠️·제목과 무게가 겹쳐 무거웠다. 레벨색은 점과 옅은 배경으로만
-              쓰고 글자는 본문색으로 두는 알약 하나(레벨 색 팔레트는 /test/select 와 공유). */}
-          <div className="intro-lv" style={{ '--lvc': LEVEL_COLORS[start.level] } as CSSProperties}>
-            <span className="dot" aria-hidden="true" />
-            <b>
-              Lv.{start.level} · {t(`lv.${start.level}.name`)}
-            </b>
-          </div>
-          <div className="intro-anticheat">{t('intro.anticheat')}</div>
-          {/* 문항 수·제한시간도 규칙과 같은 행 모양으로 — 예전엔 제목 밑 회색 한 줄이라 잘 안 읽혔다.
-              둘은 같은 '시험 규격'이라 한 행에 묶는다(규칙 4줄과 섞이면 무엇이 규칙인지 흐려진다). */}
-          <ul className="intro-rules">
-            <li>
-              <span className="ic">📝</span>
-              {t('intro.fact_q', { q: total })} · {t('intro.fact_min', { min: durationMin })}
-            </li>
-            <li>
-              <span className="ic">🖥️</span>
-              {t('intro.fullscreen')}
-            </li>
-            <li>
-              <span className="ic">🚪</span>
-              {t('intro.rule_exit')}
-            </li>
-            <li>
-              <span className="ic">📋</span>
-              {t('intro.rule_block')}
-            </li>
-            <li>
-              <span className="ic">🚫</span>
-              {t('intro.rule_void', { m: MAX_VIOLATIONS })}
-            </li>
-          </ul>
-          <div className="intro-actions">
-            <button className="btn-ghost" onClick={() => navigate('/test/select')}>
-              {t('intro.cancel')}
-            </button>
-            <button className="btn-ink" onClick={begin}>
-              {t('intro.start')}
             </button>
           </div>
         </div>

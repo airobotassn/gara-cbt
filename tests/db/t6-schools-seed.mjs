@@ -1,15 +1,22 @@
 // T6 schools seed 검증 — 마이그레이션 20260714000100_schools_seed.sql 을 pglite 에 적용해
-// 행 수(중복 없음) + 모든 region_code 가 17 시도(KR-xx) 안에 있는지 확인.
+// 행 수(중복 없음) + 모든 region_code 가 16 시도(KR-xx) 안에 있는지 확인.
 // (pg_trgm 인덱스는 G001 마이그레이션 소관이고 seed 는 순수 INSERT 라 여기선 테이블만 최소 생성.)
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
-const REGION_CODES = ['KR-11','KR-26','KR-27','KR-28','KR-29','KR-30','KR-31','KR-41','KR-42','KR-43','KR-44','KR-45','KR-46','KR-47','KR-48','KR-49','KR-50'];
+// ⛔ 광주(KR-29)는 없다 — 전남광주통합특별시로 통합되면서 KR-46 이 흡수했다(2026-08-31).
+const REGION_CODES = ['KR-11','KR-26','KR-27','KR-28','KR-30','KR-31','KR-41','KR-42','KR-43','KR-44','KR-45','KR-46','KR-47','KR-48','KR-49','KR-50'];
 
 const db = await PGlite.create();
 await db.exec(`create table schools (id text primary key, name text not null, kind text, region_code text, active boolean not null default true);`);
 const seed = readFileSync('supabase/migrations/20260714000100_schools_seed.sql', 'utf8');
 await db.exec(seed);
+
+// 2026-08-31 전남·광주 통합 — 광주 학교 3곳을 KR-46 으로 옮기는 건 통합 마이그레이션이다.
+// 이 최소 스키마엔 profiles·regions·arena 표가 없어 파일을 통째로는 못 돌리니 schools 문장만 뽑아 쓴다
+// (문장을 여기 베껴 쓰면 나중에 규칙이 갈린다 — 원본에서 읽어온다).
+const merge = readFileSync('supabase/migrations/20260831120000_jeonnam_gwangju_merge.sql', 'utf8');
+for (const stmt of merge.match(/^update schools .*$/gm) ?? []) await db.exec(stmt);
 
 const results = [];
 const rec = (name, got, want, pass) => results.push({ name, got, want, pass: pass ?? (got === want) });
@@ -23,9 +30,9 @@ await db.exec(seed);
 const count2 = (await db.query(`select count(*)::int n from schools`)).rows[0].n;
 rec('idempotent re-apply (on conflict do nothing)', count2, count);
 
-// 모든 region_code 가 17 시도 안에 있는지
+// 모든 region_code 가 16 시도 안에 있는지
 const bad = (await db.query(`select id, region_code from schools where region_code is not null and region_code <> all($1::text[])`, [REGION_CODES])).rows;
-rec('all region_code in 17 시도', bad.length, 0, bad.length === 0);
+rec('all region_code in 16 시도', bad.length, 0, bad.length === 0);
 if (bad.length) console.log('  invalid region rows:', JSON.stringify(bad));
 
 // kind 는 university|college

@@ -36,12 +36,11 @@ const JA: Record<string, string> = {
   "fab.upload_image": "画像をアップロード",
   "fab.upload_fail": "アップロード失敗",
 
-  // 온보딩/지역 (ISO 3166-2:KR 17 시도)
+  // 온보딩/지역 (ISO 3166-2:KR 16 시도 — 광주 KR-29 는 전남광주통합특별시로 흡수돼 없다)
   "region.KR-11": "ソウル特別市",
   "region.KR-26": "釜山広域市",
   "region.KR-27": "大邱広域市",
   "region.KR-28": "仁川広域市",
-  "region.KR-29": "光州広域市",
   "region.KR-30": "大田広域市",
   "region.KR-31": "蔚山広域市",
   "region.KR-41": "京畿道",
@@ -49,7 +48,7 @@ const JA: Record<string, string> = {
   "region.KR-43": "忠清北道",
   "region.KR-44": "忠清南道",
   "region.KR-45": "全北特別自治道",
-  "region.KR-46": "全羅南道",
+  "region.KR-46": "全南光州統合特別市",
   "region.KR-47": "慶尚北道",
   "region.KR-48": "慶尚南道",
   "region.KR-49": "済州特別自治道",
@@ -1111,7 +1110,7 @@ const JA: Record<string, string> = {
   "fab.light": "ライトモード",
   "nav.assoc": "協会紹介",
   "fab.login": "Googleでログイン",
-  "fab.loginhint": "ログインすると受験できます",
+  "fab.loginhint": "ログインするとご利用いただけます",
   "fab.morebtn": "もっと見る",
   "fab.changeChar": "キャラクター変更",
   "fab.editName": "名前変更",
@@ -1615,7 +1614,7 @@ const JA: Record<string, string> = {
   "daily.theory": "理論",
   "daily.hint_lead": "迷ったら",
   "daily.reward_head": "完了すると",
-  "daily.done_note": "本日のDAILY QUIZ完了 ✓ 明日新しい問題が開きます。今日の分は見返せます（報酬は1日1回）。",
+  "daily.reward_done": "完了 ✓",
   "daily.saving": "記録中…",
   "daily.pop_title": "DAILY QUIZ完了！",
   "daily.pop_bonus": "7日達成 +{b}P",
@@ -1639,7 +1638,7 @@ const JA: Record<string, string> = {
   "mg.rank_players": " · 参加 {n}人",
   "mg.rank_empty": "まだ記録がありません。最初の記録を作りましょう！",
   "mg.rank_need_login": "ログインすると自分の順位が表示されます。",
-  "mg.rank_no_mine": "まだ自分の記録がありません — 一度プレイすると登録されます。",
+  "mg.rank_no_mine": "プレイするとランキングに登録されます。",
   "mg.sec": "{n}秒",
   "mg.min_sec": "{m}分{s}秒",
 
@@ -1675,7 +1674,7 @@ const JA: Record<string, string> = {
   // ── 공유 카드(ShareCardModal + lib/shareCard.ts) ──────────────────────────
   // ⚠️ 카드 안 글자는 캔버스에 그려진다 — 훅을 못 쓰므로 renderShareCard 가 lang 을 받아 tr() 로 뽑는다.
   //    카드는 이미지로 밖으로 나가는 물건이라, 만든 사람의 화면 언어를 그대로 따라가는 게 맞다.
-  "share.modal_title": "マイカードを共有",
+  "share.modal_title": "マイランクカード",
   "share.making": "カードを作成中…",
   "share.make_fail": "カードを作成できませんでした",
   "share.img_fail": "画像を作成できませんでした",
@@ -1736,7 +1735,7 @@ const JA: Record<string, string> = {
   "hub.gate_title": "ログインが必要です",
   "hub.gate_sub": "ログインして出席・ショップを使いましょう",
   "hub.banner_login": "出席・ショップはログインが必要です",
-  "hub.share": "ランキング自慢",
+  "hub.share": "マイランクカード",
   "hub.gift_btn": "ギフト",
   "hub.help_aria": "ポイントの獲得方法",
   "hub.coin_tip": "保有CARIコイン",

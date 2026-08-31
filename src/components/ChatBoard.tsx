@@ -719,7 +719,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
       {!isFullUser ? (
         <div className="chat-login-cta">
           <span>{t('chat.loginToJoin')}</span>
-          <Link to="/login" className="chat-login-btn">{t('common.login_google')}</Link>
+          {/* /login 은 구글·카카오 둘 다 있는 화면이라 '구글로 로그인' 이 아니라 '로그인' 이다. */}
+          <Link to="/login" className="chat-login-btn">{t('common.login')}</Link>
         </div>
       ) : (
         <form className="chat-composer" onSubmit={onSend}>
