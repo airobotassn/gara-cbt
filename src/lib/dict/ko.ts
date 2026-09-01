@@ -405,7 +405,7 @@ const KO: Record<string, string> = {
   "country.KR": "대한민국",
 
   "db.title": "내 기록",
-  "db.empty": "아직 제출한 시험이 없어요.",
+  "db.empty": "레벨테스트 응시기록이 없습니다.",
   "db.start": "테스트 시작하기",
   "db.stat_maxlevel": "최고 레벨",
   "db.stat_maxlevel_d": "가장 높이 도전",

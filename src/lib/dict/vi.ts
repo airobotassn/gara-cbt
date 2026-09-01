@@ -398,7 +398,7 @@ const VI: Record<string, string> = {
   "country.KR": "Hàn Quốc",
 
   "db.title": "Hồ sơ của tôi",
-  "db.empty": "Chưa có bài kiểm tra nào được nộp.",
+  "db.empty": "Không có hồ sơ bài kiểm tra cấp độ.",
   "db.start": "Bắt đầu một bài",
   "db.stat_maxlevel": "Cấp cao nhất",
   "db.stat_maxlevel_d": "Cao nhất đã thử",

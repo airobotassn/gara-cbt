@@ -398,7 +398,7 @@ const JA: Record<string, string> = {
   "country.KR": "韓国",
 
   "db.title": "マイ記録",
-  "db.empty": "まだ提出したテストがありません。",
+  "db.empty": "レベルテストの受験記録がありません。",
   "db.start": "テストを始める",
   "db.stat_maxlevel": "最高レベル",
   "db.stat_maxlevel_d": "最も高い挑戦",

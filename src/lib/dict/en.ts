@@ -398,7 +398,7 @@ const EN: Record<string, string> = {
   "country.KR": "South Korea",
 
   "db.title": "My record",
-  "db.empty": "No submitted tests yet.",
+  "db.empty": "No level test records.",
   "db.start": "Start a test",
   "db.stat_maxlevel": "Top level",
   "db.stat_maxlevel_d": "Highest attempted",

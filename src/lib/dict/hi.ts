@@ -398,7 +398,7 @@ const HI: Record<string, string> = {
   "country.KR": "दक्षिण कोरिया",
 
   "db.title": "मेरा रिकॉर्ड",
-  "db.empty": "अभी कोई टेस्ट जमा नहीं किया।",
+  "db.empty": "लेवल टेस्ट का कोई रिकॉर्ड नहीं है।",
   "db.start": "टेस्ट शुरू करें",
   "db.stat_maxlevel": "सर्वोच्च लेवल",
   "db.stat_maxlevel_d": "सबसे ऊंचा प्रयास",

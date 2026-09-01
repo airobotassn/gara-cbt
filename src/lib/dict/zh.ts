@@ -398,7 +398,7 @@ const ZH: Record<string, string> = {
   "country.KR": "韩国",
 
   "db.title": "我的记录",
-  "db.empty": "还没有提交过测试。",
+  "db.empty": "没有等级测试的应试记录。",
   "db.start": "开始测试",
   "db.stat_maxlevel": "最高等级",
   "db.stat_maxlevel_d": "挑战的最高",
