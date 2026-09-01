@@ -1830,7 +1830,8 @@ const VI: Record<string, string> = {
   "hub.part.skin_meadow": "Đồng cỏ",
   "hub.part.skin_palace_day": "Cố cung · Ngày",
   "hub.part.skin_palace_night": "Cố cung · Đêm",
-
+  "hub.part.skin_office": "Văn phòng · Trụ sở",
+  "hub.part.skin_office_plaza": "Văn phòng · Quảng trường",
   // 쿠폰함
   "hub.coupon.title": "Phiếu giảm giá",
   "hub.coupon.discount": "Giảm {n}%",

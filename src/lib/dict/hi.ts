@@ -1830,7 +1830,8 @@ const HI: Record<string, string> = {
   "hub.part.skin_meadow": "घास का मैदान",
   "hub.part.skin_palace_day": "महल · दिन",
   "hub.part.skin_palace_night": "महल · रात",
-
+  "hub.part.skin_office": "ऑफ़िस · मुख्यालय",
+  "hub.part.skin_office_plaza": "ऑफ़िस · प्लाज़ा",
   // 쿠폰함
   "hub.coupon.title": "कूपन",
   "hub.coupon.discount": "{n}% छूट",

@@ -1830,7 +1830,8 @@ const ZH: Record<string, string> = {
   "hub.part.skin_meadow": "草原",
   "hub.part.skin_palace_day": "古宫 · 白天",
   "hub.part.skin_palace_night": "古宫 · 夜晚",
-
+  "hub.part.skin_office": "办公室 · 总部",
+  "hub.part.skin_office_plaza": "办公室 · 广场",
   // 쿠폰함
   "hub.coupon.title": "优惠券",
   "hub.coupon.discount": "{n}% 折扣",

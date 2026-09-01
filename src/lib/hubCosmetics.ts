@@ -205,13 +205,17 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  * 이 스킨이 입는 **UI 한 벌**의 이름 = `.hub` 의 `data-ui` 값.
  * `base`   = 아무 그림도 안 얹는 원래 카툰 CSS(흰 면 + 두꺼운 외곽선 + SVG 아이콘).
  * `palace` = 궁궐 9패치 판·게이지·도장·아이콘 한 벌(`public/hub/ui/*`).
+ * `office` = 사옥 벌 — 흰 면에 파란 테를 두른 판·알약 게이지·3D 파란 아이콘(`public/hub/ui-office/*`).
+ *
+ * ⚠️ **에셋 파일 이름이 벌마다 같다**(`panel-mission.webp`·`icon-shop.png` …). 폴더로만 갈리므로
+ *    한 폴더에 섞으면 한쪽이 통째로 덮인다. 새 벌은 항상 자기 폴더를 갖는다.
  *
  * ⚠️ **스킨 이름(`data-skin`)으로 UI 를 고르지 말 것.** 예전엔 CSS 가 `.hub[data-skin]` 이면
  *    무조건 궁궐 UI 를 얹었는데, 기본 배경(초원)이 생기자 초원 위에 궁궐 판이 그대로 얹혔다.
  *    급한 대로 선택자를 `palace_night` 하나로 좁혔더니 이번엔 **고궁 낮이 UI 를 잃었다**
  *    (2026-08-25). 배경과 UI 는 각자 이름을 갖는다 — 그래야 "배경만 다른 두 스킨"이 성립한다.
  */
-export type SkinUi = 'base' | 'palace'
+export type SkinUi = 'base' | 'palace' | 'office'
 
 export interface SkinDef {
   /** `data-skin` 값 = 배경 값 블록 이름(`hub.css` 의 `.hub[data-skin='<키>']`) */
@@ -264,6 +268,23 @@ export const SKINS: SkinDef[] = [
     ui: 'palace',
     iconDir: '/hub/ui',
     bg: '/hub/bg-v5.webp',
+  },
+  // 오피스 — 사옥 앞 광장. 배경 한 장에 **자기 UI 한 벌**을 같이 들고 온다(고궁 둘과 다른 점).
+  //   ⚠️ 아이콘 폴더가 `/hub/ui-office` 인 이유: 파일 이름이 궁궐 벌과 같아서 한 폴더에 못 섞는다.
+  //   값 0 · 판매중 — 상점에서 '구매'를 누르면 코인을 안 쓰고 바로 지급된다(`shop_buy` 가 0을 그냥 통과).
+  {
+    key: 'office',
+    partKey: 'skin_office',
+    ui: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office.webp',
+  },
+  {
+    key: 'office_plaza',
+    partKey: 'skin_office_plaza',
+    ui: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-plaza.webp',
   },
 ]
 

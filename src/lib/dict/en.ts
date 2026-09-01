@@ -1830,7 +1830,8 @@ const EN: Record<string, string> = {
   "hub.part.skin_meadow": "Meadow",
   "hub.part.skin_palace_day": "Palace · Day",
   "hub.part.skin_palace_night": "Palace · Night",
-
+  "hub.part.skin_office": "Office · HQ",
+  "hub.part.skin_office_plaza": "Office · Plaza",
   // 쿠폰함
   "hub.coupon.title": "Coupons",
   "hub.coupon.discount": "{n}% off",

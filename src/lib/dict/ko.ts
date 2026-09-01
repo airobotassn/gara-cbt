@@ -1859,7 +1859,8 @@ const KO: Record<string, string> = {
   "hub.part.skin_meadow": "초원",
   "hub.part.skin_palace_day": "고궁 · 낮",
   "hub.part.skin_palace_night": "고궁 · 밤",
-
+  "hub.part.skin_office": "오피스 · 사옥",
+  "hub.part.skin_office_plaza": "오피스 · 광장",
   // 쿠폰함
   "hub.coupon.title": "쿠폰함",
   "hub.coupon.discount": "{n}% 할인",

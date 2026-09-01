@@ -1830,7 +1830,8 @@ const JA: Record<string, string> = {
   "hub.part.skin_meadow": "草原",
   "hub.part.skin_palace_day": "古宮・昼",
   "hub.part.skin_palace_night": "古宮・夜",
-
+  "hub.part.skin_office": "オフィス・本社",
+  "hub.part.skin_office_plaza": "オフィス・広場",
   // 쿠폰함
   "hub.coupon.title": "クーポン",
   "hub.coupon.discount": "{n}%割引",
