@@ -97,11 +97,8 @@ export default function TermsAgree() {
           />
           <span className="text-base leading-relaxed break-keep">{t('terms.gate_marketing')}</span>
         </label>
-        <p className="mt-2 pl-8 text-sm leading-relaxed text-on-surface-variant break-keep">
-          {t('terms.gate_marketing_note')}
-        </p>
 
-        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-base text-on-surface-variant underline underline-offset-4">
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-base text-on-surface-variant underline underline-offset-4">
           {/* ⚠️ 새 탭으로 연다 — 같은 탭에서 열면 체크 상태가 날아가고 돌아올 길도 없다. */}
           <Link to="/terms" target="_blank" rel="noreferrer">{t('terms.gate_view_terms')}</Link>
           <Link to="/privacy" target="_blank" rel="noreferrer">{t('terms.gate_view_privacy')}</Link>

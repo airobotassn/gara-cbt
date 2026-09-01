@@ -135,7 +135,6 @@ const ZH: Record<string, string> = {
   "terms.gate_body": "使用本服务前，请同意以下内容。",
   "terms.gate_check": "我已年满14周岁，并同意服务条款和隐私政策。",
   "terms.gate_marketing": "（选填）接收广告营销信息和电子报邮件。",
-  "terms.gate_marketing_note": "不同意也可以使用全部服务，您可以随时在收到的邮件中退订。",
   "terms.gate_view_terms": "查看服务条款",
   "terms.gate_view_privacy": "查看隐私政策",
   "terms.gate_agree": "同意并开始",

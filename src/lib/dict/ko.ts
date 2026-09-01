@@ -135,7 +135,6 @@ const KO: Record<string, string> = {
   "terms.gate_body": "서비스를 이용하려면 아래 항목에 동의해 주세요.",
   "terms.gate_check": "만 14세 이상이며, 이용약관과 개인정보처리방침에 동의합니다.",
   "terms.gate_marketing": "(선택) 광고·마케팅 정보와 뉴스레터를 이메일로 받겠습니다.",
-  "terms.gate_marketing_note": "동의하지 않아도 서비스를 모두 이용할 수 있고, 받은 메일에서 언제든 수신을 거부할 수 있습니다.",
   "terms.gate_view_terms": "이용약관 보기",
   "terms.gate_view_privacy": "개인정보처리방침 보기",
   "terms.gate_agree": "동의하고 시작하기",

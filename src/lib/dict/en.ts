@@ -135,7 +135,6 @@ const EN: Record<string, string> = {
   "terms.gate_body": "Please agree to the following to use the service.",
   "terms.gate_check": "I am 14 or older, and I agree to the Terms of Service and the Privacy Policy.",
   "terms.gate_marketing": "(Optional) Send me marketing emails and newsletters.",
-  "terms.gate_marketing_note": "You can use every part of the service without agreeing, and you can unsubscribe at any time from any email we send.",
   "terms.gate_view_terms": "View Terms of Service",
   "terms.gate_view_privacy": "View Privacy Policy",
   "terms.gate_agree": "Agree and continue",
