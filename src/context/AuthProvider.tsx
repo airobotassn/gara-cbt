@@ -198,6 +198,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // 구글에 로그인된 계정이 하나면 동의화면 없이 그 계정으로 바로 통과한다.
         // 계정 선택창을 매번 띄워 어떤 계정으로 들어갈지 고르게 한다.
         queryParams: { prompt: 'select_account' },
+        // ⛔ 'profile' 을 다시 넣지 말 것 — 실명과 프로필 사진을 안 받는 게 의도다(2026-09-01).
+        //    구글은 이름과 사진을 'profile' 한 덩어리로 준다(따로 못 뗀다). 우리가 쓰던 건 실명뿐이고
+        //    사진은 이미 무시하고 있었다(avatar.ts 는 gem:/img: 아닌 값을 안 읽는다).
+        //    실명이 사라진 자리는 전부 이메일 앞부분으로 폴백한다(진위확인·성적표·마이페이지·이북 워터마크).
+        scopes: 'email',
       },
     })
     if (error) throw error

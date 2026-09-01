@@ -134,6 +134,8 @@ const VI: Record<string, string> = {
   "terms.gate_title": "Trước khi bắt đầu",
   "terms.gate_body": "Vui lòng đồng ý với nội dung dưới đây để sử dụng dịch vụ.",
   "terms.gate_check": "Tôi từ 14 tuổi trở lên và đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.",
+  "terms.gate_marketing": "(Tùy chọn) Nhận email quảng cáo, tiếp thị và bản tin.",
+  "terms.gate_marketing_note": "Bạn vẫn dùng được toàn bộ dịch vụ nếu không đồng ý, và có thể hủy nhận bất cứ lúc nào từ email chúng tôi gửi.",
   "terms.gate_view_terms": "Xem Điều khoản dịch vụ",
   "terms.gate_view_privacy": "Xem Chính sách bảo mật",
   "terms.gate_agree": "Đồng ý và bắt đầu",

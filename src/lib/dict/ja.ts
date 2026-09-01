@@ -134,6 +134,8 @@ const JA: Record<string, string> = {
   "terms.gate_title": "はじめる前に",
   "terms.gate_body": "サービスをご利用いただくには、以下の内容に同意してください。",
   "terms.gate_check": "満14歳以上であり、利用規約およびプライバシーポリシーに同意します。",
+  "terms.gate_marketing": "（任意）広告・マーケティング情報およびニュースレターをメールで受け取ります。",
+  "terms.gate_marketing_note": "同意しなくてもすべてのサービスをご利用いただけます。配信されたメールからいつでも受信を解除できます。",
   "terms.gate_view_terms": "利用規約を見る",
   "terms.gate_view_privacy": "プライバシーポリシーを見る",
   "terms.gate_agree": "同意して始める",

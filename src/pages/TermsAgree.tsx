@@ -28,6 +28,8 @@ export default function TermsAgree() {
   const { isFullUser, loading, onboardingLoading, needsTerms, markTermsDone, logout } = useAuth()
 
   const [checked, setChecked] = useState(false)
+  // 광고·마케팅 수신(선택). ⛔ 기본값을 true 로 두지 말 것 — 미리 체크된 항목은 명시적 동의가 아니다.
+  const [marketing, setMarketing] = useState(false)
   const [busy, setBusy] = useState(false)
 
   // 원래 가려던 목적지(내부 경로만 — 오픈 리다이렉트 방지).
@@ -46,7 +48,7 @@ export default function TermsAgree() {
     try {
       // ⛔ 동의 시각은 **엣지 함수가 찍는다.** profiles 의 그 컬럼은 service role 전용이라
       //    브라우저가 직접 쓸 수 없다 — 열어주면 체크를 안 하고도 통과시킬 수 있다.
-      await callFunction('agree-terms', {})
+      await callFunction('agree-terms', { marketing })
       markTermsDone()
       navigate(nextDest, { replace: true })
     } catch (e) {
@@ -83,7 +85,23 @@ export default function TermsAgree() {
           <span className="text-base leading-relaxed break-keep">{t('terms.gate_check')}</span>
         </label>
 
-        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-base text-on-surface-variant underline underline-offset-4">
+        {/* 광고·마케팅 수신 — **선택**이다. 정보통신망법 §50 은 광고성 정보에 명시적 사전 동의를 요구하는데,
+            동의를 서비스 이용의 조건으로 걸 수는 없다. 그래서 체크를 안 해도 아래 버튼이 눌린다.
+            ⛔ 위 필수 체크와 한 줄로 합치지 말 것 — 합치는 순간 "광고에 동의해야 서비스를 쓴다"가 되어 위법이다. */}
+        <label className="mt-4 flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1 w-5 h-5 flex-none accent-primary"
+            checked={marketing}
+            onChange={(e) => setMarketing(e.target.checked)}
+          />
+          <span className="text-base leading-relaxed break-keep">{t('terms.gate_marketing')}</span>
+        </label>
+        <p className="mt-2 pl-8 text-sm leading-relaxed text-on-surface-variant break-keep">
+          {t('terms.gate_marketing_note')}
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-base text-on-surface-variant underline underline-offset-4">
           {/* ⚠️ 새 탭으로 연다 — 같은 탭에서 열면 체크 상태가 날아가고 돌아올 길도 없다. */}
           <Link to="/terms" target="_blank" rel="noreferrer">{t('terms.gate_view_terms')}</Link>
           <Link to="/privacy" target="_blank" rel="noreferrer">{t('terms.gate_view_privacy')}</Link>
