@@ -518,7 +518,9 @@ export default function Ebooks() {
                 type="button"
                 onClick={() => { setCat(k); setPlaying(null); setBookPage(0); setLecPage(0); setPicked(new Set()) }}
                 aria-pressed={cat === k}
-                className={`rounded-full px-5 py-2.5 font-label-md text-[16px] font-bold tracking-tight transition-colors ${cat === k ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:text-on-surface'}`}
+                /* 선택 표시는 **면 밝기가 아니라 액센트 링**이다 — 면을 한 단 밝히는 것만으로는
+                   다크에서 어느 쪽이 켜졌는지 안 보였다(2026-09-01). 링은 inset 그림자라 칸 크기가 안 변한다. */
+                className={`rounded-full px-5 py-2.5 font-label-md text-[16px] font-bold tracking-tight transition ${cat === k ? 'bg-surface-container-lowest text-on-surface shadow-[inset_0_0_0_1.5px_var(--color-primary)]' : 'text-on-surface-variant hover:text-on-surface'}`}
               >
                 {CATALOG_LABEL[k]}
               </button>

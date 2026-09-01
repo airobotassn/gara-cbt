@@ -512,10 +512,14 @@ body:has(.panel.open) .fab::after {
   border-color: var(--blue);
   color: var(--txt);
 }
+/* 선택 표시 = 액센트 링(앱 공통 규칙) — 면을 통째로 칠하지 않는다.
+   ⚠️ 여기는 패널(.panel) 안이라 테마 토큰을 그대로 쓴다. 흰 면 고정인 .fab/.fab-top 과 다르다. */
 .pf-lang button.on {
-  background: var(--blue);
-  color: var(--fab-on-accent);
+  background: var(--bg);
+  color: var(--txt);
   border-color: var(--blue);
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+  font-weight: 700;
 }
 .pf-hint {
   font-size: var(--fs-sm);

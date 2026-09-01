@@ -395,6 +395,10 @@
 .admin-mini { border: 1px solid var(--line2); background: var(--bg); border-radius: 9px; padding: 6px 13px; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; color: var(--txt); transition: 0.12s; }
 .admin-mini:hover { border-color: var(--ink); }
 .admin-mini:disabled { opacity: 0.4; cursor: not-allowed; }
+/* 눌린 상태(토글) — 공지 편집의 '편집기/HTML', 미리보기의 'PC/폰'.
+   옛 방식은 인라인 font-weight 700 하나뿐이라 어느 쪽이 켜져 있는지 사실상 안 보였다.
+   선택 표시는 앱 공통 규칙(액센트 링)을 따른다. ⚠️ aria-pressed 를 단 admin-mini 에만 걸린다. */
+.admin-mini[aria-pressed='true'] { border-color: var(--blue); box-shadow: inset 0 0 0 1.5px var(--blue); }
 .admin-mini.danger { color: var(--danger-fg); border-color: color-mix(in srgb, var(--danger-fg) 35%, var(--line2)); }
 .admin-mini.danger:hover { border-color: var(--danger-fg); background: color-mix(in srgb, var(--danger-fg) 8%, var(--bg)); }
 .admin-table tr.off > td { opacity: 0.5; }

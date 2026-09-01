@@ -585,7 +585,8 @@ function EbookLibrary() {
             type="button"
             onClick={() => { setCat(k); setPlaying(null); setBookPage(0); setLecPage(0) }}
             aria-pressed={cat === k}
-            className={`rounded-full px-5 py-2.5 font-label-md text-[16px] font-bold tracking-tight transition-colors ${cat === k ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:text-on-surface'}`}
+            /* 선택 표시 = 액센트 링(스토어와 같은 버튼이라 같은 규칙). 면 밝기만으로는 안 보였다. */
+            className={`rounded-full px-5 py-2.5 font-label-md text-[16px] font-bold tracking-tight transition ${cat === k ? 'bg-surface-container-lowest text-on-surface shadow-[inset_0_0_0_1.5px_var(--color-primary)]' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             {k === 'leveltest' ? 'LEVELTEST' : 'CARIS'}
           </button>

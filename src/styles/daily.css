@@ -137,9 +137,11 @@
   margin-top: 8px; padding-bottom: 4px; }
 .dy-page .dy-viz-chip { padding: 7px 13px; font-size: 12.5px; font-weight: 900; color: var(--ink);
   background: var(--slot-bg); border: 3px solid var(--line); border-radius: 999px; cursor: pointer; line-height: 1; }
-.dy-page .dy-viz-chip.on { background: var(--brand); color: #fff; }
-.dy-page .dy-viz-chip.mv.on { background: var(--teal); color: #fff; }
-.dy-page .dy-viz-chip.tn.on { background: var(--gold); }
+/* 선택 표시 = 색 테두리(앱 공통 규칙). 면을 통째로 칠하던 옛 방식 대신 이미 있는 3px 외곽선을 물들인다.
+   ⚠️ 글자는 --ink 그대로 둔다 — 크림 면 위의 teal·gold 글자는 대비가 무너진다(칩 종류는 테두리 색이 알린다). */
+.dy-page .dy-viz-chip.on { border-color: var(--brand); box-shadow: 0 0 0 3px var(--glow); }
+.dy-page .dy-viz-chip.mv.on { border-color: var(--teal); }
+.dy-page .dy-viz-chip.tn.on { border-color: var(--gold); }
 .dy-page .dy-viz-chip.act { background: var(--gold); }
 .dy-page .dy-viz-chip:active { transform: translateY(2px); }
 .dy-page .dy-viz-hint { font-size: 12px; font-weight: 800; color: var(--ink2); }

@@ -97,7 +97,8 @@ export function LibraryFrame({
                         type="button"
                         onClick={() => onPick(g)}
                         aria-current={on ? 'true' : undefined}
-                        className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${on ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}
+                        /* 선택 표시 = 액센트 링. 면 밝기 한 단만으로는 지금 무엇을 보고 있는지 안 보였다. */
+                        className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition ${on ? 'bg-surface-container-lowest text-on-surface shadow-[inset_0_0_0_1.5px_var(--color-primary)]' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'}`}
                       >
                         <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
                         <span className={`min-w-0 flex-1 truncate font-title-md text-[17px] ${on ? 'font-bold' : 'font-semibold'}`}>{g.label}</span>
@@ -132,7 +133,7 @@ export function LibraryFrame({
                 key={g.key}
                 type="button"
                 onClick={() => onPick(g)}
-                className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 font-label-md text-[16px] transition-colors ${on ? 'bg-surface-container-high text-on-surface font-bold' : 'text-on-surface-variant'}`}
+                className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 font-label-md text-[16px] transition ${on ? 'bg-surface-container-lowest text-on-surface font-bold shadow-[inset_0_0_0_1.5px_var(--color-primary)]' : 'text-on-surface-variant'}`}
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
                 {g.short}

@@ -1105,7 +1105,9 @@ html.dark body:has(.hof-wrap) {
   font-weight: 800; font-size: var(--fs-sm); letter-spacing: .01em;
   transition: background .15s, color .15s;
 }
-.hof-tab.on { background: var(--bg); color: var(--accent); box-shadow: var(--shadow-card); }
+/* 선택 표시 = 액센트 링(앱 공통 규칙). 면을 한 단 밝히고 글자만 물들이던 옛 방식은
+   다크에서 밝기 차가 거의 없어 어느 보드를 보고 있는지 안 보였다(2026-09-01). */
+.hof-tab.on { background: var(--bg); color: var(--txt); box-shadow: var(--shadow-card), inset 0 0 0 1.5px var(--accent); }
 
 .hof-wintoggle {
   display: flex; width: fit-content; gap: 4px; margin: 0 auto 14px; padding: 3px;
