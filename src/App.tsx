@@ -125,27 +125,35 @@ const ONBOARDING_ENFORCED = [
 //    볼 수 있어야 한다(그게 응시 동기다). 로그인은 **'응시 시작' 버튼에서만** 요구하고,
 //    LevelSelect 가 /exam(ExamGate) 와 같은 로그인 안내 모달을 띄운다. 실제 차단은 서버(start-test 익명 401).
 
+// 게이트가 서로를 튕겨내지 않도록, **다른 게이트가 보내는 목적지**는 상수로 두고 서로의 예외에 넣는다.
+//   ⛔ 게이트를 새로 만들면 그 목적지를 **다른 게이트 전부의 예외 목록에** 넣을 것.
+//      안 넣으면 두 게이트가 서로에게 보내면서 무한 루프가 돈다 — 2026-08-31 실제로 그렇게 터졌다
+//      (동의 화면이 닉네임 게이트 예외에 없어서, 닉네임 미설정자가 동의 화면 ↔ 닉네임 화면을 무한 왕복).
+const RESTORE_PATH = '/account/restore'
+const TERMS_PATH = '/onboarding/terms'
+
 // 닉네임 게이트 — 지역과 달리 **전 경로**에서 강제한다.
 // 이유: 가입 트리거가 구글 실명을 display_name 에 넣어서, 안 정하면 랭킹·채팅·레벨테스트 인증서에
 // 실명이 그대로 노출된다. 미루면 그사이 실명이 새어나가므로 로그인 직후 받는다.
-// 예외는 무한 루프를 막기 위한 최소한만(설정 화면 자신 · 로그인/콜백).
-const NICKNAME_EXEMPT = ['/onboarding/nickname', '/login', '/auth/callback']
+// 예외는 무한 루프를 막기 위한 최소한만(설정 화면 자신 · **앞 게이트들의 목적지** · 로그인/콜백).
+const NICKNAME_EXEMPT = ['/onboarding/nickname', TERMS_PATH, RESTORE_PATH, '/login', '/auth/callback']
 
 // 탈퇴 게이트 — 닉네임보다 **먼저** 온다. 탈퇴 신청된 계정은 복구를 누르기 전엔 아무것도 못 한다.
 // 여태는 플래그가 랭킹에서만 걸러져서, 탈퇴한 계정이 로그인·미니게임·결제까지 그대로 됐다
 // (2026-08-24 실제로 그 상태의 계정이 나왔다). 전 경로에서 막는 이유가 그것이다.
 // 예외는 무한 루프를 막을 최소한만 — 복구 화면 자신, 로그인/콜백, 그리고 정책 문서
 // (탈퇴·파기 규정을 읽을 길은 열어둔다).
-const WITHDRAWN_EXEMPT = ['/account/restore', '/login', '/auth/callback', '/terms', '/privacy']
+const WITHDRAWN_EXEMPT = [RESTORE_PATH, '/login', '/auth/callback', '/terms', '/privacy']
 
 // 약관 동의 게이트 — 닉네임보다 **먼저** 온다. 동의를 받기 전에 닉네임(개인정보)을 저장하면 순서가 뒤집힌다.
 // 예외는 갇히지 않게 할 최소한이다:
 //   · 동의 화면 자신 · /login · /auth/callback  → 무한 루프 방지
+//   · 복구 화면                                 → ⛔ 탈퇴 게이트가 보내는 곳이다. 안 빼면 서로 튕겨낸다.
 //   · /terms · /privacy                        → 동의하라면서 그 문서를 못 읽게 할 수는 없다
 //   · /verify                                  → 자격증 진위확인은 **남이 여는 공개 화면**이다
 //   · /exam/run                                → ⛔ 응시 중 새로고침·재접속에 이 화면이 끼어들면 시험이 끊긴다.
 //                                                 동의는 시험이 끝난 뒤에 받는다.
-const TERMS_EXEMPT = ['/onboarding/terms', '/login', '/auth/callback', '/terms', '/privacy', '/verify', '/exam/run']
+const TERMS_EXEMPT = [TERMS_PATH, RESTORE_PATH, '/login', '/auth/callback', '/terms', '/privacy', '/verify', '/exam/run']
 
 function TermsGate({ children }: { children: ReactNode }) {
   const { needsTerms, onboardingLoading, isFullUser, loading } = useAuth()

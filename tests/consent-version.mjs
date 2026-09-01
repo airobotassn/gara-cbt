@@ -43,12 +43,41 @@ ok('3b 화면은 agree-terms 함수를 부른다', /callFunction\('agree-terms'/
 
 // 게이트는 갇히지 않게 최소 예외를 열어둬야 한다(약관·방침을 못 읽으면 동의할 수가 없다).
 const appSrc = readFileSync('src/App.tsx', 'utf8')
-const exempt = /const TERMS_EXEMPT = \[([^\]]*)\]/.exec(appSrc)?.[1] ?? ''
-for (const p of ['/onboarding/terms', '/login', '/auth/callback', '/terms', '/privacy', '/exam/run']) {
-  ok(`4 예외에 ${p} 가 있다`, exempt.includes(`'${p}'`), exempt)
-}
 // ⛔ 나가는 문이 없으면 동의 안 한 사람이 로그인한 채 갇힌다.
 ok('5a ⭐동의 화면에 로그아웃이 있다', /logout\(\)/.test(gateSrc), true)
+
+// ⭐ 게이트끼리 서로 튕겨내면 무한 루프가 돈다 — 2026-08-31 실제로 터졌다(동의 화면이 닉네임 게이트
+//    예외에 없어서 동의 ↔ 닉네임을 무한 왕복). **한 게이트가 보내는 목적지는 다른 게이트 전부의
+//    예외 목록에 있어야 한다.** 게이트를 새로 만들 때 이 검사가 잡아준다.
+const TERMS_PATH_LIT = '/onboarding/terms'
+const listOf = (name) => {
+  const m = new RegExp(`const ${name} = \\[([^\\]]*)\\]`).exec(appSrc)?.[1] ?? ''
+  // 상수로 쓴 경로(RESTORE_PATH 등)는 그 값으로 펴서 본다.
+  return m.replace(/RESTORE_PATH/g, "'/account/restore'").replace(/TERMS_PATH/g, "'/onboarding/terms'")
+}
+// 갇히지 않게 열어둬야 하는 최소 경로. ⚠️ 상수로 쓴 값도 펴서 본다(안 그러면 통과하는데 실패로 뜬다).
+for (const p of ['/onboarding/terms', '/login', '/auth/callback', '/terms', '/privacy', '/exam/run']) {
+  ok(`4 예외에 ${p} 가 있다`, listOf('TERMS_EXEMPT').includes(`'${p}'`), listOf('TERMS_EXEMPT'))
+}
+
+// ⚠️ 게이트는 **바깥부터** 걸린다(App.tsx 의 중첩 순서: 탈퇴 → 동의 → 닉네임).
+//    바깥 게이트가 튕기면 안쪽은 아예 안 돈다 → 필요한 조건은 "바깥 게이트의 목적지를
+//    **자기 자신과 그보다 안쪽 게이트들**이 통과시킨다" 이다. 반대 방향까지 요구하면 거짓 경보가 난다.
+const GATES = [
+  { name: '탈퇴', dest: '/account/restore', list: 'WITHDRAWN_EXEMPT' },
+  { name: '동의', dest: TERMS_PATH_LIT, list: 'TERMS_EXEMPT' },
+  { name: '닉네임', dest: '/onboarding/nickname', list: 'NICKNAME_EXEMPT' },
+]
+for (let i = 0; i < GATES.length; i++) {
+  for (let j = i; j < GATES.length; j++) {
+    const outer = GATES[i], inner = GATES[j]
+    ok(
+      `6 ⭐${inner.name} 게이트가 ${outer.name} 화면(${outer.dest})을 통과시킨다`,
+      listOf(inner.list).includes(`'${outer.dest}'`),
+      listOf(inner.list),
+    )
+  }
+}
 
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${x.got} want=${x.want})`)
 const failed = results.filter((x) => !x.pass).length
