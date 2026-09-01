@@ -77,6 +77,17 @@ export default function Layout({ children }: { children: ReactNode }) {
     pathname.startsWith('/ebooks/read/') ||
     isSEB()
 
+  // 「맨 위로」는 스크롤을 내렸을 때만 나온다 — 맨 위에서는 아무 일도 안 하는 버튼이라 화면만 가린다.
+  //   ⚠️ 라우트가 바뀌면 스크롤이 0 으로 돌아가는데 그때 scroll 이벤트가 안 날 수 있다 → pathname 마다 다시 잰다.
+  //      안 그러면 긴 화면에서 넘어온 직후 새 화면 맨 위에 버튼이 남아 있다.
+  const [showTop, setShowTop] = useState(false)
+  useEffect(() => {
+    const read = () => setShowTop(window.scrollY > 300)
+    read()
+    window.addEventListener('scroll', read, { passive: true })
+    return () => window.removeEventListener('scroll', read)
+  }, [pathname])
+
   // 관리자 여부 — 서버(admin 'me')로 확인. 관리자면 FAB에 관리자 페이지 링크 노출.
   const [isAdmin, setIsAdmin] = useState(false)
   useEffect(() => {
@@ -408,9 +419,10 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
           ) : null}
 
-          {/* 맨 위로 — FAB이 있는 모든 화면에 함께 노출(응시/SEB에선 FAB과 같이 숨김). 화면 우하단 끝. */}
+          {/* 맨 위로 — FAB이 있는 모든 화면에 함께 노출(응시/SEB에선 FAB과 같이 숨김). 화면 우하단 끝.
+              300px 넘게 내렸을 때만 보인다(.is-on) — 숨김은 CSS 라 나타날 때 페이드가 붙는다. */}
           <button
-            className="fab-top"
+            className={showTop ? 'fab-top is-on' : 'fab-top'}
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             aria-label={t('fab.toTop')}
             title={t('fab.toTop')}

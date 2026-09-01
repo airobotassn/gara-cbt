@@ -33,12 +33,12 @@ export function HomeIcon(p: IcoProps) {
   )
 }
 
-// 맨 위로(scroll-to-top) 버튼용 위쪽 화살표
+// 맨 위로(scroll-to-top) 버튼용 꺾쇠 — 줄기 없는 `^` 하나다(2026-09-01 지시).
+// 줄기를 빼면 위쪽으로 쏠려 보이므로 꺾쇠를 세로 가운데(9~15)로 내려 앉힌다.
 export function ChevronUpIcon(p: IcoProps) {
   return (
     <Ico {...p}>
-      <path d="M12 19V5" />
-      <path d="m5 12 7-7 7 7" />
+      <path d="m6 15 6-6 6 6" />
     </Ico>
   )
 }

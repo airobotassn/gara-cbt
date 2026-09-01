@@ -207,7 +207,10 @@ body:has(.panel.open) .fab::after {
   font-size: var(--fs-sm);
   font-weight: 800;
 }
-/* 맨 위로 — 화면 우하단 끝(FAB은 좌하단이므로 반대편 코너). 모든 FAB 화면에 함께 노출. */
+/* 맨 위로 — 화면 우하단 끝(FAB은 좌하단이므로 반대편 코너). 모든 FAB 화면에 함께 노출.
+   ⚠️ 스크롤을 내렸을 때만 보인다(Layout 이 `.is-on` 을 붙인다) — 맨 위에서는 할 일이 없는 버튼이라
+      떠 있어봐야 화면만 가린다. 숨김은 `display` 가 아니라 opacity+visibility 라 나타날 때 페이드가 붙고,
+      hub.css·ranking.css 의 화면별 `display:none` 은 그대로 이긴다. */
 .fab-top {
   position: fixed;
   right: max(24px, env(safe-area-inset-right));
@@ -223,9 +226,18 @@ body:has(.panel.open) .fab::after {
   display: grid;
   place-items: center;
   box-shadow: var(--fab-shadow);
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s,
+    visibility 0.15s;
 }
-.fab-top:hover {
+.fab-top.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+.fab-top.is-on:hover {
   transform: translateY(-2px);
   border-color: rgba(var(--fab-accent), 0.5);
   box-shadow: 0 0 24px -6px rgba(var(--fab-accent), 0.5);
