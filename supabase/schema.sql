@@ -368,15 +368,18 @@ create table if not exists chat_translations (
 create index if not exists chat_translations_lang_idx
   on chat_translations (lang, message_id);
 
--- ⚠️ 갱신은 사용자 요청일 때만. 워커가 갱신하면 자기가 채운 조합이 자기 때문에 영원히 살아남는다.
+-- (글, 언어) → "이 글을 이 언어로 보여달라는 요청이 있었다". 워커의 유일한 입력이다.
+--  ⚠️ **방 단위가 아니라 글 단위다(2026-09-01).** 방 단위였을 땐 한 번 켠 사람 때문에 그 방의 모든
+--     글이 5일간 번역 대상이 됐다 — 그 사람이 나가도 서버는 모른다(끄는 신호가 없다).
+--     화면이 이미 보고 있는 글 번호를 보내므로 그걸 그대로 적는다. 뜬 적 없는 글은 번역되지 않는다.
+--  ⚠️ requested_at 은 기록용이고 **워커 목록 판정에 쓰지 않는다** — 번역되면 chat_translations 에
+--     행이 생겨 자동으로 빠지므로 만료라는 개념이 필요 없다.
 create table if not exists chat_translation_demand (
-  room              text        not null,
-  lang              text        not null,
-  last_requested_at timestamptz not null default now(),
-  primary key (room, lang)
+  message_id   bigint      not null references chat_messages(id) on delete cascade,
+  lang         text        not null,
+  requested_at timestamptz not null default now(),
+  primary key (message_id, lang)
 );
-create index if not exists chat_translation_demand_fresh_idx
-  on chat_translation_demand (last_requested_at desc);
 
 -- ⚠️ chat_messages.lang 은 작성자의 화면 언어지 본문 언어가 아니다 → src_lang 이 따로 필요하다.
 alter table chat_messages add column if not exists src_lang text;
@@ -387,14 +390,16 @@ alter table chat_translations       enable row level security;
 alter table chat_translation_demand enable row level security;
 -- 정책 없음 → service role 전용. 클라가 번역본을 직접 쓰면 원문 모더레이션을 우회하는 입력 경로가 된다.
 
--- 워커 할 일 목록 — "수요가 살아있는 방(5일) × 그 언어로 아직 번역 안 된 글", 최신 글부터.
+-- 워커 할 일 목록 — "요청된 (글, 언어) 중 아직 번역이 없는 것", 최신 글부터.
+--  ⚠️ 남은 조건은 전부 수요를 적은 뒤에 상황이 바뀔 수 있는 것들이다(삭제·가림·다른 사람이 먼저 번역).
+--  ⚠️ src_lang is null 인 글도 포함한다 — 워커가 언어 판정을 먼저 하고 번역한다(둘 다 공짜).
 create or replace function public.chat_translation_pending(p_limit int default 500)
 returns table(message_id bigint, room text, body text, src_lang text, dst_lang text)
 language sql security definer set search_path = public as $$
   select m.id, m.room, m.body, m.src_lang, d.lang
   from chat_translation_demand d
   join chat_messages m
-    on  m.room       = d.room
+    on  m.id         = d.message_id
     and m.deleted_at is null
     and m.mod_status = 'ok'
     and m.body       is not null
@@ -402,8 +407,7 @@ language sql security definer set search_path = public as $$
     and (m.src_lang is null or m.src_lang <> d.lang)
   left join chat_translations t
     on t.message_id = m.id and t.lang = d.lang
-  where d.last_requested_at > now() - interval '5 days'
-    and t.message_id is null
+  where t.message_id is null
   order by m.id desc
   limit greatest(1, least(p_limit, 2000));
 $$;

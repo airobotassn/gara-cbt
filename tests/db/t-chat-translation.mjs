@@ -3,7 +3,7 @@
 // 이 기능에서 조용히 깨지면 제일 비싼 것들을 본다.
 //  · 창고가 (글, 언어) 유일키인가 — 아니면 같은 번역을 두 번 사고 두 번 저장한다
 //  · 원문이 지워지면 번역본도 따라 사라지는가(cascade)
-//  · RPC 가 **수요가 살아있는 방만** 준다 — 5일 지난 조합을 계속 채우면 아무도 안 보는 방에 일을 시킨다
+//  · RPC 가 **요청된 글만** 준다 — 방 전체를 주면 화면에 뜬 적 없는 글까지 계속 번역하게 된다
 //  · RPC 가 **이미 번역된 것을 안 준다**(anti-join) — 안 그러면 무한히 같은 글을 번역한다
 //  · RPC 가 **원문 언어 == 대상 언어**를 걸러낸다 — 번역할 이유가 없는 글
 //  · RPC 가 가림·삭제·짧은 글을 걸러낸다
@@ -14,7 +14,9 @@ import { readFileSync } from 'node:fs';
 
 const base = readFileSync('supabase/migrations/20260723120000_chat_board.sql', 'utf8');
 const rooms = readFileSync('supabase/migrations/20260804170000_chat_rooms.sql', 'utf8');
-const raw = readFileSync('supabase/migrations/20260813120000_chat_translation.sql', 'utf8');
+const first = readFileSync('supabase/migrations/20260813120000_chat_translation.sql', 'utf8');
+// 수요를 방 단위 → 글 단위로 바꾼 마이그레이션. RPC 도 여기서 다시 만든다.
+const raw = readFileSync('supabase/migrations/20260901140000_chat_demand_per_message.sql', 'utf8');
 
 // pglite 에 없는 role 대상 revoke/grant 문 제거 (원본 텍스트는 아래 정규식 검증에서 따로 본다)
 const strip = (sql) =>
@@ -26,6 +28,7 @@ const strip = (sql) =>
 const db = await PGlite.create();
 await db.exec(strip(base));
 await db.exec(strip(rooms));
+await db.exec(strip(first));
 await db.exec(strip(raw));
 
 const results = [];
@@ -41,12 +44,12 @@ const put = async (room, body, opts = {}) => {
   );
   return r.rows[0].id;
 };
-const demand = (room, lang, daysAgo = 0) =>
+// 수요는 글 단위다 — 화면에 뜬 글 번호가 그대로 일감이 된다.
+const demand = (messageId, lang) =>
   db.query(
-    `insert into chat_translation_demand(room, lang, last_requested_at)
-     values ($1,$2, now() - ($3 || ' days')::interval)
-     on conflict (room, lang) do update set last_requested_at = excluded.last_requested_at`,
-    [room, lang, String(daysAgo)],
+    `insert into chat_translation_demand(message_id, lang) values ($1,$2)
+     on conflict (message_id, lang) do nothing`,
+    [messageId, lang],
   );
 const pending = async (limit = 500) =>
   (await db.query(`select * from chat_translation_pending($1)`, [limit])).rows;
@@ -62,7 +65,7 @@ const dpk = (await db.query(
   `select a.attname from pg_index i join pg_attribute a on a.attrelid=i.indrelid and a.attnum=any(i.indkey)
    where i.indrelid='chat_translation_demand'::regclass and i.indisprimary order by a.attnum`,
 )).rows.map((r) => r.attname);
-rec('chat_translation_demand PK = (room, lang)', dpk.join(','), 'room,lang');
+rec('chat_translation_demand PK = (message_id, lang)', dpk.join(','), 'message_id,lang');
 
 const srcCol = (await db.query(
   `select data_type from information_schema.columns
@@ -96,20 +99,27 @@ rec('engine 은 edge 만 허용', engErr != null, true);
 // --- (3) 원문이 지워지면 번역본도 사라진다 ---
 const m2 = await put('CN', '这是要删除的消息');
 await db.query(`insert into chat_translations(message_id, lang, body, engine) values ($1,'ko','지울 것','edge')`, [m2]);
+await demand(m2, 'ja');
 await db.query(`delete from chat_messages where id=$1`, [m2]);
 const orphan = (await db.query(`select count(*)::int c from chat_translations where message_id=$1`, [m2])).rows[0].c;
 rec('원문 삭제 시 번역본도 cascade 삭제', orphan, 0);
+// 수요도 글에 매달려 있다 — 없는 글을 번역 대상으로 들고 있을 이유가 없다.
+const dOrphan = (await db.query(`select count(*)::int c from chat_translation_demand where message_id=$1`, [m2])).rows[0].c;
+rec('원문 삭제 시 수요도 cascade 삭제', dOrphan, 0);
 
-// --- (4) RPC: 수요가 살아있는 방만 ---
-await demand('CN', 'ko', 0);
-await demand('JP', 'ko', 9); // 9일 전 — 5일 창을 벗어났다
-const mCn = await put('CN', '这是还没翻译的消息');
-const mJp = await put('JP', 'これは日本語のメッセージです');
+// --- (4) RPC: 요청된 글만 준다 ---
+//  ⭐ 이 기능의 성격을 정하는 자리다. 옛 구조(방 단위)에서는 한 사람이 한 번 켜면 그 방의 모든 글이
+//     대상이 됐다 — 켠 사람이 나가도 5일간. 지금은 화면에 뜬 글만 대상이다.
+const mAsked = await put('CN', '这是还没翻译的消息');
+const mNotAsked = await put('CN', '这条消息没有人请求过翻译');
+await demand(mAsked, 'ko');
 let rows = await pending();
-rec('수요 살아있는 방(CN)은 나온다', rows.some((r) => r.message_id === mCn), true);
-rec('수요 만료된 방(JP, 9일)은 안 나온다', rows.some((r) => r.message_id === mJp), false);
+rec('수요에 적힌 글은 나온다', rows.some((r) => r.message_id === mAsked), true);
+rec('⭐같은 방이어도 수요에 없는 글은 안 나온다', rows.some((r) => r.message_id === mNotAsked), false);
 
 // --- (5) RPC: 이미 번역된 것은 안 준다 ---
+await demand(m1, 'ko'); // m1 은 위에서 ko 번역을 넣어뒀다
+rows = await pending();
 rec('이미 ko 번역이 있는 글은 안 나온다', rows.some((r) => r.message_id === m1 && r.dst_lang === 'ko'), false);
 
 // --- (6) RPC: 걸러내는 것들 ---
@@ -119,6 +129,8 @@ const mDeleted = await put('CN', '삭제된 메시지입니다', { deleted: true
 const mShort = await put('CN', 'ㅋㅋ');
 const mSameLang = await put('CN', '이미 한국어로 쓴 글이다', { src: 'ko' });
 const mOtherLang = await put('CN', '这是中文的消息内容', { src: 'zh-Hans' });
+// 전부 화면에 떠서 번역 요청이 갔다고 본다 — 걸러지는 이유가 '요청 안 됨' 이 아님을 분명히 하려고.
+for (const id of [mOk, mHidden, mDeleted, mShort, mSameLang, mOtherLang]) await demand(id, 'ko');
 
 rows = await pending();
 const ids = rows.map((r) => r.message_id);
@@ -131,11 +143,12 @@ rec('원문 언어가 다르면 나온다', ids.includes(mOtherLang), true);
 rec('나온 행에 원문 언어가 실려 있다', rows.find((r) => r.message_id === mOtherLang)?.src_lang, 'zh-Hans');
 rec('나온 행에 대상 언어가 실려 있다', rows.find((r) => r.message_id === mOtherLang)?.dst_lang, 'ko');
 
-// --- (7) 한 방에 언어가 둘이면 글마다 두 줄 ---
-await demand('CN', 'ja', 0);
+// --- (7) 같은 글을 두 언어로 요청하면 두 줄 ---
+//  같은 글이라도 언어마다 번역이 따로 필요하다(chat_translations 키가 (글, 언어) 라서).
+await demand(mOk, 'ja');
 rows = await pending();
 const forOk = rows.filter((r) => r.message_id === mOk).map((r) => r.dst_lang).sort();
-rec('수요 언어 2개면 같은 글이 2줄로 나온다', forOk.join(','), 'ja,ko');
+rec('같은 글에 언어 2개를 요청하면 2줄로 나온다', forOk.join(','), 'ja,ko');
 
 // --- (8) 최신 글부터 ---
 rec('최신 글부터 준다(id 내림차순)', rows.map((r) => Number(r.message_id)).every((v, i, a) => i === 0 || a[i - 1] >= v), true);

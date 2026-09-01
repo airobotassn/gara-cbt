@@ -12,13 +12,16 @@
 //     Spring 으로 옮길 때 이 함수 하나만 다시 쓰면 되고 워커는 손대지 않는다.
 //
 //  ⚠️ 대상 언어를 요청으로 받지 않는다 — profiles.country_code 에서 파생한다.
-//     요청으로 받으면 언어를 바꿔가며 (방 × 언어) 조합을 무한히 만드는 길이 열린다.
+//     요청으로 받으면 언어를 바꿔가며 (글 × 언어) 조합을 무한히 만드는 길이 열린다.
 //     그게 이 기능에서 비용이 폭발하는 유일한 경로다(country-lang.ts 머리 주석 참고).
+//
+//  ⚠️ 수요는 **글 단위**다(2026-09-01, 옛 구조는 방 단위). 화면이 띄운 글 번호가 그대로 일감이 되고,
+//     뜬 적 없는 글은 번역되지 않는다. 요청에 담긴 room 은 더 쓰지 않는다(글 번호로 직접 찾는다).
 //
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { CHAT_REQUIRE_LOGIN, normalizeRoom } from '../_shared/chat.ts'
+import { CHAT_REQUIRE_LOGIN } from '../_shared/chat.ts'
 import { langForCountry, sameLang } from '../_shared/country-lang.ts'
 import { isTranslatable } from '../_shared/translate.ts'
 
@@ -65,30 +68,43 @@ async function handleTranslate(req: Request, payload: Record<string, unknown>): 
   // 국가 미설정 — 온보딩으로 보내라는 기계 코드다. 프론트가 이걸 보고 라우팅한다.
   if (!lang) return json({ error: 'country_required' }, 409)
 
-  const room = normalizeRoom(payload?.room)
   const idsIn = Array.isArray(payload?.ids) ? (payload.ids as unknown[]) : []
   const ids = [...new Set(idsIn.map(Number).filter((n) => Number.isFinite(n)))].slice(0, MAX_IDS)
   if (ids.length === 0) return json({ lang, items: [] })
 
-  // 수요 갱신은 창고 조회보다 **앞**이다. 캐시가 다 맞아도 "이 방을 이 언어로 보고 있다"는
-  // 사실은 변하지 않는다. 뒤에 두면 워커가 잘 채워주는 활성 조합일수록 수요가 갱신되지 않아
-  // 5일 뒤 조용히 만료된다.
-  await admin
-    .from('chat_translation_demand')
-    .upsert({ room, lang, last_requested_at: new Date().toISOString() }, { onConflict: 'room,lang' })
-
-  const { data: cached } = await admin
+  // ⚠️ **창고 조회가 수요 등록보다 앞이다(2026-09-01).** 이미 번역된 글을 수요에 적을 이유가 없고,
+  //    무엇이 없는지는 조회를 해봐야 알기 때문이다. (방 단위였을 땐 반대였다 — 조회 결과와 무관하게
+  //    "이 방을 보고 있다"는 한 줄의 시각을 갱신해야 했다.)
+  // ⚠️ body 가 null 인 행(= 엔진이 못 한 글)도 **같이 받는다.** 응답에는 넣지 않지만 '행이 있다'는
+  //    사실은 봐야 한다 — 안 그러면 못 하는 글을 요청마다 수요에 다시 적어 넣는다.
+  const { data: rows } = await admin
     .from('chat_translations')
     .select('message_id, body')
     .eq('lang', lang)
     .in('message_id', ids)
-    // ⚠️ body 가 null 인 행은 **엔진이 못 한 글** 표식이다(재시도 중단용). 화면엔 원문이 남아야 하므로
-    //    돌려주지 않는다 — 여기서 안 거르면 프론트가 null 을 번역문으로 그린다.
-    .not('body', 'is', null)
 
-  // 창고에 있는 것만 돌려준다. 없는 건 위(수요 갱신)에서 이미 워커에게 넘겼으므로
-  // 여기서 더 할 일이 없다 — 프론트가 잠시 뒤 다시 물어본다(ChatBoard 의 fetchWithRetry).
-  const items = (cached ?? []).map((r) => ({ id: r.message_id as number, body: r.body as string }))
+  const have = new Set((rows ?? []).map((r) => r.message_id as number))
+  // 화면엔 원문이 남아야 하므로 실패 표식(body=null)은 돌려주지 않는다 —
+  // 여기서 안 거르면 프론트가 null 을 번역문으로 그린다.
+  const items = (rows ?? [])
+    .filter((r) => r.body != null)
+    .map((r) => ({ id: r.message_id as number, body: r.body as string }))
+
+  // ⛔ **화면이 실제로 띄운 글만 수요가 된다.** 방 단위였을 땐 한 사람이 한 번 켜면 그 방의 모든 글이,
+  //    그리고 그 뒤 5일간의 모든 글이 번역 대상이었다 — 켠 사람이 나가도 서버는 알 길이 없다
+  //    (끄는 신호도 나가는 신호도 오지 않는다). 뜬 적 없는 글은 이제 번역되지 않는다.
+  const missing = ids.filter((id) => !have.has(id))
+  if (missing.length > 0) {
+    await admin
+      .from('chat_translation_demand')
+      .upsert(missing.map((id) => ({ message_id: id, lang })), {
+        onConflict: 'message_id,lang',
+        ignoreDuplicates: true,
+      })
+  }
+
+  // 창고에 있는 것만 돌려준다. 없는 건 방금 수요로 적었으니 워커가 채운다 —
+  // 프론트가 잠시 뒤 다시 물어본다(ChatBoard 의 fetchWithRetry).
   return json({ lang, items })
 }
 
