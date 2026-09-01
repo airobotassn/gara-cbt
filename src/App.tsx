@@ -6,6 +6,13 @@ import { loadSiteSettings, applySiteHead } from './lib/siteSettings'
 import { callFunction } from './lib/supabase'
 import { ensureCheckedIn } from './lib/autoCheckin'
 import { trackVisit } from './lib/visitTrack'
+// ⚠️ **게이트 화면 둘만 정적이다**(2026-09-01). lazy 로 두면 동의 → 닉네임으로 넘어갈 때
+//    그 자리에서 화면 파일을 받느라 '불러오는 중…' 이 **0.33초** 끼어든다(실측). 로그인 직후
+//    모든 신규 회원이 반드시 지나는 두 화면이라 그 깜빡임이 첫인상이 된다.
+//    대가는 첫 진입 번들 **+1.2KB(gzip)** — 무거운 라이브러리를 안 끌고 오는 화면들이라 이 정도다.
+//    ⛔ 다른 화면을 이 규칙으로 끌어오지 말 것(아래 lazy 규칙 주석 참고).
+import NicknameSetup from './pages/NicknameSetup'
+import TermsAgree from './pages/TermsAgree'
 import Layout from './components/Layout'
 import SebEscapeHatch from './components/SebEscapeHatch'
 import SitePopups from './components/SitePopups'
@@ -48,8 +55,6 @@ const MyPage = lazy(() => import('./pages/MyPage'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 const Login = lazy(() => import('./pages/Login'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
-const NicknameSetup = lazy(() => import('./pages/NicknameSetup'))
-const TermsAgree = lazy(() => import('./pages/TermsAgree'))
 const AccountRestore = lazy(() => import('./pages/AccountRestore'))
 
 // 정적 안내 페이지
