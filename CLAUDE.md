@@ -165,8 +165,8 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/pay/success` · `/pay/fail` (결제 결과) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
 | **캐릭터 허브 / 미니게임** ||||
 | `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `shop-buy` · `character` · `redeem-referral` · `coin-gift` |
-| `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` |
-| `/daily` (DAILY QUIZ — 옛 이름 '오늘의 학습') | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
+| `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` · `term-pool`(문항) |
+| `/daily` (DAILY QUIZ — 옛 이름 '오늘의 학습') | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` · `term-pool`(문항) |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
 | `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-report`·`chat-translate` |
 | `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
@@ -175,7 +175,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` |
 | `/ranking` (리더보드) | `pages/Ranking.tsx` | `ranking.css` | `leaderboard` |
 | **관리자** ||||
-| `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) | `admin.css` | `admin` · `admin-test` |
+| `/admin` (탭 = `?top=`·`?tab=`) | `pages/Admin.tsx` (top=caris) · `pages/AdminLevelTest.tsx` (top=level) · `pages/AdminTermQuestions.tsx` (게임 문항) | `admin.css` | `admin` · `admin-test` |
 > **화면별 상세는 `docs/notes/` 에 있다.** 표에서 대상 파일을 찾았으면 **그 노트를 읽고 손댈 것** — 거기 ⚠️·⛔ 는 전부 실제로 겪은 사고의 기록이라, 안 읽고 고치면 같은 사고가 그대로 재발한다.
 >
 > | 노트 | 다루는 것 |
@@ -203,8 +203,8 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   51개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
-               · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift) · 검색라우터(route-query·route-seed)
+  functions/   52개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+               · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift·term-pool) · 검색라우터(route-query·route-seed)
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions·track-visit·agree-terms)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
@@ -375,7 +375,14 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
     - 사전을 게임마다 두지 않는 이유 = 6벌이 되고 `랭킹` 같은 **앱 브리지 공통 문구**가 파일마다 갈린다(실제로 6벌 복제돼 있었다).
     - ⚠️ **캔버스에 그리는 글자는 없다** — 전부 DOM 이라 이 방식으로 다 덮인다. 새 게임을 만들 때도 문구를 캔버스에 그리지 말 것.
     - 적용 완료 = 용어 퀴즈 3종(`beat-cari`·`shoot-cari`·`pick-cari`). **퍼즐 3종(`reach-cari`·`program-cari`·`build-cari`)은 아직 한국어**(레벨별 학습 설명문이 많아 분량이 큼).
-  - ⚠️ **문항 자체는 아직 한국어다.** 콘텐츠가 `src/lib/terms.ts` 와 `public/games/*.html` 의 `POOL` **두 벌로 복제**되어 있어서(파일 머리 주석이 "양쪽 같이 갱신" 이라고 적어둔 그 구조), 번역을 얹으면 12벌이 된다. 레벨테스트(`questions` 다국어 JSONB + `translate-questions`)처럼 **콘텐츠를 한 곳으로 모으는 게 선행**이고, 게임에는 `MGBridge` 에 문항 주입 메시지를 하나 더 두면 된다(미결).
+  - **문항도 DB 로 모였다 (2026-09-03 · `20260903120000`)** — 옛 상태: 같은 50문항이 **네 벌**(`src/lib/terms.ts` + 게임 HTML 3벌의 `POOL`)이라 문항 하나를 고치려면 개발자가 파일 넷을 고치고 배포해야 했고, `term_questions` 표와 관리자 화면은 2026-08-11 에 만들어졌는데 **아무도 안 읽어서** 저장만 되고 게임에는 안 나갔다.
+    - 단일 출처 = **`term_questions`**. 서빙은 `term-pool`(게임·DAILY QUIZ 공용, 화면 언어로 투영). 게임은 자립형 iframe 이라 부모(`MiniGame.tsx`)가 받아 `postMessage {t:'mg:pool'}` 로 주입한다.
+    - ⚠️ **코드 쪽 문항은 폴백으로만 남는다** — 게임 HTML 의 `POOL` 과 `terms.ts` 의 `TERMS` 를 고쳐도 서비스에는 안 나간다(서버가 안 열릴 때만 쓰인다). 문항을 바꾸는 자리는 관리자 화면 하나다.
+    - 관리 화면은 레벨테스트 문항 탭과 같은 구성이다(`pages/AdminTermQuestions.tsx`): 문항 목록·이력(중지/삭제 되돌리기)·엑셀 업로드·🌐 자동 번역·언어별 완료율. 문항 번호는 `T-001`.
+    - ⛔ **한국어 원문을 고치면 옛 번역을 그 자리에서 비운다**(CARIS `questionUpsert` 와 같은 이유) — 안 비우면 설명만 고쳐도 번역본은 옛 문장 그대로라 **외국어로 하는 사람만 다른 문제를 푼다.**
+    - ⚠️ **보기 개수(정답 1 + 오답 3)가 어긋난 번역은 버린다.** 순서가 곧 정답 자리라 개수가 다르면 그 언어에서만 보기가 빈다. 검사는 저장(`sanitizeTermI18n`)과 서빙(`term-pool`) 양쪽에 있다.
+    - ⚠️ **세트가 비어 있으면 그 게임은 은행 전체를 쓴다**('아직 안 골랐다'는 뜻이지 '문제 없음'이 아니다). 게임 목록의 단일 출처는 `lib/minigames.ts` 의 `TERM_GAME_IDS` — 서버 `term-pool` 의 `TARGETS`·화면 `TERM_TARGETS` 와 한 벌이다.
+    - 배포: 마이그레이션 + `npx.cmd supabase functions deploy term-pool admin`(**둘 다 플래그 없이** — anon 키가 실려 오므로 공개 예외가 필요 없다) + 프론트 push.
 - **공유 카드도 화면 언어를 따른다 (2026-08-07)**: 캔버스에 그리는 글자까지 `share.card.*`. 훅을 못 쓰는 계층이라 `ShareCardData.lang` 을 받아 `tr()` 로 뽑는다 — 호출부(`Hub`·`Ranking`·`ChatBoard`) 셋 다 `lang` 을 넘겨야 한다.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.
 

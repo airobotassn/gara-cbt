@@ -101,6 +101,14 @@ export const MINIGAMES: MiniGame[] = [
   },
 ]
 
+/** 용어 문제 은행(term_questions)을 쓰는 게임 — 나머지는 조작 퍼즐·판단이라 문항이 필요 없다.
+ *  ⚠️ 서버 `term-pool` 의 TARGETS · 관리자 화면의 TERM_TARGETS 와 **같은 목록**이어야 한다
+ *     (관리자가 '쏴라'에 문항을 담았는데 게임이 안 받아가는 어긋남을 막는다). */
+export const TERM_GAME_IDS = ['beat-cari', 'shoot-cari', 'pick-cari'] as const
+export function isTermGame(id: string | undefined): boolean {
+  return (TERM_GAME_IDS as readonly string[]).includes(id ?? '')
+}
+
 /** 비로그인(게스트)에게 열어두는 게임 — **이 하나뿐**이다(2026-08-24 결정).
  *  나머지는 목록에서 PLAY 가 회색으로 죽고, 주소를 직접 쳐도 로그인 안내로 막힌다.
  *  ⚠️ 두 화면(`/games` 목록 · `/games/:id` 실행)이 **같은 판정**을 써야 한다 — 목록만 막으면

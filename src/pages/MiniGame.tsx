@@ -7,7 +7,8 @@
 //     없다 → 점수 제출과 랭킹 조회는 전부 이 부모가 대신한다. 게임은 "점수 났다 / 랭킹 열어달라"만 알린다.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { findMiniGame, guestPlayable, GUEST_GAME_ID } from '../lib/minigames'
+import { findMiniGame, guestPlayable, GUEST_GAME_ID, isTermGame } from '../lib/minigames'
+import { fetchTermPool, type TermPoolItem, type TermTarget } from '../lib/termPool'
 import { useAuth } from '../context/AuthProvider'
 import { useT } from '../lib/i18n'
 import { callFunction } from '../lib/supabase'
@@ -47,6 +48,19 @@ export default function MiniGame() {
   //   실패해도 게임 진행은 막지 않는다(랭킹만 못 올라감).
   const ticketRef = useRef<string | null>(null)
 
+  // 용어 문항(DB) — 게임 HTML 안에 박힌 POOL 을 이걸로 갈아끼운다.
+  //   ⚠️ 문항을 못 받아도 게임은 그대로 돌아간다(게임 쪽 POOL 이 폴백). 그래서 로딩을 기다리지 않는다.
+  const frameRef = useRef<HTMLIFrameElement | null>(null)
+  const poolRef = useRef<TermPoolItem[] | null>(null)
+
+  /** 게임 프레임에 문항을 보낸다. iframe 로드 완료와 문항 도착 중 **나중 것**이 이걸 부른다. */
+  const sendPool = useCallback(() => {
+    const items = poolRef.current
+    const win = frameRef.current?.contentWindow
+    if (!items || !items.length || !win) return
+    win.postMessage({ t: 'mg:pool', items }, window.location.origin)
+  }, [])
+
   const fetchTicket = useCallback(async (id: string) => {
     try {
       const r = await callFunction<{ ticket?: string }>('submit-minigame', { action: 'start', gameId: id })
@@ -67,6 +81,19 @@ export default function MiniGame() {
     if (isFullUser) void fetchTicket(game.id)
     else void ensureAnonymous().catch(() => { /* 익명 세션 실패해도 플레이는 막지 않는다 */ })
   }, [playable, game, isFullUser, fetchTicket, ensureAnonymous])
+
+  // 문항 받아오기 — 용어 퀴즈 3종만 해당(퍼즐형은 문제 은행을 안 쓴다).
+  //   화면 언어로 투영된 문항이 오므로 게임은 받은 걸 그대로 그리면 된다.
+  useEffect(() => {
+    if (!playable || !game || !isTermGame(game.id)) return
+    let alive = true
+    void fetchTermPool(game.id as TermTarget, lang).then((items) => {
+      if (!alive) return
+      poolRef.current = items
+      sendPool() // 프레임이 이미 떠 있으면 지금 보낸다. 아직이면 onLoad 가 다시 부른다.
+    })
+    return () => { alive = false }
+  }, [playable, game, lang, sendPool])
 
   // 게임(iframe) → 앱 메시지 수신. 같은 오리진에서 서비스되므로 오리진 검사로 외부 프레임을 배제한다.
   useEffect(() => {
@@ -232,7 +259,9 @@ export default function MiniGame() {
       <iframe
         /* 게임은 자립형 HTML(iframe)이라 앱 사전을 못 쓴다 → 화면 언어를 쿼리로 넘긴다.
            게임 쪽은 public/games/i18n.js 가 ?lang= 를 읽어 인트로·아웃트로 문구를 갈아끼운다.
-           ⚠️ 문항(POOL)은 여기 해당 없음 — 그건 아직 한국어이고 콘텐츠 파이프라인 몫이다. */
+           문항(POOL)은 쿼리가 아니라 postMessage 로 내려보낸다(아래 sendPool) — 50문항을 URL 에 담을 수 없다. */
+        ref={frameRef}
+        onLoad={sendPool}
         src={`${game.src}?lang=${lang}`}
         title={t(`mg.${game.id}.title`)}
         style={{ flex: 1, width: '100%', border: 0, display: 'block' }}

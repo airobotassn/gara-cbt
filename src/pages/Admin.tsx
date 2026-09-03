@@ -55,8 +55,9 @@ import type {
 // WORLD ARENA 화면들 — 옛 <LevelTestAdmin/> 껍데기는 없어지고 개별 컴포넌트가 대메뉴 아래로 꽂힌다.
 import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaUserPanel, type ArenaUserRow } from './AdminLevelTest'
 // 재편으로 새로 만든 화면들(Admin.tsx 가 이미 6천 줄이라 분리) — 라우팅만 여기서 한다.
+import { TermPoolAdmin } from './AdminTermQuestions'
 import {
-  PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, TermPoolAdmin, CoinPolicyAdmin, HubCosmeticAdmin,
+  PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, CoinPolicyAdmin, HubCosmeticAdmin,
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
   ReadCell,
 } from './AdminReform'

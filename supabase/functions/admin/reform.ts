@@ -943,30 +943,116 @@ async function certConditionsSave(admin: any, body: any, ctx: Ctx) {
   return json({ ok: true })
 }
 
-// ── 용어 문제은행 (CARIS 방식: 은행 → 문항 → 게임별 세트) ────
+// ── 용어 문제은행 (레벨테스트/CARIS 문항관리와 같은 방식) ────
+//
+// 구조: term_banks(은행) → term_questions(문항) → minigame_question_sets(게임 × 문항).
+// ⚠️ CARIS 와 다른 점 하나: 시험은 세트가 고정돼야 하지만(1인1회·공정성) 게임은 매판 섞여도 된다.
+//    그래서 '뽑기(draw)'가 없고, 게임에 담긴 문항 전체를 내려보내 게임이 알아서 섞는다.
+//
+// 레벨테스트(admin-test/handlers/questions.ts)와 **같은 규칙**을 그대로 옮겼다:
+//   · 목록은 활성·미삭제만 (비활성/삭제는 '문항 이력' 탭에서 되돌린다)
+//   · 삭제는 되돌릴 수 있다(deleted_at) — 하드 삭제 금지
+//   · 변경은 한 줄씩 이력에 남는다(term_question_events)
+//   · 번역은 화면이 translate-questions 로 돌려 여기로 넘긴다(서버는 검증·저장만)
+
+/** 번역이 덜 찬 언어. 설명·정답·오답3 이 **모두** 있어야 그 언어가 채워진 것이다. */
+function termMissing(r: any): string[] {
+  const miss: string[] = []
+  for (const lg of TRANSLATED_LANGS) {
+    const d = (r.desc_i18n?.[lg] ?? '').trim?.() ?? ''
+    const a = (r.answer_i18n?.[lg] ?? '').trim?.() ?? ''
+    const ds = r.distractors_i18n?.[lg]
+    if (!d || !a || !Array.isArray(ds) || ds.length !== 3 || ds.some((x: unknown) => !String(x ?? '').trim())) miss.push(lg)
+  }
+  return miss
+}
+
+/** 다음 문항 번호(T-001…). 지워진 문항의 번호는 재사용하지 않는다 — 이력이 그 번호로 남아 있다. */
+function nextTermCodes(existing: (string | null)[], n: number): string[] {
+  let max = 0
+  for (const c of existing) {
+    const m = /^T-(\d+)$/.exec(String(c ?? ''))
+    if (m) max = Math.max(max, Number(m[1]))
+  }
+  return Array.from({ length: n }, (_, i) => `T-${String(max + 1 + i).padStart(3, '0')}`)
+}
+
+/** 문항 변경 이력 한 줄. 실패해도 본 작업은 막지 않는다(레벨테스트 logEvent 와 같은 규칙). */
+async function termLog(
+  admin: any,
+  e: { question_id: string | null; code: string | null; action: string; actor: string; detail?: unknown },
+) {
+  try {
+    await admin.from('term_question_events').insert({
+      question_id: e.question_id, code: e.code, action: e.action, actor: e.actor || null, detail: e.detail ?? null,
+    })
+  } catch { /* 로그 실패는 무시 */ }
+}
+
+/** 저장할 번역만 골라낸다. 한 언어라도 덜 찼으면 **그 언어만** 버린다(다른 언어는 살린다). */
+function sanitizeTermI18n(t: any): { D: Record<string, string>; A: Record<string, string>; X: Record<string, string[]>; dropped: string[] } {
+  const D: Record<string, string> = {}
+  const A: Record<string, string> = {}
+  const X: Record<string, string[]> = {}
+  const dropped: string[] = []
+  for (const lg of TRANSLATED_LANGS) {
+    const d = String(t.descI18n?.[lg] ?? '').trim()
+    const a = String(t.answerI18n?.[lg] ?? '').trim()
+    const xs = (t.distractorsI18n?.[lg] ?? []).map((s: unknown) => String(s ?? '').trim())
+    if (!d && !a && !xs.some(Boolean)) continue // 아예 비어 있으면 조용히 생략(미번역)
+    // ⚠️ 오답 개수는 3개로 맞춘다 — 게임이 '정답 1 + 오답 3 = 보기 4개'로 그린다.
+    //    개수가 어긋난 번역을 담으면 그 언어에서만 보기가 빈 칸으로 뜬다.
+    if (!d || !a || xs.length !== 3 || xs.some((s: string) => !s)) { dropped.push(lg); continue }
+    D[lg] = d; A[lg] = a; X[lg] = xs
+  }
+  return { D, A, X, dropped }
+}
+
 /**
- * 문항 목록 + **어떤 게임이 이 문항을 쓰는지**.
- * ⚠️ CARIS 와 같은 구조다 — 은행에 문항을 쌓아두고, 게임(=시험)마다 담을 것을 고른다.
- *    다른 점은 뽑기(draw)가 없다는 것뿐이다(게임은 세트를 고정할 이유가 없다).
+ * 문항 목록 + **어떤 게임이 이 문항을 쓰는지** + 언어별 번역 완료율.
+ * ⚠️ 완료율 분모는 **활성 문항**이다(CARIS 와 같은 규칙) — 비활성은 게임에 안 나가니 번역할 이유가 없는데
+ *    분모에 넣으면 영영 100%가 안 돼서 "다 됐다"를 아무도 판단 못 한다.
  */
 async function termList(admin: any) {
   const [q, banks, sets] = await Promise.all([
-    admin.from('term_questions').select('*').order('sort_order').order('created_at'),
+    admin.from('term_questions').select('*').is('deleted_at', null).eq('active', true)
+      .order('sort_order').order('created_at'),
     admin.from('term_banks').select('*').order('sort_order'),
     admin.from('minigame_question_sets').select('game_id, question_id'),
   ])
   if (q.error) return json({ error: q.error.message }, 500)
-  // 문항 → 그 문항을 쓰는 게임 목록
+  // ⚠️ 담긴 개수는 **살아 있는 문항만** 센다 — 중지·삭제된 문항의 세트 줄이 남아 있어서,
+  //    그것까지 세면 "담긴 것 50개"라고 적혀 있는데 목록엔 48개만 보이는 화면이 된다.
+  const alive = new Set(((q.data ?? []) as any[]).map((t) => t.id))
   const byQ: Record<string, string[]> = {}
-  for (const s of (sets.data ?? []) as any[]) (byQ[s.question_id] ??= []).push(s.game_id)
-  // 게임 → 담긴 문항 수(0이면 "아직 안 고름" = 은행 전체를 쓴다)
   const counts: Record<string, number> = {}
-  for (const s of (sets.data ?? []) as any[]) counts[s.game_id] = (counts[s.game_id] ?? 0) + 1
-  return json({
-    terms: ((q.data ?? []) as any[]).map((t) => ({ ...t, games: byQ[t.id] ?? [] })),
-    banks: banks.data ?? [],
-    counts,
-  })
+  for (const s of (sets.data ?? []) as any[]) {
+    if (!alive.has(s.question_id)) continue
+    ;(byQ[s.question_id] ??= []).push(s.game_id)
+    counts[s.game_id] = (counts[s.game_id] ?? 0) + 1
+  }
+  const rows = ((q.data ?? []) as any[]).map((t) => ({ ...t, games: byQ[t.id] ?? [], missing: termMissing(t) }))
+  const coverage: Record<string, number> = {}
+  for (const r of rows) for (const lg of TRANSLATED_LANGS) if (!r.missing.includes(lg)) coverage[lg] = (coverage[lg] ?? 0) + 1
+  return json({ terms: rows, banks: banks.data ?? [], counts, coverage, total: rows.length })
+}
+
+/** '문항 이력' 탭 — 되돌릴 수 있는 것들(비활성 · 삭제). */
+async function termRestorable(admin: any) {
+  const [inactive, deleted] = await Promise.all([
+    admin.from('term_questions').select('*').is('deleted_at', null).eq('active', false).order('sort_order'),
+    admin.from('term_questions').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+  ])
+  return json({ inactive: inactive.data ?? [], deleted: deleted.data ?? [] })
+}
+
+/** '문항 이력' 탭 — 변경 로그. */
+async function termEvents(admin: any, body: any) {
+  let q = admin.from('term_question_events').select('*').order('created_at', { ascending: false }).limit(500)
+  if (body?.code) q = q.eq('code', String(body.code))
+  const { data, error } = await q
+  if (error) return json({ error: error.message }, 500)
+  return json({ rows: data ?? [] })
 }
 
 /** 게임에 문항을 담거나 뺀다. `games` 가 그 문항이 들어갈 게임 목록의 **전체**다. */
@@ -998,60 +1084,165 @@ async function termSetBulk(admin: any, body: any) {
   }
   return json({ ok: true })
 }
-async function termUpsert(admin: any, body: any) {
+
+/**
+ * 문항 추가/수정.
+ * ⛔ **한국어 원문이 바뀌면 옛 번역을 그 자리에서 비운다**(CARIS questionUpsert 의 koChanged 와 같은 이유).
+ *    안 비우면 설명만 고쳐도 번역본은 옛 문장 그대로라 **외국어로 하는 사람만 다른 문제를 푼다** —
+ *    화면에는 아무 표시도 안 남는 종류의 사고다.
+ */
+async function termUpsert(admin: any, body: any, ctx: Ctx) {
   const t = body?.term ?? {}
   const ko = String(t.answerKo ?? '').trim()
   const desc = String(t.descKo ?? '').trim()
   const dis = (t.distractorsKo ?? []).map((s: unknown) => String(s ?? '').trim()).filter(Boolean)
   if (!ko || !desc) return json({ error: '설명과 정답 용어를 모두 입력하세요.' }, 400)
   if (dis.length < 3) return json({ error: '오답 용어 3개가 필요합니다(보기 4개).' }, 400)
-  const row = {
+
+  const { D, A, X, dropped } = sanitizeTermI18n(t)
+  let before: any = null
+  if (t.id) {
+    const { data } = await admin.from('term_questions').select('*').eq('id', t.id).maybeSingle()
+    before = data
+  }
+  // 한국어가 바뀌었나 — 설명·정답·오답 중 하나라도 달라지면 옛 번역은 전부 버린다.
+  const koChanged = !!before && (
+    (before.desc_i18n?.ko ?? '') !== desc ||
+    (before.answer_i18n?.ko ?? '') !== ko ||
+    JSON.stringify(before.distractors_i18n?.ko ?? []) !== JSON.stringify(dis.slice(0, 3))
+  )
+  // 한국어가 바뀌었으면 번역을 통째로 버리고 한국어만 남긴다.
+  const tr = koChanged ? { D: {}, A: {}, X: {} } : { D, A, X }
+  const row: Record<string, unknown> = {
     field: String(t.field ?? 'AI'),
-    desc_i18n: { ...(t.descI18n ?? {}), ko: desc },
-    answer_i18n: { ...(t.answerI18n ?? {}), ko },
-    distractors_i18n: { ...(t.distractorsI18n ?? {}), ko: dis.slice(0, 3) },
+    desc_i18n: { ...tr.D, ko: desc },
+    answer_i18n: { ...tr.A, ko },
+    distractors_i18n: { ...tr.X, ko: dis.slice(0, 3) },
     active: t.active !== false,
     sort_order: Number(t.sortOrder ?? 0),
     updated_at: new Date().toISOString(),
   }
-  const q = t.id ? admin.from('term_questions').update(row).eq('id', t.id) : admin.from('term_questions').insert(row)
-  const { error } = await q
+  if (!t.id) {
+    const { data: codes } = await admin.from('term_questions').select('code')
+    row.code = nextTermCodes(((codes ?? []) as any[]).map((r) => r.code), 1)[0]
+  }
+  const q = t.id
+    ? admin.from('term_questions').update(row).eq('id', t.id).select('id, code').maybeSingle()
+    : admin.from('term_questions').insert(row).select('id, code').maybeSingle()
+  const { data: saved, error } = await q
   // 같은 정답이 이미 있으면 유일 인덱스가 막는다 — 사람 말로 옮긴다.
   if (error) return json({ error: /term_questions_answer_uniq/.test(error.message) ? '같은 정답 용어가 이미 있습니다.' : error.message }, 400)
+  await termLog(admin, {
+    question_id: saved?.id ?? t.id ?? null, code: saved?.code ?? before?.code ?? null,
+    action: t.id ? 'update' : 'create', actor: ctx.email,
+    detail: { answer: ko, ...(koChanged ? { koChanged: true, clearedTranslations: true } : {}) },
+  })
+  return json({ ok: true, id: saved?.id, code: saved?.code, dropped, clearedTranslations: koChanged })
+}
+
+/** 사용/중지 토글. 중지된 문항은 게임에 안 나가고 목록에서도 빠진다('문항 이력 > 비활성'). */
+async function termSetActive(admin: any, body: any, ctx: Ctx) {
+  const id = String(body?.id ?? '')
+  const active = body?.active !== false
+  const { data, error } = await admin.from('term_questions').update({ active, updated_at: new Date().toISOString() })
+    .eq('id', id).select('id, code').maybeSingle()
+  if (error) return json({ error: error.message }, 500)
+  await termLog(admin, { question_id: id, code: data?.code ?? null, action: active ? 'activate' : 'deactivate', actor: ctx.email })
   return json({ ok: true })
 }
+
+/**
+ * 삭제 — 되돌릴 수 있게 표시만 한다.
+ * ⚠️ `active=false` 를 같이 찍는다: 정답 유일 인덱스가 `where active` 라, 안 그러면 지운 용어를 다시 못 넣는다.
+ */
 async function termDelete(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
-  const { error } = await admin.from('term_questions').delete().eq('id', id)
+  const { data, error } = await admin.from('term_questions')
+    .update({ deleted_at: new Date().toISOString(), active: false }).eq('id', id).select('id, code').maybeSingle()
   if (error) return json({ error: error.message }, 500)
+  await termLog(admin, { question_id: id, code: data?.code ?? null, action: 'delete', actor: ctx.email })
   await audit(admin, ctx, 'termDelete', id)
   return json({ ok: true })
 }
+
+/** 삭제·중지된 문항을 목록으로 되돌린다. */
+async function termRestore(admin: any, body: any, ctx: Ctx) {
+  const id = String(body?.id ?? '')
+  const { data, error } = await admin.from('term_questions')
+    .update({ deleted_at: null, active: true, updated_at: new Date().toISOString() })
+    .eq('id', id).select('id, code').maybeSingle()
+  if (error) return json({ error: /term_questions_answer_uniq/.test(error.message) ? '같은 정답 용어가 이미 있어 되돌릴 수 없습니다.' : error.message }, 400)
+  await termLog(admin, { question_id: id, code: data?.code ?? null, action: 'restore', actor: ctx.email })
+  return json({ ok: true })
+}
+
 /**
- * 코드(`src/lib/terms.ts`)에 박혀 있던 기본 문항을 DB 로 옮기는 1회용 통로.
- * ⚠️ 마이그레이션 SQL 에 50문항을 박지 않은 이유: 원본이 TS 배열이라 SQL 로 옮겨 적으면
- *    그 순간 **다섯 번째 사본**이 된다. 화면에서 한 번 밀어넣고 코드 쪽은 시드로만 남긴다.
+ * 일괄 등록 — 엑셀 업로드와 '기본 문항 불러오기'가 같이 쓴다.
+ * ⚠️ **방금 넣은 행의 id·번호를 돌려준다**(`inserted`). 화면은 그걸로 번역을 이어붙인다 —
+ *    안 돌려주면 어느 문항인지 모르는 채 순서로 추측하게 되고, 남의 문항에 번역이 박힌다(CARIS 에서 겪은 함정).
  * 이미 있는 정답은 건너뛴다(여러 번 눌러도 안전).
  */
 async function termImport(admin: any, body: any, ctx: Ctx) {
   const items = (body?.items ?? []) as any[]
   if (!Array.isArray(items) || !items.length) return json({ error: '가져올 문항이 없습니다.' }, 400)
-  const { data: exist } = await admin.from('term_questions').select('answer_i18n')
+  const { data: exist } = await admin.from('term_questions').select('code, answer_i18n')
   const have = new Set(((exist ?? []) as any[]).map((r) => r.answer_i18n?.ko).filter(Boolean))
-  const rows = items
-    .filter((it) => it?.answer && !have.has(String(it.answer)))
-    .map((it, i) => ({
-      field: String(it.field ?? 'AI'),
-      desc_i18n: { ko: String(it.desc ?? '') },
-      answer_i18n: { ko: String(it.answer) },
-      distractors_i18n: { ko: (it.distractors ?? []).slice(0, 3).map((s: unknown) => String(s)) },
-      active: true, sort_order: i,
-    }))
-  if (!rows.length) return json({ ok: true, added: 0 })
-  const { error } = await admin.from('term_questions').insert(rows)
+  const picked: any[] = []
+  for (const it of items) {
+    const answer = String(it?.answer ?? '').trim()
+    const desc = String(it?.desc ?? '').trim()
+    const dis = (it?.distractors ?? []).map((s: unknown) => String(s ?? '').trim()).filter(Boolean).slice(0, 3)
+    if (!answer || !desc || dis.length < 3 || have.has(answer)) continue
+    have.add(answer) // 파일 안에서 같은 정답이 두 번 나오는 경우도 막는다
+    picked.push({ answer, desc, field: String(it?.field ?? 'AI'), dis })
+  }
+  if (!picked.length) return json({ ok: true, added: 0, inserted: [] })
+  const codes = nextTermCodes(((exist ?? []) as any[]).map((r) => r.code), picked.length)
+  const base = ((exist ?? []) as any[]).length
+  const rows = picked.map((p, i) => ({
+    code: codes[i], field: p.field,
+    desc_i18n: { ko: p.desc }, answer_i18n: { ko: p.answer }, distractors_i18n: { ko: p.dis },
+    active: true, sort_order: base + i,
+  }))
+  const { data: ins, error } = await admin.from('term_questions').insert(rows).select('id, code, answer_i18n')
   if (error) return json({ error: error.message }, 500)
+  for (const r of (ins ?? []) as any[]) {
+    await termLog(admin, { question_id: r.id, code: r.code, action: 'import', actor: ctx.email, detail: { answer: r.answer_i18n?.ko } })
+  }
   await audit(admin, ctx, 'termImport', null, { added: rows.length })
-  return json({ ok: true, added: rows.length })
+  return json({
+    ok: true, added: rows.length,
+    inserted: ((ins ?? []) as any[]).map((r) => ({ id: r.id, code: r.code, answer: r.answer_i18n?.ko })),
+  })
+}
+
+/**
+ * 번역만 따로 저장한다(엑셀 업로드 직후·「미번역 번역」이 배치마다 부른다).
+ * ⛔ **배치마다 저장한다 — 전부 끝난 뒤 한 번에 저장하지 말 것.** 모아서 저장하면 도중에 창을 닫을 때
+ *    그때까지의 Gemini 호출이 통째로 버려진다(CARIS 에서 그렇게 만들었다가 고쳤다).
+ */
+async function termTransSave(admin: any, body: any) {
+  const rows = (body?.rows ?? []) as any[]
+  if (!Array.isArray(rows) || !rows.length) return json({ error: '저장할 번역이 없습니다.' }, 400)
+  let saved = 0
+  const dropped: string[] = []
+  for (const r of rows) {
+    const id = String(r?.id ?? '')
+    if (!id) continue
+    const { data: cur } = await admin.from('term_questions').select('desc_i18n, answer_i18n, distractors_i18n').eq('id', id).maybeSingle()
+    if (!cur) continue
+    const { D, A, X, dropped: bad } = sanitizeTermI18n(r)
+    for (const lg of bad) if (!dropped.includes(lg)) dropped.push(lg)
+    if (!Object.keys(D).length) continue
+    const { error } = await admin.from('term_questions').update({
+      desc_i18n: { ...(cur.desc_i18n ?? {}), ...D },
+      answer_i18n: { ...(cur.answer_i18n ?? {}), ...A },
+      distractors_i18n: { ...(cur.distractors_i18n ?? {}), ...X },
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (!error) saved++
+  }
+  return json({ ok: true, saved, dropped })
 }
 
 // ── CARIS 현황 > 시험환경 점검 ────────────────────────────────
@@ -1144,9 +1335,14 @@ export async function handleReform(admin: any, action: string, body: any, ctx: C
     case 'termList': return await termList(admin)
     case 'termSetGames': return await termSetGames(admin, body)
     case 'termSetBulk': return await termSetBulk(admin, body)
-    case 'termUpsert': return await termUpsert(admin, body)
+    case 'termUpsert': return await termUpsert(admin, body, ctx)
+    case 'termSetActive': return await termSetActive(admin, body, ctx)
     case 'termDelete': return await termDelete(admin, body, ctx)
+    case 'termRestore': return await termRestore(admin, body, ctx)
+    case 'termRestorable': return await termRestorable(admin)
+    case 'termEvents': return await termEvents(admin, body)
     case 'termImport': return await termImport(admin, body, ctx)
+    case 'termTransSave': return await termTransSave(admin, body)
   }
   return await handleReform2(admin, action, body, ctx, deps)
 }

@@ -477,7 +477,7 @@ const CONTACT=350;
    버텨라 CARI 와 같은 원본(AI로봇피지컬AI_용어퀴즈_50문항.xlsx).
    [분야, 설명, [정답, 오답×3]] → '용어 + 설명' 짝으로 런타임 변환.
    정답 용어를 붙이면 O, 오답 용어를 붙이면 X. 50 × 4 = 200가지. */
-const POOL = [
+let POOL = [
   ["AI","컴퓨터가 인간처럼 학습·추론하며 문제를 해결하도록 만드는 기술 전반",["인공지능(AI)","머신러닝","딥러닝","알고리즘"]],
   ["AI","데이터로부터 규칙·패턴을 스스로 학습해 성능을 개선하는 인공지능의 하위 분야",["머신러닝","딥러닝","자연어처리","컴퓨터 비전"]],
   ["AI","여러 층의 인공신경망으로 데이터의 복잡한 패턴을 학습하는 머신러닝 기법",["딥러닝","강화학습","전이학습","지도학습"]],
@@ -529,6 +529,22 @@ const POOL = [
   ["피지컬AI","시각·언어 정보를 입력받아 곧바로 로봇의 행동을 출력하는 최신 로봇 제어 모델",["VLA 모델","LLM","파운데이션 모델","멀티모달 모델"]],
   ["피지컬AI","다양한 환경 변화·예외 상황에서도 안정적으로 성능을 유지하는 능력",["강건성(Robustness)","일반화","정확도","효율성"]],
 ];
+
+/* 문항 갈아끼우기 — 부모(앱)가 DB 문항을 내려주면 위 POOL 을 대체한다.
+   ⛔ 위 배열은 **폴백**이다. 단일 출처는 관리자 화면(term_questions)이고, 이 파일을 앱 없이
+      직접 열었거나 서버가 안 열릴 때만 쓰인다 — 여기 문항을 고쳐도 서비스에는 안 나간다.
+   ⚠️ 받은 문항은 이미 화면 언어로 번역돼 온다(앱이 투영해서 보낸다). */
+window.addEventListener("message", function(e){
+  if(e.origin !== window.location.origin) return;
+  var m = e.data;
+  if(!m || m.t !== "mg:pool" || !Array.isArray(m.items)) return;
+  var next = m.items
+    .filter(function(it){ return it && it.desc && it.answer && it.distractors && it.distractors.length === 3; })
+    .map(function(it){ return [it.field || "AI", it.desc, [it.answer].concat(it.distractors)]; });
+  if(!next.length) return;
+  POOL = next;
+  recent.length = 0;   // 옛 문항으로 만든 "최근에 낸 문제" 기록을 비운다
+});
 
 /* ===== 캐릭터 =====
    전부 CARI 실루엣(둥근 후드 몸통 + 귀 2개 + 검은 바이저 + 빛나는 눈)을 공유한다.
