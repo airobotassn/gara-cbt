@@ -159,3 +159,84 @@ export async function renderEbookCover(html: string): Promise<EbookCoverImage> {
     frame.remove()
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// 표지 그림 갈아끼우기 (2026-09-03)
+//
+// 표지는 본문 1페이지를 구운 것이라, 표지만 바꾸려면 여태 **본문 HTML 을 다시 만들어 올려야 했다**
+// — 그러면 5개 언어 번역까지 다시 도는 긴 작업이 된다. 표지는 자주 바꾸는 물건이라 그 비용이 크다.
+// 그래서 올린 그림으로 **1페이지의 그림만** 바꿔치고 표지를 다시 굽는 길을 연다.
+//
+// 전제: 1페이지가 `<div class="page static-cover"><img src="data:…">` 한 장이다.
+//   2026-09-03 실측 — 이북 10권 × 6개국어 60개 파일이 전부 이 모양이고, 파일 전체에 박힌 그림도
+//   그거 하나뿐이다. 그래도 '첫 data:image' 로 찾지 않는다 — 본문에 그림이 있는 책이 나중에 들어오면
+//   엉뚱한 그림을 갈아치우게 되고, 그건 화면에 아무 표시도 안 남는 종류의 사고다.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** 표지에 박을 그림의 긴 변 상한(px). 원본이 4000px 이어도 base64 로 부풀어 본문이 무거워지지 않게 한다.
+ *  ⚠️ 지금 들어있는 표지 그림이 1024×1536 이라 그보다 넉넉하다. */
+const ART_MAX = 1600
+
+/**
+ * 이미지 파일 → 본문에 박을 data: URI(webp).
+ * ⚠️ webp 로 굽는다 — 지금 표지가 전부 webp 이고, PNG 로 박으면 같은 그림이 3~4배가 된다
+ *    (본문 HTML 은 통째로 받아야 열리므로 그 무게가 그대로 열람 지연이 된다).
+ */
+export async function imageFileToDataUri(file: File): Promise<{ dataUri: string; width: number; height: number }> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'))
+      el.src = url
+    })
+    const scale = Math.min(1, ART_MAX / Math.max(img.naturalWidth, img.naturalHeight))
+    const w = Math.round(img.naturalWidth * scale)
+    const h = Math.round(img.naturalHeight * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('캔버스를 만들 수 없습니다.')
+    ctx.drawImage(img, 0, 0, w, h)
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/webp', 0.9))
+    if (!blob) throw new Error('이미지를 변환하지 못했습니다.')
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(String(fr.result))
+      fr.onerror = () => reject(new Error('이미지를 변환하지 못했습니다.'))
+      fr.readAsDataURL(blob)
+    })
+    return { dataUri, width: w, height: h }
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * 본문 HTML 의 1페이지(`.static-cover`) 안 그림을 갈아끼운다.
+ * @returns 바뀐 HTML. 표지 페이지나 그 안의 그림을 못 찾으면 **null**(그 파일은 건드리지 않는다).
+ *
+ * ⚠️ 정규식으로 `<img … src="…">` 를 통째로 갈지 않고 **그 img 의 src 값만** 바꾼다 —
+ *    class·style 같은 다른 속성이 붙어 있어도 살아남게.
+ */
+export function replaceStaticCoverImage(html: string, dataUri: string): string | null {
+  const coverAt = html.search(/<div[^>]*class="[^"]*\bstatic-cover\b/)
+  if (coverAt < 0) return null
+  // 표지 div 가 열린 **바로 뒤**에 그림이 온다 → 여는 자리는 가까이서만 찾는다(멀리 있으면
+  // 표지 페이지의 그림이 아니라 본문 그림이다).
+  const HEAD = 2000
+  const rel = html.slice(coverAt, coverAt + HEAD).search(/<img\b/)
+  if (rel < 0) return null
+  const imgAt = coverAt + rel
+  // ⛔ **닫는 '>' 는 전체 문자열에서 찾는다.** 창을 잘라 놓고 그 안에서 찾으면 못 찾는다 —
+  //    img 태그 자체가 base64 때문에 수백 KB 다(실측 324KB). 처음에 20KB 창 안에서 찾다가
+  //    전 파일이 통째로 실패했다. base64 알파벳에 '>' 가 없어 첫 '>' 가 곧 태그 끝이다.
+  const imgEnd = html.indexOf('>', imgAt)
+  if (imgEnd < 0) return null
+  const tag = html.slice(imgAt, imgEnd + 1)
+  const next = tag.replace(/(\ssrc\s*=\s*")[^"]*(")/, `$1${dataUri}$2`)
+  if (next === tag) return null // src 속성이 없다 = 우리가 아는 모양이 아니다
+  return html.slice(0, imgAt) + next + html.slice(imgEnd + 1)
+}
