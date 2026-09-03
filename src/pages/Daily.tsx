@@ -141,7 +141,7 @@ export default function Daily() {
       {!loading && !authed && (
         <div className="dy-banner">
           <span>{t('daily.login_note')}</span>
-          <button className="dy-btn dy-btn-sm" onClick={() => loginWithGoogle()}>{t('common.login_google')}</button>
+          <button className="dy-btn dy-btn-sm" onClick={() => loginWithGoogle()}>{t('common.login')}</button>
         </div>
       )}
 

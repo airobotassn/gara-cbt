@@ -813,7 +813,8 @@ export default function Hub() {
   const pickKeys = starterKeys.length ? starterKeys : CHAR_KEYS
   const needCharPick = authed && charChosen === false
   const needTutorial = authed && charChosen === true && tutorialDone === false
-  // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점의 1,000점 밴드). 옛 '다음 순위까지 N점' 랭킹 게이지를 대체한다.
+  // HUD 경험치 바 = **ARENA 레벨 진행도**(시즌 총점 밴드 — 2026-09-03 개정으로 폭이 레벨마다 다르다).
+  //   ⚠️ 그래서 폭을 상수로 나누면 안 된다 — 반드시 arenaBand() 가 준 [최저,최고] 로 계산할 것.
   //   ⚠️ 여기 Lv 는 시험 사다리 등급(user_progress.rank)이 아니라 점수 밴드다 — 둘은 별개 축이다(scoring.ts 참고).
   const arenaLv = pv?.lv ?? arenaLevelForScore(seasonTotal)
   const [bandLo, bandHi] = arenaBand(arenaLv)
@@ -938,7 +939,7 @@ export default function Hub() {
       {!isFullUser && (
         <div className="slim-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{t('hub.banner_login')}</span>
-          <button className="pbtn" style={{ background: '#4b7bf5', padding: '7px 14px', fontSize: 13 }} onClick={() => loginWithGoogle()}>{t('common.login_google')}</button>
+          <button className="pbtn" style={{ background: '#4b7bf5', padding: '7px 14px', fontSize: 13 }} onClick={() => loginWithGoogle()}>{t('common.login')}</button>
         </div>
       )}
 
@@ -996,8 +997,17 @@ export default function Hub() {
         {/* 오늘의 미션 — 무대 **위 가로 한 줄**(하단 '출석 보상' 스트립과 같은 형태).
             좌측 열로 두면 카드 하나 때문에 캐릭터가 옆으로 밀려서 전체 폭 한 줄로 옮겼다 → 캐릭터는 정중앙 유지.
             완료 판정은 서버 플래그(daily_activity 종류별), 점수는 scoring.ts 의 ACTIVITY_DELTA 파생. */}
-        <div className="mission-bar" data-tut="mission">
-          <span className="ms-title"><Ic n="star" s={16} /> {t('hub.mission_title')}</span>
+        <div className="mission-zone" data-tut="mission">
+          {/* ⛔ **칩을 이 명패 안으로 되돌리지 말 것(2026-09-03).** 명패 그림은 1390×185 = 가로:세로 7.5:1 짜리
+              *가로로 긴 현판*이고, 좌우 장식은 쪼갤 수도 반복시킬 수도 없는 **꽃 한 덩어리**다. 칩을 안에 넣으면
+              줄바꿈 때문에 판이 세로로 커지는데(실측: 360px 폰에서 130px = 그림 비율의 3배, 320px 폰에서
+              171px = 4.4배) 그만큼 좌우 꽃이 그대로 늘어난다. 그래서 명패에는 **한 줄만** 담는다. */}
+          <div className="mission-bar">
+            <span className="ms-title"><Ic n="star" s={16} /> {t('hub.mission_title')}</span>
+            <span className="ms-n">{missionDone}/{missions.length}</span>
+          </div>
+          {/* 칩은 명패 **밖**이라 화면 폭을 다 쓴다 — 안에 있을 때보다 자리가 76px 넓어져서(좌우 장식 34px씩)
+              좁은 폰에서도 3줄로 안 떨어진다. 칩 자체가 테두리·그림자를 가진 스티커라 사진 위에서도 읽힌다. */}
           <div className="ms-chips">
           {missions.map((m) => {
             const body = (
@@ -1016,7 +1026,6 @@ export default function Hub() {
               : <span key={m.kind} className={`${cls} is-static`}>{body}</span>
           })}
           </div>
-          <span className="ms-n">{missionDone}/{missions.length}</span>
         </div>
 
         {/* 친구 초대는 화면에 카드로 꺼내지 않는다 — 도크 '초대하기' 버튼 모달 하나로 모았다(진입점 중복 제거). */}
@@ -1024,8 +1033,19 @@ export default function Hub() {
             {/* 왼쪽 레일 제거 — 출석을 오른쪽 맨 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
             {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
             <div className="rail rail-r">
-              {/* 옛 '출석' 칸은 제거됐다(2026-08-24) — 출석은 사이트에 들어오면 자동으로 찍힌다(lib/autoCheckin.ts).
-                  ⚠️ 칸을 되살릴 일이 있어도 누르는 버튼으로 두지 말 것. 이미 찍힌 걸 또 누르는 자리가 된다. */}
+              {/* 출석 — 옛 하단 '출석 보상' 스탬프판이 이 칸으로 접혔다(2026-09-03 지시).
+                  그 판이 도크에서 90px 넘게 먹는 바람에 아래 랭킹 버튼이 한 화면(100dvh) 밖으로
+                  밀려 있었고, 허브는 스크롤이 안 되는 틀이라 **폰에서는 랭킹으로 가는 길 자체가 없었다.**
+                  ⚠️ 이 버튼은 출석을 '찍는' 버튼이 아니다(출석은 들어오면 자동이다 · lib/autoCheckin.ts) —
+                     7일 사이클 진행과 기록을 **보는** 자리다. 그래서 배지로 n/7 을 달아 둔다:
+                     안 달면 눌러야만 진행 상황을 알 수 있어서 판을 접은 값이 그대로 사라진다. */}
+              <button className="fcard f-attend" data-tut="stamp" onClick={() => setModal('attend')}>
+                <span className="fico"><HubUiIcon n="calendar" dir={skin.iconDir} /></span>
+                {/* ⚠️ 진행도는 **라벨 옆에 붙인다**(2026-09-03 지시). 모서리에 뜨는 알림 배지(.bd)로 뒀더니
+                    그림에서 떨어진 자리에 작게 떠서 읽기 어려웠다 — 여기 붙이면 라벨과 같은
+                    흰 글자 + 어두운 외곽선을 그대로 물려받아 사진 위에서도 읽힌다. */}
+                <span className="f-lab">{t('hub.rail.attend')} <b>{stamps}/7</b></span>
+              </button>
               {/* '상점' → '꾸미기'. 사는 곳과 갈아입는 곳이 한 모달의 두 탭이라 상점만 말하면 절반을 숨긴다. */}
               <button className="fcard f-shop" data-tut="closet" onClick={() => { setClosetTab('shop'); setModal('closet') }}><span className="fico"><HubUiIcon n="shop" dir={skin.iconDir} /></span>{t('hub.rail.closet')}</button>
               <button className="fcard f-title" onClick={() => setModal('title')}><span className="fico"><HubUiIcon n="medal" dir={skin.iconDir} /></span>{t('hub.rail.title')}</button>
@@ -1034,29 +1054,11 @@ export default function Hub() {
             </div>
         </div>
 
-        {/* 도크: 7일 출석 스탬프 + 메인 CTA(랭킹) */}
+        {/* 도크: 메인 CTA(랭킹) 하나.
+            ⛔ **여기에 세로로 자라는 판을 다시 얹지 말 것.** 허브는 100dvh 로 잠긴 틀이라 도크가 커지는
+               만큼 랭킹 버튼이 화면 밖으로 나가는데, 스크롤이 없어서 사용자는 밀려난 걸 볼 방법이 없다
+               (2026-09-03 — 7일 출석 스탬프판이 그래서 레일 '출석' 칸으로 접혔다). */}
         <div className="dock">
-          {/* 스탬프판을 누르면 '출석 기록' 달력이 열린다(2026-08-25 — 옛 마이페이지 학습 대시보드의
-              활동 기록 달력이 여기로 왔다). 이 판이 곧 출석이라 진입점을 따로 만들지 않았다:
-              레일에 칸을 하나 더 넣으면 정사각 칸이 4개가 되면서 그만큼 작아진다.
-              ⚠️ <div> 가 아니라 <button> 이라 hub.css 에서 font/색을 상속으로 되돌려야 한다. */}
-          <button type="button" className="reward" data-tut="stamp" onClick={() => setModal('attend')}>
-            <div className="rw-top">
-              <Ic n="fire" s={20} /> {t('hub.reward_head')}
-              <span className="rw-n">{stamps} / 7</span>
-              {/* ⚠️ svg 가 아니라 글자다 — 궁궐 벌이 `.rw-top svg { display:none }` 라
-                  아이콘으로 넣으면 그 스킨에서만 조용히 사라져 '눌리는 판' 이라는 표시가 없어진다. */}
-              <span className="rw-more" aria-hidden="true">›</span>
-            </div>
-            <div className="streak">
-              {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                <div key={d} className={`day ${d <= stamps ? 'on' : ''}`}>
-                  {d === 7 && <span className="gift"><Ic n="gift" s={26} /></span>}
-                  {t('hub.day_n', { n: d })}<span className="chk">{d <= stamps ? '✓' : ''}</span>
-                </div>
-              ))}
-            </div>
-          </button>
           {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
           <Link className="cta-main" to="/ranking">
             {/* ⚠️ 궁궐 벌(고궁 낮·밤)에는 아이콘을 아예 그리지 않는다(2026-08-26 지시) — 판 그림이 이미
@@ -1285,6 +1287,22 @@ export default function Hub() {
              찍힌다. 누르는 버튼이 없어졌으니 어떻게 찍히는지 말해주는 자리가 여기밖에 없다. */}
       {modal === 'attend' && (
         <Modal title={t('hub.attend.title')} className="attend-modal" onClose={() => setModal(null)}>
+          {/* 7일 사이클 판 — 옛 도크 스탬프판이 여기로 왔다(2026-09-03). 달력 위에 두는 이유 =
+              사용자가 이 창을 여는 이유는 대개 '보너스까지 며칠 남았나' 지 지난 1년 기록이 아니다.
+              ⚠️ 클래스(.streak/.day)는 도크에 있던 것 그대로다 — 스킨 벌(궁궐·오피스)이 이 이름으로
+                 도장 그림을 갈아끼우고 있어서, 새 이름을 붙이면 그 벌에서만 판이 민무늬로 돌아간다. */}
+          <div className="rw-top">
+            <Ic n="fire" s={20} /> {t('hub.reward_head')}
+            <span className="rw-n">{stamps} / 7</span>
+          </div>
+          <div className="streak">
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+              <div key={d} className={`day ${d <= stamps ? 'on' : ''}`}>
+                {d === 7 && <span className="gift"><Ic n="gift" s={26} /></span>}
+                {t('hub.day_n', { n: d })}<span className="chk">{d <= stamps ? '✓' : ''}</span>
+              </div>
+            ))}
+          </div>
           <ContributionGraph days={new Set(attendanceDays)} />
           <p className="hub-modal-help">{t('hub.attend.help')}</p>
         </Modal>

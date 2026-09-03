@@ -15,7 +15,6 @@ const HI: Record<string, string> = {
   "common.hub": "हब",
   "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
-  "common.login_google": "Google से साइन इन करें",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "साइन इन",
   "common.logout": "साइन आउट",
@@ -53,12 +52,12 @@ const HI: Record<string, string> = {
   "region.KR-48": "ग्योंगनाम",
   "region.KR-49": "जेजू",
   "region.KR-50": "सेजोंग",
-  "onboarding.title": "आप किस क्षेत्र से जुड़ेंगे?",
+  "onboarding.title": "कृपया अपना देश और क्षेत्र चुनें।",
   // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
-  "onboarding.title_country": "आप किस देश से जुड़ेंगे?",
+  "onboarding.title_country": "कृपया अपना देश चुनें।",
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
-  "onboarding.intro_title": "रैंकिंग क्षेत्र के अनुसार होती है",
-  "onboarding.intro_body": "आपकी रैंक आपके क्षेत्र और देश के लोगों के बीच तय होगी।",
+  "onboarding.intro_title": "ग्लोबल रैंकिंग में शामिल हों",
+  "onboarding.intro_body": "लेवल टेस्ट, मिनी गेम और DAILY QUIZ में हिस्सा लें।",
   "onboarding.intro_next": "शुरू करें",
   "onboarding.country": "देश",
   "onboarding.region": "क्षेत्र",
@@ -66,7 +65,7 @@ const HI: Record<string, string> = {
   "onboarding.age": "आयु वर्ग",
   // 지역을 이미 확정한 회원이 연령대만 받으러 들어왔을 때의 제목(지역 질문이 없는 화면)
   "onboarding.age_title": "अपना आयु वर्ग बताएं",
-  "onboarding.age_hint": "केवल आंकड़ों के लिए — सटीक उम्र नहीं पूछी जाती।",
+  "onboarding.age_hint": "केवल आंकड़ों के लिए उपयोग किया जाता है।",
   "onboarding.age_10s": "20 से कम",
   "onboarding.age_20s": "20–29",
   "onboarding.age_30s": "30–39",
@@ -76,7 +75,7 @@ const HI: Record<string, string> = {
   "onboarding.age_private": "नहीं बताना चाहता",
   // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
   //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
-  "onboarding.lock_warn": "बाद में माय पेज से केवल एक बार बदल सकते हैं।",
+  "onboarding.lock_warn": "क्षेत्र का चयन माय पेज में केवल एक बार बदला जा सकता है।",
   "onboarding.start": "ऐसे ही शुरू करें",
   "onboarding.region_prefill_hint": "यह आपके IP से अनुमानित है। जांचें या संपादित करें।",
   "mypage.region_locked": "क्षेत्र और देश बदले नहीं जा सकते। गलत आवंटन पर संपर्क करें।",
@@ -283,7 +282,7 @@ const HI: Record<string, string> = {
   "locked.peek": "बस थोड़ा और — अनलॉक में 1 सेकंड",
   "locked.desc": "साइन इन करने पर यह परिणाम आपकी रेटिंग में जुड़ेगा और इसी स्कोर का विवरण खुलेगा।",
   "locked.blocked": "पिछले 3 दिनों में टेस्ट का रिकॉर्ड है, इसलिए यह खाते से नहीं जुड़ा। 3 दिन बाद दोबारा देने पर गिना जाएगा।",
-  "locked.cta": "विश्लेषण देखने के लिए Google से साइन इन करें",
+  "locked.cta": "विश्लेषण देखने के लिए साइन इन करें",
   "result.overall": "संचयी कुल रेटिंग {o} / 100",
   "result.placing": " · प्लेसमेंट जारी",
   "result.promoted": "पदोन्नति!",
@@ -941,7 +940,6 @@ const HI: Record<string, string> = {
   "mypage.exam_fallback": "CARIS",
   "mypage.login_required": "लॉगिन आवश्यक है",
   "mypage.login_desc": "माय पेज लॉगिन के बाद उपलब्ध है।",
-  "mypage.login_google": "Google से साइन इन करें",
   "mypage.login_kakao": "Kakao से साइन इन करें",
   "mypage.title": "माय पेज",
   "mypage.greeting_hello": "नमस्ते, ",
@@ -1042,6 +1040,8 @@ const HI: Record<string, string> = {
   "ll.next": "अगला",
   "ll.watch": "देखें",
   "ll.playing": "चल रहा है",
+  "ll.play_loading": "चलाने की तैयारी हो रही है…",
+  "ll.play_failed": "अभी चलाया नहीं जा सकता। कृपया थोड़ी देर बाद दोबारा कोशिश करें।",
   "ll.empty_owned": "कोई खरीदी गई सामग्री नहीं है।",
   // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
   //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
@@ -1118,7 +1118,6 @@ const HI: Record<string, string> = {
   "fab.dark": "डार्क मोड",
   "fab.light": "लाइट मोड",
   "nav.assoc": "एसोसिएशन परिचय",
-  "fab.login": "Google से साइन इन करें",
   "fab.loginhint": "साइन इन करने पर उपलब्ध",
   "fab.morebtn": "और देखें",
   "fab.changeChar": "अवतार बदलें",
@@ -1746,6 +1745,7 @@ const HI: Record<string, string> = {
   "hub.confirm": "ठीक है",
 
   // 오른쪽 레일
+  "hub.rail.attend": "चेक-इन",
   "hub.rail.closet": "सजाएँ",
   "hub.rail.title": "उपाधियाँ",
   "hub.rail.invite": "आमंत्रण इनाम",

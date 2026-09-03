@@ -174,7 +174,7 @@ export default function MiniGame() {
                 void loginWithGoogle(`${window.location.origin}/auth/callback`)
               }}
             >
-              {t('common.login_google')}
+              {t('common.login')}
             </button>
           </div>
         </div>
@@ -298,7 +298,7 @@ export default function MiniGame() {
               }}
               style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: 0, background: '#004ac6', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
             >
-              {t('common.login_google')}
+              {t('common.login')}
             </button>
             <button
               onClick={() => { guestNoticeDone.current = true; setGuestScored(false) }}

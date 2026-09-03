@@ -7,10 +7,11 @@
 //
 // ⚠️ 여기 있는 값들은 취향이 아니라 역산·반려 이력이 붙은 값이다. 고치기 전에 CLAUDE.md 의
 //    '/ebooks = 러닝 라이브러리' 절을 먼저 읽을 것(표지 51%·열 배경·잔글씨 금지·h-[] 고정 금지).
-import { Fragment, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import EbookCover from './EbookCover'
 import { usdc } from '../lib/money'
 import { ytEmbed } from '../lib/lectures'
+import { useT } from '../lib/i18n'
 import type { TFunc, Lang } from '../lib/i18n'
 import type { EbookRow, ServerLecture } from '../lib/types'
 
@@ -125,22 +126,7 @@ export function LibraryFrame({
 
       {/* ── 좁은 화면: 레벨은 가로 칩, 두 열은 탭 하나로 접는다. */}
       <div className="lg:hidden">
-        <div className="mb-3 flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {groups.map((g) => {
-            const on = g.key === active?.key
-            return (
-              <button
-                key={g.key}
-                type="button"
-                onClick={() => onPick(g)}
-                className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 font-label-md text-[16px] transition ${on ? 'bg-surface-container-lowest text-on-surface font-bold shadow-[inset_0_0_0_1.5px_var(--color-primary)]' : 'text-on-surface-variant'}`}
-              >
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
-                {g.short}
-              </button>
-            )
-          })}
-        </div>
+        <GroupStrip groups={groups} activeKey={active?.key} onPick={onPick} />
 
         {active && (
           <p className="mb-3 px-1 font-body-md text-[16px] leading-[24px] text-on-surface-variant break-keep">
@@ -177,6 +163,83 @@ export function LibraryFrame({
         </div>
       </div>
     </>
+  )
+}
+
+/** 좁은 화면의 레벨·급수 가로 칩 줄.
+ *
+ *  ⚠️ 양끝의 ‹ › 는 **장식이 아니라 유일한 안내다**(2026-09-03 지적). 그냥 가로 스크롤만 두면
+ *     화면에 잘린 칸이 안 보이는 각도에서는 옆에 더 있다는 사실 자체가 드러나지 않아,
+ *     폰으로 들어온 사람은 Lv.1~2 만 있는 줄 안다. 눌러서도 옮길 수 있어야 한다.
+ *  ⚠️ 세로 목록으로 펴지 않는 이유 = 8칸이 화면 절반을 먹어 교재·강의가 아래로 밀려난다.
+ *  ⚠️ 끝에 닿으면 그 방향 버튼을 죽인다(자리는 남긴다) — 없앴다 만들었다 하면 칩 줄 폭이 흔들려
+ *     누르려던 칩이 손가락 밑에서 움직인다. */
+function GroupStrip({
+  groups, activeKey, onPick,
+}: {
+  groups: LibGroup[]
+  activeKey?: string
+  onPick: (g: LibGroup) => void
+}) {
+  const { t } = useT()
+  const ref = useRef<HTMLDivElement>(null)
+  const [edge, setEdge] = useState({ l: false, r: false })
+
+  const readEdge = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    // 1px 여유 — 소수점 폭에서 scrollLeft 가 max 에 정확히 안 닿아 오른쪽 버튼이 영영 살아 있다.
+    setEdge({ l: el.scrollLeft > 1, r: el.scrollLeft < max - 1 })
+  }, [])
+
+  // 칸 목록(카탈로그 전환)·화면 폭이 바뀌면 다시 잰다. 스크롤 이벤트는 아래 onScroll 이 받는다.
+  useEffect(() => {
+    readEdge()
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(readEdge)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [groups, readEdge])
+
+  const nudge = (dir: 1 | -1) => {
+    const el = ref.current
+    if (!el) return
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
+  // ⚠️ 흐릿하게 두지 말 것(2026-09-03 지적 — 안 보인다). 이 줄의 배경(surface-container-low) 위에
+  //    보조색 글자만 얹으면 칩들 사이에서 그냥 사라진다. 한 단 밝은 면 + 테두리 + 본문색 글자로
+  //    '누르는 것' 이라고 말한다. 끝에 닿았을 때만 흐려진다(자리는 남는다 — 줄 폭이 흔들리면 안 된다).
+  const arrow =
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-outline-variant bg-surface-container-high text-[24px] font-bold leading-none text-on-surface transition-colors hover:bg-surface-container-highest disabled:border-transparent disabled:bg-transparent disabled:text-outline disabled:opacity-40'
+
+  return (
+    <div className="mb-3 flex items-center gap-1 rounded-2xl border border-outline-variant bg-surface-container-low px-1.5 py-2.5">
+      <button type="button" onClick={() => nudge(-1)} disabled={!edge.l} aria-label={t('ll.prev')} className={arrow}>‹</button>
+      <div
+        ref={ref}
+        onScroll={readEdge}
+        className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {groups.map((g) => {
+          const on = g.key === activeKey
+          return (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => onPick(g)}
+              className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 font-label-md text-[16px] transition ${on ? 'bg-surface-container-lowest text-on-surface font-bold shadow-[inset_0_0_0_1.5px_var(--color-primary)]' : 'text-on-surface-variant'}`}
+            >
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color, opacity: on ? 1 : 0.42 }} />
+              {g.short}
+            </button>
+          )
+        })}
+      </div>
+      <button type="button" onClick={() => nudge(1)} disabled={!edge.r} aria-label={t('ll.next')} className={arrow}>›</button>
+    </div>
   )
 }
 

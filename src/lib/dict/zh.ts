@@ -15,7 +15,6 @@ const ZH: Record<string, string> = {
   "common.hub": "角色中心",
   "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
-  "common.login_google": "使用 Google 登录",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "登录",
   "common.logout": "退出登录",
@@ -53,12 +52,12 @@ const ZH: Record<string, string> = {
   "region.KR-48": "庆尚南道",
   "region.KR-49": "济州特别自治道",
   "region.KR-50": "世宗特别自治市",
-  "onboarding.title": "您想从哪个地区加入？",
+  "onboarding.title": "请选择您的国家和地区。",
   // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
-  "onboarding.title_country": "您想从哪个国家加入？",
+  "onboarding.title_country": "请选择您的国家。",
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
-  "onboarding.intro_title": "按地区进行排名",
-  "onboarding.intro_body": "您将与同地区、同国家的人一同排名。",
+  "onboarding.intro_title": "参与全球排行榜",
+  "onboarding.intro_body": "快来参与等级测试、小游戏和 DAILY QUIZ。",
   "onboarding.intro_next": "开始",
   "onboarding.country": "国家",
   "onboarding.region": "地区",
@@ -66,7 +65,7 @@ const ZH: Record<string, string> = {
   "onboarding.age": "年龄段",
   // 지역을 이미 확정한 회원이 연령대만 받으러 들어왔을 때의 제목(지역 질문이 없는 화면)
   "onboarding.age_title": "请告诉我们您的年龄段",
-  "onboarding.age_hint": "仅用于统计，不会询问具体年龄。",
+  "onboarding.age_hint": "仅用于统计。",
   "onboarding.age_10s": "20岁以下",
   "onboarding.age_20s": "20–29岁",
   "onboarding.age_30s": "30–39岁",
@@ -76,7 +75,7 @@ const ZH: Record<string, string> = {
   "onboarding.age_private": "不愿透露",
   // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
   //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
-  "onboarding.lock_warn": "之后只能在“我的页面”更改一次。",
+  "onboarding.lock_warn": "地区选择仅可在“我的页面”更改一次。",
   "onboarding.start": "就此开始",
   "onboarding.region_prefill_hint": "根据 IP 估算，请确认或修改。",
   "mypage.region_locked": "地区和国家无法更改。如有误分配请联系我们。",
@@ -283,7 +282,7 @@ const ZH: Record<string, string> = {
   "locked.peek": "就快好了 — 1 秒后解锁",
   "locked.desc": "登录后此结果将计入累计评分，并解锁你刚看到的分数详情。",
   "locked.blocked": "最近 3 天内已有应试记录，因此本结果未关联账户。3 天后再考即可计入累计评分。",
-  "locked.cta": "使用 Google 登录查看分析",
+  "locked.cta": "登录查看分析",
   "result.overall": "累计综合评分 {o} / 100",
   "result.placing": " · 定级中",
   "result.promoted": "晋级！",
@@ -941,7 +940,6 @@ const ZH: Record<string, string> = {
   "mypage.exam_fallback": "CARIS",
   "mypage.login_required": "需要登录",
   "mypage.login_desc": "我的页面需登录后使用。",
-  "mypage.login_google": "使用 Google 登录",
   "mypage.login_kakao": "使用 Kakao 登录",
   "mypage.title": "我的页面",
   "mypage.greeting_hello": "您好，",
@@ -1042,6 +1040,8 @@ const ZH: Record<string, string> = {
   "ll.next": "下一个",
   "ll.watch": "观看",
   "ll.playing": "播放中",
+  "ll.play_loading": "正在准备播放…",
+  "ll.play_failed": "当前无法播放，请稍后再试。",
   "ll.empty_owned": "没有已购买的内容。",
   // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
   //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
@@ -1118,7 +1118,6 @@ const ZH: Record<string, string> = {
   "fab.dark": "深色模式",
   "fab.light": "浅色模式",
   "nav.assoc": "协会简介",
-  "fab.login": "使用 Google 登录",
   "fab.loginhint": "登录后即可使用",
   "fab.morebtn": "更多",
   "fab.changeChar": "更换头像",
@@ -1746,6 +1745,7 @@ const ZH: Record<string, string> = {
   "hub.confirm": "确定",
 
   // 오른쪽 레일
+  "hub.rail.attend": "签到",
   "hub.rail.closet": "装扮",
   "hub.rail.title": "称号",
   "hub.rail.invite": "邀请奖励",

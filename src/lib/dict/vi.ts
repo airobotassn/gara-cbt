@@ -15,7 +15,6 @@ const VI: Record<string, string> = {
   "common.hub": "Hub",
   "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
-  "common.login_google": "Đăng nhập bằng Google",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "Đăng nhập",
   "common.logout": "Đăng xuất",
@@ -53,12 +52,12 @@ const VI: Record<string, string> = {
   "region.KR-48": "Gyeongnam",
   "region.KR-49": "Jeju",
   "region.KR-50": "Sejong",
-  "onboarding.title": "Bạn tham gia từ khu vực nào?",
+  "onboarding.title": "Vui lòng chọn quốc gia và khu vực của bạn.",
   // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
-  "onboarding.title_country": "Bạn tham gia từ quốc gia nào?",
+  "onboarding.title_country": "Vui lòng chọn quốc gia của bạn.",
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
-  "onboarding.intro_title": "Xếp hạng theo khu vực",
-  "onboarding.intro_body": "Bạn sẽ được xếp hạng cùng những người ở khu vực và quốc gia của bạn.",
+  "onboarding.intro_title": "Tham gia bảng xếp hạng toàn cầu",
+  "onboarding.intro_body": "Hãy tham gia bài kiểm tra cấp độ, mini game và DAILY QUIZ.",
   "onboarding.intro_next": "Bắt đầu",
   "onboarding.country": "Quốc gia",
   "onboarding.region": "Khu vực",
@@ -66,7 +65,7 @@ const VI: Record<string, string> = {
   "onboarding.age": "Nhóm tuổi",
   // 지역을 이미 확정한 회원이 연령대만 받으러 들어왔을 때의 제목(지역 질문이 없는 화면)
   "onboarding.age_title": "Cho chúng tôi biết nhóm tuổi của bạn",
-  "onboarding.age_hint": "Chỉ dùng cho thống kê — không hỏi tuổi chính xác.",
+  "onboarding.age_hint": "Chỉ được dùng cho mục đích thống kê.",
   "onboarding.age_10s": "Dưới 20",
   "onboarding.age_20s": "20–29",
   "onboarding.age_30s": "30–39",
@@ -76,7 +75,7 @@ const VI: Record<string, string> = {
   "onboarding.age_private": "Không muốn tiết lộ",
   // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
   //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
-  "onboarding.lock_warn": "Sau này bạn chỉ có thể đổi một lần trong Trang của tôi.",
+  "onboarding.lock_warn": "Khu vực chỉ có thể thay đổi một lần trong Trang của tôi.",
   "onboarding.start": "Bắt đầu ngay",
   "onboarding.region_prefill_hint": "Ước tính từ IP của bạn. Vui lòng kiểm tra/sửa.",
   "mypage.region_locked": "Không thể thay đổi khu vực và quốc gia. Liên hệ nếu bị gán sai.",
@@ -283,7 +282,7 @@ const VI: Record<string, string> = {
   "locked.peek": "Sắp xong rồi — 1 giây để mở khóa",
   "locked.desc": "Đăng nhập để cộng kết quả này vào điểm của bạn và mở chi tiết đúng điểm số vừa xem.",
   "locked.blocked": "Bạn đã làm bài trong 3 ngày qua nên kết quả này chưa được liên kết. Làm lại sau 3 ngày để được tính.",
-  "locked.cta": "Đăng nhập bằng Google để xem phân tích",
+  "locked.cta": "Đăng nhập để xem phân tích",
   "result.overall": "Điểm tích lũy tổng {o} / 100",
   "result.placing": " · đang xếp hạng",
   "result.promoted": "Thăng hạng!",
@@ -941,7 +940,6 @@ const VI: Record<string, string> = {
   "mypage.exam_fallback": "CARIS",
   "mypage.login_required": "Cần đăng nhập",
   "mypage.login_desc": "Trang của tôi chỉ dùng được sau khi đăng nhập.",
-  "mypage.login_google": "Đăng nhập bằng Google",
   "mypage.login_kakao": "Đăng nhập bằng Kakao",
   "mypage.title": "Trang của tôi",
   "mypage.greeting_hello": "Xin chào, ",
@@ -1042,6 +1040,8 @@ const VI: Record<string, string> = {
   "ll.next": "Tiếp",
   "ll.watch": "Xem",
   "ll.playing": "Đang phát",
+  "ll.play_loading": "Đang chuẩn bị phát…",
+  "ll.play_failed": "Hiện chưa phát được. Vui lòng thử lại sau giây lát.",
   "ll.empty_owned": "Chưa có tài liệu đã mua.",
   // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
   //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
@@ -1118,7 +1118,6 @@ const VI: Record<string, string> = {
   "fab.dark": "Chế độ tối",
   "fab.light": "Chế độ sáng",
   "nav.assoc": "Giới thiệu Hiệp hội",
-  "fab.login": "Đăng nhập bằng Google",
   "fab.loginhint": "Có sẵn sau khi đăng nhập",
   "fab.morebtn": "Thêm",
   "fab.changeChar": "Đổi ảnh đại diện",
@@ -1746,6 +1745,7 @@ const VI: Record<string, string> = {
   "hub.confirm": "Đồng ý",
 
   // 오른쪽 레일
+  "hub.rail.attend": "Điểm danh",
   "hub.rail.closet": "Trang trí",
   "hub.rail.title": "Danh hiệu",
   "hub.rail.invite": "Thưởng mời bạn",

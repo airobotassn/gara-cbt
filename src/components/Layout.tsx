@@ -65,6 +65,8 @@ export default function Layout({ children }: { children: ReactNode }) {
   // FAB 숨김: 응시 화면(/exam/run/:id · /test/:attemptId)·보안 브라우저(SEB)는 시험 중 이탈 차단,
   //   /games/* 는 게임 UI(하단 선택지)와 FAB 겹침 방지.
   //   이북 뷰어(/ebooks/read/:id)도 전체화면 iframe 이라 FAB 이 본문 위를 덮는다 → 숨김(스토어 /ebooks 는 유지).
+  //   /ranking 은 한 화면 고정 틀이라 하단이 '내 순위' 바로 꽉 차 있다 — 왼쪽 아래 FAB 이 그 바를
+  //     그대로 덮었다(2026-09-03 지시로 제거). 이 화면의 나가는 문은 왼쪽 위 'My Home' 칩이다.
   // 그 외 모든 페이지는 헤더 없이 FAB이 네비 역할을 한다.
   //   ⚠️ 레벨테스트 응시는 폰에서 실제로 쓰는 시험 화면이고(CBT 응시는 데스크톱 전용), 하단 문항 점프 패드가
   //      FAB·'맨 위로' 버튼에 가려 문항 1·2·11·12·9·10·19·20 을 못 누른다 → 여기서 같이 숨긴다.
@@ -76,6 +78,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     pathname.startsWith('/games/') ||
     pathname.startsWith('/ebooks/read/') ||
     isSEB()
+  // 랭킹만은 FAB(과 그 패널)만 뗀다 — 「맨 위로」는 그대로 둔다(데스크톱 랭킹은 페이지가 구른다.
+  //   폰에서는 ranking.css 가 이미 따로 감추고 있다).
+  const hideFab = inTest || pathname === '/ranking'
 
   // 「맨 위로」는 스크롤을 내렸을 때만 나온다 — 맨 위에서는 아무 일도 안 하는 버튼이라 화면만 가린다.
   //   ⚠️ 라우트가 바뀌면 스크롤이 0 으로 돌아가는데 그때 scroll 이벤트가 안 날 수 있다 → pathname 마다 다시 잰다.
@@ -210,7 +215,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <>
       {children}
 
-      {!inTest && (
+      {!hideFab && (
         <>
           <div className={`panel ${open ? 'open' : ''}`}>
             <div className="pf-head">
@@ -419,17 +424,6 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
           ) : null}
 
-          {/* 맨 위로 — FAB이 있는 모든 화면에 함께 노출(응시/SEB에선 FAB과 같이 숨김). 화면 우하단 끝.
-              300px 넘게 내렸을 때만 보인다(.is-on) — 숨김은 CSS 라 나타날 때 페이드가 붙는다. */}
-          <button
-            className={showTop ? 'fab-top is-on' : 'fab-top'}
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            aria-label={t('fab.toTop')}
-            title={t('fab.toTop')}
-          >
-            <ChevronUpIcon size={24} />
-          </button>
-
           <button
             className="fab"
             onClick={() => setOpen((o) => !o)}
@@ -445,6 +439,20 @@ export default function Layout({ children }: { children: ReactNode }) {
             {inquiryAlert > 0 ? <BellIcon className="alert-bell fab-bell" size={22} /> : null}
           </button>
         </>
+      )}
+
+      {/* 맨 위로 — 화면 우하단 끝. 300px 넘게 내렸을 때만 보인다(.is-on) — 숨김은 CSS 라 나타날 때 페이드가 붙는다.
+          ⚠️ FAB 과 조건이 다르다(inTest ≠ hideFab): 랭킹은 FAB 만 떼고 이건 남긴다 — 데스크톱 랭킹은
+             페이지가 구르고, 폰은 ranking.css 가 이미 따로 감춘다(거기선 구르지 않으므로 죽은 버튼). */}
+      {!inTest && (
+        <button
+          className={showTop ? 'fab-top is-on' : 'fab-top'}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label={t('fab.toTop')}
+          title={t('fab.toTop')}
+        >
+          <ChevronUpIcon size={24} />
+        </button>
       )}
     </>
   )

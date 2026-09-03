@@ -167,7 +167,7 @@ export default function EbookReader() {
           }}
           style={{ padding: '10px 20px', borderRadius: 999, border: 0, cursor: 'pointer', background: '#004ac6', color: '#fff', fontWeight: 800 }}
         >
-          {t('common.login_google')}
+          {t('common.login')}
         </button>
       </div>
     )

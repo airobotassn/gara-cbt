@@ -807,6 +807,14 @@ html.dark body:has(.hof-wrap) {
 /* 컨테이너 = 그림 자체. 명판 글자 크기를 cqw 로 잡아 그림과 정확히 같은 비율로 줄어들게 한다
    (vw 로 잡으면 데스크톱 2단처럼 그림 폭과 화면 폭이 따로 노는 곳에서 어긋난다). */
 .hof-podium-art { position: relative; container-type: inline-size; }
+/* ⚠️ 1등 국기는 그림 **위쪽 밖**으로 걸린다(.hof-podium-flag.p1 의 top:-22.8%) — 그림 높이의 22.8%,
+   즉 **폭의 14%** 가 그림 바깥이다. 폰은 시상대 바로 위가 탭바라 그 국기가 가운데 탭을 덮었다
+   (2026-09-03 지적 — 국기는 pointer-events:none 이라 눌리긴 했지만 글자가 안 보였다).
+   그래서 국기가 걸릴 만큼을 위에 비워 둔다. 단위가 cqw(= .hof-podium 폭의 1%)인 이유 = 국기 크기가
+   그림 폭에 비례하므로 화면 폭이 어떻든 딱 필요한 만큼만 벌어진다(px 로 박으면 좁은 폰에서 과하다).
+   ⚠️ 값을 바꾸려면 국기 top/width 를 같이 볼 것 — 14 = 22.8% × 0.614(그림 높이÷폭), +1 은 숨 쉴 틈.
+   데스크톱은 시상대가 그리드 아래쪽에 붙어 위가 넉넉하므로 걸지 않는다. */
+@media (max-width: 899px) { .hof-podium-art { margin-top: 15cqw; } }
 .hof-podium-img { display: block; width: 100%; height: auto; }
 .hof-podium-flag {
   position: absolute;

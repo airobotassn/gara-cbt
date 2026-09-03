@@ -15,7 +15,6 @@ const EN: Record<string, string> = {
   "common.hub": "Hub",
   "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
-  "common.login_google": "Sign in with Google",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "Sign in",
   "common.logout": "Sign out",
@@ -53,12 +52,12 @@ const EN: Record<string, string> = {
   "region.KR-48": "Gyeongnam",
   "region.KR-49": "Jeju",
   "region.KR-50": "Sejong",
-  "onboarding.title": "Which region will you join from?",
+  "onboarding.title": "Please select your country and region.",
   // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
-  "onboarding.title_country": "Which country will you join from?",
+  "onboarding.title_country": "Please select your country.",
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
-  "onboarding.intro_title": "Rankings are by region",
-  "onboarding.intro_body": "You’ll be ranked among people from your region and country.",
+  "onboarding.intro_title": "Join the global ranking",
+  "onboarding.intro_body": "Take the level test, play mini games and do the DAILY QUIZ.",
   "onboarding.intro_next": "Start",
   "onboarding.country": "Country",
   "onboarding.region": "Region",
@@ -66,7 +65,7 @@ const EN: Record<string, string> = {
   "onboarding.age": "Age group",
   // 지역을 이미 확정한 회원이 연령대만 받으러 들어왔을 때의 제목(지역 질문이 없는 화면)
   "onboarding.age_title": "Tell us your age group",
-  "onboarding.age_hint": "For statistics only — we never ask your exact age.",
+  "onboarding.age_hint": "Used for statistics only.",
   "onboarding.age_10s": "Under 20",
   "onboarding.age_20s": "20s",
   "onboarding.age_30s": "30s",
@@ -76,7 +75,7 @@ const EN: Record<string, string> = {
   "onboarding.age_private": "Prefer not to say",
   // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
   //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
-  "onboarding.lock_warn": "You can change this only once later, in My Page.",
+  "onboarding.lock_warn": "Your region can be changed only once, in My Page.",
   "onboarding.start": "Start now",
   "onboarding.region_prefill_hint": "Estimated from your IP. Please check or edit.",
   "mypage.region_locked": "Region and country can't be changed. Contact us if misassigned.",
@@ -283,7 +282,7 @@ const EN: Record<string, string> = {
   "locked.peek": "Almost there — 1 sec to unlock",
   "locked.desc": "Sign in to apply this to your rating and unlock details for this exact score.",
   "locked.blocked": "You tested within the last 3 days, so this isn't linked. Retake after 3 days to count it.",
-  "locked.cta": "Sign in with Google to see analysis",
+  "locked.cta": "Sign in to see analysis",
   "result.overall": "Cumulative rating {o} / 100",
   "result.placing": " · placement in progress",
   "result.promoted": "Promoted!",
@@ -941,7 +940,6 @@ const EN: Record<string, string> = {
   "mypage.exam_fallback": "CARIS",
   "mypage.login_required": "Login required",
   "mypage.login_desc": "My Page is available after signing in.",
-  "mypage.login_google": "Sign in with Google",
   "mypage.login_kakao": "Sign in with Kakao",
   "mypage.title": "My Page",
   "mypage.greeting_hello": "Hello, ",
@@ -1042,6 +1040,8 @@ const EN: Record<string, string> = {
   "ll.next": "Next",
   "ll.watch": "Watch",
   "ll.playing": "Now playing",
+  "ll.play_loading": "Getting ready…",
+  "ll.play_failed": "Can't play right now. Please try again in a moment.",
   "ll.empty_owned": "No purchased materials.",
   // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
   //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
@@ -1118,7 +1118,6 @@ const EN: Record<string, string> = {
   "fab.dark": "Dark mode",
   "fab.light": "Light mode",
   "nav.assoc": "About the Association",
-  "fab.login": "Sign in with Google",
   "fab.loginhint": "Available after sign-in",
   "fab.morebtn": "More",
   "fab.changeChar": "Change avatar",
@@ -1746,6 +1745,7 @@ const EN: Record<string, string> = {
   "hub.confirm": "OK",
 
   // 오른쪽 레일
+  "hub.rail.attend": "Check-in",
   "hub.rail.closet": "Customize",
   "hub.rail.title": "Titles",
   "hub.rail.invite": "Invite reward",

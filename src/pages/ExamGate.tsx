@@ -69,7 +69,7 @@ export default function ExamGate() {
             <h3 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('gate.login_modal_title')}</h3>
             <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.login_modal_desc')}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" onClick={doLogin}>{t('fab.login')}</button>
+              <button className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" onClick={doLogin}>{t('common.login')}</button>
               <button className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors" onClick={() => setLoginNotice(false)}>{t('common.close')}</button>
             </div>
           </div>

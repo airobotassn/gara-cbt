@@ -78,6 +78,16 @@ html.dark .arena {
 /* ── 레이아웃 ── */
 .aa-grid { display: grid; grid-template-columns: 1fr 316px 52px; gap: 16px; align-items: stretch; height: clamp(500px, 70vh, 720px); }
 .aa-grid.aa-solo { grid-template-columns: 1fr 52px; }
+/* ⛔ **이 한 줄을 지우면 폰에서 화면이 가로로 넘친다**(2026-09-03 — "지구와 채팅창이 가로로 확대됨").
+   지도는 크기가 바뀔 때마다 자기 SVG 에 `width="379"` 같은 **픽셀 숫자를 속성으로 박는다**(ArenaMap 의
+   syncSize). CSS 로는 `width:100%` 라 그려지는 크기는 맞지만, 그 숫자가 SVG 의 **고유 폭**이 되어
+   그리드 칸의 최소폭(min-width:auto = min-content)으로 올라온다. 칸이 그 아래로 못 줄면 칸이 화면보다
+   넓어지고, 넓어진 폭을 지도가 다시 재서 더 큰 숫자를 박는다 — 한 번 넘치면 되돌아오지 않는 걸쇠다.
+   ⚠️ 그래서 증상이 **폭에 따라 갈리고 갑자기 나타난다**: 실측(360px) 문서폭 398 / 화면 360,
+      390px 은 397 / 390, 412px 은 안 넘친다. 여유가 몇 px 있느냐로 결정된다.
+   ⚠️ 지도 쪽에서 속성을 빼는 것도 방법이지만, 그러면 높이까지 flex 에만 기대게 돼 위험이 더 크다.
+      막는 자리는 여기다 — 칸이 내용의 고유 폭에 끌려다니지 않게 못 박는다. */
+.aa-grid > * { min-width: 0; }
 .aa-stage, .aa-side, .aa-tabs { height: 100%; min-height: 0; }
 @media (max-width: 880px) {
   .aa-grid, .aa-grid.aa-solo { grid-template-columns: 1fr; height: auto; }

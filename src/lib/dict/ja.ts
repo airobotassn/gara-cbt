@@ -15,7 +15,6 @@ const JA: Record<string, string> = {
   "common.hub": "ハブ",
   "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
-  "common.login_google": "Googleでログイン",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "ログイン",
   "common.logout": "ログアウト",
@@ -53,12 +52,12 @@ const JA: Record<string, string> = {
   "region.KR-48": "慶尚南道",
   "region.KR-49": "済州特別自治道",
   "region.KR-50": "世宗特別自治市",
-  "onboarding.title": "どの地域から参加しますか？",
+  "onboarding.title": "ご自身の国と地域を選択してください。",
   // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
-  "onboarding.title_country": "どの国から参加しますか？",
+  "onboarding.title_country": "ご自身の国を選択してください。",
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
-  "onboarding.intro_title": "地域ごとに順位を競います",
-  "onboarding.intro_body": "同じ地域・国の人たちと順位がつきます。",
+  "onboarding.intro_title": "グローバルランキングに参加しましょう",
+  "onboarding.intro_body": "レベルテスト・ミニゲーム・DAILY QUIZ に参加してみましょう。",
   "onboarding.intro_next": "始める",
   "onboarding.country": "国",
   "onboarding.region": "地域",
@@ -66,7 +65,7 @@ const JA: Record<string, string> = {
   "onboarding.age": "年代",
   // 지역을 이미 확정한 회원이 연령대만 받으러 들어왔을 때의 제목(지역 질문이 없는 화면)
   "onboarding.age_title": "年代を教えてください",
-  "onboarding.age_hint": "統計にのみ使います。正確な年齢は伺いません。",
+  "onboarding.age_hint": "統計にのみ利用されます。",
   "onboarding.age_10s": "10代以下",
   "onboarding.age_20s": "20代",
   "onboarding.age_30s": "30代",
@@ -76,7 +75,7 @@ const JA: Record<string, string> = {
   "onboarding.age_private": "回答しない",
   // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
   //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
-  "onboarding.lock_warn": "後でマイページから一度だけ変更できます。",
+  "onboarding.lock_warn": "地域の選択はマイページで1回のみ変更できます。",
   "onboarding.start": "このまま始める",
   "onboarding.region_prefill_hint": "IPからの推定値です。確認・修正してください。",
   "mypage.region_locked": "地域・国は変更できません。誤割当ての場合はお問い合わせください。",
@@ -283,7 +282,7 @@ const JA: Record<string, string> = {
   "locked.peek": "あと少し — ロック解除まで1秒",
   "locked.desc": "ログインすると累積レーティングに反映され、詳細が開きます。",
   "locked.blocked": "直近3日以内に受験履歴があるため連携されません。3日後の再受験で反映されます。",
-  "locked.cta": "Googleでログインして分析を見る",
+  "locked.cta": "ログインして分析を見る",
   "result.overall": "累積総合レーティング {o} / 100",
   "result.placing": " · 配置中",
   "result.promoted": "昇格！",
@@ -941,7 +940,6 @@ const JA: Record<string, string> = {
   "mypage.exam_fallback": "CARIS",
   "mypage.login_required": "ログインが必要です",
   "mypage.login_desc": "マイページはログイン後にご利用いただけます。",
-  "mypage.login_google": "Googleでログイン",
   "mypage.login_kakao": "Kakaoでログイン",
   "mypage.title": "マイページ",
   "mypage.greeting_hello": "こんにちは、",
@@ -1042,6 +1040,8 @@ const JA: Record<string, string> = {
   "ll.next": "次へ",
   "ll.watch": "視聴する",
   "ll.playing": "再生中",
+  "ll.play_loading": "再生の準備中…",
+  "ll.play_failed": "今は再生できません。しばらくしてからもう一度お試しください。",
   "ll.empty_owned": "購入した教材はありません。",
   // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
   //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
@@ -1118,7 +1118,6 @@ const JA: Record<string, string> = {
   "fab.dark": "ダークモード",
   "fab.light": "ライトモード",
   "nav.assoc": "協会紹介",
-  "fab.login": "Googleでログイン",
   "fab.loginhint": "ログインするとご利用いただけます",
   "fab.morebtn": "もっと見る",
   "fab.changeChar": "キャラクター変更",
@@ -1746,6 +1745,7 @@ const JA: Record<string, string> = {
   "hub.confirm": "OK",
 
   // 오른쪽 레일
+  "hub.rail.attend": "出席",
   "hub.rail.closet": "きせかえ",
   "hub.rail.title": "称号",
   "hub.rail.invite": "招待報酬",

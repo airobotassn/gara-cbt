@@ -15,7 +15,6 @@ const KO: Record<string, string> = {
   "common.hub": "허브",
   "common.my_home": "My Home",
   "common.leveltest": "WORLD ARENA",
-  "common.login_google": "구글로 로그인",
   // 로그인 수단이 여럿(구글·카카오)이라 특정 수단이 아니라 로그인 페이지로 보낼 때 쓰는 라벨
   "common.login": "로그인",
   "common.logout": "로그아웃",
@@ -53,12 +52,12 @@ const KO: Record<string, string> = {
   "region.KR-48": "경상남도",
   "region.KR-49": "제주특별자치도",
   "region.KR-50": "세종특별자치시",
-  "onboarding.title": "어느 지역에서 함께 하시겠어요?",
+  "onboarding.title": "본인의 국가와 지역을 선택해주세요.",
   // 지역 목록이 없는 나라용 제목 — 화면에 지역 칸이 없는데 "어느 지역에서" 라고 물으면 없는 걸 묻는 말이 된다.
-  "onboarding.title_country": "어느 나라에서 함께 하시겠어요?",
+  "onboarding.title_country": "본인의 국가를 선택해주세요.",
   // 1단계(설명) — 왜 지역을 받는지. 짧게, 크게.
-  "onboarding.intro_title": "지역별로 순위를 겨뤄요",
-  "onboarding.intro_body": "같은 지역·국가 사람들과 순위가 매겨져요.",
+  "onboarding.intro_title": "글로벌 랭킹에 참여해보세요",
+  "onboarding.intro_body": "레벨테스트·미니게임·DAILY QUIZ에 참여해보세요.",
   "onboarding.intro_next": "시작",
   "onboarding.country": "국가",
   "onboarding.region": "지역",
@@ -66,7 +65,7 @@ const KO: Record<string, string> = {
   "onboarding.age": "연령대",
   // 지역을 이미 확정한 회원이 연령대만 받으러 들어왔을 때의 제목(지역 질문이 없는 화면)
   "onboarding.age_title": "연령대를 알려주세요",
-  "onboarding.age_hint": "통계에만 써요. 정확한 나이는 묻지 않아요.",
+  "onboarding.age_hint": "통계에만 활용됩니다.",
   "onboarding.age_10s": "10대 이하",
   "onboarding.age_20s": "20대",
   "onboarding.age_30s": "30대",
@@ -76,7 +75,7 @@ const KO: Record<string, string> = {
   "onboarding.age_private": "공개 안 함",
   // ⚠️ 2026-08-12: '영영 못 바꾼다' 가 아니다 — 마이페이지에서 딱 한 번 바꿀 수 있다. 문구가 규칙보다
   //    무섭게 남아 있으면 사용자가 이 화면에서 얼어붙는다(실제 규칙 = set-region 의 change 경로).
-  "onboarding.lock_warn": "나중에 마이페이지에서 딱 한 번만 바꿀 수 있어요.",
+  "onboarding.lock_warn": "지역선택은 마이페이지에서 1회만 변경가능합니다.",
   "onboarding.start": "이대로 시작",
   "onboarding.region_prefill_hint": "IP 추정값이에요. 확인/수정하세요.",
   "mypage.region_locked": "지역·국가는 변경할 수 없어요. 오배정은 문의해 주세요.",
@@ -288,7 +287,7 @@ const KO: Record<string, string> = {
   "locked.peek": "거의 다 왔어요 — 잠금 해제까지 1초",
   "locked.desc": "로그인하면 이 결과가 내 누적 레이팅에 반영되고, 방금 본 점수 그대로 상세가 열립니다.",
   "locked.blocked": "최근 3일 내 응시 기록이 있어 이 결과는 계정에 연결되지 않았어요. 3일 후 다시 응시하면 누적 레이팅에 반영됩니다.",
-  "locked.cta": "구글로 로그인하고 분석 보기",
+  "locked.cta": "로그인하고 분석 보기",
   "result.overall": "누적 종합 레이팅 {o} / 100",
   "result.placing": " · 배치 진행 중",
   "result.promoted": "승급!",
@@ -951,7 +950,6 @@ const KO: Record<string, string> = {
   "mypage.exam_fallback": "CARIS",
   "mypage.login_required": "로그인이 필요합니다",
   "mypage.login_desc": "마이페이지는 로그인 후 이용할 수 있습니다.",
-  "mypage.login_google": "구글로 로그인",
   "mypage.login_kakao": "카카오로 로그인",
   "mypage.title": "마이페이지",
   "mypage.greeting_hello": "안녕하세요, ",
@@ -1059,6 +1057,9 @@ const KO: Record<string, string> = {
   //   'll.demo_note'(데모 안내)는 삭제됐다: 돈 받고 파는 물건 옆에 무료로 가는 길을 둘 수 없다.
   "ll.watch": "시청하기",
   "ll.playing": "재생 중",
+  // 강의 재생 준비(2026-09-03) — Bunny 강의만 이 상태를 지난다. 유튜브는 즉시 뜬다.
+  "ll.play_loading": "재생 준비 중…",
+  "ll.play_failed": "지금은 재생할 수 없습니다. 잠시 후 다시 눌러 주세요.",
   "ll.empty_owned": "구매한 자료가 없습니다.",
   // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 '전체' 로 줄이고
   //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
@@ -1135,7 +1136,6 @@ const KO: Record<string, string> = {
   "fab.dark": "다크 모드",
   "fab.light": "라이트 모드",
   "nav.assoc": "협회 소개",
-  "fab.login": "구글로 로그인",
   "fab.loginhint": "로그인 후 이용 가능합니다",
   "fab.morebtn": "더보기",
   "fab.changeChar": "캐릭터 변경",
@@ -1770,6 +1770,7 @@ const KO: Record<string, string> = {
   "hub.confirm": "확인",
 
   // 오른쪽 레일
+  "hub.rail.attend": "출석",
   "hub.rail.closet": "꾸미기",
   "hub.rail.title": "칭호",
   "hub.rail.invite": "초대보상",
