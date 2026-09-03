@@ -114,7 +114,11 @@ export default function Result() {
       {/* 승급 축하 꽃가루. promoted 는 false → true 로 한 번만 바뀌므로(게스트가 로그인해 잠금이 풀리는
           경우 포함) 여기서 조건부로 그리면 발사도 한 번이고, 다 떨어지면 스스로 사라진다. */}
       {promoted ? <Confetti /> : null}
-      <TopBar />
+      {/* 뒤로 = **내 기록**이다(2026-09-03 지적). 기본값(홈)으로 두면 승급 기록에서 한 줄을 눌러 들어온
+          사람이 한 칸 뒤가 아니라 사이트 첫 화면으로 튕겨 나가 목록을 다시 찾아 들어와야 했다.
+          ⚠️ 응시 직후에 오는 길도 같은 곳이 맞다 — 이 화면의 부모는 레벨테스트 기록이지 홈이 아니다.
+          ⚠️ 게스트도 안전하다: /test/record 는 기록이 없으면 로그인 벽이 아니라 '시작하기' 안내를 낸다. */}
+      <TopBar to="/test/record" label={t('db.title')} />
       <div className="card pad">
         <ScoreHeader
           level={data.level}

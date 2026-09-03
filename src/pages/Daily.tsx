@@ -128,8 +128,13 @@ export default function Daily() {
       <div className="dy-wrap">
       <div className="dy-top">
         {/* 뒤로 = 아레나. 아레나 하단 런처가 허브·레벨테스트·데일리·미니게임의 관문이라 그게 이 화면의 부모다. */}
+        {/* ⚠️ 라벨은 **폰에서만 감춘다**(2026-09-03 지시 · daily.css). 칩이 149px 이라 좁은 폰에서
+            제목 자리가 61px 만 남아 'DAILY / QUIZ' 로 접히고 머리가 95px 까지 커졌다.
+            ⚠️ 글자를 지우는 게 아니라 span 으로 감싸 CSS 로 감춘다 — 맨 텍스트는 선택자로 못 잡고,
+               aria-label 이 있어 읽어주는 이름은 그대로다. */}
         <button className="dy-back" onClick={() => navigate('/arena')} aria-label="WORLD ARENA">
-          <span className="material-symbols-outlined">arrow_back</span> WORLD ARENA
+          <span className="material-symbols-outlined">arrow_back</span>
+          <span className="dy-back-lab">WORLD ARENA</span>
         </button>
         <div className="dy-head">
           <b>{t('daily.title')}</b>

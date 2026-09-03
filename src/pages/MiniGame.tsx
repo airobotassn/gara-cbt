@@ -76,6 +76,21 @@ export default function MiniGame() {
   //   · 티켓은 정식 회원만 받는다 — submit-minigame 이 익명을 401 로 막으므로 받아봐야 실패한다.
   //     티켓이 없으면 아래 mg:score 핸들러가 조용히 넘겨서 랭킹에 안 올라간다(= 기록 미저장).
   const playable = !!game && !loading
+
+  // ⛔ **이 화면에서는 문서 스크롤을 잠근다(2026-09-03 지적: "새로고침하면 위 헤더가 사라진다").**
+  //    화면 틀은 `height: 100dvh` 라 스크롤이 필요 없는데, 폰에서는 주소창이 접혔다 펴지는 사이
+  //    문서(접힌 기준으로 계산된 높이)가 뷰포트보다 잠깐 커진다 → 그때 게임 위에서 손가락을 움직이면
+  //    (인트로 캐러셀을 좌우로 넘길 때가 그렇다) 페이지가 헤더 높이만큼 밀려 올라가고, 주소창이
+  //    다시 접혀도 **스크롤 위치는 그대로 남아** 뒤로가기 줄이 화면 밖에 머문다.
+  //    /games/* 는 Layout 이 FAB 도 숨기는 화면이라 그 줄이 사라지면 **나갈 문이 하나도 없다.**
+  //    ⚠️ 원래 값으로 되돌려야 한다 — 다른 화면은 굴러야 한다.
+  useEffect(() => {
+    const html = document.documentElement
+    const prev = html.style.overflow
+    html.style.overflow = 'hidden'
+    return () => { html.style.overflow = prev }
+  }, [])
+
   useEffect(() => {
     if (!playable || !game) return
     if (isFullUser) void fetchTicket(game.id)
