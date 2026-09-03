@@ -2,6 +2,7 @@
 //   index.ts 가 이미 2.6k줄이라 여기로 분리했다. 게이트(관리자 여부)는 index.ts 가 이미 통과시킨 뒤 부른다.
 //   ⚠️ 돈·자격을 만드는 액션(자격증 수동 발급)은 루트 전용이다 — index.ts 의 기존 구분과 같은 규칙.
 import { json } from '../_shared/cors.ts'
+import { bunnyConfigured, bunnyPullzone, bunnyThumbUrl } from '../_shared/bunny.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
@@ -201,17 +202,39 @@ function youtubeId(raw: string): string | null {
   const m = s.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/)
   return m ? m[1] : null
 }
+/** Bunny 영상 GUID 로 접는다 — 관리자가 대시보드에서 임베드 주소를 통째로 복사해 오는 게 자연스럽다.
+ *  (`https://iframe.mediadelivery.net/embed/12345/<guid>` · `https://…/play/12345/<guid>` · GUID 단독) */
+function bunnyVideoId(raw: string): string | null {
+  const s = raw.trim()
+  const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  const m = s.match(uuid)
+  return m ? m[0].toLowerCase() : null
+}
 async function lectureList(admin: any, body: any) {
   const catalog = body?.catalog === 'caris' ? 'caris' : 'leveltest'
   const { data, error } = await admin.from('lectures').select('*').eq('catalog', catalog)
     .order('sort_order').order('created_at')
   if (error) return json({ error: error.message }, 500)
-  return json({ lectures: data ?? [] })
+  // Bunny 썸네일 주소는 **풀존 호스트를 알아야** 만들 수 있고 그건 서버 시크릿이다 —
+  //   관리자 화면이 목록·미리보기에 쓰도록 여기서 완성해 붙여 준다(사용자 화면의 shapeLecture 와 같은 규칙).
+  const rows = (data ?? []).map((l: any) => ({
+    ...l,
+    bunnyThumbUrl: l.bunny_video_id ? bunnyThumbUrl(l.bunny_video_id) : null,
+  }))
+  // 폼에서 **방금 붙여넣은** id 의 미리보기를 그리려면 화면도 풀존 호스트를 알아야 한다(서버는 아직 그 행을 모른다).
+  //   ⚠️ 비밀이 아니다 — 썸네일·영상 주소에 그대로 들어 있는 값이다. 비밀인 토큰 키는 안 나간다.
+  // bunnyReady = 시크릿이 다 꽂혔나. 안 꽂혔는데 Bunny 강의를 등록하면 사용자가 재생을 못 한다 → 화면이 미리 경고한다.
+  return json({ lectures: rows, pullzone: bunnyPullzone(), bunnyReady: bunnyConfigured() })
 }
 async function lectureUpsert(admin: any, body: any, deps: ReformDeps) {
   const l = body?.lecture ?? {}
-  const vid = youtubeId(String(l.youtubeId ?? ''))
-  if (!vid) return json({ error: '유튜브 주소(또는 영상 ID)를 확인해 주세요.' }, 400)
+  // ⛔ **출처는 정확히 하나다**(DB CHECK lectures_source_chk 와 같은 규칙) — 반대편은 반드시 null 로 비운다.
+  //    둘 다 차면 어느 쪽으로 재생할지 모호해지고, 그 모호함은 화면 어디에도 안 드러난다.
+  const isBunny = l.source === 'bunny'
+  const ytVid = isBunny ? null : youtubeId(String(l.youtubeId ?? ''))
+  const bnVid = isBunny ? bunnyVideoId(String(l.bunnyVideoId ?? '')) : null
+  if (!isBunny && !ytVid) return json({ error: '유튜브 주소(또는 영상 ID)를 확인해 주세요.' }, 400)
+  if (isBunny && !bnVid) return json({ error: 'Bunny 영상 ID(GUID) 를 확인해 주세요.' }, 400)
   if (!String(l.title ?? '').trim()) return json({ error: '제목을 입력하세요.' }, 400)
   const catalog = l.catalog === 'caris' ? 'caris' : 'leveltest'
   const row: Record<string, unknown> = {
@@ -219,7 +242,7 @@ async function lectureUpsert(admin: any, body: any, deps: ReformDeps) {
     // 한 강의는 한 카탈로그에만 속한다(DB CHECK 과 같은 규칙) — 반대편 분류는 반드시 비운다.
     target_level: catalog === 'leveltest' ? (l.targetLevel ?? null) : null,
     target_tier: catalog === 'caris' ? (l.targetTier ?? null) : null,
-    youtube_id: vid, title: String(l.title),
+    youtube_id: ytVid, bunny_video_id: bnVid, title: String(l.title),
     // ⚠️ 채널은 관리자 화면에서 뺐다(2026-08-25) — 우리가 만든 강의를 파는 것이라 '어느 채널 영상인가'가
     //    쓸 정보가 아니다. 화면이 안 보내므로 저장할 때마다 빈 값이 되고, 사용자 화면은 비면 그 줄을 안 그린다.
     //    ⛔ 컬럼은 남겨둔다 — 지우면 옛 행의 값까지 사라져 되돌릴 수 없다.
@@ -228,8 +251,10 @@ async function lectureUpsert(admin: any, body: any, deps: ReformDeps) {
     // 정가 — **달러 센트**(100 = $1.00). 이북과 같은 단위다. 0 = 무료(결제창을 안 타고 바로 지급).
     //   ⚠️ 음수·소수·NaN 을 그대로 넣지 않는다 — DB CHECK 이 막아주지만 여기서 접어야 오류가 안 뜬다.
     price_usd_cents: Math.max(0, Math.round(Number(l.priceUsdCents ?? 0)) || 0),
-    // 목록 썸네일. 비우면 유튜브 썸네일 폴백 — 그 주소엔 영상 id 가 박혀 있어 **미소유자에게 노출된다**
-    //   (파는 강의는 미등록 업로드 + 자체 썸네일이 한 쌍이다. ebooks 함수 머리 주석 참고).
+    // 목록 썸네일. 비우면 출처가 주는 그림으로 폴백한다.
+    //   ⚠️ **유튜브 폴백은 영상 id 를 노출한다** — 그 주소에 id 가 박혀 있어 미소유자도 보게 되고,
+    //      유튜브는 id 만 알면 재생되므로 유료 강의라면 자체 썸네일이 사실상 필수다.
+    //   Bunny 폴백은 그 문제가 없다 — id 를 알아도 서명 없이는 재생이 안 된다.
     thumb_url: String(l.thumbUrl ?? '').trim() || null,
     published: l.published !== false, sort_order: Number(l.sortOrder ?? 0),
   }

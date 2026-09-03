@@ -742,18 +742,33 @@ interface LectureRow {
   id: string; catalog: 'leveltest' | 'caris'
   target_level: number | null; target_tier: string | null
   /** ⚠️ channel 은 관리자 화면에서 뺐다(2026-08-25) — DB 컬럼은 남아 있고 옛 값도 그대로다. */
-  youtube_id: string; title: string; channel: string; description: string
+  channel: string; title: string; description: string
+  /** ⛔ **둘 중 정확히 하나만 찬다**(DB CHECK `lectures_source_chk`, 2026-09-03).
+   *  유튜브 = 기존 무료 강의 / Bunny = 유료 강의(서명 없이는 재생 불가). */
+  youtube_id: string | null
+  bunny_video_id: string | null
+  /** Bunny 썸네일 주소 — **서버가 만들어 붙여 준다**(풀존 호스트가 서버 시크릿이라 화면에서 못 만든다). */
+  bunnyThumbUrl?: string | null
   /** 정가 — **달러 센트**(100 = $1.00). 이북과 같은 단위다. 0 = 무료. */
   price_usd_cents: number
-  /** 목록 썸네일 주소. 비우면 유튜브 썸네일로 폴백한다(그 주소엔 영상 id 가 박혀 있다 — 아래 경고 참고). */
+  /** 목록 썸네일 주소. 비우면 출처가 주는 그림으로 폴백한다(유튜브는 그 주소에 영상 id 가 박힌다 — 아래 경고). */
   thumb_url: string | null
   published: boolean; sort_order: number
 }
-type LectureDraft = Partial<LectureRow> & { _new?: boolean }
+/** `_source` = 새 강의처럼 **양쪽이 다 빈** 상태에서 관리자가 고른 출처. 기존 행은 컬럼에서 읽는다. */
+type LectureDraft = Partial<LectureRow> & { _new?: boolean; _source?: 'youtube' | 'bunny' }
+const lecSource = (d: LectureDraft): 'youtube' | 'bunny' => d._source ?? (d.bunny_video_id ? 'bunny' : 'youtube')
 const ytThumbUrl = (id: string) => `https://img.youtube.com/vi/${id}/mqdefault.jpg`
+/** 붙여넣은 글자에서 Bunny 영상 GUID 만 뽑는다(임베드 주소를 통째로 복사해 오는 게 자연스럽다).
+ *  ⚠️ 서버(reform.ts 의 bunnyVideoId)와 **같은 규칙**이다 — 여기서만 통과하면 미리보기는 뜨는데 저장이 거절된다. */
+const bunnyGuid = (raw: string): string =>
+  (raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '').toLowerCase()
+/** 목록·미리보기 썸네일 — 관리자가 올린 것 > 출처 자동. 사용자 화면(shapeLecture)과 같은 순서다. */
+const lecThumb = (l: Partial<LectureRow>): string =>
+  l.thumb_url || l.bunnyThumbUrl || (l.youtube_id ? ytThumbUrl(l.youtube_id) : '')
 
 export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
-  const { data, loading, err, reload } = useAdminData<{ lectures: LectureRow[] }>('lectureList', { catalog })
+  const { data, loading, err, reload } = useAdminData<{ lectures: LectureRow[]; pullzone?: string; bunnyReady?: boolean }>('lectureList', { catalog })
   const [edit, setEdit] = useState<LectureDraft | null>(null)
   const draft = useDraft({ kind: 'lecture', refId: edit?.id, value: edit, title: edit?.title?.trim() || '새 강의', enabled: !!edit })
   const [busy, setBusy] = useState(false)
@@ -773,7 +788,11 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
           catalog,
           targetLevel: catalog === 'leveltest' ? (edit.target_level ?? null) : null,
           targetTier: catalog === 'caris' ? (edit.target_tier ?? null) : null,
+          // ⛔ 출처를 **명시해서** 보낸다 — 서버가 반대편 컬럼을 null 로 비운다(DB CHECK 과 한 벌).
+          //    값만 보내고 서버가 추측하게 두면, 유튜브 강의를 Bunny 로 바꿀 때 옛 id 가 남아 둘 다 찬다.
+          source: lecSource(edit),
           youtubeId: edit.youtube_id ?? '',
+          bunnyVideoId: edit.bunny_video_id ?? '',
           // ⚠️ 채널은 2026-08-25 에 관리자 화면에서 뺐다 — 우리가 만든 강의를 파는 것이라 '어느 채널 영상인가'
           //    가 쓸 정보가 아니다. 넘기지 않으면 서버가 빈 값으로 덮고, 사용자 화면은 비면 그 줄을 안 그린다.
           title: edit.title ?? '', description: edit.description ?? '',
@@ -797,7 +816,9 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
     catch (e) { alert(e instanceof Error ? e.message : '삭제 실패') }
   }
 
-  const blank: LectureDraft = { _new: true, published: true, sort_order: rows.length, target_level: catalog === 'leveltest' ? 1 : null, price_usd_cents: 0 }
+  // ⚠️ 새 강의의 기본 출처는 **Bunny** 다 — 지금 새로 올리는 건 파는 강의이고, 유튜브로 팔면
+  //    영상 id 만 알면 누구나 보는 상태가 된다(위 안내문의 ⛔). 무료 강의를 올릴 때만 바꾸면 된다.
+  const blank: LectureDraft = { _new: true, _source: 'bunny', published: true, sort_order: rows.length, target_level: catalog === 'leveltest' ? 1 : null, price_usd_cents: 0 }
   return (
     <>
       <AdminHead title={`콘텐츠 관리 · ${catalog === 'caris' ? 'CARIS' : 'LEVEL TEST'}`} count={`총 ${rows.length}편`} onReload={reload} loading={loading}>
@@ -805,11 +826,13 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
       </AdminHead>
       <ErrBox msg={err} />
       <p className="admin-hint" style={{ marginBottom: 12, lineHeight: 1.7 }}>
-        ⚠️ <b>유튜브 링크만</b> 받습니다. 영상 파일을 우리 서버에 올리면 그때부터 영상 트래픽 비용이 전부 우리 몫이 됩니다.<br />
-        ⛔ <b>돈을 받는 강의는 반드시 &lsquo;미등록(unlisted)&rsquo; 으로 올리세요.</b> 유튜브 <b>공개</b> 영상은 주소만 알면 누구나 무료로 보기 때문에,
-        값을 매겨도 결제가 아무 의미가 없습니다. (미소유자에게 영상 ID 는 내려보내지 않습니다.)<br />
-        ⚠️ <b>썸네일을 안 올리면</b> 유튜브 썸네일을 대신 쓰는데, 그 주소에는 <b>영상 ID 가 들어 있어</b> 아직 안 산 사람에게도 노출됩니다.
-        유료 강의라면 썸네일을 직접 올려주세요.
+        ⛔ <b>돈을 받는 강의는 Bunny 로 올리세요.</b> Bunny 영상은 우리 서버가 서명한 주소로만 재생되므로,
+        영상 ID 가 알려져도 남이 볼 수 없습니다. Bunny 대시보드에 영상을 올린 뒤 <b>영상 ID(또는 임베드 주소)</b> 를 여기에 붙여넣으면 됩니다.<br />
+        ⚠️ <b>유튜브는 무료 강의용입니다.</b> 유튜브 <b>공개</b> 영상은 주소만 알면 누구나 보기 때문에 값을 매겨도 결제가 의미가 없고,
+        굳이 팔아야 한다면 반드시 &lsquo;미등록(unlisted)&rsquo; 으로 올려야 합니다. (미소유자에게 영상 ID 는 내려보내지 않습니다.)<br />
+        ⚠️ <b>유튜브 강의는 썸네일을 직접 올려주세요.</b> 안 올리면 유튜브 썸네일을 대신 쓰는데 그 주소에 <b>영상 ID 가 들어 있어</b> 아직 안 산 사람에게도 노출됩니다.
+        (Bunny 는 이 문제가 없어 자동 썸네일을 그대로 써도 됩니다.)<br />
+        ⛔ <b>영상 파일을 우리 서버(Supabase)에 올리지 마세요.</b> 그때부터 영상 트래픽 비용이 전부 우리 몫이 되고, CDN 도 아니라 느립니다.
       </p>
 
       <div className="admin-table-wrap">
@@ -818,8 +841,12 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
           <tbody>
             {rows.map((l) => (
               <tr key={l.id}>
-                <td><img src={l.thumb_url || ytThumbUrl(l.youtube_id)} alt="" style={{ width: 96, borderRadius: 6, display: 'block' }} /></td>
-                <td><b>{l.title}</b></td>
+                <td><img src={lecThumb(l)} alt="" style={{ width: 96, borderRadius: 6, display: 'block' }} /></td>
+                <td>
+                  <b>{l.title}</b>
+                  {/* 출처를 목록에서 바로 보이게 한다 — 유료인데 유튜브인 강의를 눈으로 잡는 자리다. */}
+                  {' '}<span className="badge">{l.bunny_video_id ? 'Bunny' : 'YouTube'}</span>
+                </td>
                 <td>{catalog === 'caris'
                   ? (l.target_tier ? <span className="badge">{tiers.find((t) => t.key === l.target_tier)?.name ?? l.target_tier}</span> : <span style={{ color: 'var(--dim)' }}>급수 무관</span>)
                   : (l.target_level ? `Lv.${l.target_level}` : <span style={{ color: 'var(--dim)' }}>레벨 무관</span>)}</td>
@@ -849,10 +876,45 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
               <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh} onRestore={(p: LectureDraft) => setEdit(p)} />
             </div>
             <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-              <label style={fld}>유튜브 주소 또는 영상 ID
-                <input style={inp} placeholder="https://youtu.be/…" value={edit.youtube_id ?? ''}
-                  onChange={(e) => setEdit({ ...edit, youtube_id: e.target.value })} />
+              {/* ⛔ 출처는 **둘 중 하나**다(DB CHECK lectures_source_chk). 고른 쪽 칸만 보여줘서
+                  둘 다 채워 넣을 여지를 없앤다 — 둘 다 차면 어느 영상이 나갈지 화면에 안 드러난다. */}
+              <label style={fld}>영상 출처
+                <select style={inp} value={lecSource(edit)}
+                  onChange={(e) => {
+                    const src = e.target.value as 'youtube' | 'bunny'
+                    // 반대편 값을 그 자리에서 비운다 — 남겨두면 저장할 때 서버가 하나만 살려도
+                    // 화면에는 옛 값이 남아 "뭘 저장했는지" 가 어긋나 보인다.
+                    setEdit({ ...edit, _source: src, youtube_id: src === 'youtube' ? (edit.youtube_id ?? '') : null, bunny_video_id: src === 'bunny' ? (edit.bunny_video_id ?? '') : null })
+                  }}>
+                  <option value="bunny">Bunny Stream (유료 강의 · 서명된 주소로만 재생)</option>
+                  <option value="youtube">YouTube (무료 강의)</option>
+                </select>
               </label>
+              {lecSource(edit) === 'bunny' ? (
+                <label style={fld}>Bunny 영상 ID 또는 임베드 주소
+                  <input style={inp} placeholder="00000000-0000-0000-0000-000000000000" value={edit.bunny_video_id ?? ''}
+                    onChange={(e) => setEdit({ ...edit, bunny_video_id: e.target.value })} />
+                  {/* ⛔ **id 오입력 방어가 이 미리보기 하나다.** 관리자 썸네일을 따로 올리면 목록에서는
+                      티가 안 나서, 남의 강의 영상이 나가도 아무도 모른 채 팔린다. */}
+                  {data?.pullzone && bunnyGuid(edit.bunny_video_id ?? '') && (
+                    <img
+                      src={`https://${data.pullzone}/${bunnyGuid(edit.bunny_video_id ?? '')}/thumbnail.jpg`}
+                      alt=""
+                      style={{ width: 200, borderRadius: 6, marginTop: 8, display: 'block' }}
+                    />
+                  )}
+                  {data && data.bunnyReady === false && (
+                    <span className="admin-hint" style={{ color: 'var(--bad, #d33)' }}>
+                      ⚠️ 영상 서버 설정(BUNNY_STREAM_*)이 아직 안 꽂혔습니다 — 지금 등록하면 사용자가 재생하지 못합니다.
+                    </span>
+                  )}
+                </label>
+              ) : (
+                <label style={fld}>유튜브 주소 또는 영상 ID
+                  <input style={inp} placeholder="https://youtu.be/…" value={edit.youtube_id ?? ''}
+                    onChange={(e) => setEdit({ ...edit, youtube_id: e.target.value })} />
+                </label>
+              )}
               <label style={fld}>제목
                 <input style={inp} value={edit.title ?? ''} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
               </label>
@@ -873,7 +935,7 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
               {/* ⚠️ 비우면 유튜브 썸네일 폴백 — 그 주소엔 영상 id 가 박혀 있어 미소유자에게 노출된다(위 안내 참고).
                   ⛔ 주소를 손으로 적게 하지 말 것(ImageField 주석과 같은 이유) — 남의 서버 링크가 걸리면
                      그쪽이 내려가는 순간 우리 목록이 깨지고, 원인을 찾기도 어렵다. */}
-              <label style={fld}>썸네일 (안 올리면 유튜브 썸네일을 씁니다)
+              <label style={fld}>썸네일 {lecSource(edit) === 'bunny' ? '(안 올리면 Bunny 자동 썸네일을 씁니다)' : '(안 올리면 유튜브 썸네일을 씁니다 — 영상 ID 가 노출됩니다)'}
                 <ImageField
                   dir="lecture"
                   value={edit.thumb_url ?? ''}

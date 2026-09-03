@@ -4,15 +4,22 @@
 //   - library : 내가 구매한 이북·강의 목록 (로그인 필수)
 //   - buy     : **무료(0원) 전용** 즉시 지급(이북·강의). 유료는 402 로 막고 payments 함수(결제)만 지급한다.
 //   - read    : 소유 확인 후 비공개 버킷 HTML 의 서명 URL 발급(뷰어 iframe 이 이걸 연다) + 열람 기록(ebook_reads)
+//   - play    : 강의 재생 — 소유 확인 후 **Bunny 서명 임베드 URL** 발급 + 재생 기록(lecture_plays)
+//   - progress: 강의 재생 위치 저장(이어보기)
 //
-// ⛔ **강의는 사기 전에 youtube_id 를 안 내려준다**(2026-08-25 유료화). 유튜브 영상은 id 만 알면 누구나
-//    보므로 그 값이 곧 상품이다 — 미소유자에게 주면 결제가 장식이 된다. 대신 썸네일 주소만 준다.
-//    ⚠️ 폴백 썸네일(img.youtube.com/vi/<id>/…)에는 그 id 가 박혀 있다. 완전히 막으려면 관리자가
-//       lectures.thumb_url 에 자체 썸네일을 넣어야 하고, 파는 영상은 **미등록(unlisted)** 이어야 한다.
+// ⛔ **영상 출처가 둘이다 — 강의마다 유튜브 아니면 Bunny 다**(2026-09-03. DB CHECK lectures_source_chk).
+//    · **유튜브**(기존 무료 강의) — 사기 전에 youtube_id 를 안 내려준다. 유튜브 영상은 id 만 알면 누구나
+//      보므로 그 값이 곧 상품이고, 미소유자에게 주면 결제가 장식이 된다.
+//      ⚠️ 폴백 썸네일(img.youtube.com/vi/<id>/…)에는 그 id 가 박혀 있다. 완전히 막으려면 관리자가
+//         lectures.thumb_url 에 자체 썸네일을 넣어야 하고, 파는 영상은 **미등록(unlisted)** 이어야 한다.
+//    · **Bunny**(유료 강의) — 위 은닉이 필요 없다. id 를 알아도 **서명이 없으면 재생이 안 되기 때문**이다.
+//      그래서 썸네일에 id 가 박혀도 괜찮고, 대신 재생 주소를 목록에 실을 수 없다(만료되므로 play 로 받는다).
+//   ⛔ 유튜브 쪽 은닉 규칙을 "이제 필요 없다"고 걷어내지 말 것 — **Bunny 강의에만** 해당되는 얘기다.
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { TIER_LABEL } from '../_shared/exam-tickets.ts'
+import { BUNNY_EMBED_TTL, bunnyConfigured, bunnyThumbUrl, signBunnyEmbed } from '../_shared/bunny.ts'
 
 // 서명 URL 유효시간(초). 길면 링크 유출 시 그만큼 오래 열람 가능 → 짧게 두고 재발급.
 const SIGNED_URL_TTL = 60 * 60
@@ -89,10 +96,18 @@ const ytThumb = (id: string) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`
 const trField = (i18n: unknown, lang: string, ko: string): string =>
   (((i18n as Record<string, string> | null) ?? {})[lang] ?? '').trim() || ko
 
-/** 강의 한 줄. ⛔ **youtubeId 는 소유자에게만** 내려간다 — 위 파일 머리 주석 참고.
+/** 강의 한 줄.
  *  제목·소개는 이북의 shape() 와 같이 **요청 언어**로 준다(2026-08-26. 그전엔 번역이 아예 없어서,
- *  러닝 라이브러리를 영어로 보면 이북 열만 영어고 강의 열은 한국어였다). 채널은 화면에서 뺀 값이라 그대로. */
+ *  러닝 라이브러리를 영어로 보면 이북 열만 영어고 강의 열은 한국어였다). 채널은 화면에서 뺀 값이라 그대로.
+ *
+ *  ⛔ **재생 경로가 출처마다 다르다**(source). 화면이 이걸 보고 갈라 쓴다:
+ *     · youtube — `youtubeId` 로 바로 재생. **소유자에게만** 내려간다(위 파일 머리 주석).
+ *     · bunny   — 여기선 아무것도 안 준다. 재생 버튼을 눌렀을 때 `play` 액션이 서명 URL 을 만들어 준다.
+ *  ⛔ **bunny_video_id 를 내려보내지 않는다.** 화면이 그 값으로 할 수 있는 일이 없고(URL 은 서버가 서명한다),
+ *     안 주면 실수로 프론트에 재생 경로가 생길 여지 자체가 없다. */
 function shapeLecture(l: Row, owned: boolean, lang: string) {
+  const bunnyId = (l.bunny_video_id as string | null) ?? null
+  const ytId = (l.youtube_id as string | null) ?? null
   return {
     id: l.id as string,
     catalog: ((l.catalog as string | null) ?? 'leveltest') as 'leveltest' | 'caris',
@@ -102,14 +117,18 @@ function shapeLecture(l: Row, owned: boolean, lang: string) {
     channel: (l.channel as string | null) ?? '',
     description: trField(l.description_i18n, lang, (l.description as string | null) ?? ''),
     price_usd_cents: (l.price_usd_cents as number) ?? 0,
-    thumbUrl: (l.thumb_url as string | null) || ytThumb(l.youtube_id as string),
-    youtubeId: owned ? (l.youtube_id as string) : null,
+    source: (bunnyId ? 'bunny' : 'youtube') as 'bunny' | 'youtube',
+    // 관리자가 올린 썸네일이 이긴다. 없으면 출처가 알아서 준 그림으로 폴백한다.
+    //   ⚠️ Bunny 썸네일 주소는 서버가 완성한다 — 풀존 호스트를 프론트에 박으면 라이브러리를 갈 때
+    //      배포가 두 번이 된다(ytThumb 를 서버가 만드는 것과 같은 이유).
+    thumbUrl: (l.thumb_url as string | null) || (bunnyId ? bunnyThumbUrl(bunnyId) : ytId ? ytThumb(ytId) : null) || '',
+    youtubeId: owned && !bunnyId ? ytId : null,
     owned,
   }
 }
 
-/** 강의 목록 select — 소유 판정 전이라 youtube_id 도 뽑는다(내려줄지는 shapeLecture 가 정한다). */
-const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, title, title_i18n, channel, description, description_i18n, price_usd_cents, thumb_url, sort_order, created_at'
+/** 강의 목록 select — 소유 판정 전이라 영상 id 도 뽑는다(내려줄지는 shapeLecture 가 정한다). */
+const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, bunny_video_id, title, title_i18n, channel, description, description_i18n, price_usd_cents, thumb_url, sort_order, created_at'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -370,6 +389,92 @@ Deno.serve(async (req) => {
         lang: entry?.path ? lang : 'ko',
         langs: ['ko', ...Object.keys(tr).filter((k) => tr[k]?.path)],
       })
+    }
+
+    // ── 강의 재생 (Bunny 전용) ───────────────────────────────────
+    // 이북 `read` 와 **같은 모양**이다: 소유 확인 → 서명 URL 발급 → 기록. 규칙을 한 벌로 유지할 것.
+    //
+    // ⛔ **이 주소를 목록(store·library)에 실을 수 없다.** 3시간이면 만료되므로, 탭을 열어둔 채
+    //    나중에 누르면 죽은 주소가 된다. 그래서 재생 버튼을 누른 그 순간에 받아 간다.
+    // ⛔ **유튜브 강의는 이 경로를 안 탄다.** 유튜브는 목록에 실린 youtubeId 로 바로 재생한다.
+    if (action === 'play') {
+      if (!uid) return json({ error: '로그인이 필요합니다.' }, 401)
+      const id = String(body?.id ?? '').trim()
+      if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
+
+      // ⛔ **소유 확인이 먼저다.** 이 한 줄이 결제의 유일한 방어선이라, 강의를 조회하기 전에 건다.
+      //    (환불로 lecture_purchases 행이 사라지면 그 순간부터 여기서 막힌다 — 회수 코드가 따로 필요 없다.)
+      const { data: owned } = await admin
+        .from('lecture_purchases')
+        .select('user_id')
+        .eq('user_id', uid)
+        .eq('lecture_id', id)
+        .maybeSingle()
+      if (!owned) return json({ error: '구매한 강의만 시청할 수 있습니다.' }, 403)
+
+      const { data: lec } = await admin
+        .from('lectures')
+        .select('id, bunny_video_id')
+        .eq('id', id)
+        .maybeSingle()
+      if (!lec) return json({ error: '강의를 찾을 수 없습니다.' }, 404)
+      const videoId = (lec.bunny_video_id as string | null) ?? ''
+      // 유튜브 강의를 여기로 부른 경우 — 화면 로직이 어긋난 것이므로 조용히 넘기지 않는다.
+      if (!videoId) return json({ error: '이 강의는 다른 방식으로 재생됩니다.' }, 400)
+      // ⚠️ 시크릿이 안 들어온 배포본에서 서명하면 **아무나 통과하는 토큰**이 나간다. 그 전에 막는다.
+      if (!bunnyConfigured()) return json({ error: '영상 서버 설정이 필요합니다. 관리자에게 문의해 주세요.' }, 503)
+
+      // 이어보기 지점 + 발급 원장. ⚠️ 조회와 증분을 한 번에 못 하므로 먼저 읽고 뒤에 쓴다.
+      const { data: prev } = await admin
+        .from('lecture_plays')
+        .select('position_sec, plays')
+        .eq('user_id', uid)
+        .eq('lecture_id', id)
+        .maybeSingle()
+      const positionSec = Math.max(0, (prev?.position_sec as number | null) ?? 0)
+
+      const embedUrl = await signBunnyEmbed(videoId, positionSec)
+
+      // 발급 기록. ⚠️ 실패는 삼킨다 — 기록이 안 됐다고 산 강의를 못 보게 만들면 본말이 전도된다.
+      //   (⛔ 다만 이 값이 비면 트래픽 폭주를 우리 DB 에서 못 본다. 마이그레이션 주석 참고.)
+      try {
+        await admin.from('lecture_plays').upsert({
+          user_id: uid,
+          lecture_id: id,
+          position_sec: positionSec,
+          plays: (((prev?.plays as number | null) ?? 0) + 1),
+          last_at: new Date().toISOString(),
+        })
+      } catch { /* 기록 실패가 시청을 막지 않는다 */ }
+
+      // ⛔ embedUrl 을 로그에 남기지 말 것 — 토큰이 통째로 들어 있다.
+      return json({ embedUrl, positionSec, expiresIn: BUNNY_EMBED_TTL })
+    }
+
+    // 재생 위치 저장(이어보기). 플레이어가 도는 동안 주기적으로 부른다.
+    //   ⚠️ 소유 확인을 여기서도 한다 — 남의 기록을 덮어쓰는 건 못 하지만(PK 가 uid), 안 산 강의로
+    //      행을 만들어 원장을 더럽힐 수는 있다.
+    //   ⚠️ 실패해도 화면은 아무것도 안 한다(재생이 우선). 그래서 오류 문구를 공들여 쓸 자리가 아니다.
+    if (action === 'progress') {
+      if (!uid) return json({ error: '로그인이 필요합니다.' }, 401)
+      const id = String(body?.id ?? '').trim()
+      const sec = Math.max(0, Math.floor(Number(body?.positionSec ?? 0)) || 0)
+      if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
+
+      const { data: owned } = await admin
+        .from('lecture_purchases')
+        .select('user_id')
+        .eq('user_id', uid)
+        .eq('lecture_id', id)
+        .maybeSingle()
+      if (!owned) return json({ error: '구매한 강의만 시청할 수 있습니다.' }, 403)
+
+      // ⚠️ plays 는 건드리지 않는다 — 여기서 올리면 30초마다 오르는 값이 되어 발급 원장이 뜻을 잃는다.
+      const { error } = await admin
+        .from('lecture_plays')
+        .upsert({ user_id: uid, lecture_id: id, position_sec: sec, last_at: new Date().toISOString() })
+      if (error) return json({ error: error.message }, 400)
+      return json({ ok: true })
     }
 
     return json({ error: '알 수 없는 action' }, 400)

@@ -10,10 +10,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import EbookCover from './EbookCover'
 import { usdc } from '../lib/money'
-import { ytEmbed } from '../lib/lectures'
+import { ytEmbed, watchBunnyProgress } from '../lib/lectures'
+import { callFunction } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import type { TFunc, Lang } from '../lib/i18n'
-import type { EbookRow, ServerLecture } from '../lib/types'
+import type { EbookRow, LecturePlayResp, ServerLecture } from '../lib/types'
 
 /** 왼쪽 열 한 칸 — 레벨(1~7·무관) 또는 급수(Beginner~Zenith·무관). 두 카탈로그가 같은 모양을 쓴다. */
 export interface LibGroup {
@@ -359,7 +360,13 @@ export function BookRow({
 /** 강의 한 줄 — **열 폭을 꽉 채운 가로 16:9 썸네일** + 그 **밑에** 제목·채널(2026-08-11 지시).
  *
  *  ⛔ **산 사람만 재생한다(2026-08-25 유료화).** 미소유는 썸네일 + 가격 + 구매하기만 보여준다 —
- *     서버가 youtubeId 를 아예 안 내려주므로 프론트에 재생 경로 자체가 없다.
+ *     유튜브 강의는 서버가 youtubeId 를 아예 안 내려주므로 프론트에 재생 경로 자체가 없고,
+ *     Bunny 강의는 재생 주소를 만드는 열쇠(토큰 키)가 서버에만 있다.
+ *  ⛔ **재생 경로가 둘이다**(`lec.source`) — 이 한 줄이 그 갈림을 다 떠안는다.
+ *     · `youtube` — 목록에 실려 온 id 로 **즉시** iframe. 예전 그대로다.
+ *     · `bunny`   — 누른 뒤에 `ebooks.play` 로 서명 주소를 받아온다 → **로딩 한 박자가 있다.**
+ *       ⚠️ 그래서 두 화면(Ebooks·MyPage)은 `playing` 만 토글하고 주소는 여기가 알아서 챙긴다 —
+ *          호출부로 올리면 같은 로직이 두 벌이 되고 한쪽만 고쳐진다.
  *     ⚠️ 썸네일을 흑백으로 깔거나 자물쇠를 얹지 않는다(2026-08-25 지시) — 무슨 강의인지 보여주는 게
  *        살 이유를 만드는 유일한 수단이다. 죽이는 건 버튼 하나면 된다.
  *  ⚠️ 교재 표지처럼 왼쪽으로 세우지 말 것 — 영상은 가로가 긴 물건이라 옆에 글을 붙이면 그림이 작아진다.
@@ -377,8 +384,51 @@ export function LectureRow({
 }) {
   // 썸네일이 404 면(영상이 내려갔거나 id 오타) 이미지를 지우고 아래 그라데이션 판이 드러나게 둔다.
   const [thumbDead, setThumbDead] = useState(false)
-  // ⚠️ 소유 여부와 **youtubeId 존재**를 같이 본다 — 옛 배포본 응답엔 id 가 없을 수 있다(그땐 재생 불가).
-  const canPlay = lec.owned && !!lec.youtubeId
+  // ⛔ **Bunny 강의는 재생 주소가 목록에 없다** — 만료되는 서명 URL 이라 실을 수 없다(탭을 열어두면 죽는다).
+  //    재생 버튼을 누른 그 순간 서버에서 받아온다.
+  const [play, setPlay] = useState<LecturePlayResp | null>(null)
+  // ⚠️ 실패는 **문구가 아니라 사전 키**로 담는다 — 문구로 담으면 언어를 바꿔도 안 따라오고,
+  //    `t` 를 이펙트 의존성에 넣게 되어 렌더마다 이펙트가 돈다(CLAUDE.md 의 허브 토스트 함정).
+  const [playErrKey, setPlayErrKey] = useState('')
+  const frameRef = useRef<HTMLIFrameElement | null>(null)
+  const posRef = useRef(0)
+  const isBunny = lec.source === 'bunny'
+  // ⚠️ 소유만 보면 안 된다 — 유튜브 강의는 미소유면 서버가 id 를 안 주고, 옛 배포본 응답엔 아예 없다.
+  //    Bunny 는 id 없이도 재생 가능하다(주소를 서버가 만들어 준다).
+  const canPlay = lec.owned && (isBunny || !!lec.youtubeId)
+
+  // 재생 주소 받아오기. ⚠️ 껐다 켜도 다시 안 받는다 — 3시간짜리라 그대로 쓴다.
+  useEffect(() => {
+    if (!playing || !isBunny || play || playErrKey) return
+    let alive = true
+    callFunction<LecturePlayResp>('ebooks', { action: 'play', id: lec.id })
+      .then((r) => { if (alive) setPlay(r) })
+      .catch(() => { if (alive) setPlayErrKey('ll.play_failed') })
+    return () => { alive = false }
+  }, [playing, isBunny, play, playErrKey, lec.id])
+
+  // 이어보기 저장. 플레이어는 초당 여러 번 알려주므로 **30초에 한 번만** 보낸다.
+  //   ⚠️ 전부 조용히 실패한다 — 진도 저장이 안 된다고 재생을 막으면 본말이 전도된다.
+  //   ⚠️ player.js 연결은 실측으로 확인된 게 아니다(lectures.ts 주석 참고). 안 오면 이어보기만 없다.
+  useEffect(() => {
+    const el = frameRef.current
+    if (!playing || !isBunny || !play || !el) return
+    let lastSent = 0
+    const stop = watchBunnyProgress(el, (sec) => {
+      posRef.current = sec
+      const now = Date.now()
+      if (now - lastSent < 30_000) return
+      lastSent = now
+      callFunction('ebooks', { action: 'progress', id: lec.id, positionSec: Math.floor(sec) }).catch(() => {})
+    })
+    return () => {
+      stop()
+      // 닫을 때 마지막 지점을 한 번 더 — 30초 창 안에서 끈 사람이 그만큼을 잃지 않게.
+      if (posRef.current > 0) {
+        callFunction('ebooks', { action: 'progress', id: lec.id, positionSec: Math.floor(posRef.current) }).catch(() => {})
+      }
+    }
+  }, [playing, isBunny, play, lec.id])
 
   const thumb = !thumbDead && (
     <img
@@ -395,14 +445,25 @@ export function LectureRow({
     <li className="px-4 py-4 transition-colors hover:bg-surface-container/60">
       <div className="relative aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-slate-700 to-slate-900">
         {playing && canPlay ? (
-          <iframe
-            src={ytEmbed(lec.youtubeId as string)}
-            title={lec.title}
-            className="absolute inset-0 h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-          />
+          isBunny && !play ? (
+            // 주소를 받아오는 동안(유튜브는 즉시라 이 상태가 없다). 실패해도 이 자리에 뜬다.
+            <div className="absolute inset-0 flex items-center justify-center px-4 text-center font-body-md text-[15px] text-white/80">
+              {t(playErrKey || 'll.play_loading')}
+            </div>
+          ) : (
+            <iframe
+              ref={frameRef}
+              src={isBunny ? (play as LecturePlayResp).embedUrl : ytEmbed(lec.youtubeId as string)}
+              title={lec.title}
+              className="absolute inset-0 h-full w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              // ⛔ **`no-referrer` 로 바꾸지 말 것.** Bunny 의 허용 도메인 검사가 이 헤더를 본다 —
+              //    referer 가 안 붙으면 우리 페이지에서 열어도 **재생이 통째로 막힌다**.
+              //    지금 값은 크로스 오리진에 오리진만 보내므로(경로는 안 샌다) 그대로 두면 된다.
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          )
         ) : canPlay ? (
           <button type="button" onClick={onPlay} className="group absolute inset-0 h-full w-full" aria-label={`${t('ll.play')} — ${lec.title}`}>
             {thumb}

@@ -500,9 +500,15 @@ export interface ServerLecture {
   catalog: 'leveltest' | 'caris'
   targetLevel: number | null
   targetTier: string | null
-  /** ⛔ **산 사람에게만 내려온다**(미소유는 null). 유튜브 영상은 id 만 알면 누구나 보므로 그 값이 곧 상품이다. */
+  /** 영상 출처(2026-09-03). 재생 경로가 통째로 갈린다 — 화면이 이걸 보고 갈라 쓴다.
+   *  · `youtube` — 아래 `youtubeId` 로 바로 재생(기존 무료 강의)
+   *  · `bunny`   — 여기엔 아무 id 도 안 온다. 재생 버튼을 눌렀을 때 `ebooks.play` 가 서명 URL 을 준다
+   *  ⚠️ 옛 배포본 응답엔 이 값이 없다 → 없으면 유튜브로 읽는다. */
+  source?: 'youtube' | 'bunny'
+  /** ⛔ **유튜브 강의를 산 사람에게만 내려온다**(그 외는 null). 유튜브 영상은 id 만 알면 누구나 보므로
+   *  그 값이 곧 상품이다. Bunny 강의는 애초에 id 를 안 주고, 줘도 서명 없이는 재생이 안 된다. */
   youtubeId: string | null
-  /** 목록 썸네일. 관리자가 넣은 값이 없으면 서버가 유튜브 썸네일 주소로 채워 준다. */
+  /** 목록 썸네일. 관리자가 넣은 값이 없으면 서버가 출처별 썸네일 주소로 채워 준다(유튜브 / Bunny 풀존). */
   thumbUrl: string
   /** 정가 — **달러 센트**(100 = $1.00). 0 = 무료. DB 컬럼명(lectures.price_usd_cents)과 같게 둔다. */
   price_usd_cents: number
@@ -530,6 +536,14 @@ export interface EbookReadResp {
   expiresIn: number
   lang: string // 실제로 연 언어(요청 언어에 번역본이 없으면 'ko')
   langs: string[] // 이 책이 가진 언어
+}
+
+/** 강의 재생(`ebooks.play`) — **Bunny 강의 전용**. 유튜브 강의는 이 액션을 안 부른다.
+ *  ⛔ `embedUrl` 은 만료되는 서명 주소다 — 어딘가에 저장해 두고 재사용하지 말 것(로그도 금지, 토큰이 들어 있다). */
+export interface LecturePlayResp {
+  embedUrl: string
+  positionSec: number // 이어보기 지점(서버가 embedUrl 에도 이미 반영해 준다)
+  expiresIn: number
 }
 
 /** 이북 번역본 1건 — `ebooks.translations` jsonb 의 값. 원문(ko)은 여기 없다.
