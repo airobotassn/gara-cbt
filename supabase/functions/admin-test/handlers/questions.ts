@@ -143,15 +143,56 @@ export async function upsertQuestions(admin: any, body: any, actor: string) {
   }
 
   // 새 문항(id 없음)에 사람용 번호(code) 자동 부여: L{level}-{NNN}
+  //
+  // ⛔ **같은 지문이 이미 있으면 그 줄은 넣지 않는다(2026-09-02).** 여기엔 중복 검사가 없어서
+  //    같은 엑셀을 두 번 반영하면 글이 글자까지 같은 문항이 번호만 다르게 한 벌 더 생겼고,
+  //    출제는 **행 번호로만** 중복을 거르므로 한 응시에 같은 문제가 두 번 나왔다
+  //    (2026-09-02 Lv.1 실제 사고 — 8초 간격으로 29개가 두 번 들어갔다. 7월 Lv.4 도 같은 사고).
+  //    ⚠️ **통째로 거절하지 않고 줄 단위로 건너뛴다** — 30개 중 3개만 새로 넣는 정상 작업을 막으면 안 된다.
+  //    ⚠️ 비교는 **공백만 정리한 완전일치**다. 비슷한 문장까지 잡으면 멀쩡한 새 문항이 조용히 사라진다 —
+  //       그건 사람이 판단할 일이라 화면에 남겨 둔다.
+  //    ⚠️ 판정 대상은 **활성 문항**뿐이다. 비활성·삭제분까지 보면 예전에 내렸던 문항을 다시 못 올린다.
+  //    ⚠️ 동시 요청 둘이 같이 통과하는 틈은 남는다(2026-09-02 지시 — 관리자가 소수라 DB 유니크는 안 건다).
   const newRows = rows.filter((r) => !r.id)
   const seqByLevel: Record<number, number> = {}
+  const koSeen: Record<number, Set<string>> = {} // 레벨 → 이미 있는(또는 이번에 넣기로 한) 한국어 지문
   if (newRows.length) {
     const levels = [...new Set(newRows.map((r) => r.level))]
-    const { data: ex } = await admin.from('test_questions').select('level, code').in('level', levels)
-    for (const lv of levels) seqByLevel[lv] = maxCodeSeq(ex ?? [], lv)
+    // 번호를 매기려고 어차피 그 레벨을 통째로 읽는다 — 지문 컬럼만 얹으면 조회는 그대로 한 번이다.
+    const { data: ex } = await admin
+      .from('test_questions')
+      .select('level, code, active, prompt_i18n')
+      .in('level', levels)
+    for (const lv of levels) {
+      seqByLevel[lv] = maxCodeSeq(ex ?? [], lv)
+      koSeen[lv] = new Set<string>()
+    }
+    for (const e of ex ?? []) {
+      if (!e.active) continue
+      const k = normKo(e.prompt_i18n?.ko)
+      if (k && koSeen[e.level]) koSeen[e.level].add(k)
+    }
   }
 
-  const payload = rows.map((r) => {
+  // 걸러낸 줄 — 화면이 "몇 개가 이미 있어서 빠졌는지" 를 말해줄 수 있게 번호를 모아 돌려준다.
+  const skipped: { num: number; ko: string }[] = []
+  const kept = rows.filter((r, i) => {
+    if (r.id) return true // 수정은 대상이 아니다
+    const k = normKo(r.prompt_i18n?.ko)
+    if (!k) return true
+    const seen = koSeen[r.level]
+    if (seen?.has(k)) {
+      skipped.push({ num: i + 1, ko: k.slice(0, 60) })
+      return false
+    }
+    seen?.add(k) // 같은 파일 안에서 두 번 나온 것도 여기서 걸린다
+    return true
+  })
+  if (!kept.length) {
+    return json({ ok: true, count: 0, skipped: skipped.length, skippedRows: skipped, codes: [] })
+  }
+
+  const payload = kept.map((r) => {
     const base = {
       level: r.level,
       category: r.category,
@@ -165,11 +206,11 @@ export async function upsertQuestions(admin: any, body: any, actor: string) {
     const n = (seqByLevel[r.level] = (seqByLevel[r.level] ?? 0) + 1)
     return { code: `L${r.level}-${String(n).padStart(3, '0')}`, ...base }
   })
-  const { data, error } = await admin.from('test_questions').upsert(payload).select('id')
+  const { data, error } = await admin.from('test_questions').upsert(payload).select('id, code, level')
   if (error) return json({ error: error.message }, 500)
 
   // 수정 이벤트 기록(실제로 바뀐 필드가 있을 때만)
-  for (const r of rows) {
+  for (const r of kept) {
     if (!r.id) continue
     const before = beforeById[r.id]
     if (!before) continue
@@ -177,7 +218,32 @@ export async function upsertQuestions(admin: any, body: any, actor: string) {
     if (Object.keys(detail).length === 0) continue
     await logEvent(admin, { question_id: r.id, code: before.code ?? null, level: r.level, action: 'edit', actor, detail })
   }
-  return json({ ok: true, count: data?.length ?? 0 })
+
+  // ⛔ **문항 추가도 이력에 남긴다(2026-09-02).** 여태 delete·edit·activate·deactivate 만 남고 추가는
+  //    한 줄도 안 남아서, 같은 파일이 두 번 들어가도 **나중에 알아볼 방법이 자체가 없었다**
+  //    (Lv.1 사고를 엣지 함수 로그로 겨우 찾았다 — 그건 보존 기간이 짧아 며칠 뒤면 사라진다).
+  //    ⚠️ 새 화면 배지(EvBadge)에 'add' 를 안 넣으면 추가가 **빨간 '삭제'로 뜬다**(모르는 값은 그리로 떨어진다).
+  const newCodes = new Set(payload.filter((p: { id?: string }) => !p.id).map((p: { code?: string }) => p.code))
+  const added = (data ?? []).filter((d: { code: string | null }) => d.code && newCodes.has(d.code))
+  for (const a of added) {
+    await logEvent(admin, { question_id: a.id, code: a.code, level: a.level, action: 'add', actor })
+  }
+
+  return json({
+    ok: true,
+    count: data?.length ?? 0,
+    skipped: skipped.length,
+    skippedRows: skipped,
+    // 화면이 "방금 넣은 것만 보기" 를 걸 수 있게 번호를 돌려준다.
+    //   ⚠️ 정렬해서 준다 — upsert 가 돌려주는 순서는 보장이 없는데, 화면은 이걸로 "L1-142 ~ L1-171"
+    //      처럼 범위를 그린다(안 맞추면 시작·끝이 뒤죽박죽으로 뜬다).
+    codes: added.map((a: { code: string | null }) => a.code).filter(Boolean).sort(),
+  })
+}
+
+/** 지문 비교용 정규화 — 앞뒤 공백과 연속 공백만 정리한다(그 이상은 사람이 판단할 몫). */
+function normKo(v: unknown): string {
+  return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''
 }
 
 // 코드 목록에서 그 레벨의 최대 일련번호 (L{lv}-NNN 의 NNN)

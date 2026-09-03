@@ -78,6 +78,11 @@ type LtQSub = 'list' | 'events' | 'generate' | 'upload'
 // isRoot = 서버('admin-test' me 액션)가 판정한 루트 관리자 여부. 문항 엑셀 다운로드는 루트 전용.
 function QuestionsTab({ isRoot }: { isRoot: boolean }) {
   const [sub, setSub] = useState<LtQSub>('list')
+  // 방금 반영한 문항 — '문항 추가 & 번역' 이 넘겨주고 '문항 목록' 이 받아 그것만 걸러 보여준다.
+  //   ⚠️ 반영하고 그 화면에 남아 있으면 버튼이 다시 눌려 같은 문항이 한 벌 더 들어간다(2026-09-02 사고).
+  //      그래서 성공하면 **화면을 떠난다.** 다만 이동만 시키면 잘 들어갔는지 확인할 데가 없어서
+  //      번호를 같이 넘겨 목록에서 방금 것만 볼 수 있게 한다.
+  const [justAdded, setJustAdded] = useState<{ level: number; codes: string[]; at: number } | null>(null)
   const SUBS: { key: LtQSub; label: string }[] = [
     { key: 'list', label: '문항 목록' },
     { key: 'events', label: '문항 이력' },
@@ -103,7 +108,7 @@ function QuestionsTab({ isRoot }: { isRoot: boolean }) {
           </button>
         ))}
       </div>
-      {sub === 'list' ? <ListTab isRoot={isRoot} /> : null}
+      {sub === 'list' ? <ListTab isRoot={isRoot} justAdded={justAdded} /> : null}
       {sub === 'events' ? <EventsTab /> : null}
       {sub === 'generate' ? (
         <>
@@ -116,7 +121,14 @@ function QuestionsTab({ isRoot }: { isRoot: boolean }) {
           </div>
         </>
       ) : null}
-      {sub === 'upload' ? <UploadTab /> : null}
+      {sub === 'upload' ? (
+        <UploadTab
+          onApplied={(level, codes) => {
+            setJustAdded({ level, codes, at: Date.now() })
+            setSub('list')
+          }}
+        />
+      ) : null}
     </>
   )
 }
@@ -803,10 +815,12 @@ function exportQuestionsXlsx(rows: ListRow[], level: number, cat: string) {
   XLSX.writeFile(wb, safeFileName(`아레나문항_Lv${level}_${catName}_${todayKST()}.xlsx`))
 }
 
-function ListTab({ isRoot }: { isRoot: boolean }) {
-  const [level, setLevel] = useState(1)
+function ListTab({ isRoot, justAdded }: { isRoot: boolean; justAdded?: { level: number; codes: string[]; at: number } | null }) {
+  const [level, setLevel] = useState(justAdded?.level ?? 1)
   const [cat, setCat] = useState('all')
   const [q, setQ] = useState('')
+  // 방금 반영하고 넘어왔을 때만 켜진다 — 그 번호들만 보여줘 "잘 들어갔나"를 눈으로 확인시킨다.
+  const [onlyNew, setOnlyNew] = useState(!!justAdded?.codes.length)
   const [rows, setRows] = useState<ListRow[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -847,7 +861,10 @@ function ListTab({ isRoot }: { isRoot: boolean }) {
 
   const axes = axesForLevel(level, 'ko')
   const qq = q.trim().toLowerCase()
+  // ⚠️ '방금 추가분만' 은 넘어온 레벨을 보고 있을 때만 건다 — 레벨을 바꾸면 그 번호들이 없어 빈 목록이 된다.
+  const newCodes = onlyNew && justAdded && justAdded.level === level ? new Set(justAdded.codes) : null
   const filtered = rows
+    .filter((r) => !newCodes || (r.code && newCodes.has(r.code)))
     .filter((r) => cat === 'all' || r.category === cat)
     .filter((r) => !qq || (r.code ?? '').toLowerCase().includes(qq) || (r.prompt_i18n?.ko ?? '').toLowerCase().includes(qq))
 
@@ -904,6 +921,22 @@ function ListTab({ isRoot }: { isRoot: boolean }) {
   return (
     <div>
       {err ? <ErrBox msg={err} /> : null}
+      {/* 방금 반영하고 넘어온 직후에만 뜬다 — 이동만 시키면 잘 들어갔는지 확인할 데가 없다. */}
+      {justAdded && justAdded.codes.length > 0 ? (
+        <div
+          className="admin-msg"
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12,
+            padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2, transparent)' }}
+        >
+          <b>✅ Lv.{justAdded.level} 문항 {justAdded.codes.length}개 추가됨</b>
+          <span style={{ color: 'var(--muted)' }}>
+            {justAdded.codes[0]} ~ {justAdded.codes[justAdded.codes.length - 1]}
+          </span>
+          <button className="admin-mini" onClick={() => setOnlyNew((v) => !v)}>
+            {onlyNew ? '전체 보기' : '방금 추가분만 보기'}
+          </button>
+        </div>
+      ) : null}
       <div className="admin-section">
         <div className="admin-toolbar">
           <label>레벨 <select value={level} onChange={(e) => { setLevel(+e.target.value); setCat('all') }}>
@@ -1201,7 +1234,7 @@ interface QEvent {
   question_id: string | null
   code: string | null
   level: number | null
-  action: 'edit' | 'deactivate' | 'activate' | 'delete'
+  action: 'add' | 'edit' | 'deactivate' | 'activate' | 'delete'
   actor: string | null
   detail: Record<string, { before: unknown; after: unknown }> | null
   created_at: string
@@ -1218,6 +1251,8 @@ function evVal(field: string, v: unknown): string {
   return String(v)
 }
 function EvBadge({ a }: { a: QEvent['action'] }) {
+  // ⚠️ 모르는 값은 맨 아래 '삭제'(빨강)로 떨어진다 — 새 action 을 서버에 추가하면 여기도 같이 넣을 것.
+  if (a === 'add') return <span className="badge ok">추가</span>
   if (a === 'edit') return <span className="badge low">수정</span>
   if (a === 'deactivate') return <span className="badge none">비활성</span>
   if (a === 'activate') return <span className="badge ok">활성·복구</span>
@@ -1547,7 +1582,7 @@ function findHeaderRow(aoa: string[][], maxScan = 15): number {
   return best.score >= 2 ? best.idx : 0
 }
 
-function UploadTab() {
+function UploadTab({ onApplied }: { onApplied: (level: number, codes: string[]) => void }) {
   const [wb, setWb] = useState<XLSX.WorkBook | null>(null)
   const [sheetNames, setSheetNames] = useState<string[]>([])
   const [sheetIdx, setSheetIdx] = useState(0)
@@ -1818,9 +1853,25 @@ function UploadTab() {
     setBusy(true)
     setApplyMsg('반영 중…')
     try {
-      const r = await callFunction<{ count: number }>('admin-test', { action: 'upsert', rows: qrows })
-      setApplyMsg(`✅ ${r.count}개 문항 반영 완료`)
+      const r = await callFunction<{ count: number; skipped?: number; codes?: string[] }>(
+        'admin-test', { action: 'upsert', rows: qrows },
+      )
+      const skipped = r.skipped ?? 0
+      // ⚠️ **하나도 안 들어갔으면 화면을 떠나지 않는다.** 아무 일도 안 일어났는데 목록으로 보내면
+      //    뭐가 어떻게 된 건지 알 수 없다 — 여기서 이유(이미 있음)를 말하고 세워 둔다.
+      if (r.count === 0) {
+        setApplyMsg(`이미 등록된 문항입니다 — ${skipped}개 전부 같은 지문이 있어 넣지 않았습니다.`)
+        setBusy(false)
+        return
+      }
       discardJob()
+      setApplyMsg('')
+      setBusy(false)
+      // ⛔ **성공하면 이 화면을 떠난다.** 남아 있으면 「DB에 반영」이 다시 눌려 같은 문항이 한 벌 더
+      //    들어간다(2026-09-02 Lv.1 사고 — 8초 간격 두 번). 잠금이 `disabled={busy}` 뿐이라
+      //    "이미 반영됨" 을 화면이 못 말한다.
+      onApplied(level, r.codes ?? [])
+      return
     } catch (e) {
       setApplyMsg('반영 실패: ' + (e instanceof Error ? e.message : String(e)))
     }
