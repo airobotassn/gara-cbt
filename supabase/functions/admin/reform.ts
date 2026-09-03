@@ -945,9 +945,17 @@ async function certConditionsSave(admin: any, body: any, ctx: Ctx) {
 
 // ── 용어 문제은행 (레벨테스트/CARIS 문항관리와 같은 방식) ────
 //
-// 구조: term_banks(은행) → term_questions(문항) → minigame_question_sets(게임 × 문항).
-// ⚠️ CARIS 와 다른 점 하나: 시험은 세트가 고정돼야 하지만(1인1회·공정성) 게임은 매판 섞여도 된다.
-//    그래서 '뽑기(draw)'가 없고, 게임에 담긴 문항 전체를 내려보내 게임이 알아서 섞는다.
+// 구조: term_questions(문항) 하나뿐. **은행 = 게임에 나가는 문제 전부**다.
+//
+// ⛔ **게임별로 문항을 고르는 기능은 없앴다(2026-09-03 지시).** 원래 CARIS(은행→시험→세트)를 본떠
+//    `minigame_question_sets` 로 게임마다 담을 문항을 고르게 해뒀는데, 쓸 이유가 없었다 —
+//    네 곳(버텨라·쏴라·골라라·DAILY)은 **같은 용어 문제를 보여주는 방식만 다르고**, 실제로도 50문항이
+//    4곳에 통째로 들어가 있었다. 안 쓰는 선택 UI 가 화면 한복판에 있으니 "이게 뭔지 모르겠다"가 됐다.
+//    (시험은 회차마다 세트가 달라야 하지만, 게임은 매판 섞이고 누구나 전 문항을 본다.)
+//    문항 하나를 빼고 싶으면 **'사용' 토글을 끄면 전부에서 빠진다** — 그 버튼이 이미 있다.
+// ⚠️ 표(`minigame_question_sets`)는 **지우지 않고 둔다** — 나중에 진짜 갈라야 할 일이 생기면 되살린다.
+//    다만 그때는 문항 하나씩 체크가 아니라 **분야(AI·로봇·피지컬AI)로 거는 쪽**이 맞다.
+//    지금은 읽는 곳이 없다(term-pool 도 안 본다).
 //
 // 레벨테스트(admin-test/handlers/questions.ts)와 **같은 규칙**을 그대로 옮겼다:
 //   · 목록은 활성·미삭제만 (비활성/삭제는 '문항 이력' 탭에서 되돌린다)
@@ -1014,27 +1022,13 @@ function sanitizeTermI18n(t: any): { D: Record<string, string>; A: Record<string
  *    분모에 넣으면 영영 100%가 안 돼서 "다 됐다"를 아무도 판단 못 한다.
  */
 async function termList(admin: any) {
-  const [q, banks, sets] = await Promise.all([
-    admin.from('term_questions').select('*').is('deleted_at', null).eq('active', true)
-      .order('sort_order').order('created_at'),
-    admin.from('term_banks').select('*').order('sort_order'),
-    admin.from('minigame_question_sets').select('game_id, question_id'),
-  ])
-  if (q.error) return json({ error: q.error.message }, 500)
-  // ⚠️ 담긴 개수는 **살아 있는 문항만** 센다 — 중지·삭제된 문항의 세트 줄이 남아 있어서,
-  //    그것까지 세면 "담긴 것 50개"라고 적혀 있는데 목록엔 48개만 보이는 화면이 된다.
-  const alive = new Set(((q.data ?? []) as any[]).map((t) => t.id))
-  const byQ: Record<string, string[]> = {}
-  const counts: Record<string, number> = {}
-  for (const s of (sets.data ?? []) as any[]) {
-    if (!alive.has(s.question_id)) continue
-    ;(byQ[s.question_id] ??= []).push(s.game_id)
-    counts[s.game_id] = (counts[s.game_id] ?? 0) + 1
-  }
-  const rows = ((q.data ?? []) as any[]).map((t) => ({ ...t, games: byQ[t.id] ?? [], missing: termMissing(t) }))
+  const { data, error } = await admin.from('term_questions').select('*')
+    .is('deleted_at', null).eq('active', true).order('sort_order').order('created_at')
+  if (error) return json({ error: error.message }, 500)
+  const rows = ((data ?? []) as any[]).map((t) => ({ ...t, missing: termMissing(t) }))
   const coverage: Record<string, number> = {}
   for (const r of rows) for (const lg of TRANSLATED_LANGS) if (!r.missing.includes(lg)) coverage[lg] = (coverage[lg] ?? 0) + 1
-  return json({ terms: rows, banks: banks.data ?? [], counts, coverage, total: rows.length })
+  return json({ terms: rows, coverage, total: rows.length })
 }
 
 /** '문항 이력' 탭 — 되돌릴 수 있는 것들(비활성 · 삭제). */
@@ -1053,36 +1047,6 @@ async function termEvents(admin: any, body: any) {
   const { data, error } = await q
   if (error) return json({ error: error.message }, 500)
   return json({ rows: data ?? [] })
-}
-
-/** 게임에 문항을 담거나 뺀다. `games` 가 그 문항이 들어갈 게임 목록의 **전체**다. */
-async function termSetGames(admin: any, body: any) {
-  const questionId = String(body?.questionId ?? '')
-  const games = (body?.games ?? []) as string[]
-  if (!questionId) return json({ error: '문항을 지정하세요.' }, 400)
-  const { error: delErr } = await admin.from('minigame_question_sets').delete().eq('question_id', questionId)
-  if (delErr) return json({ error: delErr.message }, 500)
-  if (games.length) {
-    const { error } = await admin.from('minigame_question_sets')
-      .insert(games.map((g, i) => ({ game_id: g, question_id: questionId, sort_order: i })))
-    if (error) return json({ error: error.message }, 500)
-  }
-  return json({ ok: true })
-}
-
-/** 한 게임의 세트를 통째로 바꾼다(전체 선택/해제용). */
-async function termSetBulk(admin: any, body: any) {
-  const gameId = String(body?.gameId ?? '')
-  const questionIds = (body?.questionIds ?? []) as string[]
-  if (!gameId) return json({ error: '게임을 지정하세요.' }, 400)
-  const { error: delErr } = await admin.from('minigame_question_sets').delete().eq('game_id', gameId)
-  if (delErr) return json({ error: delErr.message }, 500)
-  if (questionIds.length) {
-    const { error } = await admin.from('minigame_question_sets')
-      .insert(questionIds.map((q, i) => ({ game_id: gameId, question_id: q, sort_order: i })))
-    if (error) return json({ error: error.message }, 500)
-  }
-  return json({ ok: true })
 }
 
 /**
@@ -1333,8 +1297,6 @@ export async function handleReform(admin: any, action: string, body: any, ctx: C
     case 'mailNudge': return await mailNudge(admin, body, ctx)
     case 'mailLog': return await mailLog(admin)
     case 'termList': return await termList(admin)
-    case 'termSetGames': return await termSetGames(admin, body)
-    case 'termSetBulk': return await termSetBulk(admin, body)
     case 'termUpsert': return await termUpsert(admin, body, ctx)
     case 'termSetActive': return await termSetActive(admin, body, ctx)
     case 'termDelete': return await termDelete(admin, body, ctx)

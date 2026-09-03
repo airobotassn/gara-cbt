@@ -381,7 +381,7 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
     - 관리 화면은 레벨테스트 문항 탭과 같은 구성이다(`pages/AdminTermQuestions.tsx`): 문항 목록·이력(중지/삭제 되돌리기)·엑셀 업로드·🌐 자동 번역·언어별 완료율. 문항 번호는 `T-001`.
     - ⛔ **한국어 원문을 고치면 옛 번역을 그 자리에서 비운다**(CARIS `questionUpsert` 와 같은 이유) — 안 비우면 설명만 고쳐도 번역본은 옛 문장 그대로라 **외국어로 하는 사람만 다른 문제를 푼다.**
     - ⚠️ **보기 개수(정답 1 + 오답 3)가 어긋난 번역은 버린다.** 순서가 곧 정답 자리라 개수가 다르면 그 언어에서만 보기가 빈다. 검사는 저장(`sanitizeTermI18n`)과 서빙(`term-pool`) 양쪽에 있다.
-    - ⚠️ **세트가 비어 있으면 그 게임은 은행 전체를 쓴다**('아직 안 골랐다'는 뜻이지 '문제 없음'이 아니다). 게임 목록의 단일 출처는 `lib/minigames.ts` 의 `TERM_GAME_IDS` — 서버 `term-pool` 의 `TARGETS`·화면 `TERM_TARGETS` 와 한 벌이다.
+    - ⛔ **게임별로 문항을 고르는 기능은 없다(2026-09-03 지시).** 은행에 '사용' 상태로 있는 문항이 네 곳(버텨라·쏴라·골라라·DAILY) 전부에 나간다 — 셋은 같은 용어 문제를 **보여주는 방식만** 다르고(4지선다 / 운석 / O·X), 실제로도 50문항이 4곳에 통째로 들어가 있었다. 안 쓰는 선택 UI 가 화면 한복판에 있으니 관리자가 화면을 못 읽었다. 한 문항을 빼려면 **'중지'** 를 누른다(네 곳에서 같이 빠진다). 표 `minigame_question_sets` 는 읽는 곳 없이 남겨 뒀다 — 되살릴 일이 생기면 문항 하나씩 체크가 아니라 **분야(AI·로봇·피지컬AI)로 거는 쪽**이 맞다.
     - 배포: 마이그레이션 + `npx.cmd supabase functions deploy term-pool admin`(**둘 다 플래그 없이** — anon 키가 실려 오므로 공개 예외가 필요 없다) + 프론트 push.
 - **공유 카드도 화면 언어를 따른다 (2026-08-07)**: 캔버스에 그리는 글자까지 `share.card.*`. 훅을 못 쓰는 계층이라 `ShareCardData.lang` 을 받아 `tr()` 로 뽑는다 — 호출부(`Hub`·`Ranking`·`ChatBoard`) 셋 다 `lang` 을 넘겨야 한다.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.

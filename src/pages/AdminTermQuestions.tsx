@@ -5,6 +5,9 @@
 //
 // ⛔ 여기서 고친 문항이 **바로 게임에 나간다**(서버 term-pool → 게임 iframe · DAILY QUIZ).
 //    예전엔 게임 HTML 안 POOL 이 진짜였고 이 화면은 저장만 되고 아무 데도 안 나갔다(2026-09-03 연결).
+// ⛔ **게임별로 문항을 고르는 기능은 없다(2026-09-03 지시).** 은행에 '사용' 상태로 있는 문항이
+//    네 곳(버텨라·쏴라·골라라·DAILY) 전부에 나간다 — 셋은 같은 문제를 보여주는 방식만 다르다.
+//    한 문항을 빼려면 '중지'를 누른다(네 곳에서 같이 빠진다).
 // ⚠️ 게임 HTML(public/games/*.html)과 src/lib/terms.ts 의 문항 배열은 **폴백**으로 남아 있다 —
 //    거기를 고쳐도 서비스에는 안 나간다. 문항을 바꾸는 자리는 이 화면 하나다.
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
@@ -13,7 +16,6 @@ import { callFunction } from '../lib/supabase'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
-import { TERM_GAME_IDS } from '../lib/minigames'
 import { AdminHead } from './AdminReform'
 
 const inp: CSSProperties = {
@@ -28,14 +30,6 @@ const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
 const TERM_FIELDS = ['AI', '로봇', '피지컬AI']
 
-// 용어 문항을 쓰는 곳 — 미니게임 3종 + DAILY QUIZ.
-//   ⚠️ 퍼즐형(닿아라·지어라·프로그램해라)·판단형(막아라·시켜라)은 용어 문제가 아니라 레벨 설계라 여기 없다.
-//   ⚠️ 게임 목록은 registry(TERM_GAME_IDS)에서 가져온다 — 두 곳에 적으면 한쪽만 늘어난다.
-const GAME_LABEL: Record<string, string> = {
-  'beat-cari': '버텨라 CARI', 'shoot-cari': '쏴라 CARI', 'pick-cari': '골라라 CARI', daily: 'DAILY QUIZ',
-}
-const TERM_TARGETS: string[] = [...TERM_GAME_IDS, 'daily']
-const targetLabel = (g: string) => GAME_LABEL[g] ?? g
 
 export interface TermRow {
   id: string
@@ -46,14 +40,11 @@ export interface TermRow {
   desc_i18n: Record<string, string>
   answer_i18n: Record<string, string>
   distractors_i18n: Record<string, string[]>
-  /** 이 문항을 담고 있는 게임들. 비어 있으면 어느 게임에도 안 담긴 상태. */
-  games: string[]
   /** 번역이 덜 찬 언어(서버가 계산). ⚠️ 화면에서 다시 세지 말 것 — 목록 배지와 완료율이 서로 다른 말을 한다. */
   missing: string[]
 }
 interface TermListResp {
   terms: TermRow[]
-  counts: Record<string, number>
   coverage: Record<string, number>
   total: number
 }
@@ -73,20 +64,23 @@ const koOf = (r: TermRow) => r.answer_i18n?.ko ?? ''
 // ══════════════════════════════════════════════════════════════
 type Sub = 'list' | 'events' | 'upload'
 
-export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
+// ⚠️ 메뉴 두 곳(미니게임 › 게임 문항, DAILY QUIZ › 문항 관리)이 **같은 화면**을 연다 — 은행이 하나라서다.
+//    그래서 제목도 같은 이름으로 둔다: 어디로 들어와도 "아, 아까 그 은행" 으로 읽혀야 한다.
+//    (scope 는 어느 메뉴로 들어왔는지일 뿐, 보이는 내용은 같다.)
+export function TermPoolAdmin({ scope: _scope }: { scope: 'minigame' | 'daily' }) {
   const [sub, setSub] = useState<Sub>('list')
   // 방금 올린 문항 — '문항 추가 & 번역' 이 넘겨주고 '문항 목록' 이 받아 그것만 걸러 보여준다.
   const [justAdded, setJustAdded] = useState<{ codes: string[]; at: number } | null>(null)
   const SUBS: [Sub, string][] = [['list', '문항 목록'], ['events', '문항 이력'], ['upload', '문항 추가 & 번역']]
   return (
     <>
-      <AdminHead title={scope === 'daily' ? 'DAILY QUIZ · 문항 관리' : '게임 문항'} />
+      <AdminHead title="용어 문제은행" />
       <div className="admin-tabs" style={{ marginBottom: 16 }}>
         {SUBS.map(([k, label]) => (
           <button key={k} className={sub === k ? 'on' : ''} onClick={() => setSub(k)}>{label}</button>
         ))}
       </div>
-      {sub === 'list' && <ListTab scope={scope} justAdded={justAdded} clearJustAdded={() => setJustAdded(null)} />}
+      {sub === 'list' && <ListTab justAdded={justAdded} clearJustAdded={() => setJustAdded(null)} />}
       {sub === 'events' && <EventsTab />}
       {sub === 'upload' && (
         <UploadTab onApplied={(codes) => { setJustAdded({ codes, at: Date.now() }); setSub('list') }} />
@@ -100,8 +94,7 @@ export function TermPoolAdmin({ scope }: { scope: 'minigame' | 'daily' }) {
 // ══════════════════════════════════════════════════════════════
 const PAGE = 50
 
-function ListTab({ scope, justAdded, clearJustAdded }: {
-  scope: 'minigame' | 'daily'
+function ListTab({ justAdded, clearJustAdded }: {
   justAdded: { codes: string[]; at: number } | null
   clearJustAdded: () => void
 }) {
@@ -116,8 +109,6 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
-  // 어느 게임의 세트를 편집 중인가. 기본은 이 메뉴가 속한 곳.
-  const [target, setTarget] = useState(scope === 'daily' ? 'daily' : 'beat-cari')
 
   async function load() {
     setLoading(true)
@@ -140,25 +131,9 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
   const pageSafe = Math.min(page, pageMax - 1)
   const shown = filtered.slice(pageSafe * PAGE, pageSafe * PAGE + PAGE)
 
-  const inSet = (t: TermRow) => (t.games ?? []).includes(target)
-  const setCount = data?.counts?.[target] ?? 0
   // ⚠️ 완료율 분모는 **활성 문항**이다(CARIS 와 같은 규칙) — 비활성은 게임에 안 나가니 번역할 이유가 없다.
   const total = data?.total ?? 0
 
-  async function toggleGame(t: TermRow) {
-    const next = inSet(t) ? (t.games ?? []).filter((g) => g !== target) : [...(t.games ?? []), target]
-    try {
-      await callFunction('admin', { action: 'termSetGames', questionId: t.id, games: next })
-      await load()
-    } catch (e) { alert(e instanceof Error ? e.message : '저장 실패') }
-  }
-  async function bulkGames(pick: boolean) {
-    const ids = pick ? filtered.map((t) => t.id) : []
-    if (!pick && !confirm(`${targetLabel(target)} 의 문항을 모두 뺄까요?\n(비우면 은행 전체를 쓰게 됩니다)`)) return
-    setBusy(true)
-    try { await callFunction('admin', { action: 'termSetBulk', gameId: target, questionIds: ids }); await load() }
-    catch (e) { alert(e instanceof Error ? e.message : '저장 실패') } finally { setBusy(false) }
-  }
   async function act(t: TermRow, kind: 'deactivate' | 'delete') {
     const word = kind === 'delete' ? '삭제' : '중지'
     if (!confirm(`${t.code ?? '이 문항'} 을(를) ${word}할까요?\n목록에서 빠지고 '문항 이력' 탭으로 이동합니다. (거기서 되돌리기 가능)`)) return
@@ -250,19 +225,6 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
         </div>
       </div>
 
-      <p className="admin-hint" style={{ margin: '0 0 12px', lineHeight: 1.7 }}>
-        <b>은행에 문항을 쌓아두고, 게임마다 담을 문항을 고릅니다</b>(레벨테스트·CARIS 문제은행과 같은 방식).
-        <br />⚠️ 담긴 문항이 <b>0개면 그 게임은 은행 전체</b>를 씁니다(“아직 안 골랐다”는 뜻이지 “문제 없음”이 아닙니다).
-      </p>
-
-      {/* 어느 게임의 세트를 편집할지 — 담긴 개수를 같이 보여준다. */}
-      <div className="admin-tabs admin-tabs-sub" style={{ marginBottom: 14 }}>
-        {TERM_TARGETS.map((g) => (
-          <button key={g} className={target === g ? 'on' : ''} onClick={() => setTarget(g)}>
-            {targetLabel(g)} <span style={{ opacity: 0.6 }}>{data?.counts?.[g] ?? 0}</span>
-          </button>
-        ))}
-      </div>
 
       <div className="admin-section">
         <div className="admin-toolbar">
@@ -275,12 +237,8 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
           <button className="admin-mini" disabled={busy} onClick={translateMissing}>
             🌐 {sel.size ? `선택 ${sel.size}개 번역` : '미번역 번역'}
           </button>
-          <button className="admin-mini" disabled={busy || !filtered.length} onClick={() => bulkGames(true)}>보이는 것 모두 담기</button>
-          <button className="admin-mini" disabled={busy || !setCount} onClick={() => bulkGames(false)}>모두 빼기</button>
           <button className="admin-mini" onClick={load} disabled={loading}>새로고침</button>
-          <span className="admin-hint">
-            은행 {all.length}문항 · <b>{targetLabel(target)}</b> 에 담긴 것 {setCount}개{setCount === 0 && ' (= 은행 전체 사용)'}
-          </span>
+          <span className="admin-hint">{filtered.length}문항{loading ? ' · 불러오는 중…' : ''}</span>
         </div>
         {msg && <div className="admin-toolbar"><span className="admin-msg">{msg}</span></div>}
 
@@ -300,23 +258,16 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
                     title="전체 선택"
                   />
                 </th>
-                <th style={{ width: 84 }}>담기</th>
-                <th>번호</th><th>분야</th><th>정답 용어</th><th>설명</th><th>미번역</th><th>쓰는 곳</th><th></th>
+                <th>번호</th><th>분야</th><th>정답 용어</th><th>설명</th><th>미번역</th><th></th>
               </tr>
             </thead>
             <tbody>
               {shown.map((t) => (
-                <tr key={t.id} className={t.missing.length ? 'prob' : ''} style={inSet(t) ? undefined : { opacity: 0.55 }}>
+                <tr key={t.id} className={t.missing.length ? 'prob' : ''}>
                   <td>
                     <input type="checkbox" checked={sel.has(t.id)} onChange={() => {
                       const n = new Set(sel); n.has(t.id) ? n.delete(t.id) : n.add(t.id); setSel(n)
                     }} />
-                  </td>
-                  <td>
-                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={inSet(t)} onChange={() => toggleGame(t)} />
-                      {inSet(t) ? '담김' : ''}
-                    </label>
                   </td>
                   <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#3f8fd6' }}>{t.code ?? '-'}</td>
                   <td><span className="badge">{t.field}</span></td>
@@ -326,11 +277,6 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
                     {t.desc_i18n?.ko}
                   </td>
                   <td className="admin-status">{t.missing.length ? t.missing.map((l) => LANG_LABEL[l] ?? l).join(', ') : '완료'}</td>
-                  <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>
-                    {(t.games ?? []).length
-                      ? (t.games ?? []).map(targetLabel).join(' · ')
-                      : <span style={{ color: 'var(--dim)' }}>어디에도 안 담김</span>}
-                  </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="admin-mini" onClick={() => setEdit(t)}>수정</button>{' '}
                     <button className="admin-mini" onClick={() => act(t, 'deactivate')}>중지</button>{' '}
@@ -353,7 +299,10 @@ function ListTab({ scope, justAdded, clearJustAdded }: {
             <button className="admin-mini" disabled={pageSafe + 1 >= pageMax} onClick={() => setPage(pageSafe + 1)}>다음 ›</button>
           </div>
         )}
-        <p className="admin-hint" style={{ marginTop: 8 }}>중지·삭제한 문항은 <b>문항 이력</b> 탭에서 확인·되돌리기 할 수 있어요.</p>
+        <p className="admin-hint" style={{ marginTop: 8 }}>
+          여기 <b>사용 중인 문항이 곧 게임에 나가는 문항</b>입니다 — 버텨라·쏴라·골라라·DAILY QUIZ 가 같이 씁니다.
+          한 문항을 빼려면 <b>중지</b>를 누르세요. 중지·삭제한 문항은 <b>문항 이력</b> 탭에서 되돌릴 수 있습니다.
+        </p>
       </div>
 
       {edit && (

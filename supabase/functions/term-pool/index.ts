@@ -34,22 +34,17 @@ Deno.serve(async (req) => {
     const lang = pickLang(body?.lang)
     const admin = adminClient()
 
-    // ⚠️ 세트가 **비어 있으면 그 게임은 은행 전체를 쓴다**(minigame_question_sets 마이그레이션의 규칙).
-    //    빈 세트는 "아직 안 골랐다"는 뜻이지 "문항 없음"이 아니다 — 여기서 빈 배열을 돌려주면
-    //    관리자가 세트를 건드리는 순간 게임이 통째로 빈다.
-    const { data: setRows } = await admin
-      .from('minigame_question_sets').select('question_id').eq('game_id', gameId)
-    const ids = ((setRows ?? []) as { question_id: string }[]).map((r) => r.question_id)
-
-    let q = admin
+    // ⛔ **게임별 세트는 안 본다(2026-09-03).** 네 곳이 같은 용어 문제를 보여주는 방식만 다르고,
+    //    문항을 갈라 쓸 이유가 없어서 선택 기능을 걷어냈다 — 은행에 살아 있는 문항이 곧 나가는 문항이다.
+    //    문항 하나를 빼려면 관리자 화면에서 '사용'을 끈다(그러면 네 곳에서 같이 빠진다).
+    //    ⚠️ gameId 는 계속 받는다 — 나중에 갈라야 할 일이 생겼을 때 호출부를 안 고치려고 남겨 둔 자리다.
+    const { data, error } = await admin
       .from('term_questions')
       .select('id, code, field, desc_i18n, answer_i18n, distractors_i18n')
       .is('deleted_at', null)
       .eq('active', true)
       .order('sort_order')
       .limit(2000)
-    if (ids.length) q = q.in('id', ids)
-    const { data, error } = await q
     if (error) return json({ error: error.message }, 500)
 
     // 투영: 그 언어 번역이 있으면 번역본, 없으면 한국어(projText 가 ko 로 떨어진다).
