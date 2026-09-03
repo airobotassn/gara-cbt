@@ -22,7 +22,8 @@ const inp: CSSProperties = {
 const fld: CSSProperties = { display: 'grid', gap: 6, fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--muted)' }
 
 export function AdminHead({ title, count, children, onReload, loading }: {
-  title: string; count?: string; children?: ReactNode; onReload?: () => void; loading?: boolean
+  // 제목 옆에 부제를 달 수 있게 노드로 받는다(문자열도 그대로 들어간다).
+  title: ReactNode; count?: string; children?: ReactNode; onReload?: () => void; loading?: boolean
 }) {
   return (
     <div className="admin-head">

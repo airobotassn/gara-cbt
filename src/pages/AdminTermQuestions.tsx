@@ -31,13 +31,13 @@ const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
 const TERM_FIELDS = ['AI', '로봇', '피지컬AI']
 
-// 이 은행을 쓰는 곳 — 제목 옆에 적는다(어디로 나가는 문항인지 화면에서 바로 읽히게).
-//   ⚠️ 게임 목록의 단일 출처는 `lib/minigames.ts` 의 TERM_GAME_IDS 다 — 여기 이름만 붙인다.
+// 이 은행을 쓰는 게임 — 제목 옆에 적는다(어디로 나가는 문항인지 화면에서 바로 읽히게).
+//   ⚠️ 게임 목록의 단일 출처는 `lib/minigames.ts` 의 TERM_GAME_IDS 다 — 여기선 이름만 붙인다.
 //   ⚠️ 퍼즐형(닿아라·지어라·프로그램해라)·판단형(막아라·시켜라)은 용어 문제를 안 써서 여기 없다.
 const GAME_LABEL: Record<string, string> = {
   'beat-cari': '버텨라 CARI', 'shoot-cari': '쏴라 CARI', 'pick-cari': '골라라 CARI',
 }
-const USED_BY = [...TERM_GAME_IDS.map((g) => GAME_LABEL[g] ?? g), 'DAILY QUIZ'].join(' · ')
+const USED_BY = TERM_GAME_IDS.map((g) => GAME_LABEL[g] ?? g).join(' · ')
 
 
 export interface TermRow {
@@ -83,7 +83,9 @@ export function TermPoolAdmin({ scope: _scope }: { scope: 'minigame' | 'daily' }
   const SUBS: [Sub, string][] = [['list', '문항 목록'], ['events', '문항 이력'], ['upload', '문항 추가 & 번역']]
   return (
     <>
-      <AdminHead title="용어 문제은행" count={USED_BY} />
+      <AdminHead
+        title={<>용어 문제은행 <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--muted)' }}>{USED_BY}</span></>}
+      />
       <div className="admin-tabs" style={{ marginBottom: 16 }}>
         {SUBS.map(([k, label]) => (
           <button key={k} className={sub === k ? 'on' : ''} onClick={() => setSub(k)}>{label}</button>
