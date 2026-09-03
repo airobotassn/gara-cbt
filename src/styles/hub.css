@@ -1783,10 +1783,29 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 34px)) scale(1) }
 }
 
-/* 움직임을 줄여달라는 설정에서는 1막을 아예 안 그린다(컴포넌트가 결과부터 시작한다).
-   여기 규칙은 혹시 그 판정이 빗나갔을 때의 안전망이다. */
+/* ── 1막 · 조용한 판 (움직임 줄이기, 2026-09-02) ────────────────────────────
+   ⛔ **1막을 지우지 말 것.** 예전엔 이 설정에서 1막을 통째로 건너뛰고 결과 카드부터 띄웠는데,
+      그러면 '캐릭터가 자랐다'는 이 연출의 알맹이가 사라진다. `prefers-reduced-motion` 은
+      "화면을 크게 휘젓지 마라"이지 "축하하지 마라"가 아니다 — 삭제가 아니라 약화가 답이다.
+   남기는 것: 옛 모습 → 새 모습 **크로스페이드**, 레벨 숫자 페이드인.
+   빼는 것: 실루엣·맥동·확대축소·회전 광원·빛줄기·전체화면 섬광·폭죽(컴포넌트가 DOM 에도 안 넣는다).
+   ⚠️ 타임라인 끝(1.3초)은 `LevelUpModal.tsx` 의 EVOLVE_SOFT_MS 와 **한 쌍**이다.
+   ⚠️ 이 판에는 `transform` 이 한 줄도 없어야 한다 — 투명도만 바뀌면 화면 위에서 움직이는 것이 0이다.
+   ────────────────────────────────────────────────────────────────────────── */
+.hub .lvup.is-soft .evo-char.is-old { animation: evo-soft-out .55s ease-out .25s both; }
+.hub .lvup.is-soft .evo-char.is-old .evo-color { animation: none; }
+.hub .lvup.is-soft .evo-char.is-new { opacity: 0; animation: evo-fade-in .55s ease-out .45s both; }
+.hub .lvup.is-soft .evo-char.is-new .evo-color { animation: none; }
+.hub .lvup.is-soft .evo-lv { animation: evo-fade-in .4s ease-out .85s both; }
+@keyframes evo-soft-out { from { opacity: 1 } to { opacity: 0 } }
+
+/* 안전망 — JS 판정이 빗나가(matchMedia 없음 등) `is-soft` 가 안 붙은 채로 이 설정인 사람에게
+   화려한 판이 돌지 않게 한다. ⚠️ `.is-soft` 규칙보다 **약하게** 둘 것(:not 으로 갈라 둔 이유다) —
+   여기서 통으로 `animation: none` 을 걸면 위 크로스페이드까지 같이 죽는다. */
 @media (prefers-reduced-motion: reduce) {
-  .hub .evo-glow, .hub .evo-rays, .hub .evo-flash, .hub .evo-spark,
-  .hub .evo-char, .hub .evo-char .evo-img, .hub .evo-lv { animation: none; opacity: 1; }
-  .hub .evo-char.is-old, .hub .evo-sil { display: none; }
+  .hub .lvup:not(.is-soft) .evo-glow, .hub .lvup:not(.is-soft) .evo-rays,
+  .hub .lvup:not(.is-soft) .evo-flash, .hub .lvup:not(.is-soft) .evo-spark,
+  .hub .lvup:not(.is-soft) .evo-char, .hub .lvup:not(.is-soft) .evo-char .evo-img,
+  .hub .lvup:not(.is-soft) .evo-lv { animation: none; opacity: 1; }
+  .hub .lvup:not(.is-soft) .evo-char.is-old, .hub .lvup:not(.is-soft) .evo-sil { display: none; }
 }

@@ -28,6 +28,14 @@ import { useT } from '../lib/i18n'
  *     길면 다 끝난 화면을 멀뚱히 보게 된다. */
 const EVOLVE_MS = 2700
 
+/** 조용한 판(움직임 줄이기)의 1막 길이. `hub.css` 의 `.is-soft` 타임라인 끝과 한 쌍이다.
+ *  ⛔ **0 으로 만들어 1막을 건너뛰지 말 것(2026-09-02 지시).** 예전엔 그랬는데, 그러면
+ *     '캐릭터가 자랐다'는 이 연출의 알맹이가 통째로 사라지고 결과 카드만 남는다 —
+ *     `prefers-reduced-motion` 은 "휘젓지 마라"이지 "축하하지 마라"가 아니다.
+ *     지금은 실루엣·맥동·섬광·빛줄기·폭죽을 빼고 **옛 모습 → 새 모습 크로스페이드**만 남긴다
+ *     (제자리에서 투명도만 바뀐다 — 화면을 가로지르는 움직임이 0이다). */
+const EVOLVE_SOFT_MS = 1300
+
 /** 폭죽 조각 수. 늘리면 화려해지지만 저사양 기기에서 프레임이 떨어진다. */
 const SPARKS = 22
 
@@ -53,12 +61,13 @@ export default function LevelUpModal({
   const last = index >= count - 1
   const okRef = useRef<HTMLButtonElement | null>(null)
 
-  // ⚠️ 움직임을 줄여달라는 설정이면 1막을 통째로 건너뛴다. 이 판정은 **초기화**에서 해야 한다 —
-  //    이펙트 안에서 setState 를 동기로 부르면 진화 화면이 한 프레임 번쩍였다 사라진다.
-  const [phase, setPhase] = useState<'evolve' | 'result'>(() => {
-    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-    return reduce ? 'result' : 'evolve'
-  })
+  // ⚠️ 움직임을 줄여달라는 설정이면 1막을 **조용한 판**으로 그린다(건너뛰지 않는다 — 위 EVOLVE_SOFT_MS 참고).
+  //    판정은 **초기화**에서 해야 한다 — 이펙트 안에서 setState 를 동기로 부르면 화려한 판이
+  //    한 프레임 번쩍였다 조용한 판으로 갈린다.
+  const [soft] = useState(
+    () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+  const [phase, setPhase] = useState<'evolve' | 'result'>('evolve')
 
   // 폭죽 조각 — 각도·거리·크기·색을 미리 뽑아 CSS 변수로 넘긴다.
   //   ⚠️ CSS 의 cos()/sin() 을 쓰지 않는다(브라우저 지원이 갈린다) — 좌표를 여기서 계산해 넘긴다.
@@ -84,9 +93,9 @@ export default function LevelUpModal({
 
   useEffect(() => {
     if (phase !== 'evolve') return
-    const id = setTimeout(() => setPhase('result'), EVOLVE_MS)
+    const id = setTimeout(() => setPhase('result'), soft ? EVOLVE_SOFT_MS : EVOLVE_MS)
     return () => clearTimeout(id)
-  }, [phase])
+  }, [phase, soft])
 
   // ⚠️ 배경을 눌러도 안 닫는다 — 실수로 축하를 날리면 되돌릴 방법이 없다(워터마크가 올라가 다시 안 뜬다).
   //    1막에서는 아무 데나 누르면 **건너뛰기**(닫기가 아니다). 2막에서만 Esc 가 확인이 된다.
@@ -106,50 +115,56 @@ export default function LevelUpModal({
   if (phase === 'evolve') {
     return (
       <div
-        className="lvup is-evolve"
+        className={`lvup is-evolve${soft ? ' is-soft' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={t('hub.lvup.title')}
         onClick={() => setPhase('result')}
       >
         <div className="evo">
-          <div className="evo-glow" aria-hidden="true" />
-          <div className="evo-rays" aria-hidden="true" />
+          {/* ⚠️ 조용한 판에서는 **DOM 에 넣지도 않는다.** CSS 로 숨기기만 하면 폭죽 22개가 계속
+              만들어지고, 무엇보다 "안 보이는데 살아있는 요소" 가 남아 나중에 규칙 하나 어긋나면
+              조용해야 할 화면에서 섬광이 터진다. */}
+          {!soft && <div className="evo-glow" aria-hidden="true" />}
+          {!soft && <div className="evo-rays" aria-hidden="true" />}
 
           {/* 옛 모습 — 색이 빠져 흰 실루엣이 되고 맥동한다. 실루엣은 같은 그림을 한 장 더 얹어
-              filter 로 하얗게 태운 것이다(색 → 흰색을 filter 전환으로 하면 중간이 지저분하다). */}
+              filter 로 하얗게 태운 것이다(색 → 흰색을 filter 전환으로 하면 중간이 지저분하다).
+              조용한 판은 실루엣을 안 쓴다 — 색 그대로 옅어지며 새 모습에 자리를 내준다. */}
           <div className="evo-char is-old" aria-hidden="true">
             <CharArt charKey={charKey} level={from} className="evo-img evo-color" />
-            <CharArt charKey={charKey} level={from} className="evo-img evo-sil" />
+            {!soft && <CharArt charKey={charKey} level={from} className="evo-img evo-sil" />}
           </div>
 
           {/* 새 모습 — 섬광 뒤에 실루엣으로 나타났다가 색을 되찾는다. */}
           <div className="evo-char is-new">
             <CharArt charKey={charKey} level={to} className="evo-img evo-color" alt={`Lv.${to}`} />
-            <CharArt charKey={charKey} level={to} className="evo-img evo-sil" />
+            {!soft && <CharArt charKey={charKey} level={to} className="evo-img evo-sil" />}
           </div>
 
-          <div className="evo-flash" aria-hidden="true" />
+          {!soft && <div className="evo-flash" aria-hidden="true" />}
 
           <div className="evo-lv">
             <span className="evo-lv-txt">Lv.{to}</span>
           </div>
 
-          <div className="evo-fx" aria-hidden="true">
-            {sparks.map((s, i) => (
-              <span
-                key={i}
-                className="evo-spark"
-                style={{
-                  ['--sx' as string]: `${s.x}px`,
-                  ['--sy' as string]: `${s.y}px`,
-                  ['--ss' as string]: `${s.size}px`,
-                  ['--sd' as string]: `${s.delay}ms`,
-                  ['--sh' as string]: `${s.hue}`,
-                }}
-              />
-            ))}
-          </div>
+          {!soft && (
+            <div className="evo-fx" aria-hidden="true">
+              {sparks.map((s, i) => (
+                <span
+                  key={i}
+                  className="evo-spark"
+                  style={{
+                    ['--sx' as string]: `${s.x}px`,
+                    ['--sy' as string]: `${s.y}px`,
+                    ['--ss' as string]: `${s.size}px`,
+                    ['--sd' as string]: `${s.delay}ms`,
+                    ['--sh' as string]: `${s.hue}`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     )
