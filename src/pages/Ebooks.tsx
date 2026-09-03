@@ -55,11 +55,9 @@ const CATALOG_LABEL: Record<Catalog, string> = {
  *  교재 묶음·강의 묶음이 **각자 따로** 결제된다(한 묶음에 한 종류 — 서버 resolveBundle 과 한 벌). */
 const BUNDLE_KEY = '__bundle__'
 const BUNDLE_COLOR = '#f6c453' // 금색 — 레벨 색 사다리(표지색) 밖이라는 뜻. 전체를 묶는 자리라 따로 논다.
-/** 한 종류를 통으로 담았을 때의 할인율(%). 화면 문구(ll.bundle_hint/ll.bundle_on)의 {n} 도 이 값을 받는다
- *  — 숫자를 문구에 박지 말 것. ⚠️ 판정은 **종류 안에서** 한다(교재 7권 / 강의 7편). 섞어서 7개는 할인이 아니다.
- *  ⛔ **서버(_shared/payments.ts 의 BUNDLE_OFF_PCT)와 같은 값이어야 한다.** 어긋나면 화면에 뜬 값과 실제
- *     청구액이 갈린다 — 실제로 깎아주는 건 서버 쪽 값이고, 이 값은 화면에 쓰는 숫자일 뿐이다. */
-const BUNDLE_OFF_PCT = 10
+// ⛔ **묶음 할인은 없앴다(2026-09-03 지시).** 여기 있던 BUNDLE_OFF_PCT(10%)는 서버
+//    `_shared/payments.ts` 의 같은 이름 상수와 한 쌍이었다 — 되살릴 거면 양쪽을 같이 올릴 것.
+//    묶음(여러 권을 한 번에 결제)은 그대로 남아 있고, 값만 정가 합으로 간다.
 
 /** 전체구매 격자의 한 칸 — 교재와 강의를 **같은 모양**으로 다룬다(둘을 한 목록에서 고르므로).
  *  key 는 접두사로 가른다 — 교재 id 와 강의 id 가 한 Set 에 섞인다(둘 다 uuid 라 접두사 없이는 못 가른다). */
@@ -133,10 +131,6 @@ export default function Ebooks() {
   // 왼쪽 열 목록. 교재가 없는 레벨·급수도 남긴다 — 사다리가 중간에 비면 몇 칸짜리인지부터 헷갈린다.
   //   '무관' 칸만은 해당 교재가 있을 때만 세운다(항상 있으면 빈 칸이 하나 더 있는 것으로 읽힌다).
   const groups = useMemo<LibGroup[]>(() => {
-    // 할인은 목록에서도 보인다 — 들어가 봐야 아는 혜택이면 아무도 안 누른다.
-    const bundleBadge = (
-      <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 font-label-md text-[14px] font-bold text-secondary">-{BUNDLE_OFF_PCT}%</span>
-    )
     if (cat === 'leveltest') {
       // ⚠️ 전체구매는 **맨 앞**이다(레벨 1 위 — 2026-08-19 지시). CARIS 탭에는 아직 안 세운다:
       //    급수별 강의가 하나도 없어서 '교재만 있는 전체구매' 가 된다. 열려면 여기서 같이 push 하면 된다.
@@ -146,7 +140,6 @@ export default function Ebooks() {
         short: t('ll.bundle'),
         desc: t('ll.bundle_desc'),
         color: BUNDLE_COLOR,
-        badge: bundleBadge,
         // 전체구매는 레벨 사다리의 한 칸이 아니다 — 선을 그어 사다리와 떼어 놓는다.
         divider: true,
       }]
@@ -220,27 +213,17 @@ export default function Ebooks() {
     return [...books, ...lecs]
   }, [catRows, catLectures])
 
-  // 집계는 **교재·강의 따로**다(2026-08-19 지시). 할인도 각자 붙는다 — 교재 7권을 통으로 담으면 교재값에서
-  //   10%, 강의 7편을 통으로 담으면 강의값에서 10%. 한쪽만 채워도 그쪽은 할인이 붙고, 섞어서 7개를 담는 건
-  //   어느 쪽도 아니다. ⚠️ 두 종류를 한 주머니로 합치지 말 것 — 합치면 교재만 사려는 사람이 강의까지 담아야
-  //   할인을 받게 되어 "7개를 통으로" 라는 조건 자체가 다른 말이 된다.
+  // 집계는 **교재·강의 따로**다(2026-08-19 지시). ⚠️ 두 종류를 한 주머니로 합치지 말 것 — 묶음 하나에
+  //   한 종류만 담기는 것이 서버(resolveBundle)와의 약속이다.
   const bundleKinds = useMemo(() => {
-    // 이미 산 교재는 담을 게 없으니 분모에서 빠진다 — 안 빼면 '전체 선택' 을 눌러도 영영 전체가 안 돼 할인이 못 붙는다.
     const of = (kind: BundleItem['kind']) => {
       const items = bundleItems.filter((i) => i.kind === kind)
       const sellable = items.filter((i) => !i.owned)
       const chosen = sellable.filter((i) => picked.has(i.key))
-      // ⚠️ 세트의 크기는 **그 종류 전체 개수**(레벨 1~7 = 7)다. '살 수 있는 것' 개수로 쓰면 안 된다 —
-      //    다 가진 사람 화면에서 분모가 0 이 되어 "0개 전부 담으면 10% 할인" 이 뜬다(실제로 나왔다).
-      // ⛔ 할인은 **7개를 통으로 담았을 때만**(2026-08-19 지시). 이미 가진 책은 담을 수 없으므로 한 권이라도
-      //    보유한 사람은 이 할인을 못 받는다 — 보유분을 세트의 일부로 쳐주려면 **서버 판정(resolveBundle)과
-      //    한 벌로** 바꿔야 한다. 한쪽만 고치면 화면 금액과 청구액이 갈린다.
-      // ⚠️ 한 권짜리 카탈로그에서 할인을 걸지 않는다 — 그건 묶음이 아니라 단품이고, 서버도 2권부터 받는다.
       const done = chosen.length
-      const all = items.length >= 2 && chosen.length === items.length
-      const raw = chosen.reduce((sum, i) => sum + i.price, 0)
       // ⚠️ 표시 전용 계산이다. 실제 청구액은 언제나 서버가 상품ID로 다시 뽑는다(금액을 요청으로 받지 않는다).
-      return { items, sellable, chosen, done, all, raw, total: all ? Math.round((raw * (100 - BUNDLE_OFF_PCT)) / 100) : raw }
+      const total = chosen.reduce((sum, i) => sum + i.price, 0)
+      return { items, sellable, chosen, done, total }
     }
     return { book: of('book'), lecture: of('lecture') }
   }, [bundleItems, picked])
@@ -435,21 +418,14 @@ export default function Ebooks() {
           <div className="min-w-0">
             <p className="font-title-md text-[18px] font-bold text-on-surface">
               {t('ll.pick_of', { a: String(st.done), b: String(st.items.length) })}
-              {st.raw > 0 && (
+              {st.total > 0 && (
                 <>
                   <span className="mx-2 text-outline">·</span>
                   {usdc(st.total, lang)}
-                  {/* 깎이기 전 값을 취소선으로 같이 보여준다 — 얼마가 빠졌는지 그 줄에서 바로 읽힌다. */}
-                  {st.all && st.raw > st.total && (
-                    <span className="ml-1.5 font-body-md text-[15px] font-normal text-outline line-through">{usdc(st.raw, lang)}</span>
-                  )}
                 </>
               )}
             </p>
-            {/* ⚠️ 할인 문구는 **고르기 전에도 항상** 떠 있어야 한다(2026-08-19 요청). 다 담으면 '적용' 으로 바뀐다. */}
-            <p className={`mt-0.5 font-body-md text-[15px] break-keep ${st.all ? 'font-bold text-secondary' : 'text-on-surface-variant'}`}>
-              {t(st.all ? 'll.bundle_on' : 'll.bundle_hint', { c: String(st.items.length), n: String(BUNDLE_OFF_PCT) })}
-            </p>
+            {/* 할인 문구가 있던 자리. 할인을 없애면서 같이 걷어냈다(2026-09-03) — 안내할 혜택이 없다. */}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button

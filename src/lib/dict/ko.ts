@@ -1060,11 +1060,10 @@ const KO: Record<string, string> = {
   "ll.watch": "시청하기",
   "ll.playing": "재생 중",
   "ll.empty_owned": "구매한 자료가 없습니다.",
-  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
-  "ll.bundle": "전체구매",
+  // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 '전체' 로 줄이고
+  //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
+  "ll.bundle": "전체",
   "ll.bundle_desc": "E-Book 과 강의를 골라 한 번에 담을 수 있습니다.",
-  "ll.bundle_hint": "{c}개 전부 담으면 {n}% 할인",
-  "ll.bundle_on": "{c}개 전부 · {n}% 할인 적용",
   "ll.pick": "선택",
   "ll.picked": "선택됨",
   "ll.pick_all": "전체 선택",

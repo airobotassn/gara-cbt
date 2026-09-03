@@ -1043,11 +1043,10 @@ const VI: Record<string, string> = {
   "ll.watch": "Xem",
   "ll.playing": "Đang phát",
   "ll.empty_owned": "Chưa có tài liệu đã mua.",
-  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
-  "ll.bundle": "Mua tất cả",
+  // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
+  //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
+  "ll.bundle": "Tất cả",
   "ll.bundle_desc": "Chọn giáo trình và bài giảng rồi thêm cùng lúc.",
-  "ll.bundle_hint": "Lấy đủ {c} để giảm {n}%",
-  "ll.bundle_on": "Đủ {c} · giảm {n}%",
   "ll.pick": "Chọn",
   "ll.picked": "Đã chọn",
   "ll.pick_all": "Chọn tất cả",

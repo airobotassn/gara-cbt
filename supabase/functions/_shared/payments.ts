@@ -32,10 +32,10 @@ export const PURCHASE_TABLE: Record<BundleKind, { table: string; col: string }> 
   lecture: { table: 'lecture_purchases', col: 'lecture_id' },
 }
 
-/** 묶음 결제 할인율(%) — **한 카탈로그의 그 종류를 통으로 담았을 때만** 붙는다.
- *  ⚠️ 화면(src/pages/Ebooks.tsx 의 BUNDLE_OFF_PCT)과 **같은 값**이어야 한다. 어긋나면 화면에 뜬 금액과
- *     실제 청구액이 갈린다 — 결제에서 제일 나쁜 종류의 버그다. 값을 바꾸면 양쪽을 같이 고칠 것. */
-export const BUNDLE_OFF_PCT = 10
+// ⛔ **묶음 할인은 없앴다(2026-09-03 지시).** 여기 있던 BUNDLE_OFF_PCT(10%)와 화면 쪽 같은 이름의
+//    상수가 한 쌍이었다. 되살릴 거면 **양쪽을 같이** 올릴 것 — 한쪽만 고치면 화면에 뜬 금액과 실제
+//    청구액이 갈리고, 그건 결제에서 제일 나쁜 종류의 버그다.
+//    묶음 자체는 그대로다(여러 권을 한 번에 결제) — 값만 정가 합으로 간다.
 
 export interface PaymentRow {
   id: string
@@ -303,12 +303,14 @@ async function resolveBundle(
   }
   const priceOf = (b: Item) => b.price_usd_cents ?? 0
 
+  // 할인이 없으므로 청구액 = 정가 합이다(2026-09-03).
   const listSum = items.reduce((sum, b) => sum + priceOf(b), 0)
-  const discounted = items.length === all.length && listSum > 0
-  const total = discounted ? Math.round((listSum * (100 - BUNDLE_OFF_PCT)) / 100) : listSum
+  const total = listSum
 
   // 줄마다 얼마씩인지 배분한다(정가 비례). ⚠️ 마지막 줄에 잔액을 몰아줘야 **합이 정확히 total** 이 된다 —
   // 줄마다 반올림하면 1센트가 남거나 모자라 원장이 안 맞는다.
+  //   지금은 total = listSum 이라 줄값이 곧 정가지만, 배분 코드는 그대로 둔다 — 할인이 다시 붙는 날
+  //   이 계산이 없으면 원장 합이 1센트씩 어긋난다(그때 다시 짜는 것보다 남겨 두는 편이 안전하다).
   let acc = 0
   const lines = items.map((b, i) => {
     const list = priceOf(b)

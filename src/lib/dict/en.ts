@@ -1043,11 +1043,10 @@ const EN: Record<string, string> = {
   "ll.watch": "Watch",
   "ll.playing": "Now playing",
   "ll.empty_owned": "No purchased materials.",
-  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
-  "ll.bundle": "Buy All",
+  // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
+  //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
+  "ll.bundle": "All",
   "ll.bundle_desc": "Pick the books and lectures you want and grab them together.",
-  "ll.bundle_hint": "Add all {c} for {n}% off",
-  "ll.bundle_on": "All {c} added · {n}% off",
   "ll.pick": "Select",
   "ll.picked": "Selected",
   "ll.pick_all": "Select all",

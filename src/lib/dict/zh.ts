@@ -1043,11 +1043,10 @@ const ZH: Record<string, string> = {
   "ll.watch": "观看",
   "ll.playing": "播放中",
   "ll.empty_owned": "没有已购买的内容。",
-  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
-  "ll.bundle": "全部购买",
+  // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
+  //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
+  "ll.bundle": "全部",
   "ll.bundle_desc": "可以挑选教材和课程，一次性加入。",
-  "ll.bundle_hint": "{c} 项全部加入立减{n}%",
-  "ll.bundle_on": "{c} 项已全部加入 · 立减{n}%",
   "ll.pick": "选择",
   "ll.picked": "已选择",
   "ll.pick_all": "全选",

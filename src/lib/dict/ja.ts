@@ -1043,11 +1043,10 @@ const JA: Record<string, string> = {
   "ll.watch": "視聴する",
   "ll.playing": "再生中",
   "ll.empty_owned": "購入した教材はありません。",
-  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
-  "ll.bundle": "まとめ買い",
+  // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
+  //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
+  "ll.bundle": "すべて",
   "ll.bundle_desc": "教材と講義を選んでまとめて追加できます。",
-  "ll.bundle_hint": "{c}件すべて入れると{n}%割引",
-  "ll.bundle_on": "{c}件すべて · {n}%割引を適用",
   "ll.pick": "選択",
   "ll.picked": "選択済み",
   "ll.pick_all": "すべて選択",

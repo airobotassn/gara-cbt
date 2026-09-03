@@ -1043,11 +1043,10 @@ const HI: Record<string, string> = {
   "ll.watch": "देखें",
   "ll.playing": "चल रहा है",
   "ll.empty_owned": "कोई खरीदी गई सामग्री नहीं है।",
-  // 전체구매(2026-08-19) — 왼쪽 열 맨 위 칸. {n} = 할인율(BUNDLE_OFF_PCT).
-  "ll.bundle": "सभी खरीदें",
+  // 전체(2026-08-19) — 왼쪽 열 맨 위 칸. 2026-09-03 에 묶음 할인을 없애면서 이름을 줄이고
+  //   할인 문구 두 개(ll.bundle_hint · ll.bundle_on)를 걷어냈다.
+  "ll.bundle": "सभी",
   "ll.bundle_desc": "किताबें और लेक्चर चुनकर एक साथ जोड़ें।",
-  "ll.bundle_hint": "सभी {c} लेने पर {n}% छूट",
-  "ll.bundle_on": "सभी {c} चुने गए · {n}% छूट",
   "ll.pick": "चुनें",
   "ll.picked": "चुना गया",
   "ll.pick_all": "सब चुनें",
