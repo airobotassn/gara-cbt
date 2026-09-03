@@ -25,16 +25,25 @@ import { useT } from '../lib/i18n'
 
 /** 1막(진화)이 끝나고 2막(결과)으로 넘어가는 시각. hub.css 의 진화 타임라인 끝과 한 쌍이다.
  *  ⚠️ CSS 쪽 animation-delay 를 손대면 이 값도 같이 옮길 것 — 짧으면 폭죽이 잘리고,
- *     길면 다 끝난 화면을 멀뚱히 보게 된다. */
-const EVOLVE_MS = 2700
+ *     길면 다 끝난 화면을 멀뚱히 보게 된다.
+ *  ⚠️ 2.7초였다가 5.9초로 늘렸다(2026-09-03 · "아직도 빠르다"). 형태 교대(옛↔새 실루엣이
+ *     점점 빨라지며 번갈아 뜨는 구간)가 0.45~3.85s 를 쓰고, 그 뒤에 섬광·색 복귀·레벨 숫자·폭죽이
+ *     차례로 온다. 이 구간을 줄이면 교대가 몇 번 못 돌아 '변하는 중' 이 안 읽힌다. */
+const EVOLVE_MS = 5900
 
-/** 조용한 판(움직임 줄이기)의 1막 길이. `hub.css` 의 `.is-soft` 타임라인 끝과 한 쌍이다.
- *  ⛔ **0 으로 만들어 1막을 건너뛰지 말 것(2026-09-02 지시).** 예전엔 그랬는데, 그러면
- *     '캐릭터가 자랐다'는 이 연출의 알맹이가 통째로 사라지고 결과 카드만 남는다 —
- *     `prefers-reduced-motion` 은 "휘젓지 마라"이지 "축하하지 마라"가 아니다.
- *     지금은 실루엣·맥동·섬광·빛줄기·폭죽을 빼고 **옛 모습 → 새 모습 크로스페이드**만 남긴다
- *     (제자리에서 투명도만 바뀐다 — 화면을 가로지르는 움직임이 0이다). */
-const EVOLVE_SOFT_MS = 1300
+// 움직임 줄이기 설정에서 뭘 뺄 것인가 — 여기서 세 번 헛짚었다. 기록해 둔다(폭죽도 같은 길을 갔다).
+//   1차: 1막을 **통째로 건너뛰었다** → 레벨업했는데 결과 카드만 떴다.
+//   2차: 크로스페이드만 남겼다 → "너무 별로다". 그림 두 장이 녹아들 뿐 무슨 일인지 안 읽힌다.
+//   3차: 원래 연출을 1.5초로 **압축**했다 → "너무 빠르다". 맞다 — 같은 사건을 절반 시간에 밀어넣으면
+//        하나하나가 스쳐 지나가고, 빨라진 움직임은 오히려 더 자극적이다.
+//
+// ⛔ **결론: 속도도 줄이지 않는다.** 이 설정에서 빼는 것은 **전체화면 흰 섬광 하나**뿐이다.
+//    화면 전체가 통째로 번쩍이는 것이 이 연출에서 유일하게 부담스러운 대목이고, 나머지(광원·빛줄기·
+//    실루엣·맥동·등장 팝·레벨 숫자·폭죽)는 캐릭터 한 명 크기 안에서 일어나는 일이라 그대로 둔다.
+//    그래서 길이도 화려한 판과 **같다**.
+
+/** 1막(진화)이 끝나고 2막(결과)으로 넘어가는 시각 — 움직임 줄이기 설정에서도 같다(위 주석). */
+const EVOLVE_SOFT_MS = 5900
 
 /** 폭죽 조각 수. 늘리면 화려해지지만 저사양 기기에서 프레임이 떨어진다. */
 const SPARKS = 22
@@ -61,9 +70,9 @@ export default function LevelUpModal({
   const last = index >= count - 1
   const okRef = useRef<HTMLButtonElement | null>(null)
 
-  // ⚠️ 움직임을 줄여달라는 설정이면 1막을 **조용한 판**으로 그린다(건너뛰지 않는다 — 위 EVOLVE_SOFT_MS 참고).
-  //    판정은 **초기화**에서 해야 한다 — 이펙트 안에서 setState 를 동기로 부르면 화려한 판이
-  //    한 프레임 번쩍였다 조용한 판으로 갈린다.
+  // ⚠️ 움직임을 줄여달라는 설정에서도 1막은 그대로 돈다. 다른 건 **전체화면 흰 섬광을 안 그리는 것** 뿐이다
+  //    (위 EVOLVE_SOFT_MS 주석 참고). 판정은 **초기화**에서 해야 한다 — 이펙트 안에서 setState 를
+  //    동기로 부르면 섬광이 한 프레임 번쩍였다 사라진다.
   const [soft] = useState(
     () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
@@ -122,33 +131,31 @@ export default function LevelUpModal({
         onClick={() => setPhase('result')}
       >
         <div className="evo">
-          {/* ⚠️ 조용한 판에서는 **DOM 에 넣지도 않는다.** CSS 로 숨기기만 하면 폭죽 22개가 계속
-              만들어지고, 무엇보다 "안 보이는데 살아있는 요소" 가 남아 나중에 규칙 하나 어긋나면
-              조용해야 할 화면에서 섬광이 터진다. */}
-          {!soft && <div className="evo-glow" aria-hidden="true" />}
-          {!soft && <div className="evo-rays" aria-hidden="true" />}
+          <div className="evo-glow" aria-hidden="true" />
+          <div className="evo-rays" aria-hidden="true" />
 
           {/* 옛 모습 — 색이 빠져 흰 실루엣이 되고 맥동한다. 실루엣은 같은 그림을 한 장 더 얹어
-              filter 로 하얗게 태운 것이다(색 → 흰색을 filter 전환으로 하면 중간이 지저분하다).
-              조용한 판은 실루엣을 안 쓴다 — 색 그대로 옅어지며 새 모습에 자리를 내준다. */}
+              filter 로 하얗게 태운 것이다(색 → 흰색을 filter 전환으로 하면 중간이 지저분하다). */}
           <div className="evo-char is-old" aria-hidden="true">
             <CharArt charKey={charKey} level={from} className="evo-img evo-color" />
-            {!soft && <CharArt charKey={charKey} level={from} className="evo-img evo-sil" />}
+            <CharArt charKey={charKey} level={from} className="evo-img evo-sil" />
           </div>
 
           {/* 새 모습 — 섬광 뒤에 실루엣으로 나타났다가 색을 되찾는다. */}
           <div className="evo-char is-new">
             <CharArt charKey={charKey} level={to} className="evo-img evo-color" alt={`Lv.${to}`} />
-            {!soft && <CharArt charKey={charKey} level={to} className="evo-img evo-sil" />}
+            <CharArt charKey={charKey} level={to} className="evo-img evo-sil" />
           </div>
 
+          {/* ⛔ 움직임 줄이기 설정에서 **이것 하나만** 뺀다 — 화면 전체가 통째로 하얗게 번쩍이는 대목이라
+              이 연출에서 유일하게 부담스러운 자리다. CSS 로 숨기지 않고 DOM 에도 안 넣는다. */}
           {!soft && <div className="evo-flash" aria-hidden="true" />}
 
           <div className="evo-lv">
             <span className="evo-lv-txt">Lv.{to}</span>
           </div>
 
-          {!soft && (
+          {(
             <div className="evo-fx" aria-hidden="true">
               {sparks.map((s, i) => (
                 <span

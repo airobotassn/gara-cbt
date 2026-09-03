@@ -1689,7 +1689,7 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   background: radial-gradient(circle,
     rgba(255, 235, 175, 0) 26%, rgba(255, 216, 120, .5) 44%,
     rgba(255, 180, 60, .28) 58%, rgba(255, 170, 50, 0) 74%);
-  animation: evo-glow 1.4s ease-in both; }
+  animation: evo-glow 4.1s ease-in both; }
 @keyframes evo-glow {
   0%   { opacity: 0;   transform: translate(-50%, -50%) scale(.35) }
   55%  { opacity: .75; transform: translate(-50%, -50%) scale(1.05) }
@@ -1704,7 +1704,7 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   /* ⚠️ 너무 진하면 빛줄기가 주인공이 되어 새로 나타난 캐릭터가 안 읽힌다. 뒤에 깔리는 정도로. */
   background: repeating-conic-gradient(from 0deg, rgba(255, 238, 180, .4) 0 5deg, transparent 5deg 26deg);
   mask-image: radial-gradient(circle, transparent 12%, #000 30%, #000 46%, transparent 70%);
-  animation: evo-rays 1.5s linear both; }
+  animation: evo-rays 4.3s linear both; }
 @keyframes evo-rays {
   0%   { opacity: 0;   transform: translate(-50%, -50%) rotate(0deg) }
   40%  { opacity: .42; }
@@ -1724,31 +1724,76 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
       실루엣은 '누구인지 알아볼 수 있는 검은 그림자'가 핵심이라 테두리를 살려야 한다. */
 .hub .evo-sil { filter: brightness(0) invert(1) drop-shadow(0 0 9px rgba(255, 244, 205, .85)); }
 
-/* 옛 모습: 색이 빠지며 실루엣이 되고, 세 번 맥동한 뒤 섬광에 삼켜진다. */
-.hub .evo-char.is-old { animation: evo-pulse 1.25s ease-in-out .25s 3, evo-gone .01s linear 1.3s both; }
-.hub .evo-char.is-old .evo-color { animation: evo-fade-out .25s ease-out both; }
-.hub .evo-char.is-old .evo-sil   { animation: evo-fade-in  .25s ease-out both; }
-@keyframes evo-pulse {
-  0%, 100% { transform: scale(1) }
-  50%      { transform: scale(1.11) }
+/* ── 형태 교대(포켓몬 진화의 알맹이) ────────────────────────────────────────
+   ⛔ **이게 이 연출의 핵심이다.** 원래는 옛 실루엣이 세 번 맥동하다 섬광에 바뀌는 것이 전부였는데,
+      그러면 "빛나다가 그림이 갈렸다" 로만 읽힌다("그냥 별로다 · 포켓몬 진화를 참고해라" — 2026-09-03).
+      포켓몬 진화에서 사람이 실제로 보는 것은 **흰 실루엣이 옛 모습 ↔ 새 모습으로 번갈아 바뀌면서
+      점점 빨라지는 것**이다. 그 가속이 '지금 무언가로 변하는 중' 을 만든다.
+   구현: 두 실루엣을 같은 자리에 겹쳐 두고 opacity 를 **계단(step-end)으로** 번갈아 켠다.
+   ⛔ **횟수를 늘리지 말 것.** 처음엔 간격을 400 → 40ms 로 좁혀 14번을 교대시켰는데,
+      끝이 그냥 **깜빡거림(스트로브)** 이 됐다("이렇게 깜빡깜빡할 필요는 없다" — 2026-09-03).
+      지금은 **세 번만** 바꾸고 한 모습이 0.55~0.75초씩 머문다 — 무엇으로 변하는지 눈이 읽을 시간이
+      있어야 '변신' 이지, 빨리 바뀐다고 변신이 되는 게 아니다. 가속은 뒤로 갈수록 아주 조금만 남겼다.
+   ⚠️ 두 keyframes 는 **서로의 정확한 반대**여야 한다 — 한 프레임이라도 어긋나면 둘 다 켜지거나
+      둘 다 꺼져 실루엣이 튄다.
+   ⛔ **사이에 짧은 크로스페이드(0.15초)를 둔다 — 딱딱 끊지 말 것.** 처음엔 `step-end` 로 잘라
+      붙였는데 "저리 급하게 할 이유가 있나 · 자연스럽지 못하다 · 페이드가 없어서 그런가"(2026-09-03).
+      맞다 — 순간 교체는 변신이 아니라 **슬라이드쇼 넘김**으로 읽힌다. 다만 페이드를 길게 주면
+      두 모습이 통째로 녹아들어 뭉개지므로, 마디마다 **0.15초만** 겹친다.
+   ⚠️ 그래서 keyframes 마다 값이 **두 번씩**(유지 끝 · 전환 끝) 찍힌다 — 이 짝을 하나라도 지우면
+      전환이 그 마디 전체로 늘어져 뭉개진다.
+   ⛔ **교대는 옛 모습(2)으로 끝나야 한다** — `2 3 2 3 2 → 섬광 → 3`(2026-09-03 지시).
+      새 모습(3)으로 끝내면 `2 3 2 3 → 섬광 → 3` 이 되어 **이미 보여준 모습이 다시 확정**되는
+      꼴이라 마지막 한 번이 헛돈다. 옛 모습에서 섬광으로 넘어가야 '바뀌었다' 가 성립한다.
+      → 아래 keyframes 의 마지막 값은 old=1 / new=0 이다. 손댈 때 이 짝을 깨지 말 것.
+   교대는 `2 · 3 · 2 · 3` 넉 마디로 끝내고 **새 모습을 붙든 채 섬광으로** 넘어간다.
+     ⚠️ 여기서 한 번 옛 모습으로 끝내 봤다(`2 3 2 3 2 → 섬광`). 마디가 짧고 딱딱 끊길 때는 그게
+        나았는데, 마디를 늘리고 크로스페이드를 넣고 나니 **마지막 2 가 군더더기**가 됐다
+        (2026-09-03 판정). 지금 길이에서는 넉 마디가 맞다 — 마디 길이를 다시 줄이게 되면
+        그때는 이 선택도 같이 다시 볼 것.
+   (교대 구간 3.4초 — 머무는 시간 0.80 · 0.70 · 0.60 · **0.85** 이고 사이마다 0.15초 겹친다.)
+   ────────────────────────────────────────────────────────────────────────── */
+.hub .evo-char.is-old .evo-color { animation: evo-fade-out .3s ease-out both; }
+.hub .evo-char.is-old .evo-sil   { animation: evo-fade-in .3s ease-out both, evo-morph-a 3.4s linear .45s both; }
+.hub .evo-char.is-new .evo-sil   { animation: evo-morph-b 3.4s linear .45s both; }
+@keyframes evo-morph-a {
+  0%,   23.5% { opacity: 1 }  27.9%, 48.5% { opacity: 0 }
+  52.9%, 70.6% { opacity: 1 } 75%,   100%  { opacity: 0 }
 }
+@keyframes evo-morph-b {
+  0%,   23.5% { opacity: 0 }  27.9%, 48.5% { opacity: 1 }
+  52.9%, 70.6% { opacity: 0 } 75%,   100%  { opacity: 1 }
+}
+
+/* 교대가 도는 동안 실루엣이 서서히 부푼다 — 변신이 '커지는 일' 로 읽히게. 섬광 직전이 제일 크다. */
+.hub .evo-char.is-old, .hub .evo-char.is-new { animation: evo-swell 4.1s ease-in both; }
+@keyframes evo-swell {
+  0%   { transform: scale(1) }
+  70%  { transform: scale(1.06) }
+  100% { transform: scale(1.13) }
+}
+/* 옛 모습은 섬광 안에서 사라진다(교대가 끝나는 3.05s). */
+.hub .evo-char.is-old { animation: evo-swell 4.1s ease-in both, evo-gone .01s linear 4.1s both; }
 @keyframes evo-gone { to { opacity: 0; visibility: hidden } }
 @keyframes evo-fade-in  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes evo-fade-out { from { opacity: 1 } to { opacity: 0 } }
 
-/* 새 모습: 섬광이 터지는 순간(1.3s) 실루엣으로 등장 → 1.4~1.75s 에 색을 되찾는다. */
-.hub .evo-char.is-new { opacity: 0; animation: evo-arrive .45s cubic-bezier(.2, 1.5, .4, 1) 1.3s both; }
-.hub .evo-char.is-new .evo-color { animation: evo-fade-in .35s ease-out 1.4s both; }
-.hub .evo-char.is-new .evo-sil   { animation: evo-fade-out .35s ease-out 1.4s both; }
-@keyframes evo-arrive {
-  0%   { opacity: 0; transform: scale(1.28) }
-  60%  { opacity: 1; transform: scale(.98) }
-  100% { opacity: 1; transform: scale(1) }
+/* 새 모습: 섬광이 걷히면(3.15s) 실루엣에서 색을 되찾으며 제 크기로 내려앉는다. */
+.hub .evo-char.is-new .evo-color { animation: evo-fade-in .4s ease-out 4.2s both; }
+.hub .evo-char.is-new {
+  animation: evo-swell 4.1s ease-in both, evo-settle .5s cubic-bezier(.2, 1.5, .4, 1) 4.1s both;
 }
+@keyframes evo-settle {
+  0%   { transform: scale(1.13) }
+  55%  { transform: scale(.97) }
+  100% { transform: scale(1) }
+}
+/* 새 실루엣은 색이 들어오는 동안 걷힌다. ⚠️ 위 evo-morph-b 를 덮어써야 하므로 뒤에 온다. */
+.hub .evo-char.is-new .evo-sil { animation: evo-morph-b 3.4s linear .45s both, evo-fade-out .4s ease-out 4.2s forwards; }
 
-/* 화면을 삼키는 흰 섬광 — 이 뒤에서 그림이 바뀐다. */
+/* 화면을 삼키는 흰 섬광 — 이 뒤에서 실루엣이 색을 되찾는다. */
 .hub .evo-flash { position: fixed; inset: 0; pointer-events: none; background: #fff; opacity: 0;
-  animation: evo-flash .34s ease-out 1.16s both; }
+  animation: evo-flash .5s ease-out 3.97s both; }
 @keyframes evo-flash {
   0%   { opacity: 0 }
   38%  { opacity: 1 }
@@ -1757,7 +1802,7 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 
 /* 레벨 숫자 — 멀리서 날아와 팍 박힌다. */
 .hub .evo-lv { position: absolute; left: 50%; top: 8%; transform: translateX(-50%);
-  pointer-events: none; animation: evo-lv .5s cubic-bezier(.15, 1.6, .4, 1) 1.55s both; }
+  pointer-events: none; animation: evo-lv .5s cubic-bezier(.15, 1.6, .4, 1) 4.55s both; }
 .hub .evo-lv-txt { display: block; font-size: clamp(38px, 11vw, 66px); font-weight: 900;
   letter-spacing: .02em; color: #fff;
   text-shadow: 0 0 18px rgba(255, 214, 110, .95), 0 0 46px rgba(255, 175, 40, .7), 0 5px 0 rgba(120, 70, 0, .55); }
@@ -1776,36 +1821,35 @@ html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
   border-radius: 999px; opacity: 0;
   background: hsl(var(--sh) 100% 64%);
   box-shadow: 0 0 12px hsl(var(--sh) 100% 66% / .95);
-  animation: evo-spark .95s cubic-bezier(.12, .75, .3, 1) calc(1.7s + var(--sd)) forwards; }
+  animation: evo-spark 1s cubic-bezier(.12, .75, .3, 1) calc(4.7s + var(--sd)) forwards; }
 @keyframes evo-spark {
   0%   { opacity: 1; transform: translate(0, 0) scale(.3) }
   55%  { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) + 34px)) scale(1) }
 }
 
-/* ── 1막 · 조용한 판 (움직임 줄이기, 2026-09-02) ────────────────────────────
-   ⛔ **1막을 지우지 말 것.** 예전엔 이 설정에서 1막을 통째로 건너뛰고 결과 카드부터 띄웠는데,
-      그러면 '캐릭터가 자랐다'는 이 연출의 알맹이가 사라진다. `prefers-reduced-motion` 은
-      "화면을 크게 휘젓지 마라"이지 "축하하지 마라"가 아니다 — 삭제가 아니라 약화가 답이다.
-   남기는 것: 옛 모습 → 새 모습 **크로스페이드**, 레벨 숫자 페이드인.
-   빼는 것: 실루엣·맥동·확대축소·회전 광원·빛줄기·전체화면 섬광·폭죽(컴포넌트가 DOM 에도 안 넣는다).
-   ⚠️ 타임라인 끝(1.3초)은 `LevelUpModal.tsx` 의 EVOLVE_SOFT_MS 와 **한 쌍**이다.
-   ⚠️ 이 판에는 `transform` 이 한 줄도 없어야 한다 — 투명도만 바뀌면 화면 위에서 움직이는 것이 0이다.
-   ────────────────────────────────────────────────────────────────────────── */
-.hub .lvup.is-soft .evo-char.is-old { animation: evo-soft-out .55s ease-out .25s both; }
-.hub .lvup.is-soft .evo-char.is-old .evo-color { animation: none; }
-.hub .lvup.is-soft .evo-char.is-new { opacity: 0; animation: evo-fade-in .55s ease-out .45s both; }
-.hub .lvup.is-soft .evo-char.is-new .evo-color { animation: none; }
-.hub .lvup.is-soft .evo-lv { animation: evo-fade-in .4s ease-out .85s both; }
-@keyframes evo-soft-out { from { opacity: 1 } to { opacity: 0 } }
+/* ── 1막 · 움직임 줄이기 설정 ────────────────────────────────────────────────
+   여기서 세 번 헛짚었다. 남겨 둔다(폭죽도 같은 길을 갔다 — `Confetti.tsx` 머리 주석).
+     1차: 1막을 통째로 건너뛰었다 → 레벨업했는데 결과 카드만 떴다.
+     2차: 크로스페이드만 남겼다 → "너무 별로다". 두 장이 녹아들 뿐 무슨 일인지 안 읽힌다.
+     3차: 같은 연출을 1.5초로 **압축**했다 → "너무 빠르다". 사건을 절반 시간에 밀어넣으면
+          하나하나가 스쳐 지나가고, 빨라진 움직임은 오히려 더 자극적이다.
 
-/* 안전망 — JS 판정이 빗나가(matchMedia 없음 등) `is-soft` 가 안 붙은 채로 이 설정인 사람에게
-   화려한 판이 돌지 않게 한다. ⚠️ `.is-soft` 규칙보다 **약하게** 둘 것(:not 으로 갈라 둔 이유다) —
-   여기서 통으로 `animation: none` 을 걸면 위 크로스페이드까지 같이 죽는다. */
+   ⛔ **결론: 연출도 속도도 그대로 둔다. 빼는 것은 전체화면 흰 섬광(evo-flash) 하나뿐이다.**
+      그것만 큰 면적이 통째로 번쩍이는 대목이고, 나머지는 전부 캐릭터 한 명 크기 안에서 일어난다.
+      섬광은 컴포넌트가 DOM 에도 안 넣는다.
+   ⚠️ 섬광이 없으면 옛 모습이 **툭 사라진다**(원래는 흰 화면이 그 순간을 덮는다). 그래서 그 한 자리만
+      순간 삭제(evo-gone) 대신 짧은 페이드로 바꾼다 — 이 블록이 하는 일은 그게 전부다.
+   ────────────────────────────────────────────────────────────────────────── */
+/* ⚠️ 기본 규칙(`evo-swell` + `evo-gone`)과 **애니메이션 목록이 한 쌍**이다 — 기본 쪽 타임라인을
+      옮기면 여기 숫자도 같이 옮길 것. 다른 점은 마지막 한 자리(순간 삭제 → 짧은 페이드)뿐이다. */
+.hub .lvup.is-soft .evo-char.is-old {
+  animation: evo-swell 4.1s ease-in both, evo-soft-out .3s ease-out 3.95s both;
+}
+@keyframes evo-soft-out { from { opacity: 1 } to { opacity: 0; visibility: hidden } }
+
+/* 안전망 — JS 판정이 빗나가(matchMedia 없음 등) `is-soft` 가 안 붙은 채로 이 설정인 사람에게도
+   섬광만은 안 터지게 한다. ⚠️ 여기서 통으로 `animation: none` 을 걸지 말 것 — 위 규칙까지 죽는다. */
 @media (prefers-reduced-motion: reduce) {
-  .hub .lvup:not(.is-soft) .evo-glow, .hub .lvup:not(.is-soft) .evo-rays,
-  .hub .lvup:not(.is-soft) .evo-flash, .hub .lvup:not(.is-soft) .evo-spark,
-  .hub .lvup:not(.is-soft) .evo-char, .hub .lvup:not(.is-soft) .evo-char .evo-img,
-  .hub .lvup:not(.is-soft) .evo-lv { animation: none; opacity: 1; }
-  .hub .lvup:not(.is-soft) .evo-char.is-old, .hub .lvup:not(.is-soft) .evo-sil { display: none; }
+  .hub .lvup:not(.is-soft) .evo-flash { animation: none; opacity: 0; }
 }
