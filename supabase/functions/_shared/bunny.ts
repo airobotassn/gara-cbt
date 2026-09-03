@@ -21,7 +21,10 @@
 
 /** 영상 라이브러리 id. ⚠️ 강의 행이 아니라 **계정 설정**이라 여기(시크릿)가 단일 출처다. */
 const LIBRARY_ID = Deno.env.get('BUNNY_STREAM_LIBRARY_ID') ?? ''
-/** 토큰 보안 키 — 대시보드 Video Library → API 에 있다(API 키와 다른 값이다). */
+/** 토큰 보안 키 — 대시보드 **Video Library → Security** 탭의 `Token Authentication Key` 다.
+ *  ⛔ **API 탭의 `API Key` 가 아니다.** 둘 다 UUID 모양이라 헷갈리는데, API Key 로 서명하면
+ *     Bunny 가 임베드를 **403** 으로 거절한다(2026-09-03 실기기 확인 — 영상·도메인 설정은 멀쩡한데
+ *     토큰만 틀려서 몇 시간 헤맸다). API Key 는 영상을 관리하는 열쇠고, 서명 키는 그 옆 Security 탭에 따로 있다. */
 const TOKEN_KEY = Deno.env.get('BUNNY_STREAM_TOKEN_KEY') ?? ''
 /** 풀존 호스트(`vz-xxxx.b-cdn.net`). 썸네일 주소를 만드는 데만 쓴다. */
 const PULLZONE = (Deno.env.get('BUNNY_STREAM_PULLZONE') ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '')

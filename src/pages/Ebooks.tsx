@@ -85,8 +85,9 @@ export default function Ebooks() {
   const [msg, setMsg] = useState('')
   const [loginOpen, setLoginOpen] = useState(false)
   const [zoom, setZoom] = useState<EbookRow | null>(null)
-  // 재생 중인 강의 — 한 번에 하나만(iframe 을 여러 개 띄우면 소리가 겹치고 페이지가 무거워진다).
-  const [playing, setPlaying] = useState<string | null>(null)
+  // ⛔ **여기선 강의를 재생하지 않는다(2026-09-03 지시).** 스토어는 파는 곳이라 썸네일·제목·가격까지고,
+  //    산 강의도 여기선 안 튼다 — 재생은 마이페이지 내 서재에서만 한다("사는 곳 / 보는 곳"을 나눈다).
+  //    그래서 재생 상태(playing)를 아예 안 들고 있고, LectureRow 에 onPlay 를 안 넘긴다.
   // 카탈로그 전환. 기본은 LEVELTEST — 지금 책이 다 그쪽에 있다(빈 탭으로 시작하지 않는다).
   const [cat, setCat] = useState<Catalog>('leveltest')
   // 선택은 카탈로그마다 따로 기억한다 — 탭을 왔다 갔다 해도 보던 자리로 돌아온다.
@@ -239,7 +240,7 @@ export default function Ebooks() {
   //    truthy 라, 꼬리말 자리가 "그릴 게 있다"고 판단해 빈 띠만 남는다.
   const bookPager = books.length > 1 ? <Pager page={bookPage} total={books.length} onGo={setBookPage} t={t} /> : undefined
   const lecPager = lectures.length > 1
-    ? <Pager page={lecPage} total={lectures.length} onGo={(p) => { setLecPage(p); setPlaying(null) }} t={t} />
+    ? <Pager page={lecPage} total={lectures.length} onGo={setLecPage} t={t} />
     : undefined
 
   // 로그인 수단이 구글만이 아니라서(카카오도 있음) 특정 provider 를 호출하지 않고 로그인 페이지로 보낸다.
@@ -266,8 +267,8 @@ export default function Ebooks() {
       if (kind === 'ebook') {
         setRows((prev) => prev?.map((x) => (x.id === id ? { ...x, owned: true } : x)) ?? prev)
       } else {
-        // ⚠️ 강의는 owned 만 켜면 재생이 안 된다 — youtubeId 가 미소유일 때 null 로 내려오기 때문이다.
-        //    목록을 다시 받아 그 값을 채운다(서버가 소유자에게만 준다).
+        // 강의는 목록을 다시 받는다 — 소유 여부에 따라 서버가 내려주는 값이 달라지기 때문이다
+        //   (유튜브 강의의 영상 id 는 소유자에게만 준다). 여기선 재생을 안 하지만 '보유 중' 표시는 맞아야 한다.
         const r = await callFunction<EbookListResp>('ebooks', { action: 'store', lang })
         setDbLectures(r.lectures ?? [])
       }
@@ -336,7 +337,6 @@ export default function Ebooks() {
   // 레벨·급수를 바꾸면 목록이 통째로 갈리므로 페이지도 1쪽으로 돌린다(3쪽을 보다 옮겼는데 3쪽이 없는 칸이면 헷갈린다).
   function pick(g: LibGroup) {
     setSel(g.key)
-    setPlaying(null)
     setBookPage(0)
     setLecPage(0)
   }
@@ -366,8 +366,7 @@ export default function Ebooks() {
           t={t}
           lang={lang}
           busy={busy === lec.id}
-          playing={playing === lec.id}
-          onPlay={() => setPlaying((p) => (p === lec.id ? null : lec.id))}
+          /* ⛔ onPlay 를 안 넘긴다 = 재생 자리가 없다(위 상태 선언부 주석 참고). */
           onBuy={() => buy('lecture', lec.id, lec.price_usd_cents)}
         />
       ))}
@@ -492,7 +491,7 @@ export default function Ebooks() {
               <button
                 key={k}
                 type="button"
-                onClick={() => { setCat(k); setPlaying(null); setBookPage(0); setLecPage(0); setPicked(new Set()) }}
+                onClick={() => { setCat(k); setBookPage(0); setLecPage(0); setPicked(new Set()) }}
                 aria-pressed={cat === k}
                 /* 선택 표시는 **면 밝기가 아니라 액센트 링**이다 — 면을 한 단 밝히는 것만으로는
                    다크에서 어느 쪽이 켜졌는지 안 보였다(2026-09-01). 링은 inset 그림자라 칸 크기가 안 변한다. */

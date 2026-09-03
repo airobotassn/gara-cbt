@@ -378,8 +378,11 @@ export function LectureRow({
   t: TFunc
   lang: Lang
   busy?: boolean
-  playing: boolean
-  onPlay: () => void
+  /** ⛔ **`onPlay` 를 안 넘기면 재생 자리가 통째로 없다**(썸네일만 · 2026-09-03 지시).
+   *  스토어(`/ebooks`)가 그렇게 쓴다 — 파는 곳에서까지 재생되면 "사는 곳 / 보는 곳" 구분이 흐려진다.
+   *  서재(`/mypage/ebooks`)는 넘긴다. 두 화면의 차이를 **데이터와 버튼**으로만 두는 이 파일의 규칙 그대로다. */
+  playing?: boolean
+  onPlay?: () => void
   onBuy?: () => void
 }) {
   // 썸네일이 404 면(영상이 내려갔거나 id 오타) 이미지를 지우고 아래 그라데이션 판이 드러나게 둔다.
@@ -395,7 +398,8 @@ export function LectureRow({
   const isBunny = lec.source === 'bunny'
   // ⚠️ 소유만 보면 안 된다 — 유튜브 강의는 미소유면 서버가 id 를 안 주고, 옛 배포본 응답엔 아예 없다.
   //    Bunny 는 id 없이도 재생 가능하다(주소를 서버가 만들어 준다).
-  const canPlay = lec.owned && (isBunny || !!lec.youtubeId)
+  //    `onPlay` 도 같이 본다 — 안 넘어온 화면(스토어)에서는 재생이 아예 없다.
+  const canPlay = lec.owned && !!onPlay && (isBunny || !!lec.youtubeId)
 
   // 재생 주소 받아오기. ⚠️ 껐다 켜도 다시 안 받는다 — 3시간짜리라 그대로 쓴다.
   useEffect(() => {
@@ -493,13 +497,15 @@ export function LectureRow({
           </span>
         )}
         {lec.owned ? (
-          <button
-            onClick={onPlay}
-            disabled={!canPlay}
-            className="shrink-0 px-4 py-2.5 bg-secondary/10 text-secondary border border-secondary/20 font-label-md text-[16px] font-bold rounded-xl hover:bg-secondary/15 transition-colors disabled:opacity-50"
-          >
-            {playing ? t('ll.playing') : t('ll.watch')}
-          </button>
+          // 재생이 없는 화면(스토어)에서는 버튼 자리도 비운다 — 눌러도 아무 일 없는 버튼을 두지 않는다.
+          canPlay && (
+            <button
+              onClick={onPlay}
+              className="shrink-0 px-4 py-2.5 bg-secondary/10 text-secondary border border-secondary/20 font-label-md text-[16px] font-bold rounded-xl hover:bg-secondary/15 transition-colors"
+            >
+              {playing ? t('ll.playing') : t('ll.watch')}
+            </button>
+          )
         ) : (
           <button onClick={onBuy} disabled={busy} className="shrink-0 px-4 py-2.5 bg-primary-container text-on-primary font-label-md text-[16px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow disabled:opacity-60">
             {busy ? t('ebook.processing') : lec.price_usd_cents > 0 ? t('ebook.buy') : t('ebook.get_free')}
