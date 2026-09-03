@@ -238,6 +238,20 @@ export default function Hub() {
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
+
+  // 문서 스크롤 잠금 — **이건 빗장이지 해법이 아니다.**
+  //    랭킹 버튼이 아래로 밀리던 진짜 원인은 화면 높이 단위였고, 그건 hub.css 에서 `100svh` 로 고쳤다
+  //    (주소창이 펴진 최소 뷰포트 기준이라 어느 순간에도 통이 화면을 안 넘는다 — 그쪽 주석 참고).
+  //    여기서는 그래도 만에 하나 문서가 커지는 순간이 와도 화면이 밀리지 않게 한 겹 더 잠근다.
+  //    ⚠️ 실측: 320×568 ~ 412×915 전 구간에서 문서높이 = 화면높이(넘침 0), 랭킹 버튼이 화면 안.
+  //       세로 480px 미만(폰 가로 모드)은 이 잠금과 무관하게 지금도 도크가 잘린다 — 별개 문제다.
+  //    ⚠️ 원래 값으로 되돌려야 한다. 다른 화면은 굴러야 한다.
+  useEffect(() => {
+    const html = document.documentElement
+    const prev = html.style.overflow
+    html.style.overflow = 'hidden'
+    return () => { html.style.overflow = prev }
+  }, [])
   useEffect(() => {
     // 해시가 있을 때만 물어본다 — 평소 진입에 관리자 조회를 하나 더 얹지 않는다(캐시돼 있어도 그렇다).
     if (!previewHash) return

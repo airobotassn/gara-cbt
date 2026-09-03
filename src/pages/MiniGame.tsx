@@ -78,8 +78,9 @@ export default function MiniGame() {
   const playable = !!game && !loading
 
   // ⛔ **이 화면에서는 문서 스크롤을 잠근다(2026-09-03 지적: "새로고침하면 위 헤더가 사라진다").**
-  //    화면 틀은 `height: 100dvh` 라 스크롤이 필요 없는데, 폰에서는 주소창이 접혔다 펴지는 사이
-  //    문서(접힌 기준으로 계산된 높이)가 뷰포트보다 잠깐 커진다 → 그때 게임 위에서 손가락을 움직이면
+  //    화면 틀은 `height: 100svh`(주소창이 펴진 최소 뷰포트 · 2026-09-03 에 dvh 에서 바꿨다 — 허브와
+  //    같은 이유다) 라 스크롤이 필요 없는데, dvh 시절엔 주소창이 접혔다 펴지는 사이
+  //    문서(접힌 기준으로 계산된 높이)가 뷰포트보다 잠깐 커졌다 → 그때 게임 위에서 손가락을 움직이면
   //    (인트로 캐러셀을 좌우로 넘길 때가 그렇다) 페이지가 헤더 높이만큼 밀려 올라가고, 주소창이
   //    다시 접혀도 **스크롤 위치는 그대로 남아** 뒤로가기 줄이 화면 밖에 머문다.
   //    /games/* 는 Layout 이 FAB 도 숨기는 화면이라 그 줄이 사라지면 **나갈 문이 하나도 없다.**
@@ -203,7 +204,7 @@ export default function MiniGame() {
   // 상단 바는 게임 프레임 색(= 게임 body 배경)을 그대로 입는다 — 흰 바가 남으면 게임 위에 이색 띠로 뜬다.
   const dark = isDark(game.frame)
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: game.frame }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', background: game.frame }}>
       {/* 상단 바는 게임 스테이지와 같은 폭으로 좁혀 가운데 세운다(2026-08-25) — 게임은 iframe 안에서
           가운데 정렬된 좁은 판(460/520px)이라, 바가 화면 전체 폭이면 넓은 화면에서 '‹미니게임'·제목만
           저 멀리 왼쪽 끝에 떨어져 게임과 남남으로 보인다. 폭의 출처는 minigames.ts 의 stage 하나. */}
