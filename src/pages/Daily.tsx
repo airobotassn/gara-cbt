@@ -12,8 +12,7 @@ import '../styles/daily.css'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT, localeOf } from '../lib/i18n'
-import { termTheoryByAnswer } from '../lib/terms'
-import { fetchTermPool, dailyPick, dailyChoicesOf, type TermPoolItem } from '../lib/termPool'
+import { dailyTerm, dailyChoices, termTheory, TERMS } from '../lib/terms'
 import DailyVisual from '../components/DailyVisual'
 import StarField from '../components/StarField'
 
@@ -55,41 +54,30 @@ export default function Daily() {
   const [celebrate, setCelebrate] = useState(false) // 완료 직후 보상 연출(재방문 시엔 안 뜬다)
   const [rewarded, setRewarded] = useState(true) // 이번 완료로 재화가 실제 지급됐는지(서버 응답 first)
   const [bonus, setBonus] = useState(0) // 7일 완주 보너스 코인(서버 응답 bonus)
-  // 오늘의 문제 — 미니게임과 같은 용어 풀에서 날짜별로 하나씩 순환.
-  //   ⛔ 단일 출처는 **DB(term_questions)** 다 — 관리자 화면에서 문항을 고치면 바로 여기 반영된다.
-  //      서버가 안 열리면 코드에 박힌 50문항으로 떨어진다(fetchTermPool 안의 폴백).
-  //   ⚠️ `?term=N` 은 **개발 서버에서만** 도는 미리보기다(해설·그림을 하루씩 기다리며 확인할 수 없어서).
-  //      import.meta.env.DEV 가 false 인 빌드에서는 분기 자체가 트리셰이킹으로 사라진다.
-  const [term, setTerm] = useState<TermPoolItem | null>(null)
-  const [choices, setChoices] = useState<string[]>([]) // 보기 4개(정답+오답3), 날짜 시드로 섞임
+  // 오늘의 문제 — 미니게임과 같은 용어 풀(lib/terms)에서 날짜별로 하나씩 순환. 마운트 시 1회 고정.
+  // ⚠️ `?term=N` 은 **개발 서버에서만** 도는 미리보기다(해설·그림을 하루씩 기다리며 확인할 수 없어서).
+  //    import.meta.env.DEV 가 false 인 빌드에서는 분기 자체가 트리셰이킹으로 사라진다.
+  const [term] = useState(() => {
+    if (import.meta.env.DEV) {
+      const n = Number(new URLSearchParams(window.location.search).get('term'))
+      if (Number.isInteger(n) && n >= 0) return TERMS[n % TERMS.length]
+    }
+    return dailyTerm()
+  })
+  const [choices] = useState(() =>
+    term === dailyTerm() ? dailyChoices() : [term.answer, ...term.distractors],
+  ) // 보기 4개(정답+오답3), 날짜 시드로 섞임
   const [picked, setPicked] = useState<string | null>(null) // 이번 방문에 고른 보기
   // 정답 공개 조건 = 이번에 골랐거나 / 서버가 이미 오늘 완료로 기록(재방문)한 경우.
   const answered = picked !== null || done
   // 풀고 나서 읽는 해설. 아직 안 쓴 용어면 null 이고, 그날은 해설 블록이 아예 안 나온다.
-  const theory = termTheoryByAnswer(term?.answerKo ?? term?.answer)
+  const theory = termTheory(term)
 
   function applyHub(h: HubState) {
     setAuthed(!!h.authed)
     setPoints(h.points ?? 0)
     setDone(!!h.learnDone)
   }
-
-  // 오늘의 문항 받아오기. 화면 언어로 투영된 것이 온다 — 언어를 바꾸면 문제도 그 언어로 다시 뜬다.
-  useEffect(() => {
-    let alive = true
-    void fetchTermPool('daily', lang).then((items) => {
-      if (!alive) return
-      let t: TermPoolItem | null = null
-      if (import.meta.env.DEV) {
-        const n = Number(new URLSearchParams(window.location.search).get('term'))
-        if (Number.isInteger(n) && n >= 0 && items.length) t = items[n % items.length]
-      }
-      t = t ?? dailyPick(items)
-      setTerm(t)
-      setChoices(t ? dailyChoicesOf(t) : [])
-    })
-    return () => { alive = false }
-  }, [lang])
 
   // 마운트 하이드레이트. setState 는 프라미스 콜백에서만(허브와 동일 규칙).
   useEffect(() => {
@@ -160,9 +148,7 @@ export default function Daily() {
       {/* 2단: 콘텐츠(주) + 보상 레일(부). 880px 이하에서 1열로 스택된다. */}
       <div className="dy-grid">
       <main className="dy-main">
-      {/* 콘텐츠 슬롯 — 오늘의 용어 4지선다. 미니게임과 같은 풀에서 날짜별로 하나.
-          문항은 서버에서 온다 — 도착 전 한 박자는 카드를 안 그린다(빈 카드가 떴다 채워지면 더 어수선하다). */}
-      {term && (
+      {/* 콘텐츠 슬롯 — 오늘의 용어 4지선다. 미니게임과 같은 풀에서 날짜별로 하나. */}
       <div className="dy-quiz">
         <div className="dy-q-head">
           <span className="dy-q-badge">{term.field}</span>
@@ -194,12 +180,11 @@ export default function Daily() {
           </p>
         )}
       </div>
-      )}
 
       {/* 해설 — 문제를 덮지 않고 카드 아래로 펼친다(내가 뭘 골랐는지 보면서 읽을 수 있게).
           ⚠️ answered 로 조건부 마운트하면 펼침 연출이 안 돈다(0 높이에서 시작할 프레임이 없다).
              항상 붙여 두고 .open 클래스만 토글해 grid-template-rows 0fr→1fr 로 늘린다. */}
-      {term && theory && (
+      {theory && (
         <section className={`dy-theory${answered ? ' open' : ''}`} aria-hidden={!answered}>
           <div className="dy-th-clip">
             <div className="dy-th-card">

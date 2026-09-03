@@ -1,12 +1,12 @@
-// AI·로봇·피지컬AI 용어 문제 **폴백** 풀 (원본: AI로봇피지컬AI_용어퀴즈_50문항.xlsx).
+// AI·로봇·피지컬AI 용어 문제 풀 (원본: AI로봇피지컬AI_용어퀴즈_50문항.xlsx).
 //
-//   ⛔ **여기를 고쳐도 서비스에는 안 나간다.** 단일 출처는 DB(`term_questions`)이고, 문항을 바꾸는
-//      자리는 관리자 화면(WORLD ARENA > 미니게임 > 게임 문항) 하나다 — 2026-09-03 에 옮겼다.
-//      이 배열은 서버(`term-pool`)가 안 열릴 때 게임·DAILY QUIZ 가 빈 화면으로 뜨지 않게 하는 폴백이다.
-//   ⚠️ 그래서 옛 주석의 "public/games/*.html 의 POOL 과 같이 갱신할 것" 규칙은 없어졌다(그쪽도 폴백이다).
+//   · **DAILY QUIZ(`/daily`)의 문항은 여기가 단일 출처다.** 게임 문제은행(DB `term_questions`)과
+//     **별개다** — 2026-09-03 지시로 DAILY QUIZ 를 그 은행에서 뺐다. 여기를 고치면 /daily 가 바뀐다.
+//   · 미니게임 3종에게는 **폴백**이다. 그쪽 단일 출처는 DB 이고 관리 자리는
+//     관리자 화면(WORLD ARENA > 미니게임 > 게임 문항)이다 — 서버가 안 열릴 때만 이 배열이 쓰인다.
+//   ⚠️ 옛 주석의 "public/games/*.html 의 POOL 과 같이 갱신할 것" 규칙은 없어졌다(그쪽도 폴백이다).
 //
-//   해설(TERM_THEORY)은 여전히 여기 있다 — 그림(DailyVisual)과 짝이라 코드에 남는다.
-//   키가 **한국어 정답**이라 DB 문항도 `answerKo` 로 이걸 찾는다(termTheoryByAnswer).
+//   해설(TERM_THEORY)은 그림(DailyVisual)과 짝이라 코드에 남는다.
 
 export type TermField = 'AI' | '로봇' | '피지컬AI'
 
@@ -149,13 +149,6 @@ export const TERM_THEORY: Record<string, TermTheory> = {
 /** 오늘의 용어에 붙은 해설. 아직 안 쓴 용어면 null → 화면에서 해설 블록을 그리지 않는다. */
 export function termTheory(t: TermItem): TermTheory | null {
   return TERM_THEORY[t.answer] ?? null
-}
-
-/** 정답 용어(한국어)로 해설을 찾는다 — 문항이 DB 에서 올 때 쓴다.
- *  ⚠️ 키가 **한국어 정답**이다. 그래서 서버가 번역본과 함께 원문(answerKo)도 같이 내려준다 —
- *     번역된 정답으로 찾으면 어느 언어에서도 해설이 안 붙는다. */
-export function termTheoryByAnswer(answerKo: string | undefined): TermTheory | null {
-  return (answerKo && TERM_THEORY[answerKo]) || null
 }
 
 // 로컬 자정 기준 'epoch day'. 날짜별 결정론적 순환에 쓴다(같은 날 = 같은 값).

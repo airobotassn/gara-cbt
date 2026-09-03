@@ -1,4 +1,4 @@
-// 관리자 > WORLD ARENA > 미니게임 > 게임 문항 / DAILY QUIZ > 문항 관리
+// 관리자 > WORLD ARENA > 미니게임 > 게임 문항
 //
 // 용어 문항(term_questions) 관리 — **레벨테스트(AdminLevelTest 의 문항 탭)와 같은 모양**이다:
 //   문항 목록 · 문항 이력 · 문항 추가 & 번역(엑셀) 서브탭 + 한국어로 쓰고 🌐 자동 번역.
@@ -6,8 +6,9 @@
 // ⛔ 여기서 고친 문항이 **바로 게임에 나간다**(서버 term-pool → 게임 iframe · DAILY QUIZ).
 //    예전엔 게임 HTML 안 POOL 이 진짜였고 이 화면은 저장만 되고 아무 데도 안 나갔다(2026-09-03 연결).
 // ⛔ **게임별로 문항을 고르는 기능은 없다(2026-09-03 지시).** 은행에 '사용' 상태로 있는 문항이
-//    네 곳(버텨라·쏴라·골라라·DAILY) 전부에 나간다 — 셋은 같은 문제를 보여주는 방식만 다르다.
-//    한 문항을 빼려면 '중지'를 누른다(네 곳에서 같이 빠진다).
+//    세 게임 전부에 나간다 — 셋은 같은 문제를 보여주는 방식만 다르다(4지선다 / 운석 / O·X).
+//    한 문항을 빼려면 '중지'를 누른다(세 게임에서 같이 빠진다).
+// ⛔ **DAILY QUIZ 는 이 은행을 안 쓴다(2026-09-03 지시).** `/daily` 의 문항 출처는 `src/lib/terms.ts` 다.
 // ⚠️ 게임 HTML(public/games/*.html)과 src/lib/terms.ts 의 문항 배열은 **폴백**으로 남아 있다 —
 //    거기를 고쳐도 서비스에는 안 나간다. 문항을 바꾸는 자리는 이 화면 하나다.
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
@@ -73,10 +74,7 @@ const koOf = (r: TermRow) => r.answer_i18n?.ko ?? ''
 // ══════════════════════════════════════════════════════════════
 type Sub = 'list' | 'events' | 'upload'
 
-// ⚠️ 메뉴 두 곳(미니게임 › 게임 문항, DAILY QUIZ › 문항 관리)이 **같은 화면**을 연다 — 은행이 하나라서다.
-//    그래서 제목도 같은 이름으로 둔다: 어디로 들어와도 "아, 아까 그 은행" 으로 읽혀야 한다.
-//    (scope 는 어느 메뉴로 들어왔는지일 뿐, 보이는 내용은 같다.)
-export function TermPoolAdmin({ scope: _scope }: { scope: 'minigame' | 'daily' }) {
+export function TermPoolAdmin() {
   const [sub, setSub] = useState<Sub>('list')
   // 방금 올린 문항 — '문항 추가 & 번역' 이 넘겨주고 '문항 목록' 이 받아 그것만 걸러 보여준다.
   const [justAdded, setJustAdded] = useState<{ codes: string[]; at: number } | null>(null)
@@ -311,8 +309,8 @@ function ListTab({ justAdded, clearJustAdded }: {
           </div>
         )}
         <p className="admin-hint" style={{ marginTop: 8 }}>
-          여기 <b>사용 중인 문항이 곧 게임에 나가는 문항</b>입니다 — 버텨라·쏴라·골라라·DAILY QUIZ 가 같이 씁니다.
-          한 문항을 빼려면 <b>중지</b>를 누르세요. 중지·삭제한 문항은 <b>문항 이력</b> 탭에서 되돌릴 수 있습니다.
+          여기 <b>사용 중인 문항이 곧 게임에 나가는 문항</b>입니다. 한 문항을 빼려면 <b>중지</b>를 누르세요.
+          중지·삭제한 문항은 <b>문항 이력</b> 탭에서 되돌릴 수 있습니다.
         </p>
       </div>
 

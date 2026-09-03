@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { loadAdminMe } from '../lib/adminMe'
-import { renderEbookCover } from '../lib/ebookCover'
+import { renderEbookCover, imageFileToDataUri, replaceStaticCoverImage } from '../lib/ebookCover'
 import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
 import { feeKey } from '../lib/fees'
 import { translateEbook, translateEbookMeta, EBOOK_LANGS, EBOOK_LANG_LABEL, type ResumeSource } from '../lib/ebookTranslate'
@@ -110,7 +110,9 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     // PPT 2페이지 도형 그대로 — '미니게임' 이 상위고 게임 현황·게임 문항이 그 아래다.
     { key: 'minigame', label: '미니게임', children: [{ key: 'stat', label: '게임 현황' }, { key: 'quiz', label: '게임 문항' }] },
     { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
-    { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
+    // ⛔ DAILY QUIZ 아래 '문항 관리'는 뗐다(2026-09-03 지시) — 그 화면은 **게임 문제은행**을 보여주고
+    //    있었는데, DAILY QUIZ 는 그 은행을 안 쓴다(문항 출처는 src/lib/terms.ts). 남겨두면 거짓말이 된다.
+    { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }] },
     { key: 'chat', label: '채팅 관리' },
     { key: 'coin', label: '코인 관리' },
     // 캐릭터·스킨의 **가격·판매여부**만 만지는 화면. 그림은 코드/에셋이라 여기서 안 올린다(2026-08-20).
@@ -285,11 +287,10 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     // ── WORLD ARENA ──
     case 'arena/dash': return <ArenaDashboard />
     case 'arena/minigame/stat': return <MinigameStatAdmin />
-    case 'arena/minigame/quiz': return <TermPoolAdmin scope="minigame" />
+    case 'arena/minigame/quiz': return <TermPoolAdmin />
     case 'arena/leveltest/stat': return <ArenaAttempts />
     case 'arena/leveltest/quiz': return <ArenaQuestions isRoot={isRoot} />
     case 'arena/daily/stat': return <DailyStatAdmin />
-    case 'arena/daily/quiz': return <TermPoolAdmin scope="daily" />
     case 'arena/chat': return <ChatModAdmin />
     case 'arena/coin': return <CoinPolicyAdmin />
     case 'arena/cosmetic': return <HubCosmeticAdmin />
@@ -3952,6 +3953,25 @@ interface EbookDraft {
 function emptyEbookDraft(catalog: EbookCatalog): EbookDraft {
   return { title: '', author: '', description: '', coverUrl: '', price_usd_cents: 0, catalog, targetLevel: null, targetTier: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
 }
+/** 저장된 행 → 폼 값. ⚠️ 수정 버튼과 표지 교체가 **같은 것을 써야** 한다 — 두 벌이 되면
+ *  한쪽에만 새 필드가 추가돼 표지만 바꿨을 뿐인데 그 값이 조용히 비어 저장된다. */
+function toEbookDraft(b: AdminEbookRow): EbookDraft {
+  return {
+    id: b.id,
+    title: b.title,
+    author: b.author ?? '',
+    description: b.description ?? '',
+    coverUrl: b.coverUrl ?? '',
+    price_usd_cents: b.price_usd_cents,
+    catalog: (b.catalog ?? 'leveltest') as EbookCatalog,
+    targetLevel: b.targetLevel ?? null,
+    targetTier: b.targetTier ?? null,
+    storagePath: b.storagePath,
+    published: b.published,
+    sortOrder: b.sortOrder,
+    translations: b.translations ?? {},
+  }
+}
 
 // ── 이북 관리는 카탈로그마다 **화면이 따로**다(2026-08-11) ──────────────
 //   CARIS 이북 = CARIS 시험 탭, LEVELTEST 이북 = WORLD ARENA 탭. 한 화면에서 섞어 다루면
@@ -3994,6 +4014,9 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false) // 순서 변경 중(↑↓)
   const [uploading, setUploading] = useState<'html' | 'optimize' | 'cover' | 'translate' | null>(null)
+  // 표지 교체를 번역본까지 함께 적용할지. ⚠️ 기본은 켬 — 언어마다 자기 표지를 들고 있어서
+  //    끄면 언어를 바꾼 사람에게만 옛 표지가 남고, 그건 관리자 화면에서 안 보인다.
+  const [coverAllLangs, setCoverAllLangs] = useState(true)
   const [trStatus, setTrStatus] = useState('') // 최적화·번역 진행 문구
   // 분당 한도로 **쉬는 중**인지. 진행 문구를 눈에 띄게 바꾼다 — 안 그러면 멈춘 줄 알고 창을 닫는다.
   const [trWaiting, setTrWaiting] = useState(false)
@@ -4215,6 +4238,75 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
   }
 
   /**
+   * 표지 그림만 갈아끼운다 — 본문 1페이지의 그림을 바꾸고 표지를 다시 굽는다.
+   *
+   * 왜 이 길인가: 표지는 본문 1페이지를 구운 것이라 여태 표지를 바꾸려면 **본문을 다시 만들어
+   * 올려야 했고**, 그러면 5개 언어 번역이 통째로 다시 돌았다. 표지는 자주 바꾸는 물건이라
+   * 그 비용이 너무 크다. 여기선 그림만 갈아치우므로 번역이 돌지 않는다.
+   *
+   * ⚠️ **번역본까지 같이 간다**(기본값). 언어마다 자기 HTML·자기 표지를 들고 있어서, 한국어만
+   *    바꾸면 언어를 바꾼 사람에게는 옛 표지가 그대로 뜬다. 표지에 그 언어 글자가 들어간 책이면
+   *    체크를 끄고 한국어만 바꾼 뒤 나머지는 따로 넣으면 된다.
+   * ⚠️ 표지 파일은 **새 경로**에 올린다 — 같은 경로에 덮으면 공개 URL 이 그대로라 CDN·브라우저가
+   *    옛 그림을 계속 준다("바꿨는데 화면이 안 바뀐다").
+   * ⚠️ 바꾼 뒤 **바로 저장한다.** 본문 파일은 이미 갈렸는데 표지 주소만 폼에 머물러 있으면,
+   *    저장을 안 누르고 닫는 순간 스토어 썸네일과 책 첫 장이 서로 다른 그림이 된다.
+   *    ⚠️ 저장 payload 는 **DB 에 있는 행**에서 만든다 — 폼에 쳐 둔 다른 수정분이 표지만 바꾸려던
+   *       손짓에 딸려 저장되면 안 된다.
+   */
+  async function replaceCoverArt(file: File) {
+    if (!draft?.storagePath) return
+    const saved = draft.id ? list.find((r) => r.id === draft.id) : null
+    if (!saved) {
+      alert('먼저 저장한 뒤에 표지를 바꿀 수 있습니다.')
+      return
+    }
+    setUploading('cover')
+    try {
+      const { dataUri } = await imageFileToDataUri(file)
+      const targets: { lang: string; path: string }[] = [{ lang: 'ko', path: draft.storagePath }]
+      if (coverAllLangs) {
+        for (const lg of EBOOK_LANGS) {
+          const p = draft.translations[lg]?.path
+          if (p) targets.push({ lang: lg, path: p })
+        }
+      }
+
+      const nextTranslations = { ...draft.translations }
+      let koCover = draft.coverUrl
+      const failed: string[] = []
+      for (const t of targets) {
+        const { data, error } = await supabase.storage.from('ebooks').download(t.path)
+        if (error || !data) { failed.push(t.lang); continue }
+        const swapped = replaceStaticCoverImage(await data.text(), dataUri)
+        // 표지 페이지를 못 찾은 파일은 **건드리지 않는다** — 엉뚱한 그림을 갈아치우느니 건너뛴다.
+        if (!swapped) { failed.push(t.lang); continue }
+        const up = await supabase.storage.from('ebooks')
+          .upload(t.path, new Blob([swapped], { type: 'text/html' }), { contentType: 'text/html', upsert: true })
+        if (up.error) { failed.push(t.lang); continue }
+        const url = await bakeCover(swapped)
+        if (t.lang === 'ko') koCover = url
+        else nextTranslations[t.lang] = { ...(nextTranslations[t.lang] ?? {}), coverUrl: url }
+      }
+
+      patch({ coverUrl: koCover, translations: nextTranslations })
+      await callFunction('admin', {
+        action: 'ebookUpsert',
+        ebook: { ...toEbookDraft(saved), coverUrl: koCover, translations: nextTranslations },
+      })
+      await load()
+      const done = targets.length - failed.length
+      alert(failed.length
+        ? `표지 ${done}개 언어를 바꿨습니다. 실패: ${failed.join(', ')}`
+        : `표지를 바꿨습니다 (${done}개 언어).`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '표지를 바꾸지 못했습니다.')
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  /**
    * 저장할 때 **메타(제목·지은이·소개)만** 다시 번역해야 하나.
    *
    * 판정 기준은 둘이고, 새 상태를 들고 다니지 않으려고 **DB 에 저장된 행**과 비교한다.
@@ -4424,23 +4516,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button
                     className="admin-mini"
-                    onClick={() =>
-                      setDraft({
-                        id: b.id,
-                        title: b.title,
-                        author: b.author ?? '',
-                        description: b.description ?? '',
-                        coverUrl: b.coverUrl ?? '',
-                        price_usd_cents: b.price_usd_cents,
-                        catalog: b.catalog ?? 'leveltest',
-                        targetLevel: b.targetLevel ?? null,
-                        targetTier: b.targetTier ?? null,
-                        storagePath: b.storagePath,
-                        published: b.published,
-                        sortOrder: b.sortOrder,
-                        translations: b.translations ?? {},
-                      })
-                    }
+                    onClick={() => setDraft(toEbookDraft(b))}
                   >
                     수정
                   </button>{' '}
@@ -4543,9 +4619,9 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                 </div>
               </div>
 
-              {/* 표지 — 따로 올리지 않는다. 본문 1페이지를 그대로 구워 쓴다. */}
+              {/* 표지 = 본문 1페이지. 그림만 갈아끼울 수 있다(번역을 다시 돌리지 않는다). */}
               <div style={fieldStyle}>
-                <span>표지 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(본문 1페이지에서 자동 생성)</em></span>
+                <span>표지 <em style={{ color: 'var(--muted)', fontStyle: 'normal' }}>(본문 1페이지 = 표지)</em></span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   {draft.coverUrl ? (
                     <img src={draft.coverUrl} alt="" style={{ width: 43, height: 60, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--line)', display: 'block' }} />
@@ -4554,10 +4630,53 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                       {draft.storagePath ? '표지가 없습니다 — 아래 버튼으로 만들 수 있습니다.' : '본문 HTML 을 올리면 자동으로 만들어집니다.'}
                     </span>
                   )}
-                  <button type="button" className="admin-mini" disabled={!draft.storagePath || !!uploading} onClick={regenCover}>
-                    {uploading === 'cover' ? '표지 만드는 중…' : '표지 다시 만들기'}
-                  </button>
+                  {/* 그림 파일을 고르면 1페이지의 그림을 바꾸고 표지를 다시 굽는다 — 본문 재업로드도,
+                      번역도 다시 돌지 않는다. 등록된 책에만 쓸 수 있다(바꾼 즉시 저장하기 때문). */}
+                  <label className="admin-mini" style={{ cursor: draft.id && !uploading ? 'pointer' : 'default', opacity: draft.id && !uploading ? 1 : 0.5 }}>
+                    {uploading === 'cover' ? '바꾸는 중…' : '표지 그림 바꾸기'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      disabled={!draft.id || !!uploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        e.target.value = '' // 같은 파일을 다시 골라도 이벤트가 나게
+                        if (f) void replaceCoverArt(f)
+                      }}
+                    />
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--muted)' }}>
+                    <input type="checkbox" checked={coverAllLangs} onChange={(e) => setCoverAllLangs(e.target.checked)} />
+                    번역본에도 같이 적용
+                  </label>
+                  {/* ⚠️ 이 버튼은 **그림을 안 바꾼다** — 지금 1페이지를 다시 찍어 표지 이미지만 새로 만든다.
+                      옛 이름이 '표지 다시 만들기' 라 위 '표지 그림 바꾸기' 와 구분이 안 됐다(둘 다 "표지 …기").
+                      그래서 ① 이름에 '그림 그대로' 를 박고 ② 표지가 있을 땐 작은 링크로 물린다 —
+                      평소에 쓸 일이 없는 버튼이 주 버튼과 나란히 서 있는 것 자체가 질문을 만든다. */}
+                  {draft.coverUrl ? null : (
+                    <button type="button" className="admin-mini" disabled={!draft.storagePath || !!uploading} onClick={regenCover}>
+                      {uploading === 'cover' ? '만드는 중…' : '본문 1페이지로 표지 만들기'}
+                    </button>
+                  )}
                 </div>
+                <span className="admin-hint" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
+                  표지는 본문 1페이지입니다. 그림을 바꾸면 <b>곧바로 저장</b>되고 번역은 다시 돌지 않습니다.
+                  {draft.coverUrl ? (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        onClick={regenCover}
+                        disabled={!draft.storagePath || !!uploading}
+                        style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'var(--muted)', textDecoration: 'underline', cursor: 'pointer' }}
+                      >
+                        {uploading === 'cover' ? '다시 굽는 중…' : '그림 그대로 표지만 다시 굽기'}
+                      </button>
+                      {' (본문과 표지가 어긋났을 때만)'}
+                    </>
+                  ) : null}
+                </span>
               </div>
 
               {/* 다국어 — 본문 업로드/저장 시 자동으로 돈다. 이 버튼은 다시 돌릴 때만 쓴다. */}
