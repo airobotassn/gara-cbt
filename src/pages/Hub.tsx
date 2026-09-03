@@ -424,10 +424,11 @@ export default function Hub() {
   //   ⚠️ 미니게임은 **목록 페이지(/games)로 바로** 보낸다. 예전엔 /arena 로 보냈는데, 그때는
   //      아레나 하단 런처가 유일한 진입점이었기 때문이다. 지금은 /games 가 목록 페이지라
   //      /arena 로 보내면 지도만 뜨고 미션은 한 단계 더 찾아 들어가야 끝난다.
+  //   ⚠️ 순서는 **출석 · 미니게임 · 데일리퀴즈**다(2026-09-03 지시). 이 배열이 곧 화면 순서다.
   const missions: { kind: ActivityKind; icon: string; label: string; done: boolean; to: string | null }[] = [
     { kind: 'attendance', icon: 'calendar', label: t('hub.mission.attendance'), done: checkedIn, to: null },
-    { kind: 'daily_learn', icon: 'book', label: t('hub.mission.daily_learn'), done: learnDone, to: '/daily' },
     { kind: 'minigame', icon: 'star', label: t('hub.mission.minigame'), done: minigameDone, to: '/games' },
+    { kind: 'daily_learn', icon: 'book', label: t('hub.mission.daily_learn'), done: learnDone, to: '/daily' },
   ]
   const missionDone = missions.filter((m) => m.done).length
 
