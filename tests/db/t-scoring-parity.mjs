@@ -9,7 +9,7 @@
 //     한다(순수 함수만 남기므로 Deno.env 등 부작용 있는 코드는 애초에 포함되지 않음).
 //  3) 두 구현을 동일 샘플 입력으로 실제 실행해 출력이 값 동일한지도 검증한다(소스 텍스트 동일성만으로는
 //     사람이 포맷을 다르게 베껴 실수로 의미를 바꾸는 경우를 못 잡으므로 이중 방어).
-//  4) 원안 점수표(2026-08-04) 자체 검증 — 레벨테스트 7,000 / 활동 6,570 / 전체 13,570 과 ARENA 밴드 경계.
+//  4) 점수표(2026-09-03 개정) 자체 검증 — 레벨테스트 7,000 / 활동 9,125 / 전체 16,125 과 ARENA 밴드 경계.
 //
 // 실행: bun tests/db/t-scoring-parity.mjs  (또는 npm test:db 체인의 일부)
 
@@ -100,7 +100,7 @@ const FN_SYMBOLS = [
 const CONST_SYMBOLS = [
   'PROMOTE_RATE_LOW', 'PROMOTE_RATE_HIGH', 'MAX_POINTS', 'SEASON_DAYS',
   'ACTIVITY_DELTA', 'ACTIVITY_PER_DAY', 'ACTIVITY_SEASON_MAX',
-  'LEVELTEST_CLEAR_POINTS', 'ARENA_BAND_STEP',
+  'LEVELTEST_CLEAR_POINTS', 'ARENA_BAND_MIN',
 ];
 
 for (const name of FN_SYMBOLS) {
@@ -151,7 +151,7 @@ for (const kind of ['attendance', 'daily_learn', 'minigame', 'referral']) {
 }
 
 // ARENA 레벨 밴드(시즌 총점 → 표시 레벨) — 경계값 위주.
-const BAND_CASES = [-100, 0, 1, 999, 1000, 1999, 2000, 4999, 5000, 5999, 6000, 13570, 99999];
+const BAND_CASES = [-100, 0, 1, 1000, 1001, 2200, 2201, 3700, 3701, 5500, 5501, 7500, 7501, 10000, 10001, 16125, 99999];
 for (const total of BAND_CASES) {
   eq(Shared.arenaLevelForScore(total), FE.arenaLevelForScore(total), `arenaLevelForScore(${total})`);
 }
@@ -179,7 +179,7 @@ for (const rank of [1, 3, 7]) {
 
 // (3) 티어 경계값 테스트는 제거 — 티어 5단계 자체가 2026-08-04 에 없어졌다(scoring.ts 참고).
 
-// ---------- 4) 원안 점수표 자체 검증 (2026-08-04 반영본) ----------
+// ---------- 4) 점수표 자체 검증 (2026-09-03 개정본) ----------
 // 레벨테스트 트랙: 레벨 클리어 1회당 +1,000 · 7단계 전부 = 7,000. 부분점수 없음.
 eq(FE.computeSkillScore(7), FE.LEVELTEST_MAX, 'computeSkillScore(7) === LEVELTEST_MAX');
 eq(FE.LEVELTEST_MAX, 7000, 'LEVELTEST_MAX === 7,000 (원안 "레벨테스트 시즌 Max")');
@@ -188,34 +188,38 @@ eq(FE.computeSkillScore(0), 0, '미클리어 = 0 (컷 미달은 부분점수 없
 // 활동 트랙: seasonMax = delta × perDay × SEASON_DAYS 가 원안 표와 정확히 떨어져야 한다.
 // ⚠️ referral 은 2026-08-24 에 이 표에서 빠졌다 — 친구 초대 보상이 시즌 점수 +5 에서 코인 50(양쪽)으로
 //    옮겨갔다(RPC redeem_referral). 되살리면 화면이 주지도 않는 점수를 약속하게 된다.
-const EXPECTED_SEASON_MAX = { minigame: 2190, daily_learn: 730, attendance: 1825 };
+const EXPECTED_SEASON_MAX = { minigame: 4380, daily_learn: 1095, attendance: 3650 };
 for (const [kind, expected] of Object.entries(EXPECTED_SEASON_MAX)) {
   const derived = FE.activityDelta(kind) * FE.activityPerDay(kind) * FE.SEASON_DAYS;
   eq(derived, expected, `활동 시즌상한 ${kind} = ${FE.activityDelta(kind)}점 × ${FE.activityPerDay(kind)}회 × ${FE.SEASON_DAYS}일`);
   eq(FE.ACTIVITY_SEASON_MAX[kind], expected, `ACTIVITY_SEASON_MAX.${kind} === ${expected}`);
 }
-eq(FE.ACTIVITY_MAX, 4745, 'ACTIVITY_MAX(활동 3종 합) === 4,745');
-eq(FE.SEASON_MAX_POINTS, 11745, 'SEASON_MAX_POINTS === 11,745 (= Lv.7 최고점)');
+eq(FE.ACTIVITY_MAX, 9125, 'ACTIVITY_MAX(활동 3종 합) === 9,125');
+eq(FE.SEASON_MAX_POINTS, 16125, 'SEASON_MAX_POINTS === 16,125 (= Lv.7 최고점)');
 
-// ARENA 밴드 경계 — 원안 표 그대로 1,000점 균등.
+// ARENA 밴드 경계 — 2026-09-03 개정표(균등 1,000 폐지, 위로 갈수록 넓어진다).
+// ⚠️ 밴드 폭 = 개정표의 '점수차' 칸: 1,000 / 1,199 / 1,499 / 1,799 / 1,999 / 2,499 / 6,124.
 eq(FE.arenaLevelForScore(0), 1, 'band 0 -> Lv.1');
-eq(FE.arenaLevelForScore(999), 1, 'band 999 -> Lv.1');
-eq(FE.arenaLevelForScore(1000), 2, 'band 1,000 -> Lv.2');
-eq(FE.arenaLevelForScore(5999), 6, 'band 5,999 -> Lv.6');
-eq(FE.arenaLevelForScore(6000), 7, 'band 6,000 -> Lv.7');
+eq(FE.arenaLevelForScore(1000), 1, 'band 1,000 -> Lv.1 (Lv.1 의 최고점이다)');
+eq(FE.arenaLevelForScore(1001), 2, 'band 1,001 -> Lv.2');
+eq(FE.arenaLevelForScore(10000), 6, 'band 10,000 -> Lv.6');
+eq(FE.arenaLevelForScore(10001), 7, 'band 10,001 -> Lv.7');
 eq(FE.arenaLevelForScore(FE.SEASON_MAX_POINTS), 7, 'band 상한 -> Lv.7');
-eq(FE.arenaBand(1), [0, 999], 'arenaBand(1) === [0, 999]');
-eq(FE.arenaBand(6), [5000, 5999], 'arenaBand(6) === [5,000, 5,999]');
-eq(FE.arenaBand(7), [6000, 11745], 'arenaBand(7) === [6,000, 11,745]');
+eq(FE.arenaBand(1), [0, 1000], 'arenaBand(1) === [0, 1,000]');
+eq(FE.arenaBand(6), [7501, 10000], 'arenaBand(6) === [7,501, 10,000]');
+eq(FE.arenaBand(7), [10001, 16125], 'arenaBand(7) === [10,001, 16,125]');
+// 밴드가 빈틈도 겹침도 없이 이어지는가 — 경계를 손으로 옮길 때 한 점씩 새는 자리다.
+for (let lv = 1; lv < 7; lv++) {
+  eq(FE.arenaBand(lv)[1] + 1, FE.arenaBand(lv + 1)[0], `밴드가 이어진다: Lv.${lv} 최고점 +1 === Lv.${lv + 1} 최저점`);
+}
 
-// 두 트랙의 힘 관계 — 여기가 2026-08-24 에 뒤집혔다.
-//   원안(2026-08-04)은 활동 상한 6,570 이 레벨테스트 7,000 과 맞먹어서 **활동만 채워도 Lv.7** 이었다.
-//   친구 초대(+5 · 시즌 1,825)가 코인으로 옮겨가면서 활동 상한이 4,745 로 내려갔고, 그 성질이 깨졌다 —
-//   이제 활동만으로는 Lv.5 까지다. 의도한 결과가 아니라 **보상 지갑을 옮긴 것의 부수효과**이므로
-//   되돌리려면 남은 3종의 적립값을 올려야 한다(초대를 점수 표로 되돌리는 건 답이 아니다).
-//   보류중인 수정안(바탕화면 WORLD_ARENA_점수체계_수정제안.html)이 노리던 방향과 우연히 같다.
-eq(FE.ACTIVITY_MAX < FE.LEVELTEST_MAX, true, '활동 상한(4,745) < 레벨테스트 트랙(7,000)');
-eq(FE.arenaLevelForScore(FE.ACTIVITY_MAX), 5, '활동만으로는 ARENA Lv.5 까지 — 초대 보상이 코인으로 빠진 결과');
+// 두 트랙의 힘 관계 — 2026-09-03 개정에서 활동 적립값을 올려(출석 +10 · 퀴즈 +3 · 게임 6회)
+//   활동 상한이 4,745 → 9,125 로 올라 레벨테스트 트랙(7,000)을 넘어섰다.
+//   그래도 **활동만으로는 최고 레벨이 안 된다** — Lv.7 컷이 10,001 이라 9,125 는 Lv.6 에서 멈춘다.
+//   ⛔ 이건 개정표의 의도된 성질이다(최고 레벨은 레벨테스트를 끼워야 나온다). 적립값을 더 올릴 땐
+//      이 선을 같이 볼 것 — 활동 상한이 10,001 을 넘는 순간 레벨테스트를 한 번도 안 본 사람이 Lv.7 이 된다.
+eq(FE.ACTIVITY_MAX > FE.LEVELTEST_MAX, true, '활동 상한(9,125) > 레벨테스트 트랙(7,000)');
+eq(FE.arenaLevelForScore(FE.ACTIVITY_MAX), 6, '⭐ 활동만으로는 ARENA Lv.6 까지 — Lv.7 은 레벨테스트가 필요하다');
 
 if (failed > 0) {
   console.error(`\n${failed} scoring-parity test(s) FAILED`);

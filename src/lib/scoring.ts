@@ -101,12 +101,14 @@ export function computeRankChange(
   return { nextRank: currentRank, dir: 'stay' }
 }
 
-// ── 시즌 점수 체계 (2026-08-04 원안 반영) ──
+// ── 시즌 점수 체계 (2026-09-03 개정표) ──
 // 시즌 총점(user_progress.season_total) = 레벨테스트 트랙(skill_score) + 활동 트랙(activity_score).
 //   레벨테스트 : 레벨 클리어 1회당 +1,000 · 7단계 전부 = 7,000
-//   활동      : 미니게임 +2(일 3회) · DAILY QUIZ +2(일 1회) · 출석 +5(일 1회)
-//               → 시즌(365일) 상한 2,190 + 730 + 1,825 = 4,745
-//   전체 상한  = 7,000 + 4,745 = 11,745  (= ARENA Lv.7 최고점. 아래 밴드표와 맞물린다)
+//   활동      : 출석 +10(일 1회) · 미니게임 +2(일 6회) · DAILY QUIZ +3(일 1회)
+//               → 시즌(365일) 상한 3,650 + 4,380 + 1,095 = 9,125
+//   전체 상한  = 7,000 + 9,125 = 16,125  (= ARENA Lv.7 최고점. 아래 밴드표와 맞물린다)
+// ⚠️ 활동만 다 채워도 9,125 라 Lv.7 컷(10,001)에 못 닿는다 — 최고 레벨은 레벨테스트를 끼워야 나온다.
+//    (옛 4,745 시절엔 활동만으로 Lv.5 까지였다.) 적립값을 다시 올릴 땐 이 선을 같이 볼 것.
 // ⚠️ 친구 초대는 **이 표에 없다**(2026-08-24). 보상이 시즌 점수 +5 에서 **코인 50(양쪽)** 으로 옮겨갔다 —
 //    코인은 상점 지갑이라 랭킹에 안 섞인다. 지급은 RPC `redeem_referral`(20260824120000) 하나가 한다.
 //    ⛔ 여기에 referral 을 되살리면 화면이 "친구 초대 +5점" 이라고 말하면서 실제로는 코인만 나간다.
@@ -126,7 +128,7 @@ export function computePoints(level: number, correct: number): number {
   return Math.round(((lv - 1 + frac) / MAX_LEVEL) * MAX_POINTS)
 }
 // ── 활동 트랙 ──
-// 원안 표 그대로. 적립값·일일 횟수·시즌 상한 세 표가 한 벌이고, seasonMax = delta × perDay × SEASON_DAYS 로 떨어진다.
+// 2026-09-03 개정표 그대로. 적립값·일일 횟수·시즌 상한 세 표가 한 벌이고, seasonMax = delta × perDay × SEASON_DAYS 로 떨어진다.
 // ⚠️ 미니게임은 **참여 횟수당 고정 적립**이다(성적 무관) — 예전의 "게임별 정규화 점수 비례"는 원안 채택으로 제거됐다.
 //    성적 반영안(게임당 0~2점 · 서로 다른 3종)은 보류 상태다.
 // ⚠️ 옛 'referral'(친구 초대 +5) 은 2026-08-24 에 빠졌다 — 보상이 코인으로 옮겨갔다(위 주석 참고).
@@ -134,19 +136,19 @@ export function computePoints(level: number, correct: number): number {
 //    빼앗지 않는다). 새로 쌓는 곳만 없어졌다.
 export type ActivityKind = 'attendance' | 'daily_learn' | 'minigame'
 export const ACTIVITY_DELTA: Record<ActivityKind, number> = {
-  attendance: 5,
-  daily_learn: 2,
+  attendance: 10,
+  daily_learn: 3,
   minigame: 2,
 }
 export const ACTIVITY_PER_DAY: Record<ActivityKind, number> = {
   attendance: 1,
   daily_learn: 1,
-  minigame: 3,
+  minigame: 6,
 }
 export const ACTIVITY_SEASON_MAX: Record<ActivityKind, number> = {
-  attendance: 1825,
-  daily_learn: 730,
-  minigame: 2190,
+  attendance: 3650,
+  daily_learn: 1095,
+  minigame: 4380,
 }
 export function activityDelta(kind: ActivityKind): number {
   return ACTIVITY_DELTA[kind]
@@ -154,7 +156,7 @@ export function activityDelta(kind: ActivityKind): number {
 export function activityPerDay(kind: ActivityKind): number {
   return ACTIVITY_PER_DAY[kind]
 }
-/** 활동 트랙 시즌 상한 합 = 4,745 */
+/** 활동 트랙 시즌 상한 합 = 9,125 */
 export const ACTIVITY_MAX = Object.values(ACTIVITY_SEASON_MAX).reduce((a, b) => a + b, 0)
 
 // ── 레벨테스트 트랙 ──
@@ -168,21 +170,30 @@ export function computeSkillScore(clearedLevels: number): number {
 }
 
 // ── ARENA 레벨 밴드 — 시즌 총점 → 표시 레벨 ──
-// 원안 표 그대로 1,000점 균등 밴드: Lv.1 0~999 · Lv.2 1,000~1,999 · … · Lv.6 5,000~5,999 · Lv.7 6,000~11,745.
+// 2026-09-03 개정표 — **균등 1,000 폐지**. 위로 갈수록 밴드가 넓어진다:
+//   Lv.1 0~1,000 · Lv.2 1,001~2,200 · Lv.3 2,201~3,700 · Lv.4 3,701~5,500
+//   Lv.5 5,501~7,500 · Lv.6 7,501~10,000 · Lv.7 10,001~16,125
 // ⚠️ 이건 **표시용 레벨**이고, 시험 사다리 등급(user_progress.rank — 승급으로만 오름)과는 별개 축이다.
 //    결과창의 승급 연출은 계속 rank 기준이다.
-export const ARENA_BAND_STEP = 1000
-/** 시즌 총점 상한 = 레벨테스트 7,000 + 활동 4,745 = 11,745 (= Lv.7 최고점) */
+// ⚠️ 이 레벨은 **캐릭터 그림(lv1~lv7)** 도 같이 정한다(hubCosmetics 의 charArtSrc — /hub·/room·랭킹 카드·채팅).
+//    밴드를 넓히면 캐릭터 성장도 같이 느려진다.
+// ⛔ **SQL 에 같은 표가 한 벌 더 있다** — `public.arena_level_of()`(마이그레이션 20260903130000).
+//    트리거가 user_progress.arena_level 을 그 함수로 채우므로, 한쪽만 고치면 화면 레벨과 저장 레벨이 갈린다.
+/** 레벨 N 의 최저점(인덱스 0 = Lv.1). 개정표의 '최저점' 칸 그대로. */
+export const ARENA_BAND_MIN = [0, 1001, 2201, 3701, 5501, 7501, 10001]
+/** 시즌 총점 상한 = 레벨테스트 7,000 + 활동 9,125 = 16,125 (= Lv.7 최고점) */
 export const SEASON_MAX_POINTS = LEVELTEST_MAX + ACTIVITY_MAX
 export function arenaLevelForScore(total: number): number {
   const t = Math.max(0, Math.floor(total))
-  return Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, Math.floor(t / ARENA_BAND_STEP) + 1))
+  let lv = MIN_LEVEL
+  for (let i = 0; i < ARENA_BAND_MIN.length; i++) if (t >= ARENA_BAND_MIN[i]) lv = i + 1
+  return Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, lv))
 }
 /** 그 밴드의 [최저점, 최고점]. 최상위(Lv.7)는 위가 열려 있어 시즌 상한까지. */
 export function arenaBand(level: number): [number, number] {
   const lv = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level))
-  const lo = (lv - 1) * ARENA_BAND_STEP
-  return [lo, lv >= MAX_LEVEL ? SEASON_MAX_POINTS : lo + ARENA_BAND_STEP - 1]
+  const lo = ARENA_BAND_MIN[lv - 1]
+  return [lo, lv >= MAX_LEVEL ? SEASON_MAX_POINTS : ARENA_BAND_MIN[lv] - 1]
 }
 
 // (티어 5단계(브론즈~다이아)는 2026-08-04 제거됐다 — 엠블렘·티어명·티어색·티어사다리를 화면에서 통째로 뺐다.

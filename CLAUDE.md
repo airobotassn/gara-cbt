@@ -240,16 +240,21 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - 선례: 첫 밀기 `20260722090000_level_ladder_shift.sql`(옛 1~6 → 2~7). 되돌리기는 `_bak_20260827_*` 스냅샷.
 - **시험 규모**: 문항 수 = 제한시간(분), 레벨 구간별 — **Lv.1 = 10 · Lv.2 = 15 · Lv.3~4 = 20 · Lv.5~7 = 30**(2026-08-27 지시로 Lv.2 가 15로 따로 떨어졌다). 단일 출처는 양쪽 `scoring.ts` 의 `questionsForLevel`(`durationMinutesForLevel` 이 그대로 재사용). ⚠️ **문항 수 구간과 승급컷·보기 개수 경계는 다른 축이다** — 승급컷 70/80% 와 4/5지선다는 둘 다 Lv.4/Lv.5 에서 갈리고, 문항 수만 Lv.2 에서 한 번 더 나뉜다. 셋을 한 덩어리로 보고 같이 옮기면 어긋난다. ⚠️ 화면 문구는 전부 이 함수에서 계산된다(`lv.fact_q`·`lv.fact_min`·`lv.fact_cut`) — 문구에 숫자를 박지 말 것.
 - **등급 변동 규칙**: 승급컷 = 정답률 비율(`promoteCut` — Lv.1~4 70%, Lv.5~7 80% → Lv.1 7/10 · Lv.2 11/15 · Lv.3·4 14/20 · Lv.5~7 24/30. 2026-08-04 완화, 이전 80/90% · 2026-08-27 경계 한 칸 밀기). **강등은 없다(2026-07 제거)** — `computeRankChange` 는 승급(`up`) 아니면 유지(`stay`) 뿐이고, 강등선·3진 경고·강등 시드(`DEMOTE_*`)와 결과창/대시보드 경고 배너가 모두 삭제됐다. DB 컬럼 `user_progress.demotion_strikes`·`test_attempts.warn_strikes` 는 남아있지만 읽지도 쓰지도 않는 vestigial(옛 기록의 `rank_dir='down'` 은 서버가 `stay` 로 접어서 내려줌). 규칙/컷 바꾸면 양쪽 `scoring.ts`·`_shared/lib.ts` + 레벨선택 규칙박스 문구(`lv.rule_*`)가 같이 갱신됨.
-- **시즌 점수 (2026-08-04 원안 반영)**: 리더보드 정렬 단일 출처 = `user_progress.season_total` = **레벨테스트 트랙**(`skill_score`) + **활동 트랙**(`activity_score`).
+- **시즌 점수 (2026-09-03 개정표 · `20260903130000`)**: 리더보드 정렬 단일 출처 = `user_progress.season_total` = **레벨테스트 트랙**(`skill_score`) + **활동 트랙**(`activity_score`).
   - 레벨테스트 = 레벨 클리어 1회당 **+1,000**(부분점수 없음 — 승급컷 미달은 0) · 7단계 전부 = **7,000**. `applyAttempt` 가 "클리어한 레벨 수 = 도달 등급−1, 단 천장에서 Lv.7 을 통과하면 7" 로 계산해 GREATEST 로 쌓는다.
-  - 활동 = 미니게임 +2(일 3회) · DAILY QUIZ +2(일 1회) · 출석 +5(일 1회) → 시즌(365일) 상한 **4,745**. 적립값·일일횟수·시즌상한 3표가 한 벌이다(`ACTIVITY_DELTA`/`ACTIVITY_PER_DAY`/`ACTIVITY_SEASON_MAX`, `seasonMax = delta × perDay × SEASON_DAYS`).
-  - 전체 상한 **11,745**. 표시 레벨 `ARENA Lv.N` = 시즌 총점 1,000점 균등 밴드(`arenaLevelForScore`/`arenaBand`) — **시험 사다리 등급(`user_progress.rank`)과 별개 축**이다(결과창 승급 연출은 계속 rank 기준).
-  - ⚠️ 미니게임은 **참여 횟수당 고정 적립**이라 성적이 활동점수에 반영되지 않는다(게임 실력은 `minigame_scores` 랭킹 전용). 하루 캡은 `activity_ledger` 의 `unique(user_id, day, source_ref)` 를 회차 슬롯(`play:1`…`play:3`)으로 써서 건다.
-  - ⛔ **친구 초대는 이제 점수를 주지 않는다(2026-08-24)** — 보상이 **코인 500(양쪽 다 · 도입 때는 50)** 으로 옮겨갔다(아래 '친구 초대' 절). 그래서 활동 상한이 6,570 → **4,745**, 전체 상한이 13,570 → **11,745** 로 내려갔다.
-    - ⚠️ **부수효과 하나가 원안의 성질을 깼다** — 예전엔 활동만 채워도(6,570) Lv.7 밴드에 들어갔는데 지금은 **Lv.5 까지**다. 되돌리려면 남은 3종의 적립값을 올릴 것(초대를 점수 표로 되돌리는 건 답이 아니다 — 화면이 주지도 않는 점수를 약속하게 된다). 보류중인 수정안(바탕화면 `WORLD_ARENA_점수체계_수정제안.html`)이 노리던 방향과 우연히 같다.
-    - `activity_ledger` 의 kind CHECK 에는 `referral` 이 남아 있고 **이미 적립된 옛 행도 그대로 둔다**(받은 점수를 빼앗지 않는다). 새로 쌓는 곳만 없어졌다.
+  - 활동 = 출석 +10(일 1회) · 미니게임 +2(일 6회) · DAILY QUIZ +3(일 1회) → 시즌(365일) 상한 **9,125**. 적립값·일일횟수·시즌상한 3표가 한 벌이다(`ACTIVITY_DELTA`/`ACTIVITY_PER_DAY`/`ACTIVITY_SEASON_MAX`, `seasonMax = delta × perDay × SEASON_DAYS`).
+  - 전체 상한 **16,125**. 표시 레벨 `ARENA Lv.N` = 시즌 총점 밴드(`ARENA_BAND_MIN`/`arenaLevelForScore`/`arenaBand`) — **시험 사다리 등급(`user_progress.rank`)과 별개 축**이다(결과창 승급 연출은 계속 rank 기준).
+  - **밴드는 균등이 아니다(2026-09-03 개정)** — 위로 갈수록 넓어진다: Lv.1 0~1,000 · Lv.2 1,001~2,200 · Lv.3 2,201~3,700 · Lv.4 3,701~5,500 · Lv.5 5,501~7,500 · Lv.6 7,501~10,000 · Lv.7 10,001~16,125.
+    - ⛔ **밴드가 **세 곳**에 있다** — 양쪽 `scoring.ts` 의 `ARENA_BAND_MIN` + **SQL `public.arena_level_of()`**. SQL 쪽은 트리거가 `user_progress.arena_level`(저장 컬럼)을 채우므로, 함수만 갈고 **기존 행 백필을 빼면** 화면이 말하는 레벨과 DB 가 저장한 레벨이 갈린다. 대조는 `tests/db/t-arena-level.mjs` 가 전 구간 스윕으로 본다.
+    - ⛔ **밴드를 넓히면 기존 회원의 레벨이 내려간다 — 그때 워터마크(`user_characters.arena_level_seen`)도 같이 내려야 한다.** 안 내리면 떨어진 사람이 다시 올라와도 `level > seen` 이 거짓이라 **레벨업 축하가 영영 안 뜬다**(시즌 리셋이 같은 이유로 워터마크를 재동기화한다). 반대로 `seen < level` 인 사람은 **못 본 축하가 예약된 상태**라 건드리면 안 된다.
+    - ⚠️ 이 레벨은 **캐릭터 그림(lv1~lv7)** 도 정한다(`/hub`·`/room`·랭킹 카드·채팅). 밴드를 넓히면 캐릭터 성장도 같이 느려지고, 개정 시점에 기존 회원의 캐릭터가 작은 그림으로 되돌아간다(2026-09-03 지시: "표 그대로, 내려가도 둔다").
+  - ⚠️ **활동만으로는 Lv.7 이 안 된다** — 활동 상한 9,125 < Lv.7 컷 10,001. 최고 레벨은 레벨테스트를 끼워야 나온다(개정표의 의도된 성질). 적립값을 더 올릴 땐 이 선을 같이 볼 것.
+  - ⚠️ 미니게임은 **참여 횟수당 고정 적립**이라 성적이 활동점수에 반영되지 않는다(게임 실력은 `minigame_scores` 랭킹 전용). 하루 캡은 `activity_ledger` 의 `unique(user_id, day, source_ref)` 를 회차 슬롯(`play:1`…`play:6`)으로 써서 건다.
+  - ⚠️ 관리자 › 적립 정책 화면(`reward_policy` 표)은 **채점에 안 쓰이는 사본**이다(읽는 곳은 `admin/reform.ts` 의 조회·저장뿐). 값을 바꿀 땐 여기도 밀어야 화면이 거짓말을 안 한다.
+  - ⛔ **친구 초대는 점수를 주지 않는다(2026-08-24)** — 보상이 **코인 500(양쪽 다 · 도입 때는 50)** 으로 옮겨갔다(아래 '친구 초대' 절). `activity_ledger` 의 kind CHECK 에는 `referral` 이 남아 있고 **이미 적립된 옛 행도 그대로 둔다**(받은 점수를 빼앗지 않는다). 새로 쌓는 곳만 없어졌다.
   - 옛 `computePoints`(0~10000)는 `user_progress.points` 컬럼 전용으로만 남았다(`leaderboard_v2` 등 구코드용).
   - 값을 바꾸면 **양쪽 `scoring.ts` + `tests/db/t-scoring-parity.mjs`** 를 같이 고쳐야 한다 — 패리티 테스트가 두 파일의 소스 바이트 동일성까지 본다.
+  - 배포: 마이그레이션 + `_shared/scoring.ts` 를 쓰는 함수 **15개** 재배포(`admin-test character complete-daily get-result leaderboard list-attempts minigame-rank redeem-referral set-nickname set-region shop-buy start-test submit-minigame submit-test verify-cert` — 전부 플래그 없이) + 프론트 push.
 - **CARIS 자격검정 문항 다국어(2026-08-25)** — 응시자가 자기 언어로 시험을 본다. 여태 `questions.prompt`(text)·`choices`(jsonb) 단일 컬럼이라 번역을 담을 자리가 없어서, 무료 레벨테스트는 6개국어인데 **돈 받는 CARIS 만 한국어**였다.
   - ⛔ **한국어의 단일 출처는 여전히 `prompt`·`choices` 다 — `*_i18n` 에 ko 를 넣지 않는다.** 레벨테스트(`test_questions.prompt_i18n`)는 ko 까지 담지만 CARIS 는 관리자 화면(문항목록·채점·분석·미리보기·엑셀)이 원본 컬럼을 **열 곳 넘게** 읽는다. ko 를 i18n 안으로 옮기면 한 자리만 놓쳐도 **조용히 빈 문자열**이 되고, 옮겨도 ko 가 두 군데 생겨 동기화 페어가 늘어난다. 번역본만 담으면 중복이 0이고 관리자 화면은 손댈 게 없다.
   - 투영은 `_shared/lib.ts` 의 `projKoText`/`projKoOptions` 하나뿐이다 — ko 요청이면 원본, 번역이 있으면 번역본, **없으면 원본(한국어)**. 미번역 문항은 그 문항만 한국어로 뜬다(빈 화면이 아니다).
