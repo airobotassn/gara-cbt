@@ -51,7 +51,9 @@
       (아래 '스킨 계약' 블록 참고). 규칙은 변수만 읽는다.
    ⚠️ pointer-events:none 이 빠지면 화면 전체를 덮는 레이어라 아래 UI 가 하나도 안 눌린다.
    ⚠️ 배경·캐릭터 둘 다 background-image 다 — <img> 로 두면 스킨을 바꿀 때 HTML 을 고쳐야 한다.  */
-.hub-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+/* ⚠️ 높이는 통(.hub)과 **같은 100svh** 여야 한다. 이 레이어는 뷰포트에 고정인데 통만 짧으면
+   캐릭터 발끝(--skin-char-bottom)이 통 밖에 놓여 **도크(랭킹 판)를 덮는다**(2026-09-03 실기기). */
+.hub-scene { position: fixed; inset: 0; bottom: auto; height: 100svh; z-index: 0; pointer-events: none; overflow: hidden; }
 .hub[data-skin] .hub-scene-bg { position: absolute; inset: 0;
   background-image: var(--skin-bg);
   /* ⚠️ 기본값 cover 는 **세로 위치를 못 움직인다.** 폰처럼 세로로 긴 화면에서는 cover 가 그림 높이를
@@ -759,7 +761,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       궁궐 값을 그대로 쓰면 캐릭터가 언덕 중턱에 붕 뜬다. */
 .hub[data-skin='meadow']       {
   --skin-bg: url('/hub/bg-meadow-default.webp'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%;
-  --skin-char-h: 43vh; --skin-char-bottom: 25vh;
+  --skin-char-h: 43svh; --skin-char-bottom: 25svh;
 }
 .hub[data-skin='palace_day']   { --skin-bg: url('/hub/bg-v2.webp'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='palace_night'] { --skin-bg: url('/hub/bg-v5.webp'); --skin-bg-size: auto 130%; --skin-bg-pos: 50% 100%; }
@@ -788,14 +790,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
      ⚠️ 그래서 --skin-bg 를 여기 두지 않고 아래에서 스킨별로 덮는다. 여기 두면 한쪽이 늘 이긴다. */
   /* ⚠️ 캐릭터 그림 경로·비율은 여기 없다 — 캐릭터를 고를 수 있게 되면서(2026-08-20) 코드가 알아야
      하는 값이 됐다(src/lib/hubCosmetics.ts). 여기 남기면 두 곳이 서로 다른 그림을 가리킨다. */
-  --skin-char-h: 48vh;          /* 캐릭터 칸 높이 — 그림이 실제로 차지하는 키가 아니다(아래 ⚠️) */
+  --skin-char-h: 48svh;          /* 캐릭터 칸 높이 — 그림이 실제로 차지하는 키가 아니다(아래 ⚠️) */
                                 /* ⚠️ **캔버스 높이지 인물 키가 아니다.** 캐릭터 그림은 7장이 같은
                                    캔버스를 쓰고 그 안에서 Lv.1~6 이 세로 70%, Lv.7 만 90%대다
                                    (마지막 레벨이라 후광·옥좌까지 크게 그렸다). 그래서
                                    **인물이 화면에서 차지하는 키 = 이 값 × 0.70** 이다.
                                    ⛔ 이 70% 는 `tools/build-char-art.mjs` 의 HEADROOM(1.42)이 정한다 —
                                       한쪽만 고치면 캐릭터가 통째로 커지거나 작아진다. 한 쌍이다. */
-  --skin-char-bottom: 20vh;     /* 발끝이 놓이는 자리. 배경 지평선과 맞춘다 */
+  --skin-char-bottom: 20svh;     /* 발끝이 놓이는 자리. 배경 지평선과 맞춘다 */
                                 /* ⚠️ 이 값이 뜻대로 동작하려면 그림 아래에 투명 여백이 없어야 한다.
                                    여백이 있으면 발끝이 그만큼 떠서 이 값이 거짓말을 한다.
                                    (위 도구가 캔버스 아래끝을 발끝에 맞춰 잘라서 그걸 보장한다.) */
@@ -905,8 +907,8 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   /* 무대 — 배경 그림의 광장(포장 바닥)이 시작되는 높이에 발끝을 맞췄다.
      ⚠️ 고궁(20vh)보다 조금 높다. 이 그림은 아래쪽이 통째로 광장이라 더 낮추면 캐릭터가
         화면 아래 모서리에 붙어 도크와 겹친다. */
-  --skin-char-h: 46vh;
-  --skin-char-bottom: 22vh;
+  --skin-char-h: 46svh;
+  --skin-char-bottom: 22svh;
 
   /* 글자색 — 판이 거의 흰 면(#f9f9fc)이라 짙은 남색. 흰 바탕이라 highlight 그림자는 안 쓴다
      (밝은 글자 그림자는 흰 면에서 아무 일도 안 하고 글자만 흐려 보이게 만든다). */
@@ -1296,7 +1298,12 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       무대가 줄어드는 순간 레일이 무대를 넘쳐 아래 출석 스탬프를 덮는다(hub.css 위쪽 경고와 같은 사고).
       이제 무대가 얼마가 되든 칸들이 그 높이를 나눠 갖는다 — 그래서 칸을 더하거나 빼도(2026-08-24
       '출석' 제거로 4 → 3) 높이를 다시 실측할 일이 없다.                          */
-.hub { height: 100svh; display: flex; flex-direction: column; }
+/* ⛔ **`min-height: 0` 을 빼지 말 것.** 이 파일 맨 위 `.hub` 블록이 `min-height: 100vh` 를 들고 있는데
+   min-height 는 height 를 **이긴다** — 그래서 여기서 100dvh 를 잡아도 통은 계속 100vh(주소창이 접힌
+   큰 화면)였고, 주소창이 펴지면 그 차이만큼 맨 아래 랭킹 버튼이 화면 밖으로 내려갔다.
+   (2026-09-03: "랭킹이 밑으로 내려가서 스크롤이 생긴다" 의 진짜 원인이 이것이었다 — 단위가 아니라
+    min-height 였다. 단위를 dvh→svh 로 바꿔도 이 줄이 없으면 아무것도 안 달라진다.) */
+.hub { height: 100svh; min-height: 0; display: flex; flex-direction: column; }
 /* ⚠️ `width: 100%` 를 빼면 안 된다. 넓은 화면에서 .home 은 `margin-left/right: auto` 로 가운데 정렬되는데,
       flex 아이템은 **가로 마진이 auto 면 늘어나기(stretch)를 포기하고 내용만큼만 줄어든다**.
       그래서 .hub 를 flex 로 바꾼 순간 본문 폭이 1080 → 700 언저리로 쪼그라들었다
