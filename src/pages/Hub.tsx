@@ -210,18 +210,30 @@ const COIN_ROWS: { key: string; icon: string; n: number | null }[] = [
  * 관리자 미리보기 값 — `#preview=<캐릭터키>:<스킨파츠키>:<레벨>:<배율>`.
  * 꾸미기 관리가 이 화면을 iframe 으로 띄우고 해시만 갈아끼운다(리로드 없이 바뀐다).
  */
-interface HubPreview { char: string; skin: string; lv: number; scale: number }
+interface HubPreview { char: string; skin: string; lv: number; scale: number; img: string | null }
 function readPreviewHash(): HubPreview | null {
   const m = /(?:^#|&)preview=([^&]+)/.exec(window.location.hash)
   if (!m) return null
   const [char, skin, lv, scale] = decodeURIComponent(m[1]).split(':')
   if (!char || !skin) return null
   const n = Number(lv), s = Number(scale)
+  // 그림 주소는 **따로 받는다**(`&pvimg=`). 위 값들과 한 덩어리로 묶으면 안 된다 — 구분자가 `:` 인데
+  //   주소에 `https://` 의 `:` 가 들어 있어 쪼개지는 자리가 어긋난다.
+  // ⚠️ https 만 받는다. 이 해시는 주소창으로 아무나 넣을 수 있는 값이라, 받는 걸 <img src> 로 한정한다.
+  const im = /(?:^#|&)pvimg=([^&]+)/.exec(window.location.hash)
+  let img: string | null = null
+  if (im) {
+    try {
+      const u = decodeURIComponent(im[1])
+      if (/^https:\/\//.test(u)) img = u
+    } catch { /* 망가진 값이면 그냥 무시한다 — 미리보기는 표에서 찾은 그림으로 뜬다 */ }
+  }
   return {
     char,
     skin,
     lv: Number.isFinite(n) ? Math.min(7, Math.max(1, Math.round(n))) : 1,
     scale: Number.isFinite(s) && s > 0 ? Math.min(2, Math.max(0.4, s)) : 1,
+    img,
   }
 }
 
@@ -916,7 +928,9 @@ export default function Hub() {
         >
           {/* 캐릭터 레벨 = ARENA 레벨(시즌 총점 밴드, 1~7). 점수가 오르면 무대 위 캐릭터가 그대로 자란다.
               ⚠️ 시험 사다리 등급(user_progress.rank)이 아니다 — 둘 다 1~7 이라 헷갈리기 쉽다. */}
-          <CharArt charKey={pv?.char ?? charKey} level={arenaLv} className="hub-scene-char-img" />
+          {/* ⚠️ `pv.img` = 관리자 미리보기가 넘겨준 그림 주소. 이게 있으면 표를 안 보고 그대로 그린다 —
+              이 창은 캐릭터 표를 뜰 때 한 번만 읽어서, 방금 올린(아직 저장 전인) 그림은 표에 없다. */}
+          <CharArt charKey={pv?.char ?? charKey} level={arenaLv} srcOverride={pv?.img} className="hub-scene-char-img" />
         </div>
       </div>
 

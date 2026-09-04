@@ -23,6 +23,7 @@ export default function CharArt({
   level = CHAR_MIN_LEVEL,
   className,
   alt = '',
+  srcOverride,
 }: {
   /** 캐릭터 키(`char_a_m` 등). null·'default' 면 폴백 그림. */
   charKey: string | null | undefined
@@ -30,11 +31,23 @@ export default function CharArt({
   level?: number
   className?: string
   alt?: string
+  /**
+   * 그림 주소를 **직접** 준다(관리자 꾸미기 관리의 미리보기 전용).
+   *
+   * 왜 필요한가: 미리보기는 진짜 `/hub` 을 iframe 으로 띄우는데, 그 창은 캐릭터 표를 **뜰 때 한 번만**
+   * 읽고 들고 있다(`loadCharArt`). 그래서 방금 올린 그림은 물론이고 저장까지 마친 그림도 창을 다시
+   * 띄우기 전에는 안 바뀐다 — 관리자 입장에선 "올려도 미리보기가 그대로"다(2026-09-03 지적).
+   * ⚠️ 창을 다시 띄우는 방식(src 교체)으로 풀지 말 것 — 크기 슬라이더를 움직이는 내내 깜빡인다.
+   *    그래서 값만 흘려 넣는다.
+   */
+  srcOverride?: string | null
 }) {
   // 관리자가 올린 캐릭터 표가 도착하면 다시 그린다. 안 구독하면 표가 와도 이미 그려진 화면은
   // 코드 경로(=없는 파일 → 폴백)인 채로 남는다. 조회는 모듈이 한 번만 한다.
   useSyncExternalStore(subscribeArt, charArtVersion, charArtVersion)
-  const wanted = charKey && charKey !== 'default' ? charArtSrc(charKey, level) : CHAR_FALLBACK_SRC
+  const wanted = srcOverride
+    ? srcOverride
+    : charKey && charKey !== 'default' ? charArtSrc(charKey, level) : CHAR_FALLBACK_SRC
   // 실패한 경로를 **집합으로** 기억한다 — boolean 하나면 캐릭터나 레벨을 바꿨을 때
   // 새 그림도 폴백으로 시작한다(멀쩡한 파일이 있는데 안 보인다).
   const [failed, setFailed] = useState<Set<string>>(() => new Set())

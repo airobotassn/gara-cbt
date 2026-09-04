@@ -2106,13 +2106,23 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
   // 미리보기에 값 전달 — **해시만 갈아끼운다.** src 를 바꾸면 iframe 이 리로드돼 슬라이더가 끊긴다.
   //   ⚠️ 같은 오리진이라 contentWindow 를 직접 만질 수 있다. 다른 오리진이면 postMessage 여야 한다.
   const pvHash = partKey ? `${partKey}:${pvSkin}:${pvLevel}:${scaleOf(pvLevel)}` : ''
+  // ⛔ **지금 보고 있는 레벨의 그림 주소를 같이 넘긴다(2026-09-03).** 안 넘기면 미리보기 창이 자기가
+  //    뜰 때 받아둔 캐릭터 표에서 그림을 찾는데, 방금 올린 그림은 거기 없다 → **올려도 미리보기가
+  //    그대로**다(저장한 뒤에도 창을 다시 띄우기 전엔 안 바뀐다). 관리자가 크기를 맞추려면 지금 올린
+  //    그림이 보여야 하므로, 표를 거치지 않고 값으로 직접 흘려 넣는다.
+  //    ⚠️ 해시에 **별도 키(`&pvimg=`)로** 붙인다 — 위 pvHash 는 `:` 로 쪼개는데 주소에 `https://` 의
+  //       `:` 가 들어 있어 한 덩어리로 묶으면 파싱이 어긋난다.
+  const pvImg = urls[String(pvLevel)] ?? ''
   useEffect(() => {
     if (!pvHash) return
     try {
       const w = pvFrame.current?.contentWindow
-      if (w) w.location.hash = `preview=${encodeURIComponent(pvHash)}`
+      if (w) {
+        w.location.hash = `preview=${encodeURIComponent(pvHash)}`
+          + (pvImg ? `&pvimg=${encodeURIComponent(pvImg)}` : '')
+      }
     } catch { /* 아직 안 떴으면 src 의 초기 해시가 그 값이다 */ }
-  }, [pvHash])
+  }, [pvHash, pvImg])
 
   /**
    * 올리기 전에 **투명 여백을 잘라낸다.**
@@ -2324,7 +2334,11 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
             <iframe
               ref={pvFrame}
               title="허브 미리보기"
-              src={`/hub#preview=${encodeURIComponent(`${partKey}:${pvSkin}:${pvLevel}:${scaleOf(pvLevel)}`)}`}
+              /* ⚠️ 그림 주소를 여기에도 넣는다 — 창이 **아직 안 떴을 때**는 위 이펙트의 해시 쓰기가
+                 사라지고 이 초기값이 남기 때문이다(캐릭터를 처음 고른 직후가 그 경우다).
+                 ⚠️ `#` 뒤만 달라지는 주소 변경은 문서를 다시 안 받는다 — 그래서 슬라이더가 안 끊긴다.
+                    `#` 앞을 건드리면 그때부터 매번 리로드가 걸린다. */
+              src={`/hub#preview=${encodeURIComponent(pvHash)}${pvImg ? `&pvimg=${encodeURIComponent(pvImg)}` : ''}`}
               style={{
                 width: `${100 / PV_ZOOM}%`, height: `${100 / PV_ZOOM}%`,
                 transform: `scale(${PV_ZOOM})`, transformOrigin: '0 0', border: 0, display: 'block',
