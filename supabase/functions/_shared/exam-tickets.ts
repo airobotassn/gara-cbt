@@ -40,12 +40,13 @@ export interface ExamTicketRow {
   consumed_at: string | null
   voided_at: string | null
   void_reason: string | null
-  created_at: string
+  // ⚠️ created_at 은 2026-09-04 에 뺐다 — issued_at 과 값이 늘 같았고(둘 다 now() 로 같이 찍혔다)
+  //    읽는 코드는 issued_at 쪽뿐이었다(목록 정렬 · 화면의 '발급일' · API 의 issuedAt).
 }
 
 /** 응시권 select 컬럼 — 한 곳에 모아 함수마다 어긋나는 걸 막는다(PAYMENT_COLS 와 같은 관례). */
 export const EXAM_TICKET_COLS =
-  'id, user_id, round_id, tier, status, source, payment_id, price_paid, granted_by, note, expires_at, issued_at, consumed_at, voided_at, void_reason, created_at'
+  'id, user_id, round_id, tier, status, source, payment_id, price_paid, granted_by, note, expires_at, issued_at, consumed_at, voided_at, void_reason'
 
 /** '살아있는' 응시권 = 슬롯을 차지하는 상태. exam_tickets_live_uniq 의 부분 조건과 **반드시 같아야** 한다. */
 export const LIVE_TICKET_STATUSES: ExamTicketStatus[] = ['issued', 'consumed']
