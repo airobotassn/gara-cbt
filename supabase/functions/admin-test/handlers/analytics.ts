@@ -33,7 +33,7 @@ export async function analytics(admin: any) {
   const since7 = new Date(now - 7 * 864e5).toISOString()
   const [profRes, attRes, ansRes, qRes, progRes, usersCntRes, guestsCntRes, attsCntRes, atts7dCntRes] = await Promise.all([
     admin.from('profiles').select('created_at, is_anonymous').limit(10000),
-    admin.from('test_attempts').select('level, lang, rank_dir, total_correct, total_questions, status, submitted_at, created_at').limit(10000),
+    admin.from('test_attempts').select('level, lang, rank_dir, total_correct, total_questions, status, submitted_at, started_at').limit(10000),
     admin.from('test_answers').select('question_id, category, is_correct').limit(50000),
     admin.from('test_questions').select('id, level, category, correct_index, prompt_i18n, options_i18n, active').is('deleted_at', null).limit(5000),
     admin.from('user_progress').select('rank').limit(20000),
@@ -62,7 +62,7 @@ export async function analytics(admin: any) {
   const byLang: Record<string, number> = {}
   const rankDir = { up: 0, down: 0, stay: 0 }
   for (const a of atts as any[]) {
-    const k = (a.submitted_at ?? a.created_at ?? '').slice(0, 10)
+    const k = (a.submitted_at ?? a.started_at ?? '').slice(0, 10)
     if (k in attemptByDay) attemptByDay[k]++
     byLevel[a.level] = (byLevel[a.level] || 0) + 1
     byLang[a.lang] = (byLang[a.lang] || 0) + 1

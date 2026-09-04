@@ -6,8 +6,10 @@ import { pickLang, projText, projOptionsForLevel } from '../../_shared/scoring.t
 export async function listAttempts(admin: any) {
   const { data } = await admin
     .from('test_attempts')
-    .select('id, user_id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at')
-    .order('created_at', { ascending: false })
+    // ⚠️ created_at 은 2026-09-04 에 드롭했다(started_at 과 늘 같은 값이었다). 응답 필드 이름은
+    //    화면이 쓰던 그대로 두려고 별칭으로 유지한다 — created_at:started_at.
+    .select('id, user_id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at:started_at')
+    .order('started_at', { ascending: false })
     .limit(200)
   const ids = [...new Set((data ?? []).map((a: any) => a.user_id))]
   const nameMap: Record<string, string> = {}
