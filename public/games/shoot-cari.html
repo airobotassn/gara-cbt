@@ -501,6 +501,12 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;
 // 튜닝
 const BASE_SPEED=26;      // px/초 (기본 낙하) — 조금 더 느리게
 const SPEED_VAR=13;       // px/초 (운석별 랜덤 가감)
+/* ⛔ 위 두 값은 **기준 화면에서 잰 px/초**다. 그대로 쓰면 안 되고 REF_TRAVEL 로 환산해서 쓴다.
+   왜: 스테이지 높이가 `min(860px,100vh)` 라 화면이 낮은 폰일수록 내려올 거리가 짧아진다. 속도가
+   px/초 고정이면 그 폰만 문제 하나에 주어지는 시간이 확 줄어든다 — 실측으로 320x568 에서 11.0초,
+   아이폰14(390x844) 에서 17.8초로 **1.6배** 차이가 났다(같은 게임인데 작은 폰이 훨씬 어려웠다).
+   그래서 속도를 '초당 몇 px' 이 아니라 **'초당 낙하거리의 몇 %'** 로 읽는다. */
+const REF_TRAVEL=676;     // 기준 낙하거리(px) = 460x860 스테이지 실측(스폰 -h → 방어선)
 const LVL_SPEED=0.10;     // 레벨당 낙하 속도 +10% (완만하게)
 const START_SPAWN=3000;   // ms (여유 있게 출제)
 const MIN_SPAWN=1300;
@@ -899,7 +905,8 @@ function loop(t){
     const m=order[i];
     if(!m.animating){
       const h=m.el.offsetHeight;
-      let step=m.speed*speedMul*dt/1000;
+      // 이 화면의 실제 낙하거리로 환산 — 어느 기기든 한 문제에 주어지는 시간이 같아진다(위 REF_TRAVEL).
+      let step=m.speed*speedMul*((floorY+h)/REF_TRAVEL)*dt/1000;
       // 차간거리: 아래 기체를 침범/추월하지 못하게 감속(위로 되돌리진 않는다).
       // 가로 거리와 무관하다 — 옆으로 멀리 떨어져 있어도 줄을 선다.
       let limit=Infinity;
