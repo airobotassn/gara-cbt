@@ -452,10 +452,20 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 .hub .title-lock { position: absolute; top: 8px; right: 8px; width: 25px; height: 25px; display: grid; place-items: center;
   border: 2px solid var(--line); border-radius: 50%; background: var(--card); font-size: 12px; filter: grayscale(1); }
 .hub .title-vault-help { margin: 14px 2px 0; text-align: center; }
+/* 그림이 아직 없는 급수(CARIS-Ⅱ)의 자리. **img 와 같은 상자**여야 한다 — 크기가 다르면 한 줄 안에서
+   칭호마다 높이가 달라진다. */
+.hub .title-fallback { display: grid; place-items: center; width: min(112px, 100%); aspect-ratio: 1; font-size: 54px; line-height: 1; }
+/* 딴 칭호는 누르면 갈아 낀다 — 버튼이지만 생김새는 판 그대로다(위 .title-badge 규칙을 그대로 받는다). */
+.hub button.title-badge { cursor: pointer; font-family: inherit; }
+.hub .title-badge.is-active { border-color: var(--blue, #30a4ec); box-shadow: 0 4px 0 rgba(var(--shc), .18), inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 3px rgba(48,164,236,.28); }
+.hub .title-on { position: absolute; top: 8px; right: 8px; padding: 2px 7px; border-radius: 999px;
+  background: var(--blue, #30a4ec); color: #fff; font-size: 10.5px; font-weight: 900; letter-spacing: .2px; }
 @media (max-width: 390px) {
   .hub .title-vault { gap: 7px; }
   .hub .title-badge { padding-inline: 3px; font-size: 11px; }
   .hub .title-lock { top: 5px; right: 5px; }
+  .hub .title-fallback { font-size: 42px; }
+  .hub .title-on { top: 5px; right: 5px; font-size: 9.5px; padding: 2px 6px; }
 }
 
 /* 허브는 단일 화면이라 우하단 '맨 위로' 버튼 숨김(.hub 렌더 시에만) */

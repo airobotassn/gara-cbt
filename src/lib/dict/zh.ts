@@ -1813,6 +1813,8 @@ const ZH: Record<string, string> = {
   "hub.err.invalid_character": "无法选择的角色",
   "hub.err.invalid_kind": "无法使用的类型",
   "hub.err.invalid_part": "无法使用的道具",
+  "hub.err.invalid_title": "无法佩戴的称号",
+  "hub.err.not_earned": "你还没有取得该资格",
   "hub.part.char_a_m": "韩风角色（男）",
   "hub.part.char_a_f": "韩风角色（女）",
   "hub.part.char_b_m": "角色 B · 男",
@@ -1836,6 +1838,8 @@ const ZH: Record<string, string> = {
   // 칭호
   "hub.title.title": "称号",
   "hub.title.login": "登录后即可查看称号收藏。",
+  "hub.title.on": "佩戴中",
+  "hub.title.pick": "点击称号即可换成该称号。",
 
   // 점수 획득 방법
   "hub.earn.title": "积分与金币获取方式",

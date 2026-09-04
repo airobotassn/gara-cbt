@@ -35,7 +35,7 @@ import {
   type PaymentRow,
   type ProductType,
 } from '../_shared/payments.ts'
-import { findLiveTickets, grantExamTicket, ticketSourceAlive } from '../_shared/exam-tickets.ts'
+import { attemptPassed, findLiveTickets, grantExamTicket, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
 const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert', 'bundle', 'lecture']
 
@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
         productType === 'cert'
           ? admin
               .from('exam_attempts')
-              .select('user_id, ticket_id, status, result_release_at, total_correct, total_questions, cert_no')
+              .select('user_id, ticket_id, status, result_release_at, total_correct, total_questions, pass_ratio_snapshot, cert_no')
               .eq('id', product.ref)
               .maybeSingle()
           : Promise.resolve({ data: null }),
@@ -218,6 +218,7 @@ Deno.serve(async (req) => {
           result_release_at: string | null
           total_correct: number | null
           total_questions: number | null
+          pass_ratio_snapshot: number | null
           cert_no: string | null
         } | null
         if (!att || att.user_id !== uid) {
@@ -228,10 +229,9 @@ Deno.serve(async (req) => {
           att.status === 'submitted' &&
           !!att.result_release_at &&
           Date.now() >= new Date(att.result_release_at as string).getTime()
-        const passed =
-          released && att.total_correct != null && att.total_questions
-            ? (att.total_correct as number) >= Math.ceil((att.total_questions as number) * 0.6)
-            : false
+        // ⚠️ my-attempts 의 발급 게이트와 **같은 헬퍼**로 판정한다(응시 시점 합격선).
+        //    직접 계산하면 둘이 갈려서 "결제는 됐는데 발급만 거절"이 생긴다.
+        const passed = released && attemptPassed(att.total_correct, att.total_questions, att.pass_ratio_snapshot) === true
         if (!passed) return json({ error: '합격한 응시만 자격증을 발급할 수 있습니다.' }, 400)
         // ⚠️ my-attempts 의 발급 게이트와 **같은 판정**을 결제 전에 미리 돌린다. 여기서 안 보면
         //    환불·회수된 응시로 발급비를 받아놓고 발급 단계에서 거절하는 구간이 생긴다(= 환불거리).

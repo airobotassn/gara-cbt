@@ -571,7 +571,9 @@ interface CertRow {
   score: number | null; total: number | null; passRatio: number
   certNo: string | null; certIssuedAt: string | null; nameRoman: string | null
 }
-interface CertTierRow { tier: string; sort: number; pass_ratio: number | null; cert_available_after_days: number | null; cert_fee_override: number | null }
+/** 급수별 발급 조건. ⚠️ `cert_fee_usd_cents` 는 **달러 센트**다(응시료와 같은 단위) — 옛 이름
+ *  `cert_fee_override` 는 화면 안내가 '원 단위'라 단위가 어긋나 있었다(20260904210000). */
+interface CertTierRow { tier: string; track: string; pass_ratio: number | null; cert_fee_usd_cents: number | null }
 
 export function CertAdmin() {
   const [view, setView] = useState<'list' | 'cond'>('list')
@@ -656,7 +658,8 @@ function CertList() {
       {!list.length && !loading && <div className="admin-section admin-empty">합격한 응시가 없습니다.</div>}
 
       <p className="admin-hint" style={{ marginTop: 10, lineHeight: 1.7 }}>
-        합격 판정은 <b>응시 시점의 합격선</b>을 씁니다(응시 기록에 박혀 있음). 그래서 나중에 조건을 바꿔도 과거 판정은 흔들리지 않습니다.
+        합격 판정은 <b>응시 시점의 합격선</b>을 씁니다 — 응시를 시작할 때 그 급수의 합격선이 응시 기록에 박힙니다.
+        그래서 나중에 조건을 바꿔도 과거 판정은 흔들리지 않습니다. 2026-09-04 이전 응시는 박힌 값이 없어 60%로 판정합니다.
         <br />⚠️ 수동 발급은 응시자의 <b>영문 성명</b>이 있어야 합니다 — 자격증에 인쇄되는 이름이라 관리자가 임의로 정할 수 없습니다.
       </p>
     </>
@@ -668,19 +671,18 @@ function CertConditions() {
   const { data, loading, err, reload } = useAdminData<{ tiers: CertTierRow[] }>('certConditions')
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
-  const [draft, setDraft] = useState<Record<string, { ratio: string; days: string; fee: string }>>({})
+  const [draft, setDraft] = useState<Record<string, { ratio: string; fee: string }>>({})
   const names = Object.fromEntries(getTracks('ko').flatMap((tr) => tr.tiers.map((ti) => [ti.key, ti.name])))
 
   const val = (r: CertTierRow) => draft[r.tier] ?? {
     ratio: r.pass_ratio == null ? '' : String(r.pass_ratio),
-    days: r.cert_available_after_days == null ? '' : String(r.cert_available_after_days),
-    fee: r.cert_fee_override == null ? '' : String(r.cert_fee_override),
+    fee: r.cert_fee_usd_cents == null ? '' : String(r.cert_fee_usd_cents),
   }
   async function save(r: CertTierRow) {
     const v = val(r)
     setBusy(r.tier); setMsg('')
     try {
-      await callFunction('admin', { action: 'certConditionsSave', tier: r.tier, passRatio: v.ratio, days: v.days, fee: v.fee })
+      await callFunction('admin', { action: 'certConditionsSave', tier: r.tier, passRatio: v.ratio, fee: v.fee })
       setMsg(`✅ ${names[r.tier] ?? r.tier} 저장했습니다`)
       await reload()
     } catch (e) {
@@ -697,9 +699,10 @@ function CertConditions() {
       </div>
       <ErrBox msg={err} />
       <p className="admin-hint" style={{ marginBottom: 12, lineHeight: 1.7 }}>
-        비워두면 기본값을 씁니다 — 합격선 60% · 결과 공개 즉시 발급 · 발급비는 그 급수 응시료와 동일.
-        <br />⛔ 이미 응시한 사람의 합격 판정은 <b>바뀌지 않습니다</b>(응시 시점 값이 기록에 박혀 있습니다).
+        비워두면 기본값을 씁니다 — 합격선 60% · 발급비는 그 급수 응시료와 동일.
+        <br />⛔ 이미 응시한 사람의 합격 판정은 <b>바뀌지 않습니다</b> — 합격선은 응시를 시작할 때 그 응시 기록에 박힙니다.
         여기서 바꾼 값은 <b>앞으로의 응시</b>부터 적용됩니다.
+        <br />ℹ️ 자격증을 받을 수 있는 시점은 여기서 정하지 않습니다 — <b>회차의 성적 공개일</b> 하나로 정해집니다(회차 관리에서 바꿉니다).
       </p>
       {(data?.tiers ?? []).map((r) => {
         const v = val(r)
@@ -717,15 +720,16 @@ function CertConditions() {
                   onChange={(e) => setDraft({ ...draft, [r.tier]: { ...v, ratio: e.target.value } })} />
                 <span style={{ fontWeight: 400, color: 'var(--dim)' }}>0.6 = 60% · 0.55 = 55%</span>
               </label>
-              <label style={fld}>발급 가능 시점
-                <input style={inp} placeholder="비워두면 결과 공개 즉시" value={v.days}
-                  onChange={(e) => setDraft({ ...draft, [r.tier]: { ...v, days: e.target.value } })} />
-                <span style={{ fontWeight: 400, color: 'var(--dim)' }}>결과 공개 후 N일</span>
-              </label>
+              {/* ⚠️ 단위는 **달러 센트**다 — 응시료(exam_fees.amount_usd_cents)와 같은 단위여야 한 상품처럼
+                  계산된다. 옛 이름(cert_fee_override)은 안내가 '원 단위'라 3000 을 3,000원으로 읽게 만들었다. */}
               <label style={fld}>발급비
                 <input style={inp} placeholder="비워두면 응시료와 동일" value={v.fee}
                   onChange={(e) => setDraft({ ...draft, [r.tier]: { ...v, fee: e.target.value } })} />
-                <span style={{ fontWeight: 400, color: 'var(--dim)' }}>원 단위 · 0 이면 무료</span>
+                <span style={{ fontWeight: 400, color: 'var(--dim)' }}>
+                  달러 센트 · 100 = $1.00 · 0 이면 무료
+                  {v.fee !== '' && Number.isFinite(Number(v.fee)) && Number(v.fee) >= 0
+                    ? ` → $${(Number(v.fee) / 100).toFixed(2)}` : ''}
+                </span>
               </label>
             </div>
           </div>

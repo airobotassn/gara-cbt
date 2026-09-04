@@ -1,10 +1,11 @@
 // get-exam-result: 본인 응시 결과 재조회.
 //   - 미제출: 409
 //   - 공개일(result_release_at) 전: { released:false, ... } (점수/오답 비노출)
-//   - 공개일 이후: { released:true, totalCorrect, ..., answers:[...] }
+//   - 공개일 이후: { released:true, totalCorrect, ..., passRatio, answers:[...] }
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang, projKoOptions, projKoText } from '../_shared/lib.ts'
+import { DEFAULT_PASS_RATIO } from '../_shared/exam-tickets.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -19,7 +20,7 @@ Deno.serve(async (req) => {
 
     const { data: attempt } = await admin
       .from('exam_attempts')
-      .select('id, user_id, status, submitted_at, result_release_at, total_correct, total_questions, exam_id, lang')
+      .select('id, user_id, status, submitted_at, result_release_at, total_correct, total_questions, pass_ratio_snapshot, exam_id, lang')
       .eq('id', attemptId)
       .single()
     if (!attempt) return json({ error: '결과를 찾을 수 없습니다.' }, 404)
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
     // ⚠️ 해설(explanation)은 결과 화면에도 내리지 않는다 — 관리자 전용(요구사항: 어떤 경우에도 해설 미노출).
     const { data: rows } = await admin
       .from('attempt_answers')
-      .select('number, selected_index, answer_text, is_correct, review_status, questions(subject, topic, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index)')
+      .select('number, selected_index, answer_text, is_correct, review_status, questions(subject, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index)')
       .eq('attempt_id', attemptId)
       .order('number', { ascending: true })
 
@@ -67,7 +68,6 @@ Deno.serve(async (req) => {
     const answers = (rows ?? []).map((r: any) => ({
       number: r.number,
       subject: r.questions?.subject ?? null,
-      topic: r.questions?.topic ?? null,
       prompt: projKoText(r.questions?.prompt, r.questions?.prompt_i18n, langOf),
       kind: r.questions?.kind ?? 'mc',
       choices: projKoOptions(r.questions?.choices, r.questions?.choices_i18n, langOf),
@@ -83,6 +83,9 @@ Deno.serve(async (req) => {
       submittedAt: attempt.submitted_at,
       totalCorrect: attempt.total_correct,
       totalQuestions: attempt.total_questions,
+      // 합격선 — **응시 시점 값**이다. 화면이 0.6 을 박고 있으면 급수별 합격선을 정한 뒤로 결과창만
+      //   다른 말을 하게 된다(마이페이지·관리자는 스냅샷을 본다). 옛 응시는 스냅샷이 비어 있어 기본값.
+      passRatio: attempt.pass_ratio_snapshot ?? DEFAULT_PASS_RATIO,
       answers,
       examTitle,
     })

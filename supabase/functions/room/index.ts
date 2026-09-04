@@ -70,6 +70,8 @@ Deno.serve(async (req) => {
         avatarUrl: (profile.avatar_url as string | null) ?? null,
         seasonTotal: (progress?.season_total as number) ?? null,
         // 칭호는 랭킹·허브에 이미 노출되는 값이라 방에도 띄운다(합격한 티어 그 자체).
+        //   ⚠️ [0] = 그 사람이 **고른** 칭호다(20260904200000) — 안 골랐으면 가장 최근 합격.
+        //      내 허브 배지와 남이 보는 내 방 배지가 같아야 하므로 여기서 따로 고르지 말 것.
         title: (titleList[0] as { tier?: string } | undefined)?.tier ?? null,
         // 'default'(아직 안 고름)는 null 로 눕힌다 — 프론트가 폴백 그림 하나로 처리한다.
         character: (() => { const b = (character?.base_key as string) ?? 'default'; return b && b !== 'default' ? b : null })(),

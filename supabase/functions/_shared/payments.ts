@@ -14,7 +14,7 @@
 //    adminClient() 가 준 클라이언트와 여기 타입이 서로 안 맞는다.
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { getProvider, type ProviderPayment } from './payment-provider.ts'
-import { grantExamTicket, parseExamRef, resolveExamFee, resolveExamOffer, voidTicket } from './exam-tickets.ts'
+import { grantExamTicket, parseExamRef, resolveCertFee, resolveExamOffer, voidTicket } from './exam-tickets.ts'
 
 export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle' | 'lecture'
 
@@ -183,8 +183,9 @@ export async function resolveProduct(
     }
   }
 
-  // 자격증 발급비 — product_ref = attemptId(응시 하나). **발급비 = 그 응시 급수의 응시료와 동일**하다.
-  //   금액을 여기서 지어내지 않고 exam_fees 를 그대로 다시 읽는다(정가 단일 출처).
+  // 자격증 발급비 — product_ref = attemptId(응시 하나). **기본은 그 응시 급수의 응시료와 동일**하고,
+  //   관리자가 급수별로 따로 정했으면(exam_tiers.cert_fee_usd_cents) 그 값이 이긴다.
+  //   금액을 여기서 지어내지 않고 DB 를 그대로 다시 읽는다(정가 단일 출처 = resolveCertFee).
   //   소유자·합격 판정은 create 핸들러가 uid 로 한다(여기선 금액만 뽑는다).
   //
   // ⚠️ **resolveExamOffer 를 쓰면 안 된다.** 그건 "응시권을 지금 팔 수 있나"까지 보는 함수라
@@ -205,7 +206,7 @@ export async function resolveProduct(
       .eq('id', att.exam_id as string)
       .maybeSingle()
     if (!ex) return { ok: false, error: '시험 정보를 찾을 수 없습니다.', status: 404 }
-    const fee = await resolveExamFee(admin, ex.tier as string)
+    const fee = await resolveCertFee(admin, ex.tier as string)
     if (!fee.ok) {
       // 정가 미책정 급수(관리자 수기 발급으로만 응시한 t2 등) — 임시 금액으로 때우지 않고 막는다.
       // 열려면 관리자 화면에서 그 급수 금액만 채우면 된다(코드 변경 불필요).

@@ -78,6 +78,61 @@ export const TIER_LABEL: Record<string, string> = {
   zenith: 'Zenith',
 }
 
+/** 급수의 표시 순서. 옛 `exam_tiers.sort` 를 대신한다(20260904210000 이 그 컬럼을 드롭했다) —
+ *  칭호를 사용자가 고르게 되면서 DB 가 급수를 줄 세울 이유가 없어졌고, 남은 용도는 관리자 화면의
+ *  표시 순서 하나뿐이라 이름·잠금과 같은 자리(코드)에 두는 게 맞다.
+ *  ⚠️ TIER_LABEL 과 같은 목록이어야 한다 — 빠진 급수는 정렬에서 맨 뒤로 밀린다. */
+export const TIER_ORDER: readonly string[] = ['beginner', 'pro', 'elite', 'master', 'grandmaster', 'zenith']
+export const tierRank = (key: string) => {
+  const i = TIER_ORDER.indexOf(key)
+  return i < 0 ? TIER_ORDER.length : i
+}
+
+// ---------- 합격선 ----------
+//
+// ⛔ **판정은 응시 시점 값(exam_attempts.pass_ratio_snapshot)으로 한다.** 급수별 합격선은
+//    exam_tiers.pass_ratio 에 있지만 그건 **앞으로의 응시**에 쓰는 값이고, 이미 친 시험의 합격 여부는
+//    start-exam 이 박아둔 스냅샷이 정한다. 지금 설정을 끌어다 쓰면 관리자가 합격선을 한 칸 올리는 순간
+//    **어제 합격한 사람이 오늘 불합격**이 되고, 자격증은 이미 나가 있다.
+// ⚠️ 스냅샷이 빈 옛 응시는 0.6 이다 — 그때는 그 값이 유일한 규칙이었다.
+export const DEFAULT_PASS_RATIO = 0.6
+
+/**
+ * 합격 최소 정답 수. **판정하는 모든 자리가 이 함수를 부른다**(admin·my-attempts·payments·프론트 결과창).
+ *
+ * ⛔ `Math.ceil(total * ratio)` 를 직접 쓰지 말 것 — 이진 부동소수 오차로 한 문제가 더 붙는다.
+ *    실측: `Math.ceil(100 * 0.55)` = **56**(정답은 55). 그런데 SQL 은 numeric 이라 `ceil(100 * 0.55)` = 55 다
+ *    → 같은 응시를 두고 `user_titles`(SQL)는 합격, `my-attempts`(JS)는 불합격이라고 말한다.
+ *    0.55 는 관리자 화면이 예시로 적어 둔 바로 그 값이다.
+ */
+export function passMark(totalQuestions: number, ratio: number): number {
+  // 1e-6 자리에서 한 번 접어 오차만 걷어낸다(0.1% 단위 합격선까지 안전 — 컬럼이 numeric(4,3) 이다).
+  return Math.ceil(Math.round(totalQuestions * ratio * 1e6) / 1e6)
+}
+
+/** 이 응시가 합격인가. 점수가 아직 없으면 null(판정 자체가 없다 — false 로 접지 말 것). */
+export function attemptPassed(
+  totalCorrect: number | null | undefined,
+  totalQuestions: number | null | undefined,
+  snapshot: number | null | undefined,
+): boolean | null {
+  if (totalCorrect == null || !totalQuestions) return null
+  return totalCorrect >= passMark(totalQuestions, snapshot ?? DEFAULT_PASS_RATIO)
+}
+
+/** 지금 이 급수로 시험을 시작하면 박힐 합격선. start-exam 만 부른다. */
+export async function tierPassRatio(admin: SupabaseClient, tier: string): Promise<number> {
+  const { data } = await admin
+    .from('exam_tiers')
+    .select('pass_ratio')
+    .eq('tier', String(tier ?? '').trim().toLowerCase())
+    .maybeSingle()
+  const raw = data?.pass_ratio
+  const n = Number(raw)
+  // 0 은 "전부 합격" 이라 합격선으로 성립하지 않는다 — 미설정과 같이 기본값으로 접는다.
+  return raw != null && Number.isFinite(n) && n > 0 && n <= 1 ? n : DEFAULT_PASS_RATIO
+}
+
 /** 아직 열지 않은 급수(CARIS-Ⅱ 전부). 관리자가 **새로 여는 것**만 막는다 — 회차의 '열리는 급수' 체크와
  *  응시료 입력. 화면 짝은 src/lib/caris.ts 의 LOCKED_TIERS 이고, 여기가 그 최종 게이트다
  *  (화면 disabled 만으로는 요청을 직접 쏘면 그대로 통과한다).
@@ -246,6 +301,34 @@ export async function resolveExamFee(admin: SupabaseClient, tier: string): Promi
     return { ok: false, code: 'no_fee', error: '아직 금액이 책정되지 않은 급수입니다.', status: 400 }
   }
   return { ok: true, tier: tierKey, track, amount }
+}
+
+/**
+ * 자격증 **발급비**. 기본은 그 급수의 응시료와 같고, 관리자가 급수별로 따로 정할 수 있다
+ * (관리자 › 인증서 관리 › 급수별 발급 조건 → `exam_tiers.cert_fee_usd_cents`).
+ *
+ * ⚠️ 단위는 **달러 센트**다 — 응시료(`exam_fees.amount_usd_cents`)와 같은 단위여야 한 상품처럼 계산된다.
+ *    옛 컬럼 이름은 `cert_fee_override` 였고 화면 안내가 '원 단위'라 단위가 어긋나 있었다(20260904210000).
+ * ⚠️ 0 은 "무료로 발급한다"는 관리자의 결정이다 — 미설정(null)과 구분해서, 0 이면 그대로 0 을 쓴다.
+ *    미설정이 0 으로 접히면 오타 한 번이 전 급수 무료 발급이 된다(응시료 쪽과 같은 규칙).
+ */
+export async function resolveCertFee(admin: SupabaseClient, tier: string): Promise<ExamFeeResult> {
+  const tkey = String(tier ?? '').trim().toLowerCase()
+  const { data: tierRow } = await admin
+    .from('exam_tiers')
+    .select('tier, track, cert_fee_usd_cents')
+    .eq('tier', tkey)
+    .maybeSingle()
+  if (!tierRow) return { ok: false, code: 'tier_unknown', error: '알 수 없는 급수입니다.', status: 404 }
+  const tierKey = tierRow.tier as string
+  const track = tierRow.track as string
+  const raw = tierRow.cert_fee_usd_cents
+  if (raw !== null && raw !== undefined) {
+    const n = Math.floor(Number(raw))
+    if (Number.isFinite(n) && n >= 0) return { ok: true, tier: tierKey, track, amount: n }
+    // 숫자가 아닌 값 = 별도지정을 못 읽었다. 응시료로 떨어진다(지어내지 않는다).
+  }
+  return resolveExamFee(admin, tierKey)
 }
 
 export type ExamOfferErrorCode =

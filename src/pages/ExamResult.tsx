@@ -6,6 +6,7 @@ import { useT } from '../lib/i18n'
 import { useCountUp } from '../hooks/useCountUp'
 import { certNoPending, gradeOfTitle, gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import type { ExamResultResponse, GradedAnswer, SubmitExamResponse } from '../lib/types'
+import { PASS_RATIO, passMark } from '../lib/testConfig'
 
 // 성적 결과 — gara_11 시안 레이아웃(게이지·급수 배지·과목별 성취도) + CARIS Pro 급수 판정을
 // GARA Precision 톤으로 자체 디자인. 채점 로직/상태(공개 전·무효·에러) 보존.
@@ -135,8 +136,11 @@ function GradedResult({ data, attemptId, certName }: { data: GradedData; attempt
 
   const total = Math.max(1, data.totalQuestions)
   const scorePct = Math.round((data.totalCorrect / total) * 100)
-  // 합격 = 전체 문항의 60% 이상 정답(백엔드 my-attempts 의 PASS_RATIO=0.6 과 동일 규칙).
-  const passed = data.totalCorrect >= Math.ceil(data.totalQuestions * 0.6)
+  // 합격선은 **서버가 이 응시와 함께 내려준 값**이다(응시 시작 시점에 박힌 급수 합격선).
+  //   ⚠️ 여기 숫자를 박지 말 것 — 급수마다 합격선이 다를 수 있고, 그러면 결과창만 다른 말을 한다
+  //      (마이페이지·관리자·자격증 발급 게이트는 전부 스냅샷을 본다).
+  //   ⚠️ 판정은 passMark 로 한다(부동소수 오차로 한 문제가 더 붙는 자리다 — testConfig 주석 참고).
+  const passed = data.totalCorrect >= passMark(data.totalQuestions, data.passRatio ?? PASS_RATIO)
   // 서버가 준 시험명(예: "CARIS-Ⅰ Pro")은 급수 판정용 원본으로만 쓰고, 화면 표기는 /guide 의 급수 이름과
   // 같은 브랜드 표기(CARIS BEGINNER · CARIS PRO · CARIS ELITE …)로 통일한다.
   const examTitleRaw = data.examTitle || t('exresult.cert_fallback')

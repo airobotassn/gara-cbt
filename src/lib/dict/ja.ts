@@ -1813,6 +1813,8 @@ const JA: Record<string, string> = {
   "hub.err.invalid_character": "選べないキャラクターです",
   "hub.err.invalid_kind": "着用できない種類です",
   "hub.err.invalid_part": "着用できないアイテムです",
+  "hub.err.invalid_title": "つけられない称号です",
+  "hub.err.not_earned": "まだ取得していない資格です",
   "hub.part.char_a_m": "韓国風キャラ（男）",
   "hub.part.char_a_f": "韓国風キャラ（女）",
   "hub.part.char_b_m": "キャラB・男",
@@ -1836,6 +1838,8 @@ const JA: Record<string, string> = {
   // 칭호
   "hub.title.title": "称号",
   "hub.title.login": "ログインすると称号コレクションが表示されます。",
+  "hub.title.on": "着用中",
+  "hub.title.pick": "称号をタップするとその称号に切り替わります。",
 
   // 점수 획득 방법
   "hub.earn.title": "ポイント・コインの獲得方法",

@@ -1,9 +1,10 @@
-// character: 허브 캐릭터 선택 · 꾸미기 장착 · 튜토리얼 완료.
-//   원자 RPC(hub_choose_character · hub_equip · hub_tutorial_done)의 얇은 래퍼다 —
-//   소유·첫선택무료·종류 검증은 전부 DB 함수가 한 트랜잭션에서 한다.
+// character: 허브 캐릭터 선택 · 꾸미기 장착 · 칭호 장착 · 튜토리얼 완료.
+//   원자 RPC(hub_choose_character · hub_equip · hub_equip_title · hub_tutorial_done)의 얇은 래퍼다 —
+//   소유·첫선택무료·종류·합격 검증은 전부 DB 함수가 한 트랜잭션에서 한다.
 //
 //  · action:'choose'   — { key }              캐릭터 선택. 첫 선택이면 무료 지급 + 장착.
 //  · action:'equip'    — { kind, key }        스킨 등 장착. 소유한 것만.
+//  · action:'title'    — { tier }             칭호(자격증 배지) 장착. 합격한 급수만.
 //  · action:'tutorial' — 없음                 튜토리얼 완료 표시(건너뛰기도 완료).
 //  · action:'levelSeen'— { level }            레벨업 연출을 다 보여줬다고 표시(워터마크 상승).
 //
@@ -25,6 +26,7 @@ interface Body {
   key?: string
   kind?: string
   level?: number
+  tier?: string
 }
 
 /** RPC 예외 메시지 → 프론트가 사전 키로 옮길 수 있는 기계 코드 + HTTP 상태. */
@@ -32,6 +34,8 @@ const ERRORS: [string, number][] = [
   ['invalid_character', 400],
   ['invalid_kind', 400],
   ['invalid_part', 400],
+  ['invalid_title', 400],
+  ['not_earned', 403],
   ['not_owned', 403],
   ['unauthorized', 401],
 ]
@@ -69,6 +73,17 @@ Deno.serve(async (req) => {
       // 캐릭터는 여기로 못 온다(RPC 가 'character' 를 invalid_kind 로 거절) — 첫 선택 무료 규칙 때문에
       // 전용 경로(choose)로만 바꾼다.
       const { data, error } = await admin.rpc('hub_equip', { p_uid: user.id, p_kind: kind, p_key: key })
+      if (error) return mapError(error.message)
+      return json(data, 200)
+    }
+
+    if (action === 'title') {
+      // 칭호(자격증 배지) 장착 — 합격한 급수만. 파는 물건이 아니라 equip 과 경로가 갈린다
+      // (hub_equip 은 shop_catalog 에서 종류를 확인한다 = 상점에 없는 칭호는 통과할 수 없다).
+      //   ⚠️ 검증은 RPC 안에 있다(user_earned_tiers). 화면의 잠금 배지는 안내지 방어선이 아니다.
+      const tier = typeof body.tier === 'string' ? body.tier : ''
+      if (!tier) return json({ error: 'invalid_title' }, 400)
+      const { data, error } = await admin.rpc('hub_equip_title', { p_uid: user.id, p_tier: tier })
       if (error) return mapError(error.message)
       return json(data, 200)
     }

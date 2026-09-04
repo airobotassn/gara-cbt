@@ -149,13 +149,18 @@ const FRIENDLY_ERR = new Set([
   'insufficient_points', 'already_owned', 'unauthorized', 'not_owned',
   // 꾸미기(character 함수) — 장착·선택 거절 사유.
   'invalid_character', 'invalid_kind', 'invalid_part',
+  // 칭호 장착 거절 사유 — 안 딴 자격을 달려고 했을 때(화면 잠금은 안내고, 방어선은 서버다).
+  'invalid_title', 'not_earned',
 ])
 function friendlyError(e: unknown, t: TFunc): string {
   const msg = e instanceof Error ? e.message : ''
   return FRIENDLY_ERR.has(msg) ? t(`hub.err.${msg}`) : t('hub.err.generic')
 }
 
+/** 칭호 목록. **[0] 이 지금 달고 있는 칭호**다 — 서버(user_titles)가 사용자가 고른 것을 맨 앞에 둔다.
+ *  아직 안 골랐으면 가장 최근에 합격한 급수가 온다(20260904200000). */
 type TitleItem = { tier: string; exam_title?: string }
+/** 그림이 있는 급수. 없는 급수(CARIS-Ⅱ)는 아직 시험 자체가 안 열렸다 — 그때는 🏆 로 그린다. */
 const SHOWCASE_TITLE_TIERS = ['beginner', 'pro', 'elite'] as const
 type ShowcaseTitleTier = (typeof SHOWCASE_TITLE_TIERS)[number]
 const TITLE_ASSET: Record<ShowcaseTitleTier, string> = {
@@ -163,6 +168,7 @@ const TITLE_ASSET: Record<ShowcaseTitleTier, string> = {
   pro: '/hub/titles/pro-v3.webp',
   elite: '/hub/titles/elite-v3.webp',
 }
+const titleAsset = (tier: string): string | null => TITLE_ASSET[tier as ShowcaseTitleTier] ?? null
 
 // 'closet' = 옛 'shop'. 상점과 인벤토리가 한 모달의 두 탭이 되면서 이름을 바꿨다(2026-08-20)
 // — 사는 곳과 갈아입는 곳이 같은 자리라 버튼 이름이 '상점' 이면 절반을 숨기는 말이 된다.
@@ -657,6 +663,23 @@ export default function Hub() {
     }
   }
 
+  // 칭호(자격증 배지) 장착 — 합격한 급수 중 **사용자가 고른다**(2026-09-04).
+  //   예전엔 급수 서열(exam_tiers.sort) 최상위가 자동으로 달렸다. 급수는 서열이 아니라 각각 독립된
+  //   자격이라(2026-07 개편) 비기너로 딴 자격을 달고 싶은 사람에게 방법이 없었다.
+  //   ⚠️ 배지는 titles[0] 이다 — 서버 왕복을 기다리지 않고 화면에서 먼저 앞으로 당긴다(스킨 장착과 같은 규칙).
+  //      sort 는 안정 정렬이라 나머지 순서(최근 합격순)는 그대로 남는다.
+  async function equipTitle(tier: string) {
+    if (titles[0]?.tier === tier) return
+    const prev = titles
+    setTitles([...titles].sort((a, b) => Number(b.tier === tier) - Number(a.tier === tier)))
+    try {
+      await callFunction('character', { action: 'title', tier })
+    } catch (e) {
+      setTitles(prev)
+      pushErr(friendlyError(e, t))
+    }
+  }
+
   // 튜토리얼 종료(끝까지 봤든 건너뛰었든 같다).
   //   ⚠️ 화면을 먼저 닫고 서버에 알린다 — 저장이 늦어도 사용자를 검은 화면에 잡아두지 않는다.
   //      실패하면 다음 진입에 한 번 더 뜨는데, 그게 "닫혔는데 서버는 모르는" 상태보다 낫다.
@@ -797,12 +820,15 @@ export default function Hub() {
 
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
   // const unusedCoupons = coupons.filter((c) => !c.used).length
-  // RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
-  const activeTitleTier = titles[0]?.tier as ShowcaseTitleTier | undefined
+  // 지금 달고 있는 칭호 = titles[0]. 서버가 **사용자가 고른 것**을 맨 앞에 둔다(안 골랐으면 최근 합격).
+  const activeTitleTier = titles[0]?.tier
   const titleBadge = titles[0] ? <span className="tt">
-    {activeTitleTier && TITLE_ASSET[activeTitleTier] ? <img src={TITLE_ASSET[activeTitleTier]} alt="" /> : '🏆'}
+    {titleAsset(titles[0].tier) ? <img src={titleAsset(titles[0].tier)!} alt="" /> : '🏆'}
     CARIS {tierName(titles[0].tier)}
   </span> : null
+  // 칭호 보관소에 그릴 목록 = 그림이 있는 급수 + **딴 급수 중 목록에 없는 것**.
+  //   ⚠️ 뒤엣것을 빼면 안 된다 — CARIS-Ⅱ 급수를 딴 사람이 그 칭호를 고를 자리 자체가 없어진다.
+  const vaultTiers = [...new Set<string>([...SHOWCASE_TITLE_TIERS, ...titles.map((tt) => tt.tier)])]
   // HUD·내 방에 뜨는 이름 = 내 닉네임. (예전엔 'CARI' 가 박혀 있어서 누구 화면이든 같은 이름이었다.)
   // ⚠️ 구글 계정 이름(user_metadata.name)으로 폴백하지 말 것 — 실명이다. 닉네임 게이트가 막고 있는 걸
   //    프로필을 받아오는 짧은 사이에 그대로 흘린다. 아직 못 받았으면 마스코트 이름으로 둔다.
@@ -1294,19 +1320,28 @@ export default function Hub() {
       {modal === 'title' && (
         <Modal title={t('hub.title.title')} className="title-modal" onClose={() => setModal(null)}>
           <div className="title-vault">
-            {SHOWCASE_TITLE_TIERS.map((tier) => {
+            {vaultTiers.map((tier) => {
               const earned = titles.some((tt) => tt.tier === tier)
-              return (
-                <div key={tier} className={`title-badge ${earned ? 'is-earned' : 'is-locked'}`}>
-                  <img src={TITLE_ASSET[tier]} alt="" />
-                  <span>CARIS <b>{tierName(tier)}</b></span>
-                  {!earned && <span className="title-lock" aria-label="locked">🔒</span>}
-                </div>
-              )
+              const active = activeTitleTier === tier
+              const art = titleAsset(tier)
+              // 딴 것만 누를 수 있다. 잠긴 칭호는 버튼이 아니라 판이다 — 눌러도 아무 일도 안 일어나는
+              // 버튼을 두면 "왜 안 되지" 를 사용자가 알아내야 한다(자물쇠가 이미 말하고 있다).
+              const inner = <>
+                {art ? <img src={art} alt="" /> : <span className="title-fallback" aria-hidden>🏆</span>}
+                <span>CARIS <b>{tierName(tier)}</b></span>
+                {!earned && <span className="title-lock" aria-label="locked">🔒</span>}
+                {active && <span className="title-on">{t('hub.title.on')}</span>}
+              </>
+              const cls = `title-badge ${earned ? 'is-earned' : 'is-locked'}${active ? ' is-active' : ''}`
+              return earned
+                ? <button key={tier} type="button" className={cls} onClick={() => void equipTitle(tier)}>{inner}</button>
+                : <div key={tier} className={cls}>{inner}</div>
             })}
           </div>
-          {/* 비로그인만 안내한다 — 로그인 상태의 빈 보관소는 자물쇠 배지들이 이미 말하고 있다. */}
+          {/* 로그인 상태의 빈 보관소는 자물쇠 배지들이 이미 말하고 있다 — 안내는 (a) 비로그인
+              (b) 고를 게 둘 이상일 때만 띄운다. 하나뿐인 사람에게 "고르세요" 는 할 일이 없는 말이다. */}
           {titles.length === 0 && !authed && <p className="hub-modal-help title-vault-help">{t('hub.title.login')}</p>}
+          {titles.length > 1 && <p className="hub-modal-help title-vault-help">{t('hub.title.pick')}</p>}
         </Modal>
       )}
 

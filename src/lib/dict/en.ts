@@ -1813,6 +1813,8 @@ const EN: Record<string, string> = {
   "hub.err.invalid_character": "That character can't be selected",
   "hub.err.invalid_kind": "That can't be equipped",
   "hub.err.invalid_part": "That item can't be equipped",
+  "hub.err.invalid_title": "That title can't be worn",
+  "hub.err.not_earned": "You haven't earned that certification yet",
   "hub.part.char_a_m": "Korean Style (M)",
   "hub.part.char_a_f": "Korean Style (F)",
   "hub.part.char_b_m": "Character B · M",
@@ -1836,6 +1838,8 @@ const EN: Record<string, string> = {
   // 칭호
   "hub.title.title": "Titles",
   "hub.title.login": "Sign in to see your title collection.",
+  "hub.title.on": "Worn",
+  "hub.title.pick": "Tap a title to wear it instead.",
 
   // 점수 획득 방법
   "hub.earn.title": "How to earn points & coins",

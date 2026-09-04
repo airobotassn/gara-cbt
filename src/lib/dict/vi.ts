@@ -1813,6 +1813,8 @@ const VI: Record<string, string> = {
   "hub.err.invalid_character": "Không thể chọn nhân vật này",
   "hub.err.invalid_kind": "Không thể trang bị loại này",
   "hub.err.invalid_part": "Không thể trang bị vật phẩm này",
+  "hub.err.invalid_title": "Không thể đeo danh hiệu này",
+  "hub.err.not_earned": "Bạn chưa đạt chứng nhận đó",
   "hub.part.char_a_m": "Nhân vật Hàn (Nam)",
   "hub.part.char_a_f": "Nhân vật Hàn (Nữ)",
   "hub.part.char_b_m": "Nhân vật B · Nam",
@@ -1836,6 +1838,8 @@ const VI: Record<string, string> = {
   // 칭호
   "hub.title.title": "Danh hiệu",
   "hub.title.login": "Đăng nhập để xem bộ sưu tập danh hiệu.",
+  "hub.title.on": "Đang đeo",
+  "hub.title.pick": "Chạm vào danh hiệu để đeo danh hiệu đó.",
 
   // 점수 획득 방법
   "hub.earn.title": "Cách nhận điểm và xu",

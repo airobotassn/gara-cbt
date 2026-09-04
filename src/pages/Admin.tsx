@@ -5970,7 +5970,7 @@ function MemberCarisPanel({ userId }: { userId: string }) {
                     <span className={`admin-badge st-${at.status}`}>{STATUS_LABEL[at.status] ?? at.status}</span>
                   </td>
                   <td>{at.totalCorrect != null ? `${at.totalCorrect} / ${at.totalQuestions}` : '-'}</td>
-                  {/* 합격선 60%(서버 CBT_PASS_RATIO). 미제출·미채점은 판정 자체가 없다. */}
+                  {/* 합격선은 **응시 시점 값**이다(급수별로 다를 수 있다). 미제출·미채점은 판정 자체가 없다. */}
                   <td>{at.passed == null ? <span style={{ color: 'var(--dim)' }}>–</span>
                     : at.passed ? <span className="badge ok">합격</span> : <span className="badge low">불합격</span>}</td>
                   {/* 자격증 테이블이 따로 없다 — 합격 + 결과공개일 경과 = 발급 가능. */}

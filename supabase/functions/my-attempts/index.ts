@@ -7,9 +7,8 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang, projText } from '../_shared/lib.ts'
 import { makeCertNo, subjectOf, gradeOfTitle } from '../_shared/cert.ts'
-import { examWindowOpen, resolveExamFee, ticketSourceAlive } from '../_shared/exam-tickets.ts'
+import { attemptPassed, examWindowOpen, resolveCertFee, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
-const PASS_RATIO = 0.6
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
 const ATTEMPT_TTL_MINUTES = 240
 // 응시권 목록 상한. 한 사람이 회차×급수로 몇 장 사는 물건이라 응시 내역(50)과 같은 값이면 충분하다.
@@ -115,7 +114,7 @@ Deno.serve(async (req) => {
     if (body?.issue) {
       const { data: a } = await admin
         .from('exam_attempts')
-        .select('id, user_id, exam_id, ticket_id, status, result_release_at, submitted_at, total_correct, total_questions, verify_token, cert_no, cert_name_roman')
+        .select('id, user_id, exam_id, ticket_id, status, result_release_at, submitted_at, total_correct, total_questions, pass_ratio_snapshot, verify_token, cert_no, cert_name_roman')
         .eq('id', body.issue)
         .maybeSingle()
       if (!a || a.user_id !== user.id) return json({ error: '권한이 없습니다.' }, 403)
@@ -123,10 +122,9 @@ Deno.serve(async (req) => {
         a.status === 'submitted' &&
         !!a.result_release_at &&
         now >= new Date(a.result_release_at).getTime()
-      const passed =
-        released && a.total_correct != null && a.total_questions
-          ? a.total_correct >= Math.ceil(a.total_questions * PASS_RATIO)
-          : false
+      // 합격선은 **응시 시점 값**이다(start-exam 이 박는다) — 관리자가 급수 합격선을 고쳐도
+      // 이미 발급된 자격증의 근거가 흔들리지 않는다.
+      const passed = released && attemptPassed(a.total_correct, a.total_questions, a.pass_ratio_snapshot) === true
       if (!passed) return json({ error: '인증서는 결과 공개 후 합격한 응시만 발급할 수 있습니다.' }, 409)
 
       // 결제·응시권 생존 재확인 — start-exam 은 응시 시작 때 강제하지만, 그 뒤 환불(차지백)·관리자
@@ -141,14 +139,17 @@ Deno.serve(async (req) => {
       // ⚠️ **발급비가 $0 인 급수는 결제 확인 자체를 건너뛴다(2026-08-25).** 발급비 = 그 급수의 응시료라
       //    응시료를 0으로 연 급수는 발급비도 0인데, payments.amount 에 >0 제약이 있어 **0원 결제 행을
       //    만들 수 없다.** 그대로 두면 402 → 체크아웃 → 0원이라 결제창을 못 탐 → 다시 402 로 영원히 튕긴다.
-      //    ⛔ 판정은 반드시 resolveExamFee(정가표)로 한다 — 응시권의 price_paid(실제 낸 돈)로 보면
+      //    ⛔ 판정은 반드시 resolveCertFee(정가표)로 한다 — 응시권의 price_paid(실제 낸 돈)로 보면
       //       관리자 수기 발급분(0원)이 전부 무료 발급이 된다.
+      //    ⚠️ resolveExamFee 가 아니라 resolveCertFee 다 — 관리자가 급수별 발급비를 따로 정할 수 있고
+      //       (exam_tiers.cert_fee_usd_cents), 결제 화면과 이 게이트가 다른 금액을 보면
+      //       "무료라고 통과시켰는데 결제 화면은 돈을 받는" 조합이 생긴다.
       if (!(a.verify_token && a.cert_no)) {
         let feeFree = false
         if (a.exam_id) {
           const { data: ex } = await admin.from('exams').select('tier').eq('id', a.exam_id as string).maybeSingle()
           if (ex?.tier) {
-            const fee = await resolveExamFee(admin, ex.tier as string)
+            const fee = await resolveCertFee(admin, ex.tier as string)
             // 미설정(no_fee)은 무료가 아니다 — 그건 아래 402 로 떨어져 결제 화면이 '준비 중'을 말한다.
             feeFree = fee.ok && fee.amount === 0
           }
@@ -245,7 +246,7 @@ Deno.serve(async (req) => {
     const [{ data }, { data: tRows }, { data: checks }] = await Promise.all([
       admin
         .from('exam_attempts')
-        .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, cert_issued_at, verify_token, cert_no, cert_name_roman')
+        .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, pass_ratio_snapshot, cert_issued_at, verify_token, cert_no, cert_name_roman')
         .eq('user_id', user.id)
         .order('submitted_at', { ascending: false, nullsFirst: false })
         .order('started_at', { ascending: false })
@@ -324,7 +325,8 @@ Deno.serve(async (req) => {
         now >= new Date(r.result_release_at).getTime()
       const total = r.total_questions ?? 0
       const correct = released ? r.total_correct : null
-      const passed = released && correct != null ? correct >= Math.ceil(total * PASS_RATIO) : null
+      // 공개 전에는 판정 자체가 없다(null) — 점수를 숨기는 화면이라 합격 여부도 같이 숨긴다.
+      const passed = released ? attemptPassed(correct, total, r.pass_ratio_snapshot) : null
       return {
         attemptId: r.id,
         examTitle: r.exam_id ? titleMap[r.exam_id] ?? null : null,

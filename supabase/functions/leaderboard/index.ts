@@ -317,7 +317,8 @@ Deno.serve(async (req) => {
         me.uid = null
         // ⚠️ 급수(1급~4급)는 없다 — 2026-07 체계 개편으로 티어 6개가 각각 독립 자격이 됐고
         //    user_titles 도 그에 맞게 티어 key 만 돌려준다(20260807130000). 표시 이름은 TIER_LABEL 이 단일 출처.
-        //    RPC 가 exam_tiers.sort 내림차순으로 주므로 [0] 이 최상위 자격이다.
+        //    ⚠️ [0] = **사용자가 고른 칭호**다(20260904200000). 안 골랐으면 가장 최근에 합격한 급수가 온다.
+        //       예전엔 exam_tiers.sort 내림차순 = 최상위 자동이었고, 그 컬럼은 지금 없다.
         const titles = (titlesRes as { data: unknown }).data
         const arr = Array.isArray(titles) ? (titles as Array<{ tier: string; exam_title?: string }>) : []
         if (arr.length) {

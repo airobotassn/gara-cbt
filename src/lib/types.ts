@@ -76,6 +76,9 @@ export type ExamResultResponse =
       submittedAt: string
       totalCorrect: number
       totalQuestions: number
+      /** 이 응시의 합격선(0~1). **응시 시작 시점 값**이라 나중에 급수 합격선을 바꿔도 안 흔들린다.
+       *  옛 배포본은 안 내려준다 → 화면은 PASS_RATIO(0.6)로 폴백한다. */
+      passRatio?: number
       answers: GradedAnswer[]
       examTitle?: string | null
     }
@@ -441,7 +444,7 @@ export interface CbtUserRow {
   anon: boolean
   created: string
   attempts: number
-  /** 합격 건수(전체 문항의 60% 이상). 서버 admin 함수의 CBT_PASS_RATIO 와 같은 규칙. */
+  /** 합격 건수. 판정은 **응시 시점 합격선**(exam_attempts.pass_ratio_snapshot, 없으면 60%)이다. */
   passed: number
   /** 합격한 시험명. 급수 파싱은 certNo.ts 의 gradeOfTitle 이 단일 출처라 제목 그대로 내려온다. */
   passedTitles: string[]

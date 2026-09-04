@@ -7,7 +7,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, questionTranslated, SUPPORTED_LANGS } from '../_shared/lib.ts'
 import { refreshRates } from '../_shared/fx.ts'
-import { EXAM_ROUND_COLS, TIER_LABEL, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
+import { EXAM_ROUND_COLS, TIER_LABEL, attemptPassed, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { isExamMonth, monthOfExamDate, scheduleForMonth } from '../_shared/exam-schedule.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
@@ -111,7 +111,7 @@ async function attemptDetail(admin: any, body: any) {
 
   const { data: rows } = await admin
     .from('attempt_answers')
-    .select('id, number, selected_index, answer_text, is_correct, review_status, graded_by, graded_at, time_spent, questions(subject, topic, prompt, kind, choices, correct_index, answer_key)')
+    .select('id, number, selected_index, answer_text, is_correct, review_status, graded_by, graded_at, time_spent, questions(subject, prompt, kind, choices, correct_index, answer_key)')
     .eq('attempt_id', aid)
     .order('number', { ascending: true })
 
@@ -119,7 +119,6 @@ async function attemptDetail(admin: any, body: any) {
     answerId: r.id,
     number: r.number,
     subject: r.questions?.subject ?? null,
-    topic: r.questions?.topic ?? null,
     prompt: r.questions?.prompt ?? '',
     kind: r.questions?.kind ?? 'mc',
     choices: r.questions?.choices ?? [],
@@ -192,7 +191,7 @@ async function gradeQueue(admin: any, body: any) {
   const includeGraded = body?.scope === 'all'
   let q = admin
     .from('attempt_answers')
-    .select('id, attempt_id, number, answer_text, is_correct, review_status, graded_by, graded_at, questions!inner(subject, topic, prompt, kind, answer_key), exam_attempts!inner(user_id, status, submitted_at, exam_id, round_id)')
+    .select('id, attempt_id, number, answer_text, is_correct, review_status, graded_by, graded_at, questions!inner(subject, prompt, kind, answer_key), exam_attempts!inner(user_id, status, submitted_at, exam_id, round_id)')
     .eq('questions.kind', 'short')
     .eq('exam_attempts.status', 'submitted')
     .order('graded_at', { ascending: true, nullsFirst: true })
@@ -228,7 +227,6 @@ async function gradeQueue(admin: any, body: any) {
     attemptId: r.attempt_id,
     number: r.number,
     subject: r.questions?.subject ?? null,
-    topic: r.questions?.topic ?? null,
     prompt: r.questions?.prompt ?? '',
     answerKey: r.questions?.answer_key ?? null,
     answerText: r.answer_text ?? null,
@@ -1931,7 +1929,7 @@ async function questionList(admin: any, body: any) {
   if (!bankId) return json({ error: 'bankId 필요' }, 400)
   const { data, error } = await admin
     .from('questions')
-    .select('id, bank_id, number, subject, difficulty, topic, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index, answer_key, answer_key_i18n, explanation, active')
+    .select('id, bank_id, number, subject, difficulty, prompt, prompt_i18n, kind, choices, choices_i18n, correct_index, answer_key, answer_key_i18n, explanation, active')
     .eq('bank_id', bankId)
     .is('deleted_at', null)
     .order('number', { ascending: true })
@@ -1984,7 +1982,6 @@ async function questionUpsert(admin: any, body: any, actor: string) {
     number,
     subject,
     difficulty: normDifficulty(q.difficulty),
-    topic: String(q.topic ?? '').trim(),
     prompt,
     kind,
     // 해설 — 객관식/주관식 공통(선택). 클라 비노출(출제/결과/채점 서빙에서 제외).
@@ -2232,7 +2229,6 @@ async function questionsImport(admin: any, body: any, actor: string) {
     const r = rows[i]
     const subject = String(r?.subject ?? '').trim()
     const difficulty = normDifficulty(r?.difficulty)
-    const topic = String(r?.topic ?? '').trim()
     const prompt = String(r?.prompt ?? '').trim()
     if (!subject || !prompt) return json({ error: `#${i + 1}행: 과목·지문은 필수` }, 400)
     const kind = r?.kind === 'short' ? 'short' : 'mc'
@@ -2241,14 +2237,14 @@ async function questionsImport(admin: any, body: any, actor: string) {
     next++ // 은행 뒤에 이어붙일 새 번호
     if (kind === 'short') {
       // 주관식 — 보기/정답번호 없음, 모범답안(answerKey)은 선택
-      payload.push({ bank_id: bankId, number: next, subject, difficulty, topic, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, explanation, active: true, deleted_at: null })
+      payload.push({ bank_id: bankId, number: next, subject, difficulty, prompt, kind, choices: [], correct_index: null, answer_key: String(r?.answerKey ?? '').trim() || null, explanation, active: true, deleted_at: null })
       continue
     }
     const choices = Array.isArray(r?.choices) ? r.choices.map((c: unknown) => String(c ?? '').trim()) : []
     if (choices.length !== 4 || choices.some((c: string) => !c)) return json({ error: `#${i + 1}행: 보기 4개가 모두 필요` }, 400)
     const ci = Math.floor(Number(r?.correctIndex))
     if (!Number.isFinite(ci) || ci < 0 || ci > 3) return json({ error: `#${i + 1}행: 정답(1~4) 오류` }, 400)
-    payload.push({ bank_id: bankId, number: next, subject, difficulty, topic, prompt, kind, choices, correct_index: ci, answer_key: null, explanation, active: true, deleted_at: null })
+    payload.push({ bank_id: bankId, number: next, subject, difficulty, prompt, kind, choices, correct_index: ci, answer_key: null, explanation, active: true, deleted_at: null })
   }
 
   // ⚠️ **방금 넣은 행의 id·번호를 돌려준다** — 화면이 업로드 직후 이어서 번역을 돌리고
@@ -2705,9 +2701,10 @@ async function cbtAnalytics(admin: any) {
 }
 
 // 회원 목록 — 프로필 + 이메일 + 응시수 + 마지막 활동.
-// 합격선 — my-attempts/index.ts 의 PASS_RATIO 와 같은 값(0.6)을 유지할 것.
+// 합격선은 **응시 시점 값**(exam_attempts.pass_ratio_snapshot)이다 — 판정은 _shared 의 attemptPassed 하나가 한다.
+//   ⚠️ 여기 0.6 을 다시 박지 말 것. 급수별 합격선이 생긴 뒤로는(exam_tiers.pass_ratio) 그 값이
+//      관리자 화면과 사용자 화면에서 다른 말을 하게 된다.
 // 자격증은 별도 테이블이 없어 "합격 + 결과공개일 경과" 를 발급 가능으로 본다(응시 기록에서 계산).
-const CBT_PASS_RATIO = 0.6
 
 async function cbtUsers(admin: any) {
   // CARIS는 익명 응시 불가(start-exam이 게스트 차단) → CARIS ARENA 게스트(is_anonymous)는 회원목록에서 제외.
@@ -2721,7 +2718,7 @@ async function cbtUsers(admin: any) {
     .limit(5000)
   const { data: atts } = await admin
     .from('exam_attempts')
-    .select('user_id, exam_id, submitted_at, total_correct, total_questions')
+    .select('user_id, exam_id, submitted_at, total_correct, total_questions, pass_ratio_snapshot')
     .eq('status', 'submitted')
     .limit(20000)
   // 합격 시험의 급수를 알려면 시험명이 필요하다(exam_attempts 엔 exam_id 만 있다).
@@ -2734,14 +2731,13 @@ async function cbtUsers(admin: any) {
     }
   }
   const cnt: Record<string, number> = {}
-  const pass: Record<string, number> = {} // 합격 건수(60% 이상)
+  const pass: Record<string, number> = {} // 합격 건수(응시 시점 합격선 이상)
   const passTitles: Record<string, string[]> = {} // 합격한 시험명(→ 프론트에서 급수 칩으로)
   const last: Record<string, string> = {}
   for (const a of atts ?? []) {
     const u = (a as any).user_id
     cnt[u] = (cnt[u] || 0) + 1
-    const tq = (a as any).total_questions, tc = (a as any).total_correct
-    if (tq && tc != null && tc >= Math.ceil(tq * CBT_PASS_RATIO)) {
+    if (attemptPassed(a.total_correct, a.total_questions, a.pass_ratio_snapshot)) {
       pass[u] = (pass[u] || 0) + 1
       // 급수는 시험명에서 파싱한다 — 규칙은 프론트 certNo.ts(gradeOfTitle) 한 곳에만 둔다.
       const t = (a as any).exam_id ? examTitle[(a as any).exam_id] : null
@@ -2781,7 +2777,7 @@ async function cbtUserDetail(admin: any, body: any) {
   if (!uid) return json({ error: 'userId 필요' }, 400)
   const { data: atts } = await admin
     .from('exam_attempts')
-    .select('id, exam_id, status, total_correct, total_questions, submitted_at, created_at, result_release_at')
+    .select('id, exam_id, status, total_correct, total_questions, pass_ratio_snapshot, submitted_at, created_at, result_release_at')
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(50)
@@ -2799,9 +2795,9 @@ async function cbtUserDetail(admin: any, body: any) {
     totalQuestions: a.total_questions,
     submittedAt: a.submitted_at,
     createdAt: a.created_at,
-    // 합격 = 전체의 60% 이상(my-attempts 의 PASS_RATIO 와 같은 규칙). 미채점·미제출은 null.
-    passed: a.status === 'submitted' && a.total_questions
-      ? a.total_correct >= Math.ceil(a.total_questions * CBT_PASS_RATIO)
+    // 합격 = 응시 시점 합격선 이상(my-attempts 와 같은 헬퍼). 미채점·미제출은 null.
+    passed: a.status === 'submitted'
+      ? attemptPassed(a.total_correct, a.total_questions, a.pass_ratio_snapshot)
       : null,
     // 자격증은 테이블이 없고 응시 기록에서 계산한다 — 합격 + 결과 공개일 경과.
     released: !a.result_release_at || new Date(a.result_release_at) <= new Date(),

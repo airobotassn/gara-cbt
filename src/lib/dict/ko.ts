@@ -1841,6 +1841,8 @@ const KO: Record<string, string> = {
   "hub.err.invalid_character": "선택할 수 없는 캐릭터예요",
   "hub.err.invalid_kind": "적용할 수 없는 종류예요",
   "hub.err.invalid_part": "적용할 수 없는 아이템이에요",
+  "hub.err.invalid_title": "달 수 없는 칭호예요",
+  "hub.err.not_earned": "아직 따지 않은 자격이에요",
   // ⚠️ 캐릭터 이름은 **임시값**이다 — 그림이 아직 없어서 계열을 A·B·C 로만 부른다.
   //    그림이 도착하면 여기 이름만 갈면 된다(키는 절대 바꾸지 말 것 — 소유·장착이 키로 돌아간다).
   "hub.part.char_a_m": "한국풍 캐릭터(남)",
@@ -1866,6 +1868,8 @@ const KO: Record<string, string> = {
   // 칭호
   "hub.title.title": "칭호",
   "hub.title.login": "로그인하면 칭호 보관소가 보여요.",
+  "hub.title.on": "달고 있음",
+  "hub.title.pick": "칭호를 누르면 그걸로 바꿔 달아요.",
 
   // 점수 획득 방법
   "hub.earn.title": "점수 · 코인 획득 방법",

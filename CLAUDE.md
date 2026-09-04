@@ -375,6 +375,16 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 - **등급 연출**: 결과창은 원점수 판정으로 **승급 배너+애니**(강등이 없으니 하락 배너도 없다), 레벨별 누적 레이더(고스트=현재−deltas) 표시(`Result.tsx`). 대시보드는 레벨별 레이더를 ‹ ›로 전환.
 - **칭호(자격증)에는 급수가 없다 (2026-08-07 정정)**: `user_titles` RPC 가 옛 모델(정답률로 `1급~4급`, 트랙 `Pro`/`Master` 둘)을 계속 계산하고 있어서 화면에 **제도상 없는 'CARIS Pro 1급'** 이 찍혔다. 2026-07 개편으로 티어 6개가 **각각 독립 시험(합격 60%)** 이 됐으므로 칭호 = **합격한 티어 그 자체**다(`20260807130000`). RPC 반환이 `[{track,grade}]` → `[{tier, exam_title}]`(`exam_tiers.sort` 내림차순)로 바뀌었고 소비처는 `leaderboard`(me.title)·`Hub.tsx`(배지·칭호 모달) 둘뿐이다.
   - 표시 이름은 SQL 이 만들지 않고 **티어 key 만** 내려준다 — 이름의 단일 출처는 프론트 `src/lib/caris.ts` 의 `tierName()`, 서버 `_shared/exam-tickets.ts` 의 `TIER_LABEL` 이다. SQL 에 CASE 로 한 벌 더 두면 동기화 페어가 늘어난다.
+  - **어느 칭호를 달지는 사용자가 고른다 (2026-09-04 · `20260904200000`)** — 예전엔 `exam_tiers.sort` 내림차순 [0] = 최상위가 자동으로 달렸다. 급수는 서열이 아니라 **각각 독립된 자격**이라(2026-07 개편) 비기너로 딴 자격을 달고 싶은 사람에게 방법이 없었다. 고르는 자리는 허브의 칭호 모달(배지를 누르면 갈아 낀다), 저장은 `user_characters.equipped.title`, 쓰기는 `hub_equip_title`(→ `character` 함수 `action:'title'`).
+    - ⛔ **`user_titles` 의 반환 계약([0] 이 화면에 뜨는 칭호)은 그대로다.** 정렬 근거만 바뀐다 — **고른 것 우선 → 나머지는 최근 합격순**. 그래서 소비처 셋(`get-hub`·`leaderboard` me.title·`room`)은 한 줄도 안 고쳤다. 아직 안 고른 사람은 **가장 최근에 합격한 급수**가 뜬다.
+    - ⛔ **합격 술어는 `user_earned_tiers` 하나다** — 보여주기(`user_titles`)와 고르기(`hub_equip_title`)가 같이 본다. 두 벌이 되면 "화면에는 있는데 고르면 거절당하는" 급수가 생긴다.
+    - ⛔ **`exam_tiers.sort` 는 드롭했다**(`20260904210000`). 급수 표시 순서의 단일 출처는 `_shared/exam-tickets.ts` 의 `TIER_ORDER` 다. ⚠️ 컬럼 드롭은 **코드 배포 뒤**에 적용할 것 — 배포 전 코드가 이름으로 select 하면 PostgREST 400 이라 관리자 화면이 통째로 멈춘다.
+    - ⚠️ 칭호 그림은 `beginner`·`pro`·`elite` 셋뿐이다. 그림이 없는 급수는 🏆 로 그리고, **딴 급수는 그림이 없어도 목록에 넣는다** — 안 넣으면 그 칭호를 고를 자리 자체가 없다.
+- **합격선은 응시 시점에 박힌다 (2026-09-04)** — 급수별 합격선(`exam_tiers.pass_ratio`, 관리자 › 인증서 관리 › 급수별 발급 조건)을 `start-exam` 이 `exam_attempts.pass_ratio_snapshot` 에 박고, 판정하는 모든 자리가 그 값을 본다. 그전엔 칸만 있고 **박는 코드가 없어서**(5건 전부 null) 화면이 "응시 기록에 박혀 있습니다" 라고 적어놓고 실제로는 전 응시가 0.6 이었다.
+  - ⛔ **판정 때 `exam_tiers` 를 다시 읽지 말 것.** 관리자가 합격선을 한 칸 올리는 순간 어제 합격한 사람이 오늘 불합격이 되고, 자격증은 이미 나가 있다. 스냅샷이 빈 옛 응시는 0.6 이다(그때는 그 값이 유일한 규칙이었다).
+  - ⛔ **`Math.ceil(총문항 × 비율)` 을 직접 쓰지 말 것 — `passMark()` 를 쓴다.** 실측: `Math.ceil(100 * 0.55)` = **56**(정답 55)인데 SQL 은 numeric 이라 55 다 → 같은 응시를 두고 SQL 은 합격, 화면은 불합격이라고 말한다. 0.55 는 관리자 화면이 예시로 적어 둔 바로 그 값이다. sync 페어 = `src/lib/testConfig.ts` ↔ `_shared/exam-tickets.ts`(`tests/db/t-titles.mjs` 가 대조).
+  - 판정 자리: `_shared/exam-tickets.ts` 의 `attemptPassed`(admin·my-attempts·payments·reform) · `user_titles` RPC · 결과창은 `get-exam-result` 가 내려주는 `passRatio`.
+  - ⚠️ **자격증 발급 시점은 급수가 아니라 회차가 정한다** — 옛 `exam_tiers.cert_available_after_days` 는 드롭했다(`20260904210000`). 근거는 `exam_attempts.result_release_at` 하나뿐이다. **발급비**는 반대로 급수별 지정을 살렸다(`cert_fee_usd_cents` · 단위 = 달러 센트 · 단일 출처 `resolveCertFee`).
 - **`/daily`·`/games` i18n (2026-08-07)**: 화면 문구는 `daily.*`·`mg.*` 로 이관했다. 미니게임 제목·소개·뱃지는 `lib/minigames.ts` 에서 빼고 **`mg.<id>.title|tagline|badge` 키 조립**으로 바꿨다(데이터에 한국어를 두면 언어를 바꿔도 커버만 한국어로 남는다).
   - **게임 안 문구도 번역된다 (2026-08-07)**: 게임은 자립형 HTML(iframe)이라 앱 사전을 못 쓴다 → 부모가 `iframe src` 에 `?lang=` 을 붙이고, **공용 사전 `public/games/i18n.js`** 가 그걸 읽어 갈아끼운다. HTML 은 `data-i18n="키"`(원문은 그대로 두어 사전이 없어도 한국어로는 보인다), JS 생성 문구는 `MGI18N.t('키', {n})`. 문서 끝에서 `MGI18N.apply()` 한 번.
     - 사전을 게임마다 두지 않는 이유 = 6벌이 되고 `랭킹` 같은 **앱 브리지 공통 문구**가 파일마다 갈린다(실제로 6벌 복제돼 있었다).

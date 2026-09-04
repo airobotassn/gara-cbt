@@ -3,6 +3,7 @@
 //   ⚠️ 돈·자격을 만드는 액션(자격증 수동 발급)은 루트 전용이다 — index.ts 의 기존 구분과 같은 규칙.
 import { json } from '../_shared/cors.ts'
 import { bunnyConfigured, bunnyPullzone, bunnyThumbUrl } from '../_shared/bunny.ts'
+import { DEFAULT_PASS_RATIO, attemptPassed, tierRank } from '../_shared/exam-tickets.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
@@ -926,10 +927,9 @@ async function certList(admin: any, body: any) {
   }
   const out = rows
     .map((r) => {
-      // 합격 판정은 **응시 시점 스냅샷**이 있으면 그걸 쓴다. 없으면 기본 60%.
-      const ratio = r.pass_ratio_snapshot ?? 0.6
-      const passed = r.total_questions && r.total_correct != null
-        ? r.total_correct >= Math.ceil(r.total_questions * ratio) : null
+      // 합격 판정은 **응시 시점 스냅샷**이 있으면 그걸 쓴다. 없으면 기본값(옛 응시 = 그때의 유일한 규칙).
+      const ratio = r.pass_ratio_snapshot ?? DEFAULT_PASS_RATIO
+      const passed = attemptPassed(r.total_correct, r.total_questions, r.pass_ratio_snapshot)
       return {
         attemptId: r.id, userId: r.user_id, name: nameMap[r.user_id] ?? null,
         examTitle: r.exam_id ? titleMap[r.exam_id] ?? null : null,
@@ -944,27 +944,35 @@ async function certList(admin: any, body: any) {
 
 // 발급 조건 = **급수(티어)별**. 회차마다 다르게 두면 "이번 달 비기너 60%, 다음 달 55%" 가 되어
 // 자격의 뜻이 흔들린다. 바꾸는 단위는 급수 그 자체다.
-// ⛔ 과거 판정을 지키는 장치는 그대로 — 응시 시점 값을 exam_attempts.pass_ratio_snapshot 에 박는다.
+//
+// ⛔ 과거 판정을 지키는 장치 = 응시 시점 값을 exam_attempts.pass_ratio_snapshot 에 박는다(start-exam).
+//    2026-09-04 까지 **박는 코드가 없었다** — 칸만 있고 5건 전부 null 이라, 화면이 "응시 기록에 박혀
+//    있습니다" 라고 적어놓고 실제로는 전 응시가 0.6 으로 판정됐다. 지금은 실제로 박힌다.
+// ⛔ 여기서 정한 값은 **앞으로의 응시**에만 닿는다. 이미 친 시험을 다시 채점하지 않는다.
+// ⚠️ 발급 가능 시점(옛 cert_available_after_days)은 없앴다(20260904210000) — 발급 시점은 회차의
+//    성적공개일(exam_attempts.result_release_at) 하나로 이미 고정돼 있다. 두 개를 두면 어느 쪽이
+//    이기는지가 또 규칙이 된다.
 async function certConditions(admin: any) {
   const { data, error } = await admin.from('exam_tiers')
-    .select('tier, sort, pass_ratio, cert_available_after_days, cert_fee_override')
-    .order('sort')
+    .select('tier, track, pass_ratio, cert_fee_usd_cents')
   if (error) return json({ error: error.message }, 500)
-  return json({ tiers: data ?? [] })
+  // 표시 순서는 코드가 정한다(옛 exam_tiers.sort 는 20260904210000 이 드롭했다).
+  const tiers = [...(data ?? [])].sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
+  return json({ tiers })
 }
 async function certConditionsSave(admin: any, body: any, ctx: Ctx) {
   const tier = String(body?.tier ?? '')
   if (!tier) return json({ error: '급수를 지정하세요.' }, 400)
   const ratio = body?.passRatio == null || body.passRatio === '' ? null : Number(body.passRatio)
   if (ratio != null && (!(ratio > 0) || ratio > 1)) return json({ error: '합격선은 0 초과 1 이하로 넣어주세요(0.6 = 60%).' }, 400)
-  const days = body?.days == null || body.days === '' ? null : Number(body.days)
-  if (days != null && days < 0) return json({ error: '발급 가능 시점은 0일 이상이어야 합니다.' }, 400)
-  const fee = body?.fee == null || body.fee === '' ? null : Number(body.fee)
-  if (fee != null && fee < 0) return json({ error: '발급비는 0원 이상이어야 합니다.' }, 400)
+  // 발급비 단위는 **달러 센트**다(응시료와 같은 단위 — exam_fees.amount_usd_cents).
+  //   ⚠️ 0 은 "무료로 발급한다"는 결정이라 비움(null = 응시료와 동일)과 다른 값이다.
+  const fee = body?.fee == null || body.fee === '' ? null : Math.floor(Number(body.fee))
+  if (fee != null && (!Number.isFinite(fee) || fee < 0)) return json({ error: '발급비는 0 이상 센트로 넣어주세요.' }, 400)
   const { error } = await admin.from('exam_tiers')
-    .update({ pass_ratio: ratio, cert_available_after_days: days, cert_fee_override: fee }).eq('tier', tier)
+    .update({ pass_ratio: ratio, cert_fee_usd_cents: fee }).eq('tier', tier)
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'certConditionsSave', tier, { ratio, days, fee })
+  await audit(admin, ctx, 'certConditionsSave', tier, { ratio, fee })
   return json({ ok: true })
 }
 

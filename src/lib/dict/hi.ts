@@ -1813,6 +1813,8 @@ const HI: Record<string, string> = {
   "hub.err.invalid_character": "यह कैरेक्टर नहीं चुना जा सकता",
   "hub.err.invalid_kind": "यह लगाया नहीं जा सकता",
   "hub.err.invalid_part": "यह आइटम लगाया नहीं जा सकता",
+  "hub.err.invalid_title": "यह उपाधि नहीं लगाई जा सकती",
+  "hub.err.not_earned": "आपने यह प्रमाणन अभी तक नहीं पाया है",
   "hub.part.char_a_m": "कोरियाई शैली (पुरुष)",
   "hub.part.char_a_f": "कोरियाई शैली (महिला)",
   "hub.part.char_b_m": "कैरेक्टर B · पुरुष",
@@ -1836,6 +1838,8 @@ const HI: Record<string, string> = {
   // 칭호
   "hub.title.title": "उपाधियाँ",
   "hub.title.login": "उपाधि संग्रह देखने के लिए साइन इन करें।",
+  "hub.title.on": "लगी हुई",
+  "hub.title.pick": "किसी उपाधि पर टैप करके उसे लगाएँ।",
 
   // 점수 획득 방법
   "hub.earn.title": "पॉइंट और सिक्के कैसे कमाएँ",

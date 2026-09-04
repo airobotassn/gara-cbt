@@ -10,7 +10,7 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, pickLang, projKoOptions, projKoText, projText } from '../_shared/lib.ts'
 import { getExamActor } from '../_shared/exam-token.ts'
 import { sebCheckFailed } from '../_shared/seb.ts'
-import { EXAM_TICKET_COLS, consumeTicket, examWindowOpen } from '../_shared/exam-tickets.ts'
+import { EXAM_TICKET_COLS, consumeTicket, examWindowOpen, tierPassRatio } from '../_shared/exam-tickets.ts'
 import { blockOnReentry } from '../_shared/exam-reentry.ts'
 import { ROOT_ADMIN } from '../admin/constants.ts'
 
@@ -445,6 +445,11 @@ Deno.serve(async (req) => {
         .eq('exam_id', exam.id)
         .eq('status', 'in_progress')
 
+      // 합격선 고정 — 응시를 시작한 시점의 급수 합격선을 이 응시에 박는다.
+      //   ⛔ **판정 때 exam_tiers 를 다시 읽지 말 것.** 관리자가 합격선을 한 칸 올리는 순간
+      //      어제 합격한 사람이 오늘 불합격이 되고, 자격증은 이미 나가 있다. 여기가 그걸 막는 자리다.
+      //   ⚠️ 재개(아래 live 경로)는 이 insert 를 안 탄다 — 이미 박힌 값을 그대로 쓴다. 그게 맞다.
+      const passRatio = await tierPassRatio(admin, exam.tier as string)
       const { data: attempt, error: aErr } = await admin
         .from('exam_attempts')
         .insert({
@@ -454,6 +459,7 @@ Deno.serve(async (req) => {
           ticket_id: ticket.id,
           status: 'in_progress',
           total_questions: served.length,
+          pass_ratio_snapshot: passRatio,
           // 응시 언어 고정 — 결과창(오답노트)이 이 값으로 투영한다.
           lang: effLang,
         })
