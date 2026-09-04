@@ -2432,7 +2432,7 @@ async function cbtAnalytics(admin: any) {
 
   const [profRes, attRes, ansRes, qRes, examRes, roundRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, signups7dCnt, qTot, qAct, pendGradeCnt] = await Promise.all([
     admin.from('profiles').select('created_at, is_anonymous').limit(10000),
-    admin.from('exam_attempts').select('id, exam_id, round_id, status, started_at, submitted_at, created_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
+    admin.from('exam_attempts').select('id, exam_id, round_id, status, started_at, submitted_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
     admin.from('attempt_answers').select('attempt_id, question_id, is_correct').limit(50000),
     admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active, tier').order('created_at', { ascending: true }),
@@ -2472,7 +2472,8 @@ async function cbtAnalytics(admin: any) {
     if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
   }
   for (const a of atts as any[]) {
-    const k = (a.submitted_at ?? a.created_at ?? '').slice(0, 10)
+    // ⚠️ 폴백이 started_at 이다 — 응시의 created_at 은 2026-09-04 에 뺐다(started_at 과 늘 같은 값이었다).
+    const k = (a.submitted_at ?? a.started_at ?? '').slice(0, 10)
     if (k in submitByDay) submitByDay[k]++
     const ck = (a.cert_issued_at ?? '').slice(0, 10)
     if (ck && ck in certByDay) certByDay[ck]++
@@ -2772,7 +2773,7 @@ async function cbtUserDetail(admin: any, body: any) {
   if (!uid) return json({ error: 'userId 필요' }, 400)
   const { data: atts } = await admin
     .from('exam_attempts')
-    .select('id, exam_id, status, total_correct, total_questions, pass_ratio_snapshot, submitted_at, created_at, result_release_at')
+    .select('id, exam_id, status, total_correct, total_questions, pass_ratio_snapshot, submitted_at, started_at, result_release_at')
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(50)
@@ -2789,7 +2790,7 @@ async function cbtUserDetail(admin: any, body: any) {
     totalCorrect: a.total_correct,
     totalQuestions: a.total_questions,
     submittedAt: a.submitted_at,
-    createdAt: a.created_at,
+    createdAt: a.started_at, // 응시의 created_at 은 2026-09-04 에 뺐다(started_at 과 늘 같은 값이었다)
     // 합격 = 응시 시점 합격선 이상(my-attempts 와 같은 헬퍼). 미채점·미제출은 null.
     passed: a.status === 'submitted'
       ? attemptPassed(a.total_correct, a.total_questions, a.pass_ratio_snapshot)
