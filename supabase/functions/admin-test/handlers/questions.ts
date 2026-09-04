@@ -223,7 +223,11 @@ export async function upsertQuestions(admin: any, body: any, actor: string) {
   //    한 줄도 안 남아서, 같은 파일이 두 번 들어가도 **나중에 알아볼 방법이 자체가 없었다**
   //    (Lv.1 사고를 엣지 함수 로그로 겨우 찾았다 — 그건 보존 기간이 짧아 며칠 뒤면 사라진다).
   //    ⚠️ 새 화면 배지(EvBadge)에 'add' 를 안 넣으면 추가가 **빨간 '삭제'로 뜬다**(모르는 값은 그리로 떨어진다).
-  const newCodes = new Set(payload.filter((p: { id?: string }) => !p.id).map((p: { code?: string }) => p.code))
+  //    ⚠️ `in` 으로 좁힌다 — payload 는 위 upsert 분기 때문에 **두 모양의 유니온**이다
+  //       ({ id, …base } = 기존 문항 / { code, …base } = 새 문항). `{ id?: string }` 같은 인라인
+  //       주석으로는 두 번째 멤버와 공통 속성이 0개라 어느 오버로드에도 안 맞아 deno check 가 깨진다.
+  //       ⛔ `supabase functions deploy` 는 타입체크를 안 하므로 배포는 그냥 통과한다 — 안 보고 지나가기 쉽다.
+  const newCodes = new Set(payload.flatMap((p) => ('id' in p ? [] : [p.code])))
   const added = (data ?? []).filter((d: { code: string | null }) => d.code && newCodes.has(d.code))
   for (const a of added) {
     await logEvent(admin, { question_id: a.id, code: a.code, level: a.level, action: 'add', actor })
