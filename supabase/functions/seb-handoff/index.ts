@@ -138,9 +138,8 @@ Deno.serve(async (req) => {
           user_id: claimed.user_id as string,
           ticket_id: (claimed.ticket_id as string | null) ?? null,
           checked_at: new Date().toISOString(),
-          ua: String(body?.ua ?? '').slice(0, 400),
-          screen: String(body?.screen ?? '').slice(0, 40),
-          detail: (body?.detail ?? {}) as Record<string, unknown>,
+          // ⚠️ ua·screen·detail 은 2026-09-04 에 뺐다(컬럼도 드롭) — 쓰기만 하고 읽는 곳이 0곳이었다.
+          //    남기는 건 "이 응시권으로 점검을 마쳤다" 는 사실 하나면 충분하다.
         }
         // 응시권이 있으면 그 응시권의 기록을 갱신(유일 인덱스), 없으면 한 줄 남긴다.
         const { error: envErr } = row.ticket_id

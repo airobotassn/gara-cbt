@@ -17,11 +17,12 @@ Deno.serve(async (req) => {
     const user = await getUser(req)
     if (!user || user.is_anonymous) return json({ error: '로그인이 필요합니다.' }, 401)
 
+    // ⚠️ 2026-09-04 에 ua·screen·detail 을 안 받는다(컬럼도 드롭). 쓰기만 하고 **읽는 곳이 0곳**이었다 —
+    //    이 표를 조회하는 두 자리(admin/reform 의 환경점검 목록, my-attempts 의 '점검했나' 판정)가
+    //    ticket_id·user_id·checked_at 만 뽑는다. UA 원문은 방문 통계에서 일부러 안 남기기로 한 값이라
+    //    여기만 남기면 규칙이 두 벌이 된다. 옛 클라가 계속 보내와도 무시하면 그만이라 호환 문제도 없다.
     const body = (await req.json().catch(() => ({}))) as {
       ticketId?: string | null
-      ua?: string
-      screen?: string
-      detail?: Record<string, unknown>
     }
     const admin = adminClient()
 
@@ -41,9 +42,6 @@ Deno.serve(async (req) => {
       user_id: user.id,
       ticket_id: ticketId,
       checked_at: new Date().toISOString(),
-      ua: (body.ua ?? '').slice(0, 400),
-      screen: (body.screen ?? '').slice(0, 40),
-      detail: body.detail ?? {},
     }
 
     // 응시권이 있으면 그 응시권의 기록을 갱신(유일 인덱스), 없으면 그냥 한 줄 남긴다.

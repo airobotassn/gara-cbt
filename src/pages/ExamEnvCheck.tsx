@@ -33,13 +33,10 @@ export default function ExamEnvCheck() {
     async function report() {
       if (!nonce) { setSaved(false); return }
       try {
-        await callFunction('seb-handoff', {
-          action: 'redeem',
-          nonce,
-          ua: navigator.userAgent,
-          screen: `${window.screen.width}x${window.screen.height}`,
-          detail: { inSeb: isSEB(), fullscreen: !!document.fullscreenEnabled, online: navigator.onLine },
-        })
+        // ⚠️ ua·screen·detail 은 2026-09-04 에 안 보낸다(서버 컬럼도 드롭). 쓰기만 하고 읽는 곳이
+        //    0곳이었다 — 남길 값은 "이 응시권으로 점검을 마쳤다" 는 사실 하나면 충분하다.
+        //    화면의 점검 항목 표(전체화면·네트워크·해상도)는 그대로다 — 그건 브라우저에서 바로 본다.
+        await callFunction('seb-handoff', { action: 'redeem', nonce })
         setSaved(true)
       } catch {
         setSaved(false)
