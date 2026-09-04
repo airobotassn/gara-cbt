@@ -303,9 +303,14 @@ export function buildRegions({
   } else {
     // 대한민국은 기존 시도 파일(숫자 코드 → 실집계 매칭), 그 외는 adm1(ISO 3166-2 코드).
     const isKR = drillIso === 'KR'
-    base = provinces.map((f) => ({
+    // ⚠️ **key 에 순번을 붙인다 — code 만으로는 유일하지 않다.** Natural Earth 는 서로 다른 두 곳에
+    //    같은 code 를 주기도 한다(스페인 세우타·멜리야가 둘 다 `ES.CE`). key 가 겹치면 ① 시상대·목록의
+    //    React key 가 중복돼 **점수가 오기 전 0점으로 그린 줄이 안 지워진 채 남고**(TOP 3 인데 네 줄 ·
+    //    메달이 1,1,2,3 — 세우타가 0점으로 1위에 앉아 있던 게 이것이다) ② 지도 d3 조인에서 뒤엣것이
+    //    통째로 안 그려진다. 점수 매칭은 아래에서 계속 `code` 로 하므로 같은 code 는 같은 점수를 받는다.
+    base = provinces.map((f, i) => ({
       f,
-      key: 'P' + f.properties.code,
+      key: 'P' + i + ':' + f.properties.code,
       name: isKR ? provName(f, lang) : adm1Name(f, lang),
       code: f.properties.code,
       drill: false, // 여기가 마지막 단계다
