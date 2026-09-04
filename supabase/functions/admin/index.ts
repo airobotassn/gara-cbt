@@ -172,7 +172,7 @@ async function gradeRounds(admin: any) {
   // 정기 회차 메타
   const { data: rounds } = await admin
     .from('exam_rounds')
-    .select('id, kind, title_i18n, exam_date')
+    .select('id, title_i18n, exam_date')
     .eq('published', true)
     .order('exam_date', { ascending: false })
   const list = (rounds ?? []).map((r: any) => ({
@@ -617,7 +617,7 @@ async function faqList(admin: any) {
     .from('faqs')
     .select('*')
     .order('category', { ascending: true })
-    .order('sort', { ascending: true })
+    .order('exam_date', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: true })
   if (error) return json({ error: error.message }, 400)
   return json({ faqs: (data ?? []).map(shapeFaq) })
@@ -745,7 +745,7 @@ async function boardCatList(admin: any, body: any) {
     .from('board_categories')
     .select('*')
     .eq('kind', kind)
-    .order('sort', { ascending: true })
+    .order('exam_date', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: true })
   if (error) return json({ error: error.message }, 400)
 
@@ -863,7 +863,6 @@ async function boardCatMove(admin: any, body: any) {
 function shapeExamRound(r: any, tiers: string[] = []) {
   return {
     id: r.id,
-    kind: r.kind,
     titleI18n: r.title_i18n ?? {},
     examDate: r.exam_date, // 'YYYY-MM-DD' | null — 대표 표기일(카드·목록용)
     // 응시 창. 정기시험은 '시험일 하루'가 아니라 11~20일 10일 구간이라 대표일과 별도 컬럼이 필요하다.
@@ -874,9 +873,7 @@ function shapeExamRound(r: any, tiers: string[] = []) {
     applyEndAt: r.apply_end_at, // ISO | null
     // 관리자 화면의 월 선택기를 되채우는 값. 대표일이 곧 그 달이라 따로 저장하지 않는다.
     month: monthOfExamDate(r.exam_date),
-    noteI18n: r.note_i18n ?? {},
     published: !!r.published,
-    sort: r.sort,
     tiers, // 이 회차가 연 급수 키(활성)
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -887,8 +884,6 @@ async function examRoundList(admin: any) {
   const { data, error } = await admin
     .from('exam_rounds')
     .select('*')
-    .order('kind', { ascending: true })
-    .order('sort', { ascending: true })
     .order('exam_date', { ascending: true, nullsFirst: true })
   if (error) return json({ error: error.message }, 400)
   // 각 회차가 연 급수(활성 exams) 를 한 번에 조회해 roundId별로 묶는다.
@@ -901,42 +896,32 @@ async function examRoundList(admin: any) {
   return json({ rounds: (data ?? []).map((r: any) => shapeExamRound(r, byRound[r.id] ?? [])) })
 }
 
-// 생성/수정. 한국어(회차명·부가설명)만 입력받아 저장 시 나머지 5개국어 자동 번역. 날짜는 그대로 저장.
+// 생성/수정. 한국어 회차명만 입력받아 저장 시 나머지 5개국어 자동 번역. 날짜는 월에서 계산해 저장.
+//   ⚠️ 2026-09-04 에 회차 유형(kind)·설명(note_i18n)·수동 순서(sort)를 없앴다 — 상시 회차가 사라졌다.
 async function examRoundUpsert(admin: any, body: any) {
   const r = body?.round ?? {}
   const koTitle = String(r.titleI18n?.ko ?? '').trim()
-  const koNote = String(r.noteI18n?.ko ?? '').trim()
   if (!koTitle) return json({ error: '한국어 회차명은 필수입니다.' }, 400)
 
   let title_i18n: Record<string, string> = { ko: koTitle }
-  let note_i18n: Record<string, string> = koNote ? { ko: koNote } : {}
   let translateWarning: string | null = null
   try {
-    const koFields: Record<string, string> = { title: koTitle }
-    if (koNote) koFields.note = koNote
-    const tr = await translateKoFields(koFields)
+    const tr = await translateKoFields({ title: koTitle })
     title_i18n = tr.title
-    note_i18n = koNote ? tr.note : {}
   } catch (e) {
     translateWarning = e instanceof Error ? e.message : '자동 번역 실패'
   }
   if (!GEMINI_API_KEY) translateWarning = '번역 키(GEMINI_API_KEY_NOTICE) 미설정 — 한국어로만 저장됨'
 
-  const kind = r.kind === 'rolling' ? 'rolling' : 'regular'
-  const sortNum = Number(r.sort)
-  const hasSort = Number.isFinite(sortNum)
-
-  // 정기시험 날짜는 **월 하나에서 전부 계산한다**(2026-08-20 정책). 화면이 보낸 날짜는 쓰지 않는다 —
+  // 시험 날짜는 **월 하나에서 전부 계산한다**(2026-08-20 정책). 화면이 보낸 날짜는 쓰지 않는다 —
   // 받으면 규칙 밖 회차(접수 3일짜리 등)를 만들 수 있고, 그때부터 /plan 의 안내문이 거짓말이 된다.
-  if (kind === 'regular' && !isExamMonth(r.month)) {
+  if (!isExamMonth(r.month)) {
     return json({ error: '시험 월(YYYY-MM)을 선택하세요.' }, 400)
   }
-  const sch = kind === 'regular' ? scheduleForMonth(String(r.month)) : null
+  const sch = scheduleForMonth(String(r.month))
 
   const row: Record<string, unknown> = {
-    kind,
     title_i18n,
-    note_i18n,
     // 대표일 = 응시 마지막 날(20일). '지난 시험' 판정이 이 값을 본다.
     exam_date: sch?.examDate ?? null,
     exam_start_at: sch?.examStartAt ?? null,
@@ -949,12 +934,10 @@ async function examRoundUpsert(admin: any, body: any) {
 
   let saved: any = null
   if (r.id) {
-    if (hasSort) row.sort = Math.floor(sortNum)
     const { data, error } = await admin.from('exam_rounds').update(row).eq('id', r.id).select().maybeSingle()
     if (error) return json({ error: error.message }, 400)
     saved = data
   } else {
-    row.sort = hasSort ? Math.floor(sortNum) : 9999 // 새 항목은 맨 끝
     const { data, error } = await admin.from('exam_rounds').insert(row).select().maybeSingle()
     if (error) return json({ error: error.message }, 400)
     saved = data
@@ -1095,13 +1078,8 @@ async function syncRoundExams(
   return { tiers: keys, blocked, warning: parts.length ? parts.join(' / ') : null }
 }
 
-async function examRoundReorder(admin: any, body: any) {
-  const ids = Array.isArray(body?.ids) ? (body.ids as string[]) : []
-  if (!ids.length) return json({ error: 'ids 필요' }, 400)
-  const err = await reorderRows(admin, 'exam_rounds', 'sort', ids)
-  if (err) return json({ error: err.message }, 400)
-  return json({ ok: true })
-}
+// examRoundReorder 는 2026-09-04 에 삭제했다 — 수동 순서(sort)는 상시 회차 전용이었고,
+// 정기 회차끼리는 시험일이 곧 순서라 손으로 매길 이유가 없다.
 
 async function examRoundDelete(admin: any, body: any) {
   const id = body?.id
@@ -1334,7 +1312,6 @@ async function examTicketList(admin: any, body: any) {
       email: emailMap[t.user_id] ?? null,
       roundId: t.round_id,
       roundTitle: (r?.title_i18n?.ko as string) ?? '',
-      roundKind: r?.kind ?? null,
       examDate: r?.exam_date ?? null,
       examEndAt: r?.exam_end_at ?? null,
       tier: t.tier,
@@ -1371,8 +1348,8 @@ async function examTicketSummary(admin: any, body: any) {
   const roundId = String(body?.roundId ?? '').trim()
   const { data: roundRows } = await admin
     .from('exam_rounds')
-    .select(`${EXAM_ROUND_COLS}, sort`)
-    .order('sort', { ascending: true })
+    .select(EXAM_ROUND_COLS)
+    .order('exam_date', { ascending: true, nullsFirst: true })
   const rounds = ((roundRows ?? []) as any[]).filter((r) => !roundId || r.id === roundId)
   const now = Date.now()
   const roundById = new Map<string, any>(rounds.map((r) => [r.id, r]))
@@ -1481,13 +1458,8 @@ async function examTicketGrant(admin: any, body: any, actorEmail: string, isRoot
     if (!userId) return json({ error: `가입된 계정을 찾을 수 없습니다: ${emailIn}` }, 404)
   }
 
-  const { data: round } = await admin.from('exam_rounds').select('id, kind').eq('id', roundId).maybeSingle()
+  const { data: round } = await admin.from('exam_rounds').select('id').eq('id', roundId).maybeSingle()
   if (!round) return json({ error: '회차를 찾을 수 없습니다.' }, 404)
-  // 상시(rolling) 회차는 응시권을 팔지 않기로 했다 → 응시 창(만료)을 정할 근거가 없어
-  // 여기서 찍으면 기한 없는 무료 응시권이 된다. 발급이 필요하면 정기 회차를 만들어서 준다.
-  if (round.kind === 'rolling') {
-    return json({ error: '상시 회차에는 응시권을 발급하지 않습니다(응시 기간이 없어 만료를 정할 수 없습니다). 정기 회차를 사용하세요.' }, 400)
-  }
   // exams 행이 없으면 응시권만 있고 응시할 시험이 없는 상태가 된다(start-exam 이 400 을 뱉는다).
   const { data: exam } = await admin.from('exams').select('id, active').eq('round_id', roundId).eq('tier', tier).maybeSingle()
   if (!exam || !exam.active) {
@@ -2473,7 +2445,7 @@ async function cbtAnalytics(admin: any) {
     admin.from('attempt_answers').select('attempt_id, question_id, is_correct').limit(50000),
     admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active, tier').order('created_at', { ascending: true }),
-    admin.from('exam_rounds').select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
+    admin.from('exam_rounds').select('id, title_i18n, exam_date, apply_start_at, apply_end_at').eq('published', true),
     // CARIS는 게스트 응시 불가 → '회원'은 가입(비익명) 프로필만(CARIS ARENA 익명 세션 제외)
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', false),
     admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_anonymous', true),
@@ -2574,7 +2546,6 @@ async function cbtAnalytics(admin: any) {
       id,
       title: roundMeta[id]?.title_i18n?.ko ?? '(회차)',
       examDate: roundMeta[id]?.exam_date ?? null,
-      kind: roundMeta[id]?.kind ?? 'regular',
       attempts: v.attempts,
       pass: v.pass,
       cert: v.cert,
@@ -3396,7 +3367,6 @@ Deno.serve(async (req) => {
       case 'boardCatMove': return await boardCatMove(admin, body)
       case 'examRoundList': return await examRoundList(admin)
       case 'examRoundUpsert': return await examRoundUpsert(admin, body)
-      case 'examRoundReorder': return await examRoundReorder(admin, body)
       case 'examRoundDelete': return await examRoundDelete(admin, body)
       case 'fxGet': return await fxGet(admin)
       case 'fxSave': return await fxSave(admin, body)

@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
     const [roundsRes, paysRes] = await Promise.all([
       admin
         .from('exam_rounds')
-        .select('id, kind, published, exam_date, exam_start_at, exam_end_at, title_i18n')
+        .select('id, published, exam_date, exam_start_at, exam_end_at, title_i18n')
         .in('id', roundIds),
       payIds.length > 0
         ? admin.from('payments').select('id, status').in('id', payIds).eq('status', 'paid')

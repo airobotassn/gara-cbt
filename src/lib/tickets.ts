@@ -26,7 +26,6 @@ export interface ExamTicketView {
   ticketId: string
   roundId: string
   roundTitle: string
-  roundKind: 'regular' | 'rolling'
   examDate: string | null // 'YYYY-MM-DD' 대표일 = **응시 마지막 날**(월 규칙이면 그 달 20일)
   // 응시 창. 월 규칙(11~20일)에서 "언제부터/언제까지"를 말하려면 대표일 하나로는 안 된다.
   // ⚠️ examDate 로 '언제부터'를 말하면 마지막 날을 시작일로 안내한다(실제로 그럴 뻔했다).

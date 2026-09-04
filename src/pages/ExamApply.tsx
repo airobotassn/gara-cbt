@@ -50,16 +50,15 @@ export default function ExamApply() {
   // navigation state 는 클릭 진입 시 즉시 표시용(로딩 깜빡임 방지). 둘 다 없으면 접수중(open) 회차로 폴백.
   const st = location.state as { roundId?: string; roundLabel?: string; dateLabel?: string } | null
   const roundId = params.get('round') ?? st?.roundId ?? ''
-  const { regular, rolling, loading } = useExamRounds(lang)
-  const allRounds = [...regular, ...rolling]
-  const byId = roundId ? allRounds.find((r) => r.id === roundId) : undefined
-  // 폴백은 '판매 가능한' 회차로 고른다(status==='open' 이 아니다) — 상시(rolling)는 status 가 늘 open 이라
-  // 예전 조건이면 상시 회차로 폴백해 팔 수 없는 회차의 접수화면이 열렸다.
-  const openRound = allRounds.find((r) => r.sellable) ?? regular[0] ?? rolling[0]
+  const { regular, loading } = useExamRounds(lang)
+  const byId = roundId ? regular.find((r) => r.id === roundId) : undefined
+  // 폴백은 '판매 가능한' 회차로 고른다(status==='open' 이 아니다) — 팔 수 없는 회차의 접수화면이
+  // 열리지 않게 하는 조건이다. (상시 회차가 있던 시절엔 status 가 늘 open 이라 그쪽으로 샜다.)
+  const openRound = regular.find((r) => r.sellable) ?? regular[0]
   const active = byId ?? openRound
-  // 정기=시험일(dateText), 상시=설명(note). DB 로딩 전엔 state 값으로 즉시 표시.
+  // 시험일(dateText). DB 로딩 전엔 state 값으로 즉시 표시.
   const roundLabel = active?.title ?? st?.roundLabel ?? ''
-  const dateLabel = (active ? active.dateText || active.note : '') || st?.dateLabel || ''
+  const dateLabel = (active ? active.dateText : '') || st?.dateLabel || ''
 
   // 트랙 선택 폐지 — 두 트랙의 티어를 한 줄로 이어 붙여(Beginner·Pro·Elite + Master·Grand Master·Zenith)
   // 단일 선택으로 만든다. 트랙 정보는 티어에 붙여 두고 라벨·응시자격 문구에만 쓴다.

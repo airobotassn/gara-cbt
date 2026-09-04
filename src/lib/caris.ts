@@ -176,20 +176,7 @@ export function getPrepareExam(lang: Lang, tierKey: string): { track: Track; tie
   return null
 }
 
-// 시험 일정(정기/상시)은 DB(exam_rounds)가 단일 소스 — src/lib/rounds.ts 의 useExamRounds 로 로드.
-// (구 하드코딩 SCHEDULE/Round 는 제거: ExamSchedule·Guide·ExamApply 모두 DB 조회로 통일)
-
-// 상시시험 — 회차와 무관하게 연중 접수(예약 응시). 로케일은 caris.rolling.* 키.
-export type Rolling = { id: string; name: string; badge: string; date: string; desc: string }
-
-export function getRolling(lang: Lang): Rolling[] {
-  return [
-    {
-      id: 'pro-cbt',
-      name: tr(lang, 'caris.rolling.pro_cbt.name'),
-      badge: tr(lang, 'caris.rolling.pro_cbt.badge'),
-      date: tr(lang, 'caris.rolling.pro_cbt.date'),
-      desc: tr(lang, 'caris.rolling.pro_cbt.desc'),
-    },
-  ]
-}
+// 시험 일정은 DB(exam_rounds)가 단일 소스 — src/lib/rounds.ts 의 useExamRounds 로 로드.
+// (구 하드코딩 SCHEDULE/Round 는 제거: Plan·Guide·ExamApply 모두 DB 조회로 통일)
+// ⚠️ 2026-09-04 에 **상시시험(rolling)을 없앴다** — getRolling()·Rolling 타입·caris.rolling.* 사전 키가
+//    같이 빠졌다. 회차는 정기 하나뿐이다.

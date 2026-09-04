@@ -378,7 +378,6 @@ const VI: Record<string, string> = {
   "rank.tab_world": "World",
   "rank.tab_region": "Khu vực của tôi",
   "rank.tab_country": "Quốc gia của tôi",
-  "rank.tab_school": "Trường",
   "rank.scope_sub": "{name} TOP 10",
   "rank.scope_guest": "Đăng nhập để xem xếp hạng quốc gia và khu vực của bạn",
   "rank.scope_no_region": "Đặt quốc gia và khu vực để mở xếp hạng này",
@@ -874,7 +873,6 @@ const VI: Record<string, string> = {
   "guide.status_open": "Đang nhận",
   "guide.status_upcoming": "Sắp tới",
   "guide.status_closed": "Đã đóng",
-  "sched.rolling_badge": "Nhận thường trực",
   "sched.prev": "Trước",
   "sched.next": "Sau",
   "guide.areas_title": "5 lĩnh vực đánh giá chính",
@@ -1214,10 +1212,6 @@ const VI: Record<string, string> = {
   "caris.t2.zenith.subj.2": "Quản trị AI (ISO/IEC 42001), đạo đức và chiến lược DX",
   "caris.t2.zenith.pass": "Đánh giá theo rubric · trung bình 3 giám khảo ≥80",
   // 상시(Rolling) 항목
-  "caris.rolling.pro_cbt.name": "Kỳ thi thường trực CARIS (CBT)",
-  "caris.rolling.pro_cbt.badge": "Nhận thường trực",
-  "caris.rolling.pro_cbt.date": "Quanh năm · thi vào ngày đã đặt",
-  "caris.rolling.pro_cbt.desc": "Kỳ thi thường trực bạn dự online (CBT) vào ngày đã đặt.",
 
   // ── Guide 히어로 (2026-07 개편: 로고 락업 + 일정 패널 → 카피 + CARIS PLAN 버튼 + 로봇 이미지) ──
   // h1 은 2줄. 1줄은 브랜드 표기라 전 언어 'AI·Robot' 고정, 2줄만 번역 + 끝의 'CARIS' 는 컴포넌트가 파란색으로 붙인다.
@@ -1280,7 +1274,6 @@ const VI: Record<string, string> = {
   "sched.title": "Đăng ký CARIS",
   "sched.desc": "Chọn kỳ thi để đăng ký. Chỉ có thể đăng ký các đợt đang mở.",
   "sched.regular": "Lịch thi định kỳ",
-  "sched.rolling": "Kỳ thi thường trực",
   "sched.exam_date": "Ngày thi",
   "sched.exam_period": "Thời gian thi",
   "sched.apply_period": "Thời gian đăng ký",

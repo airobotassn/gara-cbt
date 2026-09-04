@@ -385,7 +385,6 @@ const KO: Record<string, string> = {
   "rank.tab_world": "World",
   "rank.tab_region": "내 지역",
   "rank.tab_country": "내 국가",
-  "rank.tab_school": "학교",
   "rank.scope_sub": "{name} TOP 10",
   "rank.scope_guest": "로그인하면 내 국가·지역 랭킹이 열려요",
   "rank.scope_no_region": "국가·지역을 설정하면 이 랭킹이 열려요",
@@ -884,7 +883,6 @@ const KO: Record<string, string> = {
   "guide.status_open": "접수중",
   "guide.status_upcoming": "예정",
   "guide.status_closed": "마감",
-  "sched.rolling_badge": "상시 접수",
   "sched.prev": "이전",
   "sched.next": "다음",
   "guide.areas_title": "5대 평가 영역",
@@ -1236,10 +1234,6 @@ const KO: Record<string, string> = {
   "caris.t2.zenith.subj.2": "AI 거버넌스(ISO/IEC 42001), 윤리 및 DX 전략",
   "caris.t2.zenith.pass": "루브릭 심사 · 심사위원 3인 평균 80점 이상",
   // 상시(Rolling) 항목
-  "caris.rolling.pro_cbt.name": "CARIS 상시 검정 (CBT)",
-  "caris.rolling.pro_cbt.badge": "상시 접수",
-  "caris.rolling.pro_cbt.date": "연중 상시 · 예약일 응시",
-  "caris.rolling.pro_cbt.desc": "원하는 날짜를 예약해 온라인(CBT)으로 응시하는 상시 검정입니다.",
 
   // ── Guide 히어로 (2026-07 개편: 로고 락업 + 일정 패널 → 카피 + CARIS PLAN 버튼 + 로봇 이미지) ──
   // h1 은 2줄. 1줄은 브랜드 표기라 전 언어 'AI·Robot' 고정, 2줄만 번역 + 끝의 'CARIS' 는 컴포넌트가 파란색으로 붙인다.
@@ -1302,7 +1296,6 @@ const KO: Record<string, string> = {
   "sched.title": "CARIS 접수",
   "sched.desc": "접수할 시험을 선택하세요. 접수중인 일정만 신청할 수 있습니다.",
   "sched.regular": "정기시험 일정",
-  "sched.rolling": "상시시험",
   "sched.exam_date": "시험일",
   "sched.exam_period": "응시 기간",
   "sched.apply_period": "접수기간",

@@ -282,7 +282,7 @@ Deno.serve(async (req) => {
       roundIds.length
         ? admin
             .from('exam_rounds')
-            .select('id, kind, title_i18n, exam_date, exam_start_at, exam_end_at, apply_start_at, apply_end_at, published')
+            .select('id, title_i18n, exam_date, exam_start_at, exam_end_at, apply_start_at, apply_end_at, published')
             .in('id', roundIds)
         : Promise.resolve({ data: null }),
       // 응시권 → 응시 역조회. 살아있는 응시(제출·무효·진행중)만 담는다 —
@@ -383,7 +383,6 @@ Deno.serve(async (req) => {
         ticketId: t.id,
         roundId: t.round_id,
         roundTitle: round ? projText(round.title_i18n, lang) : '',
-        roundKind: round?.kind ?? null,
         examDate: round?.exam_date ?? null,
         examStartAt: round?.exam_start_at ?? null,
         examEndAt: round?.exam_end_at ?? null,

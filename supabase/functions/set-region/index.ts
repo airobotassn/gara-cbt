@@ -1,5 +1,5 @@
 // set-region: 로그인 유저가 국가/지역을 최초 1회 확정(잠금)하고, 그 뒤 **평생 1회** 바꾼다.
-//  - region_locked_at 이 이미 있으면 재설정 불가(409). 학교(school_id)는 잠금 대상이 아니라 MyPage 에서 별도로 설정한다.
+//  - region_locked_at 이 이미 있으면 재설정 불가(409).
 //  - `action:'change'` = 마이페이지의 1회 변경. 판정·쓰기는 RPC change_region_once 한 문장이 한다
 //    (국가·지역은 enforce_region_lock 트리거가 막고 있어 service role 로도 직접 못 고친다).
 //  - 검증: country_code 는 ISO 3166-1 alpha-2 형식(전 세계). 지역은 **regions 테이블이 정답지**다 —

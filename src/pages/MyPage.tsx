@@ -88,8 +88,9 @@ function statusInfo(a: MyAttempt) {
 }
 
 // 내 정보 — 국가/지역(읽기전용, 락).
-//   ⚠️ 학교(school_id) 입력 UI 는 제거됨(2026-07-28). DB 컬럼·schools 테이블·school_leaderboard RPC 는 남아있고,
-//      랭킹의 학교 탭도 숨김 상태(Ranking.tsx) — 되살리려면 이 섹션에 자동완성 입력을 다시 붙이면 된다.
+//   학교(school) 기능은 완전히 제거됐다 — 입력 UI 2026-07-28, DB·RPC·집계 스코프 2026-09-04.
+//   되살리려면 표부터 만들지 말고 **이 섹션에 학교 선택 입력을 먼저** 붙일 것(고를 자리 없이 표만
+//   남겨뒀더니 185명 중 0명이 채운 채로 한 달을 갔다).
 function ProfileSection() {
   const { user, applyRegion } = useAuth()
   const { t, lang } = useT()

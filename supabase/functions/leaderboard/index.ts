@@ -6,8 +6,8 @@
 //      비로그인 → { needsAuth: true }, 지역/국가 미설정 → { needsRegion: true }(빈 보드).
 //  - scope 'trend': 내 순위 추이(ranking_history). 보고 있는 탭(board)의 순위 + 그날 점수.
 //      → { points: [{day, rank, score}], scope } · 비로그인 { points: [], needsAuth }.
-//  - scope 'region'|'country'|'school': 집계 버킷 리더보드(/arena 지도 · 랜딩 지구본용).
-//      RPC region_/country_/school_leaderboard — **스냅샷 테이블 arena_bucket_scores 를 select 만** 한다
+//  - scope 'region'|'country': 집계 버킷 리더보드(/arena 지도 · 랜딩 지구본용).
+//      RPC region_/country_leaderboard — **스냅샷 테이블 arena_bucket_scores 를 select 만** 한다
 //      (2026-08-18. 예전엔 호출마다 profiles ⨝ user_progress 를 두 번 훑었는데, 이걸 부르는 자리가
 //       랜딩이라 첫 화면 방문자 전원이 전 회원 집계를 돌리고 있었다. 갱신은 pg_cron 5분).
 //      개인 식별 필드 없이 집계값만(code·member_count·avg_level·active_today·participation·score·has_real,
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const body = (await req.json().catch(() => ({}))) as {
-      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'school' | 'user' | 'page' | 'trend'
+      scope?: 'global' | 'my-country' | 'my-region' | 'region' | 'country' | 'user' | 'page' | 'trend'
       window?: 'daily' | 'season'
       country?: string
       uid?: string
@@ -335,7 +335,9 @@ Deno.serve(async (req) => {
     const window = body.window === 'season' ? 'season' : 'daily'
     const country = (body.country ?? 'KR').slice(0, 8)
     const rpcName =
-      scope === 'region' ? 'region_leaderboard' : scope === 'country' ? 'country_leaderboard' : 'school_leaderboard'
+      // ⚠️ 여기 닿는 scope 는 'region'|'country' 둘뿐이다(앞의 분기가 나머지를 다 먹는다).
+      //    2026-09-04 까지 else 가 'school_leaderboard' 였는데 그 RPC 는 학교 기능과 같이 삭제됐다.
+      scope === 'region' ? 'region_leaderboard' : 'country_leaderboard'
     // country_leaderboard 는 국가 파라미터가 없다(국가 자체가 버킷).
     const params: Record<string, string> = { p_window: window }
     if (scope !== 'country') params.p_country = country

@@ -1,12 +1,15 @@
 // 시험 일정/회차 — DB(exam_rounds)에서 로드해 현재 언어로 투영 + 접수상태/날짜 계산.
-// Guide(히어로 일정 패널)와 ExamSchedule(정기·상시 목록)이 공유.
+// Guide(히어로 일정 패널)와 /plan(회차 목록)이 공유.
+//
+// ⚠️ 2026-09-04 에 **상시(rolling) 회차를 없앴다.** 회차는 이제 정기 하나뿐이라 kind 컬럼이 사라졌고,
+//    회차 안내문(note_i18n)·수동 정렬순서(sort)도 같이 뺐다(둘 다 값을 넣은 회차가 하나도 없었고,
+//    sort 는 정렬 3순위라 앞의 접수일·시험일이 같아야 도달하는데 그런 회차가 없어 한 번도 안 걸렸다).
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, isSupabaseConfigured } from './supabase'
 import type { Lang } from './i18n'
 
 interface RawRound {
   id: string
-  kind: 'regular' | 'rolling'
   title_i18n: Record<string, string> | null
   exam_date: string | null
   apply_start_at: string | null
@@ -14,22 +17,18 @@ interface RawRound {
   // 응시 창(정기시험). 월 규칙이면 그 달 11~20일. 없으면 exam_date 하루짜리 회차(월 규칙 이전 회차).
   exam_start_at: string | null
   exam_end_at: string | null
-  note_i18n: Record<string, string> | null
   open_tiers: string[] | null
-  sort: number
 }
 
 export type RoundStatus = 'open' | 'upcoming' | 'closed'
 
 export interface RoundView {
   id: string
-  kind: 'regular' | 'rolling'
   title: string
-  note: string
-  // 정기: 응시 기간 "MM. DD ~ MM. DD"(창이 없는 옛 회차는 그 하루) / 상시: ''
+  // 응시 기간 "MM. DD ~ MM. DD"(창이 없는 옛 회차는 그 하루)
   // ⚠️ '시험일 하루'가 아니다 — 월 규칙에서 응시는 11~20일 열흘이라 하루를 뽑으면 거짓말이 된다.
   dateText: string
-  applyText: string // 접수기간 "YYYY. MM. DD ~ YYYY. MM. DD" / 상시·미설정: ''
+  applyText: string // 접수기간 "YYYY. MM. DD ~ YYYY. MM. DD" / 미설정: ''
   // 원본 날짜(ISO). /plan 이 접수중 회차의 채점·발표 구간을 계산해 쓴다 — 포맷된 문자열을 되파싱하지 않도록.
   applyStartAt: string | null
   applyEndAt: string | null
@@ -97,18 +96,14 @@ function fmtApply(r: RawRound, lang: Lang): string {
 
 // 응시 기간 표기. 창(11~20일)이 있으면 범위로, 없으면(옛 회차) 시험일 하루로.
 function examText(r: RawRound, lang: Lang): string {
-  if (r.kind === 'rolling') return ''
   if (r.exam_start_at && r.exam_end_at) {
     return `${fmtShort(r.exam_start_at, lang)} ~ ${fmtShort(r.exam_end_at, lang)}`
   }
   return r.exam_date ? fmtDate(r.exam_date, lang) : ''
 }
 
-// 접수 상태: 상시는 항상 open, 정기는 접수기간(now) 기준.
-// ⚠️ 상시의 'open' 은 '늘 열려 있는 안내'라는 뜻이지 결제 가능이 아니다 — 판매 여부는 sellable 을 볼 것.
-//    이 함수를 고치면 /plan 의 상태 배지 문구까지 같이 바뀌므로 판매 판정은 여기 얹지 않았다.
+// 접수 상태 — 접수기간(now) 기준.
 function statusOf(r: RawRound): RoundStatus {
-  if (r.kind === 'rolling') return 'open'
   const now = Date.now()
   const s = r.apply_start_at ? Date.parse(r.apply_start_at) : NaN
   const e = r.apply_end_at ? Date.parse(r.apply_end_at) : NaN
@@ -131,16 +126,15 @@ export function useExamRounds(lang: Lang) {
       }
       const { data } = await supabase
         .from('exam_rounds')
-        .select('id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, exam_start_at, exam_end_at, note_i18n, open_tiers, sort')
+        .select('id, title_i18n, exam_date, apply_start_at, apply_end_at, exam_start_at, exam_end_at, open_tiers')
         .eq('published', true)
         // 접수 시작일 오름차순(= 지금 신청할 수 있는 것부터). /plan 은 접수하러 오는 페이지라
         // '언제부터 신청하나' 가 줄 세우는 기준이다.
         // ⚠️ 시험일(exam_date) 순이 아니다 — 정기시험끼리는 두 기준이 같은 순서지만, 접수를 길게 여는
         //    회차(구성원 테스트처럼 몇 년짜리)는 시험일 순으로 두면 지금 접수중인데도 맨 뒤에 선다.
-        // 접수일이 없는 회차(상시 · 미설정)는 뒤로 밀고 시험일 → sort 로 정렬.
+        // 접수일이 없는(미설정) 회차는 뒤로 민다.
         .order('apply_start_at', { ascending: true, nullsFirst: false })
         .order('exam_date', { ascending: true, nullsFirst: false })
-        .order('sort', { ascending: true })
       if (!alive) return
       setRaw((data as RawRound[] | null) ?? [])
       setLoading(false)
@@ -152,8 +146,8 @@ export function useExamRounds(lang: Lang) {
 
   const views = useMemo<RoundView[]>(() => {
     const pick = (m: Record<string, string> | null) => m?.[lang] ?? m?.ko ?? ''
-    // 시험일이 지난 정기 회차는 목록에서 제외(접수 페이지에 끝난 시험을 쌓지 않음).
-    // 접수만 마감(시험일 전)인 회차는 '마감'으로 계속 노출. 상시(exam_date 없음)는 항상 유지.
+    // 시험일이 지난 회차는 목록에서 제외(접수 페이지에 끝난 시험을 쌓지 않음).
+    // 접수만 마감(시험일 전)인 회차는 '마감'으로 계속 노출.
     // 자정 경계 흔들림 방지: 오늘 00:00 을 지난 것만 과거로 판정.
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
@@ -173,9 +167,7 @@ export function useExamRounds(lang: Lang) {
         const status = statusOf(r)
         return {
           id: r.id,
-          kind: r.kind,
           title: pick(r.title_i18n),
-          note: pick(r.note_i18n),
           dateText: examText(r, lang),
           applyText: fmtApply(r, lang),
           applyStartAt: r.apply_start_at,
@@ -185,16 +177,13 @@ export function useExamRounds(lang: Lang) {
           status,
           clickable: status === 'open',
           openTiers: r.open_tiers ?? [],
-          // clickable 과 일부러 분리했다 — clickable 은 '카드를 눌러 접수화면으로 갈 수 있는가'(/plan),
-          // sellable 은 '거기서 결제까지 갈 수 있는가'다. 정기 회차에선 둘이 같지만 상시에선 갈린다.
-          sellable: r.kind === 'regular' && status === 'open',
+          // clickable 과 일부러 분리해 둔다 — clickable 은 '카드를 눌러 접수화면으로 갈 수 있는가'(/plan),
+          // sellable 은 '거기서 결제까지 갈 수 있는가'다. 상시 회차가 없어진 지금은 두 값이 같지만,
+          // 판매만 막아야 하는 회차(문항 미등록 등)가 생기면 갈라지는 자리라 이름을 남겨 둔다.
+          sellable: status === 'open',
         }
       })
   }, [raw, lang])
 
-  return {
-    regular: views.filter((r) => r.kind === 'regular'),
-    rolling: views.filter((r) => r.kind === 'rolling'),
-    loading,
-  }
+  return { regular: views, loading }
 }

@@ -64,7 +64,7 @@ const STATUS_KEY: Record<RoundStatus, string> = {
 export default function Plan() {
   const { t, lang } = useT()
   const navigate = useNavigate()
-  const { regular, rolling, loading } = useExamRounds(lang)
+  const { regular, loading } = useExamRounds(lang)
 
   const apply = (id: string, label: string, dateLabel: string) =>
     navigate(`/exam/apply?round=${id}`, { state: { roundId: id, roundLabel: label, dateLabel } })
@@ -112,13 +112,13 @@ export default function Plan() {
             )
           })()}
 
-          {!loading && regular.length === 0 && rolling.length === 0 && (
+          {!loading && regular.length === 0 && (
             <p className="pl-empty">{t('sched.empty')}</p>
           )}
 
           {shown.length > 0 && (
             <section className="pl-sec">
-              {/* 정기시험은 섹션 헤더 없이 카드만 — 상시시험이 있을 때만 아래에 구분 헤더가 붙는다. */}
+              {/* 회차 카드만 — 섹션 헤더는 두지 않는다. */}
               <div className="pl-rounds">
                 {shown.map((s) => (
                   <article
@@ -159,41 +159,8 @@ export default function Plan() {
             </section>
           )}
 
-          {rolling.length > 0 && (
-            <section className="pl-sec">
-              <h2 className="pl-sec-head">
-                <span className="material-symbols-outlined">event_repeat</span>
-                {t('sched.rolling')}
-              </h2>
-              <div className="pl-rollings">
-                {rolling.map((r) => (
-                  <article
-                    key={r.id}
-                    className="pl-rolling"
-                    onClick={() => apply(r.id, r.title, r.note)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(r.id, r.title, r.note) } }}
-                  >
-                    <div className="pl-rolling-l">
-                      <span className="pl-rolling-ic"><span className="material-symbols-outlined">event_available</span></span>
-                      <div>
-                        <h3>{r.title}</h3>
-                        {r.note && <p>{r.note}</p>}
-                      </div>
-                    </div>
-                    <div className="pl-rolling-r">
-                      <span className="pl-pill is-rolling">{t('sched.rolling_badge')}</span>
-                      <span className="pl-go">
-                        {t('sched.apply')}
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                      </span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
+          {/* 상시(rolling) 회차 섹션은 2026-09-04 에 제거했다 — 상시 회차 자체가 없어졌다.
+              (원래도 응시권을 팔 수 없는 회차라 안내만 뜨고 결제로 못 넘어가는 자리였다.) */}
         </div>
       </main>
 

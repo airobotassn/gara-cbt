@@ -9,8 +9,8 @@
 //         뭉뚱그려 판매 불가였는데, 그러면 무료 시험을 열 방법이 아예 없다. 지금은 lookupExamFee 가
 //         미설정을 **null** 로 돌려주고 0 은 "관리자가 무료로 정했다"는 뜻이다(관리자 화면이 확인을 한 번 받는다).
 //         이 구분이 무너지면(미설정이 다시 0이 되면) **오타 한 번이 무제한 무료 응시권**이 된다 — 그게 원래 이유였다.
-//   ③ 상시(rolling) 회차는 팔지 않는다 — 회차 행이 안 바뀌어 product_ref 가 영구 고정이라
-//      계정당 평생 1회만 결제되고, exam_date 가 없어 응시창·만료 판정 근거도 없다
+//   ③ **상시(rolling) 회차는 2026-09-04 에 없어졌다** — 되살리지 말 것. 회차 행이 안 바뀌어
+//      product_ref 가 영구 고정이라 계정당 평생 1회만 결제되고, exam_date 가 없어 응시창·만료 근거도 없다
 //   ④ 시간 판정은 전부 KST — exam_date 는 bare date 라 new Date() 와 그냥 비교하면 9시간 어긋난다
 //   ⑤ 소진(consume)은 **소유자 술어를 포함한** 조건부 UPDATE 한 문장 — 빠지면 남의 응시권이 소진된다
 //
@@ -52,7 +52,6 @@ export const LIVE_TICKET_STATUSES: ExamTicketStatus[] = ['issued', 'consumed']
 
 export interface ExamRoundRow {
   id: string
-  kind: 'regular' | 'rolling'
   title_i18n: Record<string, string> | null
   exam_date: string | null
   apply_start_at: string | null
@@ -65,7 +64,7 @@ export interface ExamRoundRow {
 
 /** 회차 select 컬럼. ⚠️ exam_start_at·exam_end_at·open_tiers 는 20260807090000 마이그레이션이 만든다. */
 export const EXAM_ROUND_COLS =
-  'id, kind, title_i18n, exam_date, apply_start_at, apply_end_at, exam_start_at, exam_end_at, published, open_tiers'
+  'id, title_i18n, exam_date, apply_start_at, apply_end_at, exam_start_at, exam_end_at, published, open_tiers'
 
 /** 티어 key → 표시명. 브랜드 고유명이라 **언어 무관 고정**이고, 그래서 서버에 복제해도 번역 동기화 부담이 없다.
  *  단일 출처는 src/lib/caris.ts 의 T1_TIERS/T2_TIERS — 거기에 티어를 추가하면 여기와 exam_tiers 시드도 같이 채울 것.
@@ -134,11 +133,9 @@ function kstDayRange(ymd: string): { start: number; end: number } | null {
  * 접수(결제) 창이 열려 있는가.
  * 지금까지 이 판정이 프론트 src/lib/rounds.ts 에만 있어서 curl 로 마감 회차를 결제할 수 있었다.
  *
- * ⚠️ rolling 은 **항상 false**(결정 D2 — 상시 회차는 응시권을 팔지 않는다).
- * ⚠️ 접수기간 미설정도 false. "미설정 = 무제한 판매"로 열면 관리자가 날짜를 안 넣은 회차가 곧 상시 판매가 된다.
+ * ⚠️ 접수기간 미설정은 false. "미설정 = 무제한 판매"로 열면 관리자가 날짜를 안 넣은 회차가 곧 상시 판매가 된다.
  */
 export function applyWindowOpen(round: ExamRoundRow, at: number = Date.now()): boolean {
-  if (round.kind !== 'regular') return false
   const s = parseAt(round.apply_start_at)
   const e = parseAt(round.apply_end_at)
   if (Number.isNaN(s) && Number.isNaN(e)) return false
@@ -254,7 +251,6 @@ export async function resolveExamFee(admin: SupabaseClient, tier: string): Promi
 export type ExamOfferErrorCode =
   | 'bad_ref'
   | 'round_not_found'
-  | 'rolling'
   | 'tier_unknown'
   | 'not_open_tier'
   | 'apply_closed'
@@ -280,7 +276,7 @@ export type ExamOfferResult =
  * **주문 생성(create)과 지급(grant) 양쪽이 같은 함수를 부른다** — 접수 마감 뒤에 승인이 들어오거나
  * 그 사이 관리자가 급수를 내린 결제가 그대로 지급되던 구멍(H-CRIT-2/H15)을 여기 한 곳에서 막는다.
  *
- * 확인 순서: 회차 존재·published → kind='regular'(D2) → exam_tiers(트랙) → exams(active) → 접수창 → exam_fees.
+ * 확인 순서: 회차 존재·published → exam_tiers(트랙) → exams(active) → 접수창 → exam_fees.
  * 하나라도 실패하면 400/404. **폴백 금액은 어떤 경우에도 지어내지 않는다.**
  */
 export async function resolveExamOffer(
@@ -306,11 +302,6 @@ export async function resolveExamOffer(
   const round = roundRow as ExamRoundRow | null
   // 미발행 회차와 없는 회차를 같은 문구로 접는다 — 준비 중인 회차의 존재를 id 대입으로 떠보지 못하게.
   if (!round) return { ok: false, code: 'round_not_found', error: '접수 중인 시험 회차가 아닙니다.', status: 404 }
-
-  // D2 — 상시(rolling)는 판매하지 않는다. 기존 rolling 행·화면은 남기고 **판매만** 막는다.
-  if (round.kind !== 'regular') {
-    return { ok: false, code: 'rolling', error: '상시 검정은 현재 접수를 받지 않습니다.', status: 400 }
-  }
 
   const { data: tierRow } = await admin
     .from('exam_tiers')

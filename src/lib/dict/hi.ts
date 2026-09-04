@@ -378,7 +378,6 @@ const HI: Record<string, string> = {
   "rank.tab_world": "World",
   "rank.tab_region": "मेरा क्षेत्र",
   "rank.tab_country": "मेरा देश",
-  "rank.tab_school": "स्कूल",
   "rank.scope_sub": "{name} TOP 10",
   "rank.scope_guest": "अपने देश और क्षेत्र की रैंकिंग देखने के लिए लॉगिन करें",
   "rank.scope_no_region": "यह रैंकिंग देखने के लिए अपना देश और क्षेत्र सेट करें",
@@ -874,7 +873,6 @@ const HI: Record<string, string> = {
   "guide.status_open": "खुला",
   "guide.status_upcoming": "आगामी",
   "guide.status_closed": "बंद",
-  "sched.rolling_badge": "सतत पंजीकरण",
   "sched.prev": "पिछला",
   "sched.next": "अगला",
   "guide.areas_title": "5 मुख्य मूल्यांकन क्षेत्र",
@@ -1214,10 +1212,6 @@ const HI: Record<string, string> = {
   "caris.t2.zenith.subj.2": "AI गवर्नेंस (ISO/IEC 42001), नैतिकता और DX रणनीति",
   "caris.t2.zenith.pass": "रूब्रिक समीक्षा · तीन जूरी सदस्यों का औसत ≥80",
   // 상시(Rolling) 항목
-  "caris.rolling.pro_cbt.name": "CARIS रोलिंग परीक्षा (CBT)",
-  "caris.rolling.pro_cbt.badge": "सतत पंजीकरण",
-  "caris.rolling.pro_cbt.date": "साल भर · बुक की गई तारीख पर परीक्षा",
-  "caris.rolling.pro_cbt.desc": "अपनी पसंद की तारीख बुक कर ऑनलाइन (CBT) दी जाने वाली सतत परीक्षा।",
 
   // ── Guide 히어로 (2026-07 개편: 로고 락업 + 일정 패널 → 카피 + CARIS PLAN 버튼 + 로봇 이미지) ──
   // h1 은 2줄. 1줄은 브랜드 표기라 전 언어 'AI·Robot' 고정, 2줄만 번역 + 끝의 'CARIS' 는 컴포넌트가 파란색으로 붙인다.
@@ -1280,7 +1274,6 @@ const HI: Record<string, string> = {
   "sched.title": "CARIS पंजीकरण",
   "sched.desc": "पंजीकरण के लिए परीक्षा चुनें। केवल खुले सत्रों के लिए ही आवेदन किया जा सकता है।",
   "sched.regular": "नियमित परीक्षा कार्यक्रम",
-  "sched.rolling": "सतत परीक्षा",
   "sched.exam_date": "परीक्षा तिथि",
   "sched.exam_period": "परीक्षा अवधि",
   "sched.apply_period": "आवेदन अवधि",

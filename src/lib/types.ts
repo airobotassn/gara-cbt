@@ -237,14 +237,11 @@ export interface AdminFaqListResponse {
 // ---------- 시험 일정/회차 ----------
 export interface ExamRoundRow {
   id: string
-  kind: 'regular' | 'rolling'
   titleI18n: I18nText
   examDate: string | null // 'YYYY-MM-DD'
   applyStartAt: string | null // ISO
   applyEndAt: string | null // ISO
-  noteI18n: I18nText
   published: boolean
-  sort: number
   tiers?: string[] // 이 회차가 연 급수(getTracks 티어 key) — 회차 등록 기능
   createdAt?: string
   updatedAt?: string

@@ -757,7 +757,7 @@ function SubmissionList() {
   const subExamOpts = (subsRound && subsRound !== 'none' ? subExams.filter((e) => e.round_id === subsRound) : subExams)
     .slice().sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
   // 회차는 일정 내림차순(최신·미래가 위) — 주관식 채점(gradeRounds)과 동일 순서
-  const subRegular = subRounds.filter((r) => r.kind === 'regular').sort((a, b) => (b.examDate ?? '').localeCompare(a.examDate ?? ''))
+  const subRegular = subRounds.slice().sort((a, b) => (b.examDate ?? '').localeCompare(a.examDate ?? ''))
 
   return (
     <>
@@ -2537,14 +2537,14 @@ export function ChatModAdmin() {
 }
 
 // ── 시험 일정/회차 관리 (exam_rounds) ──────────────────────────────
-const ROUND_KINDS = ['regular', 'rolling'] as const
-const ROUND_KIND_LABEL: Record<string, string> = { regular: '정기시험', rolling: '상시시험' } // 편집폼 유형 select 라벨
+// ⚠️ 2026-09-04 에 **상시(rolling) 회차를 없앴다.** 회차는 정기 하나뿐이라 유형 선택·수동 순서(sort)
+//    ·회차 설명(note)이 전부 빠졌다. 상시는 원래도 응시권을 팔 수 없는 회차였다(결제 상품번호가
+//    영구 고정이라 계정당 평생 1회만 결제됨) — 만들 수는 있는데 아무도 못 사는 자리였다.
 
 // 목록 필터 세그먼트: 정기(안 지난 것) · 상시 · 지난 시험(지난 정기). '지난 시험'은 별도 데이터가 아니라 시험일 기준 분류.
-type RoundFilter = 'regular' | 'rolling' | 'past'
+type RoundFilter = 'regular' | 'past'
 const ROUND_FILTERS: { key: RoundFilter; label: string }[] = [
   { key: 'regular', label: '정기시험' },
-  { key: 'rolling', label: '상시시험' },
   { key: 'past', label: '지난 시험' },
 ]
 // 지난 시험 판정 — 공개화면(useExamRounds)의 isPastExam 과 동일 경계: 시험일 다음날 0시부터 과거.
@@ -2555,23 +2555,19 @@ function isPastRound(examDate: string | null): boolean {
   const d = Date.parse(`${examDate}T23:59:59`)
   return !Number.isNaN(d) && d < todayStart.getTime()
 }
-// 회차가 필터 세그먼트에 속하는지 (지난 시험 = 지난 정기, 정기 = 안 지난 정기, 상시 = rolling)
+// 회차가 필터 세그먼트에 속하는지 (지난 시험 = 응시가 끝난 회차, 정기 = 아직 안 끝난 회차)
 function matchRoundFilter(r: ExamRoundRow, f: RoundFilter): boolean {
-  if (f === 'rolling') return r.kind === 'rolling'
-  const past = r.kind === 'regular' && isPastRound(r.examDate)
-  return f === 'past' ? past : r.kind === 'regular' && !past
+  const past = isPastRound(r.examDate)
+  return f === 'past' ? past : !past
 }
 
 interface RoundDraft {
   id?: string
-  kind: 'regular' | 'rolling'
-  sort: number
   published: boolean
   titleI18n: I18nText
-  noteI18n: I18nText
-  // 정기시험은 **월 하나**만 고른다(2026-08-20 정책) — 접수·응시·채점·발표 날짜는 서버가 계산한다.
+  // 시험은 **월 하나**만 고른다(2026-08-20 정책) — 접수·응시·채점·발표 날짜는 서버가 계산한다.
   //   화면이 날짜를 만들어 보내지 않으므로 옛 examDate/applyStart/... 칸은 통째로 없앴다.
-  month: string // YYYY-MM (상시는 '')
+  month: string // YYYY-MM
   tiers: string[] // 이 회차가 여는 급수(getTracks 티어 key)
 }
 
@@ -2591,14 +2587,13 @@ function kstToday(): { y: number; m: number } {
   const k = new Date(Date.now() + 9 * 3600e3)
   return { y: k.getUTCFullYear(), m: k.getUTCMonth() + 1 }
 }
-function emptyRoundDraft(kind: 'regular' | 'rolling'): RoundDraft {
+function emptyRoundDraft(): RoundDraft {
   // 기본 월 = 이번 달(KST). 회차명도 그 달 이름으로 미리 채워 둔다 — 관리자가 고쳐 쓸 수 있다.
   const t = kstToday()
-  const month = kind === 'regular' ? `${t.y}-${String(t.m).padStart(2, '0')}` : ''
+  const month = `${t.y}-${String(t.m).padStart(2, '0')}`
   return {
-    kind, sort: 9999, published: true,
-    titleI18n: month ? { ko: autoRoundTitle(month) } : {},
-    noteI18n: {},
+    published: true,
+    titleI18n: { ko: autoRoundTitle(month) },
     month,
     tiers: [],
   }
@@ -2772,7 +2767,6 @@ function RoundsAdmin() {
   const [draft, setDraft] = useState<RoundDraft | null>(null)
   const roundDraft = useDraft({ kind: 'exam-round', refId: draft?.id, value: draft, title: draft?.titleI18n?.ko?.trim() || '새 회차', enabled: !!draft })
   const [saving, setSaving] = useState(false)
-  const [busy, setBusy] = useState(false)
   const [kindFilter, setKindFilter] = useState<RoundFilter>('regular')
 
   const load = useCallback(async () => {
@@ -2792,17 +2786,14 @@ function RoundsAdmin() {
   }, [load])
 
   function openNew() {
-    setDraft(emptyRoundDraft(kindFilter === 'rolling' ? 'rolling' : 'regular'))
+    setDraft(emptyRoundDraft())
   }
   function openEdit(r: ExamRoundRow) {
     const rx = r as ExamRoundRowX
     setDraft({
       id: r.id,
-      kind: r.kind,
-      sort: r.sort,
       published: r.published,
       titleI18n: { ...r.titleI18n },
-      noteI18n: { ...r.noteI18n },
       // 월은 서버가 내려준 값(대표일에서 되짚은 것)을 쓰고, 옛 회차(월 규칙 밖)면 대표일의 달로 폴백한다.
       // ⚠️ 옛 회차를 열어서 저장하면 그 달의 규칙 날짜로 **옮겨간다** — 그래서 아래 미리보기가 필수다.
       month: rx.month || monthOfExamDate(r.examDate),
@@ -2812,7 +2803,7 @@ function RoundsAdmin() {
   function patch(p: Partial<RoundDraft>) {
     setDraft((d) => (d ? { ...d, ...p } : d))
   }
-  function patchField(k: 'titleI18n' | 'noteI18n', v: string) {
+  function patchField(k: 'titleI18n', v: string) {
     setDraft((d) => (d ? { ...d, [k]: { ...d[k], ko: v } } : d))
   }
   function toggleTier(key: string, on: boolean) {
@@ -2831,8 +2822,7 @@ function RoundsAdmin() {
       alert('한국어 회차명은 필수입니다.')
       return
     }
-    const isReg = draft.kind === 'regular'
-    if (isReg && !isExamMonth(draft.month)) {
+    if (!isExamMonth(draft.month)) {
       alert('시험 월을 선택하세요.')
       return
     }
@@ -2848,14 +2838,11 @@ function RoundsAdmin() {
         action: 'examRoundUpsert',
         round: {
           id: draft.id,
-          kind: draft.kind,
-          sort: draft.sort,
           published: draft.published,
           titleI18n: draft.titleI18n,
-          noteI18n: isReg ? {} : draft.noteI18n,
           // ⚠️ 날짜를 보내지 않는다 — 접수·응시·채점·발표는 서버가 이 월에서 계산한다
           //    (supabase/functions/_shared/exam-schedule.ts). 화면이 날짜를 만들면 규칙 밖 회차가 생긴다.
-          month: isReg ? draft.month : null,
+          month: draft.month,
           tiers,
         },
       })
@@ -2882,40 +2869,15 @@ function RoundsAdmin() {
     }
   }
 
-  // 같은 유형(정기/상시) 안에서 ↑↓ 이동 → 전체 순서 재구성해 서버가 sort 재부여
-  async function move(r: ExamRoundRow, dir: -1 | 1) {
-    const grp = rows.filter((x) => x.kind === r.kind).sort((a, b) => a.sort - b.sort)
-    const idx = grp.findIndex((x) => x.id === r.id)
-    const swap = idx + dir
-    if (swap < 0 || swap >= grp.length) return
-    const g = [...grp]
-    ;[g[idx], g[swap]] = [g[swap], g[idx]]
-    const ids: string[] = []
-    for (const k of ROUND_KINDS) {
-      if (k === r.kind) g.forEach((x) => ids.push(x.id))
-      else rows.filter((x) => x.kind === k).sort((a, b) => a.sort - b.sort).forEach((x) => ids.push(x.id))
-    }
-    setBusy(true)
-    try {
-      await callFunction('admin', { action: 'examRoundReorder', ids })
-      await load()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '순서 변경에 실패했습니다.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // 정기시험은 시험일 오름차순 자동정렬(수동 순서 없음). 상시는 sort(수동 ↑↓) 순.
+  // 회차는 시험일 순 자동정렬이다 — 수동 ↑↓ 순서는 2026-09-04 에 없앴다(상시 회차 전용이었고,
+  // 정기끼리는 시험일이 곧 순서라 손으로 매길 이유가 없다).
   const group = rows
     .filter((r) => matchRoundFilter(r, kindFilter))
     .sort((a, b) => {
-      if (kindFilter === 'rolling') return a.sort - b.sort
       const av = a.examDate || '9999-99-99'
       const bv = b.examDate || '9999-99-99'
       return kindFilter === 'past' ? bv.localeCompare(av) : av.localeCompare(bv) // 지난 시험은 최근순
     })
-  const isReg = draft?.kind === 'regular'
   // 편집 중인 회차가 **서버 기준으로** 이미 열어둔 급수. 잠긴 급수(CARIS-Ⅱ) 체크박스를 풀지 말지의 기준이다
   // — 새 회차(id 없음)면 빈 배열이라 잠긴 급수는 전부 못 켠다.
   const serverTiers = (draft?.id ? rows.find((r) => r.id === draft.id)?.tiers : null) ?? []
@@ -2963,12 +2925,11 @@ function RoundsAdmin() {
               <th>접수기간</th>
               <th>응시기간</th>
               <th>열린 급수</th>
-              {kindFilter === 'rolling' && <th style={{ textAlign: 'center' }}>순서</th>}
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {group.map((r, i) => (
+            {group.map((r) => (
               <tr key={r.id}>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <span className={`admin-badge st-${r.published ? 'submitted' : 'voided'}`}>
@@ -2976,19 +2937,15 @@ function RoundsAdmin() {
                   </span>
                 </td>
                 <td>{r.titleI18n.ko || <span style={{ color: 'var(--muted)' }}>(회차명 없음)</span>}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{r.kind === 'rolling' ? '상시' : r.examDate ?? '-'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{r.examDate ?? '-'}</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 14 }}>
-                  {r.kind === 'rolling'
-                    ? '연중'
-                    : r.applyStartAt || r.applyEndAt
-                      ? `${dayKST(r.applyStartAt) || '?'} ~ ${dayKST(r.applyEndAt) || '?'}`
-                      : '-'}
+                  {r.applyStartAt || r.applyEndAt
+                    ? `${dayKST(r.applyStartAt) || '?'} ~ ${dayKST(r.applyEndAt) || '?'}`
+                    : '-'}
                 </td>
                 {/* 응시기간이 실제 응시 가능 여부를 정한다(시험일은 대표 표기일일 뿐). 비면 시험일 하루로 처리된다. */}
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 14 }}>
-                  {r.kind === 'rolling'
-                    ? '-'
-                    : (r as ExamRoundRowX).examStartAt || (r as ExamRoundRowX).examEndAt
+                  {(r as ExamRoundRowX).examStartAt || (r as ExamRoundRowX).examEndAt
                       ? `${dayKST((r as ExamRoundRowX).examStartAt) || '?'} ~ ${dayKST((r as ExamRoundRowX).examEndAt) || '?'}`
                       : <span title="응시기간 미설정 — 시험일 하루만 응시할 수 있습니다.">시험일 하루</span>}
                 </td>
@@ -3001,29 +2958,6 @@ function RoundsAdmin() {
                       ))
                     : <span style={{ color: 'var(--muted)' }}>-</span>}
                 </td>
-                {kindFilter === 'rolling' && (
-                  <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                    <button
-                      className="admin-mini"
-                      disabled={busy || i === 0}
-                      onClick={() => move(r, -1)}
-                      aria-label="위로"
-                      title="위로"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      className="admin-mini"
-                      style={{ marginLeft: 4 }}
-                      disabled={busy || i === group.length - 1}
-                      onClick={() => move(r, 1)}
-                      aria-label="아래로"
-                      title="아래로"
-                    >
-                      ↓
-                    </button>
-                  </td>
-                )}
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="admin-mini" onClick={() => openEdit(r)}>
                     편집
@@ -3036,8 +2970,8 @@ function RoundsAdmin() {
             ))}
             {!group.length && !loading && (
               <tr>
-                <td colSpan={kindFilter === 'rolling' ? 8 : 7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                  {kindFilter === 'past' ? '지난 시험이 없습니다.' : '이 유형의 회차가 없습니다. “+ 새 회차”로 추가하세요.'}
+                <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  {kindFilter === 'past' ? '지난 시험이 없습니다.' : '등록된 회차가 없습니다. “+ 새 회차”로 추가하세요.'}
                 </td>
               </tr>
             )}
@@ -3056,20 +2990,6 @@ function RoundsAdmin() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <label style={{ ...fieldStyle, flex: 2, minWidth: 140 }}>
-                  유형
-                  <select
-                    style={inpStyle}
-                    value={draft.kind}
-                    onChange={(e) => patch({ kind: e.target.value as 'regular' | 'rolling' })}
-                  >
-                    {ROUND_KINDS.map((k) => (
-                      <option key={k} value={k}>
-                        {ROUND_KIND_LABEL[k]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, alignSelf: 'flex-end', paddingBottom: 8 }}>
                   <input
                     type="checkbox"
@@ -3133,8 +3053,7 @@ function RoundsAdmin() {
                 </div>
               </div>
 
-              {isReg ? (
-                <>
+              <>
                   {/* 월 하나만 고른다 — 나머지 날짜는 규칙에서 나온다(2026-08-20 정책).
                       ⚠️ 날짜칸을 되살리지 말 것. 관리자가 하루라도 손대면 /plan 의 "매월 1~10일 접수"
                          안내가 그 회차에서만 거짓이 되고, 그걸 화면에서 알아챌 방법이 없다. */}
@@ -3176,35 +3095,14 @@ function RoundsAdmin() {
                       )}
                     </div>
                   </div>
-                </>
-              ) : (
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0 }}>
-                  상시시험은 시험일·접수기간이 없습니다(연중 접수).
-                </p>
-              )}
-
-              {/* 설명은 상시시험 카드에만 표시됨 → 상시일 때만 입력 */}
-              {!isReg && (
-                <label style={fieldStyle}>
-                  설명 <em style={{ color: 'var(--muted)' }}>(한국어 · 카드에 표시)</em>
-                  <textarea
-                    rows={3}
-                    style={{ ...inpStyle, resize: 'vertical', lineHeight: 1.6 }}
-                    value={draft.noteI18n.ko ?? ''}
-                    onChange={(e) => patchField('noteI18n', e.target.value)}
-                    placeholder="예: 원하는 날짜를 예약해 온라인(CBT)으로 응시합니다."
-                  />
-                </label>
-              )}
+              </>
 
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-                🌐 {isReg ? '회차명은' : '회차명·설명은'} 저장 시 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다. 날짜는 화면 언어에 맞게 자동 표기됩니다.
+                🌐 회차명은 저장 시 <b>영어·일본어·중국어·힌디어·베트남어</b>로 자동 번역됩니다. 날짜는 화면 언어에 맞게 자동 표기됩니다.
               </p>
-              {isReg && (
-                <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
-                  ⓘ 이미 접수(응시권·진행 중 결제)가 있는 급수는 체크를 해제해도 <b>닫히지 않습니다</b>. 접수분을 먼저 회수·환불하세요.
-                </p>
-              )}
+              <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
+                ⓘ 이미 접수(응시권·진행 중 결제)가 있는 급수는 체크를 해제해도 <b>닫히지 않습니다</b>. 접수분을 먼저 회수·환불하세요.
+              </p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
@@ -3237,7 +3135,6 @@ interface TicketRow {
   email: string | null
   roundId: string
   roundTitle: string
-  roundKind: string | null
   examDate: string | null
   examEndAt: string | null
   tier: string
@@ -3421,7 +3318,7 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
             <button
               className="admin-mini"
               onClick={() => {
-                const reg = roundOpts.filter((r) => r.kind === 'regular')
+                const reg = roundOpts
                 const pre = reg.some((r) => r.id === roundId) ? roundId : reg[0]?.id ?? ''
                 setGrantDraft({ roundId: pre, tier: '', email: '', note: '' })
               }}
@@ -3661,7 +3558,7 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
                 {/* 상시 회차는 응시 기간이 없어 만료를 정할 수 없다 → 서버도 400 으로 막는다. 목록에서 빼둔다. */}
                 <select style={inpStyle} value={grantDraft.roundId} onChange={(e) => setGrantDraft({ ...grantDraft, roundId: e.target.value })}>
                   <option value="">선택하세요</option>
-                  {roundOpts.filter((r) => r.kind === 'regular').map((r) => (
+                  {roundOpts.map((r) => (
                     <option key={r.id} value={r.id}>{r.titleI18n.ko || '(회차명 없음)'}</option>
                   ))}
                 </select>

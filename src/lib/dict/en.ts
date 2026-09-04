@@ -378,7 +378,6 @@ const EN: Record<string, string> = {
   "rank.tab_world": "World",
   "rank.tab_region": "My region",
   "rank.tab_country": "My country",
-  "rank.tab_school": "School",
   "rank.scope_sub": "{name} TOP 10",
   "rank.scope_guest": "Log in to see your country and region rankings",
   "rank.scope_no_region": "Set your country and region to unlock this ranking",
@@ -874,7 +873,6 @@ const EN: Record<string, string> = {
   "guide.status_open": "Open",
   "guide.status_upcoming": "Upcoming",
   "guide.status_closed": "Closed",
-  "sched.rolling_badge": "Rolling",
   "sched.prev": "Previous",
   "sched.next": "Next",
   "guide.areas_title": "5 Core Evaluation Areas",
@@ -1214,10 +1212,6 @@ const EN: Record<string, string> = {
   "caris.t2.zenith.subj.2": "AI governance (ISO/IEC 42001), ethics and DX strategy",
   "caris.t2.zenith.pass": "Rubric review · average ≥80 from three judges",
   // 상시(Rolling) 항목
-  "caris.rolling.pro_cbt.name": "CARIS Rolling Exam (CBT)",
-  "caris.rolling.pro_cbt.badge": "Rolling",
-  "caris.rolling.pro_cbt.date": "Year-round · take on your booked date",
-  "caris.rolling.pro_cbt.desc": "A rolling exam you take online (CBT) on a date you book.",
 
   // ── Guide 히어로 (2026-07 개편: 로고 락업 + 일정 패널 → 카피 + CARIS PLAN 버튼 + 로봇 이미지) ──
   // h1 은 2줄. 1줄은 브랜드 표기라 전 언어 'AI·Robot' 고정, 2줄만 번역 + 끝의 'CARIS' 는 컴포넌트가 파란색으로 붙인다.
@@ -1280,7 +1274,6 @@ const EN: Record<string, string> = {
   "sched.title": "CARIS registration",
   "sched.desc": "Select an exam to register for. Only open sessions can be applied to.",
   "sched.regular": "Regular exam schedule",
-  "sched.rolling": "Rolling exams",
   "sched.exam_date": "Exam date",
   "sched.exam_period": "Exam period",
   "sched.apply_period": "Application period",
