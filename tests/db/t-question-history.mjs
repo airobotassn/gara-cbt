@@ -16,8 +16,8 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
-const MIG = 'supabase/migrations/20260904230000_question_history_merge.sql';
-const DROP = 'supabase/migrations/20260904240000_drop_old_question_event_tables.sql';
+const MIG = 'supabase/migrations/20260904400000_question_history_merge.sql';
+const DROP = 'supabase/migrations/20260904410000_drop_old_question_event_tables.sql';
 const SHARED = 'supabase/functions/_shared/question-history.ts';
 
 const db = await PGlite.create();
