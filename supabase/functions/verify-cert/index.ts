@@ -70,14 +70,23 @@ Deno.serve(async (req) => {
     const levelUser = parseLevelCertToken(token)
     if (levelUser) return json(await verifyLevelCert(admin, levelUser))
 
-    const { data: a } = await admin
-      .from('exam_attempts')
-      .select('id, user_id, exam_id, cert_issued_at, cert_no')
+    // 자격증은 2026-09-04 부터 별 표다(exam_certificates) — 줄이 있으면 곧 발급된 것이다.
+    //   ⚠️ 옛 구조에선 응시 기록의 verify_token 으로 찾고 cert_issued_at 이 비었는지 한 번 더 봤다.
+    //      지금은 발급되지 않은 응시에는 줄 자체가 없어서 그 검사가 필요 없다.
+    //   ⛔ 만료 계산은 **first_issued_at** 을 쓴다 — 재발급으로 유효기간이 연장되면 안 된다.
+    const { data: c } = await admin
+      .from('exam_certificates')
+      .select('cert_no, first_issued_at, exam_attempts(id, user_id, exam_id)')
       .eq('verify_token', token)
       .maybeSingle()
+    const embA = (c as { exam_attempts?: unknown } | null)?.exam_attempts
+    const a = (Array.isArray(embA) ? embA[0] : embA) as
+      | { id: string; user_id: string; exam_id: string | null }
+      | null
+      | undefined
 
-    // 미발급(cert_issued_at 없음)이거나 없는 토큰 = 무효
-    if (!a || !a.cert_issued_at) return json({ valid: false, reason: 'not_found' })
+    // 없는 토큰 = 무효
+    if (!c || !a) return json({ valid: false, reason: 'not_found' })
 
     // 시험명(급수) — 트랙·만료 규칙 산정에 사용
     let title: string | null = null
@@ -88,7 +97,7 @@ Deno.serve(async (req) => {
 
     const grade = gradeOfTitle(title)
     const months = expiryMonths(grade)
-    const issuedAt = a.cert_issued_at as string
+    const issuedAt = c.first_issued_at as string
     let expiresAt: string | null = null
     if (months != null) {
       const d = new Date(issuedAt)
@@ -108,7 +117,7 @@ Deno.serve(async (req) => {
       status: expired ? 'expired' : 'valid',
       name: holder ? maskName(holder) : '',
       grade: title ?? 'CARIS',
-      certNo: a.cert_no ?? '',
+      certNo: c.cert_no ?? '',
       issuedAt,
       expiresAt,
     })

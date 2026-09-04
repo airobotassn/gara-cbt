@@ -910,7 +910,7 @@ async function suspendUser(admin: any, body: any, ctx: Ctx) {
 async function certList(admin: any, body: any) {
   const onlyPending = !!body?.pendingOnly
   const { data: atts, error } = await admin.from('exam_attempts')
-    .select('id, user_id, exam_id, status, total_correct, total_questions, submitted_at, result_release_at, cert_no, cert_issued_at, cert_name_roman, pass_ratio_snapshot')
+    .select('id, user_id, exam_id, status, total_correct, total_questions, submitted_at, result_release_at, pass_ratio_snapshot, exam_certificates(cert_no, name_roman, first_issued_at, last_issued_at, issue_count)')
     .eq('status', 'submitted').order('submitted_at', { ascending: false }).limit(2000)
   if (error) return json({ error: error.message }, 500)
   const rows = (atts ?? []) as any[]
@@ -931,12 +931,16 @@ async function certList(admin: any, body: any) {
       // 합격 판정은 **응시 시점 스냅샷**이 있으면 그걸 쓴다. 없으면 기본값(옛 응시 = 그때의 유일한 규칙).
       const ratio = r.pass_ratio_snapshot ?? DEFAULT_PASS_RATIO
       const passed = attemptPassed(r.total_correct, r.total_questions, r.pass_ratio_snapshot)
+      const embC = (r as { exam_certificates?: unknown }).exam_certificates
+      const cert = (Array.isArray(embC) ? embC[0] : embC) as { cert_no?: string; name_roman?: string; first_issued_at?: string; last_issued_at?: string; issue_count?: number } | null | undefined
       return {
         attemptId: r.id, userId: r.user_id, name: nameMap[r.user_id] ?? null,
         examTitle: r.exam_id ? titleMap[r.exam_id] ?? null : null,
         submittedAt: r.submitted_at, releasedAt: r.result_release_at,
         score: r.total_correct, total: r.total_questions, passRatio: ratio, passed,
-        certNo: r.cert_no ?? null, certIssuedAt: r.cert_issued_at ?? null, nameRoman: r.cert_name_roman ?? null,
+        // 자격증은 2026-09-04 부터 별 표다. issueCount·firstIssuedAt 은 옛 구조에선 담을 칸이 없어 사라지던 값이다.
+        certNo: cert?.cert_no ?? null, certIssuedAt: cert?.last_issued_at ?? null, nameRoman: cert?.name_roman ?? null,
+        certFirstIssuedAt: cert?.first_issued_at ?? null, certIssueCount: cert?.issue_count ?? 0,
       }
     })
     .filter((r) => r.passed === true)

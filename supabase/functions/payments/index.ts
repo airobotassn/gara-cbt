@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
         productType === 'cert'
           ? admin
               .from('exam_attempts')
-              .select('user_id, ticket_id, status, result_release_at, total_correct, total_questions, pass_ratio_snapshot, cert_no')
+              .select('user_id, ticket_id, status, result_release_at, total_correct, total_questions, pass_ratio_snapshot, exam_certificates(cert_no)')
               .eq('id', product.ref)
               .maybeSingle()
           : Promise.resolve({ data: null }),
@@ -219,12 +219,15 @@ Deno.serve(async (req) => {
           total_correct: number | null
           total_questions: number | null
           pass_ratio_snapshot: number | null
-          cert_no: string | null
+          exam_certificates?: { cert_no: string }[] | { cert_no: string } | null
         } | null
         if (!att || att.user_id !== uid) {
           return json({ error: '본인의 응시만 자격증을 발급할 수 있습니다.' }, 403)
         }
-        if (att.cert_no) return json({ error: '이미 발급된 자격증입니다.', owned: true }, 409)
+        // 자격증은 2026-09-04 부터 별 표다(exam_certificates) — 줄이 있으면 이미 발급된 것이다.
+        const embCert = att.exam_certificates
+        const hasCert = Array.isArray(embCert) ? embCert.length > 0 : Boolean(embCert)
+        if (hasCert) return json({ error: '이미 발급된 자격증입니다.', owned: true }, 409)
         const released =
           att.status === 'submitted' &&
           !!att.result_release_at &&

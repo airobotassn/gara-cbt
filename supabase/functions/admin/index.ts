@@ -857,6 +857,15 @@ async function boardCatMove(admin: any, body: any) {
   return json({ ok: true, moved: ids.length })
 }
 
+/** 응시 행에 임베드된 자격증에서 최초 발급 시각을 뽑는다(없으면 null = 미발급).
+ *  ⚠️ 자격증은 2026-09-04 부터 별 표(exam_certificates)라 응시 기록에 cert_issued_at 이 없다.
+ *     PostgREST 임베드는 관계에 따라 객체 하나 또는 배열로 오므로 둘 다 받는다. */
+function certIssuedAt(a: any): string | null {
+  const e = a?.exam_certificates
+  const row = Array.isArray(e) ? e[0] : e
+  return (row?.first_issued_at as string | undefined) ?? null
+}
+
 // ---------- 시험 일정/회차(exam_rounds) CRUD ----------
 // tiers = 이 회차가 연 급수(활성 exams.tier) 키 배열. 회차 등록 기능(exams=회차×급수)에서 채움.
 function shapeExamRound(r: any, tiers: string[] = []) {
@@ -2432,7 +2441,7 @@ async function cbtAnalytics(admin: any) {
 
   const [profRes, attRes, ansRes, qRes, examRes, roundRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, signups7dCnt, qTot, qAct, pendGradeCnt] = await Promise.all([
     admin.from('profiles').select('created_at, is_anonymous').limit(10000),
-    admin.from('exam_attempts').select('id, exam_id, round_id, status, started_at, submitted_at, total_correct, total_questions, cert_issued_at, result_release_at').limit(10000),
+    admin.from('exam_attempts').select('id, exam_id, round_id, status, started_at, submitted_at, total_correct, total_questions, result_release_at, exam_certificates(first_issued_at)').limit(10000),
     admin.from('attempt_answers').select('attempt_id, question_id, is_correct').limit(50000),
     admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
     admin.from('exams').select('id, title, slug, active, tier').order('created_at', { ascending: true }),
@@ -2475,7 +2484,7 @@ async function cbtAnalytics(admin: any) {
     // ⚠️ 폴백이 started_at 이다 — 응시의 created_at 은 2026-09-04 에 뺐다(started_at 과 늘 같은 값이었다).
     const k = (a.submitted_at ?? a.started_at ?? '').slice(0, 10)
     if (k in submitByDay) submitByDay[k]++
-    const ck = (a.cert_issued_at ?? '').slice(0, 10)
+    const ck = (certIssuedAt(a) ?? '').slice(0, 10)
     if (ck && ck in certByDay) certByDay[ck]++
   }
 
@@ -2515,9 +2524,9 @@ async function cbtAnalytics(admin: any) {
   for (const a of allAtts as any[]) {
     if (a.status === 'in_progress') inProgress++
     if (a.status !== 'submitted') continue
-    if (a.cert_issued_at) certIssued++
+    if (certIssuedAt(a)) certIssued++
     const pct = pctOf(a)
-    if (pct != null && pct >= 60 && !a.cert_issued_at) certPending++
+    if (pct != null && pct >= 60 && !certIssuedAt(a)) certPending++
     if (!a.result_release_at || a.result_release_at > nowIso) resultPending++
   }
 
@@ -2531,7 +2540,7 @@ async function cbtAnalytics(admin: any) {
     roundAgg[a.round_id].attempts++
     const pct = pctOf(a)
     if (pct != null && pct >= 60) roundAgg[a.round_id].pass++
-    if (a.cert_issued_at) roundAgg[a.round_id].cert++
+    if (certIssuedAt(a)) roundAgg[a.round_id].cert++
   }
   const roundStats = Object.entries(roundAgg)
     .map(([id, v]) => ({

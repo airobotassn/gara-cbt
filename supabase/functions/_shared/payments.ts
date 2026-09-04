@@ -99,7 +99,9 @@ export interface ResolvedProduct {
   addon?: { id: string; title: string; amount: number }
   /** 묶음(bundle) 전용 — payment_items 에 그대로 넣을 줄 목록. list=정가, amount=할인 반영 배분액.
    *  ⚠️ `kind` 가 줄의 상품 종류다(교재 묶음 / 강의 묶음). 한 묶음에 두 종류가 섞이지 않는다. */
-  bundle?: { kind: BundleKind; catalog: string; discounted: boolean; lines: { itemId: string; list: number; amount: number }[] }
+  // ⚠️ discounted 는 2026-09-04 에 뺐다 — 묶음 할인 제거(74d7dd2) 때 지역변수만 지우고 이 자리에
+  //    이름이 남아 **묶음 주문이 ReferenceError 로 500** 이었다. 읽는 곳은 처음부터 없었다.
+  bundle?: { kind: BundleKind; catalog: string; lines: { itemId: string; list: number; amount: number }[] }
   /** 화면 주문요약에 줄 단위로 그릴 내역. 곁다리가 없으면 한 줄뿐이다. */
   items: { name: string; amount: number }[]
 }
@@ -332,7 +334,7 @@ async function resolveBundle(
     //    순서만 달라도 같은 조합이 다른 상품으로 보여 '같은 묶음 재구매' 방어가 뚫린다.
     // ⚠️ 접두사가 종류를 담는다 — 같은 카탈로그의 교재 묶음과 강의 묶음이 서로 다른 상품이어야 한다.
     ref: `${kind}:${catalog}:${items.map((b) => b.id).sort().join('+')}`,
-    bundle: { kind, catalog, discounted, lines },
+    bundle: { kind, catalog, lines },
     items: items.map((b, i) => ({ name: titleOf(b), amount: lines[i].amount })),
   }
 }

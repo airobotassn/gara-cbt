@@ -28,7 +28,7 @@ interface TicketRow {
 
 interface RoundRow {
   id: string
-  kind: string
+  open_tiers: string[] | null
   title_i18n: Record<string, string> | null
   exam_date: string | null
   exam_start_at: string | null
@@ -114,10 +114,16 @@ Deno.serve(async (req) => {
     if (body?.issue) {
       const { data: a } = await admin
         .from('exam_attempts')
-        .select('id, user_id, exam_id, ticket_id, status, result_release_at, submitted_at, total_correct, total_questions, pass_ratio_snapshot, verify_token, cert_no, cert_name_roman')
+        .select('id, user_id, exam_id, ticket_id, status, result_release_at, submitted_at, total_correct, total_questions, pass_ratio_snapshot')
         .eq('id', body.issue)
         .maybeSingle()
       if (!a || a.user_id !== user.id) return json({ error: '권한이 없습니다.' }, 403)
+      // 자격증은 2026-09-04 부터 별 표다(exam_certificates). 응시당 한 줄이고, 줄이 있으면 = 이미 발급됨.
+      const { data: certRow } = await admin
+        .from('exam_certificates')
+        .select('cert_no, verify_token, name_roman')
+        .eq('attempt_id', a.id)
+        .maybeSingle()
       const released =
         a.status === 'submitted' &&
         !!a.result_release_at &&
@@ -144,7 +150,7 @@ Deno.serve(async (req) => {
       //    ⚠️ resolveExamFee 가 아니라 resolveCertFee 다 — 관리자가 급수별 발급비를 따로 정할 수 있고
       //       (exam_tiers.cert_fee_usd_cents), 결제 화면과 이 게이트가 다른 금액을 보면
       //       "무료라고 통과시켰는데 결제 화면은 돈을 받는" 조합이 생긴다.
-      if (!(a.verify_token && a.cert_no)) {
+      if (!certRow) {
         let feeFree = false
         if (a.exam_id) {
           const { data: ex } = await admin.from('exams').select('tier').eq('id', a.exam_id as string).maybeSingle()
@@ -171,7 +177,7 @@ Deno.serve(async (req) => {
 
       // 영문 성명 검증 — 채번보다 먼저 통과시킨다. 검증 실패(400)가 자격번호 시퀀스를 소각하면 안 된다.
       // 규칙: 라틴 문자·공백·하이픈·아포스트로피·마침표만(여권 표기 관행), 2~40자.
-      const stored = (a.cert_name_roman as string | null) ?? null
+      const stored = (certRow?.name_roman as string | null) ?? null
       const input = typeof body.nameRoman === 'string' ? body.nameRoman.trim().replace(/\s+/g, ' ') : ''
       let nameRoman = stored
       if (input) {
@@ -183,13 +189,12 @@ Deno.serve(async (req) => {
       if (!nameRoman) return json({ error: 'name_roman_required' }, 400)
 
       // 이미 발급된 건 = 재발급: 채번을 다시 부르지 않고(시퀀스 안 새게) 시각·이름만 갱신, 번호·토큰 불변.
-      if (a.verify_token && a.cert_no) {
-        const { error: reErr } = await admin
-          .from('exam_attempts')
-          .update({ cert_issued_at: new Date().toISOString(), cert_name_roman: nameRoman })
-          .eq('id', a.id)
+      //   ⭐ 이력이 여기 쌓인다 — first_issued_at 은 그대로 두고 last_issued_at·issue_count 만 민다.
+      //      옛 구조(응시 기록의 네 칸)에는 이 값을 담을 자리가 없어서 재발급 이력이 통째로 사라졌다.
+      if (certRow) {
+        const { error: reErr } = await admin.rpc('cert_reissue', { p_attempt: a.id, p_name: nameRoman })
         if (reErr) return json({ error: reErr.message }, 400)
-        issued = { verifyToken: a.verify_token as string, certNo: a.cert_no as string, nameRoman }
+        issued = { verifyToken: certRow.verify_token as string, certNo: certRow.cert_no as string, nameRoman }
       } else {
         // 최초 발급 — 위 검증(소유·합격·생존·이름)을 전부 통과한 뒤에만 채번한다.
         // 시험명으로 트랙 추정 → 자격번호. 연도는 취득(제출) 연도.
@@ -211,28 +216,32 @@ Deno.serve(async (req) => {
         const verifyToken = crypto.randomUUID()
         const certNo = makeCertNo(grade, year, seq)
 
-        // 선점형 UPDATE — cert_no 가 아직 비어 있을 때만 내 값을 박는다. 동시 발급이 먼저 채웠으면
-        // 0행이 돌아오고, 그땐 이미 확정된 값을 재조회해 반환한다(응답=저장 보장, 중복 번호·죽은 QR 방지).
+        // 선점형 INSERT — attempt_id 가 PK 라 동시 발급 둘 중 하나만 들어간다. 진 쪽은 0행이 돌아오고,
+        // 그땐 이미 확정된 값을 재조회해 반환한다(응답=저장 보장, 중복 번호·죽은 QR 방지).
+        //   ⚠️ 옛 구조에선 `.is('cert_no', null)` 조건부 UPDATE 가 이 역할을 했다. 표를 나눈 뒤에는
+        //      PK 충돌이 같은 일을 하므로 조건절이 필요 없다 — 대신 **ignoreDuplicates 를 켜야** 한다
+        //      (기본 upsert 는 덮어써서 토큰이 갈리고, 그러면 먼저 받아 간 QR 이 죽는다).
         const { data: won, error: issueErr } = await admin
-          .from('exam_attempts')
-          .update({ cert_issued_at: new Date().toISOString(), verify_token: verifyToken, cert_no: certNo, cert_name_roman: nameRoman })
-          .eq('id', a.id)
-          .is('cert_no', null)
-          .select('cert_no, verify_token, cert_name_roman')
+          .from('exam_certificates')
+          .upsert(
+            { attempt_id: a.id, cert_no: certNo, verify_token: verifyToken, name_roman: nameRoman },
+            { onConflict: 'attempt_id', ignoreDuplicates: true },
+          )
+          .select('cert_no, verify_token, name_roman')
         if (issueErr) return json({ error: issueErr.message }, 400)
         if (won && won.length > 0) {
           issued = { verifyToken, certNo, nameRoman }
         } else {
           // 경쟁에서 짐 — 내 seq 는 갭이 되지만(무해), 발급 번호는 이미 확정된 하나로 통일한다.
           const { data: fin } = await admin
-            .from('exam_attempts')
-            .select('cert_no, verify_token, cert_name_roman')
-            .eq('id', a.id)
+            .from('exam_certificates')
+            .select('cert_no, verify_token, name_roman')
+            .eq('attempt_id', a.id)
             .maybeSingle()
           issued = {
             verifyToken: (fin?.verify_token as string) ?? verifyToken,
             certNo: (fin?.cert_no as string) ?? certNo,
-            nameRoman: (fin?.cert_name_roman as string | null) ?? nameRoman,
+            nameRoman: (fin?.name_roman as string | null) ?? nameRoman,
           }
         }
       }
@@ -246,7 +255,11 @@ Deno.serve(async (req) => {
     const [{ data }, { data: tRows }, { data: checks }] = await Promise.all([
       admin
         .from('exam_attempts')
-        .select('id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, pass_ratio_snapshot, cert_issued_at, verify_token, cert_no, cert_name_roman')
+        // 자격증은 별 표라 임베드로 같이 받는다(FK attempt_id 로 PostgREST 가 이어준다).
+        // 응시당 최대 한 줄이라 배열이 아니라 객체 하나로 온다.
+        .select(
+          'id, exam_id, status, started_at, submitted_at, result_release_at, total_correct, total_questions, pass_ratio_snapshot, exam_certificates(cert_no, verify_token, name_roman, last_issued_at)',
+        )
         .eq('user_id', user.id)
         .order('submitted_at', { ascending: false, nullsFirst: false })
         .order('started_at', { ascending: false })
@@ -283,7 +296,7 @@ Deno.serve(async (req) => {
       roundIds.length
         ? admin
             .from('exam_rounds')
-            .select('id, title_i18n, exam_date, exam_start_at, exam_end_at, apply_start_at, apply_end_at, published')
+            .select('id, title_i18n, exam_date, exam_start_at, exam_end_at, apply_start_at, apply_end_at, published, open_tiers')
             .in('id', roundIds)
         : Promise.resolve({ data: null }),
       // 응시권 → 응시 역조회. 살아있는 응시(제출·무효·진행중)만 담는다 —
@@ -327,6 +340,11 @@ Deno.serve(async (req) => {
       const correct = released ? r.total_correct : null
       // 공개 전에는 판정 자체가 없다(null) — 점수를 숨기는 화면이라 합격 여부도 같이 숨긴다.
       const passed = released ? attemptPassed(correct, total, r.pass_ratio_snapshot) : null
+      const emb = (r as { exam_certificates?: unknown }).exam_certificates
+      const cert = (Array.isArray(emb) ? emb[0] : emb) as
+        | { cert_no?: string; verify_token?: string; name_roman?: string; last_issued_at?: string }
+        | null
+        | undefined
       return {
         attemptId: r.id,
         examTitle: r.exam_id ? titleMap[r.exam_id] ?? null : null,
@@ -338,10 +356,12 @@ Deno.serve(async (req) => {
         totalCorrect: correct,
         totalQuestions: total,
         passed,
-        certIssuedAt: passed ? r.cert_issued_at : null,
-        certNo: passed ? r.cert_no ?? null : null,
-        verifyToken: passed ? r.verify_token ?? null : null,
-        certNameRoman: passed ? r.cert_name_roman ?? null : null,
+        // ⚠️ 임베드 결과는 관계에 따라 객체 하나 또는 배열로 온다 — 둘 다 받아 접는다.
+        //    (attempt_id 가 PK 라 1:1 이지만, PostgREST 버전에 따라 배열로 오는 경우가 있다.)
+        certIssuedAt: passed ? cert?.last_issued_at ?? null : null,
+        certNo: passed ? cert?.cert_no ?? null : null,
+        verifyToken: passed ? cert?.verify_token ?? null : null,
+        certNameRoman: passed ? cert?.name_roman ?? null : null,
       }
     })
 
