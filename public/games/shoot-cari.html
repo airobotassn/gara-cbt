@@ -88,6 +88,16 @@
   .meteor{position:absolute; z-index:2; width:56%; max-width:208px; will-change:transform;
     opacity:.86; transition:opacity .12s;
     filter:drop-shadow(0 8px 20px rgba(0,0,0,.55));}
+  /* 조준 대상(맨 아래 = 지금 풀어야 하는 문제)만 크게 — 폰에서 문제 글씨가 안 읽혔다.
+     ⛔ `.meteor` 에 직접 scale 을 걸지 말 것. 그 transform 은 loop() 가 좌표로 쓰고 whack 연출이
+        키프레임으로 통째로 덮어써서, 얻어맞는 순간 크기가 튄다. 안쪽 `.body` 만 키운다 —
+        바깥 상자(offsetWidth/Height)는 그대로라 낙하·차간거리·착지 판정이 하나도 안 흔들린다.
+     ⚠️ 기준점은 **아래 가운데**다. 위로만 자라야 방어선에 닿는 순간이 안 달라진다.
+     ⚠️ 배율은 여기가 단일 출처다 — JS 가 `--target-scale` 을 읽어 연출 좌표·스폰 여백에 쓴다. */
+  :root{--target-scale:1.25;}
+  .meteor .body{position:relative; transform:scale(1); transform-origin:50% 100%;
+    transition:transform .18s cubic-bezier(.2,1.2,.4,1);}
+  .meteor.target .body{transform:scale(var(--target-scale));}
   .meteor .ship{display:block; width:100%; height:auto; aspect-ratio:536/381; pointer-events:none;}
   .meteor .screen{position:absolute; left:50%; top:59%; transform:translate(-50%,-50%);
     width:76%; min-height:33%; display:flex; align-items:center; justify-content:center; text-align:center;
@@ -496,9 +506,17 @@ const START_SPAWN=3000;   // ms (여유 있게 출제)
 const MIN_SPAWN=1300;
 const LIVES=5;
 const MAX_WRONG=2;        // 운석당 허용 오답 수(초과 시 놓침=하트 손실). 1로 낮추면 무관용
-// 겹침 방지 — 기체가 서로의 문제창을 가리면 답을 못 읽는다.
-const GAP_RATIO=0.62;     // 세로 최소 간격(기체 높이 대비). 문제창끼리 안 겹치는 선
-const XOVL_RATIO=0.80;    // 가로로 이만큼 겹칠 때만 간격을 강제(멀리 떨어져 있으면 자유 낙하)
+// 한 줄 낙하 — 기체는 언제나 앞 기체 뒤에 줄을 선다(나란히 내려오거나 추월하지 않는다).
+// ⛔ 가로 거리를 조건으로 달지 말 것. 예전엔 '가로로 겹칠 때만' 간격을 강제했는데, 기체 폭이
+//    화면 폭의 56%(최대 208px)라 폰(≤390px)에서는 어차피 늘 겹쳐서 규칙이 항상 걸렸다.
+//    그런데 pit 이 390px 을 넘는 순간(픽셀 412·Pro Max 430·PC 460) 좌우 끝에 하나씩 앉는 조합이
+//    생기고, 그 쌍만 규칙 밖이라 나란히 내려오다 빠른 쪽이 추월했다 — 기종에 따라 게임이 달라졌다.
+const PANEL_GAP=0.62;     // 문제창끼리 안 겹치는 선(기체 높이 대비)
+// 조준 대상 확대 배율 — 값은 CSS(`--target-scale`)가 갖고 여기선 읽기만 한다(한 벌로 유지).
+const TARGET_SCALE=parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--target-scale"))||1.25;
+// 실제 차간거리 — 어느 기체든 맨 아래로 내려가면 **위로** 자라므로(아래 가운데 기준 확대)
+// 그만큼을 미리 비워 둬야 한다. 안 비우면 커진 기체가 바로 위 기체의 문제창을 통째로 덮는다.
+const GAP_RATIO=PANEL_GAP+(TARGET_SCALE-1);
 
 let running=false, meteors=[], lastT=0, spawnT=0, spawnGap=START_SPAWN;
 let runSeq=0;             // 재시작하면 진행 중이던 연출 타이머를 전부 무효화한다
@@ -519,22 +537,21 @@ function spawn(){
   const el=document.createElement("div");
   el.className="meteor"; el.style.left="0px"; el.style.top="0px"; el.style.visibility="hidden";
   // 기체 스프라이트 + 가슴 홀로 패널(문제 텍스트가 들어갈 자리)
-  el.innerHTML=`<img class="ship" src="shoot-cari-enemy.webp" alt="" draggable="false"/>`+
-    `<div class="screen"><i class="flashred"></i><span></span><span class="tries">`+"<i></i>".repeat(MAX_WRONG)+`</span></div>`;
+  // `.body` = 확대되는 안쪽 겹. 바깥 `.meteor` 는 좌표·크기 판정용이라 절대 안 커진다(위 CSS 주석).
+  el.innerHTML=`<div class="body"><img class="ship" src="shoot-cari-enemy.webp" alt="" draggable="false"/>`+
+    `<div class="screen"><i class="flashred"></i><span></span><span class="tries">`+"<i></i>".repeat(MAX_WRONG)+`</span></div></div>`;
   pit.appendChild(el);
   const w=el.offsetWidth, h=el.offsetHeight, pw=pit.clientWidth, y0=-h;
-  // 가로로 겹치지 않는 자리를 찾는다. 전부 막혀 있으면 이번 스폰은 포기(문제도 안 뽑는다).
-  let x=null;
-  for(let i=0;i<14 && x===null;i++){
-    const c=8+Math.random()*Math.max(0,pw-w-16);
-    let ok=true;
-    for(const m of meteors){
-      if(m.dead)continue;
-      if(Math.abs(m.x-c)<w*XOVL_RATIO && m.y<y0+h*GAP_RATIO){ ok=false; break; }
-    }
-    if(ok)x=c;
+  // 맨 위 기체가 아직 스폰 자리를 비우지 않았으면 이번 스폰은 포기(문제도 안 뽑는다).
+  // 가로 위치는 안 본다 — 어차피 뒤에 줄을 서므로 옆자리를 찾아 피할 이유가 없다.
+  for(const m of meteors){
+    if(m.dead)continue;
+    if(m.y<y0+h*GAP_RATIO){ el.remove(); return false; }
   }
-  if(x===null){ el.remove(); return false; }
+  // 맨 아래로 내려가면 확대돼 좌우로 (배율-1)/2 만큼 더 넓어진다 → 그만큼 가장자리를 비워 둔다.
+  // 안 비우면 정작 지금 풀어야 하는 기체의 날개가 화면 밖으로 잘린다.
+  const pad=8+w*(TARGET_SCALE-1)/2;
+  const x=pad+Math.random()*Math.max(0,pw-w-pad*2);
   const q=nextQ(), [term,def,cat]=q;
   // 문제 글씨만 — 위에 붙던 분야 태그(AI·로봇·피지컬AI)는 가독성 때문에 뺐다.
   el.querySelector(".screen span").textContent=def;
@@ -568,7 +585,9 @@ function updateTarget(){
   let low=null,maxY=-1e9;
   for(const m of meteors){ if(!m.dead && m.y>maxY){maxY=m.y; low=m;} }
   if(low===curTarget)return;
-  meteors.forEach(m=>m.el.classList.remove("target"));
+  // ⚠️ 격추·반격 연출 중인 기체(dead)에서는 안 뗀다 — 떼는 순간 터지는 도중에 원래 크기로
+  //    쪼그라들고, 반격 때 크게 띄우는 '정답: ○○' 공개도 같이 작아진다.
+  meteors.forEach(m=>{ if(!m.dead) m.el.classList.remove("target") });
   curTarget=low;
   if(curTarget){ curTarget.el.classList.add("target");
     if(!curTarget.choices) curTarget.choices=makeChoices(curTarget.term,curTarget.cat); }
@@ -630,9 +649,17 @@ function sparks(cx,cy,n){
   }
 }
 // 적이 아래로 쏘는 빔 (기체 패널 → 쉴드라인)
+/* 조준 대상은 아래 가운데를 기준으로 커져 보인다(CSS `.meteor.target .body`).
+   빔·폭발·파편·팝업은 상자가 아니라 **보이는 그림**에 맞아야 하므로 세로 좌표를 같이 옮긴다.
+   ⚠️ 판정은 `curTarget` 이 아니라 DOM 클래스로 한다 — 정답을 맞히면 curTarget 이 먼저 비워져서
+      아직 커져 있는 기체를 작다고 계산한다(폭발이 발밑에서 터진다). */
+const artScale=m=>m.el.classList.contains("target")?TARGET_SCALE:1;
+/** 기체 안 세로 비율 frac(0=맨 위, 1=맨 아래)이 화면에서 실제로 놓이는 y */
+const artY=(m,frac)=>m.y+m.el.offsetHeight*(1-artScale(m)*(1-frac));
+
 function foeBeam(m){
-  const w=m.el.offsetWidth, h=m.el.offsetHeight;
-  const sx=m.x+w/2, sy=m.y+h*0.55;
+  const w=m.el.offsetWidth;
+  const sx=m.x+w/2, sy=artY(m,0.55);
   const ty=parseFloat($("dangerLine").style.top||"0");
   const dx=0, dy=ty-sy, len=Math.max(20,Math.hypot(dx,dy)), ang=Math.atan2(dy,dx)*180/Math.PI;
   const l=document.createElement("div"); l.className="laser foe";
@@ -656,7 +683,7 @@ function doom(m){
   if(sc) sc.classList.add("reveal");
   m.el.querySelectorAll(".tries i").forEach(el=>el.classList.add("off"));
   const fw=document.createElement("div"); fw.className="failword"; fw.textContent=MGI18N.t('shoot.miss');
-  fw.style.left=(m.x+w/2)+"px"; fw.style.top=(m.y+m.el.offsetHeight*0.06)+"px"; pit.appendChild(fw);
+  fw.style.left=(m.x+w/2)+"px"; fw.style.top=artY(m,0.06)+"px"; pit.appendChild(fw);
   setTimeout(()=>fw.remove(),1100);
   // 정답 보기 강조 + 공개 동안 선택지 잠금
   revealLock=true; choicesEl.classList.add("cool");
@@ -688,7 +715,7 @@ function doom(m){
 }
 // 빨간 파편
 function debrisRed(m,n){
-  const w=m.el.offsetWidth, cx=m.x+w/2, cy=m.y+m.el.offsetHeight*0.55;
+  const w=m.el.offsetWidth, cx=m.x+w/2, cy=artY(m,0.55);
   for(let i=0;i<n;i++){
     const d=document.createElement("div"); d.className="debris red";
     const s=4+Math.random()*6; d.style.width=d.style.height=s+"px";
@@ -737,16 +764,17 @@ function whack(m){
   const knock=Math.min(0.20, 0.07+(level-1)*0.012);   // 레벨 오를수록 낙하폭 증가
   const y0=m.y;
   let y1=Math.min(guard-hh-4, y0 + ph*knock);
-  // 아래 기체를 파고들지 않게 도착점 제한(그래도 최소한 제자리, 위로는 안 감)
+  // 아래 기체를 파고들지 않게 도착점 제한(그래도 최소한 제자리, 위로는 안 감).
+  // 여기도 가로 거리를 보지 않는다 — 얻어맞고 내려가다 옆줄 기체를 추월하면 안 된다.
   for(const b of meteors){
     if(b===m||b.dead)continue;
-    if(b.y>y0 && Math.abs(b.x-m.x) < w*XOVL_RATIO) y1=Math.min(y1, b.y - hh*GAP_RATIO);
+    if(b.y>y0) y1=Math.min(y1, b.y - hh*GAP_RATIO);
   }
   y1=Math.max(y0,y1);
   m.animating=true; m.el.classList.remove("whack"); void m.el.offsetWidth; m.el.classList.add("whack");
   // MISS! 팝업
   const mw=document.createElement("div"); mw.className="missword"; mw.textContent="MISS!";
-  mw.style.left=(m.x+w/2)+"px"; mw.style.top=(y0+hh*0.42)+"px"; pit.appendChild(mw);
+  mw.style.left=(m.x+w/2)+"px"; mw.style.top=artY(m,0.42)+"px"; pit.appendChild(mw);
   setTimeout(()=>mw.remove(),720);
   debrisAt(m);
   pit.classList.remove("shake"); void pit.offsetWidth; pit.classList.add("shake");
@@ -766,8 +794,8 @@ function whack(m){
 function laserTo(m){
   const cr=cari.getBoundingClientRect(), pr=pit.getBoundingClientRect();
   const cx=(cr.left-pr.left)+cr.width*0.63, cy=(cr.top-pr.top)+cr.height*0.13;  // 스프라이트 총구 화염 위치
-  const w=m.el.offsetWidth, h=m.el.offsetHeight;
-  const tx=m.x+w/2, ty=m.y+h*0.55;   // 조준점 = 기체 패널 중심
+  const w=m.el.offsetWidth;
+  const tx=m.x+w/2, ty=artY(m,0.55);   // 조준점 = 기체 패널 중심(확대분 반영)
   const dx=tx-cx, dy=ty-cy, len=Math.hypot(dx,dy), ang=Math.atan2(dy,dx)*180/Math.PI;
   const l=document.createElement("div"); l.className="laser";
   l.style.left=cx+"px"; l.style.top=(cy-10)+"px"; l.style.width=len+"px";  // height 20px 의 절반만큼 올려 중심 정렬
@@ -778,15 +806,15 @@ function laserTo(m){
 
 // 격추 폭발 — 기체 패널 중심에서 터진다
 function boom(m){
-  const w=m.el.offsetWidth, h=m.el.offsetHeight, size=w*1.0;
+  const w=m.el.offsetWidth, size=w*artScale(m);   // 커진 기체는 폭발도 같이 커야 그림에 안 묻힌다
   const el=document.createElement("div"); el.className="boom";
   el.style.width=el.style.height=size+"px";
-  el.style.left=(m.x+w/2)+"px"; el.style.top=(m.y+h*0.55)+"px";
+  el.style.left=(m.x+w/2)+"px"; el.style.top=artY(m,0.55)+"px";
   pit.appendChild(el);
   setTimeout(()=>el.remove(),500);
 }
 function debrisAt(m,n=9){
-  const w=m.el.offsetWidth, cx=m.x+w/2, cy=m.y+m.el.offsetHeight*0.55;
+  const w=m.el.offsetWidth, cx=m.x+w/2, cy=artY(m,0.55);
   for(let i=0;i<n;i++){
     const d=document.createElement("div"); d.className="debris";
     const s=4+Math.random()*5; d.style.width=d.style.height=s+"px";
@@ -830,7 +858,7 @@ function scorePop(m, gain, factor){
   const w=m.el.offsetWidth;
   const p=document.createElement("div"); p.className="scoreword"+(factor<1?" partial":"");
   p.innerHTML= factor<1 ? `+${gain} <small>${Math.round(factor*100)}%</small>` : `+${gain}`;
-  p.style.left=(m.x+w/2)+"px"; p.style.top=(m.y+m.el.offsetHeight*0.42)+"px"; pit.appendChild(p);
+  p.style.left=(m.x+w/2)+"px"; p.style.top=artY(m,0.42)+"px"; pit.appendChild(p);
   setTimeout(()=>p.remove(),720);
 }
 
@@ -870,13 +898,14 @@ function loop(t){
   for(let i=0;i<order.length;i++){
     const m=order[i];
     if(!m.animating){
-      const h=m.el.offsetHeight, w=m.el.offsetWidth;
+      const h=m.el.offsetHeight;
       let step=m.speed*speedMul*dt/1000;
-      // 차간거리: 가로로 겹치는 아래 기체가 있으면 그 기체를 침범/추월하지 못하게 감속(위로 되돌리진 않는다)
+      // 차간거리: 아래 기체를 침범/추월하지 못하게 감속(위로 되돌리진 않는다).
+      // 가로 거리와 무관하다 — 옆으로 멀리 떨어져 있어도 줄을 선다.
       let limit=Infinity;
       for(const b of settled){
         if(b.dead)continue;
-        if(Math.abs(b.x-m.x) < w*XOVL_RATIO) limit=Math.min(limit, b.y - h*GAP_RATIO);
+        limit=Math.min(limit, b.y - h*GAP_RATIO);
       }
       if(limit<Infinity) step=Math.min(step, Math.max(0, limit-m.y));
       m.y += step;
