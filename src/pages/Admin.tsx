@@ -7355,7 +7355,7 @@ function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: 
 
   const f = useTierSubjectFilter()
   const subjects = [...new Set(events.map((e) => e.subject ?? '').filter(Boolean))].sort()
-  const filtered = events.filter((e) => f.matchTS(e.subject) && f.matchQ(`${e.number ?? ''} ${e.subject ?? ''} ${CBT_EVENT_LABEL[e.action] ?? e.action}`))
+  const filtered = events.filter((e) => f.matchTS(e.subject) && f.matchQ(`${e.label ?? ''} ${e.subject ?? ''} ${CBT_EVENT_LABEL[e.action] ?? e.action}`))
 
   return (
     <>
@@ -7388,7 +7388,7 @@ function QuestionEventsView({ bankId, onChanged }: { bankId: string; onChanged: 
                   {CBT_EVENT_LABEL[e.action] ?? e.action}
                   {e.action === 'import' && e.detail ? ` (${(e.detail as { count?: number }).count ?? ''})` : ''}
                 </td>
-                <td style={{ whiteSpace: 'nowrap' }}>{e.number != null ? `${e.number}번` : '-'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{e.label ? `${e.label}번` : '-'}</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{e.subject || '-'}</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{e.actor ?? '-'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>

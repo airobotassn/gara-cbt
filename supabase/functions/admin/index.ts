@@ -9,6 +9,7 @@ import { adminClient, getUser, questionTranslated, SUPPORTED_LANGS } from '../_s
 import { refreshRates } from '../_shared/fx.ts'
 import { EXAM_ROUND_COLS, TIER_LABEL, attemptPassed, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { isExamMonth, monthOfExamDate, scheduleForMonth } from '../_shared/exam-schedule.ts'
+import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
 
@@ -1858,20 +1859,20 @@ async function manageAdmins(
 }
 
 // ---------- CBT 문항 관리 (목록·이력·엑셀 임포트) ----------
+// 이력은 세 제도 공용 표(`question_history`)에 kind='caris' 로 쌓는다 — 옛 cbt_question_events.
+//   number → label(text) · bank_id → scope. 읽고 쓰는 자리는 _shared/question-history.ts 하나다.
 async function logCbtEvent(
   admin: any,
   e: { question_id: string | null; bank_id: string | null; number: number | null; action: string; actor: string; detail?: unknown },
 ) {
-  try {
-    await admin.from('cbt_question_events').insert({
-      question_id: e.question_id,
-      bank_id: e.bank_id,
-      number: e.number,
-      action: e.action,
-      actor: e.actor || null,
-      detail: e.detail ?? null,
-    })
-  } catch { /* 로그 실패는 무시 */ }
+  await logQuestionEvent(admin, 'caris', {
+    question_id: e.question_id,
+    label: e.number,
+    scope: e.bank_id,
+    action: e.action,
+    actor: e.actor,
+    detail: e.detail,
+  })
 }
 
 // 문제은행 목록(급수별) + 은행별 문항 수(비삭제/활성). 문항 관리 셀렉터용.
@@ -2178,16 +2179,10 @@ async function questionRestore(admin: any, body: any, actor: string) {
 }
 
 // 변경 이력(최신순). bankId 필터 + 각 이벤트에 현재 복구가능 여부.
+// ⚠️ 문항 번호는 `label`(text)이다 — 옛 `number`(int)가 세 제도 공용 표로 접히면서 문자열이 됐다.
 async function questionEvents(admin: any, body: any) {
-  let q = admin
-    .from('cbt_question_events')
-    .select('id, question_id, bank_id, number, action, actor, detail, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1000)
-  if (body?.bankId) q = q.eq('bank_id', body.bankId)
-  const { data, error } = await q
-  if (error) return json({ error: error.message }, 400)
-  const events = data ?? []
+  const { rows: events, error } = await readQuestionHistory(admin, 'caris', { scope: body?.bankId ?? null })
+  if (error) return json({ error }, 400)
   const ids = [...new Set(events.map((e: any) => e.question_id).filter(Boolean))]
   const statusById: Record<string, { active: boolean; deleted: boolean }> = {}
   const subjectById: Record<string, string> = {}

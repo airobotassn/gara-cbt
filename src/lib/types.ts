@@ -339,11 +339,14 @@ export interface AdminQuestionListResp {
   langs?: string[] // 번역 대상 언어(ko 제외)
 }
 
+// 문항 변경 이력 한 줄. 세 제도 공용 표(question_history)에서 오므로 이름이 제도 중립이다 —
+// `label` = 옛 number(문항 번호) · `scope` = 옛 bank_id(문제은행).
+// ⚠️ label 은 text 다(옛 number 는 int 였다) — `120번` 처럼 쓰는 자리는 그대로지만 숫자 비교는 못 한다.
 export interface AdminQuestionEvent {
   id: string
   question_id: string | null
-  bank_id: string | null
-  number: number | null
+  scope: string | null
+  label: string | null
   subject?: string | null // 문항 과목(급수/과목 필터용)
   action: string
   actor: string | null

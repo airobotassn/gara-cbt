@@ -1229,11 +1229,14 @@ function QuestionEdit({ row, level: listLevel, onClose, onSaved }: {
 }
 
 // ============================ 문항 이력 탭 ============================
+// 이력 한 줄. 세 제도 공용 표(question_history)에서 오므로 이름이 제도 중립이다 —
+// `label` = 옛 code(L3-045) · `scope` = 옛 level(둘 다 text). 아래 QState 의 code·level 은
+// ⚠️ **다른 것**이다(test_questions 에서 직접 온 현재 상태라 옛 이름 그대로다).
 interface QEvent {
   id: string
   question_id: string | null
-  code: string | null
-  level: number | null
+  label: string | null
+  scope: string | null
   action: 'add' | 'edit' | 'deactivate' | 'activate' | 'delete'
   actor: string | null
   detail: Record<string, { before: unknown; after: unknown }> | null
@@ -1298,7 +1301,7 @@ function EventsTab() {
   const qq = q.trim().toLowerCase()
   const matchCode = (c: string | null) => !qq || (c ?? '').toLowerCase().includes(qq)
   const TABS: [typeof tab, string][] = [['history', '히스토리'], ['inactive', '비활성'], ['deleted', '삭제']]
-  const evView = rows.filter((r) => matchCode(r.code))
+  const evView = rows.filter((r) => matchCode(r.label))
   const stateView = (tab === 'inactive' ? inactive : deleted).filter((r) => matchCode(r.code))
   const count = tab === 'history' ? evView.length : stateView.length
 
@@ -1359,9 +1362,9 @@ function EventsTab() {
               {evView.map((ev) => (
                 <div key={ev.id} className="ev-card">
                   <div className="ev-head">
-                    <span style={{ fontWeight: 800, color: '#3f8fd6' }}>{ev.code ?? '번호없음'}</span>
+                    <span style={{ fontWeight: 800, color: '#3f8fd6' }}>{ev.label ?? '번호없음'}</span>
                     <EvBadge a={ev.action} />
-                    {ev.level ? <span className="admin-hint">Lv.{ev.level}</span> : null}
+                    {ev.scope ? <span className="admin-hint">Lv.{ev.scope}</span> : null}
                     <span className="admin-hint">· {ev.actor ?? '-'}</span>
                     <span className="admin-hint">· {fmtDT(ev.created_at)}</span>
                   </div>

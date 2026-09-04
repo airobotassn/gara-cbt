@@ -208,6 +208,7 @@ supabase/
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·mypage-ai·set-region·translate-questions·track-visit·agree-terms)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
+                      · question-history.ts(문항 변경 이력 — 세 제도 공용, kind 필수)
 tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계에서 돌며 번역 창고를 채운다 — **번역하는 건 이것뿐이라 꺼지면 번역이 안 된다.**
 ```
 
@@ -399,6 +400,13 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
     - ⚠️ **보기 개수(정답 1 + 오답 3)가 어긋난 번역은 버린다.** 순서가 곧 정답 자리라 개수가 다르면 그 언어에서만 보기가 빈다. 검사는 저장(`sanitizeTermI18n`)과 서빙(`term-pool`) 양쪽에 있다.
     - ⛔ **게임별로 문항을 고르는 기능은 없다(2026-09-03 지시).** 은행에 '사용' 상태로 있는 문항이 세 게임 전부에 나간다 — 셋은 같은 용어 문제를 **보여주는 방식만** 다르고(4지선다 / 운석 / O·X), 실제로도 50문항이 통째로 들어가 있었다. 안 쓰는 선택 UI 가 화면 한복판에 있으니 관리자가 화면을 못 읽었다. 한 문항을 빼려면 **'중지'** 를 누른다(세 게임에서 같이 빠진다). 표 `minigame_question_sets` 는 읽는 곳 없이 남겨 뒀다 — 되살릴 일이 생기면 문항 하나씩 체크가 아니라 **분야(AI·로봇·피지컬AI)로 거는 쪽**이 맞다.
     - 배포: 마이그레이션 + `npx.cmd supabase functions deploy term-pool admin`(**둘 다 플래그 없이** — anon 키가 실려 오므로 공개 예외가 필요 없다) + 프론트 push.
+- **문항 변경 이력은 세 제도가 한 표를 쓴다 (2026-09-04 · `20260904230000`)** — 옛 상태: 제도만 다르고 하는 일이 같은 표가 셋이었다(`cbt_question_events` 56행 · `question_events` 455행 · `term_question_events` 159행). 컬럼 6칸(id·question_id·action·actor·detail·created_at)이 완전히 같고 다른 것은 **"사람이 읽는 문항 이름표"와 "어느 묶음 소속인가"** 두 칸의 이름·타입뿐이었다. 새 표 **`question_history`** 가 그 둘을 `label`(옛 `number`·`code` — 120 / L3-045 / T-001) · `scope`(옛 `bank_id`·`level`)로 통일하고 `kind`(`caris`|`leveltest`|`term`)로 제도를 가른다.
+  - ⛔ **읽고 쓰는 자리는 `_shared/question-history.ts` 하나다 — `question_history` 를 직접 `from()` 하지 말 것.** 표가 셋이던 시절엔 서로 남남이라 필터를 빠뜨려도 남의 문항이 섞일 수가 없었다. 한 표가 된 지금은 `kind` 를 한 번 빠뜨리면 **CARIS 이력 탭에 레벨테스트 문항이 뜬다** — 에러도 안 나고 화면도 멀쩡해 보여서(모르는 번호가 늘어날 뿐) 아무도 못 알아챈다. 그래서 `logQuestionEvent`·`readQuestionHistory` 는 `kind` 를 **첫 번째 필수 인자**로 받는다(빠뜨리면 타입에서 걸린다). 2026-09-03 term 마이그레이션 머리의 *"같은 표에 세 제도를 섞으면 이력 탭이 남의 문항을 보여준다"* 가 바로 이 위험이고, 이 게이트가 그 자리를 대신한다.
+  - ⛔ **`label` 값을 다시 계산하지 말 것** — 이력의 존재 이유가 "그 시점의 스냅샷"이다. (2026-07 사다리 밀기 때 문항 번호가 바뀌었는데 이력의 code 는 옛 값이라 관리자가 번호로 검색해도 안 나온 사고가 있었다 — 그건 그때 값을 맞춰서 고친 것이고, 이관은 지금 값을 그대로 옮긴다.)
+  - ⚠️ **옛 CARIS `number` 는 int 였다 → `label` text 로 접혔다**(120 → `'120'`). 관리자 검색이 문자열 부분일치라 그대로 걸리지만, 숫자 비교·정렬은 못 한다.
+  - ⚠️ **`question_id` 가 비는 행이 정상이다** — 문항 하나가 아닌 작업(엑셀 import, 일괄 수정)은 문항 없이 남는다(실측 CARIS 30건). NOT NULL 을 걸면 그 행들이 통째로 막힌다.
+  - ⛔ **배포 순서: ① 마이그레이션(새 표 + 이관, 옛 표는 그대로) → ② 함수 배포 → ③ 재실행으로 틈 메우기 → ④ 옛 표 드롭(별도 마이그레이션).** 옛 표를 먼저 지우면 배포 전 코드가 컬럼을 이름으로 select 해 PostgREST 400 이 나고 이력 탭이 통째로 멈춘다. ③이 필요한 이유는 **①과 ② 사이의 틈**이다 — 그 사이 변경은 옛 표에만 쌓이고 배포 뒤엔 새 표에만 쌓여서, 안 쓸어 담으면 그 틈의 이력이 사라진다. 그래서 마이그레이션의 행 수 가드는 `<>` 가 아니라 **`<`** 다(배포 뒤엔 새 표가 더 많은 게 정상).
+  - 배포: 마이그레이션 + `npx.cmd supabase functions deploy admin admin-test`(둘 다 플래그 없이) + 프론트 push. 검증 = `tests/db/t-question-history.mjs`(27건).
 - **공유 카드도 화면 언어를 따른다 (2026-08-07)**: 캔버스에 그리는 글자까지 `share.card.*`. 훅을 못 쓰는 계층이라 `ShareCardData.lang` 을 받아 `tr()` 로 뽑는다 — 호출부(`Hub`·`Ranking`·`ChatBoard`) 셋 다 `lang` 을 넘겨야 한다.
 - **티어 엠블렘**: 티어는 백분위 파생 **5단계**(브론즈~다이아, `tierForPercentile`). 엠블렘은 이미지 단일 체계 — 화면은 `<TierBadge>`가 `public/emblems/<tier>.webp`(256px), 공유 카드는 같은 그림의 `<tier>.png`(512px, 캔버스용). 마이페이지 히어로 옆 **티어 사다리**(`TIER_ORDER`, 내 티어만 원색)도 이걸 쓴다. ⚠️ 옛 레벨 엠블렘(iron~master 7단계 SVG `TierEmblem`·`emblemKeyForLevel`)은 삭제됐다.
 

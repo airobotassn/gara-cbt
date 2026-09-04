@@ -58,8 +58,10 @@ interface TermListResp {
   coverage: Record<string, number>
   total: number
 }
+// 이력 한 줄. 세 제도 공용 표(question_history)에서 오므로 문항 번호(T-001)가 `label` 자리다
+// — ⚠️ 위 TermRow 의 `code` 와 **다른 것**이다(그건 term_questions 의 현재 번호).
 interface TermEvent {
-  id: string; code: string | null; action: string; actor: string | null
+  id: string; label: string | null; action: string; actor: string | null
   detail: Record<string, unknown> | null; created_at: string
 }
 
@@ -497,7 +499,7 @@ function EventsTab() {
   }
 
   const match = (s: string) => !q.trim() || s.includes(q.trim())
-  const evView = events.filter((e) => match(e.code ?? '') || match(String(e.detail?.answer ?? '')))
+  const evView = events.filter((e) => match(e.label ?? '') || match(String(e.detail?.answer ?? '')))
   const rows = (tab === 'inactive' ? inactive : deleted).filter((t) => match(t.code ?? '') || match(koOf(t)))
   const TABS: [typeof tab, string][] = [['history', '히스토리'], ['inactive', '중지'], ['deleted', '삭제']]
 
@@ -525,7 +527,7 @@ function EventsTab() {
                 {evView.map((e) => (
                   <tr key={e.id}>
                     <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(e.created_at)}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#3f8fd6' }}>{e.code ?? '-'}</td>
+                    <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#3f8fd6' }}>{e.label ?? '-'}</td>
                     <td>{ACTION_LABEL[e.action] ?? e.action}</td>
                     <td>{String(e.detail?.answer ?? '')}</td>
                     <td style={{ color: 'var(--muted)' }}>{e.actor ?? '-'}</td>

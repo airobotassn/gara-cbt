@@ -4,6 +4,7 @@
 import { json } from '../_shared/cors.ts'
 import { bunnyConfigured, bunnyPullzone, bunnyThumbUrl } from '../_shared/bunny.ts'
 import { DEFAULT_PASS_RATIO, attemptPassed, tierRank } from '../_shared/exam-tickets.ts'
+import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
@@ -993,7 +994,7 @@ async function certConditionsSave(admin: any, body: any, ctx: Ctx) {
 // 레벨테스트(admin-test/handlers/questions.ts)와 **같은 규칙**을 그대로 옮겼다:
 //   · 목록은 활성·미삭제만 (비활성/삭제는 '문항 이력' 탭에서 되돌린다)
 //   · 삭제는 되돌릴 수 있다(deleted_at) — 하드 삭제 금지
-//   · 변경은 한 줄씩 이력에 남는다(term_question_events)
+//   · 변경은 한 줄씩 이력에 남는다(세 제도 공용 표 question_history 의 kind='term')
 //   · 번역은 화면이 translate-questions 로 돌려 여기로 넘긴다(서버는 검증·저장만)
 
 /** 번역이 덜 찬 언어. 설명·정답·오답3 이 **모두** 있어야 그 언어가 채워진 것이다. */
@@ -1018,16 +1019,17 @@ function nextTermCodes(existing: (string | null)[], n: number): string[] {
   return Array.from({ length: n }, (_, i) => `T-${String(max + 1 + i).padStart(3, '0')}`)
 }
 
-/** 문항 변경 이력 한 줄. 실패해도 본 작업은 막지 않는다(레벨테스트 logEvent 와 같은 규칙). */
+/**
+ * 문항 변경 이력 한 줄. 실패해도 본 작업은 막지 않는다(레벨테스트 logEvent 와 같은 규칙).
+ * 세 제도 공용 표(question_history)에 kind='term' 으로 쌓는다 — 옛 term_question_events 의 code→label.
+ */
 async function termLog(
   admin: any,
   e: { question_id: string | null; code: string | null; action: string; actor: string; detail?: unknown },
 ) {
-  try {
-    await admin.from('term_question_events').insert({
-      question_id: e.question_id, code: e.code, action: e.action, actor: e.actor || null, detail: e.detail ?? null,
-    })
-  } catch { /* 로그 실패는 무시 */ }
+  await logQuestionEvent(admin, 'term', {
+    question_id: e.question_id, label: e.code, action: e.action, actor: e.actor, detail: e.detail,
+  })
 }
 
 /** 저장할 번역만 골라낸다. 한 언어라도 덜 찼으면 **그 언어만** 버린다(다른 언어는 살린다). */
@@ -1073,13 +1075,11 @@ async function termRestorable(admin: any) {
   return json({ inactive: inactive.data ?? [], deleted: deleted.data ?? [] })
 }
 
-/** '문항 이력' 탭 — 변경 로그. */
+/** '문항 이력' 탭 — 변경 로그. 문항 번호(T-001)는 공용 표에서 `label` 자리다. */
 async function termEvents(admin: any, body: any) {
-  let q = admin.from('term_question_events').select('*').order('created_at', { ascending: false }).limit(500)
-  if (body?.code) q = q.eq('code', String(body.code))
-  const { data, error } = await q
-  if (error) return json({ error: error.message }, 500)
-  return json({ rows: data ?? [] })
+  const { rows, error } = await readQuestionHistory(admin, 'term', { label: body?.code ?? null, limit: 500 })
+  if (error) return json({ error }, 500)
+  return json({ rows })
 }
 
 /**

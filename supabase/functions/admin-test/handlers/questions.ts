@@ -1,8 +1,10 @@
 // 문항: 목록 · 통계 · upsert(추가/수정) · 활성토글 · 삭제 · 복구 · 변경이력
-//  변경(수정/비활성/활성/삭제)은 question_events 에 한 줄씩 적재 → "문항 이력" 탭의 원천.
-//  CARIS ARENA 이관: questions→test_questions (question_events 는 유지).
+//  변경(수정/비활성/활성/삭제)은 세 제도 공용 이력 표(question_history)에 kind='leveltest' 로 한 줄씩
+//  적재 → "문항 이력" 탭의 원천. 옛 전용 표 question_events 의 code→label · level→scope 자리다.
+//  CARIS ARENA 이관: questions→test_questions.
 import { json } from '../../_shared/cors.ts'
 import { axisKeysForLevel, SUPPORTED_LANGS, MAX_LEVEL, VISIBLE_OPTIONS_BY_LEVEL } from '../../_shared/scoring.ts'
+import { logQuestionEvent, readQuestionHistory } from '../../_shared/question-history.ts'
 
 interface QRow {
   id?: string
@@ -31,16 +33,14 @@ async function logEvent(
   admin: any,
   e: { question_id: string | null; code: string | null; level: number | null; action: string; actor: string; detail?: unknown },
 ) {
-  try {
-    await admin.from('question_events').insert({
-      question_id: e.question_id,
-      code: e.code,
-      level: e.level,
-      action: e.action,
-      actor: e.actor || null,
-      detail: e.detail ?? null,
-    })
-  } catch { /* 로그 실패는 무시 */ }
+  await logQuestionEvent(admin, 'leveltest', {
+    question_id: e.question_id,
+    label: e.code,
+    scope: e.level,
+    action: e.action,
+    actor: e.actor,
+    detail: e.detail,
+  })
 }
 
 // 메인 목록 = 활성 & 미삭제만 (= 손 안 댄 것 + 수정된 것). 비활성/삭제는 이력 탭에서.
@@ -321,15 +321,8 @@ export async function listRestorable(admin: any) {
 //  각 이벤트에 그 문항의 *현재* 복구가능 여부(restorable)를 실어준다 —
 //  과거 비활성/삭제 로그라도 문항이 이미 다시 활성이면 '되돌리기'를 숨기기 위함.
 export async function listEvents(admin: any, body: any) {
-  let q = admin
-    .from('question_events')
-    .select('id, question_id, code, level, action, actor, detail, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1000)
-  if (body.filter && body.filter !== 'all') q = q.eq('action', body.filter)
-  const { data, error } = await q
-  if (error) return json({ error: error.message }, 500)
-  const events = data ?? []
+  const { rows: events, error } = await readQuestionHistory(admin, 'leveltest', { action: body.filter ?? null })
+  if (error) return json({ error }, 500)
 
   // 등장하는 문항들의 현재 상태(active/deleted) 한 번에 조회
   const ids = [...new Set(events.map((e: any) => e.question_id).filter(Boolean))]
