@@ -172,15 +172,10 @@ Deno.serve(async (req) => {
       cosmetics: (cosmetics ?? []).map((c) => c.part_key as string),
       baseKey: (character?.base_key as string) ?? 'default',
       // 2026-09-04 에 equipped(jsonb) 를 skin_key·title_tier 컬럼으로 갈랐다.
+      //   ⚠️ 옛 `equipped: {skin, title}` 필드는 프론트 빌드 시차를 메우려고 한 배포 동안만 같이
+      //      내려보내다 뺐다. 되살리지 말 것 — 값 하나짜리 둘을 굳이 객체로 묶을 이유가 없다.
       skinKey: (character?.skin_key as string | null) ?? null,
       titleTier: (character?.title_tier as string | null) ?? null,
-      // ⚠️ **한 배포 동안만** 옛 모양도 같이 내려보낸다. 프론트는 Cloudflare 빌드라 함수 배포와
-      //    시차가 있어서, 이 줄을 지금 빼면 그 몇 분 동안 옛 화면이 배경을 못 읽는다.
-      //    화면이 skinKey 로 옮겨간 뒤(다음 배포)에 이 줄을 지울 것.
-      equipped: {
-        ...(character?.skin_key ? { skin: character.skin_key as string } : {}),
-        ...(character?.title_tier ? { title: character.title_tier as string } : {}),
-      },
       // 첫 진입 흐름(캐릭터 선택 → 튜토리얼)의 판정 근거. **서버가 유일한 출처**다 —
       // localStorage 로 판정하면 브라우저를 바꾸거나 지우는 순간 이미 끝낸 사람에게 다시 강제된다.
       //   ⚠️ 시각이 아니라 boolean 으로 내린다. 화면은 "끝냈나"만 알면 되고, 시각을 내리면
