@@ -35,7 +35,6 @@ interface Row {
   is_anon: boolean
   body: string | null
   mod_status: 'ok' | 'pending' | 'hidden'
-  edited_at: string | null
   created_at: string
   updated_at: string
   /** 작성자 프로필 — chat-list 가 붙여준다. 익명 글·국가 미등록이면 null(렌더 생략). */
@@ -58,7 +57,6 @@ const REPORT_REASONS = [
 interface Tomb {
   id: number
   deleted_at: string | null
-  edited_at: string | null
   mod_status: 'ok' | 'pending' | 'hidden'
   updated_at: string
   body: string | null
@@ -412,9 +410,9 @@ export default function ChatBoard({ room = 'global' }: Props) {
               const tm = byId.get(r.id)
               if (!tm) return r
               if (tm.deleted_at != null) {
-                return { ...r, body: null, deleted_at: tm.deleted_at, edited_at: tm.edited_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
+                return { ...r, body: null, deleted_at: tm.deleted_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
               }
-              return { ...r, body: tm.body, edited_at: tm.edited_at, mod_status: tm.mod_status, updated_at: tm.updated_at }
+              return { ...r, body: tm.body, mod_status: tm.mod_status, updated_at: tm.updated_at }
             }),
           )
         }
@@ -490,7 +488,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
       is_anon: !!user.is_anonymous,
       body: text,
       mod_status: 'ok',
-      edited_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       sending: true,
@@ -513,8 +510,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
             is_anon: res.is_anon,
             body: text,
             mod_status: res.mod_status,
-            edited_at: null,
-            created_at: res.created_at,
+                  created_at: res.created_at,
             updated_at: res.updated_at,
           },
         ]

@@ -12,7 +12,9 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { normalizeRoom } from '../_shared/chat.ts'
 
-const MSG_COLUMNS = 'id, user_id, display_name, is_anon, body, mod_status, edited_at, created_at, updated_at, deleted_at'
+// ⚠️ edited_at 은 2026-09-04 에 뺐다 — 글 수정 기능(옛 chat-edit)이 삭제되면서 95건 전부 null 이었다.
+//    수정을 되살릴 거면 컬럼도 같이 되살릴 것.
+const MSG_COLUMNS = 'id, user_id, display_name, is_anon, body, mod_status, created_at, updated_at, deleted_at'
 
 type ShapedRow = ReturnType<typeof shapeRow>
 
@@ -88,7 +90,7 @@ Deno.serve(async (req) => {
         wantIds
           ? admin
               .from('chat_messages')
-              .select('id, user_id, body, deleted_at, edited_at, mod_status, updated_at')
+              .select('id, user_id, body, deleted_at, mod_status, updated_at')
               .in('id', ids.slice(0, 200))
               .gt('updated_at', sinceTs)
           : Promise.resolve(null),
@@ -100,7 +102,6 @@ Deno.serve(async (req) => {
       const tombstones = (tombRes?.data ?? []).map((r) => ({
         id: r.id,
         deleted_at: r.deleted_at,
-        edited_at: r.edited_at,
         mod_status: r.mod_status,
         updated_at: r.updated_at,
         body: r.deleted_at == null && (r.mod_status === 'ok' || (caller != null && r.user_id === caller)) ? r.body : null,
@@ -137,7 +138,6 @@ type MsgRow = {
   is_anon: boolean
   body: string | null
   mod_status: string
-  edited_at: string | null
   created_at: string
   updated_at: string
 }
@@ -153,7 +153,6 @@ function shapeRow(r: MsgRow) {
     is_anon: r.is_anon,
     body: r.body,
     mod_status: r.mod_status,
-    edited_at: r.edited_at,
     created_at: r.created_at,
     updated_at: r.updated_at,
   }
