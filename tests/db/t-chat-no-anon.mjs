@@ -1,4 +1,4 @@
-// T-Chat-No-Anon — 익명 채팅 폐지(20260907120000 → 20260907130000)를 검증한다.
+// T-Chat-No-Anon — 익명 채팅 폐지(20260907140000 → 20260907150000)를 검증한다.
 //
 // 이 변경에서 조용히 깨지면 제일 비싼 것들만 본다.
 //  · ⭐ 2단계 중간 상태에서 **두 시그니처가 공존**하는가 — 여기가 무중단의 전부다.
@@ -13,8 +13,8 @@ import { readFileSync } from 'node:fs';
 
 const base = readFileSync('supabase/migrations/20260723120000_chat_board.sql', 'utf8');
 const rooms = readFileSync('supabase/migrations/20260804170000_chat_rooms.sql', 'utf8');
-const step1 = readFileSync('supabase/migrations/20260907120000_chat_drop_anon_step1.sql', 'utf8');
-const step2 = readFileSync('supabase/migrations/20260907130000_chat_drop_anon_step2.sql', 'utf8');
+const step1 = readFileSync('supabase/migrations/20260907140000_chat_drop_anon_step1.sql', 'utf8');
+const step2 = readFileSync('supabase/migrations/20260907150000_chat_drop_anon_step2.sql', 'utf8');
 
 // pglite 에 없는 role 대상 revoke/grant 문 제거 (원본 텍스트는 아래 정규식 검증에서 따로 본다)
 const strip = (sql) =>
