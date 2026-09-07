@@ -44,13 +44,13 @@ import '../styles/arena.css'
 // 개인 랭킹과 같은 재료(skill_score+activity_score)를 국가/지역 단위로 올린 값이라 이게 이 지도의 지표다.
 // ⚠️ 같은 응답의 `avg_level` 은 쓰지 않는다 — 이름과 달리 레벨이 아니라 보정 전 원시 평균이고
 //    (레벨테스트 시절 필드명이 하위호환으로 남은 것), 그걸 쓰면 5명짜리 버킷이 그대로 1위를 먹는다.
-type ServerBucket = { code: string; score: number; member_count: number; has_real?: boolean }
+type ServerBucket = { code: string; score: number; member_count: number }
 
 /** 서버 버킷 배열 → 코드별 맵. 국가·지역이 같은 모양이라 한 함수를 쓴다. */
 function toBucketMap(bs: ServerBucket[] | undefined): RealData['country'] {
   const out: RealData['country'] = {}
   for (const b of bs ?? []) {
-    if (b?.code) out[b.code] = { score: Number(b.score), members: Number(b.member_count), hasReal: !!b.has_real }
+    if (b?.code) out[b.code] = { score: Number(b.score), members: Number(b.member_count) }
   }
   return out
 }
@@ -711,7 +711,8 @@ export default function WorldArena() {
           <b>{hover.region.name}</b>
           {/* ⛔ 옛 '실데이터' 배지는 뗐다(2026-08-25). 실회원이 있는 버킷에만 붙던 것이라 **한국에만** 떴는데,
               사용자에게 쓸모가 없는 데다 "여기만 실데이터" 라고 붙이는 순간 나머지 나라는 아니라고 우리가
-              먼저 광고하는 꼴이 된다. 판정값(region.real ← has_real)은 그대로 내려온다 — 운영 판단용이다. */}
+              먼저 광고하는 꼴이 된다. 2026-09-04 에 판정값(has_real)까지 서버에서 없앴다 — 파생값이라
+              필요하면 real_members 로 언제든 만든다(그 숫자는 운영 판단용이라 화면엔 안 내려온다). */}
           <div className="row">
             <span>{scoreLabel}</span>
             <span>{fmtScore(hover.region.score)}</span>

@@ -38,7 +38,8 @@ export type GeoFeature = Feature<Geometry, GeoProps> & { id?: string | number }
 /**
  * 지도에 칠할 한 구역(국가/시도/시군구).
  * score·takers 는 서버 버킷 값이고, 버킷이 없으면 0 이다(브라우저가 지어내지 않는다).
- * `real` = 그 버킷에 **실회원이 1명이라도 있나**(시드 더미만 있으면 false) — 툴팁의 '실집계' 배지용.
+ * ⚠️ 2026-09-04 에 `real`(실회원 유무)을 뺐다 — 툴팁의 '실집계' 배지를 2026-08-25 에 떼면서
+ * 그리는 곳이 없어졌고, 서버도 has_real 컬럼을 없앴다(파생값이라 real_members 만 남겼다).
  */
 export interface Region {
   f: GeoFeature
@@ -48,7 +49,6 @@ export interface Region {
   drill: boolean
   score: number
   takers: number
-  real: boolean
 }
 
 /**
@@ -61,12 +61,12 @@ export interface Region {
  * RPC 쪽 보정(K=25 shrinkage + 일간창 참여율 가중)을 살리려면 반드시 `score` 를 써야 한다.
  *
  * ⚠️ 이 값은 **시드 더미 + 실집계가 이미 합쳐진 것**이다(서버 `refresh_arena_buckets`).
- *    `hasReal` 만이 진짜 사람이 있는 버킷인지 말해 준다 — `members` 는 가상 회원을 포함한다.
+ *    ⚠️ `members` 에는 가상 회원이 섞여 있다 — 실사용자 수는 서버의 real_members 로만 알 수 있고
+ *    화면에는 안 내려온다(운영 판단용).
  */
 export interface RealBucket {
   score: number
   members: number
-  hasReal: boolean
 }
 export interface RealData {
   country: Record<string, RealBucket>
@@ -288,7 +288,7 @@ export function buildRegions({
   drillIso,
   adm1Index,
 }: BuildArgs): Region[] {
-  let base: Omit<Region, 'score' | 'takers' | 'real'>[]
+  let base: Omit<Region, 'score' | 'takers'>[]
   if (level === 0) {
     base = countries.map((f) => ({
       f,
@@ -335,7 +335,6 @@ export function buildRegions({
       ...r,
       score: bucket?.score ?? 0,
       takers: bucket?.members ?? 0,
-      real: bucket?.hasReal ?? false,
     }
   })
 }

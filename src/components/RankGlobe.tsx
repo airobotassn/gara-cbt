@@ -488,12 +488,12 @@ export default function RankGlobe() {
         let real: RealData = EMPTY_REAL
         try {
           const res = await callFunction<{
-            buckets?: { code: string; score: number; member_count: number; has_real?: boolean }[]
+            buckets?: { code: string; score: number; member_count: number }[]
           }>('leaderboard', { scope: 'country', window: 'season' })
           const country: RealData['country'] = {}
           for (const b of res?.buckets ?? []) {
             if (b?.code) {
-              country[b.code] = { score: Number(b.score), members: Number(b.member_count), hasReal: !!b.has_real }
+              country[b.code] = { score: Number(b.score), members: Number(b.member_count) }
             }
           }
           real = { country, region: {} }
