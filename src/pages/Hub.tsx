@@ -134,11 +134,14 @@ interface HubState { authed: boolean; level?: number | null; points?: number; co
   //   서버는 예전부터 내려주고 있었고(옛 마이페이지 학습 대시보드가 쓰던 값), 2026-08-25 에 그 화면을
   //   찢으면서 이 자리로 왔다. 새로 부르는 요청이 없다 — 허브가 이미 받고 있던 응답이다.
   attendanceDays?: string[] | null;
-  // 꾸미기 — 장착한 캐릭터(baseKey) · 그 외 장착(equipped.skin) · 첫 진입 흐름 진행 상태.
+  // 꾸미기 — 장착한 캐릭터(baseKey) · 배경(skinKey) · 칭호(titleTier) · 첫 진입 흐름 진행 상태.
+  //   ⚠️ 2026-09-04 에 서버가 equipped(jsonb) 를 컬럼 둘로 갈랐다. 옛 equipped 필드는 그 배포와
+  //      프론트 빌드의 시차를 메우려고 한 배포 동안만 같이 오던 것이고, 지금은 안 읽는다.
   //   ⚠️ charChosen·tutorialDone 은 **서버만이 안다**. 화면이 localStorage 로 기억하면
   //      브라우저를 바꾸거나 지운 사람에게 첫 진입 흐름이 다시 강제된다.
   baseKey?: string
-  equipped?: Record<string, string>
+  skinKey?: string | null
+  titleTier?: string | null
   charChosen?: boolean
   tutorialDone?: boolean
   // 레벨업 연출(2026-08-26) — 축하할 게 있으면 {from,to}, 없으면 null·없음.
@@ -535,7 +538,7 @@ export default function Hub() {
     setGiftsUnseen(h.giftsUnseen ?? 0)
     // 꾸미기 장착값 — 서버가 권위다. 'default'(아직 안 고름)는 null 로 눕혀 폴백 그림 하나로 처리한다.
     const nextChar = h.baseKey && h.baseKey !== 'default' ? h.baseKey : null
-    const nextSkin = h.equipped?.skin ?? DEFAULT_SKIN_PART
+    const nextSkin = h.skinKey ?? DEFAULT_SKIN_PART
     setCharKey(nextChar)
     setSkinPart(nextSkin)
     // 다음 진입의 첫 그림용으로 적어 둔다 — **서버 응답이 온 뒤가 유일한 쓰기 자리**다(lib/lastLook.ts).

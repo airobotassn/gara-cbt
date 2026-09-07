@@ -171,8 +171,12 @@ Deno.serve(async (req) => {
       points: Number(currency?.points ?? 0),
       cosmetics: (cosmetics ?? []).map((c) => c.part_key as string),
       baseKey: (character?.base_key as string) ?? 'default',
-      // ⚠️ 2026-09-04 에 equipped(jsonb) 를 skin_key·title_tier 컬럼으로 갈랐다. 응답 모양은 그대로
-      //    유지한다 — 화면(Hub.tsx)이 equipped.skin 을 읽고 있어서다. 화면까지 옮기면 이 줄도 편다.
+      // 2026-09-04 에 equipped(jsonb) 를 skin_key·title_tier 컬럼으로 갈랐다.
+      skinKey: (character?.skin_key as string | null) ?? null,
+      titleTier: (character?.title_tier as string | null) ?? null,
+      // ⚠️ **한 배포 동안만** 옛 모양도 같이 내려보낸다. 프론트는 Cloudflare 빌드라 함수 배포와
+      //    시차가 있어서, 이 줄을 지금 빼면 그 몇 분 동안 옛 화면이 배경을 못 읽는다.
+      //    화면이 skinKey 로 옮겨간 뒤(다음 배포)에 이 줄을 지울 것.
       equipped: {
         ...(character?.skin_key ? { skin: character.skin_key as string } : {}),
         ...(character?.title_tier ? { title: character.title_tier as string } : {}),
