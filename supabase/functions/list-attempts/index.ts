@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: '인증이 필요합니다.' }, 401)
     // 게스트는 일일 제한 대상이 아니라 dailyLeft=null(화면에서 표시 생략).
     if (user.is_anonymous)
-      return json({ attempts: [], currentRank: null, currentPoints: 0, levelSkills: [], dailyLeft: null, certificate: null })
+      return json({ attempts: [], currentRank: null, levelSkills: [], dailyLeft: null, certificate: null })
 
     const admin = adminClient()
 
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id)
         .eq('status', 'submitted')
         .order('submitted_at', { ascending: false }),
-      admin.from('user_progress').select('rank, points').eq('user_id', user.id).maybeSingle(),
+      admin.from('user_progress').select('rank').eq('user_id', user.id).maybeSingle(),
       admin
         .from('user_level_skill')
         .select('level, ratings, attempts_count, placed')
@@ -72,7 +72,6 @@ Deno.serve(async (req) => {
 
     // 현재 등급/점수 (user_progress 한 줄). 응시 기록 없으면 등급 null.
     const currentRank = attempts.length > 0 ? ((prog?.rank as number) ?? 1) : null
-    const currentPoints = (prog?.points as number) ?? 0
 
     // 레벨별 누적 레이더
     const levelSkills = (skills ?? [])
@@ -123,7 +122,7 @@ Deno.serve(async (req) => {
         }
       : null
 
-    return json({ attempts, currentRank, currentPoints, levelSkills, dailyLeft, certificate })
+    return json({ attempts, currentRank, levelSkills, dailyLeft, certificate })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)
   }

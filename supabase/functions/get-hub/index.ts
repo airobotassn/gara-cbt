@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
         .eq('user_id', uid)
         .order('issued_for_level', { ascending: false }),
       // HUD 표시(레벨·랭킹점수·실력/활동 분해)용 읽기 전용 — 이 함수는 user_progress 를 절대 쓰지 않는다(cosmetic-only).
-      admin.from('user_progress').select('rank, points, skill_score, activity_score, season_total, arena_level').eq('user_id', uid).maybeSingle(),
+      admin.from('user_progress').select('rank, skill_score, activity_score, season_total, arena_level').eq('user_id', uid).maybeSingle(),
       admin.rpc('user_titles', { p_uid: uid }),
       // 다음 순위 게이지(티어·백분위·points_to_pass) — season_total 기반 read-시점 파생, 실패해도 무시(back-compat).
       admin.rpc('my_rank_context', { p_uid: uid }),
@@ -159,7 +159,6 @@ Deno.serve(async (req) => {
     return json({
       authed: true,
       level: progress?.rank ?? null,
-      rankPoints: progress?.points ?? null,
       skillScore: (progress?.skill_score as number) ?? null,
       activityScore: (progress?.activity_score as number) ?? null,
       seasonTotal: (progress?.season_total as number) ?? null,

@@ -77,7 +77,6 @@ export interface LevelSkill {
 export interface ListAttemptsResponse {
   attempts: AttemptSummary[]
   currentRank: number | null // 현재 등급(레벨). 아직 응시 전이면 null
-  currentPoints: number // 랭킹 점수(0~10000)
   levelSkills: LevelSkill[] // 응시한 레벨들의 누적 레이더
   dailyLeft?: number | null // 오늘 남은 응시 횟수(게스트/구버전 함수면 null·undefined)
   certificate?: LevelCertData | null // 레벨테스트 인증서 데이터(응시 기록 없으면 null)
