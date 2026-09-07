@@ -396,6 +396,19 @@ export default function Hub() {
   const [rank, setRank] = useState<number | null>(null)
   const [rankTotal, setRankTotal] = useState<number | null>(null)
 
+  /** 랭킹 진입점이 어디 서는지 — PC 는 뒤로가기 줄의 칩, 폰은 옛날처럼 화면 맨 아래 도크 CTA(2026-09-07 지시).
+   *  ⛔ **CSS `display:none` 으로 둘을 겹쳐 두지 말 것.** 도크 CTA 는 스킨 아이콘 PNG(icon-ranking.png
+   *     424KB)를 `<img>` 로 들고 있어서, 감춰도 브라우저는 그대로 받아온다(2026-08-25 에 겪은 그것).
+   *     그래서 아예 안 그리는 쪽을 고른다 — 자리가 둘이므로 폰에서 칩도 같이 사라진다.
+   *  ⚠️ 768px 은 이 파일 CSS 의 데스크톱 분기와 같은 값이다(hub.css 의 `@media (min-width: 768px)`). */
+  const [wide, setWide] = useState(() => window.matchMedia('(min-width: 768px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const sync = () => setWide(mq.matches)
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
   // ⚠️ 토스트는 **종류를 같이 들고 다닌다.** 예전엔 아이콘을 문구 정규식(/부족|필요|오류/)으로 골랐는데,
   //    그건 화면이 한국어일 때만 성립하는 판정이라 i18n 이관과 동시에 전부 ✅ 로 깨진다(2026-08-07).
   const pushLog = (s: string, bad = false) => {
@@ -976,7 +989,7 @@ export default function Hub() {
         <Link className="hub-back" to="/arena">
           <span className="material-symbols-outlined">arrow_back</span>WORLD ARENA
         </Link>
-        {/* 오른쪽 두 버튼은 묶어둔다 — .hub-backrow 가 space-between 이라 낱개로 넣으면 셋이 흩어진다.
+        {/* 오른쪽 버튼들은 묶어둔다 — .hub-backrow 가 space-between 이라 낱개로 넣으면 흩어진다.
             선물은 초대하기 모달에 넣지 않고 여기 독립 진입점으로 둔다(2026-08-07 결정). */}
         <div className="hub-backrow-act">
           {/* 코인 선물 = 닉네임으로 CARI 코인을 즉시 이체. 뱃지 = 아직 확인 안 한 받은 선물 건수.
@@ -986,6 +999,16 @@ export default function Hub() {
               <span className="ic"><Ic n="coin" s={16} /></span>{t('hub.gift_btn')}
               {giftsUnseen > 0 && <span className="bd">{giftsUnseen}</span>}
             </button>
+          )}
+          {/* 랭킹 = 리더보드 진입점. 2026-09-07 지시로 **PC 에서만** 화면 맨 아래 도크의 큰 CTA 에서
+              여기 칩으로 올라왔다. 폰은 옛날 그대로 도크에 남는다 — 뒤로가기 칩(149px)까지 세 알약이
+              한 줄에 408px 이라 폰(292~362px)에서는 '내 랭킹 카드' 가 화면 밖으로 잘렸다(실측).
+              ⚠️ 아이콘은 스킨 PNG(HubUiIcon)가 아니라 SVG 다. 스킨 그림에 크기를 주던 건 `.cta-star`
+                 쪽 규칙뿐이라 여기서 쓰면 512px 원본이 그대로 튀어나온다(2026-08-25 에 겪은 그 사고). */}
+          {wide && (
+            <Link className="hub-share hub-rankbtn" to="/ranking">
+              <span className="ic"><Ic n="star" s={17} /></span>{t('common.ranking')}
+            </Link>
           )}
           {/* 공유 = 지금 순위·티어·칭호로 카드(PNG) 를 만들어 내보낸다(ShareCardModal) */}
           <button className="hub-share" onClick={() => setModal('share')}>
@@ -1112,25 +1135,28 @@ export default function Hub() {
             </div>
         </div>
 
-        {/* 도크: 메인 CTA(랭킹) 하나.
+        {/* 도크: 메인 CTA(랭킹) 하나 — **폰에서만**. PC 는 이 버튼이 뒤로가기 줄의 칩으로 올라갔다
+            (2026-09-07 지시). 폰에 남긴 이유는 위 칩 자리의 주석 참고(세 알약이 한 줄에 안 들어간다).
             ⛔ **여기에 세로로 자라는 판을 다시 얹지 말 것.** 허브는 100dvh 로 잠긴 틀이라 도크가 커지는
                만큼 랭킹 버튼이 화면 밖으로 나가는데, 스크롤이 없어서 사용자는 밀려난 걸 볼 방법이 없다
                (2026-09-03 — 7일 출석 스탬프판이 그래서 레일 '출석' 칸으로 접혔다). */}
-        <div className="dock">
-          {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
-          <Link className="cta-main" to="/ranking">
-            {/* ⚠️ 궁궐 벌(고궁 낮·밤)에는 아이콘을 아예 그리지 않는다(2026-08-26 지시) — 판 그림이 이미
-                장식을 다 하고 있어서 글자 옆에 그림을 하나 더 얹으면 스티커를 붙인 것처럼 읽힌다.
-                CSS 로 감추지 않은 이유 = display:none 이어도 브라우저는 icon-ranking.png(424KB)를
-                그대로 받아온다. 기본(초원)의 별 SVG 는 그대로다. */}
-            {skin.ui !== 'palace' && (
-              <span className="cta-star" aria-hidden="true">
-                <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
-              </span>
-            )}
-            {t('common.ranking')}
-          </Link>
-        </div>
+        {!wide && (
+          <div className="dock">
+            {/* 미니게임은 /arena 하단 런처로 옮겼고, 이 자리는 랭킹 진입점이 됐다(옛 레벨선택 화면의 랭킹 버튼). */}
+            <Link className="cta-main" to="/ranking">
+              {/* ⚠️ 궁궐 벌(고궁 낮·밤)에는 아이콘을 아예 그리지 않는다(2026-08-26 지시) — 판 그림이 이미
+                  장식을 다 하고 있어서 글자 옆에 그림을 하나 더 얹으면 스티커를 붙인 것처럼 읽힌다.
+                  CSS 로 감추지 않은 이유 = display:none 이어도 브라우저는 icon-ranking.png(424KB)를
+                  그대로 받아온다. 기본(초원)의 별 SVG 는 그대로다. */}
+              {skin.ui !== 'palace' && (
+                <span className="cta-star" aria-hidden="true">
+                  <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
+                </span>
+              )}
+              {t('common.ranking')}
+            </Link>
+          </div>
+        )}
       </div>
 
       {toast && (
