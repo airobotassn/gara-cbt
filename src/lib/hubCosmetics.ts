@@ -286,6 +286,38 @@ export const SKINS: SkinDef[] = [
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-plaza.webp',
   },
+  // 사옥 **안** 두 장 — 사무실과 라운지. 위 둘과 같은 꼴이다(배경만 다르고 UI 는 office 벌 공용).
+  //   ⚠️ 실내라 바닥·천장이 밝다(하단 판 자리 실측 214·200 — 광장이 198). 흰 카드가 배경에
+  //      묻으면 `[data-ui='office']` 의 판 그림이 아니라 **이 두 장의 밝기**를 의심할 것.
+  {
+    key: 'office_desk',
+    partKey: 'skin_office_desk',
+    ui: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-desk.webp',
+  },
+  {
+    key: 'office_lounge',
+    partKey: 'skin_office_lounge',
+    ui: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-lounge.webp',
+  },
+  // 캠퍼스 낮·노을 — 같은 광장의 두 시간대. 고궁 낮·밤과 같은 짝이다.
+  {
+    key: 'campus_day',
+    partKey: 'skin_campus_day',
+    ui: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-campus-day.webp',
+  },
+  {
+    key: 'campus_sunset',
+    partKey: 'skin_campus_sunset',
+    ui: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-campus-sunset.webp',
+  },
 ]
 
 export const DEFAULT_SKIN = SKINS[0].key

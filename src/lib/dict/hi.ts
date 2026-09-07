@@ -1826,6 +1826,10 @@ const HI: Record<string, string> = {
   "hub.part.skin_palace_night": "महल · रात",
   "hub.part.skin_office": "ऑफ़िस · मुख्यालय",
   "hub.part.skin_office_plaza": "ऑफ़िस · प्लाज़ा",
+  "hub.part.skin_office_desk": "ऑफ़िस · कार्यक्षेत्र",
+  "hub.part.skin_office_lounge": "ऑफ़िस · लाउंज",
+  "hub.part.skin_campus_day": "कैंपस · दिन",
+  "hub.part.skin_campus_sunset": "कैंपस · सूर्यास्त",
   // 쿠폰함
   "hub.coupon.title": "कूपन",
   "hub.coupon.discount": "{n}% छूट",

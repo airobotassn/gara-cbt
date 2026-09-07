@@ -786,6 +786,16 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ 그래서 이 그림을 갈 때의 조건: **간판이 세로 23% 아래, 광장이 세로 75% 위**에서 시작할 것. */
 .hub[data-skin='office']       { --skin-bg: url('/hub/bg-office.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='office_plaza'] { --skin-bg: url('/hub/bg-office-plaza.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+/* 사옥 안 두 장 + 캠퍼스 두 장 (2026-09-07). 위 둘과 같은 값 — 확대·위치를 따로 주지 말 것.
+   ⚠️ **cover 는 폰에서 가로 26%(x 37~63%)만 남긴다.** 실측: 390폭이면 배율이 세로에 잡혀
+      1499px 로 늘어나고 그중 390px 만 보인다. 그래서 그림 좌우 끝의 글자는 폰에서 통째로 사라진다 —
+      `office_desk` 의 모아교육그룹 벽 로고(x 76~97%)와 `campus_day` 의 비석(x 7~22%)이 그 경우다.
+      **가운데 26% 안에 볼 것이 있어야 한다**는 게 이 스킨 계열의 그림 조건이다.
+   ⚠️ 발끝(22svh = 세로 78%)은 네 장 다 바닥 위에 떨어진다 — 그래서 값 블록을 새로 두지 않았다. */
+.hub[data-skin='office_desk']   { --skin-bg: url('/hub/bg-office-desk.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_lounge'] { --skin-bg: url('/hub/bg-office-lounge.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_day']    { --skin-bg: url('/hub/bg-campus-day.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_sunset'] { --skin-bg: url('/hub/bg-campus-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
    ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 이름이 아니라 **`data-ui` 가 같기 때문**이다.

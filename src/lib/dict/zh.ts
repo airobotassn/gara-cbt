@@ -1826,6 +1826,10 @@ const ZH: Record<string, string> = {
   "hub.part.skin_palace_night": "古宫 · 夜晚",
   "hub.part.skin_office": "办公室 · 总部",
   "hub.part.skin_office_plaza": "办公室 · 广场",
+  "hub.part.skin_office_desk": "办公室 · 办公区",
+  "hub.part.skin_office_lounge": "办公室 · 休息区",
+  "hub.part.skin_campus_day": "校园 · 白天",
+  "hub.part.skin_campus_sunset": "校园 · 晚霞",
   // 쿠폰함
   "hub.coupon.title": "优惠券",
   "hub.coupon.discount": "{n}% 折扣",

@@ -1826,6 +1826,10 @@ const EN: Record<string, string> = {
   "hub.part.skin_palace_night": "Palace · Night",
   "hub.part.skin_office": "Office · HQ",
   "hub.part.skin_office_plaza": "Office · Plaza",
+  "hub.part.skin_office_desk": "Office · Workspace",
+  "hub.part.skin_office_lounge": "Office · Lounge",
+  "hub.part.skin_campus_day": "Campus · Day",
+  "hub.part.skin_campus_sunset": "Campus · Sunset",
   // 쿠폰함
   "hub.coupon.title": "Coupons",
   "hub.coupon.discount": "{n}% off",
