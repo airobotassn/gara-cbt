@@ -28,16 +28,15 @@ import { arenaLevelForScore } from '../lib/scoring'
 
 interface Row {
   id: number
-  /** ⚠️ 익명 글은 null 이다 — 서버가 익명성 보호로 uuid 를 안 내려준다(chat-list 의 shapeRow). */
+  /** 탈퇴 계정이면 null 일 수 있다. */
   user_id: string | null
   /** 작성자의 **지금** 닉네임 — 서버가 profiles 에서 덮어 내려준다(글에 박힌 옛 이름이 아니다). */
   display_name: string
-  is_anon: boolean
   body: string | null
   mod_status: 'ok' | 'pending' | 'hidden'
   created_at: string
   updated_at: string
-  /** 작성자 프로필 — chat-list 가 붙여준다. 익명 글·국가 미등록이면 null(렌더 생략). */
+  /** 작성자 프로필 — chat-list 가 붙여준다. 국가 미등록이면 null(렌더 생략). */
   avatar_url?: string | null
   country_code?: string | null
   sending?: boolean
@@ -124,8 +123,8 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const { t, lang } = useT()
   const navigate = useNavigate()
   // ⚠️ 쓰기 가능 판정은 user 가 아니라 isFullUser 다.
-  //    익명 세션도 user 는 truthy 라 !user 로 검사하면 입력창이 열리고, 서버(chat-post 의
-  //    CHAT_REQUIRE_LOGIN)가 login_required 로 되돌려서 다 치고 나서야 실패한다.
+  //    익명(게스트) 세션도 user 는 truthy 라 !user 로 검사하면 입력창이 열리고,
+  //    서버(chat-post 의 게스트 차단)가 login_required 로 되돌려서 다 치고 나서야 실패한다.
   const { user, isFullUser } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
@@ -485,7 +484,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
       id: tempId,
       user_id: user.id,
       display_name: t('chat.sending'),
-      is_anon: !!user.is_anonymous,
       body: text,
       mod_status: 'ok',
       created_at: new Date().toISOString(),
@@ -497,7 +495,7 @@ export default function ChatBoard({ room = 'global' }: Props) {
     keepBottomRef.current = null
     setRows((prev) => [...prev, tempRow])
     try {
-      const res = await callFunction<{ id: number; created_at: string; updated_at: string; display_name: string; is_anon: boolean; mod_status: 'ok' | 'pending' }>('chat-post', { room, body: text })
+      const res = await callFunction<{ id: number; created_at: string; updated_at: string; display_name: string; mod_status: 'ok' | 'pending' }>('chat-post', { room, body: text })
       setRows((prev) => {
         const withoutTemp = prev.filter((r) => r.id !== tempId)
         if (withoutTemp.some((r) => r.id === res.id)) return withoutTemp
@@ -507,7 +505,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
             id: res.id,
             user_id: user.id,
             display_name: res.display_name,
-            is_anon: res.is_anon,
             body: text,
             mod_status: res.mod_status,
                   created_at: res.created_at,
@@ -526,11 +523,9 @@ export default function ChatBoard({ room = 'global' }: Props) {
   // 아바타 탭 → 그 사람 카드. 카드에 필요한 값(순위·백분위·시즌점수)이 채팅 행엔 없어서 한 번 조회한다.
   //   ⚠️ 누르는 건 **아바타뿐**이다. 말풍선 전체를 누르게 하면 관성 스크롤을 멈추려고 톡 친 손가락에
   //      모달이 열린다(작은 원이라 거기 정확히 떨어질 일이 드물다).
-  //   ⚠️ 익명 글은 아예 대상이 아니다 — 익명으로 쓴 글에서 실명 카드가 나오면 익명성이 깨진다.
-  //      (서버도 같은 판단: scoped_top 이 익명 계정을 제외해서 user:null 로 되돌린다. 이중 방어)
-  //      익명 글엔 user_id 자체가 안 내려오므로 그것도 같이 막는다(삼중).
+  //   ⚠️ user_id 가 없는 글(탈퇴 계정)은 대상이 아니다 — 조회할 사람이 없다.
   async function openCard(r: Row) {
-    if (r.is_anon || !r.user_id || r.sending || cardBusy.current) return
+    if (!r.user_id || r.sending || cardBusy.current) return
     const uid = r.user_id
     cardBusy.current = true
     try {
@@ -645,23 +640,14 @@ export default function ChatBoard({ room = 'global' }: Props) {
                 <div className="chat-bubble">
                   {!own && (
                     <div className="chat-meta">
-                      {/* 익명 글은 고정 시드 — user_id 를 시드로 쓰면 같은 사람의 익명 글이
-                          늘 같은 색으로 나와 서로 이어붙일 수 있다(익명성 훼손).
-                          같은 이유로 익명 글의 아바타는 누를 수 없다(카드 = 실명 정보). */}
-                      {r.is_anon ? (
-                        <span className="chat-avatar">
-                          <Avatar avatarUrl={r.avatar_url} seed="anon" size={20} />
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="chat-avatar chat-avatar-btn"
-                          onClick={() => openCard(r)}
-                          aria-label={t('chat.cardOf', { name: r.display_name })}
-                        >
-                          <Avatar avatarUrl={r.avatar_url} seed={r.user_id ?? undefined} size={20} />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="chat-avatar chat-avatar-btn"
+                        onClick={() => openCard(r)}
+                        aria-label={t('chat.cardOf', { name: r.display_name })}
+                      >
+                        <Avatar avatarUrl={r.avatar_url} seed={r.user_id ?? undefined} size={20} />
+                      </button>
                       <span className="chat-name">{r.display_name}</span>
                       {flagUrl(r.country_code) && (
                         <img
@@ -673,7 +659,6 @@ export default function ChatBoard({ room = 'global' }: Props) {
                           decoding="async"
                         />
                       )}
-                      {r.is_anon && <span className="chat-anon-badge">{t('chat.anonBadge')}</span>}
                     </div>
                   )}
                   <div className="chat-body">

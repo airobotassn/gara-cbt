@@ -293,7 +293,6 @@ create table if not exists chat_messages (
   user_id uuid,
   ip_hash text,
   display_name text,
-  is_anon boolean not null default false,
   body text not null,
   lang text,
   room text not null default 'global',
@@ -418,22 +417,23 @@ grant  execute on function public.chat_translation_pending(int) to service_role;
 --   advisory xact lock(user, ip) 으로 동시 요청 직렬화 후 가드 평가 → insert.
 --   raise exception '<code>' (기본 errcode) 로 supabase-js 가 error.message 로 코드를 그대로 받는다.
 --   ⚠️ 가드는 방(room)을 보지 않는다(계정 단위 전역) — 방을 옮겨다니며 상한을 리셋하는 도배 방지.
+--   ⚠️ 옛 p_is_anon 인자는 2026-09-07 에 뺐다(익명 채팅 폐지) — 간격·상한이 상수가 됐다.
 drop function if exists public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text);
+drop function if exists public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text,text);
 create or replace function public.chat_post_atomic(
   p_user uuid,
   p_ip_hash text,
   p_body text,
   p_content_hash text,
   p_mod_status text,
-  p_is_anon boolean,
   p_display_name text,
   p_lang text,
   p_room text
 ) returns table(id bigint, created_at timestamptz, updated_at timestamptz)
 language plpgsql security definer set search_path = public as $$
 declare
-  v_min_interval int := case when p_is_anon then 5 else 3 end;
-  v_window_cap   int := case when p_is_anon then 5 else 10 end;
+  v_min_interval constant int := 3;
+  v_window_cap   constant int := 10;
   v_room text := coalesce(nullif(p_room, ''), 'global');
   v_last_at timestamptz;
   v_window_count int;
@@ -487,14 +487,14 @@ begin
   end if;
 
   return query
-    insert into chat_messages(user_id, ip_hash, display_name, is_anon, body, lang, mod_status, content_hash, room)
-    values (p_user, p_ip_hash, p_display_name, p_is_anon, p_body, p_lang, p_mod_status, p_content_hash, v_room)
+    insert into chat_messages(user_id, ip_hash, display_name, body, lang, mod_status, content_hash, room)
+    values (p_user, p_ip_hash, p_display_name, p_body, p_lang, p_mod_status, p_content_hash, v_room)
     returning chat_messages.id, chat_messages.created_at, chat_messages.updated_at;
 end;
 $$;
 
-revoke execute on function public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text,text) from public, anon, authenticated;
-grant execute on function public.chat_post_atomic(uuid,text,text,text,text,boolean,text,text,text) to service_role;
+revoke execute on function public.chat_post_atomic(uuid,text,text,text,text,text,text,text) from public, anon, authenticated;
+grant execute on function public.chat_post_atomic(uuid,text,text,text,text,text,text,text) to service_role;
 
 -- reco_cache / reco_shadow_log — 레벨 추천 시맨틱 캐시 (key=입력 임베딩, value=레벨)
 create table if not exists reco_cache (

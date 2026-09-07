@@ -3122,7 +3122,7 @@ async function chatBuildRows(admin: any, ids: number[], room: string | null) {
   if (!ids.length) return []
   let q = admin
     .from('chat_messages')
-    .select('id, user_id, display_name, is_anon, body, room, mod_status, deleted_at, hidden_by, created_at')
+    .select('id, user_id, display_name, body, room, mod_status, deleted_at, hidden_by, created_at')
     .in('id', ids)
   if (room) q = q.eq('room', room)
   const { data: msgs } = await q
@@ -3169,7 +3169,6 @@ async function chatBuildRows(admin: any, ids: number[], room: string | null) {
         id: m.id,
         userId: m.user_id,
         displayName: m.display_name,
-        isAnon: m.is_anon,
         body: m.body,
         room: m.room,
         modStatus: m.mod_status,

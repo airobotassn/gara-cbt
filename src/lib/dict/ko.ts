@@ -1474,7 +1474,6 @@ const KO: Record<string, string> = {
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
   "chat.roomGlobal": "World",
   "chat.roomBack": "World",
-  "chat.anonBadge": "익명",
   "chat.reportTitle": "신고 사유를 선택해주세요",
   "chat.reportSpam": "스팸·광고",
   "chat.reportAbuse": "욕설·혐오 표현",

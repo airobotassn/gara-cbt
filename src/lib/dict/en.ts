@@ -1449,7 +1449,6 @@ const EN: Record<string, string> = {
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
   "chat.roomGlobal": "World",
   "chat.roomBack": "World",
-  "chat.anonBadge": "Anon",
   "chat.reportTitle": "Why are you reporting this?",
   "chat.reportSpam": "Spam or advertising",
   "chat.reportAbuse": "Abuse or hate speech",

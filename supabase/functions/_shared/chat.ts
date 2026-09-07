@@ -5,7 +5,13 @@
 import { sha256Hex } from './seb.ts'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
-export const CHAT_REQUIRE_LOGIN = (Deno.env.get('CHAT_REQUIRE_LOGIN') ?? 'true') !== 'false'
+// ⛔ 익명(게스트) 세션은 채팅을 못 쓴다 — 토글이 아니라 고정 규칙이다(2026-09-07).
+//    옛 `CHAT_REQUIRE_LOGIN`(기본 true)은 끌 수 있는 스위치였고, 끄면 익명 글이 들어오므로
+//    "익명 글을 익명으로 지켜주는" 분기 6개(이름 치환·uuid 은닉·아바타/국기 생략·카드 차단·
+//    말풍선 색 고정·도배 간격 5초)가 딸려 있어야 했다. 익명 채팅을 안 하기로 해서 그 여섯과
+//    `chat_messages.is_anon` 칸을 같이 걷어냈다.
+//    ⛔ 스위치를 되살리지 말 것 — 되살리면 그 여섯도 같이 되살려야 하고, 하나라도 빠지면
+//       '익명'이라고 적힌 배지만 남고 실제로는 누군지 드러난다(화면에 표시가 안 나는 종류).
 export const CHAT_MOD_FAILCLOSED = (Deno.env.get('CHAT_MOD_FAILCLOSED') ?? 'true') !== 'false'
 
 // AI 모더레이션 사용 여부. `CHAT_MOD_ENABLED=false` 면 OpenAI 를 **아예 호출하지 않고** 통과시킨다.

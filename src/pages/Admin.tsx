@@ -2227,7 +2227,6 @@ interface ChatModRow {
   id: number
   userId: string | null
   displayName: string | null
-  isAnon: boolean
   body: string | null
   room: string | null
   modStatus: string
@@ -2447,7 +2446,7 @@ export function ChatModAdmin() {
                     <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                       {r.body ?? <span style={{ color: 'var(--muted)' }}>(내용 없음)</span>}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{r.isAnon ? `${r.displayName} (익명)` : r.displayName}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{r.displayName}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(r.createdAt)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {/* 결정 3종. 숨김/완전삭제를 나눠 둔 이유:

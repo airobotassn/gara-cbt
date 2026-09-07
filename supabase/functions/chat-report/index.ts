@@ -6,14 +6,14 @@
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { CHAT_AUTO_HIDE_REPORTS, CHAT_REQUIRE_LOGIN, MOD_AUTO_HIDDEN } from '../_shared/chat.ts'
+import { CHAT_AUTO_HIDE_REPORTS, MOD_AUTO_HIDDEN } from '../_shared/chat.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     const user = await getUser(req)
     if (user == null) return json({ error: 'login_required' }, 401)
-    if (CHAT_REQUIRE_LOGIN && user.is_anonymous) return json({ error: 'login_required' }, 401)
+    if (user.is_anonymous) return json({ error: 'login_required' }, 401)
 
     const { message_id, reason } = await req.json()
     const messageId = Number(message_id)

@@ -1449,7 +1449,6 @@ const HI: Record<string, string> = {
   //    (나라 방에 있을 때만 보이므로 '어디로 가는지'가 이름만으로 읽힌다).
   "chat.roomGlobal": "World",
   "chat.roomBack": "World",
-  "chat.anonBadge": "गुमनाम",
   "chat.reportTitle": "रिपोर्ट का कारण चुनें",
   "chat.reportSpam": "स्पैम या विज्ञापन",
   "chat.reportAbuse": "गाली-गलौज या घृणास्पद भाषा",

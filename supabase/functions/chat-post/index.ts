@@ -8,7 +8,7 @@ import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang } from '../_shared/lib.ts'
 import { checkBadword, normalizeKo } from '../_shared/badwords_ko.ts'
 import { sha256Hex } from '../_shared/seb.ts'
-import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, CHAT_REQUIRE_LOGIN, containsLink, moderateOpenAI, normalizeRoom, resolvePoster, resolveIpHash } from '../_shared/chat.ts'
+import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, containsLink, moderateOpenAI, normalizeRoom, resolvePoster, resolveIpHash } from '../_shared/chat.ts'
 
 const MAX_LEN = 500
 
@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
   try {
     const user = await getUser(req)
     if (user == null) return json({ error: 'login_required' }, 401)
-    if (CHAT_REQUIRE_LOGIN && user.is_anonymous) return json({ error: 'login_required' }, 401)
+    // 게스트(익명 세션)는 못 쓴다 — 고정 규칙이다(_shared/chat.ts 머리말).
+    if (user.is_anonymous) return json({ error: 'login_required' }, 401)
 
     const { body, lang, room: roomIn } = await req.json()
     const room = normalizeRoom(roomIn)
@@ -29,7 +30,6 @@ Deno.serve(async (req) => {
     if (!CHAT_ALLOW_LINKS && containsLink(text)) return json({ error: 'blocked_link' }, 422)
 
     const admin = adminClient()
-    const isAnon = !!user.is_anonymous
     // ⚠️ 프로필 조회와 모더레이션은 서로 결과를 안 쓴다(poster.name 은 아래 displayName 조립에만,
     //    moderateOpenAI 는 text 만 쓴다). 그리고 여기서 제일 오래 걸리는 건 **OpenAI 왕복**이라
     //    DB 조회를 그 뒤에 줄 세울 이유가 없다 — 같이 내보낸다.
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
     const contentHash = await sha256Hex(normalizeKo(text))
     const ipHash = await resolveIpHash(req)
-    const displayName = isAnon ? `익명#${user.id.slice(0, 4)}` : poster.name
+    const displayName = poster.name
 
     const { data, error } = await admin.rpc('chat_post_atomic', {
       p_user: user.id,
@@ -53,7 +53,6 @@ Deno.serve(async (req) => {
       p_body: text,
       p_content_hash: contentHash,
       p_mod_status: modStatus,
-      p_is_anon: isAnon,
       p_display_name: displayName,
       p_lang: pickLang(lang),
       p_room: room,
@@ -74,7 +73,6 @@ Deno.serve(async (req) => {
       created_at: row.created_at,
       updated_at: row.updated_at,
       display_name: displayName,
-      is_anon: isAnon,
       mod_status: modStatus,
     })
   } catch (e) {
