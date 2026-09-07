@@ -1870,13 +1870,25 @@ async function manageAdmins(
 // ---------- CBT 문항 관리 (목록·이력·엑셀 임포트) ----------
 // 이력은 세 제도 공용 표(`question_history`)에 kind='caris' 로 쌓는다 — 옛 cbt_question_events.
 //   number → label(text) · bank_id → scope. 읽고 쓰는 자리는 _shared/question-history.ts 하나다.
+
+/** 문항 번호 → 이력 이름표. `120` → `C-120`.
+ *  ⚠️ 표를 합치기 전 CARIS 만 int 였던 탓에 label 이 맨숫자(`"100"`)로 들어가, 레벨테스트(`L1-001`)·
+ *     용어(`T-001`)와 모양이 달랐다. 셋이 한 표에 섞여 있으면 어느 제도 것인지 눈으로 안 갈린다.
+ *  ⚠️ **세 자리로 채운다** — text 정렬이라 안 채우면 `"100" < "98"` 이 된다(문자열 비교).
+ *     지금 문항 번호는 1~233 이고, 넘치면 그대로 붙는다(잘리지 않는다).
+ *  ⚠️ label 로 조회하는 곳은 용어(term)뿐이고 CARIS 는 문제은행(scope)으로 찾는다 — 형식을 바꿔도
+ *     검색이 안 깨진다. 옛 26건은 20260904470000 이 같은 규칙으로 밀었다. */
+function cbtLabel(n: number | null): string | null {
+  return n == null ? null : `C-${String(n).padStart(3, '0')}`
+}
+
 async function logCbtEvent(
   admin: any,
   e: { question_id: string | null; bank_id: string | null; number: number | null; action: string; actor: string; detail?: unknown },
 ) {
   await logQuestionEvent(admin, 'caris', {
     question_id: e.question_id,
-    label: e.number,
+    label: cbtLabel(e.number),
     scope: e.bank_id,
     action: e.action,
     actor: e.actor,
