@@ -1974,7 +1974,7 @@ const COSMETIC_KIND_LABEL: Record<string, string> = {
 const COSMETIC_KIND_ORDER = ['character', 'skin', 'furniture']
 
 // 이 품목을 가진 사람 / 입고 있는 사람.
-// ⚠️ 착용은 두 자리에서 나온다 — 캐릭터는 `user_characters.base_key`, 파츠는 같은 행의 `equipped` 안.
+// ⚠️ 착용은 두 자리에서 나온다 — 캐릭터는 `user_characters.base_key`, 스킨은 같은 행의 `skin_key`.
 //    서버(cosmeticOwners)가 둘을 합쳐 내려준다. 화면에서 다시 세지 말 것.
 // ⚠️ **산 기록 없이 입고 있는 사람**이 있다(첫 캐릭터는 공짜라 user_cosmetics 에 안 남는다).
 //    그래서 '보유'가 비어 있는데 '착용'인 줄이 정상으로 나온다.

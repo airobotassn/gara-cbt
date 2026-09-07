@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
         admin.rpc('user_titles', { p_uid: handle }),
         // 장착한 캐릭터·스킨 — 방에 그 사람 캐릭터가 서고 배경이 그 사람 스킨으로 깔린다.
         //   ⚠️ 새로 새는 정보가 아니다: 같은 그림이 랭킹 시상대와 공유 카드에 이미 나온다.
-        admin.from('user_characters').select('base_key, equipped').eq('user_id', handle).maybeSingle(),
+        admin.from('user_characters').select('base_key, skin_key').eq('user_id', handle).maybeSingle(),
       ])
 
       // 실회원이 아니면 **랭킹 더미**인지 본다 — /ranking 시상대의 '방 보기' 는 진짜와 더미를
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
         title: (titleList[0] as { tier?: string } | undefined)?.tier ?? null,
         // 'default'(아직 안 고름)는 null 로 눕힌다 — 프론트가 폴백 그림 하나로 처리한다.
         character: (() => { const b = (character?.base_key as string) ?? 'default'; return b && b !== 'default' ? b : null })(),
-        skin: ((character?.equipped as Record<string, string> | null) ?? {}).skin ?? null,
+        skin: (character?.skin_key as string | null) ?? null,
       })
     }
 

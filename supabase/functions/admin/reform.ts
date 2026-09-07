@@ -338,12 +338,14 @@ async function hubCosmetics(admin: any) {
 
   // 장착 수 — 지금 실제로 입고 있는 사람. 보유자와 다르다(사놓고 안 입을 수 있다).
   const worn: Record<string, number> = {}
-  const { data: chars } = await admin.from('user_characters').select('base_key, equipped')
+  const { data: chars } = await admin.from('user_characters').select('base_key, skin_key')
   for (const c of chars ?? []) {
     const base = (c as any).base_key as string
     if (base && base !== 'default') worn[base] = (worn[base] ?? 0) + 1
-    const eq = ((c as any).equipped ?? {}) as Record<string, string>
-    for (const v of Object.values(eq)) if (v) worn[v] = (worn[v] ?? 0) + 1
+    // ⚠️ 2026-09-04 이전엔 equipped(jsonb) 값을 통째로 훑었다 — 그 안에 칭호(title)가 들어오면서
+    //    자격 급수 키가 '착용 중인 꾸미기' 로 세어질 참이었다. 컬럼으로 갈라서 스킨만 센다.
+    const sk = (c as any).skin_key as string | null
+    if (sk) worn[sk] = (worn[sk] ?? 0) + 1
   }
 
   const items = (data ?? []).map((r: any) => ({
@@ -622,7 +624,7 @@ async function nextCharKey(admin: any): Promise<string> {
 
 /**
  * 이 품목을 **가진 사람 / 입고 있는 사람** 목록. 값을 올리거나 진열을 내리기 전에 보는 화면이다.
- * ⚠️ 착용은 두 자리에서 나온다 — 캐릭터는 `user_characters.base_key`, 파츠는 같은 행의 `equipped` 안.
+ * ⚠️ 착용은 두 자리에서 나온다 — 캐릭터는 `user_characters.base_key`, 스킨은 같은 행의 `skin_key`.
  *    한쪽만 보면 "보유 12명 / 착용 0명" 같은 거짓말이 나온다.
  */
 async function cosmeticOwners(admin: any, body: any) {
@@ -631,13 +633,12 @@ async function cosmeticOwners(admin: any, body: any) {
 
   const [own, chars] = await Promise.all([
     admin.from('user_cosmetics').select('user_id, acquired_at, source').eq('part_key', partKey).limit(1000),
-    admin.from('user_characters').select('user_id, base_key, equipped').limit(50000),
+    admin.from('user_characters').select('user_id, base_key, skin_key').limit(50000),
   ])
   const wearing = new Set<string>()
   for (const c of (chars.data ?? []) as any[]) {
     if (c.base_key === partKey) wearing.add(c.user_id)
-    const eq = (c.equipped ?? {}) as Record<string, string>
-    for (const v of Object.values(eq)) if (v === partKey) wearing.add(c.user_id)
+    if (c.skin_key === partKey) wearing.add(c.user_id)
   }
   const byUser = new Map<string, { userId: string; name: string; acquiredAt: string | null; source: string | null; worn: boolean }>()
   for (const o of (own.data ?? []) as any[]) {
@@ -805,7 +806,7 @@ async function charArtDelete(admin: any, body: any, ctx: Ctx) {
 
   const [own, chars] = await Promise.all([
     admin.from('user_cosmetics').select('user_id').eq('part_key', partKey).limit(1),
-    admin.from('user_characters').select('user_id, base_key, equipped').eq('base_key', partKey).limit(1),
+    admin.from('user_characters').select('user_id, base_key').eq('base_key', partKey).limit(1),
   ])
   const owners = (own.data ?? []).length
   const worn = (chars.data ?? []).length

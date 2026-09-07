@@ -86,7 +86,7 @@ async function attachCosmetics(
   //   ⚠️ 안 붙여도 화면은 안 깨진다(폴백 그림). 붙이는 건 시상대에 선 사람들이 전부 같은 그림이면
   //      보드가 밋밋해서다.
   const [{ data }, { data: dm }] = await Promise.all([
-    admin.from('user_characters').select('user_id, base_key, equipped').in('user_id', ids),
+    admin.from('user_characters').select('user_id, base_key, skin_key').in('user_id', ids),
     admin.from('ranking_dummies').select('id, character_key, skin').in('id', ids),
   ])
   const byUid = new Map<string, { character: string | null; skin: string | null }>()
@@ -98,12 +98,12 @@ async function attachCosmetics(
     })
   }
   for (const c of data ?? []) {
-    const eq = (c.equipped as Record<string, string> | null) ?? {}
+    // 2026-09-04: equipped(jsonb) → skin_key 컬럼
     const base = (c.base_key as string) ?? 'default'
     byUid.set(c.user_id as string, {
       // 'default' 는 아직 안 고른 상태 = 폴백 그림을 쓰라는 뜻이라 null 로 눕힌다(프론트 분기가 하나로 준다).
       character: base && base !== 'default' ? base : null,
-      skin: eq.skin ?? null,
+      skin: (c.skin_key as string | null) ?? null,
     })
   }
 
