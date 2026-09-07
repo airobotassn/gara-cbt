@@ -126,8 +126,9 @@ function CosmeticThumb({ partKey, level }: { partKey: string; level: number }) {
 }
 
 // ── 서버 계약(입출력) ──
-// kind·surface 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
-interface CatalogItem { partKey: string; price: number; kind?: string; surface?: string | null }
+// kind 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
+// ⚠️ 짝이던 surface 는 2026-09-04 에 뺐다 — 방 꾸미기가 없어진 뒤(20260820160000) 아무도 안 읽었다.
+interface CatalogItem { partKey: string; price: number; kind?: string }
 interface HubState { authed: boolean; level?: number | null; points?: number; cosmetics?: string[]; stamps?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
   // 출석한 날짜('YYYY-MM-DD', 최근 1년) — 도크 스탬프판을 눌러 여는 '출석 기록' 달력의 유일한 출처.
   //   서버는 예전부터 내려주고 있었고(옛 마이페이지 학습 대시보드가 쓰던 값), 2026-08-25 에 그 화면을

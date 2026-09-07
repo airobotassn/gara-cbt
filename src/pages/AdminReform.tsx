@@ -1963,7 +1963,7 @@ export function PopupAdmin() {
 //    상점에만 뜬다. 무료 캐릭터를 전부 없애면 신규 회원이 첫 화면에서 갇히므로 서버가 저장을 거절한다.
 // ══════════════════════════════════════════════════════════════
 interface CosmeticRow {
-  part_key: string; price: number; kind: string; surface: string | null
+  part_key: string; price: number; kind: string
   active: boolean; sort_order: number; owners: number; worn: number
 }
 const COSMETIC_KIND_LABEL: Record<string, string> = {
@@ -2700,7 +2700,6 @@ export function HubCosmeticAdmin() {
                     <CosmeticThumb kind={r.kind} src={cosmeticThumb(r, charMap)} />
                     <span>
                       <b>{cosmeticLabel(r, charMap, t)}</b>
-                      {r.surface && <span className="admin-hint"> · {r.surface}</span>}
                       {/* ⚠️ 여는 자리는 **이름 옆 버튼**이다(2026-08-31 지시). 썸네일을 누르게 하면
                           누를 수 있다는 걸 아무도 모른다 — 그냥 그림으로 보인다. */}
                       {(r.kind === 'character' || r.kind === 'skin') && (

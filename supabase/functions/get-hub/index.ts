@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     //   ⚠️ 인증과 같이 내보낸다. 카탈로그는 user 를 전혀 안 쓰는 공개 목록인데 예전엔 원소가
     //      하나뿐인 Promise.all 뒤에 getUser 가 따로 await 되어 있어 직렬 2단이었다.
     const [{ data: catRows }, user] = await Promise.all([
-      admin.from('shop_catalog').select('part_key, price, kind, surface, sort_order').eq('active', true),
+      admin.from('shop_catalog').select('part_key, price, kind, sort_order').eq('active', true),
       getUser(req),
     ])
     const catalog = (catRows ?? [])
@@ -32,7 +32,6 @@ Deno.serve(async (req) => {
         partKey: c.part_key as string,
         price: c.price as number,
         kind: (c.kind as string) ?? 'part',
-        surface: (c.surface as string | null) ?? null,
         sort: (c.sort_order as number) ?? 0,
       }))
       // 진열 순서는 관리표(sort_order)가 정한다 — 가격순으로 두면 면(바닥/벽)이 뒤섞여 진열이 흐트러진다.
@@ -196,7 +195,6 @@ Deno.serve(async (req) => {
       // 레벨테스트·미니게임 여부는 별도 플래그로 노출(잠금 근거 아님).
       // 활동 기록 달력(마이페이지) — 출석한 날짜('YYYY-MM-DD') 목록, 최근 1년.
       attendanceDays,
-      referralCode: (referralCode as string | null) ?? null,
       referralUsed: !!referredRow?.referred_by,
       // 코인 선물 — 오늘 받은 것(사람별 합산) · 그 이전 미확인 건수 · 뱃지용 총 미확인 건수.
       giftsToday,

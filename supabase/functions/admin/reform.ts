@@ -326,7 +326,7 @@ async function rewardPolicySave(admin: any, body: any, ctx: Ctx) {
 async function hubCosmetics(admin: any) {
   const { data, error } = await admin
     .from('shop_catalog')
-    .select('part_key, price, kind, surface, active, sort_order')
+    .select('part_key, price, kind, active, sort_order')
     .order('kind')
     .order('sort_order')
   if (error) return json({ error: error.message }, 500)
@@ -348,7 +348,7 @@ async function hubCosmetics(admin: any) {
 
   const items = (data ?? []).map((r: any) => ({
     part_key: r.part_key, price: r.price, kind: r.kind ?? 'part',
-    surface: r.surface ?? null, active: r.active !== false, sort_order: r.sort_order ?? 0,
+    active: r.active !== false, sort_order: r.sort_order ?? 0,
     owners: owners[r.part_key] ?? 0, worn: worn[r.part_key] ?? 0,
   }))
   return json({ items })
