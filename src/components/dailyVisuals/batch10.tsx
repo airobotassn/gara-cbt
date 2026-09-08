@@ -214,7 +214,7 @@ function B10Align() {
       foot={
         <>
           <Chip on={!padded} onClick={() => setPadded(false)}>정렬 없음</Chip>
-          <Chip on={padded} onClick={() => setPadded(true)}>정렬(패딩)</Chip>
+          <Chip on={padded} onClick={() => setPadded(true)}>{'정렬(패딩)'}</Chip>
         </>
       }
     >

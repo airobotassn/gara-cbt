@@ -133,10 +133,11 @@ eq('⭐ 해설 배치가 전부 TERM_THEORY 에 합쳐져 있다', unregisteredT
       if (one && /[가-힣]/.test(one)) koLabels.add(one);
     };
     for (const m of src.matchAll(/'((?:[^'\\\n]|\\.)*)'|"([^"\n]*)"/g)) add((m[1] ?? m[2]).replace(/\\'/g, "'"));
-    for (const m of src.matchAll(/>([^<>{}]*)</g)) { if (!/[=;()?]|=>|&&/.test(m[1])) add(m[1]); }
+    // ⚠️ 식과 붙어 있는 글자도 화면에 나온다(`{n}비트`) — 여는 쪽이 `>` 든 `}` 든 잡는다(추출기와 같은 규칙).
+    for (const m of src.matchAll(/[>}]([^<>{}]*)[<{]/g)) { if (!/[=;()?]|=>|&&/.test(m[1])) add(m[1]); }
     // ⚠️ `Lab` 본문은 위 필터를 통과 못 하는 것도 대상이다 — 라벨에 등호·괄호가 들어가는 게 자연스럽다
     //    (`왕복 시간 × 소리 속도 ÷ 2 = 거리`). 태그 이름으로 잡으므로 코드 조각이 섞일 일이 없다.
-    for (const m of src.matchAll(/<Lab\b[^>]*>([\s\S]*?)<\/Lab>/g)) { if (!/[{<]/.test(m[1])) add(m[1]); }
+    for (const m of src.matchAll(/<(?:Lab|text)\b[^>]*>([\s\S]*?)<\/(?:Lab|text)>/g)) { if (!/[{<]/.test(m[1])) add(m[1]); }
   }
   ok(`원문 라벨 ${koLabels.size}개를 읽었다`, koLabels.size > 100, koLabels.size);
   // ⛔ 엔티티(&lsquo; 등)를 쓰면 **화면 글자와 소스 글자가 달라져** 번역 키가 안 맞는다(그 라벨만 한국어로 남는다).

@@ -170,7 +170,8 @@ function B13Encoder() {
       <path d="M84 40 L96 40 L90 50 Z" className="vz-brand" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
       <Lab x={90} y={26} tone="hot" size={11}>읽는 위치</Lab>
 
-      <Lab x={234} y={128} tone="hot" size={12}>{`카운트 ${count}`}</Lab>
+      {/* ⚠️ 값이 섞이면 통째로는 번역표에 없다 — 낱말 조각을 따로 두고 값만 붙인다. */}
+      <Lab x={234} y={128} tone="hot" size={12}>{'카운트'} {count}</Lab>
       {Array.from({ length: 12 }, (_, i) => (
         <rect
           key={i} x={176 + i * 11} y={142} width={7} height={16} rx={2}
@@ -272,12 +273,12 @@ function B13Fk() {
       h={180}
       foot={
         <>
-          <span className="dy-viz-hint">{`어깨 ${t1}°`}</span>
+          <span className="dy-viz-hint">{'어깨'} {t1}°</span>
           <input
             className="dy-viz-range" type="range" min={-170} max={-10} value={t1}
             onChange={(e) => setT1(Number(e.target.value))} aria-label="어깨 각도"
           />
-          <span className="dy-viz-hint">{`팔꿈치 ${t2}°`}</span>
+          <span className="dy-viz-hint">{'팔꿈치'} {t2}°</span>
           <input
             className="dy-viz-range" type="range" min={-150} max={10} value={t2}
             onChange={(e) => setT2(Number(e.target.value))} aria-label="팔꿈치 각도"

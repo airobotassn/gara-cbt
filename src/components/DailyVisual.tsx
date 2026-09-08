@@ -26,7 +26,7 @@ import { VISUALS_B13 } from './dailyVisuals/batch13'
 import { VISUALS_B14 } from './dailyVisuals/batch14'
 import { VISUALS_B15 } from './dailyVisuals/batch15'
 import { VISUALS_B16 } from './dailyVisuals/batch16'
-import { VW, Frame, Limb, Joint, translateTree } from './dailyVisuals/kit'
+import { VW, Frame, Limb, Joint, Lab, translateTree } from './dailyVisuals/kit'
 
 // ⛔ 부품(Frame·Limb·Joint)은 **묶음과 같은 것을 쓴다**(dailyVisuals/kit). 여기 따로 두면
 //    ① 굵기·색 규칙이 갈리고 ② **글자 번역이 이 8장에만 안 걸린다** — kit 의 Frame 이 자기 아래 글자를
@@ -306,8 +306,10 @@ function Servo() {
         <line x1={cx} y1={50} x2={cx} y2={24} stroke="currentColor" strokeWidth={5} strokeLinecap="round" />
       </g>
       <circle cx={cx} cy={50} r={5} className="vz-brand" stroke="currentColor" strokeWidth={3} />
-      <text x={cx} y={136} className="vz-lab" textAnchor="middle">{label}</text>
-      <text x={cx} y={151} className={ok ? 'vz-lab-ok' : 'vz-lab-bad'} textAnchor="middle">{sub}</text>
+      {/* ⚠️ 이 글자는 **부품 안에서** 만들어진다(밖에서 prop 으로 받은 값이라 Frame 의 훑기가 못 본다).
+          그래서 날 `<text>` 가 아니라 `Lab` 을 써야 번역이 걸린다. */}
+      <Lab x={cx} y={136}>{label}</Lab>
+      <Lab x={cx} y={151} tone={ok ? 'ok' : 'bad'}>{sub}</Lab>
     </g>
   )
   return (

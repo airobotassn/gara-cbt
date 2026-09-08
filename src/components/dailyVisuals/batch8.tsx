@@ -246,7 +246,7 @@ function B8Iou() {
 
       <Lab x={GX + BW / 2} y={28}>정답 상자</Lab>
       <Lab x={GX + dx + BW / 2} y={124} tone="bad">예측 상자</Lab>
-      <Lab x={160} y={144} tone="hot">겹친 넓이 ÷ 합친 넓이 = {iou.toFixed(2)}</Lab>
+      <Lab x={160} y={144} tone="hot">{'겹친 넓이 ÷ 합친 넓이'} = {iou.toFixed(2)}</Lab>
     </Frame>
   )
 }
@@ -567,7 +567,7 @@ function B8Synth() {
           </g>
         )
       })}
-      <Lab x={237} y={130} tone="hot" size={12}>장면 {count}가지 · 라벨 포함</Lab>
+      <Lab x={237} y={130} tone="hot" size={12}>{'장면'} {count} · {'라벨 포함'}</Lab>
       <Lab x={160} y={152} size={11}>찍은 적 없는 장면을 만들어 낸다</Lab>
     </Frame>
   )

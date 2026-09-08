@@ -288,7 +288,7 @@ function B16Robust() {
             aria-label="조건이 달라지는 정도"
           />
           <span className={`dy-viz-state${pb < 50 ? ' crack' : ''}`}>
-            강건 {Math.round(pa)}% · 약함 {Math.round(pb)}%
+            {'강건'} {Math.round(pa)}% · {'약함'} {Math.round(pb)}%
           </span>
         </>
       }

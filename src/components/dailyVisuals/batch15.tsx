@@ -339,7 +339,9 @@ function B15Transformer() {
         )
       })}
 
-      <Lab x={160} y={150} size={12}>{par ? '동시에 전부 연결된다' : `순서 ${step + 1}/${TF_TOKENS.length}`}</Lab>
+      <Lab x={160} y={150} size={12}>
+        {par ? '동시에 전부 연결된다' : <>{'순서'} {step + 1}/{TF_TOKENS.length}</>}
+      </Lab>
     </Frame>
   )
 }

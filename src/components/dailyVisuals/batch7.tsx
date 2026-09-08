@@ -44,7 +44,7 @@ function B7BigO() {
             aria-label="데이터 개수"
           />
           <span className="dy-viz-hint">
-            N={n} → 한 줄씩 {n}회 · 짝지어 {n * n}회
+            N={n} → {'한 줄씩'} {n} · {'짝지어'} {n * n}
           </span>
         </>
       }
@@ -241,7 +241,9 @@ function B7Nested() {
             onChange={(e) => setS(Number(e.target.value))}
             aria-label="실행 횟수"
           />
-          <span className="dy-viz-hint">{s > 0 ? `${i + 1}번째 줄의 ${j + 1}번째 칸` : '아직 시작 전'}</span>
+          <span className="dy-viz-hint">
+            {s > 0 ? <>{'줄'} {i + 1} · {'칸'} {j + 1}</> : '아직 시작 전'}
+          </span>
         </>
       }
     >
@@ -273,7 +275,7 @@ function B7Nested() {
         }),
       )}
 
-      <Lab x={170} y={172} tone="hot" size={13}>{s} / 9 번 실행</Lab>
+      <Lab x={170} y={172} tone="hot" size={13}>{s} / 9 {'실행'}</Lab>
       <Lab x={170} y={188} size={11}>바깥 3 번 × 안쪽 3 번</Lab>
     </Frame>
   )
