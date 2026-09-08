@@ -70,8 +70,10 @@ export default function Daily() {
   const term = useMemo<TermPoolItem | null>(() => {
     if (!pool?.length) return null
     if (import.meta.env.DEV) {
-      const n = Number(new URLSearchParams(window.location.search).get('term'))
-      if (Number.isInteger(n) && n >= 0) return pool[n % pool.length]
+      // ⚠️ `has()` 로 먼저 본다 — 없는 파라미터는 Number(null) = 0 이라 개발 서버에서 늘 0번만 떴다(2026-09-08 발견).
+      const sp = new URLSearchParams(window.location.search)
+      const n = Number(sp.get('term'))
+      if (sp.has('term') && Number.isInteger(n) && n >= 0) return pool[n % pool.length]
     }
     return pool[dailyIndex(pool.length)]
   }, [pool])
