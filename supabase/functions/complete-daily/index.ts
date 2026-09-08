@@ -9,41 +9,19 @@
 //  · body.kind = 'attendance'(기본, 출석) | 'daily_learn'(DAILY QUIZ 완료) — 코인 재화(위 RPC)와 별개로
 //    activity_ledger(kind, delta) 를 적립한다(트리거 activity_ledger_apply, STAGE1b 가 user_progress.activity_score
 //    를 원자 증분 — 이 함수는 user_progress 를 직접 쓰지 않는다, cosmetic-gate 유지).
-//    ⚠️ ACTIVITY_ATTENDANCE_DELTA/ACTIVITY_DAILY_LEARN_DELTA 는 _shared/scoring.ts 의 ACTIVITY_DELTA 와 값이
-//    같아야 한다(수동 동기) — cosmetic-only-gate 가 이 파일의 _shared/scoring.ts import 를 금지하므로 직접 참조가
-//    불가능하다. get-hub 의 ECON 상수(DB 하드코딩과 수동 동기)와 동일한 기존 컨벤션.
+//    ⚠️ 적립값은 **DB(`reward_policy`)가 정한다**(2026-09-07) — 아래 `_shared/reward-policy.ts` 참고.
+//       그 모듈은 scoring.ts 를 import 하지 않으므로 cosmetic-only-gate 에 걸리지 않는다.
 // ⚠️ _shared 를 import 하므로 대시보드 편집 불가 → CLI 배포 전용: `supabase functions deploy complete-daily`.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, getActiveSeasonId } from '../_shared/lib.ts'
 import { kstDay } from '../_shared/kst.ts'
+import { loadRewardPolicy, loadCoinDaily } from '../_shared/reward-policy.ts'
 
-// 일일 완료 적립 재화(추후 config 로 이관). 스탬프는 종류별 1 카운트씩 누적.
-const DAILY_POINTS = 10
-
-// _shared/scoring.ts ACTIVITY_DELTA 와 동일값 유지(수동 동기, 위 주석 참조).
-//
-// ⛔ **2026-09-04 정정: 이 표가 어긋나 있었다.** 여기 `attendance: 5, daily_learn: 2` 였는데
-//    규격표·scoring.ts·CLAUDE.md 는 전부 10·3 이다. 8/4 에 이 파일만 낮추고 나머지를 안 따라가서,
-//    그 뒤 두 달간 출석·DAILY QUIZ 가 **규격의 절반만** 적립됐다(DB 실측: 출석 5점 104건 · 퀴즈 2점 51건).
-//    변수 이름이 `_SYNCED` 라 동기된 줄 알고 아무도 안 봤다.
-//
-// ⛔ 값을 고칠 땐 **네 곳을 같이** 본다. 하나만 고치면 또 이렇게 조용히 갈린다:
-//      ① 여기(실제 적립)  ② _shared/scoring.ts 의 ACTIVITY_DELTA  ③ src/lib/scoring.ts(바이트 동일 페어)
-//      ④ CLAUDE.md 의 시즌 점수 표
-//    ⚠️ ②③ 은 `tests/db/t-scoring-parity.mjs` 가 바이트 동일성까지 보지만 **①은 아무도 안 본다** —
-//       그래서 이 파일이 혼자 갈릴 수 있었다. 아래 자기검사가 그 자리를 대신한다.
+// ⛔ **적립값 상수를 이 파일에 다시 두지 말 것.** 여기 사본이 있었고(`ACTIVITY_DELTA_SYNCED`),
+//    이름과 달리 동기가 안 돼서 8/4~9/4 두 달간 출석·DAILY QUIZ 가 **규격의 절반만** 적립됐다
+//    (실측: 출석 5점 104건 · 퀴즈 2점 51건). 값이 두 벌이면 언제든 다시 갈린다 —
+//    지금은 관리자 화면이 보는 그 표(`reward_policy`)를 적립도 같이 본다.
 type LedgerKind = 'attendance' | 'daily_learn'
-const ACTIVITY_DELTA_SYNCED: Record<LedgerKind, number> = { attendance: 10, daily_learn: 3 }
-
-// 규격표(2026-09-03 개정): 출석 +10(일 1회) · DAILY QUIZ +3(일 1회) · 미니게임 +2(일 6회).
-// 이 파일은 앞의 둘만 다룬다. 값이 규격을 벗어나면 **부팅 때 바로 죽는다** — 조용히 절반만 주느니
-// 눈에 띄게 실패하는 쪽이 낫다(두 달간 아무도 못 알아챈 게 그 반대 경우다).
-const ACTIVITY_DELTA_SPEC: Record<LedgerKind, number> = { attendance: 10, daily_learn: 3 }
-for (const k of Object.keys(ACTIVITY_DELTA_SPEC) as LedgerKind[]) {
-  if (ACTIVITY_DELTA_SYNCED[k] !== ACTIVITY_DELTA_SPEC[k]) {
-    throw new Error(`활동 적립값이 규격과 다르다: ${k} = ${ACTIVITY_DELTA_SYNCED[k]} (규격 ${ACTIVITY_DELTA_SPEC[k]})`)
-  }
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -62,10 +40,14 @@ Deno.serve(async (req) => {
     //        행 자체는 레벨테스트·미니게임도 만들기 때문(20260727010000 마이그레이션). RPC 반환 jsonb 를 그대로 전달.
     //     ⚠️ 활성 시즌 조회(아래 3번에서 쓴다)는 user 도 이 RPC 결과도 안 쓴다 → 같이 내보낸다.
     //        적립 순서는 그대로다 — 쓰기는 여전히 RPC 가 먼저 끝난 뒤에 일어난다.
+    // ⚠️ 코인 적립값도 DB 가 정한다 — RPC 인자로 들어가므로 **RPC 보다 먼저** 읽어야 한다.
+    //    활동 적립 규칙은 (3)에서 쓰지만 여기서 같이 내보낸다(서로 결과를 안 쓴다).
+    const [coinPoints, policy] = await Promise.all([loadCoinDaily(admin), loadRewardPolicy(admin)])
+
     const [{ data, error }, seasonId] = await Promise.all([
       admin.rpc('complete_daily_kind', {
         p_uid: user.id,
-        p_points: DAILY_POINTS,
+        p_points: coinPoints,
         p_kind: kind,
       }),
       getActiveSeasonId(admin),
@@ -85,7 +67,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         season_id: seasonId,
         kind,
-        delta: ACTIVITY_DELTA_SYNCED[kind],
+        delta: policy[kind].delta,
         day: today,
         source_ref: null,
       })

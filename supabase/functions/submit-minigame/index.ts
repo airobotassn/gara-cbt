@@ -25,7 +25,8 @@
 //    ⚠️ 남은 구멍: 게임을 오래 켜둔 뒤 큰 점수를 신고하면 (c) 를 통과한다. 완전 방어는 게임 내 텔레메트리
 //      서명(플레이 이벤트 자체를 서버가 검증)이 필요하고 자립형 게임 HTML 로직을 다 손봐야 해서 후속 과제로 둔다.
 import { corsHeaders, json } from '../_shared/cors.ts'
-import { adminClient, getUser, getActiveSeasonId, activityDelta, activityPerDay } from '../_shared/scoring.ts'
+import { adminClient, getUser, getActiveSeasonId } from '../_shared/scoring.ts'
+import { loadRewardPolicy } from '../_shared/reward-policy.ts'
 import { kstDay } from '../_shared/kst.ts'
 import { gameSpec, issueTicket, verifyTicket, plausibleCap } from '../_shared/minigames.ts'
 
@@ -101,8 +102,12 @@ Deno.serve(async (req) => {
     //     오늘 찍힌 행 수를 세어 그다음 빈 슬롯부터 insert 하고, 동시 제출로 이미 찬 슬롯이면(23505) 다음 슬롯으로
     //     넘어간다 → 레이스가 나도 하루 적립 행은 N개를 넘지 못한다(unique 인덱스가 최종 방어선).
     //     ⚠️ 옛 source_ref=gameId 행도 오늘치 카운트에 포함된다(전환기 과적립 방지 — 의도된 동작).
-    const perDay = activityPerDay('minigame')
-    const delta = activityDelta('minigame')
+    // 적립값·하루 횟수는 관리자 › 적립 정책(`reward_policy`)이 정한다(2026-09-07).
+    //   ⚠️ 게임별 행(`minigame:<gameId>`)은 안 본다 — 하루 캡이 **게임과 무관한 전역 회차 슬롯**이라
+    //      게임별로 나눌 수가 없다(아래 슬롯 주석). 그 6줄은 지웠다.
+    const { minigame: rule } = await loadRewardPolicy(admin)
+    const perDay = rule.perDay
+    const delta = rule.delta
     const { count: playsToday } = await admin
       .from('activity_ledger')
       .select('id', { count: 'exact', head: true })

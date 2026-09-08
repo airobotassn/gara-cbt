@@ -5,6 +5,7 @@ import { json } from '../_shared/cors.ts'
 import { bunnyConfigured, bunnyPullzone, bunnyThumbUrl } from '../_shared/bunny.ts'
 import { DEFAULT_PASS_RATIO, attemptPassed, tierRank } from '../_shared/exam-tickets.ts'
 import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
+import { REWARD_MAX_DELTA, REWARD_MAX_PER_DAY } from '../_shared/reward-policy.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
@@ -36,14 +37,10 @@ function i18nOf(field: Record<string, string> | undefined): Record<string, strin
   return out
 }
 
-/** 되돌릴 수 없는 조작을 남긴다. 실패해도 본 작업을 막지 않는다(로그 때문에 운영이 멈추면 안 된다). */
-async function audit(admin: any, ctx: Ctx, action: string, target: string | null, detail: unknown = {}) {
-  try {
-    await admin.from('admin_audit').insert({
-      actor: ctx.uid, actor_email: ctx.email, action, target, detail,
-    })
-  } catch { /* 로그 실패는 삼킨다 */ }
-}
+// ⛔ 관리자 감사로그(`admin_audit`)는 2026-09-07 에 지웠다 — **쌓기만 하고 보는 화면이 0곳**이었다.
+//    서버에 목록을 내려주는 액션(`auditList`)까지 있었는데 그걸 부르는 화면이 없어서, 53건이
+//    아무도 못 보는 채로 쌓여 있었다.
+//    ⚠️ 되살릴 거면 **보는 화면을 같이** 만들 것 — 쓰기만 있는 로그는 없는 것과 같다.
 
 // ── 사이트 정보 ──────────────────────────────────────────────
 async function siteSettings(admin: any) {
@@ -61,7 +58,6 @@ async function siteSettingsSave(admin: any, body: any, ctx: Ctx) {
   if (!rows.length) return json({ ok: true })
   const { error } = await admin.from('site_settings').upsert(rows, { onConflict: 'key' })
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'siteSettingsSave', null, { keys: rows.map((r) => r.key) })
   return json({ ok: true })
 }
 
@@ -94,7 +90,6 @@ async function popupDelete(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const { error } = await admin.from('popups').delete().eq('id', id)
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'popupDelete', id)
   return json({ ok: true })
 }
 
@@ -121,7 +116,6 @@ async function policyUpsert(admin: any, body: any, ctx: Ctx) {
     effective_at: effective, created_by: ctx.uid,
   })
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'policyUpsert', `${doc}#${version}`, { effective })
   return json({ ok: true, version })
 }
 
@@ -165,7 +159,6 @@ async function inquiryAnswer(admin: any, body: any, ctx: Ctx) {
     answer_seen_at: null,
   }).eq('id', id)
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'inquiryAnswer', id)
   return json({ ok: true })
 }
 
@@ -289,11 +282,19 @@ async function lectureDelete(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const { error } = await admin.from('lectures').delete().eq('id', id)
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'lectureDelete', id)
   return json({ ok: true })
 }
 
 // ── 적립 정책(코인·시즌 점수) ────────────────────────────────
+//
+// ⭐ **이 표가 실제 적립을 정한다(2026-09-07 지시).** 여태는 표시용 사본이라 여기서 숫자를 바꿔도
+//    아무 일도 안 일어났다 — 적립은 코드 상수가 했고, 두 벌이라 조용히 갈릴 수 있었다(실제로 두 달간
+//    출석·DAILY QUIZ 가 절반만 적립됐다). 지금은 `_shared/reward-policy.ts` 를 통해
+//    complete-daily · submit-minigame · get-hub 가 이 표를 읽는다.
+//
+// ⛔ **범위를 여기서 막는다.** 출석을 10 → 1000 으로 잘못 넣으면 시즌 상한이 무너지고 아레나 레벨
+//    밴드(16,125 기준)가 통째로 틀어진다 — 그건 되돌려도 이미 오른 레벨이 안 내려간다.
+//    적립 쪽에서도 한 번 더 접지만(clampDelta/clampPerDay) 이상한 값이 저장되는 것부터 막는다.
 async function rewardPolicy(admin: any) {
   const { data, error } = await admin.from('reward_policy').select('*').order('wallet').order('sort_order')
   if (error) return json({ error: error.message }, 500)
@@ -303,14 +304,24 @@ async function rewardPolicySave(admin: any, body: any, ctx: Ctx) {
   const rows = (body?.rows ?? []) as any[]
   if (!Array.isArray(rows) || !rows.length) return json({ error: '저장할 값이 없습니다.' }, 400)
   for (const r of rows) {
-    if (Number(r.amount) < 0 || Number(r.perDay) < 0) return json({ error: '음수는 넣을 수 없습니다.' }, 400)
+    const amount = Number(r.amount)
+    const perDay = Number(r.perDay)
+    if (!Number.isInteger(amount) || !Number.isInteger(perDay)) {
+      return json({ error: '정수만 넣을 수 있습니다.' }, 400)
+    }
+    if (amount < 0 || perDay < 0) return json({ error: '음수는 넣을 수 없습니다.' }, 400)
+    if (amount > REWARD_MAX_DELTA) {
+      return json({ error: `적립값은 ${REWARD_MAX_DELTA} 을 넘을 수 없습니다(랭킹 레벨 구간이 틀어집니다).` }, 400)
+    }
+    if (perDay > REWARD_MAX_PER_DAY) {
+      return json({ error: `하루 횟수는 ${REWARD_MAX_PER_DAY} 을 넘을 수 없습니다.` }, 400)
+    }
     const { error } = await admin.from('reward_policy').update({
-      amount: Number(r.amount), per_day: Number(r.perDay), active: r.active !== false,
+      amount, per_day: perDay, active: r.active !== false,
       updated_at: new Date().toISOString(),
     }).eq('wallet', r.wallet).eq('kind', r.kind)
     if (error) return json({ error: error.message }, 500)
   }
-  await audit(admin, ctx, 'rewardPolicySave', null, { n: rows.length })
   return json({ ok: true })
 }
 
@@ -392,7 +403,6 @@ async function hubCosmeticsSave(admin: any, body: any, ctx: Ctx) {
     }).eq('part_key', String(r.partKey))
     if (error) return json({ error: error.message }, 500)
   }
-  await audit(admin, ctx, 'hubCosmeticsSave', null, { n: rows.length })
   return json({ ok: true })
 }
 
@@ -785,7 +795,6 @@ async function charArtSave(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
   }, { onConflict: 'part_key' })
   if (shopErr) return json({ error: shopErr.message }, 500)
 
-  await audit(admin, ctx, 'charArtSave', partKey, { nameKo, price, active, levels: Object.keys(urls).length })
   return json({ ok: true, partKey, translated: Object.keys(nameI18n).length })
 }
 
@@ -823,7 +832,6 @@ async function charArtDelete(admin: any, body: any, ctx: Ctx) {
     if (paths.length) await admin.storage.from(CHAR_BUCKET).remove(paths)
   } catch { /* 남은 파일은 아무도 안 부른다 */ }
 
-  await audit(admin, ctx, 'charArtDelete', partKey, {})
   return json({ ok: true })
 }
 
@@ -864,12 +872,7 @@ async function alertUpdate(admin: any, body: any) {
   return json({ ok: true })
 }
 
-// ── 관리자 활동 로그 · 금지어 · 계정 정지 ────────────────────
-async function auditList(admin: any) {
-  const { data, error } = await admin.from('admin_audit').select('*').order('at', { ascending: false }).limit(300)
-  if (error) return json({ error: error.message }, 500)
-  return json({ rows: data ?? [] })
-}
+// ── 금지어 · 계정 정지 ───────────────────────────────────────
 async function bannedWordList(admin: any) {
   const { data, error } = await admin.from('banned_words').select('*').order('created_at', { ascending: false })
   if (error) return json({ error: error.message }, 500)
@@ -881,11 +884,9 @@ async function bannedWordSave(admin: any, body: any, ctx: Ctx) {
   if (body?.remove) {
     const { error } = await admin.from('banned_words').delete().eq('word', word)
     if (error) return json({ error: error.message }, 500)
-    await audit(admin, ctx, 'bannedWordRemove', word)
   } else {
     const { error } = await admin.from('banned_words').upsert({ word, active: true, added_by: ctx.uid }, { onConflict: 'word' })
     if (error) return json({ error: error.message }, 500)
-    await audit(admin, ctx, 'bannedWordAdd', word)
   }
   return json({ ok: true })
 }
@@ -900,7 +901,6 @@ async function suspendUser(admin: any, body: any, ctx: Ctx) {
     suspended_until: until, suspended_reason: days > 0 ? String(body.reason) : null,
   }).eq('id', uid)
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, days > 0 ? 'suspendUser' : 'unsuspendUser', uid, { days, reason: body?.reason ?? '' })
   return json({ ok: true })
 }
 
@@ -976,7 +976,6 @@ async function certConditionsSave(admin: any, body: any, ctx: Ctx) {
   const { error } = await admin.from('exam_tiers')
     .update({ pass_ratio: ratio, cert_fee_usd_cents: fee }).eq('tier', tier)
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'certConditionsSave', tier, { ratio, fee })
   return json({ ok: true })
 }
 
@@ -1165,7 +1164,6 @@ async function termDelete(admin: any, body: any, ctx: Ctx) {
     .update({ deleted_at: new Date().toISOString(), active: false }).eq('id', id).select('id, code').maybeSingle()
   if (error) return json({ error: error.message }, 500)
   await termLog(admin, { question_id: id, code: data?.code ?? null, action: 'delete', actor: ctx.email })
-  await audit(admin, ctx, 'termDelete', id)
   return json({ ok: true })
 }
 
@@ -1213,7 +1211,6 @@ async function termImport(admin: any, body: any, ctx: Ctx) {
   for (const r of (ins ?? []) as any[]) {
     await termLog(admin, { question_id: r.id, code: r.code, action: 'import', actor: ctx.email, detail: { answer: r.answer_i18n?.ko } })
   }
-  await audit(admin, ctx, 'termImport', null, { added: rows.length })
   return json({
     ok: true, added: rows.length,
     inserted: ((ins ?? []) as any[]).map((r) => ({ id: r.id, code: r.code, answer: r.answer_i18n?.ko })),
@@ -1317,7 +1314,6 @@ async function mailNudge(admin: any, body: any, ctx: Ctx) {
     sent_by: ctx.uid,
   })
   if (error) return json({ error: error.message }, 500)
-  await audit(admin, ctx, 'mailNudge', body?.roundId ?? null, { n: withEmail.length })
   return json({
     ok: true,
     sent: false, // ⚠️ 아직 진짜로 나가지 않았다
@@ -1379,7 +1375,6 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'visitStats': return await visitStats(admin, body)
     case 'alertList': return await alertList(admin, body)
     case 'alertUpdate': return await alertUpdate(admin, body)
-    case 'auditList': return await auditList(admin)
     case 'bannedWordList': return await bannedWordList(admin)
     case 'bannedWordSave': return await bannedWordSave(admin, body, ctx)
     case 'suspendUser': return await suspendUser(admin, body, ctx)

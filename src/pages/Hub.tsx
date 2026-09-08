@@ -16,6 +16,7 @@ import {
   ACTIVITY_DELTA,
   ACTIVITY_PER_DAY,
   ACTIVITY_SEASON_MAX,
+  SEASON_DAYS,
   LEVELTEST_CLEAR_POINTS,
   LEVELTEST_MAX,
   SEASON_MAX_POINTS,
@@ -134,6 +135,10 @@ interface HubState { authed: boolean; level?: number | null; points?: number; co
   //   서버는 예전부터 내려주고 있었고(옛 마이페이지 학습 대시보드가 쓰던 값), 2026-08-25 에 그 화면을
   //   찢으면서 이 자리로 왔다. 새로 부르는 요청이 없다 — 허브가 이미 받고 있던 응답이다.
   attendanceDays?: string[] | null;
+  // 적립표 — 관리자 › 적립 정책(reward_policy)의 지금 값. **화면과 실제 적립이 같은 표를 본다**(2026-09-07).
+  //   ⚠️ 안 오면(옛 배포본) scoring.ts 의 규격값으로 폴백한다 — 표가 비면 "+0점" 이라고 거짓말을 하게 된다.
+  rewardPolicy?: Partial<Record<ActivityKind, { delta: number; perDay: number }>> | null;
+  econ?: { dailyPoints?: number } | null;
   // 꾸미기 — 장착한 캐릭터(baseKey) · 배경(skinKey) · 칭호(titleTier) · 첫 진입 흐름 진행 상태.
   //   ⚠️ 2026-09-04 에 서버가 equipped(jsonb) 를 컬럼 둘로 갈랐다. 옛 equipped 필드는 그 배포와
   //      프론트 빌드의 시차를 메우려고 한 배포 동안만 같이 오던 것이고, 지금은 안 읽는다.
@@ -327,6 +332,15 @@ export default function Hub() {
   // 칭호 = 합격한 티어. 급수(1급~4급)는 2026-07 체계 개편으로 사라졌다(20260807130000).
   const [titles, setTitles] = useState<TitleItem[]>([])
   const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
+  // 적립표 — 서버(reward_policy)가 준 지금 값. 안 오면 규격 상수로 폴백한다(아래 earnDelta/earnPerDay).
+  const [policy, setPolicy] = useState<Partial<Record<ActivityKind, { delta: number; perDay: number }>> | null>(null)
+  const [coinDaily, setCoinDaily] = useState<number | null>(null)
+  // ⚠️ 서버 값이 이긴다. 안 오면(옛 배포본·조회 실패) 규격 상수 — 0 으로 떨어뜨리면 화면이 "+0점" 이라고
+  //    거짓말을 한다. 시즌 상한은 관리자 값으로 다시 계산한다(delta × perDay × 365).
+  const earnDelta = (k: ActivityKind) => policy?.[k]?.delta ?? ACTIVITY_DELTA[k]
+  const earnPerDay = (k: ActivityKind) => policy?.[k]?.perDay ?? ACTIVITY_PER_DAY[k]
+  const earnSeasonMax = (k: ActivityKind) =>
+    policy?.[k] ? earnDelta(k) * earnPerDay(k) * SEASON_DAYS : ACTIVITY_SEASON_MAX[k]
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [purchased, setPurchased] = useState<string | null>(null)
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null)
@@ -538,6 +552,8 @@ export default function Hub() {
     setAuthed(!!h.authed)
     setTitles(h.titles ?? [])
     setCoupons(h.coupons ?? [])
+    setPolicy(h.rewardPolicy ?? null)
+    setCoinDaily(h.econ?.dailyPoints ?? null)
     setCatalog(h.catalog ?? [])
     setSkillScore(h.skillScore ?? 0)
     setActivityScore(h.activityScore ?? 0)
@@ -1095,7 +1111,7 @@ export default function Hub() {
               <>
                 <Ic n={m.icon} s={16} />
                 <span className="ms-chip-lab">{m.label}</span>
-                <span className="ms-chip-pt">+{ACTIVITY_DELTA[m.kind]}</span>
+                <span className="ms-chip-pt">+{earnDelta(m.kind)}</span>
                 {m.done && <span className="ms-chip-chk">✓</span>}
               </>
             )
@@ -1415,8 +1431,8 @@ export default function Hub() {
                 <tr key={r.kind}>
                   <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{t(`hub.earn.row.${r.kind}`)}</td>
                   <td className="earn-v">
-                    {t('hub.earn.pt', { n: ACTIVITY_DELTA[r.kind] })}
-                    <em>{t('hub.earn.limit', { n: ACTIVITY_PER_DAY[r.kind], max: ACTIVITY_SEASON_MAX[r.kind].toLocaleString() })}</em>
+                    {t('hub.earn.pt', { n: earnDelta(r.kind) })}
+                    <em>{t('hub.earn.limit', { n: earnPerDay(r.kind), max: earnSeasonMax(r.kind).toLocaleString() })}</em>
                   </td>
                 </tr>
               ))}
@@ -1438,7 +1454,10 @@ export default function Hub() {
           <table className="earn-tb">
             <thead><tr><th>{t('hub.earn.col_act')}</th><th>{t('hub.earn.col_coin')}</th></tr></thead>
             <tbody>
-              {COIN_ROWS.filter((r) => GIFT_ENABLED || r.key !== 'gift').map((r) => (
+              {/* '오늘의 완료' 코인만 서버 값이 이긴다(관리자가 정한다) — 나머지 둘은 아직 코드 상수다. */}
+              {COIN_ROWS.filter((r) => GIFT_ENABLED || r.key !== 'gift')
+                .map((r) => (r.key === 'daily' ? { ...r, n: coinDaily ?? r.n } : r))
+                .map((r) => (
                 <tr key={r.key}>
                   <td className="earn-nm"><span className="earn-ic"><Ic n={r.icon} s={20} /></span>{t(`hub.earn.coin.${r.key}`)}</td>
                   <td className="earn-v">

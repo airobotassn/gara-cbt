@@ -2843,7 +2843,10 @@ async function setRegion(admin: any, body: any) {
 //
 // ⚠️ **루트 전용이다.** 이 조작은 '국가·지역 1회 변경' 잠금까지 풀어준다 — 등록 이메일 아무나 누를 수 있으면
 //    잠금이 사실상 없는 것과 같다(examTicketGrant 를 루트로 막은 것과 같은 이유).
-// ⚠️ 되돌릴 수 없으므로 admin_audit 에 남긴다 — 누가 남의 계정을 초기화했는지 답할 수 있어야 한다.
+// ⚠️ **되돌릴 수 없는 조작인데 기록이 없다.** 예전엔 admin_audit 에 남겼는데, 그 표는 쌓기만 하고
+//    보는 화면이 0곳이라 2026-09-07 에 지웠다(쓰기만 있는 로그는 없는 것과 같다).
+//    되돌리기 전 값(`before`)은 응답으로 돌려주니 누른 사람 화면에는 남는다 — 그게 지금 유일한 근거다.
+//    ⛔ 로그를 되살릴 거면 **보는 화면을 같이** 만들 것.
 async function resetOnboarding(admin: any, body: any, email: string, isRoot: boolean) {
   if (!isRoot) return json({ error: '루트 관리자만 초기화할 수 있습니다.' }, 403)
   const uid = String(body?.uid ?? '').trim()
@@ -2860,13 +2863,6 @@ async function resetOnboarding(admin: any, body: any, email: string, isRoot: boo
   const { error } = await admin.rpc('admin_reset_onboarding', { p_uid: uid })
   if (error) return json({ error: error.message }, 400)
 
-  // 로그 실패로 초기화를 되돌리지는 않는다(이미 끝난 조작이다). 조용히 삼킨다.
-  await admin.from('admin_audit').insert({
-    actor_email: email,
-    action: 'resetOnboarding',
-    target: uid,
-    detail: { before },
-  })
   return json({ ok: true, before })
 }
 
@@ -2887,13 +2883,6 @@ async function restoreAccount(admin: any, body: any, email: string) {
     return json({ error: msg || '복구에 실패했습니다.' }, 400)
   }
 
-  // 로그 실패로 복구를 되돌리지는 않는다(이미 끝난 조작이다).
-  await admin.from('admin_audit').insert({
-    actor_email: email,
-    action: 'restoreAccount',
-    target: uid,
-    detail: data ?? {},
-  })
   return json({ ok: true, ...(data ?? {}) })
 }
 

@@ -11,9 +11,11 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
 import { kstDay } from '../_shared/kst.ts'
+import { loadRewardPolicy, loadCoinDaily } from '../_shared/reward-policy.ts'
 
-// DB 하드코딩 상수(complete_daily: 10)와 동일하게 유지 — 표시 전용.
-const ECON = { dailyPoints: 10 }
+// 화면이 보여줄 적립표. ⛔ **여기에 숫자를 박지 말 것** — 예전엔 `const ECON = { dailyPoints: 10 }`
+//    이었고 "DB 하드코딩과 수동 동기" 라고 적혀 있었다. 그런 사본이 갈려서 두 달간 절반만 적립된
+//    사고가 났다. 지금은 적립도 화면도 `reward_policy` 한 표를 본다(2026-09-07).
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -37,9 +39,13 @@ Deno.serve(async (req) => {
       // 진열 순서는 관리표(sort_order)가 정한다 — 가격순으로 두면 면(바닥/벽)이 뒤섞여 진열이 흐트러진다.
       .sort((a, b) => a.sort - b.sort || a.price - b.price || a.partKey.localeCompare(b.partKey))
 
+    // 적립표 — 화면의 '적립 안내' 와 실제 적립이 같은 표를 보게 한다.
+    const [rewardPolicy, coinDaily] = await Promise.all([loadRewardPolicy(admin), loadCoinDaily(admin)])
+    const econ = { dailyPoints: coinDaily }
+
     // 인증: 비로그인/익명은 공개 정보만.
     if (!user || user.is_anonymous) {
-      return json({ authed: false, econ: ECON, catalog })
+      return json({ authed: false, econ, catalog, rewardPolicy })
     }
 
     const uid = user.id
@@ -211,7 +217,8 @@ Deno.serve(async (req) => {
       catalog,
       coupons: couponList,
       titles: titleList,
-      econ: ECON,
+      econ,
+      rewardPolicy,
     })
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : '오류' }, 500)
