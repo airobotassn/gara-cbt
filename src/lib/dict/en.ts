@@ -1830,13 +1830,6 @@ const EN: Record<string, string> = {
   "hub.part.skin_campus_day": "Campus · Day",
   "hub.part.skin_campus_sunset": "Campus · Sunset",
   // 쿠폰함
-  "hub.coupon.title": "Coupons",
-  "hub.coupon.discount": "{n}% off",
-  "hub.coupon.sub": "Reward for reaching Lv.{n}",
-  "hub.coupon.used": "Used",
-  "hub.coupon.have": "Available",
-  "hub.coupon.empty": "No coupons yet — rank up to earn discount coupons!",
-  "hub.coupon.login": "Sign in to see your coupons.",
 
   // 칭호
   "hub.title.title": "Titles",

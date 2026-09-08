@@ -7,6 +7,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang } from '../_shared/lib.ts'
 import { checkBadword, normalizeKo } from '../_shared/badwords_ko.ts'
+import { loadBannedWords } from '../_shared/banned-words.ts'
 import { sha256Hex } from '../_shared/seb.ts'
 import { CHAT_ALLOW_LINKS, CHAT_MOD_FAILCLOSED, containsLink, moderateOpenAI, normalizeRoom, resolvePoster, resolveIpHash } from '../_shared/chat.ts'
 
@@ -26,10 +27,14 @@ Deno.serve(async (req) => {
     if (!text) return json({ error: 'empty' }, 400)
     if (text.length > MAX_LEN) return json({ error: 'too_long' }, 400)
 
-    if (checkBadword(text).blocked) return json({ error: 'blocked_local' }, 422)
     if (!CHAT_ALLOW_LINKS && containsLink(text)) return json({ error: 'blocked_link' }, 422)
 
     const admin = adminClient()
+
+    // 금칙어 = 코드 목록 + 관리자 등록분(`banned_words`, 60초 캐시).
+    //   ⚠️ adminClient 가 필요해서 링크 검사보다 뒤에 있다 — 순서가 바뀌어도 결과는 같다(둘 다 422).
+    //   ⚠️ OpenAI 모더레이션보다 **앞**이다. 로컬에서 거를 수 있는 글에 돈을 쓸 이유가 없다.
+    if (checkBadword(text, await loadBannedWords(admin)).blocked) return json({ error: 'blocked_local' }, 422)
     // ⚠️ 프로필 조회와 모더레이션은 서로 결과를 안 쓴다(poster.name 은 아래 displayName 조립에만,
     //    moderateOpenAI 는 text 만 쓴다). 그리고 여기서 제일 오래 걸리는 건 **OpenAI 왕복**이라
     //    DB 조회를 그 뒤에 줄 세울 이유가 없다 — 같이 내보낸다.

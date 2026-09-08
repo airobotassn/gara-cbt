@@ -6,6 +6,7 @@ import { bunnyConfigured, bunnyPullzone, bunnyThumbUrl } from '../_shared/bunny.
 import { DEFAULT_PASS_RATIO, attemptPassed, tierRank } from '../_shared/exam-tickets.ts'
 import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
 import { REWARD_MAX_DELTA, REWARD_MAX_PER_DAY } from '../_shared/reward-policy.ts'
+import { invalidateBannedWords } from '../_shared/banned-words.ts'
 import { TERM_BANKS, termBankKey, type TermBankKey } from '../_shared/term-banks.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
@@ -879,9 +880,17 @@ async function bannedWordList(admin: any) {
   if (error) return json({ error: error.message }, 500)
   return json({ words: data ?? [] })
 }
+// ⭐ **이 목록이 실제 채팅 검사에 물린다(2026-09-07 지시).** 여태는 저장만 되고 `chat-post` 가
+//    코드 목록만 봐서 아무 효과가 없었다(관리자 화면조차 없었다). 지금은 `_shared/banned-words.ts` 를
+//    통해 코드 목록 **위에 얹힌다** — 표가 비어도 기본 차단은 그대로 돈다.
+// ⚠️ 반영까지 최대 1분 걸린다(글마다 DB 를 왕복하지 않으려고 60초 캐시). 화면이 그 사실을 적어 둔다.
+//    저장 직후엔 이 인스턴스의 캐시만 비운다 — 엣지는 인스턴스가 여럿이라 나머지는 TTL 로 따라온다.
 async function bannedWordSave(admin: any, body: any, ctx: Ctx) {
   const word = String(body?.word ?? '').trim().toLowerCase()
   if (!word) return json({ error: '단어를 입력하세요.' }, 400)
+  // ⚠️ 너무 짧은 단어는 막는다 — 한 글자를 넣으면 그 글자가 든 멀쩡한 글이 전부 막히고,
+  //    관리자는 자기가 무엇을 막았는지 모른 채 채팅이 죽는다.
+  if (!body?.remove && word.length < 2) return json({ error: '두 글자 이상 넣어주세요(한 글자는 멀쩡한 글까지 막습니다).' }, 400)
   if (body?.remove) {
     const { error } = await admin.from('banned_words').delete().eq('word', word)
     if (error) return json({ error: error.message }, 500)
@@ -889,6 +898,7 @@ async function bannedWordSave(admin: any, body: any, ctx: Ctx) {
     const { error } = await admin.from('banned_words').upsert({ word, active: true, added_by: ctx.uid }, { onConflict: 'word' })
     if (error) return json({ error: error.message }, 500)
   }
+  invalidateBannedWords()
   return json({ ok: true })
 }
 async function suspendUser(admin: any, body: any, ctx: Ctx) {

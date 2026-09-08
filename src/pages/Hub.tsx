@@ -130,7 +130,7 @@ function CosmeticThumb({ partKey, level }: { partKey: string; level: number }) {
 // kind 는 방 꾸미기(2026-08-14)에서 붙었다. 파츠(kind='part')는 상점에서 내려가 이제 안 온다.
 // ⚠️ 짝이던 surface 는 2026-09-04 에 뺐다 — 방 꾸미기가 없어진 뒤(20260820160000) 아무도 안 읽었다.
 interface CatalogItem { partKey: string; price: number; kind?: string }
-interface HubState { authed: boolean; level?: number | null; points?: number; cosmetics?: string[]; stamps?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; coupons?: { level: number; discount: number; used: boolean }[]; catalog?: CatalogItem[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
+interface HubState { authed: boolean; level?: number | null; points?: number; cosmetics?: string[]; stamps?: number; dailyDone?: boolean; learnDone?: boolean; minigameDone?: boolean; referralCode?: string | null; referralUsed?: boolean; titles?: TitleItem[]; catalog?: CatalogItem[]; skillScore?: number | null; activityScore?: number | null; seasonTotal?: number | null; percentile?: number | null; pointsToPass?: number | null; rank?: number | null; rankTotal?: number | null; giftsToday?: GiftToday[]; giftsOlder?: number; giftsUnseen?: number;
   // 출석한 날짜('YYYY-MM-DD', 최근 1년) — 도크 스탬프판을 눌러 여는 '출석 기록' 달력의 유일한 출처.
   //   서버는 예전부터 내려주고 있었고(옛 마이페이지 학습 대시보드가 쓰던 값), 2026-08-25 에 그 화면을
   //   찢으면서 이 자리로 왔다. 새로 부르는 요청이 없다 — 허브가 이미 받고 있던 응답이다.
@@ -181,7 +181,7 @@ const titleAsset = (tier: string): string | null => TITLE_ASSET[tier as Showcase
 
 // 'closet' = 옛 'shop'. 상점과 인벤토리가 한 모달의 두 탭이 되면서 이름을 바꿨다(2026-08-20)
 // — 사는 곳과 갈아입는 곳이 같은 자리라 버튼 이름이 '상점' 이면 절반을 숨기는 말이 된다.
-type ModalKind = 'closet' | 'coupon' | 'title' | 'share' | 'earn' | 'invite' | 'gift' | 'attend'
+type ModalKind = 'closet' | 'title' | 'share' | 'earn' | 'invite' | 'gift' | 'attend'
 /** 꾸미기 모달의 두 탭. */
 type ClosetTab = 'shop' | 'items'
 
@@ -331,7 +331,6 @@ export default function Hub() {
   const [authed, setAuthed] = useState(false)
   // 칭호 = 합격한 티어. 급수(1급~4급)는 2026-07 체계 개편으로 사라졌다(20260807130000).
   const [titles, setTitles] = useState<TitleItem[]>([])
-  const [coupons, setCoupons] = useState<{ level: number; discount: number; used: boolean }[]>([])
   // 적립표 — 서버(reward_policy)가 준 지금 값. 안 오면 규격 상수로 폴백한다(아래 earnDelta/earnPerDay).
   const [policy, setPolicy] = useState<Partial<Record<ActivityKind, { delta: number; perDay: number }>> | null>(null)
   const [coinDaily, setCoinDaily] = useState<number | null>(null)
@@ -551,7 +550,6 @@ export default function Hub() {
     setLevel(h.level ?? null)
     setAuthed(!!h.authed)
     setTitles(h.titles ?? [])
-    setCoupons(h.coupons ?? [])
     setPolicy(h.rewardPolicy ?? null)
     setCoinDaily(h.econ?.dailyPoints ?? null)
     setCatalog(h.catalog ?? [])
@@ -852,7 +850,6 @@ export default function Hub() {
   }
 
   // 쿠폰 배지 카운트 — 진입 버튼을 숨겨(비활성화) 현재 미사용. 버튼 되살리면 함께 복구.
-  // const unusedCoupons = coupons.filter((c) => !c.used).length
   // 지금 달고 있는 칭호 = titles[0]. 서버가 **사용자가 고른 것**을 맨 앞에 둔다(안 골랐으면 최근 합격).
   const activeTitleTier = titles[0]?.tier
   const titleBadge = titles[0] ? <span className="tt">
@@ -981,16 +978,6 @@ export default function Hub() {
              칸(위치·키)은 그대로 `.hub-scene-char` 가 잡고 그림만 그 안을 채운다. */}
       <div className="hub-scene" aria-hidden="true">
         <div className="hub-scene-bg" />
-        <div
-          className="hub-scene-char"
-          style={{ '--char-scale': pv?.scale ?? charScale(pv?.char ?? charKey, arenaLv) } as CSSProperties}
-        >
-          {/* 캐릭터 레벨 = ARENA 레벨(시즌 총점 밴드, 1~7). 점수가 오르면 무대 위 캐릭터가 그대로 자란다.
-              ⚠️ 시험 사다리 등급(user_progress.rank)이 아니다 — 둘 다 1~7 이라 헷갈리기 쉽다. */}
-          {/* ⚠️ `pv.img` = 관리자 미리보기가 넘겨준 그림 주소. 이게 있으면 표를 안 보고 그대로 그린다 —
-              이 창은 캐릭터 표를 뜰 때 한 번만 읽어서, 방금 올린(아직 저장 전인) 그림은 표에 없다. */}
-          <CharArt charKey={pv?.char ?? charKey} level={arenaLv} srcOverride={pv?.img} className="hub-scene-char-img" />
-        </div>
       </div>
 
       <div className="sky" aria-hidden="true">
@@ -1127,8 +1114,19 @@ export default function Hub() {
 
         {/* 친구 초대는 화면에 카드로 꺼내지 않는다 — 도크 '초대하기' 버튼 모달 하나로 모았다(진입점 중복 제거). */}
         <div className="stage-zone">
+            {/* 캐릭터와 오른쪽 레일은 같은 stage-zone 좌표계를 쓴다. 화면 높이에 따로 고정하면
+                높이가 바뀔 때 둘이 서로 다른 속도로 움직인다. 발끝은 무대 바닥, 즉 마지막
+                '초대보상' 라벨 높이에 맞춘다. */}
+            <div
+              className="hub-scene-char"
+              style={{ '--char-scale': pv?.scale ?? charScale(pv?.char ?? charKey, arenaLv) } as CSSProperties}
+            >
+              <CharArt charKey={pv?.char ?? charKey} level={arenaLv} srcOverride={pv?.img} className="hub-scene-char-img" />
+            </div>
             {/* 왼쪽 레일 제거 — 출석을 오른쪽 맨 위로 옮기고 나머지(쿠폰)는 비활성화(숨김). */}
-            {/* 쿠폰 복구 시: 아래 레일에 <button className="ricon" onClick={() => setModal('coupon')}>…</button> 추가. 모달·상태는 그대로. */}
+            {/* ⛔ 쿠폰은 2026-09-07 에 없앴다 — 모달·상태·발급·표까지 전부. 쓸 방법이 없는 쿠폰이
+                (여는 버튼도 주석 처리, 결제에 입력칸·할인·사용 처리 전부 없음) 레벨업마다 쌓이고 있었다.
+                되살릴 거면 **쓰는 길(결제 할인 + 사용 처리)을 같이** 만들 것. */}
             <div className="rail rail-r">
               {/* 출석 — 옛 하단 '출석 보상' 스탬프판이 이 칸으로 접혔다(2026-09-03 지시).
                   그 판이 도크에서 90px 넘게 먹는 바람에 아래 랭킹 버튼이 한 화면(100dvh) 밖으로
@@ -1307,30 +1305,6 @@ export default function Hub() {
                 </div>
               </div>
             </>
-          )}
-        </Modal>
-      )}
-
-      {modal === 'coupon' && (
-        <Modal title={t('hub.coupon.title')} onClose={() => setModal(null)}>
-          {coupons.length > 0 ? (
-            <div className="ticket-shelf">
-              {coupons.map((c) => (
-                <div key={c.level} className={`ticket ${c.used ? 'is-used' : ''}`}>
-                  <div className="ticket-stub">Lv.{c.level}</div>
-                  <div className="ticket-main">
-                    <b className="ticket-pct">{t('hub.coupon.discount', { n: c.discount })}</b>
-                    <span className="ticket-sub">{t('hub.coupon.sub', { n: c.level })}</span>
-                  </div>
-                  <span className="ticket-stamp">{t(c.used ? 'hub.coupon.used' : 'hub.coupon.have')}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="ticket-shelf ticket-shelf-empty">
-              <div className="ticket ticket-ghost"><span className="ticket-ghost-ic">🎫</span></div>
-              <p className="hub-modal-help">{t(authed ? 'hub.coupon.empty' : 'hub.coupon.login')}</p>
-            </div>
           )}
         </Modal>
       )}

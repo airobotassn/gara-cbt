@@ -1860,13 +1860,6 @@ const KO: Record<string, string> = {
   "hub.part.skin_campus_day": "캠퍼스 · 낮",
   "hub.part.skin_campus_sunset": "캠퍼스 · 노을",
   // 쿠폰함
-  "hub.coupon.title": "쿠폰함",
-  "hub.coupon.discount": "{n}% 할인",
-  "hub.coupon.sub": "Lv.{n} 달성 보상",
-  "hub.coupon.used": "사용함",
-  "hub.coupon.have": "보유",
-  "hub.coupon.empty": "아직 모은 쿠폰이 없어요. 레벨업하면 할인 쿠폰을 받아요!",
-  "hub.coupon.login": "로그인하면 쿠폰함이 보여요.",
 
   // 칭호
   "hub.title.title": "칭호",

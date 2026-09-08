@@ -1830,13 +1830,6 @@ const JA: Record<string, string> = {
   "hub.part.skin_campus_day": "キャンパス・昼",
   "hub.part.skin_campus_sunset": "キャンパス・夕焼け",
   // 쿠폰함
-  "hub.coupon.title": "クーポン",
-  "hub.coupon.discount": "{n}%割引",
-  "hub.coupon.sub": "Lv.{n}達成報酬",
-  "hub.coupon.used": "使用済み",
-  "hub.coupon.have": "保有",
-  "hub.coupon.empty": "まだクーポンがありません。レベルアップで割引クーポンがもらえます！",
-  "hub.coupon.login": "ログインするとクーポンが表示されます。",
 
   // 칭호
   "hub.title.title": "称号",

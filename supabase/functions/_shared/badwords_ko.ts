@@ -155,9 +155,20 @@ function findAnchoredHits(normalized: NormalizedResult, tokens: string[]): Hit[]
 // 始發(시발점 등)처럼 '나쁜말로 시작하지만' 무해한 합성어 — 시작-앵커 매칭의 오탐을 억제.
 const ALLOWLIST = ['시발점', '시발역', '시발차', '시발유', '시발지', '시발탄']
 
-export function checkBadword(text: string): { blocked: boolean; hit?: string } {
+/**
+ * 금칙어 검사.
+ * @param extra 관리자가 등록한 금칙어(`banned_words`). 코드 목록을 **대체하지 않고 얹는다** —
+ *   KO_BADWORDS 는 경계 앵커링·allowlist 예외까지 다듬어 둔 기본 방어선이라,
+ *   표가 비었다고 차단이 풀리면 안 된다(2026-09-07).
+ *   ⚠️ allowlist 예외는 관리자 단어에도 그대로 적용된다 — 관리자가 '시발' 을 넣어도
+ *      '시발점' 은 통과한다. 예외를 안 태우면 멀쩡한 글이 막히고 이유를 아무도 모른다.
+ *   ⚠️ 이 함수는 순수 함수로 유지한다(DB 를 직접 안 읽는다) — bun 으로 단위테스트가 돌아야 한다.
+ */
+export function checkBadword(text: string, extra: string[] = []): { blocked: boolean; hit?: string } {
   const normalized = normalizeWithBoundary(text)
-  const badHits = findAnchoredHits(normalized, KO_BADWORDS)
+  // 관리자 단어도 같은 정규화를 거친다 — 원문 그대로 찾으면 '시 발' 같은 회피 표기를 놓친다.
+  const words = extra.length ? [...KO_BADWORDS, ...extra.map((w) => normalizeKo(w)).filter(Boolean)] : KO_BADWORDS
+  const badHits = findAnchoredHits(normalized, words)
   for (const h of badHits) {
     // 매칭 위치부터의 나머지가 allowlist 무해어로 시작하면 오탐 → 건너뜀.
     if (ALLOWLIST.some((w) => normalized.text.slice(h.start).startsWith(w))) continue

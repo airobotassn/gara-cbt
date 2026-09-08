@@ -114,6 +114,8 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     // 그 화면이 게임 은행을 보여줘서였고, 지금은 DAILY 전용 은행(D-###)을 보여준다.
     { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
     { key: 'chat', label: '채팅 관리' },
+    // 금칙어는 검수와 별도 화면이다 — 검수는 '올라온 글을 본다', 금칙어는 '앞으로 막을 말을 정한다'.
+    { key: 'words', label: '금칙어' },
     { key: 'coin', label: '코인 관리' },
     // 캐릭터·스킨의 **가격·판매여부**만 만지는 화면. 그림은 코드/에셋이라 여기서 안 올린다(2026-08-20).
     { key: 'cosmetic', label: '꾸미기 관리' },
@@ -295,6 +297,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     case 'arena/daily/stat': return <DailyStatAdmin />
     case 'arena/daily/quiz': return <TermPoolAdmin key="daily" bank="daily" />
     case 'arena/chat': return <ChatModAdmin />
+    case 'arena/words': return <BannedWordAdmin />
     case 'arena/coin': return <CoinPolicyAdmin />
     case 'arena/cosmetic': return <HubCosmeticAdmin />
     // ── CARIS ──
@@ -2275,6 +2278,106 @@ function chatDoneLabel(r: ChatModRow): string {
   return '문제없음'
 }
 const CHAT_PAGE = 50
+
+// ── 금칙어 ───────────────────────────────────────────────────
+//
+// ⭐ **여기서 넣은 단어가 실제로 채팅을 막는다(2026-09-07 지시).** 그전엔 서버에 목록·저장 기능만
+//    있고 **부르는 화면이 없어서** 넣을 방법조차 없었고, 넣어도 chat-post 는 코드 목록만 봤다.
+// ⚠️ 코드에 박힌 기본 목록을 **대체하지 않고 얹는다** — 이 표가 비어도 기본 욕설 차단은 그대로 돈다.
+// ⚠️ 반영까지 최대 1분(서버가 60초 캐시한다). 그 사실을 화면에 적어 둔다 — 안 적으면
+//    "추가했는데 안 걸린다" 로 읽히고 관리자가 같은 단어를 여러 번 넣는다.
+interface BannedWordRow { word: string; active: boolean; created_at: string }
+
+export function BannedWordAdmin() {
+  const [rows, setRows] = useState<BannedWordRow[]>([])
+  const [word, setWord] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await callFunction<{ rows: BannedWordRow[] }>('admin', { action: 'bannedWordList' })
+      setRows(res.rows ?? [])
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '불러오지 못했습니다.')
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function save(w: string, remove: boolean) {
+    setBusy(w)
+    setErr('')
+    try {
+      await callFunction('admin', { action: 'bannedWordSave', word: w, remove })
+      if (!remove) setWord('')
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '저장하지 못했습니다.')
+    }
+    setBusy('')
+  }
+
+  return (
+    <>
+      <div className="admin-head">
+        <h1>금칙어</h1>
+        <div className="admin-head-actions">
+          <button className="admin-mini" onClick={load} disabled={loading}>새로고침</button>
+        </div>
+      </div>
+
+      <p className="admin-hint" style={{ margin: '10px 0 14px' }}>
+        여기 넣은 말이 들어간 채팅은 등록이 막힙니다. 기본 욕설 목록은 코드에 있고 이 목록이 거기에 <b>더해집니다</b> —
+        비워 두어도 기본 차단은 그대로 돕니다. 추가·삭제는 <b>최대 1분 뒤</b>부터 반영됩니다.
+      </p>
+
+      <form
+        onSubmit={(e) => { e.preventDefault(); const w = word.trim(); if (w) save(w, false) }}
+        style={{ display: 'flex', gap: 8, marginBottom: 14 }}
+      >
+        <input
+          value={word}
+          onChange={(e) => setWord(e.target.value)}
+          placeholder="막을 말 (두 글자 이상)"
+          style={{ flex: '0 1 260px', padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 8 }}
+        />
+        <button className="admin-mini" type="submit" disabled={!word.trim() || busy !== ''}>추가</button>
+      </form>
+
+      {err && <div className="admin-section admin-empty">{err}</div>}
+
+      {rows.length === 0 ? (
+        <div className="admin-section admin-empty">등록된 금칙어가 없습니다. 기본 목록만으로 검사합니다.</div>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead><tr><th>말</th><th style={{ width: 160 }}>등록</th><th style={{ width: 90 }}></th></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.word}>
+                  <td>{r.word}</td>
+                  <td style={{ color: 'var(--muted)' }}>{fmtDT(r.created_at)}</td>
+                  <td>
+                    <button className="admin-mini" onClick={() => save(r.word, true)} disabled={busy === r.word}>
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
 
 export function ChatModAdmin() {
   const [tab, setTab] = useState<'queue' | 'done'>('queue')

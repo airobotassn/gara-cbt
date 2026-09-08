@@ -429,16 +429,10 @@ export async function applyAttempt(
     { onConflict: 'user_id' },
   )
 
-  // 레벨 최초 도달마다 쿠폰 1장 발급(side-effect, 채점 공식 아님).
-  // 유니크(user_id,issued_for_level) 라 같은 레벨 재도달은 무발급 → 최초 도달 1회만.
-  if (nextRank > rankBefore) {
-    await admin
-      .from('user_coupons')
-      .upsert(
-        { user_id: userId, issued_for_level: nextRank, coupon_code: 'LEVELUP10' },
-        { onConflict: 'user_id,issued_for_level', ignoreDuplicates: true },
-      )
-  }
+  // ⛔ 옛 '레벨 최초 도달 시 LEVELUP10 쿠폰 1장' 발급은 2026-09-07 에 없앴다.
+  //    쓸 방법이 없는 쿠폰이 계속 쌓이고 있었다 — 허브의 쿠폰함을 여는 버튼이 주석 처리돼 있었고,
+  //    결제 화면에 쿠폰 입력칸도, 할인을 적용하는 코드도, 사용 처리하는 코드도 없었다(14장 전부 미사용).
+  //    ⛔ 되살릴 거면 **쓰는 길(결제 할인 + 사용 처리)을 같이** 만들 것.
 
   return {
     ratings,

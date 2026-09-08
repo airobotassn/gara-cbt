@@ -1,12 +1,12 @@
 // get-hub: 캐릭터 허브 첫 로드용 상태 하이드레이트.
 //  · RLS 정책 미부여(=service-role 전용) 테이블들(user_currency·user_cosmetics·user_characters·
-//    user_stamps·daily_activity·user_coupons)의 유일한 클라 읽기 경로.
+//    user_stamps·daily_activity)의 유일한 클라 읽기 경로.
 //    클라는 이 함수를 통해서만 자기 상태를 읽는다(직접 select 불가).
 //  · cosmetic-only 읽기: user_progress 는 HUD 표시(레벨·랭킹점수)용으로만 읽고 쓰지 않는다.
 //    실력/진화(user_progress·user_level_skill) 데이터를 절대 변형하지 않는다.
-//  · 비로그인/익명: authed=false + 공개 카탈로그(shop_catalog)만. 경제·쿠폰·칭호는 로그인 필요.
-//  · econ 상수는 DB plpgsql 하드코딩(complete_daily_fn.sql)과 동일하게 유지(표시 전용).
-//    DB 수치를 바꾸면 여기도 같이 고칠 것.
+//  · 비로그인/익명: authed=false + 공개 카탈로그(shop_catalog)만. 경제·칭호는 로그인 필요.
+//  · 적립표(econ·rewardPolicy)는 `reward_policy` 표에서 온다 — 화면과 실제 적립이 같은 값을 본다.
+//  ⛔ 쿠폰(user_coupons)은 2026-09-07 에 없앴다 — 쓸 방법이 없는 쿠폰이 쌓이고 있었다.
 // ⚠️ _shared 를 import 하므로 대시보드 편집 불가 → CLI 배포 전용: `supabase functions deploy get-hub`.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
@@ -61,7 +61,6 @@ Deno.serve(async (req) => {
       { data: character },
       { data: stamp },
       { data: daily },
-      { data: coupons },
       { data: progress },
       { data: titles },
       { data: rankCtx },
@@ -82,11 +81,6 @@ Deno.serve(async (req) => {
         .eq('user_id', uid)
         .eq('day', today)
         .maybeSingle(),
-      admin
-        .from('user_coupons')
-        .select('issued_for_level, coupon_code, issued_at, used_at, coupons(discount)')
-        .eq('user_id', uid)
-        .order('issued_for_level', { ascending: false }),
       // HUD 표시(레벨·랭킹점수·실력/활동 분해)용 읽기 전용 — 이 함수는 user_progress 를 절대 쓰지 않는다(cosmetic-only).
       admin.from('user_progress').select('rank, skill_score, activity_score, season_total, arena_level').eq('user_id', uid).maybeSingle(),
       admin.rpc('user_titles', { p_uid: uid }),
@@ -120,13 +114,6 @@ Deno.serve(async (req) => {
         .limit(200),
     ])
 
-    const couponList = (coupons ?? []).map((c) => ({
-      level: c.issued_for_level as number,
-      code: c.coupon_code as string,
-      discount: (c.coupons as { discount?: number } | null)?.discount ?? 0,
-      used: !!c.used_at,
-      issuedAt: c.issued_at as string,
-    }))
     const titleList = Array.isArray(titles) ? titles : []
     const rc = (rankCtx ?? null) as { rank?: number | null; total?: number | null; tier?: string | null; percentile?: number | null; points_to_pass?: number | null } | null
     // 마이페이지 '활동 기록' 달력은 **출석만** 표시한다(2026-07-29 결정) — 학습·게임·응시는 잔디에 안 찍는다.
@@ -215,7 +202,6 @@ Deno.serve(async (req) => {
       minigameDone: !!daily?.did_minigame,
       leveltestDone: !!daily?.did_leveltest,
       catalog,
-      coupons: couponList,
       titles: titleList,
       econ,
       rewardPolicy,

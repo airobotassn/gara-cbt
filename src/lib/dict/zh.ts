@@ -1830,13 +1830,6 @@ const ZH: Record<string, string> = {
   "hub.part.skin_campus_day": "校园 · 白天",
   "hub.part.skin_campus_sunset": "校园 · 晚霞",
   // 쿠폰함
-  "hub.coupon.title": "优惠券",
-  "hub.coupon.discount": "{n}% 折扣",
-  "hub.coupon.sub": "达成 Lv.{n} 奖励",
-  "hub.coupon.used": "已使用",
-  "hub.coupon.have": "持有",
-  "hub.coupon.empty": "还没有优惠券，升级即可获得折扣券！",
-  "hub.coupon.login": "登录后即可查看优惠券。",
 
   // 칭호
   "hub.title.title": "称号",

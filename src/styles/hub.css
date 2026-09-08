@@ -423,27 +423,6 @@ html.dark .sc-host { --card: #242a36; --line: #6b7488; --ink: #e6ebf7; --ink2: #
 .hub .hub-shop-owned { position: absolute; top: -8px; right: -8px; background: #6bbf9a; color: #fff; font-size: 10px; font-weight: 900;
   padding: 3px 7px; border-radius: 999px; border: 2px solid var(--line); }
 
-/* ── 쿠폰함: 티켓 카드 ── */
-.hub .ticket-shelf { display: flex; flex-direction: column; gap: 10px; }
-.hub .ticket { position: relative; display: flex; align-items: stretch; background: var(--card); border: 2.5px solid var(--line); border-radius: 14px; overflow: hidden;
-  box-shadow: 0 4px 0 rgba(var(--shc), .16); }
-.hub .ticket-stub { flex: 0 0 auto; width: 56px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; color: #fff;
-  background: var(--blue); border-right: 2.5px dashed var(--line); position: relative; }
-.hub .ticket-stub::before, .hub .ticket-stub::after { content: ""; position: absolute; left: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--pagebg); border: 2.5px solid var(--line); }
-.hub .ticket-stub::before { top: -7px; } .hub .ticket-stub::after { bottom: -7px; }
-.hub .ticket-main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 12px; }
-.hub .ticket-pct { font-size: 16px; font-weight: 900; color: var(--warn-ink2, #d97706); }
-.hub .ticket-sub { font-size: 11px; font-weight: 700; color: var(--ink2); }
-.hub .ticket-stamp { flex: 0 0 auto; align-self: center; margin-right: 12px; font-size: 11.5px; font-weight: 900; color: #16a34a;
-  border: 2px solid #16a34a; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-.hub .ticket.is-used .ticket-stamp { color: #9a9a9a; border-color: #c7c7c7; }
-.hub .ticket.is-used { opacity: .6; }
-.hub .ticket.is-used .ticket-stub { background: #b7bfd4; }
-.hub .ticket-shelf-empty { align-items: center; text-align: center; padding: 6px 0 2px; }
-.hub .ticket-ghost { width: 100%; max-width: 220px; height: 60px; border-style: dashed; border-color: #c7c7c7; background: transparent; box-shadow: none;
-  display: grid; place-items: center; opacity: .6; }
-.hub .ticket-ghost-ic { font-size: 24px; filter: grayscale(1); }
-
 /* ── 칭호 보관소: 뱃지 볼트 ── */
 .hub .title-modal { width: min(560px, calc(100vw - 28px)); }
 .hub .title-vault { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -800,7 +779,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       `office_desk` 의 모아교육그룹 벽 로고(x 76~97%)와 `campus_day` 의 비석(x 7~22%)이 그 경우다.
       **가운데 26% 안에 볼 것이 있어야 한다**는 게 이 스킨 계열의 그림 조건이다.
    ⚠️ 발끝(22svh = 세로 78%)은 네 장 다 바닥 위에 떨어진다 — 그래서 값 블록을 새로 두지 않았다. */
-.hub[data-skin='office_desk']   { --skin-bg: url('/hub/bg-office-desk.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_desk']   { --skin-bg: url('/hub/bg-office-desk.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 50%; }
 .hub[data-skin='office_lounge'] { --skin-bg: url('/hub/bg-office-lounge.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_day']    { --skin-bg: url('/hub/bg-campus-day.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_sunset'] { --skin-bg: url('/hub/bg-campus-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
@@ -1338,6 +1317,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       (2026-08-14 "사이즈를 왜 줄이냐니까" — 판·스탬프·랭킹이 한꺼번에 작아 보인 원인이 이 한 줄이다). */
 .hub .home { flex: 1 1 auto; min-height: 0; width: 100%; }
 .hub .stage-zone { flex: 1 1 auto; min-height: 96px; height: auto; }
+/* 캐릭터와 레일을 같은 무대 좌표계에 둔다. 레일은 가운데 정렬된 4칸 묶음이므로 캐릭터 발끝도
+   그 묶음의 아래끝(마지막 '초대보상' 라벨)에 맞춘다. 무대가 묶음보다 작으면 둘 다 바닥 0으로 붙는다. */
+.hub .stage-zone { --rail-stack-h: 354px; }
+.hub .stage-zone .hub-scene-char {
+  bottom: max(0px, calc((100% - var(--rail-stack-h)) / 2));
+  height: min(calc(var(--skin-char-h) * var(--char-scale, 1)), 100%);
+  z-index: 2;
+}
 /* ⚠️ `center` 다(옛 `space-between` 아니다 · 2026-09-03). 아래에서 칸 높이에 천장을 두면서 남는 세로가
    생겼는데, space-between 은 그 남는 만큼을 **칸 사이로** 밀어넣어 큰 화면에서 버튼이 뿔뿔이 흩어진다.
    가운데로 모으면 남는 세로는 위아래로 가고 버튼 넷은 한 덩어리로 붙어 선다. */
@@ -1349,6 +1336,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    그림끼리 49px 이 떠서 데스크톱보다 오히려 더 벌어져 있었다). 84 − 라벨 17 − 여백 1 = 66 ≥ 그림 61. */
 .hub .rail-r .fcard { flex: 1 1 0; min-height: 0; width: 64px; max-height: 84px; }
 @media (min-width: 768px) {
+  .hub .stage-zone { --rail-stack-h: 487px; }
   .hub .rail-r { gap: 5px; }
   /* ⚠️ **천장이 필요하다.** 칸은 무대 높이를 넷이 나눠 갖는데(위 `flex:1 1 0`), 그림은 칸 **폭**(96px)에
      갇혀 있어서(object-fit:contain) 칸이 그보다 커지면 커진 만큼 전부 그림 위쪽 빈 자리가 된다 —
@@ -1368,9 +1356,6 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 @media (max-width: 767px) {
   .hub[data-skin]:has(.rail-r) .hub-scene-char { transform: translateX(calc(-50% - 28px)); }
 }
-html.dark .hub .ticket-ghost { border-color: #4a5264; color: #7f8899; }
-html.dark .hub .ticket.is-used .ticket-stamp { color: #7f8899; border-color: #4a5264; }
-html.dark .hub .ticket.is-used .ticket-stub { background: #4a5264; }
 
 /* ── 로그인 게이트는 여기 없다(2026-08-24) ──
    비로그인 /hub 게이트를 **결제 화면(/checkout)의 로그인 안내 카드와 같은 것**으로 갈았다.

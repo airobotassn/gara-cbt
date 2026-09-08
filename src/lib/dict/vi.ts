@@ -1830,13 +1830,6 @@ const VI: Record<string, string> = {
   "hub.part.skin_campus_day": "Khuôn viên · Ban ngày",
   "hub.part.skin_campus_sunset": "Khuôn viên · Hoàng hôn",
   // 쿠폰함
-  "hub.coupon.title": "Phiếu giảm giá",
-  "hub.coupon.discount": "Giảm {n}%",
-  "hub.coupon.sub": "Thưởng khi đạt Lv.{n}",
-  "hub.coupon.used": "Đã dùng",
-  "hub.coupon.have": "Đang có",
-  "hub.coupon.empty": "Chưa có phiếu nào — lên hạng để nhận phiếu giảm giá!",
-  "hub.coupon.login": "Đăng nhập để xem phiếu của bạn.",
 
   // 칭호
   "hub.title.title": "Danh hiệu",

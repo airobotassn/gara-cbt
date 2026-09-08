@@ -1830,13 +1830,6 @@ const HI: Record<string, string> = {
   "hub.part.skin_campus_day": "कैंपस · दिन",
   "hub.part.skin_campus_sunset": "कैंपस · सूर्यास्त",
   // 쿠폰함
-  "hub.coupon.title": "कूपन",
-  "hub.coupon.discount": "{n}% छूट",
-  "hub.coupon.sub": "Lv.{n} पाने का इनाम",
-  "hub.coupon.used": "इस्तेमाल हुआ",
-  "hub.coupon.have": "उपलब्ध",
-  "hub.coupon.empty": "अभी कोई कूपन नहीं — लेवल बढ़ाएं और छूट कूपन पाएं!",
-  "hub.coupon.login": "कूपन देखने के लिए साइन इन करें।",
 
   // 칭호
   "hub.title.title": "उपाधियाँ",
