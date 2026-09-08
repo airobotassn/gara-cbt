@@ -9,6 +9,8 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Frame, Box, Arrow, Lab, Chip } from './kit'
+// 글자가 식과 섞이는 자리(‘AND 울린다’ 처럼)는 Lab 이 통째로 못 갈아 끼우므로 조각만 여기서 번역한다.
+import { tLab } from '../../lib/dailyI18n'
 
 // ── 빅오 표기법 ─────────────────────────────────────────────────────────────
 // N 을 밀면 네 곡선이 갈라진다. 작은 N 에서는 다 붙어 있다가 커지면 하나만 화면 밖으로 나간다 —
@@ -304,13 +306,13 @@ function B7And() {
         stroke="currentColor"
         strokeWidth={3}
       />
-      <text x={104} y={75} className={a ? 'vz-lab-hot' : 'vz-lab'} fontSize={12} textAnchor="middle">온도</text>
-      <text x={216} y={75} className={b ? 'vz-lab-hot' : 'vz-lab'} fontSize={12} textAnchor="middle">연기</text>
+      <Lab x={104} y={75} size={12} tone={a ? 'hot' : 'mute'}>온도</Lab>
+      <Lab x={216} y={75} size={12} tone={b ? 'hot' : 'mute'}>연기</Lab>
 
       <Box x={20} y={124} w={132} h={34} r={11} tone={and ? 'gold' : 'mute'} />
-      <text x={86} y={146} className={and ? 'vz-lab' : 'vz-lab'} fontSize={12} textAnchor="middle">AND {and ? '울린다' : '조용'}</text>
+      <Lab x={86} y={146} size={12}>{`AND ${tLab(and ? '울린다' : '조용')}`}</Lab>
       <Box x={168} y={124} w={132} h={34} r={11} tone={or ? 'gold' : 'mute'} />
-      <text x={234} y={146} className="vz-lab" fontSize={12} textAnchor="middle">OR {or ? '울린다' : '조용'}</text>
+      <Lab x={234} y={146} size={12}>{`OR ${tLab(or ? '울린다' : '조용')}`}</Lab>
 
       <Lab x={160} y={180} size={11}>겹친 자리에서만 AND 가 켜진다</Lab>
     </Frame>
@@ -342,27 +344,27 @@ function B7Flow() {
     >
       {/* 시작(타원) → 읽기(평행사변형) → 판단(마름모) → 실행(직사각형) */}
       <ellipse cx={160} cy={17} rx={32} ry={11} className="vz-card" stroke="currentColor" strokeWidth={3} />
-      <text x={160} y={21} className="vz-lab" fontSize={11} textAnchor="middle">시작</text>
+      <Lab x={160} y={21} size={11}>시작</Lab>
       <Arrow x1={160} y1={28} x2={160} y2={38} tone="flow" head={7} />
 
       <path d="M116 40 H216 L204 66 H104 Z" className="vz-card" stroke="currentColor" strokeWidth={3} strokeLinejoin="round" />
-      <text x={160} y={58} className="vz-lab" fontSize={12} textAnchor="middle">온도 {t}°</text>
+      <Lab x={160} y={58} size={12}>{`${tLab('온도')} ${t}°`}</Lab>
       <Arrow x1={160} y1={66} x2={160} y2={76} tone="flow" head={7} />
 
       <path d="M160 78 L222 104 L160 130 L98 104 Z" className="vz-mute" stroke="currentColor" strokeWidth={3} strokeLinejoin="round" />
-      <text x={160} y={108} className="vz-lab" fontSize={11} textAnchor="middle">40도 넘나?</text>
+      <Lab x={160} y={108} size={11}>40도 넘나?</Lab>
 
       {/* 예 — 오른쪽으로 나갔다가 아래로 */}
       <line x1={222} y1={104} x2={248} y2={104} className={hot ? 'vz-arrow' : 'vz-dash'} strokeWidth={3} strokeLinecap="round" />
       <Arrow x1={248} y1={104} x2={248} y2={142} tone={hot ? 'flow' : 'dash'} head={7} />
-      <text x={228} y={98} className={hot ? 'vz-lab-ok' : 'vz-lab'} fontSize={11} textAnchor="start">예</text>
+      <Lab x={228} y={98} size={11} anchor="start" tone={hot ? 'ok' : 'mute'}>예</Lab>
       <rect x={200} y={144} width={96} height={30} rx={7} className={hot ? 'vz-gold-f' : 'vz-card'} stroke="currentColor" strokeWidth={3} />
-      <text x={248} y={163} className="vz-lab" fontSize={11} textAnchor="middle">부저 켜기</text>
+      <Lab x={248} y={163} size={11}>부저 켜기</Lab>
 
       {/* 아니오 — 왼쪽으로 나갔다가 위로 되돌아간다(다시 읽는다) */}
       <path d="M98 104 H44 V53" fill="none" className={hot ? 'vz-dash' : 'vz-turn'} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
       <Arrow x1={44} y1={53} x2={106} y2={53} tone={hot ? 'dash' : 'turn'} head={7} />
-      <text x={92} y={98} className={hot ? 'vz-lab' : 'vz-lab-hot'} fontSize={11} textAnchor="end">아니오</text>
+      <Lab x={92} y={98} size={11} anchor="end" tone={hot ? 'mute' : 'hot'}>아니오</Lab>
 
       <Lab x={160} y={192} size={11}>마름모에서 길이 갈린다</Lab>
     </Frame>
@@ -395,13 +397,13 @@ function B7Except() {
       <Arrow x1={274} y1={62} x2={292} y2={62} tone="flow" head={7} />
       {err && (
         <>
-          <text x={140} y={44} className="vz-lab-bad" fontSize={12} textAnchor="middle">오류!</text>
+          <Lab x={140} y={44} size={12} tone="bad">오류!</Lab>
           <line x1={140} y1={50} x2={140} y2={58} className="vz-goal" strokeWidth={3} strokeLinecap="round" />
           <Box x={150} y={84} w={64} h={24} r={8} tone="card" />
-          <text x={182} y={100} className="vz-lab-ok" fontSize={11} textAnchor="middle">안전 동작</text>
+          <Lab x={182} y={100} size={11} tone="ok">안전 동작</Lab>
         </>
       )}
-      <text x={292} y={48} className="vz-lab-ok" fontSize={11} textAnchor="end">계속 간다</text>
+      <Lab x={292} y={48} size={11} anchor="end" tone="ok">계속 간다</Lab>
 
       <Lab x={14} y={128} anchor="start" size={12}>예외 처리 없음</Lab>
       <path
@@ -415,12 +417,12 @@ function B7Except() {
         <>
           <path d="M136 134 l8 8 -8 6 8 8" fill="none" className="vz-crack" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
           <line x1={156} y1={146} x2={290} y2={146} className="vz-dash" strokeWidth={3} />
-          <text x={290} y={134} className="vz-lab-bad" fontSize={11} textAnchor="end">여기서 멈춘다</text>
+          <Lab x={290} y={134} size={11} anchor="end" tone="bad">여기서 멈춘다</Lab>
         </>
       ) : (
         <>
           <Arrow x1={274} y1={146} x2={292} y2={146} tone="flow" head={7} />
-          <text x={292} y={134} className="vz-lab" fontSize={11} textAnchor="end">계속 간다</text>
+          <Lab x={292} y={134} size={11} anchor="end">계속 간다</Lab>
         </>
       )}
 
@@ -446,7 +448,7 @@ function B7Broadcast() {
       foot={<Chip on={sent} onClick={() => setSent(!sent)}>신호 쏘기</Chip>}
     >
       <Box x={16} y={72} w={64} h={40} r={10} tone={sent ? 'gold' : 'card'} />
-      <text x={48} y={97} className="vz-lab" fontSize={11} textAnchor="middle">보내는 쪽</text>
+      <Lab x={48} y={97} size={11}>보내는 쪽</Lab>
 
       <Arrow x1={80} y1={92} x2={122} y2={92} tone={tone} head={7} />
       <line x1={124} y1={44} x2={124} y2={140} className={sent ? 'vz-arrow' : 'vz-dash'} strokeWidth={3} strokeLinecap="round" />
@@ -456,7 +458,7 @@ function B7Broadcast() {
           <Arrow x1={124} y1={r.y} x2={184} y2={r.y} tone={tone} head={7} />
           <Box x={188} y={r.y - 14} w={108} h={28} r={9} tone={sent ? 'gold' : 'mute'} />
           <circle cx={200} cy={r.y} r={5} className={sent ? 'vz-node-on' : 'vz-node'} stroke="currentColor" strokeWidth={2.5} />
-          <text x={248} y={r.y + 5} className="vz-lab" fontSize={11} textAnchor="middle">{sent ? r.act : '기다린다'}</text>
+          <Lab x={248} y={r.y + 5} size={11}>{tLab(sent ? r.act : '기다린다')}</Lab>
         </g>
       ))}
 

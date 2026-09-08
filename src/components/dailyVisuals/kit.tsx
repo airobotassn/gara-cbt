@@ -6,7 +6,30 @@
 // ⛔ **색을 직접 쓰지 말 것.** SVG presentation attribute 에는 var() 가 안 먹으므로
 //    **선은 stroke="currentColor"**(루트 .vz 가 color 를 잡는다), **면은 .vz-* 클래스**로 칠한다.
 //    daily.css 의 토큰만 쓰기 때문에 다크모드가 자동으로 따라온다. #hex 를 박으면 한쪽 테마에서 증발한다.
-import type { ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
+import { tLab } from '../../lib/dailyI18n'
+
+/**
+ * 그림 안의 **모든 글자**를 화면 언어로 갈아 끼운다 — `Frame` 이 자기 아래를 통째로 훑는다.
+ *
+ * ⛔ 이렇게 하는 이유: 글자가 `Lab` 에만 있는 게 아니다. 조작줄의 칩·힌트·상태 배지, 데이터 배열에서
+ *    흘러온 낱말까지 전부 화면에 보인다. 자리마다 번역 함수를 부르게 하면 **한 자리만 빠뜨려도 그 글자만
+ *    영영 한국어로 남는다**(실제로 중국어 화면에서 칩 글자만 한국어로 남아 있었다).
+ *    여기 한 곳에서 훑으면 새 그림을 그릴 때 아무것도 기억할 필요가 없다.
+ * ⚠️ 표에 없는 글자는 그대로 둔다 — 숫자·기호·번역이 아직 없는 언어가 여기에 걸린다.
+ * ⚠️ 값이 섞인 글자(`압력 3` 처럼 만들어진 문자열)는 표에 없으니 안 바뀐다. 그런 자리는 소스에서
+ *    낱말 조각만 `tLab('압력')` 로 감싸야 한다.
+ */
+export function translateTree(node: ReactNode): ReactNode {
+  if (typeof node === 'string') return tLab(node)
+  if (Array.isArray(node)) return Children.map(node, translateTree)
+  if (isValidElement(node)) {
+    const props = node.props as { children?: ReactNode }
+    if (props?.children === undefined) return node
+    return cloneElement(node, undefined, translateTree(props.children))
+  }
+  return node
+}
 
 /** 모든 그림의 viewBox 가로. 세로는 그림마다 다르다(Frame 의 h). */
 export const VW = 320
@@ -15,8 +38,9 @@ export const VW = 320
 export function Frame({ h, children, foot }: { h: number; children: ReactNode; foot?: ReactNode }) {
   return (
     <div className="dy-viz">
-      <svg className="vz" viewBox={`0 0 ${VW} ${h}`} role="img">{children}</svg>
-      {foot && <div className="dy-viz-foot">{foot}</div>}
+      {/* 글자는 여기서 한 번에 번역된다(translateTree) — 그림을 그릴 때 번역을 신경 쓸 필요가 없다. */}
+      <svg className="vz" viewBox={`0 0 ${VW} ${h}`} role="img">{translateTree(children)}</svg>
+      {foot && <div className="dy-viz-foot">{translateTree(foot)}</div>}
     </div>
   )
 }
@@ -73,14 +97,20 @@ export function Arrow({ x1, y1, x2, y2, tone = 'flow', w = 3, head = 8 }: {
 /**
  * 글자 라벨. tone: mute(기본 회색) · hot(파랑 강조) · ok(청록) · bad(빨강) · inv(색 면 위 흰 글자)
  * ⚠️ 라벨은 **거들기만** 한다. 그림이 말을 못 해서 문장을 적고 있다면 그림을 다시 그릴 것.
+ *
+ * ⛔ **그림 속 글자는 전부 이 부품을 거친다 — 날 `<text>` 를 쓰지 말 것.** 여기 한 곳에서 화면 언어로
+ *    갈아 끼우기 때문이다(`tLab`). 날 `<text>` 로 쓰면 그 글자만 영영 한국어로 남는다.
+ * ⚠️ 번역이 없으면 한국어가 그대로 나온다(빈 그림이 되지 않는다).
  */
 export function Lab({ x, y, children, tone = 'mute', size = 13, anchor = 'middle' }: {
   x: number; y: number; children: ReactNode
   tone?: 'mute' | 'hot' | 'ok' | 'bad' | 'inv'; size?: number; anchor?: 'start' | 'middle' | 'end'
 }) {
   const cls = { mute: 'vz-lab', hot: 'vz-lab-hot', ok: 'vz-lab-ok', bad: 'vz-lab-bad', inv: 'vz-lab-inv' }[tone]
+  // 글자일 때만 갈아 끼운다 — 숫자·조각(<tspan> 등)을 넣은 자리는 그대로 둔다.
+  const body = typeof children === 'string' ? tLab(children) : children
   return (
-    <text x={x} y={y} className={cls} fontSize={size} fontWeight={800} textAnchor={anchor}>{children}</text>
+    <text x={x} y={y} className={cls} fontSize={size} fontWeight={800} textAnchor={anchor}>{body}</text>
   )
 }
 

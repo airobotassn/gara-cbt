@@ -10,7 +10,12 @@
 //   2026-09-03 에 "DAILY 는 이 은행을 쓰지 않는다" 였던 이유는 게임 은행을 같이 읽으면 관리자가 게임 문항을 고칠 때
 //   DAILY 도 따라 바뀌기 때문이었다. 은행을 갈랐으니 그 이유가 없어졌고, 이제 DAILY 문항도 관리자 화면에서 고친다.
 //   ⛔ 'daily' 를 게임 은행에 물리지 말 것 — 매핑은 `_shared/term-banks.ts` 하나다.
-// 응답:       { items: [{ id, code, field, desc, answer, distractors: [3개] }] }
+// 응답:       { items: [{ id, code, field, desc, answer, answerKo, distractors: [3개] }] }
+//
+// ⛔ **`answerKo`(한국어 정답)를 언어와 무관하게 같이 내려준다.** DAILY QUIZ 의 해설(글·그림)은 코드에 있고
+//    **한국어 정답 표기가 그 열쇠**다 — 영어로 보는 사람에게 `answer` 는 'Neural network' 로 투영되므로
+//    그걸로 해설을 찾으면 못 찾고 해설 카드가 통째로 안 뜬다(2026-09-08 실측: 외국어에선 해설이 안 나왔다).
+//    화면에 보이는 정답은 `answer`, 해설을 찾는 열쇠는 `answerKo` — 두 자리를 섞지 말 것.
 //
 // · 로그인 불필요(게스트도 게임을 한다) — anon 키만 있으면 된다. `--no-verify-jwt` 로 올리지 말 것.
 // · 정답이 그대로 실려 나가지만 이건 원래 클라이언트에서 채점하는 퀴즈 게임이다(시험이 아니다).
@@ -73,7 +78,8 @@ Deno.serve(async (req) => {
           answer = projText(r.answer_i18n, 'ko')
           distractors = projOptions(r.distractors_i18n, 'ko')
         }
-        return { id: r.id, code: r.code, field: r.field, desc, answer, distractors }
+        // answerKo 는 투영을 거치지 않은 원본이다(해설을 찾는 열쇠라 언어가 바뀌어도 그대로여야 한다).
+        return { id: r.id, code: r.code, field: r.field, desc, answer, answerKo: projText(r.answer_i18n, 'ko'), distractors }
       })
       .filter((it) => it.desc && it.answer && it.distractors.length === 3 && it.distractors.every(Boolean))
 

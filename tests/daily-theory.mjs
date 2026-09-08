@@ -110,6 +110,60 @@ const unregisteredTh = readdirSync(THEORY_DIR).filter((f) => /^batch\d+\.ts$/.te
   .filter((f) => !termsSrc.includes(f.replace('.ts', '')));
 eq('⭐ 해설 배치가 전부 TERM_THEORY 에 합쳐져 있다', unregisteredTh, []);
 
+// ── 번역 (theory/i18n/<lang>.labels.ts · <lang>.theory.ts) ──────────
+// 번역은 **덮어쓰기 표**다 — 없는 항목은 한국어가 그대로 나오므로 화면이 비지는 않는다.
+// 그래도 아래는 잡아야 한다:
+//   · 키에 오타가 나면 그 항목만 영영 한국어로 남는다(에러 없이 조용히)
+//   · 원문이 바뀌었는데 번역표에 옛 키가 남아 있으면 그 번역은 죽은 값이다
+{
+  const I18N = `${THEORY_DIR}/i18n`;
+  let dir = [];
+  try { dir = readdirSync(I18N); } catch { /* 아직 번역이 없을 수 있다 */ }
+  const langs = [...new Set(dir.map((f) => /^([a-z]{2})\.(labels|theory)\.ts$/.exec(f)?.[1]).filter(Boolean))].sort();
+
+  // 원문 라벨 = 그림 파일 안에서 **화면에 닿을 수 있는 한글 전부**.
+  // ⚠️ `Lab` 만 세면 안 된다 — 조작줄의 칩·힌트·상태 배지, 데이터 배열의 낱말도 화면에 나온다
+  //    (`Frame` 이 자기 아래 글자를 통째로 훑어 갈아 끼운다). 실제로 Lab 만 셌다가 화면 절반이 한국어로 남았다.
+  // ⚠️ 주석은 뺀다. `>` 는 비교 연산자로도 쓰이므로 등호·괄호가 섞인 조각은 코드로 보고 버린다.
+  const koLabels = new Set();
+  for (const [, raw] of visFiles) {
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const add = (s) => {
+      const one = String(s).trim().replace(/\s+/g, ' ');
+      if (one && /[가-힣]/.test(one)) koLabels.add(one);
+    };
+    for (const m of src.matchAll(/'((?:[^'\\\n]|\\.)*)'|"([^"\n]*)"/g)) add((m[1] ?? m[2]).replace(/\\'/g, "'"));
+    for (const m of src.matchAll(/>([^<>{}]*)</g)) { if (!/[=;()?]|=>|&&/.test(m[1])) add(m[1]); }
+    // ⚠️ `Lab` 본문은 위 필터를 통과 못 하는 것도 대상이다 — 라벨에 등호·괄호가 들어가는 게 자연스럽다
+    //    (`왕복 시간 × 소리 속도 ÷ 2 = 거리`). 태그 이름으로 잡으므로 코드 조각이 섞일 일이 없다.
+    for (const m of src.matchAll(/<Lab\b[^>]*>([\s\S]*?)<\/Lab>/g)) { if (!/[{<]/.test(m[1])) add(m[1]); }
+  }
+  ok(`원문 라벨 ${koLabels.size}개를 읽었다`, koLabels.size > 100, koLabels.size);
+  // ⛔ 엔티티(&lsquo; 등)를 쓰면 **화면 글자와 소스 글자가 달라져** 번역 키가 안 맞는다(그 라벨만 한국어로 남는다).
+  const entity = [...koLabels].filter((s) => /&[a-zA-Z]+;|&#\d+;/.test(s));
+  eq('⭐ 라벨에 HTML 엔티티를 쓰지 않았다', entity, []);
+
+  for (const lang of langs) {
+    const keysOf = (file, decl) => {
+      const src = readFileSync(`${I18N}/${file}`, 'utf8');
+      const body = src.slice(src.indexOf(decl));
+      // 한 줄짜리('키': '값') 와 블록형('키': { … ) 을 다 잡는다
+      return new Set([...body.matchAll(/^ {2}(?:'((?:[^'\\]|\\.)*)'|"([^"]*)"|([^\s:'"]+)): /gm)].map((m) => (m[1] ?? m[2] ?? m[3]).replace(/\\'/g, "'")));
+    };
+    const lk = keysOf(`${lang}.labels.ts`, 'LABELS');
+    const tk = keysOf(`${lang}.theory.ts`, 'THEORY');
+    const unknownL = [...lk].filter((k) => !koLabels.has(k));
+    const unknownT = [...tk].filter((k) => !theory.has(k));
+    eq(`⭐ ${lang}: 없는 라벨을 번역해 두지 않았다(원문이 바뀐 자리)`, unknownL.slice(0, 5), []);
+    eq(`⭐ ${lang}: 없는 용어를 번역해 두지 않았다`, unknownT.slice(0, 5), []);
+    const missL = [...koLabels].filter((k) => !lk.has(k));
+    const missT = [...theory.keys()].filter((k) => !tk.has(k));
+    ok(`${lang}: 라벨 ${lk.size}/${koLabels.size}${missL.length ? ` (빠짐 ${missL.length})` : ''}`, missL.length === 0, missL.slice(0, 3));
+    ok(`${lang}: 해설 ${tk.size}/${theory.size}${missT.length ? ` (빠짐 ${missT.length})` : ''}`, missT.length === 0, missT.slice(0, 3));
+  }
+  if (!langs.length) console.log('ℹ️ 번역 파일이 아직 없다(한국어로만 나간다).');
+}
+
 // ── 리포트 ───────────────────────────────────────────────────────
 let bad = 0;
 for (const r of results) {

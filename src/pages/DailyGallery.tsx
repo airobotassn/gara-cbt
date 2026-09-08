@@ -11,9 +11,16 @@ import { useState } from 'react'
 import '../styles/daily.css'
 import DailyVisual, { DAILY_VISUALS } from '../components/DailyVisual'
 import { TERM_THEORY } from '../lib/terms'
+import { tTheory, useDailyI18n } from '../lib/dailyI18n'
+
+// 언어를 바꿔 가며 훑는다 — **그림 속 글자가 넘치는지**는 언어마다 다르고, 그게 이 화면의 두 번째 용도다.
+// ⚠️ 여기서는 앱의 언어 설정을 바꾸지 않는다(도감만 그 언어로 그린다). 앱 언어까지 바꾸면 검수하다 화면이 통째로 바뀐다.
+const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi'] as const
 
 export default function DailyGallery() {
   const [q, setQ] = useState('')
+  const [lang, setLang] = useState<string>('ko')
+  useDailyI18n(lang)
   // 그림 키 → 그 그림을 쓰는 용어(해설). 짝이 없는 그림은 '(안 쓰임)' 으로 드러난다.
   const owner: Record<string, string> = {}
   for (const [term, t] of Object.entries(TERM_THEORY)) if (t.visual) owner[t.visual] = term
@@ -34,11 +41,24 @@ export default function DailyGallery() {
           placeholder="용어·그림키 검색"
           style={{ padding: '7px 11px', borderRadius: 10, border: '2px solid var(--line)', background: 'var(--card)', color: 'var(--ink)', fontWeight: 700 }}
         />
+        <div style={{ display: 'flex', gap: 6 }}>
+          {LANGS.map((l) => (
+            <button
+              key={l}
+              onClick={() => setLang(l)}
+              style={{
+                padding: '6px 11px', borderRadius: 999, fontWeight: 900, cursor: 'pointer',
+                border: `2px solid ${lang === l ? 'var(--brand)' : 'var(--line)'}`,
+                background: 'var(--card)', color: 'var(--ink)',
+              }}
+            >{l}</button>
+          ))}
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 16, alignItems: 'start' }}>
         {keys.map((k) => {
           const term = owner[k]
-          const th = term ? TERM_THEORY[term] : undefined
+          const th = term ? tTheory(term, TERM_THEORY[term]) : undefined
           return (
             <div key={k} className="dy-th-card" style={{ marginTop: 0 }}>
               <div className="dy-th-head">

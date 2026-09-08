@@ -294,7 +294,9 @@ function B13Fk() {
       <Lab x={ex + 14} y={ey - 12} tone="hot" size={12}>θ2</Lab>
 
       <circle cx={tx} cy={ty} r={9} className="vz-node-on" stroke="currentColor" strokeWidth={3} />
-      <Lab x={tx} y={ty - 16} tone="ok" size={11}>끝점</Lab>
+      {/* ⚠️ 팔이 왼쪽 끝까지 가면 라벨이 상자(0~320) 밖으로 나가 잘린다 — 가장자리에서 붙잡아 둔다.
+          번역문은 한국어보다 길어 더 잘 나가므로 넉넉히 잡는다(넘침 검사가 이 자리를 잡아냈다). */}
+      <Lab x={Math.min(280, Math.max(40, tx))} y={ty - 16} tone="ok" size={11}>끝점</Lab>
 
       <Lab x={160} y={172} size={11}>각도를 정하면 끝점이 계산된다</Lab>
     </Frame>

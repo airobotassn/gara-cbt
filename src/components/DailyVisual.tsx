@@ -26,32 +26,11 @@ import { VISUALS_B13 } from './dailyVisuals/batch13'
 import { VISUALS_B14 } from './dailyVisuals/batch14'
 import { VISUALS_B15 } from './dailyVisuals/batch15'
 import { VISUALS_B16 } from './dailyVisuals/batch16'
+import { VW, Frame, Limb, Joint, translateTree } from './dailyVisuals/kit'
 
-const VW = 320 // 모든 그림의 viewBox 가로(높이는 그림마다 다르다)
-
-/** 그림 + 아래 조작줄 공통 껍데기 */
-function Frame({ h, children, foot }: { h: number; children: ReactNode; foot?: ReactNode }) {
-  return (
-    <div className="dy-viz">
-      <svg className="vz" viewBox={`0 0 ${VW} ${h}`} role="img">{children}</svg>
-      {foot && <div className="dy-viz-foot">{foot}</div>}
-    </div>
-  )
-}
-
-/** 카툰 톤 팔 — 굵은 외곽선 위에 얇은 면을 덮어 '테두리 있는 막대'를 만든다. */
-function Limb({ x1, y1, x2, y2, w = 15 }: { x1: number; y1: number; x2: number; y2: number; w?: number }) {
-  return (
-    <>
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="currentColor" strokeWidth={w} strokeLinecap="round" />
-      <line x1={x1} y1={y1} x2={x2} y2={y2} className="vz-limb" strokeWidth={w - 6} strokeLinecap="round" />
-    </>
-  )
-}
-
-function Joint({ x, y, r = 7 }: { x: number; y: number; r?: number }) {
-  return <circle cx={x} cy={y} r={r} className="vz-card" stroke="currentColor" strokeWidth={3} />
-}
+// ⛔ 부품(Frame·Limb·Joint)은 **묶음과 같은 것을 쓴다**(dailyVisuals/kit). 여기 따로 두면
+//    ① 굵기·색 규칙이 갈리고 ② **글자 번역이 이 8장에만 안 걸린다** — kit 의 Frame 이 자기 아래 글자를
+//    통째로 훑어 화면 언어로 갈아 끼우기 때문이다(그래서 처음엔 이 8장만 외국어에서 한국어로 남았다).
 
 // ── 엔드 이펙터 ─────────────────────────────────────────────────────────────
 // 팔은 그대로 두고 끝만 갈아 끼운다 + 그때 기준점(TCP)이 같이 옮겨간다 — 두 문장을 한 그림으로.
@@ -282,19 +261,25 @@ function Manipulator() {
         onPointerUp={() => setDrag(false)}
         onPointerCancel={() => setDrag(false)}
       >
-        <ellipse cx={IK.bx} cy={IK.by + 10} rx={34} ry={9} className="vz-mute" stroke="currentColor" strokeWidth={3} />
-        <Limb x1={IK.bx} y1={IK.by} x2={ex} y2={ey} />
-        <Limb x1={ex} y1={ey} x2={tx} y2={ty} w={13} />
-        <Joint x={IK.bx} y={IK.by} />
-        <Joint x={ex} y={ey} />
-        {/* 관절 각도 — 끌 때 숫자가 같이 변하는 걸 보여 줘야 '역산'이 눈에 들어온다 */}
-        <text x={IK.bx + 14} y={IK.by - 12} className="vz-lab">θ1 {deg(t1)}°</text>
-        <text x={ex + 12} y={ey - 12} className="vz-lab">θ2 {deg(t2)}°</text>
-        <circle cx={tx} cy={ty} r={13} className="vz-target" strokeWidth={3} />
-        <circle cx={tx} cy={ty} r={4} className="vz-target-c" />
+        {/* ⚠️ 이 그림만 Frame 을 못 쓴다(끌기 이벤트가 svg 에 직접 붙는다) — 그래서 글자 번역을 여기서 직접 건다.
+            안 걸면 이 한 장만 외국어에서 한국어로 남는다. */}
+        {translateTree(
+          <>
+            <ellipse cx={IK.bx} cy={IK.by + 10} rx={34} ry={9} className="vz-mute" stroke="currentColor" strokeWidth={3} />
+            <Limb x1={IK.bx} y1={IK.by} x2={ex} y2={ey} />
+            <Limb x1={ex} y1={ey} x2={tx} y2={ty} w={13} />
+            <Joint x={IK.bx} y={IK.by} />
+            <Joint x={ex} y={ey} />
+            {/* 관절 각도 — 끌 때 숫자가 같이 변하는 걸 보여 줘야 '역산'이 눈에 들어온다 */}
+            <text x={IK.bx + 14} y={IK.by - 12} className="vz-lab">θ1 {deg(t1)}°</text>
+            <text x={ex + 12} y={ey - 12} className="vz-lab">θ2 {deg(t2)}°</text>
+            <circle cx={tx} cy={ty} r={13} className="vz-target" strokeWidth={3} />
+            <circle cx={tx} cy={ty} r={4} className="vz-target-c" />
+          </>,
+        )}
       </svg>
       <div className="dy-viz-foot">
-        <span className="dy-viz-hint">👆 손끝을 끌어 보라 — 관절 각도가 알아서 따라온다</span>
+        <span className="dy-viz-hint">{translateTree('👆 손끝을 끌어 보라 — 관절 각도가 알아서 따라온다')}</span>
       </div>
     </div>
   )

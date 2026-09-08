@@ -84,8 +84,10 @@ export default function Daily() {
   // 정답 공개 조건 = 이번에 골랐거나 / 서버가 이미 오늘 완료로 기록(재방문)한 경우.
   const answered = picked !== null || done
   // 풀고 나서 읽는 해설. 아직 안 쓴 용어면 null 이고, 그날은 해설 블록이 아예 안 나온다.
-  //   해설은 코드에 남는다(그림과 짝) — 정답 용어(한국어)가 키라, 은행에서 용어 표기를 바꾸거나 외국어로 보면 해설이 안 붙는다.
-  const theory = term ? termTheory(term) : null
+  //   ⛔ 해설을 찾을 땐 **한국어 정답(`answerKo`)** 을 쓴다 — 화면에 보이는 `answer` 는 언어로 투영돼 있어서
+  //      그걸로 찾으면 외국어 사용자에게만 해설 카드가 통째로 안 뜬다(2026-09-08 실측).
+  //      은행에서 한국어 표기를 바꾸면 해설이 떨어지는 건 그대로다(그건 코드의 키라서).
+  const theory = term ? termTheory({ answer: term.answerKo ?? term.answer }) : null
 
   function applyHub(h: HubState) {
     setAuthed(!!h.authed)
@@ -212,7 +214,7 @@ export default function Daily() {
         <section className={`dy-theory${answered ? ' open' : ''}`} aria-hidden={!answered}>
           <div className="dy-th-clip">
             {/* 카드 자체는 관리자 미리보기와 공용(components/DailyTheoryCard) — 여기서 따로 그리지 말 것. */}
-            <DailyTheoryCard answer={term.answer} theory={theory} />
+            <DailyTheoryCard answer={term.answer} answerKo={term.answerKo} theory={theory} />
           </div>
         </section>
       )}

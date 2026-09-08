@@ -19,7 +19,14 @@ export interface TermPoolItem {
   code?: string | null
   field: string
   desc: string
+  /** 화면에 보이는 정답 — 화면 언어로 투영돼 있다. */
   answer: string
+  /**
+   * 한국어 원본 정답. **해설(글·그림)을 찾는 열쇠**다 — 해설은 코드에 한국어 표기로 저장돼 있어서
+   * 투영된 `answer` 로 찾으면 외국어에선 해설 카드가 통째로 안 뜬다.
+   * ⚠️ 옛 배포본 서버는 이 칸을 안 준다 → 그때는 `answer` 로 떨어진다(한국어면 그대로 맞다).
+   */
+  answerKo?: string
   distractors: string[] // 3개
 }
 
@@ -34,7 +41,7 @@ export type TermTarget = 'beat-cari' | 'shoot-cari' | 'pick-cari' | 'daily'
 export function fallbackPool(target: TermTarget = 'beat-cari'): TermPoolItem[] {
   const src = target === 'daily' ? TERMS.filter((t) => !!termTheory(t)) : TERMS
   return src.map((t: TermItem) => ({
-    field: t.field, desc: t.desc, answer: t.answer, distractors: t.distractors.slice(0, 3),
+    field: t.field, desc: t.desc, answer: t.answer, answerKo: t.answer, distractors: t.distractors.slice(0, 3),
   }))
 }
 

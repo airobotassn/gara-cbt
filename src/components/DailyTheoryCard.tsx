@@ -8,10 +8,18 @@
 //    여기는 받은 것을 그리기만 한다.
 import DailyVisual from './DailyVisual'
 import { useT } from '../lib/i18n'
+import { tTheory, useDailyI18n } from '../lib/dailyI18n'
 import type { TermTheory } from '../lib/terms'
 
-export default function DailyTheoryCard({ answer, theory }: { answer: string; theory: TermTheory }) {
-  const { t } = useT()
+/**
+ * @param answer   화면에 보이는 정답(언어로 투영된 것) — 카드 제목이다.
+ * @param answerKo 한국어 정답 — **번역을 찾는 열쇠**(해설이 코드에 한국어 표기로 저장돼 있다).
+ */
+export default function DailyTheoryCard({ answer, answerKo, theory }: { answer: string; answerKo?: string; theory: TermTheory }) {
+  const { t, lang } = useT()
+  // 해설 글·그림 라벨의 번역표를 이 화면 언어로 받아 둔다(도착하면 다시 그려진다).
+  useDailyI18n(lang)
+  const tr = tTheory(answerKo ?? answer, theory)
   return (
     <div className="dy-th-card">
       <div className="dy-th-head">
@@ -19,19 +27,19 @@ export default function DailyTheoryCard({ answer, theory }: { answer: string; th
         <b>{answer}</b>
       </div>
       {/* 그림이 먼저다 — 2초에 읽히는 건 이쪽이고, 아래 한 줄은 그 캡션이다. */}
-      <DailyVisual name={theory.visual} />
-      <p className="dy-th-point">{theory.point}</p>
-      {theory.why && theory.why.length > 0 && (
+      <DailyVisual name={tr.visual} />
+      <p className="dy-th-point">{tr.point}</p>
+      {tr.why && tr.why.length > 0 && (
         <ul className="dy-th-why">
-          {theory.why.map((line, i) => (
+          {tr.why.map((line, i) => (
             <li key={i}>{line}</li>
           ))}
         </ul>
       )}
-      {theory.compare && (
+      {tr.compare && (
         <p className="dy-th-cmp">
           <span>{t('daily.hint_lead')}</span>
-          {theory.compare}
+          {tr.compare}
         </p>
       )}
     </div>

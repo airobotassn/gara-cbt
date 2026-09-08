@@ -400,7 +400,8 @@ function B14Swarm() {
       <rect x={16} y={16} width={34} height={26} rx={6} className="vz-card" stroke="currentColor" strokeWidth={3} />
       <line x1={16} y1={16} x2={50} y2={42} className="vz-goal" strokeWidth={3} strokeLinecap="round" />
       <line x1={50} y1={16} x2={16} y2={42} className="vz-goal" strokeWidth={3} strokeLinecap="round" />
-      <Lab x={33} y={54} size={11} tone="bad">지휘자 없음</Lab>
+      {/* ⚠️ 왼쪽 끝에 가까운 라벨은 anchor="start" 로 둔다 — 가운데 정렬이면 번역문이 길어질 때 상자 밖으로 나간다. */}
+      <Lab x={10} y={54} size={11} tone="bad" anchor="start">지휘자 없음</Lab>
 
       <g style={{ opacity: formed ? 0 : 1, transition: 'opacity .3s ease' }}>
         {SWARM_SCATTER_PAIRS.map(([i, j], k) => (
