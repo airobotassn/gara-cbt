@@ -205,7 +205,7 @@ supabase/
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
   functions/   50개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
                · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift·term-pool) · 검색라우터(route-query·route-seed)
-               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*·lecture-qa) · 운영(admin·admin-test·my-attempts·set-region·translate-questions·track-visit·agree-terms)
+               · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*) · 운영(admin·admin-test·my-attempts·set-region·translate-questions·track-visit·agree-terms)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
                       · chat.ts(모더레이션·방) · translate.ts(번역 판정) · country-lang.ts(국가→번역 대상 언어)
                       · question-history.ts(문항 변경 이력 — 세 제도 공용, kind 필수)

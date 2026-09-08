@@ -208,7 +208,7 @@ export default function Ebooks() {
       .sort((a, b) => (a.targetLevel ?? 99) - (b.targetLevel ?? 99))
       .map((l) => ({
         // ⚠️ id 는 **lectures.id(uuid)** 다 — 결제로 넘어가는 값이라 유튜브 id 를 넣으면 서버가 못 찾는다.
-        key: `l:${l.id}`, id: l.id, kind: 'lecture', title: l.title, sub: l.channel,
+        key: `l:${l.id}`, id: l.id, kind: 'lecture', title: l.title, sub: '',
         price: l.price_usd_cents, owned: l.owned, cover: null, thumb: l.thumbUrl, level: l.targetLevel,
       }))
     return [...books, ...lecs]

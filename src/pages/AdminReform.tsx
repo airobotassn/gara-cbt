@@ -745,8 +745,7 @@ function CertConditions() {
 interface LectureRow {
   id: string; catalog: 'leveltest' | 'caris'
   target_level: number | null; target_tier: string | null
-  /** ⚠️ channel 은 관리자 화면에서 뺐다(2026-08-25) — DB 컬럼은 남아 있고 옛 값도 그대로다. */
-  channel: string; title: string; description: string
+  title: string; description: string
   /** ⛔ **둘 중 정확히 하나만 찬다**(DB CHECK `lectures_source_chk`, 2026-09-03).
    *  유튜브 = 기존 무료 강의 / Bunny = 유료 강의(서명 없이는 재생 불가). */
   youtube_id: string | null

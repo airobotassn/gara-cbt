@@ -518,7 +518,6 @@ export interface ServerLecture {
   owned: boolean
   purchasedAt?: string // 서재(library) 응답에만
   title: string
-  channel: string
   description: string
 }
 export interface EbookListResp {

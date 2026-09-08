@@ -114,7 +114,6 @@ function shapeLecture(l: Row, owned: boolean, lang: string) {
     targetLevel: (l.target_level as number | null) ?? null,
     targetTier: (l.target_tier as string | null) ?? null,
     title: trField(l.title_i18n, lang, l.title as string),
-    channel: (l.channel as string | null) ?? '',
     description: trField(l.description_i18n, lang, (l.description as string | null) ?? ''),
     price_usd_cents: (l.price_usd_cents as number) ?? 0,
     source: (bunnyId ? 'bunny' : 'youtube') as 'bunny' | 'youtube',
@@ -128,7 +127,7 @@ function shapeLecture(l: Row, owned: boolean, lang: string) {
 }
 
 /** 강의 목록 select — 소유 판정 전이라 영상 id 도 뽑는다(내려줄지는 shapeLecture 가 정한다). */
-const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, bunny_video_id, title, title_i18n, channel, description, description_i18n, price_usd_cents, thumb_url, sort_order, created_at'
+const LECTURE_COLS = 'id, catalog, target_level, target_tier, youtube_id, bunny_video_id, title, title_i18n, description, description_i18n, price_usd_cents, thumb_url, sort_order, created_at'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })

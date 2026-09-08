@@ -483,7 +483,6 @@ export function LectureRow({
         )}
       </div>
       <h4 className="mt-3.5 font-title-md text-[19px] font-bold text-on-surface break-keep line-clamp-2">{lec.title}</h4>
-      {lec.channel && <p className="mt-1.5 font-body-md text-[15px] text-outline truncate">{lec.channel}</p>}
       {lec.description && <p className="mt-2 font-body-md text-[15px] leading-[23px] text-on-surface-variant line-clamp-3 break-keep">{lec.description}</p>}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {lec.owned ? (

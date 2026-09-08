@@ -245,10 +245,8 @@ async function lectureUpsert(admin: any, body: any, deps: ReformDeps) {
     target_level: catalog === 'leveltest' ? (l.targetLevel ?? null) : null,
     target_tier: catalog === 'caris' ? (l.targetTier ?? null) : null,
     youtube_id: ytVid, bunny_video_id: bnVid, title: String(l.title),
-    // ⚠️ 채널은 관리자 화면에서 뺐다(2026-08-25) — 우리가 만든 강의를 파는 것이라 '어느 채널 영상인가'가
-    //    쓸 정보가 아니다. 화면이 안 보내므로 저장할 때마다 빈 값이 되고, 사용자 화면은 비면 그 줄을 안 그린다.
-    //    ⛔ 컬럼은 남겨둔다 — 지우면 옛 행의 값까지 사라져 되돌릴 수 없다.
-    channel: String(l.channel ?? ''),
+    // ⚠️ 채널(어느 유튜브 채널 영상인가)은 2026-08-25 에 관리자 화면에서 뺐고, 2026-09-07 에 컬럼까지 지웠다.
+    //    우리가 만든 강의를 파는 것이라 쓸 정보가 아니다 — 남겨둘 값도 없었다(실측 2행 전부 빈 문자열).
     description: String(l.description ?? ''),
     // 정가 — **달러 센트**(100 = $1.00). 이북과 같은 단위다. 0 = 무료(결제창을 안 타고 바로 지급).
     //   ⚠️ 음수·소수·NaN 을 그대로 넣지 않는다 — DB CHECK 이 막아주지만 여기서 접어야 오류가 안 뜬다.
