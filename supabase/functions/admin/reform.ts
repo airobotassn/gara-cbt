@@ -6,6 +6,7 @@ import { bunnyConfigured, bunnyPullzone, bunnyThumbUrl } from '../_shared/bunny.
 import { DEFAULT_PASS_RATIO, attemptPassed, tierRank } from '../_shared/exam-tickets.ts'
 import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
 import { REWARD_MAX_DELTA, REWARD_MAX_PER_DAY } from '../_shared/reward-policy.ts'
+import { TERM_BANKS, termBankKey, type TermBankKey } from '../_shared/term-banks.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
@@ -981,7 +982,13 @@ async function certConditionsSave(admin: any, body: any, ctx: Ctx) {
 
 // ── 용어 문제은행 (레벨테스트/CARIS 문항관리와 같은 방식) ────
 //
-// 구조: term_questions(문항) 하나뿐. **은행 = 게임에 나가는 문제 전부**다.
+// 구조: term_questions(문항) 하나뿐. **은행 = 그 은행에 살아 있는 문항 전부**다.
+//
+// **은행이 둘이다(2026-09-08 지시)** — 게임 3종(bank='game', 번호 T-###)과 DAILY QUIZ(bank='daily', 번호 D-###).
+//   같은 표를 bank_id 로 가르고, 아래 핸들러 전부가 요청의 `bank` 를 받아 그 은행만 읽고 쓴다(매핑은 `_shared/term-banks.ts`).
+//   ⛔ `bank` 필터를 빠뜨리면 DAILY 화면에 게임 문항이 뜬다 — 에러 없이 조용히 섞이는 종류라, 목록·이력·되돌리기·
+//      번호 매기기·중복 검사 **다섯 자리 전부** 은행을 본다. id 로만 만지는 것(수정·중지·삭제·번역 저장)은 은행이 필요 없다.
+//   ⚠️ `bank` 를 안 보내면 게임이다(termBankKey) — 이 칸이 생기기 전 화면과의 호환.
 //
 // ⛔ **게임별로 문항을 고르는 기능은 없앴다(2026-09-03 지시).** 원래 CARIS(은행→시험→세트)를 본떠
 //    `minigame_question_sets` 로 게임마다 담을 문항을 고르게 해뒀는데, 쓸 이유가 없었다 —
@@ -1015,27 +1022,47 @@ function termMissing(r: any): string[] {
   return miss
 }
 
-/** 다음 문항 번호(T-001…). 지워진 문항의 번호는 재사용하지 않는다 — 이력이 그 번호로 남아 있다. */
-function nextTermCodes(existing: (string | null)[], n: number): string[] {
+/**
+ * 다음 문항 번호(게임 T-001… / DAILY D-001…). 지워진 문항의 번호는 재사용하지 않는다 — 이력이 그 번호로 남아 있다.
+ * ⚠️ 접두사가 은행마다 다르다 — 번호 유일 인덱스가 전역이라 같은 접두사면 두 은행이 번호를 나눠 갖는다.
+ */
+function nextTermCodes(bank: TermBankKey, existing: (string | null)[], n: number): string[] {
+  const p = TERM_BANKS[bank].codePrefix
+  const re = new RegExp(`^${p}-(\\d+)$`)
   let max = 0
   for (const c of existing) {
-    const m = /^T-(\d+)$/.exec(String(c ?? ''))
+    const m = re.exec(String(c ?? ''))
     if (m) max = Math.max(max, Number(m[1]))
   }
-  return Array.from({ length: n }, (_, i) => `T-${String(max + 1 + i).padStart(3, '0')}`)
+  return Array.from({ length: n }, (_, i) => `${p}-${String(max + 1 + i).padStart(3, '0')}`)
+}
+
+/** 그 은행의 문항만 보는 쿼리 시작점. 은행을 보는 자리는 전부 이걸 거친다(빠뜨리면 남의 은행이 섞인다). */
+function termBankRows(admin: any, bank: TermBankKey, cols = '*') {
+  return admin.from('term_questions').select(cols).eq('bank_id', TERM_BANKS[bank].id)
 }
 
 /**
  * 문항 변경 이력 한 줄. 실패해도 본 작업은 막지 않는다(레벨테스트 logEvent 와 같은 규칙).
  * 세 제도 공용 표(question_history)에 kind='term' 으로 쌓는다 — 옛 term_question_events 의 code→label.
+ * `scope` = 은행 키(game·daily). CARIS 가 scope 에 문제은행 uuid 를 두는 것과 같은 자리다.
  */
 async function termLog(
   admin: any,
+  bank: TermBankKey,
   e: { question_id: string | null; code: string | null; action: string; actor: string; detail?: unknown },
 ) {
   await logQuestionEvent(admin, 'term', {
-    question_id: e.question_id, label: e.code, action: e.action, actor: e.actor, detail: e.detail,
+    question_id: e.question_id, label: e.code, scope: bank, action: e.action, actor: e.actor, detail: e.detail,
   })
+}
+
+/**
+ * 문항 하나가 어느 은행 것인지. id 로만 만지는 핸들러(중지·삭제·되돌리기)가 이력의 scope 를 채우려고 부른다.
+ * ⚠️ 요청의 bank 를 믿고 적으면 안 된다 — 화면이 보낸 bank 와 문항의 실제 은행이 어긋나면 이력이 다른 탭에 쌓인다.
+ */
+function bankOfRow(row: any): TermBankKey {
+  return row?.bank_id === TERM_BANKS.daily.id ? 'daily' : 'game'
 }
 
 /** 저장할 번역만 골라낸다. 한 언어라도 덜 찼으면 **그 언어만** 버린다(다른 언어는 살린다). */
@@ -1062,9 +1089,10 @@ function sanitizeTermI18n(t: any): { D: Record<string, string>; A: Record<string
  * ⚠️ 완료율 분모는 **활성 문항**이다(CARIS 와 같은 규칙) — 비활성은 게임에 안 나가니 번역할 이유가 없는데
  *    분모에 넣으면 영영 100%가 안 돼서 "다 됐다"를 아무도 판단 못 한다.
  */
-async function termList(admin: any) {
-  const { data, error } = await admin.from('term_questions').select('*')
-    .is('deleted_at', null).eq('active', true).order('sort_order').order('created_at')
+async function termList(admin: any, body: any) {
+  const bank = termBankKey(body?.bank)
+  const { data, error } = await termBankRows(admin, bank)
+    .is('deleted_at', null).eq('active', true).order('sort_order').order('code')
   if (error) return json({ error: error.message }, 500)
   const rows = ((data ?? []) as any[]).map((t) => ({ ...t, missing: termMissing(t) }))
   const coverage: Record<string, number> = {}
@@ -1072,18 +1100,20 @@ async function termList(admin: any) {
   return json({ terms: rows, coverage, total: rows.length })
 }
 
-/** '문항 이력' 탭 — 되돌릴 수 있는 것들(비활성 · 삭제). */
-async function termRestorable(admin: any) {
+/** '문항 이력' 탭 — 되돌릴 수 있는 것들(비활성 · 삭제). 그 은행 것만. */
+async function termRestorable(admin: any, body: any) {
+  const bank = termBankKey(body?.bank)
   const [inactive, deleted] = await Promise.all([
-    admin.from('term_questions').select('*').is('deleted_at', null).eq('active', false).order('sort_order'),
-    admin.from('term_questions').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+    termBankRows(admin, bank).is('deleted_at', null).eq('active', false).order('sort_order'),
+    termBankRows(admin, bank).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
   ])
   return json({ inactive: inactive.data ?? [], deleted: deleted.data ?? [] })
 }
 
-/** '문항 이력' 탭 — 변경 로그. 문항 번호(T-001)는 공용 표에서 `label` 자리다. */
+/** '문항 이력' 탭 — 변경 로그. 문항 번호(T-001/D-001)는 공용 표에서 `label` 자리, 은행은 `scope` 자리다. */
 async function termEvents(admin: any, body: any) {
-  const { rows, error } = await readQuestionHistory(admin, 'term', { label: body?.code ?? null, limit: 500 })
+  const bank = termBankKey(body?.bank)
+  const { rows, error } = await readQuestionHistory(admin, 'term', { scope: bank, label: body?.code ?? null, limit: 500 })
   if (error) return json({ error }, 500)
   return json({ rows })
 }
@@ -1096,6 +1126,7 @@ async function termEvents(admin: any, body: any) {
  */
 async function termUpsert(admin: any, body: any, ctx: Ctx) {
   const t = body?.term ?? {}
+  const bank = termBankKey(body?.bank)
   const ko = String(t.answerKo ?? '').trim()
   const desc = String(t.descKo ?? '').trim()
   const dis = (t.distractorsKo ?? []).map((s: unknown) => String(s ?? '').trim()).filter(Boolean)
@@ -1125,17 +1156,20 @@ async function termUpsert(admin: any, body: any, ctx: Ctx) {
     sort_order: Number(t.sortOrder ?? 0),
     updated_at: new Date().toISOString(),
   }
+  // 새 문항은 요청의 은행에 들어간다. 수정은 은행을 **안 바꾼다**(bank_id 를 row 에 안 넣는다) — 문항을 은행 사이로
+  // 옮기는 기능은 없고, 있는 것처럼 굴면 이력·번호(T/D)가 어긋난다.
   if (!t.id) {
-    const { data: codes } = await admin.from('term_questions').select('code')
-    row.code = nextTermCodes(((codes ?? []) as any[]).map((r) => r.code), 1)[0]
+    const { data: codes } = await termBankRows(admin, bank, 'code')
+    row.code = nextTermCodes(bank, ((codes ?? []) as any[]).map((r) => r.code), 1)[0]
+    row.bank_id = TERM_BANKS[bank].id
   }
   const q = t.id
-    ? admin.from('term_questions').update(row).eq('id', t.id).select('id, code').maybeSingle()
-    : admin.from('term_questions').insert(row).select('id, code').maybeSingle()
+    ? admin.from('term_questions').update(row).eq('id', t.id).select('id, code, bank_id').maybeSingle()
+    : admin.from('term_questions').insert(row).select('id, code, bank_id').maybeSingle()
   const { data: saved, error } = await q
-  // 같은 정답이 이미 있으면 유일 인덱스가 막는다 — 사람 말로 옮긴다.
+  // 같은 정답이 이미 있으면 유일 인덱스가 막는다(은행 안에서만 유일) — 사람 말로 옮긴다.
   if (error) return json({ error: /term_questions_answer_uniq/.test(error.message) ? '같은 정답 용어가 이미 있습니다.' : error.message }, 400)
-  await termLog(admin, {
+  await termLog(admin, saved ? bankOfRow(saved) : bank, {
     question_id: saved?.id ?? t.id ?? null, code: saved?.code ?? before?.code ?? null,
     action: t.id ? 'update' : 'create', actor: ctx.email,
     detail: { answer: ko, ...(koChanged ? { koChanged: true, clearedTranslations: true } : {}) },
@@ -1148,9 +1182,9 @@ async function termSetActive(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const active = body?.active !== false
   const { data, error } = await admin.from('term_questions').update({ active, updated_at: new Date().toISOString() })
-    .eq('id', id).select('id, code').maybeSingle()
+    .eq('id', id).select('id, code, bank_id').maybeSingle()
   if (error) return json({ error: error.message }, 500)
-  await termLog(admin, { question_id: id, code: data?.code ?? null, action: active ? 'activate' : 'deactivate', actor: ctx.email })
+  await termLog(admin, bankOfRow(data), { question_id: id, code: data?.code ?? null, action: active ? 'activate' : 'deactivate', actor: ctx.email })
   return json({ ok: true })
 }
 
@@ -1161,9 +1195,9 @@ async function termSetActive(admin: any, body: any, ctx: Ctx) {
 async function termDelete(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const { data, error } = await admin.from('term_questions')
-    .update({ deleted_at: new Date().toISOString(), active: false }).eq('id', id).select('id, code').maybeSingle()
+    .update({ deleted_at: new Date().toISOString(), active: false }).eq('id', id).select('id, code, bank_id').maybeSingle()
   if (error) return json({ error: error.message }, 500)
-  await termLog(admin, { question_id: id, code: data?.code ?? null, action: 'delete', actor: ctx.email })
+  await termLog(admin, bankOfRow(data), { question_id: id, code: data?.code ?? null, action: 'delete', actor: ctx.email })
   return json({ ok: true })
 }
 
@@ -1172,9 +1206,9 @@ async function termRestore(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const { data, error } = await admin.from('term_questions')
     .update({ deleted_at: null, active: true, updated_at: new Date().toISOString() })
-    .eq('id', id).select('id, code').maybeSingle()
+    .eq('id', id).select('id, code, bank_id').maybeSingle()
   if (error) return json({ error: /term_questions_answer_uniq/.test(error.message) ? '같은 정답 용어가 이미 있어 되돌릴 수 없습니다.' : error.message }, 400)
-  await termLog(admin, { question_id: id, code: data?.code ?? null, action: 'restore', actor: ctx.email })
+  await termLog(admin, bankOfRow(data), { question_id: id, code: data?.code ?? null, action: 'restore', actor: ctx.email })
   return json({ ok: true })
 }
 
@@ -1186,8 +1220,10 @@ async function termRestore(admin: any, body: any, ctx: Ctx) {
  */
 async function termImport(admin: any, body: any, ctx: Ctx) {
   const items = (body?.items ?? []) as any[]
+  const bank = termBankKey(body?.bank)
   if (!Array.isArray(items) || !items.length) return json({ error: '가져올 문항이 없습니다.' }, 400)
-  const { data: exist } = await admin.from('term_questions').select('code, answer_i18n')
+  // 중복 검사·번호 매기기 둘 다 **그 은행 안에서만** — 게임에 있는 용어를 DAILY 에 올리는 건 정상이다.
+  const { data: exist } = await termBankRows(admin, bank, 'code, answer_i18n')
   const have = new Set(((exist ?? []) as any[]).map((r) => r.answer_i18n?.ko).filter(Boolean))
   const picked: any[] = []
   for (const it of items) {
@@ -1199,9 +1235,10 @@ async function termImport(admin: any, body: any, ctx: Ctx) {
     picked.push({ answer, desc, field: String(it?.field ?? 'AI'), dis })
   }
   if (!picked.length) return json({ ok: true, added: 0, inserted: [] })
-  const codes = nextTermCodes(((exist ?? []) as any[]).map((r) => r.code), picked.length)
+  const codes = nextTermCodes(bank, ((exist ?? []) as any[]).map((r) => r.code), picked.length)
   const base = ((exist ?? []) as any[]).length
   const rows = picked.map((p, i) => ({
+    bank_id: TERM_BANKS[bank].id,
     code: codes[i], field: p.field,
     desc_i18n: { ko: p.desc }, answer_i18n: { ko: p.answer }, distractors_i18n: { ko: p.dis },
     active: true, sort_order: base + i,
@@ -1209,7 +1246,7 @@ async function termImport(admin: any, body: any, ctx: Ctx) {
   const { data: ins, error } = await admin.from('term_questions').insert(rows).select('id, code, answer_i18n')
   if (error) return json({ error: error.message }, 500)
   for (const r of (ins ?? []) as any[]) {
-    await termLog(admin, { question_id: r.id, code: r.code, action: 'import', actor: ctx.email, detail: { answer: r.answer_i18n?.ko } })
+    await termLog(admin, bank, { question_id: r.id, code: r.code, action: 'import', actor: ctx.email, detail: { answer: r.answer_i18n?.ko } })
   }
   return json({
     ok: true, added: rows.length,
@@ -1332,12 +1369,12 @@ export async function handleReform(admin: any, action: string, body: any, ctx: C
     case 'envCheckList': return await envCheckList(admin, body)
     case 'mailNudge': return await mailNudge(admin, body, ctx)
     case 'mailLog': return await mailLog(admin)
-    case 'termList': return await termList(admin)
+    case 'termList': return await termList(admin, body)
     case 'termUpsert': return await termUpsert(admin, body, ctx)
     case 'termSetActive': return await termSetActive(admin, body, ctx)
     case 'termDelete': return await termDelete(admin, body, ctx)
     case 'termRestore': return await termRestore(admin, body, ctx)
-    case 'termRestorable': return await termRestorable(admin)
+    case 'termRestorable': return await termRestorable(admin, body)
     case 'termEvents': return await termEvents(admin, body)
     case 'termImport': return await termImport(admin, body, ctx)
     case 'termTransSave': return await termTransSave(admin, body)

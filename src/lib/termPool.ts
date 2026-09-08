@@ -1,14 +1,15 @@
-// 용어 문항 풀 — 미니게임 용어 퀴즈 3종(버텨라·쏴라·골라라) 전용.
+// 용어 문항 풀 — 미니게임 용어 퀴즈 3종(버텨라·쏴라·골라라) + DAILY QUIZ.
 //
-// ⛔ **DAILY QUIZ 는 여기 없다(2026-09-03 지시).** `/daily` 는 `terms.ts` 의 문항을 그대로 쓴다 —
-//    게임 문제은행과 별개다.
+// **은행이 둘이다(2026-09-08).** 게임 3종은 게임 은행, DAILY QUIZ 는 DAILY 은행 — 같은 표를 은행으로 가른다.
+//   서버(term-pool)가 대상(gameId)으로 은행을 고르므로 여기서는 대상 이름만 정확히 보내면 된다.
+//   ⛔ 'daily' 를 게임 은행에 물리지 말 것 — 관리자가 게임 문항을 고칠 때 DAILY 가 따라 바뀐다(2026-09-03 에 그래서 뗐다).
 //
 // ⛔ **단일 출처는 DB(term_questions)다.** 예전엔 같은 50문항이 네 벌(게임 HTML 3벌의 `POOL` +
 //    `src/lib/terms.ts`)로 복제돼 있어서, 문항 하나를 고치려면 개발자가 파일 넷을 고치고 배포해야 했다.
 //    지금은 관리자 화면에서 고치면 바로 반영된다(레벨테스트·CARIS 문항관리와 같은 방식).
 //
 // ⚠️ 코드 쪽 50문항(`terms.ts` 의 TERMS)은 **폴백으로만** 남는다 — 서버가 죽거나 비로그인 네트워크가
-//    막혀도 게임이 빈 화면으로 뜨면 안 된다. 폴백은 한국어다(번역은 DB 에만 있다).
+//    막혀도 게임·DAILY 가 빈 화면으로 뜨면 안 된다. 폴백은 한국어다(번역은 DB 에만 있다).
 import { callFunction } from './supabase'
 import { TERMS, type TermItem } from './terms'
 
@@ -22,8 +23,8 @@ export interface TermPoolItem {
   distractors: string[] // 3개
 }
 
-/** 이 문항을 쓰는 게임 — 서버 term-pool 의 TARGETS 와 같은 목록이다. */
-export type TermTarget = 'beat-cari' | 'shoot-cari' | 'pick-cari'
+/** 이 문항을 쓰는 대상 — 서버 term-pool 의 TARGETS 와 같은 목록이다. */
+export type TermTarget = 'beat-cari' | 'shoot-cari' | 'pick-cari' | 'daily'
 
 /** 코드에 박힌 기본 문항(폴백). 한국어 고정. */
 export function fallbackPool(): TermPoolItem[] {
@@ -33,8 +34,9 @@ export function fallbackPool(): TermPoolItem[] {
 }
 
 /**
- * 그 게임에 담긴 문항을 화면 언어로 받아온다. 실패하면 폴백(코드에 박힌 한국어 50문항).
+ * 그 대상에 담긴 문항을 화면 언어로 받아온다. 실패하면 폴백(코드에 박힌 한국어 50문항).
  * ⚠️ 실패를 예외로 던지지 않는다 — 문항을 못 받았다고 게임을 못 하게 만들 이유가 없다.
+ * ⚠️ 순서는 서버가 정한 그대로 둔다(sort_order → code). DAILY QUIZ 가 "오늘 = N번째" 로 고르므로 여기서 섞으면 안 된다.
  */
 export async function fetchTermPool(gameId: TermTarget, lang: string): Promise<TermPoolItem[]> {
   try {

@@ -25,7 +25,9 @@ export interface QuestionEventInput {
   label: string | number | null
   /**
    * 어느 묶음 소속인가 — 옛 `bank_id`·`level` 자리.
-   *   caris = 문제은행 uuid · leveltest = 레벨 숫자(1~7) · term = 없음(null)
+   *   caris = 문제은행 uuid · leveltest = 레벨 숫자(1~7) · term = 은행 키(`game`·`daily`, 2026-09-08 부터 — 그전 행은
+   *   마이그레이션 20260908120000 이 전부 `game` 으로 채웠다)
+   * ⚠️ term 은 **한 kind 안에 은행이 둘**이라 scope 까지 걸어야 남의 은행 이력이 안 섞인다(`_shared/term-banks.ts`).
    */
   scope?: string | number | null
   action: string

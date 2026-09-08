@@ -1,12 +1,14 @@
 // AI·로봇·피지컬AI 용어 문제 풀 (원본: AI로봇피지컬AI_용어퀴즈_50문항.xlsx).
 //
-//   · **DAILY QUIZ(`/daily`)의 문항은 여기가 단일 출처다.** 게임 문제은행(DB `term_questions`)과
-//     **별개다** — 2026-09-03 지시로 DAILY QUIZ 를 그 은행에서 뺐다. 여기를 고치면 /daily 가 바뀐다.
-//   · 미니게임 3종에게는 **폴백**이다. 그쪽 단일 출처는 DB 이고 관리 자리는
-//     관리자 화면(WORLD ARENA > 미니게임 > 게임 문항)이다 — 서버가 안 열릴 때만 이 배열이 쓰인다.
+//   · **폴백이다 — 미니게임 3종에게도, DAILY QUIZ 에게도(2026-09-08).** 단일 출처는 DB(`term_questions`)이고
+//     은행이 둘이다: 게임 은행(관리자 › 미니게임 › 게임 문항) · DAILY 은행(관리자 › DAILY QUIZ › 문항 관리).
+//     서버(term-pool)가 안 열릴 때만 이 배열이 쓰인다. **여기를 고쳐도 서비스에는 안 나간다.**
+//   · 2026-09-03 ~ 09-08 사이에는 DAILY QUIZ 의 단일 출처가 여기였다(게임 은행을 같이 읽으면 관리자가 게임 문항을
+//     고칠 때 DAILY 도 바뀌어서). DAILY 전용 은행이 생기면서 그 자리가 DB 로 옮겨갔고, 시드는 이 50개 그대로다
+//     (마이그레이션 20260908120000 — tests/db/t-term-banks.mjs 가 이 배열과 시드를 50개 전부 대조한다).
 //   ⚠️ 옛 주석의 "public/games/*.html 의 POOL 과 같이 갱신할 것" 규칙은 없어졌다(그쪽도 폴백이다).
 //
-//   해설(TERM_THEORY)은 그림(DailyVisual)과 짝이라 코드에 남는다.
+//   해설(TERM_THEORY)은 그림(DailyVisual)과 짝이라 코드에 남는다 — 정답 용어(한국어)를 키로 찾는다.
 
 export type TermField = 'AI' | '로봇' | '피지컬AI'
 
@@ -147,7 +149,8 @@ export const TERM_THEORY: Record<string, TermTheory> = {
 }
 
 /** 오늘의 용어에 붙은 해설. 아직 안 쓴 용어면 null → 화면에서 해설 블록을 그리지 않는다. */
-export function termTheory(t: TermItem): TermTheory | null {
+/** 정답 용어(한국어)로 해설을 찾는다. 번역된 문항(정답이 외국어)은 키가 안 맞아 null — 해설 자체가 한국어라 그게 맞다. */
+export function termTheory(t: Pick<TermItem, 'answer'>): TermTheory | null {
   return TERM_THEORY[t.answer] ?? null
 }
 
@@ -156,20 +159,24 @@ function epochDay(date: Date): number {
   return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000)
 }
 
-// 오늘의 문제 인덱스 — 매일 하나씩 순환(50문항 소진 후 다시 처음).
-export function dailyTermIndex(date = new Date()): number {
+/**
+ * 오늘의 문제 자리 — n개 문항 위에서 매일 하나씩 순환(소진 후 다시 처음). 문항이 없으면 -1.
+ * ⚠️ 은행(DB)의 개수를 받는다 — 관리자가 문항을 빼거나 넣으면 n 이 바뀌어 그날 문제가 바뀐다(의도된 성질).
+ *    순서는 서버가 정한 그대로(sort_order → code)여야 모두가 같은 날 같은 문제를 본다.
+ */
+export function dailyIndex(n: number, date = new Date()): number {
+  if (n <= 0) return -1
   const d = epochDay(date)
-  return ((d % TERMS.length) + TERMS.length) % TERMS.length
+  return ((d % n) + n) % n
 }
 
-export function dailyTerm(date = new Date()): TermItem {
-  return TERMS[dailyTermIndex(date)]
-}
-
-// 보기 4개(정답+오답3)를 날짜 시드로 섞은 배열. 같은 날엔 항상 같은 순서(새로고침해도 고정).
-export function dailyChoices(date = new Date()): string[] {
-  const t = dailyTerm(date)
-  const arr = [t.answer, ...t.distractors]
+/**
+ * 보기(정답+오답3)를 날짜 시드로 섞은 새 배열. 같은 날엔 항상 같은 순서(새로고침·언어 전환에도 고정).
+ * ⚠️ 순열이 **길이와 날짜에만** 의존한다 — 언어를 바꿔 같은 문항을 다시 받아도 같은 자리에 같은 보기가 온다.
+ *    /daily 가 "내가 고른 것"을 문자열이 아니라 자리(index)로 들고 있는 근거다.
+ */
+export function dailyShuffle<T>(items: readonly T[], date = new Date()): T[] {
+  const arr = [...items]
   // 시드 = epochDay. Fisher–Yates 를 선형합동 난수로 결정론적으로 돌린다.
   let seed = epochDay(date) * 2654435761
   const rand = () => {

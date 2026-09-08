@@ -6,13 +6,14 @@
 //    콘텐츠 슬롯은 자리표시자이고, 완료 트리거는 임시 버튼이다. 콘텐츠가 붙으면
 //    <DailySlot> 자리에 문제형/수동 소비형 렌더러가 들어가고, 완료 판정이
 //    '끝까지 봄(수동) · 열람·시도(문제형)'로 바뀐다. 적립 자체는 서버가 이미 권위.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/daily.css'
 import { callFunction } from '../lib/supabase'
 import { useAuth } from '../context/AuthProvider'
 import { useT, localeOf } from '../lib/i18n'
-import { dailyTerm, dailyChoices, termTheory, TERMS } from '../lib/terms'
+import { dailyIndex, dailyShuffle, termTheory } from '../lib/terms'
+import { fetchTermPool, type TermPoolItem } from '../lib/termPool'
 import DailyVisual from '../components/DailyVisual'
 import StarField from '../components/StarField'
 
@@ -54,24 +55,35 @@ export default function Daily() {
   const [celebrate, setCelebrate] = useState(false) // 완료 직후 보상 연출(재방문 시엔 안 뜬다)
   const [rewarded, setRewarded] = useState(true) // 이번 완료로 재화가 실제 지급됐는지(서버 응답 first)
   const [bonus, setBonus] = useState(0) // 7일 완주 보너스 코인(서버 응답 bonus)
-  // 오늘의 문제 — 미니게임과 같은 용어 풀(lib/terms)에서 날짜별로 하나씩 순환. 마운트 시 1회 고정.
+  // 오늘의 문제 — DAILY QUIZ 은행(관리자 › DAILY QUIZ › 문항 관리)에서 날짜별로 하나씩 순환(2026-09-08 부터 DB).
+  //   서버(term-pool)가 화면 언어로 투영해 내려주고, 못 받으면 코드의 50문항(lib/terms · 한국어)으로 떨어진다.
+  //   ⚠️ 언어를 바꾸면 다시 받는다 — 문항 자리(dailyIndex)와 보기 순서(dailyShuffle)는 언어와 무관하게 같아서,
+  //      고른 보기를 **문자열이 아니라 자리(pickedIdx)** 로 들고 있으면 언어를 바꿔도 내가 고른 것이 그대로 남는다.
+  const [pool, setPool] = useState<TermPoolItem[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    void fetchTermPool('daily', lang).then((items) => { if (alive) setPool(items) })
+    return () => { alive = false }
+  }, [lang])
   // ⚠️ `?term=N` 은 **개발 서버에서만** 도는 미리보기다(해설·그림을 하루씩 기다리며 확인할 수 없어서).
   //    import.meta.env.DEV 가 false 인 빌드에서는 분기 자체가 트리셰이킹으로 사라진다.
-  const [term] = useState(() => {
+  const term = useMemo<TermPoolItem | null>(() => {
+    if (!pool?.length) return null
     if (import.meta.env.DEV) {
       const n = Number(new URLSearchParams(window.location.search).get('term'))
-      if (Number.isInteger(n) && n >= 0) return TERMS[n % TERMS.length]
+      if (Number.isInteger(n) && n >= 0) return pool[n % pool.length]
     }
-    return dailyTerm()
-  })
-  const [choices] = useState(() =>
-    term === dailyTerm() ? dailyChoices() : [term.answer, ...term.distractors],
-  ) // 보기 4개(정답+오답3), 날짜 시드로 섞임
-  const [picked, setPicked] = useState<string | null>(null) // 이번 방문에 고른 보기
+    return pool[dailyIndex(pool.length)]
+  }, [pool])
+  // 보기 4개(정답+오답3), 날짜 시드로 섞임 — 같은 날엔 새로고침해도 같은 순서.
+  const choices = useMemo(() => (term ? dailyShuffle([term.answer, ...term.distractors]) : []), [term])
+  const [pickedIdx, setPickedIdx] = useState<number | null>(null) // 이번 방문에 고른 보기의 자리
+  const picked = pickedIdx === null ? null : choices[pickedIdx] ?? null
   // 정답 공개 조건 = 이번에 골랐거나 / 서버가 이미 오늘 완료로 기록(재방문)한 경우.
   const answered = picked !== null || done
   // 풀고 나서 읽는 해설. 아직 안 쓴 용어면 null 이고, 그날은 해설 블록이 아예 안 나온다.
-  const theory = termTheory(term)
+  //   해설은 코드에 남는다(그림과 짝) — 정답 용어(한국어)가 키라, 은행에서 용어 표기를 바꾸거나 외국어로 보면 해설이 안 붙는다.
+  const theory = term ? termTheory(term) : null
 
   function applyHub(h: HubState) {
     setAuthed(!!h.authed)
@@ -112,9 +124,9 @@ export default function Daily() {
 
   // 보기 선택 = 오늘 학습 '시도'. 정답 공개는 로그인과 무관(누구나 학습), 적립만 로그인 필요
   //   → complete() 안에서 비로그인이면 로그인 유도. 맞히든 틀리든 한 번 고르면 완료로 간다.
-  function onPick(opt: string) {
+  function onPick(i: number) {
     if (answered || busy) return
-    setPicked(opt)
+    setPickedIdx(i)
     void complete()
   }
 
@@ -153,43 +165,48 @@ export default function Daily() {
       {/* 2단: 콘텐츠(주) + 보상 레일(부). 880px 이하에서 1열로 스택된다. */}
       <div className="dy-grid">
       <main className="dy-main">
-      {/* 콘텐츠 슬롯 — 오늘의 용어 4지선다. 미니게임과 같은 풀에서 날짜별로 하나. */}
+      {/* 콘텐츠 슬롯 — 오늘의 용어 4지선다. DAILY QUIZ 은행에서 날짜별로 하나.
+          ⚠️ 문항이 오기 전에는 카드 껍데기만 그린다(.dy-quiz 의 min-height 가 자리를 잡고 있어 튀지 않는다). */}
       <div className="dy-quiz">
-        <div className="dy-q-head">
-          <span className="dy-q-badge">{term.field}</span>
-          <span className="dy-q-label">{t('daily.term_label')}</span>
-        </div>
-        <p className="dy-q-desc">{term.desc}</p>
-        <div className="dy-q-opts">
-          {choices.map((opt) => {
-            const isAnswer = opt === term.answer
-            const isPicked = opt === picked
-            const cls = answered && isAnswer ? 'dy-q-opt correct'
-              : answered && isPicked ? 'dy-q-opt wrong'
-              : 'dy-q-opt'
-            return (
-              <button key={opt} className={cls} onClick={() => onPick(opt)} disabled={answered || busy}>
-                <span className="dy-q-mark">{answered && isAnswer ? '✓' : answered && isPicked ? '✕' : ''}</span>
-                <span className="dy-q-txt">{opt}</span>
-              </button>
-            )
-          })}
-        </div>
-        {answered && (
-          <p className={`dy-q-result ${picked === term.answer ? 'ok' : picked ? 'no' : 'seen'}`}>
-            {picked === term.answer
-              ? t('daily.correct')
-              : picked
-              ? t('daily.wrong', { answer: term.answer })
-              : t('daily.already', { answer: term.answer })}
-          </p>
+        {term && (
+          <>
+            <div className="dy-q-head">
+              <span className="dy-q-badge">{term.field}</span>
+              <span className="dy-q-label">{t('daily.term_label')}</span>
+            </div>
+            <p className="dy-q-desc">{term.desc}</p>
+            <div className="dy-q-opts">
+              {choices.map((opt, i) => {
+                const isAnswer = opt === term.answer
+                const isPicked = i === pickedIdx
+                const cls = answered && isAnswer ? 'dy-q-opt correct'
+                  : answered && isPicked ? 'dy-q-opt wrong'
+                  : 'dy-q-opt'
+                return (
+                  <button key={i} className={cls} onClick={() => onPick(i)} disabled={answered || busy}>
+                    <span className="dy-q-mark">{answered && isAnswer ? '✓' : answered && isPicked ? '✕' : ''}</span>
+                    <span className="dy-q-txt">{opt}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {answered && (
+              <p className={`dy-q-result ${picked === term.answer ? 'ok' : picked ? 'no' : 'seen'}`}>
+                {picked === term.answer
+                  ? t('daily.correct')
+                  : picked
+                  ? t('daily.wrong', { answer: term.answer })
+                  : t('daily.already', { answer: term.answer })}
+              </p>
+            )}
+          </>
         )}
       </div>
 
       {/* 해설 — 문제를 덮지 않고 카드 아래로 펼친다(내가 뭘 골랐는지 보면서 읽을 수 있게).
           ⚠️ answered 로 조건부 마운트하면 펼침 연출이 안 돈다(0 높이에서 시작할 프레임이 없다).
              항상 붙여 두고 .open 클래스만 토글해 grid-template-rows 0fr→1fr 로 늘린다. */}
-      {theory && (
+      {theory && term && (
         <section className={`dy-theory${answered ? ' open' : ''}`} aria-hidden={!answered}>
           <div className="dy-th-clip">
             <div className="dy-th-card">

@@ -1,14 +1,17 @@
-// 관리자 > WORLD ARENA > 미니게임 > 게임 문항
+// 관리자 > WORLD ARENA > 미니게임 > 게임 문항  ·  관리자 > WORLD ARENA > DAILY QUIZ > 문항 관리
 //
 // 용어 문항(term_questions) 관리 — **레벨테스트(AdminLevelTest 의 문항 탭)와 같은 모양**이다:
 //   문항 목록 · 문항 이력 · 문항 추가 & 번역(엑셀) 서브탭 + 한국어로 쓰고 🌐 자동 번역.
 //
-// ⛔ 여기서 고친 문항이 **바로 게임에 나간다**(서버 term-pool → 게임 iframe · DAILY QUIZ).
+// **화면은 한 벌, 은행은 둘(2026-09-08 지시).** `bank` prop 으로 게임 은행(T-###)과 DAILY QUIZ 은행(D-###)을 가른다.
+//   서버 호출 전부에 `bank` 를 실어 보낸다 — 빠뜨리면 서버가 게임으로 접어서 DAILY 탭에 게임 문항이 뜬다.
+//   ⛔ 화면을 두 벌로 베끼지 말 것 — "보기 4개가 아닌 언어는 버린다" 같은 규칙이 한쪽에만 남는다.
+//
+// ⛔ 여기서 고친 문항이 **바로 나간다**(서버 term-pool → 게임 iframe / `/daily`).
 //    예전엔 게임 HTML 안 POOL 이 진짜였고 이 화면은 저장만 되고 아무 데도 안 나갔다(2026-09-03 연결).
-// ⛔ **게임별로 문항을 고르는 기능은 없다(2026-09-03 지시).** 은행에 '사용' 상태로 있는 문항이
+// ⛔ **게임별로 문항을 고르는 기능은 없다(2026-09-03 지시).** 게임 은행에 '사용' 상태로 있는 문항이
 //    세 게임 전부에 나간다 — 셋은 같은 문제를 보여주는 방식만 다르다(4지선다 / 운석 / O·X).
 //    한 문항을 빼려면 '중지'를 누른다(세 게임에서 같이 빠진다).
-// ⛔ **DAILY QUIZ 는 이 은행을 안 쓴다(2026-09-03 지시).** `/daily` 의 문항 출처는 `src/lib/terms.ts` 다.
 // ⚠️ 게임 HTML(public/games/*.html)과 src/lib/terms.ts 의 문항 배열은 **폴백**으로 남아 있다 —
 //    거기를 고쳐도 서비스에는 안 나간다. 문항을 바꾸는 자리는 이 화면 하나다.
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
@@ -38,7 +41,22 @@ const TERM_FIELDS = ['AI', '로봇', '피지컬AI']
 const GAME_LABEL: Record<string, string> = {
   'beat-cari': '버텨라 CARI', 'shoot-cari': '쏴라 CARI', 'pick-cari': '골라라 CARI',
 }
-const USED_BY = TERM_GAME_IDS.map((g) => GAME_LABEL[g] ?? g).join(' · ')
+
+/** 어느 은행인가 — 서버 `_shared/term-banks.ts` 의 TermBankKey 와 같은 낱말. */
+export type TermBank = 'game' | 'daily'
+// 은행마다 다른 것은 **문구뿐**이다(제목·어디로 나가는지·번호 예시·임시저장 칸). 동작은 전부 같다.
+const BANK_UI: Record<TermBank, { title: string; usedBy: string; where: string; codeEg: string; draftKind: string }> = {
+  game: {
+    title: '용어 문제은행',
+    usedBy: TERM_GAME_IDS.map((g) => GAME_LABEL[g] ?? g).join(' · '),
+    where: '게임', codeEg: 'T-012', draftKind: 'term-question',
+  },
+  daily: {
+    title: 'DAILY QUIZ 문제은행',
+    usedBy: 'DAILY QUIZ(/daily) — 매일 한 문항씩 순환',
+    where: 'DAILY QUIZ', codeEg: 'D-012', draftKind: 'daily-question',
+  },
+}
 
 
 export interface TermRow {
@@ -76,25 +94,27 @@ const koOf = (r: TermRow) => r.answer_i18n?.ko ?? ''
 // ══════════════════════════════════════════════════════════════
 type Sub = 'list' | 'events' | 'upload'
 
-export function TermPoolAdmin() {
+export function TermPoolAdmin({ bank }: { bank: TermBank }) {
   const [sub, setSub] = useState<Sub>('list')
   // 방금 올린 문항 — '문항 추가 & 번역' 이 넘겨주고 '문항 목록' 이 받아 그것만 걸러 보여준다.
   const [justAdded, setJustAdded] = useState<{ codes: string[]; at: number } | null>(null)
   const SUBS: [Sub, string][] = [['list', '문항 목록'], ['events', '문항 이력'], ['upload', '문항 추가 & 번역']]
+  const ui = BANK_UI[bank]
   return (
     <>
       <AdminHead
-        title={<>용어 문제은행 <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--muted)' }}>{USED_BY}</span></>}
+        title={<>{ui.title} <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--muted)' }}>{ui.usedBy}</span></>}
       />
       <div className="admin-tabs" style={{ marginBottom: 16 }}>
         {SUBS.map(([k, label]) => (
           <button key={k} className={sub === k ? 'on' : ''} onClick={() => setSub(k)}>{label}</button>
         ))}
       </div>
-      {sub === 'list' && <ListTab justAdded={justAdded} clearJustAdded={() => setJustAdded(null)} />}
-      {sub === 'events' && <EventsTab />}
+      {/* ⚠️ 은행이 바뀔 때의 재마운트는 부모(Admin.tsx)가 <TermPoolAdmin key={bank}> 로 한다 — 여기 상태(서브탭·방금 올린 문항)까지 같이 비워야 해서. */}
+      {sub === 'list' && <ListTab bank={bank} justAdded={justAdded} clearJustAdded={() => setJustAdded(null)} />}
+      {sub === 'events' && <EventsTab bank={bank} />}
       {sub === 'upload' && (
-        <UploadTab onApplied={(codes) => { setJustAdded({ codes, at: Date.now() }); setSub('list') }} />
+        <UploadTab bank={bank} onApplied={(codes) => { setJustAdded({ codes, at: Date.now() }); setSub('list') }} />
       )}
     </>
   )
@@ -105,10 +125,12 @@ export function TermPoolAdmin() {
 // ══════════════════════════════════════════════════════════════
 const PAGE = 50
 
-function ListTab({ justAdded, clearJustAdded }: {
+function ListTab({ bank, justAdded, clearJustAdded }: {
+  bank: TermBank
   justAdded: { codes: string[]; at: number } | null
   clearJustAdded: () => void
 }) {
+  const ui = BANK_UI[bank]
   const [data, setData] = useState<TermListResp | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -124,10 +146,12 @@ function ListTab({ justAdded, clearJustAdded }: {
   async function load() {
     setLoading(true)
     setErr('')
-    try { setData(await callFunction<TermListResp>('admin', { action: 'termList' })) }
+    try { setData(await callFunction<TermListResp>('admin', { action: 'termList', bank })) }
     catch (e) { setErr(e instanceof Error ? e.message : '불러오기 실패') }
     finally { setLoading(false) }
   }
+  // 은행이 바뀌면 Admin.tsx 가 <TermPoolAdmin key={bank}> 로 통째로 다시 마운트하므로 마운트 1회면 된다(load 가 bank 를 닫아 잡아 경고가 뜨는 것뿐).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load() }, [])
 
   const all = useMemo(() => data?.terms ?? [], [data])
@@ -239,7 +263,7 @@ function ListTab({ justAdded, clearJustAdded }: {
 
       <div className="admin-section">
         <div className="admin-toolbar">
-          <input className="admin-search" placeholder="번호(T-012)·용어·설명 검색" value={q} onChange={(e) => { setQ(e.target.value); setPage(0) }} />
+          <input className="admin-search" placeholder={`번호(${ui.codeEg})·용어·설명 검색`} value={q} onChange={(e) => { setQ(e.target.value); setPage(0) }} />
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={onlyMissing} onChange={(e) => { setOnlyMissing(e.target.checked); setPage(0) }} />
             미번역만 보기
@@ -311,13 +335,15 @@ function ListTab({ justAdded, clearJustAdded }: {
           </div>
         )}
         <p className="admin-hint" style={{ marginTop: 8 }}>
-          여기 <b>사용 중인 문항이 곧 게임에 나가는 문항</b>입니다. 한 문항을 빼려면 <b>중지</b>를 누르세요.
+          여기 <b>사용 중인 문항이 곧 {ui.where}에 나가는 문항</b>입니다. 한 문항을 빼려면 <b>중지</b>를 누르세요.
           중지·삭제한 문항은 <b>문항 이력</b> 탭에서 되돌릴 수 있습니다.
+          {bank === 'daily' && <> DAILY QUIZ 는 <b>이 목록 순서대로 매일 한 문항씩</b> 순환합니다(문항을 빼거나 넣으면 그날 문제가 바뀝니다).</>}
         </p>
       </div>
 
       {edit && (
         <TermEdit
+          bank={bank}
           row={edit === 'new' ? null : edit}
           onClose={() => setEdit(null)}
           onSaved={() => { setEdit(null); void load() }}
@@ -330,7 +356,8 @@ function ListTab({ justAdded, clearJustAdded }: {
 // ══════════════════════════════════════════════════════════════
 // 문항 추가/수정 — 한국어로 쓰고 '자동 번역'으로 나머지 5개 언어를 채운다
 // ══════════════════════════════════════════════════════════════
-function TermEdit({ row, onClose, onSaved }: { row: TermRow | null; onClose: () => void; onSaved: () => void }) {
+function TermEdit({ bank, row, onClose, onSaved }: { bank: TermBank; row: TermRow | null; onClose: () => void; onSaved: () => void }) {
+  const ui = BANK_UI[bank]
   const isNew = !row
   const [field, setField] = useState(row?.field ?? 'AI')
   const [active, setActive] = useState(row?.active ?? true)
@@ -340,8 +367,9 @@ function TermEdit({ row, onClose, onSaved }: { row: TermRow | null; onClose: () 
   const [xi, setXi] = useState<Record<string, string[]>>({ ...(row?.distractors_i18n ?? { ko: ['', '', ''] }) })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  // 임시저장 칸은 은행마다 따로 — 한 칸을 같이 쓰면 게임에서 쓰다 만 글이 DAILY 의 '새 문항' 에 복원된다.
   const draft = useDraft({
-    kind: 'term-question', refId: row?.id, value: { field, active, di, ai, xi },
+    kind: ui.draftKind, refId: row?.id, value: { field, active, di, ai, xi },
     title: (ai.ko ?? '').trim() || (row?.code ?? '새 용어 문항'),
   })
 
@@ -390,6 +418,7 @@ function TermEdit({ row, onClose, onSaved }: { row: TermRow | null; onClose: () 
     try {
       const r = await callFunction<{ dropped?: string[]; clearedTranslations?: boolean }>('admin', {
         action: 'termUpsert',
+        bank,
         term: {
           id: row?.id, field, active,
           descKo: koDesc, answerKo: koAns, distractorsKo: koDis,
@@ -453,7 +482,7 @@ function TermEdit({ row, onClose, onSaved }: { row: TermRow | null; onClose: () 
           ))}
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-            사용(끄면 게임에 안 나갑니다)
+            사용(끄면 {ui.where}에 안 나갑니다)
           </label>
         </div>
 
@@ -470,7 +499,7 @@ function TermEdit({ row, onClose, onSaved }: { row: TermRow | null; onClose: () 
 // ══════════════════════════════════════════════════════════════
 // 문항 이력 — 변경 로그 + 중지/삭제된 문항 되돌리기
 // ══════════════════════════════════════════════════════════════
-function EventsTab() {
+function EventsTab({ bank }: { bank: TermBank }) {
   const [tab, setTab] = useState<'history' | 'inactive' | 'deleted'>('history')
   const [events, setEvents] = useState<TermEvent[]>([])
   const [inactive, setInactive] = useState<TermRow[]>([])
@@ -483,13 +512,15 @@ function EventsTab() {
     setLoading(true); setErr('')
     try {
       const [e, r] = await Promise.all([
-        callFunction<{ rows: TermEvent[] }>('admin', { action: 'termEvents' }),
-        callFunction<{ inactive: TermRow[]; deleted: TermRow[] }>('admin', { action: 'termRestorable' }),
+        callFunction<{ rows: TermEvent[] }>('admin', { action: 'termEvents', bank }),
+        callFunction<{ inactive: TermRow[]; deleted: TermRow[] }>('admin', { action: 'termRestorable', bank }),
       ])
       setEvents(e.rows ?? []); setInactive(r.inactive ?? []); setDeleted(r.deleted ?? [])
     } catch (ex) { setErr(ex instanceof Error ? ex.message : '불러오기 실패') }
     finally { setLoading(false) }
   }
+  // 위 ListTab 과 같은 이유 — 은행이 바뀌면 통째로 다시 마운트된다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load() }, [])
 
   async function restore(t: TermRow) {
@@ -588,7 +619,7 @@ function findCol(header: string[], aliases: string[]): number {
 
 interface UpRow { field: string; desc: string; answer: string; distractors: string[] }
 
-function UploadTab({ onApplied }: { onApplied: (codes: string[]) => void }) {
+function UploadTab({ bank, onApplied }: { bank: TermBank; onApplied: (codes: string[]) => void }) {
   const [rows, setRows] = useState<UpRow[]>([])
   const [fileName, setFileName] = useState('')
   const [msg, setMsg] = useState('')
@@ -647,7 +678,7 @@ function UploadTab({ onApplied }: { onApplied: (codes: string[]) => void }) {
     setMsg('등록 중…')
     let inserted: { id: string; code: string; answer: string }[] = []
     try {
-      const r = await callFunction<{ added: number; inserted?: typeof inserted }>('admin', { action: 'termImport', items: rows })
+      const r = await callFunction<{ added: number; inserted?: typeof inserted }>('admin', { action: 'termImport', bank, items: rows })
       inserted = r.inserted ?? []
       if (!r.added) { setMsg('새로 추가된 문항이 없습니다(이미 있는 용어는 건너뜁니다).'); setBusy(false); return }
       setMsg(`✅ ${r.added}문항 등록됨. 이어서 번역합니다…`)
@@ -701,7 +732,7 @@ function UploadTab({ onApplied }: { onApplied: (codes: string[]) => void }) {
         <p className="admin-hint" style={{ lineHeight: 1.7 }}>
           열 이름에 <b>설명 · 정답 · 오답1~3</b>(과 선택적으로 <b>분야</b>)이 있으면 자동으로 인식합니다.
           <br />등록하면 <b>5개국어 번역이 이어서 돕니다</b> — 도중에 창을 닫아도 문항은 남고, 남은 번역은 목록에서 이어서 할 수 있습니다.
-          <br />⚠️ 이미 있는 정답 용어는 건너뜁니다(같은 파일을 두 번 올려도 중복되지 않습니다).
+          <br />⚠️ 이 은행에 이미 있는 정답 용어는 건너뜁니다(같은 파일을 두 번 올려도 중복되지 않습니다). 다른 은행에 있는 용어는 올라갑니다.
         </p>
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}

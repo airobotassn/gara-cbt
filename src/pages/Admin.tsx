@@ -110,9 +110,9 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     // PPT 2페이지 도형 그대로 — '미니게임' 이 상위고 게임 현황·게임 문항이 그 아래다.
     { key: 'minigame', label: '미니게임', children: [{ key: 'stat', label: '게임 현황' }, { key: 'quiz', label: '게임 문항' }] },
     { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
-    // ⛔ DAILY QUIZ 아래 '문항 관리'는 뗐다(2026-09-03 지시) — 그 화면은 **게임 문제은행**을 보여주고
-    //    있었는데, DAILY QUIZ 는 그 은행을 안 쓴다(문항 출처는 src/lib/terms.ts). 남겨두면 거짓말이 된다.
-    { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }] },
+    // DAILY QUIZ 문항 관리 = 게임 문항과 **같은 화면, 다른 은행**(2026-09-08 지시). 2026-09-03 에 뗐던 이유는
+    // 그 화면이 게임 은행을 보여줘서였고, 지금은 DAILY 전용 은행(D-###)을 보여준다.
+    { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
     { key: 'chat', label: '채팅 관리' },
     { key: 'coin', label: '코인 관리' },
     // 캐릭터·스킨의 **가격·판매여부**만 만지는 화면. 그림은 코드/에셋이라 여기서 안 올린다(2026-08-20).
@@ -287,10 +287,13 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     // ── WORLD ARENA ──
     case 'arena/dash': return <ArenaDashboard />
     case 'arena/minigame/stat': return <MinigameStatAdmin />
-    case 'arena/minigame/quiz': return <TermPoolAdmin />
+    // ⚠️ key={bank} — 같은 컴포넌트가 같은 자리에 서므로 키가 없으면 게임 ↔ DAILY 를 오갈 때 인스턴스가 재사용돼
+    //    서브탭·'방금 올린 문항' 필터(T-### 번호)가 다른 은행 목록에 그대로 남는다.
+    case 'arena/minigame/quiz': return <TermPoolAdmin key="game" bank="game" />
     case 'arena/leveltest/stat': return <ArenaAttempts />
     case 'arena/leveltest/quiz': return <ArenaQuestions isRoot={isRoot} />
     case 'arena/daily/stat': return <DailyStatAdmin />
+    case 'arena/daily/quiz': return <TermPoolAdmin key="daily" bank="daily" />
     case 'arena/chat': return <ChatModAdmin />
     case 'arena/coin': return <CoinPolicyAdmin />
     case 'arena/cosmetic': return <HubCosmeticAdmin />
