@@ -39,7 +39,6 @@ await db.exec(`
     user_id uuid not null,
     ebook_id uuid not null,
     price_paid integer not null default 0,
-    source text not null default 'demo',
     payment_ref text,
     created_at timestamptz not null default now(),
     unique (user_id, ebook_id)
@@ -233,7 +232,7 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   const idX = (await db.query(`select id from payments where order_id='rev-x'`)).rows[0].id;
   const idY = (await db.query(`select id from payments where order_id='rev-y'`)).rows[0].id;
   // 같은 유저가 두 책을 각각 다른 결제로 샀다. payX 만 환불됐다.
-  await db.query(`insert into ebook_purchases (user_id, ebook_id, payment_id, source) values ($1,$2,$3,'pg'),($1,$4,$5,'pg')`,
+  await db.query(`insert into ebook_purchases (user_id, ebook_id, payment_id) values ($1,$2,$3),($1,$4,$5)`,
     [U1, bookX, idX, bookY, idY]);
   // revokeForRefund 의 이북 삭제문 그대로: payment_id + user_id 로만.
   await db.query(`delete from ebook_purchases where payment_id=$1 and user_id=$2`, [idX, U1]);
@@ -427,10 +426,10 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   const lcols = (await db.query(
     `select column_name from information_schema.columns where table_schema='public' and table_name='lecture_purchases'`,
   )).rows.map((r) => r.column_name);
-  for (const c of ['user_id', 'lecture_id', 'price_paid', 'source', 'payment_id', 'payment_ref']) {
+  for (const c of ['user_id', 'lecture_id', 'price_paid', 'payment_id', 'payment_ref']) {
     rec(`lecture_purchases.${c} 존재`, lcols.includes(c), true);
   }
-  await db.query(`insert into lecture_purchases (user_id, lecture_id, price_paid, source) values ($1,$2,300,'pg')`, [U1, L1]);
+  await db.query(`insert into lecture_purchases (user_id, lecture_id, price_paid) values ($1,$2,300)`, [U1, L1]);
   let dupOwn = false;
   try {
     await db.query(`insert into lecture_purchases (user_id, lecture_id) values ($1,$2)`, [U1, L1]);

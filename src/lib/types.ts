@@ -595,7 +595,6 @@ export interface AdminEbookBuyer {
   name: string | null
   email: string | null
   pricePaid: number
-  source: string
   createdAt: string
   /** 이 사람이 이 책을 열어본 기록. 한 번도 안 열었으면 null.
    *  ⚠️ 구매(ebook_purchases)와 **수명이 다른 표**(ebook_reads)라 환불된 뒤에도 남는다 — 환불 판단용. */

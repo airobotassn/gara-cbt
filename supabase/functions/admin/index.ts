@@ -3059,7 +3059,7 @@ async function ebookBuyers(admin: any, body: any) {
   if (!id) return json({ error: 'id 가 필요합니다.' }, 400)
   const { data } = await admin
     .from('ebook_purchases')
-    .select('user_id, price_paid, source, created_at')
+    .select('user_id, price_paid, created_at')
     .eq('ebook_id', id)
     .order('created_at', { ascending: false })
     .limit(500)
@@ -3098,7 +3098,6 @@ async function ebookBuyers(admin: any, body: any) {
       name: nameMap[r.user_id] ?? null,
       email: emailMap[r.user_id] ?? null,
       pricePaid: r.price_paid ?? 0,
-      source: r.source ?? 'demo',
       createdAt: r.created_at,
       read: readMap[r.user_id] ?? null,
     })),

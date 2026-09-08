@@ -332,7 +332,6 @@ Deno.serve(async (req) => {
         user_id: uid,
         [fkCol]: id,
         price_paid: 0,
-        source: 'free',
       })
       // 23505 = unique 위반(이미 보유) → 성공으로 취급.
       if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)

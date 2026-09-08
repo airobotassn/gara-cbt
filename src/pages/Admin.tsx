@@ -4693,7 +4693,7 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                       <td>{b.name ?? '-'}</td>
                       <td>{b.email ?? '-'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        {b.pricePaid > 0 ? krw(b.pricePaid, 'ko') : '무료'} · {b.source}
+                        {b.pricePaid > 0 ? krw(b.pricePaid, 'ko') : '무료'}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(b.createdAt)}</td>
                       {/* 산 사람이 실제로 열어봤나. 환불 판단에 쓰는 값이라 구매자 목록에서 바로 보인다. */}

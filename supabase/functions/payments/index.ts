@@ -257,7 +257,6 @@ Deno.serve(async (req) => {
             user_id: uid,
             [col]: l.itemId,
             price_paid: 0,
-            source: 'free',
           }))
           const { error } = await admin.from(table).insert(rows)
           if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)
@@ -267,8 +266,9 @@ Deno.serve(async (req) => {
         // 무료 응시권. **결제 행이 없다** — payments.amount 는 >0 제약이라 0원 주문을 남길 수 없다.
         // 그래서 중복 방어는 payments_paid_product_uniq 가 아니라 exam_tickets_live_uniq 가 한다
         // (위 findLiveTickets 사전검사 + 그 유니크가 최종 방어선이다. 유료 경로와 같은 두 겹이다).
-        // ⚠️ source='free' 다 — 대사(reconcile)는 source='pg' 행만 결제와 대조하므로, 'pg' 로 넣으면
-        //    결제 행이 없는 응시권이 영원히 '미지급 의심'으로 대사 목록에 뜬다.
+        // ⚠️ 응시권의 source='free' 는 살아 있는 값이다 — 관리자 응시권 목록이 발급 경로를
+        //    (결제/무료/수기)로 갈라 보여준다. 이북·강의 구매표에 있던 같은 이름의 칸은
+        //    아무도 안 읽어서 2026-09-07 에 뺐다(그쪽은 payment_id 로 결제 여부를 안다).
         if (productType === 'exam') {
           if (!product.exam) return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
           const res = await grantExamTicket(admin, {
@@ -286,7 +286,6 @@ Deno.serve(async (req) => {
               user_id: uid,
               ebook_id: product.addon.id,
               price_paid: 0,
-              source: 'free',
             })
             if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)
           }
@@ -304,7 +303,6 @@ Deno.serve(async (req) => {
           user_id: uid,
           [col]: product.ref,
           price_paid: 0,
-          source: 'free',
         })
         if (error && (error as { code?: string }).code !== '23505') return json({ error: error.message }, 400)
         return json({ free: true, granted: true })

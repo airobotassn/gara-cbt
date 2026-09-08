@@ -25,7 +25,7 @@ export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle' | 'lecture'
 export type BundleKind = 'ebook' | 'lecture'
 
 /** 종류별 표 이름 — 소유·지급·회수가 전부 이 두 표를 **같은 코드**로 다룬다.
- *  ⚠️ 컬럼 이름도 한 벌이다(user_id / <kind>_id / price_paid / source / payment_id / payment_ref).
+ *  ⚠️ 컬럼 이름도 한 벌이다(user_id / <kind>_id / price_paid / payment_id / payment_ref).
  *     한쪽만 다르게 두면 갈래마다 다른 코드가 생기고, 그 순간 한쪽만 조용히 틀린다. */
 export const PURCHASE_TABLE: Record<BundleKind, { table: string; col: string }> = {
   ebook: { table: 'ebook_purchases', col: 'ebook_id' },
@@ -425,7 +425,6 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
       user_id: row.user_id,
       [col]: row.product_ref,
       price_paid: row.amount,
-      source: 'pg',
       payment_id: row.id,
       payment_ref: row.payment_key,
     })
@@ -496,7 +495,7 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
 }
 
 /** 응시료에 곁들여 산 교재의 열람권. 이북 단독 결제와 **같은 모양의 행**을 넣는다
- *  (source='pg' + payment_id) — 그래야 환불 회수·대사가 경로를 하나만 알면 된다. */
+ *  (payment_id 로 결제와 이어진다) — 그래야 환불 회수·대사가 경로를 하나만 알면 된다. */
 async function grantAddonEbook(admin: SupabaseClient, row: PaymentRow): Promise<void> {
   if (!row.addon_ebook_id) return
   await grantEbookLine(admin, row, row.addon_ebook_id, row.addon_amount ?? 0, '함께 산 교재')
@@ -515,7 +514,6 @@ async function grantEbookLine(
     user_id: row.user_id,
     ebook_id: ebookId,
     price_paid: pricePaid,
-    source: 'pg',
     payment_id: row.id,
     payment_ref: row.payment_key,
   })
