@@ -148,8 +148,12 @@ export const TERM_THEORY: Record<string, TermTheory> = {
   },
 }
 
-/** 오늘의 용어에 붙은 해설. 아직 안 쓴 용어면 null → 화면에서 해설 블록을 그리지 않는다. */
-/** 정답 용어(한국어)로 해설을 찾는다. 번역된 문항(정답이 외국어)은 키가 안 맞아 null — 해설 자체가 한국어라 그게 맞다. */
+/**
+ * 오늘의 용어에 붙은 해설. 정답 용어(한국어)가 열쇠다 — 아직 안 쓴 용어면 null → 화면에서 해설 블록을 그리지 않는다.
+ * 번역된 문항(정답이 외국어)도 키가 안 맞아 null — 해설 자체가 한국어라 그게 맞다.
+ * ⚠️ DAILY 은행은 이 표에 있는 8개만 살려 뒀다(2026-09-08 · 20260908130000). 여기에 용어를 더하면 그 문항을
+ *    관리자 › 문항 이력 › 삭제 탭에서 되돌리면 된다(표기가 정확히 같아야 붙는다).
+ */
 export function termTheory(t: Pick<TermItem, 'answer'>): TermTheory | null {
   return TERM_THEORY[t.answer] ?? null
 }

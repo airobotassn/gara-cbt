@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthProvider'
 import { useT, localeOf } from '../lib/i18n'
 import { dailyIndex, dailyShuffle, termTheory } from '../lib/terms'
 import { fetchTermPool, type TermPoolItem } from '../lib/termPool'
-import DailyVisual from '../components/DailyVisual'
+import DailyTheoryCard from '../components/DailyTheoryCard'
 import StarField from '../components/StarField'
 
 // ⚠️ 서버(complete-daily)의 DAILY_POINTS 와 같은 값이어야 한다. 적립 권위는 서버, 여기는 예고 표시용.
@@ -211,28 +211,8 @@ export default function Daily() {
       {theory && term && (
         <section className={`dy-theory${answered ? ' open' : ''}`} aria-hidden={!answered}>
           <div className="dy-th-clip">
-            <div className="dy-th-card">
-              <div className="dy-th-head">
-                <span className="dy-th-badge">{t('daily.theory')}</span>
-                <b>{term.answer}</b>
-              </div>
-              {/* 그림이 먼저다 — 2초에 읽히는 건 이쪽이고, 아래 한 줄은 그 캡션이다. */}
-              <DailyVisual name={theory.visual} />
-              <p className="dy-th-point">{theory.point}</p>
-              {theory.why && theory.why.length > 0 && (
-                <ul className="dy-th-why">
-                  {theory.why.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
-                </ul>
-              )}
-              {theory.compare && (
-                <p className="dy-th-cmp">
-                  <span>{t('daily.hint_lead')}</span>
-                  {theory.compare}
-                </p>
-              )}
-            </div>
+            {/* 카드 자체는 관리자 미리보기와 공용(components/DailyTheoryCard) — 여기서 따로 그리지 말 것. */}
+            <DailyTheoryCard answer={term.answer} theory={theory} />
           </div>
         </section>
       )}

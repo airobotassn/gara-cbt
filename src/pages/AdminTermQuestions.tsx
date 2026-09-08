@@ -21,7 +21,11 @@ import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 import { TERM_GAME_IDS } from '../lib/minigames'
+import { TERM_THEORY, termTheory } from '../lib/terms'
+import DailyTheoryCard from '../components/DailyTheoryCard'
 import { AdminHead } from './AdminReform'
+// 해설 카드 스타일은 daily.css 가 .dy-page 아래로 묶어 둔 것이라, 미리보기를 그리려면 이 화면도 받아야 한다.
+import '../styles/daily.css'
 
 const inp: CSSProperties = {
   width: '100%', padding: '9px 11px', borderRadius: 10,
@@ -89,6 +93,44 @@ const ACTION_LABEL: Record<string, string> = {
 const fmtDT = (s: string) => new Date(s).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
 const koOf = (r: TermRow) => r.answer_i18n?.ko ?? ''
 
+// ── DAILY QUIZ 해설 미리보기(보기만 · 2026-09-08 지시) ──
+// 해설(그림+글)은 코드에 있다(terms.ts TERM_THEORY · components/DailyVisual). 관리자는 여기서 **볼 수만** 있다.
+// 열쇠는 **한국어 정답 표기** — 표기를 한 글자라도 바꾸면 해설이 떨어지므로, 목록·수정 모달 둘 다 미리보기를 보여
+// "지금 이 표기에 해설이 붙는가" 를 관리자가 눈으로 확인하게 한다.
+const THEORY_TERMS = Object.keys(TERM_THEORY)
+
+/** /daily 에 나오는 해설 카드 그대로. 해설이 없는 표기면 무엇이 있는지 알려준다. */
+function TheoryPreview({ answer }: { answer: string }) {
+  const theory = termTheory({ answer })
+  if (!theory) {
+    return (
+      <p className="admin-hint" style={{ lineHeight: 1.7 }}>
+        「{answer || '(정답 없음)'}」에는 해설이 없습니다. 해설(그림)이 있는 용어: <b>{THEORY_TERMS.join(' · ')}</b>
+        <br />⚠️ 표기가 한 글자라도 다르면 해설이 안 붙습니다(예: '자유도(DOF)' 를 '자유도' 로 고치면 떨어짐).
+      </p>
+    )
+  }
+  // .dy-page 로 감싸야 daily.css 의 카드·그림 규칙이 먹고, dy-embed 가 페이지 배경·최소높이만 끈다.
+  return (
+    <div className="dy-page dy-embed">
+      <DailyTheoryCard answer={answer} theory={theory} />
+    </div>
+  )
+}
+
+function TheoryPreviewModal({ answer, code, onClose }: { answer: string; code: string | null; onClose: () => void }) {
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2 style={{ margin: 0 }}>해설 미리보기 {code ?? ''}</h2>
+        <p className="admin-hint">/daily 에서 답을 고른 뒤 펼쳐지는 카드 그대로입니다. 그림·글은 코드에 있어 여기서는 볼 수만 있습니다.</p>
+        <TheoryPreview answer={answer} />
+      </div>
+    </div>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════
 // 껍데기 — 서브탭(목록 · 이력 · 추가&번역)
 // ══════════════════════════════════════════════════════════════
@@ -139,6 +181,7 @@ function ListTab({ bank, justAdded, clearJustAdded }: {
   const [onlyNew, setOnlyNew] = useState(!!justAdded)
   const [page, setPage] = useState(0)
   const [edit, setEdit] = useState<TermRow | 'new' | null>(null)
+  const [preview, setPreview] = useState<TermRow | null>(null) // DAILY 만 — 해설 미리보기 모달
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -293,7 +336,9 @@ function ListTab({ bank, justAdded, clearJustAdded }: {
                     title="전체 선택"
                   />
                 </th>
-                <th>번호</th><th>분야</th><th>정답 용어</th><th>설명</th><th>미번역</th><th></th>
+                <th>번호</th><th>분야</th><th>정답 용어</th><th>설명</th>
+                {bank === 'daily' && <th>해설</th>}
+                <th>미번역</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -311,6 +356,13 @@ function ListTab({ bank, justAdded, clearJustAdded }: {
                   <td title={t.desc_i18n?.ko} style={{ maxWidth: 300, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {t.desc_i18n?.ko}
                   </td>
+                  {bank === 'daily' && (
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {termTheory({ answer: koOf(t) })
+                        ? <button className="admin-mini" onClick={() => setPreview(t)}>🖼 미리보기</button>
+                        : <span style={{ color: 'var(--dim)' }}>없음</span>}
+                    </td>
+                  )}
                   <td className="admin-status">{t.missing.length ? t.missing.map((l) => LANG_LABEL[l] ?? l).join(', ') : '완료'}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="admin-mini" onClick={() => setEdit(t)}>수정</button>{' '}
@@ -337,7 +389,12 @@ function ListTab({ bank, justAdded, clearJustAdded }: {
         <p className="admin-hint" style={{ marginTop: 8 }}>
           여기 <b>사용 중인 문항이 곧 {ui.where}에 나가는 문항</b>입니다. 한 문항을 빼려면 <b>중지</b>를 누르세요.
           중지·삭제한 문항은 <b>문항 이력</b> 탭에서 되돌릴 수 있습니다.
-          {bank === 'daily' && <> DAILY QUIZ 는 <b>이 목록 순서대로 매일 한 문항씩</b> 순환합니다(문항을 빼거나 넣으면 그날 문제가 바뀝니다).</>}
+          {bank === 'daily' && (
+            <>
+              {' '}DAILY QUIZ 는 <b>이 목록 순서대로 매일 한 문항씩</b> 순환합니다(문항을 빼거나 넣으면 그날 문제가 바뀝니다).
+              <br />해설(그림)은 코드에 있고 <b>한국어 정답 표기</b>로 붙습니다 — 표기를 바꾸면 해설이 떨어집니다. 해설 열의 미리보기로 확인하세요.
+            </>
+          )}
         </p>
       </div>
 
@@ -348,6 +405,9 @@ function ListTab({ bank, justAdded, clearJustAdded }: {
           onClose={() => setEdit(null)}
           onSaved={() => { setEdit(null); void load() }}
         />
+      )}
+      {preview && (
+        <TheoryPreviewModal answer={koOf(preview)} code={preview.code} onClose={() => setPreview(null)} />
       )}
     </>
   )
@@ -485,6 +545,16 @@ function TermEdit({ bank, row, onClose, onSaved }: { bank: TermBank; row: TermRo
             사용(끄면 {ui.where}에 안 나갑니다)
           </label>
         </div>
+
+        {/* DAILY 만 — 지금 적힌 한국어 정답 표기에 해설이 붙는지 그 자리에서 보여준다(표기를 고치는 순간 떨어지는 걸 눈으로). */}
+        {bank === 'daily' && (
+          <div style={{ marginTop: 14 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 'var(--fs-sm)' }}>
+              해설 미리보기 <span className="admin-hint">/daily 에 나오는 그대로 · 한국어 정답이 열쇠</span>
+            </h3>
+            <TheoryPreview answer={koAns} />
+          </div>
+        )}
 
         {msg && <p className="admin-msg" style={{ marginTop: 10 }}>{msg}</p>}
         <div className="admin-modal-btns" style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

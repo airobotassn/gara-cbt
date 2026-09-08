@@ -11,7 +11,7 @@
 // ⚠️ 코드 쪽 50문항(`terms.ts` 의 TERMS)은 **폴백으로만** 남는다 — 서버가 죽거나 비로그인 네트워크가
 //    막혀도 게임·DAILY 가 빈 화면으로 뜨면 안 된다. 폴백은 한국어다(번역은 DB 에만 있다).
 import { callFunction } from './supabase'
-import { TERMS, type TermItem } from './terms'
+import { TERMS, termTheory, type TermItem } from './terms'
 
 /** 서버(term-pool)가 내려주는 한 문항. 이미 화면 언어로 투영돼 있다. */
 export interface TermPoolItem {
@@ -26,9 +26,14 @@ export interface TermPoolItem {
 /** 이 문항을 쓰는 대상 — 서버 term-pool 의 TARGETS 와 같은 목록이다. */
 export type TermTarget = 'beat-cari' | 'shoot-cari' | 'pick-cari' | 'daily'
 
-/** 코드에 박힌 기본 문항(폴백). 한국어 고정. */
-export function fallbackPool(): TermPoolItem[] {
-  return TERMS.map((t: TermItem) => ({
+/**
+ * 코드에 박힌 기본 문항(폴백). 한국어 고정.
+ * ⚠️ DAILY QUIZ 는 **해설 그림이 있는 것만** 남긴다(2026-09-08 지시 · DB 은행도 그 8개만 살아 있다).
+ *    안 거르면 서버가 잠깐 안 열린 날에만 해설 없는 문항이 튀어나온다 — 규칙이 그날만 달라진다.
+ */
+export function fallbackPool(target: TermTarget = 'beat-cari'): TermPoolItem[] {
+  const src = target === 'daily' ? TERMS.filter((t) => !!termTheory(t)) : TERMS
+  return src.map((t: TermItem) => ({
     field: t.field, desc: t.desc, answer: t.answer, distractors: t.distractors.slice(0, 3),
   }))
 }
@@ -44,8 +49,8 @@ export async function fetchTermPool(gameId: TermTarget, lang: string): Promise<T
     const items = (r.items ?? []).filter(
       (it) => it && it.desc && it.answer && Array.isArray(it.distractors) && it.distractors.length === 3,
     )
-    return items.length ? items : fallbackPool()
+    return items.length ? items : fallbackPool(gameId)
   } catch {
-    return fallbackPool()
+    return fallbackPool(gameId)
   }
 }

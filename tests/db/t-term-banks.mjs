@@ -183,6 +183,49 @@ eq('⭐4 caris·leveltest 의 scope 는 그대로다',
   eq('6 두 번 돌려도 은행은 둘', (await q(`select count(*)::int n from term_banks`)).rows[0].n, 2);
 }
 
+// 8) 두 번째 마이그레이션(20260908130000) — 해설 그림이 있는 8문항만 남긴다
+//    ⭐ 남는 8개 = terms.ts TERM_THEORY 의 키(sync pair). 어긋나면 "남겼는데 해설이 안 나오는" 문항이 생긴다.
+{
+  const MIG2 = 'supabase/migrations/20260908130000_daily_bank_keep_illustrated.sql';
+  const mig2 = readFileSync(MIG2, 'utf8');
+  const thSrc = termsSrc.slice(termsSrc.indexOf('export const TERM_THEORY'), termsSrc.indexOf('export function termTheory'));
+  // ⚠️ 키는 따옴표가 있는 것('엔드 이펙터')과 없는 것(서보모터·딥러닝)이 섞여 있다 — 둘 다 잡는다. 줄끝 CR 도 허용.
+  const THEORY_KEYS = [...thSrc.matchAll(/^ {2}(?:'([^']+)'|([^\s:]+)): \{\r?$/gm)].map((m) => m[1] ?? m[2]).sort();
+  eq('전제: TERM_THEORY 키 8개', THEORY_KEYS.length, 8);
+  // ⚠️ 목록 끝은 **줄 시작의 닫는 괄호**로 찾는다 — 그냥 첫 `)` 를 찾으면 '자유도(DOF)' 안의 괄호에서 잘려
+  //    8개 중 4개만 읽고 이 대조가 헛돈다(실제로 그렇게 만들었다가 잡혔다).
+  const MIG_LIST = mig2.match(/not in \(([\s\S]*?)\r?\n\s*\)/)?.[1] ?? '';
+  const MIG_KEYS = [...MIG_LIST.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+  eq('전제: 마이그레이션 목록도 8개로 읽힌다', MIG_KEYS.length, 8);
+  eq('⭐8 마이그레이션의 8개 이름 = terms.ts TERM_THEORY 의 키', MIG_KEYS, THEORY_KEYS);
+
+  const gameBefore = (await q(`select count(*)::int n from term_questions where bank_id='${A1}'`)).rows[0].n;
+  const gameLiveBefore = (await q(`select count(*)::int n from term_questions where bank_id='${A1}' and deleted_at is null and active`)).rows[0].n;
+  const histBefore = (await q(`select count(*)::int n from question_history`)).rows[0].n;
+  await raw(mig2);
+  const alive = (await q(`select answer_i18n->>'ko' a from term_questions where bank_id='${A2}' and deleted_at is null and active order by 1`)).rows.map((r) => r.a);
+  eq('⭐8 DAILY 은행에 살아 있는 문항 = 해설 있는 8개 그대로', alive, THEORY_KEYS);
+  eq('⭐8 나머지 42개는 삭제(deleted_at + active=false) — 되돌릴 수 있는 삭제',
+    (await q(`select count(*)::int n from term_questions where bank_id='${A2}' and deleted_at is not null and not active`)).rows[0].n, 42);
+  eq('⭐8 이력에 문항마다 delete 한 줄(scope=daily)',
+    (await q(`select count(*)::int n from question_history where kind='term' and scope='daily' and action='delete' and label like 'D-%'`)).rows[0].n, 42);
+  eq('⭐8 게임 은행은 안 건드린다(살아 있는 문항 수 그대로)',
+    (await q(`select count(*)::int n from term_questions where bank_id='${A1}' and deleted_at is null and active`)).rows[0].n, gameLiveBefore);
+  eq('⭐8 게임 은행 행 수 그대로', (await q(`select count(*)::int n from term_questions where bank_id='${A1}'`)).rows[0].n, gameBefore);
+  await raw(mig2);
+  eq('8 두 번 돌려도 이력이 더 안 쌓인다', (await q(`select count(*)::int n from question_history`)).rows[0].n, histBefore + 42);
+  eq('8 두 번 돌려도 8개 그대로', (await q(`select count(*)::int n from term_questions where bank_id='${A2}' and deleted_at is null`)).rows[0].n, 8);
+  // 관리자 미리보기와 /daily 가 같은 카드를 그리는가
+  const dailyPage = readFileSync('src/pages/Daily.tsx', 'utf8');
+  const adminPage = readFileSync('src/pages/AdminTermQuestions.tsx', 'utf8');
+  ok('8 /daily 와 관리자 미리보기가 같은 해설 카드(DailyTheoryCard)를 쓴다',
+    dailyPage.includes('<DailyTheoryCard ') && adminPage.includes('<DailyTheoryCard '), true);
+  // 서버가 안 열린 날에도 규칙이 같아야 한다 — DAILY 폴백도 해설 있는 것만
+  const poolSrc = readFileSync('src/lib/termPool.ts', 'utf8');
+  ok('8 DAILY 폴백도 해설 있는 문항만 남긴다',
+    /target === 'daily' \? TERMS\.filter\(\(t\) => !!termTheory\(t\)\)/.test(poolSrc) && /fallbackPool\(gameId\)/.test(poolSrc), true);
+}
+
 // 7) 코드 sync — 마이그레이션 ↔ _shared/term-banks.ts ↔ term-pool ↔ admin ↔ 프론트
 {
   const mig = readFileSync(MIG, 'utf8');
