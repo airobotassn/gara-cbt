@@ -83,6 +83,9 @@ const Room = lazy(() => import('./pages/Room'))
 const MiniGame = lazy(() => import('./pages/MiniGame'))
 const MiniGames = lazy(() => import('./pages/MiniGames'))
 const Daily = lazy(() => import('./pages/Daily'))
+// 해설 그림 도감 — **개발 서버 전용**(아래 라우트가 import.meta.env.DEV 일 때만 걸린다).
+// 그림이 100장을 넘어 /daily 에서 하루 한 장씩으로는 훑을 수가 없어서 만들었다.
+const DailyGallery = lazy(() => import('./pages/DailyGallery'))
 
 // 러닝 라이브러리 · 결제
 const Ebooks = lazy(() => import('./pages/Ebooks'))
@@ -284,6 +287,8 @@ export default function App() {
               <Route path="/games" element={<MiniGames />} />
               <Route path="/games/:gameId" element={<MiniGame />} />
               <Route path="/daily" element={<Daily />} />
+              {/* 개발 서버에서만. 빌드에서는 이 분기가 통째로 사라져 라우트가 없다(주소를 쳐도 / 로 튕긴다). */}
+              {import.meta.env.DEV && <Route path="/daily/gallery" element={<DailyGallery />} />}
               <Route path="/login" element={<Login />} />
               <Route path="/exam" element={<ExamGate />} />
               <Route path="/exam/apply" element={<ExamApply />} />

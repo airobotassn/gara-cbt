@@ -9,6 +9,23 @@
 //     그래서 **선은 stroke="currentColor"**(루트 .vz 가 color 를 잡는다), **면은 .vz-* 클래스**로 칠한다.
 //     daily.css 의 토큰만 쓰므로 다크모드는 자동으로 따라온다.
 import { useCallback, useRef, useState, type ReactNode } from 'react'
+// 그림 묶음 — 파일 하나에 100장을 넣을 수 없어 주제별로 갈랐다(등록표는 맨 아래에서 합친다).
+import { VISUALS_B1 } from './dailyVisuals/batch1'
+import { VISUALS_B2 } from './dailyVisuals/batch2'
+import { VISUALS_B3 } from './dailyVisuals/batch3'
+import { VISUALS_B4 } from './dailyVisuals/batch4'
+import { VISUALS_B5 } from './dailyVisuals/batch5'
+import { VISUALS_B6 } from './dailyVisuals/batch6'
+import { VISUALS_B7 } from './dailyVisuals/batch7'
+import { VISUALS_B8 } from './dailyVisuals/batch8'
+import { VISUALS_B9 } from './dailyVisuals/batch9'
+import { VISUALS_B10 } from './dailyVisuals/batch10'
+import { VISUALS_B11 } from './dailyVisuals/batch11'
+import { VISUALS_B12 } from './dailyVisuals/batch12'
+import { VISUALS_B13 } from './dailyVisuals/batch13'
+import { VISUALS_B14 } from './dailyVisuals/batch14'
+import { VISUALS_B15 } from './dailyVisuals/batch15'
+import { VISUALS_B16 } from './dailyVisuals/batch16'
 
 const VW = 320 // 모든 그림의 viewBox 가로(높이는 그림마다 다르다)
 
@@ -424,7 +441,14 @@ function PhysicalLoop() {
 
 // ── 등록표 ──────────────────────────────────────────────────────────────────
 // terms.ts 의 TermTheory.visual 이 이 키를 가리킨다. 키가 없으면 그림 없이 글만 나온다.
-const DAILY_VISUALS: Record<string, () => ReactNode> = {
+//
+// 그림이 100장을 넘기면서 **묶음(dailyVisuals/batch*.tsx)** 으로 나눠 그린다. 이 파일에는 처음 8장만 남고,
+// 나머지는 묶음이 각자 들고 있다 — 여기서는 합치기만 한다.
+// ⛔ 묶음을 만들었으면 **반드시 여기 꽂아야** 화면에 나온다(안 꽂으면 해설에 그림만 조용히 빠진다).
+//    빠뜨림은 `tests/daily-theory.mjs` 가 잡는다.
+// ⚠️ 묶음끼리 그림 키가 겹치면 뒤에 오는 것이 앞의 것을 덮는다 — 그래서 키에 `b<묶음번호>_` 접두사를 붙인다.
+// eslint-disable-next-line react-refresh/only-export-components -- 등록표(그림 키 → 컴포넌트)라 컴포넌트가 아니다. 도감(/daily/gallery)이 이걸 훑는다.
+export const DAILY_VISUALS: Record<string, () => ReactNode> = {
   endEffector: EndEffector,
   dof: Dof,
   gripper: Gripper,
@@ -433,6 +457,22 @@ const DAILY_VISUALS: Record<string, () => ReactNode> = {
   deep: DeepLayers,
   aiScope: AiScope,
   physical: PhysicalLoop,
+  ...VISUALS_B1,
+  ...VISUALS_B2,
+  ...VISUALS_B3,
+  ...VISUALS_B4,
+  ...VISUALS_B5,
+  ...VISUALS_B6,
+  ...VISUALS_B7,
+  ...VISUALS_B8,
+  ...VISUALS_B9,
+  ...VISUALS_B10,
+  ...VISUALS_B11,
+  ...VISUALS_B12,
+  ...VISUALS_B13,
+  ...VISUALS_B14,
+  ...VISUALS_B15,
+  ...VISUALS_B16,
 }
 
 export default function DailyVisual({ name }: { name?: string }) {

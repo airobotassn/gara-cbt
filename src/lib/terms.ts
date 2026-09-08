@@ -91,18 +91,47 @@ export const TERMS: TermItem[] = RAW.map(([field, desc, opts]) => ({
 //    불릿 세 줄도 안 읽힌다 — 보여 줄 수 있는 개념이면 components/DailyVisual.tsx 에 그림을 만들고
 //    여기엔 그림이 못 말하는 것만 남긴다. (2026-08-05: 문단 → 불릿 → 그림 순으로 두 번 반려됨.)
 //    문장이 그림보다 빠른 개념도 있다. 그럴 땐 visual 을 비우고 point/compare 만 쓰면 된다.
-export interface TermTheory {
-  /** 이거 하나만 기억하면 되는 한 줄. 결론을 뒤로 미루지 말 것. */
-  point: string
-  /** 그림 키 — DailyVisual.tsx 의 등록표에 있는 이름. 없으면 글만 나온다. */
-  visual?: string
-  /** 그림으로 못 말한 것만. **그림이 있으면 비워 두는 게 기본**이다. */
-  why?: string[]
-  /** 헷갈리는 짝을 대조해 주는 한 줄(선택). 그림이 이미 대조하고 있으면 넣지 말 것. */
-  compare?: string
-}
+// 모양은 theory/types.ts 로 옮겼다 — 해설 묶음(theory/batch*.ts)이 여러 파일이 되면서, 그것들이 terms.ts 를
+// import 하고 terms.ts 가 다시 그것들을 import 하면 서로 물린다.
+// ⚠️ 옛 import 경로(`import type { TermTheory } from './terms'`)가 안 깨지게 여기서 그대로 다시 내보낸다.
+import type { TermTheory } from './theory/types'
+export type { TermTheory }
+// 해설 묶음 — 주제별로 갈라 쓴다(한 파일에 100개를 넣으면 아무도 못 읽는다). 여기서 합치기만 한다.
+// ⛔ 묶음을 만들었으면 **반드시 여기 꽂아야** 그 용어가 화면에 나온다. 빠뜨림은 tests/daily-theory.mjs 가 잡는다.
+import { THEORY_B1 } from './theory/batch1'
+import { THEORY_B2 } from './theory/batch2'
+import { THEORY_B3 } from './theory/batch3'
+import { THEORY_B4 } from './theory/batch4'
+import { THEORY_B5 } from './theory/batch5'
+import { THEORY_B6 } from './theory/batch6'
+import { THEORY_B7 } from './theory/batch7'
+import { THEORY_B8 } from './theory/batch8'
+import { THEORY_B9 } from './theory/batch9'
+import { THEORY_B10 } from './theory/batch10'
+import { THEORY_B11 } from './theory/batch11'
+import { THEORY_B12 } from './theory/batch12'
+import { THEORY_B13 } from './theory/batch13'
+import { THEORY_B14 } from './theory/batch14'
+import { THEORY_B15 } from './theory/batch15'
+import { THEORY_B16 } from './theory/batch16'
 
 export const TERM_THEORY: Record<string, TermTheory> = {
+  ...THEORY_B1,
+  ...THEORY_B2,
+  ...THEORY_B3,
+  ...THEORY_B4,
+  ...THEORY_B5,
+  ...THEORY_B6,
+  ...THEORY_B7,
+  ...THEORY_B8,
+  ...THEORY_B9,
+  ...THEORY_B10,
+  ...THEORY_B11,
+  ...THEORY_B12,
+  ...THEORY_B13,
+  ...THEORY_B14,
+  ...THEORY_B15,
+  ...THEORY_B16,
   '엔드 이펙터': {
     point: '팔은 그대로 두고 끝만 갈아 끼운다. 기준점(TCP)이 같이 옮겨가는 게 함정.',
     visual: 'endEffector',
