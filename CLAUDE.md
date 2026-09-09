@@ -5,7 +5,7 @@
 
 > **⚠️ 통합됨 (2026-07):** 이 저장소는 이제 **CARIS CBT 자격검정(메인) + 무료 CARIS ARENA(`/test/*` 모듈)** 가 한 앱이다.
 > 아래 "프로젝트 한눈에"는 CARIS ARENA 시절 옛 설명이라 전면 갱신 예정 — 현재 구조는 **[통합 전략](docs/통합전략.md)** · **[배포 안내](docs/통합-배포-안내.md)** 를 먼저 볼 것.
-> 요점: 라우트 `/`(CBT 홈)·`/exam/*`(CARIS)·`/test/*`+`/ranking`(CARIS ARENA). CARIS ARENA 테이블은 충돌 회피로 `test_*` 리네임(`test_questions`·`test_answers` 등), 함수는 `start-test`·`submit-test`·`get-result`·`list-attempts`·`recommend-level`·`leaderboard`·`admin-test`. 스코어링 sync 페어 = **`src/lib/scoring.ts` ↔ `supabase/functions/_shared/scoring.ts`**. CARIS ARENA 전용 프론트 파일은 `testTypes.ts`·`testConfigLevel.ts`·`useAntiCheatLevel.ts`(CBT 동명 파일과 분리).
+> 요점: 라우트 `/`(CBT 홈)·`/exam/*`(CARIS)·`/test/*`+`/ranking`(CARIS ARENA). CARIS ARENA 테이블은 충돌 회피로 `test_*` 리네임(`test_questions`·`test_answers` 등), 함수는 `start-test`·`submit-test`·`get-result`·`list-attempts`·`leaderboard`·`admin-test`. 스코어링 sync 페어 = **`src/lib/scoring.ts` ↔ `supabase/functions/_shared/scoring.ts`**. CARIS ARENA 전용 프론트 파일은 `testTypes.ts`·`testConfigLevel.ts`·`useAntiCheatLevel.ts`(CBT 동명 파일과 분리).
 
 ---
 
@@ -169,7 +169,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/daily` (DAILY QUIZ — 옛 이름 '오늘의 학습') | `pages/Daily.tsx` — 루트 클래스 `.dy-page` | `daily.css`(직접 import) | `get-hub` · `complete-daily` |
 | **WORLD ARENA (무료 레벨테스트 `/test/*`)** ||||
 | `/arena` (지도+지역랭킹+채팅) | `pages/WorldArena.tsx` + `components/ArenaMap.tsx`·`ChatBoard.tsx` · `lib/arena/*` | `arena.css` · `chat.css` | `leaderboard` · `chat-list`·`chat-post`·`chat-report`·`chat-translate` |
-| `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | `recommend-level` |
+| `/test/select` (레벨 선택) | `pages/LevelSelect.tsx` | `levelselect.css` | — |
 | `/test/record` (내 기록) | `pages/LevelRecord.tsx` | `levelrecord.css` + 공용 카드(`dashboard.css`) | `list-attempts` |
 | `/test/:attemptId` (응시) | `pages/TestRunner.tsx` | `test.css` | `start-test` · `submit-test` |
 | `/test/result/:attemptId` | `pages/Result.tsx` | `result.css` | `get-result` |
@@ -203,7 +203,7 @@ supabase/
   schema.sql   테이블 + RLS (잠금 테이블은 service role 전용) · v3=다국어/레벨별6축
   migrate_v3.sql v2→v3 정리(드롭) → schema.sql 재실행 (pre-launch 전용, 데이터 폐기)
   seed.sql     샘플 문제 120개(레벨1~5 × 6축 × 4, ko/en) — 실제 문항으로 교체 필요
-  functions/   50개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard·recommend-level)
+  functions/   50개 — CBT(start-exam·submit-exam·get-exam-result·verify-cert·seb-handoff) · 이북(ebooks) · 결제(payments·payments-webhook) · 레벨테스트(start-test·submit-test·get-result·list-attempts·leaderboard)
                · 허브(get-hub·complete-daily·shop-buy·character·room·redeem-referral·coin-gift·term-pool) · 검색라우터(route-query·route-seed)
                · 채팅(chat-list·chat-post·chat-report·chat-translate) · 지식베이스(kb-*) · 운영(admin·admin-test·my-attempts·set-region·translate-questions·track-visit·agree-terms)
   functions/_shared/  cors.ts · lib.ts (스코어링·인증·쿨다운 공용) · payments.ts(주문·금액검증·지급·대사)
@@ -346,7 +346,7 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
   - ⚠️ 게스트(익명)에게는 안 뜬다 — 개인정보를 안 남기기 때문이고, 구글로 이관하는 순간 대상이 된다.
   - 문서: 약관 제4조에 가입 연령 조항, 개인정보처리방침 **제6조(만 14세 미만 아동의 개인정보)** 신설(뒤 조항 번호가 한 칸씩 밀렸다).
   - 배포: 마이그레이션 + `npx.cmd supabase functions deploy agree-terms`(플래그 없이) + 프론트 push.
-- **레벨 추천**: 검색어 → `recommend-level` 함수 → Gemini 임베딩 코사인 → 레벨. 앵커 문구가 품질 좌우. 레벨 7개라 pgvector 불필요(메모리 비교). → `docs/온보딩.html` §12
+- ⛔ **옛 레벨 추천은 없앴다 (2026-09-07 지시)** — `recommend-level` 함수 · `reco_cache`(237행) · `reco_shadow_log`(43행) · RPC `match_reco_cache`. "검색어 → 임베딩 → 가장 비슷한 옛 문구의 레벨" 이었는데 랜딩 검색이 **의미 라우터**(위 절)로 바뀌면서 대체됐고, 부르는 화면이 0곳이 됐다(프론트가 부르는 함수 36개에 없다). ⚠️ `/test/select` 는 추천 레벨을 랜딩에서 **넘겨받기만** 한다(`navState.recommendedLevel`) — 만들던 쪽이 없어진 것이고 받는 쪽은 그대로다. ⛔ 되살릴 거면 표를 복구하지 말고 지금 라우터 위에서 다시 설계할 것.
 - **허브 캐릭터 업로드 (2026-08-31 · `20260831140000`)** — 관리자 › WORLD ARENA › 꾸미기 관리 › **캐릭터 업로드**. 캐릭터를 늘리는 데 **배포가 필요 없다**(2026-08-20 의 "그림은 코드, 가격은 DB" 선을 캐릭터에서만 옮긴 것 — 캐릭터가 가진 수치는 비율 하나뿐이라 그림에서 재면 되기 때문이다. 스킨은 9패치 값 15줄이 그림과 같이 와야 해서 여전히 배포다).
   - ⛔ **시트를 자르는 건 여전히 `tools/build-char-art.mjs` 다.** 올리는 건 **완제품 lv1~7** 이다. 흰 배경 빼기·Lv.7 후광 역산은 판단이 섞인 일이고(배경 뺀 시트를 사람이 따로 넣는다) Deno 엣지에는 그 이미지 처리기가 아예 없다.
   - ⛔ **코드의 파일 경로(`/hub/char/<키>/lv<n>.webp`)를 지우지 말 것.** 지금 그림이 있는 두 캐릭터(`char_a_m`·`char_a_f`)는 `hub_char_art` 에 행이 없어서 계속 그쪽에서 그려진다. 표를 단일 출처로 만들면 그 둘을 누군가 다시 올리기 전까지 허브가 폴백 한 장으로 뜬다.
@@ -453,7 +453,7 @@ tools/translate-worker/  엣지 번역 워커(Playwright + Edge). 우리 기계�
 
 - **프론트는 `master` push → Cloudflare 자동배포**(빌드 수 분 소요). 함수는 **별도 CLI 배포** 필요. git push 로 함수 안 올라감. SPA 라우팅은 `wrangler.jsonc`(`not_found_handling`)로 처리 — `_redirects` 금지(무한루프).
 - ⛔ **`package.json` 의 의존성을 건드리면 `bun install` 로 `bun.lock` 을 같이 커밋할 것.** Cloudflare 는 `bun install --frozen-lockfile` 로 설치해서 둘이 어긋나면 **빌드가 시작도 못 하고 죽는다**(`error: lockfile had changes, but lockfile is frozen`). 우리 로컬은 `npm` 을 쓰므로 `package-lock.json` 만 갱신되고 `bun.lock` 은 그대로 남는 게 기본값이다 — 그래서 **두 번 겪었다**(playwright 추가 `1530743`, 토스 SDK 제거 `48bfe88`). 화면이 안 바뀌는 이유를 코드에서 찾기 전에 Cloudflare 빌드 로그부터 볼 것.
-- `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음). `recommend-level` 만 단일 파일이라 대시보드 가능.
+- `_shared` import 하는 함수는 **CLI 로만** 안전 배포(대시보드 웹에디터는 `../_shared` 깨질 수 있음).
 - **결제 함수 배포**: `npx.cmd supabase functions deploy payments` (플래그 없이) + `npx.cmd supabase functions deploy payments-webhook --no-verify-jwt` (**이 함수만** 예외). 엑심베이 `status_url` 은 서버가 `/ready` 에 실어 보내므로 대시보드 설정이 필요 없다 — 값은 `https://<ref>.supabase.co/functions/v1/payments-webhook?k=<PAYMENTS_WEBHOOK_SECRET>`.
 - **SEB 인계 함수 배포**: `npx.cmd supabase functions deploy seb-handoff` (플래그 없이 — `verify_jwt` 켠 채로 맞다). SEB 안에서도 anon 키가 실려 오므로 공개 예외가 필요 없다. `--no-verify-jwt` 로 올리지 말 것.
 - **채팅 번역 배포**: `npx.cmd supabase functions deploy chat-translate` (플래그 없이). **워커도 anon 키를 실어 보내므로 공개 예외가 필요 없다** — 워커 권한은 함수 안의 `x-translate-worker-key` 가 판정한다(서비스 롤 키를 워커에 두지 않는다). 시크릿은 `TRANSLATE_WORKER_KEY` 하나. ⚠️ 옛 `chat-edit`·`chat-delete` 는 삭제됐으니 대시보드에 남아 있으면 지울 것(코드가 없어도 옛 배포본은 계속 뜬다).

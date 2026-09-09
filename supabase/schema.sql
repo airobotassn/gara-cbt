@@ -496,37 +496,13 @@ $$;
 revoke execute on function public.chat_post_atomic(uuid,text,text,text,text,text,text,text) from public, anon, authenticated;
 grant execute on function public.chat_post_atomic(uuid,text,text,text,text,text,text,text) to service_role;
 
--- reco_cache / reco_shadow_log — 레벨 추천 시맨틱 캐시 (key=입력 임베딩, value=레벨)
-create table if not exists reco_cache (
-  id         bigserial primary key,
-  embedding  vector(768) not null,
-  level      smallint not null,
-  sample     text,
-  created_at timestamptz default now()
-);
-create index if not exists reco_cache_embedding_idx
-  on reco_cache using hnsw (embedding vector_cosine_ops);
-
-create table if not exists reco_shadow_log (
-  id          bigserial primary key,
-  sample      text,
-  level_llm   smallint,
-  level_cache smallint,
-  similarity  real,
-  created_at  timestamptz default now()
-);
-
-create or replace function match_reco_cache(query_embedding vector(768), match_count int default 1)
-returns table (level smallint, similarity real)
-language sql stable as $$
-  select level, (1 - (embedding <=> query_embedding))::real as similarity
-  from reco_cache
-  order by embedding <=> query_embedding
-  limit match_count;
-$$;
-
-alter table reco_cache      enable row level security;
-alter table reco_shadow_log enable row level security;
+-- ⛔ 옛 레벨 추천(reco_cache · reco_shadow_log · match_reco_cache · 엣지 함수 recommend-level)은
+--    2026-09-07 에 통째로 지웠다. "검색어 → 임베딩 → 가장 비슷한 옛 문구의 레벨을 추천" 이었는데,
+--    랜딩 검색이 **의미 라우터**(route-query → 페이지 이동)로 바뀌면서 대체됐고
+--    `recommend-level` 을 부르는 화면이 0곳이 됐다(프론트가 부르는 함수 36개에 없다).
+--    ⚠️ `/test/select` 는 추천 레벨을 랜딩에서 **넘겨받기만** 한다(navState.recommendedLevel) —
+--       그 값을 만들던 쪽이 없어진 것이지, 받는 쪽은 그대로다.
+--    ⛔ 되살릴 거면 표를 복구하지 말고 지금 라우터 위에서 다시 설계할 것(앵커 문구가 이미 route_cache 에 있다).
 
 -- ---------- SEMI-CARIS 후속 객체 (랭킹/소프트삭제) ----------
 -- user_level_skill.rating: applyAttempt가 매 응시 기록(랭킹 정렬용 6축 평균)
