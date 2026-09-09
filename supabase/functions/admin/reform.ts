@@ -563,7 +563,9 @@ async function homeStats(admin: any) {
   ])
 
   const people = (profs.data ?? []) as any[]
-  const todayVisitors = people.filter((p) => (p.last_seen_at ?? '').slice(0, 10) === todayKst).length
+  // ⛔ `kstDayOf` 를 거친다 — 앞 10글자를 그냥 자르면 **UTC 날짜**라 한국시간 0~9시 접속이 통째로
+  //    전날로 밀린다(그래서 오전 내내 0명이었다). 그 함수 머리 주석 참고.
+  const todayVisitors = people.filter((p) => kstDayOf(p.last_seen_at) === todayKst).length
   const newUsers7d = people.filter((p) => (p.created_at ?? '') >= d7).length
   // ⚠️ 한 번도 접속 기록이 없는 계정(기록 도입 전 가입자)은 휴면으로 세지 않는다 — 판단할 근거가 없다.
   const dormant = people.filter((p) => p.last_seen_at && p.last_seen_at < dormantSince).length
@@ -843,15 +845,197 @@ async function charArtDelete(admin: any, body: any, ctx: Ctx) {
 //      방문이 쌓이면 limit 에 먼저 걸려 **조용히 틀린 숫자**를 내놓는다.
 //   ⚠️ 날짜 경계는 KST 다. 표의 `day` 도 KST 기준으로 서버가 찍는다(마이그레이션 기본값).
 async function visitStats(admin: any, body: any) {
-  const days = Math.min(365, Math.max(7, Number(body?.days ?? 90) || 90))
-  const kstNow = new Date(Date.now() + 9 * 3600e3)
-  const dayKey = (d: Date) => d.toISOString().slice(0, 10)
-  const to = dayKey(kstNow)
-  const from = dayKey(new Date(kstNow.getTime() - (days - 1) * 86400e3))
-
+  const { from, to } = visitRange(body)
   const { data, error } = await admin.rpc('visit_stats', { p_from: from, p_to: to })
   if (error) return json({ error: error.message }, 500)
   return json({ from, to, ...((data ?? {}) as Record<string, unknown>) })
+}
+
+// ── 접속통계 기간 ────────────────────────────────────────────
+// 화면이 **날짜를 직접 고를 수 있다**(레퍼런스가 시작일·종료일 입력이다). from/to 가 오면 그걸 쓰고,
+// 없으면 옛 방식(days)으로 되짚는다 — 홈 대시보드는 계속 days 만 보낸다.
+//   ⚠️ 뒤집힌 기간(from > to)은 **바로잡아서** 쓴다. 그대로 넘기면 표가 통째로 비고, 관리자는
+//      "기록이 없다" 로 읽어서 통계가 고장난 줄 안다.
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+function visitRange(body: any): { from: string; to: string } {
+  const rawFrom = String(body?.from ?? '')
+  const rawTo = String(body?.to ?? '')
+  if (DATE_RE.test(rawFrom) && DATE_RE.test(rawTo)) {
+    return rawFrom <= rawTo ? { from: rawFrom, to: rawTo } : { from: rawTo, to: rawFrom }
+  }
+  return kstRange(Math.min(365, Math.max(1, Number(body?.days ?? 90) || 90)))
+}
+
+// 시간별 · 일별 · 월별 — 같은 표에 묶는 단위만 다르다(레퍼런스의 세 메뉴).
+async function visitPeriodStats(admin: any, body: any) {
+  const { from, to } = visitRange(body)
+  const unit = ['hour', 'day', 'month'].includes(String(body?.unit)) ? String(body.unit) : 'day'
+  const { data, error } = await admin.rpc('visit_period_stats', { p_from: from, p_to: to, p_unit: unit })
+  if (error) return json({ error: error.message }, 500)
+  return json((data ?? {}) as Record<string, unknown>)
+}
+
+// 링크된 서버 · 링크된 주소 · 최초 접속 페이지.
+async function visitSourceStats(admin: any, body: any) {
+  const { from, to } = visitRange(body)
+  const { data, error } = await admin.rpc('visit_source_stats', { p_from: from, p_to: to })
+  if (error) return json({ error: error.message }, 500)
+  return json((data ?? {}) as Record<string, unknown>)
+}
+
+// IP주소별 — ⚠️ 원문이 아니라 **뒷자리를 가린 대역**이다(`185.93.89.*`). 그 선은 track-visit 에서 그어진다.
+async function visitIpStats(admin: any, body: any) {
+  const { from, to } = visitRange(body)
+  const { data, error } = await admin.rpc('visit_ip_stats', { p_from: from, p_to: to })
+  if (error) return json({ error: error.message }, 500)
+  return json((data ?? {}) as Record<string, unknown>)
+}
+
+// 방문자 로그 — 페이지를 넘겨서 본다.
+async function visitLogList(admin: any, body: any) {
+  const { from, to } = visitRange(body)
+  const { data, error } = await admin.rpc('visit_log_list', {
+    p_from: from, p_to: to,
+    p_limit: Math.min(500, Math.max(1, Number(body?.limit ?? 100) || 100)),
+    p_offset: Math.max(0, Number(body?.offset ?? 0) || 0),
+  })
+  if (error) return json({ error: error.message }, 500)
+  return json((data ?? {}) as Record<string, unknown>)
+}
+
+// ── KST 하루 경계 ────────────────────────────────────────────
+// ⛔ **DB 가 준 시각의 앞 10글자를 그대로 자르지 말 것 — 그건 UTC 날짜다.** 관리자 화면의 날짜 기준은
+//    KST 하나다(방문 통계 표의 `day` 도, 홈의 '오늘' 도). 안 밀면 **새벽 0~9시가 통째로 전날로 밀린다.**
+const kstDayOf = (iso: string | null | undefined): string => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isNaN(t) ? '' : new Date(t + 9 * 3600e3).toISOString().slice(0, 10)
+}
+/** from~to(KST) — 통계 화면들이 공통으로 쓰는 기간 계산. */
+function kstRange(days: number) {
+  const now = Date.now()
+  return { from: kstDayOf(new Date(now - (days - 1) * 86400e3).toISOString()), to: kstDayOf(new Date(now).toISOString()) }
+}
+
+// ── 회원 통계 ────────────────────────────────────────────────
+// '통계 › 회원'. 홈 대시보드의 KPI 세 개(누적·신규·휴면)로는 "늘고 있나 · 누가 오나"에 답이 안 돼서
+// `profiles` 한 표에서 낼 수 있는 것을 모아 낸다.
+//   ⚠️ 익명(게스트)은 회원이 아니라 제외한다. **탈퇴(`deactivated_at`)는 따로 세고 나머지 집계에서 뺀다** —
+//      섞으면 '누적 회원' 이 실제 쓸 수 있는 계정 수보다 커져서 매출·활성 지표와 안 맞는다.
+//   ⚠️ 지역·국가는 **회원이 스스로 고른 값**(온보딩)이다. 방문 통계의 국가(브라우저가 알아낸 값)와
+//      모수도 출처도 다르다 — 두 숫자가 안 맞는 게 정상이라 화면이 제목으로 밝힌다.
+async function memberStats(admin: any, body: any) {
+  const days = Math.min(365, Math.max(7, Number(body?.days ?? 90) || 90))
+  const { from, to } = kstRange(days)
+  const now = Date.now()
+  const d7 = now - 7 * 86400e3
+  const d30 = now - 30 * 86400e3
+  const d90 = now - 90 * 86400e3
+
+  const { data, error } = await admin
+    .from('profiles')
+    .select('created_at, last_seen_at, deactivated_at, country_code, region_code, age_band, marketing_agreed_at')
+    .eq('is_anonymous', false)
+    .limit(50000)
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+
+  const signupByDay: Record<string, number> = {}
+  const countries: Record<string, number> = {}
+  const regions: Record<string, number> = {}
+  const ages: Record<string, number> = {}
+  let total = 0, deactivated = 0, new7d = 0, new30d = 0, active30d = 0, dormant90d = 0, neverSeen = 0, marketing = 0
+
+  for (const r of rows) {
+    if (r.deactivated_at) { deactivated++; continue }
+    total++
+    const created = Date.parse(r.created_at ?? '') || 0
+    if (created >= d7) new7d++
+    if (created >= d30) new30d++
+    const day = kstDayOf(r.created_at)
+    if (day >= from && day <= to) signupByDay[day] = (signupByDay[day] ?? 0) + 1
+    const seen = r.last_seen_at ? Date.parse(r.last_seen_at) : NaN
+    if (Number.isNaN(seen)) neverSeen++
+    else if (seen >= d30) active30d++
+    else if (seen < d90) dormant90d++
+    if (r.marketing_agreed_at) marketing++
+    const c = String(r.country_code ?? '').toUpperCase()
+    if (c) countries[c] = (countries[c] ?? 0) + 1
+    // 지역은 나라마다 코드 모양이 달라(KR-11 · ES.CE) 나라를 같이 실어야 화면이 이름을 찾는다.
+    if (c && r.region_code) regions[`${c}:${r.region_code}`] = (regions[`${c}:${r.region_code}`] ?? 0) + 1
+    ages[String(r.age_band ?? '')] = (ages[String(r.age_band ?? '')] ?? 0) + 1
+  }
+
+  const top = (m: Record<string, number>, n: number) =>
+    Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n).map(([key, value]) => ({ key, value }))
+
+  return json({
+    from, to, days,
+    totals: { total, deactivated, new7d, new30d, active30d, dormant90d, neverSeen, marketing },
+    signupByDay,
+    countries: top(countries, 20),
+    regions: top(regions, 20).map((r) => ({ country: r.key.split(':')[0], key: r.key.split(':')[1], value: r.value })),
+    ages: top(ages, 10),
+  })
+}
+
+// ── 매출 통계 ────────────────────────────────────────────────
+// '통계 › 매출'. 옛날엔 CARIS 대시보드 안에 결제 현황이 얹혀 있어서 **이북·강의 매출이 자격검정 화면에
+// 섞여** 있었다(제도가 다른 돈이 한 표에 있었다). 여기가 돈을 보는 유일한 자리다.
+//   ⚠️ 금액은 **원화**다 — 구매자 화면은 달러 정가를 보여주지만 관리자는 실제 청구·정산액을 봐야 한다.
+//   ⚠️ 기간은 `created_at`(주문 생성) 기준이다. 승인(`confirmed_at`)으로 잡으면 결제창에서 하루를 넘긴
+//      주문이 다음 날로 넘어가 접수 화면의 회차 집계와 어긋난다.
+async function revenueStats(admin: any, body: any) {
+  const days = Math.min(365, Math.max(7, Number(body?.days ?? 90) || 90))
+  const { from, to } = kstRange(days)
+  const fromIso = new Date(`${from}T00:00:00+09:00`).toISOString()
+
+  const { data, error } = await admin
+    .from('payments')
+    .select('amount, status, product_type, order_name, created_at, fulfilled_at')
+    .gte('created_at', fromIso)
+    .limit(20000)
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+
+  const byDay: Record<string, number> = {}
+  const byProduct: Record<string, { n: number; amount: number }> = {}
+  const byName: Record<string, { n: number; amount: number }> = {}
+  let paidN = 0, paidAmount = 0, refundN = 0, refundAmount = 0, pendingN = 0, failedN = 0
+
+  for (const p of rows) {
+    const amt = Number(p.amount ?? 0)
+    const type = String(p.product_type ?? '기타')
+    if (p.status === 'paid') {
+      paidN++; paidAmount += amt
+      const day = kstDayOf(p.created_at)
+      if (day) byDay[day] = (byDay[day] ?? 0) + amt
+      const bp = (byProduct[type] ??= { n: 0, amount: 0 }); bp.n++; bp.amount += amt
+      const nm = String(p.order_name ?? '(이름 없음)')
+      const bn = (byName[nm] ??= { n: 0, amount: 0 }); bn.n++; bn.amount += amt
+    } else if (p.status === 'refunded') { refundN++; refundAmount += amt }
+    else if (p.status === 'pending') pendingN++
+    // 만료·실패는 돈이 안 들어온 주문이다 — 매출에 넣지 않고 '결제 이탈' 로만 센다.
+    else failedN++
+  }
+
+  // ⛔ '돈이 새는' 두 큐는 **기간을 안 건다**(paymentList 의 queues 와 같은 정의). 30일로 자르면
+  //    석 달 전 미지급 건이 화면에서 사라져 영영 안 보인다 — 그게 이 경고가 있는 이유다.
+  const [unf, rev] = await Promise.all([
+    admin.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'paid').is('fulfilled_at', null),
+    admin.from('payments').select('id', { count: 'exact', head: true }).in('status', ['refunded', 'canceled']).not('fulfilled_at', 'is', null),
+  ])
+
+  return json({
+    from, to, days,
+    totals: {
+      paidN, paidAmount, refundN, refundAmount, pendingN, failedN,
+      unfulfilled: unf.count ?? 0, revoked: rev.count ?? 0,
+      avg: paidN > 0 ? Math.round(paidAmount / paidN) : 0,
+    },
+    byDay,
+    byProduct: Object.entries(byProduct).map(([key, v]) => ({ key, ...v })).sort((a, b) => b.amount - a.amount),
+    topProducts: Object.entries(byName).map(([key, v]) => ({ key, ...v })).sort((a, b) => b.amount - a.amount).slice(0, 10),
+  })
 }
 
 // ── 시스템 알림 ──────────────────────────────────────────────
@@ -1420,6 +1604,12 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'dailyStats': return await dailyStats(admin, body)
     case 'homeStats': return await homeStats(admin)
     case 'visitStats': return await visitStats(admin, body)
+    case 'visitPeriodStats': return await visitPeriodStats(admin, body)
+    case 'visitSourceStats': return await visitSourceStats(admin, body)
+    case 'visitIpStats': return await visitIpStats(admin, body)
+    case 'visitLogList': return await visitLogList(admin, body)
+    case 'memberStats': return await memberStats(admin, body)
+    case 'revenueStats': return await revenueStats(admin, body)
     case 'alertList': return await alertList(admin, body)
     case 'alertUpdate': return await alertUpdate(admin, body)
     case 'bannedWordList': return await bannedWordList(admin)

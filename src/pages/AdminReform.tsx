@@ -7,6 +7,9 @@ import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, pr
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { krw } from '../lib/money'
+import { countryName, flagUrl } from '../lib/regions'
+// 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
+import { loadRegions } from '../lib/regionCatalog'
 import { getTracks } from '../lib/caris'
 import { MAX_LEVEL } from '../lib/categories'
 import { useT } from '../lib/i18n'
@@ -230,6 +233,557 @@ function HourChart({ hours, color = 'var(--k-teal, #2aa6a0)' }: { hours: number[
 
 const PERIODS: [number, string][] = [[7, '7일'], [30, '30일'], [90, '90일']]
 const fmtSec = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`)
+
+// ══════════════════════════════════════════════════════════════
+// 통계 공용 부품
+// ══════════════════════════════════════════════════════════════
+/** 가로 막대 한 줄 — 대시보드(`HBar`)와 **같은 클래스**를 쓴다. 통계 화면끼리 막대가 달라 보이면 안 된다. */
+function StatBar({ label, value, max, unit, icon }: { label: string; value: number; max: number; unit: string; icon?: ReactNode }) {
+  return (
+    <div className="hbar">
+      <span className="hbar-l" title={label}>{icon}{label}</span>
+      <div className="hbar-track"><div className="hbar-fill" style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%` }} /></div>
+      <span className="hbar-v">{value.toLocaleString()}{unit}</span>
+    </div>
+  )
+}
+/** ⛔ 설명문을 달지 말 것 — 밝힐 조건은 **제목에 괄호로** 붙인다(방문 통계의 그 규칙 그대로). */
+function StatPanel({ title, rows, unit, empty }: {
+  title: ReactNode; rows: { label: string; value: number; icon?: ReactNode }[]; unit: string; empty: string
+}) {
+  const max = Math.max(1, ...rows.map((r) => r.value))
+  return (
+    <div className="admin-section">
+      <div className="admin-section-head"><h3>{title}</h3></div>
+      {rows.length
+        ? rows.map((r, i) => <StatBar key={`${r.label}-${i}`} label={r.label} value={r.value} max={max} unit={unit} icon={r.icon} />)
+        : <div className="admin-empty">{empty}</div>}
+    </div>
+  )
+}
+/** 기간 버튼 — 통계 화면 전부가 같은 자리에 같은 모양으로 단다. */
+function PeriodBar({ days, onDays, hint }: { days: number; onDays: (d: number) => void; hint?: string }) {
+  return (
+    <div className="admin-toolbar">
+      {PERIODS.map(([d, label]) => (
+        <button key={d} className={days === d ? 'admin-mini on' : 'admin-mini'} onClick={() => onDays(d)}
+          style={days === d ? { background: 'var(--blue)', color: '#fff' } : undefined}>{label}</button>
+      ))}
+      {hint && <span className="admin-hint">{hint}</span>}
+    </div>
+  )
+}
+/** from~to 사이의 모든 날짜. 0인 날도 자리를 남겨야 추이가 안 찌그러진다. */
+function dayList(from: string, to: string): string[] {
+  const out: string[] = []
+  const a = Date.parse(`${from}T00:00:00Z`); const b = Date.parse(`${to}T00:00:00Z`)
+  if (isNaN(a) || isNaN(b)) return out
+  for (let t = a; t <= b; t += 86400e3) out.push(new Date(t).toISOString().slice(0, 10))
+  return out
+}
+const flagIcon = (iso: string | null) => {
+  const u = iso ? flagUrl(iso) : ''
+  return u ? <img src={u} alt="" className="hbar-flag" /> : null
+}
+
+// ══════════════════════════════════════════════════════════════
+// 통계 > 회원
+// ══════════════════════════════════════════════════════════════
+// ⚠️ 여기 국가·지역은 **회원이 온보딩에서 고른 값**이다. '접속·유입' 의 국가(브라우저가 알아낸 값)와
+//    출처도 모수도 달라서 숫자가 안 맞는 게 정상이라, 제목에 괄호로 밝힌다.
+interface MemberStatsResp {
+  from: string; to: string; days: number
+  totals: { total: number; deactivated: number; new7d: number; new30d: number; active30d: number; dormant90d: number; neverSeen: number; marketing: number }
+  signupByDay: Record<string, number>
+  countries: { key: string; value: number }[]
+  regions: { country: string; key: string; value: number }[]
+  ages: { key: string; value: number }[]
+}
+const AGE_LABEL: Record<string, string> = { '10s': '10대', '20s': '20대', '30s': '30대', '40s': '40대', '50s': '50대', '60s': '60대 이상', private: '비공개', '': '미입력' }
+
+export function MemberStats() {
+  const [days, setDays] = useState(90)
+  const { data, loading, err, reload } = useAdminData<MemberStatsResp>('memberStats', { days })
+  const [regionNames, setRegionNames] = useState<Record<string, string>>({})
+  const t = data?.totals
+
+  // 지역 이름 — 화면에 뜬 나라만 받는다(파일 하나가 30KB).
+  const regionRows = data?.regions
+  useEffect(() => {
+    const rows = regionRows ?? []
+    if (!rows.length) return
+    let alive = true
+    const isos = [...new Set(rows.map((r) => r.country).filter(Boolean))]
+    Promise.all(isos.map((iso) => loadRegions(iso, 'ko').then((list) => [iso, list] as const)))
+      .then((pairs) => {
+        if (!alive) return
+        const m: Record<string, string> = {}
+        for (const [iso, list] of pairs) for (const r of list) m[`${iso}:${r.code}`] = r.name
+        setRegionNames(m)
+      })
+      .catch(() => { /* 이름을 못 받으면 코드가 그대로 뜬다 */ })
+    return () => { alive = false }
+  }, [regionRows])
+
+  const days1 = data ? dayList(data.from, data.to) : []
+  return (
+    <>
+      <AdminHead title="회원" count={t ? `${t.total.toLocaleString()}명` : ''} onReload={reload} loading={loading} />
+      <ErrBox msg={err} />
+      <PeriodBar days={days} onDays={setDays} hint={data ? `${data.from} ~ ${data.to}` : ''} />
+
+      <div className="admin-cards">
+        <div className="admin-card k-blue">
+          <div className="k">누적 회원</div>
+          <div className="v">{(t?.total ?? 0).toLocaleString()}명</div>
+          <div className="s">탈퇴 {(t?.deactivated ?? 0).toLocaleString()}명 제외 · 게스트 제외</div>
+        </div>
+        <div className="admin-card k-violet">
+          <div className="k">신규</div>
+          <div className="v">{(t?.new30d ?? 0).toLocaleString()}명</div>
+          <div className="s">최근 30일 · 이번주 {(t?.new7d ?? 0).toLocaleString()}명</div>
+        </div>
+        <div className="admin-card k-green">
+          <div className="k">활성</div>
+          <div className="v">{(t?.active30d ?? 0).toLocaleString()}명</div>
+          <div className="s">최근 30일 안에 접속</div>
+        </div>
+        <div className="admin-card">
+          <div className="k">휴면</div>
+          <div className="v">{(t?.dormant90d ?? 0).toLocaleString()}명</div>
+          {/* ⚠️ 접속 기록이 아예 없는 계정은 휴면으로 안 센다 — 판단할 근거가 없다(기록 도입 전 가입자). */}
+          <div className="s">90일 이상 미접속 · 기록없음 {(t?.neverSeen ?? 0).toLocaleString()}명</div>
+        </div>
+      </div>
+
+      <div className="admin-section">
+        <h3>가입 추이</h3>
+        <MiniBars labels={days1.map((d) => d.slice(5))} values={days1.map((d) => data?.signupByDay[d] ?? 0)} color="var(--k-blue, #3f7bd6)" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+        <StatPanel
+          title={<>국가별 <span className="admin-hint">회원이 고른 값</span></>}
+          unit="명" empty="기록이 없습니다."
+          rows={(data?.countries ?? []).map((c) => ({ label: countryName(c.key, 'ko'), value: c.value, icon: flagIcon(c.key) }))}
+        />
+        <StatPanel
+          title={<>지역별 <span className="admin-hint">회원이 고른 값</span></>}
+          unit="명" empty="기록이 없습니다."
+          rows={(data?.regions ?? []).map((r) => ({ label: regionNames[`${r.country}:${r.key}`] ?? r.key, value: r.value, icon: flagIcon(r.country) }))}
+        />
+        <StatPanel
+          title="연령대"
+          unit="명" empty="기록이 없습니다."
+          rows={(data?.ages ?? []).map((a) => ({ label: AGE_LABEL[a.key] ?? a.key, value: a.value }))}
+        />
+        <div className="admin-section">
+          <div className="admin-section-head"><h3>마케팅 수신 동의</h3></div>
+          <div className="admin-cards" style={{ marginBottom: 0 }}>
+            <div className="admin-card">
+              <div className="k">동의</div>
+              <div className="v">{(t?.marketing ?? 0).toLocaleString()}명</div>
+              <div className="s">누적 회원의 {t && t.total ? Math.round((t.marketing / t.total) * 100) : 0}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// 통계 > 매출
+// ══════════════════════════════════════════════════════════════
+// 돈을 보는 유일한 자리. 옛날엔 결제 현황이 CARIS 대시보드 안에 얹혀 있어서 **이북·강의 매출이
+// 자격검정 화면에 섞여** 있었다(제도가 다른 돈이 한 표에 있었다).
+//   ⚠️ 금액은 **원화**다 — 구매자 화면은 달러 정가를 보여주지만 관리자는 실제 청구·정산액을 봐야 한다.
+interface RevenueStatsResp {
+  from: string; to: string; days: number
+  totals: { paidN: number; paidAmount: number; refundN: number; refundAmount: number; unfulfilled: number; revoked: number; pendingN: number; failedN: number; avg: number }
+  byDay: Record<string, number>
+  byProduct: { key: string; n: number; amount: number }[]
+  topProducts: { key: string; n: number; amount: number }[]
+}
+export function RevenueStats() {
+  const [days, setDays] = useState(30)
+  const { data, loading, err, reload } = useAdminData<RevenueStatsResp>('revenueStats', { days })
+  const t = data?.totals
+  const days1 = data ? dayList(data.from, data.to) : []
+  const maxAmt = Math.max(1, ...(data?.byProduct ?? []).map((p) => p.amount))
+
+  return (
+    <>
+      <AdminHead title="매출" count={t ? krw(t.paidAmount) : ''} onReload={reload} loading={loading} />
+      <ErrBox msg={err} />
+      <PeriodBar days={days} onDays={setDays} hint={data ? `${data.from} ~ ${data.to} · 원화` : ''} />
+
+      <div className="admin-cards">
+        <div className="admin-card k-green">
+          <div className="k">매출</div>
+          <div className="v">{krw(t?.paidAmount ?? 0)}</div>
+          <div className="s">결제 {(t?.paidN ?? 0).toLocaleString()}건</div>
+        </div>
+        <div className="admin-card k-blue">
+          <div className="k">객단가</div>
+          <div className="v">{krw(t?.avg ?? 0)}</div>
+          <div className="s">결제 1건 평균</div>
+        </div>
+        <div className="admin-card k-violet">
+          <div className="k">환불</div>
+          <div className="v">{krw(t?.refundAmount ?? 0)}</div>
+          <div className="s">{(t?.refundN ?? 0).toLocaleString()}건</div>
+        </div>
+        <div className="admin-card">
+          <div className="k">결제 이탈</div>
+          <div className="v">{((t?.pendingN ?? 0) + (t?.failedN ?? 0)).toLocaleString()}건</div>
+          {/* 돈이 안 들어온 주문이라 매출에 안 넣는다 — 결제창까지 갔다가 안 끝낸 사람의 수다. */}
+          <div className="s">미완료 {(t?.pendingN ?? 0)}건 · 만료·실패 {(t?.failedN ?? 0)}건</div>
+        </div>
+      </div>
+
+      {/* ⚠️ 이 두 줄은 **기간과 무관한 전체 누계**다 — 기간으로 자르면 오래된 미지급이 화면에서 사라진다. */}
+      {((t?.unfulfilled ?? 0) > 0 || (t?.revoked ?? 0) > 0) && (
+        <div className="admin-section admin-empty" style={{ color: 'var(--k-amber, #d98a00)', lineHeight: 1.7 }}>
+          {(t?.unfulfilled ?? 0) > 0 && <div>⚠ <b>승인됐는데 지급 안 된 결제 {t?.unfulfilled}건</b> — 돈은 받았는데 응시권·이북이 안 나갔습니다.</div>}
+          {(t?.revoked ?? 0) > 0 && <div>⚠ <b>환불·취소인데 지급이 살아있는 결제 {t?.revoked}건</b> — 응시권·열람권을 손으로 회수해야 합니다.</div>}
+        </div>
+      )}
+
+      <div className="admin-section">
+        <h3>일별 매출</h3>
+        <MiniBars labels={days1.map((d) => d.slice(5))} values={days1.map((d) => data?.byDay[d] ?? 0)} color="var(--k-green, #2f9e6e)" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+        <div className="admin-section">
+          <div className="admin-section-head"><h3>상품 종류별</h3></div>
+          {(data?.byProduct ?? []).length
+            ? (data?.byProduct ?? []).map((p) => (
+              <div key={p.key} className="hbar">
+                {/* ⚠️ 공용 `productLabel` 은 모르는 종류를 전부 '이북' 이라고 부른다(묶음결제가 그렇다) —
+                    매출을 종류로 가르는 표라 여기서는 모르는 값을 그대로 보여준다. */}
+                <span className="hbar-l">{p.key === 'bundle' ? '묶음결제' : p.key === 'ebook' ? '이북' : productLabel(p.key)}</span>
+                <div className="hbar-track"><div className="hbar-fill" style={{ width: `${Math.min(100, (p.amount / maxAmt) * 100)}%` }} /></div>
+                <span className="hbar-v">{krw(p.amount)} · {p.n}건</span>
+              </div>
+            ))
+            : <div className="admin-empty">이 기간에 결제가 없습니다.</div>}
+        </div>
+        <div className="admin-section">
+          <div className="admin-section-head"><h3>많이 팔린 상품</h3></div>
+          {(data?.topProducts ?? []).length
+            ? (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead><tr><th>상품</th><th style={{ textAlign: 'right' }}>건수</th><th style={{ textAlign: 'right' }}>매출</th></tr></thead>
+                  <tbody>
+                    {(data?.topProducts ?? []).map((p) => (
+                      <tr key={p.key}>
+                        <td>{p.key}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{p.n}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{krw(p.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : <div className="admin-empty">이 기간에 결제가 없습니다.</div>}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// 통계 > 접속·유입 (레퍼런스 = 그누보드식 접속통계)
+// ══════════════════════════════════════════════════════════════
+// 레퍼런스 메뉴 10개를 **다섯 칸으로 묶었다**(2026-09-09 지시로 만든 것):
+//   요약 / 기간별(시간·일·월) / 기기·환경(OS·브라우저·기기) / 유입경로(서버·주소·최초 접속 페이지) / 방문자 로그
+//   ⛔ 메뉴를 열 칸으로 늘리지 말 것 — 시간별·일별·월별은 **같은 표에 묶는 단위만 다르고**,
+//      OS별·브라우저별도 같은 표의 다른 열이다. 나란히 세우면 탭이 열 개가 되는데 그중 여섯은
+//      한 화면 안에서 버튼 하나로 바뀌는 것들이다.
+//   ⛔ **IP주소별은 대역까지만 본다**(2026-09-09 결정 — `185.93.89.147` 이 아니라 `185.93.89.*`).
+//      원문을 저장하지 않으므로 화면에 원문을 띄우는 쪽으로 되돌릴 수 없다(값 자체가 없다).
+//      가려도 "어느 통신사·회사망에서 몰려오나" 는 그대로 읽히고, 개인 특정만 빠진다.
+//   ⚠️ '방문수'는 페이지뷰, '방문자'는 브라우저 수다. 레퍼런스가 세는 건 앞의 것이고, 둘을 같이
+//      보여주는 이유는 하나만 두면 "총 17,637건" 이 사람 수로 읽히기 때문이다.
+
+/** 시작일·종료일 직접 지정 + 조회. ⚠️ 입력할 때마다 부르지 않는다 — 날짜를 고치는 도중에 여러 번 왕복한다. */
+function RangePicker({ from, to, onApply, loading }: {
+  from: string; to: string; onApply: (from: string, to: string) => void; loading?: boolean
+}) {
+  // ⚠️ 프리셋 버튼은 **입력칸도 같이** 바꾼다. 부모 값만 바꾸고 이펙트로 되받으면, 날짜를 손으로
+  //    고치던 중에 눌렀을 때 칸과 실제 조회 기간이 한 박자 어긋난 채로 보인다.
+  const [f, setF] = useState(from)
+  const [t, setT] = useState(to)
+  return (
+    <div className="admin-toolbar">
+      {PERIODS.map(([d, label]) => (
+        // ⚠️ 눌린 상태를 칠하지 않는다 — '최근 N일' 인지 판정하려면 렌더 중에 오늘 날짜를 읽어야 한다.
+        //    지금 보고 있는 기간은 옆의 날짜 칸이 이미 말해 준다.
+        <button key={d} className="admin-mini" onClick={() => {
+          const r = defaultRange(d)
+          setF(r.from); setT(r.to); onApply(r.from, r.to)
+        }}>{label}</button>
+      ))}
+      <input style={{ ...inp, width: 150 }} type="date" value={f} onChange={(e) => setF(e.target.value)} />
+      <span className="admin-hint">~</span>
+      <input style={{ ...inp, width: 150 }} type="date" value={t} onChange={(e) => setT(e.target.value)} />
+      <button className="admin-mini" style={{ background: 'var(--blue)', color: '#fff' }}
+        onClick={() => onApply(f, t)} disabled={!f || !t}>조회</button>
+      {loading && <span className="admin-hint">불러오는 중…</span>}
+    </div>
+  )
+}
+
+/** 기본 기간 = 최근 30일(KST). */
+function defaultRange(days = 30) {
+  const day = (ms: number) => new Date(ms + 9 * 3600e3).toISOString().slice(0, 10)
+  return { from: day(Date.now() - (days - 1) * 86400e3), to: day(Date.now()) }
+}
+
+interface VisitRow { key: string; visits: number; visitors: number }
+/** 레퍼런스의 표 — 이름 / 방문수 / 방문자 / 비율 / 가로 막대. 비율의 분모는 **그 표의 합**이다. */
+function RatioTable({ title, nameCol, rows, empty, linkify }: {
+  title: ReactNode; nameCol: string; rows: VisitRow[]; empty: string; linkify?: boolean
+}) {
+  const sum = rows.reduce((a, r) => a + r.visits, 0)
+  const max = Math.max(1, ...rows.map((r) => r.visits))
+  return (
+    <div className="admin-section">
+      <div className="admin-section-head"><h3>{title}</h3></div>
+      {rows.length ? (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>{nameCol}</th>
+                <th style={{ textAlign: 'right' }}>방문수</th>
+                <th style={{ textAlign: 'right' }}>방문자</th>
+                <th style={{ textAlign: 'right' }}>비율</th>
+                <th style={{ width: '38%' }}>그래프</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  {/* ⚠️ 링크된 주소는 남의 사이트 주소다 — 새 탭으로 열고 `noreferrer` 를 붙인다
+                      (우리 관리자 주소가 그쪽 로그에 남지 않게). */}
+                  <td style={{ wordBreak: 'break-all' }}>
+                    {linkify && /^https?:\/\//.test(r.key)
+                      ? <a href={r.key} target="_blank" rel="noreferrer noopener">{r.key}</a>
+                      : r.key}
+                  </td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><b>{r.visits.toLocaleString()}</b></td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--muted)' }}>{r.visitors.toLocaleString()}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--muted)' }}>
+                    {sum ? ((r.visits / sum) * 100).toFixed(2) : '0.00'} %
+                  </td>
+                  <td>
+                    <div className="hbar-track"><div className="hbar-fill" style={{ width: `${(r.visits / max) * 100}%` }} /></div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="admin-empty">{empty}</div>}
+    </div>
+  )
+}
+
+// ── 기간별 (시간별 · 일별 · 월별) ────────────────────────────
+const UNITS: [('hour' | 'day' | 'month'), string][] = [['hour', '시간별'], ['day', '일별'], ['month', '월별']]
+export function VisitPeriodStats() {
+  const [rng, setRng] = useState(defaultRange(30))
+  const [unit, setUnit] = useState<'hour' | 'day' | 'month'>('day')
+  const { data, loading, err, reload } = useAdminData<{ visits: number; visitors: number; rows: VisitRow[] }>(
+    'visitPeriodStats', { from: rng.from, to: rng.to, unit },
+  )
+  const rows = (data?.rows ?? []).map((r) => ({ ...r, key: unit === 'hour' ? `${r.key} 시` : r.key }))
+  return (
+    <>
+      <AdminHead
+        title={UNITS.find((u) => u[0] === unit)?.[1] ?? '기간별'}
+        count={data ? `총 ${data.visits.toLocaleString()} 건 · 방문자 ${data.visitors.toLocaleString()}` : ''}
+        onReload={reload} loading={loading}
+      />
+      <ErrBox msg={err} />
+      <div className="admin-toolbar">
+        {UNITS.map(([u, label]) => (
+          <button key={u} className="admin-mini" onClick={() => setUnit(u)}
+            style={unit === u ? { background: 'var(--blue)', color: '#fff' } : undefined}>{label}</button>
+        ))}
+      </div>
+      <RangePicker from={rng.from} to={rng.to} loading={loading} onApply={(from, to) => setRng({ from, to })} />
+      <div className="admin-section">
+        <h3>그래프</h3>
+        <MiniBars labels={rows.map((r) => r.key)} values={rows.map((r) => r.visits)} color="var(--k-blue, #3f7bd6)" />
+      </div>
+      <RatioTable
+        title="구간별"
+        nameCol={unit === 'hour' ? '시간' : unit === 'month' ? '월' : '날짜'}
+        rows={rows}
+        empty="이 기간에 기록이 없습니다."
+      />
+    </>
+  )
+}
+
+// ── 기기 · 환경 (OS별 · 브라우저별 · 기기별) ─────────────────
+// ⚠️ 새 표를 안 만든다 — 요약(`visitStats`)이 이미 같은 값을 낸다. 여기서 따로 세면 같은 기간을 두고
+//    두 화면이 다른 숫자를 말한다. 이 화면이 하는 일은 **표 형식으로 다시 그리는 것**뿐이다.
+interface VisitBucketResp { key: string | null; visitors: number; views: number }
+export function VisitEnvStats() {
+  const [rng, setRng] = useState(defaultRange(30))
+  const { data, loading, err, reload } = useAdminData<{
+    visitors: number; views: number
+    devices: VisitBucketResp[]; browsers: VisitBucketResp[]; os: VisitBucketResp[]
+  }>('visitStats', { from: rng.from, to: rng.to })
+  const conv = (b: VisitBucketResp[] | undefined, label?: Record<string, string>): VisitRow[] =>
+    (b ?? []).map((x) => ({ key: label?.[x.key ?? ''] ?? x.key ?? '기타', visits: x.views, visitors: x.visitors }))
+  return (
+    <>
+      <AdminHead title="기기 · 환경" count={data ? `총 ${data.views.toLocaleString()} 건` : ''} onReload={reload} loading={loading} />
+      <ErrBox msg={err} />
+      <RangePicker from={rng.from} to={rng.to} loading={loading} onApply={(from, to) => setRng({ from, to })} />
+      <RatioTable title="OS별" nameCol="운영체제" rows={conv(data?.os)} empty="기록이 없습니다." />
+      <RatioTable title="브라우저별" nameCol="브라우저" rows={conv(data?.browsers)} empty="기록이 없습니다." />
+      <RatioTable title="기기별" nameCol="기기" rows={conv(data?.devices, { mobile: '모바일', tablet: '태블릿', desktop: 'PC' })} empty="기록이 없습니다." />
+    </>
+  )
+}
+
+// ── 유입경로 (링크된 서버 · 링크된 주소 · 최초 접속 페이지) ──
+// ⚠️ 여기 숫자는 **그 방문의 첫 요청만** 센다(화면을 옮길 때마다 세면 외부 유입 1건이 뻥튀기된다).
+//    그래서 다른 표의 방문수보다 작은 게 정상이다.
+interface VisitSourceResp {
+  entries_total: number; direct: number
+  hosts: VisitRow[]; urls: VisitRow[]; entries: VisitRow[]
+}
+export function VisitSourceStats() {
+  const [rng, setRng] = useState(defaultRange(30))
+  const { data, loading, err, reload } = useAdminData<VisitSourceResp>('visitSourceStats', { from: rng.from, to: rng.to })
+  // 서버는 referrer 없는 방문을 빈 문자열로 준다 — 화면에서 이름을 붙인다(레퍼런스의 '직접입력').
+  const hosts = (data?.hosts ?? []).map((h) => ({ ...h, key: h.key || '직접입력' }))
+  return (
+    <>
+      <AdminHead
+        title="유입경로"
+        count={data ? `유입 ${data.entries_total.toLocaleString()} 건 · 직접입력 ${data.direct.toLocaleString()}` : ''}
+        onReload={reload} loading={loading}
+      />
+      <ErrBox msg={err} />
+      <RangePicker from={rng.from} to={rng.to} loading={loading} onApply={(from, to) => setRng({ from, to })} />
+      <RatioTable title={<>링크된 서버 <span className="admin-hint">어느 사이트에서 왔나</span></>} nameCol="도메인" rows={hosts}
+        empty="이 기간에 유입 기록이 없습니다." />
+      <RatioTable title={<>링크된 주소 <span className="admin-hint">그 사이트의 어느 글에서 왔나</span></>} nameCol="주소" rows={data?.urls ?? []}
+        empty="이 기간에 유입 기록이 없습니다." linkify />
+      <RatioTable title={<>최초 접속 페이지 <span className="admin-hint">들어와서 처음 닿은 화면</span></>} nameCol="화면" rows={data?.entries ?? []}
+        empty="이 기간에 기록이 없습니다." />
+    </>
+  )
+}
+
+// ── IP주소별 ────────────────────────────────────────────────
+// ⚠️ **원문이 아니라 뒷자리를 가린 대역이다**(`185.93.89.*`). 레퍼런스는 IP 를 그대로 세우지만
+//    2026-09-09 에 여기까지만 보기로 정했다 — "어느 통신사·회사망에서 몰려오나" 는 그대로 읽히고
+//    "그 집이 누구냐" 는 안 나온다. ⛔ 원문을 보여주는 쪽으로 되돌리지 말 것(저장 자체를 안 한다).
+export function VisitIpStats() {
+  const [rng, setRng] = useState(defaultRange(30))
+  const { data, loading, err, reload } = useAdminData<{ kinds: number; visits: number; rows: VisitRow[] }>(
+    'visitIpStats', { from: rng.from, to: rng.to },
+  )
+  // 서버는 못 알아낸 방문을 빈 키로 준다 — 조용히 빼면 합계가 왜 안 맞는지 아무도 못 찾는다.
+  const rows = (data?.rows ?? []).map((r) => ({ ...r, key: r.key || '미상' }))
+  return (
+    <>
+      <AdminHead
+        title="IP주소별"
+        count={data ? `총 ${data.kinds.toLocaleString()}종류 · ${data.visits.toLocaleString()} 건` : ''}
+        onReload={reload} loading={loading}
+      />
+      <ErrBox msg={err} />
+      <RangePicker from={rng.from} to={rng.to} loading={loading} onApply={(from, to) => setRng({ from, to })} />
+      <RatioTable
+        title={<>IP 대역 <span className="admin-hint">뒷자리는 가려서 기록합니다</span></>}
+        nameCol="IP 대역" rows={rows} empty="이 기간에 기록이 없습니다."
+      />
+    </>
+  )
+}
+
+// ── 방문자 로그 ─────────────────────────────────────────────
+// ⚠️ 누가 왔는지는 **회원 여부만** 보여준다. 방문자 칸은 브라우저 난수라 사람을 가리키지 않는다.
+interface VisitLogRow {
+  at: string; visitor: string; member: boolean; path: string
+  refHost: string | null; refUrl: string | null; entry: boolean
+  device: string; browser: string; os: string; country: string | null; ip: string | null
+}
+const LOG_PAGE = 100
+export function VisitLogAdmin() {
+  const [rng, setRng] = useState(defaultRange(7))
+  const [page, setPage] = useState(0)
+  const { data, loading, err, reload } = useAdminData<{ total: number; rows: VisitLogRow[] }>(
+    'visitLogList', { from: rng.from, to: rng.to, limit: LOG_PAGE, offset: page * LOG_PAGE },
+  )
+  const rows = data?.rows ?? []
+  const pageMax = Math.max(1, Math.ceil((data?.total ?? 0) / LOG_PAGE))
+  return (
+    <>
+      <AdminHead title="방문자 로그" count={data ? `총 ${data.total.toLocaleString()} 건` : ''} onReload={reload} loading={loading} />
+      <ErrBox msg={err} />
+      {/* ⚠️ 기간을 바꾸면 페이지를 처음으로 되돌린다 — 안 되돌리면 3페이지에 있다가 하루치를 골랐을 때 빈 화면이 뜬다. */}
+      <RangePicker from={rng.from} to={rng.to} loading={loading} onApply={(from, to) => { setPage(0); setRng({ from, to }) }} />
+      <div className="admin-section">
+        {rows.length ? (
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>시각</th><th>방문자</th><th>화면</th><th>유입</th><th>환경</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={`${r.at}-${i}`}>
+                    <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.at)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {r.member ? <b>회원</b> : <span style={{ color: 'var(--muted)' }}>비회원</span>}
+                      <div style={{ fontSize: 12, color: 'var(--dim)' }}>{r.visitor.slice(0, 8)}</div>
+                    </td>
+                    <td style={{ wordBreak: 'break-all' }}>
+                      {r.path}
+                      {r.entry && <span className="admin-hint"> · 최초</span>}
+                    </td>
+                    <td style={{ wordBreak: 'break-all', fontSize: 13 }} title={r.refUrl ?? ''}>
+                      {r.refHost ?? <span style={{ color: 'var(--muted)' }}>직접입력</span>}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 13, color: 'var(--muted)' }}>
+                      {r.os} · {r.browser} · {r.device === 'mobile' ? '모바일' : r.device === 'tablet' ? '태블릿' : 'PC'}
+                      {r.country ? ` · ${r.country}` : ''}
+                      {/* 뒷자리를 가린 대역이다 — 원문은 어디에도 저장돼 있지 않다. */}
+                      {r.ip && <div style={{ fontSize: 12, color: 'var(--dim)' }}>{r.ip}</div>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="admin-empty">이 기간에 기록이 없습니다.</div>}
+        {pageMax > 1 && (
+          <div className="admin-toolbar" style={{ justifyContent: 'center', marginTop: 10 }}>
+            <button className="admin-mini" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>‹ 이전</button>
+            <span>{page + 1} / {pageMax}</span>
+            <button className="admin-mini" disabled={page + 1 >= pageMax} onClick={() => setPage((p) => p + 1)}>다음 ›</button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
 
 export function MinigameStatAdmin() {
   const [days, setDays] = useState(30)

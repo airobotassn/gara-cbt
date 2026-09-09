@@ -4,9 +4,11 @@
 // anon 키가 실려 오므로 **공개 예외가 필요 없다**: `supabase functions deploy track-visit` (플래그 없이).
 // ⛔ `--no-verify-jwt` 로 올리지 말 것(chat-translate·seb-handoff 와 같은 이유).
 //
-// ⛔ **IP 를 보지 않는다.** 국가는 브라우저가 알아내서 두 글자로 실어 보낸 것을 그대로 받는다
-//    (`src/lib/geo.ts` 의 2026-08-24 결정 — 그 이유는 마이그레이션 머리 주석에 옮겨 적어 뒀다).
-//    `x-forwarded-for` / `cf-ipcountry` 를 읽는 코드를 여기 넣지 말 것.
+// ⚠️ **IP 는 뒷자리를 가려서만 남긴다**(2026-09-09 지시 — `185.93.89.147` → `185.93.89.*`).
+//    ⛔ **원문을 저장하지 말 것.** 마스킹은 여기(`maskIp`)에서 끝나고, DB 는 이미 가려진 문자열만 받는다
+//       (`visit_log.ip_masked` 에 형태 CHECK 가 걸려 있어 원문은 조용히 버려진다).
+//    ⛔ **국가는 여전히 브라우저가 알아낸 값이다.** `cf-ipcountry` / IP 로 국가를 정하는 쪽으로 바꾸지 말 것 —
+//       `src/lib/geo.ts` 의 2026-08-24 결정은 그대로 살아 있다. 바뀐 건 "IP 대역을 통계로 본다" 까지다.
 // ⛔ **User-Agent 원문을 저장하지 않는다.** 여기서 기기·브라우저·OS 세 글자로 접어서 넣는다.
 //    원문은 지문(fingerprint)이 되고, 저장해봐야 화면이 쓰는 건 접힌 값뿐이다.
 //
@@ -18,6 +20,9 @@ interface Body {
   visitorId?: unknown
   path?: unknown
   country?: unknown
+  // 이 방문(탭)의 첫 요청인가 + 그때의 document.referrer. 첫 요청에만 실려 온다(visitTrack.ts 의 이유).
+  entry?: unknown
+  ref?: unknown
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -44,6 +49,49 @@ function normalizePath(raw: string): string {
   p = p.replace(/^\/(room|verify)\/[^/]+/, '/$1/:id')
   p = p.replace(/^\/ebooks\/read\/[^/]+/, '/ebooks/read/:id')
   return p.slice(0, 120) || '/'
+}
+
+/**
+ * referrer → 링크된 서버(host) · 링크된 주소(url).
+ *
+ * ⚠️ **클라가 보낸 문자열을 그대로 담지 않는다** — URL 로 파싱해서 http(s) 인 것만 받는다.
+ *    안 거르면 `javascript:` 같은 값이 관리자 표에 그대로 링크로 서고, 길이도 제한이 없다.
+ * ⚠️ 호스트의 `www.` 는 **떼지 않는다.** 레퍼런스가 `facebook.com` 과 `m.facebook.com` 을 다른 줄로
+ *    세는 것과 같은 이유 — 모바일 유입과 PC 유입은 다른 정보다.
+ */
+function parseRef(raw: unknown): { host: string | null; url: string | null } {
+  const s = typeof raw === 'string' ? raw.trim() : ''
+  if (!s) return { host: null, url: null }
+  try {
+    const u = new URL(s)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return { host: null, url: null }
+    return { host: u.hostname.slice(0, 120), url: s.slice(0, 500) }
+  } catch {
+    return { host: null, url: null }
+  }
+}
+
+/**
+ * 접속 IP → **뒷자리를 가린 대역**. `185.93.89.147` → `185.93.89.*` · IPv6 는 앞 3그룹 → `2001:db8:1:*`.
+ *
+ * ⛔ **가리지 않은 값을 돌려주지 말 것.** 이 함수의 반환값이 그대로 저장된다 — 대역까지가 우리가
+ *    보기로 한 전부고(어느 통신사·회사망에서 몰려오나), 개인 특정은 여기서 끊는다.
+ * ⚠️ `x-forwarded-for` 는 **쉼표로 이어진 목록**이고 맨 앞이 클라이언트다. 뒤엣것을 쓰면 프록시 주소가
+ *    줄줄이 쌓여 표가 우리 인프라 주소로 채워진다.
+ * ⚠️ 못 알아내면 null 이다(로컬·헤더 없음). 화면은 그걸 '미상' 한 줄로 남긴다 — 조용히 버리면
+ *    합계가 왜 안 맞는지 아무도 못 찾는다.
+ */
+function maskIp(req: Request): string | null {
+  const raw = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
+  if (!raw) return null
+  if (raw.includes(':')) {
+    // IPv6 — 앞 3그룹(대략 /48)만 남긴다. 그 아래는 한 가입자에게 통째로 할당되는 자리다.
+    const g = raw.split(':').filter(Boolean).slice(0, 3)
+    return g.length ? `${g.join(':')}:*` : null
+  }
+  const o = raw.split('.')
+  if (o.length !== 4 || o.some((x) => !/^\d{1,3}$/.test(x) || Number(x) > 255)) return null
+  return `${o[0]}.${o[1]}.${o[2]}.*`
 }
 
 /** mobile | tablet | desktop */
@@ -111,19 +159,32 @@ Deno.serve(async (req) => {
 
     const rawCountry = typeof body.country === 'string' ? body.country.toUpperCase() : ''
     const country = /^[A-Z]{2}$/.test(rawCountry) ? rawCountry : null
+    const entry = body.entry === true
+    const { host: refHost, url: refUrl } = parseRef(entry ? body.ref : '')
 
     const admin = adminClient()
-    const { error } = await admin.rpc('visit_track', {
-      p_visitor: visitorId,
-      p_user: uidFromToken(req.headers.get('Authorization')),
-      p_path: path,
-      p_country: country,
-      p_device: deviceOf(ua),
-      p_browser: browserOf(ua),
-      p_os: osOf(ua),
-    })
-    if (error) return json({ ok: false, error: error.message }, 500)
-    return json({ ok: true })
+    const uid = uidFromToken(req.headers.get('Authorization'))
+    const device = deviceOf(ua)
+    const browser = browserOf(ua)
+    const os = osOf(ua)
+
+    // ⛔ **두 표에 같이 쓴다.** 요약(`visit_track`)은 "몇 명이 왔나"를 싸게 세는 자리고,
+    //    로그(`visit_log_add`)는 시간별·유입경로·최초 접속 페이지·방문자 로그가 읽는 자리다.
+    //    한쪽만 부르면 같은 기간을 두고 두 화면이 다른 숫자를 말한다.
+    // ⚠️ 로그 쓰기가 실패해도 요약은 살린다 — 로그는 상한(하루 1000줄)에 걸려 조용히 안 들어갈 수도 있다.
+    const [sum, log] = await Promise.all([
+      admin.rpc('visit_track', {
+        p_visitor: visitorId, p_user: uid, p_path: path, p_country: country,
+        p_device: device, p_browser: browser, p_os: os,
+      }),
+      admin.rpc('visit_log_add', {
+        p_visitor: visitorId, p_user: uid, p_path: path, p_country: country,
+        p_device: device, p_browser: browser, p_os: os,
+        p_ref_host: refHost, p_ref_url: refUrl, p_entry: entry, p_ip: maskIp(req),
+      }),
+    ])
+    if (sum.error) return json({ ok: false, error: sum.error.message }, 500)
+    return json({ ok: true, logged: !log.error })
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : '오류' }, 500)
   }

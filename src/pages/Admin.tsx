@@ -59,7 +59,8 @@ import { TermPoolAdmin } from './AdminTermQuestions'
 import {
   PaymentsAdmin, MinigameStatAdmin, DailyStatAdmin, CoinPolicyAdmin, HubCosmeticAdmin,
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
-  ReadCell,
+  ReadCell, MemberStats, RevenueStats,
+  VisitPeriodStats, VisitEnvStats, VisitSourceStats, VisitIpStats, VisitLogAdmin,
 } from './AdminReform'
 import { useAdminData, payStatusLabel, productLabel, type EbookReadRow } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
@@ -82,7 +83,7 @@ import { runTranslation as runQTranslation, type TransItem, type TransResult } f
 //    PPT 가 "이름 클릭 시 대시보드 표출" 이라고 못박았고, 6개 목록에도 대시보드가 없다.
 // ⚠️ 각 제품의 상세 대시보드(CARIS 분석 · 아레나 분석)는 없어지지 않고 그 대메뉴 안에 남는다.
 //    홈은 전체 요약, 대메뉴 안은 그 제품 상세 — 합치면 CARIS 분석이 묻힌다.
-type TopMenu = 'members' | 'arena' | 'caris' | 'library' | 'board' | 'site'
+type TopMenu = 'members' | 'arena' | 'caris' | 'library' | 'board' | 'site' | 'stats'
 interface SubItem { key: string; label: string; root?: boolean; children?: { key: string; label: string }[] }
 
 const MENUS: { key: TopMenu; label: string }[] = [
@@ -92,6 +93,7 @@ const MENUS: { key: TopMenu; label: string }[] = [
   { key: 'library', label: 'Learning Library' },
   { key: 'board', label: '게시판 관리' },
   { key: 'site', label: '홈페이지 관리' },
+  { key: 'stats', label: '통계' },
 ]
 
 // 대메뉴 → 하위메뉴 → 세부. **각 단계의 첫 항목이 기본**(?tab·?sub 없이 들어오면 여기로).
@@ -100,19 +102,20 @@ const MENUS: { key: TopMenu; label: string }[] = [
 const SUBS: Record<TopMenu, SubItem[]> = {
   members: [
     { key: 'users', label: '유저' },
-    // 홈 대시보드에도 같은 내용이 요약으로 서 있다 — 화면(VisitStats)은 한 벌이고 머리말만 다르다.
-    // 두 벌로 베끼지 말 것: 기간·집계 규칙이 갈리면 같은 날 숫자가 두 개 나온다.
-    { key: 'visits', label: '접속통계' },
     { key: 'payments', label: '결제관리' },
   ],
+  // ⚠️ 숫자·그래프 화면(대시보드·게임 현황·DAILY 참여 현황)은 **'통계' 대메뉴로 옮겼다**(2026-09-09 지시).
+  //    여기 남은 것은 전부 **고치고 처리하는 화면**이다. 통계를 다시 이 밑으로 끌고 오지 말 것 —
+  //    같은 숫자가 제품마다 흩어져 있던 걸 모으는 게 이번 재편의 목적이다.
+  //    (2026-08-11 주석의 "각 제품 상세 대시보드는 그 대메뉴 안에 남긴다" 는 이 지시로 뒤집혔다.)
   arena: [
-    { key: 'dash', label: '대시보드' },
-    // PPT 2페이지 도형 그대로 — '미니게임' 이 상위고 게임 현황·게임 문항이 그 아래다.
-    { key: 'minigame', label: '미니게임', children: [{ key: 'stat', label: '게임 현황' }, { key: 'quiz', label: '게임 문항' }] },
-    { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
+    // 문항 관리만 남아 3단이 한 칸뿐이라 평탄화했다 — 버튼 하나짜리 3단 줄은 자리만 차지한다.
+    { key: 'minigame', label: '미니게임 문항' },
+    // '응시 기록' 은 통계가 아니라 목록·처리 화면이라 여기 남는다(옛 이름 '참여 현황').
+    { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '응시 기록' }, { key: 'quiz', label: '문항 관리' }] },
     // DAILY QUIZ 문항 관리 = 게임 문항과 **같은 화면, 다른 은행**(2026-09-08 지시). 2026-09-03 에 뗐던 이유는
     // 그 화면이 게임 은행을 보여줘서였고, 지금은 DAILY 전용 은행(D-###)을 보여준다.
-    { key: 'daily', label: 'DAILY QUIZ', children: [{ key: 'stat', label: '참여 현황' }, { key: 'quiz', label: '문항 관리' }] },
+    { key: 'daily', label: 'DAILY QUIZ 문항' },
     { key: 'chat', label: '채팅 관리' },
     // 금칙어는 검수와 별도 화면이다 — 검수는 '올라온 글을 본다', 금칙어는 '앞으로 막을 말을 정한다'.
     { key: 'words', label: '금칙어' },
@@ -121,7 +124,7 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     { key: 'cosmetic', label: '꾸미기 관리' },
   ],
   caris: [
-    { key: 'dash', label: '대시보드' },
+    // 대시보드는 '통계 › 자격검정' 으로 옮겼다(2026-09-09 지시).
     { key: 'plan', label: 'CARIS PLAN' },
     { key: 'status', label: 'CARIS 현황', children: [{ key: 'tickets', label: '접수·응시권' }, { key: 'env', label: '시험환경 점검' }] },
     { key: 'subs', label: '제출답안/채점', children: [{ key: 'list', label: '제출 답안' }, { key: 'grading', label: '주관식 채점' }] },
@@ -145,6 +148,29 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     { key: 'popup', label: '팝업 관리' },
     { key: 'fx', label: '환율 관리' },
     { key: 'admins', label: '관리자 관리', root: true },
+  ],
+  // ── 통계 (2026-09-09 지시로 신설) ──
+  // 흩어져 있던 숫자 화면을 **주제로** 모은 자리다. 기준은 "무엇을 재는가" — 사람(접속·회원) ·
+  // 활동(학습·참여) · 성과(자격검정) · 돈(매출).
+  //   ⛔ **제품(아레나/CARIS)으로 다시 가르지 말 것.** 그러면 "회원이 늘고 있나", "돈은 얼마나 버나" 가
+  //      다시 제품별로 쪼개져서, 답 하나를 얻으려고 화면 서넛을 오가게 된다(그게 이번에 없앤 상태다).
+  //   ⛔ **목록·처리 화면을 여기 넣지 말 것**(응시 기록·접수·응시권·결제 목록). 통계는 숫자와 그래프만이고,
+  //      데이터를 고치는 화면이 섞이면 "보는 곳" 과 "만지는 곳" 의 경계가 없어진다.
+  //   ⚠️ '전체 개요' 는 홈 대시보드(좌상단 이름)와 **같은 화면 한 벌**이다. 베껴서 두 벌로 만들지 말 것.
+  stats: [
+    { key: 'overview', label: '전체 개요' },
+    // 접속·유입 3단 = 레퍼런스(그누보드식 접속통계) 메뉴 10개를 다섯으로 묶은 것. 묶은 근거는
+    // AdminReform.tsx 의 그 절 머리 주석에 있다(시간·일·월은 같은 표, OS·브라우저도 같은 표).
+    { key: 'visits', label: '접속·유입', children: [
+      { key: 'summary', label: '요약' }, { key: 'period', label: '기간별' }, { key: 'env', label: '기기·환경' },
+      { key: 'source', label: '유입경로' }, { key: 'ip', label: 'IP주소별' }, { key: 'log', label: '방문자 로그' },
+    ] },
+    { key: 'members', label: '회원' },
+    { key: 'learning', label: '학습·참여', children: [
+      { key: 'leveltest', label: '레벨테스트' }, { key: 'minigame', label: '미니게임' }, { key: 'daily', label: 'DAILY QUIZ' },
+    ] },
+    { key: 'exam', label: '자격검정' },
+    { key: 'revenue', label: '매출' },
   ],
 }
 
@@ -284,24 +310,19 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
   switch (`${top}/${tab}${sub ? `/${sub}` : ''}`) {
     // ── 회원관리 ──
     case 'members/users': return <MembersAdmin />
-    case 'members/visits': return <VisitStats standalone />
     case 'members/payments': return <PaymentsAdmin />
     // ── WORLD ARENA ──
-    case 'arena/dash': return <ArenaDashboard />
-    case 'arena/minigame/stat': return <MinigameStatAdmin />
     // ⚠️ key={bank} — 같은 컴포넌트가 같은 자리에 서므로 키가 없으면 게임 ↔ DAILY 를 오갈 때 인스턴스가 재사용돼
     //    서브탭·'방금 올린 문항' 필터(T-### 번호)가 다른 은행 목록에 그대로 남는다.
-    case 'arena/minigame/quiz': return <TermPoolAdmin key="game" bank="game" />
+    case 'arena/minigame': return <TermPoolAdmin key="game" bank="game" />
     case 'arena/leveltest/stat': return <ArenaAttempts />
     case 'arena/leveltest/quiz': return <ArenaQuestions isRoot={isRoot} />
-    case 'arena/daily/stat': return <DailyStatAdmin />
-    case 'arena/daily/quiz': return <TermPoolAdmin key="daily" bank="daily" />
+    case 'arena/daily': return <TermPoolAdmin key="daily" bank="daily" />
     case 'arena/chat': return <ChatModAdmin />
     case 'arena/words': return <BannedWordAdmin />
     case 'arena/coin': return <CoinPolicyAdmin />
     case 'arena/cosmetic': return <HubCosmeticAdmin />
     // ── CARIS ──
-    case 'caris/dash': return <DashboardAdmin go={go} />
     case 'caris/plan': return <RoundsAdmin />
     case 'caris/status/tickets': return <TicketsAdmin isRoot={isRoot} />
     case 'caris/status/env': return <EnvCheckAdmin />
@@ -328,6 +349,22 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     case 'site/popup': return <PopupAdmin />
     case 'site/fx': return <FxAdmin />
     case 'site/admins': return isRoot ? <AdminAccountsAdmin /> : <HomeDashboard go={go} />
+    // ── 통계 ──
+    // ⚠️ 전부 **기존 화면을 그대로 세운 것**이다. 통계용으로 복제하지 말 것 — 같은 날 숫자가
+    //    화면마다 다르게 뜨면 어느 쪽이 맞는지 아무도 못 가린다.
+    case 'stats/overview': return <HomeDashboard go={go} />
+    case 'stats/visits/summary': return <VisitStats standalone />
+    case 'stats/visits/period': return <VisitPeriodStats />
+    case 'stats/visits/env': return <VisitEnvStats />
+    case 'stats/visits/source': return <VisitSourceStats />
+    case 'stats/visits/ip': return <VisitIpStats />
+    case 'stats/visits/log': return <VisitLogAdmin />
+    case 'stats/members': return <MemberStats />
+    case 'stats/learning/leveltest': return <ArenaDashboard />
+    case 'stats/learning/minigame': return <MinigameStatAdmin />
+    case 'stats/learning/daily': return <DailyStatAdmin />
+    case 'stats/exam': return <DashboardAdmin go={go} />
+    case 'stats/revenue': return <RevenueStats />
     default: return <HomeDashboard go={go} />
   }
 }
@@ -344,7 +381,10 @@ interface HomeStats {
 function HomeDashboard({ go }: { go: AdminGo }) {
   const { data, loading, err, reload } = useAdminData<HomeStats>('homeStats')
   const kpis = [
-    { k: '오늘 접속자', v: `${data?.todayVisitors ?? 0}명`, sub: `누적 유저 ${(data?.users ?? 0).toLocaleString()}명`, accent: 'blue' },
+    // ⚠️ 이름에 '회원' 을 박아둔다 — 이 값은 **계정 수**(로그인한 사람만)이고, 바로 아래 방문 통계의
+    //    '방문자' 는 **브라우저 수**(비로그인 포함)라 원래 안 맞는다. 옛 이름('오늘 접속자')은 두 숫자가
+    //    같은 것을 세는 줄로 읽혀서 "왜 다르냐" 가 반복해서 나왔다.
+    { k: '오늘 접속 회원', v: `${data?.todayVisitors ?? 0}명`, sub: `누적 유저 ${(data?.users ?? 0).toLocaleString()}명`, accent: 'blue' },
     { k: '신규 유저', v: `${data?.newUsers7d ?? 0}명`, sub: '최근 7일', accent: 'violet' },
     { k: '휴면 유저', v: `${data?.dormant ?? 0}명`, sub: '90일 이상 미접속', accent: 'muted' },
     { k: '매출(30일)', v: krw(data?.revenue30d ?? 0), sub: `결제 ${data?.paid30d ?? 0}건 · 환불 ${data?.refund30d ?? 0}건`, accent: 'green' },
@@ -450,7 +490,9 @@ function HomeDashboard({ go }: { go: AdminGo }) {
  *
  * ⛔ **국가는 브라우저가 알아내 보낸 값이다 — 서버가 IP 로 정하지 않는다**(`src/lib/geo.ts` 의
  *    2026-08-24 결정). 그래서 광고차단기가 조회를 막은 방문은 '미상' 으로 남는다. 정확도를 올리겠다고
- *    엣지 함수에서 IP 를 읽는 쪽으로 바꾸지 말 것 — 그 결정이 왜 있는지는 geo.ts 머리 주석에 있다.
+ *    **IP 로 국가를 뽑는 쪽으로 바꾸지 말 것** — 그 결정이 왜 있는지는 geo.ts 머리 주석에 있다.
+ *    ⚠️ 2026-09-09 부터 IP **대역**(`185.93.89.*`)은 방문 로그에 남는다. 바뀐 건 거기까지고,
+ *       국가 판정은 그대로 브라우저 값이다 — 둘을 한 덩어리로 보고 같이 옮기지 말 것.
  * ⛔ **국가와 지역은 모수가 다르다.** 국가 = 전체 방문자, 지역 = 지역을 설정한 **로그인 회원**뿐이다
  *    (지역은 이벤트에 안 담고 `profiles.region_code` 를 조회할 때 조인한다). 두 표의 합계는 안 맞는 게
  *    정상이라 화면이 그 사실을 글자로 밝힌다 — 그 문장을 지우면 다음 사람이 버그로 신고한다.
@@ -503,7 +545,7 @@ function VisitPanel({ title, rows, unit, empty }: {
   )
 }
 
-// standalone = 유저관리 › 접속통계(자기 화면). 없으면 홈 대시보드 안의 섹션.
+// standalone = 통계 › 접속·유입(자기 화면). 없으면 홈 대시보드 안의 섹션.
 //   ⚠️ 두 자리가 **같은 컴포넌트**를 쓴다. 자기 화면용으로 복제하지 말 것 — 기간 규칙이나 집계가
 //      한쪽만 바뀌면 같은 날 방문자 수가 화면마다 다르게 뜨고, 어느 쪽이 맞는지 아무도 못 가린다.
 function VisitStats({ standalone }: { standalone?: boolean }) {
@@ -564,20 +606,18 @@ function VisitStats({ standalone }: { standalone?: boolean }) {
             : (
               <>
                 <div className="admin-cards">
+                  {/* ⚠️ 회원 수를 **방문자 카드 안에** 둔다(옛 '로그인 방문자' 카드를 접었다). 따로 세우면
+                      비슷한 숫자 셋이 나란히 서서 어느 게 사람 수인지 못 가린다 — 한 사람이 크롬·엣지로
+                      들어오면 방문자 2·회원 1 인데, 그 관계가 한 칸 안에 있어야 읽힌다. */}
                   <div className="admin-card k-blue">
-                    <div className="k">방문자</div>
+                    <div className="k">방문자 (브라우저)</div>
                     <div className="v">{(data?.visitors ?? 0).toLocaleString()}명</div>
-                    <div className="s">최근 {days}일</div>
+                    <div className="s">회원 {(data?.members ?? 0).toLocaleString()}명 · 최근 {days}일</div>
                   </div>
                   <div className="admin-card k-violet">
                     <div className="k">조회수</div>
                     <div className="v">{(data?.views ?? 0).toLocaleString()}회</div>
                     <div className="s">방문자당 {((data?.views ?? 0) / Math.max(1, data?.visitors ?? 0)).toFixed(1)}회</div>
-                  </div>
-                  <div className="admin-card k-green">
-                    <div className="k">로그인 방문자</div>
-                    <div className="v">{(data?.members ?? 0).toLocaleString()}명</div>
-                    <div className="s">최근 {days}일</div>
                   </div>
                 </div>
                 <MiniBars days={dayList} map={dailyMap} color="var(--blue)" />
@@ -5264,9 +5304,11 @@ interface PaymentListResp {
   queues: { unfulfilled: number; revoked: number }
 }
 
+// 통계 › 자격검정 (옛 'CARIS › 대시보드').
+//   ⛔ **결제·매출은 여기서 뺐다**(2026-09-09) — '통계 › 매출' 이 그 자리다. 여기 두면 이북·강의까지
+//      섞인 전사 매출이 자격검정 화면에 앉아 "이게 응시료 매출인가?" 를 매번 헷갈리게 한다.
 function DashboardAdmin({ go }: { go: AdminGo }) {
   const [a, setA] = useState<CbtAnalytics | null>(null)
-  const [pay, setPay] = useState<PaymentListResp | null>(null)
   const [sold, setSold] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -5275,14 +5317,12 @@ function DashboardAdmin({ go }: { go: AdminGo }) {
     setLoading(true)
     setErr('')
     try {
-      // 결제·접수 집계는 실패해도 대시보드 전체를 막지 않는다(응시권 마이그레이션 전이면 그냥 빈 상태).
-      const [an, p, s] = await Promise.all([
+      // 접수 집계는 실패해도 화면 전체를 막지 않는다(응시권 마이그레이션 전이면 그냥 빈 상태).
+      const [an, s] = await Promise.all([
         callFunction<CbtAnalytics>('admin', { action: 'cbtAnalytics' }),
-        callFunction<PaymentListResp>('admin', { action: 'paymentList', limit: 5 }).catch(() => null),
         callFunction<TicketSummaryResp>('admin', { action: 'examTicketSummary' }).catch(() => null),
       ])
       setA(an)
-      setPay(p)
       // 회차 접수 수는 examTicketSummary 한 곳에서만 가져온다 — 퍼널과 접수·응시권 탭이 같은 값을 봐야 한다.
       setSold(Object.fromEntries((s?.rounds ?? []).map((r) => [r.roundId, r.sold])))
     } catch (e) {
@@ -5298,7 +5338,7 @@ function DashboardAdmin({ go }: { go: AdminGo }) {
   return (
     <>
       <div className="admin-head">
-        <h1>대시보드</h1>
+        <h1>자격검정</h1>
         <div className="admin-head-actions">
           <button className="admin-mini" onClick={load} disabled={loading}>
             새로고침
@@ -5307,16 +5347,15 @@ function DashboardAdmin({ go }: { go: AdminGo }) {
       </div>
       {err && <div className="admin-section admin-empty">불러오기 실패 — {err}</div>}
       {loading && !a && <div className="admin-section" style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
-      {a && <DashboardBody a={a} pay={pay} sold={sold} go={go} />}
+      {a && <DashboardBody a={a} sold={sold} go={go} />}
     </>
   )
 }
 
 // ⚠️ 관리자 화면 금액은 **원화(krw)** 다. 구매자 화면은 $1 = 1,500원 고정 환산으로 달러를 보여주지만,
 //    관리자는 실제 청구·정산 금액을 봐야 한다. 예전엔 여기가 원화 값에 `$` 를 붙이고 있었다.
-function DashboardBody({ a, pay, sold, go }: {
+function DashboardBody({ a, sold, go }: {
   a: CbtAnalytics
-  pay: PaymentListResp | null
   sold: Record<string, number>
   go: AdminGo
 }) {
@@ -5343,13 +5382,6 @@ function DashboardBody({ a, pay, sold, go }: {
     { ico: 'assignment_turned_in', k: '응시 제출', v: o.attemptsAll.toLocaleString(), sub: `최근 7일 ${o.attempts7d}건`, accent: 'violet' },
     { ico: 'verified', k: '합격률', v: `${a.passRate}%`, sub: `채점 ${a.scoredN}건 · 평균 ${avgScore}점`, accent: 'green' },
     { ico: 'workspace_premium', k: '인증서 발급', v: certIssued.toLocaleString(), sub: `미발급 ${certPending}건`, accent: 'amber' },
-    {
-      ico: 'payments',
-      k: '매출(30일)',
-      v: krw(pay?.stats30d.paidAmount ?? 0),
-      sub: pay ? `결제 ${pay.stats30d.paidN}건 · 환불 ${pay.stats30d.refundN}건` : '결제 데이터 없음',
-      accent: 'green',
-    },
   ]
 
   return (
@@ -5373,9 +5405,6 @@ function DashboardBody({ a, pay, sold, go }: {
           </button>
         ))}
       </div>
-
-      {/* 결제 현황 — payments 원장 실데이터(30일) */}
-      <PaymentSection data={pay} />
 
       {/* 추이 */}
       <div className="admin-grid2">
@@ -5549,74 +5578,8 @@ function RoundFunnel({ rows, sold }: { rows: CbtRoundStat[]; sold: Record<string
   )
 }
 
-// 결제 현황 — payments 원장 30일 집계 + 최근 결제 + '돈이 새는' 두 큐.
-// ⚠️ 환불은 매출에서 빼지 않고 옆에 세운다 — 결제일과 환불일이 다른 달에 걸리면 상계한 값이 정산과 안 맞는다.
-// ⚠️ 두 큐(미지급·환불 후 지급 잔존)는 자동 회수를 안 하기로 한 방침의 **유일한 뒷정리 장치**다.
-//    목록이 사람 눈에 안 닿으면 방어 장치가 아니므로 0 이 아닐 때 눈에 띄게 띄운다.
-function PaymentSection({ data }: { data: PaymentListResp | null }) {
-  const s = data?.stats30d
-  const avg = s && s.paidN > 0 ? Math.round(s.paidAmount / s.paidN) : 0
-  const unfulfilled = data?.queues.unfulfilled ?? 0
-  const revoked = data?.queues.revoked ?? 0
-  return (
-    <div className="admin-section pay-sec">
-      <div className="admin-section-head">
-        <h3><span className="material-symbols-outlined pay-ico">credit_card</span>결제 현황 <span className="admin-hint">최근 30일 · 원화</span></h3>
-        {!data && <span className="admin-badge-demo">데이터 없음</span>}
-      </div>
-      <div className="pay-kpis">
-        <div><span className="pk-k">매출</span><span className="pk-v">{krw(s?.paidAmount ?? 0)}</span></div>
-        <div><span className="pk-k">결제 건수</span><span className="pk-v">{s?.paidN ?? 0}건</span></div>
-        <div><span className="pk-k">환불</span><span className="pk-v">{s?.refundN ?? 0}건 · {krw(s?.refundAmount ?? 0)}</span></div>
-        <div><span className="pk-k">객단가</span><span className="pk-v">{krw(avg)}</span></div>
-      </div>
-
-      {(unfulfilled > 0 || revoked > 0) && (
-        <div className="admin-empty" style={{ marginTop: 4, color: 'var(--k-amber, #d98a00)', lineHeight: 1.7 }}>
-          {unfulfilled > 0 && <div>⚠ <b>승인됐는데 지급 안 된 결제 {unfulfilled}건</b> — 돈은 받았는데 응시권/이북이 안 나갔습니다. 확인이 필요합니다.</div>}
-          {revoked > 0 && <div>⚠ <b>환불·취소인데 지급이 살아있는 결제 {revoked}건</b> — 응시권/열람권을 손으로 회수해야 합니다.</div>}
-        </div>
-      )}
-
-      {data && data.payments.length > 0 ? (
-        <div className="admin-table-wrap" style={{ marginTop: 10 }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>일시</th>
-                <th>구매자</th>
-                <th>상품</th>
-                <th style={{ textAlign: 'right' }}>금액</th>
-                <th>상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.payments.map((p) => (
-                <tr key={p.id}>
-                  <td style={{ whiteSpace: 'nowrap', fontSize: 14, color: 'var(--muted)' }}>{fmtDT(p.createdAt)}</td>
-                  <td style={{ fontSize: 14 }}>{p.name || p.email || '-'}</td>
-                  <td style={{ fontSize: 14 }}>
-                    {p.orderName}
-                    <span style={{ color: 'var(--muted)' }}> · {p.productType === 'exam' ? '응시료' : '이북'}</span>
-                  </td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{krw(p.amount)}</td>
-                  <td style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
-                    {p.status}
-                    {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="admin-empty" style={{ marginTop: 4 }}>
-          아직 결제 내역이 없습니다. 결제가 쌓이면 매출·최근 결제 내역이 여기에 표시됩니다.
-        </div>
-      )}
-    </div>
-  )
-}
+// 옛 `PaymentSection`(CARIS 대시보드 안의 '결제 현황')은 여기 있었다 — **'통계 › 매출' 로 옮겼다**(2026-09-09).
+// 최근 결제 표는 '유저관리 › 결제관리' 가 전체 목록으로 이미 갖고 있어 옮기지 않았다.
 
 // ── 회원 관리 (목록 · 상세) ────────────────────────────────────────
 // 합격한 시험명 목록 → 취득 급수 칩(중복 제거). 급수 파싱은 certNo.ts 가 단일 출처.
