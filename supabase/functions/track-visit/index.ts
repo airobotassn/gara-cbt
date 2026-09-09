@@ -4,11 +4,11 @@
 // anon 키가 실려 오므로 **공개 예외가 필요 없다**: `supabase functions deploy track-visit` (플래그 없이).
 // ⛔ `--no-verify-jwt` 로 올리지 말 것(chat-translate·seb-handoff 와 같은 이유).
 //
-// ⚠️ **IP 는 뒷자리를 가려서만 남긴다**(2026-09-09 지시 — `185.93.89.147` → `185.93.89.*`).
-//    ⛔ **원문을 저장하지 말 것.** 마스킹은 여기(`maskIp`)에서 끝나고, DB 는 이미 가려진 문자열만 받는다
-//       (`visit_log.ip_masked` 에 형태 CHECK 가 걸려 있어 원문은 조용히 버려진다).
+// ⚠️ **접속 IP 를 원문 그대로 남긴다**(2026-09-09 지시 — 같은 날 잠깐 마스킹했다가 열었다).
+//    ⛔ **개인정보처리방침과 한 벌이다.** 방침 제2조에 '접속 IP 정보' 로 적혀 있고, 제3조의 보유기간
+//       (180일)은 DB 크론 `purge_visit_history` 가 실제로 집행한다. **크론을 끄면 방침이 거짓이 된다.**
 //    ⛔ **국가는 여전히 브라우저가 알아낸 값이다.** `cf-ipcountry` / IP 로 국가를 정하는 쪽으로 바꾸지 말 것 —
-//       `src/lib/geo.ts` 의 2026-08-24 결정은 그대로 살아 있다. 바뀐 건 "IP 대역을 통계로 본다" 까지다.
+//       `src/lib/geo.ts` 의 2026-08-24 결정은 그대로 살아 있다. 바뀐 건 "IP 를 통계로 본다" 까지다.
 // ⛔ **User-Agent 원문을 저장하지 않는다.** 여기서 기기·브라우저·OS 세 글자로 접어서 넣는다.
 //    원문은 지문(fingerprint)이 되고, 저장해봐야 화면이 쓰는 건 접힌 값뿐이다.
 //
@@ -72,26 +72,22 @@ function parseRef(raw: unknown): { host: string | null; url: string | null } {
 }
 
 /**
- * 접속 IP → **뒷자리를 가린 대역**. `185.93.89.147` → `185.93.89.*` · IPv6 는 앞 3그룹 → `2001:db8:1:*`.
+ * 접속 IP. 관리자 '통계 › 접속·유입 › IP주소별' 과 방문자 로그가 읽는다.
  *
- * ⛔ **가리지 않은 값을 돌려주지 말 것.** 이 함수의 반환값이 그대로 저장된다 — 대역까지가 우리가
- *    보기로 한 전부고(어느 통신사·회사망에서 몰려오나), 개인 특정은 여기서 끊는다.
  * ⚠️ `x-forwarded-for` 는 **쉼표로 이어진 목록**이고 맨 앞이 클라이언트다. 뒤엣것을 쓰면 프록시 주소가
  *    줄줄이 쌓여 표가 우리 인프라 주소로 채워진다.
+ * ⚠️ **모양을 검사해서 넣는다.** 헤더는 클라가 위조할 수 있는 값이라, 거르지 않으면 관리자 표에
+ *    아무 문자열이나 줄로 서고 길이 제한도 없어진다(주소가 아닌 값은 버린다).
  * ⚠️ 못 알아내면 null 이다(로컬·헤더 없음). 화면은 그걸 '미상' 한 줄로 남긴다 — 조용히 버리면
  *    합계가 왜 안 맞는지 아무도 못 찾는다.
  */
-function maskIp(req: Request): string | null {
+function clientIp(req: Request): string | null {
   const raw = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
-  if (!raw) return null
-  if (raw.includes(':')) {
-    // IPv6 — 앞 3그룹(대략 /48)만 남긴다. 그 아래는 한 가입자에게 통째로 할당되는 자리다.
-    const g = raw.split(':').filter(Boolean).slice(0, 3)
-    return g.length ? `${g.join(':')}:*` : null
-  }
-  const o = raw.split('.')
-  if (o.length !== 4 || o.some((x) => !/^\d{1,3}$/.test(x) || Number(x) > 255)) return null
-  return `${o[0]}.${o[1]}.${o[2]}.*`
+  if (!raw || raw.length > 45) return null
+  // IPv4 점 넷 · IPv6 는 16진 그룹과 `::` 만. 둘 중 어느 모양도 아니면 버린다.
+  const v4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(raw) && raw.split('.').every((x) => Number(x) <= 255)
+  const v6 = raw.includes(':') && /^[0-9a-f:.]+$/i.test(raw)
+  return v4 || v6 ? raw : null
 }
 
 /** mobile | tablet | desktop */
@@ -180,7 +176,7 @@ Deno.serve(async (req) => {
       admin.rpc('visit_log_add', {
         p_visitor: visitorId, p_user: uid, p_path: path, p_country: country,
         p_device: device, p_browser: browser, p_os: os,
-        p_ref_host: refHost, p_ref_url: refUrl, p_entry: entry, p_ip: maskIp(req),
+        p_ref_host: refHost, p_ref_url: refUrl, p_entry: entry, p_ip: clientIp(req),
       }),
     ])
     if (sum.error) return json({ ok: false, error: sum.error.message }, 500)

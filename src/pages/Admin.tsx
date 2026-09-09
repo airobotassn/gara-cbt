@@ -61,6 +61,8 @@ import {
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
   ReadCell, MemberStats, RevenueStats,
   VisitPeriodStats, VisitEnvStats, VisitSourceStats, VisitIpStats, VisitLogAdmin,
+  // 문의 분류 이름표는 Q&A 화면과 **한 벌**이다 — 여기서 또 만들면 같은 문의가 두 이름으로 뜬다.
+  INQ_CAT, type InquiryRow,
 } from './AdminReform'
 import { useAdminData, payStatusLabel, productLabel, type EbookReadRow } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
@@ -5613,6 +5615,9 @@ interface MemberRow {
   // 탈퇴 신청 시각 / 파기 완료 시각. 둘 다 cbtUsers 만 준다(아레나 목록엔 없다).
   deactivated: string | null
   purged: string | null
+  // ⚠️ **회원이 온보딩에서 고른 값**이다 — 방문 통계의 국가(브라우저가 알아낸 값)와 출처가 다르다.
+  country: string | null
+  region: string | null
 }
 
 function MembersAdmin() {
@@ -5644,6 +5649,7 @@ function MembersAdmin() {
         carisAttempts: u.attempts, passedTitles: u.passedTitles ?? [],
         arenaRank: null, arenaAttempts: 0, lastActive: u.lastActive,
         deactivated: u.deactivated ?? null, purged: u.purged ?? null,
+        country: u.country ?? null, region: u.region ?? null,
       })
     }
     for (const a of arena?.users ?? []) {
@@ -5662,6 +5668,8 @@ function MembersAdmin() {
           carisAttempts: 0, passedTitles: [],
           arenaRank: a.rank, arenaAttempts: a.attempts, lastActive: a.lastActive,
           deactivated: null, purged: null,
+          // 게스트는 온보딩을 안 거쳐 국가·지역이 없다(아레나 목록도 안 준다).
+          country: null, region: null,
         })
       }
     }
@@ -5870,7 +5878,18 @@ function EarnedCerts({ attempts }: { attempts: CbtUserAttempt[] }) {
 //   ⚠️ 탭마다 자기 데이터를 자기가 부른다(열어야 부른다). 셋을 한 번에 부르면 CARIS 만 볼 사람도
 //      아레나·결제까지 기다린다.
 function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => void }) {
-  const [tab, setTab] = useState<'caris' | 'arena' | 'pay'>('caris')
+  const [tab, setTab] = useState<'caris' | 'arena' | 'pay' | 'note'>('caris')
+  // 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
+  const [regionName, setRegionName] = useState('')
+  const { country, region } = user
+  useEffect(() => {
+    if (!country || !region) return
+    let alive = true
+    loadRegions(country, 'ko')
+      .then((list) => { if (alive) setRegionName(list.find((r) => r.code === region)?.name ?? '') })
+      .catch(() => { /* 못 받으면 코드가 그대로 뜬다 */ })
+    return () => { alive = false }
+  }, [country, region])
   const [resetting, setResetting] = useState(false)
   const [resetDone, setResetDone] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -5938,6 +5957,18 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
         <p className="admin-modal-meta">
           가입 {fmtDT(user.created)} · {user.anon ? '게스트' : '가입 유저'}
           {user.arenaRank != null ? ` · ARENA Lv.${user.arenaRank}` : ''}
+          {/* ⚠️ 회원이 온보딩에서 **직접 고른** 값이다 — 방문 통계의 국가(브라우저가 알아낸 값)와
+              출처가 달라서 둘이 안 맞을 수 있다. 안 고른 회원은 이 줄 자체가 안 뜬다. */}
+          {user.country && (
+            <>
+              {' · '}
+              {flagUrl(user.country) && (
+                <img src={flagUrl(user.country)} alt="" style={{ width: '1.1em', aspectRatio: '4/3', verticalAlign: '-0.15em', marginRight: 4, borderRadius: 2 }} />
+              )}
+              {countryName(user.country, 'ko')}
+              {user.region ? ` ${regionName || user.region}` : ''}
+            </>
+          )}
         </p>
         {/* 탈퇴 상태는 다른 무엇보다 먼저 눈에 들어와야 한다 — 이 줄이 없어서 탈퇴한 계정이
             멀쩡한 회원처럼 보였고, 그 사실을 알려면 DB 를 직접 봐야 했다(2026-08-24). */}
@@ -5983,10 +6014,12 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
           <button className={tab === 'caris' ? 'on' : ''} onClick={() => setTab('caris')}>CARIS</button>
           <button className={tab === 'arena' ? 'on' : ''} onClick={() => setTab('arena')}>WORLD ARENA</button>
           <button className={tab === 'pay' ? 'on' : ''} onClick={() => setTab('pay')}>결제·구매</button>
+          <button className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>문의·메모</button>
         </div>
         {tab === 'caris' ? <MemberCarisPanel userId={user.id} /> : null}
         {tab === 'arena' ? <ArenaUserPanel userId={user.id} initialRank={user.arenaRank ?? 1} /> : null}
         {tab === 'pay' ? <MemberPayPanel userId={user.id} /> : null}
+        {tab === 'note' ? <MemberNotePanel userId={user.id} /> : null}
       </div>
     </div>
   )
@@ -6121,6 +6154,125 @@ function MemberPayPanel({ userId }: { userId: string }) {
         </tbody>
       </table>
     </div>
+  )
+}
+
+// ── 회원 상세 · 문의·메모 ───────────────────────────────────────
+// 한 사람에 대해 "우리가 주고받은 말" 을 한 자리에 놓는다 — 위는 본인이 남긴 1:1 문의, 아래는
+// 관리자끼리 넘기는 메모("전화로 환불 약속함").
+//   ⛔ **메모는 본인에게 안 나간다.** 서버 표(`member_notes`)가 관리자 전용이고 여기가 유일한 통로다.
+//      회원 화면에 노출하는 경로를 만들지 말 것 — 여기 적히는 건 본인이 읽으라고 쓰는 글이 아니다.
+//   ⚠️ 문의 답변은 여기서 안 한다(읽기만). 답변은 게시판 관리 › 고객센터 › Q&A 한 곳에서만 — 두 자리에서
+//      쓰면 초안·상태 처리가 갈린다.
+interface MemberNote { id: string; body: string; at: string; author: string }
+function MemberNotePanel({ userId }: { userId: string }) {
+  const [inqs, setInqs] = useState<InquiryRow[]>([])
+  const [notes, setNotes] = useState<MemberNote[]>([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    // ⚠️ 한쪽이 실패해도 다른 쪽은 보여야 한다 — 통짜 Promise.all 로 묶으면 메모 하나 때문에 문의까지 빈다.
+    const [i, n] = await Promise.all([
+      callFunction<{ inquiries: InquiryRow[] }>('admin', { action: 'inquiryList', userId }).catch(() => null),
+      callFunction<{ notes: MemberNote[] }>('admin', { action: 'memberNoteList', userId }).catch(() => null),
+    ])
+    if (!i && !n) setErr('불러오지 못했습니다.')
+    // ⚠️ 클라에서 한 번 더 거른다 — `userId` 필터는 admin 함수를 **배포해야** 먹고, 배포 전 응답은
+    //    전체 문의를 그대로 준다. 그러면 남의 문의가 이 회원 것으로 보인다.
+    setInqs((i?.inquiries ?? []).filter((r) => r.userId === userId))
+    setNotes(n?.notes ?? [])
+    setLoading(false)
+  }, [userId])
+  useEffect(() => { void load() }, [load])
+
+  async function add() {
+    const body = text.trim()
+    if (!body) return
+    setBusy(true)
+    try {
+      await callFunction('admin', { action: 'memberNoteAdd', userId, body })
+      setText('')
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '메모를 저장하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function del(id: string) {
+    if (!confirm('이 메모를 지울까요? 되돌릴 수 없습니다.')) return
+    try {
+      await callFunction('admin', { action: 'memberNoteDelete', id })
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '지우지 못했습니다.')
+    }
+  }
+
+  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+  return (
+    <>
+      {err && <div className="admin-empty">{err}</div>}
+
+      <div className="admin-sub">1:1 문의 {inqs.length ? `${inqs.length}건` : ''}</div>
+      {inqs.length ? (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead><tr><th>일시</th><th>분류</th><th>제목·내용</th><th>상태</th></tr></thead>
+            <tbody>
+              {inqs.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.createdAt)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{INQ_CAT[r.category] ?? r.category ?? '-'}</td>
+                  <td>
+                    <b>{r.title}</b>
+                    <div style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{r.body}</div>
+                    {/* 답변까지 같이 보여준다 — "뭐라고 답했더라" 가 이 화면을 여는 이유의 절반이다. */}
+                    {r.answer && (
+                      <div style={{ fontSize: 13, marginTop: 6, paddingLeft: 10, borderLeft: '2px solid var(--line2)', whiteSpace: 'pre-wrap' }}>
+                        <span style={{ color: 'var(--muted)' }}>답변 {r.answeredAt ? `· ${fmtDT(r.answeredAt)}` : ''}</span>
+                        <div>{r.answer}</div>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {r.status === 'open' ? <span className="badge low">답변 대기</span> : <span className="badge ok">답변 완료</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="admin-empty">1:1 문의가 없습니다.</div>}
+
+      <div className="admin-sub" style={{ marginTop: 18 }}>관리자 메모</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12 }}>
+        <textarea
+          style={{ ...inpStyle, flex: 1, minHeight: 64, resize: 'vertical' }}
+          placeholder="이 회원에 대해 남길 말 (본인에게는 보이지 않습니다)"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={4000}
+        />
+        <button className="btn-ink" style={{ whiteSpace: 'nowrap' }} onClick={add} disabled={busy || !text.trim()}>
+          {busy ? '저장 중…' : '메모 추가'}
+        </button>
+      </div>
+      {notes.length ? notes.map((n) => (
+        <div key={n.id} className="admin-section" style={{ padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>{n.author} · {fmtDT(n.at)}</span>
+            <button className="admin-mini" onClick={() => del(n.id)}>삭제</button>
+          </div>
+          <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{n.body}</div>
+        </div>
+      )) : <div className="admin-empty">아직 메모가 없습니다.</div>}
+    </>
   )
 }
 

@@ -688,9 +688,9 @@ export function VisitSourceStats() {
 }
 
 // ── IP주소별 ────────────────────────────────────────────────
-// ⚠️ **원문이 아니라 뒷자리를 가린 대역이다**(`185.93.89.*`). 레퍼런스는 IP 를 그대로 세우지만
-//    2026-09-09 에 여기까지만 보기로 정했다 — "어느 통신사·회사망에서 몰려오나" 는 그대로 읽히고
-//    "그 집이 누구냐" 는 안 나온다. ⛔ 원문을 보여주는 쪽으로 되돌리지 말 것(저장 자체를 안 한다).
+// ⚠️ 같은 날(2026-09-09) 마스킹으로 넣었다가 **원문으로 열었다**(지시). 그래서 그 사이에 쌓인 행은
+//    `1.2.3.*` 로 남아 있어 표에 원문과 섞여 보인다 — 고장이 아니다.
+// ⚠️ 보유기간(180일)은 DB 크론이 집행한다. 개인정보처리방침에 적힌 숫자와 한 벌이다.
 export function VisitIpStats() {
   const [rng, setRng] = useState(defaultRange(30))
   const { data, loading, err, reload } = useAdminData<{ kinds: number; visits: number; rows: VisitRow[] }>(
@@ -707,10 +707,7 @@ export function VisitIpStats() {
       />
       <ErrBox msg={err} />
       <RangePicker from={rng.from} to={rng.to} loading={loading} onApply={(from, to) => setRng({ from, to })} />
-      <RatioTable
-        title={<>IP 대역 <span className="admin-hint">뒷자리는 가려서 기록합니다</span></>}
-        nameCol="IP 대역" rows={rows} empty="이 기간에 기록이 없습니다."
-      />
+      <RatioTable title="IP 주소" nameCol="IP 주소" rows={rows} empty="이 기간에 기록이 없습니다." />
     </>
   )
 }
@@ -764,7 +761,6 @@ export function VisitLogAdmin() {
                     <td style={{ whiteSpace: 'nowrap', fontSize: 13, color: 'var(--muted)' }}>
                       {r.os} · {r.browser} · {r.device === 'mobile' ? '모바일' : r.device === 'tablet' ? '태블릿' : 'PC'}
                       {r.country ? ` · ${r.country}` : ''}
-                      {/* 뒷자리를 가린 대역이다 — 원문은 어디에도 저장돼 있지 않다. */}
                       {r.ip && <div style={{ fontSize: 12, color: 'var(--dim)' }}>{r.ip}</div>}
                     </td>
                   </tr>
@@ -1540,12 +1536,12 @@ export function LecturesAdmin({ catalog }: { catalog: 'leveltest' | 'caris' }) {
 // ══════════════════════════════════════════════════════════════
 // 게시판 관리 > 고객센터 > Q&A (1:1 문의)
 // ══════════════════════════════════════════════════════════════
-interface InquiryRow {
+export interface InquiryRow {
   id: string; userId: string; name: string | null; email: string | null
   category: string; title: string; body: string; status: string
   answer: string | null; answeredAt: string | null; createdAt: string
 }
-const INQ_CAT: Record<string, string> = { exam: '응시', payment: '결제', account: '계정', arena: 'WORLD ARENA', etc: '기타' }
+export const INQ_CAT: Record<string, string> = { exam: '응시', payment: '결제', account: '계정', arena: 'WORLD ARENA', etc: '기타' }
 const INQ_STATUS: Record<string, string> = { open: '답변 대기', answered: '답변 완료', closed: '종료' }
 
 export function QnaAdmin() {

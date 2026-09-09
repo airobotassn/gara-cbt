@@ -122,10 +122,15 @@ async function policyUpsert(admin: any, body: any, ctx: Ctx) {
 }
 
 // ── 1:1 문의 ────────────────────────────────────────────────
+// ⚠️ `userId` 를 주면 **그 회원 것만** 돌려준다 — 회원 상세의 '문의·메모' 탭이 그렇게 쓴다.
+//    별도 액션을 만들지 않는 이유: 두 벌이 되면 응답 모양(이름·이메일 붙이기, 상태 이름)이 갈려서
+//    같은 문의가 화면마다 다르게 보인다.
 async function inquiryList(admin: any, body: any) {
   const status = String(body?.status ?? '')
+  const userId = String(body?.userId ?? '')
   let sel = admin.from('inquiries').select('*', { count: 'exact' })
   if (status) sel = sel.eq('status', status)
+  if (userId) sel = sel.eq('user_id', userId)
   const { data, count, error } = await sel.order('created_at', { ascending: false }).limit(200)
   if (error) return json({ error: error.message }, 500)
   const rows = (data ?? []) as any[]
@@ -150,6 +155,52 @@ async function inquiryList(admin: any, body: any) {
     total: count ?? rows.length,
   })
 }
+// ── 회원 메모 ────────────────────────────────────────────────
+// 관리자끼리 넘기는 말("전화로 환불 약속함")을 계정에 붙인다.
+//   ⛔ **회원 본인에게 안 나간다.** `member_notes` 는 RLS 정책이 0개(service role 전용)고, 이 세 액션이
+//      유일한 통로다. 사용자 화면에서 읽는 경로를 만들지 말 것 — 여기 적히는 건 본인이 읽으라고 쓰는 글이 아니다.
+//   ⚠️ 작성자 이름은 저장하지 않고 **조회할 때 붙인다** — 저장해 두면 그 사람이 닉네임을 바꿔도 옛 이름이 남는다.
+async function memberNoteList(admin: any, body: any) {
+  const uid = String(body?.userId ?? '')
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  const { data, error } = await admin.from('member_notes')
+    .select('id, body, author, created_at').eq('user_id', uid)
+    .order('created_at', { ascending: false }).limit(200)
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+  const ids = [...new Set(rows.map((r) => r.author).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  if (ids.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids)
+    for (const p of profs ?? []) nameMap[(p as any).id] = (p as any).display_name
+  }
+  return json({
+    notes: rows.map((r) => ({
+      id: r.id, body: r.body, at: r.created_at,
+      // 관리자 계정이 지워졌으면 이름이 없다 — 메모는 남기고 이름만 비운다.
+      author: r.author ? (nameMap[r.author] ?? '(탈퇴한 관리자)') : '(알 수 없음)',
+    })),
+  })
+}
+async function memberNoteAdd(admin: any, body: any, ctx: Ctx) {
+  const uid = String(body?.userId ?? '')
+  const text = String(body?.body ?? '').trim()
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  // 길이는 DB CHECK 와 한 벌이다(1~4000). 여기서 먼저 걸러야 사람이 읽을 수 있는 문구가 나간다.
+  if (!text) return json({ error: '메모 내용을 입력해 주세요.' }, 400)
+  if (text.length > 4000) return json({ error: '메모는 4000자까지 쓸 수 있습니다.' }, 400)
+  const { error } = await admin.from('member_notes').insert({ user_id: uid, body: text, author: ctx.uid })
+  if (error) return json({ error: error.message }, 500)
+  return json({ ok: true })
+}
+async function memberNoteDelete(admin: any, body: any) {
+  const id = String(body?.id ?? '')
+  if (!id) return json({ error: 'id 필요' }, 400)
+  const { error } = await admin.from('member_notes').delete().eq('id', id)
+  if (error) return json({ error: error.message }, 500)
+  return json({ ok: true })
+}
+
 async function inquiryAnswer(admin: any, body: any, ctx: Ctx) {
   const id = String(body?.id ?? '')
   const answer = String(body?.answer ?? '').trim()
@@ -1587,6 +1638,9 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'policyUpsert': return await policyUpsert(admin, body, ctx)
     case 'inquiryList': return await inquiryList(admin, body)
     case 'inquiryAnswer': return await inquiryAnswer(admin, body, ctx)
+    case 'memberNoteList': return await memberNoteList(admin, body)
+    case 'memberNoteAdd': return await memberNoteAdd(admin, body, ctx)
+    case 'memberNoteDelete': return await memberNoteDelete(admin, body)
     case 'ebookPreview': return await ebookPreview(admin, body)
     case 'lectureList': return await lectureList(admin, body)
     case 'lectureUpsert': return await lectureUpsert(admin, body, deps)

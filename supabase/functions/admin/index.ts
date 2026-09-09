@@ -2729,7 +2729,10 @@ async function cbtUsers(admin: any) {
     .from('profiles')
     // ⚠️ 탈퇴 계정도 **목록에 남긴다** — 여기서 빼면 관리자가 "탈퇴했다" 는 사실 자체를 볼 길이 없다.
     //    2026-08-24 에 탈퇴 상태로 서비스를 계속 쓴 계정이 나왔는데 화면으로는 알아낼 방법이 없었다.
-    .select('id, display_name, is_anonymous, created_at, deactivated_at, purged_at')
+    // ⚠️ 국가·지역은 **회원이 온보딩에서 고른 값**이다(방문 통계의 국가와 출처가 다르다).
+    //    상세 모달 머리에 뜨는 값이라 목록 응답에 같이 실어 보낸다 — 상세를 열 때 또 부르면
+    //    이미 있는 값을 한 번 더 왕복하는 것이 된다.
+    .select('id, display_name, is_anonymous, created_at, deactivated_at, purged_at, country_code, region_code')
     .eq('is_anonymous', false)
     .order('created_at', { ascending: false })
     .limit(5000)
@@ -2784,6 +2787,8 @@ async function cbtUsers(admin: any) {
     // (파기된 계정은 복구할 것이 없다 — 구글 연결이 끊겨 본인도 못 들어온다).
     deactivated: p.deactivated_at ?? null,
     purged: p.purged_at ?? null,
+    country: p.country_code ?? null,
+    region: p.region_code ?? null,
   }))
   return json({ users })
 }

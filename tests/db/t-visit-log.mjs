@@ -6,13 +6,19 @@
 //  ⭐2) 시간별은 **0~23 을 전부** 돌려준다(기록 없는 시각은 0). 빠뜨리면 새벽이 통째로 사라진다.
 //  ⭐3) 유입경로는 **최초 접속(is_entry)만** 센다 — 화면을 옮길 때마다 세면 외부 유입 1건이 뻥튀기된다.
 //  ⭐4) referrer 없는 방문이 사라지지 않는다(빈 키 = '직접입력' 으로 화면이 이름 붙인다).
-//  ⭐5) IP 는 **가려진 것만** 들어간다 — 원문(끝이 `*` 가 아닌 값)은 표에 못 앉는다.
+//  ⭐5) IP 는 원문 그대로 담긴다(2026-09-09 지시로 마스킹을 열었다) — 못 알아낸 방문도 한 줄로 남는다.
 //  ⭐6) 보존기간 파기가 실제로 돈다 — 방침에 "180일 후 파기" 라고 적는 근거다(안 지우면 그게 위반).
 //   7) 일별·월별 묶음 · 기간 밖 제외 · 로그 페이지네이션.
+//
+// ⚠️ 마이그레이션 **두 장**을 순서대로 적용해 검증한다 — 뒤엣것이 앞엣것의 마스킹 제약을 걷어낸다.
+//    한 장만 보면 "지금 실제로 어떻게 도는가" 를 못 본다.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
-const MIG = 'supabase/migrations/20260909120000_visit_log.sql';
+const MIGS = [
+  'supabase/migrations/20260909120000_visit_log.sql',
+  'supabase/migrations/20260909130000_visit_ip_full.sql',
+];
 
 const db = await PGlite.create();
 const raw = (sql) => db.exec(sql);
@@ -26,13 +32,15 @@ const ok = (name, cond, got) => rec(name, got, true, !!cond);
 
 // ---- 마이그레이션 적용(역할·auth 스키마 strip) ----
 // pglite 에는 pg_cron 이 없다 → 크론 등록 두 줄만 걷어낸다(정리 함수 자체는 그대로 만들어 검증한다).
-let ddl = readFileSync(MIG, 'utf8');
-ddl = ddl.replace(/\s+references auth\.users\(id\)(\s+on delete set null)?/g, '');
-ddl = ddl.replace(/^\s*(revoke|grant)\b[\s\S]*?;\s*$/gim, '');
-ddl = ddl.replace(/^\s*select cron\.(un)?schedule[\s\S]*?;\s*$/gim, '');
 // visit_events(요약표)는 이 마이그레이션이 만들지 않는다 — 정리 함수가 건드리므로 최소 형태로 만들어 둔다.
 await raw(`create table visit_events (day date not null, visitor_id uuid not null, views integer not null default 1);`);
-await raw(ddl);
+for (const m of MIGS) {
+  let ddl = readFileSync(m, 'utf8');
+  ddl = ddl.replace(/\s+references auth\.users\(id\)(\s+on delete set null)?/g, '');
+  ddl = ddl.replace(/^\s*(revoke|grant)\b[\s\S]*?;\s*$/gim, '');
+  ddl = ddl.replace(/^\s*select cron\.(un)?schedule[\s\S]*?;\s*$/gim, '');
+  await raw(ddl);
+}
 
 const uA = '00000000-0000-0000-0000-0000000000a1';
 const v1 = '11111111-1111-4111-8111-111111111111';
@@ -40,7 +48,7 @@ const v2 = '22222222-2222-4222-8222-222222222222';
 
 const kstToday = (await q(`select (now() at time zone 'Asia/Seoul')::date::text d`)).rows[0].d;
 
-const add = (visitor, user, path, refHost, refUrl, entry, ip = '1.2.3.*') =>
+const add = (visitor, user, path, refHost, refUrl, entry, ip = '1.2.3.4') =>
   q(`select visit_log_add($1,$2,$3,'KR','desktop','Chrome','Windows',$4,$5,$6,$7)`,
     [visitor, user, path, refHost, refUrl, entry, ip]);
 
@@ -103,18 +111,16 @@ ok('6b 다음 페이지는 다른 줄', JSON.stringify(page1.rows) !== JSON.stri
 ok('6c total 은 페이지와 무관', Number(page1.total) === Number(page2.total) && Number(page1.total) > 2, Number(page1.total));
 ok('6d ⭐로그는 회원 여부만 준다(uid 원문 없음)', page1.rows.every((r) => !('user_id' in r) && typeof r.member === 'boolean'), Object.keys(page1.rows[0] ?? {}));
 
-// ---- 7) ⭐IP 는 가려진 것만 ----
-await add(v1, null, '/ip1', null, null, false, '185.93.89.*');
-await add(v1, null, '/ip2', null, null, false, '185.93.89.147'); // 원문 → 버려져야 한다
-const ipRows = (await q(`select path, ip_masked from visit_log where path in ('/ip1','/ip2') order by path`)).rows;
-eq('7a ⭐가린 값은 담긴다', ipRows[0].ip_masked, '185.93.89.*');
-ok('7b ⭐원문은 조용히 버려진다(줄은 남는다)', ipRows[1].ip_masked === null, ipRows[1]);
-let rejected = false;
-try { await q(`insert into visit_log (visitor_id, path, device, browser, os, ip_masked) values ($1,'/x','desktop','Chrome','Windows','8.8.8.8')`, [v1]); }
-catch { rejected = true; }
-ok('7c ⭐표가 원문 IP 를 거절한다(CHECK)', rejected, null);
+// ---- 7) ⭐IP 는 원문 그대로 ----
+await add(v1, null, '/ip1', null, null, false, '185.93.89.147');
+await add(v1, null, '/ip2', null, null, false, null); // 못 알아낸 방문
+const ipRows = (await q(`select path, ip from visit_log where path in ('/ip1','/ip2') order by path`)).rows;
+eq('7a ⭐원문이 그대로 담긴다', ipRows[0].ip, '185.93.89.147');
+ok('7b 못 알아낸 방문은 null 로 남는다(줄은 남는다)', ipRows[1].ip === null, ipRows[1]);
+ok('7c ⭐마스킹 CHECK 가 걷혔다', !(await q(`select 1 from pg_constraint where conname='visit_log_ip_masked_chk'`)).rows.length, null);
 const ipStat = (await q(`select visit_ip_stats($1::date, $1::date) v`, [kstToday])).rows[0].v;
 ok('7d ⭐미상(null)도 한 줄로 남는다', ipStat.rows.some((r) => r.key === ''), ipStat.rows.map((r) => r.key));
+ok('7e 원문이 표에 줄로 선다', ipStat.rows.some((r) => r.key === '185.93.89.147'), ipStat.rows.map((r) => r.key));
 
 // ---- 8) ⭐보존기간 파기 ----
 await q(`insert into visit_log (day, hour, visitor_id, path, device, browser, os)
@@ -129,7 +135,8 @@ eq('8c 요약표도 400일로 정리된다', Number((await q(`select count(*) c 
 const cols = (await q(`select column_name from information_schema.columns where table_name='visit_log'`)).rows.map((r) => r.column_name);
 ok('9a ⭐User-Agent 원문 컬럼 없음', !cols.some((c) => /agent|ua$/.test(c)), cols);
 ok('9b 지역 컬럼 없음(조회 시 조인)', !cols.includes('region_code') && !cols.includes('region'), cols);
-ok('9c ⭐IP 컬럼은 마스킹 전용 이름 하나뿐', cols.filter((c) => /ip/.test(c)).join() === 'ip_masked', cols.filter((c) => /ip/.test(c)));
+// ⚠️ 이름이 내용과 어긋나면 다음 사람이 "가려진 값이겠지" 하고 읽는다 — 옛 이름이 남으면 걸린다.
+ok('9c ⭐IP 컬럼 이름은 ip 하나뿐(옛 ip_masked 잔존 없음)', cols.filter((c) => /ip/.test(c)).join() === 'ip', cols.filter((c) => /ip/.test(c)));
 
 // ---- 결과 출력 ----
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${x.got} want=${x.want})`);

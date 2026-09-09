@@ -457,6 +457,10 @@ export interface CbtUserRow {
   deactivated: string | null
   /** 보관기간이 지나 개인정보를 파기한 시각. 찍혀 있으면 복구할 수 없다. */
   purged: string | null
+  /** 회원이 온보딩에서 **직접 고른** 국가(ISO alpha-2) — 방문 통계의 국가(브라우저가 알아낸 값)와 다르다. */
+  country: string | null
+  /** 같은 온보딩에서 고른 시/도. 코드 모양은 나라마다 다르다(KR-11 · ES.CE). */
+  region: string | null
 }
 export interface CbtUsersResp {
   users: CbtUserRow[]
