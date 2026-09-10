@@ -592,7 +592,7 @@ const KO: Record<string, string> = {
   "check.chk_seb": "보안 브라우저(SEB) 실행",
   "check.monitor_note": "· 모니터 수는 보안 브라우저 실행 시 자동 점검됩니다. 외부 모니터는 1대만 연결하세요.",
   "check.sebtest_btn": "보안 브라우저로 열어서 확인",
-  "check.sebtest_desc": "실제 시험과 같은 방식으로 보안 브라우저를 실행해, 이 PC에서 제대로 열리는지 확인합니다.\n시험 문제는 나오지 않습니다.",
+  "check.sebtest_hint": "위 확인에서 보안 브라우저가 열리지 않았다면 아래에서 설치하세요.",
   "check.back": "내 응시권으로 돌아가기",
   "done.title": "제출이 완료되었습니다",
   "done.sub1": "응시가 정상적으로 접수되었습니다. 보안 브라우저는 자동으로 종료됩니다.",

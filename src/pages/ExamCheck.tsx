@@ -91,8 +91,9 @@ export default function ExamCheck() {
                     <span className="material-symbols-outlined text-[20px]">play_arrow</span>
                     {t('check.sebtest_btn')}
                   </button>
-                  {/* whitespace-pre-line — 사전의 \n 을 살린다. 한 줄로 길게 흐르면 안 읽힌다. */}
-                  <p className="font-body-md text-body-md text-on-surface-variant mt-4 leading-relaxed break-keep max-w-prose whitespace-pre-line">{t('check.sebtest_desc')}</p>
+                  {/* 이 버튼을 눌렀는데 아무 일도 안 일어난 사람에게 갈 곳을 알려주는 한 줄이라
+                      본문(회색)보다 크고 밝게 둔다 — 흐리면 못 보고 화면에서 멈춘다. */}
+                  <p className="font-title-md text-title-md font-bold text-on-surface mt-4 leading-relaxed break-keep max-w-prose">{t('check.sebtest_hint')}</p>
                   {err && <p className="prep-warn" style={{ marginTop: 10 }}>{err}</p>}
                 </div>
               </div>

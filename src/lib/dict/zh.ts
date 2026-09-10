@@ -585,7 +585,7 @@ const ZH: Record<string, string> = {
   "check.chk_seb": "安全浏览器（SEB）启动",
   "check.monitor_note": "· 显示器数量在安全浏览器运行时自动检查。外接显示器请仅连接 1 台。",
   "check.sebtest_btn": "用安全浏览器打开确认",
-  "check.sebtest_desc": "以与正式考试相同的方式启动安全浏览器，确认其在本机能否正常打开。\n不会出现考题。",
+  "check.sebtest_hint": "如果在上面的确认中安全浏览器没有打开，请在下方安装。",
   "check.back": "返回我的考试券",
   "done.title": "提交已完成",
   "done.sub1": "您的应试已正常受理。安全浏览器将自动关闭。",

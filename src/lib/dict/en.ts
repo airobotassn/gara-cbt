@@ -585,7 +585,7 @@ const EN: Record<string, string> = {
   "check.chk_seb": "Secure browser (SEB) launch",
   "check.monitor_note": "· The number of monitors is checked automatically when the secure browser runs. Connect only one external monitor.",
   "check.sebtest_btn": "Open in the secure browser to check",
-  "check.sebtest_desc": "Launches the secure browser the same way the real exam does, to confirm it opens properly on this PC.\nNo exam questions are shown.",
+  "check.sebtest_hint": "If the secure browser did not open in the check above, install it below.",
   "check.back": "Back to my exam tickets",
   "done.title": "Your exam has been submitted",
   "done.sub1": "Your attempt was received successfully. The secure browser will close automatically.",

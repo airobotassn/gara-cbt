@@ -585,7 +585,7 @@ const VI: Record<string, string> = {
   "check.chk_seb": "Khởi chạy trình duyệt bảo mật (SEB)",
   "check.monitor_note": "· Số màn hình được kiểm tra tự động khi chạy trình duyệt bảo mật. Chỉ kết nối 1 màn hình ngoài.",
   "check.sebtest_btn": "Mở bằng trình duyệt bảo mật để kiểm tra",
-  "check.sebtest_desc": "Khởi chạy trình duyệt bảo mật giống hệt kỳ thi thật để xác nhận nó mở đúng trên máy này.\nKhông có câu hỏi thi nào xuất hiện.",
+  "check.sebtest_hint": "Nếu trình duyệt bảo mật không mở ở bước kiểm tra trên, hãy cài đặt ở bên dưới.",
   "check.back": "Quay lại vé thi của tôi",
   "done.title": "Đã nộp bài thi",
   "done.sub1": "Lượt thi của bạn đã được tiếp nhận. Trình duyệt bảo mật sẽ tự động đóng.",

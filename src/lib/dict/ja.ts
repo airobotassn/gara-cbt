@@ -585,7 +585,7 @@ const JA: Record<string, string> = {
   "check.chk_seb": "セキュアブラウザ（SEB）の起動",
   "check.monitor_note": "· モニター数はセキュアブラウザ実行時に自動点検されます。外部モニターは1台のみ接続してください。",
   "check.sebtest_btn": "セキュアブラウザで開いて確認",
-  "check.sebtest_desc": "実際の試験と同じ方法でセキュアブラウザを起動し、このPCで正しく開くかを確認します。\n試験問題は出ません。",
+  "check.sebtest_hint": "上の確認でセキュアブラウザが開かなかった場合は、下でインストールしてください。",
   "check.back": "受験券に戻る",
   "done.title": "提出が完了しました",
   "done.sub1": "受験が正常に受け付けられました。セキュアブラウザは自動的に終了します。",
