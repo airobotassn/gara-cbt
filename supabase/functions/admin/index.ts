@@ -3154,10 +3154,45 @@ async function chatBuildRows(admin: any, ids: number[], room: string | null) {
     })
   }
 
+  // 작성자별 제재 현황 — 관리자가 [제재] 를 누르기 전에 "이 사람 몇 번째인가" 를 봐야 한다.
+  //   ⚠️ 자동 가림(신고 3명)은 **차수에 안 들어간다**(서로 짜고 신고하면 남을 영구정지로 몰 수 있다).
+  //      관리자 판단을 돕는 참고 숫자로만 같이 내려준다.
+  const authorIds = [...new Set(rows.map((m: any) => m.user_id).filter((v: unknown) => v != null))] as string[]
+  const sancByUser: Record<string, { count: number; nth: number; lastAt: string | null; until: string | null; autoHidden: number }> = {}
+  if (authorIds.length) {
+    const [sancRes, profRes, autoRes] = await Promise.all([
+      admin.from('chat_sanctions').select('user_id, nth, created_at').in('user_id', authorIds),
+      admin.from('profiles').select('id, suspended_until').in('id', authorIds),
+      admin.from('chat_messages').select('user_id').eq('mod_status', 'auto_hidden').in('user_id', authorIds),
+    ])
+    for (const id of authorIds) sancByUser[id] = { count: 0, nth: 0, lastAt: null, until: null, autoHidden: 0 }
+    for (const s of (sancRes.data ?? []) as { user_id: string; created_at: string }[]) {
+      const e = sancByUser[s.user_id]
+      if (!e) continue
+      e.count += 1
+      if (e.lastAt == null || s.created_at > e.lastAt) e.lastAt = s.created_at
+    }
+    for (const p of (profRes.data ?? []) as { id: string; suspended_until: string | null }[]) {
+      const e = sancByUser[p.id]
+      if (e) e.until = p.suspended_until ?? null
+    }
+    for (const a of (autoRes.data ?? []) as { user_id: string }[]) {
+      const e = sancByUser[a.user_id]
+      if (e) e.autoHidden += 1
+    }
+    // 유효 차수 = 총 제재 수 − 감면(마지막 제재로부터 90일마다 한 칸). SQL 의 chat_sanction_nth 와 같은 식이다.
+    //   ⚠️ 여기 값은 **표시용**이다. 실제 차수는 제재를 걸 때 SQL 이 락 안에서 다시 센다(그게 단일 출처).
+    for (const e of Object.values(sancByUser)) {
+      const forgiven = e.lastAt ? Math.floor((Date.now() - new Date(e.lastAt).getTime()) / 86400e3 / 90) : 0
+      e.nth = Math.max(0, e.count - forgiven)
+    }
+  }
+
   return rows
     .map((m: any) => {
       const reports = byMsg[m.id] ?? []
       const openCount = reports.filter((r: any) => r.status === 'open').length
+      const s = m.user_id ? sancByUser[m.user_id] : undefined
       return {
         id: m.id,
         userId: m.user_id,
@@ -3171,6 +3206,11 @@ async function chatBuildRows(admin: any, ids: number[], room: string | null) {
         reportCount: reports.length,
         openCount,
         reports,
+        // 작성자 제재 현황(없으면 전부 0/null)
+        sanctionCount: s?.count ?? 0,
+        sanctionNth: s?.nth ?? 0,          // 지금 제재하면 이 값 +1 차가 된다
+        autoHiddenCount: s?.autoHidden ?? 0,
+        suspendedUntil: s?.until ?? null,
       }
     })
     .sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)))
@@ -3320,14 +3360,89 @@ async function chatApprove(admin: any, body: any) {
 //  개인정보·불법물이 본문에 담긴 경우엔 그 행이 남아 있는 것 자체가 문제라 물리 삭제가 필요하다.
 //  ⚠️ chat_reports.message_id 는 on delete set null 이라, 메시지만 지우면 신고가 고아로 남아
 //     '처리 완료' 큐에 message 없는 유령 줄이 생긴다 → 신고를 먼저 지운다.
-async function chatPurge(admin: any, body: any) {
+//  ⚠️ **제재를 먼저 건다**(sanction=true 일 때). 옛 구조의 구멍이 이거였다 — 제일 무거운 조치인
+//     완전삭제가 메시지도 신고도 다 지워서 **가장 악질인 케이스의 흔적이 0** 이었다. 지금은 제재
+//     기록이 `chat_sanctions`(다른 표)에 남아, 글을 물리 삭제해도 차수·사유·시각이 살아남는다.
+//     체크박스로 끌 수 있는 이유는 **본인이 실수로 자기 연락처를 올려 지워달라는 경우** 때문이다.
+async function chatPurge(admin: any, body: any, uid: string | null) {
   const messageId = Number(body?.message_id)
   if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+
+  let sanction: unknown = null
+  if (body?.sanction) {
+    const { data: msg } = await admin.from('chat_messages').select('user_id').eq('id', messageId).maybeSingle()
+    const target = (msg as { user_id: string | null } | null)?.user_id ?? null
+    if (!target) return json({ error: '작성자를 알 수 없어 제재할 수 없습니다.' }, 409)
+    const applied = await applySanction(admin, target, messageId, body?.reason, body?.note, uid)
+    if ('error' in applied) return json({ error: applied.error }, applied.status)
+    sanction = applied.data
+  }
+
   const { error: repErr } = await admin.from('chat_reports').delete().eq('message_id', messageId)
   if (repErr) return json({ error: repErr.message }, 500)
   const { error } = await admin.from('chat_messages').delete().eq('id', messageId)
   if (error) return json({ error: error.message }, 500)
-  return json({ ok: true })
+  return json({ ok: true, sanction })
+}
+
+// ── 채팅 제재 ────────────────────────────────────────────────
+// 관리자는 [제재] 한 번만 누른다 — **며칠인지는 사다리가 정한다**(1·3·7·30·90·영구, 90일 무위반 시 한 칸 감면).
+//  ⛔ 기간을 요청으로 받지 않는다. 받는 순간 관리자마다 다른 잣대가 되고, 사다리가 있을 이유가 없어진다.
+//  ⛔ 사유는 **코드 6개**만 받는다(신고 사유와 같은 값). 자유 텍스트로 받으면 아레나가 6개국어인데
+//     베트남 사용자가 관리자의 한국어 사유를 그대로 보게 된다. 자세한 사정은 `note`(내부용)에 적는다.
+const SANCTION_REASONS = ['spam', 'abuse', 'sexual', 'flood', 'privacy', 'other']
+
+async function applySanction(
+  admin: any, userId: string, messageId: number | null, reason: unknown, note: unknown, by: string | null,
+): Promise<{ data: unknown } | { error: string; status: number }> {
+  const r = String(reason ?? '')
+  if (!SANCTION_REASONS.includes(r)) return { error: '제재 사유를 고르세요.', status: 400 }
+  const { data, error } = await admin.rpc('chat_sanction_apply', {
+    p_user: userId,
+    p_message_id: messageId,
+    p_reason: r,
+    p_note: note == null ? null : String(note).slice(0, 1000),
+    p_by: by,
+  })
+  if (error) return { error: error.message, status: 500 }
+  return { data }
+}
+
+// 제재 + 글 숨김. 신고 큐의 기본 조치다.
+//  ⚠️ 숨김을 **제재보다 뒤에** 둔다 — 제재가 거절되면(사유 미선택 등) 글만 숨겨진 어중간한 상태가 남지 않는다.
+async function chatSanction(admin: any, body: any, uid: string | null) {
+  const messageId = Number(body?.message_id)
+  if (!Number.isFinite(messageId)) return json({ error: 'message_id 가 필요합니다.' }, 400)
+  const { data: msg } = await admin.from('chat_messages').select('user_id').eq('id', messageId).maybeSingle()
+  const target = (msg as { user_id: string | null } | null)?.user_id ?? null
+  if (!target) return json({ error: '작성자를 알 수 없어 제재할 수 없습니다.' }, 409)
+
+  const applied = await applySanction(admin, target, messageId, body?.reason, body?.note, uid)
+  if ('error' in applied) return json({ error: applied.error }, applied.status)
+
+  // 계기가 된 글은 같이 내린다(제재해놓고 글이 남아 있으면 신고자가 처리 안 된 줄로 본다).
+  //   ⚠️ 옛 글까지 쓸어 담는 건 선택이다 — 도배는 신고 1건에 글이 30개라 그게 필요하고,
+  //      욕설 한 마디면 멀쩡한 옛 글까지 사라져 남들 대화 맥락이 뚫린다. 그래서 기본은 이 글만.
+  const nowIso = new Date().toISOString()
+  await admin.from('chat_messages')
+    .update({ deleted_at: nowIso, updated_at: nowIso, hidden_by: 'admin' }).eq('id', messageId)
+  await admin.from('chat_reports').update({ status: 'resolved' }).eq('message_id', messageId).eq('status', 'open')
+
+  if (body?.hideAll) {
+    await admin.from('chat_messages')
+      .update({ deleted_at: nowIso, updated_at: nowIso, hidden_by: 'admin' })
+      .eq('user_id', target).is('deleted_at', null)
+  }
+  return json({ ok: true, sanction: applied.data })
+}
+
+// 제재 취소 — 오판 정정용. 마지막 제재 기록을 지우고 정지를 푼다(차수도 같이 내려간다).
+async function chatSanctionRevoke(admin: any, body: any) {
+  const userId = String(body?.user_id ?? '')
+  if (!userId) return json({ error: 'user_id 가 필요합니다.' }, 400)
+  const { data, error } = await admin.rpc('chat_sanction_revoke', { p_user: userId })
+  if (error) return json({ error: error.message }, 500)
+  return json({ ok: true, ...(data as Record<string, unknown>) })
 }
 
 Deno.serve(async (req) => {
@@ -3415,7 +3530,9 @@ Deno.serve(async (req) => {
       case 'chatHide': return await chatHide(admin, body)
       case 'chatUnhide': return await chatUnhide(admin, body)
       case 'chatApprove': return await chatApprove(admin, body)
-      case 'chatPurge': return await chatPurge(admin, body)
+      case 'chatPurge': return await chatPurge(admin, body, user?.id ?? null)
+      case 'chatSanction': return await chatSanction(admin, body, user?.id ?? null)
+      case 'chatSanctionRevoke': return await chatSanctionRevoke(admin, body)
       default: {
         // 관리자페이지 재편(2026-08-11)으로 생긴 액션들은 reform.ts 로 뺐다 — index.ts 가 이미 2.6k줄이다.
         //   번역기는 **여기 것을 넘겨준다**(강의 제목·소개 자동 번역). reform.ts 가 import 하면

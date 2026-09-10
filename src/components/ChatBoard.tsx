@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link, useNavigate } from 'react-router-dom'
 import { useT, localeOf, type Lang } from '../lib/i18n'
 import { useAuth } from '../context/AuthProvider'
-import { callFunction } from '../lib/supabase'
+import { callFunction, FunctionError } from '../lib/supabase'
 import { linkify } from '../lib/linkify'
 import { Avatar } from './GemAvatar'
 import { countryName, flagUrl } from '../lib/regions'
@@ -26,6 +26,31 @@ import { arenaLevelForScore } from '../lib/scoring'
 //  ⚠️ 번역 대상 언어는 서버가 국가(profiles.country_code)에서 정한다. 프론트가 언어를 보내지 않는다.
 //  ⚠️ 수정·삭제는 없다(2026-08-13 제거) — 원문이 안 변하므로 번역본을 무효화할 일도 없다.
 
+/**
+ * 글의 검수 상태 — 서버가 주는 값 그대로다.
+ *  · `ok`          검사 통과. 모두에게 보인다.
+ *  · `pending`     모더레이션(OpenAI) 장애로 **검사를 못 한 채** 올라간 글. 2026-09-10 부터 모두에게
+ *                  보이고, 복구되면 서버가 곁다리로 다시 검사한다.
+ *  · `auto_hidden` 서로 다른 3명이 신고해 자동으로 내려간 글. **작성자 본인에게만** 보인다.
+ *  · `hidden`      옛 값(지금 서버는 안 보낸다). 옛 기록이 남아 있어 타입에는 둔다.
+ *  ⚠️ `auto_hidden` 은 오래 빠져 있었다 — 서버는 보내는데 타입에 없어서 화면이 그 상태를 아예 몰랐고,
+ *     그래서 **자기 글이 남에게 안 보인다는 사실을 작성자가 알 방법이 없었다**(반응이 없으니 또 쓰고,
+ *     신고가 더 쌓였다). 아래 `statusNote` 가 그 자리를 메운다.
+ */
+type ModStatus = 'ok' | 'pending' | 'auto_hidden' | 'hidden'
+
+/** 채팅 정지 상태 — 서버(`chat_sanction_status`)가 계산해서 내려준다.
+ *  ⚠️ **사다리 숫자(1·3·7·30·90·영구)를 여기 두지 않는다.** `nextDays` 까지 서버가 계산해 주므로
+ *     화면은 받아 적기만 한다 — 표를 복사해두면 사다리를 고칠 때 양쪽을 맞춰야 한다. */
+interface Sanction {
+  suspended: boolean
+  until?: string
+  permanent?: boolean
+  nth?: number
+  reason?: string
+  nextDays?: number | null
+}
+
 interface Row {
   id: number
   /** 탈퇴 계정이면 null 일 수 있다. */
@@ -33,7 +58,7 @@ interface Row {
   /** 작성자의 **지금** 닉네임 — 서버가 profiles 에서 덮어 내려준다(글에 박힌 옛 이름이 아니다). */
   display_name: string
   body: string | null
-  mod_status: 'ok' | 'pending' | 'hidden'
+  mod_status: ModStatus
   created_at: string
   updated_at: string
   /** 작성자 프로필 — chat-list 가 붙여준다. 국가 미등록이면 null(렌더 생략). */
@@ -56,7 +81,7 @@ const REPORT_REASONS = [
 interface Tomb {
   id: number
   deleted_at: string | null
-  mod_status: 'ok' | 'pending' | 'hidden'
+  mod_status: ModStatus
   updated_at: string
   body: string | null
 }
@@ -112,6 +137,20 @@ const ERR_KEYS: Record<string, string> = {
   ip_floor: 'chat.rateLimited',
   duplicate: 'chat.duplicate',
   translate_failed: 'chat.trFailed',
+  // 정지는 토스트로 스쳐 지나가면 안 된다 — 입력창 자리에 안내가 눌러앉는다(아래 `sanction`).
+  suspended: 'chat.suspendedShort',
+}
+
+/** 제재 사유 코드 → 사전 키. **신고 사유와 같은 코드 6개를 쓴다**(서버 `SANCTION_REASONS` 와 한 벌).
+ *  ⚠️ 관리자가 자유 텍스트로 사유를 적게 하지 않는 이유가 이것이다 — 아레나는 6개국어라
+ *     한국어로 적으면 베트남 사용자가 그 한국어를 그대로 본다. 코드면 사전이 알아서 번역한다. */
+const REASON_KEYS: Record<string, string> = {
+  spam: 'chat.reportSpam',
+  abuse: 'chat.reportAbuse',
+  sexual: 'chat.reportSexual',
+  flood: 'chat.reportFlood',
+  privacy: 'chat.reportPrivacy',
+  other: 'chat.reportOther',
 }
 
 interface Props {
@@ -133,6 +172,10 @@ export default function ChatBoard({ room = 'global' }: Props) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  // 채팅 정지 — 서버가 403 으로 알려줄 때 채운다.
+  //   ⚠️ 화면 진입 때 미리 묻지 않는다. 정지된 사람은 드문데 그걸 위해 **모든 방문자**가 조회를 한 번
+  //      더 하게 되고, 정지는 글을 쓰려 할 때만 체감되는 상태라 그 순간에 알면 충분하다.
+  const [sanction, setSanction] = useState<Sanction | null>(null)
   // 번역: 토글 상태 + (글번호 → 번역문). 방이 바뀌면 재마운트되며 둘 다 초기화된다.
   const [trOn, setTrOn] = useState(false)
   const [tr, setTr] = useState<Map<number, string>>(new Map())
@@ -321,6 +364,16 @@ export default function ChatBoard({ room = 'global' }: Props) {
     const d = new Date(iso)
     const { time: kstTime, day: kstDay } = kstFmt(lang)
     return kstDay.format(d) === kstDay.format(new Date(now)) ? kstTime.format(d) : `${kstDay.format(d)} ${kstTime.format(d)}`
+  }
+
+  // 정지 만료 시각 — 날짜와 시각을 같이 보여준다.
+  //   ⚠️ 채팅 시각(`formatTime`)과 달리 '방금·N분 전' 으로 접지 않는다. 정지는 **언제 풀리는지**가
+  //      정보의 전부라, 접으면 사용자가 다시 계산해야 한다.
+  function formatUntil(iso?: string): string {
+    if (!iso) return ''
+    const { time: kstTime, day: kstDay } = kstFmt(lang)
+    const d = new Date(iso)
+    return `${kstDay.format(d)} ${kstTime.format(d)}`
   }
 
   // 초기 PAGE 건
@@ -515,6 +568,12 @@ export default function ChatBoard({ room = 'global' }: Props) {
     } catch (e) {
       setRows((prev) => prev.filter((r) => r.id !== tempId))
       setInput(text)
+      // 정지는 다음 글에서도 그대로다 — 토스트로 흘려보내면 매번 쓰려다 튕기고 이유를 못 읽는다.
+      //   ⚠️ 서버가 오류 본문에 실어 보낸 값을 그대로 쓴다(차수·기간·다음 단계 전부 서버 계산).
+      if (e instanceof FunctionError && e.message === 'suspended') {
+        const s = (e.body as { sanction?: Sanction } | undefined)?.sanction
+        if (s?.suspended) setSanction(s)
+      }
       showToast(errMsg(e instanceof Error ? e.message : 'error'))
     }
     setSending(false)
@@ -665,6 +724,13 @@ export default function ChatBoard({ room = 'global' }: Props) {
                     {deleted ? t('chat.deleted') : linkify(shown ?? r.body ?? '')}
                     {r.sending && <span className="chat-sending-tag"> · {t('chat.sending')}</span>}
                   </div>
+                  {/* 자동 가림 — 신고가 3명 쌓여 남에게는 안 보이는 상태다. 이 줄이 없으면 작성자는
+                      자기 글이 정상으로 보여서 아무도 못 본다는 걸 모른 채 계속 쓴다.
+                      ⚠️ **몇 명이 신고했는지는 밝히지 않는다** — 임계치가 새어나가면 그 수를 맞추려는
+                         조직적 신고를 유도한다(서버 `chat-report` 머리말의 같은 이유). */}
+                  {own && !deleted && r.mod_status === 'auto_hidden' && (
+                    <div className="chat-status-note">{t('chat.underReview')}</div>
+                  )}
                   <div className="chat-footer">
                     <span className="chat-time">{formatTime(r.created_at)}</span>
                     {shown && !deleted && <span className="chat-tr-mark">· {t('chat.trMark')}</span>}
@@ -702,6 +768,32 @@ export default function ChatBoard({ room = 'global' }: Props) {
           <span>{t('chat.loginToJoin')}</span>
           {/* /login 은 구글·카카오 둘 다 있는 화면이라 '구글로 로그인' 이 아니라 '로그인' 이다. */}
           <Link to="/login" className="chat-login-btn">{t('common.login')}</Link>
+        </div>
+      ) : sanction ? (
+        /* 채팅 정지 — 입력창 자리를 안내가 대신한다.
+           ⚠️ 입력창을 그냥 비활성화만 하면 "왜 안 써지지" 로 남는다. 언제까지·왜·몇 차인지를
+              그 자리에서 말해야 이의 제기든 납득이든 할 수 있다.
+           ⚠️ 읽기·시험·게임은 그대로다 — 막히는 건 이 입력창 하나뿐이다. */
+        <div className="chat-suspended" role="status">
+          <strong>{t('chat.suspendedTitle')}</strong>
+          <span>
+            {sanction.permanent
+              ? t('chat.suspendedForever')
+              : t('chat.suspendedUntil', { until: formatUntil(sanction.until) })}
+          </span>
+          {sanction.reason && REASON_KEYS[sanction.reason] && (
+            <span>{t('chat.suspendedReason', { reason: t(REASON_KEYS[sanction.reason]) })}</span>
+          )}
+          {/* 차수와 다음 단계 — 게임사들이 대부분 이렇게 알린다(억제 효과 + 영구정지 때 '못 들었다'가 안 된다).
+              ⚠️ 다음 단계 일수는 **서버가 계산해 준 값**이다. 여기서 사다리를 다시 계산하지 말 것. */}
+          {!sanction.permanent && !!sanction.nth && (
+            <span className="chat-suspended-next">
+              {sanction.nextDays == null
+                ? t('chat.suspendedNextForever', { nth: sanction.nth })
+                : t('chat.suspendedNext', { nth: sanction.nth, days: sanction.nextDays })}
+            </span>
+          )}
+          <Link to="/feedback" className="chat-suspended-appeal">{t('chat.suspendedAppeal')}</Link>
         </div>
       ) : (
         <form className="chat-composer" onSubmit={onSend}>

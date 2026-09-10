@@ -244,6 +244,49 @@
   cursor: default;
 }
 
+/* 채팅 정지 안내 — 입력창 자리를 통째로 대신한다(입력창을 흐리게만 두면 "왜 안 써지지" 로 남는다).
+   ⚠️ 색은 오류(error)로 잡는다. 경고(warn)로 하면 "잠깐 문제" 처럼 읽히는데, 여기는 며칠에서
+      영구까지 이어지는 확정된 조치라 그 온도가 맞지 않는다. */
+.chat-suspended {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-outline-variant, #c3c6d6);
+  background: var(--color-error-container, #ffdad6);
+  color: var(--color-on-error-container, #410002);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.chat-suspended strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+.chat-suspended-next {
+  opacity: 0.85;
+}
+.chat-suspended-appeal {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-weight: 600;
+  text-decoration: underline;
+  color: inherit;
+}
+
+/* 자동 가림 배지 — 내 글이 남에게 안 보인다는 사실을 작성자에게 알린다.
+   말풍선 **안**에 둔다(밖에 두면 목록 스크롤에서 어느 글 얘긴지 안 붙는다). */
+.chat-status-note {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--color-surface-container-high, #e6e5f1);
+  color: var(--color-on-surface-variant, #434654);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
 .chat-login-cta {
   display: flex;
   align-items: center;

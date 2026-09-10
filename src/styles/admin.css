@@ -733,6 +733,64 @@
   border-color: var(--danger-fg);
 }
 
+/* 제재 / 완전삭제 모달 — 사유를 고르는 자리.
+   ⚠️ 옛 완전삭제는 window.confirm 하나였다. 사유 선택이 필요해지면서 모달로 올렸고,
+      되돌릴 수 없다는 경고와 본문 미리보기는 그대로 들고 왔다. */
+.chatmod-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 45%);
+}
+.chatmod-modal {
+  width: min(460px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--a-bd);
+  background: var(--a-bg, #fff);
+  color: var(--ink);
+}
+.chatmod-modal h3 { margin: 0; font-size: var(--fs-lg); font-weight: 800; }
+.chatmod-target { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+.chatmod-quote {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--a-bd);
+  background: var(--soft);
+  border-radius: 8px;
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chatmod-warn { margin: 0; font-size: var(--fs-sm); color: var(--danger-fg); font-weight: 600; }
+/* 사유는 한 줄에 두 개 — 여섯 개를 세로로 세우면 모달이 스크롤된다. */
+.chatmod-reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.chatmod-reasons label,
+.chatmod-check { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); cursor: pointer; }
+.chatmod-hint { margin: 0; font-size: var(--fs-xs, 12px); color: var(--muted); }
+.chatmod-note {
+  width: 100%;
+  min-height: 62px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--a-bd);
+  border-radius: 8px;
+  background: var(--soft);
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.chatmod-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
 /* 회원 상세 — 보유 자격증(응시 이력 위에 모아 보여준다) */
 .cert-own { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 4px; }
 .cert-own-item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--a-bd); border-left: 3px solid var(--blue); border-radius: 10px; background: var(--soft); }

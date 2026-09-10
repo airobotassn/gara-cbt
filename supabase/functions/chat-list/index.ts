@@ -3,7 +3,7 @@
 //  else(initial/before) → 커서 페이지(최신 limit개 내림차순 조회 후 오름차순으로 뒤집어 반환).
 //  방(room): 목록·폴링은 항상 한 방으로 좁힌다(기본 전세계). 읽기는 방 제한이 없다 — 남의 나라 방도 볼 수 있다.
 //  reconcile 만 방 조건이 없다(PK 조회이고, 클라는 자기가 띄운 방의 id 만 보낸다).
-//  본문 게이트: mod_status='ok' 이거나 본인 글이면 노출, 아니면(pending/hidden 이며 타인) body=null.
+//  본문 게이트: mod_status 가 VISIBLE_MOD(ok·pending)거나 본인 글이면 노출, 아니면(auto_hidden 이며 타인) body=null.
 //  reporter_id/ip_hash/content_hash 는 응답에 절대 포함하지 않는다.
 //  ⚠️ 익명 글 개념은 2026-09-07 에 없어졌다 — 채팅은 로그인 계정만 쓴다(_shared/chat.ts 머리말).
 //  ⚠️ _shared 사용 → CLI 로만 배포할 것.
@@ -15,6 +15,16 @@ import { normalizeRoom } from '../_shared/chat.ts'
 //    수정을 되살릴 거면 컬럼도 같이 되살릴 것.
 // ⚠️ is_anon 은 2026-09-07 에 뺐다 — 익명 채팅을 안 하기로 해서 스위치·칸·분기를 통째로 걷어냈다.
 const MSG_COLUMNS = 'id, user_id, display_name, body, mod_status, created_at, updated_at, deleted_at'
+
+// 남에게도 보이는 mod_status.
+//   · 'ok'      = 검사를 통과했다.
+//   · 'pending' = 모더레이션이 죽어 **검사를 못 한 채** 올라간 글(2026-09-10 fail-open 전환).
+//     ⛔ 여기서 pending 을 빼면 "글은 써지는데 아무도 못 보는" 상태가 된다 — 사용자에게는 채팅이
+//        죽은 것과 구별되지 않는다(옛 fail-open 의 실제 동작이 그랬고, 그래서 아무 쓸모가 없었다).
+//        검사를 못 했다는 사실은 복구 뒤 `recheckPending` 이 다시 물어보는 것으로 갚는다.
+//   · 'auto_hidden'(신고 3명 누적)은 계속 빠진다 — 작성자 본인에게만 남는다.
+const VISIBLE_MOD = ['ok', 'pending'] as const
+const isVisibleMod = (s: string | null | undefined) => VISIBLE_MOD.includes(s as typeof VISIBLE_MOD[number])
 
 type ShapedRow = ReturnType<typeof shapeRow>
 
@@ -56,8 +66,10 @@ Deno.serve(async (req) => {
   try {
     const user = await getUser(req)
     const caller = user?.id ?? null
-    // mod_status='ok' 이거나 본인 글이면 노출(공개 아닌 글은 타인에게 행 자체를 안 보여줌).
-    const visibilityFilter = caller != null ? `mod_status.eq.ok,user_id.eq.${caller}` : 'mod_status.eq.ok'
+    // mod_status 가 공개 상태(VISIBLE_MOD)거나 본인 글이면 노출(그 외는 타인에게 행 자체를 안 보여줌).
+    const visibilityFilter = caller != null
+      ? `mod_status.in.(${VISIBLE_MOD.join(',')}),user_id.eq.${caller}`
+      : `mod_status.in.(${VISIBLE_MOD.join(',')})`
 
     const { after, before, limit, ids, since, room: roomIn } = await req.json().catch(() => ({}))
     const room = normalizeRoom(roomIn)
@@ -103,7 +115,7 @@ Deno.serve(async (req) => {
         deleted_at: r.deleted_at,
         mod_status: r.mod_status,
         updated_at: r.updated_at,
-        body: r.deleted_at == null && (r.mod_status === 'ok' || (caller != null && r.user_id === caller)) ? r.body : null,
+        body: r.deleted_at == null && (isVisibleMod(r.mod_status) || (caller != null && r.user_id === caller)) ? r.body : null,
       }))
       return json({ messages, tombstones })
     }

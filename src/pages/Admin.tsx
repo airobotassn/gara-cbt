@@ -2284,6 +2284,34 @@ interface ChatModRow {
   reportCount: number
   openCount: number
   reports: ChatModReport[]
+  /** 작성자의 누적 제재 수. */
+  sanctionCount: number
+  /** 유효 차수(90일 감면 반영). **지금 제재하면 이 값 +1 차**가 된다. */
+  sanctionNth: number
+  /** 참고용 — 자동 가림(신고 3명)을 몇 번 당했나. ⚠️ 차수에는 안 들어간다(짜고 신고하면 남을 몰 수 있다). */
+  autoHiddenCount: number
+  /** 지금 정지 중이면 만료 시각. 9999년이면 영구. */
+  suspendedUntil: string | null
+}
+
+/** 제재 사유 — **신고 사유와 같은 코드 6개**(서버 `SANCTION_REASONS`·화면 `REPORT_REASONS` 와 한 벌).
+ *  ⚠️ 관리자가 자유 텍스트로 적지 않는다 — 이 값이 사용자 화면에 그대로 뜨는데 아레나는 6개국어다.
+ *     코드로 보내면 사전(`chat.report*`)이 각자 언어로 번역해 보여준다. 자세한 사정은 '내부 메모'에. */
+const SANCTION_REASONS: { code: string; label: string }[] = [
+  { code: 'abuse', label: '욕설·혐오 표현' },
+  { code: 'spam', label: '스팸·광고' },
+  { code: 'flood', label: '도배' },
+  { code: 'sexual', label: '음란·선정성' },
+  { code: 'privacy', label: '개인정보 노출' },
+  { code: 'other', label: '기타' },
+]
+
+/** 정지 만료 표기. 9999년은 영구 sentinel 이다(서버가 그 값으로 넣는다 — 검사를 한 줄로 통일하려고). */
+function chatSuspendLabel(until: string | null): string | null {
+  if (!until) return null
+  const d = new Date(until)
+  if (d.getTime() <= Date.now()) return null
+  return d.getFullYear() >= 9000 ? '영구 정지' : `정지 ~${fmtDT(until)}`
 }
 interface ChatModRoomCount { room: string; count: number }
 interface ChatModResponse {
@@ -2435,6 +2463,14 @@ export function ChatModAdmin() {
   const [busyId, setBusyId] = useState<number | null>(null)
   // 신고 상세(누가·왜)는 기본 접힘 — 줄마다 펼쳐 놓으면 목록이 다시 노이즈가 된다.
   const [openDetail, setOpenDetail] = useState<Set<number>>(new Set())
+  // 제재 모달 — purge=true 면 '완전삭제 + (선택) 제재', false 면 '제재 + 글 숨김'.
+  //   ⚠️ 두 흐름이 한 모달을 쓰는 이유: 둘 다 **사유 선택**이 필요하고, 사유 목록·내부 메모가 같다.
+  //      따로 만들면 사유 목록이 두 벌이 되어 언젠가 갈린다.
+  const [sanctionFor, setSanctionFor] = useState<{ row: ChatModRow; purge: boolean } | null>(null)
+  const [sReason, setSReason] = useState('abuse')
+  const [sNote, setSNote] = useState('')
+  const [sHideAll, setSHideAll] = useState(false)
+  const [sWithSanction, setSWithSanction] = useState(true)
 
   const load = useCallback(async (t: 'queue' | 'done', rm: string, off: number) => {
     setLoading(true)
@@ -2480,19 +2516,50 @@ export function ChatModAdmin() {
     }
   }
 
-  // 완전삭제 — 되돌릴 수 없으므로 본문 일부를 보여주며 한 번 확인받는다.
-  async function purgeRow(r: ChatModRow) {
-    const preview = (r.body ?? '').slice(0, 30)
-    if (!window.confirm(`완전삭제하면 되돌릴 수 없습니다.\n\n"${preview}"\n\n이 메시지와 딸린 신고 ${r.reportCount}건을 지웁니다.`)) return
-    setBusyId(r.id)
+  // 제재·완전삭제는 사유를 골라야 해서 모달을 거친다(아래 `sanctionFor`).
+  //   ⚠️ 완전삭제는 되돌릴 수 없으므로 모달에서 본문 일부를 보여준다(옛 window.confirm 이 하던 일).
+  async function submitSanction() {
+    const s = sanctionFor
+    if (!s) return
+    setBusyId(s.row.id)
     try {
-      await callFunction('admin', { action: 'chatPurge', message_id: r.id })
+      if (s.purge) {
+        await callFunction('admin', {
+          action: 'chatPurge',
+          message_id: s.row.id,
+          sanction: sWithSanction,
+          reason: sReason,
+          note: sNote,
+        })
+      } else {
+        await callFunction('admin', {
+          action: 'chatSanction',
+          message_id: s.row.id,
+          reason: sReason,
+          note: sNote,
+          hideAll: sHideAll,
+        })
+      }
+      setSanctionFor(null)
       await load(tab, room, offset)
     } catch (e) {
-      alert(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+      alert(e instanceof Error ? e.message : '처리에 실패했습니다.')
     } finally {
       setBusyId(null)
     }
+  }
+
+  // 모달 열기 — 옵션 기본값은 여기서 정한다.
+  //   · hideAll(이 사람 글 전부 숨기기) = **기본 꺼짐.** 켜면 그 사람의 멀쩡한 옛 글까지 사라져
+  //     남들 대화 맥락이 뚫린다. 도배(신고 1건에 글 30개)일 때만 켜는 스위치다.
+  //   · withSanction(완전삭제에 제재 동반) = **기본 켜짐.** 보통은 남의 개인정보·불법물 유포라
+  //     제재 대상이지만, 본인이 실수로 자기 연락처를 올려 지워달라는 경우엔 꺼야 한다.
+  function openSanction(row: ChatModRow, purge: boolean) {
+    setSanctionFor({ row, purge })
+    setSReason('abuse')
+    setSNote('')
+    setSHideAll(false)
+    setSWithSanction(true)
   }
 
   function toggleDetail(id: number) {
@@ -2594,7 +2661,30 @@ export function ChatModAdmin() {
                     <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                       {r.body ?? <span style={{ color: 'var(--muted)' }}>(내용 없음)</span>}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{r.displayName}</td>
+                    {/* 작성자 — 이름 밑에 제재 현황을 붙인다. 이게 없으면 관리자가 "이 사람 몇 번째인가"를
+                        알 방법이 없어서, 제재 버튼이 있어도 누굴 눌러야 하는지 판단이 안 선다.
+                        ⚠️ 자동가림은 **참고**다(차수에 안 들어간다) — 섞어 보이면 짜고 신고한 결과가
+                           제재 근거처럼 읽힌다. 그래서 회색으로 따로 뗀다. */}
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {r.displayName}
+                      {(r.sanctionCount > 0 || r.suspendedUntil || r.autoHiddenCount > 0) && (
+                        <div style={{ marginTop: 2, fontSize: 11, display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {chatSuspendLabel(r.suspendedUntil) && (
+                            <span className="admin-badge st-expired">{chatSuspendLabel(r.suspendedUntil)}</span>
+                          )}
+                          {r.sanctionCount > 0 && (
+                            <span title={`누적 ${r.sanctionCount}건 · 90일 무위반이면 한 칸씩 내려간다`}>
+                              제재 {r.sanctionNth}차
+                            </span>
+                          )}
+                          {r.autoHiddenCount > 0 && (
+                            <span style={{ color: 'var(--muted)' }} title="신고 3명 누적으로 자동 가림된 글 수 — 차수에는 안 들어간다">
+                              자동가림 {r.autoHiddenCount}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(r.createdAt)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {/* 결정 3종. 숨김/완전삭제를 나눠 둔 이유:
@@ -2626,12 +2716,25 @@ export function ChatModAdmin() {
                           </button>
                         </>
                       )}
+                      {/* 제재 = 글을 내리고 **사람**을 막는다. 기간은 사다리가 정하므로 관리자가 고를 게 없다.
+                          ⚠️ 작성자를 모르는 글(탈퇴 계정)엔 낼 수 없다 — 서버도 409 로 막는다. */}
+                      {r.userId && (
+                        <button
+                          className="admin-mini chatmod-danger"
+                          style={{ marginLeft: 6 }}
+                          disabled={busyId === r.id}
+                          onClick={() => openSanction(r, false)}
+                          title={`지금 제재하면 ${r.sanctionNth + 1}차`}
+                        >
+                          제재 {r.sanctionNth > 0 && `(${r.sanctionNth + 1}차)`}
+                        </button>
+                      )}
                       {/* 완전삭제는 숨김 여부와 무관하게 항상 낸다 — 이미 숨긴 글도 지워야 할 때가 있다. */}
                       <button
                         className="admin-mini chatmod-danger"
                         style={{ marginLeft: 6 }}
                         disabled={busyId === r.id}
-                        onClick={() => purgeRow(r)}
+                        onClick={() => openSanction(r, true)}
                       >
                         완전삭제
                       </button>
@@ -2677,6 +2780,87 @@ export function ChatModAdmin() {
           <button className="admin-mini" disabled={offset + CHAT_PAGE >= total || loading} onClick={() => load(tab, room, offset + CHAT_PAGE)}>
             다음 ›
           </button>
+        </div>
+      )}
+
+      {/* 제재 / 완전삭제 모달 — 사유를 고르는 자리.
+          ⚠️ **기간을 고르는 칸이 없다.** 1·3·7·30·90·영구 사다리가 정하고, 90일 무위반이면 한 칸
+             내려간다. 관리자마다 다른 잣대가 되지 않게 일부러 뺀 것이니 되살리지 말 것. */}
+      {sanctionFor && (
+        <div className="chatmod-overlay" onClick={() => busyId == null && setSanctionFor(null)}>
+          <div className="chatmod-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h3>{sanctionFor.purge ? '완전삭제' : '제재'}</h3>
+
+            <p className="chatmod-target">
+              <b>{sanctionFor.row.displayName}</b>
+              {' · '}
+              {sanctionFor.purge && !sWithSanction
+                ? '제재 없이 글만 지웁니다'
+                : `${sanctionFor.row.sanctionNth + 1}차 제재`}
+            </p>
+            <blockquote className="chatmod-quote">{(sanctionFor.row.body ?? '(내용 없음)').slice(0, 120)}</blockquote>
+
+            {sanctionFor.purge && (
+              <p className="chatmod-warn">
+                완전삭제는 되돌릴 수 없습니다. 이 메시지와 딸린 신고 {sanctionFor.row.reportCount}건을 지웁니다.
+              </p>
+            )}
+
+            {/* 완전삭제 + 제재 동반 여부. 기본 켬 — 보통은 남의 개인정보·불법물 유포다.
+                끄는 경우: 본인이 실수로 자기 연락처를 올려 지워달라고 한 건. */}
+            {sanctionFor.purge && (
+              <label className="chatmod-check">
+                <input type="checkbox" checked={sWithSanction} onChange={(e) => setSWithSanction(e.target.checked)} />
+                제재도 함께 (끄면 글만 지우고 차수는 안 올라갑니다)
+              </label>
+            )}
+
+            {(!sanctionFor.purge || sWithSanction) && (
+              <>
+                <div className="chatmod-reasons">
+                  {SANCTION_REASONS.map((x) => (
+                    <label key={x.code}>
+                      <input
+                        type="radio"
+                        name="chatmod-reason"
+                        value={x.code}
+                        checked={sReason === x.code}
+                        onChange={() => setSReason(x.code)}
+                      />
+                      {x.label}
+                    </label>
+                  ))}
+                </div>
+                <p className="chatmod-hint">고른 사유는 사용자에게 각자의 언어로 그대로 보입니다.</p>
+
+                <textarea
+                  className="chatmod-note"
+                  value={sNote}
+                  onChange={(e) => setSNote(e.target.value)}
+                  maxLength={1000}
+                  placeholder="내부 메모 (선택) — 사용자에게 안 보입니다"
+                />
+
+                {/* 도배는 신고 1건에 글이 30개다. 반대로 욕설 한 마디에 켜면 그 사람의 멀쩡한 옛 글까지
+                    사라져 남들 대화 맥락이 뚫린다 → 기본 꺼짐. */}
+                {!sanctionFor.purge && (
+                  <label className="chatmod-check">
+                    <input type="checkbox" checked={sHideAll} onChange={(e) => setSHideAll(e.target.checked)} />
+                    이 사람 글 전부 숨기기 (도배일 때만)
+                  </label>
+                )}
+              </>
+            )}
+
+            <div className="chatmod-actions">
+              <button className="admin-mini" onClick={() => setSanctionFor(null)} disabled={busyId != null}>
+                취소
+              </button>
+              <button className="admin-mini chatmod-danger" onClick={submitSanction} disabled={busyId != null}>
+                {busyId != null ? '처리 중…' : sanctionFor.purge ? '완전삭제' : '제재'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

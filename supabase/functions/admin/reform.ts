@@ -1136,19 +1136,11 @@ async function bannedWordSave(admin: any, body: any, ctx: Ctx) {
   invalidateBannedWords()
   return json({ ok: true })
 }
-async function suspendUser(admin: any, body: any, ctx: Ctx) {
-  const uid = String(body?.userId ?? '')
-  if (!uid) return json({ error: '유저를 지정하세요.' }, 400)
-  const days = Number(body?.days ?? 0)
-  // days=0 이면 정지 해제. 사유는 정지할 때만 필수다.
-  if (days > 0 && !String(body?.reason ?? '').trim()) return json({ error: '정지 사유를 적어주세요.' }, 400)
-  const until = days > 0 ? new Date(Date.now() + days * 86400e3).toISOString() : null
-  const { error } = await admin.from('profiles').update({
-    suspended_until: until, suspended_reason: days > 0 ? String(body.reason) : null,
-  }).eq('id', uid)
-  if (error) return json({ error: error.message }, 500)
-  return json({ ok: true })
-}
+// ⛔ 옛 `suspendUser` 는 2026-09-10 에 없앴다 — 대체는 `admin/index.ts` 의 `chatSanction` 이다.
+//    이 함수는 기간(days)과 사유(자유 텍스트)를 **요청으로 받아** `profiles.suspended_until` 을 직접
+//    썼다. 그대로 두면 사다리를 우회하는 두 번째 경로가 되어, `chat_sanctions` 의 차수와 실제 정지가
+//    갈린다(3차인 사람이 이걸로 1일만 먹거나, 기록 없이 정지가 걸린다). 걸 수 있는 길은 하나여야 한다.
+//    ⚠️ 화면 연결도 원래 0곳이었다(만들어놓고 버튼을 안 붙였다) — 지우면서 잃는 기능이 없다.
 
 // ── 인증서(자격증) 관리 ──────────────────────────────────────
 // 발급 현황 = 합격한 응시. 자격번호가 있으면 발급 완료, 없으면 미발급.
@@ -1668,7 +1660,7 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'alertUpdate': return await alertUpdate(admin, body)
     case 'bannedWordList': return await bannedWordList(admin)
     case 'bannedWordSave': return await bannedWordSave(admin, body, ctx)
-    case 'suspendUser': return await suspendUser(admin, body, ctx)
+    // 'suspendUser' 는 없앴다 — 채팅 제재는 `chatSanction`(admin/index.ts) 하나로만 건다(위 주석).
     case 'certList': return await certList(admin, body)
     case 'certConditions': return await certConditions(admin)
     case 'certConditionsSave': return await certConditionsSave(admin, body, ctx)
