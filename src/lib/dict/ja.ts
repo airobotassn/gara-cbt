@@ -1851,6 +1851,9 @@ const JA: Record<string, string> = {
   "hub.part.skin_office_city": "オフィス・シティラウンジ",
   "hub.part.skin_campus_day": "キャンパス・昼",
   "hub.part.skin_campus_sunset": "キャンパス・夕焼け",
+  "hub.part.skin_campus_classroom": "キャンパス・高校の教室",
+  "hub.part.skin_campus_lecture": "キャンパス・大学講義室",
+  "hub.part.skin_campus_garden": "キャンパス・庭園",
   // 쿠폰함
 
   // 칭호

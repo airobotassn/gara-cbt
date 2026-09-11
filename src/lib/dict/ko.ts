@@ -1881,6 +1881,9 @@ const KO: Record<string, string> = {
   "hub.part.skin_office_city": "오피스 · 도심 라운지",
   "hub.part.skin_campus_day": "캠퍼스 · 낮",
   "hub.part.skin_campus_sunset": "캠퍼스 · 노을",
+  "hub.part.skin_campus_classroom": "캠퍼스 · 고등학교 교실",
+  "hub.part.skin_campus_lecture": "캠퍼스 · 대학 강의실",
+  "hub.part.skin_campus_garden": "캠퍼스 · 정원",
   // 쿠폰함
 
   // 칭호

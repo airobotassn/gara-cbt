@@ -1851,6 +1851,9 @@ const VI: Record<string, string> = {
   "hub.part.skin_office_city": "Văn phòng · Sảnh thành phố",
   "hub.part.skin_campus_day": "Khuôn viên · Ban ngày",
   "hub.part.skin_campus_sunset": "Khuôn viên · Hoàng hôn",
+  "hub.part.skin_campus_classroom": "Khuôn viên · Lớp học cấp ba",
+  "hub.part.skin_campus_lecture": "Khuôn viên · Giảng đường",
+  "hub.part.skin_campus_garden": "Khuôn viên · Khu vườn",
   // 쿠폰함
 
   // 칭호

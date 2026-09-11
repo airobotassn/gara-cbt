@@ -1851,6 +1851,9 @@ const HI: Record<string, string> = {
   "hub.part.skin_office_city": "ऑफ़िस · सिटी लाउंज",
   "hub.part.skin_campus_day": "कैंपस · दिन",
   "hub.part.skin_campus_sunset": "कैंपस · सूर्यास्त",
+  "hub.part.skin_campus_classroom": "कैंपस · हाई स्कूल क्लासरूम",
+  "hub.part.skin_campus_lecture": "कैंपस · लेक्चर हॉल",
+  "hub.part.skin_campus_garden": "कैंपस · बगीचा",
   // 쿠폰함
 
   // 칭호

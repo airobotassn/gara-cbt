@@ -1851,6 +1851,9 @@ const ZH: Record<string, string> = {
   "hub.part.skin_office_city": "办公室 · 都市休息区",
   "hub.part.skin_campus_day": "校园 · 白天",
   "hub.part.skin_campus_sunset": "校园 · 晚霞",
+  "hub.part.skin_campus_classroom": "校园 · 高中教室",
+  "hub.part.skin_campus_lecture": "校园 · 大学阶梯教室",
+  "hub.part.skin_campus_garden": "校园 · 花园",
   // 쿠폰함
 
   // 칭호

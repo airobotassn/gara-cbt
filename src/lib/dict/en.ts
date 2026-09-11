@@ -1851,6 +1851,9 @@ const EN: Record<string, string> = {
   "hub.part.skin_office_city": "Office · City Lounge",
   "hub.part.skin_campus_day": "Campus · Day",
   "hub.part.skin_campus_sunset": "Campus · Sunset",
+  "hub.part.skin_campus_classroom": "Campus · High School Classroom",
+  "hub.part.skin_campus_lecture": "Campus · Lecture Hall",
+  "hub.part.skin_campus_garden": "Campus · Garden",
   // 쿠폰함
 
   // 칭호

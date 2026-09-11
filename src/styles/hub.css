@@ -795,6 +795,10 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='lab_factory']          { --skin-bg: url('/hub/bg-lab-factory.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='lab_atrium']           { --skin-bg: url('/hub/bg-lab-atrium.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='office_city']          { --skin-bg: url('/hub/bg-office-city.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+/* 학교 3장 더 (2026-09-11) — 교실·강의실은 실내 바닥, 정원은 마당. 같은 판·같은 값이다. */
+.hub[data-skin='campus_classroom']     { --skin-bg: url('/hub/bg-campus-classroom.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_lecture']       { --skin-bg: url('/hub/bg-campus-lecture.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_garden']        { --skin-bg: url('/hub/bg-campus-garden.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
    ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 이름이 아니라 **`data-ui` 가 같기 때문**이다.

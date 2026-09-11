@@ -412,6 +412,32 @@ export const SKINS: SkinDef[] = [
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-campus-sunset.webp',
   },
+  // 학교 3장 더 (2026-09-11 · Z:「학교 스킨」폴더) — 고등학교 교실 · 대학 강의실 · 캠퍼스 정원.
+  //   ⚠️ 폴더의「대학교 캠퍼스」·「황금빛노을 대학 캠퍼스광장」은 위 캠퍼스 낮·노을과 같은 그림이라 안 넣었다.
+  {
+    key: 'campus_classroom',
+    partKey: 'skin_campus_classroom',
+    ui: 'office',
+    category: 'campus',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-campus-classroom.webp',
+  },
+  {
+    key: 'campus_lecture',
+    partKey: 'skin_campus_lecture',
+    ui: 'office',
+    category: 'campus',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-campus-lecture.webp',
+  },
+  {
+    key: 'campus_garden',
+    partKey: 'skin_campus_garden',
+    ui: 'office',
+    category: 'campus',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-campus-garden.webp',
+  },
 ]
 
 export const DEFAULT_SKIN = SKINS[0].key
