@@ -55,6 +55,9 @@
    캐릭터 발끝(--skin-char-bottom)이 통 밖에 놓여 **도크(랭킹 판)를 덮는다**(2026-09-03 실기기). */
 .hub-scene { position: fixed; inset: 0; bottom: auto; height: 100svh; z-index: 0; pointer-events: none; overflow: hidden; }
 .hub[data-skin] .hub-scene-bg { position: absolute; inset: 0;
+  /* ⚠️ 여기에 z-index·isolation 을 주지 말 것 — 아래 ::before(흐린 층)는 z-index:-1 로 **부모(.hub-scene)의**
+     스택에 들어가야 이 요소의 배경 **뒤**에 깔린다. 이 요소가 스택을 만들면 -1 이 자기 배경 위로 올라와
+     화면 전체가 흐려진다(2026-09-11 실측). */
   background-image: var(--skin-bg);
   /* ⚠️ 기본값 cover 는 **세로 위치를 못 움직인다.** 폰처럼 세로로 긴 화면에서는 cover 가 그림 높이를
      화면에 꼭 맞춰서 세로로 넘치는 부분이 0이 되고, --skin-bg-pos 의 Y 를 뭘 넣든 그림이 그대로다.
@@ -62,6 +65,18 @@
      --skin-bg-pos 로 밀어야 한다(예: auto 115%). 두 값은 한 쌍이다. */
   background-size: var(--skin-bg-size, cover);
   background-position: var(--skin-bg-pos, 50% 50%); background-repeat: no-repeat; }
+/* 양옆 채움 (2026-09-11 지시 "양옆이 잘리는 게 낫다") — 오피스 계열 17장은 `auto 100%`(세로를 창에 꼭
+   맞춤)라 PC 의 납작한 창(탭·주소창을 뺀 1920×857 ≒ 2.24:1)에서는 16:9 그림이 창보다 좁아 **양옆이
+   남는다.** 그 자리를 같은 그림을 흐리게 깐 층으로 채운다 — 빈 띠도, 다른 색도 아니라 그림이 이어지는
+   것처럼 보인다. 폰처럼 그림보다 좁은 창에서는 선명한 층이 다 덮으므로 이 층은 안 그린다(블러는 GPU 비용).
+   ⚠️ 옛 값 `cover` 는 창이 그림보다 납작하면 **위를 잘랐다**(바닥 고정) — 1920×857 에서 원본 위 21%
+      (천장·빌딩 꼭대기)가 사라져 "배경이 왜 이렇게 크냐"가 됐다. 고궁·초원(`auto 130%`)은 일부러 키운
+      값이라 그대로다. */
+@media (min-aspect-ratio: 16/9) {
+  .hub[data-skin] .hub-scene-bg::before { content: ''; position: absolute; inset: -32px; z-index: -1;
+    background-image: var(--skin-bg); background-size: cover; background-position: 50% 50%;
+    filter: blur(18px) brightness(.92); }
+}
 /* 캐릭터 칸 — **키와 발끝 위치는 스킨이 정한다**(배경마다 지평선이 다르다).
    ⚠️ 폭을 aspect-ratio 로 잡지 않는다(2026-08-20). 캐릭터가 6종이 되면서 그림마다 비율이 달라졌고,
       칸에 비율을 박으면 그 비율이 아닌 그림은 옆으로 늘어난다. 칸은 넉넉히 두고 그림이
@@ -770,35 +785,39 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       광장이 죽었다(확대를 100%로 낮춰봤다가 "크기 줄이지 마", 위치를 `50% 0%` 까지 내려봤다가
       "너무 내림"). 답은 **간판이 세로 27% 로 내려온 그림을 새로 받는 것**이었고, 그러니
       다른 스킨과 똑같은 값에서 간판도 광장도 다 들어온다.
-   ⚠️ 그래서 이 그림을 갈 때의 조건: **간판이 세로 23% 아래, 광장이 세로 75% 위**에서 시작할 것. */
-.hub[data-skin='office']       { --skin-bg: url('/hub/bg-office.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='office_plaza'] { --skin-bg: url('/hub/bg-office-plaza.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+   ⚠️ 그래서 이 그림을 갈 때의 조건: **간판이 세로 23% 아래, 광장이 세로 75% 위**에서 시작할 것.
+   ⚠️ 확대는 `cover` → **`auto 100%`** 로 바꿨다(2026-09-11). cover 는 창이 그림보다 납작하면(PC 브라우저
+      1920×857) 가로에 맞춰 키우고 **위 21% 를 잘라** 천장·간판 윗부분이 사라졌다("배경이 왜 이렇게 크냐").
+      auto 100% 는 세로를 창에 꼭 맞춰 원본이 다 보이고, 남는 양옆은 위 `.hub-scene-bg::before` 가
+      흐린 같은 그림으로 채운다. 폰(창이 그림보다 좁음)에서는 둘이 같은 결과라 아무것도 안 바뀐다. */
+.hub[data-skin='office']       { --skin-bg: url('/hub/bg-office.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_plaza'] { --skin-bg: url('/hub/bg-office-plaza.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
 /* 사옥 안 두 장 + 캠퍼스 두 장 (2026-09-07). 위 둘과 같은 값 — 확대·위치를 따로 주지 말 것.
-   ⚠️ **cover 는 폰에서 가로 26%(x 37~63%)만 남긴다.** 실측: 390폭이면 배율이 세로에 잡혀
+   ⚠️ **폰에서는 가로 26%(x 37~63%)만 남는다**(auto 100% 도 cover 도 같다). 실측: 390폭이면 배율이 세로에 잡혀
       1499px 로 늘어나고 그중 390px 만 보인다. 그래서 그림 좌우 끝의 글자는 폰에서 통째로 사라진다 —
       `office_desk` 의 모아교육그룹 벽 로고(x 76~97%)와 `campus_day` 의 비석(x 7~22%)이 그 경우다.
       **가운데 26% 안에 볼 것이 있어야 한다**는 게 이 스킨 계열의 그림 조건이다.
    ⚠️ 발끝(22svh = 세로 78%)은 네 장 다 바닥 위에 떨어진다 — 그래서 값 블록을 새로 두지 않았다. */
-.hub[data-skin='office_desk']   { --skin-bg: url('/hub/bg-office-desk.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 50%; }
-.hub[data-skin='office_lounge'] { --skin-bg: url('/hub/bg-office-lounge.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='campus_day']    { --skin-bg: url('/hub/bg-campus-day.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='campus_sunset'] { --skin-bg: url('/hub/bg-campus-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_desk']   { --skin-bg: url('/hub/bg-office-desk.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_lounge'] { --skin-bg: url('/hub/bg-office-lounge.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_day']    { --skin-bg: url('/hub/bg-campus-day.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_sunset'] { --skin-bg: url('/hub/bg-campus-sunset.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
 /* 홈·오피스 8장 더 (2026-09-11). 전부 같은 판(1672×941)·같은 값 — 실내라 바닥이 아래 1/4 에 깔려 있어
    발끝(22svh)이 여덟 장 다 바닥 위에 떨어진다. 위 네 장과 같은 이유로 값 블록을 따로 두지 않았다.
    ⚠️ 집 셋(home_*)은 러그가 화면 한복판이라 폰의 가운데 26% 안에 볼 것이 있다. 연구실·아트리움은
       좌우의 로봇 팔이 폰에서 잘리지만 가운데 통로·원형 무대가 남는다 — 그림 조건은 만족한다. */
-.hub[data-skin='home_m']               { --skin-bg: url('/hub/bg-home-m.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='home_f']               { --skin-bg: url('/hub/bg-home-f.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='home_warm']            { --skin-bg: url('/hub/bg-home-warm.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='office_future_sunset'] { --skin-bg: url('/hub/bg-office-future-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='office_future_day']    { --skin-bg: url('/hub/bg-office-future-day.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='lab_factory']          { --skin-bg: url('/hub/bg-lab-factory.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='lab_atrium']           { --skin-bg: url('/hub/bg-lab-atrium.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='office_city']          { --skin-bg: url('/hub/bg-office-city.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='home_m']               { --skin-bg: url('/hub/bg-home-m.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='home_f']               { --skin-bg: url('/hub/bg-home-f.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='home_warm']            { --skin-bg: url('/hub/bg-home-warm.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_future_sunset'] { --skin-bg: url('/hub/bg-office-future-sunset.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_future_day']    { --skin-bg: url('/hub/bg-office-future-day.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='lab_factory']          { --skin-bg: url('/hub/bg-lab-factory.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='lab_atrium']           { --skin-bg: url('/hub/bg-lab-atrium.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_city']          { --skin-bg: url('/hub/bg-office-city.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
 /* 학교 3장 더 (2026-09-11) — 교실·강의실은 실내 바닥, 정원은 마당. 같은 판·같은 값이다. */
-.hub[data-skin='campus_classroom']     { --skin-bg: url('/hub/bg-campus-classroom.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='campus_lecture']       { --skin-bg: url('/hub/bg-campus-lecture.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='campus_garden']        { --skin-bg: url('/hub/bg-campus-garden.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_classroom']     { --skin-bg: url('/hub/bg-campus-classroom.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_lecture']       { --skin-bg: url('/hub/bg-campus-lecture.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='campus_garden']        { --skin-bg: url('/hub/bg-campus-garden.webp'); --skin-bg-size: auto 100%; --skin-bg-pos: 50% 100%; }
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
    ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 이름이 아니라 **`data-ui` 가 같기 때문**이다.
