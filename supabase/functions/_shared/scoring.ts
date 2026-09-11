@@ -417,17 +417,21 @@ export async function applyAttempt(
     computeSkillScore(clearedTop ? MAX_LEVEL : nextRank - 1),
   )
 
-  // demotion_strikes 컬럼은 강등 제거로 vestigial — 읽지도 쓰지도 않는다(default 0 유지).
-  await admin.from('user_progress').upsert(
+  // ⛔ `points` 를 이 upsert 에 다시 넣지 말 것 — `user_progress.points` 는 2026-09-04 에 드롭했다
+  //    (20260904460000). 그런데 이 줄을 안 빼서 upsert 가 PostgREST 400 으로 **조용히 실패**했고
+  //    (반환값을 안 받는다), 9/4~9/11 사이 레벨테스트에 합격한 사람의 등급·실력점수가 저장되지 않았다
+  //    (실측 2명이 Lv.1 합격 후 등급 1 그대로 — 2026-09-11 정정 + 백필). 응답의 `points` 는 계산값이라 그대로 둔다.
+  //    ⚠️ 이 upsert 의 error 를 이제 받는다 — 또 조용히 실패하면 안 된다.
+  const { error: progErr } = await admin.from('user_progress').upsert(
     {
       user_id: userId,
       rank: nextRank,
-      points,
       skill_score: skillScore,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id' },
   )
+  if (progErr) throw new Error(`user_progress upsert 실패: ${progErr.message}`)
 
   // ⛔ 옛 '레벨 최초 도달 시 LEVELUP10 쿠폰 1장' 발급은 2026-09-07 에 없앴다.
   //    쓸 방법이 없는 쿠폰이 계속 쌓이고 있었다 — 허브의 쿠폰함을 여는 버튼이 주석 처리돼 있었고,

@@ -612,11 +612,14 @@ function shapeFaq(f: any) {
 }
 
 async function faqList(admin: any) {
+  // ⚠️ 2026-09-04 에 `exam_rounds.sort` 를 지우면서 `.order('sort')` 를 일괄 치환했는데 이 자리까지
+  //    `exam_date` 로 바뀌어 버렸다 — faqs 에는 exam_date 가 없고 sort 는 살아 있다. 그래서 FAQ 목록이
+  //    PostgREST 400 으로 통째로 안 떴다(2026-09-11 발견·정정). 표마다 컬럼을 보고 고칠 것.
   const { data, error } = await admin
     .from('faqs')
     .select('*')
     .order('category', { ascending: true })
-    .order('exam_date', { ascending: true, nullsFirst: true })
+    .order('sort', { ascending: true })
     .order('created_at', { ascending: true })
   if (error) return json({ error: error.message }, 400)
   return json({ faqs: (data ?? []).map(shapeFaq) })
@@ -740,11 +743,13 @@ async function boardCatList(admin: any, body: any) {
   const kind = boardKindOf(body)
   if (!kind) return json({ error: 'kind 는 notice|faq' }, 400)
 
+  // ⚠️ faqList 와 같은 사고 — 2026-09-04 일괄 치환이 이 `.order('sort')` 도 exam_date 로 바꿨다.
+  //    board_categories 에는 sort 가 살아 있고 exam_date 는 없다(2026-09-11 정정).
   const { data: cats, error } = await admin
     .from('board_categories')
     .select('*')
     .eq('kind', kind)
-    .order('exam_date', { ascending: true, nullsFirst: true })
+    .order('sort', { ascending: true })
     .order('created_at', { ascending: true })
   if (error) return json({ error: error.message }, 400)
 
@@ -2797,11 +2802,14 @@ async function cbtUsers(admin: any) {
 async function cbtUserDetail(admin: any, body: any) {
   const uid = body?.userId
   if (!uid) return json({ error: 'userId 필요' }, 400)
+  // ⚠️ exam_attempts.created_at 은 2026-09-04 에 드롭했다(started_at 과 늘 같은 값). 정렬을 안 바꿔서
+  //    이 조회가 400 을 냈고 `atts` 가 undefined → 회원 상세의 응시 이력이 **항상 비어** 보였다(2026-09-11 정정).
+  //    에러를 안 받아서(`{ data }` 만 꺼냄) 화면에는 "이력 없음" 으로만 떴다.
   const { data: atts } = await admin
     .from('exam_attempts')
     .select('id, exam_id, status, total_correct, total_questions, pass_ratio_snapshot, submitted_at, started_at, result_release_at')
     .eq('user_id', uid)
-    .order('created_at', { ascending: false })
+    .order('started_at', { ascending: false })
     .limit(50)
   const examIds = [...new Set((atts ?? []).map((a: any) => a.exam_id).filter(Boolean))]
   const titleMap: Record<string, string> = {}

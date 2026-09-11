@@ -86,9 +86,13 @@ Deno.serve(async (req) => {
       for (let i = 0; i < chunks.length; i++) {
         const emb = embeddings[i]
         if (emb && emb.length) {
-          const { data: near } = await supabase.rpc('match_kb_chunks', {
+          // ⚠️ 이 RPC 는 2026-09-11 까지 **존재하지 않았다**(20260911120000 에서 만들었다). 그전엔 error 를
+          //    안 받아서 함수 없음 오류가 삼켜졌고 중복 검사가 한 번도 안 돌았다. 이제 error 면 던진다 —
+          //    조용히 건너뛰면 같은 자료가 겹겹이 쌓이는데 화면에는 아무 표시가 안 난다.
+          const { data: near, error: nearErr } = await supabase.rpc('match_kb_chunks', {
             query_embedding: emb, p_level: level, p_axis: null, match_count: 1,
           })
+          if (nearErr) throw new Error(`중복 검사 실패: ${nearErr.message}`)
           if (Array.isArray(near) && near[0] && near[0].similarity >= DEDUP) { skipped++; continue }
         }
         rows.push(mkRow(chunks[i], emb ?? null))

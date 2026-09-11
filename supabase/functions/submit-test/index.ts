@@ -114,7 +114,9 @@ Deno.serve(async (req) => {
     //    각 UPDATE 는 `.eq('id', row.id)` 로 서로 다른 행 하나씩만 건드려 의존이 없다.
     // ⛔ **한 건이라도 실패하면 제출을 확정하지 않는다.** 아래 제출 확정·등급 반영이 이어서 도는데,
     //    답안이 반만 써진 채로 그게 돌면 점수와 답안이 어긋난 기록이 남는다.
-    const writes: Promise<{ error: { message: string } | null }>[] = []
+    // PostgrestFilterBuilder 는 thenable 이지 Promise 가 아니라 Promise<…> 로 선언하면 deno check 가 막힌다
+    // (배포는 타입 검사를 안 해서 여태 지나갔다). PromiseLike 면 await/Promise.all 둘 다 그대로 된다.
+    const writes: PromiseLike<{ error: { message: string } | null }>[] = []
     for (const row of assigned as any[]) {
       const cat = row.category as string
       totalByCat[cat] = (totalByCat[cat] ?? 0) + 1

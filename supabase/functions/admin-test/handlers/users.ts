@@ -68,9 +68,12 @@ export async function userDetail(admin: any, body: any) {
   const uid = body.userId
   if (!uid) return json({ error: 'userId 필요' }, 400)
   const [attRes, skillRes, progRes, profRes] = await Promise.all([
+    // ⚠️ test_attempts.created_at 은 2026-09-04 에 드롭했다(started_at 과 늘 같은 값). attempts.ts 는 그날
+    //    별칭(created_at:started_at)으로 바꿨는데 이 자리를 빠뜨려서 조회가 400 → 응시 이력이 **항상 비어**
+    //    보였다(2026-09-11 정정). 응답 필드 이름은 화면이 쓰던 그대로 별칭으로 유지한다.
     admin.from('test_attempts')
-      .select('id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at')
-      .eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
+      .select('id, level, lang, status, total_correct, total_questions, rank_before, rank_after, rank_dir, violation_count, violations, end_reason, submitted_at, created_at:started_at')
+      .eq('user_id', uid).order('started_at', { ascending: false }).limit(50),
     // ⚠️ order 필수 — 없으면 DB 반환 순서 그대로라 화면에 Lv.7→4→5→6→2→3→1 로 뒤섞여 나온다.
     admin.from('user_level_skill').select('level, ratings, attempts_count, placed')
       .eq('user_id', uid).order('level', { ascending: true }),
