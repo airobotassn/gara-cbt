@@ -24,7 +24,8 @@
 //   3) UI 를 새로 입힐 거면 `SkinUi` 에 이름을 하나 더 만들고 `hub.css` 에 `[data-ui='<이름>']`
 //      값 블록 + 규칙 한 벌(기존 palace 블록을 복사해 값만 갈면 된다).
 //      기존 벌을 그대로 쓸 거면 `ui` 에 그 이름만 적는다.
-//   4) 이 파일 `SKINS` 에 한 줄.
+//   4) 이 파일 `SKINS` 에 한 줄 — `category` 를 꼭 적는다(상점·보관함 칩이 그걸로 거른다).
+//      새 묶음이면 `SKIN_CATEGORIES` 에 이름 하나 + 사전 `hub.closet.cat_<이름>`(6개국어).
 //   5) `shop_catalog` 에 한 행 + 사전 `hub.part.skin_<key>`.
 
 import { supabase } from './supabase'
@@ -217,6 +218,20 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  */
 export type SkinUi = 'base' | 'palace' | 'office'
 
+/**
+ * 배경 **카테고리** — 상점·보관함의 배경 칩 필터가 이 축으로 거른다(2026-09-11).
+ * 배경이 17장이 되면서 한 격자에 다 늘어놓기엔 길어져서 생긴 축이다.
+ *
+ * ⚠️ **UI 한 벌(`ui`)과는 다른 축이다.** 홈·오피스 12장이 전부 `ui: 'office'` 라 지금은 겹쳐 보이지만,
+ *    카테고리는 "손님이 고르는 묶음"이고 `ui` 는 "판·게이지·아이콘을 어느 그림으로 그리나"다.
+ *    고궁 낮·밤도 `ui: 'palace'` 와 카테고리 `palace` 가 우연히 같은 이름일 뿐이다.
+ * ⚠️ 순서가 곧 칩 순서다. 라벨은 사전 `hub.closet.cat_<키>`(6개국어).
+ * ⚠️ `basic` 은 초원(기본) 하나뿐이고 상점엔 안 뜬다(비판매) — 그래서 칩은 **그 탭에 항목이 있는
+ *    카테고리만** 그린다(빈 칩을 눌러 빈 격자를 보게 하지 않는다).
+ */
+export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus'] as const
+export type SkinCategory = (typeof SKIN_CATEGORIES)[number]
+
 export interface SkinDef {
   /** `data-skin` 값 = 배경 값 블록 이름(`hub.css` 의 `.hub[data-skin='<키>']`) */
   key: string
@@ -224,6 +239,8 @@ export interface SkinDef {
   partKey: string
   /** 입는 UI 한 벌 = `data-ui` 값. 같은 벌을 쓰는 스킨끼리 CSS 를 통째로 공유한다. */
   ui: SkinUi
+  /** 상점·보관함 칩 필터의 묶음. 그림·수치와 같이 코드에 산다(가격만 DB 라는 2026-08-20 선 그대로). */
+  category: SkinCategory
   /** 레일 아이콘 폴더 — CSS 변수로 못 넘기는 유일한 자리(`<img src>` 라 코드가 알아야 한다).
    *  null 이면 원래 쓰던 SVG 아이콘으로 돌아간다(= `ui: 'base'` 와 한 쌍). */
   iconDir: string | null
@@ -247,6 +264,7 @@ export const SKINS: SkinDef[] = [
   {
     key: 'meadow',
     partKey: 'skin_meadow',
+    category: 'basic',
     // 기본 초원은 옛 CSS 카드·게이지와 SVG 아이콘을 한 세트로 쓴다 — 그래서 아이콘 폴더가 없다.
     ui: 'base',
     iconDir: null,
@@ -259,6 +277,7 @@ export const SKINS: SkinDef[] = [
     key: 'palace_day',
     partKey: 'skin_palace_day',
     ui: 'palace',
+    category: 'palace',
     iconDir: '/hub/ui',
     bg: '/hub/bg-v2.webp',
   },
@@ -266,6 +285,7 @@ export const SKINS: SkinDef[] = [
     key: 'palace_night',
     partKey: 'skin_palace_night',
     ui: 'palace',
+    category: 'palace',
     iconDir: '/hub/ui',
     bg: '/hub/bg-v5.webp',
   },
@@ -276,6 +296,7 @@ export const SKINS: SkinDef[] = [
     key: 'office',
     partKey: 'skin_office',
     ui: 'office',
+    category: 'office',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office.webp',
   },
@@ -283,6 +304,7 @@ export const SKINS: SkinDef[] = [
     key: 'office_plaza',
     partKey: 'skin_office_plaza',
     ui: 'office',
+    category: 'office',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-plaza.webp',
   },
@@ -293,6 +315,7 @@ export const SKINS: SkinDef[] = [
     key: 'office_desk',
     partKey: 'skin_office_desk',
     ui: 'office',
+    category: 'office',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-desk.webp',
   },
@@ -300,14 +323,84 @@ export const SKINS: SkinDef[] = [
     key: 'office_lounge',
     partKey: 'skin_office_lounge',
     ui: 'office',
+    category: 'office',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-lounge.webp',
+  },
+  // 홈·오피스 8장 더 (2026-09-11 · Z:「홈·오피스 스킨」폴더). 전부 오피스 UI 벌을 그대로 입는다.
+  //   집 셋(남·여 방 + 따뜻한 거실) · 미래형 오피스 노을·낮 · 스마트팩토리 연구실·아트리움 · 도심 라운지.
+  //   ⚠️ 폴더의「오피스 스킨.png」는 위 `office_lounge` 와 같은 그림이라(픽셀 대조) 안 넣었다.
+  //   ⚠️ 이름은 파일명을 따랐다 — 상점에 뜨는 글자는 사전 `hub.part.skin_*` 이라 언제든 바꿀 수 있다.
+  {
+    key: 'home_m',
+    partKey: 'skin_home_m',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-home-m.webp',
+  },
+  {
+    key: 'home_f',
+    partKey: 'skin_home_f',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-home-f.webp',
+  },
+  {
+    key: 'home_warm',
+    partKey: 'skin_home_warm',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-home-warm.webp',
+  },
+  {
+    key: 'office_future_sunset',
+    partKey: 'skin_office_future_sunset',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-future-sunset.webp',
+  },
+  {
+    key: 'office_future_day',
+    partKey: 'skin_office_future_day',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-future-day.webp',
+  },
+  {
+    key: 'lab_factory',
+    partKey: 'skin_lab_factory',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-lab-factory.webp',
+  },
+  {
+    key: 'lab_atrium',
+    partKey: 'skin_lab_atrium',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-lab-atrium.webp',
+  },
+  {
+    key: 'office_city',
+    partKey: 'skin_office_city',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-city.webp',
   },
   // 캠퍼스 낮·노을 — 같은 광장의 두 시간대. 고궁 낮·밤과 같은 짝이다.
   {
     key: 'campus_day',
     partKey: 'skin_campus_day',
     ui: 'office',
+    category: 'campus',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-campus-day.webp',
   },
@@ -315,6 +408,7 @@ export const SKINS: SkinDef[] = [
     key: 'campus_sunset',
     partKey: 'skin_campus_sunset',
     ui: 'office',
+    category: 'campus',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-campus-sunset.webp',
   },

@@ -783,6 +783,18 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='office_lounge'] { --skin-bg: url('/hub/bg-office-lounge.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_day']    { --skin-bg: url('/hub/bg-campus-day.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_sunset'] { --skin-bg: url('/hub/bg-campus-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+/* 홈·오피스 8장 더 (2026-09-11). 전부 같은 판(1672×941)·같은 값 — 실내라 바닥이 아래 1/4 에 깔려 있어
+   발끝(22svh)이 여덟 장 다 바닥 위에 떨어진다. 위 네 장과 같은 이유로 값 블록을 따로 두지 않았다.
+   ⚠️ 집 셋(home_*)은 러그가 화면 한복판이라 폰의 가운데 26% 안에 볼 것이 있다. 연구실·아트리움은
+      좌우의 로봇 팔이 폰에서 잘리지만 가운데 통로·원형 무대가 남는다 — 그림 조건은 만족한다. */
+.hub[data-skin='home_m']               { --skin-bg: url('/hub/bg-home-m.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='home_f']               { --skin-bg: url('/hub/bg-home-f.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='home_warm']            { --skin-bg: url('/hub/bg-home-warm.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_future_sunset'] { --skin-bg: url('/hub/bg-office-future-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_future_day']    { --skin-bg: url('/hub/bg-office-future-day.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='lab_factory']          { --skin-bg: url('/hub/bg-lab-factory.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='lab_atrium']           { --skin-bg: url('/hub/bg-lab-atrium.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_city']          { --skin-bg: url('/hub/bg-office-city.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
    ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 이름이 아니라 **`data-ui` 가 같기 때문**이다.
@@ -1391,6 +1403,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 
 .hub .closet-group + .closet-group { margin-top: 20px; }
 .hub .closet-group-h { margin: 0 0 9px; font-size: 14.5px; font-weight: 900; color: var(--ink); }
+
+/* 배경 칩 필터 — 그룹 제목 밑, 격자 위 한 줄(2026-09-11). 위 탭보다 한 단 작고 가벼운 알약이다 —
+   같은 크기면 탭이 두 줄로 보인다. 폰에서 칩이 넘치면 줄바꿈한다(가로 스크롤은 손가락으로 못 찾는다). */
+.hub .closet-cats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.hub .closet-cat { padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--card); border: 2px solid var(--line); color: var(--ink2);
+  font-family: inherit; font-size: 12.5px; font-weight: 800; line-height: 1.2; }
+.hub .closet-cat.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 
 /* 인벤토리 칸 — 눌러서 갈아입는다. 지금 입은 것은 눌리지 않고 테두리로 표시된다. */
 .hub .closet-item { display: flex; flex-direction: column; align-items: center; gap: 6px;

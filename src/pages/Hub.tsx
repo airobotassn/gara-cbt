@@ -32,7 +32,8 @@ import { rememberPostLogin } from '../lib/postLogin'
 import { loadAdminMe } from '../lib/adminMe'
 import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName, charScale,
-  DEFAULT_SKIN_PART, SKINS, isCharKey, isSkinKey, skinByPart, skinThumb,
+  DEFAULT_SKIN_PART, SKINS, SKIN_CATEGORIES, isCharKey, isSkinKey, skinByPart, skinThumb,
+  type SkinCategory,
 } from '../lib/hubCosmetics'
 import { lastLook, saveLook } from '../lib/lastLook'
 
@@ -115,6 +116,33 @@ const CLOSET_GROUPS: { kind: string; labelKey: string }[] = [
   { kind: 'skin', labelKey: 'hub.closet.g_skin' },
   { kind: 'part', labelKey: 'hub.closet.g_part' },
 ]
+
+/**
+ * 배경 칩 필터 — 상점·보관함의 배경 격자 위에 한 줄(2026-09-11). 배경이 17장이 되면서 한 격자에
+ * 다 늘어놓기엔 길어져서 생겼다. `전체` + **그 탭에 실제로 있는 카테고리만** 칩으로 선다 —
+ * 상점엔 초원(비판매)이 없으니 '기본' 칩이 없고, 보관함엔 산 묶음만 뜬다. 칩이 하나뿐이면 아예 안 그린다.
+ */
+type SkinCatFilter = SkinCategory | 'all'
+function skinCatsIn(partKeys: string[]): SkinCategory[] {
+  const present = new Set(partKeys.map((k) => skinByPart(k).category))
+  return SKIN_CATEGORIES.filter((c) => present.has(c))
+}
+function SkinCatChips({ cats, value, onChange, t }: {
+  cats: SkinCategory[]; value: SkinCatFilter; onChange: (c: SkinCatFilter) => void; t: (k: string) => string
+}) {
+  if (cats.length < 2) return null
+  const all: SkinCatFilter[] = ['all', ...cats]
+  return (
+    <div className="closet-cats" role="tablist">
+      {all.map((c) => (
+        <button key={c} type="button" role="tab" aria-selected={value === c}
+          className={`closet-cat${value === c ? ' on' : ''}`} onClick={() => onChange(c)}>
+          {t(c === 'all' ? 'hub.closet.cat_all' : `hub.closet.cat_${c}`)}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 /** 상점 썸네일 — 종류마다 그림이 다르다(캐릭터=그림 / 스킨=배경 / 그 외=이모지·가구 그림). */
 function CosmeticThumb({ partKey, level }: { partKey: string; level: number }) {
@@ -367,6 +395,10 @@ export default function Hub() {
   } | null>(null)
   const [modal, setModal] = useState<ModalKind | null>(null)
   const [closetTab, setClosetTab] = useState<ClosetTab>('shop')
+  // 배경 칩 필터 — 상점·보관함이 하나를 같이 쓴다(탭을 오가도 고른 묶음이 유지된다).
+  //   ⚠️ 고른 묶음이 그 탭에 없으면(보관함에서 '기본'을 고르고 상점으로) 그 탭에서는 '전체'로 본다 —
+  //      값은 안 바꾼다. 빈 격자를 보여주는 것도, 사용자가 안 누른 값으로 되돌리는 것도 안 한다.
+  const [skinCat, setSkinCat] = useState<SkinCatFilter>('all')
   // ── 꾸미기(캐릭터·스킨) ──
   // 장착값. 서버(get-hub)가 권위고 화면은 낙관적으로 먼저 반영한 뒤 hydrate 로 맞춘다.
   // ⚠️ 마지막에 본 모습으로 시작한다 — 안 그러면 기본배경+기본UI+폴백캐릭터 조합이 먼저 떴다가 덮인다.
@@ -879,6 +911,8 @@ export default function Hub() {
   const knownChars = [...new Set([...CHAR_KEYS, ...uploadedCharKeys()])]
   const ownedChars = [...new Set([...knownChars.filter((k) => owned.has(k)), ...[...owned].filter(isCharKey)])]
   const ownedSkins = SKINS.filter((s) => s.partKey === DEFAULT_SKIN_PART || owned.has(s.partKey))
+  const ownedSkinCats = skinCatsIn(ownedSkins.map((s) => s.partKey))
+  const ownedSkinCat: SkinCatFilter = ownedSkinCats.includes(skinCat as SkinCategory) ? skinCat : 'all'
   // 첫 진입 흐름 — 순서가 곧 규칙이다: 캐릭터를 고른 다음에 튜토리얼.
   //   ⚠️ null(아직 모름)일 때는 **아무것도 띄우지 않는다.** false 로 판정하면 하이드레이트 전 한 프레임에
   //      이미 끝낸 사람 화면에도 선택창이 번쩍인다.
@@ -1225,11 +1259,17 @@ export default function Hub() {
               // 진열 순서는 서버(sort_order)가 정하므로 여기서 다시 정렬하지 않는다.
               <>
                 {CLOSET_GROUPS.map(({ kind, labelKey }) => {
-                  const items = catalog.filter((c) => (c.kind ?? 'part') === kind)
-                  if (!items.length) return null
+                  const all = catalog.filter((c) => (c.kind ?? 'part') === kind)
+                  if (!all.length) return null
+                  // 배경만 칩으로 거른다 — 캐릭터·아이템은 아직 한 격자에 들어가는 수다.
+                  const cats = kind === 'skin' ? skinCatsIn(all.map((c) => c.partKey)) : []
+                  const cat: SkinCatFilter = cats.includes(skinCat as SkinCategory) ? skinCat : 'all'
+                  const items = kind === 'skin' && cat !== 'all'
+                    ? all.filter((c) => skinByPart(c.partKey).category === cat) : all
                   return (
                     <div key={kind} className="closet-group">
                       <h4 className="closet-group-h">{t(labelKey)}</h4>
+                      {kind === 'skin' && <SkinCatChips cats={cats} value={cat} onChange={setSkinCat} t={t} />}
                       <div className="hub-modal-grid">
                         {items.map((c) => {
                           const has = owned.has(c.partKey)
@@ -1289,8 +1329,9 @@ export default function Hub() {
 
               <div className="closet-group">
                 <h4 className="closet-group-h">{t('hub.closet.g_skin')}</h4>
+                <SkinCatChips cats={ownedSkinCats} value={ownedSkinCat} onChange={setSkinCat} t={t} />
                 <div className="hub-modal-grid">
-                  {ownedSkins.map((sk) => (
+                  {(ownedSkinCat === 'all' ? ownedSkins : ownedSkins.filter((s) => s.category === ownedSkinCat)).map((sk) => (
                     <div key={sk.partKey} className={`closet-item${skinPart === sk.partKey ? ' on' : ''}`}>
                       <button className="closet-item-thumb pv-open" onClick={() => openPreview(sk.partKey)} aria-label={t('hub.closet.preview')}>
                         <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
