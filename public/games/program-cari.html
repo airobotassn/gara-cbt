@@ -127,7 +127,7 @@ body{
 .console .program::-webkit-scrollbar{display:none;}
 .console .program{gap:6px}.console .slot.simple{width:43px;height:43px;padding:0;font-size:0;line-height:0;text-shadow:none;background-size:41px 41px!important;background-position:center!important;box-shadow:none;}
 .console .slot.simple>div:last-child{display:none;}
-.console .slot.simple .ic{display:none}.mini:not(.iff):not(.dot):not(.txt){font-size:0;}
+.console .slot.simple .ic{display:none}.mini:not(.iff):not(.dot):not(.chip){font-size:0;}
 .console .slot.block.lp{background:linear-gradient(145deg,#f3a512,#a95d00)!important;border:1px solid #ffd76b;}.console .slot.block.iff{background:linear-gradient(145deg,#ed6a52,#9f3024)!important;border:1px solid #ffad9e;}
 .program.empty{align-items:center;justify-content:center;}
 .program.empty::before{content:attr(data-empty);color:#bfe8ff;font-size:13px;font-weight:850;letter-spacing:.02em;transform:translateY(-5px);}
@@ -158,22 +158,22 @@ body{
 .mini.iff .mini{width:20px;height:20px;border-radius:5px;}
 .mini.iff.open{outline:2px solid #ffd54a;outline-offset:1px;}
 .mini.dot{font-size:12px!important;color:#fff;background:rgba(0,0,0,.18)!important;}
-/* 글자 블록 */
-.console .slot.simple.txt,.mini.txt{width:auto!important;min-width:0;height:32px!important;padding:0 8px!important;font-size:12px!important;line-height:32px!important;font-weight:850;color:#fff;white-space:nowrap;border-radius:8px;
-  background-size:auto!important;text-shadow:0 1px 2px rgba(0,0,0,.35);box-shadow:0 2px 0 rgba(0,0,0,.25);}
-.mini.txt{height:28px!important;line-height:28px!important;font-size:11px!important;padding:0 6px!important;}
-.slot.txt.mv,.mini.txt.mv{background:linear-gradient(#3d8ff0,#1f5fc0)!important;}
-.slot.txt.tl,.mini.txt.tl{background:linear-gradient(#9a6ad6,#6b3fae)!important;}
-.slot.txt.tr,.mini.txt.tr{background:linear-gradient(#f0578f,#c22a66)!important;}
-.slot.txt.pk,.mini.txt.pk{background:linear-gradient(#f5bd3a,#d48a0e)!important;}
-.console .slot.block.txt{flex-direction:row;align-items:center;gap:4px;height:42px;max-height:none;padding:0 7px;border-radius:9px;}
-.slot.block.txt .cnt{margin:0;font-size:11.5px;padding:3px 7px;}
-.slot.block.txt .cnt.tut-on{transform:none;}
-.slot.block.txt .br{font-size:15px;font-weight:900;color:rgba(255,255,255,.85);line-height:1;}
-.slot.block.txt .body{background:transparent;padding:0;min-width:0;min-height:0;flex-wrap:nowrap;gap:3px;}
-.mini.iff.txt{height:auto!important;padding:2px 4px!important;gap:3px;}
-.mini.iff.txt .q{font-size:11px;padding:0 1px;}
-.mini.iff.txt .br{font-size:13px;font-weight:900;color:rgba(255,255,255,.85);}
+/* 글자 블록(문장 흐름) — 프로그램 칸이 두 줄 높이라 칩이 길면 다음 줄로 */
+.console .program.flow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;gap:4px 3px;padding:6px 8px;overflow:hidden;}
+.console .program.flow .chip{flex:0 0 auto;width:auto!important;min-width:0;height:28px!important;line-height:28px!important;padding:0 8px!important;font-size:12px!important;font-weight:850;color:#fff;white-space:nowrap;border-radius:7px;
+  background-size:auto!important;text-shadow:0 1px 2px rgba(0,0,0,.35);box-shadow:0 2px 0 rgba(0,0,0,.25);display:block;cursor:pointer;}
+.console .program.flow .chip.mv{background:linear-gradient(#3d8ff0,#1f5fc0)!important;}
+.console .program.flow .chip.tl{background:linear-gradient(#9a6ad6,#6b3fae)!important;}
+.console .program.flow .chip.tr{background:linear-gradient(#f0578f,#c22a66)!important;}
+.console .program.flow .chip.pk{background:linear-gradient(#f5bd3a,#d48a0e)!important;}
+.console .program.flow .chip.lp{background:linear-gradient(145deg,#f3a512,#a95d00)!important;border:1px solid #ffd76b;}
+.console .program.flow .chip.iff{background:linear-gradient(145deg,#ed6a52,#9f3024)!important;border:1px solid #ffad9e;}
+.console .program.flow .chip.br{padding:0 7px!important;font-size:14px!important;}
+.console .program.flow .chip.dot{background:rgba(255,255,255,.14)!important;color:#cfe3ff;padding:0 6px!important;}
+.console .program.flow .chip .cnt,.console .program.flow .chip .q{display:inline-block;margin:0;padding:1px 6px;font-size:11.5px;line-height:1.2;vertical-align:middle;border-radius:7px;background:#fff;}
+.console .program.flow .chip.lp .cnt{color:#e59b17;}.console .program.flow .chip.iff .cnt,.console .program.flow .chip.iff .q{color:#e0674a;}
+.console .program.flow .chip .cnt.tut-on{transform:none;}
+.console .program.flow .chip.open{outline:2.5px solid #ffd54a;outline-offset:1px;}
 .slot.open{outline:2.5px solid #ffd54a;outline-offset:1px;}
 
 /* palette */
@@ -463,17 +463,32 @@ const programEl=document.getElementById('program');
 /* 글자 블록(시안 · 2026-09-14): 프로그램 칸을 그림이 아니라 문장으로 — "전진 · 오른쪽 돌기 · 6번 반복 [ 만약 앞이 막히면 [오른쪽 돌기] · 전진 ]".
    ⚠️ 지금은 튜토리얼에서만 켜고 한국어만 박아 뒀다(번역 전). 본게임까지 갈지는 보고 정한다. */
 const txtMode=()=>tutOn;
-const TXT={MV:'전진',TL:'왼쪽 돌기',TR:'오른쪽 돌기',PK:'별 줍기'};
-const txtCount=n=>n+'번 반복', txtCond=c=>c==='blocked'?'만약 앞이 막히면':'만약 별이 있으면';
+const TXT={MV:'전진',TL:'왼쪽',TR:'오른쪽',PK:'별 줍기'};
+const txtCond=c=>c==='blocked'?'앞이 막히면':'별이 있으면';
+/* 문장 흐름: 블록을 한 덩어리로 묶지 않고 "2번 반복 [" · "앞이 막히면 [" · "오른쪽" · "]" · "전진" · "]" 칩으로 풀어 놓아 길면 다음 줄로 넘어간다(칸이 두 줄 높이). */
+function chipsHTML(list){
+  let out='';
+  list.forEach((ins,i)=>{
+    const open=openStack.includes(ins)?' open':'';
+    if(ins.op==='LP'||ins.op==='IF'){
+      const lab=ins.op==='LP'?`<span class="cnt">${ins.count}번</span> 반복 [`:`<span class="cnt">${txtCond(ins.cond)}</span> [`;
+      out+=`<div class="slot chip ${ins.op==='LP'?'lp':'iff'}${open}" data-i="${i}">${lab}</div>`;
+      if(!ins.body.length) out+='<div class="chip dot">·</div>';
+      ins.body.forEach((b,j)=>{
+        if(b.op==='IF'){
+          const o2=openStack.includes(b)?' open':'';
+          out+=`<div class="mini chip iff${o2}" data-parent="${i}" data-child="${j}"><span class="q">${txtCond(b.cond)}</span> [</div>`;
+          if(!b.body.length) out+='<div class="chip dot">·</div>';
+          for(const c of b.body) out+=`<div class="mini chip ${OPS[c.op].cls}">${TXT[c.op]}</div>`;
+          out+=`<div class="mini chip br iff${o2}" data-parent="${i}" data-child="${j}">]</div>`;
+        } else out+=`<div class="mini chip ${OPS[b.op].cls}" data-parent="${i}" data-child="${j}">${TXT[b.op]}</div>`;
+      });
+      out+=`<div class="slot chip br ${ins.op==='LP'?'lp':'iff'}${open}" data-i="${i}">]</div>`;
+    } else out+=`<div class="slot chip ${OPS[ins.op].cls}" data-i="${i}">${TXT[ins.op]}</div>`;
+  });
+  return out;
+}
 function miniHTML(ins,parentIdx,childIdx){
-  if(txtMode()){
-    if(ins.op==='IF'){
-      const inner=ins.body.map(b=>`<div class="mini txt ${OPS[b.op].cls}">${TXT[b.op]}</div>`).join('')||'<div class="mini dot">·</div>';
-      const open=openStack.includes(ins)?' open':'';
-      return `<div class="mini iff txt${open}" data-parent="${parentIdx}" data-child="${childIdx}"><span class="q">${txtCond(ins.cond)}</span><span class="br">[</span>${inner}<span class="br">]</span></div>`;
-    }
-    return `<div class="mini txt ${OPS[ins.op].cls}" data-parent="${parentIdx}" data-child="${childIdx}">${TXT[ins.op]}</div>`;
-  }
   if(ins.op==='IF'){
     // 반복 안의 조건은 알약 블록으로 — 조건 라벨(막힘?/별?) + 안에 넣은 명령을 그림 그대로. 글자 아이콘으로 접으면 뭘 넣었는지 안 보인다(2026-09-14 지적).
     const inner=ins.body.map(b=>`<div class="mini ${OPS[b.op].cls}"></div>`).join('')||'<div class="mini dot">·</div>';
@@ -483,15 +498,6 @@ function miniHTML(ins,parentIdx,childIdx){
   return `<div class="mini ${OPS[ins.op].cls}" data-parent="${parentIdx}" data-child="${childIdx}">${OPS[ins.op].ic}</div>`;
 }
 function slotHTML(ins,idx){
-  if(txtMode()){
-    const open=openStack.includes(ins)?' open':'';
-    if(ins.op==='LP'||ins.op==='IF'){
-      const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini dot">·</div>';
-      const lab=ins.op==='LP'?txtCount(ins.count):txtCond(ins.cond);
-      return `<div class="slot block txt ${ins.op==='LP'?'lp':'iff'}${open}" data-i="${idx}"><span class="cnt">${lab}</span><span class="br">[</span><div class="body">${body}</div><span class="br">]</span></div>`;
-    }
-    return `<div class="slot simple txt ${OPS[ins.op].cls}" data-i="${idx}">${TXT[ins.op]}</div>`;
-  }
   if(ins.op==='LP'){
     const open=openStack.includes(ins)?' open':'';
     const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
@@ -506,7 +512,8 @@ function slotHTML(ins,idx){
   return `<div class="slot simple ${o.cls}" data-i="${idx}"><div class="ic">${o.ic}</div><div>${opLab(ins.op)}</div></div>`;
 }
 function renderProgram(){
-  programEl.innerHTML=S.prog.map((ins,i)=>slotHTML(ins,i)).join('');
+  programEl.innerHTML=txtMode()?chipsHTML(S.prog):S.prog.map((ins,i)=>slotHTML(ins,i)).join('');
+  programEl.classList.toggle('flow',txtMode());
   programEl.classList.toggle('empty',S.prog.length===0);
   document.getElementById('slotN').textContent=countOps()+'/'+lv().limit;
   tutMark();
