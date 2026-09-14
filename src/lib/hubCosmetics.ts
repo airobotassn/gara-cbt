@@ -231,10 +231,17 @@ export type SkinUi = 'base' | 'palace' | 'office' | 'world'
  * ⚠️ `basic` 은 초원(기본) 하나뿐이고 상점엔 안 뜬다(비판매) — 그래서 칩은 **그 탭에 항목이 있는
  *    카테고리만** 그린다(빈 칩을 눌러 빈 격자를 보게 하지 않는다).
  */
-// 세계는 한 칩에 25장이라 **대륙 넷**으로 갈랐다(2026-09-14 지시): 아시아 · 유럽 · 아메리카 · 중동·아프리카.
-//   ⚠️ 'world' 는 카테고리가 아니라 UI 벌 이름(`ui: 'world'`)으로만 남는다.
-export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'asia', 'europe', 'america', 'mea'] as const
+export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'world'] as const
 export type SkinCategory = (typeof SKIN_CATEGORIES)[number]
+
+/**
+ * 세계 칩 **안**의 소제목 — 대륙 넷(2026-09-14 지시 "세계 안에서 나눠라"). 칩은 그대로 '세계' 하나고,
+ * 격자가 이 순서로 아시아 · 유럽 · 아메리카 · 중동·아프리카 소제목 아래 나뉘어 선다. 라벨은 사전 `hub.closet.reg_<키>`.
+ * ⚠️ 카테고리(칩)와 다른 축이다 — 칩을 대륙으로 쪼갰더니 "세계 안에서" 로 되돌렸다. 다른 묶음에도 소제목이
+ *    필요해지면 `region` 을 그 묶음 항목에 적으면 된다(격자는 region 이 있는 항목만 소제목 아래로 모은다).
+ */
+export const SKIN_REGIONS = ['asia', 'europe', 'america', 'mea'] as const
+export type SkinRegion = (typeof SKIN_REGIONS)[number]
 
 export interface SkinDef {
   /** `data-skin` 값 = 배경 값 블록 이름(`hub.css` 의 `.hub[data-skin='<키>']`) */
@@ -245,6 +252,8 @@ export interface SkinDef {
   ui: SkinUi
   /** 상점·보관함 칩 필터의 묶음. 그림·수치와 같이 코드에 산다(가격만 DB 라는 2026-08-20 선 그대로). */
   category: SkinCategory
+  /** 칩 안의 소제목(대륙). 없으면 소제목 없이 격자 맨 앞에 선다. */
+  region?: SkinRegion
   /** 레일 아이콘 폴더 — CSS 변수로 못 넘기는 유일한 자리(`<img src>` 라 코드가 알아야 한다).
    *  null 이면 원래 쓰던 SVG 아이콘으로 돌아간다(= `ui: 'base'` 와 한 쌍). */
   iconDir: string | null
@@ -448,35 +457,35 @@ export const SKINS: SkinDef[] = [
     key: 'world_paris',
     partKey: 'skin_world_paris',
     ui: 'world',
-    category: 'europe',
+    category: 'world', region: 'europe',
     iconDir: '/hub/ui-world',
     bg: '/hub/bg-world-paris.webp',
   },
   // 나라 배경 24장 (2026-09-14) — 폴더 순서 그대로. 전부 세계 UI 벌 · 칩 '세계' · 값 0.
-  { key: 'world_za_capetown', partKey: 'skin_world_za_capetown', ui: 'world', category: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-za-capetown.webp' },
-  { key: 'world_kr_seoul_night', partKey: 'skin_world_kr_seoul_night', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-kr-seoul-night.webp' },
-  { key: 'world_kr_seoul', partKey: 'skin_world_kr_seoul', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-kr-seoul.webp' },
-  { key: 'world_de_berlin', partKey: 'skin_world_de_berlin', ui: 'world', category: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-de-berlin.webp' },
-  { key: 'world_my_petronas', partKey: 'skin_world_my_petronas', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-my-petronas.webp' },
-  { key: 'world_us_dc_capitol', partKey: 'skin_world_us_dc_capitol', ui: 'world', category: 'america', iconDir: '/hub/ui-world', bg: '/hub/bg-world-us-dc-capitol.webp' },
-  { key: 'world_us_dc_monument', partKey: 'skin_world_us_dc_monument', ui: 'world', category: 'america', iconDir: '/hub/ui-world', bg: '/hub/bg-world-us-dc-monument.webp' },
-  { key: 'world_vn_hoankiem', partKey: 'skin_world_vn_hoankiem', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-vn-hoankiem.webp' },
-  { key: 'world_vn_hanoi_temple', partKey: 'skin_world_vn_hanoi_temple', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-vn-hanoi-temple.webp' },
-  { key: 'world_es_sevilla', partKey: 'skin_world_es_sevilla', ui: 'world', category: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-es-sevilla.webp' },
-  { key: 'world_sg_marinabay', partKey: 'skin_world_sg_marinabay', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-sg-marinabay.webp' },
-  { key: 'world_ae_dubai', partKey: 'skin_world_ae_dubai', ui: 'world', category: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ae-dubai.webp' },
-  { key: 'world_gb_bigben', partKey: 'skin_world_gb_bigben', ui: 'world', category: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-gb-bigben.webp' },
-  { key: 'world_il_jerusalem', partKey: 'skin_world_il_jerusalem', ui: 'world', category: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-il-jerusalem.webp' },
-  { key: 'world_it_colosseum', partKey: 'skin_world_it_colosseum', ui: 'world', category: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-it-colosseum.webp' },
-  { key: 'world_in_lotus', partKey: 'skin_world_in_lotus', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-in-lotus.webp' },
-  { key: 'world_in_indiagate', partKey: 'skin_world_in_indiagate', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-in-indiagate.webp' },
-  { key: 'world_jp_fuji', partKey: 'skin_world_jp_fuji', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-jp-fuji.webp' },
-  { key: 'world_cn_tiantan', partKey: 'skin_world_cn_tiantan', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-cn-tiantan.webp' },
-  { key: 'world_cn_tiananmen', partKey: 'skin_world_cn_tiananmen', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-cn-tiananmen.webp' },
-  { key: 'world_ca_rockies', partKey: 'skin_world_ca_rockies', ui: 'world', category: 'america', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ca-rockies.webp' },
-  { key: 'world_ke_kilimanjaro', partKey: 'skin_world_ke_kilimanjaro', ui: 'world', category: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ke-kilimanjaro.webp' },
-  { key: 'world_ph_palawan', partKey: 'skin_world_ph_palawan', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ph-palawan.webp' },
-  { key: 'world_hk_victoria', partKey: 'skin_world_hk_victoria', ui: 'world', category: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-hk-victoria.webp' },
+  { key: 'world_za_capetown', partKey: 'skin_world_za_capetown', ui: 'world', category: 'world', region: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-za-capetown.webp' },
+  { key: 'world_kr_seoul_night', partKey: 'skin_world_kr_seoul_night', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-kr-seoul-night.webp' },
+  { key: 'world_kr_seoul', partKey: 'skin_world_kr_seoul', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-kr-seoul.webp' },
+  { key: 'world_de_berlin', partKey: 'skin_world_de_berlin', ui: 'world', category: 'world', region: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-de-berlin.webp' },
+  { key: 'world_my_petronas', partKey: 'skin_world_my_petronas', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-my-petronas.webp' },
+  { key: 'world_us_dc_capitol', partKey: 'skin_world_us_dc_capitol', ui: 'world', category: 'world', region: 'america', iconDir: '/hub/ui-world', bg: '/hub/bg-world-us-dc-capitol.webp' },
+  { key: 'world_us_dc_monument', partKey: 'skin_world_us_dc_monument', ui: 'world', category: 'world', region: 'america', iconDir: '/hub/ui-world', bg: '/hub/bg-world-us-dc-monument.webp' },
+  { key: 'world_vn_hoankiem', partKey: 'skin_world_vn_hoankiem', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-vn-hoankiem.webp' },
+  { key: 'world_vn_hanoi_temple', partKey: 'skin_world_vn_hanoi_temple', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-vn-hanoi-temple.webp' },
+  { key: 'world_es_sevilla', partKey: 'skin_world_es_sevilla', ui: 'world', category: 'world', region: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-es-sevilla.webp' },
+  { key: 'world_sg_marinabay', partKey: 'skin_world_sg_marinabay', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-sg-marinabay.webp' },
+  { key: 'world_ae_dubai', partKey: 'skin_world_ae_dubai', ui: 'world', category: 'world', region: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ae-dubai.webp' },
+  { key: 'world_gb_bigben', partKey: 'skin_world_gb_bigben', ui: 'world', category: 'world', region: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-gb-bigben.webp' },
+  { key: 'world_il_jerusalem', partKey: 'skin_world_il_jerusalem', ui: 'world', category: 'world', region: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-il-jerusalem.webp' },
+  { key: 'world_it_colosseum', partKey: 'skin_world_it_colosseum', ui: 'world', category: 'world', region: 'europe', iconDir: '/hub/ui-world', bg: '/hub/bg-world-it-colosseum.webp' },
+  { key: 'world_in_lotus', partKey: 'skin_world_in_lotus', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-in-lotus.webp' },
+  { key: 'world_in_indiagate', partKey: 'skin_world_in_indiagate', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-in-indiagate.webp' },
+  { key: 'world_jp_fuji', partKey: 'skin_world_jp_fuji', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-jp-fuji.webp' },
+  { key: 'world_cn_tiantan', partKey: 'skin_world_cn_tiantan', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-cn-tiantan.webp' },
+  { key: 'world_cn_tiananmen', partKey: 'skin_world_cn_tiananmen', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-cn-tiananmen.webp' },
+  { key: 'world_ca_rockies', partKey: 'skin_world_ca_rockies', ui: 'world', category: 'world', region: 'america', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ca-rockies.webp' },
+  { key: 'world_ke_kilimanjaro', partKey: 'skin_world_ke_kilimanjaro', ui: 'world', category: 'world', region: 'mea', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ke-kilimanjaro.webp' },
+  { key: 'world_ph_palawan', partKey: 'skin_world_ph_palawan', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-ph-palawan.webp' },
+  { key: 'world_hk_victoria', partKey: 'skin_world_hk_victoria', ui: 'world', category: 'world', region: 'asia', iconDir: '/hub/ui-world', bg: '/hub/bg-world-hk-victoria.webp' },
 ]
 
 export const DEFAULT_SKIN = SKINS[0].key

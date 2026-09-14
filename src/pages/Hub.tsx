@@ -1,7 +1,7 @@
 // 캐릭터 허브(실동작) — /demo 첫 시안 기반 단일 로비 화면.
 //   출석·상점·쿠폰·칭호는 전부 실제 백엔드 호출로 동작하며, 상세 동작은 팝업(모달)에서 처리한다.
 //   초기 재화·보유파츠·스탬프·천장·출석여부·카탈로그·쿠폰·칭호는 get-hub 로 하이드레이트(RLS 잠금 테이블이라 이 함수만 읽음).
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { ensureCheckedIn } from '../lib/autoCheckin'
@@ -32,8 +32,8 @@ import { rememberPostLogin } from '../lib/postLogin'
 import { loadAdminMe } from '../lib/adminMe'
 import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName, charScale,
-  DEFAULT_SKIN_PART, SKINS, SKIN_CATEGORIES, isCharKey, isSkinKey, skinByPart, skinThumb,
-  type SkinCategory,
+  DEFAULT_SKIN_PART, SKINS, SKIN_CATEGORIES, SKIN_REGIONS, isCharKey, isSkinKey, skinByPart, skinThumb,
+  type SkinCategory, type SkinRegion,
 } from '../lib/hubCosmetics'
 import { lastLook, saveLook } from '../lib/lastLook'
 
@@ -127,6 +127,21 @@ function skinCatsIn(partKeys: string[]): SkinCategory[] {
   const present = new Set(partKeys.map((k) => skinByPart(k).category))
   return SKIN_CATEGORIES.filter((c) => present.has(c))
 }
+/**
+ * 격자를 소제목(대륙)으로 나눈다 — region 이 없는 항목은 맨 앞 한 격자, 있는 항목은 `SKIN_REGIONS` 순서로
+ * 소제목 하나씩. 세계 칩(25장)이 한 격자에 서기엔 많아서 생겼고(2026-09-14), 칩은 그대로 '세계' 하나다.
+ * 상점(카탈로그 행)과 보관함(SkinDef) 둘 다 쓰므로 키만 받는다.
+ */
+function regionSections<T>(items: T[], keyOf: (x: T) => string): { region: SkinRegion | null; items: T[] }[] {
+  const plain = items.filter((x) => !skinByPart(keyOf(x)).region)
+  const out: { region: SkinRegion | null; items: T[] }[] = plain.length ? [{ region: null, items: plain }] : []
+  for (const r of SKIN_REGIONS) {
+    const sub = items.filter((x) => skinByPart(keyOf(x)).region === r)
+    if (sub.length) out.push({ region: r, items: sub })
+  }
+  return out
+}
+
 function SkinCatChips({ cats, value, onChange, t }: {
   cats: SkinCategory[]; value: SkinCatFilter; onChange: (c: SkinCatFilter) => void; t: (k: string) => string
 }) {
@@ -1271,8 +1286,11 @@ export default function Hub() {
                     <div key={kind} className="closet-group">
                       <h4 className="closet-group-h">{t(labelKey)}</h4>
                       {kind === 'skin' && <SkinCatChips cats={cats} value={cat} onChange={setSkinCat} t={t} />}
+                      {regionSections(items, (c) => c.partKey).map((sec) => (
+                      <Fragment key={sec.region ?? '_'}>
+                      {sec.region && <h5 className="closet-sub-h">{t(`hub.closet.reg_${sec.region}`)}</h5>}
                       <div className="hub-modal-grid">
-                        {items.map((c) => {
+                        {sec.items.map((c) => {
                           const has = owned.has(c.partKey)
                           return (
                             <div key={c.partKey} className="hub-shop-item">
@@ -1294,6 +1312,8 @@ export default function Hub() {
                           )
                         })}
                       </div>
+                      </Fragment>
+                      ))}
                     </div>
                   )
                 })}
@@ -1331,8 +1351,11 @@ export default function Hub() {
               <div className="closet-group">
                 <h4 className="closet-group-h">{t('hub.closet.g_skin')}</h4>
                 <SkinCatChips cats={ownedSkinCats} value={ownedSkinCat} onChange={setSkinCat} t={t} />
+                {regionSections(ownedSkinCat === 'all' ? ownedSkins : ownedSkins.filter((s) => s.category === ownedSkinCat), (s) => s.partKey).map((sec) => (
+                <Fragment key={sec.region ?? '_'}>
+                {sec.region && <h5 className="closet-sub-h">{t(`hub.closet.reg_${sec.region}`)}</h5>}
                 <div className="hub-modal-grid">
-                  {(ownedSkinCat === 'all' ? ownedSkins : ownedSkins.filter((s) => s.category === ownedSkinCat)).map((sk) => (
+                  {sec.items.map((sk) => (
                     <div key={sk.partKey} className={`closet-item${skinPart === sk.partKey ? ' on' : ''}`}>
                       <button className="closet-item-thumb pv-open" onClick={() => openPreview(sk.partKey)} aria-label={t('hub.closet.preview')}>
                         <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
@@ -1345,6 +1368,8 @@ export default function Hub() {
                     </div>
                   ))}
                 </div>
+                </Fragment>
+                ))}
               </div>
             </>
           )}

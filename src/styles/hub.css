@@ -1565,6 +1565,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   background: var(--card); border: 2px solid var(--line); color: var(--ink2);
   font-family: inherit; font-size: 12.5px; font-weight: 800; line-height: 1.2; }
 .hub .closet-cat.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+/* 세계 칩 안의 대륙 소제목(2026-09-14) — 그룹 제목(14.5px 굵게)보다 한 단 작고 옅게. 격자 사이에 서므로 위 여백을 둔다. */
+.hub .closet-sub-h { margin: 12px 0 7px; font-size: 13px; font-weight: 900; color: var(--ink2); }
+.hub .closet-cats + .closet-sub-h, .hub .closet-group-h + .closet-sub-h { margin-top: 2px; }
 
 /* 인벤토리 칸 — 눌러서 갈아입는다. 지금 입은 것은 눌리지 않고 테두리로 표시된다. */
 .hub .closet-item { display: flex; flex-direction: column; align-items: center; gap: 6px;
