@@ -211,6 +211,8 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  * `korea`  = 대한민국 벌 — 단청 구름·청록·금테, 한반도 메달·태극 점(`public/hub/ui-korea/*` · 2026-09-14).
  *            세계 벌과 같은 꼴(자체 장식판 아이콘 · 랭킹 버튼에 트로피 내장). ⚠️ 받은 랭킹 버튼 그림엔 '랭킹' 글자가
  *            박혀 있어 6개국어에 못 쓴다 — 글자 구간을 빼고 이어 붙인 합성본이다(scratch convert-korea.mjs).
+ * `halloween` = 할로윈 벌 — 보라 면·금테·호박 메달·박쥐 날개(`public/hub/ui-halloween/*` · 2026-09-14). 대한민국 벌과 같은 틀
+ *            (같은 생성 템플릿)이라 슬라이스 값도 거의 같다. 시즌 칩의 첫 벌 — 설날·추석·크리스마스는 자기 벌이 오면 같은 꼴로 얹는다.
  *            궁궐처럼 아이콘이 스스로 장식판이라 레일 틀을 안 씌우고, 랭킹 버튼에도 아이콘을 안 얹는다(트로피가 그림 안에 있다).
  *
  * ⚠️ **에셋 파일 이름이 벌마다 같다**(`panel-mission.webp`·`icon-shop.png` …). 폴더로만 갈리므로
@@ -221,7 +223,7 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  *    급한 대로 선택자를 `palace_night` 하나로 좁혔더니 이번엔 **고궁 낮이 UI 를 잃었다**
  *    (2026-08-25). 배경과 UI 는 각자 이름을 갖는다 — 그래야 "배경만 다른 두 스킨"이 성립한다.
  */
-export type SkinUi = 'base' | 'palace' | 'office' | 'world' | 'korea'
+export type SkinUi = 'base' | 'palace' | 'office' | 'world' | 'korea' | 'halloween'
 
 /**
  * 배경 **카테고리** — 상점·보관함의 배경 칩 필터가 이 축으로 거른다(2026-09-11).
@@ -234,7 +236,7 @@ export type SkinUi = 'base' | 'palace' | 'office' | 'world' | 'korea'
  * ⚠️ `basic` 은 초원(기본) 하나뿐이고 상점엔 안 뜬다(비판매) — 그래서 칩은 **그 탭에 항목이 있는
  *    카테고리만** 그린다(빈 칩을 눌러 빈 격자를 보게 하지 않는다).
  */
-export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'korea', 'world'] as const
+export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'korea', 'world', 'season'] as const
 export type SkinCategory = (typeof SKIN_CATEGORIES)[number]
 
 /**
@@ -463,6 +465,9 @@ export const SKINS: SkinDef[] = [
   { key: 'kr_busan', partKey: 'skin_kr_busan', ui: 'korea', category: 'korea', iconDir: '/hub/ui-korea', bg: '/hub/bg-kr-busan.webp' },
   { key: 'kr_incheon', partKey: 'skin_kr_incheon', ui: 'korea', category: 'korea', iconDir: '/hub/ui-korea', bg: '/hub/bg-kr-incheon.webp' },
   { key: 'kr_jeju', partKey: 'skin_kr_jeju', ui: 'korea', category: 'korea', iconDir: '/hub/ui-korea', bg: '/hub/bg-kr-jeju.webp' },
+  // 시즌 — 할로윈(2026-09-14 · Z:「시즌 스킨」). **할로윈 UI 한 벌**(`ui: 'halloween'`)을 같이 들고 온다. 칩 '시즌'.
+  //   설날·추석·크리스마스 배경도 같은 폴더에 있지만 각자 UI 벌이 와야 얹는다(할로윈 벌을 입히면 어색하다).
+  { key: 'season_halloween', partKey: 'skin_season_halloween', ui: 'halloween', category: 'season', iconDir: '/hub/ui-halloween', bg: '/hub/bg-season-halloween.webp' },
   // 세계 — 첫 장은 파리 에펠탑 밤(2026-09-14 · Z:「국가별 스킨」). **세계 UI 한 벌**(`ui: 'world'`)을 같이 들고 온다.
   //   나머지 나라 배경(24장)은 배경만 다르니 `ui: 'world'` 로 여기 얹으면 된다(고궁 낮·밤과 같은 꼴).
   {
