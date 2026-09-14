@@ -1212,7 +1212,7 @@ export default function Hub() {
                   CSS 로 감추지 않은 이유 = display:none 이어도 브라우저는 icon-ranking.png(424KB)를
                   그대로 받아온다. 기본(초원)의 별 SVG 는 그대로다.
                   세계 벌(2026-09-14)도 같다 — 버튼 그림 왼쪽에 트로피 원판이 이미 붙어 있다. */}
-              {skin.ui !== 'palace' && skin.ui !== 'world' && (
+              {skin.ui !== 'palace' && skin.ui !== 'world' && skin.ui !== 'korea' && (
                 <span className="cta-star" aria-hidden="true">
                   <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
                 </span>
