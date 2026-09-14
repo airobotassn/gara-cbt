@@ -1795,6 +1795,7 @@ const VI: Record<string, string> = {
   "hub.closet.cat_palace": "Cung điện",
   "hub.closet.cat_office": "Nhà · Văn phòng",
   "hub.closet.cat_campus": "Khuôn viên",
+  "hub.closet.cat_world": "Thế giới",
   "hub.closet.g_part": "Vật phẩm",
   "hub.closet.worn": "Đang dùng",
   "hub.closet.wear": "Dùng",
@@ -1854,6 +1855,7 @@ const VI: Record<string, string> = {
   "hub.part.skin_campus_classroom": "Khuôn viên · Lớp học cấp ba",
   "hub.part.skin_campus_lecture": "Khuôn viên · Giảng đường",
   "hub.part.skin_campus_garden": "Khuôn viên · Khu vườn",
+  "hub.part.skin_world_paris": "Thế giới · Tháp Eiffel, Paris",
   // 쿠폰함
 
   // 칭호

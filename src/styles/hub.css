@@ -710,7 +710,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
      ③ 에셋 — public/hub/ 아래 그 테마 그림들
    새 테마 = 배경 블록 한 줄 + (UI 를 새로 입힐 때만) 값 블록 한 벌 + 에셋 한 벌.
    규칙은 손대지 않는다 — **이름만 한 칸 더 적는다**. 규칙 선택자가
-   `.hub:is([data-ui='palace'], [data-ui='office'])` 인 이유가 그것이고, 다음 벌은 그 목록에
+   `.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'])` 인 이유가 그것이고, 다음 벌은 그 목록에
    자기 이름을 더하면 된다. ⛔ 규칙을 통째로 복사해 자기 이름으로 한 벌 더 만들지 말 것 —
    그 순간 같은 규칙이 두 벌이 되고, 한쪽만 고친 날부터 벌마다 다르게 동작한다.
    ⚠️ `:is()` 를 쓰는 건 특정도를 그대로 두려는 것이다(`:is()` 의 특정도 = 인자 중 최대 =
@@ -799,6 +799,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='campus_classroom']     { --skin-bg: url('/hub/bg-campus-classroom.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_lecture']       { --skin-bg: url('/hub/bg-campus-lecture.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_garden']        { --skin-bg: url('/hub/bg-campus-garden.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+/* 세계 — 파리 에펠탑 밤 (2026-09-14). 같은 판(1672×941), 아래 1/3 이 광장이라 값은 오피스 계열과 같다.
+   UI 는 `[data-ui='world']` 벌(아래 값 블록). 나라 배경을 더할 땐 여기 한 줄 + SKINS 한 줄이면 된다. */
+.hub[data-skin='world_paris']          { --skin-bg: url('/hub/bg-world-paris.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
    ⚠️ 두 스킨이 값 블록 하나를 같이 쓰는 건 이름이 아니라 **`data-ui` 가 같기 때문**이다.
@@ -1024,9 +1027,113 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   }
 }
 
-/* ── 규칙: 9패치 UI 벌(궁궐·오피스)을 입었을 때의 허브. 여기서는 변수만 읽는다 ─── */
+/* ── 값: 세계(world) UI 한 벌 (2026-09-14) ─────────────────────────────────────
+   에셋 public/hub/ui-world/* — 남색 세계지도 면에 금테. 받은 원본(Photoroom 배경 제거 PNG 14장)은
+   투명 여백이 커서 알파 bbox 로 잘라 넣었다(scratch 의 convert-world.mjs 와 같은 절차).
+   ⚠️ 이 벌의 판은 **왼쪽에 큰 장식(지구본·트로피·나침반)이 붙어 있다.** 그래서 9패치의 왼쪽 슬라이스가
+      장식 통째(300~345px)이고, 왼쪽 edge 가 오른쪽의 5배다 — 값이 비대칭인 게 정상이다.
+      아래 숫자는 전부 잘라낸 그림에서 잰 값이다(장식 오른끝 · 캡 반지름 · 테 두께).
+   ⚠️ 궁궐처럼 **레일 틀을 안 씌운다**(아이콘 4장이 스스로 금테 장식판) — `--skin-rail-card` 를 두지 않는다.
+   ⚠️ 랭킹 버튼 그림 안에 트로피가 있어 **아이콘을 안 얹는다** — `Hub.tsx` 가 `ui === 'world'` 도 건너뛴다.
+      `icon-ranking.png` 는 그 트로피 원판만 잘라낸 것으로, PC 상단의 작은 랭킹 칩이 쓴다.
+   ⚠️ 판이 짙은 남색이라 글자는 **밝은 크림 + 어두운 그림자** — 오피스(흰 판·남색 글자)와 정반대다. */
+.hub[data-ui='world'] {
+  --skin-char-h: 46svh;
+  --skin-char-bottom: 22svh;
 
-.hub:is([data-ui='palace'], [data-ui='office']) .mission-bar {
+  --skin-panel-ink: #fdf3d8;
+  --skin-panel-title: 17px;
+  --skin-panel-ink-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  --skin-rail-ink: #fdf3d8;
+  --skin-rail-ink-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .7);
+
+  /* 미션 바 — 1400×288. 왼쪽 지구본 원판이 x 0~340, 오른쪽 캡 60, 위아래 테 24. 원판을 원형으로 두려면
+     네 edge 의 비율이 슬라이스 비율과 같아야 한다(=한 배율): 48px 높이 기준 0.167 배. */
+  --skin-mission-img: url('/hub/ui-world/panel-mission.webp');
+  --skin-mission-slice: 24 60 24 340 fill;
+  --skin-mission-edge: 4px 10px 4px 57px;
+  --skin-mission-h: 48px;
+
+  /* 출석 보상 판 — 1400×378(7칸 도장판). 지금 화면엔 이 판이 안 그려진다(도장은 출석 기록 창 안 맨 줄) —
+     자리가 생기면 쓰라고 값만 둔다. ⚠️ 가운데 7개 원이 9패치로 늘어나면 타원이 된다 — 그때는 100% 100% 로. */
+  --skin-reward-img: url('/hub/ui-world/panel-reward.webp');
+  --skin-reward-slice: 40 60 40 60 fill;
+  --skin-reward-edge: 12px 16px;
+
+  /* 랭킹 버튼 — 1400×375. 왼쪽 트로피 원판 x 0~345(아래 구슬까지), 캡 70, 테 40. 0.15 배. */
+  --skin-cta-img: url('/hub/ui-world/button-ranking.webp');
+  --skin-cta-slice: 40 70 40 345 fill;
+  --skin-cta-edge: 6px 11px 6px 52px;
+
+  /* 경험치 게이지 — 홈 1000×68 · 채움 1000×69. 알약 캡 34. */
+  --skin-gauge-img: url('/hub/ui-world/gauge-track.webp');
+  --skin-gauge-slice: 20 34 20 34 fill;
+  --skin-gauge-edge: 6px 10px;   /* 캡(34)보다 얇게 — 폰 게이지가 좁아 캡을 제 비율로 두면 글자 자리가 안 남는다(오피스와 같은 타협) */
+  --skin-fill-img: url('/hub/ui-world/gauge-fill.webp');
+  --skin-fill-slice: 20 34 20 34 fill;
+  --skin-fill-edge: 5px 9px;
+  --skin-hud-h: 38px;
+  --skin-gauge-font: 12.5px;
+
+  /* 출석 도장 — 빈 것은 남색 원판(글자는 밝게), 찍힌 것은 금 지구본+체크(글자 없음) */
+  --skin-stamp-img: url('/hub/ui-world/stamp-empty.webp');
+  --skin-stamp-on-img: url('/hub/ui-world/stamp-filled.webp');
+  --skin-stamp-h: 52px;
+  --skin-stamp-font: 13px;
+  --skin-stamp-ink: #e8f0ff;
+  --skin-stamp-on-ink: #17356b;
+  --skin-stamp-on-ink-shadow: none;
+
+  /* 프로필 틀 — 512×551, 고리 위에 지구본이 붙어 세로가 더 길다. 고리 중심이 그림 세로 52.6% 라
+     위 inset 을 더 빼서 고리 중심 = 아바타 중심으로 맞춘다(48px 아바타 → 틀 68×74, 고리 안지름 50). */
+  --skin-profile-img: url('/hub/ui-world/profile-frame.webp');
+  --skin-profile-inset: -15px -10px -11px;
+
+  /* 랭킹 점수 칩 — 1400×210, 왼쪽 나침반 x 0~230. 칩 높이 ~30px 기준 나침반 33px → 왼쪽 여백 40. */
+  --skin-rank-img: url('/hub/ui-world/rank-score-frame.webp');
+  --skin-rank-pad: 7px 16px 6px 40px;
+  --skin-rank-ink: #fdf3d8;
+  --skin-rank-ink-shadow: 0 1px 2px rgba(0, 0, 0, .75);
+  --skin-rank-pct-ink: rgba(253, 243, 216, .68);
+
+  /* 코인 칩 — 1400×344(비율 4.07). 왼쪽 금 지구본이 폭의 21%(=높이의 0.87배), 오른쪽 ➕ 가 폭의 17%(높이의 0.7배).
+     ⚠️ 폭 비율(`--skin-currency-ar`)을 빼먹으면 궁궐 비율(3.95)로 그려져 ➕ 가 찌그러진다. */
+  --skin-currency-img: url('/hub/ui-world/currency-chip.webp');
+  --skin-currency-ar: 4.07;
+  --skin-currency-pad: 0 calc(var(--skin-hud-h) * 0.72) 0 calc(var(--skin-hud-h) * 0.9);
+  --skin-currency-ink: #fdf3d8;
+  --skin-currency-ink-shadow: 0 1px 2px rgba(0, 0, 0, .75);
+
+  --skin-gauge-ink: #ffffff;
+  --skin-gauge-ink-shadow: 0 1px 0 rgba(0, 0, 0, .9), 0 -1px 0 rgba(0, 0, 0, .75), 1px 0 0 rgba(0, 0, 0, .75),
+    -1px 0 0 rgba(0, 0, 0, .75), 0 2px 4px rgba(0, 0, 0, .85);
+}
+@media (min-width: 768px) {
+  .hub[data-ui='world'] {
+    --skin-panel-title: 20px;
+    --skin-mission-edge: 5px 13px 5px 73px;   /* 62px 높이 기준 0.215 배 */
+    --skin-mission-h: 62px;
+    --skin-reward-edge: 14px 20px;
+    --skin-cta-edge: 8px 13px 8px 66px;        /* 0.19 배 */
+    --skin-gauge-edge: 7px 12px;
+    --skin-fill-edge: 6px 11px;
+    --skin-hud-h: 50px;
+    --skin-stamp-h: 58px;
+    --skin-stamp-font: 16px;
+    --skin-profile-inset: -20px -14px -15px;   /* 68px 아바타 → 틀 96×103, 고리 안지름 71 */
+    --skin-rank-pad-l: 46px;
+    --skin-rank-pad-r: 24px;
+  }
+}
+/* 폰의 랭킹 버튼 — 왼쪽 끝 트로피 원판이 떠 있는 CARIS 로고 버튼(`.fab`, 왼쪽 24px+58px)에 가려진다.
+   궁궐·오피스는 그 자리에 아무것도 없어 상관없었다. 로고 오른쪽부터 시작하게 밀어 둔다(PC 는 도크가 가로 배치라 해당 없음). */
+@media (max-width: 767px) {
+  .hub[data-ui='world'] .cta-main { margin-left: 74px; }
+}
+
+/* ── 규칙: 9패치 UI 벌(궁궐·오피스·세계)을 입었을 때의 허브. 여기서는 변수만 읽는다 ─── */
+
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .mission-bar {
   background: transparent; box-shadow: none;
   border-style: solid; border-color: transparent; border-width: var(--skin-mission-edge);
   border-image-source: var(--skin-mission-img);
@@ -1049,7 +1156,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   .hub .mission-bar { display: contents; }
   .hub .ms-chips { order: 1; margin-top: 0; }
   .hub .ms-n { order: 2; }
-  .hub:is([data-ui='palace'], [data-ui='office']) .mission-zone {
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .mission-zone {
     background: transparent; box-shadow: none;
     border-style: solid; border-color: transparent; border-width: var(--skin-mission-edge);
     border-image-source: var(--skin-mission-img);
@@ -1059,7 +1166,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   }
 }
 
-.hub:is([data-ui='palace'], [data-ui='office']) .reward {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .reward {
   background: transparent; box-shadow: none;
   border-style: solid; border-color: transparent; border-width: var(--skin-reward-edge);
   border-image-source: var(--skin-reward-img);
@@ -1069,7 +1176,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   /* 판을 키웠으면 내용도 그 안에서 가운데로 — 안 그러면 위로 몰리고 아래가 텅 빈다 */
   display: flex; flex-direction: column; justify-content: center; gap: 10px;
 }
-.hub:is([data-ui='palace'], [data-ui='office']) .streak { margin-top: 0; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .streak { margin-top: 0; }
 /* 랭킹 버튼은 스킨이 안 건드린다 — 슬롯 모양에 맞는 그림이 아직 없어서 옛 버튼 그대로 둔다.
    그림이 오면 위 스킨 값 블록의 주석을 풀고 여기에 판·버튼과 같은 규칙을 다시 넣으면 된다. */
 
@@ -1077,16 +1184,16 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* 옆 불꺽 아이콘은 옛 카툰 SVG 라 궁정 판 위에서 혼자 논다 — 글자만으로 충분하다. */
 /* ⚠️ `!important` 가 필요하다 — 아이콘 컴포넌트(Ic)가 svg 에 인라인 style 로
       `display:block` 을 박아서 일반 규칙으로는 못 감는다(2026-08-18 안 지워져서 찾은 자리). */
-.hub:is([data-ui='palace'], [data-ui='office']) .rw-top svg { display: none !important; }
-.hub:is([data-ui='palace'], [data-ui='office']) .rw-top, .hub:is([data-ui='palace'], [data-ui='office']) .rw-n, .hub:is([data-ui='palace'], [data-ui='office']) .rw-more,
-.hub:is([data-ui='palace'], [data-ui='office']) .ms-title, .hub:is([data-ui='palace'], [data-ui='office']) .ms-n {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .rw-top svg { display: none !important; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .rw-top, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .rw-n, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .rw-more,
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .ms-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .ms-n {
   color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
   font-size: var(--skin-panel-title);
 }
 /* ⚠️ 위 규칙이 판 글자 크기를 통째로 잡아서 화살표까지 같이 눌러버린다 — 색·그림자만 물려받고
       크기는 되돌린다(기본 벌과 같은 이유: 작으면 누를 수 있는 곳으로 안 읽힌다). */
-.hub:is([data-ui='palace'], [data-ui='office']) .rw-more { font-size: 26px; }
-@media (min-width: 768px) { .hub:is([data-ui='palace'], [data-ui='office']) .rw-more { font-size: 32px; } }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .rw-more { font-size: 26px; }
+@media (min-width: 768px) { .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .rw-more { font-size: 32px; } }
 
 /* 레일 칸 — 틀을 씌울지 말지는 **벌이 정한다**(`--skin-rail-card`).
    궁궐은 안 씌운다: 아이콘 자체가 테두리 있는 장식판이라 덧씌우면 틀이 두 겹이 된다.
@@ -1096,9 +1203,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       서고, 색도 궁궐과 같은 규칙(밝은 글자 + 어두운 외곽선)을 그대로 쓴다.
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
       라벨 자리까지 먹어 글자가 통째로 사라진다. 라벨은 태그 없는 맨 텍스트라 grid 가 2행에 앉힌다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .fcard,
-.hub:is([data-ui='palace'], [data-ui='office']) .f-shop,
-.hub:is([data-ui='palace'], [data-ui='office']) .f-title, .hub:is([data-ui='palace'], [data-ui='office']) .f-invite {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .fcard,
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .f-shop,
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .f-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .f-invite {
   background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
   display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; gap: 1px;
   font-size: 15px; line-height: 1.15;
@@ -1109,33 +1216,33 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ 칸 폭이 곧 상한이다(모바일 64px · PC 96px). 제일 긴 라벨이 '초대하기'(4자)라
       모바일에서 16px 을 넘기면 줄바꿈되고, 두 줄이 되면 위 칸(1fr)의 아이콘이 그만큼 눌린다. */
 @media (min-width: 768px) {
-  .hub:is([data-ui='palace'], [data-ui='office']) .fcard,
-  .hub:is([data-ui='palace'], [data-ui='office']) .f-shop,
-  .hub:is([data-ui='palace'], [data-ui='office']) .f-title, .hub:is([data-ui='palace'], [data-ui='office']) .f-invite { font-size: 19px; }
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .fcard,
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .f-shop,
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .f-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .f-invite { font-size: 19px; }
 }
 /* ⚠️ overflow:hidden 을 쓰면 그림자까지 네모로 잘려 아이콘마다 사각 경계선이 생긴다.
       그림을 absolute 로 깔면 부모 높이가 1fr 이어도 퍼센트가 확실히 풀린다. */
 /* ⚠️ 틀(`--skin-rail-card`)은 여기 깐다 — 라벨은 이 칸 **밖**(아래 행)이라 네모에 안 갇힌다.
    ⚠️ `padding` 은 그림 여백이다. 아래 아이콘이 `inset:0` 인 absolute 라 이 padding 만큼 줄어든다
       (absolute 는 padding box 를 기준으로 앉는다) — 안 주면 그림이 틀 테두리에 닿는다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .fcard .fico { position: relative; min-height: 0; width: 100%; height: 100%;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .fcard .fico { position: relative; min-height: 0; width: 100%; height: 100%;
   background: var(--skin-rail-card, none) center / 100% 100% no-repeat;
   padding: var(--skin-rail-card-pad, 0); }
 /* ⚠️ **`.fcard` 안으로 한정해야 한다.** 이 규칙이 `.hub-ui-icon` 전체를 잡고 있었는데, 그 클래스는
       레일 3칸 말고 **랭킹 버튼 속 아이콘**도 쓴다 — 궁궐 벌은 그 아이콘을 아예 안 그려서 여태
       안 드러났고, 오피스에서 그리자마자 `inset:0 / 100%` 가 먹어 그림이 버튼을 통째로 덮고
       '랭킹' 글자를 가렸다(2026-09-01 실측). */
-.hub:is([data-ui='palace'], [data-ui='office']) .fcard .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .fcard .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
   /* 첫 행이 남는 높이를 모두 차지하므로 가운데 정렬하면 아이콘과 아래 라벨 사이가 벌어진다.
      아이콘을 행의 아래쪽에 붙여 세 버튼의 그림과 텍스트가 한 덩어리로 읽히게 한다. */
   /* ⚠️ 틀이 있는 벌은 가운데다 — 아래에 붙이면 그림이 틀 바닥에 눌린다.
         틀이 없는 궁궐은 그대로 아래(라벨과 한 덩어리로 읽히게). */
   object-fit: contain; object-position: var(--skin-rail-icon-pos, center bottom);
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
-.hub:is([data-ui='palace'], [data-ui='office']) .fcard:active { transform: translateY(2px); box-shadow: none; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .fcard:active { transform: translateY(2px); box-shadow: none; }
 /* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
       가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .fcard .bd { top: 0; right: 8px; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .fcard .bd { top: 0; right: 8px; }
 /* EVENT 배지는 제거됐다(2026-08-26 지시) — 궁궐 전용 자리잡기 규칙도 같이 걷어냈다.
    ⚠️ 되살릴 일이 있으면 `top` 으로 잡지 말 것. 여기서 칸은 `flex:1 1 0` 라 무대 높이를 셋이 나눠 갖는
       156px 짜리 세로 상자인데 그림은 그 안 **맨 아래**(object-position: center bottom)에 앉는다 —
@@ -1144,7 +1251,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 
 /* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
    ⚠️ 글자는 padding 으로 밀지 말고 가운데 정렬. padding 으로 앉히면 칸 높이가 바뀔 때 잘린다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .day {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .day {
   border: 0; border-radius: 0; box-shadow: none; padding: 0;
   min-height: var(--skin-stamp-h); font-size: var(--skin-stamp-font);
   background: var(--skin-stamp-img) center / contain no-repeat;
@@ -1153,23 +1260,23 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 }
 /* ⚠️ **반드시 background 단축으로 쓴다.** 옛 톤의 `.day.on { background: 노랑 }` 이 살아 있어서
       image 만 얹으면 노란 면이 도장을 덮고, 색만 눕히면 size 가 auto·repeat 로 남아 잘려 보인다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .day.on {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .day.on {
   background: var(--skin-stamp-on-img) center / contain no-repeat;
   color: var(--skin-stamp-on-ink); text-shadow: var(--skin-stamp-on-ink-shadow);
 }
 /* 찍힌 날은 **도장만** 남긴다 — 금색 원판 위에 '1일' 이 얹히면 꽃과 숫자가 섞인다
    (2026-08-18 결정). 날짜는 왜쪽부터 순서대로라 숫자가 없어도 몇 일차인지 읽힌다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .day.on { font-size: 0; }          /* 날짜 글자(태그 없는 맨 텍스트)를 숨긴다 */
-.hub:is([data-ui='palace'], [data-ui='office']) .day.on .chk { display: none; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .day.on { font-size: 0; }          /* 날짜 글자(태그 없는 맨 텍스트)를 숨긴다 */
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .day.on .chk { display: none; }
 /* 선물 표시도 도장 **그림** 모서리에 붙인다 — 칸(99px)보다 그림(58px)이 작아
    칸 모서리에 두면 허공에 뜨게 된다(2026-08-18 "7일에 상자 위치도 좀 애매"). */
 /* 칸(가로로 넓다)이 아니라 **도장 그림** 오른쪽 위에 붙인다 — 도장은 칸 높이에 맞춰 정사각으로
    들어가므로 좌우에 남는 여백이 생기고, 칸 모서리에 두면 그림에서 떨어져 허공에 뜬다.
    17% = (칸폭 - 도장폭)/2 를 칸폭으로 나눈 값(현재 배치 실측). */
-.hub:is([data-ui='palace'], [data-ui='office']) .day .gift { top: -2px; right: 17%; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .day .gift { top: -2px; right: 17%; }
 
 /* 경험치 게이지 */
-.hub:is([data-ui='palace'], [data-ui='office']) .exp {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .exp {
   background: none; border-radius: 0; overflow: hidden;
   border-style: solid; border-color: transparent; border-width: var(--skin-gauge-edge);
   border-image-source: var(--skin-gauge-img);
@@ -1177,7 +1284,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   border-image-repeat: stretch;
   padding: 0;
 }
-.hub:is([data-ui='palace'], [data-ui='office']) .exp-fill {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .exp-fill {
   background: none; border-radius: 0;
   border-style: solid; border-color: transparent; border-width: var(--skin-fill-edge);
   border-image-source: var(--skin-fill-img);
@@ -1187,32 +1294,32 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* ⚠️ 글자가 **두 바닥** 위에 걸친다 — 왼쪽은 채움, 오른쪽은 빈 홈. 밝은 글자 하나로는 한쪽에서 묻히므로
       검은 외곽선을 사방으로 둘러 바닥이 뭐든 형태가 서게 한다.
    ⚠️ 좌우 여백 0 — 안쪽 여백은 이미 캡(border)이 만든다. 옛 padding 을 두면 글자 자리가 또 깎인다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .exp-txt { color: var(--skin-gauge-ink); padding: 0 2px;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .exp-txt { color: var(--skin-gauge-ink); padding: 0 2px;
   font-size: var(--skin-gauge-font); font-weight: 900; letter-spacing: .01em;
   text-shadow: var(--skin-gauge-ink-shadow); }
 /* ⚠️ 셋은 한 줄에 서므로 높이를 같이 간다(하나만 바꾸면 바로 티 난다).
    ⚠️ `?` 는 **폭도 같이 줘야 한다** — 높이만 올리면 28×38 타원이 된다(2026-08-14 "왜 찌그러진거야").
       hub.css 위쪽 '아바타 달걀 방지'와 같은 종류의 사고다: 원형인데 한 축만 건드리면 달걀이 된다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .exp, .hub:is([data-ui='palace'], [data-ui='office']) .hub-help, .hub:is([data-ui='palace'], [data-ui='office']) .gchip { height: var(--skin-hud-h); }
-.hub:is([data-ui='palace'], [data-ui='office']) .hub-help { width: var(--skin-hud-h); }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .exp, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hub-help, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .gchip { height: var(--skin-hud-h); }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hub-help { width: var(--skin-hud-h); }
 
 /* 프로필과 보유 재화도 같은 궁정 물성으로 묶는다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .hud-av { isolation: isolate; }
-.hub:is([data-ui='palace'], [data-ui='office']) .hud-av::after {
-  content: ""; position: absolute; z-index: 3; inset: -11px; pointer-events: none;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-av { isolation: isolate; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-av::after {
+  content: ""; position: absolute; z-index: 3; inset: var(--skin-profile-inset, -11px); pointer-events: none;   /* 세계 벌은 틀 위에 지구본이 붙어 위를 더 뺀다 */
   background: var(--skin-profile-img) center / contain no-repeat;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.42));
 }
-.hub:is([data-ui='palace'], [data-ui='office']) .hud-av .av { position: relative; z-index: 1; border: 0; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-av .av { position: relative; z-index: 1; border: 0; }
 /* 랭킹 점수 칩 — 궁궐에서는 액자 그림을 두른다(기본 세트는 위쪽 `.hub .hud-score` 의 카툰 칩).
    ⚠️ 그림자를 빼지 말 것 — 액자 그림이 밝은 부분을 갖고 있어서 흰 글자가 거기서 녹는다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .hud-score {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-score {
   background: var(--skin-rank-img) center / 100% 100% no-repeat;
-  border: 0; border-radius: 0; padding: 7px 18px 6px;
+  border: 0; border-radius: 0; padding: var(--skin-rank-pad, 7px 18px 6px);   /* 세계 벌은 왼쪽에 나침반이 있어 자기 값을 준다 */
   color: var(--skin-rank-ink); text-shadow: var(--skin-rank-ink-shadow);
 }
-.hub:is([data-ui='palace'], [data-ui='office']) .hud-score-pct { color: var(--skin-rank-pct-ink); }
-.hub:is([data-ui='palace'], [data-ui='office']) .gchip {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-score-pct { color: var(--skin-rank-pct-ink); }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .gchip {
   background: var(--skin-currency-img) center / 100% 100% no-repeat;
   border: 0; border-radius: 0; box-shadow: none; position: relative;
   /* ⚠️ 위쪽 여백이 더 크다 — 그림의 베이지 면이 위아래 대칭이 아니기 때문이다(위 27.5% / 아래 13.9%).
@@ -1222,11 +1329,12 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   color: var(--skin-currency-ink); text-shadow: var(--skin-currency-ink-shadow);
   /* ⚠️ 폭을 고정하면 안 된다 — 틀(border) 이 좌우 30px 를 먹어서 128px 에 '99,620' 이 안 들어가
      끝자리 0 이 잘렸다(2026-08-18 "돈이 좀 짤려"). 금액은 자릿수가 변하므로 내용만큼 늘게 둔다. */
-  width: calc(var(--skin-hud-h) * 3.9464); min-width: calc(var(--skin-hud-h) * 3.9464);
-  flex: 0 0 calc(var(--skin-hud-h) * 3.9464);
+  /* 폭 = 높이 × 그림 비율. 기본 3.9464 는 궁궐·오피스 그림(둘 다 그 비율)이고, 세계 벌은 자기 값을 준다. */
+  width: calc(var(--skin-hud-h) * var(--skin-currency-ar, 3.9464)); min-width: calc(var(--skin-hud-h) * var(--skin-currency-ar, 3.9464));
+  flex: 0 0 calc(var(--skin-hud-h) * var(--skin-currency-ar, 3.9464));
 }
-.hub:is([data-ui='palace'], [data-ui='office']) .gchip .num { flex: 1 1 auto; padding-left: 4px; text-align: center; }
-.hub:is([data-ui='palace'], [data-ui='office']) .cta-main {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .gchip .num { flex: 1 1 auto; padding-left: 4px; text-align: center; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .cta-main {
   /* 그림 한 장을 통째로 늘리지 않는다 — **모서리 장식은 원본 크기로 두고 가운데 면만 늘린다**.
      그래서 판을 어떤 크기로 잡아도 네 모서리 장식은 안 찌그러진다(2026-08-18 '3번' 선택).
      ⚠️ 다만 좌우 가운데의 꽃 장식은 세로로 같이 늘어난다 — 그건 이 방식의 대가고, 없애려면
@@ -1245,20 +1353,20 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* 랭킹 버튼 속 아이콘 — `<img>` 라 크기를 안 주면 원본(500×470)이 그대로 튀어나온다.
    ⚠️ 궁궐은 이 아이콘을 안 그리므로(`Hub.tsx` 가 `ui !== 'palace'` 로 건너뛴다) `--skin-cta-icon`
       도 안 갖는다 — 값이 없으면 규칙이 통째로 무효가 되어 옛 동작 그대로다. */
-.hub:is([data-ui='palace'], [data-ui='office']) .cta-star .hub-ui-icon {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .cta-star .hub-ui-icon {
   display: block; width: var(--skin-cta-icon); height: var(--skin-cta-icon); object-fit: contain;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3));
 }
-.hub:is([data-ui='palace'], [data-ui='office']) .cta-main:active { transform: translateY(2px); box-shadow: none; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .cta-main:active { transform: translateY(2px); box-shadow: none; }
 @media (min-width: 768px) {
-  .hub:is([data-ui='palace'], [data-ui='office']) .hud-av::after { inset: -15px; }
-  .hub:is([data-ui='palace'], [data-ui='office']) .hud-score { padding-right: 30px; padding-left: 30px; }
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-av::after { inset: var(--skin-profile-inset, -15px); }
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .hud-score { padding-right: var(--skin-rank-pad-r, 30px); padding-left: var(--skin-rank-pad-l, 30px); }
   /* ⚠️ 좌·우 여백은 그림의 면과 맞춰야 한다 — 왼쪽은 코인이 덮고 있어 더 넓다.
      한쪽만 주면 숫자가 면의 가운데가 아니라 오른쪽으로 밀린다(2026-08-18 "코인 갯수 위치").
      값 자체는 벌마다 다르므로(코인 크기·면의 위아래 대칭이 그림마다 다르다)
      `--skin-currency-pad` 로 각자 값 블록의 768px 칸에서 준다. */
   /* 옆 출석 판과 위아래 선을 맞춘다(stretch) — 가운데만 늘어나므로 높이가 얼마든 장식은 그대로다 */
-  .hub:is([data-ui='palace'], [data-ui='office']) .cta-main { min-width: 300px; align-self: stretch; height: auto;
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world']) .cta-main { min-width: 300px; align-self: stretch; height: auto;
     flex-direction: row; gap: 12px; font-size: 30px; }
 }
 

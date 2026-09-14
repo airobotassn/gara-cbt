@@ -1795,6 +1795,7 @@ const HI: Record<string, string> = {
   "hub.closet.cat_palace": "महल",
   "hub.closet.cat_office": "होम · ऑफ़िस",
   "hub.closet.cat_campus": "कैंपस",
+  "hub.closet.cat_world": "विश्व",
   "hub.closet.g_part": "आइटम",
   "hub.closet.worn": "लगा हुआ",
   "hub.closet.wear": "लगाएँ",
@@ -1854,6 +1855,7 @@ const HI: Record<string, string> = {
   "hub.part.skin_campus_classroom": "कैंपस · हाई स्कूल क्लासरूम",
   "hub.part.skin_campus_lecture": "कैंपस · लेक्चर हॉल",
   "hub.part.skin_campus_garden": "कैंपस · बगीचा",
+  "hub.part.skin_world_paris": "विश्व · पेरिस एफ़िल टावर",
   // 쿠폰함
 
   // 칭호

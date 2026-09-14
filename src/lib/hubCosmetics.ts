@@ -207,6 +207,8 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  * `base`   = 아무 그림도 안 얹는 원래 카툰 CSS(흰 면 + 두꺼운 외곽선 + SVG 아이콘).
  * `palace` = 궁궐 9패치 판·게이지·도장·아이콘 한 벌(`public/hub/ui/*`).
  * `office` = 사옥 벌 — 흰 면에 파란 테를 두른 판·알약 게이지·3D 파란 아이콘(`public/hub/ui-office/*`).
+ * `world`  = 세계 벌 — 남색 세계지도 면에 금테, 지구본·나침반·트로피 장식(`public/hub/ui-world/*` · 2026-09-14).
+ *            궁궐처럼 아이콘이 스스로 장식판이라 레일 틀을 안 씌우고, 랭킹 버튼에도 아이콘을 안 얹는다(트로피가 그림 안에 있다).
  *
  * ⚠️ **에셋 파일 이름이 벌마다 같다**(`panel-mission.webp`·`icon-shop.png` …). 폴더로만 갈리므로
  *    한 폴더에 섞으면 한쪽이 통째로 덮인다. 새 벌은 항상 자기 폴더를 갖는다.
@@ -216,7 +218,7 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  *    급한 대로 선택자를 `palace_night` 하나로 좁혔더니 이번엔 **고궁 낮이 UI 를 잃었다**
  *    (2026-08-25). 배경과 UI 는 각자 이름을 갖는다 — 그래야 "배경만 다른 두 스킨"이 성립한다.
  */
-export type SkinUi = 'base' | 'palace' | 'office'
+export type SkinUi = 'base' | 'palace' | 'office' | 'world'
 
 /**
  * 배경 **카테고리** — 상점·보관함의 배경 칩 필터가 이 축으로 거른다(2026-09-11).
@@ -229,7 +231,7 @@ export type SkinUi = 'base' | 'palace' | 'office'
  * ⚠️ `basic` 은 초원(기본) 하나뿐이고 상점엔 안 뜬다(비판매) — 그래서 칩은 **그 탭에 항목이 있는
  *    카테고리만** 그린다(빈 칩을 눌러 빈 격자를 보게 하지 않는다).
  */
-export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus'] as const
+export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'world'] as const
 export type SkinCategory = (typeof SKIN_CATEGORIES)[number]
 
 export interface SkinDef {
@@ -437,6 +439,16 @@ export const SKINS: SkinDef[] = [
     category: 'campus',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-campus-garden.webp',
+  },
+  // 세계 — 첫 장은 파리 에펠탑 밤(2026-09-14 · Z:「국가별 스킨」). **세계 UI 한 벌**(`ui: 'world'`)을 같이 들고 온다.
+  //   나머지 나라 배경(24장)은 배경만 다르니 `ui: 'world'` 로 여기 얹으면 된다(고궁 낮·밤과 같은 꼴).
+  {
+    key: 'world_paris',
+    partKey: 'skin_world_paris',
+    ui: 'world',
+    category: 'world',
+    iconDir: '/hub/ui-world',
+    bg: '/hub/bg-world-paris.webp',
   },
 ]
 

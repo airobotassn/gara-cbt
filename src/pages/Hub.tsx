@@ -1195,8 +1195,9 @@ export default function Hub() {
               {/* ⚠️ 궁궐 벌(고궁 낮·밤)에는 아이콘을 아예 그리지 않는다(2026-08-26 지시) — 판 그림이 이미
                   장식을 다 하고 있어서 글자 옆에 그림을 하나 더 얹으면 스티커를 붙인 것처럼 읽힌다.
                   CSS 로 감추지 않은 이유 = display:none 이어도 브라우저는 icon-ranking.png(424KB)를
-                  그대로 받아온다. 기본(초원)의 별 SVG 는 그대로다. */}
-              {skin.ui !== 'palace' && (
+                  그대로 받아온다. 기본(초원)의 별 SVG 는 그대로다.
+                  세계 벌(2026-09-14)도 같다 — 버튼 그림 왼쪽에 트로피 원판이 이미 붙어 있다. */}
+              {skin.ui !== 'palace' && skin.ui !== 'world' && (
                 <span className="cta-star" aria-hidden="true">
                   <HubUiIcon n="ranking" dir={skin.iconDir} s={24} />
                 </span>

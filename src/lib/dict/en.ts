@@ -1795,6 +1795,7 @@ const EN: Record<string, string> = {
   "hub.closet.cat_palace": "Palace",
   "hub.closet.cat_office": "Home · Office",
   "hub.closet.cat_campus": "Campus",
+  "hub.closet.cat_world": "World",
   "hub.closet.g_part": "Items",
   "hub.closet.worn": "Equipped",
   "hub.closet.wear": "Equip",
@@ -1854,6 +1855,7 @@ const EN: Record<string, string> = {
   "hub.part.skin_campus_classroom": "Campus · High School Classroom",
   "hub.part.skin_campus_lecture": "Campus · Lecture Hall",
   "hub.part.skin_campus_garden": "Campus · Garden",
+  "hub.part.skin_world_paris": "World · Eiffel Tower, Paris",
   // 쿠폰함
 
   // 칭호

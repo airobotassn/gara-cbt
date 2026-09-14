@@ -1795,6 +1795,7 @@ const JA: Record<string, string> = {
   "hub.closet.cat_palace": "古宮",
   "hub.closet.cat_office": "ホーム・オフィス",
   "hub.closet.cat_campus": "キャンパス",
+  "hub.closet.cat_world": "世界",
   "hub.closet.g_part": "アイテム",
   "hub.closet.worn": "着用中",
   "hub.closet.wear": "着用する",
@@ -1854,6 +1855,7 @@ const JA: Record<string, string> = {
   "hub.part.skin_campus_classroom": "キャンパス・高校の教室",
   "hub.part.skin_campus_lecture": "キャンパス・大学講義室",
   "hub.part.skin_campus_garden": "キャンパス・庭園",
+  "hub.part.skin_world_paris": "世界・パリ エッフェル塔",
   // 쿠폰함
 
   // 칭호

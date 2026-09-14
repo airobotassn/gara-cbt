@@ -1795,6 +1795,7 @@ const ZH: Record<string, string> = {
   "hub.closet.cat_palace": "古宫",
   "hub.closet.cat_office": "家 · 办公室",
   "hub.closet.cat_campus": "校园",
+  "hub.closet.cat_world": "世界",
   "hub.closet.g_part": "道具",
   "hub.closet.worn": "使用中",
   "hub.closet.wear": "使用",
@@ -1854,6 +1855,7 @@ const ZH: Record<string, string> = {
   "hub.part.skin_campus_classroom": "校园 · 高中教室",
   "hub.part.skin_campus_lecture": "校园 · 大学阶梯教室",
   "hub.part.skin_campus_garden": "校园 · 花园",
+  "hub.part.skin_world_paris": "世界 · 巴黎埃菲尔铁塔",
   // 쿠폰함
 
   // 칭호

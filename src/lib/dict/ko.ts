@@ -1820,6 +1820,7 @@ const KO: Record<string, string> = {
   "hub.closet.cat_palace": "고궁",
   "hub.closet.cat_office": "홈 · 오피스",
   "hub.closet.cat_campus": "캠퍼스",
+  "hub.closet.cat_world": "세계",
   "hub.closet.g_part": "아이템",
   "hub.closet.worn": "착용 중",
   "hub.closet.wear": "적용하기",
@@ -1884,6 +1885,7 @@ const KO: Record<string, string> = {
   "hub.part.skin_campus_classroom": "캠퍼스 · 고등학교 교실",
   "hub.part.skin_campus_lecture": "캠퍼스 · 대학 강의실",
   "hub.part.skin_campus_garden": "캠퍼스 · 정원",
+  "hub.part.skin_world_paris": "세계 · 파리 에펠탑",
   // 쿠폰함
 
   // 칭호
