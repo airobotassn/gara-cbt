@@ -801,32 +801,36 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='campus_garden']        { --skin-bg: url('/hub/bg-campus-garden.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 /* 세계 — 파리 에펠탑 밤 (2026-09-14). 같은 판(1672×941), 아래 1/3 이 광장이라 값은 오피스 계열과 같다.
    UI 는 `[data-ui='world']` 벌(아래 값 블록). 나라 배경을 더할 땐 여기 한 줄 + SKINS 한 줄이면 된다. */
-.hub[data-skin='world_paris']          { --skin-bg: url('/hub/bg-world-paris.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-/* 나라 배경 24장 (2026-09-14 · Z:「국가별 스킨」폴더 전부). 전부 같은 판·같은 값·같은 세계 UI 벌. */
-.hub[data-skin='world_za_capetown']           { --skin-bg: url('/hub/bg-world-za-capetown.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_kr_seoul_night']        { --skin-bg: url('/hub/bg-world-kr-seoul-night.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_kr_seoul']              { --skin-bg: url('/hub/bg-world-kr-seoul.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_de_berlin']             { --skin-bg: url('/hub/bg-world-de-berlin.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_my_petronas']           { --skin-bg: url('/hub/bg-world-my-petronas.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_us_dc_capitol']         { --skin-bg: url('/hub/bg-world-us-dc-capitol.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_us_dc_monument']        { --skin-bg: url('/hub/bg-world-us-dc-monument.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_vn_hoankiem']           { --skin-bg: url('/hub/bg-world-vn-hoankiem.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_vn_hanoi_temple']       { --skin-bg: url('/hub/bg-world-vn-hanoi-temple.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_es_sevilla']            { --skin-bg: url('/hub/bg-world-es-sevilla.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_sg_marinabay']          { --skin-bg: url('/hub/bg-world-sg-marinabay.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_ae_dubai']              { --skin-bg: url('/hub/bg-world-ae-dubai.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_gb_bigben']             { --skin-bg: url('/hub/bg-world-gb-bigben.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_il_jerusalem']          { --skin-bg: url('/hub/bg-world-il-jerusalem.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_it_colosseum']          { --skin-bg: url('/hub/bg-world-it-colosseum.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_in_lotus']              { --skin-bg: url('/hub/bg-world-in-lotus.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_in_indiagate']          { --skin-bg: url('/hub/bg-world-in-indiagate.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_jp_fuji']               { --skin-bg: url('/hub/bg-world-jp-fuji.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_cn_tiantan']            { --skin-bg: url('/hub/bg-world-cn-tiantan.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_cn_tiananmen']          { --skin-bg: url('/hub/bg-world-cn-tiananmen.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_ca_rockies']            { --skin-bg: url('/hub/bg-world-ca-rockies.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_ke_kilimanjaro']        { --skin-bg: url('/hub/bg-world-ke-kilimanjaro.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_ph_palawan']            { --skin-bg: url('/hub/bg-world-ph-palawan.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-.hub[data-skin='world_hk_victoria']           { --skin-bg: url('/hub/bg-world-hk-victoria.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='world_paris']          { --skin-bg: url('/hub/bg-world-paris.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+/* 나라 배경 24장 (2026-09-14 · Z:「국가별 스킨」폴더 전부). 전부 같은 판·같은 세계 UI 벌.
+   ⚠️ 세로 위치가 다른 계열(100%)과 달리 **15%** 다 — 25장 전부 국기가 왼쪽 위 모서리에 걸려 있어서, 바닥 기준으로
+      두면 PC 의 납작한 창(1920×857, 위 21% 잘림)에서 국기가 통째로 잘렸다(2026-09-14 "국기들이 다 짤리네").
+      15% 면 국기는 다 들어오고 아래 잘림(19%)은 광장 앞부분이라 발끝(22svh)이 여전히 광장 위에 선다(6장 실측).
+      폰은 세로 잘림이 없어 이 값과 무관하다. */
+.hub[data-skin='world_za_capetown']           { --skin-bg: url('/hub/bg-world-za-capetown.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_kr_seoul_night']        { --skin-bg: url('/hub/bg-world-kr-seoul-night.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_kr_seoul']              { --skin-bg: url('/hub/bg-world-kr-seoul.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_de_berlin']             { --skin-bg: url('/hub/bg-world-de-berlin.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_my_petronas']           { --skin-bg: url('/hub/bg-world-my-petronas.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_us_dc_capitol']         { --skin-bg: url('/hub/bg-world-us-dc-capitol.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_us_dc_monument']        { --skin-bg: url('/hub/bg-world-us-dc-monument.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_vn_hoankiem']           { --skin-bg: url('/hub/bg-world-vn-hoankiem.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_vn_hanoi_temple']       { --skin-bg: url('/hub/bg-world-vn-hanoi-temple.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_es_sevilla']            { --skin-bg: url('/hub/bg-world-es-sevilla.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_sg_marinabay']          { --skin-bg: url('/hub/bg-world-sg-marinabay.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_ae_dubai']              { --skin-bg: url('/hub/bg-world-ae-dubai.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_gb_bigben']             { --skin-bg: url('/hub/bg-world-gb-bigben.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_il_jerusalem']          { --skin-bg: url('/hub/bg-world-il-jerusalem.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_it_colosseum']          { --skin-bg: url('/hub/bg-world-it-colosseum.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_in_lotus']              { --skin-bg: url('/hub/bg-world-in-lotus.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_in_indiagate']          { --skin-bg: url('/hub/bg-world-in-indiagate.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_jp_fuji']               { --skin-bg: url('/hub/bg-world-jp-fuji.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_cn_tiantan']            { --skin-bg: url('/hub/bg-world-cn-tiantan.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_cn_tiananmen']          { --skin-bg: url('/hub/bg-world-cn-tiananmen.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_ca_rockies']            { --skin-bg: url('/hub/bg-world-ca-rockies.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_ke_kilimanjaro']        { --skin-bg: url('/hub/bg-world-ke-kilimanjaro.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_ph_palawan']            { --skin-bg: url('/hub/bg-world-ph-palawan.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+.hub[data-skin='world_hk_victoria']           { --skin-bg: url('/hub/bg-world-hk-victoria.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
 
 
 /* ── 값: 궁궐(palace) UI 한 벌 — 낮·밤 **공용** ───────────────────────────────
