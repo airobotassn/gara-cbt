@@ -158,8 +158,8 @@ body{
 .mini.iff .mini{width:20px;height:20px;border-radius:5px;}
 .mini.iff.open{outline:2px solid #ffd54a;outline-offset:1px;}
 .mini.dot{font-size:12px!important;color:#fff;background:rgba(0,0,0,.18)!important;}
-/* 글자 블록(포함 상자) — 반복(주황) ⊃ 조건(빨강) ⊃ 명령 칩. 상자 안에서 줄바꿈되고 프로그램 칸도 줄바꿈된다(두 줄 높이) */
-.console .program.flow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;gap:3px;padding:4px 6px;overflow:hidden;}
+/* 프로그램 칸(포함 상자) — 반복(주황) ⊃ 조건(빨강) ⊃ 명령 칩. 상자 안에서 줄바꿈되고 프로그램 칸도 줄바꿈된다(두 줄 높이). 위의 .slot.simple/.mini 그림 규칙은 이제 안 쓴다 */
+.console .program.flow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;gap:3px;padding:4px 6px;overflow-x:hidden;overflow-y:auto;}  /* 세 줄을 넘으면 세로 스크롤(스크롤바는 숨김) */
 .console .program.flow .chip{flex:0 0 auto;width:auto!important;min-width:0;height:26px!important;line-height:26px!important;padding:0 8px!important;font-size:12px!important;font-weight:850;color:#fff;white-space:nowrap;border-radius:7px;
   background-size:auto!important;text-shadow:0 1px 2px rgba(0,0,0,.35);box-shadow:0 2px 0 rgba(0,0,0,.25);display:block;cursor:pointer;}
 .console .program.flow .chip.mv{background:linear-gradient(#3d8ff0,#1f5fc0)!important;}
@@ -171,7 +171,7 @@ body{
   padding:3px 4px!important;border-radius:9px;font-size:12px!important;line-height:1;color:#fff;font-weight:850;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.25);}
 .console .program.flow .box.lp{background:linear-gradient(145deg,#f3a512,#a95d00)!important;border:1px solid #ffd76b;}
 .console .program.flow .box.iff{background:linear-gradient(145deg,#ed6a52,#9f3024)!important;border:1px solid #ffad9e;}
-.console .program.flow .box .lab{padding:0 2px 0 0;text-shadow:0 1px 2px rgba(0,0,0,.35);}
+.console .program.flow .box .lab{padding:0 1px;margin-left:-1px;text-shadow:0 1px 2px rgba(0,0,0,.35);white-space:nowrap;}
 .console .program.flow .box .cnt,.console .program.flow .box .q{display:inline-block;margin:0;padding:3px 6px;font-size:11.5px;line-height:1.2;border-radius:7px;background:#fff;}
 .console .program.flow .box.lp .cnt{color:#e59b17;}.console .program.flow .box.iff .cnt,.console .program.flow .box.iff .q{color:#e0674a;}
 .console .program.flow .box .cnt.tut-on{transform:none;}
@@ -462,58 +462,33 @@ function placeCari(x,y,dir,shock,fx=false){
 function countOps(list){ list=list||S.prog; let n=0; for(const ins of list){ n++; if(ins.body) n+=countOps(ins.body); } return n; }
 function condLabel(c){return T(c==='blocked'?'prog.cond.blocked':'prog.cond.star');}
 const programEl=document.getElementById('program');
-/* 글자 블록(시안 · 2026-09-14): 프로그램 칸을 그림이 아니라 문장으로 — "전진 · 오른쪽 돌기 · 6번 반복 [ 만약 앞이 막히면 [오른쪽 돌기] · 전진 ]".
-   ⚠️ 지금은 튜토리얼에서만 켜고 한국어만 박아 뒀다(번역 전). 본게임까지 갈지는 보고 정한다. */
-const txtMode=()=>tutOn;
-const TXT={MV:'전진',TL:'왼쪽',TR:'오른쪽',PK:'별 줍기'};
-const txtCond=c=>c==='blocked'?'앞이 막히면':'별이 있으면';
-/* 문장 흐름: 블록을 한 덩어리로 묶지 않고 "2번 반복 [" · "앞이 막히면 [" · "오른쪽" · "]" · "전진" · "]" 칩으로 풀어 놓아 길면 다음 줄로 넘어간다(칸이 두 줄 높이). */
+/* 프로그램 칸 = 글자 상자(2026-09-14): 그림 아이콘을 늘어놓던 것을 "2번 반복 [ 앞이 막히면 [오른쪽] · 전진 ]" 로 —
+   반복은 주황 상자, 그 안의 조건은 빨간 상자, 그 안에 명령 칩. 포함 관계가 색으로 보이고, 좁으면 상자 안에서 줄바꿈된다(칸이 두 줄 높이).
+   라벨은 전부 사전(prog.op.* · prog.blk.*). 그림 팔레트는 그대로다. */
+const blkCond=c=>T(c==='blocked'?'prog.blk.blocked':'prog.blk.star');
 function chipsHTML(list){
-  // 포함 관계가 보이게: 반복은 주황 상자, 그 안에 조건은 빨간 상자, 그 안에 명령 칩. 상자는 안에서 줄바꿈된다(칸이 두 줄 높이).
-  const chip=(op,attrs='')=>`<div class="chip ${OPS[op].cls}"${attrs}>${TXT[op]}</div>`;
+  const chip=(op,attrs='')=>`<div class="chip ${OPS[op].cls}"${attrs}>${opLab(op)}</div>`;
   let out='';
   list.forEach((ins,i)=>{
     const open=openStack.includes(ins)?' open':'';
     if(ins.op==='LP'||ins.op==='IF'){
-      const lab=ins.op==='LP'?`<span class="cnt">${ins.count}번</span><span class="lab">반복</span>`:`<span class="cnt">${txtCond(ins.cond)}</span>`;
+      const lab=ins.op==='LP'?T('prog.blk.loop',{n:'\u0000'}).split('\u0000').map(t=>t?`<span class="lab">${t}</span>`:'').join(`<span class="cnt">${ins.count}</span>`):`<span class="cnt">${blkCond(ins.cond)}</span>`;
       let inner='';
       ins.body.forEach((b,j)=>{
         if(b.op==='IF'){
           const o2=openStack.includes(b)?' open':'';
-          inner+=`<div class="mini box iff${o2}" data-parent="${i}" data-child="${j}"><span class="q">${txtCond(b.cond)}</span>${b.body.map(c=>chip(c.op)).join('')||'<div class="chip dot">·</div>'}</div>`;
+          inner+=`<div class="mini box iff${o2}" data-parent="${i}" data-child="${j}"><span class="q">${blkCond(b.cond)}</span>${b.body.map(c=>chip(c.op)).join('')||'<div class="chip dot">·</div>'}</div>`;
         } else inner+=chip(b.op,` data-parent="${i}" data-child="${j}"`);
       });
       out+=`<div class="slot box ${ins.op==='LP'?'lp':'iff'}${open}" data-i="${i}">${lab}${inner||'<div class="chip dot">·</div>'}</div>`;
-    } else out+=`<div class="slot chip ${OPS[ins.op].cls}" data-i="${i}">${TXT[ins.op]}</div>`;
+    } else out+=`<div class="slot chip ${OPS[ins.op].cls}" data-i="${i}">${opLab(ins.op)}</div>`;
   });
   return out;
 }
-function miniHTML(ins,parentIdx,childIdx){
-  if(ins.op==='IF'){
-    // 반복 안의 조건은 알약 블록으로 — 조건 라벨(막힘?/별?) + 안에 넣은 명령을 그림 그대로. 글자 아이콘으로 접으면 뭘 넣었는지 안 보인다(2026-09-14 지적).
-    const inner=ins.body.map(b=>`<div class="mini ${OPS[b.op].cls}"></div>`).join('')||'<div class="mini dot">·</div>';
-    const open=openStack.includes(ins)?' open':'';
-    return `<div class="mini iff${open}" data-parent="${parentIdx}" data-child="${childIdx}"><span class="q">${condLabel(ins.cond)}</span>${inner}</div>`;
-  }
-  return `<div class="mini ${OPS[ins.op].cls}" data-parent="${parentIdx}" data-child="${childIdx}">${OPS[ins.op].ic}</div>`;
-}
-function slotHTML(ins,idx){
-  if(ins.op==='LP'){
-    const open=openStack.includes(ins)?' open':'';
-    const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
-    return `<div class="slot block lp${open}" data-i="${idx}"><div class="blab">${opLab('LP')}<span class="cnt">×${ins.count}</span></div><div class="body">${body}</div></div>`;
-  }
-  if(ins.op==='IF'){
-    const open=openStack.includes(ins)?' open':'';
-    const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
-    return `<div class="slot block iff${open}" data-i="${idx}"><div class="blab">${opLab('IF')}<span class="cnt">${condLabel(ins.cond)}</span></div><div class="body">${body}</div></div>`;
-  }
-  const o=OPS[ins.op];
-  return `<div class="slot simple ${o.cls}" data-i="${idx}"><div class="ic">${o.ic}</div><div>${opLab(ins.op)}</div></div>`;
-}
 function renderProgram(){
-  programEl.innerHTML=txtMode()?chipsHTML(S.prog):S.prog.map((ins,i)=>slotHTML(ins,i)).join('');
-  programEl.classList.toggle('flow',txtMode());
+  programEl.innerHTML=chipsHTML(S.prog);
+  programEl.classList.add('flow');
+  programEl.scrollTop=programEl.scrollHeight;   // 방금 넣은 명령(맨 끝)이 보이게
   programEl.classList.toggle('empty',S.prog.length===0);
   document.getElementById('slotN').textContent=countOps()+'/'+lv().limit;
   tutMark();
