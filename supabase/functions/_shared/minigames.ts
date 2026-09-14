@@ -6,29 +6,39 @@
 //   'level' — 레벨제 퍼즐(닿아라·프로그램해라·지어라). 도달 레벨이 1차 키, **동률은 소요시간(tieMs) 짧은 순**.
 //     레벨이 5·3·6개뿐이라 도달 레벨만으로는 전원 만점이 되어 보드가 무의미해진다 → 시간으로 가른다.
 //
+// replay: 답안 기록 재채점(버텨라·쏴라·골라라·닿아라 — 2026-09-11). 점수를 받지 않고 기록을 받아 서버가 다시 센다(./minigame-replay.ts).
+//   이들에는 max·perSec 가 **없다** — 다시 세니 상한이 필요 없다("상한 막 두지 말자" 지시). 골라라는 옛 15라운드 상한도
+//   게임에서 같이 뺐다(끝까지 가는 게임이 됐다). 닿아라는 레벨별 최종 관절 각도를 받아 정말 닿았는지 다시 계산한다.
+//
 // max: 서버 clamp 상한(위조 방어의 하드 실링). 'level' 은 게임의 실제 LEVELS.length 와 같아야 한다 —
 //   넉넉히 잡으면 존재하지 않는 레벨을 신고해 1위를 차지할 수 있다(런타임 실측: reach 5 · build 3 · program 6).
 // perSec: 초당 획득 가능한 상한(플레이 시간 대비 점수 sanity). 실측 텔레메트리가 없어 잠정값이며,
 //   분포를 보고 조여야 한다. 여유를 크게 준 값이라 1차 방어선(무플레이 만점 제출) 역할만 한다.
+import type { ReplayKind } from './minigame-replay.ts'
+
 export type Metric = 'score' | 'level'
 
 export interface GameSpec {
-  max: number
   metric: Metric
-  perSec: number
+  /** 답안 기록 재채점 게임 — 이때는 max·perSec 를 안 쓴다. */
+  replay?: ReplayKind
+  max?: number
+  perSec?: number
 }
 
 export const GAMES: Record<string, GameSpec> = {
-  'beat-cari': { max: 5000, metric: 'score', perSec: 80 }, // score += level*10 누적
-  'shoot-cari': { max: 5000, metric: 'score', perSec: 100 }, // score += gain 누적
-  // 골라라는 점수가 아니라 생존 라운드(round)다 — TOTAL_STAGES=15 가 상한이고 전원 클리어가 나오므로 시간으로 가른다.
-  'pick-cari': { max: 15, metric: 'level', perSec: 0.2 },
-  'reach-cari': { max: 5, metric: 'level', perSec: 0.35 },
+  'beat-cari': { metric: 'score', replay: 'beat' }, // 기록 재채점 — 정답당 level×10 을 서버가 다시 센다
+  'shoot-cari': { metric: 'score', replay: 'shoot' }, // 기록 재채점 — 20×정확도×콤보를 서버가 다시 센다
+  // 골라라는 점수가 아니라 생존 라운드(round)다 — 상한 없이 틀릴 때까지. 동률은 소요시간(기록의 마지막 시각)으로 가른다.
+  'pick-cari': { metric: 'level', replay: 'pick' },
+  'reach-cari': { metric: 'level', replay: 'reach' }, // 깬 레벨 수 — 레벨 수는 _shared/reach-levels.ts 가 안다
   'build-cari': { max: 3, metric: 'level', perSec: 0.25 },
-  'program-cari': { max: 6, metric: 'level', perSec: 0.3 },
-  // 막아라 = 서류를 읽고 규정 위반을 가리는 점수형. 문서 102장 × 최대 150점(100 + 완벽 보너스 50)이 이론상 천장.
+  'program-cari': { metric: 'level', replay: 'program' }, // 깬 레벨 수 — 동률은 명령 수 합 → 실행 횟수 합(서버가 log 로 센다)
+  // 막아라 = 서류를 읽고 규정 위반을 가리는 점수형. 서류는 5일 × 4장 = **20장**이고 전송형 18장(최대 150 = 100 + 완벽 보너스 50)
+  //   + 반려형 2장(100)이라 이론상 만점은 **2,900**이다. ⚠️ 옛 값 16,000 은 "문서 102장" 이라는 잘못된 전제로 잡혀 있었다
+  //   (2026-09-11 실측) — 실제 만점의 5.5배라 랭킹 상단이 영영 비어 있었다. 서류를 늘리면 이 값도 같이 올릴 것.
   //   perSec 는 "한 장을 2초에 처리" 를 상한으로 본 값 — 읽고 판단하는 게임이라 실제로는 훨씬 느리다.
-  'block-cari': { max: 16000, metric: 'score', perSec: 75 },
+  'block-cari': { max: 3000, metric: 'score', perSec: 75 },
   // 시켜라 = 지시를 골라 도면대로 만드는 레벨제(5레벨). 전원 만점이 나오므로 동률은 소요시간으로 가른다.
   'order-cari': { max: 5, metric: 'level', perSec: 0.3 },
   // 더듬어라 = 센서를 켜고 끄며 어두운 구역을 통과하는 레벨제(6구역).
@@ -98,9 +108,11 @@ export async function verifyTicket(ticket: unknown, userId: string, gameId: stri
   return { ok: true, ageSec }
 }
 
-/** 플레이 시간 대비 점수 상한 — 이걸 넘으면 clamp 한다(거부하지 않고 깎는다: 정상 플레이 오차를 죽이지 않기 위해). */
+/** 플레이 시간 대비 점수 상한 — 이걸 넘으면 clamp 한다(거부하지 않고 깎는다: 정상 플레이 오차를 죽이지 않기 위해).
+ *  ⚠️ replay 게임에는 부르지 않는다(max·perSec 가 없다) — 그쪽은 기록을 다시 세는 것으로 끝난다. */
 export function plausibleCap(spec: GameSpec, ageSec: number): number {
+  const max = spec.max ?? 0, perSec = spec.perSec ?? 0
   // 레벨형은 1레벨은 언제나 인정(첫 클리어가 최소 시간 안에 나올 수 있음) → 바닥 1.
   const floor = spec.metric === 'level' ? 1 : 0
-  return Math.max(floor, Math.min(spec.max, Math.ceil(spec.perSec * ageSec)))
+  return Math.max(floor, Math.min(max, Math.ceil(perSec * ageSec)))
 }

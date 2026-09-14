@@ -24,11 +24,18 @@
 //        활동점수는 참여 고정값이라 이득이 없다(위조 유인은 게임별 랭킹 쪽에만 남는다).
 //    ⚠️ 남은 구멍: 게임을 오래 켜둔 뒤 큰 점수를 신고하면 (c) 를 통과한다. 완전 방어는 게임 내 텔레메트리
 //      서명(플레이 이벤트 자체를 서버가 검증)이 필요하고 자립형 게임 HTML 로직을 다 손봐야 해서 후속 과제로 둔다.
+//  ⭐ **버텨라·쏴라·골라라·닿아라·프로그램해라는 다르다(2026-09-11)** — 점수를 안 받고 **답안 기록**(어느 문항에 뭘 골랐고 몇 ms 였나 / 닿아라는 레벨별 최종 각도 / 프로그램해라는 레벨별 프로그램)을 받아
+//    서버가 게임과 같은 공식으로 다시 센다(../_shared/minigame-replay.ts). rawScore 는 무시하고 (c)·(d) 의 상한도 없다.
+//    검사는 셋 — 문항이 진짜 은행에 있는가 · 답 사이 간격이 게임의 최소 간격 이상인가 · 전체가 티켓 시간 안인가.
+//    기록이 없거나 어긋나면 400 — 부모 앱은 조용히 넘기고 랭킹에만 안 올라간다(플레이는 그대로).
+//    ⚠️ 폴백 문항(term-pool 이 안 열렸을 때 HTML 안의 POOL)으로 한 판은 문항 id 가 없어 기록이 안 남는다 — 그때는 서버가 죽은 상황이다.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, getActiveSeasonId } from '../_shared/scoring.ts'
 import { loadRewardPolicy } from '../_shared/reward-policy.ts'
 import { kstDay } from '../_shared/kst.ts'
 import { gameSpec, issueTicket, verifyTicket, plausibleCap } from '../_shared/minigames.ts'
+import { logQuestionIds, replay } from '../_shared/minigame-replay.ts'
+import { TERM_BANKS } from '../_shared/term-banks.ts'
 
 // 게임 스펙(상한·지표·초당 상한)과 제출 티켓은 ../_shared/minigames.ts 소관 — 랭킹 조회 함수(minigame-rank)와 공용.
 //   · action:'start' → 티켓 발급(부모 앱이 게임 띄울 때).
@@ -58,12 +65,13 @@ Deno.serve(async (req) => {
     const user = await getUser(req)
     if (!user || user.is_anonymous) return json({ error: 'unauthorized' }, 401)
 
-    const { gameId, rawScore, action, ticket, tieMs } = (await req.json().catch(() => ({}))) as {
+    const { gameId, rawScore, action, ticket, tieMs, log } = (await req.json().catch(() => ({}))) as {
       gameId?: string
       rawScore?: number
       action?: string
       ticket?: string
       tieMs?: number
+      log?: unknown
     }
     const spec = gameSpec(gameId)
     if (!gameId || !spec) return json({ error: 'unknown_game' }, 400)
@@ -79,18 +87,38 @@ Deno.serve(async (req) => {
     const tk = await verifyTicket(ticket, user.id, gameId)
     if (!tk.ok) return json({ error: tk.reason ?? 'ticket_invalid' }, 400)
 
-    // (2b) 서버 clamp — 신뢰 불가 원점수를 [0, spec.max] 로 자르고, 플레이 시간 대비 상한으로 한 번 더 깎는다.
-    const raw = typeof rawScore === 'number' && isFinite(rawScore) ? rawScore : 0
-    const hardMax = spec.max
-    // clamped 는 이제 활동점수와 무관하다 — 게임별 랭킹(minigame_scores) 기록용으로만 쓴다.
-    const clamped = Math.max(0, Math.min(hardMax, Math.min(raw, plausibleCap(spec, tk.ageSec))))
-    // 퍼즐(레벨형) 동률 해소용 소요시간. 점수형은 저장하지 않는다(achieved_at 으로만 갈림).
-    const tie =
-      spec.metric === 'level' && typeof tieMs === 'number' && isFinite(tieMs) && tieMs >= 0
-        ? Math.min(Math.round(tieMs), 24 * 60 * 60 * 1000)
-        : null
-
     const admin = adminClient()
+
+    // (2b) 점수 확정 — clamped 는 활동점수와 무관하다. 게임별 랭킹(minigame_scores) 기록용으로만 쓴다.
+    let clamped: number
+    let playedMs: number | null = null
+    if (spec.replay) {
+      // 재채점 게임 — rawScore 는 안 본다. 기록의 문항이 게임 은행에 실재하는지 먼저 확인한다
+      //   (비활성·삭제된 문항도 인정 — 판 도중 관리자가 껐을 수 있다. 없는 id 만 거른다).
+      const ids = logQuestionIds(log)
+      const known = new Set<string>()
+      if (ids.length) {
+        const { data, error } = await admin
+          .from('term_questions').select('id').eq('bank_id', TERM_BANKS.game.id).in('id', ids)
+        if (error) return json({ error: error.message }, 500)
+        for (const r of data ?? []) known.add(String((r as { id: string }).id))
+      }
+      const r = replay(spec.replay, log, tk.ageSec, known)
+      if (!r.ok) return json({ error: r.reason }, 400)
+      clamped = r.score
+      playedMs = r.tie ?? r.durationMs   // 레벨형 동률값 — 시간이 아니라 명령 수로 가르는 게임(프로그램해라)은 tie 가 온다
+    } else {
+      // 신뢰 불가 원점수를 [0, spec.max] 로 자르고, 플레이 시간 대비 상한으로 한 번 더 깎는다.
+      const raw = typeof rawScore === 'number' && isFinite(rawScore) ? rawScore : 0
+      const hardMax = spec.max ?? 0
+      clamped = Math.max(0, Math.min(hardMax, Math.min(raw, plausibleCap(spec, tk.ageSec))))
+    }
+    // 퍼즐(레벨형) 동률 해소용 소요시간. 점수형은 저장하지 않는다(achieved_at 으로만 갈림).
+    //   재채점 게임(골라라)은 클라의 tieMs 대신 **기록의 마지막 시각**을 쓴다 — 같은 기록에서 나온 값이라 따로 위조할 수 없다.
+    const tie =
+      spec.metric === 'level'
+        ? playedMs ?? (typeof tieMs === 'number' && isFinite(tieMs) && tieMs >= 0 ? Math.min(Math.round(tieMs), 24 * 60 * 60 * 1000) : null)
+        : null
     const seasonId = await getActiveSeasonId(admin)
     if (seasonId == null) return json({ error: 'no_active_season' }, 409)
 
@@ -175,8 +203,9 @@ Deno.serve(async (req) => {
     // (5) 매 판 기록 — 관리자 통계(평균 플레이 시간·실제 이용 시간대)의 유일한 출처.
     //     ⚠️ 최고기록 테이블로는 그 두 값을 낼 수 없다(거긴 사람당 한 줄이고 '최고기록 세운 판'만 안다).
     //     ⚠️ 실패해도 제출을 막지 않는다 — 통계 때문에 게임이 안 되면 안 된다.
+    //     재채점 게임은 기록의 마지막 시각이 곧 플레이 시간이라 그걸 적는다(점수형은 여태 null 이었다).
     await admin.from('minigame_plays').insert({
-      user_id: user.id, game_id: gameId, score: clamped, duration_ms: tie ?? null,
+      user_id: user.id, game_id: gameId, score: clamped, duration_ms: tie ?? playedMs,
     }).then(undefined, () => { /* 통계 기록 실패는 삼킨다 */ })
 
     return json({

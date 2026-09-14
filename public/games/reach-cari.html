@@ -43,23 +43,54 @@ body{
   background:#eaf2fb url('/games/reach-cari-lab-v2.webp') center/cover no-repeat; border:1px solid #cddced;
   box-shadow:inset 0 0 30px rgba(14,65,125,.12),0 8px 24px rgba(30,60,110,.12);}
 .field svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
+/* 튜토리얼 — 지어라(build-cari)와 같은 방식: 지금 할 것 하나만 빛나고, 안내 한 줄이 위에 뜬다. 진입점은 인트로·게임화면 둘. */
+.tutmsg{position:absolute;left:10px;right:10px;top:10px;z-index:6;display:none;padding:9px 12px;border-radius:12px;
+  background:linear-gradient(#143563,#0d2145);border:1.5px solid rgba(238,233,220,.5);color:#e9f7ff;font-size:12.5px;font-weight:800;line-height:1.35;
+  box-shadow:0 4px 12px rgba(0,20,60,.35);text-align:center;}
+.tutmsg b{color:#ffd253;}
+.tutmsg.on{display:block;}
+.tut-help{position:absolute;right:10px;bottom:10px;z-index:6;width:30px;height:30px;padding:0;border-radius:50%;cursor:pointer;
+  border:1.5px solid rgba(238,233,220,.5);background:linear-gradient(#143563,#0d2145);
+  color:#ffd253;font:900 15px/1 system-ui,-apple-system,sans-serif;
+  box-shadow:0 3px 0 rgba(4,14,32,.4),inset 0 1px 0 rgba(255,255,255,.16);}
+.tut-help.quit{color:#ffb0a0;font-size:14px;}
+@keyframes tutring{
+  0%,100%{box-shadow:0 0 0 3px #ffd253,0 0 10px 2px rgba(255,210,83,.5)}
+  50%    {box-shadow:0 0 0 3px #ffd253,0 0 18px 6px rgba(255,210,83,.95)}
+}
+.jrow.tut-on{border-radius:10px;animation:tutring 1.15s ease-in-out infinite;}
+/* SVG 안의 지목(관절·목표)은 box-shadow 가 안 먹어서 링을 그려 깜빡인다. */
+.tut-ring{fill:none;stroke:#ffd253;stroke-width:3;animation:tutsvg 1.15s ease-in-out infinite;}
+@keyframes tutsvg{0%,100%{opacity:.45}50%{opacity:1}}
 
 /* controls */
 .controls{position:relative;flex:0 0 230px;padding:0;z-index:5;background:url('/games/reach-cari-controls-v5.webp') center/100% 100% no-repeat;color:#fff;filter:drop-shadow(0 -5px 10px rgba(0,20,60,.28));}
-.modeseg{position:absolute;left:38px;right:38px;top:12px;height:35px;display:flex;background:transparent;border-radius:10px;padding:1px;margin:0;}
-.modeseg button{flex:1;border:0;background:transparent;color:#8ec9ed;font-weight:900;font-size:11.5px;
-  padding:5px 4px;border-radius:9px;cursor:pointer;}
-.modeseg button.act{background:rgba(42,181,255,.18);color:#fff;box-shadow:inset 0 0 0 1px rgba(106,221,255,.55),0 0 10px rgba(23,170,255,.3);}
+/* 남은 시간 — 필드 위쪽 가운데 칩. 손끝 모드는 2026-09-11 에 뺐다(문제를 대신 풀어주는 버튼이라 실력 측정이 안 됐다).
+   ⚠️ 컨트롤 판 위 홈(옛 모드 토글 자리)에 넣었더니 홈 그림의 테두리에 글자가 잘리고 막대가 그림에 그려진 막대 위에 겹쳤다 → 필드로 옮김.
+   튜토리얼 중엔 숨긴다(그 자리에 안내가 뜬다). */
+.timebar{position:absolute;left:38px;right:38px;top:12px;height:35px;z-index:6;display:flex;align-items:center;padding:1px;margin:0;}
+.timebar.hide{visibility:hidden;}
+.timebar>*{flex:1;display:grid;place-items:center;height:100%;}
+.timebar .tb-lab{font-size:12px;font-weight:900;color:#8ec9ed;white-space:nowrap;}
+.timebar .tb-track{display:none;}
+.timebar b{font-size:16px;font-weight:900;color:#ffe273;font-variant-numeric:tabular-nums;text-shadow:0 1px 3px #001b51;}
+.timebar.crit b{color:#ff8a78;animation:tutsvg .6s ease-in-out infinite;}
 .jointpanel{position:absolute;left:39px;right:39px;top:52px;height:112px;display:flex;flex-direction:column;justify-content:center;gap:4px;min-height:0;}
 .jrow{display:flex;align-items:center;gap:10px;}
 .jrow label{font-size:11.5px;font-weight:900;color:#d7efff;width:64px;line-height:1.05;text-shadow:0 1px 2px #001735;}
 .jrow input[type=range]{flex:1; accent-color:var(--brand); height:22px;}
+.jointpanel.dense{gap:1px;}
+.jointpanel.dense .jrow input[type=range]{height:16px;}
+.jointpanel.dense .jrow label{font-size:10.5px;width:56px;}
+.jointpanel.dense .jrow .deg{font-size:11px;}
+.jointpanel.dense7{gap:0;}
+.jointpanel.dense7 .jrow input[type=range]{height:14px;}
+.jointpanel.dense7 .jrow label{font-size:10px;}
 .jrow .deg{font-size:12px;color:#ffe273;font-weight:900;width:44px;text-align:right;
   font-variant-numeric:tabular-nums;}
 .jrow.hint{border-radius:10px;background:rgba(255,205,53,.16);box-shadow:0 0 0 1px rgba(255,220,92,.7),0 0 14px rgba(255,191,31,.48);animation:hintPulse .65s ease-in-out 3;}
 .jrow.hint label,.jrow.hint .deg{color:#fff09a;text-shadow:0 0 7px #d88b00;}
 @keyframes hintPulse{50%{filter:brightness(1.35);transform:scale(1.015)}}
-.iktip{font-size:12px;color:#c9e9ff;text-align:center;padding:10px;line-height:1.45;}
 .btnrow{position:absolute;left:39px;right:39px;bottom:8px;height:48px;display:flex;gap:7px;margin:0;}
 .btn{flex:1; padding:13px 10px; border-radius:26px; border:0; cursor:pointer;
   background:linear-gradient(120deg,#1b55d0,#004ac6); color:#fff; font-size:15px; font-weight:800;
@@ -88,6 +119,7 @@ body{
   border:1px solid #84e6ff;box-shadow:inset 0 0 0 2px rgba(132,230,255,.12),0 0 8px rgba(38,181,255,.35);text-shadow:none;}
 .rules div span b{color:#ffe477;}
 .overlay #btnStart{width:190px;height:60px;margin-top:12px;padding:0;border-radius:0;background:url('/games/reach-cari-start-btn-v3.webp') center/100% 100% no-repeat;box-shadow:none;text-shadow:0 2px 4px #001b55;filter:drop-shadow(0 9px 11px rgba(0,15,55,.45));}
+.overlay #btnTutIntro{flex:0 0 auto;margin-top:8px;padding:9px 24px;background:rgba(255,255,255,.88);color:#0874d8;font-size:13.5px;box-shadow:0 4px 10px rgba(0,20,60,.18);}
 .result-console{position:relative;width:min(330px,78vw);height:min(430px,55vh);background:url('/games/reach-cari-result-console-v3.webp') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(0,10,42,.55));}
 #ovResult .floaty{position:absolute;top:6%;left:50%;transform:translateX(-50%);width:145px;height:155px;animation:none;}
 #ovResult .badge{position:absolute;top:40%;left:0;width:100%;font-size:29px;color:#6fffd2;text-shadow:0 0 12px #00b97e;}
@@ -112,12 +144,13 @@ body{
 </style>
 </head>
 <body>
+<script src="i18n.js"></script>
 <div class="stage" id="stage">
 
   <!-- HUD -->
   <div class="hud">
     <img class="cari-mini" id="hudCari" src="/games/reach-cari-hero-v2.webp" alt=""/>
-    <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub">관절 2개 · 쉬움</span></div>
+    <div class="lvlbox"><b id="lvlName">레벨 1</b><span id="lvlSub"></span></div>
     <div class="goalpill" id="goalPill">별에 닿아라</div>
   </div>
   <div class="dofrow"><span class="dl">움직이는 관절</span><span id="dofDots"></span></div>
@@ -125,18 +158,18 @@ body{
   <!-- PLAY FIELD -->
   <div class="field">
     <svg id="svg" viewBox="0 0 400 520" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="tutmsg" id="tutMsg"></div>
+    <!-- 튜토리얼 두 번째 진입점 — 게임에 들어간 뒤에도 다시 볼 수 있어야 한다(한 번 봐도 이해 못 할 수 있다). -->
+    <button class="tut-help" id="btnTut" type="button" aria-label="튜토리얼" data-i18n-attr="aria-label:reach.tutorial">?</button>
   </div>
 
   <!-- CONTROLS -->
   <div class="controls">
-    <div class="modeseg">
-      <button id="mFK" class="act">관절 하나씩 돌리기</button>
-      <button id="mIK">손끝 잡고 움직이기</button>
-    </div>
+    <div class="timebar" id="timebar"><span class="tb-lab" data-i18n="reach.time_left">남은 시간</span><div class="tb-track"><i id="tbFill"></i></div><b id="tbNum">30</b></div>
     <div class="jointpanel" id="panel"></div>
     <div class="btnrow">
-      <button class="btn ghost" id="btnReset">처음 자세</button>
-      <button class="btn" id="btnHint">관절 힌트</button>
+      <button class="btn ghost" id="btnReset" data-i18n="reach.reset">처음 자세</button>
+      <button class="btn" id="btnHint" data-i18n="reach.hint">관절 힌트</button>
     </div>
   </div>
 
@@ -145,14 +178,15 @@ body{
   <!-- START OVERLAY -->
   <div class="overlay" id="ovStart">
     <img class="floaty" id="startCari" src="/games/reach-cari-hero-v2.webp" alt="CARI와 로봇팔"/>
-    <div class="title"><span class="t1">닿아라 </span><span class="t2">CARI</span></div>
-    <div class="tag">로봇팔을 움직여 별에 닿아라!</div>
+    <div class="title"><span class="t1" data-i18n="reach.title">닿아라</span> <span class="t2">CARI</span></div>
+    <div class="tag" data-i18n="reach.tagline">로봇팔을 움직여 별에 닿아라!</div>
     <div class="rules">
-      <div><b>1</b><span>관절을 돌려 손끝을 <b>목표에 맞춰요</b></span></div>
-      <div><b>2</b><span>손끝을 끌면 팔 전체가 <b>함께 움직여요</b></span></div>
-      <div><b>3</b><span>벽에 닿지 않게 <b>피해서 이동!</b></span></div>
+      <div><b>1</b><span data-i18n="reach.rule1">관절을 돌려 손끝을 <b>목표에 맞춰요</b></span></div>
+      <div><b>2</b><span data-i18n="reach.rule2">시간 안에 못 닿으면 <b>게임 끝</b></span></div>
+      <div><b>3</b><span data-i18n="reach.rule3">벽에 닿지 않게 <b>피해서 이동!</b></span></div>
     </div>
-    <button class="btn" id="btnStart" style="margin-top:20px;padding:15px 50px;flex:0 0 auto;">시작하기</button>
+    <button class="btn" id="btnStart" style="margin-top:20px;padding:15px 50px;flex:0 0 auto;" data-i18n="reach.start">시작하기</button>
+    <button class="btn" id="btnTutIntro" type="button" data-i18n="reach.tutorial">튜토리얼</button>
   </div>
 
   <!-- RESULT OVERLAY -->
@@ -218,41 +252,150 @@ const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
 /* ================= Level data ================= */
 // base at (bx,by) in 400x520 svg coords. angles in degrees (absolute per-joint delta chained).
 // segLens list; jointLimits [min,max] absolute? we use relative angle per joint w/ limits.
+// time = 제한시간(초). 안 적으면 DEFAULT_TIME. 난이도는 전부 레벨 데이터가 정한다(배치 + 시간) — 배수 사다리는 안 건다(2026-09-11).
+// ⛔ 아래 배열의 기하(base·segs·limits·target·obstacles·time)는 서버 `_shared/reach-levels.ts` 와 **sync pair** 다 —
+//    서버가 "그 각도로 정말 닿았나" 를 다시 계산해서 랭킹을 만든다. 레벨을 넣거나 고치면 서버 쪽도 같이.
+//    tests/minigame-replay.mjs 가 두 파일을 대조한다(name·sub·goal·take 같은 문구는 대조 안 함).
 const D2R=Math.PI/180, R2D=180/Math.PI;
+/* 문구는 전부 사전(i18n.js 의 reach.*)에서 온다 — 레벨 문구는 reach.lv{n}.sub/goal/take. 사전에 없으면 LEVELS 의 한국어로 떨어진다. */
+const T=(k,v)=>window.MGI18N?MGI18N.t(k,v):k;
+function lvText(i,field,fallback){ const k='reach.lv'+(i+1)+'.'+field; const v=T(k); return v===k?fallback:v; }
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-
+const DEFAULT_TIME=60;   // 넉넉하게 — 시간은 난이도 손잡이가 아니라 '막혔다' 판정용(2026-09-14 지시)
 const LEVELS=[
+  /* 30레벨 (2026-09-14) — 난이도 구간 순: 1~5 배우기(관절 2~3) · 6~15 장애물 하나둘(관절 3~4) · 16~22 통로형(관절 5) ·
+     23~28 뱀길(관절 6) · 29~30 최상(관절 7). 같은 구간 안에 좌우를 뒤집은 바리에이션이 원본 뒤에 온다("(반대)").
+     난이도는 전부 필드로(관절 수·장애물) — 시간은 안 조인다. 떨림은 뺐다(멀미). start/solve 는 tmp 생성기(서버 기하로 검사)에서 뽑은 값:
+     단순형은 무작위 자세 탐색, 통로형은 통로 중심선을 따라 관절을 얹고 흔들어 찾았다(무작위로는 못 찾는다).
+     tests/minigame-replay.mjs 가 30개 전부 solve 가 닿고 start 가 안 닿는지 검사한다. */
   { name:"레벨 1", sub:"관절 2개 · 쉬움", goal:"별에 닿아라",
     base:{x:200,y:460}, segs:[115,100], limits:[[-165,165],[-155,155]],
-    start:[-94,25], solve:[-90,86], target:{x:300,y:340,r:20,kind:"star"}, obstacles:[],
+    start:[-90,0], solve:[-103,99], target:{x:300,y:340,r:20,kind:"star"}, obstacles:[],
     take:"<b>아래 관절</b>과 <b>위 관절</b>을 함께 움직여 목표 위치를 정확히 맞췄어요." },
-
-  { name:"레벨 2", sub:"관절 3개 · 장애물", goal:"장애물 넘어 별 집기",
-    base:{x:210,y:460}, segs:[100,88,70], limits:[[-160,160],[-150,150],[-150,150]],
-    start:[9,-123,-110], solve:[160,111,1], target:{x:120,y:320,r:19,kind:"star"}, obstacles:[
-      {x:210,y:360,w:120,h:24}],
-    take:"관절이 하나 늘어나면 같은 목표에도 <b>여러 자세</b>로 닿을 수 있어요." },
-
-  { name:"레벨 3", sub:"관절 4개 · 벽 돌아가기", goal:"벽 뒤 배터리에 닿아라",
-    base:{x:110,y:460}, segs:[95,85,75,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
-    start:[-76,113,124,-22], solve:[-33,125,-104,-39], target:{x:300,y:430,r:20,kind:"batt"}, obstacles:[
-      {x:230,y:350,w:26,h:220}],
-    take:"관절들을 차례로 꺾어 벽을 <b>감아 돌아</b> 목표에 닿았어요." },
-
-  { name:"레벨 4", sub:"관절 4개 · 좁은 통로", goal:"틈새로 넣어 배터리 집기",
-    base:{x:90,y:460}, segs:[95,85,74,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
-    start:[-60,-33,-43,-98], solve:[-50,-29,67,25], target:{x:300,y:300,r:18,kind:"batt"}, obstacles:[
-      {x:200,y:150,w:24,h:150},{x:200,y:400,w:24,h:120}],
-    take:"여러 관절을 세밀하게 움직이면 <b>좁은 틈</b>도 안전하게 통과할 수 있어요." },
-
-  { name:"레벨 5", sub:"관절 3개 · 흔들림", goal:"흔들리는 관절로 별 맞추기",
+  { name:"레벨 2", sub:"관절 2개 · 왼쪽", goal:"별에 닿아라",
+    base:{x:200,y:460}, segs:[115,100], limits:[[-165,165],[-150,150]],
+    start:[-90,0], solve:[-75,-99], target:{x:105,y:335,r:20,kind:"star"}, obstacles:[],
+    take:"같은 팔이라도 <b>반대쪽</b>은 관절을 반대로 돌려야 해요." },
+  { name:"레벨 3", sub:"관절 3개 · 멀리", goal:"멀리 있는 별로",
     base:{x:200,y:460}, segs:[110,90,66], limits:[[-160,160],[-150,150],[-150,150]],
-    start:[-110,-126,-103], solve:[-6,-117,72], target:{x:300,y:320,r:23,kind:"star"}, obstacles:[], noise:2.6,
-    take:"흔들리는 손끝을 계속 조절해 목표를 맞췄어요. 실제 로봇도 센서로 자세를 반복해서 고쳐요." },
+    start:[-87,0,-1], solve:[14,-130,47], target:{x:300,y:320,r:23,kind:"star"}, obstacles:[],
+    take:"팔을 쭉 펴야 닿는 거리예요. 관절 셋의 각도 <b>합</b>이 손끝 위치를 정해요." },
+  { name:"레벨 4", sub:"관절 3개 · 장애물", goal:"장애물 넘어 별 집기",
+    base:{x:210,y:460}, segs:[100,88,70], limits:[[-160,160],[-150,150],[-150,150]],
+    start:[-49,-1,-3], solve:[156,103,22], target:{x:120,y:320,r:19,kind:"star"}, obstacles:[{x:210,y:360,w:120,h:24}],
+    take:"관절이 하나 늘어나면 같은 목표에도 <b>여러 자세</b>로 닿을 수 있어요." },
+  { name:"레벨 5", sub:"관절 3개 · 선반 넘기", goal:"선반 위 별로",
+    base:{x:200,y:460}, segs:[100,88,70], limits:[[-165,165],[-150,150],[-150,150]],
+    start:[-56,0,1], solve:[-40,-42,-69], target:{x:205,y:262,r:19,kind:"star"}, obstacles:[{x:200,y:340,w:120,h:22}],
+    take:"가운데 선반이 막고 있으면 <b>옆으로 돌아</b> 위로 올라가요." },
+  { name:"레벨 6", sub:"관절 4개 · 벽과 선반", goal:"벽 너머 별로",
+    base:{x:200,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-122,1,15,14], solve:[21,-107,7,3], target:{x:330,y:250,r:18,kind:"star"}, obstacles:[{x:260,y:325,w:22,h:190}, {x:190,y:300,w:140,h:22}],
+    take:"선반 위로 올라가서 벽 꼭대기를 <b>넘어야</b> 닿아요." },
+  { name:"레벨 7", sub:"관절 4개 · 좁은 통로", goal:"틈새로 넣어 배터리 집기",
+    base:{x:90,y:460}, segs:[95,85,74,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
+    start:[-90,-7,-11,-7], solve:[-33,-70,71,41], target:{x:300,y:300,r:18,kind:"batt"}, obstacles:[{x:200,y:150,w:24,h:150}, {x:200,y:400,w:24,h:120}],
+    take:"여러 관절을 세밀하게 움직이면 <b>좁은 틈</b>도 안전하게 통과할 수 있어요." },
+  { name:"레벨 8", sub:"관절 4개 · 낮은 벽(반대)", goal:"벽 너머 별로",
+    base:{x:100,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-87,-6,1,-6], solve:[27,-56,-1,-76], target:{x:300,y:340,r:20,kind:"star"}, obstacles:[{x:200,y:375,w:22,h:190}],
+    take:"10번과 비슷한데 벽이 더 낮고 목표가 가까워요. 벽 꼭대기를 <b>넘는 각도</b>부터 잡아요." },
+  { name:"레벨 9", sub:"관절 4개 · 벽 돌아가기", goal:"벽 뒤 배터리에 닿아라",
+    base:{x:110,y:460}, segs:[95,85,75,62], limits:[[-170,170],[-160,160],[-160,160],[-160,160]],
+    start:[-89,-11,-1,12], solve:[-23,126,-104,-57], target:{x:300,y:430,r:20,kind:"batt"}, obstacles:[{x:230,y:350,w:32,h:226}],
+    take:"관절들을 차례로 꺾어 벽을 <b>감아 돌아</b> 목표에 닿았어요." },
+  { name:"레벨 10", sub:"관절 4개 · 벽 넘기", goal:"벽 너머 별로",
+    base:{x:110,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-90,2,-6,-13], solve:[-74,6,41,74], target:{x:295,y:320,r:22,kind:"star"}, obstacles:[{x:230,y:385,w:26,h:170}],
+    take:"벽 너머 별. 아래 관절로 높이를, 위 관절로 <b>넘어가는 각도</b>를 만들었어요." },
+  { name:"레벨 11", sub:"관절 3개 · 두 기둥 사이", goal:"기둥 사이 별로",
+    base:{x:200,y:460}, segs:[100,90,75], limits:[[-165,165],[-150,150],[-150,150]],
+    start:[-28,-5,-34], solve:[-161,97,7], target:{x:200,y:262,r:18,kind:"star"}, obstacles:[{x:200,y:392,w:100,h:22}, {x:100,y:300,w:22,h:170}, {x:300,y:300,w:22,h:170}],
+    take:"가로 막대를 옆으로 돌아 들어가야 기둥 사이에 닿아요. 곧장 가는 길이 막히면 <b>돌아가는 자세</b>를 찾아요." },
+  { name:"레벨 12", sub:"관절 4개 · 지그재그(반대)", goal:"선반 사이 별로",
+    base:{x:200,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-79,-78,-1,4], solve:[-144,59,60,-64], target:{x:200,y:200,r:18,kind:"star"}, obstacles:[{x:250,y:330,w:130,h:22}, {x:110,y:250,w:130,h:22}],
+    take:"15번과 좌우가 바뀐 판이에요. 몸이 기억한 자세를 <b>거울로 뒤집어</b> 보세요." },
+  { name:"레벨 13", sub:"관절 4개 · 벽의 틈", goal:"틈새로 배터리",
+    base:{x:90,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-98,1,-2,10], solve:[-22,9,-53,137], target:{x:320,y:420,r:18,kind:"batt"}, obstacles:[{x:230,y:470,w:24,h:90}, {x:230,y:330,w:24,h:140}],
+    take:"벽에 난 <b>작은 틈</b>으로 팔을 밀어 넣었어요. 틈이 좁을수록 맞는 자세는 하나뿐이에요." },
+  { name:"레벨 14", sub:"관절 4개 · 벽의 틈(반대)", goal:"틈새로 배터리",
+    base:{x:310,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-99,-3,-7,-2], solve:[-154,-18,59,-136], target:{x:80,y:420,r:18,kind:"batt"}, obstacles:[{x:170,y:470,w:24,h:90}, {x:170,y:330,w:24,h:140}],
+    take:"이번엔 왼쪽 벽의 틈이에요." },
+  { name:"레벨 15", sub:"관절 4개 · 두 단 지그재그", goal:"선반 사이 별로",
+    base:{x:200,y:460}, segs:[95,85,75,62], limits:[[-165,165],[-150,150],[-150,150],[-150,150]],
+    start:[-89,51,8,19], solve:[-20,-95,-7,23], target:{x:200,y:200,r:18,kind:"star"}, obstacles:[{x:150,y:330,w:130,h:22}, {x:290,y:250,w:130,h:22}],
+    take:"선반이 엇갈려 있으면 팔도 <b>S자</b>로 꺾여야 해요." },
+  { name:"레벨 16", sub:"관절 5개 · 상자의 문(반대)", goal:"문으로 배터리",
+    base:{x:200,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-65,-3,3,-12,12], solve:[-165,8,136,32,-150], target:{x:108,y:338,r:18,kind:"batt"}, obstacles:[{x:150,y:310,w:100,h:22}, {x:150,y:410,w:100,h:22}, {x:200,y:360,w:22,h:100}, {x:60,y:290,w:22,h:80}],
+    take:"문이 왼쪽에 난 상자예요." },
+  { name:"레벨 17", sub:"관절 5개 · ㄷ자 고리(반대)", goal:"고리 너머 별로",
+    base:{x:200,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-63,-1,19,-14,7], solve:[-91,-41,-61,-123,82], target:{x:73,y:438,r:18,kind:"star"}, obstacles:[{x:142,y:435,w:28,h:136}, {x:48,y:365,w:28,h:216}, {x:132.5,y:285,w:241,h:28}],
+    take:"20번의 거울. 고리는 <b>어느 쪽으로든</b> 만들 수 있어야 해요." },
+  { name:"레벨 18", sub:"관절 5개 · 상자의 문", goal:"문으로 배터리",
+    base:{x:200,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-123,20,-4,-1,11], solve:[-3,-7,-77,-68,-55], target:{x:244,y:383,r:18,kind:"batt"}, obstacles:[{x:250,y:310,w:112,h:34}, {x:250,y:410,w:112,h:34}, {x:200,y:360,w:34,h:112}, {x:340,y:290,w:34,h:92}],
+    take:"상자를 돌아 <b>문 쪽에서</b> 들어갔어요. 목표가 보여도 들어가는 길은 따로 있어요." },
+  { name:"레벨 19", sub:"관절 5개 · L자 통로", goal:"L자 통로 끝 별로",
+    base:{x:200,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-108,23,90,129,-60], solve:[-92,-16,133,-84,102], target:{x:327,y:321,r:18,kind:"star"}, obstacles:[{x:148,y:380,w:34,h:192}, {x:252,y:405,w:34,h:142}, {x:244,y:245,w:204,h:34}, {x:311,y:350,w:130,h:34}],
+    take:"위로 올라가 직각으로 꺾는 <b>L자</b> 통로예요." },
+  { name:"레벨 20", sub:"관절 5개 · ㄷ자 고리", goal:"고리 너머 별로",
+    base:{x:200,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-104,-17,0,-16,4], solve:[-88,40,62,123,-88], target:{x:334,y:434,r:18,kind:"star"}, obstacles:[{x:258,y:435,w:28,h:136}, {x:352,y:365,w:28,h:216}, {x:267.5,y:285,w:241,h:28}],
+    take:"벽 꼭대기를 넘어 반대편 주머니로 내려갔어요. 관절이 많으면 팔이 <b>고리 모양</b>도 만들 수 있어요." },
+  { name:"레벨 21", sub:"관절 5개 · S자 통로", goal:"S자 통로 끝 별로",
+    base:{x:210,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-13,-1,-95,22,12], solve:[-164,77,94,-17,-100], target:{x:234,y:276,r:18,kind:"star"}, obstacles:[{x:245,y:395,w:208,h:40}, {x:80,y:390,w:40,h:198}, {x:112.5,y:305,w:223,h:40}, {x:290,y:295,w:40,h:228}],
+    take:"통로가 S자면 팔도 S자예요. 관절 다섯이 <b>차례로</b> 꺾여야 통과해요." },
+  { name:"레벨 22", sub:"관절 5개 · 꺾인 굴뚝", goal:"굴뚝 끝 별로",
+    base:{x:200,y:460}, segs:[90,80,72,64,56], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-91,-2,74,-15,-2], solve:[-76,-86,-60,123,47], target:{x:128,y:272,r:18,kind:"star"}, obstacles:[{x:150,y:265,w:28,h:136}, {x:150,y:440,w:28,h:86}, {x:250,y:390,w:28,h:186}, {x:200,y:200,w:128,h:28}, {x:60,y:340,w:28,h:286}, {x:105,y:430,w:96,h:28}],
+    take:"굴뚝을 오르다 <b>왼쪽으로 빠져</b> 다시 오르는 길이에요." },
+  { name:"레벨 23", sub:"관절 6개 · 뱀길(반대)", goal:"뱀길 끝 별로",
+    base:{x:200,y:470}, segs:[85,76,68,60,54,48], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-109,58,-38,11,31,-31], solve:[-132,94,-9,-45,-26,-132], target:{x:197,y:272,r:18,kind:"star"}, obstacles:[{x:275,y:345,w:22,h:290}, {x:125,y:345,w:22,h:290}, {x:235,y:400,w:80,h:22}, {x:165,y:320,w:80,h:22}],
+    take:"24번의 거울. 뱀길은 <b>반대로도</b> 탈 수 있어야죠." },
+  { name:"레벨 24", sub:"관절 6개 · 뱀길", goal:"뱀길 끝 별로",
+    base:{x:200,y:470}, segs:[85,76,68,60,54,48], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-77,-63,72,-27,8,23], solve:[-48,-80,-30,84,-16,150], target:{x:199,y:271,r:18,kind:"star"}, obstacles:[{x:125,y:345,w:22,h:290}, {x:275,y:345,w:22,h:290}, {x:165,y:400,w:80,h:22}, {x:235,y:320,w:80,h:22}],
+    take:"관절 여섯이면 팔이 <b>뱀처럼</b> 통로를 타요." },
+  { name:"레벨 25", sub:"관절 7개 · 굴뚝 위 뱀길", goal:"뱀길 끝 별로",
+    base:{x:200,y:478}, segs:[80,72,65,58,52,46,40], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-78,-17,-9,-78,121,150,-52], solve:[-86,-9,-8,-51,78,84,-15], target:{x:256,y:185,r:17,kind:"star"}, obstacles:[{x:165,y:392.5,w:22,h:205}, {x:235,y:392.5,w:22,h:205}, {x:87.5,y:320,w:155,h:22}, {x:267.5,y:320,w:65,h:22}, {x:110,y:245,w:22,h:150}, {x:237.5,y:235,w:125,h:22}, {x:280,y:192.5,w:22,h:85}, {x:195,y:165,w:170,h:22}],
+    take:"긴 링크로 굴뚝을 곧게 오르고, 짧은 링크로 꼭대기 통로를 <b>뱀처럼</b> 꺾었어요." },
+  { name:"레벨 26", sub:"관절 7개 · 굴뚝 위 갈고리", goal:"주머니 속 별로",
+    base:{x:200,y:478}, segs:[80,72,65,58,52,46,40], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-92,17,-50,-65,9,70,-44], solve:[-86,-18,35,81,-3,106,-31], target:{x:307,y:396,r:17,kind:"star"}, obstacles:[{x:165,y:407.5,w:22,h:175}, {x:235,y:407.5,w:22,h:175}, {x:87.5,y:345,w:155,h:22}, {x:247.5,y:245,w:195,h:22}, {x:275,y:362.5,w:22,h:115}, {x:340,y:332.5,w:22,h:175}],
+    take:"굴뚝을 오른 뒤 천장 밑을 기어 <b>좁은 주머니</b>로 내려갔어요." },
+  { name:"레벨 27", sub:"관절 7개 · 3단 뱀길", goal:"뱀길 끝 별로",
+    base:{x:200,y:478}, segs:[80,72,65,58,52,46,40], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-74,-52,30,112,-98,-54,-150], solve:[-75,-43,3,150,-107,5,-92], target:{x:179,y:196,r:17,kind:"star"}, obstacles:[{x:140,y:337.5,w:22,h:315}, {x:260,y:337.5,w:22,h:315}, {x:169.5,y:400,w:59,h:22}, {x:230.5,y:330,w:59,h:22}, {x:169.5,y:260,w:59,h:22}],
+    take:"세 단을 꺾는 뱀길. 관절 일곱을 <b>차례로</b> 맞춰야 통과해요." },
+  { name:"레벨 28", sub:"관절 7개 · 좁은 갈고리", goal:"고리 너머 별로",
+    base:{x:190,y:478}, segs:[80,72,65,58,52,46,40], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-108,-7,25,-12,-5,7,-20], solve:[-111,40,28,37,123,-57,48], target:{x:270,y:435,r:18,kind:"star"}, obstacles:[{x:240,y:415,w:22,h:170}, {x:310,y:360,w:22,h:220}, {x:237.5,y:265,w:175,h:22}],
+    take:"고리 위 틈이 팔 두께에 가까워요. <b>그 틈을 정확히</b> 통과했어요." },
+  { name:"레벨 29", sub:"관절 7개 · 굴뚝 위 갈고리(반대)", goal:"주머니 속 별로",
+    base:{x:200,y:478}, segs:[80,72,65,58,52,46,40], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-95,1,48,17,-38,-49,78], solve:[-98,23,-35,-87,11,-113,35], target:{x:93,y:396,r:17,kind:"star"}, obstacles:[{x:235,y:407.5,w:22,h:175}, {x:165,y:407.5,w:22,h:175}, {x:312.5,y:345,w:155,h:22}, {x:152.5,y:245,w:195,h:22}, {x:125,y:362.5,w:22,h:115}, {x:60,y:332.5,w:22,h:175}],
+    take:"26번의 거울." },
+  { name:"레벨 30", sub:"관절 7개 · 굴뚝 위 뱀길(반대)", goal:"뱀길 끝 별로",
+    base:{x:200,y:478}, segs:[80,72,65,58,52,46,40], limits:[[-165,165],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150],[-150,150]],
+    start:[-88,8,-25,-89,12,-2,36], solve:[-94,12,3,55,-84,-86,28], target:{x:144,y:185,r:17,kind:"star"}, obstacles:[{x:235,y:392.5,w:22,h:205}, {x:165,y:392.5,w:22,h:205}, {x:312.5,y:320,w:155,h:22}, {x:132.5,y:320,w:65,h:22}, {x:290,y:245,w:22,h:150}, {x:162.5,y:235,w:125,h:22}, {x:120,y:192.5,w:22,h:85}, {x:205,y:165,w:170,h:22}],
+    take:"마지막. 여기까지 온 손끝은 <b>진짜 로봇 조작자</b>예요." },
 ];
 
 /* ================= State ================= */
-let LI=0, L=null, ang=[], mode="FK", won=false, rafId=0;
+let LI=0, L=null, ang=[], won=false, rafId=0;
+let cleared=0, runLog=[], runT0=0, levelStartT=0;   // 이번 판에서 깬 레벨 수 / 레벨별 기록(서버 재채점용) / 판 시작·레벨 시작 시각
+let timeLeft=0, timerId=0, timerPaused=false;       // 레벨 제한시간
+let tutOn=false, tutRound=0, tutIdx=0, tutFrom='intro', tutReturnLI=0, tutTimer=null, tutRef=null, tutDragged=false;
+const nowMs=()=>Math.round(performance.now()-runT0);
 const svg=document.getElementById('svg');
 const NS='http://www.w3.org/2000/svg';
 
@@ -338,14 +481,27 @@ function ccdSolve(a, goal){
 /* ================= Rendering ================= */
 function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
 
-function draw(){
-  const pts=fkPoints(ang);
-  const hit=armHitsAny(pts);
+/* 판정점 = 손끝이 아니라 **집게 중심**이다. 집게 그림(48px)이 마지막 마디 끝에서 앞으로 40px 뻗어 있어서, 손끝 점으로 재면
+   집게가 별을 감싸고 있어도 "안 닿음" 이 된다(2026-09-14 지적: 버그로 보인다). GRIP = 그림에서 잰 집게 중심까지의 거리.
+   ⛔ 서버 `_shared/reach-levels.ts` 의 REACH_GRIP 과 sync pair — 한쪽만 바꾸면 게임은 클리어인데 서버는 400 이다. */
+const GRIP=26;
+function gripPoint(pts){
+  const t=pts[pts.length-1], p=pts[pts.length-2], len=Math.hypot(t.x-p.x,t.y-p.y)||1;
+  return { x:t.x+(t.x-p.x)/len*GRIP, y:t.y+(t.y-p.y)/len*GRIP };
+}
+/** 자세 하나 판정(그리지 않음) — 충돌·닿음. */
+function judge(A){
+  const pts=fkPoints(A), hit=armHitsAny(pts), g=gripPoint(pts), tg=L.target;
+  const dist=Math.hypot(g.x-tg.x,g.y-tg.y);
+  return { pts, hit, grip:g, dist, reached: dist<tg.r+9 && !hit };
+}
+/* 떨림(noise)은 뺐다(2026-09-14 지시 "멀미난다"). 한때 뒤 세 관절을 흔들고 붙잡기 0.7초로 판정했었다 — 되살릴 거면
+   좁은 통로 레벨은 떨림 폭을 레벨마다 맞춰야 한다(정답 자세에서도 벽에 닿으면 영영 못 깬다). */
+function draw(A){
+  A=A||ang;
+  const {pts,hit,grip,dist,reached}=judge(A);
   const tip=pts[pts.length-1];
   const tg=L.target;
-  const dist=Math.hypot(tip.x-tg.x,tip.y-tg.y);
-  const reached=dist<tg.r+9 && !hit;
-
   let s='';
   // grid backdrop faint
   s+=`<defs>
@@ -413,25 +569,23 @@ function draw(){
   // joints: cover both segment ends with one larger bearing
   for(let i=0;i<pts.length-1;i++){
     s+=`<image href="/games/reach-cari-arm-joint-v3.webp" x="${pts[i].x-18}" y="${pts[i].y-18}" width="36" height="36" preserveAspectRatio="xMidYMid meet" filter="${hit?'url(#hitRed)':''}"/>`;
-    // joint drag handles (FK drag on non-base joints)
-    if(mode==='FK') s+=`<circle class="jhandle" data-j="${i}" cx="${pts[i].x}" cy="${pts[i].y}" r="20" fill="transparent" style="cursor:grab"/>`;
+    // joint drag handles
+    s+=`<circle class="jhandle" data-j="${i}" cx="${pts[i].x}" cy="${pts[i].y}" r="20" fill="transparent" style="cursor:grab"/>`;
   }
   // gripper / CARI tip
   const tipAngle=Math.atan2(pts[pts.length-1].y-pts[pts.length-2].y, pts[pts.length-1].x-pts[pts.length-2].x)*R2D;
   s+=gripper(tip.x,tip.y,tipAngle,reached,hit);
-  if(reached) s+=`<image href="/games/reach-cari-contact-vfx-v3.webp" x="${tip.x-34}" y="${tip.y-34}" width="68" height="68"/>`;
-
-  // tip drag handle in IK mode
-  if(mode==='IK'){
-    s+=`<circle id="tipDrag" cx="${tip.x}" cy="${tip.y}" r="26" fill="rgba(0,74,198,.10)" stroke="#004ac6" stroke-width="1.5" stroke-dasharray="3 4" style="cursor:grab"/>`;
-  }
-
+  if(reached) s+=`<image href="/games/reach-cari-contact-vfx-v3.webp" x="${grip.x-34}" y="${grip.y-34}" width="68" height="68"/>`;
+  // 튜토리얼 지목 — 관절 하나 또는 목표
+  const ts=tutStep();
+  if(ts && ts.joint!=null) s+=`<circle class="tut-ring" cx="${pts[ts.joint].x}" cy="${pts[ts.joint].y}" r="27"/>`;
+  if(ts && ts.target) s+=`<circle class="tut-ring" cx="${tg.x}" cy="${tg.y}" r="${tg.r+18}"/>`;
   svg.innerHTML=s;
-
   updatePanel(hit);
-  if(hit && !window._wasHit) toast('충돌! 벽을 피해요');
+  if(hit && !window._wasHit) toast(T('reach.collide'));
   window._wasHit=hit;
-  if(reached && !won){ won=true; setTimeout(()=>result(true), 260); }
+  if(tutOn){ tutCheck(hit,reached); return {hit,reached,dist}; }   // 튜토리얼은 기록·타이머 없이 단계만 진행
+  if(reached && !won){ won=true; levelCleared(); setTimeout(()=>result(true), 260); }
   return {hit,reached,dist};
 }
 
@@ -473,22 +627,17 @@ function gripper(x,y,angDeg,reached,hit){
 /* joint sliders panel (FK) / tip hint (IK) */
 function updatePanel(hit){
   const panel=document.getElementById('panel');
-  if(mode==='IK'){
-    if(!panel.dataset.ik){
-      panel.dataset.ik='1'; panel.dataset.fk='';
-      panel.innerHTML=`<div class="iktip">로봇의 <b>손끝</b>을 손가락이나 마우스로 끌어보세요.<br>관절들이 손끝을 따라 함께 움직여요.<br>팔이 붉어지면 장애물에 닿은 거예요.</div>`;
-    }
-    return;
-  }
-  // FK: build sliders once, then update values
+  // build sliders once, then update values
   if(panel.dataset.fk!==String(ang.length)){
-    panel.dataset.fk=String(ang.length); panel.dataset.ik='';
+    panel.dataset.fk=String(ang.length);
     let h='';
-    const jointNames=ang.length===2?['아래 관절','위 관절']:
-      ang.length===3?['아래 관절','가운데 관절','손목 관절']:
-      ['아래 관절','가운데 1','가운데 2','손목 관절'];
+    const jointNames=ang.length===2?[T('reach.joint.bottom'),T('reach.joint.top')]:
+      ang.length===3?[T('reach.joint.bottom'),T('reach.joint.middle'),T('reach.joint.wrist')]:
+      [T('reach.joint.bottom'),...Array.from({length:ang.length-2},(_,k)=>T('reach.joint.mid_n',{n:k+1})),T('reach.joint.wrist')];
+    panel.classList.toggle('dense', ang.length>4);   // 5~6개는 줄을 촘촘히 — 안 그러면 판 밖으로 넘친다
+    panel.classList.toggle('dense7', ang.length>6);  // 7개는 더 촘촘히
     for(let i=0;i<ang.length;i++){
-      h+=`<div class="jrow"><label>${jointNames[i]||('관절 '+(i+1))}</label>
+      h+=`<div class="jrow"><label>${jointNames[i]||T('reach.joint_n',{n:i+1})}</label>
         <input type="range" min="${L.limits[i][0]}" max="${L.limits[i][1]}" value="${ang[i]}" data-j="${i}">
         <span class="deg" id="deg${i}">${Math.round(ang[i])}°</span></div>`;
     }
@@ -524,23 +673,13 @@ function svgPoint(evt){
   return { x:(cx-r.left)/r.width*vb.width, y:(cy-r.top)/r.height*vb.height };
 }
 
-let dragJoint=-1, draggingTip=false;
-
+let dragJoint=-1;
 function onDown(e){
-  if(won) return;
+  if(won || timerPaused) return;
   const t=e.target;
-  if(mode==='IK' && (t.id==='tipDrag' || t.id==='tipDrag')){
-    draggingTip=true; e.preventDefault(); return;
-  }
-  if(mode==='IK'){
-    // allow grabbing anywhere near tip
-    const p=svgPoint(e); const pts=fkPoints(ang); const tip=pts[pts.length-1];
-    if(Math.hypot(p.x-tip.x,p.y-tip.y)<40){ draggingTip=true; e.preventDefault(); return; }
-  }
-  if(mode==='FK' && t.classList && t.classList.contains('jhandle')){
-    dragJoint=+t.dataset.j; e.preventDefault(); return;
-  }
-  if(mode==='FK'){
+  if(t.classList && t.classList.contains('jhandle')){
+    dragJoint=+t.dataset.j; e.preventDefault();
+  }else{
     // nearest joint pivot: rotate the joint whose pivot is closest to the touch
     const p=svgPoint(e); const pts=fkPoints(ang);
     let best=-1,bd=26;
@@ -550,20 +689,10 @@ function onDown(e){
     }
     if(best>=0){ dragJoint=best; e.preventDefault(); }
   }
+  if(dragJoint>=0){ tutDragged=true; if(tutOn) tutCheck(); }   // 튜토리얼 "직접 끌기" 단계 신호
 }
-
 function onMove(e){
   if(won) return;
-  if(draggingTip){
-    e.preventDefault();
-    const p=svgPoint(e);
-    const goal={x:clamp(p.x,6,394), y:clamp(p.y,6,514)};
-    const solved=ccdSolve(ang, goal);
-    // collision guard: only accept if not worse-colliding (allow but show red)
-    ang=solved;
-    draw();
-    return;
-  }
   if(dragJoint>=0){
     e.preventDefault();
     const p=svgPoint(e);
@@ -579,7 +708,7 @@ function onMove(e){
     draw();
   }
 }
-function onUp(){ dragJoint=-1; draggingTip=false; }
+function onUp(){ dragJoint=-1; }
 
 svg.addEventListener('mousedown',onDown);
 svg.addEventListener('touchstart',onDown,{passive:false});
@@ -588,44 +717,11 @@ window.addEventListener('touchmove',onMove,{passive:false});
 window.addEventListener('mouseup',onUp);
 window.addEventListener('touchend',onUp);
 
-/* ================= Noise (level 5) ================= */
-function tickNoise(){
-  if(L && L.noise && !won && document.getElementById('ovResult').classList.contains('hide')
-     && document.getElementById('ovStart').classList.contains('hide')){
-    // jitter last-but-one joint slightly, self-correct visually
-    const j=ang.length-1;
-    const noisy=ang.slice();
-    noisy[j]=clamp(ang[j]+(Math.random()-0.5)*L.noise*2, L.limits[j][0], L.limits[j][1]);
-    const pts=fkPoints(noisy);
-    const tip=pts[pts.length-1], tg=L.target;
-    const hit=armHitsAny(pts);
-    const reached=Math.hypot(tip.x-tg.x,tip.y-tg.y)<tg.r+9 && !hit;
-    // draw noisy version without committing (except when reached, commit)
-    renderFrom(noisy, reached);
-    if(reached && !won){ won=true; ang=noisy; setTimeout(()=>result(true),260); }
-  }
-  rafId=requestAnimationFrame(tickNoise);
-}
-function renderFrom(a, forceReached){
-  const save=ang; ang=a; draw(); ang=save;
-}
 
-/* ================= Mode / buttons ================= */
-function setMode(m){
-  mode=m;
-  document.getElementById('mFK').classList.toggle('act',m==='FK');
-  document.getElementById('mIK').classList.toggle('act',m==='IK');
-  const panel=document.getElementById('panel');
-  panel.dataset.fk=''; panel.dataset.ik='';
-  draw();
-}
-document.getElementById('mFK').onclick=()=>setMode('FK');
-document.getElementById('mIK').onclick=()=>setMode('IK');
-
-document.getElementById('btnReset').onclick=()=>{ ang=L.start.slice(); won=false; draw(); };
+/* ================= Buttons ================= */
+document.getElementById('btnReset').onclick=()=>{ if(won) return; ang=L.start.slice(); draw(); };
 document.getElementById('btnHint').onclick=()=>{
   if(won) return;
-  if(mode!=='FK') setMode('FK');
   const goal=L.solve ? L.solve : ccdSolve(ang,L.target);
   let pick=0, gap=-1;
   for(let i=0;i<ang.length;i++){
@@ -640,8 +736,8 @@ document.getElementById('btnHint').onclick=()=>{
     row.classList.add('hint');
     setTimeout(()=>row.classList.remove('hint'),2100);
   }
-  const name=row?.querySelector('label')?.textContent||('관절 '+(pick+1));
-  toast(`${name}을 ${goal[pick]>ang[pick]?'오른쪽':'왼쪽'}으로 돌려보세요`);
+  const name=row?.querySelector('label')?.textContent||T('reach.joint_n',{n:pick+1});
+  toast(T('reach.hint_turn',{name, dir:T(goal[pick]>ang[pick]?'reach.dir.right':'reach.dir.left')}));
 };
 
 /* ================= Toast ================= */
@@ -651,51 +747,215 @@ function toast(msg){
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),900);
 }
 
-/* ================= Load level ================= */
-function loadLevel(i){
-  LI=i; L=LEVELS[i]; ang=L.start.slice(); won=false; mode='FK';
+/* ================= Timer =================
+   레벨마다 제한시간(L.time, 초). 0 이 되면 게임오버 — 이 게임의 유일한 실패 조건이다(2026-09-11).
+   탭이 가려지면 멈추고 돌아오면 이어간다(다른 게임의 일시정지와 같은 이유 — 백그라운드에서 시간이 새면 억울하다). */
+function levelTime(){ return L.time || DEFAULT_TIME; }
+function renderTimer(){
+  const total=levelTime(), t=Math.max(0,timeLeft);
+  document.getElementById('tbNum').textContent=Math.ceil(t-1e-6);
+  document.getElementById('tbFill').style.width=(t/total*100).toFixed(1)+'%';
+  document.getElementById('timebar').classList.toggle('crit', t<=Math.min(10,total*0.34) && t>0);
+}
+function startTimer(){
+  document.getElementById('timebar').classList.remove('hide');
+  clearInterval(timerId); timeLeft=levelTime(); renderTimer();
+  timerId=setInterval(()=>{
+    if(timerPaused||won) return;
+    timeLeft-=0.1; renderTimer();
+    if(timeLeft<=0){ clearInterval(timerId); gameOver(); }
+  },100);
+}
+document.addEventListener('visibilitychange',()=>{ timerPaused=document.hidden; });
+window.addEventListener('blur',()=>{ timerPaused=true; });
+window.addEventListener('focus',()=>{ timerPaused=false; });
+
+/* ================= 튜토리얼 =================
+   지어라(build-cari)와 같은 규칙: 눌러야 시작하고(자동 실행 없음), 언제든 다시 볼 수 있고(인트로·게임화면 둘),
+   끝나면 시작한 자리로 돌아간다(메인 게임으로 밀지 않음). 점수·타이머 없음.
+   두 라운드 — ① 관절 돌리기(슬라이더·직접 끌기·목표에 대기) ② 벽 피하기(붉은 팔 떼기·벽 돌아 닿기).
+   ⚠️ ② 의 시작 자세는 일부러 벽을 관통한다 — "붉으면 안 된다" 는 붉은 걸 보여줘야 가르쳐진다. */
+const TUT_ROUNDS=[
+  { title:T('reach.tut.r1'),
+    level:{ name:T('reach.tut.name1'), sub:T('reach.tut.r1'), goal:T('reach.tut.goal1'),
+      base:{x:200,y:460}, segs:[115,100], limits:[[-165,165],[-155,155]],
+      start:[-94,25], target:{x:300,y:340,r:20,kind:"star"}, obstacles:[], take:'' },
+    steps:[
+      { msg:T('reach.tut.s1'), row:0, done:()=>Math.abs(ang[0]-tutRef[0])>=20 },
+      { msg:T('reach.tut.s2'), row:1, done:()=>Math.abs(ang[1]-tutRef[1])>=20 },
+      { msg:T('reach.tut.s3'), joint:1, done:()=>tutDragged },
+      { msg:T('reach.tut.s4'), target:true, done:(hit,reached)=>reached } ] },
+  { title:T('reach.tut.r2'),
+    level:{ name:T('reach.tut.name2'), sub:T('reach.tut.r2'), goal:T('reach.tut.goal2'),
+      base:{x:210,y:460}, segs:[100,88,70], limits:[[-160,160],[-150,150],[-150,150]],
+      start:[-90,0,0], target:{x:120,y:320,r:19,kind:"star"}, obstacles:[{x:210,y:360,w:120,h:24}], take:'' },
+    steps:[
+      { msg:T('reach.tut.s5'), row:0, done:(hit)=>!hit },
+      { msg:T('reach.tut.s6'), target:true, done:(hit,reached)=>reached } ] },
+];
+function tutStep(){ return tutOn ? TUT_ROUNDS[tutRound].steps[tutIdx] : null; }
+function tutSetHelp(){
+  const b=document.getElementById('btnTut');
+  b.textContent=tutOn?'✕':'?'; b.classList.toggle('quit',tutOn);
+  b.setAttribute('aria-label', T(tutOn?'reach.tutorial_quit':'reach.tutorial'));
+}
+function tutMark(){
+  document.querySelectorAll('.jrow.tut-on').forEach(el=>el.classList.remove('tut-on'));
+  const st=tutStep(); const m=document.getElementById('tutMsg');
+  if(!st){ m.classList.remove('on'); return; }
+  m.innerHTML=st.msg; m.classList.add('on');
+  if(st.row!=null){ const rows=document.querySelectorAll('.jrow'); if(rows[st.row]) rows[st.row].classList.add('tut-on'); }
+  tutRef=ang.slice(); tutDragged=false;
+}
+/** draw() 마다 불린다 — 지금 단계의 조건이 맞으면 다음 단계로. */
+function tutCheck(hit,reached){
+  const st=tutStep(); if(!st || !st.done(hit,reached)) return;
+  tutIdx++;
+  if(tutIdx<TUT_ROUNDS[tutRound].steps.length){ tutMark(); draw(); return; }
+  // 라운드 끝
+  document.getElementById('tutMsg').innerHTML = tutRound<TUT_ROUNDS.length-1
+    ? T('reach.tut.good_next',{title:TUT_ROUNDS[tutRound+1].title}) : T('reach.tut.good');
+  document.querySelectorAll('.jrow.tut-on').forEach(el=>el.classList.remove('tut-on'));
+  won=true;   // 조작 잠금(연출 동안)
+  clearTimeout(tutTimer);
+  tutTimer=setTimeout(()=>{
+    if(!tutOn) return;
+    if(tutRound<TUT_ROUNDS.length-1){ tutRound++; loadTutRound(); return; }
+    // 전부 끝 — 결과창
+    const ov=document.getElementById('ovResult'), b=document.getElementById('resBadge');
+    b.textContent=T('reach.tut.done'); b.className='badge win';
+    document.getElementById('resTitle').textContent=T('reach.tut.done_title');
+    document.getElementById('resTake').innerHTML=T('reach.tut.done_take');
+    document.getElementById('btnRetry').style.display=''; document.getElementById('btnRetry').textContent=T('reach.tut.again');
+    document.getElementById('btnNext').textContent=T('reach.tut.close');
+    ov.classList.remove('hide');
+  }, 1300);
+}
+function loadTutRound(){
+  tutIdx=0; LI=-1; L=TUT_ROUNDS[tutRound].level; ang=L.start.slice(); won=false; tutRef=ang.slice(); tutDragged=false;
+  clearInterval(timerId);
   document.getElementById('lvlName').textContent=L.name;
   document.getElementById('lvlSub').textContent=L.sub;
   document.getElementById('goalPill').textContent=L.goal;
-  document.getElementById('mFK').classList.add('act');
-  document.getElementById('mIK').classList.remove('act');
-  const panel=document.getElementById('panel'); panel.dataset.fk=''; panel.dataset.ik='';
+  document.getElementById('panel').dataset.fk='';
+  document.getElementById('timebar').classList.add('hide');
+  draw(); tutMark(); draw();
+}
+/** from='intro' | 'game' */
+function startTutorial(from){
+  tutFrom=from; if(from==='game') tutReturnLI=LI;
+  clearTimeout(tutTimer);
+  document.getElementById('ovStart').classList.add('hide'); document.getElementById('ovResult').classList.add('hide');
+  tutOn=true; tutRound=0; loadTutRound(); tutSetHelp();
+}
+function exitTutorial(){
+  clearTimeout(tutTimer); tutOn=false; runOver=false;
+  document.getElementById('tutMsg').classList.remove('on');
+  document.querySelectorAll('.jrow.tut-on').forEach(el=>el.classList.remove('tut-on'));
+  document.getElementById('ovResult').classList.add('hide');
+  tutSetHelp();
+  if(tutFrom==='game'){ startRun(); return; }   // 하던 판은 시간이 흘렀으니 새 판으로
+  L=LEVELS[0]; LI=0; ang=L.start.slice(); won=false; draw();
+  document.getElementById('lvlName').textContent=levelName(0); document.getElementById('lvlSub').textContent=lvText(0,'sub',L.sub); document.getElementById('goalPill').textContent=lvText(0,'goal',L.goal);
+  document.getElementById('timebar').classList.remove('hide');
+  document.getElementById('tbNum').textContent=levelTime(); document.getElementById('tbFill').style.width='100%';
+  document.getElementById('ovStart').classList.remove('hide');
+}
+document.getElementById('btnTut').onclick=()=>{ tutOn?exitTutorial():startTutorial('game'); };
+document.getElementById('btnTutIntro').onclick=()=>startTutorial('intro');
+
+/* ================= Load level ================= */
+function levelName(i){ return T('reach.level_n',{n:i+1}); }
+function loadLevel(i){
+  LI=i; L=LEVELS[i]; ang=L.start.slice(); won=false;
+  document.getElementById('lvlName').textContent=levelName(i);
+  document.getElementById('lvlSub').textContent=lvText(i,'sub',L.sub);
+  document.getElementById('goalPill').textContent=lvText(i,'goal',L.goal);
+  const panel=document.getElementById('panel'); panel.dataset.fk='';
   // DOF dots
   let dots=''; for(let k=0;k<L.segs.length;k++) dots+='<span class="dot on"></span>';
   document.getElementById('dofDots').innerHTML=dots;
+  levelStartT=nowMs();
   draw();
+  startTimer();
+}
+/** 한 판 = 1레벨부터. 기록 = 깬 레벨 수. */
+function startRun(){
+  cleared=0; runLog=[]; runT0=performance.now();
+  document.getElementById('ovResult').classList.add('hide');
+  loadLevel(0);
+}
+/** 클리어 순간 — 최종 관절 각도와 시각을 기록한다(서버가 이 각도로 손끝 위치·충돌을 다시 계산한다). */
+function levelCleared(){
+  clearInterval(timerId);
+  cleared++;
+  runLog.push({ lv:LI, a:ang.map(v=>Math.round(v*10)/10), s:levelStartT, t:nowMs() });
 }
 
-/* ================= Result ================= */
+/* ================= Result =================
+   레벨 클리어 → [다음]. 마지막 레벨까지 깨거나 시간이 다 되면 판이 끝난다 → 기록 제출 + [처음으로 / 다시 도전]. */
+let runOver=false;
+function submitRun(){
+  // 랭킹: 깬 레벨 수 — 숫자는 참고값이고 서버가 log(레벨별 최종 각도·시각)로 다시 센다
+  if(window.MGBridge) MGBridge.submit(cleared, {timed:true, log:runLog});
+}
 function result(win){
   const ov=document.getElementById('ovResult');
   const b=document.getElementById('resBadge');
-  b.textContent=win?'목표 포착!':'다시 조정해요';
-  b.className='badge '+(win?'win':'lose');
-  document.getElementById('resTitle').textContent=win?(L.name+' 클리어!'):'다시 도전';
-  document.getElementById('resTake').innerHTML=L.take;
-  const nextBtn=document.getElementById('btnNext');
-  if(win && window.MGBridge) MGBridge.submit(LI+1, {timed:true}); // 랭킹: 도달 레벨(동률=시간)
-  nextBtn.textContent = (LI>=LEVELS.length-1)?'처음으로':'다음';
+  const last = LI>=LEVELS.length-1;
+  runOver = last;
+  b.textContent = T(last ? 'reach.all_clear' : 'reach.caught');
+  b.className='badge win';
+  document.getElementById('resTitle').textContent = last ? T('reach.all_levels_clear',{n:LEVELS.length}) : T('reach.level_clear',{name:levelName(LI)});
+  document.getElementById('resTake').innerHTML=lvText(LI,'take',L.take);
+  document.getElementById('btnRetry').style.display='';
+  document.getElementById('btnRetry').textContent = T(last ? 'reach.to_start' : 'reach.quit');   // 그만두기 = 여기까지를 기록으로 남기고 끝
+  document.getElementById('btnNext').textContent = T(last ? 'reach.retry' : 'reach.next');
+  if(last) submitRun();
   ov.classList.remove('hide');
 }
-document.getElementById('btnRetry').onclick=()=>{
+/** 레벨 클리어 창에서 그만두기 — 깬 데까지가 기록이다(다음 레벨을 안 깨도 지금까지가 랭킹에 남는다). */
+function quitRun(){
+  runOver=true;
+  const b=document.getElementById('resBadge');
+  b.textContent=T('reach.here'); b.className='badge win';
+  document.getElementById('resTitle').textContent = T('reach.n_levels_clear',{n:cleared});
+  document.getElementById('resTake').innerHTML = T('reach.here_take');
+  document.getElementById('btnRetry').textContent=T('reach.to_start');
+  document.getElementById('btnNext').textContent=T('reach.retry');
+  submitRun();
+}
+function gameOver(){
+  won=true; runOver=true;   // 조작 잠금
+  const ov=document.getElementById('ovResult');
+  const b=document.getElementById('resBadge');
+  b.textContent=T('reach.timeout'); b.className='badge lose';
+  document.getElementById('resTitle').textContent = cleared ? T('reach.n_levels_clear',{n:cleared}) : T('reach.stuck_first');
+  document.getElementById('resTake').innerHTML = T('reach.timeout_take',{name:levelName(LI), t:levelTime()});
+  document.getElementById('btnRetry').style.display=''; document.getElementById('btnRetry').textContent=T('reach.to_start');
+  document.getElementById('btnNext').textContent=T('reach.retry');
+  submitRun();
+  ov.classList.remove('hide');
+}
+document.getElementById('btnRetry').onclick=()=>{   // 판 끝 → 인트로로 / 튜토리얼 끝 → 처음부터 다시 / 레벨 클리어 창 → 그만두기
+  if(tutOn) return startTutorial(tutFrom);
+  if(!runOver) return quitRun();
   document.getElementById('ovResult').classList.add('hide');
-  loadLevel(LI);
+  document.getElementById('ovStart').classList.remove('hide');
 };
 document.getElementById('btnNext').onclick=()=>{
+  if(tutOn) return exitTutorial();
+  if(runOver) return startRun();
   document.getElementById('ovResult').classList.add('hide');
-  loadLevel((LI+1)%LEVELS.length);
+  loadLevel(LI+1);
 };
-
 /* ================= Start ================= */
 document.getElementById('btnStart').onclick=()=>{
   document.getElementById('ovStart').classList.add('hide');
-  loadLevel(0);
+  startRun();
 };
-
-loadLevel(0);
-rafId=requestAnimationFrame(tickNoise);
+// 인트로 뒤에서 첫 레벨을 그려 둔다(타이머는 시작 버튼을 눌러야 돈다).
+L=LEVELS[0]; LI=0; ang=L.start.slice(); runT0=performance.now(); draw();
 </script>
 
 <!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 =====
@@ -727,7 +987,8 @@ rafId=requestAnimationFrame(tickNoise);
     /** 점수 전송. timed:true 면 시작 이후 경과시간을 동률 해소용으로 같이 보낸다. */
     submit: function(v, opts){
       if(typeof v !== 'number' || !isFinite(v)) return;
-      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined });
+      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined,
+             log:(opts && Array.isArray(opts.log)) ? opts.log : undefined });
     }
   };
   function mount(id){
@@ -735,8 +996,8 @@ rafId=requestAnimationFrame(tickNoise);
     if(ov.querySelector('.mg-rank')) return;
     var b = document.createElement('button');
     b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
-    b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span>랭킹</span>';
+    b.setAttribute('aria-label', window.MGI18N ? MGI18N.t('mg.rank_aria') : '이 게임 랭킹 보기');
+    b.innerHTML='<span>'+(window.MGI18N ? MGI18N.t('mg.rank') : '랭킹')+'</span>';
     b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
     ov.appendChild(b);
   }
@@ -749,5 +1010,6 @@ rafId=requestAnimationFrame(tickNoise);
   }, true);
 })();
 </script>
+<script>if (window.MGI18N) MGI18N.apply();</script>
 </body>
 </html>

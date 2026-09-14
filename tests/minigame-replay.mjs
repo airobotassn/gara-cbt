@@ -1,0 +1,246 @@
+// minigame-replay — 버텨라·쏴라·골라라·닿아라 점수 규칙의 sync pair 검증 + 서버 재채점 동작.
+//
+//  0) 닿아라 레벨 기하(reach-cari.html 의 LEVELS ↔ _shared/reach-levels.ts)가 같은가 — 서버가 이걸로 "정말 닿았나" 를 다시 계산한다.
+//  1) 네 파일(beat-cari.html · shoot-cari.html · pick-cari.html · _shared/minigame-replay.ts)의 공용 규칙 숫자가 같은가
+//     (SCORE_BASE · STREAK_MULT · RETRY_POINT · MAX_WRONG · 최소 간격). 게임 하나만 고치면 여기서 걸린다 —
+//     안 걸리면 게임이 보여준 점수와 랭킹 점수가 조용히 갈린다.
+//  2) 서버 재채점이 손으로 센 값과 같은가(연속 배수 경계 · 재정답 · 기체 폭발 · 방어선 돌파).
+//  3) 형식 검사 — 너무 촘촘한 기록 · 은행에 없는 문항 · 티켓 시간 초과 · 시각 역행을 거부하는가.
+//
+// 실행: bun tests/minigame-replay.mjs  (test:db 체인에 포함)
+import { readFileSync } from 'node:fs'
+import * as R from '../supabase/functions/_shared/minigame-replay.ts'
+import { REACH_LEVELS, REACH_DEFAULT_TIME, REACH_GRIP, reachedWith } from '../supabase/functions/_shared/reach-levels.ts'
+import { PROG_LEVELS, runProgram, validProgram, countOps as progCountOps } from '../supabase/functions/_shared/program-levels.ts'
+
+let failed = 0
+function eq(actual, expected, label) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected)
+  if (a !== e) { failed++; console.error(`FAIL ${label}: got ${a}, expected ${e}`) }
+  else console.log(`ok ${label}`)
+}
+
+const beat = readFileSync(new URL('../public/games/beat-cari.html', import.meta.url), 'utf8')
+const shoot = readFileSync(new URL('../public/games/shoot-cari.html', import.meta.url), 'utf8')
+const pick = readFileSync(new URL('../public/games/pick-cari.html', import.meta.url), 'utf8')
+const reach = readFileSync(new URL('../public/games/reach-cari.html', import.meta.url), 'utf8')
+const prog = readFileSync(new URL('../public/games/program-cari.html', import.meta.url), 'utf8')
+
+// ---------- 0b) 프로그램해라 레벨 대조 + 정답 프로그램이 서버 VM 으로 성공하는가 ----------
+{
+  const m = prog.match(/const LEVELS=(\[[\s\S]*?\n\]);/)
+  const HL = m ? new Function('return ' + m[1])() : null
+  eq(HL?.length, PROG_LEVELS.length, 'program 레벨 수 = 서버')
+  const geo = (L) => ({ cols: L.cols, rows: L.rows, limit: L.limit, runs: L.runs, ops: L.ops, start: L.start, goal: L.goalPos ?? L.goal, stars: L.stars, tiles: L.tiles })
+  ;(HL ?? []).forEach((L, i) => eq(geo(L), PROG_LEVELS[i] && geo(PROG_LEVELS[i]), `program 레벨 ${i + 1} 기하 = 서버`))
+  // 의도한 정답 — 레벨을 고치면 여기도 같이(한 레벨이라도 풀이가 없으면 아무도 못 깬다)
+  const MV = { op: 'MV' }, TL = { op: 'TL' }, TR = { op: 'TR' }, PK = { op: 'PK' }
+  const LP = (count, ...body) => ({ op: 'LP', count, body }), IFB = (...body) => ({ op: 'IF', cond: 'blocked', body }), IFS = (...body) => ({ op: 'IF', cond: 'star', body })
+  const SOL = [
+    [MV, MV, MV, MV], // 1 첫 걸음
+    [MV, MV, TL, MV, MV, MV, MV], // 2 모퉁이
+    [TL, TL, MV, MV, MV, MV], // 3 뒤돌아서기
+    [MV, MV, PK, MV, PK, MV], // 4 별 줍기
+    [MV, PK, MV, MV, PK], // 5 목표 칸의 별
+    [LP(6, MV)], // 6 반복
+    [LP(4, MV, TL, MV, TR)], // 7 계단 반복
+    [LP(4, MV), TL, LP(4, MV)], // 8 반복 두 개
+    [LP(8, IFB(TR), MV)], // 9 막히면 돌기
+    [LP(4, MV, MV, TR, MV, TL)], // 10 숨은 주기
+    [LP(6, MV, PK)], // 11 빈 칸 집기
+    [LP(8, IFB(TR), MV)], // 12 벽을 보고 시작
+    [LP(4, MV, MV, MV, MV, TR)], // 13 네 변
+    [LP(8, IFB(TR, MV, TL), MV)], // 14 비켜 가기
+    [LP(8, IFB(TR), IFB(TL, TL), MV)], // 15 오른쪽도 왼쪽도
+    [LP(8, IFB(TR), MV, IFB(TR), MV)], // 16 두 칸씩
+    [LP(8, IFB(TR), MV, IFB(TR), MV)], // 17 나선
+    [LP(8, IFB(TL), MV)], // 18 막다른 가지
+    [LP(8, IFS(PK, TL), IFB(TR), MV)], // 19 별이 표지판
+    [LP(8, IFB(TR), IFB(TR), PK, MV)], // 20 목표를 지나쳐서
+    [LP(8, PK, IFB(TL, TL), MV)], // 21 왕복
+    [LP(8, IFB(TR), PK, MV, IFB(TR), PK, MV)], // 22 별 홀짝
+    [LP(4, IFB(TL), IFB(TR, TR), MV), LP(8, IFB(TR), IFB(TL, TL), MV)], // 23 두 단계
+    [LP(8, IFS(PK, TL), IFB(TL), IFB(TL), MV)], // 24 빗살 복도
+    [LP(8, IFS(PK, TR), IFB(TR), MV)], // 25 뚫린 모퉁이
+    [LP(8, IFS(PK, TR), IFB(TL), MV)], // 26 갈림길 셋
+    [LP(8, IFB(TR), IFB(TL, TL), PK, MV)], // 27 섞인 모퉁이와 별
+    [LP(8, IFS(PK, TL, MV, TR), IFB(TR, MV, TL), MV)], // 28 양쪽으로 비켜
+    [TL, TL, LP(8, IFB(TR), MV)], // 29 뒤를 보고 시작
+    [LP(8, IFS(PK, TR), IFB(TR), MV, IFS(PK, TR), IFB(TR), MV)], // 30 최종 시험
+  ]
+  eq(SOL.length, PROG_LEVELS.length, 'program 정답 수 = 레벨 수')
+  PROG_LEVELS.forEach((L, i) => eq(validProgram(L, SOL[i]) && runProgram(L, SOL[i]).win, true, `program 레벨 ${i + 1} 정답이 서버 VM 으로 성공(${progCountOps(SOL[i])}/${L.limit})`))
+  // 재채점
+  const log = (n, runs = 1) => SOL.slice(0, n).map((p, i) => ({ lv: i, prog: p, runs }))
+  eq(R.replayProgram(log(3), 600), { ok: true, score: 3, answers: 3, durationMs: 0, tie: (4 + 7 + 6) * 1000 + 3 }, 'program 3레벨 = 3 · tie = 명령17×1000 + 실행3')
+  eq(R.replayProgram(log(30), 600).score, 30, 'program 30레벨 전부 = 30')
+  eq(R.replayProgram(log(2, 3), 600).tie, 11 * 1000 + 6, 'program 실행 3번씩 → tie 끝자리 6')
+  eq(R.replayProgram(log(1, 4), 600), { ok: false, reason: 'log_too_many_runs' }, 'program 레벨 실행 상한(3) 초과 거부')
+  eq(R.replayProgram([{ lv: 0, prog: [MV, MV, MV], runs: 1 }], 600), { ok: false, reason: 'log_not_solved' }, 'program 목표에 못 간 프로그램 거부')
+  eq(R.replayProgram([{ lv: 0, prog: [LP(6, MV)], runs: 1 }], 600), { ok: false, reason: 'log_bad_program' }, 'program 그 레벨에 없는 명령(반복) 거부')
+  eq(R.replayProgram([{ lv: 8, prog: [LP(6, MV)], runs: 1 }], 600), { ok: false, reason: 'log_malformed' }, 'program 순서 건너뛰기 거부')
+  eq(R.replayProgram([{ lv: 0, prog: [LP(3, MV)], runs: 1 }], 600), { ok: false, reason: 'log_bad_program' }, 'program 반복 횟수 3(없는 값) 거부')
+  eq(R.replayProgram([{ lv: 0, prog: [MV, MV, MV, MV, MV, MV, MV], runs: 1 }], 600), { ok: false, reason: 'log_bad_program' }, 'program 명령 칸 초과 거부')
+  eq(R.replayProgram([], 600).score, 0, 'program 빈 기록 = 0')
+}
+
+// ---------- 0) 닿아라 레벨 기하 대조 ----------
+{
+  // HTML 의 `const LEVELS=[ … ];` 리터럴을 그대로 평가한다(데이터뿐이라 안전).
+  const m = reach.match(/const LEVELS=(\[[\s\S]*?\n\]);/)
+  const htmlLevels = m ? new Function('return ' + m[1])() : null
+  const htmlDefault = lit(reach, 'DEFAULT_TIME', 'reach')
+  eq(htmlDefault, REACH_DEFAULT_TIME, 'reach DEFAULT_TIME = 서버')
+  eq(lit(reach, 'GRIP', 'reach'), REACH_GRIP, 'reach GRIP(집게 중심 거리) = 서버')
+  eq(htmlLevels?.length, REACH_LEVELS.length, 'reach 레벨 수 = 서버')
+  const geo = (L, dflt) => ({ base: L.base, segs: L.segs, limits: L.limits,
+    target: { x: L.target.x, y: L.target.y, r: L.target.r }, obstacles: L.obstacles, time: L.time || dflt })
+  ;(htmlLevels ?? []).forEach((L, i) => eq(geo(L, htmlDefault), REACH_LEVELS[i] && geo(REACH_LEVELS[i], REACH_DEFAULT_TIME), `reach 레벨 ${i + 1} 기하 = 서버`))
+  // 게임이 적어 둔 정답 자세(solve)는 서버 판정으로도 닿아야 한다 — 서버 기하학이 게임과 같다는 증거.
+  ;(htmlLevels ?? []).forEach((L, i) => eq(reachedWith(REACH_LEVELS[i], L.solve), true, `reach 레벨 ${i + 1} solve 자세가 서버에서도 닿는다`))
+  ;(htmlLevels ?? []).forEach((L, i) => eq(reachedWith(REACH_LEVELS[i], L.start), false, `reach 레벨 ${i + 1} 시작 자세는 안 닿는다`))
+  eq(/mIK|tipDrag|ccdSolve\(ang, goal\)/.test(reach), false, 'reach 손끝(IK) 모드가 없다')
+}
+
+/** `const NAME = <literal>;` 를 긁어 JSON 으로 읽는다(배열은 그대로 JSON 이다). */
+function lit(src, name, file) {
+  const m = src.match(new RegExp(`const\\s+${name}\\s*=\\s*([^;]+);`))
+  if (!m) { failed++; console.error(`FAIL ${file}: ${name} 없음`); return undefined }
+  return JSON.parse(m[1].trim())
+}
+
+// ---------- 1) 규칙 숫자 대조 ----------
+for (const [file, src] of [['beat-cari.html', beat], ['shoot-cari.html', shoot]]) {
+  eq(lit(src, 'SCORE_BASE', file), R.SCORE_BASE, `${file} SCORE_BASE = 서버`)
+  eq(lit(src, 'STREAK_MULT', file), R.STREAK_MULT, `${file} STREAK_MULT = 서버`)
+}
+eq(lit(shoot, 'RETRY_POINT', 'shoot'), R.RETRY_POINT, 'shoot RETRY_POINT = 서버')
+eq(lit(shoot, 'MAX_WRONG', 'shoot'), R.MAX_WRONG, 'shoot MAX_WRONG = 서버')
+eq(lit(beat, 'REVEAL_MS', 'beat'), R.BEAT_REVEAL_MS, 'beat REVEAL_MS = 서버 최소 간격')
+eq(lit(shoot, 'ANSWER_LOCK_MS', 'shoot'), R.SHOOT_ANSWER_LOCK_MS, 'shoot ANSWER_LOCK_MS = 서버 최소 간격')
+// 세 게임의 레벨 사다리는 한 벌이어야 한다("통일" 이 깨지면 여기서 잡는다). 골라라는 서버가 라운드 간격 검사에 쓴다.
+for (const name of ['LEVEL_STEP', 'LEVEL_MAX', 'SPEED_STEP']) {
+  eq(lit(beat, name, 'beat'), lit(shoot, name, 'shoot'), `${name} 버텨라 = 쏴라`)
+  eq(lit(pick, name, 'pick'), R.PICK[name], `${name} 골라라 = 서버`)
+}
+eq(lit(pick, 'T0', 'pick'), R.PICK.T0, 'pick T0 = 서버')
+eq(/TOTAL_STAGES|planSurvivors/.test(pick), false, 'pick 옛 15라운드 상한·생존자 주사위가 없다')
+// 쏴라 answerLock 이 상수를 진짜 쓰는지(숫자 리터럴로 되돌아가면 상수만 맞고 실제 잠금이 다르다).
+eq(/answerLock=false[^}]*\},\s*ANSWER_LOCK_MS\)/.test(shoot), true, 'shoot answerLock 이 ANSWER_LOCK_MS 를 쓴다')
+
+// ---------- 2) 재채점 ----------
+const ids = new Set(['q1', 'q2', 'q3'])
+const AGE = 600 // 티켓 나이 10분
+
+// 배수 경계: 4개까지 10, 5~9 는 15, 10~19 는 20, 20부터 30.
+eq(R.streakMult(4), 1, 'streakMult 4 → 1')
+eq(R.streakMult(5), 1.5, 'streakMult 5 → 1.5')
+eq(R.streakMult(10), 2, 'streakMult 10 → 2')
+eq(R.streakMult(20), 3, 'streakMult 20 → 3')
+
+/** n 개 답을 gap ms 간격으로. k 는 함수(i)→원본 자리. */
+const beatLog = (n, kOf, gap = 500) => Array.from({ length: n }, (_, i) => ({ q: 'q1', k: kOf(i), t: (i + 1) * gap }))
+
+eq(R.replayBeat(beatLog(4, () => 0), AGE, ids), { ok: true, score: 40, answers: 4, durationMs: 2000 }, 'beat 4연속 = 40')
+eq(R.replayBeat(beatLog(5, () => 0), AGE, ids).score, 55, 'beat 5연속 = 40 + 15')
+eq(R.replayBeat(beatLog(10, () => 0), AGE, ids).score, 40 + 15 * 5 + 20, 'beat 10연속 = 135')
+eq(R.replayBeat(beatLog(20, () => 0), AGE, ids).score, 40 + 75 + 20 * 10 + 30, 'beat 20연속 = 345')
+// 6번째에서 틀리면 연속이 끊겨 7번째는 다시 10점.
+eq(R.replayBeat(beatLog(7, (i) => (i === 5 ? 2 : 0)), AGE, ids).score, 40 + 15 + 0 + 10, 'beat 오답이 연속을 끊는다')
+eq(R.replayBeat([], AGE, ids), { ok: true, score: 0, answers: 0, durationMs: 0 }, 'beat 빈 기록 = 0')
+
+// 쏴라: 기체 m 마다 사건. 무오답 격추 / 한 번 틀리고 격추 / 두 번 틀림 / 방어선 돌파.
+let t = 0
+const S = (e) => ({ ...e, t: (t += 500) })
+eq(R.replayShoot([S({ m: 1, q: 'q1', k: 0 })], AGE, ids).score, 10, 'shoot 격추 = 10')
+t = 0
+eq(R.replayShoot([S({ m: 1, q: 'q1', k: 2 }), S({ m: 1, q: 'q1', k: 0 })], AGE, ids).score, 5, 'shoot 한 번 틀리고 격추 = 5')
+t = 0
+eq(R.replayShoot([S({ m: 1, q: 'q1', k: 2 }), S({ m: 1, q: 'q1', k: 3 }), S({ m: 1, q: 'q1', k: 0 })], AGE, ids).score, 0,
+  'shoot 두 번 틀리면 기체가 터져 그 뒤 정답은 무시')
+t = 0
+// 4연속 → 방어선 돌파 → 다음 격추는 연속 1 부터.
+eq(R.replayShoot([
+  S({ m: 1, q: 'q1', k: 0 }), S({ m: 2, q: 'q2', k: 0 }), S({ m: 3, q: 'q3', k: 0 }), S({ m: 4, q: 'q1', k: 0 }),
+  S({ m: 5, x: 1 }), S({ m: 6, q: 'q2', k: 0 }),
+], AGE, ids).score, 50, 'shoot 방어선 돌파가 연속을 끊는다')
+t = 0
+// 재정답은 연속에 안 들어간다: 4연속 → (틀림, 재정답 5) → 다음 무오답 격추는 연속 1 = 10.
+eq(R.replayShoot([
+  S({ m: 1, q: 'q1', k: 0 }), S({ m: 2, q: 'q2', k: 0 }), S({ m: 3, q: 'q3', k: 0 }), S({ m: 4, q: 'q1', k: 0 }),
+  S({ m: 5, q: 'q2', k: 1 }), S({ m: 5, q: 'q2', k: 0 }), S({ m: 6, q: 'q3', k: 0 }),
+], AGE, ids).score, 40 + 5 + 10, 'shoot 재정답은 연속에 안 넣는다')
+t = 0
+// 5연속 격추 = 10×4 + 15.
+eq(R.replayShoot([1, 2, 3, 4, 5].map((m) => S({ m, q: 'q1', k: 0 })), AGE, ids).score, 55, 'shoot 5연속 = 55')
+
+// 골라라: 라운드 간격 = 그 라운드의 답할 시간 이상. L1 10초, 정답 10개 뒤 L2 7.7초.
+eq(R.pickRoundMs(1), 10000, 'pick L1 = 10초')
+eq(Math.round(R.pickRoundMs(4)), 5263, 'pick L4 = 5.3초')
+eq(Math.round(R.pickRoundMs(7)), 3571, 'pick L7 = 3.6초')
+/** n 라운드, 전부 정답, 마지막만 오답. 간격은 레벨별 시간 + 3초(연출). */
+function pickLog(n, lastWrong = true) {
+  const out = []; let t = 500, correct = 0
+  for (let i = 0; i < n; i++) {
+    t += R.pickRoundMs(R.pickLevelFor(correct)) + 3000
+    const k = i % 2, right = !(lastWrong && i === n - 1)
+    const c = right ? (k === 0 ? 'O' : 'X') : (k === 0 ? 'X' : 'O')
+    out.push({ q: 'q1', k, c, t: Math.round(t) })
+    if (right) correct++
+  }
+  return out
+}
+eq(R.replayPick(pickLog(7), AGE, ids).score, 7, 'pick 6정답 + 7번째 오답 = 7라운드')
+eq(R.replayPick(pickLog(25), 900, ids).score, 25, 'pick 25라운드(레벨 3까지 시간이 줄어든 간격) 통과')
+eq(R.replayPick([{ q: 'q1', k: 0, c: '', t: 11000 }], AGE, ids).score, 1, 'pick 안 고르면 오답 = 1라운드')
+{ // 첫 오답 뒤의 라운드는 세지 않는다(게임이 만들 수 없는 기록)
+  const l = pickLog(3); l.push({ q: 'q1', k: 0, c: 'O', t: l[2].t + 20000 })
+  eq(R.replayPick(l, AGE, ids).score, 3, 'pick 끝난 뒤 라운드는 무시')
+}
+{ // 정답 10개 뒤(L2 = 7.7초)에 6초 간격은 거부, 10개 전(L1 = 10초)에 8초 간격도 거부
+  const l = pickLog(12, false); l[11].t = l[10].t + 6000
+  eq(R.replayPick(l, AGE, ids), { ok: false, reason: 'log_too_fast' }, 'pick L2 에서 6초 간격 거부')
+  const m = pickLog(3, false); m[2].t = m[1].t + 8000
+  eq(R.replayPick(m, AGE, ids), { ok: false, reason: 'log_too_fast' }, 'pick L1 에서 8초 간격 거부')
+}
+eq(R.replayPick([{ q: 'q1', k: 0, c: 'Z', t: 11000 }], AGE, ids), { ok: false, reason: 'log_malformed' }, 'pick c 값 범위 밖 거부')
+eq(R.replayPick([{ q: 'nope', k: 0, c: 'O', t: 11000 }], AGE, ids), { ok: false, reason: 'log_unknown_question' }, 'pick 은행에 없는 문항 거부')
+
+// 닿아라: 레벨별 최종 각도 기록. solve 자세로 순서대로 깬 기록은 통과, 순서·시간·각도가 어긋나면 거부.
+{
+  const m = reach.match(/const LEVELS=(\[[\s\S]*?\n\]);/)
+  const HL = new Function('return ' + m[1])()
+  const run = (n, gapMs = 8000) => HL.slice(0, n).map((L, i) => ({ lv: i, a: L.solve, s: 1000 + i * (gapMs + 3000), t: 1000 + i * (gapMs + 3000) + gapMs }))
+  eq(R.replayReach(run(5), AGE), { ok: true, score: 5, answers: 5, durationMs: 1000 + 4 * 11000 + 8000 }, 'reach 5레벨 전부 = 5')
+  eq(R.replayReach(run(2), AGE).score, 2, 'reach 2레벨 = 2')
+  eq(R.replayReach([], AGE).score, 0, 'reach 빈 기록 = 0')
+  { const l = run(HL.length); l.push({ lv: HL.length, a: HL[0].solve, s: l[l.length - 1].t + 1000, t: l[l.length - 1].t + 5000 }); eq(R.replayReach(l, 3000), { ok: false, reason: 'log_malformed' }, 'reach 없는 레벨 거부') }
+  eq(R.replayReach(run(HL.length), 3000).score, HL.length, `reach ${HL.length}레벨 전부 클리어 = ${HL.length}`)
+  { const l = run(2); l[1].lv = 0; eq(R.replayReach(l, AGE), { ok: false, reason: 'log_malformed' }, 'reach 순서 어긋남 거부') }
+  { const l = run(1, REACH_DEFAULT_TIME * 1000 + 2000); eq(R.replayReach(l, AGE), { ok: false, reason: 'log_over_time' }, `reach 제한시간 ${REACH_DEFAULT_TIME}초(+1.5초 여유) 초과 거부`) }
+  { const l = run(1, REACH_DEFAULT_TIME * 1000 - 1000); eq(R.replayReach(l, AGE).ok, true, `reach ${REACH_DEFAULT_TIME - 1}초는 통과`) }
+  { const l = run(1); l[0].a = HL[0].start; eq(R.replayReach(l, AGE), { ok: false, reason: 'log_not_reached' }, 'reach 안 닿은 각도 거부') }
+  { const l = run(1); l[0].a = [999, 0]; eq(R.replayReach(l, AGE), { ok: false, reason: 'log_not_reached' }, 'reach 관절 한계 밖 거부') }
+  { const l = run(2); l[1].s = l[0].t - 5000; eq(R.replayReach(l, AGE), { ok: false, reason: 'log_not_monotonic' }, 'reach 이전 클리어보다 먼저 시작 거부') }
+  { const l = run(1); l[0].t = AGE * 1000 + 9000; l[0].s = l[0].t - 1000; eq(R.replayReach(l, AGE), { ok: false, reason: 'log_exceeds_ticket' }, 'reach 티켓 시간 초과 거부') }
+}
+
+// ---------- 3) 형식 검사 ----------
+eq(R.replayBeat(beatLog(3, () => 0, 100), AGE, ids), { ok: false, reason: 'log_too_fast' }, 'beat 230ms 보다 촘촘하면 거부')
+eq(R.replayBeat(beatLog(3, () => 0, 205), AGE, ids).ok, true, 'beat 30ms 여유는 봐준다')
+t = 0
+eq(R.replayShoot([S({ m: 1, q: 'q1', k: 0 }), { m: 2, q: 'q1', k: 0, t: 700 }], AGE, ids), { ok: false, reason: 'log_too_fast' },
+  'shoot 340ms 보다 촘촘하면 거부')
+t = 0
+eq(R.replayShoot([S({ m: 1, q: 'q1', k: 0 }), { m: 2, x: 1, t: 510 }], AGE, ids).ok, true, 'shoot 돌파 사건은 간격 검사 대상이 아니다')
+eq(R.replayBeat([{ q: 'nope', k: 0, t: 500 }], AGE, ids), { ok: false, reason: 'log_unknown_question' }, '은행에 없는 문항 거부')
+eq(R.replayBeat([{ q: 'q1', k: 0, t: AGE * 1000 + 6000 }], AGE, ids), { ok: false, reason: 'log_exceeds_ticket' }, '티켓 시간 초과 거부')
+eq(R.replayBeat([{ q: 'q1', k: 0, t: 900 }, { q: 'q1', k: 0, t: 500 }], AGE, ids), { ok: false, reason: 'log_not_monotonic' }, '시각 역행 거부')
+eq(R.replayBeat(undefined, AGE, ids), { ok: false, reason: 'log_missing' }, '기록 없음 거부')
+eq(R.replayBeat([{ q: 'q1', k: 7, t: 500 }], AGE, ids), { ok: false, reason: 'log_malformed' }, 'k 범위 밖 거부')
+eq(R.replayBeat([{ q: null, k: 0, t: 500 }], AGE, ids), { ok: false, reason: 'log_malformed' }, '폴백 문항(id 없음) 기록은 거부')
+eq(R.replayShoot([{ q: 'q1', k: 0, t: 500 }], AGE, ids), { ok: false, reason: 'log_malformed' }, 'shoot 기체 순번 없으면 거부')
+eq(R.logQuestionIds([{ q: 'a' }, { q: 'b' }, { q: 'a' }, { x: 1 }]), ['a', 'b'], 'logQuestionIds 중복 제거')
+
+if (failed) { console.error(`\n${failed} failed`); process.exit(1) }
+console.log('\nall ok')

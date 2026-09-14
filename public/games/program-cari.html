@@ -70,6 +70,24 @@ body{
 .hud .slots{text-align:center;}
 .hud .slots .n{font-size:24px;font-weight:950;color:#79dfff;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(37,185,255,.55);}
 .hud .slots .lab{font-size:12px;color:#9bd4ff;font-weight:800;}
+.hud .mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+.hud .runs{font-size:11px;color:#9bd4ff;font-weight:800;display:flex;align-items:center;gap:4px;}
+.hud .runs i{display:inline-block;width:9px;height:9px;border-radius:50%;background:rgba(155,212,255,.25);box-shadow:inset 0 0 0 1px rgba(155,212,255,.5);}
+.hud .runs i.on{background:#79dfff;box-shadow:0 0 6px rgba(37,185,255,.8);}
+/* 튜토리얼 — 지어라·닿아라와 같은 방식: 지금 할 것 하나만 빛나고, 안내 한 줄이 격자 위에 뜬다. */
+.tutmsg{position:absolute;left:54px;right:54px;top:140px;z-index:6;display:none;padding:8px 12px;border-radius:12px;
+  background:linear-gradient(#143563,#0d2145);border:1.5px solid rgba(238,233,220,.5);color:#e9f7ff;font-size:12.5px;font-weight:800;line-height:1.35;
+  box-shadow:0 4px 12px rgba(0,20,60,.35);text-align:center;}
+.tutmsg b{color:#ffd253;}
+.tutmsg.on{display:block;}
+.tut-help{position:absolute;right:18px;top:196px;z-index:6;width:30px;height:30px;padding:0;border-radius:50%;cursor:pointer;
+  border:1.5px solid rgba(238,233,220,.5);background:linear-gradient(#143563,#0d2145);color:#ffd253;font:900 15px/1 system-ui,-apple-system,sans-serif;
+  box-shadow:0 3px 0 rgba(4,14,32,.4),inset 0 1px 0 rgba(255,255,255,.16);}
+.tut-help.quit{color:#ffb0a0;font-size:14px;}
+@keyframes tutring{0%,100%{box-shadow:0 0 0 3px #ffd253,0 0 10px 2px rgba(255,210,83,.5)}50%{box-shadow:0 0 0 3px #ffd253,0 0 18px 6px rgba(255,210,83,.95)}}
+.tut-on{position:relative;z-index:7;animation:tutring 1.15s ease-in-out infinite;}
+.pbtn.tut-on{border-radius:7px;}.slot .cnt.tut-on{z-index:8;}
+#startOv #btnTutIntro{margin-top:10px;padding:10px 26px;font-size:14px;}
 .goaltxt{position:absolute;left:108px;right:108px;top:140px;height:48px;display:grid;place-items:center;font-size:14px;color:#fff;font-weight:900;padding:0 10px;text-align:center;min-height:0;
   text-shadow:0 1px 5px #00112c;}
 
@@ -109,10 +127,10 @@ body{
 .console .program::-webkit-scrollbar{display:none;}
 .console .program{gap:6px}.console .slot.simple{width:43px;height:43px;padding:0;font-size:0;line-height:0;text-shadow:none;background-size:41px 41px!important;background-position:center!important;box-shadow:none;}
 .console .slot.simple>div:last-child{display:none;}
-.console .slot.simple .ic{display:none}.mini:not(.iff){font-size:0;}
+.console .slot.simple .ic{display:none}.mini:not(.iff):not(.dot){font-size:0;}
 .console .slot.block.lp{background:linear-gradient(145deg,#f3a512,#a95d00)!important;border:1px solid #ffd76b;}.console .slot.block.iff{background:linear-gradient(145deg,#ed6a52,#9f3024)!important;border:1px solid #ffad9e;}
 .program.empty{align-items:center;justify-content:center;}
-.program.empty::before{content:"＋  명령을 선택하세요";color:#bfe8ff;font-size:13px;font-weight:850;letter-spacing:.02em;transform:translateY(-5px);}
+.program.empty::before{content:attr(data-empty);color:#bfe8ff;font-size:13px;font-weight:850;letter-spacing:.02em;transform:translateY(-5px);}
 .slot{position:relative;border-radius:10px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;cursor:pointer;
   box-shadow:0 3px 7px rgba(40,50,80,.16);}
@@ -123,17 +141,23 @@ body{
 .slot.tr,.pbtn.tr,.mini.tr{background-image:url('program-cari-key-tr-v4.webp')!important;}.slot.pk,.pbtn.pk,.mini.pk{background-image:url('program-cari-key-pk-v4.webp')!important;}
 .slot.lp,.pbtn.lp{background-image:url('program-cari-key-lp-v4.webp')!important;}.slot.iff,.pbtn.iff,.mini.iff{background-image:url('program-cari-key-if-v4.webp')!important;}
 .slot.simple,.pbtn,.mini{background-position:center!important;background-size:100% 100%!important;background-repeat:no-repeat!important;background-color:transparent!important;}
-.slot .cnt{position:absolute;top:-6px;right:-6px;background:#fff;color:#e59b17;border-radius:8px;
-  font-size:9px;font-weight:900;padding:1px 4px;box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;}
+/* 배지(×N·막힘?)는 라벨 줄 안에 나란히 — 모서리에 띄우면 좁은 블록에서 라벨을 가린다 */
+.slot .cnt{display:inline-block;margin-left:4px;background:#fff;color:#e59b17;border-radius:9px;vertical-align:middle;
+  font-size:11px;font-weight:900;padding:2px 6px;box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;}
+.slot .cnt.tut-on{transform:scale(1.15);transform-origin:left center;}
 .slot.iff .cnt{color:#e0674a;}
 .slot.block{flex:0 0 auto;flex-direction:column;padding:4px 5px 5px;min-width:48px;max-height:61px;gap:3px;}
-.slot.block .blab{font-size:9px;font-weight:900;opacity:.95;}
+.slot.block .blab{font-size:9px;font-weight:900;opacity:.95;display:flex;align-items:center;justify-content:center;white-space:nowrap;}
 .slot.block .body{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;
   background:rgba(255,255,255,.22);border-radius:7px;padding:3px;min-width:26px;min-height:26px;}
 .mini{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
   font-size:12px;color:#fff;background:rgba(0,0,0,.18);}
-.mini.iff{position:relative;padding:0 2px;}
-.mini.iff .q{font-size:9px;font-weight:900;}
+.mini.iff{position:relative;width:auto;height:auto;min-height:26px;padding:2px 3px;gap:2px;border-radius:7px;border:1px solid #ffad9e;}
+.slot .body .mini.iff{background:linear-gradient(145deg,#ed6a52,#9f3024)!important;font-size:9px;}
+.mini.iff .q{font-size:9px;font-weight:900;color:#fff;padding:0 2px;white-space:nowrap;}
+.mini.iff .mini{width:20px;height:20px;border-radius:5px;}
+.mini.iff.open{outline:2px solid #ffd54a;outline-offset:1px;}
+.mini.dot{font-size:12px!important;color:#fff;background:rgba(0,0,0,.18)!important;}
 .slot.open{outline:2.5px solid #ffd54a;outline-offset:1px;}
 
 /* palette */
@@ -189,38 +213,43 @@ body{
 </style>
 </head>
 <body>
+<script src="i18n.js"></script>
 <div class="stage" id="stage">
 
   <!-- START -->
   <div class="overlay" id="startOv">
     <div class="float" id="startCari"></div>
-    <div class="intro-title"><span class="t1">프로그램해라</span> <span class="t2">CARI</span></div>
-    <div class="tag">명령을 짜서 CARI를 움직여라</div>
+    <div class="intro-title"><span class="t1" data-i18n="prog.title">프로그램해라</span> <span class="t2">CARI</span></div>
+    <div class="tag" data-i18n="prog.tagline">명령을 짜서 CARI를 움직여라</div>
     <div class="rules">
-      <div>1. 명령을 눌러 <b>프로그램</b>을 만들어라</div>
-      <div>2. <b>실행</b>하면 CARI가 순서대로 움직인다</div>
-      <div>3. 별을 모두 먹고 <b>목표 칸</b>에 도착하면 성공</div>
+      <div data-i18n="prog.rule1">1. 명령을 눌러 <b>프로그램</b>을 만들어라</div>
+      <div data-i18n="prog.rule2">2. <b>실행</b>하면 CARI가 순서대로 움직인다</div>
+      <div data-i18n="prog.rule3">3. 실행은 레벨마다 <b>3번</b>뿐 — 다 쓰면 끝</div>
     </div>
-    <button class="btn" id="startBtn" style="margin-top:20px;">시작하기</button>
+    <button class="btn" id="startBtn" style="margin-top:20px;" data-i18n="prog.start">시작하기</button>
+    <button class="btn ghost" id="btnTutIntro" type="button" data-i18n="prog.tutorial">튜토리얼</button>
   </div>
 
   <!-- GAME -->
   <div class="hud">
-    <div><div class="lv">레벨</div><div class="lvn" id="lvNum">1 / 6</div></div>
-    <div class="mid" id="lvName">첫 걸음</div>
-    <div class="slots"><div class="n" id="slotN">0/6</div><div class="lab">명령 칸</div></div>
+    <div><div class="lv" data-i18n="prog.level">레벨</div><div class="lvn" id="lvNum">1 / 30</div></div>
+    <div class="mid"><div id="lvName">첫 걸음</div><div class="runs" id="runsEl"></div></div>
+    <div class="slots"><div class="n" id="slotN">0/6</div><div class="lab" data-i18n="prog.slots">명령 칸</div></div>
   </div>
+  <div class="tutmsg" id="tutMsg"></div>
+  <!-- 튜토리얼 두 번째 진입점 — 게임에 들어간 뒤에도 다시 볼 수 있어야 한다 -->
+  <button class="tut-help" id="btnTut" type="button" aria-label="튜토리얼" data-i18n-attr="aria-label:prog.tutorial">?</button>
   <div class="goaltxt" id="goalTxt"></div>
 
   <div class="gridwrap"><div class="grid" id="grid"></div></div>
 
   <div class="console">
-    <div class="progtitle"><div class="h">내 프로그램</div><div class="hint"></div></div>
+    <div class="progtitle"><div class="h" data-i18n="prog.my_program">내 프로그램</div><div class="hint"></div></div>
     <div class="program empty" id="program"></div>
     <div class="palette" id="palette"></div>
     <div class="controls">
-      <button class="btn run" id="runBtn">실행</button>
-      <button class="btn ghost small" id="resetBtn">리셋</button>
+      <button class="btn run" id="runBtn" data-i18n="prog.run">실행</button>
+      <button class="btn ghost small" id="resetBtn" data-i18n="prog.reset">리셋</button>
     </div>
   </div>
 
@@ -241,71 +270,133 @@ body{
 </div>
 
 <script>
+/* 문구는 전부 사전(i18n.js 의 prog.*)에서 온다. 레벨 문구는 prog.lv{n}.name/goal/teach — 사전에 없으면 아래 한국어로 떨어진다. */
+const T=(k,v)=>window.MGI18N?MGI18N.t(k,v):k;
+function lvT(i,f,fb){ const k='prog.lv'+(i+1)+'.'+f; const v=T(k); return v===k?fb:v; }
 function cariPNG(kind='play'){
   const src=kind==='intro'?'program-cari-intro-hero-v4.webp':kind==='win'?'program-cari-win-v5.webp':kind==='fail'?'program-cari-fail-v5.webp':'program-cari-dir-down-v4.webp';
   return `<img src="${src}" alt="" draggable="false">`;
 }
 const DIR_ASSET=['up','right','down','left'];
-
-/* ===================== tile icons ===================== */
-function goalSVG(){return `<img src="program-cari-goal-v3.webp" alt="목표 지점" draggable="false">`;}
-function starSVG(){return `<img src="reach-cari-target-star-v3.webp" alt="별" draggable="false">`;}
-
-/* ===================== instruction defs ===================== */
+function goalSVG(){return `<img src="program-cari-goal-v3.webp" alt="" draggable="false">`;}
+function starSVG(){return `<img src="reach-cari-target-star-v3.webp" alt="" draggable="false">`;}
+/* ===================== 명령 ===================== */
 const OPS={
-  MV:{cls:'mv',ic:'⬆',lab:'앞으로'},
-  TL:{cls:'tl',ic:'↺',lab:'왼쪽'},
-  TR:{cls:'tr',ic:'↻',lab:'오른쪽'},
-  PK:{cls:'pk',ic:'★',lab:'집기'},
-  LP:{cls:'lp',ic:'⟳',lab:'반복'},
-  IF:{cls:'iff',ic:'?',lab:'조건'},
+  MV:{cls:'mv',ic:'⬆',key:'prog.op.mv'},
+  TL:{cls:'tl',ic:'↺',key:'prog.op.tl'},
+  TR:{cls:'tr',ic:'↻',key:'prog.op.tr'},
+  PK:{cls:'pk',ic:'★',key:'prog.op.pk'},
+  LP:{cls:'lp',ic:'⟳',key:'prog.op.lp'},
+  IF:{cls:'iff',ic:'?',key:'prog.op.if'},
 };
-
-/* ===================== levels ===================== */
-/* dir: 0=up 1=right 2=down 3=left */
+const opLab=op=>T(OPS[op].key);
+/* ===================== 레벨 30 =====================
+   dir: 0=위 1=오른쪽 2=아래 3=왼쪽. limit = 명령 칸 상한(중첩 포함), runs = 이 레벨의 실행 횟수(다 쓰면 판 끝).
+   ⛔ 기하(cols·rows·limit·runs·ops·start·goalPos·stars·tiles)는 서버 _shared/program-levels.ts 와 sync pair —
+      서버가 같은 규칙으로 프로그램을 다시 실행해 성공을 확인한다. tests/minigame-replay.mjs 가 대조한다.
+   ⚠️ 반복 횟수는 2·4·6·8 뿐이라 길이가 홀수인 구간은 반복 밖에 명령을 하나 더 두거나 반복 안에 둘을 넣어야 한다.
+   1~16 은 배우는 구간(기본 → 반복). 17~30 은 어려운 구간(2026-09-14 재설계) — 장치 = 양방향 미로·T자 막다른 길·별 홀짝·거꾸로 시작·회전 명령 하나 빠짐,
+      그리고 limit 이 곧 최소 정답 길이라 한 칸도 남지 않는다. 배치는 "명령 칸 안에 들어가는 정답 프로그램 수" 내림차순(53 → 2, tmp/_prog-solver.mjs 로 셈).
+      ⛔ 17~30 의 기하·limit 을 손대면 정답 수가 달라지므로 솔버로 다시 재고 순서를 다시 매길 것. */
 const LEVELS=[
- {name:'첫 걸음', cols:5, rows:3, limit:6, par:4, ops:['MV','TL','TR'],
-  goal:'앞으로 명령으로 목표까지 가라',
-  start:{x:0,y:1,dir:1}, goalPos:[4,1], stars:[],
+ {name:'첫 걸음', goal:'앞으로 명령으로 목표까지 가라', cols:5, rows:3, limit:6, runs:3, ops:["MV","TL","TR"],
+  start:{"x":0,"y":1,"dir":1}, goalPos:[4,1], stars:[],
   tiles:[[0,1],[1,1],[2,1],[3,1],[4,1]]},
-
- {name:'모퉁이', cols:5, rows:5, limit:8, par:7, ops:['MV','TL','TR'],
-  goal:'꺾어 돌아 위로 올라가라',
-  start:{x:0,y:4,dir:1}, goalPos:[2,0], stars:[],
+ {name:'모퉁이', goal:'꺾어 돌아 위로 올라가라', cols:5, rows:5, limit:8, runs:3, ops:["MV","TL","TR"],
+  start:{"x":0,"y":4,"dir":1}, goalPos:[2,0], stars:[],
   tiles:[[0,4],[1,4],[2,4],[2,3],[2,2],[2,1],[2,0]]},
-
- {name:'별 줍기', cols:5, rows:5, limit:10, par:6, ops:['MV','TL','TR','PK'],
-  goal:'별 2개를 집고 목표로 가라',
-  start:{x:0,y:2,dir:1}, goalPos:[4,2], stars:[[2,2],[3,2]],
-  tiles:[[0,2],[1,2],[2,2],[3,2],[4,2]]},
-
- {name:'긴 복도', cols:7, rows:3, limit:4, par:2, ops:['MV','TL','TR','LP'],
-  goal:'칸이 부족하다! 반복으로 묶어라',
-  start:{x:0,y:1,dir:1}, goalPos:[6,1], stars:[],
-  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]],
-  teach:'똑같은 걸 여러 번? 반복으로 묶으면 짧아져요'},
-
- {name:'꺾인 길', cols:5, rows:6, limit:6, par:4, ops:['MV','TL','TR','LP','IF'],
-  goal:'꺾이는 자리가 제각각! 조건으로 판단하라',
-  start:{x:0,y:5,dir:0}, goalPos:[2,4], stars:[],
-  tiles:[[0,5],[0,4],[0,3],[1,3],[2,3],[2,4]],
-  teach:'상황마다 다르게? 조건으로 판단하게 해요'},
-
- {name:'마지막 미션', cols:6, rows:6, limit:8, par:8, ops:['MV','TL','TR','PK','LP','IF'],
-  goal:'반복+조건+집기, 모두 써서 통과하라',
-  start:{x:0,y:5,dir:0}, goalPos:[5,0], stars:[[0,4],[0,2],[0,0]],
-  tiles:[[0,5],[0,4],[0,3],[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[4,0],[5,0]],
-  teach:'짧고 똑똑한 프로그램이 길고 멍청한 것보다 강해요'},
+ {name:'뒤돌아서기', goal:'뒤를 보고 있다! 두 번 돌아서 가라', teach:'왼쪽을 두 번 돌면 뒤를 봐요', cols:5, rows:3, limit:7, runs:3, ops:["MV","TL","TR"],
+  start:{"x":4,"y":1,"dir":1}, goalPos:[0,1], stars:[],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1]]},
+ {name:'별 줍기', goal:'별 2개를 집고 목표로 가라', teach:'별은 그 칸에 서서 집기를 눌러야 주워져요', cols:5, rows:3, limit:8, runs:3, ops:["MV","TL","TR","PK"],
+  start:{"x":0,"y":1,"dir":1}, goalPos:[4,1], stars:[[2,1],[3,1]],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1]]},
+ {name:'목표 칸의 별', goal:'목표에 서 있어도 별이 남았으면 끝이 아니다', teach:'목표 칸에 있는 별도 집어야 성공이에요', cols:5, rows:3, limit:7, runs:3, ops:["MV","TL","TR","PK"],
+  start:{"x":0,"y":1,"dir":1}, goalPos:[3,1], stars:[[1,1],[3,1]],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1]]},
+ {name:'반복', goal:'칸이 부족하다! 반복으로 묶어라', teach:'똑같은 명령을 여러 번? 반복 안에 하나만 넣고 횟수를 올려요', cols:7, rows:3, limit:4, runs:3, ops:["MV","TL","TR","LP"],
+  start:{"x":0,"y":1,"dir":1}, goalPos:[6,1], stars:[],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]]},
+ {name:'계단 반복', goal:'계단 한 칸이 반복 한 번', teach:'"앞으로·왼쪽·앞으로·오른쪽" 이 계단 한 칸이에요', cols:5, rows:5, limit:7, runs:3, ops:["MV","TL","TR","LP"],
+  start:{"x":0,"y":4,"dir":1}, goalPos:[4,1], stars:[],
+  tiles:[[0,4],[1,4],[1,3],[2,3],[2,2],[3,2],[3,1],[4,1]]},
+ {name:'반복 두 개', goal:'반복으로 가고, 돌고, 또 반복', teach:'반복 옆 ×2 를 누르면 4·6·8 로 바뀌어요', cols:6, rows:6, limit:6, runs:3, ops:["MV","TL","TR","LP"],
+  start:{"x":0,"y":5,"dir":1}, goalPos:[4,1], stars:[],
+  tiles:[[0,5],[1,5],[2,5],[3,5],[4,5],[4,4],[4,3],[4,2],[4,1]]},
+ {name:'막히면 돌기', goal:'꺾이는 자리가 제각각! 조건으로 판단하라', teach:'조건은 "앞이 막혔나?" 를 보고 맞을 때만 안의 명령을 해요. 반복이 남아도 목표에 서면 그 즉시 끝나요', cols:5, rows:6, limit:6, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[2,5], stars:[],
+  tiles:[[0,5],[0,4],[0,3],[1,3],[2,3],[3,3],[3,4],[3,5],[2,5]]},
+ {name:'숨은 주기', goal:'들쭉날쭉해 보여도 되풀이되는 한 덩이가 있다', teach:'한 덩이를 찾으면 반복 하나로 끝나요. 남는 반복은 신경 안 써도 돼요', cols:7, rows:3, limit:8, runs:3, ops:["MV","TL","TR","LP"],
+  start:{"x":0,"y":0,"dir":1}, goalPos:[6,2], stars:[],
+  tiles:[[0,0],[1,0],[2,0],[2,1],[3,1],[4,1],[4,2],[5,2],[6,2]]},
+ {name:'빈 칸 집기', goal:'별이 띄엄띄엄 — 집기를 어디에 넣나', teach:'별 없는 칸에서 집기를 눌러도 아무 일도 없어요. 그래서 매번 집어도 돼요', cols:7, rows:3, limit:5, runs:3, ops:["MV","TL","TR","PK","LP"],
+  start:{"x":0,"y":1,"dir":1}, goalPos:[6,1], stars:[[1,1],[3,1],[4,1]],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]]},
+ {name:'벽을 보고 시작', goal:'첫 칸부터 막혀 있다 — 순서가 중요하다', teach:'반복 안에서 "돌기"와 "앞으로"의 순서를 바꾸면 결과가 달라요', cols:5, rows:6, limit:6, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":5,"dir":3}, goalPos:[2,5], stars:[],
+  tiles:[[0,5],[0,4],[0,3],[1,3],[2,3],[3,3],[3,4],[3,5],[2,5]]},
+ {name:'네 변', goal:'사각형을 돌아 목표로', teach:'모퉁이에서 도는 것까지 반복 한 덩이에 넣으면 변이 몇 개든 반복 하나예요', cols:5, rows:5, limit:7, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":4,"dir":0}, goalPos:[2,4], stars:[],
+  tiles:[[0,4],[0,3],[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[3,4],[2,4]]},
+ {name:'비켜 가기', goal:'길이 한 칸씩 옆으로 밀린다', teach:'조건 안에 명령을 여러 개 넣을 수 있어요 — "돌고, 한 칸 가고, 다시 돌기" 한 묶음', cols:6, rows:6, limit:8, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[3,0], stars:[],
+  tiles:[[0,5],[0,4],[1,4],[1,3],[1,2],[2,2],[2,1],[3,1],[3,0]]},
+ {name:'오른쪽도 왼쪽도', goal:'꺾이는 방향이 섞여 있다', teach:'"막히면 오른쪽" 다음에 "그래도 막히면 왼쪽으로 두 번" — 조건을 겹쳐요', cols:5, rows:6, limit:7, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[4,1], stars:[],
+  tiles:[[0,5],[0,4],[0,3],[0,2],[1,2],[2,2],[2,1],[3,1],[4,1]]},
+ {name:'두 칸씩', goal:'반복 8번으로는 모자란 긴 길', teach:'반복 한 번에 "조건 + 앞으로" 를 두 벌 넣으면 두 배를 가요', cols:5, rows:6, limit:8, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[2,4], stars:[],
+  tiles:[[0,5],[0,4],[0,3],[0,2],[0,1],[1,1],[2,1],[3,1],[4,1],[4,2],[4,3],[4,4],[3,4],[2,4]]},
+ {name:'나선', goal:'구간이 점점 짧아진다', teach:'횟수로는 못 맞춰요. 벽을 따라가면 길이가 달라도 돼요', cols:5, rows:5, limit:9, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":4,"dir":0}, goalPos:[2,2], stars:[],
+  tiles:[[0,4],[0,3],[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[3,4],[2,4],[2,3],[2,2]]},
+ {name:'막다른 가지', goal:'갈림길의 오른쪽 가지는 막다른 길', teach:'"막히면 오른쪽" 은 막다른 길로 들어가요. 어느 쪽을 먼저 보느냐가 답을 가른다', cols:5, rows:6, limit:6, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":4,"y":4,"dir":0}, goalPos:[3,5], stars:[],
+  tiles:[[4,4],[4,3],[3,3],[2,3],[1,3],[1,4],[1,5],[2,5],[3,5],[0,5]]},
+ {name:'별이 표지판', goal:'별이 있는 갈림길은 왼쪽, 없으면 오른쪽', teach:'"별?" 조건 안에 집기와 돌기를 같이 넣어요 — 별이 방향을 알려줘요', cols:6, rows:5, limit:7, runs:3, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":1,"y":4,"dir":0}, goalPos:[2,1], stars:[[4,3],[4,1]],
+  tiles:[[1,4],[1,3],[0,3],[2,3],[3,3],[4,3],[4,2],[4,1],[3,1],[2,1],[5,1]]},
+ {name:'목표를 지나쳐서', goal:'별이 목표 너머 막다른 길에 있다', teach:'막다른 길에서 오른쪽을 두 번 돌면 되돌아 나와요. 별을 다 못 모았으면 목표를 밟아도 안 끝나요', cols:7, rows:3, limit:7, runs:3, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":0,"y":1,"dir":1}, goalPos:[2,1], stars:[[5,1]],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1]]},
+ {name:'왕복', goal:'별이 양쪽 끝에 — 갔다가 돌아와라', teach:'막히면 뒤돌기(왼쪽 둘) 를 반복 안에 넣으면 복도를 왕복해요', cols:6, rows:3, limit:6, runs:3, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":3,"y":1,"dir":1}, goalPos:[0,1], stars:[[5,1],[0,1]],
+  tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1]]},
+ {name:'별 홀짝', goal:'두 칸씩 가는데 별이 홀수·짝수 칸에 섞여 있다', teach:'두 칸씩 가면 집기도 두 번이어야 해요', cols:5, rows:6, limit:10, runs:3, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[2,5], stars:[[0,4],[1,2],[2,2],[4,3],[4,4]],
+  tiles:[[0,5],[0,4],[0,3],[0,2],[1,2],[2,2],[3,2],[4,2],[4,3],[4,4],[4,5],[3,5],[2,5]]},
+ {name:'두 단계', goal:'앞 갈림길은 왼쪽이 정답, 뒤 갈림길은 오른쪽이 정답', teach:'한 규칙으로 안 되면 반복을 둘로 나눠요 — 앞 반복이 끝나는 자리를 맞추는 게 열쇠', cols:5, rows:6, limit:14, runs:3, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":1,"y":5,"dir":0}, goalPos:[4,3], stars:[],
+  tiles:[[1,5],[1,4],[1,3],[2,3],[0,3],[0,2],[0,1],[1,1],[2,1],[3,1],[4,1],[4,0],[4,2],[4,3]]},
+ {name:'빗살 복도', goal:'옆으로 난 짧은 길마다 별 — 들어갔다 나와라', teach:'별이 "여기서 왼쪽" 표지판. 막다른 끝에서는 "막히면 왼쪽" 을 두 번 — 돌아 나와요', cols:6, rows:4, limit:11, runs:3, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":1,"y":3,"dir":1}, goalPos:[5,3], stars:[[2,3],[2,2],[4,3],[4,2]],
+  tiles:[[1,3],[2,3],[3,3],[4,3],[5,3],[2,2],[4,2]]},
+ {name:'뚫린 모퉁이', goal:'모퉁이인데 앞이 뚫려 있다 — 벽 따라가기가 빠진다', teach:'앞이 안 막혔으니 "막힘?" 은 안 걸려요. 별이 "여기서 돌아" 표지판', cols:5, rows:6, limit:7, runs:3, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[2,5], stars:[[0,2]],
+  tiles:[[0,5],[0,4],[0,3],[0,2],[0,1],[1,2],[2,2],[2,3],[2,4],[2,5]]},
+ {name:'갈림길 셋', goal:'갈림길마다 막다른 가지 — 별만 믿어라', cols:6, rows:5, limit:9, runs:2, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":0,"y":4,"dir":0}, goalPos:[5,1], stars:[[0,3],[2,1]],
+  tiles:[[0,4],[0,3],[0,2],[1,3],[2,3],[2,4],[2,2],[2,1],[2,0],[1,1],[3,1],[4,1],[5,1],[4,2]]},
+ {name:'섞인 모퉁이와 별', goal:'방향이 섞인 길에 별까지 — 실행은 두 번', teach:'앞에서 배운 걸 겹쳐요: 막히면 오른쪽, 그래도 막히면 왼쪽 둘, 그리고 집기', cols:5, rows:6, limit:10, runs:2, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":0,"y":5,"dir":0}, goalPos:[4,2], stars:[[0,4],[1,3],[2,2],[3,2]],
+  tiles:[[0,5],[0,4],[0,3],[1,3],[2,3],[2,2],[3,2],[4,2]]},
+ {name:'양쪽으로 비켜', goal:'오른쪽으로 밀린 길과 왼쪽으로 밀린 길', teach:'막히면 오른쪽으로 비키고, 별이 있으면 왼쪽으로 비켜요', cols:4, rows:6, limit:12, runs:2, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":1,"y":5,"dir":0}, goalPos:[1,0], stars:[[2,2]],
+  tiles:[[1,5],[1,4],[2,4],[2,3],[2,2],[1,2],[1,1],[1,0]]},
+ {name:'뒤를 보고 시작', goal:'막다른 길을 보고 서 있다 — 돌아서서 벽 따라가기', teach:'앞이 열려 있으니 "막힘?" 은 못 알아채요. 반복 앞에 먼저 돌아서는 명령을', cols:4, rows:5, limit:6, runs:2, ops:["MV","TL","TR","LP","IF"],
+  start:{"x":0,"y":2,"dir":2}, goalPos:[3,2], stars:[],
+  tiles:[[0,4],[0,3],[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[3,1],[3,2]]},
+ {name:'최종 시험', goal:'나선 · 뚫린 모퉁이 둘 · 별 — 실행 두 번 안에', cols:6, rows:5, limit:14, runs:2, ops:["MV","TL","TR","PK","LP","IF"],
+  start:{"x":0,"y":4,"dir":0}, goalPos:[2,2], stars:[[0,1],[5,1]],
+  tiles:[[0,4],[0,3],[0,2],[0,1],[0,0],[1,1],[2,1],[3,1],[4,1],[5,1],[5,0],[5,2],[5,3],[5,4],[4,4],[3,4],[2,4],[4,3],[2,3],[2,2]]}
 ];
-
-/* ===================== state ===================== */
-const S={lv:0, prog:[], running:false};
-let openStack=[]; // stack of open block containers accepting new ops
+/* ===================== 상태 ===================== */
+const S={lv:0, prog:[], running:false, runsLeft:0, usedRuns:0, cleared:0, log:[], runOver:false};
+let openStack=[];
 function curContainer(){ return openStack.length? openStack[openStack.length-1] : null; }
-function lv(){return LEVELS[S.lv];}
+function lv(){return tutOn ? TUT_ROUNDS[tutRound].level : LEVELS[S.lv];}
 function isTile(x,y){return lv().tiles.some(t=>t[0]===x&&t[1]===y);}
-
-/* ===================== grid render ===================== */
+/* ===================== 격자 ===================== */
 const grid=document.getElementById('grid');
 let CELL=52, GAP=5, cariEl=null, itemEls={};
 function buildGrid(){
@@ -346,53 +437,45 @@ function placeCari(x,y,dir,shock,fx=false){
   cariEl.classList.remove('stepfx');
   if(fx){void cariEl.offsetWidth;cariEl.classList.add('stepfx');}
 }
-
-/* ===================== program helpers ===================== */
-function countOps(list){ // recursive total instruction count
-  list=list||S.prog; let n=0;
-  for(const ins of list){ n++; if(ins.body) n+=countOps(ins.body); }
-  return n;
-}
-function condLabel(c){return c==='blocked'?'막힘?':'별?';}
-
-/* ===================== program render ===================== */
+/* ===================== 프로그램 ===================== */
+function countOps(list){ list=list||S.prog; let n=0; for(const ins of list){ n++; if(ins.body) n+=countOps(ins.body); } return n; }
+function condLabel(c){return T(c==='blocked'?'prog.cond.blocked':'prog.cond.star');}
 const programEl=document.getElementById('program');
 function miniHTML(ins,parentIdx,childIdx){
   if(ins.op==='IF'){
-    const inner=ins.body.map(b=>OPS[b.op].ic).join('');
-    const cond=ins.cond==='star'?'★':'▥';
-    return `<div class="mini iff" data-parent="${parentIdx}" data-child="${childIdx}" title="탭해서 조건 변경"><span class="q">${cond}${inner}</span></div>`;
+    // 반복 안의 조건은 알약 블록으로 — 조건 라벨(막힘?/별?) + 안에 넣은 명령을 그림 그대로. 글자 아이콘으로 접으면 뭘 넣었는지 안 보인다(2026-09-14 지적).
+    const inner=ins.body.map(b=>`<div class="mini ${OPS[b.op].cls}"></div>`).join('')||'<div class="mini dot">·</div>';
+    const open=openStack.includes(ins)?' open':'';
+    return `<div class="mini iff${open}" data-parent="${parentIdx}" data-child="${childIdx}"><span class="q">${condLabel(ins.cond)}</span>${inner}</div>`;
   }
-  return `<div class="mini ${OPS[ins.op].cls}" data-parent="${parentIdx}" data-child="${childIdx}" title="탭해서 삭제">${OPS[ins.op].ic}</div>`;
+  return `<div class="mini ${OPS[ins.op].cls}" data-parent="${parentIdx}" data-child="${childIdx}">${OPS[ins.op].ic}</div>`;
 }
 function slotHTML(ins,idx){
   if(ins.op==='LP'){
     const open=openStack.includes(ins)?' open':'';
     const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
-    return `<div class="slot block lp${open}" data-i="${idx}">
-      <div class="blab">반복<span class="cnt">×${ins.count}</span></div>
-      <div class="body">${body}</div></div>`;
+    return `<div class="slot block lp${open}" data-i="${idx}"><div class="blab">${opLab('LP')}<span class="cnt">×${ins.count}</span></div><div class="body">${body}</div></div>`;
   }
   if(ins.op==='IF'){
     const open=openStack.includes(ins)?' open':'';
     const body=ins.body.map((b,j)=>miniHTML(b,idx,j)).join('')||'<div class="mini">·</div>';
-    return `<div class="slot block iff${open}" data-i="${idx}">
-      <div class="blab">조건<span class="cnt">${condLabel(ins.cond)}</span></div>
-      <div class="body">${body}</div></div>`;
+    return `<div class="slot block iff${open}" data-i="${idx}"><div class="blab">${opLab('IF')}<span class="cnt">${condLabel(ins.cond)}</span></div><div class="body">${body}</div></div>`;
   }
   const o=OPS[ins.op];
-  return `<div class="slot simple ${o.cls}" data-i="${idx}"><div class="ic">${o.ic}</div><div>${o.lab}</div></div>`;
+  return `<div class="slot simple ${o.cls}" data-i="${idx}"><div class="ic">${o.ic}</div><div>${opLab(ins.op)}</div></div>`;
 }
 function renderProgram(){
   programEl.innerHTML=S.prog.map((ins,i)=>slotHTML(ins,i)).join('');
   programEl.classList.toggle('empty',S.prog.length===0);
   document.getElementById('slotN').textContent=countOps()+'/'+lv().limit;
+  tutMark();
 }
-/* single click handler: badge -> cycle value ; block/ simple -> delete (top level) */
+/* 프로그램 칸 클릭: 배지(×N·조건) → 값 바꾸기 / 블록·명령 → 삭제 */
 programEl.onclick=function(e){
   if(S.running)return;
   const mini=e.target.closest('.mini[data-parent]');
   if(mini){
+    if(tutOn) return;   // 튜토리얼 중엔 지운 걸 되돌릴 안내가 없다
     const parent=S.prog[+mini.dataset.parent];
     const child=parent&&parent.body&&parent.body[+mini.dataset.child];
     if(!child)return;
@@ -404,46 +487,43 @@ programEl.onclick=function(e){
   const i=+slot.dataset.i; const ins=S.prog[i]; if(!ins)return;
   if(e.target.classList.contains('cnt')){
     if(ins.op==='LP'){ ins.count = ins.count>=8?2:ins.count+2; }
-    else if(ins.op==='IF'){ ins.cond = ins.cond==='blocked'?'star':'blocked'; }
-    renderProgram(); return;
+    else if(ins.op==='IF'){ if(tutOn) return; ins.cond = ins.cond==='blocked'?'star':'blocked'; }
+    renderProgram(); tutCheck(); return;
   }
-  // delete whole top-level item; if it was open, pop from stack
+  if(tutOn) return;
   openStack=openStack.filter(b=>b!==ins);
   S.prog.splice(i,1);
   renderProgram(); buildPalette();
 };
-
-/* ===================== palette ===================== */
+/* ===================== 팔레트 ===================== */
 const paletteEl=document.getElementById('palette');
 function buildPalette(){
   const L=lv();
-  let html=L.ops.map(op=>{
-    const o=OPS[op];
-    return `<button class="pbtn ${o.cls}" data-op="${op}"><div class="pic">${o.ic}</div>${o.lab}</button>`;
-  }).join('');
+  let html=L.ops.map(op=>`<button class="pbtn ${OPS[op].cls}" data-op="${op}" title="${opLab(op)}"><div class="pic">${OPS[op].ic}</div>${opLab(op)}</button>`).join('');
   if(L.ops.includes('LP')||L.ops.includes('IF'))
-    html+=`<button class="pbtn close" data-op="CLOSE"><div class="pic">✔</div>닫기</button>`;
+    html+=`<button class="pbtn close" data-op="CLOSE" title="${T('prog.op.close')}"><div class="pic">✔</div>${T('prog.op.close')}</button>`;
   paletteEl.innerHTML=html;
   paletteEl.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>onOp(b.dataset.op));
   updatePalette();
 }
 function updatePalette(){
   const full=countOps()>=lv().limit;
-  const inLoop = curContainer() && curContainer().op==='LP';
   const inIf   = curContainer() && curContainer().op==='IF';
+  const st=tutStep();
   paletteEl.querySelectorAll('.pbtn').forEach(b=>{
     const op=b.dataset.op;
-    if(op==='CLOSE'){ b.hidden=openStack.length===0; b.disabled=openStack.length===0; return; }
+    if(op==='CLOSE'){ b.hidden=openStack.length===0; b.disabled=openStack.length===0||(st&&st.op!=='CLOSE'); return; }
     let dis=full;
-    // block-nesting rules: LP only at top level; IF at top level or inside a loop; no block inside IF
-    if(op==='LP' && curContainer()) dis=true;
-    if(op==='IF' && (inIf)) dis=true;
+    if(op==='LP' && curContainer()) dis=true;   // 반복은 최상위에만
+    if(op==='IF' && inIf) dis=true;              // 조건 안에 조건은 안 됨
+    if(st && st.op && st.op!==op) dis=true;      // 튜토리얼: 지목한 것만
     b.disabled=dis;
   });
+  tutMark();
 }
 function onOp(op){
   if(S.running)return;
-  if(op==='CLOSE'){ openStack.pop(); buildPalette(); renderProgram(); return; }
+  if(op==='CLOSE'){ openStack.pop(); buildPalette(); renderProgram(); tutCheck(); return; }
   if(countOps()>=lv().limit){ flashFull(); return; }
   if(op==='LP'){
     const inst={op:'LP',count:2,body:[]}; S.prog.push(inst); openStack.push(inst);
@@ -457,37 +537,40 @@ function onOp(op){
     const c=curContainer();
     if(c) c.body.push(inst); else S.prog.push(inst);
   }
-  buildPalette(); renderProgram();
+  // 방금 넣은 명령 이름을 잠깐 보여준다 — 아이콘만으로는 뭘 넣었는지 모른다
+  const hint=document.querySelector('.progtitle .hint'); if(hint){ hint.textContent=OPS[op].ic+' '+opLab(op); clearTimeout(hint._t); hint._t=setTimeout(()=>hint.textContent='',1400); }
+  buildPalette(); renderProgram(); tutCheck();
 }
 let fullT=null;
 function flashFull(){
   const n=document.getElementById('slotN'); n.style.color='var(--bad)';
-  toast('명령 칸이 가득 찼어! 반복·조건으로 줄여봐');
+  toast(T('prog.full'));
   clearTimeout(fullT); fullT=setTimeout(()=>n.style.color='var(--brand)',700);
 }
-
-/* ===================== VM: compile to flat steps ===================== */
+/* ===================== 실행기 ===================== */
 const DX=[0,1,0,-1], DY=[-1,0,1,0];
 function compile(list,topIdx,out){
   for(const ins of list){
     const ti = topIdx==null ? S.prog.indexOf(ins) : topIdx;
-    if(ins.op==='LP'){
-      for(let r=0;r<ins.count;r++) compile(ins.body,ti,out);
-    }else if(ins.op==='IF'){
-      const body=[]; compile(ins.body,ti,body);
-      out.push({op:'IF',cond:ins.cond,body,slot:ti});
-    }else{
-      out.push({op:ins.op,slot:ti});
-    }
+    if(ins.op==='LP'){ for(let r=0;r<ins.count;r++) compile(ins.body,ti,out); }
+    else if(ins.op==='IF'){ const body=[]; compile(ins.body,ti,body); out.push({op:'IF',cond:ins.cond,body,slot:ti}); }
+    else out.push({op:ins.op,slot:ti});
   }
 }
 let vmTimer=null;
+function renderRuns(){
+  const L=lv(); const el=document.getElementById('runsEl');
+  if(tutOn){ el.innerHTML=''; return; }   // 튜토리얼엔 실행 횟수가 없다
+  el.innerHTML=T('prog.runs')+' '+Array.from({length:L.runs},(_,i)=>`<i class="${i<S.runsLeft?'on':''}"></i>`).join('');
+}
 function runProgram(){
   if(S.running)return;
-  if(countOps()===0){ toast('명령을 먼저 넣어라'); return; }
+  if(countOps()===0){ toast(T('prog.empty')); return; }
+  if(tutStep() && !tutStep().run) return;           // 튜토리얼: 지목했을 때만 실행
+  if(!tutOn && S.runsLeft<=0) return;
   openStack=[]; buildPalette(); renderProgram();
-  S.running=true;
-  document.getElementById('runBtn').textContent='실행 중…';
+  S.running=true; if(!tutOn){ S.runsLeft--; S.usedRuns++; renderRuns(); }
+  document.getElementById('runBtn').textContent=T('prog.running');
   const L=lv();
   const st={x:L.start.x,y:L.start.y,dir:L.start.dir,got:new Set()};
   const steps=[]; compile(S.prog,null,steps);
@@ -499,8 +582,8 @@ function runProgram(){
   function finish(win){
     S.running=false; clearInterval(vmTimer);
     programEl.querySelectorAll('.slot').forEach(el=>el.classList.remove('run'));
-    document.getElementById('runBtn').textContent='실행';
-    setTimeout(()=>showResult(win),400);
+    document.getElementById('runBtn').textContent=T('prog.run');
+    setTimeout(()=>{ if(tutOn) tutRunDone(win); else afterRun(win); },400);
   }
   vmTimer=setInterval(()=>{
     if(++guard>300){ finish(false); return; }
@@ -524,75 +607,196 @@ function runProgram(){
     pc++;
   },330);
 }
-
-/* ===================== toast ===================== */
+/* ===================== 토스트 ===================== */
 const takeEl=document.getElementById('takeaway'); let takeT=null;
 function toast(msg,ms=1600){
   takeEl.textContent=msg; takeEl.classList.add('show');
   clearTimeout(takeT); takeT=setTimeout(()=>takeEl.classList.remove('show'),ms);
 }
-
-/* ===================== result ===================== */
-function starsFor(){
-  const used=countOps(), L=lv();
-  if(used<=L.par) return 3;
-  if(used<=Math.min(L.limit,L.par+2)) return 2;
-  return 1;
+/* ===================== 판(run) 흐름 =====================
+   한 판 = 1레벨부터. 레벨마다 실행 횟수(runs)가 있고, 실패해도 횟수가 남으면 프로그램을 고쳐 다시 실행한다.
+   횟수를 다 쓰면 판이 끝난다(2026-09-14 지시 — 시간 대신 실행 횟수. 생각하는 게임이라).
+   기록 = 깬 레벨 수 → 같으면 명령 수 합(적을수록) → 같으면 실행 횟수 합(적을수록). 서버가 log 로 다시 센다. */
+function submitRun(){
+  if(window.MGBridge) MGBridge.submit(S.cleared, {timed:true, log:S.log}); // 숫자는 참고값 — 서버가 log(레벨별 프로그램·실행 횟수)로 다시 센다
 }
-function showResult(win){
+function afterRun(win){
   const ov=document.getElementById('resultOv'); ov.classList.remove('hidden');
   document.getElementById('resCari').innerHTML=cariPNG(win?'win':'fail');
-  const badge=document.getElementById('resBadge'), rn=document.getElementById('resN'),
-        rmsg=document.getElementById('resMsg'), stEl=document.getElementById('resStars'),
-        row=document.getElementById('resRow');
-  row.innerHTML='';
+  const badge=document.getElementById('resBadge'), rn=document.getElementById('resN'), rmsg=document.getElementById('resMsg'), stEl=document.getElementById('resStars'), row=document.getElementById('resRow');
+  row.innerHTML=''; stEl.textContent='';
   if(win){
-    const s=starsFor();
-    badge.textContent='성공!'; badge.className='badge win';
-    stEl.textContent = '★★★'.slice(0,s)+'☆☆☆'.slice(0,3-s);
-    rn.textContent='명령 '+countOps()+'개 사용 (제한 '+lv().limit+')';
-    rmsg.textContent = s>=3?'완벽! 아주 짧고 똑똑한 프로그램!' : s===2?'좋아요. 더 줄일 수 있을까?' : '성공! 반복·조건으로 더 짧게 도전!';
-    document.getElementById('resStrip').textContent='레벨 '+(S.lv+1)+' 완료';
-    const isLast=S.lv>=LEVELS.length-1;
-    if(window.MGBridge) MGBridge.submit(S.lv+1, {timed:true}); // 랭킹: 도달 레벨(동률=시간)
-    row.appendChild(btn('다시 도전','ghost',()=>{ov.classList.add('hidden');resetProgram();}));
-    row.appendChild(btn(isLast?'처음으로':'다음','',()=>{ov.classList.add('hidden'); if(isLast) goStart(); else {S.lv++; loadLevel();}}));
+    S.log.push({lv:S.lv, prog:JSON.parse(JSON.stringify(S.prog)), runs:S.usedRuns});
+    S.cleared++;
+    const used=countOps(), isLast=S.lv>=LEVELS.length-1;
+    badge.textContent=T(isLast?'prog.all_clear':'prog.success'); badge.className='badge win';
+    rn.textContent=T('prog.res_used',{n:used, m:lv().limit, r:S.usedRuns});
+    rmsg.textContent=isLast?T('prog.res_all'):T('prog.res_next');
+    document.getElementById('resStrip').textContent=T('prog.level_done',{n:S.lv+1});
+    if(isLast){ S.runOver=true; submitRun(); }
+    row.appendChild(btn(T(isLast?'prog.to_start':'prog.next'),'',()=>{ ov.classList.add('hidden'); if(isLast) goStart(); else {S.lv++; loadLevel();} }));
+    row.appendChild(btn(T('prog.quit'),'ghost',()=>{ ov.classList.add('hidden'); quitRun(); }));
+  }else if(S.runsLeft>0){
+    badge.textContent=T('prog.fail'); badge.className='badge lose';
+    rn.textContent=T('prog.lost');
+    rmsg.textContent=T('prog.runs_left',{n:S.runsLeft});
+    document.getElementById('resStrip').textContent=T('prog.stopped');
+    row.appendChild(btn(T('prog.fix_retry'),'',()=>{ ov.classList.add('hidden'); resetCari(); }));   // 프로그램은 그대로 — 고쳐서 다시
+    row.appendChild(btn(T('prog.quit'),'ghost',()=>{ ov.classList.add('hidden'); quitRun(); }));
   }else{
-    badge.textContent='실패…'; badge.className='badge lose';
-    stEl.textContent='';
-    rn.textContent='CARI가 길을 잃었다';
-    rmsg.textContent='프로그램을 고쳐서 다시 실행해봐';
-    document.getElementById('resStrip').textContent='프로그램 정지';
-    row.appendChild(btn('다시 도전','',()=>{ov.classList.add('hidden');resetProgram();}));
-    row.appendChild(btn('처음으로','ghost',()=>{ov.classList.add('hidden');goStart();}));
+    // 실행 횟수 소진 → 판 끝
+    S.runOver=true; submitRun();
+    badge.textContent=T('prog.out_of_runs'); badge.className='badge lose';
+    rn.textContent=T('prog.res_cleared',{n:S.cleared});
+    rmsg.textContent=T('prog.res_over');
+    document.getElementById('resStrip').textContent=T('prog.game_over');
+    row.appendChild(btn(T('prog.retry_run'),'',()=>{ ov.classList.add('hidden'); startRun(); }));
+    row.appendChild(btn(T('prog.to_start'),'ghost',()=>{ ov.classList.add('hidden'); goStart(); }));
   }
 }
+/** 그만두기 — 깬 데까지가 기록 */
+function quitRun(){
+  S.runOver=true; submitRun();
+  const ov=document.getElementById('resultOv'); ov.classList.remove('hidden');
+  document.getElementById('resCari').innerHTML=cariPNG('win');
+  document.getElementById('resBadge').textContent=T('prog.here'); document.getElementById('resBadge').className='badge win';
+  document.getElementById('resStars').textContent='';
+  document.getElementById('resN').textContent=T('prog.res_cleared',{n:S.cleared});
+  document.getElementById('resMsg').textContent=T('prog.res_here');
+  document.getElementById('resStrip').textContent=T('prog.game_over');
+  const row=document.getElementById('resRow'); row.innerHTML='';
+  row.appendChild(btn(T('prog.retry_run'),'',()=>{ ov.classList.add('hidden'); startRun(); }));
+  row.appendChild(btn(T('prog.to_start'),'ghost',()=>{ ov.classList.add('hidden'); goStart(); }));
+}
 function btn(txt,cls,fn){const b=document.createElement('button');b.className='btn'+(cls?' '+cls:'');b.textContent=txt;b.onclick=fn;return b;}
-
-/* ===================== level control ===================== */
+/* ===================== 레벨 ===================== */
 function loadLevel(){
   const L=lv();
   S.prog=[]; openStack=[]; S.running=false; clearInterval(vmTimer);
-  document.getElementById('runBtn').textContent='실행';
-  document.getElementById('lvNum').textContent=(S.lv+1)+' / '+LEVELS.length;
-  document.getElementById('lvName').textContent=L.name;
-  document.getElementById('goalTxt').textContent='🎯 '+L.goal;
+  S.runsLeft=L.runs; S.usedRuns=0;
+  document.getElementById('runBtn').textContent=T('prog.run');
+  document.getElementById('lvNum').textContent=tutOn ? T('prog.tut_short') : (S.lv+1)+' / '+LEVELS.length;
+  document.getElementById('lvName').textContent=tutOn ? L.name : lvT(S.lv,'name',L.name);
+  document.getElementById('goalTxt').textContent='🎯 '+(tutOn ? L.goal : lvT(S.lv,'goal',L.goal));
+  renderRuns();
   buildGrid(); buildPalette(); renderProgram();
-  if(L.teach) setTimeout(()=>toast(L.teach,1800),450);
+  const teach = tutOn ? null : lvT(S.lv,'teach',L.teach||'');
+  if(teach) setTimeout(()=>toast(teach,2600),450);
 }
-function resetProgram(){
-  S.prog=[]; openStack=[]; S.running=false; clearInterval(vmTimer);
-  document.getElementById('runBtn').textContent='실행';
-  buildGrid(); buildPalette(); renderProgram();
+/** 실패 뒤 — CARI 만 제자리로, 프로그램은 남긴다 */
+function resetCari(){ S.running=false; clearInterval(vmTimer); document.getElementById('runBtn').textContent=T('prog.run'); buildGrid(); buildPalette(); renderProgram(); }
+function resetProgram(){ if(tutOn) return; S.prog=[]; openStack=[]; resetCari(); }
+function startRun(){ S.lv=0; S.cleared=0; S.log=[]; S.runOver=false; loadLevel(); }
+function goStart(){ document.getElementById('startOv').classList.remove('hidden'); }
+/* ===================== 튜토리얼 =====================
+   지어라와 같은 규칙: 눌러야 시작하고, 지금 할 것 하나만 빛나고 그것만 반응하며, 끝나면 시작한 자리로 돌아간다. 기록·실행 횟수 없음.
+   다섯 라운드 — ① 앞으로·회전 ② 집기 ③ 반복(칸이 모자란 상황을 먼저 보여주고 반복으로 푼다) ④ 조건 하나만(모퉁이에서 '막혔나?' 를 본다) ⑤ 반복 안의 조건.
+   ④⑤ 를 나눈 이유: 반복 안에서 조건부터 배우면 "조건이 뭔지" 를 못 잡는다(2026-09-14 지적 — "먼소리인지 모르겠다").
+   각 단계 문구가 "이 블록이 뭘 하는가" 를 말한다 — 아이콘만으로는 모른다는 지적(2026-09-14). */
+let tutOn=false, tutRound=0, tutIdx=0, tutFrom='intro', tutReturnLv=0;
+const TUT_ROUNDS=[
+  { title:T('prog.tut.r1'),
+    level:{ name:T('prog.tut.r1'), goal:T('prog.tut.g1'), cols:4, rows:3, limit:6, runs:9, ops:['MV','TL','TR'], start:{x:0,y:2,dir:1}, goalPos:[2,1], stars:[], tiles:[[0,2],[1,2],[2,2],[2,1]] },
+    steps:[
+      { msg:T('prog.tut.s1_1'), op:'MV', done:()=>progTop().length>=1 },
+      { msg:T('prog.tut.s1_2'), op:'MV', done:()=>progTop().length>=2 },
+      { msg:T('prog.tut.s1_3'), op:'TL', done:()=>progTop().some(i=>i.op==='TL') },
+      { msg:T('prog.tut.s1_4'), op:'MV', done:()=>progTop().length>=4 },
+      { msg:T('prog.tut.s1_5'), run:true } ] },
+  { title:T('prog.tut.r2'),
+    level:{ name:T('prog.tut.r2'), goal:T('prog.tut.g2'), cols:4, rows:3, limit:6, runs:9, ops:['MV','TL','TR','PK'], start:{x:0,y:1,dir:1}, goalPos:[3,1], stars:[[1,1]], tiles:[[0,1],[1,1],[2,1],[3,1]] },
+    steps:[
+      { msg:T('prog.tut.s2_1'), op:'MV', done:()=>progTop().length>=1 },
+      { msg:T('prog.tut.s2_2'), op:'PK', done:()=>progTop().some(i=>i.op==='PK') },
+      { msg:T('prog.tut.s2_3'), op:'MV', done:()=>progTop().filter(i=>i.op==='MV').length>=2 },
+      { msg:T('prog.tut.s2_4'), op:'MV', done:()=>progTop().filter(i=>i.op==='MV').length>=3 },
+      { msg:T('prog.tut.s2_5'), run:true } ] },
+  { title:T('prog.tut.r3'),
+    level:{ name:T('prog.tut.r3'), goal:T('prog.tut.g3'), cols:7, rows:3, limit:3, runs:9, ops:['MV','TL','TR','LP'], start:{x:0,y:1,dir:1}, goalPos:[6,1], stars:[], tiles:[[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
+    steps:[
+      { msg:T('prog.tut.s3_1'), op:'LP', done:()=>progTop().some(i=>i.op==='LP') },
+      { msg:T('prog.tut.s3_2'), op:'MV', done:()=>{const l=progTop().find(i=>i.op==='LP'); return !!l&&l.body.length>=1;} },
+      { msg:T('prog.tut.s3_3'), op:'CLOSE', done:()=>openStack.length===0 },
+      { msg:T('prog.tut.s3_4'), cnt:0, done:()=>{const l=progTop().find(i=>i.op==='LP'); return !!l&&l.count>=6;} },
+      { msg:T('prog.tut.s3_5'), run:true } ] },
+  { title:T('prog.tut.r4'),   // 조건 하나만 — 모퉁이 한 곳에서 "막혔나?" 를 눈으로 보게
+    level:{ name:T('prog.tut.r4'), goal:T('prog.tut.g4'), cols:4, rows:3, limit:4, runs:9, ops:['MV','TL','TR','IF'], start:{x:0,y:2,dir:0}, goalPos:[1,1], stars:[], tiles:[[0,2],[0,1],[1,1]] },
+    steps:[
+      { msg:T('prog.tut.s4_1'), op:'MV', done:()=>progTop().length>=1 },
+      { msg:T('prog.tut.s4_2'), op:'IF', done:()=>progTop().some(i=>i.op==='IF') },
+      { msg:T('prog.tut.s4_3'), op:'TR', done:()=>{const f=progTop().find(i=>i.op==='IF'); return !!f&&f.body.some(i=>i.op==='TR');} },
+      { msg:T('prog.tut.s4_4'), op:'CLOSE', done:()=>openStack.length===0 },
+      { msg:T('prog.tut.s4_5'), op:'MV', done:()=>progTop().filter(i=>i.op==='MV').length>=2 },
+      { msg:T('prog.tut.s4_6'), run:true } ] },
+  { title:T('prog.tut.r5'),   // 반복 안의 조건 — 매 칸마다 확인
+    level:{ name:T('prog.tut.r5'), goal:T('prog.tut.g5'), cols:4, rows:4, limit:4, runs:9, ops:['MV','TL','TR','LP','IF'], start:{x:0,y:3,dir:0}, goalPos:[2,1], stars:[], tiles:[[0,3],[0,2],[0,1],[1,1],[2,1]] },
+    steps:[
+      { msg:T('prog.tut.s5_1'), op:'LP', done:()=>progTop().some(i=>i.op==='LP') },
+      { msg:T('prog.tut.s5_2'), op:'IF', done:()=>{const l=progTop().find(i=>i.op==='LP'); return !!l&&l.body.some(i=>i.op==='IF');} },
+      { msg:T('prog.tut.s5_3'), op:'TR', done:()=>{const l=progTop().find(i=>i.op==='LP'); const f=l&&l.body.find(i=>i.op==='IF'); return !!f&&f.body.some(i=>i.op==='TR');} },
+      { msg:T('prog.tut.s5_4'), op:'CLOSE', done:()=>openStack.length===1 },
+      { msg:T('prog.tut.s5_5'), op:'MV', done:()=>{const l=progTop().find(i=>i.op==='LP'); return !!l&&l.body.some(i=>i.op==='MV');} },
+      { msg:T('prog.tut.s5_6'), op:'CLOSE', done:()=>openStack.length===0 },
+      { msg:T('prog.tut.s5_7'), cnt:0, done:()=>{const l=progTop().find(i=>i.op==='LP'); return !!l&&l.count>=6;} },
+      { msg:T('prog.tut.s5_8'), run:true } ] },
+];
+function progTop(){ return S.prog; }
+function tutStep(){ return tutOn ? TUT_ROUNDS[tutRound].steps[tutIdx] : null; }
+function tutSetHelp(){ const b=document.getElementById('btnTut'); b.textContent=tutOn?'✕':'?'; b.classList.toggle('quit',tutOn); b.setAttribute('aria-label',T(tutOn?'prog.tutorial_quit':'prog.tutorial')); }
+function tutClear(){ document.querySelectorAll('.tut-on').forEach(el=>el.classList.remove('tut-on')); }
+function tutMark(){
+  tutClear();
+  const st=tutStep(); const m=document.getElementById('tutMsg');
+  if(!st){ m.classList.remove('on'); return; }
+  m.innerHTML=st.msg; m.classList.add('on');
+  if(st.op){ const b=paletteEl.querySelector(`.pbtn[data-op="${st.op}"]`); if(b) b.classList.add('tut-on'); }
+  if(st.run) document.getElementById('runBtn').classList.add('tut-on');
+  if(st.cnt!=null){ const c=programEl.querySelectorAll('.slot .cnt')[st.cnt]; if(c) c.classList.add('tut-on'); }
 }
-function goStart(){ S.lv=0; document.getElementById('startOv').classList.remove('hidden'); }
-
-/* ===================== wire ===================== */
+function tutCheck(){
+  const st=tutStep(); if(!st || st.run || !st.done()) return;
+  tutIdx++; tutMark(); updatePalette();
+}
+function tutRunDone(win){
+  if(!win){ // 튜토리얼에서 실패는 안 나오게 짜여 있지만, 혹시 몰라 처음부터
+    toast(T('prog.tut.redo')); loadTutRound(); return; }
+  if(tutRound<TUT_ROUNDS.length-1){
+    document.getElementById('tutMsg').innerHTML=T('prog.tut.good_next',{title:TUT_ROUNDS[tutRound+1].title});
+    setTimeout(()=>{ if(!tutOn) return; tutRound++; loadTutRound(); },1500); return;
+  }
+  // 전부 끝
+  const ov=document.getElementById('resultOv'); ov.classList.remove('hidden');
+  document.getElementById('resCari').innerHTML=cariPNG('win');
+  document.getElementById('resBadge').textContent=T('prog.tut.done'); document.getElementById('resBadge').className='badge win';
+  document.getElementById('resStars').textContent='';
+  document.getElementById('resN').textContent=T('prog.tut.done_title');
+  document.getElementById('resMsg').textContent=T('prog.tut.done_take');
+  document.getElementById('resStrip').textContent=T('prog.tut_short');
+  const row=document.getElementById('resRow'); row.innerHTML='';
+  row.appendChild(btn(T('prog.tut.close'),'',()=>{ ov.classList.add('hidden'); exitTutorial(); }));
+  row.appendChild(btn(T('prog.tut.again'),'ghost',()=>{ ov.classList.add('hidden'); startTutorial(tutFrom); }));
+}
+function loadTutRound(){ tutIdx=0; loadLevel(); tutMark(); updatePalette(); }
+function startTutorial(from){
+  tutFrom=from; if(from==='game') tutReturnLv=S.lv;
+  document.getElementById('startOv').classList.add('hidden'); document.getElementById('resultOv').classList.add('hidden');
+  tutOn=true; tutRound=0; loadTutRound(); tutSetHelp();
+}
+function exitTutorial(){
+  tutOn=false; tutClear(); document.getElementById('tutMsg').classList.remove('on'); tutSetHelp();
+  document.getElementById('resultOv').classList.add('hidden');
+  if(tutFrom==='game'){ startRun(); return; }   // 하던 판은 새 판으로
+  S.lv=0; loadLevel(); document.getElementById('startOv').classList.remove('hidden');
+}
+document.getElementById('btnTut').onclick=()=>{ if(S.running) return; tutOn?exitTutorial():startTutorial('game'); };
+document.getElementById('btnTutIntro').onclick=()=>startTutorial('intro');
+/* ===================== 연결 ===================== */
 document.getElementById('startCari').innerHTML=cariPNG('intro');
-document.getElementById('startBtn').onclick=()=>{ document.getElementById('startOv').classList.add('hidden'); S.lv=0; loadLevel(); };
+programEl.dataset.empty='＋  '+T('prog.empty_hint');   // 빈 프로그램 칸 안내(CSS ::before 가 attr 로 읽는다)
+document.getElementById('startBtn').onclick=()=>{ document.getElementById('startOv').classList.add('hidden'); startRun(); };
 document.getElementById('runBtn').onclick=runProgram;
 document.getElementById('resetBtn').onclick=resetProgram;
-loadLevel();
+S.lv=0; loadLevel();
 </script>
 
 <!-- ===== 앱 브리지: 랭킹 버튼 + 점수 전송 =====
@@ -644,5 +848,6 @@ loadLevel();
   }, true);
 })();
 </script>
+<script>if (window.MGI18N) MGI18N.apply();</script>
 </body>
 </html>

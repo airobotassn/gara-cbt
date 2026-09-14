@@ -26,7 +26,7 @@ interface Row {
 interface RankResp {
   gameId: string
   metric: 'score' | 'level'
-  max: number
+  max?: number // 재채점 게임(버텨라·쏴라)은 상한이 없어 안 온다
   top: Row[]
   total: number
   me: (Row & { plays: number; percentile: number | null; scoreToPass: number | null }) | null
@@ -90,6 +90,9 @@ export default function MiniGameRankModal({
 
   const metric = data?.metric ?? 'score'
   const val = (v: number) => (metric === 'level' ? `Lv.${v}` : v.toLocaleString())
+  // 프로그램해라의 동률값은 시간이 아니라 "명령 수 합 × 1000 + 실행 횟수 합"(서버 replayProgram 이 접어 보낸다) → 그대로 풀어 보여준다.
+  const isProgram = gameId === 'program-cari'
+  const fmtTie = (ms: number) => (isProgram ? t('mg.tie_program', { c: Math.floor(ms / 1000), r: ms % 1000 }) : fmtMs(ms, t))
   // 시상대 = 2·1·3 순서로 배치(가운데가 1위). 3명 미만이면 빈 칸으로 자리만 잡는다 — /ranking 과 동일.
   const top = data?.top ?? []
   const podium = [top[1], top[0], top[2]]
@@ -120,7 +123,7 @@ export default function MiniGameRankModal({
 
         <p className="mgr-note">
           {metric === 'level'
-            ? t('mg.rank_rule_level')
+            ? t(isProgram ? 'mg.rank_rule_program' : 'mg.rank_rule_level')
             : t('mg.rank_rule_score')}
           {data ? t('mg.rank_players', { n: data.total.toLocaleString() }) : ''}
         </p>
@@ -154,7 +157,7 @@ export default function MiniGameRankModal({
                         <b>{r.name}</b>
                         <span>
                           {val(r.score)}
-                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs, t)}</small> : null}
+                          {metric === 'level' && r.tieMs != null ? <small>{fmtTie(r.tieMs)}</small> : null}
                         </span>
                       </div>
                     ) : null,
@@ -177,7 +180,7 @@ export default function MiniGameRankModal({
                         </span>
                         <span className="bar-pt">
                           {val(r.score)}
-                          {metric === 'level' && r.tieMs != null ? <small>{fmtMs(r.tieMs, t)}</small> : null}
+                          {metric === 'level' && r.tieMs != null ? <small>{fmtTie(r.tieMs)}</small> : null}
                         </span>
                       </div>
                     </div>

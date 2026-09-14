@@ -29,7 +29,7 @@ function isDark(hex: string): boolean {
 /** 게임 HTML → 앱 메시지 계약. 게임 쪽 구현은 public/games/*.html 하단의 '앱 브리지' 블록. */
 type GameMsg =
   | { t: 'mg:rank' } // 인트로/아웃트로 우상단 '랭킹' 버튼
-  | { t: 'mg:score'; score: number; tieMs?: number } // 게임오버 / 레벨 클리어
+  | { t: 'mg:score'; score: number; tieMs?: number; log?: unknown[] } // 게임오버 / 레벨 클리어. log = 답안 기록(버텨라·쏴라 — 서버가 이걸로 점수를 다시 센다)
 
 export default function MiniGame() {
   const navigate = useNavigate()
@@ -135,6 +135,7 @@ export default function MiniGame() {
           gameId: game.id,
           rawScore: m.score,
           tieMs: typeof m.tieMs === 'number' ? m.tieMs : undefined,
+          log: Array.isArray(m.log) ? m.log : undefined,
           ticket,
         }).catch(() => { /* 적립 실패는 게임 흐름을 막지 않는다 */ })
       }
