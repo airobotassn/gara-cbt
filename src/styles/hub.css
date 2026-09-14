@@ -1047,11 +1047,13 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-rail-ink: #fdf3d8;
   --skin-rail-ink-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .7);
 
-  /* 미션 바 — 1400×288. 왼쪽 지구본 원판이 x 0~340, 오른쪽 캡 60, 위아래 테 24. 원판을 원형으로 두려면
-     네 edge 의 비율이 슬라이스 비율과 같아야 한다(=한 배율): 48px 높이 기준 0.167 배. */
+  /* 미션 바 — 1400×99(14:1 · 2026-09-14 민무늬 판으로 다시 받음). 왼쪽 지구본 원판이 x 0~105(별 장식까지),
+     오른쪽 반원 캡 50, 위아래 테 10. 원판을 원형으로 두려면 네 edge 의 비율이 슬라이스 비율과 같아야
+     한다(=한 배율): 48px 높이 기준 0.485 배. ⚠️ 처음 받은 5:1 그림은 면에 지도가 있어 늘리면 대륙이
+     옆으로 퍼졌다 — 화면 비율(폰 9:1·PC 15:1)에 가깝고 면이 민무늬여야 늘린 티가 안 난다. */
   --skin-mission-img: url('/hub/ui-world/panel-mission.webp');
-  --skin-mission-slice: 24 60 24 340 fill;
-  --skin-mission-edge: 4px 10px 4px 57px;
+  --skin-mission-slice: 10 50 10 105 fill;
+  --skin-mission-edge: 5px 24px 5px 51px;
   --skin-mission-h: 48px;
 
   /* 출석 보상 판 — 1400×378(7칸 도장판). 지금 화면엔 이 판이 안 그려진다(도장은 출석 기록 창 안 맨 줄) —
@@ -1065,13 +1067,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-cta-slice: 40 70 40 345 fill;
   --skin-cta-edge: 6px 11px 6px 52px;
 
-  /* 경험치 게이지 — 홈 1000×68 · 채움 1000×69. 알약 캡 34. */
+  /* 경험치 게이지 — 홈 1000×68(캡 34) · 채움 1000×48(캡 24 · 홈 안에 들어가게 작다). 2026-09-14 민무늬로 다시 받음.
+     edge 는 캡 비율(38px 높이 → 0.56)보다 조금 얇다 — 폰 게이지가 좁아 캡을 제 비율로 두면 글자 자리가 안 남는다. */
   --skin-gauge-img: url('/hub/ui-world/gauge-track.webp');
   --skin-gauge-slice: 20 34 20 34 fill;
-  --skin-gauge-edge: 6px 10px;   /* 캡(34)보다 얇게 — 폰 게이지가 좁아 캡을 제 비율로 두면 글자 자리가 안 남는다(오피스와 같은 타협) */
+  --skin-gauge-edge: 8px 14px;
   --skin-fill-img: url('/hub/ui-world/gauge-fill.webp');
-  --skin-fill-slice: 20 34 20 34 fill;
-  --skin-fill-edge: 5px 9px;
+  --skin-fill-slice: 14 24 14 24 fill;
+  --skin-fill-edge: 6px 11px;
   --skin-hud-h: 38px;
   --skin-gauge-font: 12.5px;
 
@@ -1111,12 +1114,12 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 @media (min-width: 768px) {
   .hub[data-ui='world'] {
     --skin-panel-title: 20px;
-    --skin-mission-edge: 5px 13px 5px 73px;   /* 62px 높이 기준 0.215 배 */
+    --skin-mission-edge: 6px 31px 6px 66px;   /* 62px 높이 기준 0.626 배 */
     --skin-mission-h: 62px;
     --skin-reward-edge: 14px 20px;
     --skin-cta-edge: 8px 13px 8px 66px;        /* 0.19 배 */
-    --skin-gauge-edge: 7px 12px;
-    --skin-fill-edge: 6px 11px;
+    --skin-gauge-edge: 11px 18px;
+    --skin-fill-edge: 8px 14px;
     --skin-hud-h: 50px;
     --skin-stamp-h: 58px;
     --skin-stamp-font: 16px;
