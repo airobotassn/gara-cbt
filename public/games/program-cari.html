@@ -174,7 +174,10 @@ body{
 .console .pbtn{flex:0 0 47px;width:47px;height:48px;padding:0;border-radius:7px;box-shadow:none;background-size:42px 42px!important;background-position:center!important;
   font-size:0;line-height:0;color:transparent;text-shadow:none;overflow:visible;}
 .console .pbtn .pic{font-size:18px}
-.console .pbtn.close{position:relative;right:auto;top:auto;flex:0 0 48px;width:48px;height:38px;padding:0;background:transparent!important;border:1px solid #9bb6d0;color:#fff;z-index:5;}
+/* 닫기는 그림이 없는 버튼이라 글자를 되살린다 — 콘솔 스킨이 팔레트 글자를 전부 숨겨서 빈 네모로 보였다(2026-09-14 지적) */
+.console .pbtn.close{position:relative;right:auto;top:auto;flex:0 0 52px;width:52px;height:44px;padding:0;background:linear-gradient(#2e4a7a,#1b2f52)!important;border:1.5px solid #9bb6d0;border-radius:9px;color:#fff;z-index:5;
+  font-size:11px;line-height:1.1;font-weight:850;gap:1px;box-shadow:0 2px 0 rgba(4,14,32,.4);}
+.console .pbtn.close .pic{display:block;font-size:15px;line-height:1;color:#ffd253;}
 .console .pbtn.close[hidden]{display:none!important;}
 .controls{position:absolute!important;left:18px;right:18px;top:232px;height:68px;display:flex;gap:23px;justify-content:center;padding:0;transform:translate(-2px,-3px);}
 .controls .btn{display:grid;place-items:center;padding:0!important;line-height:1;font-size:15px;}
