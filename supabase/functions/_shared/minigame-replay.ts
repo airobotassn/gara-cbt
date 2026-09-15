@@ -1,4 +1,4 @@
-// 미니게임 답안 기록 재채점 — 버텨라·쏴라·골라라·닿아라·프로그램해라·지어라·막아라. 2026-09-11 / 09-14 / 09-15.
+// 미니게임 답안 기록 재채점 — 버텨라·쏴라·골라라·닿아라·프로그램해라·지어라·막아라·시켜라. 2026-09-11 / 09-14 / 09-15.
 //
 // 이 게임들은 점수를 믿지 않는다. 게임은 "어느 문항에 뭘 골랐고 시작 후 몇 ms 였나" 기록을 보내고, 서버가
 // 게임과 **같은 공식**으로 점수를 다시 센다. 그래서 콘솔에서 점수 변수를 바꾸거나 submit(9999) 를 부르는
@@ -18,8 +18,9 @@ import { REACH_LEVELS, reachedWith } from './reach-levels.ts'
 import { PROG_LEVELS, validProgram, runProgram, countOps as progCountOps, type Ins } from './program-levels.ts'
 import { BUILD_LEVELS, validTiles as validBuildTiles, simulate as simulateBuild, type Tile as BuildTile } from './build-levels.ts'
 import { BLOCK_DAYS, BLOCK_MAX_STRIKE, judgeBlockDoc } from './block-days.ts'
+import { ORDER_LEVELS, ORDER_MAX_TRIES, orderMatches } from './order-levels.ts'
 
-export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build' | 'block'
+export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build' | 'block' | 'order'
 
 /** 공용 점수 규칙 — 정답 1개 = SCORE_BASE × 연속 배수. 틀리면 0점, 연속 끊김. */
 export const SCORE_BASE = 10
@@ -62,6 +63,11 @@ export interface ProgEntry { lv: number; prog: Ins[]; runs: number }
 export interface BuildEntry { lv: number; tiles: BuildTile[]; runs: number }
 /** 막아라 한 장. d/i = 일차·서류 번호(0부터), m = 가린 조각의 자리, s = 1 전송 / 0 반려, t = 판 시작 후 ms. */
 export interface BlockEntry { d: number; i: number; m: number[]; s: 0 | 1; t: number }
+/** 시켜라 한 번 시키기. o = 주문 번호(0부터), c = 고른 카드 자리, t = 판 시작 후 ms. */
+export interface OrderEntry { o: number; c: number[]; t: number }
+/** 시켜라 별 만점 — 주문 수 × 3. 동률값 = (만점 − 별) × 1e7 + 소요 ms(≤ 9,999,999). */
+export const ORDER_MAX_STARS = ORDER_LEVELS.length * 3
+export const ORDER_TIE_UNIT = 10_000_000
 
 /** setTimeout 은 일찍 안 울리지만 performance.now() 반올림 여유로 30ms 는 봐준다. */
 const GAP_TOLERANCE_MS = 30
@@ -254,9 +260,33 @@ export function replayBlock(log: unknown, ageSec: number): ReplayResult | Replay
   return { ok: true, score, answers: log.length, durationMs: last }
 }
 
+/** 시켜라 — 주문마다 "어느 카드를 골라 시켰나" 를 게임과 같은 규칙으로 다시 판정한다. 주문은 1번부터 순서대로, 한 주문에 MAX_TRIES 번까지.
+ *  맞으면 다음 주문(별 = 4 − 시도 횟수), MAX_TRIES 번 틀리면 판 끝 — 그 뒤 기록은 게임이 만들 수 없다. 점수 = 깬 주문 수.
+ *  동률 = (별 만점 − 별 합) × 1e7 + 마지막 시각 ms — 별이 많을수록, 같으면 빠를수록 위. 최소 간격은 없다(생각하는 게임). */
+export function replayOrder(log: unknown, ageSec: number): ReplayResult | ReplayFail {
+  if (!Array.isArray(log)) return { ok: false, reason: 'log_missing' }
+  if (log.length > ORDER_LEVELS.length * ORDER_MAX_TRIES) return { ok: false, reason: 'log_malformed' }
+  let o = 0, tries = 0, cleared = 0, stars = 0, prevT = -Infinity, last = 0, over = false
+  for (const raw of log) {
+    const e = raw as OrderEntry
+    if (over || o >= ORDER_LEVELS.length) return { ok: false, reason: 'log_after_gameover' }
+    if (!e || typeof e !== 'object' || e.o !== o || !num(e.t) || e.t < 0 || !Array.isArray(e.c)) return { ok: false, reason: 'log_malformed' }
+    const L = ORDER_LEVELS[o]
+    if (!e.c.every((x) => Number.isInteger(x) && x >= 0 && x < L.cards.length) || new Set(e.c).size !== e.c.length) return { ok: false, reason: 'log_malformed' }
+    if (e.t < prevT) return { ok: false, reason: 'log_not_monotonic' }
+    prevT = e.t; last = e.t
+    tries++
+    if (orderMatches(L, e.c)) { cleared++; stars += Math.max(1, 4 - tries); o++; tries = 0 }
+    else if (tries >= ORDER_MAX_TRIES) over = true
+  }
+  if (last > ageSec * 1000 + AGE_SLACK_MS) return { ok: false, reason: 'log_exceeds_ticket' }
+  return { ok: true, score: cleared, answers: log.length, durationMs: last, tie: (ORDER_MAX_STARS - stars) * ORDER_TIE_UNIT + Math.min(last, ORDER_TIE_UNIT - 1) }
+}
+
 export function replay(kind: ReplayKind, log: unknown, ageSec: number, knownIds: Set<string>): ReplayResult | ReplayFail {
   if (kind === 'beat') return replayBeat(log, ageSec, knownIds)
   if (kind === 'block') return replayBlock(log, ageSec)
+  if (kind === 'order') return replayOrder(log, ageSec)
   if (kind === 'shoot') return replayShoot(log, ageSec, knownIds)
   if (kind === 'pick') return replayPick(log, ageSec, knownIds)
   if (kind === 'reach') return replayReach(log, ageSec)

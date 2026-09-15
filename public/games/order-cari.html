@@ -75,6 +75,8 @@
   .paint{display:flex;align-items:center;justify-content:center;gap:5px;padding:0 0 6px}
   .paint i{width:12px;height:12px;border-radius:50%;border:1.5px solid rgba(255,255,255,.7);display:block}
   .paint span{font-size:9.5px;font-weight:900;color:#9cc4f2;letter-spacing:.04em}
+  .chips{display:flex;justify-content:center;gap:10px}
+  .paint i.sz{border:0;border-radius:0;color:#ffd257;font-style:normal;font-size:12px;font-weight:900;line-height:12px;width:auto}
 
   .bot.build svg{animation:build .5s cubic-bezier(.2,1.2,.3,1)}
   @keyframes build{0%{transform:translateY(-22px) scale(.88);opacity:0}60%{transform:translateY(3px) scale(1.03);opacity:1}100%{transform:none}}
@@ -166,6 +168,24 @@
     border:1px solid rgba(35,43,64,.16);background:rgba(255,255,255,.92);color:#232b40}
   .mg-rank.on{display:inline-flex}
 
+  /* ── 판정 도장(완성품 위) · 틀린 부위 · 그만두기 ─────────
+     실패는 아래 창이 아니라 **판 위**에 — 창이 카드를 덮으면 뭘 골랐는지 못 본다(막아라와 같은 결). 설명 글 없음. */
+  .slot.made{position:relative}
+  .verdict{position:absolute;left:50%;top:52%;z-index:5;pointer-events:none;display:none;flex-direction:column;align-items:center;gap:1px;
+    padding:5px 12px 6px;border:4px solid;border-radius:10px;mix-blend-mode:multiply;opacity:.94;
+    transform:translate(-50%,-50%) rotate(-12deg);white-space:nowrap;font-family:system-ui,sans-serif;letter-spacing:-.02em}
+  .verdict.on{display:flex;animation:vin .28s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes vin{0%{transform:translate(-50%,-50%) rotate(-12deg) scale(2);opacity:0}100%{transform:translate(-50%,-50%) rotate(-12deg) scale(1);opacity:.94}}
+  .verdict b{font-size:min(24px,5.6vw);font-weight:950;line-height:1}
+  .verdict span{font-size:min(12px,2.9vw);font-weight:900;line-height:1.1;letter-spacing:0}
+  .verdict span:empty{display:none}
+  .verdict span b{color:inherit;font-size:inherit}
+  .verdict.pass{color:#1f7a47;border-color:#1f7a47}
+  .verdict.fail{color:#b8281c;border-color:#b8281c}
+  .verdict.over{color:#5a2b8a;border-color:#5a2b8a}
+  .quit{display:block;margin:0 0 4px auto;padding:6px 10px;border:0;border-radius:8px;cursor:pointer;
+    background:rgba(7,25,53,.7);color:#c5d8f2;font:800 11.5px/1 system-ui,sans-serif;border:1px solid rgba(126,205,255,.3)}
+  .big.stars{margin-top:8px}
   /* ⚠️ .hidden 은 반드시 스타일시트 **맨 끝**에 둔다. 특정도가 같은 .paint / .ov / .diff 보다
      뒤에 있어야 이긴다 — 위에 두면 숨겨야 할 것이 안 숨는다(실제로 '지정 도장색' 칩이 그랬다). */
   .hidden{display:none}
@@ -374,6 +394,10 @@
 /* ⚠️ min-height 없이 두면 도장색 칩이 붙는 판(레벨 4·5)에서 캡션·칩에 밀려 0 이 되고 로봇이 안 보인다. */
 .stage .bot{order:1;flex:1 1 auto;min-height:40px;padding:4px 4px 0}
 .stage .paint{order:3;flex:0 0 auto;padding:0 0 2px}
+.stage .chips{order:3;flex:0 0 auto}
+/* 틀린 부위 칩 — 무대 그림 아래 띠(노란 트레이 위). 완성품 칸 밑에 붙인다. */
+.stage .diff{position:absolute;left:50%;right:6%;top:auto;bottom:5%;width:auto;height:auto;margin:0;justify-content:center;gap:3px;z-index:6;overflow:visible}
+.stage .diff span{padding:2px 7px;font-size:min(10.5px,2.5vw);background:rgba(216,68,58,.9);border-color:#ffb3a8;color:#fff}
 .stage .paint span{text-shadow:0 1px 3px rgba(0,12,32,.95)}
 
 /* ── 시킬 말 머리띠 ───────────────────────────────────────
@@ -493,6 +517,11 @@
   color:#eaf5ff;font-size:min(15px,3.5vw);text-shadow:0 2px 4px rgba(0,20,60,.7)}
 /* 아쉬운 결과 — 판 자체를 hue-rotate 로 물들이면 금메달이 초록이 된다. 판은 그대로 두고 뒤만 붉힌다. */
 #overOv.result-fail{background:rgba(34,10,12,.84)}
+/* 두 숫자(깬 주문 · 별)를 위아래로 — 옛 판은 큰 숫자 하나였다. */
+#overOv #oCleared{top:29.5%;height:11%}
+#overOv #oClearedLab{top:40%;height:5%}
+#overOv #oStars{top:46.5%;height:10%;font-size:min(30px,7vw);color:#ffd257}
+#overOv #oStarLab{top:56.5%;height:5%}
 
 @media(max-height:690px){
   .cust{height:74px}
@@ -585,7 +614,7 @@
       폭이 아니라 높이인데, 비교판의 도면 창(전체 높이의 59%)보다 이 띠가 더 높다.
    ⚠️ 아트를 쓰지 않고 CSS 로 그린다 — 무대 아트는 창이 둘인 한 장이라 한 칸만 떼어낼 수 없다.
       대신 인트로 규칙판과 같은 베젤 문법(모서리 리벳 + 파인 화면)이라 세트 밖으로 나가지 않는다. */
-.stage.pick{max-height:none;aspect-ratio:auto;height:min(186px,24vh);padding:9px;background:
+.stage.pick{max-height:none;aspect-ratio:auto;height:min(236px,30vh);padding:9px;background:
     radial-gradient(circle at 13px 13px,#cfdae8 0 2.4px,transparent 3px),
     radial-gradient(circle at calc(100% - 13px) 13px,#cfdae8 0 2.4px,transparent 3px),
     radial-gradient(circle at 13px calc(100% - 13px),#cfdae8 0 2.4px,transparent 3px),
@@ -650,7 +679,7 @@
 
 <div id="app">
   <div class="top">
-    <span class="ordno">주문 <b id="ordNum">1</b>/5</span>
+    <span class="ordno"><span data-i18n="order.ord">주문</span> <b id="ordNum">1</b>/<span id="ordTotal">20</span></span>
     <span class="ordname" id="ordName">—</span>
     <span class="stars" id="starEl"></span>
   </div>
@@ -662,30 +691,32 @@
 
   <div class="stage">
     <div class="slot plan">
-      <p class="cap">손님이 가져온 도면</p>
+      <p class="cap" data-i18n="order.cap_plan">손님이 가져온 도면</p>
       <div class="bot" id="goalBot"></div>
-      <div class="paint hidden" id="paintChip"><i id="paintDot"></i><span id="paintTxt">지정 도장색</span></div>
+      <div class="chips"><div class="paint hidden" id="paintChip"><i id="paintDot"></i><span id="paintTxt">지정 도장색</span></div>
+      <div class="paint size hidden" id="sizeChip"><i class="sz">↕</i><span id="sizeTxt">작은 크기</span></div></div>
     </div>
     <div class="slot made">
-      <p class="cap">CARI가 만든 것</p>
+      <p class="cap" data-i18n="order.cap_made">CARI가 만든 것</p>
       <div class="bot" id="madeBot"><p class="empty">아직 아무 말도<br/>안 했다</p></div>
+      <!-- 판정 도장 — 완성품 위에 찍힌다. 설명 글 없이 한 마디 + 별/남은 횟수. -->
+      <div class="verdict" id="verdict"><b id="vTtl"></b><span id="vSub"></span></div>
     </div>
+    <!-- 틀린 부위 — 완성품에 붉은 테로도 표시된다. 어느 카드 때문인지는 안 알려준다(그걸 찾는 게 게임). -->
+    <div class="diff" id="diffRow"></div>
   </div>
 
   <div class="sayhead">
-    <h2>CARI에게 시킬 말<small>도면대로 나오게 고른다 · 많이 고른다고 좋아지지 않는다</small></h2>
+    <h2 data-i18n="order.sayhead">CARI에게 시킬 말<small>도면대로 나오게 고른다 · 많이 고른다고 좋아지지 않는다</small></h2>
     <span class="cnt zero" id="cntEl">0개</span>
   </div>
 
   <div class="scroll"><div class="tray" id="tray"></div></div>
 
-  <div class="sendwrap"><button class="send" id="sendBtn">CARI에게 시키기</button></div>
-
-  <div class="fb" id="fb">
-    <div class="fbhead"><b id="fbTtl">—</b><span class="st" id="fbStar"></span></div>
-    <div class="diff hidden" id="fbDiff"></div>
-    <p class="fbwhy" id="fbWhy">—</p>
-    <button class="fbbtn" id="fbBtn">다음</button>
+  <div class="sendwrap">
+    <!-- 그만두기 = 주문을 깬 뒤에만. 기록은 한 판에 한 번(끝나거나 그만둘 때) 나간다. -->
+    <button class="quit hidden" id="quitBtn" data-i18n="order.quit">여기까지 하고 그만두기</button>
+    <button class="send" id="sendBtn">CARI에게 시키기</button>
   </div>
 
 <!-- 인트로 -->
@@ -699,34 +730,42 @@
         (2026-08-14 실제로 그 상태였다. 밖으로 빼지 말 것.) -->
 <div class="ov" id="startOv">
   <div id="sArt"></div>
-  <p class="ttl">시켜라 <i>CARI</i></p>
-  <p class="lead">“도면대로 하나 만들어 주세요.”</p>
+  <p class="ttl" data-i18n="order.title">시켜라 <i>CARI</i></p>
+  <p class="lead" data-i18n="order.lead">“도면대로 하나 만들어 주세요.”</p>
   <!-- ⚠️ 인트로에 다 적지 않는다 — 태그 1줄 + 규칙 3개, 각 한 줄(다른 게임 전부 이 분량이다).
        화면에 보이는 것(도면 · 손님 대사)과 게임이 알아서 알려주는 것(고른 개수 · 판정 사유)은 뺀다.
        남길 것은 "안 하면 별을 잃는 것" 셋뿐이다. -->
   <ul class="rules">
-    <li><span>1</span><div><b>도면</b>을 보고 필요한 지시만 고른다</div></li>
-    <li><span>2</span><div><b>필요 없는 지시</b>를 고르면 결과가 어긋난다</div></li>
-    <li><span>3</span><div>한 번에 맞히면 <b>★★★</b></div></li>
+    <li><span>1</span><div data-i18n="order.rule1"><b>도면</b>을 보고 필요한 지시만 고른다</div></li>
+    <li><span>2</span><div data-i18n="order.rule2"><b>필요 없는 지시</b>를 고르면 결과가 어긋난다</div></li>
+    <li><span>3</span><div data-i18n="order.rule3">주문마다 <b>3번</b>까지 · 한 번에 맞히면 <b>★★★</b></div></li>
   </ul>
-  <button class="btn" id="startBtn">공방 열기</button>
+  <button class="btn" id="startBtn" data-i18n="order.start">공방 열기</button>
 </div>
 
 <!-- 종료 -->
 <div class="ov hidden" id="overOv">
   <div class="sheet">
     <div id="oArt"></div>
-    <p class="ttl">주문 다섯 건 완료</p>
-    <p class="big" id="oStars">★★★★★</p>
-    <p class="biglab" id="oStarLab">별 15 / 15</p>
-    <div class="note">프롬프트는 길게 쓰는 기술이 아니라 <b>빠뜨리지 않고, 서로 부딪히지 않게</b> 적는 기술이다. 방금 고른 말들이 그 조건이었다.</div>
-    <button class="btn" id="oAgain">처음부터 다시</button>
+    <p class="ttl" id="oTtl">주문 완료</p>
+    <p class="big" id="oCleared">0 / 20</p>
+    <p class="biglab" id="oClearedLab" data-i18n="order.o_cleared">깬 주문</p>
+    <p class="big stars" id="oStars">★ 0</p>
+    <p class="biglab" id="oStarLab">별 0 / 60</p>
+    <button class="btn" id="oAgain" data-i18n="order.again">처음부터 다시</button>
   </div>
 </div>
 
 </div><!-- /#app -->
 
+<script src="i18n.js"></script>
 <script>
+/* 문구는 전부 사전(i18n.js 의 order.*)에서 온다 — 사전에 없으면 아래 한국어로 떨어진다.
+   주문 문구는 order.lv{n}.name|who|say|paint, 카드는 order.lv{n}.c{i}. ⚠️ 한국어는 이 파일이 원본이다(사전의 ko 사본은 안 쓴다). */
+const T=(k,v)=>window.MGI18N?MGI18N.t(k,v):k;
+const KO=()=>!window.MGI18N||MGI18N.lang==='ko';
+function TX(key,fallback){ if(KO()) return fallback; const v=T(key); return v===key?fallback:v; }
+
 /* ================= CARI mascot (기존 게임과 동일 자산) ================= */
 function charSVG(suit,o={}){
   const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
@@ -769,14 +808,14 @@ function charSVG(suit,o={}){
 const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
 
 /* ===================== 조립 로봇 =====================
-   spec = {base:'none|wheel|leg|track', arms:0|1|2|4, head:'plain|cam|many',
-           size:'normal|huge', color:'#rrggbb'}
-   ⚠️ 도면과 완성품을 **같은 함수**로 그린다. 두 벌로 그리면 "도면엔 팔이 둘인데
-      판정은 하나" 같은 어긋남이 바로 생긴다. plan 모드는 선만 남긴 청사진.
-   ⚠️ huge 는 일부러 프레임 밖으로 넘치게 그린다 — 숫자가 아니라 넘치는 그림으로 읽혀야 한다.
+   spec = {base:'none|wheel|leg|track', arms:0|1|2|4, hand:'none|grip|suction', head:'plain|cam|many',
+           light:'none|lamp', battery:'normal|big', size:'small|normal|huge', color:'#rrggbb'}
+   ⚠️ 도면과 완성품을 **같은 함수**로 그린다. 두 벌로 그리면 "도면엔 팔이 둘인데 판정은 하나" 같은 어긋남이 바로 생긴다.
+      plan 모드는 선만 남긴 청사진. o.wrong = 틀린 부위 배열 — 그 부위에 붉은 테를 두른다(실패 표시).
+   ⚠️ huge 는 일부러 프레임 밖으로 넘치게, small 은 작게 그린다 — 숫자가 아니라 그림으로 읽혀야 한다.
 ==================================================== */
 function robotSVG(s,o={}){
-  const plan=!!o.plan;
+  const plan=!!o.plan, wrong=new Set(o.wrong||[]);
   const fill = plan?'none':(s.color||'#93a0b8');
   const solid= plan?'none':'#5b6a8a';
   const line = plan?'#8fc4ff':'#5b6a8a';
@@ -785,8 +824,15 @@ function robotSVG(s,o={}){
   const lens = plan?'none':'#1f6dff';
   const sw   = plan?1.6:1.5;
   const g=[];
+  const ring=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="rgba(229,72,77,.12)" stroke="#e5484d" stroke-width="2.2" stroke-dasharray="4 3"/>`;
 
   if(!plan) g.push(`<ellipse cx="60" cy="140" rx="34" ry="4.6" fill="rgba(30,45,80,.16)"/>`);
+  // 큰 배터리 = 등에 멘 팩 (몸통 뒤에 그린다)
+  if(s.battery==='big'){
+    g.push(`<rect x="82" y="88" width="20" height="26" rx="4" fill="${plan?'none':'#3f4a63'}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<rect x="88" y="84" width="8" height="5" rx="1.5" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<path d="M87 95 h10 M87 101 h10 M87 107 h10" stroke="${plan?'#8fc4ff':'#8fe0a8'}" stroke-width="2.2" stroke-linecap="round"/>`);
+  }
 
   if(s.base==='wheel'){
     g.push(`<circle cx="42" cy="124" r="14" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`);
@@ -803,9 +849,18 @@ function robotSVG(s,o={}){
     [38,60,82].forEach(x=>g.push(`<circle cx="${x}" cy="123" r="6.5" fill="${plan?'none':'#e8edf7'}" stroke="${line}" stroke-width="${sw}"/>`));
   }
 
-  const arm=(x,y,w,flip)=>`
-    <rect x="${x}" y="${y}" width="${w}" height="10" rx="5" fill="${fill}" stroke="${line}" stroke-width="${sw}"/>
-    <rect x="${flip?x-9:x+w-1}" y="${y-3}" width="10" height="16" rx="4" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`;
+  // 손 — 집게(두 갈래) / 흡착판(둥근 컵) / 없음(뭉툭한 끝)
+  const handAt=(x,y,flip)=>{
+    const d=flip?-1:1;
+    if(s.hand==='grip') return `<rect x="${flip?x-6:x}" y="${y-5}" width="6" height="10" rx="2" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`
+      +`<path d="M${x+6*d} ${y-4} l${8*d} -6 M${x+6*d} ${y+4} l${8*d} 6" stroke="${line}" stroke-width="3" stroke-linecap="round" fill="none"/>`;
+    if(s.hand==='suction') return `<rect x="${flip?x-4:x}" y="${y-3}" width="4" height="6" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`
+      +`<circle cx="${x+10*d}" cy="${y}" r="7.5" fill="${plan?'none':'#c9d4ea'}" stroke="${line}" stroke-width="${sw}"/>`
+      +`<circle cx="${x+10*d}" cy="${y}" r="3" fill="none" stroke="${line}" stroke-width="1.4"/>`;
+    return `<rect x="${flip?x-9:x-1}" y="${y-8}" width="10" height="16" rx="4" fill="${solid}" stroke="${line}" stroke-width="${sw}"/>`;
+  };
+  const arm=(x,y,w,flip)=>`<rect x="${x}" y="${y}" width="${w}" height="10" rx="5" fill="${fill}" stroke="${line}" stroke-width="${sw}"/>`
+    +handAt(flip?x:x+w,y+5,flip);
   if(s.arms>=1) g.push(arm(86,74,20,false));
   if(s.arms>=2) g.push(arm(14,74,20,true));
   if(s.arms>=4){
@@ -832,244 +887,455 @@ function robotSVG(s,o={}){
   } else {
     g.push(`<circle cx="52" cy="40" r="3.6" fill="${inkL}"/><circle cx="68" cy="40" r="3.6" fill="${inkL}"/>`);
   }
+  // 헤드라이트 = 머리 위 램프 + 빛살
+  if(s.light==='lamp'){
+    const lx=s.head==='many'?60:60, ly=s.head==='many'?8:18;
+    g.push(`<rect x="${lx-7}" y="${ly-6}" width="14" height="9" rx="3" fill="${plan?'none':'#ffe37a'}" stroke="${line}" stroke-width="${sw}"/>`);
+    g.push(`<path d="M${lx-11} ${ly-10} l-4 -4 M${lx+11} ${ly-10} l4 -4 M${lx} ${ly-9} v-6" stroke="${plan?'#8fc4ff':'#f5c518'}" stroke-width="2" stroke-linecap="round"/>`);
+  }
+
+  // 틀린 부위 붉은 테 — 부위별 대략의 상자
+  const BOX={base:[20,100,80,40],arms:[6,64,108,30],hand:[6,64,108,30],head:[36,20,48,40],light:[44,0,32,22],battery:[78,80,28,38],size:[4,4,112,140],color:[30,20,60,96]};
+  wrong.forEach(k=>{ const b=BOX[k]; if(b) g.push(ring(...b)); });
 
   const inner=g.join('');
-  const wrap = s.size==='huge'
-    ? `<g transform="translate(60,140) scale(1.42) translate(-60,-140)">${inner}</g>` : inner;
+  const wrap = s.size==='huge' ? `<g transform="translate(60,140) scale(1.42) translate(-60,-140)">${inner}</g>`
+             : s.size==='small' ? `<g transform="translate(60,140) scale(.78) translate(-60,-140)">${inner}</g>` : inner;
   return `<svg viewBox="0 0 120 148" xmlns="http://www.w3.org/2000/svg">${wrap}</svg>`;
 }
 
 /* ===================== 카드 부위 =====================
-   ⚠️ 색은 **부위**를 뜻한다. 절대 '좋은 말/나쁜 말'을 뜻하게 만들지 마라 —
-      그 순간 색이 정답표가 되고 도면을 안 본다. 같은 부위에 정상과 함정을 섞을 것.
+   ⚠️ 색은 **부위**를 뜻한다. 절대 '좋은 말/나쁜 말'을 뜻하게 만들지 마라 — 그 순간 색이 정답표가 되고 도면을 안 본다.
+      같은 부위에 정상과 함정을 섞을 것.
 ==================================================== */
 const PART={
-  move  :{label:'이동',c:'#2f7de1'},
-  arm   :{label:'팔',  c:'#12a06a'},
-  head  :{label:'머리',c:'#8257e5'},
-  finish:{label:'마감',c:'#e0891a'},
-  whole :{label:'전체',c:'#6b7589'}
+  move  :{label:'이동',  c:'#2f7de1'},
+  arm   :{label:'팔',    c:'#12a06a'},
+  head  :{label:'머리',  c:'#8257e5'},
+  light :{label:'조명',  c:'#d9a400'},
+  power :{label:'배터리',c:'#0f9ea8'},
+  finish:{label:'마감',  c:'#e0891a'},
+  whole :{label:'전체',  c:'#6b7589'}
 };
-const PARTNAME={base:'이동부',arms:'팔',head:'머리',color:'도장색',size:'크기'};
+const PARTNAME={base:'이동부',arms:'팔',hand:'손',head:'머리',light:'조명',battery:'배터리',color:'도장색',size:'크기'};
 
-const GRAY='#93a0b8', YELLOW='#f5c518', BLUE='#4a86ff';
-const BASE_SPEC={base:'none',arms:0,head:'plain',size:'normal',color:GRAY};
-const ALSSEO={base:'leg',arms:4,head:'many'};
+const GRAY='#93a0b8', YELLOW='#f5c518', BLUE='#4a86ff', RED='#e2483d', GREEN='#2bb673', PINK='#ff4fa3';
+const BASE_SPEC={base:'none',arms:0,hand:'none',head:'plain',light:'none',battery:'normal',size:'normal',color:GRAY};
 
+/* ===================== 주문 20개 =====================
+   ⛔ 원본은 tmp/_order-levels.mjs — 여기 리터럴과 서버 _shared/order-levels.ts 를 tmp/_order-apply.mjs 가 같이 쓴다.
+      손으로 한쪽만 고치지 말 것(tests/minigame-replay.mjs 가 대조한다).
+   카드: 정상(set) · 함정(bad:1 — 정상 카드 위를 덮어쓴다) · set:{} 는 아무 효과 없음(골라도 손해 없음).
+   4장 × 5주문: 1장 함정이 티가 남 → 2장 새 부품(손·조명·배터리·크기) + 말에만 있는 조건 → 3장 그럴듯한 함정
+   ("지난번처럼"·색 충돌·여태 함정이던 게 정답) → 4장 전부 섞임(카드 10장).
+==================================================== */
 const LEVELS=[
-{
-  name:'창고 심부름꾼', who:'박 반장',
+{ name:'창고 심부름꾼', who:'박 반장',
   say:'창고에서 부품 좀 날라줄 놈이 필요해. 바닥은 평평하니까 복잡할 것 없어.',
-  goal:{base:'wheel',arms:0,head:'plain',size:'normal',color:GRAY},
+  goal:{base:'wheel',arms:0,hand:'none',head:'plain',light:'none',battery:'normal',size:'normal',color:'#93a0b8'},
   cards:[
-    {p:'move',  t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
-    {p:'whole', t:'나머지는 네가 알아서 멋있게 만들어줘.', bad:1, set:ALSSEO,
-     why:'<q>알아서</q>는 지시가 아니다. 기준을 안 주면 CARI가 임의로 정하고, 시킬 때마다 다른 게 나온다.'},
-    {p:'finish',t:'기왕이면 크고 튼튼하게 만들어줘.', bad:1, set:{size:'huge'},
-     why:'크게 만들라 하면 <em>진짜로 크게</em> 만든다. 쓸 자리를 안 알려주면 “좋게”가 “과하게”가 된다.'},
-    {p:'arm',   t:'혹시 모르니 팔도 몇 개 달아줘.', bad:1, set:{arms:4},
-     why:'<q>혹시 모르니</q> 붙인 말은 반드시 결과에 나타난다. 필요 없으면 <em>안 적는 것</em>이 맞다.'}
-  ]
-},
-{
-  name:'상자 집는 손', who:'박 반장',
+    {p:'move', t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
+    {p:'whole', t:'나머지는 네가 알아서 멋있게 만들어줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+    {p:'finish', t:'기왕이면 크고 튼튼하게 만들어줘.', bad:1, set:{size:'huge'}},
+    {p:'arm', t:'혹시 모르니 팔도 몇 개 달아줘.', bad:1, set:{arms:4,hand:'grip'}},
+  ] },
+{ name:'상자 집는 손', who:'박 반장',
   say:'이제 물건도 좀 집어 들었으면 해. 한 손이면 충분하고, 바닥은 전과 같아.',
-  goal:{base:'wheel',arms:1,head:'plain',size:'normal',color:GRAY},
+  goal:{base:'wheel',arms:1,hand:'grip',head:'plain',light:'none',battery:'normal',size:'normal',color:'#93a0b8'},
   cards:[
-    {p:'move',  t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
-    {p:'arm',   t:'물건 집을 팔을 하나만 달아줘.', set:{arms:1}},
-    {p:'arm',   t:'팔은 넉넉히 달아줘, 많을수록 좋지.', bad:1, set:{arms:4},
-     why:'수량을 <q>넉넉히</q>로 맡기면 CARI는 최대로 간다. 개수는 숫자로 못 박아야 한다.'},
-    {p:'whole', t:'세부는 알아서 채워줘.', bad:1, set:ALSSEO,
-     why:'정상적인 말을 아무리 넣어도 <em>“알아서” 한 줄이 그 위를 덮는다.</em> 나쁜 지시가 좋은 지시를 이긴다.'},
-    {p:'finish',t:'튼튼한 게 좋으니 크게 만들어줘.', bad:1, set:{size:'huge'},
-     why:'“튼튼함”은 크기가 아니다. 원하는 성질은 <em>결과로 확인할 수 있는 말</em>로 바꿔 적어야 한다.'}
-  ]
-},
-{
-  name:'검사대의 눈', who:'한 검사장',
+    {p:'move', t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
+    {p:'arm', t:'집게 달린 팔을 하나만 달아줘.', set:{arms:1,hand:'grip'}},
+    {p:'arm', t:'팔은 넉넉히 달아줘, 많을수록 좋지.', bad:1, set:{arms:4,hand:'grip'}},
+    {p:'whole', t:'세부는 알아서 채워줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+    {p:'finish', t:'튼튼한 게 좋으니 크게 만들어줘.', bad:1, set:{size:'huge'}},
+  ] },
+{ name:'검사대의 눈', who:'한 검사장',
   say:'불량을 눈으로 걸러야 해. 집는 손은 양쪽에 하나씩. 바닥은 평평한 라인이야.',
-  goal:{base:'wheel',arms:2,head:'cam',size:'normal',color:GRAY},
+  goal:{base:'wheel',arms:2,hand:'grip',head:'cam',light:'none',battery:'normal',size:'normal',color:'#93a0b8'},
   cards:[
-    {p:'move',  t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
-    {p:'arm',   t:'팔은 양쪽에 하나씩, 두 개만.', set:{arms:2}},
-    {p:'head',  t:'앞을 볼 수 있게 카메라를 하나 달아줘.', set:{head:'cam'}},
-    {p:'head',  t:'센서는 많을수록 정확하니 최대한 많이 달아줘.', bad:1, set:{head:'many'},
-     why:'<em>많을수록 정확하다는 건 사실이 아니다.</em> 근거 없는 통념을 지시에 넣으면 결과가 그 통념대로 망가진다.'},
-    {p:'finish',t:'크고 튼튼하게 만들어줘.', bad:1, set:{size:'huge'},
-     why:'같은 함정이 주문마다 나온다. 습관처럼 붙이는 <q>튼튼하게</q>가 제일 자주 결과를 망친다.'},
-    {p:'whole', t:'나머지 세부는 알아서 채워줘.', bad:1, set:ALSSEO,
-     why:'채울 여지를 주면 CARI는 <em>반드시 채운다.</em> 비워두길 원하면 비워두라고 적어야 한다.'}
-  ]
-},
-{
-  name:'2층 점검원', who:'오 안전관리자',
+    {p:'move', t:'바퀴를 달아서 굴러다니게 해줘.', set:{base:'wheel'}},
+    {p:'arm', t:'집게 팔을 양쪽에 하나씩, 두 개만.', set:{arms:2,hand:'grip'}},
+    {p:'head', t:'앞을 볼 수 있게 카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'head', t:'센서는 많을수록 정확하니 최대한 많이.', bad:1, set:{head:'many'}},
+    {p:'finish', t:'크고 튼튼하게 만들어줘.', bad:1, set:{size:'huge'}},
+    {p:'whole', t:'나머지 세부는 알아서 채워줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'2층 점검원', who:'오 안전관리자', paint:'안전 노랑',
   say:'설비가 2층에 있어. 계단을 올라야 해. 그리고 우리 현장은 안전 노랑만 쓴다.',
-  goal:{base:'leg',arms:1,head:'cam',size:'normal',color:YELLOW}, paint:'안전 노랑',
+  goal:{base:'leg',arms:1,hand:'grip',head:'cam',light:'none',battery:'normal',size:'normal',color:'#f5c518'},
   cards:[
-    {p:'move',  t:'계단을 오를 수 있게 다리를 달아줘.', set:{base:'leg'}},
-    {p:'arm',   t:'팔은 하나만 달아줘.', set:{arms:1}},
-    {p:'head',  t:'카메라를 하나 달아줘.', set:{head:'cam'}},
-    {p:'finish',t:'현장 규정대로 안전 노랑으로 칠해줘.', set:{color:YELLOW}},
-    {p:'move',  t:'바퀴가 다리보다 빠르니 바퀴로 바꿔서 만들어줘.', bad:1, set:{base:'wheel'},
-     why:'맞는 말이지만 <em>계단을 못 오른다.</em> CARI가 내미는 “더 나은 방법”이 내 제약을 부수는 경우다.'},
-    {p:'finish',t:'색은 어울리는 걸로 네가 골라줘.', bad:1, set:{color:'#ff4fa3'},
-     why:'취향을 맡기면 규정이 사라진다. 지켜야 하는 값은 <em>고르게 두지 말고 지정</em>해야 한다.'},
-    {p:'whole', t:'튼튼하게, 크게 만들어줘.', bad:1, set:{size:'huge'},
-     why:'습관처럼 붙는 말이 또 결과를 가져갔다.'}
-  ]
-},
-{
-  name:'좁은 통로 순찰대', who:'문 순찰반장',
+    {p:'move', t:'계단을 오를 수 있게 다리를 달아줘.', set:{base:'leg'}},
+    {p:'arm', t:'집게 팔은 하나만 달아줘.', set:{arms:1,hand:'grip'}},
+    {p:'head', t:'카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'finish', t:'현장 규정대로 안전 노랑으로 칠해줘.', set:{color:'#f5c518'}},
+    {p:'move', t:'바퀴가 다리보다 빠르니 바퀴로 바꿔줘.', bad:1, set:{base:'wheel'}},
+    {p:'finish', t:'색은 어울리는 걸로 네가 골라줘.', bad:1, set:{color:'#ff4fa3'}},
+    {p:'whole', t:'튼튼하게, 크게 만들어줘.', bad:1, set:{size:'huge'}},
+  ] },
+{ name:'좁은 통로 순찰대', who:'문 순찰반장', paint:'식별 파랑',
   say:'바닥이 울퉁불퉁하고 통로가 아주 좁아. 손은 양쪽에 하나씩, 우리 팀 색은 파랑이다.',
-  goal:{base:'track',arms:2,head:'cam',size:'normal',color:BLUE}, paint:'식별 파랑',
+  goal:{base:'track',arms:2,hand:'grip',head:'cam',light:'none',battery:'normal',size:'normal',color:'#4a86ff'},
   cards:[
-    {p:'move',  t:'바닥이 고르지 않으니 무한궤도로 만들어줘.', set:{base:'track'}},
-    {p:'arm',   t:'팔은 양쪽에 하나씩 두 개.', set:{arms:2}},
-    {p:'head',  t:'카메라를 하나 달아줘.', set:{head:'cam'}},
-    {p:'finish',t:'식별용 파랑으로 칠해줘.', set:{color:BLUE}},
-    {p:'move',  t:'무한궤도는 느리니까 바퀴가 낫겠어. 그렇게 해줘.', bad:1, set:{base:'wheel'},
-     why:'그럴듯한 개선 제안이 제약을 지웠다. <em>바꿀 수 없는 조건은 바꾸지 말라고 같이 적어야</em> 한다.'},
-    {p:'head',  t:'감지 범위를 넓히려면 센서가 더 필요할 것 같아. 추가해줘.', bad:1, set:{head:'many'},
-     why:'<q>필요할 것 같아</q>로 시작한 추측이 요구가 되어 결과에 박힌다. <em>확실하지 않으면 시키지 않는다.</em>'},
-    {p:'finish',t:'기왕이면 크게 만들어줘.', bad:1, set:{size:'huge'},
-     why:'통로가 좁다고 했는데 크게 만들었다. <q>기왕이면</q>이 제약을 이겼다.'}
-  ]
-}
+    {p:'move', t:'바닥이 고르지 않으니 무한궤도로 만들어줘.', set:{base:'track'}},
+    {p:'arm', t:'집게 팔은 양쪽에 하나씩 두 개.', set:{arms:2,hand:'grip'}},
+    {p:'head', t:'카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'finish', t:'식별용 파랑으로 칠해줘.', set:{color:'#4a86ff'}},
+    {p:'move', t:'무한궤도는 느리니까 바퀴가 낫겠어.', bad:1, set:{base:'wheel'}},
+    {p:'head', t:'감지 범위를 넓히게 센서를 더 달아줘.', bad:1, set:{head:'many'}},
+    {p:'finish', t:'기왕이면 크게 만들어줘.', bad:1, set:{size:'huge'}},
+  ] },
+{ name:'야간 순찰', who:'문 순찰반장',
+  say:'밤에 도는 놈이야. 어두우니까 앞이 보여야 해. 바닥은 평평하고 집을 건 없어.',
+  goal:{base:'wheel',arms:0,hand:'none',head:'cam',light:'lamp',battery:'normal',size:'normal',color:'#93a0b8'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'head', t:'카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'light', t:'앞을 비추게 헤드라이트를 달아줘.', set:{light:'lamp'}},
+    {p:'arm', t:'문을 열 수 있게 팔을 하나 달아줘.', bad:1, set:{arms:1,hand:'grip'}},
+    {p:'power', t:'밤새 돌려면 배터리를 큰 걸로.', bad:1, set:{battery:'big'}},
+    {p:'whole', t:'나머지는 알아서 해줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'유리 운반', who:'정 공장장',
+  say:'유리판을 옮길 거야. 집게로 잡으면 깨진다. 양손으로 들고, 앞은 봐야지.',
+  goal:{base:'wheel',arms:2,hand:'suction',head:'cam',light:'none',battery:'normal',size:'normal',color:'#93a0b8'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'arm', t:'집게 팔을 양쪽에 하나씩 달아줘.', bad:1, set:{arms:2,hand:'grip'}},
+    {p:'arm', t:'흡착판 팔을 양쪽에 하나씩 달아줘.', set:{arms:2,hand:'suction'}},
+    {p:'head', t:'카메라를 하나 달아줘.', set:{head:'cam'}},
+    {p:'finish', t:'크게 만들어줘, 유리판이 크니까.', bad:1, set:{size:'huge'}},
+    {p:'whole', t:'조심조심 천천히 만들어줘.', set:{}},
+  ] },
+{ name:'야간 재고 조사', who:'박 반장',
+  say:'밤새 창고를 돌면서 재고를 세. 바닥은 울퉁불퉁하고, 상자를 하나씩 들어 봐야 해.',
+  goal:{base:'track',arms:1,hand:'grip',head:'cam',light:'lamp',battery:'big',size:'normal',color:'#93a0b8'},
+  cards:[
+    {p:'move', t:'바닥이 험하니 무한궤도로.', set:{base:'track'}},
+    {p:'move', t:'빨리 돌게 바퀴로 해줘.', bad:1, set:{base:'wheel'}},
+    {p:'arm', t:'집게 팔 하나.', set:{arms:1,hand:'grip'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'light', t:'헤드라이트를 달아줘.', set:{light:'lamp'}},
+    {p:'power', t:'밤새 버티게 큰 배터리로.', set:{battery:'big'}},
+    {p:'finish', t:'선반 사이가 좁으니 작게 만들어줘.', bad:1, set:{size:'small'}},
+    {p:'whole', t:'알아서 잘 만들어줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'도색 공방 조수', who:'최 도장사', paint:'공방 빨강',
+  say:'우리 공방 색은 빨강이야. 계단으로 2층에 오르고, 붓통을 한 손으로 들면 돼.',
+  goal:{base:'leg',arms:1,hand:'grip',head:'plain',light:'none',battery:'normal',size:'normal',color:'#e2483d'},
+  cards:[
+    {p:'move', t:'계단을 오르게 다리로.', set:{base:'leg'}},
+    {p:'arm', t:'집게 팔 하나.', set:{arms:1,hand:'grip'}},
+    {p:'finish', t:'빨강으로 칠해줘.', set:{color:'#e2483d'}},
+    {p:'finish', t:'안전색이 규정이니까 노랑으로 칠해줘.', bad:1, set:{color:'#f5c518'}},
+    {p:'head', t:'앞을 보게 카메라를 달아줘.', bad:1, set:{head:'cam'}},
+    {p:'whole', t:'나머지는 알아서.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+    {p:'whole', t:'깔끔하게 부탁해.', set:{}},
+  ] },
+{ name:'엘리베이터 배달', who:'서 관리인',
+  say:'건물 안 배달이야. 엘리베이터를 타야 하니까 작아야 해. 바닥은 평평하고 집을 건 없어.',
+  goal:{base:'wheel',arms:0,hand:'none',head:'cam',light:'none',battery:'normal',size:'small',color:'#93a0b8'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'finish', t:'작게 만들어줘.', set:{size:'small'}},
+    {p:'finish', t:'크고 튼튼하게.', bad:1, set:{size:'huge'}},
+    {p:'arm', t:'물건을 들게 팔을 하나.', bad:1, set:{arms:1,hand:'grip'}},
+    {p:'power', t:'오래 돌게 큰 배터리로.', bad:1, set:{battery:'big'}},
+    {p:'whole', t:'알아서 해줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'순찰대 2호', who:'문 순찰반장', paint:'식별 파랑',
+  say:'지난번 순찰대랑 비슷하게. 근데 이번엔 계단이 있어서 다리로 가야 해. 색은 그대로 파랑.',
+  goal:{base:'leg',arms:2,hand:'grip',head:'cam',light:'none',battery:'normal',size:'normal',color:'#4a86ff'},
+  cards:[
+    {p:'whole', t:'지난번 만든 거랑 똑같이 만들어줘.', bad:1, set:{base:'track',arms:2,hand:'grip',head:'cam',color:'#4a86ff'}},
+    {p:'move', t:'계단을 오르게 다리로.', set:{base:'leg'}},
+    {p:'arm', t:'집게 팔 양쪽에 하나씩.', set:{arms:2,hand:'grip'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'finish', t:'파랑으로 칠해줘.', set:{color:'#4a86ff'}},
+    {p:'finish', t:'크게 만들어줘.', bad:1, set:{size:'huge'}},
+    {p:'head', t:'센서를 더 달아줘.', bad:1, set:{head:'many'}},
+  ] },
+{ name:'야간 점검원', who:'오 안전관리자', paint:'안전 노랑',
+  say:'밤에 설비를 점검해. 우리 현장은 노랑이 규정이야. 바닥은 평평하고 한 손이면 돼.',
+  goal:{base:'wheel',arms:1,hand:'grip',head:'cam',light:'lamp',battery:'normal',size:'normal',color:'#f5c518'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'arm', t:'집게 팔 하나.', set:{arms:1,hand:'grip'}},
+    {p:'arm', t:'집게 팔 하나씩 양쪽에.', bad:1, set:{arms:2,hand:'grip'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'light', t:'헤드라이트를 달아줘.', set:{light:'lamp'}},
+    {p:'finish', t:'안전 노랑으로.', set:{color:'#f5c518'}},
+    {p:'finish', t:'회사 색이 파랑이니까 파랑으로.', bad:1, set:{color:'#4a86ff'}},
+    {p:'move', t:'혹시 계단이 있을지 모르니 다리로.', bad:1, set:{base:'leg'}},
+    {p:'whole', t:'알아서 해줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'바닥 청소부', who:'서 관리인',
+  say:'그냥 바닥 쓸고 다니는 놈이야. 아무것도 더 필요 없어.',
+  goal:{base:'wheel',arms:0,hand:'none',head:'plain',light:'none',battery:'normal',size:'normal',color:'#93a0b8'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'head', t:'앞을 보게 카메라를 달아줘.', bad:1, set:{head:'cam'}},
+    {p:'arm', t:'쓰레기를 집게 팔 하나.', bad:1, set:{arms:1,hand:'grip'}},
+    {p:'light', t:'구석이 어두우니 헤드라이트.', bad:1, set:{light:'lamp'}},
+    {p:'power', t:'오래 돌게 큰 배터리.', bad:1, set:{battery:'big'}},
+    {p:'finish', t:'가구 밑에 들어가게 작게.', bad:1, set:{size:'small'}},
+    {p:'finish', t:'색은 회색 그대로 둬.', set:{}},
+    {p:'whole', t:'알아서 해줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'안개 속 순찰', who:'문 순찰반장', paint:'식별 파랑',
+  say:'안개가 짙은 야적장이야. 카메라 하나로는 안 보여서 센서를 여러 개 달아야 해. 바닥은 험하고 색은 파랑.',
+  goal:{base:'track',arms:0,hand:'none',head:'many',light:'lamp',battery:'normal',size:'normal',color:'#4a86ff'},
+  cards:[
+    {p:'move', t:'무한궤도로.', set:{base:'track'}},
+    {p:'head', t:'센서를 여러 개 달아줘.', set:{head:'many'}},
+    {p:'head', t:'카메라 하나면 충분해.', bad:1, set:{head:'cam'}},
+    {p:'light', t:'헤드라이트를 달아줘.', set:{light:'lamp'}},
+    {p:'light', t:'헤드라이트 달고, 팔도 하나.', bad:1, set:{light:'lamp',arms:1,hand:'grip'}},
+    {p:'finish', t:'파랑으로.', set:{color:'#4a86ff'}},
+    {p:'arm', t:'혹시 모르니 팔 하나.', bad:1, set:{arms:1,hand:'grip'}},
+    {p:'finish', t:'크게 만들어줘.', bad:1, set:{size:'huge'}},
+  ] },
+{ name:'말 많은 손님', who:'김 매니저', paint:'팀 초록',
+  say:'어제 비 왔지? 아무튼 우리 팀 색은 초록이고, 팔은 하나면 돼. 아, 바닥은 평평해. 앞은 봐야 하고.',
+  goal:{base:'wheel',arms:1,hand:'grip',head:'cam',light:'none',battery:'normal',size:'normal',color:'#2bb673'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'arm', t:'집게 팔 하나.', set:{arms:1,hand:'grip'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'finish', t:'초록으로 칠해줘.', set:{color:'#2bb673'}},
+    {p:'arm', t:'집게 팔 양쪽에 하나씩.', bad:1, set:{arms:2,hand:'grip'}},
+    {p:'finish', t:'노랑으로 칠해줘.', bad:1, set:{color:'#f5c518'}},
+    {p:'move', t:'다리를 달아줘.', bad:1, set:{base:'leg'}},
+    {p:'finish', t:'크게 만들어줘.', bad:1, set:{size:'huge'}},
+    {p:'power', t:'큰 배터리로.', bad:1, set:{battery:'big'}},
+    {p:'whole', t:'알아서 해줘.', bad:1, set:{base:'leg',arms:4,hand:'grip',head:'many',light:'lamp',battery:'big',size:'huge',color:'#ff4fa3'}},
+  ] },
+{ name:'낮은 통로', who:'정 공장장', nochip:1,
+  say:'천장이 낮은 통로를 다녀. 유리병을 한 손으로 옮기고, 밤에도 돌아. 바닥은 험해. 색은 파랑.',
+  goal:{base:'track',arms:1,hand:'suction',head:'cam',light:'lamp',battery:'normal',size:'small',color:'#4a86ff'},
+  cards:[
+    {p:'move', t:'무한궤도로.', set:{base:'track'}},
+    {p:'arm', t:'집게 팔 하나.', bad:1, set:{arms:1,hand:'grip'}},
+    {p:'arm', t:'흡착판 팔 하나.', set:{arms:1,hand:'suction'}},
+    {p:'arm', t:'흡착판 팔 양쪽에 하나씩.', bad:1, set:{arms:2,hand:'suction'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'light', t:'헤드라이트.', set:{light:'lamp'}},
+    {p:'finish', t:'작게 만들어줘.', set:{size:'small'}},
+    {p:'finish', t:'파랑으로.', set:{color:'#4a86ff'}},
+    {p:'finish', t:'초록으로.', bad:1, set:{color:'#2bb673'}},
+    {p:'power', t:'밤에도 도니까 큰 배터리로.', bad:1, set:{battery:'big'}},
+  ] },
+{ name:'고쳐 만들기', who:'오 안전관리자', nochip:1,
+  say:'저번에 만든 게 자꾸 넘어져. 다리 말고 무한궤도로 바꿔. 나머지는 저번 그대로 — 양손 집게, 카메라, 노랑.',
+  goal:{base:'track',arms:2,hand:'grip',head:'cam',light:'none',battery:'normal',size:'normal',color:'#f5c518'},
+  cards:[
+    {p:'whole', t:'저번 거 그대로, 이동부만 바꿔줘.', bad:1, set:{base:'leg',arms:2,hand:'grip',head:'cam',color:'#f5c518'}},
+    {p:'move', t:'무한궤도로.', set:{base:'track'}},
+    {p:'move', t:'다리로.', bad:1, set:{base:'leg'}},
+    {p:'arm', t:'집게 팔 양쪽에 하나씩.', set:{arms:2,hand:'grip'}},
+    {p:'arm', t:'집게 팔 양쪽에 하나씩, 헤드라이트도.', bad:1, set:{arms:2,hand:'grip',light:'lamp'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'finish', t:'안전 노랑으로.', set:{color:'#f5c518'}},
+    {p:'finish', t:'안 넘어지게 크고 무겁게.', bad:1, set:{size:'huge'}},
+    {p:'head', t:'센서를 더 달아줘.', bad:1, set:{head:'many'}},
+  ] },
+{ name:'종일 근무', who:'박 반장', nochip:1,
+  say:'하루 종일 쉬지 않고 돌아야 해. 양손 집게로 상자 나르고, 밤에도 일해. 바닥은 평평해. 색은 아무래도 좋아.',
+  goal:{base:'wheel',arms:2,hand:'grip',head:'cam',light:'lamp',battery:'big',size:'normal',color:'#93a0b8'},
+  cards:[
+    {p:'move', t:'바퀴를 달아줘.', set:{base:'wheel'}},
+    {p:'arm', t:'집게 팔 양쪽에 하나씩.', set:{arms:2,hand:'grip'}},
+    {p:'arm', t:'집게 팔 양쪽에 하나씩, 흡착판으로.', bad:1, set:{arms:2,hand:'suction'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'head', t:'카메라 하나, 센서도 몇 개.', bad:1, set:{head:'many'}},
+    {p:'light', t:'헤드라이트.', set:{light:'lamp'}},
+    {p:'power', t:'종일 버티게 큰 배터리로.', set:{battery:'big'}},
+    {p:'finish', t:'파랑으로 칠해줘.', bad:1, set:{color:'#4a86ff'}},
+    {p:'finish', t:'종일 돌면 힘드니 튼튼하게 크게.', bad:1, set:{size:'huge'}},
+    {p:'arm', t:'혹시 모르니 팔을 두 개 더.', bad:1, set:{arms:4,hand:'grip'}},
+  ] },
+{ name:'작은 문', who:'최 도장사', nochip:1,
+  say:'계단을 오르고 작은 문을 지나야 해. 붓통은 한 손 집게. 앞은 보고. 우리 색 빨강 잊지 말고.',
+  goal:{base:'leg',arms:1,hand:'grip',head:'cam',light:'none',battery:'normal',size:'small',color:'#e2483d'},
+  cards:[
+    {p:'move', t:'계단을 오르게 다리로.', set:{base:'leg'}},
+    {p:'arm', t:'집게 팔 하나.', set:{arms:1,hand:'grip'}},
+    {p:'arm', t:'집게 팔 하나, 흡착판 하나.', bad:1, set:{arms:2,hand:'suction'}},
+    {p:'head', t:'카메라 하나.', set:{head:'cam'}},
+    {p:'finish', t:'빨강으로.', set:{color:'#e2483d'}},
+    {p:'finish', t:'작게 만들어줘.', set:{size:'small'}},
+    {p:'finish', t:'작게, 그래도 튼튼하게 크게.', bad:1, set:{size:'huge'}},
+    {p:'move', t:'바퀴가 빠르니 바퀴로.', bad:1, set:{base:'wheel'}},
+    {p:'finish', t:'예쁘게 분홍으로 칠해줘.', bad:1, set:{color:'#ff4fa3'}},
+    {p:'head', t:'센서를 여러 개.', bad:1, set:{head:'many'}},
+  ] },
+{ name:'야적장 총감독', who:'정 공장장', nochip:1,
+  say:'안개 낀 야적장을 밤새 돌아. 유리 상자를 양손으로 옮기고, 센서는 여러 개. 바닥은 험하고 색은 파랑.',
+  goal:{base:'track',arms:2,hand:'suction',head:'many',light:'lamp',battery:'big',size:'normal',color:'#4a86ff'},
+  cards:[
+    {p:'move', t:'무한궤도로.', set:{base:'track'}},
+    {p:'arm', t:'흡착판 팔 양쪽에 하나씩.', set:{arms:2,hand:'suction'}},
+    {p:'arm', t:'흡착판 팔 양쪽에 둘씩.', bad:1, set:{arms:4,hand:'suction'}},
+    {p:'head', t:'센서를 여러 개.', set:{head:'many'}},
+    {p:'head', t:'센서를 여러 개, 카메라도 하나.', bad:1, set:{head:'cam'}},
+    {p:'light', t:'헤드라이트.', set:{light:'lamp'}},
+    {p:'power', t:'밤새 버티게 큰 배터리로.', set:{battery:'big'}},
+    {p:'finish', t:'파랑으로.', set:{color:'#4a86ff'}},
+    {p:'whole', t:'지난번 안개 순찰대처럼 만들어줘.', bad:1, set:{base:'track',arms:0,hand:'none',head:'many',light:'lamp',color:'#4a86ff'}},
+    {p:'finish', t:'크게 만들어줘.', bad:1, set:{size:'huge'}},
+  ] },
 ];
 
 /* ===================== 상태 ===================== */
+/* ⛔ 아래 둘은 서버 _shared/order-levels.ts 와 sync pair 다(tests/minigame-replay.mjs 가 대조) — 점수는 서버가 기록으로 다시 센다. */
+const MAX_TRIES=3;
+const KEYS=['base','arms','hand','head','light','battery','size','color'];
 const $=id=>document.getElementById(id);
-const KEYS=['base','arms','head','size','color'];
-let LI=0,picked=new Set(),busy=false,tries=0,starTotal=0,starsPer=[];
+let LI=0,picked=new Set(),busy=false,tries=0,starsPer=[],state='pick';  // state: pick | fail | ok | over
+let LOG=[], T0=0;   // 답안 기록 — 시도마다 {o:주문, c:[고른 카드 자리], t:ms} · 서버가 이걸로 깬 주문 수·별을 다시 센다
+let submitted=false;
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function starStr(n){return '★'.repeat(n)+'<b>'+'☆'.repeat(3-n)+'</b>';}
-/** HUD 전용 — 그림(hud-v4)에 금별 3개가 이미 칠해져 있다. 그래서 별을 그리는 게 아니라
- *  **못 딴 칸을 덮는다**(막아라 CARI 의 경고카드와 같은 방향). 여기서 ★ 문자를 쓰면 별이 두 벌이 된다. */
 function starSockets(n){let s='';for(let i=0;i<3;i++)s+='<i'+(i<n?' class="on"':'')+'></i>';return s;}
+const lvText=(f)=>TX('order.lv'+(LI+1)+'.'+f, LEVELS[LI][f]||'');
+const cardText=(i)=>TX('order.lv'+(LI+1)+'.c'+(i+1), LEVELS[LI].cards[i].t);
+const partName=(k)=>TX('order.part.'+k, PARTNAME[k]);
+const tagName=(p)=>TX('order.tag.'+p, PART[p].label);
 
-/** 고른 말로 만들어질 스펙 — 정상 카드 먼저, 함정이 그 위를 덮는다(이 순서가 교훈이다). */
-function buildSpec(){
-  const C=LEVELS[LI].cards, spec={...BASE_SPEC};
-  const ch=[...picked].sort((a,b)=>a-b).map(i=>C[i]);
+/** 카드 → 스펙. 정상 카드를 먼저, 함정이 그 위를 덮는다("좋은 지시를 넣어도 나쁜 지시 하나가 결과를 가져간다"). 팔이 없으면 손도 없다. */
+function buildSpec(cards,pick){
+  const spec={...BASE_SPEC};
+  const ch=[...pick].sort((a,b)=>a-b).map(i=>cards[i]);
   ch.filter(c=>!c.bad).forEach(c=>Object.assign(spec,c.set));
   ch.filter(c=>c.bad).forEach(c=>Object.assign(spec,c.set));
+  if(spec.arms===0) spec.hand='none';
   return spec;
 }
+function wrongKeys(spec,goal){ return KEYS.filter(k=>spec[k]!==goal[k]); }
 
 function renderCount(){
   const n=picked.size;
-  $('cntEl').textContent=n+'개';
+  $('cntEl').textContent=T('order.count',{n});
   $('cntEl').className='cnt'+(n?'':' zero');
+}
+function setSendLabel(){
+  const b=$('sendBtn');
+  b.textContent = state==='pick' ? T('order.send')
+    : state==='fail' ? T('order.retry')
+    : state==='ok' ? (LI+1>=LEVELS.length ? T('order.result') : T('order.next'))
+    : T('order.result');
+  b.disabled=false;
+  $('quitBtn').classList.toggle('hidden', state!=='ok' || LI+1>=LEVELS.length);
 }
 
 function loadLevel(){
   const L=LEVELS[LI];
-  picked=new Set(); busy=false; tries=0;
+  picked=new Set(); busy=false; tries=0; state='pick';
   $('ordNum').textContent=LI+1;
-  $('ordName').textContent=L.name;
-  $('custWho').textContent=L.who;
-  $('custSay').textContent=L.say;
+  $('ordName').textContent=lvText('name');
+  $('custWho').textContent=lvText('who');
+  $('custSay').textContent=lvText('say');
   $('starEl').innerHTML=starSockets(3);
   $('goalBot').innerHTML=robotSVG(L.goal,{plan:true});
-  if(L.paint){ $('paintChip').classList.remove('hidden');
-    $('paintDot').style.background=L.goal.color; $('paintTxt').textContent=L.paint; }
+  // 색·크기 칩 — 4장(nochip)부터는 안 준다: 색·크기는 손님 말에서 읽어야 한다
+  if(L.paint&&!L.nochip){ $('paintChip').classList.remove('hidden');
+    $('paintDot').style.background=L.goal.color; $('paintTxt').textContent=lvText('paint'); }
   else $('paintChip').classList.add('hidden');
+  $('sizeChip').classList.toggle('hidden', L.goal.size==='normal'||!!L.nochip);
+  $('sizeTxt').textContent = L.goal.size==='small' ? T('order.size_small') : T('order.size_huge');
   $('madeBot').className='bot';
-  $('madeBot').innerHTML='<p class="empty">아직 아무 말도<br/>안 했다</p>';
-  // 고르는 동안은 도면만 띄운다(pick) — 완성품 칸은 어차피 비어 있고, 그 자리를 카드 목록이 쓴다.
-  // 시키는 순간 두 칸짜리 비교판으로 바뀐다(send 참고).
+  $('madeBot').innerHTML='<p class="empty">'+T('order.empty')+'</p>';
+  $('verdict').className='verdict'; $('diffRow').innerHTML='';
   document.querySelector('.stage').classList.add('pick');
   $('tray').innerHTML=L.cards.map((c,i)=>{
     const P=PART[c.p];
     return `<button class="pc" data-i="${i}"><span class="bar" style="background:${P.c}"></span>`+
-      `<span class="in"><span class="tag" style="background:${P.c}">${P.label}</span>`+
-      `<span class="txt">${esc(c.t)}</span><span class="chk">✓</span></span></button>`;
+      `<span class="in"><span class="tag" style="background:${P.c}">${esc(tagName(c.p))}</span>`+
+      `<span class="txt">${esc(cardText(i))}</span><span class="chk">✓</span></span></button>`;
   }).join('');
   $('tray').querySelectorAll('.pc').forEach(b=>{
-    b.onclick=()=>{ if(busy) return;
+    b.onclick=()=>{ if(busy||state==='ok'||state==='over') return;
       const i=+b.dataset.i;
       if(picked.has(i)) picked.delete(i); else picked.add(i);
       b.classList.toggle('on',picked.has(i));
       renderCount();
+      if(state==='fail'){ state='pick'; clearVerdict(); }   // 다시 고르기 시작하면 도장은 치운다
     };
   });
   renderCount();
-  $('sendBtn').disabled=false;
-  $('fb').classList.remove('on');
+  setSendLabel();
   document.querySelector('.scroll').scrollTop=0;
+}
+function clearVerdict(){
+  $('verdict').className='verdict'; $('diffRow').innerHTML='';
+  const made=$('madeBot'); if(made.dataset.spec){ made.innerHTML=robotSVG(JSON.parse(made.dataset.spec)); made.className='bot'; }
+  setSendLabel();
 }
 
 /* ===================== 시키기 ===================== */
 function send(){
   if(busy) return;
   busy=true; tries++; $('sendBtn').disabled=true;
-  // 여기서부터 볼 것은 '도면 vs 완성품' 이다 — 비교판으로 되돌린다(loadLevel 이 다시 pick 을 건다).
   document.querySelector('.stage').classList.remove('pick');
-  // 딸 수 있는 별이 시도마다 준다 — 상단에서 바로 보여야 "일단 다 눌러보기" 를 망설인다.
   $('starEl').innerHTML=starSockets(Math.max(1,4-tries));
-  const L=LEVELS[LI], spec=buildSpec();
-  const bads=[...picked].map(i=>L.cards[i]).filter(c=>c.bad);
-  const wrong=KEYS.filter(k=>spec[k]!==L.goal[k]);
+  const L=LEVELS[LI], spec=buildSpec(L.cards,picked);
+  const wrong=wrongKeys(spec,L.goal);
   const ok=wrong.length===0;
+  LOG.push({o:LI,c:[...picked].sort((a,b)=>a-b),t:Math.max(0,Math.round(performance.now()-T0))});
 
   const made=$('madeBot');
-  made.className='bot';
-  made.innerHTML='<p class="empty">CARI가<br/>만드는 중…</p>';
+  made.className='bot'; made.dataset.spec=JSON.stringify(spec);
+  made.innerHTML='<p class="empty">'+T('order.making')+'</p>';
   setTimeout(()=>{
-    made.innerHTML=robotSVG(spec);
+    made.innerHTML=robotSVG(spec,{wrong:ok?[]:wrong});
     made.className='bot build';
     setTimeout(()=>{
-      if(!ok) made.className=(spec.base==='none')?'bot fall':'bot wob';
-      const fb=$('fb');
-      fb.className='fb '+(ok?'yes on':'no on');
-      $('fbTtl').textContent = ok?'손님이 받아 갔다':'손님이 고개를 젓는다';
+      const v=$('verdict');
       if(ok){
         const st=Math.max(1,4-tries);
-        starsPer[LI]=st; starTotal=starsPer.reduce((a,b)=>a+(b||0),0);
-        $('fbStar').innerHTML=starStr(st);
+        starsPer[LI]=st;
         $('starEl').innerHTML=starSockets(st);
-        $('fbDiff').classList.add('hidden');
-        $('fbWhy').innerHTML = bads.length?'':'도면대로 나왔다. 필요한 말만 정확히 시켰다.';
-        if(!bads.length&&tries===1) $('fbWhy').innerHTML='한 번에 도면대로 나왔다. 필요한 말만 정확히 시켰다.';
-        if(window.MGBridge) MGBridge.submit(LI+1,{timed:true}); // 랭킹: 도달 레벨(동률=시간)
+        v.className='verdict on pass'; $('vTtl').textContent=T('order.v_ok'); $('vSub').innerHTML=starStr(st);
+        state='ok';
       } else {
-        // 다음 시도에 딸 수 있는 별로 바로 낮춘다 — 시키기 직전이 아니라 실패한 순간 보여야 체감된다.
-        $('starEl').innerHTML=starSockets(Math.max(1,3-tries));
-        $('fbStar').innerHTML='';
-        $('fbDiff').classList.remove('hidden');
-        $('fbDiff').innerHTML=wrong.map(k=>`<span>${PARTNAME[k]}</span>`).join('');
-        // 함정이 섞였으면 그것부터 짚는다 — 안 그러면 "덜 시켰나?" 하고 더 넣게 된다.
-        $('fbWhy').innerHTML = bads.length
-          ? `<q>${esc(bads[0].t)}</q> 이 말이 결과를 가져갔다. ${bads[0].why}`
-          : '안 시킨 것은 안 만들어진다. CARI의 기본값은 <em>내 머릿속이 아니다</em> — 도면을 다시 봐라.';
+        made.className=(spec.base==='none')?'bot fall':'bot wob';
+        $('diffRow').innerHTML=wrong.map(k=>`<span>${esc(partName(k))}</span>`).join('');
+        if(tries>=MAX_TRIES){ v.className='verdict on over'; $('vTtl').textContent=T('order.v_gone'); $('vSub').textContent=''; state='over'; }
+        else { v.className='verdict on fail'; $('vTtl').textContent=T('order.v_no'); $('vSub').textContent=T('order.tries_left',{n:MAX_TRIES-tries}); state='fail';
+               $('starEl').innerHTML=starSockets(Math.max(1,3-tries)); }
       }
-      $('fbBtn').textContent = ok?(LI+1>=LEVELS.length?'결과 보기':'다음 주문 ›'):'다시 시키기';
-      $('fbBtn').className='fbbtn'+(ok?'':' ghost');
-      fb.dataset.ok=ok?'1':'0';
+      busy=false; setSendLabel();
     },600);
   },500);
 }
 
+function submitOnce(){
+  if(submitted) return; submitted=true;
+  const cleared=starsPer.filter(Boolean).length;
+  if(window.MGBridge) MGBridge.submit(cleared,{timed:true,log:LOG});   // 숫자는 참고값 — 서버가 log 로 다시 센다
+}
+function showResult(gone){
+  submitOnce();
+  const cleared=starsPer.filter(Boolean).length, stars=starsPer.reduce((a,b)=>a+(b||0),0), full=LEVELS.length*3;
+  $('oTtl').textContent = gone ? T('order.o_gone') : (cleared>=LEVELS.length ? T('order.o_all') : T('order.o_done'));
+  $('oCleared').textContent=cleared+' / '+LEVELS.length;
+  $('oStars').textContent='★ '+stars;
+  $('oStarLab').textContent=T('order.o_stars',{s:stars,f:full});
+  $('overOv').classList.toggle('result-fail',gone);
+  $('overOv').classList.remove('hidden');
+}
+
 /* ===================== 배선 ===================== */
-$('sendBtn').onclick=send;
-$('fbBtn').onclick=()=>{
-  const ok=$('fb').dataset.ok==='1';
-  $('fb').classList.remove('on');
-  if(!ok){ busy=false; $('sendBtn').disabled=false; return; }
-  if(LI+1>=LEVELS.length){
-    $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
-    starTotal=starsPer.reduce((a,b)=>a+(b||0),0);
-    $('oStars').textContent='★ '+starTotal;
-    const full=LEVELS.length*3;
-    $('oStarLab').textContent = starTotal>=full ? '별 '+starTotal+' / '+full+' — 전부 한 번에 맞혔다'
-                                                : '별 '+starTotal+' / '+full;
-    $('overOv').classList.toggle('result-fail',starTotal<LEVELS.length*2);
-    $('overOv').classList.remove('hidden');
-  } else { LI++; loadLevel(); }
+$('sendBtn').onclick=()=>{
+  if(busy) return;
+  if(state==='pick') return send();
+  if(state==='fail'){ state='pick'; clearVerdict(); return send(); }   // 고른 그대로 다시 시키기
+  if(state==='ok'){ if(LI+1>=LEVELS.length) return showResult(false); LI++; loadLevel(); return; }
+  if(state==='over') return showResult(true);
 };
-$('oAgain').onclick=()=>{ LI=0; starsPer=[]; starTotal=0; $('overOv').classList.add('hidden'); $('overOv').classList.remove('result-fail'); loadLevel(); };
-$('startBtn').onclick=()=>$('startOv').classList.add('hidden');
+$('quitBtn').onclick=()=>showResult(false);
+$('oAgain').onclick=()=>{ LI=0; starsPer=[]; LOG=[]; submitted=false; T0=performance.now(); $('overOv').classList.add('hidden'); $('overOv').classList.remove('result-fail'); loadLevel(); };
+$('startBtn').onclick=()=>{ $('startOv').classList.add('hidden'); T0=performance.now(); LOG=[]; submitted=false; };
 
 $('sArt').innerHTML=charSVG(CARI_SUIT,{cari:true});
 loadLevel();
@@ -1080,22 +1346,26 @@ loadLevel();
 (function(){
   var EMBED=window.parent!==window, T0=Date.now();
   function post(m){ if(EMBED) window.parent.postMessage(m,window.location.origin); }
+  // ⚠️ log 를 꼭 실어 보낸다 — 빠지면 서버(재채점)가 400 을 주고 부모는 조용히 넘긴다(프로그램해라에서 겪었다).
   window.MGBridge={submit:function(v,opts){
     if(typeof v!=='number'||!isFinite(v)) return;
-    post({t:'mg:score',score:v,tieMs:(opts&&opts.timed&&T0)?(Date.now()-T0):undefined});
+    post({t:'mg:score',score:v,tieMs:(opts&&opts.timed&&T0)?(Date.now()-T0):undefined,
+          log:(opts&&Array.isArray(opts.log))?opts.log:undefined});
   }};
   function mount(id){
     var ov=document.getElementById(id); if(!ov||ov.querySelector('.mg-rank')) return;
     var b=document.createElement('button');
     b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
-    b.setAttribute('aria-label','이 게임 랭킹 보기');
+    var tr=function(k){ return window.MGI18N ? MGI18N.t(k) : k; };
+    b.setAttribute('aria-label',tr('mg.rank_aria'));
     // ⚠️ 라벨을 맨 텍스트 노드로 두지 말 것 — 랭킹 버튼은 그림(rank-button.webp)이라 CSS 가
     //   글자만 따로 가운데로 밀어야 한다(막아라·지어라 CARI 와 같은 마크업).
-    b.innerHTML='<span aria-hidden="true">🏆</span><span class="rank-label">랭킹</span>';
+    b.innerHTML='<span aria-hidden="true">🏆</span><span class="rank-label">'+tr('mg.rank')+'</span>';
     b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
     ov.appendChild(b);
   }
   mount('startOv'); mount('overOv');
+  if (window.MGI18N) MGI18N.apply();
   var intro=document.getElementById('startOv');
   if(intro) intro.addEventListener('click',function(e){
     if(e.target.closest&&e.target.closest('.mg-rank')) return;

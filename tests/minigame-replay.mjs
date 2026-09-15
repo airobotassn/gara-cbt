@@ -14,6 +14,8 @@ import { REACH_LEVELS, REACH_DEFAULT_TIME, REACH_GRIP, reachedWith } from '../su
 import { PROG_LEVELS, runProgram, validProgram, countOps as progCountOps } from '../supabase/functions/_shared/program-levels.ts'
 import { BUILD_LEVELS, simulate as simulateBuild, validTiles as validBuildTiles } from '../supabase/functions/_shared/build-levels.ts'
 import { BLOCK_DAYS, BLOCK_MAX_STRIKE, BLOCK_DOC_POINT, BLOCK_PERFECT_BONUS, judgeBlockDoc } from '../supabase/functions/_shared/block-days.ts'
+import { ORDER_LEVELS, ORDER_MAX_TRIES, ORDER_KEYS, ORDER_BASE, buildOrderSpec, orderMatches } from '../supabase/functions/_shared/order-levels.ts'
+import * as FE from '../src/lib/minigames.ts'
 
 let failed = 0
 function eq(actual, expected, label) {
@@ -29,6 +31,7 @@ const reach = readFileSync(new URL('../public/games/reach-cari.html', import.met
 const prog = readFileSync(new URL('../public/games/program-cari.html', import.meta.url), 'utf8')
 const build = readFileSync(new URL('../public/games/build-cari.html', import.meta.url), 'utf8')
 const block = readFileSync(new URL('../public/games/block-cari.html', import.meta.url), 'utf8')
+const order = readFileSync(new URL('../public/games/order-cari.html', import.meta.url), 'utf8')
 
 // ---------- 0b) 프로그램해라 레벨 대조 + 정답 프로그램이 서버 VM 으로 성공하는가 ----------
 {
@@ -365,6 +368,64 @@ eq(R.logQuestionIds([{ q: 'a' }, { q: 'b' }, { q: 'a' }, { x: 1 }]), ['a', 'b'],
   eq(docs, 50, 'block 서류 50장')
   eq(badOrder, [], 'block 서류 번역 — 조각 순서·개수가 한국어와 같다')
   for (const k of ['name', 'pii', 'acct', 'perf', 'cred', 'price', 'health', 'hr', 'src', 'legal']) eq(!!DICT[`block.rule.${k}`] && !!DICT[`block.rule.${k}.desc`], true, `block 규정 ${k} 라벨·설명`)
+}
+
+// ---------- 0f) 시켜라 주문·카드 대조 + 재채점 ----------
+{
+  const m = order.match(/const LEVELS=(\[[\s\S]*?\n\]);/)
+  const HL = m ? new Function('return ' + m[1])() : null
+  eq(HL?.length, ORDER_LEVELS.length, 'order 주문 수 = 서버')
+  ;(HL ?? []).forEach((L, i) => {
+    const S = ORDER_LEVELS[i]
+    eq(L.goal, S && S.goal, `order 주문 ${i + 1} 도면 = 서버`)
+    eq(L.cards.map((c) => ({ set: c.set, bad: c.bad })), S && S.cards.map((c) => ({ set: c.set, bad: c.bad })), `order 주문 ${i + 1} 카드 ${L.cards.length}장 효과 = 서버`)
+  })
+  eq(lit(order, 'MAX_TRIES', 'order'), ORDER_MAX_TRIES, 'order MAX_TRIES = 서버')
+  // KEYS·BASE_SPEC 은 JS 리터럴(작은따옴표·색 상수)이라 JSON 으로 못 읽는다 — 평가해서 본다
+  const jsLit = (name) => { const mm = order.match(new RegExp(`const ${name}=([^;]+);`)); return mm ? new Function("const GRAY='#93a0b8';return " + mm[1])() : undefined }
+  eq(jsLit('KEYS'), [...ORDER_KEYS], 'order KEYS = 서버')
+  eq(jsLit('BASE_SPEC'), ORDER_BASE, 'order BASE_SPEC = 서버')
+  eq(/log:\(opts&&Array\.isArray\(opts\.log\)\)\?opts\.log:undefined/.test(order), true, 'order 브리지가 log 를 실어 보낸다')
+  eq(/MGBridge\.submit\(cleared,\{timed:true,log:LOG\}\)/.test(order), true, 'order 제출이 log 를 넘긴다')
+  // 정답 배치(tests/fixtures/order-sol.json) — 정상 카드만 고르면 통과, 함정 하나만 더해도 실패, 정상 카드 하나를 빼도 실패
+  const SOL = JSON.parse(readFileSync(new URL('./fixtures/order-sol.json', import.meta.url), 'utf8'))
+  eq(SOL.length, ORDER_LEVELS.length, 'order 정답 수 = 주문 수')
+  ORDER_LEVELS.forEach((L, i) => {
+    eq(orderMatches(L, SOL[i]), true, `order 주문 ${i + 1} 정답 카드 ${SOL[i].length}장이 서버에서 통과`)
+    eq(L.cards.every((c, j) => !c.bad || !orderMatches(L, [...SOL[i], j])), true, `order 주문 ${i + 1} 함정을 더하면 전부 실패`)
+    eq(SOL[i].every((j) => !orderMatches(L, SOL[i].filter((x) => x !== j))), true, `order 주문 ${i + 1} 정답 카드를 하나 빼면 실패`)
+  })
+  eq(buildOrderSpec(ORDER_LEVELS[0], [3]).hand, 'grip', 'order 팔 카드가 손도 정한다')
+  eq(buildOrderSpec(ORDER_LEVELS[0], []).hand, 'none', 'order 팔 0 이면 손 none')
+  // 재채점 — 전부 1번에 = 20 · 별 60 · tie 0×1e7+시간
+  const P = SOL.map((c, o) => ({ o, c, t: (o + 1) * 5000 }))
+  eq(R.replayOrder(P, 600), { ok: true, score: 20, answers: 20, durationMs: 100000, tie: 100000 }, 'order 20주문 전부 1번에 = 20 · 별 60')
+  const P2 = [{ o: 0, c: [1], t: 1000 }, { o: 0, c: SOL[0], t: 2000 }, { o: 1, c: [3], t: 3000 }, { o: 1, c: [3], t: 4000 }, { o: 1, c: SOL[1], t: 5000 }]
+  eq(R.replayOrder(P2, 600), { ok: true, score: 2, answers: 5, durationMs: 5000, tie: (60 - 3) * 1e7 + 5000 }, 'order 2번째·3번째에 맞힘 = 별 2+1')
+  const P3 = [{ o: 0, c: [1], t: 1000 }, { o: 0, c: [1], t: 2000 }, { o: 0, c: [1], t: 3000 }]
+  eq(R.replayOrder(P3, 600), { ok: true, score: 0, answers: 3, durationMs: 3000, tie: 60 * 1e7 + 3000 }, 'order 3번 실패 = 0')
+  eq(R.replayOrder(P3.concat([{ o: 1, c: SOL[1], t: 4000 }]), 600), { ok: false, reason: 'log_after_gameover' }, 'order 판 끝난 뒤 기록 거부')
+  eq(R.replayOrder([{ o: 1, c: SOL[1], t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'order 주문 건너뛰기 거부')
+  eq(R.replayOrder([{ o: 0, c: [0, 0], t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'order 같은 카드 두 번 거부')
+  eq(R.replayOrder([{ o: 0, c: [9], t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'order 없는 카드 자리 거부')
+  eq(R.replayOrder([{ o: 0, c: SOL[0], t: 600 * 1000 + 6000 }], 600), { ok: false, reason: 'log_exceeds_ticket' }, 'order 티켓 시간 초과 거부')
+  eq(R.replayOrder([], 600).score, 0, 'order 빈 기록 = 0')
+  eq([FE.ORDER_MAX_STARS, FE.ORDER_TIE_UNIT], [R.ORDER_MAX_STARS, R.ORDER_TIE_UNIT], 'order 동률값 해석(프론트 minigames.ts) = 서버')
+  // 사전 — order.* 6개국어 · 주문 문구 키가 전부 있고 ko 가 HTML 과 같다
+  const src = readFileSync(new URL('../public/games/i18n.js', import.meta.url), 'utf8')
+  const dm = src.match(/var D = (\{[\s\S]*?\n  \})\r?\n\r?\n  function t\(/)
+  const DICT = dm ? new Function('return ' + dm[1])() : {}
+  const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
+  const okeys = Object.keys(DICT).filter((k) => k.startsWith('order.'))
+  eq(okeys.every((k) => LANGS.every((l) => typeof DICT[k][l] === 'string' && DICT[k][l].length > 0)), true, `order.* ${okeys.length}키 전부 6개국어`)
+  const missing = []
+  ;(HL ?? []).forEach((L, i) => {
+    const key = `order.lv${i + 1}`
+    for (const f of ['name', 'who', 'say']) if (!DICT[`${key}.${f}`] || DICT[`${key}.${f}`].ko !== L[f]) missing.push(`${key}.${f}`)
+    if (L.paint && (!DICT[`${key}.paint`] || DICT[`${key}.paint`].ko !== L.paint)) missing.push(`${key}.paint`)
+    L.cards.forEach((c, j) => { if (!DICT[`${key}.c${j + 1}`] || DICT[`${key}.c${j + 1}`].ko !== c.t) missing.push(`${key}.c${j + 1}`) })
+  })
+  eq(missing, [], 'order 주문 문구 키가 전부 있고 ko = HTML')
 }
 
 if (failed) { console.error(`\n${failed} failed`); process.exit(1) }

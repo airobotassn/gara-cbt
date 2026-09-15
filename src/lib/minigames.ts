@@ -123,3 +123,7 @@ export function guestPlayable(id: string | undefined): boolean {
 export function findMiniGame(id: string | undefined): MiniGame | undefined {
   return MINIGAMES.find((g) => g.id === id)
 }
+
+/** 시켜라 동률값 해석 — 서버 replayOrder 와 sync pair(20주문 × 3별 · 단위 1e7). tie = (60 − 별 합) × 1e7 + 소요 ms. */
+export const ORDER_MAX_STARS = 60
+export const ORDER_TIE_UNIT = 10_000_000

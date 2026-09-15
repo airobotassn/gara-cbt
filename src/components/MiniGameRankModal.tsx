@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { callFunction } from '../lib/supabase'
 import { Avatar } from './GemAvatar'
 import { useT, type TFunc } from '../lib/i18n'
+import { ORDER_MAX_STARS, ORDER_TIE_UNIT } from '../lib/minigames'
 
 interface Row {
   rank: number
@@ -91,10 +92,12 @@ export default function MiniGameRankModal({
   const metric = data?.metric ?? 'score'
   const val = (v: number) => (metric === 'level' ? `Lv.${v}` : v.toLocaleString())
   // 프로그램해라·지어라의 동률값은 시간이 아니라 "명령(타일) 수 합 × 1000 + 실행(가동) 횟수 합"(서버 replayProgram/replayBuild 가 접어 보낸다) → 그대로 풀어 보여준다.
-  const isProgram = gameId === 'program-cari', isBuild = gameId === 'build-cari'
+  const isProgram = gameId === 'program-cari', isBuild = gameId === 'build-cari', isOrder = gameId === 'order-cari'
+  // 시켜라의 동률값 = (별 만점 60 − 별 합) × 1e7 + 소요 ms(서버 replayOrder) → "별 N · 시간" 으로 풀어 보여준다.
   const fmtTie = (ms: number) =>
     isProgram ? t('mg.tie_program', { c: Math.floor(ms / 1000), r: ms % 1000 })
     : isBuild ? t('mg.tie_build', { c: Math.floor(ms / 1000), r: ms % 1000 })
+    : isOrder ? t('mg.tie_order', { s: ORDER_MAX_STARS - Math.floor(ms / ORDER_TIE_UNIT), t: fmtMs(ms % ORDER_TIE_UNIT, t) })
     : fmtMs(ms, t)
   // 시상대 = 2·1·3 순서로 배치(가운데가 1위). 3명 미만이면 빈 칸으로 자리만 잡는다 — /ranking 과 동일.
   const top = data?.top ?? []
@@ -126,7 +129,7 @@ export default function MiniGameRankModal({
 
         <p className="mgr-note">
           {metric === 'level'
-            ? t(isProgram ? 'mg.rank_rule_program' : isBuild ? 'mg.rank_rule_build' : 'mg.rank_rule_level')
+            ? t(isProgram ? 'mg.rank_rule_program' : isBuild ? 'mg.rank_rule_build' : isOrder ? 'mg.rank_rule_order' : 'mg.rank_rule_level')
             : t('mg.rank_rule_score')}
           {data ? t('mg.rank_players', { n: data.total.toLocaleString() }) : ''}
         </p>
