@@ -1878,6 +1878,8 @@ const VI: Record<string, string> = {
   "hub.part.skin_season_halloween": "Mùa · Halloween",
   "hub.part.skin_season_xmas_town": "Mùa · Làng Giáng sinh",
   "hub.part.skin_season_xmas_cabin": "Mùa · Nhà gỗ Giáng sinh",
+  "hub.part.skin_season_seollal": "Mùa · Seollal (Tết)",
+  "hub.part.skin_season_chuseok": "Mùa · Chuseok (Trung thu)",
   "hub.part.skin_world_paris": "Thế giới · Tháp Eiffel, Paris",
   "hub.part.skin_world_za_capetown": "Thế giới · Cape Town",
   "hub.part.skin_world_kr_seoul_night": "Thế giới · Seoul về đêm",

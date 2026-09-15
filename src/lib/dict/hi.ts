@@ -1878,6 +1878,8 @@ const HI: Record<string, string> = {
   "hub.part.skin_season_halloween": "सीज़न · हैलोवीन",
   "hub.part.skin_season_xmas_town": "सीज़न · क्रिसमस गाँव",
   "hub.part.skin_season_xmas_cabin": "सीज़न · क्रिसमस केबिन",
+  "hub.part.skin_season_seollal": "सीज़न · सोल्लाल (चंद्र नववर्ष)",
+  "hub.part.skin_season_chuseok": "सीज़न · चुसोक",
   "hub.part.skin_world_paris": "विश्व · पेरिस एफ़िल टावर",
   "hub.part.skin_world_za_capetown": "विश्व · केप टाउन",
   "hub.part.skin_world_kr_seoul_night": "विश्व · सियोल रात का नज़ारा",

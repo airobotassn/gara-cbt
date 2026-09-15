@@ -1878,6 +1878,8 @@ const EN: Record<string, string> = {
   "hub.part.skin_season_halloween": "Season · Halloween",
   "hub.part.skin_season_xmas_town": "Season · Christmas Village",
   "hub.part.skin_season_xmas_cabin": "Season · Christmas Cabin",
+  "hub.part.skin_season_seollal": "Season · Seollal (Lunar New Year)",
+  "hub.part.skin_season_chuseok": "Season · Chuseok",
   "hub.part.skin_world_paris": "World · Eiffel Tower, Paris",
   "hub.part.skin_world_za_capetown": "World · Cape Town",
   "hub.part.skin_world_kr_seoul_night": "World · Seoul at Night",

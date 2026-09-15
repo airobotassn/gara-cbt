@@ -1878,6 +1878,8 @@ const ZH: Record<string, string> = {
   "hub.part.skin_season_halloween": "季节 · 万圣节",
   "hub.part.skin_season_xmas_town": "季节 · 圣诞小镇",
   "hub.part.skin_season_xmas_cabin": "季节 · 圣诞小木屋",
+  "hub.part.skin_season_seollal": "季节 · 春节",
+  "hub.part.skin_season_chuseok": "季节 · 中秋",
   "hub.part.skin_world_paris": "世界 · 巴黎埃菲尔铁塔",
   "hub.part.skin_world_za_capetown": "世界 · 开普敦",
   "hub.part.skin_world_kr_seoul_night": "世界 · 首尔夜景",

@@ -472,6 +472,9 @@ export const SKINS: SkinDef[] = [
   // 크리스마스(2026-09-15 · Z:「시즌 스킨」의 크리스마스·크리스마스2). **크리스마스 UI 한 벌**(`ui: 'christmas'`) 공용 — 마을 광장과 산장.
   { key: 'season_xmas_town', partKey: 'skin_season_xmas_town', ui: 'christmas', category: 'season', iconDir: '/hub/ui-christmas', bg: '/hub/bg-season-xmas-town.webp' },
   { key: 'season_xmas_cabin', partKey: 'skin_season_xmas_cabin', ui: 'christmas', category: 'season', iconDir: '/hub/ui-christmas', bg: '/hub/bg-season-xmas-cabin.webp' },
+  // 설날·추석(2026-09-15 지시 "한국풍 UI 넣으면 될듯") — 자기 벌 없이 **대한민국 벌**(`ui: 'korea'`)을 입는다. 칩은 '시즌'.
+  { key: 'season_seollal', partKey: 'skin_season_seollal', ui: 'korea', category: 'season', iconDir: '/hub/ui-korea', bg: '/hub/bg-season-seollal.webp' },
+  { key: 'season_chuseok', partKey: 'skin_season_chuseok', ui: 'korea', category: 'season', iconDir: '/hub/ui-korea', bg: '/hub/bg-season-chuseok.webp' },
   // 세계 — 첫 장은 파리 에펠탑 밤(2026-09-14 · Z:「국가별 스킨」). **세계 UI 한 벌**(`ui: 'world'`)을 같이 들고 온다.
   //   나머지 나라 배경(24장)은 배경만 다르니 `ui: 'world'` 로 여기 얹으면 된다(고궁 낮·밤과 같은 꼴).
   {

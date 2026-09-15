@@ -1878,6 +1878,8 @@ const JA: Record<string, string> = {
   "hub.part.skin_season_halloween": "シーズン・ハロウィン",
   "hub.part.skin_season_xmas_town": "シーズン・クリスマスの村",
   "hub.part.skin_season_xmas_cabin": "シーズン・クリスマスの山小屋",
+  "hub.part.skin_season_seollal": "シーズン・ソルラル（旧正月）",
+  "hub.part.skin_season_chuseok": "シーズン・秋夕（チュソク）",
   "hub.part.skin_world_paris": "世界・パリ エッフェル塔",
   "hub.part.skin_world_za_capetown": "世界・ケープタウン",
   "hub.part.skin_world_kr_seoul_night": "世界・ソウルの夜景",

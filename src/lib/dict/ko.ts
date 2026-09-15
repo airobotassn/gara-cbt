@@ -1908,6 +1908,8 @@ const KO: Record<string, string> = {
   "hub.part.skin_season_halloween": "시즌 · 할로윈",
   "hub.part.skin_season_xmas_town": "시즌 · 크리스마스 마을",
   "hub.part.skin_season_xmas_cabin": "시즌 · 크리스마스 산장",
+  "hub.part.skin_season_seollal": "시즌 · 설날",
+  "hub.part.skin_season_chuseok": "시즌 · 추석",
   "hub.part.skin_world_paris": "세계 · 파리 에펠탑",
   "hub.part.skin_world_za_capetown": "세계 · 케이프타운",
   "hub.part.skin_world_kr_seoul_night": "세계 · 서울 야경",
