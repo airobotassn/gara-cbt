@@ -1868,6 +1868,7 @@ const JA: Record<string, string> = {
   "hub.part.skin_lab_atrium": "スマートファクトリー・アトリウム",
   "hub.part.skin_office_city": "オフィス・シティラウンジ",
   "hub.part.skin_office_gara": "オフィス・GARA本社",
+  "hub.part.skin_office_gara_sunset": "オフィス・GARA本社・夕暮れ",
   "hub.part.skin_campus_day": "キャンパス・昼",
   "hub.part.skin_campus_sunset": "キャンパス・夕焼け",
   "hub.part.skin_campus_classroom": "キャンパス・高校の教室",

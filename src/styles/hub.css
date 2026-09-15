@@ -796,8 +796,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='lab_factory']          { --skin-bg: url('/hub/bg-lab-factory.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='lab_atrium']           { --skin-bg: url('/hub/bg-lab-atrium.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='office_city']          { --skin-bg: url('/hub/bg-office-city.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
-/* GARA 사옥 정면 (2026-09-15) — 같은 판·같은 값. 광장 바닥이 아래 1/4 이라 발끝이 바닥 위에 선다. */
+/* GARA 사옥 낮·노을 (2026-09-15) — 같은 판·같은 값. 광장 바닥이 아래 1/4 이라 발끝이 바닥 위에 선다. */
 .hub[data-skin='office_gara']          { --skin-bg: url('/hub/bg-office-gara.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='office_gara_sunset']   { --skin-bg: url('/hub/bg-office-gara-sunset.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 /* 학교 3장 더 (2026-09-11) — 교실·강의실은 실내 바닥, 정원은 마당. 같은 판·같은 값이다. */
 .hub[data-skin='campus_classroom']     { --skin-bg: url('/hub/bg-campus-classroom.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='campus_lecture']       { --skin-bg: url('/hub/bg-campus-lecture.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }

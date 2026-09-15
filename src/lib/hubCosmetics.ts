@@ -421,8 +421,8 @@ export const SKINS: SkinDef[] = [
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-city.webp',
   },
-  // GARA 사옥 정면 (2026-09-15 지시) — 위 `office`(모아교육그룹 건물)를 갈아끼운 게 아니라 **따로 하나 더** 넣었다.
-  //   같은 판(1672×941)·같은 오피스 UI 벌. 정문·계단이 화면 정중앙이라 폰의 가운데 26% 안에 볼 것이 있다.
+  // GARA 사옥 낮·노을 (2026-09-15 지시) — 위 `office`(모아교육그룹 건물)를 갈아끼운 게 아니라 **따로 더** 넣었다.
+  //   같은 판(1672×941)·같은 오피스 UI 벌. 둘 다 정문·계단이 화면 정중앙이라 폰의 가운데 26% 안에 볼 것이 있다.
   {
     key: 'office_gara',
     partKey: 'skin_office_gara',
@@ -430,6 +430,14 @@ export const SKINS: SkinDef[] = [
     category: 'office',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-gara.webp',
+  },
+  {
+    key: 'office_gara_sunset',
+    partKey: 'skin_office_gara_sunset',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-gara-sunset.webp',
   },
   // 캠퍼스 낮·노을 — 같은 광장의 두 시간대. 고궁 낮·밤과 같은 짝이다.
   {
