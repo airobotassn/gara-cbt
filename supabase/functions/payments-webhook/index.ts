@@ -42,9 +42,9 @@ function pickIds(body: unknown): { orderId?: string; paymentKey?: string } {
  * 본문을 객체로 만든다. **엑심베이 status_url 의 본문 형식은 아직 실기기로 확인하지 못했다**
  * (문서가 명시하지 않는다). JSON 이 아니면 폼/쿼리스트링으로 한 번 더 시도한다 — 형식을 잘못 짚어
  * 식별자를 못 꺼내면 그 통지는 조용히 버려지고, 브라우저가 닫힌 결제를 영영 못 찾는다.
+ * ⚠️ 그래서 아래에서 **원문을 표에 남긴다**(payment_webhook_events). 짐작이 틀렸는지는 그 표를 보면 안다.
  */
-async function readBody(req: Request): Promise<unknown> {
-  const text = await req.text().catch(() => '')
+function parseBody(text: string): unknown {
   if (!text) return {}
   try {
     return JSON.parse(text)
@@ -53,33 +53,87 @@ async function readBody(req: Request): Promise<unknown> {
   }
 }
 
+/** 본문 원문 상한 — 통지 본문은 몇백 바이트다. 공개 엔드포인트라 상한 없이 받으면 표가 쓰레기통이 된다. */
+const RAW_MAX = 8 * 1024
+
+/**
+ * 받은 통지를 **원문 그대로** 남긴다(2026-09-14). 처리 결과(outcome)와 사유(note)까지.
+ *
+ * 왜 로그가 아니라 표인가 — 함수 로그는 며칠이면 사라진다(8월 테스트 결제의 로그가 이미 없어서 "그때 웹훅이
+ * 왔는지" 조차 되짚을 수 없었다). 못 읽은 통지도 버리지 않고 남겨야 파싱을 실제 모양에 맞출 수 있다.
+ *
+ * 📌 대사(reconcile)와 무관하다 — 대사 크론을 붙일 때 이 표는 손댈 게 없다(마이그레이션 머리말 참고).
+ * ⚠️ 판정에 쓰지 않는다. 결제 상태의 정본은 여전히 PG 재조회(resettle)다.
+ * ⚠️ 기록 실패가 통지 처리를 막으면 안 된다 — 표가 없거나 막혀도 결제는 돌아야 하므로 삼킨다.
+ */
+async function recordEvent(
+  admin: ReturnType<typeof adminClient>,
+  ev: { req: Request; raw: string; orderId?: string; paymentKey?: string; outcome: string; note?: string },
+): Promise<void> {
+  try {
+    await admin.from('payment_webhook_events').insert({
+      provider: 'eximbay',
+      order_id: ev.orderId ?? null,
+      payment_key: ev.paymentKey ?? null,
+      content_type: ev.req.headers.get('content-type'),
+      raw: ev.raw.slice(0, RAW_MAX),
+      outcome: ev.outcome,
+      note: ev.note ?? null,
+    })
+  } catch {
+    /* 기록은 곁다리다 — 실패해도 통지 처리는 계속한다 */
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const admin = adminClient()
+  // 본문은 시크릿 검사보다 **먼저** 읽는다 — 시크릿이 안 맞는 통지도 남겨야 "PG 가 다른 주소로 보내고 있다"
+  // 같은 설정 사고를 알 수 있다(403 만 돌려주면 우리 쪽엔 아무 흔적이 없다).
+  const raw = (await req.text().catch(() => '')).trim()
+  let ids: { orderId?: string; paymentKey?: string } = {}
   try {
     const secret = (Deno.env.get('PAYMENTS_WEBHOOK_SECRET') ?? '').trim()
     const given = new URL(req.url).searchParams.get('k') ?? ''
-    if (!secret || given !== secret) return json({ error: 'forbidden' }, 403)
+    if (!secret || given !== secret) {
+      await recordEvent(admin, { req, raw, outcome: 'forbidden' })
+      return json({ error: 'forbidden' }, 403)
+    }
 
-    const body = await readBody(req)
-    const { orderId, paymentKey } = pickIds(body)
+    const body = parseBody(raw)
+    ids = pickIds(body)
+    const { orderId, paymentKey } = ids
     if (!orderId && !paymentKey) {
-      // 우리가 못 읽는 이벤트 — 재시도를 받아봐야 똑같으니 200 으로 닫는다.
+      // 우리가 못 읽는 이벤트 — 재시도를 받아봐야 똑같으니 200 으로 닫는다. **원문은 남는다** — 파싱을 고칠 근거.
+      await recordEvent(admin, { req, raw, outcome: 'no_identifier' })
       return json({ ok: true, skipped: 'no_identifier' })
     }
 
-    const admin = adminClient()
     const q = admin.from('payments').select(PAYMENT_COLS)
     const { data } = orderId
       ? await q.eq('order_id', orderId).maybeSingle()
       : await q.eq('payment_key', paymentKey as string).maybeSingle()
     const row = data as PaymentRow | null
     // 우리 원장에 없는 주문(다른 상점/테스트 트래픽) — 재시도 대상이 아니다.
-    if (!row) return json({ ok: true, skipped: 'unknown_order' })
+    if (!row) {
+      await recordEvent(admin, { req, raw, ...ids, outcome: 'unknown_order' })
+      return json({ ok: true, skipped: 'unknown_order' })
+    }
 
     // 상태 판단은 본문이 아니라 PG 재조회로 한다. 같은 통지가 두 번 와도 결과가 같다(멱등).
     // ⚠️ 옛 주문(삭제된 PG)은 물어볼 어댑터가 없다 — 재시도해도 영영 같으니 200 으로 닫는다.
-    if (!hasProvider(row.provider)) return json({ ok: true, skipped: 'retired_provider', provider: row.provider })
+    if (!hasProvider(row.provider)) {
+      await recordEvent(admin, { req, raw, ...ids, outcome: 'retired_provider', note: row.provider })
+      return json({ ok: true, skipped: 'retired_provider', provider: row.provider })
+    }
     const out = await resettle(admin, row)
+    await recordEvent(admin, {
+      req,
+      raw,
+      ...ids,
+      outcome: 'settled',
+      note: `${out.status}${out.fulfilled ? ' · 지급됨' : ''}${out.note ? ` · ${out.note}` : ''}`,
+    })
     return json({ ok: true, ...out })
   } catch (e) {
     const msg = e instanceof Error ? e.message : '오류'
@@ -88,6 +142,7 @@ Deno.serve(async (req) => {
     //    이런 건 200 으로 닫고 사유만 남긴다(대사가 어차피 그 결제를 미완결로 집어낸다).
     //    일시적 장애(네트워크·PG 5xx)만 500 을 줘서 재시도를 받는다.
     const permanent = /중복 결제|duplicate key|23505|알 수 없는 결제대행사/i.test(msg)
+    await recordEvent(admin, { req, raw, ...ids, outcome: permanent ? 'permanent_error' : 'error', note: msg })
     if (permanent) return json({ ok: true, skipped: 'permanent_error', reason: msg })
     return json({ error: msg }, 500)
   }

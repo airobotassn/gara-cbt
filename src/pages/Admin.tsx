@@ -312,7 +312,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
   switch (`${top}/${tab}${sub ? `/${sub}` : ''}`) {
     // ── 회원관리 ──
     case 'members/users': return <MembersAdmin />
-    case 'members/payments': return <PaymentsAdmin />
+    case 'members/payments': return <PaymentsAdmin isRoot={isRoot} />
     // ── WORLD ARENA ──
     // ⚠️ key={bank} — 같은 컴포넌트가 같은 자리에 서므로 키가 없으면 게임 ↔ DAILY 를 오갈 때 인스턴스가 재사용돼
     //    서브탭·'방금 올린 문항' 필터(T-### 번호)가 다른 은행 목록에 그대로 남는다.
@@ -3596,14 +3596,13 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
     }
   }
 
-  async function doVoid(reason: string, settlePayment: 'refunded' | 'keep') {
+  async function doVoid(reason: string) {
     if (!voidDraft) return
     try {
       const res = await callFunction<{ ok: boolean; paymentNote?: string | null }>('admin', {
         action: 'examTicketVoid',
         id: voidDraft.ticketId,
         reason,
-        settlePayment,
       })
       setVoidDraft(null)
       if (res?.paymentNote) alert(res.paymentNote)
@@ -3927,16 +3926,16 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
   )
 }
 
-// 응시권 회수 모달 — 사유 + **연결 결제를 어떻게 할지**를 반드시 같이 고르게 한다.
-// 결제를 paid 로 두면 payments 의 부분 유니크가 계속 걸려 그 사용자는 같은 회차·급수를 영구히 다시 못 산다.
+// 응시권 회수 모달 — 사유만 받는다. 결제는 여기서 손대지 않는다(2026-09-14).
+//   그전엔 "연결 결제를 환불 완료로 표시" 라디오가 있었다 — PG 관리자에서 환불하고 와서 status 만 바꾸는 물건.
+//   이제 환불은 유저관리 › 결제관리에서 우리 서버가 PG 를 불러 실행하고, 환불되면 응시권은 자동 회수된다.
+//   결제가 paid 로 남으면 그 사용자는 같은 회차·급수를 다시 못 산다는 사실은 그대로라 안내 문구로만 남긴다.
 function VoidTicketModal({ row, onClose, onSubmit }: {
   row: TicketRow
   onClose: () => void
-  onSubmit: (reason: string, settlePayment: 'refunded' | 'keep') => void
+  onSubmit: (reason: string) => void
 }) {
   const [reason, setReason] = useState('')
-  const [settle, setSettle] = useState<'refunded' | 'keep'>('keep')
-  const paid = row.paymentStatus === 'paid'
   return (
     <div className="admin-modal-bg">
     {/* ⚠️ 바깥을 눌러도 닫지 않는다 — 입력하던 내용이 통째로 날아간다(닫기는 ✕·취소 버튼으로). */}
@@ -3955,26 +3954,16 @@ function VoidTicketModal({ row, onClose, onSubmit }: {
               onChange={(e) => setReason(e.target.value)} />
           </label>
           {row.paymentId && (
-            <div style={fieldStyle}>
-              <span>연결 결제 처리 <em style={{ color: 'var(--muted)' }}>(주문 {row.paymentOrderId ?? '-'} · 현재 {row.paymentStatus ?? '-'})</em></span>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, lineHeight: 1.6, color: 'inherit' }}>
-                <input type="radio" name="settle" checked={settle === 'keep'} onChange={() => setSettle('keep')} />
-                <span>결제는 그대로 둔다 — 이 사용자는 같은 회차·급수를 <b>다시 결제할 수 없습니다</b>. 재응시가 필요하면 수기 발급으로 주세요.</span>
-              </label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, lineHeight: 1.6, color: 'inherit' }}>
-                <input type="radio" name="settle" checked={settle === 'refunded'} onChange={() => setSettle('refunded')} disabled={!paid} />
-                <span>
-                  환불 완료로 표시한다 — 결제를 <code>refunded</code> 로 바꿔 <b>재구매를 열어줍니다</b>.
-                  {' '}<b>실제 환불은 여기서 일어나지 않습니다</b>(PG 관리자에서 먼저 처리하세요).
-                  {!paid && <><br /><span style={{ color: 'var(--muted)' }}>이 결제는 paid 상태가 아니라 선택할 수 없습니다.</span></>}
-                </span>
-              </label>
-            </div>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--muted)' }}>
+              연결 결제(주문 {row.paymentOrderId ?? '-'} · 현재 {row.paymentStatus ?? '-'})는 여기서 손대지 않습니다.
+              결제가 <code>paid</code> 로 남으면 이 사용자는 같은 회차·급수를 <b>다시 결제할 수 없습니다</b> —
+              돈을 돌려줄 건이면 <b>유저관리 › 결제관리</b>에서 환불하세요(환불되면 응시권은 자동 회수되고 재구매가 열립니다).
+            </p>
           )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
           <button className="admin-mini" onClick={onClose}>취소</button>
-          <button className="btn-ink" disabled={!reason.trim()} onClick={() => onSubmit(reason.trim(), settle)}>회수</button>
+          <button className="btn-ink" disabled={!reason.trim()} onClick={() => onSubmit(reason.trim())}>회수</button>
         </div>
       </div>
     </div>

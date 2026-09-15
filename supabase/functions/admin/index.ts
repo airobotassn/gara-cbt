@@ -10,6 +10,7 @@ import { refreshRates } from '../_shared/fx.ts'
 import { EXAM_ROUND_COLS, TIER_LABEL, attemptPassed, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { isExamMonth, monthOfExamDate, scheduleForMonth } from '../_shared/exam-schedule.ts'
 import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
+import { refundPayment, refundPreview } from '../_shared/refunds.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
 
@@ -1501,17 +1502,15 @@ async function examTicketGrant(admin: any, body: any, actorEmail: string, isRoot
 /**
  * 회수(void) — 오등록·본인확인 실패·부정 응시. **루트 전용**(위 규칙 ③).
  *
- * ⚠️ 연결 결제를 어떻게 할지 반드시 같이 정하게 한다. 결제를 paid 로 그냥 두면
- *    payments_paid_product_uniq 가 계속 걸려 사용자는 같은 회차·급수를 **영구히 다시 살 수 없다**
- *    (화면 문구는 '이미 결제가 완료된 상품입니다' 라 상황과 정반대로 읽힌다).
- * ⚠️ 여기서 실제 환불이 일어나지는 않는다 — 토스 취소 API 는 의도적으로 안 붙였다.
- *    'refunded' 는 "PG 에서 환불을 끝냈으니 원장을 맞춘다" 는 뜻이다.
+ * ⚠️ 결제는 건드리지 않는다. 결제가 paid 로 남으면 payments_paid_product_uniq 가 계속 걸려 사용자는 같은
+ *    회차·급수를 **다시 살 수 없다** — 돈을 돌려줄 건이면 **결제관리에서 환불**하면 된다(2026-09-14 부터 우리
+ *    서버가 PG 환불 API 를 부르고, 환불되면 응시권은 자동 회수된다). 그전엔 여기 "환불 완료로 표시" 라디오가 있어
+ *    PG 관리자에서 환불한 뒤 손으로 status 만 바꿨는데, 그 길은 곁다리 교재를 안 걷었고 금액 기록도 없었다 — 뺐다.
  */
 async function examTicketVoid(admin: any, body: any, actorEmail: string, isRoot: boolean) {
   if (!isRoot) return json({ error: '루트 관리자만 응시권을 회수할 수 있습니다.' }, 403)
   const id = String(body?.id ?? '').trim()
   const reason = String(body?.reason ?? '').trim()
-  const settle = body?.settlePayment === 'refunded' ? 'refunded' : 'keep'
   if (!id) return json({ error: 'id 필요' }, 400)
   if (!reason) return json({ error: '회수 사유를 적어주세요(분쟁 때 추적할 게 이것뿐입니다).' }, 400)
 
@@ -1524,22 +1523,34 @@ async function examTicketVoid(admin: any, body: any, actorEmail: string, isRoot:
   const { voided } = await voidTicket(admin, id, `${reason} · 처리자 ${actorEmail}`)
   if (!voided) return json({ error: '회수할 수 없는 상태입니다(이미 회수됐거나 만료 처리됨).' }, 409)
 
-  const now = new Date().toISOString()
-  let paymentNote: string | null = null
-  if (t.payment_id) {
-    if (settle === 'refunded') {
-      const { error: pe } = await admin.from('payments')
-        .update({ status: 'refunded', updated_at: now })
-        .eq('id', t.payment_id)
-        .eq('status', 'paid')
-      paymentNote = pe
-        ? `결제 원장 갱신 실패: ${pe.message}`
-        : '연결 결제를 환불(refunded)로 표시했습니다. 실제 환불은 PG 관리자에서 별도로 처리하세요. 이 사용자는 같은 회차·급수를 다시 결제할 수 있습니다.'
-    } else {
-      paymentNote = '연결 결제는 손대지 않았습니다. 결제가 paid 로 남아 있으면 이 사용자는 같은 회차·급수를 다시 결제할 수 없으니, 응시가 필요하면 수기 발급으로 다시 주세요.'
-    }
-  }
+  const paymentNote = t.payment_id
+    ? '연결 결제는 손대지 않았습니다. 돈을 돌려줄 건이면 유저관리 › 결제관리에서 환불하세요(환불되면 재구매가 열립니다). 응시만 다시 주려면 수기 발급으로 주세요.'
+    : null
   return json({ ok: true, paymentNote })
+}
+
+// ---------- 환불 (루트 전용) ----------
+// 우리 서버가 PG 환불 API 를 부른다 — 돈이 실제로 나간다. 금액은 화면이 치지 않고 서버가 원장에서 만든다
+// (관리자는 "어느 줄을 돌려줄지" 만 고른다). 규칙·잠금·원장·회수는 전부 _shared/refunds.ts 에 있다.
+async function paymentRefundPreview(admin: any, body: any, isRoot: boolean) {
+  if (!isRoot) return json({ error: '루트 관리자만 환불할 수 있습니다.' }, 403)
+  const paymentId = String(body?.paymentId ?? '').trim()
+  if (!paymentId) return json({ error: 'paymentId 필요' }, 400)
+  const out = await refundPreview(admin, paymentId)
+  if ('error' in out) return json({ error: out.error }, out.status)
+  return json(out)
+}
+
+async function paymentRefund(admin: any, body: any, actorId: string | null, isRoot: boolean) {
+  if (!isRoot) return json({ error: '루트 관리자만 환불할 수 있습니다.' }, 403)
+  const paymentId = String(body?.paymentId ?? '').trim()
+  if (!paymentId) return json({ error: 'paymentId 필요' }, 400)
+  const lines = body?.lines === 'all'
+    ? 'all' as const
+    : Array.isArray(body?.lines) ? (body.lines as unknown[]).map((v) => String(v ?? '').trim()).filter(Boolean) : []
+  const out = await refundPayment(admin, { paymentId, lines, reason: String(body?.reason ?? ''), actorId })
+  if (!out.ok) return json({ error: out.error }, out.status)
+  return json(out)
 }
 
 // ---------- 응시 중단 조회 · 복구 ----------
@@ -1678,7 +1689,7 @@ async function paymentList(admin: any, body: any) {
   const userId = String(body?.userId ?? '').trim()
 
   let sel = admin.from('payments').select(
-    'id, user_id, order_id, order_name, product_type, product_ref, amount, status, method, confirmed_at, fulfilled_at, fail_code, fail_message, addon_ebook_id, created_at',
+    'id, user_id, order_id, order_name, product_type, product_ref, amount, status, method, confirmed_at, fulfilled_at, fail_code, fail_message, addon_ebook_id, created_at, charge_amount, charge_currency, refunded_amount, payment_key',
     { count: 'exact' },
   )
   if (userId) sel = sel.eq('user_id', userId)
@@ -1810,6 +1821,12 @@ async function paymentList(admin: any, body: any) {
       failMessage: p.fail_message ?? null,
       createdAt: p.created_at,
       reads: readsOf[p.id] ?? [],
+      // 환불 판단·실행용 — 실제 청구값(통화·금액)과 지금까지 돌려준 합계. 정가(amount)와 단위가 다르다.
+      chargeAmount: p.charge_amount != null ? Number(p.charge_amount) : null,
+      chargeCurrency: p.charge_currency ?? null,
+      refundedAmount: Number(p.refunded_amount ?? 0),
+      // PG 거래번호가 없으면(옛 행·승인 전) 환불 API 를 부를 수 없다 — 화면이 버튼을 잠근다.
+      refundable: p.status === 'paid' && !!p.payment_key && Number(p.refunded_amount ?? 0) < Number(p.charge_amount ?? p.amount ?? 0),
     })),
     total: count ?? rows.length,
     stats30d: stats,
@@ -3509,6 +3526,9 @@ Deno.serve(async (req) => {
       case 'examInterruption': return await examInterruption(admin, body)
       case 'examReinstate': return await examReinstate(admin, body, email)
       case 'paymentList': return await paymentList(admin, body)
+      // 환불은 돈이 나가는 액션 — 발급·회수와 같이 루트 전용.
+      case 'paymentRefundPreview': return await paymentRefundPreview(admin, body, isRoot)
+      case 'paymentRefund': return await paymentRefund(admin, body, user?.id ?? null, isRoot)
       case 'examListForAdmin': return await examListForAdmin(admin)
       case 'bankListForAdmin': return await bankListForAdmin(admin)
       case 'examDraw': return await examDraw(admin, body, email)

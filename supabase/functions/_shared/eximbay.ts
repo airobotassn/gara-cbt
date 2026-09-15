@@ -17,7 +17,7 @@
 //
 // ⚠️ 통화: 이 어댑터는 넘겨받은 amount·currency 를 그대로 PG 규격으로 보낼 뿐이다.
 //    "달러 정가 → 원화 환산" 은 여기가 아니라 **결제 레이어(create)** 소관이다.
-import type { PaymentProvider, ProviderPayment, ProviderResult } from './payment-provider.ts'
+import type { PaymentProvider, ProviderPayment, ProviderRefundResult, ProviderResult } from './payment-provider.ts'
 
 // 환경별 호스트. 테스트/실서버가 **URL 로** 갈린다(키 접두사가 아니다).
 const HOSTS = {
@@ -72,6 +72,15 @@ interface EximbayPayment {
   auth_code?: string
   transaction_date?: string // YYYYMMDDHHMMSS
   status?: string // SALE | AUTH | REGISTERED | NONE
+  /** 환불 가능 잔액(승인액 − 환불액). ⚠️ 환불은 status 로 안 드러나고 **이 값만** 준다. */
+  balance?: string
+  [k: string]: unknown
+}
+interface EximbayRefund {
+  refund_amount?: string
+  refund_id?: string
+  refund_date?: string // YYYYMMDDHHMMSS
+  refund_transaction_id?: string
   [k: string]: unknown
 }
 interface EximbayResponse {
@@ -80,7 +89,15 @@ interface EximbayResponse {
   mid?: string
   fgkey?: string
   payment?: EximbayPayment
+  refund?: EximbayRefund
   [k: string]: unknown
+}
+
+/** 엑심베이 금액 문자열 → 숫자. 비었거나 숫자가 아니면 null(모르는 값을 0 으로 접지 않는다). */
+function numOf(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 }
 
 async function call(path: string, body: unknown): Promise<{ http: number; data: EximbayResponse | null }> {
@@ -178,6 +195,8 @@ function normalize(p: EximbayPayment): ProviderPayment {
     isVirtualAccount: p.status === 'REGISTERED',
     // YYYYMMDDHHMMSS → ISO 로 대충 변환(정확한 tz 는 실검증 때). 없으면 null.
     approvedAt: p.transaction_date ? isoFromEximbayDate(p.transaction_date) : null,
+    // 환불 가능 잔액 — 대시보드에서 직접 환불한 건을 알아채는 유일한 단서(settle 이 청구액과 비교한다).
+    refundableBalance: numOf(p.balance),
     raw: p,
   }
 }
@@ -334,6 +353,55 @@ export const eximbayProvider: PaymentProvider = {
       orderId,
       opts && { currency: opts.currency, amount: eximbayAmount(opts.currency, opts.amount) },
     ),
+
+  /**
+   * 환불 — `POST /v1/payments/{transaction_id}/cancel` (문서 확인 2026-09-14).
+   *
+   * 엑심베이는 환불을 **결제와 별개의 거래**로 만든다. 원 결제는 계속 SALE 이고 `payment.balance`(환불 가능 잔액)만
+   * 줄어든다 — 토스처럼 "취소됨" 상태로 바뀌지 않는다. 그래서 환불 사실을 확실히 아는 길은 우리가 직접 이 API 를
+   * 부르는 것뿐이고, 응답의 refund_transaction_id·refund_date 를 그 자리에서 원장에 적는다.
+   *
+   * ⚠️ 규격이 원 청구액(`payment.amount`)과 환불 **전** 잔액(`payment.balance`)을 둘 다 요구한다 — 호출부가 저장된
+   *    원장에서 만든 값을 그대로 넘긴다. 금액 문자열은 준비·조회와 같은 함수(eximbayAmount)로 만든다.
+   * ⚠️ `refund_id` 는 우리가 만든 고유값이고 PG 가 중복을 거절한다 — 두 번 눌러도 두 번 안 나간다.
+   * ⚠️ 가상계좌 환불은 환불계좌(`refund_account`)가 따로 필요해서 여기선 안 다룬다 — 응시료는 카드만 받고,
+   *    그 밖의 VA 환불은 PG 관리자에서 한다(안 붙인 것이지 못 붙이는 게 아니다).
+   */
+  refund: async (a) => {
+    const type = a.amount >= a.balance ? 'F' : 'P'
+    const { http, data } = await call(`/v1/payments/${encodeURIComponent(a.providerKey)}/cancel`, {
+      mid: mid(a.currency),
+      refund: {
+        refund_type: type,
+        refund_amount: eximbayAmount(a.currency, a.amount),
+        refund_id: a.refundKey,
+        reason: a.reason.slice(0, 200),
+      },
+      payment: {
+        order_id: a.orderId,
+        currency: a.currency,
+        amount: eximbayAmount(a.currency, a.original),
+        balance: eximbayAmount(a.currency, a.balance),
+        lang: 'EN',
+      },
+    })
+    if (data?.rescode !== '0000') {
+      const e = errResult(http, data ?? { rescode: 'REFUND_FAILED', resmsg: '환불 요청에 실패했습니다.' })
+      return e as ProviderRefundResult
+    }
+    const r = data.refund ?? {}
+    return {
+      ok: true,
+      data: {
+        providerRef: r.refund_transaction_id ?? null,
+        // PG 가 확정한 금액을 믿는다. 없으면 우리가 보낸 값(규격상 오지만 방어).
+        amount: numOf(r.refund_amount) ?? a.amount,
+        balance: numOf(data.payment?.balance),
+        refundedAt: r.refund_date ? isoFromEximbayDate(r.refund_date) : null,
+        raw: data,
+      },
+    }
+  },
 }
 
 /** 조회 — order_id 또는 transaction_id 로. status=NONE/Q004 이면 **주문 부재(absent)** 로 접어 resettle 규격에 맞춘다. */

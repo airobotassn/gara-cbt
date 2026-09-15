@@ -461,6 +461,69 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   rec('강의 가격 음수 거부', negPrice, true);
 }
 
+// --- (14b) 환불 원장(2026-08-21 작성 · 2026-09-15 적용) — 건별 기록 + 결제 행 합계 ---
+//   ⚠️ 원래 20260821140000 이었는데 같은 번호의 다른 파일에 밀려 프로덕션에 적용된 적이 없었다(표가 없었다).
+{
+  const rawRefund = readFileSync('supabase/migrations/20260915200000_payment_refunds.sql', 'utf8');
+  // actor_id 는 `references auth.users(id) on delete set null` — 공용 strip 은 cascade 만 떼므로 꼬리를 따로 뗀다.
+  await db.exec(strip(rawRefund).replace(/\s+on delete set null/g, ''));
+
+  const pid = (await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
+     values ($1,'rf-1','환불 대상','ebook',$2,300,'paid','k') returning id`, [U1, crypto.randomUUID()])).rows[0].id;
+  const zero = (await db.query(`select refunded_amount::float as r from payments where id=$1`, [pid])).rows[0];
+  rec('결제 행의 환불 합계 기본값 0', zero.r, 0);
+
+  // 멱등키(refund_key)가 유니크 — 같은 키로 두 줄이면 합계가 틀어진다.
+  await db.query(`insert into payment_refunds (payment_id, refund_key, amount, currency, reason) values ($1,'rf-key-1',1000,'KRW','테스트')`, [pid]);
+  let dupKey = false;
+  try { await db.query(`insert into payment_refunds (payment_id, refund_key, amount, currency, reason) values ($1,'rf-key-1',1000,'KRW','또')`, [pid]); }
+  catch (e) { dupKey = /unique|23505|duplicate/i.test(String(e?.message ?? '')); }
+  rec('환불키 중복 거부(멱등)', dupKey, true);
+
+  // 0원·음수 환불은 원장에 못 들어온다.
+  let zeroAmt = false;
+  try { await db.query(`insert into payment_refunds (payment_id, refund_key, amount, currency, reason) values ($1,'rf-key-2',0,'KRW','0원')`, [pid]); }
+  catch { zeroAmt = true; }
+  rec('0원 환불 거부', zeroAmt, true);
+
+  // 환불 줄이 있는 결제는 지울 수 없다(on delete restrict) — 원장은 결제보다 오래 산다.
+  let restricted = false;
+  try { await db.query(`delete from payments where id=$1`, [pid]); } catch { restricted = true; }
+  rec('환불 이력 있는 결제 삭제 거부', restricted, true);
+
+  const rrls = (await db.query(`select relrowsecurity from pg_class where relname='payment_refunds'`)).rows[0];
+  rec('payment_refunds RLS 켜짐', rrls?.relrowsecurity, true);
+  const rpol = (await db.query(`select count(*)::int as n from pg_policies where tablename='payment_refunds'`)).rows[0];
+  rec('payment_refunds 정책 0개', rpol.n, 0);
+}
+
+// --- (15) 웹훅 수신 원장(2026-09-14) — PG 통지 본문을 원문 그대로 남기는 표 ---
+{
+  const rawHook = readFileSync('supabase/migrations/20260915210000_payment_webhook_events.sql', 'utf8');
+  await db.exec(strip(rawHook));
+
+  // 못 읽은 통지도 남는다 — 식별자 없이(order_id null) outcome 만으로.
+  await db.query(
+    `insert into payment_webhook_events (raw, outcome, content_type) values ($1, 'no_identifier', 'application/x-www-form-urlencoded')`,
+    ['foo=bar&baz=1'],
+  );
+  const ev = (await db.query(`select order_id, raw, outcome from payment_webhook_events`)).rows[0];
+  rec('웹훅 원문이 식별자 없이도 남는다', ev?.raw, 'foo=bar&baz=1');
+  rec('처리 결과(outcome)가 남는다', ev?.outcome, 'no_identifier');
+
+  // 원문·결과는 필수 — 비면 표가 "무엇이 왔나" 에 답할 수 없다.
+  let noRaw = false;
+  try { await db.query(`insert into payment_webhook_events (outcome) values ('settled')`); } catch { noRaw = true; }
+  rec('원문 없는 행 거부', noRaw, true);
+
+  // RLS 켜고 정책 0개 — 결제 계열 표의 관례(엣지 함수 전용).
+  const hrls = (await db.query(`select relrowsecurity from pg_class where relname='payment_webhook_events'`)).rows[0];
+  rec('payment_webhook_events RLS 켜짐', hrls?.relrowsecurity, true);
+  const hpol = (await db.query(`select count(*)::int as n from pg_policies where tablename='payment_webhook_events'`)).rows[0];
+  rec('payment_webhook_events 정책 0개', hpol.n, 0);
+}
+
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);
 const failed = results.filter((x) => !x.pass).length;
 console.log(`\nT-PAYMENTS: ${results.length - failed}/${results.length} passed`);

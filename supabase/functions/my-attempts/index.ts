@@ -6,7 +6,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient, getUser, pickLang, projText } from '../_shared/lib.ts'
-import { makeCertNo, subjectOf, gradeOfTitle } from '../_shared/cert.ts'
+import { makeCertNo, subjectOf, gradeOfTitle, certExpiresAt, certExpired } from '../_shared/cert.ts'
 import { attemptPassed, examWindowOpen, resolveCertFee, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 
 // submit-exam 의 ATTEMPT_TTL_MINUTES 와 동일 기준 — 이 시간이 지나도록 미제출이면 만료
@@ -133,6 +133,22 @@ Deno.serve(async (req) => {
       const passed = released && attemptPassed(a.total_correct, a.total_questions, a.pass_ratio_snapshot) === true
       if (!passed) return json({ error: '인증서는 결과 공개 후 합격한 응시만 발급할 수 있습니다.' }, 409)
 
+      // 시험명(급수) — 유효기간 산정과(아래) 최초 발급의 자격번호 등급 판정에 쓴다.
+      let title: string | null = null
+      if (a.exam_id) {
+        const { data: ex } = await admin.from('exams').select('title').eq('id', a.exam_id).maybeSingle()
+        title = (ex as { title?: string } | null)?.title ?? null
+      }
+
+      // ⛔ **유효기간이 지난 자격증은 발급도 재발급도 안 된다(2026-09-14 지시).** 기준은 취득일(제출일)이라
+      //    재발급이 기간을 늘리지 못한다. 첫 발급도 막는다 — 만료된 자격을 새로 찍어줄 이유가 없다.
+      //    ⚠️ 프론트(MyPage·Certificate)가 이 문자열로 만료 안내를 가른다 — cert_fee_required 와 같은 기계 코드 관례.
+      //    ⚠️ payments/create(발급비 결제)도 같은 판정을 먼저 돌린다 — 안 그러면 돈 받고 발급만 거절한다.
+      const expiresAt = certExpiresAt(title, a.submitted_at as string | null)
+      if (expiresAt != null && now >= new Date(expiresAt).getTime()) {
+        return json({ error: 'cert_expired', expiresAt }, 410)
+      }
+
       // 결제·응시권 생존 재확인 — start-exam 은 응시 시작 때 강제하지만, 그 뒤 환불(차지백)·관리자
       // 회수(void)는 시간상 더 뒤라 발급 시점에 다시 본다. 자격번호는 한번 나가면 회수 불가라 여기서 막는다.
       // ⚠️ 같은 판정을 payments/create(발급비 결제)도 쓴다 — 판정이 갈리면 "결제는 됐는데 발급만 거절"이 생긴다.
@@ -196,13 +212,8 @@ Deno.serve(async (req) => {
         if (reErr) return json({ error: reErr.message }, 400)
         issued = { verifyToken: certRow.verify_token as string, certNo: certRow.cert_no as string, nameRoman }
       } else {
-        // 최초 발급 — 위 검증(소유·합격·생존·이름)을 전부 통과한 뒤에만 채번한다.
-        // 시험명으로 트랙 추정 → 자격번호. 연도는 취득(제출) 연도.
-        let title: string | null = null
-        if (a.exam_id) {
-          const { data: ex } = await admin.from('exams').select('title').eq('id', a.exam_id).maybeSingle()
-          title = (ex as { title?: string } | null)?.title ?? null
-        }
+        // 최초 발급 — 위 검증(소유·합격·만료·생존·이름)을 전부 통과한 뒤에만 채번한다.
+        // 시험명(위에서 읽은 title)으로 트랙 추정 → 자격번호. 연도는 취득(제출) 연도.
         const year = a.submitted_at ? new Date(a.submitted_at).getFullYear() : new Date().getFullYear()
         const grade = gradeOfTitle(title)
         // 일련번호는 DB 가 채번한다(종목·등급·연도별 원자 증가). 여기서 만들어내면 중복이 나간다.
@@ -362,6 +373,11 @@ Deno.serve(async (req) => {
         certNo: passed ? cert?.cert_no ?? null : null,
         verifyToken: passed ? cert?.verify_token ?? null : null,
         certNameRoman: passed ? cert?.name_roman ?? null : null,
+        // 자격증 만료 시각(취득일 기준 · null = 무기한)과 지금 만료됐는지. 화면이 '만료' 를 표시하고 발급
+        // 버튼을 잠그는 근거 — 판정의 정본은 {issue} 게이트이고, 이 둘은 화면이 헛되이 누르지 않게 하는 안내다.
+        // ⚠️ 만료 여부를 서버가 정해서 내려준다 — 화면이 렌더 중에 시계를 읽으면 React 순수성 검사에 걸린다.
+        certExpiresAt: passed ? certExpiresAt(r.exam_id ? titleMap[r.exam_id] ?? null : null, r.submitted_at) : null,
+        certExpired: passed ? certExpired(r.exam_id ? titleMap[r.exam_id] ?? null : null, r.submitted_at, now) : false,
       }
     })
 

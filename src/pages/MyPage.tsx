@@ -746,6 +746,9 @@ export default function MyPage() {
   }
 
   async function goCert(a: MyAttempt) {
+    // 만료된 자격은 발급도 재발급도 없다(서버가 취득일 기준으로 판정해 내려준다). 서버가 어차피 거절하지만,
+    // 여기서 막아야 아래 catch 가 "발급 기록 실패" 로 흡수해 증서 화면을 열어버리는 길이 안 생긴다.
+    if (a.certExpired) return
     let verifyToken = a.verifyToken ?? undefined
     let certNo = a.certNo ?? certNoOf(a)
     // 아직 발급(유료) 전이면 인증서 대신 결제 유도 화면으로 — 발급은 그 화면의 결제 CTA 에서 한다.
@@ -762,8 +765,13 @@ export default function MyPage() {
         nameRoman = r.issued.nameRoman ?? nameRoman
       }
       setList((prev) => prev?.map((x) => (x.attemptId === a.attemptId ? { ...x, certIssuedAt: new Date().toISOString(), certNo: r.issued?.certNo ?? x.certNo, verifyToken: r.issued?.verifyToken ?? x.verifyToken } : x)) ?? prev)
-    } catch {
-      /* 발급 기록 실패 — 증서 화면은 열어준다(다음 방문 때 상태 재동기화) */
+    } catch (e) {
+      // 서버가 '만료' 로 거절한 건 열어주지 않는다(목록이 낡아 위 사전검사를 지나친 경우). 목록도 만료로 맞춘다.
+      if (/cert_expired/.test(e instanceof Error ? e.message : '')) {
+        setList((prev) => prev?.map((x) => (x.attemptId === a.attemptId ? { ...x, certExpired: true } : x)) ?? prev)
+        return
+      }
+      /* 그 밖의 발급 기록 실패 — 증서 화면은 열어준다(다음 방문 때 상태 재동기화) */
     }
     navigate('/certificate', {
       state: {
@@ -1021,6 +1029,8 @@ export default function MyPage() {
                 {earned.map((a) => {
                   const certNo = a.certNo ?? certNoOf(a)
                   const issued = !!a.certIssuedAt
+                  // 유효기간이 지난 자격 — 발급·재발급 버튼을 잠근다(서버도 거절한다). 이미 받은 파일·번호는 그대로다.
+                  const expired = !!a.certExpired
                   return (
                     <article key={a.attemptId} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ambient-shadow ambient-shadow-hover transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                       <div className="flex items-start gap-5 flex-1">
@@ -1033,11 +1043,18 @@ export default function MyPage() {
                         </div>
                       </div>
                       <div className="shrink-0 flex flex-wrap items-center gap-3">
-                        <span className={`px-3 py-1 font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border ${issued ? 'bg-secondary/10 text-secondary border-secondary/20' : 'bg-outline/10 text-outline border-outline/20'}`}>{issued ? 'Issued' : 'Ready'}</span>
-                        <button onClick={() => goCert(a)} className="px-6 py-2.5 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow flex items-center gap-2">
-                          {issued ? t('mypage.reissue') : t('mypage.issue')}
-                          <span className="material-symbols-outlined text-[18px]">download</span>
-                        </button>
+                        <span className={`px-3 py-1 font-label-sm text-[11px] leading-[14px] uppercase tracking-wider font-bold rounded-full border ${expired ? 'bg-error/10 text-error border-error/20' : issued ? 'bg-secondary/10 text-secondary border-secondary/20' : 'bg-outline/10 text-outline border-outline/20'}`}>{expired ? 'Expired' : issued ? 'Issued' : 'Ready'}</span>
+                        {expired ? (
+                          <span className="px-6 py-2.5 bg-surface-container text-on-surface-variant font-label-md text-[15px] font-bold rounded-xl border border-outline-variant/40 flex items-center gap-2 cursor-not-allowed" title={t('mypage.cert_expired_hint')}>
+                            {t('mypage.cert_expired')}
+                            <span className="material-symbols-outlined text-[18px]">lock</span>
+                          </span>
+                        ) : (
+                          <button onClick={() => goCert(a)} className="px-6 py-2.5 bg-primary-container text-on-primary font-label-md text-[15px] font-bold rounded-xl hover:bg-primary transition-colors ambient-shadow flex items-center gap-2">
+                            {issued ? t('mypage.reissue') : t('mypage.issue')}
+                            <span className="material-symbols-outlined text-[18px]">download</span>
+                          </button>
+                        )}
                       </div>
                     </article>
                   )

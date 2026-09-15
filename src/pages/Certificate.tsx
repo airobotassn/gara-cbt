@@ -287,7 +287,13 @@ export default function Certificate() {
         navigate(`/checkout?type=cert&ref=${id}`)
         return
       }
-      setIssueErr(/name_roman/.test(msg) ? t('cert.roman_invalid') : msg || t('cert.issue_failed'))
+      setIssueErr(
+        /cert_expired/.test(msg)
+          ? t('cert.expired') // 유효기간이 지난 자격 — 서버가 발급·재발급을 거절한다(취득일 기준)
+          : /name_roman/.test(msg)
+            ? t('cert.roman_invalid')
+            : msg || t('cert.issue_failed'),
+      )
       setConfirming(false) // 확인창을 닫아야 카드 안의 에러 문구가 보인다
     } finally {
       setIssuing(false)

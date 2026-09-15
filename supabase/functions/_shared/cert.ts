@@ -47,6 +47,29 @@ export function expiryMonths(grade: GradeCode): number | null {
   return EXPIRY_MONTHS[grade]
 }
 
+/**
+ * 자격증 만료 시각 — **취득일(시험 제출일)** 에 급수별 개월을 더한 값. null = 무기한.
+ *
+ * ⛔ 기준일은 취득일 하나다(2026-09-14 지시). 그전엔 QR 진위확인만 **최초 발급일** 을 써서, 시험 보고
+ *    한 달 뒤 발급한 사람은 종이에 찍힌 만료일과 QR 이 말하는 만료일이 한 달 달랐다. 종이·QR·발급 게이트
+ *    셋이 전부 이 함수를 쓴다 — 프론트 src/lib/certNo.ts 의 certExpiryDate 와 같은 규칙이어야 한다.
+ * ⚠️ 재발급은 만료를 늘리지 않는다 — 발급 시각이 아니라 취득일이 기준이라 자연히 그렇다.
+ */
+export function certExpiresAt(title: string | null | undefined, acquiredAt: string | null | undefined): string | null {
+  const months = expiryMonths(gradeOfTitle(title))
+  if (months == null || !acquiredAt) return null
+  const d = new Date(acquiredAt)
+  if (Number.isNaN(d.getTime())) return null
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString()
+}
+
+/** 만료됐나. 무기한(null)은 늘 false. 발급 게이트(my-attempts · payments)가 같은 판정을 쓴다. */
+export function certExpired(title: string | null | undefined, acquiredAt: string | null | undefined, now: number = Date.now()): boolean {
+  const at = certExpiresAt(title, acquiredAt)
+  return at != null && now >= new Date(at).getTime()
+}
+
 // ── 레벨테스트(무료) 인증서 진위확인 토큰 ─────────────────────────────────
 // ⚠️ **임시 방식이다(2026-08-28).** CBT 는 발급 시점에 난수를 뽑아 exam_attempts.verify_token 에
 //    저장하지만, 레벨테스트 인증서에는 '발급' 이라는 사건이 없다(레벨을 깨는 순간부터 유효) —

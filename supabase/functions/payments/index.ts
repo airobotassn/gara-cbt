@@ -36,6 +36,7 @@ import {
   type ProductType,
 } from '../_shared/payments.ts'
 import { attemptPassed, findLiveTickets, grantExamTicket, ticketSourceAlive } from '../_shared/exam-tickets.ts'
+import { certExpired } from '../_shared/cert.ts'
 
 const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert', 'bundle', 'lecture']
 
@@ -112,7 +113,7 @@ Deno.serve(async (req) => {
       // exam 인데 exam 페이로드가 없으면 사전검사가 통째로 건너뛰어진다 — 조용히 통과시키지 않는다.
       if (productType === 'exam' && !product.exam) return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
 
-      const [pendingVaRes, ownedRes, mineRes, liveTickets, doneRes, hasBookRes, attRes] = await Promise.all([
+      const [pendingVaRes, ownedRes, mineRes, liveTickets, hasBookRes, attRes] = await Promise.all([
         // ⛔ 살아있는 가상계좌 주문이 있으면 새 결제를 막는다.
         //    VA 는 계좌만 발급되고 며칠 뒤 입금되는 구조라 그동안 status='waiting_deposit' 로 떠 있다.
         //    이 상태는 'paid' 가 아니라 payments_paid_product_uniq 에도 안 걸리고 지급도 안 된 상태라,
@@ -147,22 +148,14 @@ Deno.serve(async (req) => {
                 .in(col, product.bundle.lines.map((l) => l.itemId))
             })()
           : Promise.resolve({ data: null }),
-        // 응시료 — 이미 응시권을 보유 중인가.
+        // 응시료 — 이미 응시권을 보유 중인가(issued·consumed = 살아있는 것).
         // ⚠️ 접수기간·회차 published·급수 개설·응시료 존재는 resolveProduct(→ resolveExamOffer)가 이미 봤다.
+        // ⚠️ "이미 응시를 마쳤나"(exam_attempts submitted/voided) 검사는 2026-09-14 에 뺐다 — 응시를 마쳤으면
+        //    응시권이 consumed 로 살아 있어 이 검사가 먼저 막고, 회수(void)된 뒤라면 시험기간이라 접수가
+        //    이미 닫혀 resolveExamOffer 에서 끝난다. 접수·시험 기간이 겹치지 않는 한 닿지 않는 검사였다.
         productType === 'exam' && product.exam
           ? findLiveTickets(admin, uid, { roundId: product.exam.roundId, tier: product.exam.tier })
           : Promise.resolve([]),
-        // 이미 응시를 마친 시험은 다시 팔지 않는다(1인 1회). 관리자 재응시 예외는 응시권을 따로 발급받는다.
-        productType === 'exam' && product.exam
-          ? admin
-              .from('exam_attempts')
-              .select('id')
-              .eq('user_id', uid)
-              .eq('exam_id', product.exam.id)
-              .in('status', ['submitted', 'voided'])
-              .limit(1)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
         // 함께 담은 교재를 이미 갖고 있으면 결제를 막는다(위 묶음과 같은 이유).
         productType === 'exam' && product.addon
           ? admin.from('ebook_purchases').select('id').eq('user_id', uid).eq('ebook_id', product.addon.id).maybeSingle()
@@ -172,7 +165,7 @@ Deno.serve(async (req) => {
         productType === 'cert'
           ? admin
               .from('exam_attempts')
-              .select('user_id, ticket_id, status, result_release_at, total_correct, total_questions, pass_ratio_snapshot, exam_certificates(cert_no)')
+              .select('user_id, ticket_id, status, result_release_at, submitted_at, total_correct, total_questions, pass_ratio_snapshot, exam_certificates(cert_no)')
               .eq('id', product.ref)
               .maybeSingle()
           : Promise.resolve({ data: null }),
@@ -202,7 +195,6 @@ Deno.serve(async (req) => {
         if (liveTickets.length > 0) {
           return json({ error: '이미 이 시험의 응시권을 보유하고 있습니다.', owned: true }, 409)
         }
-        if (doneRes.data) return json({ error: '이미 응시를 완료한 시험입니다.', owned: true }, 409)
         if (product.addon && hasBookRes.data) {
           return json({ error: '이미 보유한 교재입니다.', ownedAddon: true }, 409)
         }
@@ -216,6 +208,7 @@ Deno.serve(async (req) => {
           ticket_id: string | null
           status: string
           result_release_at: string | null
+          submitted_at: string | null
           total_correct: number | null
           total_questions: number | null
           pass_ratio_snapshot: number | null
@@ -236,6 +229,11 @@ Deno.serve(async (req) => {
         //    직접 계산하면 둘이 갈려서 "결제는 됐는데 발급만 거절"이 생긴다.
         const passed = released && attemptPassed(att.total_correct, att.total_questions, att.pass_ratio_snapshot) === true
         if (!passed) return json({ error: '합격한 응시만 자격증을 발급할 수 있습니다.' }, 400)
+        // ⛔ 유효기간(취득일 + 급수별 개월)이 지난 자격은 발급비를 받지 않는다 — my-attempts {issue} 가
+        //    같은 판정으로 발급을 거절하므로, 여기서 안 막으면 돈만 받고 발급이 안 되는 건이 된다.
+        if (certExpired(product.cert?.examTitle, att.submitted_at)) {
+          return json({ error: '유효기간이 지난 자격증은 발급할 수 없습니다.', code: 'cert_expired' }, 410)
+        }
         // ⚠️ my-attempts 의 발급 게이트와 **같은 판정**을 결제 전에 미리 돌린다. 여기서 안 보면
         //    환불·회수된 응시로 발급비를 받아놓고 발급 단계에서 거절하는 구간이 생긴다(= 환불거리).
         const alive = await ticketSourceAlive(admin, (att.ticket_id as string | null) ?? null)

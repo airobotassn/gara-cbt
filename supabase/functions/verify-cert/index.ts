@@ -5,7 +5,7 @@
 //   ⚠️ _shared 사용 → CLI 로만 배포할 것.
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { adminClient } from '../_shared/lib.ts'
-import { gradeOfTitle, expiryMonths, maskName, parseLevelCertToken, levelCertNo } from '../_shared/cert.ts'
+import { certExpiresAt, maskName, parseLevelCertToken, levelCertNo } from '../_shared/cert.ts'
 import { MAX_LEVEL, promoteCut } from '../_shared/scoring.ts'
 
 // ── 레벨테스트(무료) 인증서 판정 ───────────────────────────────────────────
@@ -73,15 +73,17 @@ Deno.serve(async (req) => {
     // 자격증은 2026-09-04 부터 별 표다(exam_certificates) — 줄이 있으면 곧 발급된 것이다.
     //   ⚠️ 옛 구조에선 응시 기록의 verify_token 으로 찾고 cert_issued_at 이 비었는지 한 번 더 봤다.
     //      지금은 발급되지 않은 응시에는 줄 자체가 없어서 그 검사가 필요 없다.
-    //   ⛔ 만료 계산은 **first_issued_at** 을 쓴다 — 재발급으로 유효기간이 연장되면 안 된다.
+    //   ⛔ 만료 계산은 **취득일(시험 제출일)** 기준이다(2026-09-14) — 자격증 종이에 찍히는 만료일과 같은 기준.
+    //      그전엔 first_issued_at 을 써서 시험 뒤 늦게 발급한 사람은 종이와 QR 의 만료일이 달랐다.
+    //      재발급이 유효기간을 늘리지 않는 건 그대로다(발급 시각을 안 보니까).
     const { data: c } = await admin
       .from('exam_certificates')
-      .select('cert_no, first_issued_at, exam_attempts(id, user_id, exam_id)')
+      .select('cert_no, first_issued_at, exam_attempts(id, user_id, exam_id, submitted_at)')
       .eq('verify_token', token)
       .maybeSingle()
     const embA = (c as { exam_attempts?: unknown } | null)?.exam_attempts
     const a = (Array.isArray(embA) ? embA[0] : embA) as
-      | { id: string; user_id: string; exam_id: string | null }
+      | { id: string; user_id: string; exam_id: string | null; submitted_at: string | null }
       | null
       | undefined
 
@@ -95,15 +97,9 @@ Deno.serve(async (req) => {
       title = (ex as { title?: string } | null)?.title ?? null
     }
 
-    const grade = gradeOfTitle(title)
-    const months = expiryMonths(grade)
     const issuedAt = c.first_issued_at as string
-    let expiresAt: string | null = null
-    if (months != null) {
-      const d = new Date(issuedAt)
-      d.setMonth(d.getMonth() + months)
-      expiresAt = d.toISOString()
-    }
+    // 옛 응시(submitted_at 없음)는 최초 발급일로 접는다 — 무기한으로 풀리는 것보다 낫다.
+    const expiresAt = certExpiresAt(title, a.submitted_at ?? issuedAt)
     const expired = expiresAt != null && Date.now() > new Date(expiresAt).getTime()
 
     // 소지자 이름(마스킹) — auth 메타데이터에서

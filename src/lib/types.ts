@@ -117,6 +117,8 @@ export interface MyAttempt {
   certNo?: string | null // 발급 시 확정된 자격번호(미발급이면 null → 프론트 임시 계산)
   verifyToken?: string | null // QR 진위확인 토큰(발급 후에만)
   certNameRoman?: string | null // 인증서에 각인된 영문 성명(발급 신청 때 입력한 값)
+  certExpiresAt?: string | null // 자격증 만료 시각(취득일 + 급수별 개월). null=무기한
+  certExpired?: boolean // 서버가 판정한 만료 여부 — true 면 발급·재발급 버튼을 잠근다(서버 {issue} 도 거절)
 }
 
 // my-attempts 응답 — 목록 + (issue 요청 시) 방금 발급된 인증서 토큰·번호

@@ -6,7 +6,7 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, productLabel, readSummary, type EbookReadRow } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
-import { krw } from '../lib/money'
+import { krw, usdc } from '../lib/money'
 import { countryName, flagUrl } from '../lib/regions'
 // 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
 import { loadRegions } from '../lib/regionCatalog'
@@ -76,11 +76,144 @@ interface PaymentRow {
   status: string; method: string | null; fulfilledAt: string | null; createdAt: string
   // 이 결제로 나간 이북들의 열람 여부. 이북이 안 붙은 결제(응시료 단독 등)는 빈 배열이다.
   reads?: EbookReadRow[]
+  // 실제 청구값(통화·금액)과 돌려준 합계. 정가(amount, 달러 센트)와 단위가 다르다 — 환불은 이 단위로 한다.
+  chargeAmount?: number | null; chargeCurrency?: string | null; refundedAmount?: number
+  // 서버가 판정한 "지금 환불 버튼을 열어도 되나"(paid + PG 거래번호 있음 + 잔액 남음).
+  refundable?: boolean
 }
 interface PaymentListResp {
   payments: PaymentRow[]; total: number
   stats30d: { paidN: number; paidAmount: number; refundN: number; refundAmount: number }
   queues: { unfulfilled: number; revoked: number }
+}
+
+/** 청구 통화로 금액 표기 — 원이면 ₩, 아니면 $. 환불 화면은 정가(달러 센트)가 아니라 **실제 빠진 돈**을 말해야 한다. */
+function chargeText(currency: string | null | undefined, amount: number | null | undefined): string {
+  if (amount == null) return '-'
+  return (currency ?? 'USD').toUpperCase() === 'KRW' ? krw(amount) : usdc(Math.round(amount * 100))
+}
+
+// ── 환불 창 ─────────────────────────────────────────────────────
+// 관리자는 "어느 줄을 돌려줄지" 와 사유만 고른다. 금액은 서버가 원장에서 배분한 값이고 여기서 치지 않는다.
+// 돈이 실제로 나가는 버튼이라 한 번 더 누르게 한다(브라우저 confirm 은 쓰지 않는다 — 자동화·테스트가 막힌다).
+interface RefundLine { key: string; name: string; listCents: number; amount: number; refunded: boolean }
+interface RefundPreview {
+  paymentId: string; orderId: string; orderName: string; status: string
+  currency: string; chargeAmount: number; refundedAmount: number; balance: number
+  lines: RefundLine[]
+  history: { id: string; amount: number; currency: string; reason: string; lines: unknown; providerRef: string | null; createdAt: string; actorId: string | null }[]
+}
+interface RefundResult { ok: true; refundId: string; amount: number; currency: string; balance: number; status: string; providerRef: string | null; notes: string[] }
+
+function RefundModal({ row, onClose, onDone }: { row: PaymentRow; onClose: () => void; onDone: () => void }) {
+  const [pv, setPv] = useState<RefundPreview | null>(null)
+  const [err, setErr] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [reason, setReason] = useState('')
+  const [arming, setArming] = useState(false) // 한 번 눌러 확인 단계, 두 번째 눌러 실행
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<RefundResult | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    callFunction<RefundPreview>('admin', { action: 'paymentRefundPreview', paymentId: row.id })
+      .then((p) => { if (!alive) return; setPv(p); setPicked(new Set(p.lines.filter((l) => !l.refunded).map((l) => l.key))) })
+      .catch((e) => { if (alive) setErr(e instanceof Error ? e.message : '불러오지 못했습니다.') })
+    return () => { alive = false }
+  }, [row.id])
+
+  const pickable = pv?.lines.filter((l) => !l.refunded) ?? []
+  const all = pickable.length > 0 && pickable.every((l) => picked.has(l.key))
+  // 남은 줄을 전부 고르면 서버가 잔액 그대로 돌려준다(반올림 찌꺼기 포함). 화면 합계도 그 규칙을 따른다.
+  const sum = pv ? (all ? pv.balance : pickable.filter((l) => picked.has(l.key)).reduce((s, l) => s + l.amount, 0)) : 0
+  const can = !!pv && picked.size > 0 && reason.trim().length > 0 && !busy && !done
+
+  async function run() {
+    if (!pv || !can) return
+    if (!arming) { setArming(true); return }
+    setBusy(true); setErr('')
+    try {
+      const r = await callFunction<RefundResult>('admin', {
+        action: 'paymentRefund',
+        paymentId: pv.paymentId,
+        lines: all ? 'all' : [...picked],
+        reason: reason.trim(),
+      })
+      setDone(r)
+      onDone()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '환불에 실패했습니다.')
+      setArming(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="admin-modal-bg">
+      {/* 바깥을 눌러도 닫지 않는다 — 돈이 오가는 창이다. 닫기는 ✕·닫기 버튼으로만. */}
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2>환불</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 14, margin: '6px 0 14px', lineHeight: 1.6 }}>
+          {row.name ?? '(이름 없음)'} · {row.email ?? '-'}<br />
+          {row.orderName} · 주문 {row.orderId}
+        </p>
+        <ErrBox msg={err} />
+        {!pv && !err && <div style={{ color: 'var(--muted)' }}>불러오는 중…</div>}
+        {pv && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 14, lineHeight: 1.7 }}>
+              청구 <b>{chargeText(pv.currency, pv.chargeAmount)}</b>
+              {pv.refundedAmount > 0 && <> · 이미 환불 {chargeText(pv.currency, pv.refundedAmount)}</>}
+              {' '}· 남은 환불 가능액 <b>{chargeText(pv.currency, pv.balance)}</b>
+            </div>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>돌려줄 항목</div>
+              {pv.lines.map((l) => (
+                <label key={l.key} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, lineHeight: 1.8, opacity: l.refunded ? 0.5 : 1 }}>
+                  <input type="checkbox" disabled={l.refunded || !!done || pickable.length === 1}
+                    checked={l.refunded ? true : picked.has(l.key)}
+                    onChange={(e) => setPicked((s) => { const n = new Set(s); if (e.target.checked) n.add(l.key); else n.delete(l.key); return n })} />
+                  <span style={{ flex: 1 }}>{l.name}{l.refunded && <span style={{ color: 'var(--muted)' }}> · 환불됨</span>}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{chargeText(pv.currency, l.amount)}</span>
+                </label>
+              ))}
+              <div style={{ textAlign: 'right', marginTop: 6, fontSize: 15 }}>이번 환불 <b>{chargeText(pv.currency, sum)}</b></div>
+            </div>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14 }}>
+              사유 <em style={{ color: 'var(--error, #d43a3a)' }}>(필수 — 원장과 PG 양쪽에 남습니다)</em>
+              <input type="text" value={reason} disabled={!!done} placeholder="예: 1:1 문의 #123 · 응시 전 취소 요청"
+                onChange={(e) => { setReason(e.target.value); setArming(false) }}
+                style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg)', color: 'inherit' }} />
+            </label>
+            {pv.history.length > 0 && (
+              <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7 }}>
+                <div>환불 이력</div>
+                {pv.history.map((h) => (
+                  <div key={h.id}>{fmtDT(h.createdAt)} · {chargeText(h.currency, h.amount)} · {h.reason}{h.providerRef ? ` · PG ${h.providerRef}` : ''}</div>
+                ))}
+              </div>
+            )}
+            {done && (
+              <div style={{ fontSize: 14, lineHeight: 1.7, padding: '10px 12px', borderRadius: 8, background: 'rgba(42,166,160,0.08)' }}>
+                ✅ {chargeText(done.currency, done.amount)} 환불됨 · 남은 잔액 {chargeText(done.currency, done.balance)} · 결제 상태 {payStatusLabel(done.status)}
+                {done.notes.map((n, i) => <div key={i}>· {n}</div>)}
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+          <button className="admin-mini" onClick={onClose}>{done ? '닫기' : '취소'}</button>
+          {!done && (
+            <button className="btn-ink" disabled={!can} onClick={run}>
+              {busy ? '환불 중…' : arming ? `정말 ${chargeText(pv?.currency, sum)} 돌려줍니다 — 한 번 더` : '환불 실행'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 /** 열람 칸 — 결제 목록(여기)과 회원 상세 '결제·구매' 탭이 같이 쓴다.
  *  ⚠️ 여러 권이면 제목·시각을 칸에 펼치지 않고 마우스 올림(title)으로 넘긴다 — 표 줄이 무너진다.
@@ -106,11 +239,12 @@ export function ReadCell({ reads }: { reads?: EbookReadRow[] }) {
   )
 }
 
-export function PaymentsAdmin() {
+export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
   const [status, setStatus] = useState('')
   const [productType, setProductType] = useState('')
   const [queue, setQueue] = useState('')
   const [q, setQ] = useState('')
+  const [refundRow, setRefundRow] = useState<PaymentRow | null>(null)
   const { data, loading, err, reload } = useAdminData<PaymentListResp>('paymentList', { status, productType, queue, limit: 300 })
 
   const rows = (data?.payments ?? []).filter((p) => {
@@ -161,7 +295,7 @@ export function PaymentsAdmin() {
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
-            <tr><th>일시</th><th>구매자</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>수단</th><th>상태</th><th>열람</th></tr>
+            <tr><th>일시</th><th>구매자</th><th>상품</th><th style={{ textAlign: 'right' }}>정가</th><th style={{ textAlign: 'right' }}>청구</th><th>수단</th><th>상태</th><th>열람</th><th></th></tr>
           </thead>
           <tbody>
             {rows.map((p) => (
@@ -169,27 +303,41 @@ export function PaymentsAdmin() {
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.createdAt)}</td>
                 <td><div className="admin-user"><b>{p.name || '-'}</b><span>{p.email || p.orderId}</span></div></td>
                 <td>{p.orderName}<span style={{ color: 'var(--muted)' }}> · {productLabel(p.productType)}</span></td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{krw(p.amount)}</td>
+                {/* 정가는 달러 센트다(2026-08-13 전환). krw() 로 찍으면 100배·통화가 다 틀린다. */}
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: 'var(--muted)' }}>{usdc(p.amount)}</td>
+                {/* 실제로 빠진 돈 — 환불은 이 값 기준이다. 부분 환불이 있으면 그 밑에 적는다. */}
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                  {chargeText(p.chargeCurrency, p.chargeAmount)}
+                  {(p.refundedAmount ?? 0) > 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>환불 {chargeText(p.chargeCurrency, p.refundedAmount)}</div>
+                  )}
+                </td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{p.method || '-'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <span className="badge">{payStatusLabel(p.status)}</span>
                   {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
+                  {p.status === 'paid' && (p.refundedAmount ?? 0) > 0 && <span style={{ color: 'var(--muted)' }}> · 부분환불</span>}
                 </td>
                 {/* 열람 여부 — 환불 문의가 왔을 때 제일 먼저 보는 칸이다. 읽은 건은 눈에 띄어야 한다. */}
                 <ReadCell reads={p.reads} />
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {/* 환불은 루트 전용(서버도 막는다). 돈이 나가는 버튼이라 일반 관리자에겐 아예 안 보인다. */}
+                  {isRoot && p.refundable && <button className="admin-mini" onClick={() => setRefundRow(p)}>환불</button>}
+                </td>
               </tr>
             ))}
             {!rows.length && !loading && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>결제 내역이 없습니다.</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>결제 내역이 없습니다.</td></tr>
             )}
           </tbody>
         </table>
       </div>
       <p className="admin-hint" style={{ marginTop: 10, lineHeight: 1.7 }}>
-        ⚠️ 환불을 <b>실행</b>하는 버튼은 두지 않습니다 — 돈을 되돌리는 건 토스 대시보드에서 하고, 우리 쪽은 환불 웹훅을
-        받아 아직 안 쓴 이북·응시권만 자동 회수합니다. <b>미지급</b>은 승인은 됐는데 물건이 안 나간 건으로, 대사(reconcile)가
-        같은 목록을 봅니다.
+        환불은 여기서 실행합니다(루트 전용) — 우리 서버가 엑심베이 환불 API 를 부르고, 원장에 기록한 뒤 돌려준 항목의
+        열람권·시청권·미사용 응시권을 자동 회수합니다. 응시를 이미 시작한 응시권은 자동 회수하지 않습니다.
+        <b>미지급</b>은 승인은 됐는데 물건이 안 나간 건으로, 대사(reconcile)가 같은 목록을 봅니다.
       </p>
+      {refundRow && <RefundModal row={refundRow} onClose={() => setRefundRow(null)} onDone={reload} />}
     </>
   )
 }

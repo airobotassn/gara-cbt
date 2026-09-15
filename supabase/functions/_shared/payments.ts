@@ -63,11 +63,13 @@ export interface PaymentRow {
   addon_ebook_id: string | null
   /** 그 교재의 정가(달러 센트). amount 에 이미 포함돼 있다 — 내역 표시·대사용이지 청구액이 아니다. */
   addon_amount: number | null
+  /** 지금까지 돌려준 금액 합계(청구 통화 · 주요 단위). 진실은 payment_refunds 이고 이건 빠른 판정용 합계다. */
+  refunded_amount: number | null
 }
 
 /** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다. */
 export const PAYMENT_COLS =
-  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount'
+  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
 
 /**
  * **PG 에 말할 때 쓰는 금액·통화.** 승인 대조·조회·환불이 전부 이 값을 기준으로 해야 한다.
@@ -78,6 +80,12 @@ export function chargeOf(row: PaymentRow): { currency: string; amount: number } 
   return row.charge_amount != null && row.charge_currency
     ? { currency: row.charge_currency, amount: Number(row.charge_amount) }
     : { currency: row.currency, amount: row.amount }
+}
+
+/** 청구 통화의 최소단위로 반올림 — 원·엔은 정수, 나머지는 소수 둘째 자리(fx.ts·eximbay.ts 와 같은 규칙). */
+export function roundMinor(currency: string, n: number): number {
+  const c = currency.toUpperCase()
+  return c === 'KRW' || c === 'JPY' ? Math.round(n) : Math.round(n * 100) / 100
 }
 
 /** 토스가 모르는 주문을 만료로 접기까지 기다리는 시간(분).
@@ -97,6 +105,8 @@ export interface ResolvedProduct {
   exam?: { id: string; roundId: string; tier: string }
   /** 함께 담은 교재(응시료 전용). id 는 DB 에서 읽은 값이라 그대로 저장해도 된다. */
   addon?: { id: string; title: string; amount: number }
+  /** cert 전용 — 시험명(급수). create 사전검사가 자격증 유효기간(급수별 개월)을 판정하는 데 쓴다. */
+  cert?: { examTitle: string | null }
   /** 묶음(bundle) 전용 — payment_items 에 그대로 넣을 줄 목록. list=정가, amount=할인 반영 배분액.
    *  ⚠️ `kind` 가 줄의 상품 종류다(교재 묶음 / 강의 묶음). 한 묶음에 두 종류가 섞이지 않는다. */
   // ⚠️ discounted 는 2026-09-04 에 뺐다 — 묶음 할인 제거(74d7dd2) 때 지역변수만 지우고 이 자리에
@@ -223,6 +233,7 @@ export async function resolveProduct(
       amount: fee.amount,
       orderName: certName,
       ref: productRef, // attemptId(UUID) — 정규화 대상 아님
+      cert: { examTitle: (ex.title as string | null) ?? null },
       items: [{ name: certName, amount: fee.amount }],
     }
   }
@@ -440,7 +451,11 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
     return
   }
 
-  // 묶음 — 줄 목록을 읽어 한 권씩 준다. 줄 하나가 막히면 던져서 대사(미지급)에 남긴다.
+  // 묶음 — 줄 목록을 읽어 한 줄씩 준다(교재 묶음이면 열람권, 강의 묶음이면 시청권). 줄 하나가 막히면
+  // 던져서 대사(미지급)에 남긴다.
+  //   ⛔ 2026-09-14 까지 여기가 **이북 줄만** 받았다 — 강의 판매(8/25)를 붙일 때 주문 생성·줄 저장은 강의를
+  //      받게 고쳤는데 지급은 안 고쳐서, 강의 2편 이상 묶음은 승인이 나고 돈이 빠진 뒤 여기서 던졌다
+  //      (paid + 미지급). 줄의 종류는 PURCHASE_TABLE 이 아는 것이면 전부 받는다.
   if (row.product_type === 'bundle') {
     const { data, error } = await admin
       .from('payment_items')
@@ -451,8 +466,9 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
     // ⛔ 줄이 하나도 없으면 '지급 완료'로 접지 말 것 — 돈만 받은 건이 정상으로 보인다.
     if (lines.length === 0) throw new Error('묶음 주문의 줄 목록이 비어 있습니다 — 지급할 대상을 알 수 없습니다.')
     for (const line of lines) {
-      if (line.product_type !== 'ebook') throw new Error(`묶음에 담을 수 없는 상품입니다: ${line.product_type}`)
-      await grantEbookLine(admin, row, line.product_ref, line.amount, '묶음으로 산 교재')
+      const kind = line.product_type as BundleKind
+      if (!PURCHASE_TABLE[kind]) throw new Error(`묶음에 담을 수 없는 상품입니다: ${line.product_type}`)
+      await grantPurchaseLine(admin, row, kind, line.product_ref, line.amount, kind === 'lecture' ? '묶음으로 산 강의' : '묶음으로 산 교재')
     }
     return
   }
@@ -498,21 +514,24 @@ async function grant(admin: SupabaseClient, row: PaymentRow): Promise<void> {
  *  (payment_id 로 결제와 이어진다) — 그래야 환불 회수·대사가 경로를 하나만 알면 된다. */
 async function grantAddonEbook(admin: SupabaseClient, row: PaymentRow): Promise<void> {
   if (!row.addon_ebook_id) return
-  await grantEbookLine(admin, row, row.addon_ebook_id, row.addon_amount ?? 0, '함께 산 교재')
+  await grantPurchaseLine(admin, row, 'ebook', row.addon_ebook_id, row.addon_amount ?? 0, '함께 산 교재')
 }
 
-/** 결제 한 건에 딸린 이북 열람권 한 줄. 곁다리(응시료)와 묶음이 **같은 함수**를 쓴다 —
- *  23505 를 어떻게 다루느냐가 이 기능의 핵심이라 두 벌로 두면 한쪽만 조용히 틀린다. */
-async function grantEbookLine(
+/** 결제 한 건에 딸린 열람권(이북)·시청권(강의) 한 줄. 곁다리(응시료)와 묶음이 **같은 함수**를 쓴다 —
+ *  23505 를 어떻게 다루느냐가 이 기능의 핵심이라 두 벌로 두면 한쪽만 조용히 틀린다.
+ *  표는 종류가 고른다(PURCHASE_TABLE) — 이북·강의는 컬럼이 한 벌이라 코드도 한 벌이다. */
+async function grantPurchaseLine(
   admin: SupabaseClient,
   row: PaymentRow,
-  ebookId: string,
+  kind: BundleKind,
+  itemId: string,
   pricePaid: number,
   what: string,
 ): Promise<void> {
-  const { error } = await admin.from('ebook_purchases').insert({
+  const { table, col } = PURCHASE_TABLE[kind]
+  const { error } = await admin.from(table).insert({
     user_id: row.user_id,
-    ebook_id: ebookId,
+    [col]: itemId,
     price_paid: pricePaid,
     payment_id: row.id,
     payment_ref: row.payment_key,
@@ -520,16 +539,16 @@ async function grantEbookLine(
   if (!error) return
   if ((error as { code?: string }).code !== '23505') throw new Error(error.message)
 
-  // 23505 = 이미 그 책을 갖고 있다. 두 가지가 섞여 있어서 그냥 흡수하면 안 된다:
+  // 23505 = 이미 그것을 갖고 있다. 두 가지가 섞여 있어서 그냥 흡수하면 안 된다:
   //   · 이 결제의 재시도(웹훅·대사가 다시 부름) → 흡수가 맞다. 이미 이 결제분이 나갔다.
-  //   · **그 사이 /ebooks 에서 따로 산 책** → 같은 책을 두 번 낸 것이다. 여기서 조용히 '지급 완료'로
+  //   · **그 사이 /ebooks 에서 따로 산 것** → 같은 것을 두 번 낸 것이다. 여기서 조용히 '지급 완료'로
   //     접으면 fulfilled_at 이 찍혀 어느 목록에도 안 걸리고, 아무도 이중 청구를 모른다.
-  //     던져서 대사(미지급 목록)에 남긴다 — 응시권은 이미 나갔고, 사람이 책값만 환불하면 된다.
+  //     던져서 대사(미지급 목록)에 남긴다 — 나머지는 이미 나갔고, 사람이 그 몫만 환불하면 된다.
   const { data: mine } = await admin
-    .from('ebook_purchases')
+    .from(table)
     .select('payment_id')
     .eq('user_id', row.user_id)
-    .eq('ebook_id', ebookId)
+    .eq(col, itemId)
     .maybeSingle()
   if ((mine as { payment_id: string | null } | null)?.payment_id === row.id) return
   throw new Error(`${what}를 이미 다른 경로로 보유 중입니다 — 그 몫의 환불이 필요합니다.`)
@@ -553,7 +572,7 @@ async function grantEbookLine(
  *
  * @returns fulfilled — 회수 후에도 지급물이 남아있나(=사람 손이 더 필요한가). note — 대사·로그용 사유.
  */
-async function revokeForRefund(
+export async function revokeForRefund(
   admin: SupabaseClient,
   row: PaymentRow,
 ): Promise<{ fulfilled: boolean; note: string }> {
@@ -562,12 +581,16 @@ async function revokeForRefund(
     await admin.from('payments').update({ fulfilled_at: null, updated_at: new Date().toISOString() }).eq('id', row.id)
   }
 
-  // 묶음도 이북과 같은 경로다 — 이 결제로 나간 열람권은 전부 payment_id 가 박혀 있어 한 번에 짚인다.
-  if (row.product_type === 'ebook' || row.product_type === 'bundle') {
-    // payment_id + user_id 로 **이 결제분만** 삭제. 같은 책을 다른 경로로 또 샀어도 그건 안 건드린다.
-    await admin.from('ebook_purchases').delete().eq('payment_id', row.id).eq('user_id', row.user_id)
+  // 이북·강의·묶음은 같은 경로다 — 이 결제로 나간 열람권·시청권은 전부 payment_id 가 박혀 있어 한 번에 짚인다.
+  //   ⛔ 2026-09-14 까지 이북 표만 지웠다 — 강의 단품은 '회수 경로 없음' 으로 떨어졌고, 강의 묶음은 시청권이
+  //      그대로 남았다. 결제 id 는 두 표 중 한쪽에만 있으니 **둘 다** 지워도 남의 것은 안 건드린다(멱등).
+  if (row.product_type === 'ebook' || row.product_type === 'lecture' || row.product_type === 'bundle') {
+    // payment_id + user_id 로 **이 결제분만** 삭제. 같은 것을 다른 경로로 또 샀어도 그건 안 건드린다.
+    for (const { table } of Object.values(PURCHASE_TABLE)) {
+      await admin.from(table).delete().eq('payment_id', row.id).eq('user_id', row.user_id)
+    }
     await clearFulfilled()
-    return { fulfilled: false, note: '환불 — 이북 열람권 자동 회수' }
+    return { fulfilled: false, note: '환불 — 열람권·시청권 자동 회수' }
   }
 
   if (row.product_type === 'exam') {
@@ -628,13 +651,43 @@ export async function settleFromProvider(
   // ⚠️ 어댑터는 취소를 늘 'canceled' 로 준다(우리 DB 를 모르니까). **지급까지 갔다가 취소된 건 환불**이므로
   //    여기서만 canceled→refunded 로 업그레이드한다(어댑터는 우리 DB 의 fulfilled 를 모르니 늘 canceled 로 준다)
   //    — 취소가 아닌 상태는 fulfilled 를 안 봤고, 취소일 때만 fulfilled 로 갈렸다.
-  const next = pp.status === 'canceled' && fulfilled ? 'refunded' : pp.status
+  let next: string = pp.status === 'canceled' && fulfilled ? 'refunded' : pp.status
 
   const patch: Record<string, unknown> = {
     status: next,
     payment_key: pp.providerKey ?? row.payment_key,
     raw: pp.raw as Record<string, unknown>,
     updated_at: new Date().toISOString(),
+  }
+
+  // ⛔ **환불 안전망(2026-09-14).** 엑심베이는 환불을 '취소 상태' 로 알려주지 않는다 — 결제는 계속 paid(SALE) 이고
+  //    **환불 가능 잔액**만 줄어든다. 위 canceled→refunded 갈래는 토스 시절 것이라 엑심베이에선 한 번도 안 탄다.
+  //    그래서 PG 관리자 화면에서 직접 환불한 건은 여기서 잔액을 청구액과 비교해 알아챈다.
+  //    (우리가 API 로 환불한 건은 _shared/refunds.ts 가 그 자리에서 원장에 적으므로 여기선 차액이 0 이다.)
+  //    refund_key 를 '잔액 기준' 으로 결정적으로 만들어, 같은 재조회가 몇 번 돌아도 원장에 한 줄만 남는다.
+  if (pp.status === 'paid' && pp.refundableBalance != null) {
+    const chg = chargeOf(row)
+    const pgRefunded = roundMinor(chg.currency, chg.amount - pp.refundableBalance)
+    const known = Number(row.refunded_amount ?? 0)
+    if (pgRefunded > known + 1e-9) {
+      const { error: rfErr } = await admin.from('payment_refunds').insert({
+        payment_id: row.id,
+        refund_key: `ext:${row.id}:${pgRefunded}`,
+        amount: roundMinor(chg.currency, pgRefunded - known),
+        currency: chg.currency,
+        lines: [],
+        reason: 'PG 관리자 화면에서 환불됨 — 재조회 잔액으로 감지',
+        actor_id: null,
+        provider_ref: null,
+      })
+      // 23505 = 같은 잔액을 이미 적었다(재조회 반복). 그 밖의 오류는 합계를 안 올리고 다음 재조회에 맡긴다.
+      if (!rfErr || (rfErr as { code?: string }).code === '23505') patch.refunded_amount = pgRefunded
+      if (pp.refundableBalance <= 0) {
+        // 전액 환불 — 지급까지 갔으면 refunded(아래에서 회수), 아니면 canceled.
+        next = fulfilled ? 'refunded' : 'canceled'
+        patch.status = next
+      }
+    }
   }
   // 응답에 결제수단이 없을 때 null 로 덮어쓰면 이미 알던 값을 잃는다 — 있을 때만 쓴다.
   if (pp.method) patch.method = pp.method
@@ -797,7 +850,7 @@ export async function reconcile(
     .order('created_at', { ascending: true }) // 오래된 것부터 — limit 로 잘릴 때 최신만 남으면 옛 건이 영영 안 보인다
     .limit(limit)
   for (const r of (paidRows ?? []) as PaymentRow[]) {
-    const what = r.product_type === 'exam' ? '응시권' : '이북 열람권'
+    const what = r.product_type === 'exam' ? '응시권' : r.product_type === 'lecture' ? '강의 시청권' : '열람권·시청권'
     mismatched.push({ orderId: r.order_id, status: r.status, reason: `결제가 ${r.status}인데 ${what}이 남아있음 — 회수 필요` })
   }
 

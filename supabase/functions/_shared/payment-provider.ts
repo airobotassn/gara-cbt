@@ -33,9 +33,31 @@ export interface ProviderPayment {
   /** 가상계좌(입금 전 발급) 여부 — PG 응답 기준. 우리 DB 의 직전 상태까지 보는 건 settle 이 OR 로 더한다. */
   isVirtualAccount: boolean
   approvedAt: string | null
+  /**
+   * **환불 가능 잔액**(청구 통화 · 주요 단위). PG 가 조회 응답에 주면 채우고, 모르면 null.
+   * ⚠️ 엑심베이는 환불을 "취소 상태" 로 알려주지 않는다 — 결제는 계속 SALE 이고 이 잔액만 준다.
+   *    그래서 대시보드에서 직접 환불한 건을 알아채는 유일한 단서가 이 값이다(settle 이 청구액과 비교한다).
+   */
+  refundableBalance: number | null
   /** PG 원문 — payments.raw 에 그대로 저장(대사·분쟁용). */
   raw: unknown
 }
+
+/** 환불 결과 — PG 가 확정해 준 값만 담는다(우리가 보낸 값은 호출부가 이미 안다). */
+export interface ProviderRefund {
+  /** PG 쪽 환불 거래 식별자(엑심베이 refund_transaction_id). 대사 때 저쪽 원장과 맞춰본다. */
+  providerRef: string | null
+  /** PG 가 실제로 돌려줬다고 답한 금액(청구 통화 · 주요 단위). */
+  amount: number
+  /** 환불 뒤 남은 환불 가능 잔액. 모르면 null. */
+  balance: number | null
+  refundedAt: string | null
+  raw: unknown
+}
+
+export type ProviderRefundResult =
+  | { ok: true; data: ProviderRefund }
+  | { ok: false; error: ProviderError }
 
 export interface ProviderError {
   code: string
@@ -84,6 +106,23 @@ export interface PaymentProvider {
   queryByKey(providerKey: string, opts?: ProviderQueryOpts): Promise<ProviderResult>
   /** 주문번호로 조회(우리는 pending 인데 PG 에선 승인됐을 수 있는 경우). */
   queryByOrderId(orderId: string, opts?: ProviderQueryOpts): Promise<ProviderResult>
+  /**
+   * 환불(전액·부분). **되돌릴 수 없는 호출**이다 — 부르는 쪽(_shared/refunds.ts)이 금액·잔액·멱등키를 전부
+   * 저장된 원장에서 만들고, 여기는 PG 규격으로 옮겨 보내기만 한다.
+   *   · refundKey — 우리가 만든 고유 환불ID. PG 가 같은 키의 두 번째 요청을 거절한다(엑심베이 refund_id).
+   *   · amount — 이번에 돌려줄 금액(청구 통화 · 주요 단위). balance 이하여야 한다.
+   *   · original / balance — 원 청구액과 이번 환불 **전** 잔액. 엑심베이 규격이 둘 다 요구한다.
+   */
+  refund(args: {
+    providerKey: string
+    orderId: string
+    currency: string
+    original: number
+    balance: number
+    amount: number
+    refundKey: string
+    reason: string
+  }): Promise<ProviderRefundResult>
 }
 
 // 어댑터 등록. 새 PG 는 여기 한 줄 + 어댑터 파일 하나면 끝이다.
