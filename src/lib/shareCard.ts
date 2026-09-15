@@ -4,8 +4,8 @@
 //  · 레이아웃 레퍼런스 = 캐릭터 프로필 카드(좌 캐릭터 패널 / 중앙 흰 카드: 이름+능력치 / 우 랭킹 박스 / 하단 다크 바).
 //  · 렌더러는 **캔버스 2D 하나뿐**이다. 미리보기도 이 캔버스를 CSS 로 축소해 보여준다
 //    (DOM 미리보기 + 캔버스 출력 을 따로 만들면 둘이 반드시 어긋난다 → WYSIWYG 보장).
-//  · 업로드 아바타는 교차출처(Supabase Storage) → crossOrigin='anonymous'. 실패하면 젬으로 폴백한다
-//    (여기서 폴백 안 하면 캔버스가 오염돼 toBlob 자체가 터진다).
+//  · 캐릭터 그림은 교차출처일 수 있다(관리자가 올린 캐릭터 = Supabase Storage) → crossOrigin='anonymous'.
+//    빠뜨리면 캔버스가 오염돼 미리보기는 뜨는데 toBlob(저장·복사·공유)만 터진다 — 2026-09-15 에 실제로 겪었다.
 
 
 import { qrMatrix } from './qr'
@@ -226,7 +226,9 @@ export async function renderShareCard(canvas: HTMLCanvasElement, d: ShareCardDat
   const CH_FOOT = 862 // 발끝
   try {
     let char: HTMLImageElement
-    try { char = await loadImage(art.char) } catch { char = await loadImage(CHAR_FALLBACK_SRC) }
+    // ⚠️ 캐릭터는 교차출처일 수 있다 — 관리자가 올린 캐릭터(2026-08-31)는 Supabase Storage 에서 온다.
+    //    crossOrigin 없이 그리면 캔버스가 오염돼 미리보기는 뜨는데 저장·복사·공유(toBlob)만 터진다.
+    try { char = await loadImage(art.char, 'anonymous') } catch { char = await loadImage(CHAR_FALLBACK_SRC, 'anonymous') }
     const chH = 660
     const chW = (char.width / char.height) * chH
     // 발밑 그림자 — 없으면 캐릭터가 사진 위에 떠 보인다.
