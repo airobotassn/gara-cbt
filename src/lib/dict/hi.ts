@@ -1867,6 +1867,7 @@ const HI: Record<string, string> = {
   "hub.part.skin_lab_factory": "स्मार्ट फ़ैक्ट्री · लैब",
   "hub.part.skin_lab_atrium": "स्मार्ट फ़ैक्ट्री · एट्रियम",
   "hub.part.skin_office_city": "ऑफ़िस · सिटी लाउंज",
+  "hub.part.skin_office_gara": "ऑफ़िस · GARA मुख्यालय",
   "hub.part.skin_campus_day": "कैंपस · दिन",
   "hub.part.skin_campus_sunset": "कैंपस · सूर्यास्त",
   "hub.part.skin_campus_classroom": "कैंपस · हाई स्कूल क्लासरूम",

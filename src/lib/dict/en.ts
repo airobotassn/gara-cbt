@@ -1867,6 +1867,7 @@ const EN: Record<string, string> = {
   "hub.part.skin_lab_factory": "Smart Factory · Lab",
   "hub.part.skin_lab_atrium": "Smart Factory · Atrium",
   "hub.part.skin_office_city": "Office · City Lounge",
+  "hub.part.skin_office_gara": "Office · GARA HQ",
   "hub.part.skin_campus_day": "Campus · Day",
   "hub.part.skin_campus_sunset": "Campus · Sunset",
   "hub.part.skin_campus_classroom": "Campus · High School Classroom",

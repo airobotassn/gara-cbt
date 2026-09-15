@@ -1,4 +1,6 @@
 // 허브 캐릭터 시트(Lv.1~7 한 줄) → `public/hub/char/<키>/lv1.webp` ~ `lv7.webp`.
+//   ⚠️ 이 7장은 **업로드용 중간 산출물**이다(2026-09-15) — 화면은 `hub_char_art` 표만 보므로
+//      관리자 › WORLD ARENA › 꾸미기 관리 › 캐릭터 업로드로 올려야 나온다. 폴더는 gitignore 다.
 //
 //   node tools/build-char-art.mjs "<흰배경시트.png>" <키> ["<배경뺀시트.png>"]
 //   예: node tools/build-char-art.mjs "C:/…/남자.png" char_a_m "C:/…/남자_배경뺀.png"

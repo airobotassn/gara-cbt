@@ -1867,6 +1867,7 @@ const ZH: Record<string, string> = {
   "hub.part.skin_lab_factory": "智能工厂 · 研究室",
   "hub.part.skin_lab_atrium": "智能工厂 · 中庭",
   "hub.part.skin_office_city": "办公室 · 都市休息区",
+  "hub.part.skin_office_gara": "办公室 · GARA 总部",
   "hub.part.skin_campus_day": "校园 · 白天",
   "hub.part.skin_campus_sunset": "校园 · 晚霞",
   "hub.part.skin_campus_classroom": "校园 · 高中教室",

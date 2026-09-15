@@ -15,8 +15,9 @@
 //   2) 관리자 › WORLD ARENA › 꾸미기 관리 › **캐릭터 업로드** 에서 그 7장을 올리고 이름·가격을 정한다.
 //      → `hub_char_art` 한 행 + `shop_catalog` 한 행이 같이 생기고, 이름 5개국어는 자동 번역된다.
 //      비율은 브라우저가 올린 그림에서 재서 같이 보낸다(아래 `charAspect`).
-//   ⛔ 아래 `CHAR_SERIES`·`CHAR_AR`·파일 경로 규칙을 지우지 말 것 — **이미 있는 두 캐릭터**
-//      (`char_a_m`·`char_a_f`)는 표에 행이 없고 계속 `public/hub/char/...` 에서 그려진다.
+//   ⛔ **그림의 출처는 `hub_char_art` 표 하나다(2026-09-15).** 옛 코드 파일(`public/hub/char/<키>/lv<n>.webp`)은
+//      지웠다 — 6종 전부 표에 올라간 뒤에도 남아 있어서, 표가 도착하기 전 한 박자 동안 **옛 그림이 먼저
+//      떴다가** 올린 그림으로 바뀌는 번쩍임을 만들고 있었다. 되살리지 말 것. 표에 없는 키는 폴백 그림이다.
 //
 // 새 스킨을 넣을 때
 //   1) `public/hub/skin/<key>/` 에 그림 한 벌.
@@ -67,10 +68,9 @@ export function charSeriesOf(key: string): string {
 }
 
 /**
- * 아직 캐릭터를 안 고른 사람(또는 그림이 없는 키)에게 보여줄 그림.
- * 2026-08-14 부터 무대에 서 있던 그 캐릭터 그대로다 — 새 그림이 도착하기 전에도 화면이 비지 않는다.
- * ⚠️ 지우지 말 것. 2026-08-26 현재 그림이 있는 건 계열 a(`char_a_m`·`char_a_f`) 둘뿐이고
- *    나머지 4종은 아직 **모든 레벨이 이 그림으로 그려진다.**
+ * 아직 캐릭터를 안 고른 사람(또는 표에 없는 키)에게 보여줄 그림.
+ * 2026-08-14 부터 무대에 서 있던 그 캐릭터 그대로다 — 그림이 없어도 화면이 비지 않는다.
+ * ⚠️ 지우지 말 것 — 캐릭터를 고르기 전의 무대·남의 방·공유 카드가 이 한 장에 기댄다.
  */
 export const CHAR_FALLBACK_SRC = '/hub/char-korea-lv2-hanbok-final.webp'
 /** 폴백 그림의 실측 비율(가로/세로). */
@@ -109,12 +109,11 @@ export const CHAR_LEVELS: number[] = Array.from(
 export const clampCharLevel = (lv: number | null | undefined): number =>
   Math.max(CHAR_MIN_LEVEL, Math.min(CHAR_MAX_LEVEL, Math.round(lv ?? CHAR_MIN_LEVEL) || CHAR_MIN_LEVEL))
 
-/* ── 관리자가 올린 그림이 코드 경로를 이긴다 (2026-08-31) ──────────────────────
+/* ── 캐릭터 그림은 관리자가 올린 표에서만 나온다 (2026-08-31 · 2026-09-15 코드 경로 제거) ──
  * 캐릭터를 늘리는 데 배포가 필요 없게 하려고 `hub_char_art` 표를 하나 뒀다. 여기 있는 키는
- * 업로드된 주소로 그리고, 없는 키는 **예전 그대로** `public/hub/char/...` 에서 그린다.
+ * 업로드된 주소로 그리고, 없는 키는 폴백 그림(`CHAR_FALLBACK_SRC`)이다.
  *
- * ⛔ 아래 파일 경로 규칙을 지우지 말 것 — 지금 그림이 있는 두 캐릭터(`char_a_m`·`char_a_f`)는
- *    표에 행이 없다. 규칙을 없애면 누군가 그 둘을 다시 업로드하기 전까지 허브가 폴백 한 장으로 뜬다.
+ * ⚠️ 표가 오기 전에 그리면 폴백이 먼저 뜬다(`<CharArt>` 가 구독으로 다시 그린다).
  * ⚠️ 조회는 **한 번만** 하고 모듈에 들고 있는다 — `charArtSrc` 는 렌더 중에 불리는 동기 함수라
  *    (공유 카드처럼 훅을 못 쓰는 자리도 부른다) 여기서 await 할 수가 없다.
  * ⚠️ 도착하면 구독자에게 알린다. 안 알리면 이미 그려진 화면이 폴백 그림인 채로 남는다.
@@ -130,6 +129,7 @@ interface CharArtRow {
 let CHAR_ART: Record<string, CharArtRow> = {}
 const artSubs = new Set<() => void>()
 let artVersion = 0
+let artSettled = false
 let artLoading: Promise<void> | null = null
 
 export function subscribeCharArt(fn: () => void): () => void {
@@ -137,8 +137,11 @@ export function subscribeCharArt(fn: () => void): () => void {
   return () => { artSubs.delete(fn) }
 }
 export const charArtVersion = () => artVersion
+/** 표 조회가 끝났나(성공이든 실패든). 허브는 이게 true 가 될 때까지 화면을 안 연다 — 표가 오기 전에
+ *  그리면 폴백 그림이 먼저 떴다가 바뀐다(2026-09-15 지시). ⚠️ 실패도 '끝'이다 — 아니면 영영 갇힌다. */
+export const charArtSettled = () => artSettled
 
-/** 업로드된 캐릭터 표를 한 번 받아 둔다. 실패하면 조용히 코드 경로로 남는다(화면이 비지 않는다). */
+/** 업로드된 캐릭터 표를 한 번 받아 둔다. 실패하면 조용히 폴백 그림으로 남는다(화면이 비지 않는다). */
 export function loadCharArt(): Promise<void> {
   if (!artLoading) {
     artLoading = (async () => {
@@ -156,8 +159,10 @@ export function loadCharArt(): Promise<void> {
         }
         CHAR_ART = next
         artVersion++
-        for (const fn of artSubs) fn()
-      } catch { /* 못 받으면 코드 경로 그대로 — 화면이 비지 않는다 */ }
+      } catch { /* 못 받으면 폴백 그림 그대로 — 화면이 비지 않는다 */ }
+      // 성공·실패 모두 알린다 — 기다리는 쪽(허브 게이트)이 실패에도 풀려야 한다.
+      artSettled = true
+      for (const fn of artSubs) fn()
     })()
   }
   return artLoading
@@ -177,11 +182,11 @@ export function charArtName(key: string, lang: string): string | null {
 }
 
 /**
- * 캐릭터 그림 경로 — **한 캐릭터가 레벨마다 한 장**이다(`/hub/char/char_a_m/lv3.webp`).
- * 파일이 없으면 브라우저 onError 가 폴백으로 바꾼다(`<CharArt>` 참고) — 그림이 도착하기 전에도 화면이 선다.
+ * 캐릭터 그림 주소 — **한 캐릭터가 레벨마다 한 장**이다(`hub_char_art.urls['3']`).
+ * 표에 없는 키·레벨은 폴백 그림. 주소가 있어도 못 받으면 브라우저 onError 가 폴백으로 바꾼다(`<CharArt>` 참고).
  */
 export const charArtSrc = (key: string, level: number) =>
-  CHAR_ART[key]?.urls[String(clampCharLevel(level))] ?? `/hub/char/${key}/lv${clampCharLevel(level)}.webp`
+  CHAR_ART[key]?.urls[String(clampCharLevel(level))] ?? CHAR_FALLBACK_SRC
 
 /**
  * 무대에서 이 레벨이 기본 키의 몇 배로 설 것인가 (`hub.css` 의 `--char-scale`).
@@ -415,6 +420,16 @@ export const SKINS: SkinDef[] = [
     category: 'office',
     iconDir: '/hub/ui-office',
     bg: '/hub/bg-office-city.webp',
+  },
+  // GARA 사옥 정면 (2026-09-15 지시) — 위 `office`(모아교육그룹 건물)를 갈아끼운 게 아니라 **따로 하나 더** 넣었다.
+  //   같은 판(1672×941)·같은 오피스 UI 벌. 정문·계단이 화면 정중앙이라 폰의 가운데 26% 안에 볼 것이 있다.
+  {
+    key: 'office_gara',
+    partKey: 'skin_office_gara',
+    ui: 'office',
+    category: 'office',
+    iconDir: '/hub/ui-office',
+    bg: '/hub/bg-office-gara.webp',
   },
   // 캠퍼스 낮·노을 — 같은 광장의 두 시간대. 고궁 낮·밤과 같은 짝이다.
   {

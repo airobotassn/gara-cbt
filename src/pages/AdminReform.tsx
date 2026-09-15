@@ -2761,10 +2761,8 @@ function CharArtAdmin({ items, loading, err, reload, onSaved }: {
     const d = t(`hub.part.${key}`)
     return d === `hub.part.${key}` ? '(이름 없음)' : d
   }
-  // 올린 그림이 없으면 예전 파일 경로 — 허브가 실제로 그리는 그림과 같은 규칙이다.
-  //   ⚠️ 이게 없으면 옛 캐릭터를 골랐을 때 그림이 있는데도 미리보기가 '없음'으로 떠서, 관리자가
-  //      "그림이 사라졌다"고 오해한다.
-  const artOf = (lv: number) => urls[String(lv)] ?? (partKey ? `/hub/char/${partKey}/lv${lv}.webp` : null)
+  // 올린 그림만 본다 — 옛 코드 파일 경로(`/hub/char/…`)는 2026-09-15 에 지웠다(hubCosmetics 참고).
+  const artOf = (lv: number) => urls[String(lv)] ?? null
   // ⛔ **키는 화면에 없다**(2026-08-31 지시). 서버가 정하고(`nextCharKey`) 여기서는 숨겨 들고만 있는다 —
   //    관리자에게 `char_003` 은 아무 뜻도 없는 글자고, 한글 이름은 스토리지 경로가 못 된다(ASCII 만 받는다).
   //    새 캐릭터는 첫 업로드 때 서버가 키를 만들어 돌려주고, 그림 없이 저장하면 저장할 때 만든다.
@@ -3138,8 +3136,8 @@ function cosmeticLabel(r: CosmeticRow, charMap: Map<string, CharArtRow>, t: (k: 
 
 function cosmeticThumb(r: CosmeticRow, charMap: Map<string, CharArtRow>): string | null {
   if (r.kind === 'character') {
-    // 올린 그림이 있으면 그것, 없으면 예전 파일 경로(그것도 없으면 <CosmeticThumb> 가 빈 네모로 둔다).
-    return charMap.get(r.part_key)?.urls?.['1'] ?? `/hub/char/${r.part_key}/lv1.webp`
+    // 올린 그림이 있으면 그것, 없으면 <CosmeticThumb> 가 빈 네모로 둔다.
+    return charMap.get(r.part_key)?.urls?.['1'] ?? null
   }
   if (r.kind === 'skin') {
     const skin = SKINS.find((x) => x.partKey === r.part_key)
@@ -3178,11 +3176,11 @@ function CosmeticThumb({ kind, src }: { kind: string; src: string | null }) {
  *    7장이 전부 같은 키가 되어 '자란다'는 사실 자체가 사라진다.
  * ⚠️ 그래서 칸마다 네모를 두지 않고 **바닥 하나 위에 나란히 세운다.** 네모 안에 바닥 맞춤으로
  *    두면 위가 텅 빈 채 아래에 처박힌 것처럼 보인다(2026-08-31 지적) — 서 있을 땅이 없어서다.
- * ⚠️ 올린 그림이 없는 레벨은 예전 파일 경로로 떨어지고, 그것도 없으면 빈 자리로 남긴다 —
- *    거기에 폴백 그림을 채우면 "올린 줄 알았는데 안 올라간" 레벨을 못 알아챈다.
+ * ⚠️ 올린 그림이 없는 레벨은 빈 자리로 남긴다 — 거기에 폴백 그림을 채우면
+ *    "올린 줄 알았는데 안 올라간" 레벨을 못 알아챈다.
  */
-function CharLevelsModal({ name, urls, partKey, onClose }: {
-  name: string; urls: Record<string, string>; partKey: string; onClose: () => void
+function CharLevelsModal({ name, urls, onClose }: {
+  name: string; urls: Record<string, string>; onClose: () => void
 }) {
   return (
     <div className="admin-modal-bg" onClick={onClose}>
@@ -3200,7 +3198,9 @@ function CharLevelsModal({ name, urls, partKey, onClose }: {
                   height: 190, display: 'grid', placeItems: 'center', overflow: 'hidden',
                   background: 'var(--soft)', border: '1px solid var(--line2)', borderRadius: 10,
                 }}>
-                  <CharLevelImg src={urls[String(lv)] ?? `/hub/char/${partKey}/lv${lv}.webp`} lv={lv} />
+                  {urls[String(lv)]
+                    ? <CharLevelImg src={urls[String(lv)]} lv={lv} />
+                    : <span style={{ color: 'var(--dim)', fontSize: 12 }}>없음</span>}
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginTop: 4 }}>Lv.{lv}</div>
               </div>
@@ -3471,7 +3471,6 @@ export function HubCosmeticAdmin() {
       {skinView && <SkinViewModal partKey={skinView} name={cosmeticLabel((rows ?? []).find((r) => r.part_key === skinView) ?? { part_key: skinView, kind: 'skin' } as CosmeticRow, charMap, t)} onClose={() => setSkinView(null)} />}
       {charView && (
         <CharLevelsModal
-          partKey={charView}
           name={cosmeticLabel((rows ?? []).find((r) => r.part_key === charView) ?? { part_key: charView, kind: 'character' } as CosmeticRow, charMap, t)}
           urls={charMap.get(charView)?.urls ?? {}}
           onClose={() => setCharView(null)}

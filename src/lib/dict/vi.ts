@@ -1867,6 +1867,7 @@ const VI: Record<string, string> = {
   "hub.part.skin_lab_factory": "Nhà máy thông minh · Phòng lab",
   "hub.part.skin_lab_atrium": "Nhà máy thông minh · Sảnh tròn",
   "hub.part.skin_office_city": "Văn phòng · Sảnh thành phố",
+  "hub.part.skin_office_gara": "Văn phòng · Trụ sở GARA",
   "hub.part.skin_campus_day": "Khuôn viên · Ban ngày",
   "hub.part.skin_campus_sunset": "Khuôn viên · Hoàng hôn",
   "hub.part.skin_campus_classroom": "Khuôn viên · Lớp học cấp ba",

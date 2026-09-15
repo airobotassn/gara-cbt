@@ -1897,6 +1897,7 @@ const KO: Record<string, string> = {
   "hub.part.skin_lab_factory": "스마트팩토리 · 연구실",
   "hub.part.skin_lab_atrium": "스마트팩토리 · 아트리움",
   "hub.part.skin_office_city": "오피스 · 도심 라운지",
+  "hub.part.skin_office_gara": "오피스 · GARA 사옥",
   "hub.part.skin_campus_day": "캠퍼스 · 낮",
   "hub.part.skin_campus_sunset": "캠퍼스 · 노을",
   "hub.part.skin_campus_classroom": "캠퍼스 · 고등학교 교실",

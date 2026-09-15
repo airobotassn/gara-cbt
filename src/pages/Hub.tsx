@@ -1,7 +1,7 @@
 // 캐릭터 허브(실동작) — /demo 첫 시안 기반 단일 로비 화면.
 //   출석·상점·쿠폰·칭호는 전부 실제 백엔드 호출로 동작하며, 상세 동작은 팝업(모달)에서 처리한다.
 //   초기 재화·보유파츠·스탬프·천장·출석여부·카탈로그·쿠폰·칭호는 get-hub 로 하이드레이트(RLS 잠금 테이블이라 이 함수만 읽음).
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import '../styles/hub.css'
 import { callFunction, supabase } from '../lib/supabase'
 import { ensureCheckedIn } from '../lib/autoCheckin'
@@ -33,9 +33,16 @@ import { loadAdminMe } from '../lib/adminMe'
 import {
   CHAR_KEYS, CHAR_LEVELS, CHAR_MIN_LEVEL, uploadedCharKeys, charArtName, charScale,
   DEFAULT_SKIN_PART, SKINS, SKIN_CATEGORIES, SKIN_REGIONS, isCharKey, isSkinKey, skinByPart, skinThumb,
+  loadCharArt, subscribeCharArt, charArtSettled,
   type SkinCategory, type SkinRegion,
 } from '../lib/hubCosmetics'
 import { lastLook, saveLook } from '../lib/lastLook'
+
+// 캐릭터 그림 주소표는 **이 청크가 도착하는 순간** 받기 시작한다(2026-09-15 지시) — 로그인 확인과 같이 돈다.
+//   ⚠️ 화면이 그려진 뒤(<CharArt> 마운트)에 시작하면 표가 올 때까지 폴백 그림이 먼저 섰다가 바뀐다.
+//      옛 코드 파일(`public/hub/char/`)이 있을 땐 그 자리에 옛 그림이 떴고, 지운 지금은 한복 폴백이 뜬다.
+//      먼저 받아 두면 로그인 확인이 끝날 때쯤 이미 와 있어서 두 번째 방문부터는 체감 대기가 없다.
+void loadCharArt()
 
 // ── 아이콘: 기존 SVG 유지 ──
 const IK = '#2b2015'
@@ -395,7 +402,14 @@ export default function Hub() {
   //   ⚠️ **기다리는 동안 기본값으로 그리지 않는다**(2026-08-26 지시) — 초원 + 기본 UI + 폴백 캐릭터가
   //      0.4초 떴다가 제 모습으로 덮이는 게 눈에 띄었다. 틀린 걸 보여주느니 잠깐 비워 둔다.
   //   ⚠️ 응답이 실패해도 열어준다(아래 마운트 효과의 catch) — 안 그러면 영영 갇힌다.
-  const [hubReady, setHubReady] = useState(!!remembered)
+  //   ⛔ "적어 둔 게 있나" 가 아니라 **"배경까지 적혀 있나"** 를 본다(2026-09-15 지시). 기록을 쓰는 곳이
+  //      둘이라(허브 = 배경·캐릭터·점수, 떠 있는 FAB = 아바타·이름) FAB 이 먼저 다녀가면 배경·캐릭터가
+  //      없는 반쪽 기록이 생기는데, 그걸 '있음'으로 치면 기본 초원 + 한복 폴백을 먼저 그렸다가 덮는다 —
+  //      바로 위 지시가 막으려던 그 화면이 이 구멍으로 새고 있었다. 배경은 허브가 적을 때만 들어간다.
+  const [hubReady, setHubReady] = useState(!!remembered?.skin)
+  // 캐릭터 그림 주소표가 도착했나(성공·실패 모두). 모듈 위에서 이미 받기 시작했고, 여기서는 기다리기만 한다.
+  //   ⚠️ 이게 없으면 화면은 열렸는데 주소를 몰라 폴백이 한 박자 섰다가 바뀐다 — `hubReady` 와 같은 게이트다.
+  const artReady = useSyncExternalStore(subscribeCharArt, charArtSettled, charArtSettled)
   // ⚠️ 아바타·이름도 마지막 값으로 시작한다 — 안 그러면 HUD 가 색 젬 + 'CARI' 로 떴다가 바뀐다.
   const [avatarUrl, setAvatarUrl] = useState<string | null>(remembered?.avatar ?? null)
   const [displayName, setDisplayName] = useState<string | null>(remembered?.name ?? null)
@@ -1002,7 +1016,9 @@ export default function Hub() {
   //   ⚠️ 기본값으로 그리면 초원 + 기본 UI + 폴백 캐릭터가 0.4초 떴다가 제 모습으로 덮인다(실측).
   //      두 번째 진입부터는 적어 둔 값이 있어 이 화면을 아예 안 지나간다.
   //   ⚠️ 로그인 게이트보다 **뒤에** 있어야 한다 — 앞에 두면 게스트가 응답을 기다렸다 게이트를 본다.
-  if (!hubReady) {
+  //   ⚠️ 캐릭터 그림 주소표(`artReady`)도 같은 문이다(2026-09-15) — 청크가 뜰 때 받기 시작해서
+  //      보통은 로그인 확인 중에 이미 와 있고, 안 왔으면 여기서 조금 더 기다린다.
+  if (!hubReady || !artReady) {
     return (
       <div className="bg-background text-on-surface min-h-screen flex items-center justify-center">
         <p className="font-body-md text-body-md text-on-surface-variant">{t('common.loading')}</p>
