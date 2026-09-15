@@ -395,6 +395,33 @@ body{
 @media (min-width:405px) and (min-height:822px){.gridwrap{--gs:1.2}}
 @media (max-height:700px){.control-console .controls .btn{height:58px}.control-console .tool{width:min(54px,14.5%)}}
 @media (max-height:620px){.control-console .controls .btn{height:52px}.hint{font-size:11.5px;padding:6px 10px}}
+/* ===== 2026-09-15 재설계 — 벽 · 색별 센서 · 고정 타일 · 가동 횟수 ===== */
+/* 벽 = 못 놓는 칸. 빈 칸과 확실히 구분되게 어둡고 빗금. */
+.ci.wall{background:repeating-linear-gradient(135deg,#2b3550 0 6px,#1d2538 6px 12px);box-shadow:inset 0 0 0 2px #0d1426,inset 0 2px 0 rgba(255,255,255,.08);border-radius:7px;}
+/* 고정 타일 = 못 지우고 못 돌리는 기계. 자물쇠 배지 하나로 말한다(색을 죽이면 센서 색이 안 읽힌다). */
+.ci .lock{position:absolute;right:1px;top:1px;z-index:3;width:15px;height:15px;border-radius:50%;background:#fff3c4;box-shadow:0 1px 3px rgba(0,10,35,.6);
+  display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1;}
+/* 센서 색 점 — 출구 화살표만으로는 센서가 무슨 색을 보는지 한눈에 안 들어와서 왼쪽 위에 색 점을 박는다. */
+.ci.sensor .sdot{z-index:3;width:11px;height:11px;top:3px;left:3px;box-shadow:0 0 0 2px #fff,0 1px 3px rgba(0,0,0,.5);}
+/* 팔레트의 센서 도구도 같은 색 점을 단다(도구 셋이 같은 그림이라 점이 유일한 구분). */
+.control-console .tool .tdot{position:absolute;left:8%;top:6%;width:26%;height:24%;border-radius:50%;box-shadow:0 0 0 2px #fff,0 1px 3px rgba(0,0,0,.5);pointer-events:none;}
+/* 도구가 8개까지 는다(컨베이어 4 + 센서 최대 3 + 지우개). 한 줄에 다 보이게 폭을 개수로 나눈다. */
+.control-console .palette.n7 .tool{width:min(54px,12.5%)}
+.control-console .palette.n8 .tool{width:min(50px,11%)}
+/* 레벨 이름이 부제 자리에 온다 — 옛 부제(4글자)보다 길어서 자간을 줄인다. */
+.hud .lvlbox span{letter-spacing:.05em;text-indent:.05em;}
+/* 가동 횟수 — 점수판 아랫칸. 남은 만큼 밝다. */
+.scorepill .runs{display:flex;gap:calc(var(--hh)*.05);justify-content:center;align-items:center;height:calc(var(--hh)*.17);}
+.scorepill .runs i{display:block;width:calc(var(--hh)*.11);height:calc(var(--hh)*.11);border-radius:50%;background:rgba(155,212,255,.22);box-shadow:inset 0 0 0 1px rgba(155,212,255,.5);}
+.scorepill .runs i.on{background:#79dfff;box-shadow:0 0 6px rgba(37,185,255,.8);}
+/* 그만두기 — 승리 콘솔의 ↻ 자리. 그림에 ↻ 아이콘이 박혀 있는데 클리어 뒤엔 '다시' 가 뜻이 없어서,
+   그 판을 같은 색 판으로 덮고 글자를 쓴다(아이콘을 그대로 두면 눌러도 아무 일 없는 버튼이 된다). */
+#ovResult #btnRetry.asquit{overflow:visible;text-indent:0;display:grid;place-items:center;
+  background:#2b2e33!important;border-radius:9%/22%;box-shadow:inset 0 0 0 2px #17191c,inset 0 2px 0 rgba(255,255,255,.06);
+  color:#e8ecf3;font-size:calc(var(--rh)*.028);font-weight:900;letter-spacing:-.01em;text-shadow:0 1px 2px #000;}
+/* 결과 콘솔의 설명 줄 — 영어가 한국어보다 길어 세 줄이 되면 판을 넘친다(2026-09-15 실측). 한 급 줄여 세 줄까지 담는다. */
+#ovResult .scorebox .take{font-size:calc(var(--rh)*.0235);line-height:1.3;}
+/* 실패창 — 버튼 하나뿐인 그림이라 '처음으로' 글자를 그대로 쓴다. */
 </style>
 </head>
 <body>
@@ -410,7 +437,7 @@ body{
     <div class="hint" id="hintLine"></div>
     <!-- 튜토리얼 두 번째 진입점. 인트로는 페이지당 한 번만 뜨고 '다시 시작' 도 인트로로 안 돌아가서,
          여기가 없으면 게임에 들어간 뒤엔 튜토리얼을 영영 다시 못 본다. -->
-    <button class="tut-help" id="btnTut" type="button" aria-label="튜토리얼">?</button>
+    <button class="tut-help" id="btnTut" type="button" aria-label="튜토리얼" data-i18n-attr="aria-label:build.tut_aria">?</button>
   </div>
 
   <div class="gridwrap">
@@ -424,7 +451,7 @@ body{
     <div class="palette" id="palette"></div>
     <div class="controls">
       <button class="btn" id="btnRun">가동</button>
-      <button class="btn ghost" id="btnReset">리셋</button>
+      <button class="btn ghost" id="btnReset" data-i18n="build.reset">리셋</button>
     </div>
   </div>
 
@@ -434,16 +461,16 @@ body{
   <div class="overlay" id="ovStart">
     <div class="intro-console">
       <div class="floaty" id="startCari"><img src="/games/build-cari-intro-hero-v7.webp" alt="컨베이어 라인을 조립하는 CARI"/></div>
-      <div class="title"><span class="t1">지어라 </span><span class="t2">CARI</span></div>
-      <div class="tag">라인을 깔면 공장이 알아서 돌아가요!</div>
+      <div class="title"><span class="t1" data-i18n="build.title">지어라 </span><span class="t2">CARI</span></div>
+      <div class="tag" data-i18n="build.tagline">라인을 깔면 공장이 알아서 돌아가요!</div>
       <div class="rules">
-        <div><b>1</b><span>칸을 눌러 <b>컨베이어</b>를 놓아요</span></div>
-        <div><b>2</b><span><b>화살표 도구</b>를 골라 방향을 정해요</span></div>
-        <div><b>3</b><span><b>분기센서</b>로 색상별 출고함에 보내요</span></div>
+        <div><b>1</b><span data-i18n="build.rule1">칸을 눌러 <b>컨베이어</b>를 놓고, <b>센서</b>로 색을 갈라요</span></div>
+        <div><b>2</b><span data-i18n="build.rule2">상자가 <b>전부</b> 제 함에 들어가면 다음 레벨</span></div>
+        <div><b>3</b><span data-i18n="build.rule3">가동은 레벨마다 <b>3번</b>뿐 — 다 쓰면 끝</span></div>
       </div>
       <button class="btn" id="btnStart">시작하기</button>
       <!-- 아래 바의 빈 판(왼쪽)에 얹는다 — 그림에 이미 자리가 있어 아트를 다시 뽑지 않아도 된다. -->
-      <button class="btn" id="btnTutIntro" type="button">튜토리얼</button>
+      <button class="btn" id="btnTutIntro" type="button" data-i18n="build.tutorial">튜토리얼</button>
     </div>
   </div>
 
@@ -466,92 +493,91 @@ body{
 
 </div>
 
+<script src="i18n.js"></script>
 <script>
-/* ================= CARI mascot ================= */
-function charSVG(suit,o={}){
-  const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
-  const gid='c'+shade.slice(1)+(isCari?'m':'')+(shock?'k':'')+(dir+1)+Math.random().toString(36).slice(2,6);
-  const ex=dir*2.2;
-  const eyes = shock
-    ? `<path d="M22.5 25.5 l5.5 5 M28 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>
-       <path d="M36 25.5 l5.5 5 M41.5 25.5 l-5.5 5" stroke="#8fd0ff" stroke-width="2.3" stroke-linecap="round"/>`
-    : `<ellipse cx="${25.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
-       <ellipse cx="${38.5+ex}" cy="27" rx="3.7" ry="4.8" fill="#d3ecff"/>
-       <ellipse cx="${24.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>
-       <ellipse cx="${37.6+ex}" cy="25.2" rx="1.15" ry="1.5" fill="#fff"/>`;
-  const mouth = shock
-    ? `<ellipse cx="32" cy="35.5" rx="2.8" ry="3.4" fill="#2b5f8c"/>`
-    : `<path d="M28.8 34 q3.2 2.8 6.4 0" stroke="#7fc4ff" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
-  const antenna = isCari ? `
-    <path d="M32 10 v-4.4" stroke="#7fa8d8" stroke-width="1.7" stroke-linecap="round"/>
-    <circle cx="32" cy="3.8" r="3" fill="#5b90ff"/>
-    <ellipse cx="32" cy="3.8" rx="5.7" ry="1.9" fill="none" stroke="#9cc0ff" stroke-width="1.2" transform="rotate(-18 32 3.8)"/>` : '';
-  const badge = isCari ? `
-    <rect x="24" y="45" width="16" height="8.5" rx="3" fill="#fdfbf5" stroke="${shade}" stroke-width=".9"/>
-    <text x="32" y="51.3" font-size="5.4" font-weight="900" text-anchor="middle" fill="#8fb0e2" font-family="system-ui,sans-serif">CARI</text>` : '';
-  return `<svg class="art" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-    <defs><radialGradient id="${gid}" cx="38%" cy="26%" r="80%">
-      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
-      <stop offset="42%" stop-color="${body}"/><stop offset="100%" stop-color="${shade}"/>
-    </radialGradient></defs>
-    <ellipse cx="32" cy="58.5" rx="16" ry="3.4" fill="rgba(0,0,0,.32)"/>
-    ${antenna}
-    <circle cx="12.8" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
-    <circle cx="51.2" cy="15.5" r="8.6" fill="${body}" stroke="${shade}" stroke-width="1.2"/>
-    <circle cx="12.8" cy="15.5" r="4.6" fill="${ear}"/><circle cx="51.2" cy="15.5" r="4.6" fill="${ear}"/>
-    <path d="M32 8 C46.5 8 54 17.5 54 30 C54 38 52.4 43 50.4 47.4 C49.6 53.6 45 57 32 57
-             C19 57 14.4 53.6 13.6 47.4 C11.6 43 10 38 10 30 C10 17.5 17.5 8 32 8 Z"
-          fill="url(#${gid})" stroke="${shade}" stroke-width="1.3"/>
-    <ellipse cx="32" cy="28" rx="15.2" ry="14.2" fill="#141a2b"/>
-    <ellipse cx="26" cy="19.5" rx="6.4" ry="3.4" fill="#fff" opacity=".13"/>
-    ${eyes}${mouth}${badge}</svg>`;
-}
-const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
+/* 문구는 전부 사전(i18n.js 의 build.*)에서 온다. 레벨 문구는 build.lv{n}.name/goal/teach/take — 사전에 없으면 아래 한국어로 떨어진다. */
+const T=(k,v)=>window.MGI18N?MGI18N.t(k,v):k;
+function lvT(i,f,fb){ const k='build.lv'+(i+1)+'.'+f; const v=T(k); return v===k?(fb||''):v; }
 
 /* ================= Constants ================= */
 const COLS=6, ROWS=8, CELL=52, ITEM=26, SPAWN_EVERY=2;
-const TOOL_DEFS=[
-  ['conv-0','/games/build-cari-tool-up-v9.webp','위쪽 컨베이어'],
-  ['conv-1','/games/build-cari-tool-right-v9.webp','오른쪽 컨베이어'],
-  ['conv-2','/games/build-cari-tool-down-v9.webp','아래쪽 컨베이어'],
-  ['conv-3','/games/build-cari-tool-left-v9.webp','왼쪽 컨베이어'],
-  ['sensor','/games/build-cari-tool-sensor-v9.webp','분기 센서'],
-  ['erase','/games/build-cari-tool-erase-v9.webp','지우기']
-];
 const DIRS=[[-1,0],[0,1],[1,0],[0,-1]];      // 0=up 1=right 2=down 3=left
 const ARROW=['▲','▶','▼','◀'];
-const FEAT={ R:{c:'#f2664f',n:'빨강'}, B:{c:'#1b55d0',n:'파랑'}, G:{c:'#12b58c',n:'초록'} };
+const FEAT={ R:{c:'#f2664f',k:'build.red'}, B:{c:'#1b55d0',k:'build.blue'}, G:{c:'#12b58c',k:'build.green'} };
 const CARGO_ASSET={R:'/games/build-cari-cargo-red-v1.webp',B:'/games/build-cari-cargo-blue-v1.webp',G:'/games/build-cari-cargo-green-v1.webp'};
-const branchOf=dir=>(dir+3)%4;              // matched item turns this way
+const TOOL_IMG={0:'/games/build-cari-tool-up-v9.webp',1:'/games/build-cari-tool-right-v9.webp',2:'/games/build-cari-tool-down-v9.webp',3:'/games/build-cari-tool-left-v9.webp',
+  sensor:'/games/build-cari-tool-sensor-v9.webp',erase:'/games/build-cari-tool-erase-v9.webp'};
+const branchOf=dir=>(dir+3)%4;              // 센서: 자기 색은 진행 기준 왼쪽으로(아래로 가는 라인이면 화면 오른쪽)
+const DEFAULT_RUNS=3;
 
-const FOOT="기계를 <b>배치·연결</b>해 사람 손 없이 라인이 스스로 도는 게 <b>자동화·시스템 설계</b>예요. 한 번 잘 만들면 계속 재현돼요.";
-
-/* ================= Levels ================= */
+/* ================= Levels =================
+   좌표 [r,c] (r 0~7 위→아래 · c 0~5). 타일 = [r,c,'conv'|'sensor',dir,color]. dir 0=위 1=오른쪽 2=아래 3=왼쪽.
+   sources = 생산기(각자 pattern 을 한 번 내보낸다 · 두 틱마다 하나) · bins = 함(want null = 아무 색) · walls = 못 놓는 칸
+   fixed = 못 지우는 타일 · pre = 미리 깔린(지울 수 있는) 타일 · sensors = 이 레벨의 센서 색 · runs = 가동 횟수.
+   ⛔ 기하(sources·bins·walls·fixed·pre·sensors·runs)는 서버 _shared/build-levels.ts 와 sync pair —
+      서버가 게임이 보낸 레벨별 타일 배치를 같은 시뮬레이션으로 돌려 "정말 다 출고됐나" 를 본다.
+      tests/minigame-replay.mjs 가 대조한다. 레벨을 넣거나 고치면 양쪽 다(+ 테스트의 SOL). 설계·검증 = tmp/_build-levels.mjs · _build-verify.mjs */
 const LEVELS=[
-  { name:'레벨 1', sub:'직선 라인', tick:500,
-    goal:'생산기 상자를 <b>컨베이어</b>로 아래 <b>출고함</b>까지 이어라',
-    source:{r:0,c:2,dir:2}, pattern:['B','B','B','B','B'], need:5, win:5, sense:null,
-    bins:[{r:7,c:2,want:null}],
-    sol:[[1,2,'conv',2],[2,2,'conv',2],[3,2,'conv',2],[4,2,'conv',2],[5,2,'conv',2],[6,2,'conv',2]],
-    take:'컨베이어만 깔았는데 상자가 <b>알아서</b> 흘러 출고됐어요 — 이게 자동 라인!' },
-
-  { name:'레벨 2', sub:'두 색 분류', tick:500,
-    goal:'센서로 <b>빨강</b>→오른쪽 함, <b>파랑</b>→아래 함으로 갈라라',
-    source:{r:0,c:1,dir:2}, pattern:['R','B','R','B','R','B'], need:6, win:6, sense:'R',
-    bins:[{r:3,c:3,want:'R'},{r:7,c:1,want:'B'}],
-    sol:[[1,1,'conv',2],[2,1,'conv',2],[3,1,'sensor',2],
-         [3,2,'conv',1],
-         [4,1,'conv',2],[5,1,'conv',2],[6,1,'conv',2]],
-    take:'센서 하나가 <b>빨강/파랑</b>을 스스로 갈라 보냈어요 — 판단하는 라인!' },
-
-  { name:'레벨 3', sub:'두 갈래 설계', tick:480,
-    goal:'센서+길을 설계해 <b>빨강·초록</b>을 양쪽 함으로 정렬하라',
-    source:{r:0,c:2,dir:2}, pattern:['R','G','R','G','R','G'], need:6, win:6, sense:'R',
-    bins:[{r:7,c:4,want:'R'},{r:7,c:0,want:'G'}],
-    sol:[[1,2,'conv',2],[2,2,'conv',2],[3,2,'sensor',2],
-         [3,3,'conv',1],[3,4,'conv',2],[4,4,'conv',2],[5,4,'conv',2],[6,4,'conv',2],
-         [4,2,'conv',2],[5,2,'conv',2],[6,2,'conv',3],[6,1,'conv',3],[6,0,'conv',2]],
-    take:'센서와 길만 설계했더니 공장이 <b>스스로</b> 두 갈래로 분류해요 — 시스템 설계!' },
+  /* 1 */ {name:'직선 라인', goal:'생산기 상자를 <b>컨베이어</b>로 아래 <b>출고함</b>까지 이어라', take:'컨베이어만 깔았는데 상자가 <b>알아서</b> 흘러 출고됐어요 — 이게 자동 라인!',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], sensors:[], runs:3},
+  /* 2 */ {name:'모퉁이', goal:'함이 옆에 있다 — <b>꺾어서</b> 이어라', teach:'컨베이어는 <b>방향 도구</b>로 고른다. 꺾는 칸에 다른 방향을 놓으면 돼요',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":5,"c":4,"want":null}], sensors:[], runs:3},
+  /* 3 */ {name:'벽 돌아가기', goal:'<b>벽</b>은 못 놓는 칸이다 — 돌아서 가라',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], walls:[[3,1],[3,2],[3,3]], sensors:[], runs:3},
+  /* 4 */ {name:'두 색 분류', goal:'<b>빨강 센서</b>로 빨강→오른쪽 함, 파랑→아래 함으로 갈라라', teach:'센서는 자기 색만 <b>옆으로</b> 꺾고 나머지는 <b>직진</b>시켜요', take:'센서 하나가 <b>빨강/파랑</b>을 스스로 갈라 보냈어요 — 판단하는 라인!',
+    sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":3,"c":3,"want":"R"},{"r":7,"c":1,"want":"B"}], sensors:["R"], runs:3},
+  /* 5 */ {name:'꺾이는 쪽이 정해져 있다', goal:'센서는 자기 색을 <b>진행 방향의 왼쪽</b>으로만 꺾는다 — 빨강 함이 반대쪽이면?', teach:'센서를 <b>다시 눌러</b> 돌릴 수 있어요. 라인을 먼저 옆으로 보낸 뒤 센서를 두면 꺾이는 쪽이 바뀌어요',
+    sources:[{"r":0,"c":4,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":4,"c":3,"want":"R"},{"r":7,"c":1,"want":"B"}], walls:[[1,5],[2,5],[3,5],[4,5],[5,5],[6,5]], sensors:["R"], runs:3},
+  /* 6 */ {name:'고장 난 라인', goal:'누가 깔아둔 라인이 <b>어딘가 틀렸다</b> — 찾아서 고쳐라', teach:'틀린 칸 위에 바로 새 컨베이어를 놓으면 덮어써요. <b>지우개</b>는 아예 비울 때',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], pre:[[1,2,"conv",2],[2,2,"conv",2],[3,2,"conv",1],[4,2,"conv",2],[5,2,"conv",2],[6,2,"conv",2]], sensors:[], runs:3},
+  /* 7 */ {name:'세 색', goal:'빨강·초록·파랑 — 센서 <b>두 개</b>를 이어서 세 갈래로', teach:'첫 센서가 한 색을 빼면 남은 두 색이 다음 센서로 가요. <b>순서</b>를 정하는 게 설계',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":2,"c":5,"want":"R"},{"r":4,"c":5,"want":"G"},{"r":7,"c":2,"want":"B"}], sensors:["R","G","B"], runs:3},
+  /* 8 */ {name:'빨강 센서가 없다', goal:'빨강을 왼쪽 함으로 보내야 하는데 <b>파랑 센서</b>뿐이다', teach:'파랑을 빼내면 <b>남는 건 빨강</b>이에요. 꼭 그 색을 잡지 않아도 갈라져요',
+    sources:[{"r":0,"c":4,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":4,"c":0,"want":"R"},{"r":7,"c":3,"want":"B"}], sensors:["B"], runs:3},
+  /* 9 */ {name:'두 생산기', goal:'생산기가 <b>둘</b>이다 — 두 줄을 하나의 함으로', teach:'두 라인이 같은 칸으로 들어오면 <b>합쳐져요</b>. 상자끼리는 부딪히지 않아요',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["B","B","B"]},{"r":0,"c":5,"dir":2,"pattern":["B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], sensors:[], runs:3},
+  /* 10 */ {name:'문은 하나', goal:'벽에 <b>문이 하나</b>뿐이다 — 두 줄 다 그 문으로', teach:'문 앞에서 <b>합치고</b>, 문 뒤에서 <b>가른다</b>. 센서는 문 뒤 한 개면 돼요',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["R","B","R"]},{"r":0,"c":5,"dir":2,"pattern":["B","R","B"]}], bins:[{"r":7,"c":2,"want":"B"},{"r":5,"c":4,"want":"R"}], walls:[[4,0],[4,1],[4,3],[4,4],[4,5]], sensors:["R"], runs:3},
+  /* 11 */ {name:'함도 길을 막는다', goal:'길목에 <b>빨강 함</b>이 있다 — 파랑이 들어가면 오류다', teach:'함은 통과 못 해요. 틀린 색 함은 <b>벽</b>이라고 생각하고 돌아가요',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":"B"},{"r":4,"c":2,"want":"R"}], walls:[[4,0],[4,1],[4,4],[4,5]], sensors:[], runs:3},
+  /* 12 */ {name:'갇힌 함', goal:'빨강 함이 벽에 둘러싸여 <b>오른쪽에서 왼쪽으로</b>만 들어간다', teach:'센서를 <b>위로</b> 보게 두면 자기 색이 <b>왼쪽</b>으로 꺾여요. 라인을 아래에서 위로 올려 보내요',
+    sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":5,"c":3,"want":"R"},{"r":2,"c":4,"want":"B"}], walls:[[4,3],[6,3],[5,2]], sensors:["R"], runs:3},
+  /* 13 */ {name:'뱀길', goal:'벽 사이 <b>문</b>이 엇갈려 있다 — 길게 돌아가라',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":5,"want":null}], walls:[[2,0],[2,1],[2,2],[2,3],[2,4],[5,1],[5,2],[5,3],[5,4],[5,5]], sensors:[], runs:3},
+  /* 14 */ {name:'문이 둘', goal:'문이 <b>둘</b>이다 — 색마다 자기 문으로', teach:'문 앞에서 갈라요. 센서 자리를 <b>위쪽</b>에 잡을수록 두 길이 여유 있어요',
+    sources:[{"r":0,"c":3,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":4,"want":"R"},{"r":7,"c":1,"want":"B"}], walls:[[4,0],[4,2],[4,3],[4,5]], sensors:["R"], runs:3},
+  /* 15 */ {name:'고집 센 센서', goal:'<b>못 지우는 파랑 센서</b>가 길목에 있다 — 파랑을 오른쪽으로 보내버린다', teach:'센서가 갈라놓은 걸 다시 <b>한 줄로 합치고</b>, 내 센서로 다시 갈라요',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":4,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[3,0],[3,1],[3,4],[3,5]], fixed:[[3,2,"sensor",2,"B"]], sensors:["R"], runs:3},
+  /* 16 */ {name:'셋 중 둘만', goal:'세 색인데 센서는 <b>초록·파랑</b>뿐 — 빨강은 어떻게?', teach:'둘을 빼내면 <b>남는 게 빨강</b>. 빼내는 순서는 함 위치가 정해요',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":7,"c":2,"want":"R"},{"r":3,"c":5,"want":"G"},{"r":5,"c":5,"want":"B"}], sensors:["G","B"], runs:3},
+  /* 17 */ {name:'아래에서 올려 넣기', goal:'두 함 다 <b>아래에서만</b> 들어간다 — 그런데 센서는 파랑뿐', teach:'왼쪽으로 가는 라인에서 파랑을 <b>아래</b>로 떨구고, 남은 빨강은 그대로 위로 올려요. 떨군 파랑은 돌아서 올라와요',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":4,"c":3,"want":"R"},{"r":4,"c":1,"want":"B"}], walls:[[3,1],[3,3],[4,0],[4,4],[4,2]], sensors:["B"], runs:3},
+  /* 18 */ {name:'되돌아 올라가기', goal:'빨강 함이 <b>위쪽</b>에 있다 — 내려갔다가 올라와라', teach:'센서가 <b>아래</b>를 보면 빨강은 오른쪽으로 — 거기서 위로 올려요',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":0,"c":5,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[0,4],[1,4],[2,4],[3,4]], sensors:["R"], runs:3},
+  /* 19 */ {name:'두 줄이 한 색을 나눈다', goal:'두 생산기 모두 <b>파랑</b>이 섞여 나온다 — 파랑은 한 함으로', teach:'센서는 라인마다 하나씩, 함은 하나. 두 파랑 줄이 <b>합쳐져</b> 들어가요',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["R","B","R"]},{"r":0,"c":5,"dir":2,"pattern":["G","B","G"]}], bins:[{"r":7,"c":0,"want":"R"},{"r":7,"c":2,"want":"B"},{"r":2,"c":3,"want":"G"}], sensors:["B"], runs:3},
+  /* 20 */ {name:'틀린 센서', goal:'깔린 라인에 <b>초록 센서</b>가 박혀 있는데 초록은 안 나온다', teach:'센서는 자기 색이 아니면 <b>직진</b>이라 컨베이어와 같아요. 없는 색 센서는 <b>지우고</b> 필요한 걸로',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":3,"c":4,"want":"R"},{"r":7,"c":2,"want":"B"}], pre:[[1,2,"conv",2],[2,2,"conv",2],[3,2,"sensor",2,"G"],[3,3,"conv",1],[4,2,"conv",2],[5,2,"conv",2],[6,2,"conv",2]], sensors:["R","G"], runs:3},
+  /* 21 */ {name:'문 하나에 세 색', goal:'두 생산기 · 세 색 · 문 하나', teach:'합치고 → 문 → 센서 둘. 앞에서 배운 걸 한 판에',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["R","G","B"]},{"r":0,"c":5,"dir":2,"pattern":["B","R","G"]}], bins:[{"r":7,"c":2,"want":"B"},{"r":5,"c":5,"want":"R"},{"r":6,"c":5,"want":"G"}], walls:[[4,0],[4,1],[4,3],[4,4],[4,5]], sensors:["R","G"], runs:3},
+  /* 22 */ {name:'고집 센 센서 둘', goal:'못 지우는 센서가 <b>둘</b> — 하나는 빨강, 하나는 파랑', teach:'두 센서가 서로 반대로 갈라놓아요. 어느 쪽을 <b>살리고</b> 어느 쪽을 <b>합칠지</b>',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":5,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[2,0],[2,1],[2,4],[2,5],[5,0],[5,1],[5,4],[5,5]], fixed:[[2,2,"sensor",2,"B"],[5,2,"sensor",2,"R"]], sensors:["R"], runs:3},
+  /* 23 */ {name:'틀린 라인 두 군데', goal:'깔린 라인이 <b>두 군데</b> 틀렸다 — 센서 색도, 방향도', teach:'가동해 보면 상자가 어디서 죽는지 보여요. 한 번에 다 못 찾아도 <b>세 번</b> 안에',
+    sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":3,"c":4,"want":"R"},{"r":7,"c":1,"want":"B"}], pre:[[1,1,"conv",2],[2,1,"conv",2],[3,1,"sensor",2,"B"],[3,2,"conv",1],[3,3,"conv",0],[4,1,"conv",2],[5,1,"conv",2],[6,1,"conv",2]], sensors:["R","B"], runs:3},
+  /* 24 */ {name:'뱀길에 두 색', goal:'뱀길인데 색이 둘 — 문이 <b>하나</b>씩뿐이라 같이 지나야 한다', teach:'가르는 자리는 <b>마지막 문 뒤</b>. 센서는 어느 쪽에서 들어오든 <b>자기 화살표 기준</b>으로 내보내요',
+    sources:[{"r":0,"c":5,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":0,"want":"B"},{"r":7,"c":5,"want":"R"}], walls:[[2,1],[2,2],[2,3],[2,4],[2,5],[5,0],[5,1],[5,2],[5,3],[5,4]], sensors:["R"], runs:3},
+  /* 25 */ {name:'갇힌 함 둘', goal:'두 함 다 갇혀 있다 — 빨강 함은 <b>아래에서</b>, 파랑 함은 <b>오른쪽에서</b>만 들어간다', teach:'오른쪽으로 가는 라인에서 센서는 자기 색을 <b>위</b>로 꺾어요. 함마다 들어가는 방향에 맞춰 라인의 진행 방향을 정해요',
+    sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":2,"c":4,"want":"R"},{"r":6,"c":4,"want":"B"}], walls:[[1,4],[2,3],[2,5],[5,4],[7,4],[6,3]], sensors:["R"], runs:3},
+  /* 26 */ {name:'마주 보는 생산기', goal:'생산기 둘이 <b>마주 본다</b> — 상자가 서로의 생산기로 들어가면 되돌아온다', teach:'오른쪽으로 가는 줄은 센서가 자기 색을 <b>위</b>로, 왼쪽으로 가는 줄은 <b>아래</b>로 꺾어요. 양쪽이 고를 색이 달라요',
+    sources:[{"r":3,"c":0,"dir":1,"pattern":["R","B","R"]},{"r":3,"c":5,"dir":3,"pattern":["B","R","B"]}], bins:[{"r":7,"c":2,"want":"R"},{"r":0,"c":3,"want":"B"}], sensors:["R","B"], runs:3},
+  /* 27 */ {name:'위로 가는 함', goal:'함 세 개가 전부 <b>위쪽</b>이다 — 내려갔다가 각자 올라가야 한다', teach:'빨강 함은 왼쪽이라 아래를 보는 센서로는 못 보내요. 라인을 <b>위로 올리면서</b> 센서를 두면 왼쪽으로 꺾여요',
+    sources:[{"r":0,"c":2,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":2,"c":0,"want":"R"},{"r":2,"c":1,"want":"B"},{"r":2,"c":4,"want":"G"}], walls:[[1,0],[1,1],[1,3],[1,4],[1,5]], sensors:["R","G"], runs:3},
+  /* 28 */ {name:'문 둘에 세 색', goal:'문은 둘, 색은 셋 — 두 색이 <b>한 문을 같이</b> 지나야 한다', teach:'같이 지난 두 색은 문 뒤에서 <b>다시</b> 갈라요. 센서는 초록·파랑뿐이라 빨강은 남는 쪽',
+    sources:[{"r":0,"c":1,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":7,"c":1,"want":"R"},{"r":7,"c":4,"want":"G"},{"r":7,"c":5,"want":"B"}], walls:[[4,0],[4,2],[4,3],[4,5]], sensors:["G","B"], runs:3},
+  /* 29 */ {name:'긴 뱀길에 세 색', goal:'세로 벽 두 장을 돌아가는 긴 길 — 세 색을 <b>가는 길에</b> 하나씩 떨궈라', teach:'내려갈 때는 오른쪽으로, 왼쪽으로 갈 때는 아래로 꺾여요. 함이 있는 쪽으로 가는 <b>구간</b>에 센서를 놓아요',
+    sources:[{"r":0,"c":4,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":7,"c":5,"want":"G"},{"r":7,"c":4,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1]], sensors:["G","R"], runs:3},
+  /* 30 */ {name:'최종 라인', goal:'두 생산기 · 세 색 · 고집 센 센서 · 갇힌 함 — <b>전부</b>',
+    sources:[{"r":0,"c":0,"dir":2,"pattern":["R","G","B"]},{"r":0,"c":5,"dir":2,"pattern":["B","G","R"]}], bins:[{"r":7,"c":1,"want":"R"},{"r":6,"c":4,"want":"B"},{"r":7,"c":2,"want":"G"}], walls:[[3,0],[3,1],[3,4],[3,5],[5,4],[7,4],[6,5]], fixed:[[3,2,"sensor",2,"B"]], sensors:["B","G"], runs:3}
 ];
 
 /* ================= 튜토리얼 =================
@@ -559,112 +585,127 @@ const LEVELS=[
    ⚠️ 자동 실행하지 않는다. 눌러야 시작한다 — 아는 사람에게 두 번 시키면 그게 더 나쁘다.
    ⚠️ 대신 언제든 다시 할 수 있어야 한다(한 번 해도 이해 못 할 수 있다) → 진입점이 인트로·게임화면 둘.
    ⚠️ 한 라운드에 다 넣지 않는다 — 도구마다 짧은 라운드 하나씩이고, 각자 자기 가동으로 끝난다.
-      길게 이으면 중간에 뭘 배웠는지 흐려지고, 다시 보고 싶은 부분만 볼 수도 없다.
    ⚠️ 끝나면 그냥 끝난다 — 메인 게임으로 밀어넣지 않는다. 시작한 자리(인트로 / 하던 레벨)로 돌아간다.
-   ⚠️ `pre` = 미리 깔아두는 타일. 지우개는 "지울 게 있어야" 가르칠 수 있어서, 일부러 위쪽으로 놓인
-      컨베이어를 길목에 심어둔다(상자를 되돌려 보내는, 눈에 띄게 틀린 배치). */
+   ⚠️ 튜토리얼엔 가동 횟수가 없다(홈을 비운다). 제출도 없다. */
 const TUT_ROUNDS=[
-  { title:'컨베이어',
-    level:{ name:'튜토리얼 ①', sub:'컨 베 이 어', tick:520,
-      goal:'', source:{r:2,c:1,dir:2}, pattern:['B','B'], need:2, win:2, sense:null,
-      bins:[{r:4,c:2,want:null}], sol:[[3,1,'conv',2],[4,1,'conv',1]] },
+  { key:'conv',
+    level:{ sources:[{r:2,c:1,dir:2,pattern:['B','B']}], bins:[{r:4,c:2,want:null}], sensors:[], runs:0 },
     steps:[
-      { msg:'CARI 가 상자를 <b>아래로</b> 내보내요. 빛나는 칸을 눌러 <b>컨베이어</b>를 놓아요', cell:[3,1] },
-      { msg:'여기서 <b>오른쪽</b>으로 꺾어야 해요. 아래에서 <b>오른쪽 컨베이어</b>를 골라요', tool:'conv-1' },
-      { msg:'빛나는 칸을 눌러요', cell:[4,1] },
-      { msg:'라인이 이어졌어요. <b>가동</b>을 눌러요', run:true } ] },
-
-  { title:'지우개',
-    level:{ name:'튜토리얼 ②', sub:'지 우 개', tick:520,
-      goal:'', source:{r:2,c:2,dir:2}, pattern:['B','B'], need:2, win:2, sense:null,
-      bins:[{r:4,c:2,want:null}], pre:[[3,2,'conv',0]], sol:[[3,2,'conv',2]] },
+      { msg:'build.tut1.s1', cell:[3,1] },
+      { msg:'build.tut1.s2', tool:'conv-1' },
+      { msg:'build.tut1.s3', cell:[4,1] },
+      { msg:'build.tut1.s4', run:true } ] },
+  { key:'erase',
+    level:{ sources:[{r:2,c:2,dir:2,pattern:['B','B']}], bins:[{r:4,c:2,want:null}], pre:[[3,2,'conv',0]], sensors:[], runs:0 },
     steps:[
-      { msg:'이 칸이 <b>위로</b> 놓였어요 — 상자가 되돌아가요. <b>지우개</b>를 골라요', tool:'erase' },
-      { msg:'빛나는 칸을 눌러 <b>지워요</b>', cell:[3,2] },
-      { msg:'다시 <b>아래쪽 컨베이어</b>를 골라요', tool:'conv-2' },
-      { msg:'같은 칸에 놓아요', cell:[3,2] },
-      { msg:'<b>가동</b>을 눌러요', run:true } ] },
-
+      { msg:'build.tut2.s1', tool:'erase' },
+      { msg:'build.tut2.s2', cell:[3,2] },
+      { msg:'build.tut2.s3', tool:'conv-2' },
+      { msg:'build.tut2.s4', cell:[3,2] },
+      { msg:'build.tut2.s5', run:true } ] },
   /* ⚠️ 센서는 놓는 것보다 '다시 눌러 돌리는' 게 핵심이다(컨베이어는 도구로 방향을 고르지만
         센서만 재클릭으로 회전한다) → 상자가 오는 방향과 어긋나게 놓이도록 판을 짜서, 한 번 돌려야
         풀리게 만든다. 센서는 항상 아래(dir 2)로 놓이므로 여기선 왼쪽(dir 3)이 정답 = 클릭 한 번. */
-  { title:'분기 센서',
-    level:{ name:'튜토리얼 ③', sub:'분 기 센 서', tick:520,
-      goal:'', source:{r:3,c:4,dir:3}, pattern:['R','B','R','B'], need:4, win:4, sense:'R',
-      bins:[{r:3,c:1,want:'B'},{r:4,c:2,want:'R'}], pre:[[3,3,'conv',3]],
-      sol:[[3,2,'sensor',3]] },
+  { key:'sensor',
+    level:{ sources:[{r:3,c:4,dir:3,pattern:['R','B','R','B']}], bins:[{r:3,c:1,want:'B'},{r:4,c:2,want:'R'}], pre:[[3,3,'conv',3]], sensors:['R'], runs:0 },
     steps:[
-      { msg:'빨강·파랑이 섞여 나와요. 갈라줄 <b>분기 센서</b>를 골라요', tool:'sensor' },
-      { msg:'빛나는 칸에 놓아요', cell:[3,2] },
-      { msg:'화살표가 상자 오는 방향과 안 맞아요. <b>같은 칸을 다시 눌러</b> 돌려요', cell:[3,2] },
-      { msg:'빨강은 아래, 파랑은 왼쪽으로 갈라져요. <b>가동</b>을 눌러요', run:true } ] },
+      { msg:'build.tut3.s1', tool:'sensor-R' },
+      { msg:'build.tut3.s2', cell:[3,2] },
+      { msg:'build.tut3.s3', cell:[3,2] },
+      { msg:'build.tut3.s4', run:true } ] },
 ];
 let tutOn=false, tutIdx=0, tutRound=0, tutFrom='intro', tutReturnLI=0, tutTimer=null;
 
-/* ================= State ================= */
-let LI=0, L=null, grid=[], items=[], nextId=0, cellEls=[];
-let running=false, timer=null, tickN=0, spawnedCount=0;
-let good=0, bad=0, miss=0, routeLog=[], tool='conv-2', started=false;
+/* ================= State =================
+   한 판 = 1레벨부터. 레벨마다 가동 횟수(runs)가 있고, 실패해도 횟수가 남으면 배치를 고쳐 다시 가동한다.
+   횟수를 다 쓰면 판이 끝난다. 기록 = 깬 레벨 수 → 같으면 놓은 타일 수 합(적을수록) → 같으면 가동 횟수 합(적을수록).
+   서버가 log(레벨별 타일 배치·가동 횟수)로 다시 센다. */
+const S={ lv:0, runsLeft:0, usedRuns:0, cleared:0, log:[], runOver:false };
+let L=null, grid=[], items=[], nextId=0, cellEls=[];
+let running=false, timer=null, tickN=0, spawnedCount=0, spawnIdx=[];
+let good=0, bad=0, miss=0, tool='conv-2', started=false;
 const $=id=>document.getElementById(id);
+const needOf=Lv=>Lv.sources.reduce((n,s)=>n+s.pattern.length,0);
 
 /* ================= Board build ================= */
 function buildCells(){
-  const wrap=$('cells'); wrap.innerHTML='';
-  cellEls=[];
+  const wrap=$('cells'); wrap.innerHTML=''; cellEls=[];
   for(let r=0;r<ROWS;r++){ cellEls.push([]);
-    for(let c=0;c<COLS;c++){
-      const d=document.createElement('div');
-      d.className='cell'; d.dataset.r=r; d.dataset.c=c;
-      wrap.appendChild(d); cellEls[r].push(d);
-    }
-  }
+    for(let c=0;c<COLS;c++){ const d=document.createElement('div'); d.className='cell'; d.dataset.r=r; d.dataset.c=c; wrap.appendChild(d); cellEls[r].push(d); } }
 }
+/** 팔레트는 레벨이 정한다 — 컨베이어 4 + 이 레벨의 센서 색 + 지우개. */
 function buildPalette(){
-  $('palette').innerHTML=TOOL_DEFS.map(([id,src,label])=>
-    `<button type="button" class="tool" data-tool="${id}" aria-label="${label}" title="${label}"><img class="tico" src="${src}" alt="" draggable="false"></button>`
-  ).join('');
+  const tools=[['conv-0',TOOL_IMG[0],'build.tool_up'],['conv-1',TOOL_IMG[1],'build.tool_right'],['conv-2',TOOL_IMG[2],'build.tool_down'],['conv-3',TOOL_IMG[3],'build.tool_left']];
+  for(const col of (L.sensors||[])) tools.push(['sensor-'+col,TOOL_IMG.sensor,'build.tool_sensor',col]);
+  tools.push(['erase',TOOL_IMG.erase,'build.tool_erase']);
+  const pal=$('palette'); pal.className='palette n'+tools.length;
+  pal.innerHTML=tools.map(([id,src,lab,col])=>{
+    const name=col?T(lab,{color:T(FEAT[col].k)}):T(lab);
+    return `<button type="button" class="tool${id==='erase'?' erase':''}" data-tool="${id}" aria-label="${name}" title="${name}"><img class="tico" src="${src}" alt="" draggable="false">${col?`<i class="tdot" style="background:${FEAT[col].c}"></i>`:''}</button>`;
+  }).join('');
 }
 function cellInner(r,c){
   const g=grid[r][c];
+  const lock=g.fixed?`<span class="lock" title="${T('build.fixed')}">🔒</span>`:'';
+  if(g.type==='wall') return `<div class="ci wall"></div>`;
   if(g.type==='source') return `<div class="ci src"><div class="cmini"><img src="/games/build-cari-play-v5.webp" alt="" draggable="false"></div><span class="ar">${ARROW[g.dir]}</span></div>`;
   if(g.type==='bin'){ const col=g.want?FEAT[g.want].c:null;
     return `<div class="ci bin"><div class="binbox" style="border-color:${col||'#b9c2d6'}">`+
       (col?`<span class="bsw" style="background:${col}"></span>`
           :`<span class="bany">${['R','G','B'].map(f=>`<i style="background:${FEAT[f].c}"></i>`).join('')}</span>`)+`</div></div>`; }
-  if(g.type==='conv'){ const dn=['up','right','down','left'][g.dir]; return `<div class="ci conv"><img class="tile-asset" src="/games/build-cari-tool-${dn}-v9.webp" alt=""></div>`; }
+  if(g.type==='conv'){ return `<div class="ci conv"><img class="tile-asset" src="${TOOL_IMG[g.dir]}" alt="">${lock}</div>`; }
   if(g.type==='sensor'){
-    // 센서는 "지정색만 왼쪽으로 꺾고 나머지는 직진"(branchOf) 이다. 그림만으로는 그게 안 읽히므로
-    // 두 출구에 색 화살표를 얹는다 — 직진 쪽엔 안 걸리는 색, 꺾이는 쪽엔 지정색.
-    // ⚠️ L.sense 가 없는 레벨(Lv.1)도 있다 — 여기서 FEAT[null] 을 읽어 렌더가 통째로 죽었었다
-    //    (칸은 빈 칸으로 남는데 내부 상태는 센서라 보이지 않는 센서가 생겼다).
-    const sc=L.sense?FEAT[L.sense].c:null;
-    const others=[...new Set(L.pattern)].filter(f=>f!==L.sense);
+    // 센서는 "자기 색만 왼쪽으로 꺾고 나머지는 직진". 그림만으로는 안 읽히므로 두 출구에 색 화살표를 얹는다 —
+    // 꺾이는 쪽엔 센서 색, 직진 쪽엔 남는 색(하나면 그 색, 둘 이상이면 중립색). 왼쪽 위 점 = 센서 색.
+    const sc=FEAT[g.color].c;
+    const others=[...new Set(L.sources.flatMap(s=>s.pattern))].filter(f=>f!==g.color);
     const oc=others.length===1?FEAT[others[0]].c:'#dbe6f7';
-    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="/games/build-cari-tool-sensor-v9.webp" alt="">`+
+    return `<div class="ci sensor" style="--rot:${(g.dir-2)*90}deg"><img class="tile-asset" src="${TOOL_IMG.sensor}" alt="">`+
+      `<span class="sdot" style="background:${sc}"></span>`+
       `<span class="sar d${g.dir}" style="--c:${oc}"></span>`+
-      (sc?`<span class="sar d${branchOf(g.dir)}" style="--c:${sc}"></span>`:'')+`</div>`; }
+      `<span class="sar d${branchOf(g.dir)}" style="--c:${sc}"></span>${lock}</div>`; }
   return `<div class="ci empty"></div>`;
 }
 function renderCell(r,c){ cellEls[r][c].innerHTML=cellInner(r,c); }
 function renderBoard(){ for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)renderCell(r,c); }
 
 /* ================= Level load ================= */
+/** 레벨의 고정물만 깐 판(플레이어 타일 없음). 서버 _shared/build-levels.ts 의 makeGrid 와 같은 규칙. */
+function baseGrid(Lv){
+  const g=[]; for(let r=0;r<ROWS;r++){ g.push([]); for(let c=0;c<COLS;c++) g[r].push({type:'empty'}); }
+  Lv.sources.forEach(s=>{ g[s.r][s.c]={type:'source',dir:s.dir}; });
+  Lv.bins.forEach(b=>{ g[b.r][b.c]={type:'bin',want:b.want}; });
+  (Lv.walls||[]).forEach(([r,c])=>{ g[r][c]={type:'wall'}; });
+  (Lv.fixed||[]).forEach(([r,c,t,d,col])=>{ g[r][c]={type:t,dir:d,color:col,fixed:true}; });
+  (Lv.pre||[]).forEach(([r,c,t,d,col])=>{ g[r][c]={type:t,dir:d,color:col}; });
+  return g;
+}
+function layBoard(){ grid=baseGrid(L); }
 /** def 를 주면 그 판(=튜토리얼)을 띄운다. 안 주면 평소대로 LEVELS[i] — 이때 튜토리얼 모드는 자동 해제. */
 function startLevel(i, def){
   stopSim();
-  if(!def){ LI=i; tutOn=false; tutSetHelp(); }
+  if(!def){ S.lv=i; tutOn=false; tutSetHelp(); }
   L=def||LEVELS[i];
-  $('ovResult').classList.add('hide');
-  document.documentElement.style.setProperty('--tk', L.tick+'ms');
-  grid=[]; for(let r=0;r<ROWS;r++){ grid.push([]); for(let c=0;c<COLS;c++) grid[r].push({type:'empty'}); }
-  grid[L.source.r][L.source.c]={type:'source',dir:L.source.dir};
-  L.bins.forEach(b=>grid[b.r][b.c]={type:'bin',want:b.want});
-  (L.pre||[]).forEach(([r,c,t,d])=>{ grid[r][c]={type:t,dir:d}; });   // 미리 깔아두는 타일(튜토리얼용)
+  $('ovResult').classList.add('hide'); $('btnRetry').classList.remove('asquit');
+  document.documentElement.style.setProperty('--tk', (L.tick||500)+'ms');
+  layBoard();
+  S.runsLeft=L.runs; S.usedRuns=0;
   resetSim();
+  buildPalette();
   renderBoard();
-  $('lvlName').textContent=L.name; $('lvlSub').textContent=L.sub;
-  $('hintLine').innerHTML=L.goal;
+  if(def){ $('lvlName').textContent=T('build.tutorial'); $('lvlSub').textContent=T('build.tut_round',{n:tutRound+1,m:TUT_ROUNDS.length}); $('hintLine').innerHTML=''; }
+  else { $('lvlName').textContent=T('build.level',{n:i+1}); $('lvlSub').textContent=lvT(i,'name',L.name); $('hintLine').innerHTML=lvT(i,'goal',L.goal); }
   setTool('conv-2');
+}
+/** 플레이어가 놓은 타일 목록(고정물·미리 깔린 것 제외 — 미리 깔린 것은 고쳐야 카운트된다). 서버에 보내는 기록의 단위. */
+function playerTiles(){
+  const base=baseGrid(L);
+  const out=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ const g=grid[r][c], b=base[r][c];
+    if(g.type!=='conv'&&g.type!=='sensor') continue; if(g.fixed) continue;
+    if(b.type===g.type&&b.dir===g.dir&&(b.color||null)===(g.color||null)) continue;   // 미리 깔린 그대로
+    out.push(g.type==='sensor'?[r,c,'sensor',g.dir,g.color]:[r,c,'conv',g.dir]); }
+  return out;
 }
 
 /* ================= Simulation ================= */
@@ -676,19 +717,17 @@ function makeToken(it){
   $('ilayer').appendChild(el); it.el=el;
 }
 function updateToken(it){ if(it.el){ const [x,y]=tokenXY(it.r,it.c); it.el.style.transform=`translate(${x}px,${y}px)`; } }
-
 function exitDir(it){
   const g=grid[it.r][it.c];
   if(g.type==='conv'||g.type==='source') return g.dir;
-  if(g.type==='sensor') return (it.feat===L.sense) ? branchOf(g.dir) : g.dir;
+  if(g.type==='sensor') return (it.feat===g.color) ? branchOf(g.dir) : g.dir;
   return null;
 }
-function killItem(it,fate,offgrid){
+function killItem(it,fate){
   it.dead=true;
   if(fate==='good')good++; else if(fate==='bad')bad++; else miss++;
-  if(fate==='good'||fate==='bad'){ const b=grid[it.r]&&grid[it.r][it.c]; routeLog.push({feat:it.feat,want:b?b.want:null,ok:fate==='good'}); }
   if(it.el){ updateToken(it); const el=it.el; el.classList.add('x'+fate);
-    setTimeout(()=>el.remove(), Math.max(240, L.tick*0.9)); }
+    setTimeout(()=>el.remove(), Math.max(240, (L.tick||500)*0.9)); }
   // 함도 같이 반응시킨다 — 상자는 26px 이라 그것만으로는 성공/실패가 안 읽힌다.
   if((fate==='good'||fate==='bad') && cellEls[it.r] && cellEls[it.r][it.c]){
     const cd=cellEls[it.r][it.c], cls=fate==='good'?'binOk':'binNo';
@@ -702,47 +741,54 @@ function tick(){
   for(const it of items.slice()){
     if(it.dead) continue;
     const dir=exitDir(it);
-    if(dir===null){ killItem(it,'miss'); continue; }             // stuck on empty
+    if(dir===null){ killItem(it,'miss'); continue; }             // 빈 칸 위 = 멈춤
     const [nr,nc]=[it.r+DIRS[dir][0], it.c+DIRS[dir][1]];
     it.r=nr; it.c=nc; it.steps=(it.steps||0)+1;
-    if(nr<0||nr>=ROWS||nc<0||nc>=COLS){ killItem(it,'miss',true); continue; }  // off edge
+    if(nr<0||nr>=ROWS||nc<0||nc>=COLS){ killItem(it,'miss'); continue; }  // 판 밖
     const t=grid[nr][nc];
     if(t.type==='bin'){ killItem(it,(t.want==null||t.want===it.feat)?'good':'bad'); continue; }
-    if(t.type==='empty'){ killItem(it,'miss'); continue; }        // fell off belt
-    if(it.steps>ROWS*COLS+4){ killItem(it,'miss'); continue; }    // loop guard
+    if(t.type==='empty'||t.type==='wall'){ killItem(it,'miss'); continue; }   // 벨트 끝 · 벽
+    if(it.steps>ROWS*COLS+4){ killItem(it,'miss'); continue; }    // 고리
     updateToken(it);
   }
-  if(spawnedCount<L.need && tickN%SPAWN_EVERY===1) spawn();
+  if(spawnedCount<needOf(L) && tickN%SPAWN_EVERY===1) spawn();
   checkFinish();
 }
 function spawn(){
-  const s=L.source, feat=L.pattern[spawnedCount % L.pattern.length];
-  const it={id:nextId++, r:s.r, c:s.c, feat, dead:false, steps:0};
-  spawnedCount++; items.push(it); makeToken(it); updateScore();
+  L.sources.forEach((s,si)=>{
+    if(spawnIdx[si]>=s.pattern.length) return;
+    const it={id:nextId++, r:s.r, c:s.c, feat:s.pattern[spawnIdx[si]], dead:false, steps:0};
+    spawnIdx[si]++; spawnedCount++; items.push(it); makeToken(it);
+  });
+  updateScore();
 }
 function checkFinish(){
   const live=items.some(it=>!it.dead);
-  if((spawnedCount>=L.need && !live) || tickN>200){ finish(); }
+  if((spawnedCount>=needOf(L) && !live) || tickN>200){ finish(); }
 }
 function resetSim(){
   items.forEach(it=>it.el&&it.el.remove()); items=[];
-  good=bad=miss=0; tickN=0; spawnedCount=0; routeLog=[]; updateScore();
+  good=bad=miss=0; tickN=0; spawnedCount=0; spawnIdx=L.sources.map(()=>0); updateScore();
 }
 function startSim(){
   if(running) return;
+  if(!tutOn && S.runsLeft<=0) return;
   resetSim(); running=true; setEditable(false); updateRunBtn();
-  timer=setInterval(tick, L.tick);
+  if(!tutOn){ S.runsLeft--; S.usedRuns++; updateScore(); }
+  timer=setInterval(tick, L.tick||500);
 }
 function stopSim(){ running=false; if(timer){clearInterval(timer);timer=null;} setEditable(true); updateRunBtn(); }
 
 /* ================= UI ================= */
 function updateScore(){
-  const wrong=bad+miss;
-  $('scorePill').innerHTML=`<span class="metric ok"><small>출고</small><b>${good}/${L?L.need:0}</b></span><span class="metric err"><small>오류</small><b>${wrong}</b></span>`;
+  const runs = tutOn ? '' : `<span class="metric"><small>${T('build.runs')}</small><span class="runs">${Array.from({length:L?L.runs:0},(_,i)=>`<i class="${i<S.runsLeft?'on':''}"></i>`).join('')}</span></span>`;
+  $('scorePill').innerHTML=`<span class="metric ok"><small>${T('build.out')}</small><b>${good}/${L?needOf(L):0}</b></span>${runs||`<span class="metric err"><small>${T('build.err')}</small><b>${bad+miss}</b></span>`}`;
 }
-function updateRunBtn(){ const b=$('btnRun'); b.textContent=running?'멈춤':'가동'; b.classList.toggle('stop',running); }
+function updateRunBtn(){ const b=$('btnRun'); b.textContent=running?T('build.stop'):T('build.run'); b.classList.toggle('stop',running); }
 function setEditable(on){ $('cells').style.opacity=on?'1':'.92'; }
 function setTool(t){ tool=t; document.querySelectorAll('.tool').forEach(el=>el.classList.toggle('on', el.dataset.tool===t)); }
+let toastT=null;
+function toast(msg,ms=1500){ const el=$('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),ms); }
 
 /* --- 튜토리얼 진행 --- 지금 눌러야 하는 것 하나만 빛나고, 그것만 반응한다. */
 function tutStep(){ return tutOn ? TUT_ROUNDS[tutRound].steps[tutIdx] : null; }
@@ -750,21 +796,21 @@ function tutClear(){ document.querySelectorAll('.tut-on').forEach(el=>el.classLi
 function tutSetHelp(){
   const b=$('btnTut'); if(!b) return;
   b.textContent=tutOn?'✕':'?'; b.classList.toggle('quit',tutOn);
-  b.setAttribute('aria-label', tutOn?'튜토리얼 그만두기':'튜토리얼');
+  b.setAttribute('aria-label', T(tutOn?'build.tut_quit':'build.tut_aria'));
 }
 function tutMark(){
   tutClear();
   const s=tutStep(); if(!s) return;
   if(s.cell) cellEls[s.cell[0]][s.cell[1]].classList.add('tut-on');
-  if(s.tool) document.querySelector(`.tool[data-tool="${s.tool}"]`).classList.add('tut-on');
+  if(s.tool){ const el=document.querySelector(`.tool[data-tool="${s.tool}"]`); if(el) el.classList.add('tut-on'); }
   if(s.run) $('btnRun').classList.add('tut-on');
-  $('hintLine').innerHTML=s.msg;
+  $('hintLine').innerHTML=T(s.msg);
 }
 function tutNext(){ tutIdx++; if(tutIdx>=TUT_ROUNDS[tutRound].steps.length){ tutClear(); return; } tutMark(); }
 function loadTutRound(){ tutIdx=0; startLevel(-1, TUT_ROUNDS[tutRound].level); tutMark(); }
 /** from='intro' | 'game' — 끝나거나 그만두면 시작한 자리로 돌려보낸다(메인 게임으로 밀지 않는다). */
 function startTutorial(from){
-  if(from){ tutFrom=from; if(from==='game') tutReturnLI=LI; }
+  if(from){ tutFrom=from; if(from==='game') tutReturnLI=S.lv; }
   clearTimeout(tutTimer);
   $('ovStart').classList.add('hide'); $('ovResult').classList.add('hide');
   tutOn=true; tutRound=0; loadTutRound(); tutSetHelp();
@@ -772,8 +818,8 @@ function startTutorial(from){
 function exitTutorial(){
   clearTimeout(tutTimer); tutOn=false; tutClear();
   $('ovResult').classList.add('hide');
-  startLevel(tutFrom==='game' ? tutReturnLI : 0);          // startLevel 이 ? 표시를 되돌린다
-  if(tutFrom==='intro') $('ovStart').classList.remove('hide');
+  if(tutFrom==='game'){ startLevel(tutReturnLI); }
+  else { startLevel(0); $('ovStart').classList.remove('hide'); }
 }
 
 $('cells').addEventListener('click',e=>{
@@ -781,15 +827,19 @@ $('cells').addEventListener('click',e=>{
   const cd=e.target.closest('.cell'); if(!cd) return;
   const r=+cd.dataset.r, c=+cd.dataset.c, g=grid[r][c];
   const s=tutStep(); if(s && !(s.cell && s.cell[0]===r && s.cell[1]===c)) return;  // 튜토리얼: 지목한 칸만
-  if(g.type==='source'||g.type==='bin') return;
+  if(g.type==='source'||g.type==='bin'||g.type==='wall') return;
+  if(g.fixed){ toast(T('build.fixed')); return; }
   if(tool==='erase'){ grid[r][c]={type:'empty'}; }
   else if(tool.startsWith('conv-')){ grid[r][c]={type:'conv',dir:+tool.slice(5)}; }
-  else if(tool==='sensor' && g.type==='sensor'){ g.dir=(g.dir+1)%4; }
-  else { grid[r][c]={type:'sensor',dir:2}; }
+  else if(tool.startsWith('sensor-')){
+    const col=tool.slice(7);
+    if(g.type==='sensor'&&g.color===col){ g.dir=(g.dir+1)%4; }        // 같은 색 센서를 다시 누르면 회전
+    else grid[r][c]={type:'sensor',dir:2,color:col};                    // 다른 색이면 갈아끼운다
+  }
   renderCell(r,c);
   if(s) tutNext();
 });
-document.querySelector('.palette').addEventListener('click',e=>{
+$('palette').addEventListener('click',e=>{
   const t=e.target.closest('.tool'); if(!t) return;
   const s=tutStep(); if(s && s.tool!==t.dataset.tool) return;
   setTool(t.dataset.tool);
@@ -797,75 +847,113 @@ document.querySelector('.palette').addEventListener('click',e=>{
 });
 $('btnRun').onclick=()=>{
   const s=tutStep(); if(s && !s.run) return;
+  if(running){ stopSim(); return; }
+  if(!tutOn && S.runsLeft<=0) return;
   if(s) tutNext();
-  running?stopSim():startSim();
+  startSim();
 };
-$('btnReset').onclick=()=>{ tutOn?startTutorial():startLevel(LI); };
+/* 리셋 = 내가 놓은 타일만 비운다(가동 횟수는 그대로 — 되돌리기는 공짜다). */
+$('btnReset').onclick=()=>{ if(running) return; if(tutOn){ loadTutRound(); return; } layBoard(); resetSim(); renderBoard(); };
 $('btnTut').onclick=()=>{ tutOn?exitTutorial():startTutorial('game'); };
 
-/* ================= Result ================= */
+/* ================= Result =================
+   결과 콘솔 그림은 승리(버튼 둘: ↻ →) / 실패(버튼 하나) 두 벌뿐이다. 그 안에서 세 상황을 나눈다:
+   · 클리어: ↻ 자리 = '그만두기'(여기까지 기록), → = 다음(마지막이면 처음으로)
+   · 실패·횟수 남음: **콘솔을 안 띄운다** — 판 위에서 힌트·토스트로만(실패 콘솔은 게임오버로 읽힌다)
+   · 실패·횟수 소진: 실패 그림, 버튼 = 처음으로. 기록은 이때(또는 그만두기·전부 클리어) 한 번만 보낸다. */
+function submitRun(){
+  if(window.MGBridge) MGBridge.submit(S.cleared, {timed:true, log:S.log}); // 숫자는 참고값 — 서버가 log 로 다시 센다
+}
 function finish(){
   stopSim();
-  const win=good>=L.win;
-  // ⚠️ 튜토리얼은 점수를 보내지 않는다 — 랭킹은 실제 도달 레벨만 센다.
+  const win=good>=needOf(L);
   if(tutOn){
     // 중간 라운드는 결과창을 띄우지 않는다 — 짧은 레슨 사이에 창이 끼면 흐름이 끊긴다.
-    if(tutRound < TUT_ROUNDS.length-1){
-      $('hintLine').innerHTML=`좋아요! 다음 — <b>${TUT_ROUNDS[tutRound+1].title}</b>`;
+    if(win && tutRound < TUT_ROUNDS.length-1){
+      $('hintLine').innerHTML=T('build.tut_next',{name:T('build.tut_'+TUT_ROUNDS[tutRound+1].key)});
       tutTimer=setTimeout(()=>{ if(!tutOn) return; tutRound++; loadTutRound(); }, 1500);
       return;
     }
-    $('resBadge').textContent='튜토리얼 끝!'; $('resBadge').className='badge win';
-    $('resTitle').textContent='컨베이어 · 지우개 · 분기 센서';
-    $('resTake').textContent='이제 마음껏 지어봐요.';
+    if(!win){ $('hintLine').innerHTML=T('build.tut_again'); loadTutRoundKeep(); return; }
+    $('resCari').src='/games/build-cari-success-v7.webp';
+    $('resBadge').textContent=T('build.tut_done'); $('resBadge').className='badge win';
+    $('resTitle').textContent=T('build.tut_done_title');
+    $('resTake').textContent=T('build.tut_done_take');
     $('resFoot').textContent='';
     $('ovResult').classList.remove('fail');
-    $('btnRetry').textContent='다시';
-    const nt=$('btnNext'); nt.hidden=false; nt.textContent='닫기'; nt.dataset.win='tut';
+    $('btnRetry').hidden=false; $('btnRetry').textContent=T('build.again'); $('btnRetry').classList.remove('asquit');
+    const nt=$('btnNext'); nt.hidden=false; nt.textContent=T('build.close'); nt.dataset.win='tut';
     $('ovResult').classList.remove('hide');
     return;
   }
-  $('resCari').src=win?'/games/build-cari-success-v7.webp':'/games/build-cari-fail-v7.webp';
-  $('resCari').alt=win?'컨베이어 출고에 성공한 CARI':'컨베이어 연결에 실패한 CARI';
-  $('resBadge').textContent=win?'출고 완료!':'출고 실패';
-  $('resBadge').className='badge '+(win?'win':'lose');
-  $('resTitle').textContent=win ? `${L.name} · ${good}/${L.need} 출고` : `${good}/${L.need} 출고`;
-  $('resTake').textContent=win?'모든 상자가 제자리에 도착했어요.':'경로를 다시 연결해요.';
+  const nx=$('btnNext'), rt=$('btnRetry');
   $('resFoot').textContent='';
-  const nx=$('btnNext');
-  if(win && window.MGBridge) MGBridge.submit(LI+1, {timed:true}); // 랭킹: 도달 레벨(동률=시간)
-  $('btnRetry').textContent=win?'다시':'다시 시작';
-  $('ovResult').classList.toggle('fail',!win);
-  nx.hidden=!win;
-  nx.textContent = LI>=LEVELS.length-1?'처음으로':'다음';
-  nx.dataset.win=win?'1':'0';
+  if(win){
+    S.log.push({lv:S.lv, tiles:playerTiles(), runs:S.usedRuns});
+    S.cleared++;
+    const isLast=S.lv>=LEVELS.length-1;
+    $('resCari').src='/games/build-cari-success-v7.webp';
+    $('resBadge').textContent=T(isLast?'build.all_clear':'build.success'); $('resBadge').className='badge win';
+    $('resTitle').textContent=T('build.res_used',{n:S.log[S.log.length-1].tiles.length, r:S.usedRuns});
+    $('resTake').innerHTML=lvT(S.lv,'take',L.take)||T(isLast?'build.res_all':'build.res_next');
+    $('ovResult').classList.remove('fail');
+    rt.hidden=isLast; rt.textContent=T('build.quit'); rt.dataset.mode='quit'; rt.classList.add('asquit');
+    nx.hidden=false; nx.textContent=T(isLast?'build.to_start':'build.next'); nx.dataset.win=isLast?'last':'1';
+    if(isLast){ S.runOver=true; submitRun(); }
+  }else if(S.runsLeft>0){
+    // 횟수가 남은 실패는 화면을 안 바꾼다 — 실패 콘솔로 넘기면 게임오버로 읽힌다(2026-09-15 지적). 판은 그대로,
+    // 힌트줄이 배울 점(teach)을 말하고 토스트가 출고 수·남은 횟수를 알린다(점수판에도 그대로 있다).
+    $('hintLine').innerHTML=lvT(S.lv,'teach',L.teach)||T('build.res_fix');
+    toast(T('build.res_out',{n:good, m:needOf(L)})+' · '+T('build.runs_left',{n:S.runsLeft}), 2600);
+    return;
+  }else{
+    S.runOver=true; submitRun();
+    $('resCari').src='/games/build-cari-fail-v7.webp';
+    $('resBadge').textContent=T('build.out_of_runs'); $('resBadge').className='badge lose';
+    $('resTitle').textContent=T('build.res_cleared',{n:S.cleared});
+    $('resTake').textContent=T('build.res_over');
+    $('ovResult').classList.add('fail');
+    rt.hidden=false; rt.textContent=T('build.to_start'); rt.dataset.mode='over'; rt.classList.remove('asquit');
+    nx.hidden=true;
+  }
   $('ovResult').classList.remove('hide');
 }
-$('btnRetry').onclick=()=>{ $('ovResult').classList.add('hide'); tutOn?startTutorial():startLevel(LI); };
+function loadTutRoundKeep(){ tutTimer=setTimeout(()=>{ if(tutOn) loadTutRound(); }, 1200); }
+$('btnRetry').onclick=()=>{
+  const mode=$('btnRetry').dataset.mode;
+  $('ovResult').classList.add('hide');
+  if(tutOn){ startTutorial(); return; }
+  if(mode==='over'){ goStart(); return; }
+  if(mode==='quit'){ S.runOver=true; submitRun(); goStart(); return; }   // 그만두기 — 깬 데까지가 기록
+};
 $('btnNext').onclick=()=>{
   const d=$('btnNext').dataset.win;
   $('ovResult').classList.add('hide');
   if(d==='tut'){ exitTutorial(); return; }               // 튜토리얼 끝 → 시작한 자리로(메인 게임으로 안 넘김)
-  startLevel(d==='1' ? (LI+1)%LEVELS.length : LI);
+  if(d==='last'){ goStart(); return; }
+  startLevel(S.lv+1);
 };
+function goStart(){ startRun(); $('ovStart').classList.remove('hide'); }
+function startRun(){ S.cleared=0; S.log=[]; S.runOver=false; startLevel(0); }
 
 /* ================= Boot ================= */
-buildPalette();
 buildCells();
-startLevel(0);
-$('btnStart').onclick=()=>{ $('ovStart').classList.add('hide'); started=true; startLevel(0); };
+startRun();
+$('btnStart').onclick=()=>{ $('ovStart').classList.add('hide'); started=true; startRun(); };
 $('btnTutIntro').onclick=()=>{ started=true; startTutorial('intro'); };
 
 /* ================= test hooks ================= */
 window.LEVELS=LEVELS;
+window.TUT_ROUNDS=TUT_ROUNDS;
+window.S=S;
 window.__startLevel=startLevel;
-window.__auto=i=>{ startLevel(i); L.sol.forEach(([r,c,t,d])=>{ grid[r][c]={type:t,dir:d}; }); renderBoard(); };
+window.__place=tiles=>{ tiles.forEach(([r,c,t,d,col])=>{ grid[r][c]=t==='sensor'?{type:t,dir:d,color:col}:{type:t,dir:d}; }); renderBoard(); };
+window.__auto=i=>{ startLevel(i); };
 window.__tick=tick;
 window.__run=startSim;
 window.__stop=stopSim;
 window.__reset=resetSim;
-window.__stat=()=>({good,bad,miss,spawnedCount,tickN,running,LI,live:items.filter(x=>!x.dead).length,need:L.need});
-window.__routeLog=()=>routeLog.slice();
+window.__stat=()=>({good,bad,miss,spawnedCount,tickN,running,lv:S.lv,live:items.filter(x=>!x.dead).length,need:needOf(L),runsLeft:S.runsLeft,cleared:S.cleared});
 window.__finished=()=>!$('ovResult').classList.contains('hide');
 window.__won=()=>$('resBadge').classList.contains('win');
 </script>
@@ -874,14 +962,14 @@ window.__won=()=>$('resBadge').classList.contains('win');
      이 HTML 은 자립형이라 세션도 supabase 클라도 없다 → 실제 제출/조회는 부모(/games/:id = MiniGame.tsx)가 한다.
      여기서는 (1) 인트로·아웃트로 우상단에 '랭킹' 버튼을 얹고, (2) 점수가 나면 postMessage 로 알리기만 한다.
      ⚠️ 이 파일을 단독으로 열면 부모가 없어 버튼도 숨고 아무것도 보내지 않는다(게임은 그대로 동작).
-     ⚠️ tieMs(레벨형 동률 해소용 소요시간)는 인트로에서 시작을 누른 시점부터 잰다. '처음으로'로 되돌아가
-       인트로를 다시 거치지 않으면 계속 누적된다 — 순위 1차 키가 아니라 동률 해소용이라 그대로 둔다. -->
+     ⚠️ log(레벨별 타일 배치·가동 횟수)를 같이 실어 보낸다 — 서버가 이걸로 기록을 다시 센다. 빠지면 서버가 400 을 주고 랭킹에 안 남는다. -->
 <style>
-.mg-rank{position:absolute; top:12px; right:12px; z-index:60; display:none; align-items:center; gap:6px;
-  padding:8px 13px; border-radius:999px; cursor:pointer; font:800 12.5px/1 system-ui,-apple-system,sans-serif;
-  border:1px solid rgba(40,50,76,.16); background:rgba(255,255,255,.92); color:#28324c;
-  box-shadow:0 4px 12px -4px rgba(20,30,60,.28); -webkit-tap-highlight-color:transparent;}
-.mg-rank.on{display:inline-flex;}
+.mg-rank{top:11px!important;right:11px!important;width:auto!important;height:38px!important;aspect-ratio:1701/494;
+  position:absolute;z-index:60;cursor:pointer;
+  padding:0!important;border:0!important;border-radius:0!important;background:url('/games/rank-button.webp') center/100% 100% no-repeat!important;
+  color:#fff!important;box-shadow:none!important;filter:drop-shadow(0 5px 8px rgba(0,10,42,.38));text-shadow:0 1px 3px #001c55!important;
+  font:800 12.5px/1 system-ui,-apple-system,sans-serif;display:none;place-items:center;-webkit-tap-highlight-color:transparent;}
+.mg-rank.on{display:grid!important}.mg-rank .rank-label{position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;text-align:center}
 .mg-rank:active{transform:translateY(1px);}
 </style>
 <script>
@@ -890,19 +978,21 @@ window.__won=()=>$('resBadge').classList.contains('win');
   var T0 = 0;
   function post(m){ if(EMBED) window.parent.postMessage(m, window.location.origin); }
   window.MGBridge = {
-    /** 점수 전송. timed:true 면 시작 이후 경과시간을 동률 해소용으로 같이 보낸다. */
+    /** 점수 전송. timed:true 면 시작 이후 경과시간을 동률 해소용으로 같이 보낸다(서버는 log 의 값을 우선한다). */
     submit: function(v, opts){
       if(typeof v !== 'number' || !isFinite(v)) return;
-      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined });
+      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined,
+             log:(opts && Array.isArray(opts.log)) ? opts.log : undefined });
     }
   };
+  var tr = function(k){ return window.MGI18N ? MGI18N.t(k) : k; };
   function mount(id){
     var ov = document.getElementById(id); if(!ov) return;
     if(ov.querySelector('.mg-rank')) return;
     var b = document.createElement('button');
     b.type='button'; b.className='mg-rank' + (EMBED ? ' on' : '');
-    b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">\uD83C\uDFC6</span><span class="rank-label">랭킹</span>';
+    b.setAttribute('aria-label', tr('mg.rank_aria'));
+    b.innerHTML='<span class="rank-label">'+tr('mg.rank')+'</span>';
     b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); post({t:'mg:rank'}); });
     ov.appendChild(b);
   }
@@ -915,5 +1005,6 @@ window.__won=()=>$('resBadge').classList.contains('win');
   }, true);
 })();
 </script>
+<script>if (window.MGI18N) MGI18N.apply();</script>
 </body>
 </html>

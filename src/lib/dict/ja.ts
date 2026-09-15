@@ -1650,6 +1650,8 @@ const JA: Record<string, string> = {
   "mg.rank_rule_level": "到達レベルが高い順 · 同じなら所要時間が短い順",
   "mg.rank_rule_program": "クリアレベル数 · 同じなら命令数が少ない順、次に実行回数",
   "mg.tie_program": "命令{c} · 実行{r}",
+  "mg.rank_rule_build": "クリアレベル数 · 同じならタイル数が少ない順、次に稼働回数",
+  "mg.tie_build": "タイル{c} · 稼働{r}",
   "mg.rank_rule_score": "スコアが高い順 · 同じなら先に到達した順",
   "mg.rank_players": " · 参加 {n}人",
   "mg.rank_empty": "まだ記録がありません。最初の記録を作りましょう！",

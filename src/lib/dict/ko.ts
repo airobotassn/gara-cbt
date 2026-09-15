@@ -1675,6 +1675,8 @@ const KO: Record<string, string> = {
   "mg.rank_rule_level": "도달 레벨이 높은 순 · 같으면 걸린 시간이 짧은 순",
   "mg.rank_rule_program": "깬 레벨이 많은 순 · 같으면 명령 수가 적은 순 · 그다음 실행 횟수가 적은 순",
   "mg.tie_program": "명령 {c} · 실행 {r}",
+  "mg.rank_rule_build": "깬 레벨이 많은 순 · 같으면 놓은 타일이 적은 순 · 그다음 가동 횟수가 적은 순",
+  "mg.tie_build": "타일 {c} · 가동 {r}",
   "mg.rank_rule_score": "점수가 높은 순 · 같으면 먼저 도달한 순",
   "mg.rank_players": " · 참가 {n}명",
   "mg.rank_empty": "아직 기록이 없어요. 첫 기록의 주인이 되어보세요!",

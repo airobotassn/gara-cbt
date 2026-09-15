@@ -1650,6 +1650,8 @@ const HI: Record<string, string> = {
   "mg.rank_rule_level": "सबसे ऊँचा लेवल · बराबरी पर कम समय",
   "mg.rank_rule_program": "ज़्यादा स्तर पार · बराबरी पर कम कमांड, फिर कम रन",
   "mg.tie_program": "कमांड {c} · रन {r}",
+  "mg.rank_rule_build": "ज़्यादा स्तर पार · बराबरी पर कम टाइल, फिर कम रन",
+  "mg.tie_build": "टाइल {c} · रन {r}",
   "mg.rank_rule_score": "सबसे ज़्यादा स्कोर · बराबरी पर पहले पहुँचने वाला",
   "mg.rank_players": " · {n} खिलाड़ी",
   "mg.rank_empty": "अभी कोई स्कोर नहीं — पहले बनिए!",

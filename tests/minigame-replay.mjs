@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs'
 import * as R from '../supabase/functions/_shared/minigame-replay.ts'
 import { REACH_LEVELS, REACH_DEFAULT_TIME, REACH_GRIP, reachedWith } from '../supabase/functions/_shared/reach-levels.ts'
 import { PROG_LEVELS, runProgram, validProgram, countOps as progCountOps } from '../supabase/functions/_shared/program-levels.ts'
+import { BUILD_LEVELS, simulate as simulateBuild, validTiles as validBuildTiles } from '../supabase/functions/_shared/build-levels.ts'
 
 let failed = 0
 function eq(actual, expected, label) {
@@ -25,6 +26,7 @@ const shoot = readFileSync(new URL('../public/games/shoot-cari.html', import.met
 const pick = readFileSync(new URL('../public/games/pick-cari.html', import.meta.url), 'utf8')
 const reach = readFileSync(new URL('../public/games/reach-cari.html', import.meta.url), 'utf8')
 const prog = readFileSync(new URL('../public/games/program-cari.html', import.meta.url), 'utf8')
+const build = readFileSync(new URL('../public/games/build-cari.html', import.meta.url), 'utf8')
 
 // ---------- 0b) 프로그램해라 레벨 대조 + 정답 프로그램이 서버 VM 으로 성공하는가 ----------
 {
@@ -82,6 +84,35 @@ const prog = readFileSync(new URL('../public/games/program-cari.html', import.me
   eq(R.replayProgram([{ lv: 0, prog: [LP(3, MV)], runs: 1 }], 600), { ok: false, reason: 'log_bad_program' }, 'program 반복 횟수 3(없는 값) 거부')
   eq(R.replayProgram([{ lv: 0, prog: [MV, MV, MV, MV, MV, MV, MV], runs: 1 }], 600), { ok: false, reason: 'log_bad_program' }, 'program 명령 칸 초과 거부')
   eq(R.replayProgram([], 600).score, 0, 'program 빈 기록 = 0')
+}
+
+// ---------- 0c) 지어라 레벨 대조 + 정답 배치가 서버 시뮬레이터로 전부 출고되는가 ----------
+{
+  const m = build.match(/const LEVELS=(\[[\s\S]*?\n\]);/)
+  const HL = m ? new Function('return ' + m[1])() : null
+  eq(HL?.length, BUILD_LEVELS.length, 'build 레벨 수 = 서버')
+  const geo = (L) => ({ sources: L.sources, bins: L.bins, walls: L.walls ?? [], fixed: L.fixed ?? [], pre: L.pre ?? [], sensors: L.sensors, runs: L.runs })
+  ;(HL ?? []).forEach((L, i) => eq(geo(L), BUILD_LEVELS[i] && geo(BUILD_LEVELS[i]), `build 레벨 ${i + 1} 기하 = 서버`))
+  // 의도한 정답 배치(tests/fixtures/build-sol.json — tmp/_build-apply.mjs 가 쓴다). 한 레벨이라도 풀이가 없으면 아무도 못 깬다.
+  const SOL = JSON.parse(readFileSync(new URL('./fixtures/build-sol.json', import.meta.url), 'utf8'))
+  eq(SOL.length, BUILD_LEVELS.length, 'build 정답 수 = 레벨 수')
+  BUILD_LEVELS.forEach((L, i) => eq(validBuildTiles(L, SOL[i]) && simulateBuild(L, SOL[i]).win, true, `build 레벨 ${i + 1} 정답이 서버 시뮬레이터로 전부 출고(${SOL[i].length}타일)`))
+  // 재채점 — 순서·횟수·배치 검사
+  const log = (n, runs = 1) => SOL.slice(0, n).map((tiles, lv) => ({ lv, tiles, runs }))
+  const tsum = (n) => SOL.slice(0, n).reduce((a, t) => a + t.length, 0)
+  eq(R.replayBuild(log(3), 600), { ok: true, score: 3, answers: 3, durationMs: 0, tie: tsum(3) * 1000 + 3 }, `build 3레벨 = 3 · tie = 타일${tsum(3)}×1000 + 가동3`)
+  eq(R.replayBuild(log(30), 600).score, 30, 'build 30레벨 전부 = 30')
+  eq(R.replayBuild(log(2, 3), 600).tie, tsum(2) * 1000 + 6, 'build 가동 3번씩 → tie 끝자리 6')
+  eq(R.replayBuild(log(1, 4), 600), { ok: false, reason: 'log_too_many_runs' }, 'build 레벨 가동 상한(3) 초과 거부')
+  eq(R.replayBuild([{ lv: 0, tiles: SOL[0].slice(0, 3), runs: 1 }], 600), { ok: false, reason: 'log_not_solved' }, 'build 함까지 못 간 배치 거부')
+  eq(R.replayBuild([{ lv: 0, tiles: [[0, 2, 'conv', 2]], runs: 1 }], 600), { ok: false, reason: 'log_bad_tiles' }, 'build 생산기 칸 위 타일 거부')
+  eq(R.replayBuild([{ lv: 2, tiles: [[3, 1, 'conv', 2]], runs: 1 }], 600), { ok: false, reason: 'log_malformed' }, 'build 순서 건너뛰기 거부')
+  eq(R.replayBuild([{ lv: 0, tiles: [[1, 2, 'sensor', 2, 'R']], runs: 1 }], 600), { ok: false, reason: 'log_bad_tiles' }, 'build 그 레벨에 없는 센서 색 거부')
+  eq(R.replayBuild([{ lv: 0, tiles: [[1, 2, 'conv', 2], [1, 2, 'conv', 2]], runs: 1 }], 600), { ok: false, reason: 'log_bad_tiles' }, 'build 한 칸 두 타일 거부')
+  // 고정 타일 위 · 벽 위
+  eq(R.replayBuild(log(14).concat([{ lv: 14, tiles: [[3, 2, 'conv', 2]], runs: 1 }]), 600), { ok: false, reason: 'log_bad_tiles' }, 'build 고정 센서 칸 위 타일 거부')
+  eq(R.replayBuild(log(2).concat([{ lv: 2, tiles: [[3, 2, 'conv', 2]], runs: 1 }]), 600), { ok: false, reason: 'log_bad_tiles' }, 'build 벽 위 타일 거부')
+  eq(R.replayBuild([], 600).score, 0, 'build 빈 기록 = 0')
 }
 
 // ---------- 0) 닿아라 레벨 기하 대조 ----------

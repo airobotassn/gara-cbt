@@ -16,8 +16,9 @@
 
 import { REACH_LEVELS, reachedWith } from './reach-levels.ts'
 import { PROG_LEVELS, validProgram, runProgram, countOps as progCountOps, type Ins } from './program-levels.ts'
+import { BUILD_LEVELS, validTiles as validBuildTiles, simulate as simulateBuild, type Tile as BuildTile } from './build-levels.ts'
 
-export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program'
+export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build'
 
 /** 공용 점수 규칙 — 정답 1개 = SCORE_BASE × 연속 배수. 틀리면 0점, 연속 끊김. */
 export const SCORE_BASE = 10
@@ -56,6 +57,8 @@ export interface PickEntry { q: string; k: number; c: 'O' | 'X' | ''; t: number 
 export interface ReachEntry { lv: number; a: number[]; s: number; t: number }
 /** 프로그램해라 한 레벨 클리어. lv = 레벨 번호(0부터), prog = 성공한 프로그램(블록 트리), runs = 그 레벨에서 쓴 실행 횟수. */
 export interface ProgEntry { lv: number; prog: Ins[]; runs: number }
+/** 지어라 한 레벨 클리어. lv = 레벨 번호(0부터), tiles = 플레이어가 놓은 타일(고정물·미리 깔린 것 제외), runs = 그 레벨에서 쓴 가동 횟수. */
+export interface BuildEntry { lv: number; tiles: BuildTile[]; runs: number }
 
 /** setTimeout 은 일찍 안 울리지만 performance.now() 반올림 여유로 30ms 는 봐준다. */
 const GAP_TOLERANCE_MS = 30
@@ -200,10 +203,30 @@ export function replayProgram(log: unknown, ageSec: number): ReplayResult | Repl
   return { ok: true, score: log.length, answers: log.length, durationMs: 0, tie: cmds * 1000 + Math.min(runs, 999) }
 }
 
+/** 지어라 — 깬 레벨 수를 센다. 레벨은 1부터 순서대로, 각 레벨의 타일 배치는 (a) 고정물 위가 아니고 허용된 센서 색이며 (b) 서버 시뮬레이터로 돌려 전부 출고돼야 한다.
+ *  동률 해소 = 타일 수 합(적을수록) → 가동 횟수 합(적을수록) — 프로그램해라와 같은 한 숫자(타일수합×1000 + 가동횟수합). 시간은 안 본다(생각하는 게임). */
+export function replayBuild(log: unknown, ageSec: number): ReplayResult | ReplayFail {
+  if (!Array.isArray(log)) return { ok: false, reason: 'log_missing' }
+  if (log.length > BUILD_LEVELS.length) return { ok: false, reason: 'log_malformed' }
+  let tiles = 0, runs = 0
+  for (let i = 0; i < log.length; i++) {
+    const e = log[i] as BuildEntry
+    if (!e || typeof e !== 'object' || e.lv !== i || !num(e.runs) || e.runs < 1 || !Number.isInteger(e.runs)) return { ok: false, reason: 'log_malformed' }
+    const L = BUILD_LEVELS[i]
+    if (e.runs > L.runs) return { ok: false, reason: 'log_too_many_runs' }
+    if (!validBuildTiles(L, e.tiles)) return { ok: false, reason: 'log_bad_tiles' }
+    if (!simulateBuild(L, e.tiles).win) return { ok: false, reason: 'log_not_solved' }
+    tiles += e.tiles.length; runs += e.runs
+  }
+  void ageSec
+  return { ok: true, score: log.length, answers: log.length, durationMs: 0, tie: tiles * 1000 + Math.min(runs, 999) }
+}
+
 export function replay(kind: ReplayKind, log: unknown, ageSec: number, knownIds: Set<string>): ReplayResult | ReplayFail {
   if (kind === 'beat') return replayBeat(log, ageSec, knownIds)
   if (kind === 'shoot') return replayShoot(log, ageSec, knownIds)
   if (kind === 'pick') return replayPick(log, ageSec, knownIds)
   if (kind === 'reach') return replayReach(log, ageSec)
+  if (kind === 'build') return replayBuild(log, ageSec)
   return replayProgram(log, ageSec)
 }

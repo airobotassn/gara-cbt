@@ -1650,6 +1650,8 @@ const EN: Record<string, string> = {
   "mg.rank_rule_level": "Highest level reached · ties broken by fastest time",
   "mg.rank_rule_program": "Most levels cleared · ties: fewer commands, then fewer runs",
   "mg.tie_program": "{c} cmds · {r} runs",
+  "mg.rank_rule_build": "Most levels cleared · ties: fewer tiles, then fewer runs",
+  "mg.tie_build": "{c} tiles · {r} runs",
   "mg.rank_rule_score": "Highest score · ties broken by who got there first",
   "mg.rank_players": " · {n} players",
   "mg.rank_empty": "No scores yet — be the first!",

@@ -1650,6 +1650,8 @@ const VI: Record<string, string> = {
   "mg.rank_rule_level": "Cấp đạt cao nhất · hòa thì thời gian ngắn hơn",
   "mg.rank_rule_program": "Qua nhiều màn nhất · hòa thì ít lệnh hơn, rồi ít lần chạy hơn",
   "mg.tie_program": "{c} lệnh · {r} lần chạy",
+  "mg.rank_rule_build": "Qua nhiều màn nhất · hòa thì ít ô hơn, rồi ít lần chạy hơn",
+  "mg.tie_build": "{c} ô · {r} lần chạy",
   "mg.rank_rule_score": "Điểm cao nhất · hòa thì ai đạt trước",
   "mg.rank_players": " · {n} người chơi",
   "mg.rank_empty": "Chưa có điểm nào — hãy là người đầu tiên!",

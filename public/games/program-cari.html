@@ -849,7 +849,10 @@ S.lv=0; loadLevel();
     /** 점수 전송. timed:true 면 시작 이후 경과시간을 동률 해소용으로 같이 보낸다. */
     submit: function(v, opts){
       if(typeof v !== 'number' || !isFinite(v)) return;
-      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined });
+      // ⚠️ log(레벨별 프로그램·실행 횟수)를 반드시 실어야 한다 — 서버가 이걸로 기록을 다시 센다. 2026-09-14 재설계 때 이 줄이
+      //    빠져서 프로그램해라 기록이 전부 400(log_missing)으로 튕겼다(부모는 조용히 넘겨서 화면엔 아무 표시가 없었다).
+      post({ t:'mg:score', score:v, tieMs:(opts && opts.timed && T0) ? (Date.now()-T0) : undefined,
+             log:(opts && Array.isArray(opts.log)) ? opts.log : undefined });
     }
   };
   function mount(id){

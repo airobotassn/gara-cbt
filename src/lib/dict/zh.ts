@@ -1650,6 +1650,8 @@ const ZH: Record<string, string> = {
   "mg.rank_rule_level": "按到达关卡由高到低 · 相同则用时短者优先",
   "mg.rank_rule_program": "通关数由多到少 · 相同则命令少者优先，再看运行次数",
   "mg.tie_program": "命令 {c} · 运行 {r}",
+  "mg.rank_rule_build": "通关数由多到少 · 相同则用块少者优先，再看开机次数",
+  "mg.tie_build": "{c} 块 · 开机 {r}",
   "mg.rank_rule_score": "按分数由高到低 · 相同则先达成者优先",
   "mg.rank_players": " · {n} 人参与",
   "mg.rank_empty": "还没有成绩，来当第一个吧！",
