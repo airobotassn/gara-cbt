@@ -1632,8 +1632,6 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   --skin-gauge-ink: #3b2a7a;
   --skin-gauge-ink-shadow: 0 1px 0 rgba(255, 255, 255, .55);
 }
-/* 경험치 채움이 옅은 청록이라 흰 홈 위에서 비어 보인다(2026-09-15 지적) — 이 벌만 채움을 진하게 덮는다. 그림을 다시 받으면 지울 것. */
-.hub[data-ui='fantasy'] .exp-fill { filter: saturate(1.7) brightness(.82); }
 @media (min-width: 768px) {
   .hub[data-ui='fantasy'] {
     --skin-panel-title: 20px;
