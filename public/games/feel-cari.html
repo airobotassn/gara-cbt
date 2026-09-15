@@ -943,14 +943,16 @@ function loop(){
       // ── 회전 스캔 (라이다) ────────────────────────────────
       // 실제 라이다는 빙글 돌며 훑는다. 그래서 **한 바퀴 돌아야 사방이 보이고**,
       // 빨리 움직이면 도는 사이에 로봇이 이동해 지도가 뒤틀린다. 그게 이 센서의 값과 대가다.
+      // ⚠️ 회전각은 **세계 기준**이다 — 몸통 방향(bot.a)을 더하지 않는다. 더하면 로봇이 돌 때 빔이 몸통과 같이
+      //   홱 돌아서 "라이다가 멈췄다 튀는" 것처럼 보였다(2026-09-15 지적 "라이다는 그냥 계속 돌아야").
       const from=scanA, to=scanA+S.spin*dt;
       for(let a=Math.ceil(from/1.6)*1.6;a<to;a+=1.6){
-        const r=ray(k,bot.a+a*D2R);
+        const r=ray(k,a*D2R);
         if(r.hit) addMark(r.x,r.y,S.c,S.dotR,S.jit);
       }
       if(Math.floor(to/360)>Math.floor(from/360)){ m.d=ray(k,bot.a).d; m.t=nowS; } // 정면은 한 바퀴에 한 번만 갱신
       scanA=to;
-      const sa=bot.a+(to%360)*D2R;
+      const sa=(to%360)*D2R;
       beams.push(`<line x1="${estX()}" y1="${estY()}" x2="${estX()+Math.cos(sa)*S.range}" y2="${estY()+Math.sin(sa)*S.range}" stroke="${S.c}88" stroke-width="1.6"/>`);
     } else if(nowS-m.t >= (S.tick||0)){
       // ── 펄스/셔터 ─────────────────────────────────────────
