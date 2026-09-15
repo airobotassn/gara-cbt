@@ -829,6 +829,12 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='world_za_capetown']           { --skin-bg: url('/hub/bg-world-za-capetown.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
 .hub[data-skin='world_kr_seoul_night']        { --skin-bg: url('/hub/bg-world-kr-seoul-night.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
 .hub[data-skin='world_kr_seoul']              { --skin-bg: url('/hub/bg-world-kr-seoul.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
+/* 한옥 양반집 둘 (2026-09-15) — 국기가 없어 세로 위치는 바닥 기준(100%). UI 는 대한민국 벌. */
+.hub[data-skin='world_kr_hanok']       { --skin-bg: url('/hub/bg-world-kr-hanok.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='world_kr_hanok2']      { --skin-bg: url('/hub/bg-world-kr-hanok2.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+/* 산토리니·만리장성 (2026-09-15 · 옛「배경 스킨」에서 옮김) — 국기가 없어 바닥 기준. */
+.hub[data-skin='world_gr_santorini']   { --skin-bg: url('/hub/bg-world-gr-santorini.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='world_cn_greatwall']   { --skin-bg: url('/hub/bg-world-cn-greatwall.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 .hub[data-skin='world_de_berlin']             { --skin-bg: url('/hub/bg-world-de-berlin.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
 .hub[data-skin='world_my_petronas']           { --skin-bg: url('/hub/bg-world-my-petronas.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
 .hub[data-skin='world_us_dc_capitol']         { --skin-bg: url('/hub/bg-world-us-dc-capitol.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
