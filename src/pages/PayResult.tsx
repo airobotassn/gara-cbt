@@ -1,8 +1,10 @@
-// 결제 결과 (/pay/success · /pay/fail) — 결제창이 돌아오는 자리(토스 successUrl/failUrl · 엑심베이 return_url).
+// 결제 결과 (/pay/success) — 엑심베이 결제창이 돌아오는 자리(return_url → payments-return → 여기).
+//   성공·실패 둘 다 이 주소로 온다(엑심베이는 실패 주소가 따로 없다) — rescode 로 가른다.
+//   토스 시절의 /pay/fail 은 2026-09-15 에 뺐다.
 //
 // ⚠️ 여기 도착한 것만으로는 결제가 된 게 아니다. 인증만 끝났을 뿐이라, **서버가 승인 API 를 호출해
 //    성공해야** 비로소 결제이고 그때 지급된다. 그래서 이 화면은 도착하자마자 confirm 을 부른다.
-// ⚠️ failUrl 로 온 경우엔 승인을 부르면 안 된다(인증 실패·사용자 취소). 사전 문구 하나와 재시도 길만 준다 —
+// ⚠️ 실패로 온 경우엔 승인을 부르면 안 된다(인증 실패·사용자 취소). 사전 문구 하나와 재시도 길만 준다 —
 //    PG 의 사유·코드 원문은 화면에 안 내보낸다(웹훅 원장에 남는다).
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -39,8 +41,6 @@ export default function PayResult() {
   const navigate = useNavigate()
   const { t, lang } = useT()
 
-  const isFail = location.pathname.endsWith('/fail')
-
   // 어느 PG 가 돌려보낸 콜백인가 — 파라미터 이름이 다르다. 엑심베이는 order_id·transaction_id(스네이크케이스)를
   // 쓰고, **실패도 이 주소로 돌아온다**(토스처럼 failUrl 이 따로 없다). 그래서 rescode 로 성패를 먼저 가른다.
   const exOrderId = params.get('order_id') ?? ''
@@ -60,7 +60,6 @@ export default function PayResult() {
   //    뜻이 없고 6개국어 사전과도 안 맞는다. 사용자에겐 사전 문구 하나만 보이고, 원문은 웹훅 원장
   //    (payment_webhook_events)에 남으니 문의가 오면 주문번호로 우리가 찾는다.
   const [view, setView] = useState<View>(() => {
-    if (isFail) return { kind: 'failed', message: t('pay.fail_body') }
     if (params.get('free')) return { kind: 'free' } // 0원 상품 — 서버가 이미 지급했다
     // 엑심베이가 실패로 돌아온 경우. 토스의 failUrl 과 같은 자리이므로 **승인을 부르지 않는다**.
     // (주문은 pending 으로 남고 대사가 만료로 접는다 — 결제가 안 된 건을 우리가 failed 로 단정하지 않는다.)

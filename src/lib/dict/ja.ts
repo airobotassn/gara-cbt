@@ -979,7 +979,7 @@ const JA: Record<string, string> = {
   "ebook.go_library": "マイライブラリで見る",
   "ebook.load_failed": "E-Bookを読み込めません。",
 
-  // ---- 결제(/checkout · /pay/success · /pay/fail) ----
+  // ---- 결제(/checkout · /pay/success) ----
   // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
   "pay.title": "お支払い",
   "pay.back": "戻る",
@@ -1652,6 +1652,8 @@ const JA: Record<string, string> = {
   "mg.tie_program": "命令{c} · 実行{r}",
   "mg.rank_rule_build": "クリアレベル数 · 同じならタイル数が少ない順、次に稼働回数",
   "mg.tie_build": "タイル{c} · 稼働{r}",
+  "mg.rank_rule_order": "完了した注文数 · 同じなら星が多い順、次に速い順",
+  "mg.tie_order": "星{s} · {t}",
   "mg.rank_rule_score": "スコアが高い順 · 同じなら先に到達した順",
   "mg.rank_players": " · 参加 {n}人",
   "mg.rank_empty": "まだ記録がありません。最初の記録を作りましょう！",

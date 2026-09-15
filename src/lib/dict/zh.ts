@@ -979,7 +979,7 @@ const ZH: Record<string, string> = {
   "ebook.go_library": "在 我的书架中查看",
   "ebook.load_failed": "无法加载电子书。",
 
-  // ---- 결제(/checkout · /pay/success · /pay/fail) ----
+  // ---- 결제(/checkout · /pay/success) ----
   // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
   "pay.title": "结算",
   "pay.back": "返回",
@@ -1652,6 +1652,8 @@ const ZH: Record<string, string> = {
   "mg.tie_program": "命令 {c} · 运行 {r}",
   "mg.rank_rule_build": "通关数由多到少 · 相同则用块少者优先，再看开机次数",
   "mg.tie_build": "{c} 块 · 开机 {r}",
+  "mg.rank_rule_order": "完成订单多的在前 · 相同则星多者在前，再看用时",
+  "mg.tie_order": "{s} 星 · {t}",
   "mg.rank_rule_score": "按分数由高到低 · 相同则先达成者优先",
   "mg.rank_players": " · {n} 人参与",
   "mg.rank_empty": "还没有成绩，来当第一个吧！",

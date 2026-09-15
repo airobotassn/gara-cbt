@@ -991,7 +991,7 @@ const KO: Record<string, string> = {
   "ebook.go_library": "내 서재에서 보기",
   "ebook.load_failed": "이북을 불러올 수 없습니다.",
 
-  // ---- 결제(/checkout · /pay/success · /pay/fail) ----
+  // ---- 결제(/checkout · /pay/success) ----
   // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
   "pay.title": "결제",
   "pay.back": "돌아가기",
@@ -1677,6 +1677,8 @@ const KO: Record<string, string> = {
   "mg.tie_program": "명령 {c} · 실행 {r}",
   "mg.rank_rule_build": "깬 레벨이 많은 순 · 같으면 놓은 타일이 적은 순 · 그다음 가동 횟수가 적은 순",
   "mg.tie_build": "타일 {c} · 가동 {r}",
+  "mg.rank_rule_order": "깬 주문이 많은 순 · 같으면 별이 많은 순 · 그다음 빠른 순",
+  "mg.tie_order": "별 {s} · {t}",
   "mg.rank_rule_score": "점수가 높은 순 · 같으면 먼저 도달한 순",
   "mg.rank_players": " · 참가 {n}명",
   "mg.rank_empty": "아직 기록이 없어요. 첫 기록의 주인이 되어보세요!",

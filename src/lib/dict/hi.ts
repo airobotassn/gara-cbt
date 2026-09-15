@@ -979,7 +979,7 @@ const HI: Record<string, string> = {
   "ebook.go_library": "मेरी लाइब्रेरी में खोलें",
   "ebook.load_failed": "ईबुक लोड नहीं हो सकी।",
 
-  // ---- 결제(/checkout · /pay/success · /pay/fail) ----
+  // ---- 결제(/checkout · /pay/success) ----
   // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
   "pay.title": "भुगतान",
   "pay.back": "वापस",
@@ -1652,6 +1652,8 @@ const HI: Record<string, string> = {
   "mg.tie_program": "कमांड {c} · रन {r}",
   "mg.rank_rule_build": "ज़्यादा स्तर पार · बराबरी पर कम टाइल, फिर कम रन",
   "mg.tie_build": "टाइल {c} · रन {r}",
+  "mg.rank_rule_order": "ज़्यादा ऑर्डर पूरे · बराबर हो तो ज़्यादा स्टार, फिर तेज़",
+  "mg.tie_order": "{s} स्टार · {t}",
   "mg.rank_rule_score": "सबसे ज़्यादा स्कोर · बराबरी पर पहले पहुँचने वाला",
   "mg.rank_players": " · {n} खिलाड़ी",
   "mg.rank_empty": "अभी कोई स्कोर नहीं — पहले बनिए!",

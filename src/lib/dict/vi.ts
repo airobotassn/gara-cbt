@@ -979,7 +979,7 @@ const VI: Record<string, string> = {
   "ebook.go_library": "Xem trong Thư viện của tôi",
   "ebook.load_failed": "Không thể tải eBook.",
 
-  // ---- 결제(/checkout · /pay/success · /pay/fail) ----
+  // ---- 결제(/checkout · /pay/success) ----
   // ⚠️ 통화는 화면 언어와 무관하게 **원(KRW)** 이다. 금액 문자열은 여기 넣지 말고 lib/money.ts 의 krw() 로 찍을 것.
   "pay.title": "Thanh toán",
   "pay.back": "Quay lại",
@@ -1652,6 +1652,8 @@ const VI: Record<string, string> = {
   "mg.tie_program": "{c} lệnh · {r} lần chạy",
   "mg.rank_rule_build": "Qua nhiều màn nhất · hòa thì ít ô hơn, rồi ít lần chạy hơn",
   "mg.tie_build": "{c} ô · {r} lần chạy",
+  "mg.rank_rule_order": "Nhiều đơn hơn xếp trước · bằng nhau thì nhiều sao hơn, rồi nhanh hơn",
+  "mg.tie_order": "{s} sao · {t}",
   "mg.rank_rule_score": "Điểm cao nhất · hòa thì ai đạt trước",
   "mg.rank_players": " · {n} người chơi",
   "mg.rank_empty": "Chưa có điểm nào — hãy là người đầu tiên!",

@@ -162,7 +162,7 @@ CSS는 대부분 `src/index.css` 가 일괄 `@import` — 페이지에서 직접
 | `/ebooks` (러닝 라이브러리 = 교재+강의) | `pages/Ebooks.tsx` | (Tailwind 유틸) | `ebooks` |
 | `/ebooks/read/:id` (이북 뷰어) | `pages/EbookReader.tsx` | (인라인) | `ebooks` |
 | `/checkout?type=&ref=` (결제) | `pages/Checkout.tsx` | (Tailwind 유틸) | `payments` |
-| `/pay/success` · `/pay/fail` (결제 결과) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
+| `/pay/success` (결제 결과 — 성공·실패 둘 다) | `pages/PayResult.tsx` | (Tailwind 유틸) | `payments` |
 | **캐릭터 허브 / 미니게임** ||||
 | `/hub` (실동작 로비) | `pages/Hub.tsx` | `hub.css`(직접 import) | `get-hub` · `complete-daily` · `shop-buy` · `character` · `redeem-referral` · `coin-gift` |
 | `/games/:gameId` | `pages/MiniGame.tsx` (목록=`lib/minigames.ts`) | `hub.css` · `minigame.css` | `submit-minigame` · `minigame-rank` · `term-pool`(문항) |
