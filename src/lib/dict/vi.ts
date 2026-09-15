@@ -1128,7 +1128,7 @@ const VI: Record<string, string> = {
   "fab.uploadFail": "Tải lên thất bại.",
   "fab.toTop": "Lên đầu trang",
   "fab.menu": "Menu",
-  "fab.hint": "Menu ở đây",
+  "fab.click": "Click",
   // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
   "fab.newanswer": "Có phản hồi mới cho câu hỏi của bạn",
   "landing.hero_pre": "Trong kỷ nguyên AI vật lý,",

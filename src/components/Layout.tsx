@@ -31,6 +31,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
   const { user, isFullUser, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  function togglePanel() {
+    setOpen(!open)
+  }
   // ⚠️ 프로필이 오기 전 한 박자를 **마지막에 본 값**으로 메운다(`lib/lastLook.ts`) — 안 그러면
   //    떠 있는 FAB 이 색 젬으로 떴다가 내가 올린 사진으로 바뀌는 게 화면마다 보인다.
   // ⛔ 표시용 초기값일 뿐이다. 진짜 값이 오면 그대로 덮이고, 게스트면 아래 이펙트가 즉시 null 로 되돌린다.
@@ -426,8 +429,8 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           <button
             className="fab"
-            onClick={() => setOpen((o) => !o)}
-            aria-label={inquiryAlert > 0 ? t('fab.newanswer') : 'menu'}
+            onClick={togglePanel}
+            aria-label={inquiryAlert > 0 ? t('fab.newanswer') : t('fab.menu')}
             title={inquiryAlert > 0 ? t('fab.newanswer') : undefined}
           >
             <img
@@ -438,6 +441,15 @@ export default function Layout({ children }: { children: ReactNode }) {
             {/* 새 답변 알림 — 빨간 점이 아니라 노란 종(2026-08-12 요청). 점은 "뭔가 있다"까지만 말한다. */}
             {inquiryAlert > 0 ? <BellIcon className="alert-bell fab-bell" size={22} /> : null}
           </button>
+          {/* 원 위 'Click' 말풍선(2026-09-15) — 로고만 든 원은 표식으로 읽혀 버튼인 줄 모른다는 의견에 대한 답.
+              **메인(/)에서만** 뜬다(2026-09-15 지시 — 다른 화면엔 안 나와도 된다). 항상 떠 있고(원의 맥동에 맞춰
+              나왔다 사라진다 — fab.css), 패널이 열린 동안만 숨는다. 누르면 원과 같은 일을 한다.
+              스크린리더에는 원(aria-label)이 이미 이름을 갖고 있어 이건 숨긴다. */}
+          {pathname === '/' ? (
+            <button className="fab-hint" onClick={togglePanel} aria-hidden="true" tabIndex={-1}>
+              {t('fab.click')}
+            </button>
+          ) : null}
         </>
       )}
 

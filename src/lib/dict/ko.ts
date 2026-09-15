@@ -1146,7 +1146,7 @@ const KO: Record<string, string> = {
   "fab.uploadFail": "업로드에 실패했습니다.",
   "fab.toTop": "맨 위로",
   "fab.menu": "메뉴",
-  "fab.hint": "메뉴는 여기 있어요",
+  "fab.click": "Click",
   // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
   "fab.newanswer": "문의에 새 답변이 있습니다",
   "landing.hero_pre": "피지컬 AI 시대,",

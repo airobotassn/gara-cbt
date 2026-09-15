@@ -1193,9 +1193,6 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    궁궐·오피스는 그 자리에 아무것도 없어 상관없었다. 로고 오른쪽부터 시작하게 밀어 둔다(PC 는 도크가 가로 배치라 해당 없음). */
 @media (max-width: 767px) {
   .hub:is([data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas'], [data-ui='scenery']) .cta-main { margin-left: 74px; }
-  /* FAB 의 "누르는 거예요" 힌트(fab.css 의 .fab-hint · 2026-09-15)는 폰 허브에서 뗀다 — 원 오른쪽에 뜨는데
-     그 자리가 바로 랭킹 버튼이다. */
-  body:has(.hub) .fab-hint { display: none; }
 }
 
 /* ── 값: 대한민국(korea) UI 한 벌 (2026-09-14) ──────────────────────────────────

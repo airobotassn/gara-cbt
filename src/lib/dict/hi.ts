@@ -1128,7 +1128,7 @@ const HI: Record<string, string> = {
   "fab.uploadFail": "अपलोड विफल रहा।",
   "fab.toTop": "ऊपर जाएँ",
   "fab.menu": "मेनू",
-  "fab.hint": "मेनू यहाँ है",
+  "fab.click": "Click",
   // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
   "fab.newanswer": "आपकी पूछताछ का नया उत्तर आया है",
   "landing.hero_pre": "फिजिकल AI के युग में,",

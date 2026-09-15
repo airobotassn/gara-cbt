@@ -1128,7 +1128,7 @@ const JA: Record<string, string> = {
   "fab.uploadFail": "アップロードに失敗しました。",
   "fab.toTop": "トップへ",
   "fab.menu": "メニュー",
-  "fab.hint": "メニューはこちら",
+  "fab.click": "Click",
   // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
   "fab.newanswer": "お問い合わせに新しい返信があります",
   "landing.hero_pre": "フィジカルAIの時代、",

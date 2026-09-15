@@ -1128,7 +1128,7 @@ const ZH: Record<string, string> = {
   "fab.uploadFail": "上传失败。",
   "fab.toTop": "回到顶部",
   "fab.menu": "菜单",
-  "fab.hint": "菜单在这里",
+  "fab.click": "Click",
   // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
   "fab.newanswer": "您的咨询有新回复",
   "landing.hero_pre": "实体 AI 时代，",
