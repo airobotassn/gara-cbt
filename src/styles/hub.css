@@ -711,7 +711,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
      ③ 에셋 — public/hub/ 아래 그 테마 그림들
    새 테마 = 배경 블록 한 줄 + (UI 를 새로 입힐 때만) 값 블록 한 벌 + 에셋 한 벌.
    규칙은 손대지 않는다 — **이름만 한 칸 더 적는다**. 규칙 선택자가
-   `.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'])` 인 이유가 그것이고, 다음 벌은 그 목록에
+   `.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas'])` 인 이유가 그것이고, 다음 벌은 그 목록에
    자기 이름을 더하면 된다. ⛔ 규칙을 통째로 복사해 자기 이름으로 한 벌 더 만들지 말 것 —
    그 순간 같은 규칙이 두 벌이 되고, 한쪽만 고친 날부터 벌마다 다르게 동작한다.
    ⚠️ `:is()` 를 쓰는 건 특정도를 그대로 두려는 것이다(`:is()` 의 특정도 = 인자 중 최대 =
@@ -812,6 +812,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 .hub[data-skin='kr_jeju']        { --skin-bg: url('/hub/bg-kr-jeju.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 /* 시즌 — 할로윈 (2026-09-14 · Z:「시즌 스킨」). 아래 1/3 이 저택 앞 돌길이라 값은 오피스 계열과 같다. UI 는 `[data-ui='halloween']`. */
 .hub[data-skin='season_halloween']     { --skin-bg: url('/hub/bg-season-halloween.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+/* 시즌 — 크리스마스 마을 광장·산장 (2026-09-15 · Z:「시즌 스킨」). 아래 1/3 이 눈 덮인 광장·마당이라 값은 같다. UI 는 `[data-ui='christmas']`. */
+.hub[data-skin='season_xmas_town']     { --skin-bg: url('/hub/bg-season-xmas-town.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
+.hub[data-skin='season_xmas_cabin']    { --skin-bg: url('/hub/bg-season-xmas-cabin.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 100%; }
 /* 세계 — 파리 에펠탑 밤 (2026-09-14). 같은 판(1672×941), 아래 1/3 이 광장이라 값은 오피스 계열과 같다.
    UI 는 `[data-ui='world']` 벌(아래 값 블록). 나라 배경을 더할 땐 여기 한 줄 + SKINS 한 줄이면 된다. */
 .hub[data-skin='world_paris']          { --skin-bg: url('/hub/bg-world-paris.webp'); --skin-bg-size: cover; --skin-bg-pos: 50% 15%; }
@@ -1174,7 +1177,12 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* 폰의 랭킹 버튼 — 왼쪽 끝 트로피 원판이 떠 있는 CARIS 로고 버튼(`.fab`, 왼쪽 24px+58px)에 가려진다.
    궁궐·오피스는 그 자리에 아무것도 없어 상관없었다. 로고 오른쪽부터 시작하게 밀어 둔다(PC 는 도크가 가로 배치라 해당 없음). */
 @media (max-width: 767px) {
-  .hub:is([data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .cta-main { margin-left: 74px; }
+  .hub:is([data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .cta-main { margin-left: 74px; }
+  /* FAB 원 밑에 '메뉴' 글자가 붙는다(fab.css 의 .fab-label · 2026-09-15). 폰 허브에서는 뗀다 —
+     그 글자 높이만큼 원이 올라가는데, 위 74px 은 원이 도크와 같은 높이에 있을 때 잰 값이라 원이 뜨면
+     도크 위 스킨 UI 를 덮는다. 글자를 떼고 높이도 0 으로 되돌려 원을 옛 자리에 둔다. */
+  body:has(.hub) { --fab-label-h: 0px; }
+  body:has(.hub) .fab-label { display: none; }
 }
 
 /* ── 값: 대한민국(korea) UI 한 벌 (2026-09-14) ──────────────────────────────────
@@ -1366,9 +1374,97 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   }
 }
 
+/* ── 값: 크리스마스(christmas) UI 한 벌 (2026-09-15) ──────────────────────────
+   에셋 public/hub/ui-christmas/* — 대한민국·할로윈과 같은 생성 템플릿. 면 색: 미션 판 = 빨강, 코인 칩·랭킹 버튼 = 초록
+   (둘 다 글자 밝게), 점수 칩·게이지 홈·빈 도장 = 크림(글자 짙은 초록), 채움·찍힌 도장 = 빨강.
+   랭킹 버튼은 '랭킹' 글자를 뺀 합성본(478×206) — 눈 덮인 윗부분이 틀 위로 튀어나와 위 슬라이스(60)에 눈이 들어간다. */
+.hub[data-ui='christmas'] {
+  --skin-char-h: 46svh;
+  --skin-char-bottom: 22svh;
+
+  --skin-panel-ink: #fff6e6;
+  --skin-panel-title: 17px;
+  --skin-panel-ink-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  --skin-cta-ink: #fff6e6;
+  --skin-cta-ink-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  --skin-rail-ink: #ffffff;
+  --skin-rail-ink-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .7);
+
+  /* 미션 바 — 1400×92(빨강 판). 왼쪽 선물 메달 x 0~92, 오른쪽 캡 50, 테 6. 48px 기준 0.52 배. */
+  --skin-mission-img: url('/hub/ui-christmas/panel-mission.webp');
+  --skin-mission-slice: 6 50 6 100 fill;
+  --skin-mission-edge: 3px 26px 3px 52px;
+  --skin-mission-h: 48px;
+
+  --skin-reward-img: url('/hub/ui-christmas/panel-reward.webp');
+  --skin-reward-slice: 40 60 40 60 fill;
+  --skin-reward-edge: 12px 16px;
+
+  /* 합성본 478×206: 왼쪽 호랑가시+트로피 x 0~313, 민무늬 10, 오른쪽 장식 155. */
+  --skin-cta-img: url('/hub/ui-christmas/button-ranking.webp');
+  --skin-cta-slice: 60 155 60 313 fill;
+  --skin-cta-edge: 14px 36px 14px 73px;
+
+  --skin-gauge-img: url('/hub/ui-christmas/gauge-track.webp');
+  --skin-gauge-slice: 18 32 18 32 fill;
+  --skin-gauge-edge: 8px 14px;
+  --skin-fill-img: url('/hub/ui-christmas/gauge-fill.webp');
+  --skin-fill-slice: 14 25 14 25 fill;
+  --skin-fill-edge: 6px 11px;
+  --skin-hud-h: 38px;
+  --skin-gauge-font: 12.5px;
+
+  --skin-stamp-img: url('/hub/ui-christmas/stamp-empty.webp');
+  --skin-stamp-on-img: url('/hub/ui-christmas/stamp-filled.webp');
+  --skin-stamp-h: 52px;
+  --skin-stamp-font: 13px;
+  --skin-stamp-ink: #1f4d3a;
+  --skin-stamp-on-ink: #fff6e6;
+  --skin-stamp-on-ink-shadow: none;
+
+  /* 프로필 틀 — 488×455, 위 눈·오른쪽 위 리본. 고리 안지름이 폭의 70% 라 틀을 조금 더 키운다(48px → 틀 70×65). */
+  --skin-profile-img: url('/hub/ui-christmas/profile-frame.webp');
+  --skin-profile-inset: -11px -11px -7px;
+
+  --skin-rank-img: url('/hub/ui-christmas/rank-score-frame.webp');
+  --skin-rank-pad: 7px 14px 6px 35px;
+  --skin-rank-ink: #1f4d3a;
+  --skin-rank-ink-shadow: none;
+  --skin-rank-pct-ink: rgba(31, 77, 58, .62);
+
+  --skin-currency-img: url('/hub/ui-christmas/currency-chip.webp');
+  --skin-currency-ar: 4.4;
+  --skin-currency-pad: 0 calc(var(--skin-hud-h) * 0.66) 0 calc(var(--skin-hud-h) * 0.88);
+  --skin-currency-ink: #fff6e6;
+  --skin-currency-ink-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+
+  --skin-gauge-ink: #ffffff;
+  --skin-gauge-ink-shadow: 0 1px 0 rgba(0, 0, 0, .9), 0 -1px 0 rgba(0, 0, 0, .75), 1px 0 0 rgba(0, 0, 0, .75),
+    -1px 0 0 rgba(0, 0, 0, .75), 0 2px 4px rgba(0, 0, 0, .85);
+}
+@media (min-width: 768px) {
+  .hub[data-ui='christmas'] {
+    --skin-panel-title: 20px;
+    --skin-mission-edge: 4px 34px 4px 67px;
+    --skin-mission-h: 62px;
+    --skin-reward-edge: 14px 20px;
+    --skin-cta-edge: 17px 43px 17px 88px;
+    --skin-gauge-edge: 11px 18px;
+    --skin-fill-edge: 8px 14px;
+    --skin-hud-h: 50px;
+    --skin-stamp-h: 58px;
+    --skin-stamp-font: 16px;
+    --skin-profile-inset: -14px -15px -9px;   /* 68px 아바타 → 틀 98×91 */
+    --skin-rank-pad-l: 41px;
+    --skin-rank-pad-r: 20px;
+    --skin-currency-ar: 4.96;
+    --skin-currency-pad: 0 calc(var(--skin-hud-h) * 0.72) 0 calc(var(--skin-hud-h) * 0.97);
+  }
+}
+
 /* ── 규칙: 9패치 UI 벌(궁궐·오피스·세계)을 입었을 때의 허브. 여기서는 변수만 읽는다 ─── */
 
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .mission-bar {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .mission-bar {
   background: transparent; box-shadow: none;
   border-style: solid; border-color: transparent; border-width: var(--skin-mission-edge);
   border-image-source: var(--skin-mission-img);
@@ -1391,7 +1487,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   .hub .mission-bar { display: contents; }
   .hub .ms-chips { order: 1; margin-top: 0; }
   .hub .ms-n { order: 2; }
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .mission-zone {
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .mission-zone {
     background: transparent; box-shadow: none;
     border-style: solid; border-color: transparent; border-width: var(--skin-mission-edge);
     border-image-source: var(--skin-mission-img);
@@ -1401,7 +1497,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   }
 }
 
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .reward {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .reward {
   background: transparent; box-shadow: none;
   border-style: solid; border-color: transparent; border-width: var(--skin-reward-edge);
   border-image-source: var(--skin-reward-img);
@@ -1411,7 +1507,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   /* 판을 키웠으면 내용도 그 안에서 가운데로 — 안 그러면 위로 몰리고 아래가 텅 빈다 */
   display: flex; flex-direction: column; justify-content: center; gap: 10px;
 }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .streak { margin-top: 0; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .streak { margin-top: 0; }
 /* 랭킹 버튼은 스킨이 안 건드린다 — 슬롯 모양에 맞는 그림이 아직 없어서 옛 버튼 그대로 둔다.
    그림이 오면 위 스킨 값 블록의 주석을 풀고 여기에 판·버튼과 같은 규칙을 다시 넣으면 된다. */
 
@@ -1419,16 +1515,16 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* 옆 불꺽 아이콘은 옛 카툰 SVG 라 궁정 판 위에서 혼자 논다 — 글자만으로 충분하다. */
 /* ⚠️ `!important` 가 필요하다 — 아이콘 컴포넌트(Ic)가 svg 에 인라인 style 로
       `display:block` 을 박아서 일반 규칙으로는 못 감는다(2026-08-18 안 지워져서 찾은 자리). */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rw-top svg { display: none !important; }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rw-top, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rw-n, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rw-more,
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .ms-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .ms-n {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rw-top svg { display: none !important; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rw-top, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rw-n, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rw-more,
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .ms-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .ms-n {
   color: var(--skin-panel-ink); text-shadow: var(--skin-panel-ink-shadow);
   font-size: var(--skin-panel-title);
 }
 /* ⚠️ 위 규칙이 판 글자 크기를 통째로 잡아서 화살표까지 같이 눌러버린다 — 색·그림자만 물려받고
       크기는 되돌린다(기본 벌과 같은 이유: 작으면 누를 수 있는 곳으로 안 읽힌다). */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rw-more { font-size: 26px; }
-@media (min-width: 768px) { .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rw-more { font-size: 32px; } }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rw-more { font-size: 26px; }
+@media (min-width: 768px) { .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rw-more { font-size: 32px; } }
 
 /* 레일 칸 — 틀을 씌울지 말지는 **벌이 정한다**(`--skin-rail-card`).
    궁궐은 안 씌운다: 아이콘 자체가 테두리 있는 장식판이라 덧씌우면 틀이 두 겹이 된다.
@@ -1438,9 +1534,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       서고, 색도 궁궐과 같은 규칙(밝은 글자 + 어두운 외곽선)을 그대로 쓴다.
    ⚠️ **grid 2행(아이콘 1fr / 라벨 auto)이어야 한다.** flex + 아이콘 flex:1 로 두면 아이콘이
       라벨 자리까지 먹어 글자가 통째로 사라진다. 라벨은 태그 없는 맨 텍스트라 grid 가 2행에 앉힌다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard,
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .f-shop,
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .f-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .f-invite {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard,
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .f-shop,
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .f-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .f-invite {
   background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
   /* 아이콘 칸은 **글자와 무관한 고정 정사각형**, 라벨 칸은 **두 줄 높이 고정**(2026-09-14).
      전엔 1fr/auto 라 아이콘이 라벨에 끌려다녔다 — 한 줄로 긴 라벨(영어 Check-in 3/7 · 베트남어 Điểm danh 3/7)은
@@ -1455,9 +1551,9 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
    ⚠️ 칸 폭이 곧 상한이다(모바일 64px · PC 96px). 제일 긴 라벨이 '초대하기'(4자)라
       모바일에서 16px 을 넘기면 줄바꿈되고, 두 줄이 되면 위 칸(1fr)의 아이콘이 그만큼 눌린다. */
 @media (min-width: 768px) {
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard,
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .f-shop,
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .f-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .f-invite { font-size: 19px; }
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard,
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .f-shop,
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .f-title, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .f-invite { font-size: 19px; }
 }
 /* ⚠️ overflow:hidden 을 쓰면 그림자까지 네모로 잘려 아이콘마다 사각 경계선이 생긴다.
       그림을 absolute 로 깔면 부모 높이가 1fr 이어도 퍼센트가 확실히 풀린다. */
@@ -1466,14 +1562,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
       (absolute 는 padding box 를 기준으로 앉는다) — 안 주면 그림이 틀 테두리에 닿는다. */
 /* 아이콘 칸 = **남는 세로를 한 변으로 하는 정사각형**(aspect-ratio). 칸 높이는 레일이 정하고 라벨 줄은 2.1em 고정이라
    남는 세로가 언어와 무관하게 같다 → 아이콘 크기·자리가 언어와 무관하게 같다. 폭은 세로에서 따라온다(라벨 폭이 아니다). */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard .fico { position: relative; min-height: 0; width: auto; height: 100%; aspect-ratio: 1 / 1; max-width: 100%;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard .fico { position: relative; min-height: 0; width: auto; height: 100%; aspect-ratio: 1 / 1; max-width: 100%;
   background: var(--skin-rail-card, none) center / 100% 100% no-repeat;
   padding: var(--skin-rail-card-pad, 0); }
 /* ⚠️ **`.fcard` 안으로 한정해야 한다.** 이 규칙이 `.hub-ui-icon` 전체를 잡고 있었는데, 그 클래스는
       레일 3칸 말고 **랭킹 버튼 속 아이콘**도 쓴다 — 궁궐 벌은 그 아이콘을 아예 안 그려서 여태
       안 드러났고, 오피스에서 그리자마자 `inset:0 / 100%` 가 먹어 그림이 버튼을 통째로 덮고
       '랭킹' 글자를 가렸다(2026-09-01 실측). */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard .hub-ui-icon { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
   /* 첫 행이 남는 높이를 모두 차지하므로 가운데 정렬하면 아이콘과 아래 라벨 사이가 벌어진다.
      아이콘을 행의 아래쪽에 붙여 세 버튼의 그림과 텍스트가 한 덩어리로 읽히게 한다. */
   /* ⚠️ 틀이 있는 벌은 가운데다 — 아래에 붙이면 그림이 틀 바닥에 눌린다.
@@ -1483,14 +1579,14 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* 출석 라벨(글자 + n/7)은 이 벌들에서 **줄바꿈을 허용**한다 — 라벨 칸이 두 줄 고정이라 자리가 있고,
    한 줄로 못 박으면 영어 "Check-in 3/7"·베트남어 "Điểm danh 3/7" 이 칸을 넘어 화면 오른쪽 밖으로 잘린다
    (레일이 오른쪽 끝에 붙어 있어 넘친 만큼 그대로 사라진다). 기본(초원)의 nowrap 은 그대로다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard .f-lab { white-space: normal; text-align: center; max-width: 100%; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard .f-lab { white-space: normal; text-align: center; max-width: 100%; }
 /* 라벨 두 줄이 들어갈 자리만큼 칸 천장을 올린다(84→94 · 118→130). 옛 천장은 한 줄 라벨 기준이었다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rail-r .fcard { max-height: 94px; line-height: 1.05; }
-@media (min-width: 768px) { .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .rail-r .fcard { max-height: 130px; } }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard:active { transform: translateY(2px); box-shadow: none; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rail-r .fcard { max-height: 94px; line-height: 1.05; }
+@media (min-width: 768px) { .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .rail-r .fcard { max-height: 130px; } }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard:active { transform: translateY(2px); box-shadow: none; }
 /* ⚠️ 숫자 뱃지는 **칸이 아니라 아이콘**에 붙어야 한다. 칸은 96px 인데 아이콘은 그 안에
       가운데 정렬된 73px 이라, 칸 모서리(-8px)에 두면 그림에서 20px 넘게 떨어진다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .fcard .bd { top: 0; right: 8px; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .fcard .bd { top: 0; right: 8px; }
 /* EVENT 배지는 제거됐다(2026-08-26 지시) — 궁궐 전용 자리잡기 규칙도 같이 걷어냈다.
    ⚠️ 되살릴 일이 있으면 `top` 으로 잡지 말 것. 여기서 칸은 `flex:1 1 0` 라 무대 높이를 셋이 나눠 갖는
       156px 짜리 세로 상자인데 그림은 그 안 **맨 아래**(object-position: center bottom)에 앉는다 —
@@ -1499,7 +1595,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 
 /* 출석 도장 — 늘리지 않고 칸 안에 맞춘다(비가 깨지면 꽃이 찌그러진다).
    ⚠️ 글자는 padding 으로 밀지 말고 가운데 정렬. padding 으로 앉히면 칸 높이가 바뀔 때 잘린다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .day {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .day {
   border: 0; border-radius: 0; box-shadow: none; padding: 0;
   min-height: var(--skin-stamp-h); font-size: var(--skin-stamp-font);
   background: var(--skin-stamp-img) center / contain no-repeat;
@@ -1508,23 +1604,23 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 }
 /* ⚠️ **반드시 background 단축으로 쓴다.** 옛 톤의 `.day.on { background: 노랑 }` 이 살아 있어서
       image 만 얹으면 노란 면이 도장을 덮고, 색만 눕히면 size 가 auto·repeat 로 남아 잘려 보인다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .day.on {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .day.on {
   background: var(--skin-stamp-on-img) center / contain no-repeat;
   color: var(--skin-stamp-on-ink); text-shadow: var(--skin-stamp-on-ink-shadow);
 }
 /* 찍힌 날은 **도장만** 남긴다 — 금색 원판 위에 '1일' 이 얹히면 꽃과 숫자가 섞인다
    (2026-08-18 결정). 날짜는 왜쪽부터 순서대로라 숫자가 없어도 몇 일차인지 읽힌다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .day.on { font-size: 0; }          /* 날짜 글자(태그 없는 맨 텍스트)를 숨긴다 */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .day.on .chk { display: none; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .day.on { font-size: 0; }          /* 날짜 글자(태그 없는 맨 텍스트)를 숨긴다 */
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .day.on .chk { display: none; }
 /* 선물 표시도 도장 **그림** 모서리에 붙인다 — 칸(99px)보다 그림(58px)이 작아
    칸 모서리에 두면 허공에 뜨게 된다(2026-08-18 "7일에 상자 위치도 좀 애매"). */
 /* 칸(가로로 넓다)이 아니라 **도장 그림** 오른쪽 위에 붙인다 — 도장은 칸 높이에 맞춰 정사각으로
    들어가므로 좌우에 남는 여백이 생기고, 칸 모서리에 두면 그림에서 떨어져 허공에 뜬다.
    17% = (칸폭 - 도장폭)/2 를 칸폭으로 나눈 값(현재 배치 실측). */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .day .gift { top: -2px; right: 17%; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .day .gift { top: -2px; right: 17%; }
 
 /* 경험치 게이지 */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .exp {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .exp {
   background: none; border-radius: 0; overflow: hidden;
   border-style: solid; border-color: transparent; border-width: var(--skin-gauge-edge);
   border-image-source: var(--skin-gauge-img);
@@ -1532,7 +1628,7 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   border-image-repeat: stretch;
   padding: 0;
 }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .exp-fill {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .exp-fill {
   background: none; border-radius: 0;
   border-style: solid; border-color: transparent; border-width: var(--skin-fill-edge);
   border-image-source: var(--skin-fill-img);
@@ -1542,32 +1638,32 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* ⚠️ 글자가 **두 바닥** 위에 걸친다 — 왼쪽은 채움, 오른쪽은 빈 홈. 밝은 글자 하나로는 한쪽에서 묻히므로
       검은 외곽선을 사방으로 둘러 바닥이 뭐든 형태가 서게 한다.
    ⚠️ 좌우 여백 0 — 안쪽 여백은 이미 캡(border)이 만든다. 옛 padding 을 두면 글자 자리가 또 깎인다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .exp-txt { color: var(--skin-gauge-ink); padding: 0 2px;
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .exp-txt { color: var(--skin-gauge-ink); padding: 0 2px;
   font-size: var(--skin-gauge-font); font-weight: 900; letter-spacing: .01em;
   text-shadow: var(--skin-gauge-ink-shadow); }
 /* ⚠️ 셋은 한 줄에 서므로 높이를 같이 간다(하나만 바꾸면 바로 티 난다).
    ⚠️ `?` 는 **폭도 같이 줘야 한다** — 높이만 올리면 28×38 타원이 된다(2026-08-14 "왜 찌그러진거야").
       hub.css 위쪽 '아바타 달걀 방지'와 같은 종류의 사고다: 원형인데 한 축만 건드리면 달걀이 된다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .exp, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hub-help, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .gchip { height: var(--skin-hud-h); }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hub-help { width: var(--skin-hud-h); }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .exp, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hub-help, .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .gchip { height: var(--skin-hud-h); }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hub-help { width: var(--skin-hud-h); }
 
 /* 프로필과 보유 재화도 같은 궁정 물성으로 묶는다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-av { isolation: isolate; }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-av::after {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-av { isolation: isolate; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-av::after {
   content: ""; position: absolute; z-index: 3; inset: var(--skin-profile-inset, -11px); pointer-events: none;   /* 세계 벌은 틀 위에 지구본이 붙어 위를 더 뺀다 */
   background: var(--skin-profile-img) center / contain no-repeat;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.42));
 }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-av .av { position: relative; z-index: 1; border: 0; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-av .av { position: relative; z-index: 1; border: 0; }
 /* 랭킹 점수 칩 — 궁궐에서는 액자 그림을 두른다(기본 세트는 위쪽 `.hub .hud-score` 의 카툰 칩).
    ⚠️ 그림자를 빼지 말 것 — 액자 그림이 밝은 부분을 갖고 있어서 흰 글자가 거기서 녹는다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-score {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-score {
   background: var(--skin-rank-img) center / 100% 100% no-repeat;
   border: 0; border-radius: 0; padding: var(--skin-rank-pad, 7px 18px 6px);   /* 세계 벌은 왼쪽에 나침반이 있어 자기 값을 준다 */
   color: var(--skin-rank-ink); text-shadow: var(--skin-rank-ink-shadow);
 }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-score-pct { color: var(--skin-rank-pct-ink); }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .gchip {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-score-pct { color: var(--skin-rank-pct-ink); }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .gchip {
   background: var(--skin-currency-img) center / 100% 100% no-repeat;
   border: 0; border-radius: 0; box-shadow: none; position: relative;
   /* ⚠️ 위쪽 여백이 더 크다 — 그림의 베이지 면이 위아래 대칭이 아니기 때문이다(위 27.5% / 아래 13.9%).
@@ -1581,8 +1677,8 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
   width: calc(var(--skin-hud-h) * var(--skin-currency-ar, 3.9464)); min-width: calc(var(--skin-hud-h) * var(--skin-currency-ar, 3.9464));
   flex: 0 0 calc(var(--skin-hud-h) * var(--skin-currency-ar, 3.9464));
 }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .gchip .num { flex: 1 1 auto; padding-left: 4px; text-align: center; }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .cta-main {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .gchip .num { flex: 1 1 auto; padding-left: 4px; text-align: center; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .cta-main {
   /* 그림 한 장을 통째로 늘리지 않는다 — **모서리 장식은 원본 크기로 두고 가운데 면만 늘린다**.
      그래서 판을 어떤 크기로 잡아도 네 모서리 장식은 안 찌그러진다(2026-08-18 '3번' 선택).
      ⚠️ 다만 좌우 가운데의 꽃 장식은 세로로 같이 늘어난다 — 그건 이 방식의 대가고, 없애려면
@@ -1602,20 +1698,20 @@ html.dark .hub .hub-modal-backdrop { background: rgba(0,0,0,.6); }
 /* 랭킹 버튼 속 아이콘 — `<img>` 라 크기를 안 주면 원본(500×470)이 그대로 튀어나온다.
    ⚠️ 궁궐은 이 아이콘을 안 그리므로(`Hub.tsx` 가 `ui !== 'palace'` 로 건너뛴다) `--skin-cta-icon`
       도 안 갖는다 — 값이 없으면 규칙이 통째로 무효가 되어 옛 동작 그대로다. */
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .cta-star .hub-ui-icon {
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .cta-star .hub-ui-icon {
   display: block; width: var(--skin-cta-icon); height: var(--skin-cta-icon); object-fit: contain;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3));
 }
-.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .cta-main:active { transform: translateY(2px); box-shadow: none; }
+.hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .cta-main:active { transform: translateY(2px); box-shadow: none; }
 @media (min-width: 768px) {
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-av::after { inset: var(--skin-profile-inset, -15px); }
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .hud-score { padding-right: var(--skin-rank-pad-r, 30px); padding-left: var(--skin-rank-pad-l, 30px); }
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-av::after { inset: var(--skin-profile-inset, -15px); }
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .hud-score { padding-right: var(--skin-rank-pad-r, 30px); padding-left: var(--skin-rank-pad-l, 30px); }
   /* ⚠️ 좌·우 여백은 그림의 면과 맞춰야 한다 — 왼쪽은 코인이 덮고 있어 더 넓다.
      한쪽만 주면 숫자가 면의 가운데가 아니라 오른쪽으로 밀린다(2026-08-18 "코인 갯수 위치").
      값 자체는 벌마다 다르므로(코인 크기·면의 위아래 대칭이 그림마다 다르다)
      `--skin-currency-pad` 로 각자 값 블록의 768px 칸에서 준다. */
   /* 옆 출석 판과 위아래 선을 맞춘다(stretch) — 가운데만 늘어나므로 높이가 얼마든 장식은 그대로다 */
-  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween']) .cta-main { min-width: 300px; align-self: stretch; height: auto;
+  .hub:is([data-ui='palace'], [data-ui='office'], [data-ui='world'], [data-ui='korea'], [data-ui='halloween'], [data-ui='christmas']) .cta-main { min-width: 300px; align-self: stretch; height: auto;
     flex-direction: row; gap: 12px; font-size: 30px; }
 }
 

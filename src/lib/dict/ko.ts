@@ -762,6 +762,7 @@ const KO: Record<string, string> = {
   "cert.confirm_ok": "이 이름으로 발급",
   "cert.confirm_edit": "수정하기",
   "cert.roman_invalid": "영문 성명을 로마자로 입력해 주세요(영문·공백·하이픈만).",
+  "cert.expired": "유효기간이 만료된 자격증은 발급·재발급할 수 없습니다.",
   // ⚠️ 증서 안에 각인되는 글자는 **6개국어 모두 영문 고정**이다(2026-08-26 지시).
   //    자격증 서식(cert-template-v4.webp)이 영문 한 벌뿐이라 화면 언어를 따라가면 영문 증서에
   //    한글·중국어 캡션만 섞여 박힌다. 번역하지 말 것.
@@ -1073,6 +1074,8 @@ const KO: Record<string, string> = {
   "ll.bundle_buy": "선택 항목 구매",
   "ll.bundle_empty": "담을 수 있는 항목이 아직 없습니다.",
   "mypage.reissue": "재발급",
+  "mypage.cert_expired": "유효기간 만료",
+  "mypage.cert_expired_hint": "유효기간이 지나 발급·재발급할 수 없습니다.",
   "mypage.issue": "발급 신청",
   "mypage.view_sample": "견본 보기",
   "mypage.sample_title": "인증서 견본",
@@ -1142,6 +1145,7 @@ const KO: Record<string, string> = {
   "fab.uploadImg": "이미지 업로드",
   "fab.uploadFail": "업로드에 실패했습니다.",
   "fab.toTop": "맨 위로",
+  "fab.menu": "메뉴",
   // FAB 의 빨간 점(1:1 문의 새 답변) 안내 — 점 자체는 aria-hidden 이라 이 문구가 유일한 설명이다.
   "fab.newanswer": "문의에 새 답변이 있습니다",
   "landing.hero_pre": "피지컬 AI 시대,",
@@ -1902,6 +1906,8 @@ const KO: Record<string, string> = {
   "hub.part.skin_kr_incheon": "대한민국 · 인천",
   "hub.part.skin_kr_jeju": "대한민국 · 제주",
   "hub.part.skin_season_halloween": "시즌 · 할로윈",
+  "hub.part.skin_season_xmas_town": "시즌 · 크리스마스 마을",
+  "hub.part.skin_season_xmas_cabin": "시즌 · 크리스마스 산장",
   "hub.part.skin_world_paris": "세계 · 파리 에펠탑",
   "hub.part.skin_world_za_capetown": "세계 · 케이프타운",
   "hub.part.skin_world_kr_seoul_night": "세계 · 서울 야경",
