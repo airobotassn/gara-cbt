@@ -355,7 +355,8 @@ Deno.serve(async (req) => {
     // ⚠️ 응시자에게 나가는 페이로드 — correct_index·answer_key·explanation(해설)은 절대 select 금지.
     const { data: set, error: qErr } = await admin
       .from('exam_questions')
-      .select('number, questions(id, subject, topic, prompt, prompt_i18n, kind, choices, choices_i18n, active)')
+      // ⚠️ topic 은 2026-09-04 에 드롭됐다(20260904190000) — 다시 적지 말 것.
+      .select('number, questions(id, subject, prompt, prompt_i18n, kind, choices, choices_i18n, active)')
       .eq('exam_id', exam.id)
       .order('number', { ascending: true })
     if (qErr) return json({ error: qErr.message }, 500)
@@ -367,7 +368,7 @@ Deno.serve(async (req) => {
     //    재개는 요청 언어가 아니라 **처음 응시한 언어**로 돌아가야 하기 때문이다(아래 effLang).
     let served = setRows.map((r: any) => ({
       id: r.questions.id, number: r.number, subject: r.questions.subject,
-      topic: r.questions.topic, kind: r.questions.kind ?? 'mc',
+      kind: r.questions.kind ?? 'mc',
       prompt: r.questions.prompt, promptI18n: r.questions.prompt_i18n ?? {},
       choices: r.questions.choices ?? [], choicesI18n: r.questions.choices_i18n ?? {},
     }))
@@ -551,7 +552,6 @@ Deno.serve(async (req) => {
         id: q.id,
         number: q.number,
         subject: q.subject,
-        topic: q.topic,
         prompt: projKoText(q.prompt, q.promptI18n, effLang),
         kind: q.kind ?? 'mc',
         choices: projKoOptions(q.choices, q.choicesI18n, effLang),

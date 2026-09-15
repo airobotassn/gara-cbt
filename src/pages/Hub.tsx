@@ -117,10 +117,11 @@ function partEmoji(key: string) {
   return '🎁'
 }
 
-/** 상점 진열 순서 = 이 표의 순서. 종류별로 묶어야 캐릭터·배경·가구가 한 격자에 섞이지 않는다. */
+/** 상점 진열 순서 = 이 표의 순서. 종류별로 묶어야 캐릭터·배경·가구가 한 격자에 섞이지 않는다.
+ *  배경이 먼저다(2026-09-15) — 캐릭터 6장이 위에 서면 배경 칩이 첫 화면 밖으로 밀려 있는 줄도 모르고 스크롤을 시작한다. */
 const CLOSET_GROUPS: { kind: string; labelKey: string }[] = [
-  { kind: 'character', labelKey: 'hub.closet.g_character' },
   { kind: 'skin', labelKey: 'hub.closet.g_skin' },
+  { kind: 'character', labelKey: 'hub.closet.g_character' },
   { kind: 'part', labelKey: 'hub.closet.g_part' },
 ]
 
@@ -135,6 +136,19 @@ function skinCatsIn(partKeys: string[]): SkinCategory[] {
   return SKIN_CATEGORIES.filter((c) => present.has(c))
 }
 /**
+ * 칩의 실제 선택값. ⚠️ **기본은 '전체' 가 아니다**(2026-09-15) — 배경이 70장이 되자 '전체' 로 열리는 첫 화면이
+ * 소제목 하나 없는 격자 14줄이었고, 칩이 있어도 아무 일을 안 했다. 아직 아무것도 안 눌렀으면(null)
+ * **입고 있는 스킨의 묶음**으로 열고, 그 묶음이 이 탭에 없으면(초원은 상점에 없다) 첫 묶음으로 연다.
+ * 한 번 누른 뒤에는 그 값이고, 그 묶음이 이 탭에 없을 때만 이 탭에서 '전체' 로 본다(값은 안 바꾼다).
+ */
+function resolveSkinCat(cats: SkinCategory[], chosen: SkinCatFilter | null, worn: SkinCategory, total: number): SkinCatFilter {
+  if (chosen) return chosen === 'all' || cats.includes(chosen) ? chosen : 'all'
+  if (total <= FITS_ONE_GRID) return 'all'
+  return cats.includes(worn) ? worn : (cats[0] ?? 'all')
+}
+/** 이 수까지는 한 격자로 본다(PC 5칸 × 2줄) — 보관함처럼 몇 장 없는 목록을 묶음으로 쪼개면 소제목이 카드보다 많아진다. */
+const FITS_ONE_GRID = 10
+/**
  * 격자를 소제목(대륙)으로 나눈다 — region 이 없는 항목은 맨 앞 한 격자, 있는 항목은 `SKIN_REGIONS` 순서로
  * 소제목 하나씩. 세계 칩(25장)이 한 격자에 서기엔 많아서 생겼고(2026-09-14), 칩은 그대로 '세계' 하나다.
  * 상점(카탈로그 행)과 보관함(SkinDef) 둘 다 쓰므로 키만 받는다.
@@ -147,6 +161,17 @@ function regionSections<T>(items: T[], keyOf: (x: T) => string): { region: SkinR
     if (sub.length) out.push({ region: r, items: sub })
   }
   return out
+}
+/**
+ * 배경 격자의 토막 목록. 칩이 '전체' 면 **묶음마다 소제목**을 세우고(안 세우면 고궁→오피스→…→판타지 40장이
+ * 경계 없이 이어진다 — 2026-09-15), 그 안에서 세계 묶음만 대륙 소제목을 한 번 더 세운다. 칩을 골랐으면
+ * 묶음 소제목은 없고 대륙 소제목만 선다(전과 같다). 묶음 안의 순서는 서버(sort_order)가 정한 그대로다.
+ */
+function skinSections<T>(items: T[], cat: SkinCatFilter, keyOf: (x: T) => string): { catHead: SkinCategory | null; region: SkinRegion | null; items: T[] }[] {
+  const byCat = cat === 'all' && items.length > FITS_ONE_GRID
+    ? SKIN_CATEGORIES.map((c) => ({ cat: c, items: items.filter((x) => skinByPart(keyOf(x)).category === c) })).filter((g) => g.items.length)
+    : [{ cat: null, items }]
+  return byCat.flatMap((g) => regionSections(g.items, keyOf).map((r, i) => ({ catHead: i === 0 ? g.cat : null, region: r.region, items: r.items })))
 }
 
 function SkinCatChips({ cats, value, onChange, t }: {
@@ -427,7 +452,7 @@ export default function Hub() {
   // 배경 칩 필터 — 상점·보관함이 하나를 같이 쓴다(탭을 오가도 고른 묶음이 유지된다).
   //   ⚠️ 고른 묶음이 그 탭에 없으면(보관함에서 '기본'을 고르고 상점으로) 그 탭에서는 '전체'로 본다 —
   //      값은 안 바꾼다. 빈 격자를 보여주는 것도, 사용자가 안 누른 값으로 되돌리는 것도 안 한다.
-  const [skinCat, setSkinCat] = useState<SkinCatFilter>('all')
+  const [skinCat, setSkinCat] = useState<SkinCatFilter | null>(null) // null = 아직 안 누름(입은 스킨의 묶음으로 연다)
   // ── 꾸미기(캐릭터·스킨) ──
   // 장착값. 서버(get-hub)가 권위고 화면은 낙관적으로 먼저 반영한 뒤 hydrate 로 맞춘다.
   // ⚠️ 마지막에 본 모습으로 시작한다 — 안 그러면 기본배경+기본UI+폴백캐릭터 조합이 먼저 떴다가 덮인다.
@@ -941,7 +966,8 @@ export default function Hub() {
   const ownedChars = [...new Set([...knownChars.filter((k) => owned.has(k)), ...[...owned].filter(isCharKey)])]
   const ownedSkins = SKINS.filter((s) => s.partKey === DEFAULT_SKIN_PART || owned.has(s.partKey))
   const ownedSkinCats = skinCatsIn(ownedSkins.map((s) => s.partKey))
-  const ownedSkinCat: SkinCatFilter = ownedSkinCats.includes(skinCat as SkinCategory) ? skinCat : 'all'
+  const wornSkinCat = skinByPart(skinPart).category
+  const ownedSkinCat = resolveSkinCat(ownedSkinCats, skinCat, wornSkinCat, ownedSkins.length)
   // 첫 진입 흐름 — 순서가 곧 규칙이다: 캐릭터를 고른 다음에 튜토리얼.
   //   ⚠️ null(아직 모름)일 때는 **아무것도 띄우지 않는다.** false 로 판정하면 하이드레이트 전 한 프레임에
   //      이미 끝낸 사람 화면에도 선택창이 번쩍인다.
@@ -1265,12 +1291,14 @@ export default function Hub() {
           ⚠️ 둘을 나누지 않은 이유 — 사고 나서 입는 게 한 동작이라, 화면을 나누면 산 뒤에 "그래서 어디서
              입지" 를 찾아야 한다. 구매 직후 인벤토리 탭으로 자동으로 넘어가는 것도 그래서다. */}
       {modal === 'closet' && (
-        <Modal title={t('hub.closet.title')} className="closet-modal" onClose={() => setModal(null)}>
-          <div className="hub-shop-head">
-            <span className="hub-shop-head-lab">{t('hub.shop.balance')}</span>
-            <span className="gchip" style={{ margin: 0 }}><span className="num">{points.toLocaleString()}</span></span>
-          </div>
-
+        <Modal title={t('hub.closet.title')} className="closet-modal" onClose={() => setModal(null)}
+          // 잔액은 제목 줄에 붙인다 — 띠 한 단으로 두면 제목·잔액·탭 세 단이 물건보다 먼저 온다(2026-09-15).
+          aside={
+            <span className="closet-coin">
+              <span className="closet-coin-lab">{t('hub.shop.balance')}</span>
+              <span className="gchip" style={{ margin: 0 }}><span className="num">{points.toLocaleString()}</span></span>
+            </span>
+          }>
           <div className="closet-tabs" role="tablist">
             {(['shop', 'items'] as ClosetTab[]).map((k) => (
               <button
@@ -1295,16 +1323,20 @@ export default function Hub() {
                   if (!all.length) return null
                   // 배경만 칩으로 거른다 — 캐릭터·아이템은 아직 한 격자에 들어가는 수다.
                   const cats = kind === 'skin' ? skinCatsIn(all.map((c) => c.partKey)) : []
-                  const cat: SkinCatFilter = cats.includes(skinCat as SkinCategory) ? skinCat : 'all'
+                  const cat = kind === 'skin' ? resolveSkinCat(cats, skinCat, wornSkinCat, all.length) : 'all'
                   const items = kind === 'skin' && cat !== 'all'
                     ? all.filter((c) => skinByPart(c.partKey).category === cat) : all
+                  const sections = kind === 'skin'
+                    ? skinSections(items, cat, (c) => c.partKey)
+                    : [{ catHead: null, region: null, items }]
                   return (
                     <div key={kind} className="closet-group">
                       <h4 className="closet-group-h">{t(labelKey)}</h4>
                       {kind === 'skin' && <SkinCatChips cats={cats} value={cat} onChange={setSkinCat} t={t} />}
-                      {regionSections(items, (c) => c.partKey).map((sec) => (
-                      <Fragment key={sec.region ?? '_'}>
-                      {sec.region && <h5 className="closet-sub-h">{t(`hub.closet.reg_${sec.region}`)}</h5>}
+                      {sections.map((sec) => (
+                      <Fragment key={`${sec.catHead ?? ''}/${sec.region ?? '_'}`}>
+                      {sec.catHead && <h5 className="closet-sub-h">{t(`hub.closet.cat_${sec.catHead}`)}</h5>}
+                      {sec.region && <h5 className={`closet-sub-h${cat === 'all' ? ' closet-sub-h--in' : ''}`}>{t(`hub.closet.reg_${sec.region}`)}</h5>}
                       <div className="hub-modal-grid">
                         {sec.items.map((c) => {
                           const has = owned.has(c.partKey)
@@ -1312,18 +1344,22 @@ export default function Hub() {
                             <div key={c.partKey} className="hub-shop-item">
                               {has && <span className="hub-shop-owned">{t('hub.shop.owned')}</span>}
                               {/* 썸네일 = 미리보기 버튼. 74px 로는 캐릭터가 어떻게 생겼는지도,
-                                  스킨이 화면을 어떻게 바꾸는지도 알 수 없다 — 사기 전에 크게 볼 길이 필요하다. */}
-                              <button className="hub-shop-thumb pv-open" onClick={() => openPreview(c.partKey)} aria-label={t('hub.closet.preview')}>
+                                  스킨이 화면을 어떻게 바꾸는지도 알 수 없다 — 사기 전에 크게 볼 길이 필요하다.
+                                  배경 썸네일은 칸 폭에 맞춘 가로 그림이다(`is-skin`) — 세로 92px 고정이면 카드가 길어진다. */}
+                              <button className={`hub-shop-thumb pv-open${isSkinKey(c.partKey) ? ' is-skin' : ''}`} onClick={() => openPreview(c.partKey)} aria-label={t('hub.closet.preview')}>
                                 <CosmeticThumb partKey={c.partKey} level={arenaLv} />
                                 <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
                               </button>
                               {/* 어느 면에 놓는 물건인지 이름 옆에 밝힌다 — 방에 자리가 벽 2칸·바닥 3칸으로 나뉘어 있어서,
                                   안 밝히면 벽 자리만 남았는데 바닥 가구를 사는 일이 생긴다. */}
                               <div className="hub-shop-name">{partName(c.partKey, t, lang)}</div>
-                              <div className="hub-shop-price">{c.price > 0 ? `🪙 ${c.price}` : t('hub.shop.free')}</div>
-                              <button className="pbtn hub-shop-buy" style={btn(has ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={has}>
-                                {t(has ? 'hub.shop.owned' : 'hub.shop.buy')}
-                              </button>
+                              {/* 값과 구매를 한 줄에 — 세 줄(이름·값·버튼)이던 카드 바닥을 두 줄로(2026-09-15). */}
+                              <div className="hub-shop-foot">
+                                <span className="hub-shop-price">{c.price > 0 ? `🪙 ${c.price}` : t('hub.shop.free')}</span>
+                                <button className="pbtn hub-shop-buy" style={btn(has ? '#c3cbe0' : '#6bbf9a')} onClick={() => doBuy(c.partKey, c.price)} disabled={has}>
+                                  {t(has ? 'hub.shop.owned' : 'hub.shop.buy')}
+                                </button>
+                              </div>
                             </div>
                           )
                         })}
@@ -1338,8 +1374,33 @@ export default function Hub() {
               <p className="hub-modal-help">{t(isFullUser ? 'hub.shop.empty' : 'hub.shop.login')}</p>
             )
           ) : (
-            // ── 인벤토리 — 가진 것을 눌러 갈아입는다. 지금 입은 것에 표시가 붙는다. ──
+            // ── 인벤토리 — 가진 것을 눌러 갈아입는다. 지금 입은 것에 표시가 붙는다. 상점과 같은 순서(배경 → 캐릭터). ──
             <>
+              <div className="closet-group">
+                <h4 className="closet-group-h">{t('hub.closet.g_skin')}</h4>
+                <SkinCatChips cats={ownedSkinCats} value={ownedSkinCat} onChange={setSkinCat} t={t} />
+                {skinSections(ownedSkinCat === 'all' ? ownedSkins : ownedSkins.filter((s) => s.category === ownedSkinCat), ownedSkinCat, (s) => s.partKey).map((sec) => (
+                <Fragment key={`${sec.catHead ?? ''}/${sec.region ?? '_'}`}>
+                {sec.catHead && <h5 className="closet-sub-h">{t(`hub.closet.cat_${sec.catHead}`)}</h5>}
+                {sec.region && <h5 className={`closet-sub-h${ownedSkinCat === 'all' ? ' closet-sub-h--in' : ''}`}>{t(`hub.closet.reg_${sec.region}`)}</h5>}
+                <div className="hub-modal-grid">
+                  {sec.items.map((sk) => (
+                    <div key={sk.partKey} className={`closet-item${skinPart === sk.partKey ? ' on' : ''}`}>
+                      <button className="closet-item-thumb pv-open is-skin" onClick={() => openPreview(sk.partKey)} aria-label={t('hub.closet.preview')}>
+                        <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
+                        <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
+                      </button>
+                      <span className="closet-item-name">{partName(sk.partKey, t, lang)}</span>
+                      <button className="closet-item-act" onClick={() => equip('skin', sk.partKey)} disabled={skinPart === sk.partKey}>
+                        {t(skinPart === sk.partKey ? 'hub.closet.worn' : 'hub.closet.wear')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                </Fragment>
+                ))}
+              </div>
+
               <div className="closet-group">
                 <h4 className="closet-group-h">{t('hub.closet.g_character')}</h4>
                 {ownedChars.length ? (
@@ -1362,30 +1423,6 @@ export default function Hub() {
                 ) : (
                   <p className="hub-modal-help">{t('hub.closet.empty_character')}</p>
                 )}
-              </div>
-
-              <div className="closet-group">
-                <h4 className="closet-group-h">{t('hub.closet.g_skin')}</h4>
-                <SkinCatChips cats={ownedSkinCats} value={ownedSkinCat} onChange={setSkinCat} t={t} />
-                {regionSections(ownedSkinCat === 'all' ? ownedSkins : ownedSkins.filter((s) => s.category === ownedSkinCat), (s) => s.partKey).map((sec) => (
-                <Fragment key={sec.region ?? '_'}>
-                {sec.region && <h5 className="closet-sub-h">{t(`hub.closet.reg_${sec.region}`)}</h5>}
-                <div className="hub-modal-grid">
-                  {sec.items.map((sk) => (
-                    <div key={sk.partKey} className={`closet-item${skinPart === sk.partKey ? ' on' : ''}`}>
-                      <button className="closet-item-thumb pv-open" onClick={() => openPreview(sk.partKey)} aria-label={t('hub.closet.preview')}>
-                        <img className="closet-skin-img" src={skinThumb(sk)} alt="" />
-                        <span className="pv-mag" aria-hidden="true"><span className="material-symbols-outlined">search</span></span>
-                      </button>
-                      <span className="closet-item-name">{partName(sk.partKey, t, lang)}</span>
-                      <button className="closet-item-act" onClick={() => equip('skin', sk.partKey)} disabled={skinPart === sk.partKey}>
-                        {t(skinPart === sk.partKey ? 'hub.closet.worn' : 'hub.closet.wear')}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                </Fragment>
-                ))}
               </div>
             </>
           )}
@@ -1969,7 +2006,8 @@ function TutorialOverlay({ step, onPrev, onNext, onDone }: {
   )
 }
 
-function Modal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
+/** `aside` = 제목과 닫기 사이에 서는 것(꾸미기 창의 코인 잔액). 없으면 전과 같다. */
+function Modal({ title, onClose, children, className, aside }: { title: string; onClose: () => void; children: ReactNode; className?: string; aside?: ReactNode }) {
   // Hub() 밖이라 t 를 물려받지 못한다 — 여기서 다시 훅을 부른다(닫기 버튼 aria-label 용).
   const { t } = useT()
   return (
@@ -1977,6 +2015,7 @@ function Modal({ title, onClose, children, className }: { title: string; onClose
       <div className={`hub-modal${className ? ' ' + className : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="hub-modal-head">
           <h3>{title}</h3>
+          {aside}
           <button className="hub-modal-close" onClick={onClose} aria-label={t('common.close')}>×</button>
         </div>
         <div className="hub-modal-body">{children}</div>
