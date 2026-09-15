@@ -59,7 +59,7 @@ const U2 = '00000000-0000-0000-0000-0000000000a2';
 const BOOK = '00000000-0000-0000-0000-0000000000b1';
 
 let seq = 0;
-const insertPayment = (userId, { status = 'pending', amount = 3000, ref = BOOK, orderId = null } = {}) =>
+let insertPayment = (userId, { status = 'pending', amount = 3000, ref = BOOK, orderId = null } = {}) =>
   db.query(
     `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status, customer_key)
      values ($1, $2, '테스트 교재', 'ebook', $3, $4, $5, 'cus-test') returning id`,
@@ -146,17 +146,8 @@ rec('다른 사용자의 paid 는 허용', (await failsWith(() => insertPayment(
 await db.exec(`update payments set status='refunded' where user_id='${U1}' and status='paid'`);
 rec('환불 후 재구매 허용', (await failsWith(() => insertPayment(U1, { status: 'paid' }))), null);
 
-// --- (7) customerKey 는 계정당 하나(고정) ---
+// --- (7) 구매자 키(customer_key) — 2026-09-15 에 걷어냈다. 드롭 검증은 맨 끝 (16) 에서(앞 절들의 insert 가 그 컬럼을 쓴다) ---
 await db.exec(`insert into profiles (id) values ('${U1}'), ('${U2}')`);
-rec('profiles.payment_customer_key 컬럼 추가됨',
-  (await db.query(`select 1 from information_schema.columns where table_name='profiles' and column_name='payment_customer_key'`)).rows.length, 1);
-await db.exec(`update profiles set payment_customer_key='cus-aaa' where id='${U1}'`);
-const dupCus = await failsWith(() => db.exec(`update profiles set payment_customer_key='cus-aaa' where id='${U2}'`));
-rec('customer_key 중복 거부', dupCus !== null, true);
-// null 은 여럿 허용돼야 한다(아직 결제 안 해본 회원들)
-await db.exec(`insert into profiles (id) values ('00000000-0000-0000-0000-0000000000a3'), ('00000000-0000-0000-0000-0000000000a4')`);
-rec('payment_customer_key null 은 여러 행 허용',
-  (await db.query(`select count(*)::int c from profiles where payment_customer_key is null`)).rows[0].c >= 2, true);
 
 // --- (8) 이북 구매 ↔ 결제 연결 ---
 rec('ebook_purchases.payment_id 컬럼 추가됨',
@@ -522,6 +513,23 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   rec('payment_webhook_events RLS 켜짐', hrls?.relrowsecurity, true);
   const hpol = (await db.query(`select count(*)::int as n from pg_policies where tablename='payment_webhook_events'`)).rows[0];
   rec('payment_webhook_events 정책 0개', hpol.n, 0);
+}
+
+// --- (16) 구매자 키(customer_key) 드롭(2026-09-15) — 토스 규격(카드 저장 식별자)이었고 엑심베이엔 안 보낸다 ---
+//   두 단계(NOT NULL 해제 → 드롭)를 여기서도 순서대로 밟는다. 맨 끝인 이유 = 앞 절들의 insert 가 그 컬럼을 쓴다.
+{
+  await db.exec(strip(readFileSync('supabase/migrations/20260915220000_customer_key_nullable.sql', 'utf8')));
+  // NOT NULL 만 풀린 상태 — 옛 코드(값 보냄)와 새 코드(안 보냄)가 둘 다 살아야 하는 구간.
+  rec('1단계 뒤: customer_key 없이 insert 허용', await failsWith(() => db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status)
+     values ($1, 'nokey-1', '키 없음', 'ebook', $2, 300, 'pending')`, [U2, crypto.randomUUID()])), null);
+  await db.exec(strip(readFileSync('supabase/migrations/20260915230000_drop_customer_key.sql', 'utf8')));
+  rec('payments.customer_key 드롭됨',
+    (await db.query(`select 1 from information_schema.columns where table_name='payments' and column_name='customer_key'`)).rows.length, 0);
+  rec('profiles.payment_customer_key 드롭됨',
+    (await db.query(`select 1 from information_schema.columns where table_name='profiles' and column_name='payment_customer_key'`)).rows.length, 0);
+  // 지운 뒤에도 원장은 그대로다 — 옛 행이 사라지면 안 된다.
+  rec('드롭 뒤 옛 결제 행 보존', (await db.query(`select count(*)::int n from payments`)).rows[0].n > 0, true);
 }
 
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);

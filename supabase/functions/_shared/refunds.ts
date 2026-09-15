@@ -218,7 +218,9 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
   const unlock = () => admin.from('payments').update({ refunded_amount: before, updated_at: new Date().toISOString() }).eq('id', row.id)
 
   // ③ PG 호출
-  const refundKey = `rf-${crypto.randomUUID()}`
+  // ⚠️ 엑심베이 refund_id 는 **30자 이하**다(실측 2026-09-15: `rf-<uuid>` 39자로 보냈다가 REQUIRED_PARAMETER_MISSING
+  //    "refund.refundid size must be between 0 and 30" 으로 거절). uuid 의 하이픈을 빼고 28자만 쓴다 — 112비트라 충돌 걱정 없다.
+  const refundKey = `rf${crypto.randomUUID().replace(/-/g, '').slice(0, 28)}`
   let res
   try {
     res = await getProvider(row.provider).refund({

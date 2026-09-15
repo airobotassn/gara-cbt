@@ -25,7 +25,6 @@ import {
 import {
   PAYMENT_COLS,
   chargeOf,
-  ensureCustomerKey,
   newOrderId,
   reconcile,
   resolveProduct,
@@ -337,7 +336,6 @@ Deno.serve(async (req) => {
         ? { currency: 'KRW', amount: convertFromUsdCents(product.amount, fxRate as number, 'KRW') }
         : { currency: 'USD', amount: product.amount / 100 }
 
-      const customerKey = await ensureCustomerKey(admin, uid)
       const orderId = newOrderId(productType)
       const { data: inserted, error: insErr } = await admin.from('payments').insert({
         user_id: uid,
@@ -360,7 +358,6 @@ Deno.serve(async (req) => {
         addon_ebook_id: product.addon?.id ?? null,
         addon_amount: product.addon?.amount ?? null,
         status: 'pending',
-        customer_key: customerKey,
       }).select('id').single()
       // 23505 = 이 사람이 이 상품을 이미 결제 완료했다(부분 유니크 인덱스). 위 보유 검사와 겹치지만
       // 동시 요청이 둘 다 통과한 경우를 여기서 잡는다.
@@ -451,7 +448,6 @@ Deno.serve(async (req) => {
         // 주문요약을 줄 단위로 그리기 위한 내역. 응시료만 살 땐 한 줄이라 화면이 예전과 같아 보인다.
         items: product.items,
         currency: 'USD',
-        customerKey,
         provider: providerName,
         // 실제로 청구되는 값. 화면 고지문이 "얼마가 빠지는지"를 정확히 말하려면 정가만으론 부족하다
         // (엑심베이는 달러로 빠진다). 정가와 같으면 프론트가 원화 문구를 그대로 쓴다.

@@ -32,7 +32,6 @@ export interface CreateOrderResp {
   /** 주문 내역(줄 단위). 응시료+교재처럼 두 건일 때 화면이 각각을 보여주기 위한 값. */
   items?: { name: string; amount: number }[]
   currency?: string
-  customerKey?: string
   /** 이 주문이 열린 PG. 지금은 항상 'eximbay'. */
   provider?: string
   /**

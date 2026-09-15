@@ -55,7 +55,6 @@ export interface PaymentRow {
   fx_rate: number | null
   status: string
   payment_key: string | null
-  customer_key: string
   fulfilled_at: string | null
   confirmed_at: string | null
   created_at: string
@@ -69,7 +68,7 @@ export interface PaymentRow {
 
 /** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다. */
 export const PAYMENT_COLS =
-  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, customer_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
+  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
 
 /**
  * **PG 에 말할 때 쓰는 금액·통화.** 승인 대조·조회·환불이 전부 이 값을 기준으로 해야 한다.
@@ -379,47 +378,8 @@ export function newOrderId(productType: ProductType): string {
   return `${productType}-${crypto.randomUUID()}`
 }
 
-/**
- * customerKey — **계정마다 한 번 만들어 고정**한다.
- * 토스 규격상 유추 가능한 값(이메일·회원ID·순번)은 금지고, 매번 새로 만들면 저장된 카드가 계정에 안 붙는다.
- */
-export async function ensureCustomerKey(admin: SupabaseClient, uid: string): Promise<string> {
-  const { data } = await admin
-    .from('profiles')
-    .select('payment_customer_key')
-    .eq('id', uid)
-    .maybeSingle()
-  const existing = (data?.payment_customer_key as string | null) ?? null
-  if (existing) return existing
-
-  const key = crypto.randomUUID() // 36자 · '-' 포함 → 규격(2~50자, 특수문자 1개 이상) 충족
-
-  // 아직 비어있을 때만 박는다(`.is(null)`). 동시 요청 둘이 겹쳐도 먼저 쓴 쪽 값이 살아남고,
-  // 진 쪽은 아래에서 그 값을 다시 읽어 쓴다 — 계정당 키가 갈리면 저장된 카드가 계정에 안 붙는다.
-  const { data: won } = await admin
-    .from('profiles')
-    .update({ payment_customer_key: key })
-    .eq('id', uid)
-    .is('payment_customer_key', null)
-    .select('payment_customer_key')
-    .maybeSingle()
-  if (won?.payment_customer_key) return won.payment_customer_key as string
-
-  // 못 박은 경우 = (a) 다른 요청이 먼저 박았거나 (b) profiles 행이 아직 없다.
-  const { data: again } = await admin
-    .from('profiles')
-    .select('payment_customer_key')
-    .eq('id', uid)
-    .maybeSingle()
-  if (again?.payment_customer_key) return again.payment_customer_key as string
-
-  // (b) — 가입 트리거가 만들어주는 게 정상이지만, 없으면 결제를 막지 말고 여기서 만들어준다.
-  const { error } = await admin
-    .from('profiles')
-    .upsert({ id: uid, payment_customer_key: key }, { onConflict: 'id' })
-  if (error) throw new Error('결제 식별자를 만들 수 없습니다.')
-  return key
-}
+// 구매자 키(customerKey)는 2026-09-15 에 걷어냈다 — 토스 규격(카드 저장을 계정에 붙이는 식별자)이었고
+// 엑심베이엔 보내지도 않았다. 컬럼(payments.customer_key · profiles.payment_customer_key)도 20260915230000 에서 지웠다.
 
 // ---------- ② 지급 ----------
 
