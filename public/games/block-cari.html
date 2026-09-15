@@ -6,15 +6,17 @@
 <title>막아라 CARI — 검문소</title>
 <!--
   ─────────────────────────────────────────────────────────────
-  막아라 CARI (block-cari) — 프로토타입
+  막아라 CARI (block-cari) — 10일 × 5장 (2026-09-15 재설계)
   ─────────────────────────────────────────────────────────────
   Papers, Please 구조를 그대로 가져온다. 다만 검사하는 것이 여권이 아니라
   **AI 에 넣기 직전의 사내 문서**다.
 
-    · 왼쪽 규정집이 날마다 한 줄씩 늘어난다 (외울 수 없게 되는 것이 핵심)
+    · 규정집이 날마다 하나씩 늘어난다 (외울 수 없게 되는 것이 핵심) — 10일, 규정 10개
     · 서류에서 규정에 걸리는 곳을 찍어 가린다
-    · 도장 두 개 — [AI 전송] / [반려]
+    · 도장 두 개 — [AI 전송] / [반려] · 판정은 서류 위 잉크 도장 한 마디(설명 글 없음)
     · 틀리면 경고장. 세 장이면 끝.
+    · 점수는 서버가 기록(LOG)으로 다시 센다 — _shared/block-days.ts 가 sync pair
+    · 문구는 6개국어 — i18n.js 의 block.* (서류 번역은 조각 순서가 한국어와 같아야 한다)
 
   ⚠️ 이 게임이 퀴즈가 되지 않는 이유는 "동사"에 있다. 읽고 고르는 게 아니라
      **규정집과 서류를 왔다 갔다 하며 걸리는 곳을 찍어내는 작업**이다.
@@ -24,10 +26,10 @@
     ① **위반이 하나도 없는 서류를 섞는다.** 전부 뭔가 걸리면 "일단 칠하고 본다"가 최적 전략이 된다.
     ② **다 칠하면 실패해야 한다.** 핵심 정보(k)를 가리면 CARI 가 맥락을 잃고 엉뚱한 답을 낸다.
        "지울 것과 남길 것을 가르는 것"이 실력이고, 과잉 마스킹은 실무에서 실제로 흔한 실패다.
-    ③ **아직 규정에 없는 것은 통과다.** 3일차에 단가가 나와도 5일차 규정이 생기기 전엔 위반이 아니다.
+    ③ **아직 규정에 없는 것은 통과다.** 7일차에 코드 서류가 와도 8일차 규정이 생기기 전엔 위반이 아니다.
        규정이 자라난다는 걸 몸으로 알게 하는 장치라, 편의로 미리 막지 말 것.
 
-  지표: 점수 (처리 건수 × 정확도) · 통산 최고
+  지표: 점수(전송형 100 + 완벽 보너스 50 · 반려형 100 · 만점 7,150) · 통산 최고
 -->
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -80,29 +82,32 @@
   .book{position:relative;flex:0 0 auto;width:calc(100% - 18px);aspect-ratio:1453/774;margin:0 auto 5px;padding:0;border:0;
     background:url('/games/block-cari-rules-v4.webp') 48.7% 24.3%/129.5% 108% no-repeat;filter:drop-shadow(0 7px 12px rgba(0,0,0,.28))}
   .brow{position:absolute;left:6%;width:87%;height:35.8%;margin:0;display:flex;align-items:center;gap:8px;overflow:hidden}
-  .brow:nth-of-type(1){top:15.4%}
+  /* ⚠️ 위 줄은 클립 그림이 5% 만큼 내려와 있어 그만큼 아래서 시작한다 — 안 그러면 첫 줄이 클립 밑으로 들어간다. */
+  .brow:nth-of-type(1){top:20.4%;height:30.8%}
   .brow:nth-of-type(2){top:55%}
   /* ⚠️ 규정집은 매 판 눈으로 훑는 곳이다 — 12px 대로 두면 안 읽힌다(종이 칸은 넉넉하다). */
-  .blab{flex:0 0 auto;font-size:15px;font-weight:900;letter-spacing:.01em;color:#355f82;
-    padding:0;width:70px}
+  .blab{flex:0 0 auto;font-size:15px;font-weight:900;letter-spacing:.01em;color:#355f82;padding:0}
   .blab.red{color:#a3271c}
-  .chips{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:4px}
-  /* ⚠️ v4 규정집은 크림색 종이다 — 흰 글자·흰 반투명 칩은 그대로 사라진다. 잉크색으로 뒤집을 것. */
-  .chip{padding:7px 14px;border-radius:8px;font-size:16px;font-weight:800;cursor:pointer;
-    background:rgba(74,54,26,.10);color:#4a3c28;border:1px solid rgba(96,72,38,.28)}
-  .chip.blk{background:rgba(180,40,28,.11);color:#a3271c;border-color:rgba(170,50,38,.38)}
+  /* ⚠️ 규정은 칩이 아니라 글줄이다 — 가릴 것이 7개까지 차는데(10일차) 칩으로는 360px 폰에서 네 줄이 되어 넘쳤다.
+        글줄이면 360px 에서 세 줄(줄높이 1.3 × 14px × 3 = 55px ≤ 칸 56px), 460px 에서 두 줄이다.
+        글자를 키우거나 라벨을 늘리면 다시 넘친다 — 라벨은 짧게 유지할 것. */
+  .chips{flex:1 1 auto;display:block;font-size:14px;line-height:1.3;word-break:keep-all}
+  .chip{display:inline;white-space:nowrap;padding:0 2px;border:0;border-radius:4px;font-size:14px;font-weight:800;color:#4a3c28;cursor:default}
+  .chip::after{content:' · ';color:#b3a68a;font-weight:400;white-space:normal}
+  .chip:last-child::after{content:''}
+  .chip.blk{color:#a3271c}
   .chip.new{animation:glow 1.4s ease-in-out 3}
-  @keyframes glow{0%,100%{box-shadow:0 0 0 rgba(150,110,40,0)}50%{box-shadow:0 0 0 3px rgba(150,110,40,.45)}}
-  .bnone{font-size:15px;font-weight:700;color:#8b7c66;padding:0}
+  @keyframes glow{0%,100%{box-shadow:0 0 0 rgba(150,110,40,0);background:none}50%{box-shadow:0 0 0 3px rgba(227,180,90,.55);background:rgba(227,180,90,.55)}}
+  .bnone{font-size:14px;font-weight:700;color:#8b7c66;padding:0}
 
   /* ── 서류 ─────────────────────────────────── */
   /* ⚠️ 서류는 남는 공간 가운데에 둔다. flex-start 로 두면 짧은 서류일 때 아래가 통째로 비어
      (860px 화면에서 500px 가까이) 도장만 화면 바닥에 따로 떨어져 보인다. */
-  .desk{flex:1 1 auto;min-height:0;padding:0 13px 8px;display:flex;align-items:center}
+  .desk{position:relative;flex:1 1 auto;min-height:0;padding:0 13px 8px;display:flex;align-items:center}
   /* 내용만큼만 서되 한 장의 서류로 보일 만큼은 확보한다 — 짧은 문서가 쪽지처럼 보이면 안 된다. */
   .paper{flex:0 1 auto;width:100%;max-height:100%;min-height:min(100%,330px);background:linear-gradient(135deg,#fffdf4,#eee5d2);color:#2a2620;border-radius:7px;border:1px solid #d5c8ac;
     padding:15px 16px 18px;overflow-y:auto;box-shadow:0 14px 30px -12px rgba(0,0,0,.75);
-    transform-origin:50% 50%}
+    transform-origin:50% 50%;position:relative}
   .paper.in{animation:pin .32s ease-out}
   @keyframes pin{0%{transform:translateY(26px) rotate(-1.5deg);opacity:0}100%{transform:none;opacity:1}}
   .paper.out{animation:pout .34s ease-in forwards}
@@ -126,8 +131,35 @@
     box-shadow:inset 0 0 0 1px #000}
   .tk.leak{animation:leak .5s ease-out 3;background:rgba(224,60,45,.35);border-bottom-color:#c0392b}
   @keyframes leak{0%,100%{background:rgba(224,60,45,.14)}50%{background:rgba(224,60,45,.5)}}
-  .tk.over{background:rgba(255,170,40,.4);border-bottom-color:#d08a12}
+  .tk.over{background:rgba(255,170,40,.4);border-bottom-color:#d08a12;color:#2a2620}   /* 가렸던 글자를 다시 보여준다 — 뭘 가리면 안 됐는지 */
   .paper.done .tk{cursor:default}
+  /* 첫 서류 안내 — 별도 튜토리얼 없이, 눌러야 할 조각 하나 → 도장 순서로 깜빡인다(2026-09-15 결정). */
+  .tk.hint{animation:hint 1s ease-in-out infinite}
+  @keyframes hint{0%,100%{box-shadow:0 0 0 0 rgba(63,134,232,0)}50%{box-shadow:0 0 0 4px rgba(63,134,232,.6);background:rgba(63,134,232,.22)}}
+  .st.hint{animation:sthint 1s ease-in-out infinite}
+  @keyframes sthint{0%,100%{filter:drop-shadow(0 7px 9px rgba(0,0,0,.35))}50%{filter:drop-shadow(0 0 14px rgba(63,134,232,.95)) brightness(1.15)}}
+  /* 금지 서류를 보내 버렸을 때 — 머리의 붉은 표시가 깜빡인다(거기 적혀 있었다). */
+  .pstamp.hit{animation:phit .5s ease-out 3}
+  @keyframes phit{50%{background:#c0392b;color:#fff;transform:rotate(-6deg) scale(1.12)}}
+
+  /* ── 판정 도장 ────────────────────────────── */
+  /* 본문 아래 빈 칸(.pfoot)에 잉크로 찍힌다 — 글자와 겹치면 도장 문구가 안 읽혀서 자리를 따로 뒀다.
+     설명 글 없이 도장 한 마디 + 점수. 서류 안에 있어서 서류가 빠질 때 같이 나간다. */
+  .pfoot{position:relative;height:96px;margin-top:4px}
+  .verdict{position:absolute;left:50%;top:50%;z-index:20;pointer-events:none;display:none;
+    flex-direction:column;align-items:center;gap:2px;padding:9px 24px 11px;border:5px solid;border-radius:14px;
+    mix-blend-mode:multiply;opacity:.92;
+    transform:translate(-50%,-50%) rotate(-12deg);
+    font-family:system-ui,sans-serif;letter-spacing:-.02em;white-space:nowrap}
+  .verdict.on{display:flex;animation:vin .28s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes vin{0%{transform:translate(-50%,-50%) rotate(-12deg) scale(2.2);opacity:0}100%{transform:translate(-50%,-50%) rotate(-12deg) scale(1);opacity:.92}}
+  .verdict b{font-size:42px;font-weight:950;line-height:1}
+  .verdict span{font-size:20px;font-weight:900;line-height:1}
+  .verdict span:empty{display:none}
+  .verdict.pass{color:#1f7a47;border-color:#1f7a47}
+  .verdict.rej{color:#1f4f85;border-color:#1f4f85}
+  .verdict.fail{color:#b8281c;border-color:#b8281c}
+  .verdict.over{color:#b8700c;border-color:#b8700c}
 
   /* ── 도장 ─────────────────────────────────── */
   /* ⚠️ 두 도장은 그림 비율이 서로 다르다(전송 2.688 · 반려 2.534) — flex:1 로 같은 폭을 주면
@@ -140,24 +172,11 @@
   .st.rej{aspect-ratio:1942/809;background:url('/games/block-cari-reject-v4.webp') center/100% 100% no-repeat}
   .st:active{transform:translateY(2px)}
   .st:disabled{opacity:.4;cursor:default;transform:none}
-
-  /* ── 판정 시트 ────────────────────────────── */
-  /* ⚠️ 시트가 미끄러져 나가는 동안에도 버튼이 눌려서 두 번 탭하면 한 단계를 건너뛴다.
-     보이지 않을 때는 클릭을 안 받게 막는다. */
-  .fb{position:absolute;left:13px;right:13px;bottom:13px;z-index:30;background:#20242f;
-    border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:13px 15px;
-    box-shadow:0 22px 46px -18px rgba(0,0,0,.9);transform:translateY(160%);
-    pointer-events:none;transition:transform .24s cubic-bezier(.2,.9,.3,1)}
-  .fb.on{transform:translateY(0);pointer-events:auto}
-  .fbhead{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-  .fbhead b{font-size:17.5px;font-weight:900;letter-spacing:-.02em}
-  .fbhead .pt{margin-left:auto;font-size:16px;font-weight:900;color:#8fe0a8}
-  .fb.no .fbhead b{color:#ff9a8a} .fb.no .pt{color:#ff9a8a}
-  .fb.yes .fbhead b{color:#8fe0a8}
-  .fbwhy{margin:0 0 13px;font-size:15px;font-weight:700;line-height:1.6;color:#aeb7ca;word-break:keep-all}
-  .fbwhy em{font-style:normal;color:#ffcf8a;font-weight:900}
-  .fbbtn{width:100%;padding:15px;border:0;border-radius:13px;cursor:pointer;
-    background:#3f86e8;color:#fff;font:900 16px/1 system-ui,sans-serif}
+  /* 도장을 찍고 나면 두 도장 자리에 '다음 서류' 하나만 선다 — 판정은 서류 위 도장이 이미 말했다. */
+  .nxt{display:none;flex:1 1 auto;max-width:300px;height:56px;margin-bottom:10px;border:0;border-radius:13px;cursor:pointer;
+    background:#3f86e8;color:#fff;font:900 17px/1 system-ui,sans-serif;box-shadow:0 10px 20px -10px rgba(0,0,0,.6)}
+  .stamps.judged .st{display:none}
+  .stamps.judged .nxt{display:block}
 
   /* ── 오버레이 ─────────────────────────────── */
   /* ⚠️ 오버레이도 게임 기둥(520px) 안에 묶는다. 화면 전체로 두면 데스크톱 폭에서 인트로·결과 그림이
@@ -294,30 +313,27 @@
   <div id="flash"></div>
 
   <div class="top">
-    <span class="day" id="dayEl">1<i>일차</i></span>
-    <span class="prog" id="progEl">1 / 4</span>
+    <span class="day" id="dayEl">1<i data-i18n="block.day">일차</i></span>
+    <span class="prog" id="progEl">1 / 5</span>
     <span class="strikes" id="strEl"></span>
     <span class="sc" id="scEl">0</span>
   </div>
 
   <div class="book">
-    <div class="brow"><span class="blab">가릴 것</span><span class="chips" id="maskChips"></span></div>
-    <div class="brow"><span class="blab red">전송 금지</span><span class="chips" id="blockChips"></span></div>
+    <div class="brow"><span class="blab" data-i18n="block.mask">가릴 것</span><span class="chips" id="maskChips"></span></div>
+    <div class="brow"><span class="blab red" data-i18n="block.block">전송 금지</span><span class="chips" id="blockChips"></span></div>
   </div>
 
   <div class="desk">
     <div class="paper" id="paper"></div>
+    <!-- 판정 도장 — loadDoc 이 서류 안으로 옮겨 붙인다. 서류는 그대로 보이고 걸린 조각만 색이 든다. -->
+    <div class="verdict" id="verdict"><b id="vTtl"></b><span id="vPt"></span></div>
   </div>
 
-  <div class="stamps">
-    <button class="st rej" id="rejBtn">반려</button>
-    <button class="st send" id="sendBtn">AI 전송</button>
-  </div>
-
-  <div class="fb" id="fb">
-    <div class="fbhead"><b id="fbTtl">—</b><span class="pt" id="fbPt"></span></div>
-    <p class="fbwhy" id="fbWhy">—</p>
-    <button class="fbbtn" id="fbBtn">다음 서류</button>
+  <div class="stamps" id="stamps">
+    <button class="st rej" id="rejBtn" data-i18n="block.reject">반려</button>
+    <button class="st send" id="sendBtn" data-i18n="block.send">AI 전송</button>
+    <button class="nxt" id="fbBtn" data-i18n="block.next">다음 서류</button>
   </div>
 </div>
 
@@ -325,16 +341,16 @@
 <div class="ov" id="startOv">
   <div class="sheet">
     <div id="sArt"></div>
-    <p class="ttl">막아라 <i>CARI</i></p>
-    <p class="lead">“이거 AI로 정리해 주세요.”</p>
+    <p class="ttl" data-i18n="block.title">막아라 <i>CARI</i></p>
+    <p class="lead" data-i18n="block.lead">“이거 AI로 정리해 주세요.”</p>
     <!-- ⚠️ 인트로에 다 적지 않는다. 화면에 보이는 것(밑줄·도장 두 개)과 게임이 알아서 알려주는 것
          (규정이 날마다 는다 → 2일차 공지 화면)은 뺀다. 남길 것은 "안 하면 손해 보는 것" 셋뿐이다. -->
     <ul class="rules">
-      <li><span>①</span><div><b>규정집</b>을 보고 <b>걸리는 곳을 눌러 가린다</b></div></li>
-      <li><span>②</span><div>다 됐으면 <b>AI 전송</b> · 안 될 건 <b>반려</b></div></li>
-      <li><span>③</span><div>놓쳐도 과하게 가려도 <b>경고장</b> · 3장이면 끝</div></li>
+      <li><span>①</span><div data-i18n="block.rule1"><b>규정집</b>을 보고 <b>걸리는 곳을 눌러 가린다</b></div></li>
+      <li><span>②</span><div data-i18n="block.rule2">다 됐으면 <b>AI 전송</b> · 안 될 건 <b>반려</b></div></li>
+      <li><span>③</span><div data-i18n="block.rule3">놓쳐도 과하게 가려도 <b>경고장</b> · 3장이면 끝</div></li>
     </ul>
-    <button class="btn" id="startBtn">출근하기</button>
+    <button class="btn" id="startBtn" data-i18n="block.start">출근하기</button>
   </div>
 </div>
 
@@ -342,12 +358,12 @@
 <div class="ov hidden" id="dayOv">
   <div class="sheet">
     <p class="ttl" id="dTtl">2일차</p>
-    <p class="lead">사내 공지가 붙었다.</p>
+    <p class="lead" data-i18n="block.notice">사내 공지가 붙었다.</p>
     <div class="memo">
-      <h4 id="dMemoTtl">■ 추가 지침</h4>
+      <h4 id="dMemoTtl" data-i18n="block.memo_title">■ 추가 지침</h4>
       <ul id="dMemo"></ul>
     </div>
-    <button class="btn" id="dBtn">일 시작</button>
+    <button class="btn" id="dBtn" data-i18n="block.begin">일 시작</button>
   </div>
 </div>
 
@@ -357,19 +373,23 @@
     <div id="oArt"></div>
     <p class="ttl" id="oTtl">해고</p>
     <p class="bigscore" id="oScore">0</p>
-    <p class="biglab">점수</p>
-    <p class="newbest hidden" id="newbest">최고 기록 경신!</p>
+    <p class="biglab" data-i18n="block.o_score">점수</p>
+    <p class="newbest hidden" id="newbest" data-i18n="block.o_best">최고 기록 경신!</p>
     <div class="stats">
-      <div class="stat"><b id="oDay">1</b><span>버틴 일수</span></div>
-      <div class="stat"><b id="oDocs">0</b><span>처리 서류</span></div>
-      <div class="stat"><b id="oPerf">0</b><span>완벽 처리</span></div>
+      <div class="stat"><b id="oDay">1</b><span data-i18n="block.o_days">버틴 일수</span></div>
+      <div class="stat"><b id="oDocs">0</b><span data-i18n="block.o_docs">처리 서류</span></div>
+      <div class="stat"><b id="oPerf">0</b><span data-i18n="block.o_perfect">완벽 처리</span></div>
     </div>
-    <div class="note" id="oNote">—</div>
-    <button class="btn" id="againBtn">다시 출근</button>
+    <button class="btn" id="againBtn" data-i18n="block.again">다시 출근</button>
   </div>
 </div>
 
+<script src="i18n.js"></script>
 <script>
+/* 문구는 전부 사전(i18n.js 의 block.*)에서 온다 — 사전에 없으면 아래 한국어로 떨어진다.
+   서류 50장도 block.d{일차}.{번호}.from|ask|text|stamp 키로 온다. ⚠️ 번역된 text 의 {종류|…} 조각은 한국어와
+   **같은 순서·개수**여야 한다 — 기록(LOG)이 조각 자리로 서버에 가고 서버는 한국어 표로 판정한다(tests/minigame-replay.mjs 가 대조). */
+const T=(k,v)=>window.MGI18N?MGI18N.t(k,v):k;
 /* ================= CARI mascot (기존 게임과 동일 자산) ================= */
 function charSVG(suit,o={}){
   const [body,shade,ear]=suit; const isCari=o.cari, dir=o.dir||0, shock=o.shock;
@@ -414,23 +434,37 @@ const CARI_SUIT=['#f4efe4','#cfc6b4','#9fb6de'];
 /* ===================== 규정 =====================
    MASK  — 가리고 보내면 되는 것
    BLOCK — 가려도 못 보내는 것(반려)
+   ⚠️ 예외(단가의 '판매가는 그대로')는 라벨을 '협력사 단가' 로 좁혀서 담는다 — 라벨에 괄호로 붙이면 규정집이 세 줄이 되어 넘친다.
 ================================================ */
 const MASK={
-  name :{label:'실명',        desc:'고객·직원 이름'},
-  acct :{label:'계좌·카드',   desc:'금융 정보 일체'},
-  pii  :{label:'연락처·주민번호', desc:'개인을 특정하는 정보'},
-  perf :{label:'미공개 수치', desc:'아직 발표 안 한 매출·목표·가입자'},
-  price:{label:'단가·계약금액', desc:'협력사 거래 조건'}
+  name  :{label:'실명',               desc:'고객·직원 이름'},
+  pii   :{label:'연락처·주민번호',    desc:'전화번호·주소·주민등록번호'},
+  acct  :{label:'계좌·카드',          desc:'계좌번호·카드번호'},
+  perf  :{label:'미공개 수치',        desc:'아직 발표 안 한 매출·목표·가입자 — 이미 공개된 수치는 그대로'},
+  cred  :{label:'접속 정보',          desc:'비밀번호·API 키·서버 주소'},
+  price :{label:'협력사 단가',        desc:'협력사와 주고받는 단가·계약금액 — 소비자 판매가는 그대로'},
+  health:{label:'건강·병력',          desc:'진단명·치료 내역'}
 };
 const BLOCK={
-  hr :{label:'인사 평가·징계', desc:'가려도 전송 금지 — 반려'},
-  src:{label:'개발 중 코드',  desc:'가려도 전송 금지 — 반려'}
+  hr   :{label:'인사 평가·징계', desc:'가려도 전송 금지 — 반려'},
+  src  :{label:'개발 중 코드',   desc:'가려도 전송 금지 — 반려'},
+  legal:{label:'소송·수사 자료', desc:'가려도 전송 금지 — 반려'}
 };
 
 /* ===================== 서류 =====================
    본문 표기 — {규칙|텍스트} 위반 · {k|텍스트} 핵심(가리면 맥락 손상) · {d|텍스트} 무해
+   10일 × 5장 = 50장. 날마다 규정 하나가 늘고, 서류도 같이 어려워진다(2026-09-15 지적 "조건만 늘고 문제는 그대로"):
+     1 누르고 찍기 · 2 번호처럼 보여도 번호가 아닌 것(송장·사번) · 3 한 장에 위반 여럿
+     4 공개된 수치는 무해(공시·기사) · 5 금지 서류는 가려도 소용없다(겹침) · 6 '비밀번호'라는 말 ≠ 비밀번호 값 · 링크 속 키
+     7 정가는 예외 · 아직 규정에 없는 코드 서류는 통과 · 8 코드+접속정보 겹침 · 공개 문서의 저자 이름은 무해
+     9 검진 일정·캠페인 ≠ 진단명 · 10 전부 섞임
+   ⛔ 6일차부터 금지 서류에 붉은 딱지(stamp)가 없다 — 내용을 읽고 인사 평가·코드·소송 자료임을 알아채야 한다.
+   ⛔ 위반은 문장 속에 숨긴다("전월보다 18% 정도"·"허리 때문에 수술을 받아"·링크 속 key) — 눈에 띄는 모양으로 쓰지 말 것.
+   ⛔ 위반처럼 보이는 핵심 조각(k)을 사이사이 넣는다(공시된 숫자·판매가·회사명·홍길동·공개 문서 저자) — 가리면 실패.
    ⚠️ 하루에 최소 한 장은 **위반 0** 인 서류를 넣는다(설계 규칙 ①).
+   ⚠️ 전화·주소·계좌·주민번호·비밀번호는 누가 봐도 가짜인 값(1111·○○구)만 쓴다(2026-09-15 지시 — 실제 같으면 안 된다).
    ⚠️ k 는 넉넉히 넣는다 — 이게 "일단 다 칠하기" 를 막는 유일한 장치다(설계 규칙 ②).
+   ⚠️ 7일차 4번(개발 중 코드)은 규정이 생기기 전이라 **전송이 정답**이다(설계 규칙 ③). 편의로 미리 막지 말 것.
 ================================================ */
 const DAYS=[
 { n:1, newMask:['name'], newBlock:[], docs:[
@@ -441,54 +475,129 @@ const DAYS=[
   {from:'최 사원', ask:'답변 초안 좀 써 주세요',
    text:'{name|정민호} 고객님과 {name|한지우} 고객님이 같은 건으로 문의하셨습니다. 요지는 {k|반품 접수 후 회수가 오지 않는다}는 것이고, {k|둘 다 같은 지역}입니다.'},
   {from:'박 주임', ask:'후기들 <b>한 문단으로</b> 정리해 주세요',
-   text:'{d|스마트스토어} 후기 모음입니다. {name|윤서진} 님 “{k|포장이 꼼꼼했다}”, 익명 “{k|배송이 빨랐다}”, {name|오세라} 님 “{k|설명서가 부실하다}”.'}
+   text:'{d|스마트스토어} 후기 모음입니다. {name|윤서진} 님 “{k|포장이 꼼꼼했다}”, 익명 “{k|배송이 빨랐다}”, {name|오세라} 님 “{k|설명서가 부실하다}”.'},
+  {from:'총무팀', ask:'안내문 <b>짧게</b> 다듬어 주세요',
+   text:'{d|다음 주 수요일} 사무실 {k|정수기를 교체}합니다. {k|오전 10시부터 두 시간} 동안 물을 쓸 수 없습니다. 장소는 {d|3층 탕비실}입니다.'}
 ]},
-{ n:2, newMask:['acct','pii'], newBlock:[], docs:[
-  {from:'김 대리', ask:'환불 처리 <b>절차 정리</b> 부탁해요',
-   text:'{name|강도윤} 고객님 환불 건입니다. 환불 계좌는 {acct|국민 604702-01-338291} 이고, {k|결제 취소가 두 번 실패}했습니다. {k|카드사 승인 내역 확인}이 필요합니다.'},
+{ n:2, newMask:['pii'], newBlock:[], docs:[
   {from:'상담팀', ask:'상담 이력 <b>요약</b>해 주세요',
-   text:'{name|서지안} 고객님 상담 기록입니다. 연락처는 {pii|010-4872-9031}. {k|같은 문제로 세 번째 전화}시고, {k|보상 요구}가 있었습니다.'},
-  {from:'마케팅', ask:'배너 문구 <b>다듬어</b> 주세요',
+   text:'{name|서지안} 고객님 상담 기록입니다. 연락처는 {pii|010-1111-2222}. {k|같은 문제로 세 번째 전화}시고, {k|보상 요구}가 있었습니다.'},
+  {from:'물류팀', ask:'배송 사고 <b>보고서로</b> 정리해 주세요',
+   text:'{name|강민준} 고객님 건입니다. 송장번호 {d|6012-3341-9902}. {k|상자가 젖은 채 도착}했고 {k|재발송을 요청}하셨습니다. {d|택배사에도 통보}했습니다.'},
+  {from:'법무팀', ask:'민원 내용 <b>쟁점만</b> 뽑아 주세요',
+   text:'{name|임하늘} 님 민원입니다. 주민등록번호 {pii|111111-1111111}, 주소 {pii|서울 ○○구 ○○로 11}. 요지는 {k|개인정보 삭제 요청}이고 {k|기한을 못 박아} 왔습니다.'},
+  {from:'마케팅팀', ask:'배너 문구 <b>다듬어</b> 주세요',
    text:'{d|봄 프로모션} 문구 후보입니다. {k|무료 배송}과 {k|첫 구매 10% 할인}을 앞세우는 방향이고, {d|기간은 4월 한 달}입니다.'},
-  {from:'법무', ask:'민원 내용 <b>쟁점만</b> 뽑아 주세요',
-   text:'{name|임하늘} 님 민원입니다. 주민등록번호 {pii|980412-2334512}, 주소 {pii|서울 마포구 성산로 41}. 요지는 {k|개인정보 삭제 요청}이고 {k|기한을 못 박아} 왔습니다.'}
+  {from:'인사팀', ask:'사내 공지 <b>초안</b> 부탁해요',
+   text:'{d|4월 1일}부터 {k|출입증을 새 것으로 교체}합니다. {k|사번이 카드 뒷면에 인쇄}됩니다(예: {d|E-20431}). 담당은 {name|서다인} 주임, 수령은 {d|총무팀 창구}입니다.'}
 ]},
-{ n:3, newMask:['perf'], newBlock:[], docs:[
-  {from:'기획팀', ask:'주간 보고 <b>초안</b> 만들어 주세요',
-   text:'{perf|3월 매출 12억 4천만원}으로 {perf|전월 대비 18% 상승}했습니다. {k|배송 지연 클레임은 절반으로 감소}했고, {k|반품률은 변동 없음}입니다.'},
+{ n:3, newMask:['acct'], newBlock:[], docs:[
+  {from:'김 대리', ask:'환불 처리 <b>절차 정리</b> 부탁해요',
+   text:'{name|강도윤} 고객님 환불 건입니다. 환불 계좌는 {acct|국민 111-1111-1111} 이고, {k|결제 취소가 두 번 실패}했습니다. {k|카드사 승인 내역 확인}이 필요합니다.'},
+  {from:'재무팀', ask:'지출 내역 <b>표로</b> 만들어 주세요',
+   text:'{d|3월 법인카드} 사용 내역입니다. 카드번호 {acct|1111-2222-3333-4444}. {k|회식비가 한도를 넘은 건이 두 번}, {k|영수증 누락이 한 건} 있습니다. {d|결제일은 25일}입니다.'},
   {from:'CS팀', ask:'대응 방안 <b>정리</b> 부탁드립니다',
-   text:'{name|노가온} 고객님이 {k|같은 제품을 세 번 교환}받으셨습니다. 환불 계좌 {acct|신한 110-482-773901}. {k|본사 차원 대응}이 필요해 보입니다.'},
+   text:'{name|노가온} 고객님이 {k|같은 제품을 세 번 교환}받으셨습니다. 환불 계좌 {acct|신한 222-2222-2222}. {k|본사 차원 대응}이 필요해 보입니다.'},
+  {from:'영업팀', ask:'거래처 메일 <b>답장 초안</b> 써 주세요',
+   text:'{name|한서준} 부장님께 보낼 답장입니다. 입금 계좌 {acct|우리 333-3333-3333}, 연락처 {pii|010-2222-3333}. 요지는 {k|납품일을 일주일 당길 수 있는지}와 {k|분할 납품이 되는지}입니다.'},
+  {from:'홍보팀', ask:'SNS 게시글 <b>문구</b> 다듬어 주세요',
+   text:'{d|신제품 출시} 게시글입니다. {k|한정 수량 500개}와 {k|출시 기념 사은품}을 앞세우고, {d|해시태그 세 개}를 붙입니다.'}
+]},
+{ n:4, newMask:['perf'], newBlock:[], docs:[
+  {from:'기획팀', ask:'주간 보고 <b>초안</b> 만들어 주세요',
+   text:'{d|4월 둘째 주} 주간 보고입니다. {perf|3월 매출은 12억 4천만원}으로 {perf|전월보다 18% 정도} 올랐습니다. {k|배송 지연 클레임은 절반으로 줄었고} {k|반품률은 그대로}입니다. {name|정 팀장}님이 {k|다음 달 물류비 절감안}을 발표하실 예정이고, {d|보고는 금요일 오전}입니다.'},
   {from:'홍보팀', ask:'보도자료 <b>문장 다듬기</b>',
-   text:'{d|보도자료} 초안입니다. {k|지난해 공개된 연 매출 1,200억}을 근거로 {k|업계 3위}임을 강조하려 합니다. {d|발표는 다음 주 월요일}.'},
+   text:'{d|보도자료} 초안입니다. {k|지난해 공시한 연 매출 1,200억}과 {k|업계 3위}를 앞세우고, {k|신규 물류센터 착공} 소식을 붙입니다. {d|대표 인터뷰}는 {k|이미 기사로 나간 문장}을 그대로 씁니다. {d|발표는 다음 주 월요일}입니다.'},
   {from:'전략팀', ask:'발표 슬라이드 <b>구성 추천</b>해 주세요',
-   text:'{perf|4월 예상 매출 15억}과 {perf|신규 가입자 2만 3천명} 자료로 {k|사내 발표용 슬라이드}를 만들려 합니다. {k|그래프 형태} 추천 부탁드립니다.'}
+   text:'{d|사내 발표} 슬라이드입니다. {perf|4월 예상 매출 15억}과 {perf|신규 가입자 2만 3천 명}, 그리고 {k|지난 분기 공개된 가입자 18만 명}을 한 장에 넣으려 합니다. {k|그래프 종류}와 {k|장수}를 추천해 주세요. 발표자는 {name|이 상무}님입니다.'},
+  {from:'IR팀', ask:'주주 서한 <b>문장</b> 다듬어 주세요',
+   text:'{d|1분기 주주 서한}입니다. {k|지난달 공시한 영업이익 42억}은 그대로 두고, {perf|2분기 내부 목표 55억}과 {perf|하반기 신사업 매출 전망}은 빼야 합니다. 끝에 담당자 {name|박서현}과 연락처 {pii|010-1111-2222}가 들어갑니다. {k|어조는 차분하게}, {k|분량은 한 장}으로 부탁드립니다.'},
+  {from:'채용팀', ask:'지원자 <b>경력만</b> 뽑아 주세요',
+   text:'{name|조은비} 지원자 서류입니다. 연락처 {pii|010-3333-4444}, 주소 {pii|서울 ○○구 ○○로 11}. {k|물류 경력 5년}, {k|재고 시스템 구축 경험}이 있고 {k|전 직장에서 창고 자동화를 맡았습니다}. {d|면접은 다음 주}이고 {k|질문 목록}을 뽑아 주세요.'}
 ]},
-{ n:4, newMask:[], newBlock:['hr'], docs:[
+{ n:5, newMask:[], newBlock:['hr'], docs:[
   {from:'인사팀', ask:'평가 코멘트 <b>요약</b>해 주세요', stamp:'인사 평가', block:'hr',
-   text:'{d|2026년 상반기} 팀원 평가표입니다. 등급과 코멘트가 길어서 {k|사람별로 세 줄씩 요약}했으면 합니다.'},
-  {from:'CS팀', ask:'FAQ 문장 <b>정리</b>해 주세요',
-   text:'{d|고객센터} FAQ 초안입니다. {k|교환 절차}와 {k|반품 기한}, {k|배송비 부담 기준}을 정리했습니다.'},
+   text:'{d|2026년 상반기} 팀원 평가표입니다. {name|한지민} 과장은 {k|협업 태도 미흡}, {name|오세훈} 대리는 {k|납기 준수 우수}. 등급과 코멘트가 길어서 {k|사람별로 세 줄씩} 요약했으면 합니다.'},
+  {from:'인사팀', ask:'채용 공고 <b>문구</b> 다듬어 주세요',
+   text:'{d|경력직 채용 공고}입니다. {k|물류 데이터 분석 3년 이상}, {k|주 2회 재택}, {k|연봉은 면접 후 협의}를 앞세웁니다. {d|지원은 채용 사이트}로 받고 {d|마감은 이달 말}입니다. {k|문장을 딱딱하지 않게} 다듬어 주세요.'},
+  {from:'노무팀', ask:'회의록 <b>3줄로</b> 정리해 주세요', stamp:'징계 기록', block:'hr',
+   text:'{name|백서우} 팀장 건 {d|징계위원회} 회의록입니다. 계좌 {acct|국민 111-1111-1111}로 {perf|회사 손실 3천만원}이 오간 경위가 적혀 있습니다. {k|경위}와 {k|결정 사항}만 남기면 됩니다.'},
   {from:'영업팀', ask:'회의록 <b>3줄 요약</b>',
-   text:'{name|백서우} 팀장 주재 회의입니다. {perf|2분기 목표 22억}이 언급됐고, {k|인력 충원 논의}와 {k|채널 확대}가 있었습니다.'},
-  {from:'채용', ask:'지원자 <b>경력만</b> 뽑아 주세요',
-   text:'{name|조은비} 지원자 서류입니다. 연락처 {pii|010-2201-8834}. {k|물류 경력 5년}과 {k|재고 시스템 구축 경험}이 있습니다.'}
+   text:'{name|류가영} 팀장 주재 회의입니다. {perf|2분기 목표 22억}이 언급됐고, {k|인력 충원 논의}와 {k|채널 확대}가 있었습니다. {k|작년에 발표한 연 매출 목표}는 이미 공개된 것이라 그대로 씁니다. 참석자 {name|강도윤} 대리 연락처 {pii|010-2222-3333}.'},
+  {from:'CS팀', ask:'FAQ 문장 <b>정리</b>해 주세요',
+   text:'{d|고객센터} FAQ 초안입니다. {k|교환 절차}, {k|반품 기한}, {k|배송비 부담 기준}을 정리했고 {k|예시 문의}도 넣었습니다. 예시의 고객 이름은 {d|홍길동}처럼 가짜 이름입니다. {d|분량은 한 장}.'}
 ]},
-{ n:5, newMask:['price'], newBlock:['src'], docs:[
+{ n:6, newMask:['cred'], newBlock:[], docs:[
+  {from:'개발팀', ask:'장애 보고서 <b>요약</b>해 주세요',
+   text:'{d|5월 3일 새벽} 장애 보고입니다. 서버 {cred|10.0.0.1}에 {cred|admin / 1234}로 들어가 확인했고, {k|디스크가 가득 차서} 멈춘 것을 {k|로그를 지우고 복구}했습니다. 확인한 사람은 {name|윤재호} 팀장이고, {k|재발 방지로 로그 보관 기간을 줄이자}는 의견입니다.'},
+  {from:'마케팅팀', ask:'툴 사용법 <b>순서대로</b> 정리해 주세요',
+   text:'{d|뉴스레터 툴} 사용법입니다. 관리자 페이지는 {cred|admin.example.com/?key=1234}이고 {k|발송 예약}과 {k|수신 거부 처리}를 순서대로 적어 주세요. {d|화면 캡처}는 {k|버튼 이름}만 글로 옮기면 됩니다.'},
+  {from:'팀장', ask:'코멘트 <b>한 줄씩</b> 다듬어 주세요', block:'hr',
+   text:'{d|상반기} 팀원 코멘트입니다. {name|최민서} — {k|등급 B, 협업 태도 미흡}. {name|서다인} — {k|등급 A, 납기 준수}. {k|사람별로 한 줄씩} 다듬어 주세요.'},
+  {from:'CS팀', ask:'고객 답변 <b>초안</b> 부탁해요',
+   text:'{name|문지호} 고객님이 {k|비밀번호 재설정 메일이 안 온다}고 하십니다. 주문번호 {d|B-77012}. 임시 비밀번호 {cred|temp1234}를 발급했고 {k|스팸함 확인 안내}도 넣어 주세요. 고객 연락처 {pii|010-4444-5555}.'},
+  {from:'보안팀', ask:'사내 공지 <b>다듬어</b> 주세요',
+   text:'{d|이번 달} 보안 공지입니다. {k|비밀번호는 90일마다 변경}하고 {k|공용 PC는 10분 뒤 자동 로그아웃}됩니다. {k|비밀번호는 숫자와 문자를 섞어 8자 이상}으로 만드세요. {d|문의는 보안팀}으로.'}
+]},
+{ n:7, newMask:['price'], newBlock:[], docs:[
   {from:'구매팀', ask:'견적 <b>비교표</b>로 만들어 주세요',
-   text:'{d|A사} 견적서입니다. 단가는 {price|개당 3,200원}, 조건은 {price|월 최소 물량 5만개}. {k|납기 2주}이고 {k|불량 교환은 무상}입니다.'},
-  {from:'개발팀', ask:'주석 좀 <b>정리</b>해 주세요', stamp:'개발 중 코드', block:'src',
-   text:'{k|결제 모듈} 리팩터링 중인 코드입니다. {k|함수 주석}을 통일된 형식으로 바꾸고 싶습니다.'},
-  {from:'법무', ask:'계약서 <b>위험 조항</b> 짚어 주세요',
-   text:'{name|하시윤} 담당자와 협의한 초안입니다. {price|연 계약금 8,400만원}, 대금은 {acct|하나 391-910022-84}로 입금. {k|위약 조항}과 {k|자동 갱신 여부}를 봐 주세요.'},
-  {from:'품질팀', ask:'재발 방지 대책 <b>초안</b>',
-   text:'{name|구민재} 고객 클레임과 {perf|이번 달 반품률 7.2%} 자료입니다. {k|같은 라인에서 반복}되고 있어 {k|원인 분석}이 필요합니다.'}
+   text:'{d|A사}와 {d|B사} 견적입니다. A사는 {price|개당 3,200원}에 {price|월 최소 5만 개}, B사는 {price|개당 3,050원}에 {k|납기 3주}. {k|불량 교환은 둘 다 무상}이고, 우리 {k|판매가 9,900원}은 그대로 둡니다. 담당 {name|장우진} 과장.'},
+  {from:'영업팀', ask:'제품 소개 <b>문구</b> 다듬어 주세요',
+   text:'{d|신형 청소기} 소개 문구입니다. 판매가 {k|249,000원}, {k|출시 기념 10% 할인}, {k|정가는 홈페이지에 공개}돼 있습니다. {d|온라인몰 전용}이고 {k|첫 문장을 짧게} 다듬어 주세요.'},
+  {from:'법무팀', ask:'계약서 <b>위험 조항</b> 짚어 주세요',
+   text:'{name|하시윤} 담당자와 협의한 초안입니다. {price|연 8,400만원}에 합의했고 대금은 {acct|하나 444-4444-4444}로 입금합니다. {k|위약 조항}과 {k|자동 갱신 여부}를 봐 주세요. 상대 회사는 {d|(주)한빛물류}이고 {k|계약 기간은 2년}입니다.'},
+  {from:'개발팀', ask:'주석 좀 <b>정리</b>해 주세요', block:'src',
+   text:'{k|결제 모듈}을 리팩터링 중입니다. {k|함수 주석}을 통일된 형식으로 바꾸고 싶고, {d|스타일 가이드}는 {k|회사 위키에 있는 것}을 따릅니다.'},
+  {from:'구매팀', ask:'협력사 메일 <b>답장</b> 써 주세요',
+   text:'{name|장우진} 과장님께 보낼 답장입니다. 우리 제안은 {price|개당 2,900원}, 상대 요구는 {price|개당 3,100원}입니다. {k|중간에서 맞출지}, {k|물량을 늘려 단가를 낮출지} 의견 주세요. 답장은 {d|이번 주 안}에 보내야 하고, 상대 연락처는 {pii|010-2222-3333}입니다.'}
+]},
+{ n:8, newMask:[], newBlock:['src'], docs:[
+  {from:'개발팀', ask:'주석 좀 <b>달아</b> 주세요', block:'src',
+   text:'{k|재고 동기화} 배치 코드입니다. {k|에러 처리 부분}에 주석이 없어서 읽기 어렵습니다. {d|파일은 세 개}이고 {k|함수 이름}은 그대로 둬 주세요.'},
+  {from:'개발팀', ask:'문서 <b>번역</b> 부탁해요',
+   text:'{d|오픈소스 라이브러리} 공식 문서입니다. {k|설치 방법}과 {k|기본 설정} 부분을 한국어로 옮겨 주세요. {d|공개 저장소}에 있는 글이고, 저자 이름 {d|Jane Doe}도 문서에 적힌 대로 둡니다.'},
+  {from:'개발팀', ask:'설정 파일 <b>검토</b>해 주세요', block:'src',
+   text:'{d|배포 설정} 파일입니다. {cred|DB_PASS=1234} 줄이 그대로 들어 있어서 {k|환경변수로 빼는 방법}을 알려 주세요. {k|서비스 코드}와 같이 올립니다.'},
+  {from:'기획팀', ask:'기능 설명서 <b>초안</b>',
+   text:'{d|신규 기능} 설명서입니다. {k|알림 설정 화면}과 {k|자동 저장}을 사용자 눈높이로 풀어 주세요. 테스트에 쓴 계정 {cred|tester / 1234}는 지우고, 담당 기획자 {name|남주혁}의 {pii|010-5555-6666}은 문의처로 적혀 있습니다.'},
+  {from:'QA팀', ask:'버그 리포트 <b>정리</b>해 주세요',
+   text:'{d|버그 리포트} 12건입니다. {k|로그인 화면 무한 로딩}과 {k|결제 후 영수증 미표시}가 반복됩니다. 테스트 계정은 {cred|qa01 / 1234}, 재현 순서는 {k|캡처 대신 글}로 적었습니다. {d|우선순위}는 {k|결제 쪽부터}.'}
+]},
+{ n:9, newMask:['health'], newBlock:[], docs:[
+  {from:'총무팀', ask:'검진 안내문 <b>짧게</b>',
+   text:'{d|10월 건강검진} 안내입니다. {k|지정 병원 3곳} 중 고르고 {k|예약은 사내 포털}에서 합니다. {k|당일 금식}이고, {d|작년 검진 결과}는 {k|병원에서 직접 받으세요}.'},
+  {from:'인사팀', ask:'휴직 신청 <b>정리</b>해 주세요',
+   text:'{name|서도현} 사원의 휴직 신청입니다. {health|허리 때문에 수술을 받아} {k|6월부터 두 달} 쉽니다. {k|대체 인력 배치}가 필요하고, 본인 연락처는 {pii|010-4444-5555}입니다.'},
+  {from:'CS팀', ask:'클레임 <b>요약</b> 부탁해요',
+   text:'{name|배수아} 고객님이 {k|제품 사용 후 이상 반응}이 있었다고 하십니다. 병원에서 {health|접촉성 피부염 진단}을 받았고, 연락처 {pii|010-5555-7777}, 환불 계좌 {acct|신한 222-2222-2222}. {k|의료비 보상 요구}가 있고 {k|제품 회수}도 요청했습니다.'},
+  {from:'복지팀', ask:'보험 안내 <b>다듬어</b> 주세요',
+   text:'{d|단체 실손보험} 갱신 안내입니다. {k|보장 한도가 올라가고} {k|가족도 추가 가입}할 수 있습니다. {d|신청은 이달 말까지}이고, {k|건강한 식단 캠페인}과 같이 공지합니다.'},
+  {from:'노무팀', ask:'산재 신청서 <b>정리</b>해 주세요',
+   text:'{name|고태윤} 기사님 산재 신청 건입니다. {health|왼쪽 손목이 부러져} {k|창고 작업 중 발생}했고 {k|목격자 진술}이 있습니다. 주민번호 {pii|222222-2222222}, 치료비는 {acct|우리 333-3333-3333}로 지급 예정. {perf|이번 달 사고 3건}은 아직 공표 전입니다.'}
+]},
+{ n:10, newMask:[], newBlock:['legal'], docs:[
+  {from:'법무팀', ask:'검토 자료 <b>요약</b>해 주세요', block:'legal',
+   text:'{d|손해배상 건}으로 {k|법원에 낼 준비서면}입니다. {k|쟁점 세 가지}를 표로 정리해 주세요. 상대 측 대리인은 {name|오지환} 변호사입니다.'},
+  {from:'법무팀', ask:'약관 개정안 <b>검토</b>',
+   text:'{d|이용약관} 개정안입니다. {k|환불 규정}과 {k|자동 결제 고지} 조항을 쉬운 말로 바꿔 주세요. {k|법령 인용}은 그대로 두고, 예시 이름은 {d|홍길동}으로 씁니다. {d|시행일은 다음 달 1일}.'},
+  {from:'감사팀', ask:'거래 내역 <b>날짜순으로</b>', block:'legal',
+   text:'{d|경찰서}에서 온 요청입니다. {name|임수빈} 관련 계좌 {acct|기업 555-5555-5555}의 거래 내역을 {k|날짜순으로 정리}해 달라고 합니다. {k|표 형식}으로.'},
+  {from:'대표실', ask:'전사 메일 <b>초안</b> 다듬어 주세요',
+   text:'{perf|올해 목표 매출 200억}과 {k|신규 사업 진출}을 담은 전사 메일입니다. {name|정하윤} 신임 본부장 소개도 들어가고, {k|작년 공시된 매출 150억}은 그대로 씁니다. {k|어조는 담담하게}, 문의는 {pii|010-7777-8888}로.'},
+  {from:'인사팀', ask:'통보문 <b>형식</b> 맞춰 주세요', block:'hr',
+   text:'{name|윤찬영} 사원에게 보낼 {k|경고 처분} 통보문입니다. {k|정해진 양식}에 맞게 다듬어 주세요. 사유는 {k|무단 결근 3회}이고 {d|발송은 내일}입니다.'}
 ]}
 ];
 
 /* ===================== 상태 ===================== */
 const $=id=>document.getElementById(id);
+const VERDICT=document.getElementById('verdict');   // 서류 innerHTML 에 지워지므로 참조를 들고 있는다
+/* ⛔ 아래 셋은 서버 _shared/block-days.ts 와 sync pair 다(tests/minigame-replay.mjs 가 대조) — 점수는 서버가 기록으로 다시 센다. */
 const MAX_STRIKE=3;
+const DOC_POINT=100;
+const PERFECT_BONUS=50;
 let di=0, qi=0, strikes=0, score=0, docsDone=0, perfect=0;
+let LOG=[], T0=0;   // 답안 기록 — 서류마다 {d,i,m:가린 자리,s:전송1/반려0,t} · 서버가 이걸로 점수를 다시 센다
 let activeMask=new Set(), activeBlock=new Set(), cur=null, locked=true, lastSent=true;
 let best=(()=>{try{return +localStorage.getItem('cari_block_best')||0}catch(e){return 0}})();
 
@@ -507,19 +616,26 @@ function renderText(src){
   return out;
 }
 
+/** 한국어는 이 파일이 원본이다 — 사전의 ko 사본을 쓰지 않는다(사본이 낡으면 옛 서류가 뜬다 — 실제로 그랬다). */
+const KO=()=>!window.MGI18N||MGI18N.lang==='ko';
+/** 규정 라벨·설명 — 한국어는 위 MASK/BLOCK, 다른 언어는 사전(block.rule.<코드>), 사전에 없으면 한국어. */
+function ruleLabel(k){ if(KO()) return (MASK[k]||BLOCK[k]).label; const v=T('block.rule.'+k); return v==='block.rule.'+k ? (MASK[k]||BLOCK[k]).label : v; }
+function ruleDesc(k){ if(KO()) return (MASK[k]||BLOCK[k]).desc; const v=T('block.rule.'+k+'.desc'); return v==='block.rule.'+k+'.desc' ? (MASK[k]||BLOCK[k]).desc : v; }
+/** 서류 문구 — 한국어는 DAYS, 다른 언어는 사전(block.d{일차}.{번호}.<필드>), 사전에 없으면 한국어. */
+function docText(f){ if(KO()) return cur[f]||''; const k='block.d'+DAYS[di].n+'.'+(qi+1)+'.'+f; const v=T(k); return v===k ? (cur[f]||'') : v; }
 function renderBook(newOnes){
   const mk=[...activeMask];
   $('maskChips').innerHTML = mk.length
-    ? mk.map(k=>`<span class="chip${newOnes&&newOnes.includes(k)?' new':''}" title="${esc(MASK[k].desc)}">${esc(MASK[k].label)}</span>`).join('')
-    : '<span class="bnone">아직 없음</span>';
+    ? mk.map(k=>`<span class="chip${newOnes&&newOnes.includes(k)?' new':''}">${esc(ruleLabel(k))}</span>`).join('')
+    : `<span class="bnone">${esc(T('block.none'))}</span>`;
   const bk=[...activeBlock];
   $('blockChips').innerHTML = bk.length
-    ? bk.map(k=>`<span class="chip blk${newOnes&&newOnes.includes(k)?' new':''}" title="${esc(BLOCK[k].desc)}">${esc(BLOCK[k].label)}</span>`).join('')
-    : '<span class="bnone">아직 없음</span>';
+    ? bk.map(k=>`<span class="chip blk${newOnes&&newOnes.includes(k)?' new':''}">${esc(ruleLabel(k))}</span>`).join('')
+    : `<span class="bnone">${esc(T('block.none'))}</span>`;
 }
 
 function renderHud(){
-  $('dayEl').innerHTML=DAYS[di].n+'<i>일차</i>';   // 정사각 슬롯이라 숫자 크게 + '일차' 작게 두 줄
+  $('dayEl').innerHTML=DAYS[di].n+'<i>'+esc(T('block.day'))+'</i>';   // 정사각 슬롯이라 숫자 크게 + '일차' 작게 두 줄
   $('progEl').textContent=(qi+1)+' / '+DAYS[di].docs.length;
   $('scEl').textContent=score.toLocaleString();
   $('strEl').innerHTML=Array.from({length:MAX_STRIKE},(_,i)=>`<span class="${i<strikes?'on':''}"></span>`).join('');
@@ -531,13 +647,18 @@ function loadDoc(){
   const p=$('paper');
   p.className='paper in';
   p.innerHTML=
-    `<div class="phead"><span class="pfrom">${esc(d.from)}</span>`+
-    (d.stamp?`<span class="pstamp">${esc(d.stamp)}</span>`:'')+`</div>`+
-    `<p class="pask">“${d.ask}”</p>`+
-    `<div class="ptext">${renderText(d.text)}</div>`;
+    `<div class="phead"><span class="pfrom">${esc(docText('from'))}</span>`+
+    (d.stamp?`<span class="pstamp">${esc(docText('stamp'))}</span>`:'')+`</div>`+
+    `<p class="pask">“${docText('ask')}”</p>`+
+    `<div class="ptext">${renderText(docText('text'))}</div>`+
+    `<div class="pfoot"></div>`;                   // 도장 자리 — 본문 아래 빈 칸이라 글자와 안 겹친다
+  p.querySelector('.pfoot').appendChild(VERDICT);  // innerHTML 로 지워지므로 매번 다시 붙인다
   p.querySelectorAll('.tk').forEach(t=>{
-    t.onclick=()=>{ if(locked) return; t.classList.toggle('mk'); };
+    t.onclick=()=>{ if(locked) return; t.classList.toggle('mk');
+      if(t.classList.contains('hint')){ t.classList.remove('hint'); $('sendBtn').classList.add('hint'); } };
   });
+  // 첫 서류만: 가려야 할 조각 하나가 깜빡이고, 가리면 전송 도장이 깜빡인다.
+  if(di===0&&qi===0){ const h=p.querySelector('.tk[data-kind="name"]'); if(h) h.classList.add('hint'); }
   p.scrollTop=0;
   locked=false;
   $('sendBtn').disabled=false; $('rejBtn').disabled=false;
@@ -554,56 +675,58 @@ function loadDoc(){
 =============================================== */
 function judge(sent){
   if(locked) return;
+  const p0=$('paper');
   locked=true; lastSent=sent;
-  $('sendBtn').disabled=true; $('rejBtn').disabled=true;
+  $('sendBtn').disabled=true; $('rejBtn').disabled=true; $('sendBtn').classList.remove('hint');
+  p0.querySelectorAll('.tk.hint').forEach(t=>t.classList.remove('hint'));
   const p=$('paper'), toks=[...p.querySelectorAll('.tk')];
   const isBlock = cur.block && activeBlock.has(cur.block);
-  let ok=false, ttl, why, pt='', flash=false;
+  // 도장 한 마디로 끝낸다 — 설명 글은 없다. 걸린 조각(빨강/주황)과 서류 머리 표시가 이유를 보여준다.
+  let ok=false, ttl, kind, pt='', flash=false;
 
   if(!sent){
-    if(isBlock){ ok=true; ttl='반려 처리'; why=`<em>${esc(BLOCK[cur.block].label)}</em> 자료는 가려도 넘길 수 없다. 잘 막았다.`; }
-    else { ttl='업무 마비'; why='넘겨도 되는 서류를 반려했다. 안 되는 것만 막아야 일이 돌아간다.'; }
+    if(isBlock){ ok=true; ttl=T('block.v_rej'); kind='rej'; }
+    else { ttl=T('block.v_rejwrong'); kind='fail'; }
   } else if(isBlock){
-    ttl='유출 사고';
-    why=`<em>${esc(BLOCK[cur.block].label)}</em> 자료다. 이건 가린다고 되는 게 아니라 <em>아예 넣으면 안 되는</em> 종류다.`;
-    flash=true;
+    ttl=T('block.v_incident'); kind='fail'; flash=true;
+    const ps=p.querySelector('.pstamp'); if(ps) ps.classList.add('hit');
   } else {
     const leaked=toks.filter(t=>activeMask.has(t.dataset.kind)&&!t.classList.contains('mk'));
     const over=toks.filter(t=>t.dataset.kind==='k'&&t.classList.contains('mk'));
     if(leaked.length){
       leaked.forEach(t=>t.classList.add('leak'));
-      ttl='유출됐다'; flash=true;
-      why=`<em>${esc(MASK[leaked[0].dataset.kind].label)}</em> 이(가) 그대로 넘어갔다. 규정집에 오늘 추가된 줄을 다시 봐라.`;
+      ttl=T('block.v_leak'); kind='fail'; flash=true;
     } else if(over.length){
       over.forEach(t=>t.classList.add('over'));
-      ttl='CARI 가 헛소리를 한다';
-      why='필요한 내용까지 가렸다. CARI 는 남은 것만 보고 답한다 — <em>지울 것과 남길 것을 가르는 게 일</em>이다.';
+      ttl=T('block.v_over'); kind='over';
     } else {
-      ok=true;
+      ok=true; ttl=T('block.v_pass'); kind='pass';
       const extra=toks.filter(t=>t.dataset.kind!=='k'&&!activeMask.has(t.dataset.kind)&&t.classList.contains('mk'));
-      const gain=100+(extra.length?0:50);
+      const gain=DOC_POINT+(extra.length?0:PERFECT_BONUS);
       score+=gain; pt='+'+gain; docsDone++;
-      if(!extra.length){ perfect++; ttl='통과'; why='필요한 것만 정확히 가렸다.'; }
-      else { ttl='통과'; why='새어 나간 건 없다. 다만 안 가려도 될 것까지 가렸다 — 보너스는 없다.'; }
+      if(!extra.length) perfect++;
     }
   }
 
-  if(ok&&!sent){ score+=100; pt='+100'; docsDone++; }
+  if(ok&&!sent){ score+=DOC_POINT; pt='+'+DOC_POINT; docsDone++; }
   if(!ok) strikes++;
+  LOG.push({d:di,i:qi,m:toks.map((t,i)=>t.classList.contains('mk')?i:-1).filter(i=>i>=0),s:sent?1:0,t:Math.max(0,Math.round(performance.now()-T0))});
   if(flash){ $('flash').classList.remove('on'); void $('flash').offsetWidth; $('flash').classList.add('on'); }
   p.classList.add('done');
   renderHud();
 
-  const fb=$('fb');
-  fb.className='fb '+(ok?'yes on':'no on');
-  $('fbTtl').textContent=ttl; $('fbPt').textContent=pt; $('fbWhy').innerHTML=why;
-  $('fbBtn').textContent = strikes>=MAX_STRIKE ? '결과 보기'
-    : (qi+1>=DAYS[di].docs.length ? (di+1>=DAYS.length?'결과 보기':'퇴근') : '다음 서류');
-  fb.dataset.ok=ok?'1':'0';
+  const v=VERDICT;
+  v.className='verdict '+kind; void v.offsetWidth; v.classList.add('on');
+  $('vTtl').textContent=ttl; $('vPt').textContent=pt;
+  p.scrollTop=p.scrollHeight;   // 긴 서류면 도장이 아래 있으니 내려서 보여준다
+  $('fbBtn').textContent = strikes>=MAX_STRIKE ? T('block.result')
+    : (qi+1>=DAYS[di].docs.length ? (di+1>=DAYS.length?T('block.result'):T('block.clockout')) : T('block.next'));
+  $('stamps').classList.add('judged');
 }
 
 function nextStep(){
-  $('fb').classList.remove('on');
+  VERDICT.classList.remove('on');
+  $('stamps').classList.remove('judged');
   if(strikes>=MAX_STRIKE) return gameOver(false);
   const p=$('paper');
   // 전송한 서류는 오른쪽(AI 쪽)으로, 반려한 서류는 왼쪽(되돌려주는 쪽)으로 빠진다.
@@ -625,29 +748,30 @@ function openDay(){
   D.newBlock.forEach(k=>activeBlock.add(k));
   renderBook(news);
   renderHud();
-  $('dTtl').textContent=D.n+'일차';
+  $('dTtl').textContent=T('block.day_n',{n:D.n});
   $('dMemo').innerHTML=
-    D.newMask.map(k=>`<li><b>${esc(MASK[k].label)}</b> 은(는) 가리고 보낼 것<i>${esc(MASK[k].desc)}</i></li>`).join('')+
-    D.newBlock.map(k=>`<li><b>${esc(BLOCK[k].label)}</b> 자료는 전송 금지<i>${esc(BLOCK[k].desc)}</i></li>`).join('');
+    D.newMask.map(k=>`<li>${T('block.memo_mask',{x:esc(ruleLabel(k))})}<i>${esc(ruleDesc(k))}</i></li>`).join('')+
+    D.newBlock.map(k=>`<li>${T('block.memo_block',{x:esc(ruleLabel(k))})}<i>${esc(ruleDesc(k))}</i></li>`).join('');
   $('dayOv').classList.remove('hidden');
 }
 
 function start(){
   di=0;qi=0;strikes=0;score=0;docsDone=0;perfect=0;
+  LOG=[]; T0=performance.now();
   activeMask=new Set(); activeBlock=new Set();
   $('startOv').classList.add('hidden');
   $('overOv').classList.add('hidden');
-  $('fb').classList.remove('on');
+  VERDICT.classList.remove('on'); $('stamps').classList.remove('judged');
   openDay();
 }
 
 function gameOver(cleared){
   locked=true;
-  $('fb').classList.remove('on');
-  if(window.MGBridge) MGBridge.submit(score); // 랭킹: 점수형
+  VERDICT.classList.remove('on'); $('stamps').classList.remove('judged');
+  if(window.MGBridge) MGBridge.submit(score,{log:LOG}); // 숫자는 참고값 — 서버가 log 로 다시 센다
   $('overOv').classList.toggle('cleared',cleared);
   $('oArt').innerHTML=charSVG(CARI_SUIT,{cari:true,shock:!cleared});
-  $('oTtl').textContent=cleared?'무사히 한 주를 넘겼다':'해고';
+  $('oTtl').textContent=cleared?T('block.o_clear'):T('block.o_fired');
   $('oScore').textContent=score.toLocaleString();
   $('oDay').textContent=DAYS[Math.min(di,DAYS.length-1)].n;
   $('oDocs').textContent=docsDone;
@@ -655,9 +779,6 @@ function gameOver(cleared){
   if(score>best){best=score;try{localStorage.setItem('cari_block_best',best)}catch(e){}
     $('newbest').classList.remove('hidden');}
   else $('newbest').classList.add('hidden');
-  $('oNote').innerHTML=cleared
-    ? '실무에서 AI 사고가 나는 자리가 정확히 여기다. <b>넣기 전에 한 번 더 보는 습관</b>이 전부다.'
-    : '규정은 자란다. 어제 괜찮던 것이 오늘 걸린다 — <b>서류보다 규정집을 먼저</b> 봐야 하는 이유다.';
   $('overOv').classList.remove('hidden');
 }
 
@@ -678,18 +799,21 @@ renderBook(); renderHud();
 (function(){
   var EMBED=window.parent!==window;
   function post(m){ if(EMBED) window.parent.postMessage(m,window.location.origin); }
-  window.MGBridge={submit:function(v){ if(typeof v==='number'&&isFinite(v)) post({t:'mg:score',score:v}); }};
+  // ⚠️ log 를 꼭 실어 보낸다 — 이 한 줄이 빠지면 서버(재채점)가 기록을 못 받아 전부 400 이고 부모는 조용히 넘긴다(프로그램해라에서 겪었다).
+  window.MGBridge={submit:function(v,opts){ if(typeof v==='number'&&isFinite(v)) post({t:'mg:score',score:v,log:(opts&&Array.isArray(opts.log))?opts.log:undefined}); }};
   function mount(id){
     var ov=document.getElementById(id); if(!ov||ov.querySelector('.mg-rank')) return;
     var b=document.createElement('button');
     b.type='button'; b.className='mg-rank'+(EMBED?' on':'');
-    b.setAttribute('aria-label','이 게임 랭킹 보기');
-    b.innerHTML='<span aria-hidden="true">🏆</span><span class="rank-label">랭킹</span>';
+    var tr=function(k){ return window.MGI18N ? MGI18N.t(k) : k; };
+    b.setAttribute('aria-label',tr('mg.rank_aria'));
+    b.innerHTML='<span aria-hidden="true">🏆</span><span class="rank-label">'+tr('mg.rank')+'</span>';
     b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();post({t:'mg:rank'});});
     ov.appendChild(b);
   }
   mount('startOv'); mount('overOv');
 })();
+if (window.MGI18N) MGI18N.apply();
 </script>
 </body>
 </html>

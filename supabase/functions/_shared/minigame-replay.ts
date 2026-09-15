@@ -1,4 +1,4 @@
-// 미니게임 답안 기록 재채점 — 버텨라·쏴라·골라라·닿아라·프로그램해라. 2026-09-11 / 09-14.
+// 미니게임 답안 기록 재채점 — 버텨라·쏴라·골라라·닿아라·프로그램해라·지어라·막아라. 2026-09-11 / 09-14 / 09-15.
 //
 // 이 게임들은 점수를 믿지 않는다. 게임은 "어느 문항에 뭘 골랐고 시작 후 몇 ms 였나" 기록을 보내고, 서버가
 // 게임과 **같은 공식**으로 점수를 다시 센다. 그래서 콘솔에서 점수 변수를 바꾸거나 submit(9999) 를 부르는
@@ -17,8 +17,9 @@
 import { REACH_LEVELS, reachedWith } from './reach-levels.ts'
 import { PROG_LEVELS, validProgram, runProgram, countOps as progCountOps, type Ins } from './program-levels.ts'
 import { BUILD_LEVELS, validTiles as validBuildTiles, simulate as simulateBuild, type Tile as BuildTile } from './build-levels.ts'
+import { BLOCK_DAYS, BLOCK_MAX_STRIKE, judgeBlockDoc } from './block-days.ts'
 
-export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build'
+export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build' | 'block'
 
 /** 공용 점수 규칙 — 정답 1개 = SCORE_BASE × 연속 배수. 틀리면 0점, 연속 끊김. */
 export const SCORE_BASE = 10
@@ -59,6 +60,8 @@ export interface ReachEntry { lv: number; a: number[]; s: number; t: number }
 export interface ProgEntry { lv: number; prog: Ins[]; runs: number }
 /** 지어라 한 레벨 클리어. lv = 레벨 번호(0부터), tiles = 플레이어가 놓은 타일(고정물·미리 깔린 것 제외), runs = 그 레벨에서 쓴 가동 횟수. */
 export interface BuildEntry { lv: number; tiles: BuildTile[]; runs: number }
+/** 막아라 한 장. d/i = 일차·서류 번호(0부터), m = 가린 조각의 자리, s = 1 전송 / 0 반려, t = 판 시작 후 ms. */
+export interface BlockEntry { d: number; i: number; m: number[]; s: 0 | 1; t: number }
 
 /** setTimeout 은 일찍 안 울리지만 performance.now() 반올림 여유로 30ms 는 봐준다. */
 const GAP_TOLERANCE_MS = 30
@@ -222,8 +225,38 @@ export function replayBuild(log: unknown, ageSec: number): ReplayResult | Replay
   return { ok: true, score: log.length, answers: log.length, durationMs: 0, tie: tiles * 1000 + Math.min(runs, 999) }
 }
 
+/** 막아라 — 서류마다 "뭘 가리고 어느 도장을 찍었나" 를 게임과 같은 규칙으로 다시 판정해 점수를 더한다.
+ *  서류는 1일차 1번부터 **순서대로**여야 하고(건너뛰기·되돌리기 없음), 실패가 MAX_STRIKE 에 닿으면 그 뒤 기록은 게임이 만들 수 없다.
+ *  최소 간격은 없다(읽고 판단하는 게임이라 빠른 게 실력) — 위조는 답이 클라에 있어 어차피 못 막는다(다른 재채점 게임과 같은 한계). */
+export function replayBlock(log: unknown, ageSec: number): ReplayResult | ReplayFail {
+  if (!Array.isArray(log)) return { ok: false, reason: 'log_missing' }
+  const total = BLOCK_DAYS.reduce((n, D) => n + D.docs.length, 0)
+  if (log.length > total) return { ok: false, reason: 'log_malformed' }
+  const activeMask = new Set<string>(), activeBlock = new Set<string>()
+  let d = 0, i = 0, score = 0, strikes = 0, prevT = -Infinity, last = 0
+  BLOCK_DAYS[0].mask.forEach((k) => activeMask.add(k)); BLOCK_DAYS[0].block.forEach((k) => activeBlock.add(k))
+  for (const raw of log) {
+    const e = raw as BlockEntry
+    if (!e || typeof e !== 'object' || e.d !== d || e.i !== i || (e.s !== 0 && e.s !== 1) || !num(e.t) || e.t < 0) return { ok: false, reason: 'log_malformed' }
+    if (!Array.isArray(e.m) || !e.m.every((x) => Number.isInteger(x) && x >= 0 && x < BLOCK_DAYS[d].docs[i].kinds.length)) return { ok: false, reason: 'log_malformed' }
+    if (e.t < prevT) return { ok: false, reason: 'log_not_monotonic' }
+    if (strikes >= BLOCK_MAX_STRIKE) return { ok: false, reason: 'log_after_gameover' }
+    prevT = e.t; last = e.t
+    const r = judgeBlockDoc(activeMask, activeBlock, BLOCK_DAYS[d].docs[i], new Set(e.m), e.s === 1)
+    if (r.ok) score += r.gain; else strikes++
+    i++
+    if (i >= BLOCK_DAYS[d].docs.length) {
+      d++; i = 0
+      if (d < BLOCK_DAYS.length) { BLOCK_DAYS[d].mask.forEach((k) => activeMask.add(k)); BLOCK_DAYS[d].block.forEach((k) => activeBlock.add(k)) }
+    }
+  }
+  if (last > ageSec * 1000 + AGE_SLACK_MS) return { ok: false, reason: 'log_exceeds_ticket' }
+  return { ok: true, score, answers: log.length, durationMs: last }
+}
+
 export function replay(kind: ReplayKind, log: unknown, ageSec: number, knownIds: Set<string>): ReplayResult | ReplayFail {
   if (kind === 'beat') return replayBeat(log, ageSec, knownIds)
+  if (kind === 'block') return replayBlock(log, ageSec)
   if (kind === 'shoot') return replayShoot(log, ageSec, knownIds)
   if (kind === 'pick') return replayPick(log, ageSec, knownIds)
   if (kind === 'reach') return replayReach(log, ageSec)

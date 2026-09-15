@@ -1,4 +1,4 @@
-// minigame-replay — 버텨라·쏴라·골라라·닿아라 점수 규칙의 sync pair 검증 + 서버 재채점 동작.
+// minigame-replay — 버텨라·쏴라·골라라·닿아라·프로그램해라·지어라·막아라 점수 규칙의 sync pair 검증 + 서버 재채점 동작.
 //
 //  0) 닿아라 레벨 기하(reach-cari.html 의 LEVELS ↔ _shared/reach-levels.ts)가 같은가 — 서버가 이걸로 "정말 닿았나" 를 다시 계산한다.
 //  1) 네 파일(beat-cari.html · shoot-cari.html · pick-cari.html · _shared/minigame-replay.ts)의 공용 규칙 숫자가 같은가
@@ -13,6 +13,7 @@ import * as R from '../supabase/functions/_shared/minigame-replay.ts'
 import { REACH_LEVELS, REACH_DEFAULT_TIME, REACH_GRIP, reachedWith } from '../supabase/functions/_shared/reach-levels.ts'
 import { PROG_LEVELS, runProgram, validProgram, countOps as progCountOps } from '../supabase/functions/_shared/program-levels.ts'
 import { BUILD_LEVELS, simulate as simulateBuild, validTiles as validBuildTiles } from '../supabase/functions/_shared/build-levels.ts'
+import { BLOCK_DAYS, BLOCK_MAX_STRIKE, BLOCK_DOC_POINT, BLOCK_PERFECT_BONUS, judgeBlockDoc } from '../supabase/functions/_shared/block-days.ts'
 
 let failed = 0
 function eq(actual, expected, label) {
@@ -27,6 +28,7 @@ const pick = readFileSync(new URL('../public/games/pick-cari.html', import.meta.
 const reach = readFileSync(new URL('../public/games/reach-cari.html', import.meta.url), 'utf8')
 const prog = readFileSync(new URL('../public/games/program-cari.html', import.meta.url), 'utf8')
 const build = readFileSync(new URL('../public/games/build-cari.html', import.meta.url), 'utf8')
+const block = readFileSync(new URL('../public/games/block-cari.html', import.meta.url), 'utf8')
 
 // ---------- 0b) 프로그램해라 레벨 대조 + 정답 프로그램이 서버 VM 으로 성공하는가 ----------
 {
@@ -272,6 +274,98 @@ eq(R.replayBeat([{ q: 'q1', k: 7, t: 500 }], AGE, ids), { ok: false, reason: 'lo
 eq(R.replayBeat([{ q: null, k: 0, t: 500 }], AGE, ids), { ok: false, reason: 'log_malformed' }, '폴백 문항(id 없음) 기록은 거부')
 eq(R.replayShoot([{ q: 'q1', k: 0, t: 500 }], AGE, ids), { ok: false, reason: 'log_malformed' }, 'shoot 기체 순번 없으면 거부')
 eq(R.logQuestionIds([{ q: 'a' }, { q: 'b' }, { q: 'a' }, { x: 1 }]), ['a', 'b'], 'logQuestionIds 중복 제거')
+
+// ---------- 0d) 막아라 서류·규칙 대조 + 재채점 ----------
+{
+  // HTML 의 DAYS 리터럴을 평가해 조각 종류 순서만 뽑는다 — 서버 표(block-days.ts)는 문구 없이 이 순서만 들고 있다.
+  const m = block.match(/const DAYS=(\[[\s\S]*?\n\]);/)
+  const HD = m ? new Function('return ' + m[1])() : null
+  eq(HD?.length, BLOCK_DAYS.length, 'block 일수 = 서버')
+  const kindsOf = (text) => [...text.matchAll(/\{([a-z]+)\|/g)].map((x) => x[1])
+  ;(HD ?? []).forEach((D, di) => {
+    const S = BLOCK_DAYS[di]
+    eq({ mask: D.newMask, block: D.newBlock }, S && { mask: S.mask, block: S.block }, `block ${di + 1}일차 새 규정 = 서버`)
+    eq(D.docs.map((d) => ({ block: d.block, kinds: kindsOf(d.text) })), S && S.docs.map((d) => ({ block: d.block, kinds: d.kinds })), `block ${di + 1}일차 서류 ${D.docs.length}장 조각 = 서버`)
+  })
+  eq(lit(block, 'MAX_STRIKE', 'block'), BLOCK_MAX_STRIKE, 'block MAX_STRIKE = 서버')
+  eq(lit(block, 'DOC_POINT', 'block'), BLOCK_DOC_POINT, 'block DOC_POINT = 서버')
+  eq(lit(block, 'PERFECT_BONUS', 'block'), BLOCK_PERFECT_BONUS, 'block PERFECT_BONUS = 서버')
+  eq(/log:\(opts&&Array\.isArray\(opts\.log\)\)\?opts\.log:undefined/.test(block), true, 'block 브리지가 log 를 실어 보낸다')
+  eq(/MGBridge\.submit\(score,\{log:LOG\}\)/.test(block), true, 'block 게임오버가 log 를 넘긴다')
+  // 설계 규칙 — 날마다 위반 0 인 서류가 한 장은 있고, 전송형 서류는 핵심(k) 조각이 둘 이상이다(다 칠하기 방지).
+  const am = new Set(), ab = new Set()
+  BLOCK_DAYS.forEach((D, di) => {
+    D.mask.forEach((k) => am.add(k)); D.block.forEach((k) => ab.add(k))
+    const send = D.docs.filter((d) => !(d.block && ab.has(d.block)))
+    eq(send.some((d) => !d.kinds.some((k) => am.has(k))), true, `block ${di + 1}일차 위반 0 서류 있음`)
+    eq(send.every((d) => d.kinds.filter((k) => k === 'k').length >= 2), true, `block ${di + 1}일차 전송형 서류 k≥2`)
+    eq(D.docs.every((d) => d.kinds.every((k) => k === 'k' || k === 'd' || am.has(k))), true, `block ${di + 1}일차 아직 규정에 없는 종류의 조각 없음`)
+  })
+  // 정답 기록(전부 맞게 처리) → 만점. 손으로 센 값: 전송형 150 × N + 반려형 100 × M.
+  const perfect = () => {
+    const out = []; const amk = new Set(), abk = new Set(); let t = 0
+    BLOCK_DAYS.forEach((D, d) => { D.mask.forEach((k) => amk.add(k)); D.block.forEach((k) => abk.add(k))
+      D.docs.forEach((doc, i) => { const isB = doc.block && abk.has(doc.block); t += 3000
+        out.push({ d, i, m: isB ? [] : doc.kinds.map((k, j) => amk.has(k) ? j : -1).filter((j) => j >= 0), s: isB ? 0 : 1, t }) }) })
+    return out
+  }
+  const P = perfect()
+  const nRej = P.filter((e) => e.s === 0).length, nSend = P.length - nRej
+  const MAX = nSend * (BLOCK_DOC_POINT + BLOCK_PERFECT_BONUS) + nRej * BLOCK_DOC_POINT
+  eq(R.replayBlock(P, 600), { ok: true, score: MAX, answers: 50, durationMs: 150000 }, `block 정답 50장 = ${MAX} (전송 ${nSend} · 반려 ${nRej})`)
+  eq(R.replayBlock(P.slice(0, 12), 600).score, 12 * (BLOCK_DOC_POINT + BLOCK_PERFECT_BONUS), 'block 12장까지 = 1,800')
+  // 개별 판정 — 게임 judge() 의 갈래 그대로
+  const j = (mask, blk, doc, m, sent) => judgeBlockDoc(new Set(mask), new Set(blk), doc, new Set(m), sent)
+  eq(j(['name'], [], { kinds: ['d', 'name', 'k', 'k'] }, [1], true), { ok: true, gain: 150 }, 'block 위반만 가림 = 150')
+  eq(j(['name'], [], { kinds: ['d', 'name', 'k', 'k'] }, [0, 1], true), { ok: true, gain: 100 }, 'block 무해까지 가림 = 100(보너스 없음)')
+  eq(j(['name'], [], { kinds: ['d', 'name', 'k', 'k'] }, [], true), { ok: false, gain: 0 }, 'block 안 가리고 전송 = 유출')
+  eq(j(['name'], [], { kinds: ['d', 'name', 'k', 'k'] }, [1, 2], true), { ok: false, gain: 0 }, 'block 핵심 가림 = 실패')
+  eq(j(['name'], [], { kinds: ['d', 'name', 'k', 'k'] }, [], false), { ok: false, gain: 0 }, 'block 멀쩡한 서류 반려 = 실패')
+  eq(j(['name'], ['hr'], { block: 'hr', kinds: ['d', 'k'] }, [], false), { ok: true, gain: 100 }, 'block 금지 서류 반려 = 100')
+  eq(j(['name'], ['hr'], { block: 'hr', kinds: ['name', 'k'] }, [0], true), { ok: false, gain: 0 }, 'block 금지 서류는 가려도 전송 = 실패')
+  eq(j(['name'], [], { block: 'src', kinds: ['k', 'k'] }, [], true), { ok: true, gain: 150 }, 'block 아직 규정에 없는 코드 서류 = 전송이 정답(7일차 4번)')
+  eq(j(['name'], [], { kinds: ['price', 'k', 'k'] }, [0], true), { ok: true, gain: 100 }, 'block 아직 규정에 없는 종류를 가림 = 통과(보너스만 없음)')
+  // 형식 — 순서·해고 뒤·시각
+  eq(R.replayBlock([{ d: 0, i: 1, m: [], s: 1, t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'block 1번 건너뛰기 거부')
+  eq(R.replayBlock([{ d: 0, i: 0, m: [9], s: 1, t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'block 없는 조각 자리 거부')
+  const three = [{ d: 0, i: 0, m: [], s: 0, t: 10 }, { d: 0, i: 1, m: [], s: 0, t: 20 }, { d: 0, i: 2, m: [], s: 0, t: 30 }]
+  eq(R.replayBlock(three, 600), { ok: true, score: 0, answers: 3, durationMs: 30 }, 'block 반려 실수 3번 = 0점 해고')
+  eq(R.replayBlock(three.concat([{ d: 0, i: 3, m: [], s: 1, t: 40 }]), 600), { ok: false, reason: 'log_after_gameover' }, 'block 해고 뒤 기록 거부')
+  eq(R.replayBlock([P[0], { ...P[1], t: 1 }], 600), { ok: false, reason: 'log_not_monotonic' }, 'block 시각 역행 거부')
+  eq(R.replayBlock([{ ...P[0], t: 600 * 1000 + 6000 }], 600), { ok: false, reason: 'log_exceeds_ticket' }, 'block 티켓 시간 초과 거부')
+  eq(R.replayBlock([], 600).score, 0, 'block 빈 기록 = 0')
+  eq(R.replayBlock(P.concat([P[0]]), 600), { ok: false, reason: 'log_malformed' }, 'block 50장 넘는 기록 거부')
+}
+
+// ---------- 0e) 막아라 사전 — 번역된 서류의 조각 순서가 한국어와 같은가 ----------
+//   기록(LOG)은 화면에 보인 조각의 **자리**로 서버에 가고 서버는 한국어 표로 판정한다. 번역에서 조각 순서가 바뀌면
+//   그 언어에서만 정답을 틀렸다고 판정한다 — 화면에는 아무 오류도 안 뜬다.
+{
+  const src = readFileSync(new URL('../public/games/i18n.js', import.meta.url), 'utf8')
+  const m = src.match(/var D = (\{[\s\S]*?\n  \})\r?\n\r?\n  function t\(/)
+  const DICT = m ? new Function('return ' + m[1])() : null
+  eq(!!DICT, true, 'i18n.js 사전을 읽었다')
+  const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
+  const kindsOf = (text) => [...text.matchAll(/\{([a-z]+)\|/g)].map((x) => x[1]).join(',')
+  const keys = Object.keys(DICT ?? {}).filter((k) => k.startsWith('block.'))
+  eq(keys.length > 200, true, `block.* 키 ${keys.length}개`)
+  eq(keys.every((k) => LANGS.every((l) => typeof DICT[k][l] === 'string' && DICT[k][l].length > 0)), true, 'block.* 전부 6개국어')
+  const m2 = block.match(/const DAYS=(\[[\s\S]*?\n\]);/)
+  const HD = new Function('return ' + m2[1])()
+  let docs = 0, badOrder = []
+  HD.forEach((D, di) => D.docs.forEach((d, i) => {
+    docs++
+    const key = `block.d${di + 1}.${i + 1}`
+    for (const f of ['from', 'ask', 'text']) if (!DICT[`${key}.${f}`]) badOrder.push(`${key}.${f} 없음`)
+    const e = DICT[`${key}.text`]; if (!e) return
+    if (e.ko !== d.text) badOrder.push(`${key}.text ko ≠ HTML`)
+    for (const l of LANGS) if (kindsOf(e[l]) !== kindsOf(d.text)) badOrder.push(`${key}.text ${l} 조각 순서`)
+    if (d.stamp && !DICT[`${key}.stamp`]) badOrder.push(`${key}.stamp 없음`)
+  }))
+  eq(docs, 50, 'block 서류 50장')
+  eq(badOrder, [], 'block 서류 번역 — 조각 순서·개수가 한국어와 같다')
+  for (const k of ['name', 'pii', 'acct', 'perf', 'cred', 'price', 'health', 'hr', 'src', 'legal']) eq(!!DICT[`block.rule.${k}`] && !!DICT[`block.rule.${k}.desc`], true, `block 규정 ${k} 라벨·설명`)
+}
 
 if (failed) { console.error(`\n${failed} failed`); process.exit(1) }
 console.log('\nall ok')
