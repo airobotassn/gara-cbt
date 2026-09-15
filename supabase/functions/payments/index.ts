@@ -40,6 +40,15 @@ import { certExpired } from '../_shared/cert.ts'
 
 const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert', 'bundle', 'lecture']
 
+/** 상품 종류 → 그 상품이 있는 우리 화면. 엑심베이 /ready 의 product.link(문서상 필수)에 실린다 — 표시용이다. */
+const PRODUCT_PAGE: Record<ProductType, string> = {
+  ebook: '/ebooks',
+  lecture: '/ebooks',
+  bundle: '/ebooks',
+  exam: '/exam/apply',
+  cert: '/mypage/attempts',
+}
+
 /** 구매자 표기를 ASCII 로만 만든다 — 한글이 PG·카드사 구간에서 깨져 돌아오면 대사할 때 사람이 못 읽는다.
  *  이름 자체가 결제 판정에 쓰이지 않으므로 이메일 아이디로 충분하다(비면 상수). */
 function asciiBuyerName(email: string): string {
@@ -412,6 +421,10 @@ Deno.serve(async (req) => {
           statusUrl: `${fnBase}/functions/v1/payments-webhook?k=${encodeURIComponent(hookKey)}`,
           // 코드표는 eximbayLang 이 단일 출처다(ISO 639-1 이 아니다 — 일본어가 ja 가 아니라 JP).
           lang: eximbayLang(lang),
+          // 상품 목록(문서상 필수). 간편결제가 이 이름을 자기 규격으로 넘겨받는다 — 없으면 카카오페이가 itemName 오류로
+          // 거절한다(2026-09-15 실측). 주문명 그대로 한 줄, 링크는 그 상품이 있는 우리 화면.
+          productName: product.orderName,
+          productLink: `${origin}${PRODUCT_PAGE[productType]}`,
         })
         if (!ready.ok) {
           // 준비가 실패하면 결제창 자체를 못 띄운다. 방금 만든 주문은 접어둔다 —

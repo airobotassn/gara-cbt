@@ -13,7 +13,9 @@
 //      · 금액 단위(KRW "1000" 이 1,000원인지 — /ready 는 통과했지만 매출 확정 전엔 모른다)
 //      · status_url(서버-서버 통지)의 본문 형식 — payments-webhook 이 JSON·폼 양쪽을 견디게는 해뒀다
 //    ⚠️ 위 키·MID 는 포트원이 공개한 **공유 샌드박스**다. 계약 후 전용 값으로 재확인할 것.
-//       간편결제(토스·카카오페이)는 그 상점에 계약이 없어 X048·X042 로 거절된다 — 카드는 승인된다.
+//       ⛔ 정정(2026-09-15 실측): 간편결제가 X042 로 거절된 건 계약이 아니라 **상품 목록(product)을 안 보내서**였다 —
+//          카카오페이가 "itemName length must be between 1 and 500" 으로 되돌렸다. 카드는 상품명 없이도 승인돼 여태 안 걸렸다.
+//          지금은 /ready 에 상품 한 줄을 실어 보낸다(아래 eximbayReady).
 //
 // ⚠️ 통화: 이 어댑터는 넘겨받은 amount·currency 를 그대로 PG 규격으로 보낼 뿐이다.
 //    "달러 정가 → 원화 환산" 은 여기가 아니라 **결제 레이어(create)** 소관이다.
@@ -201,20 +203,38 @@ function normalize(p: EximbayPayment): ProviderPayment {
   }
 }
 
-/** 'YYYYMMDDHHMMSS' → ISO. ⚠️ TODO(verify): 엑심베이 시각의 tz 를 문서에서 못 봤다. 실검증 때 KST/UTC 확인. */
+/**
+ * 'YYYYMMDDHHMMSS' → ISO. **엑심베이 시각은 한국시간(KST, +09:00)이다** — 2026-09-15 실측으로 확정:
+ * 웹훅이 02:08:16 UTC 에 왔는데 transaction_date 는 20260915110816 이었다.
+ * ⚠️ 시간대를 안 붙이면 Postgres 가 UTC 로 읽어 confirmed_at 이 실제보다 9시간 앞으로 저장된다(그렇게 되고 있었다).
+ *    매출 일자 집계에서 자정 근처 결제가 다른 날로 잡히는 종류의 오차라, 반드시 +09:00 을 붙인다.
+ */
 function isoFromEximbayDate(s: string): string | null {
   const m = s.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/)
   if (!m) return null
-  return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`
+  return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+09:00`
 }
 
 /** 프론트 JS SDK(`EXIMBAY.request_pay`)에 그대로 넘길 페이로드. /ready 에 보낸 것과 **글자 하나까지 같아야** 한다. */
 export interface EximbayReadyPayload {
-  payment: { transaction_type: string; order_id: string; currency: string; amount: string; lang: string }
+  payment: { transaction_type: string; order_id: string; currency: string; amount: string; lang: string; multi_payment_method?: string }
   merchant: { mid: string }
   buyer: { name: string; email: string }
   url: { return_url: string; status_url: string }
+  /** 상품 목록(최대 3줄). 문서상 필수 — 간편결제(카카오페이 등)가 이 이름을 자기 쪽 규격으로 넘겨받는다. */
+  product: { name: string; quantity: string; unit_price: string; link: string }[]
 }
+
+/**
+ * 국내(원화) 결제창에 띄울 수단 — **카드 + 간편결제만**(2026-09-15 지시). 코드는 payment_method 코드표 그대로.
+ *   P000 카드 · P302 카카오페이 · P303 토스 · P304 PAYCO · P015 네이버페이
+ * ⛔ 실시간 계좌이체(P301)·가상계좌(P305)·네이버포인트(P308)는 뺐다 — 세금 항목(공급가·부가세·현금영수증)이 따로
+ *    필수이고, 가상계좌는 입금이 며칠 뒤라 응시료를 지급하지 않는 정책이며, 환불도 환불계좌가 따로 필요해 안 붙였다.
+ *    열 거면 세 가지를 같이 만들 것(tax 객체 · VA 지급 정책 · refund_account).
+ * ⚠️ 해외(달러) MID 는 지정하지 않는다 — 어떤 수단이 계약돼 있는지 모르는 채로 목록을 박으면 계약된 수단이 사라진다.
+ *    해외 쪽에도 비동기 수단(해외 가상계좌 P310 · 편의점 ECONTEXT P006)이 있으니, 실계약 때 목록을 확인해 여기 넣을 것.
+ */
+const LOCAL_METHODS = 'P000-P302-P303-P304-P015'
 
 /**
  * 결제 준비 — 엑심베이 전용. **create 단계**에서 부른다(토스엔 없는 단계).
@@ -233,9 +253,14 @@ export async function eximbayReady(input: {
   returnUrl: string
   statusUrl: string
   lang?: string
+  /** 결제창·간편결제 앱에 뜨는 상품명(주문명). 카카오페이가 이게 비면 itemName 오류로 거절한다. */
+  productName: string
+  /** 상품 페이지 주소(문서상 필수). 우리 사이트의 그 상품이 있는 화면이면 된다. */
+  productLink: string
 }): Promise<
   { ok: true; fgkey: string; payload: EximbayReadyPayload } | { ok: false; code: string; message: string }
 > {
+  const isLocal = input.currency.toUpperCase() === 'KRW'
   const payload: EximbayReadyPayload = {
     payment: {
       transaction_type: 'PAYMENT', // 준비→SDK→검증→승인→매입 자동 단일 플로우
@@ -243,10 +268,15 @@ export async function eximbayReady(input: {
       currency: input.currency,
       amount: input.amount,
       lang: input.lang ?? 'EN',
+      // 국내만 수단을 지정한다(카드+간편결제). 해외는 계약 목록을 모르니 안 건드린다(LOCAL_METHODS 주석).
+      ...(isLocal ? { multi_payment_method: LOCAL_METHODS } : {}),
     },
     merchant: { mid: mid(input.currency) },
     buyer: { name: input.buyerName, email: input.buyerEmail },
     url: { return_url: input.returnUrl, status_url: input.statusUrl },
+    // 한 줄로 보낸다 — 묶음도 "주문명 × 1 × 청구액". 줄을 상품마다 나누면 최대 3줄 상한과 배분 반올림이 걸리고,
+    // 여기 이름은 결제창·영수증 표시용일 뿐 지급·대사 판정에 안 쓴다(그건 우리 원장의 줄 목록이 한다).
+    product: [{ name: input.productName.slice(0, 500), quantity: '1', unit_price: input.amount, link: input.productLink }],
   }
   const { data } = await call('/v1/payments/ready', payload)
   if (data?.rescode === '0000' && data.fgkey) return { ok: true, fgkey: data.fgkey, payload }

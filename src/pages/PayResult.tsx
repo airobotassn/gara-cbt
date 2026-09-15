@@ -2,7 +2,8 @@
 //
 // ⚠️ 여기 도착한 것만으로는 결제가 된 게 아니다. 인증만 끝났을 뿐이라, **서버가 승인 API 를 호출해
 //    성공해야** 비로소 결제이고 그때 지급된다. 그래서 이 화면은 도착하자마자 confirm 을 부른다.
-// ⚠️ failUrl 로 온 경우엔 승인을 부르면 안 된다(인증 실패·사용자 취소). 코드만 보여주고 재시도 길을 준다.
+// ⚠️ failUrl 로 온 경우엔 승인을 부르면 안 된다(인증 실패·사용자 취소). 사전 문구 하나와 재시도 길만 준다 —
+//    PG 의 사유·코드 원문은 화면에 안 내보낸다(웹훅 원장에 남는다).
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useT } from '../lib/i18n'
@@ -30,7 +31,7 @@ type View =
   | { kind: 'working' }
   | { kind: 'done'; res: PaymentStatusResp }
   | { kind: 'free' }
-  | { kind: 'failed'; message: string; code?: string }
+  | { kind: 'failed'; message: string }
 
 export default function PayResult() {
   const [params] = useSearchParams()
@@ -54,20 +55,16 @@ export default function PayResult() {
 
   // 첫 화면은 URL 만 보면 정해진다(실패·무료·정보부족). effect 안에서 동기 setState 를 하지 않도록
   // 초기값으로 계산해 두고, effect 는 승인 호출이 필요한 경우에만 일한다.
+  // ⛔ PG 가 준 사유 문구(resmsg)·오류 코드(rescode)는 화면에 내보내지 않는다(2026-09-15 지시).
+  //    PG 원문은 영어·한국어가 섞인 기술 문구라("invalid param(itemName length…)" · "X042") 사용자에게 아무
+  //    뜻이 없고 6개국어 사전과도 안 맞는다. 사용자에겐 사전 문구 하나만 보이고, 원문은 웹훅 원장
+  //    (payment_webhook_events)에 남으니 문의가 오면 주문번호로 우리가 찾는다.
   const [view, setView] = useState<View>(() => {
-    if (isFail) {
-      return {
-        kind: 'failed',
-        code: params.get('code') ?? undefined,
-        message: params.get('message') || t('pay.fail_body'),
-      }
-    }
+    if (isFail) return { kind: 'failed', message: t('pay.fail_body') }
     if (params.get('free')) return { kind: 'free' } // 0원 상품 — 서버가 이미 지급했다
     // 엑심베이가 실패로 돌아온 경우. 토스의 failUrl 과 같은 자리이므로 **승인을 부르지 않는다**.
     // (주문은 pending 으로 남고 대사가 만료로 접는다 — 결제가 안 된 건을 우리가 failed 로 단정하지 않는다.)
-    if (isEximbay && exCode !== '0000') {
-      return { kind: 'failed', code: exCode || undefined, message: params.get('resmsg') || t('pay.fail_body') }
-    }
+    if (isEximbay && exCode !== '0000') return { kind: 'failed', message: t('pay.fail_body') }
     if (!paymentKey || !orderId || !Number.isFinite(amount)) {
       return { kind: 'failed', message: t('pay.bad_request') }
     }
@@ -252,9 +249,6 @@ export default function PayResult() {
               <Icon name="error" tone="bad" />
               <Title>{t('pay.fail_title')}</Title>
               <Body>{view.message}</Body>
-              {view.code && (
-                <p className="font-body-md text-[14px] text-on-surface-variant/70 mb-6">{view.code}</p>
-              )}
               <Cta onClick={retryGo}>{retryLabel}</Cta>
             </>
           )}
