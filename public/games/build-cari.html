@@ -419,6 +419,19 @@ body{
 #ovResult #btnRetry.asquit{overflow:visible;text-indent:0;display:grid;place-items:center;
   background:#2b2e33!important;border-radius:9%/22%;box-shadow:inset 0 0 0 2px #17191c,inset 0 2px 0 rgba(255,255,255,.06);
   color:#e8ecf3;font-size:calc(var(--rh)*.028);font-weight:900;letter-spacing:-.01em;text-shadow:0 1px 2px #000;}
+/* 실패 배너 — 횟수가 남은 실패. 콘솔로 안 넘기는 대신 **판 한가운데에 크게** 띄운다(2026-09-15 지적: 점 하나 줄어드는 걸로는
+   실패한 줄 모른다). 판은 그 뒤에 그대로 있고, 버튼이나 판을 누르면 사라진다. */
+.failbar{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.92);z-index:16;width:min(86%,340px);
+  padding:16px 18px 14px;border-radius:18px;text-align:center;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+  background:linear-gradient(#3a1a22,#241018);border:2px solid #ff6b57;box-shadow:0 14px 34px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12);color:#fff;}
+.failbar.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
+.failbar .fb-img{width:104px;height:78px;object-fit:contain;margin:-4px auto 2px;display:block;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5));}
+.failbar .fb-t{font-size:24px;font-weight:950;color:#ff8f7c;letter-spacing:-.02em;text-shadow:0 2px 4px #000;}
+.failbar .fb-n{font-size:15px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums;}
+.failbar .fb-n b{color:#ffd253;}
+.failbar .fb-btn{margin-top:12px;padding:11px 22px;border:0;border-radius:999px;cursor:pointer;font:900 14px/1 system-ui,-apple-system,sans-serif;
+  background:linear-gradient(120deg,#ff7a5c,#e0492f);color:#fff;box-shadow:0 6px 14px rgba(224,73,47,.45);}
+.failbar .fb-btn:active{transform:scale(.97);}
 /* 결과 콘솔의 설명 줄 — 영어가 한국어보다 길어 세 줄이 되면 판을 넘친다(2026-09-15 실측). 한 급 줄여 세 줄까지 담는다. */
 #ovResult .scorebox .take{font-size:calc(var(--rh)*.0235);line-height:1.3;}
 /* 실패창 — 버튼 하나뿐인 그림이라 '처음으로' 글자를 그대로 쓴다. */
@@ -456,6 +469,12 @@ body{
   </div>
 
   <div class="toast" id="toast"></div>
+  <div class="failbar" id="failbar" role="alert">
+    <img class="fb-img" src="/games/build-cari-fail-v7.webp" alt=""/>
+    <div class="fb-t" id="fbT"></div>
+    <div class="fb-n" id="fbN"></div>
+    <button type="button" class="fb-btn" id="fbBtn"></button>
+  </div>
 
   <!-- START -->
   <div class="overlay" id="ovStart">
@@ -495,7 +514,7 @@ body{
 
 <script src="i18n.js"></script>
 <script>
-/* 문구는 전부 사전(i18n.js 의 build.*)에서 온다. 레벨 문구는 build.lv{n}.name/goal/teach/take — 사전에 없으면 아래 한국어로 떨어진다. */
+/* 문구는 전부 사전(i18n.js 의 build.*)에서 온다. 레벨 문구는 build.lv{n}.name/goal/take — 사전에 없으면 아래 한국어로 떨어진다. */
 const T=(k,v)=>window.MGI18N?MGI18N.t(k,v):k;
 function lvT(i,f,fb){ const k='build.lv'+(i+1)+'.'+f; const v=T(k); return v===k?(fb||''):v; }
 
@@ -520,61 +539,61 @@ const DEFAULT_RUNS=3;
 const LEVELS=[
   /* 1 */ {name:'직선 라인', goal:'생산기 상자를 <b>컨베이어</b>로 아래 <b>출고함</b>까지 이어라', take:'컨베이어만 깔았는데 상자가 <b>알아서</b> 흘러 출고됐어요 — 이게 자동 라인!',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], sensors:[], runs:3},
-  /* 2 */ {name:'모퉁이', goal:'함이 옆에 있다 — <b>꺾어서</b> 이어라', teach:'컨베이어는 <b>방향 도구</b>로 고른다. 꺾는 칸에 다른 방향을 놓으면 돼요',
+  /* 2 */ {name:'모퉁이', goal:'함이 옆에 있다 — <b>꺾어서</b> 이어라',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":5,"c":4,"want":null}], sensors:[], runs:3},
   /* 3 */ {name:'벽 돌아가기', goal:'<b>벽</b>은 못 놓는 칸이다 — 돌아서 가라',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], walls:[[3,1],[3,2],[3,3]], sensors:[], runs:3},
-  /* 4 */ {name:'두 색 분류', goal:'<b>빨강 센서</b>로 빨강→오른쪽 함, 파랑→아래 함으로 갈라라', teach:'센서는 자기 색만 <b>옆으로</b> 꺾고 나머지는 <b>직진</b>시켜요', take:'센서 하나가 <b>빨강/파랑</b>을 스스로 갈라 보냈어요 — 판단하는 라인!',
+  /* 4 */ {name:'두 색 분류', goal:'<b>빨강 센서</b>로 빨강→오른쪽 함, 파랑→아래 함으로 갈라라', take:'센서 하나가 <b>빨강/파랑</b>을 스스로 갈라 보냈어요 — 판단하는 라인!',
     sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":3,"c":3,"want":"R"},{"r":7,"c":1,"want":"B"}], sensors:["R"], runs:3},
-  /* 5 */ {name:'꺾이는 쪽이 정해져 있다', goal:'센서는 자기 색을 <b>진행 방향의 왼쪽</b>으로만 꺾는다 — 빨강 함이 반대쪽이면?', teach:'센서를 <b>다시 눌러</b> 돌릴 수 있어요. 라인을 먼저 옆으로 보낸 뒤 센서를 두면 꺾이는 쪽이 바뀌어요',
+  /* 5 */ {name:'꺾이는 쪽이 정해져 있다', goal:'센서는 자기 색을 <b>진행 방향의 왼쪽</b>으로만 꺾는다 — 빨강 함이 반대쪽이면?',
     sources:[{"r":0,"c":4,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":4,"c":3,"want":"R"},{"r":7,"c":1,"want":"B"}], walls:[[1,5],[2,5],[3,5],[4,5],[5,5],[6,5]], sensors:["R"], runs:3},
-  /* 6 */ {name:'고장 난 라인', goal:'누가 깔아둔 라인이 <b>어딘가 틀렸다</b> — 찾아서 고쳐라', teach:'틀린 칸 위에 바로 새 컨베이어를 놓으면 덮어써요. <b>지우개</b>는 아예 비울 때',
+  /* 6 */ {name:'고장 난 라인', goal:'누가 깔아둔 라인이 <b>어딘가 틀렸다</b> — 찾아서 고쳐라',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], pre:[[1,2,"conv",2],[2,2,"conv",2],[3,2,"conv",1],[4,2,"conv",2],[5,2,"conv",2],[6,2,"conv",2]], sensors:[], runs:3},
-  /* 7 */ {name:'세 색', goal:'빨강·초록·파랑 — 센서 <b>두 개</b>를 이어서 세 갈래로', teach:'첫 센서가 한 색을 빼면 남은 두 색이 다음 센서로 가요. <b>순서</b>를 정하는 게 설계',
+  /* 7 */ {name:'세 색', goal:'빨강·초록·파랑 — 센서 <b>두 개</b>를 이어서 세 갈래로',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":2,"c":5,"want":"R"},{"r":4,"c":5,"want":"G"},{"r":7,"c":2,"want":"B"}], sensors:["R","G","B"], runs:3},
-  /* 8 */ {name:'빨강 센서가 없다', goal:'빨강을 왼쪽 함으로 보내야 하는데 <b>파랑 센서</b>뿐이다', teach:'파랑을 빼내면 <b>남는 건 빨강</b>이에요. 꼭 그 색을 잡지 않아도 갈라져요',
+  /* 8 */ {name:'빨강 센서가 없다', goal:'빨강을 왼쪽 함으로 보내야 하는데 <b>파랑 센서</b>뿐이다',
     sources:[{"r":0,"c":4,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":4,"c":0,"want":"R"},{"r":7,"c":3,"want":"B"}], sensors:["B"], runs:3},
-  /* 9 */ {name:'두 생산기', goal:'생산기가 <b>둘</b>이다 — 두 줄을 하나의 함으로', teach:'두 라인이 같은 칸으로 들어오면 <b>합쳐져요</b>. 상자끼리는 부딪히지 않아요',
+  /* 9 */ {name:'두 생산기', goal:'생산기가 <b>둘</b>이다 — 두 줄을 하나의 함으로',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["B","B","B"]},{"r":0,"c":5,"dir":2,"pattern":["B","B","B"]}], bins:[{"r":7,"c":2,"want":null}], sensors:[], runs:3},
-  /* 10 */ {name:'문은 하나', goal:'벽에 <b>문이 하나</b>뿐이다 — 두 줄 다 그 문으로', teach:'문 앞에서 <b>합치고</b>, 문 뒤에서 <b>가른다</b>. 센서는 문 뒤 한 개면 돼요',
+  /* 10 */ {name:'문은 하나', goal:'벽에 <b>문이 하나</b>뿐이다 — 두 줄 다 그 문으로',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["R","B","R"]},{"r":0,"c":5,"dir":2,"pattern":["B","R","B"]}], bins:[{"r":7,"c":2,"want":"B"},{"r":5,"c":4,"want":"R"}], walls:[[4,0],[4,1],[4,3],[4,4],[4,5]], sensors:["R"], runs:3},
-  /* 11 */ {name:'함도 길을 막는다', goal:'길목에 <b>빨강 함</b>이 있다 — 파랑이 들어가면 오류다', teach:'함은 통과 못 해요. 틀린 색 함은 <b>벽</b>이라고 생각하고 돌아가요',
+  /* 11 */ {name:'함도 길을 막는다', goal:'길목에 <b>빨강 함</b>이 있다 — 파랑이 들어가면 오류다',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":2,"want":"B"},{"r":4,"c":2,"want":"R"}], walls:[[4,0],[4,1],[4,4],[4,5]], sensors:[], runs:3},
-  /* 12 */ {name:'갇힌 함', goal:'빨강 함이 벽에 둘러싸여 <b>오른쪽에서 왼쪽으로</b>만 들어간다', teach:'센서를 <b>위로</b> 보게 두면 자기 색이 <b>왼쪽</b>으로 꺾여요. 라인을 아래에서 위로 올려 보내요',
+  /* 12 */ {name:'갇힌 함', goal:'빨강 함이 벽에 둘러싸여 <b>오른쪽에서 왼쪽으로</b>만 들어간다',
     sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":5,"c":3,"want":"R"},{"r":2,"c":4,"want":"B"}], walls:[[4,3],[6,3],[5,2]], sensors:["R"], runs:3},
   /* 13 */ {name:'뱀길', goal:'벽 사이 <b>문</b>이 엇갈려 있다 — 길게 돌아가라',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["B","B","B","B","B"]}], bins:[{"r":7,"c":5,"want":null}], walls:[[2,0],[2,1],[2,2],[2,3],[2,4],[5,1],[5,2],[5,3],[5,4],[5,5]], sensors:[], runs:3},
-  /* 14 */ {name:'문이 둘', goal:'문이 <b>둘</b>이다 — 색마다 자기 문으로', teach:'문 앞에서 갈라요. 센서 자리를 <b>위쪽</b>에 잡을수록 두 길이 여유 있어요',
+  /* 14 */ {name:'문이 둘', goal:'문이 <b>둘</b>이다 — 색마다 자기 문으로',
     sources:[{"r":0,"c":3,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":4,"want":"R"},{"r":7,"c":1,"want":"B"}], walls:[[4,0],[4,2],[4,3],[4,5]], sensors:["R"], runs:3},
-  /* 15 */ {name:'고집 센 센서', goal:'<b>못 지우는 파랑 센서</b>가 길목에 있다 — 파랑을 오른쪽으로 보내버린다', teach:'센서가 갈라놓은 걸 다시 <b>한 줄로 합치고</b>, 내 센서로 다시 갈라요',
+  /* 15 */ {name:'고집 센 센서', goal:'<b>못 지우는 파랑 센서</b>가 길목에 있다 — 파랑을 오른쪽으로 보내버린다',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":4,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[3,0],[3,1],[3,4],[3,5]], fixed:[[3,2,"sensor",2,"B"]], sensors:["R"], runs:3},
-  /* 16 */ {name:'셋 중 둘만', goal:'세 색인데 센서는 <b>초록·파랑</b>뿐 — 빨강은 어떻게?', teach:'둘을 빼내면 <b>남는 게 빨강</b>. 빼내는 순서는 함 위치가 정해요',
+  /* 16 */ {name:'셋 중 둘만', goal:'세 색인데 센서는 <b>초록·파랑</b>뿐 — 빨강은 어떻게?',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":7,"c":2,"want":"R"},{"r":3,"c":5,"want":"G"},{"r":5,"c":5,"want":"B"}], sensors:["G","B"], runs:3},
-  /* 17 */ {name:'아래에서 올려 넣기', goal:'두 함 다 <b>아래에서만</b> 들어간다 — 그런데 센서는 파랑뿐', teach:'왼쪽으로 가는 라인에서 파랑을 <b>아래</b>로 떨구고, 남은 빨강은 그대로 위로 올려요. 떨군 파랑은 돌아서 올라와요',
+  /* 17 */ {name:'아래에서 올려 넣기', goal:'두 함 다 <b>아래에서만</b> 들어간다 — 그런데 센서는 파랑뿐',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":4,"c":3,"want":"R"},{"r":4,"c":1,"want":"B"}], walls:[[3,1],[3,3],[4,0],[4,4],[4,2]], sensors:["B"], runs:3},
-  /* 18 */ {name:'되돌아 올라가기', goal:'빨강 함이 <b>위쪽</b>에 있다 — 내려갔다가 올라와라', teach:'센서가 <b>아래</b>를 보면 빨강은 오른쪽으로 — 거기서 위로 올려요',
+  /* 18 */ {name:'되돌아 올라가기', goal:'빨강 함이 <b>위쪽</b>에 있다 — 내려갔다가 올라와라',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":0,"c":5,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[0,4],[1,4],[2,4],[3,4]], sensors:["R"], runs:3},
-  /* 19 */ {name:'두 줄이 한 색을 나눈다', goal:'두 생산기 모두 <b>파랑</b>이 섞여 나온다 — 파랑은 한 함으로', teach:'센서는 라인마다 하나씩, 함은 하나. 두 파랑 줄이 <b>합쳐져</b> 들어가요',
+  /* 19 */ {name:'두 줄이 한 색을 나눈다', goal:'두 생산기 모두 <b>파랑</b>이 섞여 나온다 — 파랑은 한 함으로',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["R","B","R"]},{"r":0,"c":5,"dir":2,"pattern":["G","B","G"]}], bins:[{"r":7,"c":0,"want":"R"},{"r":7,"c":2,"want":"B"},{"r":2,"c":3,"want":"G"}], sensors:["B"], runs:3},
-  /* 20 */ {name:'틀린 센서', goal:'깔린 라인에 <b>초록 센서</b>가 박혀 있는데 초록은 안 나온다', teach:'센서는 자기 색이 아니면 <b>직진</b>이라 컨베이어와 같아요. 없는 색 센서는 <b>지우고</b> 필요한 걸로',
+  /* 20 */ {name:'틀린 센서', goal:'깔린 라인에 <b>초록 센서</b>가 박혀 있는데 초록은 안 나온다',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":3,"c":4,"want":"R"},{"r":7,"c":2,"want":"B"}], pre:[[1,2,"conv",2],[2,2,"conv",2],[3,2,"sensor",2,"G"],[3,3,"conv",1],[4,2,"conv",2],[5,2,"conv",2],[6,2,"conv",2]], sensors:["R","G"], runs:3},
-  /* 21 */ {name:'문 하나에 세 색', goal:'두 생산기 · 세 색 · 문 하나', teach:'합치고 → 문 → 센서 둘. 앞에서 배운 걸 한 판에',
+  /* 21 */ {name:'문 하나에 세 색', goal:'두 생산기 · 세 색 · 문 하나',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["R","G","B"]},{"r":0,"c":5,"dir":2,"pattern":["B","R","G"]}], bins:[{"r":7,"c":2,"want":"B"},{"r":5,"c":5,"want":"R"},{"r":6,"c":5,"want":"G"}], walls:[[4,0],[4,1],[4,3],[4,4],[4,5]], sensors:["R","G"], runs:3},
-  /* 22 */ {name:'고집 센 센서 둘', goal:'못 지우는 센서가 <b>둘</b> — 하나는 빨강, 하나는 파랑', teach:'두 센서가 서로 반대로 갈라놓아요. 어느 쪽을 <b>살리고</b> 어느 쪽을 <b>합칠지</b>',
+  /* 22 */ {name:'고집 센 센서 둘', goal:'못 지우는 센서가 <b>둘</b> — 하나는 빨강, 하나는 파랑',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":5,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[2,0],[2,1],[2,4],[2,5],[5,0],[5,1],[5,4],[5,5]], fixed:[[2,2,"sensor",2,"B"],[5,2,"sensor",2,"R"]], sensors:["R"], runs:3},
-  /* 23 */ {name:'틀린 라인 두 군데', goal:'깔린 라인이 <b>두 군데</b> 틀렸다 — 센서 색도, 방향도', teach:'가동해 보면 상자가 어디서 죽는지 보여요. 한 번에 다 못 찾아도 <b>세 번</b> 안에',
+  /* 23 */ {name:'틀린 라인 두 군데', goal:'깔린 라인이 <b>두 군데</b> 틀렸다 — 센서 색도, 방향도',
     sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":3,"c":4,"want":"R"},{"r":7,"c":1,"want":"B"}], pre:[[1,1,"conv",2],[2,1,"conv",2],[3,1,"sensor",2,"B"],[3,2,"conv",1],[3,3,"conv",0],[4,1,"conv",2],[5,1,"conv",2],[6,1,"conv",2]], sensors:["R","B"], runs:3},
-  /* 24 */ {name:'뱀길에 두 색', goal:'뱀길인데 색이 둘 — 문이 <b>하나</b>씩뿐이라 같이 지나야 한다', teach:'가르는 자리는 <b>마지막 문 뒤</b>. 센서는 어느 쪽에서 들어오든 <b>자기 화살표 기준</b>으로 내보내요',
+  /* 24 */ {name:'뱀길에 두 색', goal:'뱀길인데 색이 둘 — 문이 <b>하나</b>씩뿐이라 같이 지나야 한다',
     sources:[{"r":0,"c":5,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":7,"c":0,"want":"B"},{"r":7,"c":5,"want":"R"}], walls:[[2,1],[2,2],[2,3],[2,4],[2,5],[5,0],[5,1],[5,2],[5,3],[5,4]], sensors:["R"], runs:3},
-  /* 25 */ {name:'갇힌 함 둘', goal:'두 함 다 갇혀 있다 — 빨강 함은 <b>아래에서</b>, 파랑 함은 <b>오른쪽에서</b>만 들어간다', teach:'오른쪽으로 가는 라인에서 센서는 자기 색을 <b>위</b>로 꺾어요. 함마다 들어가는 방향에 맞춰 라인의 진행 방향을 정해요',
+  /* 25 */ {name:'갇힌 함 둘', goal:'두 함 다 갇혀 있다 — 빨강 함은 <b>아래에서</b>, 파랑 함은 <b>오른쪽에서</b>만 들어간다',
     sources:[{"r":0,"c":1,"dir":2,"pattern":["R","B","R","B","R","B"]}], bins:[{"r":2,"c":4,"want":"R"},{"r":6,"c":4,"want":"B"}], walls:[[1,4],[2,3],[2,5],[5,4],[7,4],[6,3]], sensors:["R"], runs:3},
-  /* 26 */ {name:'마주 보는 생산기', goal:'생산기 둘이 <b>마주 본다</b> — 상자가 서로의 생산기로 들어가면 되돌아온다', teach:'오른쪽으로 가는 줄은 센서가 자기 색을 <b>위</b>로, 왼쪽으로 가는 줄은 <b>아래</b>로 꺾어요. 양쪽이 고를 색이 달라요',
+  /* 26 */ {name:'마주 보는 생산기', goal:'생산기 둘이 <b>마주 본다</b> — 상자가 서로의 생산기로 들어가면 되돌아온다',
     sources:[{"r":3,"c":0,"dir":1,"pattern":["R","B","R"]},{"r":3,"c":5,"dir":3,"pattern":["B","R","B"]}], bins:[{"r":7,"c":2,"want":"R"},{"r":0,"c":3,"want":"B"}], sensors:["R","B"], runs:3},
-  /* 27 */ {name:'위로 가는 함', goal:'함 세 개가 전부 <b>위쪽</b>이다 — 내려갔다가 각자 올라가야 한다', teach:'빨강 함은 왼쪽이라 아래를 보는 센서로는 못 보내요. 라인을 <b>위로 올리면서</b> 센서를 두면 왼쪽으로 꺾여요',
+  /* 27 */ {name:'위로 가는 함', goal:'함 세 개가 전부 <b>위쪽</b>이다 — 내려갔다가 각자 올라가야 한다',
     sources:[{"r":0,"c":2,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":2,"c":0,"want":"R"},{"r":2,"c":1,"want":"B"},{"r":2,"c":4,"want":"G"}], walls:[[1,0],[1,1],[1,3],[1,4],[1,5]], sensors:["R","G"], runs:3},
-  /* 28 */ {name:'문 둘에 세 색', goal:'문은 둘, 색은 셋 — 두 색이 <b>한 문을 같이</b> 지나야 한다', teach:'같이 지난 두 색은 문 뒤에서 <b>다시</b> 갈라요. 센서는 초록·파랑뿐이라 빨강은 남는 쪽',
+  /* 28 */ {name:'문 둘에 세 색', goal:'문은 둘, 색은 셋 — 두 색이 <b>한 문을 같이</b> 지나야 한다',
     sources:[{"r":0,"c":1,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":7,"c":1,"want":"R"},{"r":7,"c":4,"want":"G"},{"r":7,"c":5,"want":"B"}], walls:[[4,0],[4,2],[4,3],[4,5]], sensors:["G","B"], runs:3},
-  /* 29 */ {name:'긴 뱀길에 세 색', goal:'세로 벽 두 장을 돌아가는 긴 길 — 세 색을 <b>가는 길에</b> 하나씩 떨궈라', teach:'내려갈 때는 오른쪽으로, 왼쪽으로 갈 때는 아래로 꺾여요. 함이 있는 쪽으로 가는 <b>구간</b>에 센서를 놓아요',
+  /* 29 */ {name:'긴 뱀길에 세 색', goal:'세로 벽 두 장을 돌아가는 긴 길 — 세 색을 <b>가는 길에</b> 하나씩 떨궈라',
     sources:[{"r":0,"c":4,"dir":2,"pattern":["R","G","B","R","G","B","R","G","B"]}], bins:[{"r":7,"c":5,"want":"G"},{"r":7,"c":4,"want":"R"},{"r":7,"c":0,"want":"B"}], walls:[[0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1]], sensors:["G","R"], runs:3},
   /* 30 */ {name:'최종 라인', goal:'두 생산기 · 세 색 · 고집 센 센서 · 갇힌 함 — <b>전부</b>',
     sources:[{"r":0,"c":0,"dir":2,"pattern":["R","G","B"]},{"r":0,"c":5,"dir":2,"pattern":["B","G","R"]}], bins:[{"r":7,"c":1,"want":"R"},{"r":6,"c":4,"want":"B"},{"r":7,"c":2,"want":"G"}], walls:[[3,0],[3,1],[3,4],[3,5],[5,4],[7,4],[6,5]], fixed:[[3,2,"sensor",2,"B"]], sensors:["B","G"], runs:3}
@@ -686,7 +705,7 @@ function startLevel(i, def){
   stopSim();
   if(!def){ S.lv=i; tutOn=false; tutSetHelp(); }
   L=def||LEVELS[i];
-  $('ovResult').classList.add('hide'); $('btnRetry').classList.remove('asquit');
+  $('ovResult').classList.add('hide'); $('btnRetry').classList.remove('asquit'); $('failbar').classList.remove('show');
   document.documentElement.style.setProperty('--tk', (L.tick||500)+'ms');
   layBoard();
   S.runsLeft=L.runs; S.usedRuns=0;
@@ -773,6 +792,7 @@ function resetSim(){
 function startSim(){
   if(running) return;
   if(!tutOn && S.runsLeft<=0) return;
+  $('failbar').classList.remove('show');
   resetSim(); running=true; setEditable(false); updateRunBtn();
   if(!tutOn){ S.runsLeft--; S.usedRuns++; updateScore(); }
   timer=setInterval(tick, L.tick||500);
@@ -855,6 +875,10 @@ $('btnRun').onclick=()=>{
 /* 리셋 = 내가 놓은 타일만 비운다(가동 횟수는 그대로 — 되돌리기는 공짜다). */
 $('btnReset').onclick=()=>{ if(running) return; if(tutOn){ loadTutRound(); return; } layBoard(); resetSim(); renderBoard(); };
 $('btnTut').onclick=()=>{ tutOn?exitTutorial():startTutorial('game'); };
+const hideFail=()=>$('failbar').classList.remove('show');
+$('fbBtn').onclick=hideFail;
+$('cells').addEventListener('pointerdown',hideFail,true);   // 판을 건드리면 배너는 비킨다
+$('palette').addEventListener('pointerdown',hideFail,true);
 
 /* ================= Result =================
    결과 콘솔 그림은 승리(버튼 둘: ↻ →) / 실패(버튼 하나) 두 벌뿐이다. 그 안에서 세 상황을 나눈다:
@@ -901,10 +925,13 @@ function finish(){
     nx.hidden=false; nx.textContent=T(isLast?'build.to_start':'build.next'); nx.dataset.win=isLast?'last':'1';
     if(isLast){ S.runOver=true; submitRun(); }
   }else if(S.runsLeft>0){
-    // 횟수가 남은 실패는 화면을 안 바꾼다 — 실패 콘솔로 넘기면 게임오버로 읽힌다(2026-09-15 지적). 판은 그대로,
-    // 힌트줄이 배울 점(teach)을 말하고 토스트가 출고 수·남은 횟수를 알린다(점수판에도 그대로 있다).
-    $('hintLine').innerHTML=lvT(S.lv,'teach',L.teach)||T('build.res_fix');
-    toast(T('build.res_out',{n:good, m:needOf(L)})+' · '+T('build.runs_left',{n:S.runsLeft}), 2600);
+    // 횟수가 남은 실패 — 결과 콘솔로 넘기지 않는다(게임오버로 읽힌다). 대신 판 한가운데에 실패 배너를 크게 띄운다
+    // (점수판의 점 하나가 줄어드는 걸로는 실패한 줄 모른다 — 2026-09-15 지적 둘). 배너 뒤에 판은 그대로 있고,
+    // [고쳐서 다시] 나 판을 누르면 배너만 사라진다. 설명 문장은 안 쓴다(2026-09-15 지시 — 힌트줄의 목표 문장 하나면 된다).
+    $('fbT').textContent=T('build.fail');
+    $('fbN').innerHTML=T('build.res_out',{n:good, m:needOf(L)})+' · <b>'+T('build.runs_left',{n:S.runsLeft})+'</b>';
+    $('fbBtn').textContent=T('build.fix_retry');
+    $('failbar').classList.add('show');
     return;
   }else{
     S.runOver=true; submitRun();
