@@ -215,6 +215,7 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  *            (같은 생성 템플릿)이라 슬라이스 값도 거의 같다. 시즌 칩의 첫 벌 — 설날·추석은 자기 벌이 오면 같은 꼴로 얹는다.
  * `christmas` = 크리스마스 벌 — 초록·빨강·금테, 눈 쌓인 틀·리본·호랑가시(`public/hub/ui-christmas/*` · 2026-09-15). 같은 템플릿.
  * `scenery` = 풍경 벌 — 호두나무 틀·아이보리 면·일출 메달(`public/hub/ui-scenery/*` · 2026-09-15). 같은 템플릿. 자연 풍경 배경 공용.
+ * `fantasy` = 판타지 벌 — 연보라 수정·은테·별 장식(`public/hub/ui-fantasy/*` · 2026-09-15). 같은 템플릿.
  *            궁궐처럼 아이콘이 스스로 장식판이라 레일 틀을 안 씌우고, 랭킹 버튼에도 아이콘을 안 얹는다(트로피가 그림 안에 있다).
  *
  * ⚠️ **에셋 파일 이름이 벌마다 같다**(`panel-mission.webp`·`icon-shop.png` …). 폴더로만 갈리므로
@@ -225,7 +226,7 @@ export const charAspect = (key: string) => CHAR_ART[key]?.ar ?? CHAR_AR[key] ?? 
  *    급한 대로 선택자를 `palace_night` 하나로 좁혔더니 이번엔 **고궁 낮이 UI 를 잃었다**
  *    (2026-08-25). 배경과 UI 는 각자 이름을 갖는다 — 그래야 "배경만 다른 두 스킨"이 성립한다.
  */
-export type SkinUi = 'base' | 'palace' | 'office' | 'world' | 'korea' | 'halloween' | 'christmas' | 'scenery'
+export type SkinUi = 'base' | 'palace' | 'office' | 'world' | 'korea' | 'halloween' | 'christmas' | 'scenery' | 'fantasy'
 
 /**
  * 배경 **카테고리** — 상점·보관함의 배경 칩 필터가 이 축으로 거른다(2026-09-11).
@@ -238,7 +239,7 @@ export type SkinUi = 'base' | 'palace' | 'office' | 'world' | 'korea' | 'hallowe
  * ⚠️ `basic` 은 초원(기본) 하나뿐이고 상점엔 안 뜬다(비판매) — 그래서 칩은 **그 탭에 항목이 있는
  *    카테고리만** 그린다(빈 칩을 눌러 빈 격자를 보게 하지 않는다).
  */
-export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'korea', 'world', 'season', 'scenery'] as const
+export const SKIN_CATEGORIES = ['basic', 'palace', 'office', 'campus', 'korea', 'world', 'season', 'scenery', 'fantasy'] as const
 export type SkinCategory = (typeof SKIN_CATEGORIES)[number]
 
 /**
@@ -482,6 +483,11 @@ export const SKINS: SkinDef[] = [
   { key: 'scenery_savanna', partKey: 'skin_scenery_savanna', ui: 'scenery', category: 'scenery', iconDir: '/hub/ui-scenery', bg: '/hub/bg-scenery-savanna.webp' },
   { key: 'scenery_beach', partKey: 'skin_scenery_beach', ui: 'scenery', category: 'scenery', iconDir: '/hub/ui-scenery', bg: '/hub/bg-scenery-beach.webp' },
   { key: 'scenery_safari', partKey: 'skin_scenery_safari', ui: 'scenery', category: 'scenery', iconDir: '/hub/ui-scenery', bg: '/hub/bg-scenery-safari.webp' },
+  // 판타지 4장(2026-09-15 · Z:「판타지 스킨」) — **판타지 UI 한 벌**(`ui: 'fantasy'`) 공용. 칩 '판타지'.
+  { key: 'fantasy_medieval', partKey: 'skin_fantasy_medieval', ui: 'fantasy', category: 'fantasy', iconDir: '/hub/ui-fantasy', bg: '/hub/bg-fantasy-medieval.webp' },
+  { key: 'fantasy_alps', partKey: 'skin_fantasy_alps', ui: 'fantasy', category: 'fantasy', iconDir: '/hub/ui-fantasy', bg: '/hub/bg-fantasy-alps.webp' },
+  { key: 'fantasy_aurora', partKey: 'skin_fantasy_aurora', ui: 'fantasy', category: 'fantasy', iconDir: '/hub/ui-fantasy', bg: '/hub/bg-fantasy-aurora.webp' },
+  { key: 'fantasy_heaven', partKey: 'skin_fantasy_heaven', ui: 'fantasy', category: 'fantasy', iconDir: '/hub/ui-fantasy', bg: '/hub/bg-fantasy-heaven.webp' },
   // 세계 — 첫 장은 파리 에펠탑 밤(2026-09-14 · Z:「국가별 스킨」). **세계 UI 한 벌**(`ui: 'world'`)을 같이 들고 온다.
   //   나머지 나라 배경(24장)은 배경만 다르니 `ui: 'world'` 로 여기 얹으면 된다(고궁 낮·밤과 같은 꼴).
   {
