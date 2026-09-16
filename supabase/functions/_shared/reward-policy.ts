@@ -79,7 +79,7 @@ export async function loadRewardPolicy(admin: SupabaseClient): Promise<Record<Ac
   return out
 }
 
-/** '오늘의 완료' 코인 적립값. 꺼져 있으면 0, 못 읽으면 폴백. */
+/** '오늘의 완료' 코인 적립값 — **완료 1건당**(출석·DAILY QUIZ 각각 하루 1회, 2026-09-16). 꺼져 있으면 0, 못 읽으면 폴백. */
 export async function loadCoinDaily(admin: SupabaseClient): Promise<number> {
   const { data, error } = await admin
     .from('reward_policy')

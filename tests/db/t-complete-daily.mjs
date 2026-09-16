@@ -4,6 +4,7 @@
 //     사본을 두면 제품이 바뀌어도 테스트는 계속 초록불이다 — 다시 복사해 넣지 말 것.
 //  검증 범위:
 //   · 하루 1회 가드(같은 날 재호출은 재적립 없음) · 날이 바뀌면 다시 적립(원자 증분)
+//   · ⭐코인은 출석·DAILY QUIZ **각각** 하루 1회(2026-09-16) — 출석 도장·완주 보너스는 **출석에만**(퀴즈는 안 찍음)
 //   · 스탬프 7일 사이클: 1..7 로 차고, 7 을 찍은 날은 판이 꽉 찬 채로 남고, **다음 출석에서 1 로** 새 사이클
 //   · 7일 완주 보너스 코인(+20)은 7 을 찍은 그 호출에서만
 //   · 총 누적 출석일('daily_total')은 사이클 리셋과 무관하게 계속 증가
@@ -55,6 +56,20 @@ await db.exec(`
     level int not null default 0,
     primary key (user_id, skill_key)
   );
+  -- 적립 정책 표 — 20260916 마이그레이션이 coin/daily_complete 줄의 라벨·횟수를 고친다.
+  create table reward_policy (
+    wallet text not null,
+    kind text not null,
+    label text not null,
+    amount int not null default 0,
+    per_day int not null default 1,
+    active boolean not null default true,
+    sort_order int not null default 0,
+    updated_at timestamptz not null default now(),
+    primary key (wallet, kind)
+  );
+  insert into reward_policy (wallet, kind, label, amount, per_day, sort_order)
+    values ('coin', 'daily_complete', '오늘의 완료(출석·학습)', 10, 1, 1);
 `);
 
 // 백필 대상: 리셋이 없던 시절의 누적 스탬프 23회. 23 = 7*3 + 2 → 사이클 위치 2, 총 누적 23.
@@ -70,6 +85,7 @@ const applyMigration = async (file) => {
 };
 await applyMigration('20260727010000_complete_daily_per_kind.sql');
 await applyMigration('20260812120000_stamp_7day_cycle.sql');
+await applyMigration('20260916120000_daily_coin_per_kind.sql');
 
 // cosmetic-only 감시 대상 시드(경제 흐름 전후로 반드시 그대로여야 한다).
 await db.query(`insert into user_progress (user_id, xp) values ($1, 777)`, [uid]);
@@ -151,14 +167,42 @@ rec('day 14: 사이클 7 (두 번째 완주)', await cycle(), 7);
 rec('day 14: 보너스 재지급', r14.bonus, CYCLE_BONUS);
 rec('day 14: 총 누적 14', await total(), 14);
 
-// ── 출석·학습은 재화를 통틀어 하루 1회 ──────────────────────
+// ── 코인은 출석·학습 **각각** 하루 1회, 출석 도장은 출석에만 (2026-09-16) ──
 await nextDay();
 await checkIn();
-const { rows: lr } = await db.query(`select complete_daily_kind($1, $2, 'daily_learn') as r`, [uid, DAILY_POINTS]);
-rec('같은 날 학습: first=false (재화는 통틀어 1회)', lr[0].r.first, false);
-rec('같은 날 학습: kind_first=true (종류는 처음)', lr[0].r.kind_first, true);
+const before = await points();
+const learn = async () => (await db.query(`select complete_daily_kind($1, $2, 'daily_learn') as r`, [uid, DAILY_POINTS])).rows[0].r;
+const l1 = await learn();
+rec('⭐같은 날 학습: first=true (코인은 종류별로 따로)', l1.first, true);
+rec('같은 날 학습: kind_first=true (종류는 처음)', l1.kind_first, true);
+rec('⭐같은 날 학습: 코인 +10', await points(), before + DAILY_POINTS);
+rec('같은 날 학습: 도장은 안 찍힘(stamps=null)', l1.stamps, null);
+rec('같은 날 학습: 보너스 없음', l1.bonus, 0);
 rec('같은 날 학습: 사이클 불변(15일차 = 1)', await cycle(), 1);
 rec('같은 날 학습: 총 누적 불변', await total(), 15);
+const l2 = await learn();
+rec('같은 날 학습 재호출: first=false', l2.first, false);
+rec('같은 날 학습 재호출: 코인 불변', await points(), before + DAILY_POINTS);
+
+// 학습을 먼저 한 날 — 출석 도장은 말 그대로 출석에만 붙는다(퀴즈는 절대 안 찍음). 뒤따르는 출석이 도장을 찍는다.
+await nextDay();
+const b2 = await points();
+const l3 = await learn();
+rec('학습 먼저: first=true (코인 받음)', l3.first, true);
+rec('⭐학습 먼저: 도장은 안 찍힘(퀴즈는 출석 도장과 무관)', l3.stamps, null);
+rec('학습 먼저: 사이클 불변(아직 1)', await cycle(), 1);
+const a3 = await checkIn();
+rec('⭐학습 뒤 출석: first=true (코인 받음)', a3.first, true);
+rec('⭐학습 뒤 출석: 도장 찍힘(16일차 = 2)', a3.stamps, 2);
+rec('⭐하루 두 종류 = 코인 +20', await points(), b2 + 2 * DAILY_POINTS);
+rec('하루 두 종류: 도장은 한 칸', await cycle(), 2);
+rec('하루 두 종류: 총 누적 +1', await total(), 16);
+
+// 적립 정책 표 — 라벨이 새 규칙과 같은 말을 하고 값은 그대로.
+const pol = await q1(`select label, amount, per_day from reward_policy where wallet='coin' and kind='daily_complete'`);
+rec('reward_policy: 값 10 그대로', Number(pol.amount), 10);
+rec('reward_policy: 하루 2회(출석 1 + 퀴즈 1)', Number(pol.per_day), 2);
+rec('reward_policy: 라벨에 "건당"', /건당/.test(pol.label), true);
 
 // ── cosmetic-only 불변식 ────────────────────────────────────
 rec('user_progress.xp UNCHANGED (cosmetic-only)', Number((await q1(`select xp from user_progress where user_id=$1`, [uid])).xp), 777);

@@ -1,7 +1,8 @@
 // complete-daily: 로그인 유저가 '오늘의 완료'를 1/일(KST) 로 확정하고 cosmetic 재화·스탬프를 적립한다.
 //  · 1/day 가드는 daily_activity 의 **종류 플래그**(did_attendance / did_learn) 다. 행 존재로 판정하면 안 된다 —
 //    그 행은 레벨테스트·미니게임도 만들기 때문(그 버그로 레벨테스트한 날 출석/학습이 잠겼다, 2026-07-27 수정).
-//    재화·스탬프는 출석·학습 통틀어 하루 1회(RPC 응답 first), 활동점수는 종류별로 각각 적립.
+//    코인은 출석·학습 **각각** 하루 1회(2026-09-16 · RPC 응답 first = 이 호출로 코인이 나갔는가), 출석 도장·완주 보너스는
+//    말 그대로 **출석에만**(퀴즈는 도장을 안 찍는다), 활동점수는 종류별로 각각 적립.
 //  · 적립은 원자 SECURITY DEFINER SQL fn(complete_daily_kind) 로 위임 — 기존 JS select→절대값 upsert(read-modify-write)
 //    는 동시 호출 시 적립을 유실할 수 있어, 증분(points = points + p_points)을 하나의 트랜잭션으로 처리한다.
 //  · cosmetic-only 하드 불변식: 실력 진척/스킬 레벨 테이블을 절대 읽거나 쓰지 않고,

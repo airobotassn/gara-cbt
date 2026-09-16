@@ -20,15 +20,16 @@ import StarField from '../components/StarField'
 // ⚠️ 서버(complete-daily)의 DAILY_POINTS 와 같은 값이어야 한다. 적립 권위는 서버, 여기는 예고 표시용.
 const DAILY_POINTS = 10
 
-// ⚠️ 이 화면에는 스탬프 표시가 없다(2026-08-26 제거). 서버는 여전히 스탬프를 적립하지만
-//    자동 출석이 늘 먼저 찍어서 'DAILY QUIZ'로는 한 번도 들어오지 않는다 — 화면에 '스탬프 +1'
-//    예고와 7칸 판을 두면 매일 거짓말을 한다. 스탬프를 보는 자리는 허브 도크 하나뿐이다.
+// ⚠️ 이 화면에는 스탬프 표시가 없다(2026-08-26 제거). 출석 도장은 말 그대로 출석에만 붙어서
+//    DAILY QUIZ 는 도장을 안 찍는다(2026-09-16 부터는 규칙으로 — 그전엔 자동 출석이 늘 먼저 찍어서 결과만 같았다).
+//    화면에 '스탬프 +1' 예고와 7칸 판을 두면 거짓말이 된다. 스탬프를 보는 자리는 허브 도크 하나뿐이다.
 
 // get-hub 응답 중 이 화면이 쓰는 것만. (전체 형태는 Hub.tsx 참고)
 //   ⚠️ 이 화면의 완료 판정은 learnDone(=daily_activity.did_learn) 이다. dailyDone(출석)이나 행 존재로
 //      판정하면 레벨테스트·미니게임만 해도 오늘의 문제가 잠긴다(2026-07-27 버그).
 interface HubState { authed: boolean; points?: number; learnDone?: boolean }
-// complete-daily 응답. first = 이번 호출로 재화(코인·스탬프)가 실제 지급됐는지(출석·학습 통틀어 하루 1회).
+// complete-daily 응답. first = 이번 호출로 코인이 실제 지급됐는지 — 출석·DAILY QUIZ 각각 하루 1회(2026-09-16).
+// 출석 도장(7일 스탬프)은 말 그대로 출석에만 붙는다 — 퀴즈는 코인만 받고 도장은 안 찍는다(bonus 도 늘 0).
 // bonus = 7일 스탬프를 채운 날 붙는 완주 보너스 코인(0 이면 없음). 금액 권위는 서버다.
 interface DailyResp { ok: boolean; day: string; first: boolean; bonus?: number }
 
@@ -116,7 +117,7 @@ export default function Daily() {
       const r = await callFunction<DailyResp>('complete-daily', { kind: 'daily_learn' })
       const h = await callFunction<HubState>('get-hub', {})
       applyHub(h)
-      setRewarded(!!r.first) // 오늘 출석으로 이미 재화를 받았으면 false — 보상 문구를 거짓말하지 않는다.
+      setRewarded(!!r.first) // 오늘 퀴즈를 이미 완료한 재호출이면 false — 보상 문구를 거짓말하지 않는다.
       setBonus(r.bonus ?? 0)
       setCelebrate(true)
     } catch {
@@ -252,17 +253,17 @@ export default function Daily() {
           <div className="dy-pop" onClick={(e) => e.stopPropagation()}>
             <div className="dy-pop-burst"><Ic n="sun" s={64} /></div>
             <b className="dy-pop-title">{t('daily.pop_title')}</b>
-            {/* ⚠️ 받은 게 없으면 이 줄을 아예 안 그린다 — 스탬프 칸이 빠지면서 둘 다 거짓인 날
-                (자동 출석이 먼저 받아간 날 = 사실상 매일)은 빈 띠만 남는다. */}
+            {/* ⚠️ 받은 게 없으면 이 줄을 아예 안 그린다(빈 띠 방지). 2026-09-16 부터 퀴즈 코인은 출석과 별개로
+                나가므로 첫 완료면 늘 +10P 가 뜬다 — 비는 경우는 이미 완료한 날의 재호출뿐이다. */}
             {(rewarded || bonus > 0) && (
               <div className="dy-pop-gain">
                 {rewarded && <span><Ic n="coin" s={22} />+{DAILY_POINTS}P</span>}
                 {bonus > 0 && <span><Ic n="coin" s={22} />{t('daily.pop_bonus', { b: bonus })}</span>}
               </div>
             )}
-            <p className="dy-pop-msg">
-              {t(rewarded ? 'daily.pop_grew' : 'daily.pop_already')}
-            </p>
+            {/* 옛 '출석으로 이미 받았다' 문구는 지웠다(2026-09-16 지시) — 코인을 출석·퀴즈가 나눠 쓰던 규칙 자체가
+                없어져서 설명할 일이 없다. 코인이 안 나간 호출은 문구 없이 제목·닫기만 남는다. */}
+            {rewarded && <p className="dy-pop-msg">{t('daily.pop_grew')}</p>}
             {/* 버튼은 '닫기' 하나 — 완료 보상이 이 화면에서 끝나므로 허브로 보낼 이유가 없다. */}
             <div className="dy-pop-btns">
               <button className="dy-btn" onClick={() => setCelebrate(false)}>{t('common.close')}</button>
