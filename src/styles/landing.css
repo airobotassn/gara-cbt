@@ -29,6 +29,14 @@ html.lp-noscrollbar::-webkit-scrollbar {
   padding: var(--pad-y) var(--pad-x);
   background: #000208; /* 우주. 지구본이 덮지만 로드 전 깜빡임 방지 */
 }
+/* 모바일만: 문구·검색창·버튼 스택을 위로 5vh 올린다(2026-09-16 지시 — 지구와 같이 올라가야 한다).
+   아래 여백을 10vh 더 주면 flex 가운데 정렬의 중심이 그 절반만큼 위로 간다.
+   ⚠️ RankGlobe.tsx 의 `CFG.posyNarrow`(지구 세로 위치)와 한 쌍 — 지구를 더 올리면 여기도 같이. */
+@media (max-width: 600px) {
+  .lp {
+    padding-bottom: calc(var(--pad-y) + 10vh);
+  }
+}
 /* 배경 지구(.rg — 옛 영상 히어로 .eh)는 z-index 0, 나머지 콘텐츠는 그 위로.
    ⚠️ 여기서 빠뜨리면 배경이 flex 아이템으로 접혀 0×0 이 된다(실제로 .rg 를 그렇게 잃었다). */
 .lp > *:not(.eh):not(.rg) {
