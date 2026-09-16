@@ -53,6 +53,8 @@ export interface PaymentStatusResp {
   orderName?: string
   amount?: number
   currency?: string
+  /** failed 일 때 사유 코드. DUPLICATE_CHARGED = 같은 상품을 두 번 산 두 번째 결제(돈은 빠졌고 환불 대상). */
+  failCode?: string | null
 }
 
 /**

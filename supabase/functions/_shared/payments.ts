@@ -54,6 +54,8 @@ export interface PaymentRow {
   /** 원화로 청구한 건의 주문 생성 시점 환율. 승인 때 다시 계산하지 않는다. */
   fx_rate: number | null
   status: string
+  /** 실패 사유 코드(failed 일 때). DUPLICATE_CHARGED = 중복 주문인데 PG 에 매출이 있다 → 환불 큐. */
+  fail_code: string | null
   payment_key: string | null
   fulfilled_at: string | null
   confirmed_at: string | null
@@ -68,7 +70,7 @@ export interface PaymentRow {
 
 /** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다. */
 export const PAYMENT_COLS =
-  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
+  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, fail_code, payment_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
 
 /**
  * **PG 에 말할 때 쓰는 금액·통화.** 승인 대조·조회·환불이 전부 이 값을 기준으로 해야 한다.

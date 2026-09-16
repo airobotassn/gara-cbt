@@ -101,6 +101,8 @@ export default function Checkout() {
   //      열기 때문이다. 같은 이름으로 다시 열면 브라우저가 새 창을 만들지 않고 그 창을 재사용한다.
   //      주문·FGKey 도 같은 것을 다시 쓰므로(새로 만들지 않는다) 결제 건이 늘어나지도 않는다.
   const [reopen, setReopen] = useState(false)
+  // 서버가 결제창 열기를 막은 뒤(이미 결제된 상품·닫힌 주문) — 버튼을 잠근다. 다시 열 길은 결제 화면 재진입뿐이다.
+  const [closed, setClosed] = useState(false)
 
   // StrictMode 는 개발에서 effect 를 두 번 돌린다 — 막지 않으면 주문이 두 개 생긴다.
   const startedRef = useRef(false)
@@ -143,14 +145,17 @@ export default function Checkout() {
   }, [authLoading, isFullUser, productType, productRef, addonEbookId, bundleIdsRaw, bundleKind, lang, navigate, t, preflightErr])
 
   async function pay() {
-    if (!order?.orderId || paying || !agreed) return
+    if (!order?.orderId || paying || !agreed || closed) return
     setPaying(true)
     setErr('')
     try {
       try { sessionStorage.setItem(PRODUCT_HINT_KEY, productType) } catch { /* 없으면 결과 화면이 이북 기준으로 떨어질 뿐이다 */ }
       // 동의를 **결제창을 열기 전에** 결제 건에 남긴다. 실패하면 결제창을 열지 않는다 —
       // 동의 기록 없이 돈만 빠지면 그 건은 나중에 증거가 없다.
-      if (!reopen) await agreeTerms(order.orderId) // 동의는 이 주문에 이미 기록됐다 — 다시 열 땐 안 부른다
+      // ⚠️ 다시 열 때도 매번 부른다(2026-09-16) — 서버가 이 자리에서 "이 주문이 아직 열려 있나 · 같은 상품을 그 사이
+      //    다른 탭에서 사지 않았나" 를 본다. 엑심베이는 팝업 안에서 돈이 빠져 팝업이 뜬 뒤엔 못 막으므로 여기가 마지막 관문이다.
+      //    동의 시각은 서버가 최초값을 덮지 않으니 여러 번 불러도 증거가 안 바뀐다.
+      await agreeTerms(order.orderId)
       const ex = order.eximbay
       if (!ex || !window.EXIMBAY) throw new Error(t('pay.error_generic'))
       // ⚠️ 페이로드를 여기서 만들지 않는다 — FGKey 는 서버가 /ready 에 보낸 값들의 서명이라
@@ -162,7 +167,14 @@ export default function Checkout() {
       setPaying(false)
       setReopen(true)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('pay.error_generic'))
+      // 서버가 "이미 결제된 상품 / 닫힌 주문" 으로 막은 경우 — 팝업을 안 열었고, 이 화면에선 더 진행할 게 없다.
+      const code = (e as { code?: string } | null)?.code
+      if (code === 'already_paid' || code === 'order_closed') {
+        setErr(t('pay.already_paid'))
+        setClosed(true)
+      } else {
+        setErr(e instanceof Error ? e.message : t('pay.error_generic'))
+      }
       setPaying(false)
     }
   }
@@ -337,7 +349,7 @@ export default function Checkout() {
 
             <button
               onClick={pay}
-              disabled={phase !== 'ready' || paying || !agreed}
+              disabled={phase !== 'ready' || paying || !agreed || closed}
               className="w-full py-4 bg-primary text-on-primary font-label-md text-[17px] font-bold rounded-2xl ambient-shadow disabled:opacity-50 transition-opacity"
             >
               {paying

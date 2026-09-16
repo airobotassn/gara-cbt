@@ -74,6 +74,7 @@ interface PaymentRow {
   id: string; userId: string; name: string | null; email: string | null
   orderId: string; orderName: string; productType: string; amount: number
   status: string; method: string | null; fulfilledAt: string | null; createdAt: string
+  failCode?: string | null
   // 이 결제로 나간 이북들의 열람 여부. 이북이 안 붙은 결제(응시료 단독 등)는 빈 배열이다.
   reads?: EbookReadRow[]
   // 실제 청구값(통화·금액)과 돌려준 합계. 정가(amount, 달러 센트)와 단위가 다르다 — 환불은 이 단위로 한다.
@@ -84,7 +85,7 @@ interface PaymentRow {
 interface PaymentListResp {
   payments: PaymentRow[]; total: number
   stats30d: { paidN: number; paidAmount: number; refundN: number; refundAmount: number }
-  queues: { unfulfilled: number; revoked: number }
+  queues: { unfulfilled: number; revoked: number; dupCharged: number }
 }
 
 /** 청구 통화로 금액 표기 — 원이면 ₩, 아니면 $. 환불 화면은 정가(달러 센트)가 아니라 **실제 빠진 돈**을 말해야 한다. */
@@ -271,6 +272,13 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
             {data?.queues.unfulfilled ?? 0}건
           </div>
         </div>
+        {/* 같은 상품을 두 번 산 두 번째 결제 — 지급은 안 했는데 돈은 빠졌다. 0이 아니면 [환불] 로 돌려줘야 한다. */}
+        <div className="admin-card">
+          <div className="k">중복 결제(환불 필요)</div>
+          <div className="v" style={(data?.queues.dupCharged ?? 0) ? { color: 'var(--k-amber, #d98a00)' } : undefined}>
+            {data?.queues.dupCharged ?? 0}건
+          </div>
+        </div>
       </div>
 
       <div className="admin-toolbar">
@@ -289,6 +297,7 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
           <option value="">처리 대기 보기</option>
           <option value="unfulfilled">미지급(돈 받고 안 준 것)</option>
           <option value="revoked">환불 후 미회수</option>
+          <option value="dup_charged">중복 결제(환불 필요)</option>
         </select>
         <span className="admin-hint">{rows.length}건{loading ? ' · 불러오는 중…' : ''}</span>
       </div>
@@ -318,6 +327,7 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
                   <span className="badge">{payStatusLabel(p.status)}</span>
                   {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
                   {p.status === 'paid' && (p.refundedAmount ?? 0) > 0 && <span style={{ color: 'var(--muted)' }}> · 부분환불</span>}
+                  {p.status === 'failed' && p.failCode === 'DUPLICATE_CHARGED' && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 중복 결제(환불 필요)</b>}
                 </td>
                 {/* 열람 여부 — 환불 문의가 왔을 때 제일 먼저 보는 칸이다. 읽은 건은 눈에 띄어야 한다. */}
                 <ReadCell reads={p.reads} />
