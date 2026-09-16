@@ -389,7 +389,8 @@ function HomeDashboard({ go }: { go: AdminGo }) {
     { k: '오늘 접속 회원', v: `${data?.todayVisitors ?? 0}명`, sub: `누적 유저 ${(data?.users ?? 0).toLocaleString()}명`, accent: 'blue' },
     { k: '신규 유저', v: `${data?.newUsers7d ?? 0}명`, sub: '최근 7일', accent: 'violet' },
     { k: '휴면 유저', v: `${data?.dormant ?? 0}명`, sub: '90일 이상 미접속', accent: 'muted' },
-    { k: '매출(30일)', v: krw(data?.revenue30d ?? 0), sub: `결제 ${data?.paid30d ?? 0}건 · 환불 ${data?.refund30d ?? 0}건`, accent: 'green' },
+    // 정가 센트 합계다 — krw() 로 찍으면 $1 이 "100원" 이 된다(2026-09-16 실제로 그랬다).
+    { k: '매출(30일)', v: usdc(data?.revenue30d ?? 0), sub: `결제 ${data?.paid30d ?? 0}건 · 환불 ${data?.refund30d ?? 0}건`, accent: 'green' },
   ]
   return (
     <>
@@ -6313,7 +6314,8 @@ function MemberPayPanel({ userId }: { userId: string }) {
                 {p.orderName}
                 <span style={{ color: 'var(--muted)' }}> · {productLabel(p.productType)}</span>
               </td>
-              <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{krw(p.amount)}</td>
+              {/* `amount` 는 정가 센트다 — krw() 로 찍으면 $1 이 "100원" 이 된다. */}
+              <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{usdc(p.amount)}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
                 {/* ⚠️ 영문 코드(paid·pending)를 그대로 내보내지 않는다 — 이 화면은 사무 담당자가 본다. */}
                 <span className="badge">{payStatusLabel(p.status)}</span>

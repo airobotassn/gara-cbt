@@ -260,7 +260,8 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
       <ErrBox msg={err} />
 
       <div className="admin-cards" style={{ marginBottom: 16 }}>
-        <div className="admin-card"><div className="k">매출(30일)</div><div className="v">{krw(st?.paidAmount ?? 0)}</div></div>
+        {/* 정가 센트 합계다 — krw() 로 찍으면 $1 이 "100원" 이 된다. */}
+        <div className="admin-card"><div className="k">매출(30일)</div><div className="v">{usdc(st?.paidAmount ?? 0)}</div></div>
         <div className="admin-card"><div className="k">결제 건수(30일)</div><div className="v">{st?.paidN ?? 0}건</div></div>
         <div className="admin-card"><div className="k">환불(30일)</div><div className="v">{st?.refundN ?? 0}건</div></div>
         {/* 이 숫자가 0이 아니면 누군가 돈만 내고 못 받고 있다는 뜻이다. */}
@@ -545,7 +546,9 @@ export function MemberStats() {
 // ══════════════════════════════════════════════════════════════
 // 돈을 보는 유일한 자리. 옛날엔 결제 현황이 CARIS 대시보드 안에 얹혀 있어서 **이북·강의 매출이
 // 자격검정 화면에 섞여** 있었다(제도가 다른 돈이 한 표에 있었다).
-//   ⚠️ 금액은 **원화**다 — 구매자 화면은 달러 정가를 보여주지만 관리자는 실제 청구·정산액을 봐야 한다.
+//   ⚠️ 금액은 **달러 센트**다(서버가 `payments.amount` = 정가 센트를 더한다). `krw()` 로 찍지 말 것 —
+//      그러면 $1 이 "100원" 으로 나온다(2026-09-16 실제로 그랬다). 실제 청구 원화(`charge_amount`)를
+//      더하지 않는 이유는 해외 결제가 달러로 청구돼 통화가 섞이기 때문이다 — 정가 단위 하나로 본다.
 interface RevenueStatsResp {
   from: string; to: string; days: number
   totals: { paidN: number; paidAmount: number; refundN: number; refundAmount: number; unfulfilled: number; revoked: number; pendingN: number; failedN: number; avg: number }
@@ -562,24 +565,24 @@ export function RevenueStats() {
 
   return (
     <>
-      <AdminHead title="매출" count={t ? krw(t.paidAmount) : ''} onReload={reload} loading={loading} />
+      <AdminHead title="매출" count={t ? usdc(t.paidAmount) : ''} onReload={reload} loading={loading} />
       <ErrBox msg={err} />
-      <PeriodBar days={days} onDays={setDays} hint={data ? `${data.from} ~ ${data.to} · 원화` : ''} />
+      <PeriodBar days={days} onDays={setDays} hint={data ? `${data.from} ~ ${data.to} · 달러 정가` : ''} />
 
       <div className="admin-cards">
         <div className="admin-card k-green">
           <div className="k">매출</div>
-          <div className="v">{krw(t?.paidAmount ?? 0)}</div>
+          <div className="v">{usdc(t?.paidAmount ?? 0)}</div>
           <div className="s">결제 {(t?.paidN ?? 0).toLocaleString()}건</div>
         </div>
         <div className="admin-card k-blue">
           <div className="k">객단가</div>
-          <div className="v">{krw(t?.avg ?? 0)}</div>
+          <div className="v">{usdc(t?.avg ?? 0)}</div>
           <div className="s">결제 1건 평균</div>
         </div>
         <div className="admin-card k-violet">
           <div className="k">환불</div>
-          <div className="v">{krw(t?.refundAmount ?? 0)}</div>
+          <div className="v">{usdc(t?.refundAmount ?? 0)}</div>
           <div className="s">{(t?.refundN ?? 0).toLocaleString()}건</div>
         </div>
         <div className="admin-card">
@@ -613,7 +616,7 @@ export function RevenueStats() {
                     매출을 종류로 가르는 표라 여기서는 모르는 값을 그대로 보여준다. */}
                 <span className="hbar-l">{p.key === 'bundle' ? '묶음결제' : p.key === 'ebook' ? '이북' : productLabel(p.key)}</span>
                 <div className="hbar-track"><div className="hbar-fill" style={{ width: `${Math.min(100, (p.amount / maxAmt) * 100)}%` }} /></div>
-                <span className="hbar-v">{krw(p.amount)} · {p.n}건</span>
+                <span className="hbar-v">{usdc(p.amount)} · {p.n}건</span>
               </div>
             ))
             : <div className="admin-empty">이 기간에 결제가 없습니다.</div>}
@@ -630,7 +633,7 @@ export function RevenueStats() {
                       <tr key={p.key}>
                         <td>{p.key}</td>
                         <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{p.n}</td>
-                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{krw(p.amount)}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{usdc(p.amount)}</td>
                       </tr>
                     ))}
                   </tbody>
