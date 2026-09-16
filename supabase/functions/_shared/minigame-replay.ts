@@ -1,4 +1,4 @@
-// 미니게임 답안 기록 재채점 — 버텨라·쏴라·골라라·닿아라·프로그램해라·지어라·막아라·시켜라. 2026-09-11 / 09-14 / 09-15.
+// 미니게임 답안 기록 재채점 — 버텨라·쏴라·골라라·닿아라·프로그램해라·지어라·막아라·시켜라·더듬어라. 2026-09-11 / 09-14 / 09-15 / 09-16.
 //
 // 이 게임들은 점수를 믿지 않는다. 게임은 "어느 문항에 뭘 골랐고 시작 후 몇 ms 였나" 기록을 보내고, 서버가
 // 게임과 **같은 공식**으로 점수를 다시 센다. 그래서 콘솔에서 점수 변수를 바꾸거나 submit(9999) 를 부르는
@@ -19,8 +19,9 @@ import { PROG_LEVELS, validProgram, runProgram, countOps as progCountOps, type I
 import { BUILD_LEVELS, validTiles as validBuildTiles, simulate as simulateBuild, type Tile as BuildTile } from './build-levels.ts'
 import { BLOCK_DAYS, BLOCK_MAX_STRIKE, judgeBlockDoc } from './block-days.ts'
 import { ORDER_LEVELS, ORDER_MAX_TRIES, orderMatches } from './order-levels.ts'
+import { FEEL_LEVELS, FEEL_MAX_TRIES, FEEL_MAX_HIT } from './feel-levels.ts'
 
-export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build' | 'block' | 'order'
+export type ReplayKind = 'beat' | 'shoot' | 'pick' | 'reach' | 'program' | 'build' | 'block' | 'order' | 'feel'
 
 /** 공용 점수 규칙 — 정답 1개 = SCORE_BASE × 연속 배수. 틀리면 0점, 연속 끊김. */
 export const SCORE_BASE = 10
@@ -65,6 +66,8 @@ export interface BuildEntry { lv: number; tiles: BuildTile[]; runs: number }
 export interface BlockEntry { d: number; i: number; m: number[]; s: 0 | 1; t: number }
 /** 시켜라 한 번 시키기. o = 주문 번호(0부터), c = 고른 카드 자리, t = 판 시작 후 ms. */
 export interface OrderEntry { o: number; c: number[]; t: number }
+/** 더듬어라 한 번 들어가기. z = 구역(0부터), ok = 1 도착 / 0 실패, h = 부딪힘 수, b = 남은 배터리 %, t = 판 시작 후 ms. */
+export interface FeelEntry { z: number; ok: 0 | 1; h: number; b: number; t: number }
 /** 시켜라 별 만점 — 주문 수 × 3. 동률값 = (만점 − 별) × 1e7 + 소요 ms(≤ 9,999,999). */
 export const ORDER_MAX_STARS = ORDER_LEVELS.length * 3
 export const ORDER_TIE_UNIT = 10_000_000
@@ -283,10 +286,34 @@ export function replayOrder(log: unknown, ageSec: number): ReplayResult | Replay
   return { ok: true, score: cleared, answers: log.length, durationMs: last, tie: (ORDER_MAX_STARS - stars) * ORDER_TIE_UNIT + Math.min(last, ORDER_TIE_UNIT - 1) }
 }
 
+/** 더듬어라 — 구역별 시도 기록의 **순서와 횟수**만 다시 검사한다. 조이스틱 궤적을 프레임 단위로 되돌리는 건 무리라 물리는 안 돌린다
+ *  (다른 재채점 게임처럼 정답이 클라에 있는 한계 위에, 여기는 "정말 도착했나" 도 클라 주장이다). 구역은 0번부터 순서대로, 한 구역에
+ *  MAX_TRIES 번까지, 도착(ok)하면 다음 구역, MAX_TRIES 번 실패하면 판 끝. 부딪힘 0~3 · 배터리 0~100 · 시각 단조증가. 점수 = 깬 구역 수, 동률 = 마지막 시각. */
+export function replayFeel(log: unknown, ageSec: number): ReplayResult | ReplayFail {
+  if (!Array.isArray(log)) return { ok: false, reason: 'log_missing' }
+  if (log.length > FEEL_LEVELS.length * FEEL_MAX_TRIES) return { ok: false, reason: 'log_malformed' }
+  let z = 0, tries = 0, cleared = 0, prevT = -Infinity, last = 0, over = false
+  for (const raw of log) {
+    const e = raw as FeelEntry
+    if (over || z >= FEEL_LEVELS.length) return { ok: false, reason: 'log_after_gameover' }
+    if (!e || typeof e !== 'object' || e.z !== z || (e.ok !== 0 && e.ok !== 1) || !num(e.t) || e.t < 0) return { ok: false, reason: 'log_malformed' }
+    if (!Number.isInteger(e.h) || e.h < 0 || e.h > FEEL_MAX_HIT || !num(e.b) || e.b < 0 || e.b > 100) return { ok: false, reason: 'log_malformed' }
+    if (e.ok === 1 && e.h >= FEEL_MAX_HIT) return { ok: false, reason: 'log_malformed' }   // 3번 부딪히면 도착일 수 없다
+    if (e.t < prevT) return { ok: false, reason: 'log_not_monotonic' }
+    prevT = e.t; last = e.t
+    tries++
+    if (e.ok === 1) { cleared++; z++; tries = 0 }
+    else if (tries >= FEEL_MAX_TRIES) over = true
+  }
+  if (last > ageSec * 1000 + AGE_SLACK_MS) return { ok: false, reason: 'log_exceeds_ticket' }
+  return { ok: true, score: cleared, answers: log.length, durationMs: last }
+}
+
 export function replay(kind: ReplayKind, log: unknown, ageSec: number, knownIds: Set<string>): ReplayResult | ReplayFail {
   if (kind === 'beat') return replayBeat(log, ageSec, knownIds)
   if (kind === 'block') return replayBlock(log, ageSec)
   if (kind === 'order') return replayOrder(log, ageSec)
+  if (kind === 'feel') return replayFeel(log, ageSec)
   if (kind === 'shoot') return replayShoot(log, ageSec, knownIds)
   if (kind === 'pick') return replayPick(log, ageSec, knownIds)
   if (kind === 'reach') return replayReach(log, ageSec)

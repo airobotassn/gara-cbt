@@ -16,6 +16,7 @@ import { BUILD_LEVELS, simulate as simulateBuild, validTiles as validBuildTiles 
 import { BLOCK_DAYS, BLOCK_MAX_STRIKE, BLOCK_DOC_POINT, BLOCK_PERFECT_BONUS, judgeBlockDoc } from '../supabase/functions/_shared/block-days.ts'
 import { ORDER_LEVELS, ORDER_MAX_TRIES, ORDER_KEYS, ORDER_BASE, buildOrderSpec, orderMatches } from '../supabase/functions/_shared/order-levels.ts'
 import * as FE from '../src/lib/minigames.ts'
+import { FEEL_LEVELS, FEEL_MAX_TRIES, FEEL_MAX_HIT } from '../supabase/functions/_shared/feel-levels.ts'
 
 let failed = 0
 function eq(actual, expected, label) {
@@ -32,6 +33,7 @@ const prog = readFileSync(new URL('../public/games/program-cari.html', import.me
 const build = readFileSync(new URL('../public/games/build-cari.html', import.meta.url), 'utf8')
 const block = readFileSync(new URL('../public/games/block-cari.html', import.meta.url), 'utf8')
 const order = readFileSync(new URL('../public/games/order-cari.html', import.meta.url), 'utf8')
+const feel = readFileSync(new URL('../public/games/feel-cari.html', import.meta.url), 'utf8')
 
 // ---------- 0b) 프로그램해라 레벨 대조 + 정답 프로그램이 서버 VM 으로 성공하는가 ----------
 {
@@ -426,6 +428,53 @@ eq(R.logQuestionIds([{ q: 'a' }, { q: 'b' }, { q: 'a' }, { x: 1 }]), ['a', 'b'],
     L.cards.forEach((c, j) => { if (!DICT[`${key}.c${j + 1}`] || DICT[`${key}.c${j + 1}`].ko !== c.t) missing.push(`${key}.c${j + 1}`) })
   })
   eq(missing, [], 'order 주문 문구 키가 전부 있고 ko = HTML')
+}
+
+// ---------- 0g) 더듬어라 구역 대조 + 재채점 ----------
+{
+  const m = feel.match(/const LEVELS=(\[[\s\S]*?\n\]);/)
+  const HL = m ? new Function('return ' + m[1])() : null
+  eq(HL?.length, FEEL_LEVELS.length, 'feel 구역 수 = 서버')
+  ;(HL ?? []).forEach((L, i) => eq({ envs: L.envs, hint: L.hint, grid: L.grid }, FEEL_LEVELS[i] && { envs: FEEL_LEVELS[i].envs, hint: FEEL_LEVELS[i].hint, grid: FEEL_LEVELS[i].grid }, `feel 구역 ${i + 1} 격자·환경 = 서버`))
+  eq(lit(feel, 'MAX_TRIES', 'feel'), FEEL_MAX_TRIES, 'feel MAX_TRIES = 서버')
+  eq(/MAX_HIT=3/.test(feel), FEEL_MAX_HIT === 3, 'feel MAX_HIT = 서버')
+  eq(/log:\(opts&&Array\.isArray\(opts\.log\)\)\?opts\.log:undefined/.test(feel), true, 'feel 브리지가 log 를 실어 보낸다')
+  eq(/MGBridge\.submit\(cleared,\{timed:true,log:LOG\}\)/.test(feel), true, 'feel 제출이 log 를 넘긴다')
+  // 격자 — 크기·S/E 하나씩·길 있음·모르는 글자 없음
+  FEEL_LEVELS.forEach((L, i) => {
+    const g = L.grid, all = g.join('')
+    eq(g.length === 17 && g.every((r) => r.length === 13), true, `feel 구역 ${i + 1} 13×17`)
+    eq((all.match(/S/g) || []).length === 1 && (all.match(/E/g) || []).length === 1, true, `feel 구역 ${i + 1} S·E 하나씩`)
+    eq(all.replace(/[#GBMCSE.dbks]/g, ''), '', `feel 구역 ${i + 1} 모르는 글자 없음`)
+    let sx, sy, ex, ey; g.forEach((r, y) => { for (let x = 0; x < 13; x++) { if (r[x] === 'S') { sx = x; sy = y } if (r[x] === 'E') { ex = x; ey = y } } })
+    const seen = new Set([sy * 13 + sx]); const q = [[sx, sy]]; let found = false
+    while (q.length) { const [x, y] = q.shift(); if (x === ex && y === ey) { found = true; break }
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= 13 || ny >= 17) continue; if ('#GBMC'.includes(g[ny][nx]) || seen.has(ny * 13 + nx)) continue; seen.add(ny * 13 + nx); q.push([nx, ny]) } }
+    eq(found, true, `feel 구역 ${i + 1} 출발→도착 길 있음`)
+  })
+  // 재채점
+  const P = FEEL_LEVELS.map((_, z) => ({ z, ok: 1, h: 0, b: 80, t: (z + 1) * 30000 }))
+  eq(R.replayFeel(P, 900), { ok: true, score: 20, answers: 20, durationMs: 600000 }, 'feel 20구역 전부 도착 = 20')
+  const P2 = [{ z: 0, ok: 0, h: 3, b: 50, t: 1000 }, { z: 0, ok: 1, h: 1, b: 40, t: 2000 }, { z: 1, ok: 0, h: 0, b: 0, t: 3000 }, { z: 1, ok: 0, h: 3, b: 20, t: 4000 }, { z: 1, ok: 1, h: 2, b: 30, t: 5000 }]
+  eq(R.replayFeel(P2, 600), { ok: true, score: 2, answers: 5, durationMs: 5000 }, 'feel 실패 뒤 도착 = 2')
+  const P3 = [{ z: 0, ok: 0, h: 3, b: 50, t: 1000 }, { z: 0, ok: 0, h: 3, b: 50, t: 2000 }, { z: 0, ok: 0, h: 3, b: 50, t: 3000 }]
+  eq(R.replayFeel(P3, 600), { ok: true, score: 0, answers: 3, durationMs: 3000 }, 'feel 3번 실패 = 0')
+  eq(R.replayFeel(P3.concat([{ z: 1, ok: 1, h: 0, b: 50, t: 4000 }]), 600), { ok: false, reason: 'log_after_gameover' }, 'feel 판 끝난 뒤 기록 거부')
+  eq(R.replayFeel([{ z: 1, ok: 1, h: 0, b: 50, t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'feel 구역 건너뛰기 거부')
+  eq(R.replayFeel([{ z: 0, ok: 1, h: 3, b: 50, t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'feel 3번 부딪히고 도착 거부')
+  eq(R.replayFeel([{ z: 0, ok: 1, h: 0, b: 120, t: 10 }], 600), { ok: false, reason: 'log_malformed' }, 'feel 배터리 범위 밖 거부')
+  eq(R.replayFeel([P[0], { ...P[1], t: 1 }], 900), { ok: false, reason: 'log_not_monotonic' }, 'feel 시각 역행 거부')
+  eq(R.replayFeel([{ ...P[0], t: 600 * 1000 + 6000 }], 600), { ok: false, reason: 'log_exceeds_ticket' }, 'feel 티켓 시간 초과 거부')
+  eq(R.replayFeel([], 600).score, 0, 'feel 빈 기록 = 0')
+  // 사전 — feel.* 6개국어 · 구역 이름 20개 ko = HTML
+  const src = readFileSync(new URL('../public/games/i18n.js', import.meta.url), 'utf8')
+  const dm = src.match(/var D = (\{[\s\S]*?\n  \})\r?\n\r?\n  function t\(/)
+  const DICT = dm ? new Function('return ' + dm[1])() : {}
+  const LANGS = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
+  const fkeys = Object.keys(DICT).filter((k) => k.startsWith('feel.'))
+  eq(fkeys.every((k) => LANGS.every((l) => typeof DICT[k][l] === 'string' && DICT[k][l].length > 0)), true, `feel.* ${fkeys.length}키 전부 6개국어`)
+  eq((HL ?? []).map((L, i) => DICT[`feel.z${i + 1}`]?.ko === L.name).every(Boolean), true, 'feel 구역 이름 키가 전부 있고 ko = HTML')
+  for (const k of ['ultra', 'lidar', 'cam', 'ir', 'radar', 'bump']) eq(!!DICT[`feel.sensor.${k}`], true, `feel 센서 이름 ${k}`)
 }
 
 if (failed) { console.error(`\n${failed} failed`); process.exit(1) }

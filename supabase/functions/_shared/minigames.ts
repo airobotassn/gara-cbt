@@ -12,7 +12,7 @@
 //   게임에서 같이 뺐다(끝까지 가는 게임이 됐다). 닿아라는 레벨별 최종 관절 각도를 받아 정말 닿았는지 다시 계산한다.
 //
 // max: 서버 clamp 상한(위조 방어의 하드 실링). 'level' 은 게임의 실제 LEVELS.length 와 같아야 한다 —
-//   넉넉히 잡으면 존재하지 않는 레벨을 신고해 1위를 차지할 수 있다(런타임 실측: order 5 · feel 6).
+//   넉넉히 잡으면 존재하지 않는 레벨을 신고해 1위를 차지할 수 있다(옛 실측: order 5 · feel 6 — 둘 다 이제 재채점이라 max 없음).
 // perSec: 초당 획득 가능한 상한(플레이 시간 대비 점수 sanity). 실측 텔레메트리가 없어 잠정값이며,
 //   분포를 보고 조여야 한다. 여유를 크게 준 값이라 1차 방어선(무플레이 만점 제출) 역할만 한다.
 import type { ReplayKind } from './minigame-replay.ts'
@@ -42,10 +42,9 @@ export const GAMES: Record<string, GameSpec> = {
   // 시켜라 = 지시 카드를 골라 도면대로 만드는 레벨제(20주문 · 주문당 3번). 기록 재채점(2026-09-15) — 서버가 카드 → 스펙 → 도면 대조를
   //   다시 한다(_shared/order-levels.ts). 동률 = 별 합(많을수록) → 시간(짧을수록)을 한 숫자로 접어 tie 로 보낸다(replayOrder).
   'order-cari': { metric: 'level', replay: 'order' },
-  // 더듬어라 = 센서를 켜고 끄며 어두운 구역을 통과하는 레벨제(6구역).
-  //   한 구역이 1분 안팎이라 6구역이면 5분 넘게 걸린다 — perSec 0.25 는 20초면 6까지 인정하는 넉넉한 상한이라
-  //   정상 플레이를 깎지 않으면서 무플레이 만점 제출만 막는다(다른 레벨형과 같은 기준).
-  'feel-cari': { max: 6, metric: 'level', perSec: 0.25 },
+  // 더듬어라 = 센서를 켜고 끄며 어두운 구역을 통과하는 레벨제(20구역 · 구역당 3번). 기록 재채점(2026-09-16) — 서버가 구역별 시도의
+  //   순서·횟수만 다시 검사한다(replayFeel · _shared/feel-levels.ts). 물리는 안 돌린다(조이스틱 궤적 재현은 무리). 동률 = 시간.
+  'feel-cari': { metric: 'level', replay: 'feel' },
 }
 
 export function gameSpec(id: unknown): GameSpec | undefined {
