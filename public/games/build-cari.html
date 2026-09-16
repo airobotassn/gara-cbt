@@ -152,7 +152,7 @@ body{
    아래 %좌표는 전부 PNG 를 픽셀 스캔해서 뽑은 값이다. 그림을 갈면 다시 재야 한다.
      hud-v10        1735×473 : 가운데 남색판 x23.2~74.6 y8.7~91.3 · 오른쪽 칸 x76.7~97.5(위 y8.7~45.9 / 아래 y54.1~91.3)
      intro-v10       955×1413: 남색판 x9~90.6 y49.5~61.6 · 규칙 3줄 중심 y67.6/74.7/81.8(뱃지 오른쪽 끝 x21.2) · 시작=초록원 cx49.8 cy92
-     result-win-v9  1086×1448: 남색판 x11.9~87.8 y52.9~75.7 · 버튼 y78.2~93.4(x11.7~47.9 / x51.8~88)
+     result-win-v10 1086×1448: 남색판 x11.9~87.8 y52.9~75.7 · 버튼 y78.2~93.4(x11.7~47.9 / x51.8~88) (v9 와 판·버튼 자리 동일 — 창 아래 띠만 메운 것)
      result-fail-v9           : 남색판 x12.7~87.2 y59.8~76.6 · 버튼 1개 x10.3~86.6 y78.9~93.5
      run/reset-v9    810×352 : 아이콘 x13.6~26.4(왼쪽) · 안쪽 판 x6.8~93 → 글자는 버튼 정중앙(아이콘과 안 겹친다)
      rank-button     1701×494: 트로피 x2.5~20.2 · 남색판 x22.3~96.5 → 글자는 판 중앙 = 버튼 폭의 59.4%
@@ -281,11 +281,19 @@ body{
   /* ⛔ 위쪽을 마스크로 자르지 말 것 — 액자의 두꺼운 윗 테두리가 같이 잘려 **판 머리가 싹둑 잘린 것처럼**
      보인다(2026-08-14 반려). 콘솔 아트에 원래 있는 CARI 의 안테나(행성)가 액자 위로 나와 있는데,
      그건 자르는 게 아니라 **창 안 새 CARI 의 행성을 잘라** 해결한다(아래 .floaty img 참고). */}
-/* 창 실측(눈금 대조) = x6.7~93.3% · y4.2~47.0% · 모서리 곡률 = 높이의 3.3%.
+/* 창 실측(픽셀 스캔, 955×1413 · 2026-09-16 재측정) = 크림 테두리 안쪽 x65~885 · y64~664 → x6.81~92.67% · y4.53~47.0%.
+   (창 둘레에 어두운 고무 테 10px 가 그려져 있다 — 사진은 그 테까지 덮고, 베젤의 밝은 빗면만 남긴다.)
    ⚠️ **곡률이 이 판의 핵심이다.** 창은 모서리가 크게 둥근데 사각으로 덮으면 네 귀퉁이가 크림색 액자를
-      파고들어 "안 맞는" 게 바로 보인다(2026-08-14 반려). 사각형을 창에 맞추는 게 아니라 곡률까지 맞춘다. */
-#ovStart .floaty{display:block;position:absolute;z-index:1;left:8%;top:4.6%;width:84%;height:44.7%;
-  overflow:hidden;border-radius:6%/4.06%;animation:none;
+      파고들어 "안 맞는" 게 바로 보인다(2026-08-14 반려). 사각형을 창에 맞추는 게 아니라 곡률까지 맞춘다.
+   ⚠️ **창 아래는 직선이 아니다** — 가운데가 아래로 꺾인 사다리꼴 홈(x≈265~688 → 303~650, y664~694)이고
+      원본 CARI 몸통이 그 홈까지 내려와 있다. 사각형만으로는 ① 홈 바닥까지 내리면 양옆 베젤 띠를 사진이
+      덮고 ② 664 에서 끊으면 홈 안의 원본 몸통이 삐져나온다. 그래서 박스는 홈 바닥(694)까지 두고
+      clip-path 로 양옆을 664 에서 잘라 홈 모양을 그대로 딴다(border-radius 는 clip-path 와 같이 먹는다).
+   ⚠️ 옛 값(left 8% / w 84% / h 44.7%)은 좌우가 창보다 좁아 원본 장면이 양옆에 띠로 남고, 아래는
+      남색판까지 내려가 베젤 띠를 덮었다(2026-09-16 지적). */
+#ovStart .floaty{display:block;position:absolute;z-index:1;left:6.81%;top:4.53%;width:85.86%;height:44.59%;
+  overflow:hidden;border-radius:13.7%/15.4%;animation:none;
+  clip-path:polygon(0 0,100% 0,100% 95.24%,76% 95.24%,71.3% 100%,29% 100%,24.4% 95.24%,0 95.24%);
   background:url('/games/build-cari-intro-bg-v7.webp') center/cover no-repeat;}
 /* ⚠️ 인트로·결과 캐릭터 PNG(-v7)는 **알파 여백을 잘라낸 상태**로 저장돼 있다(2026-08-14).
    받았을 때는 정사각 캔버스 한가운데 그림이 있어서, contain 으로 넣으면 캔버스의 빈 테두리까지
@@ -333,18 +341,24 @@ body{
 #ovResult{padding:0;background-image:linear-gradient(rgba(18,28,36,.1),rgba(18,28,36,.3)),url('/games/build-cari-game-bg-v7.webp');}
 .result-console{--rh:min(calc(var(--sh)*.78),calc(var(--sw)*1.12));
   position:relative;width:calc(var(--rh)*.75);height:var(--rh);
-  background:url('/games/build-cari-result-win-v9.webp') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
+  background:url('/games/build-cari-result-win-v10.webp') center/100% 100% no-repeat;filter:drop-shadow(0 18px 24px rgba(25,28,24,.36));}
 #ovResult.fail .result-console{background-image:url('/games/build-cari-result-fail-v9.webp')}
 /* ⚠️ 이 판은 콘솔 그림의 **창 안**을 통째로 갈아끼우는 자리다(콘솔 아트엔 원래 다른 로봇이 그려져 있다).
    그래서 창 테두리와 **정확히** 겹쳐야 한다 — 옛 값(left 6.5% / w 87%)은 창(11%~88.9%)보다 넓어서
    사진 판이 크림색 프레임 위로 넘쳐 나왔다(2026-08-14 반려. 화면에서 네모가 액자 밖으로 튀어나온 그것).
+   두 번째 옛 값(left 11.4% / w 77.2% / h 44%)도 좌우 1.5% · 아래 2% 씩 창보다 커서 베젤 위로 넘쳤다(2026-09-16 지적).
    ⚠️ 승리/실패는 창 위치가 다르다 — 아래 .fail 이 따로 잡는다. 한 벌로 합치지 말 것.
-   ⚠️ 모서리 곡률까지 맞춰야 한다 — 사각으로 덮으면 네 귀퉁이가 액자를 파고든다.
-   창 실측(눈금 대조) = 승리 x11.6~88.4% y8.8~51.3% · 실패 x11.8~88.2% y7.3~56.8%. */
-#ovResult .floaty{display:block;position:absolute;z-index:1;left:11.4%;top:8.4%;width:77.2%;height:44%;
-  overflow:hidden;border-radius:6%/4.5%;animation:none;
+   ⚠️ 모서리 곡률까지 맞춰야 한다 — 사각으로 덮으면 네 귀퉁이가 액자를 파고든다. 실패 창은 위 모서리(≈66px)가
+      아래 모서리(≈35px)보다 둥글어서 네 귀퉁이 값을 따로 준다.
+   창 실측(픽셀 스캔, 1086×1448 · 2026-09-16 재측정) = 승리 x140~943 · y121~727 → x12.89~86.83% y8.36~50.21%
+   · 실패 x125~960 · y105~839 → x11.51~88.40% y7.25~57.94%.
+   ⚠️ 승리 액자는 v10 이다 — v9 는 원본 로봇의 몸통·컨베이어 다리가 창 아래 베젤 띠(y727~763)까지 내려와 있어서,
+      사진 판을 창에 딱 맞추면 그 조각이 베젤 위로 삐져나왔다. v10 은 그 띠를 양옆의 깨끗한 베젤 색으로 메운 것
+      (raw RGBA 에서 y727~763 · x300~780 을 x217/x869 기둥 색으로 선형 보간해 다시 인코딩). 창 좌표는 v9 와 같다. */
+#ovResult .floaty{display:block;position:absolute;z-index:1;left:12.89%;top:8.36%;width:73.94%;height:41.85%;
+  overflow:hidden;border-radius:6.2%/8.25%;animation:none;
   background:url('/games/build-cari-game-bg-v7.webp') center/cover no-repeat;}
-#ovResult.fail .floaty{left:11.8%;top:7%;width:76.4%;height:50.6%;border-radius:5%/3.75%;}
+#ovResult.fail .floaty{left:11.51%;top:7.25%;width:76.89%;height:50.69%;border-radius:7.9% 7.9% 4.2% 4.2%/9% 9% 4.8% 4.8%;}
 /* ⚠️ 성공·실패 그림은 **모양이 서로 다르다**(성공 1.12:1 세로형 / 실패 1.50:1 가로형).
    같은 슬롯을 쓰지만 contain 이라 각자 알아서 앉는다 — 한쪽에 맞춰 슬롯 비율을 바꾸지 말 것. */
 #ovResult .floaty img{width:100%;height:100%;padding:2%;box-sizing:border-box;object-fit:contain;display:block;}
