@@ -221,18 +221,7 @@ export default function PayResult() {
           )}
 
           {/* 가상계좌 입금 대기 화면은 2026-09-16 에 뺐다 — 후불 수단을 결제창에서 국내·해외 모두 뺐다. */}
-          {/* 중복 결제 — 같은 상품을 다른 탭에서 먼저 사고 이 주문도 팝업에서 결제된 경우. 돈은 빠졌고 지급은 안 했다.
-              서버가 환불 큐에 남겨 관리자가 돌려준다. '실패' 로 그리면 사용자가 또 결제하려 드니 따로 말한다. */}
-          {view.kind === 'done' && view.res.status !== 'paid' && view.res.failCode === 'DUPLICATE_CHARGED' && (
-            <>
-              <Icon name="info" tone="neutral" />
-              <Title>{t('pay.dup_title')}</Title>
-              <Body>{t('pay.dup_body')}</Body>
-              <Cta onClick={okGo}>{okLabel}</Cta>
-            </>
-          )}
-
-          {view.kind === 'done' && view.res.status !== 'paid' && view.res.failCode !== 'DUPLICATE_CHARGED' && (
+          {view.kind === 'done' && view.res.status !== 'paid' && (
             <>
               <Icon name="error" tone="bad" />
               <Title>{t('pay.fail_title')}</Title>

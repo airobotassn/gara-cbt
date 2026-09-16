@@ -48,50 +48,6 @@ const PRODUCT_PAGE: Record<ProductType, string> = {
   cert: '/mypage/attempts',
 }
 
-/**
- * 중복 주문을 접는다 — 같은 사람·같은 상품에 이미 paid 가 있어서 이 주문은 지급하면 안 되는 경우.
- *
- * ⛔ 접기 전에 **PG 에 이 주문이 실제로 청구됐는지 묻는다(2026-09-16).** 엑심베이는 팝업 안에서 돈이 빠지므로
- *    confirm 에 도달한 중복 주문은 대개 이미 결제된 것이다. 예전 코드는 "진 쪽은 돈이 안 빠진다"(토스 시절 —
- *    토스는 confirm 때 청구됐다) 고 믿고 그냥 failed 로 접었는데, 그러면 **돈 받은 사실이 어디에도 안 남는다.**
- *    청구됐으면 fail_code 를 DUPLICATE_CHARGED 로 남기고 거래ID·원문·승인시각을 채운다 → 관리자 결제관리의
- *    "중복 결제(환불 필요)" 큐에 뜨고 [환불] 로 돌려준다. status 는 paid 로 못 올린다(같은 상품 paid 유니크).
- * @returns charged — PG 에 매출이 있었나.
- */
-async function closeAsDuplicate(
-  admin: ReturnType<typeof adminClient>,
-  row: PaymentRow,
-  openStatuses: string[],
-  why: string,
-): Promise<{ charged: boolean }> {
-  const chg = chargeOf(row)
-  let charged = false
-  let patch: Record<string, unknown> = {
-    status: 'failed',
-    fail_code: 'DUPLICATE_PRODUCT',
-    fail_message: why,
-    updated_at: new Date().toISOString(),
-  }
-  try {
-    const check = await getProvider(row.provider).queryByOrderId(row.order_id, chg)
-    if (check.ok && check.data.status === 'paid') {
-      charged = true
-      patch = {
-        ...patch,
-        fail_code: 'DUPLICATE_CHARGED',
-        fail_message: `${why} — PG 에 매출 있음(환불 필요)`,
-        payment_key: check.data.providerKey ?? row.payment_key,
-        confirmed_at: check.data.approvedAt ?? new Date().toISOString(),
-        raw: check.data.raw as Record<string, unknown>,
-      }
-    }
-  } catch {
-    /* 조회 실패 — 청구 여부를 모른 채 DUPLICATE_PRODUCT 로 접는다. 대사·웹훅 원장으로 되짚을 수 있다. */
-  }
-  await admin.from('payments').update(patch).eq('id', row.id).in('status', openStatuses)
-  return { charged }
-}
-
 /** 구매자 표기를 ASCII 로만 만든다 — 한글이 PG·카드사 구간에서 깨져 돌아오면 대사할 때 사람이 못 읽는다.
  *  이름 자체가 결제 판정에 쓰이지 않으므로 이메일 아이디로 충분하다(비면 상수). */
 function asciiBuyerName(email: string): string {
@@ -554,13 +510,19 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle()
       if (dupPaid) {
-        // 이 주문은 실패로 접는다 — pending 으로 두면 대사(reconcile)가 매번 PG 에 물어보며 영원히 남는다.
-        // ⚠️ 접기 전에 PG 에 청구됐는지 묻는다(closeAsDuplicate) — 청구됐으면 환불 큐에 남는다.
-        const { charged } = await closeAsDuplicate(admin, row, OPEN, `이미 결제 완료된 주문 ${dupPaid.order_id}`)
+        // 이 주문은 실패로 접는다 — pending 으로 두면 대사(reconcile)가 매번 토스에 물어보며 영원히 남는다.
+        await admin
+          .from('payments')
+          .update({
+            status: 'failed',
+            fail_code: 'DUPLICATE_PRODUCT',
+            fail_message: `이미 결제 완료된 주문 ${dupPaid.order_id}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', row.id)
+          .in('status', OPEN)
         return json(
-          charged
-            ? { error: '이미 구매한 상품입니다. 이번 결제분은 확인 후 환불해 드립니다.', code: 'duplicate_charged', owned: true }
-            : { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
+          { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
           400,
         )
       }
@@ -583,11 +545,18 @@ Deno.serve(async (req) => {
         if (claimErr) {
           // 23505 = payments_confirming_product_uniq = 같은 상품의 승인이 이미 PG 로 나가 있다.
           if ((claimErr as { code?: string }).code === '23505') {
-            const { charged } = await closeAsDuplicate(admin, row, OPEN, '같은 상품의 승인이 이미 진행 중')
+            await admin
+              .from('payments')
+              .update({
+                status: 'failed',
+                fail_code: 'DUPLICATE_PRODUCT',
+                fail_message: '같은 상품의 승인이 이미 진행 중입니다.',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', row.id)
+              .in('status', OPEN)
             return json(
-              charged
-                ? { error: '이미 구매한 상품입니다. 이번 결제분은 확인 후 환불해 드립니다.', code: 'duplicate_charged', owned: true }
-                : { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
+              { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
               400,
             )
           }
@@ -656,49 +625,21 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ---------- 환불규정 동의 + 결제창 열기 직전 확인 ----------
-    // 결제창을 열기 **직전에** 프론트가 부른다(다시 열기 때도 매번). 주문 생성 때 받지 않는 이유는 순서 때문이다 —
+    // ---------- 환불규정 동의 ----------
+    // 결제창을 열기 **직전에** 프론트가 부른다. 주문 생성 때 받지 않는 이유는 순서 때문이다 —
     // 주문은 화면에 금액을 띄우려고 진입하자마자 만들어지고, 동의는 그 금액을 본 다음에 한다.
     // ⚠️ 한 번 찍힌 시각은 덮어쓰지 않는다(재시도해도 최초 동의 시각이 증거다).
-    //
-    // ⛔ **여기서 "열어도 되나" 를 한 번 더 본다(2026-09-16).** 엑심베이는 팝업 안에서 돈이 빠지므로, 팝업이 열린 뒤엔
-    //    우리가 막을 수 없다. 결제 화면을 탭 두 개로 열어 주문이 둘 생기고 한쪽이 먼저 결제되면, 다른 탭의 결제하기는
-    //    여기서 "이미 결제된 상품" 으로 막혀 팝업이 안 뜬다. confirm 의 중복 검사(4·5번)는 지급을 막을 뿐 청구는 못 막는다.
     if (action === 'agree') {
       const orderId = String(body?.orderId ?? '').trim()
       if (!orderId) return json({ error: '주문번호가 필요합니다.' }, 400)
       const { data } = await admin
         .from('payments')
-        .select('id, order_id, user_id, status, terms_agreed_at, product_type, product_ref')
+        .select('order_id, user_id, status, terms_agreed_at')
         .eq('order_id', orderId)
         .maybeSingle()
-      const row = data as { id: string; user_id: string; status: string; terms_agreed_at: string | null; product_type: string; product_ref: string } | null
+      const row = data as { user_id: string; status: string; terms_agreed_at: string | null } | null
       if (!row) return json({ error: '주문을 찾을 수 없습니다.' }, 404)
       if (row.user_id !== uid) return json({ error: '권한이 없습니다.' }, 403)
-      // 이 주문이 아직 열려 있나(pending·expired) — 닫힌 주문으로는 팝업을 열지 않는다.
-      if (row.status !== 'pending' && row.status !== 'expired') {
-        return json({ error: '이미 처리된 주문입니다. 결제 화면을 다시 열어주세요.', code: 'order_closed', status: row.status }, 409)
-      }
-      // 같은 사람·같은 상품이 이미 결제 완료됐나 — 다른 탭에서 방금 산 경우.
-      const { data: dup } = await admin
-        .from('payments')
-        .select('id')
-        .eq('user_id', uid)
-        .eq('product_type', row.product_type)
-        .eq('product_ref', row.product_ref)
-        .eq('status', 'paid')
-        .neq('id', row.id)
-        .limit(1)
-        .maybeSingle()
-      if (dup) {
-        // 이 주문은 접는다 — pending 으로 두면 대사가 매번 PG 에 물어본다(confirm 의 4번과 같은 이유).
-        await admin
-          .from('payments')
-          .update({ status: 'failed', fail_code: 'DUPLICATE_PRODUCT', fail_message: '결제창 열기 전 중복 감지', updated_at: new Date().toISOString() })
-          .eq('id', row.id)
-          .in('status', ['pending', 'expired'])
-        return json({ error: '이미 결제가 완료된 상품입니다.', code: 'already_paid', owned: true }, 409)
-      }
       if (row.terms_agreed_at) return json({ ok: true, agreedAt: row.terms_agreed_at })
       const agreedAt = new Date().toISOString()
       const { error } = await admin
@@ -726,8 +667,6 @@ Deno.serve(async (req) => {
         orderName: row.order_name,
         amount: row.amount,
         currency: row.currency,
-        // 결과 화면이 "중복 결제 — 환불 처리" 문구를 가르는 데 쓴다. 그 밖의 실패 코드는 화면에 안 내보낸다(PayResult).
-        failCode: row.fail_code ?? null,
       })
     }
 

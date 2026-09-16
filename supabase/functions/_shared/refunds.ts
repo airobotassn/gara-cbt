@@ -180,9 +180,7 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
   if (!reason) return { ok: false, error: '환불 사유를 적어주세요(원장과 PG 양쪽에 남습니다).', status: 400 }
   const row = await loadRow(admin, input.paymentId)
   if (!row) return { ok: false, error: '결제를 찾을 수 없습니다.', status: 404 }
-  // 환불 대상 = paid, 또는 중복 청구(failed + DUPLICATE_CHARGED — 지급은 안 했지만 PG 엔 매출이 있는 건).
-  const dupCharged = row.status === 'failed' && row.fail_code === 'DUPLICATE_CHARGED'
-  if (row.status !== 'paid' && !dupCharged) return { ok: false, error: `환불할 수 있는 상태가 아닙니다(현재 ${row.status}).`, status: 409 }
+  if (row.status !== 'paid') return { ok: false, error: `환불할 수 있는 상태가 아닙니다(현재 ${row.status}).`, status: 409 }
   if (!row.payment_key) return { ok: false, error: 'PG 거래번호가 없어 환불 API 를 부를 수 없습니다.', status: 409 }
 
   const preview = await refundPreview(admin, row.id)
@@ -211,7 +209,7 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
     .from('payments')
     .update({ refunded_amount: after, updated_at: new Date().toISOString() })
     .eq('id', row.id)
-    .eq('status', row.status) // paid 또는 failed(DUPLICATE_CHARGED) — 잠금 사이에 상태가 바뀌었으면 0행
+    .eq('status', 'paid')
     .eq('refunded_amount', before)
     .select('id')
   if (!locked || locked.length === 0) {
@@ -266,11 +264,11 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
 
   // ⑤ 회수 + 상태
   const newBalance = roundMinor(chg.currency, preview.chargeAmount - (before + finalAmount))
-  let status = row.status
+  let status = 'paid'
   if (newBalance <= 0) {
     // 전액 — 결제를 refunded 로 눕히고 이 결제로 나간 것 전부를 걷는다(revokeForRefund 가 payment_id 로만 짚는다).
     status = 'refunded'
-    await admin.from('payments').update({ status, updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', row.status)
+    await admin.from('payments').update({ status, updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'paid')
     if (row.fulfilled_at) {
       const r = await revokeForRefund(admin, { ...row, status, refunded_amount: before + finalAmount })
       notes.push(r.note)
