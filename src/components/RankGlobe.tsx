@@ -41,6 +41,7 @@ const CFG = {
   size: 150, // 지구 크기
   posx: 50, // 가로 위치
   posy: 53, // 세로 위치
+  posyNarrow: 48, // 세로 위치 — 좁은 화면(모바일)만. PC 는 posy 그대로(2026-09-16 지시: 모바일만 조금 올린다)
 } as const
 
 /**
@@ -192,7 +193,7 @@ export default function RankGlobe() {
       const narrow = W < 640
       const k = CFG.size / 100
       const R = Math.min(W * (narrow ? 0.42 : 0.3), H * (narrow ? 0.26 : 0.42)) * k
-      return { cx: W * (narrow ? 0.5 : CFG.posx / 100), cy: H * (CFG.posy / 100), R }
+      return { cx: W * (narrow ? 0.5 : CFG.posx / 100), cy: H * ((narrow ? CFG.posyNarrow : CFG.posy) / 100), R }
     }
 
     /** [lon,lat] 이 지금 앞면인가. 1 = 정면, 0 = 테두리, 음수 = 뒷면. */
