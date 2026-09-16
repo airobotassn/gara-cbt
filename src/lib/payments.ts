@@ -46,7 +46,7 @@ export interface CreateOrderResp {
 }
 
 export interface PaymentStatusResp {
-  status: 'pending' | 'waiting_deposit' | 'paid' | 'canceled' | 'refunded' | 'failed' | 'expired'
+  status: 'pending' | 'paid' | 'canceled' | 'refunded' | 'failed' | 'expired'
   fulfilled: boolean
   productType: ProductType
   productRef: string

@@ -31,7 +31,6 @@ export const PAY_STATUS_LABEL: Record<string, string> = {
   paid: '결제 완료',
   pending: '결제 진행 중',
   confirming: '승인 확인 중',
-  waiting_deposit: '입금 대기',
   refunded: '환불 완료',
   canceled: '결제 취소',
   failed: '결제 실패',

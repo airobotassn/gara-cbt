@@ -121,20 +121,9 @@ Deno.serve(async (req) => {
       // exam 인데 exam 페이로드가 없으면 사전검사가 통째로 건너뛰어진다 — 조용히 통과시키지 않는다.
       if (productType === 'exam' && !product.exam) return json({ error: '상품 정보가 올바르지 않습니다.' }, 400)
 
-      const [pendingVaRes, ownedRes, mineRes, liveTickets, hasBookRes, attRes] = await Promise.all([
-        // ⛔ 살아있는 가상계좌 주문이 있으면 새 결제를 막는다.
-        //    VA 는 계좌만 발급되고 며칠 뒤 입금되는 구조라 그동안 status='waiting_deposit' 로 떠 있다.
-        //    이 상태는 'paid' 가 아니라 payments_paid_product_uniq 에도 안 걸리고 지급도 안 된 상태라,
-        //    막지 않으면 "입금 기다리기 싫어서 카드로 또 결제" → 나중에 계좌에 입금 → **두 번 청구**가 된다.
-        admin
-          .from('payments')
-          .select('order_id')
-          .eq('user_id', uid)
-          .eq('product_type', productType)
-          .eq('product_ref', product.ref)
-          .eq('status', 'waiting_deposit')
-          .limit(1)
-          .maybeSingle(),
+      //   ⚠️ '입금 대기(가상계좌) 주문이 있으면 막는다' 검사는 2026-09-16 에 걷어냈다 — 후불 수단을 결제창에서
+      //      국내·해외 모두 뺐다(eximbay.ts 의 수단 목록). 되살릴 땐 그 검사도 같이.
+      const [ownedRes, mineRes, liveTickets, hasBookRes, attRes] = await Promise.all([
         // 이미 가진 상품에 결제창을 띄우지 않는다(띄워도 DB 유니크가 막지만, 돈부터 받고 막으면 환불거리다).
         //   ⚠️ 이북·강의는 표만 다르고 검사는 한 벌이다(PURCHASE_TABLE).
         productType === 'ebook' || productType === 'lecture'
@@ -180,13 +169,6 @@ Deno.serve(async (req) => {
       ])
 
       // 판정 순서는 예전 그대로다 — 위 병렬 조회는 '언제 묻느냐'만 바꿨고 '무엇이 먼저 걸리느냐'는 안 바꿨다.
-      if (pendingVaRes.data) {
-        return json(
-          { error: '입금 대기 중인 결제가 있습니다. 입금을 마치거나 취소한 뒤 다시 시도해주세요.', pending: true },
-          409,
-        )
-      }
-
       if ((productType === 'ebook' || productType === 'lecture') && ownedRes.data) {
         return json({ error: productType === 'lecture' ? '이미 보유한 강의입니다.' : '이미 보유한 이북입니다.', owned: true }, 409)
       }
@@ -475,7 +457,7 @@ Deno.serve(async (req) => {
         return json({ status: 'paid', fulfilled: Boolean(row.fulfilled_at), productType: row.product_type, productRef: row.product_ref })
       }
       // ⛔ confirm 은 **pending(또는 expired) 주문만** 승인한다. 그 밖의 상태(refunded·canceled·failed·
-      //    waiting_deposit)를 재진입시키면 (1) 종결 행을 덮어써 대사 회수 신호가 깨지고,
+      //    입금대기)를 재진입시키면 (1) 종결 행을 덮어써 대사 회수 신호가 깨지고,
       //    (2) 실패했던 주문이 PG 재승인으로 paid+지급으로 되살아나는 무단 지급이 열린다.
       //    이 상태들은 PG 를 부르지 않고 저장된 결과를 그대로 돌려준다(멱등).
       // ⚠️ **expired 는 되살린다(2026-09-16).** expired 는 "30분 넘게 소식이 없어 대사가 접어 둔 것" 이지 결제가 없었다고
@@ -515,17 +497,15 @@ Deno.serve(async (req) => {
       //    ※ 이 검사만으로는 **두 confirm 이 동시에** 들어오는 경우를 못 막는다(그 순간 paid 행이 없어 둘 다 통과).
       //      그래서 아래에서 PG 를 부르기 직전에 주문을 'confirming' 으로 선점한다 — 그게 최종 방어선이고
       //      이 검사는 사용자에게 이유를 알려주는 앞단이다(2026-08-10 마이그레이션 payments_confirming).
-      //    ⚠️ 'paid' 만 보면 안 된다. **가상계좌 주문은 'waiting_deposit' 으로 살아 있다** — 입금 전이라
-      //      paid 도 아니고 부분 유니크에도 안 걸린다. 그래서 "가상계좌로 주문해두고 기다리기 싫어 카드로 또 결제"
-      //      가 그대로 성립하고, 나중에 그 계좌에 입금하면 실제로 두 번 청구된 것이 된다.
-      //      살아있는 결제(paid + waiting_deposit)를 전부 세야 한다.
+      //    ⚠️ 예전엔 'waiting_deposit'(가상계좌 입금 대기)도 살아있는 결제로 셌다 — 2026-09-16 에 후불 수단을 결제창에서
+      //      뺐으므로 그 상태는 더 생기지 않는다. 지금은 paid 만 본다.
       const { data: dupPaid } = await admin
         .from('payments')
         .select('id, order_id, status')
         .eq('user_id', row.user_id)
         .eq('product_type', row.product_type)
         .eq('product_ref', row.product_ref)
-        .in('status', ['paid', 'waiting_deposit'])
+        .eq('status', 'paid')
         .neq('id', row.id)
         .limit(1)
         .maybeSingle()

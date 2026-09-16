@@ -114,17 +114,14 @@ async function call(path: string, body: unknown): Promise<{ http: number; data: 
 
 // 엑심베이 status → 우리 CanonicalStatus.
 //   SALE       = 매출 확정(결제 완료)                → paid
-//   REGISTERED = 주문만 등록, 입금 후 확정(무통장/이체) → waiting_deposit (가상계좌와 같은 취급)
 //   AUTH       = 승인만 됨, 매입 전(수동 capture 필요) → pending (아직 돈이 확정 안 됨 → 지급하면 안 된다)
+//   REGISTERED = 주문만 등록, 입금 후 확정(무통장/이체) → pending. 후불 수단을 결제창에서 뺐으니(GLOBAL/LOCAL_METHODS)
+//                올 일이 없다 — 혹시 오면 돈이 안 들어온 상태이니 지급하지 않는 쪽(pending)으로 접는다.
 //   NONE       = 주문 없음                            → 조회 경로에서 '부재(absent)'로 처리(아래 retrieve 참고)
 function mapStatus(s: string | undefined): ProviderPayment['status'] {
   switch (s) {
     case 'SALE':
       return 'paid'
-    case 'REGISTERED':
-      return 'waiting_deposit'
-    case 'AUTH':
-      return 'pending'
     default:
       return 'pending'
   }
@@ -193,8 +190,6 @@ function normalize(p: EximbayPayment): ProviderPayment {
     orderId: p.order_id ?? '',
     status: mapStatus(p.status),
     method: eximbayMethodName(p.payment_method as string | undefined),
-    // REGISTERED(입금 후 확정) — 계좌가 발급됐을 뿐 아직 돈이 안 들어온 상태.
-    isVirtualAccount: p.status === 'REGISTERED',
     // YYYYMMDDHHMMSS → ISO 로 대충 변환(정확한 tz 는 실검증 때). 없으면 null.
     approvedAt: p.transaction_date ? isoFromEximbayDate(p.transaction_date) : null,
     // 환불 가능 잔액 — 대시보드에서 직접 환불한 건을 알아채는 유일한 단서(settle 이 청구액과 비교한다).
@@ -226,15 +221,17 @@ export interface EximbayReadyPayload {
 }
 
 /**
- * 국내(원화) 결제창에 띄울 수단 — **카드 + 간편결제만**(2026-09-15 지시). 코드는 payment_method 코드표 그대로.
- *   P000 카드 · P302 카카오페이 · P303 토스 · P304 PAYCO · P015 네이버페이
- * ⛔ 실시간 계좌이체(P301)·가상계좌(P305)·네이버포인트(P308)는 뺐다 — 세금 항목(공급가·부가세·현금영수증)이 따로
- *    필수이고, 가상계좌는 입금이 며칠 뒤라 응시료를 지급하지 않는 정책이며, 환불도 환불계좌가 따로 필요해 안 붙였다.
- *    열 거면 세 가지를 같이 만들 것(tax 객체 · VA 지급 정책 · refund_account).
- * ⚠️ 해외(달러) MID 는 지정하지 않는다 — 어떤 수단이 계약돼 있는지 모르는 채로 목록을 박으면 계약된 수단이 사라진다.
- *    해외 쪽에도 비동기 수단(해외 가상계좌 P310 · 편의점 ECONTEXT P006)이 있으니, 실계약 때 목록을 확인해 여기 넣을 것.
+ * 결제창에 띄울 수단 — **즉시 결제되는 것만**(2026-09-15·16 지시). 코드는 payment_method 코드표 그대로.
+ *   국내(원화): P000 카드 · P302 카카오페이 · P303 토스 · P304 PAYCO · P015 네이버페이
+ *   해외(달러): P000 카드만. 해외 간편결제(PayPal·Alipay·WeChat…)는 어느 게 계약돼 있는지 확인된 뒤 늘린다.
+ * ⛔ **후불 수단은 국내·해외 모두 뺐다** — 실시간 계좌이체(P301)·가상계좌(P305)·네이버포인트(P308)·해외 가상계좌(P310)·
+ *    편의점(ECONTEXT P006). 이유 셋: 세금 항목(공급가·부가세·현금영수증)이 따로 필수 · 입금이 며칠 뒤라 접수 마감과 어긋난다 ·
+ *    환불에 환불계좌가 따로 필요하다. 그래서 2026-09-16 에 '입금 대기(waiting_deposit)' 상태와 관련 검사를 코드에서 전부 걷어냈다.
+ *    ⚠️ 후불 수단을 다시 열려면 그 상태·검사(create 의 입금대기 중복 검사 · confirm 의 살아있는 결제 검사 · settle 의
+ *       지급 보류 · reconcile 대상)를 같이 되살려야 한다 — git 이력 a01ef4d 이전 버전 참고.
  */
 const LOCAL_METHODS = 'P000-P302-P303-P304-P015'
+const GLOBAL_METHODS = 'P000'
 
 /**
  * 결제 준비 — 엑심베이 전용. **create 단계**에서 부른다(토스엔 없는 단계).
@@ -268,8 +265,8 @@ export async function eximbayReady(input: {
       currency: input.currency,
       amount: input.amount,
       lang: input.lang ?? 'EN',
-      // 국내만 수단을 지정한다(카드+간편결제). 해외는 계약 목록을 모르니 안 건드린다(LOCAL_METHODS 주석).
-      ...(isLocal ? { multi_payment_method: LOCAL_METHODS } : {}),
+      // 후불 수단을 빼기 위해 국내·해외 모두 수단을 지정한다(LOCAL_METHODS 주석).
+      multi_payment_method: isLocal ? LOCAL_METHODS : GLOBAL_METHODS,
     },
     merchant: { mid: mid(input.currency) },
     buyer: { name: input.buyerName, email: input.buyerEmail },

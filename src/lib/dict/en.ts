@@ -1002,13 +1002,10 @@ const EN: Record<string, string> = {
   "pay.free_body": "It's free, so it went straight to your library.",
   "pay.free_title_exam": "Your exam pass is ready",
   "pay.free_body_exam": "This level is free, so your pass was issued without payment.",
-  // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
-  "pay.waiting_title": "Waiting for your deposit",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
   // 실패로 읽히면 사용자가 다시 결제하려다 '이미 결제 완료'를 보고 두 화면이 정반대로 말하게 된다.
   "pay.hold_title": "Payment received",
   "pay.hold_body": "Delivery is on hold pending review. Our team will sort it out — please don't pay again.",
-  "pay.waiting_body": "Once your deposit arrives, access is granted automatically.",
   "pay.fail_title": "Payment didn't go through",
   "pay.fail_body": "The payment was cancelled or declined.",
   "pay.retry": "Try again",
@@ -1541,16 +1538,12 @@ const EN: Record<string, string> = {
   "pay.go_plan": "View exam schedule",
   "pay.exam_success_title": "Your exam ticket is ready",
   "pay.exam_success_body": "Find it in My Page › Exam Status and start when the exam window opens.",
-  // 응시료는 카드·간편결제만 판다(가상계좌 제외). 그래도 가상계좌 결제가 들어오면 응시권을 발급하지 않으므로
-  // 이북과 같은 '입금하면 자동 지급' 문구(pay.waiting_body)를 쓰면 안 된다.
-  "pay.exam_waiting_body": "Exam fees support cards and easy-pay only. A bank transfer will not issue a ticket automatically — please contact us.",
   // 자격증 발급비 — 결제로 끝나는 게 아니라 **발급이 한 걸음 남아 있다**. '결제 완료'로만 닫으면
   // 사용자는 자격증이 어디 있는지 못 찾는다(지급물이 따로 없는 유일한 상품이라 더 그렇다).
   "pay.go_cert": "Get my certificate",
   "pay.go_attempts": "View my exam history",
   "pay.cert_success_title": "Issuing fee paid",
   "pay.cert_success_body": "Your certificate is issued next — tap the button below.",
-  "pay.cert_waiting_body": "Once your deposit arrives, you can issue the certificate.",
   // 통화 고지 — 화면 가격은 달러인데 토스 결제창은 원화로 뜬다. 이 문구가 없으면 사용자는 금액이 다르다고 느낀다.
   //   {krw} = lib/money.ts 의 krw() 로 찍은 실제 청구액 문자열.
   // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.

@@ -651,7 +651,7 @@ export async function settleFromProvider(
   }
   // 응답에 결제수단이 없을 때 null 로 덮어쓰면 이미 알던 값을 잃는다 — 있을 때만 쓴다.
   if (pp.method) patch.method = pp.method
-  if ((next === 'paid' || next === 'waiting_deposit') && !row.confirmed_at) {
+  if (next === 'paid' && !row.confirmed_at) {
     patch.confirmed_at = pp.approvedAt ?? new Date().toISOString()
   }
   const { error: upErr } = await admin.from('payments').update(patch).eq('id', row.id)
@@ -671,21 +671,9 @@ export async function settleFromProvider(
     return { status: next, ...(await revokeForRefund(admin, row)) }
   }
 
-  // 여기서 가상계좌(waiting_deposit)가 걸러진다 — **발급됐을 뿐 입금 전**이라 지급하면 돈 안 받고 물건을 준다.
+  // paid 가 아니거나(승인만·미확정) 이미 지급됐으면 여기서 끝.
+  //   ⚠️ 가상계좌(입금 대기) 분기는 2026-09-16 에 걷어냈다 — 후불 수단을 결제창에서 국내·해외 모두 뺐다(eximbay.ts 의 수단 목록).
   if (next !== 'paid' || fulfilled) return { status: next, fulfilled }
-
-  // ⛔ 결정 D3 — **응시료는 카드·간편결제만.** 가상계좌로 들어온 응시료는 입금이 끝나(paid) 여기 와도 지급하지 않는다.
-  //    VA 는 입금까지 며칠이 걸려 '접수 마감 뒤에 paid 가 되는 것'이 정상 동작이라, 그때 응시권을 주면 마감이 무의미해진다.
-  //    결제는 그대로 두고 fulfilled_at 을 비워 **대사 목록으로 넘긴다**(사람이 환불 판단 — 자동 환불은 하지 않는다).
-  //    ⚠️ 여기서 던지지 않는 이유: 이 경로는 입금 웹훅이라 500 을 주면 토스가 계속 재시도한다.
-  //      note 로 돌려주면 resettle→reconcile 이 mismatched 목록에 담아 사람 눈에 띈다.
-  //    판별은 method 문자열('가상계좌')만 믿지 않는다 — 응답에 method 가 없을 수 있어 virtualAccount 객체와
-  //    직전 상태(waiting_deposit)까지 같이 본다.
-  //    판별: PG 응답 기준(pp.isVirtualAccount)에 우리 DB 직전 상태(waiting_deposit)를 OR 로 더한다.
-  const isVirtualAccount = pp.isVirtualAccount || row.status === 'waiting_deposit'
-  if (row.product_type === 'exam' && isVirtualAccount) {
-    return { status: next, fulfilled: false, note: '가상계좌로 결제된 응시료 — 자동 발급 대상이 아님(환불 필요)' }
-  }
 
   // ⛔ **지급 실패를 결제 실패로 만들지 마라.** 여기 도달했다는 건 토스 승인이 끝나 **돈이 이미 빠졌다**는 뜻이다.
   //    예전엔 grant 가 던지면 그 예외가 confirm 밖으로 나가 500 이 되고, 화면은 '결제 실패'를 그렸다.
@@ -755,7 +743,7 @@ export async function resettle(
 
 /**
  * 어긋난 결제만 골라낸다. 목표는 무결점이 아니라 **어긋난 걸 자동으로 알아채는 것**이다.
- *   · unconfirmed : 우리는 pending/입금대기인데 토스에선 이미 승인됨 → 돈은 받았는데 물건이 없다
+ *   · unconfirmed : 우리는 pending 인데 토스에선 이미 승인됨 → 돈은 받았는데 물건이 없다
  *   · unfulfilled : 승인은 됐는데 지급이 안 됨 → 다시 주면 된다
  *   · revoked     : 우리는 지급했는데 토스에선 취소됨 → 권한 회수 대상(사람이 판단)
  *
@@ -770,7 +758,7 @@ export async function reconcile(
     .from('payments')
     .select(PAYMENT_COLS)
     // 'confirming' 은 선점만 하고 끊긴 주문이다. 대사가 유일한 수습 경로라 반드시 포함해야 한다.
-    .or('status.in.(pending,confirming,waiting_deposit),and(status.eq.paid,fulfilled_at.is.null)')
+    .or('status.in.(pending,confirming),and(status.eq.paid,fulfilled_at.is.null)')
     .order('created_at', { ascending: true })
     .limit(limit)
 

@@ -220,21 +220,8 @@ export default function PayResult() {
             </>
           )}
 
-          {/* 가상계좌 — 계좌는 나왔지만 입금 전이라 아직 지급되지 않았다. 이북은 입금하면 웹훅이 알아서 지급한다.
-              ⚠️ 응시료는 가상계좌를 쓰지 않기로 했다(D3) — 입금이 접수 마감 뒤에 들어와도 응시권을 줄 수 없어서다.
-                 그래도 이 화면에 닿는 경로가 남아 있으므로(웹훅·대사) 이북과 같은 문구를 쓰면 안 된다. */}
-          {view.kind === 'done' && view.res.status === 'waiting_deposit' && (
-            <>
-              <Icon name="account_balance" tone="neutral" />
-              <Title>{t('pay.waiting_title')}</Title>
-              <Body>{isCert ? t('pay.cert_waiting_body') : isExam ? t('pay.exam_waiting_body') : t('pay.waiting_body')}</Body>
-              <Cta onClick={isCert ? goTickets : isExam ? goTickets : goStore}>
-                {isCert ? t('pay.go_attempts') : isExam ? t('pay.go_tickets') : t('ebook.go_store')}
-              </Cta>
-            </>
-          )}
-
-          {view.kind === 'done' && view.res.status !== 'paid' && view.res.status !== 'waiting_deposit' && (
+          {/* 가상계좌 입금 대기 화면은 2026-09-16 에 뺐다 — 후불 수단을 결제창에서 국내·해외 모두 뺐다. */}
+          {view.kind === 'done' && view.res.status !== 'paid' && (
             <>
               <Icon name="error" tone="bad" />
               <Title>{t('pay.fail_title')}</Title>

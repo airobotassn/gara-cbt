@@ -8,10 +8,11 @@
 //    서버에서 추상화할 수 없다. 서버가 공유하는 건 승인·조회·상태정규화뿐이다.
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
-/** 우리 payments.status 표준값. 어떤 PG 든 어댑터가 자기 상태를 이 값으로 정규화해서 넘긴다. */
+/** 우리 payments.status 표준값. 어떤 PG 든 어댑터가 자기 상태를 이 값으로 정규화해서 넘긴다.
+ *  ⚠️ 'waiting_deposit'(입금 대기)은 2026-09-16 에 걷어냈다 — 후불 수단(가상계좌·계좌이체·편의점)을 결제창에서
+ *     국내·해외 모두 뺐기 때문이다. DB 의 status CHECK 에는 값이 남아 있지만 코드는 만들지도 읽지도 않는다. */
 export type CanonicalStatus =
   | 'pending'
-  | 'waiting_deposit'
   | 'paid'
   | 'canceled'
   | 'refunded'
@@ -30,8 +31,6 @@ export interface ProviderPayment {
    */
   status: CanonicalStatus
   method: string | null
-  /** 가상계좌(입금 전 발급) 여부 — PG 응답 기준. 우리 DB 의 직전 상태까지 보는 건 settle 이 OR 로 더한다. */
-  isVirtualAccount: boolean
   approvedAt: string | null
   /**
    * **환불 가능 잔액**(청구 통화 · 주요 단위). PG 가 조회 응답에 주면 채우고, 모르면 null.

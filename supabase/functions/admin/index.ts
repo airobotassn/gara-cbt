@@ -982,7 +982,7 @@ async function examRoundUpsert(admin: any, body: any) {
 /**
  * 이 (회차 × 급수)에 '접수'가 있는가 = 살아있는 응시권 + 아직 응시권이 안 된 진행 중 결제.
  *
- * 결제까지 세는 이유: pending/waiting_deposit 은 승인되면 그대로 응시권이 된다. 응시권만 보면
+ * 결제까지 세는 이유: pending 은 승인되면 그대로 응시권이 된다. 응시권만 보면
  * "결제창은 떠 있는데 아직 티켓이 없는" 몇 초~며칠 구간이 통째로 비어, 그 사이 급수를 해제하면
  * 존재하지 않는 시험의 응시권이 발급된다(돈은 받고 응시는 불가).
  * ⚠️ 실패하면 0 이 아니라 throw 다 — 돈을 막는 가드가 조용히 꺼지면 안 된다.
@@ -993,7 +993,7 @@ async function roundTierSold(admin: any, roundId: string, tier: string): Promise
       .eq('round_id', roundId).eq('tier', tier).in('status', ['issued', 'consumed']),
     admin.from('payments').select('id', { count: 'exact', head: true })
       .eq('product_type', 'exam').eq('product_ref', `${roundId}:${tier}`)
-      .in('status', ['pending', 'waiting_deposit', 'paid']),
+      .in('status', ['pending', 'paid']),
   ])
   if (t.error) throw new Error(`응시권 조회 실패: ${t.error.message}`)
   if (p.error) throw new Error(`결제 조회 실패: ${p.error.message}`)

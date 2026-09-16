@@ -1002,13 +1002,10 @@ const ZH: Record<string, string> = {
   "pay.free_body": "免费资料，已直接加入书架。",
   "pay.free_title_exam": "考试券已发放",
   "pay.free_body_exam": "该级别免费，无需支付即已发放。",
-  // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
-  "pay.waiting_title": "等待入款",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
   // 실패로 읽히면 사용자가 다시 결제하려다 '이미 결제 완료'를 보고 두 화면이 정반대로 말하게 된다.
   "pay.hold_title": "支付已完成",
   "pay.hold_body": "但发放处理已暂缓，我们的团队会处理 — 请不要重复支付。",
-  "pay.waiting_body": "款项到账后将自动发放。",
   "pay.fail_title": "支付未完成",
   "pay.fail_body": "支付已取消或未获批准。",
   "pay.retry": "重试",
@@ -1541,16 +1538,12 @@ const ZH: Record<string, string> = {
   "pay.go_plan": "查看考试日程",
   "pay.exam_success_title": "应试券已发放",
   "pay.exam_success_body": "请在个人中心 › 考试应试现况中查看，到应试期间即可应试。",
-  // 응시료는 카드·간편결제만 판다(가상계좌 제외). 그래도 가상계좌 결제가 들어오면 응시권을 발급하지 않으므로
-  // 이북과 같은 '입금하면 자동 지급' 문구(pay.waiting_body)를 쓰면 안 된다.
-  "pay.exam_waiting_body": "应试费仅支持银行卡和便捷支付。即使汇入虚拟账户也不会自动发放应试券，请联系客服。",
   // 자격증 발급비 — 결제로 끝나는 게 아니라 **발급이 한 걸음 남아 있다**. '결제 완료'로만 닫으면
   // 사용자는 자격증이 어디 있는지 못 찾는다(지급물이 따로 없는 유일한 상품이라 더 그렇다).
   "pay.go_cert": "领取证书",
   "pay.go_attempts": "查看应试记录",
   "pay.cert_success_title": "发放费用支付完成",
   "pay.cert_success_body": "接下来将发放证书，请点击下方按钮。",
-  "pay.cert_waiting_body": "款项到账后即可发放证书。",
   // 통화 고지 — 화면 가격은 달러인데 토스 결제창은 원화로 뜬다. 이 문구가 없으면 사용자는 금액이 다르다고 느낀다.
   //   {krw} = lib/money.ts 의 krw() 로 찍은 실제 청구액 문자열.
   // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.

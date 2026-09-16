@@ -1002,13 +1002,10 @@ const VI: Record<string, string> = {
   "pay.free_body": "Tài liệu miễn phí nên đã vào thẳng thư viện của bạn.",
   "pay.free_title_exam": "Đã cấp vé dự thi",
   "pay.free_body_exam": "Cấp độ này miễn phí nên vé đã được cấp mà không cần thanh toán.",
-  // 가상계좌 — 계좌만 발급된 상태다. 여기서 '완료'라고 하면 안 된다(입금 전이라 지급도 안 됐다).
-  "pay.waiting_title": "Đang chờ bạn chuyển khoản",
   // 결제는 성공했는데 지급이 보류된 상태(paid + fulfilled_at=null). **실패 문구를 쓰면 안 된다** — 돈은 이미 빠졌다.
   // 실패로 읽히면 사용자가 다시 결제하려다 '이미 결제 완료'를 보고 두 화면이 정반대로 말하게 된다.
   "pay.hold_title": "Đã nhận thanh toán",
   "pay.hold_body": "Tuy nhiên việc cấp phát đang tạm giữ để kiểm tra. Đội ngũ sẽ xử lý — vui lòng đừng thanh toán lại.",
-  "pay.waiting_body": "Khi nhận được tiền, quyền truy cập sẽ được cấp tự động.",
   "pay.fail_title": "Thanh toán chưa thành công",
   "pay.fail_body": "Thanh toán đã bị hủy hoặc không được chấp nhận.",
   "pay.retry": "Thử lại",
@@ -1541,16 +1538,12 @@ const VI: Record<string, string> = {
   "pay.go_plan": "Xem lịch thi",
   "pay.exam_success_title": "Vé dự thi đã được cấp",
   "pay.exam_success_body": "Xem tại Trang cá nhân › Tình trạng dự thi và dự thi khi đến thời gian thi.",
-  // 응시료는 카드·간편결제만 판다(가상계좌 제외). 그래도 가상계좌 결제가 들어오면 응시권을 발급하지 않으므로
-  // 이북과 같은 '입금하면 자동 지급' 문구(pay.waiting_body)를 쓰면 안 된다.
-  "pay.exam_waiting_body": "Lệ phí thi chỉ hỗ trợ thẻ và thanh toán nhanh. Chuyển khoản vào tài khoản ảo sẽ không tự động cấp vé — vui lòng liên hệ với chúng tôi.",
   // 자격증 발급비 — 결제로 끝나는 게 아니라 **발급이 한 걸음 남아 있다**. '결제 완료'로만 닫으면
   // 사용자는 자격증이 어디 있는지 못 찾는다(지급물이 따로 없는 유일한 상품이라 더 그렇다).
   "pay.go_cert": "Nhận chứng chỉ của tôi",
   "pay.go_attempts": "Xem lịch sử dự thi",
   "pay.cert_success_title": "Đã thanh toán phí cấp chứng chỉ",
   "pay.cert_success_body": "Tiếp theo là cấp chứng chỉ — hãy nhấn nút bên dưới.",
-  "pay.cert_waiting_body": "Khi nhận được tiền, bạn có thể cấp chứng chỉ.",
   // 통화 고지 — 화면 가격은 달러인데 토스 결제창은 원화로 뜬다. 이 문구가 없으면 사용자는 금액이 다르다고 느낀다.
   //   {krw} = lib/money.ts 의 krw() 로 찍은 실제 청구액 문자열.
   // ⚠️ 문장 안의 '1,500' 은 하드코딩이다 — lib/money.ts 의 KRW_PER_USD 를 바꾸면 6개국어를 전부 같이 고칠 것.
