@@ -93,10 +93,12 @@
     background:rgba(4,12,26,.78);border:1px solid rgba(90,200,255,.22);color:#dfe7f5}
   .legend span i{width:9px;height:9px;border-radius:2px;display:block}
   .legend span.env{border-color:rgba(255,176,32,.45);color:#ffd27a}
-  /* 환경 — 화면 전체 톤. 깜깜함=더 어둡게, 햇빛=노란 빛, 연기=회색 안개가 흐른다. */
+  /* 환경 — 연기=회색 안개가 화면 위에 흐른다(공기 중에 있는 것이라 위가 맞다).
+     ⚠️ 깜깜함·햇빛은 여기(화면 위 div)가 아니라 SVG 안 #envDark·#envBright 다 — 바닥 위·센서 읽기 아래. 로봇과 라이다 점이 같이 어두워지거나 노래지면 안 된다. */
   .view .envfx{position:absolute;inset:0;pointer-events:none;display:none}
-  .view.env-dark .envfx.dark{display:block;background:radial-gradient(60% 50% at 50% 55%,transparent,rgba(0,0,0,.55) 70%,rgba(0,0,0,.8))}
-  .view.env-bright .envfx.bright{display:block;background:linear-gradient(160deg,rgba(255,214,120,.22),rgba(255,214,120,.04) 55%,transparent)}
+  #envDark,#envBright{display:none}
+  .view.env-dark #envDark{display:block}
+  .view.env-bright #envBright{display:block}
   .view.env-smoke .envfx.smoke{display:block;background:
       radial-gradient(40% 30% at 30% 40%,rgba(180,190,200,.28),transparent 70%),
       radial-gradient(45% 35% at 70% 65%,rgba(180,190,200,.24),transparent 70%),
@@ -105,15 +107,27 @@
   /* 센서 표 버튼 + 표 */
   .batt .tbl{flex:0 0 auto;padding:5px 9px;border:1px solid rgba(90,200,255,.35);border-radius:7px;background:rgba(4,12,26,.7);
     color:#9fd7ff;font:900 11px/1 system-ui,sans-serif;cursor:pointer}
-  #tblOv .sheet{padding:16px 14px;display:flex;flex-direction:column;gap:10px}
-  #tblOv h3{margin:0;font-size:15px;font-weight:900;color:#dfe7f5}
-  .stbl{width:100%;border-collapse:collapse;font-size:12px;font-weight:800}
-  .stbl th,.stbl td{padding:6px 4px;text-align:center;border-bottom:1px solid rgba(90,200,255,.14)}
-  .stbl th{font-size:10.5px;color:#7fa8cf;font-weight:900}
-  .stbl td:first-child{text-align:left;white-space:nowrap}
-  .stbl .ok{color:#3ddc84}.stbl .no{color:#ff8a7a}
-  .stbl .env{font-size:10.5px;color:#ffd27a}
-  .stbl .pw{letter-spacing:1px;color:#9fd7ff;font-size:10px}
+  /* 센서 표 — 판(클립보드 그림) **안쪽**에 브리핑과 같은 방식으로 앉힌다(.ov .sheet 의 padding 을 덮지 말 것 — 덮으면 글이 액자 위로 올라간다).
+     콘크리트 열은 뺐다(전부 ✓ 라 정보가 없다).
+     ⛔ 말줄임(…) 금지 · 어느 언어든 넘치면 안 된다(2026-09-16 지시). 360px 폰에서 판 안쪽 폭이 246px 뿐이라
+        센서 하나 = 두 줄이다 — 이름 줄(전체 폭) + 표시 줄(재질 4 · 먹통 · 전력). 한 줄에 7칸을 넣으면 영어 'Black rubber'·힌디가 칸을 뚫는다.
+        글자 크기는 판 폭(cqw)에도 묶여 있어 더 좁은 화면에서는 같이 준다. 검증 = tmp/_feel-table-shots.mjs(6개국어 × 360px). */
+  #tblOv .sheet{justify-content:flex-start}
+  /* .tbody = 제목+표. 버튼을 뺀 남은 높이를 전부 차지하고(flex:1 · basis 0) 그 크기를 컨테이너로 삼아
+     표 글자를 min(14px, 폭 5.6cqw, 높이 (100cqh−48px)/28) 로 정한다 — 제목+13줄의 실측 높이가 27.7em+45px 라(tmp/_ft-desk.mjs 가 잰다) 어느 화면에서도 버튼 밑으로 안 들어간다. */
+  .tbody{flex:1 1 0;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:8px;container-type:size}
+  #tblOv h3{margin:0;font-size:min(20px,2.4vh);font-weight:900;letter-spacing:-.02em;color:#eaf4ff}
+  .stbl{width:100%;table-layout:fixed;border-collapse:collapse;line-height:1.2;font-weight:800;color:#dfe7f5;
+    font-size:min(14px,5.6cqw,calc((100cqh - 48px) / 28))}
+  .stbl th:nth-child(-n+4){width:15%}
+  .stbl th:nth-child(5){width:23%}
+  .stbl th:nth-child(6){width:17%}
+  .stbl th,.stbl td{padding:.5em 2px;text-align:center;border-bottom:1px solid rgba(90,200,255,.16);word-break:keep-all}
+  .stbl th{font-size:.75em;color:#7fa8cf;font-weight:900;line-height:1.15;vertical-align:bottom}  /* .82 면 'rubber' 가 15% 칸을 뚫는다 */
+  .stbl tr.nm td{text-align:left;font-weight:900;padding-bottom:1px;border-bottom:0}
+  .stbl .ok{color:#3ddc84;font-size:1.1em}.stbl .no{color:#ff8a7a;font-size:1.1em}
+  .stbl .env{font-size:.79em;color:#ffd27a}
+  .stbl .pw{color:#9fd7ff;font-size:.68em;letter-spacing:0;white-space:nowrap}
   .slipcell{fill:url(#slipPat)}
   .zm{display:inline-flex;align-items:center;gap:5px;margin:0 6px 6px 0;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:900;
     background:rgba(90,200,255,.08);border:1px solid rgba(90,200,255,.25);color:#dfe7f5}
@@ -287,10 +301,14 @@
         가운데 조각이 가로로 늘어나 손잡이가 판 전체 폭의 막대가 된다. 통짜로 늘리고 비율을 고정한다.
      ⚠️ 그래서 판은 **높이로 크기를 정한다**(width:auto + aspect-ratio). 폭으로 정하면 낮은 화면에서
         판이 세로로 넘쳐 잘린다.
-     ⚠️ 아래 %는 실측값이다(트림 후 652×994 · 안쪽 판 x10.3~89.4 · y13.9~92.6).
-        padding 의 % 는 **폭 기준**이라 세로값은 높이비(1/0.6559)를 곱해 환산했다 — 그림을 갈면 다시 잰다. */
-  .ov .sheet{height:min(92%,660px);width:auto;aspect-ratio:652/994;max-width:96%;
-    padding:21.2% 10.5% 11.3%;border:0;border-radius:0;box-shadow:none;
+     ⚠️ 아래 계수는 실측값이다(트림 후 652×994 · 안쪽 판 x10.3~89.4 · y13.9~92.6 → 높이의 .139 / .074 · 폭의 .105).
+        ⛔ padding 을 % 로 쓰지 말 것 — % 는 판이 아니라 **.ov 폭** 기준이라 PC(판 415 / .ov 488)에서 글이 액자 안쪽보다 15px 아래서 시작하고
+           세로 여유를 23px 잃었다(센서 표가 닫기 버튼 밑으로 들어간 원인 중 하나 · 2026-09-16). 그래서 .ov 를 컨테이너로 삼아
+           판 높이(--sh)·폭(--sw)을 cq 단위로 정하고 여백을 그 둘에서 계산한다. 그림을 갈면 계수를 다시 잰다.
+     ⚠️ 좁은 폰(360)에서는 폭이 96cqw 에 걸려 판이 세로로 늘어난다(315×651 · 원래 비율이면 480) — 처음부터 그랬고 여백은 늘어난 크기 기준으로 맞는다. */
+  .ov{container-type:size}
+  .ov .sheet{--sh:min(92cqh,660px);--sw:min(calc(var(--sh) * 652 / 994),96cqw);height:var(--sh);width:var(--sw);flex:none;
+    padding:calc(var(--sh) * .139) calc(var(--sw) * .105) calc(var(--sh) * .074);border:0;border-radius:0;box-shadow:none;
     background:url('/games/feel-cari-intro-panel-v1.webp') center/100% 100% no-repeat;
     filter:drop-shadow(0 18px 24px rgba(0,0,0,.7));
     display:flex;flex-direction:column;scrollbar-width:none}
@@ -407,17 +425,32 @@
           <stop offset="100%" stop-color="#4a8fe8" stop-opacity="0"/>
         </radialGradient>
         <pattern id="slipPat" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><rect width="8" height="8" fill="rgba(90,160,255,.10)"/><rect width="2" height="8" fill="rgba(120,190,255,.16)"/></pattern>
+        <radialGradient id="darkG" cx="50%" cy="55%" r="60%">
+          <stop offset="0" stop-color="#000" stop-opacity="0"/>
+          <stop offset="70%" stop-color="#000" stop-opacity=".55"/>
+          <stop offset="100%" stop-color="#000" stop-opacity=".8"/>
+        </radialGradient>
+        <linearGradient id="brightG" x1="0" y1="0" x2=".36" y2="1">
+          <stop offset="0" stop-color="#ffd678" stop-opacity=".22"/>
+          <stop offset="55%" stop-color="#ffd678" stop-opacity=".04"/>
+          <stop offset="100%" stop-color="#ffd678" stop-opacity="0"/>
+        </linearGradient>
         <radialGradient id="goalAura">
           <stop offset="0" stop-color="#3ddc84" stop-opacity=".42"/>
           <stop offset="55%" stop-color="#3ddc84" stop-opacity=".13"/>
           <stop offset="100%" stop-color="#3ddc84" stop-opacity="0"/>
         </radialGradient>
       </defs>
-      <g id="gEnvR"></g><g id="gWall"></g><g id="gHit"></g><g id="gPass"></g><g id="gMark"></g><polyline id="gTrail" fill="none"
+      <g id="gEnvR"></g><g id="gWall"></g>
+      <!-- 깜깜함·햇빛 — 여기(바닥·벽 위, 센서 읽기·로봇 아래)에 깐다. 어둠·햇빛은 카메라·적외선이 못 보는 것이지 라이다·초음파가 읽은 점이나 로봇이
+           어두워지거나 노래질 일이 아니다(2026-09-16 지시). 연기는 공기 중에 떠 있는 것이라 화면 위 div 그대로. -->
+      <rect id="envDark" x="0" y="0" width="100%" height="100%" fill="url(#darkG)"/>
+      <rect id="envBright" x="0" y="0" width="100%" height="100%" fill="url(#brightG)"/>
+      <g id="gHit"></g><g id="gPass"></g><g id="gMark"></g><polyline id="gTrail" fill="none"
         stroke="rgba(90,163,255,.26)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       <g id="gBeam"></g><g id="gGoal"></g><g id="gBot"></g><g id="gLab"></g>
     </svg>
-    <div class="envfx dark"></div><div class="envfx bright"></div><div class="envfx smoke"></div>
+    <div class="envfx smoke"></div>
     <!-- 판 위 배너 — 도착 / 부딪힘 3번 / 배터리 방전 / 구역 실패. 설명 글 없이 한 마디 + 별(남은 횟수) + 버튼. 판은 뒤에 그대로(벽 공개). -->
     <div class="banner hidden" id="banner"><b id="bnTtl">—</b><span id="bnSub"></span><button class="fbbtn" id="bnBtn">다음</button><button class="quit hidden" id="quitBtn" data-i18n="feel.quit">여기까지 하고 그만두기</button></div>
     <div class="compass">
@@ -463,8 +496,10 @@
 <!-- 센서 표 — 재질별로 보이나·먹통 환경·전력. 전부 SENSORS 표에서 그린다(외우는 게 아니라 찾아보는 것). -->
 <div class="ov hidden" id="tblOv">
   <div class="sheet">
-    <h3 data-i18n="feel.table">센서 표</h3>
-    <table class="stbl" id="stbl"></table>
+    <div class="tbody">
+      <h3 data-i18n="feel.table">센서 표</h3>
+      <table class="stbl" id="stbl"></table>
+    </div>
     <button class="btn" id="tblClose" data-i18n="feel.close">닫기</button>
   </div>
 </div>
@@ -1004,7 +1039,7 @@ let markDom=0, trailStr='', botG=null, botDir=null;
 const MARK_MAX=1400;
 const markFrag=document.createDocumentFragment();
 let meas={}, scanA=0;   // meas=센서별 마지막 측정 캐시 · scanA=라이다 회전각(누적)
-let raf=null, running=false, bumpUntil=0, lastT=0, starsPer=[];
+let raf=null, running=false, lastTouchAt=-1e9, lastT=0, starsPer=[];   // lastTouchAt=마지막으로 벽에 닿아 있던 시각(새 충돌 판정)
 
 /** ⚠️ 반드시 0~3 으로 접는다 — 예전엔 총점을 5로 나눈 값을 그대로 넘겨서 전 구역 무사통과(별 18)면
  *  `'☆'.repeat(-1)` 로 결과창이 통째로 터졌다(RangeError). 만점을 받은 사람만 못 보는 화면이었다. */
@@ -1139,7 +1174,7 @@ function loadLevel(){
   const envTxt=L.envs.map(e=>envName(e)).join(' · ');
   $('envTag').textContent=envTxt; $('envTag').classList.toggle('hidden',!envTxt);
   $('driftTag').classList.toggle('hidden',zoneEnvs(L).indexOf('slip')<0);
-  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={u:0,d:0,l:0,r:0}; joyX=0; joyY=0; touching=false;
+  hits=0; marks=new Set(); markDom=0; trail=[]; trailStr=''; err={x:0,y:0}; held={u:0,d:0,l:0,r:0}; joyX=0; joyY=0; touching=false; lastTouchAt=-1e9;
   batt=BATT_MAX; on={}; meas={}; scanA=0;
   driftDir=Math.random()*Math.PI*2;   // 드리프트는 한 방향으로 쏠린다 — 랜덤워크면 상쇄돼 아무 일도 안 난다
   $('hitEl').textContent='0';
@@ -1244,7 +1279,8 @@ function loop(){
   }
   if(driveInput>DEADZONE){
     const step=SPEED*driveInput*dt;
-    const nx=bot.x+Math.cos(bot.a)*step, ny=bot.y+Math.sin(bot.a)*step;
+    const dx=Math.cos(bot.a)*step, dy=Math.sin(bot.a)*step;
+    const nx=bot.x+dx, ny=bot.y+dy;
     if(hitsWall(nx,ny)){
       touching=true;
       // 범퍼를 켜뒀으면 접촉이 곧 정보다 — 벽을 지도에 남기고 위치 추정을 다시 잡는다.
@@ -1252,15 +1288,21 @@ function loop(){
         addMark(bot.x+Math.cos(bot.a)*BOT_R, bot.y+Math.sin(bot.a)*BOT_R, SENSORS.bump.c, SENSORS.bump.dotR, 0);
         err.x*=0.3; err.y*=0.3;
       }
-      if(now>bumpUntil){
+      /* 부딪힘은 **새로 닿았을 때**만 센다 — 0.3초 넘게 벽에서 떨어져 있다가 다시 닿아야 한 번이다(2026-09-16 지시).
+         전에는 "닿은 채로 0.9초" 마다 또 셌는데, 한 번 박고 옆으로 빠져나오려고 비비는 2~3초가 그대로 2~3번이 됐다. */
+      const fresh=now-lastTouchAt>300; lastTouchAt=now;
+      if(fresh){
         hits++; $('hitEl').textContent=hits;
-        bumpUntil=now+900;
         flashHitCell(); hitLabel();
         $('view').classList.add('bump');
         setTimeout(()=>{ $('view').classList.remove('bump'); },700);
         if(hits>=MAX_HIT) return fail(T('feel.f_hits'));
       }
-      bot.x-=Math.cos(bot.a)*1.6; bot.y-=Math.sin(bot.a)*1.6;
+      /* 벽을 따라 미끄러진다 — 막힌 축만 버리고 나머지 축으로는 간다. 로봇은 스틱 쪽으로 몸을 돌리며 앞으로 미는 구조라,
+         이게 없으면 스틱을 옆으로 밀어도 머리가 벽에서 돌아 나올 때까지 계속 벽만 민다(못 빠져나온다). 둘 다 막히면 살짝 밀려난다. */
+      if(!hitsWall(bot.x+dx,bot.y)) bot.x+=dx;
+      else if(!hitsWall(bot.x,bot.y+dy)) bot.y+=dy;
+      else { bot.x-=Math.cos(bot.a)*1.6; bot.y-=Math.sin(bot.a)*1.6; }
     } else {
       bot.x=nx; bot.y=ny;
       // 미끄러운 바닥 — 바퀴가 헛돌아 "내가 아는 내 위치"가 한쪽으로 밀린다(오도메트리 드리프트).
@@ -1497,11 +1539,12 @@ function openBrief(){
 $('zGo').onclick=()=>{ $('brOv').classList.add('hidden'); loadLevel(); };
 /* 센서 표 — SENSORS 에서 그린다. 여는 동안 게임은 멈추지 않는다(배터리도 닳는다 — 표를 보는 것도 시간이다). */
 function buildTable(){
-  const mats=['#','G','B','M','C'];
-  let h='<tr><th></th>'+mats.map(m=>`<th>${matName(m)}</th>`).join('')+`<th>${T('feel.dead')}</th><th>${T('feel.power')}</th></tr>`;
-  Object.keys(SENSORS).forEach(k=>{ const S=SENSORS[k];
-    h+=`<tr><td>${S.ic} ${sensName(k)}</td>`+mats.map(m=>`<td class="${S.sees[m]?'ok':'no'}">${S.sees[m]?'✓':'✗'}</td>`).join('')
-      +`<td class="env">${S.envFail.map(x=>envName(x)).join('·')||'—'}</td><td class="pw">${pwDots(k)}</td></tr>`; });
+  const mats=['G','B','M','C'];   // 콘크리트는 전부 ✓ 라 뺀다
+  let h='<tr>'+mats.map(m=>`<th>${matName(m)}</th>`).join('')+`<th>${T('feel.dead')}</th><th>${T('feel.power')}</th></tr>`;
+  Object.keys(SENSORS).forEach(k=>{ const S=SENSORS[k];   // 센서 하나 = 이름 줄 + 표시 줄(폭 246px 에 7칸은 안 들어간다 — CSS 주석)
+    h+=`<tr class="nm"><td colspan="6">${S.ic} ${sensName(k)}</td></tr><tr>`
+      +mats.map(m=>`<td class="${S.sees[m]?'ok':'no'}">${S.sees[m]?'✓':'✗'}</td>`).join('')
+      +`<td class="env">${S.envFail.map(x=>envName(x)).join('<br>')||'—'}</td><td class="pw">${pwDots(k)}</td></tr>`; });
   $('stbl').innerHTML=h;
 }
 $('tblBtn').onclick=()=>{ buildTable(); $('tblOv').classList.remove('hidden'); };
