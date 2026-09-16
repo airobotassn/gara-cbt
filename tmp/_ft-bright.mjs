@@ -1,0 +1,16 @@
+// 11구역 왼쪽 햇빛 구간에 로봇을 두고 라이다·적외선을 켠 화면 — 로봇·점이 노랗게 물들지 않는지
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 })
+await page.goto('http://127.0.0.1:8124/games/feel-cari.html?lang=ko'); await page.waitForTimeout(300)
+await page.evaluate(() => { window.MGBridge.submit = () => {} })
+await page.click('#startBtn'); await page.waitForTimeout(100)
+await page.evaluate(() => { $('brOv').classList.add('hidden'); LI = 10; loadLevel(); document.querySelector('.s[data-k=lidar]').click(); document.querySelector('.s[data-k=ir]').click(); bot.x = 2 * CELL + 13; bot.y = 8 * CELL + 13; bot.a = Math.PI / 2; joyX = 0; joyY = 1 })
+await page.waitForTimeout(1200)
+await page.evaluate(() => { joyX = 0; joyY = 0 })
+await page.waitForTimeout(900)
+const cls = await page.evaluate(() => { stop(); return document.getElementById('view').className })
+console.log('view class:', cls)
+const box = await page.evaluate(() => { const v = document.getElementById('view').getBoundingClientRect(); return { x: v.left, y: v.top, width: v.width, height: v.height } })
+await page.screenshot({ path: 'tmp/_ft-bright.png', clip: box })
+await browser.close()
