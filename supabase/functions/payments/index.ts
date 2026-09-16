@@ -474,13 +474,20 @@ Deno.serve(async (req) => {
       if (row.status === 'paid') {
         return json({ status: 'paid', fulfilled: Boolean(row.fulfilled_at), productType: row.product_type, productRef: row.product_ref })
       }
-      // ⛔ confirm 은 **pending 주문만** 승인한다. paid 외의 비-pending 상태(refunded·canceled·failed·
-      //    expired·waiting_deposit)를 재진입시키면 (1) 종결 행을 덮어써 대사 회수 신호가 깨지고,
-      //    (2) 실패했던 주문이 토스 재승인으로 paid+지급으로 되살아나는 무단 지급이 열린다.
-      //    이 상태들은 토스를 부르지 않고 저장된 결과를 그대로 돌려준다(멱등).
-      if (row.status !== 'pending') {
+      // ⛔ confirm 은 **pending(또는 expired) 주문만** 승인한다. 그 밖의 상태(refunded·canceled·failed·
+      //    waiting_deposit)를 재진입시키면 (1) 종결 행을 덮어써 대사 회수 신호가 깨지고,
+      //    (2) 실패했던 주문이 PG 재승인으로 paid+지급으로 되살아나는 무단 지급이 열린다.
+      //    이 상태들은 PG 를 부르지 않고 저장된 결과를 그대로 돌려준다(멱등).
+      // ⚠️ **expired 는 되살린다(2026-09-16).** expired 는 "30분 넘게 소식이 없어 대사가 접어 둔 것" 이지 결제가 없었다고
+      //    확정한 게 아니다. 사용자가 팝업을 30분 넘게 열어 뒀다 결제하면 대사가 먼저 expired 로 접고 그 뒤 돈이 빠지는데,
+      //    여기서 문전박대하면 웹훅이 안 오는 한 아무도 다시 안 물어봐(대사는 expired 를 안 훑는다) 돈만 받은 채 묻힌다.
+      //    승인은 어차피 PG 에 되물어 확인한 것만 믿으므로 expired 를 pending 과 같이 다루는 게 안전하다.
+      const resumable = row.status === 'pending' || row.status === 'expired'
+      if (!resumable) {
         return json({ status: row.status, fulfilled: Boolean(row.fulfilled_at), productType: row.product_type, productRef: row.product_ref })
       }
+      // 아래 상태 갱신들이 "아직 이 상태일 때만" 으로 거는 술어 — pending·expired 둘 다 허용한다.
+      const OPEN = ['pending', 'expired']
 
       // ② successUrl 의 amount 를 그대로 승인에 넘기지 않는다 — 저장된 주문 금액과 대조부터 한다.
       //    ⚠️ 대조 기준은 정가(원화)가 아니라 **PG 에 실제로 청구한 값**이다. 엑심베이는 달러로 청구하므로
@@ -493,7 +500,7 @@ Deno.serve(async (req) => {
           .from('payments')
           .update({ status: 'failed', fail_code: 'AMOUNT_MISMATCH', fail_message: `요청 ${clientAmount} ≠ 주문 ${chg.amount} ${chg.currency}`, updated_at: new Date().toISOString() })
           .eq('id', row.id)
-          .eq('status', 'pending')  // 금액 검사는 선점 전이라 여기선 pending 만 본다
+          .in('status', OPEN)  // 금액 검사는 선점 전이라 여기선 열린 상태(pending·expired)만 본다
         return json({ error: '결제 금액이 주문과 일치하지 않습니다.' }, 400)
       }
 
@@ -533,7 +540,7 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', row.id)
-          .eq('status', 'pending')
+          .in('status', OPEN)
         return json(
           { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
           400,
@@ -553,7 +560,7 @@ Deno.serve(async (req) => {
           .from('payments')
           .update({ status: 'confirming', updated_at: new Date().toISOString() })
           .eq('id', row.id)
-          .eq('status', 'pending')
+          .in('status', OPEN)
           .select('id')
         if (claimErr) {
           // 23505 = payments_confirming_product_uniq = 같은 상품의 승인이 이미 PG 로 나가 있다.
@@ -567,7 +574,7 @@ Deno.serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
               .eq('id', row.id)
-              .eq('status', 'pending')
+              .in('status', OPEN)
             return json(
               { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
               400,
