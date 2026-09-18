@@ -43,6 +43,13 @@ export function usdc(cents: number, lang: string = 'ko'): string {
   }
 }
 
+/** 청구 통화로 금액 표기 — 원이면 ₩, 아니면 $. 환불 화면은 정가(달러 센트)가 아니라 **실제 빠진 돈**을 말해야 한다.
+ *  ⚠️ 인자는 `payments.charge_amount`·`refunded_amount` 의 단위(원 정수 / 달러 소수)다 — 센트가 아니다. */
+export function chargeText(currency: string | null | undefined, amount: number | null | undefined): string {
+  if (amount == null) return '-'
+  return (currency ?? 'USD').toUpperCase() === 'KRW' ? krw(amount) : usdc(Math.round(amount * 100))
+}
+
 /** 관리자 입력칸(달러) → 저장할 센트 정수. `1.05` → `105` */
 export function usdInputToCents(usdAmount: number): number {
   const v = Number.isFinite(usdAmount) ? Math.max(0, usdAmount) : 0

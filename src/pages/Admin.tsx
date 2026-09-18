@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthProvider'
 import { callFunction, supabase } from '../lib/supabase'
 import { loadAdminMe } from '../lib/adminMe'
 import { renderEbookCover, imageFileToDataUri, replaceStaticCoverImage } from '../lib/ebookCover'
-import { krw, usdc, usdInputToCents, centsToUsdInput } from '../lib/money'
+import { krw, usdc, usdInputToCents, centsToUsdInput, chargeText } from '../lib/money'
 import { feeKey } from '../lib/fees'
 import { translateEbook, translateEbookMeta, EBOOK_LANGS, EBOOK_LANG_LABEL, type ResumeSource } from '../lib/ebookTranslate'
 import { fitNoticeHtml, importNoticeHtml } from '../lib/noticeHtml'
@@ -61,6 +61,7 @@ import {
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
   ReadCell, MemberStats, RevenueStats,
   VisitPeriodStats, VisitEnvStats, VisitSourceStats, VisitIpStats, VisitLogAdmin,
+  MailComposeModal, type MailTarget,
   // 문의 분류 이름표는 Q&A 화면과 **한 벌**이다 — 여기서 또 만들면 같은 문의가 두 이름으로 뜬다.
   INQ_CAT, type InquiryRow,
 } from './AdminReform'
@@ -72,6 +73,7 @@ import { autoRoundTitle, isExamMonth, monthOfExamDate, schedulePreview } from '.
 import { REGIONS, countryName, flagEmoji, flagUrl } from '../lib/regions'
 // 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
 import { loadRegions } from '../lib/regionCatalog'
+import { charArtName } from '../lib/hubCosmetics'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
 // ⚠️ 별칭이 필요하다 — 이 파일 안에 이북 본문 번역용 `runTranslation`(다른 시그니처)이 이미 있다.
@@ -110,20 +112,23 @@ const SUBS: Record<TopMenu, SubItem[]> = {
   //    여기 남은 것은 전부 **고치고 처리하는 화면**이다. 통계를 다시 이 밑으로 끌고 오지 말 것 —
   //    같은 숫자가 제품마다 흩어져 있던 걸 모으는 게 이번 재편의 목적이다.
   //    (2026-08-11 주석의 "각 제품 상세 대시보드는 그 대메뉴 안에 남긴다" 는 이 지시로 뒤집혔다.)
+  // ⚠️ **순서와 이름은 홈(/arena)의 메뉴와 같다**(2026-09-18 지시 · PPT `관리자 페이지 수정사항` 1페이지) —
+  //    마이홈 › 레벨테스트 › 미니게임 › DAILY QUIZ › 채팅. 홈에서 보던 순서로 관리자에서도 찾게 하는 것이
+  //    목적이라, 홈 메뉴를 바꾸면 여기도 같이 옮길 것.
   arena: [
-    // 문항 관리만 남아 3단이 한 칸뿐이라 평탄화했다 — 버튼 하나짜리 3단 줄은 자리만 차지한다.
-    { key: 'minigame', label: '미니게임 문항' },
+    // 마이홈(/hub) 밑에서 파는 것들 — 꾸미기(캐릭터·스킨 가격·판매여부)와 코인(적립 정책).
+    // 꾸미기는 그림을 안 올린다(2026-08-20) → 캐릭터 업로드만 예외로 그 화면에서 한다(2026-08-31).
+    { key: 'myhome', label: '마이홈', children: [{ key: 'cosmetic', label: '꾸미기 관리' }, { key: 'coin', label: '코인 관리' }] },
     // '응시 기록' 은 통계가 아니라 목록·처리 화면이라 여기 남는다(옛 이름 '참여 현황').
     { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '응시 기록' }, { key: 'quiz', label: '문항 관리' }] },
+    // 미니게임·DAILY QUIZ 는 밑에 문항 관리 하나뿐이라 평탄화했다 — 버튼 하나짜리 3단 줄은 자리만 차지한다.
+    // 이름에서 '문항' 을 뺀 건 홈과 글자까지 맞추려는 것(2026-09-18).
+    { key: 'minigame', label: '미니게임' },
     // DAILY QUIZ 문항 관리 = 게임 문항과 **같은 화면, 다른 은행**(2026-09-08 지시). 2026-09-03 에 뗐던 이유는
     // 그 화면이 게임 은행을 보여줘서였고, 지금은 DAILY 전용 은행(D-###)을 보여준다.
-    { key: 'daily', label: 'DAILY QUIZ 문항' },
-    { key: 'chat', label: '채팅 관리' },
-    // 금칙어는 검수와 별도 화면이다 — 검수는 '올라온 글을 본다', 금칙어는 '앞으로 막을 말을 정한다'.
-    { key: 'words', label: '금칙어' },
-    { key: 'coin', label: '코인 관리' },
-    // 캐릭터·스킨의 **가격·판매여부**만 만지는 화면. 그림은 코드/에셋이라 여기서 안 올린다(2026-08-20).
-    { key: 'cosmetic', label: '꾸미기 관리' },
+    { key: 'daily', label: 'DAILY QUIZ' },
+    // 검수와 금칙어는 별도 화면이다 — 검수는 '올라온 글을 본다', 금칙어는 '앞으로 막을 말을 정한다'.
+    { key: 'chat', label: '채팅관리', children: [{ key: 'review', label: '채팅 검수' }, { key: 'words', label: '금칙어' }] },
   ],
   caris: [
     // 대시보드는 '통계 › 자격검정' 으로 옮겼다(2026-09-09 지시).
@@ -316,14 +321,14 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     // ── WORLD ARENA ──
     // ⚠️ key={bank} — 같은 컴포넌트가 같은 자리에 서므로 키가 없으면 게임 ↔ DAILY 를 오갈 때 인스턴스가 재사용돼
     //    서브탭·'방금 올린 문항' 필터(T-### 번호)가 다른 은행 목록에 그대로 남는다.
-    case 'arena/minigame': return <TermPoolAdmin key="game" bank="game" />
+    case 'arena/myhome/cosmetic': return <HubCosmeticAdmin />
+    case 'arena/myhome/coin': return <CoinPolicyAdmin />
     case 'arena/leveltest/stat': return <ArenaAttempts />
     case 'arena/leveltest/quiz': return <ArenaQuestions isRoot={isRoot} />
+    case 'arena/minigame': return <TermPoolAdmin key="game" bank="game" />
     case 'arena/daily': return <TermPoolAdmin key="daily" bank="daily" />
-    case 'arena/chat': return <ChatModAdmin />
-    case 'arena/words': return <BannedWordAdmin />
-    case 'arena/coin': return <CoinPolicyAdmin />
-    case 'arena/cosmetic': return <HubCosmeticAdmin />
+    case 'arena/chat/review': return <ChatModAdmin />
+    case 'arena/chat/words': return <BannedWordAdmin />
     // ── CARIS ──
     case 'caris/plan': return <RoundsAdmin />
     case 'caris/status/tickets': return <TicketsAdmin isRoot={isRoot} />
@@ -3533,6 +3538,7 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
   const [err, setErr] = useState('')
   const [grantDraft, setGrantDraft] = useState<{ roundId: string; tier: string; email: string; note: string } | null>(null)
   const [voidDraft, setVoidDraft] = useState<TicketRow | null>(null)
+  const [nudge, setNudge] = useState(false)
 
   const loadSummary = useCallback(async (rid: string) => {
     try {
@@ -3791,6 +3797,11 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
             onKeyDown={(e) => { if (e.key === 'Enter') setQ(qLive.trim()) }}
           />
           <button className="admin-mini" onClick={() => setQ(qLive.trim())} disabled={loading}>검색</button>
+          {/* 그 회차의 미사용 응시권 보유자에게 독려 메일(2026-09-18 · PPT 6페이지). 회차를 골라야 켜진다 —
+              '전체 회차' 로 보내면 마감이 제각각인 사람이 한 통에 섞인다. */}
+          <button className="btn-ink" onClick={() => setNudge(true)} disabled={!roundId} title={roundId ? '' : '회차를 먼저 고르세요'}>
+            미사용자 메일
+          </button>
         </div>
       </div>
 
@@ -3923,7 +3934,104 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
       )}
 
       {voidDraft && <VoidTicketModal row={voidDraft} onClose={() => setVoidDraft(null)} onSubmit={doVoid} />}
+      {nudge && roundId && (
+        <TicketNudgeModal
+          roundId={roundId}
+          roundTitle={roundOpts.find((r) => r.id === roundId)?.titleI18n.ko ?? ''}
+          onClose={() => setNudge(false)}
+        />
+      )}
     </>
+  )
+}
+
+// ── 응시권 미사용자 독려 메일 — 대상 고르기 (2026-09-18 · PPT 6페이지) ──
+// 고른 회차의 **미사용(issued)** 응시권을 서버 목록(examTicketList · status=issued)에서 그대로 받아 체크한다.
+//   ⚠️ 응시 마감({examEnd})은 응시권마다 다를 수 있다(급수별 응시 창) — 사람마다 그 사람 값이 채워진다.
+const TICKET_MAIL_VARS: [string, string][] = [
+  ['{name}', '이름'], ['{round}', '회차명'], ['{tier}', '급수'], ['{examEnd}', '응시 마감'], ['{link}', '응시 안내 주소'],
+]
+function TicketNudgeModal({ roundId, roundTitle, onClose }: { roundId: string; roundTitle: string; onClose: () => void }) {
+  const [rows, setRows] = useState<TicketRow[] | null>(null)
+  const [err, setErr] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [compose, setCompose] = useState(false)
+  useEffect(() => {
+    callFunction<TicketListResp>('admin', { action: 'examTicketList', roundId, status: 'issued', limit: 500, offset: 0 })
+      // 서버가 만료를 접어 '미사용' 으로 주는 건 응시 창이 끝난 것이라 보낼 이유가 없다 — 화면값(effStatus)으로 한 번 더 거른다.
+      .then((r) => setRows(r.tickets.filter((t) => t.effStatus === 'issued')))
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
+  }, [roundId])
+
+  const list = rows ?? []
+  const sendable = list.filter((t) => t.email)
+  const allOn = sendable.length > 0 && sendable.every((t) => picked.has(t.ticketId))
+  const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const toggleAll = () => setPicked(allOn ? new Set() : new Set(sendable.map((t) => t.ticketId)))
+  // 같은 사람이 급수 둘을 접수했으면 응시권이 둘 — 메일은 사람당 한 통이라 userId 로 접는다(먼저 고른 것 기준).
+  const targets: MailTarget[] = []
+  const seen = new Set<string>()
+  for (const t of list.filter((x) => picked.has(x.ticketId))) {
+    if (seen.has(t.userId)) continue
+    seen.add(t.userId)
+    targets.push({
+      userId: t.userId, email: t.email, name: t.name,
+      sample: { '{round}': t.roundTitle, '{tier}': TIER_LABEL[t.tier] ?? t.tier, '{examEnd}': fmtDT(t.examEndAt), '{link}': `${location.origin}/exam` },
+    })
+  }
+
+  return (
+    <div className="admin-modal-bg" onClick={onClose}>
+      <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose}>✕</button>
+        <h2>미사용자 독려 메일</h2>
+        <p className="admin-modal-meta">{roundTitle || '(회차명 없음)'} · 응시권을 받고 아직 응시하지 않은 사람</p>
+        <div className="admin-toolbar">
+          <span className="admin-hint">
+            {rows ? `미사용 ${list.length}장 · 이메일 없음 ${list.length - sendable.length}장${targets.length ? ` · 받는 사람 ${targets.length}명` : ''}` : '불러오는 중…'}
+          </span>
+          <button className="btn-ink" style={{ marginLeft: 'auto' }} onClick={() => setCompose(true)} disabled={!targets.length}>
+            {targets.length ? `${targets.length}명에게 메일 보내기` : '메일 보내기'}
+          </button>
+        </div>
+        {err && <div className="admin-empty">{err}</div>}
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th style={{ width: 44 }}><input type="checkbox" checked={allOn} onChange={toggleAll} disabled={!sendable.length} /></th>
+                <th>이름</th><th>이메일</th><th>급수</th><th>발급</th><th>응시 마감</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((t) => (
+                <tr key={t.ticketId}>
+                  <td><input type="checkbox" checked={picked.has(t.ticketId)} onChange={() => toggle(t.ticketId)} disabled={!t.email} /></td>
+                  <td><b>{t.name || '-'}</b></td>
+                  <td style={{ color: t.email ? 'var(--muted)' : 'var(--dim)' }}>{t.email || '이메일 없음 — 보낼 수 없음'}</td>
+                  <td>{TIER_LABEL[t.tier] ?? t.tier}</td>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(t.issuedAt)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(t.examEndAt)}</td>
+                </tr>
+              ))}
+              {rows && !list.length && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>이 회차에 미사용 응시권이 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {compose && (
+          <MailComposeModal
+            kind="nudge_ticket"
+            settingKeys={{ subject: 'mail_ticket_subject', body: 'mail_ticket_body' }}
+            vars={TICKET_MAIL_VARS}
+            roundId={roundId}
+            targets={targets}
+            onClose={() => setCompose(false)}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -5472,6 +5580,17 @@ interface PaymentAdminRow {
   createdAt: string
   // 이 결제로 나간 이북들의 열람 여부(환불 판단용). 이북이 안 붙은 결제는 빈 배열이다.
   reads?: EbookReadRow[]
+  // 청구 통화·금액과 돌려준 합계(payments.refunded_amount) — 정가(amount, 달러 센트)와 단위가 다르다.
+  chargeAmount?: number | null
+  chargeCurrency?: string | null
+  refundedAmount?: number
+}
+interface RefundRow {
+  id: string; paymentId: string; orderName: string; orderId: string
+  amount: number; currency: string; reason: string
+  // 원장에 남은 줄 — `_shared/refunds.ts` 가 {key, name, amount} 로 적는다(amount 는 청구 통화).
+  lines: { key?: string; name?: string; amount?: number }[]
+  providerRef: string | null; at: string; actor: string | null
 }
 interface PaymentListResp {
   payments: PaymentAdminRow[]
@@ -5801,6 +5920,8 @@ function MembersAdmin() {
   const [q, setQ] = useState('')
   const [type, setType] = useState<'all' | 'google' | 'guest'>('google')
   const [sort, setSort] = useState<'created' | 'caris' | 'arena'>('created')
+  // 국가 필터(2026-09-18 · PPT 3페이지). 값은 회원이 온보딩에서 고른 국가 코드 — 게스트·미설정은 '' 로 뭉친다.
+  const [country, setCountry] = useState('')
   const [page, setPage] = useState(0)
   const [open, setOpen] = useState<MemberRow | null>(null)
 
@@ -5851,12 +5972,22 @@ function MembersAdmin() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
-  useEffect(() => { setPage(0) }, [q, type, sort])
+  useEffect(() => { setPage(0) }, [q, type, sort, country])
 
-  const filtered = rows
+  // 국가 목록은 **지금 목록에 있는 나라만** — 249개국을 다 늘어놓으면 대부분 0명이라 고를 게 없다.
+  // 유형(가입/게스트) 필터를 먼저 적용한 모수에서 센다 → 게스트만 보면 국가 목록이 비는 게 맞다.
+  const typed = rows.filter((u) => !(type === 'google' && u.anon) && !(type === 'guest' && !u.anon))
+  const countryOpts = (() => {
+    const n = new Map<string, number>()
+    for (const u of typed) n.set(u.country ?? '', (n.get(u.country ?? '') ?? 0) + 1)
+    const known = [...n.entries()].filter(([c]) => c).map(([c, k]) => ({ code: c, name: countryName(c, 'ko'), n: k }))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ko'))
+    return { known, unset: n.get('') ?? 0 }
+  })()
+
+  const filtered = typed
     .filter((u) => {
-      if (type === 'google' && u.anon) return false
-      if (type === 'guest' && !u.anon) return false
+      if (country === '-' ? !!u.country : country ? u.country !== country : false) return false
       if (q) {
         const s = q.toLowerCase()
         if (!(u.name || '').toLowerCase().includes(s) && !(u.email || '').toLowerCase().includes(s)) return false
@@ -5898,6 +6029,12 @@ function MembersAdmin() {
           <option value="caris">CARIS 응시 많은순</option>
           <option value="arena">ARENA 등급순</option>
         </select>
+        {/* 국가 = 회원이 온보딩에서 고른 값. ⚠️ 방문 통계의 국가(브라우저가 알아낸 값)와 출처가 다르다. */}
+        <select value={country} onChange={(e) => setCountry(e.target.value)}>
+          <option value="">전체 국가</option>
+          {countryOpts.known.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.n})</option>)}
+          {countryOpts.unset > 0 && <option value="-">국가 미설정 ({countryOpts.unset})</option>}
+        </select>
         <span className="admin-hint">{filtered.length}명{loading ? ' · 불러오는 중…' : ''}</span>
       </div>
 
@@ -5920,7 +6057,14 @@ function MembersAdmin() {
             {shown.map((u) => (
               <tr key={u.id}>
                 <td>
-                  {u.name || '-'}
+                  {/* 이름을 눌러도 상세가 열린다(2026-09-18 · PPT 3페이지) — 오른쪽 끝 '상세' 까지 가지 않아도 되게. */}
+                  <button
+                    type="button"
+                    onClick={() => setOpen(u)}
+                    style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line2)', textUnderlineOffset: 3 }}
+                  >
+                    {u.name || '-'}
+                  </button>
                   {/* 탈퇴는 이름 옆에 붙인다 — 칸을 새로 만들면 대부분 빈칸인 열이 하나 늘고,
                       정작 급한 정보(이 사람은 지금 탈퇴 상태다)는 표 끝으로 밀린다. */}
                   {/* 파기됨은 회색(끝난 상태), 탈퇴는 빨강(아직 되돌릴 수 있어 눈에 띄어야 한다). */}
@@ -6051,8 +6195,16 @@ function EarnedCerts({ attempts }: { attempts: CbtUserAttempt[] }) {
 // 회원 상세 — 한 사람을 세 관점으로 본다. 목록을 합친 대신 여기서 갈랐다.
 //   ⚠️ 탭마다 자기 데이터를 자기가 부른다(열어야 부른다). 셋을 한 번에 부르면 CARIS 만 볼 사람도
 //      아레나·결제까지 기다린다.
+// 탭 8개 · 순서는 PPT `관리자 페이지 수정사항` 2페이지 그대로(2026-09-18).
+//   유저정보 › 메모 › 1:1문의 › CARIS › WORLD ARENA › 결제·환불 › 독려이력 › 로그인정보
+type MemberTab = 'info' | 'note' | 'inquiry' | 'caris' | 'arena' | 'pay' | 'mail' | 'access'
+const MEMBER_TABS: { key: MemberTab; label: string }[] = [
+  { key: 'info', label: '유저정보' }, { key: 'note', label: '메모' }, { key: 'inquiry', label: '1:1 문의' },
+  { key: 'caris', label: 'CARIS' }, { key: 'arena', label: 'WORLD ARENA' }, { key: 'pay', label: '결제·환불' },
+  { key: 'mail', label: '독려이력' }, { key: 'access', label: '로그인정보' },
+]
 function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => void }) {
-  const [tab, setTab] = useState<'caris' | 'arena' | 'pay' | 'note'>('caris')
+  const [tab, setTab] = useState<MemberTab>('info')
   // 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
   const [regionName, setRegionName] = useState('')
   const { country, region } = user
@@ -6184,24 +6336,58 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
             </span>
           </div>
         )}
-        <div className="admin-tabs" style={{ marginBottom: 14 }}>
-          <button className={tab === 'caris' ? 'on' : ''} onClick={() => setTab('caris')}>CARIS</button>
-          <button className={tab === 'arena' ? 'on' : ''} onClick={() => setTab('arena')}>WORLD ARENA</button>
-          <button className={tab === 'pay' ? 'on' : ''} onClick={() => setTab('pay')}>결제·구매</button>
-          <button className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>문의·메모</button>
+        <div className="admin-tabs" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
+          {MEMBER_TABS.map((t) => (
+            <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>{t.label}</button>
+          ))}
         </div>
+        {tab === 'info' ? <MemberInfoPanel user={user} /> : null}
+        {tab === 'note' ? <MemberNotePanel userId={user.id} /> : null}
+        {tab === 'inquiry' ? <MemberInquiryPanel userId={user.id} /> : null}
         {tab === 'caris' ? <MemberCarisPanel userId={user.id} /> : null}
         {tab === 'arena' ? <ArenaUserPanel userId={user.id} initialRank={user.arenaRank ?? 1} /> : null}
         {tab === 'pay' ? <MemberPayPanel userId={user.id} /> : null}
-        {tab === 'note' ? <MemberNotePanel userId={user.id} /> : null}
+        {tab === 'mail' ? <MemberMailPanel userId={user.id} /> : null}
+        {tab === 'access' ? <MemberAccessPanel userId={user.id} /> : null}
       </div>
     </div>
   )
 }
 
+// 한 응시의 문항별 정오답 — 제출답안 탭의 상세 모달과 같은 그림. 회원 상세 안에서는 표 아래 줄에 펼친다.
+//   ⚠️ 호출부가 `key={attemptId}` 를 건다 — 다른 응시로 바꾸면 새로 마운트되어 옛 답안이 잠깐 남지 않는다.
+function CarisAnswerList({ attemptId }: { attemptId: string }) {
+  const [d, setD] = useState<AdminDetailResponse | null>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    callFunction<AdminDetailResponse>('admin', { action: 'detail', attemptId })
+      .then(setD)
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
+  }, [attemptId])
+  if (err) return <div className="admin-empty">{err}</div>
+  if (!d) return <div className="admin-empty">불러오는 중…</div>
+  if (!d.answers.length) return <div className="admin-empty">문항 기록이 없습니다.</div>
+  return (
+    <div className="admin-ans-list">
+      {d.answers.map((a) => (
+        <div key={a.number} className={`admin-ans ${a.isCorrect ? 'ok' : 'no'}`}>
+          <span className="admin-ans-no">{a.number}</span>
+          <span className="admin-ans-q">{a.prompt}</span>
+          <span className="admin-ans-pick">
+            {a.kind === 'short'
+              ? <>{a.answerText ? `"${a.answerText}"` : '미응답'}{a.answerKey ? ` / 모범답안 ${a.answerKey}` : ''}{a.isCorrect == null ? ' · 미채점' : ''}</>
+              : <>{a.selectedIndex === null ? '미응답' : `${a.selectedIndex + 1}번`}{' / 정답 '}{a.correctIndex + 1}번</>}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function MemberCarisPanel({ userId }: { userId: string }) {
-  // 중단 기록을 펼쳐 볼 응시. 표에서 고른 한 건만 아래에 보여준다.
+  // 중단 기록(기록·복구) 또는 문항별 정오답을 펼쳐 볼 응시. 표에서 고른 한 건만 아래에 보여준다.
   const [resumeId, setResumeId] = useState('')
+  const [answersId, setAnswersId] = useState('')
   const [detail, setDetail] = useState<CbtUserDetailResp | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -6252,10 +6438,11 @@ function MemberCarisPanel({ userId }: { userId: string }) {
                   <td>{at.passed !== true ? <span style={{ color: 'var(--dim)' }}>–</span>
                     : at.released ? <span className="badge ok">발급 가능</span> : <span className="badge low">공개 대기</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(at.submittedAt)}</td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {/* 제출한 응시는 문항별 정오답, 중단된 응시는 중단 기록·복구. 둘 중 하나만 펼친다. */}
                     {at.status === 'submitted'
-                      ? <span style={{ color: 'var(--dim)' }}>–</span>
-                      : <button className="admin-mini" onClick={() => setResumeId(at.id)}>기록·복구</button>}
+                      ? <button className="admin-mini" onClick={() => { setResumeId(''); setAnswersId(answersId === at.id ? '' : at.id) }}>{answersId === at.id ? '닫기' : '문항·정오답'}</button>
+                      : <button className="admin-mini" onClick={() => { setAnswersId(''); setResumeId(resumeId === at.id ? '' : at.id) }}>{resumeId === at.id ? '닫기' : '기록·복구'}</button>}
                   </td>
                 </tr>
               ))}
@@ -6268,11 +6455,16 @@ function MemberCarisPanel({ userId }: { userId: string }) {
               )}
             </tbody>
           </table>
-          {/* 고른 응시의 중단 기록 + 복구. 표 바로 아래에 펼쳐 보여준다(모달을 또 띄우지 않는다 —
+          {/* 고른 응시의 중단 기록 + 복구 / 문항별 정오답. 표 바로 아래에 펼쳐 보여준다(모달을 또 띄우지 않는다 —
               이미 회원 상세 모달 안이라 모달이 두 겹이 된다). */}
           {resumeId && (
             <div style={{ marginTop: 12 }}>
               <InterruptionPanel attemptId={resumeId} />
+            </div>
+          )}
+          {answersId && (
+            <div style={{ marginTop: 12 }}>
+              <CarisAnswerList key={answersId} attemptId={answersId} />
             </div>
           )}
         </div>
@@ -6281,16 +6473,22 @@ function MemberCarisPanel({ userId }: { userId: string }) {
   )
 }
 
-// 결제·구매 — 이 사람 결제 내역. `paymentList` 에 userId 필터를 얹어 쓴다.
-//   ⚠️ 목록 화면(회원관리 > 결제관리)은 아직 없다(3단계). 여기는 "이 회원이 뭘 샀나" 만 본다.
+// 결제·환불 — 이 사람 결제 내역 + 환불 원장. `paymentList` 에 userId 필터를 얹어 쓰고, 환불은 `refundList`.
+//   ⚠️ 환불 **실행**은 여기서 안 한다 — 유저관리 › 결제관리 한 곳에서만(돈이 나가는 버튼은 한 자리).
+//      여기는 "이 회원이 뭘 샀고 얼마를 돌려받았나" 만 본다.
 function MemberPayPanel({ userId }: { userId: string }) {
   const [data, setData] = useState<PaymentListResp | null>(null)
+  const [refunds, setRefunds] = useState<RefundRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   useEffect(() => {
     setLoading(true)
-    callFunction<PaymentListResp>('admin', { action: 'paymentList', userId, limit: 100 })
-      .then(setData)
+    Promise.all([
+      callFunction<PaymentListResp>('admin', { action: 'paymentList', userId, limit: 100 }),
+      // 환불 원장은 실패해도 결제 표는 보여야 한다(옛 배포본엔 이 액션이 없다).
+      callFunction<{ refunds: RefundRow[] }>('admin', { action: 'refundList', userId }).catch(() => ({ refunds: [] as RefundRow[] })),
+    ])
+      .then(([d, r]) => { setData(d); setRefunds(r.refunds ?? []) })
       .catch((e) => setErr(e instanceof Error ? e.message : '불러오기 실패'))
       .finally(() => setLoading(false))
   }, [userId])
@@ -6299,36 +6497,78 @@ function MemberPayPanel({ userId }: { userId: string }) {
   // ⚠️ 클라에서 한 번 더 거른다. `userId` 필터는 admin 함수를 **배포해야** 먹는데, 배포 전 응답은
   //    전체 결제를 그대로 돌려준다 — 그러면 남의 결제가 이 회원 것으로 보인다. 돈 얘기라 서버만 믿지 않는다.
   const rows = (data?.payments ?? []).filter((p) => p.userId === userId)
-  if (!rows.length) return <div className="admin-empty">결제 내역이 없습니다.</div>
   return (
-    <div className="admin-table-wrap">
-      <table className="admin-table">
-        <thead>
-          <tr><th>일시</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th>상태</th><th>열람</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => (
-            <tr key={p.id}>
-              <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.createdAt)}</td>
-              <td>
-                {p.orderName}
-                <span style={{ color: 'var(--muted)' }}> · {productLabel(p.productType)}</span>
-              </td>
-              {/* `amount` 는 정가 센트다 — krw() 로 찍으면 $1 이 "100원" 이 된다. */}
-              <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{usdc(p.amount)}</td>
-              <td style={{ whiteSpace: 'nowrap' }}>
-                {/* ⚠️ 영문 코드(paid·pending)를 그대로 내보내지 않는다 — 이 화면은 사무 담당자가 본다. */}
-                <span className="badge">{payStatusLabel(p.status)}</span>
-                {/* 돈은 받았는데 물건이 안 나간 건 — 대사에서 잡히는 그 신호다. */}
-                {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
-              </td>
-              {/* 이북을 샀다면 실제로 열어봤는지 — 환불 문의를 받았을 때 여기부터 본다. */}
-              <ReadCell reads={p.reads} />
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="admin-sub">결제 내역 {rows.length ? `${rows.length}건` : ''}</div>
+      {rows.length ? (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr><th>일시</th><th>상품</th><th style={{ textAlign: 'right' }}>금액</th><th style={{ textAlign: 'right' }}>환불</th><th>상태</th><th>열람</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((p) => (
+                <tr key={p.id}>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.createdAt)}</td>
+                  <td>
+                    {p.orderName}
+                    <span style={{ color: 'var(--muted)' }}> · {productLabel(p.productType)}</span>
+                  </td>
+                  {/* `amount` 는 정가 센트다 — krw() 로 찍으면 $1 이 "100원" 이 된다. 청구액이 있으면 그 통화로 덧붙인다. */}
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                    {usdc(p.amount)}
+                    {p.chargeAmount != null && (p.chargeCurrency ?? 'USD').toUpperCase() === 'KRW' && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>청구 {chargeText(p.chargeCurrency, p.chargeAmount)}</div>
+                    )}
+                  </td>
+                  {/* 돌려준 돈은 **청구 통화**로 — 원화 결제는 원화로 빠졌다. */}
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                    {(p.refundedAmount ?? 0) > 0 ? chargeText(p.chargeCurrency, p.refundedAmount) : <span style={{ color: 'var(--dim)' }}>–</span>}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {/* ⚠️ 영문 코드(paid·pending)를 그대로 내보내지 않는다 — 이 화면은 사무 담당자가 본다. */}
+                    <span className="badge">{payStatusLabel(p.status)}</span>
+                    {p.status === 'paid' && (p.refundedAmount ?? 0) > 0 && <span style={{ color: 'var(--muted)' }}> · 부분환불</span>}
+                    {/* 돈은 받았는데 물건이 안 나간 건 — 대사에서 잡히는 그 신호다. */}
+                    {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
+                  </td>
+                  {/* 이북을 샀다면 실제로 열어봤는지 — 환불 문의를 받았을 때 여기부터 본다. */}
+                  <ReadCell reads={p.reads} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="admin-empty">결제 내역이 없습니다.</div>}
+
+      <div className="admin-sub" style={{ marginTop: 18 }}>환불 내역 {refunds.length ? `${refunds.length}건` : ''}</div>
+      {refunds.length ? (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead><tr><th>일시</th><th>주문</th><th style={{ textAlign: 'right' }}>환불액</th><th>내역·사유</th><th>처리</th></tr></thead>
+            <tbody>
+              {refunds.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.at)}</td>
+                  <td>{r.orderName || r.orderId}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{chargeText(r.currency, r.amount)}</td>
+                  <td>
+                    {/* 줄 단위로 남긴 원장 — "응시료만 절반" 과 "교재만 전액" 이 여기서 갈린다. */}
+                    {r.lines.length ? (
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        {r.lines.map((l) => `${l.name ?? l.key ?? '-'}${l.amount != null ? ` ${chargeText(r.currency, l.amount)}` : ''}`).join(' · ')}
+                      </div>
+                    ) : null}
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{r.reason}</div>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.actor ?? '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="admin-empty">환불 내역이 없습니다.</div>}
+    </>
   )
 }
 
@@ -6339,9 +6579,55 @@ function MemberPayPanel({ userId }: { userId: string }) {
 //      회원 화면에 노출하는 경로를 만들지 말 것 — 여기 적히는 건 본인이 읽으라고 쓰는 글이 아니다.
 //   ⚠️ 문의 답변은 여기서 안 한다(읽기만). 답변은 게시판 관리 › 고객센터 › Q&A 한 곳에서만 — 두 자리에서
 //      쓰면 초안·상태 처리가 갈린다.
+// 1:1 문의 — 이 사람이 남긴 문의와 우리 답변(읽기 전용). 2026-09-18 에 메모와 탭을 갈랐다(PPT 2페이지).
+function MemberInquiryPanel({ userId }: { userId: string }) {
+  const [inqs, setInqs] = useState<InquiryRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    callFunction<{ inquiries: InquiryRow[] }>('admin', { action: 'inquiryList', userId })
+      // ⚠️ 클라에서 한 번 더 거른다 — `userId` 필터는 admin 함수를 **배포해야** 먹고, 배포 전 응답은
+      //    전체 문의를 그대로 준다. 그러면 남의 문의가 이 회원 것으로 보인다.
+      .then((i) => setInqs((i.inquiries ?? []).filter((r) => r.userId === userId)))
+      .catch(() => setErr('불러오지 못했습니다.'))
+      .finally(() => setLoading(false))
+  }, [userId])
+  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+  if (err) return <div className="admin-empty">{err}</div>
+  if (!inqs.length) return <div className="admin-empty">1:1 문의가 없습니다.</div>
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead><tr><th>일시</th><th>분류</th><th>제목·내용</th><th>상태</th></tr></thead>
+        <tbody>
+          {inqs.map((r) => (
+            <tr key={r.id}>
+              <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.createdAt)}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>{INQ_CAT[r.category] ?? r.category ?? '-'}</td>
+              <td>
+                <b>{r.title}</b>
+                <div style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{r.body}</div>
+                {/* 답변까지 같이 보여준다 — "뭐라고 답했더라" 가 이 화면을 여는 이유의 절반이다. */}
+                {r.answer && (
+                  <div style={{ fontSize: 13, marginTop: 6, paddingLeft: 10, borderLeft: '2px solid var(--line2)', whiteSpace: 'pre-wrap' }}>
+                    <span style={{ color: 'var(--muted)' }}>답변 {r.answeredAt ? `· ${fmtDT(r.answeredAt)}` : ''}</span>
+                    <div>{r.answer}</div>
+                  </div>
+                )}
+              </td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                {r.status === 'open' ? <span className="badge low">답변 대기</span> : <span className="badge ok">답변 완료</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 interface MemberNote { id: string; body: string; at: string; author: string }
 function MemberNotePanel({ userId }: { userId: string }) {
-  const [inqs, setInqs] = useState<InquiryRow[]>([])
   const [notes, setNotes] = useState<MemberNote[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -6351,16 +6637,12 @@ function MemberNotePanel({ userId }: { userId: string }) {
   const load = useCallback(async () => {
     setLoading(true)
     setErr('')
-    // ⚠️ 한쪽이 실패해도 다른 쪽은 보여야 한다 — 통짜 Promise.all 로 묶으면 메모 하나 때문에 문의까지 빈다.
-    const [i, n] = await Promise.all([
-      callFunction<{ inquiries: InquiryRow[] }>('admin', { action: 'inquiryList', userId }).catch(() => null),
-      callFunction<{ notes: MemberNote[] }>('admin', { action: 'memberNoteList', userId }).catch(() => null),
-    ])
-    if (!i && !n) setErr('불러오지 못했습니다.')
-    // ⚠️ 클라에서 한 번 더 거른다 — `userId` 필터는 admin 함수를 **배포해야** 먹고, 배포 전 응답은
-    //    전체 문의를 그대로 준다. 그러면 남의 문의가 이 회원 것으로 보인다.
-    setInqs((i?.inquiries ?? []).filter((r) => r.userId === userId))
-    setNotes(n?.notes ?? [])
+    try {
+      const n = await callFunction<{ notes: MemberNote[] }>('admin', { action: 'memberNoteList', userId })
+      setNotes(n.notes ?? [])
+    } catch {
+      setErr('불러오지 못했습니다.')
+    }
     setLoading(false)
   }, [userId])
   useEffect(() => { void load() }, [load])
@@ -6394,38 +6676,7 @@ function MemberNotePanel({ userId }: { userId: string }) {
     <>
       {err && <div className="admin-empty">{err}</div>}
 
-      <div className="admin-sub">1:1 문의 {inqs.length ? `${inqs.length}건` : ''}</div>
-      {inqs.length ? (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead><tr><th>일시</th><th>분류</th><th>제목·내용</th><th>상태</th></tr></thead>
-            <tbody>
-              {inqs.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.createdAt)}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{INQ_CAT[r.category] ?? r.category ?? '-'}</td>
-                  <td>
-                    <b>{r.title}</b>
-                    <div style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{r.body}</div>
-                    {/* 답변까지 같이 보여준다 — "뭐라고 답했더라" 가 이 화면을 여는 이유의 절반이다. */}
-                    {r.answer && (
-                      <div style={{ fontSize: 13, marginTop: 6, paddingLeft: 10, borderLeft: '2px solid var(--line2)', whiteSpace: 'pre-wrap' }}>
-                        <span style={{ color: 'var(--muted)' }}>답변 {r.answeredAt ? `· ${fmtDT(r.answeredAt)}` : ''}</span>
-                        <div>{r.answer}</div>
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    {r.status === 'open' ? <span className="badge low">답변 대기</span> : <span className="badge ok">답변 완료</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : <div className="admin-empty">1:1 문의가 없습니다.</div>}
-
-      <div className="admin-sub" style={{ marginTop: 18 }}>관리자 메모</div>
+      <div className="admin-sub">관리자 메모</div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12 }}>
         <textarea
           style={{ ...inpStyle, flex: 1, minHeight: 64, resize: 'vertical' }}
@@ -6447,6 +6698,222 @@ function MemberNotePanel({ userId }: { userId: string }) {
           <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{n.body}</div>
         </div>
       )) : <div className="admin-empty">아직 메모가 없습니다.</div>}
+    </>
+  )
+}
+
+// ── 회원 상세 · 유저정보 (2026-09-18 · PPT 2페이지) ──────────────────
+// "지금 알고 있는 이 사람의 값" 을 한 화면에. 순위는 랭킹 화면과 같은 RPC 로 서버가 센다(memberInfo).
+//   ⚠️ 숫자 표로만 보여준다(2026-09-18 결정 — 랭킹 화면의 카드 그림을 그대로 넣지 않는다).
+interface MemberInfoResp {
+  profile: {
+    name: string | null; created: string | null; anon: boolean
+    country: string | null; region: string | null; ageBand: string | null; lastSeen: string | null
+    termsAgreedAt: string | null; termsVersion: string | null; marketingAgreedAt: string | null
+    referralCode: string | null; referrer: { name: string | null } | null; invited: number
+    deactivated: string | null; purged: string | null; suspendedUntil: string | null; suspendedReason: string | null
+  }
+  progress: { rank: number; arenaLevel: number | null; seasonTotal: number; skillScore: number; activityScore: number } | null
+  coins: number
+  character: { base: string | null; skin: string | null; title: string | null } | null
+  titles: { tier: string; examTitle: string | null }[]
+  ranking: {
+    global: { rank: number | null; total: number | null }
+    country: { rank: number | null; total: number | null }
+    region: { rank: number | null; total: number | null }
+    tier: string | null; percentile: number | null
+  }
+  fetchedAt: string
+}
+const AGE_BAND_KO: Record<string, string> = {
+  '10s': '10대 이하', '20s': '20대', '30s': '30대', '40s': '40대', '50s': '50대', '60s': '60대 이상', private: '공개 안 함',
+}
+const ARENA_TIER_KO: Record<string, string> = {
+  iron: '아이언', bronze: '브론즈', silver: '실버', gold: '골드', platinum: '플래티넘', diamond: '다이아', master: '마스터',
+}
+const SANCTION_REASON_KO: Record<string, string> = {
+  spam: '광고·홍보', abuse: '욕설·비방', sexual: '음란', flood: '도배', privacy: '개인정보 노출', other: '기타',
+}
+const InfoRow = ({ k, v }: { k: string; v: ReactNode }) => (
+  <div className="admin-row" style={{ marginTop: 4 }}><span>{k}</span><b>{v}</b></div>
+)
+function MemberInfoPanel({ user }: { user: MemberRow }) {
+  const [d, setD] = useState<MemberInfoResp | null>(null)
+  const [err, setErr] = useState('')
+  const [regionName, setRegionName] = useState('')
+  useEffect(() => {
+    callFunction<Omit<MemberInfoResp, 'fetchedAt'>>('admin', { action: 'memberInfo', userId: user.id })
+      .then((r) => setD({ ...r, fetchedAt: new Date().toISOString() }))
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
+  }, [user.id])
+  const country = d?.profile.country ?? null
+  const region = d?.profile.region ?? null
+  useEffect(() => {
+    if (!country || !region) return
+    let alive = true
+    loadRegions(country, 'ko')
+      .then((list) => { if (alive) setRegionName(list.find((r) => r.code === region)?.name ?? '') })
+      .catch(() => { /* 못 받으면 코드가 그대로 뜬다 */ })
+    return () => { alive = false }
+  }, [country, region])
+  if (err) return <div className="admin-empty">{err}</div>
+  if (!d) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+  const p = d.profile
+  const rk = d.ranking
+  const rankText = (r: { rank: number | null; total: number | null }) =>
+    r.rank == null ? '–' : `${r.rank.toLocaleString()}위${r.total != null ? ` / ${r.total.toLocaleString()}명` : ''}`
+  const permanent = p.suspendedUntil ? new Date(p.suspendedUntil).getFullYear() >= 9999 : false
+  // '정지 중' 판정 — 서버 응답이 온 시각 기준이면 충분하다(분 단위 정확도가 필요한 자리가 아니다).
+  const suspended = p.suspendedUntil ? new Date(p.suspendedUntil) > new Date(d.fetchedAt) : false
+  const Row = InfoRow
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0 24px' }}>
+      <div>
+        <div className="admin-sub">계정</div>
+        <Row k="닉네임" v={p.name || '-'} />
+        <Row k="이메일" v={user.email || '-'} />
+        <Row k="유형" v={p.anon ? '게스트' : '가입 유저'} />
+        <Row k="가입" v={fmtDT(p.created)} />
+        <Row k="마지막 접속" v={fmtDT(p.lastSeen)} />
+        <Row k="국가·지역" v={country ? <>{flagUrl(country) && <img src={flagUrl(country)} alt="" style={{ width: '1.1em', aspectRatio: '4/3', verticalAlign: '-0.15em', marginRight: 4, borderRadius: 2 }} />}{countryName(country, 'ko')}{region ? ` ${regionName || region}` : ''}</> : '미설정'} />
+        <Row k="연령대" v={AGE_BAND_KO[p.ageBand ?? ''] ?? '미수집'} />
+        <Row k="약관 동의" v={p.termsAgreedAt ? `${fmtDT(p.termsAgreedAt)}${p.termsVersion ? ` (${p.termsVersion})` : ''}` : '아직'} />
+        <Row k="광고 수신" v={p.marketingAgreedAt ? `동의 · ${fmtDT(p.marketingAgreedAt)}` : '미동의'} />
+        <Row k="친구 초대" v={<>{p.referralCode ? <code>{p.referralCode}</code> : '-'} · 초대한 사람 {p.invited}명{p.referrer ? ` · 추천인 ${p.referrer.name ?? '(이름 없음)'}` : ''}</>} />
+        {/* 채팅 제재는 '정지 중' 일 때만 줄이 뜬다 — 대부분 회원에게 빈칸이 늘 보이면 소음이다. */}
+        {suspended && (
+          <Row k="채팅 정지" v={<span style={{ color: 'var(--danger-fg)' }}>{permanent ? '영구' : `${fmtDT(p.suspendedUntil)} 까지`}{p.suspendedReason ? ` · ${SANCTION_REASON_KO[p.suspendedReason] ?? p.suspendedReason}` : ''}</span>} />
+        )}
+      </div>
+      <div>
+        <div className="admin-sub">WORLD ARENA · 순위</div>
+        <Row k="전체 순위" v={rankText(rk.global)} />
+        <Row k="국가 순위" v={country ? rankText(rk.country) : '–'} />
+        <Row k="지역 순위" v={region ? rankText(rk.region) : '–'} />
+        <Row k="티어" v={rk.tier ? `${ARENA_TIER_KO[rk.tier] ?? rk.tier}${rk.percentile != null ? ` · 상위 ${rk.percentile}%` : ''}` : '–'} />
+        <Row k="ARENA 레벨" v={d.progress?.arenaLevel != null ? `Lv.${d.progress.arenaLevel}` : '–'} />
+        <Row k="시즌 점수" v={d.progress ? `${d.progress.seasonTotal.toLocaleString()} (레벨테스트 ${d.progress.skillScore.toLocaleString()} + 활동 ${d.progress.activityScore.toLocaleString()})` : '–'} />
+        <Row k="레벨테스트 등급" v={d.progress ? `Lv.${d.progress.rank}` : '–'} />
+        <div className="admin-sub" style={{ marginTop: 18 }}>허브 · 자격</div>
+        <Row k="코인" v={d.coins.toLocaleString()} />
+        <Row k="캐릭터" v={d.character?.base ? `${charArtName(d.character.base, 'ko') ?? d.character.base}${d.character.skin ? ` · 배경 ${d.character.skin}` : ''}` : '아직 안 고름'} />
+        <Row k="취득 급수" v={d.titles.length ? d.titles.map((t) => tierName(t.tier)).join(' · ') : '없음'} />
+        <Row k="장착 칭호" v={d.character?.title ? tierName(d.character.title) : (d.titles[0] ? `${tierName(d.titles[0].tier)} (최근 합격)` : '–')} />
+      </div>
+    </div>
+  )
+}
+
+// ── 회원 상세 · 독려이력 ──
+// 이 사람에게 보낸 독려 메일 — 언어·발송됨/실패(사유)까지. 'logged'(미발송)는 발송 수단이 없던 때의 옛 행이다.
+interface MemberMailRow {
+  id: number; at: string; email: string; status: 'logged' | 'sent' | 'failed'; sentAt: string | null; error: string | null
+  lang: string | null; kind: string | null; subject: string; body: string; sentBy: string | null
+}
+const MAIL_KIND_KO: Record<string, string> = { nudge_env_check: '시험환경 점검 독려', nudge_leveltest: '레벨테스트 독려', nudge_ticket: '응시 마감 임박' }
+const MAIL_LANG_KO: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
+function MemberMailPanel({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<MemberMailRow[] | null>(null)
+  const [err, setErr] = useState('')
+  const [openId, setOpenId] = useState<number | null>(null)
+  useEffect(() => {
+    callFunction<{ mails: MemberMailRow[] }>('admin', { action: 'memberMailList', userId })
+      .then((r) => setRows(r.mails ?? []))
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
+  }, [userId])
+  if (err) return <div className="admin-empty">{err}</div>
+  if (!rows) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+  return (
+    <>
+      {rows.length ? (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead><tr><th>일시</th><th>종류</th><th>제목</th><th>받는 주소</th><th>언어</th><th>상태</th><th>보낸 사람</th></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <Fragment key={r.id}>
+                  <tr>
+                    <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(r.at)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{MAIL_KIND_KO[r.kind ?? ''] ?? r.kind ?? '-'}</td>
+                    <td>
+                      {r.subject || '(제목 없음)'}
+                      <button className="admin-mini" style={{ marginLeft: 8 }} onClick={() => setOpenId(openId === r.id ? null : r.id)}>{openId === r.id ? '닫기' : '본문'}</button>
+                    </td>
+                    <td style={{ color: 'var(--muted)' }}>{r.email}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{r.lang ? (MAIL_LANG_KO[r.lang] ?? r.lang) : '-'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {r.status === 'sent' ? <span className="badge ok">발송됨</span>
+                        : r.status === 'failed' ? <><span className="badge none">실패</span>{r.error && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'normal' }}>{r.error}</div>}</>
+                          : <span className="badge low">미발송</span>}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{r.sentBy ?? '-'}</td>
+                  </tr>
+                  {openId === r.id && (
+                    <tr><td colSpan={7} style={{ background: 'var(--soft)', whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{r.body || '(본문 없음)'}</td></tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="admin-empty">보낸 메일이 없습니다.</div>}
+    </>
+  )
+}
+
+// ── 회원 상세 · 로그인정보 ──
+// 로그인 이벤트 표는 따로 없다(2026-09-18 결정: 방문 로그 재활용). 인증 서버의 '마지막 로그인' 과,
+// 방문 로그를 날짜 × IP × 기기로 접은 '접속 기록' 을 보여준다.
+//   ⚠️ 로그인 전 방문은 이 사람 것으로 못 센다(방문 로그의 회원 ID 는 로그인한 채 본 화면에만 붙는다).
+//   ⚠️ 방문 로그는 180일 보관이다(개인정보처리방침과 한 벌) — 그보다 오래된 접속은 여기 없다.
+interface MemberAccessResp {
+  auth: { lastSignIn: string | null; created: string | null; provider: string | null; email: string | null } | null
+  sessions: { day: string; ip: string | null; country: string | null; device: string; browser: string; os: string; first: string; last: string; views: number; entryPath: string | null }[]
+  totalViews: number
+}
+const DEVICE_KO: Record<string, string> = { mobile: '모바일', tablet: '태블릿', desktop: 'PC' }
+function MemberAccessPanel({ userId }: { userId: string }) {
+  const [d, setD] = useState<MemberAccessResp | null>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    callFunction<MemberAccessResp>('admin', { action: 'memberAccess', userId })
+      .then(setD)
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
+  }, [userId])
+  if (err) return <div className="admin-empty">{err}</div>
+  if (!d) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>불러오는 중…</div>
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' })
+  return (
+    <>
+      <div className="admin-sub">로그인</div>
+      <div className="admin-row" style={{ marginTop: 4 }}><span>마지막 로그인</span><b>{fmtDT(d.auth?.lastSignIn ?? null)}</b></div>
+      <div className="admin-row" style={{ marginTop: 4 }}><span>로그인 수단</span><b>{d.auth?.provider === 'google' ? '구글' : d.auth?.provider ?? '-'}</b></div>
+      <div className="admin-row" style={{ marginTop: 4 }}><span>계정 생성</span><b>{fmtDT(d.auth?.created ?? null)}</b></div>
+
+      <div className="admin-sub" style={{ marginTop: 18 }}>접속 기록 <span className="admin-hint">날짜·IP·기기별 · 최근 180일 · 화면 조회 {d.totalViews.toLocaleString()}건</span></div>
+      {d.sessions.length ? (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead><tr><th>날짜</th><th>시간</th><th>IP</th><th>국가</th><th>기기</th><th>브라우저 · OS</th><th style={{ textAlign: 'right' }}>조회</th><th>첫 화면</th></tr></thead>
+            <tbody>
+              {d.sessions.map((s, i) => (
+                <tr key={i}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{s.day}</td>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{hhmm(s.first)}{s.views > 1 ? ` ~ ${hhmm(s.last)}` : ''}</td>
+                  <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{s.ip ?? <span style={{ color: 'var(--dim)' }}>미상</span>}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {s.country ? <>{flagUrl(s.country) && <img src={flagUrl(s.country)} alt="" style={{ width: '1.1em', aspectRatio: '4/3', verticalAlign: '-0.15em', marginRight: 4, borderRadius: 2 }} />}{countryName(s.country, 'ko')}</> : <span style={{ color: 'var(--dim)' }}>미상</span>}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{DEVICE_KO[s.device] ?? s.device}</td>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{s.browser} · {s.os}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{s.views}</td>
+                  <td style={{ color: 'var(--muted)' }}>{s.entryPath ?? '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="admin-empty">접속 기록이 없습니다. (로그인한 채 본 화면만 남습니다 · 2026-09-09 이후)</div>}
     </>
   )
 }

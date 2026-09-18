@@ -4,7 +4,7 @@
 //  - 이관 범위: 대시보드 · 유저 · 응시 기록 · 문항 목록 · 문항 이력 · 문항 생성(KB 파이프라인) · 번역 · 제보 · 관리자 관리.
 //  - KB 파이프라인(kb-extract/generate/save/publish/embed-backfill)·translate-questions 는 관리자 인증만으로 호출한다
 //    (옛 x-passcode 입력칸은 제거 — 서버 시크릿 KB_PASSCODE/TRANSLATE_PASSCODE 미설정이라 검사 자체를 안 함).
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { callFunction } from '../lib/supabase'
 import { axesForLevel, axisDef, MAX_LEVEL } from '../lib/categories'
@@ -12,6 +12,7 @@ import { optionCountForLevel } from '../lib/scoring'
 import { runTranslation, type TransItem, type TransResult } from '../lib/adminTranslate'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
+import { MailComposeModal, type MailTarget } from './AdminReform'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
@@ -521,6 +522,8 @@ const HIST_PAGE = 10
 function AttemptHistory({ attempts }: { attempts: Omit<AttemptRow, 'name'>[] }) {
   const [withIncomplete, setWithIncomplete] = useState(false)
   const [page, setPage] = useState(0)
+  // 펼쳐 볼 응시(문항별 정오답). 한 번에 하나만 — 표 바로 아래 줄에 붙인다(회원 상세 모달 안이라 모달을 또 안 띄운다).
+  const [openId, setOpenId] = useState('')
   const doneCount = attempts.filter((a) => a.status === 'submitted').length
   const shown = withIncomplete ? attempts : attempts.filter((a) => a.status === 'submitted')
   const pageCount = Math.max(1, Math.ceil(shown.length / HIST_PAGE))
@@ -541,13 +544,14 @@ function AttemptHistory({ attempts }: { attempts: Omit<AttemptRow, 'name'>[] }) 
         </label>
       </div>
       <table className="admin-table">
-        <thead><tr><th>일시</th><th>레벨</th><th>언어</th><th>점수</th><th>상태</th><th>등급변동</th></tr></thead>
+        <thead><tr><th>일시</th><th>레벨</th><th>언어</th><th>점수</th><th>상태</th><th>등급변동</th><th /></tr></thead>
         <tbody>
           {slice.map((a) => {
             const logs = a.violations ?? []
             const vs = logs.length ? violationSummary(logs) : null
             return (
-              <tr key={a.id}>
+              <Fragment key={a.id}>
+              <tr>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtDT(a.submitted_at || a.created_at)}</td>
                 <td>Lv.{a.level}</td>
                 <td>{a.lang}</td>
@@ -559,11 +563,21 @@ function AttemptHistory({ attempts }: { attempts: Omit<AttemptRow, 'name'>[] }) 
                   {vs ? <div className="vio-sum" title={vs.detail}>{vs.text}</div> : null}
                 </td>
                 <td><RankBadge before={a.rank_before} after={a.rank_after} dir={a.rank_dir} /></td>
+                <td>
+                  {/* 중단 응시는 문항 기록이 없다(제출 전이라) — 버튼을 안 그린다. */}
+                  {a.status === 'submitted'
+                    ? <button className="admin-mini" onClick={() => setOpenId(openId === a.id ? '' : a.id)}>{openId === a.id ? '닫기' : '문항·정오답'}</button>
+                    : null}
+                </td>
               </tr>
+              {openId === a.id ? (
+                <tr><td colSpan={7} style={{ background: 'var(--soft)', padding: '8px 12px' }}><LevelTestAnswers key={a.id} attemptId={a.id} /></td></tr>
+              ) : null}
+              </Fragment>
             )
           })}
           {!slice.length ? (
-            <tr><td colSpan={6} className="admin-empty">{attempts.length ? '완료된 응시 없음' : '응시 이력 없음'}</td></tr>
+            <tr><td colSpan={7} className="admin-empty">{attempts.length ? '완료된 응시 없음' : '응시 이력 없음'}</td></tr>
           ) : null}
         </tbody>
       </table>
@@ -632,6 +646,7 @@ function AttemptsTab() {
   const [dirF, setDirF] = useState<'all' | 'up' | 'down' | 'stay'>('all')
   const [outF, setOutF] = useState<'all' | 'submitted' | 'voided' | 'incomplete'>('all')
   const [open, setOpen] = useState<AttemptRow | null>(null)
+  const [nudge, setNudge] = useState(false)
 
   useEffect(() => {
     callFunction<{ attempts: AttemptRow[] }>('admin-test', { action: 'attempts' })
@@ -674,6 +689,8 @@ function AttemptsTab() {
             <option value="all">전체 결과</option><option value="submitted">완료</option><option value="voided">경고중단</option><option value="incomplete">중도이탈</option>
           </select>
           <span className="admin-hint">{filtered.length}건{loading ? ' · 불러오는 중…' : ''}</span>
+          {/* 마지막 응시가 N일 지난 회원에게 독려 메일(2026-09-18 · PPT 4페이지). 대상 고르기는 모달 안에서. */}
+          <button className="btn-ink" style={{ marginLeft: 'auto' }} onClick={() => setNudge(true)}>독려 메일</button>
         </div>
         <table className="admin-table">
           <thead><tr><th>유저</th><th>레벨</th><th>언어</th><th>점수</th><th>결과</th><th>등급변동</th><th>일시</th><th></th></tr></thead>
@@ -700,6 +717,102 @@ function AttemptsTab() {
         {filtered.length === 0 && !loading ? <div className="admin-empty">조건에 맞는 응시가 없습니다.</div> : null}
       </div>
       {open ? <AttemptDetail attempt={open} onClose={() => setOpen(null)} /> : null}
+      {nudge ? <LevelNudgeModal onClose={() => setNudge(false)} /> : null}
+    </div>
+  )
+}
+
+// ── 레벨테스트 독려 메일 — 대상 고르기 (2026-09-18 · PPT 4페이지) ──
+// "마지막 응시가 N일 지난 회원" 을 서버가 골라 주고(leveltest_nudge_candidates), 여기서 체크해 메일 창으로 넘긴다.
+//   ⚠️ '마지막 독려' 열이 있는 이유 = 지난주에 보낸 사람이 이번 주에도 후보로 뜬다. 최근에 받은 사람은 기본으로 뺀다.
+interface NudgePerson { userId: string; name: string | null; email: string | null; rank: number; lastAt: string; daysSince: number; lastMailAt: string | null }
+const LEVEL_MAIL_VARS: [string, string][] = [['{name}', '이름'], ['{level}', '현재 레벨등급'], ['{link}', '레벨테스트 주소']]
+function LevelNudgeModal({ onClose }: { onClose: () => void }) {
+  const [days, setDays] = useState(7)
+  const [applied, setApplied] = useState(7)
+  const [people, setPeople] = useState<NudgePerson[] | null>(null)
+  const [err, setErr] = useState('')
+  const [skipRecent, setSkipRecent] = useState(true)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [compose, setCompose] = useState(false)
+  // 목록을 받은 시각 — '최근 독려' 판정의 기준. 렌더마다 시계를 읽지 않는다.
+  const [fetchedAt, setFetchedAt] = useState(0)
+
+  useEffect(() => {
+    callFunction<{ people: NudgePerson[] }>('admin', { action: 'levelNudgeList', days: applied })
+      .then((r) => { setPeople(r.people); setPicked(new Set()); setFetchedAt(Date.now()) })
+      .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
+  }, [applied])
+
+  // 최근 독려 = 지금 고른 N일 안에 이미 한 번 보낸 사람. 같은 사람에게 매주 보내는 걸 막는 기본값이다.
+  const recentMs = applied * 86400e3
+  const shown = (people ?? []).filter((p) => !skipRecent || !p.lastMailAt || Date.parse(p.lastMailAt) < fetchedAt - recentMs)
+  const sendable = shown.filter((p) => p.email)
+  const allOn = sendable.length > 0 && sendable.every((p) => picked.has(p.userId))
+  const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const toggleAll = () => setPicked(allOn ? new Set() : new Set(sendable.map((p) => p.userId)))
+  const targets: MailTarget[] = shown.filter((p) => picked.has(p.userId)).map((p) => ({
+    userId: p.userId, email: p.email, name: p.name,
+    sample: { '{level}': `Lv.${p.rank}`, '{link}': `${location.origin}/test/select` },
+  }))
+
+  return (
+    <div className="lt-modal" onClick={onClose}>
+      <div className="lt-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="admin-modal-h">
+          <b>레벨테스트 독려 메일</b>
+          <span className="admin-hint">마지막 응시가 오래된 회원에게 한 번에</span>
+          <button className="admin-x" onClick={onClose}>✕</button>
+        </div>
+        <div className="admin-toolbar">
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
+            마지막 응시 후
+            <input type="number" min={0} max={365} value={days} onChange={(e) => setDays(Math.max(0, Math.min(365, +e.target.value || 0)))} style={{ width: 64 }} />
+            일 지난 회원
+          </label>
+          <button className="admin-mini" onClick={() => setApplied(days)} disabled={days === applied}>적용</button>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
+            <input type="checkbox" checked={skipRecent} onChange={(e) => setSkipRecent(e.target.checked)} />
+            최근 {applied}일 안에 독려받은 사람 제외
+          </label>
+          <span className="admin-hint">{people ? `${shown.length}명 · 이메일 없음 ${shown.length - sendable.length}명` : '불러오는 중…'}</span>
+          <button className="btn-ink" style={{ marginLeft: 'auto' }} onClick={() => setCompose(true)} disabled={!targets.length}>
+            {targets.length ? `${targets.length}명에게 메일 보내기` : '메일 보내기'}
+          </button>
+        </div>
+        {err ? <ErrBox msg={err} /> : null}
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th style={{ width: 44 }}><input type="checkbox" checked={allOn} onChange={toggleAll} disabled={!sendable.length} /></th>
+              <th>이름</th><th>이메일</th><th>레벨</th><th>마지막 응시</th><th>경과</th><th>마지막 독려</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((p) => (
+              <tr key={p.userId}>
+                <td><input type="checkbox" checked={picked.has(p.userId)} onChange={() => toggle(p.userId)} disabled={!p.email} /></td>
+                <td><b>{p.name || '-'}</b></td>
+                <td style={{ color: p.email ? 'var(--muted)' : 'var(--dim)' }}>{p.email || '이메일 없음 — 보낼 수 없음'}</td>
+                <td>Lv.{p.rank}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.lastAt)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{p.daysSince}일</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{p.lastMailAt ? fmtDT(p.lastMailAt) : '–'}</td>
+              </tr>
+            ))}
+            {people && !shown.length ? <tr><td colSpan={7} className="admin-empty">조건에 맞는 회원이 없습니다.</td></tr> : null}
+          </tbody>
+        </table>
+        {compose ? (
+          <MailComposeModal
+            kind="nudge_leveltest"
+            settingKeys={{ subject: 'mail_leveltest_subject', body: 'mail_leveltest_body' }}
+            vars={LEVEL_MAIL_VARS}
+            targets={targets}
+            onClose={() => setCompose(false)}
+          />
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -711,15 +824,38 @@ const ABORT_INFO: Record<string, { title: string; desc: string }> = {
   expired: { title: '시간 초과 중단', desc: '제한 시간이 지나 자동으로 종료됐어요.' },
   in_progress: { title: '중도 이탈 — 미제출', desc: '응시를 끝내지 않고 나가서 제출 기록이 없어요.' },
 }
-function AttemptDetail({ attempt, onClose }: { attempt: AttemptRow; onClose: () => void }) {
-  const aborted = attempt.status !== 'submitted'
+/** 한 응시의 문항별 정오답. 응시 기록 탭의 상세 모달과 유저관리 › 상세 › WORLD ARENA 탭이 같이 쓴다(2026-09-18).
+ *  ⚠️ 호출부가 `key={attemptId}` 를 건다 — 다른 응시로 바꾸면 새로 마운트되어 옛 답안이 잠깐 남지 않는다. */
+export function LevelTestAnswers({ attemptId }: { attemptId: string }) {
   const [answers, setAnswers] = useState<AnswerRow[] | null>(null)
   useEffect(() => {
-    if (aborted) return // 중단 응시는 문항 안 불러옴
-    callFunction<{ answers: AnswerRow[] }>('admin-test', { action: 'attemptDetail', attemptId: attempt.id })
+    callFunction<{ answers: AnswerRow[] }>('admin-test', { action: 'attemptDetail', attemptId })
       .then((r) => setAnswers(r.answers))
       .catch(() => setAnswers([]))
-  }, []) // eslint-disable-line
+  }, [attemptId])
+  return (
+    <>
+      {!answers ? <div className="admin-empty">불러오는 중…</div> : null}
+      {answers?.map((ans, i) => (
+        <div key={i} className={`ans-item ${ans.isCorrect ? 'ok' : 'no'}`}>
+          <div className="ans-q"><span className="ans-badge">{ans.isCorrect ? '정답' : '오답'}</span> {ans.prompt}</div>
+          <ol>
+            {ans.options.map((o, k) => (
+              <li key={k} className={`${k === ans.correctIndex ? 'correct' : ''} ${k === ans.selectedIndex && !ans.isCorrect ? 'picked-wrong' : ''}`}>
+                {o}
+                {k === ans.correctIndex ? ' ✓ 정답' : ''}
+                {k === ans.selectedIndex && k !== ans.correctIndex ? ' ← 선택' : ''}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
+      {answers?.length === 0 ? <div className="admin-empty">문항 기록 없음</div> : null}
+    </>
+  )
+}
+function AttemptDetail({ attempt, onClose }: { attempt: AttemptRow; onClose: () => void }) {
+  const aborted = attempt.status !== 'submitted'
   const info = ABORT_INFO[attempt.status] ?? ABORT_INFO.in_progress
   return (
     <div className="lt-modal" onClick={onClose}>
@@ -745,24 +881,7 @@ function AttemptDetail({ attempt, onClose }: { attempt: AttemptRow; onClose: () 
             </div>
           </div>
         ) : (
-          <>
-            {!answers ? <div className="admin-empty">불러오는 중…</div> : null}
-            {answers?.map((ans, i) => (
-              <div key={i} className={`ans-item ${ans.isCorrect ? 'ok' : 'no'}`}>
-                <div className="ans-q"><span className="ans-badge">{ans.isCorrect ? '정답' : '오답'}</span> {ans.prompt}</div>
-                <ol>
-                  {ans.options.map((o, k) => (
-                    <li key={k} className={`${k === ans.correctIndex ? 'correct' : ''} ${k === ans.selectedIndex && !ans.isCorrect ? 'picked-wrong' : ''}`}>
-                      {o}
-                      {k === ans.correctIndex ? ' ✓ 정답' : ''}
-                      {k === ans.selectedIndex && k !== ans.correctIndex ? ' ← 선택' : ''}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-            {answers?.length === 0 ? <div className="admin-empty">문항 기록 없음</div> : null}
-          </>
+          <LevelTestAnswers attemptId={attempt.id} />
         )}
       </div>
     </div>

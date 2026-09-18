@@ -8,6 +8,8 @@ import { logQuestionEvent, readQuestionHistory } from '../_shared/question-histo
 import { REWARD_MAX_DELTA, REWARD_MAX_PER_DAY } from '../_shared/reward-policy.ts'
 import { invalidateBannedWords } from '../_shared/banned-words.ts'
 import { TERM_BANKS, termBankKey, type TermBankKey } from '../_shared/term-banks.ts'
+import { mailConfig, sendMails, fillVars, splitTemplate, isTextPart, joinTemplate } from '../_shared/mail.ts'
+import { langForCountry } from '../_shared/country-lang.ts'
 
 interface Ctx { email: string; isRoot: boolean; uid: string | null }
 
@@ -199,6 +201,149 @@ async function memberNoteDelete(admin: any, body: any) {
   const { error } = await admin.from('member_notes').delete().eq('id', id)
   if (error) return json({ error: error.message }, 500)
   return json({ ok: true })
+}
+
+// ── 회원 상세 · 유저정보 (2026-09-18 · PPT 2페이지) ──────────────
+// "지금 알고 있는 이 사람의 값" 을 한 화면에 모은다 — 프로필·진척·코인·캐릭터·칭호·순위.
+//   ⚠️ 순위는 랭킹 화면과 **같은 RPC(scoped_top)** 로 센다. 여기서 따로 세면 회원이 보는 숫자와 관리자가
+//      보는 숫자가 갈린다. 익명·탈퇴 계정은 그 RPC 가 이미 걸러서 순위가 null 로 온다(정상).
+//   ⚠️ 국가·지역 순위의 범위는 **그 사람 프로필**에서 읽는다(leaderboard 의 scope:'user' 와 같은 이유).
+async function memberInfo(admin: any, body: any) {
+  const uid = String(body?.userId ?? '')
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  const [
+    { data: prof }, { data: prog }, { data: cur }, { data: ch }, { data: titles }, { count: invited },
+  ] = await Promise.all([
+    admin.from('profiles')
+      .select('display_name, created_at, is_anonymous, country_code, region_code, age_band, last_seen_at, terms_agreed_at, terms_version, marketing_agreed_at, referral_code, referred_by, deactivated_at, purged_at, suspended_until, suspended_reason')
+      .eq('id', uid).maybeSingle(),
+    admin.from('user_progress').select('rank, skill_score, activity_score, season_total, arena_level').eq('user_id', uid).maybeSingle(),
+    admin.from('user_currency').select('points').eq('user_id', uid).maybeSingle(),
+    admin.from('user_characters').select('base_key, skin_key, equipped').eq('user_id', uid).maybeSingle(),
+    admin.rpc('user_titles', { p_uid: uid }),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('referred_by', uid),
+  ])
+  if (!prof) return json({ error: '회원을 찾을 수 없습니다.' }, 404)
+  const p = prof as any
+  // 추천인 이름 — 코드가 아니라 사람으로 보여준다.
+  let referrer: { name: string | null } | null = null
+  if (p.referred_by) {
+    const { data: r } = await admin.from('profiles').select('display_name').eq('id', p.referred_by).maybeSingle()
+    referrer = { name: (r as any)?.display_name ?? null }
+  }
+  // 순위 — 전체 · 국가 · 지역. p_limit=0 이면 top 은 비고 me 칸만 온다(한 사람만 집어 오는 방법).
+  const scoped = async (country: string | null, region: string | null) => {
+    const { data } = await admin.rpc('scoped_top', { p_uid: uid, p_limit: 0, p_country: country, p_region: region })
+    const d = (data ?? {}) as { total?: number; me?: any }
+    return { rank: d.me?.rank ?? null, total: d.total ?? null, tier: d.me?.tier ?? null, percentile: d.me?.percentile ?? null }
+  }
+  const cc = p.country_code ?? null
+  const rc = p.region_code ?? null
+  const [g, c, r] = await Promise.all([scoped(null, null), scoped(cc, null), cc && rc ? scoped(cc, rc) : Promise.resolve({ rank: null, total: null, tier: null, percentile: null })])
+  const eq = ((ch as any)?.equipped ?? {}) as Record<string, unknown>
+  return json({
+    profile: {
+      name: p.display_name, created: p.created_at, anon: !!p.is_anonymous,
+      country: cc, region: rc, ageBand: p.age_band, lastSeen: p.last_seen_at,
+      termsAgreedAt: p.terms_agreed_at, termsVersion: p.terms_version, marketingAgreedAt: p.marketing_agreed_at,
+      referralCode: p.referral_code, referrer, invited: invited ?? 0,
+      deactivated: p.deactivated_at, purged: p.purged_at, suspendedUntil: p.suspended_until, suspendedReason: p.suspended_reason,
+    },
+    progress: prog ? {
+      rank: (prog as any).rank, arenaLevel: (prog as any).arena_level, seasonTotal: (prog as any).season_total,
+      skillScore: (prog as any).skill_score, activityScore: (prog as any).activity_score,
+    } : null,
+    coins: (cur as any)?.points ?? 0,
+    character: ch ? { base: (ch as any).base_key, skin: (ch as any).skin_key, title: (eq.title as string | undefined) ?? null } : null,
+    titles: ((titles ?? []) as { tier: string; exam_title: string | null }[]).map((t) => ({ tier: t.tier, examTitle: t.exam_title })),
+    ranking: { global: g, country: c, region: r, tier: g.tier, percentile: g.percentile },
+  })
+}
+
+// ── 회원 상세 · 독려이력 ──
+// 이 사람에게 보낸(기록한) 메일. status 가 'logged' 면 발송 수단이 없어 **기록만** 한 것이다 — 화면이 그 말을 한다.
+async function memberMailList(admin: any, body: any) {
+  const uid = String(body?.userId ?? '')
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  const { data, error } = await admin.from('mail_recipients')
+    .select('id, email, status, sent_at, error, lang, created_at, mail_log(kind, subject, body, sent_by)')
+    .eq('user_id', uid).order('created_at', { ascending: false }).limit(200)
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+  const ids = [...new Set(rows.map((r) => r.mail_log?.sent_by).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  if (ids.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids)
+    for (const x of profs ?? []) nameMap[(x as any).id] = (x as any).display_name
+  }
+  return json({
+    mails: rows.map((r) => ({
+      id: r.id, at: r.created_at, email: r.email, status: r.status, sentAt: r.sent_at, error: r.error, lang: r.lang ?? null,
+      kind: r.mail_log?.kind ?? null, subject: r.mail_log?.subject ?? '', body: r.mail_log?.body ?? '',
+      sentBy: r.mail_log?.sent_by ? (nameMap[r.mail_log.sent_by] ?? '(탈퇴한 관리자)') : null,
+    })),
+  })
+}
+
+// ── 회원 상세 · 로그인정보 ──
+// 로그인 이벤트 표는 따로 없다(2026-09-18 결정: 방문 로그를 재활용). 인증 서버의 '마지막 로그인' 한 값과,
+// 방문 로그(visit_log · 180일 보관)를 **날짜 × IP × 기기 단위로 접어** "언제 어디서 들어왔나" 로 보여준다.
+//   ⚠️ 방문 로그의 user_id 는 로그인한 채 본 화면에만 붙는다 — 로그인 전 방문은 이 사람 것으로 못 센다.
+//   ⚠️ 행 단위(화면 조회 한 건 = 한 줄)로 그대로 내보내면 하루치가 수십 줄이라 접는다.
+async function memberAccess(admin: any, body: any) {
+  const uid = String(body?.userId ?? '')
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  const [au, { data, error }] = await Promise.all([
+    admin.auth.admin.getUserById(uid).catch(() => ({ data: null })),
+    admin.from('visit_log').select('at, ip, country, device, browser, os, path, is_entry')
+      .eq('user_id', uid).order('at', { ascending: false }).limit(3000),
+  ])
+  if (error) return json({ error: error.message }, 500)
+  const u = (au as any)?.data?.user ?? null
+  const groups = new Map<string, { day: string; ip: string | null; country: string | null; device: string; browser: string; os: string; first: string; last: string; views: number; entryPath: string | null }>()
+  for (const r of (data ?? []) as any[]) {
+    const day = kstDayOf(r.at)
+    const k = `${day}|${r.ip ?? ''}|${r.device}|${r.browser}|${r.os}`
+    const g = groups.get(k)
+    if (g) {
+      // 내림차순이라 먼저 본 것이 늦은 시각. first 만 앞으로 당긴다.
+      g.first = r.at; g.views++
+      if (r.is_entry) g.entryPath = r.path
+    } else {
+      groups.set(k, { day, ip: r.ip ?? null, country: r.country ?? null, device: r.device, browser: r.browser, os: r.os, first: r.at, last: r.at, views: 1, entryPath: r.is_entry ? r.path : null })
+    }
+  }
+  return json({
+    auth: u ? { lastSignIn: u.last_sign_in_at ?? null, created: u.created_at ?? null, provider: u.app_metadata?.provider ?? null, email: u.email ?? null } : null,
+    sessions: [...groups.values()].slice(0, 100),
+    totalViews: (data ?? []).length,
+  })
+}
+
+// ── 회원 상세 · 환불 내역 ──
+// 환불 원장(payment_refunds)을 이 사람 결제로 걸러 준다. 결제 한 건에 부분 환불이 여러 줄일 수 있다.
+async function refundList(admin: any, body: any) {
+  const uid = String(body?.userId ?? '')
+  if (!uid) return json({ error: 'userId 필요' }, 400)
+  const { data, error } = await admin.from('payment_refunds')
+    .select('id, payment_id, amount, currency, reason, lines, provider_ref, actor_id, created_at, payments!inner(user_id, order_name, order_id)')
+    .eq('payments.user_id', uid).order('created_at', { ascending: false }).limit(200)
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+  const ids = [...new Set(rows.map((r) => r.actor_id).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  if (ids.length) {
+    const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids)
+    for (const x of profs ?? []) nameMap[(x as any).id] = (x as any).display_name
+  }
+  return json({
+    refunds: rows.map((r) => ({
+      id: r.id, paymentId: r.payment_id, orderName: r.payments?.order_name ?? '', orderId: r.payments?.order_id ?? '',
+      amount: Number(r.amount), currency: r.currency, reason: r.reason, lines: r.lines ?? [],
+      providerRef: r.provider_ref, at: r.created_at,
+      actor: r.actor_id ? (nameMap[r.actor_id] ?? '(탈퇴한 관리자)') : null,
+    })),
+  })
 }
 
 async function inquiryAnswer(admin: any, body: any, ctx: Ctx) {
@@ -1572,29 +1717,125 @@ async function envCheckList(admin: any, body: any) {
 }
 
 /**
- * 독려 메일 발송 — **고른 사람 전체에게 한 번에** 보낸다(한 명씩 쓰는 게 아니다).
- * ⚠️ 지금은 실제 발송 수단이 없다. 보낼 내용을 확정하고 **이력만** 남긴다 —
- *    발송 서비스가 붙기 전에 "보냈다" 고 표시하면 안 보낸 걸 보냈다고 믿게 된다. 그래서 응답에 sent:false 를 준다.
+ * 독려 메일 발송 — **고른 사람 전체에게 한 번에** 보낸다(한 명씩 쓰는 게 아니다). 세 화면이 다 여기로 온다
+ * (시험환경 점검·레벨테스트·응시권 미사용자). 보내는 건 `_shared/mail.ts`(Resend) 하나.
+ *
+ * 흐름: 발신 설정 확인 → 사람마다 받을 언어 결정 → 외국어가 하나라도 있으면 **번역기를 한 번** 불러
+ *       필요한 언어 본문을 만든다 → 사람마다 제목·본문에 값을 채워 발송 → 사람별 결과(발송됨/실패+사유)를 기록.
+ *   ⚠️ 번역은 사람 수와 무관하다 — 100명이어도 호출은 1번(한국어만이면 0번). 치환자(`{name}` 등)는 번역
+ *      바깥에 두었다가 사람마다 끼우므로 번역이 늘지 않는다.
+ *   ⚠️ 발신 설정이 없으면 **아무것도 기록하지 않고** 거절한다 — 안 보낸 걸 보냈다고 남기지 않는다.
+ *   ⚠️ 언어 = 마지막 레벨테스트 응시 언어 → 마지막 CARIS 응시 언어 → 국가 → 한국어. 프로필에 언어 칸이 없어서다.
  */
-async function mailNudge(admin: any, body: any, ctx: Ctx) {
-  const targets = (body?.targets ?? []) as { userId: string; email: string | null }[]
+// 종류는 화면이 보내는 문자열이지만 **여기 목록에 있는 것만** 받는다 — 아무 값이나 kind 로 쌓이면 이력 화면이 못 읽는다.
+const MAIL_KINDS = new Set(['nudge_env_check', 'nudge_leveltest', 'nudge_ticket'])
+const MAIL_LANGS = new Set(['ko', 'en', 'ja', 'zh', 'hi', 'vi'])
+
+/** 사람마다 받을 언어. */
+async function pickMailLangs(admin: any, userIds: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {}
+  if (!userIds.length) return out
+  const [{ data: lt }, { data: ex }, { data: pr }] = await Promise.all([
+    admin.from('test_attempts').select('user_id, lang, started_at').in('user_id', userIds).order('started_at', { ascending: false }).limit(userIds.length * 5),
+    admin.from('exam_attempts').select('user_id, lang, started_at').in('user_id', userIds).not('lang', 'is', null).order('started_at', { ascending: false }).limit(userIds.length * 5),
+    admin.from('profiles').select('id, country_code').in('id', userIds),
+  ])
+  const first: Record<string, string> = {}
+  for (const r of (lt ?? []) as any[]) if (!first[r.user_id] && r.lang) first[r.user_id] = r.lang
+  for (const r of (ex ?? []) as any[]) if (!first[r.user_id] && r.lang) first[r.user_id] = r.lang
+  const byCountry: Record<string, string> = {}
+  for (const p of (pr ?? []) as any[]) byCountry[p.id] = langForCountry(p.country_code) ?? ''
+  for (const id of userIds) {
+    // 국가 매핑은 'zh-Hans' 처럼 변종이 붙어 온다 — 메일 사전은 6개뿐이라 앞 두 글자로 접는다.
+    const l = (first[id] || byCountry[id] || 'ko').toLowerCase().split('-')[0]
+    out[id] = MAIL_LANGS.has(l) ? l : 'ko'
+  }
+  return out
+}
+
+/**
+ * 제목·본문을 필요한 언어로 — 치환자와 줄바꿈은 번역에 안 보내고 자리만 지킨다.
+ * 반환: lang → {subject, body}. 'ko' 는 원문. 번역이 실패한 언어는 빠진다(그 사람은 한국어로 받는다).
+ */
+async function translateMailTemplate(
+  deps: ReformDeps, subject: string, body: string, langs: string[],
+): Promise<Record<string, { subject: string; body: string }>> {
+  const out: Record<string, { subject: string; body: string }> = { ko: { subject, body } }
+  const need = langs.filter((l) => l !== 'ko')
+  if (!need.length || !deps.hasTranslateKey) return out
+  // 치환자·줄바꿈 경계로 쪼갠다. 글자 조각만 번역기에 보낸다(_shared/mail.ts).
+  const sp = splitTemplate(subject), bp = splitTemplate(body)
+  const fields: Record<string, string> = {}
+  sp.forEach((x, i) => { if (isTextPart(x)) fields[`s${i}`] = x })
+  bp.forEach((x, i) => { if (isTextPart(x)) fields[`b${i}`] = x })
+  let tr: Record<string, Record<string, string>>
+  try {
+    tr = await deps.translateKoFields(fields)
+  } catch {
+    return out // 번역기가 죽으면 전원 한국어 — 발송을 막지는 않는다
+  }
+  for (const l of need) {
+    const s = joinTemplate(sp, (i) => tr[`s${i}`]?.[l])
+    const b = joinTemplate(bp, (i) => tr[`b${i}`]?.[l])
+    // 한 조각도 안 바뀌었으면(번역기가 그 언어를 못 줬으면) 그 언어는 없는 것으로 — 한국어로 간다.
+    if (s === subject && b === body) continue
+    out[l] = { subject: s, body: b }
+  }
+  return out
+}
+
+async function mailNudge(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
+  const targets = (body?.targets ?? []) as { userId: string; email: string | null; name?: string | null; vars?: Record<string, string> }[]
   if (!Array.isArray(targets) || !targets.length) return json({ error: '보낼 대상을 고르세요.' }, 400)
   const subject = String(body?.subject ?? '').trim()
+  const bodyText = String(body?.body ?? '')
   if (!subject) return json({ error: '메일 제목이 비어 있습니다.' }, 400)
-  const withEmail = targets.filter((t) => t.email && t.email.includes('@'))
-  const { error } = await admin.from('mail_log').insert({
-    kind: 'nudge_env_check',
-    round_id: body?.roundId || null,
-    recipients: withEmail.length,
-    subject,
-    sent_by: ctx.uid,
+  if (!bodyText.trim()) return json({ error: '메일 본문이 비어 있습니다.' }, 400)
+  const kind = String(body?.kind ?? 'nudge_env_check')
+  if (!MAIL_KINDS.has(kind)) return json({ error: '알 수 없는 메일 종류입니다.' }, 400)
+
+  const cfg = await mailConfig(admin)
+  if (!cfg) {
+    return json({ error: '메일 발신 설정이 없습니다. 홈페이지 관리 › 사이트 정보의 발신자 주소와 서버의 RESEND_API_KEY 를 확인하세요.' }, 400)
+  }
+
+  // 같은 주소 둘이면 한 통만(응시권 둘 가진 사람 등) — 먼저 온 것 기준.
+  const seen = new Set<string>()
+  const withEmail = targets.filter((t) => {
+    const e = (t.email ?? '').trim().toLowerCase()
+    if (!e.includes('@') || seen.has(e)) return false
+    seen.add(e)
+    return true
   })
+  if (!withEmail.length) return json({ error: '이메일이 있는 대상이 없습니다.' }, 400)
+
+  const langOf = await pickMailLangs(admin, withEmail.map((t) => t.userId).filter(Boolean))
+  const needLangs = [...new Set(withEmail.map((t) => langOf[t.userId] ?? 'ko'))]
+  const tpl = await translateMailTemplate(deps, subject, bodyText, needLangs)
+
+  const { data: logRow, error } = await admin.from('mail_log').insert({
+    kind, round_id: body?.roundId || null, recipients: withEmail.length, subject, body: bodyText, sent_by: ctx.uid,
+  }).select('id').single()
   if (error) return json({ error: error.message }, 500)
+
+  const items = withEmail.map((t) => {
+    const lang = tpl[langOf[t.userId] ?? 'ko'] ? (langOf[t.userId] ?? 'ko') : 'ko'
+    const vars = { ...(t.vars ?? {}), name: t.name ?? t.vars?.name ?? '' }
+    return { lang, to: t.email!.trim(), subject: fillVars(tpl[lang].subject, vars), text: fillVars(tpl[lang].body, vars) }
+  })
+  const results = await sendMails(cfg, items)
+  const now = new Date().toISOString()
+  const { error: rErr } = await admin.from('mail_recipients').insert(
+    withEmail.map((t, i) => ({
+      mail_id: (logRow as any).id, user_id: t.userId || null, email: items[i].to, lang: items[i].lang,
+      status: results[i].ok ? 'sent' : 'failed', sent_at: results[i].ok ? now : null, error: results[i].ok ? null : (results[i].error ?? '실패'),
+    })),
+  )
+  if (rErr) return json({ error: rErr.message }, 500)
+  const sentN = results.filter((r) => r.ok).length
   return json({
-    ok: true,
-    sent: false, // ⚠️ 아직 진짜로 나가지 않았다
-    queued: withEmail.length,
-    skipped: targets.length - withEmail.length,
+    ok: true, sent: true, queued: sentN, failed: results.length - sentN, skipped: targets.length - withEmail.length,
+    langs: Object.fromEntries(needLangs.map((l) => [l, items.filter((x) => x.lang === l).length])),
   })
 }
 async function mailLog(admin: any) {
@@ -1603,11 +1844,45 @@ async function mailLog(admin: any) {
   return json({ rows: data ?? [] })
 }
 
+/**
+ * 레벨테스트 독려 대상 — 마지막 응시가 N일 지난 회원(2026-09-18 · PPT 4페이지).
+ * 후보는 SQL(`leveltest_nudge_candidates`)이 고르고, 여기서는 이메일과 "마지막으로 받은 독려" 만 붙인다.
+ * ⚠️ 마지막 독려 시각을 같이 준다 — 없으면 같은 사람에게 매주 또 보내게 된다(화면이 그 열로 거른다).
+ */
+async function levelNudgeList(admin: any, body: any) {
+  const days = Math.max(0, Math.min(365, Math.floor(Number(body?.days ?? 7)) || 0))
+  const { data, error } = await admin.rpc('leveltest_nudge_candidates', { p_days: days })
+  if (error) return json({ error: error.message }, 500)
+  const rows = (data ?? []) as any[]
+  const emailMap: Record<string, string> = {}
+  try {
+    const { data: au } = await admin.rpc('admin_user_emails')
+    for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
+  } catch { /* 이메일만 빈칸 */ }
+  const lastMail: Record<string, string> = {}
+  if (rows.length) {
+    const { data: mails } = await admin.from('mail_recipients')
+      .select('user_id, created_at, mail_log!inner(kind)')
+      .eq('mail_log.kind', 'nudge_leveltest')
+      .in('user_id', rows.map((r) => r.user_id))
+      .order('created_at', { ascending: false })
+    for (const m of (mails ?? []) as any[]) if (!lastMail[m.user_id]) lastMail[m.user_id] = m.created_at
+  }
+  return json({
+    days,
+    people: rows.map((r) => ({
+      userId: r.user_id, name: r.display_name ?? null, email: emailMap[r.user_id] ?? null,
+      rank: r.rank, lastAt: r.last_at, daysSince: r.days_since, lastMailAt: lastMail[r.user_id] ?? null,
+    })),
+  })
+}
+
 export async function handleReform(admin: any, action: string, body: any, ctx: Ctx, deps: ReformDeps): Promise<Response | null> {
   switch (action) {
     case 'envCheckList': return await envCheckList(admin, body)
-    case 'mailNudge': return await mailNudge(admin, body, ctx)
+    case 'mailNudge': return await mailNudge(admin, body, ctx, deps)
     case 'mailLog': return await mailLog(admin)
+    case 'levelNudgeList': return await levelNudgeList(admin, body)
     case 'termList': return await termList(admin, body)
     case 'termUpsert': return await termUpsert(admin, body, ctx)
     case 'termSetActive': return await termSetActive(admin, body, ctx)
@@ -1635,6 +1910,10 @@ async function handleReform2(admin: any, action: string, body: any, ctx: Ctx, de
     case 'memberNoteList': return await memberNoteList(admin, body)
     case 'memberNoteAdd': return await memberNoteAdd(admin, body, ctx)
     case 'memberNoteDelete': return await memberNoteDelete(admin, body)
+    case 'memberInfo': return await memberInfo(admin, body)
+    case 'memberMailList': return await memberMailList(admin, body)
+    case 'memberAccess': return await memberAccess(admin, body)
+    case 'refundList': return await refundList(admin, body)
     case 'ebookPreview': return await ebookPreview(admin, body)
     case 'lectureList': return await lectureList(admin, body)
     case 'lectureUpsert': return await lectureUpsert(admin, body, deps)

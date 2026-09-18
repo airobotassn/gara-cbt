@@ -6,7 +6,7 @@ import { callFunction, supabase } from '../lib/supabase'
 import { useAdminData, fmtAdminDT as fmtDT, PAY_STATUS_LABEL, payStatusLabel, productLabel, readSummary, type EbookReadRow } from '../lib/adminData'
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
-import { krw, usdc } from '../lib/money'
+import { usdc, chargeText } from '../lib/money'
 import { countryName, flagUrl } from '../lib/regions'
 // 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
 import { loadRegions } from '../lib/regionCatalog'
@@ -85,12 +85,6 @@ interface PaymentListResp {
   payments: PaymentRow[]; total: number
   stats30d: { paidN: number; paidAmount: number; refundN: number; refundAmount: number }
   queues: { unfulfilled: number; revoked: number }
-}
-
-/** 청구 통화로 금액 표기 — 원이면 ₩, 아니면 $. 환불 화면은 정가(달러 센트)가 아니라 **실제 빠진 돈**을 말해야 한다. */
-function chargeText(currency: string | null | undefined, amount: number | null | undefined): string {
-  if (amount == null) return '-'
-  return (currency ?? 'USD').toUpperCase() === 'KRW' ? krw(amount) : usdc(Math.round(amount * 100))
 }
 
 // ── 환불 창 ─────────────────────────────────────────────────────
@@ -2014,48 +2008,70 @@ export function EnvCheckAdmin() {
         </div>
       )}
 
-      {compose && <MailComposeModal targets={pickedPeople} roundId={roundId} onClose={() => setCompose(false)} />}
+      {compose && (
+        <MailComposeModal
+          kind="nudge_env_check"
+          settingKeys={{ subject: 'mail_nudge_subject', body: 'mail_nudge_body' }}
+          vars={MAIL_VARS}
+          roundId={roundId}
+          onClose={() => setCompose(false)}
+          targets={pickedPeople.map((p) => ({
+            userId: p.userId, email: p.email, name: p.name,
+            sample: { '{round}': p.roundTitle, '{tier}': p.tier, '{examDate}': p.examDate ?? '', '{link}': `${location.origin}/exam` },
+          }))}
+        />
+      )}
     </>
   )
 }
 
+/** 메일 한 통의 받는 사람 — `sample` 은 치환자(`{level}` 등)에 들어갈 그 사람 값. 미리보기와 실제 발송이 같은 값을 쓴다. `{name}` 은 자동. */
+export interface MailTarget { userId: string; email: string | null; name: string | null; sample: Record<string, string> }
+const LANG_KO: Record<string, string> = { en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
+
 // 메일 작성 — 사이트 정보에 저장해둔 제목·본문을 불러와 고칠 수 있게 하고, 고른 사람 전체에게 한 번에 보낸다.
-function MailComposeModal({ targets, roundId, onClose }: { targets: EnvPerson[]; roundId: string; onClose: () => void }) {
+//   시험환경 점검(nudge_env_check)과 레벨테스트 독려(nudge_leveltest)가 같이 쓴다(2026-09-18) — 종류·템플릿 키·치환자만 다르다.
+export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, onClose }: {
+  targets: MailTarget[]
+  kind: 'nudge_env_check' | 'nudge_leveltest' | 'nudge_ticket'
+  settingKeys: { subject: string; body: string }
+  vars: [string, string][]
+  roundId?: string
+  onClose: () => void
+}) {
   const { data } = useAdminData<{ settings: Record<string, string> }>('siteSettings')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [seeded, setSeeded] = useState(false)
-  const draft = useDraft({ kind: 'mail-nudge', value: { subject, body }, title: subject || '독려 메일' })
+  const draft = useDraft({ kind: `mail-${kind}`, value: { subject, body }, title: subject || '독려 메일' })
   useEffect(() => {
     if (!data || seeded) return
     setSeeded(true)
-    setSubject(data.settings.mail_nudge_subject ?? '')
-    setBody(data.settings.mail_nudge_body ?? '')
-  }, [data, seeded])
+    setSubject(data.settings[settingKeys.subject] ?? '')
+    setBody(data.settings[settingKeys.body] ?? '')
+  }, [data, seeded, settingKeys.subject, settingKeys.body])
 
   const sendable = targets.filter((t) => t.email && t.email.includes('@'))
   const first = targets[0]
-  const sample: Record<string, string> = {
-    '{name}': first?.name ?? '홍길동',
-    '{round}': first?.roundTitle ?? '제 5회 CARIS',
-    '{tier}': first?.tier ?? 'beginner',
-    '{examDate}': first?.examDate ?? '2026-11-28',
-    '{link}': `${location.origin}/exam`,
-  }
+  const sample: Record<string, string> = { '{name}': first?.name ?? '홍길동', ...(first?.sample ?? {}) }
   const fill = (s: string) => Object.entries(sample).reduce((acc, [k, v]) => acc.split(k).join(v), s ?? '')
 
   async function send() {
     setBusy(true); setMsg('')
     try {
-      const r = await callFunction<{ sent: boolean; queued: number; skipped: number }>('admin', {
-        action: 'mailNudge', roundId: roundId || null, subject, body,
-        targets: targets.map((t) => ({ userId: t.userId, email: t.email })),
+      // 사람마다 채울 값(`{level}`·`{round}`…)을 같이 보낸다 — 서버가 사람마다 본문을 채워 보낸다.
+      // 치환자 키는 중괄호 없이(`level`), 서버 fillVars 가 `{level}` 자리에 끼운다.
+      const r = await callFunction<{ queued: number; failed: number; skipped: number; langs: Record<string, number> }>('admin', {
+        action: 'mailNudge', kind, roundId: roundId || null, subject, body,
+        targets: targets.map((t) => ({
+          userId: t.userId, email: t.email, name: t.name,
+          vars: Object.fromEntries(Object.entries(t.sample).map(([k, v]) => [k.replace(/[{}]/g, ''), v])),
+        })),
       })
-      setMsg(r.sent
-        ? `✅ ${r.queued}명에게 보냈습니다`
-        : `내용과 대상 ${r.queued}명을 기록했습니다 — 발송 서비스가 아직 안 붙어 실제로 나가진 않았습니다`)
+      const langs = Object.entries(r.langs ?? {}).filter(([l]) => l !== 'ko').map(([l, n]) => `${LANG_KO[l] ?? l} ${n}`).join(' · ')
+      setMsg(`✅ ${r.queued}명에게 보냈습니다${r.failed ? ` · 실패 ${r.failed}명(유저관리 › 상세 › 독려이력에서 사유 확인)` : ''}${langs ? ` · 번역 발송: ${langs}` : ''}`)
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '실패')
     } finally { setBusy(false) }
@@ -2084,7 +2100,7 @@ function MailComposeModal({ targets, roundId, onClose }: { targets: EnvPerson[];
               <textarea style={{ ...inp, minHeight: 220, fontFamily: 'inherit', lineHeight: 1.7 }} value={body} onChange={(e) => setBody(e.target.value)} />
             </label>
             <p className="admin-hint" style={{ margin: 0, lineHeight: 1.7 }}>
-              치환자: {MAIL_VARS.map(([k, d]) => `${k} ${d}`).join(' · ')} — 사람마다 값이 채워집니다.
+              치환자: {vars.map(([k, d]) => `${k} ${d}`).join(' · ')} — 사람마다 값이 채워집니다.
             </p>
           </div>
           <div style={{ border: '1px solid var(--line2)', borderRadius: 10, padding: 14, background: 'var(--soft)' }}>
@@ -2142,8 +2158,18 @@ const SITE_GROUPS: { title: string; note?: string; preview: 'browser' | 'footer'
       { key: 'privacy_officer', label: '개인정보보호책임자', where: '푸터 넷째 줄 · 개인정보처리방침' },
     ],
   },
-  // ⚠️ 메일은 여기 없다 — 발신자·제목·본문 모두 `CARIS 현황 > 시험환경 점검` 의 메일 작성창에 있다.
+  // ⚠️ 메일 **본문**은 여기 없다 — 제목·본문은 각 메일 작성창(시험환경 점검·레벨테스트·응시권)에 있다.
   //    보낼 대상을 고르는 화면과 보낼 내용을 쓰는 화면이 갈라져 있으면 둘 다 안 쓰게 된다.
+  //    **발신자**만 여기다(2026-09-18) — 세 창이 같은 주소로 보내므로 한 곳에 둔다.
+  {
+    title: '메일 발신자',
+    note: '독려 메일(시험환경 점검·레벨테스트·응시권)이 이 이름·주소로 나갑니다. 주소는 발송 서비스에 인증된 도메인이어야 합니다.',
+    preview: 'mail',
+    keys: [
+      { key: 'sender_name', label: '보내는 사람 이름', where: '받는 사람의 메일함에 보이는 이름' },
+      { key: 'sender_email', label: '보내는 주소', where: '예: noreply@우리도메인 — 답장도 이 주소로 온다' },
+    ],
+  },
   {
     title: '운영 값',
     note: '지금까지 코드에 박혀 있어 바꾸려면 배포가 필요했던 값들입니다.',
