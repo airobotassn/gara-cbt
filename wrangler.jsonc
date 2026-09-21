@@ -14,6 +14,9 @@
   // 배포 때마다 다시 붙지는 않는다(이미 있으면 그대로). 옛 workers.dev 주소도 그대로 살아 있다.
   // ⚠️ 나중에 AWS 로 옮길 때는 이 두 줄을 빼고 Cloudflare DNS 의 garacaris.com 레코드를 AWS 로 돌리면 된다
   //    — Supabase Auth·결제 복귀·SEB 는 전부 이 도메인을 보므로 그쪽은 다시 손댈 게 없다.
+  // ⛔ routes 를 적으면 wrangler 가 workers.dev 주소를 **기본으로 끈다** — 2026-09-21 첫 배포 때 옛 주소가
+  //    404 로 죽었다(대시보드에서 다시 켜서 복구). 옛 주소로 나간 링크·SEB 파일이 있으니 이 줄은 지우지 말 것.
+  "workers_dev": true,
   "routes": [
     { "pattern": "garacaris.com", "custom_domain": true },
     { "pattern": "www.garacaris.com", "custom_domain": true }
