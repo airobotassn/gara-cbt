@@ -8,5 +8,14 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  // 커스텀 도메인(2026-09-21). DNS 존 garacaris.com 은 같은 Cloudflare 계정(airobotassn)에 있고
+  // 네임서버를 카페24 → Cloudflare 로 옮겼다. 대시보드에서 먼저 붙였고 여기엔 같은 값을 적어 둔 것이라
+  // 배포 때마다 다시 붙지는 않는다(이미 있으면 그대로). 옛 workers.dev 주소도 그대로 살아 있다.
+  // ⚠️ 나중에 AWS 로 옮길 때는 이 두 줄을 빼고 Cloudflare DNS 의 garacaris.com 레코드를 AWS 로 돌리면 된다
+  //    — Supabase Auth·결제 복귀·SEB 는 전부 이 도메인을 보므로 그쪽은 다시 손댈 게 없다.
+  "routes": [
+    { "pattern": "garacaris.com", "custom_domain": true },
+    { "pattern": "www.garacaris.com", "custom_domain": true }
+  ]
 }

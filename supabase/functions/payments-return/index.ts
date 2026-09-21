@@ -21,16 +21,19 @@ import { corsHeaders } from '../_shared/cors.ts'
 /**
  * 돌아갈 곳 — **화이트리스트로만** 연다. `to` 는 주소에 실려 오는 값이라 그대로 믿고 리다이렉트하면
  * 우리 도메인을 발판 삼아 아무 데나 보내는 오픈 리다이렉트가 된다(피싱 링크로 쓰인다).
- * 개발(로컬)과 배포 두 곳이면 충분하다.
+ * 개발(로컬)과 배포 주소면 충분하다.
+ * ⚠️ 옛 workers.dev 주소도 남긴다(2026-09-21 도메인 연결) — 그 주소로 열어 둔 탭에서 결제를 시작한 사람이
+ *    돌아올 자리다. 목록에서 빼면 그 사람의 결제 결과 화면이 **세션이 없는 다른 오리진**으로 떨어진다.
  */
 const ALLOWED_ORIGINS = [
+  /^https:\/\/(www\.)?garacaris\.com$/,
   /^https:\/\/gara-cbt\.airobotassn\.workers\.dev$/,
   /^http:\/\/localhost:\d{2,5}$/,
   /^http:\/\/127\.0\.0\.1:\d{2,5}$/,
 ]
 
 /** 목록에 없으면 배포 주소로 떨어뜨린다 — 결제는 이미 끝난 상태라 사용자를 빈손으로 두면 안 된다. */
-const FALLBACK_ORIGIN = 'https://gara-cbt.airobotassn.workers.dev'
+const FALLBACK_ORIGIN = 'https://garacaris.com'
 
 function safeOrigin(raw: string | null): string {
   const v = (raw ?? '').trim().replace(/\/$/, '')

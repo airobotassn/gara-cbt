@@ -4,7 +4,7 @@
 //
 // 사용:
 //   node tools/make-seb-all.mjs <origin> [출력디렉토리] [허용모니터수]
-//   예) 배포:  node tools/make-seb-all.mjs https://gara-cbt.airobotassn.workers.dev public 8
+//   예) 배포:  node tools/make-seb-all.mjs https://garacaris.com public 8
 //       로컬:  node tools/make-seb-all.mjs http://localhost:5174 public 8
 //
 // 생성물(언어 6종 × 실제/연습):

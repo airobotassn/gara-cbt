@@ -25,7 +25,7 @@ const FONT = `system-ui, -apple-system, 'Malgun Gothic', 'Apple SD Gothic Neo', 
 // — CertGaramond 는 한글 글리프가 없어 한글 이름은 CertMyeongjo 로 자동 폴백된다.
 const SERIF = `'CertGaramond', 'CertMyeongjo', Georgia, serif`
 // QR 목적지 = 메인(랜딩). 카드를 본 사람이 스캔하면 바로 서비스로 온다 — 이 카드의 유일한 유입 경로다.
-const SITE_URL = 'https://gara-cbt.airobotassn.workers.dev/'
+const SITE_URL = 'https://garacaris.com/'
 
 // 배경 그림을 못 받았을 때 남는 바탕색(styles/base.css 의 --blue-deep). 흰 구멍보다 낫다.
 const BRAND_DEEP = '#00174b'

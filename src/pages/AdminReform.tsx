@@ -2250,7 +2250,7 @@ function SitePreview({ kind, v }: { kind: 'browser' | 'footer' | 'mail'; v: Reco
         <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', margin: '16px 0 8px' }}>구글 검색 결과</div>
         <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 12 }}>
           <div style={{ color: '#7aa7ff', fontSize: 17 }}>{v.site_name || '(사이트 이름 없음)'}</div>
-          <div style={{ color: 'var(--dim)', fontSize: 12, margin: '2px 0 4px' }}>https://gara-cbt.airobotassn.workers.dev</div>
+          <div style={{ color: 'var(--dim)', fontSize: 12, margin: '2px 0 4px' }}>https://garacaris.com</div>
           <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
             {v.site_desc || '(사이트 설명이 비어 있어 검색 결과에 아무 소개도 안 나옵니다)'}
           </div>
@@ -2282,7 +2282,7 @@ function SitePreview({ kind, v }: { kind: 'browser' | 'footer' | 'mail'; v: Reco
   // 메일 — 치환자가 실제 값으로 바뀐 모습까지 보여준다.
   const sample: Record<string, string> = {
     '{name}': '홍길동', '{round}': '제 5회 CARIS', '{tier}': 'Beginner',
-    '{examDate}': '2026-11-28', '{link}': 'https://gara-cbt.airobotassn.workers.dev/exam',
+    '{examDate}': '2026-11-28', '{link}': 'https://garacaris.com/exam',
   }
   const fill = (s: string) => Object.entries(sample).reduce((acc, [k, val]) => acc.split(k).join(val), s ?? '')
   return (
