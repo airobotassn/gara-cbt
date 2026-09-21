@@ -71,7 +71,7 @@ export interface Analytics {
 //   ⚠️ 권한 확인도 Admin.tsx 한 곳으로 올라갔다. 여기서 `admin-test me` 를 다시 부르지 않는다.
 
 // WORLD ARENA > 레벨테스트 아래 두 세부(참여 현황 · 문항 관리)는 상위 메뉴 줄이 직접 고른다.
-export { DashboardTab as ArenaDashboard, AttemptsTab as ArenaAttempts, QuestionsTab as ArenaQuestions }
+export { DashboardTab as ArenaDashboard, AttemptsTab as ArenaAttempts, QuestionsTab as ArenaQuestions, PeopleTab as ArenaPeople }
 
 // ============================ 문항 탭 (목록·이력·생성·번역 통합) ============================
 // CARIS(CBT) 관리자의 '문항' 탭과 동일하게, 문항 관련 화면을 한 탭 안 서브탭으로 묶는다.
@@ -646,7 +646,6 @@ function AttemptsTab() {
   const [dirF, setDirF] = useState<'all' | 'up' | 'down' | 'stay'>('all')
   const [outF, setOutF] = useState<'all' | 'submitted' | 'voided' | 'incomplete'>('all')
   const [open, setOpen] = useState<AttemptRow | null>(null)
-  const [nudge, setNudge] = useState(false)
 
   useEffect(() => {
     callFunction<{ attempts: AttemptRow[] }>('admin-test', { action: 'attempts' })
@@ -689,8 +688,6 @@ function AttemptsTab() {
             <option value="all">전체 결과</option><option value="submitted">완료</option><option value="voided">경고중단</option><option value="incomplete">중도이탈</option>
           </select>
           <span className="admin-hint">{filtered.length}건{loading ? ' · 불러오는 중…' : ''}</span>
-          {/* 마지막 응시가 N일 지난 회원에게 독려 메일(2026-09-18 · PPT 4페이지). 대상 고르기는 모달 안에서. */}
-          <button className="btn-ink" style={{ marginLeft: 'auto' }} onClick={() => setNudge(true)}>독려 메일</button>
         </div>
         <table className="admin-table">
           <thead><tr><th>유저</th><th>레벨</th><th>언어</th><th>점수</th><th>결과</th><th>등급변동</th><th>일시</th><th></th></tr></thead>
@@ -717,19 +714,23 @@ function AttemptsTab() {
         {filtered.length === 0 && !loading ? <div className="admin-empty">조건에 맞는 응시가 없습니다.</div> : null}
       </div>
       {open ? <AttemptDetail attempt={open} onClose={() => setOpen(null)} /> : null}
-      {nudge ? <LevelNudgeModal onClose={() => setNudge(false)} /> : null}
     </div>
   )
 }
 
-// ── 레벨테스트 독려 메일 — 대상 고르기 (2026-09-18 · PPT 4페이지) ──
-// "마지막 응시가 N일 지난 회원" 을 서버가 골라 주고(leveltest_nudge_candidates), 여기서 체크해 메일 창으로 넘긴다.
-//   ⚠️ '마지막 독려' 열이 있는 이유 = 지난주에 보낸 사람이 이번 주에도 후보로 뜬다. 최근에 받은 사람은 기본으로 뺀다.
-interface NudgePerson { userId: string; name: string | null; email: string | null; rank: number; lastAt: string; daysSince: number; lastMailAt: string | null }
+// ============================ 응시자 탭 (2026-09-21) ============================
+// 사람 = 한 줄. 레벨테스트를 한 번이라도 제출한 회원(게스트·탈퇴자 제외)이 최근 응시순으로 선다 —
+// 서버 `leveltest_nudge_candidates` 가 고른다. 독려 메일도 여기서 보낸다(2026-09-18 엔 응시 기록 탭에 버튼으로
+// 있었는데, 그 탭은 "시험 한 건 = 한 줄" 이라 사람을 고르는 자리로는 어색했다).
+//   · '마지막 응시 후 N일' 은 필터다 — 0 이면 전원. 독려 대상을 추릴 때 7·14 처럼 올린다.
+//   ⚠️ '마지막 독려' 열 + '최근 N일 안에 독려받은 사람 제외' 가 있는 이유 = 지난주에 보낸 사람이 이번 주에도 뜬다.
+//   ⚠️ 여기 '레벨' 은 레벨테스트 등급(시험 사다리)이다 — 시즌 점수로 정하는 ARENA 레벨이 아니다.
+interface NudgePerson { userId: string; name: string | null; email: string | null; rank: number; lastAt: string; daysSince: number; attempts: number; lastMailAt: string | null }
 const LEVEL_MAIL_VARS: [string, string][] = [['{name}', '이름'], ['{level}', '현재 레벨등급'], ['{link}', '레벨테스트 주소']]
-function LevelNudgeModal({ onClose }: { onClose: () => void }) {
-  const [days, setDays] = useState(7)
-  const [applied, setApplied] = useState(7)
+function PeopleTab() {
+  const [days, setDays] = useState(0)
+  const [applied, setApplied] = useState(0)
+  const [q, setQ] = useState('')
   const [people, setPeople] = useState<NudgePerson[] | null>(null)
   const [err, setErr] = useState('')
   const [skipRecent, setSkipRecent] = useState(true)
@@ -744,9 +745,16 @@ function LevelNudgeModal({ onClose }: { onClose: () => void }) {
       .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
   }, [applied])
 
-  // 최근 독려 = 지금 고른 N일 안에 이미 한 번 보낸 사람. 같은 사람에게 매주 보내는 걸 막는 기본값이다.
+  // 최근 독려 = 지금 고른 N일 안에 이미 한 번 보낸 사람. 같은 사람에게 매주 보내는 걸 막는 기본값이다(N=0 이면 아무도 안 뺀다).
   const recentMs = applied * 86400e3
-  const shown = (people ?? []).filter((p) => !skipRecent || !p.lastMailAt || Date.parse(p.lastMailAt) < fetchedAt - recentMs)
+  const shown = (people ?? []).filter((p) => {
+    if (skipRecent && applied > 0 && p.lastMailAt && Date.parse(p.lastMailAt) >= fetchedAt - recentMs) return false
+    if (q) {
+      const s = q.toLowerCase()
+      if (!(p.name || '').toLowerCase().includes(s) && !(p.email || '').toLowerCase().includes(s)) return false
+    }
+    return true
+  })
   const sendable = shown.filter((p) => p.email)
   const allOn = sendable.length > 0 && sendable.every((p) => picked.has(p.userId))
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -756,36 +764,34 @@ function LevelNudgeModal({ onClose }: { onClose: () => void }) {
     sample: { '{level}': `Lv.${p.rank}`, '{link}': `${location.origin}/test/select` },
   }))
 
+  if (err) return <ErrBox msg={err} />
   return (
-    <div className="lt-modal" onClick={onClose}>
-      <div className="lt-modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="admin-modal-h">
-          <b>레벨테스트 독려 메일</b>
-          <span className="admin-hint">마지막 응시가 오래된 회원에게 한 번에</span>
-          <button className="admin-x" onClick={onClose}>✕</button>
-        </div>
+    <div>
+      <div className="admin-section">
         <div className="admin-toolbar">
+          <input className="admin-search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
             마지막 응시 후
             <input type="number" min={0} max={365} value={days} onChange={(e) => setDays(Math.max(0, Math.min(365, +e.target.value || 0)))} style={{ width: 64 }} />
             일 지난 회원
           </label>
           <button className="admin-mini" onClick={() => setApplied(days)} disabled={days === applied}>적용</button>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
-            <input type="checkbox" checked={skipRecent} onChange={(e) => setSkipRecent(e.target.checked)} />
-            최근 {applied}일 안에 독려받은 사람 제외
-          </label>
-          <span className="admin-hint">{people ? `${shown.length}명 · 이메일 없음 ${shown.length - sendable.length}명` : '불러오는 중…'}</span>
+          {applied > 0 && (
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 'var(--fs-sm)' }}>
+              <input type="checkbox" checked={skipRecent} onChange={(e) => setSkipRecent(e.target.checked)} />
+              최근 {applied}일 안에 독려받은 사람 제외
+            </label>
+          )}
+          <span className="admin-hint">{people ? `${shown.length}명${shown.length - sendable.length ? ` · 이메일 없음 ${shown.length - sendable.length}명` : ''}` : '불러오는 중…'}</span>
           <button className="btn-ink" style={{ marginLeft: 'auto' }} onClick={() => setCompose(true)} disabled={!targets.length}>
-            {targets.length ? `${targets.length}명에게 메일 보내기` : '메일 보내기'}
+            {targets.length ? `${targets.length}명에게 독려 메일` : '독려 메일'}
           </button>
         </div>
-        {err ? <ErrBox msg={err} /> : null}
         <table className="admin-table">
           <thead>
             <tr>
               <th style={{ width: 44 }}><input type="checkbox" checked={allOn} onChange={toggleAll} disabled={!sendable.length} /></th>
-              <th>이름</th><th>이메일</th><th>레벨</th><th>마지막 응시</th><th>경과</th><th>마지막 독려</th>
+              <th>이름</th><th>이메일</th><th>레벨</th><th style={{ textAlign: 'right' }}>응시</th><th>마지막 응시</th><th>경과</th><th>마지막 독려</th>
             </tr>
           </thead>
           <tbody>
@@ -795,24 +801,25 @@ function LevelNudgeModal({ onClose }: { onClose: () => void }) {
                 <td><b>{p.name || '-'}</b></td>
                 <td style={{ color: p.email ? 'var(--muted)' : 'var(--dim)' }}>{p.email || '이메일 없음 — 보낼 수 없음'}</td>
                 <td>Lv.{p.rank}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{p.attempts}회</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.lastAt)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{p.daysSince}일</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{p.lastMailAt ? fmtDT(p.lastMailAt) : '–'}</td>
               </tr>
             ))}
-            {people && !shown.length ? <tr><td colSpan={7} className="admin-empty">조건에 맞는 회원이 없습니다.</td></tr> : null}
+            {people && !shown.length ? <tr><td colSpan={8} className="admin-empty">조건에 맞는 회원이 없습니다.</td></tr> : null}
           </tbody>
         </table>
-        {compose ? (
-          <MailComposeModal
-            kind="nudge_leveltest"
-            settingKeys={{ subject: 'mail_leveltest_subject', body: 'mail_leveltest_body' }}
-            vars={LEVEL_MAIL_VARS}
-            targets={targets}
-            onClose={() => setCompose(false)}
-          />
-        ) : null}
       </div>
+      {compose ? (
+        <MailComposeModal
+          kind="nudge_leveltest"
+          settingKeys={{ subject: 'mail_leveltest_subject', body: 'mail_leveltest_body' }}
+          vars={LEVEL_MAIL_VARS}
+          targets={targets}
+          onClose={() => setCompose(false)}
+        />
+      ) : null}
     </div>
   )
 }

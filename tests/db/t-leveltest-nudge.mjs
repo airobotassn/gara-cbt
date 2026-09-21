@@ -25,9 +25,12 @@ await raw(`
   create table user_progress (user_id uuid primary key, rank int not null default 1);
   create table test_attempts (id uuid primary key default gen_random_uuid(), user_id uuid not null, status text not null, submitted_at timestamptz);
 `);
-let ddl = readFileSync('supabase/migrations/20260918130000_leveltest_nudge.sql', 'utf8');
-ddl = ddl.replace(/^\s*(revoke|grant)\b[\s\S]*?;\s*$/gim, '');
-await raw(ddl);
+// 두 장을 순서대로 — 뒤엣것(20260921120000)이 반환 칸(응시 횟수)을 늘려 함수를 다시 만든다.
+for (const m of ['supabase/migrations/20260918130000_leveltest_nudge.sql', 'supabase/migrations/20260921120000_leveltest_people.sql']) {
+  let ddl = readFileSync(m, 'utf8');
+  ddl = ddl.replace(/^\s*(revoke|grant)\b[\s\S]*?;\s*$/gim, '');
+  await raw(ddl);
+}
 
 const U = (n) => `00000000-0000-0000-0000-0000000000${n}`;
 const uOld = U('a1'), uRecent = U('a2'), uGuest = U('a3'), uOut = U('a4'), uNever = U('a5'), uNoProg = U('a6'), uHalf = U('a7');
@@ -45,7 +48,7 @@ await q(`insert into test_attempts (user_id, status, submitted_at) values
   ($6,'submitted', now() - interval '30 days'), ($6,'in_progress', null), ($6,'voided', now() - interval '1 day')`,
   [uOld, uRecent, uGuest, uOut, uNoProg, uHalf]);
 
-const ids = async (days) => (await q(`select user_id, rank, days_since from leveltest_nudge_candidates($1) order by user_id`, [days])).rows;
+const ids = async (days) => (await q(`select user_id, rank, days_since, attempts from leveltest_nudge_candidates($1) order by user_id`, [days])).rows;
 
 const r7 = await ids(7);
 eq('1 최근에 다시 본 사람은 빠진다', r7.some((r) => r.user_id === uRecent), false);
@@ -57,6 +60,8 @@ eq('4 무응시자는 후보가 아니다', r7.some((r) => r.user_id === uNever)
 eq('5 user_progress 없으면 레벨 1', r7.find((r) => r.user_id === uNoProg)?.rank, 1);
 eq('5b 레벨은 user_progress.rank', r7.find((r) => r.user_id === uOld)?.rank, 3);
 eq('5c 경과일 계산', r7.find((r) => r.user_id === uOld)?.days_since, 30);
+eq('5d 응시 횟수 = 제출한 것만(미제출·무효 제외)', r7.find((r) => r.user_id === uHalf)?.attempts, 1);
+eq('5e 응시 횟수 — 두 번 본 사람', (await ids(0)).find((r) => r.user_id === uRecent)?.attempts, 2);
 eq('7 N=20 이면 10일 전 응시자는 빠진다', (await ids(20)).some((r) => r.user_id === uNoProg), false);
 eq('7b N=0 이면 제출자 전부(최근 포함)', (await ids(0)).some((r) => r.user_id === uRecent), true);
 

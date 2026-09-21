@@ -1872,7 +1872,7 @@ async function levelNudgeList(admin: any, body: any) {
     days,
     people: rows.map((r) => ({
       userId: r.user_id, name: r.display_name ?? null, email: emailMap[r.user_id] ?? null,
-      rank: r.rank, lastAt: r.last_at, daysSince: r.days_since, lastMailAt: lastMail[r.user_id] ?? null,
+      rank: r.rank, lastAt: r.last_at, daysSince: r.days_since, attempts: r.attempts ?? 0, lastMailAt: lastMail[r.user_id] ?? null,
     })),
   })
 }

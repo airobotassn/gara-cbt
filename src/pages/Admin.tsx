@@ -53,7 +53,7 @@ import type {
   EbookTranslation,
 } from '../lib/types'
 // WORLD ARENA 화면들 — 옛 <LevelTestAdmin/> 껍데기는 없어지고 개별 컴포넌트가 대메뉴 아래로 꽂힌다.
-import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaUserPanel, type ArenaUserRow } from './AdminLevelTest'
+import { ArenaDashboard, ArenaAttempts, ArenaQuestions, ArenaPeople, ArenaUserPanel, type ArenaUserRow } from './AdminLevelTest'
 // 재편으로 새로 만든 화면들(Admin.tsx 가 이미 6천 줄이라 분리) — 라우팅만 여기서 한다.
 import { TermPoolAdmin } from './AdminTermQuestions'
 import {
@@ -119,8 +119,9 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     // 마이홈(/hub) 밑에서 파는 것들 — 꾸미기(캐릭터·스킨 가격·판매여부)와 코인(적립 정책).
     // 꾸미기는 그림을 안 올린다(2026-08-20) → 캐릭터 업로드만 예외로 그 화면에서 한다(2026-08-31).
     { key: 'myhome', label: '마이홈', children: [{ key: 'cosmetic', label: '꾸미기 관리' }, { key: 'coin', label: '코인 관리' }] },
-    // '응시 기록' 은 통계가 아니라 목록·처리 화면이라 여기 남는다(옛 이름 '참여 현황').
-    { key: 'leveltest', label: '레벨테스트', children: [{ key: 'stat', label: '응시 기록' }, { key: 'quiz', label: '문항 관리' }] },
+    // '응시자'(사람 = 한 줄 · 독려 메일)가 맨 앞 = 기본 화면(2026-09-21 지시). '응시 기록'(시험 한 건 = 한 줄)은
+    // 통계가 아니라 목록·처리 화면이라 여기 남는다(옛 이름 '참여 현황').
+    { key: 'leveltest', label: '레벨테스트', children: [{ key: 'people', label: '응시자' }, { key: 'stat', label: '응시 기록' }, { key: 'quiz', label: '문항 관리' }] },
     // 미니게임·DAILY QUIZ 는 밑에 문항 관리 하나뿐이라 평탄화했다 — 버튼 하나짜리 3단 줄은 자리만 차지한다.
     // 이름에서 '문항' 을 뺀 건 홈과 글자까지 맞추려는 것(2026-09-18).
     { key: 'minigame', label: '미니게임' },
@@ -323,6 +324,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     //    서브탭·'방금 올린 문항' 필터(T-### 번호)가 다른 은행 목록에 그대로 남는다.
     case 'arena/myhome/cosmetic': return <HubCosmeticAdmin />
     case 'arena/myhome/coin': return <CoinPolicyAdmin />
+    case 'arena/leveltest/people': return <ArenaPeople />
     case 'arena/leveltest/stat': return <ArenaAttempts />
     case 'arena/leveltest/quiz': return <ArenaQuestions isRoot={isRoot} />
     case 'arena/minigame': return <TermPoolAdmin key="game" bank="game" />
