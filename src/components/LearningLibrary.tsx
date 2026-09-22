@@ -363,7 +363,7 @@ export function BookRow({
 }
 
 /** 이북 상품 정보(2026-09-22) — 소개 아래 빈자리. 항목을 **좌우 두 칸**에 나눠 넣고 가운데 세로선(지시 "A").
- *    왼쪽: 상품 유형 · 언어 · 페이지 수 / 오른쪽: 제공 방법 · 판매자. 페이지 수는 값이 없으면 안 그린다.
+ *    왼쪽: 상품 유형 · 언어 / 오른쪽: 제공 방법 · 판매자 · 페이지 수. 페이지 수는 값이 없으면 안 그린다.
  *    null 인 칸은 기본값 — 사전(6개국어)으로 그린다. 관리자가 고쳐 쓴 값은 쓴 그대로.
  *  ⚠️ 옛 배포본 응답엔 product 가 없다 → 그때도 기본값으로 그린다(칸이 비지 않는다). */
 function ProductInfo({ b, t }: { b: EbookRow; t: TFunc }) {
@@ -374,11 +374,12 @@ function ProductInfo({ b, t }: { b: EbookRow; t: TFunc }) {
     [t('ebook.p_type'), p.type ?? EBOOK_PRODUCT_DEFAULTS.type],
     [t('ebook.p_langs'), langNames],
   ]
-  if (p.pages) left.push([t('ebook.p_pages'), t('ebook.p_pages_v', { n: p.pages })])
   const right: [string, string][] = [
     [t('ebook.p_delivery'), p.delivery ?? t('ebook.p_delivery_default')],
     [t('ebook.p_seller'), p.seller ?? t('ebook.p_seller_default')],
   ]
+  // 페이지 수는 판매자 밑(2026-09-22 지시) — 왼쪽은 언어 목록이 두 줄로 길어져 오른쪽이 비는 게 자연스럽다.
+  if (p.pages) right.push([t('ebook.p_pages'), t('ebook.p_pages_v', { n: p.pages })])
   const col = (rows: [string, string][]) => (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
       {rows.map(([k, v]) => (
