@@ -13,9 +13,8 @@ import type { MyAttemptsResponse } from '../lib/types'
 // 원본: stitch_design_critique_assistant/gara_4/code.html
 export default function ExamGate() {
   const navigate = useNavigate()
-  const { isFullUser, loginWithGoogle } = useAuth()
+  const { isFullUser } = useAuth()
   const { t, lang } = useT()
-  const [loginNotice, setLoginNotice] = useState(false)
 
   if (isMobileDevice()) return <MobileBlock />
 
@@ -36,46 +35,19 @@ export default function ExamGate() {
     .filter((tk) => tk.usable)
     .sort((a, b) => (b.ticketId === preferTicket ? 1 : 0) - (a.ticketId === preferTicket ? 1 : 0))
 
-  // 응시 시작: 로그인 체크 → prepare. SEB 실행/설치 안내는 prepare 마지막 단계("시작하기").
+  // 응시 시작은 **응시권 카드의 버튼**에서만 한다(2026-09-22 지시 — 위쪽 큰 '응시하기' 버튼을 뺐다).
+  //   그 버튼은 응시권이 한 장이면 바로 가고 여러 장이면 목록으로 화면만 내려서, 두 장 가진 사람은
+  //   눌러도 아무 일도 안 난 것처럼 보였다. 카드에서 누르면 어느 급수(응시권)인지가 곧 정해진다.
+  //   ⚠️ 비로그인은 이 화면에 정상 경로로 못 들어온다(마이페이지 응시권 → 여기) — 로그인 안내도 같이 뺐다.
+  // SEB 실행/설치 안내는 prepare 마지막 단계("시작하기").
   // ⚠️ 응시권을 **반드시 실어 보낸다** — 안 실으면 응시권이 2장 이상일 때 start-exam 이
   //    "어느 걸 쓸지 골라라"로 튕기는데 그걸 고를 화면이 없다.
   function goPrepare(ticketId: string) {
     navigate(`/exam/prepare?ticket=${encodeURIComponent(ticketId)}`, { state: { ticketId } })
   }
-  function onStart() {
-    if (!isFullUser) { setLoginNotice(true); return }
-    if (usable.length === 1) { goPrepare(usable[0].ticketId); return }
-    // 응시권이 없거나 여러 장이면 아래 목록에서 고르게 한다.
-    document.getElementById('my-tickets')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  // 로그인 안내 팝업에서 실제 구글 로그인 실행.
-  // ⚠️ 돌아올 곳은 **이 화면**이다 — 준비 화면은 응시권이 정해진 뒤에만 열리는데, 로그인하고 돌아온
-  //    시점엔 아직 안 골랐다. 여기로 돌아와야 아래 응시권 목록에서 고르는 흐름이 이어진다.
-  function doLogin() {
-    localStorage.setItem('examIntent', '1')
-    loginWithGoogle(`${window.location.origin}/auth/callback?next=${encodeURIComponent('/exam')}`)
-  }
 
   return (
     <div className="bg-background text-on-surface mesh-bg min-h-screen flex flex-col">
-      {/* 로그인 안내 모달 — 응시하기 클릭 시 미로그인이면 노출 */}
-      {loginNotice && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setLoginNotice(false)}>
-          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full text-center ambient-shadow" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
-            </div>
-            <h3 className="font-title-md text-title-md font-bold text-on-surface mb-2">{t('gate.login_modal_title')}</h3>
-            <p className="font-body-md text-body-md text-on-surface-variant mb-6">{t('gate.login_modal_desc')}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button className="bg-primary-container text-on-primary font-label-md text-label-md font-bold px-6 py-3 rounded-xl ambient-shadow inline-flex items-center justify-center" onClick={doLogin}>{t('common.login')}</button>
-              <button className="bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-label-md text-label-md px-6 py-3 rounded-xl hover:border-primary-container hover:text-primary-container transition-colors" onClick={() => setLoginNotice(false)}>{t('common.close')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 헤더 없음 — FAB이 네비 */}
       <main className="flex-grow pt-12 pb-24 px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto">
         <div className="glass-panel rounded-2xl p-8 md:p-10 ambient-shadow flex flex-col gap-16">
@@ -92,20 +64,16 @@ export default function ExamGate() {
                 <h2 className="font-headline-lg text-headline-lg md:font-display-lg md:text-display-lg text-on-surface mb-3">{t('gate.title')}</h2>
                 <p className="font-body-lg text-body-lg text-on-surface-variant break-keep whitespace-pre-line leading-relaxed">{t('gate.fullname')}</p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4 mt-2">
-                <button onClick={onStart} className="bg-primary-container text-on-primary font-title-md text-title-md px-10 py-4 rounded-xl hover:translate-y-[-2px] transition-transform duration-200 ambient-shadow flex items-center justify-center gap-2">
-                  {t('gate.btn_start')}
-                  <span className="material-symbols-outlined">arrow_forward</span>
-                </button>
-                {/* ⚠️ 시험환경 테스트는 **응시권마다** 하는 것이라 아래 응시권 카드로 옮겼다.
-                    여기 남겨두면 어느 응시권으로 점검한 건지 기록이 안 남아 "점검 완료" 가 안 붙는다.
-                    응시권이 없는 사람만 이 버튼으로 미리 체험한다. */}
-                {isFullUser && usable.length > 0 ? null : (
+              {/* ⚠️ 시험환경 테스트는 **응시권마다** 하는 것이라 아래 응시권 카드로 옮겼다.
+                  여기 남겨두면 어느 응시권으로 점검한 건지 기록이 안 남아 "점검 완료" 가 안 붙는다.
+                  응시권이 없는 사람만 이 버튼으로 미리 체험한다. */}
+              {isFullUser && usable.length > 0 ? null : (
+                <div className="flex flex-col sm:flex-row gap-4 mt-2">
                   <button onClick={() => navigate('/exam/check')} className="bg-surface-container-lowest text-on-surface-variant hover:text-primary-container font-title-md text-title-md px-10 py-4 rounded-xl transition-all border border-outline-variant hover:border-primary-container hover:shadow-md flex items-center justify-center gap-2">
                     {t('gate.btn_check')}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </section>
 

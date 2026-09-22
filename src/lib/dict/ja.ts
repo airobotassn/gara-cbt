@@ -484,8 +484,6 @@ const JA: Record<string, string> = {
   "gate.login_hint": "CARISは本人確認のためGoogleログイン後に受験します。",
   "gate.check_link": "🧪 初めてですか？ 試験環境テスト（事前点検）→",
   "gate.instr_title": "重要なご案内",
-  "gate.login_modal_title": "ログインが必要です",
-  "gate.login_modal_desc": "ログインしていません。ログイン後に受験できます。",
   "prep.step_exam": "検定案内",
   "prep.exam_lead": "本試験は {exam} 検定です。以下の科目・試験構成・合格基準をご確認ください。",
   "prep.exam_unknown": "この受験券の等級情報が見つからず、検定案内を表示できません。以下の準備ステップはそのまま進めてください。",

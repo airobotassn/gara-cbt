@@ -484,8 +484,6 @@ const ZH: Record<string, string> = {
   "gate.login_hint": "为核实身份，CARIS 需先用 Google 登录后应试。",
   "gate.check_link": "🧪 第一次？测试考试环境（预检）→",
   "gate.instr_title": "重要须知",
-  "gate.login_modal_title": "需要登录",
-  "gate.login_modal_desc": "您尚未登录。登录后即可应试。",
   "prep.step_exam": "检定说明",
   "prep.exam_lead": "本次为 {exam} 检定。请确认以下科目、考试构成与合格标准。",
   "prep.exam_unknown": "未能找到该准考证的等级信息，因此无法显示检定说明。以下准备步骤可照常进行。",

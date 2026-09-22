@@ -484,8 +484,6 @@ const VI: Record<string, string> = {
   "gate.login_hint": "CARIS yêu cầu đăng nhập Google để xác minh danh tính.",
   "gate.check_link": "🧪 Lần đầu? Kiểm tra môi trường thi (kiểm tra trước) →",
   "gate.instr_title": "Lưu ý quan trọng",
-  "gate.login_modal_title": "Cần đăng nhập",
-  "gate.login_modal_desc": "Bạn chưa đăng nhập. Vui lòng đăng nhập để dự thi.",
   "prep.step_exam": "Giới thiệu kỳ thi",
   "prep.exam_lead": "Đây là kỳ thi {exam}. Xem môn thi, cấu trúc và tiêu chí đạt bên dưới.",
   "prep.exam_unknown": "Không tìm thấy thông tin cấp bậc của vé này nên không thể hiển thị hướng dẫn kỳ thi. Bạn vẫn có thể tiếp tục các bước bên dưới.",

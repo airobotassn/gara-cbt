@@ -484,8 +484,6 @@ const EN: Record<string, string> = {
   "gate.login_hint": "CARIS requires Google sign-in to verify your identity.",
   "gate.check_link": "🧪 First time? Test your exam environment (pre-check) →",
   "gate.instr_title": "Important Instructions",
-  "gate.login_modal_title": "Sign-in required",
-  "gate.login_modal_desc": "You're not signed in. Please sign in to take the exam.",
   "prep.step_exam": "Exam guide",
   "prep.exam_lead": "This is the {exam} exam. Review the subjects, format, and passing criteria below.",
   "prep.exam_unknown": "We couldn't find the grade details for this ticket, so the exam guide can't be shown. You can continue with the steps below.",

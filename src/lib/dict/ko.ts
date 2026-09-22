@@ -491,8 +491,6 @@ const KO: Record<string, string> = {
   "gate.login_hint": "CARIS는 본인 확인을 위해 구글 로그인 후 응시합니다.",
   "gate.check_link": "🧪 처음이신가요? 시험환경 테스트(사전 점검) →",
   "gate.instr_title": "중요 안내사항",
-  "gate.login_modal_title": "로그인이 필요합니다",
-  "gate.login_modal_desc": "로그인이 되어 있지 않습니다. 로그인 후 응시할 수 있어요.",
   "prep.step_exam": "검정 안내",
   "prep.exam_lead": "이 시험은 {exam} 검정입니다. 아래 과목·시험 구성·합격 기준을 확인하세요.",
   "prep.exam_unknown": "이 응시권의 급수 정보를 찾지 못해 검정 안내를 표시할 수 없습니다. 아래 준비 단계는 그대로 진행하시면 됩니다.",
