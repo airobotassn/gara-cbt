@@ -2873,38 +2873,9 @@ async function setRegion(admin: any, body: any) {
   return json({ ok: true })
 }
 
-// ---------- 어드민: 첫 진입 상태로 되돌리기 ----------
-// 신규 가입 흐름(닉네임 → 국가·지역·연령대)을 실제 경로 그대로 다시 태운다. 온보딩 값만 비운다
-// (코인·아바타·응시 이력·자격증은 그대로) — 마이그레이션 20260819170000 주석 참고.
-//
-// ⚠️ **루트 전용이다.** 이 조작은 '국가·지역 1회 변경' 잠금까지 풀어준다 — 등록 이메일 아무나 누를 수 있으면
-//    잠금이 사실상 없는 것과 같다(examTicketGrant 를 루트로 막은 것과 같은 이유).
-// ⚠️ **되돌릴 수 없는 조작인데 기록이 없다.** 예전엔 admin_audit 에 남겼는데, 그 표는 쌓기만 하고
-//    보는 화면이 0곳이라 2026-09-07 에 지웠다(쓰기만 있는 로그는 없는 것과 같다).
-//    되돌리기 전 값(`before`)은 응답으로 돌려주니 누른 사람 화면에는 남는다 — 그게 지금 유일한 근거다.
-//    ⛔ 로그를 되살릴 거면 **보는 화면을 같이** 만들 것.
-async function resetOnboarding(admin: any, body: any, email: string, isRoot: boolean) {
-  if (!isRoot) return json({ error: '루트 관리자만 초기화할 수 있습니다.' }, 403)
-  const uid = String(body?.uid ?? '').trim()
-  if (!uid) return json({ error: 'uid 가 필요합니다.' }, 400)
-
-  // 되돌리기 전 값을 로그에 남긴다 — 실수로 눌렀을 때 사람이 복구할 근거가 이것뿐이다.
-  const { data: before } = await admin
-    .from('profiles')
-    .select('nickname_set_at, region_locked_at, region_changed_at, country_code, region_code, age_band')
-    .eq('id', uid)
-    .maybeSingle()
-  if (!before) return json({ error: '회원을 찾을 수 없습니다.' }, 404)
-
-  const { error } = await admin.rpc('admin_reset_onboarding', { p_uid: uid })
-  if (error) return json({ error: error.message }, 400)
-
-  return json({ ok: true, before })
-}
-
 // 탈퇴 계정 복구(회원 상세의 '복구' 버튼).
 // ⚠️ 루트 전용으로 두지 않는다 — 되돌릴 수 있는 조작이고(다시 탈퇴하면 그만), 실수로 탈퇴한
-//    사용자의 문의는 아무 관리자나 받는다. resetOnboarding 을 루트로 막은 이유(되돌릴 수 없음)와 다르다.
+//    사용자의 문의는 아무 관리자나 받는다.
 // ⚠️ 판정·닉네임 충돌 처리는 전부 RPC 안에 있다(admin_restore_account) — 본인 복구와 같은 규칙을 쓰려고
 //    한 벌로 뒀다. 여기서 조건을 더 얹으면 두 경로가 다른 말을 한다.
 async function restoreAccount(admin: any, body: any, email: string) {
@@ -3552,8 +3523,6 @@ Deno.serve(async (req) => {
       case 'cbtUsers': return await cbtUsers(admin)
       case 'cbtUserDetail': return await cbtUserDetail(admin, body)
       case 'setRegion': return await setRegion(admin, body)
-      // ⚠️ isRoot 를 넘겨 루트 전용으로 막는다(위 주석 — 지역 1회 변경 잠금을 푸는 조작이다).
-      case 'resetOnboarding': return await resetOnboarding(admin, body, email, isRoot)
       case 'restoreAccount': return await restoreAccount(admin, body, email)
       case 'ebookList': return await ebookList(admin)
       case 'ebookUpsert': return await ebookUpsert(admin, body)

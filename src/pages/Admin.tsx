@@ -61,7 +61,7 @@ import {
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
   ReadCell, MemberStats, RevenueStats,
   VisitPeriodStats, VisitEnvStats, VisitSourceStats, VisitIpStats, VisitLogAdmin,
-  MailComposeModal, type MailTarget,
+  MailComposeModal, MailAdmin, mailTemplate, type MailTarget,
   // 문의 분류 이름표는 Q&A 화면과 **한 벌**이다 — 여기서 또 만들면 같은 문의가 두 이름으로 뜬다.
   INQ_CAT, type InquiryRow,
 } from './AdminReform'
@@ -155,6 +155,8 @@ const SUBS: Record<TopMenu, SubItem[]> = {
     { key: 'info', label: '사이트 정보' },
     { key: 'popup', label: '팝업 관리' },
     { key: 'fx', label: '환율 관리' },
+    // 독려 메일 세 벌의 기본 문구 + 보내는 사람(2026-09-22 지시). 메일 것은 전부 여기 한 탭.
+    { key: 'mail', label: '메일 관리' },
     { key: 'admins', label: '관리자 관리', root: true },
   ],
   // ── 통계 (2026-09-09 지시로 신설) ──
@@ -357,6 +359,7 @@ function AdminScreen({ top, tab, sub, isRoot, go }: { top: TopMenu | ''; tab: st
     case 'site/info': return <SiteInfoAdmin />
     case 'site/popup': return <PopupAdmin />
     case 'site/fx': return <FxAdmin />
+    case 'site/mail': return <MailAdmin />
     case 'site/admins': return isRoot ? <AdminAccountsAdmin /> : <HomeDashboard go={go} />
     // ── 통계 ──
     // ⚠️ 전부 **기존 화면을 그대로 세운 것**이다. 통계용으로 복제하지 말 것 — 같은 날 숫자가
@@ -3950,9 +3953,7 @@ function TicketsAdmin({ isRoot }: { isRoot: boolean }) {
 // ── 응시권 미사용자 독려 메일 — 대상 고르기 (2026-09-18 · PPT 6페이지) ──
 // 고른 회차의 **미사용(issued)** 응시권을 서버 목록(examTicketList · status=issued)에서 그대로 받아 체크한다.
 //   ⚠️ 응시 마감({examEnd})은 응시권마다 다를 수 있다(급수별 응시 창) — 사람마다 그 사람 값이 채워진다.
-const TICKET_MAIL_VARS: [string, string][] = [
-  ['{name}', '이름'], ['{round}', '회차명'], ['{tier}', '급수'], ['{examEnd}', '응시 마감'], ['{link}', '응시 안내 주소'],
-]
+const TICKET_MAIL_VARS = mailTemplate('nudge_ticket').vars
 function TicketNudgeModal({ roundId, roundTitle, onClose }: { roundId: string; roundTitle: string; onClose: () => void }) {
   const [rows, setRows] = useState<TicketRow[] | null>(null)
   const [err, setErr] = useState('')
@@ -6219,8 +6220,6 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
       .catch(() => { /* 못 받으면 코드가 그대로 뜬다 */ })
     return () => { alive = false }
   }, [country, region])
-  const [resetting, setResetting] = useState(false)
-  const [resetDone, setResetDone] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [restoreDone, setRestoreDone] = useState(false)
 
@@ -6247,31 +6246,6 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
       alert(e instanceof Error ? e.message : '복구에 실패했습니다.')
     } finally {
       setRestoring(false)
-    }
-  }
-
-  // 첫 진입 상태로 되돌리기 — 신규 가입 흐름(닉네임 → 국가·지역·연령대)을 실제 경로 그대로 다시 태운다.
-  //   ⚠️ 게스트(익명)에게는 안 쓴다 — 게이트가 정식 회원에게만 도는 구조라 눌러도 아무 화면도 안 뜬다.
-  //   ⚠️ 서버가 루트 전용으로 막는다(지역 1회 변경 잠금을 푸는 조작이라). 여기선 버튼을 숨기지 않고
-  //      눌렀을 때 서버 문구를 그대로 보여준다 — 숨기면 왜 없는지 아무도 모른다.
-  async function resetOnboarding() {
-    if (!confirm(
-      [
-        `${user.name || user.email || '이 회원'} 을 첫 진입 상태로 되돌릴까요?`,
-        '',
-        '· 닉네임·국가·지역·연령대를 비웁니다 → 다음 접속에서 그 화면들을 다시 만납니다',
-        '· 국가·지역 1회 변경권도 되돌아갑니다',
-        '· 코인·아바타·응시 이력·자격증은 그대로입니다',
-      ].join(String.fromCharCode(10)),
-    )) return
-    setResetting(true)
-    try {
-      await callFunction('admin', { action: 'resetOnboarding', uid: user.id })
-      setResetDone(true)
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '초기화에 실패했습니다.')
-    } finally {
-      setResetting(false)
     }
   }
 
@@ -6325,18 +6299,6 @@ function MemberDetailModal({ user, onClose }: { user: MemberRow; onClose: () => 
                 </span>
               </>
             )}
-          </div>
-        )}
-        {!user.anon && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 12px' }}>
-            <button className="admin-mini" onClick={resetOnboarding} disabled={resetting || resetDone}>
-              {resetting ? '초기화 중…' : resetDone ? '초기화됨' : '첫 진입 상태로 초기화'}
-            </button>
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-              {resetDone
-                ? '이 회원이 다음에 접속하면 닉네임 → 국가·지역 화면을 다시 만납니다.'
-                : '신규 가입 흐름(닉네임·국가·지역·연령대)을 다시 태웁니다. 이력·자격증은 그대로.'}
-            </span>
           </div>
         )}
         <div className="admin-tabs" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
