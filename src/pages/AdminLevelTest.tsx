@@ -725,7 +725,9 @@ function AttemptsTab() {
 //   · '마지막 응시 후 N일' 은 필터다 — 0 이면 전원. 독려 대상을 추릴 때 7·14 처럼 올린다.
 //   ⚠️ '마지막 독려' 열 + '최근 N일 안에 독려받은 사람 제외' 가 있는 이유 = 지난주에 보낸 사람이 이번 주에도 뜬다.
 //   ⚠️ 여기 '레벨' 은 레벨테스트 등급(시험 사다리)이다 — 시즌 점수로 정하는 ARENA 레벨이 아니다.
-interface NudgePerson { userId: string; name: string | null; email: string | null; rank: number; lastAt: string; daysSince: number; attempts: number; lastMailAt: string | null }
+//   ⛔ 레벨 UP 독려는 **광고성**이라 광고 수신 동의자에게만 보낸다(2026-09-22 결정). 미동의자는 체크박스를 잠근다 —
+//      버튼을 죽이는 방식은 관리자가 누가 문제인지 줄을 훑어야 해서 안 쓴다. 서버도 한 번 더 거른다(mailNudge).
+interface NudgePerson { userId: string; name: string | null; email: string | null; rank: number; lastAt: string; daysSince: number; attempts: number; lastMailAt: string | null; marketing: boolean }
 const LEVEL_MAIL_VARS: [string, string][] = [['{name}', '이름'], ['{level}', '현재 레벨등급'], ['{link}', '레벨테스트 주소']]
 function PeopleTab() {
   const [days, setDays] = useState(0)
@@ -738,12 +740,14 @@ function PeopleTab() {
   const [compose, setCompose] = useState(false)
   // 목록을 받은 시각 — '최근 독려' 판정의 기준. 렌더마다 시계를 읽지 않는다.
   const [fetchedAt, setFetchedAt] = useState(0)
+  // 보낸 뒤 목록을 다시 받는 스위치 — '마지막 독려' 가 바로 뜨고 체크가 풀려야 같은 사람에게 또 안 보낸다.
+  const [reloadN, setReloadN] = useState(0)
 
   useEffect(() => {
     callFunction<{ people: NudgePerson[] }>('admin', { action: 'levelNudgeList', days: applied })
       .then((r) => { setPeople(r.people); setPicked(new Set()); setFetchedAt(Date.now()) })
       .catch((e) => setErr(e instanceof Error ? e.message : '불러오지 못했습니다.'))
-  }, [applied])
+  }, [applied, reloadN])
 
   // 최근 독려 = 지금 고른 N일 안에 이미 한 번 보낸 사람. 같은 사람에게 매주 보내는 걸 막는 기본값이다(N=0 이면 아무도 안 뺀다).
   const recentMs = applied * 86400e3
@@ -755,7 +759,9 @@ function PeopleTab() {
     }
     return true
   })
-  const sendable = shown.filter((p) => p.email)
+  // 보낼 수 있는 사람 = 이메일이 있고 광고 수신에 동의한 사람.
+  const sendable = shown.filter((p) => p.email && p.marketing)
+  const noConsent = shown.filter((p) => p.email && !p.marketing).length
   const allOn = sendable.length > 0 && sendable.every((p) => picked.has(p.userId))
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const toggleAll = () => setPicked(allOn ? new Set() : new Set(sendable.map((p) => p.userId)))
@@ -782,7 +788,11 @@ function PeopleTab() {
               최근 {applied}일 안에 독려받은 사람 제외
             </label>
           )}
-          <span className="admin-hint">{people ? `${shown.length}명${shown.length - sendable.length ? ` · 이메일 없음 ${shown.length - sendable.length}명` : ''}` : '불러오는 중…'}</span>
+          <span className="admin-hint">
+            {people
+              ? `${shown.length}명 · 보낼 수 있음 ${sendable.length}명${noConsent ? ` · 광고 미동의 ${noConsent}명` : ''}${shown.filter((p) => !p.email).length ? ` · 이메일 없음 ${shown.filter((p) => !p.email).length}명` : ''}`
+              : '불러오는 중…'}
+          </span>
           <button className="btn-ink" style={{ marginLeft: 'auto' }} onClick={() => setCompose(true)} disabled={!targets.length}>
             {targets.length ? `${targets.length}명에게 독려 메일` : '독려 메일'}
           </button>
@@ -791,15 +801,17 @@ function PeopleTab() {
           <thead>
             <tr>
               <th style={{ width: 44 }}><input type="checkbox" checked={allOn} onChange={toggleAll} disabled={!sendable.length} /></th>
-              <th>이름</th><th>이메일</th><th>레벨</th><th style={{ textAlign: 'right' }}>응시</th><th>마지막 응시</th><th>경과</th><th>마지막 독려</th>
+              <th>이름</th><th>이메일</th><th>광고 수신</th><th>레벨</th><th style={{ textAlign: 'right' }}>응시</th><th>마지막 응시</th><th>경과</th><th>마지막 독려</th>
             </tr>
           </thead>
           <tbody>
             {shown.map((p) => (
               <tr key={p.userId}>
-                <td><input type="checkbox" checked={picked.has(p.userId)} onChange={() => toggle(p.userId)} disabled={!p.email} /></td>
+                <td><input type="checkbox" checked={picked.has(p.userId)} onChange={() => toggle(p.userId)} disabled={!p.email || !p.marketing} /></td>
                 <td><b>{p.name || '-'}</b></td>
                 <td style={{ color: p.email ? 'var(--muted)' : 'var(--dim)' }}>{p.email || '이메일 없음 — 보낼 수 없음'}</td>
+                {/* 광고성 메일이라 미동의자는 못 고른다 — 체크박스가 잠긴 이유가 이 칸에서 보인다. */}
+                <td style={{ whiteSpace: 'nowrap' }}>{p.marketing ? <span className="badge ok">동의</span> : <span className="badge none">미동의</span>}</td>
                 <td>Lv.{p.rank}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{p.attempts}회</td>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{fmtDT(p.lastAt)}</td>
@@ -807,7 +819,7 @@ function PeopleTab() {
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{p.lastMailAt ? fmtDT(p.lastMailAt) : '–'}</td>
               </tr>
             ))}
-            {people && !shown.length ? <tr><td colSpan={8} className="admin-empty">조건에 맞는 회원이 없습니다.</td></tr> : null}
+            {people && !shown.length ? <tr><td colSpan={9} className="admin-empty">조건에 맞는 회원이 없습니다.</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -818,6 +830,7 @@ function PeopleTab() {
           vars={LEVEL_MAIL_VARS}
           targets={targets}
           onClose={() => setCompose(false)}
+          onSent={() => setReloadN((n) => n + 1)}
         />
       ) : null}
     </div>

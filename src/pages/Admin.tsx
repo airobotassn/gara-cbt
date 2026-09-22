@@ -4030,6 +4030,7 @@ function TicketNudgeModal({ roundId, roundTitle, onClose }: { roundId: string; r
             roundId={roundId}
             targets={targets}
             onClose={() => setCompose(false)}
+            onSent={() => setPicked(new Set())}
           />
         )}
       </div>

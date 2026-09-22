@@ -1801,13 +1801,29 @@ async function mailNudge(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
 
   // 같은 주소 둘이면 한 통만(응시권 둘 가진 사람 등) — 먼저 온 것 기준.
   const seen = new Set<string>()
-  const withEmail = targets.filter((t) => {
+  let withEmail = targets.filter((t) => {
     const e = (t.email ?? '').trim().toLowerCase()
     if (!e.includes('@') || seen.has(e)) return false
     seen.add(e)
     return true
   })
-  if (!withEmail.length) return json({ error: '이메일이 있는 대상이 없습니다.' }, 400)
+  // 광고성 메일은 **광고 수신에 동의한 사람에게만**(2026-09-22 결정 · 정보통신망법 §50).
+  //   · 레벨 UP 독려(nudge_leveltest) = 광고 — "다시 와서 해보라" 는 권유라 동의가 필요하다.
+  //   · 시험환경 점검·응시 마감(nudge_env_check·nudge_ticket) = 본인이 접수한 시험의 고지 — 광고가 아니라 접수자 전원.
+  //   화면이 미동의자 체크박스를 잠그지만, 화면을 우회해도 여기서 한 번 더 거른다. 걸러진 수는 응답(noConsent)으로 돌려준다.
+  //   ⛔ 2026-09-22 첫 발송 4통 중 3통이 미동의자에게 나갔다 — 이 검사가 없어서였다.
+  let noConsent = 0
+  if (kind === 'nudge_leveltest' && withEmail.length) {
+    const { data: profs } = await admin.from('profiles').select('id, marketing_agreed_at')
+      .in('id', withEmail.map((t) => t.userId).filter(Boolean))
+    const ok = new Set(((profs ?? []) as any[]).filter((p) => p.marketing_agreed_at).map((p) => p.id))
+    const before = withEmail.length
+    withEmail = withEmail.filter((t) => t.userId && ok.has(t.userId))
+    noConsent = before - withEmail.length
+  }
+  if (!withEmail.length) {
+    return json({ error: noConsent ? '고른 사람이 전부 광고 수신 미동의입니다. 보낼 수 없습니다.' : '이메일이 있는 대상이 없습니다.' }, 400)
+  }
 
   const langOf = await pickMailLangs(admin, withEmail.map((t) => t.userId).filter(Boolean))
   const needLangs = [...new Set(withEmail.map((t) => langOf[t.userId] ?? 'ko'))]
@@ -1834,7 +1850,7 @@ async function mailNudge(admin: any, body: any, ctx: Ctx, deps: ReformDeps) {
   if (rErr) return json({ error: rErr.message }, 500)
   const sentN = results.filter((r) => r.ok).length
   return json({
-    ok: true, sent: true, queued: sentN, failed: results.length - sentN, skipped: targets.length - withEmail.length,
+    ok: true, sent: true, queued: sentN, failed: results.length - sentN, skipped: targets.length - withEmail.length - noConsent, noConsent,
     langs: Object.fromEntries(needLangs.map((l) => [l, items.filter((x) => x.lang === l).length])),
   })
 }
@@ -1860,19 +1876,27 @@ async function levelNudgeList(admin: any, body: any) {
     for (const x of au ?? []) emailMap[(x as any).id] = (x as any).email ?? ''
   } catch { /* 이메일만 빈칸 */ }
   const lastMail: Record<string, string> = {}
+  // 광고 수신 동의 — 레벨 UP 독려는 광고성이라 동의한 사람에게만 나간다(2026-09-22 결정). 화면이 미동의자 체크박스를 잠근다.
+  const marketing: Record<string, boolean> = {}
   if (rows.length) {
-    const { data: mails } = await admin.from('mail_recipients')
-      .select('user_id, created_at, mail_log!inner(kind)')
-      .eq('mail_log.kind', 'nudge_leveltest')
-      .in('user_id', rows.map((r) => r.user_id))
-      .order('created_at', { ascending: false })
+    const ids = rows.map((r) => r.user_id)
+    const [{ data: mails }, { data: profs }] = await Promise.all([
+      admin.from('mail_recipients')
+        .select('user_id, created_at, mail_log!inner(kind)')
+        .eq('mail_log.kind', 'nudge_leveltest')
+        .in('user_id', ids)
+        .order('created_at', { ascending: false }),
+      admin.from('profiles').select('id, marketing_agreed_at').in('id', ids),
+    ])
     for (const m of (mails ?? []) as any[]) if (!lastMail[m.user_id]) lastMail[m.user_id] = m.created_at
+    for (const p of (profs ?? []) as any[]) marketing[p.id] = !!p.marketing_agreed_at
   }
   return json({
     days,
     people: rows.map((r) => ({
       userId: r.user_id, name: r.display_name ?? null, email: emailMap[r.user_id] ?? null,
       rank: r.rank, lastAt: r.last_at, daysSince: r.days_since, attempts: r.attempts ?? 0, lastMailAt: lastMail[r.user_id] ?? null,
+      marketing: marketing[r.user_id] ?? false,
     })),
   })
 }

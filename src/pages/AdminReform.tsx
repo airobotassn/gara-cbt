@@ -2029,6 +2029,7 @@ export function EnvCheckAdmin() {
           vars={MAIL_VARS}
           roundId={roundId}
           onClose={() => setCompose(false)}
+          onSent={() => { setPicked(new Set()); reload() }}
           targets={pickedPeople.map((p) => ({
             userId: p.userId, email: p.email, name: p.name,
             sample: { '{round}': p.roundTitle, '{tier}': p.tier, '{examDate}': p.examDate ?? '', '{link}': `${location.origin}/exam` },
@@ -2045,13 +2046,16 @@ const LANG_KO: Record<string, string> = { en: '영어', ja: '일본어', zh: '�
 
 // 메일 작성 — 사이트 정보에 저장해둔 제목·본문을 불러와 고칠 수 있게 하고, 고른 사람 전체에게 한 번에 보낸다.
 //   시험환경 점검(nudge_env_check)과 레벨테스트 독려(nudge_leveltest)가 같이 쓴다(2026-09-18) — 종류·템플릿 키·치환자만 다르다.
-export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, onClose }: {
+export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, onClose, onSent }: {
   targets: MailTarget[]
   kind: 'nudge_env_check' | 'nudge_leveltest' | 'nudge_ticket'
   settingKeys: { subject: string; body: string }
   vars: [string, string][]
   roundId?: string
   onClose: () => void
+  /** 보내기가 끝나면(부분 실패 포함) 호출 — 부른 화면이 목록을 다시 받아 '마지막 독려' 가 바로 뜨게 한다.
+   *  ⚠️ 없으면 관리자가 새로고침 전까지 "안 눌렸나?" 하고 같은 사람에게 또 보낸다(2026-09-22 지적). */
+  onSent?: () => void
 }) {
   const { data } = useAdminData<{ settings: Record<string, string> }>('siteSettings')
   const [subject, setSubject] = useState('')
@@ -2059,6 +2063,8 @@ export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, on
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [seeded, setSeeded] = useState(false)
+  // 한 번 보냈으면 이 창에서는 다시 못 보낸다 — 같은 사람에게 두 통 나가는 걸 막는다. 다시 보내려면 닫고 새로 고른다.
+  const [sentOnce, setSentOnce] = useState(false)
   const draft = useDraft({ kind: `mail-${kind}`, value: { subject, body }, title: subject || '독려 메일' })
   useEffect(() => {
     if (!data || seeded) return
@@ -2077,7 +2083,7 @@ export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, on
     try {
       // 사람마다 채울 값(`{level}`·`{round}`…)을 같이 보낸다 — 서버가 사람마다 본문을 채워 보낸다.
       // 치환자 키는 중괄호 없이(`level`), 서버 fillVars 가 `{level}` 자리에 끼운다.
-      const r = await callFunction<{ queued: number; failed: number; skipped: number; langs: Record<string, number> }>('admin', {
+      const r = await callFunction<{ queued: number; failed: number; skipped: number; noConsent?: number; langs: Record<string, number> }>('admin', {
         action: 'mailNudge', kind, roundId: roundId || null, subject, body,
         targets: targets.map((t) => ({
           userId: t.userId, email: t.email, name: t.name,
@@ -2085,7 +2091,9 @@ export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, on
         })),
       })
       const langs = Object.entries(r.langs ?? {}).filter(([l]) => l !== 'ko').map(([l, n]) => `${LANG_KO[l] ?? l} ${n}`).join(' · ')
-      setMsg(`✅ ${r.queued}명에게 보냈습니다${r.failed ? ` · 실패 ${r.failed}명(유저관리 › 상세 › 독려이력에서 사유 확인)` : ''}${langs ? ` · 번역 발송: ${langs}` : ''}`)
+      setMsg(`✅ ${r.queued}명에게 보냈습니다${r.failed ? ` · 실패 ${r.failed}명(유저관리 › 상세 › 독려이력에서 사유 확인)` : ''}${r.noConsent ? ` · 광고 미동의 제외 ${r.noConsent}명` : ''}${langs ? ` · 번역 발송: ${langs}` : ''}`)
+      setSentOnce(true)
+      onSent?.()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '실패')
     } finally { setBusy(false) }
@@ -2130,8 +2138,8 @@ export function MailComposeModal({ targets, kind, settingKeys, vars, roundId, on
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', marginTop: 16 }}>
           {msg && <span className="admin-msg">{msg}</span>}
           <button className="admin-mini" onClick={onClose}>닫기</button>
-          <button className="btn-ink" onClick={send} disabled={busy || !sendable.length || !subject.trim()}>
-            {busy ? '처리 중…' : `${sendable.length}명에게 보내기`}
+          <button className="btn-ink" onClick={send} disabled={busy || sentOnce || !sendable.length || !subject.trim()}>
+            {busy ? '처리 중…' : sentOnce ? '보냈습니다' : `${sendable.length}명에게 보내기`}
           </button>
         </div>
       </div>
