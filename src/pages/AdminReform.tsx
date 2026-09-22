@@ -14,7 +14,7 @@ import { getTracks } from '../lib/caris'
 import { MAX_LEVEL } from '../lib/categories'
 import { useT } from '../lib/i18n'
 // 이름·그림은 허브가 쓰는 것을 그대로 쓴다 — 관리자용 표를 따로 두면 같은 물건이 두 이름으로 뜬다.
-import { SKINS, skinThumb, DEFAULT_SKIN_PART } from '../lib/hubCosmetics'
+import { SKINS, skinThumb, skinByPart, DEFAULT_SKIN_PART, SKIN_CATEGORIES, SKIN_REGIONS, type SkinCategory, type SkinRegion } from '../lib/hubCosmetics'
 import { MAIL_TEMPLATES, mailTemplate } from '../lib/mailTemplates'
 
 // ── 공용 ──────────────────────────────────────────────────────
@@ -3449,6 +3449,31 @@ function CharLevelImg({ src, lv }: { src: string; lv: number }) {
   )
 }
 
+// 배경 표의 소제목 — 허브 꾸미기의 묶음(기본·고궁·…·판타지, 세계 안은 대륙)을 **그대로** 따른다(2026-09-22 지시).
+//   관리자가 보는 순서와 사용자가 상점에서 보는 순서가 같아야 "어디에 뜨는지" 를 표에서 읽을 수 있다.
+//   묶음은 코드(`hubCosmetics.ts` 의 SkinDef.category/region)가 정하고 여기서는 읽기만 한다.
+interface CosmeticSection { cat: SkinCategory | null; region: SkinRegion | null; items: CosmeticRow[] }
+const bySort = (a: CosmeticRow, b: CosmeticRow) => a.sort_order - b.sort_order || a.part_key.localeCompare(b.part_key)
+function cosmeticSections(rows: CosmeticRow[], kind: string): CosmeticSection[] {
+  // ⚠️ 화면 순서 = 저장될 순서(sort_order). 서버가 준 배열 순서를 그대로 그리면 ↑↓ 를 눌렀을 때
+  //    줄이 안 움직이는 것처럼 보인다(값만 바뀌고 자리는 그대로라서).
+  const list = rows.filter((r) => r.kind === kind).sort(bySort)
+  if (kind !== 'skin') return list.length ? [{ cat: null, region: null, items: list }] : []
+  const out: CosmeticSection[] = []
+  for (const cat of SKIN_CATEGORIES) {
+    const inCat = list.filter((r) => skinByPart(r.part_key).category === cat)
+    if (!inCat.length) continue
+    // 허브와 같은 순서 — 대륙이 없는 것이 먼저, 그다음 대륙 순(Hub.tsx 의 regionSections).
+    const plain = inCat.filter((r) => !skinByPart(r.part_key).region)
+    if (plain.length) out.push({ cat, region: null, items: plain })
+    for (const reg of SKIN_REGIONS) {
+      const sub = inCat.filter((r) => skinByPart(r.part_key).region === reg)
+      if (sub.length) out.push({ cat, region: reg, items: sub })
+    }
+  }
+  return out
+}
+
 export function HubCosmeticAdmin() {
   const { t } = useT()
   const { data, loading, err, reload } = useAdminData<{ items: CosmeticRow[] }>('hubCosmetics')
@@ -3457,34 +3482,59 @@ export function HubCosmeticAdmin() {
   const chars = useAdminData<{ items: CharArtRow[] }>('charArtList')
   const charMap = new Map((chars.data?.items ?? []).map((c) => [c.partKey, c]))
   const [rows, setRows] = useState<CosmeticRow[] | null>(null)
-  const draft = useDraft({ kind: 'hub-cosmetics', value: rows, title: '허브 꾸미기 가격표', enabled: !!rows })
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState('')
+  // 저장·새로고침은 **표마다 따로**다(2026-09-22 지시 — 맨 위 버튼 하나가 셋을 통째로 다루던 것을 뗐다).
+  //   조회는 여전히 한 번에 오므로, 새로 받은 값을 **어느 표에** 덮어쓸지를 부른 쪽이 적어 둔다.
+  //   안 적으면 배경을 새로고침했다고 캐릭터에서 고치던 값까지 서버 값으로 되돌아간다.
+  //   null = 처음 받는 것(전부 덮는다). 그 뒤로는 적어 둔 표만.
+  const adopt = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (!data) return
+    const want = adopt.current
+    adopt.current = new Set()
+    setRows((prev) => {
+      if (!prev || !want) return data.items
+      return [...prev.filter((r) => !want.has(r.kind)), ...data.items.filter((r) => want.has(r.kind))]
+    })
+  }, [data])
+  async function refreshKind(kind: string) {
+    ;(adopt.current ??= new Set()).add(kind)
+    await reload()
+  }
+  const rowsOf = (kind: string) => (rows ?? []).filter((r) => r.kind === kind)
+  // 임시본도 표마다 — 한 벌로 두면 배경을 저장했을 때 캐릭터의 임시본까지 지워진다.
+  const draftChar = useDraft({ kind: 'hub-cosmetics-character', value: rowsOf('character'), title: '꾸미기 · 캐릭터', enabled: !!rows })
+  const draftSkin = useDraft({ kind: 'hub-cosmetics-skin', value: rowsOf('skin'), title: '꾸미기 · 배경·UI 스킨', enabled: !!rows })
+  const draftFurn = useDraft({ kind: 'hub-cosmetics-furniture', value: rowsOf('furniture'), title: '꾸미기 · 가구', enabled: !!rows })
+  const draftOf = (kind: string) => (kind === 'character' ? draftChar : kind === 'skin' ? draftSkin : draftFurn)
+  const [busy, setBusy] = useState<string | null>(null)       // 저장 중인 표
+  const [msg, setMsg] = useState<Record<string, string>>({})   // 표마다 결과 문구
   const [owners, setOwners] = useState<string | null>(null)   // 보유자 목록을 연 품목 키
   const [charView, setCharView] = useState<string | null>(null) // 레벨별로 펼쳐 본 캐릭터 키
   const [skinView, setSkinView] = useState<string | null>(null) // 크게 펼쳐 본 배경 스킨 키
-  useEffect(() => { if (data) setRows(data.items) }, [data])
 
   const patch = (key: string, p: Partial<CosmeticRow>) =>
     setRows((prev) => (prev ? prev.map((r) => (r.part_key === key ? { ...r, ...p } : r)) : prev))
 
   /**
-   * 한 칸 위/아래로. 순서는 **묶음(kind) 안에서만** 뜻이 있다 — 캐릭터와 스킨은 서로 다른 목록이라
-   * 번호가 겹쳐도 상관없다.
-   * ⚠️ 옮긴 뒤 그 묶음을 0부터 다시 매긴다. 자리를 바꾸기만 하고 번호를 그대로 두면 화면 순서와
-   *    저장될 순서가 갈라진다(보이는 것과 저장되는 것이 달라지는 종류의 사고다).
+   * 한 칸 위/아래로. 순서는 **소제목 안에서만** 움직인다 — 캐릭터와 스킨은 서로 다른 목록이고,
+   * 배경은 허브가 묶음별로 보여주므로 묶음을 넘는 순서는 화면에 없는 값이다.
+   * ⚠️ 옮긴 뒤 그 종류 전체를 화면 순서(묶음 순 → 묶음 안 순)로 0부터 다시 매긴다. 자리를 바꾸기만
+   *    하고 번호를 그대로 두면 화면 순서와 저장될 순서가 갈라진다(보이는 것과 저장되는 것이 달라지는
+   *    종류의 사고다). 허브는 묶음 안의 상대 순서만 보므로 묶음 사이 번호가 어떻든 화면이 같다.
    */
   function move(kind: string, key: string, dir: -1 | 1) {
     setRows((prev) => {
       if (!prev) return prev
-      const group = prev.filter((r) => r.kind === kind)
-        .sort((a, b) => a.sort_order - b.sort_order || a.part_key.localeCompare(b.part_key))
-      const at = group.findIndex((r) => r.part_key === key)
+      const secs = cosmeticSections(prev, kind)
+      const si = secs.findIndex((s) => s.items.some((r) => r.part_key === key))
+      if (si < 0) return prev
+      const items = [...secs[si].items]
+      const at = items.findIndex((r) => r.part_key === key)
       const to = at + dir
-      if (at < 0 || to < 0 || to >= group.length) return prev
-      const [moved] = group.splice(at, 1)
-      group.splice(to, 0, moved)
-      const order = new Map(group.map((r, i) => [r.part_key, i]))
+      if (to < 0 || to >= items.length) return prev
+      ;[items[at], items[to]] = [items[to], items[at]]
+      secs[si] = { ...secs[si], items }
+      const order = new Map(secs.flatMap((s) => s.items).map((r, i) => [r.part_key, i]))
       return prev.map((r) => (order.has(r.part_key) ? { ...r, sort_order: order.get(r.part_key)! } : r))
     })
   }
@@ -3493,34 +3543,43 @@ export function HubCosmeticAdmin() {
   //   ⚠️ 값(price)은 보지 않는다 — 첫 선택은 값과 무관하게 공짜다(20260824120000).
   //      서버 가드(hubCosmeticsSave)와 같은 조건이어야 한다. 어긋나면 화면은 되는 줄 알고
   //      저장을 눌렀는데 서버가 거절하거나, 반대로 갇히는 값을 통과시킨다.
-  const starters = (rows ?? []).filter((r) => r.kind === 'character' && r.active)
+  const starters = rowsOf('character').filter((r) => r.active)
 
-  async function save() {
-    if (!rows) return
-    setBusy(true); setMsg('')
+  // 그 표의 줄만 보낸다 — 서버는 받은 줄만 고치고 첫 선택 후보 검사는 저장 뒤 전체 모습으로 한다.
+  async function save(kind: string) {
+    const list = rowsOf(kind)
+    if (!list.length) return
+    setBusy(kind); setMsg((m) => ({ ...m, [kind]: '' }))
     try {
       await callFunction('admin', {
         action: 'hubCosmeticsSave',
-        rows: rows.map((r) => ({ partKey: r.part_key, price: r.price, active: r.active, sortOrder: r.sort_order })),
+        rows: list.map((r) => ({ partKey: r.part_key, price: r.price, active: r.active, sortOrder: r.sort_order })),
       })
-      setMsg('✅ 저장했습니다')
-      draft.clear()
-      await reload()
+      setMsg((m) => ({ ...m, [kind]: '✅ 저장했습니다' }))
+      draftOf(kind).clear()
+      await refreshKind(kind)
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : '저장 실패')
-    } finally { setBusy(false) }
+      setMsg((m) => ({ ...m, [kind]: e instanceof Error ? e.message : '저장 실패' }))
+    } finally { setBusy(null) }
   }
 
   const table = (kind: string) => {
-    // ⚠️ 화면 순서 = 저장될 순서(sort_order). 서버가 준 배열 순서를 그대로 그리면 ↑↓ 를 눌렀을 때
-    //    줄이 안 움직이는 것처럼 보인다(값만 바뀌고 자리는 그대로라서).
-    const list = (rows ?? []).filter((r) => r.kind === kind)
-      .sort((a, b) => a.sort_order - b.sort_order || a.part_key.localeCompare(b.part_key))
-    if (!list.length) return null
+    const secs = cosmeticSections(rows ?? [], kind)
+    if (!secs.length) return null
     const isChar = kind === 'character'
+    const d = draftOf(kind)
     return (
       <div className="admin-section" key={kind}>
-        <h3>{COSMETIC_KIND_LABEL[kind] ?? kind}</h3>
+        <div className="admin-section-head">
+          <h3>{COSMETIC_KIND_LABEL[kind] ?? kind}</h3>
+          <div className="admin-head-actions">
+            {msg[kind] && <span className="admin-msg">{msg[kind]}</span>}
+            <DraftBar status={d.status} savedAt={d.savedAt} drafts={d.drafts} onRefresh={d.refresh}
+              onRestore={(p: CosmeticRow[]) => setRows((prev) => [...(prev ?? []).filter((r) => r.kind !== kind), ...p])} />
+            <button className="admin-mini" onClick={() => void refreshKind(kind)} disabled={loading}>새로고침</button>
+            <button className="btn-ink" onClick={() => void save(kind)} disabled={busy != null}>{busy === kind ? '저장 중…' : '저장'}</button>
+          </div>
+        </div>
         {/* ⚠️ 설명문은 두지 않는다(2026-08-31 지시). **저장이 막히는 상태일 때만** 한 줄 띄운다 —
             이건 안내가 아니라 오류 예고다. 없으면 관리자가 이유 모를 저장 실패를 본다. */}
         {isChar && starters.length === 0 && (
@@ -3538,62 +3597,71 @@ export function HubCosmeticAdmin() {
               <th style={{ width: 150 }}>보유 / 착용</th>
             </tr>
           </thead>
-          <tbody>
-            {list.map((r, i) => (
-              <tr key={r.part_key}>
-                {/* ⛔ 키(`char_c_f`)를 글자로 내보내지 말 것(2026-08-31 지시) — 보는 사람에게 아무 뜻이 없다.
-                    그림과 이름이 그 자리를 대신하고, 키는 title 로만 남긴다(장애 신고 때 쓴다). */}
-                <td title={r.part_key}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CosmeticThumb kind={r.kind} src={cosmeticThumb(r, charMap)} />
-                    <span>
-                      <b>{cosmeticLabel(r, charMap, t)}</b>
-                      {/* ⚠️ 여는 자리는 **이름 옆 버튼**이다(2026-08-31 지시). 썸네일을 누르게 하면
-                          누를 수 있다는 걸 아무도 모른다 — 그냥 그림으로 보인다. */}
-                      {(r.kind === 'character' || r.kind === 'skin') && (
-                        <>
-                          {' '}
-                          <button
-                            className="admin-mini"
-                            onClick={() => (r.kind === 'skin' ? setSkinView(r.part_key) : setCharView(r.part_key))}
-                          >
-                            보기
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <input style={inp} type="number" min={0} step={1} value={r.price}
-                    onChange={(e) => patch(r.part_key, { price: Math.max(0, Math.floor(+e.target.value || 0)) })} />
-                </td>
-                {/* ⛔ 순서를 숫자로 치게 하지 말 것(2026-08-31 지시). 사이에 하나 끼우려면 뒤를 전부 다시
-                    매겨야 하고, 같은 숫자를 두 개 주면 순서가 안 정해진다(그땐 키 순으로 떨어져 무작위로 보인다).
-                    ⚠️ 보이는 순서가 곧 저장될 순서다 — 옮기면 그 묶음을 0부터 다시 번호 매긴다. */}
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="admin-mini" onClick={() => move(kind, r.part_key, -1)} disabled={i === 0} title="위로">↑</button>
-                  {' '}
-                  <button className="admin-mini" onClick={() => move(kind, r.part_key, 1)} disabled={i === list.length - 1} title="아래로">↓</button>
-                </td>
-                <td>
-                  {/* ⚠️ '진열/내림' 은 무엇을 뜻하는지 안 통했다 → **상점에 뜨는가**로 말을 바꿨다. */}
-                  <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input type="checkbox" checked={r.active}
-                      onChange={(e) => patch(r.part_key, { active: e.target.checked })} />
-                    {r.active ? '상점에 표시' : '상점에서 숨김'}
-                  </label>
-                </td>
-                {/* 보유자는 값을 올리기 전에, 착용자는 진열을 내리기 전에 봐야 하는 숫자다.
-                    ⚠️ 숫자만으로는 판단이 안 서서 **누구인지** 열 수 있게 했다(2026-08-31 지시). */}
-                <td>
-                  <button className="admin-mini" onClick={() => setOwners(r.part_key)} disabled={!r.owners && !r.worn}>
-                    {r.owners}명 / {r.worn}명
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+          {secs.map((sec, si) => (
+            <tbody key={`${sec.cat ?? ''}/${sec.region ?? ''}`}>
+              {/* 묶음 소제목은 배경에만 선다. 같은 묶음이 대륙으로 더 나뉘면 묶음 줄은 첫 대륙 앞에 한 번만. */}
+              {sec.cat && (si === 0 || secs[si - 1].cat !== sec.cat) && (
+                <tr className="admin-group-row"><td colSpan={5}>{t(`hub.closet.cat_${sec.cat}`)}</td></tr>
+              )}
+              {sec.region && (
+                <tr className="admin-group-sub"><td colSpan={5}>{t(`hub.closet.reg_${sec.region}`)}</td></tr>
+              )}
+              {sec.items.map((r, i) => (
+                <tr key={r.part_key}>
+                  {/* ⛔ 키(`char_c_f`)를 글자로 내보내지 말 것(2026-08-31 지시) — 보는 사람에게 아무 뜻이 없다.
+                      그림과 이름이 그 자리를 대신하고, 키는 title 로만 남긴다(장애 신고 때 쓴다). */}
+                  <td title={r.part_key}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <CosmeticThumb kind={r.kind} src={cosmeticThumb(r, charMap)} />
+                      <span>
+                        <b>{cosmeticLabel(r, charMap, t)}</b>
+                        {/* ⚠️ 여는 자리는 **이름 옆 버튼**이다(2026-08-31 지시). 썸네일을 누르게 하면
+                            누를 수 있다는 걸 아무도 모른다 — 그냥 그림으로 보인다. */}
+                        {(r.kind === 'character' || r.kind === 'skin') && (
+                          <>
+                            {' '}
+                            <button
+                              className="admin-mini"
+                              onClick={() => (r.kind === 'skin' ? setSkinView(r.part_key) : setCharView(r.part_key))}
+                            >
+                              보기
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <input style={inp} type="number" min={0} step={1} value={r.price}
+                      onChange={(e) => patch(r.part_key, { price: Math.max(0, Math.floor(+e.target.value || 0)) })} />
+                  </td>
+                  {/* ⛔ 순서를 숫자로 치게 하지 말 것(2026-08-31 지시). 사이에 하나 끼우려면 뒤를 전부 다시
+                      매겨야 하고, 같은 숫자를 두 개 주면 순서가 안 정해진다(그땐 키 순으로 떨어져 무작위로 보인다).
+                      ⚠️ 보이는 순서가 곧 저장될 순서다 — 옮기면 그 종류를 0부터 다시 번호 매긴다. */}
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="admin-mini" onClick={() => move(kind, r.part_key, -1)} disabled={i === 0} title="위로">↑</button>
+                    {' '}
+                    <button className="admin-mini" onClick={() => move(kind, r.part_key, 1)} disabled={i === sec.items.length - 1} title="아래로">↓</button>
+                  </td>
+                  <td>
+                    {/* ⚠️ '진열/내림' 은 무엇을 뜻하는지 안 통했다 → **상점에 뜨는가**로 말을 바꿨다. */}
+                    <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input type="checkbox" checked={r.active}
+                        onChange={(e) => patch(r.part_key, { active: e.target.checked })} />
+                      {r.active ? '상점에 표시' : '상점에서 숨김'}
+                    </label>
+                  </td>
+                  {/* 보유자는 값을 올리기 전에, 착용자는 진열을 내리기 전에 봐야 하는 숫자다.
+                      ⚠️ 숫자만으로는 판단이 안 서서 **누구인지** 열 수 있게 했다(2026-08-31 지시). */}
+                  <td>
+                    <button className="admin-mini" onClick={() => setOwners(r.part_key)} disabled={!r.owners && !r.worn}>
+                      {r.owners}명 / {r.worn}명
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
     )
@@ -3601,21 +3669,17 @@ export function HubCosmeticAdmin() {
 
   return (
     <>
-      <AdminHead title="꾸미기 관리" onReload={reload} loading={loading}>
-        {msg && <span className="admin-msg">{msg}</span>}
-        <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
-          onRestore={(p: CosmeticRow[]) => setRows(p)} />
-        <button className="btn-ink" onClick={save} disabled={busy || !rows}>{busy ? '저장 중…' : '저장'}</button>
-      </AdminHead>
+      {/* 제목줄에는 버튼이 없다 — 저장·새로고침은 표마다 있다(2026-09-22 지시). */}
+      <AdminHead title="꾸미기 관리" />
       <ErrBox msg={err} />
       {/* 캐릭터를 **만드는** 자리 — 아래 가격표는 이미 있는 것의 값만 만진다.
-          ⚠️ 저장하면 shop_catalog 행이 같이 생기므로 가격표를 다시 불러와야 새 줄이 보인다. */}
+          ⚠️ 저장하면 shop_catalog 행이 같이 생기므로 캐릭터 표를 다시 받아야 새 줄이 보인다. */}
       <CharArtAdmin
         items={chars.data?.items ?? []}
         loading={chars.loading}
         err={chars.err}
         reload={chars.reload}
-        onSaved={reload}
+        onSaved={() => refreshKind('character')}
       />
       {COSMETIC_KIND_ORDER.map(table)}
       {owners && <CosmeticOwners partKey={owners} onClose={() => setOwners(null)} />}
