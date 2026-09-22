@@ -2372,19 +2372,13 @@ export function MailAdmin() {
           onRestore={(p: Record<string, string>) => setEdits(p)} />
       </AdminHead>
       <ErrBox msg={err} />
-      <p className="admin-hint" style={{ marginBottom: 14, lineHeight: 1.7 }}>
-        독려 메일이 나갈 때 쓰는 <b>기본 문구</b>입니다. 각 메일 창은 여기 저장된 제목·본문으로 시작하고, 창에서 고친 건 그 한 번만 적용됩니다.
-      </p>
 
-      {/* 보내는 사람 — 세 메일이 같은 주소로 나간다. */}
+      {/* 보내는 사람 — 세 메일이 같은 주소로 나간다. ⛔ 설명 문장을 달지 말 것(2026-09-22 질책 — "이런 이상한 글좀 쓰지마라"). */}
       <div className="admin-section">
         <div className="admin-section-head">
           <h3>보내는 사람</h3>
           <MailSaveBtn n={dirtyIn(['sender_name', 'sender_email'])} name="보내는 사람" saving={savingKey} onClick={() => saveKeys(['sender_name', 'sender_email'], '보내는 사람')} />
         </div>
-        <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12, lineHeight: 1.7 }}>
-          주소는 발송 서비스에 인증된 도메인(garacaris.com)의 것이어야 합니다. 받는 사람 메일함에는 <b>{senderLine}</b> 으로 보입니다.
-        </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px) minmax(240px, 420px)', gap: 12 }}>
           <label style={fld}>이름
             <input style={inp} value={form.sender_name ?? ''} onChange={(e) => set('sender_name', e.target.value)} placeholder="CARIS" />
@@ -2407,10 +2401,6 @@ export function MailAdmin() {
               <h3>{t.title} <span className="admin-hint">{t.where}</span></h3>
               <MailSaveBtn n={dirtyIn(keys)} name={t.title} saving={savingKey} onClick={() => saveKeys(keys, t.title)} />
             </div>
-            <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12, lineHeight: 1.7 }}>
-              {t.ad ? '광고성 메일이라 광고 수신에 동의한 회원에게만 나갑니다.' : '본인이 접수한 시험에 대한 안내라 접수자 전원에게 나갑니다.'}
-              {' '}치환자: {t.vars.map(([k, d]) => `${k} ${d}`).join(' · ')} — 사람마다 값이 채워집니다.
-            </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(300px, 1fr)', gap: 18, alignItems: 'start' }}>
               <div style={{ display: 'grid', gap: 12 }}>
                 <label style={fld}>제목
