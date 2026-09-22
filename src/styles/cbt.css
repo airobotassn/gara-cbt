@@ -686,7 +686,7 @@
   font-size: var(--fs-md);
   color: var(--txt);
   line-height: 1.6;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .prep-sebwarn {
   border-top: 1px solid var(--line);
@@ -697,14 +697,14 @@
   font-size: var(--fs-md);
   color: var(--ink);
   margin-bottom: 6px;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .prep-sebwarn p {
   margin: 0;
   color: var(--muted);
   font-size: var(--fs-md);
   line-height: 1.9;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .prep-kbd {
   display: inline-block;

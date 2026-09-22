@@ -70,7 +70,7 @@
 }
 
 /* 공지 상세(NoticeDetail) 본문 — 관리자 WYSIWYG(react-quill) HTML 렌더용 서식 */
-.notice-content { line-height: 1.75; color: var(--txt); word-break: keep-all; }
+.notice-content { line-height: 1.75; color: var(--txt); word-break: var(--wb, keep-all); }
 .notice-content h2 { font-size: 1.4em; font-weight: 800; letter-spacing: -0.01em; margin: 1.3em 0 .5em; }
 .notice-content h3 { font-size: 1.18em; font-weight: 700; margin: 1.1em 0 .45em; }
 .notice-content p { margin: 0 0 .85em; }
@@ -137,9 +137,15 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   /* 한국어 개행: 어절(띄어쓰기) 단위로만 꺾고, 넘칠 때만 강제 분리 (전역 상속) */
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
   overflow-wrap: break-word;
 }
+/* ⛔ 일본어·중국어는 띄어쓰기가 없어서 keep-all 이면 **문장 하나가 단어 하나**가 된다 — 어디서도 못 꺾여
+   카드를 뚫고 나간다(2026-09-22 /exam 안내 카드 실측). 그래서 keep-all 을 쓰는 자리는 전부 `--wb` 를 거치고
+   그 두 언어만 글자 단위로 꺾는다. Tailwind `break-keep` 도 같은 이유로 같이 꺾는다.
+   ⚠️ 새 CSS 에 `word-break: keep-all` 을 직접 쓰지 말 것 — `var(--wb, keep-all)` 로. */
+html:lang(ja), html:lang(zh) { --wb: normal; }
+html:lang(ja) .break-keep, html:lang(zh) .break-keep { word-break: normal; }
 
 /* 개행 다듬기(전역): 제목은 줄 길이 균형, 본문은 마지막 줄 외톨이 단어 방지.
    미지원 브라우저는 무시(점진적 향상). nowrap/ellipsis 클래스가 있으면 그쪽이 이김. */
@@ -203,7 +209,7 @@ dd {
   font-size: var(--fs-md);
   line-height: 1.6;
   margin: 12px 0 30px;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 
 /* 별하늘 배경(<StarField />) — 다크에서만 붙는다(컴포넌트가 라이트에선 아예 언마운트).

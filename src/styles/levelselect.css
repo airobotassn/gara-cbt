@@ -140,7 +140,7 @@
   font-size: var(--fs-md);
   font-weight: 600;
   /* 한국어: 단어(어절) 중간에서 끊기지 않게 띄어쓰기 단위로만 줄바꿈 */
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
   overflow-wrap: anywhere;
 }
 .step .diffword {
@@ -527,7 +527,7 @@
   font-weight: 600;
   line-height: 1.5;
   padding: 12px 14px;
-  word-break: keep-all; /* 한국어: 단어(어절) 중간에서 끊기지 않게 */
+  word-break: var(--wb, keep-all); /* 한국어: 단어(어절) 중간에서 끊기지 않게 */
 }
 
 

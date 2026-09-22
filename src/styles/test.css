@@ -432,7 +432,7 @@
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--ink);
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .intro-anticheat {
   display: inline-block;
@@ -463,7 +463,7 @@
   padding: 12px 14px;
   font-size: var(--fs-md);
   line-height: 1.5;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .intro-rules li .ic {
   flex: none;

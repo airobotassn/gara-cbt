@@ -3,7 +3,7 @@
   max-width: 760px;
   margin: 0 auto;
   line-height: 1.7;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 
 /* ===== 협회 소개 hero ===== */

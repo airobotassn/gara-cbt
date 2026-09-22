@@ -10,7 +10,7 @@
 .pl-head { margin: 26px 0 34px; }
 .pl-head h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); font-weight: 900; letter-spacing: -.02em; color: var(--g-navy); }
 .pl-head h1 em { font-style: normal; color: var(--g-blue); }
-.pl-head p { margin: 12px 0 0; font-size: 15.5px; line-height: 1.7; color: var(--g-muted); word-break: keep-all; }
+.pl-head p { margin: 12px 0 0; font-size: 15.5px; line-height: 1.7; color: var(--g-muted); word-break: var(--wb, keep-all); }
 
 /* ── 접수중 회차 일정표 (2026-08-20) ─────────────────────────────
    왼쪽 색 칩(원서접수·응시기간·채점기간·합격자조회) + 오른쪽 날짜 한 줄. */
@@ -28,11 +28,11 @@
    라이트에서는 옅은 파스텔, 다크에서는 어두운 틴트로 알아서 뒤집힌다. */
 .pl-crit-chip {
   flex: 0 0 108px; text-align: center; padding: 7px 10px; border-radius: 8px;
-  font-size: 13.5px; font-weight: 700; word-break: keep-all;
+  font-size: 13.5px; font-weight: 700; word-break: var(--wb, keep-all);
   background: color-mix(in srgb, var(--c) 16%, var(--g-card));
   color: color-mix(in srgb, var(--c) 72%, var(--g-ink));
 }
-.pl-crit-when { font-size: 15px; font-weight: 800; color: var(--g-ink); word-break: keep-all; }
+.pl-crit-when { font-size: 15px; font-weight: 800; color: var(--g-ink); word-break: var(--wb, keep-all); }
 
 .pl-empty { margin: 40px 0; text-align: center; font-size: 15px; color: var(--g-muted); }
 
@@ -102,7 +102,7 @@ html.dark .pl-rolling { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 20
 }
 html.dark .pl-rolling-ic { background: rgba(18, 165, 140, .18); color: #4fd6bd; }
 .pl-rolling h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--g-navy); }
-.pl-rolling p { margin: 3px 0 0; font-size: 13.5px; color: var(--g-muted); word-break: keep-all; }
+.pl-rolling p { margin: 3px 0 0; font-size: 13.5px; color: var(--g-muted); word-break: var(--wb, keep-all); }
 .pl-rolling-r { display: flex; align-items: center; gap: 12px; flex: none; }
 .pl-rolling-r .pl-go { margin-top: 0; }
 

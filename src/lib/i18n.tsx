@@ -142,6 +142,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     loadDict(lang).then(() => { if (alive) setReady(true) })
     return () => { alive = false }
   }, [lang, ready])
+  // <html lang> 을 실제 언어에 맞춘다 — index.html 은 ko 로 박혀 있어서, 저장된 언어로 다시 들어오면
+  // setLang 을 안 거치므로 여기서 맞춰야 한다. CSS 가 `:lang(ja)` 로 개행 규칙을 가른다(base.css).
+  useEffect(() => { document.documentElement.lang = lang }, [lang])
 
   function setLang(l: Lang) {
     localStorage.setItem('lang', l)

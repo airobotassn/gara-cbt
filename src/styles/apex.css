@@ -38,7 +38,7 @@
   color: var(--ax-text);
   min-height: 100vh;
   font-family: var(--font-sans);
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .ax-wrap {
   width: 100%;

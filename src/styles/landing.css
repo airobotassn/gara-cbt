@@ -87,7 +87,7 @@ html.lp-noscrollbar::-webkit-scrollbar {
   font-weight: 500;
   margin: 18px 0 0;
   letter-spacing: -0.01em;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .cta {
   position: relative;
@@ -277,7 +277,7 @@ html.lp-noscrollbar::-webkit-scrollbar {
   font-weight: 600;
   line-height: 1.5;
   padding: 13px 16px;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 .lp-reco-sub {
   margin-top: 6px;

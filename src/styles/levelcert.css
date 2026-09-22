@@ -422,7 +422,7 @@
   color: #93a3bd;
   font-size: var(--fs-md);
   line-height: 1.6;
-  word-break: keep-all;
+  word-break: var(--wb, keep-all);
 }
 
 /* 인쇄 = PDF 저장: 인증서 한 장(A4 가로). 배경 그림이 있어 색 보정을 강제한다. */
