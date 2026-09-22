@@ -20,7 +20,7 @@ const CASES = [
   ['내 강의', '/mypage/ebooks'], ['구매한 강의 어디서 봐', '/mypage/ebooks'], ['내 서재', '/mypage/ebooks'],
   ['의견 보내기', '/faq'], ['건의사항 있어', '/faq'], ['환불 어떻게 해', '/faq'],
   ['응시 자격이 뭐야', '/guide'], ['어떤 시험 있어', '/guide'], ['급수가 어떻게 돼', '/guide'],
-  ['시험 보러 왔어', '/exam'], ['모의고사', '/exam/check'], ['자격증 발급', '/certificate'],
+  ['시험 보러 왔어', '/plan'], ['모의고사', '/exam/check'], ['자격증 발급', '/certificate'],
   ['랭킹', '/ranking'], ['아레나', '/arena'], ['미니게임', '/games'],
   ['DAILY QUIZ', '/daily'], ['데일리 퀴즈', '/daily'], ['오늘의 학습', '/daily'],
   ['캐릭터 바꾸고싶어', '/hub'], ['레벨테스트 하고싶어', '/test/select'],

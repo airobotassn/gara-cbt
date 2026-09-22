@@ -15,7 +15,8 @@ const VALID_DESTS = new Set([
   // WORLD ARENA 계열
   '/arena', '/test/select', '/ranking', '/hub', '/games', '/daily',
   // CARIS 자격검정
-  '/guide', '/plan', '/exam/apply', '/exam', '/exam/check', '/certificate',
+  //   ⚠️ `/exam`(응시 게이트)은 목적지가 아니다(2026-09-22) — "시험 보러 왔어" 는 /plan 이다.
+  '/guide', '/plan', '/exam/apply', '/exam/check', '/certificate',
   // 내 정보
   //   ⚠️ `/mypage` 는 더 이상 어떤 인텐트의 목적지가 아니다 — 2026-08-25 에 그 기본 화면이
   //      이북 서재가 되면서 "내 점수" 검색이 서재로 떨어졌다. 지금은 응시 현황 탭으로 직행한다.
@@ -38,10 +39,10 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재|강의)|산\s?책|내\s?강의|my\s?e-?book|e-?book\s?library|my\s?lecture|本棚|購入した本|我的电子书|我的课程|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
   if (h(/이북|e-?book|전자책|전자\s?교재|교재|강의|인강|lecture|online\s?course|電子書籍|講義|电子书|课程|sách điện tử|bài giảng/)) return '/ebooks'
   // --- 캐릭터 허브 ---
-  if (h(/허브|캐릭터|아바타|코인|상점|출석|hub|character|avatar|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|コイン|ショップ|出席|角色|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
+  if (h(/허브|캐릭터|아바타|코인|상점|출석|칭호|배지|선물|친구|초대|추천인|hub|character|avatar|coin|shop|attendance|check[\s-]?in|badge|gift|referral|invite|ハブ|キャラ|コイン|ショップ|出席|称号|招待|角色|金币|商店|签到|称號|邀请|nhân vật|điểm danh|cửa hàng|danh hiệu|mời bạn/)) return '/hub'
   // --- 이하 기존 순서 유지 ---
   if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
-  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage/attempts'
+  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|응시\s?현황|내\s?응시권|응시권\s?(확인|어디|있)|내 기록|닉네임|국가\s?변경|지역\s?변경|my score|my result|my page|mypage|my\s?tickets?|nickname|マイページ|受験履歴|受験券|ニックネーム|个人中心|我的成绩|准考证|昵称|trang cá nhân|vé thi|biệt danh/)) return '/mypage/attempts'
   if (h(/자격증|합격증|증명서|인증서|certificate|証明書|合格証|证书|chứng chỉ của/)) return '/certificate'
   if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|gara|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
@@ -51,12 +52,15 @@ function clientKeywordRoute(q: string): string | null {
   if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
   // ⚠️ '응시 자격' 은 **정보**를 묻는 말이라 안내로 가야 한다 — 아래 '응시' 규칙이 먼저 잡아서
   //    시험장 입구로 보내고 있었다(2026-08-25 점검에서 발견). 그래서 이 줄이 그보다 위에 있어야 한다.
+  // ⚠️ "시험 보러 왔어" 는 **일정·접수(/plan)** 다(2026-09-22 지시). 메인에서 그 말을 치는 사람은 응시권을
+  //    든 사람이 아니라 언제 시험이 있고 어떻게 접수하는지 알고 싶은 사람이다 — 응시권을 든 사람은
+  //    마이페이지 응시권 카드로 /exam 에 들어간다. ('응시권'·'응시 현황' 은 위 마이페이지 규칙이 먼저 잡는다.)
   if (h(/응시\s?자격|수험\s?자격|지원\s?자격|eligib|受験資格|报考资格|điều kiện dự thi/)) return '/guide'
-  if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
+  if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/plan'
   // '카리스/caris' = 자격검정 브랜드명 → 안내로. ('카리스 아레나' 는 위 arena 규칙이 이미 가져갔다)
   if (h(/자격|급수|과목|자격검정|카리스|caris|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
   if (h(/레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
-  if (h(/약관|이용약관|terms/)) return '/terms'
+  if (h(/약관|이용약관|탈퇴|계정\s?삭제|terms|withdraw|delete (my )?account|退会|利用規約|注销|服务条款|xóa tài khoản|điều khoản/)) return '/terms'
   if (h(/개인정보|프라이버시|privacy/)) return '/privacy'
   if (h(/로그인|로그아웃|login|sign\s?in/)) return '/login'
   return null

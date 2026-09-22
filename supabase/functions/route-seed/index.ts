@@ -59,6 +59,12 @@ const SEED: { dest: string; phrases: string[] }[] = [
       '캐릭터 허브', '허브', '로비', '내 캐릭터', '캐릭터 보기', '캐릭터 꾸미기', '아바타 바꾸기', '아바타 변경',
       '프로필 사진 바꾸기', '젬 색 바꾸기',
       '코인', '내 코인', '코인 얼마 있지', '상점', '코인 상점', '아이템 사기', '출석체크', '출석', '오늘 출석했나',
+      // 칭호·코인 선물·친구 초대는 전부 허브 안에 있다(2026-09-22 추가 — 이 말들이 어디로도 못 갔다).
+      '칭호', '내 칭호', '칭호 바꾸기', '배지', '코인 선물', '코인 선물하기', '친구 초대', '초대 코드', '추천인 코드',
+      'my title', 'badge', 'gift coins', 'send coins', 'invite friends', 'referral code',
+      '称号', 'コインを贈る', '友達を招待', '招待コード',
+      '称號', '赠送金币', '邀请好友', '邀请码',
+      'danh hiệu', 'tặng xu', 'mời bạn bè', 'mã giới thiệu',
       'character hub', 'my character', 'change my avatar', 'avatar', 'customize character',
       'coins', 'my coins', 'shop', 'buy items', 'attendance', 'daily check-in', 'lobby',
       'キャラクターハブ', 'マイキャラ', 'アバター変更', 'コイン', 'ショップ', 'アイテム購入', '出席チェック', 'ロビー',
@@ -134,15 +140,24 @@ const SEED: { dest: string; phrases: string[] }[] = [
     // ⚠️ 여기가 `/guide` 였던 건 **옛날 얘기다.** 2026-07 개편으로 일정이 /plan 으로 분리되면서
     //    /guide 에는 날짜가 한 줄도 안 남았는데 이 목적지만 그대로였다 — 일정을 물어본 사람이
     //    일정 없는 페이지에 떨어지고 있었다(2026-08-25 점검에서 발견).
-    dest: '/plan', // 시험 일정·회차·접수 기간
+    // ⚠️ "시험 보러 왔어"·"응시하기" 도 여기다(2026-09-22 지시). 옛 `/exam` 블록(응시 게이트)은 없앴다 —
+    //    메인에서 그 말을 치는 사람은 응시권을 든 사람이 아니라 일정·접수를 알고 싶은 사람이고,
+    //    응시권을 든 사람은 마이페이지 응시권 카드로 /exam 에 들어간다.
+    dest: '/plan', // 시험 일정·회차·접수 기간 · 시험 보러 왔다
     phrases: [
       '시험 일정 알려줘', '시험 언제야', '정기시험 일정', '다음 시험 날짜', '시험 회차',
       '언제 시험 봐', '시험 날짜 확인', '접수 기간 언제', '시험 스케줄', '몇 월에 시험 있어',
+      '시험 보러 왔어', '응시하러 왔어', '지금 시험 볼래', '시험 시작할래', '응시하기',
+      '시험장 입장', '시험 응시', '시험 치르러 왔어', 'CBT 응시하기', '바로 시험 시작',
       'exam schedule', 'when is the exam', 'exam dates', 'next exam date', 'test schedule', 'registration period',
+      'I want to take the exam now', 'start the exam', 'take the test', 'enter the exam', 'sit the exam',
       '試験日程', '試験はいつ', '次の試験日', '受付期間',
+      '試験を受けに来た', '今すぐ受験', '試験を始める', '受験する',
       '考试日程', '考试什么时候', '下次考试时间', '报名时间',
+      '我来考试', '现在开始考试', '参加考试', '进入考场',
       'परीक्षा कार्यक्रम', 'परीक्षा कब है', 'अगली परीक्षा तिथि',
       'lịch thi', 'khi nào thi', 'ngày thi tiếp theo', 'thời gian đăng ký',
+      'tôi muốn thi ngay', 'bắt đầu thi', 'vào thi', 'dự thi',
     ],
   },
   {
@@ -155,17 +170,6 @@ const SEED: { dest: string; phrases: string[] }[] = [
       '我要报名', '报名考试', '考试报名', '报名费多少',
       'परीक्षा के लिए पंजीकरण', 'परीक्षा के लिए आवेदन', 'पंजीकरण शुल्क',
       'đăng ký thi', 'đăng ký dự thi', 'lệ phí thi', 'nộp hồ sơ thi',
-    ],
-  },
-  {
-    dest: '/exam', // 응시 게이트: 시험 보러/응시 시작/시험장 입장
-    phrases: [
-      '시험 보러 왔어', '응시하러 왔어', '지금 시험 볼래', '시험 시작할래', '응시하기',
-      '시험장 입장', '시험 응시', '시험 치르러 왔어', 'CBT 응시하기', '바로 시험 시작',
-      'I want to take the exam now', 'start the exam', 'take the test', 'enter the exam', 'sit the exam',
-      '試験を受けに来た', '今すぐ受験', '試験を始める', '受験する',
-      '我来考试', '现在开始考试', '参加考试', '进入考场',
-      'tôi muốn thi ngay', 'bắt đầu thi', 'vào thi', 'dự thi',
     ],
   },
   {
@@ -187,6 +191,12 @@ const SEED: { dest: string; phrases: string[] }[] = [
     phrases: [
       '내 점수 보고싶어', '내 시험 결과', '내 응시 이력', '마이페이지', '내가 딴 자격',
       '내 성적 확인', '내 정보 보기', '지난 결과 보기', '내 기록', '시험 응시 현황',
+      // 응시권 카드와 닉네임·국가 변경은 마이페이지 위쪽에 있다(2026-09-22 추가).
+      '내 응시권', '응시권 확인', '응시권 어디 있어', '닉네임 변경', '닉네임 바꾸기', '국가 변경', '지역 변경',
+      'my exam ticket', 'my tickets', 'change nickname', 'change my country', 'change region',
+      '受験券', 'ニックネーム変更', '国を変更',
+      '我的准考证', '修改昵称', '更改国家',
+      'vé thi của tôi', 'đổi biệt danh', 'đổi quốc gia',
       'my score', 'my exam results', 'my page', 'my attempts', 'view my results',
       '私のスコア', '試験結果を見る', 'マイページ', '受験履歴',
       '我的成绩', '我的考试结果', '个人中心', '我的记录',
@@ -306,6 +316,10 @@ const SEED: { dest: string; phrases: string[] }[] = [
     dest: '/terms', // 이용약관
     phrases: [
       '이용약관', '약관', '서비스 약관', '약관 보고싶어', '이용 규정', '회원 약관', '약관 어디 있어',
+      // 회원 탈퇴 버튼이 약관 페이지 맨 아래에 있다(2026-09-22 추가 — '탈퇴' 가 어디로도 못 갔다).
+      '회원 탈퇴', '탈퇴하고 싶어', '탈퇴', '계정 삭제', '계정 지우기',
+      'delete my account', 'withdraw membership', 'close account',
+      '退会したい', 'アカウント削除', '注销账号', '删除账户', 'xóa tài khoản', 'hủy tài khoản',
       'terms of service', 'terms', 'terms and conditions', 'user agreement', 'where are the terms',
       '利用規約', '規約', '会員規約', '規約はどこ',
       '服务条款', '使用条款', '用户协议', '条款在哪',

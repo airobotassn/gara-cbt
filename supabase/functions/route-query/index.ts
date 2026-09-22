@@ -45,9 +45,10 @@ const DEST: Record<string, string> = {
   guide: '/guide',              // 자격검정 안내(종류·급수·과목·응시자격)
   // ⚠️ 일정은 2026-07 에 /guide 에서 **분리됐다** — 지금 /guide 에는 날짜가 한 줄도 없다.
   //    (그 전 주석은 "일정 페이지 폐지 → 안내로 통합" 이었고, 그 상태로 1년 가까이 남아 있었다.)
-  schedule: '/plan',            // 시험 일정·회차·접수 기간
+  // ⚠️ "시험 보러 왔어" 도 여기다(2026-09-22 지시) — 옛 `take_exam → /exam` 은 응시권 없는 사람을
+  //    응시권 목록만 있는 게이트에 떨어뜨렸다. 응시권을 든 사람은 마이페이지 카드로 /exam 에 들어간다.
+  schedule: '/plan',            // 시험 일정·회차·접수 기간 · 시험 보러 왔다
   apply: '/exam/apply',         // 원서접수(회차 미지정이면 접수중 회차로 폴백)
-  take_exam: '/exam',           // 응시 시작(시험 보러)
   exam_check: '/exam/check',    // 시험환경 점검·모의응시
   certificate: '/certificate',  // 자격증 발급·확인
   // --- 내 정보 ---
@@ -105,20 +106,19 @@ const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색�
 - arena      : WORLD ARENA 자체(세계지도·세계리그·지역/국가 랭킹·아레나 채팅)를 보러 왔다. ("월드 아레나", "WORLD ARENA", "카리스 아레나", "아레나", "세계 리그", "지도 보고싶어", "우리 지역 순위", "아레나 채팅")
 - level_test : 지금 무료 AI 실력 진단(레벨테스트)을 응시하고 싶다. ("레벨테스트 하고싶어", "내 실력 몇점", "무료 진단", "몇 레벨인지", "실력 측정")
 - ranking    : 전체 순위/랭킹/리더보드/명예의전당. ("랭킹", "순위", "1등이 누구")
-- hub        : 캐릭터 허브 — 내 캐릭터/아바타, 코인, 꾸미기(스킨 상점), 출석 기록. ("캐릭터", "아바타 바꾸기", "코인", "꾸미기", "출석체크", "허브")
+- hub        : 캐릭터 허브 — 내 캐릭터/아바타, 코인, 꾸미기(스킨 상점), 출석 기록, 칭호·배지, 코인 선물, 친구 초대. ("캐릭터", "아바타 바꾸기", "코인", "꾸미기", "출석체크", "허브", "칭호", "친구 초대", "코인 선물")
 - minigame   : 미니게임을 하고 싶다. ("미니게임", "게임", "버텨라 카리", "쏴라 카리", "골라라 카리", "닿아라 카리", "프로그램해라 카리", "지어라 카리", "게임하고싶어")
 - daily      : DAILY QUIZ(하루 한 문제 · 옛 이름 "오늘의 학습")/오늘의 문제/데일리 콘텐츠. ("DAILY QUIZ", "데일리 퀴즈", "오늘의 학습", "오늘의 문제", "데일리", "오늘 뭐 배워")
 
 [CARIS 자격검정]
 - guide      : 어떤 시험/자격증이 있는지, 급수·과목·응시자격 등 자격검정 "정보"가 궁금하다. ("어떤 시험 있어", "자격증 종류", "응시 자격", "CARIS가 뭐야")
-- schedule   : 시험 "일정/날짜/회차"가 궁금하다. ("시험 언제야", "정기시험 일정", "다음 시험 날짜", "접수 기간", "몇 월에 시험 있어")
+- schedule   : 시험 "일정/날짜/회차"가 궁금하거나, 시험을 보러/응시하러 왔다. ("시험 언제야", "정기시험 일정", "다음 시험 날짜", "접수 기간", "몇 월에 시험 있어", "시험 보러 왔어", "응시하기", "시험 시작")
 - apply      : 원서접수/시험 신청/등록/응시료 결제를 하고 싶다. ("원서접수", "시험 신청", "접수하기", "응시료")
-- take_exam  : 지금 시험을 응시/시작하러 왔다. ("시험 보러 왔어", "응시하기", "시험 시작", "시험장 입장")
 - exam_check : 시험 환경 점검/모의응시/시험 프로그램(SEB) 설치. ("모의고사", "환경 점검", "연습 시험", "SEB 설치")
 - certificate: 인증서/자격증/합격증/증명서 발급·확인·출력. ("인증서 발급", "자격증 발급", "증명서 출력", "내 인증서")
 
 [내 정보]
-- mypage       : 내 점수/시험 결과/응시 이력/마이페이지/내가 딴 자격. ("내 점수", "내 결과", "마이페이지", "응시 이력", "내 성적")
+- mypage       : 내 점수/시험 결과/응시 이력/마이페이지/내가 딴 자격/내 응시권/닉네임·국가 변경. ("내 점수", "내 결과", "마이페이지", "응시 이력", "내 성적", "내 응시권", "닉네임 바꾸기")
 - ebook_library: 이미 "구매한" 이북·강의를 보고 싶다(마이페이지 내 서재). ("내 이북", "내 서재", "산 책 어디서 봐", "구매한 강의 어디서 봐")
 - ebook        : 이북/전자책/교재/강의를 "사고" 싶다(러닝 라이브러리 스토어). ("이북", "전자책", "교재 사기", "강의 구매", "인강", "eBook")
 - login        : 로그인/로그아웃/계정 접속. ("로그인", "로그아웃", "구글 로그인")
@@ -127,15 +127,15 @@ const SYSTEM = `사용자가 자격검정 사이트(GARA·CARIS) 홈의 검색�
 - about      : 협회/기관 소개, 이 사이트가 뭔지. ("협회 소개", "무슨 협회야", "GARA가 뭐야")
 - notice     : 공지사항/소식/안내/점검 공지. ("공지사항", "새 소식", "점검 공지")
 - faq        : 문의·고객센터·환불·결제문제·시스템오류·도움·건의/의견. ("문의", "환불", "고객센터", "결제 문제", "도움 필요", "의견 보내기", "건의사항")
-- terms      : 이용약관. ("약관", "이용약관")
+- terms      : 이용약관 · 회원 탈퇴(탈퇴 버튼이 약관 페이지 맨 아래에 있다). ("약관", "이용약관", "회원 탈퇴", "계정 삭제")
 - privacy    : 개인정보처리방침. ("개인정보", "프라이버시 정책")
 
 - unknown    : 입력이 이 사이트(시험·자격·학습·게임·내 정보 등)와 **정말로 무관**할 때만. (인사·잡담·욕설·무의미·사이트와 상관없는 질문 "오늘 점심 뭐먹지" 등)
 
-원칙: 입력이 조금이라도 관련 있으면 애매하더라도 **위 21개 중 가장 가까운 하나**를 골라라. unknown 은 최후의 수단이다.
+원칙: 입력이 조금이라도 관련 있으면 애매하더라도 **위 20개 중 가장 가까운 하나**를 골라라. unknown 은 최후의 수단이다.
 구분 팁:
 · 아레나 계열 — "아레나/지도/세계리그/지역순위"=arena, "지금 응시하겠다"=level_test, "전체 순위표"=ranking.
-· 자격검정 — "정보(급수·과목·응시자격)"=guide, "날짜·회차·접수기간"=schedule, "접수/신청/결제"=apply, "지금 응시"=take_exam.
+· 자격검정 — "정보(급수·과목·응시자격)"=guide, "날짜·회차·접수기간·시험 보러 왔다"=schedule, "접수/신청/결제"=apply.
 · 이북·강의 — 사려는 것=ebook, 이미 산 걸 보려는 것=ebook_library.
 · 내 데이터(점수·자격증)=mypage/certificate.
 다국어 가능(한/영/일/중/힌/베). 반드시 JSON 으로만 답한다.`
@@ -169,10 +169,10 @@ function keywordRoute(q: string): string | null {
   if (h(/내\s?이북|이북\s?서재|서재|구매한\s?(책|이북|교재|강의)|산\s?책|내\s?강의|my\s?e-?book|e-?book\s?library|my\s?lecture|本棚|購入した本|我的电子书|我的课程|书架|thư viện\s?ebook/)) return '/mypage/ebooks'
   if (h(/이북|e-?book|전자책|전자\s?교재|교재|강의|인강|lecture|online\s?course|電子書籍|講義|电子书|课程|sách điện tử|bài giảng/)) return '/ebooks'
   // --- 캐릭터 허브 ---
-  if (h(/허브|캐릭터|아바타|코인|상점|출석|hub|character|avatar|coin|shop|attendance|check[\s-]?in|ハブ|キャラ|コイン|ショップ|出席|角色|金币|商店|签到|nhân vật|điểm danh|cửa hàng/)) return '/hub'
+  if (h(/허브|캐릭터|아바타|코인|상점|출석|칭호|배지|선물|친구|초대|추천인|hub|character|avatar|coin|shop|attendance|check[\s-]?in|badge|gift|referral|invite|ハブ|キャラ|コイン|ショップ|出席|称号|招待|角色|金币|商店|签到|称號|邀请|nhân vật|điểm danh|cửa hàng|danh hiệu|mời bạn/)) return '/hub'
   // --- 이하 기존 순서 유지 ---
   if (h(/랭킹|순위|리더보드|명예의?\s?전당|rank|leaderboard|ランキング|順位|排名|排行|名人堂|xếp hạng|thứ hạng/)) return '/ranking'
-  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|내 기록|my score|my result|my page|mypage|マイページ|受験履歴|个人中心|我的成绩|trang cá nhân/)) return '/mypage/attempts'
+  if (h(/마이\s?페이지|내 점수|내 결과|내 성적|응시\s?이력|응시\s?현황|내\s?응시권|응시권\s?(확인|어디|있)|내 기록|닉네임|국가\s?변경|지역\s?변경|my score|my result|my page|mypage|my\s?tickets?|nickname|マイページ|受験履歴|受験券|ニックネーム|个人中心|我的成绩|准考证|昵称|trang cá nhân|vé thi|biệt danh/)) return '/mypage/attempts'
   if (h(/자격증|합격증|증명서|인증서|certificate|証明書|合格証|证书|chứng chỉ của/)) return '/certificate'
   if (h(/협회\s?소개|무슨 협회|어떤 단체|기관\s?소개|회사\s?소개|gara|about us|協会について|关于我们|协会介绍|giới thiệu hiệp hội|về chúng tôi/)) return '/about'
   if (h(/공지|소식|안내사항|announcement|notice|お知らせ|公告|thông báo/)) return '/notice'
@@ -182,12 +182,15 @@ function keywordRoute(q: string): string | null {
   if (h(/원서|접수|신청|등록|응시료|register|apply|sign\s?up|願書|申込|受験料|报名|đăng ký|lệ phí/)) return '/exam/apply'
   // ⚠️ '응시 자격' 은 **정보**를 묻는 말이라 안내로 가야 한다 — 아래 '응시' 규칙이 먼저 잡아서
   //    시험장 입구로 보내고 있었다(2026-08-25 점검에서 발견). 그래서 이 줄이 그보다 위에 있어야 한다.
+  // ⚠️ "시험 보러 왔어" 는 **일정·접수(/plan)** 다(2026-09-22 지시). 메인에서 그 말을 치는 사람은 응시권을
+  //    든 사람이 아니라 언제 시험이 있고 어떻게 접수하는지 알고 싶은 사람이다 — 응시권을 든 사람은
+  //    마이페이지 응시권 카드로 /exam 에 들어간다. ('응시권'·'응시 현황' 은 위 마이페이지 규칙이 먼저 잡는다.)
   if (h(/응시\s?자격|수험\s?자격|지원\s?자격|eligib|受験資格|报考资格|điều kiện dự thi/)) return '/guide'
-  if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/exam'
+  if (h(/응시|시험 ?보|시험 ?볼|시험 ?시작|시험장|치르|take (the )?exam|sit (the )?exam|受験|参加考试|dự thi|vào thi/)) return '/plan'
   // '카리스/caris' = 자격검정 브랜드명 → 안내로. ('카리스 아레나' 는 위 arena 규칙이 이미 가져갔다)
   if (h(/자격|급수|과목|자격검정|카리스|caris|certif|eligib|資格|资格|試験|kỳ thi|chứng nhận|시험/)) return '/guide'
   if (h(/레벨|진단|실력|무료|수준|측정|level|test|assess|diagnos|レベル|診断|等级|水平|测评|trình độ|kiểm tra|đánh giá/)) return '/test/select'
-  if (h(/약관|이용약관|terms/)) return '/terms'
+  if (h(/약관|이용약관|탈퇴|계정\s?삭제|terms|withdraw|delete (my )?account|退会|利用規約|注销|服务条款|xóa tài khoản|điều khoản/)) return '/terms'
   if (h(/개인정보|프라이버시|privacy/)) return '/privacy'
   if (h(/로그인|로그아웃|login|sign\s?in/)) return '/login'
   return null
@@ -212,7 +215,7 @@ async function classify(q: string): Promise<string> {
               // ⚠️ 위 DEST 의 키 전부 + 'unknown'. 하나라도 빠지면 그 인텐트는 절대 안 나온다.
               enum: [
                 'arena', 'level_test', 'ranking', 'hub', 'minigame', 'daily',
-                'guide', 'schedule', 'apply', 'take_exam', 'exam_check', 'certificate',
+                'guide', 'schedule', 'apply', 'exam_check', 'certificate',
                 'mypage', 'ebook_library', 'ebook', 'login',
                 'about', 'notice', 'faq', 'terms', 'privacy',
                 'unknown',
