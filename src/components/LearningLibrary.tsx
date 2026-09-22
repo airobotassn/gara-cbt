@@ -12,9 +12,10 @@ import EbookCover from './EbookCover'
 import { usdc } from '../lib/money'
 import { ytEmbed, watchBunnyProgress } from '../lib/lectures'
 import { callFunction } from '../lib/supabase'
-import { useT } from '../lib/i18n'
+import { useT, LANGS } from '../lib/i18n'
 import type { TFunc, Lang } from '../lib/i18n'
 import type { EbookRow, LecturePlayResp, ServerLecture } from '../lib/types'
+import { EBOOK_PRODUCT_DEFAULTS, EBOOK_PRODUCT_LANGS } from '../lib/ebookProduct'
 
 /** 왼쪽 열 한 칸 — 레벨(1~7·무관) 또는 급수(Beginner~Zenith·무관). 두 카탈로그가 같은 모양을 쓴다. */
 export interface LibGroup {
@@ -319,7 +320,8 @@ export function BookRow({
   onOpen: () => void
 }) {
   return (
-    <li className="flex gap-4 px-4 py-4 transition-colors hover:bg-surface-container/60">
+    <li className="px-4 py-4 transition-colors hover:bg-surface-container/60">
+     <div className="flex gap-4">
       {/* self-start 필수 — flex 자식 기본값 stretch 라 표지 박스가 줄 높이만큼 늘어나 A4 비율이 깨진다. */}
       <button type="button" onClick={onZoom} aria-label={t('ebook.cover_zoom')} className={`${MEDIA_W} cursor-zoom-in`}>
         {/* width = 표시 폭(약 222)의 2배 — 고밀도 화면에서 표지 글자가 뭉개지지 않게 스토리지 변환으로 받는다. */}
@@ -353,7 +355,45 @@ export function BookRow({
           )}
         </div>
       </div>
+     </div>
+      {/* 상품 정보는 표지 줄 **아래 전체 폭** — 표지 옆 글 칸은 좁아서 2열이 안 들어간다(실측: 오른쪽 열이 잘렸다). */}
+      <ProductInfo b={b} t={t} />
     </li>
+  )
+}
+
+/** 이북 상품 정보(2026-09-22) — 소개 아래 빈자리. 항목을 **좌우 두 칸**에 나눠 넣고 가운데 세로선(지시 "A").
+ *    왼쪽: 상품 유형 · 언어 · 페이지 수 / 오른쪽: 제공 방법 · 판매자. 페이지 수는 값이 없으면 안 그린다.
+ *    null 인 칸은 기본값 — 사전(6개국어)으로 그린다. 관리자가 고쳐 쓴 값은 쓴 그대로.
+ *  ⚠️ 옛 배포본 응답엔 product 가 없다 → 그때도 기본값으로 그린다(칸이 비지 않는다). */
+function ProductInfo({ b, t }: { b: EbookRow; t: TFunc }) {
+  const p = b.product ?? { type: null, langs: null, pages: null, delivery: null, seller: null }
+  const codes = p.langs && p.langs.length ? p.langs : EBOOK_PRODUCT_LANGS
+  const langNames = EBOOK_PRODUCT_LANGS.filter((c) => codes.includes(c)).map((c) => LANGS.find((l) => l.code === c)?.label ?? c).join(', ')
+  const left: [string, string][] = [
+    [t('ebook.p_type'), p.type ?? EBOOK_PRODUCT_DEFAULTS.type],
+    [t('ebook.p_langs'), langNames],
+  ]
+  if (p.pages) left.push([t('ebook.p_pages'), t('ebook.p_pages_v', { n: p.pages })])
+  const right: [string, string][] = [
+    [t('ebook.p_delivery'), p.delivery ?? t('ebook.p_delivery_default')],
+    [t('ebook.p_seller'), p.seller ?? t('ebook.p_seller_default')],
+  ]
+  const col = (rows: [string, string][]) => (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      {rows.map(([k, v]) => (
+        <Fragment key={k}>
+          <dt className="whitespace-nowrap font-label-md text-[14px] text-outline">{k}</dt>
+          <dd className="font-body-md text-[14px] text-on-surface-variant break-keep">{v}</dd>
+        </Fragment>
+      ))}
+    </dl>
+  )
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-4 sm:divide-x sm:divide-outline-variant/40">
+      {col(left)}
+      <div className="sm:pl-4">{col(right)}</div>
+    </div>
   )
 }
 

@@ -75,6 +75,8 @@ import { REGIONS, countryName, flagEmoji, flagUrl } from '../lib/regions'
 import { loadRegions } from '../lib/regionCatalog'
 import { charArtName } from '../lib/hubCosmetics'
 import { mailTemplate } from '../lib/mailTemplates'
+import { EBOOK_PRODUCT_DEFAULTS, EBOOK_PRODUCT_LANGS } from '../lib/ebookProduct'
+import { LANGS } from '../lib/i18n'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
 // ⚠️ 별칭이 필요하다 — 이 파일 안에 이북 본문 번역용 `runTranslation`(다른 시그니처)이 이미 있다.
@@ -4280,9 +4282,18 @@ interface EbookDraft {
   published: boolean
   sortOrder: number
   translations: Record<string, EbookTranslation>
+  // 상품 정보(2026-09-22). 폼은 기본값으로 채워져 시작하고, 서버가 기본값과 같으면 null 로 접어 저장한다(사전 6개국어로 그리려고).
+  productType: string
+  productLangs: string[]
+  pageCount: string // 숫자 입력칸 — 빈칸 허용(기본값 없음)
+  delivery: string
+  seller: string
 }
 function emptyEbookDraft(catalog: EbookCatalog): EbookDraft {
-  return { title: '', author: '', description: '', coverUrl: '', price_usd_cents: 0, catalog, targetLevel: null, targetTier: null, storagePath: '', published: false, sortOrder: 0, translations: {} }
+  return {
+    title: '', author: '', description: '', coverUrl: '', price_usd_cents: 0, catalog, targetLevel: null, targetTier: null, storagePath: '', published: false, sortOrder: 0, translations: {},
+    productType: EBOOK_PRODUCT_DEFAULTS.type, productLangs: [...EBOOK_PRODUCT_LANGS], pageCount: '', delivery: EBOOK_PRODUCT_DEFAULTS.delivery, seller: EBOOK_PRODUCT_DEFAULTS.seller,
+  }
 }
 /** 저장된 행 → 폼 값. ⚠️ 수정 버튼과 표지 교체가 **같은 것을 써야** 한다 — 두 벌이 되면
  *  한쪽에만 새 필드가 추가돼 표지만 바꿨을 뿐인데 그 값이 조용히 비어 저장된다. */
@@ -4301,6 +4312,12 @@ function toEbookDraft(b: AdminEbookRow): EbookDraft {
     published: b.published,
     sortOrder: b.sortOrder,
     translations: b.translations ?? {},
+    // null(기본값)이면 기본 문구를 칸에 채워 보여준다 — 관리자가 "지금 뭐가 나가는지" 를 폼에서 그대로 본다.
+    productType: b.productType ?? EBOOK_PRODUCT_DEFAULTS.type,
+    productLangs: b.productLangs && b.productLangs.length ? b.productLangs : [...EBOOK_PRODUCT_LANGS],
+    pageCount: b.pageCount ? String(b.pageCount) : '',
+    delivery: b.delivery ?? EBOOK_PRODUCT_DEFAULTS.delivery,
+    seller: b.seller ?? EBOOK_PRODUCT_DEFAULTS.seller,
   }
 }
 
@@ -4888,6 +4905,40 @@ export function EbooksAdmin({ catalog = 'leveltest' }: { catalog?: EbookCatalog 
                 소개
                 <textarea style={{ ...inpStyle, minHeight: 80 }} value={draft.description} onChange={(e) => patch({ description: e.target.value })} />
               </label>
+              {/* 상품 정보(2026-09-22) — 카드의 소개 아래에 나간다. 페이지 수만 기본값이 없다(비우면 카드에서 그 칸을 안 그린다). */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                <label style={fieldStyle}>
+                  상품 유형
+                  <input style={inpStyle} value={draft.productType} onChange={(e) => patch({ productType: e.target.value })} />
+                </label>
+                <label style={fieldStyle}>
+                  페이지 수
+                  <input style={inpStyle} type="number" min={1} value={draft.pageCount} onChange={(e) => patch({ pageCount: e.target.value })} />
+                </label>
+                <label style={fieldStyle}>
+                  제공 방법
+                  <input style={inpStyle} value={draft.delivery} onChange={(e) => patch({ delivery: e.target.value })} />
+                </label>
+                <label style={fieldStyle}>
+                  판매자
+                  <input style={inpStyle} value={draft.seller} onChange={(e) => patch({ seller: e.target.value })} />
+                </label>
+              </div>
+              <div style={fieldStyle}>
+                언어
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontWeight: 400 }}>
+                  {EBOOK_PRODUCT_LANGS.map((c) => (
+                    <label key={c} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={draft.productLangs.includes(c)}
+                        onChange={(e) => patch({ productLangs: e.target.checked ? [...draft.productLangs, c] : draft.productLangs.filter((x) => x !== c) })}
+                      />
+                      {LANGS.find((l) => l.code === c)?.label ?? c}
+                    </label>
+                  ))}
+                </div>
+              </div>
               {/* 정렬 순서 입력칸은 제거 — 목록의 ↑↓(순서 열)로 관리(FAQ 방식). */}
               {/* 가격은 **달러로 입력**한다(2026-08-11) — 구매자 화면이 달러로만 말하는데 여기만 원이면
                   `2` 를 넣고 "$2 로 팔린다" 고 믿는 사고가 난다(실제로 $0.01 짜리 책이 그렇게 생겼다).

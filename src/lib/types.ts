@@ -500,6 +500,8 @@ export interface EbookRow {
   langs: string[] // 이 책이 가진 언어(항상 'ko' 포함)
   owned: boolean
   purchasedAt?: string // 서재(library) 응답에만
+  /** 상품 정보(2026-09-22). 각 칸 null = 기본값(lib/ebookProduct.ts). 옛 배포본 응답엔 이 필드 자체가 없다. */
+  product?: { type: string | null; langs: string[] | null; pages: number | null; delivery: string | null; seller: string | null }
 }
 /** 관리자가 등록한 강의 한 건(lectures 테이블). **이북과 같은 유료 상품이다**(2026-08-25).
  *  ⛔ `id` 는 우리 uuid 지 유튜브 id 가 아니다 — 결제·소유가 그 uuid 로 걸린다. */
@@ -590,6 +592,12 @@ export interface AdminEbookRow {
   createdAt: string
   buyers: number
   translations: Record<string, EbookTranslation>
+  /** 상품 정보(2026-09-22). null = 기본값. 옛 배포본 응답엔 없다. */
+  productType?: string | null
+  productLangs?: string[] | null
+  pageCount?: number | null
+  delivery?: string | null
+  seller?: string | null
 }
 export interface AdminEbookListResp {
   ebooks: AdminEbookRow[]

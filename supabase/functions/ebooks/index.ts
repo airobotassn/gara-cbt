@@ -57,6 +57,14 @@ function shape(b: Row, owned: boolean, lang: string) {
     targetTier: (b.target_tier as string | null) ?? null,
     langs: ['ko', ...Object.keys(tr).filter((k) => tr[k]?.path)],
     owned,
+    // 상품 정보(2026-09-22). null = 기본값 — 화면이 사전의 기본 문구를 보는 사람 언어로 그린다.
+    product: {
+      type: (b.product_type as string | null) ?? null,
+      langs: (b.product_langs as string[] | null) ?? null,
+      pages: (b.page_count as number | null) ?? null,
+      delivery: (b.delivery as string | null) ?? null,
+      seller: (b.seller as string | null) ?? null,
+    },
   }
 }
 
@@ -149,7 +157,7 @@ Deno.serve(async (req) => {
       const [{ data, error }, mine, { data: lec }, mineLec] = await Promise.all([
         admin
           .from('ebooks')
-          .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations')
+          .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations, product_type, product_langs, page_count, delivery, seller')
           .eq('published', true)
           .order('sort_order', { ascending: true })
           .order('created_at', { ascending: false }),
@@ -183,7 +191,7 @@ Deno.serve(async (req) => {
       //    필요한 건 대상 레벨 몇 권 + 모자랄 때 채울 '레벨 무관' 몇 권뿐이라 **DB 에서 좁혀서 필요한 만큼만** 받는다.
       //    한 방 OR 쿼리로 합치지 않는 이유: 정렬이 sort_order 라, 노출순이 앞선 '레벨 무관' 책이 많으면
       //    limit 안에서 정작 대상 레벨 책을 밀어내 잘못된 폴백이 나온다. 그래서 두 쿼리로 나눈다.
-      const SELECT = 'id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations'
+      const SELECT = 'id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, published, sort_order, created_at, translations, product_type, product_langs, page_count, delivery, seller'
       // ⚠️ 추천은 **레벨테스트 카탈로그만** 본다. CARIS 교재는 급수(자격검정)에 묶인 물건이라
       //    레벨테스트 결과창에 섞이면 "Lv.3 탈락자에게 Elite 교재" 같은 추천이 나간다.
       //    특히 '레벨 무관' 폴백(②)이 위험하다 — CARIS 책은 target_level 이 항상 null 이라 전부 걸린다.
@@ -273,7 +281,7 @@ Deno.serve(async (req) => {
         ids.length
           ? admin
               .from('ebooks')
-              .select('id, title, author, description, cover_url, price_usd_cents, translations, catalog, target_level, target_tier')
+              .select('id, title, author, description, cover_url, price_usd_cents, translations, catalog, target_level, target_tier, product_type, product_langs, page_count, delivery, seller')
               .in('id', ids)
           : Promise.resolve({ data: [] as Row[] }),
         lecIds.length

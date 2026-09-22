@@ -2889,7 +2889,7 @@ async function restoreAccount(admin: any, body: any, email: string) {
 async function ebookList(admin: any) {
   const { data, error } = await admin
     .from('ebooks')
-    .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, storage_path, published, sort_order, created_at, updated_at, translations')
+    .select('id, title, author, description, cover_url, price_usd_cents, catalog, target_level, target_tier, storage_path, published, sort_order, created_at, updated_at, translations, product_type, product_langs, page_count, delivery, seller')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) return json({ error: error.message }, 400)
@@ -2916,8 +2916,31 @@ async function ebookList(admin: any) {
     createdAt: b.created_at,
     buyers: counts[b.id] ?? 0,
     translations: b.translations ?? {},
+    // 상품 정보(2026-09-22). null = 기본값(화면이 기본 문구를 채워 보여준다).
+    productType: b.product_type ?? null,
+    productLangs: b.product_langs ?? null,
+    pageCount: b.page_count ?? null,
+    delivery: b.delivery ?? null,
+    seller: b.seller ?? null,
   }))
   return json({ ebooks })
+}
+
+// 상품 정보 기본값 — 관리자 폼이 이 값으로 채워져 시작하고, **저장 때 이 값과 같으면 null 로 접는다.**
+//   문자열로 박아 두면 한국어 문장이 그대로 남아 외국어 화면에서도 한국어로 뜬다. null 이면 화면이 사전(6개국어)을 쓴다.
+//   ⚠️ 프론트 `lib/ebookProduct.ts` 의 같은 이름 상수와 한 벌 — 한쪽만 고치면 기본값이 문자열로 굳어 저장된다.
+const EBOOK_PRODUCT_DEFAULTS = { type: 'Digital E-BOOK', delivery: '결제 후 웹뷰어에 열람', seller: '글로벌AI로봇협회' }
+const EBOOK_LANG_CODES = ['ko', 'en', 'ja', 'zh', 'hi', 'vi']
+/** 기본값·빈 값은 null, 나머지는 다듬은 문자열. */
+function productText(v: unknown, def: string): string | null {
+  const s = String(v ?? '').trim()
+  return !s || s === def ? null : s
+}
+/** 언어 목록 — 사전에 있는 코드만, 6개 전부면 null(기본). 하나도 없으면 null(전부로 본다 — 빈 상품은 없다). */
+function productLangs(v: unknown): string[] | null {
+  if (!Array.isArray(v)) return null
+  const picked = EBOOK_LANG_CODES.filter((c) => v.includes(c))
+  return picked.length === 0 || picked.length === EBOOK_LANG_CODES.length ? null : picked
 }
 
 // 추천 대상 레벨 파싱 — 1~7 밖이거나 빈 값이면 null(레벨 무관).
@@ -2995,6 +3018,12 @@ async function ebookUpsert(admin: any, body: any) {
     updated_at: new Date().toISOString(),
     // 언어별 본문·표지·메타. 클라가 번역 파이프라인을 돌린 결과를 통째로 넘긴다(없으면 빈 객체 유지).
     translations: e.translations && typeof e.translations === 'object' ? e.translations : {},
+    // 상품 정보 — 기본값과 같으면 null(위 EBOOK_PRODUCT_DEFAULTS 주석).
+    product_type: productText(e.productType, EBOOK_PRODUCT_DEFAULTS.type),
+    product_langs: productLangs(e.productLangs),
+    page_count: (() => { const n = Math.floor(Number(e.pageCount)); return Number.isFinite(n) && n > 0 ? n : null })(),
+    delivery: productText(e.delivery, EBOOK_PRODUCT_DEFAULTS.delivery),
+    seller: productText(e.seller, EBOOK_PRODUCT_DEFAULTS.seller),
   }
 
   if (e.id) {
