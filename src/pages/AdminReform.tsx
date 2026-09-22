@@ -74,6 +74,8 @@ interface PaymentRow {
   id: string; userId: string; name: string | null; email: string | null
   orderId: string; orderName: string; productType: string; amount: number
   status: string; method: string | null; fulfilledAt: string | null; createdAt: string
+  // failed·refunded 의 사유 코드. DUPLICATE_CHARGED = 같은 상품을 두 번 산 두 번째 결제(지급 없이 돈만 받은 건).
+  failCode?: string | null
   // 이 결제로 나간 이북들의 열람 여부. 이북이 안 붙은 결제(응시료 단독 등)는 빈 배열이다.
   reads?: EbookReadRow[]
   // 실제 청구값(통화·금액)과 돌려준 합계. 정가(amount, 달러 센트)와 단위가 다르다 — 환불은 이 단위로 한다.
@@ -84,7 +86,7 @@ interface PaymentRow {
 interface PaymentListResp {
   payments: PaymentRow[]; total: number
   stats30d: { paidN: number; paidAmount: number; refundN: number; refundAmount: number }
-  queues: { unfulfilled: number; revoked: number }
+  queues: { unfulfilled: number; revoked: number; dupCharged: number }
 }
 
 // ── 환불 창 ─────────────────────────────────────────────────────
@@ -265,6 +267,13 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
             {data?.queues.unfulfilled ?? 0}건
           </div>
         </div>
+        {/* 같은 상품을 두 번 산 두 번째 결제 — 지급은 안 했는데 돈은 빠졌고 **자동 환불이 실패한** 건. 0이 아니면 [환불] 로 돌려줘야 한다. */}
+        <div className="admin-card">
+          <div className="k">중복 결제(환불 필요)</div>
+          <div className="v" style={(data?.queues.dupCharged ?? 0) ? { color: 'var(--k-amber, #d98a00)' } : undefined}>
+            {data?.queues.dupCharged ?? 0}건
+          </div>
+        </div>
       </div>
 
       <div className="admin-toolbar">
@@ -283,6 +292,7 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
           <option value="">처리 대기 보기</option>
           <option value="unfulfilled">미지급(돈 받고 안 준 것)</option>
           <option value="revoked">환불 후 미회수</option>
+          <option value="dup_charged">중복 결제(환불 필요)</option>
         </select>
         <span className="admin-hint">{rows.length}건{loading ? ' · 불러오는 중…' : ''}</span>
       </div>
@@ -312,6 +322,9 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
                   <span className="badge">{payStatusLabel(p.status)}</span>
                   {p.status === 'paid' && !p.fulfilledAt && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 미지급</b>}
                   {p.status === 'paid' && (p.refundedAmount ?? 0) > 0 && <span style={{ color: 'var(--muted)' }}> · 부분환불</span>}
+                  {/* 중복 결제 — 자동 환불이 안 된 건은 경고색(돈이 새는 중), 환불까지 끝난 건은 회색(끝난 일). */}
+                  {p.status === 'failed' && p.failCode === 'DUPLICATE_CHARGED' && <b style={{ color: 'var(--k-amber, #d98a00)' }}> · 중복 결제(환불 필요)</b>}
+                  {p.status === 'refunded' && p.failCode === 'DUPLICATE_CHARGED' && <span style={{ color: 'var(--muted)' }}> · 중복 결제 자동환불</span>}
                 </td>
                 {/* 열람 여부 — 환불 문의가 왔을 때 제일 먼저 보는 칸이다. 읽은 건은 눈에 띄어야 한다. */}
                 <ReadCell reads={p.reads} />
@@ -331,6 +344,7 @@ export function PaymentsAdmin({ isRoot }: { isRoot: boolean }) {
         환불은 여기서 실행합니다(루트 전용) — 우리 서버가 엑심베이 환불 API 를 부르고, 원장에 기록한 뒤 돌려준 항목의
         열람권·시청권·미사용 응시권을 자동 회수합니다. 응시를 이미 시작한 응시권은 자동 회수하지 않습니다.
         <b>미지급</b>은 승인은 됐는데 물건이 안 나간 건으로, 대사(reconcile)가 같은 목록을 봅니다.
+        <b>중복 결제(환불 필요)</b>는 같은 상품을 두 번 낸 두 번째 결제 중 자동 환불이 실패한 건입니다 — 지급된 것은 없으니 [환불] 로 전액 돌려주면 됩니다.
       </p>
       {refundRow && <RefundModal row={refundRow} onClose={() => setRefundRow(null)} onDone={reload} />}
     </>

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useT } from '../lib/i18n'
 import { usdc } from '../lib/money'
-import { confirmOrder, orderStatus, type PaymentStatusResp, type ProductType } from '../lib/payments'
+import { cancelOrder, confirmOrder, orderStatus, type PaymentStatusResp, type ProductType } from '../lib/payments'
 import SiteFooter from '../components/SiteFooter'
 
 // 실패(failUrl) 콜백에는 **상품 정보가 없다** — 토스가 주는 건 code·message·orderId 뿐이라,
@@ -19,6 +19,11 @@ import SiteFooter from '../components/SiteFooter'
 // ⚠️ CTA 목적지 하나를 정하는 **표시용 힌트**다. 권한·지급 판정에 절대 쓰지 말 것(사용자가 고칠 수 있는 값이다).
 // ⚠️ Checkout.tsx 가 같은 키로 쓴다 — 한쪽만 바꾸면 조용히 안 맞는다.
 const PRODUCT_HINT_KEY = 'payProductType'
+
+/** 중복 결제로 접힌 주문인가(환불됐거나 환불 대기). 이 둘만 '실패' 가 아니라 전용 화면으로 그린다. */
+function isDupClosed(res: PaymentStatusResp): boolean {
+  return res.failCode === 'DUPLICATE_CHARGED' && (res.status === 'refunded' || res.status === 'failed')
+}
 
 /** 저장이 막혀 있거나(프라이빗 모드) 힌트가 없으면 빈 문자열 — 그때는 이북 기준 CTA 로 떨어진다. */
 function productHint(): ProductType | '' {
@@ -95,6 +100,16 @@ export default function PayResult() {
   }, [handoff])
 
   const ranRef = useRef(false) // StrictMode 중복 실행 방지(서버도 멱등이지만 호출을 아낀다)
+
+  // 엑심베이가 취소/실패(rescode≠0000)로 돌려보낸 경우 — 열린 주문을 failed(USER_CANCEL)로 접는다(2026-09-21).
+  //   pending 으로 두면 대사가 30분 뒤 만료로 접을 때까지 PG 에 계속 물어본다. 나중에 웹훅이 paid 라고 하면 서버가 되살린다.
+  //   ⚠️ 팝업(handoff)에서는 부르지 않는다 — 원래 창이 같은 주소를 받아 부른다. 실패해도 화면은 그대로다(단정은 서버 몫).
+  const canceledRef = useRef(false)
+  useEffect(() => {
+    if (handoff || !isEximbay || exCode === '0000' || !orderId || canceledRef.current) return
+    canceledRef.current = true
+    void cancelOrder(orderId).catch(() => {})
+  }, [handoff, isEximbay, exCode, orderId])
 
   useEffect(() => {
     // 승인해야 할 게 있을 때만 움직인다. failUrl 로 온 건은 절대 승인을 부르지 않는다.
@@ -220,8 +235,28 @@ export default function PayResult() {
             </>
           )}
 
+          {/* 중복 결제(2026-09-21) — 같은 상품을 다른 탭에서 먼저 사고 이 주문도 팝업에서 결제된 경우. 돈은 빠졌고 지급은 안 했다.
+              서버가 그 자리에서 PG 환불까지 불렀으면 refunded, 환불이 실패했으면 failed 로 남아 관리자가 돌려준다.
+              '실패' 로 그리면 사용자가 또 결제하려 드니 따로 말한다. CTA 는 성공과 같은 곳(okGo — 이미 산 물건이 거기 있다). */}
+          {view.kind === 'done' && view.res.status === 'refunded' && view.res.failCode === 'DUPLICATE_CHARGED' && (
+            <>
+              <Icon name="info" tone="neutral" />
+              <Title>{t('pay.dup_refunded_title')}</Title>
+              <Body>{t('pay.dup_refunded_body')}</Body>
+              <Cta onClick={okGo}>{okLabel}</Cta>
+            </>
+          )}
+          {view.kind === 'done' && view.res.status === 'failed' && view.res.failCode === 'DUPLICATE_CHARGED' && (
+            <>
+              <Icon name="info" tone="neutral" />
+              <Title>{t('pay.dup_pending_title')}</Title>
+              <Body>{t('pay.dup_pending_body')}</Body>
+              <Cta onClick={okGo}>{okLabel}</Cta>
+            </>
+          )}
+
           {/* 가상계좌 입금 대기 화면은 2026-09-16 에 뺐다 — 후불 수단을 결제창에서 국내·해외 모두 뺐다. */}
-          {view.kind === 'done' && view.res.status !== 'paid' && (
+          {view.kind === 'done' && view.res.status !== 'paid' && !isDupClosed(view.res) && (
             <>
               <Icon name="error" tone="bad" />
               <Title>{t('pay.fail_title')}</Title>

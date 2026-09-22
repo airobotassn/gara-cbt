@@ -15,6 +15,10 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { getProvider, type ProviderPayment } from './payment-provider.ts'
 import { grantExamTicket, parseExamRef, resolveCertFee, resolveExamOffer, voidTicket } from './exam-tickets.ts'
+// ⚠️ refunds.ts ↔ payments.ts 순환 import 다(refunds.ts 가 여기서 PAYMENT_COLS·revokeForRefund 를 가져간다).
+//    둘 다 **함수 본문 안에서만** 서로를 부르고 모듈 최상위에서 평가하는 값이 없으므로 ESM 에서 안전하다 —
+//    모듈 최상위에서 closeDuplicateCharge 를 호출하거나 상수로 펼치는 순간 초기화 순서에 걸린다.
+import { closeDuplicateCharge } from './refunds.ts'
 
 export type ProductType = 'ebook' | 'exam' | 'cert' | 'bundle' | 'lecture'
 
@@ -54,6 +58,12 @@ export interface PaymentRow {
   /** 원화로 청구한 건의 주문 생성 시점 환율. 승인 때 다시 계산하지 않는다. */
   fx_rate: number | null
   status: string
+  /** 실패 사유 코드(failed 일 때). DUPLICATE_CHARGED = 중복 주문인데 PG 에 매출이 있다 → 자동 환불·관리자 큐. */
+  fail_code: string | null
+  /** 이 주문의 PG 결제창이 지금 열려 있나(agree 가 켜고 release·종결이 내린다). payments_window_product_uniq 의 술어. */
+  window_open: boolean
+  /** 결제 화면이 마지막으로 "창이 열려 있다" 고 신호한 시각. 60초 넘게 끊기면 다음 agree 가 청소한다. */
+  window_seen_at: string | null
   payment_key: string | null
   fulfilled_at: string | null
   confirmed_at: string | null
@@ -66,9 +76,10 @@ export interface PaymentRow {
   refunded_amount: number | null
 }
 
-/** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다. */
+/** payments 행에서 읽어오는 컬럼 목록 — 한 곳에 모아 select 문이 함수마다 어긋나는 걸 막는다.
+ *  ⚠️ window_open·window_seen_at 은 20260921130000 이 만든다 — 그 마이그레이션보다 함수를 먼저 올리면 결제 조회가 전부 400 이다. */
 export const PAYMENT_COLS =
-  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, payment_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
+  'id, user_id, provider, order_id, order_name, product_type, product_ref, amount, currency, charge_amount, charge_currency, fx_rate, status, fail_code, window_open, window_seen_at, payment_key, fulfilled_at, confirmed_at, created_at, addon_ebook_id, addon_amount, refunded_amount'
 
 /**
  * **PG 에 말할 때 쓰는 금액·통화.** 승인 대조·조회·환불이 전부 이 값을 기준으로 해야 한다.
@@ -601,7 +612,7 @@ export async function settleFromProvider(
   admin: SupabaseClient,
   row: PaymentRow,
   pp: ProviderPayment,
-): Promise<{ status: string; fulfilled: boolean; note?: string }> {
+): Promise<{ status: string; fulfilled: boolean; note?: string; failCode?: string }> {
   // 종결(환불·취소)된 주문은 settle 이 되살리지 않는다 — PG 재조회/desync 로 뒤늦게 불려도
   //   상태를 덮거나 재지급하지 않는다(무단 지급·회수신호 언두 방지). paid 재지급은 아래 fulfilled 로 막힌다.
   if (row.status === 'refunded' || row.status === 'canceled') {
@@ -654,13 +665,30 @@ export async function settleFromProvider(
   if (next === 'paid' && !row.confirmed_at) {
     patch.confirmed_at = pp.approvedAt ?? new Date().toISOString()
   }
+  // 결제창 잠금 해제 — 상태가 열린 상태(pending·expired)를 벗어나면 그 창은 끝난 것이다(2026-09-21).
+  //   ⚠️ PG 가 아직 pending(AUTH·REGISTERED)이라고 답한 경우는 창이 살아 있을 수 있으니 건드리지 않는다.
+  if (next !== 'pending') patch.window_open = false
   const { error: upErr } = await admin.from('payments').update(patch).eq('id', row.id)
   if (upErr) {
     // ⚠️ 이 UPDATE 는 조용히 실패할 수 있다 — status 를 'paid' 로 올리는 순간
     //    payments_paid_product_uniq(user_id, product_type, product_ref) 에 걸리는 경우가 있다(= 중복 결제).
     //    예전엔 결과를 안 봐서 그대로 지급 + fulfilled_at 을 찍고, 정작 행은 영원히 pending 이라
-    //    reconcile 이 매번 '고쳤다'고 보고하는 유령 루프가 됐다. 여기서 멈춘다.
+    //    reconcile 이 매번 '고쳤다'고 보고하는 유령 루프가 됐다.
     const dup = (upErr as { code?: string }).code === '23505'
+    if (dup && pp.status === 'paid') {
+      // ⛔ 중복 결제인데 **PG 에는 이 주문의 매출이 있다**(pp.status 가 paid) — 사용자는 같은 상품을 두 번 냈다.
+      //    예전엔 여기서 던지기만 해서(웹훅은 permanent_error 로 닫고 끝) 돈 받은 사실이 어디에도 안 남았다.
+      //    이제 failed+DUPLICATE_CHARGED 로 접고 그 자리에서 PG 환불까지 부른다(refunds.ts). 환불이 실패하면
+      //    관리자 결제관리의 '중복 결제(환불 필요)' 큐에 남는다.
+      const out = await closeDuplicateCharge(admin, row, pp, '같은 상품에 이미 완료된 결제가 있음(중복 결제)')
+      return {
+        status: out.status,
+        fulfilled: false,
+        // 결과 화면이 이 코드로 "이미 구매한 상품 · 환불 처리" 를 가른다(confirm 이 그대로 실어 보낸다).
+        failCode: 'DUPLICATE_CHARGED',
+        note: out.refunded ? '중복 결제 — 자동 환불' : `중복 결제 — 자동 환불 실패: ${out.error ?? '사유 없음'}`,
+      }
+    }
     throw new Error(dup ? '같은 상품에 이미 완료된 결제가 있습니다(중복 결제).' : upErr.message)
   }
 

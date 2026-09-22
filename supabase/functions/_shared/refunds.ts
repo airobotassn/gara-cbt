@@ -13,9 +13,19 @@
 //
 // 📌 대사·웹훅과 무관하다. 대시보드에서 직접 환불한 건은 settleFromProvider 의 잔액 안전망이 따로 잡는다.
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { getProvider } from './payment-provider.ts'
+import { getProvider, type ProviderPayment } from './payment-provider.ts'
+// ⚠️ payments.ts 와 순환 import 다(그쪽 settleFromProvider 가 closeDuplicateCharge 를 부른다). 양쪽 다 함수 본문
+//    안에서만 서로를 쓰므로 ESM 에서 안전하다 — 모듈 최상위에서 저쪽 값을 평가하는 코드를 여기 두지 말 것.
 import { PAYMENT_COLS, PURCHASE_TABLE, chargeOf, revokeForRefund, roundMinor, type BundleKind, type PaymentRow } from './payments.ts'
 import { voidTicket } from './exam-tickets.ts'
+
+/** 중복 청구(같은 상품을 두 번 냄)로 접힌 주문의 fail_code. refundPayment 가 paid 말고 유일하게 받는 상태다. */
+export const DUPLICATE_CHARGED = 'DUPLICATE_CHARGED'
+
+/** 이 행이 '지급 없이 돈만 받은 중복 청구' 인가 — 환불 대상 판정을 한 곳에서 한다(refundPayment · 관리자 목록). */
+export function isDuplicateCharged(row: { status: string; fail_code?: string | null }): boolean {
+  return row.status === 'failed' && row.fail_code === DUPLICATE_CHARGED
+}
 
 /** 환불 줄 하나 — 결제를 이루는 항목. 화면이 이 목록에서 고르고, 같은 키가 원장 lines 에 남는다. */
 export interface RefundLine {
@@ -180,7 +190,11 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
   if (!reason) return { ok: false, error: '환불 사유를 적어주세요(원장과 PG 양쪽에 남습니다).', status: 400 }
   const row = await loadRow(admin, input.paymentId)
   if (!row) return { ok: false, error: '결제를 찾을 수 없습니다.', status: 404 }
-  if (row.status !== 'paid') return { ok: false, error: `환불할 수 있는 상태가 아닙니다(현재 ${row.status}).`, status: 409 }
+  // 환불 대상 = paid, 또는 중복 청구(failed + DUPLICATE_CHARGED — 지급은 안 했지만 PG 엔 매출이 있는 건 · 2026-09-21).
+  //   후자는 fulfilled_at 이 늘 null 이라 아래 회수 경로(revokeForRefund·revokeLines)에서 걷을 것이 없다.
+  if (row.status !== 'paid' && !isDuplicateCharged(row)) {
+    return { ok: false, error: `환불할 수 있는 상태가 아닙니다(현재 ${row.status}).`, status: 409 }
+  }
   if (!row.payment_key) return { ok: false, error: 'PG 거래번호가 없어 환불 API 를 부를 수 없습니다.', status: 409 }
 
   const preview = await refundPreview(admin, row.id)
@@ -209,7 +223,7 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
     .from('payments')
     .update({ refunded_amount: after, updated_at: new Date().toISOString() })
     .eq('id', row.id)
-    .eq('status', 'paid')
+    .eq('status', row.status) // paid 또는 failed(DUPLICATE_CHARGED) — 잠금 사이에 상태가 바뀌었으면 0행
     .eq('refunded_amount', before)
     .select('id')
   if (!locked || locked.length === 0) {
@@ -264,11 +278,12 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
 
   // ⑤ 회수 + 상태
   const newBalance = roundMinor(chg.currency, preview.chargeAmount - (before + finalAmount))
-  let status = 'paid'
+  let status = row.status
   if (newBalance <= 0) {
     // 전액 — 결제를 refunded 로 눕히고 이 결제로 나간 것 전부를 걷는다(revokeForRefund 가 payment_id 로만 짚는다).
+    //   중복 청구(failed)도 같은 길이다 — fail_code 는 그대로 남아 관리자 목록이 '중복 결제 자동환불' 로 읽는다.
     status = 'refunded'
-    await admin.from('payments').update({ status, updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'paid')
+    await admin.from('payments').update({ status, updated_at: new Date().toISOString() }).eq('id', row.id).eq('status', row.status)
     if (row.fulfilled_at) {
       const r = await revokeForRefund(admin, { ...row, status, refunded_amount: before + finalAmount })
       notes.push(r.note)
@@ -278,4 +293,67 @@ export async function refundPayment(admin: SupabaseClient, input: RefundInput): 
   }
 
   return { ok: true, refundId: refundKey, amount: finalAmount, currency: chg.currency, balance: newBalance, status, providerRef: res.data.providerRef, notes }
+}
+
+// ---------- 중복 청구 자동 환불 (2026-09-21) ----------
+
+/**
+ * 중복 주문인데 **PG 에는 이 주문의 매출이 있다** — 같은 사람이 같은 상품을 두 번 냈고 첫 번째가 이미 paid 다.
+ * 두 번째 주문은 paid 로 못 올린다(paid 유니크). 그래서 ① failed+DUPLICATE_CHARGED 로 접으면서 거래ID·원문·승인시각을
+ * 채우고(돈 받은 사실을 원장에 남긴다) ② 그 자리에서 PG 환불(refundPayment)을 부른다. 환불이 성공하면 refunded,
+ * 실패하면 failed 그대로 남아 관리자 결제관리의 '중복 결제(환불 필요)' 큐에 뜬다 — 사람이 [환불] 로 다시 시도한다.
+ *
+ * 부르는 자리 둘: payments 함수 confirm 의 중복 감지(closeAsDuplicate) · settleFromProvider 의 paid 유니크 23505(웹훅·대사 경로).
+ * ⚠️ 접기 update 가 0행이면(이미 다른 경로가 처리) 환불을 다시 부르지 않는다 — 같은 건에 환불 두 번은 refundPayment 의
+ *    잠금이 막지만, 여기서 먼저 끊는 게 PG 호출을 아낀다.
+ */
+export async function closeDuplicateCharge(
+  admin: SupabaseClient,
+  row: PaymentRow,
+  pp: ProviderPayment,
+  why: string,
+): Promise<{ status: string; refunded: boolean; error?: string }> {
+  const now = new Date().toISOString()
+  const patch: Record<string, unknown> = {
+    status: 'failed',
+    fail_code: DUPLICATE_CHARGED,
+    fail_message: why,
+    // 환불 API 는 PG 거래ID 로 부른다 — 여기서 못 채우면 아래 refundPayment 가 '거래번호 없음' 으로 멈춘다.
+    payment_key: pp.providerKey ?? row.payment_key,
+    confirmed_at: row.confirmed_at ?? pp.approvedAt ?? now,
+    raw: pp.raw as Record<string, unknown>,
+    window_open: false,
+    updated_at: now,
+  }
+  if (pp.method) patch.method = pp.method
+  const { data: closed, error } = await admin
+    .from('payments')
+    .update(patch)
+    .eq('id', row.id)
+    // failed 도 받는다 — 앞서 DUPLICATE_PRODUCT 로 접힌 주문이 나중에 웹훅으로 '매출 있음' 이 확인되는 경우다.
+    .in('status', ['pending', 'expired', 'confirming', 'failed'])
+    .select('id')
+  if (error) return { status: row.status, refunded: false, error: error.message }
+  if (!closed || closed.length === 0) {
+    // 이미 처리됨(refunded·paid·canceled 등) — 현재 상태만 돌려준다.
+    const cur = await loadRow(admin, row.id)
+    const status = cur?.status ?? row.status
+    return { status, refunded: status === 'refunded' }
+  }
+
+  const res = await refundPayment(admin, {
+    paymentId: row.id,
+    lines: 'all',
+    reason: `중복 결제 자동 환불 — ${why}`,
+    actorId: null,
+  })
+  if (res.ok) return { status: res.status, refunded: res.status === 'refunded' }
+
+  // 환불 실패 — 사유를 fail_message 에 덧붙여 관리자가 목록에서 바로 읽게 한다. status 는 failed 그대로(= 환불 필요 큐).
+  await admin
+    .from('payments')
+    .update({ fail_message: `${why} · 자동 환불 실패: ${res.error}`, updated_at: new Date().toISOString() })
+    .eq('id', row.id)
+    .eq('status', 'failed')
+  return { status: 'failed', refunded: false, error: res.error }
 }

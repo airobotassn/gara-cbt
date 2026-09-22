@@ -10,7 +10,7 @@ import { refreshRates } from '../_shared/fx.ts'
 import { EXAM_ROUND_COLS, TIER_LABEL, attemptPassed, examWindowState, grantExamTicket, isTierLocked, ticketExpired, voidTicket } from '../_shared/exam-tickets.ts'
 import { isExamMonth, monthOfExamDate, scheduleForMonth } from '../_shared/exam-schedule.ts'
 import { logQuestionEvent, readQuestionHistory } from '../_shared/question-history.ts'
-import { refundPayment, refundPreview } from '../_shared/refunds.ts'
+import { isDuplicateCharged, refundPayment, refundPreview } from '../_shared/refunds.ts'
 import { ROOT_ADMIN } from './constants.ts'
 import { handleReform } from './reform.ts'
 
@@ -1674,9 +1674,11 @@ async function examReinstate(admin: any, body: any, actorEmail: string) {
 
 /**
  * 결제 원장 조회 + 30일 집계.
- * queue 는 '돈이 새는' 두 목록이다 — 목록이 사람 눈에 안 닿으면 방어 장치가 아니다.
+ * queue 는 '돈이 새는' 세 목록이다 — 목록이 사람 눈에 안 닿으면 방어 장치가 아니다.
  *   · unfulfilled = 승인은 났는데 지급이 안 된 건(돈은 받았는데 응시권이 0장)
  *   · revoked     = 환불·취소인데 지급이 살아있는 건(자동 회수를 안 하기로 한 방침의 뒷정리 큐)
+ *   · dup_charged = 같은 상품을 두 번 산 두 번째 결제 — 지급은 안 했는데 PG 엔 매출이 있고 **자동 환불이 실패한** 건(2026-09-21).
+ *                   자동 환불이 됐으면 refunded 로 넘어가 여기서 빠진다(목록엔 '중복 결제 자동환불' 로만 남는다).
  */
 async function paymentList(admin: any, body: any) {
   const limit = Math.min(Math.max(1, Math.floor(body?.limit ?? 50)), 500)
@@ -1697,6 +1699,7 @@ async function paymentList(admin: any, body: any) {
   if (status) sel = sel.eq('status', status)
   if (queue === 'unfulfilled') sel = sel.eq('status', 'paid').is('fulfilled_at', null)
   else if (queue === 'revoked') sel = sel.in('status', ['refunded', 'canceled']).not('fulfilled_at', 'is', null)
+  else if (queue === 'dup_charged') sel = sel.eq('status', 'failed').eq('fail_code', 'DUPLICATE_CHARGED')
 
   const { data, count, error } = await sel.order('created_at', { ascending: false }).range(offset, offset + limit - 1)
   if (error) return json({ error: error.message }, 400)
@@ -1797,9 +1800,11 @@ async function paymentList(admin: any, body: any) {
     if (cr.length < CHUNK) break
   }
 
-  const [unf, rev] = await Promise.all([
+  const [unf, rev, dup] = await Promise.all([
     admin.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'paid').is('fulfilled_at', null),
     admin.from('payments').select('id', { count: 'exact', head: true }).in('status', ['refunded', 'canceled']).not('fulfilled_at', 'is', null),
+    // 중복 청구 중 아직 안 돌려준 것 — 전액 환불되면 status 가 refunded 로 넘어가 여기서 빠진다.
+    admin.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'failed').eq('fail_code', 'DUPLICATE_CHARGED'),
   ])
 
   return json({
@@ -1826,11 +1831,12 @@ async function paymentList(admin: any, body: any) {
       chargeCurrency: p.charge_currency ?? null,
       refundedAmount: Number(p.refunded_amount ?? 0),
       // PG 거래번호가 없으면(옛 행·승인 전) 환불 API 를 부를 수 없다 — 화면이 버튼을 잠근다.
-      refundable: p.status === 'paid' && !!p.payment_key && Number(p.refunded_amount ?? 0) < Number(p.charge_amount ?? p.amount ?? 0),
+      //   중복 청구(failed+DUPLICATE_CHARGED)도 환불 대상이다 — 판정은 refunds.ts 의 isDuplicateCharged 한 곳.
+      refundable: (p.status === 'paid' || isDuplicateCharged(p)) && !!p.payment_key && Number(p.refunded_amount ?? 0) < Number(p.charge_amount ?? p.amount ?? 0),
     })),
     total: count ?? rows.length,
     stats30d: stats,
-    queues: { unfulfilled: unf.count ?? 0, revoked: rev.count ?? 0 },
+    queues: { unfulfilled: unf.count ?? 0, revoked: rev.count ?? 0, dupCharged: dup.count ?? 0 },
   })
 }
 

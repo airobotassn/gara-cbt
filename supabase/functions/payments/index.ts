@@ -14,7 +14,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts'
 import { convertFromUsdCents, refreshRates } from '../_shared/fx.ts'
 import { adminClient, getUser } from '../_shared/lib.ts'
-import { getProvider, DEFAULT_PROVIDER } from '../_shared/payment-provider.ts'
+import { getProvider, DEFAULT_PROVIDER, type ProviderPayment } from '../_shared/payment-provider.ts'
 import {
   eximbayAmount,
   eximbayLang,
@@ -36,8 +36,78 @@ import {
 } from '../_shared/payments.ts'
 import { attemptPassed, findLiveTickets, grantExamTicket, ticketSourceAlive } from '../_shared/exam-tickets.ts'
 import { certExpired } from '../_shared/cert.ts'
+import { closeDuplicateCharge } from '../_shared/refunds.ts'
 
 const PRODUCT_TYPES: ProductType[] = ['ebook', 'exam', 'cert', 'bundle', 'lecture']
+
+/** 아래 상태 갱신들이 "아직 이 상태일 때만" 으로 거는 술어 — 열린 주문 = pending·expired 둘 다.
+ *  ⚠️ expired 도 열린 것으로 친다(2026-09-16). 30분 넘게 소식이 없어 대사가 접어 둔 것이지 결제가 없었다고 확정한 게 아니다. */
+const OPEN = ['pending', 'expired']
+
+/** 결제 화면의 heartbeat 가 이만큼 끊긴 결제창 표시(window_open)는 죽은 것으로 보고 다음 agree 가 청소한다.
+ *  화면은 20초마다 보내므로 두 번 놓쳐야 넘는다. 너무 짧으면 잠깐 백그라운드로 간 창이 풀리고, 길면 죽은 창이 그만큼 막는다. */
+const WINDOW_STALE_MS = 60_000
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** 중복 주문을 접은 결과 → 응답 코드. 사용자 문구는 화면이 이 코드로 사전에서 뽑는다(PG 원문은 안 내보낸다). */
+type DupCode = 'already_paid' | 'duplicate_refunded' | 'duplicate_charged'
+const DUP_MESSAGE: Record<DupCode, string> = {
+  already_paid: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.',
+  duplicate_refunded: '이미 구매한 상품입니다. 이번 결제분은 환불 처리했습니다.',
+  duplicate_charged: '이미 구매한 상품입니다. 이번 결제분은 확인 후 환불해 드립니다.',
+}
+const dupResponse = (code: DupCode) => json({ error: DUP_MESSAGE[code], code, owned: true }, 400)
+
+/**
+ * 중복 주문을 접는다 — 같은 사람·같은 상품에 이미 paid 가 있어서 이 주문은 지급하면 안 되는 경우.
+ *
+ * ⛔ 접기 전에 **PG 에 이 주문이 실제로 청구됐는지 묻는다(2026-09-21).** 엑심베이는 팝업 안에서 돈이 빠지므로
+ *    confirm 에 도달한 중복 주문은 대개 이미 결제된 것이다. 옛 코드는 "진 쪽은 돈이 안 빠진다"(토스 시절 — 토스는
+ *    confirm 때 청구됐다) 고 믿고 그냥 failed 로 접었는데, 그러면 **돈 받은 사실이 어디에도 안 남는다.**
+ *    · 청구됨 → closeDuplicateCharge(refunds.ts): failed+DUPLICATE_CHARGED 로 남기고 **그 자리에서 PG 환불**.
+ *                환불이 되면 duplicate_refunded, 안 되면 duplicate_charged(관리자 큐에서 사람이 돌려준다).
+ *    · 안 됨/모름 → 지금처럼 failed+DUPLICATE_PRODUCT. 조회 자체가 실패했으면 fail_message 에 그 사실을 남긴다 —
+ *                대사·웹훅 원장으로 되짚을 수 있게.
+ */
+async function closeAsDuplicate(
+  admin: ReturnType<typeof adminClient>,
+  row: PaymentRow,
+  openStatuses: string[],
+  why: string,
+): Promise<DupCode> {
+  let charged: ProviderPayment | null = null
+  let unknown = false
+  let pgNote = ''
+  try {
+    const check = await getProvider(row.provider).queryByOrderId(row.order_id, chargeOf(row))
+    if (check.ok) {
+      if (check.data.status === 'paid') charged = check.data
+      else pgNote = ` — PG 상태 ${check.data.status}(미확정)`
+    } else if (!check.error.absent) {
+      unknown = true // absent(그런 결제 없음)만 '청구 안 됨' 으로 확정. 그 밖의 오류는 청구 여부를 모른다.
+    }
+  } catch {
+    unknown = true
+  }
+
+  if (charged) {
+    const out = await closeDuplicateCharge(admin, row, charged, why)
+    return out.status === 'refunded' ? 'duplicate_refunded' : 'duplicate_charged'
+  }
+  await admin
+    .from('payments')
+    .update({
+      status: 'failed',
+      fail_code: 'DUPLICATE_PRODUCT',
+      fail_message: unknown ? `${why} — PG 조회 실패 — 청구 여부 미확인` : `${why}${pgNote}`,
+      window_open: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', row.id)
+    .in('status', openStatuses)
+  return 'already_paid'
+}
 
 /** 상품 종류 → 그 상품이 있는 우리 화면. 엑심베이 /ready 의 product.link(문서상 필수)에 실린다 — 표시용이다. */
 const PRODUCT_PAGE: Record<ProductType, string> = {
@@ -414,6 +484,7 @@ Deno.serve(async (req) => {
               status: 'failed',
               fail_code: ready.code,
               fail_message: ready.message,
+              window_open: false,
               updated_at: new Date().toISOString(),
             })
             .eq('order_id', orderId)
@@ -468,8 +539,6 @@ Deno.serve(async (req) => {
       if (!resumable) {
         return json({ status: row.status, fulfilled: Boolean(row.fulfilled_at), productType: row.product_type, productRef: row.product_ref })
       }
-      // 아래 상태 갱신들이 "아직 이 상태일 때만" 으로 거는 술어 — pending·expired 둘 다 허용한다.
-      const OPEN = ['pending', 'expired']
 
       // ② successUrl 의 amount 를 그대로 승인에 넘기지 않는다 — 저장된 주문 금액과 대조부터 한다.
       //    ⚠️ 대조 기준은 정가(원화)가 아니라 **PG 에 실제로 청구한 값**이다. 엑심베이는 달러로 청구하므로
@@ -480,7 +549,7 @@ Deno.serve(async (req) => {
       if (!Number.isFinite(clientAmount) || cents(clientAmount) !== cents(chg.amount)) {
         await admin
           .from('payments')
-          .update({ status: 'failed', fail_code: 'AMOUNT_MISMATCH', fail_message: `요청 ${clientAmount} ≠ 주문 ${chg.amount} ${chg.currency}`, updated_at: new Date().toISOString() })
+          .update({ status: 'failed', fail_code: 'AMOUNT_MISMATCH', fail_message: `요청 ${clientAmount} ≠ 주문 ${chg.amount} ${chg.currency}`, window_open: false, updated_at: new Date().toISOString() })
           .eq('id', row.id)
           .in('status', OPEN)  // 금액 검사는 선점 전이라 여기선 열린 상태(pending·expired)만 본다
         return json({ error: '결제 금액이 주문과 일치하지 않습니다.' }, 400)
@@ -488,79 +557,70 @@ Deno.serve(async (req) => {
 
       // ⛔ 이중 결제 차단 — **승인 API 를 부르기 전에** 같은 상품의 완료된 결제가 있는지 본다.
       //    주문(payments)은 status='pending' 으로 생기는데 중복 방지 유니크는 status='paid' 에만 걸린다.
-      //    즉 같은 상품으로 pending 주문을 무제한 만들 수 있고, 결제창을 두 개 띄워 둘 다 결제하면
-      //    **토스는 두 건 다 승인해서 돈이 두 번 빠진다**(두 번째는 우리 DB 유니크에서만 터진다).
-      //    승인 전에 여기서 끊으면 돈이 아예 안 빠진다. 이북에도 실재하던 버그라 상품 종류를 가리지 않는다.
-      //    ※ create 에서 '살아있는 pending 주문 재사용'도 검토했지만 넣지 않았다 — 토스 결제 세션은 10분 만료라
-      //      만료분을 판별할 방법이 우리 쪽에 없고(주문 나이만 봐선 알 수 없다), 살아있는 세션을 재사용하려다
-      //      죽은 orderId 를 돌려주면 결제가 시작조차 안 된다. 돈이 빠지는 걸 막는 건 이 승인 전 검사로 충분하다.
+      //    즉 같은 상품으로 pending 주문을 무제한 만들 수 있다. 토스 시절엔 여기서 끊으면 돈이 아예 안 빠졌지만,
+      //    **엑심베이는 팝업 안에서 이미 청구된 뒤라** 여기서 잡히는 중복은 대개 돈이 빠진 것이다 — 그래서 접을 때
+      //    PG 에 청구 여부를 되물어 자동 환불까지 간다(closeAsDuplicate). 돈이 빠지기 **전에** 막는 건 agree 액션의
+      //    결제창 잠금(window_open)이다(2026-09-21).
       //    ※ 이 검사만으로는 **두 confirm 이 동시에** 들어오는 경우를 못 막는다(그 순간 paid 행이 없어 둘 다 통과).
       //      그래서 아래에서 PG 를 부르기 직전에 주문을 'confirming' 으로 선점한다 — 그게 최종 방어선이고
       //      이 검사는 사용자에게 이유를 알려주는 앞단이다(2026-08-10 마이그레이션 payments_confirming).
       //    ⚠️ 예전엔 'waiting_deposit'(가상계좌 입금 대기)도 살아있는 결제로 셌다 — 2026-09-16 에 후불 수단을 결제창에서
       //      뺐으므로 그 상태는 더 생기지 않는다. 지금은 paid 만 본다.
-      const { data: dupPaid } = await admin
-        .from('payments')
-        .select('id, order_id, status')
-        .eq('user_id', row.user_id)
-        .eq('product_type', row.product_type)
-        .eq('product_ref', row.product_ref)
-        .eq('status', 'paid')
-        .neq('id', row.id)
-        .limit(1)
-        .maybeSingle()
-      if (dupPaid) {
-        // 이 주문은 실패로 접는다 — pending 으로 두면 대사(reconcile)가 매번 토스에 물어보며 영원히 남는다.
-        await admin
+      const findDupPaid = async () => {
+        const { data } = await admin
           .from('payments')
-          .update({
-            status: 'failed',
-            fail_code: 'DUPLICATE_PRODUCT',
-            fail_message: `이미 결제 완료된 주문 ${dupPaid.order_id}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', row.id)
-          .in('status', OPEN)
-        return json(
-          { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
-          400,
-        )
+          .select('id, order_id, status')
+          .eq('user_id', row.user_id)
+          .eq('product_type', row.product_type)
+          .eq('product_ref', row.product_ref)
+          .eq('status', 'paid')
+          .neq('id', row.id)
+          .limit(1)
+          .maybeSingle()
+        return data as { id: string; order_id: string } | null
+      }
+      const dupPaid = await findDupPaid()
+      if (dupPaid) {
+        // 이 주문은 접는다 — pending 으로 두면 대사(reconcile)가 매번 PG 에 물어보며 영원히 남는다.
+        // ⚠️ 접기 전에 PG 에 청구됐는지 묻는다(closeAsDuplicate) — 청구됐으면 그 자리에서 환불한다.
+        return dupResponse(await closeAsDuplicate(admin, row, OPEN, `이미 결제 완료된 주문 ${dupPaid.order_id}`))
       }
 
       // ⛔ **PG 를 부르기 전에 주문을 선점한다.** 위 dupPaid 검사는 원자적이지 않다 —
-      //    같은 상품의 confirm 두 개가 동시에 들어오면 둘 다 "완료된 결제 없음"을 보고 통과하고,
-      //    토스가 두 건 다 승인해서 **돈이 두 번 빠진다**(두 번째는 우리 DB 유니크에서만 터진다).
+      //    같은 상품의 confirm 두 개가 동시에 들어오면 둘 다 "완료된 결제 없음"을 보고 통과한다.
       //    선점은 payments_confirming_product_uniq 가 (사람 × 상품) 단위로 막으므로 한 번에 하나만
-      //    PG 로 나간다 — 진 쪽은 결제가 아예 시작되지 않는다.
+      //    PG 로 나간다 — 진 쪽은 승인이 시작되지 않는다.
       //  ⚠️ 'confirming' 은 일시 상태다. 선점만 하고 끊기면 행이 여기 남는데, 그건 reconcile 이
       //     미완결 대상에 포함해 PG 에 다시 물어 수렴시키고, 아래 실패 경로들이 잠금을 풀어준다.
       //     (안 풀면 그 상품은 영영 잠겨 사용자가 재시도할 수 없다.)
-      {
-        const { data: claimed, error: claimErr } = await admin
+      //  ⚠️ 선점하면서 결제창 표시(window_open)도 내린다 — 결과 화면까지 왔다는 건 그 창은 끝났다는 뜻이다.
+      const claim = () =>
+        admin
           .from('payments')
-          .update({ status: 'confirming', updated_at: new Date().toISOString() })
+          .update({ status: 'confirming', window_open: false, updated_at: new Date().toISOString() })
           .eq('id', row.id)
           .in('status', OPEN)
           .select('id')
-        if (claimErr) {
-          // 23505 = payments_confirming_product_uniq = 같은 상품의 승인이 이미 PG 로 나가 있다.
-          if ((claimErr as { code?: string }).code === '23505') {
-            await admin
-              .from('payments')
-              .update({
-                status: 'failed',
-                fail_code: 'DUPLICATE_PRODUCT',
-                fail_message: '같은 상품의 승인이 이미 진행 중입니다.',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', row.id)
-              .in('status', OPEN)
-            return json(
-              { error: '이미 결제가 완료된 상품입니다. 결제를 진행하지 않았습니다.', code: 'already_paid', owned: true },
-              400,
-            )
+      {
+        let claimed: { id: string }[] | null = null
+        // 23505 = payments_confirming_product_uniq = 같은 상품의 승인이 **지금** PG 로 나가 있다(첫 번째 팝업의 confirm).
+        // 그 승인은 몇 초 안에 paid 아니면 failed 로 끝난다. 곧바로 접지 않고 1.5초 간격으로 최대 3번 기다린다 —
+        //   · 그 사이 paid 가 생기면 → 중복이다 → closeAsDuplicate(청구됐으면 환불).
+        //   · 잠금이 풀렸는데 paid 가 없으면(첫 번째가 실패) → 선점을 다시 시도해 이 주문을 정상 진행한다.
+        //   · 3번 다 23505 면 → 첫 번째가 아직도 도는 중이거나 끊긴 채 남은 것 → closeAsDuplicate 로 접는다(대사가 수렴).
+        for (let attempt = 0; ; attempt++) {
+          const { data, error: claimErr } = await claim()
+          if (!claimErr) {
+            claimed = (data ?? []) as { id: string }[]
+            break
           }
-          return json({ error: claimErr.message }, 400)
+          if ((claimErr as { code?: string }).code !== '23505') return json({ error: claimErr.message }, 400)
+          if (attempt >= 3) {
+            return dupResponse(await closeAsDuplicate(admin, row, OPEN, '같은 상품의 승인이 이미 진행 중'))
+          }
+          await sleep(1500)
+          const dup = await findDupPaid()
+          if (dup) return dupResponse(await closeAsDuplicate(admin, row, OPEN, `이미 결제 완료된 주문 ${dup.order_id}`))
         }
         // 0행 = 그사이 이 주문이 pending 이 아니게 됐다. 저장된 현재 상태를 그대로 돌려준다(멱등).
         if (!claimed || claimed.length === 0) {
@@ -607,7 +667,7 @@ Deno.serve(async (req) => {
         //   (위 confirm 진입부가 이미 non-pending 을 단락시키지만, 동시성으로 그사이 바뀐 경우까지 막는다.)
         await admin
           .from('payments')
-          .update({ status: 'failed', fail_code: res.error.code, fail_message: res.error.message, payment_key: paymentKey, updated_at: new Date().toISOString() })
+          .update({ status: 'failed', fail_code: res.error.code, fail_message: res.error.message, payment_key: paymentKey, window_open: false, updated_at: new Date().toISOString() })
           .eq('id', row.id)
           // 여기까지 왔으면 이 주문은 위에서 'confirming' 으로 선점돼 있다 — 실패로 접으면서 잠금도 푼다.
           .in('status', ['pending', 'confirming'])
@@ -622,26 +682,106 @@ Deno.serve(async (req) => {
         productRef: row.product_ref,
         orderName: row.order_name,
         amount: row.amount,
+        // settle 안에서 중복 결제로 판명돼 자동 환불된 경우(선점은 이겼지만 paid 유니크에 걸린 드문 순서) —
+        // 결과 화면이 '결제 실패' 가 아니라 '이미 구매한 상품 · 환불 처리' 를 그리도록 코드를 같이 보낸다.
+        failCode: out.failCode ?? null,
       })
     }
 
-    // ---------- 환불규정 동의 ----------
-    // 결제창을 열기 **직전에** 프론트가 부른다. 주문 생성 때 받지 않는 이유는 순서 때문이다 —
+    // ---------- 환불규정 동의 + 결제창 열기 직전 관문 ----------
+    // 결제창을 열기 **직전에** 프론트가 부른다(다시 열기 때도 매번). 주문 생성 때 받지 않는 이유는 순서 때문이다 —
     // 주문은 화면에 금액을 띄우려고 진입하자마자 만들어지고, 동의는 그 금액을 본 다음에 한다.
-    // ⚠️ 한 번 찍힌 시각은 덮어쓰지 않는다(재시도해도 최초 동의 시각이 증거다).
+    // ⚠️ 한 번 찍힌 동의 시각은 덮어쓰지 않는다(재시도해도 최초 동의 시각이 증거다).
+    //
+    // ⛔ **여기가 돈이 빠지기 전 마지막 관문이다(2026-09-21).** 엑심베이는 팝업 안에서 청구되므로 팝업이 뜬 뒤엔 우리가
+    //    못 막는다. 결제 화면을 탭 두 개로 열어 주문이 둘 생긴 경우:
+    //      ① 같은 상품 paid 가 이미 있다 → 이 주문을 접고 already_paid(다른 탭에서 방금 샀다)
+    //      ② 같은 상품 confirming 이 있다 → in_progress(다른 탭의 결제가 승인 중 — 곧 paid 가 된다)
+    //      ③ 같은 상품의 결제창이 열려 있다(window_open) → window_open(첫 팝업이 아직 결제 중)
+    //    ③은 select 로 보지 않고 **update 가 payments_window_product_uniq 에 걸리는 것**으로 판정한다 — 두 요청이
+    //    나란히 들어와도 DB 가 하나만 통과시킨다. 죽은 표시(heartbeat 60초 끊김)는 그 앞에서 청소한다.
     if (action === 'agree') {
       const orderId = String(body?.orderId ?? '').trim()
       if (!orderId) return json({ error: '주문번호가 필요합니다.' }, 400)
       const { data } = await admin
         .from('payments')
-        .select('order_id, user_id, status, terms_agreed_at')
+        .select('id, order_id, user_id, status, terms_agreed_at, product_type, product_ref')
         .eq('order_id', orderId)
         .maybeSingle()
-      const row = data as { user_id: string; status: string; terms_agreed_at: string | null } | null
+      const row = data as {
+        id: string
+        user_id: string
+        status: string
+        terms_agreed_at: string | null
+        product_type: string
+        product_ref: string
+      } | null
       if (!row) return json({ error: '주문을 찾을 수 없습니다.' }, 404)
       if (row.user_id !== uid) return json({ error: '권한이 없습니다.' }, 403)
+      // 이 주문이 아직 열려 있나 — 닫힌 주문(paid·failed·refunded…)으로는 팝업을 열지 않는다.
+      if (!OPEN.includes(row.status)) {
+        return json({ error: '이미 처리된 주문입니다. 결제 화면을 다시 열어주세요.', code: 'order_closed', status: row.status }, 409)
+      }
+
+      // ①② 같은 사람·같은 상품의 다른 주문 중 paid / confirming.
+      const { data: others } = await admin
+        .from('payments')
+        .select('id, status')
+        .eq('user_id', uid)
+        .eq('product_type', row.product_type)
+        .eq('product_ref', row.product_ref)
+        .neq('id', row.id)
+        .in('status', ['paid', 'confirming'])
+      const otherRows = (others ?? []) as { id: string; status: string }[]
+      if (otherRows.some((o) => o.status === 'paid')) {
+        // 이 주문은 접는다 — pending 으로 두면 대사가 매번 PG 에 물어본다(confirm 의 중복 접기와 같은 이유).
+        await admin
+          .from('payments')
+          .update({ status: 'failed', fail_code: 'DUPLICATE_PRODUCT', fail_message: '결제창 열기 전 중복 감지', window_open: false, updated_at: new Date().toISOString() })
+          .eq('id', row.id)
+          .in('status', OPEN)
+        return json({ error: '이미 결제가 완료된 상품입니다.', code: 'already_paid', owned: true }, 409)
+      }
+      if (otherRows.some((o) => o.status === 'confirming')) {
+        // 접지 않는다 — 그 승인이 실패로 끝나면 이 주문으로 다시 열 수 있어야 한다.
+        return json({ error: '이 상품의 결제 확인이 진행 중입니다.', code: 'in_progress' }, 409)
+      }
+
+      // ③-a 죽은 결제창 표시 청소 — 같은 상품에 window_open 인데 heartbeat 가 끊긴 지 오래된 다른 주문.
+      //   브라우저가 죽거나 모바일이 백그라운드로 가면 release 가 안 온다. 안 치우면 그 상품이 60초가 아니라 영영 잠긴다.
+      const staleBefore = new Date(Date.now() - WINDOW_STALE_MS).toISOString()
+      await admin
+        .from('payments')
+        .update({ window_open: false, updated_at: new Date().toISOString() })
+        .eq('user_id', uid)
+        .eq('product_type', row.product_type)
+        .eq('product_ref', row.product_ref)
+        .neq('id', row.id)
+        .eq('window_open', true)
+        .or(`window_seen_at.is.null,window_seen_at.lt.${staleBefore}`)
+
+      // ③-b 이 주문의 결제창을 연다. 같은 행을 다시 여는 것(다시 열기)은 유니크와 무관하게 통과한다.
+      const seenAt = new Date().toISOString()
+      const { data: opened, error: openErr } = await admin
+        .from('payments')
+        .update({ window_open: true, window_seen_at: seenAt, updated_at: seenAt })
+        .eq('id', row.id)
+        .in('status', OPEN)
+        .select('id')
+      if (openErr) {
+        // 23505 = payments_window_product_uniq = 같은 상품의 결제창이 다른 주문(다른 탭)에서 살아 있다.
+        if ((openErr as { code?: string }).code === '23505') {
+          return json({ error: '다른 창에서 이 상품의 결제가 진행 중입니다.', code: 'window_open' }, 409)
+        }
+        return json({ error: openErr.message }, 400)
+      }
+      // 0행 = 그 사이 이 주문이 닫혔다(동시 confirm 등).
+      if (!opened || opened.length === 0) {
+        return json({ error: '이미 처리된 주문입니다. 결제 화면을 다시 열어주세요.', code: 'order_closed' }, 409)
+      }
+
       if (row.terms_agreed_at) return json({ ok: true, agreedAt: row.terms_agreed_at })
-      const agreedAt = new Date().toISOString()
+      const agreedAt = seenAt
       const { error } = await admin
         .from('payments')
         .update({ terms_agreed_at: agreedAt })
@@ -649,6 +789,60 @@ Deno.serve(async (req) => {
         .is('terms_agreed_at', null)
       if (error) return json({ error: error.message }, 400)
       return json({ ok: true, agreedAt })
+    }
+
+    // ---------- 결제창 생존 신호 ----------
+    // 결제 화면이 팝업이 열려 있는 동안 20초마다 부른다. window_seen_at 만 갱신한다 — 이 값이 60초 넘게 멈추면
+    // 다음 agree 가 그 표시를 죽은 것으로 보고 치운다(브라우저가 죽어 release 가 못 온 경우의 유일한 회수 경로).
+    if (action === 'heartbeat') {
+      const orderId = String(body?.orderId ?? '').trim()
+      if (!orderId) return json({ error: '주문번호가 필요합니다.' }, 400)
+      await admin
+        .from('payments')
+        .update({ window_seen_at: new Date().toISOString() })
+        .eq('order_id', orderId)
+        .eq('user_id', uid)
+        .eq('window_open', true)
+      return json({ ok: true })
+    }
+
+    // ---------- 결제창 닫힘 ----------
+    // 팝업이 닫힌 것을 화면이 알아챘을 때 · 결제 화면을 떠날 때(pagehide) 부른다. 표시만 내린다 — 주문 상태는 그대로다
+    // (닫았다가 다시 열 수 있어야 하고, 결제가 됐는지는 결과 화면의 confirm 이 PG 에 물어 정한다).
+    if (action === 'release') {
+      const orderId = String(body?.orderId ?? '').trim()
+      if (!orderId) return json({ error: '주문번호가 필요합니다.' }, 400)
+      await admin
+        .from('payments')
+        .update({ window_open: false, updated_at: new Date().toISOString() })
+        .eq('order_id', orderId)
+        .eq('user_id', uid)
+        .eq('window_open', true)
+      return json({ ok: true })
+    }
+
+    // ---------- 결제창에서 취소/실패로 복귀 ----------
+    // 결과 화면이 엑심베이 rescode≠0000 으로 돌아왔을 때 한 번 부른다. 열린 주문(pending·expired)을 failed+USER_CANCEL 로
+    // 접는다 — pending 으로 두면 대사가 30분 뒤 만료로 접을 때까지 PG 에 계속 물어본다.
+    // ⚠️ 나중에 웹훅이 이 주문을 paid 라고 알려오면 settleFromProvider 가 failed→paid 로 올린다(기존 동작 그대로) —
+    //    사용자가 취소한 줄 알았는데 실제로는 승인된 건이 묻히지 않는다.
+    if (action === 'cancel') {
+      const orderId = String(body?.orderId ?? '').trim()
+      if (!orderId) return json({ error: '주문번호가 필요합니다.' }, 400)
+      const { data: canceled } = await admin
+        .from('payments')
+        .update({
+          status: 'failed',
+          fail_code: 'USER_CANCEL',
+          fail_message: '결제창에서 취소/실패로 복귀',
+          window_open: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('order_id', orderId)
+        .eq('user_id', uid)
+        .in('status', OPEN)
+        .select('id')
+      return json({ ok: true, closed: (canceled ?? []).length > 0 })
     }
 
     // ---------- 상태 조회 ----------
@@ -667,6 +861,8 @@ Deno.serve(async (req) => {
         orderName: row.order_name,
         amount: row.amount,
         currency: row.currency,
+        // 결과 화면이 "중복 결제 — 환불 처리" 문구를 가르는 데 쓴다. 그 밖의 실패 코드는 화면에 안 내보낸다(PayResult).
+        failCode: row.fail_code ?? null,
       })
     }
 

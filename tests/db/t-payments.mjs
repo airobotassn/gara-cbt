@@ -532,6 +532,67 @@ rec("paid 유니크가 (user_id, product_type, product_ref) where status='paid'"
   rec('드롭 뒤 옛 결제 행 보존', (await db.query(`select count(*)::int n from payments`)).rows[0].n > 0, true);
 }
 
+// --- (17) 결제창 잠금(2026-09-21 · 20260921130000) — **돈이 빠지기 전에** 같은 상품의 결제창이 둘 열리는 것을 DB 가 막는 자리 ---
+//   엑심베이는 팝업 안에서 청구되므로 paid 유니크·confirming 선점은 전부 돈이 빠진 뒤에만 걸린다. agree 액션이 팝업을 열기
+//   직전에 이 주문을 window_open=true 로 표시하고, 아래 유니크가 (사람 × 상품) 단위로 그 표시를 하나로 제한한다.
+{
+  await db.exec(strip(readFileSync('supabase/migrations/20260921130000_payments_window_open.sql', 'utf8')));
+  const wcols = (await db.query(
+    `select column_name from information_schema.columns where table_name='payments'
+      and column_name in ('window_open','window_seen_at','fail_code')`)).rows.map((r) => r.column_name).sort();
+  rec('window_open · window_seen_at 추가됨(fail_code 는 원래 있음)', wcols.join(','), 'fail_code,window_open,window_seen_at');
+  const wIdx = (await db.query(`select indexdef from pg_indexes where indexname='payments_window_product_uniq'`)).rows[0]?.indexdef ?? '';
+  rec("결제창 유니크가 (user_id, product_type, product_ref) where window_open",
+    /user_id, product_type, product_ref/.test(wIdx) && /WHERE window_open/i.test(wIdx), true);
+
+  const PROD = '00000000-0000-0000-0000-0000000d0001';
+  const OTHER = '00000000-0000-0000-0000-0000000d0002';
+  const mk = (orderId, ref = PROD) => db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status)
+     values ($1, $2, '결제창 잠금', 'ebook', $3, 300, 'pending') returning id`, [U2, orderId, ref]);
+  const idA = (await mk('win-a')).rows[0].id;
+  const idB = (await mk('win-b')).rows[0].id;
+  const idC = (await mk('win-c', OTHER)).rows[0].id;
+  rec('새 주문의 window_open 기본값 false', (await db.query(`select window_open from payments where id=$1`, [idA])).rows[0].window_open, false);
+
+  // agree 가 하는 그 update 그대로 — 첫 탭이 결제창을 연다.
+  await db.query(`update payments set window_open=true, window_seen_at=now() where id=$1 and status in ('pending','expired')`, [idA]);
+  rec('첫 탭 결제창 열기 성공', (await db.query(`select window_open from payments where id=$1`, [idA])).rows[0].window_open, true);
+
+  // 두 번째 탭(다른 주문, 같은 상품)이 열려고 한다 → DB 가 막는다(= 팝업이 뜨기 전에 끊긴다).
+  let blocked = false;
+  try {
+    await db.query(`update payments set window_open=true, window_seen_at=now() where id=$1 and status in ('pending','expired')`, [idB]);
+  } catch (e) { blocked = /unique|duplicate|23505/i.test(String(e?.message ?? '')); }
+  rec('⭐ 같은 사람·같은 상품에 결제창 둘 열기 거부(돈이 빠지기 전에 막힌다)', blocked, true);
+
+  // 같은 주문을 다시 여는 것(다시 열기 버튼)은 유니크와 무관하다 — 자기 자신과는 안 충돌한다.
+  rec('같은 주문 다시 열기 허용', await failsWith(() =>
+    db.query(`update payments set window_open=true, window_seen_at=now() where id=$1`, [idA])), null);
+
+  // 다른 상품은 무관하다.
+  rec('다른 상품의 결제창은 같이 열린다', await failsWith(() =>
+    db.query(`update payments set window_open=true, window_seen_at=now() where id=$1`, [idC])), null);
+
+  // 첫 탭이 닫히면(release · 60초 죽은 표시 청소 · 상태 종결) 다음 주문이 열린다.
+  await db.query(`update payments set window_open=false where id=$1`, [idA]);
+  rec('표시를 내리면 다음 주문이 결제창을 열 수 있다', await failsWith(() =>
+    db.query(`update payments set window_open=true, window_seen_at=now() where id=$1 and status in ('pending','expired')`, [idB])), null);
+  rec('두 번째 주문 결제창 열림', (await db.query(`select window_open from payments where id=$1`, [idB])).rows[0].window_open, true);
+
+  // 다른 사람은 같은 상품의 결제창을 당연히 열 수 있다.
+  const idU1 = (await db.query(
+    `insert into payments (user_id, order_id, order_name, product_type, product_ref, amount, status)
+     values ($1, 'win-u1', '결제창 잠금', 'ebook', $2, 300, 'pending') returning id`, [U1, PROD])).rows[0].id;
+  rec('다른 사용자의 결제창은 무관', await failsWith(() =>
+    db.query(`update payments set window_open=true, window_seen_at=now() where id=$1`, [idU1])), null);
+
+  // 종결(confirming 선점·failed 접기)이 표시를 같이 내리는 갱신 — 코드가 늘 붙이는 window_open:false 와 같은 모양.
+  await db.query(`update payments set status='confirming', window_open=false where id=$1 and status in ('pending','expired')`, [idB]);
+  const b = (await db.query(`select status, window_open from payments where id=$1`, [idB])).rows[0];
+  rec('선점(confirming)이 결제창 표시를 내린다', `${b.status}/${b.window_open}`, 'confirming/false');
+}
+
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${JSON.stringify(x.got)} want=${JSON.stringify(x.want)})`);
 const failed = results.filter((x) => !x.pass).length;
 console.log(`\nT-PAYMENTS: ${results.length - failed}/${results.length} passed`);

@@ -53,6 +53,8 @@ export interface PaymentStatusResp {
   orderName?: string
   amount?: number
   currency?: string
+  /** failed·refunded 일 때 사유 코드. DUPLICATE_CHARGED = 같은 상품을 두 번 산 두 번째 결제(돈은 빠졌고 환불 대상/환불됨). */
+  failCode?: string | null
 }
 
 /**
@@ -96,11 +98,29 @@ export function confirmOrder(args: {
 }
 
 /**
- * 취소·환불 규정 동의를 결제 건에 기록한다. **결제창을 열기 직전에** 부른다.
+ * 취소·환불 규정 동의를 결제 건에 기록하고 **결제창을 열어도 되는지** 서버가 판정한다. 결제창을 열기 직전에,
+ * 다시 열 때도 매번 부른다. 엑심베이는 팝업 안에서 돈이 빠지므로 여기가 돈이 빠지기 전 마지막 관문이다(2026-09-21).
+ * 거절이면 `FunctionError.code` 로 온다 — already_paid(다른 탭에서 방금 삼) · in_progress(다른 탭의 승인이 도는 중) ·
+ * window_open(다른 창의 결제창이 살아 있음) · order_closed(이 주문은 닫힘). 그때 팝업을 열면 안 된다.
  * ⚠️ 실패하면 결제창을 열지 말 것 — 동의 기록 없이 돈만 빠지면 그 건은 증거가 없다.
  */
 export function agreeTerms(orderId: string) {
   return callFunction<{ ok: true; agreedAt: string }>('payments', { action: 'agree', orderId })
+}
+
+/** 결제창이 아직 열려 있다는 신호. 팝업이 열려 있는 동안 20초마다 — 60초 넘게 끊기면 서버가 그 표시를 죽은 것으로 본다. */
+export function heartbeat(orderId: string) {
+  return callFunction<{ ok: true }>('payments', { action: 'heartbeat', orderId })
+}
+
+/** 결제창 표시를 내린다(팝업이 닫힘 · 화면을 떠남). 주문 상태는 안 바꾼다 — 닫았다가 다시 열 수 있다. */
+export function releaseWindow(orderId: string) {
+  return callFunction<{ ok: true }>('payments', { action: 'release', orderId })
+}
+
+/** 결제창에서 취소/실패로 돌아왔을 때 — 열린 주문을 failed(USER_CANCEL)로 접는다. 나중에 웹훅이 paid 라고 하면 서버가 되살린다. */
+export function cancelOrder(orderId: string) {
+  return callFunction<{ ok: true; closed: boolean }>('payments', { action: 'cancel', orderId })
 }
 
 export function orderStatus(orderId: string) {
