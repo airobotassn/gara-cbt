@@ -2479,8 +2479,7 @@ async function cbtAnalytics(admin: any) {
   const days: string[] = []
   for (let i = 89; i >= 0; i--) days.push(new Date(now - i * 864e5).toISOString().slice(0, 10))
 
-  const [profRes, attRes, ansRes, qRes, examRes, roundRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, signups7dCnt, qTot, qAct, pendGradeCnt] = await Promise.all([
-    admin.from('profiles').select('created_at, is_anonymous').limit(10000),
+  const [attRes, ansRes, qRes, examRes, roundRes, usersCnt, guestsCnt, attsCnt, atts7dCnt, signups7dCnt, qTot, qAct, pendGradeCnt] = await Promise.all([
     admin.from('exam_attempts').select('id, exam_id, round_id, status, started_at, submitted_at, total_correct, total_questions, result_release_at, exam_certificates(first_issued_at)').limit(10000),
     admin.from('attempt_answers').select('attempt_id, question_id, is_correct').limit(50000),
     admin.from('questions').select('id, bank_id, number, subject, prompt, active, difficulty').is('deleted_at', null).limit(5000),
@@ -2497,7 +2496,6 @@ async function cbtAnalytics(admin: any) {
     admin.from('attempt_answers').select('id, questions!inner(kind), exam_attempts!inner(status)', { count: 'exact', head: true }).eq('questions.kind', 'short').eq('review_status', 'pending').eq('exam_attempts.status', 'submitted'),
   ])
 
-  const profs = profRes.data ?? []
   const allAtts = attRes.data ?? []
   const atts = allAtts.filter((a: any) => a.status === 'submitted')
   const ans = ansRes.data ?? []
@@ -2510,16 +2508,10 @@ async function cbtAnalytics(admin: any) {
   // 채점 완료 판정(합격컷 60) 헬퍼
   const pctOf = (a: any) => (a.total_questions && a.total_correct != null ? Math.round((a.total_correct / a.total_questions) * 100) : null)
 
-  // 추이(90일): 가입 · 제출 · 인증서 발급
-  const signupByDay: Record<string, number> = {}
+  // 추이(90일): 제출 · 인증서 발급. ⚠️ '가입 추이' 는 자격검정 것이 아니라(사이트 전체 가입) 회원 통계로 갔다(2026-09-22).
   const submitByDay: Record<string, number> = {}
   const certByDay: Record<string, number> = {}
-  days.forEach((d) => { signupByDay[d] = 0; submitByDay[d] = 0; certByDay[d] = 0 })
-  for (const p of profs as any[]) {
-    if (p.is_anonymous) continue // 가입 추이 = 가입 회원(비익명)만 — 게스트·CARIS ARENA 익명 세션 제외(누적 회원 KPI와 동일 기준)
-    const k = (p.created_at ?? '').slice(0, 10)
-    if (k in signupByDay && p.created_at >= since90) signupByDay[k]++
-  }
+  days.forEach((d) => { submitByDay[d] = 0; certByDay[d] = 0 })
   for (const a of atts as any[]) {
     // ⚠️ 폴백이 started_at 이다 — 응시의 created_at 은 2026-09-04 에 뺐다(started_at 과 늘 같은 값이었다).
     const k = (a.submitted_at ?? a.started_at ?? '').slice(0, 10)
@@ -2710,7 +2702,7 @@ async function cbtAnalytics(admin: any) {
 
   return json({
     overview: {
-      users: usersCnt.count ?? profs.length,
+      users: usersCnt.count ?? 0,
       guests: guestsCnt.count ?? 0,
       attemptsAll: attsCnt.count ?? atts.length,
       attempts7d: atts7dCnt.count ?? 0,
@@ -2727,7 +2719,6 @@ async function cbtAnalytics(admin: any) {
       nextExamDate,
     },
     days,
-    signupByDay,
     submitByDay,
     certByDay,
     scoreBands,

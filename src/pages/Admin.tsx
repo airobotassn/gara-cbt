@@ -5706,12 +5706,11 @@ function DashboardBody({ a, sold, go }: {
         ))}
       </div>
 
-      {/* 추이 */}
+      {/* 추이 — 자격검정 것만. '가입 추이' 는 사이트 전체 가입이라 회원 통계에 있고 여기선 뺐다(2026-09-22 지시). */}
       <div className="admin-grid2">
-        <TrendChart title="가입 추이" days={a.days} map={a.signupByDay} color="var(--k-blue)" />
         <TrendChart title="응시(제출) 추이" days={a.days} map={a.submitByDay} color="var(--k-violet)" />
+        {a.certByDay && <TrendChart title="인증서 발급 추이" days={a.days} map={a.certByDay} color="var(--k-green)" />}
       </div>
-      {a.certByDay && <TrendChart title="인증서 발급 추이" days={a.days} map={a.certByDay} color="var(--k-green)" />}
 
       {/* 급수별 분석 (/guide 자격 체계 기준 · 서버 실집계) */}
       <TierAnalysis tiers={a.tiers ?? []} />

@@ -425,7 +425,6 @@ export interface CbtAnalytics {
     nextExamDate?: string | null
   }
   days: string[]
-  signupByDay: Record<string, number>
   submitByDay: Record<string, number>
   certByDay?: Record<string, number>
   scoreBands: Record<string, number>
