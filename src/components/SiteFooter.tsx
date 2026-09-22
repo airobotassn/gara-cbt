@@ -39,6 +39,9 @@ export default function SiteFooter() {
     //       실제로 자라는 건 푸터가 속한 페이지 컨테이너라 그걸 관찰한다.
     const ro = new ResizeObserver(onScroll)
     ro.observe(el.parentElement ?? document.body)
+    // 푸터 자신도 본다 — 사업자 정보가 늦게 도착해 푸터가 커질 때, 부모가 flex 로 높이를 고정한 화면(메인의
+    // 임시 '첫 화면에 푸터' 배치)에서는 부모 크기가 안 변해 위 관찰만으로는 FAB 이 푸터 위에 얹힌 채 굳는다.
+    ro.observe(el)
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)

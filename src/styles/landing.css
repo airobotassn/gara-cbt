@@ -29,6 +29,23 @@ html.lp-noscrollbar::-webkit-scrollbar {
   padding: var(--pad-y) var(--pad-x);
   background: #000208; /* 우주. 지구본이 덮지만 로드 전 깜빡임 방지 */
 }
+/* ── 임시: 첫 화면에 푸터까지 (2026-09-22 지시 — 엑심베이 심사 동안만) ──
+   래퍼를 세로 flex 로 세워 히어로가 "화면 높이 − 푸터 높이" 만 차지하게 한다. 푸터 높이는 안 재고 flex 가 나눈다.
+   지구본은 .lp 상자 높이 비율로 그려지므로 그만큼 조금 작아질 뿐 구도는 같다.
+   ⚠️ 심사 끝나면 이 블록과 Landing.tsx 의 `lp-footer-inview` 클래스를 같이 지울 것. */
+.lp-footer-inview {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.lp-footer-inview .lp {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+.lp-footer-inview > footer {
+  flex: none;
+}
+
 /* 모바일만: 문구·검색창·버튼 스택을 위로 5vh 올린다(2026-09-16 지시 — 지구와 같이 올라가야 한다).
    아래 여백을 10vh 더 주면 flex 가운데 정렬의 중심이 그 절반만큼 위로 간다.
    ⚠️ RankGlobe.tsx 의 `CFG.posyNarrow`(지구 세로 위치)와 한 쌍 — 지구를 더 올리면 여기도 같이. */

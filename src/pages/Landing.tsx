@@ -135,7 +135,10 @@ export default function Landing() {
     //   글자색·버튼색·크기는 손대지 않았다 — 지금 다크 모드에서 보이는 그대로다.
     //   ⚠️ force-dark 를 .lp 가 아니라 바깥 겹에 두는 이유 = 아래 <SiteFooter> 까지 같이 덮기 위해서다.
     //      토큰만 갈아끼우는 클래스라(레이아웃 없음) 위치를 올려도 .lp 안 모양은 그대로다.
-    <div className="force-dark">
+    // lp-footer-inview: **임시**(2026-09-22 지시 — 엑심베이 심사 동안만). 히어로를 "화면 높이 − 푸터 높이" 로 줄여
+    //   첫 화면 맨 아래에 사업자 정보 푸터가 스크롤 없이 보이게 한다(landing.css 의 같은 이름 블록).
+    //   심사가 끝나면 이 클래스와 CSS 블록을 지우면 원래(히어로 한 화면 + 스크롤 아래 푸터)로 돌아간다.
+    <div className="force-dark lp-footer-inview">
       {/* 히어로는 딱 한 화면(min-height:100vh). 푸터는 그 **바깥 형제**라 처음 뜨는 화면은
           예전과 픽셀이 같고, 스크롤을 내려야 나온다.
           ⚠️ .lp 안에 넣으면 안 된다 — .lp 의 overflow:hidden(지구본 클리핑용)에 잘려 영영 안 보인다. */}
