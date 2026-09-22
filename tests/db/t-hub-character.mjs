@@ -1,6 +1,6 @@
 // T-Hub-Character — 캐릭터 선택 · 꾸미기 장착 · 튜토리얼 RPC 를 pglite(WASM Postgres 18)에서 검증.
 //   대상 = 20260820120000_hub_character_skin.sql 의 hub_choose_character · hub_equip · hub_tutorial_done
-//          + 같은 파일이 갈아끼운 admin_reset_onboarding.
+//          + 20260922120000 이 내린 admin_reset_onboarding(없어졌는지).
 //
 // 이 스위트가 지키는 것 — 전부 "틀렸을 때 조용히 손해가 나는" 자리다:
 //   1) 첫 선택은 **한 번뿐**이고 무료다. chosen_at 이 그 표시고, 갈아입어도 밀리지 않는다.
@@ -11,12 +11,11 @@
 //   4) equip 은 equipped jsonb 의 **한 키만** 갱신한다(통째로 덮으면 다른 종류가 지워진다).
 //   5) 종류가 맞아야 한다 — 스킨 자리에 가구를 꽂을 수 없다.
 //   6) 튜토리얼 완료 시각은 처음 값을 지킨다(멱등).
-//   7) 관리자 초기화는 캐릭터·튜토리얼을 비우되 **소유(user_cosmetics)는 건드리지 않는다**.
+//   7) 관리자 '첫 진입 상태로 초기화' 는 없앴다(2026-09-22) — RPC 가 DB 에 남아 있으면 안 된다.
 //
 // ⚠️ auth 스키마가 pglite 에 없으므로 `references auth.users(id) [on delete cascade]` 만 제거(하네스 strip).
-// ⚠️ profiles·set_config 트리거가 없는 최소 모형이라 admin_reset_onboarding 은 GUC 만 흉내 낸다.
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const db = await PGlite.create();
 const raw = (sql) => db.exec(sql);
@@ -47,7 +46,7 @@ await raw(strip(readFileSync('supabase/migrations/20260714000400_phase2_characte
 //      그 제거는 t-drop-gacha.mjs 가 본다. 여기서는 상점 테이블만 있으면 된다.
 await raw(readFileSync('supabase/migrations/20260714000500_gacha_shop.sql', 'utf8'));
 
-// ---- profiles 최소 모형 — admin_reset_onboarding 이 만지는 컬럼만 ----
+// ---- profiles 최소 모형 ----
 await raw(`
   create table profiles (
     id uuid primary key,
@@ -62,9 +61,6 @@ await raw(`
 `);
 
 // ---- 검증 대상 마이그레이션 ----
-// admin_reset_onboarding 은 이 파일이 `create or replace` 로 갈아끼운다 → 원본을 먼저 깔아야
-// "반환형을 안 바꿨다"까지 같이 검증된다(바꿨으면 여기서 터진다).
-await raw(readFileSync('supabase/migrations/20260819170000_admin_reset_onboarding.sql', 'utf8'));
 await raw(readFileSync('supabase/migrations/20260820120000_hub_character_skin.sql', 'utf8'));
 // 캐릭터 값 매기기(500) + 첫 선택 자격을 값에서 '판매 중'으로 옮긴 판. 원본을 먼저 깔아야
 // `create or replace` 가 실제로 갈아끼우는지까지 같이 검증된다.
@@ -237,26 +233,17 @@ const wRow = (await q(`select tutorial_done_at is not null d from user_character
 ok('5c 장착 행이 없던 사람도 완료 처리된다', wRow?.d === true, wRow);
 
 // ============================================================
-// 6) 관리자 초기화 — 캐릭터·튜토리얼은 비우고, **소유는 지키고**
+// 6) '첫 진입 상태로 초기화' 는 없앴다(2026-09-22) — 20260820120000 §4 가 만든 RPC 를 20260922120000 이 내린다
 // ============================================================
-const ownedBefore = (await q(`select part_key from user_cosmetics where user_id=$1 order by part_key`, [U])).rows.map((r) => r.part_key);
-await q(`select admin_reset_onboarding($1)`, [U]);
-const after = (await q(`select base_key, chosen_at, tutorial_done_at from user_characters where user_id=$1`, [U])).rows[0];
-eq('6a 캐릭터가 미선택으로 돌아간다', after.base_key, 'default');
-ok('6b chosen_at 이 비워진다(첫 선택 무료 부활)', after.chosen_at === null, after.chosen_at);
-ok('6c tutorial_done_at 이 비워진다', after.tutorial_done_at === null, after.tutorial_done_at);
-const ownedAfter = (await q(`select part_key from user_cosmetics where user_id=$1 order by part_key`, [U])).rows.map((r) => r.part_key);
-eq('6d ⭐ 산 물건은 그대로 남는다(초기화지 몰수가 아니다)', ownedAfter, ownedBefore);
-// 기존 초기화 대상(프로필)도 계속 비워져야 한다 — 갈아끼우면서 흘리지 않았는지.
-const p = (await q(`select nickname_set_at, region_locked_at, country_code, region_code, age_band, region_changed_at, display_name
-                      from profiles where id=$1`, [U])).rows[0];
-ok('6e 프로필 온보딩 값도 그대로 비워진다',
-  p.nickname_set_at === null && p.region_locked_at === null && p.country_code === null &&
-  p.region_code === null && p.age_band === null && p.region_changed_at === null, p);
-eq('6f ⛔ display_name 은 안 건드린다', p.display_name, '홍길동');
-// 초기화 뒤 첫 선택이 실제로 다시 열리는가 — 6b 의 결과가 말이 되는지 끝까지 본다.
-const again = (await q(`select hub_choose_character($1,'char_a_f') as r`, [U])).rows[0].r;
-eqObj('6g ⭐ 초기화 뒤 첫 선택이 다시 열린다', again, { base_key: 'char_a_f', first: true });
+const before6 = (await q(`select count(*)::int n from pg_proc where proname='admin_reset_onboarding'`)).rows[0].n;
+eq('6a 내리기 전엔 RPC 가 있다(20260820120000 §4)', before6, 1);
+await raw(readFileSync('supabase/migrations/20260922120000_drop_admin_reset_onboarding.sql', 'utf8'));
+const after6 = (await q(`select count(*)::int n from pg_proc where proname='admin_reset_onboarding'`)).rows[0].n;
+eq('6b ⭐ 내린 뒤엔 없다', after6, 0);
+// 되살아나지 않았는지 — 이 파일이 깔지 않는 마이그레이션 중 다시 만드는 것이 있으면 여기서 잡힌다.
+const later = readdirSync('supabase/migrations').filter((f) => f > '20260922120000' && f.endsWith('.sql'))
+  .filter((f) => /create\s+(or\s+replace\s+)?function\s+(public\.)?admin_reset_onboarding/i.test(readFileSync(`supabase/migrations/${f}`, 'utf8')));
+eq('6c ⛔ 그 뒤 마이그레이션이 다시 만들지 않는다', later, []);
 
 // ---- 결과 출력 ----
 for (const x of results) console.log(`${x.pass ? 'PASS' : 'FAIL'} | ${x.name} (got=${x.got} want=${x.want})`);

@@ -79,7 +79,6 @@ await raw(strip(readFileSync('supabase/migrations/20260721030000_ranking_season_
 await raw(readFileSync('supabase/migrations/20260721050000_reset_season_fn.sql', 'utf8'));
 // hub_choose_character 원본 → 값 매기기 판 → 이번 판. 순서대로 깔아야 `create or replace` 가
 // 실제로 갈아끼우는지까지 같이 검증된다.
-await raw(strip(readFileSync('supabase/migrations/20260819170000_admin_reset_onboarding.sql', 'utf8')));
 await raw(readFileSync('supabase/migrations/20260820120000_hub_character_skin.sql', 'utf8'));
 await raw(readFileSync('supabase/migrations/20260824120000_hub_character_price.sql', 'utf8'));
 
