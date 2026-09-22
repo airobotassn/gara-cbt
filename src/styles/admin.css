@@ -403,7 +403,9 @@
 .admin-mini.danger:hover { border-color: var(--danger-fg); background: color-mix(in srgb, var(--danger-fg) 8%, var(--bg)); }
 .admin-table tr.off > td { opacity: 0.5; }
 /* 꾸미기 관리 › 배경 표의 소제목 줄 — 허브 꾸미기의 묶음(기본·고궁·…)과 그 안의 대륙. 표 하나에 줄로 끼워야 열이 안 흔들린다. */
-.admin-table tr.admin-group-row > td { background: var(--soft); font-weight: 800; padding-top: 14px; }
+.admin-table tr.admin-group-row > td { background: var(--soft); font-weight: 800; padding-top: 14px; cursor: pointer; user-select: none; }
+.admin-group-caret { display: inline-block; width: 1.1em; color: var(--dim); }
+.admin-group-n { margin-left: 8px; font-weight: 600; color: var(--dim); }
 .admin-table tr.admin-group-sub > td { font-weight: 700; color: var(--dim); padding-left: 26px; }
 .admin-table tbody tr.admin-group-row:hover, .admin-table tbody tr.admin-group-sub:hover { background: inherit; }
 /* 문항 이력 */

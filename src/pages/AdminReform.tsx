@@ -3511,6 +3511,10 @@ export function HubCosmeticAdmin() {
   const [owners, setOwners] = useState<string | null>(null)   // 보유자 목록을 연 품목 키
   const [charView, setCharView] = useState<string | null>(null) // 레벨별로 펼쳐 본 캐릭터 키
   const [skinView, setSkinView] = useState<string | null>(null) // 크게 펼쳐 본 배경 스킨 키
+  // 배경 묶음은 소제목을 눌러 접고 편다. **처음엔 전부 접힘**(2026-09-22 지시) — 70장을 다 펼치면 표가 화면 몇 장이다.
+  const [openCats, setOpenCats] = useState<Set<SkinCategory>>(() => new Set())
+  const toggleCat = (c: SkinCategory) =>
+    setOpenCats((prev) => { const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n })
 
   const patch = (key: string, p: Partial<CosmeticRow>) =>
     setRows((prev) => (prev ? prev.map((r) => (r.part_key === key ? { ...r, ...p } : r)) : prev))
@@ -3597,16 +3601,25 @@ export function HubCosmeticAdmin() {
               <th style={{ width: 150 }}>보유 / 착용</th>
             </tr>
           </thead>
-          {secs.map((sec, si) => (
+          {secs.map((sec, si) => {
+            const open = !sec.cat || openCats.has(sec.cat)
+            return (
             <tbody key={`${sec.cat ?? ''}/${sec.region ?? ''}`}>
-              {/* 묶음 소제목은 배경에만 선다. 같은 묶음이 대륙으로 더 나뉘면 묶음 줄은 첫 대륙 앞에 한 번만. */}
+              {/* 묶음 소제목은 배경에만 선다. 같은 묶음이 대륙으로 더 나뉘면 묶음 줄은 첫 대륙 앞에 한 번만.
+                  줄 자체가 여닫는 버튼이다 — 접힌 동안 그 묶음의 장수만 남긴다. */}
               {sec.cat && (si === 0 || secs[si - 1].cat !== sec.cat) && (
-                <tr className="admin-group-row"><td colSpan={5}>{t(`hub.closet.cat_${sec.cat}`)}</td></tr>
+                <tr className={`admin-group-row${open ? ' open' : ''}`} onClick={() => toggleCat(sec.cat!)}>
+                  <td colSpan={5}>
+                    <span className="admin-group-caret">{open ? '▾' : '▸'}</span>
+                    {t(`hub.closet.cat_${sec.cat}`)}
+                    <span className="admin-group-n">{secs.filter((x) => x.cat === sec.cat).reduce((n, x) => n + x.items.length, 0)}</span>
+                  </td>
+                </tr>
               )}
-              {sec.region && (
+              {open && sec.region && (
                 <tr className="admin-group-sub"><td colSpan={5}>{t(`hub.closet.reg_${sec.region}`)}</td></tr>
               )}
-              {sec.items.map((r, i) => (
+              {open && sec.items.map((r, i) => (
                 <tr key={r.part_key}>
                   {/* ⛔ 키(`char_c_f`)를 글자로 내보내지 말 것(2026-08-31 지시) — 보는 사람에게 아무 뜻이 없다.
                       그림과 이름이 그 자리를 대신하고, 키는 title 로만 남긴다(장애 신고 때 쓴다). */}
@@ -3661,7 +3674,8 @@ export function HubCosmeticAdmin() {
                 </tr>
               ))}
             </tbody>
-          ))}
+            )
+          })}
         </table>
       </div>
     )
