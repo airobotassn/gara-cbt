@@ -15,6 +15,7 @@ import { MAX_LEVEL } from '../lib/categories'
 import { useT } from '../lib/i18n'
 // 이름·그림은 허브가 쓰는 것을 그대로 쓴다 — 관리자용 표를 따로 두면 같은 물건이 두 이름으로 뜬다.
 import { SKINS, skinThumb, DEFAULT_SKIN_PART } from '../lib/hubCosmetics'
+import { MAIL_TEMPLATES, mailTemplate } from '../lib/mailTemplates'
 
 // ── 공용 ──────────────────────────────────────────────────────
 const inp: CSSProperties = {
@@ -2026,7 +2027,7 @@ export function EnvCheckAdmin() {
         <MailComposeModal
           kind="nudge_env_check"
           settingKeys={{ subject: 'mail_nudge_subject', body: 'mail_nudge_body' }}
-          vars={MAIL_VARS}
+          vars={MAIL_VARS()}
           roundId={roundId}
           onClose={() => setCompose(false)}
           onSent={() => { setPicked(new Set()); reload() }}
@@ -2180,18 +2181,8 @@ const SITE_GROUPS: { title: string; note?: string; preview: 'browser' | 'footer'
       { key: 'privacy_officer', label: '개인정보보호책임자', where: '푸터 넷째 줄 · 개인정보처리방침' },
     ],
   },
-  // ⚠️ 메일 **본문**은 여기 없다 — 제목·본문은 각 메일 작성창(시험환경 점검·레벨테스트·응시권)에 있다.
-  //    보낼 대상을 고르는 화면과 보낼 내용을 쓰는 화면이 갈라져 있으면 둘 다 안 쓰게 된다.
-  //    **발신자**만 여기다(2026-09-18) — 세 창이 같은 주소로 보내므로 한 곳에 둔다.
-  {
-    title: '메일 발신자',
-    note: '독려 메일(시험환경 점검·레벨테스트·응시권)이 이 이름·주소로 나갑니다. 주소는 발송 서비스에 인증된 도메인이어야 합니다.',
-    preview: 'mail',
-    keys: [
-      { key: 'sender_name', label: '보내는 사람 이름', where: '받는 사람의 메일함에 보이는 이름' },
-      { key: 'sender_email', label: '보내는 주소', where: '예: noreply@우리도메인 — 답장도 이 주소로 온다' },
-    ],
-  },
+  // ⚠️ 메일은 여기 없다 — 발신자·제목·본문 전부 **홈페이지 관리 › 메일 관리**(MailAdmin)다(2026-09-22 지시).
+  //    9/18 엔 발신자만 여기 있었는데 문구 기본값을 고칠 화면이 없어서 메일 것을 한 탭에 모았다.
   {
     title: '운영 값',
     note: '지금까지 코드에 박혀 있어 바꾸려면 배포가 필요했던 값들입니다.',
@@ -2251,10 +2242,8 @@ function ImageField({ value, onChange, hint, dir = 'site' }: { value: string; on
 }
 
 // 치환자 — 메일 본문에 쓰면 사람마다 값이 채워진다. 목록을 화면에 보여줘야 관리자가 쓸 수 있다.
-const MAIL_VARS: [string, string][] = [
-  ['{name}', '응시자 이름'], ['{round}', '회차명'], ['{tier}', '급수'],
-  ['{examDate}', '시험일'], ['{link}', '응시 안내 주소'],
-]
+// 치환자 표의 단일 출처는 MAIL_TEMPLATES 다(메일 관리 화면과 메일 창이 같이 쓴다). 아래에 선언되므로 쓰는 자리에서 부른다.
+const MAIL_VARS = () => mailTemplate('nudge_env_check').vars
 
 /** 입력한 값이 실제로 어떻게 보이는지 — 글로만 적어두면 감이 안 온다. */
 function SitePreview({ kind, v }: { kind: 'browser' | 'footer' | 'mail'; v: Record<string, string> }) {
@@ -2320,9 +2309,130 @@ function SitePreview({ kind, v }: { kind: 'browser' | 'footer' | 'mail'; v: Reco
         </div>
       </div>
       <p className="admin-hint" style={{ margin: '10px 0 0', lineHeight: 1.7 }}>
-        본문에 쓸 수 있는 치환자: {MAIL_VARS.map(([k, d]) => `${k} ${d}`).join(' · ')}
+        본문에 쓸 수 있는 치환자: {MAIL_VARS().map(([k, d]) => `${k} ${d}`).join(' · ')}
       </p>
     </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// 홈페이지 관리 > 메일 관리 (2026-09-22 지시)
+// ══════════════════════════════════════════════════════════════
+// 독려 메일 세 벌의 **기본 문구**(제목·본문)와 **보내는 사람**을 고치는 자리. 각 메일 창은 보낼 때 여기 저장된 값을
+// 불러와 시작하고, 창에서 고친 건 그 한 번뿐이다 — 기본값을 바꾸는 곳은 여기 하나다.
+//   ⚠️ 치환자 목록·미리보기 값은 메일 창과 **같은 표**(`lib/mailTemplates.ts` 의 MAIL_TEMPLATES)를 쓴다 — 두 벌이면 한쪽만 늘어난다.
+//   ⚠️ 저장 = site_settings 의 `mail_*_subject/body`·`sender_*` 키. 사이트 정보 화면과 같은 저장 액션.
+//   ⚠️ 입력값은 "저장된 값 위에 얹은 수정분"(edits)으로 든다 — 목록이 도착하면 그대로 보이고, 고친 칸만 dirty 다.
+function MailSaveBtn({ n, name, saving, onClick }: { n: number; name: string; saving: string; onClick: () => void }) {
+  return (
+    <button className="btn-ink" onClick={onClick} disabled={!n || !!saving}>
+      {saving === name ? '저장 중…' : n ? `변경한 ${n}개 저장` : '변경 없음'}
+    </button>
+  )
+}
+export function MailAdmin() {
+  const { data, loading, err, reload } = useAdminData<{ settings: Record<string, string> }>('siteSettings')
+  const [edits, setEdits] = useState<Record<string, string>>({})
+  const saved = data?.settings ?? {}
+  const form: Record<string, string> = { ...saved, ...edits }
+  const draft = useDraft({ kind: 'mail-settings', value: edits, title: '메일 관리', enabled: !!data })
+  const [msg, setMsg] = useState('')
+
+  const dirty = Object.keys(edits).filter((k) => (edits[k] ?? '') !== (saved[k] ?? ''))
+  const set = (k: string, v: string) => setEdits((e) => ({ ...e, [k]: v }))
+  const dirtyIn = (keys: string[]) => keys.filter((k) => dirty.includes(k)).length
+
+  // 저장은 카드마다 — 어디까지가 이번에 저장되는지 보이게(사이트 정보와 같은 이유).
+  const [savingKey, setSavingKey] = useState('')
+  async function saveKeys(keys: string[], name: string) {
+    const changed = keys.filter((k) => dirty.includes(k))
+    if (!changed.length) return
+    setSavingKey(name); setMsg('')
+    try {
+      const patch: Record<string, string> = {}
+      for (const k of changed) patch[k] = form[k]
+      await callFunction('admin', { action: 'siteSettingsSave', settings: patch })
+      setMsg(`✅ ${name} 저장했습니다`)
+      // 저장된 칸은 수정분에서 뺀다 — 다시 받은 값이 그대로 보이게.
+      setEdits((e) => { const n = { ...e }; for (const k of changed) delete n[k]; return n })
+      draft.clear()
+      await reload()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '저장 실패')
+    } finally { setSavingKey('') }
+  }
+  const senderName = (form.sender_name ?? '').replace(/["<>]/g, '')
+  const senderLine = form.sender_email ? (senderName ? `${senderName} <${form.sender_email}>` : form.sender_email) : '(주소 없음 — 이대로면 못 보냅니다)'
+
+  return (
+    <>
+      <AdminHead title="메일 관리" onReload={reload} loading={loading}>
+        {msg && <span className="admin-msg">{msg}</span>}
+        <DraftBar status={draft.status} savedAt={draft.savedAt} drafts={draft.drafts} onRefresh={draft.refresh}
+          onRestore={(p: Record<string, string>) => setEdits(p)} />
+      </AdminHead>
+      <ErrBox msg={err} />
+      <p className="admin-hint" style={{ marginBottom: 14, lineHeight: 1.7 }}>
+        독려 메일이 나갈 때 쓰는 <b>기본 문구</b>입니다. 각 메일 창은 여기 저장된 제목·본문으로 시작하고, 창에서 고친 건 그 한 번만 적용됩니다.
+      </p>
+
+      {/* 보내는 사람 — 세 메일이 같은 주소로 나간다. */}
+      <div className="admin-section">
+        <div className="admin-section-head">
+          <h3>보내는 사람</h3>
+          <MailSaveBtn n={dirtyIn(['sender_name', 'sender_email'])} name="보내는 사람" saving={savingKey} onClick={() => saveKeys(['sender_name', 'sender_email'], '보내는 사람')} />
+        </div>
+        <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12, lineHeight: 1.7 }}>
+          주소는 발송 서비스에 인증된 도메인(garacaris.com)의 것이어야 합니다. 받는 사람 메일함에는 <b>{senderLine}</b> 으로 보입니다.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px) minmax(240px, 420px)', gap: 12 }}>
+          <label style={fld}>이름
+            <input style={inp} value={form.sender_name ?? ''} onChange={(e) => set('sender_name', e.target.value)} placeholder="CARIS" />
+          </label>
+          <label style={fld}>주소
+            <input style={inp} value={form.sender_email ?? ''} onChange={(e) => set('sender_email', e.target.value)} placeholder="noreply@garacaris.com" />
+          </label>
+        </div>
+      </div>
+
+      {MAIL_TEMPLATES.map((t) => {
+        const subject = form[t.subjectKey] ?? ''
+        const body = form[t.bodyKey] ?? ''
+        const sample: Record<string, string> = { '{name}': '홍길동', ...t.sample }
+        const fill = (s: string) => Object.entries(sample).reduce((acc, [k, v]) => acc.split(k).join(v), s ?? '')
+        const keys = [t.subjectKey, t.bodyKey]
+        return (
+          <div key={t.kind} className="admin-section">
+            <div className="admin-section-head">
+              <h3>{t.title} <span className="admin-hint">{t.where}</span></h3>
+              <MailSaveBtn n={dirtyIn(keys)} name={t.title} saving={savingKey} onClick={() => saveKeys(keys, t.title)} />
+            </div>
+            <p className="admin-hint" style={{ marginTop: -6, marginBottom: 12, lineHeight: 1.7 }}>
+              {t.ad ? '광고성 메일이라 광고 수신에 동의한 회원에게만 나갑니다.' : '본인이 접수한 시험에 대한 안내라 접수자 전원에게 나갑니다.'}
+              {' '}치환자: {t.vars.map(([k, d]) => `${k} ${d}`).join(' · ')} — 사람마다 값이 채워집니다.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(300px, 1fr)', gap: 18, alignItems: 'start' }}>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <label style={fld}>제목
+                  <input style={inp} value={subject} onChange={(e) => set(t.subjectKey, e.target.value)} />
+                </label>
+                <label style={fld}>본문
+                  <textarea style={{ ...inp, minHeight: 240, fontFamily: 'inherit', lineHeight: 1.7 }} value={body} onChange={(e) => set(t.bodyKey, e.target.value)} />
+                </label>
+              </div>
+              <div style={{ border: '1px solid var(--line2)', borderRadius: 10, padding: 14, background: 'var(--soft)' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginBottom: 8 }}>받는 사람에게 이렇게 갑니다</div>
+                <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14 }}>
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>보낸사람 <b style={{ color: 'var(--ink)' }}>{senderLine}</b></div>
+                  <div style={{ fontWeight: 700, margin: '8px 0 10px' }}>{fill(subject) || '(제목 없음)'}</div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.8, color: 'var(--muted)' }}>{fill(body) || '(본문 없음 — 이대로면 빈 메일이 나갑니다)'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </>
   )
 }
 

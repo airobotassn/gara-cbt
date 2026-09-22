@@ -13,6 +13,7 @@ import { runTranslation, type TransItem, type TransResult } from '../lib/adminTr
 import { useDraft } from '../lib/adminDraft'
 import DraftBar from '../components/DraftBar'
 import { MailComposeModal, type MailTarget } from './AdminReform'
+import { mailTemplate } from '../lib/mailTemplates'
 
 const LANGS = ['en', 'ja', 'zh', 'hi', 'vi'] as const
 const LANG_LABEL: Record<string, string> = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', hi: '힌디어', vi: '베트남어' }
@@ -728,7 +729,7 @@ function AttemptsTab() {
 //   ⛔ 레벨 UP 독려는 **광고성**이라 광고 수신 동의자에게만 보낸다(2026-09-22 결정). 미동의자는 체크박스를 잠근다 —
 //      버튼을 죽이는 방식은 관리자가 누가 문제인지 줄을 훑어야 해서 안 쓴다. 서버도 한 번 더 거른다(mailNudge).
 interface NudgePerson { userId: string; name: string | null; email: string | null; rank: number; lastAt: string; daysSince: number; attempts: number; lastMailAt: string | null; marketing: boolean }
-const LEVEL_MAIL_VARS: [string, string][] = [['{name}', '이름'], ['{level}', '현재 레벨등급'], ['{link}', '레벨테스트 주소']]
+const LEVEL_MAIL_VARS = mailTemplate('nudge_leveltest').vars
 function PeopleTab() {
   const [days, setDays] = useState(0)
   const [applied, setApplied] = useState(0)

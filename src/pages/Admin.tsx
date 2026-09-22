@@ -61,7 +61,7 @@ import {
   CertAdmin, LecturesAdmin, QnaAdmin, PolicyAdmin, SiteInfoAdmin, PopupAdmin, AdminHead, EnvCheckAdmin,
   ReadCell, MemberStats, RevenueStats,
   VisitPeriodStats, VisitEnvStats, VisitSourceStats, VisitIpStats, VisitLogAdmin,
-  MailComposeModal, MailAdmin, mailTemplate, type MailTarget,
+  MailComposeModal, MailAdmin, type MailTarget,
   // 문의 분류 이름표는 Q&A 화면과 **한 벌**이다 — 여기서 또 만들면 같은 문의가 두 이름으로 뜬다.
   INQ_CAT, type InquiryRow,
 } from './AdminReform'
@@ -74,6 +74,7 @@ import { REGIONS, countryName, flagEmoji, flagUrl } from '../lib/regions'
 // 지역 이름은 지도 파일에서 온다 — 관리자에서 이름표를 새로 만들지 않는다(regionCatalog 머리 주석).
 import { loadRegions } from '../lib/regionCatalog'
 import { charArtName } from '../lib/hubCosmetics'
+import { mailTemplate } from '../lib/mailTemplates'
 import { gradeDisplay, certExpiryDate, fmtCertDate } from '../lib/certNo'
 import { optimizeEbookHtml, optimizeSummary } from '../lib/ebookOptimize'
 // ⚠️ 별칭이 필요하다 — 이 파일 안에 이북 본문 번역용 `runTranslation`(다른 시그니처)이 이미 있다.
